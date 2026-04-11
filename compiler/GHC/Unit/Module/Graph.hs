@@ -226,11 +226,7 @@ mkHomeModuleMap nodes = ModuleNameHomeMap completeUnits providerMap where
           ]
 
     completeUnits :: Set UnitId
-    completeUnits = Set.fromList $
-                    [
-                        moduleNodeInfoUnitId moduleNodeInfo |
-                            ModuleNode _ moduleNodeInfo <- nodes
-                    ]
+    completeUnits = Set.unions (Map.elems providerMap)
 
 mgHomeModuleMap :: ModuleGraph -> ModuleNameHomeMap
 mgHomeModuleMap = mg_home_map
