@@ -30,6 +30,20 @@ The semantics are identical, but the golden file test fails.
 
 This affects tests in `libraries/base/tests/perf`, `codeGen`, `deSugar`, `arityanal`, `dmdanal` and elsewhere.
 
+## Related: `grep_errmsg` tests (#18909)
+
+Around 100 tests use `grep_errmsg` to check for specific patterns in Core output, rather than full golden files. This is a workaround for golden-file fragility. But `grep_errmsg` tests:
+
+- Don't show useful diffs on failure
+- Can't be auto-updated with `--test-accept`
+- Often have stale `.stderr` files that don't reflect actual compiler output
+
+With `-dcanonicalize-local-binds`, these tests could convert to full-Core golden files. That gives:
+
+- Meaningful diffs when something actually changes
+- Proper `--test-accept` behavior
+- Full Core context on failure instead of "pattern not found"
+
 ## Proposal
 
 Add `-dcanonicalize-local-binds` to rename local binders to canonical names (`a`, `b`, `c`, ..., `a1`, `b1`, ...) based on their order of first appearance at a binding site. External names (top-level definitions, imports, constructors, primops) stay unchanged.
