@@ -30,11 +30,11 @@ fusionElemMap
 
 Semantics identical, golden test fails.
 
-This came up in `!15812` where full-Core golden files were proposed but flagged as fragile. `#27101` asks for checking Core output more directly than today's grep-based tests.
+This came up in !15812 where full-Core golden files were proposed but flagged as fragile. #27101 asks for checking Core output more directly than today's grep-based tests.
 
 ## Why grep_errmsg isn't a good workaround
 
-About 100 tests use `grep_errmsg` instead of full golden files — a workaround for binder-name churn. But as `#18909` notes:
+About 100 tests use `grep_errmsg` instead of full golden files — a workaround for binder-name churn. But as #18909 notes:
 
 - failures don't show useful diffs
 - `--test-accept` doesn't reliably refresh these tests
