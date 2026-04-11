@@ -87,7 +87,7 @@ A testsuite-only normalizer would need to parse Core syntax, which is fragile. D
 
 ## Related
 
-- `!15812`: elem/fusion tests, concern about fragile Core golden files
-- `#27101`: check Core output more directly in `T17752`
-- `#18909`: grep_errmsg has poor diff ergonomics
-- `#21983`: `-ddump-*` flags need better test coverage — more stable dumps help
+- !15812: elem/fusion tests, concern about fragile Core golden files
+- #27101: check Core output more directly in T17752
+- #18909: grep_errmsg has poor diff ergonomics
+- #21983: -ddump-* flags need better test coverage — more stable dumps help
