@@ -79,11 +79,7 @@ fusionElemMap
 
 ## Why in GHC, not just the testsuite
 
-A testsuite-only normalizer would need to parse Core syntax, which is fragile. Doing this in GHC:
-
-- helps developers reading and diffing Core dumps, not just tests
-- works for all Core-dump consumers
-- tests opt in with a single flag, no ad hoc text-processing
+A testsuite-only normalizer would need to parse Core syntax, which is fragile. Putting this in GHC benefits anyone diffing Core output — developers comparing compiler versions, bisecting regressions, or reviewing optimization changes — not just the testsuite.
 
 ## Related
 
