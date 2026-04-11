@@ -148,7 +148,7 @@ doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
         -- and BUILD is the same as our HOST.
 
     let io_manager_defs =
-          [ "-D__IO_MANAGER_WINIO__=1" | isWindows ] ++
+          [ "-D__IO_MANAGER_WINIO__=2" | isWindows ] ++
           [ "-D__IO_MANAGER_MIO__=1"               ]
 
     let sse_defs =
