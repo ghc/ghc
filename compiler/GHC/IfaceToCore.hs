@@ -76,7 +76,7 @@ import GHC.Core.Predicate( isUnaryClass )
 import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
-import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
+import GHC.Core.Opt.OccurAnal ( occurAnalyseBndrsAndExpr )
 import GHC.Core.Ppr
 
 import GHC.Hs.Extension ( GhcRn )
@@ -1418,18 +1418,22 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
                                                (emptyBag, errs) }
                    ; return (bndrs', args', rhs') }
         ; let mb_tcs = map ifTopFreeName args
+              (bndrs_occ, rhs_occ) = occurAnalyseBndrsAndExpr bndrs' rhs'
+                   -- See Note [OccInfo in unfoldings and rules]
         ; this_mod <- getIfModule
-        ; return (Rule { ru_name = name, ru_fn = fn,
-                          ru_act = act,
-                          ru_bndrs = bndrs', ru_args = args',
-                          ru_rhs = occurAnalyseExpr rhs',
-                          ru_rough = mb_tcs,
-                          ru_origin = this_mod,
-                          ru_orphan = orph,
-                          ru_auto = auto,
-                          ru_local = False }) } -- An imported RULE is never for a local Id
-                                                -- or, even if it is (module loop, perhaps)
-                                                -- we'll just leave it in the non-local set
+        ; return (Rule { ru_name   = name
+                       , ru_fn     = fn
+                       , ru_act    = act
+                       , ru_bndrs  = bndrs_occ
+                       , ru_args   = args'
+                       , ru_rhs    = rhs_occ
+                       , ru_rough  = mb_tcs
+                       , ru_origin = this_mod
+                       , ru_orphan = orph
+                       , ru_auto   = auto
+                       , ru_local  = False }) }
+              -- ru_local=False: an imported RULE is never for a local Id or, even if
+              -- it is (module loop, perhaps) we'll just leave it in the non-local set
   where
         -- This function *must* mirror exactly what Rules.roughTopNames does
         -- We could have stored the ru_rough field in the iface file

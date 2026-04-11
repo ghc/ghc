@@ -1219,8 +1219,20 @@ simplExprF1 _ (Type ty) cont
 simplExprF1 env (Var v)        cont = {-#SCC "simplInId" #-} simplInId env v cont
 simplExprF1 env (Lit lit)      cont = {-#SCC "rebuild" #-} rebuild env (Lit lit) cont
 simplExprF1 env (Tick t expr)  cont = {-#SCC "simplTick" #-} simplTick env t expr cont
-simplExprF1 env (Cast body co) cont = {-#SCC "simplCast" #-} simplCast env body co cont
 simplExprF1 env (Coercion co)  cont = {-#SCC "simplCoercionF" #-} simplCoercionF env co cont
+
+simplExprF1 env (Cast body co) cont
+  = do  { co1 <- {-#SCC "simplCast-simplCoercion" #-}
+                 simplCoercion env co
+
+        ; cont1 <- {-#SCC "simplCast-addCoerce" #-}
+                   if isReflCo co1
+                   then return cont  -- See Note [Optimising reflexivity]
+                   else pushCast env co1 cont
+                        -- True <=> co1 is optimised
+
+        ; {-#SCC "simplCast-simplExprF" #-}
+          simplExprF env body cont1 }
 
 simplExprF1 env (App fun arg) cont
   = {-#SCC "simplExprF1-App" #-} case arg of
@@ -1567,6 +1579,10 @@ rebuild_go env expr cont
       Stop {}          -> return (emptyFloats env, expr)
       TickIt t cont    -> rebuild_go env (mkTick t expr) cont
       CastIt { sc_co = co, sc_opt = opt, sc_cont = cont }
+        | isReflexiveCo co'  -- Worth trying this because casts can
+                             -- get stacked up by simplCast
+        -> rebuild_go env expr cont
+        | otherwise
         -> rebuild_go env (mkCast expr co') cont
            -- NB: mkCast implements the (Coercion co |> g) optimisation
         where
@@ -1689,9 +1705,8 @@ on each successive composition -- that's at least quadratic.  So:
 * In `addCoerce` (in `simplCast`) if we combine this new coercion with
   an existing once, we build a CastIt for (co1 ; co2) with sc_opt=False.
 
-* When unpacking a CastIt, in `rebuildCall` and `rebuild`, we optimise
-  the (presumably composed) coercion if sc_opt=False; this is done
-  by `optOutCoercion`.
+* When unpacking a CastIt, in `rebuild`, we optimise the (presumably
+  composed) coercion if sc_opt=False; this is done by `optOutCoercion`.
 
 * When duplicating a continuation in `mkDupableContWithDmds`, before
   duplicating a CastIt, optimise the coercion. Otherwise we'll end up
@@ -1708,76 +1723,70 @@ optOutCoercion env co already_optimised
     empty_subst = mkEmptySubst (seInScope env)
     opts = seOptCoercionOpts env
 
-simplCast :: SimplEnv -> InExpr -> InCoercion -> SimplCont
-          -> SimplM (SimplFloats, OutExpr)
-simplCast env body co0 cont0
-  = do  { co1   <- {-#SCC "simplCast-simplCoercion" #-} simplCoercion env co0
-        ; cont1 <- {-#SCC "simplCast-addCoerce" #-}
-                   if isReflCo co1
-                   then return cont0  -- See Note [Optimising reflexivity]
-                   else addCoerce co1 True cont0
-                        -- True <=> co1 is optimised
-        ; {-#SCC "simplCast-simplExprF" #-} simplExprF env body cont1 }
+pushCast :: SimplEnv -> OutCoercion -> SimplCont -> SimplM SimplCont
+pushCast env co cont
+  = go co True cont
   where
+    go :: OutCoercion -> Bool -> SimplCont -> SimplM SimplCont
+    go co1 _ (CastIt { sc_co = co2, sc_cont = cont })  -- See Note [Optimising reflexivity]
+      = go (mkTransCo co1 co2) False cont
+                  -- False: (mkTransCo co1 co2) is not fully optimised
+                  -- See Note [Avoid re-simplifying coercions]
+
+    go co co_is_opt (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
+      | Just (arg_ty', m_co') <- pushCoTyArg co arg_ty
+      = {-#SCC "addCoerce-pushCoTyArg" #-}
+        do { tail' <- go_mco m_co' co_is_opt tail
+           ; return (ApplyToTy { sc_arg_ty  = arg_ty'
+                               , sc_cont    = tail'
+                               , sc_hole_ty = coercionLKind co }) }
+                                    -- NB!  As the cast goes past, the
+                                    -- type of the hole changes (#16312)
+
+    -- (f |> co) e   ===>   (f (e |> co1)) |> co2
+    -- where   co :: (s1->s2) ~ (t1->t2)
+    --         co1 :: t1 ~ s1
+    --         co2 :: s2 ~ t2
+    go co co_is_opt cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
+                                     , sc_dup = dup, sc_cont = tail
+                                     , sc_hole_ty = fun_ty })
+      | not co_is_opt
+      = -- pushCoValArg duplicates the coercion, so optimise first
+        go (optOutCoercion (zapSubstEnv env) co co_is_opt) True cont
+
+      | Just (m_co1, m_co2) <- pushCoValArg co
+      = {-#SCC "addCoerce-pushCoValArg" #-}
+        do { tail' <- go_mco m_co2 co_is_opt tail
+           ; case m_co1 of {
+               MRefl -> return (cont { sc_cont = tail'
+                                     , sc_hole_ty = coercionLKind co }) ;
+                  -- See Note [Avoiding simplifying repeatedly]
+
+               MCo co1 ->
+        do { (dup', arg_se', arg') <- simplLazyArg env dup fun_ty Nothing arg_se arg
+                -- When we build the ApplyTo we can't mix the OutCoercion
+                -- 'co' with the InExpr 'arg', so we simplify
+                -- to make it all consistent.  It's a bit messy.
+                -- But it isn't a common case.
+                -- Example of use: #995
+           ; return (ApplyToVal { sc_arg  = mkCast arg' co1
+                                , sc_env  = arg_se'
+                                , sc_dup  = dup'
+                                , sc_cont = tail'
+                                , sc_hole_ty = coercionLKind co }) } } }
+
+    go co co_is_opt cont
+      | isReflCo co = return cont  -- Having this at the end makes a huge
+                                   -- difference in T12227, for some reason
+                                   -- See Note [Optimising reflexivity]
+      | otherwise = return (CastIt { sc_co = co, sc_opt = co_is_opt, sc_cont = cont })
+
 
         -- If the first parameter is MRefl, then simplifying revealed a
         -- reflexive coercion. Omit.
-        addCoerceM :: MOutCoercion -> Bool -> SimplCont -> SimplM SimplCont
-        addCoerceM MRefl    _   cont = return cont
-        addCoerceM (MCo co) opt cont = addCoerce co opt cont
-
-        addCoerce :: OutCoercion -> Bool -> SimplCont -> SimplM SimplCont
-        addCoerce co1 _ (CastIt { sc_co = co2, sc_cont = cont })  -- See Note [Optimising reflexivity]
-          = addCoerce (mkTransCo co1 co2) False cont
-                      -- False: (mkTransCo co1 co2) is not fully optimised
-                      -- See Note [Avoid re-simplifying coercions]
-
-        addCoerce co co_is_opt (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
-          | Just (arg_ty', m_co') <- pushCoTyArg co arg_ty
-          = {-#SCC "addCoerce-pushCoTyArg" #-}
-            do { tail' <- addCoerceM m_co' co_is_opt tail
-               ; return (ApplyToTy { sc_arg_ty  = arg_ty'
-                                   , sc_cont    = tail'
-                                   , sc_hole_ty = coercionLKind co }) }
-                                        -- NB!  As the cast goes past, the
-                                        -- type of the hole changes (#16312)
-
-        -- (f |> co) e   ===>   (f (e |> co1)) |> co2
-        -- where   co :: (s1->s2) ~ (t1->t2)
-        --         co1 :: t1 ~ s1
-        --         co2 :: s2 ~ t2
-        addCoerce co co_is_opt cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
-                                                , sc_dup = dup, sc_cont = tail
-                                                , sc_hole_ty = fun_ty })
-          | not co_is_opt  -- pushCoValArg duplicates the coercion, so optimise first
-          = addCoerce (optOutCoercion (zapSubstEnv env) co co_is_opt) True cont
-
-          | Just (m_co1, m_co2) <- pushCoValArg co
-          = {-#SCC "addCoerce-pushCoValArg" #-}
-            do { tail' <- addCoerceM m_co2 co_is_opt tail
-               ; case m_co1 of {
-                   MRefl -> return (cont { sc_cont = tail'
-                                         , sc_hole_ty = coercionLKind co }) ;
-                      -- See Note [Avoiding simplifying repeatedly]
-
-                   MCo co1 ->
-            do { (dup', arg_se', arg') <- simplLazyArg env dup fun_ty Nothing arg_se arg
-                    -- When we build the ApplyTo we can't mix the OutCoercion
-                    -- 'co' with the InExpr 'arg', so we simplify
-                    -- to make it all consistent.  It's a bit messy.
-                    -- But it isn't a common case.
-                    -- Example of use: #995
-               ; return (ApplyToVal { sc_arg  = mkCast arg' co1
-                                    , sc_env  = arg_se'
-                                    , sc_dup  = dup'
-                                    , sc_cont = tail'
-                                    , sc_hole_ty = coercionLKind co }) } } }
-
-        addCoerce co co_is_opt cont
-          | isReflCo co = return cont  -- Having this at the end makes a huge
-                                       -- difference in T12227, for some reason
-                                       -- See Note [Optimising reflexivity]
-          | otherwise = return (CastIt { sc_co = co, sc_opt = co_is_opt, sc_cont = cont })
+    go_mco :: MOutCoercion -> Bool -> SimplCont -> SimplM SimplCont
+    go_mco MRefl    _   cont = return cont
+    go_mco (MCo co) opt cont = go co opt cont
 
 simplLazyArg :: SimplEnvIS              -- ^ Used only for its InScopeSet
              -> DupFlag
@@ -2293,14 +2302,21 @@ simplInId env var cont
 ---------------------------------------------------------
 simplOutExpr :: SimplEnvIS -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
 simplOutExpr env expr cont
-  = case fun of
-      Var v                    -> simplOutId env v cont'
-      Lam {} | not (null args) -> simplLam env occ_fun cont'  -- We have a beta-redex
-      _                        -> rebuild_go env expr cont
-  where
-    (fun, args) = collectArgs expr
-    cont' = pushArgs env Simplified (exprType fun) args cont
-    occ_fun = occurAnalyseExpr fun  -- ToDo:explain; c.f. Note [Occurrence-analyse after rule firing]
+  | Lam {} <- expr
+  , hasArgs cont
+  = simplLam env (occurAnalyseExpr expr) cont
+    -- ToDo:explain; c.f. Note [Occurrence-analyse after rule firing]
+
+  | Cast e co <- expr  -- The inlined expression may be (x |> co)
+                       -- and the cast may cancel with `cont`
+  = do { cont' <- pushCast env co cont
+       ; simplOutExpr env e cont' }
+
+  | (Var v, args) <- collectArgs expr
+  = simplOutId env v (pushArgs env (idType v) args cont)
+
+  | otherwise
+  = rebuild_go env expr cont
 
 ---------------------------------------------------------
 simplOutId :: SimplEnvIS -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
@@ -2654,7 +2670,7 @@ fireRuleAFTER env rule_match arg_specs cont
        , rm_binds = wrap, rm_bndrs = bndrs } <- rule_match
   = do { let env' = env `addNewInScopeIds` bndrs
        ; (floats, e') <- simplExprF env' rhs $
-                         pushArgs env' Simplified (exprType rhs) rhs_args $
+                         pushArgs env' (exprType rhs) rhs_args $
                          pushArgSpecs env' (drop (ruleArity rule) arg_specs) cont
        ; return $
          if isEmptyBindWrapper wrap  -- Not very pretty

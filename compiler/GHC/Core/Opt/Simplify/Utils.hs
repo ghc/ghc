@@ -25,7 +25,7 @@ module GHC.Core.Opt.Simplify.Utils (
         isSimplified, contIsStop,
         contIsDupable, contResultType, contHoleType, contHoleScaling,
         contIsTrivial, contArgs, contIsRhs,
-        countArgs, contOutArgs, dropContArgs,
+        hasArgs, countArgs, contOutArgs, dropContArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
         interestingCallContext,
 
@@ -384,17 +384,17 @@ isStrictArgInfo (ArgInfo { ai_dmds = dmds })
   | dmd:_ <- dmds = isStrUsedDmd dmd
   | otherwise     = False
 
-pushArgs :: SimplEnvIS -> DupFlag -> Type -> [OutExpr] -> SimplCont -> SimplCont
-pushArgs _env _dup _fun_ty [] cont
+pushArgs :: SimplEnvIS -> Type -> [OutExpr] -> SimplCont -> SimplCont
+pushArgs _env _fun_ty [] cont
   = cont
-pushArgs env dup fun_ty (arg:args) cont
+pushArgs env fun_ty (arg:args) cont
   | Type ty <- arg
   = ApplyToTy { sc_hole_ty = fun_ty, sc_arg_ty = ty
-              , sc_cont = pushArgs env dup (piResultTy fun_ty ty) args cont }
+              , sc_cont = pushArgs env (piResultTy fun_ty ty) args cont }
   | otherwise
-  = ApplyToVal { sc_dup = dup, sc_hole_ty = fun_ty
+  = ApplyToVal { sc_dup = Simplified, sc_hole_ty = fun_ty
                , sc_arg = arg, sc_env = env
-               , sc_cont = pushArgs env dup (funResultTy fun_ty) args  cont}
+               , sc_cont = pushArgs env (funResultTy fun_ty) args  cont}
 
 pushArgSpecs :: SimplEnvIS  -- Barely needed, since sc_dup = Simplified
              -> [ArgSpec]   -- In normal, forward order
@@ -522,6 +522,12 @@ contHoleScaling (ApplyToVal { sc_cont = k }) = contHoleScaling k
 contHoleScaling (TickIt _ k) = contHoleScaling k
 
 -------------------
+hasArgs :: SimplCont -> Bool
+-- True <=> some leading arguments
+hasArgs (ApplyToTy {})  = True
+hasArgs (ApplyToVal {}) = True
+hasArgs _               = False
+
 countArgs :: SimplCont -> Int
 -- Count all arguments, including types, coercions,
 -- and other values; skipping over casts.

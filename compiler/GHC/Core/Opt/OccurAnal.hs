@@ -27,7 +27,8 @@ core expression with (hopefully) improved usage information.
 
 module GHC.Core.Opt.OccurAnal (
     occurAnalysePgm,
-    occurAnalyseExpr, occurAnalyseExpr_Prep,
+    occurAnalyseExpr, occurAnalyseBndrsAndExpr,
+    occurAnalyseExpr_Prep,
     zapLambdaBndrs
   ) where
 
@@ -84,6 +85,14 @@ occurAnalyseExpr :: CoreExpr -> CoreExpr
 occurAnalyseExpr expr = expr'
   where
     WUD _ expr' = occAnal initOccEnv expr
+
+occurAnalyseBndrsAndExpr :: [Var] -> CoreExpr -> ([Var], CoreExpr)
+-- Occur-anal (\bs.e), but taking and returning `bs` and `e` separately
+occurAnalyseBndrsAndExpr bndrs expr
+  = (bndrs', expr')
+  where
+    WUD usage expr' = occAnal initOccEnv expr
+    bndrs' = tagLamBinders usage bndrs
 
 -- | A version of 'occurAnalyseExpr' suitable for CorePrep.
 --

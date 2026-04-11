@@ -2088,6 +2088,11 @@ Given this decision it's vital that we do *always* do it.
   occurrence in f out of scope. This happened in #8892, where the unfolding
   in question was a DFun unfolding.
 
+Wrinkles
+
+(OUR1) For a RULE, say,
+              forall x y. f (x,y) = x+y
+ToDO
 
 ************************************************************************
 *                                                                      *

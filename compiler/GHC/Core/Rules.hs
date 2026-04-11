@@ -65,7 +65,7 @@ import GHC.Core.Tidy     ( tidyRules )
 import GHC.Core.Map.Expr ( eqCoreExpr )
 import GHC.Core.Opt.Arity( etaExpandToJoinPointRule )
 import GHC.Core.Make     ( mkCoreLams )
-import GHC.Core.Opt.OccurAnal( occurAnalyseExpr )
+import GHC.Core.Opt.OccurAnal( occurAnalyseBndrsAndExpr )
 import GHC.Core.Rules.Config (roBuiltinRules)
 
 import GHC.Tc.Utils.TcType  ( tcSplitTyConApp_maybe )
@@ -199,16 +199,18 @@ mkRule this_mod is_auto is_local name act fn bndrs args rhs
   = Rule { ru_name   = name
          , ru_act    = act
          , ru_fn     = fn
-         , ru_bndrs  = bndrs
+         , ru_bndrs  = bndrs'
          , ru_args   = args
-         , ru_rhs    = occurAnalyseExpr rhs
-                       -- See Note [OccInfo in unfoldings and rules]
+         , ru_rhs    = rhs'
          , ru_rough  = roughTopNames args
          , ru_origin = this_mod
          , ru_orphan = orph
          , ru_auto   = is_auto
          , ru_local  = is_local }
   where
+    (bndrs', rhs') = occurAnalyseBndrsAndExpr bndrs rhs
+        -- See Note [OccInfo in unfoldings and rules]
+
         -- Compute orphanhood.  See Note [Orphans] in GHC.Core.InstEnv
         -- A rule is an orphan only if none of the variables
         -- mentioned on its left-hand side are locally defined
