@@ -16,7 +16,7 @@ For each top-level binding:
 1. Walk the RHS in left-to-right, outside-in order, collecting local binders at their **binding sites**: lambda params (L→R), let/joinrec binders (definition order), case-alternative binders (alt order)
 2. Skip binders with External names — these must stay unchanged
 3. Skip type variables — less fragile, and hidden by `-dsuppress-type-signatures` anyway
-4. Assign canonical names from a single namespace: `a`, `b`, ..., `z`, `a1`, `b1`, ..., `z1`, `a2`, ...
+4. Assign canonical names from a single namespace: `clbA`, `clbB`, ..., `clbZ`, `clbA1`, `clbB1`, ..., `clbZ1`, `clbA2`, ...
 5. Dead binders → `_`
 6. Build a `Subst` mapping old Ids → new Ids (same type/IdInfo, new name) and apply via `substBind`
 

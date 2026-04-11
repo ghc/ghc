@@ -32,7 +32,7 @@ This affects tests in `libraries/base/tests/perf`, `codeGen`, `deSugar`, `aritya
 
 ## Proposal
 
-Add `-dcanonicalize-local-binds` to rename local binders to canonical names (`a`, `b`, `c`, ..., `a1`, `b1`, ...) based on their order of first appearance at a binding site. External names (top-level definitions, imports, constructors, primops) stay unchanged.
+Add `-dcanonicalize-local-binds` to rename local binders to canonical names (`clbA`, `clbB`, `clbC`, ..., `clbA1`, `clbB1`, ...) based on their order of first appearance at a binding site. External names (top-level definitions, imports, constructors, primops) stay unchanged.
 
 The canonicalization runs as a Core-to-Core pass just before printing in `dumpPassResult`. Off by default — fully backwards compatible.
 
@@ -56,20 +56,20 @@ With `-ddump-simpl -dsuppress-all -dsuppress-uniques -dcanonicalize-local-binds`
 
 ```
 fusionElemMap
-  = \ a b ->
+  = \ clbA clbB ->
       joinrec {
-        c d
-          = case d of {
+        clbC clbD
+          = case clbD of {
               [] -> False;
-              : e f ->
-                case a of { I# g ->
-                case e of { I# h ->
-                  case ==# g (+# h 1#) of {
-                    __DEFAULT -> jump c f;
+              : clbE clbF ->
+                case clbA of { I# clbG ->
+                case clbE of { I# clbH ->
+                  case ==# clbG (+# clbH 1#) of {
+                    __DEFAULT -> jump clbC clbF;
                     1# -> True
                   } } }
             }; } in
-      jump c b
+      jump clbC clbB
 ```
 
 Each top-level binding is canonicalized independently.
