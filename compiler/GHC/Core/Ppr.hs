@@ -430,19 +430,20 @@ pprTypedLamBinder bind_site debug_on var
   = sdocOption sdocSuppressTypeSignatures $ \suppress_sigs ->
     case () of
     _
-      | not debug_on            -- Show case-bound wild binders only if debug is on
-      , CaseBind <- bind_site
-      , isDeadBinder var        -> empty
-
-      | not debug_on            -- Even dead binders can be one-shot
-      , isDeadBinder var        -> char '_' <+> ppWhen (isId var)
-                                                (pprIdBndrInfo (idInfo var))
-
-      | not debug_on            -- No parens, no kind info
-      , CaseBind <- bind_site   -> pprUntypedBinder var
-
+      -- Show case-bound wild binders only if debug is on
       | not debug_on
-      , CasePatBind <- bind_site    -> pprUntypedBinder var
+      , CaseBind <- bind_site
+      -> if isDeadBinder var
+         then empty
+         else pprUntypedBinder var
+
+      -- Show binders as "_" in case patterns
+      -- (but not in RULES or let)
+      | not debug_on            -- Even dead binders can be one-shot
+      , CasePatBind <- bind_site
+      -> if (isDeadBinder var)
+         then char '_' <+> ppWhen (isId var) (pprIdBndrInfo (idInfo var))
+         else pprUntypedBinder var
 
       | suppress_sigs -> pprUntypedBinder var
 

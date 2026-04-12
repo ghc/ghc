@@ -1565,13 +1565,13 @@ the former.
 
 preInlineUnconditionally
     :: SimplEnv -> TopLevelFlag -> InId
-    -> InExpr -> StaticEnv  -- These two go together
+    -> DupFlag -> InExpr -> StaticEnv  -- These three go together
     -> Maybe SimplEnv       -- Returned env has extended substitution
 -- Precondition: rhs satisfies the let-can-float invariant
 -- See Note [Core let-can-float invariant] in GHC.Core
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
-preInlineUnconditionally env top_lvl bndr rhs rhs_env
+preInlineUnconditionally env top_lvl bndr dup rhs rhs_env
   | not pre_inline_unconditionally           = Nothing
   | not active                               = Nothing
   | isTopLevel top_lvl && isDeadEndId bndr   = Nothing -- Note [Top-level bottoming Ids]
@@ -1584,10 +1584,17 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
   -- See Note [Stable unfoldings and preInlineUnconditionally]
   | not (isInlinePragma inline_prag)
   , Just inl <- maybeUnfoldingTemplate unf   = Just $! (extend_subst_with inl)
+
   | otherwise                                = Nothing
   where
     unf = idUnfolding bndr
-    extend_subst_with inl_rhs = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
+
+    -- If the rhs is already simplified, then extend the envt with DoneEx;
+    -- If not then ContEx
+    -- ToDo: flesh this note out
+    extend_subst_with inl_rhs
+      | isSimplified dup = extendIdSubst env bndr $! DoneEx inl_rhs NotJoinPoint
+      | otherwise        = extendIdSubst env bndr $! mkContEx rhs_env inl_rhs
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
     one_occ OneOcc{ occ_n_br   = 1

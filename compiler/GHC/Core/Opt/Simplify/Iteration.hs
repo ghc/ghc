@@ -283,7 +283,7 @@ simplRecOrTopPair :: SimplEnv
 
 simplRecOrTopPair env bind_cxt old_bndr new_bndr rhs
   | Just env' <- preInlineUnconditionally env (bindContextLevel bind_cxt)
-                                          old_bndr rhs env
+                                          old_bndr NoDup rhs env
   = {-#SCC "simplRecOrTopPair-pre-inline-uncond" #-}
     simplTrace "SimplBindr:inline-uncond1" (ppr old_bndr) $
     do { tick (PreInlineUnconditionally old_bndr)
@@ -1298,7 +1298,7 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
     do { ty' <- simplType env ty
        ; simplExprF (extendTvSubst env bndr ty') body cont }
 
-  | Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs env
+  | Just env' <- preInlineUnconditionally env NotTopLevel bndr NoDup rhs env
     -- Because of the let-can-float invariant, it's ok to
     -- inline freely, or to drop the binding if it is dead.
   = do { simplTrace "SimplBindr:inline-uncond2" (ppr bndr) $
@@ -1869,7 +1869,7 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
              --      It's wrong to err in either direction
              --      But fun_ty is an OutType, so is fully substituted
 
-       ; if | Just env' <- preInlineUnconditionally env NotTopLevel bndr arg arg_se
+       ; if | Just env' <- preInlineUnconditionally env NotTopLevel bndr dup arg arg_se
             , not (needsCaseBindingL arg_levity arg)
               -- Ok to test arg::InExpr in needsCaseBinding because
               -- exprOkForSpeculation is stable under simplification
@@ -2686,10 +2686,9 @@ tryRules env rules fn args
   | Just rule_match <- lookupRule ropts in_scope_env
                                   act_fun fn args rules
     -- Fire a rule for the function
-  = do { let the_rule = rm_rule rule_match
-       ; logger <- getLogger
-       ; checkedTick (RuleFired (ruleName the_rule))
-       ; dump logger the_rule (rm_rhs rule_match)
+  = do { logger <- getLogger
+       ; checkedTick (RuleFired (ruleName (rm_rule rule_match)))
+       ; dump logger rule_match
        ; return (Just rule_match) }
 
   | otherwise  -- No rule fires
@@ -2707,7 +2706,7 @@ tryRules env rules fn args
                       (pprModuleName . moduleName)
                       (ruleModule rule))
 
-    dump logger rule rule_rhs
+    dump logger (RM { rm_rule = rule, rm_rhs = rhs, rm_args = rule_args })
       | logHasDumpFlag logger Opt_D_dump_rule_rewrites
       = log_rule Opt_D_dump_rule_rewrites "Rule fired" $ vcat
           [ text "Rule:" <+> ftext (ruleName rule)
@@ -2716,7 +2715,8 @@ tryRules env rules fn args
         --, text "Rule activation:" <+> ppr (ruleActivation rule)
           , text "Full arity:" <+>  ppr (ruleArity rule)
           , text "Before:" <+> hang (ppr fn) 2 (sep (map ppr args))
-          , text "After: " <+> pprCoreExpr rule_rhs ]
+          , text "After:"  <+> pprCoreExpr (mkApps rhs rule_args)
+          ]
 
       | logHasDumpFlag logger Opt_D_dump_rule_firings
       = log_rule Opt_D_dump_rule_firings "Rule fired:" $
@@ -3839,7 +3839,7 @@ knownCon env scrut dc dc_args case_bndr alt_bndrs rhs cont
         return ( emptyFloats env
                , extendIdSubst env case_bndr (DoneEx scrut NotJoinPoint))
 
-      | Just env' <- preInlineUnconditionally env NotTopLevel case_bndr con_app env
+      | Just env' <- preInlineUnconditionally env NotTopLevel case_bndr NoDup con_app env
       = return (emptyFloats env', env')
 
       | otherwise
