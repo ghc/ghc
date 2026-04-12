@@ -89,7 +89,7 @@ knownOccs
     , enumFromToClassOpOcc, enumFromThenToClassOpOcc
 
     -- Static
-    , fromStaticPtrClassOpOcc 
+    , fromStaticPtrClassOpOcc
 
     -- Typeable stuff
     , someTypeRepTyConOcc, someTypeRepDataConOcc, mkTrConOcc, mkTrAppCheckedOcc
