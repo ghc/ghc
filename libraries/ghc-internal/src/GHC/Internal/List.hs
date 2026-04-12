@@ -46,7 +46,6 @@ module GHC.Internal.List (
 import GHC.Internal.Base
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Err (error)
-import GHC.Internal.Magic (oneShot)
 import GHC.Internal.Num (Num(..))
 import GHC.Internal.Bignum.Integer (Integer)
 import GHC.Internal.Prim (seq)
