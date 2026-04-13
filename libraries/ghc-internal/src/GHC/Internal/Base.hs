@@ -1819,6 +1819,12 @@ foldr k z = go
             go []     = z
             go (y:ys) = y `k` go ys
 
+
+foldrList :: (a -> b -> b) -> b -> [a] -> b
+-- An alias for `foldr`,  used only internally
+-- See Note [Tricky known-occ cases] in GHC.Builtin.KnownOccs
+foldrList = foldr
+
 -- | A list producer that can be fused with 'foldr'.
 -- This function is merely
 --

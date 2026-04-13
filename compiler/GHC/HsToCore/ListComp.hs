@@ -37,6 +37,7 @@ import GHC.Driver.DynFlags
 import GHC.Tc.Utils.TcType
 
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim( alphaTyVar )
 
@@ -129,7 +130,7 @@ dsTransStmt (TransStmt { trS_form = form, trS_stmts = stmts, trS_bndrs = binderM
 
     -- Create an unzip function for the appropriate arity and element types and find "map"
     unzip_stuff' <- mkUnzipBind form from_bndrs_tys
-    map_id <- dsLookupKnownKeyId mapIdKey
+    map_id <- dsLookupKnownOccId mapIdOcc
 
     -- Generate the expressions to build the grouped list
     let -- First we apply the grouping function to the inner list
@@ -682,7 +683,7 @@ mkFoldrExpr :: Type             -- ^ Element type of the list
             -> CoreExpr         -- ^ List expression being folded acress
             -> DsM CoreExpr
 mkFoldrExpr elt_ty result_ty c n list = do
-    foldr_id <- dsLookupKnownKeyId foldrIdKey
+    foldr_id <- dsLookupKnownOccId foldrListIdOcc
     return (Var foldr_id `App` Type elt_ty
            `App` Type result_ty
            `App` c

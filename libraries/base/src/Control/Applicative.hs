@@ -63,10 +63,13 @@ import GHC.Internal.Data.Functor ((<$>))
 import GHC.Internal.Data.Functor.Const (Const(..))
 import GHC.Internal.Data.Typeable (Typeable)
 import GHC.Internal.Data.Data (Data)
-
+import GHC.Generics( Generic, Generic1 )
 import GHC.Internal.Functor.ZipList (ZipList(..))
-import GHC.Generics
-import qualified GHC.KnownKeyNames as Rebindable
+
+import qualified GHC.Internal.Data.Data as Rebindable
+import qualified GHC.Internal.Data.Typeable.Internal as Rebindable
+import qualified GHC.Num as Rebindable
+import qualified GHC.Generics as Rebindable hiding( Fixity(..) )
 
 -- $setup
 -- >>> import Prelude

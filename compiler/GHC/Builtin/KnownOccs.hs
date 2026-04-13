@@ -43,6 +43,49 @@ mechanisms:
   to make an ExactOcc RdrName for the thing.  We use the latter for
   known-key things, merely to avoid duplicating knowledge of the KnownOcc
 
+Note [Tricky known-occ cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A few known-occ entities are a bit tricky, because ghc-internal has distinct
+entities that share the same occ-name.  For these, we must be careful to
+have the correct one in scope when looking up a known-occ name.
+
+* Data types involving Fixity.  We have
+     module GHC.Internal.Data.Data where
+        data Fixity = Infix | Prefix
+     module GHC.Internal.Generics where
+        data Fixity = Prefix | Infix Associativity Int
+     module GHC.Internal.TH.Syntax where
+        data Fixity = Fixity Int FixityDirection
+
+  Of these, Fixity(Infix,Prefix) from GHC.Internal.Data.Data are the
+  known-occ entities, used in derived Data instances; the other are not.
+
+* `prec`: we have
+     module GHC.Internal.Text.ParserCombinators.ReadPrec where
+        prec :: Prec -> ReadPrec a -> ReadPrec a
+     module GHC.Internal.Generics where
+        prec :: Fixity -> Int
+
+   Of these, the former is the known-occ entity, used in the derived instances
+   for Read.  The latter is not.
+
+* `foldr`: we  have
+     module GHC.Internal.Data.Foldable where
+       class Foldable t where
+          foldr :: (a -> b -> b) -> b -> t a -> b
+     module GHC.Internal.Base where
+       foldr :: (a -> b -> b) -> b -> [a] -> b
+
+  This one is particularly annoying because
+  * We need the Foldable `foldr` to be known-occ so we can refer to it in
+    derived Foldable instances
+  * We need the list `foldr` to be known-occ so we can refer to it when
+    desugaring list comprehensions.
+
+  So we define an alias
+     module GHC.Internal.Base where
+       foldrList = foldr
+  make `foldrList` known-occ, and refer to that in desugaring list comprehensions.
 -}
 
 
@@ -107,8 +150,10 @@ rightDataConOcc  = mkDataOcc "Right"
 voidTyConOcc     = mkTcOcc "Void"
 rationalTyConOcc = mkTcOcc "Rational"
 
-composeIdOcc :: KnownOcc
-composeIdOcc = mkVarOcc "."
+composeIdOcc, mapIdOcc, foldrListIdOcc :: KnownOcc
+composeIdOcc   = mkVarOcc "."
+mapIdOcc       = mkVarOcc "map"
+foldrListIdOcc = mkVarOcc "foldrList"
 
 fromStaticPtrClassOpOcc :: KnownOcc
 fromStaticPtrClassOpOcc = mkVarOcc "fromStaticPtr"
@@ -128,16 +173,9 @@ enumFromToClassOpOcc     = mkVarOcc "enumFromTo"
 enumFromThenToClassOpOcc = mkVarOcc "enumFromThenTo"
 
 -- Class Typeable, and functions for constructing `Typeable` dictionaries
-someTypeRepTyConOcc
-  , someTypeRepDataConOcc
-  , mkTrConOcc
-  , mkTrAppCheckedOcc
-  , mkTrFunOcc
-  , typeRepIdOcc
-  , typeNatTypeRepOcc
-  , typeSymbolTypeRepOcc
-  , typeCharTypeRepOcc
-  :: KnownOcc
+someTypeRepTyConOcc, someTypeRepDataConOcc, mkTrConOcc, mkTrAppCheckedOcc
+  , mkTrFunOcc, typeRepIdOcc, typeNatTypeRepOcc, typeSymbolTypeRepOcc
+  , typeCharTypeRepOcc :: KnownOcc
 someTypeRepTyConOcc   = mkTcOcc   "SomeTypeRep"
 someTypeRepDataConOcc = mkDataOcc "SomeTypeRep"
 typeRepIdOcc          = mkVarOcc  "typeRep#"
@@ -148,21 +186,14 @@ typeNatTypeRepOcc     = mkVarOcc  "typeNatTypeRep"
 typeSymbolTypeRepOcc  = mkVarOcc  "typeSymbolTypeRep"
 typeCharTypeRepOcc    = mkVarOcc  "typeCharTypeRep"
 
-typeLitSymbolDataConOcc
-  , typeLitNatDataConOcc
-  , typeLitCharDataConOcc
-  :: KnownOcc
+typeLitSymbolDataConOcc, typeLitNatDataConOcc, typeLitCharDataConOcc :: KnownOcc
 typeLitSymbolDataConOcc = mkDataOcc "TypeLitSymbol"
 typeLitNatDataConOcc    = mkDataOcc "TypeLitNat"
 typeLitCharDataConOcc   = mkDataOcc "TypeLitChar"
 
 
-trModuleTyConOcc
-  , trModuleDataConOcc
-  , trNameSDataConOcc
-  , trTyConTyConOcc
-  , trTyConDataConOcc
-  :: KnownOcc
+trModuleTyConOcc, trModuleDataConOcc, trNameSDataConOcc
+  , trTyConTyConOcc, trTyConDataConOcc :: KnownOcc
 trModuleTyConOcc     = mkTcOcc "Module"
 trModuleDataConOcc   = mkDataOcc "Module"
 trNameSDataConOcc    = mkDataOcc "TrNameS"
@@ -170,14 +201,8 @@ trTyConTyConOcc      = mkTcOcc   "TyCon"
 trTyConDataConOcc    = mkDataOcc "TyCon"
 
 -- Typeable representation types
-kindRepTyConOcc
-  , kindRepTyConAppDataConOcc
-  , kindRepVarDataConOcc
-  , kindRepAppDataConOcc
-  , kindRepFunDataConOcc
-  , kindRepTYPEDataConOcc
-  , kindRepTypeLitSDataConOcc
-  :: KnownOcc
+kindRepTyConOcc, kindRepTyConAppDataConOcc, kindRepVarDataConOcc, kindRepAppDataConOcc
+  , kindRepFunDataConOcc, kindRepTYPEDataConOcc, kindRepTypeLitSDataConOcc :: KnownOcc
 kindRepTyConOcc           = mkTcOcc "KindRep"
 kindRepTyConAppDataConOcc = mkDataOcc "KindRepTyConApp"
 kindRepVarDataConOcc      = mkDataOcc "KindRepVar"
@@ -210,20 +235,20 @@ main_RDR_Unqual = mkUnqual varName (fsLit "main")
         -- We definitely don't want an Orig RdrName, because
         -- main might, in principle, be imported into module Main
 
-
 error_RDR :: RdrName
 error_RDR = knownVarOccRdrName "error"
 
 toDyn_RDR :: RdrName
 toDyn_RDR = knownVarOccRdrName "toDyn"
 
-compose_RDR :: RdrName
+compose_RDR, map_RDR :: RdrName
 compose_RDR = knownOccRdrName composeIdOcc
+map_RDR     = knownOccRdrName mapIdOcc
 
 appE_RDR, lift_RDR, liftTyped_RDR :: RdrName
-appE_RDR             = knownVarOccRdrName "appE"
-lift_RDR             = knownVarOccRdrName "lift"
-liftTyped_RDR        = knownVarOccRdrName "liftTyped"
+appE_RDR       = knownVarOccRdrName "appE"
+lift_RDR       = knownVarOccRdrName "lift"
+liftTyped_RDR  = knownVarOccRdrName "liftTyped"
 
 enumFrom_RDR, enumFromTo_RDR, enumFromThen_RDR, enumFromThenTo_RDR :: RdrName
 enumFrom_RDR       = knownOccRdrName enumFromClassOpOcc
@@ -420,10 +445,9 @@ ltTag_RDR       = nameRdrName ordLTDataConName
 eqTag_RDR       = nameRdrName ordEQDataConName
 gtTag_RDR       = nameRdrName ordGTDataConName
 
-map_RDR, fmap_RDR, replace_RDR, pure_RDR, ap_RDR, liftA2_RDR, foldable_foldr_RDR,
+fmap_RDR, replace_RDR, pure_RDR, ap_RDR, liftA2_RDR, foldable_foldr_RDR,
     foldMap_RDR, null_RDR, all_RDR, traverse_RDR, mempty_RDR,
     mappend_RDR :: RdrName
-map_RDR            = knownKeyRdrName mapIdKey
 fmap_RDR           = knownKeyRdrName fmapClassOpKey
 pure_RDR           = knownKeyRdrName pureAClassOpKey
 ap_RDR             = knownKeyRdrName apAClassOpKey

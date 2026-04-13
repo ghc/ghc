@@ -116,7 +116,7 @@ import GHC.Types.SafeHaskell
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.Map( listToUniqMap )
-import GHC.Types.Unique.FM( UniqFM, listToUFM, lookupUFM )
+import GHC.Types.Unique.FM( UniqFM, listToUFM, lookupUFM, elemUFM )
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing
 import GHC.Types.PkgQual
@@ -284,9 +284,12 @@ loadKnownKeyOccMaps
                       cannotFindModule hsc_env kNOWN_KEY_NAMES fr }
 
        ; let kk_map :: UniqFM KnownKey Name
+             -- Domain is just the KnownKeys in the knownKeyTable
              kk_map  = listToUFM [ (getUnique nm, nm)
                                  | avail <- mi_exports iface
-                                 , nm <- availNames avail ]
+                                 , nm <- availNames avail
+                                 , let uniq = getUnique nm
+                                 , uniq `elemUFM` knownKeyUniqMap ]
              occ_map :: OccEnv Name
              occ_map = mkOccEnv [ (nameOccName nm, nm)
                                 | avail <- mi_exports iface

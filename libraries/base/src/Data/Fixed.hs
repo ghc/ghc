@@ -93,7 +93,7 @@ import Prelude
 import GHC.Internal.Data.Data
 import GHC.Internal.TypeLits (KnownNat, natVal)
 import GHC.Internal.Read
-import GHC.Internal.Text.ParserCombinators.ReadPrec( ReadPrec, pfail )
+import GHC.Internal.Text.ParserCombinators.ReadPrec( ReadPrec )
 import GHC.Internal.Text.Read.Lex
 import qualified GHC.Internal.TH.Monad as TH
 import qualified GHC.Internal.TH.Lift as TH

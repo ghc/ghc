@@ -1066,7 +1066,7 @@ gen_Traversable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
   where
     data_cons = getPossibleDataCons tycon tycon_args
 
-    traverse_name = L (noAnnSrcSpan loc) traverse_RDR
+    traverse_name = mkMethBinder loc traverse_RDR
 
     -- See Note [EmptyDataDecls with Functor, Foldable, and Traversable]
     traverse_bind = mkRdrFunBindEC 2 (nlHsApp pure_Expr)
