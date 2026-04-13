@@ -1308,6 +1308,16 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
        case COMPAT_R_386_NONE:                  break;
        case COMPAT_R_386_32:   *pP = value;     break;
        case COMPAT_R_386_PC32: *pP = value - P; break;
+       case COMPAT_R_386_PLT32: *pP = value - P; break;
+       case COMPAT_R_386_GOTOFF: *pP = value - (Elf_Addr)oc->info->got_start; break;
+       case COMPAT_R_386_GOTPC:  *pP = (Elf_Addr)oc->info->got_start + A - P; break;
+       case COMPAT_R_386_GOT32:
+       case COMPAT_R_386_GOT32X:
+           CHECK(symbol);
+           CHECK(symbol->got_addr);
+           *pP = (Elf_Addr)symbol->got_addr
+               - (Elf_Addr)oc->info->got_start + A;
+           break;
 #        endif
 
 #        if defined(arm_HOST_ARCH)
