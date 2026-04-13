@@ -22,7 +22,7 @@ import GHC.Internal.Enum
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Real (fromIntegral)
 import GHC.Internal.Word (Word32)
-import GHC.Internal.Show (Show)
+import GHC.Internal.Show
 import GHC.Internal.Ptr (Ptr(..), plusPtr)
 import GHC.Internal.Foreign.C.String.Encoding (CString, peekCString)
 import GHC.Internal.Foreign.C.Types (CBool(..))

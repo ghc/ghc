@@ -34,7 +34,7 @@ import GHC.Internal.IORef
 import GHC.Internal.Conc.Signal (Signal)
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Real (fromIntegral)
-import GHC.Internal.Show (Show)
+import GHC.Internal.Show
 import GHC.Internal.Word (Word8)
 import GHC.Internal.Foreign.C.Error (throwErrnoIfMinus1_, throwErrno, getErrno)
 import GHC.Internal.Foreign.C.Types (CInt(..), CSize(..))

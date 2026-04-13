@@ -740,7 +740,7 @@ import GHC.Internal.Data.Maybe      ( Maybe(..), fromMaybe )
 import GHC.Internal.Data.Ord        ( Down(..) )
 import GHC.Internal.Prim        ( Addr#, Char#, Double#, Float#, Int#, Word# )
 import GHC.Internal.Ptr         ( Ptr(..) )
-import GHC.Internal.Base hiding( Any ) -- clashes with the Semigroup
+import GHC.Internal.Base hiding( Any, foldr ) -- clashes with the Semigroup
 import GHC.Internal.Num  -- For deriving
 import GHC.Internal.Ix  -- For deriving
 import GHC.Internal.Enum  -- For deriving
@@ -748,8 +748,8 @@ import GHC.Internal.Enum  -- For deriving
 -- Needed for instances
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Prim    ( coerce )
-import GHC.Internal.Read    ( Read(..) )
-import GHC.Internal.Show    ( Show(..), showString, showChar, showParen, appPrec )
+import GHC.Internal.Read    ( Read )
+import GHC.Internal.Show
 import GHC.Internal.Stack.Types ( SrcLoc(..) )
 import GHC.Internal.Tuple   (Solo (..))
 import GHC.Internal.Unicode ( GeneralCategory(..) )
@@ -769,7 +769,8 @@ import GHC.Internal.Data.Functor.Identity
 import GHC.Internal.Data.Proxy   ( Proxy(..) )
 import GHC.Internal.TypeLits ( KnownSymbol, KnownNat, Nat, symbolVal, natVal )
 
-import GHC.Internal.Num as Rebindable( fromInteger )     -- For known-key names
+import qualified GHC.Internal.Num  as Rebindable
+import qualified GHC.Internal.Read as Rebindable
 
 --------------------------------------------------------------------------------
 -- Representation types

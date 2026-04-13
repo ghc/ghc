@@ -31,7 +31,7 @@ module GHC.Tc.Deriv.Generate (
         gen_Newtype_fam_insts,
 
         mkCoerceClassMethEqn,
-        genAuxBinds,
+        genAuxBinds, mkMethBinder,
         ordOpTbl, boxConTbl, nlHsCompose,
         mkRdrFunBind, mkRdrFunBindEC, mkRdrFunBindSE, error_Expr,
 
@@ -2151,6 +2151,16 @@ mkParentType tc
 nlHsCompose :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
 nlHsCompose x y = compose_RDR `nlHsApps` [x, y]
 
+mkMethBinder :: SrcSpan -> RdrName -> LocatedN RdrName
+-- The binder for a class method `op` in in an instance decl
+-- can be /unqualified/, thus
+--    instance C Int where
+--       op = ...      -- The "op" can be unqualied
+-- because the renamer looks in the class to find it.  Having it
+-- unqualified reduces the need for it to be in scope
+mkMethBinder loc op_rdr
+  = L (noAnnSrcSpan loc ) (mkRdrUnqual (rdrNameOcc op_rdr))
+
 -- | Make a function binding. If no equations are given, produce a function
 -- with the given arity that produces a stock error.
 mkFunBindSE :: Arity -> SrcSpan -> RdrName
@@ -2169,18 +2179,19 @@ mkRdrFunBind :: LocatedN RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
 mkRdrFunBind fun@(L loc _fun_rdr) matches
   = L (l2l loc) (mkFunBind (Generated OtherExpansion SkipPmc) fun matches)
 
--- | Make a function binding. If no equations are given, produce a function
--- with the given arity that uses an empty case expression for the last
--- argument that is passes to the given function to produce the right-hand
--- side.
+-- | Make a function binding for a class metchd. If no equations are given,
+-- produce a function with the given arity that uses an empty case expression
+-- for the last argument that is passes to the given function to produce
+-- the right-hand side.
 mkFunBindEC :: Arity -> SrcSpan -> RdrName
             -> (LHsExpr GhcPs -> LHsExpr GhcPs)
             -> [([LPat GhcPs], LHsExpr GhcPs)]
             -> LHsBind GhcPs
 mkFunBindEC arity loc fun catch_all pats_and_exprs
-  = mkRdrFunBindEC arity catch_all (L (noAnnSrcSpan loc) fun) matches
+  = mkRdrFunBindEC arity catch_all fun_bndr matches
   where
-    matches = [ mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun) noAnn)
+    fun_bndr = mkMethBinder loc fun
+    matches = [ mkMatch (mkPrefixFunRhs fun_bndr noAnn)
                                 (noLocA (map (parenthesizePat appPrec) p)) e
                                 emptyLocalBinds
               | (p,e) <- pats_and_exprs ]

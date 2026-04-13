@@ -39,7 +39,7 @@ import GHC.Internal.Data.Bits ((.|.), (.&.))
 import GHC.Internal.Data.Semigroup.Internal (stimesMonoid)
 
 import GHC.Internal.Base
-import GHC.Internal.Show (Show(..))
+import GHC.Internal.Show
 import GHC.Internal.Word (Word64)
 import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 

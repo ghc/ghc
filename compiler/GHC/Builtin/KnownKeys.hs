@@ -447,12 +447,6 @@ basicKnownKeyNames
         -- The SPEC type for SpecConstr
         , specTyConName
 
-        -- The Either type
-        , eitherTyConName, leftDataConName, rightDataConName
-
-        -- The Void type
-        , voidTyConName
-
         -- Plugins
         , pluginTyConName
         , frontendPluginTyConName
@@ -514,14 +508,6 @@ runRWName     = varQual gHC_MAGIC       (fsLit "runRW#")    runRWKey
 
 specTyConName :: Name
 specTyConName     = tcQual gHC_TYPES (fsLit "SPEC") specTyConKey
-
-eitherTyConName, leftDataConName, rightDataConName :: Name
-eitherTyConName   = tcQual  gHC_INTERNAL_DATA_EITHER (fsLit "Either") eitherTyConKey
-leftDataConName   = dcQual gHC_INTERNAL_DATA_EITHER (fsLit "Left")   leftDataConKey
-rightDataConName  = dcQual gHC_INTERNAL_DATA_EITHER (fsLit "Right")  rightDataConKey
-
-voidTyConName :: Name
-voidTyConName = tcQual gHC_INTERNAL_BASE (fsLit "Void") voidTyConKey
 
 -- Generics (types)
 v1TyConName, u1TyConName, par1TyConName, rec1TyConName,

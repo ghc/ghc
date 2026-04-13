@@ -38,7 +38,7 @@ import GHC.Internal.Enum (maxBound)
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num (Num(..))
 import GHC.Internal.Real (fromIntegral, div)
-import GHC.Internal.Show (Show)
+import GHC.Internal.Show
 import GHC.Internal.System.Posix.Types (Fd(..), CNfds(..))
 
 import qualified GHC.Internal.Event.Array as A

@@ -17,14 +17,12 @@ import GHC.Hs
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types  -- A bunch of wired-in TyCons and DataCons
 import GHC.Builtin.PrimOps.Ids (primOpId)
-import GHC.Builtin.Modules
 import GHC.Builtin.KnownKeys
 
 import GHC.Types.Name( KnownOcc )
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader( RdrName, mkVarUnqual, getRdrName
-                            , nameRdrName, knownOccRdrName, mkOrig, mkUnqual )
-import GHC.Unit.Types( Module )
+                            , nameRdrName, knownOccRdrName, mkUnqual )
 
 import GHC.Data.List.Infinite (Infinite (..))
 import qualified GHC.Data.List.Infinite as Inf
@@ -57,18 +55,17 @@ mechanisms:
 knownVarOccRdrName :: String -> RdrName
 knownVarOccRdrName s = knownOccRdrName (mkVarOcc s)
 
-----------------------
--- ToDo: these functions should disappear
+knownTcOccRdrName :: String -> RdrName
+knownTcOccRdrName s = knownOccRdrName (mkTcOcc s)
 
-varQual_RDR, tcQual_RDR, clsQual_RDR, dataQual_RDR
-    :: Module -> FastString -> RdrName
-varQual_RDR  mod str = mkOrig mod (mkOccNameFS varName str)
-tcQual_RDR   mod str = mkOrig mod (mkOccNameFS tcName str)
-clsQual_RDR  mod str = mkOrig mod (mkOccNameFS clsName str)
-dataQual_RDR mod str = mkOrig mod (mkOccNameFS dataName str)
+knownDataOccRdrName :: String -> RdrName
+knownDataOccRdrName s = knownOccRdrName (mkDataOcc s)
 
-fieldQual_RDR :: Module -> FastString -> FastString -> RdrName
-fieldQual_RDR mod con str = mkOrig mod (mkOccNameFS (fieldName con) str)
+knownFieldOccRdrName :: String -> String -> RdrName
+knownFieldOccRdrName con s = knownOccRdrName (mkOccNameFS (fieldName (fsLit con)) (fsLit s))
+
+primOpRdrName :: PrimOp -> RdrName
+primOpRdrName op = getRdrName (primOpId op)
 
 
 {- *********************************************************************
@@ -78,8 +75,8 @@ fieldQual_RDR mod con str = mkOrig mod (mkOccNameFS (fieldName con) str)
 ********************************************************************* -}
 
 knownOccs :: [KnownOcc]
--- Used only for sanity-checks, and for suppressing unused imports
--- when -frebindable-known-key-names is on
+-- Used only for sanity-checks
+-- Sadly incomplete .. is it worth it?  See fromEnum_REDR etc....
 knownOccs
   = [ composeIdOcc
     , rationalTyConOcc
@@ -102,7 +99,12 @@ knownOccs
     , kindRepTypeLitSDataConOcc
     ]
 
-rationalTyConOcc :: KnownOcc
+-- Some known-occ data types and their constructors
+eitherTyConOcc, leftDataConOcc, rightDataConOcc, voidTyConOcc, rationalTyConOcc :: KnownOcc
+eitherTyConOcc   = mkTcOcc "Either"
+leftDataConOcc   = mkDataOcc "Left"
+rightDataConOcc  = mkDataOcc "Right"
+voidTyConOcc     = mkTcOcc "Void"
 rationalTyConOcc = mkTcOcc "Rational"
 
 composeIdOcc :: KnownOcc
@@ -117,6 +119,7 @@ bindIOIdOcc   = mkVarOcc "bindIO"
 thenIOIdOcc   = mkVarOcc "thenIO"
 printIdOcc    = mkVarOcc "print"
 
+-- Enumerations
 enumFromClassOpOcc, enumFromThenClassOpOcc,
   enumFromToClassOpOcc, enumFromThenToClassOpOcc :: KnownOcc
 enumFromClassOpOcc       = mkVarOcc "enumFrom"
@@ -209,7 +212,7 @@ main_RDR_Unqual = mkUnqual varName (fsLit "main")
 
 
 error_RDR :: RdrName
-error_RDR = varQual_RDR gHC_INTERNAL_ERR (fsLit "error")
+error_RDR = knownVarOccRdrName "error"
 
 toDyn_RDR :: RdrName
 toDyn_RDR = knownVarOccRdrName "toDyn"
@@ -278,116 +281,116 @@ gfoldl_RDR, gunfold_RDR, toConstr_RDR, dataTypeOf_RDR, mkConstrTag_RDR,
     int8DataCon_RDR, int16DataCon_RDR, int32DataCon_RDR, int64DataCon_RDR,
     word8DataCon_RDR, word16DataCon_RDR, word32DataCon_RDR, word64DataCon_RDR
     :: RdrName
-gfoldl_RDR     = varQual_RDR  gHC_INTERNAL_DATA_DATA (fsLit "gfoldl")
-gunfold_RDR    = varQual_RDR  gHC_INTERNAL_DATA_DATA (fsLit "gunfold")
-toConstr_RDR   = varQual_RDR  gHC_INTERNAL_DATA_DATA (fsLit "toConstr")
-dataTypeOf_RDR = varQual_RDR  gHC_INTERNAL_DATA_DATA (fsLit "dataTypeOf")
-dataCast1_RDR  = varQual_RDR  gHC_INTERNAL_DATA_DATA (fsLit "dataCast1")
-dataCast2_RDR  = varQual_RDR  gHC_INTERNAL_DATA_DATA (fsLit "dataCast2")
-mkConstrTag_RDR = varQual_RDR gHC_INTERNAL_DATA_DATA (fsLit "mkConstrTag")
-constr_RDR     = tcQual_RDR   gHC_INTERNAL_DATA_DATA (fsLit "Constr")
-mkDataType_RDR = varQual_RDR  gHC_INTERNAL_DATA_DATA (fsLit "mkDataType")
-dataType_RDR   = tcQual_RDR   gHC_INTERNAL_DATA_DATA (fsLit "DataType")
-conIndex_RDR   = varQual_RDR  gHC_INTERNAL_DATA_DATA (fsLit "constrIndex")
-prefix_RDR     = dataQual_RDR gHC_INTERNAL_DATA_DATA (fsLit "Prefix")
-infix_RDR      = dataQual_RDR gHC_INTERNAL_DATA_DATA (fsLit "Infix")
+gfoldl_RDR      = knownVarOccRdrName  "gfoldl"
+gunfold_RDR     = knownVarOccRdrName  "gunfold"
+toConstr_RDR    = knownVarOccRdrName  "toConstr"
+dataTypeOf_RDR  = knownVarOccRdrName  "dataTypeOf"
+dataCast1_RDR   = knownVarOccRdrName  "dataCast1"
+dataCast2_RDR   = knownVarOccRdrName  "dataCast2"
+mkConstrTag_RDR = knownVarOccRdrName  "mkConstrTag"
+constr_RDR      = knownTcOccRdrName   "Constr"
+mkDataType_RDR  = knownVarOccRdrName  "mkDataType"
+dataType_RDR    = knownTcOccRdrName   "DataType"
+conIndex_RDR    = knownVarOccRdrName  "constrIndex"
+prefix_RDR      = knownDataOccRdrName "Prefix"
+infix_RDR       = knownDataOccRdrName "Infix"
 
-gcast1_RDR     = varQual_RDR  gHC_INTERNAL_TYPEABLE (fsLit "gcast1")
-gcast2_RDR     = varQual_RDR  gHC_INTERNAL_TYPEABLE (fsLit "gcast2")
+gcast1_RDR = knownVarOccRdrName "gcast1"
+gcast2_RDR = knownVarOccRdrName "gcast2"
 
-eqChar_RDR     = varQual_RDR  gHC_PRIM (fsLit "eqChar#")
-ltChar_RDR     = varQual_RDR  gHC_PRIM (fsLit "ltChar#")
-leChar_RDR     = varQual_RDR  gHC_PRIM (fsLit "leChar#")
-gtChar_RDR     = varQual_RDR  gHC_PRIM (fsLit "gtChar#")
-geChar_RDR     = varQual_RDR  gHC_PRIM (fsLit "geChar#")
+eqChar_RDR     = primOpRdrName CharEqOp
+ltChar_RDR     = primOpRdrName CharLtOp
+leChar_RDR     = primOpRdrName CharLeOp
+gtChar_RDR     = primOpRdrName CharGtOp
+geChar_RDR     = primOpRdrName CharGeOp
 
-eqInt_RDR      = varQual_RDR  gHC_PRIM (fsLit "==#")
-neInt_RDR      = varQual_RDR  gHC_PRIM (fsLit "/=#")
-ltInt_RDR      = varQual_RDR  gHC_PRIM (fsLit "<#" )
-leInt_RDR      = varQual_RDR  gHC_PRIM (fsLit "<=#")
-gtInt_RDR      = varQual_RDR  gHC_PRIM (fsLit ">#" )
-geInt_RDR      = varQual_RDR  gHC_PRIM (fsLit ">=#")
+eqInt_RDR      = primOpRdrName IntEqOp
+neInt_RDR      = primOpRdrName IntNeOp
+ltInt_RDR      = primOpRdrName IntLtOp
+leInt_RDR      = primOpRdrName IntLeOp
+gtInt_RDR      = primOpRdrName IntGtOp
+geInt_RDR      = primOpRdrName IntGeOp
 
-eqInt8_RDR     = varQual_RDR  gHC_PRIM (fsLit "eqInt8#")
-ltInt8_RDR     = varQual_RDR  gHC_PRIM (fsLit "ltInt8#" )
-leInt8_RDR     = varQual_RDR  gHC_PRIM (fsLit "leInt8#")
-gtInt8_RDR     = varQual_RDR  gHC_PRIM (fsLit "gtInt8#" )
-geInt8_RDR     = varQual_RDR  gHC_PRIM (fsLit "geInt8#")
+eqInt8_RDR     = primOpRdrName Int8EqOp
+ltInt8_RDR     = primOpRdrName Int8LtOp
+leInt8_RDR     = primOpRdrName Int8LeOp
+gtInt8_RDR     = primOpRdrName Int8GtOp
+geInt8_RDR     = primOpRdrName Int8GeOp
 
-eqInt16_RDR    = varQual_RDR  gHC_PRIM (fsLit "eqInt16#")
-ltInt16_RDR    = varQual_RDR  gHC_PRIM (fsLit "ltInt16#" )
-leInt16_RDR    = varQual_RDR  gHC_PRIM (fsLit "leInt16#")
-gtInt16_RDR    = varQual_RDR  gHC_PRIM (fsLit "gtInt16#" )
-geInt16_RDR    = varQual_RDR  gHC_PRIM (fsLit "geInt16#")
+eqInt16_RDR    = primOpRdrName Int16EqOp
+ltInt16_RDR    = primOpRdrName Int16LtOp
+leInt16_RDR    = primOpRdrName Int16LeOp
+gtInt16_RDR    = primOpRdrName Int16GtOp
+geInt16_RDR    = primOpRdrName Int16GeOp
 
-eqInt32_RDR    = varQual_RDR  gHC_PRIM (fsLit "eqInt32#")
-ltInt32_RDR    = varQual_RDR  gHC_PRIM (fsLit "ltInt32#" )
-leInt32_RDR    = varQual_RDR  gHC_PRIM (fsLit "leInt32#")
-gtInt32_RDR    = varQual_RDR  gHC_PRIM (fsLit "gtInt32#" )
-geInt32_RDR    = varQual_RDR  gHC_PRIM (fsLit "geInt32#")
+eqInt32_RDR    = primOpRdrName Int32EqOp
+ltInt32_RDR    = primOpRdrName Int32LtOp
+leInt32_RDR    = primOpRdrName Int32LeOp
+gtInt32_RDR    = primOpRdrName Int32GtOp
+geInt32_RDR    = primOpRdrName Int32GeOp
 
-eqInt64_RDR    = varQual_RDR  gHC_PRIM (fsLit "eqInt64#")
-ltInt64_RDR    = varQual_RDR  gHC_PRIM (fsLit "ltInt64#" )
-leInt64_RDR    = varQual_RDR  gHC_PRIM (fsLit "leInt64#")
-gtInt64_RDR    = varQual_RDR  gHC_PRIM (fsLit "gtInt64#" )
-geInt64_RDR    = varQual_RDR  gHC_PRIM (fsLit "geInt64#")
+eqInt64_RDR    = primOpRdrName Int64EqOp
+ltInt64_RDR    = primOpRdrName Int64LtOp
+leInt64_RDR    = primOpRdrName Int64LeOp
+gtInt64_RDR    = primOpRdrName Int64GtOp
+geInt64_RDR    = primOpRdrName Int64GeOp
 
-eqWord_RDR     = varQual_RDR  gHC_PRIM (fsLit "eqWord#")
-ltWord_RDR     = varQual_RDR  gHC_PRIM (fsLit "ltWord#")
-leWord_RDR     = varQual_RDR  gHC_PRIM (fsLit "leWord#")
-gtWord_RDR     = varQual_RDR  gHC_PRIM (fsLit "gtWord#")
-geWord_RDR     = varQual_RDR  gHC_PRIM (fsLit "geWord#")
+eqWord_RDR     = primOpRdrName WordEqOp
+ltWord_RDR     = primOpRdrName WordLtOp
+leWord_RDR     = primOpRdrName WordLeOp
+gtWord_RDR     = primOpRdrName WordGtOp
+geWord_RDR     = primOpRdrName WordGeOp
 
-eqWord8_RDR    = varQual_RDR  gHC_PRIM (fsLit "eqWord8#")
-ltWord8_RDR    = varQual_RDR  gHC_PRIM (fsLit "ltWord8#" )
-leWord8_RDR    = varQual_RDR  gHC_PRIM (fsLit "leWord8#")
-gtWord8_RDR    = varQual_RDR  gHC_PRIM (fsLit "gtWord8#" )
-geWord8_RDR    = varQual_RDR  gHC_PRIM (fsLit "geWord8#")
+eqWord8_RDR    = primOpRdrName Word8EqOp
+ltWord8_RDR    = primOpRdrName Word8LtOp
+leWord8_RDR    = primOpRdrName Word8LeOp
+gtWord8_RDR    = primOpRdrName Word8GtOp
+geWord8_RDR    = primOpRdrName Word8GeOp
 
-eqWord16_RDR   = varQual_RDR  gHC_PRIM (fsLit "eqWord16#")
-ltWord16_RDR   = varQual_RDR  gHC_PRIM (fsLit "ltWord16#" )
-leWord16_RDR   = varQual_RDR  gHC_PRIM (fsLit "leWord16#")
-gtWord16_RDR   = varQual_RDR  gHC_PRIM (fsLit "gtWord16#" )
-geWord16_RDR   = varQual_RDR  gHC_PRIM (fsLit "geWord16#")
+eqWord16_RDR   = primOpRdrName Word16EqOp
+ltWord16_RDR   = primOpRdrName Word16LtOp
+leWord16_RDR   = primOpRdrName Word16LeOp
+gtWord16_RDR   = primOpRdrName Word16GtOp
+geWord16_RDR   = primOpRdrName Word16GeOp
 
-eqWord32_RDR   = varQual_RDR  gHC_PRIM (fsLit "eqWord32#")
-ltWord32_RDR   = varQual_RDR  gHC_PRIM (fsLit "ltWord32#" )
-leWord32_RDR   = varQual_RDR  gHC_PRIM (fsLit "leWord32#")
-gtWord32_RDR   = varQual_RDR  gHC_PRIM (fsLit "gtWord32#" )
-geWord32_RDR   = varQual_RDR  gHC_PRIM (fsLit "geWord32#")
+eqWord32_RDR   = primOpRdrName Word32EqOp
+ltWord32_RDR   = primOpRdrName Word32LtOp
+leWord32_RDR   = primOpRdrName Word32LeOp
+gtWord32_RDR   = primOpRdrName Word32GtOp
+geWord32_RDR   = primOpRdrName Word32GeOp
 
-eqWord64_RDR   = varQual_RDR  gHC_PRIM (fsLit "eqWord64#")
-ltWord64_RDR   = varQual_RDR  gHC_PRIM (fsLit "ltWord64#" )
-leWord64_RDR   = varQual_RDR  gHC_PRIM (fsLit "leWord64#")
-gtWord64_RDR   = varQual_RDR  gHC_PRIM (fsLit "gtWord64#" )
-geWord64_RDR   = varQual_RDR  gHC_PRIM (fsLit "geWord64#")
+eqWord64_RDR   = primOpRdrName Word64EqOp
+ltWord64_RDR   = primOpRdrName Word64LtOp
+leWord64_RDR   = primOpRdrName Word64LeOp
+gtWord64_RDR   = primOpRdrName Word64GtOp
+geWord64_RDR   = primOpRdrName Word64GeOp
 
-eqAddr_RDR     = varQual_RDR  gHC_PRIM (fsLit "eqAddr#")
-ltAddr_RDR     = varQual_RDR  gHC_PRIM (fsLit "ltAddr#")
-leAddr_RDR     = varQual_RDR  gHC_PRIM (fsLit "leAddr#")
-gtAddr_RDR     = varQual_RDR  gHC_PRIM (fsLit "gtAddr#")
-geAddr_RDR     = varQual_RDR  gHC_PRIM (fsLit "geAddr#")
+eqAddr_RDR     = primOpRdrName AddrEqOp
+ltAddr_RDR     = primOpRdrName AddrLtOp
+leAddr_RDR     = primOpRdrName AddrLeOp
+gtAddr_RDR     = primOpRdrName AddrGtOp
+geAddr_RDR     = primOpRdrName AddrGeOp
 
-eqFloat_RDR    = varQual_RDR  gHC_PRIM (fsLit "eqFloat#")
-ltFloat_RDR    = varQual_RDR  gHC_PRIM (fsLit "ltFloat#")
-leFloat_RDR    = varQual_RDR  gHC_PRIM (fsLit "leFloat#")
-gtFloat_RDR    = varQual_RDR  gHC_PRIM (fsLit "gtFloat#")
-geFloat_RDR    = varQual_RDR  gHC_PRIM (fsLit "geFloat#")
+eqFloat_RDR    = primOpRdrName FloatEqOp
+ltFloat_RDR    = primOpRdrName FloatLtOp
+leFloat_RDR    = primOpRdrName FloatLeOp
+gtFloat_RDR    = primOpRdrName FloatGtOp
+geFloat_RDR    = primOpRdrName FloatGeOp
 
-eqDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit "==##")
-ltDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit "<##" )
-leDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit "<=##")
-gtDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit ">##" )
-geDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit ">=##")
+eqDouble_RDR   = primOpRdrName DoubleEqOp
+ltDouble_RDR   = primOpRdrName DoubleLtOp
+leDouble_RDR   = primOpRdrName DoubleLeOp
+gtDouble_RDR   = primOpRdrName DoubleGtOp
+geDouble_RDR   = primOpRdrName DoubleGeOp
 
-int8DataCon_RDR   = dataQual_RDR gHC_INTERNAL_INT (fsLit "I8#")
-int16DataCon_RDR  = dataQual_RDR gHC_INTERNAL_INT (fsLit "I16#")
-int32DataCon_RDR  = dataQual_RDR gHC_INTERNAL_INT (fsLit "I32#")
-int64DataCon_RDR  = dataQual_RDR gHC_INTERNAL_INT (fsLit "I64#")
-word8DataCon_RDR  = dataQual_RDR gHC_INTERNAL_WORD (fsLit "W8#")
-word16DataCon_RDR = dataQual_RDR gHC_INTERNAL_WORD (fsLit "W16#")
-word32DataCon_RDR = dataQual_RDR gHC_INTERNAL_WORD (fsLit "W32#")
-word64DataCon_RDR = dataQual_RDR gHC_INTERNAL_WORD (fsLit "W64#")
+int8DataCon_RDR   = knownDataOccRdrName "I8#"
+int16DataCon_RDR  = knownDataOccRdrName "I16#"
+int32DataCon_RDR  = knownDataOccRdrName "I32#"
+int64DataCon_RDR  = knownDataOccRdrName "I64#"
+word8DataCon_RDR  = knownDataOccRdrName "W8#"
+word16DataCon_RDR = knownDataOccRdrName "W16#"
+word32DataCon_RDR = knownDataOccRdrName "W32#"
+word64DataCon_RDR = knownDataOccRdrName "W64#"
 
 eq_RDR, ge_RDR, le_RDR, lt_RDR, gt_RDR, compare_RDR :: RdrName
 eq_RDR      = knownKeyRdrName eqClassOpKey
@@ -420,19 +423,19 @@ gtTag_RDR       = nameRdrName ordGTDataConName
 map_RDR, fmap_RDR, replace_RDR, pure_RDR, ap_RDR, liftA2_RDR, foldable_foldr_RDR,
     foldMap_RDR, null_RDR, all_RDR, traverse_RDR, mempty_RDR,
     mappend_RDR :: RdrName
-map_RDR                 = knownKeyRdrName mapIdKey
-fmap_RDR                = knownKeyRdrName fmapClassOpKey
-pure_RDR                = knownKeyRdrName pureAClassOpKey
-ap_RDR                  = knownKeyRdrName apAClassOpKey
-mempty_RDR              = knownKeyRdrName memptyClassOpKey
-mappend_RDR             = knownKeyRdrName mappendClassOpKey
-replace_RDR             = varQual_RDR gHC_INTERNAL_BASE (fsLit "<$")
-liftA2_RDR              = varQual_RDR gHC_INTERNAL_BASE (fsLit "liftA2")
-foldable_foldr_RDR      = varQual_RDR gHC_INTERNAL_DATA_FOLDABLE       (fsLit "foldr")
-foldMap_RDR             = varQual_RDR gHC_INTERNAL_DATA_FOLDABLE       (fsLit "foldMap")
-null_RDR                = varQual_RDR gHC_INTERNAL_DATA_FOLDABLE       (fsLit "null")
-all_RDR                 = varQual_RDR gHC_INTERNAL_DATA_FOLDABLE       (fsLit "all")
-traverse_RDR            = varQual_RDR gHC_INTERNAL_DATA_TRAVERSABLE    (fsLit "traverse")
+map_RDR            = knownKeyRdrName mapIdKey
+fmap_RDR           = knownKeyRdrName fmapClassOpKey
+pure_RDR           = knownKeyRdrName pureAClassOpKey
+ap_RDR             = knownKeyRdrName apAClassOpKey
+mempty_RDR         = knownKeyRdrName memptyClassOpKey
+mappend_RDR        = knownKeyRdrName mappendClassOpKey
+replace_RDR        = knownVarOccRdrName "<$"
+liftA2_RDR         = knownVarOccRdrName "liftA2"
+foldable_foldr_RDR = knownVarOccRdrName "foldr"
+foldMap_RDR        = knownVarOccRdrName "foldMap"
+null_RDR           = knownVarOccRdrName "null"
+all_RDR            = knownVarOccRdrName "all"
+traverse_RDR       = knownVarOccRdrName "traverse"
 
 ltTag_Expr, eqTag_Expr, gtTag_Expr, false_Expr,
   true_Expr, pure_Expr,
@@ -451,8 +454,8 @@ all_Expr              = nlHsVar all_RDR
 null_Expr             = nlHsVar null_RDR
 
 minusInt_RDR, tagToEnum_RDR, dataToTag_RDR :: RdrName
-minusInt_RDR  = getRdrName (primOpId IntSubOp   )
-tagToEnum_RDR = getRdrName (primOpId TagToEnumOp)
+minusInt_RDR  = primOpRdrName IntSubOp
+tagToEnum_RDR = primOpRdrName TagToEnumOp
 dataToTag_RDR = knownKeyRdrName dataToTagClassOpKey
 
 -- Generics (constructors and functions)
@@ -463,101 +466,98 @@ u1DataCon_RDR, par1DataCon_RDR, rec1DataCon_RDR,
   from_RDR, from1_RDR, to_RDR, to1_RDR,
   datatypeName_RDR, moduleName_RDR, packageName_RDR, isNewtypeName_RDR,
   conName_RDR, conFixity_RDR, conIsRecord_RDR, selName_RDR,
-  prefixDataCon_RDR, infixDataCon_RDR, leftAssocDataCon_RDR,
-  rightAssocDataCon_RDR, notAssocDataCon_RDR,
+  leftAssocDataCon_RDR, rightAssocDataCon_RDR, notAssocDataCon_RDR,
   uAddrDataCon_RDR, uCharDataCon_RDR, uDoubleDataCon_RDR,
   uFloatDataCon_RDR, uIntDataCon_RDR, uWordDataCon_RDR,
   uAddrHash_RDR, uCharHash_RDR, uDoubleHash_RDR,
   uFloatHash_RDR, uIntHash_RDR, uWordHash_RDR :: RdrName
 
-u1DataCon_RDR    = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "U1")
-par1DataCon_RDR  = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "Par1")
-rec1DataCon_RDR  = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "Rec1")
-k1DataCon_RDR    = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "K1")
-m1DataCon_RDR    = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "M1")
+u1DataCon_RDR    = knownDataOccRdrName "U1"
+par1DataCon_RDR  = knownDataOccRdrName "Par1"
+rec1DataCon_RDR  = knownDataOccRdrName "Rec1"
+k1DataCon_RDR    = knownDataOccRdrName "K1"
+m1DataCon_RDR    = knownDataOccRdrName "M1"
 
-l1DataCon_RDR     = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "L1")
-r1DataCon_RDR     = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "R1")
+l1DataCon_RDR    = knownDataOccRdrName "L1"
+r1DataCon_RDR    = knownDataOccRdrName "R1"
 
-prodDataCon_RDR   = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit ":*:")
-comp1DataCon_RDR  = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "Comp1")
+prodDataCon_RDR  = knownDataOccRdrName ":*:"
+comp1DataCon_RDR = knownDataOccRdrName "Comp1"
 
-unPar1_RDR  = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "Par1")  (fsLit "unPar1")
-unRec1_RDR  = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "Rec1")  (fsLit "unRec1")
-unK1_RDR    = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "K1")    (fsLit "unK1")
-unComp1_RDR = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "Comp1") (fsLit "unComp1")
+unPar1_RDR  = knownFieldOccRdrName "Par1"  "unPar1"
+unRec1_RDR  = knownFieldOccRdrName "Rec1"  "unRec1"
+unK1_RDR    = knownFieldOccRdrName "K1"    "unK1"
+unComp1_RDR = knownFieldOccRdrName "Comp1" "unComp1"
 
-from_RDR  = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "from")
-from1_RDR = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "from1")
-to_RDR    = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "to")
-to1_RDR   = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "to1")
+from_RDR  = knownVarOccRdrName "from"
+from1_RDR = knownVarOccRdrName "from1"
+to_RDR    = knownVarOccRdrName "to"
+to1_RDR   = knownVarOccRdrName "to1"
 
-datatypeName_RDR  = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "datatypeName")
-moduleName_RDR    = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "moduleName")
-packageName_RDR   = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "packageName")
-isNewtypeName_RDR = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "isNewtype")
-selName_RDR       = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "selName")
-conName_RDR       = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "conName")
-conFixity_RDR     = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "conFixity")
-conIsRecord_RDR   = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "conIsRecord")
+datatypeName_RDR  = knownVarOccRdrName "datatypeName"
+moduleName_RDR    = knownVarOccRdrName "moduleName"
+packageName_RDR   = knownVarOccRdrName "packageName"
+isNewtypeName_RDR = knownVarOccRdrName "isNewtype"
+selName_RDR       = knownVarOccRdrName "selName"
+conName_RDR       = knownVarOccRdrName "conName"
+conFixity_RDR     = knownVarOccRdrName "conFixity"
+conIsRecord_RDR   = knownVarOccRdrName "conIsRecord"
 
-prefixDataCon_RDR     = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "Prefix")
-infixDataCon_RDR      = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "Infix")
 leftAssocDataCon_RDR  = nameRdrName leftAssociativeDataConName
 rightAssocDataCon_RDR = nameRdrName rightAssociativeDataConName
 notAssocDataCon_RDR   = nameRdrName notAssociativeDataConName
 
-uAddrDataCon_RDR   = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "UAddr")
-uCharDataCon_RDR   = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "UChar")
-uDoubleDataCon_RDR = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "UDouble")
-uFloatDataCon_RDR  = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "UFloat")
-uIntDataCon_RDR    = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "UInt")
-uWordDataCon_RDR   = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "UWord")
+uAddrDataCon_RDR   = knownDataOccRdrName "UAddr"
+uCharDataCon_RDR   = knownDataOccRdrName "UChar"
+uDoubleDataCon_RDR = knownDataOccRdrName "UDouble"
+uFloatDataCon_RDR  = knownDataOccRdrName "UFloat"
+uIntDataCon_RDR    = knownDataOccRdrName "UInt"
+uWordDataCon_RDR   = knownDataOccRdrName "UWord"
 
-uAddrHash_RDR   = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "UAddr")   (fsLit "uAddr#")
-uCharHash_RDR   = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "UChar")   (fsLit "uChar#")
-uDoubleHash_RDR = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "UDouble") (fsLit "uDouble#")
-uFloatHash_RDR  = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "UFloat")  (fsLit "uFloat#")
-uIntHash_RDR    = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "UInt")    (fsLit "uInt#")
-uWordHash_RDR   = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "UWord")   (fsLit "uWord#")
+uAddrHash_RDR   = knownFieldOccRdrName "UAddr"   "uAddr#"
+uCharHash_RDR   = knownFieldOccRdrName "UChar"   "uChar#"
+uDoubleHash_RDR = knownFieldOccRdrName "UDouble" "uDouble#"
+uFloatHash_RDR  = knownFieldOccRdrName "UFloat"  "uFloat#"
+uIntHash_RDR    = knownFieldOccRdrName "UInt"    "uInt#"
+uWordHash_RDR   = knownFieldOccRdrName "UWord"   "uWord#"
 
 readList_RDR, readListDefault_RDR, readListPrec_RDR, readListPrecDefault_RDR,
     readPrec_RDR, parens_RDR, choose_RDR, lexP_RDR, expectP_RDR :: RdrName
-readList_RDR            = varQual_RDR gHC_INTERNAL_READ (fsLit "readList")
-readListDefault_RDR     = varQual_RDR gHC_INTERNAL_READ (fsLit "readListDefault")
-readListPrec_RDR        = varQual_RDR gHC_INTERNAL_READ (fsLit "readListPrec")
-readListPrecDefault_RDR = varQual_RDR gHC_INTERNAL_READ (fsLit "readListPrecDefault")
-readPrec_RDR            = varQual_RDR gHC_INTERNAL_READ (fsLit "readPrec")
-parens_RDR              = varQual_RDR gHC_INTERNAL_READ (fsLit "parens")
-choose_RDR              = varQual_RDR gHC_INTERNAL_READ (fsLit "choose")
-lexP_RDR                = varQual_RDR gHC_INTERNAL_READ (fsLit "lexP")
-expectP_RDR             = varQual_RDR gHC_INTERNAL_READ (fsLit "expectP")
+readList_RDR            = knownVarOccRdrName "readList"
+readListDefault_RDR     = knownVarOccRdrName "readListDefault"
+readListPrec_RDR        = knownVarOccRdrName "readListPrec"
+readListPrecDefault_RDR = knownVarOccRdrName "readListPrecDefault"
+readPrec_RDR            = knownVarOccRdrName "readPrec"
+parens_RDR              = knownVarOccRdrName "parens"
+choose_RDR              = knownVarOccRdrName "choose"
+lexP_RDR                = knownVarOccRdrName "lexP"
+expectP_RDR             = knownVarOccRdrName "expectP"
 
 readField_RDR, readFieldHash_RDR, readSymField_RDR :: RdrName
-readField_RDR           = varQual_RDR gHC_INTERNAL_READ (fsLit "readField")
-readFieldHash_RDR       = varQual_RDR gHC_INTERNAL_READ (fsLit "readFieldHash")
-readSymField_RDR        = varQual_RDR gHC_INTERNAL_READ (fsLit "readSymField")
+readField_RDR           = knownVarOccRdrName "readField"
+readFieldHash_RDR       = knownVarOccRdrName "readFieldHash"
+readSymField_RDR        = knownVarOccRdrName "readSymField"
 
 punc_RDR, ident_RDR, symbol_RDR :: RdrName
-punc_RDR                = dataQual_RDR gHC_INTERNAL_LEX (fsLit "Punc")
-ident_RDR               = dataQual_RDR gHC_INTERNAL_LEX (fsLit "Ident")
-symbol_RDR              = dataQual_RDR gHC_INTERNAL_LEX (fsLit "Symbol")
+punc_RDR                = knownDataOccRdrName "Punc"
+ident_RDR               = knownDataOccRdrName "Ident"
+symbol_RDR              = knownDataOccRdrName "Symbol"
 
 step_RDR, alt_RDR, reset_RDR, prec_RDR, pfail_RDR :: RdrName
-step_RDR                = varQual_RDR  gHC_INTERNAL_READ_PREC (fsLit "step")
-alt_RDR                 = varQual_RDR  gHC_INTERNAL_READ_PREC (fsLit "+++")
-reset_RDR               = varQual_RDR  gHC_INTERNAL_READ_PREC (fsLit "reset")
-prec_RDR                = varQual_RDR  gHC_INTERNAL_READ_PREC (fsLit "prec")
-pfail_RDR               = varQual_RDR  gHC_INTERNAL_READ_PREC (fsLit "pfail")
+step_RDR                = knownVarOccRdrName "step"
+alt_RDR                 = knownVarOccRdrName "+++"
+reset_RDR               = knownVarOccRdrName "reset"
+prec_RDR                = knownVarOccRdrName "prec"
+pfail_RDR               = knownVarOccRdrName "pfail"
 
 showsPrec_RDR, shows_RDR, showString_RDR,
     showSpace_RDR, showCommaSpace_RDR, showParen_RDR :: RdrName
-showsPrec_RDR           = varQual_RDR gHC_INTERNAL_SHOW (fsLit "showsPrec")
-shows_RDR               = varQual_RDR gHC_INTERNAL_SHOW (fsLit "shows")
-showString_RDR          = varQual_RDR gHC_INTERNAL_SHOW (fsLit "showString")
-showSpace_RDR           = varQual_RDR gHC_INTERNAL_SHOW (fsLit "showSpace")
-showCommaSpace_RDR      = varQual_RDR gHC_INTERNAL_SHOW (fsLit "showCommaSpace")
-showParen_RDR           = varQual_RDR gHC_INTERNAL_SHOW (fsLit "showParen")
+showsPrec_RDR      = knownVarOccRdrName "showsPrec"
+shows_RDR          = knownVarOccRdrName "shows"
+showString_RDR     = knownVarOccRdrName "showString"
+showSpace_RDR      = knownVarOccRdrName "showSpace"
+showCommaSpace_RDR = knownVarOccRdrName "showCommaSpace"
+showParen_RDR      = knownVarOccRdrName "showParen"
 
 {- *********************************************************************
 *                                                                      *

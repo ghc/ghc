@@ -352,9 +352,9 @@ gk2gkDC Gen1 dc tc_args = Gen1_DC $ assert (isTyVarTy last_dc_inst_univ)
 mkBindsRep :: DynFlags -> GenericKind -> SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, [LSig GhcPs])
 mkBindsRep dflags gk loc dit@(DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
       where
-        binds = [mkRdrFunBind (L loc' from01_RDR) [from_eqn]]
+        binds = [mkRdrFunBind (mkMethBinder loc' from01_RDR) [from_eqn]]
               ++
-                [mkRdrFunBind (L loc' to01_RDR) [to_eqn]]
+                [mkRdrFunBind (mkMethBinder loc' to01_RDR) [to_eqn]]
 
         -- See Note [Generics performance tricks]
         sigs = if     gopt Opt_InlineGenericsAggressively dflags

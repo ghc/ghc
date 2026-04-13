@@ -41,6 +41,7 @@ import GHC.Core.Make
 import GHC.Core.ConLike
 
 import GHC.Builtin.Types
+import GHC.Builtin.KnownOccs
 import GHC.Builtin.KnownKeys
 
 import GHC.Types.Id
@@ -435,9 +436,9 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdIf _ mb_fun cond then_cmd else_cmd)
     (core_else, fvs_else, else_ids)
        <- dsfixCmd ids local_vars stack_ty res_ty else_cmd
     stack_id   <- newSysLocalMDs stack_ty
-    either_con <- dsLookupTyCon eitherTyConName
-    left_con   <- dsLookupDataCon leftDataConName
-    right_con  <- dsLookupDataCon rightDataConName
+    either_con <- dsLookupKnownOccTyCon eitherTyConOcc
+    left_con   <- dsLookupKnownOccDataCon leftDataConOcc
+    right_con  <- dsLookupKnownOccDataCon rightDataConOcc
 
     let mk_left_expr ty1 ty2 e = mkCoreConApps left_con   [Type ty1,Type ty2, e]
         mk_right_expr ty1 ty2 e = mkCoreConApps right_con [Type ty1,Type ty2, e]
@@ -783,10 +784,10 @@ dsCases ids local_vars stack_id stack_ty res_ty
                   core_leaf)
 
   branches <- mapM make_branch leaves
-  either_con <- dsLookupTyCon eitherTyConName
-  left_con <- dsLookupDataCon leftDataConName
-  right_con <- dsLookupDataCon rightDataConName
-  void_ty <- mkTyConTy <$> dsLookupTyCon voidTyConName
+  either_con <- dsLookupKnownOccTyCon   eitherTyConOcc
+  left_con   <- dsLookupKnownOccDataCon leftDataConOcc
+  right_con  <- dsLookupKnownOccDataCon rightDataConOcc
+  void_ty <- mkTyConTy <$> dsLookupKnownOccTyCon voidTyConOcc
   let
       left_id  = mkConLikeTc (RealDataCon left_con)
       right_id = mkConLikeTc (RealDataCon right_con)
