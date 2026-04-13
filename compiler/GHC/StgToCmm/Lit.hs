@@ -31,6 +31,7 @@ import GHC.Utils.Panic
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
 import Data.Char (ord)
+import GHC.Data.FastString (mkFastStringShortText)
 
 newStringCLit :: String -> FCode CmmLit
 -- ^ Make a global definition for the string,
@@ -94,8 +95,8 @@ mkSimpleLit platform = \case
    (LitNumber LitNumWord32 i)   -> CmmInt i W32
    (LitNumber LitNumWord64 i)   -> CmmInt i W64
    (LitFloating fty r)          -> CmmFloat r fty
-   (LitLabel fs fod)
-     -> let -- TODO: Literal labels might not actually be in the current package...
-            labelSrc = ForeignLabelInThisPackage
-        in CmmLabel (mkForeignLabel fs labelSrc fod)
-   other -> pprPanic "mkSimpleLit" (ppr other)
+   (LitLabel
+      (CLabelSpec lbl fod tgt)) -> CmmLabel (mkForeignLabel (mkFastStringShortText lbl) lblsrc fod)
+                                     where lblsrc = ForeignLabelInThisPackage
+                                     -- TODO: Literal labels might not actually be in the current package...
+   other                        -> pprPanic "mkSimpleLit" (ppr other)
