@@ -33,6 +33,8 @@ module GHC.Types.ForeignCall (
   isSafeForeignCall,
   -- ** CCallSpec
   CCallSpec(..),
+  -- ** CLabelSpec
+  CLabelSpec(..),
 
   -- * Foreign export types
   -- ** Data-type
@@ -233,6 +235,58 @@ renameHeader (Header a b) = Header a b
 {-
 ************************************************************************
 *                                                                      *
+\subsubsection{C labels}
+*                                                                      *
+************************************************************************
+-}
+
+-- | A C name (closely related to an assembler label or linker symbol), along
+-- with /what/ kind of entity the name refers to and /where/ the the entity
+-- lives.
+--
+-- The \"what\" is whether it refers to a C function or C data (e.g. a C global
+-- variable or constant). We track this because we need to know in the backends
+-- how to use the name.
+--
+-- The \"where\" is where the entity that the name refers to lives.
+-- Specifically, what shared library it lives in. We track this because on some
+-- platforms (especially Windows) the the backend has to generate different
+-- code to access symbols depending on whether they are in the current shared
+-- library or a different one.
+--
+-- This is used in Core's representation of 'Literal's, in the 'LitLabel'
+-- case, to represent the address of a C entity (function or data) by its name
+-- (also called a label or symbol). It gets used in the representation of FFI
+-- imports of the address of C names, like:
+--
+-- > foreign import ccall "foo.h &foo" foo :: Ptr CInt
+--
+data CLabelSpec
+   = CLabelSpec
+       !CLabelString            -- name
+       !CLabelIsFunctionOrData  -- what
+       !CLabelTargetLibrary     -- where
+  deriving (Eq, Data)
+
+type CLabelIsFunctionOrData = ForeignLabelIsFunctionOrData
+
+instance Binary CLabelSpec where
+    put_ bh (CLabelSpec lbl fod tgt) = do
+        put_ bh lbl
+        put_ bh fod
+        put_ bh tgt
+    get bh = do
+        lbl <- get bh
+        fod <- get bh
+        tgt <- get bh
+        return (CLabelSpec lbl fod tgt)
+
+instance NFData CLabelSpec where
+    rnf (CLabelSpec lbl fod tgt) = rnf lbl `seq` rnf fod `seq` rnf tgt
+
+{-
+************************************************************************
+*                                                                      *
 \subsection{ForeignLabelIsFunctionOrData}
 *                                                                      *
 ************************************************************************
@@ -330,6 +384,11 @@ data CLabelTargetLibrary
     -- otherwise.
   | CLabelTargetInUnit !Unit
   deriving (Data, Eq)
+
+instance Outputable CLabelTargetLibrary where
+   ppr CLabelTargetUnknown       = parens (text "unknown library")
+   ppr (CLabelTargetInUnit unit) = parens (text "in unit " <> ppr unit)
+
 
 data StaticTargetGhc = StaticTargetGhc
   { staticTargetLabel :: SourceText

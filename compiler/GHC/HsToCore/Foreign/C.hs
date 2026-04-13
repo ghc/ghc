@@ -116,7 +116,7 @@ dsCImport id co (CLabel cid) _ _ _ = do
    (resTy, foRhs) <- resultWrapper ty
    assert (fromJust resTy `eqType` addrPrimTy) $    -- typechecker ensures this
     let
-        rhs = foRhs (Lit (LitLabel cid fod))
+        rhs = foRhs (Lit (LitLabel (CLabelSpec cid fod CLabelTargetUnknown)))
         rhs' = Cast rhs co
     in
     return ([(id, rhs')], mempty, mempty)
@@ -191,8 +191,10 @@ dsCFExportDynamic id co0 cconv = do
           to be entered using an external calling convention
           (ccall).
          -}
+        fe_lbl        = CLabelSpec fe_nm ForeignLabelIsFunction
+                                   CLabelTargetUnknown
         adj_args      = [ Var stbl_value
-                        , Lit (LitLabel fe_nm ForeignLabelIsFunction)
+                        , Lit (LitLabel fe_lbl)
                         , Lit (mkLitString typestring)
                         ]
           -- name of external entry point providing these services.
