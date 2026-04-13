@@ -109,6 +109,7 @@ import GHC.Data.Maybe
 import GHC.Data.List.SetOps( minusList )
 import GHC.Data.OrdList
 
+import GHC.Data.Bag        (emptyBag, snocBag, bagToList)
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -118,6 +119,7 @@ import Control.Monad       ( guard )
 import Data.ByteString     ( ByteString )
 import Data.Function       ( on )
 import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL )
+import qualified Data.List.NonEmpty as NE
 import Data.Ord            ( comparing )
 import qualified Data.Set as Set
 
@@ -303,104 +305,302 @@ mkCast expr co
 *                                                                      *
 ********************************************************************* -}
 
--- | Wraps the given expression in the source annotation, dropping the
--- annotation if possible.
+-- | Wraps the given expression in a Tick, floating the tick as far into
+-- the AST as possible in order to try to satisfy the tick's desired placement
+-- properties (as per Note [Tickish placement] in GHC.Types.Tickish).
+--
+-- Prefer using 'mkTick' over explicit use of the 'Tick' constructor.
+--
+-- Also performs small on-the-fly optimisations:
+--
+--   * Eliminate unnecessary ticks by either absorbing them into existing ones
+--     or dropping them if that is valid (e.g. dropping profiling ticks around
+--     types, coercions and literals).
+--   * Split profiling ticks into counting/scoping parts so that the two parts
+--     can be placed independently into the AST.
 mkTick :: CoreTickish -> CoreExpr -> CoreExpr
-mkTick t orig_expr = mkTick' id orig_expr
+mkTick t orig_expr = mkTick' orig_expr
  where
   -- Some ticks (cost-centres) can be split in two, with the
   -- non-counting part having laxer placement properties.
-  canSplit = tickishCanSplit t && tickishPlace (mkNoCount t) /= tickishPlace t
+  -- See Note [Scoping ticks and counting ticks] in GHC.Types.Tickish.
+  can_split = tickishCanSplit t
 
-  -- mkTick' handles floating of ticks *into* the expression.
-  mkTick' :: (CoreExpr -> CoreExpr) -- Apply before adding tick (float with)
-                                    -- Always a composition of (Tick t) wrappers
-          -> CoreExpr               -- Current expression
-          -> CoreExpr
-          -- So in the call (mkTick' rest e), the expression
-          --   (rest e)
-          -- has the same type as e
-          -- Returns an expression equivalent to (Tick t (rest e))
-  mkTick' rest expr = case expr of
-    -- Float ticks into unsafe coerce the same way we would do with a cast.
-    Case scrut bndr ty alts@[Alt ac abs _rhs]
-      | Just rhs <- isUnsafeEqualityCase scrut bndr alts
-      -> Case scrut bndr ty [Alt ac abs (mkTick' rest rhs)]
-
-    -- Cost centre ticks should never be reordered relative to each
-    -- other. Therefore we can stop whenever two collide.
-    Tick t2 e
-      | ProfNote{} <- t2, ProfNote{} <- t -> Tick t $ rest expr
-
-    -- Otherwise we assume that ticks of different placements float
-    -- through each other.
-      | tickishPlace t2 /= tickishPlace t -> Tick t2 $ mkTick' rest e
-
-    -- For annotations this is where we make sure to not introduce
-    -- redundant ticks.
-      | tickishContains t t2              -> mkTick' rest e  -- Drop t2
-      | tickishContains t2 t              -> rest e          -- Drop t
-      | otherwise                         -> mkTick' (rest . Tick t2) e
-
-    -- Ticks don't care about types, so we just float all ticks
-    -- through them. Note that it's not enough to check for these
-    -- cases top-level. While mkTick will never produce Core with type
-    -- expressions below ticks, such constructs can be the result of
-    -- unfoldings. We therefore make an effort to put everything into
-    -- the right place no matter what we start with.
-    Cast e co   -> mkCast (mkTick' rest e) co
-    Coercion co -> Tick t $ rest (Coercion co)
+  -- mkTick' handles floating of tick `t` *into* the expression.
+  mkTick' :: CoreExpr -> CoreExpr
+  mkTick' expr
+    -- Deal with ticking a expression headed by one or more ticks.
+    | Just (ts, e) <- tickedExpr_maybe expr
+    = tickTickedExpr t ts e
+  mkTick' expr = case expr of
 
     Lam x e
       -- Always float through type lambdas. Even for non-type lambdas,
       -- floating is allowed for all but the most strict placement rule.
       | not (isRuntimeVar x) || tickishPlace t /= PlaceRuntime
-      -> Lam x $ mkTick' rest e
+      -> Lam x $ mkTick' e
 
-      -- If it is both counting and scoped, we split the tick into its
-      -- two components, often allowing us to keep the counting tick on
-      -- the outside of the lambda and push the scoped tick inside.
-      -- The point of this is that the counting tick can probably be
-      -- floated, and the lambda may then be in a position to be
-      -- beta-reduced.
-      | canSplit
-      -> Tick (mkNoScope t) $ rest $ Lam x $ mkTick (mkNoCount t) e
+      -- Push SCCs into lambdas.
+      -- See (PSCC2) in Note [Pushing SCCs inwards].
+      | can_split
+      -> Tick (mkNoScope t) $ Lam x $ mkTick (mkNoCount t) e
 
     App f arg
-      -- Always float through type applications.
+      -- All ticks float inwards through non-runtime arguments, as per
+      -- Note [Tickish placement] in GHC.Types.Tickish.
       | not (isRuntimeArg arg)
-      -> App (mkTick' rest f) arg
+      -> App (mkTick' f) arg
 
-      -- We can also float through constructor applications, placement
-      -- permitting. Again we can split.
-      | isSaturatedConApp expr && (tickishPlace t==PlaceCostCentre || canSplit)
+      -- Push SCCs into saturated constructor applications.
+      -- See (PSCC3) in Note [Pushing SCCs inwards].
+      | isSaturatedConApp expr
+      , tickishPlace t == PlaceCostCentre || can_split
       -> if tickishPlace t == PlaceCostCentre
-         then rest $ tickHNFArgs t expr
-         else Tick (mkNoScope t) $ rest $ tickHNFArgs (mkNoCount t) expr
+         then tickHNFArgs t expr
+         else Tick (mkNoScope t) $ tickHNFArgs (mkNoCount t) expr
+
+    -- See Note [No ticks around types or coercions]
+    e@(Coercion {}) -> e
+    e@(Type {})     -> e
+    -- Don't wrap static data in a tick which compiles to code,
+    -- as the code will never be run.
+    e@(Lit {}) | tickishIsCode t -> e
+
+    -- All ticks can be floated through casts, as per Note [Tickish placement].
+    Cast e co   -> mkCast (mkTick' e) co
+
+    -- Treat 'unsafeCoerce' as if it was a cast: float all ticks inwards.
+    -- See Note [Push ticks into unsafeCoerce]
+    Case scrut bndr ty alts@[Alt ac abs _rhs]
+      | Just rhs <- isUnsafeEqualityCase scrut bndr alts
+      -> Case scrut bndr ty [Alt ac abs (mkTick' rhs)]
 
     Var x
-      | notFunction && tickishPlace t == PlaceCostCentre
-      -> rest expr  -- Drop t
-      | notFunction && canSplit
-      -> Tick (mkNoScope t) $ rest expr
-      where
-        -- SCCs can be eliminated on variables provided the variable
-        -- is not a function.  In these cases the SCC makes no difference:
-        -- the cost of evaluating the variable will be attributed to its
-        -- definition site.  When the variable refers to a function, however,
-        -- an SCC annotation on the variable affects the cost-centre stack
-        -- when the function is called, so we must retain those.
-        notFunction = not (isFunTy (idType x))
-
-    Lit{}
+       -- Don't drop any ticks around a function
+      | isFunTy (idType x)
+      -> Tick t expr
+      -- Drop SCCs around non-function variables.
+      -- See (PSCC1) in Note [Pushing SCCs inwards].
       | tickishPlace t == PlaceCostCentre
-      -> rest expr   -- Drop t
+      -> -- Drop pure SCC ticks:  scc<foo> (x :: Int) ==> x
+         expr
+      | can_split
+      -> -- Drop the scoping part of the tick, but keep the counting part.
+         Tick (mkNoScope t) expr
 
-    -- Catch-all: Annotate where we stand
-    _any -> Tick t $ rest expr
+    -- Catch-all: annotate where we stand.
+    -- In particular (but not only): Let, most Cases.
+    _other -> Tick t expr
+
+-- | Apply a tick to an expression headed by ticks.
+tickTickedExpr
+  :: CoreTickish             -- ^ tick to add
+  -> NE.NonEmpty CoreTickish -- ^ existing stack of ticks
+  -> CoreExpr                -- ^ inner core expression
+  -> CoreExpr
+tickTickedExpr t1 t2s e
+
+  -- Case 1: common up 't1' with a tick in the stack.
+  --
+  -- It's important to look at the whole stack to expose more opportunities for
+  -- combination.
+  -- See Note [Avoiding duplicate ticks] in GHC.Core.Opt.FloatOut
+  -- and Note [Ordering of source notes] in GHC.Types.Tickish.
+  | Just t2s' <- combine_into_stack t2s
+  = apply_ticks t2s' e
+
+  -- Case 2: 't1' can be commuted past all the ticks in the stack, e.g. because
+  -- it has tighter placement properties than all the ticks in the stack.
+  -- Push it inwards to expose cancellation opportunities.
+  | all (tickishCommutable t1) t2s
+  = apply_ticks t2s $ mkTick t1 e
+
+  -- Fallback: keep the new tick on the outside.
+  | otherwise
+  = apply_ticks (t1 NE.:| NE.toList t2s) e
+
+  where
+    apply_ticks :: NE.NonEmpty CoreTickish -> CoreExpr -> CoreExpr
+    apply_ticks ts e' = foldr Tick e' ts
+
+    -- Try to combine 't1' into a stack of ticks.
+    combine_into_stack :: NE.NonEmpty CoreTickish -> Maybe (NE.NonEmpty CoreTickish)
+    combine_into_stack (t2 NE.:| rest)
+      | Just t2' <- combineTickish_maybe t1 t2
+      = Just (t2' NE.:| rest)
+      | r_hd : r_tl <- rest
+      , Just rest' <- combine_into_stack (r_hd NE.:| r_tl)
+      = Just (t2 NE.:| NE.toList rest')
+      | otherwise
+      = Nothing
+
+{- Note [Pushing SCCs inwards]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Amongst all ticks, SCCs have the laxest placement properties (PlaceCostCentre,
+as described in Note [Tickish placement] GHC.Types.Tickish):
+
+  (PSCC1) SCCs around non-function variables can be eliminated.
+    The cost of evaluating the variable will be attributed to its definition
+    site, so the SCC makes no difference. Example:
+
+      scc<foo> (x :: Int)  ==>  x
+
+    NB: this is only valid when the variable is not a function. For example, in:
+
+      scc<foo> (f :: Int -> Int)
+
+    we must retain the cost centre annotation, as it affects the cost-centre
+    pointer when the function is called. Discarding the SCC in this case would
+    defeat the profiling mechanism entirely!
+
+  (PSCC2) SCCs can be pushed into lambdas.
+
+       scc<foo> (\x -> e)  ==>  \x -> scc<foo> e
+
+  (PSCC3) We can push SCCs into (saturated) constructor applications.
+    For example, for an arity 2 data constructor 'D':
+
+       scc<foo> (D e1 e2)  ==>  D (scc<foo> e1) (scc<foo> e2)
+
+Now, two kinds of ticks contain SCCs:
+
+  - bare SCCs (i.e. ProfNote with profNoteCounts = False, profNoteScopes = True)
+  - profiling ticks that both count and scope
+
+The above explanation deals with bare SCCs. When handling profiling ticks that
+both count and scope, we can split tick into two, so that the scoping part can
+be pushed inwards (or even discarded). Specifically, we perform the following
+transformations:
+
+  (PSCC1) Drop the SCC around non-function variables, keeping only the counting
+    part:
+
+       scctick<foo> (x :: Int)  ==>  tick<foo> x
+
+  (PSCC2) Push the SCC inside lambdas:
+
+       scctick<foo> (\x. e)  ==>  tick<foo> (\x. scc<foo> e)
+
+    NB: we must keep the counting part outside the lambda, in order to preserve
+    tick counter tallies – it would not be sound to push the counting part inside.
+
+  (PSCC3) Push the SCC inside saturated contructor applications.
+
+       scctick<foo> (D e1 e2)  ==>  tick<foo> (D (scc<foo> e1) (scc<foo> e2))
+
+The benefit of these transformation is that the counting part, tick<foo>, can
+likely be floated out of the way, which may expose additional optimisation
+opportunities. For example, for (PSCC2):
+
+  (scctick<foo> (\x. e)) arg
+
+    ==>{PSCC2}
+
+  (tick<foo> (\x. scc<foo> e)) arg
+
+    ==>{GHC.Core.Opt.FloatOut.floatExpr, because 'tick<foo>' has no scope}
+
+  tick<foo> ((\x. scc<foo> e) arg)
+
+    ==>{beta reduction}
+
+  tick<foo> (let x = arg in scc<foo> e)
+
+For (PSCC3):
+
+  case (scctick<foo> (Just x)) of { Nothing -> 0; Just y -> y + 1 }
+
+    ==>{PSCC3}
+
+  case (tick<foo> (Just (scc<foo> x))) of { Nothing -> 0; Just y -> y + 1 }
+
+    ==>{GHC.Core.Opt.FloatOut.floatExpr, because 'tick<foo>' has no scope}
+
+  tick<foo> (case Just (scc<foo> x) of { Nothing -> 0; Just y -> y + 1 })
+
+    ==>{case of known constructor}
+
+  tick<foo> (let y = scc<foo> x in y + 1)
+
+Note [Push ticks into unsafeCoerce]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In #25212, we had a program of the form:
+
+  data Box = Box Any
+  asBox :: a -> Box
+  asBox x = {-# SCC asBox #-} Box (unsafeCoerce x)
+
+As per Note [Implementing unsafeCoerce] in GHC.Internal.Unsafe.Coerce, the call
+to `unsafeCoerce` turns into
+
+  case unsafeEqualityProof @Type @a @Any of
+    UnsafeRefl (co :: a ~# Any) -> x |> Sub co
+
+The worker for 'asBox' is then of the form:
+
+  $wasBox = \@a (x :: a) ->
+    (# case unsafeEqualityProof @Type @a @Any of
+        UnsafeRefl (co :: a ~# Any) -> x |> Sub co
+    #)
+
+When inserting the SCC, we push it into the constructor as per (PSCC3) in
+Note [Pushing SCCs inwards], so we get:
+
+  $wasBox = \@a (x :: a) ->
+    tick<asBox>
+    (# scc<asBox>
+       case unsafeEqualityProof @Type @a @Any of
+         UnsafeRefl (co :: a ~# Any) -> x |> Sub co
+    #)
+
+Now, if we don't push the SCC tick into the case statement, Core Prep will
+see an expression like 'MkSolo# (scc<asBox> ...)', which it will ANFise to
+'let x = scc<asBox> ... in MkSolo# x', creating an unwanted thunk in the process.
+
+So the strategy is to treat this 'unsafeEqualityProof' case statement as if it
+was a cast. We thus push the SCC into the RHS of the pattern match:
+
+  $wasBox = \@a (x :: a) ->
+    tick<asBox>
+    (# case unsafeEqualityProof @Type @a @Any of
+         UnsafeRefl (co :: a ~# Any) -> scc<asBox> x |> Sub co
+    #)
+
+Then the SCC completely evaporates, as per (PSCC1) in Note [Pushing SCCs inwards].
+
+Note [No ticks around types or coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It doesn't make much sense to put a tick around a type or a coercion, as both
+types and coercions are erased in the end.
+
+In fact, it is quite dangerous to add a tick around types or coercions, because
+the optimiser does not robustly look through ticks:
+
+  - 'GHC.Core.SimpleOpt.simple_bind_pair' does not look through ticks when
+    looking at the RHS to decide whether it is a Type or Coercion,
+  - 'GHC.Core.Opt.Simplify.Iteration.completeBind' does not look through ticks
+    when looking at the RHS of an CoVar binding.
+
+This means it is vital to drop ticks around types/coercions:
+
+  - (#26941) Core Lint rejects bindings of the form "let co = tick ..."
+    in which the LHS is a CoVar and the RHS is a ticked Coercion.
+  - (#27121) The simplifier mis-handles ticked coercion bindings, which can
+    result in 'lookupIdSubst' panics (due to failing to extend the substitution
+    with a coercion).
+-}
 
 mkTicks :: [CoreTickish] -> CoreExpr -> CoreExpr
 mkTicks ticks expr = foldr mkTick expr ticks
+
+-- | Is this expression headed by a stack of ticks?
+tickedExpr_maybe :: CoreExpr -> Maybe (NE.NonEmpty CoreTickish, CoreExpr)
+tickedExpr_maybe = go emptyBag
+  where
+    go ts (Tick t e) = go (ts `snocBag` t) e
+    go ts e = case bagToList ts of
+      [] -> Nothing
+      t2:rest -> Just (t2 NE.:| rest, e)
 
 isSaturatedConApp :: CoreExpr -> Bool
 isSaturatedConApp e = go e []
@@ -2545,8 +2745,8 @@ exprIsTickedString = isJust . exprIsTickedString_maybe
 exprIsTickedString_maybe :: CoreExpr -> Maybe ByteString
 exprIsTickedString_maybe (Lit (LitString bs)) = Just bs
 exprIsTickedString_maybe (Tick t e)
-  -- we don't tick literals with CostCentre ticks, compare to mkTick
-  | tickishPlace t == PlaceCostCentre = Nothing
+  -- Shortcut: ticks with code never wrap literals (compare with 'mkTick')
+  | tickishIsCode t = Nothing
   | otherwise = exprIsTickedString_maybe e
 exprIsTickedString_maybe _ = Nothing
 

@@ -212,10 +212,8 @@ shouldMakeDistinctTable StgDebugOpts{stgDebug_distinctConstructorTables} dc =
   where
     dcStr = occNameString . occName $ dataConName dc
 
-{-
-Note [Mapping Info Tables to Source Positions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+{- Note [Mapping Info Tables to Source Positions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This note describes what the `-finfo-table-map` flag achieves.
 
 When debugging memory issues it is very useful to be able to map a specific closure
