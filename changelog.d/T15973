@@ -1,0 +1,6 @@
+section: ghc-lib
+synopsis: GHC now represents target's Int constants internally with a TargetInt
+  (~Int64) in order to avoid overflows when cross-compiling from a 32-bit
+  architecture to a 64-bit one.
+issues: #15973
+mrs: !15883
