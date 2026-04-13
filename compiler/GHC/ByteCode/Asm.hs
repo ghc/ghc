@@ -994,7 +994,7 @@ assembleI platform i = case i of
 
 literal :: Platform -> Literal -> OneOrTwo BCONPtr
 literal platform = \case
-  LitLabel fs _  -> OnlyOne (BCONPtrLbl fs)
+  LitLabel (CLabelSpec fs _ _) -> OnlyOne (BCONPtrLbl fs)
   LitNullAddr    -> word 0
   LitFloating LitFloat  x -> float platform (litFloatingToHostFloat x)
   LitFloating LitDouble x -> double platform (litFloatingToHostDouble x)

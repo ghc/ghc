@@ -15,6 +15,7 @@ module GHC.Types.Literal
         , LitNumType(..)
         , LitFloating
         , LitFloatingType(..)
+        , CLabelSpec(..)
 
         -- ** Creating Literals
         , mkLitInt, mkLitIntWrap, mkLitIntWrapC, mkLitIntUnchecked
@@ -144,14 +145,15 @@ data Literal
                                 -- ^ @Float#@ or @Double#@.
                                 -- Create with 'mkLitFloat' or 'mkLitDouble'.
 
-  | LitLabel FastString ForeignLabelIsFunctionOrData
-                                -- ^ A label literal. Parameters:
+  | LitLabel !CLabelSpec        -- ^ A label literal. Parameters:
                                 --
                                 -- 1) The name of the symbol mentioned in the
                                 --    declaration
                                 --
                                 -- 2) Flag indicating whether the symbol
                                 --    references a function or a data
+                                --
+                                -- 3) Where the thing lives: which shared lib.
   deriving Data
 
 -- | Numeric literal type
@@ -265,10 +267,9 @@ instance Binary Literal where
     put_ bh (LitNullAddr)    = putByte bh 2
     put_ bh (LitFloating LitFloat ah)  = do putByte bh 3; put_ bh ah
     put_ bh (LitFloating LitDouble ai) = do putByte bh 4; put_ bh ai
-    put_ bh (LitLabel aj fod)
+    put_ bh (LitLabel lsp)
         = do putByte bh 5
-             put_ bh aj
-             put_ bh fod
+             put_ bh lsp
     put_ bh (LitNumber nt i)
         = do putByte bh 6
              put_ bh nt
@@ -293,9 +294,8 @@ instance Binary Literal where
                     ai <- get bh
                     return (LitFloating LitDouble ai)
               5 -> do
-                    aj <- get bh
-                    fod <- get bh
-                    return (LitLabel aj fod)
+                    lsp <- get bh
+                    return (LitLabel lsp)
               6 -> do
                     nt <- get bh
                     i  <- get bh
@@ -308,7 +308,7 @@ instance NFData Literal where
     rnf (LitString s) = rnf s
     rnf LitNullAddr = ()
     rnf (LitFloating ty f) = rnf ty `seq` rnf f
-    rnf (LitLabel l1 k2) = rnf l1 `seq` rnf k2
+    rnf (LitLabel l) = rnf l
     rnf (LitRubbish {}) = () -- LitRubbish is not contained within interface files.
                              -- See Note [Rubbish literals].
 
@@ -844,7 +844,7 @@ literalType (LitChar _)       = charPrimTy
 literalType (LitString  _)    = addrPrimTy
 literalType (LitFloating LitFloat  _) = floatPrimTy
 literalType (LitFloating LitDouble _) = doublePrimTy
-literalType (LitLabel _ _)    = addrPrimTy
+literalType (LitLabel _)      = addrPrimTy
 literalType (LitNumber lt _)  = case lt of
    LitNumBigNat  -> byteArrayPrimTy
    LitNumInt     -> intPrimTy
@@ -875,7 +875,8 @@ cmpLit (LitString    a)     (LitString     b)     = a `compare` b
 cmpLit (LitNullAddr)        (LitNullAddr)         = EQ
 cmpLit (LitFloating lft1 a) (LitFloating lft2 b)
   = (lft1 `compare` lft2) `mappend` (a `compare` b)
-cmpLit (LitLabel     a _) (LitLabel      b _    ) = a `lexicalCompareFS` b
+cmpLit (LitLabel (CLabelSpec a _ _))
+       (LitLabel (CLabelSpec b _ _))              = a `lexicalCompareFS` b
 cmpLit (LitNumber nt1 a)    (LitNumber nt2  b)
   = (nt1 `compare` nt2) `mappend` (a `compare` b)
 cmpLit (LitRubbish tc1 b1)  (LitRubbish tc2 b2)  = (tc1 `compare` tc2) `mappend`
@@ -915,8 +916,8 @@ pprLiteral _       (LitNumber nt i)
        LitNumWord16  -> pprPrimWord16 i
        LitNumWord32  -> pprPrimWord32 i
        LitNumWord64  -> pprPrimWord64 i
-pprLiteral add_par (LitLabel l fod) =
-    add_par (text "__label" <+> pprHsString l <+> ppr fod)
+pprLiteral add_par (LitLabel (CLabelSpec l fod tgt)) =
+    add_par (text "__label" <+> pprHsString l <+> ppr fod <+> ppr tgt)
 pprLiteral _       (LitRubbish torc rep)
   = text "RUBBISH" <> pp_tc <> parens (ppr rep)
   where
