@@ -243,7 +243,7 @@ dsJsImport id co (CLabel cid) _ _ _ = do
              _ -> ForeignLabelIsData
    (_resTy, foRhs) <- jsResultWrapper ty
 --   ASSERT(fromJust resTy `eqType` addrPrimTy)    -- typechecker ensures this
-   let rhs = foRhs (Lit (LitLabel (mkFastStringShortText cid) fod))
+   let rhs = foRhs (Lit (LitLabel (CLabelSpec cid fod CLabelTargetUnknown)))
        rhs' = Cast rhs co
 
    return ([(id, rhs')], mempty, mempty)
@@ -293,8 +293,10 @@ dsJsFExportDynamic id co0 cconv = do
           to be entered using an external calling convention
           (ccall).
          -}
+        fe_lbl        = CLabelSpec fe_nm ForeignLabelIsFunction
+                                   CLabelTargetUnknown
         adj_args      = [ Var stbl_value
-                        , Lit (LitLabel (mkFastStringShortText fe_nm) ForeignLabelIsFunction)
+                        , Lit (LitLabel fe_lbl)
                         , Lit (mkLitString typestring)
                         ]
           -- name of external entry point providing these services.
