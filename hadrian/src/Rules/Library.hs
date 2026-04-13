@@ -220,13 +220,6 @@ extraObjects context
          interpretInContext context getBignumBackend >>= \case
             "gmp" -> gmpObjects (stage context)
             _     -> return []
-
-    | package context == rts = do
-          target   <- interpretInContext context getStagedTarget
-          builddir <- buildPath context
-          return [ builddir -/- "libHSghc-internal.dll.a"
-                 | archOS_OS (tgtArchOs target) == OSMinGW32
-                 , Dynamic `wayUnit` way context ]
     | otherwise = return []
 
 -- | Return all the object files to be put into the library we're building for
