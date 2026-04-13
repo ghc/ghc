@@ -78,6 +78,7 @@ import GHC.Float (castFloatToWord32, castDoubleToWord64)
 import qualified Data.List as List ( any )
 import GHC.Exts
 import GHC.Core.DataCon
+import GHC.Data.FastString (mkFastStringShortText)
 import GHC.Data.FlatBag
 import GHC.Types.Id
 import Data.List (unfoldr)
@@ -994,7 +995,7 @@ assembleI platform i = case i of
 
 literal :: Platform -> Literal -> OneOrTwo BCONPtr
 literal platform = \case
-  LitLabel fs _  -> OnlyOne (BCONPtrLbl fs)
+  LitLabel (CLabelSpec fs _ _) -> OnlyOne (BCONPtrLbl (mkFastStringShortText fs))
   LitNullAddr    -> word 0
   LitFloating LitFloat  x -> float platform (litFloatingToHostFloat x)
   LitFloating LitDouble x -> double platform (litFloatingToHostDouble x)
