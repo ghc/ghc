@@ -69,7 +69,8 @@ import GHC.Internal.Generics (Generic)
 import GHC.Internal.IO
 import GHC.Internal.Real
 import GHC.Internal.Show
-import GHC.Internal.Num  -- For known-key names
+import qualified GHC.Internal.Num as Rebindable
+import qualified GHC.Internal.Generics as Rebindable
 
 -- | 'RtsTime' is defined as a @StgWord64@ in @stg/Types.h@
 --

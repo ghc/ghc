@@ -67,7 +67,7 @@ import GHC.Internal.Base
 import GHC.Internal.Err (error, errorWithoutStackTrace)
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Prim (seq)
-import GHC.Internal.Read
+import GHC.Internal.Read (ReadS, readParen, lex, lexDigits)
 import GHC.Internal.Real
 import GHC.Internal.Float
 import GHC.Internal.Num
@@ -76,6 +76,7 @@ import GHC.Internal.Text.ParserCombinators.ReadP( ReadP, readP_to_S, pfail )
 import qualified GHC.Internal.Text.Read.Lex as L
 import GHC.Internal.Base as Rebindable( (>>=) )                -- For known-key names
 import GHC.Internal.Control.Monad.Fail as Rebindable( fail )   -- For known-key names
+import qualified GHC.Internal.Read as Rebindable
 
 -- $setup
 -- >>> import Prelude

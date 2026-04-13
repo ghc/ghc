@@ -32,7 +32,7 @@ module GHC.Internal.Read
   , readLitChar
   , lexDigits
 
-  -- defining readers
+  -- Defining readers
   , lexP, expectP
   , paren
   , parens
@@ -44,8 +44,10 @@ module GHC.Internal.Read
   , readFieldHash
   , readSymField
 
-  -- Temporary
+  -- Convenient known-occ names for importing scopes
   , readParen
+  , prec, step, reset, (+++), pfail
+  , L.Lexeme(..)
   )
  where
 
@@ -59,6 +61,7 @@ import GHC.Internal.Text.ParserCombinators.ReadP
   )
 
 import qualified GHC.Internal.Text.Read.Lex as L
+import qualified GHC.Internal.Text.Read.Lex as Rebindable
 -- Lex exports 'lex', which is also defined here,
 -- hence the qualified import.
 -- We can't import *anything* unqualified, because that

@@ -52,7 +52,7 @@ import GHC.Internal.Foreign.Storable (Storable(..))
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num (Num(..))
 import GHC.Internal.Real (fromIntegral, div)
-import GHC.Internal.Show (Show)
+import GHC.Internal.Show
 import GHC.Internal.System.Posix.Internals (c_close, setCloseOnExec)
 import GHC.Internal.System.Posix.Types (Fd(..))
 

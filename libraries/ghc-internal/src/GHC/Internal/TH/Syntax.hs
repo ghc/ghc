@@ -61,6 +61,7 @@ import GHC.Internal.Num
 import GHC.Internal.IO.Unsafe
 import GHC.Internal.List (dropWhile, break, replicate, reverse, last)
 import GHC.Internal.Unicode
+import qualified GHC.Internal.Generics as Rebindable hiding( prec )
 #endif
 import GHC.Internal.ForeignSrcLang
 import GHC.Internal.LanguageExtensions

@@ -174,7 +174,7 @@ gen_Functor_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
   = ([fmap_bind, replace_bind], emptyBag)
   where
     data_cons = getPossibleDataCons tycon tycon_args
-    fmap_name = L (noAnnSrcSpan loc) fmap_RDR
+    fmap_name = mkMethBinder loc fmap_RDR
 
     -- See Note [EmptyDataDecls with Functor, Foldable, and Traversable]
     fmap_bind = mkRdrFunBindEC 2 id fmap_name fmap_eqns
@@ -821,7 +821,7 @@ gen_Foldable_binds loc (DerivInstTys{dit_rep_tc = tycon})
   | Phantom <- last (tyConRoles tycon)
   = ([foldMap_bind], emptyBag)
   where
-    foldMap_name = L (noAnnSrcSpan loc) foldMap_RDR
+    foldMap_name = mkMethBinder loc foldMap_RDR
     foldMap_bind = mkRdrFunBind foldMap_name foldMap_eqns
     foldMap_eqns = [mkSimpleMatch foldMap_match_ctxt
                                   (noLocA [nlWildPat, nlWildPat])
@@ -839,9 +839,8 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
   where
     data_cons = getPossibleDataCons tycon tycon_args
 
-    foldr_name = L (noAnnSrcSpan loc) foldable_foldr_RDR
-
-    foldr_bind = mkRdrFunBind (L (noAnnSrcSpan loc) foldable_foldr_RDR) eqns
+    foldr_name = mkMethBinder loc foldable_foldr_RDR
+    foldr_bind = mkRdrFunBind foldr_name eqns
     eqns = map foldr_eqn data_cons
     foldr_eqn con
       = evalState (match_foldr z_Expr [f_Pat,z_Pat] con =<< parts) bs_RDRsInf
@@ -849,7 +848,7 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
         parts = sequence $ foldDataConArgs ft_foldr con dit
     foldr_match_ctxt = mkPrefixFunRhs foldr_name noAnn
 
-    foldMap_name = L (noAnnSrcSpan loc) foldMap_RDR
+    foldMap_name = mkMethBinder loc foldMap_RDR
 
     -- See Note [EmptyDataDecls with Functor, Foldable, and Traversable]
     foldMap_bind = mkRdrFunBindEC 2 (const mempty_Expr)
@@ -873,7 +872,7 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
       go NotNull = Nothing
       go (NullM a) = Just (Just a)
 
-    null_name = L (noAnnSrcSpan loc) null_RDR
+    null_name = mkMethBinder loc null_RDR
     null_match_ctxt = mkPrefixFunRhs null_name noAnn
     null_bind = mkRdrFunBind null_name null_eqns
     null_eqns = map null_eqn data_cons
@@ -1053,7 +1052,7 @@ gen_Traversable_binds loc (DerivInstTys{dit_rep_tc = tycon})
   | Phantom <- last (tyConRoles tycon)
   = ([traverse_bind], emptyBag)
   where
-    traverse_name = L (noAnnSrcSpan loc) traverse_RDR
+    traverse_name = mkMethBinder loc traverse_RDR
     traverse_bind = mkRdrFunBind traverse_name traverse_eqns
     traverse_eqns =
         [mkSimpleMatch traverse_match_ctxt

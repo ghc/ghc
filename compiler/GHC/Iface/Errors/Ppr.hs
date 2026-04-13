@@ -313,12 +313,12 @@ interfaceErrorDiagnostic opts = \ case
   KnownKeyScopeError occ gres call_stack
     | null gres
     -> hang (text "Could not find known-key entity" <+> quotes (ppr occ))
-          2 (vcat [ text "in the top-level global environment"
+          2 (vcat [ text "in the top-level environment (unqualified, or qualified as Rebindable)"
                   , text "Consider importing it"
                   , prettyCallStackDoc call_stack ])
     | otherwise
     -> hang (text "Known-key entity" <+> quotes (ppr occ))
-          2 (text "is ambiguous in the top-level global environment")
+          2 (text "is ambiguous in the top-level global environment" $$ ppr gres)
 
 lookingForHerald :: InterfaceLookingFor -> SDoc
 lookingForHerald looking_for =

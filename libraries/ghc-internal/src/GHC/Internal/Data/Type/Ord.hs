@@ -36,7 +36,7 @@ module GHC.Internal.Data.Type.Ord (
   ) where
 
 import GHC.Internal.Base
-import GHC.Internal.Show (Show(..))
+import GHC.Internal.Show
 import GHC.Internal.TypeError
 import GHC.Internal.TypeLits.Internal
 import GHC.Internal.TypeNats.Internal

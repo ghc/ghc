@@ -113,7 +113,6 @@ import GHC.Data.FastString
 import GHC.Data.List.SetOps ( minusList )
 import GHC.Data.Bag
 
-import GHC.Stack( callStack )
 import Control.Monad
 import Data.Either      ( partitionEithers )
 import Data.Function    ( on )
@@ -1057,7 +1056,7 @@ lookup_known_occ (KKNS_InScope gbl_rdr_env) occ
                           ; traceIf $ hang (text "lookupKnownKeyOcc NoImplicitKnownKeyNames")
                                          2 (ppr name <+> ppr occ)
                           ; return (Succeeded name) }
-      Failed gres -> return (Failed (KnownKeyScopeError occ gres callStack))
+      Failed err -> return (Failed err)
 
 lookupLocatedOccRn :: WhatLooking
                    -> GenLocated (EpAnn ann) RdrName

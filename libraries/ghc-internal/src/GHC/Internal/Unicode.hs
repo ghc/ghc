@@ -43,7 +43,7 @@ import qualified GHC.Internal.Unicode.Char.UnicodeData.SimpleUpperCaseMapping as
 
 -- Data.Char.chr already imports this and we need to define a Show instance
 -- for GeneralCategory
-import GHC.Internal.Show ( Show )
+import GHC.Internal.Show
 
 -- $setup
 -- >>> import Prelude

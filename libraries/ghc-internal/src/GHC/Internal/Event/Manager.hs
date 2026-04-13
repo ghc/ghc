@@ -77,7 +77,7 @@ import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num (Num(..))
 import GHC.Internal.Prim (seq)
 import GHC.Internal.Real (fromIntegral)
-import GHC.Internal.Show (Show(..))
+import GHC.Internal.Show
 import GHC.Internal.Event.Control
 import GHC.Internal.Event.IntTable (IntTable)
 import GHC.Internal.Event.Internal (Backend, Event, evtClose, evtRead, evtWrite,

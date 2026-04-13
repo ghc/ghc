@@ -61,7 +61,7 @@ import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num (Num(..))
 import GHC.Internal.Real (quot, fromIntegral)
 import GHC.Internal.Prim (seq)
-import GHC.Internal.Show (Show(..))
+import GHC.Internal.Show
 import GHC.Internal.Event.Control
 import GHC.Internal.Event.Internal (Backend, Event, evtRead, Timeout(..))
 import GHC.Internal.Event.Unique (UniqueSource, newSource, newUnique)

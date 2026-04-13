@@ -210,20 +210,27 @@ lookupKnownKeyName key (KKNS_InScope gbl_rdr_env)
                            ; traceIf $ hang (text "lookupKnownKeyName1 NoImplicitKnownKeyNames")
                                           2 (ppr name <+> ppr key)
                            ; return (Succeeded name) }
-       Failed gres  -> return (Failed (KnownKeyScopeError occ gres callStack))
+       Failed err    -> return (Failed err)
 
   | otherwise
   = pprTrace "lookup failed" (pprKnownKey key $$ callStackDoc) $
     return (Failed (MissingKnownKey2 key))
 
-lookupKnownGRE :: GlobalRdrEnv -> OccName -> MaybeErr [GlobalRdrElt] GlobalRdrElt
+lookupKnownGRE :: HasDebugCallStack
+               => GlobalRdrEnv -> OccName -> MaybeErr IfaceMessage GlobalRdrElt
 lookupKnownGRE rdr_env occ
   | [gre] <- pickQualGREs rEBINDABLE_MOD_NAME gres
   = Succeeded gre  -- Found qualified 'Known.occ' in scope
+
   | [gre] <- pickUnqualGREs gres
   = Succeeded gre  -- Found unqualified 'occ' in scope
+
+  | [_] <- gres
+  = Failed (KnownKeyScopeError occ [] callStack)
+           -- It's in scope, but only qualified
+
   | otherwise
-  = Failed gres
+  = Failed (KnownKeyScopeError occ gres callStack)
   where
     gres :: [GlobalRdrElt]
     gres = lookupGRE rdr_env (LookupOccName occ SameNameSpace)
@@ -256,7 +263,7 @@ lookupKnownOccName occ (KKNS_InScope gbl_rdr_env)
                            ; traceIf $ hang (text "lookupKnownKeyName2 NoImplicitKnownKeyNames")
                                           2 (ppr name <+> ppr occ)
                            ; return (Succeeded name) }
-       Failed gres  -> return (Failed (KnownKeyScopeError occ gres callStack))
+       Failed err -> return (Failed err)
 
 loadKnownKeyOccMaps :: IfM lcl KnownKeyNameMaps
 loadKnownKeyOccMaps

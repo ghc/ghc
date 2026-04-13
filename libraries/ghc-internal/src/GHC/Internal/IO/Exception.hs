@@ -58,7 +58,8 @@ import GHC.Internal.Maybe ( Maybe(..) )
 import GHC.Internal.IO
 import GHC.Internal.Prim ( Addr#, (==#) )
 import GHC.Internal.Show
-import GHC.Internal.Read
+import GHC.Internal.Read( Read )
+import qualified GHC.Internal.Read as Rebindable
 import GHC.Internal.Exception
 import GHC.Internal.IO.Handle.Types
 import GHC.Internal.Stack.Types (HasCallStack)

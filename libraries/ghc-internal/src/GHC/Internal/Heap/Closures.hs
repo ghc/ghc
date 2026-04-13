@@ -83,6 +83,7 @@ import GHC.Internal.Numeric
 import GHC.Internal.Ptr
 import GHC.Internal.Unsafe.Coerce
 import GHC.Internal.Stack (HasCallStack)
+import qualified GHC.Internal.Data.Foldable as Rebindable
 
 ------------------------------------------------------------------------
 -- Boxes

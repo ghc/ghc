@@ -13,8 +13,12 @@
 module GHC.KnownKeyNames
     ( Eq(..), Ord(..)  -- With their methods
     , Show, Read
-    , Foldable, Traversable
-    , Functor, fmap
+
+    -- Foldable/Traversable with their methods
+    , Foldable, foldMap, null, all
+    , Traversable, traverse
+
+    , Functor, fmap, (<$)
     , Monad, (>>), (>>=), return, fail, guard, mfix, join
     , Alternative
 
@@ -23,7 +27,7 @@ module GHC.KnownKeyNames
     , seq#
 
     -- Applicative
-    , Applicative, pure, mzip, (<*>), (*>)
+    , Applicative, pure, mzip, (<*>), (*>), liftA2
 
     -- Semigroup, Monoid
     , Semigroup, Monoid
@@ -52,11 +56,39 @@ module GHC.KnownKeyNames
     , gcast1, gcast2
 
     -- Generics
-    , Generic, Generic1
+    , Generic(..), Generic1(..)
+    , Datatype(..), Constructor(..), Selector(..)
+    , U1(..), Par1(..), Rec1(..), K1(..), M1(..)
+    , (:+:)(L1, R1), (:*:)((:*:))
+    , Comp1(..)
+    , UAddr(..), UChar(..), UDouble(..), UFloat(..), UInt(..), UWord(..)
 
     -- DataToTag
     , DataToTag
     , dataToTag#
+
+    -- Other data types
+    , Either(..)
+    , Void
+
+    -- Show internals
+    , showsPrec, shows, showString, showSpace, showCommaSpace, showParen
+
+    -- Read internals
+    , readList, readListDefault, readListPrec, readListPrecDefault
+    , readPrec, parens, choose, lexP, expectP
+    , readField, readFieldHash, readSymField
+    , Lexeme(Punc, Ident, Symbol)
+
+    -- ReadPrec internals
+    , step, reset, prec, pfail, (+++)
+
+    -- Int/Word newtype constructors
+    , Int8(I8#), Int16(I16#), Int32(I32#), Int64(I64#)
+    , Word8(W8#), Word16(W16#), Word32(W32#), Word64(W64#)
+
+    -- Error
+    , error
 
     -- Numbers
     , Num, Integral, Real, Fractional, RealFloat, RealFrac
@@ -176,8 +208,9 @@ import GHC.Internal.Enum
 import GHC.Internal.Data.Dynamic( toDyn )
 import GHC.Internal.Data.Data
 import GHC.Internal.Data.String( fromString )
-import GHC.Internal.Data.Foldable( Foldable )
-import GHC.Internal.Data.Traversable( Traversable )
+import GHC.Internal.Data.Either( Either(..) )
+import GHC.Internal.Data.Foldable( Foldable, foldMap, null, all )
+import GHC.Internal.Data.Traversable( Traversable, traverse )
 import GHC.Internal.Float( RealFloat )
 import GHC.Internal.IO( seq# )
 import GHC.Internal.Control.Monad( fail, guard )
@@ -190,6 +223,11 @@ import GHC.Internal.CString as CS
 import GHC.Internal.TypeError( Unsatisfiable, unsatisfiable )
 import GHC.Internal.System.IO( print )
 import qualified GHC.Internal.IsList as IL
+import GHC.Internal.Err( error )
+import GHC.Internal.Int( Int8(I8#), Int16(I16#), Int32(I32#), Int64(I64#) )
+import GHC.Internal.Word( Word8(W8#), Word16(W16#), Word32(W32#), Word64(W64#) )
+import GHC.Internal.Text.ParserCombinators.ReadPrec( step, reset, prec, pfail, (+++) )
+import GHC.Internal.Text.Read.Lex( Lexeme(Punc, Ident, Symbol) )
 
 import GHC.Internal.Unsafe.Coerce( UnsafeEquality(..), unsafeEqualityProof )
 

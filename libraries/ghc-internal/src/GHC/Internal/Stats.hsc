@@ -38,13 +38,14 @@ import GHC.Internal.Int
 import GHC.Internal.Maybe ( Maybe(..) )
 import GHC.Internal.Word
 import GHC.Internal.Generics (Generic)
-import GHC.Internal.Read ( Read )
-import GHC.Internal.Show ( Show )
+import GHC.Internal.Read
+import GHC.Internal.Show
 import GHC.Internal.IO.Exception
 import GHC.Internal.Foreign.Marshal.Alloc
 import GHC.Internal.Foreign.Storable
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
+import qualified GHC.Internal.Generics as Rebindable hiding( prec )
 
 #include "Rts.h"
 

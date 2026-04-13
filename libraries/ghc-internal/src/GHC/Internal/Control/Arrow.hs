@@ -56,6 +56,7 @@ import GHC.Internal.Data.Tuple ( uncurry )
 import GHC.Internal.Data.Either
 import GHC.Internal.Control.Category
 import GHC.Internal.Generics (Generic, Generic1)
+import qualified GHC.Internal.Generics as Rebindable
 
 infixr 5 <+>
 infixr 3 ***
