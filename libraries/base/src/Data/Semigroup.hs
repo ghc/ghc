@@ -121,7 +121,8 @@ import           GHC.Internal.Data.Traversable
 import           GHC.Internal.Data.Semigroup.Internal
 import           GHC.Internal.Control.Monad.Fix
 import           GHC.Internal.Data.Data
-import           GHC.Generics
+import           GHC.Generics( Generic, Generic1 )
+import qualified GHC.Generics as Rebindable hiding( Fixity(..) )
 import qualified GHC.Internal.List as List
 import qualified GHC.KnownKeyNames as Rebindable
 

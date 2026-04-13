@@ -33,7 +33,7 @@ import GHC.Internal.Base as Rebindable hiding( Type )
 import GHC.Internal.TH.Syntax
 import GHC.Internal.TH.Monad
 import qualified GHC.Internal.TH.Lib as Lib (litE)
-import GHC.Internal.TH.Lib hiding( InjectivityAnn, Role )
+import GHC.Internal.TH.Lib
     -- For known-key names
     -- See wrinkle (W4) of Note [Tracking dependencies on primitives]
 

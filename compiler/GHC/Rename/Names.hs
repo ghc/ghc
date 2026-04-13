@@ -2029,14 +2029,6 @@ findImportUsage imports used_gres
           | used
           = acc
 
-{-  ToDo: delete this
-          -- -frebindable-known-key-names is on, and `n` is a known-key name
-          -- Then don't warn about an unused import.
-          -- See (UI2) in Note [Unused imports]
-          | rebindable_known_key_names
-          , isKnownKeyName n || nameOccName n `elemOccSet` allKnownOccs
-          = acc
--}
           | otherwise
           = UnusedNames (acc_ns `extendNameSet` n) acc_wcs acc_fs
           where
@@ -2210,6 +2202,7 @@ warnUnusedImport :: GlobalRdrEnv -> ImportDeclUsage -> RnM ()
 warnUnusedImport rdr_env (L loc decl, used, unused, unused_wcs)
 
   -- Do not warn for 'import M()'
+  -- See (UI1) in Note [Unused imports]
   | Just (Exactly, _) <- ideclImportList decl
   , null unused
   = return ()
@@ -2221,8 +2214,7 @@ warnUnusedImport rdr_env (L loc decl, used, unused, unused_wcs)
   = return ()
 
   -- Do not warn about import X as Rebindable
-  -- See Note [Overview of known-key entities]
-  -- ToDo: write wrinkle
+  -- See (UI2) in Note [Unused imports]
   | Just (L _ mod) <- ideclAs decl
   , mod == rEBINDABLE_MOD_NAME
   = return ()
@@ -2405,21 +2397,13 @@ and neither `a` nor `b` is used, we report the entire import decl as unused.  We
 check this by looking at the names that it brings into scope scope; if there are
 no ununused names, don't report.
 
-This neatly takes into account two things:
-
 (UI1) We don't want to complain about `import M()`, because that is often used to bring
-   M's /instances/ into scope.
+   M's /instances/ into scope.  That is neatly dealt with by the "no unused names"
+   criterion.
 
-(UI2) In base:Data.Enum we see
-            import GHC.Internal.Num( Num ) -- For -frebindable-known-key-names (defaulting)
-   'Num' is not mentioned explicity but the import is still required; see KKNS_InScope
-   in Note [Overview of known-key entities] in GHC.Builtin
+(UI2) We don't report a decl as unused if it has an `as Rebindable` qualifier.
+  See (KKN1) in Note [Overview of known-key entities] in GHC.Builtin
 
-   We don't want this import reported at an unused. So `findImportUsage`, when looking
-   at `import M( x )`,  we do /not/ record `x` as "unused" (regardless of whether it is
-   mentioned in M if
-        (a) -frebindable-known-key-names is on, and
-        (b) `x` is a known-key name
 
 Note [Printing minimal imports]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -14,16 +14,16 @@ module GHC.KnownKeyNames
     ( Eq(..), Ord(..)  -- With their methods
     , Show, Read
 
-    -- Foldable/Traversable with their methods
-    , Foldable, foldMap, null, all
-    , Traversable, traverse
+    -- Foldable/Traversable with those methods need for deriving
+    , Foldable(foldr, foldMap, null), all
+    , Traversable(traverse)
 
     , Functor, fmap, (<$)
     , Monad, (>>), (>>=), return, fail, guard, mfix, join
     , Alternative
 
     -- Misc
-    , (.), (&&), not, map, foldr, build
+    , (.), (&&), not, foldrList, build, map
     , seq#
 
     -- Applicative
@@ -47,7 +47,7 @@ module GHC.KnownKeyNames
     , Ix, range, inRange, index, unsafeIndex, unsafeRangeSize
 
     -- Data
-    , Data
+    , Data, Fixity(Prefix,Infix)
     , gfoldl, gunfold, toConstr, dataTypeOf, dataCast1, dataCast2
     , mkConstrTag, Constr, mkDataType, DataType, constrIndex
 
@@ -59,9 +59,8 @@ module GHC.KnownKeyNames
     , Generic(..), Generic1(..)
     , Datatype(..), Constructor(..), Selector(..)
     , U1(..), Par1(..), Rec1(..), K1(..), M1(..)
-    , (:+:)(L1, R1), (:*:)((:*:))
-    , Comp1(..)
-    , UAddr(..), UChar(..), UDouble(..), UFloat(..), UInt(..), UWord(..)
+    , (:+:)(L1, R1), (:*:)((:*:)), (:.:)(Comp1, unComp1)
+    , UAddr, UChar, UDouble, UFloat, UInt, UWord
 
     -- DataToTag
     , DataToTag
@@ -196,7 +195,7 @@ module GHC.KnownKeyNames
     , Clause, clause
     ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base hiding( foldr )
 import GHC.Internal.Show
 import GHC.Internal.Read
 import GHC.Internal.Num
@@ -209,7 +208,7 @@ import GHC.Internal.Data.Dynamic( toDyn )
 import GHC.Internal.Data.Data
 import GHC.Internal.Data.String( fromString )
 import GHC.Internal.Data.Either( Either(..) )
-import GHC.Internal.Data.Foldable( Foldable, foldMap, null, all )
+import GHC.Internal.Data.Foldable( Foldable(..), null, all )
 import GHC.Internal.Data.Traversable( Traversable, traverse )
 import GHC.Internal.Float( RealFloat )
 import GHC.Internal.IO( seq# )
@@ -226,8 +225,6 @@ import qualified GHC.Internal.IsList as IL
 import GHC.Internal.Err( error )
 import GHC.Internal.Int( Int8(I8#), Int16(I16#), Int32(I32#), Int64(I64#) )
 import GHC.Internal.Word( Word8(W8#), Word16(W16#), Word32(W32#), Word64(W64#) )
-import GHC.Internal.Text.ParserCombinators.ReadPrec( step, reset, prec, pfail, (+++) )
-import GHC.Internal.Text.Read.Lex( Lexeme(Punc, Ident, Symbol) )
 
 import GHC.Internal.Unsafe.Coerce( UnsafeEquality(..), unsafeEqualityProof )
 
@@ -236,11 +233,18 @@ import GHC.Internal.StaticPtr.Internal( makeStatic )
 
 import GHC.Internal.Data.Typeable( gcast1, gcast2 )
 import GHC.Internal.Data.Typeable.Internal as TR
-import GHC.Internal.Generics
+import GHC.Internal.Generics( Generic(..), Generic1(..), Datatype(..)
+                            , Constructor(..), Selector(..)
+                            , U1(..), Par1(..), Rec1(..), K1(..), M1(..)
+                            , (:+:)(..), (:*:)(..), (:.:)(..)
+                            , UAddr,  UChar, UDouble
+                            , UFloat, UInt,  UWord
+                            )
 
 import GHC.Internal.Bignum.BigNat
 
-import GHC.Internal.TH.Syntax as TH
-import GHC.Internal.TH.Lib hiding( InjectivityAnn, Role )
+import GHC.Internal.TH.Syntax as TH hiding( Fixity(..) )
+   -- hiding(Fixity) see Note [Tricky known-occ cases] in GHC.Builtin.KnownOccs
+import GHC.Internal.TH.Lib
 import GHC.Internal.TH.Lift
 import GHC.Internal.TH.Monad

@@ -219,7 +219,6 @@ knownKeyTable
     -- Class Functor
     , (mkTcOcc "Functor",     functorClassKey)
     , (mkVarOcc "fmap",       fmapClassOpKey)
-    , (mkVarOcc "map",        mapIdKey)
 
     -- Class Monad, MonadFix, MonadZip
     , (mkTcOcc "Monad",        monadClassKey)
@@ -254,7 +253,6 @@ knownKeyTable
     , (mkVarOcc "dataToTag#", dataToTagClassOpKey)
 
     -- Lists
-    , (mkVarOcc "foldr", foldrIdKey)
     , (mkVarOcc "build",  buildIdKey)
 
     -- Records

@@ -352,14 +352,14 @@ gk2gkDC Gen1 dc tc_args = Gen1_DC $ assert (isTyVarTy last_dc_inst_univ)
 mkBindsRep :: DynFlags -> GenericKind -> SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, [LSig GhcPs])
 mkBindsRep dflags gk loc dit@(DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
       where
-        binds = [mkRdrFunBind (mkMethBinder loc' from01_RDR) [from_eqn]]
+        binds = [mkRdrFunBind from01_bndr [from_eqn]]
               ++
-                [mkRdrFunBind (mkMethBinder loc' to01_RDR) [to_eqn]]
+                [mkRdrFunBind to01_bndr [to_eqn]]
 
         -- See Note [Generics performance tricks]
         sigs = if     gopt Opt_InlineGenericsAggressively dflags
                   || (gopt Opt_InlineGenerics dflags && inlining_useful)
-               then [inline1 from01_RDR, inline1 to01_RDR]
+               then [inline1 from01_bndr, inline1 to01_bndr]
                else []
          where
            inlining_useful
@@ -373,7 +373,7 @@ mkBindsRep dflags gk loc dit@(DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
                cons       = length datacons
                max_fields = maximum $ 0 :| map dataConSourceArity datacons
 
-           inline1 f = L loc'' . InlineSig noAnn (L loc' f)
+           inline1 f = L loc'' . InlineSig noAnn f
                      $ alwaysInlinePragma `setInlinePragmaActivation` activeAfter (Phase 1)
 
         -- The topmost M1 (the datatype metadata) has the exact same type
@@ -386,10 +386,11 @@ mkBindsRep dflags gk loc dit@(DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
 
         from_matches  = [mkHsCaseAlt pat rhs | (pat,rhs) <- from_alts]
         to_matches    = [mkHsCaseAlt pat rhs | (pat,rhs) <- to_alts  ]
-        loc'          = noAnnSrcSpan loc
         loc''         = noAnnSrcSpan loc
         datacons      = tyConDataCons tycon
 
+        from01_bndr = mkMethBinder loc from01_RDR
+        to01_bndr   = mkMethBinder loc to01_RDR
         (from01_RDR, to01_RDR) = case gk of
                                    Gen0 -> (from_RDR,  to_RDR)
                                    Gen1 -> (from1_RDR, to1_RDR)

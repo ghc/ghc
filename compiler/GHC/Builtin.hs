@@ -93,6 +93,18 @@ import Data.Maybe
 
 {- Note [Overview of known-key entities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are three kinds of entities that GHC knows something about.
+  * known-occ entities
+  * known-key entities
+  * wired-in entities
+It is pretty easy, cheap, and robust to add a new known-occ entity; but GHC
+does not know much about it.  In contrast, it is expensive and relatively
+fragile to add a new wired-in entity; but in exchange GHC knows a lot about
+it.  Known-key entities are in the middle.  Use the cheapest one that does
+what you need!
+
+Here are more details.
+
 A "wired-in" entity:
   * Its Unique, OccName
   * Its defining module
@@ -103,7 +115,7 @@ A "wired-in" entity:
   knowledge precisely reflects the code in the library.
 
 A "known-key" entity:
-  * Its Unique and OccName are baked into GHC
+  * Its Unique and OccName are baked into GHC. Its Unique is called a KnownKey.
   * It is exported by base:GHC.KnownKeyNames
   * But that's all that GHC knows about it
   In particular, GHC does /not/ know in which module the entity is defined.
@@ -115,7 +127,7 @@ A "known-key" entity:
   to GHC. It's not hard.
 
 A "known-occ" entity:
-  * Its OccName is baked into GHC
+  * Its OccName is baked into GHC -- we call it a KnownOcc
   * It is exported by base:GHC.KnownKeyNames
   * But that's all that GHC knows about it
   In particular, GHC does /not/ know in which module the entity is defined,
@@ -127,13 +139,15 @@ A "known-occ" entity:
   It is significantly easier to add a known-occ entity to GHC than a known-key
   entity, so we use known-occ entities whenever we can.
 
+  Every known-key entity is also a known-occ entity, but not vice versa.
+
 When do we use each of these?
 
-* We use a wired-in entity when we must.  E.g. `boolTy` uses the wired-in TyCon
-  `boolTyCon`.  We want a static `boolTy` so we can use it in `mkIfThenElse`,
-  which is a pure function with no monad in sight.
+* WIRED-IN.  We use a wired-in entity when we want a statically-defined Type or TyCon.
+  E.g. `boolTy` uses the wired-in TyCon `boolTyCon`.  We want a static `boolTy` so
+  we can use it in `mkIfThenElse`, which is a pure function with no monad in sight.
 
-* We use a known-key entity when we want a fast test to say, for example,
+* KNOWN-KEY. We use a known-key entity when we want a fast test to say, for example,
   "are you /the/ Typeable class?", not some other class that happens to be called
   "Typeable".  It checks this using
        cls `hasKnownKey` typeableClassKey
@@ -142,76 +156,73 @@ When do we use each of these?
   where GHC.Builtin.KnownKeys.typeableClassKey is the statically chosen unique
   for `Typeable`.  See `GHC.Tc.Instance.Class.matchGlobalInst`
 
-* We use a known-occ entity when we just want to refer to the thing in, say,
-  the code generated for a `deriving` clause.
-
-
-
-
-* Very similarly, see `GHC.Tc.Deriv.Utils.stockSideConditions`, which checks if a
+  Very similarly, see `GHC.Tc.Deriv.Utils.stockSideConditions`, which checks if a
   class is suitable for stock deriving.
 
-Here is why GHC might want to refer to a known-occ entity:
+  * For type-class defauting GHC has built-in defaulting behaviour
+    for Num, IsString, etc.   It gets hold of these classes via their known key, via
+       tcLookupKnownKeyClass :: KnownKey -> TcM Class
+    See GHC.Tc.Gen.Default.tcDefaultDecls.
 
-* When desugaring a Template Haskell quotation, in GHC.HsToCore.Quote, GHC
-  must generate Core that mentions a myriad of functions defined in
-  ghc-internal:GHC.Internal.TH.Lib, such as `varE`, `conE`, `funD`, etc etc.
-  They don't need a fixed /unique/, but we still need to find them, so we use
-  their /OccName/.  They are "known-occ" entities.
+* KNOWN_OCC. We use a known-occ entity when we just want to /refer/ to the thing in,
+  say, the code generated for a `deriving` clause.  Here is why GHC might want to
+  refer to a known-occ entity:
 
-  To do the lookup it uses
-     dsLookupKnownOccId :: KnownOcc -> DsM TyThing
+  * When desugaring a Template Haskell quotation, in GHC.HsToCore.Quote, GHC
+    must generate Core that mentions a myriad of functions defined in
+    ghc-internal:GHC.Internal.TH.Lib, such as `varE`, `conE`, `funD`, etc etc.
+    They don't need a fixed /unique/, but we still need to find them, so we use
+    their /OccName/.  They are "known-occ" entities.
 
-* When dealing with `deriving` clauses, GHC generates (LHsBinds GhcPs) bindings,
-  and then renames and typechecks them.  These bindings refer to a myriad of
-  identifiers, such as `(==)`, `(>)`, `inRange`, and so on.  Again GHC does not
-  need to know a statically-known unique for them, but it does need to find them
-  so it uses known
+    To do the lookup it uses
+       dsLookupKnownOccId :: KnownOcc -> DsM TyThing
 
-* When desugaring, the desugarer wants to refer to a particular
-  class, type, or function.  It does this via (e.g.)
-     dsLookupKnownOccTyCon :: KnownOcc -> DsM TyCon
-  or
-     dsLookupKnownKeyTyCon :: KnownKey -> DsM TyCon
-  It doesn't really matter which we use.
+  * When dealing with `deriving` clauses, GHC generates (LHsBinds GhcPs) bindings,
+    and then renames and typechecks them.  These bindings refer to a myriad of
+    identifiers, such as `(==)`, `(>)`, `inRange`, and so on.  Again GHC does not
+    need to know a statically-known unique for them, but it does need to find them
+    so it uses known
 
-* In a very similar way, for type-class defauting GHC has built-in defaulting behaviour
-  for Num, IsString, etc.   It gets hold of these classes via their known key, via
-     tcLookupKnownKeyClass :: KnownKey -> TcM Class
-  See GHC.Tc.Gen.Default.tcDefaultDecls
+  * When desugaring, the desugarer wants to refer to a particular
+    class, type, or function.  It does this via (e.g.)
+       dsLookupKnownOccTyCon :: KnownOcc -> DsM TyCon
+    or
+       dsLookupKnownKeyTyCon :: KnownKey -> DsM TyCon
+    It doesn't really matter which we use.
 
 To implement all this, here are the moving parts:
+
+* INVARIANT (KnownEntityInvariant): It is a requirement that all known-key and known-occ
+  entities have distinct OccNames. We could have multiple name-spaces, but in practice
+  this is not an onerous restriction.  But see Note [Tricky known-occ cases] in
+  GHC.Builtin.KnownOccs for some awkward cases.
 
 * Each known-key name has a /statically-chosen/ unique, fixed in GHC.Builtin.KnownKeys.
   e.g. eqClassKey :: KnownKey
        eqClassKey = mkPreludeClassUnique 3
 
 * All the known-key names are gathered in one table:
-      knownKeyTable :: [(OccName, KnownKey)]
+      knownKeyTable :: [(KnownOcc, KnownKey)]
       knownKeyTable
         = [ (mkTcOcc "Rational",     rationalTyConKey)
           , (mkTcOcc "Eq",           eqClassKey)
           ... etc ... ]
 
-  INVARIANT (KnownKeyInvariant): It is a requirement that all known-key names
-  have distinct OccNames. (We could have multiple name-spaces, but in practice
-  this is not an onerous restriction.)
-
-* Because of (KnownKeyInvariant) we can turn that table into two mappings:
+* Because of (KnownEntityInvariant) we can turn that table into two mappings:
 
       knownKeyOccMap :: OccEnv KnownKey
       knownKeyOccMap = mkOccEnv knownKeyTable
 
-      knownKeyUniqMap :: UniqFM KnownKey OccName
+      knownKeyUniqMap :: UniqFM KnownKey KnownOcc
 
-* A new module `base:GHC.KnownKeyNames` exports all the known-key names.
+* A special module `base:GHC.KnownKeyNames` exports all the known-key names.
   There is nothing special about this module except that GHC knows its
   name and can import it.
 
   In effect, the `mi_exports` of `GHC/KnownKeyNames.hi` tells GHC where each
   known-key name is defined.
 
-  This is one reason for (KnownKeyInvariant): an export list cannot have two
+  This is a big reason for (KnownEntityInvaroiant): an export list cannot have two
   entities with the same OccName.
 
 * There are three flags that control the treatment of known-key names:
@@ -220,17 +231,25 @@ To implement all this, here are the moving parts:
     -fexclude-known-key-define=wombat   See wrinkle (KKN2)
   Details in the following bullets.
 
-* Known-key name lookup (normal case: KKNS_FromModule)
-  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  In normal client code, suppose the desugarer calls `dsLookupKnownKeyTyCon`
-  on `rationalTyConKey`.  Then, in `loadKnownKeyOccMap`
+* Known-key or known-occ lookup (normal case: KKNS_FromModule)
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  In normal client code, suppose the desugarer calls
+     dsLookupKnownKeyTyCon rationalTyConKey
+  or
+     dsLookupKnownOccTyCon rationalTyConOcc
+
+  Then, in `loadKnownKeyOccMaps`
     * GHC imports GHC.KnownKeyNames, i.e. looks for `GHC/KnownKeyNames.hi`
-    * Assuming this is successful, GHC usees its `mi_exports` to builds a mapping
-      `KnownKeyNameMap` from each known-key unique to the Name of the entity.
-    * It stashes this map in the `eps_known_keys` field of the ExternalPackageState
+
+    * Assuming this is successful, GHC uses its `mi_exports` to build `KnownKeyNameMaps`,
+      which has (a) a map from the KnownKey of each known-key entity to its Name
+                (b) a map from the KnownOcc of each known-occ entity to its Name
+
+    * It stashes these maps in the `eps_known_keys` field of the ExternalPackageState
       so that it doesn't need to repeat the exercise.
-  Now it can simplhy look up `rationalTyConKey` in the `eps_known_keys`.  Easy!
-  See `dsLookupKnownKeyName`.
+
+  Now it can simply look up `rationalTyConKey` in the `eps_known_keys`.  Easy!
+  See `GHC.Iface.Load.lookupKnownKeyThing` and `lookupKnownOccThing`.
 
 * Known-key name lookup (base case: KKNS_InScope)
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -238,14 +257,26 @@ To implement all this, here are the moving parts:
   GHC.KnownKeyNames has not yet been compiled!  Instead, we use whatever is in scope with
   the desired `OccName`, rather like `-XRebindableSyntax`.
 
-  See the `KnownKeyNameSource` argument to `lookupKnownKeyName`. When compiling modules
+  See the `KnownKeyNameSource` argument to `lookupKnownOccThing`. When compiling modules
   in `ghc-internal` or `base`:
-    * We switch on -frebindable-known-key-names
-    * That ensures that we pass `KKNS_InScope` to `lookupKnownKeyName`
-    * The latter now looks in the GlobalRdrEnv it is passed.
 
-  This does mean that in `base` and `ghc-internal` we occasionally need an extra import
-  to bring into scope some entities that are needed by `dsLookupKnownKeyTyCon` etc.
+    * We switch on -frebindable-known-key-names
+
+    * That ensures that we pass `KKNS_InScope gbl_rdr_env` to `lookupKnownKeyThing`
+
+    * Suppose we are looking up the known-occ entity `wombat`.   The key function is
+      `lookupKnownGRE`:
+         * First we look in the `gbl_rdr_env` for the qualified name `Rebindable.wombat`.
+           If we find a unique hit, choose it.
+         * Otherwise we look in `gbl_rdr_env` for the /unqualified/ name `wombat`.
+           If we find a unique hit, choose it.
+
+      This plan means that we can have an unrelated local binding for `wombat` and still
+      not get confused provided we import Rebindable.wombat.
+
+  This does mean that in `base` and `ghc-internal` we need quite a few extra imports that
+  look like    import GHC.InternalNum as Rebindable
+          or   import qualified GHC.Internal.Num as Rebindable
   See also wrinkle (KKN1)
 
 * Defining known-key names
@@ -267,8 +298,13 @@ To implement all this, here are the moving parts:
 
 Wrinkles
 
-(KKN1) We need some special treatment of unused-import warnings.
-   See (UI1) in Note [Unused imports] in GHC.Rename.Names
+(KKN1) An import declaration may look entirely unused, if it is there solely to
+   bring a known-occ name into scope for the desugarer. Why?  Becuase we only generate
+   usage information, to drive unused-import warnings, in the renamer and typechecker.
+   Not, currently, the desugarer.
+
+   So we simply suppress an unused-import-decl warning if it has a "as Rebindable"
+   qualifier.  See (UI1) in Note [Unused imports] in GHC.Rename.Names
 
 (KKN2) The flag `-fdefines-known-key-names` is module-wide.  But what if that module
    happens to define an entity that /isn't/ a known-key entity, but /does/ share the
@@ -284,15 +320,13 @@ Wrinkles
    So we compile GHC.Internal.Data.Foldable with
        -fexclude-known-key-define=toList
 
-(KKN3) You don't need need to export the wired-in entities from GHC.KnownKeyNames
+(KKN3) You don't need need to export wired-in entities from GHC.KnownKeyNames
   because we (should) never look up a wired-in name via its key.  That is,
   `GHC.Iface.Load.lookupKnownKeyName` should never be called on the key of
   a wired-in name.
 
   Alternative: export all wired-in entities from GHC.KnownKeyNames.  But that
   would simply bloat the interface for no good reason.
-
-(KKN4) Typeable binds early in tc
 
 Note [Recipe for adding a known-occ name]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -302,12 +336,15 @@ To make `wombat` into a known-occ name, you must ensure that:
 
 * In any module in `base` or `ghc-internal` (which are compiled with
   -frebindable-known-key-names), in which `wombat` is needed, you must ensure
-  that `wombat` is in scope by saying `import M( wombat )`.
+  that `wombat` is in scope by saying `import M( wombat )`, or
+     import qualified M as Rebindable( wombat )
 
-  You do not need to import the module in which `wombat` is /defined/, although
-  you may.  It is enough simply to bring `wombat` in scope by importing a
-  module that re-exports. You can even import `GHC.KnownKeyNames`, if that does
-  not create a module loop!
+  Using the `as Rebindable` qualifier will suppress any unused-import-decl warnings.
+
+  You do not need to import the precise module in which `wombat` is /defined/,
+  although you may.  It is enough simply to bring `wombat` in scope by importing a
+  module that re-exports it. You can even import `GHC.KnownKeyNames`, if doing so
+  does not create a module loop!
 
 Note [Recipe for adding a known-key name]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -329,17 +366,9 @@ To make `wombat` into a known-key name, you must ensure that:
   entry for `wombat`
       (mkVarOcc "wombat", wombatKey)
 
-* In any module in `base` or `ghc-internal` (which are compiled with
-  -frebindable-known-key-names), you must ensure that `wombat` is in scope
-  by saying `import M( wombat )`.
-
-  If you just say `import M` you may get a "unused import" warning; that
-  warning is suppressed for known-key names if you import `wombat` by name.
-
-  You do not need to import the module in which `wombat` is /defined/, although
-  you may.  It is enough simply to bring `wombat` in scope by importing a
-  module that re-exports. You can even import `GHC.KnownKeyNames`, if that does
-  not create a module loop!
+* Just like known-occ names, above in any module in `base` or `ghc-internal` (which
+  are compiled with -frebindable-known-key-names), you must ensure that `wombat` is
+  in scope by saying `import M( wombat )`.
 -}
 
 allKnownOccs :: OccSet

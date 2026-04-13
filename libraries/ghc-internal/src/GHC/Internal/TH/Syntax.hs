@@ -42,7 +42,6 @@ import GHC.Ptr          ( Ptr, plusPtr )
 import GHC.Generics     ( Generic )
 #else
 -- Compiling with stage1 compiler
-import qualified GHC.Internal.Base as Rebindable
 import GHC.Internal.Base hiding( Type, Module )
 import GHC.Internal.Data.Traversable
 import GHC.Internal.Err (error)
@@ -61,7 +60,9 @@ import GHC.Internal.Num
 import GHC.Internal.IO.Unsafe
 import GHC.Internal.List (dropWhile, break, replicate, reverse, last)
 import GHC.Internal.Unicode
-import qualified GHC.Internal.Generics as Rebindable hiding( prec )
+import qualified GHC.Internal.Base          as Rebindable hiding( foldr )
+import qualified GHC.Internal.Data.Foldable as Rebindable
+import qualified GHC.Internal.Generics      as Rebindable hiding( prec )
 #endif
 import GHC.Internal.ForeignSrcLang
 import GHC.Internal.LanguageExtensions

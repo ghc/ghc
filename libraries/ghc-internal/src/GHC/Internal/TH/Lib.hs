@@ -19,10 +19,8 @@
 -- is safe to break things.
 
 module GHC.Internal.TH.Lib where
-
-import GHC.Internal.TH.Syntax hiding (Role, InjectivityAnn)
+import GHC.Internal.TH.Syntax
 import GHC.Internal.TH.Monad
-import qualified GHC.Internal.TH.Syntax as TH
 
 #ifdef BOOTSTRAP_TH
 import Control.Applicative(liftA, Applicative(..))
@@ -93,10 +91,6 @@ type PatSynDirQ          = Q PatSynDir
 type PatSynArgsQ         = Q PatSynArgs
 type FamilyResultSigQ    = Q FamilyResultSig
 type DerivStrategyQ      = Q DerivStrategy
-
--- must be defined here for DsMeta to find it
-type Role                = TH.Role
-type InjectivityAnn      = TH.InjectivityAnn
 
 type TyVarBndrUnit       = TyVarBndr ()
 type TyVarBndrSpec       = TyVarBndr Specificity
@@ -974,7 +968,7 @@ tyVarSig = fmap TyVarSig
 -- *   Injectivity annotation
 
 injectivityAnn :: Name -> [Name] -> InjectivityAnn
-injectivityAnn = TH.InjectivityAnn
+injectivityAnn = InjectivityAnn
 
 -------------------------------------------------------------------------------
 -- *   Role

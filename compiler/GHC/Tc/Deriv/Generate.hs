@@ -2152,14 +2152,11 @@ nlHsCompose :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
 nlHsCompose x y = compose_RDR `nlHsApps` [x, y]
 
 mkMethBinder :: SrcSpan -> RdrName -> LocatedN RdrName
--- The binder for a class method `op` in in an instance decl
--- can be /unqualified/, thus
---    instance C Int where
---       op = ...      -- The "op" can be unqualied
--- because the renamer looks in the class to find it.  Having it
--- unqualified reduces the need for it to be in scope
-mkMethBinder loc op_rdr
-  = L (noAnnSrcSpan loc ) (mkRdrUnqual (rdrNameOcc op_rdr))
+-- The binder for a class method `op` in in an `derived` instance decl
+-- should be an Exact RdrName, so that the derived instance works even when
+-- that method name is not in scope in this module.  (Usually, a method must
+-- be in scope for you to define it in an instance decl.)
+mkMethBinder loc op_rdr = L (noAnnSrcSpan loc ) op_rdr
 
 -- | Make a function binding. If no equations are given, produce a function
 -- with the given arity that produces a stock error.
