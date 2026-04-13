@@ -701,15 +701,15 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr
   = assert (notNull rbnds) $ mkExpandedExprTc expr <$>
     do  { -- Expand the record update. See Note [Record Updates].
 
-        ; (ds_expr, ds_res_ty, err_msg)
+        ; (ds_expr, err_msg)
             <- expandRecordUpd record_expr possible_parents rbnds res_ty
         ; addErrCtxt err_msg $
           do { -- Typecheck the expanded expression.
-               expr' <- tcExpr ds_expr (Check ds_res_ty)
+               tcExpr ds_expr res_ty
                -- NB: it's important to use ds_res_ty and not res_ty here.
                -- Test case: T18802b.
 
-             ; tcWrapResultMono expr expr' ds_res_ty res_ty
+             -- ; tcWrapResultMono expr expr' ds_res_ty res_ty
              -- We need to unify the result type of the expanded
              -- expression with the expected result type.
              --
@@ -1314,8 +1314,6 @@ expandRecordUpd :: LHsExpr GhcRn
                       -- ^ the expected result type of the record update
                  -> TcM ( HsExpr GhcRn
                            -- Expanded record update expression
-                        , TcType
-                           -- result type of expanded record update
                         , HsCtxt
                            -- error context to push when typechecking
                            -- the expanded code
@@ -1388,17 +1386,17 @@ expandRecordUpd record_expr@(L lspan _) possible_parents rbnds res_ty
          -- with metavariables to obtain a type for each 'Id'.
          -- This will allow us to have 'Id's with polymorphic types
          -- by using 'IdSig'. See Wrinkle [Using IdSig] in Note [Record Updates].
-       ; let (univ_tvs, ex_tvs, eq_spec, _, _, arg_tys, con_res_ty) = conLikeFullSig relevant_con
+       ; let (univ_tvs, ex_tvs, _, _, _, arg_tys, _) = conLikeFullSig relevant_con
        ; (subst, tc_tvs) <- newMetaTyVars (univ_tvs ++ ex_tvs)
        ; let (actual_univ_tys, _actual_ex_tys) = splitAtList univ_tvs $ map mkTyVarTy tc_tvs
 
              -- See Wrinkle [GADT result type in tcRecordUpd]
              -- for an explanation of the following.
-             ds_res_ty = case relevant_con of
-               RealDataCon con
-                 | not (null eq_spec) -- We only need to do this if we have actual GADT equalities.
-                 -> mkFamilyTyConApp (dataConTyCon con) actual_univ_tys
-               _ -> substTy subst con_res_ty
+             -- ds_res_ty = case relevant_con of
+             --   RealDataCon con
+             --     | not (null eq_spec) -- We only need to do this if we have actual GADT equalities.
+             --     -> mkFamilyTyConApp (dataConTyCon con) actual_univ_tys
+             --   _ -> substTy subst con_res_ty
 
        -- Gather pairs of let-bound Ids and their right-hand sides,
        -- e.g. (x', e1), (y', e2), ...
@@ -1460,7 +1458,7 @@ expandRecordUpd record_expr@(L lspan _) possible_parents rbnds res_ty
                  (lhs_con_pats, rhs_con_args)
                     = zipWithAndUnzip mk_con_arg [1..] con_fields
                  pat = genSimpleConPat con lhs_con_pats
-                 rhs = wrapGenSpan $ genHsApps con rhs_con_args
+                 rhs = wrapGenSpan $ genHsExpApps (genHsTyApps (genHsVar con) actual_univ_tys) rhs_con_args
                  con = conLikeName conLike
                  con_fields = conLikeFieldLabels conLike
 
@@ -1508,10 +1506,9 @@ expandRecordUpd record_expr@(L lspan _) possible_parents rbnds res_ty
         ; traceTc "expandRecordUpd" $
             vcat [ text "relevant_con:" <+> ppr relevant_con
                  , text "res_ty:" <+> ppr res_ty
-                 , text "ds_res_ty:" <+> ppr ds_res_ty
                  , text "ds_expr:" <+> ppr ds_expr
                  ]
-        ; return (ds_expr, ds_res_ty, RecordUpdCtxt relevant_cons upd_fld_names ex_tvs) }
+        ; return (ds_expr, RecordUpdCtxt relevant_cons upd_fld_names ex_tvs) }
 
 
 

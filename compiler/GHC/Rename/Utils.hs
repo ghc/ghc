@@ -18,7 +18,7 @@ module GHC.Rename.Utils (
         checkUnusedRecordWildcard,
         badQualBndrErr, typeAppErr, badFieldConErr,
         wrapGenSpan, wrapGenSpan', wrapNoSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genHsApps', genHsExpApps,
-        genLHsApp, genAppType,
+        genLHsApp, genAppType, genHsTyApps,
         genLHsLit, genHsIntegralLit, genHsTyLit, genSimpleConPat,
         genVarPat, genWildPat,
         genSimpleFunBind, genFunBind,
@@ -725,6 +725,9 @@ genHsVar n = mkHsVar (wrapGenSpan n)
 
 genHsApps :: Name -> [LHsExpr GhcRn] -> HsExpr GhcRn
 genHsApps fun args = foldl genHsApp (genHsVar fun) args
+
+genHsTyApps :: HsExpr GhcRn -> [Type] -> HsExpr GhcRn
+genHsTyApps e tys = foldl genAppType e (map XHsType tys)
 
 -- | Keeps the span given to the 'Name' for the application head only
 genHsApps' :: LocatedN Name -> [LHsExpr GhcRn] -> HsExpr GhcRn
