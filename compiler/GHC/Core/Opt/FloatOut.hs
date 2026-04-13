@@ -383,10 +383,40 @@ floatExpr (Tick tickish expr)
     case (floatExpr expr)    of { (fs, floating_defns, expr') ->
         -- Wrap floated code with the correct tick scope, but using 'mkNoCount'
         -- to ensure we don't duplicate counters.
+        --
+        -- See also Note [Avoiding duplicate ticks].
     let annotated_defns = wrapTick (mkNoCount tickish) floating_defns
     in
     (fs, annotated_defns, Tick tickish expr') }
 
+{- Note [Avoiding duplicate ticks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When FloatOut floats an expression through scoped ticks, it accumulates all
+the scopes on the way, e.g.
+
+  src<loc1>
+    let x = ..
+    in
+      src<loc2>
+      let y = ...
+      in
+        src<loc3>
+        let z = fib 100
+        in ...
+
+When we float 'z' out to the top level, it will accumulate all the intervening
+ticks:
+
+  lvl_z = src<loc1> src<loc2> src<loc3> fib 100
+
+It's important to combine these ticks up as much as possible to avoid hugely
+bloating the Core; for example if loc1 = loc3 then we should combine those two
+source notes, which requires moving src<loc1> past src<loc2> to allow
+cancellation to take place.
+
+Failing to do so can result in stacks of millions of duplicated source notes!
+This happened e.g. when compiling the LintCodes.Static testsuite file.
+-}
 
 floatExpr (Cast expr co)
   = case (floatExpr expr) of { (fs, floating_defns, expr') ->

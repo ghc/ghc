@@ -48,7 +48,9 @@ main = do
                         assertEqual (cc_module myCostCentre) "Main"
                         assertEqual (cc_srcloc myCostCentre) (Just "tso_and_stack_closures.hs:24:48-80")
                         assertEqual (cc_is_caf myCostCentre) False
-                    Nothing -> error $ "MyCostCentre not found in:\n" ++ unlines (cc_label <$> linkedCostCentres costCentre)
+                    Nothing -> error "MyCostCentre not found"
+                      -- Don't print all of 'linkedCostCentres costCentre',
+                      -- as that is ~20k lines of output.
 #endif
 
 linkedCostCentres :: Maybe CostCentre -> [CostCentre]

@@ -17,6 +17,8 @@ module GHC.Types.Tickish (
   TickishPlacement(..),
   tickishPlace,
   tickishContains,
+  combineTickish_maybe,
+  tickishCommutable,
 
   -- * Breakpoint tick identifiers
   BreakpointId(..), BreakTickIndex
@@ -140,20 +142,7 @@ data GenTickish pass =
 
   -- | A source note.
   --
-  -- Source notes are pure annotations: Their presence should neither
-  -- influence compilation nor execution. The semantics are given by
-  -- causality: The presence of a source note means that a local
-  -- change in the referenced source code span will possibly provoke
-  -- the generated code to change. On the flip-side, the functionality
-  -- of annotated code *must* be invariant against changes to all
-  -- source code *except* the spans referenced in the source notes
-  -- (see "Causality of optimized Haskell" paper for details).
-  --
-  -- Therefore extending the scope of any given source note is always
-  -- valid. Note that it is still undesirable though, as this reduces
-  -- their usefulness for debugging and profiling. Therefore we will
-  -- generally try only to make use of this property where it is
-  -- necessary to enable optimizations.
+  -- See Note [Source notes and debug information]
   | SourceNote
     { sourceSpan :: RealSrcSpan -- ^ Source covered
     , sourceName :: LexicalFastString  -- ^ Name for source location
@@ -169,6 +158,70 @@ deriving instance Data (GenTickish 'TickishPassStg)
 deriving instance Eq (GenTickish 'TickishPassCmm)
 deriving instance Ord (GenTickish 'TickishPassCmm)
 deriving instance Data (GenTickish 'TickishPassCmm)
+
+{- Note [Source notes and debug information]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Source notes are used to generate debug information, in the form of DWARF
+directives in the generated assembly:
+
+  # At the top of the assembly file
+
+  .file 1 "MyModule.hs"
+  .file 2 "OtherModule.hs"
+
+  ...
+
+  # Generated assembly for a particular piece of code
+
+  #   - The DWARF debug information
+  #     This is not an instruction; it's information for the debugger.
+  .loc 1 1287 8  # MyModule.hs, line 1287, column 8
+
+  #   - The actual assembly instructions
+  movq 16(%rbx), %rax
+  addq $1, %rax
+  movq %rax, 16(%rbx)
+
+This functionality is enabled by using the -g flag (DWARF debug information).
+Source notes ticks are also enabled by the -finfo-table-map and
+-fprof-late-overloaded-calls flags; see GHC.Driver.Session.needSourceNotes.
+
+Source notes are pure annotations: their presence should neither influence
+compilation nor execution.
+The semantics are given by causality: the presence of a source note means that
+a local change in the referenced source code span will possibly provoke the
+generated code to change.
+On the flip-side, the functionality of annotated code *must* be invariant
+against changes to all source code *except* the spans referenced in the source
+notes (see "Causality of optimized Haskell" paper for details).
+This means that it is valid to extend the scope of any given source note, but
+it is undesirable as this reduces its usefulness for debugging and profiling.
+Therefore, we will generally try only to make use of this property where it is
+necessary to enable optimizations.
+
+Note [Ordering of source notes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ordering of source notes is important:
+
+  - inner ticks represent the original, most immediate source location of the
+    syntax tree node they wrap (the definition site),
+  - outer ticks represent the lexical or execution context into which that
+    expression was placed or inlined (the use site).
+
+We thus try to avoid commuting source note ticks past eachother in order to
+preserve this ordering. However, we must still cancel out duplicate source
+notes, e.g.:
+
+  mkTick src<loc2> (mkTick src<loc1>) (src<loc3> src<loc2> src<loc1> e)
+
+    ==>
+
+  src<loc3> src<loc2> src<loc1> e
+
+To do this, 'combineTickishs_maybe' peeks at the rest of the stack to expose
+cancellation opportunities, but 'mkTick' otherwise takes care not to
+commute source notes.
+-}
 
 --------------------------------------------------------------------------------
 -- Tick breakpoint index
@@ -261,8 +314,12 @@ Ticks have two independent attributes:
 
      See Note [Scoped ticks]
 
+Note that profiling notes which both count and scope can be split into two
+separate ticks, one that counts and doesn't scope and one that scopes and doesn't
+count; see 'tickishCanSplit', 'mkNoCount' and 'mkNoScope'.
+
 Note [Counting ticks]
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 The following ticks count:
   - ProfNote ticks with profNoteCounts = True
   - HPC ticks
@@ -290,7 +347,7 @@ sharing, so in practice the actual number of ticks may vary, except
 that we never change the value from zero to non-zero or vice-versa.
 
 Note [Scoped ticks]
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 The following ticks are scoped:
   - ProfNote ticks with profNoteScope = True
   - Breakpoints
@@ -375,6 +432,61 @@ Whether we are allowed to float in additional cost depends on the tick:
 
     While these transformations are legal, we want to make a best effort to
     only make use of them where it exposes transformation opportunities.
+
+Note [Tickish placement]
+~~~~~~~~~~~~~~~~~~~~~~~~
+The placement behaviour of ticks (i.e. which nodes we want the tick to be placed
+around in the AST) is governed by 'TickishPlacement'.
+From most restrictive to least restrictive placement rules:
+
+  - PlaceRuntime: counting ticks.
+
+    Ticks with 'PlaceRuntime' placement want to be placed around run-time
+    expressions. They can be moved through pure compile-time constructs such as
+    other type arguments, casts, or type lambdas:
+
+      tick <t> (f @ty)    ==>   (tick <t> f) @ty
+      tick <t> (e |> co)  ==>   (tick <t> e) |> co
+      tick <t> (/\a. e)   ==>   /\a. tick <t> e
+
+    This is the most restrictive placement rule for ticks, as all tickishs have
+    in common that they want to track runtime behaviour.
+
+    Any tick that counts (see Note [Counting ticks]) has 'PlaceRuntime' placement.
+
+  - PlaceNonLam: source notes.
+
+    Like PlaceRuntime, but we can also float the tick through value lambdas:
+
+      tick <t> (\x. e)   ==>   \x. tick <t> e
+
+    This makes sense where there is little difference between annotating the
+    lambda and annotating the lambda's code.
+
+  - PlaceCostCentre: non-counting profiling ticks.
+
+    In addition to floating through lambdas, cost-centre style tickishs can be
+    pushed into (saturated) constructor applications, and can be eliminated when
+    placed around non-function variables:
+
+      tick <t> (C e1 e2)   ==>  C (tick <t> e1) (tick <t> e2)
+
+      tick <t> (x :: Int)  ==>  (x :: Int)
+
+    Neither the constructor application nor the variable 'x' are likely to have
+    any cost worth mentioning.
+
+We generally try to push ticks inwards until they end up placed around a Core
+expression that is appropriate for their placement rule, as described above.
+This gives us the opportunity to eliminate the tick, either by combining it with
+another tick (see 'combineTickish_maybe') or by dropping it altogether. For
+example, a (non-counting) SCC around a non-function variable can be dropped, as
+there is no cost to scope over.
+
+After the tick has been placed by 'mkTick', the simplifier may later (during
+simplification) decide to float it outwards (see e.g. GHC.Core.Opt.Simplify.Iteration.simplTick).
+The story here is not fully worked out, as the simplifier calls 'mkTick', which
+might push the tick inwards again.
 -}
 
 -- | Returns @True@ for ticks that can be floated upwards easily even
@@ -441,35 +553,19 @@ isProfTick _          = False
 -- annotating for example using @mkTick@. If we find that we want to
 -- put a tickish on an expression ruled out here, we try to float it
 -- inwards until we find a suitable expression.
+--
+-- See Note [Tickish placement].
 data TickishPlacement =
 
-    -- | Place ticks exactly on run-time expressions. We can still
-    -- move the tick through pure compile-time constructs such as
-    -- other ticks, casts or type lambdas. This is the most
-    -- restrictive placement rule for ticks, as all tickishs have in
-    -- common that they want to track runtime processes. The only
-    -- legal placement rule for counting ticks.
-    -- NB: We generally try to move these as close to the relevant
-    -- runtime expression as possible. This means they get pushed through
-    -- tyoe arguments. E.g. we create `(tick f) @Bool` instead of `tick (f @Bool)`.
+    -- | Place ticks exactly on run-time expressions, moving them through pure
+    -- compile-time constructs such as other ticks, casts or type lambdas.
     PlaceRuntime
 
-    -- | As @PlaceRuntime@, but we float the tick through all
-    -- lambdas. This makes sense where there is little difference
-    -- between annotating the lambda and annotating the lambda's code.
+    -- | As @PlaceRuntime@, but also allow to float the tick through all lambdas.
   | PlaceNonLam
 
-    -- | In addition to floating through lambdas, cost-centre style
-    -- tickishs can also be moved from constructors, non-function
-    -- variables and literals. For example:
-    --
-    --   let x = scc<...> C (scc<...> y) (scc<...> 3) in ...
-    --
-    -- Neither the constructor application, the variable or the
-    -- literal are likely to have any cost worth mentioning. And even
-    -- if y names a thunk, the call would not care about the
-    -- evaluation context. Therefore removing all annotations in the
-    -- above example is safe.
+    -- | As 'PlaceNonLam', but also float through constructors, non-function
+    -- variables and literals.
   | PlaceCostCentre
 
   deriving (Eq,Show)
@@ -477,7 +573,9 @@ data TickishPlacement =
 instance Outputable TickishPlacement where
   ppr = text . show
 
--- | Placement behaviour we want for the ticks
+-- | Placement behaviour we want for the ticks.
+--
+-- See Note [Tickish placement].
 tickishPlace :: GenTickish pass -> TickishPlacement
 tickishPlace n@ProfNote{}
   | profNoteCount n        = PlaceRuntime
@@ -485,6 +583,63 @@ tickishPlace n@ProfNote{}
 tickishPlace HpcTick{}     = PlaceRuntime
 tickishPlace Breakpoint{}  = PlaceRuntime
 tickishPlace SourceNote{}  = PlaceNonLam
+
+-- | Merge two ticks into one, if that is possible.
+--
+-- Examples:
+--
+--  - combine two source note ticks if one contains the other,
+--  - combine a non-counting profiling tick with a non-scoping profiling tick
+--    for the same cost centre
+--  - combine two equal breakpoint ticks or HPC ticks
+combineTickish_maybe :: Eq (GenTickish pass)
+                     => GenTickish pass -> GenTickish pass -> Maybe (GenTickish pass)
+combineTickish_maybe
+  (ProfNote { profNoteCC = cc1, profNoteCount = cnt1, profNoteScope = scope1 })
+  (ProfNote { profNoteCC = cc2, profNoteCount = cnt2, profNoteScope = scope2 })
+    | cc1 == cc2
+    , not cnt1 || not cnt2
+    = Just $ ProfNote { profNoteCC    = cc1
+                      , profNoteCount = cnt1 || cnt2
+                      , profNoteScope = scope1 || scope2
+                      }
+combineTickish_maybe t1@(SourceNote sp1 n1) t2@(SourceNote sp2 n2)
+  | n1 == n2
+  , sp1 `containsSpan` sp2
+  = Just t1
+  | n1 == n2
+  , sp2 `containsSpan` sp1
+  = Just t2
+  -- NB: it would be possible to use 'combineRealSrcSpans' instead,
+  -- but that has the risk of combining many source note ticks into a single
+  -- tick with a huge source span.
+combineTickish_maybe t1@(HpcTick {}) t2@(HpcTick {})
+  | t1 == t2
+  = Just t1
+combineTickish_maybe t1@(Breakpoint {}) t2@(Breakpoint {})
+  | t1 == t2
+  = Just t1
+combineTickish_maybe _ _ = Nothing
+
+-- | Can these two ticks be commuted (moved past eachother)?
+tickishCommutable :: GenTickish pass -> GenTickish pass -> Bool
+tickishCommutable
+  -- Profiling ticks for different cost centres should never be re-ordered
+  -- relative to each other.
+  (ProfNote { profNoteCC = cc1 }) (ProfNote { profNoteCC = cc2 })
+  = cc1 == cc2
+
+tickishCommutable t1 t2
+  -- Ticks of different placements float through each other, so that each
+  -- tick can be floated into its expected position in the AST.
+  -- See Note [Tickish placement]
+  | tickishPlace t1 /= tickishPlace t2
+  = True
+
+  -- Don't commute other ticks. In particular, don't commute two SourceNote
+  -- ticks, as per Note [Ordering of source notes] in GHC.Types.Tickish.
+  | otherwise
+  = False
 
 -- | Returns whether one tick "contains" the other one, therefore
 -- making the second tick redundant.
