@@ -1,0 +1,4 @@
+section: ghci
+synopsis: Fix duplicate warnings in GHCi when typechecking statements.
+issues: #26233
+mrs: !15860
