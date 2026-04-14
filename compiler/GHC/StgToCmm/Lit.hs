@@ -96,7 +96,6 @@ mkSimpleLit platform = \case
    (LitNumber LitNumWord64 i)   -> CmmInt i W64
    (LitFloating fty r)          -> CmmFloat r fty
    (LitLabel
-      (CLabelSpec lbl fod _tg)) -> CmmLabel (mkForeignLabel (mkFastStringShortText lbl) lblsrc fod)
-                                     where lblsrc = ForeignLabelInThisPackage
-                                     -- TODO: Literal labels might not actually be in the current package...
+      (CLabelSpec lbl fod tgt)) -> CmmLabel (mkForeignLabel (mkFastStringShortText lbl) lblsrc fod)
+                                     where lblsrc = toForeignLabelSource tgt
    other                        -> pprPanic "mkSimpleLit" (ppr other)
