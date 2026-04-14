@@ -291,7 +291,7 @@ dsJsFExportDynamic id co0 cconv = do
           (ccall).
          -}
         fe_lbl        = CLabelSpec fe_nm ForeignLabelIsFunction
-                                   CLabelTargetUnknown
+                                   (CLabelTargetInUnit (moduleUnit mod))
         adj_args      = [ Var stbl_value
                         , Lit (LitLabel fe_lbl)
                         , Lit (mkLitString typestring)
