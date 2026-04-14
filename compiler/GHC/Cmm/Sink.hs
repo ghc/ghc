@@ -164,7 +164,7 @@ cmmSink cfg graph = ofBlockList (g_entry graph) <$> sink mapEmpty blocks
 
   join_pts = findJoinPoints blocks
 
-  sink :: LabelMap Assignments -> [CmmBlock] -> UniqDSM [CmmBlock]  
+  sink :: LabelMap Assignments -> [CmmBlock] -> UniqDSM [CmmBlock]
   sink _ [] = pure []
   sink sunk (b:bs) =
     -- pprTrace "sink" (ppr lbl) $
@@ -220,7 +220,7 @@ cmmSink cfg graph = ofBlockList (g_entry graph) <$> sink mapEmpty blocks
 
             upd set | r `elemLRegSet` set = set `Word64Set.union` live_rhs
                     | otherwise          = set
- 
+
             live_rhs = foldRegsUsed platform (flip insertLRegSet) emptyLRegSet rhs
 
       final_middle = foldl' blockSnoc middle' dropped_last
