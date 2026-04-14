@@ -96,6 +96,5 @@ mkSimpleLit platform = \case
    (LitFloating fty r)          -> CmmFloat r fty
    (LitLabel
       (CLabelSpec lbl fod tgt)) -> CmmLabel (mkForeignLabel lbl lblsrc fod)
-                                     where lblsrc = ForeignLabelInThisPackage
-                                     -- TODO: Literal labels might not actually be in the current package...
+                                     where lblsrc = toForeignLabelSource tgt
    other                        -> pprPanic "mkSimpleLit" (ppr other)
