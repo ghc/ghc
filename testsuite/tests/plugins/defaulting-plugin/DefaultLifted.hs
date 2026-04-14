@@ -7,6 +7,7 @@ import GHC.Tc.Plugin
 import GHC.Core.InstEnv
 import GHC.Tc.Solver (approximateWC)
 import GHC.Unit.Finder (findPluginModule)
+import GHC.Driver.Env (hscUnitIndexQuery)
 import GHC.Driver.Config.Finder (initFinderOpts)
 import Data.List
 import GHC.Tc.Types
@@ -51,8 +52,8 @@ lookupModule mod_nm = do
   let fc        = hsc_FC hsc_env
   let units     = hsc_units hsc_env
   let home_unit = hsc_home_unit hsc_env
-  -- found_module <- findPluginModule fc fopts units home_unit mod_name
-  found_module <- tcPluginIO $ findPluginModule fc fopts units (Just home_unit) mod_nm
+  query <- tcPluginIO $ hscUnitIndexQuery hsc_env
+  found_module <- tcPluginIO $ findPluginModule fc fopts units query (Just home_unit) mod_nm
   case found_module of
     FoundModule h -> return (fr_mod h)
     _          -> do
