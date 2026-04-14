@@ -159,7 +159,7 @@ compileCmmForRegAllocStats logger home_unit dflags cmmFile ncgImplF us = do
     mapM (\ (count, thisCmm) ->
         cmmNativeGen logger ncgImpl
             dusb2 dwarfFileIds dbgMap thisCmm count >>=
-                (\(_, _, _, _, colorStats, linearStats, _, _) ->
+                (\(_, _, _, _, colorStats, linearStats, _) ->
                 -- scrub unneeded output from cmmNativeGen
                 return (colorStats, linearStats)))
                 $ zip [0.. (length collectedCmms)] collectedCmms

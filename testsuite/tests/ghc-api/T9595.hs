@@ -5,6 +5,7 @@ import GHC.Unit.State
 import GHC.Driver.Monad
 import GHC.Driver.Session
 import GHC.Driver.Env
+import GHC.Driver.Env (hscUnitIndexQuery)
 import GHC.Utils.Outputable
 import GHC.Unit.Module
 import System.Environment
@@ -14,8 +15,10 @@ main =
      _ <- runGhc (Just libdir) $ do
                 dflags <- getSessionDynFlags
                 setSessionDynFlags dflags
-                state <- hsc_units <$> getSession
-                liftIO $ print (mkModuleName "GHC.Utils.Outputable" `elem` listVisibleModuleNames state)
+                hsc_env <- getSession
+                let state = hsc_units hsc_env
+                query <- liftIO $ hscUnitIndexQuery hsc_env
+                liftIO $ print (mkModuleName "GHC.Utils.Outputable" `elem` listVisibleModuleNames state query)
      _ <- runGhc (Just libdir) $ do
                 dflags <- getSessionDynFlags
                 setSessionDynFlags (dflags {
@@ -23,6 +26,8 @@ main =
                                                   (PackageArg "ghc")
                                                   (ModRenaming True [])]
                     })
-                state <- hsc_units <$> getSession
-                liftIO $ print (mkModuleName "GHC.Utils.Outputable" `elem` listVisibleModuleNames state)
+                hsc_env <- getSession
+                let state = hsc_units hsc_env
+                query <- liftIO $ hscUnitIndexQuery hsc_env
+                liftIO $ print (mkModuleName "GHC.Utils.Outputable" `elem` listVisibleModuleNames state query)
      return ()
