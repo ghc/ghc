@@ -66,11 +66,13 @@ GHC.Data.FastString.Env
 GHC.Data.FiniteMap
 GHC.Data.FlatBag
 GHC.Data.Graph.Directed
+GHC.Data.Graph.Directed.Internal
 GHC.Data.Graph.UnVar
 GHC.Data.List.Infinite
 GHC.Data.List.SetOps
 GHC.Data.Maybe
 GHC.Data.OrdList
+GHC.Data.OsPath
 GHC.Data.Pair
 GHC.Data.SmallArray
 GHC.Data.Strict
@@ -187,6 +189,7 @@ GHC.Types.RepType
 GHC.Types.SafeHaskell
 GHC.Types.SourceFile
 GHC.Types.SourceText
+GHC.Types.SptEntry
 GHC.Types.SrcLoc
 GHC.Types.Tickish
 GHC.Types.TyThing
@@ -212,6 +215,7 @@ GHC.Unit.Module.Imported
 GHC.Unit.Module.Location
 GHC.Unit.Module.ModIface
 GHC.Unit.Module.Warnings
+GHC.Unit.Module.WholeCoreBindings
 GHC.Unit.Parser
 GHC.Unit.Ppr
 GHC.Unit.State
@@ -234,6 +238,7 @@ GHC.Utils.Lexeme
 GHC.Utils.Logger
 GHC.Utils.Misc
 GHC.Utils.Monad
+GHC.Utils.Monad.State.Strict
 GHC.Utils.Outputable
 GHC.Utils.Panic
 GHC.Utils.Panic.Plain

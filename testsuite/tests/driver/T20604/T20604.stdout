@@ -1,11 +1,11 @@
 A1
 A
-addDependentFile "/home/zubin/ghcs/unicode-lex/_build_devel2/stage1/lib/../lib/x86_64-linux-ghc-9.10.2.20250728/ghc-prim-0.12.0-inplace/libHSghc-prim-0.12.0-inplace.a" 019a1208b8742850eeb197adcf0445f3
-addDependentFile "/home/zubin/ghcs/unicode-lex/_build_devel2/stage1/lib/../lib/x86_64-linux-ghc-9.10.2.20250728/ghc-bignum-1.3-inplace/libHSghc-bignum-1.3-inplace.a" ca54044c2ea501531ac3016a72a9d92b
-addDependentFile "/home/zubin/ghcs/unicode-lex/_build_devel2/stage1/lib/../lib/x86_64-linux-ghc-9.10.2.20250728/ghc-internal-9.1002.0-inplace/libHSghc-internal-9.1002.0-inplace.a" 1c2b59e426d6ae9172eb46d890155e19
-addDependentFile "/home/zubin/ghcs/unicode-lex/_build_devel2/stage1/lib/../lib/x86_64-linux-ghc-9.10.2.20250728/base-4.20.2.0-inplace/libHSbase-4.20.2.0-inplace.a" 820a64d9cb81281e10660ded650e973f
-addDependentFile "/home/zubin/ghcs/unicode-lex/_build_devel2/stage1/lib/../lib/x86_64-linux-ghc-9.10.2.20250728/ghc-boot-th-9.10.2.20250728-inplace/libHSghc-boot-th-9.10.2.20250728-inplace.a" 47565629d3614763d649bde91000bf42
-addDependentFile "/home/zubin/ghcs/unicode-lex/_build_devel2/stage1/lib/../lib/x86_64-linux-ghc-9.10.2.20250728/array-0.5.8.0-inplace/libHSarray-0.5.8.0-inplace.a" 7fb37d6d03900a689d24212e83d3f729
-addDependentFile "/home/zubin/ghcs/unicode-lex/_build_devel2/stage1/lib/../lib/x86_64-linux-ghc-9.10.2.20250728/deepseq-1.5.0.0-inplace/libHSdeepseq-1.5.0.0-inplace.a" 316be3ed9f3b5e893b2eb9924f8bb698
-addDependentFile "/home/zubin/ghcs/unicode-lex/_build_devel2/stage1/lib/../lib/x86_64-linux-ghc-9.10.2.20250728/pretty-1.1.3.6-inplace/libHSpretty-1.1.3.6-inplace.a" ab975b458837cd4dd7a38be2c7e71603
-addDependentFile "/home/zubin/ghcs/unicode-lex/_build_devel2/stage1/lib/../lib/x86_64-linux-ghc-9.10.2.20250728/template-haskell-2.22.0.0-inplace/libHStemplate-haskell-2.22.0.0-inplace.a" 8520e0f59701ce4073df664d176ade9c
+addDependentFile "/home/jun/ghc-mercury/_build/stage1/lib/../lib/x86_64-linux-ghc-9.10.3/libHSarray-0.5.8.0-inplace-ghc9.10.3.so" 0717ace0efd3f216d44080d72e777b57
+addDependentFile "/home/jun/ghc-mercury/_build/stage1/lib/../lib/x86_64-linux-ghc-9.10.3/libHStemplate-haskell-2.22.0.0-inplace-ghc9.10.3.so" 1c343114dfd1b7bfa15035e39bb31119
+addDependentFile "/home/jun/ghc-mercury/_build/stage1/lib/../lib/x86_64-linux-ghc-9.10.3/libHSghc-internal-9.1003.0-inplace-ghc9.10.3.so" 30830013b4f7e79de6b1320985d790f2
+addDependentFile "/home/jun/ghc-mercury/_build/stage1/lib/../lib/x86_64-linux-ghc-9.10.3/libHSghc-boot-th-9.10.3-inplace-ghc9.10.3.so" 3715d4b4fe5be09798d72693b43dc3ab
+addDependentFile "/home/jun/ghc-mercury/_build/stage1/lib/../lib/x86_64-linux-ghc-9.10.3/libHSghc-bignum-1.3-inplace-ghc9.10.3.so" 3cfeb43532cdf1d50100dbeaf41a5471
+addDependentFile "/home/jun/ghc-mercury/_build/stage1/lib/../lib/x86_64-linux-ghc-9.10.3/libHSpretty-1.1.3.6-inplace-ghc9.10.3.so" 6df22cf85be7c88ab9998489fdfee8d2
+addDependentFile "/home/jun/ghc-mercury/_build/stage1/lib/../lib/x86_64-linux-ghc-9.10.3/libHSdeepseq-1.5.0.0-inplace-ghc9.10.3.so" b20735870c9b596c7f3bccb08192f92e
+addDependentFile "/home/jun/ghc-mercury/_build/stage1/lib/../lib/x86_64-linux-ghc-9.10.3/libHSbase-4.20.2.0-inplace-ghc9.10.3.so" c5d748bfa4388bbbbcd0c75e7f6e92eb
+addDependentFile "/home/jun/ghc-mercury/_build/stage1/lib/../lib/x86_64-linux-ghc-9.10.3/libHSghc-prim-0.12.0-inplace-ghc9.10.3.so" f690d2bb6c31a69db4c14fe78993f3fe
