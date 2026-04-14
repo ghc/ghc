@@ -265,15 +265,19 @@ dsFCall fn_id co fcall mDeclHeader = do
 
     (fcall', cDoc) <-
               case fcall of
-              CCall (CCallSpec (StaticTarget stExt cName targetKind)
+              CCall (CCallSpec (StaticTarget _ cName targetKind)
                                CApiConv safety) ->
                do nextWrapperNum <- ds_next_wrapper_num <$> getGblEnv
                   wrapperName <- mkWrapperName nextWrapperNum "ghc_wrapper" (unpackFS cName)
-                  let fcall' = CCall (CCallSpec
-                                      (StaticTarget (stExt { staticTargetLabel = NoSourceText} )
-                                                    wrapperName
-                                                    ForeignFunction)
-                                      CApiConv safety)
+                  mod <- getModule
+                  let thisUnit = moduleUnit mod
+                      -- the C wrapper function is linked into this unit (shared lib)
+                      wrapperTarget = StaticTarget (StaticTargetGhc
+                                                      NoSourceText
+                                                      (CLabelTargetInUnit thisUnit))
+                                                   wrapperName
+                                                   ForeignFunction
+                      fcall' = CCall (CCallSpec wrapperTarget CApiConv safety)
                       c = includes
                        $$ fun_proto <+> braces (cRet <> semi)
                       includes = vcat [ text "#include \"" <> ftext h
