@@ -823,3 +823,17 @@ test ('T26425',
       [ collect_compiler_stats('all',20) ],
       compile,
       ['-O'])
+
+# Test that stresses the code generator's control flow and block layout
+# Single Cmm procedure with thousands of basic blocks forming diamond patterns
+# Works with all NCG backends (X86, AArch64, WASM, etc.)
+test('CmmControlFlowPerf',
+     [ only_ways(['optasm']),
+       unless(have_ncg(), skip),
+       collect_compiler_stats('bytes allocated', 5),
+       collect_compiler_residency(15),
+       pre_cmd('./genCmmControlFlowPerf'),
+       extra_files(['genCmmControlFlowPerf']),
+     ],
+     multimod_compile,
+     ['CmmControlFlowPerf', '-O -v0 -no-hs-main'])
