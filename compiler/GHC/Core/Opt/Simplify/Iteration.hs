@@ -2300,9 +2300,14 @@ simplInId env var cont
 
 ---------------------------------------------------------
 simplOutExpr :: SimplEnvIS -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
+-- A teeny-tiny simplifier for an OutExpr, which parsimonously avoids re-simplifying
+-- the entire things all over again
+--
+-- What if expr = (K x y) and cont is `Select`?  That is handled by rebuild.
+--   (Why?  That's a bit inconsistent with beta.)
 simplOutExpr env expr cont
   | Lam {} <- expr
-  , hasArgs cont
+  , cont_has_args
   = simplLam env (occurAnalyseExpr expr) cont
     -- ToDo:explain; c.f. Note [Occurrence-analyse after rule firing]
 
@@ -2312,10 +2317,18 @@ simplOutExpr env expr cont
        ; simplOutExpr env e cont' }
 
   | (Var v, args) <- collectArgs expr
-  = simplOutId env v (pushArgs env (idType v) args cont)
+  , not (isDataConWorkId v)
+  , cont_has_args
+  = -- Maybe `expr` is a partial application which we didn't inline before
+    -- But now it is applied to more arguments so perhaps it will inline
+    -- The base case, with args=[], is important: we are substituting
+    -- a bare variable, and it might inline, or have rewrite rules to apply
+    simplOutId env v (pushArgs env (idType v) args cont)
 
   | otherwise
   = rebuild_go env expr cont
+  where
+    cont_has_args = hasArgs cont
 
 ---------------------------------------------------------
 simplOutId :: SimplEnvIS -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
