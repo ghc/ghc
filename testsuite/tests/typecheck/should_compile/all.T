@@ -889,6 +889,7 @@ test('T21909', normal, compile, [''])
 test('T21909b', normal, compile, [''])
 test('T21443', normal, compile, [''])
 test('T22194', normal, compile, [''])
+test('T26030', normal, compile, [''])
 test('QualifiedRecordUpdate',
     [ extra_files(['QualifiedRecordUpdate_aux.hs']) ]
     , multimod_compile, ['QualifiedRecordUpdate', '-v0'])

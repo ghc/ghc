@@ -2038,22 +2038,22 @@ qlUnify ty1 ty2
       = go_flexi1 kappa ty2
 
     go_flexi1 kappa ty2  -- ty2 is zonked
-      | -- See Note [QuickLook unification] (UQL1)
-        simpleUnifyCheck UC_QuickLook kappa ty2
-      , checkTopShape (metaTyVarInfo kappa) ty2
-          -- NB: don't forget to do a shape check, as we might be dealing
-          -- with an ordinary metavariable (and not a quick-look instantiation variable).
-          -- (Forgetting this led to #25950.)
-      = do { co <- unifyKind (Just (TypeThing ty2)) ty2_kind kappa_kind
-                   -- unifyKind: see (UQL2) in Note [QuickLook unification]
-                   --            and (MIV2) in Note [Monomorphise instantiation variables]
-           ; let ty2' = mkCastTy ty2 co
-           ; traceTc "qlUnify:update" $
-             ppr kappa <+> text ":=" <+> ppr ty2
-           ; liftZonkM $ writeMetaTyVar kappa ty2' }
-
-      | otherwise
-      = return ()   -- Occurs-check or forall-bound variable
+      = do { cur_lvl <- getTcLevel
+              -- See Note [Unification preconditions], (UNTOUCHABLE) wrinkles
+              -- Here we are in the TcM monad, which does not track enclosing
+              -- Given equalities; so for quick-look unification we conservatively
+              -- treat /any/ level outside this one as untouchable. Hence cur_lvl.
+           ; case simpleUnifyCheck UC_QuickLook cur_lvl kappa ty2 of
+              SUC_CanUnify ->
+                do { co <- unifyKind (Just (TypeThing ty2)) ty2_kind kappa_kind
+                           -- unifyKind: see (UQL2) in Note [QuickLook unification]
+                           --            and (MIV2) in Note [Monomorphise instantiation variables]
+                   ; let ty2' = mkCastTy ty2 co
+                   ; traceTc "qlUnify:update" $
+                     ppr kappa <+> text ":=" <+> ppr ty2
+                   ; liftZonkM $ writeMetaTyVar kappa ty2' }
+              _ -> return () -- e.g. occurs-check or forall-bound variable
+           }
       where
         kappa_kind = tyVarKind kappa
         ty2_kind   = typeKind ty2

@@ -122,7 +122,7 @@ module GHC.Tc.Solver.Monad (
     pprEq,
 
     -- Enforcing invariants for type equalities
-    checkTypeEq, checkTouchableTyVarEq
+    checkTypeEq
 ) where
 
 import GHC.Prelude
@@ -2169,129 +2169,36 @@ wrapUnifierX ev role do_unifications
 ************************************************************************
 -}
 
-checkTouchableTyVarEq
-   :: CtEvidence
-   -> TcTyVar    -- A touchable meta-tyvar
-   -> TcType     -- The RHS
-   -> TcS (PuResult () Reduction)
--- Used for Nominal, Wanted equalities, with a touchable meta-tyvar on LHS
--- If checkTouchableTyVarEq tv ty = PuOK cts redn
---   then we can unify
---       tv := ty |> redn
---   with extra wanteds 'cts'
--- If it returns (PuFail reason) we can't unify, and the reason explains why.
-checkTouchableTyVarEq ev lhs_tv rhs
-  | simpleUnifyCheck UC_Solver lhs_tv rhs   -- An (optional) short-cut
-  = do { traceTcS "checkTouchableTyVarEq: simple-check wins" (ppr lhs_tv $$ ppr rhs)
-       ; return (pure (mkReflRedn Nominal rhs)) }
-
-  | otherwise
-  = do { traceTcS "checkTouchableTyVarEq {" (ppr lhs_tv $$ ppr rhs)
-       ; check_result <- wrapTcS (check_rhs rhs)
-       ; traceTcS "checkTouchableTyVarEq }" (ppr lhs_tv $$ ppr check_result)
-       ; case check_result of
-            PuFail reason -> return (PuFail reason)
-            PuOK cts redn -> do { emitWork cts
-                                ; return (pure redn) } }
-
-  where
-    (lhs_tv_info, lhs_tv_lvl) = case tcTyVarDetails lhs_tv of
-       MetaTv { mtv_info = info, mtv_tclvl = lvl } -> (info,lvl)
-       _ -> pprPanic "checkTouchableTyVarEq" (ppr lhs_tv)
-            -- lhs_tv should be a meta-tyvar
-
-    is_concrete_lhs_tv = isConcreteInfo lhs_tv_info
-
-    check_rhs rhs
-       -- Crucial special case for  alpha ~ F tys
-       -- We don't want to flatten that (F tys)!
-       | Just (TyFamLHS tc tys) <- canTyFamEqLHS_maybe rhs
-       = if is_concrete_lhs_tv
-         then failCheckWith (cteProblem cteConcrete)
-         else recurseIntoTyConApp arg_flags tc tys
-       | otherwise
-       = checkTyEqRhs flags rhs
-
-    flags = TEF { tef_foralls  = False -- isRuntimeUnkSkol lhs_tv
-                , tef_fam_app  = mkTEFA_Break ev NomEq break_wanted
-                , tef_unifying = Unifying lhs_tv_info lhs_tv_lvl (LC_Promote False)
-                , tef_lhs      = TyVarLHS lhs_tv
-                , tef_occurs   = cteInsolubleOccurs }
-
-    arg_flags = famAppArgFlags flags
-
-    break_wanted :: FamAppBreaker Ct
-    break_wanted fam_app
-      -- Occurs check or skolem escape; so flatten
-      = do { let fam_app_kind = typeKind fam_app
-           ; reason <- checkPromoteFreeVars cteInsolubleOccurs
-                            lhs_tv lhs_tv_lvl (tyCoVarsOfType fam_app_kind)
-           ; if not (cterHasNoProblem reason)  -- Failed to promote free vars
-             then failCheckWith reason
-             else
-        do { new_tv_ty <-
-              case lhs_tv_info of
-                ConcreteTv conc_info ->
-                  -- Make a concrete tyvar if lhs_tv is concrete
-                  -- e.g.  alpha[2,conc] ~ Maybe (F beta[4])
-                  --       We want to flatten to
-                  --       alpha[2,conc] ~ Maybe gamma[2,conc]
-                  --       gamma[2,conc] ~ F beta[4]
-                  TcM.newConcreteTyVarTyAtLevel conc_info lhs_tv_lvl fam_app_kind
-                _ -> TcM.newMetaTyVarTyAtLevel lhs_tv_lvl fam_app_kind
-
-           ; let pty = mkPrimEqPredRole Nominal fam_app new_tv_ty
-           ; hole <- TcM.newVanillaCoercionHole pty
-           ; let new_ev = CtWanted { ctev_pred      = pty
-                                   , ctev_dest      = HoleDest hole
-                                   , ctev_loc       = cb_loc
-                                   , ctev_rewriters = ctEvRewriters ev }
-           ; return (PuOK (singleCt (mkNonCanonical new_ev))
-                          (mkReduction (HoleCo hole) new_tv_ty)) } }
-
-    -- See Detail (7) of the Note
-    cb_loc = updateCtLocOrigin (ctEvLoc ev) CycleBreakerOrigin
-
-------------------------
 checkTypeEq :: CtEvidence -> EqRel -> CanEqLHS -> TcType
             -> TcS (PuResult () Reduction)
 -- Used for general CanEqLHSs, ones that do
 -- not have a touchable type variable on the LHS (i.e. not unifying)
-checkTypeEq ev eq_rel lhs rhs
-  | isGiven ev
-  = do { traceTcS "checkTypeEq {" (vcat [ text "lhs:" <+> ppr lhs
-                                        , text "rhs:" <+> ppr rhs ])
-       ; check_result <- wrapTcS (check_given_rhs rhs)
-       ; traceTcS "checkTypeEq }" (ppr check_result)
-       ; case check_result of
-            PuFail reason -> return (PuFail reason)
-            PuOK prs redn -> do { new_givens <- mapBagM mk_new_given prs
-                                ; emitWork new_givens
-                                ; updInertSet (addCycleBreakerBindings prs)
-                                ; return (pure redn) } }
-
-  | otherwise  -- Wanted
-  = do { check_result <- wrapTcS (checkTyEqRhs wanted_flags rhs)
-       ; case check_result of
-            PuFail reason -> return (PuFail reason)
-            PuOK cts redn -> do { emitWork cts
-                                ; return (pure redn) } }
+checkTypeEq ev eq_rel lhs rhs =
+  case ev of
+    CtGiven {} ->
+      do { traceTcS "checkTypeEq {" (vcat [ text "lhs:" <+> ppr lhs
+                                          , text "rhs:" <+> ppr rhs ])
+         ; check_result <- wrapTcS (checkTyEqRhs given_flags rhs)
+         ; traceTcS "checkTypeEq }" (ppr check_result)
+         ; case check_result of
+              PuFail reason -> return (PuFail reason)
+              PuOK prs redn -> do { new_givens <- mapBagM mk_new_given prs
+                                  ; emitWork new_givens
+                                  ; updInertSet (addCycleBreakerBindings prs)
+                                  ; return (pure redn) } }
+    CtWanted {} ->
+      do { check_result <- wrapTcS (checkTyEqRhs wanted_flags rhs)
+         ; case check_result of
+              PuFail reason -> return (PuFail reason)
+              PuOK cts redn -> do { emitWork cts
+                                  ; return (pure redn) } }
   where
-    check_given_rhs :: TcType -> TcM (PuResult (TcTyVar,TcType) Reduction)
-    check_given_rhs rhs
-       -- See Note [Special case for top-level of Given equality]
-       | Just (TyFamLHS tc tys) <- canTyFamEqLHS_maybe rhs
-       = recurseIntoTyConApp arg_flags tc tys
-       | otherwise
-       = checkTyEqRhs given_flags rhs
-
-    arg_flags = famAppArgFlags given_flags
 
     given_flags :: TyEqFlags (TcTyVar,TcType)
     given_flags = TEF { tef_lhs      = lhs
                       , tef_foralls  = False
                       , tef_unifying = NotUnifying
-                      , tef_fam_app  = mkTEFA_Break ev eq_rel break_given
+                      , tef_fam_app  = mkTEFA_Break ev eq_rel BreakGiven
                       , tef_occurs   = occ_prob }
         -- TEFA_Break used for: [G] a ~ Maybe (F a)
         --                   or [W] F a ~ Maybe (F a)
@@ -2308,13 +2215,6 @@ checkTypeEq ev eq_rel lhs rhs
                  NomEq  -> cteInsolubleOccurs
                  ReprEq -> cteSolubleOccurs
 
-    break_given :: TcType -> TcM (PuResult (TcTyVar,TcType) Reduction)
-    break_given fam_app
-      = do { new_tv <- TcM.newCycleBreakerTyVar (typeKind fam_app)
-           ; return (PuOK (unitBag (new_tv, fam_app))
-                          (mkReflRedn Nominal (mkTyVarTy new_tv))) }
-                    -- Why reflexive? See Detail (4) of the Note
-
     ---------------------------
     mk_new_given :: (TcTyVar, TcType) -> TcS Ct
     mk_new_given (new_tv, fam_app)
@@ -2326,20 +2226,6 @@ checkTypeEq ev eq_rel lhs rhs
 
     -- See Detail (7) of the Note
     cb_loc = updateCtLocOrigin (ctEvLoc ev) CycleBreakerOrigin
-
-mkTEFA_Break :: CtEvidence -> EqRel -> FamAppBreaker a -> TyEqFamApp a
-mkTEFA_Break ev eq_rel breaker
-  | NomEq <- eq_rel
-  , not cycle_breaker_origin
-  = TEFA_Break breaker
-  | otherwise
-  = TEFA_Recurse
-  where
-    -- cycle_breaker_origin: see Detail (7) of Note [Type equality cycles]
-    -- in GHC.Tc.Solver.Equality
-    cycle_breaker_origin = case ctLocOrigin (ctEvLoc ev) of
-                              CycleBreakerOrigin {} -> True
-                              _                     -> False
 
 -------------------------
 -- | Fill in CycleBreakerTvs with the variables they stand for.
@@ -2356,31 +2242,6 @@ restoreTyVarCycles is
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 (a ~R# b a) is soluble if b later turns out to be Identity
 So we treat this as a "soluble occurs check".
-
-Note [Special case for top-level of Given equality]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We take care when examining
-    [G] F ty ~ G (...(F ty)...)
-where both sides are TyFamLHSs.  We don't want to flatten that RHS to
-    [G] F ty ~ cbv
-    [G] G (...(F ty)...) ~ cbv
-Instead we'd like to say "occurs-check" and swap LHS and RHS, which yields a
-canonical constraint
-    [G] G (...(F ty)...) ~ F ty
-That tents to rewrite a big type to smaller one. This happens in T15703,
-where we had:
-    [G] Pure g ~ From1 (To1 (Pure g))
-Making a loop breaker and rewriting left to right just makes much bigger
-types than swapping it over.
-
-(We might hope to have swapped it over before getting to checkTypeEq,
-but better safe than sorry.)
-
-NB: We never see a TyVarLHS here, such as
-    [G] a ~ F tys here
-because we'd have swapped it to
-   [G] F tys ~ a
-in canEqCanLHS2, before getting to checkTypeEq.
 
 Note [Don't cycle-break Wanteds when not unifying]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
