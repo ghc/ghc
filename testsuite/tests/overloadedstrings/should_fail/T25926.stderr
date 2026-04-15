@@ -1,0 +1,5 @@
+T25926.hs:4:3: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type ‘()’ with actual type ‘Char’
+    • In the pattern: 'a'
+      In an equation for ‘f’: f 'a' _ = ()
+
