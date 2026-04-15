@@ -33,6 +33,8 @@ module GHC.Types.ForeignCall (
   isSafeForeignCall,
   -- ** CCallSpec
   CCallSpec(..),
+  -- ** CLabelSpec
+  CLabelSpec(..),
 
   -- * Foreign export types
   -- ** Data-type
@@ -47,7 +49,7 @@ module GHC.Types.ForeignCall (
   CCallTarget(..),
   -- *** GHC extension point
   StaticTargetGhc(..),
-  CCallStaticTargetUnit(..),
+  CLabelTargetLibrary(..),
   -- *** Queries
   isDynamicTarget,
   -- ** Foreign target kind
@@ -89,6 +91,8 @@ module GHC.Types.ForeignCall (
   -- *** Conversion
   renameHeader,
   typeCheckHeader,
+  -- ** ForeignLabelIsFunctionOrData
+  ForeignLabelIsFunctionOrData(..),
   ) where
 
 import GHC.Prelude
@@ -201,8 +205,8 @@ instance Outputable CCallSpec where
                 ForeignValue    -> text "__ffi_static_ccall_value"
                 ForeignFunction -> text "__ffi_static_ccall"
               pprUnit ext = case staticTargetUnit ext of
-                TargetIsInThisUnit  -> empty
-                TargetIsInThat unit -> ppr unit
+                CLabelTargetUnknown     -> empty
+                CLabelTargetInUnit unit -> ppr unit
               (srcTxt, pPkgId) = (staticTargetLabel ext, pprUnit ext)
           in pCallType
                <> gc_suf
@@ -227,6 +231,87 @@ typeCheckHeader (Header a b) = Header a b
 
 renameHeader :: Header GhcPs -> Header GhcRn
 renameHeader (Header a b) = Header a b
+
+{-
+************************************************************************
+*                                                                      *
+\subsubsection{C labels}
+*                                                                      *
+************************************************************************
+-}
+
+-- | A C name (closely related to an assembler label or linker symbol), along
+-- with /what/ kind of entity the name refers to and /where/ the the entity
+-- lives.
+--
+-- The \"what\" is whether it refers to a C function or C data (e.g. a C global
+-- variable or constant). We track this because we need to know in the backends
+-- how to use the name.
+--
+-- The \"where\" is where the entity that the name refers to lives.
+-- Specifically, what shared library it lives in. We track this because on some
+-- platforms (especially Windows) the the backend has to generate different
+-- code to access symbols depending on whether they are in the current shared
+-- library or a different one.
+--
+-- This is used in Core's representation of 'Literal's, in the 'LitLabel'
+-- case, to represent the address of a C entity (function or data) by its name
+-- (also called a label or symbol). It gets used in the representation of FFI
+-- imports of the address of C names, like:
+--
+-- > foreign import ccall "foo.h &foo" foo :: Ptr CInt
+--
+data CLabelSpec
+   = CLabelSpec
+       !CLabelString            -- name
+       !CLabelIsFunctionOrData  -- what
+       !CLabelTargetLibrary     -- where
+  deriving (Eq, Data)
+
+type CLabelIsFunctionOrData = ForeignLabelIsFunctionOrData
+
+instance Binary CLabelSpec where
+    put_ bh (CLabelSpec lbl fod tgt) = do
+        put_ bh lbl
+        put_ bh fod
+        put_ bh tgt
+    get bh = do
+        lbl <- get bh
+        fod <- get bh
+        tgt <- get bh
+        return (CLabelSpec lbl fod tgt)
+
+instance NFData CLabelSpec where
+    rnf (CLabelSpec lbl fod tgt) = rnf lbl `seq` rnf fod `seq` rnf tgt
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{ForeignLabelIsFunctionOrData}
+*                                                                      *
+************************************************************************
+-}
+
+data ForeignLabelIsFunctionOrData = ForeignLabelIsFunction | ForeignLabelIsData
+    deriving (Eq, Ord, Data)
+
+instance Outputable ForeignLabelIsFunctionOrData where
+    ppr ForeignLabelIsFunction = text "(function)"
+    ppr ForeignLabelIsData     = text "(data)"
+
+instance Binary ForeignLabelIsFunctionOrData where
+    put_ bh ForeignLabelIsFunction = putByte bh 0
+    put_ bh ForeignLabelIsData     = putByte bh 1
+    get bh = do
+        h <- getByte bh
+        case h of
+          0 -> return ForeignLabelIsFunction
+          1 -> return ForeignLabelIsData
+          _ -> panic "Binary ForeignLabelIsFunctionOrData"
+
+instance NFData ForeignLabelIsFunctionOrData where
+  rnf ForeignLabelIsFunction = ()
+  rnf ForeignLabelIsData = ()
 
 {-
 ************************************************************************
@@ -277,25 +362,41 @@ instance Binary CCallConv where
               3 -> return CApiConv
               _ -> return JavaScriptCallConv
 
--- |
--- Which compilation 'Unit' is the static target in,
--- either it is in this currently compiling compilation 'Unit',
--- or it is in /that other/, compilation 'Unit'.
-data CCallStaticTargetUnit
-  = TargetIsInThisUnit  -- ^ In this current 'Unit'.
-  | TargetIsInThat Unit -- ^ In that other   'Unit'.
+-- | Where the target of the C label is: specifically what shared library (if
+-- building with shared libraries).
+--
+-- This information is used in the code generators (on some platforms) to
+-- determine whether a reference using the label is in the same shared library
+-- as the target, or if the target is in a different library.
+--
+-- For normal user-specified FFI imports, we do not know, which uses
+-- 'CLabelTargetUnknown'. Some internally generated labels where the target is
+-- known (e.g. the RTS) use 'CLabelTargetInUnit'.
+--
+data CLabelTargetLibrary
+
+    -- | The entity (that the name\/label points to) is in an unknown shared
+    -- library. In particular it could either be in the current library (where
+    -- the label is used) or an external one. This case is used for all
+    -- user-written Haskell FFI ccall\/capi imports, because in this case we do
+    -- not know where the entity the name refers to lives.
+  = CLabelTargetUnknown
+
+    -- | The entity is /known/ to live in a specific Haskell unit (package),
+    -- and thus the shared library corresponding to the unit. Uses of this
+    -- label within the same unit will be intra-library, and inter-library
+    -- otherwise.
+  | CLabelTargetInUnit !Unit
   deriving (Data, Eq)
+
+instance Outputable CLabelTargetLibrary where
+   ppr CLabelTargetUnknown       = parens (text "unknown library")
+   ppr (CLabelTargetInUnit unit) = parens (text "in unit " <> ppr unit)
+
 
 data StaticTargetGhc = StaticTargetGhc
   { staticTargetLabel :: SourceText
-  , staticTargetUnit  :: CCallStaticTargetUnit
-      -- ^ What package the function is in.
-      -- If 'TargetIsInThisUnit', then it's taken to be in the current package
-      -- Note: This information is only used for PrimCalls on Windows.
-      --       See CLabel.labelDynamic and CoreToStg.coreToStgApp
-      --       for the difference in representation between PrimCalls
-      --       and ForeignCalls. If the CCallTarget is representing
-      --       a regular ForeignCall then it's safe to set this to Nothing.
+  , staticTargetUnit  :: CLabelTargetLibrary
   }
   deriving (Data, Eq)
 
@@ -327,19 +428,19 @@ instance NFData (Header (GhcPass p)) where
     rnf (Header s h) =
       rnf s `seq` rnf h
 
-instance NFData CCallStaticTargetUnit where
+instance NFData CLabelTargetLibrary where
     rnf = \case
-      TargetIsInThisUnit  -> ()
-      TargetIsInThat unit -> rnf unit
+      CLabelTargetUnknown     -> ()
+      CLabelTargetInUnit unit -> rnf unit
 
-instance Binary CCallStaticTargetUnit where
+instance Binary CLabelTargetLibrary where
     put_ bh = \case
-      TargetIsInThisUnit  -> putByte bh 0
-      TargetIsInThat unit -> putByte bh 1 *> put_ bh unit
+      CLabelTargetUnknown     -> putByte bh 0
+      CLabelTargetInUnit unit -> putByte bh 1 *> put_ bh unit
 
     get bh = getByte bh >>= \case
-      0 -> pure TargetIsInThisUnit
-      _ -> TargetIsInThat <$> get bh
+      0 -> pure CLabelTargetUnknown
+      _ -> CLabelTargetInUnit <$> get bh
 
 instance NFData CTypeGhc where
     rnf st =

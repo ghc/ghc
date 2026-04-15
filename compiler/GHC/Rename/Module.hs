@@ -40,7 +40,6 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin ( TypedThing(..) )
 
-import GHC.Unit
 import GHC.Unit.Module.Warnings
 import GHC.Builtin.Names( applicativeClassName, pureAName, thenAName
                         , monadClassName, returnMName, thenMName
@@ -61,7 +60,6 @@ import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc as SrcLoc
 
 import GHC.Driver.DynFlags
-import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
 
 import GHC.Utils.Misc   ( lengthExceeds )
 import GHC.Utils.Panic
@@ -393,13 +391,10 @@ rnDefaultDecl (DefaultDecl _ mb_cls tys)
 
 rnHsForeignDecl :: ForeignDecl GhcPs -> RnM (ForeignDecl GhcRn, FreeNames)
 rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
-  = do { topEnv :: HscEnv <- getTopEnv
-       ; name' <- lookupLocatedTopBndrRnN WL_TermVariable name
+  = do { name' <- lookupLocatedTopBndrRnN WL_TermVariable name
        ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
 
-        -- Mark any PackageTarget style imports as coming from the current package
-       ; let home_unit = hsc_home_unit topEnv
-             spec'  = patchForeignImport (homeUnitAsUnit home_unit) spec
+       ; let spec' = rnHsForeignImport spec
 
        ; return (ForeignImport { fd_i_ext = noExtField
                                , fd_name = name', fd_sig_ty = ty'
@@ -416,28 +411,28 @@ rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
         --     we add it to the free-variable list.  It might, for example,
         --     be imported from another module
 
--- | For Windows DLLs we need to know what packages imported symbols are from
---      to generate correct calls. Imported symbols are tagged with the current
---      package, so if they get inlined across a package boundary we'll still
---      know where they're from.
---
-patchForeignImport :: Unit -> (ForeignImport GhcPs) -> (ForeignImport GhcRn)
-patchForeignImport unit (CImport ext cconv safety fs spec)
-        = CImport ext cconv safety (renameHeader <$> fs) (patchCImportSpec unit spec)
+rnHsForeignImport :: ForeignImport GhcPs -> ForeignImport GhcRn
+rnHsForeignImport (CImport ext cconv safety fs spec)
+        = CImport ext cconv safety (renameHeader <$> fs) (rnHsCImportSpec spec)
 
-patchCImportSpec :: Unit -> CImportSpec GhcPs -> CImportSpec GhcRn
-patchCImportSpec unit = \case
-    CFunction callTarget -> CFunction $ patchCCallTarget unit callTarget
+rnHsCImportSpec :: CImportSpec GhcPs -> CImportSpec GhcRn
+rnHsCImportSpec = \case
+    CFunction callTarget -> CFunction $ rnHsCCallTarget callTarget
     CLabel    cLabel     -> CLabel cLabel
     CWrapper             -> CWrapper
 
-patchCCallTarget :: Unit -> CCallTarget GhcPs -> CCallTarget GhcRn
-patchCCallTarget unit = \case
+-- | For user-specified FFI imports, we /do not know/ where the named entity
+-- comes from: from the current shared library or an external one. There is no
+-- syntax for specifying it. So we annotate all user foreign imports with an
+-- unknown target ('CLabelTargetUnknown').
+--
+rnHsCCallTarget :: CCallTarget GhcPs -> CCallTarget GhcRn
+rnHsCCallTarget = \case
     DynamicTarget x -> DynamicTarget x
     StaticTarget sTxt label targetKind ->
       let ext = StaticTargetGhc
             { staticTargetLabel = sTxt
-            , staticTargetUnit  = TargetIsInThat unit
+            , staticTargetUnit  = CLabelTargetUnknown
             }
       in  StaticTarget ext label targetKind
 

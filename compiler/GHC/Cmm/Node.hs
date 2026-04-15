@@ -28,7 +28,6 @@ import GHC.Utils.Outputable
 import GHC.Runtime.Heap.Layout
 import GHC.Types.Tickish (CmmTickish)
 import qualified GHC.Types.Unique as U
-import GHC.Types.Basic (FunctionOrData(..))
 
 import GHC.Platform
 import GHC.Cmm.Dataflow.Block
@@ -500,7 +499,7 @@ pprForeignTarget platform (PrimTarget op)
  = pdoc platform
                (mkForeignLabel
                           (mkFastString (show op))
-                          ForeignLabelInThisPackage IsFunction)
+                          ForeignLabelInThisPackage ForeignLabelIsFunction)
 
 instance Outputable Convention where
   ppr = pprConvention

@@ -39,7 +39,6 @@ import GHC.Types.SourceText
 import GHC.Types.Name
 import GHC.Types.RepType
 import GHC.Types.ForeignCall
-import GHC.Types.Basic
 import GHC.Types.Unique
 
 import GHC.Unit.Module
@@ -237,11 +236,11 @@ dsJsImport id co (CLabel cid) _ _ _ = do
        fod = case tyConAppTyCon_maybe (dropForAlls ty) of
              Just tycon
               | tyConUnique tycon == funPtrTyConKey ->
-                 IsFunction
-             _ -> IsData
+                 ForeignLabelIsFunction
+             _ -> ForeignLabelIsData
    (_resTy, foRhs) <- jsResultWrapper ty
 --   ASSERT(fromJust resTy `eqType` addrPrimTy)    -- typechecker ensures this
-   let rhs = foRhs (Lit (LitLabel cid fod))
+   let rhs = foRhs (Lit (LitLabel (CLabelSpec cid fod CLabelTargetUnknown)))
        rhs' = Cast rhs co
 
    return ([(id, rhs')], mempty, mempty)
@@ -291,15 +290,24 @@ dsJsFExportDynamic id co0 cconv = do
           to be entered using an external calling convention
           (ccall).
          -}
+        fe_lbl        = CLabelSpec fe_nm ForeignLabelIsFunction
+                                   (CLabelTargetInUnit (moduleUnit mod))
         adj_args      = [ Var stbl_value
-                        , Lit (LitLabel fe_nm IsFunction)
+                        , Lit (LitLabel fe_lbl)
                         , Lit (mkLitString typestring)
                         ]
           -- name of external entry point providing these services.
           -- (probably in the RTS.)
-        adjustor   = fsLit "createAdjustor"
+        adjustor   = CCallSpec
+                       (StaticTarget
+                         (StaticTargetGhc NoSourceText
+                                          (CLabelTargetInUnit rtsUnit))
+                         (fsLit "createAdjustor")
+                         ForeignFunction)
+                       CCallConv
+                       PlayRisky
 
-    ccall_adj <- dsCCall adjustor adj_args PlayRisky (mkTyConApp io_tc [res_ty])
+    ccall_adj <- dsCCall adjustor adj_args (mkTyConApp io_tc [res_ty])
         -- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
 
     let io_app = mkLams tvs                  $
@@ -649,7 +657,7 @@ mkJsCall u tgt args t = mkFCall u ccall args t
   where
     stExt = StaticTargetGhc
         { staticTargetLabel = NoSourceText
-        , staticTargetUnit  = TargetIsInThat ghcInternalUnit
+        , staticTargetUnit  = CLabelTargetInUnit ghcInternalUnit
         }
     ccall = CCall $ CCallSpec
               (StaticTarget stExt tgt ForeignFunction)

@@ -44,7 +44,6 @@ import GHC.Platform
 import GHC.Platform.Reg
 import GHC.Platform.Regs
 import GHC.Prelude hiding (EQ)
-import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc (srcSpanFile, srcSpanStartCol, srcSpanStartLine)
 import GHC.Types.Tickish (GenTickish (..))
@@ -1897,9 +1896,9 @@ genPrimCCall name dsts args = do
 genLibCCall :: FastString -> [CmmFormal] -> [CmmActual] -> NatM InstrBlock
 genLibCCall name dsts args = do
   config <- getConfig
-  target <-
-    cmmMakeDynamicReference config CallReference
-      $ mkForeignLabel name ForeignLabelInThisPackage IsFunction
+  target <- cmmMakeDynamicReference config CallReference $
+              mkForeignLabel name ForeignLabelInThisPackage
+                                  ForeignLabelIsFunction
   let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
   genCCall target cconv dsts args
 

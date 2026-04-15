@@ -54,7 +54,6 @@ import GHC.Utils.Outputable
 import Control.Monad    ( mapAndUnzipM )
 import GHC.Float
 
-import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.Literal.Floating
 import GHC.Data.FastString
@@ -2724,7 +2723,8 @@ genCCall target dest_regs arg_regs = do
     mkCCall name = do
       config <- getConfig
       target <- cmmMakeDynamicReference config CallReference $
-          mkForeignLabel name ForeignLabelInThisPackage IsFunction
+                  mkForeignLabel name ForeignLabelInThisPackage
+                                      ForeignLabelIsFunction
       let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
       genCCall (ForeignTarget target cconv) dest_regs arg_regs
 

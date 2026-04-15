@@ -34,7 +34,6 @@ import GHC.Core.Predicate( tyCoVarsOfTypeWellScoped )
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
 
-import GHC.Types.SourceText
 import GHC.Types.Id.Make
 import GHC.Types.ForeignCall
 import GHC.Types.Basic
@@ -91,25 +90,18 @@ follows:
 \end{verbatim}
 -}
 
-dsCCall :: CLabelString -- C routine to invoke
+dsCCall :: CCallSpec    -- C routine to invoke
         -> [CoreExpr]   -- Arguments (desugared)
         -- Precondition: none have representation-polymorphic types
-        -> Safety       -- Safety of the call
         -> Type         -- Type of the result: IO t
         -> DsM CoreExpr -- Result, of type ???
 
-dsCCall lbl args may_gc result_ty
+dsCCall ccall args result_ty
   = do (unboxed_args, arg_wrappers) <- mapAndUnzipM unboxArg args
        (ccall_result_ty, res_wrapper) <- boxResult result_ty
        uniq <- newUnique
-       let stExt = StaticTargetGhc
-             { staticTargetLabel = NoSourceText
-             , staticTargetUnit  = TargetIsInThisUnit
-             }
-           target = StaticTarget stExt lbl ForeignFunction
-           the_fcall    = CCall (CCallSpec target CCallConv may_gc)
-           the_prim_app = mkFCall uniq the_fcall unboxed_args ccall_result_ty
-       return (foldr ($) (res_wrapper the_prim_app) arg_wrappers)
+       let ccall_app = mkFCall uniq (CCall ccall) unboxed_args ccall_result_ty
+       return (foldr ($) (res_wrapper ccall_app) arg_wrappers)
 
 mkFCall :: Unique -> ForeignCall
         -> [CoreExpr]     -- Args

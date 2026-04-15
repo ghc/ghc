@@ -115,6 +115,7 @@ module GHC.Cmm.CLabel (
         hasIdLabelInfo,
         isBytesLabel,
         isForeignLabel,
+        isForeignLabelUnknownPackage,
         isSomeRODataLabel,
         isStaticClosureLabel,
 
@@ -124,6 +125,7 @@ module GHC.Cmm.CLabel (
         toEntryLbl,
         toInfoLbl,
         toProcDelimiterLbl,
+        toForeignLabelSource,
 
         -- * Pretty-printing
         LabelStyle (..),
@@ -143,7 +145,8 @@ module GHC.Cmm.CLabel (
 import GHC.Prelude
 
 import GHC.Types.Id.Info
-import GHC.Types.Basic
+import GHC.Types.ForeignCall (ForeignLabelIsFunctionOrData(..),
+                              CLabelTargetLibrary(..))
 import {-# SOURCE #-} GHC.Cmm.BlockId (BlockId, mkBlockId)
 import GHC.Unit.Types
 import GHC.Types.Name
@@ -240,7 +243,7 @@ data CLabel
 
         ForeignLabelSource      -- ^ what package the foreign label is in.
 
-        FunctionOrData
+        ForeignLabelIsFunctionOrData
 
   -- | Local temporary label used for native (or LLVM) code generation; must not
   -- appear outside of these contexts. Use primarily for debug information
@@ -446,7 +449,31 @@ data ForeignLabelSource
    --   contain compiled Haskell code, and is not associated with any .hi files.
    --   We don't have to worry about Haskell code being inlined from
    --   external packages. It is safe to treat the RTS package as "external".
+   --
+   --   On Windows in particular, we assume the label is definately in an
+   --   external DLL and expect to link it against a __imp_* symbol. Thus it
+   --   will /not/ link correctly if the symbol is actually in the same DLL.
    | ForeignLabelInExternalPackage
+
+   -- | The label is somewhere, but we do not know if it is in this package or
+   --   an external package. This is the case we end up with for Haskell FFI
+   --   declarations like @foreign import ccall@. There is not enough
+   --   information to tell us if the label is from the same package (e.g. in
+   --   a local @cbits/blah.c@ file) or is from an external foreign library.
+   --
+   --   On ELF, this is not a problem and the symbol can be resolved without
+   --   knowing if its local or external.
+   --
+   --   On Windows/PE, this is a bit of a problem. On Windows one normally
+   --   needs to know if it's local or external since the symbol names and
+   --   ABI differ. However, GCC & LLVM have extensions to help porting Unix
+   --   software (that is not used to making these distinctions). There are a
+   --   number of useful mechanisms including \"auto import\" (to import
+   --   symbols found in DLLs automatically), a @.refptr@ mechanism to load
+   --   data via an indirection (which the linker can relocate) and
+   --   \"pseudo relocations\" which is a runtime feature to do additional
+   --   relocations beyond what the Win32 native linker does.
+   | ForeignLabelInUnknownPackage
 
    -- | Label is in the package currently being compiled.
    --   This is only used for creating hacky tmp labels during code generation.
@@ -456,6 +483,28 @@ data ForeignLabelSource
    | ForeignLabelInThisPackage
 
    deriving (Eq, Ord)
+
+-- | The 'CLabelTargetLibrary' is used in the core phases, while
+-- 'ForeignLabelSource' is used in Cmm and below.
+--
+-- Apart from naming conventions, the difference is that 'ForeignLabelSource'
+-- has two extra cases:
+--
+-- 1. 'ForeignLabelInThisPackage' with an implicit \"this\". This works in
+--    the Cmm stage of the pipeline and below because there is a consistent
+--    notion of current package. In core, where unfoldings get moved across
+--    unit boundaries we must only use an explicit unit (which can be initially
+--    set to the unit where something is defined).
+--
+-- 2. 'ForeignLabelInExternalPackage'. This has a few uses in the cmm layer,
+--    but the use case does not arise in the frontend: we neve know positively
+--    that a name is in an external package without also knowing where it is
+--    from, e.g. the RTS, which then fall into the 'CLabelTargetInUnit' case.
+--
+toForeignLabelSource :: CLabelTargetLibrary -> ForeignLabelSource
+toForeignLabelSource CLabelTargetUnknown       = ForeignLabelInUnknownPackage
+toForeignLabelSource (CLabelTargetInUnit unit) = ForeignLabelInPackage
+                                                   (toUnitId unit)
 
 
 -- | For debugging problems with the CLabel representation.
@@ -657,7 +706,7 @@ mkDirty_MUT_VAR_Label,
     mkSMAP_DIRTY_infoLabel, mkBadAlignmentLabel,
     mkOutOfBoundsAccessLabel, mkMemcpyRangeOverlapLabel,
     mkMUT_VAR_CLEAN_infoLabel :: CLabel
-mkDirty_MUT_VAR_Label           = mkForeignLabel (fsLit "dirty_MUT_VAR") ForeignLabelInExternalPackage IsFunction
+mkDirty_MUT_VAR_Label           = mkForeignLabel (fsLit "dirty_MUT_VAR") ForeignLabelInExternalPackage ForeignLabelIsFunction
 mkNonmovingWriteBarrierEnabledLabel
                                 = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "nonmoving_write_barrier_enabled") CmmData
 mkOrigThunkInfoLabel            = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_orig_thunk_info_frame") CmmInfo
@@ -675,8 +724,8 @@ mkSMAP_FROZEN_CLEAN_infoLabel   = CmmLabel rtsUnitId (NeedExternDecl False) (fsL
 mkSMAP_FROZEN_DIRTY_infoLabel   = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY") CmmInfo
 mkSMAP_DIRTY_infoLabel          = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_SMALL_MUT_ARR_PTRS_DIRTY") CmmInfo
 mkBadAlignmentLabel             = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_badAlignment")      CmmEntry
-mkOutOfBoundsAccessLabel        = mkForeignLabel (fsLit "rtsOutOfBoundsAccess") ForeignLabelInExternalPackage IsFunction
-mkMemcpyRangeOverlapLabel       = mkForeignLabel (fsLit "rtsMemcpyRangeOverlap") ForeignLabelInExternalPackage IsFunction
+mkOutOfBoundsAccessLabel        = mkForeignLabel (fsLit "rtsOutOfBoundsAccess") ForeignLabelInExternalPackage ForeignLabelIsFunction
+mkMemcpyRangeOverlapLabel       = mkForeignLabel (fsLit "rtsMemcpyRangeOverlap") ForeignLabelInExternalPackage ForeignLabelIsFunction
 mkMUT_VAR_CLEAN_infoLabel       = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_MUT_VAR_CLEAN")     CmmInfo
 
 mkSRTInfoLabel :: Int -> CLabel
@@ -761,7 +810,7 @@ mkPrimCallLabel (PrimCall str pkg)
 mkForeignLabel
         :: FastString           -- name
         -> ForeignLabelSource   -- what package it's in
-        -> FunctionOrData
+        -> ForeignLabelIsFunctionOrData
         -> CLabel
 
 mkForeignLabel = ForeignLabel
@@ -775,6 +824,10 @@ isBytesLabel _lbl = False
 isForeignLabel :: CLabel -> Bool
 isForeignLabel (ForeignLabel _ _ _) = True
 isForeignLabel _lbl = False
+
+isForeignLabelUnknownPackage :: CLabel -> Bool
+isForeignLabelUnknownPackage (ForeignLabel _ ForeignLabelInUnknownPackage _) = True
+isForeignLabelUnknownPackage _lbl = False
 
 -- | Whether label is a static closure label (can come from haskell or cmm)
 isStaticClosureLabel :: CLabel -> Bool
@@ -1226,8 +1279,8 @@ labelType (RtsLabel (RtsPrimOp _))              = CodeLabel
 labelType (RtsLabel (RtsSlowFastTickyCtr _))    = DataLabel
 labelType (LocalBlockLabel _)                   = CodeLabel
 labelType (SRTLabel _)                          = DataLabel
-labelType (ForeignLabel _ _ IsFunction)         = CodeLabel
-labelType (ForeignLabel _ _ IsData)             = DataLabel
+labelType (ForeignLabel _ _ ForeignLabelIsFunction) = CodeLabel
+labelType (ForeignLabel _ _ ForeignLabelIsData)     = DataLabel
 labelType (AsmTempLabel _)                      = panic "labelType(AsmTempLabel)"
 labelType (AsmTempDerivedLabel _ _)             = panic "labelType(AsmTempDerivedLabel)"
 labelType (StringLitLabel _)                    = DataLabel
@@ -1306,9 +1359,9 @@ labelDynamic this_mod platform external_dynamic_refs lbl =
 
    LocalBlockLabel _    -> False
 
-   ForeignLabel _ source _  ->
-       if os == OSMinGW32
-       then case source of
+   ForeignLabel _ source _
+     | os == OSMinGW32 ->
+          case source of
             -- Foreign label is in some un-named foreign package (or DLL).
             ForeignLabelInExternalPackage -> True
 
@@ -1316,16 +1369,22 @@ labelDynamic this_mod platform external_dynamic_refs lbl =
             -- source file currently being compiled.
             ForeignLabelInThisPackage -> False
 
+            -- Foreign label is either in the same package or is in some
+            -- foreign package/DLL/DSO. Neither yes nor no is the correct
+            -- answer here, because on Windows these are a distinct case
+            -- that need special treatment in the code generator.
+            ForeignLabelInUnknownPackage -> True
+
             -- Foreign label is in some named package.
             -- When compiling in the "dyn" way, each package is to be
             -- linked into its own DLL.
             ForeignLabelInPackage pkgId ->
                 external_dynamic_refs && (this_unit /= pkgId)
 
-       else -- On Mac OS X and on ELF platforms, false positives are OK,
-            -- so we claim that all foreign imports come from dynamic
-            -- libraries
-            True
+       -- On Mac OS X and on ELF platforms, false positives are OK,
+       -- so we claim that all foreign imports come from dynamic
+       -- libraries
+     | otherwise -> True
 
    CC_Label cc ->
      external_dynamic_refs && not (ccFromThisModule cc this_mod)
@@ -1676,6 +1735,7 @@ instance Outputable ForeignLabelSource where
         ForeignLabelInPackage pkgId     -> parens $ text "package: " <> ppr pkgId
         ForeignLabelInThisPackage       -> parens $ text "this package"
         ForeignLabelInExternalPackage   -> parens $ text "external package"
+        ForeignLabelInUnknownPackage    -> parens $ text "unknown package"
 
 -- -----------------------------------------------------------------------------
 -- Machine-dependent knowledge about labels.

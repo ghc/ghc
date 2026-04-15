@@ -56,6 +56,7 @@ import GHC.Types.Id.Info
 import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Types.Basic
+import GHC.Types.ForeignCall
 import GHC.Types.Tickish ( tickishIsCode )
 
 import GHC.Utils.Misc
@@ -862,7 +863,8 @@ link_caf node = do
         -- Call the RTS function newCAF, returning the newly-allocated
         -- blackhole indirection closure
   ; let newCAF_lbl = mkForeignLabel (fsLit "newCAF")
-                                    ForeignLabelInExternalPackage IsFunction
+                                    ForeignLabelInExternalPackage
+                                    ForeignLabelIsFunction
   ; let profile  = stgToCmmProfile cfg
   ; let platform = profilePlatform profile
   ; bh <- newTemp (bWord platform)

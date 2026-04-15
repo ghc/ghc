@@ -478,7 +478,10 @@ static  :: { CmmParse [CmmStatic] }
                 { do { lits <- sequence $4
                 ; profile <- getProfile
                      ; return $ map CmmStaticLit $
-                        mkStaticClosure profile (mkForeignLabel $3 ForeignLabelInExternalPackage IsData)
+                        mkStaticClosure profile
+                                        (mkForeignLabel $3
+                                           ForeignLabelInExternalPackage
+                                           ForeignLabelIsData)
                          -- mkForeignLabel because these are only used
                          -- for CHARLIKE and INTLIKE closures in the RTS.
                         dontCareCCS (map getLit lits) [] [] [] [] } }
@@ -647,40 +650,47 @@ importName
 
         -- A code label imported from within the same shared library.
         : NAME
-        { ($1, mkForeignLabel $1 ForeignLabelInThisPackage IsFunction) }
+        { ($1, mkForeignLabel $1 ForeignLabelInThisPackage
+                                 ForeignLabelIsFunction) }
 
         -- A data label imported from within the same shared library.
         | 'DATA' NAME
-        { ($2, mkForeignLabel $2 ForeignLabelInThisPackage IsData) }
+        { ($2, mkForeignLabel $2 ForeignLabelInThisPackage
+                                 ForeignLabelIsData) }
 
         -- CLOSURE is a historical alias for DATA in this context.
         | 'CLOSURE' NAME
-        { ($2, mkForeignLabel $2 ForeignLabelInThisPackage IsData) }
+        { ($2, mkForeignLabel $2 ForeignLabelInThisPackage
+                                 ForeignLabelIsData) }
 
         -- A code label imported from another unamed shared library. These may
         -- come from a foreign shared library, or from the shared library for
         -- an unnamed Haskell package. This corresponds on Windows/PE to
         -- __declspec(dllimport) in C.
         | 'extern' NAME
-        { ($2, mkForeignLabel $2 ForeignLabelInExternalPackage IsFunction) }
+        { ($2, mkForeignLabel $2 ForeignLabelInExternalPackage
+                                 ForeignLabelIsFunction) }
 
         -- A data label imported from another unamed shared library.
         -- This corresponds on Windows/PE to __declspec(dllimport) in C (but
         -- cmm doesn't know about data vs function symbols so we have to say).
         | 'extern' 'DATA' NAME
-        { ($3, mkForeignLabel $3 ForeignLabelInExternalPackage IsData) }
+        { ($3, mkForeignLabel $3 ForeignLabelInExternalPackage
+                                 ForeignLabelIsData) }
 
         -- A code label imported from the shared library for a Haskell package
         -- with the given UnitId. Such labels behave as local when used within
         -- the specified unit, or as extern otherwise.
         | STRING NAME
-        { ($2, mkForeignLabel $2 (ForeignLabelInPackage (UnitId (mkFastString $1))) IsFunction) }
+        { ($2, mkForeignLabel $2 (ForeignLabelInPackage (UnitId (mkFastString $1)))
+                                 ForeignLabelIsFunction) }
 
         -- A data label imported from the shared library for a Haskell package
         -- with the given UnitId. Such labels behave as local when used within
         -- the specified unit, or as extern otherwise.
         | STRING 'DATA' NAME
-        { ($3, mkForeignLabel $3 (ForeignLabelInPackage (UnitId (mkFastString $1))) IsData) }
+        { ($3, mkForeignLabel $3 (ForeignLabelInPackage (UnitId (mkFastString $1)))
+                                 ForeignLabelIsData) }
 
 
 names   :: { [FastString] }
@@ -780,7 +790,9 @@ expr_or_unknown
                 { do e <- $1; return (Just e) }
 
 foreignLabel     :: { CmmParse CmmExpr }
-        : NAME                          { return (CmmLit (CmmLabel (mkForeignLabel $1 ForeignLabelInThisPackage IsFunction))) }
+        : NAME                          { return . CmmLit . CmmLabel $
+                                            mkForeignLabel $1 ForeignLabelInThisPackage
+                                                              ForeignLabelIsFunction }
 
 opt_never_returns :: { CmmReturnInfo }
         :                               { CmmMayReturn }
