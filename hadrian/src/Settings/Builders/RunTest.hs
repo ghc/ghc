@@ -360,6 +360,7 @@ getTestArgs = do
     haveDocs        <- willDocsBeBuilt
     let configFileArg= ["--config-file=" ++ (testConfigFile args)]
         testOnlyArg  =  map ("--only=" ++) (testOnly args ++ testEnvTargets)
+        testSkipArg  =  map ("--skip=" ++) (testSkip args)
         onlyPerfArg  = if testOnlyPerf args
                            then Just "--only-perf-tests"
                            else Nothing
@@ -399,7 +400,7 @@ getTestArgs = do
         inTreeArg    = [ "-e", "config.in_tree_compiler=" ++
           show (isInTreeCompiler (testCompiler args) || testHasInTreeFiles args) ]
 
-    pure $  configFileArg ++ testOnlyArg ++ speedArg
+    pure $  configFileArg ++ testOnlyArg ++ testSkipArg ++ speedArg
          ++ catMaybes [ onlyPerfArg, skipPerfArg, summaryArg
                       , junitArg, metricsArg, verbosityArg  ]
          ++ configArgs ++ wayArgs ++  compilerArg ++ ghcPkgArg

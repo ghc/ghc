@@ -79,6 +79,7 @@ parser.add_argument("--summary-file", help="file in which to save the (human-rea
 parser.add_argument("--unexpected-output-dir", help="directory in which to place unexpected output")
 parser.add_argument("--target-wrapper", help="wrapper executable to use when executing binaries compiled for the target")
 parser.add_argument("--only", action="append", help="just this test (can be give multiple --only= flags)")
+parser.add_argument("--skip", action="append", help="skip this test (can be given multiple --skip= flags)")
 parser.add_argument("--way", action="append", help="just this way")
 parser.add_argument("--skipway", action="append", help="skip this way")
 parser.add_argument("--threads", type=int, help="threads to run simultaneously")
@@ -134,6 +135,9 @@ if args.unexpected_output_dir:
 if args.only:
     config.only = args.only
     config.run_only_some_tests = True
+
+if args.skip:
+    config.skip = set(args.skip)
 
 if args.way:
     for way in args.way:

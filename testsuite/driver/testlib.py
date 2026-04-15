@@ -1526,6 +1526,9 @@ def test(name: TestName,
             # report on any tests we couldn't find and error out.
             config.only.remove(name)
 
+    if name in config.skip:
+        return
+
     # Make a deep copy of the default_testopts, as we need our own copy
     # of any dictionaries etc inside it. Otherwise, if one test modifies
     # them, all tests will see the modified version!

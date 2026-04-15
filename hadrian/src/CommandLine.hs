@@ -71,6 +71,7 @@ data TestArgs = TestArgs
     , testJUnit      :: Maybe FilePath
     , testMetricsFile:: Maybe FilePath
     , testOnly       :: [String]
+    , testSkip       :: [String]
     , testOnlyPerf   :: Bool
     , testSkipPerf   :: Bool
     , testRootDirs   :: [FilePath]
@@ -100,6 +101,7 @@ defaultTestArgs = TestArgs
     , testJUnit      = Nothing
     , testMetricsFile= Nothing
     , testOnly       = []
+    , testSkip       = []
     , testOnlyPerf   = False
     , testSkipPerf   = False
     , testRootDirs   = []
@@ -190,6 +192,13 @@ readTestOnly tests = Right $ \flags ->
 
   where tests' = maybe [] words tests
         tests'' flags = testOnly (testArgs flags) ++ tests'
+
+readTestSkip :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readTestSkip tests = Right $ \flags ->
+  flags { testArgs = (testArgs flags) { testSkip = tests'' flags } }
+
+  where tests' = maybe [] words tests
+        tests'' flags = testSkip (testArgs flags) ++ tests'
 
 readTestOnlyPerf :: Either String (CommandLineArgs -> CommandLineArgs)
 readTestOnlyPerf = Right $ \flags -> flags { testArgs = (testArgs flags) { testOnlyPerf = True } }
@@ -306,6 +315,8 @@ optDescrs =
       "Output testsuite performance metrics summary."
     , Option [] ["only"] (OptArg readTestOnly "TESTS")
       "Test cases to run."
+    , Option [] ["skip-test"] (OptArg readTestSkip "TESTS")
+      "Test cases to skip."
     , Option [] ["only-perf"] (NoArg readTestOnlyPerf)
       "Only run performance tests."
     , Option [] ["skip-perf"] (NoArg readTestSkipPerf)
