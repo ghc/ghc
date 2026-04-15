@@ -1,0 +1,6 @@
+T27124.hs:6:5: warning: [GHC-18872] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match type ‘[Char]’ with ‘Char’
+        arising from the literal ‘"HI"’
+    • In the pattern: "HI"
+      In an equation for ‘foo’: foo "HI" = True
+
