@@ -694,6 +694,15 @@ coreExprAsPmLit :: CoreExpr -> Maybe PmLit
 coreExprAsPmLit (Tick _t e) = coreExprAsPmLit e
 coreExprAsPmLit (Lit l) = literalToPmLit (literalType l) l
 coreExprAsPmLit e = case collectArgs e of
+
+  -- Look through nospec, noinline and lazy, which are only eliminated by Core Prep.
+  -- See Note [coreExprAsPmLit and nospec]
+  (Var x, Type _ : inner : rest_args)
+    | x `hasKey` nospecIdKey
+   || x `hasKey` noinlineIdKey
+   || x `hasKey` lazyIdKey
+    -> coreExprAsPmLit (mkApps inner rest_args)
+
   (Var x, [Lit l])
     | Just dc <- isDataConWorkId_maybe x
     , dc `elem` [intDataCon, wordDataCon, charDataCon, floatDataCon, doubleDataCon]
@@ -834,6 +843,34 @@ with large exponents case. This will return a `PmLitOverRat` literal.
 Which is then passed to overloadPmLit which simply returns it as-is since
 it's already overloaded.
 
+Note [coreExprAsPmLit and nospec]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For coverage checking, we need to analyse overloaded literal patterns to figure
+out which literals they correspond to; this is what 'coreExprAsPmLit' does.
+For example, the literal pattern "fromString" (with -XOverloadedStrings)
+will turn into an equality check against the **expression**
+
+  fromString @T $dFromString "hello"#
+
+and 'coreExprAsPmLit' recovers the string by taking apart this application.
+
+However, when $dFromString is non-canonical (e.g. when an INCOHERENT
+instance was discarded during resolution of the typeclass constraint, or when
+the dictionary comes from 'withDict'), the desugarer wraps 'fromString' in
+'nospec' (as per Note [nospecId magic] in GHC.Types.Id.Make and
+Note [Desugaring non-canonical evidence] in GHC.HsToCore.Expr):
+
+  nospec @(IsString a => String -> Maybe a) fromString @T $dFromString "hello"#
+
+(For a full example, see test case T27124a.)
+
+The 'nospec' mechanism only exists for the specialiser; it should be transparent
+to everything else. 'coreExprAsPmLit' must thus look through the 'nospec'
+application in order obtain the string "hello". If it doesn't, we can't do
+pattern match checking (in fact GHC.HsToCore.Pmc.Desugar.desugarPat is liable
+to crash!).
+
+The same reasoning applies to `noinline` and `lazy`.
 -}
 
 instance Outputable PmLitValue where
