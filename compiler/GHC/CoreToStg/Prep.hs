@@ -1055,6 +1055,9 @@ cpeApp top_env expr
        || f `hasKey` nospecIdKey        -- Replace (nospec a) with a
             -- See Note [nospecId magic] in GHC.Types.Id.Make
 
+        -- NB: keep this in sync with GHC.HsToCore.Pmc.Solver.Types.coreExprAsPmLit,
+        -- as that also needs to see through these magic Ids.
+
         -- Consider the code:
         --
         --      lazy (f x) y
