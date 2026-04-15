@@ -31,6 +31,9 @@ class TestConfig:
         self.run_only_some_tests = False
         self.only = set()
 
+        # Skip these tests
+        self.skip = set()
+
         # Don't fail on out-of-tolerance stat failures
         self.ignore_perf_increases = False
         self.ignore_perf_decreases = False

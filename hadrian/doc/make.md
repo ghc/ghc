@@ -133,7 +133,8 @@ time you fire up a build. This is not possible with the Make build system.
 
   As illustrated in the examples above, you can use the `TEST` environment
   variable, the `--only=...` flag or even both to restrict your testsuite run
-  to some (usually small) subset of the testsuite.
+  to some (usually small) subset of the testsuite. You can also skip specific
+  tests with `--skip-test=...` (e.g. `build test --skip-test="test1 test2"`).
 
   See [the docs for the test rules](./testsuite.md) if you want to know about
   all the options that hadrian supports and what they correspond to in the Make

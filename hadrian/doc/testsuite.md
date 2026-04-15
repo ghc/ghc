@@ -60,6 +60,29 @@ TEST="test1 test2" build test
 TEST="test1 test2" build test --only="test3 test4"
 ```
 
+### Skipping specific tests
+
+You can use the `--skip-test=...` command line argument to skip specific
+tests. This is useful when some tests are known to fail or are too slow
+in your environment.
+
+``` sh
+# skip the test named 'slowtest'
+build test --skip-test=slowtest
+
+# skip 'test1' and 'test2'
+build test --skip-test="test1 test2"
+```
+
+`--skip-test` can be combined with `--only`: if a test appears in both,
+it is skipped. This lets you start from a set of tests and then subtract
+from it:
+
+``` sh
+# run test1 and test3, but not test2
+build test --only="test1 test2 test3" --skip-test=test2
+```
+
 ### Whole directories of tests
 
 You can also ask Hadrian to run all the tests that live under one or

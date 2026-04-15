@@ -1,0 +1,13 @@
+section: build-tools
+synopsis: The testsuite driver and Hadrian now support a ``--skip-test`` flag
+          (``--skip`` in the Python driver) to skip specific tests.
+issues: #27188
+mrs: !15915
+
+description: {
+    A new ``--skip-test`` flag has been added to Hadrian, passed through
+    as ``--skip`` to the testsuite driver. This is the complement of
+    ``--only``: it removes named tests from the set of tests to run.
+    If a test appears in both ``--only`` and ``--skip-test``, it is skipped.
+    Multiple ``--skip-test`` flags are unioned together.
+}
