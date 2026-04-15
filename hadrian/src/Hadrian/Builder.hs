@@ -29,7 +29,9 @@ import Hadrian.Utilities
 
 -- | This data structure captures all information relevant to invoking a builder.
 data BuildInfo = BuildInfo {
-    -- | Command line arguments.
+    -- | Command line arguments. Some builders (e.g. Ar, Ghc, Haddock) omit
+    -- buildInputs from buildArgs so that buildInputs can be passed separately
+    -- using a response file.
     buildArgs :: [String],
     -- | Input files.
     buildInputs :: [FilePath],
