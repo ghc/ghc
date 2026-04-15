@@ -50,7 +50,6 @@ import GHC.Internal.IO.BufferedIO
 import GHC.Internal.IO.Encoding.Types
 import GHC.Internal.IORef
 import GHC.Internal.Show
-import GHC.Internal.Read
 import GHC.Internal.Types (Bool(..), Int)
 import GHC.Internal.Word
 import GHC.Internal.IO.Device
@@ -273,7 +272,6 @@ data BufferMode
                 -- is 'Just' @n@ and is otherwise implementation-dependent.
    deriving ( Eq   -- ^ @since base-4.2.0.0
             , Ord  -- ^ @since base-4.2.0.0
-            , Read -- ^ @since base-4.2.0.0
             , Show -- ^ @since base-4.2.0.0
             )
 
@@ -379,7 +377,6 @@ data Newline = LF    -- ^ @\'\\n\'@
              | CRLF  -- ^ @\'\\r\\n\'@
              deriving ( Eq   -- ^ @since base-4.2.0.0
                       , Ord  -- ^ @since base-4.3.0.0
-                      , Read -- ^ @since base-4.3.0.0
                       , Show -- ^ @since base-4.3.0.0
                       )
 
@@ -396,7 +393,6 @@ data NewlineMode
                  }
              deriving ( Eq   -- ^ @since base-4.2.0.0
                       , Ord  -- ^ @since base-4.3.0.0
-                      , Read -- ^ @since base-4.3.0.0
                       , Show -- ^ @since base-4.3.0.0
                       )
 

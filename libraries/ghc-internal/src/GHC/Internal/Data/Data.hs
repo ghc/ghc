@@ -61,6 +61,7 @@ module GHC.Internal.Data.Data (
         mkIntType,
         mkFloatType,
         mkCharType,
+        mkPrimCon,
         mkNoRepType,
         -- ** Observers
         dataTypeName,
@@ -94,7 +95,6 @@ module GHC.Internal.Data.Data (
         constrIndex,
         -- ** From strings to constructors and vice versa: all data types
         showConstr,
-        readConstr,
 
         -- * Convenience functions: take type constructors apart
         tyconUQname,
@@ -126,10 +126,8 @@ import GHC.Internal.Base (
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.List
 import GHC.Internal.Num
-import GHC.Internal.Read
 import GHC.Internal.Show
 import GHC.Internal.Tuple (Solo (..))
-import GHC.Internal.Text.Read( reads )
 import GHC.Internal.Types (
     Bool(..), Char, Coercible, Float, Double, Type, type (~), type (~~),
   )
@@ -687,32 +685,6 @@ constrFixity = confixity
 showConstr :: Constr -> String
 showConstr = constring
 
-
--- | Lookup a constructor via a string
-readConstr :: DataType -> String -> Maybe Constr
-readConstr dt str =
-      case dataTypeRep dt of
-        AlgRep cons -> idx cons
-        IntRep      -> mkReadCon (\i -> (mkPrimCon dt str (IntConstr i)))
-        FloatRep    -> mkReadCon ffloat
-        CharRep     -> mkReadCon (\c -> (mkPrimCon dt str (CharConstr c)))
-        NoRep       -> Nothing
-  where
-
-    -- Read a value and build a constructor
-    mkReadCon :: Read t => (t -> Constr) -> Maybe Constr
-    mkReadCon f = case (reads str) of
-                    [(t,"")] -> Just (f t)
-                    _ -> Nothing
-
-    -- Traverse list of algebraic datatype constructors
-    idx :: [Constr] -> Maybe Constr
-    idx cons = case filter ((==) str . showConstr) cons of
-                [] -> Nothing
-                hd : _ -> Just hd
-
-    ffloat :: Double -> Constr
-    ffloat =  mkPrimCon dt str . FloatConstr . toRational
 
 ------------------------------------------------------------------------------
 --

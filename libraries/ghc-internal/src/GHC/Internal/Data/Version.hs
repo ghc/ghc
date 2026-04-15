@@ -10,7 +10,7 @@
 --
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  stable
--- Portability :  non-portable (local universal quantification in ReadP)
+-- Portability :  non-portable
 --
 -- A general library for representation and manipulation of versions.
 --
@@ -31,23 +31,17 @@ module GHC.Internal.Data.Version (
         -- * The @Version@ type
         Version(..),
         -- * A concrete representation of @Version@
-        showVersion, parseVersion,
+        showVersion,
         -- * Constructor function
         makeVersion
   ) where
 
-import GHC.Internal.Classes          ( Eq(..), (&&) )
-import GHC.Internal.Data.Functor     ( Functor(..) )
+import GHC.Internal.Classes          ( Eq ((==)), (&&) )
 import GHC.Internal.Int              ( Int )
 import GHC.Internal.Data.List        ( map, sort, concat, concatMap, intersperse, (++) )
 import GHC.Internal.Data.Ord
 import GHC.Internal.Data.String      ( String )
-import GHC.Internal.Base             ( Applicative(..) )
-import GHC.Internal.Unicode          ( isDigit, isAlphaNum )
-import GHC.Internal.Read
 import GHC.Internal.Show
-import GHC.Internal.Text.ParserCombinators.ReadP
-import GHC.Internal.Text.Read        ( read )
 
 {- |
 A 'Version' represents the version of a software entity.
@@ -69,8 +63,8 @@ operations are the right thing for every 'Version'.
 
 Similarly, concrete representations of versions may differ.  One
 possible concrete representation is provided (see 'showVersion' and
-'parseVersion'), but depending on the application a different concrete
-representation may be more appropriate.
+'Data.Version.parseVersion'), but depending on the application a
+different concrete representation may be more appropriate.
 -}
 data Version =
   Version { versionBranch :: [Int],
@@ -92,8 +86,7 @@ data Version =
                 -- The interpretation of the list of tags is entirely dependent
                 -- on the entity that this version applies to.
         }
-  deriving ( Read    -- ^ @since base-2.01
-           , Show    -- ^ @since base-2.01
+  deriving ( Show    -- ^ @since base-2.01
            )
 {-# DEPRECATED versionTags "See GHC ticket #2496" #-}
 -- TODO. Remove all references to versionTags in GHC 8.0 release.
@@ -119,13 +112,6 @@ showVersion :: Version -> String
 showVersion (Version branch tags)
   = concat (intersperse "." (map show branch)) ++
      concatMap ('-':) tags
-
--- | A parser for versions in the format produced by 'showVersion'.
---
-parseVersion :: ReadP Version
-parseVersion = do branch <- sepBy1 (fmap read (munch1 isDigit)) (char '.')
-                  tags   <- many (char '-' *> munch1 isAlphaNum)
-                  pure Version{versionBranch=branch, versionTags=tags}
 
 -- | Construct tag-less 'Version'
 --

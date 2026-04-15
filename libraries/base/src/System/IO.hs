@@ -1,5 +1,8 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE StandaloneDeriving #-}
+
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 -- |
 --
@@ -895,3 +898,24 @@ rw_flags     = output_flags .|. o_RDWR
 -- output
 -- > input^D
 -- output
+
+{-NOTE:
+    The following instances are technically orphans, but practically they are
+    not, since ordinary users should not use @ghc-internal@ directly and thus
+    get the instantiated types only through this module.
+-}
+
+-- | @since base-4.2.0.0
+deriving instance Read IOMode
+
+-- | @since base-4.2.0.0
+deriving instance Read BufferMode
+
+-- | @since base-4.2.0.0
+deriving instance Read SeekMode
+
+-- | @since base-4.3.0.0
+deriving instance Read Newline
+
+-- | @since base-4.3.0.0
+deriving instance Read NewlineMode

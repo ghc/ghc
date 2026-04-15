@@ -34,7 +34,6 @@ import GHC.Internal.Types ( Bool(..), Int )
 import GHC.Internal.Word
 import GHC.Internal.Arr
 import GHC.Internal.Enum
-import GHC.Internal.Read
 import GHC.Internal.Show
 import GHC.Internal.Ptr
 import GHC.Internal.Num
@@ -182,7 +181,6 @@ data SeekMode
              , Ord  -- ^ @since base-4.2.0.0
              , Ix   -- ^ @since base-4.2.0.0
              , Enum -- ^ @since base-4.2.0.0
-             , Read -- ^ @since base-4.2.0.0
              , Show -- ^ @since base-4.2.0.0
              )
 

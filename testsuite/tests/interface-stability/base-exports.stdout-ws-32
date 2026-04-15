@@ -9453,7 +9453,7 @@ module GHC.Word where
   uncheckedShiftRL64# :: GHC.Internal.Prim.Word64# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Word64#
 
 module Numeric where
-  -- Safety: Safe
+  -- Safety: Trustworthy
   type Floating :: * -> Constraint
   class GHC.Internal.Real.Fractional a => Floating a where
     pi :: a
@@ -12430,7 +12430,6 @@ instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (GHC.Inter
 instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (GHC.Internal.Data.Bits.Xor a) -- Defined in ‘GHC.Internal.Data.Bits’
 instance forall a b. (GHC.Internal.Ix.Ix a, GHC.Internal.Read.Read a, GHC.Internal.Read.Read b) => GHC.Internal.Read.Read (GHC.Internal.Arr.Array a b) -- Defined in ‘GHC.Internal.Read’
 instance GHC.Internal.Read.Read GHC.Internal.Types.Bool -- Defined in ‘GHC.Internal.Read’
-instance GHC.Internal.Read.Read GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.Internal.Read’
 instance GHC.Internal.Read.Read GHC.Internal.Types.Char -- Defined in ‘GHC.Internal.Read’
 instance GHC.Internal.Read.Read GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Read’
 instance GHC.Internal.Read.Read GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Read’
@@ -12497,7 +12496,7 @@ instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (Data.Semi
 instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (Data.Semigroup.Min a) -- Defined in ‘Data.Semigroup’
 instance forall m. GHC.Internal.Read.Read m => GHC.Internal.Read.Read (Data.Semigroup.WrappedMonoid m) -- Defined in ‘Data.Semigroup’
 instance forall k (a :: k) (b :: k). Coercible a b => GHC.Internal.Read.Read (GHC.Internal.Data.Type.Coercion.Coercion a b) -- Defined in ‘GHC.Internal.Data.Type.Coercion’
-instance GHC.Internal.Read.Read GHC.Internal.Data.Version.Version -- Defined in ‘GHC.Internal.Data.Version’
+instance [safe] GHC.Internal.Read.Read GHC.Internal.Data.Version.Version -- Defined in ‘Data.Version’
 instance GHC.Internal.Read.Read GHC.Internal.Foreign.Ptr.IntPtr -- Defined in ‘GHC.Internal.Foreign.Ptr’
 instance GHC.Internal.Read.Read GHC.Internal.Foreign.Ptr.WordPtr -- Defined in ‘GHC.Internal.Foreign.Ptr’
 instance GHC.Internal.Read.Read GHC.Internal.Foreign.C.Types.CBool -- Defined in ‘GHC.Internal.Foreign.C.Types’
@@ -12526,6 +12525,7 @@ instance GHC.Internal.Read.Read GHC.Internal.Foreign.C.Types.CULong -- Defined i
 instance GHC.Internal.Read.Read GHC.Internal.Foreign.C.Types.CUSeconds -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Read.Read GHC.Internal.Foreign.C.Types.CUShort -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Read.Read GHC.Internal.Foreign.C.Types.CWchar -- Defined in ‘GHC.Internal.Foreign.C.Types’
+instance [safe] GHC.Internal.Read.Read GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.ByteOrder’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Internal.Read.Read (f p), GHC.Internal.Read.Read (g p)) => GHC.Internal.Read.Read ((GHC.Internal.Generics.:*:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Internal.Read.Read (f p), GHC.Internal.Read.Read (g p)) => GHC.Internal.Read.Read ((GHC.Internal.Generics.:+:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k2 k1 (f :: k2 -> *) (g :: k1 -> k2) (p :: k1). GHC.Internal.Read.Read (f (g p)) => GHC.Internal.Read.Read ((GHC.Internal.Generics.:.:) f g p) -- Defined in ‘GHC.Internal.Generics’
@@ -12540,16 +12540,16 @@ instance GHC.Internal.Read.Read GHC.Internal.Generics.SourceStrictness -- Define
 instance GHC.Internal.Read.Read GHC.Internal.Generics.SourceUnpackedness -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Read.Read (GHC.Internal.Generics.U1 p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Read.Read (GHC.Internal.Generics.V1 p) -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Read.Read GHC.Internal.IO.Device.SeekMode -- Defined in ‘GHC.Internal.IO.Device’
-instance GHC.Internal.Read.Read GHC.Internal.IO.Handle.Types.BufferMode -- Defined in ‘GHC.Internal.IO.Handle.Types’
-instance GHC.Internal.Read.Read GHC.Internal.IO.Handle.Types.Newline -- Defined in ‘GHC.Internal.IO.Handle.Types’
-instance GHC.Internal.Read.Read GHC.Internal.IO.Handle.Types.NewlineMode -- Defined in ‘GHC.Internal.IO.Handle.Types’
-instance GHC.Internal.Read.Read GHC.Internal.IO.IOMode.IOMode -- Defined in ‘GHC.Internal.IO.IOMode’
 instance [safe] GHC.Internal.Read.Read GHC.Stats.GCDetails -- Defined in ‘GHC.Stats’
 instance [safe] GHC.Internal.Read.Read GHC.Stats.RTSStats -- Defined in ‘GHC.Stats’
 instance GHC.Internal.Read.Read GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
 instance GHC.Internal.Read.Read GHC.Internal.TypeLits.SomeChar -- Defined in ‘GHC.Internal.TypeLits’
 instance GHC.Internal.Read.Read GHC.Internal.TypeLits.SomeSymbol -- Defined in ‘GHC.Internal.TypeLits’
+instance GHC.Internal.Read.Read GHC.Internal.IO.Handle.Types.BufferMode -- Defined in ‘System.IO’
+instance GHC.Internal.Read.Read GHC.Internal.IO.IOMode.IOMode -- Defined in ‘System.IO’
+instance GHC.Internal.Read.Read GHC.Internal.IO.Handle.Types.Newline -- Defined in ‘System.IO’
+instance GHC.Internal.Read.Read GHC.Internal.IO.Handle.Types.NewlineMode -- Defined in ‘System.IO’
+instance GHC.Internal.Read.Read GHC.Internal.IO.Device.SeekMode -- Defined in ‘System.IO’
 instance forall k a (b :: k). GHC.Internal.Real.Fractional a => GHC.Internal.Real.Fractional (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Real.Fractional (Data.Complex.Complex a) -- Defined in ‘Data.Complex’
 instance forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Real.Fractional (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’

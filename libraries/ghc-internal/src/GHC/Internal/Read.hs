@@ -80,7 +80,6 @@ import GHC.Internal.Types (Bool(..), Char, Int, Ordering(..))
 import GHC.Internal.Word
 import GHC.Internal.List (filter)
 import GHC.Internal.Tuple (Solo (..))
-import GHC.Internal.ByteOrder
 
 
 -- | @'readParen' 'True' p@ parses what @p@ parses, but surrounded with
@@ -840,6 +839,3 @@ instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
                           ; return (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o) })
   readListPrec = readListPrecDefault
   readList     = readListDefault
-
--- | @since base-4.11.0.0
-deriving instance Read ByteOrder
