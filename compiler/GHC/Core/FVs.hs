@@ -332,18 +332,14 @@ stableUnfoldingVars unf = fmap (runFVSelectiveSet isLocalVar) $
 
 stableUnfoldingFVs :: Unfolding -> Maybe SelectiveDFV
 stableUnfoldingFVs unf
-  | isStableUnfolding unf = Just (unfoldingFVs unf)
-  | otherwise             = Nothing
-
-unfoldingFVs :: Unfolding -> FV
-unfoldingFVs (CoreUnfolding { uf_tmpl = rhs })
-  = exprLocalFVs rhs
-unfoldingFVs (DFunUnfolding { df_bndrs = bndrs, df_args = args })
-  = FV.delFVs (mkVarSet bndrs) $ exprsLocalFVs args
-    -- DFuns are top level, so no fvs from types of bndrs
-unfoldingFVs _
-  = emptyFV
-
+  = case unf of
+      CoreUnfolding { uf_tmpl = rhs, uf_src = src }
+         | isStableSource src
+         -> Just (exprFVs rhs)
+      DFunUnfolding { df_bndrs = bndrs, df_args = args }
+         -> Just (addCoreBndrsFV bndrs (exprsFVs args))
+            -- DFuns are top level, so no fvs from types of bndrs
+      _other -> Nothing
 
 --      Comment about obsolete code
 -- We used to gather the free variables the RULES at a variable occurrence

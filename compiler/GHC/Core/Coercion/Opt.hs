@@ -315,7 +315,7 @@ opt_co_refl subst co
     go_s cos = map go cos
 
     -- See Note [Substituting in a coercion hole]
-    go_hole h@(CoercionHole { ch_co_var = cv })
+    go_hole h@(CH { ch_co_var = cv })
       = h { ch_co_var = updateVarType go_ty cv }
 
     go (Refl ty)                     = Refl (substTy subst ty)
