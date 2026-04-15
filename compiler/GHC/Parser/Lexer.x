@@ -638,7 +638,11 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 <0,string_inter> {
   s \" / { ifExtension StringInterpolationBit } { string_inter_begin }
   -- FIXME(bchinn): interpolated multiline strings
-  -- FIXME(bchinn): qualified interpolated strings
+  @qual s \" / {
+    alexAndPred
+      (ifExtension QualifiedStringsBit)
+      (ifExtension StringInterpolationBit)
+  } { string_inter_begin } -- FIXME(bchinn)
 }
 
 <0,string_inter> {
@@ -1412,6 +1416,9 @@ alexNotPred p userState in1 len in2
 
 alexOrPred p1 p2 userState in1 len in2
   = p1 userState in1 len in2 || p2 userState in1 len in2
+
+alexAndPred p1 p2 userState in1 len in2
+  = p1 userState in1 len in2 && p2 userState in1 len in2
 
 multiline_doc_comment :: Action
 multiline_doc_comment span buf _len _buf2 = {-# SCC "multiline_doc_comment" #-} withLexedDocType worker

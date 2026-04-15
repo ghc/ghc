@@ -29,13 +29,16 @@ test('ListTuplePunsConstraints', extra_files(['ListTuplePunsConstraints.hs']), g
 test('T25937', normal, compile_and_run, [''])
 test('T26415', normal, compile_and_run, [''])
 
-# Multiline strings
+# ---------- Multiline strings ---------- #
 test('MultilineStrings', normal, compile_and_run, [''])
 test('MultilineStringsOverloaded', normal, compile_and_run, [''])
 test('T25375', normal, compile_and_run, [''])
 test('T25609', normal, compile_and_run, [''])
 test('T25784', normal, compile_and_run, [''])
 
-# String interpolation
+# ---------- String interpolation ---------- #
 test('StringInterpolation', normal, compile_and_run, [''])
 test('StringInterpolationOverloaded', normal, compile_and_run, [''])
+
+# ---------- END OF FILE ---------- #
+# Don't just place tests at the end here; put in correct section
