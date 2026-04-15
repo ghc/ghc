@@ -50,9 +50,9 @@ import Data.List.Extra
 import Data.Maybe
 import Data.Semigroup
 #if MIN_VERSION_shake(0,19,0)
-import Development.Shake hiding (unit, (&%>), Normal)
+import Development.Shake hiding (unit, (&%>), Normal, withTempFile)
 #else
-import Development.Shake hiding (unit, (&%>), (*>), Normal)
+import Development.Shake hiding (unit, (&%>), (*>), Normal, withTempFile)
 #endif
 import qualified Development.Shake as Shake
 import Development.Shake.Classes

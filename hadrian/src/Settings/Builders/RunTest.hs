@@ -50,7 +50,7 @@ runTestGhcFlags = do
 
     -- Also pass -keep-tmp-files to GHC when --keep-test-files is
     -- passed to hadrian for debugging purpose (#26688)
-    keepFiles <- testKeepFiles <$> userSetting defaultTestArgs
+    KeepTempFiles keepFiles <- userSetting (KeepTempFiles False)
     let keepTmpFilesFlag
           | keepFiles = "-keep-tmp-files"
           | otherwise = ""
@@ -243,7 +243,7 @@ runTestBuilderArgs = builder Testsuite ? do
     bignumBackend <- getBignumBackend
     bignumCheck   <- getBignumCheck
 
-    keepFiles <- expr (testKeepFiles <$> userSetting defaultTestArgs)
+    KeepTempFiles keepFiles <- expr (userSetting (KeepTempFiles False))
 
     accept <- expr (testAccept <$> userSetting defaultTestArgs)
     (acceptPlatform, acceptOS) <- expr . liftIO $

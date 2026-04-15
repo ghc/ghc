@@ -34,6 +34,7 @@ data CommandLineArgs = CommandLineArgs
     , bignumCheck    :: Bool
     , progressInfo   :: ProgressInfo
     , buildRoot      :: BuildRoot
+    , keepTempFiles  :: Bool
     , testArgs       :: TestArgs
     , docsArgs       :: DocArgs
     , docTargets     :: DocTargets
@@ -55,6 +56,7 @@ defaultCommandLineArgs = CommandLineArgs
     , bignumCheck    = False
     , progressInfo   = Brief
     , buildRoot      = BuildRoot "_build"
+    , keepTempFiles  = False
     , testArgs       = defaultTestArgs
     , docsArgs       = defaultDocArgs
     , docTargets     = Set.fromList [minBound..maxBound]
@@ -64,8 +66,7 @@ defaultCommandLineArgs = CommandLineArgs
 
 -- | These arguments are used by the `test` target.
 data TestArgs = TestArgs
-    { testKeepFiles  :: Bool
-    , testCompiler   :: String
+    { testCompiler   :: String
     , testConfigFile :: String
     , testConfigs    :: [String]
     , testJUnit      :: Maybe FilePath
@@ -93,8 +94,7 @@ data TestArgs = TestArgs
 -- | Default value for `TestArgs`.
 defaultTestArgs :: TestArgs
 defaultTestArgs = TestArgs
-    { testKeepFiles  = False
-    , testCompiler   = "stage2"
+    { testCompiler   = "stage2"
     , testConfigFile = "testsuite/config/ghc"
     , testConfigs    = []
     , testJUnit      = Nothing
@@ -158,8 +158,8 @@ readProgressInfo ms =
     set :: ProgressInfo -> Either String (CommandLineArgs -> CommandLineArgs)
     set flag = Right $ \flags -> flags { progressInfo = flag }
 
-readTestKeepFiles :: Either String (CommandLineArgs -> CommandLineArgs)
-readTestKeepFiles = Right $ \flags -> flags { testArgs = (testArgs flags) { testKeepFiles = True } }
+readKeepTempFiles :: Either String (CommandLineArgs -> CommandLineArgs)
+readKeepTempFiles = Right $ \flags -> flags { keepTempFiles = True }
 
 readTestAccept :: Either String (CommandLineArgs -> CommandLineArgs)
 readTestAccept = Right $ \flags -> flags { testArgs = (testArgs flags) { testAccept = True } }
@@ -292,8 +292,8 @@ optDescrs =
       "Progress info style (None, Brief, Normal or Unicorn)."
     , Option [] ["docs"] (ReqArg readDocsArg "TARGET")
       "Strip down docs targets (none, no-haddocks, no-sphinx[-{html, pdfs, man}]."
-    , Option ['k'] ["keep-test-files"] (NoArg readTestKeepFiles)
-      "Keep all the files generated when running the testsuite."
+    , Option ['k'] ["keep-test-files", "keep-temp-files"] (NoArg readKeepTempFiles)
+      "Keep all temporary files generated during the build."
     , Option [] ["test-compiler"] (ReqArg readTestCompiler "TEST_COMPILER")
       "Use given compiler [Default=stage2]."
     , Option [] ["test-config-file"] (ReqArg readTestConfigFile "CONFIG_FILE")
@@ -368,6 +368,7 @@ cmdLineArgsMap = do
 
     return $ insertExtra (progressInfo   args) -- Accessed by Hadrian.Utilities
            $ insertExtra (buildRoot      args) -- Accessed by Hadrian.Utilities
+           $ insertExtra (KeepTempFiles (keepTempFiles args)) -- Accessed by Hadrian.Utilities
            $ insertExtra (testArgs       args) -- Accessed by Settings.Builders.RunTest
            $ insertExtra (docsArgs       args) -- Accessed by Rules.Documentation
            $ insertExtra allSettings           -- Accessed by Settings

@@ -12,6 +12,9 @@ module Hadrian.Utilities (
     -- * Accessing Shake's type-indexed map
     insertExtra, lookupExtra, userSetting,
 
+    -- * Temporary files
+    KeepTempFiles (..), withTempFile,
+
     -- * Paths
     BuildRoot (..), buildRoot, buildRootRules, isGeneratedSource,
 
@@ -44,7 +47,8 @@ import Data.HashMap.Strict (HashMap)
 import Data.List.Extra
 import Data.Maybe
 import Data.Typeable (TypeRep, typeOf)
-import Development.Shake hiding (Normal)
+import Development.Shake hiding (Normal, withTempFile)
+import qualified Development.Shake as Shake
 import Development.Shake.Classes
 import Development.Shake.FilePath
 import System.Environment (lookupEnv)
@@ -55,6 +59,7 @@ import qualified Data.HashMap.Strict    as Map
 import qualified System.Directory.Extra as IO
 import qualified System.Info.Extra      as IO
 import qualified System.IO              as IO
+import qualified System.IO.Extra        as IO
 import System.IO.Error (isPermissionError)
 import qualified System.FilePath.Posix as Posix
 
@@ -299,6 +304,11 @@ userSettingRules defaultValue = do
 
 newtype BuildRoot = BuildRoot FilePath deriving (Eq, Show)
 
+-- | Whether to keep temporary files (e.g. response files, temp test files)
+-- after use. Controlled by @--keep-temp-files@/@--keep-test-files@/@-k@.
+newtype KeepTempFiles = KeepTempFiles Bool
+  deriving (Eq, Show)
+
 -- | All build results are put into the 'buildRoot' directory.
 buildRoot :: Action FilePath
 buildRoot = do
@@ -394,6 +404,20 @@ removeFile :: FilePath -> Action ()
 removeFile file = do
     putProgressInfo $ "| Remove file " ++ file
     liftIO . whenM (IO.doesFileExist file) $ IO.removeFile file
+
+-- | Like 'Shake.withTempFile', except respects
+-- @-k@/@--keep-temp-files@/@--keep-test-files@.
+--
+-- Use this instead to ensure we respect the flag.
+withTempFile :: (FilePath -> Action a) -> Action a
+withTempFile act = do
+    KeepTempFiles keep <- userSetting (KeepTempFiles False)
+    if keep
+      then do
+        (file, _del) <- liftIO IO.newTempFile
+        putProgressInfo $ "| Keep temp file " ++ file
+        act file
+      else Shake.withTempFile act
 
 -- | Create a directory if it does not already exist.
 createDirectory :: FilePath -> Action ()

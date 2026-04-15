@@ -19,7 +19,7 @@
 module Hadrian.Builder.Ar (ArMode (..), runAr, runArWithoutTempFile) where
 
 import Control.Monad
-import Development.Shake
+import Development.Shake hiding (withTempFile)
 import Development.Shake.Classes
 import GHC.Generics
 import Hadrian.Utilities
