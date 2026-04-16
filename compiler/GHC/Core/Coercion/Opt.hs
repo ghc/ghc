@@ -301,11 +301,11 @@ optCoRefl check_stuff subst in_co
 
 opt_co_refl :: Subst -> InCoercion -> OutCoercion
 opt_co_refl subst co
-  | lk `eqTypeIgnoringMultiplicity` rk = mkReflCo (coercionRole co) lk
-  | otherwise                          = out_co
+  | lk' `eqTypeIgnoringMultiplicity` rk' = mkReflCo (coercionRole co) lk'
+  | otherwise                            = out_co
   where
     out_co = go co
-    Pair lk rk = coercionKind out_co
+    Pair lk' rk' = coercionKind out_co
 
     go_m MRefl    = MRefl
     go_m (MCo co) = MCo (go co)
@@ -351,7 +351,7 @@ opt_co_refl subst co
        | otherwise                            = gobble0 gs1 [co2]
        where
          co1' = go co1
-         Pair lk' rk' = coercionKind co1
+         Pair lk' rk' = coercionKind co1'
          role = coercionRole co1
 
          gs0, gs1 :: GobbleState
