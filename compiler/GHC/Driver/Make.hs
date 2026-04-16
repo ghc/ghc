@@ -43,115 +43,108 @@ module GHC.Driver.Make (
         ModNodeMap(..), emptyModNodeMap, modNodeMapElems, modNodeMapLookup, modNodeMapInsert, modNodeMapSingleton, modNodeMapUnionWith
         ) where
 
-import GHC.Prelude
-import GHC.Platform
-
-import GHC.Tc.Utils.Backpack
-import GHC.Tc.Utils.Monad  ( initIfaceCheck, concatMapM )
-
-import GHC.Runtime.Interpreter
+import Control.Concurrent (
+  ThreadId,
+  forkIOWithUnmask,
+  killThread,
+  newQSem,
+  signalQSem,
+  waitQSem,
+  )
+import Control.Concurrent.MVar
+import Control.Concurrent.STM
+import Control.Monad
+import qualified Control.Monad.Catch as MC
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Except (ExceptT (..), runExceptT, throwE)
+import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.State.Lazy
+import Data.Bifunctor (first)
+import Data.Either (lefts, partitionEithers, rights)
+import Data.Function
+import Data.IORef
+import Data.List (groupBy, sortBy, sortOn, unfoldr)
+import qualified Data.Map as Map
+import qualified Data.Map.Strict as M
+import Data.Maybe
+import qualified Data.Set as Set
+import Data.Time
+import GHC.ByteCode.Types
+import qualified GHC.Conc as CC
+import GHC.Conc (getNumCapabilities, getNumProcessors, setNumCapabilities)
+import GHC.Data.Bag (listToBag)
+import GHC.Data.FastString
+import GHC.Data.Graph.Directed
+import GHC.Data.Graph.Directed.Reachability
+import qualified GHC.Data.Maybe as MB
+import GHC.Data.Maybe (expectJust)
+import qualified GHC.Data.OsPath as OsPath
+import GHC.Data.OsPath (OsPath, unsafeEncodeUtf)
+import GHC.Data.StringBuffer
+import GHC.Iface.Errors.Types
+import GHC.Iface.Load (cannotFindModule, readIface)
+import GHC.Iface.Recomp (CompileReason (..), RecompileRequired (..))
+import GHC.IfaceToCore (typecheckIface)
+import qualified GHC.LanguageExtensions as LangExt
 import qualified GHC.Linker.Loader as Linker
 import GHC.Linker.Types
-
+import GHC.Parser.Header
+import GHC.Platform
 import GHC.Platform.Ways
+import GHC.Prelude
+import GHC.Rename.Names
+import GHC.Runtime.Interpreter
+import GHC.Runtime.Loader
+import GHC.Tc.Utils.Backpack
+import GHC.Tc.Utils.Monad (concatMapM, initIfaceCheck)
+import GHC.Types.Basic
+import GHC.Types.Error
+import GHC.Types.PkgQual
+import GHC.Types.SourceError
+import GHC.Types.SourceFile
+import GHC.Types.SrcLoc
+import GHC.Types.Target
+import GHC.Types.TypeEnv
+import GHC.Types.Unique.Map
+import GHC.Unit
+import GHC.Unit.Env
+import GHC.Unit.Finder
+import qualified GHC.Unit.Home.Graph as HUG
+import GHC.Unit.Home.ModInfo
+import GHC.Unit.Home.PackageTable
+import GHC.Unit.Module.Graph
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModSummary
+import GHC.Utils.Constants
+import GHC.Utils.Error
+import GHC.Utils.Exception (SomeAsyncException, throwIO)
+import GHC.Utils.Fingerprint
+import GHC.Utils.Logger
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.TmpFs
+import System.Directory
+import System.FilePath
 
+import GHC.Driver.Backend
+import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Finder (initFinderOpts)
 import GHC.Driver.Config.Parser (initParserOpts)
-import GHC.Driver.Config.Diagnostic
-import GHC.Driver.Phases
-import GHC.Driver.Pipeline
-import GHC.Driver.Session
-import GHC.Driver.Backend
-import GHC.Driver.Monad
 import GHC.Driver.Env
+import GHC.Driver.Env.KnotVars
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.Main
 import GHC.Driver.MakeSem
-
-import GHC.Parser.Header
-import GHC.ByteCode.Types
-
-import GHC.Iface.Load      ( cannotFindModule )
-import GHC.IfaceToCore     ( typecheckIface )
-import GHC.Iface.Recomp    ( RecompileRequired(..), CompileReason(..) )
-
-import GHC.Data.Bag        ( listToBag )
-import GHC.Data.Graph.Directed
-import GHC.Data.FastString
-import GHC.Data.Maybe      ( expectJust )
-import GHC.Data.OsPath     ( unsafeEncodeUtf )
-import GHC.Data.StringBuffer
-import qualified GHC.LanguageExtensions as LangExt
-
-import GHC.Utils.Exception ( throwIO, SomeAsyncException )
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
-import GHC.Utils.Misc
-import GHC.Utils.Error
-import GHC.Utils.Logger
-import GHC.Utils.Fingerprint
-import GHC.Utils.TmpFs
-
-import GHC.Types.Basic
-import GHC.Types.Error
-import GHC.Types.Target
-import GHC.Types.SourceFile
-import GHC.Types.SourceError
-import GHC.Types.SrcLoc
-import GHC.Types.Unique.Map
-import GHC.Types.PkgQual
-
-import GHC.Unit
-import GHC.Unit.Env
-import GHC.Unit.Finder
-import GHC.Unit.Module.ModSummary
-import GHC.Unit.Module.ModIface
-import GHC.Unit.Module.Graph
-import GHC.Unit.Home.ModInfo
-import GHC.Unit.Module.ModDetails
-
-import Data.Either ( rights, partitionEithers, lefts )
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-
-import GHC.Data.OsPath (OsPath)
-import qualified GHC.Data.OsPath as OsPath
-import Control.Concurrent ( newQSem, waitQSem, signalQSem, ThreadId, killThread, forkIOWithUnmask )
-import qualified GHC.Conc as CC
-import Control.Concurrent.MVar
-import Control.Monad
-import Control.Monad.Trans.Except ( ExceptT(..), runExceptT, throwE )
-import qualified Control.Monad.Catch as MC
-import Data.IORef
-import Data.Maybe
-import Data.Time
-import Data.List (sortOn, unfoldr)
-import Data.List (sortOn, unfoldr, groupBy, sortBy)
-import Data.Bifunctor (first)
-import System.Directory
-import System.FilePath
-
-import GHC.Conc ( getNumProcessors, getNumCapabilities, setNumCapabilities )
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader
+import GHC.Driver.Monad
+import GHC.Driver.Phases
+import GHC.Driver.Pipeline
 import GHC.Driver.Pipeline.LogQueue
-import qualified Data.Map.Strict as M
-import GHC.Types.TypeEnv
-import Control.Monad.Trans.State.Lazy
-import Control.Monad.Trans.Class
-import GHC.Driver.Env.KnotVars
-import Control.Concurrent.STM
-import Control.Monad.Trans.Maybe
-import GHC.Runtime.Loader
-import GHC.Rename.Names
-import GHC.Utils.Constants
-import GHC.Iface.Errors.Types
-import Data.Function
-
-import GHC.Data.Graph.Directed.Reachability
-import qualified GHC.Unit.Home.Graph as HUG
-import GHC.Unit.Home.PackageTable
+import GHC.Driver.Session
 
 -- -----------------------------------------------------------------------------
 -- Loading the program
@@ -628,13 +621,16 @@ createBuildPlan mod_graph maybe_top_mod =
 
         -- An environment mapping a module to its hs-boot file and all nodes on the path between the two, if one exists
         boot_modules = mkModuleEnv
-          [ (ms_mod ms, (m, boot_path (ms_mod_name ms) (ms_unitid ms))) | m@(ModuleNode _ ms) <- (mgModSummaries' mod_graph), isBootSummary ms == IsBoot]
+          [ (mn, (m, boot_path (moduleName mn) (moduleUnitId mn)))
+            | m@(ModuleNode _ ms) <- (mgModSummaries' mod_graph)
+            , let mn = moduleNodeInfoModule ms
+            , isBootModuleNodeInfo ms == IsBoot]
 
         select_boot_modules :: [ModuleGraphNode] -> [ModuleGraphNode]
         select_boot_modules = mapMaybe (fmap fst . get_boot_module)
 
         get_boot_module :: ModuleGraphNode -> Maybe (ModuleGraphNode, [ModuleGraphNode])
-        get_boot_module m = case m of ModuleNode _ ms | HsSrcFile <- ms_hsc_src ms -> lookupModuleEnv boot_modules (ms_mod ms); _ -> Nothing
+        get_boot_module m = case m of ModuleNode _ ms | NotBoot <- isBootModuleNodeInfo ms -> lookupModuleEnv boot_modules (moduleNodeInfoModule ms); _ -> Nothing
 
         -- Any cycles should be resolved now
         collapseSCC :: [SCC ModuleGraphNode] -> Either [ModuleGraphNode] [(Either ModuleGraphNode ModuleGraphNodeWithBootFile)]
@@ -760,7 +756,7 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
         -- prune the HPT so everything is not retained when doing an
         -- upsweep.
         !pruned_cache = pruneCache cache
-                            (flattenSCCs (filterToposortToModules  mg2_with_srcimps))
+                            [ms | (ModuleNodeCompile ms) <- (flattenSCCs (filterToposortToModules  mg2_with_srcimps))]
 
 
     -- before we unload anything, make sure we don't leave an old
@@ -820,7 +816,7 @@ guessOutputFile = modifySession $ \env ->
                 mainModuleSrcPath :: Maybe String
                 mainModuleSrcPath = do
                   ms <- mgLookupModule mod_graph (mainModIs hue)
-                  ml_hs_file (ms_location ms)
+                  ml_hs_file (moduleNodeInfoLocation ms)
                 name = fmap dropExtension mainModuleSrcPath
 
                 -- MP: This exception is quite sensitive to being forced, if you
@@ -1153,7 +1149,7 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
                   executeInstantiationNode mod_idx n_mods hug uid iu
                   return Nothing
               ModuleNode _build_deps ms ->
-                let !old_hmi = M.lookup (msKey ms) old_hpt
+                let !old_hmi = M.lookup (mnKey ms) old_hpt
                     rehydrate_mods = mapMaybe nodeKeyModName <$> rehydrate_nodes
                 in withCurrentUnit (moduleGraphNodeUnitId mod) $ do
                      !_ <- wait_deps build_deps
@@ -1523,13 +1519,13 @@ modNodeMapUnionWith f (ModNodeMap m) (ModNodeMap n) = ModNodeMap (M.unionWith f 
 -- components in the topological sort, then those imports can
 -- definitely be replaced by ordinary non-SOURCE imports: if SOURCE
 -- were necessary, then the edge would be part of a cycle.
-warnUnnecessarySourceImports :: GhcMonad m => [SCC ModSummary] -> m ()
+warnUnnecessarySourceImports :: GhcMonad m => [SCC ModuleNodeInfo] -> m ()
 warnUnnecessarySourceImports sccs = do
   diag_opts <- initDiagOpts <$> getDynFlags
   when (diag_wopt Opt_WarnUnusedImports diag_opts) $ do
     let check ms =
-           let mods_in_this_cycle = map ms_mod_name ms in
-           [ warn i | m <- ms, i <- ms_home_srcimps m,
+           let mods_in_this_cycle = map moduleNodeInfoModuleName ms in
+           [ warn i | (ModuleNodeCompile m) <- ms, i <- ms_home_srcimps m,
                       unLoc i `notElem`  mods_in_this_cycle ]
 
         warn :: Located ModuleName -> MsgEnvelope GhcMessage
@@ -1670,7 +1666,7 @@ downsweep_imports hsc_env old_summaries old_graph excl_mods allow_dup_roots (roo
              (final_deps, done', summarised') <- loopImports (calcDeps ms) done summarised
              -- This has the effect of finding a .hs file if we are looking at the .hs-boot file.
              (_, done'', summarised'') <- loopImports (maybeToList hs_file_for_boot) done' summarised'
-             loopSummaries next (M.insert k (ModuleNode final_deps ms) done'', summarised'')
+             loopSummaries next (M.insert k (ModuleNode final_deps (ModuleNodeCompile ms)) done'', summarised'')
           where
             k = NodeKey_Module (msKey ms)
 
@@ -1904,7 +1900,7 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph =
   where
     defaultBackendOf ms = platformDefaultBackend (targetPlatform $ ue_unitFlags (ms_unitid ms) unit_env)
     enable_code_gen :: ModuleGraphNode -> IO ModuleGraphNode
-    enable_code_gen n@(ModuleNode deps ms)
+    enable_code_gen n@(ModuleNode deps (ModuleNodeCompile ms))
       | ModSummary
         { ms_location = ms_location
         , ms_hsc_src = HsSrcFile
@@ -1942,7 +1938,7 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph =
                      , ms_hspp_opts = updOptLevel 0 $ new_dflags
                      }
                -- Recursive call to catch the other cases
-               enable_code_gen (ModuleNode deps ms')
+               enable_code_gen (ModuleNode deps (ModuleNodeCompile ms'))
 
          -- If -fprefer-byte-code then satisfy dependency by enabling bytecode (if normal object not enough)
          -- we only get to this case if the default backend is already generating object files, but we need dynamic
@@ -1952,19 +1948,19 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph =
                      { ms_hspp_opts = gopt_set (ms_hspp_opts ms) Opt_ByteCodeAndObjectCode
                      }
                -- Recursive call to catch the other cases
-               enable_code_gen (ModuleNode deps ms')
+               enable_code_gen (ModuleNode deps (ModuleNodeCompile ms'))
          | dynamic_too_enable enable_spec ms -> do
                let ms' = ms
                      { ms_hspp_opts = gopt_set (ms_hspp_opts ms) Opt_BuildDynamicToo
                      }
                -- Recursive call to catch the other cases
-               enable_code_gen (ModuleNode deps ms')
+               enable_code_gen (ModuleNode deps (ModuleNodeCompile ms'))
          | ext_interp_enable ms -> do
                let ms' = ms
                      { ms_hspp_opts = gopt_set (ms_hspp_opts ms) Opt_ExternalInterpreter
                      }
                -- Recursive call to catch the other cases
-               enable_code_gen (ModuleNode deps ms')
+               enable_code_gen (ModuleNode deps (ModuleNodeCompile ms'))
 
          | otherwise -> return n
 
@@ -2043,7 +2039,7 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph =
         -- Note we don't need object code for a module if it uses TemplateHaskell itself. Only
         -- it's dependencies.
         [ deps
-        | (ModuleNode deps ms) <- mod_graph
+        | (ModuleNode deps (ModuleNodeCompile ms)) <- mod_graph
         , isTemplateHaskellOrQQNonBoot ms
         , not (gopt Opt_UseBytecodeRatherThanObjects (ms_hspp_opts ms))
         ]
@@ -2052,7 +2048,7 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph =
     need_bc_set =
       concat
         [ deps
-        | (ModuleNode deps ms) <- mod_graph
+        | (ModuleNode deps (ModuleNodeCompile ms)) <- mod_graph
         , isTemplateHaskellOrQQNonBoot ms
         , gopt Opt_UseBytecodeRatherThanObjects (ms_hspp_opts ms)
         ]
@@ -2514,9 +2510,14 @@ cyclicModuleErr mss
     ppr_node (InstantiationNode _uid u) = text "instantiated unit" <+> ppr u
     ppr_node (LinkNode uid _) = pprPanic "LinkNode should not be in a cycle" (ppr uid)
 
-    ppr_ms :: ModSummary -> SDoc
-    ppr_ms ms = quotes (ppr (moduleName (ms_mod ms))) <+>
-                (parens (text (msHsFilePath ms)))
+    ppr_ms :: ModuleNodeInfo -> SDoc
+    ppr_ms ms = quotes (ppr (moduleNodeInfoModule ms)) <+>
+                (parens (text (node_path ms)))
+
+    node_path :: ModuleNodeInfo -> FilePath
+    node_path ms = case ml_hs_file (moduleNodeInfoLocation ms) of
+      Just f -> f
+      Nothing -> ml_hi_file (moduleNodeInfoLocation ms)
 
 
 cleanCurrentModuleTempFilesMaybe :: MonadIO m => Logger -> TmpFs -> DynFlags -> m ()
@@ -2609,39 +2610,72 @@ executeInstantiationNode k n deps uid iu = do
             return res
 
 
+-- | executeCompileNode interprets how --make module should compile a ModuleNode
+--
+-- 1. If the ModuleNode is a ModuleNodeCompile, then we first check
+--    if the interface file exists and is up to date. If it is, we return those.
+--    Otherwise, we compile the module and return the new HomeModInfo.
+-- 2. If the ModuleNode is a ModuleNodeFixed, then we just need to load the interface
+--    and artifacts from disk.
+
 executeCompileNode :: Int
   -> Int
   -> Maybe HomeModInfo
   -> HomeUnitGraph
   -> Maybe [ModuleName] -- List of modules we need to rehydrate before compiling
-  -> ModSummary
+  -> ModuleNodeInfo
   -> RunMakeM HomeModInfo
-executeCompileNode k n !old_hmi hug mrehydrate_mods mod = do
+executeCompileNode k n !old_hmi hug mrehydrate_mods mni = do
   me@MakeEnv{..} <- ask
   -- Rehydrate any dependencies if this module had a boot file or is a signature file.
   lift $ MaybeT (withAbstractSem compile_sem $ withLoggerHsc k me $ \hsc_env -> do
-     hsc_env' <- liftIO $ maybeRehydrateBefore (setHUG hug hsc_env) mod fixed_mrehydrate_mods
+     hsc_env' <- liftIO $ maybeRehydrateBefore (setHUG hug hsc_env) mni fixed_mrehydrate_mods
+     case mni of
+       ModuleNodeCompile mod -> executeCompileNodeWithSource hsc_env' me mod
+       ModuleNodeFixed key loc -> executeCompileNodeFixed hsc_env' me key loc
+    )
+
+  where
+    fixed_mrehydrate_mods =
+      case moduleNodeInfoHscSource mni of
+        -- MP: It is probably a bit of a misimplementation in backpack that
+        -- compiling a signature requires an knot_var for that unit.
+        -- If you remove this then a lot of backpack tests fail.
+        Just HsigFile -> Just []
+        _        -> mrehydrate_mods
+
+    executeCompileNodeFixed :: HscEnv -> MakeEnv -> ModNodeKeyWithUid -> ModLocation -> IO (Maybe HomeModInfo)
+    executeCompileNodeFixed hsc_env MakeEnv{diag_wrapper, env_messager} mod_key loc =
+      wrapAction diag_wrapper hsc_env $ do
+        forM_ env_messager $ \hscMessage -> hscMessage hsc_env (k, n) UpToDate (ModuleNode [] (ModuleNodeFixed mod_key loc))
+        read_result <- readIface (hsc_dflags hsc_env) (hsc_NC hsc_env) (mnkToModule mod_key) (ml_hi_file loc)
+        case read_result of
+          MB.Failed interface_err ->
+
+            let mn = mnkModuleName mod_key
+                err = Can'tFindInterface (BadIfaceFile interface_err) (LookingForModule (gwib_mod mn) (gwib_isBoot mn))
+            in throwErrors $ singleMessage $ mkPlainErrorMsgEnvelope noSrcSpan (GhcDriverMessage (DriverInterfaceError err))
+          MB.Succeeded iface -> do
+            details <- genModDetails hsc_env iface
+            mb_object <- findObjectLinkableMaybe (mi_module iface) loc
+            mb_bytecode <- loadIfaceByteCodeLazy hsc_env iface loc (md_types details)
+            let hm_linkable = HomeModLinkable mb_bytecode mb_object
+            return (HomeModInfo iface details hm_linkable)
+
+    executeCompileNodeWithSource :: HscEnv -> MakeEnv -> ModSummary -> IO (Maybe HomeModInfo)
+    executeCompileNodeWithSource hsc_env MakeEnv{diag_wrapper, env_messager} mod = do
      let -- Use the cached DynFlags which includes OPTIONS_GHC pragmas
          lcl_dynflags = ms_hspp_opts mod
      let lcl_hsc_env =
              -- Localise the hsc_env to use the cached flags
              hscSetFlags lcl_dynflags $
-             hsc_env'
+             hsc_env
      -- Compile the module, locking with a semaphore to avoid too many modules
      -- being compiled at the same time leading to high memory usage.
      wrapAction diag_wrapper lcl_hsc_env $ do
       res <- upsweep_mod lcl_hsc_env env_messager old_hmi mod k n
-      cleanCurrentModuleTempFilesMaybe (hsc_logger hsc_env') (hsc_tmpfs hsc_env') lcl_dynflags
-      return res)
-
-  where
-    fixed_mrehydrate_mods =
-      case ms_hsc_src mod of
-        -- MP: It is probably a bit of a misimplementation in backpack that
-        -- compiling a signature requires an knot_var for that unit.
-        -- If you remove this then a lot of backpack tests fail.
-        HsigFile -> Just []
-        _        -> mrehydrate_mods
+      cleanCurrentModuleTempFilesMaybe (hsc_logger hsc_env) (hsc_tmpfs hsc_env) lcl_dynflags
+      return res
 
 {- Rehydration, see Note [Rehydrating Modules] -}
 
@@ -2669,9 +2703,9 @@ rehydrate hsc_env hmis = do
 
 -- If needed, then rehydrate the necessary modules with a suitable KnotVars for the
 -- module currently being compiled.
-maybeRehydrateBefore :: HscEnv -> ModSummary -> Maybe [ModuleName] -> IO HscEnv
+maybeRehydrateBefore :: HscEnv -> ModuleNodeInfo -> Maybe [ModuleName] -> IO HscEnv
 maybeRehydrateBefore hsc_env _ Nothing = return hsc_env
-maybeRehydrateBefore hsc_env mod (Just mns) = do
+maybeRehydrateBefore hsc_env mni (Just mns) = do
   knot_var <- initialise_knot_var hsc_env
   let hsc_env' = hsc_env { hsc_type_env_vars = knotVarsFromModuleEnv knot_var }
   hmis <- mapM (fmap (expectJust "mr") . lookupHpt (hsc_HPT hsc_env')) mns
@@ -2681,7 +2715,7 @@ maybeRehydrateBefore hsc_env mod (Just mns) = do
 
   where
    initialise_knot_var hsc_env = liftIO $
-    let mod_name = homeModuleInstantiation (hsc_home_unit_maybe hsc_env) (ms_mod mod)
+    let mod_name = homeModuleInstantiation (hsc_home_unit_maybe hsc_env) (moduleNodeInfoModule mni)
     in mkModuleEnv . (:[]) . (mod_name,) <$> newIORef emptyTypeEnv
 
 rehydrateAfter :: HscEnv

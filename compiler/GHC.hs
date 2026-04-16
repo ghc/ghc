@@ -75,9 +75,12 @@ module GHC (
         compileToCoreModule, compileToCoreSimplified,
 
         -- * Inspecting the module structure of the program
-        ModuleGraph, emptyMG, mapMG, mkModuleGraph, mgModSummaries,
-        mgLookupModule,
+        ModuleGraph, emptyMG, mapMG, mkModuleGraph, mgModSummaries, mgModSummaries',
+        mgLookupModule, mgNodeIsModule,
         ModSummary(..), ms_mod_name, ModLocation(..),
+        ModuleNodeInfo(..), moduleNodeInfoModule, moduleNodeInfoModuleName,
+        moduleNodeInfoLocation, moduleNodeInfoHscSource,
+        isBootModuleNodeInfo,
         pattern ModLocation,
         getModSummary,
         getModuleGraph,

@@ -50,6 +50,7 @@ module GHC.Driver.Main
     , initModDetails
     , initWholeCoreBindings
     , loadIfaceByteCode
+    , loadIfaceByteCodeLazy
     , hscMaybeWriteIface
     , hscCompileCmmFile
 
@@ -106,6 +107,7 @@ module GHC.Driver.Main
     , hscAddSptEntries
     , writeInterfaceOnlyMode
     , loadByteCode
+    , genModDetails
     ) where
 
 import GHC.Prelude
@@ -824,7 +826,7 @@ hscRecompStatus
   = do
     let
         msg what = case mHscMessage of
-          Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode [] mod_summary)
+          Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode [] (ModuleNodeCompile mod_summary))
           Nothing -> return ()
 
     -- First check to see if the interface file agrees with the
@@ -1054,6 +1056,27 @@ loadIfaceByteCode hsc_env iface location type_env =
       if_time <- modificationTimeIfExists (ml_hi_file location)
       time <- maybe getCurrentTime pure if_time
       return $! Linkable time (mi_module iface) parts
+
+loadIfaceByteCodeLazy ::
+  HscEnv ->
+  ModIface ->
+  ModLocation ->
+  TypeEnv ->
+  IO (Maybe Linkable)
+loadIfaceByteCodeLazy hsc_env iface location type_env =
+  case iface_core_bindings iface location of
+    Nothing -> return Nothing
+    Just wcb -> do
+      Just <$> compile wcb
+  where
+    compile decls = do
+      ~(bcos, fos) <- unsafeInterleaveIO $ compileWholeCoreBindings hsc_env type_env decls
+      linkable $ BCOs bcos :| [DotO fo ForeignObject | fo <- fos]
+
+    linkable parts = do
+      if_time <- modificationTimeIfExists (ml_hi_file location)
+      time <- maybe getCurrentTime pure if_time
+      return $!Linkable time (mi_module iface) parts
 
 -- | If the 'Linkable' contains Core bindings loaded from an interface, replace
 -- them with a lazy IO thunk that compiles them to bytecode and foreign objects,
