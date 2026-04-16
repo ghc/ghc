@@ -265,6 +265,27 @@ findImportedModuleNoHsc fc fopts ue complete_home_units mb_home_unit mod_name mb
       | uid <- other_providing_deps
       ]
 
+    !() = pprTrace "findImportedModuleNoHsc" (vcat lines) () where
+
+        lines = [
+                 -- text "complete_home_units" <+> ppr complete_home_units,
+                 -- text "mb_home_unit " <+> ppr mb_home_unit,
+                    text "mod_name:" <+> ppr mod_name,
+                    text "cached_module_providers:" <+> ppr cached_module_providers,
+                    text "mb_home_unit_id:" <+> ppr mb_home_unit_id,
+                 -- text "all_opts:" <+> ppr all_opts,
+                 -- text "any_home_import:" <+> ppr any_home_import,
+                 -- text "pkg_import:" <+> ppr pkg_import   ,
+                 -- text "unqual_import:" <+> ppr unqual_import,
+                 -- text "units:" <+> ppr units    ,
+                    text "hpt_deps:" <+> ppr hpt_deps,
+                    text "cached_providing_deps:" <+> ppr cached_providing_deps,
+                    text "other_cached_providing_deps:" <+> ppr other_cached_providing_deps,
+                    text "uncached_providing_deps:" <+> ppr uncached_providing_deps,
+                    text "other_providing_deps:" <+> ppr other_providing_deps
+                 -- text "other_fopts:" <+> ppr other_fopts
+                ]
+
 -- | Locate a plugin module requested by the user, for a compiler
 -- plugin.  This consults the same set of exposed packages as
 -- 'findImportedModule', unless @-hide-all-plugin-packages@ or
