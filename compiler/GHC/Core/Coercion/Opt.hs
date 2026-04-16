@@ -321,13 +321,10 @@ opt_co_refl subst co
     go (Refl ty)                     = Refl (substTy subst ty)
     go (GRefl r ty mco)              = GRefl r $!! go_ty ty $!! go_m mco
     go (CoVarCo cv)                  = substCoVar subst cv
-    go (HoleCo h)                    = HoleCo $!! go_hole h
-    go (SymCo co)                    = mkSymCo $!! go co
-    go (KindCo co)                   = mkKindCo $!! go co
-    go (SubCo co)                    = mkSubCo $!! (let co' = go co in
-                                                    if isReflexiveCo co' && not (isReflCo co')
-                                                    then pprTrace "yuike" (ppr co $$ ppr co') co'
-                                                    else co')
+    go (HoleCo h)                    = HoleCo    $!! go_hole h
+    go (SymCo co)                    = mkSymCo   $!! go co
+    go (KindCo co)                   = mkKindCo  $!! go co
+    go (SubCo co)                    = mkSubCo   $!! go co
     go (SelCo n co)                  = mkSelCo n $!! go co
     go (LRCo n co)                   = mkLRCo n  $!! go co
     go (AppCo co1 co2)               = mkAppCo   $!! go co1 $!! go co2

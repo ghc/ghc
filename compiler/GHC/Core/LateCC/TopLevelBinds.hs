@@ -117,9 +117,11 @@ topLevelBindsCC pred core_bind =
     -- executions of the RHS. Note that the lambdas might be hidden under ticks
     -- or casts. So look through these as well.
     addCC :: Id -> CoreExpr -> LateCCM s CoreExpr
-    addCC bndr (Cast rhs co) = pure Cast <*> addCC bndr rhs <*> pure co
-    addCC bndr (Tick t rhs) = (Tick t) <$> addCC bndr rhs
-    addCC bndr (Lam b rhs) = Lam b <$> addCC bndr rhs
+    addCC bndr (Cast rhs co) = Cast   <$> addCC bndr rhs <*> pure co
+    addCC bndr (Tick t rhs)  = Tick t <$> addCC bndr rhs
+    addCC bndr (Lam b rhs)   = Lam b  <$> addCC bndr rhs
+    addCC _  e@(Coercion {}) = return e  -- Do not add cost centres
+    addCC _  e@(Type {})     = return e  -- around coercions or types
     addCC bndr rhs = do
       let name = idName bndr
           cc_loc = nameSrcSpan name
