@@ -1941,7 +1941,7 @@ hscSimpleIface' mb_core_program tc_result summary = do
 --------------------------------------------------------------
 
 -- | Compile to hard-code.
-hscGenHardCode :: HscEnv -> CgGuts -> ModLocation -> FilePath
+hscGenHardCode :: HasCallStack => HscEnv -> CgGuts -> ModLocation -> FilePath
                -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], Maybe StgCgInfos, Maybe CmmCgInfos )
                 -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode hsc_env cgguts mod_loc output_filename = do
@@ -2246,7 +2246,7 @@ generateFreshByteCodeLinkable hsc_env mod_name cgguts mod_location = do
   return $ mkModuleByteCodeLinkable bco_time bco_object
 ------------------------------
 
-hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> FilePath -> IO (Maybe FilePath)
+hscCompileCmmFile :: HasCallStack => HscEnv -> FilePath -> FilePath -> FilePath -> IO (Maybe FilePath)
 hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hsc_env $ do
     let dflags   = hsc_dflags hsc_env
         logger   = hsc_logger hsc_env

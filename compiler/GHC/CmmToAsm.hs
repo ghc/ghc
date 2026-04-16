@@ -132,7 +132,7 @@ import System.IO
 import System.Directory ( getCurrentDirectory )
 
 --------------------
-nativeCodeGen :: forall a . Logger -> ToolSettings -> NCGConfig -> ModLocation -> Handle
+nativeCodeGen :: forall a . HasCallStack => Logger -> ToolSettings -> NCGConfig -> ModLocation -> Handle
               -> CgStream RawCmmGroup a
               -> UniqDSMT IO a
 nativeCodeGen logger ts config modLoc h cmms

@@ -18,8 +18,9 @@ import qualified GHC.CmmToAsm.AArch64.Ppr     as AArch64
 import qualified GHC.CmmToAsm.AArch64.CodeGen as AArch64
 import qualified GHC.CmmToAsm.AArch64.Regs    as AArch64
 import qualified GHC.CmmToAsm.AArch64.RegInfo as AArch64
+import GHC.Stack (HasCallStack)
 
-ncgAArch64 :: NCGConfig -> NcgImpl RawCmmStatics AArch64.Instr AArch64.JumpDest
+ncgAArch64 :: HasCallStack => NCGConfig -> NcgImpl RawCmmStatics AArch64.Instr AArch64.JumpDest
 ncgAArch64 config
  = NcgImpl {
         ncgConfig                 = config

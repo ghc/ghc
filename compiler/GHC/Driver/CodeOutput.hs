@@ -63,6 +63,7 @@ import GHC.Types.Unique.Supply ( UniqueTag(..) )
 import System.IO
 import Data.Set (Set)
 import qualified Data.Set as Set
+import GHC.Stack (HasCallStack)
 
 {-
 ************************************************************************
@@ -74,7 +75,7 @@ import qualified Data.Set as Set
 
 codeOutput
     :: forall a.
-       Logger
+       HasCallStack =>  Logger
     -> TmpFs
     -> LlvmConfigCache
     -> DynFlags
@@ -192,7 +193,7 @@ outputC logger dflags filenm dus cmm_stream unit_deps =
 ************************************************************************
 -}
 
-outputAsm :: Logger
+outputAsm :: HasCallStack => Logger
           -> DynFlags
           -> Module
           -> ModLocation

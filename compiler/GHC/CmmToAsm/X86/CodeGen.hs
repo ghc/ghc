@@ -142,7 +142,7 @@ avx512dqEnabled :: NatM Bool
 avx512dqEnabled = ncgAvx512dqEnabled <$> getConfig
 
 cmmTopCodeGen
-        :: RawCmmDecl
+        :: HasCallStack => RawCmmDecl
         -> NatM [NatCmmDecl (Alignment, RawCmmStatics) Instr]
 
 cmmTopCodeGen (CmmProc info lab live graph) = do
@@ -212,7 +212,7 @@ verifyBasicBlock platform instrs
                    (pprInstr platform i <+> text "in:" $$ vcat (map (pprInstr platform) instrs))
 
 basicBlockCodeGen
-        :: CmmBlock
+        :: HasCallStack => CmmBlock
         -> NatM ( [NatBasicBlock Instr]
                 , [NatCmmDecl (Alignment, RawCmmStatics) Instr])
 
@@ -325,7 +325,7 @@ which *are* known to change the basic block.
 
 -- See Note [Keeping track of the current block] for why
 -- we pass the BlockId.
-stmtsToInstrs :: BlockId -- ^ Basic block these statement will start to be placed in.
+stmtsToInstrs :: HasCallStack => BlockId -- ^ Basic block these statement will start to be placed in.
               -> [CmmNode O O] -- ^ Cmm Statement
               -> NatM (InstrBlock, BlockId) -- ^ Resulting instruction
 stmtsToInstrs bid stmts =
@@ -341,7 +341,8 @@ stmtsToInstrs bid stmts =
 -- | `bid` refers to the current block and is used to update the CFG
 --   if new blocks are inserted in the control flow.
 -- See Note [Keeping track of the current block] for more details.
-stmtToInstrs :: BlockId -- ^ Basic block this statement will start to be placed in.
+stmtToInstrs :: HasCallStack
+             => BlockId -- ^ Basic block this statement will start to be placed in.
              -> CmmNode e x
              -> NatM (InstrBlock, Maybe BlockId)
              -- ^ Instructions, and bid of new block if successive
@@ -546,7 +547,7 @@ assignReg_I64Code (CmmLocal dst) valueTree = do
 assignReg_I64Code _ _
    = panic "assignReg_I64Code(i386): invalid lvalue"
 
-iselExpr64 :: HasDebugCallStack => CmmExpr -> NatM (RegCode64 InstrBlock)
+iselExpr64 :: HasCallStack => CmmExpr -> NatM (RegCode64 InstrBlock)
 iselExpr64 (CmmLit (CmmInt i _)) = do
   Reg64 rhi rlo <- getNewReg64
   let
@@ -855,12 +856,12 @@ iselExpr64ParallelBin op e1 e2 = do
 
 --------------------------------------------------------------------------------
 
-getRegister :: HasDebugCallStack => CmmExpr -> NatM Register
+getRegister :: HasCallStack => CmmExpr -> NatM Register
 getRegister e = do platform <- getPlatform
                    is32Bit <- is32BitPlatform
                    getRegister' platform is32Bit e
 
-getRegister' :: HasDebugCallStack => Platform -> Bool -> CmmExpr -> NatM Register
+getRegister' :: HasCallStack => Platform -> Bool -> CmmExpr -> NatM Register
 
 getRegister' platform is32Bit (CmmReg reg)
   = case reg of
@@ -3412,12 +3413,12 @@ intLoadCode instr mem = do
 
 -- Compute an expression into *any* register, adding the appropriate
 -- move instruction if necessary.
-getAnyReg :: HasDebugCallStack => CmmExpr -> NatM (Reg -> InstrBlock)
+getAnyReg :: HasCallStack => CmmExpr -> NatM (Reg -> InstrBlock)
 getAnyReg expr = do
   r <- getRegister expr
   anyReg r
 
-anyReg :: HasDebugCallStack => Register -> NatM (Reg -> InstrBlock)
+anyReg :: HasCallStack => Register -> NatM (Reg -> InstrBlock)
 anyReg (Any _ code)          = return code
 anyReg (Fixed rep reg fcode) = do
   config <- getConfig
@@ -3426,7 +3427,7 @@ anyReg (Fixed rep reg fcode) = do
 -- A bit like getSomeReg, but we want a reg that can be byte-addressed.
 -- Fixed registers might not be byte-addressable, so we make sure we've
 -- got a temporary, inserting an extra reg copy if necessary.
-getByteReg :: HasDebugCallStack => CmmExpr -> NatM (Reg, InstrBlock)
+getByteReg :: HasCallStack => CmmExpr -> NatM (Reg, InstrBlock)
 getByteReg expr = do
   config <- getConfig
   is32Bit <- is32BitPlatform
@@ -3448,7 +3449,7 @@ getByteReg expr = do
 
 -- Another variant: this time we want the result in a register that cannot
 -- be modified by code to evaluate an arbitrary expression.
-getNonClobberedReg :: HasDebugCallStack => CmmExpr -> NatM (Reg, InstrBlock)
+getNonClobberedReg :: HasCallStack => CmmExpr -> NatM (Reg, InstrBlock)
 getNonClobberedReg expr = do
   r <- getRegister expr
   config <- getConfig
@@ -4324,7 +4325,8 @@ genCondBranch' _ bid id false bool = do
 -- to take/return a block id.
 
 genForeignCall
-    :: ForeignTarget -- ^ function to call
+    :: HasCallStack
+    => ForeignTarget -- ^ function to call
     -> [CmmFormal]   -- ^ where to put the result
     -> [CmmActual]   -- ^ arguments (of mixed type)
     -> BlockId       -- ^ The block we are in
@@ -4559,7 +4561,7 @@ loadIntoRegMightClobberOtherReg _               = True
 
 -- | Generate C call to the given function in ghc-prim
 genPrimCCall
-  :: BlockId
+  :: HasCallStack => BlockId
   -> FastString
   -> [CmmFormal]
   -> [CmmActual]
@@ -4574,7 +4576,7 @@ genPrimCCall bid lbl_txt dsts args = do
 
 -- | Generate C call to the given function in libc
 genLibCCall
-  :: BlockId
+  :: HasCallStack => BlockId
   -> FastString
   -> [CmmFormal]
   -> [CmmActual]
@@ -4592,7 +4594,7 @@ genLibCCall bid lbl_txt dsts args = do
 
 -- | Generate C call to the given function in the RTS
 genRTSCCall
-  :: BlockId
+  :: HasCallStack => BlockId
   -> FastString
   -> [CmmFormal]
   -> [CmmActual]
@@ -4608,7 +4610,7 @@ genRTSCCall bid lbl_txt dsts args = do
 
 -- | Generate a real C call to the given address with the given convention
 genCCall
-  :: BlockId
+  :: HasCallStack => BlockId
   -> CmmExpr
   -> ForeignConvention
   -> [CmmFormal]
@@ -4786,7 +4788,7 @@ genCCall32 addr _conv dest_regs args = do
                 call `appOL`
                 assign_code dest_regs)
 
-genCCall64 :: CmmExpr           -- ^ address of function to call
+genCCall64 :: HasCallStack => CmmExpr           -- ^ address of function to call
            -> ForeignConvention -- ^ calling convention
            -> [CmmFormal]       -- ^ where to put the result
            -> [CmmActual]       -- ^ arguments (of mixed type)

@@ -19,12 +19,13 @@ import qualified GHC.CmmToAsm.X86.Instr   as X86
 import qualified GHC.CmmToAsm.X86.Ppr     as X86
 import qualified GHC.CmmToAsm.X86.CodeGen as X86
 import qualified GHC.CmmToAsm.X86.Regs    as X86
+import GHC.Stack (HasCallStack)
 
 ncgX86 :: NCGConfig -> NcgImpl (Alignment, RawCmmStatics) X86.Instr X86.JumpDest
 ncgX86 = ncgX86_64
 
 
-ncgX86_64 :: NCGConfig -> NcgImpl (Alignment, RawCmmStatics) X86.Instr X86.JumpDest
+ncgX86_64 :: HasCallStack => NCGConfig -> NcgImpl (Alignment, RawCmmStatics) X86.Instr X86.JumpDest
 ncgX86_64 config = NcgImpl
    { ncgConfig                 = config
    , cmmTopCodeGen             = X86.cmmTopCodeGen

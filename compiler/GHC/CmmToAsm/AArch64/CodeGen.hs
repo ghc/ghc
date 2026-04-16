@@ -95,7 +95,7 @@ import GHC.Utils.Monad (mapAccumLM)
 --   data GenBasicBlock i = BasicBlock BlockId [i]
 
 cmmTopCodeGen
-    :: RawCmmDecl
+    :: HasCallStack => RawCmmDecl
     -> NatM [NatCmmDecl RawCmmStatics Instr]
 
 -- Thus we'll have to deal with either CmmProc ...
@@ -123,7 +123,7 @@ cmmTopCodeGen _cmm@(CmmData sec dat) = do
   return [CmmData sec dat] -- no translation, we just use CmmStatic
 
 basicBlockCodeGen
-        :: Block CmmNode C C
+        :: HasCallStack => Block CmmNode C C
         -> NatM ( [NatBasicBlock Instr]
                 , [NatCmmDecl RawCmmStatics Instr])
 

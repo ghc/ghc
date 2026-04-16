@@ -92,12 +92,12 @@ showPlainGhcException =
       . s . showString "\n\n"
       . showString "Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug\n"
 
-throwPlainGhcException :: PlainGhcException -> a
+throwPlainGhcException :: HasCallStack => PlainGhcException -> a
 throwPlainGhcException = Exception.throw
 
 -- | Panics and asserts.
 panic, sorry, pgmError :: HasCallStack => String -> a
-panic    x = unsafeDupablePerformIO $ throwPlainGhcException (PlainPanic x)
+panic    x = unsafeDupablePerformIO $ throwPlainGhcException (PlainPanic (unlines [x, show callStack]))
 
 sorry    x = throwPlainGhcException (PlainSorry x)
 pgmError x = throwPlainGhcException (PlainProgramError x)
