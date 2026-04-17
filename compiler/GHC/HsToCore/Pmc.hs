@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingVia #-}
-
 -- | This module coverage checks pattern matches. It finds
 --
 --     * Uncovered patterns, certifying non-exhaustivity
@@ -66,7 +63,6 @@ import {-# SOURCE #-} GHC.HsToCore.Expr (dsLExpr)
 import GHC.HsToCore.Monad
 import GHC.Data.Bag
 import GHC.Data.OrdList
-import GHC.Generics (Generic, Generically(..))
 
 import Control.Monad (when, forM_)
 import qualified Data.Semigroup as Semi
@@ -468,8 +464,13 @@ data CIRB
   , cirb_red   :: !(OrdList SrcInfo) -- ^ Redundant clauses
   , cirb_bangs :: !(OrdList SrcInfo) -- ^ Redundant bang patterns
   }
-  deriving (Generic)
-  deriving (Semigroup, Monoid) via Generically CIRB
+
+instance Semigroup CIRB where
+  CIRB a b c d <> CIRB e f g h = CIRB (a <> e) (b <> f) (c <> g) (d <> h)
+    where (<>) = (Semi.<>)
+
+instance Monoid CIRB where
+  mempty = CIRB mempty mempty mempty mempty
 
 -- See Note [Determining inaccessible clauses]
 ensureOneNotRedundant :: CIRB -> CIRB

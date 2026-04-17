@@ -1,8 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingVia #-}
 
 -- | Handle conversion of CmmProc to LLVM code.
 module GHC.CmmToLlvm.CodeGen ( genLlvmProc ) where
@@ -31,8 +29,6 @@ import GHC.Data.FastString
 import GHC.Data.Maybe (expectJust)
 import GHC.Data.OrdList
 
-import GHC.Generics (Generic, Generically(..))
-
 import GHC.Types.ForeignCall
 import GHC.Types.Unique.DSM
 import GHC.Types.Unique
@@ -52,6 +48,7 @@ import Data.List ( nub )
 import qualified Data.List as List
 import Data.List.NonEmpty ( NonEmpty (..), nonEmpty )
 import Data.Maybe ( catMaybes )
+import qualified Data.Semigroup as Semigroup
 
 type Atomic = Maybe MemoryOrdering
 type LlvmStatements = OrdList LlvmStatement
@@ -2478,8 +2475,14 @@ getTBAARegMeta = getTBAAMeta . getTBAA
 
 -- | A more convenient way of accumulating LLVM statements and declarations.
 data LlvmAccum = LlvmAccum LlvmStatements [LlvmCmmDecl]
-  deriving (Generic)
-  deriving (Monoid, Semigroup) via Generically LlvmAccum
+
+instance Semigroup LlvmAccum where
+  LlvmAccum stmtsA declsA <> LlvmAccum stmtsB declsB =
+        LlvmAccum (stmtsA Semigroup.<> stmtsB) (declsA Semigroup.<> declsB)
+
+instance Monoid LlvmAccum where
+    mempty = LlvmAccum nilOL []
+    mappend = (Semigroup.<>)
 
 liftExprData :: LlvmM ExprData -> WriterT LlvmAccum LlvmM LlvmVar
 liftExprData action = do

@@ -44,7 +44,6 @@ import GHC.Types.Unique
 
 import Data.Coerce
 import Data.Data
-import Data.Semigroup
 
 -- See Note [UniqSet invariant] in GHC.Types.Unique.Set for why we want a newtype here.
 -- Beyond preserving invariants, we may also want to 'override' typeclass
@@ -155,9 +154,3 @@ instance Outputable a => Outputable (UniqDSet a) where
 
 pprUniqDSet :: (a -> SDoc) -> UniqDSet a -> SDoc
 pprUniqDSet f = braces . pprWithCommas f . uniqDSetToList
-
-instance Semigroup (UniqDSet a) where
-  (<>) = unionUniqDSets
-
-instance Monoid (UniqDSet a) where
-  mempty = emptyUniqDSet

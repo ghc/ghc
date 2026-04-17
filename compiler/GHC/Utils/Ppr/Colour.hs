@@ -1,17 +1,21 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingVia #-}
-
 module GHC.Utils.Ppr.Colour where
 import GHC.Prelude.Basic
 
 import Data.Maybe (fromMaybe)
 import GHC.Data.Bool
-import GHC.Generics (Generic, Generically(..))
+import Data.Semigroup as Semi
 
 -- | A colour\/style for use with 'coloured'.
 newtype PprColour = PprColour { renderColour :: String }
-  deriving (Generic)
-  deriving (Semigroup, Monoid) via Generically PprColour
+
+instance Semi.Semigroup PprColour where
+  PprColour s1 <> PprColour s2 = PprColour (s1 <> s2)
+
+-- | Allow colours to be combined (e.g. bold + red);
+--   In case of conflict, right side takes precedence.
+instance Monoid PprColour where
+  mempty = PprColour mempty
+  mappend = (<>)
 
 renderColourAfresh :: PprColour -> String
 renderColourAfresh c = renderColour (colReset `mappend` c)
