@@ -345,12 +345,9 @@ rnExpr (HsHole h)
 -- HsOverLabel: see Note [Handling overloaded and rebindable constructs]
 rnExpr (HsOverLabel src v)
   = do { (from_label, fvs) <- lookupSyntaxName fromLabelClassOpName
-       ; return ( mkExpandedExpr (HsOverLabel src v) $
-                  HsAppType noExtField (genLHsVar from_label) hs_ty_arg
-                , fvs ) }
-  where
-    hs_ty_arg = mkEmptyWildCardBndrs $ wrapGenSpan $
-                HsTyLit noExtField (HsString NoSourceText v)
+       ; let rs_table = [("fromLabel", from_label)]
+       ; return (HsOverLabel (src, rs_table) v, fvs)
+       }
 
 rnExpr (HsLit x lit) | HsString src s <- lit
   = do { opt_OverloadedStrings <- xoptM LangExt.OverloadedStrings
@@ -419,13 +416,15 @@ rnExpr (HsGetField _ e f)
  = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
       ; (e, fv_e) <- rnLExpr e
       ; let f' = rnDotFieldOcc <$> f
-      ; return (HsGetField getField e f', fv_e `plusFN` fv_getField) }
+            rs_table = [("getField", getField)]
+      ; return (HsGetField rs_table e f', fv_e `plusFN` fv_getField) }
 
 rnExpr (HsProjection _ fs)
-  = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
-       ; circ <- lookupOccRn WL_TermVariable compose_RDR
+  = do { (getFieldName, fv_getField) <- lookupSyntaxName getFieldName
+       ; circName <- lookupOccRn WL_TermVariable compose_RDR
        ; let fs' = NE.map rnDotFieldOcc fs
-       ; return (HsProjection (getField , circ) fs', unitFN circ `plusFN` fv_getField) }
+             rs_table = [("getField" , getFieldName), ("circ", circName)]
+       ; return (HsProjection rs_table fs', unitFN circName `plusFN` fv_getField) }
 
 ------------------------------------------
 -- Template Haskell extensions
@@ -488,15 +487,12 @@ rnExpr (ExplicitList _ exps)
   = do  { (exps', fvs) <- rnExprs exps
         ; opt_OverloadedLists <- xoptM LangExt.OverloadedLists
         ; if not opt_OverloadedLists
-          then return  (ExplicitList noExtField exps', fvs)
+          then return  (ExplicitList Nothing exps', fvs)
           else
     do { (from_list_n_name, fvs') <- lookupSyntaxName fromListNName
-       ; loc <- getSrcSpanM -- See Note [Source locations for implicit function calls]
-       ; let rn_list  = ExplicitList noExtField exps'
-             lit_n    = mkIntegralLit (length exps)
-             hs_lit   = genHsIntegralLit lit_n
-             exp_list = genHsApps' (wrapGenSpan' loc from_list_n_name) [hs_lit, wrapGenSpan rn_list]
-       ; return ( mkExpandedExpr rn_list exp_list
+       ; let rs_table = Just [("fromListN", from_list_n_name)]
+             rn_list  = ExplicitList rs_table exps'
+       ; return ( rn_list
                 , fvs `plusFN` fvs') } }
 
 rnExpr (ExplicitTuple _ tup_args boxity)
@@ -540,7 +536,7 @@ rnExpr (RecordUpd { rupd_expr = L l expr, rupd_flds = rbinds })
                     RegularRecUpdFields
                     { xRecUpdFields = parents
                     , recUpdFields  = flds }
-            ; return ( RecordUpd noExtField (L l e) upd_flds
+            ; return ( RecordUpd Nothing (L l e) upd_flds
                      , fv_e `plusFN` fv_flds ) }
 
       -- 'OverloadedRecordUpdate' is in effect. Record dot update desugaring.
@@ -555,13 +551,13 @@ rnExpr (RecordUpd { rupd_expr = L l expr, rupd_flds = rbinds })
            ; (setField, fv_setField) <- lookupSyntaxName setFieldName
            ; (e, fv_e) <- rnExpr expr
            ; (us, fv_us) <- rnHsUpdProjs flds
-            ; let upd_flds = OverloadedRecUpdFields
+           ; let upd_flds = OverloadedRecUpdFields
                             { xOLRecUpdFields = noExtField
                             , olRecUpdFields  = us }
-            ; return ( mkExpandedExpr
-                         (RecordUpd noExtField (L l e) upd_flds)
-                         (mkRecordDotUpd getField setField (L l e) us)
-                        , plusFNs [fv_getField, fv_setField, fv_e, fv_us] ) }
+                 rs_table = Just [("getFieldName", getField) , ("setFieldName", setField)]
+           ; return (RecordUpd rs_table (L l e) upd_flds
+                    , plusFNs [fv_getField, fv_setField, fv_e, fv_us] )
+           }
 
 
 rnExpr (ExprWithTySig _ expr pty)
@@ -2698,18 +2694,15 @@ rnHsIf p b1 b2
        ; (b1', fvB1) <- rnLExpr b1
        ; (b2', fvB2) <- rnLExpr b2
        ; let fvs_if = plusFNs [fvP, fvB1, fvB2]
-             rn_if  = HsIf noExtField  p' b1' b2'
-
        -- Deal with rebindable syntax
        ; mb_ite <- lookupIfThenElse
        ; case mb_ite of
             Nothing  -- Non rebindable-syntax case
-              -> return (rn_if, fvs_if)
+              -> return (HsIf Nothing  p' b1' b2', fvs_if)
 
             Just ite_name   -- Rebindable-syntax case
-              -> do { let ds_if = genHsApps ite_name [p', b1', b2']
-                          fvs   = plusFNs [fvs_if, unitFN ite_name]
-                    ; return (mkExpandedExpr rn_if ds_if, fvs) } }
+              -> do { let fvs   = plusFNs [fvs_if, unitFN ite_name]
+                    ; return (HsIf (Just [("ifThenElse" , ite_name)]) p' b1' b2', fvs) } }
 
 
 rnHsUpdProjs :: [LHsRecUpdProj GhcPs] -> RnM ([LHsRecUpdProj GhcRn], FreeNames)

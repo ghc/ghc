@@ -440,12 +440,13 @@ tcExprNoExpand e@HsQualLit{} _ = pprPanic "tcExpr: HsQualLit" (ppr e)
 ************************************************************************
 -}
 
--- Explicit lists [e1,e2,e3] have been expanded already in the renamer
+-- Explicit lists [e1,e2,e3] have been expanded already in tcExpand
 -- The expansion includes an ExplicitList, but it is always the built-in
 -- list type, so that's all we need concern ourselves with here.  See
 -- GHC.Rename.Expr. Note [Handling overloaded and rebindable constructs]
-tcExprNoExpand (ExplicitList _ exprs) res_ty
-  = do  { res_ty <- expTypeToType res_ty
+tcExprNoExpand (ExplicitList x exprs) res_ty
+  = assert (isNothing x) $
+    do  { res_ty <- expTypeToType res_ty
         ; (coi, elt_ty) <- matchExpectedListTy res_ty
         ; let tc_elt expr = tcCheckPolyExpr expr elt_ty
         ; exprs' <- mapM tc_elt exprs
@@ -537,12 +538,15 @@ tcExprNoExpand (HsCase ctxt scrut matches) res_ty
         ; return (HsCase ctxt scrut' matches') }
 
 tcExprNoExpand (HsIf x pred b1 b2) res_ty
-  = do { pred'    <- tcCheckMonoExpr pred boolTy
+  -- HsIf in rebindable case would be expanded out so we would not
+  -- have a Just RebindableSyntaxTable here, only Nothing
+  = assert (isNothing x) $
+    do { pred'    <- tcCheckMonoExpr pred boolTy
        ; let res_ty' = adjustExpTypeForCaseBranches res_ty [b1,b2]
        ; (u1,b1') <- tcCollectingUsage $ tcMonoLExpr b1 res_ty'
        ; (u2,b2') <- tcCollectingUsage $ tcMonoLExpr b2 res_ty'
        ; tcEmitBindingUsage (supUE u1 u2)
-       ; return (HsIf x pred' b1' b2') }
+       ; return (HsIf noExtField pred' b1' b2') }
 
 {-
 Note [MultiWayIf linearity checking]
@@ -679,7 +683,7 @@ tcExprNoExpand expr@(RecordCon { rcon_con = L loc qcon@(WithUserRdr _ con_name)
 -- in the renamer. See Note [Overview of record dot syntax] in
 -- GHC.Hs.Expr. This is why we match on 'rupd_flds = Left rbnds' here
 -- and panic otherwise.
--- WIP: To be fixed soon expandRecordUpd needs to return HsExpansion and not a separate ds_res_ty
+-- WIP: To be fixed soon (#27160) expandRecordUpd needs to return HsExpansion and not a separate ds_res_ty
 tcExprNoExpand expr@(RecordUpd { rupd_expr = record_expr
                        , rupd_flds =
                            RegularRecUpdFields
@@ -1640,7 +1644,7 @@ disambiguateRecordBinds record_expr record_rho possible_parents rbnds res_ty
                              RegularRecUpdFields
                               { xRecUpdFields = parents
                               , recUpdFields  = rbnds }
-                         , rupd_ext = noExtField }
+                         , rupd_ext = Nothing }
         loc  = getLocA (head rbnds)
 
 {-
