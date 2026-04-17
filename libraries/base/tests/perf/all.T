@@ -5,15 +5,13 @@ setTestOpts(js_skip)
 # Check optimization of `elem`
 #--------------------------------------
 
-elemCoreFilter = "sed -En '/^(is|fusion|noFusion)[A-Za-z]*($| )/,/^$/p'"
-
 def elemCoreTest(test_name, module_name, opt):
     test(test_name,
          [only_ways(['normal']), extra_files([module_name + '.hs'])],
          multimod_compile_filter,
          [module_name,
           f'{opt} -ddump-simpl -dsuppress-all -dsuppress-uniques -dno-typeable-binds',
-          elemCoreFilter])
+          "sed -En '/^(is|fusion|noFusion)[A-Za-z]*($| )/,/^$/p'"])
 
 elemCoreTest('T17752_O1', 'T17752', '-O1')
 elemCoreTest('T17752_O2', 'T17752', '-O2')
