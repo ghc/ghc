@@ -1049,7 +1049,7 @@ lookup_known_occ KKNS_FromModule occ
            Just name -> return (Succeeded name)
            Nothing   -> return (Failed (MissingKnownKey3 occ)) }
 
-lookup_known_occ (KKNS_InScope gbl_rdr_env) occ
+lookup_known_occ (KKNS_InScope _ gbl_rdr_env _) occ
   = case lookupKnownGRE gbl_rdr_env occ of
       Succeeded gre -> do { addUsedGRE NoDeprecationWarnings gre
                           ; let name = greName gre

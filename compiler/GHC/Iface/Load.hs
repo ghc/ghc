@@ -155,7 +155,7 @@ import qualified GHC.Unit.Home.Graph as HUG
 ********************************************************************* -}
 
 data KnownKeyNameSource
-  = KKNS_InScope GlobalRdrEnv
+  = KKNS_InScope Module GlobalRdrEnv TypeEnv
       -- Look up the known-key name in this GlobalRdrEnv, which
       -- is the top-level scope of the current module.
       -- This happens when -frebindable-known-key-name is set, usually when
@@ -167,17 +167,17 @@ data KnownKeyNameSource
        -- is /not/ set
 
 instance Outputable KnownKeyNameSource where
-  ppr KKNS_FromModule    = text "FromModule"
-  ppr (KKNS_InScope env) = text "InScope" <> braces (ppr env)
+  ppr KKNS_FromModule                     = text "FromModule"
+  ppr (KKNS_InScope mod rdr_env type_env) = text "InScope" <> braces (ppr rdr_env)
 
 lookupKnownKeyThing :: HasDebugCallStack
                     => KnownKey -> KnownKeyNameSource
                     -> IfM lcl (MaybeErr IfaceMessage TyThing)
-lookupKnownKeyThing key mb_gbl_rdr_env
-  = do { mb_name <- lookupKnownKeyName key mb_gbl_rdr_env
+lookupKnownKeyThing key kk_ns
+  = do { mb_name <- lookupKnownKeyName key kk_ns
        ; case mb_name of
              Failed err     -> return (Failed err)
-             Succeeded name -> lookupGlobalName name }
+             Succeeded name -> lookupKnownName kk_ns name }
 
 lookupKnownKeyName :: HasDebugCallStack
                    => KnownKey -> KnownKeyNameSource
@@ -199,7 +199,7 @@ lookupKnownKeyName key KKNS_FromModule
              | otherwise
              -> return (Failed (MissingKnownKey1 key)) }
 
-lookupKnownKeyName key (KKNS_InScope gbl_rdr_env)
+lookupKnownKeyName key (KKNS_InScope _ gbl_rdr_env _)
   -- Just gbl_rdr_env: we have -frebindable-known-key-names on, and
   --                   here is the top-level GlobalRdrEnv
   -- Look up the /un-qualified/ known-key OccName in the GlobalRdrEnv
@@ -238,11 +238,11 @@ lookupKnownGRE rdr_env occ
 lookupKnownOccThing :: HasDebugCallStack
                     => KnownOcc -> KnownKeyNameSource
                     -> IfM lcl (MaybeErr IfaceMessage TyThing)
-lookupKnownOccThing occ mb_gbl_rdr_env
-  = do { mb_name <- lookupKnownOccName occ mb_gbl_rdr_env
+lookupKnownOccThing occ kk_ns
+  = do { mb_name <- lookupKnownOccName occ kk_ns
        ; case mb_name of
              Failed err     -> return (Failed err)
-             Succeeded name -> lookupGlobalName name }
+             Succeeded name -> lookupKnownName kk_ns name }
 
 lookupKnownOccName :: HasDebugCallStack
                    => KnownOcc -> KnownKeyNameSource
@@ -253,7 +253,7 @@ lookupKnownOccName occ KKNS_FromModule
            Just name -> return (Succeeded name)
            Nothing   -> return (Failed (MissingKnownKey3 occ)) }
 
-lookupKnownOccName occ (KKNS_InScope gbl_rdr_env)
+lookupKnownOccName occ (KKNS_InScope _ gbl_rdr_env _)
   -- Just gbl_rdr_env: we have -frebindable-known-key-names on, and
   --                   here is the top-level GlobalRdrEnv
   -- Look up the /un-qualified/ known-key OccName in the GlobalRdrEnv
@@ -264,6 +264,24 @@ lookupKnownOccName occ (KKNS_InScope gbl_rdr_env)
                                           2 (ppr name <+> ppr occ)
                            ; return (Succeeded name) }
        Failed err -> return (Failed err)
+
+lookupKnownName :: HasDebugCallStack
+                => KnownKeyNameSource -> Name
+                -> IfM lcl (MaybeErr IfaceMessage TyThing)
+-- Go from a known Name to its TyThing
+-- If we are in KKNS_InScope, look up in the current module's type environment
+-- in case it is defined right here in this module rather than imported
+lookupKnownName kk_ns name
+  = case kk_ns of
+      KKNS_InScope this_mod _ type_env
+         | name_mod == this_mod
+         -> case lookupTypeEnv type_env name of
+              Just thing -> return (Succeeded thing)
+              Nothing    -> return (Failed ...)
+
+      _ -> loadGlobalName name name_mod
+  where
+    name_mod = nameModule name
 
 loadKnownKeyOccMaps :: IfM lcl KnownKeyNameMaps
 loadKnownKeyOccMaps
@@ -331,16 +349,12 @@ checkKnownKeyNamesIface known_key_names_occ_map
 *                                                                      *
 ********************************************************************* -}
 
-lookupGlobalName :: HasDebugCallStack
-                 => Name ->  IfM lcl (MaybeErr IfaceMessage TyThing)
--- Only works for External Names that have a Module
-lookupGlobalName name = loadGlobalName name (nameModule name)
-
 loadGlobalName :: forall lcl.
                   HasDebugCallStack
                => Name
                -> Module  -- Use this for non-External Names (maybe Backpack-related?)
                -> IfM lcl (MaybeErr IfaceMessage TyThing)
+-- Only works for External Names that have a Module
 loadGlobalName name mod
   = do  { env <- getGblEnv
         ; case lookupKnotVars (if_rec_types env) mod of
@@ -357,7 +371,7 @@ loadGlobalName name mod
                                     ; via_external }
                 }
 
-            _ -> do { traceIf (text "loadGlobalName4" <+> ppr name)
+            _ -> do { traceIf (text "loadGlobalName4" <+> ppr name $$ ppr (if_rec_types env) $$ text "stack" <+> callStackDoc)
                     ; via_external } }
   where
     via_external = do { hsc_env <- getTopEnv

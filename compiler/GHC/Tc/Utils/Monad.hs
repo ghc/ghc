@@ -353,7 +353,7 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
           , tcg_default            = emptyDefaultEnv
           , tcg_default_exports    = emptyDefaultEnv
           , tcg_type_env           = emptyNameEnv
-          , tcg_type_env_var       = hsc_type_env_vars hsc_env
+          , tcg_knot_vars          = hsc_type_env_vars hsc_env
           , tcg_inst_env           = emptyInstEnv
           , tcg_fam_inst_env       = emptyFamInstEnv
           , tcg_ann_env            = emptyAnnEnv
@@ -2404,7 +2404,7 @@ initIfaceTcRn thing_inside
         ; hsc_env <- getTopEnv
           -- bangs to avoid leaking the envs (#19356)
         ; let !mhome_unit = hsc_home_unit_maybe hsc_env
-              !knot_vars = tcg_type_env_var tcg_env
+              !knot_vars = tcg_knot_vars tcg_env
               -- When we are instantiating a signature,
               -- we DEFINITELY do not want to knot tie.
               is_instantiate = fromMaybe False (isHomeUnitInstantiating <$> mhome_unit)

@@ -731,7 +731,7 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   mg <- downsweepThunk hsc_env mod_summary
 
   -- Need to set the knot-tying mutable variable for interface
-  -- files. See GHC.Tc.Utils.TcGblEnv.tcg_type_env_var.
+  -- files. See GHC.Tc.Utils.TcGblEnv.tcg_knot_vars
   -- See also Note [hsc_type_env_var hack]
   type_env_var <- newIORef emptyNameEnv
   let hsc_env' =

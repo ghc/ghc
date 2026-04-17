@@ -332,13 +332,17 @@ tcRnModuleTcRnM hsc_env mod_sum
                ; whenM (goptM Opt_DoCoreLinting) $
                  lintGblEnv (hsc_logger hsc_env) (hsc_dflags hsc_env) tcg_env
 
+               -- Sync the knot-tied type environment before checking
+               -- the M.hi-boot interface, if any
+               ; syncTypeEnvKnotVars tcg_env
+
                ; setGblEnv tcg_env
                  $ do { -- Compare hi-boot iface (if any) with the real thing
                         -- Must be done after processing the exports
                         tcg_env <- checkHiBootIface tcg_env boot_info
                       ; -- The new type env is already available to stuff
-                        -- slurped from interface files, via
-                        -- GHC.Tc.Utils.Env.setGlobalTypeEnv. It's important that this
+                        -- slurped from interface files, via syncTypeEnvKnotVars,
+                        -- itself called by tcRnSrcDecls. It's important that this
                         -- includes the stuff in checkHiBootIface,
                         -- because the latter might add new bindings for
                         -- boot_dfuns, which may be mentioned in imported
@@ -553,6 +557,7 @@ tcRnSrcDecls :: Bool  -- False => no 'module M(..) where' header at all
 tcRnSrcDecls explicit_mod_hdr export_ies decls
  = do { -- Do all the declarations
       ; (tcg_env, tcl_env, lie) <- tc_rn_src_decls decls
+      ; traceTc "tcRnSrcDecls" (ppr (tcg_type_env tcg_env))
 
       ------ Simplify constraints ---------
       --
@@ -570,7 +575,13 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
                       ; ev_binds <- simplifyTop (lie `andWC` lie_main)
                       ; return (tcg_env `addEvBinds` ev_binds) }
 
+      -- Update the knot-tied type environment to include everything
+      -- bound in this module. Do this now because when compiling GHC.Internal.Types,
+      -- mkTypeableBinds needs to "see" the definition of `Module`
+      ; syncTypeEnvKnotVars tcg_env
+
         -- Emit Typeable bindings
+      ; traceTc "Before mkTypeableBinds" (ppr (tcg_type_env tcg_env))
       ; tcg_env <- setGblEnv tcg_env $
                    mkTypeableBinds
 
@@ -643,15 +654,15 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
               -- to the previous tcg_env
 
             ; tcg_env' = tcg_env
-                          { tcg_binds     = binds'     ++ binds_mf
+                          { tcg_type_env  = final_type_env
+                          , tcg_binds     = binds'     ++ binds_mf
                           , tcg_ev_binds  = ev_binds' `unionBags` ev_binds_mf
                           , tcg_imp_specs = imp_specs' ++ imp_specs_mf
                           , tcg_rules     = rules'     ++ rules_mf
                           , tcg_fords     = fords'     ++ fords_mf
                           , tcg_patsyns   = pat_syns'  ++ patsyns_mf } } ;
 
-      ; setGlobalTypeEnv tcg_env' final_type_env
-   }
+      ; return tcg_env' }
 
 zonkTcGblEnv :: TcGblEnv
              -> TcM (TypeEnv, Bag EvBind, LHsBinds GhcTc,
@@ -710,6 +721,7 @@ tc_rn_src_decls ds
       ; (tcg_env, rn_decls) <- rnTopSrcDecls first_group
                 -- rnTopSrcDecls fails if there are any errors
 
+      ; traceRn "tc_rn_src_decls 77" empty
         -- Get TH-generated top-level declarations and make sure they don't
         -- contain any splices since we don't handle that at the moment
         --
@@ -730,8 +742,8 @@ tc_rn_src_decls ds
                               AddTopDeclsUnexpectedDeclarationSplice
                         }
                       -- Rename TH-generated top-level declarations
-                    ; (tcg_env, th_rn_decls) <- setGblEnv tcg_env
-                        $ rnTopSrcDecls th_group
+                    ; (tcg_env, th_rn_decls) <- setGblEnv tcg_env 
+                       $ rnTopSrcDecls th_group
 
                       -- Dump generated top-level declarations
                     ; let msg = "top-level declarations added with 'addTopDecls'"
@@ -747,6 +759,7 @@ tc_rn_src_decls ds
       -- NB: set the env **before** captureTopConstraints so that error messages
       -- get reported w.r.t. the right GlobalRdrEnv. It is for this reason that
       -- the captureTopConstraints must go here, not in tcRnSrcDecls.
+      ; traceRn "about to typechecke decls" (ppr rn_decls)
       ; ((tcg_env, tcl_env), lie1) <- setGblEnv tcg_env $
                                       captureTopConstraints $
                                       tcTopSrcDecls rn_decls
@@ -834,10 +847,11 @@ tcRnHsBootDecls boot_or_sig decls
         ; let { type_env0 = tcg_type_env gbl_env
               ; type_env1 = extendTypeEnvWithIds type_env0 val_ids
               ; type_env2 = extendTypeEnvWithIds type_env1 dfun_ids
-              ; dfun_ids = map iDFunId inst_infos
+              ; dfun_ids  = map iDFunId inst_infos
+              ; gbl_env'  = gbl_env { tcg_type_env = type_env2 }
               }
 
-        ; setGlobalTypeEnv gbl_env type_env2
+        ; return gbl_env'
    }}}
    ; traceTc "boot" (ppr lie); return gbl_env }
 
@@ -875,20 +889,14 @@ checkHiBootIface tcg_env boot_info
         --
         -- to (a) the type envt, and (b) the top-level bindings
         ; let boot_impedance_bds = map fst imp_prs
-              type_env'          = extendTypeEnvWithIds local_type_env boot_impedance_bds
+              !type_env'         = extendTypeEnvWithIds local_type_env boot_impedance_bds
               impedance_binds    =  [ mkVarBind boot_id (nlHsVar id)
                                     | (boot_id, id) <- imp_prs ]
               tcg_env_w_binds
-                = tcg_env { tcg_binds = binds ++ impedance_binds }
+                = tcg_env { tcg_type_env = type_env'
+                          , tcg_binds = binds ++ impedance_binds }
 
-        ; type_env' `seq`
-             -- Why the seq?  Without, we will put a TypeEnv thunk in
-             -- tcg_type_env_var.  That thunk will eventually get
-             -- forced if we are typechecking interfaces, but that
-             -- is no good if we are trying to typecheck the very
-             -- DFun we were going to put in.
-             -- TODO: Maybe setGlobalTypeEnv should be strict.
-          setGlobalTypeEnv tcg_env_w_binds type_env' }
+        ; return tcg_env_w_binds }
 
 {- Note [DFun impedance matching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -978,7 +986,7 @@ This most works well, but there is one problem: DFuns!  We do not want
 to look at the mb_insts of the ModDetails in SelfBootInfo, because a
 dfun in one of those ClsInsts is gotten (in GHC.IfaceToCore.tcIfaceInst) by a
 (lazily evaluated) lookup in the if_rec_types.  We could extend the
-type env, do a setGloblaTypeEnv etc; but that all seems very indirect.
+type env, do a syncTypeEnvKnotVars etc; but that all seems very indirect.
 It is much more directly simply to extract the DFunIds from the
 md_types of the SelfBootInfo.
 

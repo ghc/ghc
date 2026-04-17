@@ -16,7 +16,7 @@ module GHC.Tc.Utils.Env(
 
         -- Global environment
         tcExtendGlobalEnv, tcExtendTyConEnv,
-        tcExtendGlobalEnvImplicit, setGlobalTypeEnv,
+        tcExtendGlobalEnvImplicit, syncTypeEnvKnotVars,
         tcExtendGlobalValEnv, tcTyThBinders,
         tcLookupLocatedGlobal, tcLookupGlobal, tcLookupGlobalOnly,
         tcLookupTyCon, tcLookupClass,
@@ -515,8 +515,10 @@ getKnownKeySource :: TcRn KnownKeyNameSource
 getKnownKeySource
   = do { rebindable_path <- goptM Opt_RebindableKnownKeyNames
        ; if rebindable_path
-         then do { rdr_env <- getGlobalRdrEnv
-                 ; return (KKNS_InScope rdr_env) }
+         then do { env <- getGlobalEnv
+                 ; return (KKNS_InScope (tcg_mod env)
+                                        (tcg_rdr_env env)
+                                        (tcg_type_env env)) }
          else return KKNS_FromModule }
 
 tcrn_wrapper :: HasDebugCallStack
@@ -606,16 +608,21 @@ get_id do_the_lookup
 ************************************************************************
 -}
 
-setGlobalTypeEnv :: TcGblEnv -> TypeEnv -> TcM TcGblEnv
--- Use this to update the global type env
--- It updates both  * the normal tcg_type_env field
---                  * the tcg_type_env_var field seen by interface files
-setGlobalTypeEnv tcg_env new_type_env
-  = do  {     -- Sync the type-envt variable seen by interface files
-         ; case lookupKnotVars (tcg_type_env_var tcg_env) (tcg_mod tcg_env) of
-              Just tcg_env_var -> writeMutVar tcg_env_var new_type_env
-              Nothing -> return ()
-         ; return (tcg_env { tcg_type_env = new_type_env }) }
+syncTypeEnvKnotVars :: TcGblEnv -> TcM ()
+-- Use this to sync the tcg_knot_vars with the current type env
+-- so that interface-file and known-key/occ lookups will find the
+-- current bindings
+--
+-- Why the "!" before writing it into the variable?  Without, we will put
+-- a TypeEnv thunk into the knot-tied variable.  That thunk will eventually get
+-- forced if we are typechecking interfaces, but that is no good if we are
+-- trying to typecheck the very DFun we were going to put in.
+syncTypeEnvKnotVars tcg_env
+  = case lookupKnotVars (tcg_knot_vars tcg_env) (tcg_mod tcg_env) of
+      Just tcg_env_var -> do { let !type_env = tcg_type_env tcg_env
+                               -- Why the "!"?  See comment on the function
+                             ; writeMutVar tcg_env_var type_env }
+      Nothing -> return ()
 
 
 tcExtendGlobalEnvImplicit :: [TyThing] -> TcM r -> TcM r
@@ -623,8 +630,9 @@ tcExtendGlobalEnvImplicit :: [TyThing] -> TcM r -> TcM r
   -- Do not extend tcg_tcs, tcg_patsyns etc
 tcExtendGlobalEnvImplicit things thing_inside
    = do { tcg_env <- getGblEnv
-        ; let ge'  = extendTypeEnvList (tcg_type_env tcg_env) things
-        ; tcg_env' <- setGlobalTypeEnv tcg_env ge'
+        ; let !type_env' = extendTypeEnvList (tcg_type_env tcg_env) things
+              tcg_env'   = tcg_env { tcg_type_env = type_env' }
+        ; syncTypeEnvKnotVars tcg_env'
         ; setGblEnv tcg_env' thing_inside }
 
 tcExtendGlobalEnv :: [TyThing] -> TcM r -> TcM r
@@ -677,8 +685,8 @@ tcExtendRecEnv gbl_stuff thing_inside
  = do  { tcg_env <- getGblEnv
        ; let ge'      = extendNameEnvList (tcg_type_env tcg_env) gbl_stuff
              tcg_env' = tcg_env { tcg_type_env = ge' }
-         -- No need for setGlobalTypeEnv (which side-effects the
-         -- tcg_type_env_var); tcExtendRecEnv is used just
+         -- No need for syncTypeEnvKnotVars (which side-effects the
+         -- tcg_knot_vars); tcExtendRecEnv is used just
          -- when kind-check a group of type/class decls. It would
          -- in any case be wrong for an interface-file decl to end up
          -- with a TcTyCon in it!
