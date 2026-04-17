@@ -51,6 +51,7 @@ import GHC.Driver.DynFlags
 import GHC.Utils.Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Misc
 import GHC.Data.FastString ( FastString, mkFastString, fsLit )
 
 import Control.Monad.Trans.State.Strict
@@ -316,13 +317,15 @@ We use it in:
 -- 'tcRnSrcDecls'.
 --
 -- See Note [Grand plan for Typeable] in "GHC.Tc.Instance.Typeable".
-mkTypeableBinds :: TcM TcGblEnv
+mkTypeableBinds :: HasDebugCallStack => TcM TcGblEnv
 mkTypeableBinds
   = do { dflags <- getDynFlags
        ; tcg_env <- getGblEnv
        ; let this_mod         = tcg_mod tcg_env
              tycons_that_need = filter tc_needs_typeable (tcg_tcs tcg_env)
                -- These tycons will need some typeable bindings
+
+       ; traceTc "mkTypableBinds" (ppr this_mod $$ ppr tycons_that_need $$ callStackDoc)
 
        -- Stop now if we don't need any typable bindings
        -- See (GPT8) in Note [Grand plan for Typeable]

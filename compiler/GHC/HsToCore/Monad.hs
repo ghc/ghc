@@ -578,8 +578,10 @@ dsGetKnownKeySource :: DsM KnownKeyNameSource
 dsGetKnownKeySource
   = do { rebindable_path <- goptM Opt_RebindableKnownKeyNames
        ; if rebindable_path
-         then do { rdr_env <- dsGetGlobalRdrEnv
-                 ; return (KKNS_InScope rdr_env) }
+         then do { env <- getGblEnv
+                 ; return (KKNS_InScope (ds_mod env)
+                                        (ds_gbl_rdr_env env)
+                                        (ds_type_env env)) }
          else return KKNS_FromModule }
 
 --------------------------------------

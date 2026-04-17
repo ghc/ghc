@@ -59,12 +59,14 @@ presumably include source-file location information:
 data DsGblEnv
   = DsGblEnv
   { ds_mod          :: Module             -- For SCC profiling
-  , ds_fam_inst_env :: FamInstEnv         -- Like tcg_fam_inst_env
   , ds_gbl_rdr_env  :: GlobalRdrEnv
         -- The GlobalRdrEnv is needed for the following reasons:
         --    - to know what newtype constructors are in scope
         --    - to check whether all members of a COMPLETE pragma are in scope
         --    - when looking up know-key names
+  , ds_fam_inst_env :: FamInstEnv         -- Like tcg_fam_inst_env
+  , ds_type_env     :: TypeEnv            -- Like tcg_type_enb
+
   , ds_name_ppr_ctx :: NamePprCtx
   , ds_msgs    :: IORef (Messages DsMessage) -- Diagnostic messages
   , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,

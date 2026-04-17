@@ -487,7 +487,7 @@ data TcGblEnv
           -- NB: for what "things in this module" means, see
           -- Note [The interactive package] in "GHC.Runtime.Context"
 
-        tcg_type_env_var :: KnotVars (IORef TypeEnv),
+        tcg_knot_vars :: KnotVars (IORef TypeEnv),
                 -- Used only to initialise the interface-file
                 -- typechecker in initIfaceTcRn, so that it can see stuff
                 -- bound in this module when dealing with hi-boot recursions
