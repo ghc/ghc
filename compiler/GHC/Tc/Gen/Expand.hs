@@ -16,6 +16,8 @@ import GHC.Hs
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.ErrCtxt
 
+import GHC.Tc.Gen.Do
+
 import GHC.Types.Id.Make
 import GHC.Types.SrcLoc
 
@@ -138,6 +140,28 @@ tcExpand e@(SectionL _ expr op)
               , hse_exp = wrapGenSpan ds_section } }
 
 ------------------------------------------
+-- Do expression statements
+
+tcExpand (HsDo _ do_or_lc stmts)
+  | DoExpr{} <- do_or_lc
+  -- ApplicativeDo are typechecked using tcDoStmts
+  = do isApplicativeDo <- xoptM LangExt.ApplicativeDo
+       if isApplicativeDo
+         then return Nothing
+         -- Expand expression on the fly otherwise
+         -- See Note [Typechecking by expansion: overview]
+         else do { hse <- expandDoStmts do_or_lc stmts
+                 ; return (Just hse) }
+  | MDoExpr{} <- do_or_lc
+  = do hse <- expandDoStmts do_or_lc stmts
+       return (Just hse)
+  | otherwise
+  -- ListComp and MonadComp are handled by legacy tcDoStmts for now,
+  -- The ultimate goal is to handle them via expandDoStmts.
+  -- GHCiStmts are handled completely separate
+  = return Nothing
+
+------------------------------------------
 -- Record dot syntax
 
 tcExpand e@(HsGetField getFieldName expr f)
@@ -151,6 +175,9 @@ tcExpand e@(HsProjection (getFieldName, circName) fs)
         , hse_exp = wrapGenSpan $ (mkProjection getFieldName circName $ NE.map (unLoc . dfoLabel) fs) }
 
 ---------
+-- We return ExpandedThingRn as is for now,
+-- but after removing all the calls to mkExpandExpr in the renamer,
+-- this case should never happen, as the renamer will never produce an ExpandedThingRn
 tcExpand (XExpr (ExpandedThingRn hse))
   = return (Just hse)
 
