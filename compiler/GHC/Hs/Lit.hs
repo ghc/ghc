@@ -97,7 +97,6 @@ data OverLitTc
 {-
 Note [Overloaded literal witnesses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 During renaming, the coercion function needed for a given HsOverLit is
 resolved according to the current scope and RebindableSyntax (see Note
 [ol_rebindable]). The result of this resolution *before* type checking

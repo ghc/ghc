@@ -75,7 +75,7 @@ import GHC.Rename.Utils
 
 import GHC.Builtin.Types
 import GHC.Builtin.Modules( rOOT_MAIN )
-import GHC.Builtin( knownKeyOccMap, knownKeyOccName )
+import GHC.Builtin( knownKeyOccMap )
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
@@ -1041,15 +1041,15 @@ rnLookupKnownOccName occ
            Succeeded name -> return name }
 
 lookup_known_occ :: HasDebugCallStack
-                   => KnownKeyNameSource -> KnownOcc
+                   => KnownNameSource -> KnownOcc
                    -> RnM (MaybeErr IfaceMessage Name)
-lookup_known_occ KKNS_FromModule occ
+lookup_known_occ KNS_FromModule occ
   = do { (_, occ_map) <- initIfaceTcRn loadKnownKeyOccMaps
        ; case lookupOccEnv occ_map occ of
            Just name -> return (Succeeded name)
            Nothing   -> return (Failed (MissingKnownKey3 occ)) }
 
-lookup_known_occ (KKNS_InScope _ gbl_rdr_env _) occ
+lookup_known_occ (KNS_InScope _ gbl_rdr_env _) occ
   = case lookupKnownGRE gbl_rdr_env occ of
       Succeeded gre -> do { addUsedGRE NoDeprecationWarnings gre
                           ; let name = greName gre
@@ -2423,40 +2423,37 @@ lookupIfThenElse
                  ; return (Just ite) } }
 
 lookupSyntaxName :: HasDebugCallStack
-                 => KnownKey      -- ^ The standard name
-                 -> RnM (Name, FreeNames) -- ^ Possibly a non-standard name
+                 => KnownOcc      -- ^ The standard name
+                -> RnM (Name, FreeNames) -- ^ Possibly a non-standard name
 -- Lookup a Name that may be subject to Rebindable Syntax (RS).
 --
 -- - When RS is off, just return the supplied (standard) Name
 --
 -- - When RS is on, look up the OccName of the supplied Name; return
 --   what we find, or the supplied Name if there is nothing in scope
-lookupSyntaxName std_uniq
+lookupSyntaxName std_occ
   = do { rebind <- xoptM LangExt.RebindableSyntax
        ; if not rebind
-         then do { nm <- rnLookupKnownKeyName std_uniq
+         then do { nm <- rnLookupKnownOccName std_occ
                  ; return (nm, emptyFNs) }
-         else do { nm <- lookupOccRnNone $ mkRdrUnqual $
-                         knownKeyOccName std_uniq
+         else do { nm <- lookupOccRnNone $ mkRdrUnqual std_occ
                  ; return (nm, unitFN nm) } }
 
-lookupSyntaxExpr :: KnownKey               -- ^ The standard name
+lookupSyntaxExpr :: KnownOcc                       -- ^ The standard name
                  -> RnM (HsExpr GhcRn, FreeNames)  -- ^ Possibly a non-standard name
-lookupSyntaxExpr std_uniq
-  = do { (name, fvs) <- lookupSyntaxName std_uniq
+lookupSyntaxExpr std_occ
+  = do { (name, fvs) <- lookupSyntaxName std_occ
        ; return (genHsVar name, fvs) }
 
-lookupSyntax :: KnownKey                  -- The standard name
-             -> RnM (SyntaxExpr GhcRn, FreeNames) -- Possibly a non-standard
-                                                 -- name
-lookupSyntax std_uniq
-  = do { (expr, fvs) <- lookupSyntaxExpr std_uniq
+lookupSyntax :: KnownOcc                          -- The standard name
+             -> RnM (SyntaxExpr GhcRn, FreeNames) -- Possibly a non-standard name
+lookupSyntax std_occ
+  = do { (expr, fvs) <- lookupSyntaxExpr std_occ
        ; return (SyntaxExprRn expr, fvs) }
 
-lookupNameWithQualifier :: ModuleName -> KnownKey -> RnM (Name, FreeNames)
-lookupNameWithQualifier modName std_uniq
-  = do { qname <- lookupOccRnNone $
-                  mkRdrQual modName (knownKeyOccName std_uniq)
+lookupNameWithQualifier :: ModuleName -> KnownOcc -> RnM (Name, FreeNames)
+lookupNameWithQualifier modName std_occ
+  = do { qname <- lookupOccRnNone (mkRdrQual modName std_occ)
        ; return (qname, unitFN qname) }
 
 

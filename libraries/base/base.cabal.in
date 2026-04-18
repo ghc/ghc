@@ -33,9 +33,9 @@ Library
         ghc-internal == @ProjectVersionForLib@.*,
         ghc-prim,
 
-    -- Set -frebindable-known-key-names,
+    -- Set -frebindable-known-names,
     -- since GHC.KnownKeyNames isn't available yet
-    ghc-options: -frebindable-known-key-names
+    ghc-options: -frebindable-known-names
 
     exposed-modules:
           Control.Applicative

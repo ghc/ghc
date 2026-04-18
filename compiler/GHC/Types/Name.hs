@@ -233,7 +233,7 @@ data NameSort
 
   | KnownKey Module
         -- Just like External, but signals that this is a KnownKey Name
-        -- See Note [Overview of known-key entities]
+        -- See Note [Overview of known entities]
 
   | WiredIn Module TyThing BuiltInSyntax
         -- A variant of External, for wired-in things
@@ -298,7 +298,7 @@ nameSrcSpan   name = n_loc  name
 ********************************************************************* -}
 
 -- A known-key Name is identified by a statically-allocated Unique
--- See Note [Overview of known-key entities] in GHC.Builtin
+-- See Note [Overview of known entities] in GHC.Builtin
 type KnownKey = Unique
 type KnownOcc = OccName
 

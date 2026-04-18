@@ -42,10 +42,9 @@ import GHC.Core.ConLike
 
 import GHC.Builtin.Types
 import GHC.Builtin.KnownOccs
-import GHC.Builtin.KnownKeys
 
 import GHC.Types.Id
-import GHC.Types.Name( KnownKey )
+import GHC.Types.Name( KnownOcc )
 import GHC.Types.Basic
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
@@ -69,7 +68,7 @@ mkCmdEnv :: CmdSyntaxTable GhcTc -> DsM ([CoreBind], DsCmdEnv)
 mkCmdEnv (CST tc_meths)
   = do { (meth_binds, prs) <- mapAndUnzipM mk_bind tc_meths
 
-       ; let lookup_meth :: KnownKey -> CoreExpr
+       ; let lookup_meth :: KnownOcc -> CoreExpr
              lookup_meth key
                 = case assocMaybe prs key of
                     Nothing -> pprPanic "mkCmdEnv" (text "Not found:" <+> ppr key)
@@ -78,12 +77,12 @@ mkCmdEnv (CST tc_meths)
              -- symbol is never used. That's why we use Maybe first and then
              -- panic. An eager panic caused trouble in typecheck/should_compile/tc192
 
-       ; return (meth_binds, DsCmdEnv { arr_id     = lookup_meth arrAIdKey
-                                      , compose_id = lookup_meth composeAIdKey
-                                      , first_id   = lookup_meth firstAIdKey
-                                      , app_id     = lookup_meth appAIdKey
-                                      , choice_id  = lookup_meth choiceAIdKey
-                                      , loop_id    = lookup_meth loopAIdKey })
+       ; return (meth_binds, DsCmdEnv { arr_id     = lookup_meth arrAIdOcc
+                                      , compose_id = lookup_meth composeAIdOcc
+                                      , first_id   = lookup_meth firstAIdOcc
+                                      , app_id     = lookup_meth appAIdOcc
+                                      , choice_id  = lookup_meth choiceAIdOcc
+                                      , loop_id    = lookup_meth loopAIdOcc })
        }
   where
     mk_bind (std_name, expr)

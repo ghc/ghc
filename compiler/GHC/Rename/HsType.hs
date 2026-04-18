@@ -66,7 +66,6 @@ import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_LocalOnly) )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr ( pprHsDocContext )
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Utils.Env( rnLookupKnownKeyName )
 
 import GHC.Types.Name.Reader
 import GHC.Types.Hint ( UntickedPromotedThing(..) )
@@ -80,6 +79,7 @@ import GHC.Types.Basic  ( TypeOrKind(..) )
 
 import GHC.Builtin( mkUnboundName, isUnboundName )
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs
 import GHC.Builtin.Types( oneDataConName )
 
 import GHC.Unit.Module ( getModule )
@@ -1717,7 +1717,7 @@ lookupFixityOp :: OpName -> RnM Fixity
 lookupFixityOp (NormalOp n)  = lookupFixityRn (getName n)
 lookupFixityOp (UnboundOp u) = lookupFixityRn (mkUnboundName (occName u))
 lookupFixityOp (RecFldOp f)  = lookupFieldFixityRn f
-lookupFixityOp NegateOp      = do { nm <- rnLookupKnownKeyName negateClassOpKey
+lookupFixityOp NegateOp      = do { nm <- rnLookupKnownOccName negateClassOpOcc
                                   ; lookupFixityRn nm }
 
 -- Precedence-related error messages

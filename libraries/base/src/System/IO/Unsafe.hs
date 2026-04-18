@@ -28,7 +28,7 @@ import GHC.Internal.IO
 import GHC.Internal.IORef
 import GHC.Internal.Exception
 import GHC.Internal.Control.Exception
-import GHC.Internal.Num as Rebindable( Num ) -- For -frebindable-known-key-names
+import GHC.Internal.Num as Rebindable( Num ) -- For -frebindable-known-names
 
 -- | A slightly faster version of `GHC.Internal.System.IO.fixIO` that may not be
 -- safe to use with multiple threads.  The unsafety arises when used

@@ -1480,7 +1480,7 @@ type instance XXCmd       GhcTc = HsWrap HsCmd
     -- Then (XCmd (HsWrap wrap cmd)) :: arg2 --> res
 
 -- | Command Syntax Table (for Arrow syntax)
-newtype CmdSyntaxTable p = CST [(KnownKey, HsExpr p)]
+newtype CmdSyntaxTable p = CST [(KnownOcc, HsExpr p)]
 -- See Note [CmdSyntaxTable]
 
 instance Typeable p => Data (CmdSyntaxTable p) where

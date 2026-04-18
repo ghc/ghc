@@ -25,7 +25,7 @@ module Data.Enum
     ) where
 
 import GHC.Internal.Enum
-import GHC.Internal.Num as Rebindable( Num ) -- For -frebindable-known-key-names (defaulting)
+import GHC.Internal.Num as Rebindable( Num ) -- For -frebindable-known-names (defaulting)
 
 -- | Returns a list of all values of an enum type
 --

@@ -43,19 +43,17 @@ import {-# SOURCE #-} GHC.Rename.Splice ( rnSplicePat, rnSpliceTyPat )
 import GHC.Hs
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Utils.TcMType ( hsOverLitKey )
+import GHC.Tc.Utils.TcMType ( hsOverLitKnownOcc )
+
 import GHC.Rename.Doc (rnLHsDoc)
 import GHC.Rename.Env
 import GHC.Rename.Fixity
-import GHC.Rename.Utils    ( newLocalBndrRn, bindLocalNames
-                           , warnUnusedMatches, newLocalBndrRn
-                           , checkUnusedRecordWildcard
-                           , checkDupNames, checkDupAndShadowedNames
-                           , wrapGenSpan, genHsApps, genLHsApp, genLHsVar, genHsIntegralLit, delLocalNames, typeAppErr )
+import GHC.Rename.Utils
 import GHC.Rename.HsType
 import GHC.Rename.Lit
+
 import GHC.Builtin       ( isUnboundName, mkUnboundName )
-import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs
 import GHC.Builtin.Types (trueDataConName)
 
 import GHC.Types.Hint
@@ -571,7 +569,7 @@ rnPatAndThen mk (LitPat x lit)
     normal_lit = do { liftCps (rnLit lit); return (LitPat x (convertLit lit)) }
 
 rnPatAndThen _ (QualLitPat x lit) = do
-  eqExpr <- liftCpsFV $ lookupSyntaxExpr eqClassOpKey
+  eqExpr <- liftCpsFV $ lookupSyntaxExpr eqClassOpOcc
   (lit', desugaredExpr) <- liftCpsFV $ rnQualLit lit
   let origPat = QualLitPat x lit'
   let inverse = desugaredExpr -- The inverse of '((expr ==) -> True)' is simply 'expr'.
@@ -587,7 +585,7 @@ rnPatAndThen _ (QualLitPat x lit) = do
 rnPatAndThen _ (NPat x (L l lit) mb_neg _eq)
   = do { (lit', mb_neg') <- liftCpsFV $ rnOverLit lit
        ; mb_neg' -- See Note [Negative zero]
-           <- let negative = do { (neg, fvs) <- lookupSyntax negateClassOpKey
+           <- let negative = do { (neg, fvs) <- lookupSyntax negateClassOpOcc
                                 ; return (Just neg, fvs) }
                   positive = return (Nothing, emptyFNs)
               in liftCpsFV $ case (mb_neg , mb_neg') of
@@ -595,7 +593,7 @@ rnPatAndThen _ (NPat x (L l lit) mb_neg _eq)
                                   (Just _ , Nothing) -> negative
                                   (Nothing, Nothing) -> positive
                                   (Just _ , Just _ ) -> positive
-       ; eq' <- liftCpsFV $ lookupSyntax eqClassOpKey
+       ; eq' <- liftCpsFV $ lookupSyntax eqClassOpOcc
        ; return (NPat x (L l lit') mb_neg' eq') }
 
 rnPatAndThen mk (NPlusKPat _ rdr (L l lit) _ _ _ )
@@ -604,8 +602,8 @@ rnPatAndThen mk (NPlusKPat _ rdr (L l lit) _ _ _ )
                                                 -- We skip negateName as
                                                 -- negative zero doesn't make
                                                 -- sense in n + k patterns
-       ; minus <- liftCpsFV $ lookupSyntax minusClassOpKey
-       ; ge    <- liftCpsFV $ lookupSyntax geClassOpKey
+       ; minus <- liftCpsFV $ lookupSyntax minusClassOpOcc
+       ; ge    <- liftCpsFV $ lookupSyntax geClassOpOcc
        ; return (NPlusKPat noExtField (L (noAnnSrcSpan $ nameSrcSpan new_name) new_name)
                                       (L l lit') lit' ge minus) }
                 -- The Report says that n+k patterns must be in Integral
@@ -646,10 +644,10 @@ rnPatAndThen mk (ListPat _ pats)
          else
     -- If OverloadedLists is enabled, desugar to a view pattern.
     -- See Note [Desugaring overloaded list patterns]
-    do { (to_list_name,_)     <- liftCps $ lookupSyntaxName toListClassOpKey
+    do { (to_list_name,_)     <- liftCps $ lookupSyntaxName toListClassOpOcc
        -- Use 'fromList' as proof of invertibility of the view pattern.
        -- See Note [Invertible view patterns] in GHC.Tc.TyCl.PatSyn
-       ; (from_list_n_name,_) <- liftCps $ lookupSyntaxName fromListNClassOpKey
+       ; (from_list_n_name,_) <- liftCps $ lookupSyntaxName fromListNClassOpOcc
        ; let
            lit_n   = mkIntegralLit (length pats)
            hs_lit  = genHsIntegralLit lit_n
@@ -1216,14 +1214,15 @@ rnOverLit origLit
             | opt_NumDecimals = origLit {ol_val = generalizeOverLitVal (ol_val origLit)}
             | otherwise       = origLit
           }
-        ; let std_key = hsOverLitKey val
-        ; (from_thing_name, fvs1) <- lookupSyntaxName std_key
+        ; let std_occ = hsOverLitKnownOcc val
+        ; (from_thing_name, fvs1) <- lookupSyntaxName std_occ
         ; loc <- getSrcSpanM -- See Note [Source locations for implicit function calls] in GHC.Iface.Ext.Ast
-        ; let rebindable = not (from_thing_name `hasKnownKey` std_key)
+        ; std_name <- rnLookupKnownOccName std_occ
+        ; let rebindable = not (from_thing_name == std_name)
               lit' = lit { ol_ext = OverLitRn { ol_rebindable = rebindable
                                               , ol_from_fun = L (noAnnSrcSpan loc) from_thing_name } }
         ; if isNegativeZeroOverLit lit'
-          then do { (negate_expr, fvs2) <- lookupSyntaxExpr negateClassOpKey
+          then do { (negate_expr, fvs2) <- lookupSyntaxExpr negateClassOpOcc
                   ; return ((lit' { ol_val = negateOverLitVal val }, Just negate_expr)
                            , fvs1 `plusFN` fvs2) }
           else return ((lit', Nothing), fvs1) }

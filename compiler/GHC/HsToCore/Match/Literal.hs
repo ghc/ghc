@@ -48,6 +48,7 @@ import GHC.Types.Name
 import GHC.Types.Literal
 import GHC.Types.SrcLoc
 
+import GHC.Builtin.KnownOccs
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
@@ -227,9 +228,9 @@ dsFractionalLitToRational fl@FL{ fl_signi = signi, fl_exp = exp, fl_exp_base = b
   | otherwise
   = do
       let mk_rat_key = case base of
-                             Base2 -> mkRationalBase2IdKey
-                             Base10 -> mkRationalBase10IdKey
-      mkRational <- dsLookupKnownKeyId mk_rat_key
+                             Base2  -> mkRationalBase2IdOcc
+                             Base10 -> mkRationalBase10IdOcc
+      mkRational <- dsLookupKnownOccId mk_rat_key
       litR <- dsRational signi
       platform <- targetPlatform <$> getDynFlags
       let litE = mkIntegerExpr platform exp

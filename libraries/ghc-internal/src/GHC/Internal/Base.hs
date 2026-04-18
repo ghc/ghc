@@ -462,9 +462,9 @@ transitive imports.
 
 Wrinkles:
 
-(TD1) When compiling `ghc-internal` and `base` we use -frebindable-known-key-names,
+(TD1) When compiling `ghc-internal` and `base` we use -frebindable-known-names,
   so we must bring into scope any known-key or known-occ names that are needed.
-  See Note [Overview of known-key entities] in GHC.Builtin
+  See Note [Overview of known entities] in GHC.Builtin
 
   For modules high up in the hierarchy of `base`, a convenient way to
   do this is to say

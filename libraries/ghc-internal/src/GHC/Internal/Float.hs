@@ -63,7 +63,7 @@ module GHC.Internal.Float
     , word2Float
     , integerToFloat#
     , naturalToFloat#
-    , rationalToFloat
+    , rationalToFloat#, rationalToFloat
     , castWord32ToFloat
     , castFloatToWord32
     , castWord32ToFloat#
@@ -102,7 +102,7 @@ module GHC.Internal.Float
     , word2Double
     , integerToDouble#
     , naturalToDouble#
-    , rationalToDouble
+    , rationalToDouble#, rationalToDouble
     , castWord64ToDouble
     , castDoubleToWord64
     , castWord64ToDouble#

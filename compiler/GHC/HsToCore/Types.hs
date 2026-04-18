@@ -18,6 +18,7 @@ import Data.IORef
 import GHC.Types.CostCentre.State
 import GHC.Types.Error
 import GHC.Types.Name.Env
+import GHC.Types.TypeEnv( TypeEnv )
 import GHC.Types.SrcLoc
 import GHC.Types.Var
 import GHC.Types.Var.Set

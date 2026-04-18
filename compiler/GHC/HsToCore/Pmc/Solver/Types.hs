@@ -60,6 +60,7 @@ import GHC.Core.TyCo.Compare( eqType, nonDetCmpType )
 import GHC.Core.Map.Expr
 import GHC.Core.Utils (exprType)
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Tc.Solver.InertSet (InertSet, emptyInertSet)
@@ -721,14 +722,14 @@ coreExprAsPmLit e = case collectArgs e of
 
   (Var x, args)
     -- See Note [Detecting overloaded literals with -XRebindableSyntax]
-    | is_rebound_name x fromIntegerClassOpKey
+    | is_rebound_name x fromIntegerClassOpOcc
     , Just arg <- lastMaybe args
     , Just (_ty,l) <- bignum_conapp_maybe arg
     -> Just (PmLit integerTy (PmLitInt l)) >>= overloadPmLit (exprType e)
   (Var x, args)
     -- See Note [Detecting overloaded literals with -XRebindableSyntax]
     -- fromRational <expr>
-    | is_rebound_name x fromRationalClassOpKey
+    | is_rebound_name x fromRationalClassOpOcc
     , [r] <- dropWhile (not . is_ratio) args
     -> coreExprAsPmLit r >>= overloadPmLit (exprType e)
 
@@ -752,7 +753,7 @@ coreExprAsPmLit e = case collectArgs e of
       Just $ PmLit (exprType e) (PmLitOverRat neg frac)
 
   (Var x, args)
-    | is_rebound_name x fromStringClassOpKey
+    | is_rebound_name x fromStringClassOpOcc
     -- See Note [Detecting overloaded literals with -XRebindableSyntax]
     , s:_ <- filter (isStringTy . exprType) $ filter isValArg args
     -- NB: Calls coreExprAsPmLit and then overloadPmLit, so that we return PmLitOverStrings
@@ -790,17 +791,17 @@ coreExprAsPmLit e = case collectArgs e of
       | otherwise
       = False
     is_larg_exp_ratio x
-      | is_rebound_name x mkRationalBase10IdKey
+      | is_rebound_name x mkRationalBase10IdOcc
       = Just Base10
-      | is_rebound_name x mkRationalBase2IdKey
+      | is_rebound_name x mkRationalBase2IdOcc
       = Just Base2
       | otherwise
       = Nothing
 
 
     -- See Note [Detecting overloaded literals with -XRebindableSyntax]
-    is_rebound_name :: Id -> KnownKey -> Bool
-    is_rebound_name x k = getOccFS (idName x) == occNameFS (knownKeyOccName k)
+    is_rebound_name :: Id -> KnownOcc -> Bool
+    is_rebound_name x ko = getOccFS (idName x) == occNameFS ko
 
 {- Note [Detecting overloaded literals with -XRebindableSyntax]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

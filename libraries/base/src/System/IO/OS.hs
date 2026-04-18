@@ -63,7 +63,7 @@ import GHC.IO.Exception
        )
 import Foreign.Ptr (Ptr)
 import Foreign.C.Types (CInt)
-import GHC.Internal.Num as Rebindable( Num ) -- For -frebindable-known-key-names (defaulting)
+import GHC.Internal.Num as Rebindable( Num ) -- For -frebindable-known-names (defaulting)
 
 -- * Obtaining POSIX file descriptors and Windows handles
 

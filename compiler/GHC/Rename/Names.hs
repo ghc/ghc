@@ -2402,7 +2402,7 @@ no ununused names, don't report.
    criterion.
 
 (UI2) We don't report a decl as unused if it has an `as Rebindable` qualifier.
-  See (KKN1) in Note [Overview of known-key entities] in GHC.Builtin
+  See (KN1) in Note [Overview of known entities] in GHC.Builtin
 
 
 Note [Printing minimal imports]

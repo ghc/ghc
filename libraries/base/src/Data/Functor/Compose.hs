@@ -7,7 +7,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
-{-# OPTIONS_GHC -fno-rebindable-known-key-names #-}
+{-# OPTIONS_GHC -fno-rebindable-known-names #-}
     -- We import Prelude, hence GHC.KnownKeyNames is available
 
 -----------------------------------------------------------------------------

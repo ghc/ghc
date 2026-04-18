@@ -510,19 +510,19 @@ tcMetaTy tc_name
   = do { t <- tcLookupTyCon tc_name
        ; return (mkTyConTy t) }
 
-getKnownKeySource :: TcRn KnownKeyNameSource
+getKnownKeySource :: TcRn KnownNameSource
 -- Used by both renamer and typechecker and renamer
 getKnownKeySource
-  = do { rebindable_path <- goptM Opt_RebindableKnownKeyNames
+  = do { rebindable_path <- goptM Opt_RebindableKnownNames
        ; if rebindable_path
-         then do { env <- getGlobalEnv
-                 ; return (KKNS_InScope (tcg_mod env)
+         then do { env <- getGblEnv
+                 ; return (KNS_InScope (tcg_mod env)
                                         (tcg_rdr_env env)
                                         (tcg_type_env env)) }
-         else return KKNS_FromModule }
+         else return KNS_FromModule }
 
 tcrn_wrapper :: HasDebugCallStack
-             => (KnownKeyNameSource -> IfG (MaybeErr IfaceMessage a)) -> TcRn a
+             => (KnownNameSource -> IfG (MaybeErr IfaceMessage a)) -> TcRn a
 tcrn_wrapper do_the_lookup
   = do { kk_source <- getKnownKeySource
        ; mb_res <- initIfaceTcRn (do_the_lookup kk_source)

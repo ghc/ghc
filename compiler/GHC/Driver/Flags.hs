@@ -892,9 +892,9 @@ data GeneralFlag
    | Opt_G_NoStateHack
    | Opt_G_NoOptCoercion
 
-   -- Known-key names
+   -- Known names; see Note [Overview of known entities] in GHC.Builtin.
    | Opt_DefinesKnownKeyNames
-   | Opt_RebindableKnownKeyNames
+   | Opt_RebindableKnownNames
    deriving (Eq, Show, Enum)
 
 -- | The set of flags which affect optimisation for the purposes of

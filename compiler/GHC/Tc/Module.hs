@@ -575,13 +575,7 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
                       ; ev_binds <- simplifyTop (lie `andWC` lie_main)
                       ; return (tcg_env `addEvBinds` ev_binds) }
 
-      -- Update the knot-tied type environment to include everything
-      -- bound in this module. Do this now because when compiling GHC.Internal.Types,
-      -- mkTypeableBinds needs to "see" the definition of `Module`
-      ; syncTypeEnvKnotVars tcg_env
-
         -- Emit Typeable bindings
-      ; traceTc "Before mkTypeableBinds" (ppr (tcg_type_env tcg_env))
       ; tcg_env <- setGblEnv tcg_env $
                    mkTypeableBinds
 
