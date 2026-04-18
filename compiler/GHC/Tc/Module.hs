@@ -736,7 +736,7 @@ tc_rn_src_decls ds
                               AddTopDeclsUnexpectedDeclarationSplice
                         }
                       -- Rename TH-generated top-level declarations
-                    ; (tcg_env, th_rn_decls) <- setGblEnv tcg_env 
+                    ; (tcg_env, th_rn_decls) <- setGblEnv tcg_env
                        $ rnTopSrcDecls th_group
 
                       -- Dump generated top-level declarations
