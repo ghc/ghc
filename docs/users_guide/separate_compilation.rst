@@ -1671,7 +1671,7 @@ flags:
     for the module ``base:GHC.KnownKeyNames``, but this module does not exist
     when compiling ``ghc-internal`` or ``base``, which is why the flag is needed.
 
-.. ghc-flag:: -fdefines-known-names
+.. ghc-flag:: -fdefines-known-key-names
     :shortdesc: This module defines a known name
     :type: dynamic
     :category:
@@ -1681,7 +1681,7 @@ flags:
     called "Rational" in this module is *the* known ``Rational`` and not
     some other random type or class that happens to be called "Rational".
 
-.. ghc-flag:: -fexclude-known-define=(name)
+.. ghc-flag:: -fexclude-known-key-define=(name)
     :shortdesc: Do not treat a definition of (name) as a definition of a known entity
     :type: dynamic
     :category:
