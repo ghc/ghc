@@ -77,7 +77,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
 import GHC.Builtin.Uniques ( mkBuiltinUnique )

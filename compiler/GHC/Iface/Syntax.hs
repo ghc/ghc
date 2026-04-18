@@ -83,7 +83,7 @@ import GHC.Unit.Module.Warnings
 
 import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisForAllTyFlag )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
-import GHC.Builtin.Types ( constraintKindTyConName )
+import GHC.Builtin.WiredIn.Types ( constraintKindTyConName )
 import GHC.Stg.EnforceEpt.TagSig
 import GHC.Parser.Annotation (noLocA)
 import GHC.Hs.Extension ( GhcPass, GhcRn, GhcTc )

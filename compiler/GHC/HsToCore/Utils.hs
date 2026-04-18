@@ -53,7 +53,6 @@ import GHC.HsToCore.Monad
 
 import GHC.Core.Utils
 import GHC.Core.Make
-import GHC.Types.Id.Make
 import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Core.TyCon
@@ -62,10 +61,10 @@ import GHC.Core.PatSyn
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep( Scaled(..) )
-import GHC.Builtin.Types
 import GHC.Core.ConLike
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
+import GHC.Types.Id.Make( DataConBoxer(..), unwrapNewTypeBody )
 import GHC.Unit.Module
 import GHC.Builtin.KnownKeys
 import GHC.Utils.Outputable
@@ -76,6 +75,9 @@ import GHC.Utils.Misc
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import qualified GHC.LanguageExtensions as LangExt
+
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Ids
 
 import GHC.Rename.Env ( irrefutableConLikeTc )
 import GHC.Tc.Types.Evidence

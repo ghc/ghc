@@ -152,7 +152,7 @@ import GHC.Parser.Errors.Types
 import GHC.Utils.Lexeme ( okConOcc )
 import GHC.Types.TyThing
 import GHC.Core.Type    ( Specificity(..) )
-import GHC.Builtin.Types( cTupleTyConName, tupleTyCon, tupleDataCon,
+import GHC.Builtin.WiredIn.Types( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
                           listTyConName, listTyConKey, sumDataCon,
                           unrestrictedFunTyCon, unitDataCon )

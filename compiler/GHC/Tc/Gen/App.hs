@@ -42,7 +42,7 @@ import GHC.Core.TyCo.Subst ( substTyWithInScope )
 import GHC.Core.Type
 import GHC.Core.Coercion
 
-import GHC.Builtin.Types ( multiplicityTy, runtimeRepTy )
+import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy )
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.KnownKeys
 

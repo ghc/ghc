@@ -10,7 +10,7 @@ Wired-in knowledge about primitive types
 
 -- | This module defines TyCons that can't be expressed in Haskell.
 --   They are all, therefore, wired-in TyCons.  C.f module "GHC.Builtin.Types"
-module GHC.Builtin.Types.Prim(
+module GHC.Builtin.WiredIn.Prim(
         mkTemplateKindVar, mkTemplateKindVars,
         mkTemplateTyVars, mkTemplateTyVarsFrom,
         mkTemplateKiTyVars, mkTemplateKiTyVar,
@@ -110,7 +110,7 @@ module GHC.Builtin.Types.Prim(
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
   ( runtimeRepTy, levityTy, unboxedTupleKind, liftedTypeKind, unliftedTypeKind
   , boxedRepDataConTyCon, vecRepDataConTyCon
   , liftedRepTy, unliftedRepTy, zeroBitRepTy

@@ -38,7 +38,7 @@ import qualified GHC.Boot.TH.Syntax as TH
 --            import "ghc-internal"     qualified GHC.Internal.TH.Syntax as TH
 import qualified GHC.Boot.TH.Ppr as TH
 
-import GHC.Builtin.Types( boxedRepDataConTyCon, tYPETyCon, pretendNameIsInScope )
+import GHC.Builtin.WiredIn.Types( boxedRepDataConTyCon, tYPETyCon, pretendNameIsInScope )
 import GHC.Builtin.KnownKeys -- A bunch of keys
 
 import GHC.Types.Name.Reader

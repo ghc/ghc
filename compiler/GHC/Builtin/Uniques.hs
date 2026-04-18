@@ -58,7 +58,7 @@ module GHC.Builtin.Uniques
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
 import {-# SOURCE #-} GHC.Core.TyCon
 import {-# SOURCE #-} GHC.Core.DataCon
 import {-# SOURCE #-} GHC.Types.Id

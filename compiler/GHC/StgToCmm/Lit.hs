@@ -22,7 +22,7 @@ import GHC.Cmm.Utils
 
 import GHC.Types.Literal
 import GHC.Types.RepType( runtimeRepPrimRep )
-import GHC.Builtin.Types ( unitDataConId )
+import GHC.Builtin.WiredIn.Types ( unitDataConId )
 import GHC.Core.TyCon
 import GHC.Utils.Misc
 import GHC.Utils.Outputable

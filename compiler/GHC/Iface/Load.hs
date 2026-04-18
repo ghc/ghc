@@ -91,7 +91,8 @@ import GHC.Builtin.KnownKeys
 import GHC.Builtin.Modules( rEBINDABLE_MOD_NAME, kNOWN_KEY_NAMES, gHC_PRIM )
 import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Prim
+import GHC.Builtin.WiredIn.Ids( seqId )
 
 import GHC.Core.Rules
 import GHC.Core.TyCon
@@ -102,7 +103,6 @@ import GHC.Parser.Annotation( noLocA )
 
 import GHC.Types.Annotations
 import GHC.Types.Id
-import GHC.Types.Id.Make( seqId )
 import GHC.Types.Name
 import GHC.Types.Name.Cache
 import GHC.Types.Name.Env

@@ -149,7 +149,7 @@ import GHC.Data.FastString
 import GHC.Data.Pair
 import GHC.Types.SrcLoc
 import GHC.Builtin.KnownKeys
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Prim
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe
 import GHC.Types.Unique.FM

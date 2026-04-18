@@ -59,8 +59,8 @@ import GHC.Core.Type (mkStrLitTy, mkCastTy)
 import GHC.Core.TyCo.Ppr( pprTyVars )
 import GHC.Core.TyCo.Tidy( tidyOpenTypeX )
 
-import GHC.Builtin.Types ( mkConstraintTupleTy )
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Types ( mkConstraintTupleTy )
+import GHC.Builtin.WiredIn.Prim
 import GHC.Unit.Module
 
 import GHC.Types.SourceText

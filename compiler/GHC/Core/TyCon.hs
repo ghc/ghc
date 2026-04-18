@@ -144,7 +144,7 @@ import {-# SOURCE #-} GHC.Core.TyCo.FVs
    ( noFreeVarsOfType )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr
    ( pprType )
-import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
    ( runtimeRepTyCon, constraintKind, levityTyCon
    , multiplicityTyCon
    , vecCountTyCon, vecElemTyCon )

@@ -45,7 +45,7 @@ import GHC.Core.Unify (tcUnifyTy)
 
 import GHC.Data.Pair
 import GHC.Builtin.KnownKeys
-import GHC.Builtin.Types (mkConstraintTupleTy, typeToTypeKind)
+import GHC.Builtin.WiredIn.Types (mkConstraintTupleTy, typeToTypeKind)
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

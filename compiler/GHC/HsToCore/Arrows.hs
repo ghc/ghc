@@ -40,7 +40,7 @@ import GHC.Core.Utils
 import GHC.Core.Make
 import GHC.Core.ConLike
 
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.KnownOccs
 
 import GHC.Types.Id

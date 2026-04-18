@@ -70,7 +70,7 @@ import GHC.Core.InstEnv as InstEnv
 
 import GHC.Builtin.TH
 import GHC.Builtin.KnownKeys
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 
 import GHC.ThToHs
 import GHC.HsToCore.Docs

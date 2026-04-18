@@ -31,7 +31,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Bind( tcValBinds )
 import GHC.Tc.Utils.TcType
 
-import GHC.Builtin.Types( unitTy )
+import GHC.Builtin.WiredIn.Types( unitTy )
 import GHC.Builtin.Uniques ( mkBuiltinUnique )
 
 import GHC.Hs

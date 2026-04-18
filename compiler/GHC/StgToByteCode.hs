@@ -47,7 +47,7 @@ import GHC.Core.TyCon
 import GHC.Utils.Misc
 import GHC.Utils.Logger
 import GHC.Types.Var.Set
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Prim
 import GHC.Core.TyCo.Ppr ( pprType )
 import GHC.Utils.Error
 import GHC.Builtin.Uniques

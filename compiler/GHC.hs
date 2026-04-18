@@ -378,7 +378,7 @@ import GHC.Parser.Utils
 import GHC.Iface.Env ( trace_if )
 import GHC.Iface.Load        ( loadSysInterface )
 import GHC.Hs
-import GHC.Builtin.Types.Prim ( alphaTyVars )
+import GHC.Builtin.WiredIn.Prim ( alphaTyVars )
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt

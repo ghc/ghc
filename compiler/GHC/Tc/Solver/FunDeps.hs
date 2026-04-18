@@ -30,7 +30,7 @@ import GHC.Core.Unify( tcUnifyTysForInjectivity, typeListsAreApart )
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Subst( elemSubst )
 
-import GHC.Builtin.Types.Literals( tryInteractTopFam, tryInteractInertFam )
+import GHC.Builtin.WiredIn.TypeLits( tryInteractTopFam, tryInteractInertFam )
 
 import GHC.Types.Var.Set
 

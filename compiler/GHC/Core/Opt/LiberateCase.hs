@@ -15,7 +15,7 @@ import GHC.Prelude
 import GHC.Core
 import GHC.Core.Unfold
 import GHC.Core.Opt.Simplify.Inline
-import GHC.Builtin.Types ( unitDataConId )
+import GHC.Builtin.WiredIn.Types ( unitDataConId )
 import GHC.Types.Id
 import GHC.Types.Var.Env
 import GHC.Utils.Misc    ( notNull )

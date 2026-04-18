@@ -63,8 +63,8 @@ import GHC.Core.Map.Expr
 import GHC.Core.Utils (exprType)
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim
 import GHC.Tc.Solver.InertSet (InertSet, emptyInertSet)
 import GHC.Tc.Utils.TcType (isStringTy, topTcLevel)
 import GHC.Types.CompleteMatch

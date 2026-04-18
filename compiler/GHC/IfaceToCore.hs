@@ -35,8 +35,8 @@ import GHC.ByteCode.Types
 import GHC.Driver.Session
 import GHC.Driver.Config.Core.Lint ( initLintConfig )
 
-import GHC.Builtin.Types.Literals(typeNatCoAxiomRules)
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.TypeLits(typeNatCoAxiomRules)
+import GHC.Builtin.WiredIn.Types
 
 import GHC.Iface.Syntax
 import GHC.Iface.Load

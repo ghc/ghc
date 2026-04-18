@@ -41,7 +41,7 @@ executablePath = Nothing
 -- to one OS implementation from breaking another.
 
 import GHC.Internal.Maybe (Maybe(..))
-import GHC.Internal.IO (FilePath, IO)
+import GHC.Internal.IO (FilePath)
 #if defined(darwin_HOST_OS)
 import GHC.Internal.Control.Exception (catch, throw)
 import GHC.Internal.Err (errorWithoutStackTrace)

@@ -60,7 +60,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 
 import GHC.Builtin.KnownKeys
-import GHC.Builtin.Types.Prim( isArrowTyCon )
+import GHC.Builtin.WiredIn.Prim( isArrowTyCon )
 
 import GHC.Driver.Session
 import GHC.Driver.Backend
@@ -81,7 +81,7 @@ import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Trans.Class
   ( lift )
 import Data.Maybe (isJust)
-import GHC.Builtin.Types (unitTyCon)
+import GHC.Builtin.WiredIn.Types (unitTyCon)
 import GHC.Types.RepType (typePrimRep1)
 
 -- Defines a binding

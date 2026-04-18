@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}   -- See calls to mkTemplateTyVars
 
-module GHC.Builtin.Types.Literals
+module GHC.Builtin.WiredIn.TypeLits
   ( tryInteractInertFam, tryInteractTopFam, tryMatchFam
 
   , typeNatTyCons
@@ -39,8 +39,8 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Compare   ( tcEqType )
 import GHC.Types.Name          ( Name, BuiltInSyntax(..) )
 import GHC.Types.Unique.FM
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim  ( mkTemplateAnonTyConBinders, mkTemplateTyVars )
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim  ( mkTemplateAnonTyConBinders, mkTemplateTyVars )
 import GHC.Builtin.Modules     ( gHC_INTERNAL_TYPELITS
                                , gHC_INTERNAL_TYPELITS_INTERNAL
                                , gHC_INTERNAL_TYPENATS

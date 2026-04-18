@@ -55,7 +55,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info( RecSelParent(..) )
 import GHC.Tc.Gen.Bind
 import GHC.Types.Basic
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Types.Var.Set
 import GHC.Tc.TyCl.Utils
 import GHC.Core.ConLike

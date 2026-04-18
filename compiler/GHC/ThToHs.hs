@@ -36,8 +36,8 @@ import GHC.Types.Name.Occurrence as OccName
 import GHC.Types.SrcLoc
 import GHC.Core.Type as Hs
 import qualified GHC.Core.Coercion as Coercion ( Role(..) )
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim( fUNTyCon )
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim( fUNTyCon )
 import GHC.Hs.Decls.Overlap as Hs
 import GHC.Types.Basic as Hs
 import GHC.Types.ForeignCall

@@ -28,6 +28,7 @@ import GHC.Tc.Deriv.Generate
 import GHC.Tc.Utils.TcType
 
 import GHC.Builtin.KnownOccs
+import GHC.Builtin.WiredIn.Ids( coerceName )  -- `coerce` is wired-in
 
 import GHC.Core.DataCon
 import GHC.Core.TyCon
@@ -38,10 +39,6 @@ import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Types.Var
 import GHC.Types.Var.Set
-
-import GHC.Types.Id.Make( coerceName )  -- `coerce` is wired-in
-
-
 
 import GHC.Utils.Misc
 import GHC.Utils.Monad.State.Strict

@@ -17,7 +17,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Unique.DFM
 import GHC.Core.ConLike
 import GHC.Core.DataCon
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import Control.Monad.Trans.RWS.CPS

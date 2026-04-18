@@ -23,8 +23,8 @@ import GHC.Core.TyCo.Rep
 import GHC.Types.Id
 import GHC.Types.RepType
 
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

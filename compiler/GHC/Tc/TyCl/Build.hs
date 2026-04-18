@@ -18,7 +18,7 @@ module GHC.Tc.TyCl.Build (
 import GHC.Prelude
 
 import GHC.Iface.Env
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad

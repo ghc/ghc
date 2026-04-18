@@ -125,7 +125,7 @@ import GHC.Core.ConLike
 import GHC.Core.Make   ( mkChunkified )
 import GHC.Core.Type   ( Type, isUnliftedType )
 
-import GHC.Builtin.Types ( unitTy )
+import GHC.Builtin.WiredIn.Types ( unitTy )
 
 import GHC.Types.Id
 import GHC.Types.Name

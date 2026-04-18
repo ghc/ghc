@@ -24,8 +24,8 @@ import GHC.Iface.Env( newGlobalBinder )
 import GHC.Builtin.Modules( gHC_TYPES, gHC_PRIM )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
-import GHC.Builtin.Types.Prim ( primTyCons )
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Prim ( primTyCons )
+import GHC.Builtin.WiredIn.Types
                   ( runtimeRepTyCon
                   , levityTyCon, vecCountTyCon, vecElemTyCon
                   , nilDataCon, consDataCon )

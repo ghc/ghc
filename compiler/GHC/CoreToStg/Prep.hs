@@ -26,8 +26,9 @@ import GHC.Unit
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim
+import GHC.Builtin.WiredIn.Ids ( realWorldPrimId )
 
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
@@ -58,7 +59,6 @@ import GHC.Types.Demand
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Id.Make ( realWorldPrimId )
 import GHC.Types.Basic
 import GHC.Types.Name   ( OccName, NamedThing(..), isInternalName )
 import GHC.Types.Name.Occurrence (occNameString)

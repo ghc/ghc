@@ -1,0 +1,11 @@
+section: compiler
+synopsis: Completely refactor the handling of "known entities".  The goal is to
+  make it possible to move code from one module to another within `ghc-internal`
+  and `base` (or move code between those two libraries) without changing GHC
+  itself.   This is a major step along the path to making `base` into an ordinary
+  re-installable library.
+
+  Mostly this change is only visible to authors of modules in `ghc-internal` or
+  `base`.
+issues: #27013
+mrs: !15899

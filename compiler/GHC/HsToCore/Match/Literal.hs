@@ -50,8 +50,8 @@ import GHC.Types.SrcLoc
 
 import GHC.Builtin.KnownOccs
 import GHC.Builtin.KnownKeys
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim
 
 import GHC.Types.Id
 import GHC.Types.SourceText

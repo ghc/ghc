@@ -49,9 +49,10 @@ import GHC.Prelude
 import GHC.Builtin.Uniques
 import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Literals ( typeNatTyCons )
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.TypeLits ( typeNatTyCons )
+import GHC.Builtin.WiredIn.Ids ( wiredInIds, ghcPrimIds )
+import GHC.Builtin.WiredIn.Prim
 import GHC.Builtin.TH ( templateHaskellNames, thKnownOccs )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs( knownOccs, knownOccRdrNames )
@@ -65,7 +66,6 @@ import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Reader( rdrNameOcc )
 import GHC.Types.Name.Env
-import GHC.Types.Id.Make
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.TyThing
@@ -111,6 +111,7 @@ Use the cheapest one that does what you need!
 Here are more details.
 
 A "wired-in" entity:
+  * Defined in GHC.Builtin.WiredIn.*
   * Its Unique, OccName
   * Its defining module
   * Its data constructors etc
@@ -120,6 +121,7 @@ A "wired-in" entity:
   knowledge precisely reflects the code in the library.
 
 A "known-key" entity:
+  * Defined in GHC.Builtin.KnownKeys
   * Its Unique and OccName are baked into GHC. Its Unique is called a KnownKey.
   * It is exported by base:GHC.KnownKeyNames
   * But that's all that GHC knows about it
@@ -132,6 +134,7 @@ A "known-key" entity:
   to GHC. It's not hard.
 
 A "known-occ" entity:
+  * Defined in GHC.Builtin.KnownOccs
   * Its OccName is baked into GHC -- we call it a KnownOcc
   * It is exported by base:GHC.KnownKeyNames
   * But that's all that GHC knows about it

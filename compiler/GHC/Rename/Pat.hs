@@ -54,7 +54,7 @@ import GHC.Rename.Lit
 
 import GHC.Builtin       ( isUnboundName, mkUnboundName )
 import GHC.Builtin.KnownOccs
-import GHC.Builtin.Types (trueDataConName)
+import GHC.Builtin.WiredIn.Types (trueDataConName)
 
 import GHC.Types.Hint
 import GHC.Types.Name
@@ -72,7 +72,7 @@ import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
 import GHC.Types.Literal   ( inCharRange )
 import GHC.Types.GREInfo   ( ConInfo(..), conInfoFields, ConFieldInfo (..) )
-import GHC.Builtin.Types   ( nilDataCon )
+import GHC.Builtin.WiredIn.Types   ( nilDataCon )
 import GHC.Core.DataCon
 import GHC.Core.TyCon      ( isKindName )
 import qualified GHC.LanguageExtensions as LangExt

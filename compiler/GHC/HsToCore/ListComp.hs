@@ -38,8 +38,8 @@ import GHC.Tc.Utils.TcType
 
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim( alphaTyVar )
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim( alphaTyVar )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

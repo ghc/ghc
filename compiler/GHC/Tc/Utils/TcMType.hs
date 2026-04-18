@@ -132,7 +132,7 @@ import GHC.Types.Name
 import GHC.Types.SourceText
 import GHC.Types.Var.Set
 
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Types.Var.Env
 import GHC.Types.Unique.Set
 import GHC.Types.Basic ( TypeOrKind(..)

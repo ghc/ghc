@@ -65,7 +65,7 @@ import GHC.Types.Basic
 import GHC.Types.SourceText
 -- others:
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Types.Var
 import GHC.Types.Name.Reader
 import GHC.Core.ConLike

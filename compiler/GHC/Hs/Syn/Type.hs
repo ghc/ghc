@@ -12,8 +12,8 @@ module GHC.Hs.Syn.Type (
 
 import GHC.Prelude
 
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim
 import GHC.Core.Coercion
 import GHC.Core.ConLike
 import GHC.Core.DataCon (dataConWrapperType)

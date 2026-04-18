@@ -68,7 +68,7 @@ import GHC.Core.Opt.OccurAnal( occurAnalyseExpr )
 import GHC.Core.Rules.Config (roBuiltinRules)
 
 import GHC.Tc.Utils.TcType  ( tcSplitTyConApp_maybe )
-import GHC.Builtin.Types    ( anyTypeOfKind )
+import GHC.Builtin.WiredIn.Types    ( anyTypeOfKind )
 
 import GHC.Types.Id
 import GHC.Types.Id.Info ( RuleInfo( RuleInfo ) )

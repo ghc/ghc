@@ -75,7 +75,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.Tickish
 
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Prim
 import GHC.Builtin.Uniques
 
 import GHC.Data.FastString

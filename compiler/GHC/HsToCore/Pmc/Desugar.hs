@@ -20,7 +20,7 @@ import GHC.Tc.Utils.TcMType (shortCutLit)
 import GHC.Types.Id
 import GHC.Core.ConLike
 import GHC.Types.Name
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.KnownKeys ( toListClassOpKey )
 import GHC.Builtin.KnownOccs ( rationalTyConOcc )
 import GHC.Types.SrcLoc

@@ -34,7 +34,7 @@ import GHC.Data.Maybe
 import GHC.Exts (oneShot)
 import Control.Monad
 import Control.Applicative (liftA3)
-import GHC.Builtin.Types (tYPETyCon)
+import GHC.Builtin.WiredIn.Types (tYPETyCon)
 import Data.List ( find )
 import GHC.Data.List.Infinite (Infinite)
 import GHC.Data.Bag( listToBag )

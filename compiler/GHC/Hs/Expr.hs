@@ -52,7 +52,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Core.Type
-import GHC.Builtin.Types (mkTupleStr)
+import GHC.Builtin.WiredIn.Types (mkTupleStr)
 import GHC.Tc.Utils.TcType (TcType)
 import {-# SOURCE #-} GHC.Tc.Types.LclEnv (TcLclEnv)
 
