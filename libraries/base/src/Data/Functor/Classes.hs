@@ -71,7 +71,8 @@ module Data.Functor.Classes (
     showsBinary1,
   ) where
 
-import GHC.KnownKeyNames
+import Prelude hiding( foldr )
+import qualified GHC.KnownKeyNames as Rebindable
 
 import Control.Applicative (Alternative((<|>)), Const(Const))
 
@@ -90,7 +91,6 @@ import GHC.Internal.Text.ParserCombinators.ReadPrec (ReadPrec, readPrec_to_S, re
 import GHC.Internal.Text.Read (Read(..), parens, prec, step, reset)
 import GHC.Internal.Text.Read.Lex (Lexeme(..))
 import GHC.Internal.Text.Show (showListWith)
-import Prelude hiding( foldr )
 
 
 -- $setup

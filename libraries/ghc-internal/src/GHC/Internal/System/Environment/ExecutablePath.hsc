@@ -26,7 +26,7 @@ import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 ##if defined(javascript_HOST_ARCH)
 
-import GHC.Internal.IO (FilePath, IO)
+import GHC.Internal.IO (FilePath)
 import GHC.Internal.Data.Maybe (Maybe(..))
 
 getExecutablePath :: IO FilePath
