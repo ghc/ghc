@@ -543,8 +543,8 @@ fmap_RDR, replace_RDR, pure_RDR, ap_RDR, liftA2_RDR, foldable_foldr_RDR,
 fmap_RDR           = knownOccRdrName fmapClassOpOcc
 pure_RDR           = knownKeyRdrName pureAClassOpKey
 ap_RDR             = knownOccRdrName apAClassOpOcc
-mempty_RDR         = knownKeyRdrName memptyClassOpKey
 mappend_RDR        = knownKeyRdrName mappendClassOpKey
+mempty_RDR         = knownVarOccRdrName "mempty"
 replace_RDR        = knownVarOccRdrName "<$"
 liftA2_RDR         = knownVarOccRdrName "liftA2"
 foldable_foldr_RDR = knownVarOccRdrName "foldr"
@@ -572,7 +572,7 @@ null_Expr             = nlHsVar null_RDR
 minusInt_RDR, tagToEnum_RDR, dataToTag_RDR :: RdrName
 minusInt_RDR  = primOpRdrName IntSubOp
 tagToEnum_RDR = primOpRdrName TagToEnumOp
-dataToTag_RDR = knownKeyRdrName dataToTagClassOpKey
+dataToTag_RDR = knownVarOccRdrName "dataToTag#"
 
 -- Generics (constructors and functions)
 u1DataCon_RDR, par1DataCon_RDR, rec1DataCon_RDR,

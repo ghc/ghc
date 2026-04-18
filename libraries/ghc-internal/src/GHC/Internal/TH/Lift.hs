@@ -17,6 +17,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Lift
+
 -- | This module gives the definition of the 'Lift' class.
 --
 -- This is an internal module.

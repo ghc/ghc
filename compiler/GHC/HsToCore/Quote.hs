@@ -114,7 +114,7 @@ mkMetaWrappers q@(QuoteWrapper quote_var_raw m_var) = do
       let quote_var = Var quote_var_raw
       -- Get the superclass selector to select the Monad dictionary, going
       -- to be used to construct the monadWrapper.
-      quote_tc <- dsLookupTyCon quoteClassName
+      quote_tc <- dsLookupKnownOccTyCon quoteClassOcc
       monad_tc <- dsLookupKnownKeyTyCon monadClassKey
       let cls = expectJust $ tyConClass_maybe quote_tc
           monad_cls = expectJust $ tyConClass_maybe monad_tc
@@ -2221,7 +2221,7 @@ repP (ConPat NoExtField dc details)
    rep_fld :: LHsRecField GhcRn (LPat GhcRn) -> MetaM (Core (M (TH.Name, TH.Pat)))
    rep_fld (L _ fld) = do { MkC v <- lookupOcc (hsRecFieldSel fld)
                           ; MkC p <- repLP (hfbRHS fld)
-                          ; rep2 fieldPatName [v,p] }
+                          ; krep2 fieldPatOcc [v,p] }
 repP (NPat _ (L _ l) Nothing _) = do { a <- repOverloadedLiteral l
                                      ; repPlit a }
 repP (ViewPat _ e p) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }
@@ -2424,12 +2424,12 @@ type family NotM a where
   NotM (M _) = TypeError ('Text ("rep2_nw must not produce something of overloaded type"))
   NotM _other = (() :: Constraint)
 
-rep2M :: Name -> [CoreExpr] -> MetaM (Core (M a))
+-- rep2M :: Name -> [CoreExpr] -> MetaM (Core (M a))
 rep2 :: Name -> [CoreExpr] -> MetaM (Core (M a))
 rep2_nw :: NotM a => Name -> [CoreExpr] -> MetaM (Core a)
 rep2_nwDsM :: NotM a => Name -> [CoreExpr] -> DsM (Core a)
 rep2 = rep2X lift (asks quoteWrapper)
-rep2M = rep2X lift (asks monadWrapper)
+-- rep2M = rep2X lift (asks monadWrapper)
 rep2_nw n xs = lift (rep2_nwDsM n xs)
 rep2_nwDsM = rep2X id (return id)
 
@@ -2444,12 +2444,12 @@ rep2X lift_dsm get_wrap n xs = do
   ; return (MkC $ (foldl' App (wrap (Var rep_id)) xs)) }
 
 
--- krep2M      ::           KnownOcc -> [CoreExpr] -> MetaM (Core (M a))
+krep2M      ::           KnownOcc -> [CoreExpr] -> MetaM (Core (M a))
 krep2       ::           KnownOcc -> [CoreExpr] -> MetaM (Core (M a))
 krep2_nw    :: NotM a => KnownOcc -> [CoreExpr] -> MetaM (Core a)
 krep2_nwDsM :: NotM a => KnownOcc -> [CoreExpr] -> DsM (Core a)
 krep2  = krep2X lift (asks quoteWrapper)
--- krep2M = krep2X lift (asks monadWrapper)
+krep2M = krep2X lift (asks monadWrapper)
 krep2_nw n xs = lift (krep2_nwDsM n xs)
 krep2_nwDsM   = krep2X id (return id)
 
@@ -2650,10 +2650,10 @@ repImplicitParamVar (MkC x) = krep2 implicitParamVarEOcc [x]
 
 ------------ Right hand sides (guarded expressions) ----
 repGuarded :: Core [M (TH.Guard, TH.Exp)] -> MetaM (Core (M TH.Body))
-repGuarded (MkC pairs) = rep2 guardedBName [pairs]
+repGuarded (MkC pairs) = krep2 guardedBOcc [pairs]
 
 repNormal :: Core (M TH.Exp) -> MetaM (Core (M TH.Body))
-repNormal (MkC e) = rep2 normalBName [e]
+repNormal (MkC e) = krep2 normalBOcc [e]
 
 ------------ Guards ----
 repLNormalGE :: LHsExpr GhcRn -> LHsExpr GhcRn
@@ -2663,26 +2663,26 @@ repLNormalGE g e = do g' <- repLE g
                       repNormalGE g' e'
 
 repNormalGE :: Core (M TH.Exp) -> Core (M TH.Exp) -> MetaM (Core (M (TH.Guard, TH.Exp)))
-repNormalGE (MkC g) (MkC e) = rep2 normalGEName [g, e]
+repNormalGE (MkC g) (MkC e) = krep2 normalGEOcc [g, e]
 
 repPatGE :: Core [(M TH.Stmt)] -> Core (M TH.Exp) -> MetaM (Core (M (TH.Guard, TH.Exp)))
-repPatGE (MkC ss) (MkC e) = rep2 patGEName [ss, e]
+repPatGE (MkC ss) (MkC e) = krep2 patGEOcc [ss, e]
 
 ------------- Stmts -------------------
 repBindSt :: Core (M TH.Pat) -> Core (M TH.Exp) -> MetaM (Core (M TH.Stmt))
-repBindSt (MkC p) (MkC e) = rep2 bindSName [p,e]
+repBindSt (MkC p) (MkC e) = krep2 bindSOcc [p,e]
 
 repLetSt :: Core [(M TH.Dec)] -> MetaM (Core (M TH.Stmt))
-repLetSt (MkC ds) = rep2 letSName [ds]
+repLetSt (MkC ds) = krep2 letSOcc [ds]
 
 repNoBindSt :: Core (M TH.Exp) -> MetaM (Core (M TH.Stmt))
-repNoBindSt (MkC e) = rep2 noBindSName [e]
+repNoBindSt (MkC e) = krep2 noBindSOcc [e]
 
 repParSt :: Core [[(M TH.Stmt)]] -> MetaM (Core (M TH.Stmt))
-repParSt (MkC sss) = rep2 parSName [sss]
+repParSt (MkC sss) = krep2 parSOcc [sss]
 
 repRecSt :: Core [(M TH.Stmt)] -> MetaM (Core (M TH.Stmt))
-repRecSt (MkC ss) = rep2 recSName [ss]
+repRecSt (MkC ss) = krep2 recSOcc [ss]
 
 -------------- Range (Arithmetic sequences) -----------
 repFrom :: Core (M TH.Exp) -> MetaM (Core (M TH.Exp))
@@ -3210,11 +3210,11 @@ repGensym (MkC lit_str) = rep2 newNameName [lit_str]
 repBindM :: Type -> Type        -- a and b
          -> Core (M a) -> Core (a -> M b) -> MetaM (Core (M b))
 repBindM ty_a ty_b (MkC x) (MkC y)
-  = rep2M bindMName [Type ty_a, Type ty_b, x, y]
+  = krep2M bindMClassOpOcc [Type ty_a, Type ty_b, x, y]
 
 repSequenceM :: Type -> Core [M a] -> MetaM (Core (M [a]))
 repSequenceM ty_a (MkC list)
-  = rep2M sequenceQName [Type ty_a, list]
+  = krep2M sequenceQOcc [Type ty_a, list]
 
 repUnboundVar :: Core TH.Name -> MetaM (Core (M TH.Exp))
 repUnboundVar (MkC name) = krep2 unboundVarEOcc [name]

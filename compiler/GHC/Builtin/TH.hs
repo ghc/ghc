@@ -9,13 +9,18 @@ module GHC.Builtin.TH where
 import GHC.Prelude ()
 
 import GHC.Unit.Types
-import GHC.Types.Name( Name, KnownOcc, mk_known_key_name )
+import GHC.Types.Name( Name, KnownOcc, KnownKey, mk_known_key_name )
 import GHC.Types.Name.Occurrence
 import GHC.Types.Unique ( Unique )
 import GHC.Builtin.Uniques
 import GHC.Data.FastString
 
 import Language.Haskell.Syntax.Module.Name
+
+thKnownKeyTable :: [(OccName, KnownKey)]
+thKnownKeyTable
+  = [ (liftClassOcc, liftClassKey)
+    ]
 
 thKnownOccs :: [KnownOcc]
 thKnownOccs
@@ -31,7 +36,7 @@ thKnownOccs
     , litPOcc, varPOcc, tupPOcc, unboxedTupPOcc, unboxedSumPOcc, conPOcc
     , infixPOcc, tildePOcc, bangPOcc, asPOcc, wildPOcc, recPOcc, listPOcc
     , sigPOcc, viewPOcc, typePOcc, invisPOcc, orPOcc
-    , matchOcc, clauseOcc
+    , matchOcc, fieldPatOcc, clauseOcc
     , varEOcc, conEOcc, litEOcc, appEOcc, appTypeEOcc, infixEOcc, infixAppOcc
     , sectionLOcc, sectionROcc, lamEOcc, lamCaseEOcc, lamCasesEOcc, tupEOcc
     , unboxedTupEOcc, unboxedSumEOcc, condEOcc, multiIfEOcc, letEOcc
@@ -54,6 +59,9 @@ thKnownOccs
     , tySynEqnTyConOcc, roleTyConOcc, derivClauseTyConOcc, kindTyConOcc
     , tyVarBndrUnitTyConOcc, tyVarBndrSpecTyConOcc, tyVarBndrVisTyConOcc
     , derivStrategyTyConOcc
+    , guardedBOcc, normalBOcc
+    , normalGEOcc, patGEOcc
+    , bindSOcc, letSOcc, noBindSOcc, parSOcc, recSOcc
     ]
 
 templateHaskellNames :: [Name]
@@ -61,20 +69,13 @@ templateHaskellNames :: [Name]
 -- Should stay in sync with the import list of GHC.HsToCore.Quote
 
 templateHaskellNames = [
-    sequenceQName, newNameName,
+    newNameName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName, mkNameG_fldName,
     mkNameLName,
     mkNameSName, mkNameQName,
     mkModNameName,
     unTypeName, unTypeCodeName,
-    -- FieldPat
-    fieldPatName,
-    -- Body
-    guardedBName, normalBName,
-    -- Guard
-    normalGEName, patGEName,
-    -- Stmt
-    bindSName, letSName, noBindSName, parSName, recSName,
+
     -- Cxt
     cxtName,
 
@@ -150,9 +151,6 @@ templateHaskellNames = [
     -- DerivClause
     derivClauseName,
 
-    -- The type classes
-    liftClassName, quoteClassName,
-
     -- Quasiquoting
     quoteDecName, quoteTypeName, quoteExpName, quotePatName]
 
@@ -185,11 +183,9 @@ qqFld :: FastString -> Unique -> Name
 qqFld = mk_known_key_name (fieldName (fsLit "QuasiQuoter")) qqLib
 
 -------------------- TH.Syntax -----------------------
-liftClassName :: Name
-liftClassName = mk_known_key_name clsName liftLib (fsLit "Lift") liftClassKey
-
-quoteClassName :: Name
-quoteClassName = thMonadCls (fsLit "Quote") quoteClassKey
+liftClassOcc, quoteClassOcc :: KnownOcc
+liftClassOcc  = mkTcOcc "Lift"
+quoteClassOcc = mkTcOcc "Quote"
 
 qTyConOcc, nameTyConOcc, fieldExpTyConOcc, patTyConOcc,
     fieldPatTyConOcc, expTyConOcc, decTyConOcc, typeTyConOcc,
@@ -215,11 +211,13 @@ overlapTyConOcc       = mkTcOcc "Overlap"
 modNameTyConOcc       = mkTcOcc "ModName"
 quasiQuoterTyConOcc   = mkTcOcc "QuasiQuoter"
 
-sequenceQName, newNameName,
+sequenceQOcc :: KnownOcc
+sequenceQOcc = mkVarOcc "sequenceQ"
+
+newNameName,
     mkNameName, mkNameG_vName, mkNameG_fldName, mkNameG_dName, mkNameG_tcName,
     mkNameLName, mkNameSName, unTypeName, unTypeCodeName,
     mkModNameName, mkNameQName :: Name
-sequenceQName  = thMonadFun (fsLit "sequenceQ") sequenceQIdKey
 newNameName    = thMonadFun (fsLit "newName")   newNameIdKey
 mkNameName     = thFun (fsLit "mkName")     mkNameIdKey
 mkNameG_vName  = thFun (fsLit "mkNameG_v")  mkNameG_vIdKey
@@ -277,16 +275,10 @@ typePOcc       = mkVarOcc "typeP"
 invisPOcc      = mkVarOcc "invisP"
 
 -- type FieldPat = ...
-fieldPatName :: Name
-fieldPatName = libFun (fsLit "fieldPat") fieldPatIdKey
-
--- data Match = ...
-matchOcc :: KnownOcc
-matchOcc = mkVarOcc "match"
-
--- data Clause = ...
-clauseOcc :: KnownOcc
-clauseOcc = mkVarOcc "clause"
+fieldPatOcc, matchOcc, clauseOcc ::KnownOcc
+fieldPatOcc = mkVarOcc "fieldPat"
+matchOcc    = mkVarOcc "match"
+clauseOcc   = mkVarOcc "clause"
 
 -- data Exp = ...
 varEOcc, conEOcc, litEOcc, appEOcc, appTypeEOcc, infixEOcc, infixAppOcc,
@@ -345,22 +337,22 @@ fieldExpOcc :: KnownOcc
 fieldExpOcc = mkVarOcc "fieldExp"
 
 -- data Body = ...
-guardedBName, normalBName :: Name
-guardedBName = libFun (fsLit "guardedB") guardedBIdKey
-normalBName  = libFun (fsLit "normalB")  normalBIdKey
+guardedBOcc, normalBOcc :: KnownOcc
+guardedBOcc = mkVarOcc "guardedB"
+normalBOcc  = mkVarOcc "normalB"
 
 -- data Guard = ...
-normalGEName, patGEName :: Name
-normalGEName = libFun (fsLit "normalGE") normalGEIdKey
-patGEName    = libFun (fsLit "patGE")    patGEIdKey
+normalGEOcc, patGEOcc :: KnownOcc
+normalGEOcc = mkVarOcc "normalGE"
+patGEOcc    = mkVarOcc "patGE"
 
 -- data Stmt = ...
-bindSName, letSName, noBindSName, parSName, recSName :: Name
-bindSName   = libFun (fsLit "bindS")   bindSIdKey
-letSName    = libFun (fsLit "letS")    letSIdKey
-noBindSName = libFun (fsLit "noBindS") noBindSIdKey
-parSName    = libFun (fsLit "parS")    parSIdKey
-recSName    = libFun (fsLit "recS")    recSIdKey
+bindSOcc, letSOcc, noBindSOcc, parSOcc, recSOcc :: KnownOcc
+bindSOcc   = mkVarOcc "bindS"
+letSOcc    = mkVarOcc "letS"
+noBindSOcc = mkVarOcc "noBindS"
+parSOcc    = mkVarOcc "parS"
+recSOcc    = mkVarOcc "recS"
 
 -- data Dec = ...
 funDOcc, valDOcc, dataDOcc, newtypeDOcc, typeDataDOcc, tySynDOcc, classDOcc,
@@ -911,27 +903,10 @@ forallEIdKey           = mkPreludeMiscIdUnique 802
 forallVisEIdKey        = mkPreludeMiscIdUnique 803
 constrainedEIdKey      = mkPreludeMiscIdUnique 804
 
--- type FieldExp = ...
-fieldExpIdKey :: Unique
-fieldExpIdKey       = mkPreludeMiscIdUnique 307
-
--- data Body = ...
-guardedBIdKey, normalBIdKey :: Unique
-guardedBIdKey     = mkPreludeMiscIdUnique 308
-normalBIdKey      = mkPreludeMiscIdUnique 309
-
 -- data Guard = ...
 normalGEIdKey, patGEIdKey :: Unique
 normalGEIdKey     = mkPreludeMiscIdUnique 310
 patGEIdKey        = mkPreludeMiscIdUnique 311
-
--- data Stmt = ...
-bindSIdKey, letSIdKey, noBindSIdKey, parSIdKey, recSIdKey :: Unique
-bindSIdKey       = mkPreludeMiscIdUnique 312
-letSIdKey        = mkPreludeMiscIdUnique 313
-noBindSIdKey     = mkPreludeMiscIdUnique 314
-parSIdKey        = mkPreludeMiscIdUnique 315
-recSIdKey        = mkPreludeMiscIdUnique 316
 
 -- data Dec = ...
 funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey, classDIdKey,
