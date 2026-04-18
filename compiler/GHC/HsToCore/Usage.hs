@@ -223,11 +223,12 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports imp_decls u
   where
     safe_implicit_imps_req = uc_safe_implicit_imps_req uc
 
-    used_mods    = moduleEnvKeys ent_map
-    dir_imp_mods = Map.keys direct_imports
-    all_mods     = used_mods ++ filter (`notElem` used_mods) dir_imp_mods
-    usage_mods   = sortBy stableModuleCmp all_mods
-                        -- canonical order is imported, to avoid interface-file
+    used_mods     = nonDetModuleEnvKeys ent_map
+    is_used_mod m = m `elemModuleEnv` ent_map
+    dir_imp_mods  = Map.keys direct_imports
+    all_mods      = filter (not . is_used_mod) dir_imp_mods ++ used_mods
+    usage_mods    = sortBy stableModuleCmp all_mods
+                        -- canonical order is important, to avoid interface-file
                         -- wobblage.
 
     -- ent_map groups together all the things imported and used

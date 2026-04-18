@@ -8,7 +8,7 @@ module GHC.Unit.Module.Env
    , lookupWithDefaultModuleEnv, mapModuleEnv, mkModuleEnv, emptyModuleEnv
    , alterModuleEnv
    , partitionModuleEnv
-   , moduleEnvKeys, moduleEnvElts, moduleEnvToList
+   , moduleEnvKeys, nonDetModuleEnvKeys, moduleEnvElts, moduleEnvToList
    , unitModuleEnv, isEmptyModuleEnv
    , extendModuleEnvWith, filterModuleEnv, mapMaybeModuleEnv
 
@@ -157,8 +157,11 @@ mkModuleEnv xs = ModuleEnv (Map.fromList [(NDModule k, v) | (k,v) <- xs])
 emptyModuleEnv :: ModuleEnv a
 emptyModuleEnv = ModuleEnv Map.empty
 
+nonDetModuleEnvKeys :: ModuleEnv a -> [Module]
+nonDetModuleEnvKeys (ModuleEnv e) = map unNDModule $ Map.keys e
+
 moduleEnvKeys :: ModuleEnv a -> [Module]
-moduleEnvKeys (ModuleEnv e) = sort $ map unNDModule $ Map.keys e
+moduleEnvKeys = sort . nonDetModuleEnvKeys
   -- See Note [ModuleEnv performance and determinism]
 
 moduleEnvElts :: ModuleEnv a -> [a]
