@@ -432,8 +432,7 @@ tcCmdSyntaxTable loc orig ty (CST tbl)
        ; return (CST tbl') }
   where
      do_one (std_occ, user_nm_expr)
-       = -- Use the user_nm_expr in place of the standard operation
-         do { std_id <- tcLookupKnownOccId std_occ
+       = do { std_id <- tcLookupKnownOccId std_occ
             ; if | HsVar _ (L _ (WithUserRdr _ user_nm)) <- user_nm_expr
                  , idName std_id == user_nm
                  ->  -- Use the standard operation
@@ -476,8 +475,8 @@ arity_map :: OccEnv Arity
 -- Domain is only the arrow operations
 arity_map = mkOccEnv
    [ (arrAIdOcc,     3)  -- result used as an argument in, e.g., do_premap
-   , (composeAIdOcc, 3)  -- result used as an argument in, e.g., dsCmdStmt/BodyStmt
-   , (firstAIdOcc,   5)  -- result used as an argument in, e.g., dsCmdStmt/BodyStmt
+   , (composeAIdOcc, 5)  -- result used as an argument in, e.g., dsCmdStmt/BodyStmt
+   , (firstAIdOcc,   4)  -- result used as an argument in, e.g., dsCmdStmt/BodyStmt
    , (appAIdOcc,     2)  -- result used as an argument in, e.g., dsCmd/HsCmdArrApp/HsHigherOrderApp
    , (choiceAIdOcc,  5)  -- result used as an argument in, e.g., HsCmdIf
    , (loopAIdOcc,    4)  -- result used as an argument in, e.g., HsCmdIf

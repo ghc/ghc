@@ -798,7 +798,6 @@ coreExprAsPmLit e = case collectArgs e of
       | otherwise
       = Nothing
 
-
     -- See Note [Detecting overloaded literals with -XRebindableSyntax]
     is_rebound_name :: Id -> KnownOcc -> Bool
     is_rebound_name x ko = getOccFS (idName x) == occNameFS ko

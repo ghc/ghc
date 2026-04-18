@@ -112,6 +112,7 @@ import GHC.Prelude
 
 import GHC.Builtin.Modules
 import GHC.Builtin.Uniques
+import GHC.Builtin.TH( thKnownKeyTable )
 
 import GHC.Unit.Types
 
@@ -169,24 +170,25 @@ wired in ones are defined in GHC.Builtin.Types etc.
 
 knownKeyTable :: [(OccName, KnownKey)]
 knownKeyTable
-  = [ (mkTcOcc "Read",         readClassKey)
+  = thKnownKeyTable ++
+    [ (mkTcOcc "IO", ioTyConKey)
+
+     -- Classes
+    , (mkTcOcc "Eq",           eqClassKey)
+    , (mkTcOcc "Ord",          ordClassKey)
+    , (mkTcOcc "Enum",         enumClassKey)
+    , (mkTcOcc "Bounded",      boundedClassKey)
+    , (mkTcOcc "Read",         readClassKey)
     , (mkTcOcc "Show",         showClassKey)
     , (mkTcOcc "Foldable",     foldableClassKey)
     , (mkTcOcc "Traversable",  traversableClassKey)
-    , (mkTcOcc "Bounded",      boundedClassKey)
     , (mkTcOcc "Data",         dataClassKey)
     , (mkTcOcc "Ix",           ixClassKey)
     , (mkTcOcc "Alternative",  alternativeClassKey)
     , (mkTcOcc "Typeable",     typeableClassKey)
+    , (mkTcOcc "Functor",     functorClassKey)
 
-    -- Class Eq and Ord
-    , (mkTcOcc "Eq",           eqClassKey)
-    , (mkTcOcc "Ord",          ordClassKey)
-
-    -- Enum
-    , (mkTcOcc "Enum",            enumClassKey)
-
-    -- Numeric operations
+    -- Numeric classes
     , (mkTcOcc "Num",               numClassKey)
     , (mkTcOcc "Integral",          integralClassKey)
     , (mkTcOcc "Real",              realClassKey)
@@ -200,9 +202,6 @@ knownKeyTable
     , (mkVarOcc "toInteger",        toIntegerClassOpKey)
     , (mkVarOcc "toRational",       toRationalClassOpKey)
     , (mkVarOcc "realToFrac",       realToFracIdKey)
-
-    -- Class Functor
-    , (mkTcOcc "Functor",     functorClassKey)
 
     -- Class Monad, MonadFix, MonadZip
     , (mkTcOcc "Monad",        monadClassKey)
@@ -220,15 +219,12 @@ knownKeyTable
     , (mkTcOcc "Monoid",       monoidClassKey)
     , (sappendClassOpOcc,      sappendClassOpKey)
     , (mappendClassOpOcc,      mappendClassOpKey)
-    , (mkVarOcc "mempty",      memptyClassOpKey)
 
     -- Class IsString
     , (mkTcOcc "IsString",    isStringClassKey)
-    , (mkVarOcc "fromString", fromStringClassOpKey)
 
     -- DataToTag
     , (mkTcOcc "DataToTag",   dataToTagClassKey)
-    , (mkVarOcc "dataToTag#", dataToTagClassOpKey)
 
     -- Lists
     , (mkVarOcc "build",  buildIdKey)
@@ -1426,10 +1422,6 @@ failMClassOpKey = mkPreludeMiscIdUnique 159
 -- fromLabel
 fromLabelClassOpKey :: KnownKey
 fromLabelClassOpKey = mkPreludeMiscIdUnique 160
-
--- DataToTag
-dataToTagClassOpKey :: KnownKey
-dataToTagClassOpKey = mkPreludeMiscIdUnique 161
 
 -- Arrow notation
 arrAIdKey, composeAIdKey, firstAIdKey, appAIdKey, choiceAIdKey,

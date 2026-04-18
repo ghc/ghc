@@ -99,7 +99,8 @@ import Data.Function ( on )
 -}
 
 newKnownOccMethod
-  :: CtOrigin              -- ^ why do we need this?
+  :: HasDebugCallStack
+  => CtOrigin              -- ^ why do we need this?
   -> KnownOcc              -- ^ name of the method
   -> [TcRhoType]           -- ^ types with which to instantiate the class
   -> TcM (HsExpr GhcTc)
@@ -115,12 +116,12 @@ newKnownOccMethod origin occ ty_args
        ; finish_nkko origin id ty_args }
 
 newKnownKeyMethod  -- Same as newKnownOccMethod, but with a KnownKey
-  :: CtOrigin -> KnownKey -> [TcRhoType]-> TcM (HsExpr GhcTc)
+  :: HasDebugCallStack => CtOrigin -> KnownKey -> [TcRhoType]-> TcM (HsExpr GhcTc)
 newKnownKeyMethod origin key ty_args
   = do { id <- tcLookupKnownKeyId key
        ; finish_nkko origin id ty_args }
 
-finish_nkko :: CtOrigin -> Id -> [TcRhoType] -> TcM (HsExpr GhcTc)
+finish_nkko :: HasDebugCallStack => CtOrigin -> Id -> [TcRhoType] -> TcM (HsExpr GhcTc)
 finish_nkko origin id ty_args
   = do { let ty = piResultTys (idType id) ty_args
              (theta, _caller_knows_this) = tcSplitPhiTy ty

@@ -169,10 +169,11 @@ module GHC.KnownKeyNames
     , integerComplement, integerBit#, integerTestBit#, integerShiftL#, integerShiftR#
 
     -- Template Haskell
+    , Lift, Quote  -- The Lift and Quote classeso
     , Q, DecsQ, ExpQ, TypeQ, PatQ
     , Name, Decs, TH.Type, FunDep
     , Pred, Code, InjectivityAnn, Overlap, ModName, QuasiQuoter
-    , Stmt, Con, BangType, VarBangType, RuleBndr, TySynEqn, Role, DerivClause
+    , Con, BangType, VarBangType, RuleBndr, TySynEqn, Role, DerivClause
     , Kind, TyVarBndrUnit, TyVarBndrSpec, TyVarBndrVis, DerivStrategy
     , sequenceQ, newName, mkName, mkNameG_v, mkNameG_d, mkNameG_tc, mkNameG_fld, mkNameL
     , mkNameQ, mkNameS, mkModName, unType, unTypeCode, unsafeCodeCoerce
@@ -201,6 +202,7 @@ module GHC.KnownKeyNames
     , FieldPat, fieldPat
     , Match, match
     , Clause, clause
+    , Stmt, bindS, letS, noBindS, parS, recS
     ) where
 
 import GHC.Internal.Base hiding( foldr )

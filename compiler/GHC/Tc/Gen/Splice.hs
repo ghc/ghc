@@ -762,7 +762,7 @@ mkMetaTyVar =
 -- | For a type 'm', emit the constraint 'Quote m'.
 emitQuoteWanted :: Type -> TcM EvVar
 emitQuoteWanted m_var =  do
-        quote_con <- tcLookupTyCon quoteClassName
+        quote_con <- tcLookupKnownOccTyCon quoteClassOcc
         emitWantedEvVar BracketOrigin $
           mkTyConApp quote_con [m_var]
 
