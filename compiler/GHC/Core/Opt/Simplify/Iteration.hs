@@ -48,7 +48,6 @@ import GHC.Hs.Extension
 import GHC.Types.Literal   ( litIsLifted ) --, mkLitInt ) -- temporarily commented out. See #8326
 import GHC.Types.SourceText
 import GHC.Types.Id
-import GHC.Types.Id.Make   ( seqId )
 import GHC.Types.Id.Info
 import GHC.Types.InlinePragma
 import GHC.Types.Name   ( mkSystemVarName, isExternalName, getOccFS )
@@ -57,8 +56,10 @@ import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Tickish
 import GHC.Types.Var    ( isTyCoVar )
-import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
+
+import GHC.Builtin.WiredIn.Prim( realWorldStatePrimTy )
 import GHC.Builtin.KnownKeys( runRWKey, seqHashKey )
+import GHC.Builtin.WiredIn.Ids( seqId )
 
 import GHC.Data.Maybe   ( isNothing, orElse, mapMaybe )
 import GHC.Data.FastString

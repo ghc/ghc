@@ -111,7 +111,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader ( RdrName, WithUserRdr(..) )
 import GHC.Types.Var ( VarBndr, visArgTypeLike )
 import GHC.Core.TyCo.Rep ( Type(..) )
-import GHC.Builtin.Types( mkTupleStr )
+import GHC.Builtin.WiredIn.Types( mkTupleStr )
 import GHC.Core.Ppr ( pprOccWithTick)
 import GHC.Core.Type
 import GHC.Core.Multiplicity( pprArrowWithModifiers )

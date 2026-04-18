@@ -228,7 +228,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Basic
 
 import GHC.Builtin.KnownKeys
-import GHC.Builtin.Types ( coercibleClass, eqClass, heqClass, unitTyConKey
+import GHC.Builtin.WiredIn.Types ( coercibleClass, eqClass, heqClass, unitTyConKey
                          , listTyCon, constraintKind )
 import GHC.Data.Maybe
 import GHC.Data.List.SetOps ( getNth, findDupsEq )

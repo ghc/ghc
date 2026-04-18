@@ -24,8 +24,8 @@ import GHC.Tc.Types.Origin ( InstanceWhat (..), SafeOverlapping, isHasFieldOrigi
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcLookupDataFamInst, FamInstEnvs )
 import GHC.Rename.Env( addUsedGRE, addUsedDataCons, DeprecationWarnings (..) )
 
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.PrimOps ( PrimOp(..) )
 import GHC.Builtin.PrimOps.Ids ( primOpId )

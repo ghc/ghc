@@ -64,7 +64,6 @@ import GHC.Types.Basic
 import GHC.Types.Fixity
 import GHC.Types.Name
 import GHC.Types.SourceText
-import GHC.Types.Id.Make ( coerceId )
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM ( lookupUFM, listToUFM )
 import GHC.Types.Var.Env
@@ -73,8 +72,9 @@ import GHC.Types.Var.Set
 
 import GHC.Builtin.KnownOccs
 import GHC.Builtin.TH
-import GHC.Builtin.Types.Prim
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Prim
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Ids( coerceId )
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable

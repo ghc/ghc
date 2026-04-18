@@ -57,8 +57,8 @@ import GHC.Builtin( isUnboundName )
 import GHC.Builtin.KnownOccs
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.TH
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim
 
 import GHC.Unit.Module
 

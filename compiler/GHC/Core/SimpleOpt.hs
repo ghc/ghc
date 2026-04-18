@@ -47,7 +47,7 @@ import GHC.Types.Demand( etaConvertDmdSig, topSubDmd )
 import GHC.Types.Tickish
 import GHC.Types.Basic
 
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.KnownKeys
 
 import GHC.Unit.Module ( Module )

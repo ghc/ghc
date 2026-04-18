@@ -42,7 +42,7 @@ import GHC.Unit.Types
 import GHC.Utils.Outputable ( Outputable(..), text, (<+>), vcat )
 import GHC.Utils.Panic
 
-import GHC.Builtin.Types.Prim ( addrPrimTy )
+import GHC.Builtin.WiredIn.Prim ( addrPrimTy )
 import GHC.Core.Type          ( isUnliftedType )
 import GHC.Core.TyCo.Compare  ( eqType )
 import GHC.Core.TyCon

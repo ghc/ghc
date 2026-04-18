@@ -67,14 +67,14 @@ module GHC.Iface.Type (
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
                                  ( coercibleTyCon, heqTyCon
                                  , constraintKindTyConName
                                  , tupleTyConName
                                  , tupleDataConName
                                  , manyDataConTyCon
                                  , liftedRepTyCon, liftedDataConTyCon
-                                 , sumTyCon )
+                                 , liftedTypeKindTyConName, sumTyCon,  )
 import GHC.Base ( Multiplicity(..) )
 import GHC.Core.Multiplicity ( pprArrowWithModifiers )
 import GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy )
@@ -84,7 +84,6 @@ import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var
 import GHC.Builtin.KnownKeys
-import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyConName )
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Utils.Binary

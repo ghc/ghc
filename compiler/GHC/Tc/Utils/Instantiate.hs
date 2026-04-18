@@ -41,7 +41,7 @@ import GHC.Driver.Session
 import GHC.Driver.Env
 
 import GHC.Builtin.KnownOccs( rationalTyConOcc )
-import GHC.Builtin.Types( integerTy )
+import GHC.Builtin.WiredIn.Types( integerTy )
 
 import GHC.Hs
 import GHC.Hs.Syn.Type   ( hsLitType )

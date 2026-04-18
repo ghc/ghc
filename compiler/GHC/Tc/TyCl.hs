@@ -60,7 +60,7 @@ import GHC.Tc.Types.LclEnv
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.ErrCtxt( ReportRedundantConstraints(..) )
 
-import GHC.Builtin.Types ( oneDataConTy,  unitTy, makeRecoveryTyCon, manyDataConTy )
+import GHC.Builtin.WiredIn.Types ( oneDataConTy,  unitTy, makeRecoveryTyCon, manyDataConTy )
 
 import GHC.Rename.Env( lookupConstructorFields )
 

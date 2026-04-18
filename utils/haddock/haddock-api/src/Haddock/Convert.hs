@@ -38,7 +38,7 @@ import GHC.Builtin.KnownKeys
   , liftedDataConKey
   , tYPETyConKey
   )
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
   ( eqTyConName
   , liftedTypeKindTyConName
   , listTyConName
@@ -47,7 +47,7 @@ import GHC.Builtin.Types
   , unitTy
   )
 
-import GHC.Builtin.Types.Prim (alphaTyVars)
+import GHC.Builtin.WiredIn.Prim (alphaTyVars)
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
 import GHC.Core.ConLike

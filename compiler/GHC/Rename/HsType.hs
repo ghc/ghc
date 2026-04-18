@@ -80,7 +80,7 @@ import GHC.Types.Basic  ( TypeOrKind(..) )
 import GHC.Builtin( mkUnboundName, isUnboundName )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
-import GHC.Builtin.Types( oneDataConName )
+import GHC.Builtin.WiredIn.Types( oneDataConName )
 
 import GHC.Unit.Module ( getModule )
 

@@ -15,7 +15,7 @@ import GHC.Hs
 
 
 import GHC.Builtin.PrimOps
-import GHC.Builtin.Types  -- A bunch of wired-in TyCons and DataCons
+import GHC.Builtin.WiredIn.Types  -- A bunch of wired-in TyCons and DataCons
 import GHC.Builtin.PrimOps.Ids (primOpId)
 import GHC.Builtin.KnownKeys
 

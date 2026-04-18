@@ -49,8 +49,8 @@ import GHC.Driver.Config
 import GHC.Cmm.Expr
 import GHC.Cmm.Utils
 
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
 

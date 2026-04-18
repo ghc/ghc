@@ -235,9 +235,9 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 
 import GHC.Core.TyCon
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Prim
 
-import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
    ( charTy, naturalTy
    , typeSymbolKind, liftedTypeKind, unliftedTypeKind
    , constraintKind, zeroBitTypeKind

@@ -207,9 +207,10 @@ Library
         GHC.Builtin.PrimOps.Casts
         GHC.Builtin.PrimOps.Ids
         GHC.Builtin.TH
-        GHC.Builtin.Types
-        GHC.Builtin.Types.Literals
-        GHC.Builtin.Types.Prim
+        GHC.Builtin.WiredIn.Types
+        GHC.Builtin.WiredIn.TypeLits
+        GHC.Builtin.WiredIn.Prim
+        GHC.Builtin.WiredIn.Ids
         GHC.Builtin.Uniques
         GHC.ByteCode.Asm
         GHC.ByteCode.Binary

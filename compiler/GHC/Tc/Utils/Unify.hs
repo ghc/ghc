@@ -97,7 +97,7 @@ import GHC.Core.Reduction
 
 import qualified GHC.LanguageExtensions as LangExt
 
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Types.Name
 import GHC.Types.Id( idType )
 import GHC.Types.Var as Var

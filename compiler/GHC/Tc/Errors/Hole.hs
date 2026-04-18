@@ -51,7 +51,7 @@ import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Builtin.Modules ( gHC_INTERNAL_ERR, gHC_INTERNAL_UNSAFE_COERCE )
-import GHC.Builtin.Types ( tupleDataConName, unboxedSumDataConName )
+import GHC.Builtin.WiredIn.Types ( tupleDataConName, unboxedSumDataConName )
 import GHC.Types.Id
 import GHC.Types.Name.Set (extendNameSet, NameSet, emptyNameSet)
 import GHC.Types.Var (isVisibleFunArg)

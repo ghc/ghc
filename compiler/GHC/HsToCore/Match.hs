@@ -59,7 +59,7 @@ import GHC.Core.TyCo.Compare( eqType, eqTypes )
 import GHC.Core.Coercion ( eqCoercion )
 import GHC.Core.TyCon    ( isNewTyCon )
 import GHC.Core.Multiplicity
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 
 import GHC.Types.Id
 import GHC.Types.Literal

@@ -35,17 +35,18 @@ import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
 
 import GHC.Types.SourceText
-import GHC.Types.Id.Make
 import GHC.Types.ForeignCall
+import GHC.Types.Id.Make( mkFCallId )
 import GHC.Types.Basic
 import GHC.Types.Literal
 import GHC.Types.RepType (typePrimRep1)
 
 import GHC.Tc.Utils.TcType
 
-import GHC.Builtin.Types.Prim
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Prim
+import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.WiredIn.Ids( realWorldPrimId )
 
 import GHC.Driver.DynFlags
 

@@ -71,10 +71,10 @@ import GHC.Core.Coercion     ( isCoVar, mkRepReflCo, mkForAllVisCos )
 import GHC.Core.DataCon      ( DataCon, dataConWorkId, dataConWrapId )
 import GHC.Core.Multiplicity
 
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.Modules
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Prim
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc

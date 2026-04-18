@@ -83,7 +83,7 @@ import GHC.Types.Basic
 import GHC.Types.Demand      ( splitDmdSig, isDeadEndDiv )
 
 import GHC.Builtin.KnownKeys
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Prim
 
 import GHC.Data.Bag
 import GHC.Data.List.SetOps

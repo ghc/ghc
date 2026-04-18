@@ -34,7 +34,7 @@ module GHC.Tc.Zonk.Type (
 
 import GHC.Prelude
 
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Hs
 
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (runTopSplice)

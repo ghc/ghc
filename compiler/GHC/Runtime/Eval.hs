@@ -84,7 +84,7 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 
 import GHC.Builtin.KnownOccs ( toDyn_RDR )
-import GHC.Builtin.Types ( pretendNameIsInScope )
+import GHC.Builtin.WiredIn.Types ( pretendNameIsInScope )
 
 import GHC.Data.Maybe
 import GHC.Data.FastString

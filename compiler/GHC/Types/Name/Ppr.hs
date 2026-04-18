@@ -22,8 +22,8 @@ import GHC.Types.Name.Reader
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
-import GHC.Builtin.Types.Prim ( fUNTyConName )
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Prim ( fUNTyConName )
+import GHC.Builtin.WiredIn.Types
 import Data.Maybe (isJust)
 
 

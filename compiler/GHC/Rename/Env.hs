@@ -73,7 +73,7 @@ import GHC.Parser.PostProcess ( setRdrNameSpace )
 import GHC.Rename.Unbound
 import GHC.Rename.Utils
 
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.Modules( rOOT_MAIN )
 import GHC.Builtin( knownKeyOccMap )
 

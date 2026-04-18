@@ -29,8 +29,8 @@ module GHC.Builtin.PrimOps (
 
 import GHC.Prelude
 
-import GHC.Builtin.Types.Prim
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Prim
+import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.Uniques (mkPrimOpIdUnique, mkPrimOpWrapperUnique )
 import GHC.Builtin.Modules ( gHC_PRIMOPWRAPPERS )
 

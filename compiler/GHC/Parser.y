@@ -88,11 +88,12 @@ import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.String
 
-import GHC.Builtin.Types ( unitTyCon, unitDataCon, sumTyCon,
-                           tupleTyCon, tupleDataCon, nilDataCon,
-                           unboxedUnitTyCon, unboxedUnitDataCon,
-                           listTyConName, consDataConName,
-                           unrestrictedFunTyCon )
+import GHC.Builtin.WiredIn.Types
+            ( unitTyCon, unitDataCon, sumTyCon,
+              tupleTyCon, tupleDataCon, nilDataCon,
+              unboxedUnitTyCon, unboxedUnitDataCon,
+              listTyConName, consDataConName,
+              unrestrictedFunTyCon )
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 

@@ -60,7 +60,6 @@ import GHC.Types.Name hiding (varName)
 import GHC.Types.CostCentre
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Id.Make
 import GHC.Types.Var( isInvisibleAnonPiTyBinder )
 import GHC.Types.Var.Set( isEmptyVarSet, elemVarSet )
 import GHC.Types.Basic
@@ -70,8 +69,9 @@ import GHC.Types.Tickish
 import GHC.Unit.Module
 import GHC.Core.ConLike
 import GHC.Core.DataCon
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.WiredIn.Ids
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable

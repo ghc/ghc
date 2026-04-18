@@ -166,7 +166,7 @@ import GHC.Prelude
 
 
 import GHC.Builtin.KnownKeys
-import GHC.Builtin.Types( zonkAnyTyCon )
+import GHC.Builtin.WiredIn.Types( zonkAnyTyCon )
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Hole.Plugin ( HoleFitPluginR (..) )

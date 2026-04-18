@@ -38,7 +38,8 @@ import GHC.Core.Opt.Arity( collectBindersPushingCo )
 import GHC.Core.Opt.Monad
 import GHC.Core.Opt.Simplify.Env ( SimplPhase(..), isActive )
 
-import GHC.Builtin.Types  ( unboxedUnitTy )
+import GHC.Builtin.WiredIn.Types  ( unboxedUnitTy )
+import GHC.Builtin.WiredIn.Ids  ( voidArgId, voidPrimId )
 
 import GHC.Data.Maybe     ( isJust )
 import GHC.Data.Bag
@@ -50,7 +51,6 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Unique.DFM
 import GHC.Types.Name
 import GHC.Types.Tickish
-import GHC.Types.Id.Make  ( voidArgId, voidPrimId )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env

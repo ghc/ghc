@@ -31,7 +31,7 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Float
 
-import GHC.Types.Id.Make ( unboxedUnitExpr )
+import GHC.Builtin.WiredIn.Ids ( unboxedUnitExpr )
 import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Types.Literal.Floating
@@ -58,8 +58,8 @@ import GHC.Core.Opt.Range
 
 import GHC.Builtin.PrimOps ( PrimOp(..), tagToEnumKey )
 import GHC.Builtin.PrimOps.Ids (primOpId)
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim
 import GHC.Builtin.KnownKeys
 
 import GHC.Cmm.MachOp ( FMASign(..) )

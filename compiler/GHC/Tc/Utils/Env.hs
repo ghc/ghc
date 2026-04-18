@@ -83,7 +83,7 @@ import GHC.Driver.DynFlags
 
 import GHC.Builtin( isUnboundName )
 import GHC.Builtin.KnownKeys
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 
 import GHC.Runtime.Context
 

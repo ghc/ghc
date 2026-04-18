@@ -31,7 +31,6 @@ import GHC.Core.Coercion
 import GHC.Core.Multiplicity
 
 import GHC.Types.Id
-import GHC.Types.Id.Make
 import GHC.Types.InlinePragma ( ActivationX(NeverActive) )
 import GHC.Types.Literal
 import GHC.Types.ForeignStubs
@@ -54,10 +53,11 @@ import GHC.JS.Ppr
 import GHC.Driver.DynFlags
 import GHC.Driver.Config
 
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
+import GHC.Builtin.WiredIn.Ids( realWorldPrimId )
 
 
 import GHC.Data.FastString

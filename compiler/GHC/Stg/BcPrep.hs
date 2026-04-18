@@ -17,16 +17,21 @@ import GHC.Prelude
 import GHC.Types.Id.Make
 import GHC.Types.Id
 import GHC.Core.Type
-import GHC.Builtin.Types ( unboxedUnitTy )
-import GHC.Builtin.Types.Prim
+
+import GHC.Builtin.WiredIn.Types ( unboxedUnitTy )
+import GHC.Builtin.WiredIn.Prim
+import GHC.Builtin.WiredIn.Ids
+
 import GHC.Types.Unique
-import GHC.Data.FastString
-import GHC.Utils.Panic.Plain
 import GHC.Types.Tickish
 import GHC.Types.Unique.Supply
+
+import GHC.Data.FastString
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Monad.State.Strict
+
 import qualified GHC.Types.CostCentre as CC
 import GHC.Stg.Syntax
-import GHC.Utils.Monad.State.Strict
 
 data BcPrepM_State
    = BcPrepM_State

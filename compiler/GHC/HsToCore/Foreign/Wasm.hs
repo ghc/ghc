@@ -16,8 +16,8 @@ import Data.Maybe
 import GHC.Builtin.Modules( mkGhcInternalModule )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs( bindIOIdOcc, returnIOIdOcc )
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim
 import GHC.Core
 import GHC.Core.Coercion
 import GHC.Core.DataCon

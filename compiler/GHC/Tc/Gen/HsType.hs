@@ -106,8 +106,8 @@ import GHC.Core.TyCo.Ppr
 
 import GHC.Builtin( allNameStrings )
 import GHC.Builtin.KnownKeys hiding ( wildCardName )
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim
 
 import GHC.Types.Error
 import GHC.Types.Name.Env

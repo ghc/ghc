@@ -44,14 +44,14 @@ import GHC.Builtin.KnownKeys( unsatisfiableIdKey
                             , isStringClassKey
                             , emptyExceptionContextName )
 import GHC.Builtin.Modules ( gHC_INTERNAL_TYPEERROR )
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Ids ( unboxedUnitExpr )
 
 import GHC.Types.TyThing ( MonadThings(lookupId) )
 import GHC.Types.Unique
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.Id.Make  ( unboxedUnitExpr )
 
 import GHC.Driver.DynFlags
 import GHC.Unit.Module ( getModule )

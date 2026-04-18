@@ -36,7 +36,7 @@ module GHC.Plugins
    , module GHC.Core.Type
    , module GHC.Core.TyCon
    , module GHC.Core.Coercion
-   , module GHC.Builtin.Types
+   , module GHC.Builtin.WiredIn.Types
    , module GHC.Driver.Env
    , module GHC.Types.Basic
    , module GHC.Types.Var.Set
@@ -114,7 +114,7 @@ import GHC.Core.Type hiding {- conflict with GHC.Core.Subst -}
 import GHC.Core.Coercion hiding {- conflict with GHC.Core.Subst -}
                 ( substCo )
 import GHC.Core.TyCon
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Driver.Env
 import GHC.Types.Basic
 

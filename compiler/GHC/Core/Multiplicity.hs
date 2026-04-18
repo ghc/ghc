@@ -41,7 +41,7 @@ import GHC.Base (Multiplicity(..))
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Types.Var( isFUNArg )
-import {-# SOURCE #-} GHC.Builtin.Types ( multMulTyCon )
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types ( multMulTyCon )
 import GHC.Builtin.KnownKeys (multMulTyConKey)
 import GHC.Types.Unique (hasKey)
 import GHC.Utils.Panic (assertPpr)

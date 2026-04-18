@@ -60,8 +60,9 @@ import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
 import GHC.Core.Ppr
 
 import GHC.Builtin.KnownKeys
-import GHC.Builtin.Types.Prim
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Prim
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Ids ( mkRepPolyIdConcreteTyVars )
 
 import GHC.Data.Maybe    ( expectJust )
 import GHC.Data.OrdList
@@ -76,7 +77,6 @@ import GHC.Utils.Logger
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Id.Make ( mkRepPolyIdConcreteTyVars )
 import GHC.Types.InlinePragma ( alwaysInlinePragma, competesWith )
 import GHC.Types.ForeignStubs
 import GHC.Types.Avail

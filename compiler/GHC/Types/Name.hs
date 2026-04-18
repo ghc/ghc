@@ -92,7 +92,7 @@ module GHC.Types.Name (
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Types.TyThing ( TyThing )
-import {-# SOURCE #-} GHC.Builtin.Types ( listTyCon )
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types ( listTyCon )
 
 import GHC.Platform
 import GHC.Types.Name.Occurrence

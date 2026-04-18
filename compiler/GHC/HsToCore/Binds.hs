@@ -60,7 +60,7 @@ import GHC.Core.TyCo.Compare( eqType )
 
 import GHC.Builtin.KnownKeys( typeableClassKey )
 import GHC.Builtin.KnownOccs
-import GHC.Builtin.Types ( naturalTy, typeSymbolKind, charTy )
+import GHC.Builtin.WiredIn.Types ( naturalTy, typeSymbolKind, charTy )
 
 import GHC.Tc.Types.Evidence
 

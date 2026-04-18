@@ -46,12 +46,13 @@ import GHC.Rename.Pat
 import GHC.Driver.DynFlags
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
-import GHC.Builtin.Types ( nilDataConName, oneDataConName )
+import GHC.Builtin.WiredIn.Types ( nilDataConName, oneDataConName )
+import GHC.Builtin.WiredIn.Ids( rightSectionName, leftSectionName )
+
 import GHC.Unit.Module ( isInteractiveModule )
 
 import GHC.Types.Basic (TypeOrKind (TypeLevel))
 import GHC.Types.FieldLabel
-import GHC.Types.Id.Make
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader

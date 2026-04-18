@@ -47,7 +47,6 @@ import GHC.Types.Error (DiagnosticReason(..))
 import GHC.Types.Literal ( litIsLifted )
 import GHC.Types.Id
 import GHC.Types.Id.Info ( IdDetails(..) )
-import GHC.Types.Id.Make ( voidArgId, voidPrimId )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name
@@ -68,7 +67,8 @@ import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Monad
 
-import GHC.Builtin.KnownKeys ( specTyConKey )
+import GHC.Builtin.KnownKeys   ( specTyConKey )
+import GHC.Builtin.WiredIn.Ids ( voidArgId, voidPrimId )
 
 import GHC.Exts( SpecConstrAnnotation(..) )
 import GHC.Serialized   ( deserializeWithData )

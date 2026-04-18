@@ -26,7 +26,7 @@ import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique (uniqueTag)
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.KnownKeys
 import GHC.Builtin
 
