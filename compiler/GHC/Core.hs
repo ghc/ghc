@@ -1569,7 +1569,7 @@ data CoreRule
         ru_key   :: KnownKey,     -- ^ Identifies the function
                                          -- Not its Name because BuiltInRules are constants
                                          -- and GHC doesn't know the defining module
-                                         -- See Note [Overview of known-key entities]
+                                         -- See Note [Overview of known entities]
         ru_nargs :: Int,        -- ^ Number of arguments that 'ru_try' consumes,
                                 -- if it fires, including type arguments
         ru_try   :: RuleFun

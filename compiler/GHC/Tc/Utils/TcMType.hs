@@ -90,7 +90,7 @@ module GHC.Tc.Utils.TcMType (
   -- * Other HsSyn functions
   mkHsDictLet, mkHsApp,
   mkHsAppTy, mkHsCaseAlt,
-  tcShortCutLit, shortCutLit, hsOverLitKey,
+  tcShortCutLit, shortCutLit, hsOverLitKnownOcc,
   conLikeResTy
   ) where
 
@@ -112,7 +112,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Errors.Types
 import GHC.Tc.Zonk.TcType
 
-import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs
 
 import GHC.Core.ConLike
 import GHC.Core.DataCon
@@ -2338,11 +2338,11 @@ mkLit :: DataCon -> HsLit GhcTc -> HsExpr GhcTc
 mkLit con lit = HsApp noExtField (nlHsDataCon con) (nlHsLit lit)
 
 ------------------------------
-hsOverLitKey :: OverLitVal -> KnownKey
+hsOverLitKnownOcc :: OverLitVal -> KnownOcc
 -- Get the canonical 'fromX' name for a particular OverLitVal
-hsOverLitKey (HsIntegral {})   = fromIntegerClassOpKey
-hsOverLitKey (HsFractional {}) = fromRationalClassOpKey
-hsOverLitKey (HsIsString {})   = fromStringClassOpKey
+hsOverLitKnownOcc (HsIntegral {})   = fromIntegerClassOpOcc
+hsOverLitKnownOcc (HsFractional {}) = fromRationalClassOpOcc
+hsOverLitKnownOcc (HsIsString {})   = fromStringClassOpOcc
 
 
 {- *********************************************************************

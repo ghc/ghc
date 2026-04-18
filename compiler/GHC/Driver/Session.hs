@@ -2673,7 +2673,7 @@ fFlagsDeps = [
 
   -- Known-key names
   flagSpec "defines-known-key-names"          Opt_DefinesKnownKeyNames,
-  flagSpec "rebindable-known-key-names"       Opt_RebindableKnownKeyNames
+  flagSpec "rebindable-known-names"           Opt_RebindableKnownNames
   ]
   ++ fHoleFlags
 

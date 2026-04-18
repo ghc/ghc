@@ -20,7 +20,7 @@ module GHC.Iface.Load (
         loadGlobalName,
 
         -- Known-key things
-        KnownKeyNameSource(..),
+        KnownNameSource(..),
         lookupKnownKeyThing, lookupKnownKeyName,
         lookupKnownOccThing, lookupKnownOccName,
         loadKnownKeyOccMaps, lookupKnownGRE,
@@ -154,24 +154,24 @@ import qualified GHC.Unit.Home.Graph as HUG
 *                                                                      *
 ********************************************************************* -}
 
-data KnownKeyNameSource
-  = KKNS_InScope Module GlobalRdrEnv TypeEnv
+data KnownNameSource
+  = KNS_InScope Module GlobalRdrEnv TypeEnv
       -- Look up the known-key name in this GlobalRdrEnv, which
       -- is the top-level scope of the current module.
-      -- This happens when -frebindable-known-key-name is set, usually when
+      -- This happens when -frebindable-known-name is set, usually when
       -- we are compiling `ghc-internal` or `base`
 
-  | KKNS_FromModule
+  | KNS_FromModule
        -- Look up the known-key name in the export list of GHC.KnownKeyNames
-       -- This is the "normal path", and happens when -frebindable-known-key-name
+       -- This is the "normal path", and happens when -frebindable-key-name
        -- is /not/ set
 
-instance Outputable KnownKeyNameSource where
-  ppr KKNS_FromModule                     = text "FromModule"
-  ppr (KKNS_InScope mod rdr_env type_env) = text "InScope" <> braces (ppr rdr_env)
+instance Outputable KnownNameSource where
+  ppr KNS_FromModule            = text "FromModule"
+  ppr (KNS_InScope _ rdr_env _) = text "InScope" <> braces (ppr rdr_env)
 
 lookupKnownKeyThing :: HasDebugCallStack
-                    => KnownKey -> KnownKeyNameSource
+                    => KnownKey -> KnownNameSource
                     -> IfM lcl (MaybeErr IfaceMessage TyThing)
 lookupKnownKeyThing key kk_ns
   = do { mb_name <- lookupKnownKeyName key kk_ns
@@ -180,16 +180,16 @@ lookupKnownKeyThing key kk_ns
              Succeeded name -> lookupKnownName kk_ns name }
 
 lookupKnownKeyName :: HasDebugCallStack
-                   => KnownKey -> KnownKeyNameSource
+                   => KnownKey -> KnownNameSource
                    -> IfM lcl (MaybeErr IfaceMessage Name)
-lookupKnownKeyName key KKNS_FromModule
+lookupKnownKeyName key KNS_FromModule
   = do { (kk_map, _) <- loadKnownKeyOccMaps
        ; case lookupUFM kk_map key of
            Just name -> return (Succeeded name)
            Nothing
              | wired_in_nm : _ <- filter (`hasKey` key) wiredInNames
              -> -- We should never call lookupKnownKeyName on the key of a wired-in
-                -- entity; see (KKN3) in Note [Overview of known-key entities]
+                -- entity; see (KN3) in Note [Overview of known entities]
                 -- We hackily panic here rather than use a civilised error
                 -- message so that we get a helpful stack backtrace
                 pprPanic "lookupKownKeyName" $
@@ -199,8 +199,8 @@ lookupKnownKeyName key KKNS_FromModule
              | otherwise
              -> return (Failed (MissingKnownKey1 key)) }
 
-lookupKnownKeyName key (KKNS_InScope _ gbl_rdr_env _)
-  -- Just gbl_rdr_env: we have -frebindable-known-key-names on, and
+lookupKnownKeyName key (KNS_InScope _ gbl_rdr_env _)
+  -- Just gbl_rdr_env: we have -frebindable-known-names on, and
   --                   here is the top-level GlobalRdrEnv
   -- Look up the /un-qualified/ known-key OccName in the GlobalRdrEnv
   -- If we get a unique hit, use it; if not, panic.
@@ -236,7 +236,7 @@ lookupKnownGRE rdr_env occ
     gres = lookupGRE rdr_env (LookupOccName occ SameNameSpace)
 
 lookupKnownOccThing :: HasDebugCallStack
-                    => KnownOcc -> KnownKeyNameSource
+                    => KnownOcc -> KnownNameSource
                     -> IfM lcl (MaybeErr IfaceMessage TyThing)
 lookupKnownOccThing occ kk_ns
   = do { mb_name <- lookupKnownOccName occ kk_ns
@@ -245,16 +245,16 @@ lookupKnownOccThing occ kk_ns
              Succeeded name -> lookupKnownName kk_ns name }
 
 lookupKnownOccName :: HasDebugCallStack
-                   => KnownOcc -> KnownKeyNameSource
+                   => KnownOcc -> KnownNameSource
                    -> IfM lcl (MaybeErr IfaceMessage Name)
-lookupKnownOccName occ KKNS_FromModule
+lookupKnownOccName occ KNS_FromModule
   = do { (_, occ_map) <- loadKnownKeyOccMaps
        ; case lookupOccEnv occ_map occ of
            Just name -> return (Succeeded name)
            Nothing   -> return (Failed (MissingKnownKey3 occ)) }
 
-lookupKnownOccName occ (KKNS_InScope _ gbl_rdr_env _)
-  -- Just gbl_rdr_env: we have -frebindable-known-key-names on, and
+lookupKnownOccName occ (KNS_InScope _ gbl_rdr_env _)
+  -- Just gbl_rdr_env: we have -frebindable-known-names on, and
   --                   here is the top-level GlobalRdrEnv
   -- Look up the /un-qualified/ known-key OccName in the GlobalRdrEnv
   -- If we get a unique hit, use it; if not, panic.
@@ -266,18 +266,20 @@ lookupKnownOccName occ (KKNS_InScope _ gbl_rdr_env _)
        Failed err -> return (Failed err)
 
 lookupKnownName :: HasDebugCallStack
-                => KnownKeyNameSource -> Name
+                => KnownNameSource -> Name
                 -> IfM lcl (MaybeErr IfaceMessage TyThing)
 -- Go from a known Name to its TyThing
--- If we are in KKNS_InScope, look up in the current module's type environment
+-- If we are in KNS_InScope, look up in the current module's type environment
 -- in case it is defined right here in this module rather than imported
 lookupKnownName kk_ns name
   = case kk_ns of
-      KKNS_InScope this_mod _ type_env
+      KNS_InScope this_mod _ type_env
          | name_mod == this_mod
          -> case lookupTypeEnv type_env name of
               Just thing -> return (Succeeded thing)
-              Nothing    -> return (Failed ...)
+              Nothing    -> pprPanic "lookupKnownName" (ppr name $$ ppr type_env)
+                 -- We found the name in the GlobalRdrEnv, but it's
+                 -- not in the type env.  That's a compiler error
 
       _ -> loadGlobalName name name_mod
   where

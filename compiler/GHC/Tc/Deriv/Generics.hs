@@ -50,7 +50,6 @@ import GHC.Types.Var.Set (elemVarSet)
 import GHC.Builtin.KnownOccs
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
-import GHC.Builtin.KnownKeys
 
 import GHC.Utils.Error( Validity'(..), andValid )
 import GHC.Utils.Outputable
@@ -421,8 +420,8 @@ gen_Generic_fam_inst gk get_fixity loc
        --                               ; data instance D Int a b = D_ a }
   do { -- `rep` = GHC.Generics.Rep or GHC.Generics.Rep1 (type family)
        fam_tc <- case gk of
-         Gen0 -> tcLookupTyCon repTyConName
-         Gen1 -> tcLookupTyCon rep1TyConName
+         Gen0 -> tcLookupKnownOccTyCon repTyConOcc
+         Gen1 -> tcLookupKnownOccTyCon rep1TyConOcc
 
      ; let -- If the derived instance is
            --   instance Generic (Foo x)
@@ -541,43 +540,43 @@ tc_mkRepTy ::  -- Gen0 or Gen1, for Rep or Rep1
 tc_mkRepTy gk get_fixity dit@(DerivInstTys{ dit_rep_tc = tycon
                                           , dit_rep_tc_args = tycon_args }) k =
   do
-    d1      <- tcLookupTyCon d1TyConName
-    c1      <- tcLookupTyCon c1TyConName
-    s1      <- tcLookupTyCon s1TyConName
-    rec0    <- tcLookupTyCon rec0TyConName
-    rec1    <- tcLookupTyCon rec1TyConName
-    par1    <- tcLookupTyCon par1TyConName
-    u1      <- tcLookupTyCon u1TyConName
-    v1      <- tcLookupTyCon v1TyConName
-    plus    <- tcLookupTyCon sumTyConName
-    times   <- tcLookupTyCon prodTyConName
-    comp    <- tcLookupTyCon compTyConName
-    uAddr   <- tcLookupTyCon uAddrTyConName
-    uChar   <- tcLookupTyCon uCharTyConName
-    uDouble <- tcLookupTyCon uDoubleTyConName
-    uFloat  <- tcLookupTyCon uFloatTyConName
-    uInt    <- tcLookupTyCon uIntTyConName
-    uWord   <- tcLookupTyCon uWordTyConName
+    d1      <- tcLookupKnownOccTyCon d1TyConOcc
+    c1      <- tcLookupKnownOccTyCon c1TyConOcc
+    s1      <- tcLookupKnownOccTyCon s1TyConOcc
+    rec0    <- tcLookupKnownOccTyCon rec0TyConOcc
+    rec1    <- tcLookupKnownOccTyCon rec1TyConOcc
+    par1    <- tcLookupKnownOccTyCon par1TyConOcc
+    u1      <- tcLookupKnownOccTyCon u1TyConOcc
+    v1      <- tcLookupKnownOccTyCon v1TyConOcc
+    plus    <- tcLookupKnownOccTyCon sumTyConOcc
+    times   <- tcLookupKnownOccTyCon prodTyConOcc
+    comp    <- tcLookupKnownOccTyCon compTyConOcc
+    uAddr   <- tcLookupKnownOccTyCon uAddrTyConOcc
+    uChar   <- tcLookupKnownOccTyCon uCharTyConOcc
+    uDouble <- tcLookupKnownOccTyCon uDoubleTyConOcc
+    uFloat  <- tcLookupKnownOccTyCon uFloatTyConOcc
+    uInt    <- tcLookupKnownOccTyCon uIntTyConOcc
+    uWord   <- tcLookupKnownOccTyCon uWordTyConOcc
 
-    let tcLookupPromDataCon = fmap promoteDataCon . tcLookupDataCon
+    let tcLookupPromDataCon = fmap promoteDataCon . tcLookupKnownOccDataCon
 
-    md         <- tcLookupPromDataCon metaDataDataConName
-    mc         <- tcLookupPromDataCon metaConsDataConName
-    ms         <- tcLookupPromDataCon metaSelDataConName
-    pPrefix    <- tcLookupPromDataCon prefixIDataConName
-    pInfix     <- tcLookupPromDataCon infixIDataConName
-    pLA        <- tcLookupPromDataCon leftAssociativeDataConName
-    pRA        <- tcLookupPromDataCon rightAssociativeDataConName
-    pNA        <- tcLookupPromDataCon notAssociativeDataConName
-    pSUpk      <- tcLookupPromDataCon sourceUnpackDataConName
-    pSNUpk     <- tcLookupPromDataCon sourceNoUnpackDataConName
-    pNSUpkness <- tcLookupPromDataCon noSourceUnpackednessDataConName
-    pSLzy      <- tcLookupPromDataCon sourceLazyDataConName
-    pSStr      <- tcLookupPromDataCon sourceStrictDataConName
-    pNSStrness <- tcLookupPromDataCon noSourceStrictnessDataConName
-    pDLzy      <- tcLookupPromDataCon decidedLazyDataConName
-    pDStr      <- tcLookupPromDataCon decidedStrictDataConName
-    pDUpk      <- tcLookupPromDataCon decidedUnpackDataConName
+    md         <- tcLookupPromDataCon metaDataDataConOcc
+    mc         <- tcLookupPromDataCon metaConsDataConOcc
+    ms         <- tcLookupPromDataCon metaSelDataConOcc
+    pPrefix    <- tcLookupPromDataCon prefixIDataConOcc
+    pInfix     <- tcLookupPromDataCon infixIDataConOcc
+    pLA        <- tcLookupPromDataCon leftAssociativeDataConOcc
+    pRA        <- tcLookupPromDataCon rightAssociativeDataConOcc
+    pNA        <- tcLookupPromDataCon notAssociativeDataConOcc
+    pSUpk      <- tcLookupPromDataCon sourceUnpackDataConOcc
+    pSNUpk     <- tcLookupPromDataCon sourceNoUnpackDataConOcc
+    pNSUpkness <- tcLookupPromDataCon noSourceUnpackednessDataConOcc
+    pSLzy      <- tcLookupPromDataCon sourceLazyDataConOcc
+    pSStr      <- tcLookupPromDataCon sourceStrictDataConOcc
+    pNSStrness <- tcLookupPromDataCon noSourceStrictnessDataConOcc
+    pDLzy      <- tcLookupPromDataCon decidedLazyDataConOcc
+    pDStr      <- tcLookupPromDataCon decidedStrictDataConOcc
+    pDUpk      <- tcLookupPromDataCon decidedUnpackDataConOcc
 
     let mkSum' a b = mkTyConApp plus  [k,a,b]
         mkProd a b = mkTyConApp times [k,a,b]

@@ -16,11 +16,10 @@ the big-num package or (for plugins) the ghc package.
  - Uniques for Ids, DataCons, TyCons and Classes that the compiler
    "knows about" in some way
         e.g.    orderingTyConKey :: Unique
-                minusClassOpKey :: Unique
 
  - Knowledge about known-key names.
      knownKeyUniqMap, knownkeyOccMap, basicKnownKeyTable, etc
-   See Note [Overview of known-key entities] in GHC.Builtin
+   See Note [Overview of known entities] in GHC.Builtin
 
  - RdrNames for Ids, DataCons etc that the compiler may emit into
    generated code (e.g. for deriving).
@@ -28,7 +27,7 @@ the big-num package or (for plugins) the ghc package.
    It's not necessary to know the uniques for these guys, only their names
 
 
-Note [Known-key names]   <---- OLD VERSION
+Note [Known-key names]   <---- LEGACY VERSION
 ~~~~~~~~~~~~~~~~~~~~~~
 It is *very* important that the compiler gives wired-in things and
 things with "known-key" names the correct Uniques wherever they
@@ -183,12 +182,6 @@ knownKeyTable
     -- Class Eq and Ord
     , (mkTcOcc "Eq",           eqClassKey)
     , (mkTcOcc "Ord",          ordClassKey)
-    , (mkVarOcc "==",          eqClassOpKey)
-    , (mkVarOcc ">=",          geClassOpKey)
-    , (mkVarOcc "<=",          leClassOpKey)
-    , (mkVarOcc "<",           ltClassOpKey)
-    , (mkVarOcc ">",           gtClassOpKey)
-    , (mkVarOcc "compare",     compareClassOpKey)
 
     -- Enum
     , (mkTcOcc "Enum",            enumClassKey)
@@ -200,40 +193,25 @@ knownKeyTable
     , (mkTcOcc "Fractional",        fractionalClassKey)
     , (mkTcOcc "RealFloat",         realFloatClassKey)
     , (mkTcOcc "RealFrac",          realFracClassKey)
-    , (mkVarOcc "-",                minusClassOpKey)
-    , (mkVarOcc "negate",           negateClassOpKey)
-    , (mkVarOcc "fromInteger",      fromIntegerClassOpKey)
-    , (mkVarOcc "divInt#",          divIntIdKey)
-    , (mkVarOcc "modInt#",          modIntIdKey)
 
     , (mkTcOcc "Ratio",             ratioTyConKey)
     , (mkDataOcc ":%",              ratioDataConKey)
     , (mkVarOcc "fromIntegral",     fromIntegralIdKey)
-    , (mkVarOcc "fromRational",     fromRationalClassOpKey)
     , (mkVarOcc "toInteger",        toIntegerClassOpKey)
     , (mkVarOcc "toRational",       toRationalClassOpKey)
     , (mkVarOcc "realToFrac",       realToFracIdKey)
-    , (mkVarOcc "mkRationalBase2",  mkRationalBase2IdKey)
-    , (mkVarOcc "mkRationalBase10", mkRationalBase10IdKey)
 
     -- Class Functor
     , (mkTcOcc "Functor",     functorClassKey)
-    , (mkVarOcc "fmap",       fmapClassOpKey)
 
     -- Class Monad, MonadFix, MonadZip
     , (mkTcOcc "Monad",        monadClassKey)
     , (thenMClassOpOcc,        thenMClassOpKey)
-    , (mkVarOcc ">>=",         bindMClassOpKey)
+    , (bindMClassOpOcc,        bindMClassOpKey)
     , (returnMClassOpOcc,      returnMClassOpKey)
-    , (mkVarOcc "fail",        failMClassOpKey)
-    , (mkVarOcc "guard",       guardMIdKey)
-    , (mkVarOcc "mfix",        mfixIdKey)
-    , (mkVarOcc "join",        joinMIdKey)
 
     -- Class Applicative
     , (mkTcOcc "Applicative",  applicativeClassKey)
-    , (mkVarOcc "mzip",        mzipIdKey)
-    , (mkVarOcc "<*>",         apAClassOpKey)
     , (pureAClassOpOcc,        pureAClassOpKey)
     , (thenAClassOpOcc,        thenAClassOpKey)
 
@@ -257,22 +235,10 @@ knownKeyTable
 
     -- Records
     , (mkTcOcc "HasField",   hasFieldClassKey)
-    , (mkVarOcc "fromLabel", fromLabelClassOpKey)
-    , (mkVarOcc "getField",  getFieldClassOpKey)
-    , (mkVarOcc "setField",  setFieldClassOpKey)
+    , (getFieldClassOpOcc,   getFieldClassOpKey)
 
     -- FromList
-    , (mkVarOcc "fromList",   fromListClassOpKey)
-    , (mkVarOcc "fromListN",  fromListNClassOpKey)
     , (mkVarOcc "toList",     toListClassOpKey)
-
-    -- Arrows
-    , (mkVarOcc "arr",        arrAIdKey)
-    , (mkVarOcc ">>>",        composeAIdKey)
-    , (mkVarOcc "first",      firstAIdKey)
-    , (mkVarOcc "app",        appAIdKey)
-    , (mkVarOcc "|||",        choiceAIdKey)
-    , (mkVarOcc "loop",       loopAIdKey)
 
     -- Generics
     , (mkTcOcc "Generic",   genClassKey)
@@ -298,11 +264,19 @@ knownKeyTable
     , (mkVarOcc "eqString",                 eqStringIdKey)
     , (mkVarOcc "inline",                   inlineIdKey)
     , (mkVarOcc "seq#",                     seqHashKey)
+    , (mkVarOcc "divInt#",                  divIntIdKey)
+    , (mkVarOcc "modInt#",                  modIntIdKey)
 
     -- Unsafe equality proofs
     , (mkVarOcc "unsafeEqualityProof",      unsafeEqualityProofIdKey)
     , (mkTcOcc  "UnsafeEquality",           unsafeEqualityTyConKey)
     , (mkDataOcc "UnsafeRefl",              unsafeReflDataConKey)
+
+    -- BuiltinRules in ConstantFold
+    , (mkVarOcc "integerToFloat#",    integerToFloatIdKey)
+    , (mkVarOcc "integerToDouble#",   integerToDoubleIdKey)
+    , (mkVarOcc "rationalToFloat#",   rationalToFloatIdKey)
+    , (mkVarOcc "rationalToDouble#",  rationalToDoubleIdKey)
 
     -- Bignum operations, have BuiltinRules in ConstantFold
     , (mkVarOcc "bigNatEq#",                 bignatEqIdKey)
@@ -366,8 +340,7 @@ knownKeyTable
 
 basicKnownKeyNames :: [Name]  -- See Note [Known-key names]
 basicKnownKeyNames
- = genericTyConNames
- ++ [   --  Classes.  *Must* include:
+ = [   --  Classes.  *Must* include:
         --      classes that are grabbed by key (e.g., eqClassKey)
         --      classes in "Class.standardClassKeys" (quite a few)
         -- The IO type
@@ -382,23 +355,14 @@ basicKnownKeyNames
         starArrStarArrStarKindRepName,
         constraintKindRepName,
 
-        -- String stuff
-        fromStringName,
-
         -- Monad stuff
         bindMName,
-
-        -- Stable pointers
-        newStablePtrName,
 
         -- GHC Extensions
         considerAccessibleName,
 
         -- Strings and lists
         unpackCStringName, unpackCStringUtf8Name,
-
-        -- Non-empty lists
-        nonEmptyTyConName,
 
         -- FFI primitive types that are not wired-in.
         stablePtrTyConName, ptrTyConName, funPtrTyConName, constPtrConName,
@@ -412,12 +376,6 @@ basicKnownKeyNames
         assertErrorName, traceName,
         printName,
         dollarName,
-
-        -- Float/Double
-        integerToFloatName,
-        integerToDoubleName,
-        rationalToFloatName,
-        rationalToDoubleName,
 
         -- Type-level naturals
         knownNatClassName, knownSymbolClassName, knownCharClassName,
@@ -469,21 +427,6 @@ basicKnownKeyNames
         , unsafeUnpackJSStringUtf8ShShName
     ]
 
-genericTyConNames :: [Name]
-genericTyConNames = [
-    v1TyConName, u1TyConName, par1TyConName, rec1TyConName, sumTyConName,
-    prodTyConName, compTyConName, rec0TyConName, d1TyConName, c1TyConName,
-    s1TyConName, repTyConName, rep1TyConName,
-    uAddrTyConName, uCharTyConName, uDoubleTyConName,
-    uFloatTyConName, uIntTyConName, uWordTyConName,
-    prefixIDataConName, infixIDataConName, leftAssociativeDataConName,
-    rightAssociativeDataConName, notAssociativeDataConName,
-    sourceUnpackDataConName, sourceNoUnpackDataConName,
-    noSourceUnpackednessDataConName, sourceLazyDataConName,
-    sourceStrictDataConName, noSourceStrictnessDataConName,
-    decidedLazyDataConName, decidedStrictDataConName, decidedUnpackDataConName,
-    metaDataDataConName, metaConsDataConName, metaSelDataConName
-  ]
 
 {-
 ************************************************************************
@@ -506,64 +449,6 @@ runRWName     = varQual gHC_MAGIC       (fsLit "runRW#")    runRWKey
 
 specTyConName :: Name
 specTyConName     = tcQual gHC_TYPES (fsLit "SPEC") specTyConKey
-
--- Generics (types)
-v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
-  sumTyConName, prodTyConName, compTyConName, rec0TyConName, d1TyConName,
-  c1TyConName, s1TyConName, repTyConName, rep1TyConName,
-  uAddrTyConName, uCharTyConName, uDoubleTyConName,
-  uFloatTyConName, uIntTyConName, uWordTyConName,
-  prefixIDataConName, infixIDataConName, leftAssociativeDataConName,
-  rightAssociativeDataConName, notAssociativeDataConName,
-  sourceUnpackDataConName, sourceNoUnpackDataConName,
-  noSourceUnpackednessDataConName, sourceLazyDataConName,
-  sourceStrictDataConName, noSourceStrictnessDataConName,
-  decidedLazyDataConName, decidedStrictDataConName, decidedUnpackDataConName,
-  metaDataDataConName, metaConsDataConName, metaSelDataConName :: Name
-
-v1TyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "V1") v1TyConKey
-u1TyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "U1") u1TyConKey
-par1TyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "Par1") par1TyConKey
-rec1TyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "Rec1") rec1TyConKey
-
-sumTyConName    = tcQual gHC_INTERNAL_GENERICS (fsLit ":+:") sumTyConKey
-prodTyConName   = tcQual gHC_INTERNAL_GENERICS (fsLit ":*:") prodTyConKey
-compTyConName   = tcQual gHC_INTERNAL_GENERICS (fsLit ":.:") compTyConKey
-
-rec0TyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "Rec0") rec0TyConKey
-d1TyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "D1") d1TyConKey
-c1TyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "C1") c1TyConKey
-s1TyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "S1") s1TyConKey
-
-repTyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "Rep")  repTyConKey
-rep1TyConName = tcQual gHC_INTERNAL_GENERICS (fsLit "Rep1") rep1TyConKey
-
-uAddrTyConName     = tcQual gHC_INTERNAL_GENERICS (fsLit "UAddr") uAddrTyConKey
-uCharTyConName     = tcQual gHC_INTERNAL_GENERICS (fsLit "UChar") uCharTyConKey
-uDoubleTyConName   = tcQual gHC_INTERNAL_GENERICS (fsLit "UDouble") uDoubleTyConKey
-uFloatTyConName    = tcQual gHC_INTERNAL_GENERICS (fsLit "UFloat") uFloatTyConKey
-uIntTyConName      = tcQual gHC_INTERNAL_GENERICS (fsLit "UInt") uIntTyConKey
-uWordTyConName     = tcQual gHC_INTERNAL_GENERICS (fsLit "UWord") uWordTyConKey
-
-prefixIDataConName = dcQual gHC_INTERNAL_GENERICS (fsLit "PrefixI")  prefixIDataConKey
-infixIDataConName  = dcQual gHC_INTERNAL_GENERICS (fsLit "InfixI")   infixIDataConKey
-leftAssociativeDataConName  = dcQual gHC_INTERNAL_GENERICS (fsLit "LeftAssociative")   leftAssociativeDataConKey
-rightAssociativeDataConName = dcQual gHC_INTERNAL_GENERICS (fsLit "RightAssociative")  rightAssociativeDataConKey
-notAssociativeDataConName   = dcQual gHC_INTERNAL_GENERICS (fsLit "NotAssociative")    notAssociativeDataConKey
-
-sourceUnpackDataConName         = dcQual gHC_INTERNAL_GENERICS (fsLit "SourceUnpack")         sourceUnpackDataConKey
-sourceNoUnpackDataConName       = dcQual gHC_INTERNAL_GENERICS (fsLit "SourceNoUnpack")       sourceNoUnpackDataConKey
-noSourceUnpackednessDataConName = dcQual gHC_INTERNAL_GENERICS (fsLit "NoSourceUnpackedness") noSourceUnpackednessDataConKey
-sourceLazyDataConName           = dcQual gHC_INTERNAL_GENERICS (fsLit "SourceLazy")           sourceLazyDataConKey
-sourceStrictDataConName         = dcQual gHC_INTERNAL_GENERICS (fsLit "SourceStrict")         sourceStrictDataConKey
-noSourceStrictnessDataConName   = dcQual gHC_INTERNAL_GENERICS (fsLit "NoSourceStrictness")   noSourceStrictnessDataConKey
-decidedLazyDataConName          = dcQual gHC_INTERNAL_GENERICS (fsLit "DecidedLazy")          decidedLazyDataConKey
-decidedStrictDataConName        = dcQual gHC_INTERNAL_GENERICS (fsLit "DecidedStrict")        decidedStrictDataConKey
-decidedUnpackDataConName        = dcQual gHC_INTERNAL_GENERICS (fsLit "DecidedUnpack")        decidedUnpackDataConKey
-
-metaDataDataConName  = dcQual gHC_INTERNAL_GENERICS (fsLit "MetaData")  metaDataDataConKey
-metaConsDataConName  = dcQual gHC_INTERNAL_GENERICS (fsLit "MetaCons")  metaConsDataConKey
-metaSelDataConName   = dcQual gHC_INTERNAL_GENERICS (fsLit "MetaSel")   metaSelDataConKey
 
 -- Base strings Strings
 unpackCStringName, unpackCStringUtf8Name :: Name
@@ -597,13 +482,12 @@ considerAccessibleName :: Name
 considerAccessibleName = varQual gHC_MAGIC (fsLit "considerAccessible") considerAccessibleIdKey
 
 -- Random GHC.Internal.Base functions
-fromStringName, otherwiseIdName,
+otherwiseIdName,
     assertName,
     dollarName :: Name
 dollarName        = varQual gHC_INTERNAL_BASE (fsLit "$")          dollarIdKey
 otherwiseIdName   = varQual gHC_INTERNAL_BASE (fsLit "otherwise")  otherwiseIdKey
 assertName        = varQual gHC_INTERNAL_BASE (fsLit "assert")     assertIdKey
-fromStringName    = varQual gHC_INTERNAL_DATA_STRING (fsLit "fromString") fromStringClassOpKey
 
 bnbVarQual, bnnVarQual, bniVarQual :: String -> Unique -> Name
 bnbVarQual str key = varQual gHC_INTERNAL_NUM_BIGNAT  (fsLit str) key
@@ -616,14 +500,6 @@ bniVarQual str key = varQual gHC_INTERNAL_NUM_INTEGER (fsLit str) key
 -- End of ghc-bignum
 ---------------------------------
 
--- GHC.Internal.Real types and classes
--- other GHC.Internal.Float functions
-integerToFloatName, integerToDoubleName,
-  rationalToFloatName, rationalToDoubleName :: Name
-integerToFloatName   = varQual gHC_INTERNAL_FLOAT (fsLit "integerToFloat#") integerToFloatIdKey
-integerToDoubleName  = varQual gHC_INTERNAL_FLOAT (fsLit "integerToDouble#") integerToDoubleIdKey
-rationalToFloatName  = varQual gHC_INTERNAL_FLOAT (fsLit "rationalToFloat#") rationalToFloatIdKey
-rationalToDoubleName = varQual gHC_INTERNAL_FLOAT (fsLit "rationalToDouble#") rationalToDoubleIdKey
 
 -- Class Typeable, and functions for constructing `Typeable` dictionaries
 trGhcPrimModuleName, starKindRepName, starArrStarKindRepName,
@@ -639,9 +515,6 @@ constraintKindRepName  = varQual gHC_TYPES         (fsLit "krep$Constraint") con
 -- WithDict
 withDictClassName :: Name
 withDictClassName = clsQual gHC_MAGIC_DICT (fsLit "WithDict") withDictClassKey
-
-nonEmptyTyConName :: Name
-nonEmptyTyConName = tcQual gHC_INTERNAL_BASE (fsLit "NonEmpty") nonEmptyTyConKey
 
 -- Custom type errors
 errorMessageTypeErrorFamName
@@ -715,9 +588,8 @@ ptrTyConName      = tcQual   gHC_INTERNAL_PTR (fsLit "Ptr")    ptrTyConKey
 funPtrTyConName   = tcQual   gHC_INTERNAL_PTR (fsLit "FunPtr") funPtrTyConKey
 
 -- Foreign objects and weak pointers
-stablePtrTyConName, newStablePtrName :: Name
+stablePtrTyConName :: Name
 stablePtrTyConName    = tcQual   gHC_INTERNAL_STABLE (fsLit "StablePtr")    stablePtrTyConKey
-newStablePtrName      = varQual  gHC_INTERNAL_STABLE (fsLit "newStablePtr") newStablePtrIdKey
 
 -- Annotation type checking
 toAnnotationWrapperName :: Name
@@ -821,14 +693,16 @@ dcQual   modu str unique = mk_known_key_name dataName modu str unique
 *                                                                      *
 ********************************************************************* -}
 
-sappendClassOpOcc, pureAClassOpOcc, thenAClassOpOcc,
-  returnMClassOpOcc, thenMClassOpOcc, mappendClassOpOcc :: KnownOcc
-sappendClassOpOcc = mkVarOcc "<>"
-pureAClassOpOcc   = mkVarOcc "pure"
-returnMClassOpOcc = mkVarOcc "return"
-thenMClassOpOcc   = mkVarOcc ">>"
-thenAClassOpOcc   = mkVarOcc "*>"
-mappendClassOpOcc = mkVarOcc "mappend"
+sappendClassOpOcc, pureAClassOpOcc, thenAClassOpOcc, bindMClassOpOcc,
+  returnMClassOpOcc, thenMClassOpOcc, mappendClassOpOcc, getFieldClassOpOcc :: KnownOcc
+sappendClassOpOcc  = mkVarOcc "<>"
+pureAClassOpOcc    = mkVarOcc "pure"
+returnMClassOpOcc  = mkVarOcc "return"
+thenMClassOpOcc    = mkVarOcc ">>"
+bindMClassOpOcc    = mkVarOcc ">>="
+thenAClassOpOcc    = mkVarOcc "*>"
+mappendClassOpOcc  = mkVarOcc "mappend"
+getFieldClassOpOcc = mkVarOcc "getField"
 
 
 {- *********************************************************************

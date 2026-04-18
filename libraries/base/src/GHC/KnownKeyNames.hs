@@ -58,9 +58,11 @@ module GHC.KnownKeyNames
     -- Generics
     , Generic(..), Generic1(..)
     , Datatype(..), Constructor(..), Selector(..)
-    , U1(..), Par1(..), Rec1(..), K1(..), M1(..)
-    , (:+:)(L1, R1), (:*:)((:*:)), (:.:)(Comp1, unComp1)
-    , UAddr, UChar, UDouble, UFloat, UInt, UWord
+    , U1(..), Par1(..), Rec0, Rec1(..), K1(..), M1(..), S1, C1, D1
+    , V1, (:+:)(L1, R1), (:*:)((:*:)), (:.:)(Comp1, unComp1)
+    , UAddr, UChar, UDouble, UFloat, UInt, UWord, Meta(..)
+    , FixityI(..), Associativity(..), SourceUnpackedness(..), SourceStrictness(..)
+    , DecidedStrictness(..)
 
     -- DataToTag
     , DataToTag
@@ -126,6 +128,9 @@ module GHC.KnownKeyNames
     -- Static pointers
     , IsStatic( fromStaticPtr ), makeStatic
 
+    -- Stable pointers
+    , newStablePtr
+
     -- Dynamic
     , toDyn
 
@@ -144,6 +149,9 @@ module GHC.KnownKeyNames
     , typeRep#
     , mkTrCon, mkTrAppChecked, mkTrFun
     , typeNatTypeRep, typeSymbolTypeRep, typeCharTypeRep
+
+    -- More things with RULES
+    , integerToFloat#, integerToDouble#, rationalToFloat#, rationalToDouble#
 
     -- Bignums
     , bigNatEq#, bigNatCompare, bigNatCompareWord#
@@ -210,7 +218,7 @@ import GHC.Internal.Data.String( fromString )
 import GHC.Internal.Data.Either( Either(..) )
 import GHC.Internal.Data.Foldable( Foldable(..), null, all )
 import GHC.Internal.Data.Traversable( Traversable, traverse )
-import GHC.Internal.Float( RealFloat )
+import GHC.Internal.Float
 import GHC.Internal.IO( seq# )
 import GHC.Internal.Control.Monad( fail, guard )
 import GHC.Internal.Control.Monad.Fix( mfix, loop )
@@ -231,19 +239,15 @@ import GHC.Internal.Unsafe.Coerce( UnsafeEquality(..), unsafeEqualityProof )
 import GHC.Internal.StaticPtr( IsStatic(..) )
 import GHC.Internal.StaticPtr.Internal( makeStatic )
 
+import GHC.Internal.Stable( newStablePtr )
 import GHC.Internal.Data.Typeable( gcast1, gcast2 )
 import GHC.Internal.Data.Typeable.Internal as TR
-import GHC.Internal.Generics( Generic(..), Generic1(..), Datatype(..)
-                            , Constructor(..), Selector(..)
-                            , U1(..), Par1(..), Rec1(..), K1(..), M1(..)
-                            , (:+:)(..), (:*:)(..), (:.:)(..)
-                            , UAddr,  UChar, UDouble
-                            , UFloat, UInt,  UWord
-                            )
-
+import GHC.Internal.Generics hiding( Fixity(..), prec )
 import GHC.Internal.Bignum.BigNat
 
-import GHC.Internal.TH.Syntax as TH hiding( Fixity(..) )
+import GHC.Internal.TH.Syntax as TH
+       hiding( Fixity(..), SourceUnpackedness(..), SourceStrictness(..)
+             , DecidedStrictness(..) )
    -- hiding(Fixity) see Note [Tricky known-occ cases] in GHC.Builtin.KnownOccs
 import GHC.Internal.TH.Lib
 import GHC.Internal.TH.Lift

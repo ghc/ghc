@@ -167,7 +167,7 @@ module Prelude (
 import GHC.KnownKeyNames ()
    -- Force a dependency on KnownKeyNames, so that any module that
    -- imports Prelude can rely on KnownKeyNames existing, and hence
-   -- can be compiled without -frebindable-known-key-names
+   -- can be compiled without -frebindable-known-names
 
 import GHC.Internal.Control.Monad
 import GHC.Internal.System.IO

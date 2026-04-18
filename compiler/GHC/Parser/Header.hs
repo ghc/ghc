@@ -88,7 +88,7 @@ getImportEdges
 getImportEdges dflags buf filename source_filename = do
   let loc  = mkRealSrcLoc (mkFastString filename) 1 1
       imp_prelude   = xopt LangExt.ImplicitPrelude dflags
-      rebindable_kn = gopt Opt_RebindableKnownKeyNames dflags
+      rebindable_kn = gopt Opt_RebindableKnownNames dflags
       popts         = initParserOpts dflags
       sec           = initSourceErrorContext dflags
   case unP parseHeader (initParserState popts buf loc) of
@@ -114,7 +114,7 @@ getImportEdges dflags buf filename source_filename = do
                 convImport (L _ (i :: ImportDecl GhcPs))     = (convImportLevel (ideclLevelSpec i), ideclPkgQual i, reLoc $ ideclName i)
                 convImport_src (L _ (i :: ImportDecl GhcPs)) = (reLoc $ ideclName i)
 
-                known_key_name_edges   -- Add an edge to GHC.KnownKeyNames, unless -frebindable-known-key-names is on
+                known_key_name_edges   -- Add an edge to GHC.KnownKeyNames, unless -frebindable-known-names is on
                   | rebindable_kn = []
                   | otherwise = [(NormalLevel, NoRawPkgQual, noLoc kNOWN_KEY_NAMES)]
               in

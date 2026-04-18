@@ -26,7 +26,7 @@ Library
 
     build-depends: ghc-internal
 
-    ghc-options: -frebindable-known-key-names
+    ghc-options: -frebindable-known-names
          -- Do not create dependencies on GHC.KnownKeyNames!
          -- It doesn't exist yet.
 

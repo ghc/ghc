@@ -277,7 +277,7 @@ dsJsFExportDynamic id co0 cconv = do
         -- Construct the label based on the passed id, don't use names
         -- depending on Unique. See #13807 and Note [Unique Determinism].
     cback <- newSysLocalDs scaled_arg_ty
-    newStablePtrId <- dsLookupGlobalId newStablePtrName
+    newStablePtrId <- dsLookupKnownOccId newStablePtrIdOcc
     stable_ptr_tycon <- dsLookupTyCon stablePtrTyConName
     let
         stable_ptr_ty = mkTyConApp stable_ptr_tycon [arg_ty]

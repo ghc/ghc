@@ -142,21 +142,62 @@ knownOccs
     , kindRepTypeLitSDataConOcc
     ]
 
+eqClassOpOcc, negateClassOpOcc, minusClassOpOcc, geClassOpOcc, toListClassOpOcc,
+  fromListNClassOpOcc, fromListClassOpOcc, fromLabelClassOpOcc,
+  setFieldClassOpOcc, fromStringClassOpOcc :: KnownOcc
+eqClassOpOcc         = mkVarOcc "=="
+negateClassOpOcc     = mkVarOcc "negate"
+minusClassOpOcc      = mkVarOcc "-"
+geClassOpOcc         = mkVarOcc ">="
+toListClassOpOcc     = mkVarOcc "toList"
+fromListNClassOpOcc  = mkVarOcc "fromListN"
+fromListClassOpOcc   = mkVarOcc "fromList"
+fromLabelClassOpOcc  = mkVarOcc "fromLabel"
+setFieldClassOpOcc   = mkVarOcc "setField"
+fromStringClassOpOcc = mkVarOcc "fromString"
+
+appAIdOcc, arrAIdOcc, firstAIdOcc, composeAIdOcc, choiceAIdOcc, loopAIdOcc :: KnownOcc
+appAIdOcc            = mkVarOcc "app"
+arrAIdOcc            = mkVarOcc "arr"
+composeAIdOcc        = mkVarOcc ">>>"
+firstAIdOcc          = mkVarOcc "first"
+choiceAIdOcc         = mkVarOcc "|||"
+loopAIdOcc           = mkVarOcc "loop"
+
+composeIdOcc, mapIdOcc, foldrListIdOcc :: KnownOcc
+composeIdOcc         = mkVarOcc "."
+mapIdOcc             = mkVarOcc "map"
+foldrListIdOcc       = mkVarOcc "foldrList"
+
+guardMIdOcc, mfixIdOcc, joinMIdOcc, mzipIdOcc, apAClassOpOcc, failMClassOpOcc, fmapClassOpOcc,
+  fromIntegerClassOpOcc,
+  fromRationalClassOpOcc, mkRationalBase2IdOcc, mkRationalBase10IdOcc :: KnownOcc
+guardMIdOcc            = mkVarOcc "guard"
+mfixIdOcc              = mkVarOcc "mfix"
+joinMIdOcc             = mkVarOcc "join"
+mzipIdOcc              = mkVarOcc "mzip"
+apAClassOpOcc          = mkVarOcc "<*>"
+fmapClassOpOcc         = mkVarOcc "fmap"
+failMClassOpOcc        = mkVarOcc "fail"
+fromIntegerClassOpOcc  = mkVarOcc "fromInteger"
+fromRationalClassOpOcc = mkVarOcc "fromRational"
+mkRationalBase2IdOcc   = mkVarOcc "mkRationalBase2"
+mkRationalBase10IdOcc  = mkVarOcc "mkRationalBase10"
+
 -- Some known-occ data types and their constructors
-eitherTyConOcc, leftDataConOcc, rightDataConOcc, voidTyConOcc, rationalTyConOcc :: KnownOcc
+eitherTyConOcc, leftDataConOcc, rightDataConOcc, voidTyConOcc, rationalTyConOcc,
+  nonEmptyTyConOcc :: KnownOcc
 eitherTyConOcc   = mkTcOcc "Either"
 leftDataConOcc   = mkDataOcc "Left"
 rightDataConOcc  = mkDataOcc "Right"
 voidTyConOcc     = mkTcOcc "Void"
 rationalTyConOcc = mkTcOcc "Rational"
+nonEmptyTyConOcc = mkTcOcc "NonEmpty"
 
-composeIdOcc, mapIdOcc, foldrListIdOcc :: KnownOcc
-composeIdOcc   = mkVarOcc "."
-mapIdOcc       = mkVarOcc "map"
-foldrListIdOcc = mkVarOcc "foldrList"
 
-fromStaticPtrClassOpOcc :: KnownOcc
+fromStaticPtrClassOpOcc, newStablePtrIdOcc :: KnownOcc
 fromStaticPtrClassOpOcc = mkVarOcc "fromStaticPtr"
+newStablePtrIdOcc       = mkVarOcc "newStablePtr"
 
 returnIOIdOcc, bindIOIdOcc, thenIOIdOcc, printIdOcc :: KnownOcc
 returnIOIdOcc = mkVarOcc "returnIO"
@@ -211,6 +252,57 @@ kindRepFunDataConOcc      = mkDataOcc "KindRepFun"
 kindRepTYPEDataConOcc     = mkDataOcc "KindRepTYPE"
 kindRepTypeLitSDataConOcc = mkDataOcc "KindRepTypeLitS"
 
+-- Generics
+v1TyConOcc, u1TyConOcc, par1TyConOcc, rec1TyConOcc,
+  sumTyConOcc, prodTyConOcc, compTyConOcc, rec0TyConOcc, d1TyConOcc,
+  c1TyConOcc, s1TyConOcc, repTyConOcc, rep1TyConOcc,
+  uAddrTyConOcc, uCharTyConOcc, uDoubleTyConOcc,
+  uFloatTyConOcc, uIntTyConOcc, uWordTyConOcc,
+  prefixIDataConOcc, infixIDataConOcc, leftAssociativeDataConOcc,
+  rightAssociativeDataConOcc, notAssociativeDataConOcc,
+  sourceUnpackDataConOcc, sourceNoUnpackDataConOcc,
+  noSourceUnpackednessDataConOcc, sourceLazyDataConOcc,
+  sourceStrictDataConOcc, noSourceStrictnessDataConOcc,
+  decidedLazyDataConOcc, decidedStrictDataConOcc, decidedUnpackDataConOcc,
+  metaDataDataConOcc, metaConsDataConOcc, metaSelDataConOcc :: KnownOcc
+
+v1TyConOcc      = mkTcOcc "V1"
+u1TyConOcc      = mkTcOcc "U1"
+par1TyConOcc    = mkTcOcc "Par1"
+rec1TyConOcc    = mkTcOcc "Rec1"
+sumTyConOcc     = mkTcOcc ":+:"
+prodTyConOcc    = mkTcOcc ":*:"
+compTyConOcc    = mkTcOcc ":.:"
+rec0TyConOcc    = mkTcOcc "Rec0"
+d1TyConOcc      = mkTcOcc "D1"
+c1TyConOcc      = mkTcOcc "C1"
+s1TyConOcc      = mkTcOcc "S1"
+repTyConOcc     = mkTcOcc "Rep"
+rep1TyConOcc    = mkTcOcc "Rep1"
+uAddrTyConOcc   = mkTcOcc "UAddr"
+uCharTyConOcc   = mkTcOcc "UChar"
+uDoubleTyConOcc = mkTcOcc "UDouble"
+uFloatTyConOcc  = mkTcOcc "UFloat"
+uIntTyConOcc    = mkTcOcc "UInt"
+uWordTyConOcc   = mkTcOcc "UWord"
+
+prefixIDataConOcc              = mkDataOcc "PrefixI"
+infixIDataConOcc               = mkDataOcc "InfixI"
+leftAssociativeDataConOcc      = mkDataOcc "LeftAssociative"
+rightAssociativeDataConOcc     = mkDataOcc "RightAssociative"
+notAssociativeDataConOcc       = mkDataOcc "NotAssociative"
+sourceUnpackDataConOcc         = mkDataOcc "SourceUnpack"
+sourceNoUnpackDataConOcc       = mkDataOcc "SourceNoUnpack"
+noSourceUnpackednessDataConOcc = mkDataOcc "NoSourceUnpackedness"
+sourceLazyDataConOcc           = mkDataOcc "SourceLazy"
+sourceStrictDataConOcc         = mkDataOcc "SourceStrict"
+noSourceStrictnessDataConOcc   = mkDataOcc "NoSourceStrictness"
+decidedLazyDataConOcc          = mkDataOcc "DecidedLazy"
+decidedStrictDataConOcc        = mkDataOcc "DecidedStrict"
+decidedUnpackDataConOcc        = mkDataOcc "DecidedUnpack"
+metaDataDataConOcc             = mkDataOcc "MetaData"
+metaConsDataConOcc             = mkDataOcc "MetaCons"
+metaSelDataConOcc              = mkDataOcc "MetaSel"
 
 {- *********************************************************************
 *                                                                      *
@@ -418,12 +510,12 @@ word32DataCon_RDR = knownDataOccRdrName "W32#"
 word64DataCon_RDR = knownDataOccRdrName "W64#"
 
 eq_RDR, ge_RDR, le_RDR, lt_RDR, gt_RDR, compare_RDR :: RdrName
-eq_RDR      = knownKeyRdrName eqClassOpKey
-ge_RDR      = knownKeyRdrName geClassOpKey
-le_RDR      = knownKeyRdrName leClassOpKey
-lt_RDR      = knownKeyRdrName ltClassOpKey
-gt_RDR      = knownKeyRdrName gtClassOpKey
-compare_RDR = knownKeyRdrName compareClassOpKey
+eq_RDR      = knownOccRdrName eqClassOpOcc
+ge_RDR      = knownOccRdrName geClassOpOcc
+le_RDR      = knownVarOccRdrName "<="
+lt_RDR      = knownVarOccRdrName "<"
+gt_RDR      = knownVarOccRdrName ">"
+compare_RDR = knownVarOccRdrName "compare"
 
 returnM_RDR :: RdrName
 returnM_RDR = knownKeyRdrName returnMClassOpKey
@@ -448,9 +540,9 @@ gtTag_RDR       = nameRdrName ordGTDataConName
 fmap_RDR, replace_RDR, pure_RDR, ap_RDR, liftA2_RDR, foldable_foldr_RDR,
     foldMap_RDR, null_RDR, all_RDR, traverse_RDR, mempty_RDR,
     mappend_RDR :: RdrName
-fmap_RDR           = knownKeyRdrName fmapClassOpKey
+fmap_RDR           = knownOccRdrName fmapClassOpOcc
 pure_RDR           = knownKeyRdrName pureAClassOpKey
-ap_RDR             = knownKeyRdrName apAClassOpKey
+ap_RDR             = knownOccRdrName apAClassOpOcc
 mempty_RDR         = knownKeyRdrName memptyClassOpKey
 mappend_RDR        = knownKeyRdrName mappendClassOpKey
 replace_RDR        = knownVarOccRdrName "<$"
@@ -527,9 +619,9 @@ conName_RDR       = knownVarOccRdrName "conName"
 conFixity_RDR     = knownVarOccRdrName "conFixity"
 conIsRecord_RDR   = knownVarOccRdrName "conIsRecord"
 
-leftAssocDataCon_RDR  = nameRdrName leftAssociativeDataConName
-rightAssocDataCon_RDR = nameRdrName rightAssociativeDataConName
-notAssocDataCon_RDR   = nameRdrName notAssociativeDataConName
+leftAssocDataCon_RDR  = knownOccRdrName leftAssociativeDataConOcc
+rightAssocDataCon_RDR = knownOccRdrName rightAssociativeDataConOcc
+notAssocDataCon_RDR   = knownOccRdrName notAssociativeDataConOcc
 
 uAddrDataCon_RDR   = knownDataOccRdrName "UAddr"
 uCharDataCon_RDR   = knownDataOccRdrName "UChar"

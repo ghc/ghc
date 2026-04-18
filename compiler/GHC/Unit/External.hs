@@ -153,7 +153,7 @@ data ExternalPackageState
         -- See Note [Interface Files with Core Definitions]
         eps_iface_bytecode :: !(ModuleEnv (IO Linkable)),
 
-        eps_known_keys   :: Maybe KnownKeyNameMaps, -- ^ See Note [Overview of known-key entities]
+        eps_known_keys   :: Maybe KnownKeyNameMaps, -- ^ See Note [Overview of known entities]
 
         eps_inst_env     :: !PackageInstEnv,   -- ^ The total 'InstEnv' accumulated
                                                -- from all the external-package modules

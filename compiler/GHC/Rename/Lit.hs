@@ -4,7 +4,7 @@ module GHC.Rename.Lit where
 
 import GHC.Prelude
 
-import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs
 import GHC.Hs
 import GHC.Rename.Env (lookupNameWithQualifier)
 import GHC.Rename.Utils (genHsApps, genLHsLit)
@@ -17,7 +17,7 @@ rnQualLit QualLit{..} = do
   let (funNameBase, hsLit) =
         case ql_val of
           -- See Note [Implementation of QualifiedStrings]
-          HsQualString st s -> (fromStringClassOpKey, HsString st s)
+          HsQualString st s -> (fromStringClassOpOcc, HsString st s)
   (funName, fvs) <- lookupNameWithQualifier ql_mod funNameBase
   let lit = QualLit{ql_ext = L noAnn funName, ..}
   let expr = genHsApps funName [genLHsLit hsLit]

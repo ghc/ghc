@@ -28,7 +28,7 @@ module GHC.HsToCore.Monad (
         dsLookupGlobal, dsLookupGlobalId, dsLookupTyCon,
         dsLookupDataCon, dsLookupConLike,
         dsLookupKnownKeyTyCon, dsLookupKnownKeyDataCon, dsLookupKnownKeyId,
-        dsLookupKnownKeyName,
+        dsLookupKnownKeyName, dsLookupKnownOccName,
         dsLookupKnownOccId, dsLookupKnownOccTyCon, dsLookupKnownOccDataCon,
 
         DsMetaEnv, DsMetaVal(..), dsGetMetaEnv, dsLookupMetaEnv, dsExtendMetaEnv,
@@ -378,7 +378,8 @@ initTcDsForSolver thing_inside
          --
          --  - ds_fam_inst_env tells it how to reduce type families,
          --  - ds_gbl_rdr_env  tells it which newtypes it can unwrap.
-       ; let DsGblEnv { ds_mod = mod
+       ; let DsGblEnv { ds_mod          = mod
+                      , ds_type_env     = type_env
                       , ds_fam_inst_env = fam_inst_env
                       , ds_gbl_rdr_env  = rdr_env
                       } = gbl
@@ -386,7 +387,8 @@ initTcDsForSolver thing_inside
 
        ; (msgs, mb_ret) <- liftIO $ initTc hsc_env HsSrcFile False mod loc $
          updGblEnv (\tc_gbl -> tc_gbl { tcg_fam_inst_env = fam_inst_env
-                                      , tcg_rdr_env      = rdr_env }) $
+                                      , tcg_rdr_env      = rdr_env
+                                      , tcg_type_env     = type_env }) $
          thing_inside
        ; case mb_ret of
            Just ret -> pure ret
@@ -417,8 +419,9 @@ mkDsEnvs unit_env mod rdr_env type_env fam_inst_env ptc msg_var cc_st_var
                              NotBoot
         real_span = realSrcLocSpan (mkRealSrcLoc (moduleNameFS (moduleName mod)) 1 1)
 
-        gbl_env = DsGblEnv { ds_mod     = mod
+        gbl_env = DsGblEnv { ds_mod          = mod
                            , ds_fam_inst_env = fam_inst_env
+                           , ds_type_env     = type_env
                            , ds_gbl_rdr_env  = rdr_env
                            , ds_if_env  = (if_genv, if_lenv)
                            , ds_name_ppr_ctx = mkNamePprCtx ptc unit_env rdr_env
@@ -574,18 +577,27 @@ instance MonadThings (IOEnv (Env DsGblEnv DsLclEnv)) where
 *                                                                      *
 ********************************************************************* -}
 
-dsGetKnownKeySource :: DsM KnownKeyNameSource
+dsGetKnownKeySource :: DsM KnownNameSource
 dsGetKnownKeySource
-  = do { rebindable_path <- goptM Opt_RebindableKnownKeyNames
+  = do { rebindable_path <- goptM Opt_RebindableKnownNames
        ; if rebindable_path
          then do { env <- getGblEnv
-                 ; return (KKNS_InScope (ds_mod env)
+                 ; return (KNS_InScope (ds_mod env)
                                         (ds_gbl_rdr_env env)
                                         (ds_type_env env)) }
-         else return KKNS_FromModule }
+         else return KNS_FromModule }
 
 --------------------------------------
 -- Lookups for known-occ things
+
+dsLookupKnownOccName :: KnownOcc -> DsM Name
+dsLookupKnownOccName occ
+  = do { rebindable_src <- dsGetKnownKeySource
+       ; dsToIfL $
+         do { mb_res <- lookupKnownOccName occ rebindable_src
+            ; case mb_res of
+                 Succeeded name -> return name
+                 Failed msg -> failIfM (pprDiagnostic msg) } }
 
 dsLookupKnownOccThing :: KnownOcc -> DsM TyThing
 dsLookupKnownOccThing occ

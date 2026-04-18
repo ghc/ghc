@@ -44,6 +44,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.TyCl ( IsPrefixConGADT(..), unannotatedMultIsLinear )
 
+
 import GHC.Core.Class
 import GHC.Core.DataCon
 import GHC.Core.TyCon
@@ -53,6 +54,7 @@ import GHC.Core.Make
 import GHC.Core.Utils
 
 import GHC.Builtin( isUnboundName )
+import GHC.Builtin.KnownOccs
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.TH
 import GHC.Builtin.Types
@@ -1607,8 +1609,9 @@ repE (OpApp _ e1 op e2) =
        repInfixApp arg1 the_op arg2 }
 repE (NegApp _ x _)      = do
                               a         <- repLE x
-                              negateVar <- lift (globalKnownKey negateClassOpKey) >>= repVar
-                              negateVar `repApp` a
+                              neg_name  <- lift (globalKnownOcc negateClassOpOcc)
+                              neg_var   <- repVar neg_name
+                              neg_var `repApp` a
 repE (HsPar _ x)            = repLE x
 repE (SectionL _ x y)       = do { a <- repLE x; b <- repLE y; repSectionL a b }
 repE (SectionR _ x y)       = do { a <- repLE x; b <- repLE y; repSectionR a b }
@@ -2317,9 +2320,7 @@ lookupOccDsM n
           case mb_val of
                 Nothing           -> globalVar n
                 Just (DsBound x)  -> return (coreVar x)
-                Just (DsSplice _) -> pprPanic "repE:lookupOcc" (ppr n)
-    }
-
+                Just (DsSplice _) -> pprPanic "repE:lookupOcc" (ppr n) }
 
 -- Not bound by the meta-env
 -- Could be top-level; or could be local
@@ -2331,9 +2332,9 @@ globalVar n =
     Just m  -> globalVarExternal m (getOccName n)
     Nothing -> globalVarLocal (getUnique n) (getOccName n)
 
-globalKnownKey :: KnownKey -> DsM (Core TH.Name)
-globalKnownKey key
-  = do { name <- dsLookupKnownKeyName key
+globalKnownOcc :: KnownOcc -> DsM (Core TH.Name)
+globalKnownOcc occ
+  = do { name <- dsLookupKnownOccName occ
        ; globalVar name }
 
 globalVarLocal :: Unique -> OccName -> DsM (Core TH.Name)
@@ -3166,15 +3167,15 @@ repOverLiteralVal lit = do
 repQualLit :: HsQualLit GhcRn -> MetaM (Core (M TH.Exp))
 repQualLit QualLit{ql_mod = modName, ql_val = lit} = do
   modNameStr <- coreStringLit (moduleNameFS modName)
-  funNameStr <- coreStringLit (mkFastString . occNameString . nameOccName $ funName)
+  funNameStr <- coreStringLit (occNameFS funOcc)
   funExp <- repVar =<< repNameQ modNameStr funNameStr
   litCore <- lift . dsLit =<< mkHsLit
   litExp <- repLit =<< krep2_nw litFunName [litCore]
   repApps funExp [litExp]
   where
-    funName =
+    funOcc =
       case lit of
-        HsQualString{} -> fromStringName
+        HsQualString{} -> fromStringClassOpOcc
     (litFunName, mkHsLit) =
       case lit of
         HsQualString _ s -> (stringLOcc, mk_string s)
@@ -3230,7 +3231,7 @@ repGetField (MkC exp) fs = do
 
 repProjection :: NonEmpty FastString -> MetaM (Core (M TH.Exp))
 repProjection fs = do
-  ne_tycon <- lift $ dsLookupTyCon nonEmptyTyConName
+  ne_tycon <- lift $ dsLookupKnownOccTyCon nonEmptyTyConOcc
   MkC xs <- coreListNonEmpty ne_tycon stringTy <$>
             mapM coreStringLit fs
   krep2 projectionEOcc [xs]
@@ -3259,7 +3260,7 @@ repNonEmptyM
 repNonEmptyM tc_name f args
   = do { ty <- wrapName tc_name
        ; args' <- traverse f args
-       ; ne_tycon <- lift $ dsLookupTyCon nonEmptyTyConName -- the DataCon is not known-key
+       ; ne_tycon <- lift $ dsLookupKnownOccTyCon nonEmptyTyConOcc -- the DataCon is not known-occ
        ; return $ coreListNonEmpty ne_tycon ty args' }
 
 coreListM :: KnownOcc -> [Core a] -> MetaM (Core [a])

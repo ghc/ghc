@@ -1,7 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 {-# OPTIONS_GHC -dno-typeable-binds #-}
-  -- See (KKN4) in Note [Overview of known-key entities]
+  -- See (KKN4) in Note [Overview of known entities]
 
 module Dummy where
 

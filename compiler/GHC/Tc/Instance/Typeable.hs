@@ -157,7 +157,7 @@ There are many wrinkles:
          That's saves work; and it's very good in `base` because it means we
          often don't need to tiresomely bring
              `GHC.Internal.Data.Typeable.Internal.Module`
-         into scope (for -frebindable-known-key-names) for tiny shim modules.
+         into scope (for -frebindable-known-names) for tiny shim modules.
 -}
 
 {- Note [NOINLINE on generated Typeable bindings]

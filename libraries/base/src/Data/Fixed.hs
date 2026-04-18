@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
-{-# OPTIONS_GHC -fno-rebindable-known-key-names #-}
+{-# OPTIONS_GHC -fno-rebindable-known-names #-}
     -- We are importing Prelude, hence GHC.KnownKeyNames is available
 
 -----------------------------------------------------------------------------

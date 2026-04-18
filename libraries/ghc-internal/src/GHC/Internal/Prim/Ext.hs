@@ -6,7 +6,7 @@
 {-# LANGUAGE UnliftedFFITypes #-}
 
 {-# OPTIONS_GHC -dno-typeable-binds #-}
-  -- See (KKN4) in Note [Overview of known-key entities]
+  -- See (KKN4) in Note [Overview of known entities]
 
 {-# OPTIONS_GHC -Wno-orphans -Wno-inline-rule-shadowing #-}
 

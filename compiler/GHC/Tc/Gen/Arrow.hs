@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeFamilies   #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE MultiWayIf #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -39,13 +40,14 @@ import GHC.Core.Coercion
 import GHC.Core.Type( splitPiTy )
 
 import GHC.Types.Arity ( Arity )
-import GHC.Types.Id( mkLocalId, idType )
+import GHC.Types.Id( mkLocalId, idType, idName )
 import GHC.Types.Name.Reader (WithUserRdr(..))
-import GHC.Types.Name( KnownKey, hasKnownKey )
+import GHC.Types.Name( KnownOcc )
+import GHC.Types.Name.Occurrence( OccEnv, mkOccEnv, lookupOccEnv )
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
 
-import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 
@@ -429,55 +431,57 @@ tcCmdSyntaxTable loc orig ty (CST tbl)
     do { tbl' <- mapM do_one tbl
        ; return (CST tbl') }
   where
-     do_one (std_uniq, HsVar _ (L _ (WithUserRdr _ user_nm)))
-       | user_nm `hasKnownKey` std_uniq
-       = -- Use the standard operation
-         do rhs <- newKnownKeyMethod orig std_uniq [ty]
-            return (std_uniq, rhs)
-
-     do_one (std_uniq, user_nm_expr)
+     do_one (std_occ, user_nm_expr)
        = -- Use the user_nm_expr in place of the standard operation
-         do { std_id <- tcLookupKnownKeyId std_uniq
-            ; let ([tv], _, tau) = tcSplitSigmaTy (idType std_id)
-                  sigma1         = substTyWith [tv] [ty] tau
-                  -- Actually, the "tau-type" might be a sigma-type in the
-                  -- case of locally-polymorphic methods.
+         do { std_id <- tcLookupKnownOccId std_occ
+            ; if | HsVar _ (L _ (WithUserRdr _ user_nm)) <- user_nm_expr
+                 , idName std_id == user_nm
+                 ->  -- Use the standard operation
+                    do { rhs <- newKnownOccMethod orig std_occ [ty]
+                       ; return (std_occ, rhs) }
 
-            ; addErrCtxt (SyntaxNameCtxt user_nm_expr orig sigma1 (locA loc)) $
+                 | otherwise
+                 -> -- Use the rebindable operation
+                    do_rebindable std_occ std_id user_nm_expr }
+
+     do_rebindable std_occ std_id user_nm_expr
+       = addErrCtxt (SyntaxNameCtxt user_nm_expr orig sigma1 (locA loc)) $
          do {   -- Check that the user-supplied thing has the
                 -- same type as the standard one.
-                -- Tiresome jiggling because tcCheckSigma takes a located expression
-           ; expr <- tcCheckPolyExpr (L (noAnnSrcSpan (locA loc)) user_nm_expr) sigma1
-           ; hasFixedRuntimeRepRes std_uniq user_nm_expr sigma1
-           ; return (std_uniq, unLoc expr) } }
+                -- Tiresome jiggling because tcCheckPolyExpr takes a located expression
+              expr <- tcCheckPolyExpr (L (noAnnSrcSpan (locA loc)) user_nm_expr) sigma1
+            ; hasFixedRuntimeRepRes std_occ user_nm_expr sigma1
+            ; return (std_occ, unLoc expr) }
+       where
+         ([tv], _, tau) = tcSplitSigmaTy (idType std_id)
+         sigma1         = substTyWith [tv] [ty] tau
+         -- Actually, the "tau-type" might be a sigma-type in the
+         -- case of locally-polymorphic methods.
 
 -- | Check that the result type of an expression has a fixed runtime representation.
 --
 -- Used only for arrow operations such as 'arr', 'first', etc.
-hasFixedRuntimeRepRes :: KnownKey -> HsExpr GhcRn -> TcSigmaType -> TcM ()
-hasFixedRuntimeRepRes std_uniq user_expr ty = mapM_ do_check mb_arity
+hasFixedRuntimeRepRes :: KnownOcc -> HsExpr GhcRn -> TcSigmaType -> TcM ()
+hasFixedRuntimeRepRes std_occ user_expr ty
+  = mapM_ do_check $ lookupOccEnv arity_map std_occ
   where
    do_check :: Arity -> TcM ()
-   do_check arity =
-     let res_ty = nTimes arity (snd . splitPiTy) ty
-     in hasFixedRuntimeRep_syntactic (FRRArrow $ ArrowFun user_expr) res_ty
+   do_check arity
+     = hasFixedRuntimeRep_syntactic (FRRArrow $ ArrowFun user_expr) res_ty
+     where
+       res_ty = nTimes arity (snd . splitPiTy) ty
 
-   mb_arity :: Maybe Arity
-   mb_arity -- arity of the arrow operation, counting type-level arguments
-     | std_uniq == arrAIdKey     -- result used as an argument in, e.g., do_premap
-     = Just 3
-     | std_uniq == composeAIdKey -- result used as an argument in, e.g., dsCmdStmt/BodyStmt
-     = Just 5
-     | std_uniq == firstAIdKey   -- result used as an argument in, e.g., dsCmdStmt/BodyStmt
-     = Just 4
-     | std_uniq == appAIdKey     -- result used as an argument in, e.g., dsCmd/HsCmdArrApp/HsHigherOrderApp
-     = Just 2
-     | std_uniq == choiceAIdKey  -- result used as an argument in, e.g., HsCmdIf
-     = Just 5
-     | std_uniq == loopAIdKey    -- result used as an argument in, e.g., HsCmdIf
-     = Just 4
-     | otherwise
-     = Nothing
+arity_map :: OccEnv Arity
+-- Arity of the arrow operation, counting type-level arguments
+-- Domain is only the arrow operations
+arity_map = mkOccEnv
+   [ (arrAIdOcc,     3)  -- result used as an argument in, e.g., do_premap
+   , (composeAIdOcc, 3)  -- result used as an argument in, e.g., dsCmdStmt/BodyStmt
+   , (firstAIdOcc,   5)  -- result used as an argument in, e.g., dsCmdStmt/BodyStmt
+   , (appAIdOcc,     2)  -- result used as an argument in, e.g., dsCmd/HsCmdArrApp/HsHigherOrderApp
+   , (choiceAIdOcc,  5)  -- result used as an argument in, e.g., HsCmdIf
+   , (loopAIdOcc,    4)  -- result used as an argument in, e.g., HsCmdIf
+   ]
 
 {-
 ************************************************************************
