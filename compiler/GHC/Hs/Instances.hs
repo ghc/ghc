@@ -6,6 +6,10 @@
 -- no matter what we do. Furthermore, they are incredibly slow to compile with
 -- optimisation (see #9557). Consequently we compile this with -O0.
 -- See #18254.
+-- We also exlusively SOURCE import it inside ghc for further build time improvements.
+-- This means modules depending on this module only have to wait for the (trivial) boot
+-- module to compiler rather than waiting for codegen for the whole thing.
+-- See also #27198.
 {-# OPTIONS_GHC -O0 #-}
 
 module GHC.Hs.Instances where
