@@ -203,6 +203,7 @@ module GHC.KnownKeyNames
     , Match, match
     , Clause, clause
     , Stmt, bindS, letS, noBindS, parS, recS
+    , Body, normalB, guardedB
     ) where
 
 import GHC.Internal.Base hiding( foldr )
