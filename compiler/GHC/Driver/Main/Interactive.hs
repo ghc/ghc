@@ -460,7 +460,6 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
                                                 fam_insts defaults fix_env
     return (new_tythings, new_ictxt)
 
-
 {-
   Note [Fixity declarations in GHCi]
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

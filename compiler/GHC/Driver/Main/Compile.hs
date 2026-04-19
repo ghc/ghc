@@ -151,7 +151,6 @@ import GHC.Types.Unique.FM
 import GHC.Cmm.Config (CmmConfig)
 import Data.Bifunctor
 
-
 {- **********************************************************************
 %*                                                                      *
                 The main compiler pipeline

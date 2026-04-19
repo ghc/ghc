@@ -16,7 +16,6 @@ module GHC.Core.Opt.Stats (
 import GHC.Prelude
 
 import GHC.Types.Var
-import GHC.Types.Error
 
 import GHC.Utils.Outputable as Outputable
 

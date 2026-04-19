@@ -44,7 +44,8 @@ import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Class( AssocInstInfo(..), isNotAssociated )
 import GHC.Tc.Instance.Family
 
-import GHC.Tc.Deriv
+-- See Note [hs-boot files as "header" files]
+import {-# SOURCE #-} GHC.Tc.Deriv ( DerivInfo(..), tcDeriving )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Unify

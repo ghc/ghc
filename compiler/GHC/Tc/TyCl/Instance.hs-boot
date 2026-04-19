@@ -8,7 +8,8 @@ module GHC.Tc.TyCl.Instance ( tcInstDecls1 ) where
 import GHC.Hs
 import GHC.Tc.Types
 import GHC.Tc.Utils.Env( InstInfo )
-import GHC.Tc.Deriv
+-- See Note [hs-boot files as "header" files]
+import {-# SOURCE #-} GHC.Tc.Deriv
 
 -- We need this because of the mutual recursion
 -- between GHC.Tc.TyCl and GHC.Tc.TyCl.Instance

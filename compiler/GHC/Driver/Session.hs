@@ -280,6 +280,7 @@ import GHC.Utils.Error (emptyDiagOpts, logInfo)
 import GHC.Settings
 import GHC.CmmToAsm.CFG.Weight
 import GHC.Core.Opt.CallerCC
+-- See Note [hs-boot files as "header" files]
 import {-# SOURCE #-} GHC.Parser (parseIdentifier) -- build time optimization
 import GHC.Parser.Lexer (mkParserOpts, initParserState, P(..), ParseResult(..))
 import GHC.Stg.Debug.Types

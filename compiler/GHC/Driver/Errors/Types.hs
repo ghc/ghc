@@ -23,7 +23,16 @@ import Data.Typeable
 
 import GHC.Driver.DynFlags (DynFlags, PackageArg, gopt, ReexportedModule)
 import GHC.Driver.Flags (GeneralFlag (Opt_BuildingCabalPackage))
-import GHC.Types.Error
+-- See Note [hs-boot files as "header" files]
+import {-# SOURCE #-} GHC.Types.Error
+    ( MsgEnvelope,
+      NoDiagnosticOpts,
+      UnknownDiagnosticFor,
+      Diagnostic,
+      DiagnosticOpts,
+      DiagnosticHint,
+      Messages,
+      mkSimpleUnknownDiagnostic )
 import GHC.Unit.Module
 import GHC.Unit.Module.Graph
 import GHC.Unit.State

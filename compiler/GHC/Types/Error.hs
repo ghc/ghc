@@ -113,6 +113,7 @@ import Data.Maybe ( maybeToList )
 import Data.Typeable ( Typeable )
 import Numeric.Natural ( Natural )
 import Text.Printf ( printf )
+import Data.Kind (Type)
 
 {- Note [Messages]
 ~~~~~~~~~~~~~~~~~~
@@ -139,7 +140,7 @@ declarative) or removed altogether.
 -- /INVARIANT/: All the messages in this collection must be relevant, i.e.
 -- their 'Severity' should /not/ be 'SevIgnore'. The smart constructor
 -- 'mkMessages' will filter out any message which 'Severity' is 'SevIgnore'.
-newtype Messages e = Messages { getMessages :: Bag (MsgEnvelope e) }
+newtype Messages (e :: Type) = Messages { getMessages :: Bag (MsgEnvelope e) }
   deriving newtype (Semigroup, Monoid)
   deriving stock (Functor, Foldable, Traversable)
 
@@ -242,7 +243,7 @@ defaultDiagnosticOpts = defaultOpts @(DiagnosticOpts opts)
 -- A 'Diagnostic' carries the /actual/ description of the message (which, in
 -- GHC's case, it can be an error or a warning) and the /reason/ why such
 -- message was generated in the first place.
-class (Outputable (DiagnosticHint a), HasDefaultDiagnosticOpts (DiagnosticOpts a)) => Diagnostic a where
+class (Outputable (DiagnosticHint (a::Type)), HasDefaultDiagnosticOpts (DiagnosticOpts a)) => Diagnostic a where
 
   -- | Type of configuration options for the diagnostic.
   type DiagnosticOpts a
