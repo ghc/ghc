@@ -234,7 +234,7 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports imp_decls u
     -- ent_map groups together all the things imported and used
     -- from a particular module
     ent_map :: ModuleEnv [OccName]
-    ent_map  = nonDetStrictFoldUniqSet add_mv emptyModuleEnv used_names
+    !ent_map = nonDetStrictFoldUniqSet add_mv emptyModuleEnv used_names
      -- nonDetStrictFoldUniqSet is OK here. If you follow the logic, we sort by
      -- OccName in ent_hashs
      where
