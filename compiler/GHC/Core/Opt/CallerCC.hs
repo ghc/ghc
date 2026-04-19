@@ -28,15 +28,13 @@ import GHC.Types.Var
 import GHC.Unit.Types
 import GHC.Data.FastString
 import GHC.Core
-import GHC.Core.Opt.Monad
 import GHC.Core.Opt.CallerCC.Types
 
 
-addCallerCostCentres :: ModGuts -> CoreM ModGuts
-addCallerCostCentres guts = do
-  dflags <- getDynFlags
+addCallerCostCentres :: DynFlags -> ModGuts -> ModGuts
+addCallerCostCentres dflags guts =
   let filters = callerCcFilters dflags
-  let env :: Env
+      env :: Env
       env = Env
         { thisModule = mg_module guts
         , ccState = newCostCentreState
@@ -44,9 +42,9 @@ addCallerCostCentres guts = do
         , revParents = []
         , filters = filters
         }
-  let guts' = guts { mg_binds = doCoreProgram env (mg_binds guts)
+      guts' = guts { mg_binds = doCoreProgram env (mg_binds guts)
                    }
-  return guts'
+  in  guts'
 
 doCoreProgram :: Env -> CoreProgram -> CoreProgram
 doCoreProgram env binds = flip evalState newCostCentreState $ do

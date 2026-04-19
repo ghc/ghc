@@ -510,7 +510,7 @@ doCorePass pass guts = do
                                  specConstrProgram guts
 
     CoreAddCallerCcs          -> {-# SCC "AddCallerCcs" #-}
-                                 addCallerCostCentres guts
+                                 pure $ addCallerCostCentres dflags guts
 
     CoreAddLateCcs            -> {-# SCC "AddLateCcs" #-}
                                  topLevelBindsCCMG guts
