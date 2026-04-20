@@ -299,7 +299,8 @@ interfaceErrorDiagnostic opts = \ case
 
   MissingKnownKey1 key -> hang (text "Could not find known key" <+> quotes (pprKnownKey key))
                              2 (vcat [ text "in the exports of GHC.KnownKeys"
-                                     , text "occname:" <+> pp_occ (knownKeyOccName_maybe key) ])
+                                     , text "occname:" <+> pp_occ (knownKeyOccName_maybe key)
+                                     , text "REMEMBER: for tycons, divide by 2!!"])
          where
            pp_occ (Just occ) = ppr occ
            pp_occ Nothing    = text "Yikes: that key isn't in the known-key table"

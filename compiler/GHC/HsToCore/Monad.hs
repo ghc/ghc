@@ -629,7 +629,7 @@ dsLookupKnownKeyName uniq
                  Succeeded name -> return name
                  Failed msg -> failIfM (pprDiagnostic msg) } }
 
-dsLookupKnownKeyThing :: KnownKey -> DsM TyThing
+dsLookupKnownKeyThing :: HasDebugCallStack => KnownKey -> DsM TyThing
 dsLookupKnownKeyThing uniq
   = do { rebindable_src <- dsGetKnownKeySource
        ; dsToIfL $
@@ -638,13 +638,13 @@ dsLookupKnownKeyThing uniq
                  Succeeded thing -> return thing
                  Failed msg -> failIfM (pprDiagnostic msg) } }
 
-dsLookupKnownKeyTyCon :: KnownKey -> DsM TyCon
+dsLookupKnownKeyTyCon :: HasDebugCallStack => KnownKey -> DsM TyCon
 dsLookupKnownKeyTyCon uniq = tyThingTyCon <$> dsLookupKnownKeyThing uniq
 
-dsLookupKnownKeyDataCon :: KnownKey -> DsM DataCon
+dsLookupKnownKeyDataCon :: HasDebugCallStack => KnownKey -> DsM DataCon
 dsLookupKnownKeyDataCon uniq = tyThingDataCon <$> dsLookupKnownKeyThing uniq
 
-dsLookupKnownKeyId :: KnownKey -> DsM Id
+dsLookupKnownKeyId :: HasDebugCallStack => KnownKey -> DsM Id
 dsLookupKnownKeyId uniq = tyThingId <$> dsLookupKnownKeyThing uniq
 
 --------------------------------------

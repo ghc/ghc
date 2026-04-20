@@ -903,11 +903,6 @@ forallEIdKey           = mkPreludeMiscIdUnique 802
 forallVisEIdKey        = mkPreludeMiscIdUnique 803
 constrainedEIdKey      = mkPreludeMiscIdUnique 804
 
--- data Guard = ...
-normalGEIdKey, patGEIdKey :: Unique
-normalGEIdKey     = mkPreludeMiscIdUnique 310
-patGEIdKey        = mkPreludeMiscIdUnique 311
-
 -- data Dec = ...
 funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey, classDIdKey,
     instanceWithOverlapDIdKey, instanceDIdKey, sigDIdKey, forImpDIdKey,

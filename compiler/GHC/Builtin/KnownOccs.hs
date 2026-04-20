@@ -86,6 +86,11 @@ have the correct one in scope when looking up a known-occ name.
      module GHC.Internal.Base where
        foldrList = foldr
   make `foldrList` known-occ, and refer to that in desugaring list comprehensions.
+
+* (>>>).  You might think that the known-occ version is the one defined in
+  GHC.Internal.Control.Category.  But no, it isn't. We have a different one
+  (albeit with the same definitino!) in GHC.Internal.Desugar, whose type
+  has the right "shape" type for `newKnownOccMethod`.  Sigh.
 -}
 
 

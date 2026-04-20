@@ -92,7 +92,7 @@ module GHC.KnownKeyNames
     , error
 
     -- Numbers
-    , Num, Integral, Real, Fractional, RealFloat, RealFrac
+    , Num, Integral, Real, Floating, Fractional, RealFloat, RealFrac
     , (+), (-), (*), negate, fromInteger
     , divInt#, modInt#
 
@@ -204,6 +204,7 @@ module GHC.KnownKeyNames
     , Clause, clause
     , Stmt, bindS, letS, noBindS, parS, recS
     , Body, normalB, guardedB
+    , Guard, normalGE, patGE
     ) where
 
 import GHC.Internal.Base hiding( foldr )
@@ -226,7 +227,8 @@ import GHC.Internal.IO( seq# )
 import GHC.Internal.Control.Monad( fail, guard )
 import GHC.Internal.Control.Monad.Fix( mfix, loop )
 import GHC.Internal.Control.Monad.Zip( mzip )
-import GHC.Internal.Control.Arrow( arr, (>>>), first, app, (|||) )
+import GHC.Internal.Control.Arrow( arr, first, app, (|||) )
+import GHC.Internal.Desugar( (>>>) )  -- See Note [Tricky known-occ cases]
 import GHC.Internal.OverloadedLabels( fromLabel )
 import GHC.Internal.Records
 import GHC.Internal.CString as CS

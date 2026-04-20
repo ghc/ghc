@@ -2370,10 +2370,10 @@ lookupType :: KnownOcc    -- Name of type constructor (e.g. (M TH.Exp))
 lookupType tc_name = do { tc <- lift $ dsLookupKnownOccTyCon tc_name ;
                           return (mkTyConTy tc) }
 
-lookupKnownKeyType :: Unique      -- Unique of type constructor (e.g. (M TH.Exp))
+lookupKnownOccType :: KnownOcc    -- Occ-name of type constructor (e.g. (M TH.Exp))
                    -> MetaM Type  -- The type
-lookupKnownKeyType tc_key
-  = do { tc <- lift $ dsLookupKnownKeyTyCon tc_key
+lookupKnownOccType tc_key
+  = do { tc <- lift $ dsLookupKnownOccTyCon tc_key
        ; return (mkTyConApp tc []) }
 
 wrapGenSyms :: [GenSymBind]
@@ -3133,7 +3133,7 @@ mk_integer :: Integer -> MetaM (HsLit GhcTc)
 mk_integer  i = return $ XLit $ HsInteger NoSourceText i integerTy
 
 mk_rational :: FractionalLit -> MetaM (HsLit GhcTc)
-mk_rational r = do rat_ty <- lookupKnownKeyType rationalTyConKey
+mk_rational r = do rat_ty <- lookupKnownOccType rationalTyConOcc
                    return $ XLit $ HsRat r rat_ty
 
 mk_string :: FastString -> MetaM (HsLit GhcRn)
