@@ -70,16 +70,35 @@ enum CapsetType { CapsetTypeCustom = CAPSET_TYPE_CUSTOM,
 #define DEBUG_continuation RtsFlags.DebugFlags.continuation
 #define DEBUG_iomanager   RtsFlags.DebugFlags.iomanager
 
-// Event-enabled flags
-// These semantically booleans but we use a dense packing to minimize their
-// cache impact.
-extern uint8_t TRACE_sched;
-extern uint8_t TRACE_gc;
-extern uint8_t TRACE_nonmoving_gc;
-extern uint8_t TRACE_spark_sampled;
-extern uint8_t TRACE_spark_full;
-extern uint8_t TRACE_cap;
-/* extern uint8_t TRACE_user; */  // only used in Trace.c
+// These trace flags are shorthand for the members of the RuntimeTraceFlagCache
+// struct. Within the RTS, these should be treated as read-only variables.
+#define TRACE_sched         ((const bool)RuntimeTraceFlagCache.scheduler)
+#define TRACE_gc            ((const bool)RuntimeTraceFlagCache.gc)
+#define TRACE_nonmoving_gc  ((const bool)RuntimeTraceFlagCache.nonmoving_gc)
+#define TRACE_spark_sampled ((const bool)RuntimeTraceFlagCache.spark_sampled)
+#define TRACE_spark_full    ((const bool)RuntimeTraceFlagCache.spark_full)
+#define TRACE_user          ((const bool)RuntimeTraceFlagCache.user)
+#define TRACE_cap           ((const bool)RuntimeTraceFlagCache.cap)
+
+/*
+ * Runtime trace flags.
+ */
+typedef struct {
+  bool scheduler;
+  bool gc;
+  bool nonmoving_gc;
+  bool spark_sampled;
+  bool spark_full;
+  bool user;
+  bool cap;
+} RUNTIME_TRACE_FLAG_CACHE;
+
+/*
+ * These flags should be used to determine whether or not some value should
+ * be traced at runtime, rather than the values in RtsFlags. These flags can
+ * be modified at runtime using setTraceFlag in `rts/EventLogWriter.h`.
+ */
+extern RUNTIME_TRACE_FLAG_CACHE RuntimeTraceFlagCache;
 
 // -----------------------------------------------------------------------------
 // Posting events

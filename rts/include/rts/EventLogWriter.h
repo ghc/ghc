@@ -78,3 +78,34 @@ void endEventLogging(void);
  * Flush the eventlog. cap can be NULL if one is not held.
  */
 void flushEventLog(Capability **cap);
+
+/*
+ * An enumeration for the runtime trace flags.
+ */
+typedef enum {
+  TRACE_SCHEDULER,
+  TRACE_GC,
+  TRACE_NONMOVING_GC,
+  TRACE_SPARK_SAMPLED,
+  TRACE_SPARK_FULL,
+  TRACE_USER,
+  TRACE_CAP,
+} RUNTIME_TRACE_FLAG;
+
+/*
+ * Get the value of the given runtime trace flag.
+ *
+ * Warning: The trace flag cache is not thread-safe. After initialisation, the
+ * RTS never writes to these values, but concurrently using getTraceFlag and
+ * setTraceFlag for the same flag is a race condition.
+ */
+bool getTraceFlag(RUNTIME_TRACE_FLAG flag);
+
+/*
+ * Set the value of the given runtime trace flag.
+ *
+ * Warning: The trace flag cache is not thread-safe. After initialisation, the
+ * RTS never writes to these values. However, inconsistent reads may lead to
+ * incorrect tracing for a short time after setting a trace flag.
+ */
+void setTraceFlag(RUNTIME_TRACE_FLAG flag, bool value);

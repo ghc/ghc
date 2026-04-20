@@ -29,14 +29,54 @@
 #include <unistd.h>
 #endif
 
-// events
-uint8_t TRACE_sched;
-uint8_t TRACE_gc;
-uint8_t TRACE_nonmoving_gc;
-uint8_t TRACE_spark_sampled;
-uint8_t TRACE_spark_full;
-uint8_t TRACE_user;
-uint8_t TRACE_cap;
+RUNTIME_TRACE_FLAG_CACHE RuntimeTraceFlagCache = {0};
+
+bool getTraceFlag(RUNTIME_TRACE_FLAG flag) {
+  switch (flag) {
+  case TRACE_SCHEDULER:
+    return RuntimeTraceFlagCache.scheduler;
+  case TRACE_GC:
+    return RuntimeTraceFlagCache.gc;
+  case TRACE_NONMOVING_GC:
+    return RuntimeTraceFlagCache.nonmoving_gc;
+  case TRACE_SPARK_SAMPLED:
+    return RuntimeTraceFlagCache.spark_sampled;
+  case TRACE_SPARK_FULL:
+    return RuntimeTraceFlagCache.spark_full;
+  case TRACE_USER:
+    return RuntimeTraceFlagCache.user;
+  case TRACE_CAP:
+    return RuntimeTraceFlagCache.cap;
+  default:
+    return false;
+  }
+}
+
+void setTraceFlag(RUNTIME_TRACE_FLAG flag, bool value) {
+  switch (flag) {
+  case TRACE_SCHEDULER:
+    RuntimeTraceFlagCache.scheduler = value;
+    break;
+  case TRACE_GC:
+    RuntimeTraceFlagCache.gc = value;
+    break;
+  case TRACE_NONMOVING_GC:
+    RuntimeTraceFlagCache.nonmoving_gc = value;
+    break;
+  case TRACE_SPARK_SAMPLED:
+    RuntimeTraceFlagCache.spark_sampled = value;
+    break;
+  case TRACE_SPARK_FULL:
+    RuntimeTraceFlagCache.spark_full = value;
+    break;
+  case TRACE_USER:
+    RuntimeTraceFlagCache.user = value;
+    break;
+  case TRACE_CAP:
+    RuntimeTraceFlagCache.cap = value;
+    break;
+  }
+}
 
 #if defined(THREADED_RTS)
 static Mutex trace_utx;
@@ -51,43 +91,41 @@ static void traceCap_stderr(Capability *cap, char *msg, ...);
  --------------------------------------------------------------------------- */
 
 /*
- * Update the TRACE_* globals. Must be called whenever RtsFlags.TraceFlags is
- * modified.
+ * Initialise the runtime trace flags from RtsFlags.TraceFlags.
  */
-static void updateTraceFlagCache (void)
-{
-    // -Ds turns on scheduler tracing too
-    TRACE_sched =
-        RtsFlags.TraceFlags.scheduler ||
-        RtsFlags.DebugFlags.scheduler;
+static void updateTraceFlagCache(void) {
+  // -Ds turns on scheduler tracing too
+  RuntimeTraceFlagCache.scheduler =
+    RtsFlags.TraceFlags.scheduler ||
+    RtsFlags.DebugFlags.scheduler;
 
-    // -Dg turns on gc tracing too
-    TRACE_gc =
-        RtsFlags.TraceFlags.gc ||
-        RtsFlags.DebugFlags.gc ||
-        RtsFlags.DebugFlags.scheduler;
+  // -Dg turns on gc tracing too
+  RuntimeTraceFlagCache.gc =
+    RtsFlags.TraceFlags.gc ||
+    RtsFlags.DebugFlags.gc ||
+    RtsFlags.DebugFlags.scheduler;
 
-    TRACE_nonmoving_gc =
-        RtsFlags.TraceFlags.nonmoving_gc;
+  RuntimeTraceFlagCache.nonmoving_gc =
+    RtsFlags.TraceFlags.nonmoving_gc;
 
-    TRACE_spark_sampled =
-        RtsFlags.TraceFlags.sparks_sampled;
+  RuntimeTraceFlagCache.spark_sampled =
+    RtsFlags.TraceFlags.sparks_sampled;
 
-    // -Dr turns on full spark tracing
-    TRACE_spark_full =
-        RtsFlags.TraceFlags.sparks_full ||
-        RtsFlags.DebugFlags.sparks;
+  // -Dr turns on full spark tracing
+  RuntimeTraceFlagCache.spark_full =
+      RtsFlags.TraceFlags.sparks_full ||
+      RtsFlags.DebugFlags.sparks;
 
-    TRACE_user =
-        RtsFlags.TraceFlags.user;
+  RuntimeTraceFlagCache.user =
+    RtsFlags.TraceFlags.user;
 
-    // We trace cap events if we're tracing anything else
-    TRACE_cap =
-        TRACE_sched ||
-        TRACE_gc ||
-        TRACE_spark_sampled ||
-        TRACE_spark_full ||
-        TRACE_user;
+  // We trace cap events if we're tracing anything else
+  RuntimeTraceFlagCache.cap =
+    TRACE_sched ||
+    TRACE_gc ||
+    TRACE_spark_sampled ||
+    TRACE_spark_full ||
+    TRACE_user;
 }
 
 void initTracing (void)
