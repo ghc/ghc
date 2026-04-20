@@ -529,6 +529,10 @@ Library
         GHC.Driver.LlvmConfigCache
         GHC.Driver.MakeSem
         GHC.Driver.Main
+        GHC.Driver.Main.Compile
+        GHC.Driver.Main.Hsc
+        GHC.Driver.Main.Interactive
+        GHC.Driver.Main.Passes
         GHC.Driver.Make
         GHC.Driver.Messager
         GHC.Driver.MakeAction

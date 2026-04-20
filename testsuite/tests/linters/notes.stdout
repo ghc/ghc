@@ -6,7 +6,6 @@ ref    compiler/GHC/Core/Opt/Simplify/Iteration.hs:2556:55:     Note [Plan (AFTE
 ref    compiler/GHC/Core/Opt/Simplify/Iteration.hs:2985:13:     Note [Case binder next]
 ref    compiler/GHC/Core/Opt/Specialise.hs:1758:29:     Note [Arity decrease]
 ref    compiler/GHC/Driver/DynFlags.hs:1217:52:     Note [Eta-reduction in -O0]
-ref    compiler/GHC/Driver/Main.hs:1886:34:     Note [simpleTidyPgm - mkBootModDetailsTc]
 ref    compiler/GHC/Hs/Expr.hs:190:63:     Note [Pending Splices]
 ref    compiler/GHC/Hs/Expr.hs:2212:87:     Note [Lifecycle of a splice]
 ref    compiler/GHC/Hs/Expr.hs:2265:7:     Note [Pending Splices]

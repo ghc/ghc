@@ -115,7 +115,7 @@ import Data.Map ( toList )
 import System.FilePath
 import System.Directory
 import GHC.Driver.Env.KnotVars
-import {-# source #-} GHC.Driver.Main (loadIfaceByteCode)
+import {-# source #-} GHC.Driver.Main.Compile (loadIfaceByteCode)
 import GHC.Iface.Errors.Types
 import Data.Function ((&))
 import GHC.Unit.Module.Graph

@@ -4,6 +4,7 @@ module GHC.Driver.Env.Types
   ( Hsc(..)
   , HscEnv(..)
   , HasHscEnv(..)
+
   ) where
 
 import GHC.Driver.Errors.Types ( GhcMessage )

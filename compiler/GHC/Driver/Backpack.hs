@@ -27,7 +27,7 @@ import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Monad
 import GHC.Driver.Session
 import GHC.Driver.Ppr
-import GHC.Driver.Main
+import GHC.Driver.Messager ( Messager, showModuleIndex )
 import GHC.Driver.Make
 import GHC.Driver.Env
 import GHC.Driver.Errors

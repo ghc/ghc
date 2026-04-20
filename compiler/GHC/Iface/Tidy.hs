@@ -95,7 +95,8 @@ import Data.List        ( sortBy, mapAccumL )
 import qualified Data.Set as S
 import GHC.Types.CostCentre
 
-{-
+{- Note [hscSimpleIface - mkBootModDetailsTc]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Constructing the TypeEnv, Instances, Rules from which the
 ModIface is constructed, and which goes on to subsequent modules in
 --make mode.
