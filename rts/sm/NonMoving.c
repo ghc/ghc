@@ -1339,7 +1339,7 @@ concurrent_marking:
         nonmovingPrintAllocatorCensus(!concurrent);
 #endif
 #if defined(TRACING)
-    if (RtsFlags.TraceFlags.nonmoving_gc)
+    if (RTS_UNLIKELY(TRACE_nonmoving_gc))
         nonmovingTraceAllocatorCensus();
 #endif
 
