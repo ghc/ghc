@@ -40,7 +40,6 @@ import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Rename.Splice  ( rnTypedBracket, rnUntypedBracket, rnTypedSplice
                           , rnUntypedSpliceExpr, checkThLocalNameWithLift, checkThLocalNameNoLift )
 import GHC.Rename.HsType
-import GHC.Rename.Lit
 import GHC.Rename.Pat
 
 import GHC.Driver.DynFlags
@@ -369,10 +368,11 @@ rnExpr (HsOverLit x lit)
                  return (HsApp noExtField (noLocA neg) (noLocA (HsOverLit x lit'))
                         , fvs ) }
 
-rnExpr (HsQualLit x lit) = do
-  ((lit', desugaredExpr), fvs) <- rnQualLit lit
-  let origExpr = HsQualLit x lit'
-  return (mkExpandedExpr origExpr desugaredExpr, fvs)
+rnExpr (HsQualLit x QualLit{..})
+ = do { (funName, fvs) <- lookupNameWithQualifier fromStringName ql_mod
+      ; let lit' = QualLit{ql_ext = L noAnn funName, ..}
+      ; return (HsQualLit x lit', fvs)
+      }
 
 rnExpr (HsApp x fun arg)
   = do { (fun',fvFun) <- rnLExpr fun

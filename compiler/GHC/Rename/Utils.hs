@@ -41,7 +41,7 @@ module GHC.Rename.Utils (
 where
 
 
-import GHC.Prelude hiding (init, last, scanl, tail)
+import GHC.Prelude
 
 import GHC.Core.Type
 import GHC.Hs

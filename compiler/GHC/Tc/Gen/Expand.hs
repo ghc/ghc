@@ -131,6 +131,20 @@ tcExpand e@(HsOverLabel (_, rs_table) v)
   | otherwise
   = pprPanic "tcExpand" (vcat [ text "Should Never Happen: could not find fromLabel in rs_table"
                               , ppr e] )
+
+------------------------------------------
+-- Qualified Literals
+tcExpand e@(HsQualLit _ QualLit{ql_val = ql_val, ql_ext = (L _ fromStringName)})
+  = do { let hsLit = case ql_val of
+                        -- See Note [Implementation of QualifiedStrings]
+                        HsQualString st s -> HsString st s
+       ;  return $ Just $
+          HSE { hse_ctxt = ExprCtxt e
+              , hse_exp = wrapGenSpan $ genHsApps fromStringName [genLHsLit hsLit]
+              }
+       }
+
+
 ------------------------------------------
 -- Operator Applications
 tcExpand e@(OpApp _ arg1 op arg2)
@@ -186,7 +200,7 @@ tcExpand (HsDo _ do_or_lc stmts)
   -- ApplicativeDo are typechecked using tcDoStmts
   = do isApplicativeDo <- xoptM LangExt.ApplicativeDo
        if isApplicativeDo
-         then return Nothing
+         then return Nothing -- to be fixed by #24406
          -- Expand expression on the fly otherwise
          -- See Note [Typechecking by expansion: overview]
          else do { hse <- expandDoStmts do_or_lc stmts
@@ -254,10 +268,9 @@ tcExpand e@(RecordUpd (Just rs_table) (L l expr) (OverloadedRecUpdFields { olRec
 
 
 
----------
--- We return ExpandedThingRn as is for now,
--- but after removing all the calls to mkExpandExpr in the renamer,
--- this case should never happen, as the renamer will never produce an ExpandedThingRn
+------------------------
+-- XExpr
+-- Expansions are idempotent, XExprs do not expand again
 tcExpand (XExpr (ExpandedThingRn hse))
   = return (Just hse)
 
