@@ -344,7 +344,7 @@ rnExpr (HsHole h)
 -- HsOverLabel: see Note [Handling overloaded and rebindable constructs]
 rnExpr (HsOverLabel src v)
   = do { (from_label, fvs) <- lookupSyntaxName fromLabelClassOpName
-       ; let rs_table = [("fromLabel", from_label)]
+       ; let rs_table = Rebindable [(nameOccName fromLabelClassOpName, from_label)]
        ; return (HsOverLabel (src, rs_table) v, fvs)
        }
 
@@ -416,14 +416,14 @@ rnExpr (HsGetField _ e f)
  = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
       ; (e, fv_e) <- rnLExpr e
       ; let f' = rnDotFieldOcc <$> f
-            rs_table = [("getField", getField)]
+            rs_table = Rebindable  [(nameOccName getFieldName, getField)]
       ; return (HsGetField rs_table e f', fv_e `plusFN` fv_getField) }
 
 rnExpr (HsProjection _ fs)
   = do { (getFieldName, fv_getField) <- lookupSyntaxName getFieldName
        ; circName <- lookupOccRn WL_TermVariable compose_RDR
        ; let fs' = NE.map rnDotFieldOcc fs
-             rs_table = [("getField" , getFieldName), ("circ", circName)]
+             rs_table = Rebindable  [(nameOccName getFieldName , getFieldName), (rdrNameOcc compose_RDR, circName)]
        ; return (HsProjection rs_table fs', unitFN circName `plusFN` fv_getField) }
 
 ------------------------------------------
@@ -487,10 +487,10 @@ rnExpr (ExplicitList _ exps)
   = do  { (exps', fvs) <- rnExprs exps
         ; opt_OverloadedLists <- xoptM LangExt.OverloadedLists
         ; if not opt_OverloadedLists
-          then return  (ExplicitList Nothing exps', fvs)
+          then return  (ExplicitList NoRebindable exps', fvs)
           else
     do { (from_list_n_name, fvs') <- lookupSyntaxName fromListNName
-       ; let rs_table = Just [("fromListN", from_list_n_name)]
+       ; let rs_table = Rebindable  [(nameOccName fromListNName, from_list_n_name)]
              rn_list  = ExplicitList rs_table exps'
        ; return ( rn_list
                 , fvs `plusFN` fvs') } }
@@ -536,7 +536,7 @@ rnExpr (RecordUpd { rupd_expr = L l expr, rupd_flds = rbinds })
                     RegularRecUpdFields
                     { xRecUpdFields = parents
                     , recUpdFields  = flds }
-            ; return ( RecordUpd Nothing (L l e) upd_flds
+            ; return ( RecordUpd NoRebindable (L l e) upd_flds
                      , fv_e `plusFN` fv_flds ) }
 
       -- 'OverloadedRecordUpdate' is in effect. Record dot update desugaring.
@@ -554,7 +554,7 @@ rnExpr (RecordUpd { rupd_expr = L l expr, rupd_flds = rbinds })
            ; let upd_flds = OverloadedRecUpdFields
                             { xOLRecUpdFields = noExtField
                             , olRecUpdFields  = us }
-                 rs_table = Just [("getFieldName", getField) , ("setFieldName", setField)]
+                 rs_table = Rebindable [(nameOccName getField, getField) , (nameOccName getField, setField)]
            ; return (RecordUpd rs_table (L l e) upd_flds
                     , plusFNs [fv_getField, fv_setField, fv_e, fv_us] )
            }
@@ -2698,11 +2698,11 @@ rnHsIf p b1 b2
        ; mb_ite <- lookupIfThenElse
        ; case mb_ite of
             Nothing  -- Non rebindable-syntax case
-              -> return (HsIf Nothing  p' b1' b2', fvs_if)
+              -> return (HsIf NoRebindable  p' b1' b2', fvs_if)
 
             Just ite_name   -- Rebindable-syntax case
               -> do { let fvs   = plusFNs [fvs_if, unitFN ite_name]
-                    ; return (HsIf (Just [("ifThenElse" , ite_name)]) p' b1' b2', fvs) } }
+                    ; return (HsIf (Rebindable [(rdrNameOcc $ mkVarUnqual (fsLit "ifThenElse"), ite_name)]) p' b1' b2', fvs) } }
 
 
 rnHsUpdProjs :: [LHsRecUpdProj GhcPs] -> RnM ([LHsRecUpdProj GhcRn], FreeNames)

@@ -445,7 +445,7 @@ tcExprNoExpand e@HsQualLit{} _ = pprPanic "tcExpr: HsQualLit" (ppr e)
 -- list type, so that's all we need concern ourselves with here.  See
 -- GHC.Rename.Expr. Note [Handling overloaded and rebindable constructs]
 tcExprNoExpand (ExplicitList x exprs) res_ty
-  = assert (isNothing x) $
+  = assert (isNoRebindable x) $
     do  { res_ty <- expTypeToType res_ty
         ; (coi, elt_ty) <- matchExpectedListTy res_ty
         ; let tc_elt expr = tcCheckPolyExpr expr elt_ty
@@ -540,7 +540,7 @@ tcExprNoExpand (HsCase ctxt scrut matches) res_ty
 tcExprNoExpand (HsIf x pred b1 b2) res_ty
   -- HsIf in rebindable case would be expanded out so we would not
   -- have a Just RebindableSyntaxTable here, only Nothing
-  = assert (isNothing x) $
+  = assert (isNoRebindable x) $
     do { pred'    <- tcCheckMonoExpr pred boolTy
        ; let res_ty' = adjustExpTypeForCaseBranches res_ty [b1,b2]
        ; (u1,b1') <- tcCollectingUsage $ tcMonoLExpr b1 res_ty'
@@ -680,7 +680,7 @@ tcExprNoExpand expr@(RecordCon { rcon_con = L loc qcon@(WithUserRdr _ con_name)
     orig = OccurrenceOf con_name
 
 -- Record updates via dot syntax are replaced by expanded expressions
--- in the renamer. See Note [Overview of record dot syntax] in
+-- in GHC.Tc.Expand. See Note [Overview of record dot syntax] in
 -- GHC.Hs.Expr. This is why we match on 'rupd_flds = Left rbnds' here
 -- and panic otherwise.
 -- WIP: To be fixed soon (#27160) expandRecordUpd needs to return HsExpansion and not a separate ds_res_ty
@@ -1644,7 +1644,7 @@ disambiguateRecordBinds record_expr record_rho possible_parents rbnds res_ty
                              RegularRecUpdFields
                               { xRecUpdFields = parents
                               , recUpdFields  = rbnds }
-                         , rupd_ext = Nothing }
+                         , rupd_ext = NoRebindable }
         loc  = getLocA (head rbnds)
 
 {-

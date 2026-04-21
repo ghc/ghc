@@ -279,7 +279,7 @@ type instance XCase          GhcRn = HsMatchContextRn
 type instance XCase          GhcTc = HsMatchContextRn
 
 type instance XIf            GhcPs = AnnsIf
-type instance XIf            GhcRn = Maybe RebindableSyntaxTable -- Nothing <=> RebindableSyntax is off
+type instance XIf            GhcRn = RebindableSyntaxTable -- NoRebindable <=> RebindableSyntax is off
 type instance XIf            GhcTc = NoExtField
 
 type instance XMultiIf       GhcPs = (EpToken "if", EpToken "{", EpToken "}")
@@ -295,7 +295,7 @@ type instance XDo            GhcRn = NoExtField
 type instance XDo            GhcTc = Type
 
 type instance XExplicitList  GhcPs = AnnList ()
-type instance XExplicitList  GhcRn = Maybe RebindableSyntaxTable -- Nothing <=> RebindableSyntax is off
+type instance XExplicitList  GhcRn = RebindableSyntaxTable -- NoRebindable <=> RebindableSyntax is off
 type instance XExplicitList  GhcTc = Type
 -- GhcPs: ExplicitList includes all source-level
 --   list literals, including overloaded ones
@@ -310,7 +310,7 @@ type instance XRecordCon     GhcRn = NoExtField
 type instance XRecordCon     GhcTc = PostTcExpr   -- Instantiated constructor function
 
 type instance XRecordUpd     GhcPs = (Maybe (EpToken "{"), Maybe (EpToken "}"))
-type instance XRecordUpd     GhcRn = Maybe RebindableSyntaxTable -- Nothing <=> RebindableSyntaxTable is off
+type instance XRecordUpd     GhcRn = RebindableSyntaxTable -- NoRebindable <=> RebindableSyntaxTable is off
 type instance XRecordUpd     GhcTc = DataConCantHappen
   -- We desugar record updates in the typechecker.
   -- See [Handling overloaded and rebindable constructs],
@@ -1484,10 +1484,14 @@ type instance XXCmd       GhcTc = HsWrap HsCmd
 type CmdSyntaxTable p = [(Name, HsExpr p)]
 -- See Note [CmdSyntaxTable]
 
-type RebindableSyntaxTable = [(String, Name)]
+data RebindableSyntaxTable = NoRebindable | Rebindable [(OccName, Name)]
 -- Stores the names of the operators for rebindable syntax
 -- eg. getField, setField etc.
 -- GHC.Tc.Expand will use these names to build the expansions
+
+isNoRebindable :: RebindableSyntaxTable -> Bool
+isNoRebindable NoRebindable = True
+isNoRebindable Rebindable{} = False
 
 {-
 Note [CmdSyntaxTable]

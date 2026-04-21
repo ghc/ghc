@@ -5,29 +5,33 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-module GHC.Tc.Gen.Expand( tcExpand ) where
+module GHC.Tc.Gen.Expand( tcExpand, tcExpandNoTcM ) where
 
 import GHC.Prelude hiding (last, init, tail)
-
-import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
+import GHC.Data.FastString
 
 import GHC.Hs
 
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Gen.Do
+import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
 
 import GHC.Types.Name
+import GHC.Types.Name.Reader
 import GHC.Types.Id.Make
 import GHC.Types.SrcLoc
 import GHC.Types.SourceText ( mkIntegralLit , SourceText(..) )
 
+import GHC.Builtin.Names
+
 import GHC.Rename.Utils
-import qualified Data.List.NonEmpty as NE ( map, head, (<|) )
-import Data.List.NonEmpty ( NonEmpty(..), init, last, tail )
 
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
+
+import qualified Data.List.NonEmpty as NE ( map, head, (<|) )
+import Data.List.NonEmpty ( NonEmpty(..), init, last, tail )
 
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -116,14 +120,15 @@ Wrinkle (TBE1)
 
 -- See Note [Typechecking by expansion: overview]
 tcExpand :: HsExpr GhcRn -> TcM (Maybe (HsExpansion GhcRn))
+tcExpandNoTcM :: HsExpr GhcRn -> Maybe (HsExpansion GhcRn)
 
 ------------------------------------------
 -- Overloaded labels
-tcExpand e@(HsOverLabel (_, rs_table) v)
-  | Just fromLabelName <- lookup "fromLabel" rs_table
+tcExpandNoTcM e@(HsOverLabel (_, Rebindable rs_table) v)
+  | Just fromLabelName <- lookup (nameOccName fromLabelClassOpName) rs_table
   , let hs_ty_arg = mkEmptyWildCardBndrs $ wrapGenSpan $
                       HsTyLit noExtField (HsString NoSourceText v)
-  = return $ Just $
+  = Just $
     HSE { hse_ctxt = ExprCtxt e
         , hse_exp = wrapGenSpan $ HsAppType noExtField (genLHsVar fromLabelName) hs_ty_arg
         }
@@ -134,25 +139,91 @@ tcExpand e@(HsOverLabel (_, rs_table) v)
 
 ------------------------------------------
 -- Qualified Literals
-tcExpand e@(HsQualLit _ QualLit{ql_val = ql_val, ql_ext = (L _ fromStringName)})
+tcExpandNoTcM e@(HsQualLit _ QualLit{ql_val = ql_val, ql_ext = (L _ fromStringName)})
   = do { let hsLit = case ql_val of
                         -- See Note [Implementation of QualifiedStrings]
                         HsQualString st s -> HsString st s
-       ;  return $ Just $
-          HSE { hse_ctxt = ExprCtxt e
-              , hse_exp = wrapGenSpan $ genHsApps fromStringName [genLHsLit hsLit]
-              }
+       ; Just $
+         HSE { hse_ctxt = ExprCtxt e
+             , hse_exp = wrapGenSpan $ genHsApps fromStringName [genLHsLit hsLit]
+             }
        }
 
 
 ------------------------------------------
 -- Operator Applications
-tcExpand e@(OpApp _ arg1 op arg2)
-  = return $ Just $
+tcExpandNoTcM e@(OpApp _ arg1 op arg2)
+  = Just $
     HSE { hse_ctxt = ExprCtxt e
         , hse_exp  = foldl ap op [arg1,arg2] }
   where
     ap f a = wrapGenSpan (HsApp noExtField f a)
+
+------------------------------------------
+-- If
+
+-- NoRebindable <=> rebindable is turned off
+--             so we typecheck the HsIf in tcExprNoExpand
+tcExpandNoTcM (HsIf NoRebindable _ _ _ )
+  = Nothing
+tcExpandNoTcM e@(HsIf (Rebindable rs_table) p b1 b2)
+  | Just ifThenElseName <- lookup (rdrNameOcc $ mkVarUnqual (fsLit "ifThenElse")) rs_table
+  = Just $
+    HSE { hse_ctxt = ExprCtxt e
+        , hse_exp = wrapGenSpan $ genHsApps ifThenElseName [p, b1, b2]
+        }
+  | otherwise
+  = pprPanic "tcExpand" (vcat [ text "Should Never Happen: could not find ifThenElse in rs_table"
+                              , ppr e ])
+
+------------------------------------------
+-- Record dot syntax
+
+tcExpandNoTcM e@(HsGetField (Rebindable rs_table) expr f)
+ | Just getField <- lookup (nameOccName getFieldName) rs_table
+ = Just $
+   HSE { hse_ctxt = ExprCtxt e
+       , hse_exp = wrapGenSpan $ (mkGetField getField expr (fmap (unLoc . dfoLabel) f)) }
+ | otherwise
+ = pprPanic "tcExpand" (vcat [ text "Should Never Happen: could not find getField in rs_table"
+                             , ppr e ])
+
+tcExpandNoTcM e@(HsProjection (Rebindable rs_table) fs)
+ | Just getField <- lookup (nameOccName getFieldName) rs_table
+ , Just circ <- lookup (rdrNameOcc compose_RDR) rs_table
+ = Just $
+   HSE { hse_ctxt = ExprCtxt e
+       , hse_exp = wrapGenSpan $ (mkProjection getField circ $ NE.map (unLoc . dfoLabel) fs) }
+ | otherwise
+ = pprPanic "tcExpand" (vcat [ text "Should Never Happen: could not find getField or circ in rs_table"
+                             , ppr e])
+
+
+tcExpandNoTcM (RecordUpd NoRebindable _ _ ) = Nothing -- until #27160 is fixed
+
+tcExpandNoTcM e@(RecordUpd (Rebindable rs_table) (L l expr) (OverloadedRecUpdFields { olRecUpdFields = us}))
+ | Just getField <- lookup (nameOccName getFieldName) rs_table
+ , Just setField <- lookup (nameOccName setFieldName) rs_table
+ = Just $
+   HSE { hse_ctxt = ExprCtxt e
+       , hse_exp = wrapGenSpan $ mkRecordDotUpd getField setField (L l expr) us }
+ | otherwise
+ = pprPanic "tcExpand" (vcat [ text "Should Never Happen: could not find getField or setfield in rs_table"
+                             , ppr e ])
+
+
+
+------------------------
+-- XExpr
+-- Expansions are idempotent, XExprs do not expand again
+tcExpandNoTcM (XExpr (ExpandedThingRn hse))
+  = Just hse
+
+
+tcExpandNoTcM _
+  = Nothing
+
+
 
 ------------------------------------------
 -- Left and Right Sections
@@ -174,15 +245,20 @@ tcExpand e@(SectionL _ expr op)
           HSE { hse_ctxt = ExprCtxt e
               , hse_exp = wrapGenSpan ds_section } }
 
-tcExpand (ExplicitList Nothing _ )
+------------------------------------------
+-- Explicit Lists
+
+tcExpand (ExplicitList NoRebindable _ )
   = return Nothing -- rebindable syntax is off
-tcExpand e@(ExplicitList (Just rs_table) exps)
-  | Just from_list_n_name <- lookup "fromListN" rs_table
+tcExpand e@(ExplicitList (Rebindable rs_table) exps)
+  | Just from_list_n_name <- lookup (nameOccName fromListNName) rs_table
   = do { loc <- getSrcSpanM -- See Note [Source locations for implicit function calls]
        ; let lit_n    = mkIntegralLit (length exps)
              hs_lit   = genHsIntegralLit lit_n
              exp_list = genHsApps' (wrapGenSpan' loc from_list_n_name)
-                           [hs_lit, wrapGenSpan (ExplicitList Nothing exps)]
+                           [hs_lit, wrapGenSpan (ExplicitList NoRebindable exps)]
+                                                               -- important to make it NoRebindable
+                                                               -- Or we will go into an infinite loop
        ; return $ Just $
          HSE { hse_ctxt = ExprCtxt e
              , hse_exp = wrapGenSpan $ exp_list }
@@ -193,7 +269,7 @@ tcExpand e@(ExplicitList (Just rs_table) exps)
 
 
 ------------------------------------------
--- Do expression statements
+-- Do statements
 
 tcExpand (HsDo _ do_or_lc stmts)
   | DoExpr{} <- do_or_lc
@@ -215,76 +291,17 @@ tcExpand (HsDo _ do_or_lc stmts)
   = return Nothing
 
 ------------------------------------------
--- If
-
--- Nothing <=> rebindable is turned off
---             so we typecheck the HsIf in tcExprNoExpand
-tcExpand (HsIf Nothing _ _ _ )
-  = return Nothing
-tcExpand e@(HsIf (Just rs_table) p b1 b2)
-  | Just ifThenElseName <- lookup "ifThenElse" rs_table
-  = return $ Just $
-    HSE { hse_ctxt = ExprCtxt e
-        , hse_exp = wrapGenSpan $ genHsApps ifThenElseName [p, b1, b2]
-        }
-  | otherwise
-  = pprPanic "tcExpand" (vcat [ text "Should Never Happen: could not find ifThenElse in rs_table"
-                              , ppr e ])
-
-------------------------------------------
--- Record dot syntax
-
-tcExpand e@(HsGetField rs_table expr f)
- | Just getFieldName <- lookup "getField" rs_table
- = return $ Just $
-   HSE { hse_ctxt = ExprCtxt e
-       , hse_exp = wrapGenSpan $ (mkGetField getFieldName expr (fmap (unLoc . dfoLabel) f)) }
- | otherwise
- = pprPanic "tcExpand" (vcat [ text "Should Never Happen: could not find getField in rs_table"
-                             , ppr e ])
-
-tcExpand e@(HsProjection rs_table fs)
- | Just getFieldName <- lookup "getField" rs_table
- , Just circName <- lookup "circ" rs_table
- = return $ Just $
-   HSE { hse_ctxt = ExprCtxt e
-       , hse_exp = wrapGenSpan $ (mkProjection getFieldName circName $ NE.map (unLoc . dfoLabel) fs) }
- | otherwise
- = pprPanic "tcExpand" (vcat [ text "Should Never Happen: could not find getField or circ in rs_table"
-                             , ppr e])
-
-
-tcExpand (RecordUpd Nothing _ _ ) = return Nothing -- until #27160 is fixed
-
-tcExpand e@(RecordUpd (Just rs_table) (L l expr) (OverloadedRecUpdFields { olRecUpdFields = us}))
- | Just getFieldName <- lookup "getFieldName" rs_table
- , Just setFieldName <- lookup "setFieldName" rs_table
- = return $ Just $
-   HSE { hse_ctxt = ExprCtxt e
-       , hse_exp = wrapGenSpan $ mkRecordDotUpd getFieldName setFieldName (L l expr) us }
- | otherwise
- = pprPanic "tcExpand" (vcat [ text "Should Never Happen: could not find getField or setfield in rs_table"
-                             , ppr e ])
-
-
-
-------------------------
--- XExpr
--- Expansions are idempotent, XExprs do not expand again
-tcExpand (XExpr (ExpandedThingRn hse))
-  = return (Just hse)
-
-------------------------------------------
 -- Template Haskell Splices
 
 tcExpand e@(HsUntypedSplice splice_res _)
 -- See Note [Looking through Template Haskell splices in splitHsApps]
   = do { fun <- getUntypedSpliceBody splice_res
        ; return $ Just $
-         HSE { hse_ctxt = ExprCtxt e
-             , hse_exp  = wrapGenSpan fun } }
+             HSE { hse_ctxt = ExprCtxt e
+                 , hse_exp  = wrapGenSpan fun }
+       }
 
-tcExpand _ = return Nothing
+tcExpand e = return $ tcExpandNoTcM e
 
 
 

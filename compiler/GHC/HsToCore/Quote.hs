@@ -44,6 +44,8 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.TyCl ( IsPrefixConGADT(..), unannotatedMultIsLinear )
 
+import GHC.Tc.Gen.Expand ( tcExpandNoTcM )
+
 import GHC.Core.Class
 import GHC.Core.DataCon
 import GHC.Core.TyCon
@@ -1618,11 +1620,13 @@ repE (HsCase _ e (MG { mg_alts = (L _ ms) }))
                                ; ms2 <- mapM repMatchTup ms
                                ; core_ms2 <- coreListM matchTyConName ms2
                                ; repCaseE arg core_ms2 }
-repE (HsIf _ x y z)       = do
-                            a <- repLE x
-                            b <- repLE y
-                            c <- repLE z
-                            repCond a b c
+repE e@(HsIf _ x y z)  = case (tcExpandNoTcM e) of
+  Nothing -> do { a <- repLE x
+                ; b <- repLE y
+                ; c <- repLE z
+                ; repCond a b c }
+  Just (HSE _ (L _ e')) -> repE e'
+
 repE (HsMultiIf _ alts)
   = do { (binds, alts') <- NE.unzip <$> mapM repLGRHS alts
        ; expr' <- repMultiIf (nonEmptyCoreList' alts')

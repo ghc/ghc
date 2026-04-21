@@ -340,6 +340,8 @@ deriving instance Data (RoleAnnotDecl GhcTc)
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs.Expr -----------------------------------
 
+deriving instance Data RebindableSyntaxTable -- maybe don't traverse?
+
 deriving instance Data (FieldLabelStrings GhcPs)
 deriving instance Data (FieldLabelStrings GhcRn)
 deriving instance Data (FieldLabelStrings GhcTc)
@@ -684,7 +686,6 @@ deriving instance Data (HsExpansion GhcTc)
 deriving instance Data a => Data (WithUserRdr a)
 
 -- -------------------------------
---------------------------------------
 deriving instance Data XXExprGhcTc
 deriving instance Data XXPatGhcTc
 
