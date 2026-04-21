@@ -524,6 +524,9 @@ extern char **environ;
       SymI_HasProto(__word_encodeFloat)                                 \
       SymI_HasDataProto(stg_atomicallyzh)                                   \
       SymI_HasProto(barf)                                               \
+      SymI_HasProto(startEventLogging)                                  \
+      SymI_HasProto(endEventLogging)                                    \
+      SymI_HasProto(flushEventLog)                                      \
       SymI_HasProto(flushEventLog)                                      \
       SymI_HasProto(getTraceFlag)                                       \
       SymI_HasProto(setTraceFlag)                                       \
