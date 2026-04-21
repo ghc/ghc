@@ -156,6 +156,52 @@ void traceGcEvent_ (Capability *cap, EventTypeNum tag);
 void traceGcEventAtT_ (Capability *cap, StgWord64 ts, EventTypeNum tag);
 
 /*
+ * Record a nonmoving GC event.
+ */
+#define traceConcMarkBegin()                                           \
+    if (RTS_UNLIKELY(TRACE_nonmoving_gc)) {                            \
+        traceNonmovingGcEvent_(EVENT_CONC_MARK_BEGIN);                 \
+    }
+#define traceConcMarkEnd(marked_obj_count)                             \
+    if (RTS_UNLIKELY(TRACE_nonmoving_gc)) {                            \
+        traceConcMarkEnd_(marked_obj_count);                           \
+    }
+#define traceConcSyncBegin()                                           \
+    if (RTS_UNLIKELY(TRACE_nonmoving_gc)) {                            \
+        traceNonmovingGcEvent_(EVENT_CONC_SYNC_BEGIN);                 \
+    }
+#define traceConcSyncEnd()                                             \
+    if (RTS_UNLIKELY(TRACE_nonmoving_gc)) {                            \
+        traceNonmovingGcEvent_(EVENT_CONC_SYNC_END);                   \
+    }
+#define traceConcSweepBegin()                                          \
+    if (RTS_UNLIKELY(TRACE_nonmoving_gc)) {                            \
+        traceNonmovingGcEvent_(EVENT_CONC_SWEEP_BEGIN);                \
+    }
+#define traceConcSweepEnd()                                            \
+    if (RTS_UNLIKELY(TRACE_nonmoving_gc)) {                            \
+        traceNonmovingGcEvent_(EVENT_CONC_SWEEP_END);                  \
+    }
+#define traceConcUpdRemSetFlush(cap)                                   \
+    if (RTS_UNLIKELY(TRACE_nonmoving_gc)) {                            \
+        traceConcUpdRemSetFlush_(cap);                                 \
+    }
+#define traceNonmovingHeapCensus(blk_size, census)                     \
+    if (RTS_UNLIKELY(TRACE_nonmoving_gc)) {                            \
+        traceNonmovingHeapCensus_(blk_size, census);                   \
+    }
+#define traceNonmovingPrunedSegments(pruned_segments, free_segments)   \
+    if (RTS_UNLIKELY(TRACE_nonmoving_gc)) {                            \
+        traceNonmovingPrunedSegments_(pruned_segments, free_segments); \
+    }
+
+void traceNonmovingGcEvent_ (EventTypeNum tag);
+void traceConcMarkEnd_(StgWord32 marked_obj_count);
+void traceConcUpdRemSetFlush_(Capability *cap);
+void traceNonmovingHeapCensus_(uint16_t blk_size, const struct NonmovingAllocCensus *census);
+void traceNonmovingPrunedSegments_(uint32_t pruned_segments, uint32_t free_segments);
+
+/*
  * Record a heap event
  */
 #define traceHeapEvent(cap, tag, heap_capset, info1) \
@@ -340,17 +386,6 @@ void traceProfSampleCostCentre(Capability *cap,
 void traceProfBegin(void);
 #endif /* PROFILING */
 
-void traceConcMarkBegin(void);
-void traceConcMarkEnd(StgWord32 marked_obj_count);
-void traceConcSyncBegin(void);
-void traceConcSyncEnd(void);
-void traceConcSweepBegin(void);
-void traceConcSweepEnd(void);
-void traceConcUpdRemSetFlush(Capability *cap);
-void traceNonmovingHeapCensus(uint16_t blk_size,
-                              const struct NonmovingAllocCensus *census);
-void traceNonmovingPrunedSegments(uint32_t pruned_segments, uint32_t free_segments);
-
 void traceIPE(const InfoProvEnt *ipe);
 void flushTrace(void);
 
@@ -403,6 +438,7 @@ void flushTrace(void);
 #define traceConcSweepEnd() /* nothing */
 #define traceConcUpdRemSetFlush(cap) /* nothing */
 #define traceNonmovingHeapCensus(blk_size, census) /* nothing */
+#define traceNonmovingPrunedSegments(pruned_segments, free_segments) /* nothing */
 
 #define flushTrace() /* nothing */
 

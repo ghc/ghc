@@ -918,59 +918,65 @@ void traceThreadLabel_(Capability *cap,
     }
 }
 
-void traceConcMarkBegin(void)
+void traceNonmovingGcEvent_ (EventTypeNum tag)
 {
-    if (eventlog_enabled)
-        postEventNoCap(EVENT_CONC_MARK_BEGIN);
+#if defined(DEBUG)
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        /* nothing - no string representation for nonmoving GC events  */
+    } else
+#endif
+    {
+        /* currently most non-moving GC events are nullary events */
+        postEventNoCap(tag);
+    }
 }
 
-void traceConcMarkEnd(StgWord32 marked_obj_count)
+void traceConcMarkEnd_(StgWord32 marked_obj_count)
 {
-    if (eventlog_enabled)
+#if defined(DEBUG)
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        /* nothing - no string representation for nonmoving GC events  */
+    } else
+#endif
+    {
         postConcMarkEnd(marked_obj_count);
+    }
 }
 
-void traceConcSyncBegin(void)
+void traceConcUpdRemSetFlush_(Capability *cap)
 {
-    if (eventlog_enabled)
-        postEventNoCap(EVENT_CONC_SYNC_BEGIN);
-}
-
-void traceConcSyncEnd(void)
-{
-    if (eventlog_enabled)
-        postEventNoCap(EVENT_CONC_SYNC_END);
-}
-
-void traceConcSweepBegin(void)
-{
-    if (eventlog_enabled)
-        postEventNoCap(EVENT_CONC_SWEEP_BEGIN);
-}
-
-void traceConcSweepEnd(void)
-{
-    if (eventlog_enabled)
-        postEventNoCap(EVENT_CONC_SWEEP_END);
-}
-
-void traceConcUpdRemSetFlush(Capability *cap)
-{
-    if (eventlog_enabled)
+#if defined(DEBUG)
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        /* nothing - no string representation for nonmoving GC events  */
+    } else
+#endif
+    {
         postConcUpdRemSetFlush(cap);
+    }
 }
 
-void traceNonmovingHeapCensus(uint16_t blk_size,
-                              const struct NonmovingAllocCensus *census)
+void traceNonmovingHeapCensus_(uint16_t blk_size, const struct NonmovingAllocCensus *census)
 {
-    if (eventlog_enabled && TRACE_nonmoving_gc)
+#if defined(DEBUG)
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        /* nothing - no string representation for nonmoving GC events  */
+    } else
+#endif
+    {
         postNonmovingHeapCensus(blk_size, census);
+    }
 }
 
-void traceNonmovingPrunedSegments(uint32_t pruned_segments, uint32_t free_segments)
+void traceNonmovingPrunedSegments_(uint32_t pruned_segments, uint32_t free_segments)
 {
-    if (eventlog_enabled && TRACE_nonmoving_gc)
+#if defined(DEBUG)
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        /* nothing - no string representation for nonmoving GC events  */
+    } else
+#endif
+    {
         postNonmovingPrunedSegments(pruned_segments, free_segments);
+    }
 }
 
 void traceThreadStatus_ (StgTSO *tso USED_IF_DEBUG)
