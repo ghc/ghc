@@ -447,7 +447,7 @@ coreToStgExpr expr@(Lam {})
              fun_ty  = mkLamTypes val_bndrs body_ty
                        -- This type is a bit ill-formed but it doesn't matter
              rhs = StgRhsClosure noExtFieldSilent currentCCS
-                                 ReEntrant val_bndrs body' body_ty
+                                 ReEntrant val_bndrs body' (MkStgKind (typeKind body_ty))
              tmp_fun = mkSysLocal (fsLit "pap") uniq ManyTy fun_ty
        ; return (StgLet noExtFieldSilent (StgNonRec tmp_fun rhs) $
                  StgApp tmp_fun []) }

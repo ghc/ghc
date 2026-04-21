@@ -328,14 +328,14 @@ newUnboxedTupleRegs :: Kind -> FCode ([LocalReg], [ForeignHint])
 -- regs it wants will save later assignments.
 newUnboxedTupleRegs res_kind
   -- TODO: clean up this messy assert. It is basically isUnboxedTupleType, but then for kinds.
-  = assert (Just True == ((\x -> tyConAppTyCon x `hasKey` tupleRepDataConKey) <$> (kindRep_maybe res_kind))) $
+  = assert (Just True == ((\x -> tyConAppTyCon x `hasKey` tupleRepDataConKey) <$> kindRep_maybe res_kind)) $
     do  { platform <- getPlatform
         ; sequel <- getSequel
         ; regs <- choose_regs platform sequel
         ; massert (regs `equalLength` reps)
         ; return (regs, map primRepForeignHint reps) }
   where
-    -- FIXME: this is partial
+    -- TODO: this is partial
     Just reps = kindPrimRep_maybe res_kind
     choose_regs _ (AssignTo regs _) = return regs
     choose_regs platform _          = mapM (newTemp . primRepCmmType platform) reps

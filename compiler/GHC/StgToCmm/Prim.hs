@@ -1905,7 +1905,7 @@ emitPrimOp cfg primop =
     Right gen -> gen res0 args
 
   inlinePrimopWithReturnType
-    :: (Type          -- return type
+    :: (StgKind       -- return kind
         -> [LocalReg] -- where to put the results
         -> FCode ())
     -> PrimopCmmEmit
