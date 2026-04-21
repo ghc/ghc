@@ -312,7 +312,7 @@ exprRefs :: UniqFM Id CgStgExpr -> CgStgExpr -> Set Id
 exprRefs u = \case
   StgApp f args             -> s f <> l (argRefs u) args
   StgConApp d _n args _     -> l s [ i | AnId i <- dataConImplicitTyThings d] <> l (argRefs u) args
-  StgOpApp _ args _         -> l (argRefs u) args
+  StgOpApp _ args           -> l (argRefs u) args
   StgLit {}                 -> mempty
   StgCase expr _ _ alts     -> exprRefs u expr <> mconcat (fmap (altRefs u) alts)
   StgLet _ bnd expr         -> bindingRefs u bnd <> exprRefs u expr
@@ -400,7 +400,7 @@ stgExprLive includeLHS = \case
   StgApp occ args -> unionDVarSets (unitDVarSet occ : map stgArgLive args)
   StgLit {}       -> emptyDVarSet
   StgConApp _dc _n args _tys -> unionDVarSets (map stgArgLive args)
-  StgOpApp _op args _ty      -> unionDVarSets (map stgArgLive args)
+  StgOpApp _op args          -> unionDVarSets (map stgArgLive args)
   StgCase e b _at alts
     | includeLHS -> el `unionDVarSet` delDVarSet al b
     | otherwise  -> delDVarSet al b
@@ -445,11 +445,13 @@ isInlineExpr = \case
     -> True
   StgConApp{}
     -> True
-  StgOpApp (StgFCallOp f _) _ _
+  StgOpApp (StgFCallOp f _ _) _
     -> isInlineForeignCall f
-  StgOpApp (StgPrimOp op) _ _
+  StgOpApp (StgPrimOp op) _
     -> primOpIsReallyInline op
-  StgOpApp (StgPrimCallOp _c) _ _
+  StgOpApp (StgPrimCallOp _c _) _
+    -> True
+  StgOpApp (StgTagToEnumOp _) _c
     -> True
   StgCase e _ _ alts
     ->let ie   = isInlineExpr e

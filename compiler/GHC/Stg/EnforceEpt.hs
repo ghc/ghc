@@ -419,11 +419,11 @@ inferTagExpr env (StgTick tick body)
   where
     (info, body') = inferTagExpr env body
 
-inferTagExpr _ (StgOpApp op args ty)
+inferTagExpr _ (StgOpApp op args)
   -- Which primops guarantee to return a properly tagged value?
   -- Probably none, and that is the conservative assumption anyway.
   -- (And foreign calls definitely need not make promises.)
-  = (TagDunno, StgOpApp op args ty)
+  = (TagDunno, StgOpApp op args)
 
 inferTagExpr env (StgLet ext bind body)
   = (info, StgLet ext bind' body')

@@ -576,8 +576,8 @@ unariseExpr rho (StgConApp dc n args ty_args)
       let args' = unariseConArgs rho args in
       return $ (StgConApp dc n args' [])
 
-unariseExpr rho (StgOpApp op args ty)
-  = return (StgOpApp op (unariseFunArgs rho args) ty)
+unariseExpr rho (StgOpApp op args)
+  = return (StgOpApp op (unariseFunArgs rho args))
 
 unariseExpr rho (StgCase scrut bndr alt_ty alts)
   -- tuple/sum binders in the scrutinee can always be eliminated
@@ -904,7 +904,7 @@ stgKindPrimRep1 (MkStgKind k) = case kindPrimRep_maybe k of
 
 mkCast :: StgArg -> PrimOp -> OutId -> StgKind -> StgExpr -> StgExpr
 mkCast arg_in cast_op out_id out_kind in_rhs =
-  let scrut = StgOpApp (StgPrimOp cast_op) [arg_in] out_kind
+  let scrut = StgOpApp (StgPrimOp cast_op) [arg_in]
       alt = GenStgAlt { alt_con = DEFAULT, alt_bndrs = [], alt_rhs = in_rhs}
       alt_ty = PrimAlt (stgKindPrimRep1 out_kind)
   in (StgCase scrut out_id alt_ty [alt])

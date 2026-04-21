@@ -229,7 +229,7 @@ liftExpr (StgApp f args) = do
   let top_lvl_args = map StgVarArg fvs' ++ args'
   pure (StgApp f' top_lvl_args)
 liftExpr (StgConApp con mn args tys) = StgConApp con mn <$> traverse liftArgs args <*> pure tys
-liftExpr (StgOpApp op args ty) = StgOpApp op <$> traverse liftArgs args <*> pure ty
+liftExpr (StgOpApp op args) = StgOpApp op <$> traverse liftArgs args
 liftExpr (StgCase scrut info ty alts) = do
   scrut' <- liftExpr scrut
   withSubstBndr (binderInfoBndr info) $ \bndr' -> do

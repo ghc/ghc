@@ -69,27 +69,26 @@ might be a Haskell closure pointer, we don't want to evaluate it. -}
 ----------------------------------
 cgOpApp :: StgOp        -- The op
         -> [StgArg]     -- Arguments
-        -> StgKind      -- Kind (always unboxed tuple)
         -> FCode ReturnKind
 
 -- Foreign calls
-cgOpApp (StgFCallOp fcall ty) stg_args res_kind
+cgOpApp (StgFCallOp fcall ty res_kind) stg_args
   = cgForeignCall fcall ty stg_args res_kind
       -- See Note [Foreign call results]
 
-cgOpApp (StgPrimOp primop) args kind = do
+cgOpApp (StgPrimOp primop) args = do
     cfg <- getStgToCmmConfig
     cmm_args <- getNonVoidArgAmodes args
-    cmmPrimOpApp cfg primop cmm_args (Just kind)
+    cmmPrimOpApp cfg primop cmm_args
 
-cgOpApp (StgPrimCallOp primcall) args _res_ty
+cgOpApp (StgPrimCallOp primcall _) args
   = do  { cmm_args <- getNonVoidArgAmodes args
         ; let fun = CmmLit (CmmLabel (mkPrimCallLabel primcall))
         ; emitCall (NativeNodeCall, NativeReturn) fun cmm_args }
 
 -- tagToEnum# is special: we need to pull the constructor
 -- out of the table, and perform an appropriate return.
-cgOpApp (StgTagToEnumOp tyc) args _ = do
+cgOpApp (StgTagToEnumOp tyc) args = do
   amodes <- getNonVoidArgAmodes args
   case amodes of
     [amode] -> do
@@ -103,14 +102,10 @@ cgOpApp (StgTagToEnumOp tyc) args _ = do
       emitReturn [tagToClosure platform tyc amode]
     _ -> pprPanic "cgOpApp: tagToEnum# should be applied to exactly one argument" (ppr args)
 
-cmmPrimOpApp :: StgToCmmConfig -> PrimOp -> [CmmExpr] -> Maybe StgKind-> FCode ReturnKind
-cmmPrimOpApp cfg primop cmm_args mres_ty = do
+cmmPrimOpApp :: StgToCmmConfig -> PrimOp -> [CmmExpr] -> FCode ReturnKind
+cmmPrimOpApp cfg primop cmm_args =
   let PrimopCmmEmit _inline f = emitPrimOp cfg primop cmm_args
-  let
-     -- if the result type isn't explicitly given, we directly use the
-     -- result type of the primop.
-     res_ty = fromMaybe (MkStgKind (typeKind (primOpResultType primop))) mres_ty
-  f res_ty
+  in f (MkStgKind (typeKind (primOpResultType primop)))
 
 externalPrimop :: PrimOp -> [CmmExpr] -> PrimopCmmEmit
 externalPrimop primop args = outOfLinePrimop (callExternalPrimop primop args)
@@ -118,7 +113,7 @@ externalPrimop primop args = outOfLinePrimop (callExternalPrimop primop args)
 outOfLinePrimop :: FCode ReturnKind -> PrimopCmmEmit
 outOfLinePrimop code = PrimopCmmEmit
   { primopCmmInline = False
-  , primopCmmCode = \_res_ty -> code
+  , primopCmmCode = \_res_kind -> code
   }
 
 callExternalPrimop :: PrimOp -> [CmmExpr] -> FCode ReturnKind
@@ -2402,7 +2397,7 @@ genericIntMul2Op [res_c, res_h, res_l] both_args@[arg_x, arg_y]
       p   <- newTemp t
       -- 1) compute the multiplication as if numbers were unsigned
       _ <- withSequel (AssignTo [p, res_l] False) $
-             cmmPrimOpApp cfg WordMul2Op both_args Nothing
+             cmmPrimOpApp cfg WordMul2Op both_args
       -- 2) correct the high bits of the unsigned result
       let carryFill x = CmmMachOp (MO_S_Shr ww) [x, wwm1]
           sub x y     = CmmMachOp (MO_Sub   ww) [x, y]
@@ -3760,7 +3755,7 @@ emitRangeBoundsCheck idx len arrSizeExpr = do
     rangeTooLargeReg <- newTemp (bWord platform)
     lastSafeIndexReg <- newTemp (bWord platform)
     _ <- withSequel (AssignTo [lastSafeIndexReg, rangeTooLargeReg] False) $
-      cmmPrimOpApp config WordSubCOp [arrSize, len] Nothing
+      cmmPrimOpApp config WordSubCOp [arrSize, len]
     boundsCheckFailed <- getCode $
       emitCCallNeverReturns [] (mkLblExpr mkOutOfBoundsAccessLabel) []
     let

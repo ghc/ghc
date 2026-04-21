@@ -103,7 +103,7 @@ unfloatStringLits' stringLits allBindings = (binderWithoutChanges ++ binderWithU
     -- No args
     processStgExpr (StgApp _ []) = Nothing
     processStgExpr (StgConApp _ _ [] _) = Nothing
-    processStgExpr (StgOpApp _ [] _) = Nothing
+    processStgExpr (StgOpApp _ []) = Nothing
 
     -- Main targets. Preserving the order of args is important
     processStgExpr (StgApp fn args@(_:_))
@@ -116,9 +116,9 @@ unfloatStringLits' stringLits allBindings = (binderWithoutChanges ++ binderWithU
       | otherwise = Just (StgConApp dc n unified tys, names)
       where
         (unified, names) = substituteArgWithNames args
-    processStgExpr (StgOpApp op args@(_:_) tys)
+    processStgExpr (StgOpApp op args@(_:_))
       | isEmptyUniqSet names = Nothing
-      | otherwise = Just (StgOpApp op unified tys, names)
+      | otherwise = Just (StgOpApp op unified, names)
       where
         (unified, names) = substituteArgWithNames args
 

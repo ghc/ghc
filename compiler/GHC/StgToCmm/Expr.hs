@@ -70,7 +70,7 @@ cgExpr (StgApp fun args)     = cgIdApp fun args
 -- dataToTagSmall# :: a_levpoly -> Int#
 -- See Note [DataToTag overview] in GHC.Tc.Instance.Class,
 -- particularly wrinkles H3 and DTW4
-cgExpr (StgOpApp (StgPrimOp DataToTagSmallOp) [StgVarArg a] _res_ty) = do
+cgExpr (StgOpApp (StgPrimOp DataToTagSmallOp) [StgVarArg a]) = do
   platform <- getPlatform
   emitComment (mkFastString "dataToTagSmall#")
 
@@ -85,7 +85,7 @@ cgExpr (StgOpApp (StgPrimOp DataToTagSmallOp) [StgVarArg a] _res_ty) = do
 -- dataToTagLarge# :: a_levpoly -> Int#
 -- See Note [DataToTag overview] in GHC.Tc.Instance.Class,
 -- particularly wrinkles H3 and DTW4
-cgExpr (StgOpApp (StgPrimOp DataToTagLargeOp) [StgVarArg a] _res_ty) = do
+cgExpr (StgOpApp (StgPrimOp DataToTagLargeOp) [StgVarArg a]) = do
   platform <- getPlatform
   emitComment (mkFastString "dataToTagLarge#")
 
@@ -115,7 +115,7 @@ cgExpr (StgOpApp (StgPrimOp DataToTagLargeOp) [StgVarArg a] _res_ty) = do
   emitReturn [CmmReg $ CmmLocal result_reg]
 
 
-cgExpr (StgOpApp op args kind) = cgOpApp op args kind
+cgExpr (StgOpApp op args) = cgOpApp op args
 cgExpr (StgConApp con mn args _) = cgConApp con mn args
 cgExpr (StgTick t e)         = cgTick t >> cgExpr e
 cgExpr (StgLit lit)          = do cmm_expr <- cgLit lit
@@ -622,7 +622,7 @@ cgCase scrut bndr alt_type alts
        ; cgAlts (gc_plan,ret_kind) (NonVoid bndr) alt_type alts
        }
   where
-    is_cmp_op (StgOpApp (StgPrimOp op) _ _) = isComparisonPrimOp op
+    is_cmp_op (StgOpApp (StgPrimOp op) _)   = isComparisonPrimOp op
     is_cmp_op _                             = False
 
 
@@ -664,7 +664,7 @@ isSimpleScrut :: CgStgExpr -> AltType -> FCode Bool
 -- heap usage from alternatives into the stuff before the case
 -- NB: if you get this wrong, and claim that the expression doesn't allocate
 --     when it does, you'll deeply mess up allocation
-isSimpleScrut (StgOpApp op args _) _         = isSimpleOp op args
+isSimpleScrut (StgOpApp op args)   _         = isSimpleOp op args
 isSimpleScrut (StgLit _)           _         = return True       -- case 1# of { 0# -> ..; ... }
 isSimpleScrut (StgApp _ [])    (PrimAlt _)   = return True       -- case x# of { 0# -> ..; ... }
 isSimpleScrut (StgApp f [])   _
@@ -678,7 +678,7 @@ isSimpleScrut _                    _         = return False
 
 isSimpleOp :: StgOp -> [StgArg] -> FCode Bool
 -- True iff the op cannot block or allocate
-isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _) _ = return $! not (playSafe safe)
+isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _ _) _ = return $! not (playSafe safe)
 -- dataToTagSmall#/dataToTagLarge# evaluate an argument;
 -- see Note [DataToTag overview] in GHC.Tc.Instance.Class
 isSimpleOp (StgPrimOp DataToTagSmallOp) _ = return False
@@ -688,7 +688,7 @@ isSimpleOp (StgPrimOp op) stg_args                  = do
     cfg       <- getStgToCmmConfig
     -- See Note [Inlining out-of-line primops and heap checks]
     return $! shouldInlinePrimOp cfg op arg_exprs
-isSimpleOp (StgPrimCallOp _) _                           = return False
+isSimpleOp (StgPrimCallOp _ _) _ = return False
 isSimpleOp (StgTagToEnumOp _) _ = return True
 
 -----------------

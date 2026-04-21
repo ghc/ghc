@@ -234,9 +234,9 @@ exprFVs env = go
       | (imp_fvs, top_fvs, lcl_fvs) <- argsFVs env as
       = (StgConApp dc n as tys, imp_fvs, top_fvs, lcl_fvs)
 
-    go (StgOpApp op as ty)
+    go (StgOpApp op as)
       | (imp_fvs, top_fvs, lcl_fvs) <- argsFVs env as
-      = (StgOpApp op as ty, imp_fvs, top_fvs, lcl_fvs)
+      = (StgOpApp op as, imp_fvs, top_fvs, lcl_fvs)
 
     go (StgCase scrut bndr ty alts)
       | (scrut',scrut_imp_fvs,scrut_top_fvs,scrut_lcl_fvs) <- exprFVs env scrut

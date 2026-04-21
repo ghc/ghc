@@ -42,7 +42,7 @@ collectArgs = \case
         -> x : concatMap collectArgsA args
       StgConApp _con _mn args _ts
         -> concatMap collectArgsA args
-      StgOpApp _x args _t
+      StgOpApp _x args
         -> concatMap collectArgsA args
       StgCase e _b _a alts
         -> collectArgsE e ++ concatMap collectArgsAlt alts

@@ -282,9 +282,6 @@ for the details of this transformation.
 
   | StgOpApp    StgOp    -- Primitive op or foreign call
                 [StgArg] -- Saturated.
-                StgKind  -- Result kind
-                         -- We need to know this so that we can
-                         -- assign result registers
 
 {-
 ************************************************************************
@@ -795,9 +792,9 @@ last moment that we still have access to the type information.
 data StgOp
   = StgPrimOp  PrimOp
 
-  | StgPrimCallOp PrimCall
+  | StgPrimCallOp PrimCall StgKind
 
-  | StgFCallOp ForeignCall [StgFArgType]
+  | StgFCallOp ForeignCall [StgFArgType] StgKind
         -- The foreign argument types, which are obtained from the foreign
         -- import declaration itself, areneeded by the stg-to-cmm pass to
         -- determine the offset to apply to unlifted boxed arguments in
@@ -907,7 +904,7 @@ pprStgExpr opts e = case e of
       -> ppr func <> ppr sig
       | otherwise -> hang (ppr func) 4 (interppSP args) -- TODO: Print taggedness
    StgConApp con n args _ -> hsep [ ppr con, ppr n, brackets (interppSP args) ]
-   StgOpApp op args _   -> hsep [ pprStgOp op, brackets (interppSP args)]
+   StgOpApp op args -> hsep [ pprStgOp op, brackets (interppSP args)]
 
 -- special case: let v = <very specific thing>
 --               in
@@ -994,8 +991,8 @@ pprStgAlt opts indent GenStgAlt{alt_con, alt_bndrs, alt_rhs}
 
 pprStgOp :: StgOp -> SDoc
 pprStgOp (StgPrimOp  op)   = ppr op
-pprStgOp (StgPrimCallOp op)= ppr op
-pprStgOp (StgFCallOp op _) = ppr op
+pprStgOp (StgPrimCallOp op _)= ppr op
+pprStgOp (StgFCallOp op _ _) = ppr op
 -- TODO: how do we want to pretty print this?
 pprStgOp (StgTagToEnumOp tyc) = text "TagToEnumOp" <+> ppr tyc
 

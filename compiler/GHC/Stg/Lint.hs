@@ -291,7 +291,7 @@ lintStgExpr app@(StgConApp con _n args _arg_tys) = do
     opts <- getStgPprOpts
     lintConApp con args (pprStgExpr opts app)
 
-lintStgExpr (StgOpApp _ args _) =
+lintStgExpr (StgOpApp _ args) =
     mapM_ lintStgFunArg args
 
 lintStgExpr (StgLet _ binds body) = do

@@ -396,7 +396,7 @@ rewriteExpr (StgTick t e)             = StgTick t <$!> rewriteExpr e
 rewriteExpr e@(StgConApp {})          = rewriteConApp e
 rewriteExpr e@(StgApp {})             = rewriteApp e
 rewriteExpr (StgLit lit)              = return $! (StgLit lit)
-rewriteExpr (StgOpApp op args res_ty) = (StgOpApp op) <$!> rewriteArgs args <*> pure res_ty
+rewriteExpr (StgOpApp op args)        = StgOpApp op <$!> rewriteArgs args
 
 
 rewriteCase :: InferStgExpr -> RM TgStgExpr
@@ -496,12 +496,12 @@ So for these we should call `rewriteArgs`.
 -}
 
 rewriteOpApp :: InferStgExpr -> RM TgStgExpr
-rewriteOpApp (StgOpApp op args res_ty) = case op of
+rewriteOpApp (StgOpApp op args) = case op of
   op@(StgPrimOp primOp)
     | primOp == DataToTagSmallOp || primOp == DataToTagLargeOp
     -- see Note [Rewriting primop arguments]
-    -> (StgOpApp op) <$!> rewriteArgs args <*> pure res_ty
-  _ -> pure $! StgOpApp op args res_ty
+    -> StgOpApp op <$!> rewriteArgs args
+  _ -> pure $! StgOpApp op args
 rewriteOpApp _ = panic "Impossible"
 
 -- `mkSeq` x x' e generates `case x of x' -> e`

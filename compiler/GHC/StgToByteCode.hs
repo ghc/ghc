@@ -692,12 +692,12 @@ schemeT d s p app
    = implement_tagToId d s p arg constr_names
 
    -- Case 1
-schemeT d s p (StgOpApp (StgFCallOp (CCall ccall_spec) _ty) args kind)
+schemeT d s p (StgOpApp (StgFCallOp (CCall ccall_spec) _argtys kind) args)
    = if isSupportedCConv ccall_spec
       then generateCCall d s p ccall_spec kind args
       else unsupportedCConvException
 
-schemeT d s p (StgOpApp (StgPrimOp op) args _ty) = do
+schemeT d s p (StgOpApp (StgPrimOp op) args) = do
   profile <- getProfile
   let platform = profilePlatform profile
   case doPrimOp platform op d s p args of
@@ -706,7 +706,7 @@ schemeT d s p (StgOpApp (StgPrimOp op) args _ty) = do
     -- Otherwise we have to do a call to the primop wrapper instead :(
     _         -> doTailCall d s p (primOpId op) (reverse args)
 
-schemeT d s p (StgOpApp (StgPrimCallOp (PrimCall label _)) args _reps)
+schemeT d s p (StgOpApp (StgPrimCallOp (PrimCall label _) _) args)
    = generatePrimCall d s p label args
 
 schemeT d s p (StgConApp con _cn args _tys)
@@ -2219,7 +2219,7 @@ mkDummyLiteral platform pr
 
 maybe_is_tagToEnum_call :: CgStgExpr -> Maybe (StgArg, [Name])
 -- Detect and extract relevant info for the tagToEnum kludge.
-maybe_is_tagToEnum_call (StgOpApp (StgTagToEnumOp tyc) args _)
+maybe_is_tagToEnum_call (StgOpApp (StgTagToEnumOp tyc) args)
   | [v] <- args
   = Just (v, extract_constr_Names tyc)
   | otherwise

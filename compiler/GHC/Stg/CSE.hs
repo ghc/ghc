@@ -349,8 +349,8 @@ stgCseExpr env (StgApp fun args)
         args' = substArgs env args
 stgCseExpr _ (StgLit lit)
     = StgLit lit
-stgCseExpr env (StgOpApp op args tys)
-    = StgOpApp op args' tys
+stgCseExpr env (StgOpApp op args)
+    = StgOpApp op args'
   where args' = substArgs env args
 stgCseExpr env (StgTick tick body)
     = let body' = stgCseExpr env body

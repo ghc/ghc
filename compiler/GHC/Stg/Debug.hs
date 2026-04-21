@@ -103,7 +103,7 @@ collectExpr = go
     go (StgConApp dc _mn as tys) = do
       n' <- numberDataCon dc []
       return (StgConApp dc n' as tys)
-    go (StgOpApp op as ty) = return (StgOpApp op as ty)
+    go (StgOpApp op as) = return (StgOpApp op as)
     go (StgCase scrut bndr ty alts) =
       StgCase <$> collectExpr scrut <*> pure bndr <*> pure ty <*> mapM collectAlt alts
     go (StgLet ext bind body) = do

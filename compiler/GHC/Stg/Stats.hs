@@ -150,7 +150,7 @@ statExpr :: StgExpr -> StatEnv
 statExpr (StgApp _ _)     = countOne Applications
 statExpr (StgLit _)       = countOne Literals
 statExpr (StgConApp {})   = countOne ConstructorApps
-statExpr (StgOpApp _ _ _) = countOne PrimitiveApps
+statExpr (StgOpApp _ _)   = countOne PrimitiveApps
 statExpr (StgTick _ e)    = statExpr e
 
 statExpr (StgLetNoEscape _ binds body)

@@ -574,24 +574,24 @@ mkStgApp f how_bound core_args stg_args res_ty
       -- stores the type constructor information. See Note [tagToEnum# in STG]
       -- in GHC.Stg.Syntax.
       PrimOpId TagToEnumOp _ -> 
-        StgOpApp (StgTagToEnumOp (tcTyConAppTyCon res_ty)) stg_args res_kind
+        StgOpApp (StgTagToEnumOp (tcTyConAppTyCon res_ty)) stg_args
 
       -- Some primitive operator that might be implemented as a library call.
       -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
       -- we require that primop applications be saturated.
       PrimOpId op _    -> -- assertPpr saturated (ppr f <+> ppr stg_args) $
-                          StgOpApp (StgPrimOp op) stg_args res_kind
+                          StgOpApp (StgPrimOp op) stg_args
 
       -- A call to some primitive Cmm function.
       FCallId (CCall (CCallSpec
                             (StaticTarget ext lbl ForeignFunction) PrimCallConv _))
                             | TargetIsInThat unit <- staticTargetUnit ext
                        -> assert exactly_saturated $
-                          StgOpApp (StgPrimCallOp (PrimCall lbl unit)) stg_args res_kind
+                          StgOpApp (StgPrimCallOp (PrimCall lbl unit) res_kind) stg_args
 
       -- A regular foreign call.
       FCallId call     -> assert exactly_saturated $
-                          StgOpApp (StgFCallOp call (collectStgFArgTypes (idType f))) stg_args res_kind
+                          StgOpApp (StgFCallOp call (collectStgFArgTypes (idType f)) res_kind) stg_args
 
       TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,stg_args)
 

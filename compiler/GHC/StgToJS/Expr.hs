@@ -107,14 +107,14 @@ genExpr ctx stg = case stg of
     as <- concatMapM genArg args
     c <- genCon ctx con as
     return (c, ExprInline)
-  StgOpApp (StgFCallOp f _) args k
+  StgOpApp (StgFCallOp f _ k) args
     -> genForeignCall ctx f k (concatMap typex_expr $ ctxTarget ctx) args
-  StgOpApp (StgPrimOp op) args _k
+  StgOpApp (StgPrimOp op) args
     -> genPrimOp ctx op args
-  StgOpApp (StgPrimCallOp c) args k
+  StgOpApp (StgPrimCallOp c k) args
     -> genPrimCall ctx c args k
-  StgOpApp (StgTagToEnumOp tyc) [arg] _k -> genTagToEnumOp ctx tyc arg
-  StgOpApp op@(StgTagToEnumOp _) args k -> pprPanic "genExpr: StgTagToEnumOp not applied to exactly one argument" (ppr op <+> ppr args <+> ppr (getStgKind k))
+  StgOpApp (StgTagToEnumOp tyc) [arg] -> genTagToEnumOp ctx tyc arg
+  StgOpApp op@(StgTagToEnumOp _) args -> pprPanic "genExpr: StgTagToEnumOp not applied to exactly one argument" (ppr op <+> ppr args)
   StgCase e b at alts
     -> genCase ctx b e at alts (liveVars $ stgExprLive False stg)
   StgLet _ b e -> do
