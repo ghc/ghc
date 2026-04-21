@@ -468,10 +468,12 @@ Wrinkles:
 
   For modules high up in the hierarchy of `base`, a convenient way to
   do this is to say
-      import GHC.KnownKeyNames
+        import qualified GHC.KnownKeyNames as Rebindable
+  (Why `qualified` and `as Rebindable`?  See (KN1) in
+   Note [Overview of known entities] in GHC.Builtin.)
 
   For modules not so high up, you can say
-       import GHC.Internal.Base
+       import qualified GHC.Internal.Base as Rebindable
   though you may also need GHC.Internal.Num when numerics are concerned.
 
   For `ghc-internal` modules below GHC.Internal.Base we have to be more selective.

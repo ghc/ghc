@@ -112,9 +112,9 @@ Here are more details.
 
 A "wired-in" entity:
   * Defined in GHC.Builtin.WiredIn.*
-  * Its Unique, OccName
-  * Its defining module
-  * Its data constructors etc
+  * GHC knows its Unique, OccName
+  * GHC knows its defining module
+  * GHC knows its data constructors etc
   So GHC knows /everything/ about it.  See Note [Overview of wired-in things].
 
   We try hard to avoid wired-in things; it's tricky to ensure that GHC's static
@@ -123,12 +123,14 @@ A "wired-in" entity:
 A "known-key" entity:
   * Defined in GHC.Builtin.KnownKeys
   * Its Unique and OccName are baked into GHC. Its Unique is called a KnownKey.
-  * It is exported by base:GHC.KnownKeyNames
+  * It is exported by GHC.KnownKeyNames
   * But that's all that GHC knows about it
   In particular, GHC does /not/ know in which module the entity is defined.
 
   Example: the `Eq` class has OccName "Eq" and unique `eqClassKey`.  It happens
   to be defined in ghc-internal:GHC.Internal.Classes, but GHC does not know that.
+
+  Every known-key entity is also a known-occ entity, but not vice versa.
 
   See Note [Recipe for adding a known-key name] for how to add a known-key name
   to GHC. It's not hard.
@@ -136,7 +138,7 @@ A "known-key" entity:
 A "known-occ" entity:
   * Defined in GHC.Builtin.KnownOccs
   * Its OccName is baked into GHC -- we call it a KnownOcc
-  * It is exported by base:GHC.KnownKeyNames
+  * It is exported by GHC.KnownKeyNames
   * But that's all that GHC knows about it
   In particular, GHC does /not/ know in which module the entity is defined,
   nor its Unique.
@@ -189,14 +191,22 @@ When do we use each of these?
     and then renames and typechecks them.  These bindings refer to a myriad of
     identifiers, such as `(==)`, `(>)`, `inRange`, and so on.  Again GHC does not
     need to know a statically-known unique for them, but it does need to find them
-    so it uses known
+    so it uses known-occ names for them.  See lots ant lots of definitions like
+       gunfold_RDR :: RdrName
+       gunfold_RDR     = knownVarOccRdrName  "gunfold"
+   in GHC.Builtin.KnownOccs.  This definition constructs a known-occ RdrName; sse
+       knownOccRdrName :: KnownOcc -> RdrName
+   in GHC.Types.Name.Reader
 
   * When desugaring, the desugarer wants to refer to a particular
     class, type, or function.  It does this via (e.g.)
+       dsLookupKnownOccTyCon eitherTyConOcc
+    where
        dsLookupKnownOccTyCon :: KnownOcc -> DsM TyCon
-    or
+
+    For known-key entities you can also use
        dsLookupKnownKeyTyCon :: KnownKey -> DsM TyCon
-    (It doesn't really matter which we use.)
+    by giving it the known key of the entity.
 
 To implement all this, here are the moving parts.
 
@@ -209,7 +219,7 @@ How known-occ entities work
   this is not an onerous restriction.  But see Note [Tricky known-occ cases] in
   GHC.Builtin.KnownOccs for some awkward cases.
 
-* A special module `base:GHC.KnownKeyNames` exports all the known-key and known-occ
+* A distinguished module `GHC.KnownKeyNames` exports all the known-key and known-occ
   entities names. There is nothing special about this module except that GHC knows its
   name and can import it.
 
@@ -219,6 +229,9 @@ How known-occ entities work
 
   This is a big reason for (KnownEntityInvariant): an export list cannot have two
   entities with the same OccName.
+
+  When GHC wants to find GHC.KnownKeyNames, it just looks for it in the same
+  way as any other import.
 
 * There are three flags that control the treatment of known entities:
     -frebindable-known-names
@@ -307,10 +320,10 @@ Known-key entities are
 
 * DEFINING.  In the module that /defines/ a known-key name, such as
       the `Num` class in ghc-internal:GHC.Internal.Num
-  we must assign the correct Unique. So in GHC.Rename.Env.newTopVanillaSrcBinder
-  if -fdefines-known-key-names is set (Opt_DefinesKnownKeyNames), we check the
-  OccName against the list in `knownKeyTable`; if it appears there, we use the
-  Unique from the table.
+  we must assign the correct Unique at its definitino site. So in
+  `GHC.Rename.Env.newTopVanillaSrcBinder`, if -fdefines-known-key-names is set
+  (Opt_DefinesKnownKeyNames), we check the OccName against the list in `knownKeyTable`;
+  if it appears there, we use the Unique from the table.
 
 * SERIALISING.
   - When we serialise a known-key name into an interface file, we mark it as such.
@@ -343,7 +356,7 @@ Wrinkles
    So we compile GHC.Internal.Data.Foldable with
        -fexclude-known-define=toList
 
-(KN3) We don't need need to export wired-in entities from GHC.KnownKeyNames
+(KN3) We don't need to export wired-in entities from GHC.KnownKeyNames
   because we (should) never look up a wired-in name via its key.  That is,
   `GHC.Iface.Load.lookupKnownKeyName` should never be called on the key of
   a wired-in name.
@@ -355,9 +368,9 @@ Wrinkles
 
 Note [Recipe for adding a known-occ name]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-To make `wombat` into a known-occ name, you must ensure that:
+To make `wombat` into a known-occ name, you do the following:
 
-* The module `GHC.KnownKeyNames` must export `wombat`.
+* Ensure that the module `GHC.KnownKeyNames` exports `wombat`.
 
 * In any module in `base` or `ghc-internal` (which are compiled with
   -frebindable-known-names), in which `wombat` is needed, you must ensure
@@ -373,14 +386,14 @@ To make `wombat` into a known-occ name, you must ensure that:
 
 Note [Recipe for adding a known-key name]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-To make `wombat` into a known-key name, you must ensure that:
+To make `wombat` into a known-key name, do the following.
 
-* The module M that defines `wombat` is compiled with `-fdefines-known-names`.
+* Ensure that the module M that defines `wombat` is compiled with `-fdefines-known-names`.
 
-* If M.hs has an `M.hs-boot` file, it too must be compiled
+* If M.hs has an `M.hs-boot` file, ensure that it too must be compiled
   with `-fdefines-known-names`.
 
-* The module `GHC.KnownKeyNames` must export `wombat`.
+* Ensure that the module `GHC.KnownKeyNames` exports `wombat`.
 
 * In GHC.Builtin.KnownKeys you must define a static unique
      wombatKey :: KnownKey

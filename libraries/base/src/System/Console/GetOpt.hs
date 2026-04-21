@@ -1,7 +1,5 @@
 {-# LANGUAGE Safe #-}
 
-{-# OPTIONS_GHC -fno-rebindable-known-names #-}
-    -- We are importing Prelude, hence GHC.KnownKeyNames is available
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  System.Console.GetOpt
@@ -65,6 +63,7 @@ module System.Console.GetOpt (
 ) where
 
 import Prelude
+import qualified GHC.KnownKeyNames as Rebindable
 import GHC.Internal.Data.List ( isPrefixOf, find )
 
 -- |What to do with options following non-options

@@ -1,9 +1,6 @@
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\section[GHC.Builtin.KnownKeys]{Definitions of prelude modules and names}
-
-
 Nota Bene: all Names defined in here should come from the base package,
 the big-num package or (for plugins) the ghc package.
 

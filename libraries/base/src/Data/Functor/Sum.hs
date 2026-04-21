@@ -4,9 +4,6 @@
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
-{-# OPTIONS_GHC -fno-rebindable-known-names #-}
-    -- We are importing Prelude, hence GHC.KnownKeyNames is available
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Functor.Sum
@@ -27,6 +24,7 @@ module Data.Functor.Sum (
   ) where
 
 import Prelude
+import qualified GHC.KnownKeyNames as Rebindable
 import Control.Applicative ((<|>))
 import GHC.Internal.Data.Data (Data)
 import Data.Functor.Classes

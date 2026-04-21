@@ -4,9 +4,6 @@
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
-{-# OPTIONS_GHC -fno-rebindable-known-names #-}
-    -- We import Prelude, hence GHC.KnownKeyNames is available
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Functor.Product
@@ -27,6 +24,7 @@ module Data.Functor.Product (
   ) where
 
 import Prelude
+import qualified GHC.KnownKeyNames as Rebindable
 import Control.Applicative
 import GHC.Internal.Control.Monad (MonadPlus(..))
 import GHC.Internal.Control.Monad.Fix (MonadFix(..))
