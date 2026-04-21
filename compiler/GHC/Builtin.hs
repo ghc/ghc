@@ -191,7 +191,7 @@ When do we use each of these?
     and then renames and typechecks them.  These bindings refer to a myriad of
     identifiers, such as `(==)`, `(>)`, `inRange`, and so on.  Again GHC does not
     need to know a statically-known unique for them, but it does need to find them
-    so it uses known-occ names for them.  See lots ant lots of definitions like
+    so it uses known-occ names for them.  See lots and lots of definitions like
        gunfold_RDR :: RdrName
        gunfold_RDR     = knownVarOccRdrName  "gunfold"
    in GHC.Builtin.KnownOccs.  This definition constructs a known-occ RdrName; sse
