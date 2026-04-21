@@ -525,6 +525,8 @@ extern char **environ;
       SymI_HasDataProto(stg_atomicallyzh)                                   \
       SymI_HasProto(barf)                                               \
       SymI_HasProto(flushEventLog)                                      \
+      SymI_HasProto(getTraceFlag)                                       \
+      SymI_HasProto(setTraceFlag)                                       \
       SymI_HasProto(deRefStablePtr)                                     \
       SymI_HasProto(debugBelch)                                         \
       SymI_HasProto(errorBelch)                                         \
