@@ -554,7 +554,7 @@ rnExpr (RecordUpd { rupd_expr = L l expr, rupd_flds = rbinds })
            ; let upd_flds = OverloadedRecUpdFields
                             { xOLRecUpdFields = noExtField
                             , olRecUpdFields  = us }
-                 rs_table = Rebindable [(nameOccName getField, getField) , (nameOccName getField, setField)]
+                 rs_table = Rebindable [(nameOccName getField, getField) , (nameOccName setField, setField)]
            ; return (RecordUpd rs_table (L l e) upd_flds
                     , plusFNs [fv_getField, fv_setField, fv_e, fv_us] )
            }

@@ -24,6 +24,7 @@ import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
+import GHC.Tc.Gen.Expand
 import GHC.Driver.Env.Types
 
 import GHC.Rename.Env
@@ -141,9 +142,12 @@ rnTypedBracket e br_body
        ; recordThUse
 
        ; traceRn "Renaming typed TH bracket" empty
-       ; (body', fvs_e) <- setThLevel (Brack cur_level RnPendingTyped) $ rnLExpr br_body
-       ; return (HsTypedBracket noExtField body', fvs_e)
-
+       ; (body'@(L loc b) , fvs_e) <- setThLevel (Brack cur_level RnPendingTyped) $ rnLExpr br_body
+       -- ; return (HsTypedBracket noExtField body', fvs_e)
+       ; mb_b <- tcExpand b
+       ; case mb_b of
+           Nothing -> return (HsTypedBracket noExtField body', fvs_e)
+           Just hse -> return (HsTypedBracket noExtField (L loc (XExpr (ExpandedThingRn hse))), fvs_e)
        }
 
 rnUntypedBracket :: HsExpr GhcPs -> HsQuote GhcPs -> RnM (HsExpr GhcRn, FreeNames)
@@ -176,6 +180,7 @@ rnUntypedBracket e br_body
          setThLevel (UntypedBrack cur_level ps_var) $
                   rn_utbracket br_body
        ; pendings <- readMutVar ps_var
+
        ; return (HsUntypedBracket pendings body', fvs_e)
 
        }
