@@ -61,7 +61,7 @@ import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc as SrcLoc
 
 import GHC.Driver.DynFlags
-import GHC.Driver.Env ( HscEnv(..), hsc_home_unit )
+import GHC.Driver.Env ( HscEnv(..), hsc_home_unit, hsc_units )
 
 import GHC.Utils.Misc   ( lengthExceeds )
 import GHC.Utils.Panic
@@ -393,14 +393,9 @@ rnDefaultDecl (DefaultDecl _ mb_cls tys)
 
 rnHsForeignDecl :: ForeignDecl GhcPs -> RnM (ForeignDecl GhcRn, FreeNames)
 rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
-  = do { topEnv :: HscEnv <- getTopEnv
-       ; name' <- lookupLocatedTopBndrRnN WL_TermVariable name
+  = do { name' <- lookupLocatedTopBndrRnN WL_TermVariable name
        ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
-
-        -- Mark any PackageTarget style imports as coming from the current package
-       ; let home_unitid = homeUnitId (hsc_home_unit topEnv)
-             spec'  = patchForeignImport home_unitid spec
-
+       ; spec' <- rnHsForeignImport spec
        ; return (ForeignImport { fd_i_ext = noExtField
                                , fd_name = name', fd_sig_ty = ty'
                                , fd_fi = spec' }, fvs) }
@@ -416,28 +411,65 @@ rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
         --     we add it to the free-variable list.  It might, for example,
         --     be imported from another module
 
--- | For Windows DLLs we need to know what packages imported symbols are from
---      to generate correct calls. Imported symbols are tagged with the current
---      package, so if they get inlined across a package boundary we'll still
---      know where they're from.
---
-patchForeignImport :: UnitId -> (ForeignImport GhcPs) -> (ForeignImport GhcRn)
-patchForeignImport unitid (CImport ext cconv safety fs spec)
-        = CImport ext cconv safety (renameHeader <$> fs) (patchCImportSpec unitid spec)
+rnHsForeignImport :: ForeignImport GhcPs -> RnM (ForeignImport GhcRn)
 
-patchCImportSpec :: UnitId -> CImportSpec GhcPs -> CImportSpec GhcRn
-patchCImportSpec unitid = \case
-    CFunction callTarget -> CFunction $ patchCCallTarget unitid callTarget
+-- | Rename 'foreign import prim "[pkgname] cmmid"': the (optional) package name
+-- is used to specify in which unit the cmm primitive lives. Resolve the
+-- package name to a unit. If the package name is not specified, it means the
+-- target lives in the current unit.
+--
+-- Note: the PackageName is stashed in the Header field in parsePrimImport.
+-- It gets pulled out below in the rnHsForeignImport case for PrimCallConv.
+-- It would be nicer if the ForeignImport representation had a case for each
+-- calling convention. See issue #27209.
+--
+-- The typical use cases are:
+--  * cmm primops defined in the rts but bound in a library like ghc-internal
+--    e.g. foreign import prim "rts blah"
+--  * cmm primops defined in a local .cmm file in the same library.
+--
+rnHsForeignImport (CImport ext cconv@(L _ PrimCallConv) safety header spec)
+  = do { topEnv :: HscEnv <- getTopEnv
+       ; target <- getPrimTargetUnit topEnv header
+       ; return (CImport ext cconv safety Nothing
+                         (renameCImportSpec target spec))
+       }
+  where
+    getPrimTargetUnit topEnv Nothing =
+        let this = homeUnitId (hsc_home_unit topEnv) in
+        return (CLabelTargetInUnit this)
+
+    getPrimTargetUnit topEnv (Just (Header _ fs)) =
+        let pkgname = PackageName fs in
+        case lookupPackageName (hsc_units topEnv) pkgname of
+            Just that ->
+                return (CLabelTargetInUnit that)
+            Nothing   -> do
+                addErrAt (locA ext) (TcRnUnknownPrimCallPackageName pkgname)
+                let this = homeUnitId (hsc_home_unit topEnv)
+                return (CLabelTargetInUnit this)
+
+rnHsForeignImport (CImport ext cconv safety header spec)
+  = do { topEnv :: HscEnv <- getTopEnv
+       ; let target = CLabelTargetInUnit (homeUnitId (hsc_home_unit topEnv))
+       ; return (CImport ext cconv safety
+                         (renameHeader <$> header)
+                         (renameCImportSpec target spec))
+       }
+
+renameCImportSpec :: CLabelTargetLibrary -> CImportSpec GhcPs -> CImportSpec GhcRn
+renameCImportSpec targetLib = \case
+    CFunction callTarget -> CFunction $ renameCCallTarget targetLib callTarget
     CLabel    cLabel     -> CLabel cLabel
     CWrapper             -> CWrapper
 
-patchCCallTarget :: UnitId -> CCallTarget GhcPs -> CCallTarget GhcRn
-patchCCallTarget unitid = \case
+renameCCallTarget :: CLabelTargetLibrary -> CCallTarget GhcPs -> CCallTarget GhcRn
+renameCCallTarget targetLib = \case
     DynamicTarget x -> DynamicTarget x
     StaticTarget sTxt label targetKind ->
       let ext = StaticTargetGhc
             { staticTargetLabel = sTxt
-            , staticTargetUnit  = CLabelTargetInUnit unitid
+            , staticTargetUnit  = targetLib
             }
       in  StaticTarget ext label targetKind
 

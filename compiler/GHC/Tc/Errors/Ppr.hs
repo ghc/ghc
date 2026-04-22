@@ -2060,6 +2060,9 @@ instance Diagnostic TcRnMessage where
     TcRnUnexpectedTypeSyntaxInTerms syntax -> mkSimpleDecorated $
       text "Unexpected" <+> pprTypeSyntaxName syntax
 
+    TcRnUnknownPrimCallPackageName pkgname -> mkSimpleDecorated $
+      text "Unknown source package" <+> quotes (ppr pkgname) <+> "in foreign import prim."
+
   diagnosticReason :: TcRnMessage -> DiagnosticReason
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2700,6 +2703,8 @@ instance Diagnostic TcRnMessage where
     TcRnOutOfArityTyVar{}
       -> ErrorWithoutFlag
     TcRnUnexpectedTypeSyntaxInTerms{}
+      -> ErrorWithoutFlag
+    TcRnUnknownPrimCallPackageName {}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -3427,6 +3432,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnUnexpectedTypeSyntaxInTerms syntax
       -> [suggestExtension (typeSyntaxExtension syntax)]
+    TcRnUnknownPrimCallPackageName {}
+      -> noHints
 
   diagnosticCode = constructorCode @GHC
 
