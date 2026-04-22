@@ -373,7 +373,7 @@ To make `wombat` into a known-occ name, you do the following:
 * Ensure that the module `GHC.Essentials` exports `wombat`.
 
 * In any module in `base` or `ghc-internal` (which are compiled with
-  -frebindable-known-names), in which `wombat` is needed, you must ensure
+  -frebindable-known-names), in which `wombat` is needed, ensure
   that `wombat` is in scope by saying `import M( wombat )`, or
      import qualified M as Rebindable( wombat )
 
@@ -390,22 +390,22 @@ To make `wombat` into a known-key name, do the following.
 
 * Ensure that the module M that defines `wombat` is compiled with `-fdefines-known-names`.
 
-* If M.hs has an `M.hs-boot` file, ensure that it too must be compiled
+* If M.hs has an `M.hs-boot` file, ensure that it too is compiled
   with `-fdefines-known-names`.
 
 * Ensure that the module `GHC.Essentials` exports `wombat`.
 
-* In GHC.Builtin.KnownKeys you must define a static unique
+* In GHC.Builtin.KnownKeys define a static unique
      wombatKey :: KnownKey
      wombatKey = mkPreludeMiscIdUnique 892
   with an unused unique, here 892.
 
-* The big list `GHC.Builtin.KnownKeys.knownKeyTable` must contain an
-  entry for `wombat`
+* Add an entry
       (mkVarOcc "wombat", wombatKey)
+  to the big list `GHC.Builtin.KnownKeys.knownKeyTable`
 
-* Just like known-occ names, above in any module in `base` or `ghc-internal` (which
-  are compiled with -frebindable-known-names), you must ensure that `wombat` is
+* Just like for known-occ names above, in any module in `base` or `ghc-internal` (which
+  are compiled with -frebindable-known-names), ensure that `wombat` is
   in scope by saying `import M( wombat )`.
 -}
 
