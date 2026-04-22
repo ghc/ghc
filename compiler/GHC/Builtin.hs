@@ -235,8 +235,8 @@ How known-occ entities work
 
 * There are three flags that control the treatment of known entities:
     -frebindable-known-names
-    -fdefines-known-names
-    -fexclude-known-define=wombat   See wrinkle (KN2)
+    -fdefines-known-key-names
+    -fexclude-known-key-define=wombat   See wrinkle (KN2)
   Details in the following bullets.
 
 * You initiate a known-occ lookup by calling
@@ -342,7 +342,7 @@ Wrinkles
    So we simply suppress an unused-import-decl warning if it has a "as Rebindable"
    qualifier.  See (UI1) in Note [Unused imports] in GHC.Rename.Names
 
-(KN2) The flag `-fdefines-known-names` is module-wide.  But what if that module
+(KN2) The flag `-fdefines-known-key-names` is module-wide.  But what if that module
    happens to define an entity that /isn't/ a known-key entity, but /does/ share the
    same OccName.   For example:
           module GHC.Internal.Data.Foldable where
@@ -350,11 +350,11 @@ Wrinkles
           module GHC.Internal.IsList where
              class IsList l where { ...; toList :: l -> [Item l] }
    Foldable is a known-key entity, so GHC.Internal.Data.Foldable must be compiled
-   with `-fdefines-known-names`.  But its `toList` method is /not/ known-key.
+   with `-fdefines-known-key-names`.  But its `toList` method is /not/ known-key.
    Rather, the `toList` from GHC.Internal.IsList is teh known-key entity.
 
    So we compile GHC.Internal.Data.Foldable with
-       -fexclude-known-define=toList
+       -fexclude-known-key-define=toList
 
 (KN3) We don't need to export wired-in entities from GHC.Essentials
   because we (should) never look up a wired-in name via its key.  That is,
@@ -388,10 +388,10 @@ Note [Recipe for adding a known-key name]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 To make `wombat` into a known-key name, do the following.
 
-* Ensure that the module M that defines `wombat` is compiled with `-fdefines-known-names`.
+* Ensure that the module M that defines `wombat` is compiled with `-fdefines-known-key-names`.
 
 * If M.hs has an `M.hs-boot` file, ensure that it too is compiled
-  with `-fdefines-known-names`.
+  with `-fdefines-known-key-names`.
 
 * Ensure that the module `GHC.Essentials` exports `wombat`.
 

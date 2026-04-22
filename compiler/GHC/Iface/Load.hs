@@ -163,7 +163,7 @@ data KnownNameSource
 
   | KNS_FromModule
        -- Look up the known-occ name in the export list of GHC.Essentials
-       -- This is the "normal path", and happens when -frebindable-key-name
+       -- This is the "normal path", and happens when -frebindable-known-names
        -- is /not/ set
 
 instance Outputable KnownNameSource where
