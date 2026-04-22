@@ -3162,7 +3162,7 @@ mkImport cconv safety (L loc sLit, v, ty) (timport, td) =
           then addFatalError $ mkPlainErrorMsgEnvelope loc PsErrInvalidCApiImport
           else returnSpec imp
       StdCallConv        -> returnSpec =<< mkCImport
-      PrimCallConv       -> mkOtherImport
+      PrimCallConv       -> returnSpec =<< mkPrimImport
       JavaScriptCallConv -> mkOtherImport
   where
     esrc = stringLitSourceText sLit
@@ -3180,6 +3180,14 @@ mkImport cconv safety (L loc sLit, v, ty) (timport, td) =
 
     isCWrapperImport (CImport _ _ _ _ CWrapper) = True
     isCWrapperImport _ = False
+
+    mkPrimImport = do
+      case parsePrimImport (reLoc cconv) (reLoc safety)
+                           (mkExtName (unLoc v))
+                           entity (L loc esrc) of
+        Nothing         -> addFatalError $ mkPlainErrorMsgEnvelope loc $
+                             PsErrMalformedEntityString
+        Just importSpec -> return importSpec
 
     -- currently, all the other import conventions only support a symbol name in
     -- the entity string. If it is missing, we use the function name instead.
@@ -3260,6 +3268,49 @@ parseCImport cconv safety nm str sourceText =
                       cs <-  many (satisfy id_char)
                       return (packHText (c:cs)))
 
+-- Parse a Cmm name entity string of the following form:
+--   "[pkgname] cmmid"
+-- If 'cmmid' is missing, the function name 'v' is used instead as symbol
+-- name (cf section 8.5.1 in Haskell 2010 report).
+
+-- Note: the PackageName is stashed in the Header field. It gets pulled out
+-- in the renamer, see rnHsForeignImport case for PrimCallConv. It would be
+-- nicer if the ForeignImport representation had a case for each calling
+-- convention. See issue #27209.
+--
+parsePrimImport :: LocatedA CCallConv -> LocatedA Safety -> CLabelString -> HText
+                -> Located SourceText
+                -> Maybe (ForeignImport GhcPs)
+parsePrimImport cconv safety nm str sourceText =
+    listToMaybe $ map fst $ filter (null.snd) $
+      readP_to_S parse (unpackHText str)
+  where
+    parse = do
+       skipSpaces
+       pkgname <- return Nothing
+              +++ (do pkgname <- fastStringToShortText <$> parse_pkgname
+                      skipSpaces
+                      return (Just (Header NoSourceText pkgname)))
+       cmmid  <- fastStringToShortText <$> return (mkFastStringShortText nm) +++ parse_cmmid
+       skipSpaces
+       let !cfun = CFunction (StaticTarget NoSourceText cmmid ForeignFunction)
+           !cimp = CImport (reLoc sourceText) (reLoc cconv)
+                           (reLoc safety) pkgname cfun
+       return cimp
+
+    parse_cmmid = mkFastString <$>
+                    ((:) <$> satisfy cmmid_first_char
+                         <*> many (satisfy cmmid_char))
+
+    parse_pkgname = do str <- many1 (satisfy pkgname_char)
+                       if looksLikePackageName str
+                         then return (mkFastString str)
+                         else fail "invalid package name syntax"
+
+    cmmid_first_char c = isAlpha    c || c == '_'
+    cmmid_char       c = isAlphaNum c || c == '_'
+
+    pkgname_char     c = isAlphaNum c || c == '_' || c == '-'
 
 -- construct a foreign export declaration
 --

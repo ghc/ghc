@@ -2097,6 +2097,9 @@ instance Diagnostic TcRnMessage where
     TcRnTooManyMultiplicities -> mkSimpleDecorated $
       text "Too many Multiplicity modifiers"
 
+    TcRnUnknownPrimCallPackageName pkgname -> mkSimpleDecorated $
+      text "Unknown source package" <+> quotes (ppr pkgname) <+> "in foreign import prim."
+
   diagnosticReason :: TcRnMessage -> DiagnosticReason
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2747,6 +2750,8 @@ instance Diagnostic TcRnMessage where
     TcRnUnknownModifierKind{}
       -> ErrorWithoutFlag
     TcRnTooManyMultiplicities{}
+      -> ErrorWithoutFlag
+    TcRnUnknownPrimCallPackageName {}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -3495,6 +3500,8 @@ instance Diagnostic TcRnMessage where
            (Just name, Nothing) -> [SuggestModifierSignature mod name]
            _ -> noHints
     TcRnTooManyMultiplicities{}
+      -> noHints
+    TcRnUnknownPrimCallPackageName {}
       -> noHints
 
   diagnosticCode = constructorCode @GHC
