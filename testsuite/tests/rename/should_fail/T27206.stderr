@@ -1,0 +1,3 @@
+T27206.hs:13:21: error: [GHC-57392]
+    Unknown source package ‘pkg-foo’ in foreign import prim.
+

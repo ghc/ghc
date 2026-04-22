@@ -163,6 +163,7 @@ import GHC.Data.OrdList
 import GHC.Utils.Outputable as Outputable
 import GHC.Data.FastString
 import GHC.Data.Maybe
+import qualified GHC.Data.ShortText as ShortText
 import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Monad (unlessM)
@@ -3168,7 +3169,7 @@ mkImport cconv safety (L loc sLit, v, ty) (timport, td) =
           then addFatalError $ mkPlainErrorMsgEnvelope loc PsErrInvalidCApiImport
           else returnSpec imp
       StdCallConv        -> returnSpec =<< mkCImport
-      PrimCallConv       -> mkOtherImport
+      PrimCallConv       -> returnSpec =<< mkPrimImport
       JavaScriptCallConv -> mkOtherImport
   where
     esrc = stringLitSourceText sLit
@@ -3186,6 +3187,14 @@ mkImport cconv safety (L loc sLit, v, ty) (timport, td) =
 
     isCWrapperImport (CImport _ _ _ _ CWrapper) = True
     isCWrapperImport _ = False
+
+    mkPrimImport = do
+      case parsePrimImport (reLoc cconv) (reLoc safety)
+                           (mkExtName (unLoc v))
+                           entity (L loc esrc) of
+        Nothing         -> addFatalError $ mkPlainErrorMsgEnvelope loc $
+                             PsErrMalformedEntityString
+        Just importSpec -> return importSpec
 
     -- currently, all the other import conventions only support a symbol name in
     -- the entity string. If it is missing, we use the function name instead.
@@ -3218,9 +3227,9 @@ parseCImport cconv safety nm str sourceText =
  listToMaybe $ map fst $ filter (null.snd) $
      readP_to_S parse str
  where
-   parse = do
-       skipSpaces
-       r <- choice [
+   parse =
+       skipSpacesAround $
+       choice [
           string "dynamic" >> return (mk Nothing (CFunction (DynamicTarget NoExtField))),
           string "wrapper" >> return (mk Nothing CWrapper),
           do optional (token "static" >> skipSpaces)
@@ -3231,8 +3240,6 @@ parseCImport cconv safety nm str sourceText =
                   mk (Just (Header (SourceText src) (packHText h)))
                       <$> cimp nm))
          ]
-       skipSpaces
-       return r
 
    token str = do _ <- string str
                   toks <- look
@@ -3266,6 +3273,77 @@ parseCImport cconv safety nm str sourceText =
                       cs <-  many (satisfy id_char)
                       return (packHText (c:cs)))
 
+skipSpacesAround :: ReadP a -> ReadP a
+skipSpacesAround p = skipSpaces *> p <* skipSpaces
+
+-- Parse a Cmm name entity string of the following form:
+--   "[pkgname] [cmmid]"
+-- If 'cmmid' is missing, the function name 'nm' is used instead as symbol
+-- name (cf section 8.5.1 in Haskell 2010 report).
+--
+-- Note: the PackageName is stashed in the Header field. It gets pulled out
+-- in the renamer, see rnHsForeignImport case for PrimCallConv. It would be
+-- nicer if the ForeignImport representation had a case for each calling
+-- convention. See issue #27209.
+parsePrimImport :: LocatedA CCallConv
+                -> LocatedA Safety
+                -> CLabelString
+                -> HText
+                -> Located SourceText
+                -> Maybe (ForeignImport GhcPs)
+parsePrimImport cconv safety nm str sourceText =
+  case parsePrimImportStr (unpackHText str) of
+    Nothing -> Nothing
+    Just (importPkgMay, importCmmIdMay) -> let
+      -- Default package is the current package
+      importHeaderMay = fmap
+        (\importPkg -> Header NoSourceText (ShortText.pack importPkg))
+        importPkgMay
+      -- Default cmm ID is 'nm'
+      importCmmId = case importCmmIdMay of
+        Nothing -> nm
+        Just importCmmId -> ShortText.pack importCmmId
+      cfun = CFunction (StaticTarget NoSourceText importCmmId ForeignFunction)
+      in Just (
+        CImport
+          (reLoc sourceText)
+          (reLoc cconv)
+          (reLoc safety)
+          importHeaderMay
+          cfun
+      )
+
+-- Parse a cmm name entity string into just the pkgname and ccmmid.
+parsePrimImportStr :: String
+                -- ^ Cmm name entity string (without the surrounding quotes)
+                -> Maybe (Maybe String, Maybe String)
+                -- ^ If parsed successfully then Just the package name and import CMM name
+parsePrimImportStr str =
+    listToMaybe $ map fst $ filter (null . snd) $
+      readP_to_S parse str
+  where
+    parse :: ReadP (Maybe String, Maybe String)
+    parse =
+        skipSpacesAround $
+              ((,) Nothing <$> (ReadP.option Nothing (Just <$> parse_cmmid)))
+          +++ ((,) <$> fmap Just parse_pkgname
+                   <*  skipSpaces
+                   <*> (ReadP.option Nothing (Just <$> parse_cmmid)))
+
+    parse_cmmid :: ReadP String
+    parse_cmmid = (:) <$> satisfy cmmid_first_char
+                      <*> many (satisfy cmmid_char)
+
+    parse_pkgname :: ReadP String
+    parse_pkgname = do str <- many1 (satisfy pkgname_char)
+                       if looksLikePackageName str
+                         then return str
+                         else fail "invalid package name syntax"
+
+    cmmid_first_char c = isAlpha    c || c == '_'
+    cmmid_char       c = isAlphaNum c || c == '_'
+
+    pkgname_char     c = isAlphaNum c || c == '_' || c == '-'
 
 -- construct a foreign export declaration
 --
