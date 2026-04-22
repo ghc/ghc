@@ -1401,10 +1401,11 @@ mergeDatabases logger = foldM merge (emptyUniqMap, emptyUniqMap) . zip [1..]
     merge (pkg_map, prec_map) (i, UnitDatabase db_path db) = do
       debugTraceMsg logger 2 $
           text "loading package database" <+> OsPath.pprOsPath db_path
-      forM_ (Set.toList override_set) $ \pkg ->
-          debugTraceMsg logger 2 $
-              text "package" <+> ppr pkg <+>
-              text "overrides a previously defined package"
+      when (log_verbosity (logFlags logger) >= 2) $
+        forM_ (Set.toList override_set) $ \pkg ->
+            debugTraceMsg logger 2 $
+                text "package" <+> ppr pkg <+>
+                text "overrides a previously defined package"
       return (pkg_map', prec_map')
      where
       db_map = mk_pkg_map db
@@ -2382,4 +2383,3 @@ implicitPackageDeps dflags
    = [thUnitId | xopt TemplateHaskellQuotes dflags]
    -- TODO: Should also include `base` and `ghc-prim` if we use those implicitly, but
    -- it is possible to not depend on base (for example, see `ghc-prim`)
-
