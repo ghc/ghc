@@ -299,7 +299,7 @@ dsJsFExportDynamic id co0 cconv = do
         adjustor   = CCallSpec
                        (StaticTarget
                          (StaticTargetGhc NoSourceText
-                                          (CLabelTargetInUnit rtsUnit))
+                                          (CLabelTargetInUnit rtsUnitId))
                          (fsLit "createAdjustor")
                          ForeignFunction)
                        CCallConv
@@ -655,7 +655,7 @@ mkJsCall u tgt args t = mkFCall u ccall args t
   where
     stExt = StaticTargetGhc
         { staticTargetLabel = NoSourceText
-        , staticTargetUnit  = CLabelTargetInUnit ghcInternalUnit
+        , staticTargetUnit  = CLabelTargetInUnit ghcInternalUnitId
         }
     ccall = CCall $ CCallSpec
               (StaticTarget stExt tgt ForeignFunction)

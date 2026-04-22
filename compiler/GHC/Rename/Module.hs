@@ -61,7 +61,7 @@ import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc as SrcLoc
 
 import GHC.Driver.DynFlags
-import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
+import GHC.Driver.Env ( HscEnv(..), hsc_home_unit )
 
 import GHC.Utils.Misc   ( lengthExceeds )
 import GHC.Utils.Panic
@@ -401,8 +401,8 @@ rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec, f
        ; (ty', fvs) <- rnHsSigType ctxt TypeLevel ty
 
         -- Mark any PackageTarget style imports as coming from the current package
-       ; let home_unit = hsc_home_unit topEnv
-             spec'  = patchForeignImport (homeUnitAsUnit home_unit) spec
+       ; let home_unitid = homeUnitId (hsc_home_unit topEnv)
+             spec'  = patchForeignImport home_unitid spec
 
        ; (modifiers', mods_fvs) <- rnModifiersContext ctxt modifiers
 
@@ -430,23 +430,23 @@ rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec, f
 --      package, so if they get inlined across a package boundary we'll still
 --      know where they're from.
 --
-patchForeignImport :: Unit -> (ForeignImport GhcPs) -> (ForeignImport GhcRn)
-patchForeignImport unit (CImport ext cconv safety fs spec)
-        = CImport ext cconv safety (renameHeader <$> fs) (patchCImportSpec unit spec)
+patchForeignImport :: UnitId -> (ForeignImport GhcPs) -> (ForeignImport GhcRn)
+patchForeignImport unitid (CImport ext cconv safety fs spec)
+        = CImport ext cconv safety (renameHeader <$> fs) (patchCImportSpec unitid spec)
 
-patchCImportSpec :: Unit -> CImportSpec GhcPs -> CImportSpec GhcRn
-patchCImportSpec unit = \case
-    CFunction callTarget -> CFunction $ patchCCallTarget unit callTarget
+patchCImportSpec :: UnitId -> CImportSpec GhcPs -> CImportSpec GhcRn
+patchCImportSpec unitid = \case
+    CFunction callTarget -> CFunction $ patchCCallTarget unitid callTarget
     CLabel    cLabel     -> CLabel cLabel
     CWrapper             -> CWrapper
 
-patchCCallTarget :: Unit -> CCallTarget GhcPs -> CCallTarget GhcRn
-patchCCallTarget unit = \case
+patchCCallTarget :: UnitId -> CCallTarget GhcPs -> CCallTarget GhcRn
+patchCCallTarget unitid = \case
     DynamicTarget x -> DynamicTarget x
     StaticTarget sTxt label targetKind ->
       let ext = StaticTargetGhc
             { staticTargetLabel = sTxt
-            , staticTargetUnit  = CLabelTargetInUnit unit
+            , staticTargetUnit  = CLabelTargetInUnit unitid
             }
       in  StaticTarget ext label targetKind
 
