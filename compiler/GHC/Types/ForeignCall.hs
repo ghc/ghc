@@ -319,7 +319,7 @@ data CLabelTargetLibrary
     -- and thus the shared library corresponding to the unit. Uses of this
     -- label within the same unit will be intra-library, and inter-library
     -- otherwise.
-  = CLabelTargetInUnit !Unit
+  = CLabelTargetInUnit !UnitId
   deriving (Data, Eq)
 
 data StaticTargetGhc = StaticTargetGhc

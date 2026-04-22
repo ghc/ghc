@@ -477,8 +477,7 @@ data ForeignLabelSource
 --    from, e.g. the RTS, which then fall into the 'CLabelTargetInUnit' case.
 --
 toForeignLabelSource :: CLabelTargetLibrary -> ForeignLabelSource
-toForeignLabelSource (CLabelTargetInUnit unit) = ForeignLabelInPackage
-                                                   (toUnitId unit)
+toForeignLabelSource (CLabelTargetInUnit unit) = ForeignLabelInPackage unit
 
 
 -- | For debugging problems with the CLabel representation.
@@ -774,8 +773,8 @@ mkApEntryLabel platform upd arity =
 
 -- A call to some primitive hand written Cmm code
 mkPrimCallLabel :: PrimCall -> CLabel
-mkPrimCallLabel (PrimCall str pkg)
-        = CmmLabel (toUnitId pkg) (NeedExternDecl True) str CmmPrimCall
+mkPrimCallLabel (PrimCall str unitid)
+        = CmmLabel unitid (NeedExternDecl True) str CmmPrimCall
 
 
 -- Constructing ForeignLabels

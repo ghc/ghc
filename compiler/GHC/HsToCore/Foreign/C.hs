@@ -200,7 +200,7 @@ dsCFExportDynamic id co0 cconv = do
         adjustor   = CCallSpec
                        (StaticTarget
                          (StaticTargetGhc NoSourceText
-                                          (CLabelTargetInUnit rtsUnit))
+                                          (CLabelTargetInUnit rtsUnitId))
                          (fsLit "createAdjustor")
                          ForeignFunction)
                        CCallConv

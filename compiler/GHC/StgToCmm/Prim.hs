@@ -36,7 +36,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.Graph
 import GHC.Stg.Syntax
 import GHC.Cmm
-import GHC.Unit         ( rtsUnit )
+import GHC.Unit         ( rtsUnitId )
 import GHC.Core.Type    ( Type, tyConAppTyCon_maybe )
 import GHC.Core.TyCon
 import GHC.Cmm.CLabel
@@ -3842,7 +3842,7 @@ emitCopyUpdRemSetPush platform hdr_size dst dst_off n =
         emit graph
   where
     lbl = mkLblExpr $ mkPrimCallLabel
-          $ PrimCall (fsLit "stg_copyArray_barrier") rtsUnit
+          $ PrimCall (fsLit "stg_copyArray_barrier") rtsUnitId
     args =
       [ mkIntExpr platform hdr_size
       , dst
