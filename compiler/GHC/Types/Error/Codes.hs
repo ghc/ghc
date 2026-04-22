@@ -701,6 +701,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnUnrecognisedModifier"                      = 49969
   GhcDiagnosticCode "TcRnUnknownModifierKind"                       = 38026
   GhcDiagnosticCode "TcRnTooManyMultiplicities"                     = 65505
+  GhcDiagnosticCode "TcRnUnknownPrimCallPackageName"                = 57392
 
   -- TcRnIllegalInvisibleTypePattern
   GhcDiagnosticCode "InvisPatWithoutFlag"                           = 78249
