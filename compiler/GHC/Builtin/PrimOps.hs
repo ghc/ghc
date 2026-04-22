@@ -50,7 +50,7 @@ import GHC.Types.SrcLoc  ( wiredInSrcSpan )
 import GHC.Types.ForeignCall ( CLabelString )
 import GHC.Types.Unique  ( Unique )
 
-import GHC.Unit.Types    ( Unit )
+import GHC.Unit.Types    ( UnitId )
 
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
@@ -929,11 +929,11 @@ pprPrimOp other_op = pprOccName (primOpOcc other_op)
 ************************************************************************
 -}
 
-data PrimCall = PrimCall CLabelString Unit
+data PrimCall = PrimCall CLabelString UnitId
 
 instance Outputable PrimCall where
-  ppr (PrimCall lbl pkgId)
-        = text "__primcall" <+> ppr pkgId <+> ppr lbl
+  ppr (PrimCall lbl unitId)
+        = text "__primcall" <+> ppr unitId <+> ppr lbl
 
 -- | Indicate if a primop is really inline: that is, it isn't out-of-line and it
 -- isn't DataToTagOp which are two primops that evaluate their argument
