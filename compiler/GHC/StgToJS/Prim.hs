@@ -25,7 +25,6 @@ import GHC.StgToJS.Regs
 import GHC.StgToJS.Symbols
 
 import GHC.Builtin.PrimOps
-import GHC.Tc.Utils.TcType (isBoolTy)
 import GHC.Utils.Encoding (zEncodeString)
 
 import GHC.Data.FastString
