@@ -139,6 +139,7 @@ import Foreign.C
 import System.IO
 import Data.Data
 import Data.IORef
+import qualified Data.List.NonEmpty as NE
 import Data.Semigroup as Semi
 
 import Foreign
@@ -232,6 +233,7 @@ instance IsString FastString where
 
 instance Semi.Semigroup FastString where
     (<>) = appendFS
+    sconcat = concatFS . NE.toList
 
 instance Monoid FastString where
     mempty = nilFS
@@ -619,6 +621,42 @@ unpackFS fs = utf8DecodeShortByteString $ fs_sbs fs
 zEncodeFS :: FastString -> FastZString
 zEncodeFS fs = fs_zenc fs
 
+-- Sometimes an `appendFS` operand is temporarily constructed, and we
+-- should avoid retaining the unused `FastString` operand in the
+-- table. The RULES below mitigate the issue by concatenating the
+-- `ShortByteString`s instead when an operand is `fsLit` or
+-- `mkFastString`, which cover most such `appendFS` use cases. See
+-- #27205.
+
+{-# RULES
+"appendFS/fsLit y" forall x y.
+  appendFS x (fsLit y) =
+    mkFastStringShortByteString $
+      fs_sbs x Semi.<> utf8EncodeShortByteString y
+  #-}
+
+{-# RULES
+"appendFS/fsLit x" forall x y.
+  appendFS (fsLit x) y =
+    mkFastStringShortByteString $
+      utf8EncodeShortByteString x Semi.<> fs_sbs y
+  #-}
+
+{-# RULES
+"appendFS/mkFastString y" forall x y.
+  appendFS x (mkFastString y) =
+    mkFastStringShortByteString $
+      fs_sbs x Semi.<> utf8EncodeShortByteString y
+  #-}
+
+{-# RULES
+"appendFS/mkFastString x" forall x y.
+  appendFS (mkFastString x) y =
+    mkFastStringShortByteString $
+      utf8EncodeShortByteString x Semi.<> fs_sbs y
+  #-}
+
+{-# INLINE[1] appendFS #-}
 appendFS :: FastString -> FastString -> FastString
 appendFS fs1 fs2 = mkFastStringShortByteString
                  $ (Semi.<>) (fs_sbs fs1) (fs_sbs fs2)
