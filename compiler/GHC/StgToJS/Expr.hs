@@ -372,7 +372,7 @@ resultSize kind = result
   where
     result       = result_reps `zip` result_slots
     result_slots = fmap (slotCount . primRepSize) result_reps
-    result_reps  = stgKindPrimRep kind
+    result_reps  = kindPrimRep (getStgKind kind)
 
 -- | Ensure that the set of identifiers has valid 'RuntimeRep's. This function
 -- returns a no-op when 'csRuntimeAssert' in 'StgToJSConfig' is False.

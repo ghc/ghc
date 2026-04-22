@@ -14,6 +14,7 @@ module GHC.Types.RepType
     countFunRepArgs, countConRepArgs, dataConRuntimeRepStrictness,
     tyConPrimRep,
     runtimeRepPrimRep_maybe, kindPrimRep_maybe, typePrimRep_maybe,
+    kindPrimRep, kindPrimRep1,
 
     -- * Unboxed sum representation type
     ubxSumRepType, layoutUbxSum, repSlotTy, SlotTy (..),
@@ -566,9 +567,12 @@ to process the LiftedRep and WordRep, concatenating the results.
 -- no runtime representation (void) or multiple (unboxed tuple/sum)
 -- See also Note [Getting from RuntimeRep to PrimRep]
 typePrimRep :: HasDebugCallStack => Type -> [PrimRep]
-typePrimRep ty = kindPrimRep (text "typePrimRep" <+>
-                              parens (ppr ty <+> dcolon <+> ppr (typeKind ty)))
-                             (typeKind ty)
+typePrimRep ty =
+  let ki = typeKind ty in
+  case kindPrimRep_maybe ki of
+    Just reps -> reps
+    Nothing -> 
+      pprPanic "typePrimRep" (ppr ty <+> dcolon <+> ppr ki)
 
 -- | Discovers the primitive representation of a 'Type'. Returns
 -- a list of 'PrimRep': it's a list because of the possibility of
@@ -599,20 +603,29 @@ typePrimRepU ty = case typePrimRep ty of
 -- See also Note [Getting from RuntimeRep to PrimRep]
 tyConPrimRep :: HasDebugCallStack => TyCon -> [PrimRep]
 tyConPrimRep tc
-  = kindPrimRep (text "kindRep tc" <+> ppr tc $$ ppr res_kind)
-                res_kind
+  = case kindPrimRep_maybe res_kind of
+      Just reps -> reps
+      Nothing -> pprPanic "kindRep tc" (ppr tc $$ ppr res_kind)
   where
     res_kind = tyConResKind tc
 
 -- | Take a kind (of shape @TYPE rr@) and produce the 'PrimRep's
 -- of values of types of this kind.
 -- See also Note [Getting from RuntimeRep to PrimRep]
-kindPrimRep :: HasDebugCallStack => SDoc -> Kind -> [PrimRep]
-kindPrimRep doc ki
-  | Just runtime_rep <- kindRep_maybe ki
-  = runtimeRepPrimRep doc runtime_rep
-kindPrimRep doc ki
-  = pprPanic "kindPrimRep" (ppr ki $$ doc)
+kindPrimRep :: HasDebugCallStack => Kind -> [PrimRep]
+kindPrimRep ki
+  = case kindPrimRep_maybe ki of
+      Just reps -> reps
+      Nothing -> pprPanic "kindPrimRep" (ppr ki)
+
+-- | Like 'kindPrimRep', but assumes that there is exactly one 'PrimRep' output.
+-- This assumption holds after unarise, see Note [Post-unarisation invariants].
+-- Before unarise it may or may not hold.
+-- See also Note [RuntimeRep and PrimRep] and Note [VoidRep]
+kindPrimRep1 :: HasDebugCallStack => Kind -> PrimRep
+kindPrimRep1 k = case kindPrimRep_maybe k of
+  Just [rep] -> rep
+  r -> pprPanic "kindPrimRep1" (ppr k $$ ppr r)
 
 -- NB: We could implement the partial methods by calling into the maybe
 -- variants here. But then both would need to pass around the doc argument.

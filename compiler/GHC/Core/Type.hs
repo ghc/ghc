@@ -70,7 +70,7 @@ module GHC.Core.Type (
         isLitTy,
 
         getRuntimeRep, splitRuntimeRep_maybe, kindRep_maybe, kindRep,
-        getLevity, levityType_maybe,
+        getLevity, levityType_maybe, isUnboxedTupleKind,
 
         mkCastTy, mkCoercionTy, splitCastTy_maybe,
 
@@ -2801,6 +2801,12 @@ isFixedRuntimeRepKind k
   = assertPpr (isTYPEorCONSTRAINT k) (ppr k) $
     -- the isLiftedTypeKind check is necessary b/c of Constraint
     isConcreteType k
+
+isUnboxedTupleKind :: HasDebugCallStack => Kind -> Bool
+isUnboxedTupleKind kind
+  = tyConAppTyCon (kindRep kind) `hasKey` tupleRepDataConKey
+  -- NB: Do not use typePrimRep, as that can't tell the difference between
+  -- unboxed tuples and unboxed sums
 
 -- | Tests whether the given type is concrete, i.e. it
 -- whether it consists only of concrete type constructors,

@@ -882,7 +882,6 @@ mapSumIdBinders alt_bndr args rhs rho0
 -- Convert the argument to the given type, and wrap the conversion
 -- around the given expression. Use the given Id as a name for the
 -- converted value.
--- TODO: the 'Type' in the argument here should probably be 'StgKind'
 castArgRename :: [(PrimOp,Type,Unique)] -> StgArg -> StgExpr -> StgExpr
 castArgRename ops in_arg rhs =
   case ops of
@@ -896,17 +895,11 @@ castArgRename ops in_arg rhs =
 mkCastVar :: Unique -> Type -> Id
 mkCastVar uq ty = mkSysLocal (fsLit "cst_sum") uq ManyTy ty
 
--- TODO: move/rename this
-stgKindPrimRep1 :: HasDebugCallStack => StgKind -> PrimRep
-stgKindPrimRep1 (MkStgKind k) = case kindPrimRep_maybe k of
-  Just [rep] -> rep
-  r -> pprPanic "kindPrimRepU" (ppr k $$ ppr r)
-
 mkCast :: StgArg -> PrimOp -> OutId -> StgKind -> StgExpr -> StgExpr
 mkCast arg_in cast_op out_id out_kind in_rhs =
   let scrut = StgOpApp (StgPrimOp cast_op) [arg_in]
       alt = GenStgAlt { alt_con = DEFAULT, alt_bndrs = [], alt_rhs = in_rhs}
-      alt_ty = PrimAlt (stgKindPrimRep1 out_kind)
+      alt_ty = PrimAlt (kindPrimRep1 (getStgKind out_kind))
   in (StgCase scrut out_id alt_ty [alt])
 
 -- | Build a unboxed sum term from arguments of an alternative.
