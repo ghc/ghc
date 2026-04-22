@@ -338,12 +338,6 @@ genBody ctx startReg args e kind = do
 
   return $ la <> lav <> e <> returnStack
 
--- TODO: move to a proper place
-stgKindPrimRep :: StgKind -> [PrimRep]
-stgKindPrimRep (MkStgKind kind) = case kindPrimRep_maybe kind of
-  Just rs -> rs
-  r -> pprPanic "stgKindPrimRep" (ppr r)
-
 -- | Find the result type after applying the function to the arguments
 --
 -- It's trickier than it looks because:
