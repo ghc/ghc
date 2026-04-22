@@ -571,7 +571,7 @@ typePrimRep ty =
   let ki = typeKind ty in
   case kindPrimRep_maybe ki of
     Just reps -> reps
-    Nothing -> 
+    Nothing ->
       pprPanic "typePrimRep" (ppr ty <+> dcolon <+> ppr ki)
 
 -- | Discovers the primitive representation of a 'Type'. Returns
