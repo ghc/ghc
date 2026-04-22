@@ -27,7 +27,7 @@ module System.Info
   ) where
 
 import GHC.Internal.Data.Version (Version (..))
-import GHC.KnownKeyNames
+import GHC.Essentials
 import Prelude
 
 -- | The version of 'compilerName' with which the program was compiled

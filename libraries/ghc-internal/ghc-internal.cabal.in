@@ -572,7 +572,7 @@ Library
     ghc-options: -this-unit-id ghc-internal
 
     -- Set -frebindable-known-names,
-    -- since GHC.KnownKeyNames isn't available yet
+    -- since GHC.Essentials isn't available yet
     ghc-options: -frebindable-known-names
 
     -- Make sure we don't accidentally regress into anti-patterns

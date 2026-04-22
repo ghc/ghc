@@ -1461,7 +1461,7 @@ To satisfy (c) we reset the LocalRdrEnv each time.
 
 {- *********************************************************************
 *                                                                      *
-                Lookups for known-key names
+                Lookups for known-occ names
 *                                                                      *
 ********************************************************************* -}
 

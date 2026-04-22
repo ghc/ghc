@@ -101,7 +101,7 @@ import GHC.Internal.Word
 import GHC.Internal.Numeric
 import GHC.Internal.Numeric.Natural
 import System.IO
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 
 -- $setup
 -- >>> import Prelude

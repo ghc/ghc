@@ -27,7 +27,7 @@ module Data.Functor.Compose (
   ) where
 
 import Prelude
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 import Data.Functor.Classes
 import Control.Applicative
 import GHC.Internal.Data.Coerce (coerce)

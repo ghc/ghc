@@ -41,7 +41,7 @@ import qualified GHC.Internal.Stats as Internal
 import GHC.Generics (Generic)
 import Data.Word (Word64,Word32)
 import Data.Int (Int64)
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 
 -- | Time values from the RTS, using a fixed resolution of nanoseconds.
 type RtsTime = Int64

@@ -56,7 +56,7 @@ module GHC.RTS.Flags
   ) where
 
 import Prelude (Show,IO,Bool,Maybe,String,Int,Enum,FilePath,Double,Eq,(<$>))
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 
 import GHC.Generics (Generic)
 import qualified GHC.Internal.RTS.Flags as Internal

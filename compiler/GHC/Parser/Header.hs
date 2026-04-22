@@ -33,7 +33,7 @@ import GHC.Parser           ( parseHeader )
 import GHC.Parser.Lexer
 
 import GHC.Hs
-import GHC.Builtin.Modules( mAIN_NAME, kNOWN_KEY_NAMES, pRELUDE_NAME )
+import GHC.Builtin.Modules( mAIN_NAME, eSSENTIALS_NAME, pRELUDE_NAME )
 
 import GHC.Types.Error
 import GHC.Types.SrcLoc
@@ -68,7 +68,7 @@ import Text.Read (readPrec)
 
 -- | Returns the dependency edges of the module graph, by
 --    * parsing the module and looking for `import` declarations
---    * adding edges for Prelude and GHC.KnownKeyNames as required
+--    * adding edges for Prelude and GHC.Essentials as required
 --
 -- Throws a 'SourceError' if parsing fails.
 getImportEdges
@@ -114,9 +114,9 @@ getImportEdges dflags buf filename source_filename = do
                 convImport (L _ (i :: ImportDecl GhcPs))     = (convImportLevel (ideclLevelSpec i), ideclPkgQual i, reLoc $ ideclName i)
                 convImport_src (L _ (i :: ImportDecl GhcPs)) = (reLoc $ ideclName i)
 
-                known_key_name_edges   -- Add an edge to GHC.KnownKeyNames, unless -frebindable-known-names is on
+                known_key_name_edges   -- Add an edge to GHC.Essentials, unless -frebindable-known-names is on
                   | rebindable_kn = []
-                  | otherwise = [(NormalLevel, NoRawPkgQual, noLoc kNOWN_KEY_NAMES)]
+                  | otherwise = [(NormalLevel, NoRawPkgQual, noLoc eSSENTIALS_NAME)]
               in
               return ( map convImport_src src_idecls
                      , known_key_name_edges ++

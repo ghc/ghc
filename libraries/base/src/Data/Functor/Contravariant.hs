@@ -59,7 +59,7 @@ import Data.Functor.Compose
 import GHC.Internal.Data.Monoid (Alt(..), All(..))
 import GHC.Internal.Data.Proxy
 import GHC.Generics
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 
 
 -- | The class of contravariant functors.

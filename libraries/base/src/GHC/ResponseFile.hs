@@ -20,7 +20,7 @@ module GHC.ResponseFile (
     expandResponse
   ) where
 
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 
 import Control.Monad      (return, (>>=), mapM)
 import Control.Exception  (IOException, catch)

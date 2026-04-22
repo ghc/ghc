@@ -23,7 +23,7 @@ module System.IO.OS
 )
 where
 
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 
 import Control.Monad (return)
 import Control.Concurrent.MVar (MVar)

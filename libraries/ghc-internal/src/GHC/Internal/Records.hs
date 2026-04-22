@@ -52,8 +52,8 @@ class HasField x r a | x r -> a where
 setField :: forall {k} (x::k) (r :: Type) (a :: Type). a -> r -> r
 -- This setField is never used
 --   -XRebindableSyntax is required if -XOverloadedRecordUpdate is enabled
--- But we still want to export setField from GHC.KnownKeyNames, so that
+-- But we still want to export setField from GHC.Essentials, so that
 --   * We can have a known-key for setField (see uses of setFieldClassOpKey)
---   * The assertion check that GHC.KnownKeyNames exports every known-key
+--   * The assertion check that GHC.Essentials exports every known-key
 --     should not fail
 setField = error "Yikes! setField is not implemented yet"

@@ -34,7 +34,7 @@ Library
         ghc-prim,
 
     -- Set -frebindable-known-names,
-    -- since GHC.KnownKeyNames isn't available yet
+    -- since GHC.Essentials isn't available yet
     ghc-options: -frebindable-known-names
 
     exposed-modules:
@@ -217,7 +217,7 @@ Library
         , GHC.Integer.Logarithms
         , GHC.IsList
         , GHC.Ix
-        , GHC.KnownKeyNames
+        , GHC.Essentials
         , GHC.List
         , GHC.Maybe
         , GHC.MVar

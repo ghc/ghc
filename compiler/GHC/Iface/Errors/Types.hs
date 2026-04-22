@@ -56,7 +56,7 @@ data IfaceMessage
 
   | MissingKnownKey1 KnownKey
     -- We looked up a known-key, but it wasn't in the
-    -- known-key map that came from importing GHC.KnownKeyNames
+    -- known-key map that came from importing GHC.Essentials
 
    | MissingKnownKey2 KnownKey
      -- We looked up a known-key, but it wasn't in
@@ -64,10 +64,10 @@ data IfaceMessage
 
    | MissingKnownKey3 KnownOcc
      -- We looked up a known-occ, but it wasn't in
-     -- the exports of GHC.KnownKeyNames
+     -- the exports of GHC.Essentials
 
    | KnownKeyScopeError KnownOcc [GlobalRdrElt] CallStack
-     -- We looked up a known-key in the GlobalRdrEnv,
+     -- We looked up a known-occ in the GlobalRdrEnv,
      -- but did not find a unique hit
      -- CallStack is so that we can get a backtrace
   deriving Generic

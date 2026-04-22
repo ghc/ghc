@@ -13,7 +13,7 @@ import Control.Applicative (Const (..))
 import Data.Bifoldable     (Bifoldable (..))
 import Data.Semigroup      (Arg (..), Semigroup (..))
 import Prelude             (Either (..), id)
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 
 class Bifoldable t => Bifoldable1 t where
      bifold1 :: Semigroup m => t m m -> m

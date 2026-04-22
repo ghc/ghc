@@ -72,7 +72,7 @@ module Data.Functor.Classes (
   ) where
 
 import Prelude hiding( foldr )
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 
 import Control.Applicative (Alternative((<|>)), Const(Const))
 

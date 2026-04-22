@@ -143,10 +143,10 @@ mkInteractiveModule :: String -> Module
 -- (mkInteractiveMoudule "9") makes module 'interactive:Ghci9'
 mkInteractiveModule n = mkModule interactiveUnit (mkModuleName ("Ghci" ++ n))
 
-pRELUDE_NAME, mAIN_NAME, kNOWN_KEY_NAMES :: ModuleName
+pRELUDE_NAME, mAIN_NAME, eSSENTIALS_NAME :: ModuleName
 pRELUDE_NAME    = mkModuleNameFS (fsLit "Prelude")
 mAIN_NAME       = mkModuleNameFS (fsLit "Main")
-kNOWN_KEY_NAMES = mkModuleNameFS (fsLit "GHC.KnownKeyNames")
+eSSENTIALS_NAME = mkModuleNameFS (fsLit "GHC.Essentials")
 
 rEBINDABLE_MOD_NAME :: ModuleName
 rEBINDABLE_MOD_NAME = mkModuleName "Rebindable"

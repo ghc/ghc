@@ -2,7 +2,7 @@
 
 -- |
 --
--- Module      :  GHC.KnownKeyNames
+-- Module      :  GHC.Essentials
 -- License     :  see libraries/base/LICENSE
 --
 -- Maintainer  :  ghc-devs@haskell.org
@@ -10,7 +10,7 @@
 -- Portability :  non-portable (GHC Extensions)
 --
 
-module GHC.KnownKeyNames
+module GHC.Essentials
     ( Eq(..), Ord(..)  -- With their methods
     , Show, Read
 

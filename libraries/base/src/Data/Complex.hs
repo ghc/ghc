@@ -44,7 +44,7 @@ import Foreign (Storable, castPtr, peek, poke, pokeElemOff, peekElemOff, sizeOf,
                 alignment)
 import GHC.Internal.Control.Monad.Fix (MonadFix(..))
 import Control.Monad.Zip (MonadZip(..))
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 
 infix  6  :+
 

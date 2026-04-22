@@ -492,7 +492,7 @@ to bring the data constructor A into scope. We thus emit the following message:
 
 ************************************************************************
 *                                                                      *
-                Looking up known-key things
+                Looking up known-occ things
 *                                                                      *
 ************************************************************************
 -}

@@ -26,7 +26,7 @@ module GHC.Builtin (
         knownKeyTable, knownKeyOccMap, knownKeyUniqMap,
         knownKeyOccName, knownKeyOccName_maybe,
 
-        -- * Known-key names
+        -- * Known-occ names
         oldIsKnownKeyName,
         oldLookupKnownKeyName,
         oldLookupKnownNameInfo,
@@ -87,7 +87,7 @@ import Data.Maybe
 
 {- *********************************************************************
 *                                                                      *
-                     Known-key things
+                     Known-occ things
 *                                                                      *
 ********************************************************************* -}
 
@@ -123,7 +123,7 @@ A "wired-in" entity:
 A "known-key" entity:
   * Defined in GHC.Builtin.KnownKeys
   * Its Unique and OccName are baked into GHC. Its Unique is called a KnownKey.
-  * It is exported by GHC.KnownKeyNames
+  * It is exported by GHC.Essentials
   * But that's all that GHC knows about it
   In particular, GHC does /not/ know in which module the entity is defined.
 
@@ -138,7 +138,7 @@ A "known-key" entity:
 A "known-occ" entity:
   * Defined in GHC.Builtin.KnownOccs
   * Its OccName is baked into GHC -- we call it a KnownOcc
-  * It is exported by GHC.KnownKeyNames
+  * It is exported by GHC.Essentials
   * But that's all that GHC knows about it
   In particular, GHC does /not/ know in which module the entity is defined,
   nor its Unique.
@@ -214,23 +214,23 @@ To implement all this, here are the moving parts.
 How known-occ entities work
 ---------------------------
 
-* INVARIANT (KnownEntityInvariant): It is a requirement that all known-key and known-occ
+* INVARIANT (KnownOccNameInvariant): It is a requirement that all known-occ
   entities have distinct OccNames. We could have multiple name-spaces, but in practice
   this is not an onerous restriction.  But see Note [Tricky known-occ cases] in
   GHC.Builtin.KnownOccs for some awkward cases.
 
-* A distinguished module `GHC.KnownKeyNames` exports all the known-key and known-occ
+* A distinguished module `GHC.Essentials` exports all the known-key and known-occ
   entities names. There is nothing special about this module except that GHC knows its
   name and can import it.
 
-  In effect, the `mi_exports` of `GHC/KnownKeyNames.hi` tells GHC where each
-  known-key name is defined.  It is /the/ place where we define canonically which
+  In effect, the `mi_exports` of `GHC/Essentials.hi` tells GHC where each
+  known-occ name is defined.  It is /the/ place where we define canonically which
   particular "Eq" you mean when you want the known-occ "Eq".
 
-  This is a big reason for (KnownEntityInvariant): an export list cannot have two
+  This is a big reason for (KnownOccNameInvariant): an export list cannot have two
   entities with the same OccName.
 
-  When GHC wants to find GHC.KnownKeyNames, it just looks for it in the same
+  When GHC wants to find GHC.Essentials, it just looks for it in the same
   way as any other import.
 
 * There are three flags that control the treatment of known entities:
@@ -255,7 +255,7 @@ How known-occ entities work
 
   Then, in `GHC.Iface.Load.loadKnownKeyOccMaps`
 
-    * GHC imports GHC.KnownKeyNames, i.e. looks for `GHC/KnownKeyNames.hi`
+    * GHC imports GHC.Essentials, i.e. looks for `GHC/KnownKeyNames.hi`
 
     * Assuming this is successful, GHC uses its `mi_exports` to build `KnownKeyNameMaps`,
       which has (a) a map from the KnownKey of each known-key entity to its Name
@@ -270,7 +270,7 @@ How known-occ entities work
 * Known-occ lookup (base case: KNS_InScope)
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   We can't follow the above plan when compiling modules in `base` or `ghc-internal` because
-  GHC.KnownKeyNames has not yet been compiled!  Instead, we use (roughly) whatever is in
+  GHC.Essentials has not yet been compiled!  Instead, we use (roughly) whatever is in
   scope with the desired `OccName`, rather like `-XRebindableSyntax`.
 
   More precisely, when compiling modules in `ghc-internal` or `base`:
@@ -311,7 +311,7 @@ Known-key entities are
           , (mkTcOcc "Eq",           eqClassKey)
           ... etc ... ]
 
-* Because of (KnownEntityInvariant) we can turn that table into two mappings:
+* Because of (KnownOccNameInvariant) we can turn that table into two mappings:
 
       knownKeyOccMap :: OccEnv KnownKey
       knownKeyOccMap = mkOccEnv knownKeyTable
@@ -356,21 +356,21 @@ Wrinkles
    So we compile GHC.Internal.Data.Foldable with
        -fexclude-known-define=toList
 
-(KN3) We don't need to export wired-in entities from GHC.KnownKeyNames
+(KN3) We don't need to export wired-in entities from GHC.Essentials
   because we (should) never look up a wired-in name via its key.  That is,
   `GHC.Iface.Load.lookupKnownKeyName` should never be called on the key of
   a wired-in name.
 
-  However, it's not wrong for GHC.KnownKeyNames to export more than necessary.
+  However, it's not wrong for GHC.Essentials to export more than necessary.
 
-  Alternative: export all wired-in entities from GHC.KnownKeyNames.  But that
+  Alternative: export all wired-in entities from GHC.Essentials.  But that
   would simply bloat the interface for no good reason.
 
 Note [Recipe for adding a known-occ name]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 To make `wombat` into a known-occ name, you do the following:
 
-* Ensure that the module `GHC.KnownKeyNames` exports `wombat`.
+* Ensure that the module `GHC.Essentials` exports `wombat`.
 
 * In any module in `base` or `ghc-internal` (which are compiled with
   -frebindable-known-names), in which `wombat` is needed, you must ensure
@@ -381,7 +381,7 @@ To make `wombat` into a known-occ name, you do the following:
 
   You do not need to import the precise module in which `wombat` is /defined/,
   although you may.  It is enough simply to bring `wombat` in scope by importing a
-  module that re-exports it. You can even import `GHC.KnownKeyNames`, if doing so
+  module that re-exports it. You can even import `GHC.Essentials`, if doing so
   does not create a module loop!
 
 Note [Recipe for adding a known-key name]
@@ -393,7 +393,7 @@ To make `wombat` into a known-key name, do the following.
 * If M.hs has an `M.hs-boot` file, ensure that it too must be compiled
   with `-fdefines-known-names`.
 
-* Ensure that the module `GHC.KnownKeyNames` exports `wombat`.
+* Ensure that the module `GHC.Essentials` exports `wombat`.
 
 * In GHC.Builtin.KnownKeys you must define a static unique
      wombatKey :: KnownKey

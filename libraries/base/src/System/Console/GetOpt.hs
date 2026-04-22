@@ -63,7 +63,7 @@ module System.Console.GetOpt (
 ) where
 
 import Prelude
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 import GHC.Internal.Data.List ( isPrefixOf, find )
 
 -- |What to do with options following non-options

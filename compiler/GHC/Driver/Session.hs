@@ -2671,7 +2671,7 @@ fFlagsDeps = [
   flagSpec "info-table-map-with-stack"        Opt_InfoTableMapWithStack,
   flagSpec "info-table-map-with-fallback"     Opt_InfoTableMapWithFallback,
 
-  -- Known-key names
+  -- Known-occ names
   flagSpec "defines-known-key-names"          Opt_DefinesKnownKeyNames,
   flagSpec "rebindable-known-names"           Opt_RebindableKnownNames
   ]

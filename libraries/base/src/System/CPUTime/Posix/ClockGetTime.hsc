@@ -11,7 +11,7 @@ module System.CPUTime.Posix.ClockGetTime
     ) where
 
 import Prelude
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 
 #if _POSIX_TIMERS > 0 && defined(_POSIX_CPUTIME) && _POSIX_CPUTIME >= 0
 

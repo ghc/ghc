@@ -25,7 +25,7 @@ module Data.Bool
      ) where
 
 import Prelude ( Bool(..), (&&), (||), not, otherwise )
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 
 -- $setup
 -- >>> import Prelude

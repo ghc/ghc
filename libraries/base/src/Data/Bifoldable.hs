@@ -55,7 +55,7 @@ import GHC.Internal.Data.Functor.Utils (Max(..), Min(..), (#.))
 import GHC.Internal.Data.Maybe (fromMaybe)
 import GHC.Internal.Data.Monoid
 import GHC.Generics (K1(..))
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 
 -- $setup
 -- >>> import Prelude

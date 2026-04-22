@@ -19,7 +19,7 @@ module GHC.Iface.Load (
         checkWiredInTyCon, ifCheckWiredInThing,
         loadGlobalName,
 
-        -- Known-key things
+        -- Known-occ things
         KnownNameSource(..),
         lookupKnownKeyThing, lookupKnownKeyName,
         lookupKnownOccThing, lookupKnownOccName,
@@ -88,7 +88,7 @@ import GHC.Settings.Constants
 
 import GHC.Builtin
 import GHC.Builtin.KnownKeys
-import GHC.Builtin.Modules( rEBINDABLE_MOD_NAME, kNOWN_KEY_NAMES, gHC_PRIM )
+import GHC.Builtin.Modules( rEBINDABLE_MOD_NAME, eSSENTIALS_NAME, gHC_PRIM )
 import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids
 import GHC.Builtin.WiredIn.Prim
@@ -150,19 +150,19 @@ import qualified GHC.Unit.Home.Graph as HUG
 
 {- *********************************************************************
 *                                                                      *
-*                      Known-key things                                *
+*                      Known-occ things                                *
 *                                                                      *
 ********************************************************************* -}
 
 data KnownNameSource
   = KNS_InScope Module GlobalRdrEnv TypeEnv
-      -- Look up the known-key name in this GlobalRdrEnv, which
+      -- Look up the known-occ name in this GlobalRdrEnv, which
       -- is the top-level scope of the current module.
       -- This happens when -frebindable-known-name is set, usually when
       -- we are compiling `ghc-internal` or `base`
 
   | KNS_FromModule
-       -- Look up the known-key name in the export list of GHC.KnownKeyNames
+       -- Look up the known-occ name in the export list of GHC.Essentials
        -- This is the "normal path", and happens when -frebindable-key-name
        -- is /not/ set
 
@@ -256,7 +256,7 @@ lookupKnownOccName occ KNS_FromModule
 lookupKnownOccName occ (KNS_InScope _ gbl_rdr_env _)
   -- Just gbl_rdr_env: we have -frebindable-known-names on, and
   --                   here is the top-level GlobalRdrEnv
-  -- Look up the /un-qualified/ known-key OccName in the GlobalRdrEnv
+  -- Look up the /un-qualified/ known-occ OccName in the GlobalRdrEnv
   -- If we get a unique hit, use it; if not, panic.
   = case lookupKnownGRE gbl_rdr_env occ of
        Succeeded gre -> do { let name = greName gre
@@ -295,13 +295,13 @@ loadKnownKeyOccMaps
     -- We don't have a KnownKeyOccMap yet, so create it
     -- from the interface file for KnownKeyName
     do { hsc_env <- getTopEnv
-       ; mb_res <- liftIO $ findImportedModule hsc_env kNOWN_KEY_NAMES NoPkgQual
+       ; mb_res <- liftIO $ findImportedModule hsc_env eSSENTIALS_NAME NoPkgQual
        ; iface <- case mb_res of
            Found _ mod -> loadInterfaceWithException doc mod ImportBySystem
            fr -> do { hsc_env <- getTopEnv
                     ; pprPanic "loadKnownKeyOccMap" $
                       missingInterfaceErrorDiagnostic defaultIfaceMessageOpts $
-                      cannotFindModule hsc_env kNOWN_KEY_NAMES fr }
+                      cannotFindModule hsc_env eSSENTIALS_NAME fr }
 
        ; let kk_map :: UniqFM KnownKey Name
              -- Domain is just the KnownKeys in the knownKeyTable

@@ -31,7 +31,7 @@ import GHC.Internal.Control.Exception   (Exception(..), handleJust, bracket,
                             asyncExceptionToException,
                             asyncExceptionFromException)
 import GHC.Internal.Data.Unique         (Unique, newUnique)
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 
 -- $setup
 -- >>> import Prelude

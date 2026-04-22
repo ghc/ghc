@@ -21,7 +21,7 @@ module Data.Bifunctor
 import Prelude
 import Control.Applicative  ( Const(..) )
 import GHC.Generics ( K1(..) )
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 
 -- $setup
 -- >>> import Prelude

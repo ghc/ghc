@@ -468,7 +468,7 @@ Wrinkles:
 
   For modules high up in the hierarchy of `base`, a convenient way to
   do this is to say
-        import qualified GHC.KnownKeyNames as Rebindable
+        import qualified GHC.Essentials as Rebindable
   (Why `qualified` and `as Rebindable`?  See (KN1) in
    Note [Overview of known entities] in GHC.Builtin.)
 

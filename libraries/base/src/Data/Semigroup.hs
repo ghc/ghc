@@ -124,7 +124,7 @@ import           GHC.Internal.Data.Data
 import           GHC.Generics( Generic, Generic1 )
 import qualified GHC.Generics as Rebindable hiding( Fixity(..) )
 import qualified GHC.Internal.List as List
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 
 -- $setup
 -- >>> import Prelude

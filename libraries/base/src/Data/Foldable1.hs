@@ -59,7 +59,7 @@ import Prelude
        (Maybe (..), Monad (..), Ord, Ordering (..), id, seq, ($!), ($), (.),
        (=<<), flip, const, error)
 
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 
 -- $setup
 -- >>> import Prelude hiding (foldr1, foldl1, head, last, minimum, maximum)

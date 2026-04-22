@@ -8,7 +8,7 @@ module GHC.Fingerprint (
         getFileHash
    ) where
 
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 
 import GHC.Internal.Fingerprint
 import Data.Function (($))

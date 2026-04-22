@@ -21,7 +21,7 @@ module Data.Array.Byte (
 ) where
 
 import Prelude
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 import GHC.Internal.Data.Bits ((.&.), unsafeShiftR)
 import GHC.Internal.Data.Data (mkNoRepType, Data(..))
 import GHC.Internal.Data.Typeable (Typeable)

@@ -24,7 +24,7 @@ module Data.Functor.Product (
   ) where
 
 import Prelude
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 import Control.Applicative
 import GHC.Internal.Control.Monad (MonadPlus(..))
 import GHC.Internal.Control.Monad.Fix (MonadFix(..))

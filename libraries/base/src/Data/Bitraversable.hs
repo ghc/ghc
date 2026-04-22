@@ -36,7 +36,7 @@ import GHC.Internal.Data.Coerce
 import GHC.Internal.Data.Functor.Identity (Identity(..))
 import GHC.Internal.Data.Functor.Utils (StateL(..), StateR(..))
 import GHC.Generics (K1(..))
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 
 -- $setup
 -- >>> import Prelude

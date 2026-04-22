@@ -24,7 +24,7 @@ module Data.Functor.Sum (
   ) where
 
 import Prelude
-import qualified GHC.KnownKeyNames as Rebindable
+import qualified GHC.Essentials as Rebindable
 import Control.Applicative ((<|>))
 import GHC.Internal.Data.Data (Data)
 import Data.Functor.Classes
