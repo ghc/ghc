@@ -20,7 +20,7 @@ module GHC.ByteCode.Binary (
 import GHC.Prelude
 
 import GHC.ByteCode.Types
-import GHC.Data.FastString
+import qualified GHC.Data.Word64Map.Strict as Word64Map
 import GHC.Types.Name
 import GHC.Types.Name.Cache
 import GHC.Types.Name.Env
@@ -269,9 +269,8 @@ addBinNameWriter bh' = do
         | otherwise -> do
             putByte bh 1
             key <- getBinNameKey env_ref nm
-            -- Delimit the OccName from the deterministic counter to keep the
-            -- encoding injective, avoiding collisions like "foo1" vs "foo#1".
-            put_ bh (occNameFS (occName nm) `appendFS` mkFastString ('#' : show key))
+            put_ bh $ occNameFS $ occName nm
+            put_ bh key
   where
     -- Find a deterministic key for local names. This
     getBinNameKey ref name = do
@@ -282,7 +281,7 @@ addBinNameWriter bh' = do
 
 addBinNameReader :: NameCache -> ReadBinHandle -> IO ReadBinHandle
 addBinNameReader nc bh' = do
-  env_ref <- newIORef emptyOccEnv
+  env_ref <- newIORef Word64Map.empty
   pure $ flip addReaderToUserData bh' $ BinaryReader $ \bh -> do
     t <- getByte bh
     case t of
@@ -291,15 +290,16 @@ addBinNameReader nc bh' = do
         pure $ BinName nm
       1 -> do
         occ <- mkVarOccFS <$> get bh
+        key <- get bh
         -- We don't want to get a new unique from the NameCache each time we
         -- see a name.
         nm' <- unsafeInterleaveIO $ do
           u <- takeUniqFromNameCache nc
           evaluate $ mkInternalName u occ noSrcSpan
         fmap BinName $ atomicModifyIORef' env_ref $ \env ->
-          case lookupOccEnv env occ of
+          case Word64Map.lookup key env of
             Just nm -> (env, nm)
-            _ -> nm' `seq` (extendOccEnv env occ nm', nm')
+            _ -> nm' `seq` (Word64Map.insert key nm' env, nm')
       _ -> panic "Binary BinName: invalid byte"
 
 -- Note [Serializing Names in bytecode]
