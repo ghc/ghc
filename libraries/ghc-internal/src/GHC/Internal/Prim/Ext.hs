@@ -55,7 +55,7 @@ default () -- Double and Integer aren't available yet
 #if defined(mingw32_HOST_OS)
 
 -- | Asynchronously read bytes from specified file descriptor.
-foreign import prim "stg_asyncReadzh" asyncRead#
+foreign import prim "rts stg_asyncReadzh" asyncRead#
   :: Int#
   -> Int#
   -> Int#
@@ -64,7 +64,7 @@ foreign import prim "stg_asyncReadzh" asyncRead#
   -> (# State# RealWorld, Int#, Int# #)
 
 -- | Asynchronously write bytes from specified file descriptor.
-foreign import prim "stg_asyncWritezh" asyncWrite#
+foreign import prim "rts stg_asyncWritezh" asyncWrite#
   :: Int#
   -> Int#
   -> Int#
@@ -73,7 +73,7 @@ foreign import prim "stg_asyncWritezh" asyncWrite#
   -> (# State# RealWorld, Int#, Int# #)
 
 -- | Asynchronously perform procedure (first arg), passing it 2nd arg.
-foreign import prim "stg_asyncDoProczh" asyncDoProc#
+foreign import prim "rts stg_asyncDoProczh" asyncDoProc#
   :: Addr#
   -> Addr#
   -> State# RealWorld
@@ -86,7 +86,7 @@ foreign import prim "stg_asyncDoProczh" asyncDoProc#
 ------------------------------------------------------------------------
 
 -- | Retrieves the allocation counter for the current thread.
-foreign import prim "stg_getThreadAllocationCounterzh" getThreadAllocationCounter#
+foreign import prim "rts stg_getThreadAllocationCounterzh" getThreadAllocationCounter#
   :: State# RealWorld
   -> (# State# RealWorld, Int64# #)
 
