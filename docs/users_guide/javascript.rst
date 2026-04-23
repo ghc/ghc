@@ -430,7 +430,7 @@ format.
 In other cases, C functions are used for performance. For these cases, pure-Haskell
 implementations are the preferred first step for compatibility with the JavaScript
 backend since it would be more future-proof against changes to the RTS data format.
-Depending on the use case, compiler-optimised JS code might be hard to complete with
+Depending on the use case, compiler-optimised JS code might be hard to compete with
 using hand-written JavaScript. Generally, the most likely performance gains from
 hand-written JavaScript come from functions with data that stays as JavaScript
 primitive types for a long time, especially strings. For this, ``JSVal`` allows
