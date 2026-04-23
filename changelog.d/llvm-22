@@ -1,0 +1,4 @@
+section: llvm-backend
+synopsis: Bump LlvmMaxVersion to support LLVM 22.x releases.
+issues: #26813
+mrs: !15405
