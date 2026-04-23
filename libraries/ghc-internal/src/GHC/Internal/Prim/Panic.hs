@@ -72,10 +72,12 @@ absentError to me.
 -- `stg_panic#` never returns but it can't just return `State# RealWorld` so we
 -- indicate that it returns `(# #)` too to make the compiler happy.
 -- See Note [Compiler error functions]
-foreign import prim "stg_paniczh" panic# :: Addr# -> State# RealWorld -> (# State# RealWorld, (# #) #)
+foreign import prim "rts stg_paniczh"
+  panic# :: Addr# -> State# RealWorld -> (# State# RealWorld, (# #) #)
 
 -- See Note [Compiler error functions]
-foreign import prim "stg_absentErrorzh" stg_absentError# :: Addr# -> State# RealWorld -> (# State# RealWorld, (# #) #)
+foreign import prim "rts stg_absentErrorzh"
+  stg_absentError# :: Addr# -> State# RealWorld -> (# State# RealWorld, (# #) #)
 
 -- | Display the CString whose address is given as an argument and exit.
 panicError :: Addr# -> a
