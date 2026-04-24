@@ -59,7 +59,7 @@ module GHC.Utils.Misc (
         replaceAt, dropTail, capitalise,
 
         -- * Sorting
-        sortWith, minWith, nubSort, ordNub, ordNubOn,
+        sortWith, minWith, nubSort,
 
         -- * Comparisons
         isEqual,
@@ -569,23 +569,6 @@ minWith get_key xs = assert (not (null xs) )
 
 nubSort :: Ord a => [a] -> [a]
 nubSort = Set.toAscList . Set.fromList
-
--- | Remove duplicates but keep elements in order.
---   O(n * log n)
-ordNub :: Ord a => [a] -> [a]
-ordNub xs = ordNubOn id xs
-
--- | Remove duplicates but keep elements in order.
---   O(n * log n)
-ordNubOn :: Ord b => (a -> b) -> [a] -> [a]
-ordNubOn f xs
-  = go Set.empty xs
-  where
-    go _ [] = []
-    go s (x:xs)
-      | Set.member (f x) s = go s xs
-      | otherwise = x : go (Set.insert (f x) s) xs
-
 
 {-
 ************************************************************************

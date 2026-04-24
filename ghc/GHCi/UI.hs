@@ -128,6 +128,7 @@ import Control.Monad.Trans.Except
 import Data.Array
 import qualified Data.ByteString.Char8 as BS
 import Data.Char
+import Data.Containers.ListUtils (nubOrd)
 import Data.Function
 import qualified Data.Foldable as Foldable
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
@@ -786,7 +787,7 @@ installInteractiveHomeUnits dflags = do
           -- This is mostly for a clear separation of concerns,
           -- to indicate we only care about unit dependencies from package dbs.
           & filter (not . selectHptFlag (HUG.allUnits $ hsc_HUG hsc_env))
-          & ordNub
+          & nubOrd
         else
           packageFlags dflags0
 
@@ -871,7 +872,7 @@ installInteractiveHomeUnits dflags = do
         prefix =
           longestCommonPrefix stacks
       in
-        prefix ++ ordNub (concatMap (List.drop (length prefix)) stacks)
+        prefix ++ nubOrd (concatMap (List.drop (length prefix)) stacks)
 
 reportError :: GhciMonad m => GhciCommandMessage -> m ()
 reportError err = do
@@ -1249,7 +1250,7 @@ generatePromptFunctionFromString promptS modules_names line =
         processString ('%':'s':xs) =
             liftM2 (<>) (return modules_list) (processString xs)
             where
-              modules_list = hsep . map text . ordNub $ modules_names
+              modules_list = hsep . map text . nubOrd $ modules_names
         processString ('%':'l':xs) =
             liftM2 (<>) (return $ ppr line) (processString xs)
         processString ('%':'d':xs) =

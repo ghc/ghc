@@ -112,6 +112,7 @@ import GHC.Utils.Exception
 import System.Directory
 import System.FilePath as FilePath
 import Control.Monad
+import Data.Containers.ListUtils (nubOrd)
 import Data.Graph (stronglyConnComp, SCC(..))
 import Data.Char ( toUpper )
 import Data.List ( intersperse, partition, sortBy, sortOn, sort )
@@ -1705,7 +1706,7 @@ mkUnitState logger cfg = do
       basicLinkedUnits = fmap (RealUnit . Definite)
                          $ filter (flip elemUniqMap pkg_db)
                          $ unitConfigAutoLink cfg
-      preload3 = ordNub $ (basicLinkedUnits ++ preload1)
+      preload3 = nubOrd $ (basicLinkedUnits ++ preload1)
 
   -- Close the preload packages with their dependencies
   dep_preload <- mayThrowUnitErr

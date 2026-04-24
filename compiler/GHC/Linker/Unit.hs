@@ -25,6 +25,7 @@ import qualified GHC.Data.ShortText as ST
 import GHC.Settings
 
 import Control.Monad
+import Data.Containers.ListUtils (nubOrd)
 import Data.List (nub)
 import Data.Semigroup ( Semigroup(..) )
 import System.Directory
@@ -95,7 +96,7 @@ collectArchives namever ways pc =
   filterM doesFileExist [ searchPath </> ("lib" ++ lib ++ ".a")
                         | searchPath <- searchPaths
                         , lib <- libs ]
-  where searchPaths = ordNub . filter notNull . libraryDirsForWay ways $ pc
+  where searchPaths = nubOrd . filter notNull . libraryDirsForWay ways $ pc
         libs        = unitHsLibs namever ways pc ++ (map ST.unpack . unitExtDepLibsStaticSys $ pc)
 
 getLibs :: GhcNameVersion -> Ways -> UnitEnv -> [UnitId] -> IO [(String,String)]

@@ -32,6 +32,7 @@ import GHC.Unit.Module.Deps
 import GHC.Data.Maybe
 import GHC.Data.FastString
 
+import Data.Containers.ListUtils (nubOrdOn)
 import Data.List (sortBy)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -180,7 +181,7 @@ the TH splice.
 -- modules and direct object files for pkg dependencies
 mkObjectUsage :: Plugins -> FinderCache -> [LinkableUsage] -> PkgsLoaded -> IO [Usage]
 mkObjectUsage plugins fc th_links_needed th_pkgs_needed = do
-      let ls = ordNubOn linkableModule (th_links_needed ++ plugins_links_needed)
+      let ls = nubOrdOn linkableModule (th_links_needed ++ plugins_links_needed)
           ds = concatMap loaded_pkg_hs_objs $ eltsUDFM (plusUDFM th_pkgs_needed plugin_pkgs_needed) -- TODO possibly record loaded_pkg_non_hs_objs as well
           (plugins_links_needed, plugin_pkgs_needed) = loadedPluginDeps plugins
       concat <$> sequence (map linkableToUsage ls ++ map librarySpecToUsage ds)

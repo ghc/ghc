@@ -49,6 +49,7 @@ import GHC.Unit.Database
 
 import GHC.Settings
 
+import Data.Containers.ListUtils (nubOrd)
 import Data.Version
 import Data.Bifunctor
 import Data.List (isPrefixOf, stripPrefix)
@@ -185,7 +186,7 @@ mkUnitPprInfo ufs i = UnitPprInfo
 
 -- | Find all the include directories in the given units
 collectIncludeDirs :: [UnitInfo] -> [FilePath]
-collectIncludeDirs ps = map ST.unpack $ ordNub (filter (not . ST.null) (concatMap unitIncludeDirs ps))
+collectIncludeDirs ps = map ST.unpack $ nubOrd (filter (not . ST.null) (concatMap unitIncludeDirs ps))
 
 -- | Find all the C-compiler options in the given units
 collectExtraCcOpts :: [UnitInfo] -> [String]
@@ -193,7 +194,7 @@ collectExtraCcOpts ps = map ST.unpack (concatMap unitCcOptions ps)
 
 -- | Find all the library directories in the given units for the given ways
 collectLibraryDirs :: Ways -> [UnitInfo] -> [FilePath]
-collectLibraryDirs ws = ordNub . filter notNull . concatMap (libraryDirsForWay ws)
+collectLibraryDirs ws = nubOrd . filter notNull . concatMap (libraryDirsForWay ws)
 
 -- | Find all the frameworks in the given units
 collectFrameworks :: [UnitInfo] -> [String]
@@ -201,7 +202,7 @@ collectFrameworks ps = map ST.unpack (concatMap unitExtDepFrameworks ps)
 
 -- | Find all the package framework paths in these and the preload packages
 collectFrameworksDirs :: [UnitInfo] -> [String]
-collectFrameworksDirs ps = map ST.unpack (ordNub (filter (not . ST.null) (concatMap unitExtDepFrameworkDirs ps)))
+collectFrameworksDirs ps = map ST.unpack (nubOrd (filter (not . ST.null) (concatMap unitExtDepFrameworkDirs ps)))
 
 -- | Either the 'unitLibraryDirs' or 'unitLibraryDynDirs' as appropriate for the way.
 libraryDirsForWay :: Ways -> UnitInfo -> [String]

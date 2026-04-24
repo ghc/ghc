@@ -76,6 +76,7 @@ import GHC.Data.FastString
 import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.Data.ShortText as ST
 
+import Data.Containers.ListUtils (nubOrd)
 import Data.List ( partition )
 import System.Exit
 import Control.Monad
@@ -763,14 +764,14 @@ hsunitModuleGraph do_link unit = do
     let inodes = instantiationNodes (homeUnitId $ hsc_home_unit hsc_env) (hsc_units hsc_env)
     -- TODO: Backpack mode does not properly support ExternalPackage nodes yet
     -- Module nodes do not get given package dependencies (see hsModuleToModSummary).
-    let pkg_nodes =  ordNub $ map (\(_, iud) -> UnitNode [] (instUnitInstanceOf iud)) inodes
+    let pkg_nodes =  nubOrd $ map (\(_, iud) -> UnitNode [] (instUnitInstanceOf iud)) inodes
     let graph_nodes = nodes ++ req_nodes ++ (map (uncurry InstantiationNode) $ inodes) ++ pkg_nodes
         key_nodes = map mkNodeKey graph_nodes
         all_nodes = graph_nodes ++ [LinkNode key_nodes (homeUnitId $ hsc_home_unit hsc_env) | do_link]
     -- This error message is not very good but .bkp mode is just for testing so
     -- better to be direct rather than pretty.
     when
-      (length key_nodes /= length (ordNub key_nodes))
+      (length key_nodes /= length (nubOrd key_nodes))
       (pprPanic "Duplicate nodes keys in backpack file" (ppr key_nodes))
 
     -- 3. Return the kaboodle

@@ -25,7 +25,6 @@ import qualified GHC.Unit.State as State
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 
-import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Monad       ( liftIO, mapMaybeM )
@@ -35,6 +34,7 @@ import System.IO
 import System.Exit
 import System.FilePath
 import Control.Monad
+import Data.Containers.ListUtils (nubOrdOn)
 import Data.List ( partition, (\\) )
 import qualified Data.Set as Set
 import GHC.Prelude
@@ -204,7 +204,7 @@ checkDuplicateUnits dflags flags =
 
   where
     uids = map (second homeUnitId_) flags
-    deduplicated_uids = ordNubOn snd uids
+    deduplicated_uids = nubOrdOn snd uids
     duplicate_ids = Set.fromList (map snd uids \\ map snd deduplicated_uids)
 
     duplicate_flags = filter (flip Set.member duplicate_ids . snd) uids

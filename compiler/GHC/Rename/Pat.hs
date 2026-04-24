@@ -79,6 +79,7 @@ import GHC.Core.TyCon      ( isKindName )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad       ( when, ap, guard, unless )
+import Data.Containers.ListUtils (nubOrdOn)
 import Data.Foldable
 import Data.Function       ( on )
 import Data.Functor.Identity ( Identity (..) )
@@ -667,7 +668,7 @@ rnPatAndThen mk (OrPat _ pats)
        ; pats' <- rnLPatsAndThen mk pats
        ; let bndrs = collectPatsBinders CollVarTyVarBinders (NE.toList pats')
        ; liftCps $ setSrcSpan loc $ checkErr (null bndrs) $
-           TcRnOrPatBindsVariables (NE.fromList (ordNubOn getOccName bndrs))
+           TcRnOrPatBindsVariables (NE.fromList (nubOrdOn getOccName bndrs))
        ; return (OrPat noExtField pats') }
 
 rnPatAndThen mk (SumPat _ pat alt arity)

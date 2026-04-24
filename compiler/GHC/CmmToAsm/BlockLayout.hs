@@ -36,6 +36,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 
+import Data.Containers.ListUtils (nubOrd)
 import Data.List (sortOn, sortBy, nub)
 import Data.List.NonEmpty (nonEmpty)
 import qualified Data.List.NonEmpty as NE
@@ -426,7 +427,7 @@ combineNeighbourhood edges chains
         applyEdges :: [CfgEdge] -> FrontierMap -> FrontierMap -> Set.Set (BlockId, BlockId)
                    -> ([BlockChain], Set.Set (BlockId,BlockId))
         applyEdges [] chainEnds _chainFronts combined =
-            (ordNub $ map snd $ mapElems chainEnds, combined)
+            (nubOrd $ map snd $ mapElems chainEnds, combined)
         applyEdges ((CfgEdge from to _w):edges) chainEnds chainFronts combined
             | Just (c1_e,c1) <- mapLookup from chainEnds
             , Just (c2_f,c2) <- mapLookup to chainFronts
