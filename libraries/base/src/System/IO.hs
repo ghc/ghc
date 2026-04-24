@@ -187,25 +187,7 @@ module System.IO
 
 import GHC.Internal.System.IO (putStrLn, print)
 
-import GHC.Essentials as Rebindable
-       (
-           Module (Module),
-           TrName (TrNameS),
-           TypeLitSort (TypeLitSymbol, TypeLitChar, TypeLitNat),
-           TyCon (TyCon),
-           KindRep
-           (
-               KindRepVar,
-               KindRepTYPE,
-               KindRepTypeLitS,
-               KindRepFun,
-               KindRepTyConApp,
-               KindRepApp
-           ),
-           fail,
-           Num,
-           fromInteger
-       )
+import qualified GHC.Essentials as Rebindable
 
 import GHC.Base (Bool (False, True), otherwise, failIO)
 import GHC.Err (errorWithoutStackTrace)
