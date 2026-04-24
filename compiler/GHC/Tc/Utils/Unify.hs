@@ -11,7 +11,7 @@
 module GHC.Tc.Utils.Unify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcWrapResultMono,
-  tcSubType, tcSubTypeSigma, tcSubTypePat, tcSubTypeDS, tcSubTypeHoleFit,
+  tcSubType, tcSubTypeSigma, tcSubTypePat, tcSubTypeApp, tcSubTypeHoleFit,
   addSubTypeCtxt,
   tcSubTypeAmbiguity, tcSubMult,
   checkConstraints, checkTvConstraints,
@@ -1488,23 +1488,61 @@ tcSubTypePat _ _ (Infer inf_res) ty_expected
 
 ---------------
 
--- | A subtype check that performs deep subsumption.
--- See also 'tcSubTypeMono', for when no instantiation is required.
-tcSubTypeDS :: HsExpr GhcTc -- ^ App head (for error messages only)
-            -> DeepSubsumptionDepth
-            -> HsExpr GhcRn
-            -> TcRhoType   -- ^ Actual type; a rho-type, not a sigma-type
-            -> TcRhoType   -- ^ Expected type
-                           -- DeepSubsumption <=> when checking, this type
-                           --                     is deeply skolemised
-            -> TcM HsWrapper
--- Only one call site, in GHC.Tc.Gen.App.checkResultTy
-tcSubTypeDS tc_fun ds_depth rn_expr act_rho exp_rho
-  = do { wrap <- tc_sub_type_deep (Just tc_fun, Top) ds_depth
-                   (unifyExprType rn_expr)
-                   (exprCtOrigin rn_expr)
-                   GenSigCtxt act_rho exp_rho
+-- | Connect up the inferred type of an application with the expected type.
+-- This is usually just a unification, but with deep subsumption there is more to do.
+tcSubTypeApp :: HsExpr GhcRn
+             -> HsExpr GhcTc  -- Head
+             -> TcRhoType     -- Inferred type of the application; zonked to
+                              --   expose foralls, but maybe not /deeply/ instantiated
+             -> ExpRhoType    -- Expected type; this is deeply skolemised
+             -> TcM HsWrapper
+tcSubTypeApp rn_expr tc_fun app_res_rho (Infer inf_res)
+  = do { ds_flag <- getDeepSubsumptionFlag_DataConHead tc_fun
+         -- Why the "DataConHead" bit?  See (IIR5) in
+         -- Note [Instantiation of InferResult] in GHC.Tc.Utils.Unify.
+       ; fillInferResult ds_flag (exprCtOrigin rn_expr) app_res_rho inf_res }
+
+tcSubTypeApp rn_expr tc_fun app_res_rho (Check exp_rho)
+ = do { ds_flag <- getDeepSubsumptionFlag_DataConHead tc_fun
+      ; traceTc "tcSubTypeApp {" $
+          vcat [ text "tc_fun:" <+> ppr tc_fun
+               , text "app_res_rho:" <+> ppr app_res_rho
+               , text "exp_rho:"  <+> ppr exp_rho
+               , text "ds_flag:" <+> ppr ds_flag ]
+      ; wrap <- case ds_flag of
+          Shallow -- No deep subsumption
+            -- app_res_rho and res_ty are both rho-types,
+            -- so with simple subsumption we can just unify them
+            -- No need to zonk; the unifier does that
+            -> do { co <- unifyExprType rn_expr app_res_rho exp_rho
+                  ; return (mkWpCastN co) }
+
+          Deep ds_depth -- Deep subsumption is ON
+            -- Even though both app_res_rho and res_ty are rho-types,
+            -- they may have nested polymorphism, so if deep subsumption
+            -- is on we must call tcSubType.
+            -> tc_sub_type_deep (Just tc_fun, Top) ds_depth
+                                (unifyExprType rn_expr)
+                                (exprCtOrigin rn_expr)
+                                GenSigCtxt app_res_rho exp_rho
+
+       ; traceTc "tcSubTypeApp }" $
+          vcat [ text "tc_fun:" <+> ppr tc_fun
+               , text "wrap:" <+> ppr wrap ]
+
        ; return (mkWpSubType wrap) }
+
+-- | Variant of 'getDeepSubsumptionFlag' which enables a top-level subsumption
+-- in order to implement the plan of Note [Typechecking data constructors].
+getDeepSubsumptionFlag_DataConHead :: HsExpr GhcTc -> TcM DeepSubsumptionFlag
+getDeepSubsumptionFlag_DataConHead app_head
+  = do { user_ds <- xoptM LangExt.DeepSubsumption
+       ; return $ if | user_ds
+                     -> Deep DeepSub
+                     | XExpr (ConLikeTc (RealDataCon {})) <- app_head
+                     -> Deep TopSub
+                     | otherwise
+                     -> Shallow  }
 
 ---------------
 
@@ -2104,18 +2142,6 @@ getDeepSubsumptionFlag =
        else return Shallow
      }
 
--- | Variant of 'getDeepSubsumptionFlag' which enables a top-level subsumption
--- in order to implement the plan of Note [Typechecking data constructors].
-getDeepSubsumptionFlag_DataConHead :: HsExpr GhcTc -> TcM DeepSubsumptionFlag
-getDeepSubsumptionFlag_DataConHead app_head
-  = do { user_ds <- xoptM LangExt.DeepSubsumption
-       ; return $ if | user_ds
-                     -> Deep DeepSub
-                     | XExpr (ConLikeTc (RealDataCon {})) <- app_head
-                     -> Deep TopSub
-                     | otherwise
-                     -> Shallow  }
-
 
 -- | 'tc_sub_type_deep' is where the actual work happens for deep subsumption.
 --
@@ -2132,11 +2158,7 @@ tc_sub_type_deep :: HasDebugCallStack
                  -> TcRhoType      -- ^ Expected; deeply skolemised
                  -> TcM HsWrapper
 tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual ty_expected
-  = assertPpr (isDeeplySkolemised ty_expected)
-     (vcat [ text "tc_sub_type_deep: expected type is not a deep rho type"
-           , text "ty_expected:" <+> ppr ty_expected
-           , text "ty_actual:" <+> ppr ty_actual
-           ]) $
+  = assert_precondition $
     do { traceTc "tc_sub_type_deep" $
          vcat [ text "ty_actual   =" <+> ppr ty_actual
               , text "ty_expected =" <+> ppr ty_expected ]
@@ -2249,6 +2271,27 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
            }
       where
         given_orig = GivenOrigin (SigSkol GenSigCtxt exp_arg [])
+
+    -- Assertion check.
+    -- If DeepSubsumption is on (ds_depth = Deep DeepSub) then `exp_rho`
+    --    should already be deeply skolemised; the assertion checks this
+    -- But if DeepSubsumption is NOT on, but there is a data constructor at the
+    --    head, we must still call `tc_sub_type_deep` (for the multiplicity arrows)
+    --    Hence ds_flag = Deep TopSub, but `exp_rho` will only be /top-level/ skolemised
+    --    So we can only check for top-level skolemisation (`isRhoTy`)
+    -- Example of the latter (see #27210), with -XNoDeepSubsumption
+    --     foo :: forall a. a -> forall b. b -> (a,b)
+    --     foo = (,)
+    -- We will only shallowly-skolemise the expected type
+    assert_precondition = assertPpr ty_expected_is_ok $
+                          vcat [ text "tc_sub_type_deep: expected type is not a deep rho type"
+                               , text "ty_expected:" <+> ppr ty_expected
+                               , text "ty_actual:" <+> ppr ty_actual ]
+    ty_expected_is_ok
+      = case ds_depth of
+          TopSub  -> True
+          DeepSub -> isDeeplySkolemised ty_expected
+
 
 -- | Whether to do deep subsumption when recurring inside arguments.
 recurInArgumentDSFlag :: DeepSubsumptionDepth -> DeepSubsumptionFlag
@@ -5145,5 +5188,3 @@ lookupCycleBreakerVar cbv (IS { inert_cycle_breakers = cbvs_stack })
   = tyfam_app
   | otherwise
   = pprPanic "lookupCycleBreakerVar found an unbound cycle breaker" (ppr cbv $$ ppr cbvs_stack)
-
---------------------------------------------------------------------------------

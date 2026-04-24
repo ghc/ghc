@@ -791,10 +791,9 @@ nonBidirectionalErr = TcRnPatSynNotBidirectional
 
 {- Note [Typechecking data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As per Note [Polymorphisation of linear fields] in
-GHC.Core.Multiplicity, when we use a data constructor as a term, we want to
-consider its field to have polymorphic multiplicities. That is,
-Note [Data constructors are linear by default] says:
+As per Note [Polymorphisation of linear fields] in GHC.Core.Multiplicity, when
+we use a data constructor as a term, we want to consider its field to have
+polymorphic multiplicities. Note [Data constructors are linear by default] says:
 
     Just :: a. a %1 -> Maybe a
 
