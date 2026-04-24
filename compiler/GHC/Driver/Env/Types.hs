@@ -29,10 +29,11 @@ import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State
 import Data.IORef
 import GHC.Driver.Env.KnotVars
+import Control.Monad.Catch
 
 -- | The Hsc monad: Passing an environment and diagnostic state
 newtype Hsc a = Hsc (HscEnv -> Messages GhcMessage -> IO (a, Messages GhcMessage))
-    deriving (Functor, Applicative, Monad, MonadIO)
+    deriving (Functor, Applicative, Monad, MonadIO, MonadCatch, MonadThrow, MonadMask)
       via ReaderT HscEnv (StateT (Messages GhcMessage) IO)
 
 instance HasHscEnv ((->) HscEnv) where

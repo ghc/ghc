@@ -33,6 +33,7 @@ import GHC.Types.SrcLoc
 import GHC.Driver.Main
 import GHC.Driver.Downsweep
 import GHC.Tc.Types
+import GHC.Tc.Utils.Monad (TcMPluginHandling(..))
 import GHC.Types.Error
 import GHC.Driver.Errors.Types
 import GHC.Fingerprint
@@ -42,6 +43,7 @@ import GHC.Platform
 import Data.List (intercalate, isInfixOf)
 import qualified Data.List.NonEmpty as NE
 import GHC.Unit.Env
+import GHC.Unit.Home.ModInfo
 import GHC.Utils.Error
 import Data.Maybe
 import GHC.CmmToLlvm.Mangler
@@ -82,11 +84,10 @@ import GHC.Rename.Names
 import GHC.StgToJS.Linker.Linker (embedJsFile)
 
 import Language.Haskell.Syntax.Module.Name
-import GHC.Unit.Home.ModInfo
-
 
 newtype HookedUse a = HookedUse { runHookedUse :: (Hooks, PhaseHook) -> IO a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch) via (ReaderT (Hooks, PhaseHook) IO)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask)
+    via (ReaderT (Hooks, PhaseHook) IO)
 
 instance MonadUse TPhase HookedUse where
   use fa = HookedUse $ \(hooks, (PhaseHook k)) ->
@@ -788,7 +789,12 @@ mkOneShotModLocation pipe_env dflags src_flavour mod_name = do
       fopts = initFinderOpts dflags
 
 runHscTcPhase :: HscEnv -> ModSummary -> IO (FrontendResult, Messages GhcMessage)
-runHscTcPhase = hscTypecheckAndGetWarnings
+runHscTcPhase hsc_env ms =
+  hscTypecheckAndGetWarnings hsc_env ms StartAndKeepRunningTcMPlugins
+    -- NB: we properly stop TcM plugins in 'hscPipeline':
+    --
+    --  - if we proceed to desugaring, the desugarer will shut them down
+    --  - otherwise, we shut them down after typechecking.
 
 runHscPostTcPhase ::
     HscEnv
@@ -797,9 +803,9 @@ runHscPostTcPhase ::
   -> Messages GhcMessage
   -> Maybe Fingerprint
   -> IO HscBackendAction
-runHscPostTcPhase hsc_env mod_summary tc_result tc_warnings mb_old_hash = do
-        runHsc hsc_env $ do
-            hscDesugarAndSimplify mod_summary tc_result tc_warnings mb_old_hash
+runHscPostTcPhase hsc_env mod_summary tc_result tc_warnings mb_old_hash
+  = runHsc hsc_env $
+    hscDesugarAndSimplify mod_summary tc_result tc_warnings mb_old_hash
 
 
 runHsPpPhase :: HscEnv -> FilePath -> FilePath -> FilePath -> IO FilePath

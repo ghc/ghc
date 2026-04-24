@@ -38,7 +38,8 @@ plugin =
           { tcPluginInit    = pure ()
           , tcPluginSolve   = \ _ -> solve
           , tcPluginRewrite = \ _ -> emptyUFM
-          , tcPluginStop    = \ _ -> pure ()
+          , tcPluginPostTc   = \ _ -> pure ()
+          , tcPluginShutdown = \ _ -> pure ()
           }
     }
 

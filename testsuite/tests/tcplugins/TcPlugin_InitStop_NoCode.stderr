@@ -1,0 +1,13 @@
+[1 of 4] Compiling TcPlugin_InitStop_Plugin ( TcPlugin_InitStop_Plugin.hs, TcPlugin_InitStop_Plugin.o )
+[2 of 4] Compiling TcPlugin_InitStop_NoCode[boot] ( TcPlugin_InitStop_NoCode.hs-boot, TcPlugin_InitStop_NoCode.o-boot )
+Plugin starting for module TcPlugin_InitStop_NoCode
+Plugin post-tc for module TcPlugin_InitStop_NoCode
+Plugin shutdown for module TcPlugin_InitStop_NoCode
+[3 of 4] Compiling TcPlugin_InitStop_NoCode_aux ( TcPlugin_InitStop_NoCode_aux.hs, TcPlugin_InitStop_NoCode_aux.o )
+Plugin starting for module TcPlugin_InitStop_NoCode_aux
+Plugin post-tc for module TcPlugin_InitStop_NoCode_aux
+Plugin shutdown for module TcPlugin_InitStop_NoCode_aux
+[4 of 4] Compiling TcPlugin_InitStop_NoCode ( TcPlugin_InitStop_NoCode.hs, TcPlugin_InitStop_NoCode.o )
+Plugin starting for module TcPlugin_InitStop_NoCode
+Plugin post-tc for module TcPlugin_InitStop_NoCode
+Plugin shutdown for module TcPlugin_InitStop_NoCode

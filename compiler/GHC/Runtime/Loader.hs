@@ -35,7 +35,10 @@ import GHC.Runtime.Interpreter.Types
 
 import GHC.Rename.Names ( gresFromAvails )
 
-import GHC.Tc.Utils.Monad      ( initTcInteractive, initIfaceTcRn )
+import GHC.Tc.Utils.Monad
+  ( TcMPluginHandling (..)
+  , initTcInteractive, initIfaceTcRn
+  )
 import GHC.Iface.Load          ( loadPluginInterface, cannotFindModule )
 import GHC.Builtin.Names ( pluginTyConName, frontendPluginTyConName )
 
@@ -228,7 +231,7 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
 -- for debugging (@-ddump-if-trace@) only: it is shown as the reason why the module is being loaded.
 forceLoadModuleInterfaces :: HscEnv -> SDoc -> [Module] -> IO ()
 forceLoadModuleInterfaces hsc_env doc modules
-    = (initTcInteractive hsc_env $
+    = (initTcInteractive NoTcMPlugins hsc_env $
        initIfaceTcRn $
        mapM_ (loadPluginInterface doc) modules)
       >> return ()
@@ -347,7 +350,7 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     case found_module of
         Found _ mod -> do
             -- Find the exports of the module
-            (_, mb_iface) <- initTcInteractive hsc_env $
+            (_, mb_iface) <- initTcInteractive NoTcMPlugins hsc_env $
                              initIfaceTcRn $
                              loadPluginInterface doc mod
             case mb_iface of

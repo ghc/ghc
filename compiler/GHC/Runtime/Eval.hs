@@ -873,7 +873,7 @@ mkTopLevEnv hsc_env modl
 mkTopLevImportedEnv :: HscEnv -> HomeModInfo -> IO GlobalRdrEnv
 mkTopLevImportedEnv hsc_env details = do
     runInteractiveHsc hsc_env
-  $ ioMsgMaybe $ hoistTcRnMessage $ runTcInteractive hsc_env
+  $ ioMsgMaybe $ hoistTcRnMessage $ runTcInteractive NoTcMPlugins hsc_env
   $ fmap (foldr plusGlobalRdrEnv emptyGlobalRdrEnv)
   $ forM imports $ \iface_import -> do
     let ImpUserSpec spec details = tcIfaceImport iface_import
@@ -1088,7 +1088,7 @@ typeKind normalise str = withSession $ \hsc_env ->
 getInstancesForType :: GhcMonad m => Type -> m [ClsInst]
 getInstancesForType ty = withSession $ \hsc_env ->
   liftIO $ runInteractiveHsc hsc_env $
-    ioMsgMaybe $ hoistTcRnMessage $ runTcInteractive hsc_env $ do
+    ioMsgMaybe $ hoistTcRnMessage $ runTcInteractive StartAndStopTcMPlugins hsc_env $ do
       -- Bring class and instances from unqualified modules into scope, this fixes #16793.
       loadUnqualIfaces hsc_env (hsc_IC hsc_env)
       matches <- findMatchingInstances ty

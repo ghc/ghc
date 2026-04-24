@@ -79,7 +79,7 @@ cmmOfSummary summ = do
 frontend :: DynFlags -> HscEnv -> ModSummary -> IO ModGuts
 frontend _dflags env summary = do
    parsed <- hscParse env summary
-   (checked, _) <- hscTypecheckRename env summary parsed
+   (checked, _) <- hscTypecheckRename env summary StartAndKeepRunningTcMPlugins parsed
    hscDesugar env summary checked >>= hscSimplify env []
 
 loadCmm :: FilePath -> Ghc CmmGroup

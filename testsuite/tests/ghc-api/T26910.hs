@@ -76,7 +76,7 @@ main = do
     _ <- load LoadAllTargets
     modSum <- getModSummary m
     parsed <- parseModule modSum
-    tc     <- typecheckModule parsed
+    tc     <- typecheckModule StartAndStopTcMPlugins parsed
 
     let tcSrc = tm_typechecked_source tc
         check name = liftIO $ checkBinding dflags name tcSrc

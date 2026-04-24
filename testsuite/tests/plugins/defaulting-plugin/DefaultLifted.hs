@@ -32,10 +32,13 @@ plugin = defaultPlugin {
   }
 
 install :: p -> Maybe GHC.Tc.Types.DefaultingPlugin
-install _ = Just $ DefaultingPlugin { dePluginInit = initialize
-                                    , dePluginRun  = run
-                                    , dePluginStop = stop
-                                    }
+install _ = Just $
+  DefaultingPlugin
+    { dePluginInit = initialize
+    , dePluginRun  = run
+    , dePluginPostTc = \ _ -> pure ()
+    , dePluginShutdown = \ _ -> pure ()
+    }
 
 pattern FoundModule :: Module -> FindResult
 pattern FoundModule a <- Found _ a
@@ -101,7 +104,3 @@ initialize = do
 run :: PluginState -> WantedConstraints -> TcPluginM [DefaultingProposal]
 run s ws = do
   solveDefaultType s (ctsElts $ approximateWC False ws)
-
-stop :: Monad m => p -> m ()
-stop _ = do
-  return ()

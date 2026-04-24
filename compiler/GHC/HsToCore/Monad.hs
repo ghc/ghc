@@ -284,8 +284,15 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
              -- in allocations by ~5% if we don't do this.
            traverse (lookupCompleteMatch type_env hsc_env) =<<
              localAndImportedCompleteMatches tcg_comp_env eps
-       ; return $ mkDsEnvs unit_env this_mod rdr_env type_env fam_inst_env ptc
-                           msg_var cc_st_var statics_var
+       ; tcm_plugins <- liftIO $ readIORef (tcg_plugins tcg_env)
+
+       -- Pass the running 'TcM' plugins to the desugarer, so that the pattern-match
+       -- checker can invoke the typechecker without having to re-initialise them.
+       --
+       -- See Note [Stop TcM plugins after desugaring] in GHC.Driver.Main.
+       ; let tcm_plugin_env = tcMPluginsRunActions $ runningTcMPlugins tcm_plugins
+       ; return $ mkDsEnvs unit_env this_mod rdr_env type_env fam_inst_env
+                           tcm_plugin_env ptc msg_var cc_st_var statics_var
                            next_wrapper_num_var ds_complete_matches
        }
 
@@ -345,9 +352,11 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
        ; ds_complete_matches <- traverse (lookupCompleteMatch type_env hsc_env) =<<
             localAndImportedCompleteMatches local_complete_matches eps
        ; let
-             envs  = mkDsEnvs unit_env this_mod rdr_env type_env
-                              fam_inst_env ptc msg_var cc_st_var statics_var
-                              next_wrapper_num ds_complete_matches
+            tcm_plugins = emptyTcMPluginsRun
+            envs  = mkDsEnvs unit_env this_mod rdr_env type_env
+                             fam_inst_env tcm_plugins ptc
+                             msg_var cc_st_var statics_var
+                             next_wrapper_num ds_complete_matches
        ; runDs hsc_env envs thing_inside
        }
 
@@ -373,25 +382,39 @@ initTcDsForSolver thing_inside
        ; let DsGblEnv { ds_mod = mod
                       , ds_fam_inst_env = fam_inst_env
                       , ds_gbl_rdr_env  = rdr_env
+                      , ds_tcm_plugins  = tcm_plugins
                       } = gbl
              DsLclEnv { dsl_loc = loc } = lcl
 
-       ; (msgs, mb_ret) <- liftIO $ initTc hsc_env HsSrcFile False mod loc $
+       ; let
+           -- We specifically stored TcM plugins in the DsGblEnv so that we
+           -- can invoke the typechecker without having to re-initialise them.
+           running_tcm_plugins =
+             TcMPluginsRunning $
+               RunningTcMPlugins
+                 tcm_plugins
+                 emptyTcMPluginsPostTc
+                 emptyTcMPluginsShutdown
+
+       ; tcm_plugins_ref <- liftIO $ newIORef running_tcm_plugins
+       ; (msgs, mb_ret) <- liftIO $ initTc UseRunningTcMPlugins hsc_env HsSrcFile False mod loc $
          updGblEnv (\tc_gbl -> tc_gbl { tcg_fam_inst_env = fam_inst_env
-                                      , tcg_rdr_env      = rdr_env }) $
+                                      , tcg_rdr_env      = rdr_env
+                                      , tcg_plugins      = tcm_plugins_ref }) $
          thing_inside
        ; case mb_ret of
            Just ret -> pure ret
            Nothing  -> pprPanic "initTcDsForSolver" (vcat $ pprMsgEnvelopeBagWithLocDefault (getErrorMessages msgs)) }
 
 mkDsEnvs :: UnitEnv -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
+         -> TcMPluginsRun
          -> PromotionTickContext
          -> IORef (Messages DsMessage) -> IORef CostCentreState
          -> IORef (OrdList (Id,CoreExpr))
          -> IORef (ModuleEnv Int) -> DsCompleteMatches
          -> (DsGblEnv, DsLclEnv)
-mkDsEnvs unit_env mod rdr_env type_env fam_inst_env ptc msg_var cc_st_var
-         statics_var next_wrapper_num complete_matches
+mkDsEnvs unit_env mod rdr_env type_env fam_inst_env tcm_plugins ptc msg_var
+         cc_st_var statics_var next_wrapper_num complete_matches
   = let if_genv = IfGblEnv { if_doc       = text "mkDsEnvs"
   -- Failing tests here are `ghci` and `T11985` if you get this wrong.
   -- this is very very "at a distance" because the reason for this check is that the type_env in interactive
@@ -406,6 +429,7 @@ mkDsEnvs unit_env mod rdr_env type_env fam_inst_env ptc msg_var cc_st_var
         gbl_env = DsGblEnv { ds_mod     = mod
                            , ds_fam_inst_env = fam_inst_env
                            , ds_gbl_rdr_env  = rdr_env
+                           , ds_tcm_plugins = tcm_plugins
                            , ds_if_env  = (if_genv, if_lenv)
                            , ds_name_ppr_ctx = mkNamePprCtx ptc unit_env rdr_env
                            , ds_msgs    = msg_var

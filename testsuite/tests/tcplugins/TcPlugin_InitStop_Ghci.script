@@ -1,0 +1,2 @@
+:load TcPlugin_InitStop_Ghci.hs
+:quit

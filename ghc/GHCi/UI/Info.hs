@@ -312,7 +312,7 @@ getModInfo m = do
     modifySessionM (liftIO . initializePlugins)
 
     p <- parseModule mod_summary
-    typechecked <- typecheckModule p
+    typechecked <- typecheckModule StartAndStopTcMPlugins p
     let allTypes = processAllTypeCheckedModule typechecked
     let !rdr_env = tcg_rdr_env (fst $ tm_internals_ typechecked)
     ts <- liftIO $ getModificationTime $ srcFilePath mod_summary

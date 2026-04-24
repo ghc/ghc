@@ -25,7 +25,7 @@ import GHC.Types.Name.Reader (GlobalRdrEnv)
 
 import GHC.Hs (LForeignDecl, HsExpr, GhcTc)
 
-import GHC.Tc.Types (TcRnIf, IfGblEnv, IfLclEnv)
+import GHC.Tc.Types (TcRnIf, IfGblEnv, IfLclEnv, TcMPluginsRun)
 
 import GHC.HsToCore.Pmc.Types (Nablas)
 import GHC.HsToCore.Errors.Types
@@ -63,6 +63,12 @@ data DsGblEnv
   , ds_gbl_rdr_env  :: GlobalRdrEnv       -- needed only for the following reasons:
                                           --    - to know what newtype constructors are in scope
                                           --    - to check whether all members of a COMPLETE pragma are in scope
+  , ds_tcm_plugins :: TcMPluginsRun
+      -- ^ 'TcM' plugins, stored here so that we can invoke the typechecker
+      -- without having to repeatedly re-initialise them.
+      --
+      -- See Note [Stop TcM plugins after desugaring] in GHC.Driver.Main.
+
   , ds_name_ppr_ctx :: NamePprCtx
   , ds_msgs    :: IORef (Messages DsMessage) -- Diagnostic messages
   , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,

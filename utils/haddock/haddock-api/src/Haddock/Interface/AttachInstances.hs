@@ -95,7 +95,7 @@ attachInstances expInfo ifaces instIfaceMap isOneShot = do
 
   (_msgs, mb_index) <- do
     hsc_env <- getSession
-    liftIO $ runTcInteractive hsc_env $ do
+    liftIO $ runTcInteractive NoTcMPlugins hsc_env $ do
       -- In one shot mode we don't want to load anything more than is already loaded
       unless isOneShot $ do
         let doc = text "Need interface for haddock"

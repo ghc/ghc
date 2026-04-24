@@ -17,7 +17,8 @@ plugin = defaultPlugin
     { defaultingPlugin = \_ -> Just DefaultingPlugin
         { dePluginInit = pure ()
         , dePluginRun = \ _ -> defaultEverythingToInt
-        , dePluginStop = \ _ -> pure ()
+        , dePluginPostTc = \ _ -> pure ()
+        , dePluginShutdown = \ _ -> pure ()
         }
     }
 

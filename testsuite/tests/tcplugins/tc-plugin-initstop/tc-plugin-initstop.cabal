@@ -1,0 +1,13 @@
+Name:           tc-plugin-initstop
+Version:        0.1
+Synopsis:       Testing TcPlugin init/stop in GHCi
+Cabal-Version:  >= 1.2
+Build-Type:     Simple
+License:        BSD3
+Author:         GHC Testsuite
+
+Library
+    Build-Depends:
+        base, ghc
+    Exposed-Modules:
+        TcPlugin_InitStop_Plugin

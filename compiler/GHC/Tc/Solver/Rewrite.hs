@@ -6,10 +6,7 @@ module GHC.Tc.Solver.Rewrite(
 import GHC.Prelude
 
 import GHC.Core.TyCo.Ppr ( pprTyVar )
-import GHC.Tc.Types ( TcGblEnv(tcg_tc_plugin_rewriters),
-                      TcPluginRewriter, TcPluginRewriteResult(..),
-                      RewriteEnv(..),
-                      runTcPluginM )
+import GHC.Tc.Types
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc( CtLoc, resetCtLocDepth )
 import GHC.Core.Predicate
@@ -25,6 +22,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Driver.DynFlags
+import GHC.Tc.Utils.Monad (rewriterTcMPlugins)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Tc.Solver.Monad as TcS
@@ -920,7 +918,9 @@ try_to_reduce tc tys tc_rewriters
 -- headed by the given 'TyCon`.
 getTcPluginRewritersForTyCon :: TyCon -> RewriteM [TcPluginRewriter]
 getTcPluginRewritersForTyCon tc
-  = liftTcS $ do { rewriters <- tcg_tc_plugin_rewriters <$> getGblEnv
+  = liftTcS $ do { tcg_env <- getGblEnv
+                 ; plugins <- readTcRef (tcg_plugins tcg_env)
+                 ; let rewriters = rewriterTcMPlugins plugins
                  ; return (lookupWithDefaultUFM rewriters [] tc) }
 
 -- Run a collection of rewriting functions obtained from type-checking plugins,

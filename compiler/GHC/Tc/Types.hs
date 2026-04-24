@@ -80,6 +80,17 @@ module GHC.Tc.Types(
         removeBindingShadowing,
         getPlatform,
 
+        -- 'TcM' plugins
+        TcMPluginsState(..), RunningTcMPlugins(..), emptyRunningTcMPlugins,
+        TcMPluginsRun(..), emptyTcMPluginsRun,
+        TcMPluginsPostTc(..), emptyTcMPluginsPostTc,
+        TcMPluginsShutdown(..), emptyTcMPluginsShutdown,
+
+        runningTcMPlugins,
+        tcMPluginsRunActions,
+        tcMPluginsPostTcActions,
+        tcMPluginsShutdownActions,
+
         -- Constraint solver plugins
         TcPlugin(..),
         TcPluginSolveResult(TcPluginContradiction, TcPluginOk, ..),
@@ -163,6 +174,7 @@ import GHC.Unit.Module.Deps
 import GHC.Unit.Module.ModDetails
 
 import GHC.Utils.Error
+import GHC.Utils.Misc ( HasDebugCallStack )
 import GHC.Utils.Outputable
 import GHC.Utils.Fingerprint
 import GHC.Utils.Panic
@@ -180,6 +192,7 @@ import Data.Dynamic  ( Dynamic )
 import Data.Map ( Map )
 import Data.Typeable ( TypeRep )
 import Data.Maybe    ( mapMaybe )
+
 
 -- | The import specification as written by the user, including
 -- the list of explicitly imported names. Used in 'ModIface' to
@@ -666,18 +679,8 @@ data TcGblEnv
         -- are supplied (#19714), or if those reasons have already been
         -- reported by GHC.Driver.Main.markUnsafeInfer
 
-        tcg_tc_plugin_solvers :: [TcPluginSolver],
-        -- ^ A list of user-defined type-checking plugins for constraint solving.
-
-        tcg_tc_plugin_rewriters :: UniqFM TyCon [TcPluginRewriter],
-        -- ^ A collection of all the user-defined type-checking plugins for rewriting
-        -- type family applications, collated by their type family 'TyCon's.
-
-        tcg_defaulting_plugins :: [FillDefaulting],
-        -- ^ A list of user-defined plugins for type defaulting plugins.
-
-        tcg_hf_plugins :: [HoleFitPlugin],
-        -- ^ A list of user-defined plugins for hole fit suggestions.
+        tcg_plugins :: TcRef TcMPluginsState,
+        -- ^ All 'TcM' plugins (solver/rewriter/defaulting/hole-fit).
 
         tcg_top_loc :: RealSrcSpan,
         -- ^ The RealSrcSpan this module came from
@@ -991,7 +994,7 @@ unsafeTcPluginTcM = TcPluginM
 
 data TcPlugin = forall s. TcPlugin
   { tcPluginInit :: TcPluginM s
-    -- ^ Initialize plugin, when entering type-checker.
+    -- ^ Initialize plugin, once per module, when starting the type-checker.
 
   , tcPluginSolve :: s -> TcPluginSolver
     -- ^ Solve some constraints.
@@ -1020,8 +1023,18 @@ data TcPlugin = forall s. TcPlugin
     --
     -- Use @ \\ _ -> emptyUFM @ if your plugin does not provide this functionality.
 
-  , tcPluginStop :: s -> TcPluginM ()
-   -- ^ Clean up after the plugin, when exiting the type-checker.
+  , tcPluginPostTc :: s -> TcPluginM ()
+    -- ^ Action to run at the end of typechecking a module, e.g. to intercept
+    -- the final 'TcGblEnv'/'TcLclEnv' at the end of typechecking, possibly
+    -- modifying mutable fields.
+    --
+    -- Should not terminate the plugin, as the plugin may continue to be invoked
+    -- when desugaring the module (as the pattern-match checker may invoke the
+    -- constraint solver).
+
+  , tcPluginShutdown :: s -> IO ()
+    -- ^ Clean up after the plugin, when GHC is done processing the given
+    -- module (e.g. after desugaring).
   }
 
 -- | The plugin found a contradiction.
@@ -1107,11 +1120,13 @@ type FillDefaulting
 -- | A plugin for controlling defaulting.
 data DefaultingPlugin = forall s. DefaultingPlugin
   { dePluginInit :: TcPluginM s
-    -- ^ Initialize plugin, when entering type-checker.
+    -- ^ Initialize plugin, when beginning to typecheck a module.
   , dePluginRun :: s -> FillDefaulting
-    -- ^ Default some types
-  , dePluginStop :: s -> TcPluginM ()
-   -- ^ Clean up after the plugin, when exiting the type-checker.
+    -- ^ Type defaulting action.
+  , dePluginPostTc :: s -> TcPluginM ()
+    -- ^ Action to run at the end of typechecking a module.
+  , dePluginShutdown :: s -> IO ()
+    -- ^ Clean up after the plugin, once done processing a module.
   }
 
 {- *********************************************************************
@@ -1167,3 +1182,110 @@ data DocLoc = DeclDoc Name
 -- | The current collection of docs that Template Haskell has built up via
 -- putDoc.
 type THDocs = Map DocLoc (HsDoc GhcRn)
+
+{- *********************************************************************
+*                                                                      *
+                          TcM plugins
+*                                                                      *
+********************************************************************* -}
+
+-- | "run" actions for already-started 'TcM' plugins (meaning that we have
+-- initialised them and not yet stopped them).
+--
+-- Includes typechecker plugins, defaulting plugins, and hole fit plugins.
+data TcMPluginsRun = TcMPluginsRun
+  { tcmp_solvers    :: [TcPluginSolver]
+    -- ^ Running constraint solver plugins.
+  , tcmp_rewriters  :: UniqFM TyCon [TcPluginRewriter]
+    -- ^ Running type-family rewriting plugins.
+  , tcmp_defaulters :: [FillDefaulting]
+    -- ^ Running defaulting plugins.
+  , tcmp_hole_fits  :: [HoleFitPlugin]
+    -- ^ Running hole-fit plugins.
+  }
+
+emptyTcMPluginsRun :: TcMPluginsRun
+emptyTcMPluginsRun = TcMPluginsRun
+  { tcmp_solvers    = []
+  , tcmp_rewriters  = emptyUFM
+  , tcmp_defaulters = []
+  , tcmp_hole_fits  = []
+  }
+
+-- | The "post-tc" actions for 'TcM' plugins.
+--
+-- Includes typechecker plugins, defaulting plugins and hole fit plugins.
+data TcMPluginsPostTc =
+  TcMPluginsPostTc
+  { tcpt_tc_plugins         :: [TcPluginM ()]
+  , tcpt_defaulting_plugins :: [TcPluginM ()]
+  , tcpt_hole_fit_plugins   :: [TcM ()]
+  }
+
+emptyTcMPluginsPostTc :: TcMPluginsPostTc
+emptyTcMPluginsPostTc = TcMPluginsPostTc
+  { tcpt_tc_plugins         = []
+  , tcpt_defaulting_plugins = []
+  , tcpt_hole_fit_plugins   = []
+  }
+
+-- | The "shutdown" actions for 'TcM' plugins.
+--
+-- Includes typechecker plugins and defaulting plugins.
+data TcMPluginsShutdown =
+  TcMPluginsShutdown
+  { tcps_tc_plugins         :: [IO ()]
+  , tcps_defaulting_plugins :: [IO ()]
+  }
+
+emptyTcMPluginsShutdown :: TcMPluginsShutdown
+emptyTcMPluginsShutdown = TcMPluginsShutdown
+  { tcps_tc_plugins         = []
+  , tcps_defaulting_plugins = []
+  }
+
+-- | Plugins that run in the typechecker.
+--
+-- May be uninitialised or already stopped.
+data TcMPluginsState
+  -- | The 'TcM' plugins have not been started.
+  = TcMPluginsUninitialised
+  -- | The 'TcM' plugins have been initialised and not yet stopped.
+  --
+  -- We may be in the middle of typechecker, or have finished typechecking
+  -- and be in the middle of desugaring.
+  | TcMPluginsRunning !RunningTcMPlugins
+  -- | The 'TcM' plugins have been stopped.
+  | TcMPluginsStopped
+
+data RunningTcMPlugins =
+  RunningTcMPlugins
+    { rtcmp_run      :: TcMPluginsRun
+    , rtcmp_post_tc  :: TcMPluginsPostTc
+    , rtcmp_shutdown :: TcMPluginsShutdown
+    }
+
+emptyRunningTcMPlugins :: RunningTcMPlugins
+emptyRunningTcMPlugins =
+  RunningTcMPlugins
+    emptyTcMPluginsRun
+    emptyTcMPluginsPostTc
+    emptyTcMPluginsShutdown
+
+tcMPluginsRunActions :: RunningTcMPlugins -> TcMPluginsRun
+tcMPluginsRunActions = rtcmp_run
+tcMPluginsPostTcActions :: RunningTcMPlugins -> TcMPluginsPostTc
+tcMPluginsPostTcActions = rtcmp_post_tc
+tcMPluginsShutdownActions :: RunningTcMPlugins -> TcMPluginsShutdown
+tcMPluginsShutdownActions = rtcmp_shutdown
+
+-- | Retrieve the 'TcM' plugins from a 'TcMPluginsState'.
+--
+-- Assumes the plugins have been already started and not yet stopped.
+runningTcMPlugins
+   :: HasDebugCallStack
+   => TcMPluginsState -> RunningTcMPlugins
+runningTcMPlugins = \case
+  TcMPluginsUninitialised -> panic "runningTcMPlugins: TcM plugins not started"
+  TcMPluginsStopped -> panic "runningTcMPlugins: TcM plugins already stopped"
+  TcMPluginsRunning plugins -> plugins

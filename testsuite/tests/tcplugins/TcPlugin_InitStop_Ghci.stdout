@@ -1,0 +1,3 @@
+Plugin starting for module TcPlugin_InitStop_Ghci
+Plugin post-tc for module TcPlugin_InitStop_Ghci
+Plugin shutdown for module TcPlugin_InitStop_Ghci

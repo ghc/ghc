@@ -11,10 +11,11 @@ import Control.Monad.IO.Class
 import qualified Data.Kind as K
 import GHC.Driver.Phases
 import GHC.Utils.TmpFs
+import Control.Monad.Catch (MonadMask)
 
 -- The interface that the pipeline monad must implement.
 type TPipelineClass (f :: K.Type -> K.Type) (m :: K.Type -> K.Type)
-  = (Functor m, MonadIO m, Applicative m, Monad m, MonadUse f m)
+  = (Functor m, MonadIO m, Applicative m, Monad m, MonadMask m, MonadUse f m)
 
 -- | Lift a `f` action into an `m` action.
 class MonadUse f m where

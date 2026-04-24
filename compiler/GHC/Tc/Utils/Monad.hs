@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE RecordWildCards #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -32,7 +32,9 @@ module GHC.Tc.Utils.Monad(
   getHpt, getEpsAndHug,
 
   -- * Initialising TcM plugins
-  withTcPlugins, withDefaultingPlugins, withHoleFitPlugins,
+  TcMPluginHandling(..),
+  withTcMPlugins, shutdownTcMPluginsIO,
+  rewriterTcMPlugins, holeFitTcMPlugins, defaultingTcMPlugins, solverTcMPlugins,
 
   -- * Arrow scopes
   newArrowScope, escapeArrowScope,
@@ -169,7 +171,7 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types( zonkAnyTyCon )
 
 import GHC.Tc.Errors.Types
-import GHC.Tc.Errors.Hole.Plugin ( HoleFitPluginR (..) )
+import GHC.Tc.Errors.Hole.Plugin ( HoleFitPlugin, HoleFitPluginR (..) )
 import GHC.Tc.Types     -- Re-export all
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc
@@ -220,6 +222,7 @@ import GHC.Data.Maybe
 
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Error
+import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Logger
@@ -251,9 +254,11 @@ import GHC.Types.SourceFile
 
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.IORef
+import Control.Exception ( throwIO )
 import Control.Monad
-
+import Control.Monad.Catch ( bracket_, finally, onException, mask, mask_, MonadCatch )
+import Data.Foldable (traverse_)
+import Data.IORef
 import qualified Data.Map as Map
 
 {-
@@ -264,32 +269,78 @@ import qualified Data.Map as Map
 ************************************************************************
 -}
 
--- | Setup the initial typechecking environment
-initTc :: HscEnv
-       -> HscSource
-       -> Bool          -- True <=> retain renamed syntax trees
-       -> Module
-       -> RealSrcSpan
-       -> TcM r
-       -> IO (Messages TcRnMessage, Maybe r)
-                -- Nothing => error thrown by the thing inside
-                -- (error messages should have been printed already)
+-- | How should 'TcM' plugins be handled when initialising of the
+-- typechecker? See Note [Stop TcM plugins after desugaring].
+--
+-- Usage:
+--
+--  1. If you want to typecheck then desugar, use 'StartAndKeepRunningTcMPlugins'.
+--     This will ensure 'TcM' plugins are kept running for the benefit of the
+--     pattern-match checker, and shut down after desugaring.
+--  2. If you only want to typecheck and not desugar, use 'StartAndStopTcMPlugins'.
+--  3. If a prior operation has started 'TcM' plugins, you can use 'UseRunningTcMPlugins'
+--     to avoid re-initialising the plugins, for example in 'initTc'.
+--  4. If you don't care about 'TcM' plugins at all, you can use 'NoTcMPlugins'.
+data TcMPluginHandling
+  -- | Start 'TcM' plugins, run the inner action, then shut down all 'TcM' plugins.
+  --
+  -- Use this if you only need to run the typechecker, and do not intend to
+  -- proceed to desugaring (in which case you should use 'StartAndKeepRunningTcMPlugins').
+  = StartAndStopTcMPlugins
+  -- | Start 'TcM' plugins, run the inner action, then run the "post-tc"
+  -- actions of the plugins, but keep the 'TcM' plugins running.
+  --
+  -- Use this when you intend to proceed to desugaring, as the desugarer wants
+  -- 'TcM' plugins to be running (for solver invocations via the pattern match checker).
+  -- The desugarer will then shut down all 'TcM' plugins.
+  --
+  -- If you only intend to typecheck, without desugaring, you should use
+  -- 'StartAndStopTcMPlugins'.
+  | StartAndKeepRunningTcMPlugins
+  -- | Use the 'TcM' plugins that are already running.
+  --
+  -- Use this when a prior operation has already initialised 'TcM' plugins
+  -- in order to avoid re-initialising them.
+  --
+  -- NB: this will cause a crash if the plugins are not running (either not
+  -- started or already stopped).
+  | UseRunningTcMPlugins
 
-initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
- = do { gbl_env <- initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc
+  -- | Don't use any 'TcM' plugins.
+  | NoTcMPlugins
 
-        -- OK, here's the business end!
-      ;  initTcWithGbl hsc_env gbl_env loc $
+-- | Set up the typechecking environment.
+initTc
+  :: TcMPluginHandling
+  -> HscEnv
+  -> HscSource
+  -> Bool      -- True <=> retain renamed syntax trees
+  -> Module
+  -> RealSrcSpan
+  -> TcM r
+  -> IO (Messages TcRnMessage, Maybe r)
+initTc plugin_handling hsc_env hsc_src keep_rn_syntax mod loc do_this
+  = do { gbl_env <- initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc
+       ; initTcWithGbl hsc_env gbl_env loc $
+           case plugin_handling of
+             StartAndStopTcMPlugins ->
+               withTcMPlugins hsc_env do_this
+             StartAndKeepRunningTcMPlugins -> mask $ \restore -> do
+               -- Initialise the plugins
+               restore $ initTcMPlugins hsc_env
 
-          -- Make sure to initialise all TcM plugins from the ambient HscEnv.
-          --
-          -- This ensures that all callers of 'initTc' enable plugins (#26395).
-          withTcPlugins hsc_env $
-          withDefaultingPlugins hsc_env $
-          withHoleFitPlugins hsc_env $
+               -- Run the inner action and then the "post-tc" action.
+               (restore do_this `finally` tcMPluginsPostTc)
+                 `onException` shutdownTcMPluginsTcM
+                 -- If an uncaught exception escapes TcM, ensure TcM plugins are
+                 -- shut down, because we won't progress to desugaring (which
+                 -- would otherwise be responsible for shutting down plugins).
+             UseRunningTcMPlugins -> do
+               do_this
+             NoTcMPlugins -> do
+               withoutTcMPlugins do_this
+        }
 
-            do_this
-    }
 
 -- | Create an empty 'TcGblEnv'.
 initTcGblEnv :: HscEnv -> HscSource -> Bool -> Module -> RealSrcSpan -> IO TcGblEnv
@@ -313,6 +364,7 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
      ; th_remote_state_var  <- newIORef Nothing
      ; th_docs_var          <- newIORef Map.empty
      ; th_needed_deps_var   <- newIORef ([], emptyUDFM)
+     ; tcm_plugins_var      <- newIORef TcMPluginsUninitialised
      ; next_wrapper_num     <- newIORef emptyModuleEnv
      ; let
         -- bangs to avoid leaking the env (#19356)
@@ -397,10 +449,7 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
           , tcg_safe_infer_reasons  = infer_reasons_var
           , tcg_dependent_files     = dependent_files_var
           , tcg_dependent_dirs      = dependent_dirs_var
-          , tcg_tc_plugin_solvers   = []
-          , tcg_tc_plugin_rewriters = emptyUFM
-          , tcg_defaulting_plugins  = []
-          , tcg_hf_plugins          = []
+          , tcg_plugins             = tcm_plugins_var
           , tcg_top_loc             = loc
           , tcg_complete_matches    = []
           , tcg_cc_st               = cc_st_var
@@ -460,10 +509,14 @@ initTcWithGbl hsc_env gbl_env loc do_this
       ; return (msgs, final_res)
       }
 
-initTcInteractive :: HscEnv -> TcM a -> IO (Messages TcRnMessage, Maybe a)
--- Initialise the type checker monad for use in GHCi
-initTcInteractive hsc_env thing_inside
-  = initTc hsc_env HsSrcFile False
+-- | Initialise the type checker monad for use in GHCi.
+initTcInteractive
+  :: TcMPluginHandling
+  -> HscEnv
+  -> TcM a
+  -> IO (Messages TcRnMessage, Maybe a)
+initTcInteractive tcm_plugin_handling hsc_env thing_inside
+  = initTc tcm_plugin_handling hsc_env HsSrcFile False
            (icInteractiveModule (hsc_IC hsc_env))
            (realSrcLocSpan interactive_src_loc)
            thing_inside
@@ -715,74 +768,210 @@ withIfaceErr ctx do_this = do
 ************************************************************************
 -}
 
--- | Initialise typechecker plugins, run the inner action, then stop
--- the typechecker plugins.
-withTcPlugins :: HscEnv -> TcM a -> TcM a
-withTcPlugins hsc_env m =
-    case catMaybes $ mapPlugins (hsc_plugins hsc_env) tcPlugin of
-       []      -> m  -- Common fast case
-       plugins -> do
-                (solvers, rewriters, stops) <-
-                  unzip3 `fmap` mapM start_plugin plugins
-                let
-                  rewritersUniqFM :: UniqFM TyCon [TcPluginRewriter]
-                  !rewritersUniqFM = sequenceUFMList rewriters
-                -- The following ensures that tcPluginStop is called even if a type
-                -- error occurs during compilation (Fix of #10078)
-                eitherRes <- tryM $
-                  updGblEnv (\e -> e { tcg_tc_plugin_solvers   = solvers
-                                     , tcg_tc_plugin_rewriters = rewritersUniqFM })
-                    m
-                mapM_ runTcPluginM stops
-                case eitherRes of
-                  Left _ -> failM
-                  Right res -> return res
-  where
-  start_plugin (TcPlugin start solve rewrite stop) =
-    do s <- runTcPluginM start
-       return (solve s, rewrite s, stop s)
+-- | Initialise all 'TcM' plugins, run the inner action, then run
+-- both their "post-tc" and "shutdown" actions.
+withTcMPlugins :: HasDebugCallStack => HscEnv -> TcM a -> TcM a
+withTcMPlugins hsc_env thing_inside
+  = do { eitherRes <-
+           -- Using 'bracket_' ensures the plugins are always stopped.
+           bracket_ (initTcMPlugins hsc_env) stopTcMPluginsTcM $
+             tryM thing_inside
+       ; case eitherRes of
+           Left  ex  -> liftIO $ throwIO ex
+           Right res -> return res
+       }
 
--- | Initialise defaulting plugins, run the inner action, then stop
--- the defaulting plugins.
-withDefaultingPlugins :: HscEnv -> TcM a -> TcM a
-withDefaultingPlugins hsc_env m =
-  do case catMaybes $ mapPlugins (hsc_plugins hsc_env) defaultingPlugin of
-       [] -> m  -- Common fast case
-       plugins  -> do (plugins,stops) <- mapAndUnzipM start_plugin plugins
-                      -- This ensures that dePluginStop is called even if a type
-                      -- error occurs during compilation
-                      eitherRes <- tryM $ do
-                        updGblEnv (\e -> e { tcg_defaulting_plugins = plugins })
-                          m
-                      mapM_ runTcPluginM stops
-                      case eitherRes of
-                        Left _ -> failM
-                        Right res -> return res
+-- | Run the inner action without any 'TcM' plugins.
+withoutTcMPlugins :: TcM a -> TcM a
+withoutTcMPlugins thing_inside = do
+  bracket_ setup teardown thing_inside
   where
-  start_plugin (DefaultingPlugin start fill stop) =
-    do s <- runTcPluginM start
-       return (fill s, stop s)
+    setup = do
+      tcg_env <- getGblEnv
+      writeTcRef (tcg_plugins tcg_env) $
+        TcMPluginsRunning emptyRunningTcMPlugins
+    teardown = do
+      tcg_env <- getGblEnv
+      writeTcRef (tcg_plugins tcg_env) TcMPluginsStopped
 
--- | Initialise hole fit plugins, run the inner action, then stop
--- the hole fit plugins.
-withHoleFitPlugins :: HscEnv -> TcM a -> TcM a
-withHoleFitPlugins hsc_env m =
+-- | Initialise 'TcM' plugins.
+initTcMPlugins :: HscEnv -> TcM ()
+initTcMPlugins hsc_env = mask $ \ restore -> do
+  (solvers, rewritersUniqFM, tc_post_tcs, tc_shutdowns) <- restore $ start_tc_plugins hsc_env
+  (defaulters, dflt_post_tcs, dflt_shutdowns) <-
+    restore (start_defaulting_plugins hsc_env)
+      `onException` liftIO (runPluginShutdowns tc_shutdowns)
+  (hf_plugins, hf_stops) <-
+    restore (start_holefit_plugins hsc_env)
+      `onException` liftIO (runPluginShutdowns (tc_shutdowns ++ dflt_shutdowns))
+  let runs =
+        TcMPluginsRun
+          { tcmp_solvers    = solvers
+          , tcmp_rewriters  = rewritersUniqFM
+          , tcmp_defaulters = defaulters
+          , tcmp_hole_fits  = hf_plugins
+          }
+      post_tcs =
+        TcMPluginsPostTc
+           { tcpt_tc_plugins         = tc_post_tcs
+           , tcpt_defaulting_plugins = dflt_post_tcs
+           , tcpt_hole_fit_plugins   = hf_stops
+           }
+      shutdowns =
+        TcMPluginsShutdown
+          { tcps_tc_plugins         = tc_shutdowns
+          , tcps_defaulting_plugins = dflt_shutdowns
+          }
+  set_TcMPlugins_initialised $
+    RunningTcMPlugins runs post_tcs shutdowns
+
+set_TcMPlugins_initialised :: RunningTcMPlugins -> TcM ()
+set_TcMPlugins_initialised plugins = do
+  tcg_env <- getGblEnv
+  writeTcRef (tcg_plugins tcg_env) (TcMPluginsRunning plugins)
+
+-- | Run all plugin shutdown actions, using 'finally' to ensure all run even
+-- if one throws.
+runPluginShutdowns :: [IO ()] -> IO ()
+runPluginShutdowns = foldr finally (return ())
+
+-- | Like 'traverse', but threads accumulated cleanup actions as state,
+-- so that if starting one plugin fails, we run the cleanup actions of
+-- previously started plugins.
+startPluginsWithCleanup
+  :: MonadCatch m
+  => ([c] -> m ())   -- ^ cleanup action
+  -> (a -> m (r, c)) -- ^ start one
+  -> [a]
+  -> m ([r], [c])
+startPluginsWithCleanup runCleanups start xs = do
+  (cs, rs) <- mapAccumLM step [] xs
+  return (rs, reverse cs)
+  where
+    step cs x = do
+      (r, c) <- start x `onException` runCleanups cs
+      return (c : cs, r)
+
+start_tc_plugins :: HscEnv -> TcM ([TcPluginSolver], UniqFM TyCon [TcPluginRewriter], [TcPluginM ()], [IO ()])
+start_tc_plugins hsc_env =
+  case catMaybes $ mapPlugins (hsc_plugins hsc_env) tcPlugin of
+    []      -> return ([], emptyUFM, [], [])
+    plugins -> do
+      (triples, shutdowns) <-
+        startPluginsWithCleanup (liftIO . runPluginShutdowns) start_plugin plugins
+      let (solvers, rewriters, stops) = unzip3 triples
+          !rewritersUniqFM = sequenceUFMList rewriters
+      return (solvers, rewritersUniqFM, stops, shutdowns)
+  where
+    start_plugin (TcPlugin start solve rewrite post_tc shutdown) = do
+      s <- runTcPluginM start
+      return ((solve s, rewrite s, post_tc s), shutdown s)
+
+start_defaulting_plugins :: HscEnv -> TcM ([FillDefaulting], [TcPluginM ()], [IO ()])
+start_defaulting_plugins hsc_env =
+  case catMaybes $ mapPlugins (hsc_plugins hsc_env) defaultingPlugin of
+    []      -> return ([], [], [])
+    plugins -> do
+      (pairs, shutdowns) <-
+        startPluginsWithCleanup (liftIO . runPluginShutdowns) start_plugin plugins
+      let (fillers, post_tcs) = unzip pairs
+      return (fillers, post_tcs, shutdowns)
+  where
+    start_plugin (DefaultingPlugin start fill post_tc shutdown) = do
+      s <- runTcPluginM start
+      return ((fill s, post_tc s), shutdown s)
+
+start_holefit_plugins :: HscEnv -> TcM ([HoleFitPlugin], [TcM ()])
+start_holefit_plugins hsc_env =
   case catMaybes $ mapPlugins (hsc_plugins hsc_env) holeFitPlugin of
-    [] -> m  -- Common fast case
-    plugins -> do (plugins,stops) <- mapAndUnzipM start_plugin plugins
-                  -- This ensures that hfPluginStop is called even if a type
-                  -- error occurs during compilation.
-                  eitherRes <- tryM $
-                    updGblEnv (\e -> e { tcg_hf_plugins = plugins })
-                      m
-                  sequence_ stops
-                  case eitherRes of
-                    Left _ -> failM
-                    Right res -> return res
+    []      -> return ([], [])
+    plugins ->
+      startPluginsWithCleanup sequence_ start_plugin plugins
   where
-    start_plugin (HoleFitPluginR init plugin stop) =
-      do ref <- init
-         return (plugin ref, stop ref)
+    start_plugin (HoleFitPluginR init plugin stop) = do
+      ref <- init
+      return (plugin ref, stop ref)
+
+-- | Run the "post-tc" actions of all 'TcM' plugins, at the end of typechecking.
+tcMPluginsPostTc :: HasDebugCallStack => TcM ()
+tcMPluginsPostTc = do
+  tcm_plugins_ref <- tcg_plugins <$> getGblEnv
+  tcm_plugins <- readTcRef tcm_plugins_ref
+  case tcm_plugins of
+    TcMPluginsUninitialised ->
+      pprPanic "tcMPluginsPostTc" $ text "TcM plugins not initialised"
+    TcMPluginsStopped ->
+      pprPanic "tcMPluginsPostTc" $ text "TcM plugins already stopped"
+    TcMPluginsRunning
+      (RunningTcMPlugins { rtcmp_post_tc = post_tcs }) ->
+        do_post_tcs post_tcs
+  where
+    do_post_tcs (TcMPluginsPostTc tcs defs hfs) = do
+      traverse_ runTcPluginM tcs
+      traverse_ runTcPluginM defs
+      sequence_ hfs
+
+-- | Runs both the "post-tc" and "shutdown" actions of all 'TcM' plugins.
+stopTcMPluginsTcM :: TcM ()
+stopTcMPluginsTcM =
+  tcMPluginsPostTc `finally` shutdownTcMPluginsTcM
+
+-- | Runs the "shutdown" actions of all 'TcM' plugins.
+shutdownTcMPluginsTcM :: TcM ()
+shutdownTcMPluginsTcM = mask_ $ do
+  tcg_env <- getGblEnv
+  tcm_plugins_ref <- tcg_plugins <$> getGblEnv
+  tcm_plugins <- readTcRef tcm_plugins_ref
+  liftIO $ shutdownTcMPlugins tcm_plugins
+  writeTcRef (tcg_plugins tcg_env) TcMPluginsStopped
+
+shutdownTcMPluginsIO :: TcRef TcMPluginsState -> IO ()
+shutdownTcMPluginsIO plugins_ref = mask_ $ do
+  tcm_plugins <- readTcRef plugins_ref
+  shutdownTcMPlugins tcm_plugins
+  writeIORef plugins_ref TcMPluginsStopped
+
+-- | Shutdown all 'TcM' plugins.
+--
+-- Precondition: async exceptions are masked.
+shutdownTcMPlugins :: TcMPluginsState -> IO ()
+shutdownTcMPlugins = \case
+  TcMPluginsUninitialised -> return ()
+  TcMPluginsStopped -> return ()
+  TcMPluginsRunning
+    (RunningTcMPlugins { rtcmp_shutdown = stops }) ->
+      do_stop stops
+  where
+    do_stop (TcMPluginsShutdown tcs defs) =
+      runPluginShutdowns (tcs ++ defs)
+
+solverTcMPlugins :: HasDebugCallStack => TcMPluginsState -> [TcPluginSolver]
+solverTcMPlugins = \case
+  TcMPluginsUninitialised -> panic "solverTcMPlugins: TcM plugins not started"
+  TcMPluginsStopped -> panic "solverTcMPlugins: TcM plugins already stopped"
+  TcMPluginsRunning plugins ->
+    tcmp_solvers (tcMPluginsRunActions plugins)
+
+rewriterTcMPlugins :: HasDebugCallStack => TcMPluginsState -> UniqFM TyCon [TcPluginRewriter]
+rewriterTcMPlugins = \case
+  TcMPluginsUninitialised -> panic "rewriterTcMPlugins: TcM plugins not started"
+  TcMPluginsStopped -> panic "rewriterTcMPlugins: TcM plugins already stopped"
+  TcMPluginsRunning plugins ->
+    tcmp_rewriters (tcMPluginsRunActions plugins)
+
+defaultingTcMPlugins :: HasDebugCallStack => TcMPluginsState -> [FillDefaulting]
+defaultingTcMPlugins = \case
+  TcMPluginsUninitialised -> panic "defaultingTcMPlugins: TcM plugins not started"
+  TcMPluginsStopped -> panic "defaultingTcMPlugins: TcM plugins already stopped"
+  TcMPluginsRunning plugins ->
+    tcmp_defaulters (tcMPluginsRunActions plugins)
+
+holeFitTcMPlugins :: HasDebugCallStack => TcMPluginsState -> [HoleFitPlugin]
+holeFitTcMPlugins = \case
+  TcMPluginsUninitialised -> panic "holeFitTcMPlugins: TcM plugins not started"
+  TcMPluginsStopped -> panic "holeFitTcMPlugins: TcM plugins already stopped"
+  TcMPluginsRunning plugins ->
+    tcmp_hole_fits (tcMPluginsRunActions plugins)
 
 {-
 ************************************************************************

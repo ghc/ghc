@@ -29,7 +29,7 @@ main = do
                         load LoadAllTargets
                         modSum <- getModSummary m
                         p <- parseModule modSum
-                        t <- typecheckModule p
+                        t <- typecheckModule StartAndKeepRunningTcMPlugins p
                         d <- desugarModule t
                         let ts=typecheckedSource d
 --                        liftIO (putStr (showSDocDebug (ppr ts)))

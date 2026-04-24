@@ -565,7 +565,7 @@ runTR hsc_env thing = do
 
 runTR_maybe :: HscEnv -> TR a -> IO (Maybe a)
 runTR_maybe hsc_env thing_inside
-  = do { (_errs, res) <- initTcInteractive hsc_env thing_inside
+  = do { (_errs, res) <- initTcInteractive StartAndStopTcMPlugins hsc_env thing_inside
        ; return res }
 
 -- | Term Reconstruction trace

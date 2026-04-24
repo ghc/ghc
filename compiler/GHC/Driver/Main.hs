@@ -273,6 +273,7 @@ import Data.List ( nub, isPrefixOf, partition )
 import qualified Data.List.NonEmpty as NE
 import Data.Traversable (for)
 import Control.Monad
+import Control.Exception (finally, mask_)
 import Data.IORef
 import System.FilePath as FilePath
 import System.Directory
@@ -639,33 +640,48 @@ extract_renamed_stuff mod_summary tc_result = do
 
 -- -----------------------------------------------------------------------------
 -- | Rename and typecheck a module, additionally returning the renamed syntax
-hscTypecheckRename :: HscEnv -> ModSummary -> HsParsedModule
+hscTypecheckRename :: HscEnv -> ModSummary -> TcMPluginHandling -> HsParsedModule
                    -> IO (TcGblEnv, RenamedStuff)
-hscTypecheckRename hsc_env mod_summary rdr_module =
-    fst <$> hscTypecheckRenameWithDiagnostics hsc_env mod_summary rdr_module
+hscTypecheckRename hsc_env mod_summary tcm_plugin_handling rdr_module =
+    fst <$> hscTypecheckRenameWithDiagnostics hsc_env mod_summary tcm_plugin_handling rdr_module
 
 -- | Rename and typecheck a module, additionally returning the renamed syntax
 -- and the diagnostics produced.
-hscTypecheckRenameWithDiagnostics :: HscEnv -> ModSummary -> HsParsedModule
-                                  -> IO ((TcGblEnv, RenamedStuff), Messages GhcMessage)
-hscTypecheckRenameWithDiagnostics hsc_env mod_summary rdr_module = runHsc' hsc_env $
-    hsc_typecheck True mod_summary (Just rdr_module)
+hscTypecheckRenameWithDiagnostics
+  :: HscEnv -> ModSummary -> TcMPluginHandling -> HsParsedModule
+  -> IO ((TcGblEnv, RenamedStuff), Messages GhcMessage)
+hscTypecheckRenameWithDiagnostics hsc_env mod_summary tcm_plugin_handling rdr_module
+  = runHsc' hsc_env $
+      hsc_typecheck tc_rn_opts mod_summary (Just rdr_module)
+  where
+    tc_rn_opts =
+      TcRnModuleOptions
+        { tcRnModuleKeepRenamedSyntax = True
+        , tcRnModuleTcMPluginHandling = tcm_plugin_handling
+        }
 
 -- | Do Typechecking without throwing SourceError exception with -Werror
-hscTypecheckAndGetWarnings :: HscEnv ->  ModSummary -> IO (FrontendResult, WarningMessages)
-hscTypecheckAndGetWarnings hsc_env summary = runHsc' hsc_env $ do
-  case hscFrontendHook (hsc_hooks hsc_env) of
-    Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False summary Nothing
-    Just h  -> h summary
+hscTypecheckAndGetWarnings :: HscEnv -> ModSummary -> TcMPluginHandling -> IO (FrontendResult, WarningMessages)
+hscTypecheckAndGetWarnings hsc_env summary tcm_plugin_handling =
+  runHsc' hsc_env $ do
+    case hscFrontendHook (hsc_hooks hsc_env) of
+      Nothing -> FrontendTypecheck . fst <$> hsc_typecheck tc_rn_opts summary Nothing
+      Just h  -> h summary
+  where
+    tc_rn_opts =
+      TcRnModuleOptions
+        { tcRnModuleKeepRenamedSyntax = False
+        , tcRnModuleTcMPluginHandling = tcm_plugin_handling
+        }
 
 -- | A bunch of logic piled around @tcRnModule'@, concerning a) backpack
 -- b) concerning dumping rename info and hie files. It would be nice to further
 -- separate this stuff out, probably in conjunction better separating renaming
 -- and type checking (#17781).
-hsc_typecheck :: Bool -- ^ Keep renamed source?
+hsc_typecheck :: TcRnModuleOptions
               -> ModSummary -> Maybe HsParsedModule
               -> Hsc (TcGblEnv, RenamedStuff)
-hsc_typecheck keep_rn mod_summary mb_rdr_module = do
+hsc_typecheck tc_rn_opts mod_summary mb_rdr_module = do
     hsc_env <- getHscEnv
     let hsc_src = ms_hsc_src mod_summary
         dflags = hsc_dflags hsc_env
@@ -676,7 +692,11 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
         inner_mod = homeModuleNameInstantiation home_unit mod_name
         src_filename  = ms_hspp_file mod_summary
         real_loc = realSrcLocSpan $ mkRealSrcLoc (mkFastString src_filename) 1 1
-        keep_rn' = gopt Opt_WriteHie dflags || keep_rn
+        tc_rn_opts' =
+          tc_rn_opts
+            { tcRnModuleKeepRenamedSyntax =
+                gopt Opt_WriteHie dflags || tcRnModuleKeepRenamedSyntax tc_rn_opts
+            }
     massert (isHomeModule home_unit outer_mod)
     tc_result <- if hsc_src == HsigFile && not (isHoleModule inner_mod)
         then ioMsgMaybe $ hoistTcRnMessage $ tcRnInstantiateSignature hsc_env outer_mod' real_loc
@@ -684,7 +704,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
          do hpm <- case mb_rdr_module of
                     Just hpm -> return hpm
                     Nothing -> hscParse' mod_summary
-            tc_result0 <- tcRnModule' mod_summary keep_rn' hpm
+            tc_result0 <- tcRnModule' mod_summary tc_rn_opts' hpm
             if hsc_src == HsigFile
                 then do (iface, _) <- liftIO $ hscSimpleIface hsc_env Nothing tc_result0 mod_summary
                         ioMsgMaybe $ hoistTcRnMessage $
@@ -696,9 +716,11 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
     return (tc_result, rn_info)
 
 -- wrapper around tcRnModule to handle safe haskell extras
-tcRnModule' :: ModSummary -> Bool -> HsParsedModule
+tcRnModule' :: ModSummary
+            -> TcRnModuleOptions
+            -> HsParsedModule
             -> Hsc TcGblEnv
-tcRnModule' sum save_rn_syntax mod = do
+tcRnModule' sum tc_rn_opts mod = do
     hsc_env <- getHscEnv
     dflags  <- getDynFlags
 
@@ -712,8 +734,7 @@ tcRnModule' sum save_rn_syntax mod = do
 
     tcg_res <- {-# SCC "Typecheck-Rename" #-}
                ioMsgMaybe $ hoistTcRnMessage $
-                   tcRnModule hsc_env sum
-                     save_rn_syntax mod
+                   tcRnModule hsc_env sum tc_rn_opts mod
 
     -- See Note [Safe Haskell Overlapping Instances Implementation]
     -- although this is used for more than just that failure case.
@@ -753,10 +774,15 @@ hscDesugar hsc_env mod_summary tc_result =
 
 hscDesugar' :: ModLocation -> TcGblEnv -> Hsc ModGuts
 hscDesugar' mod_location tc_result = do
+    let !tcm_plugins_ref = tcg_plugins tc_result
     hsc_env <- getHscEnv
     ioMsgMaybe $ hoistDsMessage $
-      {-# SCC "deSugar" #-}
-      deSugar hsc_env mod_location tc_result
+      ({-# SCC "deSugar" #-}
+       deSugar hsc_env mod_location tc_result)
+        `finally` shutdownTcMPluginsIO tcm_plugins_ref
+          -- See Note [Stop TcM plugins after desugaring]
+          -- Using 'finally' ensures we stop the plugins even when
+          -- an exception is thrown.
 
 -- | Make a 'ModDetails' from the results of typechecking. Used when
 -- typechecking only, as opposed to full compilation.
@@ -1260,6 +1286,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
       hsc_src = ms_hsc_src summary
       diag_opts = initDiagOpts dflags
       print_config = initPrintConfig dflags
+      !tcm_plugins_ref = tcg_plugins tc_result
 
   -- Desugar, if appropriate
   --
@@ -1267,15 +1294,23 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
   -- would miss errors thrown by the desugaring (see #10600). The only
   -- exception is when it is not a HsSrcFile module.
   mb_desugar <- if
-    | hsc_src /= HsSrcFile       -> pure Nothing
+    | hsc_src /= HsSrcFile -> do
+      -- 'hscDesugar' stops 'TcM' plugins. If we are skipping desugaring,
+      -- then we need to stop them manually. See Note [Stop TcM plugins after desugaring]
+      liftIO $ mask_ $ shutdownTcMPluginsIO tcm_plugins_ref
+      pure Nothing
+
     -- Desugar an empty ghc-prim:GHC.Prim module by filtering out all its
     -- bindings: the reason is that some of them are invalid (such as top-level
     -- unlifted ones like void# or proxy#) and cause HsToCore failures.
     --
     -- We still need to desugar *something* because the driver and the linkers
     -- expect a valid object file (.o) to be generated for this module.
-    | ms_mod summary == gHC_PRIM -> Just <$> hscDesugar' (ms_location summary) (tc_result { tcg_binds = [] })
-    | otherwise                  -> Just <$> hscDesugar' (ms_location summary) tc_result
+    | ms_mod summary == gHC_PRIM
+    -> Just <$> hscDesugar' (ms_location summary) (tc_result { tcg_binds = [] })
+
+    | otherwise
+    -> Just <$> hscDesugar' (ms_location summary) tc_result
 
   -- Report the warnings from both typechecking and desugar together
   w <- getDiagnostics
@@ -1340,6 +1375,25 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
         if ms_mod summary == gHC_PRIM
           then return $ HscUpdate (getGhcPrimIface (hsc_hooks hsc_env))
           else return $ HscUpdate iface
+
+{- Note [Stop TcM plugins after desugaring]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We keep TcM plugins running during desugaring, so that:
+
+  1. The pattern-match checker includes them when it invokes the typechecker,
+     as per 'initTcDsForSolver' (#26395).
+  2. We don't repeatedly re-initialise them (#26839).
+
+We achieve this by:
+
+  - initialising them a single time before typechecking;
+  - storing them in the 'ds_tcm_plugins' field of 'DsGblEnv', so that they can
+    be run when the desugarer invokes the typechecker, without having to be
+    re-initialised;
+  - stopping them after desugaring (see 'hscDesugar'), or, if we aren't
+    desugaring, after typechecking (see 'hscDesugarAndSimplify').
+    See calls to 'shutdownTcMPluginsIO'.
+-}
 
 {-
 Note [Writing interface files]
@@ -2529,29 +2583,28 @@ hscParseDeclsWithLocation hsc_env source line_num str = do
 hscParsedDecls :: HscEnv -> [LHsDecl GhcPs] -> IO ([TyThing], InteractiveContext)
 hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     hsc_env <- getHscEnv
-    let interp = hscInterp hsc_env
+    let
+      interp = hscInterp hsc_env
+      -- We use a basically null location for iNTERACTIVE
+      iNTERACTIVELoc = OsPathModLocation
+          { ml_hs_file_ospath   = Nothing,
+            ml_hi_file_ospath   = panic "hsDeclsWithLocation:ml_hi_file_ospath",
+            ml_obj_file_ospath  = panic "hsDeclsWithLocation:ml_obj_file_ospath",
+            ml_dyn_obj_file_ospath = panic "hsDeclsWithLocation:ml_dyn_obj_file_ospath",
+            ml_dyn_hi_file_ospath = panic "hsDeclsWithLocation:ml_dyn_hi_file_ospath",
+            ml_hie_file_ospath  = panic "hsDeclsWithLocation:ml_hie_file_ospath",
+            ml_bytecode_file_ospath = panic "hsDeclsWithLocation:ml_bytecode_file_ospath"
+            }
 
     {- Rename and typecheck it -}
     tc_gblenv <- ioMsgMaybe $ hoistTcRnMessage $ tcRnDeclsi hsc_env decls
-
-    {- Grab the new instances -}
-    -- We grab the whole environment because of the overlapping that may have
-    -- been done. See the notes at the definition of InteractiveContext
-    -- (ic_instances) for more details.
-    let defaults = tcg_default tc_gblenv
+      -- NB: 'tcRnDeclsi' keeps 'TcM' plugins running, so that the desugarer can invoke them.
+      -- See Note [Stop TcM plugins after desugaring].
 
     {- Desugar it -}
-    -- We use a basically null location for iNTERACTIVE
-    let iNTERACTIVELoc = OsPathModLocation
-            { ml_hs_file_ospath   = Nothing,
-              ml_hi_file_ospath   = panic "hsDeclsWithLocation:ml_hi_file_ospath",
-              ml_obj_file_ospath  = panic "hsDeclsWithLocation:ml_obj_file_ospath",
-              ml_dyn_obj_file_ospath = panic "hsDeclsWithLocation:ml_dyn_obj_file_ospath",
-              ml_dyn_hi_file_ospath = panic "hsDeclsWithLocation:ml_dyn_hi_file_ospath",
-              ml_hie_file_ospath  = panic "hsDeclsWithLocation:ml_hie_file_ospath",
-              ml_bytecode_file_ospath = panic "hsDeclsWithLocation:ml_bytecode_file_ospath"
-              }
     ds_result <- hscDesugar' iNTERACTIVELoc tc_gblenv
+      -- 'TcM' plugins are stopped at the end of 'hscDesugar'.
+      -- See Note [Stop TcM plugins after desugaring].
 
     {- Simplify -}
     simpl_mg <- liftIO $ do
@@ -2595,6 +2648,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
         ictxt        = hsc_IC hsc_env
         -- See Note [Fixity declarations in GHCi]
         fix_env      = tcg_fix_env tc_gblenv
+        defaults     = tcg_default tc_gblenv
         new_ictxt    = extendInteractiveContext ictxt new_tythings cls_insts
                                                 fam_insts defaults fix_env
     return (new_tythings, new_ictxt)

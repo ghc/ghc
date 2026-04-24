@@ -36,5 +36,6 @@ optCallCount opts = Just $
             return $ TcPluginOk [] []
 
         , tcPluginRewrite = \ _ -> emptyUFM
-        , tcPluginStop = const $ return ()
+        , tcPluginPostTc   = \ _ -> pure ()
+        , tcPluginShutdown = \ _ -> pure ()
         }

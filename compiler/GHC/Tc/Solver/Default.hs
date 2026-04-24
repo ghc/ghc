@@ -1008,7 +1008,8 @@ applyDefaultingRules wanteds
        ; wanteds                       <- TcS.zonkWC wanteds
 
        ; tcg_env <- TcS.getGblEnv
-       ; let plugins = tcg_defaulting_plugins tcg_env
+       ; tcm_plugins <- TcS.readTcRef (tcg_plugins tcg_env)
+       ; let plugins = defaultingTcMPlugins tcm_plugins
              default_tys = defaultList default_env
              -- see Note [Named default declarations] in GHC.Tc.Gen.Default
 

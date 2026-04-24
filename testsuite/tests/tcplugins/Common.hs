@@ -105,10 +105,11 @@ mkTcPlugin :: ( PluginDefs -> EvBindsVar -> [Ct] -> [Ct] -> TcPluginM TcPluginSo
            -> TcPlugin
 mkTcPlugin solve rewrite =
   TcPlugin
-    { tcPluginInit    = lookupDefs
-    , tcPluginSolve   = solve
-    , tcPluginRewrite = rewrite
-    , tcPluginStop    = \ _ -> pure ()
+    { tcPluginInit     = lookupDefs
+    , tcPluginSolve    = solve
+    , tcPluginRewrite  = rewrite
+    , tcPluginPostTc   = \ _ -> pure ()
+    , tcPluginShutdown = \ _ -> pure ()
     }
 
 don'tSolve :: [String] -> s -> EvBindsVar -> [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult

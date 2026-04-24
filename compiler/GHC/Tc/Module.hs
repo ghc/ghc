@@ -23,11 +23,10 @@ module GHC.Tc.Module (
         tcRnDeclsi,
         isGHCiMonad,
         runTcInteractive,    -- Used by GHC API clients (#8878)
-        withTcPlugins,       -- Used by GHC API clients (#20499)
-        withHoleFitPlugins,  -- Used by GHC API clients (#20499)
-        withDefaultingPlugins,
+        withTcMPlugins,      -- Used by GHC API clients (#20499)
         tcRnLookupName,
         tcRnGetInfo,
+        TcRnModuleOptions(..),
         tcRnModule, tcRnModuleTcRnM,
         tcTopSrcDecls,
         rnTopSrcDecls,
@@ -187,8 +186,6 @@ import Data.Foldable ( for_ )
 import Data.Traversable ( for )
 import Data.IORef( newIORef )
 
-
-
 {-
 ************************************************************************
 *                                                                      *
@@ -197,20 +194,37 @@ import Data.IORef( newIORef )
 ************************************************************************
 -}
 
--- | Top level entry point for typechecker and renamer
+-- | Options for typechecking a module
+data TcRnModuleOptions
+  = TcRnModuleOptions
+  { tcRnModuleKeepRenamedSyntax :: Bool
+     -- ^ keep renamed syntax?
+  , tcRnModuleTcMPluginHandling :: TcMPluginHandling
+     -- ^ how to handle 'TcM' monad plugins; see 'TcMPluginHandling'
+     --
+     -- If you want to proceed to desugaring, pass 'StartAndKeepRunningTcMPlugins'
+     -- to keep the plugins running for pattern-match checking. The desugarer
+     -- will shut the plugins down.
+     --
+     -- If you do not want to proceed to desugaring, use 'StartAndStopTcMPlugins'.
+  }
+
+-- | Top level entry point for renaming and typechecking a single module.
 tcRnModule :: HscEnv
            -> ModSummary
-           -> Bool              -- True <=> save renamed syntax
+           -> TcRnModuleOptions
            -> HsParsedModule
            -> IO (Messages TcRnMessage, Maybe TcGblEnv)
-
-tcRnModule hsc_env mod_sum save_rn_syntax
+tcRnModule hsc_env mod_sum
+   TcRnModuleOptions
+     { tcRnModuleKeepRenamedSyntax = save_rn_syntax
+     , tcRnModuleTcMPluginHandling = tcm_plugin_handling }
    parsedModule@HsParsedModule {hpm_module= L loc this_module}
  | RealSrcSpan real_loc _ <- loc
  = withTiming logger
               (text "Renamer/typechecker"<+>brackets (ppr this_mod))
               (const ()) $
-   initTc hsc_env hsc_src save_rn_syntax this_mod real_loc $
+   initTc tcm_plugin_handling hsc_env hsc_src save_rn_syntax this_mod real_loc $
           tcRnModuleTcRnM hsc_env mod_sum parsedModule this_mod
 
   | otherwise
@@ -2107,13 +2121,15 @@ withInteractiveModuleNode hsc_env thing_inside = do
   mg <- liftIO $ downsweepInteractiveImports hsc_env (hsc_IC hsc_env)
   updTopEnv (setModuleGraph mg) thing_inside
 
-
-runTcInteractive :: HscEnv -> TcRn a -> IO (Messages TcRnMessage, Maybe a)
--- Initialise the tcg_inst_env with instances from all home modules.
+runTcInteractive
+  :: TcMPluginHandling
+  -> HscEnv
+  -> TcRn a
+  -> IO (Messages TcRnMessage, Maybe a)
+-- ^ Initialise the tcg_inst_env with instances from all home modules.
 -- This mimics the more selective call to hptInstances in tcRnImports
-runTcInteractive hsc_env thing_inside
-  = initTcInteractive hsc_env $ withTcPlugins hsc_env $
-    withDefaultingPlugins hsc_env $ withHoleFitPlugins hsc_env $
+runTcInteractive tcm_plugin_handling hsc_env thing_inside
+  = initTcInteractive tcm_plugin_handling hsc_env $
     withInteractiveModuleNode hsc_env $
     do { traceTc "setInteractiveContext" $
             vcat [ text "ic_tythings:" <+> vcat (map ppr (ic_tythings icxt))
@@ -2163,8 +2179,8 @@ runTcInteractive hsc_env thing_inside
 
        ; updEnvs upd_envs thing_inside }
   where
-    icxt                     = hsc_IC hsc_env
-    (ic_insts, ic_finsts)    = ic_instances icxt
+    icxt = hsc_IC hsc_env
+    (ic_insts, ic_finsts) = ic_instances icxt
     (lcl_ids, top_ty_things) = partitionWith is_closed (ic_tythings icxt)
 
     is_closed :: TyThing -> Either (Name, TcTyThing) TyThing
@@ -2221,7 +2237,10 @@ We don't bother with the tcl_th_bndrs environment either.
 tcRnStmt :: HscEnv -> GhciLStmt GhcPs
          -> IO (Messages TcRnMessage, Maybe ([Id], LHsExpr GhcTc, FixityEnv))
 tcRnStmt hsc_env rdr_stmt
-  = runTcInteractive hsc_env $ do {
+  = runTcInteractive StartAndStopTcMPlugins hsc_env $ do {
+    -- Don't bother to keep TcM plugins running, as the consumer of
+    -- the output of 'tcRnStmt' is 'deSugarExpr' which has no need to
+    -- invoke 'TcM' plugins, unlike Note [Stop TcM plugins after desugaring] in GHC.Driver.Main.
 
     -- The real work is done here
     ((bound_ids, tc_expr), fix_env) <- tcUserStmt rdr_stmt ;
@@ -2593,7 +2612,7 @@ getGhciStepIO = do
 
 isGHCiMonad :: HscEnv -> String -> IO (Messages TcRnMessage, Maybe Name)
 isGHCiMonad hsc_env ty
-  = runTcInteractive hsc_env $ do
+  = runTcInteractive NoTcMPlugins hsc_env $ do
         rdrEnv <- getGlobalRdrEnv
         let occIO = lookupOccEnv rdrEnv (mkOccName tcName ty)
         case occIO of
@@ -2618,7 +2637,7 @@ tcRnExpr :: HscEnv
          -> LHsExpr GhcPs
          -> IO (Messages TcRnMessage, Maybe Type)
 tcRnExpr hsc_env mode rdr_expr
-  = runTcInteractive hsc_env $
+  = runTcInteractive StartAndStopTcMPlugins hsc_env $
     do {
 
     (rn_expr, _fvs) <- rnLExpr rdr_expr ;
@@ -2713,7 +2732,7 @@ tcRnImportDecls :: HscEnv
 -- Find the new chunk of GlobalRdrEnv created by this list of import
 -- decls.  In contract tcRnImports *extends* the TcGblEnv.
 tcRnImportDecls hsc_env import_decls
- =  runTcInteractive hsc_env $
+ =  runTcInteractive NoTcMPlugins hsc_env $
     do { (_, gbl_env) <- updGblEnv zap_rdr_env $
                          tcRnImports hsc_env $ map (,text "is directly imported") import_decls
        ; return (tcg_rdr_env gbl_env) }
@@ -2737,7 +2756,7 @@ tcRnType :: HscEnv
          -> LHsType GhcPs
          -> IO (Messages TcRnMessage, Maybe (Type, Kind))
 tcRnType hsc_env flexi normalise rdr_type
-  = runTcInteractive hsc_env $
+  = runTcInteractive StartAndStopTcMPlugins hsc_env $
     setXOptM LangExt.PolyKinds $   -- See Note [Kind-generalise in tcRnType]
     do { (HsWC { hswc_ext = wcs, hswc_body = rn_sig_type@(L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body })) }, _fvs)
                  -- we are using 'rnHsSigWcType' to bind the unbound type variables
@@ -2878,7 +2897,11 @@ tcRnDeclsi :: HscEnv
            -> [LHsDecl GhcPs]
            -> IO (Messages TcRnMessage, Maybe TcGblEnv)
 tcRnDeclsi hsc_env local_decls
-  = runTcInteractive hsc_env $
+  -- Keep 'TcM' plugins running, so that the desugarer can invoke them
+  -- without having to re-initialise them.
+  --
+  -- See Note [Stop TcM plugins after desugaring] in GHC.Driver.Main.
+  = runTcInteractive StartAndKeepRunningTcMPlugins hsc_env $
     tcRnSrcDecls False Nothing local_decls
 
 externaliseAndTidyId :: Module -> Id -> TcM Id
@@ -2903,15 +2926,15 @@ externaliseAndTidyId this_mod id
 -- could not be found.
 getModuleInterface :: HscEnv -> Module -> IO (Messages TcRnMessage, Maybe ModIface)
 getModuleInterface hsc_env mod
-  = runTcInteractive hsc_env $
+  = runTcInteractive NoTcMPlugins hsc_env $
     loadModuleInterface (text "getModuleInterface") mod
 
 tcRnLookupRdrName :: HscEnv -> LocatedN RdrName
                   -> IO (Messages TcRnMessage, Maybe [Name])
 -- ^ Find all the Names that this RdrName could mean, in GHCi
 tcRnLookupRdrName hsc_env (L loc rdr_name)
-  = runTcInteractive hsc_env $
-    setSrcSpanA loc          $
+  = runTcInteractive NoTcMPlugins hsc_env $
+    setSrcSpanA loc $
     do {   -- If the identifier is a constructor (begins with an
            -- upper-case letter), then we need to consider both
            -- constructor and type class identifiers.
@@ -2923,7 +2946,7 @@ tcRnLookupRdrName hsc_env (L loc rdr_name)
 
 tcRnLookupName :: HscEnv -> Name -> IO (Messages TcRnMessage, Maybe TyThing)
 tcRnLookupName hsc_env name
-  = runTcInteractive hsc_env $
+  = runTcInteractive NoTcMPlugins hsc_env $
     tcRnLookupName' name
 
 -- To look up a name we have to look in the local environment (tcl_lcl)
@@ -2951,7 +2974,7 @@ tcRnGetInfo :: HscEnv
 --  *and* as a type or class constructor;
 -- hence the call to dataTcOccs, and we return up to two results
 tcRnGetInfo hsc_env name
-  = runTcInteractive hsc_env $
+  = runTcInteractive NoTcMPlugins hsc_env $
     do { loadUnqualIfaces hsc_env (hsc_IC hsc_env)
            -- Load the interface for all unqualified types and classes
            -- That way we will find all the instance declarations

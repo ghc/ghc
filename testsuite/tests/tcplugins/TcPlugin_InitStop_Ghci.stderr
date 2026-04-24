@@ -1,0 +1,8 @@
+TcPlugin_InitStop_Ghci.hs:7:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘f’: Patterns of type ‘Bool’ not matched: False
+
+TcPlugin_InitStop_Ghci.hs:10:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘g’: Patterns of type ‘Bool’ not matched: True
+

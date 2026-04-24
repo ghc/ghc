@@ -29,6 +29,12 @@ data TPhase res where
   T_Cpp   :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
   T_HsPp  :: PipeEnv -> HscEnv -> FilePath -> FilePath -> TPhase FilePath
   T_HscRecomp :: PipeEnv -> HscEnv -> FilePath -> HscSource -> TPhase (HscEnv, ModSummary, HscRecompStatus)
+
+  -- | Parse\/rename\/typecheck compilation phase.
+  --
+  -- NB: the consumer of the returned 'FrontendResult' is responsible for
+  -- shutting down all 'TcM' plugins (e.g. by calling 'shutdownTcMPluginsIO').
+  -- In particular, the 'HscPostTc' phase shuts down 'TcM' plugins.
   T_Hsc :: HscEnv -> ModSummary -> TPhase (FrontendResult, Messages GhcMessage)
   T_HscPostTc :: HscEnv -> ModSummary
               -> FrontendResult

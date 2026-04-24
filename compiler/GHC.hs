@@ -63,6 +63,7 @@ module GHC (
         SuccessFlag(..), succeeded, failed,
         defaultWarnErrLogger, WarnErrLogger,
         workingDirectoryChanged,
+        TcMPluginHandling(..),
         parseModule, typecheckModule, desugarModule,
         ParsedModule(..), TypecheckedModule(..), DesugaredModule(..),
         TypecheckedSource, ParsedSource, RenamedSource,   -- ditto
@@ -384,7 +385,10 @@ import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Rename.Names (renamePkgQual, renameRawPkgQual)
 
-import GHC.Tc.Utils.Monad    ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
+import GHC.Tc.Utils.Monad
+  ( TcMPluginHandling(..)
+  , finalSafeMode, fixSafeInstances, initIfaceTcRn, shutdownTcMPluginsIO
+  )
 import GHC.Tc.Types
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Module
@@ -1347,8 +1351,8 @@ parseModule ms = do
 -- | Typecheck and rename a parsed module.
 --
 -- Throws a 'SourceError' if either fails.
-typecheckModule :: GhcMonad m => ParsedModule -> m TypecheckedModule
-typecheckModule pmod = do
+typecheckModule :: GhcMonad m => TcMPluginHandling -> ParsedModule -> m TypecheckedModule
+typecheckModule tcm_plugin_handling pmod = do
  hsc_env <- getSession
 
  liftIO $ do
@@ -1358,9 +1362,10 @@ typecheckModule pmod = do
           hscSetFlags lcl_dflags $
           hscSetActiveUnitId (toUnitId $ moduleUnit $ ms_mod ms) hsc_env
    let lcl_logger  = hsc_logger lcl_hsc_env
-   (tc_gbl_env, rn_info) <- hscTypecheckRename lcl_hsc_env ms $
-                        HsParsedModule { hpm_module = parsedSource pmod,
-                                         hpm_src_files = pm_extra_src_files pmod }
+   (tc_gbl_env, rn_info) <-
+     hscTypecheckRename lcl_hsc_env ms tcm_plugin_handling $
+        HsParsedModule { hpm_module = parsedSource pmod
+                       , hpm_src_files = pm_extra_src_files pmod }
    details <- makeSimpleDetails lcl_logger tc_gbl_env
    safe    <- finalSafeMode lcl_dflags tc_gbl_env
 
@@ -1382,20 +1387,22 @@ typecheckModule pmod = do
 
 -- | Desugar a typechecked module.
 desugarModule :: GhcMonad m => TypecheckedModule -> m DesugaredModule
-desugarModule tcm = do
- hsc_env <- getSession
- liftIO $ do
-   let ms = modSummary tcm
-   let (tcg, _) = tm_internals tcm
-   let lcl_hsc_env = hscSetFlags (ms_hspp_opts ms) hsc_env
-   guts <- hscDesugar lcl_hsc_env ms tcg
-   return $
-     DesugaredModule {
-       dm_typechecked_module = tcm,
-       dm_core_module        = guts
-     }
-
-
+desugarModule tcm = do_desugar `MC.onException` (liftIO $ shutdownTcMPluginsIO tcm_plugins_ref)
+  where
+    (tc_gbl, _) = tm_internals_ tcm
+    tcm_plugins_ref = tcg_plugins tc_gbl
+    do_desugar = do
+      hsc_env <- getSession
+      liftIO $ do
+        let ms = modSummary tcm
+        let (tcg, _) = tm_internals tcm
+        let lcl_hsc_env = hscSetFlags (ms_hspp_opts ms) hsc_env
+        guts <- hscDesugar lcl_hsc_env ms tcg
+        return $
+          DesugaredModule {
+            dm_typechecked_module = tcm,
+            dm_core_module        = guts
+          }
 
 -- %************************************************************************
 -- %*                                                                      *
@@ -1449,9 +1456,11 @@ compileCore simplify fn = do
        -- Now we have the module name;
        -- parse, typecheck and desugar the module
        (tcg, mod_guts) <- -- TODO: space leaky: call hsc* directly?
-         do tm <- typecheckModule =<< parseModule modSummary
-            let tcg = fst (tm_internals tm)
-            (,) tcg . coreModule <$> desugarModule tm
+         MC.mask $ \ restore ->
+           do pm <- restore $ parseModule modSummary
+              tm <- restore $ typecheckModule StartAndKeepRunningTcMPlugins pm
+              let tcg = fst (tm_internals tm)
+              (,) tcg . coreModule <$> restore (desugarModule tm)
        liftM (gutsToCoreModule (mg_safe_haskell mod_guts)) $
          if simplify
           then do
@@ -1519,7 +1528,7 @@ getNameToInstancesIndex :: GhcMonad m
   -> m (Messages TcRnMessage, Maybe (NameEnv ([ClsInst], [FamInst])))
 getNameToInstancesIndex visible_mods mods_to_load = do
   hsc_env <- getSession
-  liftIO $ runTcInteractive hsc_env $
+  liftIO $ runTcInteractive NoTcMPlugins hsc_env $
     do { case mods_to_load of
            Nothing -> loadUnqualIfaces hsc_env (hsc_IC hsc_env)
            Just mods ->

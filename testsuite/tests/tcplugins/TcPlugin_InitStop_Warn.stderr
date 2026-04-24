@@ -1,0 +1,13 @@
+[1 of 2] Compiling TcPlugin_InitStop_Plugin ( TcPlugin_InitStop_Plugin.hs, TcPlugin_InitStop_Plugin.o )
+[2 of 2] Compiling TcPlugin_InitStop_Warn ( TcPlugin_InitStop_Warn.hs, TcPlugin_InitStop_Warn.o )
+Plugin starting for module TcPlugin_InitStop_Warn
+Plugin post-tc for module TcPlugin_InitStop_Warn
+Plugin shutdown for module TcPlugin_InitStop_Warn
+TcPlugin_InitStop_Warn.hs:7:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘f’: Patterns of type ‘Bool’ not matched: False
+
+TcPlugin_InitStop_Warn.hs:10:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘g’: Patterns of type ‘Bool’ not matched: True
+

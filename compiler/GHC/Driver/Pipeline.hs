@@ -94,18 +94,20 @@ import GHC.Data.StringBuffer   ( hPutStringBuffer )
 import GHC.Data.Maybe          ( expectJust )
 import qualified System.OsPath as SysOsPath
 
-import GHC.Iface.Make          ( mkFullIface )
 import GHC.Iface.Load          ( getGhcPrimIface )
+import GHC.Iface.Make          ( mkFullIface )
+import GHC.Iface.Recomp
+
 import GHC.Runtime.Loader      ( initializePlugins )
 
-
-import GHC.Types.Basic       ( SuccessFlag(..), ForeignSrcLang(..) )
-import GHC.Types.Error       ( singleMessage, getMessages, mkSimpleUnknownDiagnostic, defaultDiagnosticOpts )
-import GHC.Types.ForeignStubs (ForeignStubs (NoStubs))
+import GHC.Types.Basic        ( SuccessFlag(..), ForeignSrcLang(..) )
+import GHC.Types.Error        ( singleMessage, getMessages, mkSimpleUnknownDiagnostic, defaultDiagnosticOpts )
+import GHC.Types.ForeignStubs ( ForeignStubs (NoStubs) )
 import GHC.Types.Target
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
 import GHC.Types.SourceError
+import GHC.Types.Unique.DSet
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -120,15 +122,15 @@ import System.Directory
 import System.FilePath
 import System.IO
 import Control.Monad
-import qualified Control.Monad.Catch as MC (handle)
+import qualified Control.Monad.Catch as MC (handle, mask, onException)
 import Data.Maybe
 import qualified Data.Set as Set
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 
-import Data.Time        ( getCurrentTime )
-import GHC.Iface.Recomp
-import GHC.Types.Unique.DSet
+import Data.Time ( getCurrentTime )
+import GHC.Tc.Utils.Monad (shutdownTcMPluginsIO, FrontendResult (..), tcg_plugins)
+
 
 -- Simpler type synonym for actions in the pipeline monad
 type P m = TPipelineClass TPhase m
@@ -872,10 +874,23 @@ hscPipeline :: P m => PipeEnv -> (HscEnv, ModSummary, HscRecompStatus) -> m (Mod
 hscPipeline pipe_env (hsc_env_with_plugins, mod_sum, hsc_recomp_status) = do
   case hsc_recomp_status of
     HscUpToDate iface mb_linkable -> return (iface, mb_linkable)
-    HscRecompNeeded mb_old_hash -> do
-      (tc_result, warnings) <- use (T_Hsc hsc_env_with_plugins mod_sum)
-      hscBackendAction <- use (T_HscPostTc hsc_env_with_plugins mod_sum tc_result warnings mb_old_hash )
-      hscBackendPipeline pipe_env hsc_env_with_plugins mod_sum hscBackendAction
+    HscRecompNeeded mb_old_hash ->
+      MC.mask $ \ restore -> do
+        (tc_result@(FrontendTypecheck tc_gbl), warnings) <-
+          restore $ use (T_Hsc hsc_env_with_plugins mod_sum)
+
+        -- We need the TcM plugins for the 'onException' action below.
+        -- Eagerly extract them out from the 'TcGblEnv' to avoid retaining the
+        -- entire 'TcGblEnv'.
+        let !tcm_plugins = tcg_plugins tc_gbl
+        hscBackendAction <-
+          restore $
+            (use (T_HscPostTc hsc_env_with_plugins mod_sum tc_result warnings mb_old_hash))
+              -- The post-tc phase shuts down plugins; the `onException` handler
+              -- here serves as a fallback in case an exception is thrown before
+              -- the post-tc phase gets the chance to shut the plugins down.
+            `MC.onException` liftIO (shutdownTcMPluginsIO tcm_plugins)
+        restore $ hscBackendPipeline pipe_env hsc_env_with_plugins mod_sum hscBackendAction
 
 hscBackendPipeline :: P m => PipeEnv -> HscEnv -> ModSummary -> HscBackendAction -> m (ModIface, RecompLinkables)
 hscBackendPipeline pipe_env hsc_env mod_sum result =

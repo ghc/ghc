@@ -1895,7 +1895,9 @@ data TcPluginProgress = TcPluginProgress
 
 getTcPluginSolvers :: TcS [TcPluginSolver]
 getTcPluginSolvers
-  = do { tcg_env <- TcS.getGblEnv; return (tcg_tc_plugin_solvers tcg_env) }
+  = do { tcg_env <- TcS.getGblEnv
+       ; plugins <- TcS.readTcRef (tcg_plugins tcg_env)
+       ; return $ TcM.solverTcMPlugins plugins }
 
 -- | Starting from a pair of (given, wanted) constraints,
 -- invoke each of the typechecker constraint-solving plugins in turn and return

@@ -12,5 +12,6 @@ thePlugin opts = TcPlugin
   { tcPluginInit    = return ()
   , tcPluginSolve   = \_ _ _ _ -> return $ TcPluginOk [] []
   , tcPluginRewrite = \_ -> emptyUFM
-  , tcPluginStop    = \_ -> return ()
+  , tcPluginPostTc   = \ _ -> return ()
+  , tcPluginShutdown = \ _ -> return ()
   }

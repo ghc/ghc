@@ -594,7 +594,9 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
      ; sortingAlg <- getHoleFitSortingAlg
      ; dflags <- getDynFlags
      ; let exts = extensionFlags dflags
-     ; hfPlugs <- tcg_hf_plugins <$> getGblEnv
+     ; tcg_env <- getGblEnv
+     ; plugins <- readTcRef (tcg_plugins tcg_env)
+     ; let hfPlugs = holeFitTcMPlugins plugins
      ; let findVLimit = if sortingAlg > HFSNoSorting then Nothing else maxVSubs
            refLevel = refLevelHoleFits dflags
            hole = TypedHole { th_relevant_cts =

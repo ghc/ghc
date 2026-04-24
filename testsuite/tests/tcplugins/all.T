@@ -123,6 +123,38 @@ test('T26395'
       , '-dynamic -package ghc' if have_dynamic() else '-package ghc' ]
     )
 
+# TcM plugin initialisation/stopping tests for #26839.
+test('TcPlugin_InitStop_Warn'
+    , [ extra_files([ 'tc-plugin-initstop/TcPlugin_InitStop_Plugin.hs' ])
+      ]
+    , multimod_compile
+    , [ 'TcPlugin_InitStop_Warn.hs'
+      , '-dynamic -package ghc' if have_dynamic() else '-package ghc' ]
+    )
+
+test('TcPlugin_InitStop_NoCode'
+    , [ extra_files([ 'tc-plugin-initstop/TcPlugin_InitStop_Plugin.hs'
+                    , "TcPlugin_InitStop_NoCode.hs-boot"
+                    , "TcPlugin_InitStop_NoCode_aux.hs" ])
+      ]
+    , multimod_compile
+    , [ 'TcPlugin_InitStop_NoCode.hs'
+      , '-dynamic -package ghc' if have_dynamic() else '-package ghc' ]
+    )
+
+test('TcPlugin_InitStop_Ghci'
+    , [ extra_files([ 'TcPlugin_InitStop_Ghci.hs'
+                    , 'TcPlugin_InitStop_Ghci.script'
+                    , 'tc-plugin-initstop/'
+                    ])
+      , only_ways(['ghci'])
+      , pre_cmd('$MAKE -s --no-print-directory -C tc-plugin-initstop package.initstop TOP={top}')
+      , extra_hc_opts('-package-db tc-plugin-initstop/pkg.initstop/local.package.conf')
+      ]
+    , ghci_script
+    , [ 'TcPlugin_InitStop_Ghci.script' ]
+    )
+
 test('T11462', [js_broken(22261), req_th, req_plugins], multi_compile,
      [None, [('T11462_Plugin.hs', '-package ghc'), ('T11462.hs', '')],
       '-dynamic' if have_dynamic() else ''])

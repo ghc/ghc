@@ -40,7 +40,10 @@ import GHC.HsToCore.Docs
 
 import GHC.Tc.Types
 import GHC.Tc.Types.Origin ( Position(..), mkArgPos )
-import GHC.Tc.Utils.Monad  ( finalSafeMode, fixSafeInstances )
+import GHC.Tc.Utils.Monad
+  ( TcMPluginHandling(..)
+  , finalSafeMode, fixSafeInstances
+  )
 import GHC.Tc.Module ( runTcInteractive )
 
 import GHC.Core.Type
@@ -66,6 +69,10 @@ import GHC.Builtin.Types
 import GHC.Data.Maybe    ( expectJust )
 import GHC.Data.OrdList
 import GHC.Data.SizedSeq ( sizeSS )
+
+import GHC.Iface.Make (mkRecompUsageInfo)
+
+import GHC.Runtime.Interpreter (interpreterProfiled)
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -97,8 +104,6 @@ import GHC.Unit.Module.Deps
 
 import Data.List (partition)
 import Data.IORef
-import GHC.Iface.Make (mkRecompUsageInfo)
-import GHC.Runtime.Interpreter (interpreterProfiled)
 
 {-
 ************************************************************************
@@ -301,7 +306,7 @@ deSugarExpr hsc_env tc_expr = do
     showPass logger "Desugar"
 
     -- Do desugaring
-    (tc_msgs, mb_result) <- runTcInteractive hsc_env $
+    (tc_msgs, mb_result) <- runTcInteractive NoTcMPlugins hsc_env $
                             initDsTc $
                             dsLExpr tc_expr
 

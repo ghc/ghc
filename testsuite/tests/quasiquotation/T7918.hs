@@ -76,7 +76,7 @@ test7918 = do
   typecheckedB <-
     getModSummary (mkModule mainUnit (mkModuleName "T7918B"))
     >>= parseModule
-    >>= typecheckModule
+    >>= typecheckModule StartAndStopTcMPlugins
   let (_loc, ids) = execState (traverse (tm_typechecked_source typecheckedB)) (noSrcSpan, [])
   liftIO . forM_ (sortBy (SrcLoc.leftmost_smallest `on` snd) (reverse ids)) $ putStrLn . showSDoc dynFlags . ppr
 

@@ -341,7 +341,7 @@ tcRnCheckUnit hsc_env uid =
    withTiming logger
               (text "Check unit id" <+> ppr uid)
               (const ()) $
-   initTc hsc_env
+   initTc StartAndStopTcMPlugins hsc_env
           HsigFile -- bogus
           False
           (mainModIs (hsc_HUE hsc_env))
@@ -362,7 +362,7 @@ tcRnMergeSignatures hsc_env hpm orig_tcg_env iface =
   withTiming logger
              (text "Signature merging" <+> brackets (ppr this_mod))
              (const ()) $
-  initTc hsc_env HsigFile False this_mod real_loc $
+  initTc StartAndStopTcMPlugins hsc_env HsigFile False this_mod real_loc $
     mergeSignatures hpm orig_tcg_env iface
  where
   logger   = hsc_logger hsc_env
@@ -903,7 +903,7 @@ tcRnInstantiateSignature hsc_env this_mod real_loc =
    withTiming logger
               (text "Signature instantiation"<+>brackets (ppr this_mod))
               (const ()) $
-   initTc hsc_env HsigFile False this_mod real_loc $ instantiateSignature
+   initTc StartAndStopTcMPlugins hsc_env HsigFile False this_mod real_loc $ instantiateSignature
   where
    logger = hsc_logger hsc_env
 

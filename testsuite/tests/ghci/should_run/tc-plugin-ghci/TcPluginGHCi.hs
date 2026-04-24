@@ -13,5 +13,6 @@ thePlugin opts = TcPlugin
   { tcPluginInit    = trace "TcPluginGHCi" (return ())
   , tcPluginSolve   = \_ _ _ _ -> return $ TcPluginOk [] []
   , tcPluginRewrite = \_ -> emptyUFM
-  , tcPluginStop    = \_ -> return ()
+  , tcPluginPostTc   = \ _ -> pure ()
+  , tcPluginShutdown = \ _ -> pure ()
   }

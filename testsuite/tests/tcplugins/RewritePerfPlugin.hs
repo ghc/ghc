@@ -88,7 +88,8 @@ rewritingPlugin =
     { tcPluginInit    = lookupDefs
     , tcPluginSolve   = \ _ _ _ _ -> pure $ TcPluginOk [] []
     , tcPluginRewrite = rewriter
-    , tcPluginStop    = \ _ -> pure ()
+    , tcPluginPostTc   = \ _ -> pure ()
+    , tcPluginShutdown = \ _ -> pure ()
     }
 
 rewriter :: PluginDefs -> UniqFM TyCon TcPluginRewriter
