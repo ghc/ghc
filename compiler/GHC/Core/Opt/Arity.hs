@@ -906,7 +906,7 @@ findRhsArity opts is_rec bndr rhs
     -- arity_increased: eta-expand if we'll get more lambdas
     -- to the top of the RHS
   where
-    old_arity = exprArity rhs
+    manifest_arity = manifestArity rhs
 
     init_env :: ArityEnv
     init_env = findRhsArityEnv opts (isJoinId bndr)
@@ -915,7 +915,7 @@ findRhsArity opts is_rec bndr rhs
     non_join_arity_type = case is_rec of
                              Recursive    -> go 0 botArityType
                              NonRecursive -> step init_env
-    arity_increased = arityTypeArity non_join_arity_type > old_arity
+    arity_increased = arityTypeArity non_join_arity_type > manifest_arity
 
     -- Join-points only
     -- See Note [Arity for non-recursive join bindings]
@@ -939,15 +939,15 @@ findRhsArity opts is_rec bndr rhs
 
     -- The fixpoint iteration (go), done for recursive bindings. We
     -- always do one step, but usually that produces a result equal
-    -- to old_arity, and then we stop right away, because old_arity
+    -- to manifest_arity, and then we stop right away, because manifest_arity
     -- is assumed to be sound. In other words, arities should never
     -- decrease.  Result: the common case is that there is just one
     -- iteration
     go :: Int -> SafeArityType -> SafeArityType
     go !n cur_at@(AT lams div)
-      | not (isDeadEndDiv div)           -- the "stop right away" case
-      , length lams <= old_arity = cur_at -- from above
-      | next_at == cur_at        = cur_at
+      | not (isDeadEndDiv div)        -- The "stop right away" case
+      , length lams <= manifest_arity = cur_at -- from above
+      | next_at == cur_at             = cur_at
       | otherwise
          -- Warn if more than 2 iterations. Why 2? See Note [Exciting arity]
       = warnPprTrace (debugIsOn && n > 2)
