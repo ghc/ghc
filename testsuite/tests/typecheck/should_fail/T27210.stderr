@@ -1,0 +1,9 @@
+T27210.hs:11:8: error: [GHC-83865]
+    • Couldn't match expected type: forall x.
+                                    (a -> Parser x) -> Parser x
+                  with actual type: (a -> Parser a0) -> Parser a0
+    • In the expression: BindP
+      In an equation for ‘oneM’: oneM = BindP
+    • Relevant bindings include
+        oneM :: Parser a -> forall x. (a -> Parser x) -> Parser x
+          (bound at T27210.hs:11:1)

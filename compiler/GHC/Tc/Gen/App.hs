@@ -458,45 +458,9 @@ checkResultTy :: HsExpr GhcRn
                             --   expose foralls, but maybe not /deeply/ instantiated
               -> ExpRhoType -- Expected type; this is deeply skolemised
               -> TcM HsWrapper
-checkResultTy rn_expr (tc_fun,_) _ app_res_rho (Infer inf_res)
-  = do { ds_flag <- getDeepSubsumptionFlag_DataConHead tc_fun
-         -- Why the "DataConHead" bit?  See (IIR5) in
-         -- Note [Instantiation of InferResult] in GHC.Tc.Utils.Unify.
-       ; fillInferResult ds_flag (exprCtOrigin rn_expr) app_res_rho inf_res }
-
-checkResultTy rn_expr (tc_fun, fun_loc) inst_args app_res_rho (Check res_ty)
--- Unify with expected type from the context
--- See Note [Unify with expected type before typechecking arguments]
---
--- Match up app_res_rho: the result type of rn_expr
---     with res_ty:  the expected result type
+checkResultTy rn_expr (tc_fun, fun_loc) inst_args app_res_rho res_ty
  = perhaps_add_res_ty_ctxt $
-   do { ds_flag <- getDeepSubsumptionFlag_DataConHead tc_fun
-      ; traceTc "checkResultTy {" $
-          vcat [ text "tc_fun:" <+> ppr tc_fun
-               , text "app_res_rho:" <+> ppr app_res_rho
-               , text "res_ty:"  <+> ppr res_ty
-               , text "ds_flag:" <+> ppr ds_flag ]
-      ; case ds_flag of
-          Shallow -> -- No deep subsumption
-             -- app_res_rho and res_ty are both rho-types,
-             -- so with simple subsumption we can just unify them
-             -- No need to zonk; the unifier does that
-             do { co <- unifyExprType rn_expr app_res_rho res_ty
-                ; traceTc "checkResultTy 1 }" (ppr co)
-                ; return (mkWpCastN co) }
-
-          Deep ds_reason ->   -- Deep subsumption
-             -- Even though both app_res_rho and res_ty are rho-types,
-             -- they may have nested polymorphism, so if deep subsumption
-             -- is on we must call tcSubType.
-             do { wrap <- tcSubTypeDS tc_fun ds_reason rn_expr app_res_rho res_ty
-                ; traceTc "checkResultTy 2 }" $
-                   vcat [ text "app_res_rho:" <+> ppr app_res_rho
-                        , text "res_ty:" <+> ppr res_ty
-                        , text "wrap:" <+> ppr wrap
-                        ]
-                ; return wrap } }
+   tcSubTypeApp rn_expr tc_fun app_res_rho res_ty
   where
     -- perhaps_add_res_ty_ctxt: Inside an expansion, the addFunResCtxt stuff is
     -- more confusing than helpful because the function at the head isn't in
@@ -506,7 +470,7 @@ checkResultTy rn_expr (tc_fun, fun_loc) inst_args app_res_rho (Check res_ty)
       | isGeneratedSrcSpan fun_loc
       = thing_inside
       | otherwise
-      = addFunResCtxt tc_fun inst_args app_res_rho (mkCheckExpType res_ty) $
+      = addFunResCtxt tc_fun inst_args app_res_rho res_ty $
         thing_inside
 
 ----------------
