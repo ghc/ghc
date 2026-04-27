@@ -334,13 +334,23 @@ keepResponseFiles = do
 withResponseFile :: (FilePath -> Action a) -> Action a
 withResponseFile action = do
     keep <- keepResponseFiles
+    let putVerboseResponseFile tmp = do
+            verbosity <- getVerbosity
+            when (verbosity >= Verbose) $ do
+                tmpContent <- liftIO (readFile tmp)
+                putVerbose (tmp <> " (use hadrian flag --keep-response-files to keep this file):\n" <> tmpContent)
     if keep
         then do
             (tmp, h) <- liftIO $ openTempFile "." "hadrian-rsp"
             liftIO $ hClose h
             putInfo $ "Keeping response file: " ++ tmp
-            action tmp
-        else withTempFile action
+            result <- action tmp
+            putVerboseResponseFile tmp
+            return result
+        else withTempFile $ \tmp -> do
+            result <- action tmp
+            putVerboseResponseFile tmp
+            return result
 
 -- | Link a file tracking the link target. Create the target directory if
 -- missing.
