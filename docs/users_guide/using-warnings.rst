@@ -2711,7 +2711,7 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-unrecognised-modifiers
 
-    :since: 9.16
+    :since: 10.0
 
     :default: on
 

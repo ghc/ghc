@@ -6,7 +6,7 @@ Modifiers
 .. extension:: Modifiers
     :shortdesc: Allow experimental modifier syntax.
 
-    :since: 9.16
+    :since: 10.0
     :status: Experimental
 
     Enable modifier syntax in various places, such as arrows (``a %m -> b``) and
@@ -138,10 +138,10 @@ and limitations.
      let %1  (Just x) = ... -- (2b)
      let %1 !(Just x) = ... -- (2c)
 
-  In 9.14, (1a) and (2a) parsed as (1b) and (2b) respectively. From 9.16, (1a)
+  In 9.14, (1a) and (2a) parsed as (1b) and (2b) respectively. From 10.0, (1a)
   parses as (1d), and (2a) fails to parse.
 
-  Note that linear bindings must be strict. (1c) and (2c) parse in 9.16 the same
+  Note that linear bindings must be strict. (1c) and (2c) parse in 10.0 the same
   as in 9.14. But with ``-XStrict`` enabled, (1a) and (2a) would previously have
   been accepted, and are now rejected, even with
   ``-XLinearTypes -XNoModifiers``.

@@ -6,7 +6,7 @@ Qualified string literals
 .. extension:: QualifiedStrings
     :shortdesc: Enable qualified string literals.
 
-    :since: 9.16.1
+    :since: 10.0.1
 
     Enable qualified string literals.
 

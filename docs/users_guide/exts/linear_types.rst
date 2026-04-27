@@ -318,7 +318,7 @@ hidden; it is an essential part of the exposed interface.)
 
 Interaction with Modifiers
 --------------------------
-Since GHC version 9.16, Linear types use :extension:`Modifiers` syntax, and by
+Since GHC version 10.0, Linear types use :extension:`Modifiers` syntax, and by
 default enable that extension. In earlier versions, linear types used a more
 restricted variant of that syntax.
 

@@ -121,7 +121,7 @@ there is a need to support older GHC versions.
 Wildcards in import/export lists
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Since:** GHC 9.16
+**Since:** GHC 10.0
 
 Namespace-specified wildcards ``type ..`` and ``data ..`` may be used to import
 all names in the corresponding namespace from a module: ::

@@ -1112,9 +1112,9 @@ data WarningFlag =
        -- ^ @since 9.14, scheduled to be removed in 9.18
        --
        -- See Note [Quantifying over equalities in RULES] in GHC.Tc.Gen.Sig
-   | Opt_WarnUnusableUnpackPragmas                   -- Since 9.14
-   | Opt_WarnPatternNamespaceSpecifier               -- Since 9.14
-   | Opt_WarnUnrecognisedModifiers                   -- ^ @since 9.16
+   | Opt_WarnUnusableUnpackPragmas                   -- ^ @since 9.14
+   | Opt_WarnPatternNamespaceSpecifier               -- ^ @since 9.14
+   | Opt_WarnUnrecognisedModifiers                   -- ^ @since 10.0
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -1377,7 +1377,7 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnTypeEqualityRequiresOperators,
         Opt_WarnInconsistentFlags,
         Opt_WarnTypeEqualityOutOfScope,
-        Opt_WarnImplicitRhsQuantification, -- was in -Wcompat since 9.8, enabled by default since 9.14, to turn into a hard error in 9.16
+        Opt_WarnImplicitRhsQuantification, -- was in -Wcompat since 9.8, enabled by default since 9.14, to turn into a hard error in 10.2 (#25911)
         Opt_WarnViewPatternSignatures,
         Opt_WarnUselessSpecialisations,
         Opt_WarnDeprecatedPragmas,

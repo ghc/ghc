@@ -1618,7 +1618,7 @@ Some flags only make sense for particular target platforms.
     :type: dynamic
     :category: platform-options
 
-    :since: 9.16.1
+    :since: 10.0.1
     :implies: :ghc-flag:`-mavx512f`
 
     (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
@@ -1639,7 +1639,7 @@ Some flags only make sense for particular target platforms.
     :type: dynamic
     :category: platform-options
 
-    :since: 9.16.1
+    :since: 10.0.1
     :implies: :ghc-flag:`-mavx512f`
 
     (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
@@ -1684,7 +1684,7 @@ Some flags only make sense for particular target platforms.
     :type: dynamic
     :category: platform-options
 
-    :since: 9.16.1
+    :since: 10.0.1
     :implies: :ghc-flag:`-mavx512f`
 
     (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
@@ -1823,7 +1823,7 @@ Some flags only make sense for particular target platforms.
     :type: dynamic
     :category: platform-options
 
-    :since: 9.16.1
+    :since: 10.0.1
 
     (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
     or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86 GFNI instructions.

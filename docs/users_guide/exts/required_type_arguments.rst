@@ -303,7 +303,7 @@ A few limitations apply:
   * In term syntax, in positions where ``*`` is a direct argument to ``->``, e.g.
     in ``f (* -> * -> *)`` and ``f (* -> Constraint)``, the ``*``\s stand for
     ``Type``, provided the :extension:`StarIsType` extension is enabled.
-    This is supported from GHC 9.16 onwards; earlier versions will produce
+    This is supported from GHC 10.0 onwards; earlier versions will produce
     a parse error.
 
   What to do instead: use ``Type`` from the ``Data.Kind`` module.
