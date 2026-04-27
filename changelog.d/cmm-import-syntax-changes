@@ -1,0 +1,34 @@
+section: cmm
+synopsis: Changes to Cmm hand-written syntax for symbol imports.
+issues: #27162
+mrs: !15135
+
+description: {
+  In hand-written Cmm, there is syntax to declare symbol names from outside of
+  the current .cmm file (e.g. .c or .cmm files).
+
+  The existing syntax is
+
+  > import foo;         -- for a function
+  > import CLOSURE foo; -- for data
+
+  and this implicitly meant that the symbol (`foo`) could be found in an
+  external shared library, not the current one. There was no syntax to specify
+  that the symbol should be found in the current shared library, i.e. in a
+  .cmm file (or .hs file) in the current Haskell package.
+
+  The new syntax assumes local by default and allows specifying external:
+
+  > import foo;               -- for a function in the current lib
+  > import DATA foo;          -- for data in the current lib
+  > import extern foo;        -- for a function in an external lib
+  > import extern DATA foo;   -- for data in an external lib
+  > import "unitid" foo;      -- for a function in the Haskell unit "unitid"
+  > import "unitid" DATA foo; -- for data in the Haskell unit "unitid"
+
+  In practice, the only platform where this can be expected to make a
+  difference is on Windows, and only when compiling each Haskell package as a
+  separate .dll dynamic library.
+}
+
+
