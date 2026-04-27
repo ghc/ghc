@@ -45,6 +45,7 @@ Target
 , tgtOpt = Nothing
 , tgtLlvmAs = Nothing
 , tgtWindres = Nothing
+, tgtDlltool = Nothing
 , tgtOtool = Nothing
 , tgtInstallNameTool = Nothing
 }
