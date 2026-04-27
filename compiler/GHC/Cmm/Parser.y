@@ -668,25 +668,29 @@ importName
         -- an unnamed Haskell package. This corresponds on Windows/PE to
         -- __declspec(dllimport) in C.
         | 'extern' NAME
-        { ($2, mkForeignLabel $2 ForeignLabelInExternalPackage IsFunction) }
+        { ($2, mkForeignLabel $2 ForeignLabelInExternalPackage
+                                 ForeignLabelIsFunction) }
 
         -- A data label imported from another unamed shared library.
         -- This corresponds on Windows/PE to __declspec(dllimport) in C (but
         -- cmm doesn't know about data vs function symbols so we have to say).
         | 'extern' 'DATA' NAME
-        { ($3, mkForeignLabel $3 ForeignLabelInExternalPackage IsData) }
+        { ($3, mkForeignLabel $3 ForeignLabelInExternalPackage
+                                 ForeignLabelIsData) }
 
         -- A code label imported from the shared library for a Haskell package
         -- with the given UnitId. Such labels behave as local when used within
         -- the specified unit, or as extern otherwise.
         | STRING NAME
-        { ($2, mkForeignLabel $2 (ForeignLabelInPackage (UnitId (mkFastString $1))) IsFunction) }
+        { ($2, mkForeignLabel $2 (ForeignLabelInPackage (UnitId (mkFastString $1)))
+                                 ForeignLabelIsFunction) }
 
         -- A data label imported from the shared library for a Haskell package
         -- with the given UnitId. Such labels behave as local when used within
         -- the specified unit, or as extern otherwise.
         | STRING 'DATA' NAME
-        { ($3, mkForeignLabel $3 (ForeignLabelInPackage (UnitId (mkFastString $1))) IsData) }
+        { ($3, mkForeignLabel $3 (ForeignLabelInPackage (UnitId (mkFastString $1)))
+                                 ForeignLabelIsData) }
 
 
 names   :: { [FastString] }
