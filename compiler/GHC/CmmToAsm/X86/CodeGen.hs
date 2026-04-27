@@ -78,7 +78,7 @@ import GHC.Generics (Generic, Generically(..))
 
 -- The rest:
 import GHC.Data.Maybe ( expectJust )
-import GHC.Types.ForeignCall ( CCallConv(..) )
+import GHC.Types.ForeignCall ( CCallConv(..), ForeignLabelIsFunctionOrData(..) )
 import GHC.Types.Literal.Floating
 import GHC.Data.OrdList
 import GHC.Utils.Outputable
@@ -4584,7 +4584,8 @@ genLibCCall bid lbl_txt dsts args = do
   -- Assume we can call these functions directly, and that they're not in a dynamic library.
   -- TODO: Why is this ok? Under linux this code will be in libm.so
   --       Is it because they're really implemented as a primitive instruction by the assembler??  -- BL 2009/12/31
-  let lbl = mkForeignLabel lbl_txt ForeignLabelInThisPackage IsFunction
+  let lbl = mkForeignLabel lbl_txt ForeignLabelInThisPackage
+                                   ForeignLabelIsFunction
   addr <- cmmMakeDynamicReference config CallReference lbl
   let conv = ForeignConvention CCallConv [] [] CmmMayReturn
   genCCall bid addr conv dsts args
@@ -4599,7 +4600,8 @@ genRTSCCall
 genRTSCCall bid lbl_txt dsts args = do
   config <- getConfig
   -- Assume we can call these functions directly, and that they're not in a dynamic library.
-  let lbl = mkForeignLabel lbl_txt ForeignLabelInThisPackage IsFunction
+  let lbl = mkForeignLabel lbl_txt ForeignLabelInThisPackage
+                                   ForeignLabelIsFunction
   addr <- cmmMakeDynamicReference config CallReference lbl
   let conv = ForeignConvention CCallConv [] [] CmmMayReturn
   genCCall bid addr conv dsts args

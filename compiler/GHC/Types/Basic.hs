@@ -36,7 +36,6 @@ module GHC.Types.Basic (
         Alignment, mkAlignment, alignmentOf, alignmentBytes,
 
         PromotionFlag(..), isPromoted,
-        FunctionOrData(..),
 
         RecFlag(..), isRec, isNonRec, boolToRecFlag,
         Origin(..), isGenerated, DoPmc(..), requiresPMC,
@@ -386,35 +385,6 @@ instance Binary PromotionFlag where
          0 -> return NotPromoted
          1 -> return IsPromoted
          _ -> fail "Binary(IsPromoted): fail)"
-
-{-
-************************************************************************
-*                                                                      *
-\subsection[FunctionOrData]{FunctionOrData}
-*                                                                      *
-************************************************************************
--}
-
-data FunctionOrData = IsFunction | IsData
-    deriving (Eq, Ord, Data)
-
-instance Outputable FunctionOrData where
-    ppr IsFunction = text "(function)"
-    ppr IsData     = text "(data)"
-
-instance Binary FunctionOrData where
-    put_ bh IsFunction = putByte bh 0
-    put_ bh IsData     = putByte bh 1
-    get bh = do
-        h <- getByte bh
-        case h of
-          0 -> return IsFunction
-          1 -> return IsData
-          _ -> panic "Binary FunctionOrData"
-
-instance NFData FunctionOrData where
-  rnf IsFunction = ()
-  rnf IsData = ()
 
 {-
 ************************************************************************

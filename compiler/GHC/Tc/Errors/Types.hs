@@ -212,7 +212,7 @@ import GHC.Types.Var.Set (TyVarSet, VarSet)
 import GHC.Types.DefaultEnv (ClassDefaults)
 
 import GHC.Unit.Types (Module)
-import GHC.Unit.State (UnitState)
+import GHC.Unit.State (UnitState, PackageName)
 import GHC.Unit.Module.ModIface (ModIface)
 
 import GHC.Utils.Outputable
@@ -4436,6 +4436,20 @@ data TcRnMessage where
     Test cases: T24159_type_syntax_rn_fail
   -}
   TcRnUnexpectedTypeSyntaxInTerms :: TypeSyntax -> TcRnMessage
+
+  {-| TcRnUnknownPrimCallPackageName is an error that occurs when
+      a 'foreign import prim "pkgname cmmid"' refers to a pkgname
+      that is not a declared dependency (direct or indirect) of the
+      current unit.
+
+      Example:
+       foreign import prim "bad stg_paniczh" panic# :: ...
+
+      Test cases:
+        T27206
+  -}
+  TcRnUnknownPrimCallPackageName :: PackageName -> TcRnMessage
+
   deriving Generic
 
 ----

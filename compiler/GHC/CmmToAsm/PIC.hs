@@ -66,6 +66,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.Utils (cmmLoadBWord)
 
 import GHC.Types.Basic
+import GHC.Types.ForeignCall (ForeignLabelIsFunctionOrData(..))
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -540,7 +541,8 @@ gotLabel
         -- HACK: this label isn't really foreign
         = mkForeignLabel
                 (fsLit ".LCTOC1")
-                ForeignLabelInThisPackage IsData
+                ForeignLabelInThisPackage
+                ForeignLabelIsData
 
 
 

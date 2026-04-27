@@ -80,7 +80,7 @@ setGlobalAllocationLimitHandler killBehaviour mHandler = do
   setAllocLimitKill shouldKill shouldRunHandler
 
 -- | Retrieves the allocation counter for the another thread.
-foreign import prim "stg_getOtherThreadAllocationCounterzh" getOtherThreadAllocationCounter#
+foreign import prim "rts stg_getOtherThreadAllocationCounterzh" getOtherThreadAllocationCounter#
   :: ThreadId#
   -> State# RealWorld
   -> (# State# RealWorld, Int64# #)

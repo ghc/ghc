@@ -63,7 +63,7 @@ import GHC.Utils.Panic
 import Control.Monad    ( mapAndUnzipM, when )
 import Data.Word
 
-import GHC.Types.Basic
+import GHC.Types.ForeignCall ( ForeignLabelIsFunctionOrData(..) )
 import GHC.Data.FastString
 
 -- -----------------------------------------------------------------------------
@@ -2051,7 +2051,9 @@ genCCall' config gcp target dest_regs args
         outOfLineMachOp mop =
             do
                 mopExpr <- cmmMakeDynamicReference config CallReference $
-                              mkForeignLabel functionName ForeignLabelInThisPackage IsFunction
+                             mkForeignLabel functionName
+                                            ForeignLabelInThisPackage
+                                            ForeignLabelIsFunction
                 let mopLabelOrExpr = case mopExpr of
                         CmmLit (CmmLabel lbl) -> Left lbl
                         _ -> Right mopExpr

@@ -264,3 +264,4 @@ test('T25901_sub_c', [extra_files(['T25901_sub_c_helper.hs'])], multimod_compile
 test('T25901_sub_d', [extra_files(['T25901_sub_d_helper.hs'])], multimod_compile_fail, ['T25901_sub_d', '-v0'])
 test('T25901_sub_w', normal, compile_fail, [''])
 test('T26545', normal, compile_fail, [''])
+test('T27206', normal, compile_fail, [''])

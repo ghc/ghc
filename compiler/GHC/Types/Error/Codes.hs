@@ -697,6 +697,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnUnexpectedTypeSyntaxInTerms"               = 31244
   GhcDiagnosticCode "TcRnTypeApplicationsDisabled"                  = 23482
   GhcDiagnosticCode "TcRnUnpromotableLit"                           = 51819
+  GhcDiagnosticCode "TcRnUnknownPrimCallPackageName"                = 57392
 
   -- TcRnIllegalInvisibleTypePattern
   GhcDiagnosticCode "InvisPatWithoutFlag"                           = 78249

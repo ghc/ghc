@@ -12,7 +12,6 @@ import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Data.FastString
-import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
@@ -201,7 +200,8 @@ tsanTarget fn formals args =
     ForeignTarget (CmmLit (CmmLabel lbl)) conv
   where
     conv = ForeignConvention CCallConv args formals CmmMayReturn
-    lbl = mkForeignLabel fn ForeignLabelInExternalPackage IsFunction
+    lbl = mkForeignLabel fn ForeignLabelInExternalPackage
+                            ForeignLabelIsFunction
 
 tsanStore :: Env
           -> CmmType -> CmmExpr

@@ -868,7 +868,7 @@ assembleI platform i = case i of
     emit_ = emit word_size
 
     literal :: Literal -> m Word
-    literal (LitLabel fs _)   = litlabel fs
+    literal (LitLabel lbl)    = litlabel lbl
     literal LitNullAddr       = word 0
     literal (LitFloating LitFloat  x) = float  (litFloatingToHostFloat  x)
     literal (LitFloating LitDouble x) = double (litFloatingToHostDouble x)
@@ -893,7 +893,7 @@ assembleI platform i = case i of
     -- analysis messed up.
     literal (LitRubbish {}) = word 0
 
-    litlabel fs = lit1 (BCONPtrLbl fs)
+    litlabel (CLabelSpec fs _ _) = lit1 (BCONPtrLbl fs)
     words ws = lit (fmap BCONPtrWord ws)
     word w = words (OnlyOne w)
     word2 w1 w2 = words (OnlyTwo w1 w2)

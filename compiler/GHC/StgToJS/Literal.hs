@@ -21,7 +21,7 @@ import GHC.StgToJS.Linker.Utils (decodeModifiedUTF8)
 
 import GHC.Types.Literal
 import GHC.Types.Literal.Floating
-import GHC.Types.Basic
+import GHC.Types.ForeignCall
 import GHC.Types.RepType
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -61,12 +61,13 @@ genLit = \case
     LitNumBigNat  -> panic "genLit: unexpected BigNat that should have been removed in CorePrep"
   LitFloating LitFloat r     -> return [ toJExpr (float2Double $ litFloatingToHostFloat r) ]
   LitFloating LitDouble r    -> return [ toJExpr (litFloatingToHostDouble r) ]
-  LitLabel name fod
-    | fod == IsFunction      -> return [ ApplExpr hdMkFunctionPtr
+  LitLabel (CLabelSpec name ForeignLabelIsFunction _)
+                             -> return [ ApplExpr hdMkFunctionPtr
                                                   [global (mkRawSymbol True name)]
                                        , ValExpr (JInt 0)
                                        ]
-    | otherwise              -> return [ toJExpr (global (mkRawSymbol True name))
+  LitLabel (CLabelSpec name ForeignLabelIsData _)
+                             -> return [ toJExpr (global (mkRawSymbol True name))
                                        , ValExpr (JInt 0)
                                        ]
   LitRubbish _ rr_ty ->
@@ -114,8 +115,10 @@ genStaticLit = \case
     LitNumBigNat  -> panic "genStaticLit: unexpected BigNat that should have been removed in CorePrep"
   LitFloating LitFloat r   -> return [ DoubleLit . SaneDouble $ float2Double $ litFloatingToHostFloat r ]
   LitFloating LitDouble r  -> return [ DoubleLit . SaneDouble $ litFloatingToHostDouble r ]
-  LitLabel name fod        -> return [ LabelLit (fod == IsFunction) (mkRawSymbol True name)
-                                     , IntLit 0 ]
+  LitLabel (CLabelSpec name fod _)
+                  -> return [ LabelLit (fod == ForeignLabelIsFunction)
+                                       (mkRawSymbol True name)
+                            , IntLit 0 ]
   LitRubbish _ rep ->
     let prim_reps = runtimeRepPrimRep (text "GHC.StgToJS.Literal.genStaticLit") rep
     in case expectOnly prim_reps of -- Note [Post-unarisation invariants]
