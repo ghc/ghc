@@ -21,6 +21,15 @@
 
 #include "sm/GC.h" // for evac_fn
 
+#if defined(mingw32_HOST_OS)
+/* Global var (only on Windows) that is exported (hence before BeginPrivate.h)
+ * to be shared with the I/O code in the base library to tell us which style
+ * of I/O manager we are using: one that uses the Windows native API HANDLEs,
+ * or one that uses Posix style fds.
+ */
+extern bool rts_IOManagerIsWin32Native;
+#endif
+
 #include "BeginPrivate.h"
 
 /* The ./configure gives us a set of CPP flags, one for each named I/O manager:
@@ -159,14 +168,6 @@ typedef enum {
 
 /* Global var to tell us which I/O manager impl we are using */
 extern IOManagerType iomgr_type;
-
-#if defined(mingw32_HOST_OS)
-/* Global var (only on Windows) that is exported to be shared with the I/O code
- * in the base library to tell us which style of I/O manager we are using: one
- * that uses the Windows native API HANDLEs, or one that uses Posix style fds.
- */
-extern bool rts_IOManagerIsWin32Native;
-#endif
 
 
 /* The CapIOManager is the per-capability data structure belonging to the I/O
