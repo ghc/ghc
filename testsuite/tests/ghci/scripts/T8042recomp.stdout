@@ -1,4 +1,4 @@
-[1 of 2] Compiling T8042B           ( T8042B.hs, T8042B.o )[main]
+[1 of 2] Compiling T8042B           ( T8042B.hs, T8042B.o )[interactive-session]
 [2 of 2] Compiling T8042A           ( T8042A.hs, T8042A.o )[interactive-session]
 Ok, two modules loaded.
 [2 of 2] Compiling T8042A           ( T8042A.hs, interpreted )[interactive-session]

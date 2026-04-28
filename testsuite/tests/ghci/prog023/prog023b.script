@@ -1,0 +1,2 @@
+:load src/A.hs
+foo
