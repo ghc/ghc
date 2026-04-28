@@ -484,9 +484,9 @@ default_prompt_cont = generatePromptFunctionFromString "ghci| "
 default_args :: [String]
 default_args = []
 
-interactiveUI :: GhciSettings -> [(FilePath, Maybe UnitId, Maybe Phase)] -> Maybe [String]
+interactiveUI :: GhciSettings -> DynFlags -> [(FilePath, Maybe UnitId, Maybe Phase)] -> Maybe [String]
               -> Ghc ()
-interactiveUI config srcs maybe_exprs = do
+interactiveUI config baseDFlags srcs maybe_exprs = do
    -- HACK! If we happen to get into an infinite loop (eg the user
    -- types 'let x=x in x' at the prompt), then the thread will block
    -- on a blackhole, and become unreachable during GC.  The GC will
@@ -502,7 +502,7 @@ interactiveUI config srcs maybe_exprs = do
     -- Initialise buffering for the *interpreted* I/O system
    (nobuffering, flush) <- runInternal initInterpBuffering
 
-   installInteractiveHomeUnits
+   installInteractiveHomeUnits baseDFlags
 
    -- Update the LogAction. Ensure we don't override the user's log action lest
    -- we break -ddump-json (#14078)
@@ -666,14 +666,34 @@ commands in the GHCi session.
 === 'interactiveSessionUnit' Home Unit
 
 The 'interactiveSessionUnit' home unit is used as a kitchen sink for Modules that
-are not part of a home unit already.
+are not part of any home unit already.
 When the user types ":load", it is not trivial to figure to which home unit the module
 should be added to.
 Especially, when there is more than home unit. Thus, we always ":load"ed modules
 to this home unit.
 
-The 'DynFlags' of the 'interactiveSessionUnit' can be modified via the ':set'
-commands in the GHCi session.
+The 'DynFlags' of the 'interactiveSessionUnit' are inherited from the "base" 'DynFlags'.
+These are the 'DynFlags' passed at the top-level of the GHCi invocation ignoring @-unit@ flags.
+For example:
+
+    1. ghci -isrc -this-unit-id main ...
+    2. ghci -unit @{ -isrc -this-unit-id main }
+
+where @\@{ ... }@ denotes the contents of the @-unit@ response file argument.
+
+In 1., the 'interactiveSessionUnit' inherits the import directory @-isrc@ because it is given
+as a top-level 'DynFlags' argument.
+However, in 2., the @-isrc@ is given as an argument *only* for the home unit @main@, thus
+'interactiveSessionUnit' won't inherit the @-isrc@.
+
+Thus, these two cli invocations are somewhat subtly different.
+However, this allows to handle multiple home units and single home units identically,
+while still upholding previous usage patterns such as:
+
+    $ ghci -isrc
+    > :load A
+    > :add B
+
 -}
 
 -- | Set up the multiple home unit session.
@@ -695,8 +715,8 @@ commands in the GHCi session.
 -- Within GHCi, you can rely on this property.
 --
 -- For motivation and design, see Note [Multiple Home Units aware GHCi]
-installInteractiveHomeUnits :: GHC.GhcMonad m => m ()
-installInteractiveHomeUnits = do
+installInteractiveHomeUnits :: GHC.GhcMonad m => DynFlags -> m ()
+installInteractiveHomeUnits dflags = do
   logger <- getLogger
   hsc_env <- GHC.getSession
   -- The initial set of DynFlags used for interactive evaluation is the same
@@ -704,7 +724,7 @@ installInteractiveHomeUnits = do
   -- * -XExtendedDefaultRules and
   -- * -XNoMonomorphismRestriction.
   -- See Note [Changing language extensions for interactive evaluation] #10857
-  dflags <- getDynFlags
+
   let
     dflags0' =
       (xopt_set_unlessExplSpec LangExt.ExtendedDefaultRules xopt_set) .
@@ -734,30 +754,27 @@ installInteractiveHomeUnits = do
   dflagsPrompt <- GHC.normaliseInteractiveDynFlags logger $
     setHomeUnitId interactiveGhciUnitId $ dflags0
       { packageFlags =
-        [ sessionUnitExposedFlag ] ++
-        [ homeUnitPkgFlag uid
-        | homeUnitEnv <- Foldable.toList $ hsc_HUG hsc_env
-        , Just homeUnit <- [homeUnitEnv_home_unit homeUnitEnv]
-        , let uid = homeUnitId homeUnit
-        ] ++
-        (packageFlags dflags0)
+        concat
+          [ [ sessionUnitExposedFlag ]
+          , [ homeUnitPkgFlag uid
+            | uid <- S.toList $ HUG.allUnits $ hsc_HUG hsc_env
+            ]
+          , packageFlags dflags0
+          ]
       , importPaths = []
       }
 
   let
     -- Explicitly depends on all current home units.
-    -- Additionally, we remove all 'importPaths', to avoid accidentally adding
-    -- any 'Target's to this 'Unit' that are not ':load'ed.
     dflagsSession =
       setHomeUnitId interactiveSessionUnitId $ dflags
         { packageFlags =
-          [ homeUnitPkgFlag uid
-          | homeUnitEnv <- Foldable.toList $ hsc_HUG hsc_env
-          , Just homeUnit <- [homeUnitEnv_home_unit homeUnitEnv]
-          , let uid = homeUnitId homeUnit
-          ] ++
-          (packageFlags dflags)
-        , importPaths = []
+          concat
+            [ [ homeUnitPkgFlag uid
+              | uid <- S.toList $ HUG.allUnits $ hsc_HUG hsc_env
+              ]
+            , packageFlags dflags
+            ]
         }
 
   let
@@ -2303,9 +2320,8 @@ addModule files = do
     checkTargetModule :: GhciMonad m => ModuleName -> m Bool
     checkTargetModule m = do
       hsc_env <- GHC.getSession
-      let home_unit = hsc_home_unit hsc_env
       result <- liftIO $
-        Finder.findImportedModule hsc_env m (ThisPkg (homeUnitId home_unit))
+        Finder.findImportedModule hsc_env m NoPkgQual
       case result of
         Found _ _ -> return True
         _ -> do reportError (GhciModuleError $ GhciModuleNotFound (moduleNameString m))

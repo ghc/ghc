@@ -1,0 +1,6 @@
+:load src/A.hs src/B.hs
+foo
+bar
+B.bar
+:m + B
+bar
