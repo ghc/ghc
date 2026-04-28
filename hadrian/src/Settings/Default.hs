@@ -44,6 +44,7 @@ import Settings.Builders.SplitSections
 import Settings.Builders.RunTest
 import Settings.Builders.Xelatex
 import Settings.Packages
+import Settings.Program
 import Settings.Warnings
 import qualified Hadrian.Builder.Git
 import Settings.Builders.Win32Tarballs
@@ -215,12 +216,22 @@ testsuitePackages = return ([ timeout | windowsHost ] ++ [ checkPpr, checkExact,
 -- * We build 'profiling' way when stage > Stage0.
 -- * We build 'dynamic' way when stage > Stage0 and the platform supports it.
 defaultLibraryWays :: Ways
-defaultLibraryWays = Set.fromList <$>
-    mconcat
-    [ pure [vanilla]
-    , notStage0 ? pure [profiling]
-    , notStage0 ? platformSupportsSharedLibs ? pure [dynamic, profilingDynamic]
-    ]
+defaultLibraryWays = do
+    pkg <- getPackage
+    if isLibrary pkg
+
+      -- modules for libraries get built several ways
+      then Set.fromList <$>
+             mconcat
+             [ pure [vanilla]
+             , notStage0 ? pure [profiling]
+             , notStage0 ? platformSupportsSharedLibs
+                         ? pure [dynamic, profilingDynamic]
+             ]
+
+      -- modules for executables get built only one way
+      else do stage <- getStage
+              Set.singleton <$> expr (programWay stage pkg)
 
 -- | Default build ways for the RTS.
 defaultRtsWays :: Ways

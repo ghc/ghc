@@ -1,5 +1,6 @@
 module Settings.Program
   ( programContext
+  , programWay
   , ghcWithInterpreter
   ) where
 
@@ -17,18 +18,21 @@ import Settings.Builders.Common (anyTargetOs, anyTargetArch, isArmTarget)
 -- get a context/contexts for a given stage and package.
 programContext :: Stage -> Package -> Action Context
 programContext stage pkg = do
-    profiled <- askGhcProfiled stage
-    dynGhcProgs <- askDynGhcPrograms --dynamicGhcPrograms =<< flavour
-    return $ Context stage pkg (wayFor profiled dynGhcProgs) Final
+    way <- programWay stage pkg
+    return $ Context stage pkg way Final
 
-    where wayFor prof dyn
-            | prof && dyn                          = profilingDynamic
-            | pkg == ghc && prof && notStage0 stage = profiling
-            | dyn && notStage0 stage                = dynamic
-            | otherwise                            = vanilla
+programWay :: Stage -> Package -> Action Way
+programWay stage pkg =
+    wayFor <$> askGhcProfiled stage <*> askDynGhcPrograms
+  where
+    wayFor prof dyn
+      | prof && dyn                           = profilingDynamic
+      | pkg == ghc && prof && notStage0 stage = profiling
+      | dyn && notStage0 stage                = dynamic
+      | otherwise                             = vanilla
 
-          notStage0 (Stage0 {}) = False
-          notStage0 _ = True
+    notStage0 (Stage0 {}) = False
+    notStage0 _ = True
 
 -- | When cross compiling, enable for stage0 to get ghci
 -- support. But when not cross compiling, disable for
