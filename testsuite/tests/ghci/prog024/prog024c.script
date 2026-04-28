@@ -1,0 +1,6 @@
+:load A B
+foo
+bar
+B.bar
+:m + B
+bar

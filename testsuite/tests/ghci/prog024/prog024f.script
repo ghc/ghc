@@ -1,0 +1,3 @@
+:add src/A.hs src/B.hs
+foo
+bar

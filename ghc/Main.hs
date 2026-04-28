@@ -293,6 +293,9 @@ ghciUI _ _ _ =
   throwGhcException (CmdLineError "not built for interactive use")
 #else
 ghciUI units srcs maybe_expr = do
+  -- The base 'DynFlags' are the initial flags
+  -- that the ghci prompt is using.
+  baseDFlags <- getDynFlags
   hs_srcs <- case NE.nonEmpty units of
     Just ne_units -> do
       initMulti ne_units (checkOptions DoMake)
@@ -303,7 +306,7 @@ ghciUI units srcs maybe_expr = do
           s <- initMake srcs
           dflags <- getDynFlags
           return $ map (uncurry (,Just $ homeUnitId_ dflags,)) s
-  interactiveUI defaultGhciSettings hs_srcs maybe_expr
+  interactiveUI defaultGhciSettings baseDFlags hs_srcs maybe_expr
 #endif
 
 -- ----------------------------------------------------------------------------
