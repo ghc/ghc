@@ -321,6 +321,7 @@ rtsPackageArgs = package rts ? do
           , Profiling `wayUnit` way          ? arg "-DPROFILING"
           , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
           , notM targetSupportsSMP           ? arg "-optc-DNOSMP"
+          , isWinHost                        ? arg "-optl-Wl,--disable-runtime-pseudo-reloc"
 
             -- See Note [AutoApply.cmm for vectors] in genapply/Main.hs
             --
