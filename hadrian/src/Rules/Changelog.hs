@@ -7,6 +7,7 @@ import Packages
 import Settings.Program (programContext)
 
 import qualified System.Directory as IO
+import qualified System.Environment as IO
 
 -- | Rules for generating and managing changelog entries.
 --
@@ -14,6 +15,8 @@ import qualified System.Directory as IO
 --   hadrian/build changelog                              -- generate RST release notes
 --   hadrian/build changelog --changelog-version=10.2.1   -- with explicit version
 --   hadrian/build libraries-changelog-markdown           -- emit per-library Markdown bullets to stdout
+--   hadrian/build list-markdown-targets                  -- print one repo-relative path per
+--                                                          markdown-targets: row, used by CI
 --   hadrian/build changelog-clear                        -- remove old entries
 changelogRules :: Rules ()
 changelogRules = do
@@ -46,6 +49,17 @@ changelogRules = do
              [ top -/- "changelog.d/"
              , "--libraries-changelog-markdown"
              ]
+
+    phony "list-markdown-targets" $ do
+        ctx <- programContext stage0Boot changelogD
+        progPath <- programPath ctx
+        need [progPath]
+        top <- topDirectory
+        let args = [top -/- "changelog.d/", "--list-markdown-targets"]
+        mOut <- liftIO $ IO.lookupEnv "TOOL_OUTPUT"
+        case mOut of
+          Nothing -> cmd_ [progPath] args
+          Just fp -> quietly $ (cmd (FileStdout fp) [progPath] args :: Action ())
 
     phony "changelog-clear" $ do
         top <- topDirectory

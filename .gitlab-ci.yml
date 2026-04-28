@@ -274,6 +274,24 @@ lint-changelog:
     # Build changelog-d and validate all entries (checks required fields, section names, MR number)
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh run_hadrian test --test-root-dirs="testsuite/tests/linters" --only=changelog-d
+    # Reject MRs that directly modify any path listed in
+    # changelog.d/config's markdown-targets: those files are regenerated
+    # from fragments at release time.
+    - export TOOL_OUTPUT=_build/changelog-d-markdown-targets.txt
+    - .gitlab/ci.sh run_hadrian list-markdown-targets
+    - |
+      paths=$(cat "$TOOL_OUTPUT")
+      touched=$(git diff --name-only "$base..$CI_COMMIT_SHA" -- $paths)
+      if [ -n "$touched" ]; then
+        echo "ERROR: This MR modifies a per-library changelog file directly:"
+        echo "$touched" | sed 's/^/  /'
+        echo
+        echo "These files are generated at release time from changelog.d/"
+        echo "fragments. Please add a fragment in changelog.d/ with the"
+        echo "appropriate 'section:' instead of editing the file directly."
+        echo "If this is a deliberate exception, apply the 'no-changelog' label."
+        exit 1
+      fi
   dependencies: []
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'

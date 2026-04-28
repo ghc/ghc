@@ -20,7 +20,7 @@ import Data.Set                (Set)
 import Data.Traversable        (for)
 import System.Directory        (doesDirectoryExist, doesFileExist, listDirectory)
 import System.Environment      (getArgs)
-import System.Exit             (exitFailure)
+import System.Exit             (ExitCode(..), exitFailure, exitWith)
 import System.FilePath         ((</>), dropTrailingPathSeparator, takeDirectory)
 import System.IO               (hPutStrLn, stderr)
 
@@ -72,6 +72,10 @@ usage = unlines
     , "                                  to a single section. Without this, all"
     , "                                  configured markdown-targets are emitted,"
     , "                                  separated by HTML-comment markers."
+    , "  --list-markdown-targets         Print one repo-relative path per line for"
+    , "                                  every entry in `markdown-targets:`. Used"
+    , "                                  by CI to source the list of files MRs are"
+    , "                                  not allowed to edit directly."
     , "  --help                          Show this help"
     ]
 
@@ -79,13 +83,14 @@ parseArgs :: [String] -> Either String Opts
 parseArgs = go defaultOpts
   where
     defaultOpts = Opts
-        { optDirectory  = "changelog.d"
-        , optVersion    = Nothing
-        , optValidate   = False
-        , optExpectMR   = Nothing
-        , optExpectCLC  = False
-        , optMarkdown   = False
-        , optMdSection  = Nothing
+        { optDirectory   = "changelog.d"
+        , optVersion     = Nothing
+        , optValidate    = False
+        , optExpectMR    = Nothing
+        , optExpectCLC   = False
+        , optMarkdown    = False
+        , optMdSection   = Nothing
+        , optListTargets = False
         }
 
     go opts [] = Right opts
@@ -102,6 +107,8 @@ parseArgs = go defaultOpts
         go opts { optMarkdown = True } rest
     go opts ("--section" : s : rest) = go opts { optMdSection = Just s } rest
     go _    ("--section" : []) = Left "--section requires an argument"
+    go opts ("--list-markdown-targets" : rest) =
+        go opts { optListTargets = True } rest
     go _    (('-':'-':opt) : _) = Left $ "Unknown option: --" ++ opt
     go _    (('-':opt) : _) = Left $ "Unknown option: -" ++ opt
     go opts (dir : rest) = go opts { optDirectory = dir } rest
@@ -147,6 +154,10 @@ makeChangelog Opts {..} = do
         contents <- BS.readFile filename
         either (exitWithExc . PlainError) return $
             parseWith parseConfig filename contents
+
+    when optListTargets $ do
+        for_ (cfgMarkdownTargets cfg) (putStrLn . mtPath)
+        exitWith ExitSuccess
 
     -- Read only regular files, skipping config, dotfiles, and any
     -- subdirectories (e.g. golden-output dirs alongside test fragments).
@@ -619,6 +630,7 @@ data Opts = Opts
     , optExpectCLC  :: Bool             -- ^ Require entry matched by --expect-mr to have clc:
     , optMarkdown   :: Bool             -- ^ Emit per-library Markdown to stdout
     , optMdSection  :: Maybe String     -- ^ Restrict markdown emission to one section
+    , optListTargets :: Bool            -- ^ List markdown-targets paths to stdout
     }
   deriving (Show)
 
