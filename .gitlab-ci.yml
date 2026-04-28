@@ -247,6 +247,9 @@ ghc-linters:
 
 # Check that MRs include a changelog entry in changelog.d/.
 # Skipped if the MR has the ~"no-changelog" label.
+#
+# If MR's diff touches libraries/base/, the changelog must also have a non-empty
+# `clc:` field.
 lint-changelog:
   stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
@@ -254,6 +257,7 @@ lint-changelog:
   variables:
     BUILD_FLAVOUR: default
     CHANGELOG_EXPECT_MR: "$CI_MERGE_REQUEST_IID"
+    CHANGELOG_EXPECT_CLC: ""
   script:
     # Check that the MR adds at least one changelog entry
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
@@ -276,6 +280,10 @@ lint-changelog:
       when: never
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*no-changelog.*/'
       when: never
+    - changes:
+        - libraries/base/**/*
+      variables:
+        CHANGELOG_EXPECT_CLC: "1"
     - if: $CI_MERGE_REQUEST_ID
     - *drafts-can-fail-lint
 

@@ -30,8 +30,12 @@ notes:
 	(cd $(TOP)/.. && $(LINT_NOTES) broken-refs)
 
 changelog-d:
-ifdef CHANGELOG_EXPECT_MR
+ifneq "$(CHANGELOG_EXPECT_MR)" ""
+ifneq "$(CHANGELOG_EXPECT_CLC)" ""
+	(cd $(TOP)/.. && $(CHANGELOG_D) changelog.d/ --validate --expect-mr $(CHANGELOG_EXPECT_MR) --expect-clc)
+else
 	(cd $(TOP)/.. && $(CHANGELOG_D) changelog.d/ --validate --expect-mr $(CHANGELOG_EXPECT_MR))
+endif
 else
 	(cd $(TOP)/.. && $(CHANGELOG_D) changelog.d/ --validate)
 endif

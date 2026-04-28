@@ -1,0 +1,48 @@
+-- This file exercises every construct supported by changelog-d's parser
+-- and RST -> Markdown rewriter. It is kept in tree as a regression
+-- fixture: when the parser or rewriter is touched, run
+--   cabal run changelog-d -- --validate changelog.d/
+--   cabal run changelog-d -- --libraries-changelog-markdown changelog.d/
+-- and visually compare the output. The tool treats this like any
+-- other fragment, so it WILL appear in `--version`'ed RST and in
+-- `--libraries-changelog-markdown` output. Delete it before cutting a
+-- release, or move it under utils/changelog-d/tests/ if/when that
+-- directory is wired up.
+section: base
+synopsis: Self-test fixture exercising the parser/rewriter. Uses double-backtick ``code``,
+  RST hyperlinks `the changelog wiki <https://gitlab.haskell.org/ghc/ghc/-/wikis/contributing/changelog>`_,
+  GHC-flavoured roles :ghc-ticket:`12345`, :ghc-mr:`6789`, :ghc-wiki:`commentary/compiler`,
+  :clc:`123`, :ghc-flag:`-fxxx`, :extension:`TypeApplications`, :ghci-cmd:`:type`,
+  :rts-flag:`-N`, haddock cross-refs :base-ref:`Data.Maybe.fromMaybe`,
+  :th-ref:`Language.Haskell.TH.Lib`, :cabal-ref:`Distribution.Simple`,
+  :ghc-prim-ref:`GHC.Prim`, the :doc:`internal-doc` role, and an :unknown-role:`pass-through`.
+issues: #26002
+mrs: !15830
+clc: #0
+
+description: {
+  This description block exercises block-level rewrites and inline rewrites
+  inside a multi-line braced field.
+
+  Inline forms inside the description: ``inline code``, :extension:`DataKinds`,
+  :ghc-mr:`15830`, :base-ref:`Control.Applicative`, and a `bare RST link
+  <https://example.invalid/>`_.
+
+  .. note::
+     This is an RST note admonition. It should render as a Markdown
+     blockquote prefixed with ``> **Note:**``.
+
+  .. warning::
+     This is an RST warning admonition. It should render as a Markdown
+     blockquote prefixed with ``> **Warning:**``.
+
+  .. code-block:: haskell
+
+     foo :: Int -> Int
+     foo x = x + 1
+     bar :: String
+     bar = "hello"
+
+  After the code block, plain prose continues. Verify that the renderer
+  exits the fenced block correctly and resumes paragraph flow here.
+}

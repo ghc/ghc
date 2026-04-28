@@ -27,6 +27,7 @@ sections: {
   cmm               Cmm
   build-tools       Build tools
   base              ``base`` library
+  ghc-internal      ``ghc-internal`` library
   ghc-prim          ``ghc-prim`` library
   ghc-lib           ``ghc`` library
   ghc-heap          ``ghc-heap`` library
@@ -34,6 +35,18 @@ sections: {
   template-haskell  ``template-haskell`` library
   ghc-pkg           ``ghc-pkg``
   ghc-toolchain     ``ghc-toolchain``
+}
+
+-- markdown-targets: sections that also need to end up in
+-- per-library changelog files. The optional third token
+-- lists extra fields that might be required for this section
+-- like `clc` for base.
+markdown-targets: {
+  base               libraries/base/changelog.md             clc
+  ghc-internal       libraries/ghc-internal/CHANGELOG.md
+  ghc-prim           libraries/ghc-prim/changelog.md
+  ghc-experimental   libraries/ghc-experimental/CHANGELOG.md
+  template-haskell   libraries/template-haskell/changelog.md
 }
 
 included-libraries-preamble: {

@@ -23,7 +23,8 @@ https://gitlab.haskell.org/ghc/ghc/-/wikis/Contributing-a-Patch
 - [ ] This MR solves the problem described in the following issue: <!-- issue number here (please open a new issue if there isn't one) -->
 - [ ] A changelog entry was added in `changelog.d/` for user-facing changes (see [changelog guide][changelog]).
       If this MR does not need a changelog entry, the ~"no-changelog" label was applied.
-- [ ] This MR does not make any significant changes to `base`, or it has an accompanying [CLC proposal](https://github.com/haskell/core-libraries-committee#base-package).
+- [ ] This MR does not make any significant changes to `base`, or it has an accompanying [CLC proposal](https://github.com/haskell/core-libraries-committee#base-package)
+      and the changelog fragment uses `section: base` with the `clc: #<proposal>` field set.
 - [ ] If this MR has the potential to break user programs, the ~"user-facing" label was applied to 
       test against head.hackage.
 - [ ] All commits are either individually buildable or squashed.

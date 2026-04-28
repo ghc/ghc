@@ -1,0 +1,9 @@
+required-fields: synopsis mrs issues section
+
+sections: {
+  base   ``base`` library
+}
+
+markdown-targets: {
+  base   _fake/changelog.md   clc
+}

@@ -10,15 +10,15 @@
 module Main (main) where
 
 import Control.Exception       (Exception (..))
-import Control.Monad           (unless, void, when)
-import Data.Char               (isSpace)
+import Control.Monad           (filterM, unless, void, when)
+import Data.Char               (isAlpha, isSpace)
 import Data.Foldable           (for_, toList, traverse_)
 import Data.Function           (on)
-import Data.List               (intercalate, sort, sortBy)
+import Data.List               (find, intercalate, isPrefixOf, isSuffixOf, sort, sortBy, stripPrefix)
 import Data.Maybe              (isJust, isNothing, mapMaybe)
 import Data.Set                (Set)
 import Data.Traversable        (for)
-import System.Directory        (listDirectory)
+import System.Directory        (doesDirectoryExist, doesFileExist, listDirectory)
 import System.Environment      (getArgs)
 import System.Exit             (exitFailure)
 import System.FilePath         ((</>), dropTrailingPathSeparator, takeDirectory)
@@ -58,16 +58,35 @@ usage = unlines
     , "  Collect changelog entries and produce release notes."
     , ""
     , "Options:"
-    , "  --version <version>   Version number for RST file header (e.g. 10.2.1)"
-    , "  --validate            Validate entries only, no output"
-    , "  --expect-mr <N>       Check that at least one entry references MR !N"
-    , "  --help                Show this help"
+    , "  --version <version>             Version number for RST file header (e.g. 10.2.1)"
+    , "  --validate                      Validate entries only, no output"
+    , "  --expect-mr <N>                 Check that at least one entry references MR !N"
+    , "  --expect-clc                    Require the entry matched by --expect-mr"
+    , "                                  to have a non-empty 'clc:' field. Used by"
+    , "                                  CI for MRs touching base."
+    , "  --libraries-changelog-markdown  Emit per-library Markdown bullets to"
+    , "                                  stdout (suppresses RST emission). Output"
+    , "                                  is intended to be pasted into each"
+    , "                                  libraries/<lib>/changelog.md by hand;"
+    , "  --section <key>                 Restrict --libraries-changelog-markdown"
+    , "                                  to a single section. Without this, all"
+    , "                                  configured markdown-targets are emitted,"
+    , "                                  separated by HTML-comment markers."
+    , "  --help                          Show this help"
     ]
 
 parseArgs :: [String] -> Either String Opts
 parseArgs = go defaultOpts
   where
-    defaultOpts = Opts "changelog.d" Nothing False Nothing
+    defaultOpts = Opts
+        { optDirectory  = "changelog.d"
+        , optVersion    = Nothing
+        , optValidate   = False
+        , optExpectMR   = Nothing
+        , optExpectCLC  = False
+        , optMarkdown   = False
+        , optMdSection  = Nothing
+        }
 
     go opts [] = Right opts
     go _    ("--help" : _) = Left ""
@@ -78,6 +97,11 @@ parseArgs = go defaultOpts
         [(mr, "")] -> go opts { optExpectMR = Just mr } rest
         _          -> Left $ "--expect-mr requires a number, got: " ++ n
     go _    ("--expect-mr" : []) = Left "--expect-mr requires an argument"
+    go opts ("--expect-clc" : rest) = go opts { optExpectCLC = True } rest
+    go opts ("--libraries-changelog-markdown" : rest) =
+        go opts { optMarkdown = True } rest
+    go opts ("--section" : s : rest) = go opts { optMdSection = Just s } rest
+    go _    ("--section" : []) = Left "--section requires an argument"
     go _    (('-':'-':opt) : _) = Left $ "Unknown option: --" ++ opt
     go _    (('-':opt) : _) = Left $ "Unknown option: -" ++ opt
     go opts (dir : rest) = go opts { optDirectory = dir } rest
@@ -124,9 +148,14 @@ makeChangelog Opts {..} = do
         either (exitWithExc . PlainError) return $
             parseWith parseConfig filename contents
 
+    -- Read only regular files, skipping config, dotfiles, and any
+    -- subdirectories (e.g. golden-output dirs alongside test fragments).
     dirContents <- filter (not . isTmpFile) <$> listDirectory optDirectory
+    fragmentNames <-
+      filterM (\name -> doesFileExist (optDirectory </> name))
+              (filter (/= "config") $ sort dirContents)
     allEntries <- fmap Map.fromList $
-      for (filter (/= "config") $ sort dirContents) $ \name -> do
+      for fragmentNames $ \name -> do
         let fp = optDirectory </> name
         contents <- BS.readFile fp
         entry <- parseEntryFile fp contents
@@ -140,17 +169,38 @@ makeChangelog Opts {..} = do
       exitWithExc $ PlainError "Validation failed."
 
     -- Check expected MR number if specified
-    for_ optExpectMR $ \expectedMR -> do
-      let expectedMRNum = MRNumber expectedMR
-          entriesWithMR = Map.filter (\e -> expectedMRNum `Set.member` entryMrs e) allEntries
-      when (Map.null entriesWithMR && not (Map.null allEntries)) $ do
-        hPutStrLn stderr $ "Warning: No changelog entry references this MR (!" ++ show expectedMR ++ ")."
-        hPutStrLn stderr $ "Add 'mrs: !" ++ show expectedMR ++ "' to your changelog entry."
-        hPutStrLn stderr ""
-        exitFailure
+    matchedByMR <- case optExpectMR of
+      Nothing -> pure Map.empty
+      Just expectedMR -> do
+        let expectedMRNum = MRNumber expectedMR
+            withMR = Map.filter (\e -> expectedMRNum `Set.member` entryMrs e) allEntries
+        when (Map.null withMR && not (Map.null allEntries)) $ do
+          hPutStrLn stderr $ "Warning: No changelog entry references this MR (!" ++ show expectedMR ++ ")."
+          hPutStrLn stderr $ "Add 'mrs: !" ++ show expectedMR ++ "' to your changelog entry."
+          hPutStrLn stderr ""
+          exitFailure
+        pure withMR
+
+    -- --expect-clc: assert that the MR-matched entry has clc: set.
+    when optExpectCLC $ case optExpectMR of
+      Nothing -> exitWithExc $ PlainError
+        "--expect-clc requires --expect-mr (which entry to check?)"
+      Just expectedMR ->
+        when (not (Map.null matchedByMR)
+              && all (Set.null . entryClcs) matchedByMR) $ do
+          hPutStrLn stderr $
+            "Error: changelog entry for !" ++ show expectedMR
+            ++ " does not have a 'clc:' field."
+          hPutStrLn stderr
+            "Changes to base or user-facing changes require a CLC proposal."
+          hPutStrLn stderr "Add 'clc: #<proposal>' to your changelog entry."
+          exitFailure
 
     unless optValidate $
-      outputRST optDirectory optVersion cfg (Map.elems allEntries)
+      if optMarkdown
+        then outputMarkdown optDirectory cfg optMdSection
+                            (Map.elems allEntries)
+        else outputRST optDirectory optVersion cfg (Map.elems allEntries)
 
 -------------------------------------------------------------------------------
 -- RST output
@@ -218,6 +268,9 @@ formatEntry Entry {..} =
         ] ++
         [ "(:ghc-mr:`" ++ show n ++ "`)"
         | MRNumber n <- Set.toList entryMrs
+        ] ++
+        [ "(:clc:`" ++ show n ++ "`)"
+        | CLCNumber n <- Set.toList entryClcs
         ]
 
     description = maybe "" (\d -> "\n" ++ trim d ++ "\n\n") entryDescription
@@ -262,25 +315,281 @@ generateIncludedLibraries baseDir preamble libs = do
   where
     fst3 (a, _, _) = a
 
-    extractField :: String -> String -> Maybe String
-    extractField fieldName contents =
-        case mapMaybe (matchField fieldName) (lines contents) of
-            (v:_) -> Just v
-            []    -> Nothing
+extractField :: String -> String -> Maybe String
+extractField fieldName contents =
+    case mapMaybe (matchField fieldName) (lines contents) of
+        (v:_) -> Just v
+        []    -> Nothing
 
-    matchField :: String -> String -> Maybe String
-    matchField fieldName line =
-        let stripped = dropWhile isSpace line
-            (key, rest) = break (\c -> c == ':' || isSpace c) stripped
-        in if map toLower' key == map toLower' fieldName
-           then case dropWhile isSpace rest of
-                    (':':val) -> Just (trim (dropWhile isSpace val))
-                    _         -> Nothing
-           else Nothing
+matchField :: String -> String -> Maybe String
+matchField fieldName line =
+    let stripped = dropWhile isSpace line
+        (key, rest) = break (\c -> c == ':' || isSpace c) stripped
+    in if map toLower' key == map toLower' fieldName
+       then case dropWhile isSpace rest of
+                (':':val) -> Just (trim (dropWhile isSpace val))
+                _         -> Nothing
+       else Nothing
 
-    toLower' c
-        | c >= 'A' && c <= 'Z' = toEnum (fromEnum c + 32)
-        | otherwise             = c
+toLower' :: Char -> Char
+toLower' c
+    | c >= 'A' && c <= 'Z' = toEnum (fromEnum c + 32)
+    | otherwise             = c
+
+-------------------------------------------------------------------------------
+-- Markdown output
+-------------------------------------------------------------------------------
+
+-- | Emit per-library Markdown bullets to stdout.
+--
+-- With 'mSect' set, emit just that section's bullets (used interactively).
+-- Without it, emit every section listed in @markdown-targets:@, separated
+-- by HTML comments naming each section
+outputMarkdown
+    :: FilePath           -- ^ changelog.d directory (used to locate cabal files)
+    -> Cfg
+    -> Maybe String       -- ^ --section <key>
+    -> [Entry]
+    -> IO ()
+outputMarkdown dir Cfg{..} mSect entries = do
+    targets <- case mSect of
+      Just key -> case find ((== key) . mtSection) cfgMarkdownTargets of
+        Nothing -> exitWithExc $ PlainError $
+            "Unknown markdown section: " ++ key
+            ++ "\nKnown sections: "
+            ++ intercalate ", " (map mtSection cfgMarkdownTargets)
+        Just mt -> pure [mt]
+      Nothing  -> pure cfgMarkdownTargets
+
+    let multi   = isNothing mSect
+        baseDir = takeDirectory (dropTrailingPathSeparator dir)
+
+    case mSect of
+      Just key | not (any (\mt -> mtSection mt == key) cfgMarkdownTargets) ->
+          -- impossible; handled above
+          pure ()
+      Just key | null (entriesFor key entries) ->
+          exitWithExc $ PlainError $ "No entries for section " ++ key
+      _ -> pure ()
+
+    for_ targets $ \mt -> do
+        let es = entriesFor (mtSection mt) entries
+        unless (null es) $ do
+            when multi $ do
+                putStrLn $ "<!-- ===== " ++ mtSection mt
+                         ++ " (" ++ mtPath mt ++ ") ===== -->"
+                putStrLn ""
+            libVer <- readLibraryVersion baseDir (mtPath mt)
+            putStrLn $ "## " ++ libVer ++ " *TBA*"
+            putStrLn ""
+            for_ (sortBy (flip compare `on` hasDescription) es) $ \entry ->
+                putStr (formatEntryMd entry)
+            when multi $ putStrLn ""
+
+entriesFor :: String -> [Entry] -> [Entry]
+entriesFor key = filter $ \e -> case entrySection e of
+    Just (Section s) -> s == key
+    Nothing          -> False
+
+-- | Given the path of a library's @changelog.md@ (repo-relative), find the
+-- sibling @*.cabal@ (or @*.cabal.in@) and read the @version:@ field.
+readLibraryVersion :: FilePath -> FilePath -> IO String
+readLibraryVersion baseDir mdPath = do
+    let libDir   = takeDirectory mdPath
+        libDirFs = baseDir </> libDir
+    exists <- doesDirectoryExist libDirFs
+    if not exists
+      then do
+        hPutStrLn stderr $ "Warning: directory does not exist: " ++ libDirFs
+        pure "?.?.?"
+      else do
+        candidates <- listDirectory libDirFs
+        let cabals = filter (\f -> ".cabal" `isSuffixOf` f) candidates
+            -- Prefer non-templated *.cabal over *.cabal.in (the former is
+            -- the rendered file Hadrian needs before invoking us).
+            ranked  = sortBy (compare `on` (\f -> if ".cabal.in" `isSuffixOf` f then (1::Int) else 0)) cabals
+        case ranked of
+          []      -> do
+              hPutStrLn stderr $
+                  "Warning: no .cabal file under " ++ libDir
+              pure "?.?.?"
+          (cf:_)  -> do
+              contents <- readFile (libDirFs </> cf)
+              case extractField "version" contents of
+                Just v  -> pure v
+                Nothing -> do
+                    hPutStrLn stderr $
+                        "Warning: could not parse version from " ++ libDir </> cf
+                    pure "?.?.?"
+
+-- | Format an Entry as a Markdown bullet. Mirrors 'formatEntry' for RST
+-- but emits Markdown links for issues/MRs/CLC and rewrites RST inline
+-- markup to markdown.
+formatEntryMd :: Entry -> String
+formatEntryMd Entry{..} = indentBulletMd (header ++ description)
+  where
+    header = unwords $
+        [ rstToMarkdown entrySynopsis ] ++
+        [ mdLink ("#" ++ show n)
+                 ("https://gitlab.haskell.org/ghc/ghc/issues/" ++ show n)
+        | IssueNumber n <- Set.toList entryIssues
+        ] ++
+        [ mdLink ("!" ++ show n)
+                 ("https://gitlab.haskell.org/ghc/ghc/-/merge_requests/" ++ show n)
+        | MRNumber n <- Set.toList entryMrs
+        ] ++
+        [ mdLink ("CLC proposal #" ++ show n)
+                 ("https://github.com/haskell/core-libraries-committee/issues/" ++ show n)
+        | CLCNumber n <- Set.toList entryClcs
+        ]
+
+    description = maybe "" (\d -> "\n\n" ++ rstToMarkdown (trim d) ++ "\n") entryDescription
+
+    mdLink :: String -> String -> String
+    mdLink txt url = "(" ++ "[" ++ txt ++ "](" ++ url ++ ")" ++ ")"
+
+-- | Indent text as a Markdown bullet: the first line gets @"* "@ prefix,
+-- subsequent lines are indented two spaces. Mirrors 'indentBullet'.
+indentBulletMd :: String -> String
+indentBulletMd = unlines . go . lines
+  where
+    go []     = []
+    go (x:xs) = ("* " ++ x) : map indentLine xs
+    indentLine "" = ""
+    indentLine s  = "  " ++ s
+
+-------------------------------------------------------------------------------
+-- RST -> Markdown rewriting
+-------------------------------------------------------------------------------
+--
+-- Applies the following rules:
+--
+-- | RST                                              | Markdown                                                                                               |
+-- | -------------------------------------------------| ------------------------------------------------------------------------------------------------------ |
+-- | ``code`` (double-backtick)                       | `code` (single-backtick)                                                                               |
+-- | `text <url>`_                                    | [text](url)                                                                                            |
+-- | :ghc-ticket:`N`                                  | [#N](https://gitlab.haskell.org/ghc/ghc/issues/N)                                                      |
+-- | :ghc-mr:`N`                                      | [!N](https://gitlab.haskell.org/ghc/ghc/-/merge_requests/N)                                            |
+-- | :ghc-wiki:`p`                                    | [p](https://gitlab.haskell.org/ghc/ghc/wikis/p)                                                        |
+-- | :clc:`N`                                         | [CLC proposal #N](https://github.com/haskell/core-libraries-committee/issues/N)                        |
+-- | :ghc-flag:`-foo`                                 | `-foo`                                                                                                 |
+-- | :extension:`E`                                   | `E`                                                                                                    |
+-- | :ghci-cmd:`X`, :rts-flag:`X`                     | `X`                                                                                                    |
+-- | :base-ref:`Mod.id` ``                            | `Mod.id`                                                                                               |
+-- | :th-ref:, :cabal-ref: ,:ghc-prim-ref:            | `ref`                                                                                                  |
+-- | .. code-block:: lang + indented body             | Triple-backtick fenced block with `lang`                                                               |
+-- | .. note:: / .. warning::                         | `> **Note:**` / `> **Warning:**` blockquote                                                            |
+
+rstToMarkdown :: String -> String
+rstToMarkdown s =
+    let trailingNL = not (null s) && last s == '\n'
+        body       = intercalate "\n" . blockPass . lines . inlinePass $ s
+    in body ++ (if trailingNL then "\n" else "")
+
+inlinePass :: String -> String
+inlinePass [] = []
+-- Double-backtick code: ``code`` → `code`
+inlinePass ('`':'`':rest) =
+    case breakOnSubstring "``" rest of
+      (body, _:_:after) -> "`" ++ body ++ "`" ++ inlinePass after
+      _                 -> '`':'`': inlinePass rest
+-- RST hyperlink: `text <url>`_ → [text](url)
+inlinePass ('`':rest)
+  | Just (txt, url, after) <- pickRstLink rest =
+      "[" ++ trim txt ++ "](" ++ url ++ ")" ++ inlinePass after
+-- :role:`body` interpreted-text role
+inlinePass (':':rest)
+  | Just (role, body, after) <- pickRole rest =
+      renderRole role body ++ inlinePass after
+inlinePass (c:cs) = c : inlinePass cs
+
+breakOnSubstring :: String -> String -> (String, String)
+breakOnSubstring needle = go
+  where
+    go [] = ([], [])
+    go s@(c:cs)
+      | needle `isPrefixOf` s = ([], s)
+      | otherwise =
+          let (a, b) = go cs in (c:a, b)
+
+-- | Try to consume a @\`text \<url\>\`_@ RST hyperlink starting after the
+-- leading backtick. Returns @(text, url, rest)@ on success.
+pickRstLink :: String -> Maybe (String, String, String)
+pickRstLink xs = do
+    let (txt, r1) = break (== '<') xs
+    case r1 of
+      '<':r2 -> do
+          let (url, r3) = break (== '>') r2
+          case r3 of
+            '>':'`':'_':'_':after -> Just (txt, url, after)
+            '>':'`':'_':after     -> Just (txt, url, after)
+            _                     -> Nothing
+      _ -> Nothing
+
+-- | Try to consume a @role:\`body\`@ interpreted-text role starting just
+-- after the leading colon.
+pickRole :: String -> Maybe (String, String, String)
+pickRole xs =
+    let (name, r1) = span (\c -> isAlpha c || c == '-') xs
+    in case (null name, r1) of
+         (False, ':':'`':r2) -> case break (== '`') r2 of
+           (body, '`':after) | not (null body) -> Just (name, body, after)
+           _ -> Nothing
+         _ -> Nothing
+
+-- | Render a known interpreted-text role to Markdown.
+renderRole :: String -> String -> String
+renderRole role body = case role of
+    "ghc-ticket"   -> mdLink ("#"  ++ body) ("https://gitlab.haskell.org/ghc/ghc/issues/" ++ body)
+    "ghc-mr"       -> mdLink ("!"  ++ body) ("https://gitlab.haskell.org/ghc/ghc/-/merge_requests/" ++ body)
+    "ghc-wiki"     -> mdLink body            ("https://gitlab.haskell.org/ghc/ghc/wikis/" ++ body)
+    "clc"          -> mdLink ("CLC proposal #" ++ body)
+                             ("https://github.com/haskell/core-libraries-committee/issues/" ++ body)
+    "ghc-flag"     -> "`" ++ body ++ "`"
+    "extension"    -> "`" ++ body ++ "`"
+    "ghci-cmd"     -> "`" ++ body ++ "`"
+    "rts-flag"     -> "`" ++ body ++ "`"
+    "doc"          -> body
+    "base-ref"     -> "`" ++ body ++ "`"
+    "th-ref"       -> "`" ++ body ++ "`"
+    "cabal-ref"    -> "`" ++ body ++ "`"
+    "ghc-prim-ref" -> "`" ++ body ++ "`"
+    _              -> ":" ++ role ++ ":`" ++ body ++ "`"
+  where
+    mdLink txt url = "[" ++ txt ++ "](" ++ url ++ ")"
+
+-- | Block-level transforms applied after the inline pass.
+blockPass :: [String] -> [String]
+blockPass [] = []
+blockPass (l:rest)
+  | Just lang <- stripPrefix ".. code-block:: " (trim l) =
+      let (body, rest') = takeIndentedBlock rest
+      in ("```" ++ lang) : map (dropIndent 4) body ++ ["```"] ++ blockPass rest'
+  | trim l == ".. note::" =
+      let (body, rest') = takeIndentedBlock rest
+      in "> **Note:**" : map (("> " ++) . dropIndent 4) body ++ blockPass rest'
+  | trim l == ".. warning::" =
+      let (body, rest') = takeIndentedBlock rest
+      in "> **Warning:**" : map (("> " ++) . dropIndent 4) body ++ blockPass rest'
+  | otherwise = l : blockPass rest
+
+-- | Take a block of indented (or blank) lines following a directive; stop
+-- at the first non-blank, non-indented line.
+takeIndentedBlock :: [String] -> ([String], [String])
+takeIndentedBlock = go . dropWhile null
+  where
+    go []                       = ([], [])
+    go (x:xs)
+      | null x                  = let (a, b) = go xs in (x:a, b)
+      | take 1 x == " "         = let (a, b) = go xs in (x:a, b)
+      | otherwise               = ([], x:xs)
+
+-- | Drop up to @n@ leading spaces from a line.
+dropIndent :: Int -> String -> String
+dropIndent _ "" = ""
+dropIndent 0 s  = s
+dropIndent n (' ':cs) = dropIndent (n-1) cs
+dropIndent _ s  = s
 
 -------------------------------------------------------------------------------
 -- Section grouping
@@ -303,10 +612,13 @@ groupBySections sectionDefs entries =
 -------------------------------------------------------------------------------
 
 data Opts = Opts
-    { optDirectory :: FilePath
-    , optVersion   :: Maybe String
-    , optValidate  :: Bool
-    , optExpectMR  :: Maybe Int        -- ^ Expected MR number
+    { optDirectory  :: FilePath
+    , optVersion    :: Maybe String
+    , optValidate   :: Bool
+    , optExpectMR   :: Maybe Int        -- ^ Expected MR number
+    , optExpectCLC  :: Bool             -- ^ Require entry matched by --expect-mr to have clc:
+    , optMarkdown   :: Bool             -- ^ Emit per-library Markdown to stdout
+    , optMdSection  :: Maybe String     -- ^ Restrict markdown emission to one section
     }
   deriving (Show)
 
@@ -332,6 +644,24 @@ instance C.Parsec MRNumber where
 instance C.Pretty MRNumber where
     pretty (MRNumber n) = PP.char '!' PP.<> PP.int n
 
+newtype CLCNumber = CLCNumber Int
+  deriving (Eq, Ord, Show)
+
+instance C.Parsec CLCNumber where
+    parsec = do
+        _ <- P.char '#'
+        CLCNumber <$> P.integral
+
+instance C.Pretty CLCNumber where
+    pretty (CLCNumber n) = PP.char '#' PP.<> PP.int n
+
+data MarkdownTarget = MarkdownTarget
+    { mtSection        :: String       -- ^ section key matching an entry's `section:`
+    , mtPath           :: FilePath     -- ^ target changelog path, repo-relative
+    , mtRequiredFields :: [String]     -- ^ extra required-fields when this section is used
+    }
+  deriving (Show)
+
 newtype Section = Section String
   deriving (Eq, Ord, Show)
 
@@ -351,6 +681,7 @@ data Cfg = Cfg
     , cfgPreamble                  :: String
     , cfgIncludedLibraries         :: [(FilePath, String)] -- ^ (cabalPath, description)
     , cfgIncludedLibrariesPreamble :: String
+    , cfgMarkdownTargets           :: [MarkdownTarget]
     }
   deriving (Show)
 
@@ -364,6 +695,7 @@ parseConfig fields0 = do
         , cfgPreamble                  = cfgRawPreamble raw
         , cfgIncludedLibraries         = parseIncludedLibraries (cfgRawIncludedLibraries raw)
         , cfgIncludedLibrariesPreamble = cfgRawIncludedLibrariesPreamble raw
+        , cfgMarkdownTargets           = parseMarkdownTargets (cfgRawMarkdownTargets raw)
         }
   where
     (fields, sections) = C.partitionFields fields0
@@ -378,6 +710,7 @@ data CfgRaw = CfgRaw
     , cfgRawPreamble                  :: String
     , cfgRawIncludedLibraries         :: String
     , cfgRawIncludedLibrariesPreamble :: String
+    , cfgRawMarkdownTargets           :: String
     }
 
 cfgRawRequiredFieldsL :: Functor f => (Set String -> f (Set String)) -> CfgRaw -> f CfgRaw
@@ -395,6 +728,9 @@ cfgRawIncludedLibrariesL f s = (\x -> s { cfgRawIncludedLibraries = x }) <$> f (
 cfgRawIncludedLibrariesPreambleL :: Functor f => (String -> f String) -> CfgRaw -> f CfgRaw
 cfgRawIncludedLibrariesPreambleL f s = (\x -> s { cfgRawIncludedLibrariesPreamble = x }) <$> f (cfgRawIncludedLibrariesPreamble s)
 
+cfgRawMarkdownTargetsL :: Functor f => (String -> f String) -> CfgRaw -> f CfgRaw
+cfgRawMarkdownTargetsL f s = (\x -> s { cfgRawMarkdownTargets = x }) <$> f (cfgRawMarkdownTargets s)
+
 cfgRawGrammar :: C.ParsecFieldGrammar CfgRaw CfgRaw
 cfgRawGrammar = CfgRaw
     <$> C.monoidalFieldAla "required-fields"              (C.alaSet' C.FSep C.Token) cfgRawRequiredFieldsL
@@ -402,6 +738,7 @@ cfgRawGrammar = CfgRaw
     <*> C.freeTextFieldDef "preamble"                     cfgRawPreambleL
     <*> C.freeTextFieldDef "included-libraries"           cfgRawIncludedLibrariesL
     <*> C.freeTextFieldDef "included-libraries-preamble"  cfgRawIncludedLibrariesPreambleL
+    <*> C.freeTextFieldDef "markdown-targets"             cfgRawMarkdownTargetsL
 
 parseSections :: String -> [(String, String)]
 parseSections = mapMaybe parseLine . lines
@@ -419,6 +756,20 @@ parseIncludedLibraries = mapMaybe parseLine . lines
             (path, rest) | not (null path) -> Just (path, trim rest)
             _ -> Nothing
 
+-- | Parse the @markdown-targets:@ block.
+--
+-- Each non-empty, non-comment line is
+-- <section-key> <path> [<extra-required-field>...]
+-- The extra tokens declare additional fields required of any entry whose section: matches.
+parseMarkdownTargets :: String -> [MarkdownTarget]
+parseMarkdownTargets = mapMaybe parseLine . lines
+  where
+    parseLine l = case words (trim l) of
+        []          -> Nothing
+        [_]         -> Nothing  -- need at least section + path
+        (sect:path:extra) ->
+            Just $ MarkdownTarget sect path extra
+
 -------------------------------------------------------------------------------
 -- Entry
 -------------------------------------------------------------------------------
@@ -428,6 +779,7 @@ data Entry = Entry
     , entryDescription  :: Maybe String
     , entryMrs          :: Set MRNumber
     , entryIssues       :: Set IssueNumber
+    , entryClcs         :: Set CLCNumber
     , entrySection      :: Maybe Section
     }
   deriving (Show)
@@ -446,6 +798,9 @@ entryMrsL f s = (\x -> s { entryMrs = x }) <$> f (entryMrs s)
 
 entryIssuesL :: Functor f => (Set IssueNumber -> f (Set IssueNumber)) -> Entry -> f Entry
 entryIssuesL f s = (\x -> s { entryIssues = x }) <$> f (entryIssues s)
+
+entryClcsL :: Functor f => (Set CLCNumber -> f (Set CLCNumber)) -> Entry -> f Entry
+entryClcsL f s = (\x -> s { entryClcs = x }) <$> f (entryClcs s)
 
 entrySectionL :: Functor f => (Maybe Section -> f (Maybe Section)) -> Entry -> f Entry
 entrySectionL f s = (\x -> s { entrySection = x }) <$> f (entrySection s)
@@ -477,6 +832,7 @@ entryGrammar = Entry
     <*> C.freeTextField    "description"                           entryDescriptionL
     <*> C.monoidalFieldAla "mrs"          (C.alaSet C.NoCommaFSep) entryMrsL
     <*> C.monoidalFieldAla "issues"       (C.alaSet C.NoCommaFSep) entryIssuesL
+    <*> C.monoidalFieldAla "clc"          (C.alaSet C.NoCommaFSep) entryClcsL
     <*> C.optionalField    "section"                               entrySectionL
 
 -------------------------------------------------------------------------------
@@ -510,8 +866,21 @@ validateEntry cfg entry = foldMap (\validator -> validator cfg entry)
 
 validateRequiredFields :: Validator
 validateRequiredFields Cfg{..} Entry{..} = fmap RequiredFieldError $
-  mapMaybe checkField $ Set.toList cfgRequiredFields
+  mapMaybe checkField $ Set.toList effectiveRequired
   where
+    -- Effective required-fields = global cfgRequiredFields + extras for the
+    -- entry's section as declared in cfgMarkdownTargets
+    -- (e.g. `base` adds `clc`).
+    effectiveRequired =
+      cfgRequiredFields `Set.union`
+      Set.fromList
+        [ f
+        | Just (Section sect) <- [entrySection]
+        , mt <- cfgMarkdownTargets
+        , mtSection mt == sect
+        , f <- mtRequiredFields mt
+        ]
+
     checkField :: String -> Maybe RequiredFieldError
     checkField reqField = case fieldIsEmpty reqField of
       Left err   -> Just err
@@ -522,6 +891,7 @@ validateRequiredFields Cfg{..} Entry{..} = fmap RequiredFieldError $
     fieldIsEmpty "description"  = pure $ isNothing entryDescription
     fieldIsEmpty "mrs"          = pure $ null entryMrs
     fieldIsEmpty "issues"       = pure $ null entryIssues
+    fieldIsEmpty "clc"          = pure $ null entryClcs
     fieldIsEmpty "section"      = pure $ isNothing entrySection
     fieldIsEmpty f              = Left $ UnknownRequiredField f
 
