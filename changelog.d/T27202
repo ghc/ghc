@@ -1,0 +1,9 @@
+section: ghci
+synopsis: Fix regression to allow loading modules into the GHCi after startup.
+issues: #27202
+mrs: !15980
+
+description: {
+    Fix a regression that made it impossible to import modules using `:load <Mod>` and `:add <Mod>` after GHCi startup.
+    GHCi wasn't honouring the `-i<directory>` argument if given via `ghci -i<directory>`.
+}

@@ -1,0 +1,3 @@
+:load src/B.hs
+foo
+bar
