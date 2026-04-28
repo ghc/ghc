@@ -226,12 +226,23 @@ defaultLibraryWays = do
              [ pure [vanilla]
              , notStage0 ? pure [profiling]
              , notStage0 ? platformSupportsSharedLibs
+                         ? onlyDynGhcLibIfSupported
                          ? pure [dynamic, profilingDynamic]
              ]
 
       -- modules for executables get built only one way
       else do stage <- getStage
               Set.singleton <$> expr (programWay stage pkg)
+
+-- | Only build the ghc library (and libs that depend on it) the dynamic way,
+-- if the platform supports it.
+--
+onlyDynGhcLibIfSupported :: Predicate
+onlyDynGhcLibIfSupported = do
+    pkg <- getPackage
+    if isGhcApiPackage pkg
+      then expr defaultDynamicGhcPrograms
+      else pure True
 
 -- | Default build ways for the RTS.
 defaultRtsWays :: Ways
@@ -323,7 +334,7 @@ defaultDynamicGhcPrograms = do
   supportsShared <- platformSupportsSharedLibs
   winTarget <- isWinTarget
   -- For now, don't build dynamic ghc on windows because we hit dll
-  -- symbol limits for the ghc library.
+  -- symbol limits for the ghc library. See issue #27162.
   return (supportsShared && not winTarget)
 
 -- | All 'Builder'-dependent command line arguments.

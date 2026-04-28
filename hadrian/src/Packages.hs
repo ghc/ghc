@@ -13,6 +13,7 @@ module Packages (
     transformers, unlit, unix, win32, xhtml,
     lintersCommon, lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace,
     ghcPackages, isGhcPackage,
+    ghcApiPackages, isGhcApiPackage,
 
     -- * Package information
     crossPrefix, programName, nonHsMainPackage, programPath, timeoutPath,
@@ -48,6 +49,16 @@ ghcPackages =
 -- TODO: Optimise by switching to sets of packages.
 isGhcPackage :: Package -> Bool
 isGhcPackage = (`elem` ghcPackages)
+
+-- | This package list contains the ghc api package (called 'compiler' here),
+-- and all the libraries (not programs) that depend on the ghc api package.
+-- This is used to special-case things for the ghc api package and its deps.
+--
+ghcApiPackages :: [Package]
+ghcApiPackages = [compiler, haddockApi]
+
+isGhcApiPackage :: Package -> Bool
+isGhcApiPackage = (`elem` ghcApiPackages)
 
 -- | Package definitions, see 'Package'.
 array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, countDeps,
