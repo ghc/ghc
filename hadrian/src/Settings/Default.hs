@@ -321,7 +321,10 @@ defaultFlavour = Flavour
 defaultDynamicGhcPrograms :: Action Bool
 defaultDynamicGhcPrograms = do
   supportsShared <- platformSupportsSharedLibs
-  return (not windowsHost && supportsShared)
+  winTarget <- isWinTarget
+  -- For now, don't build dynamic ghc on windows because we hit dll
+  -- symbol limits for the ghc library.
+  return (supportsShared && not winTarget)
 
 -- | All 'Builder'-dependent command line arguments.
 defaultBuilderArgs :: Args
