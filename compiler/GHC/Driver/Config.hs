@@ -26,7 +26,7 @@ initSimpleOpts dflags = SimpleOpts
    { so_uf_opts = unfoldingOpts dflags
    , so_co_opts = initOptCoercionOpts dflags
    , so_eta_red = gopt Opt_DoEtaReduction dflags
-   , so_inline  = True
+   , so_inline  = const True
    }
 
 -- | Instruct the interpreter evaluation to break...

@@ -1,0 +1,12 @@
+section: ghc-lib
+synopsis: Generalize the ``so_inline`` option of the simple optimizer to a predicate
+          that selects the bindings to preserve.
+
+issues: #24386
+mrs: !15988
+
+description: {
+  The ``so_inline`` option of the simple optimizer was a boolean and now it is a
+  predicate taking a binding ``Id`` and returning a boolean. ``const b`` has the
+  same effect as formerly setting ``b``.
+}

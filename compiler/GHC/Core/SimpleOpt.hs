@@ -108,6 +108,93 @@ unfolding-info to the scrutinee's Id.)
 * Bad bad bad: then the x in  case x of ... may be replaced with a version that has an unfolding.
 
 See ticket #25790
+
+Note [Controlling inlining in the simple optimiser]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Sometimes, plugins that analyse Core programs may want to prevent the
+inlining of certain bindings. While they could avoid running the simple
+optimiser at all, that would leave plenty of generated bindings that do not
+have a direct correspondence to the source code.
+
+For example, consider the following Haskell code:
+
+    foo = z
+      where
+        z  = z1 + z2
+        z1 = 42
+        z2 = 1
+
+Before the simple optimizer runs, the Core programs is roughly:
+
+    foo =
+      let
+        foo_aIb =
+          let
+            z2
+              = let
+                  z2_aHG = 1
+                 in
+                  z2_aHG
+           in
+            let
+              z1 =
+                let
+                  z1_aHR = 42
+                 in
+                  z1_aHR
+             in
+              let
+                z =
+                  let
+                    z_aI5 = z1 + z2
+                   in
+                    z_aI5
+               in
+                z
+      in
+        foo_aIb
+
+After the simple optimizer runs, the Core program is:
+
+    foo = 42 + 1
+
+And the bindings for `z`, `z1`, and `z2` are all gone. If a plugin wanted to
+analyse those bindings, it would have to deal with the unsimplified Core, but
+cope with the generated bindings `z2_aHG`, `z1_aHR`, `z_aI5`, and `foo_aIb`,
+all of which have no direct correspondence to the source code.
+
+Fortunately, a plugin can still improve the output by using the `so_inline`
+field of `SimpleOpts`. The `so_inline` field is a /function/ of type
+`(Id -> Bool)` that tells the simple optimiser whether or not to inline the `Id`.
+The client of the GHC can thereby control precisely which bindings are inlined
+and which are not. For instance,
+
+    simplOptPgm
+      (defaultSimpleOpts { so_inline = (`notElem` ["z", "z1", "z2"]) })
+      ...
+
+produces the following Core program:
+
+    foo =
+      let
+        z2 = 1
+       in
+        let
+          z1 = 42
+         in
+          let
+            z = z1 + z2
+           in
+            z
+
+which contains the bindings of interest and little else.
+
+For the specifics of how this affects a concrete plugin (Liquid Haskell), see
+the discussion in https://gitlab.haskell.org/ghc/ghc/-/issues/24386
+
+In addition to supporting clients of the GHC API, there is another use of
+`so_inline` mentioned in 'simpleOptExprNoInline'.
+
 -}
 
 -- | Simple optimiser options
@@ -115,8 +202,11 @@ data SimpleOpts = SimpleOpts
    { so_uf_opts :: !UnfoldingOpts   -- ^ Unfolding options
    , so_co_opts :: !OptCoercionOpts -- ^ Coercion optimiser options
    , so_eta_red :: !Bool            -- ^ Eta reduction on?
-   , so_inline :: !Bool             -- ^ False <=> do no inlining whatsoever,
-                                    --    even for trivial or used-once things
+   , so_inline :: !(Var -> Bool)    -- ^ False <=> do no inline the given
+                                    --   binding whatsoever, even for trivial or
+                                    --   used-once things
+                                    --
+                                    --   See Note [Controlling inlining in the simple optimiser]
    }
 
 -- | Default options for the Simple optimiser.
@@ -125,7 +215,7 @@ defaultSimpleOpts = SimpleOpts
    { so_uf_opts = defaultUnfoldingOpts
    , so_co_opts = OptCoercionOpts { optCoercionEnabled = False }
    , so_eta_red = False
-   , so_inline  = True
+   , so_inline  = const True
    }
 
 simpleOptExpr :: HasDebugCallStack => SimpleOpts -> CoreExpr -> CoreExpr
@@ -170,7 +260,7 @@ simpleOptExprNoInline :: HasDebugCallStack => SimpleOpts -> CoreExpr -> CoreExpr
 simpleOptExprNoInline opts expr
   = simple_opt_expr init_env expr
   where
-    init_opts  = opts { so_inline = False }
+    init_opts  = opts { so_inline = const False }
     init_env   = (emptyEnv init_opts) { soe_subst = init_subst }
     init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
 
@@ -639,12 +729,12 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst, soe_opts = opt
 
     pre_inline_unconditionally :: Bool
     pre_inline_unconditionally
-       | not (so_inline opts)     = False    -- Not if so_inline is False
-       | isExportedId in_bndr     = False
-       | stable_unf               = False
-       | not active               = False    -- Note [Inline prag in simplOpt]
-       | not (safe_to_inline occ) = False
-       | otherwise                = True
+       | not (so_inline opts in_bndr) = False    -- Not if so_inline is False
+       | isExportedId in_bndr         = False
+       | stable_unf                   = False
+       | not active                   = False    -- Note [Inline prag in simplOpt]
+       | not (safe_to_inline occ)     = False
+       | otherwise                    = True
 
         -- Unconditionally safe to inline
 safe_to_inline :: OccInfo -> Bool
@@ -711,15 +801,15 @@ simple_out_bind_pair env@(SOE { soe_subst = subst, soe_opts = opts })
 
     post_inline_unconditionally :: Bool
     post_inline_unconditionally
-       | not (so_inline opts)  = False -- Not if so_inline is False
-       | isExportedId in_bndr  = False -- Note [Exported Ids and trivial RHSs]
-       | stable_unf            = False -- Note [Stable unfoldings and postInlineUnconditionally]
-       | not active            = False --     in GHC.Core.Opt.Simplify.Utils
-       | is_loop_breaker       = False -- If it's a loop-breaker of any kind, don't inline
-                                       -- because it might be referred to "earlier"
-       | exprIsTrivial out_rhs = True
-       | coercible_hack        = True
-       | otherwise             = False
+       | not (so_inline opts in_bndr) = False -- Not if so_inline is False
+       | isExportedId in_bndr         = False -- Note [Exported Ids and trivial RHSs]
+       | stable_unf                   = False -- Note [Stable unfoldings and postInlineUnconditionally]
+       | not active                   = False --     in GHC.Core.Opt.Simplify.Utils
+       | is_loop_breaker              = False -- If it's a loop-breaker of any kind, don't inline
+                                              -- because it might be referred to "earlier"
+       | exprIsTrivial out_rhs        = True
+       | coercible_hack               = True
+       | otherwise                    = False
 
     is_loop_breaker = isWeakLoopBreaker occ_info
 
