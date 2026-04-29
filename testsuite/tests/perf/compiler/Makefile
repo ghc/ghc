@@ -31,7 +31,11 @@ MultiModulesDefsWithCore:
 	./genMultiLayerModulesCore
 
 MultiComponentModulesRecomp:
-	'$(PYTHON)' genMultiComp.py
+	'$(PYTHON)' genMultiComp.py 20 20
+	TEST_HC='$(TEST_HC)' TEST_HC_OPTS='$(TEST_HC_OPTS)' ./run
+
+MultiComponentModulesRecomp100:
+	'$(PYTHON)' genMultiComp.py 100 20
 	TEST_HC='$(TEST_HC)' TEST_HC_OPTS='$(TEST_HC_OPTS)' ./run
 
 MultiLayerModulesTH_Make_Prep:

@@ -7,11 +7,12 @@
 # * A number of modules names Mod_<pid>_<mid>, each module imports all the top
 #   modules beneath it, and all the modules in the current unit beneath it.
 
+import sys
 import os
 import stat
 
-modules_per = 20
-packages = 20
+packages = int(sys.argv[1])
+modules_per = int(sys.argv[2])
 total = modules_per * packages
 
 def unit_dir(p):

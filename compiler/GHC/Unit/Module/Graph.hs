@@ -67,6 +67,8 @@ module GHC.Unit.Module.Graph
    , mgLookupModule
    , mgLookupModuleName
    , mgHasHoles
+   , HomeModuleNameProvidersMap
+   , mgHomeModuleNameProvidersMap
    , showModMsg
 
     -- ** Reachability queries
@@ -156,10 +158,12 @@ import GHC.Unit.Module.ModIface
 import GHC.Utils.Misc ( partitionWith )
 
 import System.FilePath
+import Data.Set (Set)
+import qualified Data.Set as Set
+import Data.Map (Map)
 import qualified Data.Map as Map
 import GHC.Types.Unique.DSet
-import qualified Data.Set as Set
-import Data.Set (Set)
+import GHC.Types.Unique.Map (UniqMap, emptyUniqMap, listToUniqMap_C)
 import GHC.Unit.Module
 import GHC.Unit.Module.ModNodeKey
 import GHC.Unit.Module.Stage
@@ -202,7 +206,24 @@ data ModuleGraph = ModuleGraph
   -- Cached computation, whether any of the ModuleGraphNode are isHoleModule,
   -- This is only used for a hack in GHC.Iface.Load to do with backpack, please
   -- remove this at the earliest opportunity.
+  , mg_home_module_name_providers_map :: HomeModuleNameProvidersMap
+    -- ^ For each module name, which home units provide it.
   }
+
+type HomeModuleNameProvidersMap = UniqMap ModuleName (Set UnitId)
+
+mkHomeModuleNameProvidersMap :: [ModuleGraphNode] -> HomeModuleNameProvidersMap
+mkHomeModuleNameProvidersMap nodes
+    = listToUniqMap_C Set.union $
+      [
+          (moduleName, Set.singleton unitID) |
+              ModuleNode _ moduleNodeInfo <- nodes,
+              let moduleName = moduleNodeInfoModuleName moduleNodeInfo,
+              let unitID     = moduleNodeInfoUnitId moduleNodeInfo
+      ]
+
+mgHomeModuleNameProvidersMap :: ModuleGraph -> HomeModuleNameProvidersMap
+mgHomeModuleNameProvidersMap = mg_home_module_name_providers_map
 
 -- | Why do we ever need to construct empty graphs? Is it because of one shot mode?
 emptyMG :: ModuleGraph
@@ -210,6 +231,7 @@ emptyMG = ModuleGraph [] (graphReachability emptyGraph, const Nothing)
                          (graphReachability emptyGraph, const Nothing)
                          (graphReachability emptyGraph, const Nothing)
                          False
+                         emptyUniqMap
 
 -- | Construct a module graph. This function should be the only entry point for
 -- building a 'ModuleGraph', since it is supposed to be built once and never modified.
@@ -308,7 +330,7 @@ checkModuleGraph ModuleGraph{..} =
   where
     duplicate_errs = rights (Map.elems node_types)
 
-    node_types :: Map.Map NodeKey (Either ModuleNodeType ModuleGraphInvariantError)
+    node_types :: Map NodeKey (Either ModuleNodeType ModuleGraphInvariantError)
     node_types = Map.fromListWithKey go [ (mkNodeKey n, Left (moduleNodeType n)) | n <- mg_mss ]
       where
         -- Multiple nodes with the same key are not allowed.
@@ -319,7 +341,7 @@ checkModuleGraph ModuleGraph{..} =
 
 -- | Check that all dependencies in the graph are present in the node_types map.
 -- This is a helper function used by checkModuleGraph.
-checkAllDependenciesInGraph :: Map.Map NodeKey (Either ModuleNodeType ModuleGraphInvariantError)
+checkAllDependenciesInGraph :: Map NodeKey (Either ModuleNodeType ModuleGraphInvariantError)
                             -> ModuleGraphNode
                             -> Maybe ModuleGraphInvariantError
 checkAllDependenciesInGraph node_types node =
@@ -334,7 +356,7 @@ checkAllDependenciesInGraph node_types node =
 -- | Check if for the fixed module node invariant:
 --
 --   Fixed nodes can only depend on other fixed nodes.
-checkFixedModuleInvariant :: Map.Map NodeKey (Either ModuleNodeType ModuleGraphInvariantError)
+checkFixedModuleInvariant :: Map NodeKey (Either ModuleNodeType ModuleGraphInvariantError)
                 -> ModuleGraphNode
                 -> Maybe ModuleGraphInvariantError
 checkFixedModuleInvariant node_types node = case node of
@@ -484,13 +506,17 @@ isEmptyMG = null . mg_mss
 -- To preserve invariants, 'f' can't change the isBoot status.
 mapMG :: (ModSummary -> ModSummary) -> ModuleGraph -> ModuleGraph
 mapMG f mg@ModuleGraph{..} = mg
-  { mg_mss = flip fmap mg_mss $ \case
-      InstantiationNode uid iuid -> InstantiationNode uid iuid
-      LinkNode uid nks -> LinkNode uid nks
-      ModuleNode deps (ModuleNodeFixed key loc)  -> ModuleNode deps (ModuleNodeFixed key loc)
-      ModuleNode deps (ModuleNodeCompile ms) -> ModuleNode deps (ModuleNodeCompile (f ms))
-      UnitNode deps uid -> UnitNode deps uid
+  { mg_mss = new_mss
+  , mg_home_module_name_providers_map = mkHomeModuleNameProvidersMap new_mss
   }
+  where
+    new_mss =
+      flip fmap mg_mss $ \case
+        InstantiationNode uid iuid -> InstantiationNode uid iuid
+        LinkNode uid nks -> LinkNode uid nks
+        ModuleNode deps (ModuleNodeFixed key loc)  -> ModuleNode deps (ModuleNodeFixed key loc)
+        ModuleNode deps (ModuleNodeCompile ms) -> ModuleNode deps (ModuleNodeCompile (f ms))
+        UnitNode deps uid -> UnitNode deps uid
 
 -- | Map a function 'f' over all the 'ModSummaries', in 'IO'.
 -- To preserve invariants, 'f' can't change the isBoot status.
@@ -856,7 +882,7 @@ moduleNodeInfoBootString mn@(ModuleNodeFixed {}) =
 -- described in the export list haddocks.
 --------------------------------------------------------------------------------
 
-newtype NodeMap a = NodeMap { unNodeMap :: Map.Map NodeKey a }
+newtype NodeMap a = NodeMap { unNodeMap :: Map NodeKey a }
   deriving (Functor, Traversable, Foldable)
 
 -- | Transitive dependencies, including SOURCE edges
@@ -932,7 +958,7 @@ moduleGraphNodesZero summaries =
     lookup_key :: ZeroScopeKey -> Maybe Int
     lookup_key = fmap zeroSummaryNodeKey . lookup_node
 
-    node_map :: Map.Map ZeroScopeKey ZeroSummaryNode
+    node_map :: Map ZeroScopeKey ZeroSummaryNode
     node_map =
       Map.fromList [ (s, node)
                    | node <- nodes
@@ -1031,7 +1057,7 @@ moduleGraphNodesStages summaries =
     lookup_key ::  (NodeKey, ModuleStage) -> Maybe Int
     lookup_key = fmap stageSummaryNodeKey . lookup_node
 
-    node_map :: Map.Map (NodeKey, ModuleStage) StageSummaryNode
+    node_map :: Map (NodeKey, ModuleStage) StageSummaryNode
     node_map =
       Map.fromList [ (s, node)
                    | node <- nodes
@@ -1049,10 +1075,13 @@ moduleGraphNodesStages summaries =
 extendMG :: ModuleGraph -> ModuleGraphNode -> ModuleGraph
 extendMG ModuleGraph{..} node =
   ModuleGraph
-    { mg_mss = node : mg_mss
-    , mg_graph =  mkTransDeps (node : mg_mss)
-    , mg_loop_graph = mkTransLoopDeps (node : mg_mss)
-    , mg_zero_graph = mkTransZeroDeps (node : mg_mss)
+    { mg_mss = new_mss
+    , mg_graph =  mkTransDeps new_mss
+    , mg_loop_graph = mkTransLoopDeps new_mss
+    , mg_zero_graph = mkTransZeroDeps new_mss
     , mg_has_holes = mg_has_holes || maybe False isHsigFile (moduleNodeInfoHscSource =<< mgNodeIsModule node)
+    , mg_home_module_name_providers_map = mkHomeModuleNameProvidersMap new_mss
     }
+  where
+    new_mss = node : mg_mss
 
