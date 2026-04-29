@@ -1,0 +1,15 @@
+section: compiler
+synopsis: Introduce a cache of home module name providers
+issues: #27055
+mrs: !15888
+description: {
+    This contribution optimizes the algorithm for finding out which home
+    unit provides the module that a certain import declaration refers
+    to. The previous approach has been to simply search all home units
+    in no particular order. This change introduces a cache that allows
+    for efficiently determining those complete home units that provide a
+    certain module name and changes the module-finding algorithm such
+    that it searches these units before the other home units. This leads
+    to significant performance improvements in situations where there
+    are lots of home units.
+}
