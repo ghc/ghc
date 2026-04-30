@@ -43,7 +43,7 @@ import GHC.Internal.Foreign.Storable (Storable(..))
 import GHC.Internal.Enum (toEnum)
 import GHC.Internal.Num (Num(..))
 import GHC.Internal.Real (quotRem, fromIntegral)
-import GHC.Internal.Show (Show(show))
+import GHC.Internal.Show
 import GHC.Internal.Event.Internal (Timeout(..))
 import GHC.Internal.System.Posix.Internals (c_close,c_getpid)
 import GHC.Internal.System.Posix.Types (Fd(..), CPid)
