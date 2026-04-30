@@ -135,7 +135,7 @@ dsWasmJSDynamicExport ::
   CCallStaticTargetUnit ->
   DsM ([Binding], CHeader, CStub, [Id])
 dsWasmJSDynamicExport sync fn_id co unitId = do
-  sp_tycon <- dsLookupTyCon stablePtrTyConName
+  sp_tycon <- dsLookupKnownKeyTyCon stablePtrTyConKey
   let ty = coercionLKind co
       (tv_bndrs, fun_ty) = tcSplitForAllTyVarBinders ty
       ([Scaled ManyTy arg_ty], io_jsval_ty) = tcSplitFunTys fun_ty

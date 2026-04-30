@@ -278,7 +278,7 @@ dsJsFExportDynamic id co0 cconv = do
         -- depending on Unique. See #13807 and Note [Unique Determinism].
     cback <- newSysLocalDs scaled_arg_ty
     newStablePtrId <- dsLookupKnownOccId newStablePtrIdOcc
-    stable_ptr_tycon <- dsLookupTyCon stablePtrTyConName
+    stable_ptr_tycon <- dsLookupKnownKeyTyCon stablePtrTyConKey
     let
         stable_ptr_ty = mkTyConApp stable_ptr_tycon [arg_ty]
         export_ty     = mkVisFunTyMany stable_ptr_ty arg_ty

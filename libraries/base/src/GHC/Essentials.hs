@@ -130,7 +130,7 @@ module GHC.Essentials
     , IsStatic( fromStaticPtr ), makeStatic
 
     -- Stable pointers
-    , newStablePtr
+    , StablePtr, newStablePtr
 
     -- Dynamic
     , toDyn
@@ -249,7 +249,7 @@ import GHC.Internal.Unsafe.Coerce( UnsafeEquality(..), unsafeEqualityProof )
 import GHC.Internal.StaticPtr( IsStatic(..) )
 import GHC.Internal.StaticPtr.Internal( makeStatic )
 
-import GHC.Internal.Stable( newStablePtr )
+import GHC.Internal.Stable( StablePtr, newStablePtr )
 import GHC.Internal.Data.Typeable( gcast1, gcast2 )
 import GHC.Internal.Data.Typeable.Internal as TR
 import GHC.Internal.Generics hiding( Fixity(..), prec )

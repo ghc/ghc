@@ -240,6 +240,9 @@ knownKeyTable
     -- Static pointers
     , (mkVarOcc "makeStatic",    makeStaticKey)
 
+    -- Stable pointers
+    , (mkTcOcc "StablePtr", stablePtrTyConKey)
+
     -- WithDict
     , (mkTcOcc "WithDict", withDictClassKey)
 
@@ -349,7 +352,7 @@ basicKnownKeyNames
         unpackCStringName, unpackCStringUtf8Name,
 
         -- FFI primitive types that are not wired-in.
-        stablePtrTyConName, ptrTyConName, funPtrTyConName, constPtrConName,
+        ptrTyConName, funPtrTyConName, constPtrConName,
         int8TyConName, int16TyConName, int32TyConName, int64TyConName,
         word8TyConName, word16TyConName, word32TyConName, word64TyConName,
         jsvalTyConName,
@@ -536,10 +539,6 @@ word64TyConName   = tcQual  gHC_INTERNAL_WORD (fsLit "Word64") word64TyConKey
 ptrTyConName, funPtrTyConName :: Name
 ptrTyConName      = tcQual   gHC_INTERNAL_PTR (fsLit "Ptr")    ptrTyConKey
 funPtrTyConName   = tcQual   gHC_INTERNAL_PTR (fsLit "FunPtr") funPtrTyConKey
-
--- Foreign objects and weak pointers
-stablePtrTyConName :: Name
-stablePtrTyConName    = tcQual   gHC_INTERNAL_STABLE (fsLit "StablePtr")    stablePtrTyConKey
 
 -- Annotation type checking
 toAnnotationWrapperName :: Name
