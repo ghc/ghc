@@ -340,7 +340,6 @@ basicKnownKeyNames
         ioTyConName, ioDataConName,
 
         -- KindReps for common cases
-        trGhcPrimModuleName,
         starKindRepName,
         starArrStarKindRepName,
         starArrStarArrStarKindRepName,
@@ -462,11 +461,10 @@ bniVarQual str key = varQual gHC_INTERNAL_NUM_INTEGER (fsLit str) key
 
 
 -- Class Typeable, and functions for constructing `Typeable` dictionaries
-trGhcPrimModuleName, starKindRepName, starArrStarKindRepName,
+starKindRepName, starArrStarKindRepName,
   starArrStarArrStarKindRepName, constraintKindRepName :: Name
 -- This is the Typeable 'Module' for GHC.Prim (which has no code, so we place in GHC.Types)
 -- See Note [Grand plan for Typeable] in GHC.Tc.Instance.Typeable.
-trGhcPrimModuleName   = varQual gHC_TYPES         (fsLit "tr$ModuleGHCPrim")  trGhcPrimModuleKey
 starKindRepName        = varQual gHC_TYPES         (fsLit "krep$*")          starKindRepKey
 starArrStarKindRepName = varQual gHC_TYPES         (fsLit "krep$*Arr*")      starArrStarKindRepKey
 starArrStarArrStarKindRepName = varQual gHC_TYPES  (fsLit "krep$*->*->*")    starArrStarArrStarKindRepKey
@@ -1104,12 +1102,10 @@ srcLocDataConKey :: KnownKey
 srcLocDataConKey                        = mkPreludeDataConUnique 37
 
 trTyConDataConKey, trModuleDataConKey,
-  trNameSDataConKey,
-  trGhcPrimModuleKey :: KnownKey
+  trNameSDataConKey :: KnownKey
 trTyConDataConKey                       = mkPreludeDataConUnique 41
 trModuleDataConKey                      = mkPreludeDataConUnique 43
 trNameSDataConKey                       = mkPreludeDataConUnique 45
-trGhcPrimModuleKey                      = mkPreludeDataConUnique 47
 
 typeErrorTextDataConKey,
   typeErrorAppendDataConKey,
