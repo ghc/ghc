@@ -356,11 +356,8 @@ basicKnownKeyNames
         jsvalTyConName,
 
         -- Others
-        otherwiseIdName,
-        assertName,
         assertErrorName, traceName,
         printName,
-        dollarName,
 
         -- Type-level naturals
         knownNatClassName, knownSymbolClassName, knownCharClassName,
@@ -452,14 +449,6 @@ apAClassOpKey       = mkPreludeMiscIdUnique 751 -- <*>
 pureAClassOpKey     = mkPreludeMiscIdUnique 752
 thenAClassOpKey     = mkPreludeMiscIdUnique 753
 alternativeClassKey = mkPreludeMiscIdUnique 754
-
--- Random GHC.Internal.Base functions
-otherwiseIdName,
-    assertName,
-    dollarName :: Name
-dollarName        = varQual gHC_INTERNAL_BASE (fsLit "$")          dollarIdKey
-otherwiseIdName   = varQual gHC_INTERNAL_BASE (fsLit "otherwise")  otherwiseIdKey
-assertName        = varQual gHC_INTERNAL_BASE (fsLit "assert")     assertIdKey
 
 bnbVarQual, bnnVarQual, bniVarQual :: String -> Unique -> Name
 bnbVarQual str key = varQual gHC_INTERNAL_NUM_BIGNAT  (fsLit str) key
