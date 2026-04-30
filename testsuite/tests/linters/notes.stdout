@@ -28,7 +28,6 @@ ref    compiler/GHC/Tc/Solver/Rewrite.hs:1020:7:     Note [Stability of rewritin
 ref    compiler/GHC/Tc/TyCl.hs:1662:6:     Note [Unification variables need fresh Names]
 ref    compiler/GHC/Tc/Types/Constraint.hs:209:9:     Note [NonCanonical Semantics]
 ref    compiler/GHC/Types/Demand.hs:304:25:     Note [Preserving Boxity of results is rarely a win]
-ref    compiler/GHC/Unit/Module/Deps.hs:97:13:     Note [Structure of dep_boot_mods]
 ref    compiler/GHC/Utils/Monad.hs:415:34:     Note [multiShotIO]
 ref    compiler/Language/Haskell/Syntax/Binds.hs:206:31:     Note [fun_id in Match]
 ref    configure.ac:205:10:     Note [Linking ghc-bin against threaded stage0 RTS]

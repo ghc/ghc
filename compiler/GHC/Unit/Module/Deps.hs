@@ -96,7 +96,7 @@ data Dependencies = Deps
    , dep_boot_mods_ :: Set (UnitId, ModuleNameWithIsBoot)
       -- ^ All modules which have boot files below this one, and whether we
       -- should use the boot file or not.
-      -- This information is only used to populate the eps_is_boot field.
+      -- This information is only used to populate the 'eps_is_boot' field.
       -- See Note [Structure of dep_boot_mods]
 
    , dep_orphs_ :: [Module]
@@ -605,7 +605,7 @@ hash of the module. The export hash is computed in `GHC.Iface.Recomp.addFingerpr
 -}
 
 {-
-Note [Structure of dep_boot_deps]
+Note [Structure of dep_boot_mods]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In `-c` mode we always need to know whether to load the normal or boot version of
