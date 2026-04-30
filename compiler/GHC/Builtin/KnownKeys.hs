@@ -346,12 +346,6 @@ basicKnownKeyNames
         starArrStarArrStarKindRepName,
         constraintKindRepName,
 
-        -- Monad stuff
-        bindMName,
-
-        -- GHC Extensions
-        considerAccessibleName,
-
         -- Strings and lists
         unpackCStringName, unpackCStringUtf8Name,
 
@@ -442,10 +436,6 @@ unpackCStringName, unpackCStringUtf8Name :: Name
 unpackCStringName       = varQual gHC_CSTRING (fsLit "unpackCString#") unpackCStringIdKey
 unpackCStringUtf8Name       = varQual gHC_CSTRING (fsLit "unpackCStringUtf8#") unpackCStringUtf8IdKey
 
--- Class Monad
-bindMName  :: Name
-bindMName          = varQual gHC_INTERNAL_BASE (fsLit ">>=")    bindMClassOpKey
-
 -- Class MonadFail
 failMName :: Name
 failMName          = varQual gHC_INTERNAL_MONAD_FAIL (fsLit "fail")      failMClassOpKey
@@ -462,11 +452,6 @@ apAClassOpKey       = mkPreludeMiscIdUnique 751 -- <*>
 pureAClassOpKey     = mkPreludeMiscIdUnique 752
 thenAClassOpKey     = mkPreludeMiscIdUnique 753
 alternativeClassKey = mkPreludeMiscIdUnique 754
-
-
--- Functions for GHC extensions
-considerAccessibleName :: Name
-considerAccessibleName = varQual gHC_MAGIC (fsLit "considerAccessible") considerAccessibleIdKey
 
 -- Random GHC.Internal.Base functions
 otherwiseIdName,
