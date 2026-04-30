@@ -318,6 +318,15 @@ traceIdOcc = mkVarOcc "trace"
 assertErrorIdOcc :: KnownOcc
 assertErrorIdOcc = mkVarOcc "assertError"
 
+-- KindReps for common cases
+-- See Note [Grand plan for Typeable] (GPT6) in GHC.Tc.Instance.Typeable.
+starKindRepIdOcc, starArrStarKindRepIdOcc,
+  starArrStarArrStarKindRepIdOcc, constraintKindRepIdOcc :: KnownOcc
+starKindRepIdOcc               = mkVarOcc "krepStar"
+starArrStarKindRepIdOcc        = mkVarOcc "krepArrStar"
+starArrStarArrStarKindRepIdOcc = mkVarOcc "krepStarArrStarArrStarKind"
+constraintKindRepIdOcc         = mkVarOcc "krepConstraint"
+
 {- *********************************************************************
 *                                                                      *
         Known-occ RdrNames
