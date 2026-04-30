@@ -338,8 +338,6 @@ basicKnownKeyNames
         --      classes in "Class.standardClassKeys" (quite a few)
         -- The IO type
         ioTyConName, ioDataConName,
-        runMainIOName,
-        runRWName,
 
         -- KindReps for common cases
         trGhcPrimModuleName,
@@ -435,10 +433,6 @@ and it's convenient to write them all down in one place.
 
 wildCardName :: Name
 wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
-
-runMainIOName, runRWName :: Name
-runMainIOName = varQual gHC_INTERNAL_TOP_HANDLER (fsLit "runMainIO") runMainKey
-runRWName     = varQual gHC_MAGIC       (fsLit "runRW#")    runRWKey
 
 specTyConName :: Name
 specTyConName     = tcQual gHC_TYPES (fsLit "SPEC") specTyConKey

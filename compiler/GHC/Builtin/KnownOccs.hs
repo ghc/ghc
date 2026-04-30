@@ -309,6 +309,9 @@ metaDataDataConOcc             = mkDataOcc "MetaData"
 metaConsDataConOcc             = mkDataOcc "MetaCons"
 metaSelDataConOcc              = mkDataOcc "MetaSel"
 
+runMainIOOcc :: KnownOcc
+runMainIOOcc = mkVarOcc "runMainIO"
+
 {- *********************************************************************
 *                                                                      *
         Known-occ RdrNames

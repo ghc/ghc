@@ -1948,7 +1948,7 @@ generateMainBinding tcg_env main_name = do
             -- See Note [Root-main Id]
             -- Construct the binding
             --      :Main.main :: IO res_ty = runMainIO res_ty main
-    ; run_main_id <- tcLookupId runMainIOName
+    ; run_main_id <- tcLookupKnownOccId runMainIOOcc
     ; let { root_main_name =  mkExternalName rootMainKey rOOT_MAIN
                                (mkVarOccFS (fsLit "main"))
                                (getSrcSpan main_name)

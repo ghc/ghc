@@ -134,6 +134,9 @@ module GHC.Essentials
     -- Dynamic
     , toDyn
 
+    -- Run Top Handler (Note [Dealing with main])
+    , runMainIO
+
     -- Names that have BuiltinRules
     , CS.unpackFoldrCString#, CS.unpackFoldrCStringUtf8#, CS.unpackAppendCString#
     , CS.unpackAppendCStringUtf8#, CS.cstringLength#
@@ -257,3 +260,4 @@ import GHC.Internal.TH.Syntax as TH
 import GHC.Internal.TH.Lib
 import GHC.Internal.TH.Lift
 import GHC.Internal.TH.Monad
+import GHC.Internal.TopHandler
