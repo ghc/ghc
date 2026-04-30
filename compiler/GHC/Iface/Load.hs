@@ -24,6 +24,7 @@ module GHC.Iface.Load (
         lookupKnownKeyThing, lookupKnownKeyName,
         lookupKnownOccThing, lookupKnownOccName,
         loadKnownKeyOccMaps, lookupKnownGRE,
+        lookupKnownKeysMap,
 
         -- RnM/TcM functions
         loadModuleInterface, loadModuleInterfaces,
@@ -156,13 +157,13 @@ import qualified GHC.Unit.Home.Graph as HUG
 
 data KnownNameSource
   = KNS_InScope Module GlobalRdrEnv TypeEnv
-      -- Look up the known-occ name in this GlobalRdrEnv, which
+      -- ^ Look up the known-occ name in this GlobalRdrEnv, which
       -- is the top-level scope of the current module.
       -- This happens when -frebindable-known-name is set, usually when
       -- we are compiling `ghc-internal` or `base`
 
   | KNS_FromModule
-       -- Look up the known-occ name in the export list of GHC.Essentials
+       -- ^ Look up the known-occ name in the export list of GHC.Essentials
        -- This is the "normal path", and happens when -frebindable-known-names
        -- is /not/ set
 
@@ -184,20 +185,7 @@ lookupKnownKeyName :: HasDebugCallStack
                    -> IfM lcl (MaybeErr IfaceMessage Name)
 lookupKnownKeyName key KNS_FromModule
   = do { (kk_map, _) <- loadKnownKeyOccMaps
-       ; case lookupUFM kk_map key of
-           Just name -> return (Succeeded name)
-           Nothing
-             | wired_in_nm : _ <- filter (`hasKey` key) wiredInNames
-             -> -- We should never call lookupKnownKeyName on the key of a wired-in
-                -- entity; see (KN3) in Note [Overview of known entities]
-                -- We hackily panic here rather than use a civilised error
-                -- message so that we get a helpful stack backtrace
-                pprPanic "lookupKownKeyName" $
-                hang (text "You tried to look up wired-in"
-                      <+> quotes (ppr wired_in_nm) <+> text "in the known-key table")
-                   2 (text "Better to use the wired-in name directly")
-             | otherwise
-             -> return (Failed (MissingKnownKey1 key)) }
+       ; return $ lookupKnownKeysMap kk_map key }
 
 lookupKnownKeyName key (KNS_InScope _ gbl_rdr_env _)
   -- Just gbl_rdr_env: we have -frebindable-known-names on, and
@@ -327,6 +315,22 @@ loadKnownKeyOccMaps
        ; return (kk_map, occ_map) } } }
   where
     doc = text "Need interface for KnonwKeyNames"
+
+lookupKnownKeysMap :: UniqFM KnownKey Name -> KnownKey -> MaybeErr IfaceMessage Name
+lookupKnownKeysMap kk_map key = case lookupUFM kk_map key of
+  Just name -> Succeeded name
+  Nothing
+    | wired_in_nm : _ <- filter (`hasKey` key) wiredInNames
+    -> -- We should never call lookupKnownKeyName on the key of a wired-in
+       -- entity; see (KN3) in Note [Overview of known entities]
+       -- We hackily panic here rather than use a civilised error
+       -- message so that we get a helpful stack backtrace
+       pprPanic "lookupKownKeyName" $
+       hang (text "You tried to look up wired-in"
+             <+> quotes (ppr wired_in_nm) <+> text "in the known-key table")
+          2 (text "Better to use the wired-in name directly")
+    | otherwise
+    -> Failed (MissingKnownKey1 key)
 
 #ifdef DEBUG
 checkKnownKeyNamesIface :: UniqFM KnownKey Name -> Maybe SDoc

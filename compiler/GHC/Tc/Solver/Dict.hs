@@ -22,6 +22,7 @@ import GHC.Tc.Solver.FunDeps( tryDictFunDeps )
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad
 import GHC.Tc.Solver.Types
+import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify( uType, mightEqualLater )
 
@@ -36,7 +37,6 @@ import GHC.Core.InstEnv( DFunInstType )
 import GHC.Core.Multiplicity ( scaledThing )
 import GHC.Core.Unify ( ruleMatchTyKiX )
 
-import GHC.Types.TyThing( lookupDataCon, lookupId )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Var
@@ -186,25 +186,26 @@ solveCallStack ev ev_cs
 evCallStack :: TcPredType -> EvCallStack -> TcS EvExpr
 -- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
 evCallStack _ EvCsEmpty
-  = Var <$> lookupId emptyCallStackName
+  = Var <$> wrapTcS (tcLookupId emptyCallStackName)
 evCallStack pred (EvCsPushCall fs loc tm)
   = do { df <- getDynFlags
        ; m  <- getModule
-       ; srcLocDataCon <- lookupDataCon srcLocDataConName
+       ; srcLocDataCon <- wrapTcS (tcLookupDataCon srcLocDataConName)
+       ; mk_str <- getTcMkStringsIds
        ; let platform = targetPlatform df
-             mkSrcLoc l = mkCoreConWrapApps srcLocDataCon <$>
-                          sequence [ mkStringExprFS (unitFS $ moduleUnit m)
-                                   , mkStringExprFS (moduleNameFS $ moduleName m)
-                                   , mkStringExprFS (srcSpanFile l)
-                                   , return $ mkIntExprInt platform (srcSpanStartLine l)
-                                   , return $ mkIntExprInt platform (srcSpanStartCol l)
-                                   , return $ mkIntExprInt platform (srcSpanEndLine l)
-                                   , return $ mkIntExprInt platform (srcSpanEndCol l)
-                                   ]
+             mkSrcLoc l = mkCoreConWrapApps srcLocDataCon
+                            [ mkStringExprFSWith mk_str (unitFS $ moduleUnit m)
+                            , mkStringExprFSWith mk_str (moduleNameFS $ moduleName m)
+                            , mkStringExprFSWith mk_str (srcSpanFile l)
+                            , mkIntExprInt platform (srcSpanStartLine l)
+                            , mkIntExprInt platform (srcSpanStartCol l)
+                            , mkIntExprInt platform (srcSpanEndLine l)
+                            , mkIntExprInt platform (srcSpanEndCol l)
+                            ]
 
-       ; push_cs_id <- lookupId pushCallStackName
-       ; name_expr  <- mkStringExprFS fs
-       ; loc_expr   <- mkSrcLoc loc
+       ; push_cs_id <- wrapTcS (tcLookupId pushCallStackName)
+       ; let name_expr = mkStringExprFSWith mk_str fs
+       ; let loc_expr  = mkSrcLoc loc
                -- At this point tm :: IP sym CallStack
                -- but we need the actual CallStack to pass to pushCS,
                -- so we use evUwrapIP to strip the dictionary wrapper

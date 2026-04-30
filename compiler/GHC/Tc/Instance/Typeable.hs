@@ -30,7 +30,6 @@ import GHC.Builtin.WiredIn.Types
                   , levityTyCon, vecCountTyCon, vecElemTyCon
                   , nilDataCon, consDataCon )
 
-import GHC.Types.TyThing ( lookupId )
 import GHC.Types.Basic ( TypeOrConstraint(..) )
 import GHC.Types.InlinePragma ( neverInlinePragma )
 import GHC.Types.SourceText ( SourceText(..) )
@@ -804,7 +803,7 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep_shortcut
 
     new_kind_rep k@(TyConApp tc tys)
       | Just rep_name <- tyConRepName_maybe tc
-      = do rep_id <- liftTc $ lookupId rep_name
+      = do rep_id <- liftTc $ tcLookupId rep_name
            tys' <- mapM (getKindRep stuff in_scope) tys
            return $ nlHsDataCon kindRepTyConAppDataCon
                     `nlHsApp` nlHsVar rep_id

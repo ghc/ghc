@@ -250,6 +250,9 @@ knownKeyTable
     , (mkTcOcc  "Unsatisfiable", unsatisfiableClassKey)
     , (mkVarOcc "unsatisfiable", unsatisfiableIdKey)
 
+    -- Base strings Strings
+    , (mkVarOcc "unpackCString#",     unpackCStringIdKey)
+    , (mkVarOcc "unpackCStringUtf8#", unpackCStringUtf8IdKey)
 
     -- Known-key names that have BuiltinRules in ConstantFold
     , (mkVarOcc "unpackFoldrCString#",      unpackCStringFoldrIdKey)
@@ -348,9 +351,6 @@ basicKnownKeyNames
         starArrStarArrStarKindRepName,
         constraintKindRepName,
 
-        -- Strings and lists
-        unpackCStringName, unpackCStringUtf8Name,
-
         -- FFI primitive types that are not wired-in.
         ptrTyConName, funPtrTyConName, constPtrConName,
         int8TyConName, int16TyConName, int32TyConName, int64TyConName,
@@ -428,11 +428,6 @@ wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
 
 specTyConName :: Name
 specTyConName     = tcQual gHC_TYPES (fsLit "SPEC") specTyConKey
-
--- Base strings Strings
-unpackCStringName, unpackCStringUtf8Name :: Name
-unpackCStringName       = varQual gHC_CSTRING (fsLit "unpackCString#") unpackCStringIdKey
-unpackCStringUtf8Name       = varQual gHC_CSTRING (fsLit "unpackCStringUtf8#") unpackCStringUtf8IdKey
 
 -- Class MonadFail
 failMName :: Name

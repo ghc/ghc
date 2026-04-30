@@ -138,6 +138,9 @@ module GHC.Essentials
     -- Run Top Handler (Note [Dealing with main])
     , runMainIO
 
+    -- Base strings
+    , CS.unpackCString# , CS.unpackCStringUtf8#
+
     -- Names that have BuiltinRules
     , CS.unpackFoldrCString#, CS.unpackFoldrCStringUtf8#, CS.unpackAppendCString#
     , CS.unpackAppendCStringUtf8#, CS.cstringLength#

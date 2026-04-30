@@ -25,7 +25,7 @@ module GHC.Tc.Utils.Env(
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupAxiom,
         tcLookupImported_maybe,
-        lookupGlobal, lookupGlobal_maybe,
+        lookupGlobal, lookupGlobal_maybe, lookupKnownKeyGlobal,
         addTypecheckedBinds, addEvBinds, addTopEvBinds,
         failIllegalTyCon, failIllegalTyVar,
 
@@ -213,6 +213,17 @@ importDecl_maybe hsc_env name
   | otherwise
   = initIfaceLoad hsc_env (importDecl name)
 
+lookupKnownKeyGlobal :: HscEnv -> KnownKey -> IO TyThing
+lookupKnownKeyGlobal hsc_env key = do
+  eps <- hscEPS hsc_env
+  case eps_known_keys eps of
+    Nothing -> pprPanic "lookupKnownKeyGlobal" (text "eps_known_keys not initialized")
+    Just (kk_map, _) -> case lookupKnownKeysMap kk_map key of
+      Succeeded name -> lookupGlobal hsc_env name
+      Failed err     -> pprPanic "lookupKnownKeyGlobal" (pprDiagnostic err)
+
+--------------------------------------------------------------------------------
+
 addTypecheckedBinds :: TcGblEnv -> [LHsBinds GhcTc] -> TcGblEnv
 addTypecheckedBinds tcg_env binds
   | isHsBootOrSig (tcg_src tcg_env) = tcg_env
@@ -393,9 +404,6 @@ tcGetInstEnvs = do { eps <- getEps
                    ; return (InstEnvs { ie_global  = eps_inst_env eps
                                       , ie_local   = tcg_inst_env env
                                       , ie_visible = tcVisibleOrphanMods env }) }
-
-instance MonadThings (IOEnv (Env TcGblEnv TcLclEnv)) where
-    lookupThing = tcLookupGlobal
 
 -- Illegal term-level use of type things
 failIllegalTyCon :: WhatLooking -> WithUserRdr Name -> TcM a

@@ -117,7 +117,7 @@ dsLit l = do
     HsFloatPrim  _ fl -> return (mkFloatLit  (rationalFromFractionalLit fl))
     HsDoublePrim _ fl -> return (mkDoubleLit (rationalFromFractionalLit fl))
     HsChar _ c       -> return (mkCharExpr c)
-    HsString _ str   -> mkStringExprFS str
+    HsString _ str   -> (`mkStringExprFSWith` str) <$> getMkStringIds dsLookupKnownKeyId
     HsNatural _ i    -> return (mkNaturalExpr platform (il_value i))
     HsDouble _ fl    -> return (mkDoubleExpr (fromRational (rationalFromFractionalLit fl)))
     HsInt _ i        -> return (mkIntExpr platform (il_value i))
@@ -633,7 +633,8 @@ matchLiterals (var :| vars) ty sub_groups
         = do { -- We now have to convert back to FastString. Perhaps there
                -- should be separate LitBytes and LitString constructors?
                let s'  = mkFastStringByteString s
-             ; lit    <- mkStringExprFS s'
+             ; mks <- getMkStringIds dsLookupKnownKeyId
+             ; let lit  = mkStringExprFSWith mks s'
              ; let pred = mkApps (Var eq_str) [Var var, lit]
              ; return (mkGuardedMatchResult pred mr) }
     wrap_str_guard _ (l, _) = pprPanic "matchLiterals/wrap_str_guard" (ppr l)

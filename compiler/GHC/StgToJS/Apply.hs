@@ -48,6 +48,7 @@ import GHC.StgToJS.Types
 import GHC.StgToJS.Utils
 import GHC.StgToJS.Linker.Utils (decodeModifiedUTF8)
 
+import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.CostCentre
@@ -163,7 +164,7 @@ genApp ctx i args
     -- + Utf8 version below
     | [StgLitArg (LitString bs)] <- args
     , Just d <- decodeModifiedUTF8 bs
-    , idName i == unpackCStringName
+    , i `hasKnownKey` unpackCStringIdKey
     , [top] <- concatMap typex_expr (ctxTarget ctx)
     = return
         ( top |= app "h$toHsStringA" [toJExpr d]
@@ -171,7 +172,7 @@ genApp ctx i args
         )
     | [StgLitArg (LitString bs)] <- args
     , Just d <- decodeModifiedUTF8 bs
-    , idName i == unpackCStringUtf8Name
+    , i `hasKnownKey` unpackCStringUtf8IdKey
     , [top] <- concatMap typex_expr (ctxTarget ctx)
     = return
         ( top |= app "h$toHsString" [toJExpr d]

@@ -79,7 +79,6 @@ import GHC.Types.ForeignCall
 import GHC.Types.Id
 import GHC.Types.InlinePragma
 import GHC.Types.SourceText
-import GHC.Types.TyThing
 import GHC.Types.Name hiding( varName, tcName )
 import GHC.Types.Name.Env
 
@@ -105,6 +104,8 @@ data MetaWrappers = MetaWrappers {
     , metaTy :: Type -> Type
       -- Information about the wrappers which be printed to be inspected
     , _debugWrappers :: (HsWrapper, HsWrapper, Type)
+      -- MkStringIds to make exprs with mStringExprFSWith
+    , mkStringsMeta :: MkStringIds
     }
 
 -- | Construct the functions which will apply the relevant part of the
@@ -130,6 +131,7 @@ mkMetaWrappers q@(QuoteWrapper quote_var_raw m_var) = do
                                 (mkClassPred monad_cls (mkTyVarTys (binderVars tyvars)))
 
       massertPpr (idType monad_sel `eqType` expected_ty) (ppr monad_sel $$ ppr expected_ty)
+      mk_strs <- getMkStringIds dsLookupKnownKeyId
 
       let m_ty = Type m_var
           -- Construct the contents of MetaWrappers
@@ -140,7 +142,7 @@ mkMetaWrappers q@(QuoteWrapper quote_var_raw m_var) = do
           debug = (quoteWrapper, monadWrapper, m_var)
       dsHsWrapper quoteWrapper $ \q_f -> do {
       dsHsWrapper monadWrapper $ \m_f -> do {
-      return (MetaWrappers q_f m_f tyWrapper debug) } }
+      return (MetaWrappers q_f m_f tyWrapper debug mk_strs) } }
 
 -- Turn A into m A
 wrapName :: KnownOcc -> MetaM Type
@@ -736,7 +738,7 @@ repForD (L loc (ForeignImport { fd_name = name, fd_sig_ty = typ
       MkC cc' <- repCCallConv cc
       MkC s' <- repSafety s
       cis' <- conv_cimportspec cis
-      MkC str <- coreStringLit (mkFastString (static ++ chStr ++ cis'))
+      MkC str <- lift $ coreStringLit (mkFastString (static ++ chStr ++ cis'))
       dec <- krep2 forImpDOcc [cc', s', str, name', typ']
       return (locA loc, dec)
  where
@@ -802,7 +804,7 @@ repRuleD (L loc (HsRule { rd_name = n
                         , rd_rhs = rhs }))
   = fmap (locA loc, ) <$>
       repRuleBinders bndrs $ \ ty_bndrs' tm_bndrs' ->
-        do { n'   <- coreStringLit $ unLoc n
+        do { n'   <- lift $ coreStringLit $ unLoc n
            ; act' <- repPhases act
            ; lhs' <- repLE lhs
            ; rhs' <- repLE rhs
@@ -1166,7 +1168,7 @@ rep_sccFun nm Nothing loc = do
 
 rep_sccFun nm (Just (L _ str)) loc = do
   nm1 <- lookupLOcc nm
-  str1 <- coreStringLit (sl_fs str)
+  str1 <- lift $ coreStringLit (sl_fs str)
   scc <- repPragSCCFunNamed nm1 str1
   return [(loc, scc)]
 
@@ -1517,7 +1519,7 @@ repTyLit (HsNatural _ i) = do
   platform <- getPlatform
   rep2 numTyLitName [mkIntegerExpr platform (il_value i)]
 repTyLit (HsString _ s) = do
-  s' <- mkStringExprFS s
+  s' <- (`mkStringExprFSWith` s) <$> asks mkStringsMeta
   rep2 strTyLitName [s']
 repTyLit (HsChar _ c) = do
   c' <- return (mkCharExpr c)
@@ -1997,7 +1999,7 @@ rep_implicit_param_bind (L loc (IPBind _ (L _ n) (L _ rhs)))
       ; return (locA loc, ipb) }
 
 rep_implicit_param_name :: HsIPName -> MetaM (Core String)
-rep_implicit_param_name (HsIPName name) = coreStringLit name
+rep_implicit_param_name (HsIPName name) = lift $ coreStringLit name
 
 rep_val_binds :: HsValBinds GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
 -- Assumes: all the binders of the binding are already in the meta-env
@@ -2397,12 +2399,12 @@ wrapGenSyms binds body@(MkC b)
     go _ [] = return body
     go var_ty ((name,id) : binds)
       = do { MkC body'  <- go var_ty binds
-           ; lit_str    <- occNameLit (occName name)
+           ; lit_str    <- lift $ occNameLit (occName name)
            ; gensym_app <- repGensym lit_str
            ; repBindM var_ty elt_ty
                       gensym_app (MkC (Lam id body')) }
 
-occNameLit :: MonadThings m => OccName -> m (Core String)
+occNameLit :: OccName -> DsM (Core String)
 occNameLit name = coreStringLit (occNameFS name)
 
 
@@ -2614,7 +2616,7 @@ repDoBlock doName maybeModName (MkC ss) = do
     coreModNameM :: MetaM (Core (Maybe TH.ModName))
     coreModNameM = case maybeModName of
       Just m -> do
-        MkC s <- coreStringLit (moduleNameFS m)
+        MkC s <- lift $ coreStringLit (moduleNameFS m)
         mName <- rep2_nw mkModNameName [s]
         coreJust modNameTyConOcc mName
       _ -> coreNothing modNameTyConOcc
@@ -3166,8 +3168,8 @@ repOverLiteralVal lit = do
 
 repQualLit :: HsQualLit GhcRn -> MetaM (Core (M TH.Exp))
 repQualLit QualLit{ql_mod = modName, ql_val = lit} = do
-  modNameStr <- coreStringLit (moduleNameFS modName)
-  funNameStr <- coreStringLit (occNameFS funOcc)
+  modNameStr <- lift $ coreStringLit (moduleNameFS modName)
+  funNameStr <- lift $ coreStringLit (occNameFS funOcc)
   funExp <- repVar =<< repNameQ modNameStr funNameStr
   litCore <- lift . dsLit =<< mkHsLit
   litExp <- repLit =<< krep2_nw litFunName [litCore]
@@ -3183,16 +3185,16 @@ repQualLit QualLit{ql_mod = modName, ql_val = lit} = do
 repRdrName :: RdrName -> MetaM (Core TH.Name)
 repRdrName rdr_name = do
   case rdr_name of
-    Unqual occ -> repNameS =<< occNameLit occ
+    Unqual occ -> repNameS =<< lift (occNameLit occ)
     Qual mn occ -> do
       let name_mod = moduleNameFS mn
-      mod <- coreStringLit name_mod
-      occ <- occNameLit occ
+      mod <- lift $ coreStringLit name_mod
+      occ <- lift $ occNameLit occ
       repNameQ mod occ
     Orig m n -> lift $ globalVarExternal m n
     Exact (ExactName n)  -> lift $ globalVar n
 
-    Exact (ExactOcc occ) -> repNameS =<< occNameLit occ
+    Exact (ExactOcc occ) -> repNameS =<< lift (occNameLit occ)
       -- This is pretty sketchy, but `repRdrName` is only
       -- used for holes anyway so it probably never happens
 
@@ -3221,19 +3223,19 @@ repUnboundVar (MkC name) = krep2 unboundVarEOcc [name]
 
 repOverLabel :: FastString -> MetaM (Core (M TH.Exp))
 repOverLabel fs = do
-                    MkC s <- coreStringLit fs
+                    MkC s <- lift $ coreStringLit fs
                     krep2 labelEOcc [s]
 
 repGetField :: Core (M TH.Exp) -> FastString -> MetaM (Core (M TH.Exp))
 repGetField (MkC exp) fs = do
-  MkC s <- coreStringLit fs
+  MkC s <- lift $ coreStringLit fs
   krep2 getFieldEOcc [exp,s]
 
 repProjection :: NonEmpty FastString -> MetaM (Core (M TH.Exp))
 repProjection fs = do
   ne_tycon <- lift $ dsLookupKnownOccTyCon nonEmptyTyConOcc
   MkC xs <- coreListNonEmpty ne_tycon stringTy <$>
-            mapM coreStringLit fs
+            mapM (lift . coreStringLit) fs
   krep2 projectionEOcc [xs]
 
 ------------ Lists -------------------
@@ -3292,8 +3294,8 @@ nonEmptyCoreList xs@(MkC x:_) = MkC (mkListExpr (exprType x) (map unC xs))
 nonEmptyCoreList' :: NonEmpty (Core a) -> Core [a]
 nonEmptyCoreList' xs@(MkC x:|_) = MkC (mkListExpr (exprType x) (toList $ fmap unC xs))
 
-coreStringLit :: MonadThings m => FastString -> m (Core String)
-coreStringLit s = do { z <- mkStringExprFS s; return (MkC z) }
+coreStringLit :: FastString -> DsM (Core String)
+coreStringLit s = do { mks <- getMkStringIds dsLookupKnownKeyId; return (MkC (mkStringExprFSWith mks s)) }
 
 ------------------- Maybe ------------------
 

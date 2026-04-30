@@ -902,7 +902,8 @@ dsHandleMonadicFailure ctx pat res_ty match m_fail_op =
           -- that's the non-ApplicativeDo code path
           mkErrorAppDs pAT_ERROR_ID res_ty (matchDoContextErrString ctx)
         Just fail_op -> do
-          fail_msg <- mkStringExpr (mk_fail_msg dflags ctx pat)
+          mk_str <- getMkStringIds dsLookupKnownKeyId
+          let fail_msg = mkStringExprWith mk_str (mk_fail_msg dflags ctx pat)
           dsSyntaxExpr fail_op [fail_msg]
       body fail_expr
 

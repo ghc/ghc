@@ -47,7 +47,6 @@ import GHC.Builtin.Modules ( gHC_INTERNAL_TYPEERROR )
 import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Ids ( unboxedUnitExpr )
 
-import GHC.Types.TyThing ( MonadThings(lookupId) )
 import GHC.Types.Unique
 import GHC.Types.Var
 import GHC.Types.Var.Env
@@ -72,6 +71,7 @@ import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import GHC.Data.Maybe     ( isJust, mapMaybe, catMaybes )
 import Data.Monoid     ( First(..) )
+import qualified GHC.Tc.Utils.Env as TcM
 
 
 {- Note [Top-level Defaulting Plan]
@@ -449,7 +449,7 @@ defaultExceptionContext ct
   | ClassPred cls tys <- classifyPredType (ctPred ct)
   , isJust (isExceptionContextPred cls tys)
   = do { warnTcS $ TcRnDefaultedExceptionContext (ctLoc ct)
-       ; empty_ec_id <- lookupId emptyExceptionContextName
+       ; empty_ec_id <- wrapTcS (TcM.tcLookupId emptyExceptionContextName)
        ; let ev = ctEvidence ct
              ev_tm = EvExpr (evWrapIPE (ctEvPred ev) (Var empty_ec_id))
        ; setDictIfWanted ev EvCanonical ev_tm

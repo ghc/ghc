@@ -44,7 +44,7 @@ import GHC.Core.Predicate
 import GHC.Core.Coercion
 import GHC.Core.InstEnv
 import GHC.Core.Type
-import GHC.Core.Make ( mkCharExpr, mkNaturalExpr, mkStringExprFS, mkCoreLams )
+import GHC.Core.Make ( getMkStringIds, mkCharExpr, mkNaturalExpr, mkStringExprFSWith, mkCoreLams )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
@@ -378,7 +378,8 @@ matchKnownSymbol :: DynFlags
                  -> Class -> [Type] -> TcM ClsInstResult
 matchKnownSymbol _ _ clas [ty]  -- clas = KnownSymbol
   | Just s <- isStrLitTy ty = do
-        et <- mkStringExprFS s
+        mk_str <- getMkStringIds tcLookupKnownKeyId
+        let et = mkStringExprFSWith mk_str s
         makeLitDict clas ty et
 matchKnownSymbol df sc clas tys = matchInstEnv df sc clas tys
  -- See Note [Fabricating Evidence for Literals in Backpack] for why

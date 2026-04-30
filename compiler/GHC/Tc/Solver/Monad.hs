@@ -57,7 +57,7 @@ module GHC.Tc.Solver.Monad (
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
     getTopEnv, getGblEnv, getLclEnv, setSrcSpan,
-    getTcEvBindsVar, getTcLevel,
+    getTcEvBindsVar, getTcMkStringsIds, getTcLevel,
     getTcEvBindsMap, setTcEvBindsMap, getTcEvBindsState, combineTcEvBinds,
     tcLookupKnownKeyId,
 
@@ -161,6 +161,7 @@ import GHC.Tc.Types.Constraint
 
 import GHC.Builtin.KnownKeys ( callStackTyConName, exceptionContextTyConName )
 
+import GHC.Core.Make
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep as Rep
 import GHC.Core.TyCo.Tidy
@@ -177,7 +178,6 @@ import GHC.Rename.Env
 import qualified GHC.Rename.Env as TcM
 
 import GHC.Types.Name
-import GHC.Types.TyThing
 import GHC.Types.Name.Reader
 import GHC.Types.DefaultEnv ( DefaultEnv )
 import GHC.Types.Var
@@ -1008,7 +1008,9 @@ data TcSEnv
       -- See Note [TcSMode]
       tcs_mode :: TcSMode,
 
-      tcs_worklist :: TcRef WorkList
+      tcs_worklist :: TcRef WorkList,
+
+      tcs_mk_strs :: MkStringIds
     }
 
 ---------------
@@ -1042,9 +1044,6 @@ instance MonadUnique TcS where
 
 instance HasModule TcS where
    getModule = wrapTcS getModule
-
-instance MonadThings TcS where
-   lookupThing n = wrapTcS (lookupThing n)
 
 -- Basic functionality
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1190,12 +1189,14 @@ runTcSWithEvBinds' mode ev_binds_var thing_inside
 
        ; wl_var      <- TcM.newTcRef emptyWorkList
        ; unif_lvl_var <- TcM.newTcRef infiniteTcLevel
+       ; mk_strs <- getMkStringIds TcM.tcLookupKnownKeyId
        ; let env = TcSEnv { tcs_ev_binds = ev_binds_var
                           , tcs_what     = WU_Coarse unif_lvl_var
                           , tcs_count    = step_count
                           , tcs_inerts   = inert_var
                           , tcs_mode     = mode
-                          , tcs_worklist = wl_var }
+                          , tcs_worklist = wl_var
+                          , tcs_mk_strs  = mk_strs }
 
              -- Run the computation
        ; res <- unTcS thing_inside env
@@ -1476,6 +1477,9 @@ updTcRef ref upd_fn = wrapTcS (TcM.updTcRef ref upd_fn)
 
 getTcEvBindsVar :: TcS EvBindsVar
 getTcEvBindsVar = TcS (return . tcs_ev_binds)
+
+getTcMkStringsIds :: TcS MkStringIds
+getTcMkStringsIds = TcS (return . tcs_mk_strs)
 
 getTcLevel :: TcS TcLevel
 getTcLevel = wrapTcS TcM.getTcLevel

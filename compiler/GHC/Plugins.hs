@@ -74,7 +74,6 @@ where
 import GHC.Driver.Plugins
 
 -- Variable naming
-import GHC.Types.TyThing
 import GHC.Types.PkgQual
 import GHC.Types.SourceError
 import GHC.Types.Name.Reader
@@ -145,7 +144,6 @@ import GHC.Iface.Env    ( lookupNameCache )
 import GHC.Prelude
 import GHC.Utils.Monad  ( MonadIO, mapMaybeM )
 import GHC.ThToHs       ( thRdrNameGuesses )
-import GHC.Tc.Utils.Env ( lookupGlobal )
 import GHC.Types.Name.Cache ( NameCache )
 
 import GHC.Tc.Errors.Hole.FitTypes
@@ -157,12 +155,6 @@ import GHC.Types.Error         ( Messages )
 import GHC.Hs                  ( HsParsedModule )
 
 import qualified GHC.Boot.TH.Syntax as TH
-
-{- This instance is defined outside GHC.Core.Opt.Monad so that
-   GHC.Core.Opt.Monad does not depend on GHC.Tc.Utils.Env -}
-instance MonadThings CoreM where
-    lookupThing name = do { hsc_env <- getHscEnv
-                          ; liftIO $ lookupGlobal hsc_env name }
 
 {-
 ************************************************************************

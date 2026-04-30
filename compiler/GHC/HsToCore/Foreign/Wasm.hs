@@ -338,7 +338,8 @@ dsWasmJSStaticImport fn_id co js_src' unitId sync = do
           importCStub Sync cfun_name (map scaledThing arg_tys) res_ty js_src
         )
     Async -> do
-      err_msg <- mkStringExpr $ js_src
+      mk_str <- getMkStringIds dsLookupKnownKeyId
+      let err_msg = mkStringExprWith mk_str js_src
       io_tycon <- dsLookupKnownKeyTyCon ioTyConKey
       jsval_ty <-
         mkTyConTy

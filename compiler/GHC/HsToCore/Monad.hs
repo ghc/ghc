@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an orphan
-
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -568,10 +566,6 @@ failDs = failM
 mkNamePprCtxDs :: DsM NamePprCtx
 mkNamePprCtxDs = ds_name_ppr_ctx <$> getGblEnv
 
-instance MonadThings (IOEnv (Env DsGblEnv DsLclEnv)) where
-    lookupThing = dsLookupGlobal
-
-
 {- *********************************************************************
 *                                                                      *
                 Looking things up in the monad
@@ -732,7 +726,7 @@ pprRuntimeTrace :: String   -- ^ header
                 -> DsM CoreExpr
 pprRuntimeTrace str doc expr = do
   traceId <- dsLookupKnownOccId traceIdOcc
-  unpackCStringId <- dsLookupGlobalId unpackCStringName
+  unpackCStringId <- dsLookupKnownKeyId unpackCStringIdKey
   dflags <- getDynFlags
   let message :: CoreExpr
       message = App (Var unpackCStringId) $

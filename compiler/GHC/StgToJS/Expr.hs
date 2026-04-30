@@ -56,6 +56,7 @@ import GHC.StgToJS.Linker.Utils (decodeModifiedUTF8)
 import GHC.Types.CostCentre
 import GHC.Types.Tickish
 import GHC.Types.Var.Set
+import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.Unique.FM
 import GHC.Types.RepType
@@ -614,7 +615,7 @@ genCase ctx bnd e at alts l
   | StgLit (LitString bs) <- e
   , [GenStgAlt DEFAULT _ rhs] <- alts
   , StgApp i args <- rhs
-  , idName i == unpackCStringName
+  , i `hasKnownKey` unpackCStringIdKey
   , [StgVarArg b'] <- args
   , bnd == b'
   , Just d <- decodeModifiedUTF8 bs
@@ -626,7 +627,7 @@ genCase ctx bnd e at alts l
   | StgLit (LitString bs) <- e
   , [GenStgAlt DEFAULT _ rhs] <- alts
   , StgApp i args <- rhs
-  , idName i == unpackCStringUtf8Name
+  , i `hasKnownKey` unpackCStringUtf8IdKey
   , [StgVarArg b'] <- args
   , bnd == b'
   , Just d <- decodeModifiedUTF8 bs
