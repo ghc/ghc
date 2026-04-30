@@ -312,6 +312,9 @@ metaSelDataConOcc              = mkDataOcc "MetaSel"
 runMainIOOcc :: KnownOcc
 runMainIOOcc = mkVarOcc "runMainIO"
 
+traceIdOcc :: KnownOcc
+traceIdOcc = mkVarOcc "trace"
+
 {- *********************************************************************
 *                                                                      *
         Known-occ RdrNames

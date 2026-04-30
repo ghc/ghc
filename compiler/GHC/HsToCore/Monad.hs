@@ -87,6 +87,7 @@ import GHC.Iface.Load
 
 import GHC.Tc.Utils.Monad
 
+import GHC.Builtin.KnownOccs (traceIdOcc)
 import GHC.Builtin.KnownKeys
 
 import GHC.Data.FastString
@@ -730,7 +731,7 @@ pprRuntimeTrace :: String   -- ^ header
                 -> CoreExpr -- ^ expression
                 -> DsM CoreExpr
 pprRuntimeTrace str doc expr = do
-  traceId <- dsLookupGlobalId traceName
+  traceId <- dsLookupKnownOccId traceIdOcc
   unpackCStringId <- dsLookupGlobalId unpackCStringName
   dflags <- getDynFlags
   let message :: CoreExpr

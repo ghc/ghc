@@ -356,7 +356,7 @@ basicKnownKeyNames
         jsvalTyConName,
 
         -- Others
-        assertErrorName, traceName,
+        assertErrorName,
         printName,
 
         -- Type-level naturals
@@ -507,10 +507,6 @@ unsafeCoercePrimName    = varQual gHC_INTERNAL_UNSAFE_COERCE (fsLit "unsafeCoerc
 -- Error module
 assertErrorName    :: Name
 assertErrorName   = varQual gHC_INTERNAL_IO_Exception (fsLit "assertError") assertErrorIdKey
-
--- GHC.Internal.Debug.Trace
-traceName          :: Name
-traceName         = varQual gHC_INTERNAL_DEBUG_TRACE (fsLit "trace") traceKey
 
 genericClassKeys :: [KnownKey]
 genericClassKeys = [genClassKey, gen1ClassKey]
