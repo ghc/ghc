@@ -356,7 +356,6 @@ basicKnownKeyNames
         jsvalTyConName,
 
         -- Others
-        assertErrorName,
         printName,
 
         -- Type-level naturals
@@ -503,10 +502,6 @@ typeErrorShowTypeDataConName =
 -- Unsafe coercion proofs
 unsafeCoercePrimName:: Name
 unsafeCoercePrimName    = varQual gHC_INTERNAL_UNSAFE_COERCE (fsLit "unsafeCoerce#") unsafeCoercePrimIdKey
-
--- Error module
-assertErrorName    :: Name
-assertErrorName   = varQual gHC_INTERNAL_IO_Exception (fsLit "assertError") assertErrorIdKey
 
 genericClassKeys :: [KnownKey]
 genericClassKeys = [genClassKey, gen1ClassKey]
@@ -1301,10 +1296,9 @@ rootMainKey, runMainKey :: KnownKey
 rootMainKey                   = mkPreludeMiscIdUnique 101
 runMainKey                    = mkPreludeMiscIdUnique 102
 
-thenIOIdKey, lazyIdKey, assertErrorIdKey, oneShotKey, runRWKey :: KnownKey
+thenIOIdKey, lazyIdKey, oneShotKey, runRWKey :: KnownKey
 thenIOIdKey                   = mkPreludeMiscIdUnique 103
 lazyIdKey                     = mkPreludeMiscIdUnique 104
-assertErrorIdKey              = mkPreludeMiscIdUnique 105
 oneShotKey                    = mkPreludeMiscIdUnique 106
 runRWKey                      = mkPreludeMiscIdUnique 107
 

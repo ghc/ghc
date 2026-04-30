@@ -315,6 +315,9 @@ runMainIOOcc = mkVarOcc "runMainIO"
 traceIdOcc :: KnownOcc
 traceIdOcc = mkVarOcc "trace"
 
+assertErrorIdOcc :: KnownOcc
+assertErrorIdOcc = mkVarOcc "assertError"
+
 {- *********************************************************************
 *                                                                      *
         Known-occ RdrNames
