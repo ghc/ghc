@@ -294,6 +294,10 @@ Primitive imports
 
     :status: InternalUseOnly
 
+This feature is not intended for use outside of the core libraries that
+come with GHC. For more details see the
+:ghc-wiki:`GHC developer wiki <commentary/prim-ops>`.
+
 With :extension:`GHCForeignImportPrim`, GHC extends the FFI with an additional
 calling convention ``prim``, e.g.: ::
 
@@ -306,9 +310,15 @@ or ``Any :: UnliftedType`` (which can be arranged by way of
 ``unsafeCoerce#``) and the result type is allowed to be an unboxed tuple
 or the types ``Any :: Type`` or ``Any :: UnliftedType``.
 
-This feature is not intended for use outside of the core libraries that
-come with GHC. For more details see the
-:ghc-wiki:`GHC developer wiki <commentary/prim-ops>`.
+The source package may be specified before the symbol name, separated by a
+space. For example, to import ``addOne`` from ``somePackage``: ::
+
+       foreign import prim "somePackage addOne" addOne :: Int# -> Int#
+
+When dynamic linking on windows, source package must be correctly specified.
+If the source package is omitted then it is assumed to be the current package.
+An incorrect source package will result in linker errors when dynamic linking
+on windows. Static linking and non-windows targets are unaffected.
 
 .. _ffi-interruptible:
 
