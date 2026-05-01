@@ -5,6 +5,7 @@
 
 {-# LANGUAGE NoPolyKinds #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- | GHC.Core holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module GHC.Core (
@@ -2704,3 +2705,5 @@ collectNAnnBndrs orig_n e
     collect 0 bs body               = (reverse bs, body)
     collect n bs (_, AnnLam b body) = collect (n-1) (b:bs) body
     collect _ _  _                  = pprPanic "collectNBinders" $ int orig_n
+
+$(pure [])

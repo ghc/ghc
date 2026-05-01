@@ -56,6 +56,7 @@ compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
               ]
             , commonGhcArgs
             , ghcLinkArgs
+            , stage1 ? package compiler ? builder (Ghc CompileHs) ? mconcat [arg "-fexternal-interpreter"]
             , defaultGhcWarningsArgs
             , builder (Ghc CompileHs) ? arg "-c"
             , hieFiles stage ? builder (Ghc CompileHs) ? mconcat
