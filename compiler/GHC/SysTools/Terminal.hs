@@ -14,17 +14,9 @@ import qualified Graphics.Win32 as Win32
 import qualified System.Win32 as Win32
 #endif
 
-import System.IO.Unsafe
-
--- | Does the controlling terminal support ANSI color sequences?
--- This memoized to avoid thread-safety issues in ncurses (see #17922).
-stderrSupportsAnsiColors :: Bool
-stderrSupportsAnsiColors = unsafePerformIO stderrSupportsAnsiColors'
-{-# NOINLINE stderrSupportsAnsiColors #-}
-
 -- | Check if ANSI escape sequences can be used to control color in stderr.
-stderrSupportsAnsiColors' :: IO Bool
-stderrSupportsAnsiColors' = do
+stderrSupportsAnsiColors :: IO Bool
+stderrSupportsAnsiColors = do
 #if !defined(mingw32_HOST_OS)
   -- Equivalent of https://hackage.haskell.org/package/ansi-terminal/docs/System-Console-ANSI.html#v:hSupportsANSI
   isTerminal <- hIsTerminalDevice stderr
