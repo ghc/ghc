@@ -1,0 +1,11 @@
+section: compiler
+synopsis: Fix a divergence in the interaction between ``recover`` and ``putQ`` between the internal and external interpreter
+description: The ``recover`` method in TemplateHaskell now behaves the same 
+  with the internal and external interpreter.
+  In the past, when an error was encountered in a computation in a ``recover`` block,
+  the external interpreter would discard any state changes from ``putQ``,
+  whereas the internal interpreter would not.
+  This was a long-standing error in the implementation of the external interpreter.
+  Both now keep state changes from ``putQ`` in ``recover`` blocks.
+mrs: !15994
+issues: #27022

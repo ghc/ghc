@@ -650,3 +650,4 @@ test('GadtConSigs_th_dump1', normal, compile, ['-v0 -ddump-splices -dsuppress-un
 test('T26099', normal, compile_fail, [''])
 test('T8306_th', only_ways(['ghci']), ghci_script, ['T8306_th.script'])
 test('T26862_th', only_ways(['ghci']), ghci_script, ['T26862_th.script'])
+test('T27022', normal, compile_and_run, [''])

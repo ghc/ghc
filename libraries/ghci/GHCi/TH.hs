@@ -175,9 +175,7 @@ instance TH.Quasi GHCiQ where
     e <- try $ unmask $ runGHCiQ (a <* ghcCmd FailIfErrs) sRef
     remoteTHCall (qsPipe s) (EndRecover (isLeft e))
     case e of
-      Left GHCiQException{} ->
-        -- in case of error, restore the state to the start of the `recover` block.
-        newIORef s >>= h
+      Left GHCiQException{} -> h sRef
       Right r -> return r
   qLookupName isType occ = ghcCmd (LookupName isType occ)
   qReify name = ghcCmd (Reify name)
