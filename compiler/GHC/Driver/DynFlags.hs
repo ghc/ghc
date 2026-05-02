@@ -546,6 +546,7 @@ initDynFlags dflags = do
                          `catchIOError` \_ -> return False
  ghcNoUnicodeEnv <- lookupEnv "GHC_NO_UNICODE"
  let useUnicode' = isNothing ghcNoUnicodeEnv && canUseUnicode
+ canUseColor <- stderrSupportsAnsiColors
  maybeGhcColorsEnv  <- lookupEnv "GHC_COLORS"
  maybeGhcColoursEnv <- lookupEnv "GHC_COLOURS"
  let adjustCols (Just env) = Col.parseScheme env
@@ -557,9 +558,9 @@ initDynFlags dflags = do
  return dflags{
         useUnicode    = useUnicode',
         useColor      = useColor',
-        canUseColor   = stderrSupportsAnsiColors,
+        canUseColor   = canUseColor,
         -- if the terminal supports color, we assume it supports links as well
-        canUseErrorLinks = stderrSupportsAnsiColors,
+        canUseErrorLinks = canUseColor,
         colScheme     = colScheme',
         tmpDir        = TempDir tmp_dir
         }
