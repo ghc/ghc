@@ -9,7 +9,7 @@ d = D 10## RUBBISH(IntRep)
 
 lvl = foo d
 
-bar1 = \ _ eta -> case lvl of { W# ipv -> (# eta, () #) }
+bar1 = \ x eta -> case lvl of { W# ipv -> (# eta, () #) }
 
 bar = bar1 `cast` <Co:6> :: ...
 

@@ -9,7 +9,7 @@
 -- The 'CoreRule' datatype itself is declared elsewhere.
 module GHC.Core.Rules (
         -- ** Looking up rules
-        lookupRule, matchExprs, ruleLhsIsMoreSpecific,
+        RuleMatch(..), lookupRule, matchExprs, ruleLhsIsMoreSpecific,
 
         -- ** RuleBase, RuleEnv
         RuleBase, RuleEnv(..), mkRuleEnv, emptyRuleEnv,
@@ -50,8 +50,7 @@ import GHC.Core.Subst
 import GHC.Core.SimpleOpt ( exprIsLambda_maybe )
 import GHC.Core.FVs       ( exprFreeVars, bindFreeVars
                           , rulesFreeVarsDSet, orphNamesOfExprs )
-import GHC.Core.Utils     ( exprType, mkTick, mkTicks
-                          , stripTicksTopT, stripTicksTopE
+import GHC.Core.Utils     ( exprType, stripTicksTopT, stripTicksTopE
                           , isJoinBind, mkCastMCo )
 import GHC.Core.Ppr       ( pprRules )
 import GHC.Core.Unify as Unify ( ruleMatchTyKiX )
@@ -63,8 +62,8 @@ import GHC.Core.Coercion as Coercion
 import GHC.Core.Tidy     ( tidyRules )
 import GHC.Core.Map.Expr ( eqCoreExpr )
 import GHC.Core.Opt.Arity( etaExpandToJoinPointRule )
-import GHC.Core.Make     ( mkCoreLams )
-import GHC.Core.Opt.OccurAnal( occurAnalyseExpr )
+import GHC.Core.Make
+import GHC.Core.Opt.OccurAnal( occurAnalyseBndrsAndExpr )
 import GHC.Core.Rules.Config (roBuiltinRules)
 
 import GHC.Tc.Utils.TcType  ( tcSplitTyConApp_maybe )
@@ -88,6 +87,7 @@ import GHC.Types.Basic
 import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.Bag
+import GHC.Data.OrdList
 import GHC.Data.List.SetOps( hasNoDups )
 
 import GHC.Utils.Misc as Utils
@@ -197,16 +197,18 @@ mkRule this_mod is_auto is_local name act fn bndrs args rhs
   = Rule { ru_name   = name
          , ru_act    = act
          , ru_fn     = fn
-         , ru_bndrs  = bndrs
+         , ru_bndrs  = bndrs'
          , ru_args   = args
-         , ru_rhs    = occurAnalyseExpr rhs
-                       -- See Note [OccInfo in unfoldings and rules]
+         , ru_rhs    = rhs'
          , ru_rough  = roughTopNames args
          , ru_origin = this_mod
          , ru_orphan = orph
          , ru_auto   = is_auto
          , ru_local  = is_local }
   where
+    (bndrs', rhs') = occurAnalyseBndrsAndExpr bndrs rhs
+        -- See (OUR1) in Note [OccInfo in unfoldings and rules]
+
         -- Compute orphanhood.  See Note [Orphans] in GHC.Core.InstEnv
         -- A rule is an orphan only if none of the variables
         -- mentioned on its left-hand side are locally defined
@@ -541,6 +543,7 @@ map.
 ************************************************************************
 -}
 
+
 -- | The main rule matching function. Attempts to apply all (active)
 -- supplied rules to this instance of an application in a given
 -- context, returning the rule applied and the resulting expression if
@@ -551,7 +554,7 @@ lookupRule :: HasDebugCallStack
            -> Id -- Function head
            -> [CoreExpr] -- Args
            -> [CoreRule] -- Rules
-           -> Maybe (CoreRule, CoreExpr)
+           -> Maybe RuleMatch
 
 -- See Note [Extra args in the target]
 -- See comments on matchRule
@@ -563,17 +566,17 @@ lookupRule opts rule_env@(ISE in_scope _) is_active fn args rules
   where
     rough_args = map roughTopName args
 
-    -- Strip ticks from arguments, see Note [Tick annotations in RULE
-    -- matching]. We only collect ticks if a rule actually matches -
+    -- Strip ticks from arguments, see Note [Tick annotations in RULE matching]
+    -- We only collect ticks if a rule actually matches -
     -- this matters for performance tests.
     args' = map (stripTicksTopE tickishFloatable) args
     ticks = concatMap (stripTicksTopT tickishFloatable) args
 
-    go :: [(CoreRule,CoreExpr)] -> [CoreRule] -> [(CoreRule,CoreExpr)]
+    go :: [RuleMatch] -> [CoreRule] -> [RuleMatch]
     go ms [] = ms
     go ms (r:rs)
-      | Just e <- matchRule opts rule_env is_active fn args' rough_args r
-      = go ((r,mkTicks ticks e):ms) rs
+      | Just rm <- matchRule opts rule_env is_active fn args' rough_args r
+      = go (rm { rm_floats = toOL (map FloatTick ticks) `appOL` rm_floats rm } : ms) rs
       | otherwise
       = -- pprTrace "match failed" (ppr r $$ ppr args $$
         --   ppr [ (arg_id, maybeUnfoldingTemplate unf)
@@ -582,35 +585,38 @@ lookupRule opts rule_env@(ISE in_scope _) is_active fn args rules
         --       , isCheapUnfolding unf] )
         go ms rs
 
-findBest :: InScopeSet -> (Id, [CoreExpr])
-         -> (CoreRule,CoreExpr) -> [(CoreRule,CoreExpr)] -> (CoreRule,CoreExpr)
+findBest :: InScopeSet
+         -> (Id, [CoreExpr])   -- Target, just for overlap reporting
+         -> RuleMatch          -- Most specific so far
+         -> [RuleMatch]
+         -> RuleMatch
 -- All these pairs matched the expression
 -- Return the pair the most specific rule
 -- The (fn,args) is just for overlap reporting
 
-findBest _        _      (rule,ans)   [] = (rule,ans)
-findBest in_scope target (rule1,ans1) ((rule2,ans2):prs)
-  | ruleIsMoreSpecific in_scope rule1 rule2 = findBest in_scope target (rule1,ans1) prs
-  | ruleIsMoreSpecific in_scope rule2 rule1 = findBest in_scope target (rule2,ans2) prs
-  | debugIsOn = let pp_rule rule
+findBest _        _      rm   [] = rm
+findBest in_scope target rm1 (rm2: rms)
+  | ruleIsMoreSpecific in_scope rm1 rm2 = findBest in_scope target rm1 rms
+  | ruleIsMoreSpecific in_scope rm2 rm1 = findBest in_scope target rm2 rms
+  | debugIsOn = let pp_rule (RM { rm_rule = rule })
                       = ifPprDebug (ppr rule)
                                    (doubleQuotes (ftext (ruleName rule)))
                 in pprTrace "Rules.findBest: rule overlap (Rule 1 wins)"
                          (vcat [ whenPprDebug $
                                  text "Expression to match:" <+> ppr fn
                                  <+> sep (map ppr args)
-                               , text "Rule 1:" <+> pp_rule rule1
-                               , text "Rule 2:" <+> pp_rule rule2]) $
-                findBest in_scope target (rule1,ans1) prs
-  | otherwise = findBest in_scope target (rule1,ans1) prs
+                               , text "Rule 1:" <+> pp_rule rm1
+                               , text "Rule 2:" <+> pp_rule rm2]) $
+                findBest in_scope target rm1 rms
+  | otherwise = findBest in_scope target rm1 rms
   where
     (fn,args) = target
 
-ruleIsMoreSpecific :: InScopeSet -> CoreRule -> CoreRule -> Bool
+ruleIsMoreSpecific :: InScopeSet -> RuleMatch -> RuleMatch -> Bool
 -- The call (rule1 `ruleIsMoreSpecific` rule2)
 -- sees if rule2 can be instantiated to look like rule1
 -- See Note [ruleIsMoreSpecific]
-ruleIsMoreSpecific in_scope rule1 rule2
+ruleIsMoreSpecific in_scope (RM { rm_rule = rule1 }) (RM { rm_rule = rule2 })
   = case rule1 of
        BuiltinRule {} -> False
        Rule { ru_bndrs = bndrs1, ru_args = args1 }
@@ -681,7 +687,7 @@ start, in general eta expansion wastes work.  SLPJ July 99
 matchRule :: HasDebugCallStack
           => RuleOpts -> InScopeEnv -> (ActivationGhc -> Bool)
           -> Id -> [CoreExpr] -> [Maybe Name]
-          -> CoreRule -> Maybe CoreExpr
+          -> CoreRule -> Maybe RuleMatch
 
 -- If (matchRule rule args) returns Just (name,rhs)
 -- then (f args) matches the rule, and the corresponding
@@ -707,26 +713,7 @@ matchRule :: HasDebugCallStack
 --
 -- NB: The 'surplus' argument e4 in the input is simply dropped.
 -- See Note [Extra args in the target]
-
-matchRule opts rule_env _is_active fn args _rough_args
-          (BuiltinRule { ru_try = match_fn })
-  | not (roBuiltinRules opts) = Nothing
-  | otherwise                 = match_fn opts rule_env fn args
-
-matchRule _ rule_env is_active _ args rough_args
-          (Rule { ru_name = rule_name, ru_act = act, ru_rough = tpl_tops
-                , ru_bndrs = tpl_vars, ru_args = tpl_args, ru_rhs = rhs })
-  | not (is_active act) = Nothing
-  | ruleCantMatch tpl_tops rough_args      = Nothing
-  | otherwise = matchN rule_env rule_name tpl_vars tpl_args args rhs
-
-
----------------------------------------
-matchN  :: HasDebugCallStack
-        => InScopeEnv
-        -> RuleName -> [Var] -> [CoreExpr]
-        -> [CoreExpr] -> CoreExpr           -- ^ Target; can have more elements than the template
-        -> Maybe CoreExpr
+--
 -- For a given match template and context, find bindings to wrap around
 -- the entire result and what should be substituted for each template variable.
 --
@@ -737,24 +724,35 @@ matchN  :: HasDebugCallStack
 -- trailing ones, returning the result of applying the rule to a prefix
 -- of the actual arguments.
 
-matchN ise _rule_name tmpl_vars tmpl_es target_es rhs
-  = do { (bind_wrapper, matched_es) <- matchExprs ise tmpl_vars tmpl_es target_es
-       ; return (bind_wrapper $
-                 mkLams tmpl_vars rhs `mkApps` matched_es) }
+matchRule opts rule_env _is_active fn args _rough_args
+          (BuiltinRule { ru_try = match_fn })
+  = do { guard (roBuiltinRules opts)
+       ; match_fn opts rule_env fn args }
+
+matchRule _opts rule_env is_active _fn target_es rough_args
+          rule@(Rule { ru_act = act, ru_rough = tpl_tops
+                     , ru_bndrs = tpl_vars, ru_args = tpl_args, ru_rhs = rhs })
+  | not (is_active act)
+  = Nothing
+  | ruleCantMatch tpl_tops rough_args
+  = Nothing
+  | otherwise
+  = do { (matched_es, float_bs) <- matchExprs rule_env tpl_vars tpl_args target_es
+        ; return (RM { rm_rule  = rule
+                     , rm_rhs   = mkLams tpl_vars rhs
+                     , rm_args  = matched_es
+                     , rm_floats = float_bs }) }
 
 matchExprs :: HasDebugCallStack
            => InScopeEnv -> [Var] -> [CoreExpr] -> [CoreExpr]
-           -> Maybe (BindWrapper, [CoreExpr])  -- 1-1 with the [Var]
+           -> Maybe ( [CoreExpr]    -- 1-1 with the incoming [Var]
+                    , FloatBinds )  -- Floated binds
 matchExprs (ISE in_scope id_unf) tmpl_vars tmpl_es target_es
   = do  { rule_subst <- match_exprs init_menv emptyRuleSubst tmpl_es target_es
         ; let (_, matched_es) = mapAccumL (lookup_tmpl rule_subst)
                                           (mkEmptySubst in_scope) $
                                 tmpl_vars `zip` tmpl_vars1
-
-        ; let bind_wrapper = rs_binds rule_subst
-                             -- Floated bindings; see Note [Matching lets]
-
-        ; return (bind_wrapper, matched_es) }
+        ; return (matched_es, rs_binds rule_subst) }
   where
     (init_rn_env, tmpl_vars1) = mapAccumL rnBndrL (mkRnEnv2 in_scope) tmpl_vars
                   -- See Note [Cloning the template binders]
@@ -933,7 +931,7 @@ see `init_menv` in `matchN`.
 -- * The domain of the TvSubstEnv and IdSubstEnv are the template
 --   variables passed into the match.
 --
--- * The BindWrapper in a RuleSubst are the bindings floated out
+-- * The FloatBinds in a RuleSubst are the bindings floated out
 --   from nested matches; see the Let case of match, below
 --
 data RuleSubst = RS { -- Substitution; applied only to the template, not the target
@@ -943,17 +941,15 @@ data RuleSubst = RS { -- Substitution; applied only to the template, not the tar
                     , rs_id_subst :: IdSubstEnv
 
                       -- Floated bindings
-                    , rs_binds    :: BindWrapper  -- Floated bindings
-                    , rs_bndrs    :: [Var]        -- Variables bound by floated lets
+                      -- See Notes [Matching lets] and [Matching cases]
+                    , rs_binds    :: FloatBinds  -- Floated bindings
+                    , rs_bndrs    :: [Var]       -- Variables bound by floated bindings
                     }
 
-type BindWrapper = CoreExpr -> CoreExpr
-  -- See Notes [Matching lets] and [Matching cases]
-  -- we represent the floated bindings as a core-to-core function
 
 emptyRuleSubst :: RuleSubst
 emptyRuleSubst = RS { rs_tv_subst = emptyVarEnv, rs_id_subst = emptyVarEnv
-                    , rs_binds = \e -> e, rs_bndrs = [] }
+                    , rs_binds = emptyFloatBinds, rs_bndrs = [] }
 
 
 {- Note [Casts in the target]
@@ -1089,7 +1085,7 @@ match renv subst e1 (Tick t e2) mco
   | otherwise
   = Nothing
   where
-    subst' = subst { rs_binds = rs_binds subst . mkTick t }
+    subst' = subst { rs_binds = rs_binds subst `snocOL` FloatTick t }
 
 match renv subst e@(Tick t e1) e2 mco
   | tickishFloatable t  -- Ignore floatable ticks in rule template.
@@ -1323,7 +1319,7 @@ match renv subst e1 (Let bind e2) mco
                 -- We are floating the let-binding out, as if it had enclosed
                 -- the entire target from Day 1.  So we must add its binders to
                 -- the in-scope set (#20200)
-          (subst { rs_binds = rs_binds subst . Let bind'
+          (subst { rs_binds = rs_binds subst `snocOL` FloatLet bind'
                  , rs_bndrs = new_bndrs ++ rs_bndrs subst })
           e1 e2 mco
   | otherwise
@@ -1349,7 +1345,7 @@ match renv subst (Lam x1 e1) e2 mco
   , Just (x2, e2', ts) <- exprIsLambda_maybe in_scope_env casted_e2
     -- See Note [Lambdas in the template]
   = let renv'  = rnMatchBndr2 renv x1 x2
-        subst' = subst { rs_binds = rs_binds subst . flip (foldr mkTick) ts }
+        subst' = subst { rs_binds = rs_binds subst `appOL` toOL (map FloatTick ts) }
     in  match renv' subst' e1 e2' MRefl
 
 match renv subst e1 e2@(Lam {}) mco
@@ -1414,11 +1410,11 @@ match _ _ _e1 _e2 _mco = -- pprTrace "Failing at" ((text "e1:" <+> ppr _e1) $$ (
 eta_reduce :: RuleMatchEnv -> CoreExpr -> Maybe (RuleMatchEnv, CoreExpr)
 -- See Note [Eta reduction in the target]
 eta_reduce renv e@(Lam {})
-  = go renv id [] e
+  = go renv emptyFloatBinds [] e
   where
-    go :: RuleMatchEnv -> BindWrapper -> [Var] -> CoreExpr
+    go :: RuleMatchEnv -> FloatBinds -> [Var] -> CoreExpr
        -> Maybe (RuleMatchEnv, CoreExpr)
-    go renv bw vs (Let b e) = go renv (bw . Let b) vs e
+    go renv bw vs (Let b e) = go renv (bw `snocOL` FloatLet b) vs e
 
     go renv bw vs (Lam v e) = go renv' bw (v':vs) e
       where
@@ -1433,7 +1429,7 @@ eta_reduce renv e@(Lam {})
       , v == rnOccR (rv_lcl renv) tv
       = go renv bw vs f
 
-    go renv bw []    e = Just (renv, bw e)
+    go renv bw []    e = Just (renv, wrapFloats bw e)
     go _    _  (_:_) _ = Nothing
 
 eta_reduce _ _ = Nothing

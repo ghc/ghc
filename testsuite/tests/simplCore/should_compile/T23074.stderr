@@ -1,7 +1,7 @@
 
 ==================== Tidy Core rules ====================
 "SPEC $cstimes @Int"
-    forall ($dIntegral :: Integral Int).
+    forall ($dIntegral [Occ=Dead] :: Integral Int).
       $fSemigroupSumInt_$cstimes @Int $dIntegral
       = foo
 

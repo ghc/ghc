@@ -21,11 +21,12 @@ module GHC.Core.Opt.Simplify.Utils (
         BindContext(..), bindContextLevel,
 
         -- The continuation type
-        SimplCont(..), DupFlag(..), FromWhat(..), StaticEnv,
+        SimplCont(..), DupFlag(..), FromWhat(..),
+        StaticEnv(..),
         isSimplified, contIsStop,
         contIsDupable, contResultType, contHoleType, contHoleScaling,
         contIsTrivial, contArgs, contIsRhs,
-        countArgs, contOutArgs, dropContArgs,
+        hasArgs, countArgs, contOutArgs, dropContArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
         interestingCallContext,
 
@@ -33,7 +34,7 @@ module GHC.Core.Opt.Simplify.Utils (
         ArgInfo(..), ArgSpec(..), mkArgInfo,
         addValArgTo, addTyArgTo,
         argInfoExpr, argSpecArg,
-        pushSimplifiedArgs,
+        pushOutArgs, pushArgSpecs,
         isStrictArgInfo, lazyArgContext,
 
         abstractFloats,
@@ -171,11 +172,12 @@ data SimplCont
       , sc_cont :: SimplCont }
 
   | ApplyToVal         -- (ApplyToVal arg K)[e] = K[ e arg ]
-      { sc_dup     :: DupFlag   -- See Note [DupFlag invariants]
-      , sc_hole_ty :: OutType   -- Type of the function, presumably (forall a. blah)
-                                -- See Note [The hole type in ApplyToTy]
-      , sc_arg  :: InExpr       -- The argument,
-      , sc_env  :: StaticEnv    -- see Note [StaticEnv invariant]
+      { sc_hole_ty :: OutType    -- Type of the function, presumably (forall a. blah)
+                                 -- See Note [The hole type in ApplyToTy]
+      , sc_env  :: StaticEnv     -- See Note [StaticEnv]
+      , sc_arg  :: CoreExpr      -- The argument
+      , sc_cast :: MOutCoercion  -- Wrap this OutCoercion around the (simplified) argument
+                                 -- See Note [The sc_cast field of ApplyToVal]
       , sc_cont :: SimplCont }
 
   | ApplyToTy          -- (ApplyToTy ty K)[e] = K[ e ty ]
@@ -185,25 +187,24 @@ data SimplCont
       , sc_cont    :: SimplCont }
 
   | Select             -- (Select alts K)[e] = K[ case e of alts ]
-      { sc_dup  :: DupFlag        -- See Note [DupFlag invariants]
-      , sc_bndr :: InId           -- case binder
-      , sc_alts :: [InAlt]        -- Alternatives
-      , sc_env  :: StaticEnv      -- See Note [StaticEnv invariant]
+      { sc_env  :: StaticEnv      -- See Note [StaticEnv]
+      , sc_bndr :: Id             -- Case binder
+      , sc_alts :: [CoreAlt]      -- Alternatives
       , sc_cont :: SimplCont }
 
   -- The two strict forms have no DupFlag, because we never duplicate them
   | StrictBind          -- (StrictBind x b K)[e] = let x = e in K[b]
                         --       or, equivalently,  = K[ (\x.b) e ]
-      { sc_dup   :: DupFlag        -- See Note [DupFlag invariants]
-      , sc_from  :: FromWhat
-      , sc_bndr  :: InId
-      , sc_body  :: InExpr
-      , sc_env   :: StaticEnv      -- Static env for both sc_bndr (stable unfolding thereof)
-                                   -- and sc_body.  Also see Note [StaticEnv invariant]
+      { sc_from  :: FromWhat
+      , sc_env   :: StaticEnv  -- See Note [StaticEnv]
+                               -- The sc_env in StrictBind is never (Simplified NoDup)
+      , sc_bndr  :: Id
+      , sc_body  :: CoreExpr
+
       , sc_cont  :: SimplCont }
 
   | StrictArg           -- (StrictArg (f e1 ..en) K)[e] = K[ f e1 .. en e ]
-      { sc_dup  :: DupFlag     -- Always Simplified or OkToDup
+      { sc_dup :: DupFlag
       , sc_fun  :: ArgInfo     -- Specifies f, e1..en, Whether f has rules, etc
                                --     plus demands and discount flags for *this* arg
                                --          and further args
@@ -217,60 +218,82 @@ data SimplCont
         CoreTickish     -- Tick tickish <hole>
         SimplCont
 
-type StaticEnv = SimplEnv       -- Just the static part is relevant
+data StaticEnv  -- See Note [StaticEnv]
+  = Simplified DupFlag       -- No static env needed
+  | UnSimplified SimplEnv    -- Just the static part is relevant
 
 data FromWhat = FromLet | FromBeta Levity
 
--- See Note [DupFlag invariants]
-data DupFlag = NoDup       -- Unsimplified, might be big
-             | Simplified  -- Simplified
-             | OkToDup     -- Simplified and small
+data DupFlag = NoDup     -- Too big (or unknown) to dup
+             | OkDup     -- Small enough to dup
 
-isSimplified :: DupFlag -> Bool
-isSimplified NoDup = False
-isSimplified _     = True       -- Invariant: the subst-env is empty
+okToDup :: DupFlag -> Bool
+okToDup NoDup = False
+okToDup OkDup = True
 
-perhapsSubstTy :: DupFlag -> StaticEnv -> Type -> Type
-perhapsSubstTy dup env ty
-  | isSimplified dup = ty
-  | otherwise        = substTy env ty
+okToDupSE :: StaticEnv -> Bool
+okToDupSE (Simplified dup)  = okToDup dup
+okToDupSE (UnSimplified {}) = False
 
-{- Note [StaticEnv invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We pair up an InExpr or InAlts with a StaticEnv, which establishes the
-lexical scope for that InExpr.
+isSimplified :: StaticEnv -> Bool
+isSimplified (Simplified {})   = True
+isSimplified (UnSimplified {}) = False
 
-When we simplify that InExpr/InAlts, we use
-  - Its captured StaticEnv
-  - Overriding its InScopeSet with the larger one at the
-    simplification point.
+perhapsSubstTy :: StaticEnv -> Type -> Type
+perhapsSubstTy (Simplified {})    ty = ty
+perhapsSubstTy (UnSimplified env) ty = substTy env ty
 
-Why override the InScopeSet?  Example:
-      (let y = ey in f) ex
-By the time we simplify ex, 'y' will be in scope.
 
-However the InScopeSet in the StaticEnv is not irrelevant: it should
-include all the free vars of applying the substitution to the InExpr.
-Reason: contHoleType uses perhapsSubstTy to apply the substitution to
-the expression, and that (rightly) gives ASSERT failures if the InScopeSet
-isn't big enough.
+{- Note [StaticEnv]
+~~~~~~~~~~~~~~~~~~~
+Consider ApplyToVal, which has
+    sc_env :: StaticEnv
+    sc_arg :: CoreExpr
+Initially, `sc_arg` is an un-simplified InExpr, and `sc_env` is (UnSimplified env),
+where `env` gives meaning to the free variables of `sc_arg`; in particular, `env`
+may have substitutions that must apply to the argument.
 
-Note [DupFlag invariants]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-In both ApplyToVal { se_dup = dup, se_env = env, se_cont = k}
-   and  Select { se_dup = dup, se_env = env, se_cont = k}
-the following invariants hold
+But sometimes we simplify the argument, and in that case, `sc_arg` is an OutExpr,
+the simplified argument, and `sc_env` is (Simplified NoDup) or (Simplified OkDup).
+The former is the safe, conservative option, but in `mkDupableCont` we want to make
+the continuation duplicable, so we make the argument small and tag it with
+(Simplified OkDup).
 
-  (a) if dup = OkToDup, then continuation k is also ok-to-dup
-  (b) if dup = OkToDup or Simplified, the subst-env is empty,
-               or at least is always ignored; the payload is
-               already an OutThing
+We later simplify the argument, e.g. in `simplArg`.  Then
+  * If sc_env is Simplified, it's a no-op
+  * If sc_env is (UnSimplified arg_env) we simplify `sc_arg` with
+     - Its captured envt `arg_env`
+     - but overriding its InScopeSet with the larger one at the
+       simplification point.
+    Why override the InScopeSet?  Example:
+          (let y = ey in f) ex
+    By the time we simplify ex, 'y' will be in scope.
+  All this is done in `simplArg`.
+
+Note that:
+
+* In the Simplified case there is no environment, because the substitution has
+  already been applied.
+
+* We say sc_arg :: CoreExpr, rather than sc_arg :: InExpr or sc_arg :: OutExpr,
+  because whether it is InExpr or OutExpr depends on `sc_env`
+
+* Same deal for Select, and StrictBind, but the StaticEnv scopes over
+    * sc_bndr and sc_alts (for Select)
+    * sc_bndr and sc_body (for StrictBind)
+
+* Even though the InScopeSet of an (UnSimplified se) is overridden in `simplArg`,
+  that InScopeSet is not irrelevant: it should include all the free vars of
+  applying the substitution to the InExpr. Reason: contHoleType uses perhapsSubstTy
+  to apply the substitution to the expression, and that (rightly) gives ASSERT
+  failures if the InScopeSet isn't big enough.
+
+(SE1) If dup = OkToDup, then continuation k is also ok-to-dup
 -}
 
 instance Outputable DupFlag where
-  ppr OkToDup    = text "ok"
-  ppr NoDup      = text "nodup"
-  ppr Simplified = text "simpl"
+  ppr OkDup = text "okdup"
+  ppr NoDup = text "nodup"
 
 instance Outputable SimplCont where
   ppr (Stop ty interesting eval_sd)
@@ -283,18 +306,21 @@ instance Outputable SimplCont where
     = (text "TickIt" <+> ppr t) $$ ppr cont
   ppr (ApplyToTy  { sc_arg_ty = ty, sc_cont = cont })
     = (text "ApplyToTy" <+> pprParendType ty) $$ ppr cont
-  ppr (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_cont = cont, sc_hole_ty = hole_ty })
-    = (hang (text "ApplyToVal" <+> ppr dup <+> text "hole-ty:" <+> pprParendType hole_ty)
+  ppr (ApplyToVal { sc_arg = arg, sc_env = env, sc_cont = cont, sc_hole_ty = hole_ty })
+    = (hang (text "ApplyToVal" <> braces (ppr env) <+> text "hole-ty:" <+> pprParendType hole_ty)
           2 (pprParendExpr arg))
       $$ ppr cont
   ppr (StrictBind { sc_bndr = b, sc_cont = cont })
     = (text "StrictBind" <+> ppr b) $$ ppr cont
   ppr (StrictArg { sc_fun = ai, sc_cont = cont })
     = (text "StrictArg" <+> ppr (ai_fun ai)) $$ ppr cont
-  ppr (Select { sc_dup = dup, sc_bndr = bndr, sc_alts = alts, sc_cont = cont })
-    = (text "Select" <+> ppr dup <+> ppr bndr) $$
+  ppr (Select { sc_env = env, sc_bndr = bndr, sc_alts = alts, sc_cont = cont })
+    = (text "Select" <> braces (ppr env) <+> ppr bndr) $$
       whenPprDebug (nest 2 $ ppr alts) $$ ppr cont
 
+instance Outputable StaticEnv where
+  ppr (Simplified dup)    = ppr dup
+  ppr (UnSimplified _env) = text "in"  -- For InExpr etc
 
 {- Note [The hole type in ApplyToTy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -384,18 +410,27 @@ isStrictArgInfo (ArgInfo { ai_dmds = dmds })
   | dmd:_ <- dmds = isStrUsedDmd dmd
   | otherwise     = False
 
-pushSimplifiedArgs :: SimplEnv
-                   -> [ArgSpec]   -- In normal, forward order
-                   -> SimplCont -> SimplCont
-pushSimplifiedArgs env args cont = foldr (pushSimplifiedArg env) cont args
--- pushSimplifiedRevArgs env args cont = foldl' (\k a -> pushSimplifiedArg env a k) cont args
+pushOutArgs :: Type -> [OutExpr] -> SimplCont -> SimplCont
+pushOutArgs _fun_ty [] cont
+  = cont
+pushOutArgs fun_ty (arg:args) cont
+  | Type ty <- arg
+  = ApplyToTy { sc_hole_ty = fun_ty, sc_arg_ty = ty
+              , sc_cont = pushOutArgs (piResultTy fun_ty ty) args cont }
+  | otherwise
+  = ApplyToVal { sc_hole_ty = fun_ty, sc_cast = MRefl
+               , sc_arg = arg, sc_env = Simplified NoDup
+               , sc_cont = pushOutArgs (funResultTy fun_ty) args  cont}
 
-pushSimplifiedArg :: SimplEnv -> ArgSpec -> SimplCont -> SimplCont
-pushSimplifiedArg _env (TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }) cont
+pushArgSpecs :: [ArgSpec]   -- In normal, forward order
+             -> SimplCont -> SimplCont
+pushArgSpecs args cont = foldr pushArgSpec cont args
+
+pushArgSpec :: ArgSpec -> SimplCont -> SimplCont
+pushArgSpec (TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }) cont
   = ApplyToTy  { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont }
-pushSimplifiedArg env (ValArg { as_arg = arg, as_hole_ty = hole_ty }) cont
-  = ApplyToVal { sc_arg = arg, sc_env = env, sc_dup = Simplified
-                 -- The SubstEnv will be ignored since sc_dup=Simplified
+pushArgSpec (ValArg { as_arg = arg, as_hole_ty = hole_ty }) cont
+  = ApplyToVal { sc_arg = arg, sc_env = Simplified NoDup, sc_cast = MRefl
                , sc_hole_ty = hole_ty, sc_cont = cont }
 
 argSpecArg :: ArgSpec -> OutExpr
@@ -444,13 +479,14 @@ contIsStop (Stop {}) = True
 contIsStop _         = False
 
 contIsDupable :: SimplCont -> Bool
-contIsDupable (Stop {})                         = True
-contIsDupable (ApplyToTy  { sc_cont = k })      = contIsDupable k
-contIsDupable (ApplyToVal { sc_dup = OkToDup }) = True -- See Note [DupFlag invariants]
-contIsDupable (Select { sc_dup = OkToDup })     = True -- ...ditto...
-contIsDupable (StrictArg { sc_dup = OkToDup })  = True -- ...ditto...
-contIsDupable (CastIt { sc_cont = k })          = contIsDupable k
-contIsDupable _                                 = False
+contIsDupable (Stop {})                    = True
+contIsDupable (ApplyToTy  { sc_cont = k }) = contIsDupable k
+contIsDupable (ApplyToVal { sc_env = se }) = okToDupSE se -- See (SE1) in Note [StaticEnv]
+contIsDupable (Select { sc_env = se })     = okToDupSE se -- ...ditto...
+contIsDupable (StrictBind { sc_env = se }) = okToDupSE se -- ...ditto...
+contIsDupable (StrictArg { sc_dup = dup }) = okToDup dup  -- ...ditto...
+contIsDupable (CastIt { sc_cont = k })     = contIsDupable k
+contIsDupable (TickIt _ k)                 = contIsDupable k
 
 -------------------
 contIsTrivial :: SimplCont -> Bool
@@ -476,13 +512,11 @@ contHoleType :: SimplCont -> OutType
 contHoleType (Stop ty _ _)                    = ty
 contHoleType (TickIt _ k)                     = contHoleType k
 contHoleType (CastIt { sc_co = co })          = coercionLKind co
-contHoleType (StrictBind { sc_bndr = b, sc_dup = dup, sc_env = se })
-  = perhapsSubstTy dup se (idType b)
+contHoleType (StrictBind { sc_bndr = b, sc_env = se }) = perhapsSubstTy se (idType b)
 contHoleType (StrictArg  { sc_fun_ty = ty })  = funArgTy ty
 contHoleType (ApplyToTy  { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
 contHoleType (ApplyToVal { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
-contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
-  = perhapsSubstTy d se (idType b)
+contHoleType (Select { sc_bndr =  b, sc_env = se }) = perhapsSubstTy se (idType b)
 
 
 -- Computes the multiplicity scaling factor at the hole. That is, in (case [] of
@@ -510,6 +544,12 @@ contHoleScaling (ApplyToVal { sc_cont = k }) = contHoleScaling k
 contHoleScaling (TickIt _ k) = contHoleScaling k
 
 -------------------
+hasArgs :: SimplCont -> Bool
+-- True <=> some leading arguments
+hasArgs (ApplyToTy {})  = True
+hasArgs (ApplyToVal {}) = True
+hasArgs _               = False
+
 countArgs :: SimplCont -> Int
 -- Count all arguments, including types, coercions,
 -- and other values; skipping over casts.
@@ -526,11 +566,11 @@ countValArgs (CastIt     { sc_cont = cont }) = countValArgs cont
 countValArgs _                               = 0
 
 -------------------
-contArgs :: SimplCont -> (Bool, [ArgSummary], SimplCont)
+contArgs :: SimplEnv -> SimplCont -> (Bool, [ArgSummary], SimplCont)
 -- Summarises value args, discards type args and coercions
 -- The returned continuation of the call is only used to
 -- answer questions like "are you interesting?"
-contArgs cont
+contArgs env cont
   | lone cont = (True, [], cont)
   | otherwise = go [] cont
   where
@@ -540,14 +580,10 @@ contArgs cont
     lone _               = True
 
     go args (ApplyToVal { sc_arg = arg, sc_env = se, sc_cont = k })
-                                        = go (is_interesting arg se : args) k
+                                        = go (interestingArg env se arg : args) k
     go args (ApplyToTy { sc_cont = k }) = go args k
     go args (CastIt { sc_cont = k })    = go args k
     go args k                           = (False, reverse args, k)
-
-    is_interesting arg se = interestingArg se arg
-                   -- Do *not* use short-cutting substitution here
-                   -- because we want to get as much IdInfo as possible
 
 contOutArgs :: SimplEnv -> SimplCont -> [OutExpr]
 -- Get the leading arguments from the `SimplCont`, as /OutExprs/
@@ -559,9 +595,10 @@ contOutArgs env cont
     go (ApplyToTy { sc_arg_ty = ty, sc_cont = cont })
       = Type ty : go cont
 
-    go (ApplyToVal { sc_dup = dup, sc_arg = arg, sc_env = env, sc_cont = cont })
-      | isSimplified dup = arg : go cont
-      | otherwise        = GHC.Core.Subst.substExpr (getFullSubst in_scope env) arg : go cont
+    go (ApplyToVal { sc_arg = arg, sc_env = se, sc_cont = cont })
+      = case se of
+          Simplified {}    -> arg : go cont
+          UnSimplified env -> GHC.Core.Subst.substExpr (getFullSubst in_scope env) arg : go cont
         -- Make sure we apply the static environment `sc_env` as a substitution
         --   to get an OutExpr.  See (BF1) in Note [tryRules: plan (BEFORE)]
         --   in GHC.Core.Opt.Simplify.Iteration
@@ -584,26 +621,33 @@ dropContArgs n cont = pprPanic "dropContArgs" (ppr n $$ ppr cont)
 -- For example, when simplifying the argument `e` in `f e` and `f` has the
 -- demand signature `<MP(S,A)>`, this function will give you back `P(S,A)` when
 -- simplifying `e`.
---
--- PRECONDITION: Don't call with 'ApplyToVal'. We haven't thoroughly thought
--- about what to do then and no call sites so far seem to care.
-contEvalContext :: SimplCont -> SubDemand
-contEvalContext k = case k of
-  Stop _ _ sd              -> sd
-  TickIt _ k               -> contEvalContext k
-  CastIt   { sc_cont = k } -> contEvalContext k
-  ApplyToTy{ sc_cont = k } -> contEvalContext k
-    --  ApplyToVal{sc_cont=k}      -> mkCalledOnceDmd $ contEvalContext k
+contEvalContext :: [Var] -> SimplCont -> SubDemand
+contEvalContext bndrs cont = go cont
+  where
+    go (Stop _ _ sd)              = sd
+    go (TickIt _ k)               = go k
+    go (CastIt   { sc_cont = k }) = go k
+    go (ApplyToTy{ sc_cont = k }) = go k
+
+    -- The ApplyToVal case can actually happen, if we have
+    --     (CastIt co (ApplyToVal ..))
+    -- Possible code:
+    --    go (ApplyToVal{sc_cont=k}) = mkCalledOnceDmd $ contEvalContext k
     -- Not 100% sure that's correct, . Here's an example:
     --   f (e x) and f :: <SC(S,C(1,L))>
     -- then what is the evaluation context of 'e' when we simplify it? E.g.,
     --   simpl e (ApplyToVal x $ Stop "C(S,C(1,L))")
     -- then it *should* be "C(1,C(S,C(1,L))", so perhaps correct after all.
-    -- But for now we just panic:
-  ApplyToVal{}               -> pprPanic "contEvalContext" (ppr k)
-  StrictArg{sc_fun=fun_info} -> subDemandIfEvaluated (Partial.head (ai_dmds fun_info))
-  StrictBind{sc_bndr=bndr}   -> subDemandIfEvaluated (idDemandInfo bndr)
-  Select{}                   -> topSubDmd
+    -- But for now we just return topDmd.
+    go (ApplyToVal{ sc_arg = arg }) = warnPprTrace True "contEvalContext"
+                                        (vcat [ text "arg:"   <+> ppr arg
+                                              , text "bndrs:" <+> ppr bndrs
+                                              , text "cont:"  <+> ppr cont ])
+                                      topSubDmd
+
+    go (StrictArg{sc_fun=fun_info}) = subDemandIfEvaluated (Partial.head (ai_dmds fun_info))
+    go (StrictBind{sc_bndr=bndr})   = subDemandIfEvaluated (idDemandInfo bndr)
+    go (Select{})                   = topSubDmd
     -- Perhaps reconstruct the demand on the scrutinee by looking at field
     -- and case binder dmds, see addCaseBndrDmd. No priority right now.
 
@@ -1037,16 +1081,19 @@ Wrinkles:
 
 -}
 
-interestingArg :: SimplEnv -> CoreExpr -> ArgSummary
+interestingArg :: SimplEnv -> StaticEnv -> CoreExpr -> ArgSummary
 -- See Note [Interesting arguments]
-interestingArg env e = go env 0 e
+interestingArg env se e
+  = case se of
+      Simplified {}           -> go env                                0 e
+      UnSimplified static_env -> go (static_env `setInScopeFromE` env) 0 e
   where
     -- n is # value args to which the expression is applied
     go env n (Var v)
        = case substId env v of
            DoneId v'            -> go_var n v'
-           DoneEx e _           -> go (zapSubstEnv env)             n e
-           ContEx tvs cvs ids e -> go (setSubstEnv env tvs cvs ids) n e
+           DoneEx e _           -> go (zapSubstEnv env)          n e
+           ContEx se e _mco     -> go (se `setInScopeFromE` env) n e
 
     go _   _ (Lit l)
        | isLitRubbish l        = NonTrivArg -- See (IA3) in Note [Interesting arguments]
@@ -1547,13 +1594,13 @@ the former.
 
 preInlineUnconditionally
     :: SimplEnv -> TopLevelFlag -> InId
-    -> InExpr -> StaticEnv  -- These two go together
+    -> StaticEnv -> CoreExpr -> MOutCoercion  -- The argument
     -> Maybe SimplEnv       -- Returned env has extended substitution
 -- Precondition: rhs satisfies the let-can-float invariant
 -- See Note [Core let-can-float invariant] in GHC.Core
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
-preInlineUnconditionally env top_lvl bndr rhs rhs_env
+preInlineUnconditionally env top_lvl bndr rhs_se rhs rhs_mco
   | not pre_inline_unconditionally           = Nothing
   | not active                               = Nothing
   | isTopLevel top_lvl && isDeadEndId bndr   = Nothing -- Note [Top-level bottoming Ids]
@@ -1565,11 +1612,26 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
 
   -- See Note [Stable unfoldings and preInlineUnconditionally]
   | not (isInlinePragma inline_prag)
-  , Just inl <- maybeUnfoldingTemplate unf   = Just $! (extend_subst_with inl)
+  , Just inl <- maybeUnfoldingTemplate unf   = assertPpr (isReflMCo rhs_mco) (ppr bndr) $
+                                               Just $! (extend_subst_with inl)
+
   | otherwise                                = Nothing
   where
     unf = idUnfolding bndr
-    extend_subst_with inl_rhs = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
+
+    -- If the rhs is /not/ already simplified, extend the envt with ContEx, which captures
+    --    the the lexical environment for us to restore in `simplInId`.
+    -- If the rhs /is/ already simplified, then extend the envt with DoneEx;
+    --    That makes `simplInId` call `simplOutExpr` which avoids re-simplifying
+    --    the RHS.
+    -- See Note [Avoid repeated simplification] in GHC.Core.Opt.Simplify.Iteration
+    extend_subst_with inl_rhs
+      = extendIdSubst env bndr $!
+        case rhs_se of
+          Simplified _ -> case rhs_mco of
+                             MRefl  -> DoneEx inl_rhs NotJoinPoint -- Common case
+                             MCo co -> DoneEx (mkCast inl_rhs co) NotJoinPoint
+          UnSimplified rhs_env -> ContEx rhs_env inl_rhs rhs_mco
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
     one_occ OneOcc{ occ_n_br   = 1
@@ -1805,7 +1867,7 @@ two places
 1. In the full `postInlineUnconditionally` look for the special case
    of "one occurrence, not under a lambda", and inline unconditionally then.
 
-   This is a bit risky: see Note [Avoiding simplifying repeatedly] in
+   This is a bit risky: see Note [Avoid repeated simplification] in
    Simplify.Iteration.  But in practice it seems to be a small win.
 
 2. `simplAuxBind` does a kind of poor-man's `postInlineUnconditionally`.  It
@@ -1908,9 +1970,7 @@ rebuildLam env bndrs@(bndr:_) body cont
     mb_rhs   = contIsRhs cont
 
     -- See Note [Eta reduction based on evaluation context]
-    eval_sd = contEvalContext cont
-        -- NB: cont is never ApplyToVal, because beta-reduction would
-        -- have happened.  So contEvalContext can panic on ApplyToVal.
+    eval_sd = contEvalContext bndrs cont
 
     try_eta :: [OutBndr] -> OutExpr -> SimplM OutExpr
     try_eta bndrs body

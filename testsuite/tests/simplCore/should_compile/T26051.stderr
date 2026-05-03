@@ -7,7 +7,7 @@ Result size of Specialise = {terms: 31, types: 39, coercions: 8, joins: 0/1}
 specMe [InlPrag=INLINABLE] :: forall n a. (Integral n, MaybeShowNum a n) => a -> n -> (String, n)
 [LclIdX,
  Arity=4,
- Unf=Unf{Src=StableUser, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [30 0 0 20] 260 10
+ Unf=Unf{Src=StableUser, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [90 60 0 20] 260 10
          Tmpl= \ (@n) (@a) ($dIntegral [Occ=Once1] :: Integral n) (irred :: MaybeShowNum a n) (eta [Occ=Once1] :: a) (eta [Occ=Once1] :: n) ->
                  let {
                    $dNum :: Num n
@@ -63,7 +63,7 @@ foo = \ (x :: Int) -> specMe @Int @Bool GHC.Internal.Real.$fIntegralInt ($dCTupl
 -- RHS size: {terms: 37, types: 26, coercions: 0, joins: 0/0}
 main :: State# RealWorld -> (# State# RealWorld, () #)
 [LclId, Arity=1, Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 301 0}]
-main = \ (eta [OS=OneShot] :: State# RealWorld) -> GHC.Internal.IO.Handle.Text.hPutStr2 GHC.Internal.IO.StdHandles.stdout (case GHC.Internal.Enum.eftIntFB @(Int -> Int) (GHC.Internal.Base.mapFB @Int @(Int -> Int) @Int (\ (ds :: Int) (ds1 [OS=OneShot] :: Int -> Int) (v [OS=OneShot] :: Int) -> case v of { I# ipv -> ds1 (case ds of { I# y -> GHC.Internal.Types.I# (+# ipv y) }) }) (\ (x :: Int) -> case foo x of { (_ [Occ=Dead], y) -> y })) (breakpoint @Int) 1# 1000# (GHC.Internal.Types.I# 0#) of { I# n -> GHC.Internal.Show.itos n (GHC.Internal.Types.[] @Char) }) GHC.Internal.Types.True eta
+main = \ (eta [OS=OneShot] :: State# RealWorld) -> GHC.Internal.IO.Handle.Text.hPutStr2 GHC.Internal.IO.Handle.FD.stdout (case GHC.Internal.Enum.eftIntFB @(Int -> Int) (GHC.Internal.Base.mapFB @Int @(Int -> Int) @Int (\ (ds :: Int) (ds1 [OS=OneShot] :: Int -> Int) (v [OS=OneShot] :: Int) -> case v of { I# ipv -> ds1 (case ds of { I# y -> GHC.Internal.Types.I# (+# ipv y) }) }) (\ (x :: Int) -> case foo x of { (_ [Occ=Dead], y) -> y })) (breakpoint @Int) 1# 1000# (GHC.Internal.Types.I# 0#) of { I# n -> GHC.Internal.Show.itos n (GHC.Internal.Types.[] @Char) }) GHC.Internal.Types.True eta
 
 -- RHS size: {terms: 1, types: 0, coercions: 3, joins: 0/0}
 main :: IO ()
@@ -72,7 +72,7 @@ main = main `cast` (Sym (GHC.Internal.Types.N:IO <()>_R) :: (State# RealWorld ->
 
 
 ------ Local rules for imported ids --------
-"SPEC/T26051 $wspecMe @Int @Bool" [2] forall ($dIntegral :: Integral Int) (irred :: MaybeShowNum Bool Int). T26051_Import.$wspecMe @Int @Bool $dIntegral irred = $s$wspecMe
-"SPEC/T26051 specMe @Int @Bool" [2] forall ($dIntegral :: Integral Int) (irred :: MaybeShowNum Bool Int). specMe @Int @Bool $dIntegral irred = $sspecMe
+"SPEC/T26051 $wspecMe @Int @Bool" [2] forall ($dIntegral [Occ=Dead] :: Integral Int) (irred [Occ=Dead] :: MaybeShowNum Bool Int). T26051_Import.$wspecMe @Int @Bool $dIntegral irred = $s$wspecMe
+"SPEC/T26051 specMe @Int @Bool" [2] forall ($dIntegral [Occ=Dead] :: Integral Int) (irred [Occ=Dead] :: MaybeShowNum Bool Int). specMe @Int @Bool $dIntegral irred = $sspecMe
 
 

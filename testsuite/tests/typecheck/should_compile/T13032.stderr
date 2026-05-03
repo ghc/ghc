@@ -9,7 +9,11 @@ f :: forall a b. (a ~ b) => a -> b -> Bool
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=True)}]
-f = \ (@a) (@b) _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] ->
+f = \ (@a)
+      (@b)
+      ($d~ [Occ=Dead] :: a ~ b)
+      (x [Occ=Dead] :: a)
+      (y [Occ=Dead] :: b) ->
       GHC.Internal.Types.True
 
 -- RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}

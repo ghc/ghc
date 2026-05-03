@@ -513,11 +513,7 @@ mkDictSelId name clas
 
     -- This is the built-in rule that goes
     --      op (dfT d1 d2) --->  opT d1 d2
-    rule = BuiltinRule { ru_name = fsLit "Class op " `appendFS`
-                                     occNameFS (getOccName name)
-                       , ru_fn    = name
-                       , ru_nargs = n_ty_args + 1
-                       , ru_try   = dictSelRule val_index n_ty_args }
+    rule = dictSelRule name n_ty_args val_index
 
         -- The strictness signature is of the form U(AAAVAAAA) -> T
         -- where the V depends on which item we are selecting
@@ -561,20 +557,80 @@ mkDictSelRhs clas val_index
                                 -- varToCoreExpr needed for equality superclass selectors
                                 --   sel a b d = case x of { MkC _ (g:a~b) _ -> CO g }
 
-dictSelRule :: Int -> Arity -> RuleFun
+dictSelRule :: Name -> Arity -> Int -> CoreRule
 -- Tries to persuade the argument to look like a constructor
 -- application, using exprIsConApp_maybe, and then selects
 -- from it
 --       sel_i t1..tk (D t1..tk op1 ... opm) = opi
 --
 -- See Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance
-dictSelRule val_index n_ty_args _ in_scope_env _ args
-  | (dict_arg : _) <- drop n_ty_args args
-  , Just (_, floats, _, _, con_args)
-             <- exprIsConApp_maybe in_scope_env dict_arg
-  = Just (wrapFloats floats $ getNth con_args val_index)
-  | otherwise
-  = Nothing
+
+dictSelRule name n_ty_args val_index
+  = -- This is Variant (1); see Note [dictSelRule]
+    rule
+  where
+    rule = BuiltinRule { ru_name = fsLit "Class op " `appendFS`
+                                     occNameFS (getOccName name)
+                       , ru_fn    = name
+                       , ru_nargs = n_ty_args + 1
+                       , ru_try   = try }
+
+    try :: RuleFun
+    try _opts in_scope_env _fn args
+      | (dict_arg : _) <- drop n_ty_args args
+      , Just (_, floats, _, _, con_args) <- exprIsConApp_maybe in_scope_env dict_arg
+      , let meth_e = getNth con_args val_index
+      = Just (RM { rm_floats = floats
+                 , rm_rhs    = meth_e
+                 , rm_args   = []
+                 , rm_rule   = rule })
+      | otherwise
+      = Nothing
+
+{- Note [dictSelRule]
+~~~~~~~~~~~~~~~~~~~~~
+Here is Variant (2) of dictSelRule
+This one rewrites
+    op (m1,..,mn)  -->   (\x.x) mi
+This way we can take advantage of the stuff described in
+Note [Avoid repeated simplification] in GHC.Core.Opt.Simplify.Iteration
+
+However in practice this has a small cost (from the extra beta reduction), and class-op
+simplification usaully happens via Plan (BEFORE), and dictionary arguments are usually small.
+The net effect: adopting Variant (2) led to a slight increase in compile times.
+
+dictSelRule name n_ty_args val_index
+  = rule
+  where
+    rule = BuiltinRule { ru_name = fsLit "Class op " `appendFS`
+                                     occNameFS (getOccName name)
+                       , ru_fn    = name
+                       , ru_nargs = n_ty_args + 1
+                       , ru_try   = try }
+
+    try :: RuleFun
+    try _opts in_scope_env _fn args
+      | (dict_arg : _) <- drop n_ty_args args
+      , Just (_, floats, _, _, con_args) <- exprIsConApp_maybe in_scope_env dict_arg
+      , let meth_e = getNth con_args val_index
+      = Just (RM { rm_floats = floats
+                 , rm_rhs    = mkIdLam (exprType meth_e)
+                 , rm_args   = [meth_e]
+                 , rm_rule   = rule })
+      | otherwise
+      = Nothing
+
+mkIdLam :: Type -> CoreExpr
+-- Make an identity lambda (\(x::ty).x), already occ-analysed
+mkIdLam ty
+  = Lam x (varToCoreExpr x)
+  where
+    x = mkTemplateLocal 1 ty
+        `setIdOccInfo` OneOcc { occ_in_lam  = NotInsideLam
+                              , occ_n_br    = 1
+                              , occ_int_cxt = NotInteresting
+                              , occ_tail    = NoTailCallInfo }
+-}
 
 {-
 ************************************************************************

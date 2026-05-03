@@ -871,8 +871,9 @@ addCoreCt nabla x e = do
           s' -> core_expr x (mkListExpr charTy (map mkCharExpr s'))
       | Just lit <- coreExprAsPmLit e
       = pm_lit x lit
-      | Just (in_scope, _empty_floats@[], dc, _arg_tys, args)
+      | Just (in_scope, empty_floats, dc, _arg_tys, args)
             <- exprIsConApp_maybe in_scope_env e
+      , isEmptyFloatBinds empty_floats
       = data_con_app x in_scope dc args
       -- See Note [Detecting pattern synonym applications in expressions]
       | Var y <- e, Nothing <- isDataConId_maybe x

@@ -35,7 +35,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Set
 
 import GHC.Utils.Misc
-import GHC.Utils.Panic.Plain
+import GHC.Utils.Panic
 
 import GHC.Utils.Outputable
 
@@ -379,6 +379,7 @@ fiExpr platform to_drop (_, AnnTick tickish expr)
   = Tick tickish (fiExpr platform to_drop expr)
 
   | otherwise -- Wimp out for now - we could push values in
+              -- And/or we could use FloatTick to float it inwards
   = wrapFloats to_drop (Tick tickish (fiExpr platform [] expr))
 
 {-
@@ -861,7 +862,12 @@ floatIsDupable :: Platform -> FloatBind -> Bool
 floatIsDupable platform (FloatCase scrut _ _ _) = exprIsDupable platform scrut
 floatIsDupable platform (FloatLet (Rec prs))    = all (exprIsDupable platform . snd) prs
 floatIsDupable platform (FloatLet (NonRec _ r)) = exprIsDupable platform r
+floatIsDupable _        (FloatTick t)           = pprPanic "floatIsDupable" (ppr t)
+  -- FloatTick: whether it is safe to float a tick inwards should reallly depend
+  -- on the kind of tick.  But in fact FloatIn never floats ticks at all, so
+  -- this case can't happen.  Hence the panic, which is at least simple.
 
 floatIsCase :: FloatBind -> Bool
 floatIsCase (FloatCase {}) = True
 floatIsCase (FloatLet {})  = False
+floatIsCase (FloatTick {}) = False

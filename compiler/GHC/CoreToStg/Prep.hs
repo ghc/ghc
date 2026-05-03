@@ -32,9 +32,9 @@ import GHC.Builtin.Types.Prim
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
 import GHC.Core.Lint    ( EndPassConfig(..), endPassIO )
-import GHC.Core
+import GHC.Core hiding( FloatBind(..) )
 import GHC.Core.Subst
-import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
+import GHC.Core.Make
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCon
@@ -2108,6 +2108,8 @@ instance Outputable FloatInfo where
 
 -- See Note [Floating in CorePrep]
 -- and Note [BindInfo and FloatInfo]
+-- This data type is very like GHC.Core.FloatBind,
+-- but with extra info on the let-bindings
 data FloatingBind
   = Float !CoreBind !BindInfo !FloatInfo    -- Never a join-point binding
   | UnsafeEqualityCase !CoreExpr !CoreBndr !AltCon ![CoreBndr]

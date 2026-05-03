@@ -1,7 +1,8 @@
 
 ==================== Tidy Core rules ====================
 "SPEC foo @IO @Int"
-    forall ($dMonad :: Monad IO) ($dIntegral :: Integral Int).
+    forall ($dMonad [Occ=Dead] :: Monad IO)
+           ($dIntegral [Occ=Dead] :: Integral Int).
       foo1 @IO @Int $dMonad $dIntegral
       = foo_$sfoo
 

@@ -6,7 +6,7 @@ TYPE CONSTRUCTORS
 PATTERN SYNONYMS
   (:||:) :: forall {a} {b}. a -> b -> (a, b)
 Dependent modules: []
-Dependent packages: [(normal, base-4.21.0.0)]
+Dependent packages: [(normal, base-4.23.0.0)]
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
@@ -35,7 +35,7 @@ T18052a.$m:||:
       (@b)
       (scrut :: (a, b))
       (cont :: a -> b -> r)
-      _ [Occ=Dead] ->
+      (fail [Occ=Dead] :: (# #) -> r) ->
       case scrut of { (x, y) -> cont x y }
 
 

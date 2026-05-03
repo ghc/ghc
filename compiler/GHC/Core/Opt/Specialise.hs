@@ -24,7 +24,7 @@ import GHC.Core.DataCon (dataConTyCon)
 import qualified GHC.Core.Subst as Core
 import GHC.Core.Unfold.Make
 import GHC.Core
-import GHC.Core.Make      ( mkLitRubbish )
+import GHC.Core.Make      ( mkLitRubbish, wrapFloats )
 import GHC.Core.Unify     ( tcMatchTy )
 import GHC.Core.Rules
 import GHC.Core.Subst (substTickish)
@@ -1821,7 +1821,11 @@ specLookupRule env fn args is_active rules
   | null rules
   = Nothing    -- Saves building a few thunks in the common case
   | otherwise
-  = lookupRule ropts in_scope_env is_active fn args rules
+  = case lookupRule ropts in_scope_env is_active fn args rules of
+      Just (RM { rm_rule = rule, rm_rhs = rule_rhs
+               , rm_floats = float_bs, rm_args = rule_args })
+        -> Just (rule, wrapFloats float_bs (mkApps rule_rhs rule_args))
+      Nothing -> Nothing
   where
     dflags       = se_dflags env
     in_scope     = substInScopeSet (se_subst env)

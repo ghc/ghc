@@ -870,7 +870,7 @@ primOpRules nm = \case
 
 -- useful shorthands
 mkPrimOpRule :: Name -> Int -> [RuleM CoreExpr] -> Maybe CoreRule
-mkPrimOpRule nm arity rules = Just $ mkBasicRule nm arity (msum rules)
+mkPrimOpRule nm arity rules = Just $ mkBasicRule1 nm arity (msum rules)
 
 mkRelOpRule :: Name -> (forall a . Ord a => a -> a -> Bool)
             -> [RuleM CoreExpr] -> Maybe CoreRule
@@ -1679,16 +1679,35 @@ but that is only a historical accident.
 ************************************************************************
 -}
 
-mkBasicRule :: Name -> Int -> RuleM CoreExpr -> CoreRule
+mkBasicRule1 :: Name -> Int -> RuleM CoreExpr -> CoreRule
 -- Gives the Rule the same name as the primop itself
-mkBasicRule op_name n_args rm
-  = BuiltinRule { ru_name  = occNameFS (nameOccName op_name),
-                  ru_fn    = op_name,
-                  ru_nargs = n_args,
-                  ru_try   = runRuleM rm }
+mkBasicRule1 op_name n_args rm
+  = mkBasicRule (occNameFS (nameOccName op_name)) op_name n_args rm
 
-newtype RuleM r = RuleM
-  { runRuleM :: RuleOpts -> InScopeEnv -> Id -> [CoreExpr] -> Maybe r }
+mkBasicRule :: RuleName -> Name -> Int -> RuleM CoreExpr -> CoreRule
+-- The Builtin rules in this module all produce an expression
+-- with no args; hence rm_args = [].  The `rm_rhs` is the complete
+-- result of the rule rewrite.  This is OK because it's always
+-- small (I think).
+mkBasicRule rule_name op_name n_args rm
+  = rule
+  where
+    rule = BuiltinRule { ru_name  = rule_name
+                       , ru_fn    = op_name
+                       , ru_nargs = n_args
+                       , ru_try   = try }
+
+    try opts in_scope fn args
+      = case runRuleM rm opts in_scope fn args of
+          Nothing  -> Nothing
+          Just rhs -> Just (RM { rm_rule = rule
+                               , rm_rhs  = rhs
+                               , rm_args = []
+                               , rm_floats = emptyFloatBinds })
+
+type CFRuleFun r = RuleOpts -> InScopeEnv -> Id -> [CoreExpr] -> Maybe r
+
+newtype RuleM r = RuleM { runRuleM :: CFRuleFun r }
   deriving (Functor)
 
 instance Applicative RuleM where
@@ -2132,28 +2151,16 @@ is fine.
 builtinRules :: [CoreRule]
 -- Rules for non-primops that can't be expressed using a RULE pragma
 builtinRules
-  = [BuiltinRule { ru_name = fsLit "CStringFoldrLit",
-                   ru_fn = unpackCStringFoldrName,
-                   ru_nargs = 4, ru_try = match_cstring_foldr_lit_C },
-     BuiltinRule { ru_name = fsLit "CStringFoldrLitUtf8",
-                   ru_fn = unpackCStringFoldrUtf8Name,
-                   ru_nargs = 4, ru_try = match_cstring_foldr_lit_utf8 },
-     BuiltinRule { ru_name = fsLit "CStringAppendLit",
-                   ru_fn = unpackCStringAppendName,
-                   ru_nargs = 2, ru_try = match_cstring_append_lit_C },
-     BuiltinRule { ru_name = fsLit "CStringAppendLitUtf8",
-                   ru_fn = unpackCStringAppendUtf8Name,
-                   ru_nargs = 2, ru_try = match_cstring_append_lit_utf8 },
-     BuiltinRule { ru_name = fsLit "EqString", ru_fn = eqStringName,
-                   ru_nargs = 2, ru_try = match_eq_string },
-     BuiltinRule { ru_name = fsLit "CStringLength", ru_fn = cstringLengthName,
-                   ru_nargs = 1, ru_try = match_cstring_length },
-     BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
-                   ru_nargs = 2, ru_try = \_ _ _ -> match_inline },
+  = [ mkBasicRule1 unpackCStringFoldrName      4 (RuleM match_cstring_foldr_lit_C)
+    , mkBasicRule1 unpackCStringFoldrUtf8Name  4 (RuleM match_cstring_foldr_lit_utf8)
+    , mkBasicRule1 unpackCStringAppendName     2 (RuleM match_cstring_append_lit_C)
+    , mkBasicRule1 unpackCStringAppendUtf8Name 2 (RuleM match_cstring_append_lit_utf8)
+    , mkBasicRule1 eqStringName                2 (RuleM match_eq_string)
+    , mkBasicRule1 cstringLengthName           1 (RuleM match_cstring_length)
+    , mkBasicRule1 inlineIdName                2 (RuleM match_inline)
+    , mkBasicRule1 unsafeEqualityProofName     3 unsafeEqualityProofRule
 
-     mkBasicRule unsafeEqualityProofName 3 unsafeEqualityProofRule,
-
-     mkBasicRule divIntName 2 $ msum
+    , mkBasicRule1 divIntName 2 $ msum
         [ nonZeroLit 1 >> binaryLit (intOp2 div)
         , leftZero
         , do
@@ -2161,9 +2168,9 @@ builtinRules
           Just n <- return $ exactLog2 d
           platform <- getPlatform
           return $ Var (primOpId IntSraOp) `App` arg `App` mkIntVal platform n
-        ],
+        ]
 
-     mkBasicRule modIntName 2 $ msum
+    , mkBasicRule1 modIntName 2 $ msum
         [ nonZeroLit 1 >> binaryLit (intOp2 mod)
         , leftZero
         , do
@@ -2322,15 +2329,9 @@ builtinBignumRules =
       encodeLitDouble LitDouble
   ]
   where
-    mkRule str name nargs f = BuiltinRule
-      { ru_name = fsLit str
-      , ru_fn = name
-      , ru_nargs = nargs
-      , ru_try = runRuleM $ do
-          env <- getRuleOpts
-          guard (roBignumRules env)
-          f
-      }
+    mkRule str name nargs f = mkBasicRule (fsLit str) name nargs rm
+      where
+        rm = do { env <- getRuleOpts; guard (roBignumRules env); f }
 
     integer_to_lit str name convert = mkRule str name 1 $ do
       [a0] <- getArgs
@@ -2506,15 +2507,15 @@ builtinBignumRules =
 --
 
 -- CString version
-match_cstring_append_lit_C :: RuleFun
+match_cstring_append_lit_C :: CFRuleFun CoreExpr
 match_cstring_append_lit_C = match_cstring_append_lit unpackCStringAppendIdKey unpackCStringIdKey
 
 -- CStringUTF8 version
-match_cstring_append_lit_utf8 :: RuleFun
+match_cstring_append_lit_utf8 :: CFRuleFun CoreExpr
 match_cstring_append_lit_utf8 = match_cstring_append_lit unpackCStringAppendUtf8IdKey unpackCStringUtf8IdKey
 
 {-# INLINE match_cstring_append_lit #-}
-match_cstring_append_lit :: Unique -> Unique -> RuleFun
+match_cstring_append_lit :: Unique -> Unique -> CFRuleFun CoreExpr
 match_cstring_append_lit append_key unpack_key _ env _ [lit1, e2]
   | Just (LitString s1) <- exprIsLiteral_maybe env lit1
   , (strTicks, Var unpk `App` lit2) <- stripStrTopTicks env e2
@@ -2540,15 +2541,15 @@ match_cstring_append_lit _ _ _ _ _ _ = Nothing
 -- See also Note [String literals in GHC] in CString.hs
 
 -- CString version
-match_cstring_foldr_lit_C :: RuleFun
+match_cstring_foldr_lit_C :: CFRuleFun CoreExpr
 match_cstring_foldr_lit_C = match_cstring_foldr_lit unpackCStringFoldrIdKey
 
 -- CStringUTF8 version
-match_cstring_foldr_lit_utf8 :: RuleFun
+match_cstring_foldr_lit_utf8 :: CFRuleFun CoreExpr
 match_cstring_foldr_lit_utf8 = match_cstring_foldr_lit unpackCStringFoldrUtf8IdKey
 
 {-# INLINE match_cstring_foldr_lit #-}
-match_cstring_foldr_lit :: Unique -> RuleFun
+match_cstring_foldr_lit :: Unique -> CFRuleFun CoreExpr
 match_cstring_foldr_lit foldVariant _ env _
         [ Type ty1
         , lit1
@@ -2595,7 +2596,7 @@ stripStrTopTicksT e = stripTicksTopT tickishFloatable e
 --      eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2)) = s1==s2
 -- Also  matches unpackCStringUtf8#
 
-match_eq_string :: RuleFun
+match_eq_string :: CFRuleFun CoreExpr
 match_eq_string _ env _ [e1, e2]
   | (ticks1, Var unpk1 `App` lit1) <- stripStrTopTicks env e1
   , (ticks2, Var unpk2 `App` lit2) <- stripStrTopTicks env e2
@@ -2628,7 +2629,7 @@ match_eq_string _ _ _ _ = Nothing
 -- helpful when using OverloadedStrings to create a ByteString since the
 -- function computing the length of such ByteStrings can often be constant
 -- folded.
-match_cstring_length :: RuleFun
+match_cstring_length :: CFRuleFun CoreExpr
 match_cstring_length rule_env env _ [lit1]
   | Just (LitString str) <- exprIsLiteral_maybe env lit1
     -- If elemIndex returns Just, it has the index of the first embedded NUL
@@ -2676,8 +2677,8 @@ The moving parts are simple:
   Also, don't forget about 'inline's type argument!
 -}
 
-match_inline :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-match_inline (Type _ : e : _) = go e
+match_inline :: CFRuleFun CoreExpr
+match_inline _ _ _ (Type _ : e : _) = go e
   -- Maybe Monad ahead:
   where
     go (Var f)      = -- Ignore the IdUnfoldingFun here!
@@ -2689,7 +2690,7 @@ match_inline (Type _ : e : _) = go e
     go (Tick t e)   = do { app <- go e; pure (Tick t app) }
     go _            = Nothing
 
-match_inline _ = Nothing
+match_inline _ _ _ _ = Nothing
 
 --------------------------------------------------------
 -- Note [Constant folding through nested expressions]

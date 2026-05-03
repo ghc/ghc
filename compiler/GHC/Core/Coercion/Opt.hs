@@ -3,7 +3,7 @@
 {-# LANGUAGE CPP #-}
 
 module GHC.Core.Coercion.Opt
-   ( optCoercion
+   ( optCoercion, optTransCo
    , OptCoercionOpts (..)
    )
 where
@@ -168,6 +168,14 @@ We use the following invariants:
 newtype OptCoercionOpts = OptCoercionOpts
    { optCoercionEnabled :: Bool  -- ^ Enable coercion optimisation (reduce its size)
    }
+
+optTransCo :: HasDebugCallStack => OptCoercionOpts -> InScopeSet
+           -> NormalCo -> NormalCo -> NormalCo
+optTransCo opts in_scope co1 co2
+  | optCoercionEnabled opts
+  = opt_trans in_scope co1 co2
+  | otherwise
+  = co1 `mkTransCo` co2
 
 optCoercion :: OptCoercionOpts -> Subst -> Coercion -> NormalCo
 -- ^ optCoercion applies a substitution to a coercion,

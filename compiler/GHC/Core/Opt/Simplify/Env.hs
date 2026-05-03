@@ -28,7 +28,7 @@ module GHC.Core.Opt.Simplify.Env (
         SimplEnvIS,  checkSimplEnvIS, pprBadSimplEnvIS,
 
         -- * Substitution results
-        SimplSR(..), mkContEx, substId, lookupRecBndr,
+        SimplSR(..), substId, lookupRecBndr,
 
         -- * Simplifying 'Id' binders
         simplNonRecBndr, simplNonRecJoinBndr, simplRecBndrs, simplRecJoinBndrs,
@@ -442,7 +442,7 @@ instance Outputable SimplFloats where
                        , text "joins:" <+> ppr jf
                        , text "in_scope:" <+> ppr is ])
 
-emptyFloats :: SimplEnv -> SimplFloats
+emptyFloats :: SimplEnvIS -> SimplFloats
 emptyFloats env
   = SimplFloats { sfLetFloats  = emptyLetFloats
                 , sfJoinFloats = emptyJoinFloats
@@ -488,12 +488,11 @@ data SimplSR
        -- and  v is a join-point of arity a
        --      <=> x is a join-point of arity a
 
-  | ContEx TvSubstEnv                 -- A suspended substitution
-           CvSubstEnv
-           SimplIdSubst
+  | ContEx SimplEnv
            InExpr
-      -- If   x :-> ContEx tv cv id e   is in the SimplISubst
-      -- then replace occurrences of x by (subst (tv,cv,id) e)
+           MOutCoercion  -- See Note [The sc_cast field of ApplyToVal]
+      -- If   x :-> ContEx static_env e mco   is in the SimplISubst
+      -- then replace occurrences of x by (subst static_env e) |> mco
 
 instance Outputable SimplSR where
   ppr (DoneId v)    = text "DoneId" <+> ppr v
@@ -503,8 +502,8 @@ instance Outputable SimplSR where
                 NotJoinPoint -> empty
                 JoinPoint n  -> parens (int n)
 
-  ppr (ContEx _tv _cv _id e) = vcat [text "ContEx" <+> ppr e {-,
-                                ppr (filter_env tv), ppr (filter_env id) -}]
+  ppr (ContEx _env e _mco) = text "ContEx" <+> ppr e
+                             -- ppr (filter_env tv), ppr (filter_env id)
         -- where
         -- fvs = exprFreeVars e
         -- filter_env env = filterVarEnv_Directly keep env
@@ -735,9 +734,6 @@ zapSubstEnv env@(SimplEnv { seInlineDepth = n })
 
 setSubstEnv :: SimplEnv -> TvSubstEnv -> CvSubstEnv -> SimplIdSubst -> SimplEnv
 setSubstEnv env tvs cvs ids = env { seTvSubst = tvs, seCvSubst = cvs, seIdSubst = ids }
-
-mkContEx :: SimplEnv -> InExpr -> SimplSR
-mkContEx (SimplEnv { seTvSubst = tvs, seCvSubst = cvs, seIdSubst = ids }) e = ContEx tvs cvs ids e
 
 {-
 ************************************************************************
@@ -1368,17 +1364,15 @@ getTCvSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv
 
 getFullSubst :: InScopeSet -> SimplEnv -> Subst
 getFullSubst in_scope (SimplEnv { seIdSubst = id_env, seTvSubst = tv_env, seCvSubst = cv_env })
-  = mk_full_subst in_scope tv_env cv_env id_env
-
-mk_full_subst :: InScopeSet -> TvSubstEnv -> CvSubstEnv -> SimplIdSubst -> Subst
-mk_full_subst in_scope tv_env cv_env id_env
   = mkSubst in_scope (mapVarEnv to_expr id_env) tv_env cv_env
   where
     to_expr :: SimplSR -> CoreExpr
     -- A tiresome impedence-matcher
-    to_expr (DoneEx e _)           = e
-    to_expr (DoneId v)             = Var v
-    to_expr (ContEx tvs cvs ids e) = GHC.Core.Subst.substExprSC (mk_full_subst in_scope tvs cvs ids) e
+    to_expr (DoneEx e _)       = e
+    to_expr (DoneId v)         = Var v
+    to_expr (ContEx env e mco) = mkCastMCo e' mco
+      where
+        e' = GHC.Core.Subst.substExprSC (getFullSubst in_scope env) e
 
 substTy :: HasDebugCallStack => SimplEnv -> Type -> Type
 substTy env ty = Type.substTy (getTCvSubst env) ty

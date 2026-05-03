@@ -426,7 +426,8 @@ decomposeFunCo :: HasDebugCallStack
 
 decomposeFunCo (FunCo { fco_mult = w, fco_arg = co1, fco_res = co2 })
   = (w, co1, co2)
-   -- Short-circuits the calls to mkSelCo
+   -- Fast path that short-circuits the calls to mkSelCo,
+   -- even though they would give the exact same answers
 
 decomposeFunCo co
   = assertPpr all_ok (ppr co) $
