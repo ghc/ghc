@@ -1,7 +1,7 @@
 
 ==================== Tidy Core rules ====================
 "USPEC showsIArray @UA @_"
-    forall (@i) ($dIArray :: IArray UA) ($dShow :: Show i).
+    forall (@i) ($dIArray [Occ=Dead] :: IArray UA) ($dShow :: Show i).
       showsIArray @UA @i $dIArray $dShow
       = showsIArray_$sshowsIArray @i $dShow
 

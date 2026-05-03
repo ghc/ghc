@@ -1,5 +1,6 @@
 
 ==================== Tidy Core rules ====================
-"USPEC bar @_" forall (@a) ($dC :: C a). bar @a $dC = bar_$sbar @a
+"USPEC bar @_"
+    forall (@a) ($dC [Occ=Dead] :: C a). bar @a $dC = bar_$sbar @a
 
 

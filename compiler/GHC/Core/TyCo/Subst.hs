@@ -12,7 +12,7 @@ module GHC.Core.TyCo.Subst
         -- * Substitutions
         Subst(..), TvSubstEnv, CvSubstEnv, IdSubstEnv,
         emptyIdSubstEnv, emptyTvSubstEnv, emptyCvSubstEnv, composeTCvSubst,
-        emptySubst, mkEmptySubst, isEmptyTCvSubst, isEmptySubst,
+        emptySubst, mkEmptySubst, isEmptyTvSubst, isEmptyTCvSubst, isEmptySubst,
         mkSubst, mkTCvSubst, mkTvSubst, mkCvSubst, mkIdSubst,
         getTvSubstEnv, getIdSubstEnv,
         getCvSubstEnv, substInScopeSet, setInScope, getSubstRangeTyCoFVs,
@@ -261,6 +261,11 @@ mkEmptySubst in_scope = Subst in_scope emptyVarEnv emptyVarEnv emptyVarEnv
 isEmptySubst :: Subst -> Bool
 isEmptySubst (Subst _ id_env tv_env cv_env)
   = isEmptyVarEnv id_env && isEmptyVarEnv tv_env && isEmptyVarEnv cv_env
+
+-- | Checks if the type substitution (only) is empty
+isEmptyTvSubst :: Subst -> Bool
+isEmptyTvSubst (Subst _ _ tv_env _)
+  = isEmptyVarEnv tv_env
 
 -- | Checks whether the tyvar and covar environments are empty.
 -- This function should be used over 'isEmptySubst' when substituting

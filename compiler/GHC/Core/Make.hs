@@ -18,9 +18,6 @@ module GHC.Core.Make (
         mkCharExpr, mkStringExpr, mkStringExprFS, mkStringExprFSWith,
         MkStringIds (..), getMkStringIds,
 
-        -- * Floats
-        FloatBind(..), wrapFloat, wrapFloats, floatBindings,
-
         -- * Constructing small tuples
         mkCoreVarTupTy, mkCoreTup, mkCoreUnboxedTuple, mkCoreUnboxedSum,
         mkCoreTupBoxity, unitExpr,
@@ -40,6 +37,9 @@ module GHC.Core.Make (
 
         -- * Constructing Maybe expressions
         mkNothingExpr, mkJustExpr,
+
+        -- * Floats
+        wrapFloat, wrapFloats,
 
         -- * Error Ids
         mkRuntimeErrorApp, mkImpossibleExpr, mkAbsentErrorApp, errorIds,
@@ -64,7 +64,7 @@ import GHC.Types.Literal
 import GHC.Types.Unique.Supply
 
 import GHC.Core
-import GHC.Core.Utils ( exprType, mkSingleAltCase, bindNonRec, mkCast )
+import GHC.Core.Utils ( exprType, mkSingleAltCase, bindNonRec, mkCast, mkTick )
 import GHC.Core.Type
 import GHC.Core.Predicate    ( scopedSort, isEqPred )
 import GHC.Core.TyCo.Compare ( eqType )
@@ -82,6 +82,7 @@ import GHC.Utils.Panic
 
 import GHC.Settings.Constants( mAX_TUPLE_SIZE )
 import GHC.Data.FastString
+import GHC.Data.OrdList
 import GHC.Data.Maybe ( expectJust )
 
 import Data.List        ( partition )
@@ -739,42 +740,6 @@ mkSmallTupleCase vars body scrut_var scrut
 {-
 ************************************************************************
 *                                                                      *
-                Floats
-*                                                                      *
-************************************************************************
--}
-
-data FloatBind
-  = FloatLet  CoreBind
-  | FloatCase CoreExpr Id AltCon [Var]
-      -- case e of y { C ys -> ... }
-      -- See Note [Floating single-alternative cases] in GHC.Core.Opt.SetLevels
-
-instance Outputable FloatBind where
-  ppr (FloatLet b) = text "LET" <+> ppr b
-  ppr (FloatCase e b c bs) = hang (text "CASE" <+> ppr e <+> text "of" <+> ppr b)
-                                2 (ppr c <+> ppr bs)
-
-wrapFloat :: FloatBind -> CoreExpr -> CoreExpr
-wrapFloat (FloatLet defns)       body = Let defns body
-wrapFloat (FloatCase e b con bs) body = mkSingleAltCase e b con bs body
-
--- | Applies the floats from right to left. That is @wrapFloats [b1, b2, …, bn]
--- u = let b1 in let b2 in … in let bn in u@
-wrapFloats :: [FloatBind] -> CoreExpr -> CoreExpr
-wrapFloats floats expr = foldr wrapFloat expr floats
-
-bindBindings :: CoreBind -> [Var]
-bindBindings (NonRec b _) = [b]
-bindBindings (Rec bnds) = map fst bnds
-
-floatBindings :: FloatBind -> [Var]
-floatBindings (FloatLet bnd) = bindBindings bnd
-floatBindings (FloatCase _ b _ bs) = b:bs
-
-{-
-************************************************************************
-*                                                                      *
 \subsection{Common list manipulation expressions}
 *                                                                      *
 ************************************************************************
@@ -849,6 +814,25 @@ mkNothingExpr ty = mkConApp nothingDataCon [Type ty]
 -- | Makes a Just from a value of the specified type
 mkJustExpr :: Type -> CoreExpr -> CoreExpr
 mkJustExpr ty val = mkConApp justDataCon [Type ty, val]
+
+
+{-
+************************************************************************
+*                                                                      *
+             Manipulating Floats
+*                                                                      *
+************************************************************************
+-}
+
+wrapFloat :: FloatBind -> CoreExpr -> CoreExpr
+wrapFloat (FloatTick t)          body = mkTick t body
+wrapFloat (FloatLet defns)       body = Let defns body
+wrapFloat (FloatCase e b con bs) body = mkSingleAltCase e b con bs body
+
+-- | Applies the floats from right to left. That is @wrapFloats [b1, b2, …, bn]
+-- u = let b1 in let b2 in … in let bn in u@
+wrapFloats :: FloatBinds -> CoreExpr -> CoreExpr
+wrapFloats floats expr = foldrOL wrapFloat expr floats
 
 
 {-

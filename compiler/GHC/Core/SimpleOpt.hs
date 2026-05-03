@@ -27,10 +27,10 @@ import GHC.Core.Utils
 import GHC.Core.FVs
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
-import GHC.Core.Make ( FloatBind(..), mkWildValBinder )
+import GHC.Core.Make
 import GHC.Core.Opt.OccurAnal( occurAnalyseExpr, occurAnalysePgm, zapLambdaBndrs )
 import GHC.Core.DataCon
-import GHC.Core.Coercion.Opt ( optCoercion, OptCoercionOpts (..) )
+import GHC.Core.Coercion.Opt ( optCoercion, optTransCo, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
 import GHC.Core.Predicate( isCoVarType )
@@ -57,6 +57,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import GHC.Data.Maybe       ( orElse )
+import GHC.Data.OrdList
 import GHC.Data.Graph.UnVar
 import Data.List (mapAccumL)
 import qualified Data.ByteString as BS
@@ -387,7 +388,8 @@ simple_opt_expr env expr = go expr
 
     go (Case e b ty as)
       | isDeadBinder b
-      , Just (_, [], con, _tys, es) <- exprIsConApp_maybe in_scope_env e'
+      , Just (_, floats, con, _tys, es) <- exprIsConApp_maybe in_scope_env e'
+      , isEmptyFloatBinds floats
         -- We don't need to be concerned about floats when looking for coerce.
       , Just (Alt altcon bs rhs) <- findAlt (DataAlt con) as
       = case altcon of
@@ -421,18 +423,6 @@ simple_opt_expr env expr = go expr
       = Alt con bndrs' (simple_opt_expr env' rhs)
       where
         (env', bndrs') = subst_opt_bndrs env bndrs
-
-mk_cast :: CoreExpr -> CoercionR -> CoreExpr
--- Like GHC.Core.Utils.mkCast, but does a full reflexivity check.
--- mkCast doesn't do that because the Simplifier does (in simplCast)
--- But in SimpleOpt it's nice to kill those nested casts (#18112)
-mk_cast (Cast e co1) co2        = mk_cast e (co1 `mkTransCo` co2)
-mk_cast (Tick t e)   co         = Tick t (mk_cast e co)
-mk_cast e co
-  | isReflexiveCo co
-  = e
-  | otherwise
-  = Cast e co
 
 ----------------------
 -- simple_app collects arguments for beta reduction
@@ -554,14 +544,16 @@ simple_app env e as
 
 add_cast :: SimpleOptEnv -> InCoercion -> [SimpleContItem] -> [SimpleContItem]
 add_cast env co1 as
-  | isReflCo co1'
+  | isReflCo co1
   = as
   | otherwise
   = case as of
-      CastIt co2:rest -> CastIt (co1' `mkTransCo` co2):rest
-      _               -> CastIt co1':as
+      CastIt co2:rest -> CastIt (optTransCo opts in_scope opt_co1 co2):rest
+      _               -> CastIt opt_co1:as
   where
-    co1' = optCoercion (so_co_opts (soe_opts env)) (soe_subst env) co1
+    opts     = so_co_opts (soe_opts env)
+    in_scope = soeInScope env
+    opt_co1  = optCoercion opts (soe_subst env) co1
 
 rebuild_app :: HasDebugCallStack
             => SimpleOptEnv -> OutExpr -> [SimpleContItem] -> OutExpr
@@ -571,6 +563,14 @@ rebuild_app env fun args = foldl mk_app fun args
     mk_app out_fun = \case
       ApplyToArg arg -> App out_fun (simple_opt_clo in_scope arg)
       CastIt co      -> mk_cast out_fun co
+
+mk_cast :: CoreExpr -> CoercionR -> CoreExpr
+-- Does a full reflexivity check, unlike GHC.Core.Utils.mkCast,
+-- which does the cheaper isReflCo only.
+-- But in SimpleOpt it's nice to kill those nested casts (#18112)
+mk_cast e co
+  | isReflexiveCo co = e
+  | otherwise        = Cast e co
 
 {- Note [Desugaring unlifted newtypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1436,7 +1436,7 @@ Note [Don't float join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 exprIsConApp_maybe should succeed on
    let v = e in Just v
-returning [x=e] as one of the [FloatBind].  But it must
+returning [x=e] as one of the FloatBinds.  But it must
 NOT succeed on
    join j x = rhs in Just v
 because join-points can't be gaily floated.  Consider
@@ -1529,21 +1529,21 @@ data ConCont = CC [CoreExpr] MCoercion
 -- in "GHC.Types.Id.Make".
 --
 -- We also return the incoming InScopeSet, augmented with
--- the binders from any [FloatBind] that we return
+-- the binders from any FloatBinds that we return
 exprIsConApp_maybe :: HasDebugCallStack
                    => InScopeEnv -> CoreExpr
-                   -> Maybe (InScopeSet, [FloatBind], DataCon, [Type], [CoreExpr])
+                   -> Maybe (InScopeSet, FloatBinds, DataCon, [Type], [CoreExpr])
 exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
-  = go (Left in_scope) [] expr (CC [] MRefl)
+  = go (Left in_scope) emptyFloatBinds expr (CC [] MRefl)
   where
     go :: Either InScopeSet Subst
              -- Left in-scope  means "empty substitution"
              -- Right subst    means "apply this substitution to the CoreExpr"
              -- NB: in the call (go subst floats expr cont)
              --     the substitution applies to 'expr', but /not/ to 'floats' or 'cont'
-       -> [FloatBind] -> CoreExpr -> ConCont
+       -> FloatBinds -> CoreExpr -> ConCont
              -- Notice that the floats here are in reverse order
-       -> Maybe (InScopeSet, [FloatBind], DataCon, [Type], [CoreExpr])
+       -> Maybe (InScopeSet, FloatBinds, DataCon, [Type], [CoreExpr])
     go subst floats (Tick t expr) cont
        | not (tickishIsCode t) = go subst floats expr cont
 
@@ -1572,7 +1572,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
        -- Good: returning (Mk#, [x]) with a float of  case exp of x { DEFAULT -> [] }
        --       simplifier produces case exp of a { DEFAULT -> exp[x/a] }
        , (subst', float, bndr) <- case_bind subst arg arg_type
-       = go subst' (float:floats) fun (CC (Var bndr : args) mco)
+       = go subst' (floats `snocOL` float) fun (CC (Var bndr : args) mco)
        | otherwise
        = go subst floats fun (CC (subst_expr subst arg : args) mco)
 
@@ -1582,7 +1582,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
        | otherwise
        = let (subst', bndr') = subst_bndr subst bndr
              float           = FloatLet (NonRec bndr' arg)
-         in go subst' (float:floats) body (CC args mco)
+         in go subst' (floats `snocOL` float) body (CC args mco)
 
     go subst floats (Let (NonRec bndr rhs) expr) cont
        | not (isJoinId bndr)
@@ -1590,7 +1590,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
        = let rhs'            = subst_expr subst rhs
              (subst', bndr') = subst_bndr subst bndr
              float           = FloatLet (NonRec bndr' rhs')
-         in go subst' (float:floats) expr cont
+         in go subst' (floats `snocOL` float) expr cont
 
     go subst floats (Case scrut b _ [Alt con vars expr]) cont
        | do_case_elim scrut' b vars  -- See Note [Case elim in exprIsConApp_maybe]
@@ -1601,7 +1601,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
           (subst'', vars') = subst_bndrs subst' vars
           float            = FloatCase scrut' b' con vars'
          in
-           go subst'' (float:floats) expr cont
+           go subst'' (floats `snocOL` float) expr cont
        where
           scrut'           = subst_expr subst scrut
 
@@ -1617,7 +1617,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
         , count isValArg args == idArity fun
         , (in_scope', seq_floats, args') <- mkFieldSeqFloats in_scope con args
           -- mkFieldSeqFloats: See (SFC2) in Note [Strict fields in Core]
-        = succeedWith in_scope' (seq_floats ++ floats) $
+        = succeedWith in_scope' (floats `appOL` seq_floats) $
           pushCoDataCon con args' mco
 
         -- Look through data constructor wrappers: they inline late (See Note
@@ -1666,12 +1666,11 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
 
     go _ _ _ _ = Nothing
 
-    succeedWith :: InScopeSet -> [FloatBind]
+    succeedWith :: InScopeSet -> FloatBinds
                 -> Maybe (DataCon, [Type], [CoreExpr])
-                -> Maybe (InScopeSet, [FloatBind], DataCon, [Type], [CoreExpr])
-    succeedWith in_scope rev_floats x
+                -> Maybe (InScopeSet, FloatBinds, DataCon, [Type], [CoreExpr])
+    succeedWith in_scope floats x
       = do { (con, tys, args) <- x
-           ; let floats = reverse rev_floats
            ; return (in_scope, floats, con, tys, args) }
 
     ----------------------------
@@ -1703,7 +1702,8 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
     extend (Left in_scope) v e = Right (extendSubst (mkEmptySubst in_scope) v e)
     extend (Right s)       v e = Right (extendSubst s v e)
 
-    case_bind :: Either InScopeSet Subst -> CoreExpr -> Type -> (Either InScopeSet Subst, FloatBind, Id)
+    case_bind :: Either InScopeSet Subst -> CoreExpr -> Type
+              -> (Either InScopeSet Subst, FloatBind, Id)
     case_bind subst expr expr_ty = (subst', float, bndr)
       where
         bndr   = setCaseBndrEvald MarkedStrict $
@@ -1713,22 +1713,23 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
         expr'  = subst_expr subst expr
         float  = FloatCase expr' bndr DEFAULT []
 
-    mkFieldSeqFloats :: InScopeSet -> DataCon -> [CoreExpr] -> (InScopeSet, [FloatBind], [CoreExpr])
+    mkFieldSeqFloats :: InScopeSet -> DataCon -> [CoreExpr] -> (InScopeSet, FloatBinds, [CoreExpr])
     -- See Note [Strict fields in Core] for what a field seq is and (SFC2) for
     -- why we insert them
     mkFieldSeqFloats in_scope dc args
       | isLazyDataConRep dc
-      = (in_scope, [], args)
+      = (in_scope, nilOL, args)
       | otherwise
       = (in_scope', floats', ty_args ++ val_args')
       where
         (ty_args, val_args) = splitAtList (dataConUnivAndExTyCoVars dc) args
-        (in_scope', floats', val_args') = foldr do_one (in_scope, [], []) $ zipEqual str_marks val_args
+        (in_scope', floats', val_args') = foldr do_one (in_scope, nilOL, []) $
+                                          zipEqual str_marks val_args
         str_marks = dataConRepStrictness dc
         do_one (str, arg) (in_scope,floats,args)
           | NotMarkedStrict <- str   = no_seq
           | exprIsHNF arg            = no_seq
-          | otherwise                = (in_scope', float:floats, Var bndr:args)
+          | otherwise                = (in_scope', float `consOL` floats, Var bndr:args)
           where
             no_seq = (in_scope, floats, arg:args)
             (in_scope', float, bndr) =

@@ -2,7 +2,6 @@ Broken note references (target note not found!):
 ref    compiler/GHC/Core/Coercion/Axiom.hs:488:2:     Note [RoughMap and rm_empty]
 ref    compiler/GHC/Core/Opt/OccurAnal.hs:1150:7:     Note [Loop breaking]
 ref    compiler/GHC/Core/Opt/SetLevels.hs:1688:30:     Note [Top level scope]
-ref    compiler/GHC/Core/Opt/Simplify/Iteration.hs:2556:55:     Note [Plan (AFTER)]
 ref    compiler/GHC/Core/Opt/Simplify/Iteration.hs:2985:13:     Note [Case binder next]
 ref    compiler/GHC/Core/Opt/Specialise.hs:1758:29:     Note [Arity decrease]
 ref    compiler/GHC/Driver/DynFlags.hs:1217:52:     Note [Eta-reduction in -O0]

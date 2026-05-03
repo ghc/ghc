@@ -3,11 +3,11 @@
 Result size of Tidy Core
   = {terms: 71, types: 45, coercions: 0, joins: 0/0}
 
-foo0 = \ _ -> 16##
+foo0 = \ ds -> 16##
 
-foo1 = \ _ -> 4##
+foo1 = \ ds -> 4##
 
-foo2 = \ _ -> 11##
+foo2 = \ ds -> 11##
 
 foo3 = foo0
 
@@ -21,11 +21,11 @@ foo3' = foo0'
 
 foo4' = I# 31#
 
-ctz0 = \ _ -> 30##
+ctz0 = \ ds -> 30##
 
-ctz1 = \ _ -> 6##
+ctz1 = \ ds -> 6##
 
-ctz2 = \ _ -> 14##
+ctz2 = \ ds -> 14##
 
 ctz3 = ctz0
 
@@ -39,11 +39,11 @@ ctz3' = ctz0'
 
 ctz4' = I# 62#
 
-clz1 = \ _ -> 5##
+clz1 = \ ds -> 5##
 
-clz2 = \ _ -> 13##
+clz2 = \ ds -> 13##
 
-clz3 = \ _ -> 29##
+clz3 = \ ds -> 29##
 
 clz1' = I# 5#
 

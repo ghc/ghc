@@ -4,28 +4,28 @@ Result size of Tidy Core
   = {terms: 40, types: 122, coercions: 26, joins: 0/0}
 
 nat2Word#
-  = \ @n $dKnownNat _ ->
+  = \ @n $dKnownNat p1 ->
       naturalToWord# ((natSing $dKnownNat) `cast` <Co:2> :: ...)
 
-foo = \ _ -> 18##
+foo = \ ds -> 18##
 
 fd
-  = \ @n $dKnownNat _ ->
+  = \ @n $dKnownNat ds ->
       naturalToWord# ((natSing $dKnownNat) `cast` <Co:6> :: ...)
 
-d = \ _ -> 3##
+d = \ ds -> 3##
 
 fm
-  = \ @n $dKnownNat _ ->
+  = \ @n $dKnownNat ds ->
       naturalToWord# ((natSing $dKnownNat) `cast` <Co:8> :: ...)
 
-m = \ _ -> 9##
+m = \ ds -> 9##
 
 fp
-  = \ @n $dKnownNat _ ->
+  = \ @n $dKnownNat ds ->
       naturalToWord# ((natSing $dKnownNat) `cast` <Co:10> :: ...)
 
-p = \ _ -> 512##
+p = \ ds -> 512##
 
 
 

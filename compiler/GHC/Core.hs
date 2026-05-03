@@ -84,8 +84,12 @@ module GHC.Core (
         IsOrphan(..), isOrphan, notOrphan, chooseOrphanAnchor,
 
         -- * Core rule data types
-        CoreRule(..),
+        CoreRule(..), RuleMatch(..),
         RuleName, RuleFun, IdUnfoldingFun, InScopeEnv(..), RuleOpts,
+
+        -- * Floats
+        FloatBind(..), FloatBinds, emptyFloatBinds, isEmptyFloatBinds,
+        floatBinders, floatsBinders,
 
         -- ** Operations on 'CoreRule's
         ruleArity, ruleName, ruleIdName, ruleActivation,
@@ -115,6 +119,8 @@ import GHC.Utils.Binary
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+
+import GHC.Data.OrdList
 
 import Data.Data hiding (TyCon)
 import Data.Int
@@ -1574,7 +1580,41 @@ data CoreRule
     }
                 -- See Note [Extra args in the target] in GHC.Core.Rules
 
-type RuleFun = RuleOpts -> InScopeEnv -> Id -> [CoreExpr] -> Maybe CoreExpr
+type RuleFun = RuleOpts -> InScopeEnv
+               -> Id -> [CoreExpr]   -- Function applied to these arguments
+               -> Maybe RuleMatch
+
+data RuleMatch -- See Note [data RuleMatch]
+  = RM { rm_rule   :: CoreRule
+       , rm_rhs    :: CoreExpr      -- Rhs of the rule
+       , rm_args   :: [CoreExpr]    -- The args of the RHS
+       , rm_floats :: FloatBinds    -- Floated let-bindings
+                                    -- See Note [Matching lets]
+       }
+
+{- Note [data RuleMatch]
+~~~~~~~~~~~~~~~~~~~~~~~
+A `RuleMatch` returns the result of a successful attempt to match a RULE
+against a target.  For example, suppose we have
+     RULE forall x,y. f (Just (y,x)) = g x y True
+and we match it againt a target
+     f (let v = ev in Just (ey, ex)) ez
+Then we get the RuleMatch
+     RM { rm_rule   = r
+        , rm_rhs    = \xy. g x y True
+        , rm_args   = [ex, ey]
+        , rm_floats = Let v=ev }
+
+Note that:
+
+* The `rm_rule` is the `CoreRule` that matched.
+* The `rm_rhs` comes entirely from the RULE
+* The `rm_args` are fragments of the original target.
+* The `rm_floats` are bindings in the target that got floated out
+* The leftover `ez` is not returned; the caller is responsible for
+  counting (ruleArity r) arguments.  See Note [Extra args in the target]
+-}
+
 
 -- | The 'InScopeSet' in the 'InScopeEnv' is a /superset/ of variables that are
 -- currently in scope. See Note [The InScopeSet invariant].
@@ -1621,6 +1661,37 @@ isLocalRule (Rule { ru_local = is_local }) = is_local
 -- | Set the 'Name' of the 'GHC.Types.Id.Id' at the head of the rule left hand side
 setRuleIdName :: Name -> CoreRule -> CoreRule
 setRuleIdName nm ru = ru { ru_fn = nm }
+
+{-
+************************************************************************
+*                                                                      *
+                Floats
+*                                                                      *
+************************************************************************
+-}
+
+type FloatBinds = OrdList FloatBind
+
+emptyFloatBinds :: FloatBinds
+emptyFloatBinds = nilOL
+
+isEmptyFloatBinds :: FloatBinds -> Bool
+isEmptyFloatBinds = isNilOL
+
+data FloatBind
+  = FloatLet  CoreBind
+  | FloatCase CoreExpr CoreBndr AltCon [CoreBndr]
+      -- case e of y { C ys -> ... }
+      -- See Note [Floating single-alternative cases] in GHC.Core.Opt.SetLevels
+  | FloatTick CoreTickish
+
+floatsBinders :: FloatBinds -> [Var]
+floatsBinders fs = foldr ((++) . floatBinders) [] fs
+
+floatBinders :: FloatBind -> [Var]
+floatBinders (FloatLet bnd)       = bindersOf bnd
+floatBinders (FloatCase _ b _ bs) = b:bs
+floatBinders (FloatTick {})       = []
 
 {-
 ************************************************************************
@@ -2058,7 +2129,7 @@ Note [OccInfo in unfoldings and rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In unfoldings and rules, we guarantee that the template is occ-analysed, so
 that the occurrence info on the binders is correct. That way, when the
-Simplifier inlines an unfolding, it doesn't need to occ-analysis it first.
+Simplifier inlines an unfolding, it doesn't need to occ-analyse it first.
 (The Simplifier is designed to simplify occ-analysed expressions.)
 
 Given this decision it's vital that we do *always* do it.
@@ -2087,6 +2158,19 @@ Given this decision it's vital that we do *always* do it.
   may inline g entirely in body, dropping its binding, and leaving the
   occurrence in f out of scope. This happened in #8892, where the unfolding
   in question was a DFun unfolding.
+
+Wrinkles
+
+(OUR1) For a RULE (as opposed to an unfolding), say,
+          RULE "foo" forall x y z. f (x,y,z) = x+y
+  we occ-analyse the binder wrt the RHS /only/, not the LHS.  So we'll mark
+  x,y as used-once, and z as dead:
+          RULE "foo" forall x[Once] y[Once] z[Dead]. f (x,y,z) = x+y
+
+  This is good when we apply the rule: we transform the call thus:
+      f (e1, e2, e3)   -->    (\xyz. x+y) e1 e2 e3
+  Now we immediately do beta-reduction and drop the z=e3 binding.  Note
+  that it's irrelevant (for this purpose) that `z` is used on the LHS!
 
 
 ************************************************************************

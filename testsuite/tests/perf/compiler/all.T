@@ -841,3 +841,12 @@ test ('T26425',
       [ collect_compiler_stats('all',20) ],
       compile,
       ['-O'])
+
+test ('T26989',
+      [ only_ways(['normal']),
+        collect_compiler_stats('bytes allocated',1)
+      , extra_files(['T26989a.hs'])
+      ],
+      multimod_compile,
+      ['T26989', '-v0 -O'])
+
