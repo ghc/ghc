@@ -59,7 +59,6 @@ import GHC.Tc.Utils.TcType
 import GHC.Core
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Coercion
-import GHC.Core.Utils( mkCast )
 import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
 import GHC.Core.Predicate
 import GHC.Core.Type
@@ -932,7 +931,8 @@ evCastE ee co
   | assertPpr (coercionRole co == Representational)
               (vcat [text "Coercion of wrong role passed to evCastE:", ppr ee, ppr co]) $
     isReflCo co = ee
-  | otherwise   = mkCast ee co
+  | otherwise   = Cast ee co   -- Do not call mkCast because its assertion
+                               -- checks fail on un-zonked terms (#27219)
 
 evDFunApp :: DFunId -> [Type] -> [EvExpr] -> EvTerm
 -- Dictionary instance application, including when the "dictionary function"
