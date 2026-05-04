@@ -218,23 +218,20 @@ static void tracePreface (void)
 
 #if defined(DEBUG)
 static char *thread_stop_reasons[] = {
-    [HeapOverflow] = "heap overflow",
-    [StackOverflow] = "stack overflow",
-    [ThreadYielding] = "yielding",
-    [ThreadFinished] = "finished",
-    [THREAD_SUSPENDED_FOREIGN_CALL] = "suspended while making a foreign call",
-    [6 + BlockedOnMVar]         = "blocked on an MVar",
-    [6 + BlockedOnMVarRead]     = "blocked on an atomic MVar read",
-    [6 + BlockedOnBlackHole]    = "blocked on a black hole",
-    [6 + BlockedOnRead]         = "blocked on a read operation",
-    [6 + BlockedOnWrite]        = "blocked on a write operation",
-    [6 + BlockedOnDelay]        = "blocked on a delay operation",
-    [6 + BlockedOnSTM]          = "blocked on STM",
-    [6 + BlockedOnDoProc]       = "blocked on asyncDoProc",
-    [6 + BlockedOnCCall]        = "blocked on a foreign call",
-    [6 + BlockedOnCCall_Interruptible] = "blocked on a foreign call (interruptible)",
-    [6 + BlockedOnMsgThrowTo]   =  "blocked on throwTo",
-    [6 + ThreadMigrating]       =  "migrating"
+    [STOP_THREAD_HeapOverflow]        = "heap overflow",
+    [STOP_THREAD_StackOverflow]       = "stack overflow",
+    [STOP_THREAD_ThreadYielding]      = "yielding",
+    [STOP_THREAD_ThreadFinished]      = "finished",
+    [STOP_THREAD_ForeignCall]         = "suspended while making a foreign call",
+    [STOP_THREAD_BlockedOnMVar]       = "blocked on an MVar",
+    [STOP_THREAD_BlockedOnMVarRead]   = "blocked on an atomic MVar read",
+    [STOP_THREAD_BlockedOnBlackHole]  = "blocked on a black hole",
+    [STOP_THREAD_BlockedOnRead]       = "blocked on a read operation",
+    [STOP_THREAD_BlockedOnWrite]      = "blocked on a write operation",
+    [STOP_THREAD_BlockedOnDelay]      = "blocked on a delay operation",
+    [STOP_THREAD_BlockedOnSTM]        = "blocked on STM",
+    [STOP_THREAD_BlockedOnDoProc]     = "blocked on asyncDoProc",
+    [STOP_THREAD_BlockedOnMsgThrowTo] = "blocked on throwTo"
 };
 #endif
 
@@ -278,10 +275,10 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
         break;
 
     case EVENT_STOP_THREAD:     // (cap, thread, status)
-        if (info1 == 6 + BlockedOnBlackHole) {
+        if (info1 == STOP_THREAD_BlockedOnBlackHole) {
             debugBelch("cap %d: thread %" FMT_Word "[\"%.*s\"]" " stopped (blocked on black hole owned by thread %lu)\n",
                        cap->no, (W_)tso->id, threadLabelLen, threadLabel, (long)info2);
-        } else if (info1 == StackOverflow) {
+        } else if (info1 == STOP_THREAD_StackOverflow) {
             debugBelch("cap %d: thread %" FMT_Word "[\"%.*s\"]"
                        " stopped (stack overflow, size %lu)\n",
                       cap->no, (W_)tso->id, threadLabelLen, threadLabel, (long)info2);
