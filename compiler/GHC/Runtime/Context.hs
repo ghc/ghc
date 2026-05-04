@@ -41,11 +41,10 @@ import GHC.Types.Name.Ppr
 import GHC.Types.TyThing
 import GHC.Types.Var
 
-import GHC.Builtin.KnownKeys ( ioTyConName )
 import GHC.Builtin.Modules   ( mkInteractiveModule )
 
 import GHC.Utils.Outputable
-import GHC.Builtin.KnownOccs (printIdOcc)
+import GHC.Builtin.KnownOccs (printIdOcc, ioTyConOcc)
 
 {-
 Note [The interactive package]
@@ -365,7 +364,7 @@ emptyInteractiveContext dflags
        ic_tythings   = [],
        ic_instances  = (emptyInstEnv,[]),
        ic_fix_env    = emptyNameEnv,
-       ic_monad      = ExactName ioTyConName, -- IO monad by default
+       ic_monad      = ExactOcc ioTyConOcc, -- IO monad by default
        ic_int_print  = ExactOcc printIdOcc,   -- System.IO.print by default
        ic_default    = emptyDefaultEnv,
        ic_resume     = [],

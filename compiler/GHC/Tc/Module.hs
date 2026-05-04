@@ -1975,7 +1975,7 @@ generateMainBinding tcg_env main_name = do
 
 getIOType :: TcM (TcType, TcType)
 -- Return (IO alpha, alpha) for fresh alpha
-getIOType = do { ioTyCon <- tcLookupTyCon ioTyConName
+getIOType = do { ioTyCon <- tcLookupKnownOccTyCon ioTyConOcc
                ; res_ty <- newFlexiTyVarTy liftedTypeKind
                ; return (mkTyConApp ioTyCon [res_ty], res_ty) }
 
@@ -2589,8 +2589,9 @@ getGhciStepIO :: TcM (LHsExpr GhcRn)
 getGhciStepIO = do
     ghciTy <- getGHCiMonad
     a_tv <- newName (mkTyVarOccFS (fsLit "a"))
+    ioTyCon <- tcLookupKnownOccTyCon ioTyConOcc
     let ghciM   = nlHsAppTy (nlHsTyVar NotPromoted ghciTy) (nlHsTyVar NotPromoted a_tv)
-        ioM     = nlHsAppTy (nlHsTyVar NotPromoted ioTyConName) (nlHsTyVar NotPromoted a_tv)
+        ioM     = nlHsAppTy (nlHsTyVar NotPromoted (tyConName ioTyCon)) (nlHsTyVar NotPromoted a_tv)
 
         step_ty :: LHsSigType GhcRn
         step_ty = noLocA $ HsSig

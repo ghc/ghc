@@ -343,7 +343,7 @@ basicKnownKeyNames
         --      classes that are grabbed by key (e.g., eqClassKey)
         --      classes in "Class.standardClassKeys" (quite a few)
         -- The IO type
-        ioTyConName, ioDataConName,
+        ioDataConName,
 
         -- FFI primitive types that are not wired-in.
         ptrTyConName, funPtrTyConName, constPtrConName,
@@ -488,9 +488,8 @@ ghciIoClassName = clsQual gHC_INTERNAL_GHCI (fsLit "GHCiSandboxIO") ghciIoClassK
 ghciStepIoMName = varQual gHC_INTERNAL_GHCI (fsLit "ghciStepIO") ghciStepIoMClassOpKey
 
 -- IO things
-ioTyConName, ioDataConName :: Name
-ioTyConName       = tcQual  gHC_TYPES (fsLit "IO")       ioTyConKey
-ioDataConName     = dcQual  gHC_TYPES (fsLit "IO")       ioDataConKey
+ioDataConName :: Name
+ioDataConName = dcQual  gHC_TYPES (fsLit "IO")       ioDataConKey
 
 -- Int, Word, and Addr things
 int8TyConName, int16TyConName, int32TyConName, int64TyConName :: Name

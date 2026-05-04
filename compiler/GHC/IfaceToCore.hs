@@ -131,13 +131,13 @@ import GHC.Unit.Module.WholeCoreBindings
 import Data.IORef
 import Data.Foldable
 import Data.List(nub)
-import GHC.Builtin.KnownKeys ( ioTyConName )
 import GHC.Builtin.Modules   ( rOOT_MAIN )
 import GHC.Iface.Errors.Types
 
 import Language.Haskell.Syntax.BooleanFormula (BooleanFormula)
 import Language.Haskell.Syntax.BooleanFormula qualified as BF(BooleanFormula(..))
 import Language.Haskell.Syntax.Extension (NoExtField (NoExtField))
+import GHC.Builtin.KnownOccs (ioTyConOcc)
 
 {-
 This module takes
@@ -983,9 +983,11 @@ mk_top_id (IfGblTopBndr gbl_name)
   -- rather than the current module so we need this special case.
   -- See some similar logic in `GHC.Rename.Env`.
   | Just rOOT_MAIN == nameModule_maybe gbl_name
-    = do
-        ATyCon ioTyCon <- tcIfaceGlobal ioTyConName
-        return $ mkExportedVanillaId gbl_name (mkTyConApp ioTyCon [unitTy])
+    = lookupKnownOccThing ioTyConOcc KNS_FromModule >>= \case
+        Failed err          -> failIfM (pprDiagnostic err)
+        Succeeded ioTyThing -> do
+          ATyCon ioTyCon <- pure ioTyThing
+          return $ mkExportedVanillaId gbl_name (mkTyConApp ioTyCon [unitTy])
   | otherwise = tcIfaceExtId gbl_name
 mk_top_id (IfLclTopBndr raw_name iface_type info details) = do
    ty <- tcIfaceType iface_type
