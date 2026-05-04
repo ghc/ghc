@@ -339,12 +339,7 @@ knownKeyTable
 
 basicKnownKeyNames :: [Name]  -- See Note [Known-key names]
 basicKnownKeyNames
- = [   --  Classes.  *Must* include:
-        --      classes that are grabbed by key (e.g., eqClassKey)
-        --      classes in "Class.standardClassKeys" (quite a few)
-        -- The IO type
-        ioDataConName,
-
+ = [
         -- FFI primitive types that are not wired-in.
         ptrTyConName, funPtrTyConName, constPtrConName,
         int8TyConName, int16TyConName, int32TyConName, int64TyConName,
@@ -486,10 +481,6 @@ genericClassKeys = [genClassKey, gen1ClassKey]
 ghciIoClassName, ghciStepIoMName :: Name
 ghciIoClassName = clsQual gHC_INTERNAL_GHCI (fsLit "GHCiSandboxIO") ghciIoClassKey
 ghciStepIoMName = varQual gHC_INTERNAL_GHCI (fsLit "ghciStepIO") ghciStepIoMClassOpKey
-
--- IO things
-ioDataConName :: Name
-ioDataConName = dcQual  gHC_TYPES (fsLit "IO")       ioDataConKey
 
 -- Int, Word, and Addr things
 int8TyConName, int16TyConName, int32TyConName, int64TyConName :: Name

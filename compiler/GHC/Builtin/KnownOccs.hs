@@ -205,12 +205,13 @@ fromStaticPtrClassOpOcc = mkVarOcc "fromStaticPtr"
 newStablePtrIdOcc       = mkVarOcc "newStablePtr"
 
 returnIOIdOcc, bindIOIdOcc, thenIOIdOcc,
-  printIdOcc, ioTyConOcc :: KnownOcc
+  printIdOcc, ioTyConOcc, ioDataConOcc :: KnownOcc
 returnIOIdOcc = mkVarOcc "returnIO"
 bindIOIdOcc   = mkVarOcc "bindIO"
 thenIOIdOcc   = mkVarOcc "thenIO"
 printIdOcc    = mkVarOcc "print"
 ioTyConOcc    = mkTcOcc  "IO"
+ioDataConOcc  = mkTcOcc  "IO"
 
 -- Enumerations
 enumFromClassOpOcc, enumFromThenClassOpOcc,

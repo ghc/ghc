@@ -15,7 +15,7 @@ import Data.List qualified
 import Data.Maybe
 import GHC.Builtin.Modules( mkGhcInternalModule )
 import GHC.Builtin.KnownKeys
-import GHC.Builtin.KnownOccs( bindIOIdOcc, returnIOIdOcc )
+import GHC.Builtin.KnownOccs( bindIOIdOcc, returnIOIdOcc, ioDataConOcc )
 import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
 import GHC.Core
@@ -449,7 +449,7 @@ importBindingRHS unitId cfun_name tvs arg_tys orig_res_ty res_trans = do
         lookupGhcInternalVarId
           "GHC.Internal.IO.Unsafe"
           "unsafeDupablePerformIO"
-      io_data_con <- dsLookupDataCon ioDataConName
+      io_data_con <- dsLookupKnownOccDataCon ioDataConOcc
       let ccall_res_ty = mkTupleTy Unboxed [realWorldStatePrimTy, orig_res_ty]
           toIOCon = dataConWorkId io_data_con
           wrap the_call =

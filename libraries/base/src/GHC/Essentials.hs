@@ -118,7 +118,7 @@ module GHC.Essentials
     , arr, (>>>), first, app, (|||), loop
 
     -- IO
-    , IO, thenIO, bindIO, returnIO, print
+    , IO(IO), thenIO, bindIO, returnIO, print
 
     -- WithDict
     , WithDict
