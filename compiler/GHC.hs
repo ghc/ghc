@@ -387,7 +387,7 @@ import GHC.Rename.Names (renamePkgQual, renameRawPkgQual)
 import GHC.Tc.Utils.Monad    ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
 import GHC.Tc.Types
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Module
+import GHC.Tc.Module hiding (getGHCiMonad)
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family
 
@@ -1817,11 +1817,11 @@ setGHCiMonad :: GhcMonad m => String -> m ()
 setGHCiMonad name = withSession $ \hsc_env -> do
     ty <- liftIO $ hscIsGHCiMonad hsc_env name
     modifySession $ \s ->
-        let ic = (hsc_IC s) { ic_monad = ty }
+        let ic = (hsc_IC s) { ic_monad = ExactName ty }
         in s { hsc_IC = ic }
 
 -- | Get the monad GHCi lifts user statements into.
-getGHCiMonad :: GhcMonad m => m Name
+getGHCiMonad :: GhcMonad m => m ExactRdrName
 getGHCiMonad = fmap (ic_monad . hsc_IC) getSession
 
 getHistorySpan :: GhcMonad m => History -> m SrcSpan

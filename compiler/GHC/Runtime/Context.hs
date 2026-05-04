@@ -41,10 +41,11 @@ import GHC.Types.Name.Ppr
 import GHC.Types.TyThing
 import GHC.Types.Var
 
-import GHC.Builtin.KnownKeys ( ioTyConName, printName )
+import GHC.Builtin.KnownKeys ( ioTyConName )
 import GHC.Builtin.Modules   ( mkInteractiveModule )
 
 import GHC.Utils.Outputable
+import GHC.Builtin.KnownOccs (printIdOcc)
 
 {-
 Note [The interactive package]
@@ -322,10 +323,10 @@ data InteractiveContext
          ic_resume :: [Resume],
              -- ^ The stack of breakpoint contexts
 
-         ic_monad      :: Name,
+         ic_monad      :: ExactRdrName,
              -- ^ The monad that GHCi is executing in
 
-         ic_int_print  :: Name,
+         ic_int_print  :: ExactRdrName,
              -- ^ The function that is used for printing results
              -- of expressions in ghci and -e mode.
 
@@ -364,8 +365,8 @@ emptyInteractiveContext dflags
        ic_tythings   = [],
        ic_instances  = (emptyInstEnv,[]),
        ic_fix_env    = emptyNameEnv,
-       ic_monad      = ioTyConName,  -- IO monad by default
-       ic_int_print  = printName,    -- System.IO.print by default
+       ic_monad      = ExactName ioTyConName, -- IO monad by default
+       ic_int_print  = ExactOcc printIdOcc,   -- System.IO.print by default
        ic_default    = emptyDefaultEnv,
        ic_resume     = [],
        ic_cwd        = Nothing,
@@ -444,7 +445,7 @@ extendInteractiveContextWithIds ictxt new_ids
     new_tythings = map AnId new_ids
 
 setInteractivePrintName :: InteractiveContext -> Name -> InteractiveContext
-setInteractivePrintName ic n = ic{ic_int_print = n}
+setInteractivePrintName ic n = ic{ic_int_print = ExactName n}
 
 icExtendIcGblRdrEnv :: IcGlobalRdrEnv -> [TyThing] -> IcGlobalRdrEnv
 icExtendIcGblRdrEnv igre tythings = IcGlobalRdrEnv

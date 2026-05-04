@@ -53,7 +53,7 @@ module GHC.Tc.Utils.Monad(
   debugTc,
 
   -- * Typechecker global environment
-  getIsGHCi, getGHCiMonad, getInteractivePrintName,
+  getIsGHCi,
   tcHscSource, tcIsHsBootOrSig, tcIsHsig, tcSelfBootInfo, getGlobalRdrEnv,
   getRdrEnvs, getImports,
   getFixityEnv, extendFixityEnv,
@@ -1012,12 +1012,6 @@ traceOptIf flag doc
 getIsGHCi :: TcRn Bool
 getIsGHCi = do { mod <- getModule
                ; return (isInteractiveModule mod) }
-
-getGHCiMonad :: TcRn Name
-getGHCiMonad = do { hsc <- getTopEnv; return (ic_monad $ hsc_IC hsc) }
-
-getInteractivePrintName :: TcRn Name
-getInteractivePrintName = do { hsc <- getTopEnv; return (ic_int_print $ hsc_IC hsc) }
 
 tcIsHsBootOrSig :: TcRn Bool
 tcIsHsBootOrSig = isHsBootOrSig <$> tcHscSource

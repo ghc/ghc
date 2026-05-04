@@ -2080,7 +2080,7 @@ getGhciStepIO :: GHC.GhcMonad m => m (LHsExpr GhcPs)
 getGhciStepIO = do
   ghciTyConName <- GHC.getGHCiMonad
   let stringTy = nlHsTyVar NotPromoted stringTyCon_RDR
-      ghciM = nlHsTyVar NotPromoted (getRdrName ghciTyConName) `nlHsAppTy` stringTy
+      ghciM = nlHsTyVar NotPromoted (Exact ghciTyConName) `nlHsAppTy` stringTy
       ioM = nlHsTyVar NotPromoted (getRdrName ioTyConName) `nlHsAppTy` stringTy
       body = nlHsVar (getRdrName ghciStepIoMName)
       tySig = mkHsWildCardBndrs $ noLocA $ mkHsImplicitSigType $

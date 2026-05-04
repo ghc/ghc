@@ -351,9 +351,6 @@ basicKnownKeyNames
         word8TyConName, word16TyConName, word32TyConName, word64TyConName,
         jsvalTyConName,
 
-        -- Others
-        printName,
-
         -- Type-level naturals
         knownNatClassName, knownSymbolClassName, knownCharClassName,
 
@@ -494,10 +491,6 @@ ghciStepIoMName = varQual gHC_INTERNAL_GHCI (fsLit "ghciStepIO") ghciStepIoMClas
 ioTyConName, ioDataConName :: Name
 ioTyConName       = tcQual  gHC_TYPES (fsLit "IO")       ioTyConKey
 ioDataConName     = dcQual  gHC_TYPES (fsLit "IO")       ioDataConKey
-
--- IO things
-printName :: Name
-printName         = varQual gHC_INTERNAL_SYSTEM_IO (fsLit "print") printIdKey
 
 -- Int, Word, and Addr things
 int8TyConName, int16TyConName, int32TyConName, int64TyConName :: Name

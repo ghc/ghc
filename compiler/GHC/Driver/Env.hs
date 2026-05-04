@@ -90,6 +90,7 @@ import GHC.Builtin.Modules( gHC_PRIM )
 
 import Data.IORef
 import qualified Data.Set as Set
+import GHC.Types.Name.Reader (ExactRdrName(..))
 
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env hsc = do
@@ -430,12 +431,12 @@ discardIC hsc_env
   dflags = ic_dflags old_ic
   old_ic = hsc_IC hsc_env
   empty_ic = emptyInteractiveContext dflags
+  home_unit = hsc_home_unit hsc_env
   keep_external_name ic_name
-    | nameIsFromExternalPackage home_unit old_name = old_name
+    | ExactName old_name <- ic_name old_ic
+    , nameIsFromExternalPackage home_unit old_name = ExactName old_name
+    | ExactOcc old_occ <- ic_name old_ic = ExactOcc old_occ
     | otherwise = ic_name empty_ic
-    where
-    home_unit = hsc_home_unit hsc_env
-    old_name = ic_name old_ic
 
 
 --------------------------------------------------------------------------------

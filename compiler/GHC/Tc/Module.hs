@@ -22,6 +22,8 @@ module GHC.Tc.Module (
         getModuleInterface,
         tcRnDeclsi,
         isGHCiMonad,
+        getGHCiMonad,
+        getInteractivePrintName,
         runTcInteractive,    -- Used by GHC API clients (#8878)
         withTcPlugins,       -- Used by GHC API clients (#20499)
         withHoleFitPlugins,  -- Used by GHC API clients (#20499)
@@ -2600,6 +2602,20 @@ getGhciStepIO = do
         stepTy = mkEmptyWildCardBndrs step_ty
 
     return (noLocA $ ExprWithTySig noExtField (nlHsVar ghciStepIoMName) stepTy)
+
+getGHCiMonad :: TcRn Name
+getGHCiMonad = do { hsc <- getTopEnv
+                  ; monad_id <- case ic_monad $ hsc_IC hsc of
+                      ExactOcc occ -> idName <$> tcLookupKnownOccId occ
+                      ExactName nm -> pure nm
+                  ; return monad_id }
+
+getInteractivePrintName :: TcRn Name
+getInteractivePrintName = do { hsc <- getTopEnv
+                             ; print_id <- case ic_int_print $ hsc_IC hsc of
+                                 ExactOcc occ -> idName <$> tcLookupKnownOccId occ
+                                 ExactName nm -> pure nm
+                             ; return print_id }
 
 isGHCiMonad :: HscEnv -> String -> IO (Messages TcRnMessage, Maybe Name)
 isGHCiMonad hsc_env ty

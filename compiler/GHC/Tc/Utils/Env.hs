@@ -1,6 +1,4 @@
 -- (c) The University of Glasgow 2006
-{-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an
-                                       -- orphan
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 {-# LANGUAGE TypeFamilies #-}
@@ -539,7 +537,6 @@ tcrn_wrapper do_the_lookup
                                ; failWithTc (TcRnInterfaceError err) }
            Succeeded res -> return res }
 
-
 ------------------------------------------------------
 -- Known-key functions
 
@@ -579,6 +576,7 @@ tcLookupKnownOccId :: HasDebugCallStack => KnownOcc -> TcM Id
 tcLookupKnownOccId = get_id . tcLookupKnownOccGlobal
 
 -------------------------------------------------------
+
 get_class :: TcRn TyThing -> TcRn Class
 get_class do_the_lookup
   = do { thing <- do_the_lookup
@@ -607,7 +605,6 @@ get_id do_the_lookup
        ; case thing of
            AnId id -> return id
            _  -> wrongThingErr WrongThingClass (AGlobal thing) (getName thing) }
-
 
 {- *********************************************************************
 *                                                                      *
