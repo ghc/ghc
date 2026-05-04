@@ -5208,7 +5208,7 @@ pprHasFieldMsg = \case
         text "NB: the field type of the record field" <+> quotes (ppr fld) <+> text "of" <+> quotes (ppr tc) <+> text "is not a mono-type."
   CustomHasField custom_hasField ->
     text "NB:" <+> quotes (ppr custom_hasField) <+> text "is not the built-in"
-      <+> quotes (ppr hasFieldClassName) <+> text "class."
+      <+> quotes (text "HasField") <+> text "class."
   SuggestSimilarFields (Just (tc, rep_tc)) fld suggs pat_syns _imp_suggs ->
     vcat
       [   text "NB:" <+> quotes (ppr tc)
@@ -5253,7 +5253,7 @@ pprHasFieldPatSynMsg fld pat_syns =
   if any same_name pat_syns
   then
     text "Pattern synonym record fields do not contribute"
-      <+> quotes (ppr hasFieldClassName) <+> text "instances."
+      <+> quotes (text "HasField") <+> text "instances."
   else empty
   where
     same_name (_,nm) =

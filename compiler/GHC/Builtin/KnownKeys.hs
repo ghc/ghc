@@ -352,9 +352,6 @@ basicKnownKeyNames
         -- Type-level naturals
         knownNatClassName, knownSymbolClassName, knownCharClassName,
 
-        -- Overloaded record fields
-        hasFieldClassName,
-
         -- ExceptionContext
         exceptionContextTyConName,
         emptyExceptionContextName,
@@ -512,11 +509,6 @@ knownSymbolClassName :: Name
 knownSymbolClassName  = clsQual gHC_INTERNAL_TYPELITS (fsLit "KnownSymbol") knownSymbolClassKey
 knownCharClassName :: Name
 knownCharClassName  = clsQual gHC_INTERNAL_TYPELITS (fsLit "KnownChar") knownCharClassKey
-
--- Overloaded record fields
-hasFieldClassName :: Name
-hasFieldClassName
- = clsQual gHC_INTERNAL_RECORDS (fsLit "HasField") hasFieldClassKey
 
 -- ExceptionContext
 exceptionContextTyConName, emptyExceptionContextName :: Name
