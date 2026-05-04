@@ -175,6 +175,9 @@ static void deleteAllThreads (void);
 static void deleteThread_(StgTSO *tso);
 #endif
 
+static inline EventThreadStatus eventlogThreadStatus(StgThreadReturnCode ret_code);
+static inline EventThreadStatus eventlogThreadStatusBlocked(StgWord why_blocked);
+
 /* ---------------------------------------------------------------------------
    Main scheduling loop.
 
@@ -524,19 +527,20 @@ run_thread:
 
     if (ret == ThreadBlocked) {
         uint16_t why_blocked = ACQUIRE_LOAD(&t->why_blocked);
+        EventThreadStatus status = eventlogThreadStatusBlocked(why_blocked);
+        StgWord32 status_detail = 0;
         if (why_blocked == BlockedOnBlackHole) {
             StgTSO *owner = blackHoleOwner(t->block_info.bh->bh);
-            traceEventStopThread(cap, t, t->why_blocked + 6,
-                                 owner != NULL ? owner->id : 0);
-        } else {
-            traceEventStopThread(cap, t, t->why_blocked + 6, 0);
+            status_detail = owner != NULL ? owner->id : 0;
         }
+        traceEventStopThread(cap, t, status, status_detail);
     } else {
+        EventThreadStatus status = eventlogThreadStatus(ret);
+        StgWord32 status_detail = 0;
         if (ret == StackOverflow) {
-          traceEventStopThread(cap, t, ret, t->tot_stack_size);
-        } else {
-          traceEventStopThread(cap, t, ret, 0);
+            status_detail = t->tot_stack_size;
         }
+        traceEventStopThread(cap, t, status, status_detail);
     }
 
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
@@ -2510,7 +2514,7 @@ suspendThread (StgRegTable *reg, bool interruptible)
   task = cap->running_task;
   tso = cap->r.rCurrentTSO;
 
-  traceEventStopThread(cap, tso, THREAD_SUSPENDED_FOREIGN_CALL, 0);
+  traceEventStopThread(cap, tso, STOP_THREAD_ForeignCall, 0);
 
   // XXX this might not be necessary --SDM
   RELAXED_STORE(&tso->what_next, ThreadRunGHC);
@@ -3343,4 +3347,41 @@ void setAllocLimitKill(bool shouldKill, bool shouldHook)
 {
    allocLimitKill = shouldKill;
    allocLimitRunHook = shouldHook;
+}
+
+/* Map from the internal thread return codes and the tso->why_blocked values to
+ * the external eventlog STOP_THREAD status codes. See issue #9003 for what
+ * goes wrong if we do not handle this mapping in an intentional fashion.
+ *
+ * For the internal values see Constants.h
+ * For the external values see rts/include/rts/EventLogFormat.h and
+ * docs/users_guide/eventlog-formats.rst
+ */
+static const unsigned char thread_stop_code[] = {
+    [HeapOverflow]   = STOP_THREAD_HeapOverflow,
+    [StackOverflow]  = STOP_THREAD_StackOverflow,
+    [ThreadYielding] = STOP_THREAD_ThreadYielding,
+    [ThreadFinished] = STOP_THREAD_ThreadFinished
+};
+
+static const unsigned char thread_blocked_code[] = {
+    [BlockedOnMVar]                = STOP_THREAD_BlockedOnMVar,
+    [BlockedOnMVarRead]            = STOP_THREAD_BlockedOnMVarRead,
+    [BlockedOnBlackHole]           = STOP_THREAD_BlockedOnBlackHole,
+    [BlockedOnRead]                = STOP_THREAD_BlockedOnRead,
+    [BlockedOnWrite]               = STOP_THREAD_BlockedOnWrite,
+    [BlockedOnDelay]               = STOP_THREAD_BlockedOnDelay,
+    [BlockedOnSTM]                 = STOP_THREAD_BlockedOnSTM,
+    [BlockedOnDoProc]              = STOP_THREAD_BlockedOnDoProc,
+    [BlockedOnMsgThrowTo]          = STOP_THREAD_BlockedOnMsgThrowTo,
+};
+
+static inline EventThreadStatus eventlogThreadStatus(StgThreadReturnCode ret_code)
+{
+    return thread_stop_code[ret_code];
+}
+
+static inline EventThreadStatus eventlogThreadStatusBlocked(StgWord why_blocked)
+{
+    return thread_blocked_code[why_blocked];
 }

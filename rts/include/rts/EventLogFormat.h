@@ -26,7 +26,7 @@
  *    - generate the event itself by calling postEvent() somewhere
  *
  *  - Describe the meaning and encoding of the event in the users guide
- *    (docs/user_guide/eventlog-formats.rst)
+ *    (docs/users_guide/eventlog-formats.rst)
  *
  *  - In the Haskell code to parse the event log file:
  *    - add types and code to read the new event
@@ -85,26 +85,26 @@
 
 /*
  * Status values for EVENT_STOP_THREAD
- *
- * 1-5 are the StgRun return values (from rts/include/Constants.h):
- *
- * #define HeapOverflow   1
- * #define StackOverflow  2
- * #define ThreadYielding 3
- * #define ThreadFinished 5
- * #define ForeignCall                  6
- * #define BlockedOnMVar                7
- * #define BlockedOnBlackHole           8
- * #define BlockedOnRead                9
- * #define BlockedOnWrite               10
- * #define BlockedOnDelay               11
- * #define BlockedOnSTM                 12
- * #define BlockedOnDoProc              13
- * #define BlockedOnCCall               -- not used (see ForeignCall)
- * #define BlockedOnCCall_NoUnblockExc  -- not used (see ForeignCall)
- * #define BlockedOnMsgThrowTo          16
+ * type EventThreadStatus
+ * Keep values in sync with docs/users_guide/eventlog-formats.rst
  */
-#define THREAD_SUSPENDED_FOREIGN_CALL 6
+#define STOP_THREAD_HeapOverflow        1
+#define STOP_THREAD_StackOverflow       2
+#define STOP_THREAD_ThreadYielding      3
+/* 4 unused */
+#define STOP_THREAD_ThreadFinished      5
+#define STOP_THREAD_ForeignCall         6
+#define STOP_THREAD_BlockedOnMVar       7
+#define STOP_THREAD_BlockedOnBlackHole  8
+#define STOP_THREAD_BlockedOnRead       9
+#define STOP_THREAD_BlockedOnWrite      10
+#define STOP_THREAD_BlockedOnDelay      11
+#define STOP_THREAD_BlockedOnSTM        12
+#define STOP_THREAD_BlockedOnDoProc     13
+/* 14-17 unused */
+#define STOP_THREAD_BlockedOnMsgThrowTo 18
+/* 19 unused */
+#define STOP_THREAD_BlockedOnMVarRead   20
 
 /*
  * Capset type values for EVENT_CAPSET_CREATE
