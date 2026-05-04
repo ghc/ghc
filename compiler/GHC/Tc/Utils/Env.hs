@@ -29,7 +29,8 @@ module GHC.Tc.Utils.Env(
 
         tcLookupKnownKeyGlobal, tcLookupKnownKeyTyCon,
         tcLookupKnownKeyClass, tcLookupKnownKeyId,
-        tcLookupKnownOccTyCon, tcLookupKnownOccDataCon, tcLookupKnownOccId,
+        tcLookupKnownOccTyCon, tcLookupKnownOccClass,
+        tcLookupKnownOccDataCon, tcLookupKnownOccId,
         rnLookupKnownKeyName, rnLookupKnownKeyRdr, getKnownKeySource,
 
         -- Local environment
@@ -568,6 +569,9 @@ tcLookupKnownOccGlobal = tcrn_wrapper . lookupKnownOccThing
 
 tcLookupKnownOccTyCon :: HasDebugCallStack => KnownOcc -> TcM TyCon
 tcLookupKnownOccTyCon = get_tycon . tcLookupKnownOccGlobal
+
+tcLookupKnownOccClass :: HasDebugCallStack => KnownOcc -> TcM Class
+tcLookupKnownOccClass = get_class . tcLookupKnownOccGlobal
 
 tcLookupKnownOccDataCon :: HasDebugCallStack => KnownOcc -> TcM DataCon
 tcLookupKnownOccDataCon = get_datacon . tcLookupKnownOccGlobal

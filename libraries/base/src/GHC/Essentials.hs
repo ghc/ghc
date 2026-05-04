@@ -220,6 +220,9 @@ module GHC.Essentials
     , krepStar, krepArrStar
     , krepStarArrStarArrStarKind
     , krepConstraint
+
+    -- GHCi
+    , GHCiSandboxIO(ghciStepIO)
     ) where
 
 import GHC.Internal.Base hiding( foldr )
@@ -275,3 +278,4 @@ import GHC.Internal.TH.Lift
 import GHC.Internal.TH.Monad
 import GHC.Internal.TopHandler
 import GHC.Internal.Classes.IP (IP)
+import GHC.Internal.GHCi

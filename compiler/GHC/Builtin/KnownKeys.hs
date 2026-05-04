@@ -373,9 +373,6 @@ basicKnownKeyNames
         , pluginTyConName
         , frontendPluginTyConName
 
-        -- GHCi Sandbox
-        , ghciIoClassName, ghciStepIoMName
-
         -- StaticPtr
         , staticPtrTyConName
         , staticPtrDataConName, staticPtrInfoDataConName
@@ -473,11 +470,6 @@ unsafeCoercePrimName    = varQual gHC_INTERNAL_UNSAFE_COERCE (fsLit "unsafeCoerc
 
 genericClassKeys :: [KnownKey]
 genericClassKeys = [genClassKey, gen1ClassKey]
-
--- GHCi things
-ghciIoClassName, ghciStepIoMName :: Name
-ghciIoClassName = clsQual gHC_INTERNAL_GHCI (fsLit "GHCiSandboxIO") ghciIoClassKey
-ghciStepIoMName = varQual gHC_INTERNAL_GHCI (fsLit "ghciStepIO") ghciStepIoMClassOpKey
 
 -- Int, Word, and Addr things
 int8TyConName, int16TyConName, int32TyConName, int64TyConName :: Name
@@ -672,9 +664,6 @@ knownSymbolClassKey = mkPreludeClassUnique 43
 
 knownCharClassKey :: KnownKey
 knownCharClassKey = mkPreludeClassUnique 44
-
-ghciIoClassKey :: KnownKey
-ghciIoClassKey = mkPreludeClassUnique 45
 
 semigroupClassKey, monoidClassKey :: KnownKey
 semigroupClassKey = mkPreludeClassUnique 47
@@ -1349,10 +1338,6 @@ toRationalClassOpKey = mkPreludeMiscIdUnique 193
 guardMIdKey, mzipIdKey :: KnownKey
 guardMIdKey     = mkPreludeMiscIdUnique 194
 mzipIdKey       = mkPreludeMiscIdUnique 196
-
--- GHCi
-ghciStepIoMClassOpKey :: KnownKey
-ghciStepIoMClassOpKey = mkPreludeMiscIdUnique 197
 
 -- Overloaded lists
 isListClassKey, fromListClassOpKey, fromListNClassOpKey, toListClassOpKey :: KnownKey

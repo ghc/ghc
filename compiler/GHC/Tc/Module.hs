@@ -2602,6 +2602,7 @@ getGhciStepIO = do
         stepTy :: LHsSigWcType GhcRn
         stepTy = mkEmptyWildCardBndrs step_ty
 
+    ghciStepIoMName <- idName <$> tcLookupKnownOccId ghciStepIoMOcc
     return (noLocA $ ExprWithTySig noExtField (nlHsVar ghciStepIoMName) stepTy)
 
 getGHCiMonad :: TcRn Name
@@ -2626,7 +2627,7 @@ isGHCiMonad hsc_env ty
         case occIO of
             Just [n] -> do
                 let name = greName n
-                ghciClass <- tcLookupClass ghciIoClassName
+                ghciClass <- tcLookupKnownOccClass ghciIoClassOcc
                 userTyCon <- tcLookupTyCon name
                 let userTy = mkTyConApp userTyCon []
                 _ <- tcLookupInstance ghciClass [userTy]

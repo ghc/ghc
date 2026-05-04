@@ -330,6 +330,11 @@ starArrStarKindRepIdOcc        = mkVarOcc "krepArrStar"
 starArrStarArrStarKindRepIdOcc = mkVarOcc "krepStarArrStarArrStarKind"
 constraintKindRepIdOcc         = mkVarOcc "krepConstraint"
 
+-- ghci
+ghciIoClassOcc, ghciStepIoMOcc :: KnownOcc
+ghciIoClassOcc = mkTcOcc "GHCiSandboxIO"
+ghciStepIoMOcc = mkVarOcc "ghciStepIO"
+
 {- *********************************************************************
 *                                                                      *
         Known-occ RdrNames
