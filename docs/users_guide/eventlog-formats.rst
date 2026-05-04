@@ -211,7 +211,7 @@ Thread and scheduling events
       * 1: HeapOverflow
       * 2: StackOverflow
       * 3: ThreadYielding
-      * 4: ThreadBlocked
+      * 4: unused
       * 5: ThreadFinished
       * 6: ForeignCall
       * 7: BlockedOnMVar
@@ -237,6 +237,10 @@ Thread and scheduling events
    these eventlog stop thread codes are now independent. We are nevertheless
    left with some historical warts:
 
+    * 4: this was previously documented as `ThreadBlocked`. This code was used
+      in GHC 6.12.x (the first GHC version with eventlog support) and in 7.0.x.
+      From GHC 7.2 onwards this code is no longer used. Whenever a thread
+      blocks, a more detailed `BlockedOn*` code is used instead.
     * 14,15: these correspond to GHC internal status codes `BlockedOnGA` and
       `BlockedOnGA_NoSend` that are no longer used (and may never have been
       used by any released version of GHC).
