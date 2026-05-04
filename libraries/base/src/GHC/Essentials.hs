@@ -223,6 +223,9 @@ module GHC.Essentials
 
     -- GHCi
     , GHCiSandboxIO(ghciStepIO)
+
+    -- Callstacks
+    , SrcLoc(..)
     ) where
 
 import GHC.Internal.Base hiding( foldr )
@@ -280,3 +283,4 @@ import GHC.Internal.TopHandler
 import GHC.Internal.Classes.IP (IP)
 import GHC.Internal.GHCi
 import GHC.Internal.Desugar (toAnnotationWrapper)
+import GHC.Internal.Stack.Types

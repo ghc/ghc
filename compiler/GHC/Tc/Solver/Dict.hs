@@ -45,7 +45,8 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.SrcLoc
 
-import GHC.Builtin.KnownKeys( srcLocDataConName, pushCallStackName, emptyCallStackName )
+import GHC.Builtin.KnownOccs( srcLocDataConOcc )
+import GHC.Builtin.KnownKeys( pushCallStackName, emptyCallStackName )
 
 import GHC.Utils.Monad ( concatMapM )
 import GHC.Utils.Outputable
@@ -190,7 +191,7 @@ evCallStack _ EvCsEmpty
 evCallStack pred (EvCsPushCall fs loc tm)
   = do { df <- getDynFlags
        ; m  <- getModule
-       ; srcLocDataCon <- wrapTcS (tcLookupDataCon srcLocDataConName)
+       ; srcLocDataCon <- wrapTcS (tcLookupKnownOccDataCon srcLocDataConOcc)
        ; mk_str <- getTcMkStringsIds
        ; let platform = targetPlatform df
              mkSrcLoc l = mkCoreConWrapApps srcLocDataCon

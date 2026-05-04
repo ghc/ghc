@@ -339,6 +339,10 @@ ghciStepIoMOcc = mkVarOcc "ghciStepIO"
 toAnnotationWrapperIdOcc :: KnownOcc
 toAnnotationWrapperIdOcc = mkVarOcc "toAnnotationWrapper"
 
+-- CallStacks/Source locations
+srcLocDataConOcc :: KnownOcc
+srcLocDataConOcc = mkDataOcc "SrcLoc"
+
 {- *********************************************************************
 *                                                                      *
         Known-occ RdrNames

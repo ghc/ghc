@@ -360,11 +360,8 @@ basicKnownKeyNames
         callStackTyConName,
         emptyCallStackName, pushCallStackName,
 
-        -- Source Locations
-        srcLocDataConName
-
         -- Plugins
-        , pluginTyConName
+        pluginTyConName
         , frontendPluginTyConName
 
         -- StaticPtr
@@ -497,16 +494,13 @@ emptyExceptionContextName
   = varQual gHC_INTERNAL_EXCEPTION_CONTEXT (fsLit "emptyExceptionContext") emptyExceptionContextKey
 
 -- Source Locations
-callStackTyConName, emptyCallStackName, pushCallStackName,
-  srcLocDataConName :: Name
+callStackTyConName, emptyCallStackName, pushCallStackName :: Name
 callStackTyConName
   = tcQual gHC_INTERNAL_STACK_TYPES  (fsLit "CallStack") callStackTyConKey
 emptyCallStackName
   = varQual gHC_INTERNAL_STACK_TYPES (fsLit "emptyCallStack") emptyCallStackKey
 pushCallStackName
   = varQual gHC_INTERNAL_STACK_TYPES (fsLit "pushCallStack") pushCallStackKey
-srcLocDataConName
-  = dcQual gHC_INTERNAL_STACK_TYPES  (fsLit "SrcLoc")    srcLocDataConKey
 
 -- plugins
 pLUGINS :: Module
@@ -1020,9 +1014,6 @@ staticPtrDataConKey                     = mkPreludeDataConUnique 33
 
 staticPtrInfoDataConKey :: KnownKey
 staticPtrInfoDataConKey                 = mkPreludeDataConUnique 34
-
-srcLocDataConKey :: KnownKey
-srcLocDataConKey                        = mkPreludeDataConUnique 37
 
 trTyConDataConKey, trModuleDataConKey,
   trNameSDataConKey :: KnownKey
