@@ -45,8 +45,8 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.SrcLoc
 
-import GHC.Builtin.KnownOccs( srcLocDataConOcc )
-import GHC.Builtin.KnownKeys( pushCallStackName, emptyCallStackName )
+import GHC.Builtin.KnownOccs( pushCallStackIdOcc, srcLocDataConOcc )
+import GHC.Builtin.KnownKeys( emptyCallStackName )
 
 import GHC.Utils.Monad ( concatMapM )
 import GHC.Utils.Outputable
@@ -204,7 +204,7 @@ evCallStack pred (EvCsPushCall fs loc tm)
                             , mkIntExprInt platform (srcSpanEndCol l)
                             ]
 
-       ; push_cs_id <- wrapTcS (tcLookupId pushCallStackName)
+       ; push_cs_id <- wrapTcS (tcLookupKnownOccId pushCallStackIdOcc)
        ; let name_expr = mkStringExprFSWith mk_str fs
        ; let loc_expr  = mkSrcLoc loc
                -- At this point tm :: IP sym CallStack

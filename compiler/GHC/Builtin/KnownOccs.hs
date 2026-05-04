@@ -340,8 +340,9 @@ toAnnotationWrapperIdOcc :: KnownOcc
 toAnnotationWrapperIdOcc = mkVarOcc "toAnnotationWrapper"
 
 -- CallStacks/Source locations
-srcLocDataConOcc :: KnownOcc
-srcLocDataConOcc = mkDataOcc "SrcLoc"
+pushCallStackIdOcc, srcLocDataConOcc :: KnownOcc
+pushCallStackIdOcc = mkVarOcc "pushCallStack"
+srcLocDataConOcc   = mkDataOcc "SrcLoc"
 
 {- *********************************************************************
 *                                                                      *

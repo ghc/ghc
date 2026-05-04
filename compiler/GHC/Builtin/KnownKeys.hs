@@ -358,7 +358,7 @@ basicKnownKeyNames
 
         -- Call Stacks
         callStackTyConName,
-        emptyCallStackName, pushCallStackName,
+        emptyCallStackName,
 
         -- Plugins
         pluginTyConName
@@ -494,13 +494,11 @@ emptyExceptionContextName
   = varQual gHC_INTERNAL_EXCEPTION_CONTEXT (fsLit "emptyExceptionContext") emptyExceptionContextKey
 
 -- Source Locations
-callStackTyConName, emptyCallStackName, pushCallStackName :: Name
+callStackTyConName, emptyCallStackName :: Name
 callStackTyConName
   = tcQual gHC_INTERNAL_STACK_TYPES  (fsLit "CallStack") callStackTyConKey
 emptyCallStackName
   = varQual gHC_INTERNAL_STACK_TYPES (fsLit "emptyCallStack") emptyCallStackKey
-pushCallStackName
-  = varQual gHC_INTERNAL_STACK_TYPES (fsLit "pushCallStack") pushCallStackKey
 
 -- plugins
 pLUGINS :: Module
@@ -1364,9 +1362,8 @@ memptyClassOpKey  = mkPreludeMiscIdUnique 555
 mappendClassOpKey = mkPreludeMiscIdUnique 556
 mconcatClassOpKey = mkPreludeMiscIdUnique 557
 
-emptyCallStackKey, pushCallStackKey :: KnownKey
+emptyCallStackKey :: KnownKey
 emptyCallStackKey = mkPreludeMiscIdUnique 558
-pushCallStackKey  = mkPreludeMiscIdUnique 559
 
 fromStaticPtrClassOpKey :: KnownKey
 fromStaticPtrClassOpKey = mkPreludeMiscIdUnique 560
