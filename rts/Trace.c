@@ -221,7 +221,6 @@ static char *thread_stop_reasons[] = {
     [HeapOverflow] = "heap overflow",
     [StackOverflow] = "stack overflow",
     [ThreadYielding] = "yielding",
-    [ThreadBlocked] = "blocked",
     [ThreadFinished] = "finished",
     [THREAD_SUSPENDED_FOREIGN_CALL] = "suspended while making a foreign call",
     [6 + BlockedOnMVar]         = "blocked on an MVar",
