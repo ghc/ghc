@@ -7,6 +7,7 @@
   -- LANGUAGE pragmas: see Note [IP: implicit parameter class]
 
 {-# OPTIONS_HADDOCK not-home #-}
+{-# OPTIONS_GHC -fdefine-known-key-names -}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Classes.IP

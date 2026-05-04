@@ -250,6 +250,9 @@ knownKeyTable
     , (mkTcOcc  "Unsatisfiable", unsatisfiableClassKey)
     , (mkVarOcc "unsatisfiable", unsatisfiableIdKey)
 
+    -- Implicit Params
+    , (mkTcOcc "IP", ipClassKey)
+
     -- Base strings Strings
     , (mkVarOcc "unpackCString#",     unpackCStringIdKey)
     , (mkVarOcc "unpackCStringUtf8#", unpackCStringUtf8IdKey)
@@ -348,9 +351,6 @@ basicKnownKeyNames
 
         -- Type-level naturals
         knownNatClassName, knownSymbolClassName, knownCharClassName,
-
-        -- Implicit Parameters
-        ipClassName,
 
         -- Overloaded record fields
         hasFieldClassName,
@@ -512,11 +512,6 @@ knownSymbolClassName :: Name
 knownSymbolClassName  = clsQual gHC_INTERNAL_TYPELITS (fsLit "KnownSymbol") knownSymbolClassKey
 knownCharClassName :: Name
 knownCharClassName  = clsQual gHC_INTERNAL_TYPELITS (fsLit "KnownChar") knownCharClassKey
-
--- Implicit Parameters
-ipClassName :: Name
-ipClassName
-  = clsQual gHC_CLASSES_IP (fsLit "IP") ipClassKey
 
 -- Overloaded record fields
 hasFieldClassName :: Name

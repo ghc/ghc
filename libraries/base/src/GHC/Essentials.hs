@@ -68,6 +68,9 @@ module GHC.Essentials
     , DataToTag
     , dataToTag#
 
+    -- Implicit Params
+    , IP
+
     -- Other data types
     , Either(..)
     , Void
@@ -271,3 +274,4 @@ import GHC.Internal.TH.Lib
 import GHC.Internal.TH.Lift
 import GHC.Internal.TH.Monad
 import GHC.Internal.TopHandler
+import GHC.Internal.Classes.IP (IP)

@@ -369,7 +369,7 @@ tcExpr e@(HsIPVar _ x) res_ty
           -- (The type of an implicit parameter must have kind 'Type'.)
        ; let ip_name = mkStrLitTy (hsIPNameFS x)
              origin  = IPOccOrigin x
-       ; ip_class <- tcLookupClass ipClassName
+       ; ip_class <- tcLookupKnownKeyClass ipClassKey
        ; let ip_pred = mkClassPred ip_class [ip_name, ip_ty]
        ; ip_dict <- emitWantedEvVar origin ip_pred
        ; let (ip_op, _) = decomposeIPPred ip_pred
