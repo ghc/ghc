@@ -91,7 +91,6 @@
  * #define HeapOverflow   1
  * #define StackOverflow  2
  * #define ThreadYielding 3
- * #define ThreadBlocked  4
  * #define ThreadFinished 5
  * #define ForeignCall                  6
  * #define BlockedOnMVar                7
