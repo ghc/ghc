@@ -657,7 +657,7 @@ INLINE_HEADER void traceEventRunThread(Capability *cap STG_UNUSED,
 
 INLINE_HEADER void traceEventStopThread(Capability          *cap    STG_UNUSED,
                                         StgTSO              *tso    STG_UNUSED,
-                                        StgThreadReturnCode  status STG_UNUSED,
+                                        EventThreadStatus    status STG_UNUSED,
                                         StgWord32           info    STG_UNUSED)
 {
     traceSchedEvent2(cap, EVENT_STOP_THREAD, tso, status, info);
