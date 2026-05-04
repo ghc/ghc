@@ -210,16 +210,19 @@ data RdrName
         --  (2) By Template Haskell, when TH has generated a unique name
         --
         -- Such a 'RdrName' can be created by using 'getRdrName' on a 'Name'
+        --
+        -- See also Note [Exact RdrNames]
   deriving Data
 
+-- | Exactly a 'Name' or a 'KnownOcc'.
+-- See Note [Exact RdrNames]
 data ExactRdrName
   = ExactName -- Use this when you know the exact Name
       Name
 
   | ExactOcc  -- Use this for known-occ names
-      OccName
-
-  deriving Data
+      KnownOcc
+  deriving (Eq, Ord, Data)
 
 instance NFData RdrName where
   rnf (Unqual occ)  = rnf occ
@@ -231,6 +234,30 @@ instance NFData ExactRdrName where
   rnf (ExactName n)  = rnf n
   rnf (ExactOcc occ) = rnf occ
 
+{-
+Note [Exact RdrNames]
+~~~~~~~~~~~~~~~~~~~~~
+A parsed syntax tree, of type (HsExpr GhcPs), is populated with RdrNames.
+Sometimes such a syntax tree wants to refer to a particular entity,
+rather than whatever happens to be in scope. Examples:
+
+* When we splice in the result of a Template Haskell splice.  E.g.
+     \x -> $(f 'x)
+  The spliced-in tree refers to precisely the `x` bound by the lambda.
+
+* A derived instance `deriving( Ord )` generates a syntax tree that refers to
+  many build-in entities (classes, types, and functions), such as `(>)` or `map`.
+
+We suppport these use-cases through the `Exact` data contructor of `RdrName`.
+It carries an `ExactRdrName`, which has two constructors:
+
+* ExactName Name: we use this in the TH application to embed a full `Name` inside
+  a `RdrName`.
+
+* ExactOcc KnownOcc: use this in the `deriving` application, to embed the OccName
+  of a known-occ entity in a `RdrName`.  See Note [Overview of known entities]
+  in GHC.Builtin.
+-}
 {-
 ************************************************************************
 *                                                                      *
@@ -397,17 +424,6 @@ instance OutputableBndr RdrName where
              -- pprPrefixName has some special cases, so
              -- we delegate to them rather than reproduce them
       | otherwise = pprPrefixVar (isSymOcc (rdrNameOcc rdr)) (ppr rdr)
-
-instance Eq ExactRdrName where
-    (ExactName n1)  == (ExactName n2)  = n1==n2
-    (ExactOcc occ1) == (ExactOcc occ2) = occ1==occ2
-    _               == _               = False
-
-instance Ord ExactRdrName where
-    (ExactName n1)  `compare` (ExactName n2)  = n1 `compare` n2
-    (ExactName {})  `compare` (ExactOcc {})   = LT
-    (ExactOcc {})   `compare` (ExactName {})  = GT
-    (ExactOcc o1)   `compare` (ExactOcc o2)   = o1 `compare` o2
 
 instance Eq RdrName where
     (Exact n1)    == (Exact n2)    = n1==n2
