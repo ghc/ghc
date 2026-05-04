@@ -361,10 +361,7 @@ basicKnownKeyNames
         emptyCallStackName, pushCallStackName,
 
         -- Source Locations
-        srcLocDataConName,
-
-        -- Annotation type checking
-        toAnnotationWrapperName
+        srcLocDataConName
 
         -- The SPEC type for SpecConstr
         , specTyConName
@@ -489,10 +486,6 @@ word64TyConName   = tcQual  gHC_INTERNAL_WORD (fsLit "Word64") word64TyConKey
 ptrTyConName, funPtrTyConName :: Name
 ptrTyConName      = tcQual   gHC_INTERNAL_PTR (fsLit "Ptr")    ptrTyConKey
 funPtrTyConName   = tcQual   gHC_INTERNAL_PTR (fsLit "FunPtr") funPtrTyConKey
-
--- Annotation type checking
-toAnnotationWrapperName :: Name
-toAnnotationWrapperName = varQual gHC_INTERNAL_DESUGAR (fsLit "toAnnotationWrapper") toAnnotationWrapperIdKey
 
 -- Type-level naturals
 knownNatClassName :: Name
@@ -1322,10 +1315,6 @@ loopAIdKey      = mkPreludeMiscIdUnique 185
 
 fromStringClassOpKey :: KnownKey
 fromStringClassOpKey = mkPreludeMiscIdUnique 186
-
--- Annotation type checking
-toAnnotationWrapperIdKey :: KnownKey
-toAnnotationWrapperIdKey = mkPreludeMiscIdUnique 187
 
 -- Conversion functions
 fromIntegralIdKey, realToFracIdKey, toIntegerClassOpKey, toRationalClassOpKey :: KnownKey

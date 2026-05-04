@@ -70,6 +70,7 @@ import GHC.Core.InstEnv as InstEnv
 
 import GHC.Builtin.TH
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs (toAnnotationWrapperIdOcc)
 import GHC.Builtin.WiredIn.Types
 
 import GHC.ThToHs
@@ -1078,7 +1079,7 @@ runAnnotation target expr = do
     -- Find the classes we want instances for in order to call toAnnotationWrapper
     loc <- getSrcSpanM
     data_class <- tcLookupKnownKeyClass dataClassKey
-    to_annotation_wrapper_id <- tcLookupId toAnnotationWrapperName
+    to_annotation_wrapper_id <- tcLookupKnownOccId toAnnotationWrapperIdOcc
 
     -- Check the instances we require live in another module (we want to execute it..)
     -- and check identifiers live in other modules using TH stage checks. tcSimplifyStagedExpr

@@ -279,3 +279,4 @@ import GHC.Internal.TH.Monad
 import GHC.Internal.TopHandler
 import GHC.Internal.Classes.IP (IP)
 import GHC.Internal.GHCi
+import GHC.Internal.Desugar (toAnnotationWrapper)

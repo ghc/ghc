@@ -335,6 +335,10 @@ ghciIoClassOcc, ghciStepIoMOcc :: KnownOcc
 ghciIoClassOcc = mkTcOcc "GHCiSandboxIO"
 ghciStepIoMOcc = mkVarOcc "ghciStepIO"
 
+-- Annotation type checking
+toAnnotationWrapperIdOcc :: KnownOcc
+toAnnotationWrapperIdOcc = mkVarOcc "toAnnotationWrapper"
+
 {- *********************************************************************
 *                                                                      *
         Known-occ RdrNames
