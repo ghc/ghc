@@ -363,9 +363,6 @@ basicKnownKeyNames
         -- Source Locations
         srcLocDataConName
 
-        -- The SPEC type for SpecConstr
-        , specTyConName
-
         -- Plugins
         , pluginTyConName
         , frontendPluginTyConName
@@ -402,9 +399,6 @@ and it's convenient to write them all down in one place.
 
 wildCardName :: Name
 wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
-
-specTyConName :: Name
-specTyConName     = tcQual gHC_TYPES (fsLit "SPEC") specTyConKey
 
 -- Class MonadFail
 failMName :: Name
