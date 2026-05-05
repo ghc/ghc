@@ -66,7 +66,8 @@ module GHC.Internal.Types (
 
         -- * Runtime type representation
         Module(..), TrName(..), TyCon(..), TypeLitSort(..),
-        KindRep(..), KindBndr,
+        KindRep(..), KindBndr, krepStar, krepArrStar,
+        krepStarArrStarArrStarKind, krepConstraint,
 
         -- * Unboxed tuples
         Unit#,
