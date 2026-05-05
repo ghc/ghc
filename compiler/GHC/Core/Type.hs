@@ -244,7 +244,7 @@ import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
    , manyDataConTy, oneDataConTy
    , liftedRepTy, unliftedRepTy, zeroBitRepTy )
 
-import GHC.Types.Name( Name )
+import GHC.Types.Name( Name, hasKnownKey )
 import GHC.Builtin.KnownKeys
 import GHC.Core.Coercion.Axiom
 
@@ -1226,21 +1226,21 @@ pprUserTypeErrorTy ty =
 
     -- Text "Something"
     Just (tc,[txt])
-      | tyConName tc == typeErrorTextDataConName
+      | tc `hasKnownKey` typeErrorTextDataConKey
       , Just str <- isStrLitTy txt -> ftext str
 
     -- ShowType t
     Just (tc,[_k,t])
-      | tyConName tc == typeErrorShowTypeDataConName -> ppr t
+      | tc `hasKnownKey` typeErrorShowTypeDataConKey -> ppr t
 
     -- t1 :<>: t2
     Just (tc,[t1,t2])
-      | tyConName tc == typeErrorAppendDataConName ->
+      | tc `hasKnownKey` typeErrorAppendDataConKey ->
         pprUserTypeErrorTy t1 <> pprUserTypeErrorTy t2
 
     -- t1 :$$: t2
     Just (tc,[t1,t2])
-      | tyConName tc == typeErrorVAppendDataConName ->
+      | tc `hasKnownKey` typeErrorVAppendDataConKey ->
         pprUserTypeErrorTy t1 $$ pprUserTypeErrorTy t2
 
     -- An unevaluated type function

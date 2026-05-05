@@ -1426,7 +1426,7 @@ userTypeError_maybe look_everywhere = go
       | Just ty' <- coreView ty
       = go ty'
     go (TyConApp tc tys)
-      | tyConName tc == errorMessageTypeErrorFamName
+      | tc `hasKnownKey` errorMessageTypeErrorFamKey
       , _kind : msg : _ <- tys
               -- There may be more than 2 arguments, if the type error is
               -- used as a type constructor (e.g. at kind `Type -> Type`).

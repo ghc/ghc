@@ -259,6 +259,13 @@ knownKeyTable
     -- Exception context
     , (mkVarOcc "ExceptionContext", exceptionContextTyConKey)
 
+    -- Custom type errors
+    , (mkTcOcc   "TypeError", errorMessageTypeErrorFamKey)
+    , (mkDataOcc "Text",      typeErrorTextDataConKey)
+    , (mkDataOcc ":<>:",      typeErrorAppendDataConKey)
+    , (mkDataOcc ":$$:",      typeErrorVAppendDataConKey)
+    , (mkDataOcc "ShowType",  typeErrorShowTypeDataConKey)
+
     -- Base strings Strings
     , (mkVarOcc "unpackCString#",     unpackCStringIdKey)
     , (mkVarOcc "unpackCStringUtf8#", unpackCStringUtf8IdKey)
@@ -371,13 +378,6 @@ basicKnownKeyNames
         , staticPtrTyConName
         , staticPtrDataConName, staticPtrInfoDataConName
 
-        -- Custom type errors
-        , errorMessageTypeErrorFamName
-        , typeErrorTextDataConName
-        , typeErrorAppendDataConName
-        , typeErrorVAppendDataConName
-        , typeErrorShowTypeDataConName
-
         -- Unsafe coercion proofs
         , unsafeCoercePrimName
 
@@ -442,29 +442,6 @@ constraintKindRepName  = varQual gHC_TYPES         (fsLit "krep$Constraint") con
 -- WithDict
 withDictClassName :: Name
 withDictClassName = clsQual gHC_MAGIC_DICT (fsLit "WithDict") withDictClassKey
-
--- Custom type errors
-errorMessageTypeErrorFamName
-  , typeErrorTextDataConName
-  , typeErrorAppendDataConName
-  , typeErrorVAppendDataConName
-  , typeErrorShowTypeDataConName
-  :: Name
-
-errorMessageTypeErrorFamName =
-  tcQual gHC_INTERNAL_TYPEERROR (fsLit "TypeError") errorMessageTypeErrorFamKey
-
-typeErrorTextDataConName =
-  dcQual gHC_INTERNAL_TYPEERROR (fsLit "Text") typeErrorTextDataConKey
-
-typeErrorAppendDataConName =
-  dcQual gHC_INTERNAL_TYPEERROR (fsLit ":<>:") typeErrorAppendDataConKey
-
-typeErrorVAppendDataConName =
-  dcQual gHC_INTERNAL_TYPEERROR (fsLit ":$$:") typeErrorVAppendDataConKey
-
-typeErrorShowTypeDataConName =
-  dcQual gHC_INTERNAL_TYPEERROR (fsLit "ShowType") typeErrorShowTypeDataConKey
 
 -- Unsafe coercion proofs
 unsafeCoercePrimName:: Name

@@ -126,6 +126,10 @@ module GHC.Essentials
     -- WithDict
     , WithDict
 
+    -- Custom type errors
+    , TypeError
+    , ErrorMessage(..)
+
     -- Unsatisfiable
     , Unsatisfiable, unsatisfiable
 
@@ -253,7 +257,7 @@ import GHC.Internal.Desugar( (>>>) )  -- See Note [Tricky known-occ cases]
 import GHC.Internal.OverloadedLabels( fromLabel )
 import GHC.Internal.Records
 import GHC.Internal.CString as CS
-import GHC.Internal.TypeError( Unsatisfiable, unsatisfiable )
+import GHC.Internal.TypeError( TypeError, ErrorMessage(..), Unsatisfiable, unsatisfiable )
 import GHC.Internal.System.IO( print )
 import qualified GHC.Internal.IsList as IL
 import GHC.Internal.Err( error )
