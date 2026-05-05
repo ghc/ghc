@@ -22,7 +22,7 @@ module GHC.Data.IOEnv (
         IOEnvFailure(..),
 
         -- Getting at the environment
-        getEnv, setEnv, updEnv, updEnvIO,
+        getEnv, setEnv, updEnv, updEnvIO, withRunInIO,
 
         runIOEnv, unsafeInterleaveM, uninterruptibleMaskM_,
         tryM, tryAllM, tryMostM, fixM,
@@ -258,3 +258,12 @@ updEnv upd (IOEnv m) = IOEnv (\ env -> m (upd env))
 updEnvIO :: (env -> IO env') -> IOEnv env' a -> IOEnv env a
 {-# INLINE updEnvIO #-}
 updEnvIO upd (IOEnv m) = IOEnv (\ env -> m =<< upd env)
+
+-- | 'withRunInIO' specialised to `IOEnv`.
+--   See https://hackage.haskell.org/package/unliftio-core/docs/Control-Monad-IO-Unlift.html#v:withRunInIO for an explanation.
+withRunInIO:: forall env b. ((forall a. IOEnv env a -> IO a) -> IO b) -> IOEnv env b
+withRunInIO k = IOEnv $ \env ->
+  let
+    unlift :: forall a. IOEnv env a -> IO a
+    unlift (IOEnv m) = m env
+  in k unlift

@@ -1,0 +1,9 @@
+section: template-haskell
+synopsis: Hide the implementation of Q
+description: The constructor of Q is now hidden.
+  This is done to improve the stability of ``template-haskell``.
+  To minimize breakage, we have added a new ``qRunQ`` operation to ``Quasi``.
+  The ``Quasi TcM`` instance is no longer exposed from the ``ghc`` API.
+  See the `GHC proposal <https://github.com/ghc-proposals/ghc-proposals/pull/700>`_ for more details.
+mrs: !15696
+issues: #27341
