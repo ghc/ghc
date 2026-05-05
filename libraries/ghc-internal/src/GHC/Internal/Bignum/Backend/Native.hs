@@ -50,6 +50,12 @@ count_words_bits_int :: Word# -> (# Int#, Int# #)
 count_words_bits_int n = case count_words_bits n of
    (# nw, nb #) -> (# word2Int# nw, word2Int# nb #)
 
+-- | Compare two non-zero BigNat of the same length
+--
+-- Return:
+--     < 0 ==> LT
+--    == 0 ==> EQ
+--     > 0 ==> GT
 bignat_compare :: WordArray# -> WordArray# -> Int#
 bignat_compare wa wb = go (sz -# 1#)
    where
@@ -62,6 +68,13 @@ bignat_compare wa wb = go (sz -# 1#)
               | isTrue# (a `gtWord#` b) -> 1#
               | True                    -> -1#
 
+-- | Add two non-zero BigNat
+--
+-- Result is to be stored in the MutableWordArray#.
+-- The latter has size: max (size a, size b) + 1
+--
+-- The potential 0 most-significant Word (i.e. the potential carry) will be
+-- removed by the caller if it is not already done by the backend.
 bignat_add
    :: MutableWordArray# s -- ^ Result
    -> WordArray#
@@ -120,6 +133,13 @@ bignat_add mwa wa wb = addABc 0# 0##
            in case mwaWrite# mwa i r s of
                s' -> addAoBc wab (i +# 1#) carry' s'
 
+-- | Add a non-zero BigNat and a non-zero Word#
+--
+-- Result is to be stored in the MutableWordArray#.
+-- The latter has size: size a + 1
+--
+-- The potential 0 most-significant Word (i.e. the potential carry) will be
+-- removed by the caller if it is not already done by the backend.
 bignat_add_word
    :: MutableWordArray# RealWorld -- ^ Result
    -> WordArray#
@@ -128,6 +148,15 @@ bignat_add_word
    -> State# RealWorld
 bignat_add_word mwa wa b s = mwaInitArrayPlusWord mwa wa b s
 
+-- | Sub a non-zero word from a non-zero BigNat
+--
+-- Result is to be stored in the MutableWordArray#.
+-- The latter has size: size a
+--
+-- The potential 0 most-significant Words will be removed by the caller if it is
+-- not already done by the backend.
+--
+-- Return False# to indicate underflow.
 bignat_sub_word
    :: MutableWordArray# RealWorld
    -> WordArray#
@@ -154,6 +183,13 @@ bignat_sub_word mwa wa b = go b 0#
             (# l  , c  #) -> case mwaWrite# mwa i l s of
                               s1 -> go (int2Word# c) (i +# 1#) s1
 
+-- | Multiply a non-zero BigNat and a non-zero Word#
+--
+-- Result is to be stored in the MutableWordArray#.
+-- The latter has size: size a + 1
+--
+-- The potential 0 most-significant Word (i.e. the potential carry) will be
+-- removed by the caller if it is not already done by the backend.
 bignat_mul_word
    :: MutableWordArray# RealWorld -- ^ Result
    -> WordArray#
@@ -173,6 +209,13 @@ bignat_mul_word mwa wa b = go 0# 0##
                   s' -> go (i +# 1#) carry' s'
 
 
+-- | Multiply two non-zero BigNat
+--
+-- Result is to be stored in the MutableWordArray#.
+-- The latter has size: size a+size b
+--
+-- The potential 0 most-significant Word (i.e. the potential carry) will be
+-- removed by the caller if it is not already done by the backend.
 bignat_mul
    :: MutableWordArray# RealWorld -- ^ Result
    -> WordArray#
@@ -214,6 +257,15 @@ bignat_mul mwa wa wb s1 =
             bi  -> case mul mwa wa bi i ctzA 0## s of
                      s' -> mulEachB (i +# 1#) s'
 
+-- | Sub two non-zero BigNat
+--
+-- Result is to be stored in the MutableWordArray#.
+-- The latter has size: size a
+--
+-- The potential 0 most-significant Words will be removed by the caller if it is
+-- not already done by the backend.
+--
+-- Return False# to indicate underflow.
 bignat_sub
    :: MutableWordArray# RealWorld
    -> WordArray#
@@ -227,6 +279,7 @@ bignat_sub mwa wa wb s =
    case mwaArrayCopy# mwa 0# wa 0# (wordArraySize# wa) s of
       s' -> mwaSubInplaceArray mwa 0# wb s'
 
+-- | PopCount of a non-zero BigNat
 bignat_popcount :: WordArray# -> Word#
 bignat_popcount wa = go 0# 0##
    where
@@ -235,6 +288,13 @@ bignat_popcount wa = go 0# 0##
          | isTrue# (i ==# sz) = c
          | True               = go (i +# 1#) (c `plusWord#` popCnt# (indexWordArray# wa i))
 
+-- | Left-shift a non-zero BigNat by a non-zero amount of bits
+--
+-- Result is to be stored in the MutableWordArray#.
+-- The latter has size: size a + required new limbs
+--
+-- The potential 0 most-significant Word (i.e. the potential carry) will be
+-- removed by the caller if it is not already done by the backend.
 bignat_shiftl
    :: MutableWordArray# s
    -> WordArray#
@@ -267,6 +327,13 @@ bignat_shiftl mwa wa n s1 =
                   s' -> mwaBitShift (i +# 1#) c' s'
 
 
+-- | Right-shift a non-zero BigNat by a non-zero amount of bits
+--
+-- Result is to be stored in the MutableWordArray#.
+-- The latter has size: required limbs
+--
+-- The potential 0 most-significant Word (i.e. the potential carry) will be
+-- removed by the caller if it is not already done by the backend.
 bignat_shiftr
    :: MutableWordArray# s
    -> WordArray#
@@ -293,6 +360,15 @@ bignat_shiftr mwa wa n s1
             in case mwaWrite# mwa i v s of
                   s' -> mwaBitShift (i -# 1#) c' s'
 
+-- | Right-shift a non-zero BigNat by a non-zero amount of bits by first
+-- converting it into its two's complement representation and then again after
+-- the arithmetic shift.
+--
+-- Result is to be stored in the MutableWordArray#.
+-- The latter has size: required limbs
+--
+-- The potential 0 most-significant Words (i.e. the potential carry) will be
+-- removed by the caller if it is not already done by the backend.
 bignat_shiftr_neg
    :: MutableWordArray# s
    -> WordArray#
@@ -329,6 +405,10 @@ bignat_shiftr_neg mwa wa n s1
            in go 0#
 
 
+-- | OR two non-zero BigNat
+--
+-- Result is to be stored in the MutableWordArray#.
+-- The latter has size: max (size a, size b)
 bignat_or
    :: MutableWordArray# RealWorld -- ^ Result
    -> WordArray#
@@ -346,6 +426,13 @@ bignat_or mwa wa wb s1
          case mwaInitArrayBinOp mwa wx wy or# s of
             s' -> mwaArrayCopy# mwa ny wx ny (nx -# ny) s'
 
+-- | XOR two non-zero BigNat
+--
+-- Result is to be stored in the MutableWordArray#.
+-- The latter has size: max (size a, size b)
+--
+-- The potential 0 most-significant Words will be removed by the caller if it is
+-- not already done by the backend.
 bignat_xor
    :: MutableWordArray# RealWorld -- ^ Result
    -> WordArray#
@@ -363,6 +450,13 @@ bignat_xor mwa wa wb s1
          case mwaInitArrayBinOp mwa wx wy xor# s of
             s' -> mwaArrayCopy# mwa ny wx ny (nx -# ny) s'
 
+-- | AND two non-zero BigNat
+--
+-- Result is to be stored in the MutableWordArray#.
+-- The latter has size: min (size a, size b)
+--
+-- The potential 0 most-significant Words will be removed by the caller if it is
+-- not already done by the backend.
 bignat_and
    :: MutableWordArray# RealWorld -- ^ Result
    -> WordArray#
@@ -371,6 +465,13 @@ bignat_and
    -> State# RealWorld
 bignat_and mwa wa wb s = mwaInitArrayBinOp mwa wa wb and# s
 
+-- | ANDNOT two non-zero BigNat
+--
+-- Result is to be stored in the MutableWordArray#.
+-- The latter has size: size a
+--
+-- The potential 0 most-significant Words will be removed by the caller if it is
+-- not already done by the backend.
 bignat_and_not
    :: MutableWordArray# RealWorld -- ^ Result
    -> WordArray#
@@ -384,9 +485,17 @@ bignat_and_not mwa wa wb s =
       !szA = wordArraySize# wa
       !szB = wordArraySize# wb
 
+-- | QuotRem of two non-zero BigNat
+--
+-- Result quotient and remainder are to be stored in the MutableWordArray#.
+-- The first one (quotient) has size: size(A)-size(B)+1
+-- The second one (remainder) has size: size(b)
+--
+-- The potential 0 most-significant Words will be removed by the caller if it is
+-- not already done by the backend.
 bignat_quotrem
-   :: MutableWordArray# s
-   -> MutableWordArray# s
+   :: MutableWordArray# s -- ^ Quotient
+   -> MutableWordArray# s -- ^ Remainder
    -> WordArray#
    -> WordArray#
    -> State# s
@@ -434,8 +543,15 @@ bignat_quotrem mwq mwr uwa uwb s0 =
 
 
 
+-- | Quotient of two non-zero BigNat
+--
+-- Result quotient is to be stored in the MutableWordArray#.
+-- The latter has size: size(A)-size(B)+1
+--
+-- The potential 0 most-significant Words will be removed by the caller if it is
+-- not already done by the backend.
 bignat_quot
-   :: MutableWordArray# RealWorld
+   :: MutableWordArray# RealWorld -- ^ Quotient
    -> WordArray#
    -> WordArray#
    -> State# RealWorld
@@ -445,8 +561,15 @@ bignat_quot mwq wa wb s =
    case newWordArray# (wordArraySize# wb) s of
       (# s, mwr #) -> bignat_quotrem mwq mwr wa wb s
 
+-- | Remainder of two non-zero BigNat
+--
+-- Result remainder is to be stored in the MutableWordArray#.
+-- The latter has size: size(B)
+--
+-- The potential 0 most-significant Words will be removed by the caller if it is
+-- not already done by the backend.
 bignat_rem
-   :: MutableWordArray# RealWorld
+   :: MutableWordArray# RealWorld -- ^ Remainder
    -> WordArray#
    -> WordArray#
    -> State# RealWorld
@@ -577,6 +700,15 @@ bignat_quotrem_normalized mwq mwa b s0 =
          | True    -> loop (m -# 1#) s2
    }}
 
+-- | QuotRem of a non-zero BigNat and a non-zero Word
+--
+-- Result quotient is to be stored in the MutableWordArray#.
+-- The latter has size: size(A)
+--
+-- The remainder is returned.
+--
+-- The potential 0 most-significant Words will be removed by the caller if it is
+-- not already done by the backend.
 bignat_quotrem_word
    :: MutableWordArray# s -- ^ Quotient
    -> WordArray#
@@ -595,6 +727,13 @@ bignat_quotrem_word mwq wa b s = go (sz -# 1#) 0## s
             in case mwaWrite# mwq i q s of
                   s' -> go (i -# 1#) r' s'
 
+-- | Quot of a non-zero BigNat and a non-zero Word
+--
+-- Result quotient is to be stored in the MutableWordArray#.
+-- The latter has size: size(A)
+--
+-- The potential 0 most-significant Words will be removed by the caller if it is
+-- not already done by the backend.
 bignat_quot_word
    :: MutableWordArray# s -- ^ Quotient
    -> WordArray#
@@ -613,6 +752,9 @@ bignat_quot_word mwq wa b s = go (sz -# 1#) 0## s
             in case mwaWrite# mwq i q s of
                   s' -> go (i -# 1#) r' s'
 
+-- | Remainder of a non-zero BigNat and a non-zero Word
+--
+-- The remainder is returned.
 bignat_rem_word
    :: WordArray#
    -> Word#
@@ -629,6 +771,14 @@ bignat_rem_word wa b = go (sz -# 1#) 0##
             in go (i -# 1#) r'
 
 
+-- | Greatest common divisor (GCD) of two non-zero and non-one BigNat
+--
+-- Result GCD is to be stored in the MutableWordArray#.
+-- The latter has size: size(B)
+-- The first WordArray# is greater than the second WordArray#.
+--
+-- The potential 0 most-significant Words will be removed by the caller if it is
+-- not already done by the backend.
 bignat_gcd
    :: MutableWordArray# s
    -> WordArray#
@@ -647,13 +797,21 @@ bignat_gcd mwr = go
              !wmin' = bigNatRem wmax wmin
            in go wmax' wmin' s
 
+-- | Greatest common divisor (GCD) of a non-zero/non-one BigNat and a
+-- non-zero/non-one Word#
+--
+-- Result GCD is returned
 bignat_gcd_word
    :: WordArray#
    -> Word#
    -> Word#
 bignat_gcd_word a b = bignat_gcd_word_word b (bigNatRemWord# a b)
 
--- | This operation doesn't really belongs here, but GMP's one is much faster
+-- | Greatest common divisor (GCD) of two Word#
+--
+-- Result GCD is returned.
+--
+-- This operation doesn't really belongs here, but GMP's one is much faster
 -- than this simple implementation (basic Euclid algorithm).
 --
 -- Ideally we should make an implementation as fast as GMP's one and put it into
@@ -665,6 +823,7 @@ bignat_gcd_word_word
 bignat_gcd_word_word a 0## = a
 bignat_gcd_word_word a b   = bignat_gcd_word_word b (a `remWord#` b)
 
+-- | Encode (# BigNat mantissa, Int# exponent #) into a Double#
 bignat_encode_double :: WordArray# -> Int# -> Double#
 bignat_encode_double wa e0 = go 0.0## e0 0#
    where
@@ -676,6 +835,12 @@ bignat_encode_double wa e0 = go 0.0## e0 0#
               (e +# WORD_SIZE_IN_BITS#) -- FIXME: we assume that e doesn't overflow...
               (i +# 1#)
 
+-- | \"@'bignat_powmod_word' /b/ /e/ /m/@\" computes base @/b/@ raised to
+-- exponent @/e/@ modulo @/m/@.
+--
+-- b > 1
+-- e > 0
+-- m > 1
 bignat_powmod_word :: WordArray# -> WordArray# -> Word# -> Word#
 bignat_powmod_word b0 e0 m = go (naturalFromBigNat# b0) (naturalFromBigNat# e0) (naturalFromWord# 1##)
    where
@@ -693,6 +858,18 @@ bignat_powmod_word b0 e0 m = go (naturalFromBigNat# b0) (naturalFromBigNat# e0) 
           m' = naturalFromWord# m
           e' = e `naturalShiftR#` 1## -- slightly faster than "e `div` 2"
 
+-- | \"@'bignat_powmod' r /b/ /e/ /m/@\" computes base @/b/@ raised to
+-- exponent @/e/@ modulo @/m/@.
+--
+-- b > 1
+-- e > 0
+-- m > 1
+--
+-- Result is to be stored in the MutableWordArray# (which size is equal to the
+-- one of m).
+--
+-- The potential 0 most-significant Words will be removed by the caller if it is
+-- not already done by the backend.
 bignat_powmod
    :: MutableWordArray# RealWorld
    -> WordArray#
@@ -720,6 +897,12 @@ bignat_powmod r b0 e0 m s = mwaInitCopyShrink# r r' s
           m' = naturalFromBigNat# m
           e' = e `naturalShiftR#` 1## -- slightly faster than "e `div` 2"
 
+-- | \"@'bignat_powmod' /b/ /e/ /m/@\" computes base @/b/@ raised to
+-- exponent @/e/@ modulo @/m/@.
+--
+-- b > 1
+-- e > 0
+-- m > 1
 bignat_powmod_words
    :: Word#
    -> Word#
@@ -731,6 +914,13 @@ bignat_powmod_words b e m =
                       m
 
 
+-- | Return extended GCD of two non-zero integers.
+--
+-- I.e. integer_gcde a b returns (g,x,y) so that ax + by = g
+--
+-- Input: a and b are non zero.
+-- Output: g must be > 0
+--
 integer_gcde
    :: Integer
    -> Integer
@@ -748,6 +938,12 @@ integer_gcde a b = f (# a,integerOne,integerZero #) (# b,integerZero,integerOne 
                               !(# q, r #) -> f new (# r , old_s `integerSub` (q `integerMul` s)
                                                         , old_t `integerSub` (q `integerMul` t) #)
 
+-- | Computes the modular inverse of two non-zero integers.
+--
+-- I.e. y = integer_recip_mod x m
+--        = x^(-1) `mod` m
+--
+-- with 0 < y < abs m
 integer_recip_mod
    :: Integer
    -> Natural
@@ -763,6 +959,12 @@ integer_recip_mod x m =
                                        -- a `mod` m > 0 because m > 0
          | True                     -> (# | () #)
 
+-- | Computes the modular exponentiation.
+--
+-- I.e. y = integer_powmod b e m
+--        = b^e `mod` m
+--
+-- with 0 <= y < abs m
 integer_powmod
    :: Integer
    -> Natural
