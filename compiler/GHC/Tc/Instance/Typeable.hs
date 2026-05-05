@@ -22,6 +22,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Iface.Env( newGlobalBinder )
 
 import GHC.Builtin.Modules( gHC_TYPES, gHC_PRIM )
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
 import GHC.Builtin.WiredIn.Prim ( primTyCons )
 import GHC.Builtin.WiredIn.Types
@@ -135,15 +136,6 @@ There are many wrinkles:
          To reduce the number of bindings we need to produce, we generate their
          KindReps once in GHC.Types. These are referred to as "built-in"
          KindReps below.
-
-         * When compiling GHC.Internal.Types, generate some extra bindings for
-         built-in kindreps (see `todoForExportedKindReps`):
-
-             krepStar = MkTyCon app ...
-
-         * Re-export `krepStar` from GHC.Essentials.
-         * In `mkTypeableBinds`, use `krepStar` directly rather than using its
-         long form. Must use lookupKnownOcc to find it.
 
   (GPT7) Even though KindReps aren't inlined, this scheme still has more of an
          effect on compilation time than I'd like. This is especially true in
@@ -471,12 +463,11 @@ todoForTyCons mod mod_id tycons = do
     mod_fpr = fingerprintString $ moduleNameString $ moduleName mod
     pkg_fpr = fingerprintString $ unitString $ moduleUnit mod
 
-todoForExportedKindReps :: [(Kind, KnownOcc)] -> TcM TypeRepTodo
+todoForExportedKindReps :: [(Kind, Name)] -> TcM TypeRepTodo
 todoForExportedKindReps kinds = do
     trKindRepTy <- mkTyConTy <$> tcLookupKnownOccTyCon kindRepTyConOcc
-    names <- mapM (fmap idName . tcLookupKnownOccId . snd) kinds -- ROMES:TODO: ugh... I don't see how this would work. These bindings are defined dynamically here when compiling this module, so how would knownOcc find them? they aren't defined!
-    let mkId k name = (k, mkExportedVanillaId name trKindRepTy)
-    return $ ExportedKindRepsTodo $ zipWith mkId (map fst kinds) names
+    let mkId (k, name) = (k, mkExportedVanillaId name trKindRepTy)
+    return $ ExportedKindRepsTodo $ map mkId kinds
 
 -- | Generate TyCon bindings for a set of type constructors
 mkTypeRepTodoBinds :: [TypeRepTodo] -> TcM TcGblEnv
@@ -671,13 +662,13 @@ liftTc = KindRepM . lift
 
 -- | We generate `KindRep`s for a few common kinds, so that they
 -- can be reused across modules.
--- These definitions are generated in `GHC.Internal.Types`.
-builtInKindReps :: [(Kind, KnownOcc)]
+-- These definitions are generated in `ghc-prim:GHC.Types`.
+builtInKindReps :: [(Kind, Name)]
 builtInKindReps =
-    [ (star,                              starKindRepIdOcc)
-    , (constraintKind,                    constraintKindRepIdOcc)
-    , (mkVisFunTyMany star star,          starArrStarKindRepIdOcc)
-    , (mkVisFunTysMany [star, star] star, starArrStarArrStarKindRepIdOcc)
+    [ (star,                              starKindRepName)
+    , (constraintKind,                    constraintKindRepName)
+    , (mkVisFunTyMany star star,          starArrStarKindRepName)
+    , (mkVisFunTysMany [star, star] star, starArrStarArrStarKindRepName)
     ]
   where
     star = liftedTypeKind
@@ -686,7 +677,7 @@ initialKindRepEnv :: TcRn KindRepEnv
 initialKindRepEnv = foldlM add_kind_rep emptyTypeMap builtInKindReps
   where
     add_kind_rep acc (k,n) = do
-        id <- tcLookupKnownOccId n
+        id <- tcLookupId n
         return $! extendTypeMap acc k (id, Nothing)
         -- The TypeMap looks through type synonyms
 

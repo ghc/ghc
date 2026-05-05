@@ -8,7 +8,6 @@
 -- NegativeLiterals: see Note [Fixity of (->)]
 
 {-# OPTIONS_HADDOCK print-explicit-runtime-reps #-}
-{-# OPTIONS_GHC -frebindable-known-names #-} -- built-in type reps (e.g. krepStar) are defined in this module.
 
 -----------------------------------------------------------------------------
 -- |

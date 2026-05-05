@@ -343,6 +343,11 @@ knownKeyTable
 basicKnownKeyNames :: [Name]  -- See Note [Known-key names]
 basicKnownKeyNames
  = [
+        -- KindReps for common cases
+        starKindRepName,
+        starArrStarKindRepName,
+        starArrStarArrStarKindRepName,
+        constraintKindRepName,
         -- FFI primitive types that are not wired-in.
         ptrTyConName, funPtrTyConName, constPtrConName,
         int8TyConName, int16TyConName, int32TyConName, int64TyConName,
@@ -424,6 +429,17 @@ bniVarQual str key = varQual gHC_INTERNAL_NUM_INTEGER (fsLit str) key
 ---------------------------------
 -- End of ghc-bignum
 ---------------------------------
+
+
+-- Class Typeable, and functions for constructing `Typeable` dictionaries
+starKindRepName, starArrStarKindRepName,
+  starArrStarArrStarKindRepName, constraintKindRepName :: Name
+-- This is the Typeable 'Module' for GHC.Prim (which has no code, so we place in GHC.Types)
+-- See Note [Grand plan for Typeable] in GHC.Tc.Instance.Typeable.
+starKindRepName        = varQual gHC_TYPES         (fsLit "krep$*")          starKindRepKey
+starArrStarKindRepName = varQual gHC_TYPES         (fsLit "krep$*Arr*")      starArrStarKindRepKey
+starArrStarArrStarKindRepName = varQual gHC_TYPES  (fsLit "krep$*->*->*")    starArrStarArrStarKindRepKey
+constraintKindRepName  = varQual gHC_TYPES         (fsLit "krep$Constraint") constraintKindRepKey
 
 -- WithDict
 withDictClassName :: Name
@@ -1343,6 +1359,13 @@ typeSymbolTypeRepKey  = mkPreludeMiscIdUnique 508
 typeCharTypeRepKey    = mkPreludeMiscIdUnique 509
 typeRepIdKey          = mkPreludeMiscIdUnique 510
 mkTrFunKey            = mkPreludeMiscIdUnique 511
+
+-- KindReps for common cases
+starKindRepKey, starArrStarKindRepKey, starArrStarArrStarKindRepKey, constraintKindRepKey :: KnownKey
+starKindRepKey               = mkPreludeMiscIdUnique 520
+starArrStarKindRepKey        = mkPreludeMiscIdUnique 521
+starArrStarArrStarKindRepKey = mkPreludeMiscIdUnique 522
+constraintKindRepKey         = mkPreludeMiscIdUnique 523
 
 -- Dynamic
 toDynIdKey :: KnownKey

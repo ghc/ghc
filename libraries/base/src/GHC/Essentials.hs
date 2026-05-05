@@ -216,11 +216,6 @@ module GHC.Essentials
     , Body, normalB, guardedB
     , Guard, normalGE, patGE
 
-    -- See Note [Grand plan for Typeable] point (GPT6)
-    , krepStar, krepArrStar
-    , krepStarArrStarArrStarKind
-    , krepConstraint
-
     -- GHCi
     , GHCiSandboxIO(ghciStepIO)
 
