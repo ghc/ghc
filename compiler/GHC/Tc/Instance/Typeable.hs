@@ -35,7 +35,6 @@ import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.Var ( VarBndr(..) )
-import GHC.Types.SrcLoc
 
 import GHC.Core.TyCo.Rep( Type(..), TyLit(..) )
 import GHC.Core.Type
@@ -144,7 +143,7 @@ There are many wrinkles:
 
          * Re-export `krepStar` from GHC.Essentials.
          * In `mkTypeableBinds`, use `krepStar` directly rather than using its
-         long form.
+         long form. Must use lookupKnownOcc to find it.
 
   (GPT7) Even though KindReps aren't inlined, this scheme still has more of an
          effect on compilation time than I'd like. This is especially true in
@@ -472,14 +471,12 @@ todoForTyCons mod mod_id tycons = do
     mod_fpr = fingerprintString $ moduleNameString $ moduleName mod
     pkg_fpr = fingerprintString $ unitString $ moduleUnit mod
 
-todoForExportedKindReps :: [(Kind, KnownOcc)] -> Module -> TcM TypeRepTodo
-todoForExportedKindReps kinds mod = do
+todoForExportedKindReps :: [(Kind, KnownOcc)] -> TcM TypeRepTodo
+todoForExportedKindReps kinds = do
     trKindRepTy <- mkTyConTy <$> tcLookupKnownOccTyCon kindRepTyConOcc
-    let mkId (k,occ) = do
-          uq <- newUnique
-          let name = mkExternalName uq mod occ noSrcSpan
-          pure (k, mkExportedVanillaId name trKindRepTy)
-    ExportedKindRepsTodo <$> mapM mkId kinds
+    names <- mapM (fmap idName . tcLookupKnownOccId . snd) kinds -- ROMES:TODO: ugh... I don't see how this would work. These bindings are defined dynamically here when compiling this module, so how would knownOcc find them? they aren't defined!
+    let mkId k name = (k, mkExportedVanillaId name trKindRepTy)
+    return $ ExportedKindRepsTodo $ zipWith mkId (map fst kinds) names
 
 -- | Generate TyCon bindings for a set of type constructors
 mkTypeRepTodoBinds :: [TypeRepTodo] -> TcM TcGblEnv
@@ -529,7 +526,7 @@ mkPrimTypeableTodos mod this_mod_id
          (gbl_env',  ghc_prim_module_id) <- mkModIdBindings mod "tr$ModuleGHCPrim"
 
          -- Build TypeRepTodos for built-in KindReps
-       ; todo1 <- todoForExportedKindReps builtInKindReps mod
+       ; todo1 <- todoForExportedKindReps builtInKindReps
 
          -- Build TypeRepTodos for types in GHC.Prim
        ; todo2 <- todoForTyCons gHC_PRIM ghc_prim_module_id
