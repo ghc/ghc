@@ -5,13 +5,17 @@
 {-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE UnboxedTuples #-}
+-- Don't warn for using 'report' from ghc-internal
+{-# OPTIONS_GHC -Wno-warnings-deprecations #-}
 
 module Language.Haskell.TH.Syntax (
     Quote (..),
     Exp (..),
     Match (..),
     Clause (..),
-    Q (..),
+    Q,
+    -- backwards compatibility
+    Language.Haskell.TH.Syntax.unQ,
     Pat (..),
     Stmt (..),
     Con (..),
@@ -202,11 +206,14 @@ where
 
 import GHC.Boot.TH.Lift
 import GHC.Boot.TH.Syntax
-import GHC.Boot.TH.Monad
+import GHC.Boot.TH.Monad hiding (report)
+import qualified GHC.Boot.TH.Monad as Internal
 import System.FilePath
 import Data.Data hiding (Fixity(..))
 import Data.List.NonEmpty (NonEmpty(..))
 import GHC.Lexeme ( startsVarSym, startsVarId )
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import System.IO (hPutStrLn, stderr)
 
 -- This module completely re-exports 'GHC.Boot.TH.Syntax',
 -- and exports additionally functions that depend on @filepath@ or @System.IO@.
@@ -499,3 +506,172 @@ reassociate the tree as necessary.
 -- Subsumed by the more general 'SpecialiseEP' constructor.
 pattern SpecialiseP :: Name -> Type -> (Maybe Inline) -> Phases -> Pragma
 pattern SpecialiseP nm ty inl phases = SpecialiseEP Nothing [] (SigE (VarE nm) ty) inl phases
+
+unQ :: Q a -> (forall m. Quasi m => m a)
+unQ m =  runQ m
+
+-----------------------------------------------------
+--
+--              The Quasi class
+--
+-----------------------------------------------------
+
+-- | The 'Quasi' typeclass used to provide an exhaustive list of the effects exposed by the 'Q' monad.
+-- This invariant no longer holds, and it is encouraged to use 'Q' or 'Quote' instead.
+class (MonadIO m, MonadFail m) => Quasi m where
+  qRunQ :: Q a -> m a
+  -- | Fresh names. See 'newName'.
+  qNewName :: String -> m Name
+  qNewName = qRunQ . newName
+
+  ------- Error reporting and recovery -------
+  -- | Report an error (True) or warning (False)
+  -- ...but carry on; use 'fail' to stop. See 'report'.
+  qReport  :: Bool -> String -> m ()
+  qReport b s = qRunQ $ report b s
+
+  -- | See 'recover'.
+  qRecover :: m a -- ^ the error handler
+           -> m a -- ^ action which may fail
+           -> m a -- ^ Recover from the monadic 'fail'
+
+  ------- Inspect the type-checker's environment -------
+  -- | True <=> type namespace, False <=> value namespace. See 'lookupName'.
+  qLookupName :: Bool -> String -> m (Maybe Name)
+  qLookupName ns s = qRunQ $ lookupName ns s
+  -- | See 'reify'.
+  qReify          :: Name -> m Info
+  qReify v = qRunQ $ reify v
+  -- | See 'reifyFixity'.
+  qReifyFixity    :: Name -> m (Maybe Fixity)
+  qReifyFixity v = qRunQ $ reifyFixity v
+  -- | See 'reifyType'.
+  qReifyType      :: Name -> m Type
+  qReifyType v = qRunQ $ reifyType v
+  -- | Is (n tys) an instance? Returns list of matching instance Decs (with
+  -- empty sub-Decs) Works for classes and type functions. See 'reifyInstances'.
+  qReifyInstances :: Name -> [Type] -> m [Dec]
+  qReifyInstances cls tys = qRunQ $ reifyInstances cls tys
+  -- | See 'reifyRoles'.
+  qReifyRoles         :: Name -> m [Role]
+  qReifyRoles nm = qRunQ $ reifyRoles nm
+  -- | See 'reifyAnnotations'.
+  qReifyAnnotations   :: Data a => AnnLookup -> m [a]
+  qReifyAnnotations an = qRunQ $ reifyAnnotations an
+  -- | See 'reifyModule'.
+  qReifyModule        :: Module -> m ModuleInfo
+  qReifyModule m = qRunQ $ reifyModule m
+  -- | See 'reifyConStrictness'.
+  qReifyConStrictness :: Name -> m [DecidedStrictness]
+  qReifyConStrictness nm = qRunQ $ reifyConStrictness nm
+
+  -- | See 'location'.
+  qLocation :: m Loc
+  qLocation = qRunQ location
+
+  -- | Input/output (dangerous). See 'runIO'.
+  qRunIO :: IO a -> m a
+  qRunIO = liftIO
+  -- | See 'getPackageRoot'.
+  qGetPackageRoot :: m FilePath
+  qGetPackageRoot = qRunQ getPackageRoot
+
+  -- | See 'addDependentFile'.
+  qAddDependentFile :: FilePath -> m ()
+  qAddDependentFile p = qRunQ $ addDependentFile p
+
+  -- | See 'addDependentDirectory'.
+  qAddDependentDirectory :: FilePath -> m ()
+  qAddDependentDirectory p = qRunQ $ addDependentDirectory p
+
+  -- | See 'addTempFile'.
+  qAddTempFile :: String -> m FilePath
+  qAddTempFile p = qRunQ $ addTempFile p
+
+  -- | See 'addTopDecls'.
+  qAddTopDecls :: [Dec] -> m ()
+  qAddTopDecls decls = qRunQ $ addTopDecls decls
+
+  -- | See 'addForeignFilePath'.
+  qAddForeignFilePath :: ForeignSrcLang -> String -> m ()
+  qAddForeignFilePath lang fp = qRunQ $ addForeignFilePath lang fp
+
+  -- | See 'addModFinalizer'.
+  qAddModFinalizer :: Q () -> m ()
+  qAddModFinalizer fin = qRunQ $ addModFinalizer fin
+
+  -- | See 'addCorePlugin'.
+  qAddCorePlugin :: String -> m ()
+  qAddCorePlugin nm = qRunQ $ addCorePlugin nm
+
+  -- | See 'getQ'.
+  qGetQ :: Typeable a => m (Maybe a)
+  qGetQ = qRunQ getQ
+
+  -- | See 'putQ'.
+  qPutQ :: Typeable a => a -> m ()
+  qPutQ x = qRunQ $ putQ x
+
+  -- | See 'isExtEnabled'.
+  qIsExtEnabled :: Extension -> m Bool
+  qIsExtEnabled ext = qRunQ $ isExtEnabled ext
+  -- | See 'extsEnabled'.
+  qExtsEnabled :: m [Extension]
+  qExtsEnabled = qRunQ extsEnabled
+
+  -- | See 'putDoc'.
+  qPutDoc :: DocLoc -> String -> m ()
+  qPutDoc l s = qRunQ $ putDoc l s
+  -- | See 'getDoc'.
+  qGetDoc :: DocLoc -> m (Maybe String)
+  qGetDoc l = qRunQ $ getDoc l
+
+-- | \"Runs\" the 'Q' monad. Normal users of Template Haskell
+-- should not need this function, as the splice brackets @$( ... )@
+-- are the usual way of running a 'Q' computation.
+--
+-- This function is primarily used in GHC internals, and for debugging
+-- splices by running them in 'IO'.
+--
+-- Note that many functions in 'Q', such as 'reify' and other compiler
+-- queries, are not supported when running 'Q' in 'IO'; these operations
+-- simply fail at runtime. Indeed, the only operations guaranteed to succeed
+-- are 'newName', 'runIO', 'reportError' and 'reportWarning'.
+runQ :: Quasi m => Q a -> m a
+runQ = qRunQ
+
+-----------------------------------------------------
+--      The IO instance of Quasi
+-----------------------------------------------------
+
+--  | This instance is used only when running a Q
+--  computation in the IO monad, usually just to
+--  print the result.  There is no interesting
+--  type environment, so reification isn't going to
+--  work. Please use 'Quote' instead, which is much safer.
+instance Quasi IO where
+  qRunQ (Q m) = m metaHandlersIO
+  qNewName = newNameIO
+
+  qReport True  msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
+  qReport False msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
+  qRecover _ _          = badIO "recover" -- Maybe we could fix this?
+
+instance Quasi Q where
+  qRunQ               = id
+  qRecover            = recover
+
+
+-- | Report an error (True) or warning (False),
+-- but carry on; use 'fail' to stop.
+report  :: Bool -> String -> Q ()
+report = Internal.report
+{-# DEPRECATED report "Use reportError or reportWarning instead" #-} -- deprecated in 7.6
+
+-- | Report an error to the user, but allow the current splice's computation to carry on. To abort the computation, use 'fail'.
+reportError :: String -> Q ()
+reportError = report True
+
+-- | Report a warning to the user, and carry on.
+reportWarning :: String -> Q ()
+reportWarning = report False
