@@ -221,6 +221,8 @@ module GHC.Essentials
 
     -- Callstacks
     , emptyCallStack, pushCallStack, SrcLoc(..)
+
+    , toAnnotationWrapper
     ) where
 
 import GHC.Internal.Base hiding( foldr )
@@ -275,7 +277,6 @@ import GHC.Internal.TH.Lib
 import GHC.Internal.TH.Lift
 import GHC.Internal.TH.Monad
 import GHC.Internal.TopHandler
-import GHC.Internal.Classes.IP (IP)
 import GHC.Internal.GHCi
 import GHC.Internal.Desugar (toAnnotationWrapper)
 import GHC.Internal.Stack.Types

@@ -14,7 +14,6 @@ module GHC.Stg.BcPrep ( bcPrep ) where
 
 import GHC.Prelude
 
-import GHC.Types.Id.Make
 import GHC.Types.Id
 import GHC.Core.Type
 
