@@ -126,6 +126,9 @@ module GHC.Essentials
     -- WithDict
     , WithDict
 
+    -- Type-level naturals/symbols/chars
+    , KnownNat, KnownSymbol, KnownChar
+
     -- Custom type errors
     , TypeError
     , ErrorMessage(..)
@@ -241,6 +244,8 @@ import GHC.Internal.Real
 import Data.String( IsString )
 import GHC.Internal.Ix
 import GHC.Internal.Magic.Dict( WithDict )
+import GHC.Internal.TypeNats( KnownNat )
+import GHC.Internal.TypeLits( KnownSymbol, KnownChar )
 import GHC.Internal.Enum
 import GHC.Internal.Data.Dynamic( toDyn )
 import GHC.Internal.Data.Data

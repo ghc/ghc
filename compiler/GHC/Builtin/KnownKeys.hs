@@ -366,9 +366,6 @@ basicKnownKeyNames
         int8TyConName, int16TyConName, int32TyConName, int64TyConName,
         word8TyConName, word16TyConName, word32TyConName, word64TyConName,
 
-        -- Type-level naturals
-        knownNatClassName, knownSymbolClassName, knownCharClassName,
-
         -- Plugins
         pluginTyConName
         , frontendPluginTyConName
@@ -463,14 +460,6 @@ word64TyConName   = tcQual  gHC_INTERNAL_WORD (fsLit "Word64") word64TyConKey
 ptrTyConName, funPtrTyConName :: Name
 ptrTyConName      = tcQual   gHC_INTERNAL_PTR (fsLit "Ptr")    ptrTyConKey
 funPtrTyConName   = tcQual   gHC_INTERNAL_PTR (fsLit "FunPtr") funPtrTyConKey
-
--- Type-level naturals
-knownNatClassName :: Name
-knownNatClassName     = clsQual gHC_INTERNAL_TYPENATS (fsLit "KnownNat") knownNatClassKey
-knownSymbolClassName :: Name
-knownSymbolClassName  = clsQual gHC_INTERNAL_TYPELITS (fsLit "KnownSymbol") knownSymbolClassKey
-knownCharClassName :: Name
-knownCharClassName  = clsQual gHC_INTERNAL_TYPELITS (fsLit "KnownChar") knownCharClassKey
 
 -- plugins
 pLUGINS :: Module

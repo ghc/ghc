@@ -27,12 +27,13 @@ import GHC.Rename.Env( addUsedGRE, addUsedDataCons, DeprecationWarnings (..) )
 import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs
 import GHC.Builtin.PrimOps ( PrimOp(..) )
 import GHC.Builtin.PrimOps.Ids ( primOpId )
 
 import GHC.Types.FieldLabel
 import GHC.Types.SafeHaskell
-import GHC.Types.Name   ( Name )
+import GHC.Types.Name   ( Name, KnownOcc )
 import GHC.Types.Name.Reader
 import GHC.Types.Var.Env ( VarEnv )
 import GHC.Types.Id
@@ -960,9 +961,9 @@ matchTypeable clas [k,t]  -- clas = Typeable
       -- see Note [No Typeable for polytypes or qualified types]
 
   -- Now cases that do work
-  | k `eqType` naturalTy      = doTyLit knownNatClassName         t
-  | k `eqType` typeSymbolKind = doTyLit knownSymbolClassName      t
-  | k `eqType` charTy         = doTyLit knownCharClassName        t
+  | k `eqType` naturalTy      = doTyLit knownNatClassOcc          t
+  | k `eqType` typeSymbolKind = doTyLit knownSymbolClassOcc       t
+  | k `eqType` charTy         = doTyLit knownCharClassOcc         t
   | Just (tc, ks) <- splitTyConApp_maybe t -- See Note [Typeable (T a b c)]
   , onlyNamedBndrsApplied tc ks            = doTyConApp clas t tc ks
 
@@ -1038,8 +1039,8 @@ mk_typeable_pred clas ty = mkClassPred clas [ typeKind ty, ty ]
   -- Typeable is implied by KnownNat/KnownSymbol. In the case of a type literal
   -- we generate a sub-goal for the appropriate class.
   -- See Note [Typeable for Nat and Symbol]
-doTyLit :: Name -> Type -> TcM ClsInstResult
-doTyLit kc t = do { kc_clas <- tcLookupClass kc
+doTyLit :: KnownOcc -> Type -> TcM ClsInstResult
+doTyLit kc t = do { kc_clas <- tcLookupKnownOccClass kc
                   ; let kc_pred    = mkClassPred kc_clas [ t ]
                         mk_ev [ev] = evTypeable t $ EvTypeableTyLit (EvExpr ev)
                         mk_ev _    = panic "doTyLit"

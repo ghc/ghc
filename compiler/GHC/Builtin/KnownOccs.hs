@@ -209,6 +209,11 @@ staticPtrTyConOcc        = mkTcOcc   "StaticPtr"
 staticPtrDataConOcc      = mkDataOcc "StaticPtr"
 staticPtrInfoDataConOcc  = mkDataOcc "StaticPtrInfo"
 
+knownNatClassOcc, knownSymbolClassOcc, knownCharClassOcc :: KnownOcc
+knownNatClassOcc    = mkTcOcc "KnownNat"
+knownSymbolClassOcc = mkTcOcc "KnownSymbol"
+knownCharClassOcc   = mkTcOcc "KnownChar"
+
 returnIOIdOcc, bindIOIdOcc, thenIOIdOcc,
   printIdOcc, ioTyConOcc, ioDataConOcc :: KnownOcc
 returnIOIdOcc = mkVarOcc "returnIO"
