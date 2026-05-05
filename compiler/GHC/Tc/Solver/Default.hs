@@ -40,9 +40,10 @@ import GHC.Types.Unique.Set
 import GHC.Types.Id
 
 import GHC.Builtin
+import GHC.Builtin.KnownOccs ( emptyExceptionContextIdOcc )
 import GHC.Builtin.KnownKeys( unsatisfiableIdKey
                             , isStringClassKey
-                            , emptyExceptionContextName )
+                            )
 import GHC.Builtin.Modules ( gHC_INTERNAL_TYPEERROR )
 import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Ids ( unboxedUnitExpr )
@@ -449,7 +450,7 @@ defaultExceptionContext ct
   | ClassPred cls tys <- classifyPredType (ctPred ct)
   , isJust (isExceptionContextPred cls tys)
   = do { warnTcS $ TcRnDefaultedExceptionContext (ctLoc ct)
-       ; empty_ec_id <- wrapTcS (TcM.tcLookupId emptyExceptionContextName)
+       ; empty_ec_id <- wrapTcS (TcM.tcLookupKnownOccId emptyExceptionContextIdOcc)
        ; let ev = ctEvidence ct
              ev_tm = EvExpr (evWrapIPE (ctEvPred ev) (Var empty_ec_id))
        ; setDictIfWanted ev EvCanonical ev_tm

@@ -336,6 +336,10 @@ emptyCallStackIdOcc = mkVarOcc "emptyCallStack"
 pushCallStackIdOcc  = mkVarOcc "pushCallStack"
 srcLocDataConOcc    = mkDataOcc "SrcLoc"
 
+-- ExceptionContext
+emptyExceptionContextIdOcc :: KnownOcc
+emptyExceptionContextIdOcc = mkVarOcc "emptyExceptionContext"
+
 {- *********************************************************************
 *                                                                      *
         Known-occ RdrNames

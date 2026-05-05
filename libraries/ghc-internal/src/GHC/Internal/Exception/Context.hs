@@ -6,6 +6,7 @@
 {-# LANGUAGE GADTs #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Exception.Context

@@ -220,7 +220,10 @@ module GHC.Essentials
     , GHCiSandboxIO(ghciStepIO)
 
     -- Callstacks
-    , emptyCallStack, pushCallStack, SrcLoc(..)
+    , CallStack, emptyCallStack, pushCallStack, SrcLoc(..)
+
+    -- Exception context
+    , ExceptionContext, emptyExceptionContext
 
     , toAnnotationWrapper
     ) where
@@ -280,3 +283,4 @@ import GHC.Internal.TopHandler
 import GHC.Internal.GHCi
 import GHC.Internal.Desugar (toAnnotationWrapper)
 import GHC.Internal.Stack.Types
+import GHC.Internal.Exception.Context

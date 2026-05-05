@@ -253,6 +253,12 @@ knownKeyTable
     -- Implicit Params
     , (mkTcOcc "IP", ipClassKey)
 
+    -- Callstacks
+    , (mkVarOcc "CallStack", callStackTyConKey)
+
+    -- Exception context
+    , (mkVarOcc "ExceptionContext", exceptionContextTyConKey)
+
     -- Base strings Strings
     , (mkVarOcc "unpackCString#",     unpackCStringIdKey)
     , (mkVarOcc "unpackCStringUtf8#", unpackCStringUtf8IdKey)
@@ -356,13 +362,6 @@ basicKnownKeyNames
 
         -- Type-level naturals
         knownNatClassName, knownSymbolClassName, knownCharClassName,
-
-        -- ExceptionContext
-        exceptionContextTyConName,
-        emptyExceptionContextName,
-
-        -- Call Stacks
-        callStackTyConName,
 
         -- Plugins
         pluginTyConName
@@ -500,18 +499,6 @@ knownSymbolClassName :: Name
 knownSymbolClassName  = clsQual gHC_INTERNAL_TYPELITS (fsLit "KnownSymbol") knownSymbolClassKey
 knownCharClassName :: Name
 knownCharClassName  = clsQual gHC_INTERNAL_TYPELITS (fsLit "KnownChar") knownCharClassKey
-
--- ExceptionContext
-exceptionContextTyConName, emptyExceptionContextName :: Name
-exceptionContextTyConName =
-    tcQual gHC_INTERNAL_EXCEPTION_CONTEXT (fsLit "ExceptionContext") exceptionContextTyConKey
-emptyExceptionContextName
-  = varQual gHC_INTERNAL_EXCEPTION_CONTEXT (fsLit "emptyExceptionContext") emptyExceptionContextKey
-
--- Source Locations
-callStackTyConName :: Name
-callStackTyConName
-  = tcQual gHC_INTERNAL_STACK_TYPES  (fsLit "CallStack") callStackTyConKey
 
 -- plugins
 pLUGINS :: Module
@@ -1387,9 +1374,6 @@ fromStaticPtrClassOpKey = mkPreludeMiscIdUnique 560
 
 makeStaticKey :: KnownKey
 makeStaticKey = mkPreludeMiscIdUnique 561
-
-emptyExceptionContextKey :: KnownKey
-emptyExceptionContextKey = mkPreludeMiscIdUnique 562
 
 -- Unsafe coercion proofs
 unsafeEqualityProofIdKey, unsafeCoercePrimIdKey :: KnownKey

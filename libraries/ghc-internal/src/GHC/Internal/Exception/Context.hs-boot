@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
 
 module GHC.Internal.Exception.Context where
 

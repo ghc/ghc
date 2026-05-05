@@ -136,7 +136,7 @@ import qualified GHC.Tc.Utils.Monad    as TcM
 import qualified GHC.Tc.Utils.TcMType  as TcM
 import qualified GHC.Tc.Instance.Class as TcM( matchGlobalInst, ClsInstResult(..) )
 import qualified GHC.Tc.Utils.Env      as TcM
-       ( tcGetDefaultTys, tcLookupKnownKeyId, tcLookupTyCon )
+       ( tcGetDefaultTys, tcLookupKnownKeyId, tcLookupKnownKeyTyCon )
 import GHC.Tc.Zonk.Monad ( ZonkM )
 import qualified GHC.Tc.Zonk.TcType  as TcM
 
@@ -159,7 +159,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Constraint
 
-import GHC.Builtin.KnownKeys ( callStackTyConName, exceptionContextTyConName )
+import GHC.Builtin.KnownKeys ( callStackTyConKey, exceptionContextTyConKey )
 
 import GHC.Core.Make
 import GHC.Core.Type
@@ -569,8 +569,8 @@ updSolvedDicts :: InstanceWhat -> DictCt -> TcS ()
 updSolvedDicts what dict_ct@(DictCt { di_cls = cls, di_tys = tys, di_ev = ev })
   | isWanted ev
   , instanceReturnsDictCon what
-  = do { is_callstack    <- is_tyConTy isCallStackTy        callStackTyConName
-       ; is_exceptionCtx <- is_tyConTy isExceptionContextTy exceptionContextTyConName
+  = do { is_callstack    <- is_tyConTy isCallStackTy        callStackTyConKey
+       ; is_exceptionCtx <- is_tyConTy isExceptionContextTy exceptionContextTyConKey
        ; let contains_callstack_or_exceptionCtx =
                mightMentionIP
                  (const True)
@@ -593,9 +593,9 @@ updSolvedDicts what dict_ct@(DictCt { di_cls = cls, di_tys = tys, di_ev = ev })
     -- per Note [Using typesAreApart when calling mightMentionIP].
     --
     -- See Note [Using isCallStackTy in mightMentionIP].
-    is_tyConTy :: (Type -> Bool) -> Name -> TcS (Type -> Bool)
-    is_tyConTy is_eq tc_name
-      = do { (mb_tc, _) <- wrapTcS $ TcM.tryTc $ TcM.tcLookupTyCon tc_name
+    is_tyConTy :: (Type -> Bool) -> KnownKey -> TcS (Type -> Bool)
+    is_tyConTy is_eq tc_key
+      = do { (mb_tc, _) <- wrapTcS $ TcM.tryTc $ TcM.tcLookupKnownKeyTyCon tc_key
            ; case mb_tc of
               Just tc ->
                 return $ \ ty -> not (typesAreApart ty (mkTyConTy tc))

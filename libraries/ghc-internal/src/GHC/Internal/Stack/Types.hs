@@ -9,6 +9,7 @@
 -- we hide this module from haddock to enforce GHC.Internal.Stack as the main
 -- access point.
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Stack.Types
