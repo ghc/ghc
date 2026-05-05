@@ -23,7 +23,7 @@ import qualified GHC.Internal.Bignum.Backend.Native   as Native
 import qualified GHC.Internal.Bignum.Backend.Selected as Other
 
 #if defined(BIGNUM_NATIVE)
-#error You can't validate Native backend against itself. Choose another backend (e.g. gmp, ffi)
+#error You can't validate Native backend against itself. Choose another backend (e.g. gmp)
 #endif
 
 default ()

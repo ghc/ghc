@@ -33,20 +33,9 @@ supported:
   integer-simple package. The major difference is that it uses a much more
   efficient memory representation (integer-simple was based on Haskell lists)
   and that it allows a lot more code sharing between the different backends than
-  was previously possible between integer-gmp and integer-simple.
-
-* FFI: an implementation that relies on external FFI calls. This backend can be
-  useful:
-
-  * for alternative GHC backends that target non native platforms (JavaScript,
-    JVM, etc.): the backend can dynamically match and rewrite the FFI calls in
-    order to call the appropriate platform specific BigNum API.
-    
-  * to test new native backends: just tweak the ghc-bignum build to link with
-    the native library providing the implementation of the FFI calls
-
-  Note that the FFI backend module contains the description of the interface
-  that needs to be implemented by every backend.
+  was previously possible between integer-gmp and integer-simple. The Native
+  backend module contains the description of the interface that needs to be
+  implemented by every backend.
 
 This package has been designed to make the implementation of new backends
 relatively easy. Previously you had to implement the whole Integer/Natural

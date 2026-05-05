@@ -302,7 +302,7 @@ optDescrs =
     , Option [] ["skip-depends"] (NoArg readSkipDepends)
       "Skip rebuilding dependency information."
     , Option [] ["bignum"] (OptArg readBignum "BACKEND")
-      "Select bignum backend: native, gmp (default), check-gmp (gmp compared to native), ffi."
+      "Select bignum backend: native, gmp (default), check-gmp (gmp compared to native)."
     , Option [] ["progress-info"] (ReqArg readProgressInfo "STYLE")
       "Progress info style (None, Brief, Normal or Unicorn)."
     , Option [] ["docs"] (ReqArg readDocsArg "TARGET")

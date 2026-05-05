@@ -24,7 +24,7 @@ data Flavour = Flavour {
     extraArgs :: Args,
     -- | Build these packages.
     packages :: Stage -> Action [Package],
-    -- | Bignum backend: 'native', 'gmp', 'ffi', etc.
+    -- | Bignum backend: 'native', 'gmp', etc.
     bignumBackend :: String,
     -- | Check selected bignum backend against native backend
     bignumCheck :: Bool,

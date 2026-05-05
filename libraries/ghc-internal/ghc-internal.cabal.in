@@ -56,11 +56,6 @@ Flag bignum-native
     Manual: True
     Default: False
 
-Flag bignum-ffi
-    Description: Enable FFI bignum backend
-    Manual: True
-    Default: False
-
 Flag bignum-gmp
     Description: Enable GMP bignum backend
     Manual: True
@@ -382,13 +377,11 @@ Library
     -- Bignum configuration
     ----------------------------------------
     -- check that at least one backend is enabled
-    if !flag(bignum-native) && !flag(bignum-gmp) && !flag(bignum-ffi)
+    if !flag(bignum-native) && !flag(bignum-gmp)
       buildable: False
 
     -- check that at most one flag is set
-    if flag(bignum-native) && (flag(bignum-gmp) || flag(bignum-ffi))
-      buildable: False
-    if flag(bignum-gmp) && flag(bignum-ffi)
+    if flag(bignum-native) && flag(bignum-gmp)
       buildable: False
 
     if flag(bignum-gmp)
@@ -397,11 +390,6 @@ Library
            GHC.Internal.Bignum.Backend.GMP
         c-sources:
            cbits/gmp_wrappers.c
-
-    if flag(bignum-ffi)
-        cpp-options: -DBIGNUM_FFI
-        other-modules:
-           GHC.Internal.Bignum.Backend.FFI
 
     if flag(bignum-native)
         cpp-options: -DBIGNUM_NATIVE

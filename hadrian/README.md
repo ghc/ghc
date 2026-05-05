@@ -101,7 +101,7 @@ Stage2 GHC.
 
 * `--skip-depends`: skips rebuilding Haskell module dependency files.
 
-* `--bignum={native,gmp,check-gmp,ffi}`: **Deprecated.** Use the `+native_bignum` flavour
+* `--bignum={native,gmp,check-gmp}`: **Deprecated.** Use the `+native_bignum` flavour
   transformer instead (e.g. `--flavour=default+native_bignum`). When building for the
   JavaScript target, the native bignum backend is enabled automatically.
 

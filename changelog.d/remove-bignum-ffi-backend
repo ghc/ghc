@@ -1,0 +1,12 @@
+section: packaging
+synopsis: Remove the FFI backend of ghc-bignum
+issues: #27305
+mrs: !16106
+
+description: {
+    The FFI backend of ghc-bignum (now part of ghc-internal) has been removed.
+    It had no known users and was easy to recreate by relinking ghc-internal
+    with a custom backend implementation. As a result, the ``bignum-ffi``
+    cabal flag has been dropped, and selecting the ``ffi`` backend via
+    Hadrian's ``--bignum`` option is no longer supported.
+}
