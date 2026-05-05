@@ -1,0 +1,10 @@
+section: compiler
+synopsis: Support dynamic trace flags in RTS
+issues: #27186
+mrs: !15936
+
+description: {
+    The RTS API now exposes the `RUNTIME_TRACE_FLAG` type and
+    the `getTraceFlags` and `setTraceFlags` functions that can be used to
+    change the trace flags at runtime.
+}
