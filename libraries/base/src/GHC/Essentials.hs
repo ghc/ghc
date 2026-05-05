@@ -157,6 +157,9 @@ module GHC.Essentials
     , CS.unpackAppendCStringUtf8#, CS.cstringLength#
     , eqString, inline
 
+    -- JS primitives
+    , unsafeUnpackJSStringUtf8##
+
     , UnsafeEquality( UnsafeRefl ), unsafeEqualityProof
 
     -- Typeable and type representations
@@ -294,3 +297,4 @@ import GHC.Internal.GHCi
 import GHC.Internal.Desugar (toAnnotationWrapper)
 import GHC.Internal.Stack.Types
 import GHC.Internal.Exception.Context
+import GHC.Internal.JS.Prim (unsafeUnpackJSStringUtf8##)

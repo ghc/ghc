@@ -111,7 +111,7 @@ genApp ctx i args
     -- We detect if the Id is unsafeUnpackJSStringUtf8## applied to a string literal,
     -- if so then we convert the unsafeUnpack to a call to h$decode.
     | [StgVarArg v] <- args
-    , idName i == unsafeUnpackJSStringUtf8ShShName
+    , i `hasKnownKey` unsafeUnpackJSStringUtf8ShShKey
     -- See: https://gitlab.haskell.org/ghc/ghc/-/merge_requests/10588
     -- Comment by Josh Meredith  <josh.meredith@iohk.io>
     -- `typex_expr` can throw an error for certain bindings so it's important
@@ -122,7 +122,7 @@ genApp ctx i args
     -- Test case T23479
     | [StgLitArg (LitString bs)] <- args
     , Just d <- decodeModifiedUTF8 bs
-    , idName i == unsafeUnpackJSStringUtf8ShShName
+    , i `hasKnownKey` unsafeUnpackJSStringUtf8ShShKey
     , [top] <- concatMap typex_expr (ctxTarget ctx)
     = return . (,ExprInline) $ top |= toJExpr d
 

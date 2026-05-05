@@ -270,6 +270,9 @@ knownKeyTable
     , (mkVarOcc "unpackCString#",     unpackCStringIdKey)
     , (mkVarOcc "unpackCStringUtf8#", unpackCStringUtf8IdKey)
 
+    -- JS primitives
+    , (mkVarOcc "unsafeUnpackJSStringUtf8##", unsafeUnpackJSStringUtf8ShShKey)
+
     -- Known-key names that have BuiltinRules in ConstantFold
     , (mkVarOcc "unpackFoldrCString#",      unpackCStringFoldrIdKey)
     , (mkVarOcc "unpackFoldrCStringUtf8#",  unpackCStringFoldrUtf8IdKey)
@@ -372,8 +375,6 @@ basicKnownKeyNames
 
         -- Unsafe coercion proofs
         , unsafeCoercePrimName
-
-        , unsafeUnpackJSStringUtf8ShShName
     ]
 
 
@@ -473,8 +474,6 @@ constPtrConName :: Name
 constPtrConName =
     tcQual gHC_INTERNAL_FOREIGN_C_CONSTPTR (fsLit "ConstPtr") constPtrTyConKey
 
-unsafeUnpackJSStringUtf8ShShName :: Name
-unsafeUnpackJSStringUtf8ShShName = varQual gHC_INTERNAL_JS_PRIM (fsLit "unsafeUnpackJSStringUtf8##") unsafeUnpackJSStringUtf8ShShKey
 
 {-
 ************************************************************************

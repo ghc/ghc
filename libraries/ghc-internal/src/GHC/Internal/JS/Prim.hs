@@ -6,6 +6,8 @@
 {-# LANGUAGE UnliftedFFITypes #-}
 {-# LANGUAGE UnboxedTuples #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+
 module GHC.Internal.JS.Prim ( JSVal(..), JSVal#
                    , JSException(..)
                    , WouldBlockException(..)
