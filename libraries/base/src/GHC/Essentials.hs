@@ -220,7 +220,7 @@ module GHC.Essentials
     , GHCiSandboxIO(ghciStepIO)
 
     -- Callstacks
-    , pushCallStack, SrcLoc(..)
+    , emptyCallStack, pushCallStack, SrcLoc(..)
     ) where
 
 import GHC.Internal.Base hiding( foldr )

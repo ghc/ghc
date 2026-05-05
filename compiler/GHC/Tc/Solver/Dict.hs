@@ -45,8 +45,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.SrcLoc
 
-import GHC.Builtin.KnownOccs( pushCallStackIdOcc, srcLocDataConOcc )
-import GHC.Builtin.KnownKeys( emptyCallStackName )
+import GHC.Builtin.KnownOccs( emptyCallStackIdOcc, pushCallStackIdOcc, srcLocDataConOcc )
 
 import GHC.Utils.Monad ( concatMapM )
 import GHC.Utils.Outputable
@@ -187,7 +186,7 @@ solveCallStack ev ev_cs
 evCallStack :: TcPredType -> EvCallStack -> TcS EvExpr
 -- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
 evCallStack _ EvCsEmpty
-  = Var <$> wrapTcS (tcLookupId emptyCallStackName)
+  = Var <$> wrapTcS (tcLookupKnownOccId emptyCallStackIdOcc)
 evCallStack pred (EvCsPushCall fs loc tm)
   = do { df <- getDynFlags
        ; m  <- getModule
