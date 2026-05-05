@@ -1,0 +1,15 @@
+section: rts
+synopsis: Fix design of TSO blocking info, fixing a use-after-free bug
+issues: #26716 #26717
+mrs: !15519
+description: {
+  Experimental work on ASAN support for GHC (MR !15168) revealed a
+  use-after-free bug when using the combination of the new poll I/O
+  manager with the compacting GC. The ultimate cause is that a TSO's
+  `block_info` (used by I/O managers and many other parts of the RTS)
+  is sometimes a GC pointer and sometimes not, but without a consistent
+  and easy-to-follow rule for when this is the case. The solution has
+  been to clean up and enforce that the TSO's `why_blocked` enumeration
+  is a proper tag for the `block_info`, and to use an encoding that
+  determines precisely when the `block_info` is a GC pointer or not.
+}
