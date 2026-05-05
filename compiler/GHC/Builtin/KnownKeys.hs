@@ -365,7 +365,6 @@ basicKnownKeyNames
         ptrTyConName, funPtrTyConName, constPtrConName,
         int8TyConName, int16TyConName, int32TyConName, int64TyConName,
         word8TyConName, word16TyConName, word32TyConName, word64TyConName,
-        jsvalTyConName,
 
         -- Type-level naturals
         knownNatClassName, knownSymbolClassName, knownCharClassName,
@@ -484,9 +483,6 @@ frontendPluginTyConName = tcQual pLUGINS (fsLit "FrontendPlugin") frontendPlugin
 constPtrConName :: Name
 constPtrConName =
     tcQual gHC_INTERNAL_FOREIGN_C_CONSTPTR (fsLit "ConstPtr") constPtrTyConKey
-
-jsvalTyConName :: Name
-jsvalTyConName = tcQual gHC_INTERNAL_WASM_PRIM_TYPES (fsLit "JSVal") jsvalTyConKey
 
 unsafeUnpackJSStringUtf8ShShName :: Name
 unsafeUnpackJSStringUtf8ShShName = varQual gHC_INTERNAL_JS_PRIM (fsLit "unsafeUnpackJSStringUtf8##") unsafeUnpackJSStringUtf8ShShKey
