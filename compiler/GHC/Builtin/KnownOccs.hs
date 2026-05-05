@@ -204,6 +204,11 @@ fromStaticPtrClassOpOcc, newStablePtrIdOcc :: KnownOcc
 fromStaticPtrClassOpOcc = mkVarOcc "fromStaticPtr"
 newStablePtrIdOcc       = mkVarOcc "newStablePtr"
 
+staticPtrTyConOcc, staticPtrDataConOcc, staticPtrInfoDataConOcc :: KnownOcc
+staticPtrTyConOcc        = mkTcOcc   "StaticPtr"
+staticPtrDataConOcc      = mkDataOcc "StaticPtr"
+staticPtrInfoDataConOcc  = mkDataOcc "StaticPtrInfo"
+
 returnIOIdOcc, bindIOIdOcc, thenIOIdOcc,
   printIdOcc, ioTyConOcc, ioDataConOcc :: KnownOcc
 returnIOIdOcc = mkVarOcc "returnIO"

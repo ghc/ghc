@@ -135,6 +135,7 @@ module GHC.Essentials
 
     -- Static pointers
     , IsStatic( fromStaticPtr ), makeStatic
+    , StaticPtr( StaticPtr ), StaticPtrInfo( StaticPtrInfo )
 
     -- Stable pointers
     , StablePtr, newStablePtr
@@ -267,7 +268,7 @@ import GHC.Internal.Word( Word8(W8#), Word16(W16#), Word32(W32#), Word64(W64#) )
 
 import GHC.Internal.Unsafe.Coerce( UnsafeEquality(..), unsafeEqualityProof )
 
-import GHC.Internal.StaticPtr( IsStatic(..) )
+import GHC.Internal.StaticPtr( IsStatic(..), StaticPtr(..), StaticPtrInfo(..) )
 import GHC.Internal.StaticPtr.Internal( makeStatic )
 
 import GHC.Internal.Stable( StablePtr, newStablePtr )

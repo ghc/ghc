@@ -374,10 +374,6 @@ basicKnownKeyNames
         pluginTyConName
         , frontendPluginTyConName
 
-        -- StaticPtr
-        , staticPtrTyConName
-        , staticPtrDataConName, staticPtrInfoDataConName
-
         -- Unsafe coercion proofs
         , unsafeCoercePrimName
 
@@ -484,22 +480,6 @@ pluginTyConName :: Name
 pluginTyConName = tcQual pLUGINS (fsLit "Plugin") pluginTyConKey
 frontendPluginTyConName :: Name
 frontendPluginTyConName = tcQual pLUGINS (fsLit "FrontendPlugin") frontendPluginTyConKey
-
-staticPtrInfoTyConName :: Name
-staticPtrInfoTyConName =
-    tcQual gHC_INTERNAL_STATICPTR (fsLit "StaticPtrInfo") staticPtrInfoTyConKey
-
-staticPtrInfoDataConName :: Name
-staticPtrInfoDataConName =
-    dcQual gHC_INTERNAL_STATICPTR (fsLit "StaticPtrInfo") staticPtrInfoDataConKey
-
-staticPtrTyConName :: Name
-staticPtrTyConName =
-    tcQual gHC_INTERNAL_STATICPTR (fsLit "StaticPtr") staticPtrTyConKey
-
-staticPtrDataConName :: Name
-staticPtrDataConName =
-    dcQual gHC_INTERNAL_STATICPTR (fsLit "StaticPtr") staticPtrDataConKey
 
 constPtrConName :: Name
 constPtrConName =
@@ -847,12 +827,6 @@ specTyConKey = mkPreludeTyConUnique 185
 
 smallArrayPrimTyConKey        = mkPreludeTyConUnique  187
 smallMutableArrayPrimTyConKey = mkPreludeTyConUnique  188
-
-staticPtrTyConKey  :: KnownKey
-staticPtrTyConKey  = mkPreludeTyConUnique 189
-
-staticPtrInfoTyConKey :: KnownKey
-staticPtrInfoTyConKey = mkPreludeTyConUnique 190
 
 callStackTyConKey :: KnownKey
 callStackTyConKey = mkPreludeTyConUnique 191

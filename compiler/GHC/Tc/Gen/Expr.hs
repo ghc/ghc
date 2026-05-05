@@ -629,7 +629,7 @@ tcExpr (HsStatic _ expr) res_ty
         --                    StaticPtr a -> p a
         ; fromStaticPtr <- newKnownOccMethod StaticOrigin
                                     fromStaticPtrClassOpOcc [p_ty]
-        ; static_ptr_ty_con <- tcLookupTyCon staticPtrTyConName
+        ; static_ptr_ty_con <- tcLookupKnownOccTyCon staticPtrTyConOcc
         ; let wrap = mkWpEvVarApps [typeable_ev] <.> mkWpTyApps [expr_ty]
               static_expr_ty = mkTyConApp static_ptr_ty_con [expr_ty]
         ; return $ mkHsWrapCo co $
