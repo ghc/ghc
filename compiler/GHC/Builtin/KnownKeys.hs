@@ -366,7 +366,6 @@ basicKnownKeyNames
         constraintKindRepName,
         -- FFI primitive types that are not wired-in.
         ptrTyConName, funPtrTyConName, constPtrConName,
-        int8TyConName, int16TyConName, int32TyConName, int64TyConName,
         word8TyConName, word16TyConName, word32TyConName, word64TyConName,
 
         -- Plugins
@@ -442,13 +441,6 @@ unsafeCoercePrimName    = varQual gHC_INTERNAL_UNSAFE_COERCE (fsLit "unsafeCoerc
 
 genericClassKeys :: [KnownKey]
 genericClassKeys = [genClassKey, gen1ClassKey]
-
--- Int, Word, and Addr things
-int8TyConName, int16TyConName, int32TyConName, int64TyConName :: Name
-int8TyConName     = tcQual gHC_INTERNAL_INT  (fsLit "Int8")  int8TyConKey
-int16TyConName    = tcQual gHC_INTERNAL_INT  (fsLit "Int16") int16TyConKey
-int32TyConName    = tcQual gHC_INTERNAL_INT  (fsLit "Int32") int32TyConKey
-int64TyConName    = tcQual gHC_INTERNAL_INT  (fsLit "Int64") int64TyConKey
 
 -- Word module
 word8TyConName, word16TyConName, word32TyConName, word64TyConName :: Name

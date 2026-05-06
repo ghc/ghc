@@ -60,7 +60,6 @@ import GHC.Driver.DynFlags
 
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Unique (sameUnique)
 
 import GHC.Data.FastString
 import qualified GHC.Data.List.NonEmpty as NEL
@@ -310,29 +309,29 @@ warnAboutOverflowedLiterals dflags lit
  , Just (i, tc) <- lit
  = if
     -- These only show up via the 'HsOverLit' route
-    | sameUnique tc intTyConName        -> check i tc minInt         maxInt
-    | sameUnique tc wordTyConName       -> check i tc minWord        maxWord
-    | sameUnique tc int8TyConName       -> check i tc (min' @Int8)   (max' @Int8)
-    | sameUnique tc int16TyConName      -> check i tc (min' @Int16)  (max' @Int16)
-    | sameUnique tc int32TyConName      -> check i tc (min' @Int32)  (max' @Int32)
-    | sameUnique tc int64TyConName      -> check i tc (min' @Int64)  (max' @Int64)
-    | sameUnique tc word8TyConName      -> check i tc (min' @Word8)  (max' @Word8)
-    | sameUnique tc word16TyConName     -> check i tc (min' @Word16) (max' @Word16)
-    | sameUnique tc word32TyConName     -> check i tc (min' @Word32) (max' @Word32)
-    | sameUnique tc word64TyConName     -> check i tc (min' @Word64) (max' @Word64)
-    | sameUnique tc naturalTyConName    -> checkPositive i tc
+    | tc `hasKnownKey` intTyConKey        -> check i tc minInt         maxInt
+    | tc `hasKnownKey` wordTyConKey       -> check i tc minWord        maxWord
+    | tc `hasKnownKey` int8TyConKey       -> check i tc (min' @Int8)   (max' @Int8)
+    | tc `hasKnownKey` int16TyConKey      -> check i tc (min' @Int16)  (max' @Int16)
+    | tc `hasKnownKey` int32TyConKey      -> check i tc (min' @Int32)  (max' @Int32)
+    | tc `hasKnownKey` int64TyConKey      -> check i tc (min' @Int64)  (max' @Int64)
+    | tc `hasKnownKey` word8TyConKey      -> check i tc (min' @Word8)  (max' @Word8)
+    | tc `hasKnownKey` word16TyConKey     -> check i tc (min' @Word16) (max' @Word16)
+    | tc `hasKnownKey` word32TyConKey     -> check i tc (min' @Word32) (max' @Word32)
+    | tc `hasKnownKey` word64TyConKey     -> check i tc (min' @Word64) (max' @Word64)
+    | tc `hasKnownKey` naturalTyConKey    -> checkPositive i tc
 
     -- These only show up via the 'HsLit' route
-    | sameUnique tc intPrimTyConName    -> check i tc minInt         maxInt
-    | sameUnique tc wordPrimTyConName   -> check i tc minWord        maxWord
-    | sameUnique tc int8PrimTyConName   -> check i tc (min' @Int8)   (max' @Int8)
-    | sameUnique tc int16PrimTyConName  -> check i tc (min' @Int16)  (max' @Int16)
-    | sameUnique tc int32PrimTyConName  -> check i tc (min' @Int32)  (max' @Int32)
-    | sameUnique tc int64PrimTyConName  -> check i tc (min' @Int64)  (max' @Int64)
-    | sameUnique tc word8PrimTyConName  -> check i tc (min' @Word8)  (max' @Word8)
-    | sameUnique tc word16PrimTyConName -> check i tc (min' @Word16) (max' @Word16)
-    | sameUnique tc word32PrimTyConName -> check i tc (min' @Word32) (max' @Word32)
-    | sameUnique tc word64PrimTyConName -> check i tc (min' @Word64) (max' @Word64)
+    | tc `hasKnownKey` intPrimTyConKey    -> check i tc minInt         maxInt
+    | tc `hasKnownKey` wordPrimTyConKey   -> check i tc minWord        maxWord
+    | tc `hasKnownKey` int8PrimTyConKey   -> check i tc (min' @Int8)   (max' @Int8)
+    | tc `hasKnownKey` int16PrimTyConKey  -> check i tc (min' @Int16)  (max' @Int16)
+    | tc `hasKnownKey` int32PrimTyConKey  -> check i tc (min' @Int32)  (max' @Int32)
+    | tc `hasKnownKey` int64PrimTyConKey  -> check i tc (min' @Int64)  (max' @Int64)
+    | tc `hasKnownKey` word8PrimTyConKey  -> check i tc (min' @Word8)  (max' @Word8)
+    | tc `hasKnownKey` word16PrimTyConKey -> check i tc (min' @Word16) (max' @Word16)
+    | tc `hasKnownKey` word32PrimTyConKey -> check i tc (min' @Word32) (max' @Word32)
+    | tc `hasKnownKey` word64PrimTyConKey -> check i tc (min' @Word64) (max' @Word64)
 
     | otherwise -> return ()
 
