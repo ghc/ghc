@@ -5,6 +5,12 @@
 {-# LANGUAGE UnboxedTuples #-}
 #endif
 
+#if __GLASGOW_HASKELL__ > 1000
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+  -- 'Plugin' and 'FrontendPlugin' are known-key names
+  --  (they have a fixed known unique) (from GHC 10.2)
+  -- See Note [Overview of known entities] in GHC.Builtin
+#endif
 
 -- | Definitions for writing /plugins/ for GHC. Plugins can hook into
 -- several areas of the compiler. See the 'Plugin' type. These plugins

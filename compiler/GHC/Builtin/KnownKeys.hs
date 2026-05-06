@@ -163,6 +163,8 @@ knownKeyRdrName key = knownOccRdrName (knownKeyOccName key)
 This section tells what the compiler knows about the association of
 names with uniques.  These ones are the *non* wired-in ones.  The
 wired in ones are defined in GHC.Builtin.Types etc.
+
+See Note [Overview of known entities] in GHC.Builtin
 -}
 
 knownKeyTable :: [(OccName, KnownKey)]
@@ -269,6 +271,10 @@ knownKeyTable
     , (mkDataOcc ":$$:",      typeErrorVAppendDataConKey)
     , (mkDataOcc "ShowType",  typeErrorShowTypeDataConKey)
 
+    -- Plugins
+    , (mkTcOcc "Plugin", pluginTyConKey)
+    , (mkTcOcc "FrontendPlugin", frontendPluginTyConKey)
+
     -- Base strings Strings
     , (mkVarOcc "unpackCString#",     unpackCStringIdKey)
     , (mkVarOcc "unpackCStringUtf8#", unpackCStringUtf8IdKey)
@@ -368,12 +374,8 @@ basicKnownKeyNames
         starArrStarArrStarKindRepName,
         constraintKindRepName,
 
-        -- Plugins
-        pluginTyConName
-        , frontendPluginTyConName
-
         -- Unsafe coercion proofs
-        , unsafeCoercePrimName
+        unsafeCoercePrimName
     ]
 
 
@@ -441,14 +443,6 @@ unsafeCoercePrimName    = varQual gHC_INTERNAL_UNSAFE_COERCE (fsLit "unsafeCoerc
 
 genericClassKeys :: [KnownKey]
 genericClassKeys = [genClassKey, gen1ClassKey]
-
--- plugins
-pLUGINS :: Module
-pLUGINS = mkThisGhcModule (fsLit "GHC.Driver.Plugins")
-pluginTyConName :: Name
-pluginTyConName = tcQual pLUGINS (fsLit "Plugin") pluginTyConKey
-frontendPluginTyConName :: Name
-frontendPluginTyConName = tcQual pLUGINS (fsLit "FrontendPlugin") frontendPluginTyConKey
 
 {-
 ************************************************************************

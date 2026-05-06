@@ -37,7 +37,7 @@ import GHC.Rename.Names ( gresFromAvails )
 
 import GHC.Tc.Utils.Monad      ( initTcInteractive, initIfaceTcRn )
 import GHC.Iface.Load          ( loadPluginInterface, cannotFindModule )
-import GHC.Builtin.KnownKeys ( pluginTyConName, frontendPluginTyConName )
+import GHC.Builtin.KnownKeys ( pluginTyConKey, frontendPluginTyConKey )
 
 import GHC.Driver.Env
 import GHCi.RemoteTypes     ( HValue )
@@ -47,7 +47,7 @@ import GHC.Core.TyCon       ( TyCon(tyConName) )
 
 
 import GHC.Types.SrcLoc        ( noSrcSpan )
-import GHC.Types.Name    ( Name, nameModule, nameModule_maybe )
+import GHC.Types.Name    ( Name, nameModule, nameModule_maybe, KnownKey, mkKnownKeyName, mkTcOcc )
 import GHC.Types.Id      ( idType )
 import GHC.Types.PkgQual
 import GHC.Types.TyThing
@@ -75,6 +75,7 @@ import GHC.Linker.Types
 import Data.List (unzip4)
 import GHC.Iface.Errors.Ppr
 import GHC.Driver.Monad
+import GHC.Builtin.Modules
 
 {- Note [Timing of plugin initialization]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -170,12 +171,13 @@ loadPlugins hsc_env
       where
         options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
                             , opt_mod_nm == mod_nm ]
+    pluginTyConName = mkKnownKeyGhcPluginsName (mkTcOcc "Plugin") pluginTyConKey
     loadPlugin = loadPlugin' (mkVarOccFS (fsLit "plugin")) pluginTyConName hsc_env
-
 
 loadFrontendPlugin :: HscEnv -> ModuleName -> IO (FrontendPlugin, [LinkableUsage], PkgsLoaded)
 loadFrontendPlugin hsc_env mod_name = do
     checkExternalInterpreter hsc_env
+    let frontendPluginTyConName = mkKnownKeyGhcPluginsName (mkTcOcc "FrontendPlugin") frontendPluginTyConKey
     (plugin, _iface, links, pkgs)
       <- loadPlugin' (mkVarOccFS (fsLit "frontendPlugin")) frontendPluginTyConName
            hsc_env mod_name
@@ -187,6 +189,10 @@ checkExternalInterpreter hsc_env = case interpInstance <$> hsc_interp hsc_env of
   Just (ExternalInterp {})
     -> throwIO (InstallationError "Plugins require -fno-external-interpreter")
   _ -> pure ()
+
+mkKnownKeyGhcPluginsName :: OccName -> KnownKey -> Name
+mkKnownKeyGhcPluginsName occ kk =
+  mkKnownKeyName kk (mkThisGhcModule (fsLit "GHC.Driver.Plugins")) occ noSrcSpan
 
 loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, ModIface, [LinkableUsage], PkgsLoaded)
 loadPlugin' occ_name plugin_name hsc_env mod_name
