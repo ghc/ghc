@@ -18,7 +18,7 @@ module GHC.Tc.Utils.Concrete
 
 import GHC.Prelude
 
-import GHC.Builtin.KnownKeys       ( unsafeCoercePrimName )
+import GHC.Builtin.KnownKeys       ( unsafeCoercePrimIdKey )
 import GHC.Builtin.WiredIn.Types
 
 import GHC.Core.Coercion
@@ -45,6 +45,7 @@ import GHC.Utils.Outputable
 import GHC.Data.FastString     ( FastString, fsLit )
 
 import Control.Monad      ( void )
+import GHC.Types.Name (hasKnownKey)
 
 
 {- Note [Concrete overview]
@@ -857,7 +858,7 @@ idConcreteTvs id
   -- in the correct information in the desugarer).
   -- So, for the time being, we manually inspect the type of the original,
   -- unpatched Id to retrieve which of its outer forall-d tyvars should be concrete.
-  | idName id == unsafeCoercePrimName
+  | id `hasKnownKey`unsafeCoercePrimIdKey
   , (a_rep:_b_rep:a:_b:_, _) <- tcSplitForAllTyVars $ idType id
   -- NB: only check the argument representation, not the result representation.
   -- This is because the following is OK:
@@ -866,7 +867,7 @@ idConcreteTvs id
   --   unsafeCoerceWordRep = unsafeCoerce#
   = mkNameEnv
     [(tyVarName a_rep, ConcreteFRR $ FixedRuntimeRepOrigin (mkTyVarTy a)
-                                   $ FRRRepPolyId unsafeCoercePrimName RepPolyFunction
+                                   $ FRRRepPolyId (idName id) RepPolyFunction
                                    $ mkArgPos 1 Top)]
 
   | otherwise

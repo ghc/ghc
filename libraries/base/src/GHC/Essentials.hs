@@ -161,7 +161,7 @@ module GHC.Essentials
     , CS.unpackAppendCStringUtf8#, CS.cstringLength#
     , eqString, inline
 
-    , UnsafeEquality( UnsafeRefl ), unsafeEqualityProof
+    , UnsafeEquality( UnsafeRefl ), unsafeEqualityProof, unsafeCoerce#
 
     -- Typeable and type representations
     , SomeTypeRep( SomeTypeRep ), TR.Module( Module )

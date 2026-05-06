@@ -271,6 +271,9 @@ knownKeyTable
     , (mkDataOcc ":$$:",      typeErrorVAppendDataConKey)
     , (mkDataOcc "ShowType",  typeErrorShowTypeDataConKey)
 
+    -- Unsafe coercion proofs
+    , (mkVarOcc "unsafeCoerce#", unsafeCoercePrimIdKey)
+
     -- Plugins
     , (mkTcOcc "Plugin", pluginTyConKey)
     , (mkTcOcc "FrontendPlugin", frontendPluginTyConKey)
@@ -372,10 +375,7 @@ basicKnownKeyNames
         starKindRepName,
         starArrStarKindRepName,
         starArrStarArrStarKindRepName,
-        constraintKindRepName,
-
-        -- Unsafe coercion proofs
-        unsafeCoercePrimName
+        constraintKindRepName
     ]
 
 
@@ -436,10 +436,6 @@ constraintKindRepName  = varQual gHC_TYPES         (fsLit "krep$Constraint") con
 -- WithDict
 withDictClassName :: Name
 withDictClassName = clsQual gHC_MAGIC_DICT (fsLit "WithDict") withDictClassKey
-
--- Unsafe coercion proofs
-unsafeCoercePrimName:: Name
-unsafeCoercePrimName    = varQual gHC_INTERNAL_UNSAFE_COERCE (fsLit "unsafeCoerce#") unsafeCoercePrimIdKey
 
 genericClassKeys :: [KnownKey]
 genericClassKeys = [genClassKey, gen1ClassKey]

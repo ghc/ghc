@@ -86,7 +86,6 @@ import GHC.Types.SourceFile
 import GHC.Types.TypeEnv
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.Name.Env
 import GHC.Types.Name.Ppr
 import GHC.Types.HpcInfo
 
@@ -99,6 +98,7 @@ import Data.List (partition)
 import Data.IORef
 import GHC.Iface.Make (mkRecompUsageInfo)
 import GHC.Runtime.Interpreter (interpreterProfiled)
+import GHC.Types.Unique.FM
 
 {-
 ************************************************************************
@@ -684,13 +684,14 @@ patchMagicDefns pairs
   -- optimization: check whether we're in a magic module before looking
   -- at all the ids
   = do { this_mod <- getModule
+       ; magicDefnModules <- mkMagicDefnModules
        ; if this_mod `elemModuleSet` magicDefnModules
          then traverse patchMagicDefn pairs
          else return pairs }
 
 patchMagicDefn :: (Id, CoreExpr) -> DsM (Id, CoreExpr)
 patchMagicDefn orig_pair@(orig_id, orig_rhs)
-  | Just mk_magic_pair <- lookupNameEnv magicDefnsEnv (getName orig_id)
+  | Just mk_magic_pair <- lookupUFM magicDefnsEnv (getUnique orig_id)
   = do { magic_pair@(magic_id, _) <- mk_magic_pair orig_id orig_rhs
 
        -- Patching should not change the Name or the type of the Id
@@ -701,22 +702,25 @@ patchMagicDefn orig_pair@(orig_id, orig_rhs)
   | otherwise
   = return orig_pair
 
-magicDefns :: [(Name,    Id -> CoreExpr     -- old Id and RHS
+magicDefns :: [(KnownKey,    Id -> CoreExpr     -- old Id and RHS
                       -> DsM (Id, CoreExpr) -- new Id and RHS
                )]
-magicDefns = [ (unsafeCoercePrimName, mkUnsafeCoercePrimPair) ]
+magicDefns = [ (unsafeCoercePrimIdKey, mkUnsafeCoercePrimPair) ]
 
-magicDefnsEnv :: NameEnv (Id -> CoreExpr -> DsM (Id, CoreExpr))
-magicDefnsEnv = mkNameEnv magicDefns
+magicDefnsEnv :: UniqFM KnownKey (Id -> CoreExpr -> DsM (Id, CoreExpr))
+magicDefnsEnv = listToUFM magicDefns
 
-magicDefnModules :: ModuleSet
-magicDefnModules = mkModuleSet $ map (nameModule . getName . fst) magicDefns
+mkMagicDefnModules :: DsM ModuleSet
+mkMagicDefnModules = do
+  mods <- mapM (fmap nameModule . dsLookupKnownKeyName . fst) magicDefns
+  pure $ mkModuleSet mods
 
 mkUnsafeCoercePrimPair :: Id -> CoreExpr -> DsM (Id, CoreExpr)
 -- See Note [Wiring in unsafeCoerce#] for the defn we are creating here
 mkUnsafeCoercePrimPair _old_id old_expr
   = do { unsafe_equality_proof_id <- dsLookupKnownKeyId unsafeEqualityProofIdKey
        ; unsafe_equality_tc       <- dsLookupKnownKeyTyCon unsafeEqualityTyConKey
+       ; unsafeCoercePrimName     <- dsLookupKnownKeyName unsafeCoercePrimIdKey
 
        ; let [unsafe_refl_data_con] = tyConDataCons unsafe_equality_tc
 

@@ -2566,7 +2566,7 @@ tcGhciStmts stmts
       -- We use Any rather than a dummy type such as () because of
       -- the rules of unsafeCoerce#; see Unsafe/Coerce.hs for the details.
 
-      ; AnId unsafe_coerce_id <- tcLookupGlobal unsafeCoercePrimName
+      ; AnId unsafe_coerce_id <- tcLookupKnownKeyGlobal unsafeCoercePrimIdKey
            -- We use unsafeCoerce# here because of (U11) in
            -- Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
 
