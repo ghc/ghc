@@ -365,7 +365,7 @@ toCType t = case f False t of
            -- If the inner type is void-based, we collapse the pointer
            -- chain to just "void*". See Note [Collapsing void pointer chains].
            | Just (ptr, [t']) <- splitTyConApp_maybe t
-           , tyConName ptr `elem` [ptrTyConName, funPtrTyConName]
+           , tyConUnique ptr `elem` [ptrTyConKey, funPtrTyConKey]
               = case f True t' of
                 (mh, True, _) ->
                     (mh, True, text "void*")

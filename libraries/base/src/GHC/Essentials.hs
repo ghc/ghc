@@ -76,6 +76,7 @@ module GHC.Essentials
     , Void
 
     -- FFI
+    , Ptr, FunPtr
     , ConstPtr
 
     -- Show internals
@@ -302,6 +303,7 @@ import GHC.Internal.GHCi
 import GHC.Internal.Desugar (toAnnotationWrapper)
 import GHC.Internal.Stack.Types
 import GHC.Internal.Exception.Context
+import GHC.Internal.Ptr
 import GHC.Internal.Foreign.C.ConstPtr
 #if defined(javascript_HOST_ARCH)
 import GHC.Internal.JS.Prim (unsafeUnpackJSStringUtf8##)
