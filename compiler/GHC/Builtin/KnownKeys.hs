@@ -367,7 +367,6 @@ basicKnownKeyNames
         starArrStarKindRepName,
         starArrStarArrStarKindRepName,
         constraintKindRepName,
-        word8TyConName,
 
         -- Plugins
         pluginTyConName
@@ -442,10 +441,6 @@ unsafeCoercePrimName    = varQual gHC_INTERNAL_UNSAFE_COERCE (fsLit "unsafeCoerc
 
 genericClassKeys :: [KnownKey]
 genericClassKeys = [genClassKey, gen1ClassKey]
-
--- Word module
-word8TyConName :: Name
-word8TyConName = tcQual  gHC_INTERNAL_WORD (fsLit "Word8")  word8TyConKey
 
 -- plugins
 pLUGINS :: Module

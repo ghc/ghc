@@ -58,7 +58,7 @@ module GHC.Builtin.WiredIn.Types (
         wordTyCon, wordDataCon, wordTyConName, wordTy,
 
         -- * Word8
-        word8TyCon, word8DataCon, word8Ty,
+        word8TyCon, word8DataCon, word8TyConName, word8Ty,
 
         -- * List
         listTyCon, listTyConName, listTyConKey,
@@ -395,10 +395,11 @@ nothingDataConName = mkWiredInDataConName UserSyntax gHC_INTERNAL_MAYBE (fsLit "
 justDataConName    = mkWiredInDataConName UserSyntax gHC_INTERNAL_MAYBE (fsLit "Just")
                                           justDataConKey justDataCon
 
-wordTyConName, wordDataConName, word8DataConName :: Name
-wordTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Word")   wordTyConKey     wordTyCon
-wordDataConName    = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "W#")     wordDataConKey   wordDataCon
-word8DataConName   = mkWiredInDataConName UserSyntax gHC_INTERNAL_WORD  (fsLit "W8#")    word8DataConKey  word8DataCon
+wordTyConName, wordDataConName, word8TyConName, word8DataConName :: Name
+wordTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES         (fsLit "Word")   wordTyConKey     wordTyCon
+wordDataConName    = mkWiredInDataConName UserSyntax gHC_TYPES         (fsLit "W#")     wordDataConKey   wordDataCon
+word8TyConName     = mkWiredInTyConName   UserSyntax gHC_INTERNAL_WORD (fsLit "Word8")  word8TyConKey    word8TyCon
+word8DataConName   = mkWiredInDataConName UserSyntax gHC_INTERNAL_WORD (fsLit "W8#")    word8DataConKey  word8DataCon
 
 floatTyConName, floatDataConName, doubleTyConName, doubleDataConName :: Name
 floatTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Float")  floatTyConKey    floatTyCon
