@@ -165,34 +165,6 @@ import GHC.Builtin.Uniques ( isTupleTyConUnique, isCTupleTyConUnique,
 
    The BuiltInSyntax flag => It's a syntactic form, not "in scope" (e.g. [])
    All built-in syntax things are WiredIn.
-
-Note [Fast comparison for built-in Names]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this wired-in Name in GHC.Builtin.KnownKeys:
-
-   int8TyConName = tcQual gHC_INTERNAL_INT  (fsLit "Int8")  int8TyConKey
-
-Ultimately this turns into something like:
-
-   int8TyConName = Name gHC_INTERNAL_INT (mkOccName ..."Int8") int8TyConKey
-
-So a comparison like `x == int8TyConName` will turn into `getUnique x ==
-int8TyConKey`, nice and efficient.  But if the `n_occ` field is strict, that
-definition will look like:
-
-   int8TyConName = case (mkOccName..."Int8") of occ ->
-                   Name gHC_INTERNAL_INT occ int8TyConKey
-
-and now the comparison will not optimise.  This matters even more when there are
-numerous comparisons (see #19386):
-
-if | tc == int8TyCon  -> ...
-   | tc == int16TyCon -> ...
-   ...etc...
-
-when we would like to get a single multi-branched case.
-
-TL;DR: we make the `n_occ` field lazy.
 -}
 
 {- *******************************************************************
@@ -207,11 +179,8 @@ data Name = Name
   { n_sort :: NameSort
     -- ^ What sort of name it is
 
-  , n_occ  :: OccName
+  , n_occ  :: !OccName
     -- ^ Its occurrence name.
-    --
-    -- NOTE: kept lazy to allow known names to be known constructor applications
-    -- and to inline better. See Note [Fast comparison for built-in Names]
 
   , n_uniq :: {-# UNPACK #-} !Unique
     -- ^ Its unique.
