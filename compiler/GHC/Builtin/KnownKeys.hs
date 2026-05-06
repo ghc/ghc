@@ -200,6 +200,9 @@ knownKeyTable
     , (mkVarOcc "toRational",       toRationalClassOpKey)
     , (mkVarOcc "realToFrac",       realToFracIdKey)
 
+    -- FFI things
+    , (mkTcOcc "ConstPtr", constPtrTyConKey)
+
     -- Class Monad, MonadFix, MonadZip
     , (mkTcOcc "Monad",        monadClassKey)
     , (thenMClassOpOcc,        thenMClassOpKey)
@@ -365,7 +368,7 @@ basicKnownKeyNames
         starArrStarArrStarKindRepName,
         constraintKindRepName,
         -- FFI primitive types that are not wired-in.
-        ptrTyConName, funPtrTyConName, constPtrConName,
+        ptrTyConName, funPtrTyConName,
         word8TyConName,
 
         -- Plugins
@@ -458,11 +461,6 @@ pluginTyConName :: Name
 pluginTyConName = tcQual pLUGINS (fsLit "Plugin") pluginTyConKey
 frontendPluginTyConName :: Name
 frontendPluginTyConName = tcQual pLUGINS (fsLit "FrontendPlugin") frontendPluginTyConKey
-
-constPtrConName :: Name
-constPtrConName =
-    tcQual gHC_INTERNAL_FOREIGN_C_CONSTPTR (fsLit "ConstPtr") constPtrTyConKey
-
 
 {-
 ************************************************************************

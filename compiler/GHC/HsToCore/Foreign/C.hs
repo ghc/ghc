@@ -241,7 +241,7 @@ dsFCall fn_id co fcall mDeclHeader = do
           | (_, res_ty1) <- tcSplitFunTys ty1
           , newty <- maybe res_ty1 snd (tcSplitIOType_maybe res_ty1)
           , Just (ptr, _) <- splitTyConApp_maybe newty
-          , tyConName ptr == constPtrConName
+          , tyConName ptr `hasKnownKey` constPtrTyConKey
           = text "const"
           | otherwise = empty
 
