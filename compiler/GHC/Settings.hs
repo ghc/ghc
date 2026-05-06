@@ -179,12 +179,24 @@ data ToolSettings = ToolSettings
 -- | Paths to various files and directories used by GHC, including those that
 -- provide more settings.
 data FileSettings = FileSettings
-  { fileSettings_ghcUsagePath          :: FilePath       -- ditto
-  , fileSettings_ghciUsagePath         :: FilePath       -- ditto
-  , fileSettings_toolDir               :: Maybe FilePath -- ditto
-  , fileSettings_topDir                :: FilePath       -- ditto
+  { fileSettings_ghcUsagePath          :: FilePath
+    -- ^ Path to @ghc-usage.txt@, displayed by @ghc --help@
+  , fileSettings_ghciUsagePath         :: FilePath
+    -- ^ Path to @ghci-usage.txt@, displayed by @ghci --help@
+  , fileSettings_toolDir               :: Maybe FilePath
+    -- ^ Directory containing the mingw toolchain (Windows only);
+    -- see Note [tooldir: How GHC finds mingw on Windows] in `GHC.SysTools.BaseDir`
+  , fileSettings_topDir                :: FilePath
+    -- ^ GHC's top directory: the root from which GHC locates its support files
+    -- (e.g. settings).
+    -- See Note [topdir: How GHC finds its files] in `GHC.SysTools.BaseDir`
   , fileSettings_globalPackageDatabase :: FilePath
+    -- ^ Path to the global package database, relative to `libDir`
   , fileSettings_libDir                :: FilePath
+    -- ^ Directory containing GHC's library packages and the global package
+    -- database. Defaults to 'fileSettings_topDir' but can differ in inplace
+    -- builds used for cross-compilation testing (the "stage2 cross-compiler"
+    -- scenario).
   }
 
 
