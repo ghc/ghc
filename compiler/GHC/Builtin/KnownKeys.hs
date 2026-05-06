@@ -366,7 +366,7 @@ basicKnownKeyNames
         constraintKindRepName,
         -- FFI primitive types that are not wired-in.
         ptrTyConName, funPtrTyConName, constPtrConName,
-        word8TyConName, word16TyConName, word32TyConName, word64TyConName,
+        word8TyConName,
 
         -- Plugins
         pluginTyConName
@@ -443,11 +443,8 @@ genericClassKeys :: [KnownKey]
 genericClassKeys = [genClassKey, gen1ClassKey]
 
 -- Word module
-word8TyConName, word16TyConName, word32TyConName, word64TyConName :: Name
-word8TyConName    = tcQual  gHC_INTERNAL_WORD (fsLit "Word8")  word8TyConKey
-word16TyConName   = tcQual  gHC_INTERNAL_WORD (fsLit "Word16") word16TyConKey
-word32TyConName   = tcQual  gHC_INTERNAL_WORD (fsLit "Word32") word32TyConKey
-word64TyConName   = tcQual  gHC_INTERNAL_WORD (fsLit "Word64") word64TyConKey
+word8TyConName :: Name
+word8TyConName = tcQual  gHC_INTERNAL_WORD (fsLit "Word8")  word8TyConKey
 
 -- PrelPtr module
 ptrTyConName, funPtrTyConName :: Name
