@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, Trustworthy, RankNTypes #-}
+{-# LANGUAGE MagicHash, Trustworthy, RankNTypes, CPP #-}
 
 -- |
 --
@@ -138,7 +138,7 @@ module GHC.Essentials
 
     -- Static pointers
     , IsStatic( fromStaticPtr ), makeStatic
-    , StaticPtr( StaticPtr ), StaticPtrInfo( StaticPtrInfo )
+    , StaticPtr, StaticPtrInfo( StaticPtrInfo )
 
     -- Stable pointers
     , StablePtr, newStablePtr
@@ -156,9 +156,6 @@ module GHC.Essentials
     , CS.unpackFoldrCString#, CS.unpackFoldrCStringUtf8#, CS.unpackAppendCString#
     , CS.unpackAppendCStringUtf8#, CS.cstringLength#
     , eqString, inline
-
-    -- JS primitives
-    , unsafeUnpackJSStringUtf8##
 
     , UnsafeEquality( UnsafeRefl ), unsafeEqualityProof
 
@@ -237,6 +234,11 @@ module GHC.Essentials
     , ExceptionContext, emptyExceptionContext
 
     , toAnnotationWrapper
+
+#if defined(javascript_HOST_ARCH)
+    -- JS primitives
+    , unsafeUnpackJSStringUtf8##
+#endif
     ) where
 
 import GHC.Internal.Base hiding( foldr )
@@ -276,7 +278,7 @@ import GHC.Internal.Word( Word8(W8#), Word16(W16#), Word32(W32#), Word64(W64#) )
 
 import GHC.Internal.Unsafe.Coerce( UnsafeEquality(..), unsafeEqualityProof )
 
-import GHC.Internal.StaticPtr( IsStatic(..), StaticPtr(..), StaticPtrInfo(..) )
+import GHC.Internal.StaticPtr( IsStatic(..), StaticPtr, StaticPtrInfo(..) )
 import GHC.Internal.StaticPtr.Internal( makeStatic )
 
 import GHC.Internal.Stable( StablePtr, newStablePtr )
@@ -297,4 +299,6 @@ import GHC.Internal.GHCi
 import GHC.Internal.Desugar (toAnnotationWrapper)
 import GHC.Internal.Stack.Types
 import GHC.Internal.Exception.Context
+#if defined(javascript_HOST_ARCH)
 import GHC.Internal.JS.Prim (unsafeUnpackJSStringUtf8##)
+#endif
