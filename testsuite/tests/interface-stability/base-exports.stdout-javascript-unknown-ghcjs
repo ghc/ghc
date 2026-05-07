@@ -11937,6 +11937,8 @@ instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Semigroup.Internal.Sum a) -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance forall (f :: * -> *) a. (GHC.Internal.Base.Applicative f, GHC.Internal.Enum.Bounded a) => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Monoid.Ap f a) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance GHC.Internal.Enum.Bounded GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Float’
+instance GHC.Internal.Enum.Bounded GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Float’
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (Data.Semigroup.Last a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (Data.Semigroup.Max a) -- Defined in ‘Data.Semigroup’
@@ -11972,8 +11974,6 @@ instance GHC.Internal.Enum.Bounded GHC.Internal.Foreign.C.Types.CULong -- Define
 instance GHC.Internal.Enum.Bounded GHC.Internal.Foreign.C.Types.CUShort -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Enum.Bounded GHC.Internal.Foreign.C.Types.CWchar -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Enum.Bounded GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.Internal.ByteOrder’
-instance GHC.Internal.Enum.Bounded GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Float’
-instance GHC.Internal.Enum.Bounded GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Enum.Bounded GHC.Internal.Generics.Associativity -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Enum.Bounded GHC.Internal.Generics.DecidedStrictness -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Enum.Bounded GHC.Internal.Generics.SourceStrictness -- Defined in ‘GHC.Internal.Generics’

@@ -22,10 +22,10 @@ module Data.RealFloat (
   pattern NaN,
 ) where
 
-import Data.Bool
-import GHC.Internal.Data.Ord
-import GHC.Internal.Float
-import GHC.Internal.Real
+import Data.Bool (Bool (..), (&&))
+import GHC.Internal.Data.Ord ((<), (>))
+import GHC.Internal.Float (RealFloat (..))
+import GHC.Internal.Real ((/))
 
 pattern Infinity :: (RealFloat a) => a
 pattern Infinity <- ((\x -> isInfinite x && x > 0) -> True) where Infinity = 1/0
