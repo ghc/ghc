@@ -897,10 +897,10 @@ type KindBndr = Int
 -- See Note [Representing TyCon kinds: KindRep] in GHC.Tc.Instance.Typeable.
 data KindRep = KindRepTyConApp TyCon [KindRep]
              | KindRepVar !KindBndr
-             | KindRepApp KindRep KindRep
-             | KindRepFun KindRep KindRep
-             | KindRepType
-             | KindRepConstraint
+             | KindRepApp KindRep KindRep   -- The kind (k1 k2)
+             | KindRepFun KindRep KindRep   -- The kind k1->k2
+             | KindRepType                  -- The kind Type
+             | KindRepConstraint            -- The kind Constraint
              | KindRepTypeLitS TypeLitSort Addr#
              | KindRepTypeLitD TypeLitSort [Char]
 
@@ -915,6 +915,18 @@ data TyCon = TyCon Word64#    -- ^ Fingerprint (high)
                    TrName     -- ^ Type constructor name
                    Int#       -- ^ How many kind variables do we accept?
                    KindRep    -- ^ A representation of the type's kind
+
+intTyCon :: TyCon
+intTyCon = TyCon ... intKindRep
+
+-- Int :: TYPE (BoxedRep Lifted)
+intKindRep :: KindRep
+intKindRep = KindRepTyConApp tYPETyCon [t...]
+
+-- TYPE :: Type -> Type
+tYPETyCon :: TyCon
+tYPETyCon = TyCon ... (KindRepRun typeTyCon typTyCon)
+
 
 {- *********************************************************************
 *                                                                      *

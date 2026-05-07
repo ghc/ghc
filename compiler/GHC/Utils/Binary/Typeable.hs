@@ -18,10 +18,18 @@ import GHC.Exts (Levity(Lifted, Unlifted))
 import GHC.Serialized
 
 import Foreign
-import Type.Reflection
+import Type.Reflection  -- TyCon from bootstrap compiler e.g GHC 9.6
 import Type.Reflection.Unsafe
 import Data.Kind (Type)
 
+
+-- The entire purpose of this module is to provide
+--   instance Binary Serialized
+-- so that we can serialise annotations into an interface file
+--
+-- To serialise an annotation we need to serialise a TypeRep
+-- So if the inner representationns of TypeRep change, you'll need CPP
+-- so that this module can be compiled both by the bootstrap compiler and the stage-1 compiler
 
 getSomeTypeRep :: ReadBinHandle -> IO SomeTypeRep
 getSomeTypeRep = error "getSomeTypeRep"
@@ -31,7 +39,7 @@ instance Binary TyCon where
     put_ bh tc = do
         put_ bh (tyConPackage tc)
         put_ bh (tyConModule tc)
-        put_ bh (tyConName tc)
+`        put_ bh (tyConName tc)
         put_ bh (tyConKindArgs tc)
         put_ bh (tyConKindRep tc)
     get bh =

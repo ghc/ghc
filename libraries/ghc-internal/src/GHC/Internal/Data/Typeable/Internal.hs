@@ -616,11 +616,14 @@ someTypeRepTyCon :: SomeTypeRep -> TyCon
 someTypeRepTyCon (SomeTypeRep t) = typeRepTyCon t
 
 -- | Observe the type constructor of a type representation
+-- E.g typeRepTyCon (T a b)  = T
+--     typeRepTyCon (a -> b) = tyConFun
+--     typeRepTyCon Type     = tyConTYPE
 typeRepTyCon :: TypeRep a -> TyCon
-typeRepTyCon TrType = tyConTYPE
+typeRepTyCon TrType                   = tyConTYPE
 typeRepTyCon (TrTyCon {trTyCon = tc}) = tc
 typeRepTyCon (TrApp {trAppFun = a})   = typeRepTyCon a
-typeRepTyCon (TrFun {})               = typeRepTyCon $ typeRep @(->)
+typeRepTyCon (TrFun {})               = tyConArrow
 
 -- | Type equality
 --
@@ -694,9 +697,13 @@ tyConKind (TyCon _ _ _ _ nKindVars# kindRep) kindVars =
     in instantiateKindRep kindVarsArr kindRep
 
 instantiateKindRep :: A.Array KindBndr SomeTypeRep -> KindRep -> SomeTypeRep
+-- This function is THE principal consumer of KindRep
 instantiateKindRep vars = go
   where
     go :: KindRep -> SomeTypeRep
+    go KindRepType       = SomeTypeRep TrType  -- Special magic for TrType
+    go KindRepConstraint = SomeTypeRep (typeRep @Constraint)
+
     go (KindRepTyConApp tc args)
       = let n_kind_args = tyConKindArgs tc
             (kind_args, ty_args) = splitAt n_kind_args args
@@ -714,8 +721,7 @@ instantiateKindRep vars = go
       = SomeTypeRep $ mkTrApp (unsafeCoerceRep $ go f) (unsafeCoerceRep $ go a)
     go (KindRepFun a b)
       = SomeTypeRep $ mkTrFun trMany (unsafeCoerceRep $ go a) (unsafeCoerceRep $ go b)
-    go KindRepType       = SomeTypeRep TrType  -- Special magic for TrType
-    go KindRepConstraint = unkindedTypeRep @(RuntimeRep -> Type) @Constraint
+
     go (KindRepTypeLitS sort s)
       = mkTypeLitFromString sort (unpackCStringUtf8# s)
     go (KindRepTypeLitD sort s)
@@ -987,6 +993,9 @@ tyCon'Lifted = typeRepTyCon (typeRep @'Lifted)
 
 tyCon'BoxedRep :: TyCon
 tyCon'BoxedRep = typeRepTyCon (typeRep @'BoxedRep)
+
+tyConArrow :: TyCon
+tyConArrow = typeRepTyCon $ typeRep @(->)
 
 {- OLD
 tyConRuntimeRep :: TyCon
