@@ -47,6 +47,8 @@ bool getTraceFlag(RUNTIME_TRACE_FLAG flag) {
     return RuntimeTraceFlagCache.user;
   case TRACE_CAP:
     return RuntimeTraceFlagCache.cap;
+  case TRACE_IPE:
+    return RuntimeTraceFlagCache.ipe;
   default:
     return false;
   }
@@ -74,6 +76,9 @@ void setTraceFlag(RUNTIME_TRACE_FLAG flag, bool value) {
     break;
   case TRACE_CAP:
     RuntimeTraceFlagCache.cap = value;
+    break;
+  case TRACE_IPE:
+    RuntimeTraceFlagCache.ipe = value;
     break;
   }
 }
@@ -119,13 +124,19 @@ static void updateTraceFlagCache(void) {
   RuntimeTraceFlagCache.user =
     RtsFlags.TraceFlags.user;
 
+  // -DI turns on IPE tracing too
+  RuntimeTraceFlagCache.ipe =
+      RtsFlags.TraceFlags.ipe ||
+      RtsFlags.DebugFlags.ipe;
+
   // We trace cap events if we're tracing anything else
   RuntimeTraceFlagCache.cap =
     TRACE_sched ||
     TRACE_gc ||
     TRACE_spark_sampled ||
     TRACE_spark_full ||
-    TRACE_user;
+    TRACE_user ||
+    TRACE_ipe;
 }
 
 void initTracing (void)
@@ -720,6 +731,7 @@ void traceHeapProfSampleString(const char *label, StgWord residency)
     }
 }
 
+// The TRACE_ipe test happens in dumpIPEToEventLog.
 void traceIPE(const InfoProvEnt *ipe)
 {
 #if defined(DEBUG)

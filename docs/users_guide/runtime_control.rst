@@ -1304,6 +1304,9 @@ When the program is linked with the :ghc-flag:`-eventlog` option
     - ``u`` — user events. These are events emitted from Haskell code using
       functions such as ``Debug.Trace.traceEvent``. Enabled by default.
 
+    - ``I`` — IPE events. These events describe source position information
+      for info tables. See :ghc-flag:`-finfo-table-map`.
+
     You can disable specific classes, or enable/disable all classes at
     once:
 
