@@ -166,7 +166,7 @@ module GHC.Essentials
     -- Typeable and type representations
     , SomeTypeRep( SomeTypeRep ), TR.Module( Module )
     , TyCon( TyCon ), TrName( TrNameS )
-    , KindRep( KindRepTyConApp, KindRepVar, KindRepApp, KindRepFun, KindRepTYPE, KindRepTypeLitS )
+    , KindRep( KindRepTyConApp, KindRepVar, KindRepApp, KindRepFun, KindRepType, KindRepConstraint, KindRepTypeLitS )
     , TypeLitSort( TypeLitSymbol, TypeLitNat, TypeLitChar )
     , typeRep#
     , mkTrCon, mkTrAppChecked, mkTrFun

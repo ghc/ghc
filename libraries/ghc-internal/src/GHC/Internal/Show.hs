@@ -601,8 +601,8 @@ instance Show KindRep where
       . showsPrec 11 p
       . showString " "
       . showsPrec 11 q
-  showsPrec d (KindRepTYPE rep) = showParen (d > 10) $
-    showString "KindRepTYPE " . showsPrec 11 rep
+  showsPrec d KindRepType       = showParen (d > 10) $ showString "KindRepType"
+  showsPrec d KindRepConstraint = showParen (d > 10) $ showString "KindRepConstraint"
   showsPrec d (KindRepTypeLitS p q) = showParen (d > 10) $
     showString "KindRepTypeLitS "
       . showsPrec 11 p

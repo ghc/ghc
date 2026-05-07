@@ -562,7 +562,7 @@ data TypeableStuff
             , kindRepVarDataCon      :: DataCon
             , kindRepAppDataCon      :: DataCon
             , kindRepFunDataCon      :: DataCon
-            , kindRepTYPEDataCon     :: DataCon
+            , kindRepTypeDataCon     :: DataCon
             , kindRepTypeLitSDataCon :: DataCon
             , typeLitSymbolDataCon   :: DataCon
             , typeLitCharDataCon     :: DataCon
@@ -579,7 +579,7 @@ collect_stuff = do
     kindRepVarDataCon      <- tcLookupKnownOccDataCon kindRepVarDataConOcc
     kindRepAppDataCon      <- tcLookupKnownOccDataCon kindRepAppDataConOcc
     kindRepFunDataCon      <- tcLookupKnownOccDataCon kindRepFunDataConOcc
-    kindRepTYPEDataCon     <- tcLookupKnownOccDataCon kindRepTYPEDataConOcc
+    kindRepTypeDataCon     <- tcLookupKnownOccDataCon kindRepTypeDataConOcc
     kindRepTypeLitSDataCon <- tcLookupKnownOccDataCon kindRepTypeLitSDataConOcc
     typeLitSymbolDataCon   <- tcLookupKnownOccDataCon typeLitSymbolDataConOcc
     typeLitNatDataCon      <- tcLookupKnownOccDataCon typeLitNatDataConOcc
@@ -766,22 +766,14 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep_shortcut
         -- We handle (TYPE LiftedRep) etc separately to make it
         -- clear to consumers (e.g. serializers) that there is
         -- a loop here (as TYPE :: RuntimeRep -> TYPE 'LiftedRep)
-      | Just (TypeLike, rep) <- sORTKind_maybe k
+      | Just (torc, rep) <- sORTKind_maybe k
+      , isLiftedRuntimeRep rep    -- rep is (Boxed LiftedRep)
               -- Typeable respects the Constraint/Type distinction
               -- so do not follow the special case here
+      , TypeLike <- torc  -- For now
       = -- Here k = TYPE <something>
-        case splitTyConApp_maybe rep of
-          Just (tc, [])         -- TYPE IntRep, TYPE FloatRep etc
-            | Just dc <- isPromotedDataCon_maybe tc
-              -> return $ nlHsDataCon kindRepTYPEDataCon `nlHsApp` nlHsDataCon dc
+        return (nlHsDataCon kindRepTypeDataCon)
 
-          Just (rep_tc, [levArg])  -- TYPE (BoxedRep lev)
-            | Just dcRep <- isPromotedDataCon_maybe rep_tc
-            , Just (lev_tc, []) <- splitTyConApp_maybe levArg
-            , Just dcLev <- isPromotedDataCon_maybe lev_tc
-              -> return $ nlHsDataCon kindRepTYPEDataCon `nlHsApp` (nlHsDataCon dcRep `nlHsApp` nlHsDataCon dcLev)
-
-          _   -> new_kind_rep k
       | otherwise = new_kind_rep k
 
     new_kind_rep ki  -- Expand synonyms
@@ -896,8 +888,7 @@ The TypeRep encoding of `Proxy Type Int` looks like this:
     $trProxy = TrApp $trProxyType $trInt TrType
 
     $tkProxy :: GHC.Types.KindRep
-    $tkProxy = KindRepFun (KindRepVar 0)
-                          (KindRepTyConApp (KindRepTYPE LiftedRep) [])
+    $tkProxy = KindRepFun (KindRepVar 0) KindRepType
 
 Note how $trProxyType cannot use 'TrApp', because TypeRep cannot represent
 polymorphic types.  So instead

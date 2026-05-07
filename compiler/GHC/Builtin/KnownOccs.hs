@@ -143,7 +143,7 @@ knownOccs
     , typeLitCharDataConOcc
     , trModuleTyConOcc, trModuleDataConOcc, trNameSDataConOcc, trTyConTyConOcc
     , trTyConDataConOcc, kindRepTyConOcc, kindRepTyConAppDataConOcc, kindRepVarDataConOcc
-    , kindRepAppDataConOcc, kindRepFunDataConOcc, kindRepTYPEDataConOcc
+    , kindRepAppDataConOcc, kindRepFunDataConOcc, kindRepTypeDataConOcc
     , kindRepTypeLitSDataConOcc
     ]
 
@@ -260,13 +260,13 @@ trTyConDataConOcc    = mkDataOcc "TyCon"
 
 -- Typeable representation types
 kindRepTyConOcc, kindRepTyConAppDataConOcc, kindRepVarDataConOcc, kindRepAppDataConOcc
-  , kindRepFunDataConOcc, kindRepTYPEDataConOcc, kindRepTypeLitSDataConOcc :: KnownOcc
+  , kindRepFunDataConOcc, kindRepTypeDataConOcc, kindRepTypeLitSDataConOcc :: KnownOcc
 kindRepTyConOcc           = mkTcOcc "KindRep"
 kindRepTyConAppDataConOcc = mkDataOcc "KindRepTyConApp"
 kindRepVarDataConOcc      = mkDataOcc "KindRepVar"
 kindRepAppDataConOcc      = mkDataOcc "KindRepApp"
 kindRepFunDataConOcc      = mkDataOcc "KindRepFun"
-kindRepTYPEDataConOcc     = mkDataOcc "KindRepTYPE"
+kindRepTypeDataConOcc     = mkDataOcc "KindRepType"
 kindRepTypeLitSDataConOcc = mkDataOcc "KindRepTypeLitS"
 
 -- Generics

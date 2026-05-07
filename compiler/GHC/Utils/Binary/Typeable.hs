@@ -23,6 +23,10 @@ import Type.Reflection.Unsafe
 import Data.Kind (Type)
 
 
+getSomeTypeRep :: ReadBinHandle -> IO SomeTypeRep
+getSomeTypeRep = error "getSomeTypeRep"
+
+{-
 instance Binary TyCon where
     put_ bh tc = do
         put_ bh (tyConPackage tc)
@@ -137,10 +141,11 @@ instance Binary RuntimeRep where
 instance Binary KindRep where
     put_ bh (KindRepTyConApp tc k) = putByte bh 0 >> put_ bh tc >> put_ bh k
     put_ bh (KindRepVar bndr) = putByte bh 1 >> put_ bh bndr
-    put_ bh (KindRepApp a b) = putByte bh 2 >> put_ bh a >> put_ bh b
-    put_ bh (KindRepFun a b) = putByte bh 3 >> put_ bh a >> put_ bh b
-    put_ bh (KindRepTYPE r) = putByte bh 4 >> put_ bh r
-    put_ bh (KindRepTypeLit sort r) = putByte bh 5 >> put_ bh sort >> put_ bh r
+    put_ bh (KindRepApp a b)  = putByte bh 2 >> put_ bh a >> put_ bh b
+    put_ bh (KindRepFun a b)  = putByte bh 3 >> put_ bh a >> put_ bh b
+    put_ bh KindRepType       = putByte bh 4
+    put_ bh KindRepConstraint = putByte bh 5
+    put_ bh (KindRepTypeLit sort r) = putByte bh 6 >> put_ bh sort >> put_ bh r
 
     get bh = do
         tag <- getByte bh
@@ -149,8 +154,9 @@ instance Binary KindRep where
           1 -> KindRepVar <$> get bh
           2 -> KindRepApp <$> get bh <*> get bh
           3 -> KindRepFun <$> get bh <*> get bh
-          4 -> KindRepTYPE <$> get bh
-          5 -> KindRepTypeLit <$> get bh <*> get bh
+          4 -> KindRepType
+          5 -> KindRepConstraint
+          6 -> KindRepTypeLit <$> get bh <*> get bh
           _ -> fail "Binary.putKindRep: invalid tag"
 
 instance Binary TypeLitSort where
@@ -186,3 +192,8 @@ instance Binary Serialized where
         the_type <- get bh
         bytes <- get bh
         return (Serialized the_type bytes)
+-}
+
+instance Binary Serialized where
+    put_ bh (Serialized the_type bytes) = error "Binary Serialised: put"
+    get bh = error "Binary Serialised: get"

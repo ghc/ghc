@@ -171,7 +171,8 @@ rnfKindRep (KindRepTyConApp tc args) = rnfTyCon tc `seq` rnfList rnfKindRep args
 rnfKindRep (KindRepVar _)   = ()
 rnfKindRep (KindRepApp a b) = rnfKindRep a `seq` rnfKindRep b
 rnfKindRep (KindRepFun a b) = rnfKindRep a `seq` rnfKindRep b
-rnfKindRep (KindRepTYPE rr) = rnfRuntimeRep rr
+rnfKindRep KindRepType           = ()
+rnfKindRep KindRepConstraint     = ()
 rnfKindRep (KindRepTypeLitS _ _) = ()
 rnfKindRep (KindRepTypeLitD _ t) = rnfString t
 
@@ -713,14 +714,13 @@ instantiateKindRep vars = go
       = SomeTypeRep $ mkTrApp (unsafeCoerceRep $ go f) (unsafeCoerceRep $ go a)
     go (KindRepFun a b)
       = SomeTypeRep $ mkTrFun trMany (unsafeCoerceRep $ go a) (unsafeCoerceRep $ go b)
-    go (KindRepTYPE (BoxedRep Lifted)) = SomeTypeRep TrType
-    go (KindRepTYPE r) = unkindedTypeRep $ tYPE `kApp` runtimeRepTypeRep r
+    go KindRepType       = SomeTypeRep TrType  -- Special magic for TrType
+    go KindRepConstraint = unkindedTypeRep @(RuntimeRep -> Type) @Constraint
     go (KindRepTypeLitS sort s)
       = mkTypeLitFromString sort (unpackCStringUtf8# s)
     go (KindRepTypeLitD sort s)
       = mkTypeLitFromString sort s
 
-    tYPE = kindedTypeRep @(RuntimeRep -> Type) @TYPE
 
 unsafeCoerceRep :: SomeTypeRep -> TypeRep a
 unsafeCoerceRep (SomeTypeRep r) = unsafeCoerce r
@@ -749,6 +749,7 @@ buildList = foldr cons nil
     nil = kindedTypeRep @[k] @'[]
     cons x rest = SomeKindedTypeRep (typeRep @'(:)) `kApp` x `kApp` rest
 
+{- Not needed any more
 runtimeRepTypeRep :: RuntimeRep -> SomeKindedTypeRep RuntimeRep
 runtimeRepTypeRep r =
     case r of
@@ -778,6 +779,7 @@ runtimeRepTypeRep r =
   where
     rep :: forall (a :: RuntimeRep). Typeable a => SomeKindedTypeRep RuntimeRep
     rep = kindedTypeRep @RuntimeRep @a
+-}
 
 levityTypeRep :: Levity -> SomeKindedTypeRep Levity
 levityTypeRep c =
@@ -972,6 +974,22 @@ splitApps = go []
 -- #14480.
 
 tyConRuntimeRep :: TyCon
+tyConRuntimeRep = typeRepTyCon (typeRep @RuntimeRep)
+
+tyConTYPE :: TyCon
+tyConTYPE = typeRepTyCon (typeRep @TYPE)
+
+tyConLevity :: TyCon
+tyConLevity = typeRepTyCon (typeRep @Levity)
+
+tyCon'Lifted :: TyCon
+tyCon'Lifted = typeRepTyCon (typeRep @'Lifted)
+
+tyCon'BoxedRep :: TyCon
+tyCon'BoxedRep = typeRepTyCon (typeRep @'BoxedRep)
+
+{- OLD
+tyConRuntimeRep :: TyCon
 tyConRuntimeRep = mkTyCon ghcPrimPackage "GHC.Internal.Types" "RuntimeRep" 0
   (KindRepTYPE (BoxedRep Lifted))
 
@@ -996,6 +1014,7 @@ tyCon'BoxedRep = mkTyCon ghcPrimPackage "GHC.Internal.Types" "'BoxedRep" 0
 
 ghcPrimPackage :: String
 ghcPrimPackage = tyConPackage (typeRepTyCon (typeRep @Bool))
+-}
 
 funTyCon :: TyCon
 funTyCon = typeRepTyCon (typeRep @(->))
@@ -1089,7 +1108,7 @@ pattern KindRepTypeLit sort t <- (getKindRepTypeLit -> Just (sort, t))
     KindRepTypeLit sort t = KindRepTypeLitD sort t
 
 {-# COMPLETE KindRepTyConApp, KindRepVar, KindRepApp, KindRepFun,
-             KindRepTYPE, KindRepTypeLit #-}
+             KindRepType, KindRepConstraint, KindRepTypeLit #-}
 
 getKindRepTypeLit :: KindRep -> Maybe (TypeLitSort, String)
 getKindRepTypeLit (KindRepTypeLitS sort t) = Just (sort, unpackCStringUtf8# t)
