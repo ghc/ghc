@@ -1,0 +1,9 @@
+section: compiler
+synopsis: Add eventlog flag -lI to enable/disable IPE tracing
+issues: #27239
+mrs: !16004
+
+description: {
+    The RTS `-l` flag now accepts the new event class `I`,
+    which controls whether or not IPE events are emitted.
+}

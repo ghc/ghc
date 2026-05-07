@@ -249,6 +249,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TraceFlags.sparks_sampled= false;
     RtsFlags.TraceFlags.sparks_full   = false;
     RtsFlags.TraceFlags.user          = false;
+    RtsFlags.TraceFlags.ipe           = false;
     RtsFlags.TraceFlags.ticky         = false;
     RtsFlags.TraceFlags.trace_output  = NULL;
 #  if defined(THREADED_RTS)
@@ -449,6 +450,7 @@ usage_text[] = {
 "                p    par spark events (sampled)",
 "                f    par spark events (full detail)",
 "                u    user events (emitted from Haskell code)",
+"                I    IPE events",
 #if defined(TICKY_TICKY)
 "                T    ticky-ticky counter samples",
 #endif
@@ -457,7 +459,7 @@ usage_text[] = {
 "                t    add time stamps (only useful with -v)",
 #  endif
 "               -x    disable an event class, for any flag above",
-"             the initial enabled event classes are 'sgpu'",
+"             the initial enabled event classes are 'sgIpu'",
 #  if defined(THREADED_RTS)
 " --eventlog-flush-interval=<secs>",
 "             Periodically flush the eventlog at the specified interval.",
@@ -2528,6 +2530,7 @@ static void read_trace_flags(const char *arg)
     RtsFlags.TraceFlags.gc             = true;
     RtsFlags.TraceFlags.sparks_sampled = true;
     RtsFlags.TraceFlags.user           = true;
+    RtsFlags.TraceFlags.ipe            = true;
 
     for (c  = arg; *c != '\0'; c++) {
         switch(*c) {
@@ -2541,8 +2544,9 @@ static void read_trace_flags(const char *arg)
             RtsFlags.TraceFlags.gc             = enabled;
             RtsFlags.TraceFlags.sparks_sampled = enabled;
             RtsFlags.TraceFlags.sparks_full    = enabled;
-            RtsFlags.TraceFlags.user           = enabled;
             RtsFlags.TraceFlags.nonmoving_gc   = enabled;
+            RtsFlags.TraceFlags.user           = enabled;
+            RtsFlags.TraceFlags.ipe            = enabled;
 #if defined(TICKY_TICKY)
             RtsFlags.TraceFlags.ticky          = enabled;
 #endif
@@ -2575,6 +2579,10 @@ static void read_trace_flags(const char *arg)
             break;
         case 'u':
             RtsFlags.TraceFlags.user      = enabled;
+            enabled = true;
+            break;
+        case 'I':
+            RtsFlags.TraceFlags.ipe       = enabled;
             enabled = true;
             break;
         case 'T':

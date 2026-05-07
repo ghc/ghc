@@ -90,6 +90,7 @@ typedef enum {
   TRACE_SPARK_FULL,
   TRACE_USER,
   TRACE_CAP,
+  TRACE_IPE,
 } RUNTIME_TRACE_FLAG;
 
 /*

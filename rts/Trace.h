@@ -79,6 +79,7 @@ enum CapsetType { CapsetTypeCustom = CAPSET_TYPE_CUSTOM,
 #define TRACE_spark_full    ((const bool)RuntimeTraceFlagCache.spark_full)
 #define TRACE_user          ((const bool)RuntimeTraceFlagCache.user)
 #define TRACE_cap           ((const bool)RuntimeTraceFlagCache.cap)
+#define TRACE_ipe           ((const bool)RuntimeTraceFlagCache.ipe)
 
 /*
  * Runtime trace flags.
@@ -91,6 +92,7 @@ typedef struct {
   bool spark_full;
   bool user;
   bool cap;
+  bool ipe;
 } RUNTIME_TRACE_FLAG_CACHE;
 
 /*

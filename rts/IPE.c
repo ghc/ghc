@@ -165,26 +165,46 @@ static void traceIPEFromHashTable(void *data STG_UNUSED, StgWord key STG_UNUSED,
 }
 
 void dumpIPEToEventLog(void) {
-    // Dump pending entries
-    IpeBufferListNode *node = RELAXED_LOAD(&ipeBufferList);
-    while (node != NULL) {
-        if (ipe_node_valid(node)){
-          decompressIPEBufferListNodeIfCompressed(node);
+    /*
+    Usually, traceX functions are defined as a pair of a traceX_ function that
+    traces unconditionally and a traceX functional macro that performs the test
+    for the relevant TRACE_x flag.
 
-          for (uint32_t i = 0; i < node->count; i++) {
-              const InfoProvEnt ent = ipeBufferEntryToIpe(node, i);
-              traceIPE(&ent);
-          }
+    This function is the only function that calls traceIPE, but it takes a lot
+    of work just to prepare the IPE information. If traceIPE does not trace that
+    IPE information, all that work is wasted. Hence, the test of TRACE_ipe is
+    performed in this function instead.
+
+    This function is called via traceInitEvent in RtsStartup.c, which registers
+    it as an init event handler. It is important that this happens regardless
+    of whether or not IPE tracing is enabled at startup, since IPE tracing can
+    be started/stopped at runtime using the dynamic trace flags API.
+
+    IPE tracing is enabled whenever IPE debug printing is enabled via -DI, so
+    this test does not prevent IPE debug printing.
+    */
+    if (RTS_UNLIKELY(TRACE_ipe)) {
+        // Dump pending entries
+        IpeBufferListNode *node = RELAXED_LOAD(&ipeBufferList);
+        while (node != NULL) {
+            if (ipe_node_valid(node)){
+              decompressIPEBufferListNodeIfCompressed(node);
+
+              for (uint32_t i = 0; i < node->count; i++) {
+                  const InfoProvEnt ent = ipeBufferEntryToIpe(node, i);
+                  traceIPE(&ent);
+              }
+            }
+            node = node->next;
         }
-        node = node->next;
-    }
 
-    // Dump entries already in hashmap
-    ACQUIRE_LOCK(&ipeMapLock);
-    if (ipeMap != NULL) {
-        mapHashTable(ipeMap, NULL, &traceIPEFromHashTable);
+        // Dump entries already in hashmap
+        ACQUIRE_LOCK(&ipeMapLock);
+        if (ipeMap != NULL) {
+            mapHashTable(ipeMap, NULL, &traceIPEFromHashTable);
+        }
+        RELEASE_LOCK(&ipeMapLock);
     }
-    RELEASE_LOCK(&ipeMapLock);
 }
 
 
