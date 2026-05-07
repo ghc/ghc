@@ -47,6 +47,8 @@ bool getTraceFlag(RUNTIME_TRACE_FLAG flag) {
     return RuntimeTraceFlagCache.user;
   case TRACE_CAP:
     return RuntimeTraceFlagCache.cap;
+  case TRACE_IPE:
+    return RuntimeTraceFlagCache.ipe;
   default:
     return false;
   }
@@ -74,6 +76,9 @@ void setTraceFlag(RUNTIME_TRACE_FLAG flag, bool value) {
     break;
   case TRACE_CAP:
     RuntimeTraceFlagCache.cap = value;
+    break;
+  case TRACE_IPE:
+    RuntimeTraceFlagCache.ipe = value;
     break;
   }
 }
@@ -126,6 +131,11 @@ static void updateTraceFlagCache(void) {
     TRACE_spark_sampled ||
     TRACE_spark_full ||
     TRACE_user;
+
+  // -DI turns on IPE tracing too
+  RuntimeTraceFlagCache.cap =
+      RtsFlags.TraceFlags.ipe ||
+      RtsFlags.DebugFlags.ipe;
 }
 
 void initTracing (void)

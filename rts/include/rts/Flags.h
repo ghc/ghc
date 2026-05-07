@@ -191,6 +191,7 @@ typedef struct _TRACE_FLAGS {
     bool sparks_full;    /* trace spark events 100% accurately */
     bool ticky;          /* trace ticky-ticky samples */
     bool user;           /* trace user events (emitted from Haskell code) */
+    bool ipe;            /* trace IPE events */
 #if defined(THREADED_RTS)
     /* Time between force eventlog flushes (or 0 if disabled) */
     Time eventlogFlushTime;
