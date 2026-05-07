@@ -730,6 +730,7 @@ void traceHeapProfSampleString(const char *label, StgWord residency)
     }
 }
 
+// The TRACE_ipe test happens in dumpIPEToEventLog.
 void traceIPE(const InfoProvEnt *ipe)
 {
 #if defined(DEBUG)
