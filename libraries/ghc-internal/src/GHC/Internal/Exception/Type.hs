@@ -234,9 +234,7 @@ instance Exception Void
 --
 -- @since base-3.0
 instance Exception SomeException where
-    toException (SomeException e) =
-        let ?exceptionContext = emptyExceptionContext
-        in SomeException e
+    toException e = e
     fromException = Just
     backtraceDesired (SomeException e) = backtraceDesired e
     displayException (SomeException e) = displayException e
