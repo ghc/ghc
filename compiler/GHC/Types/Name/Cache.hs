@@ -122,7 +122,7 @@ data NameCache = NameCache
 type OrigNameCache   = ModuleEnv (OccEnv Name)
 
 takeUniqFromNameCache :: NameCache -> IO Unique
-takeUniqFromNameCache (NameCache c _) = uniqFromTagGrimly c
+takeUniqFromNameCache (NameCache c _) = uniqFromTagGrimily c
 
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
 lookupOrigNameCache nc mod occ = lookup_infinite <|> lookup_normal

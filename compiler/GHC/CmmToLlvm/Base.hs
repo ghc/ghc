@@ -318,7 +318,7 @@ instance DSM.MonadGetUnique LlvmM where
     tag <- getEnv envTag
     liftUDSMT $! do
       uq <- DSM.getUniqueM
-      return (newTagUniqueGrimly uq tag)
+      return (newTagUniqueGrimily uq tag)
 
 -- | Lifting of IO actions. Not exported, as we want to encapsulate IO.
 liftIO :: IO a -> LlvmM a

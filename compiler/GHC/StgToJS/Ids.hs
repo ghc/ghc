@@ -130,7 +130,7 @@ makeIdentForId i num id_type current_module = name ident
         -- unique suffix for non-exported Ids
       , if exported
           then mempty
-          else let (c,u) = unpkUniqueGrimly (getUnique i)
+          else let (c,u) = unpkUniqueGrimily (getUnique i)
                in mconcat [BSC.pack ['_',c,'_'], word64BS u]
       ]
 
@@ -235,4 +235,3 @@ declVarsForId  i = case typeSize (idType i) of
   0 -> return mempty
   1 -> decl <$> identForId i
   s -> mconcat <$> mapM (\n -> decl <$> identForIdN i n) [1..s]
-

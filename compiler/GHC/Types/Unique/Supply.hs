@@ -16,10 +16,10 @@ module GHC.Types.Unique.Supply (
         -- ** Operations on supplies
         uniqFromSupply, uniqsFromSupply, -- basic ops
         takeUniqFromSupply,
-        uniqFromTag, uniqFromTagGrimly,
+        uniqFromTag, uniqFromTagGrimily,
         UniqueTag(..),
 
-        mkSplitUniqSupply, mkSplitUniqSupplyGrimly,
+        mkSplitUniqSupply, mkSplitUniqSupplyGrimily,
         splitUniqSupply, listSplitUniqSupply,
 
         -- * Unique supply monad and its abstraction
@@ -203,10 +203,10 @@ data UniqSupply
                                 -- when split => these two supplies
 
 mkSplitUniqSupply  :: UniqueTag -> IO UniqSupply
-mkSplitUniqSupply ut = mkSplitUniqSupplyGrimly (uniqueTag ut)
+mkSplitUniqSupply ut = mkSplitUniqSupplyGrimily (uniqueTag ut)
 {-# INLINE mkSplitUniqSupply #-}
 
-mkSplitUniqSupplyGrimly :: Char -> IO UniqSupply
+mkSplitUniqSupplyGrimily :: Char -> IO UniqSupply
 -- ^ Create a unique supply out of thin air.
 -- The "tag" (Char) supplied is mostly cosmetic, making it easier
 -- to figure out where a Unique was born. See Note [Uniques and tags].
@@ -219,7 +219,7 @@ mkSplitUniqSupplyGrimly :: Char -> IO UniqSupply
 
 -- See Note [How the unique supply works]
 -- See Note [Optimising the unique supply]
-mkSplitUniqSupplyGrimly ut
+mkSplitUniqSupplyGrimily ut
   = unsafeDupableInterleaveIO (IO mk_supply)
 
   where
@@ -286,15 +286,15 @@ initUniqSupply counter inc = do
     poke ghc_unique_inc       inc
 
 uniqFromTag :: UniqueTag -> IO Unique
-uniqFromTag !ut = uniqFromTagGrimly (uniqueTag ut)
+uniqFromTag !ut = uniqFromTagGrimily (uniqueTag ut)
 
 {-# INLINE uniqFromTag #-}
 
-uniqFromTagGrimly :: Char -> IO Unique
-uniqFromTagGrimly !tag
+uniqFromTagGrimily :: Char -> IO Unique
+uniqFromTagGrimily !tag
   = do { uqNum <- genSym
        ; return $! mkUniqueGrimilyWithTag tag uqNum }
-{-# NOINLINE uniqFromTagGrimly #-} -- We'll unbox everything, but we don't want to inline it
+{-# NOINLINE uniqFromTagGrimily #-} -- We'll unbox everything, but we don't want to inline it
 
 splitUniqSupply :: UniqSupply -> (UniqSupply, UniqSupply)
 -- ^ Build two 'UniqSupply' from a single one, each of which

@@ -707,7 +707,7 @@ putName BinSymbolTable{
                bin_symtab_next = symtab_next }
         bh name
   | isKnownKeyName name
-  , let (c, u) = unpkUniqueGrimly (nameUnique name) -- INVARIANT: (ord c) fits in 8 bits
+  , let (c, u) = unpkUniqueGrimily (nameUnique name) -- INVARIANT: (ord c) fits in 8 bits
   = -- assert (u < 2^(22 :: Int))
     put_ bh (0x80000000
              .|. (fromIntegral (ord c) `shiftL` 22)

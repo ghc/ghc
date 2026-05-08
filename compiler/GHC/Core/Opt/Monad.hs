@@ -175,11 +175,11 @@ instance MonadPlus CoreM
 instance MonadUnique CoreM where
     getUniqueSupplyM = do
         tag <- read cr_uniq_tag
-        liftIO $! mkSplitUniqSupplyGrimly tag
+        liftIO $! mkSplitUniqSupplyGrimily tag
 
     getUniqueM = do
         tag <- read cr_uniq_tag
-        liftIO $! uniqFromTagGrimly tag
+        liftIO $! uniqFromTagGrimily tag
 
 runCoreM :: HscEnv
          -> RuleBase

@@ -66,9 +66,9 @@ newtype StgM a = StgM { _unStgM :: ReaderT Char IO a }
 
 instance MonadUnique StgM where
   getUniqueSupplyM = StgM $ do { tag <- ask
-                               ; liftIO $! mkSplitUniqSupplyGrimly tag}
+                               ; liftIO $! mkSplitUniqSupplyGrimily tag}
   getUniqueM = StgM $ do { tag <- ask
-                         ; liftIO $! uniqFromTagGrimly tag}
+                         ; liftIO $! uniqFromTagGrimily tag}
 
 runStgM :: UniqueTag -> StgM a -> IO a
 runStgM mask (StgM m) = runReaderT m (uniqueTag mask)

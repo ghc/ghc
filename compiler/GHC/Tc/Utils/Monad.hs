@@ -1008,13 +1008,13 @@ newUnique :: TcRnIf gbl lcl Unique
 newUnique
  = do { env <- getEnv
       ; let tag = env_ut env
-      ; liftIO $! uniqFromTagGrimly tag }
+      ; liftIO $! uniqFromTagGrimily tag }
 
 newUniqueSupply :: TcRnIf gbl lcl UniqSupply
 newUniqueSupply
  = do { env <- getEnv
       ; let tag = env_ut env
-      ; liftIO $! mkSplitUniqSupplyGrimly tag }
+      ; liftIO $! mkSplitUniqSupplyGrimily tag }
 
 cloneLocalName :: Name -> TcM Name
 -- Make a fresh Internal name with the same OccName and SrcSpan

@@ -38,12 +38,12 @@ module GHC.Types.Unique (
         mkUniqueIntGrimily,
         getKey,
         mkUnique, unpkUnique,
-        unpkUniqueGrimly,
+        unpkUniqueGrimily,
         mkUniqueInt,
         eqUnique, ltUnique,
         incrUnique, stepUnique,
 
-        newTagUnique, newTagUniqueGrimly,
+        newTagUnique, newTagUniqueGrimily,
         nonDetCmpUnique,
         isValidKnownKeyUnique,
 
@@ -99,7 +99,7 @@ Note [Performance implications of UniqueTag]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The UniqueTag ADT is meant to be ephemeral and eliminated by the simplifier,
 so for long term storage (i.e. in monadic environments or data structures) we
-want to store the raw 'Char's. Working with the raw tags is done via the *Grimly
+want to store the raw 'Char's. Working with the raw tags is done via the *Grimily
 class of functions
 
 For instance, if we are generating a unique for a concrete tag, we should use
@@ -116,7 +116,7 @@ newUnique
        ; liftIO $! uniqFromTag tag }
 
 Prefer `env_ut :: Char` and
-       ; liftIO $! uniqFromTagGrimly tag }
+       ; liftIO $! uniqFromTagGrimily tag }
 
 -}
 
@@ -295,7 +295,7 @@ The stuff about unique *supplies* is handled further down this module.
 -}
 
 unpkUnique :: Unique -> (UniqueTag, Word64)        -- The reverse
-unpkUniqueGrimly :: Unique -> (Char, Word64)        -- The reverse
+unpkUniqueGrimily :: Unique -> (Char, Word64)        -- The reverse
 
 mkUniqueGrimily :: Word64 -> Unique                -- A trap-door for UniqSupply
 getKey          :: Unique -> Word64                -- for Var
@@ -303,7 +303,7 @@ getKey          :: Unique -> Word64                -- for Var
 incrUnique   :: Unique -> Unique
 stepUnique   :: Unique -> Word64 -> Unique
 newTagUnique :: Unique -> UniqueTag -> Unique
-newTagUniqueGrimly :: Unique -> Char -> Unique
+newTagUniqueGrimily :: Unique -> Char -> Unique
 
 mkUniqueGrimily = MkUnique
 
@@ -323,9 +323,9 @@ maxLocalUnique :: Unique
 maxLocalUnique = mkLocalUnique uniqueMask
 
 -- newTagUnique changes the "domain" of a unique to a different char
-newTagUnique u c = newTagUniqueGrimly u (uniqueTag c)
+newTagUnique u c = newTagUniqueGrimily u (uniqueTag c)
 
-newTagUniqueGrimly u c = mkUniqueGrimilyWithTag c i where (_,i) = unpkUniqueGrimly u
+newTagUniqueGrimily u c = mkUniqueGrimilyWithTag c i where (_,i) = unpkUniqueGrimily u
 
 -- | Bitmask that has zeros for the tag bits and ones for the rest.
 uniqueMask :: Word64
@@ -368,7 +368,7 @@ mkUniqueIntGrimily = MkUnique . intToWord64
 
 {-# INLINE mkUniqueIntGrimily #-}
 
-unpkUniqueGrimly (MkUnique u)
+unpkUniqueGrimily (MkUnique u)
   = let
         -- The potentially truncating use of fromIntegral here is safe
         -- because the argument is just the tag bits after shifting.
@@ -376,10 +376,10 @@ unpkUniqueGrimly (MkUnique u)
         i   = u .&. uniqueMask
     in
     (tag, i)
-{-# INLINE unpkUniqueGrimly #-}
+{-# INLINE unpkUniqueGrimily #-}
 
 
-unpkUnique u = case unpkUniqueGrimly u of
+unpkUnique u = case unpkUniqueGrimily u of
   (c, i) -> ( charToUniqueTag c, i)
 {-# INLINE unpkUnique #-}
 
@@ -389,7 +389,7 @@ unpkUnique u = case unpkUniqueGrimly u of
 -- See Note [Symbol table representation of names] in "GHC.Iface.Binary" for details.
 isValidKnownKeyUnique :: Unique -> Bool
 isValidKnownKeyUnique u =
-    case unpkUniqueGrimly u of
+    case unpkUniqueGrimily u of
       (c, x) -> ord c < 0xff && x <= (1 `shiftL` 22)
 
 {-
@@ -512,7 +512,7 @@ showUnique :: Unique -> String
 showUnique uniq
   = tagStr ++ w64ToBase62 u
   where
-    (tag, u) = unpkUniqueGrimly uniq
+    (tag, u) = unpkUniqueGrimily uniq
     -- Avoid emitting non-printable characters in pretty uniques.
     -- See #25989.
     tagStr
