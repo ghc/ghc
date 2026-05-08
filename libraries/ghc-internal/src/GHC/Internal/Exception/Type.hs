@@ -208,7 +208,6 @@ Caught MismatchedParentheses
 
 -}
 class (Typeable e, Show e) => Exception e where
-    -- | @toException@ should produce a 'SomeException' with no attached 'ExceptionContext'.
     toException   :: e -> SomeException
     fromException :: SomeException -> Maybe e
 
