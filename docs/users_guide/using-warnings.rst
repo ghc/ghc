@@ -84,6 +84,7 @@ as ``-Wno-...`` for every individual warning in the group.
         * :ghc-flag:`-Wnoncanonical-monad-instances`
         * :ghc-flag:`-Wimplicit-rhs-quantification`
         * :ghc-flag:`-Wunusable-unpack-pragmas`
+        * :ghc-flag:`-Wredundant-canonical-methods`
 
 .. ghc-flag:: -W
     :shortdesc: enable normal warnings
@@ -605,34 +606,53 @@ of ``-W(no-)*``.
     category, is used. See :ref:`warning-deprecated-pragma` for more details on
     the pragmas. An alias for :ghc-flag:`-Wdeprecations`.
 
+.. ghc-flag:: -Wredundant-canonical-methods
+    :shortdesc: warn when a ``Monad`` or ``Monoid`` instance has a definition
+        of ``return`` or ``mappend``.
+    :type: dynamic
+    :reverse: -Wno-redundant-canonical-methods
+    :category:
+
+    :since: 10.2
+
+    :default: on
+
+    Causes a warning to be emitted if a ``Monad`` or ``Monoid`` instance
+    explicitly defines ``return`` or ``mappend``. As of 10.2, these
+    definitions, if present, are required to be ``return = pure`` or ``mappend = (<>)``.
+    Writing these definitions has no effect, because ``Monad`` and ``Monoid``
+    include them as default methods. In a future release, these methods will be
+    removed from their classes (and promoted to top-level definitions), and so
+    in preparation for that release users are recommended to remove them from
+    their instances early.
+
 .. ghc-flag:: -Wnoncanonical-monad-instances
     :shortdesc: warn when ``Applicative`` or ``Monad`` instances have
-        noncanonical definitions of ``return``, ``pure``, ``(>>)``,
-        or ``(*>)``.
+        noncanonical definitions of ``(>>)``, or ``(*>)``.
         See flag description in :ref:`options-sanity` for more details.
     :type: dynamic
     :reverse: -Wno-noncanonical-monad-instances
     :category:
 
-    :since: 8.0
+    :since: 8.0 *see below*
 
     :default: on
 
-    Warn if noncanonical ``Applicative`` or ``Monad`` instances
-    declarations are detected.
-
     When this warning is enabled, the following conditions are verified:
 
-    In ``Monad`` instances declarations warn if any of the following
-    conditions does not hold:
-
-     * If ``return`` is defined it must be canonical (i.e. ``return = pure``).
-     * If ``(>>)`` is defined it must be canonical (i.e. ``(>>) = (*>)``).
-
-    Moreover, in ``Applicative`` instance declarations:
-
-     * Warn if ``pure`` is defined backwards (i.e. ``pure = return``).
+     * Warn if ``(>>)`` is defined in any way apart from the canonical definition
+        (i.e. ``(>>) = (*>)``).
      * Warn if ``(*>)`` is defined backwards (i.e. ``(*>) = (>>)``).
+
+    This warning has a changed effect since GHC 10.2. Previouly it warned about
+    non-canonical ``return`` and ``pure`` instances as well, but those are now
+    always-on errors.
+    It was used during the transition period of the Monad of No Return
+    proposal, to detect when ``return`` or ``(>>)`` were defined as anything
+    other than ``pure`` or ``(*>)`` respectively. In current operation it can
+    only be disabled for ``(>>)`` and ``(*>)`` definitions.
+
+    This warning is partially superseded by :ghc-flag:`-Wredundant-canonical-methods`.
 
 .. ghc-flag:: -Wnoncanonical-monadfail-instances
     :shortdesc: *(deprecated)*
@@ -651,7 +671,8 @@ of ``-W(no-)*``.
     backwards, using the method in ``Monad``.
 
 .. ghc-flag:: -Wnoncanonical-monoid-instances
-    :shortdesc: warn when ``Semigroup`` or ``Monoid`` instances have
+    :shortdesc: *(deprecated)*
+        warn when ``Semigroup`` or ``Monoid`` instances have
         noncanonical definitions of ``(<>)`` or ``mappend``.
         See flag description in :ref:`options-sanity` for more details.
     :type: dynamic
@@ -660,22 +681,9 @@ of ``-W(no-)*``.
 
     :since: 8.0
 
-    :default: on
-
-    Warn if noncanonical ``Semigroup`` or ``Monoid`` instances
-    declarations are detected.
-
-    When this warning is enabled, the following conditions are verified:
-
-    In ``Monoid`` instances declarations warn if any of the following
-    conditions does not hold:
-
-     * If ``mappend`` is defined it must be canonical
-       (i.e. ``mappend = (Data.Semigroup.<>)``).
-
-    Moreover, in ``Semigroup`` instance declarations:
-
-     * Warn if ``(<>)`` is defined backwards (i.e. ``(<>) = mappend``).
+    This warning is deprecated. It no longer has any effect since GHC 10.2.
+    It was used during the transition period of the semigroup proposal, to
+    detect when ``mappend`` was defined as anything other than ``(<>)``.
 
 .. ghc-flag:: -Wmissing-monadfail-instances
     :shortdesc: *(deprecated)*

@@ -305,7 +305,6 @@ instance Applicative Id where
   Id f <*> Id x = Id (f x)
 
 instance Monad Id where
-  return = pure
   Id x >>= f = f x
 
 data Box a = Box { unBox :: a }
@@ -318,7 +317,6 @@ instance Applicative Box where
   Box f <*> Box x = Box (f x)
 
 instance Monad Box where
-  return = pure
   Box x >>= f = f x
 
 delay_inline :: (a -> b) -> a -> b

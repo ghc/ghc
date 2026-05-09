@@ -494,6 +494,9 @@ data GhcHint
     OccName -- ^ method with non-canonical implementation
     OccName -- ^ possible other method to use as the RHS instead
     String -- ^ Documentation URL
+  {-| Suggest removing a method implementation when it is to be moved from its
+      class and the definition is redundant with a default implementation. -}
+  | SuggestRemoveCanonicalDefinition OccName
   {-| Suggest eta-reducing a type synonym used in the implementation
       of abstract data. -}
   | SuggestEtaReduceAbsDataTySyn TyCon

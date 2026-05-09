@@ -406,7 +406,6 @@ infixl 9 !?,\\{-This comment teaches CPP correct behaviour -}
 instance Monoid (Word64Map a) where
     mempty  = empty
     mconcat = unions
-    mappend = (<>)
 
 -- | @since 0.5.7
 instance Semigroup (Word64Map a) where

@@ -73,7 +73,6 @@ instance Monad GHCJSQ where
     do (m', s')  <- runGHCJSQ m s
        (a,  s'') <- runGHCJSQ (f m') s'
        return (a, s'')
-  return    = pure
 
 instance MonadFail GHCJSQ where
   fail = undefined

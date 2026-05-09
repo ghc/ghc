@@ -846,7 +846,6 @@ instance Semi.Semigroup InterestingCxt where
 
 instance Monoid InterestingCxt where
   mempty = NotInteresting
-  mappend = (Semi.<>)
 
 -----------------
 -- | Inside Lambda
@@ -866,7 +865,6 @@ instance Semi.Semigroup InsideLam where
 
 instance Monoid InsideLam where
   mempty = NotInsideLam
-  mappend = (Semi.<>)
 
 -----------------
 data TailCallInfo

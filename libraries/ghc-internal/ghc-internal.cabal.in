@@ -555,4 +555,4 @@ Library
     ghc-options: -frebindable-known-names
 
     -- Make sure we don't accidentally regress into anti-patterns
-    ghc-options: -Wcompat -Wnoncanonical-monad-instances
+    ghc-options: -Wcompat

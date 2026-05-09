@@ -51,7 +51,6 @@ instance Semigroup (OrdList a) where
 
 instance Monoid (OrdList a) where
   mempty = nilOL
-  mappend = (Semigroup.<>)
   mconcat = concatOL
 
 instance Foldable OrdList where

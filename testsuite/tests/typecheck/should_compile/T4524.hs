@@ -164,17 +164,17 @@ instance Functor Perhaps where
   fmap = liftM
 
 instance Applicative Perhaps where
-  pure  = return
+  pure  = Succeeded
   (<*>) = ap
+  Failed   *> _       =  Failed
+  (Succeeded _) *> k  =  k
+  Unknown  *> k       =  k
 
 instance  Monad Perhaps where
     (Succeeded x) >>= k =  k x
     Failed   >>= _      =  Failed
     Unknown  >>= _      =  Unknown
-    Failed   >> _       =  Failed
-    (Succeeded _) >> k  =  k
-    Unknown  >> k       =  k
-    return              =  Succeeded
+    (>>) = (*>)
 
 instance MonadFail Perhaps where
     fail _              =  Unknown

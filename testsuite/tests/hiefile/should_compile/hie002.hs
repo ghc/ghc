@@ -3605,7 +3605,7 @@ instance Applicative HappyIdentity where
     pure  = HappyIdentity
     (<*>) = ap
 instance Monad HappyIdentity where
-    return = pure
+
     (HappyIdentity p) >>= q = q p
 
 happyThen :: () => HappyIdentity a -> (a -> HappyIdentity b) -> HappyIdentity b

@@ -175,7 +175,6 @@ newtype CmdLineP s a = CmdLineP (forall m. (Monad m) => StateT s m a)
 
 instance Monad (CmdLineP s) where
     CmdLineP k >>= f = CmdLineP (k >>= \x -> case f x of CmdLineP g -> g)
-    return = pure
 
 instance Applicative (CmdLineP s) where
     pure x = CmdLineP (pure x)

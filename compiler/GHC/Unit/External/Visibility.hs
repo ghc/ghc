@@ -68,5 +68,4 @@ instance Monoid UnitVisibility where
              , uv_requirements = emptyUniqMap
              , uv_explicit = Nothing
              }
-    mappend = (Semigroup.<>)
 

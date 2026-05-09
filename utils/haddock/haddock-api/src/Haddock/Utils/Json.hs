@@ -247,7 +247,6 @@ instance Monad.Monad Parser where
       path
       kf
       (\a -> runParser (g a) path kf ks)
-  return = pure
 
 instance Fail.MonadFail Parser where
   fail msg = Parser $ \path kf _ks -> kf (reverse path) msg
@@ -275,7 +274,6 @@ instance Semigroup (Parser a) where
 
 instance Monoid (Parser a) where
   mempty = fail "mempty"
-  mappend = (<>)
 
 apP :: Parser (a -> b) -> Parser a -> Parser b
 apP d e = do

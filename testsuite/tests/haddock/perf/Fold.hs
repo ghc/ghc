@@ -489,7 +489,6 @@ instance (Applicative (Rep p), Representable p) => Applicative (Prep p) where
     go (xf',xa') = sieve pf xf' <*> sieve pa xa'
 
 instance (Monad (Rep p), Representable p) => Monad (Prep p) where
-  return a = Prep () $ tabulate $ const $ return a
   Prep xa pa >>= f = Prep xa $ tabulate $ sieve pa >=> \a -> case f a of
     Prep xb pb -> sieve pb xb
 
@@ -1879,8 +1878,6 @@ instance Applicative (Indexed i a) where
   {-# INLINE (<*>) #-}
 
 instance Monad (Indexed i a) where
-  return = pure
-  {-# INLINE return #-}
   Indexed f >>= k = Indexed $ \i a -> runIndexed (k (f i a)) i a
   {-# INLINE (>>=) #-}
 

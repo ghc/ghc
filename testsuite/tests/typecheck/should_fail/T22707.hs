@@ -44,9 +44,9 @@ evalCont c = (runCont c)id
 
 instance Functor (Cont p p) where
 instance Applicative (Cont p p) where
+  pure a = Cont ($ a)
 
 instance Monad (Cont p p) where
-  return a = Cont ($ a)
   (>>=) = (>>==)
 
 class PMonad m where

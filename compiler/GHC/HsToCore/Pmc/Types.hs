@@ -232,7 +232,6 @@ instance Semi.Semigroup Precision where
 
 instance Monoid Precision where
   mempty = Precise
-  mappend = (Semi.<>)
 
 -- | Redundancy sets, used to determine redundancy of RHSs and bang patterns
 -- (later digested into a 'CIRB').

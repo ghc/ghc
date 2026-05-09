@@ -431,7 +431,6 @@ instance Applicative RunAsm where
 
 
 instance Monad RunAsm where
-  return  = pure
   (RunAsm m) >>= f = RunAsm $ \a b c !s -> m a b c s >>= \(s', r) -> runRunAsm (f r) a b c s'
   {-# INLINE (>>=) #-}
 
@@ -581,7 +580,6 @@ instance Applicative InspectAsm where
                                                                   (# s'', x' #) -> (# s'', f' x' #)
 
 instance Monad InspectAsm where
-  return = pure
   (InspectAsm m) >>= f = InspectAsm $ \ a b -> case m a b of
                                                 (# s', a' #) -> runInspectAsm (f a') a s'
 

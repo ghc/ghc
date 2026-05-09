@@ -23,7 +23,7 @@ instance Applicative (Reader r) where
   Reader f <*> Reader g = Reader (\r -> f r (g r))
 
 instance Monad (Reader r) where
-  return = pure
+
   Reader g >>= f = Reader (\r -> runReader (f (g r)) r)
 
 asks :: (r -> a) -> Reader r a
@@ -44,7 +44,7 @@ instance Applicative Gen where
     in (h x, s2)
 
 instance Monad Gen where
-  return = pure
+
   Gen g >>= f = Gen $ \n s ->
     let (x, s1) = g n s
     in runGen (f x) n s1

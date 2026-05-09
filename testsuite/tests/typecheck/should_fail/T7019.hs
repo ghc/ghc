@@ -12,7 +12,6 @@ type C c = forall a. c (Free c a)
 
 -- Notice that C is a synonym, illegal!
 instance C c => Monad (Free c) where
-  return a = Free ($ a)
   Free f >>= g = f g
 
 

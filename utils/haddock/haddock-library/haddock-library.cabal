@@ -43,7 +43,7 @@ common ghc-options
     -fhide-source-paths -Wno-unused-do-bind -fshow-hole-constraints
     -Wno-unticked-promoted-constructors -Werror=unused-imports
     -fdicts-strict -Wunused-packages -funbox-strict-fields
-    -Wnoncanonical-monad-instances -Wmissing-home-modules
+    -Wmissing-home-modules
 
   build-depends:
     , base         >= 4.10     && < 4.24

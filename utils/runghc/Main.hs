@@ -83,7 +83,6 @@ instance Semi.Semigroup RunGhcFlags where
 
 instance Monoid RunGhcFlags where
     mempty = RunGhcFlags Nothing
-    mappend = (<>)
 
 parseRunGhcFlags :: [String] -> (RunGhcFlags, [String])
 parseRunGhcFlags = f mempty

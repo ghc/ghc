@@ -31,7 +31,7 @@ main = do
   print ("gsconcat", gsconcat lsNE)
   print ("gmconcat", gmconcat ls)
   print ("dsconcat", dsconcat lsNE)
-  print ("dmconcatMappend", dmconcatMappend ls) -- uses `mappend` which is incorrect, see above
+  print ("dmconcatMappend", dmconcatMappend ls) -- uses `sappend` after MonR
   print ("dmconcatSappend", dmconcatSappend ls)
   print ("dmconcatUsingSconcat", dmconcatUsingSconcat ls)
 
@@ -39,7 +39,7 @@ main = do
       fOn s f = print ("strictness " <> s, f undefinedList)
   (fOn "mconcat" mconcat `finally` -- derived instance is fine, shows
     fOn "gmconcat" gmconcat `finally` -- this is too strict - using mappend on lists needs all lists
-    fOn "dmconcatMappend" dmconcatMappend `finally` -- also too strict for the above
+    fOn "dmconcatMappend" dmconcatMappend `finally` -- correct strictness (post monr), shows
     fOn "dmconcatSappend" dmconcatSappend `finally` -- correct strictness, shows
     fOn "dmconcatUsingSconcat" dmconcatUsingSconcat -- sconcat is too strict as well
     ) `catch` \(_ :: SomeException) -> pure ()

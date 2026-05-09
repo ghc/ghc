@@ -698,9 +698,10 @@ class Semigroup a => Monoid a where
         --
         -- __NOTE__: This method is redundant and has the default
         -- implementation @'mappend' = ('<>')@ since /base-4.11.0.0/.
-        -- Should it be implemented manually, since 'mappend' is a synonym for
-        -- ('<>'), it is expected that the two functions are defined the same
-        -- way. In a future GHC release 'mappend' will be removed from 'Monoid'.
+        --
+        -- As of GHC 10.2, it is an error to give 'mappend' any other definition.
+        -- In a future GHC release 'mappend' will be moved from 'Monoid' to the
+        -- top level.
         mappend :: a -> a -> a
         mappend = (<>)
         {-# INLINE mappend #-}
@@ -1388,6 +1389,10 @@ class Applicative m => Monad m where
     -- This function should /not/ be different from its default implementation
     -- as 'pure'. The justification for the existence of this function is
     -- merely historic.
+    --
+    -- As of GHC 10.2, it is an error to give 'return' any other definition.
+    -- In a future GHC release 'return' will be moved from 'Monad' to the top
+    -- level.
     return      :: a -> m a
     return      = pure
 
@@ -1410,6 +1415,10 @@ Monad! And people do this in the wild.
 This turned into a nasty bug that was tricky to track down, and rather
 than eliminate it everywhere upstream, it's easier to just retain the
 original default.
+
+In time we may make it an error to define (>>) like this, but until
+we can prove that `(>>) = (*>)` is performant in all situations, we
+can't make that leap.
 
 -}
 

@@ -30,7 +30,7 @@ module Main where
           };
         instance (Monad TM) where
                 {
-                return = pure;
+
                 (>>=) ma amb = MkTM (debugFunc ">>=" ((Prelude.>>=) (unTM ma) (\a -> unTM (amb a))));
                 (>>) = (*>)
                 };

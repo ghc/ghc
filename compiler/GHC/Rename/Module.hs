@@ -479,7 +479,7 @@ rnSrcInstDecl (ClsInstD { cid_inst = cid })
        ; traceRn "rnSrcIstDecl end }" empty
        ; return (ClsInstD { cid_d_ext = noExtField, cid_inst = cid' }, fvs) }
 
--- | Warn about non-canonical typeclass instance declarations
+-- | Warn and error for non-canonical typeclass instance declarations
 --
 -- A "non-canonical" instance definition can occur for instances of a
 -- class which redundantly defines an operation its superclass
@@ -493,24 +493,21 @@ rnSrcInstDecl (ClsInstD { cid_inst = cid })
 -- 'checkCanonicalMonoidInstances'
 checkCanonicalInstances :: Name -> LHsSigType GhcRn -> LHsBinds GhcRn -> RnM ()
 checkCanonicalInstances cls poly_ty mbinds = do
-    whenWOptM Opt_WarnNonCanonicalMonadInstances
-        $ checkCanonicalMonadInstances
-
-    whenWOptM Opt_WarnNonCanonicalMonoidInstances
-        $ checkCanonicalMonoidInstances
-
+    checkCanonicalMonadInstances
+    checkCanonicalMonoidInstances
   where
-    -- Warn about unsound/non-canonical 'Applicative'/'Monad' instance
-    -- declarations. Specifically, the following conditions are verified:
+    -- Raise errors or warnings for non-canonical 'Applicative'/'Monad' 'pure'/'return',
+    -- and warn for non-canonical '(>>)' declarations. Specifically, the
+    -- following conditions are verified:
     --
     -- In 'Monad' instances declarations:
     --
-    --  * If 'return' is overridden it must be canonical (i.e. @return = pure@)
+    --  * Warn if @return = pure@, error if return is otherwise overridden
     --  * If '(>>)' is overridden it must be canonical (i.e. @(>>) = (*>)@)
     --
     -- In 'Applicative' instance declarations:
     --
-    --  * Warn if 'pure' is defined backwards (i.e. @pure = return@).
+    --  * Error if 'pure' is defined backwards (i.e. @pure = return@).
     --  * Warn if '(*>)' is defined backwards (i.e. @(*>) = (>>)@).
     --
     checkCanonicalMonadInstances
@@ -521,11 +518,12 @@ checkCanonicalInstances cls poly_ty mbinds = do
                           , fun_matches = mg }
                       | name `hasKnownKey` pureAClassOpKey
                       , isAliasMG mg returnMClassOpKey
-                      -> addWarnNonCanonicalMonad NonCanonical_Pure
+                      -> addErrNonCanonicalMonad NonCanonical_Pure
 
                       | name `hasKnownKey` thenAClassOpKey
                       , isAliasMG mg thenMClassOpKey
-                      -> addWarnNonCanonicalMonad NonCanonical_ThenA
+                      -> whenWOptM Opt_WarnNonCanonicalMonadInstances $
+                          addWarnNonCanonicalMonad NonCanonical_ThenA
 
                   _ -> return ()
 
@@ -535,29 +533,33 @@ checkCanonicalInstances cls poly_ty mbinds = do
                   FunBind { fun_id = L _ name
                           , fun_matches = mg }
                       | name `hasKey` returnMClassOpKey
-                      , not (isAliasMG mg pureAClassOpKey)
-                      -> addWarnNonCanonicalMonad NonCanonical_Return
+                      ->
+                        if isAliasMG mg pureAClassOpKey then
+                          redundantCanonicalMethod Canonical_Return
+                        else
+                          addErrNonCanonicalMonad NonCanonical_Return
 
+                      -- we currently always allow canonical `(>>)` definitions
+                      -- and just warn on non-canonical definitions
                       | name `hasKey` thenMClassOpKey
                       , not (isAliasMG mg thenAClassOpKey)
-                      -> addWarnNonCanonicalMonad NonCanonical_ThenM
+                      -> whenWOptM Opt_WarnNonCanonicalMonadInstances $
+                          addWarnNonCanonicalMonad NonCanonical_ThenM
 
                   _ -> return ()
 
       | otherwise = return ()
 
-    -- Check whether Monoid(mappend) is defined in terms of
-    -- Semigroup((<>)) (and not the other way round). Specifically,
-    -- the following conditions are verified:
+    -- Raise errors or warnings for non-canonical 'Semigroup'/'Monoid' '(<>)'/'mappend'
+    -- declarations. Specifically, the following conditions are verified:
     --
     -- In 'Monoid' instances declarations:
     --
-    --  * If 'mappend' is overridden it must be canonical
-    --    (i.e. @mappend = (<>)@)
+    --  * Warn if @mappend = (<>)@, error if 'mappend' is otherwise overridden
     --
     -- In 'Semigroup' instance declarations:
     --
-    --  * Warn if '(<>)' is defined backwards (i.e. @(<>) = mappend@).
+    --  * Error if '(<>)' is defined backwards (i.e. @(<>) = mappend@).
     --
     checkCanonicalMonoidInstances
       | cls `hasKnownKey`semigroupClassKey =
@@ -567,7 +569,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
                           , fun_matches = mg }
                       | name `hasKnownKey` sappendClassOpKey
                       , isAliasMG mg mappendClassOpKey
-                      -> addWarnNonCanonicalMonoid NonCanonical_Sappend
+                      -> addErrNonCanonicalMonoid NonCanonical_Sappend
 
                   _ -> return ()
 
@@ -577,8 +579,11 @@ checkCanonicalInstances cls poly_ty mbinds = do
                   FunBind { fun_id = L _ name
                           , fun_matches = mg }
                       | name `hasKnownKey` mappendClassOpKey
-                      , not (isAliasMG mg sappendClassOpKey)
-                      -> addWarnNonCanonicalMonoid NonCanonical_Mappend
+                      ->
+                        if isAliasMG mg sappendClassOpKey then
+                          redundantCanonicalMethod Canonical_Mappend
+                        else
+                          addErrNonCanonicalMonoid NonCanonical_Mappend
 
                   _ -> return ()
 
@@ -595,14 +600,24 @@ checkCanonicalInstances cls poly_ty mbinds = do
         = getName rhsName `hasKnownKey` key
     isAliasMG _ _ = False
 
-    addWarnNonCanonicalMonoid reason =
-      addWarnNonCanonicalDefinition (NonCanonicalMonoid reason)
+    addErrNonCanonicalMonoid reason =
+      addErrNonCanonicalDefinition (NonCanonicalMonoid reason)
+
+    addErrNonCanonicalMonad reason =
+      addErrNonCanonicalDefinition (NonCanonicalMonad reason)
+
+    addErrNonCanonicalDefinition reason =
+      addErr (TcRnNonCanonicalDefinition reason poly_ty)
 
     addWarnNonCanonicalMonad reason =
       addWarnNonCanonicalDefinition (NonCanonicalMonad reason)
 
     addWarnNonCanonicalDefinition reason =
       addDiagnostic (TcRnNonCanonicalDefinition reason poly_ty)
+
+    redundantCanonicalMethod reason =
+      whenWOptM Opt_WarnRedundantCanonicalMethods $
+        addDiagnostic (TcRnRedundantCanonicalMethod reason poly_ty)
 
 rnClsInstDecl :: ClsInstDecl GhcPs -> RnM (ClsInstDecl GhcRn, FreeNames)
 rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _)

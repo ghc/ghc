@@ -625,7 +625,6 @@ instance Semi.Semigroup (UniqFM key a) where
 
 instance Monoid (UniqFM key a) where
     mempty = emptyUFM
-    mappend = (Semi.<>)
 
 -- Output-ery
 

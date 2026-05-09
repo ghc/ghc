@@ -258,7 +258,6 @@ type Key    = Word64
 instance Monoid Word64Set where
     mempty  = empty
     mconcat = unions
-    mappend = (<>)
 
 -- | @since 0.5.7
 instance Semigroup Word64Set where

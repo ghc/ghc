@@ -1086,9 +1086,9 @@ data WarningFlag =
    | Opt_WarnDerivingTypeable
    | Opt_WarnDeferredTypeErrors
    | Opt_WarnDeferredOutOfScopeVariables
-   | Opt_WarnNonCanonicalMonadInstances              -- ^ @since 8.0
+   | Opt_WarnNonCanonicalMonadInstances              -- ^ @since 8.0, from 10.2 only warns about (>>)
    | Opt_WarnNonCanonicalMonadFailInstances          -- ^ @since 8.0, has no effect since 8.8
-   | Opt_WarnNonCanonicalMonoidInstances             -- ^ @since 8.0
+   | Opt_WarnNonCanonicalMonoidInstances             -- ^ @since 8.0, has no effect since 10.2
    | Opt_WarnMissingPatternSynonymSignatures         -- ^ @since 8.0
    | Opt_WarnUnrecognisedWarningFlags                -- ^ @since 8.0
    | Opt_WarnSimplifiableClassConstraints            -- ^ @since 8.2
@@ -1143,9 +1143,11 @@ data WarningFlag =
    | Opt_WarnUnusableUnpackPragmas                   -- ^ @since 9.14
    | Opt_WarnPatternNamespaceSpecifier               -- ^ @since 9.14
    | Opt_WarnUnrecognisedModifiers                   -- ^ @since 10.0
-   | Opt_WarnSemaphoreOpenFailure                   -- Since 10.0.1
+   | Opt_WarnSemaphoreOpenFailure                    -- ^ @since 10.0.1
    | Opt_WarnDefaultedCallStack                      -- ^ @since 10.2
    | Opt_WarnImplicitFieldStrictness                 -- ^ @since 10.2
+   | Opt_WarnRedundantCanonicalMethods               -- ^ @since 10.2
+   --search codebase for Opt_WarnRedundantCanonicalMethods for cleanup
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -1227,6 +1229,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnUnusedTypePatterns                      -> "unused-type-patterns" :| []
   Opt_WarnUnusedRecordWildcards                   -> "unused-record-wildcards" :| []
   Opt_WarnRedundantBangPatterns                   -> "redundant-bang-patterns" :| []
+  Opt_WarnRedundantCanonicalMethods               -> "redundant-canonical-methods" :| []
   Opt_WarnRedundantRecordWildcards                -> "redundant-record-wildcards" :| []
   Opt_WarnRedundantStrictnessFlags                -> "redundant-strictness-flags" :| []
   Opt_WarnWrongDoBind                             -> "wrong-do-bind" :| []
@@ -1402,8 +1405,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnStarIsType,
         Opt_WarnInaccessibleCode,
         Opt_WarnSpaceAfterBang,
+        Opt_WarnRedundantCanonicalMethods, -- enabled by default since 10.2
         Opt_WarnNonCanonicalMonadInstances,
-        Opt_WarnNonCanonicalMonoidInstances,
         Opt_WarnOperatorWhitespaceExtConflict,
         Opt_WarnUnicodeBidirectionalFormatCharacters,
         Opt_WarnGADTMonoLocalBinds,

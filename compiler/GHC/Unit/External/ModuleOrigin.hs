@@ -106,7 +106,6 @@ instance Semigroup ModuleOrigin where
 
 instance Monoid ModuleOrigin where
     mempty = ModOrigin Nothing [] [] False
-    mappend = (Semigroup.<>)
 
 -- | Is the name from the import actually visible? (i.e. does it cause
 -- ambiguity, or is it only relevant when we're making suggestions?)

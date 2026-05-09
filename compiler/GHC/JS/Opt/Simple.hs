@@ -109,7 +109,6 @@ instance Semi.Semigroup VarValue where
 
 instance Monoid VarValue where
   mempty = Unassigned
-  mappend = (Semi.<>)
 
 instance Semigroup Multiplicity where
     Zero <> x = x
@@ -118,7 +117,6 @@ instance Semigroup Multiplicity where
 
 instance Monoid Multiplicity where
     mempty = Zero
-    mappend = (Semi.<>)
 
 data VarUsage = VarUsage
     { varUsed :: !Multiplicity

@@ -67,7 +67,5 @@ instance Applicative (Sink s m) where
   m *> k = m >>= \_ -> k
 
 instance Monad (Sink s m) where
-  return = pure
-  {-# INLINE return #-}
   m >>= k = Sink $ \s cont -> unSink m s $ \a s' -> unSink (k a) s' cont
 

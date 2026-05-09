@@ -1,0 +1,20 @@
+RedundantCanonicalMethods.hs:10:3: warning: [GHC-54927] [-Wredundant-canonical-methods (in -Wdefault)]
+    Canonical ‘mappend’ definition detected
+    in the instance declaration for ‘Monoid U’.
+    This definition is redundant with the
+    default implementation of ‘mappend’,
+    and will eventually need to be removed when
+    ‘mappend’ is moved from ‘Monoid’ to a top-level
+    definition.
+    Suggested fix: Remove the definition for ‘mappend’
+
+RedundantCanonicalMethods.hs:18:3: warning: [GHC-54927] [-Wredundant-canonical-methods (in -Wdefault)]
+    Canonical ‘return’ definition detected
+    in the instance declaration for ‘Monad P’.
+    This definition is redundant with the
+    default implementation of ‘return’,
+    and will eventually need to be removed when
+    ‘return’ is moved from ‘Monad’ to a top-level
+    definition.
+    Suggested fix: Remove the definition for ‘return’
+

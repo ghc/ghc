@@ -109,7 +109,6 @@ instance Applicative P where
   (<*>) = ap
 
 instance Monad P where
-  return = pure
   m >>= k = P $ \s0 -> do
     (s1, x) <- unP m s0
     unP (k x) s1

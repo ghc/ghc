@@ -21,11 +21,11 @@ instance Monad m => Functor (Rand m) where
   fmap = liftM
 
 instance Monad m => Applicative (Rand m) where
-  pure  = return
+  pure = Rand . const . return
   (<*>) = ap
 
 instance (Monad m) => Monad (Rand m) where
-  return           = Rand . const . return
+
   (Rand rnd) >>= f = Rand $ \g -> (\x -> runRand (f x) g) =<< rnd g
 
 instance MonadTrans Rand where

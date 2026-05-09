@@ -1,0 +1,30 @@
+Noncanonical.hs:9:3: [GHC-50928]
+    Noncanonical ‘(<>) = mappend’ definition detected
+    in the instance declaration for ‘Semi.Semigroup S’.
+    Suggested fix:
+      Move definition from ‘mappend’ to ‘(<>)’
+      See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/semigroup-monoid
+
+Noncanonical.hs:12:3: [GHC-50928]
+    Noncanonical ‘mappend’ definition detected
+    in the instance declaration for ‘Monoid S’.
+    ‘mappend’ will eventually be removed in favour of ‘(<>)’
+    Suggested fix:
+      Either remove definition for ‘mappend’ (recommended) or define as ‘mappend = (<>)’
+      See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/semigroup-monoid
+
+Noncanonical.hs:22:3: [GHC-22705]
+    Noncanonical ‘pure = return’ definition detected
+    in the instance declaration for ‘Applicative M’.
+    Suggested fix:
+      Move definition from ‘return’ to ‘pure’
+      See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return
+
+Noncanonical.hs:26:3: [GHC-22705]
+    Noncanonical ‘return’ definition detected
+    in the instance declaration for ‘Monad M’.
+    ‘return’ will eventually be removed in favour of ‘pure’
+    Suggested fix:
+      Either remove definition for ‘return’ (recommended) or define as ‘return = pure’
+      See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return
+

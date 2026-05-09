@@ -69,7 +69,6 @@ instance Applicative (ConduitM i o m) where
     {-# INLINE (<*>) #-}
 
 instance Monad (ConduitM i o m) where
-    return = pure
     ConduitM f >>= g = ConduitM $ \h -> f $ \a -> unConduitM (g a) h
 
 instance Monad m => Functor (Pipe l i o u m) where
@@ -83,9 +82,6 @@ instance Monad m => Applicative (Pipe l i o u m) where
     {-# INLINE (<*>) #-}
 
 instance Monad m => Monad (Pipe l i o u m) where
-    return = pure
-    {-# INLINE return #-}
-
     HaveOutput p c o >>= fp = HaveOutput (p >>= fp)            c          o
     NeedInput p c    >>= fp = NeedInput  (p >=> fp)            (c >=> fp)
     Done x           >>= fp = fp x

@@ -550,7 +550,6 @@ renum from = (\(_,m,g)->(g,m))
 newtype S z s a = S {unS :: forall o. (a -> s -> ST z o) -> s -> ST z o}
   deriving (Functor)
 instance Monad (S z s) where
-  return = pure
   S g >>= f = S (\k -> g (\a -> unS (f a) k))
 instance Applicative (S z s) where
   pure a = S (\k -> k a)

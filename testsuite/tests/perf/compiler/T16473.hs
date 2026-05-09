@@ -54,8 +54,6 @@ instance Applicative (Semantic f) where
   {-# INLINE (<*>) #-}
 
 instance Monad (Semantic f) where
-  return = pure
-  {-# INLINE return #-}
   Semantic ma >>= f = Semantic $ \k -> do
     z <- ma k
     runSemantic (f z) k

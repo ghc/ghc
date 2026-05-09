@@ -50,7 +50,6 @@ instance Applicative FormResult where
     _ <*> _ = FormMissing
 instance Monoid m => Monoid (FormResult m) where
     mempty = pure mempty
-    mappend = (<>)
 instance Semigroup m => Semigroup (FormResult m) where
     x <> y = (<>) <$> x <*> y
 

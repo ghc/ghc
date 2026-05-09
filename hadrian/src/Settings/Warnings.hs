@@ -42,12 +42,14 @@ ghcWarningsArgs = do
         [ libraryPackage       ? pure [ "-Wno-deprecated-flags" ]
         , package ghcInternal  ? pure [ "-Wno-trustworthy-safe" ]
         , package base         ? pure [ "-Wno-trustworthy-safe" ]
-        , package binary       ? pure [ "-Wno-deprecations" ]
-        , package bytestring   ? pure [ "-Wno-inline-rule-shadowing" ]
+        , package binary       ? pure [ "-Wno-deprecations", "-Wno-redundant-canonical-methods" ]
+        , package bytestring   ? pure [ "-Wno-inline-rule-shadowing", "-Wno-redundant-canonical-methods" ]
         , package compiler     ? pure [ "-Wcpp-undef" ]
+        , package containers   ? pure [ "-Wno-unused-imports", "-Wno-redundant-canonical-methods" ]
         , package directory    ? pure [ "-Wno-unused-imports"
                                       , "-Wno-deprecations" -- https://gitlab.haskell.org/ghc/ghc/-/issues/24240
                                       ]
+        , package exceptions   ? pure [ "-Wno-redundant-canonical-methods" ]
         , package fileio       ? pure [ "-Wno-unused-imports" ] -- https://github.com/haskell/file-io/issues/30
         , package ghc          ? pure [ "-Wcpp-undef"
                                       , "-Wincomplete-uni-patterns"
@@ -62,40 +64,45 @@ ghcWarningsArgs = do
                                       , "-Wno-unused-imports"
                                       , "-Wno-redundant-constraints"
                                       , "-Wno-simplifiable-class-constraints"
-                                      , "-Wno-deriving-typeable" ]
-        , package pretty       ? pure [ "-Wno-unused-imports" ]
+                                      , "-Wno-deriving-typeable"
+                                      , "-Wno-redundant-canonical-methods" ]
+        , package hpcBin       ? pure [ "-Wno-redundant-canonical-methods" ]
+        , package hsc2hs       ? pure [ "-Wno-redundant-canonical-methods" ]
+        , package pretty       ? pure [ "-Wno-unused-imports", "-Wno-redundant-canonical-methods" ]
         , package primitive    ? pure [ "-Wno-unused-imports"
                                       , "-Wno-deprecations" ]
         , package rts          ? pure [ "-Wcpp-undef" ]
         , package text         ? pure [ "-Wno-deprecations"
                                       , "-Wno-deriving-typeable"
-                                      , "-Wno-unused-imports" ]
-        , package terminfo     ? pure [ "-Wno-unused-imports", "-Wno-deriving-typeable" ]
-        , package stm          ? pure [ "-Wno-deriving-typeable" ]
-        , package osString     ? pure [ "-Wno-deriving-typeable", "-Wno-unused-imports" ]
-        , package parsec       ? pure [ "-Wno-deriving-typeable"
+                                      , "-Wno-unused-imports"
+                                      , "-Wno-redundant-canonical-methods" ]
+        , package terminfo     ? pure [ "-Wno-unused-imports", "-Wno-deriving-typeable", "-Wno-redundant-canonical-methods" ]
+        , package stm          ? pure [ "-Wno-deriving-typeable", "-Wno-redundant-canonical-methods" ]
+        , package osString     ? pure [ "-Wno-deriving-typeable", "-Wno-unused-imports", "-Wno-redundant-canonical-methods" ]
+        , package parsec       ? pure [ "-Wno-deriving-typeable", "-Wno-redundant-canonical-methods"
                                       , "-Wno-x-partial"
                                       ]
 
         , package filepath     ? pure [ "-Wno-x-partial" ]
 
-        , package cabal        ? pure [ "-Wno-deriving-typeable", "-Wno-incomplete-record-selectors" ]
+        , package cabal        ? pure [ "-Wno-deriving-typeable", "-Wno-incomplete-record-selectors", "-Wno-redundant-canonical-methods" ]
              -- The -Wno-incomplete-record-selectors is due to
              -- https://github.com/haskell/cabal/issues/10402
              -- If that ticket is fixed, bwe can remove the flag again
 
-        , package cabalSyntax  ? pure [ "-Wno-deriving-typeable" ]
-        , package time         ? pure [ "-Wno-deriving-typeable" ]
+        , package cabalSyntax  ? pure [ "-Wno-deriving-typeable", "-Wno-redundant-canonical-methods" ]
+        , package time         ? pure [ "-Wno-deriving-typeable", "-Wno-redundant-canonical-methods" ]
         , package transformers ? pure [ "-Wno-unused-matches"
                                       , "-Wno-unused-imports"
                                       , "-Wno-redundant-constraints"
-                                      , "-Wno-orphans" ]
-        , package unix         ? pure [ "-Wno-deprecations", "-Wno-deriving-typeable" ]
+                                      , "-Wno-orphans"
+                                      , "-Wno-redundant-canonical-methods" ]
+        , package unix         ? pure [ "-Wno-deprecations", "-Wno-deriving-typeable", "-Wno-redundant-canonical-methods" ]
         , package win32        ? pure [ "-Wno-trustworthy-safe"
                                       , "-Wno-deprecations" -- https://gitlab.haskell.org/ghc/ghc/-/issues/24240
                                       , "-Wno-deriving-typeable"
                                       ]
-        , package xhtml        ? pure [ "-Wno-unused-imports" ]
+        , package xhtml        ? pure [ "-Wno-unused-imports", "-Wno-redundant-canonical-methods" ]
         , package containers   ? pure [ "-Wno-unused-imports" ]
         , package semaphoreCompat ? pure [ "-Wno-unused-imports" ]
         ] ]

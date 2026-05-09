@@ -1,0 +1,4 @@
+section: language
+synopsis: Non-canonical definitions of `return` and `mappend` are errors and canonical definitions are warnings
+issues: #25783
+mrs: !15795

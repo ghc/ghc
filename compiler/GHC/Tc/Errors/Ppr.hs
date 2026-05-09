@@ -1942,6 +1942,9 @@ instance Diagnostic TcRnMessage where
     TcRnNonCanonicalDefinition reason inst_ty
       -> mkSimpleDecorated $
          pprNonCanonicalDefinition inst_ty reason
+    TcRnRedundantCanonicalMethod reason inst_ty
+      -> mkSimpleDecorated $
+         pprRedundantCanonicalMethod inst_ty reason
     TcRnDefaultedExceptionContext ct_loc ->
       mkSimpleDecorated $ vcat [ header, warning, proposal ]
       where
@@ -2691,9 +2694,15 @@ instance Diagnostic TcRnMessage where
     TcRnBindingNameConflict{}
       -> ErrorWithoutFlag
     TcRnNonCanonicalDefinition (NonCanonicalMonoid _) _
-      -> WarningWithFlag Opt_WarnNonCanonicalMonoidInstances
-    TcRnNonCanonicalDefinition (NonCanonicalMonad _) _
+      -> ErrorWithoutFlag
+    TcRnNonCanonicalDefinition (NonCanonicalMonad NonCanonical_ThenA) _
       -> WarningWithFlag Opt_WarnNonCanonicalMonadInstances
+    TcRnNonCanonicalDefinition (NonCanonicalMonad NonCanonical_ThenM) _
+      -> WarningWithFlag Opt_WarnNonCanonicalMonadInstances
+    TcRnNonCanonicalDefinition (NonCanonicalMonad _) _
+      -> ErrorWithoutFlag
+    TcRnRedundantCanonicalMethod _ _
+      -> WarningWithFlag Opt_WarnRedundantCanonicalMethods
     TcRnDefaultedExceptionContext{}
       -> WarningWithFlag Opt_WarnDefaultedExceptionContext
     TcRnDefaultedCallStack{}
@@ -3431,6 +3440,11 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnNonCanonicalDefinition reason _
       -> suggestNonCanonicalDefinition reason
+    TcRnRedundantCanonicalMethod reason _
+      -> [ SuggestRemoveCanonicalDefinition $ case reason of
+             Canonical_Mappend -> mappendClassOpOcc
+             Canonical_Return -> returnMClassOpOcc
+         ]
     TcRnDefaultedExceptionContext _
       -> noHints
     TcRnDefaultedCallStack{}
@@ -6620,6 +6634,42 @@ pprNonCanonicalDefinition inst_ty = \case
           , quotes (text lhs) <+>
             text "will eventually be removed in favour of" <+>
             quotes (text rhs)
+          ]
+
+    inst = instDeclCtxt1 inst_ty
+
+    -- stolen from GHC.Tc.TyCl.Instance
+    instDeclCtxt1 :: LHsSigType GhcRn -> SDoc
+    instDeclCtxt1 hs_inst_ty
+      = inst_decl_ctxt (ppr (getLHsInstDeclHead hs_inst_ty))
+
+    inst_decl_ctxt :: SDoc -> SDoc
+    inst_decl_ctxt doc = hang (text "in the instance declaration for")
+                         2 (quotes doc <> text ".")
+
+pprRedundantCanonicalMethod :: LHsSigType GhcRn
+                            -> Canonical
+                            -> SDoc
+pprRedundantCanonicalMethod inst_ty = \case
+  Canonical_Mappend -> msg "mappend" "Monoid"
+  Canonical_Return -> msg "return" "Monad"
+  where
+    msg :: String -> String -> SDoc
+    msg lhs cls =
+      vcat [ text "Canonical" <+>
+            quotes (text lhs) <+>
+            text "definition detected"
+          , inst
+          , text "This definition is redundant with the"
+          , text "default implementation of" <+>
+            quotes (text lhs) <>
+            text ","
+          , text "and will eventually need to be removed when"
+          , quotes (text lhs) <+>
+            text "is moved from" <+>
+            quotes (text cls) <+>
+            text "to a top-level"
+          , text "definition."
           ]
 
     inst = instDeclCtxt1 inst_ty

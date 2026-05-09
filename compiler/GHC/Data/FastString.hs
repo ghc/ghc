@@ -238,7 +238,6 @@ instance Semi.Semigroup FastString where
 
 instance Monoid FastString where
     mempty = nilFS
-    mappend = (Semi.<>)
     mconcat = concatFS
 
 instance Show FastString where

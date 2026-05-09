@@ -283,7 +283,6 @@ instance Applicative SolverStage where
   (<*>)  = ap
 
 instance Monad SolverStage where
-  return          = pure
   (Stage m) >>= k = Stage $
                     do { soc <- m
                        ; case soc of

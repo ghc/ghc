@@ -38,7 +38,6 @@ instance Semi.Semigroup a => Semi.Semigroup (Pair a) where
 
 instance (Semi.Semigroup a, Monoid a) => Monoid (Pair a) where
   mempty = Pair mempty mempty
-  mappend = (Semi.<>)
 
 instance Outputable a => Outputable (Pair a) where
   ppr (Pair a b) = ppr a <+> char '~' <+> ppr b

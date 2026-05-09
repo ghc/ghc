@@ -294,6 +294,8 @@ instance Outputable GhcHint where
       text "or define as" <+>
       quotes (pprPrefixOcc lhs <+> text "=" <+> pprPrefixOcc rhs) $$
       text "See also:" <+> text refURL
+    SuggestRemoveCanonicalDefinition lhs ->
+      text "Remove the definition for" <+> quotes (pprPrefixOcc lhs)
     SuggestEtaReduceAbsDataTySyn tc
         -> text "If possible, eta-reduce the type synonym" <+> ppr_tc <+> text "so that it is nullary."
         where ppr_tc = quotes (ppr $ tyConName tc)

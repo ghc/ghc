@@ -21,27 +21,27 @@ data APattern a = APattern
 data CExpr = CExpr
 data CPattern = CPattern
 data NiceDeclaration = QQ
-data TypeError = NotAValidLetBinding NiceDeclaration  
-data TCState = TCSt { stFreshThings :: FreshThings }  
+data TypeError = NotAValidLetBinding NiceDeclaration
+data TCState = TCSt { stFreshThings :: FreshThings }
 data FreshThings = Fresh
 
 newtype NewName a = NewName a
-newtype LetDef = LetDef NiceDeclaration  
+newtype LetDef = LetDef NiceDeclaration
 newtype TCMT (m :: * -> *) a = TCM ()
 
-localToAbstract :: ToAbstract c a => c -> (a -> TCMT IO b) -> TCMT IO b  
+localToAbstract :: ToAbstract c a => c -> (a -> TCMT IO b) -> TCMT IO b
 localToAbstract = undefined
 
-typeError :: MonadTCM tcm => TypeError -> tcm a  
+typeError :: MonadTCM tcm => TypeError -> tcm a
 typeError = undefined
 
-lhsArgs :: [Arg (Named String CPattern)]  
+lhsArgs :: [Arg (Named String CPattern)]
 lhsArgs = undefined
 
-freshNoName :: (MonadState s m, HasFresh NameId s) => Range -> m Name  
+freshNoName :: (MonadState s m, HasFresh NameId s) => Range -> m Name
 freshNoName = undefined
 
-class (Monad m) => MonadState s m | m -> s  
+class (Monad m) => MonadState s m | m -> s
 class (Monad m) => MonadIO m
 
 class ToAbstract concrete abstract | concrete -> abstract where
@@ -53,9 +53,9 @@ class (MonadState TCState tcm) => MonadTCM tcm where
 class HasFresh i a where
     nextFresh :: a -> (i,a)
 
-instance ToAbstract c a => ToAbstract [c] [a] where  
-instance ToAbstract c a => ToAbstract (Arg c) (Arg a) where  
-instance ToAbstract c a => ToAbstract (Named name c) (Named name a) where  
+instance ToAbstract c a => ToAbstract [c] [a] where
+instance ToAbstract c a => ToAbstract (Arg c) (Arg a) where
+instance ToAbstract c a => ToAbstract (Named name c) (Named name a) where
 instance ToAbstract CPattern (APattern CExpr) where
 
 instance ToAbstract LetDef [ALetBinding] where
@@ -83,11 +83,10 @@ instance Functor (TCMT m) where
   fmap = liftM
 
 instance Applicative (TCMT m) where
-  pure  = return
+  pure  = undefined
   (<*>) = ap
 
 instance Monad (TCMT m) where
-    return = undefined
     (>>=) = undefined
 
 instance Monad m => MonadIO (TCMT m) where

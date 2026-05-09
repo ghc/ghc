@@ -11,11 +11,11 @@ instance Functor RV where
   fmap f = RV . map (\(x,y) -> (x, f y)) . getPDF
 
 instance Applicative RV where
-  pure = return
+  pure x = RV [(1,x)]
   (<*>) = ap
 
 instance Monad RV where
-  return x = RV [(1,x)]
+
   rv >>= f = RV $
     do (p,a) <- getPDF rv
        guard (p > 0)

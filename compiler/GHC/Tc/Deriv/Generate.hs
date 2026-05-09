@@ -62,6 +62,7 @@ import GHC.Core.Class
 import GHC.Types.Name.Reader
 import GHC.Types.Basic
 import GHC.Types.Fixity
+import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
@@ -71,6 +72,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Set
 
 import GHC.Builtin.KnownOccs
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.TH
 import GHC.Builtin.WiredIn.Prim
 import GHC.Builtin.WiredIn.Types
@@ -1866,7 +1868,7 @@ gen_Newtype_binds :: SrcSpan
                   -> LHsBinds GhcPs
 -- See Note [Newtype-deriving instances]
 gen_Newtype_binds loc' cls inst_tvs inst_tys rhs_ty
-  = map mk_bind (classMethods cls)
+  = map mk_bind (filter (shouldDerive (className cls) . idName) (classMethods cls))
   where
     -- Same as inst_tys, but with the last argument type replaced by the
     -- representation type.
@@ -1932,6 +1934,19 @@ gen_Newtype_binds loc' cls inst_tvs inst_tys rhs_ty
                    [mkTyVarTy tv | Bndr tv spec <- to_tvbs, spec /= InferredSpec] -- (2)
                      -- Filter out any inferred arguments, since they can't be
                      -- applied with visible type application.
+
+    -- We never want to derive any of the methods relevant to
+    -- -Wredundant-canonical-methods; we want to use their default
+    -- implementations instead. When these methods are removed from their
+    -- classes, this filter can be removed along with that warning.
+    -- associated with Opt_WarnRedundantCanonicalMethods
+    shouldDerive :: Name -> Name -> Bool
+    shouldDerive c
+      | c `hasKnownKey` monoidClassKey =
+          \m -> not (m `hasKnownKey` mappendClassOpKey)
+      | c `hasKnownKey` monadClassKey  =
+          \m -> not (m `hasKnownKey` returnMClassOpKey)
+      | otherwise            = const True
 
 gen_Newtype_fam_insts :: SrcSpan
                       -> Class   -- the class being derived

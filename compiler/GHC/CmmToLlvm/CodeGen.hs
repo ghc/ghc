@@ -2482,7 +2482,6 @@ instance Semigroup LlvmAccum where
 
 instance Monoid LlvmAccum where
     mempty = LlvmAccum nilOL []
-    mappend = (Semigroup.<>)
 
 liftExprData :: LlvmM ExprData -> WriterT LlvmAccum LlvmM LlvmVar
 liftExprData action = do

@@ -98,7 +98,6 @@ instance Applicative Eval where
   (<*>)  = ap
 
 instance Monad Eval where
-  return = pure
   Eval x >>= k = Eval $ \s -> case x s of
                                 (# s', a #) -> case k a of
                                                       Eval f -> f s'

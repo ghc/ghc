@@ -153,8 +153,6 @@ Library
     -- Hadrian further set some warnings in its Settings.Warnings module.
     GHC-Options: -Wall
                  -Wno-name-shadowing
-                 -Wnoncanonical-monad-instances
-                 -Wnoncanonical-monoid-instances
 
     if flag(internal-interpreter)
         CPP-Options: -DHAVE_INTERNAL_INTERPRETER

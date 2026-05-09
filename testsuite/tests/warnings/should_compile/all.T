@@ -80,6 +80,7 @@ test('T22826', normal, compile, [''])
 test('T23573', [extra_files(["T23573.hs", "T23573A.hs", "T23573B.hs"])], multimod_compile, ['T23573', '-v0'])
 test('T23465', normal, compile, ['-ddump-parsed'])
 test('WarnNoncanonical', normal, compile, [''])
+test('RedundantCanonicalMethods', normal, compile, ['']) # on by default
 test('T24396', [extra_files(["T24396a.hs", "T24396b.hs"])], multimod_compile, ['T24396b', ''])
 test('SpecMultipleTys',     normal, compile, ['']) # compile_fail from GHC 9.18
 test('SpecMultipleTysMono', normal, compile, ['']) # compile_fail from GHC 9.18

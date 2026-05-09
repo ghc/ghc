@@ -167,7 +167,6 @@ instance Applicative M where
         (Just (maybeParen p (fromMaybe (text "pure") d1 <+> char '|' <+> fromMaybe (text "pure") d2)), f' a')
 
 instance Monad M where
-  return = pure
   M m >>= k = M $ \p ->
     let (d1, a) = m True
         (d2, b) = case k a of M f -> f True

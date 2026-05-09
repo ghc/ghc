@@ -15,7 +15,6 @@ instance Semi.Semigroup PprColour where
 --   In case of conflict, right side takes precedence.
 instance Monoid PprColour where
   mempty = PprColour mempty
-  mappend = (<>)
 
 renderColourAfresh :: PprColour -> String
 renderColourAfresh c = renderColour (colReset `mappend` c)

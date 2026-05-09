@@ -29,8 +29,6 @@ instance Applicative (Codensity f) where
     Codensity $ oneShot (\bfr -> f $ oneShot (\ab -> g $ oneShot (\x -> bfr (ab x))))
   {-# INLINE (<*>) #-}
 instance Monad (Codensity f) where
-  return = pure
-  {-# INLINE return #-}
   m >>= k =
     Codensity $ oneShot (\c -> runCodensity m $ oneShot (\a -> runCodensity (k a) c))
   {-# INLINE (>>=) #-}

@@ -74,11 +74,10 @@ instance Functor Identity where
     fmap = liftM
 
 instance Applicative Identity where
-    pure  = return
+    pure a = Identity a
     (<*>) = ap
 
 instance Monad Identity where
-    return a = Identity a
     m >>= k  = k (runIdentity m)
 
 instance MonadFail Identity where
@@ -91,11 +90,10 @@ instance (Monad m, Functor s) => Functor (Trampoline m s) where
   fmap = liftM
 
 instance (Monad m, Functor s) => Applicative (Trampoline m s) where
-  pure  = return
+  pure x = Trampoline (return (Done x))
   (<*>) = ap
 
 instance (Monad m, Functor s) => Monad (Trampoline m s) where
-   return x = Trampoline (return (Done x))
    t >>= f = Trampoline (bounce t >>= apply f)
       where apply f (Done x) = bounce (f x)
             apply f (Suspend s) = return (Suspend (fmap (>>= f) s))

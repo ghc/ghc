@@ -317,7 +317,6 @@ instance Semi.Semigroup IfaceAppArgs where
 
 instance Monoid IfaceAppArgs where
   mempty = IA_Nil
-  mappend = (Semi.<>)
 
 -- Encodes type constructors, kind constructors,
 -- coercion constructors, the lot.

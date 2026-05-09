@@ -876,7 +876,6 @@ instance Semigroup (Stream m a) where
 
 instance Monoid (Stream m a) where
     mempty = nil
-    mappend = (<>)
 
 -------------------------------------------------------------------------------
 -- Functor
@@ -1213,8 +1212,6 @@ instance Monad m => Applicative (Stream m) where
 -- the monad instance of StreamD is slower than StreamK after foldr/build
 -- fusion.
 instance Monad m => Monad (Stream m) where
-    {-# INLINE return #-}
-    return = pure
     {-# INLINE (>>=) #-}
     (>>=) = flip concatMap
 

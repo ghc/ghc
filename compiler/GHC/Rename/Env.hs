@@ -857,7 +857,6 @@ instance Semi.Semigroup DisambigInfo where
 
 instance Monoid DisambigInfo where
   mempty = NoOccurrence
-  mappend = (Semi.<>)
 
 -- Lookup SubBndrOcc can never be ambiguous
 --

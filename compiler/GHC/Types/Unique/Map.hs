@@ -75,7 +75,6 @@ instance Semigroup (UniqMap k a) where
 
 instance Monoid (UniqMap k a) where
     mempty = emptyUniqMap
-    mappend = (Semi.<>)
 
 instance (Outputable k, Outputable a) => Outputable (UniqMap k a) where
     ppr (UniqMap m) =

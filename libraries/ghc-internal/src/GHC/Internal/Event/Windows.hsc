@@ -333,7 +333,6 @@ data EventData = EventData { evtTopLevel :: !Event, evtElems :: !EventElements }
 
 instance Monoid EventData where
   mempty  = EventData evtNothing []
-  mappend = (<>)
 
 instance Semigroup EventData where
   (<>)   = \a b -> EventData (evtTopLevel a <> evtTopLevel b)

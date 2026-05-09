@@ -1034,7 +1034,6 @@ instance S.Semigroup WantedConstraints where
   (<>) = andWC
 instance Monoid WantedConstraints where
   mempty  = emptyWC
-  mappend = (S.<>)
 
 emptyWC :: WantedConstraints
 emptyWC = WC { wc_simple = emptyBag

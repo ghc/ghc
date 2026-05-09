@@ -2405,7 +2405,8 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnNonCanonicalMonadInstances -> warnSpec x
   Opt_WarnNonCanonicalMonadFailInstances
     -> depWarnSpec x "fail is no longer a method of Monad"
-  Opt_WarnNonCanonicalMonoidInstances -> warnSpec x
+  Opt_WarnNonCanonicalMonoidInstances
+    -> depWarnSpec x "noncanonical definitions in Monoid instances are no longer allowed"
   Opt_WarnOrphans -> warnSpec x
   Opt_WarnOverflowedLiterals -> warnSpec x
   Opt_WarnOverlappingPatterns -> warnSpec x
@@ -2436,6 +2437,7 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnUnusedTypePatterns -> warnSpec x
   Opt_WarnUnusedRecordWildcards -> warnSpec x
   Opt_WarnRedundantBangPatterns -> warnSpec x
+  Opt_WarnRedundantCanonicalMethods -> warnSpec x
   Opt_WarnRedundantRecordWildcards -> warnSpec x
   Opt_WarnRedundantStrictnessFlags -> warnSpec x
   Opt_WarnWrongDoBind -> warnSpec x

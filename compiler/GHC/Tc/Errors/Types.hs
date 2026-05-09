@@ -120,6 +120,7 @@ module GHC.Tc.Errors.Types (
   , NonCanonicalDefinition(..)
   , NonCanonical_Monoid(..)
   , NonCanonical_Monad(..)
+  , Canonical(..)
   , TypeSyntax(..)
   , typeSyntaxExtension
   , SuggestLinear(..)
@@ -4159,18 +4160,33 @@ data TcRnMessage where
                              -- ^ The locations of the duplicates
                           -> TcRnMessage
 
-  {-| TcRnNonCanonicalDefinition is a warning indicating that an instance
+  {-| TcRnNonCanonicalDefinition is a warning or error indicating that an instance
     defines an implementation for a method that should not be defined in a way
     that deviates from its default implementation, for example because it has
     been scheduled to be absorbed into another method, like @pure@ making
     @return@ obsolete.
 
     Test cases:
-      WCompatWarningsOn, WCompatWarningsOff, WCompatWarningsOnOff
+      Noncanonical
   -}
-  TcRnNonCanonicalDefinition :: !NonCanonicalDefinition -- ^ Specifics
+  TcRnNonCanonicalDefinition :: !NonCanonicalDefinition
+                                  -- ^ Specifics of non-canonicity (monad/monoid, method)
                              -> !(LHsSigType GhcRn) -- ^ The instance type
                              -> TcRnMessage
+
+  {-| TcRnRedundantCanonicalMethod is a warning indicating that an instance
+    defines an implementation for a method that is both redundant with its
+    default implementation and slated to be removed from the class in a future
+    release.
+
+    Test cases:
+      RedundantCanonicalMethods
+  -}
+  TcRnRedundantCanonicalMethod :: !Canonical
+                                    -- ^ Specifics of canonicity (return/mappend)
+                               -> !(LHsSigType GhcRn) -- ^ The instance type
+                               -> TcRnMessage
+
   {-| TcRnImplicitImportOfPrelude is a warning, controlled by @Wimplicit-prelude@,
       that is triggered upon an implicit import of the @Prelude@ module.
 
@@ -6712,7 +6728,7 @@ data NonCanonicalDefinition =
   NonCanonicalMonad NonCanonical_Monad
   deriving (Generic)
 
--- | Possible cases for the -Wnoncanonical-monoid-instances.
+-- | Possible Semigroup/Monoid cases for TcRnNonCanonicalDefinition.
 data NonCanonical_Monoid =
   -- | @(<>) = mappend@ was defined.
   NonCanonical_Sappend
@@ -6720,7 +6736,7 @@ data NonCanonical_Monoid =
   -- | @mappend@ was defined as something other than @(<>)@.
   NonCanonical_Mappend
 
--- | Possible cases for the -Wnoncanonical-monad-instances.
+-- | Possible Applicative/Monad cases for TcRnNonCanonicalDefinition.
 data NonCanonical_Monad =
   -- | @pure = return@ was defined.
   NonCanonical_Pure
@@ -6733,6 +6749,11 @@ data NonCanonical_Monad =
   |
   -- | @(>>)@ was defined as something other than @(*>)@.
   NonCanonical_ThenM
+
+-- | Possible cases for -Wredundant-canonical-methods / TcRnRedundantCanonicalMethod.
+data Canonical
+  = Canonical_Return
+  | Canonical_Mappend
 
 -- | Why was an instance declaration rejected?
 data IllegalInstanceReason

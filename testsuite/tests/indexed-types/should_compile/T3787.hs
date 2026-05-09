@@ -86,7 +86,6 @@ instance (Functor s, Monad m) => Applicative (Trampoline s m) where
    (<*>) = ap
 
 instance (Functor s, Monad m) => Monad (Trampoline s m) where
-   return = pure
    t >>= f = Trampoline (bounce t >>= apply f)
       where apply f (Done x) = bounce (f x)
             apply f (Suspend s) = return (Suspend (fmap (>>= f) s))

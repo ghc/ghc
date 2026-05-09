@@ -20,8 +20,6 @@ instance Applicative Gen where
   (<*>) = ap
 
 instance Monad Gen where
-  return = pure
-
   MkGen m >>= k =
     MkGen
       ( \r n ->

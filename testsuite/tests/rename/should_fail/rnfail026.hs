@@ -14,7 +14,6 @@ instance Functor Set where
         f `fmap` (Set xs) = Set $ f `fmap` xs
 -}
 instance Monad (forall a. Eq a => Set a) where
-        return x = Set [x]
 {-
 instance Eq (forall a. [a]) where
 -}

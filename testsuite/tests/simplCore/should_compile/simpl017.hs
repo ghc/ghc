@@ -32,13 +32,13 @@ instance Monad m => Functor (E' RValue m) where
 
 instance Monad m => Applicative (E' RValue m) where
     {-# INLINE pure #-}
-    pure x = return x
+    pure x = E $ return x
     {-# INLINE (<*>) #-}
     (<*>) = ap
 
 instance (Monad m) => Monad (E' RValue m) where
-    {-# INLINE return #-}
-    return x = E $ return x
+
+
     {-# INLINE (>>=) #-}
     x >>= f = E $ do
         x' <- runE x

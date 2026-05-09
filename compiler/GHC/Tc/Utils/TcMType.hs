@@ -1289,7 +1289,6 @@ instance Semi.Semigroup CandidatesQTvs where
 
 instance Monoid CandidatesQTvs where
    mempty = DV { dv_kvs = emptyDVarSet, dv_tvs = emptyDVarSet, dv_cvs = emptyVarSet }
-   mappend = (Semi.<>)
 
 instance Outputable CandidatesQTvs where
   ppr (DV {dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs })

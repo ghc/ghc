@@ -17,7 +17,6 @@ instance Applicative Foo where
   (<*>) = ap
 
 instance Monad Foo where
-  return         = pure
   (Foo a) >>= k  = k a
 
 instance MonadFail Foo where
