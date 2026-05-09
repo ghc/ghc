@@ -6,6 +6,7 @@
   * Add `Data.List.NonEmpty.{zip{3..7},zipWith{3..7},unzip{3..7}}` ([CLC proposal #409)(https://github.com/haskell/core-libraries-committee/issues/409))
   * Ensure that `Data.List.elem` and `notElem` can be specialized even when no list fusion happens. ([CLC proposal #412)(https://github.com/haskell/core-libraries-committee/issues/412))
   * Introduce `Data.Double` and `Data.Float` modules. ([CLC proposal #378](https://github.com/haskell/core-libraries-committee/issues/378))
+  * Change `Generically a`'s `Monoid` definition to require a `Semigroup` constraint, and define its `mconcat` using `(<>)` from that constraint. ([CLC proposal #413](https://github.com/haskell/core-libraries-committee/issues/413))
 
 ## 4.23.0.0 *TBA*
   * Add `System.IO.hGetNewlineMode`. ([CLC proposal #370](https://github.com/haskell/core-libraries-committee/issues/370))

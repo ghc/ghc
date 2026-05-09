@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wno-noncanonical-monoid-instances #-}
-
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveFunctor              #-}
@@ -744,7 +742,7 @@ import GHC.Internal.Types hiding (Any) -- clashes with the Semigroup
 import GHC.Internal.Ix      ( Ix )
 import GHC.Internal.Base    ( Alternative(..), Applicative(..), Functor(..)
                    , Monad(..), MonadPlus(..), NonEmpty(..), String
-                   , Semigroup(..), Void )
+                   , Semigroup(..), Void)
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Classes ( Eq(..), Ord(..) )
 import GHC.Internal.Enum    ( Bounded, Enum )
@@ -1437,6 +1435,10 @@ class Generic1 (f :: k -> Type) where
 -- type/ like 'Generically' decouples the instance from the type
 -- class.
 --
+-- Note that if you don't generate parent and child instances using the same
+-- method, the result may be incongruous; for example, in previous versions
+-- `mconcat` didn't use the correct `(<>)`, instead preferring a Generic version.
+--
 -- @since base-4.17.0.0
 newtype Generically a = Generically a
 
@@ -1446,12 +1448,14 @@ instance (Generic a, Semigroup (Rep a ())) => Semigroup (Generically a) where
   Generically a <> Generically b = Generically (to (from a <> from b :: Rep a ()))
 
 -- | @since base-4.17.0.0
-instance (Generic a, Monoid (Rep a ())) => Monoid (Generically a) where
+instance (Generic a, Semigroup a, Monoid (Rep a ())) => Monoid (Generically a) where
   mempty :: Generically a
   mempty = Generically (to (mempty :: Rep a ()))
 
-  mappend :: Generically a -> Generically a -> Generically a
-  mappend = (<>)
+  -- https://github.com/haskell/core-libraries-committee/issues/324
+  mconcat :: [Generically a] -> Generically a
+  mconcat = foldr (coerce @(a -> a -> a) (<>)) mempty
+  {-# INLINE mconcat #-}
 
 -- | A type whose instances are defined generically, using the
 -- 'Generic1' representation. 'Generically1' is a higher-kinded

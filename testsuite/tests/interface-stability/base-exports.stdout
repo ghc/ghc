@@ -11056,7 +11056,7 @@ instance GHC.Internal.Base.Monoid ghc-internal-10.100.0:GHC.Internal.Event.Inter
 instance GHC.Internal.Base.Monoid ghc-internal-10.100.0:GHC.Internal.Event.Internal.Types.Lifetime -- Defined in ‘ghc-internal-10.100.0:GHC.Internal.Event.Internal.Types’
 instance forall k (f :: k -> *) (p :: k) (g :: k -> *). (GHC.Internal.Base.Monoid (f p), GHC.Internal.Base.Monoid (g p)) => GHC.Internal.Base.Monoid ((GHC.Internal.Generics.:*:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k2 k1 (f :: k2 -> *) (g :: k1 -> k2) (p :: k1). GHC.Internal.Base.Monoid (f (g p)) => GHC.Internal.Base.Monoid ((GHC.Internal.Generics.:.:) f g p) -- Defined in ‘GHC.Internal.Generics’
-instance forall a. (GHC.Internal.Generics.Generic a, GHC.Internal.Base.Monoid (GHC.Internal.Generics.Rep a ())) => GHC.Internal.Base.Monoid (GHC.Internal.Generics.Generically a) -- Defined in ‘GHC.Internal.Generics’
+instance forall a. (GHC.Internal.Generics.Generic a, GHC.Internal.Base.Semigroup a, GHC.Internal.Base.Monoid (GHC.Internal.Generics.Rep a ())) => GHC.Internal.Base.Monoid (GHC.Internal.Generics.Generically a) -- Defined in ‘GHC.Internal.Generics’
 instance forall k c i (p :: k). GHC.Internal.Base.Monoid c => GHC.Internal.Base.Monoid (GHC.Internal.Generics.K1 i c p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (f :: k -> *) (p :: k) i (c :: GHC.Internal.Generics.Meta). GHC.Internal.Base.Monoid (f p) => GHC.Internal.Base.Monoid (GHC.Internal.Generics.M1 i c f p) -- Defined in ‘GHC.Internal.Generics’
 instance forall p. GHC.Internal.Base.Monoid p => GHC.Internal.Base.Monoid (GHC.Internal.Generics.Par1 p) -- Defined in ‘GHC.Internal.Generics’

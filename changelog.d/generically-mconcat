@@ -1,0 +1,4 @@
+section: base
+synopsis: Add definition for Generically's `mconcat` in terms of the type variable's Semigroup instance instead of using the generically derived version.
+issues: #27245
+mrs: !16011
