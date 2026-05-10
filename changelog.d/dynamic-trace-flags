@@ -1,4 +1,4 @@
-section: compiler
+section: rts
 synopsis: Support dynamic trace flags in RTS
 issues: #27186
 mrs: !15936
