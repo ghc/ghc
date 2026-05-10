@@ -1,0 +1,20 @@
+section: rts
+synopsis: The RTS no longer uses signals for its interval timer
+issues: #27073
+mrs: !15757 !16014
+description: {
+  Historically, on unix platforms, the RTS used a signal for its interval
+  timer. The interval timer is used for thread context switching amongst other
+  things. This would use either SIGVTALRM or SIGALRM. It was always somewhat
+  problematic: signals can cause system calls to be interrupted, the signal
+  must be disabled before forking a new process or the child process will also
+  receive the signals, and code executed within a signal handler is very
+  limited in what it can do.
+
+  Most unix platforms were already using other interval timer implementations.
+  In particular OSX and recent Linux were using thread-based timers. As of
+  this release, no platforms use a signal based interval timer. So it is no
+  longer necessary to mitigate the issues that arise. In particular the
+  `stopTimer` and `startTimer` RTS C functions (used by some libraries) are
+  now no-ops and are deprecated.
+}
