@@ -732,7 +732,7 @@ as such you shouldn't need to set any of them explicitly. A flag
     :reverse: -fno-inter-module-far-jumps
     :category:
 
-    :default: Off
+    :default: on if the target is AArch64-Linux and this is a profiling way, off on all others
 
     This flag forces GHC to use far jumps instead of near jumps for all jumps
     which cross module boundries. This removes the need for jump islands/linker
