@@ -2536,6 +2536,30 @@ suspendThread (StgRegTable *reg, bool interruptible)
 
   suspendTask(cap,task);
   cap->in_haskell = false;
+
+#if defined(THREADED_RTS)
+  // #27113: re-arm interrupt_pending if entering an interruptible call with
+  // a live throw already queued.  Covers under-mask EINTR-retry: throwToMsg
+  // set the flag, resumeThread cleared it, and we're now re-entering pause.
+  // Under cap->lock, after suspendTask, so the scan and store are serialised
+  // with the revoke walk.
+  if (interruptible
+      && !((tso->flags & TSO_BLOCKEX) &&
+           ((tso->flags & TSO_INTERRUPTIBLE) == 0))) {
+      MessageThrowTo *head = ACQUIRE_LOAD(&tso->blocked_exceptions);
+      bool live = false;
+      for (MessageThrowTo *m = head;
+           m != END_BLOCKED_EXCEPTIONS_QUEUE;
+           m = (MessageThrowTo*)m->link) {
+          if (RELAXED_LOAD((StgWord*)&m->header.info)
+              != (StgWord)&stg_MSG_NULL_info) { live = true; break; }
+      }
+      if (live) {
+          RELEASE_STORE(&task->incall->interrupt_pending, 1);
+      }
+  }
+#endif
+
   releaseCapability_(cap,false);
 
   RELEASE_LOCK(&cap->lock);
@@ -2574,8 +2598,14 @@ resumeThread (void *task_)
     // entry on the suspended_ccalls list will also have been
     // migrated.
 
-    // Remove the thread from the suspended list
+    // #27113: clear interrupt_pending and unlink under cap->lock so the
+    // ticker's TRY_ACQUIRE_LOCK serialises with us.  Without the lock, the
+    // ticker can read a stale flag and SIGPIPE the worker after it has
+    // already returned from the FFI call onto an unrelated syscall.
+    ACQUIRE_LOCK(&cap->lock);
+    RELEASE_STORE(&incall->interrupt_pending, 0);
     recoverSuspendedTask(cap,task);
+    RELEASE_LOCK(&cap->lock);
 
     tso = incall->suspended_tso;
     incall->suspended_tso = NULL;
@@ -2613,6 +2643,49 @@ resumeThread (void *task_)
 
     return &cap->r;
 }
+
+#if defined(THREADED_RTS)
+// #27113: re-fire interruptOSThread for InCalls whose interrupt_pending is
+// still set.  Reads only InCall fields, never TSO heap state, so no GC race.
+//
+// cap->lock is held across the OS interrupt call.  This pairs with the
+// same lock taken by resumeThread around its clear+unlink: when we fire
+// interruptOSThread, resumeThread is either blocked behind us on the lock
+// (signal lands harmlessly on a thread inside pthread sync) or has not yet
+// run (signal lands inside the FFI call where it belongs).  Releasing the
+// lock before signalling would let resumeThread complete and re-enter
+// Haskell first, so SIGPIPE / CancelSynchronousIo would hit an unrelated
+// later syscall.
+//
+// The per-OS-call cost is small (~µs for pthread_kill on POSIX, ~tens of
+// µs for OpenThread+CancelSynchronousIo+CloseHandle on Windows), but the
+// per-tick lock-hold time scales linearly with the number of pending
+// interruptible calls on this cap.  For typical workloads this is well
+// below the tick interval; FFI-heavy workloads with many concurrent
+// interruptible calls per cap may want empirical measurement.
+void
+retryInterruptibleSignals(void)
+{
+    bool any_pending = false;
+    uint32_t n = getNumCapabilities();
+    for (uint32_t i = 0; i < n; i++) {
+        Capability *cap = getCapability(i);
+        if (RELAXED_LOAD(&cap->n_suspended_ccalls) == 0) continue;
+        if (TRY_ACQUIRE_LOCK(&cap->lock) != 0) continue;
+        for (InCall *ic = cap->suspended_ccalls; ic != NULL; ic = ic->next) {
+            if (ACQUIRE_LOAD(&ic->interrupt_pending) == 0) continue;
+            // ic->task is set by newInCall and never cleared.
+            if (ic->task != NULL) {
+                any_pending = true;
+                interruptOSThread(ic->task->id);
+            }
+        }
+        RELEASE_LOCK(&cap->lock);
+    }
+    // Keep the timer alive; handle_tick's idle path would otherwise stop it.
+    if (any_pending) setRecentActivity(ACTIVITY_YES);
+}
+#endif
 
 /* ---------------------------------------------------------------------------
  * scheduleThread()

@@ -131,6 +131,11 @@ handle_tick(int unused STG_UNUSED)
           flushEventLog(NULL);
       }
   }
+  // #27113 retry; gated on timer_disabled like the context-switch path
+  // above so that setNumCapabilities's resize pause is respected (#17289).
+  if (SEQ_CST_LOAD_ALWAYS(&timer_disabled) == 0) {
+      retryInterruptibleSignals();
+  }
 #endif
 
   /*

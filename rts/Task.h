@@ -106,6 +106,15 @@ typedef struct InCall_ {
     // Links InCalls onto suspended_ccalls, spare_incalls
     struct InCall_ *prev;
     struct InCall_ *next;
+
+    // #27113.  Set (atomically) by throwToMsg once it has fired
+    // interruptOSThread for this call's worker; cleared by resumeThread
+    // (when the call returns) and by the revoke paths in
+    // doneWithMsgThrowTo (when all queued throws against the target are
+    // MSG_NULL).  The ticker reads this and re-fires interruptOSThread
+    // while it is set.  Not GC-managed — lives in malloc'd memory with
+    // the Task that owns this InCall.
+    StgWord interrupt_pending;
 } InCall;
 
 typedef struct Task_ {

@@ -267,6 +267,7 @@ newInCall (Task *task)
     incall->next = NULL;
     incall->prev = NULL;
     incall->prev_stack = task->incall;
+    incall->interrupt_pending = 0;
     task->incall = incall;
 }
 
