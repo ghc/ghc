@@ -9,6 +9,7 @@
 
 {-# OPTIONS -fno-warn-name-shadowing #-}
 -- This module does a lot of it
+{-# OPTIONS -Wno-x-partial #-}
 
 -----------------------------------------------------------------------------
 --
@@ -53,6 +54,7 @@ import GHC.Driver.Errors (printOrThrowDiagnostics)
 import GHC.Driver.Errors.Types
 import GHC.Driver.Phases
 import GHC.Driver.Session as DynFlags
+import GHC.Driver.DynFlags as DynFlags
 import GHC.Driver.Ppr hiding (printForUser)
 import GHC.Utils.Error hiding (traceCmd)
 import GHC.Driver.Monad ( modifySession, modifySessionM )
@@ -131,6 +133,7 @@ import qualified Data.Foldable as Foldable
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
 import Data.List ( find, intercalate, intersperse,
                    isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\) )
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as S
 import Data.Maybe
@@ -745,6 +748,48 @@ installInteractiveHomeUnits dflags = do
     sessionUnitExposedFlag =
       homeUnitPkgFlag interactiveSessionUnitId
 
+    -- Currently, we are in a somewhat awkward situation.
+    -- Users clearly want to control precisely which packages are available at the GHCi prompt,
+    -- but there is currently no way for the user to declaratively change the set of packages
+    -- available at the prompt. Thus, a bit of guessing is necessary to provide the reasonable
+    -- GHCi UX experience, but in the future, we might want to give the user more precise control.
+    --
+    -- The prompt and session home unit may not have any package db specified, but we still want to
+    -- to import modules from our home unit dependencies.
+    -- To make this possible, the prompt and session home unit need to have a package db, but which one?
+    -- We decide, if a package db is given at the top level, e.g. @ghci -package-db ...@,
+    -- then we honour what the user requests and only use this @-package-db@.
+    -- However, in the case of multiple home units, initialised via @ghci -unit ... -unit ...@, there
+    -- are not @-package-db@ arguments in the base 'DynFlags'...
+    -- To fix this, we look at the home units and merge their package dbs stacks.
+    -- We assume, that many package db stacks look almost identical, and only differ in view elements.
+    -- Thus, we try to extract a common package db stack (i.e., longest common prefix), and then concat
+    -- the rest of the package db stacks. At last, we add the two result package db stacks.
+    -- This should work reliably with cabal and stack, but it is hacky.
+    -- A proper solution would be to teach cabal and other tooling to specify the correct package db
+    -- stacks for the prompt and session home unit.
+    ghciPackageDbStacks =
+      if all (isNothing . DynFlags.isPackageDbRef) (packageDBFlags dflags0)
+        then
+          HUG.unitEnv_assocs (hsc_HUG hsc_env)
+          & concatPackageDbStacksUsingLongestCommonPrefix . map (packageDBFlags . HUG.homeUnitEnv_dflags . snd)
+        else
+          packageDBFlags dflags0
+
+    -- Make sure the prompt and session home unit use the correct dependencies.
+    ghciPackageFlags =
+      if null (packageFlags dflags0)
+        then
+          HUG.unitEnv_assocs (hsc_HUG hsc_env)
+          & concatMap (packageFlags . HUG.homeUnitEnv_dflags . snd)
+          -- We don't want to add `-package-id` flags for home units.
+          -- This is mostly for a clear separation of concerns,
+          -- to indicate we only care about unit dependencies from package dbs.
+          & filter (not . selectHptFlag (HUG.allUnits $ hsc_HUG hsc_env))
+          & ordNub
+        else
+          packageFlags dflags0
+
   -- Explicitly depends on all home units and 'sessionUnitExposedFlag'.
   -- Normalise the 'dflagsPrompt', as they will be used for 'ic_dflags'
   -- of the 'InteractiveContext'.
@@ -759,8 +804,9 @@ installInteractiveHomeUnits dflags = do
           , [ homeUnitPkgFlag uid
             | uid <- S.toList $ HUG.allUnits $ hsc_HUG hsc_env
             ]
-          , packageFlags dflags0
+          , ghciPackageFlags
           ]
+      , packageDBFlags = ghciPackageDbStacks
       , importPaths = []
       }
 
@@ -773,25 +819,19 @@ installInteractiveHomeUnits dflags = do
             [ [ homeUnitPkgFlag uid
               | uid <- S.toList $ HUG.allUnits $ hsc_HUG hsc_env
               ]
-            , packageFlags dflags
+            , ghciPackageFlags
             ]
+        , packageDBFlags = ghciPackageDbStacks
         }
 
   let
-    cached_unit_dbs =
-        concat
-      . catMaybes
-      . fmap homeUnitEnv_unit_dbs
-      $ Foldable.toList
-      $ hsc_HUG hsc_env
-
     all_unit_ids =
       S.insert interactiveGhciUnitId $
       S.insert interactiveSessionUnitId $
       hsc_all_home_unit_ids hsc_env
 
-  ghciPromptUnit  <- setupHomeUnitFor logger dflagsPrompt  all_unit_ids cached_unit_dbs
-  ghciSessionUnit <- setupHomeUnitFor logger dflagsSession all_unit_ids cached_unit_dbs
+  ghciPromptUnit  <- setupHomeUnitFor logger dflagsPrompt  all_unit_ids
+  ghciSessionUnit <- setupHomeUnitFor logger dflagsSession all_unit_ids
   let
     -- Setup up the HUG, install the interactive home units
     withInteractiveUnits =
@@ -813,12 +853,25 @@ installInteractiveHomeUnits dflags = do
 
   pure ()
   where
-    setupHomeUnitFor :: GHC.GhcMonad m => Logger -> DynFlags -> S.Set UnitId -> [UnitDatabase UnitId] -> m HomeUnitEnv
-    setupHomeUnitFor logger dflags all_home_units cached_unit_dbs = do
+    setupHomeUnitFor :: GHC.GhcMonad m => Logger -> DynFlags -> S.Set UnitId -> m HomeUnitEnv
+    setupHomeUnitFor logger dflags all_home_units = do
       (dbs,unit_state,home_unit,_mconstants) <-
-        liftIO $ initUnits logger dflags (Just cached_unit_dbs) all_home_units
+        liftIO $ initUnits logger dflags Nothing all_home_units
       hpt <- liftIO emptyHomePackageTable
       pure (HUG.mkHomeUnitEnv unit_state (Just dbs) dflags hpt (Just home_unit))
+
+    concatPackageDbStacksUsingLongestCommonPrefix :: [[PackageDBFlag]] -> [PackageDBFlag]
+    concatPackageDbStacksUsingLongestCommonPrefix stacks =
+      let
+        -- O (m * n)
+        -- m ... Number of PackageDBFlag stacks
+        -- n ... Size of the stacks
+        longestCommonPrefix =
+          map List.head . List.takeWhile ((List.all . (==) . List.head) <*> List.tail) . List.transpose
+        prefix =
+          longestCommonPrefix stacks
+      in
+        prefix ++ ordNub (concatMap (List.drop (length prefix)) stacks)
 
 reportError :: GhciMonad m => GhciCommandMessage -> m ()
 reportError err = do

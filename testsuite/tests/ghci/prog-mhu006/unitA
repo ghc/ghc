@@ -1,0 +1,9 @@
+-i
+-ia/
+A
+-this-unit-id a-0.0.0
+-this-package-name a
+-global-package-db
+-package base
+-package-id b-0.0.0
+-package containers
