@@ -206,6 +206,13 @@ test('foreignInterruptible', [when(fast(), skip),
                               ],
       compile_and_run, [''])
 
+test('T27113',
+     [when(opsys('mingw32'), skip),
+      only_threaded_ways,
+      req_c,
+      expect_broken(27113)],
+     compile_and_run, ['T27113_c.c'])
+
 test('conc037', only_ways(['threaded1', 'threaded2', 'nonmoving_thr']), compile_and_run, [''])
 test('conc038', only_ways(['threaded1', 'threaded2', 'nonmoving_thr']), compile_and_run, [''])
 
