@@ -35,6 +35,7 @@ module GHC.Driver.DynFlags (
         packageFlagsChanged,
         IgnorePackageFlag(..), TrustFlag(..),
         PackageDBFlag(..), PkgDbRef(..),
+        isPackageDbRef,
         Option(..), showOpt,
         DynLibLoader(..),
         positionIndependent,
@@ -817,7 +818,7 @@ isNoLink _      = False
 data PackageArg =
       PackageArg String    -- ^ @-package@, by 'PackageName'
     | UnitIdArg Unit       -- ^ @-package-id@, by 'Unit'
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 instance Outputable PackageArg where
     ppr (PackageArg pn) = text "package" <+> text pn
@@ -838,7 +839,7 @@ data ModRenaming = ModRenaming {
     modRenamingWithImplicit :: Bool, -- ^ Bring all exposed modules into scope?
     modRenamings :: [(ModuleName, ModuleName)] -- ^ Bring module @m@ into scope
                                                --   under name @n@.
-  } deriving (Eq)
+  } deriving (Eq, Ord)
 instance Outputable ModRenaming where
     ppr (ModRenaming b rns) = ppr b <+> parens (ppr rns)
 
@@ -856,14 +857,21 @@ data TrustFlag
 data PackageFlag
   = ExposePackage   String PackageArg ModRenaming -- ^ @-package@, @-package-id@
   | HidePackage     String -- ^ @-hide-package@
-  deriving (Eq) -- NB: equality instance is used by packageFlagsChanged
+  deriving (Eq, Ord) -- NB: equality instance is used by packageFlagsChanged
 
 data PackageDBFlag
   = PackageDB PkgDbRef
   | NoUserPackageDB
   | NoGlobalPackageDB
   | ClearPackageDBs
-  deriving (Eq)
+  deriving (Eq, Ord)
+
+isPackageDbRef :: PackageDBFlag -> Maybe PkgDbRef
+isPackageDbRef = \ case
+  PackageDB ref -> Just ref
+  NoUserPackageDB -> Nothing
+  NoGlobalPackageDB -> Nothing
+  ClearPackageDBs -> Nothing
 
 packageFlagsChanged :: DynFlags -> DynFlags -> Bool
 packageFlagsChanged idflags1 idflags0 =
@@ -938,7 +946,7 @@ data PkgDbRef
   = GlobalPkgDb
   | UserPkgDb
   | PkgDbPath OsPath
-  deriving Eq
+  deriving (Eq, Ord)
 
 
 

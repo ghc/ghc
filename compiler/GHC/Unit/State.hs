@@ -69,7 +69,9 @@ module GHC.Unit.State (
         pprRawUnitIds,
 
         -- * Utils
-        unwireUnit)
+        unwireUnit,
+        selectHptFlag,
+        )
 where
 
 import GHC.Prelude
