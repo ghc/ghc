@@ -1242,7 +1242,6 @@ defaultFlags settings
       Opt_SpecialiseIncoherents,
       Opt_WriteSelfRecompInfo
     ]
-
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
              -- The default -O0 options
 
