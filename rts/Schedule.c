@@ -2536,6 +2536,25 @@ suspendThread (StgRegTable *reg, bool interruptible)
 
   suspendTask(cap,task);
   cap->in_haskell = false;
+
+#if defined(THREADED_RTS)
+  if (interruptible
+      && !((tso->flags & TSO_BLOCKEX) &&
+           ((tso->flags & TSO_INTERRUPTIBLE) == 0))) {
+      MessageThrowTo *head = ACQUIRE_LOAD(&tso->blocked_exceptions);
+      bool live = false;
+      for (MessageThrowTo *m = head;
+           m != END_BLOCKED_EXCEPTIONS_QUEUE;
+           m = (MessageThrowTo*)m->link) {
+          if (RELAXED_LOAD((StgWord*)&m->header.info)
+              != (StgWord)&stg_MSG_NULL_info) { live = true; break; }
+      }
+      if (live) {
+          RELEASE_STORE(&task->incall->interrupt_pending, 1);
+      }
+  }
+#endif
+
   releaseCapability_(cap,false);
 
   RELEASE_LOCK(&cap->lock);
@@ -2574,8 +2593,10 @@ resumeThread (void *task_)
     // entry on the suspended_ccalls list will also have been
     // migrated.
 
-    // Remove the thread from the suspended list
+    ACQUIRE_LOCK(&cap->lock);
+    RELEASE_STORE(&incall->interrupt_pending, 0);
     recoverSuspendedTask(cap,task);
+    RELEASE_LOCK(&cap->lock);
 
     tso = incall->suspended_tso;
     incall->suspended_tso = NULL;
@@ -2613,6 +2634,31 @@ resumeThread (void *task_)
 
     return &cap->r;
 }
+
+#if defined(THREADED_RTS)
+void
+retryInterruptibleSignals(void)
+{
+    bool any_pending = false;
+    uint32_t n = getNumCapabilities();
+    for (uint32_t i = 0; i < n; i++) {
+        Capability *cap = getCapability(i);
+        if (RELAXED_LOAD(&cap->n_suspended_ccalls) == 0) continue;
+        if (TRY_ACQUIRE_LOCK(&cap->lock) != 0) continue;
+        for (InCall *ic = cap->suspended_ccalls; ic != NULL; ic = ic->next) {
+            if (ACQUIRE_LOAD(&ic->interrupt_pending) == 0) continue;
+            // ic->task is set by newInCall and never cleared.
+            if (ic->task != NULL) {
+                any_pending = true;
+                interruptOSThread(ic->task->id);
+            }
+        }
+        RELEASE_LOCK(&cap->lock);
+    }
+    // Keep the timer alive; handle_tick's idle path would otherwise stop it.
+    if (any_pending) setRecentActivity(ACTIVITY_YES);
+}
+#endif
 
 /* ---------------------------------------------------------------------------
  * scheduleThread()

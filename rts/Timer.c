@@ -131,6 +131,9 @@ handle_tick(int unused STG_UNUSED)
           flushEventLog(NULL);
       }
   }
+  if (SEQ_CST_LOAD_ALWAYS(&timer_disabled) == 0) {
+      retryInterruptibleSignals();
+  }
 #endif
 
   /*

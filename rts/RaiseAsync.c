@@ -36,6 +36,11 @@ static void throwToSendMsg (Capability *cap USED_IF_THREADS,
                             Capability *target_cap USED_IF_THREADS,
                             MessageThrowTo *msg USED_IF_THREADS);
 
+#if defined(THREADED_RTS)
+static void clear_interrupt_pending_if_no_live_throw (Capability *cap,
+                                                      StgTSO *target);
+#endif
+
 /* -----------------------------------------------------------------------------
    throwToSingleThreaded
 
@@ -338,7 +343,13 @@ check_target:
         }
 
         // nobody else can wake up this TSO after we claim the message
+#if defined(THREADED_RTS)
+        StgTSO *m_target = m->target;
+#endif
         doneWithMsgThrowTo(cap, m);
+#if defined(THREADED_RTS)
+        clear_interrupt_pending_if_no_live_throw(cap, m_target);
+#endif
 
         raiseAsync(cap, target, msg->exception, false, NULL);
         return THROWTO_SUCCESS;
@@ -433,11 +444,12 @@ check_target:
 #if defined(THREADED_RTS)
     {
         Task *task = NULL;
-        // walk suspended_ccalls to find the correct worker thread
+        InCall *target_incall = NULL;
         InCall *incall;
         for (incall = cap->suspended_ccalls; incall != NULL; incall = incall->next) {
             if (incall->suspended_tso == target) {
                 task = incall->task;
+                target_incall = incall;
                 break;
             }
         }
@@ -446,6 +458,7 @@ check_target:
             if (!((target->flags & TSO_BLOCKEX) &&
                   ((target->flags & TSO_INTERRUPTIBLE) == 0))) {
                 interruptWorkerTask(task);
+                RELEASE_STORE(&target_incall->interrupt_pending, 1);
             }
             return THROWTO_BLOCKED;
         } else {
@@ -520,8 +533,14 @@ blockedThrowTo (Capability *cap, StgTSO *target, MessageThrowTo *msg)
     ASSERT(target->cap == cap);
 
     dirty_TSO(cap,target); // we will modify the blocked_exceptions queue
+#if defined(THREADED_RTS)
+    ACQUIRE_LOCK(&cap->lock);
+#endif
     msg->link = target->blocked_exceptions;
-    target->blocked_exceptions = msg;
+    RELEASE_STORE(&target->blocked_exceptions, msg);
+#if defined(THREADED_RTS)
+    RELEASE_LOCK(&cap->lock);
+#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -664,6 +683,46 @@ removeFromMVarBlockedQueue (StgTSO *tso)
     tso->_link = END_TSO_QUEUE;
 }
 
+#if defined(THREADED_RTS)
+static void
+clear_interrupt_pending_if_no_live_throw (Capability *cap, StgTSO *target)
+{
+    if (target == NULL) return;
+    if (ACQUIRE_LOAD(&target->why_blocked) != BlockedOnCCall_Interruptible)
+        return;
+
+    Capability *target_cap = ACQUIRE_LOAD(&target->cap);
+    ACQUIRE_LOCK(&target_cap->lock);
+
+    // Find the InCall on target_cap.  If target has already resumed (or
+    // wasn't really suspended on this cap), do nothing.
+    InCall *found = NULL;
+    for (InCall *ic = target_cap->suspended_ccalls; ic != NULL; ic = ic->next) {
+        if (ic->suspended_tso == target) { found = ic; break; }
+    }
+    if (found == NULL) {
+        RELEASE_LOCK(&target_cap->lock);
+        return;
+    }
+
+    bool live = false;
+    for (MessageThrowTo *t = ACQUIRE_LOAD(&target->blocked_exceptions);
+         t != END_BLOCKED_EXCEPTIONS_QUEUE;
+         t = (MessageThrowTo*)t->link) {
+        if (RELAXED_LOAD((StgWord*)&t->header.info)
+            != (StgWord)&stg_MSG_NULL_info) {
+            live = true; break;
+        }
+    }
+    if (!live) {
+        RELEASE_STORE(&found->interrupt_pending, 0);
+    }
+
+    RELEASE_LOCK(&target_cap->lock);
+    (void)cap;
+}
+#endif
+
 static void
 removeFromQueues(Capability *cap, StgTSO *tso)
 {
@@ -699,8 +758,16 @@ removeFromQueues(Capability *cap, StgTSO *tso)
       // capabilities.
       // ASSERT(m->header.info == &stg_WHITEHOLE_info);
 
+#if defined(THREADED_RTS)
+      StgTSO *m_target = m->target;
+#endif
+
       // unlock and revoke it at the same time
       doneWithMsgThrowTo(cap, m);
+
+#if defined(THREADED_RTS)
+      clear_interrupt_pending_if_no_live_throw(cap, m_target);
+#endif
       break;
   }
 

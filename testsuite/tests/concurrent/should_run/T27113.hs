@@ -10,7 +10,7 @@ import System.IO
 import System.Timeout
 
 foreign import ccall interruptible "cpu_then_pause"
-    c_cpu_then_pause :: CLong -> IO ()
+    c_cpu_then_pause :: CLLong -> IO ()
 
 killDelay :: Int
 killDelay = 200_000
@@ -18,7 +18,7 @@ killDelay = 200_000
 joinTimeout :: Int
 joinTimeout = 3_000_000
 
-runCase :: String -> CLong -> IO ()
+runCase :: String -> CLLong -> IO ()
 runCase name spinNs = do
     tid <- forkIO $
         c_cpu_then_pause spinNs

@@ -106,6 +106,8 @@ typedef struct InCall_ {
     // Links InCalls onto suspended_ccalls, spare_incalls
     struct InCall_ *prev;
     struct InCall_ *next;
+
+    StgWord interrupt_pending;
 } InCall;
 
 typedef struct Task_ {

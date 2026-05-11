@@ -43,6 +43,10 @@ void scheduleThreadOn(Capability *cap, StgWord cpu, StgTSO *tso);
 void wakeUpRts(void);
 #endif
 
+#if defined(THREADED_RTS)
+void retryInterruptibleSignals(void);
+#endif
+
 /* raiseExceptionHelper */
 StgWord raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception);
 
