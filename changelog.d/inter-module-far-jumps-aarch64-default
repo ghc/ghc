@@ -1,0 +1,5 @@
+section: compiler
+synopsis: enable -finter-module-far-jumps by default on profiled aarch64-linux
+issues: #26994
+mrs: !16016
+description: Some binutils and gcc versions lead to jump offset erros on aarch64-linux profiled ways. To mitigate this bug, we enable inter-module-far-jumps by default on this platform/way.

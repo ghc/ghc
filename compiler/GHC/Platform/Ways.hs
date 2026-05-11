@@ -154,6 +154,14 @@ wayGeneralFlags _ WayDyn      = [Opt_PIC, Opt_ExternalDynamicRefs]
     -- .so before loading the .so using the system linker.  Since only
     -- PIC objects can be linked into a .so, we have to compile even
     -- modules of the main program with -fPIC when using -dynamic.
+wayGeneralFlags platform WayProf
+    | ArchAArch64 <- platformArch platform
+    , OSLinux <- platformOS platform = [Opt_InterModuleFarJumps]
+    {- note(mangoiv):
+     - on aarch64 profiled-dynamic, we are seeing jump offset overflow
+     - errors on certain binutils versions. This can probably be deactivated
+     - if we stop supporting binutils 2.44 / GCC 14.2
+     - https://gitlab.haskell.org/ghc/ghc/-/issues/26994 -}
 wayGeneralFlags _ WayProf     = []
 
 -- | Turn these flags off when enabling this way
