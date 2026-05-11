@@ -900,6 +900,29 @@ mkProfilingInfo profile id val_descr
   where
     ty_descr_w8  = BS8.pack (getTyDescription (idType id))
 
+-- | Short label for the type of a closure, stored in profiling info tables and
+-- shown in heap profiles that use the RTS @-hy@ option (breakdown by type).
+--
+-- This is an intentionally lossy summary, not a pretty-printed 'Type':
+--
+-- * A type constructor is its 'OccName' string, e.g. @Int@, @Maybe@.
+--
+-- * Type application keeps only the head constructor: @Maybe Int@ and @Maybe Bool@
+--   both become @Maybe@.
+--
+-- * A type variable becomes @*@ (so polymorphic / unknown shape collapses to a
+--   single marker).
+--
+-- * Function types are written by following the spine of nested 'FunTy' nodes in
+--   the /result/ only: the outer arrow is @-@, each further arrow under that
+--   adds one @>@, then the final non-function type is summarized as above.
+--   Examples (ignoring explicit foralls, which are stripped first):
+--   @Int -> Bool@ is @->Bool@; @Int -> Bool -> Char@ is @->>Char@;
+--   @Int -> Bool -> Char -> Double@ is @->>>Double@.  The domain of a function
+--   is not described except insofar as it affects this result spine---for
+--   example @(Int -> Bool) -> Char@ is also @->Char@.
+--
+-- Literal type literals ('TyLit') use 'getTyLitDescription'.
 getTyDescription :: Type -> String
 getTyDescription ty
   = case (tcSplitSigmaTy ty) of { (_, _, tau_ty) ->

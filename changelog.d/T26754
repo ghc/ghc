@@ -1,0 +1,5 @@
+section: profiling
+synopsis: Document how ``-hy`` encodes function types in heap profiles, including
+  the ``->>>`` marker sequence.
+issues: #26754
+mrs: !16019
