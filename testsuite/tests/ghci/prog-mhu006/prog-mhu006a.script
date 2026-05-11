@@ -1,0 +1,4 @@
+"Can import modules from dependencies"
+:m + Data.ByteString
+:m + Data.Text
+"Imported Data.ByteString and Data.Text"

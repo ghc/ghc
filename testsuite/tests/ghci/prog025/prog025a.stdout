@@ -1,0 +1,7 @@
+Reading package info from "testpkg/testpkg-0.1.0.0.pkg" ... done.
+Reading package info from "testpkg/testpkg-0.2.0.0.pkg" ... done.
+local01.package.conf
+    (testpkg-0.1.0.0)
+    (testpkg-0.2.0.0)
+
+"Imported package dependency module with multiple installed versions"
