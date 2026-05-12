@@ -143,7 +143,17 @@ AC_DEFUN([FIND_GHC_TOOLCHAIN_BIN],[
             GHC_TOOLCHAIN_BIN="bin/${CrossCompilePrefix}ghc-toolchain-bin"
             ;;
         NO)
-            # We're in the source tree, so compile ghc-toolchain
+            # We're in the source tree
+
+            # Check for consistency of LLVM versions
+            hs_min_llvm=$(sed -n 's/^minLlvmVersion = //p' utils/ghc-toolchain/src/GHC/Toolchain/Program.hs)
+            hs_max_llvm=$(sed -n 's/^maxLlvmVersionExcl = //p' utils/ghc-toolchain/src/GHC/Toolchain/Program.hs)
+            test "$hs_min_llvm" = "$LlvmMinVersion" || \
+                AC_MSG_ERROR([minLlvmVersion ($hs_min_llvm) in utils/ghc-toolchain/src/GHC/Toolchain/Program.hs must equal LlvmMinVersion ($LlvmMinVersion) in configure.ac])
+            test "$hs_max_llvm" = "$LlvmMaxVersion" || \
+                AC_MSG_ERROR([maxLlvmVersionExcl ($hs_max_llvm) in utils/ghc-toolchain/src/GHC/Toolchain/Program.hs must equal LlvmMaxVersion ($LlvmMaxVersion) in configure.ac])
+
+            # Compile ghc-toolchain
             "$GHC" -v0 \
                 -ilibraries/ghc-platform/src -iutils/ghc-toolchain/src \
                 -XNoImplicitPrelude \
