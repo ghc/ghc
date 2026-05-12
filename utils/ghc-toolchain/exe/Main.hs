@@ -289,13 +289,9 @@ formatOpts = [
 
 validateOpts :: Opts -> [String]
 validateOpts opts = mconcat
-    [ assertJust _optTriple "missing --triple flag"
-    , assertJust _optOutput "missing --output flag"
+    [ ["missing --triple flag" | isNothing (optTriple opts)]
+    , ["missing --output flag" | isNothing (optOutput opts)]
     ]
-  where
-    assertJust :: Lens Opts (Maybe a) -> String -> [String]
-    assertJust lens msg =
-      [ msg | Nothing <- pure $ view lens opts ]
 
 main :: IO ()
 main = do
@@ -480,13 +476,13 @@ mkTarget opts = do
       throwE "Neither a object-merging tool (e.g. ld -r) nor an ar that supports -L is available"
 
     -- LLVM toolchain
-    llc <- optional $ findProgram "llc" (optLlc opts) ["llc"]
-    opt <- optional $ findProgram "opt" (optOpt opts) ["opt"]
-    llvmAs <- optional $ findProgram "llvm assembler" (optLlvmAs opts) ["clang"]
+    llc <- optional $ findLlvmProgram "llc" (optLlc opts) "llc" True
+    opt <- optional $ findLlvmProgram "opt" (optOpt opts) "opt" True
+    llvmAs <- optional $ findLlvmProgram "llvm assembler" (optLlvmAs opts) "clang" True
 
     -- for windows, also used for cross compiling
     windres <- optional $ findProgram "windres" (optWindres opts) ["windres"]
-    dlltool <- optional $ findProgram "dlltool" (optDlltool opts) ["llvm-dlltool"]
+    dlltool <- optional $ findLlvmProgram "dlltool" (optDlltool opts) "llvm-dlltool" False
 
     -- Darwin-specific utilities
     (otool, installNameTool) <-
