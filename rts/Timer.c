@@ -98,7 +98,8 @@ static
 void
 handle_tick(int unused STG_UNUSED)
 {
-  handleProfTick();
+  handleProfTick(); // Bad or worse: see issue #27250.
+
   if (RtsFlags.ConcFlags.ctxtSwitchTicks > 0)
   {
       ticks_to_ctxt_switch--;
@@ -113,7 +114,7 @@ handle_tick(int unused STG_UNUSED)
       ticks_to_eventlog_flush--;
       if (ticks_to_eventlog_flush <= 0) {
           ticks_to_eventlog_flush = RtsFlags.TraceFlags.eventlogFlushTicks;
-          flushEventLog(NULL);
+          flushEventLog(NULL);  // Bad or worse: see issue #27250.
       }
   }
 #endif

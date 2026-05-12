@@ -117,6 +117,11 @@ static void startTicker(void) {
                                    interval, // inital interval
                                    interval, // recurrant interval
                                    WT_EXECUTEINTIMERTHREAD);
+    //TODO: using WT_EXECUTEINTIMERTHREAD is fine for context switching, and
+    // plausibly also ok for profile sampling but is way out for eventlog
+    // flushing. The eventlog flush does a global synchronisation of all
+    // capabilities and I/O! And with eventlog providers, it calls arbitrary
+    // user code. This is not ok! See issue #27250.
     if (r == 0) {
         sysErrorBelch("CreateTimerQueueTimer");
         stg_exit(EXIT_FAILURE);
