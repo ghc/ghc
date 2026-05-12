@@ -28,15 +28,6 @@
 #include "RtsSignals.h"
 #include "rts/EventLogWriter.h"
 
-// This global counter is used to allow multiple threads to stop the
-// timer temporarily with a stopTimer()/startTimer() pair.  If
-//      timer_enabled  == 0          timer is enabled
-//      timer_disabled == N, N > 0   timer is disabled by N threads
-// When timer_enabled makes a transition to 0, we enable the timer,
-// and when it makes a transition to non-0 we disable it.
-
-static StgWord timer_disabled;
-
 /* ticks left before next pre-emptive context switch */
 static int ticks_to_ctxt_switch = 0;
 
@@ -108,8 +99,7 @@ void
 handle_tick(int unused STG_UNUSED)
 {
   handleProfTick();
-  if (RtsFlags.ConcFlags.ctxtSwitchTicks > 0
-      && SEQ_CST_LOAD_ALWAYS(&timer_disabled) == 0)
+  if (RtsFlags.ConcFlags.ctxtSwitchTicks > 0)
   {
       ticks_to_ctxt_switch--;
       if (ticks_to_ctxt_switch <= 0) {
@@ -183,7 +173,6 @@ void initTimer(void)
     if (RtsFlags.MiscFlags.tickInterval != 0) {
         initTicker(RtsFlags.MiscFlags.tickInterval, handle_tick);
     }
-    SEQ_CST_STORE_ALWAYS(&timer_disabled, 1);
 #endif
 }
 
@@ -200,10 +189,8 @@ void startTimer(void) { /* no-op */ }
 void pauseTimer(void)
 {
 #if defined(HAVE_PREEMPTION)
-    if (SEQ_CST_SUB_ALWAYS(&timer_disabled, 1) == 0) {
-        if (RtsFlags.MiscFlags.tickInterval != 0) {
-            pauseTicker();
-        }
+    if (RtsFlags.MiscFlags.tickInterval != 0) {
+        pauseTicker();
     }
 #endif
 }
@@ -211,10 +198,8 @@ void pauseTimer(void)
 void unpauseTimer(void)
 {
 #if defined(HAVE_PREEMPTION)
-    if (SEQ_CST_ADD_ALWAYS(&timer_disabled, 1) == 1) {
-        if (RtsFlags.MiscFlags.tickInterval != 0) {
-            unpauseTicker();
-        }
+    if (RtsFlags.MiscFlags.tickInterval != 0) {
+        unpauseTicker();
     }
 #endif
 }
