@@ -249,6 +249,7 @@ test('T21305', [cmm_src], multi_compile_and_run,
 
 test('T22159',
      [unless(opsys('mingw32'), skip),
+      fragile(27248),
       extra_files(['T22159_c.c'])],
      makefile_test, ['T22159'])
 
