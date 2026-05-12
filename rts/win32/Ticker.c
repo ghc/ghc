@@ -109,12 +109,13 @@ exitTicker(void)
 
 static void startTicker(void) {
     ASSERT(timer_queue != NULL && timer == NULL);
+    DWORD interval = TimeToMS(tick_interval); // ms
     BOOL r = CreateTimerQueueTimer(&timer,
                                    timer_queue,
                                    tick_callback,
-                                   0,
-                                   0,
-                                   TimeToMS(tick_interval), // ms
+                                   NULL,     // callback param
+                                   interval, // inital interval
+                                   interval, // recurrant interval
                                    WT_EXECUTEINTIMERTHREAD);
     if (r == 0) {
         sysErrorBelch("CreateTimerQueueTimer");
