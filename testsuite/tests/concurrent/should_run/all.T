@@ -325,3 +325,15 @@ test('T26341b'
     # test uses pipe operations which are not supported by the JS/wasm backends
     , when(arch('wasm32') or arch('javascript'), skip)
     , compile_and_run, ['-package process'])
+
+# Scheduler (very rough) fairness
+test('T27105',
+     [when(arch('wasm32'), skip),   # same reason as T367_letnoescape
+      run_timeout_multiplier(0.05)], # we expect this to run for ~2s
+     compile_and_run, [''])
+test('T27105_fail',
+     [when(arch('wasm32'), skip),
+      # And we can expect it to fail if we context switch too coarsely
+      extra_run_opts('+RTS -C0.2 -RTS'), expect_fail,
+      run_timeout_multiplier(0.05)],
+     multimod_compile_and_run, ['T27105.hs', ''])
