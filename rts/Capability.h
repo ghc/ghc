@@ -348,7 +348,7 @@ bool yieldCapability (Capability** pCap, Task *task, bool gcAllowed);
 // need to service some global event.
 //
 void prodOneCapability (void);
-void prodCapability (Capability *cap, Task *task);
+void prodCapability (Capability *cap);
 
 // Similar to prodOneCapability(), but prods all of them.
 //
