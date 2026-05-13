@@ -52,4 +52,8 @@ void exitTicker(void);
 void pauseTicker(void);
 void unpauseTicker(void);
 
+#if defined(THREADED_RTS)
+void wakeUpRtsViaTicker(void);
+#endif
+
 #include "EndPrivate.h"
