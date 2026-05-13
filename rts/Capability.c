@@ -1100,11 +1100,10 @@ yieldCapability
 #if defined(THREADED_RTS)
 
 void
-prodCapability (Capability *cap, Task *task)
+prodCapability (Capability *cap)
 {
     ACQUIRE_LOCK(&cap->lock);
     if (!cap->running_task) {
-        cap->running_task = task;
         releaseCapability_(cap,true);
     }
     RELEASE_LOCK(&cap->lock);

@@ -1522,7 +1522,7 @@ waitForGcThreads (Capability *cap, bool idle_cap[])
         for(i = 0; i < getNumCapabilities(); ++i) {
             if (i == me || idle_cap[i]) { continue; }
             if (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_STANDING_BY) {
-                prodCapability(getCapability(i), cap->running_task);
+                prodCapability(getCapability(i));
                 interruptCapability(getCapability(i));
             }
         }
