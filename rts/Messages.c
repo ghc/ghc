@@ -49,9 +49,11 @@ void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
     recordClosureMutated(from_cap,(StgClosure*)msg);
 
     if (to_cap->running_task == NULL) {
-        to_cap->running_task = myTask();
-            // precond for releaseCapability_()
-        releaseCapability_(to_cap,false);
+        /* Precond for releaseCapability_ is: running_task || always_wakeup.
+         * We have running_task == NULL, hence we must use always_wakeup. This
+         * is ok since the inbox is now non-empty, so we wake a task anyway.
+         */
+        releaseCapability_(to_cap, true /*always_wakeup*/);
     } else {
         interruptCapability(to_cap);
     }
