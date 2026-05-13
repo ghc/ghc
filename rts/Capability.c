@@ -525,13 +525,20 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
 /* ----------------------------------------------------------------------------
  * releaseCapability
  *
- * The current Task (cap->task) releases the Capability.  The Capability is
- * marked free, and if there is any work to do, an appropriate Task is woken up.
+ * This serves two purposes:
+ *
+ * 1. The current Task (cap->running_task) releases the Capability.
+ *    The Capability is marked free, and if there is any work to do, an
+ *    appropriate Task is woken up.
+ *
+ * 2. There is no current task (cap->task == NULL), and thus the Capability
+ *    is idle, and we want to wake up an idle Task to animate the Capability.
+ *    In this case set always_wakeup. See also prodCapability.
  *
  * The caller must hold cap->lock and will still hold it after
  * releaseCapability returns.
  *
- * N.B. May need to take all_tasks_mutex.
+ * N.B. May need to take all_tasks_mutex, if it needs to start a new task.
  *
  * ------------------------------------------------------------------------- */
 
@@ -540,12 +547,18 @@ void
 releaseCapability_ (Capability* cap,
                     bool always_wakeup)
 {
-    Task *task;
+    {
+        Task *task = cap->running_task;
 
-    task = cap->running_task;
-
-    ASSERT_PARTIAL_CAPABILITY_INVARIANTS(cap,task);
-    ASSERT_RETURNING_TASKS(cap,task);
+        ASSERT(task || always_wakeup);
+        // To cover purpose 2 above, we allow the cap->running_task to be
+        // NULL, to handle cases where a thread (that is not itself a Task)
+        // needs to wake up an idle task for the capability.
+        if (task) {
+            ASSERT_PARTIAL_CAPABILITY_INVARIANTS(cap,task);
+            ASSERT_RETURNING_TASKS(cap,task);
+        }
+    }
     ASSERT_LOCK_HELD(&cap->lock);
 
     RELAXED_STORE(&cap->running_task, NULL);
@@ -581,8 +594,8 @@ releaseCapability_ (Capability* cap,
         // assertion is false: in schedule() we force a yield after
         // ThreadBlocked, but the thread may be back on the run queue
         // by now.
-        task = peekRunQueue(cap)->bound->task;
-        giveCapabilityToTask(cap, task);
+        Task *btask = peekRunQueue(cap)->bound->task;
+        giveCapabilityToTask(cap, btask);
         return;
     }
 
