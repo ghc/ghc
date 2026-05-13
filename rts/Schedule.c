@@ -2885,8 +2885,8 @@ performBlockingMajorGC(void)
 }
 
 /* ---------------------------------------------------------------------------
-   Interrupt execution.
-   Might be called inside a signal handler so it mustn't do anything fancy.
+   Interrupt execution in response to ctl-c.
+   On posix, ctl-c is a signal, while on Win32 it is a console event.
    ------------------------------------------------------------------------ */
 
 void
@@ -2896,17 +2896,37 @@ interruptStgRts(void)
     setSchedState(SCHED_INTERRUPTING);
     interruptAllCapabilities();
 #if defined(THREADED_RTS)
+    /* It may be that all capabilities are idle. If so, we must wake one up. */
+#if defined(mingw32_HOST_OS)
+    /* On win32, console handlers are invoked in a proper thread, so we can
+     * directly call wakeUpRts. Although it is an OS thread, it is not one
+     * we created or control necessarily, so it may have no associated Task.
+     */
     wakeUpRts();
+#else
+    /* On posix on the other hand, signal handlers are very limited in what
+     * they can do. We cannot directly call wakeUpRts below because it is not
+     * signal safe (it uses cond vars to wake up a task). So instead we proxy
+     * it: we interrupt the ticker thread and ask the ticker thread to call
+     * wakeUpRts below. The ticker thread is a proper thread and so can call
+     * wakeUpRts. We can interrupt the ticker thread from signal handler
+     * context safely because it only involves writing to a pipe/eventfd.
+     */
+    wakeUpRtsViaTicker();
+#endif
 #endif
 }
 
 /* -----------------------------------------------------------------------------
    Wake up the RTS
 
-   This function causes at least one OS thread to wake up and run the
-   scheduler loop.  It is invoked when the RTS might be deadlocked, or
-   an external event has arrived that may need servicing (eg. a
-   keyboard interrupt).
+   This function causes at least one task to wake up and run the scheduler
+   loop on at least one capability.
+
+   It is invoked:
+   1. as part of the idle GC scheme: when the RTS has been idle for long enough
+      and it is time to go back to the scheduler which will invoke idle GC; or
+   2. when a ctl-c occurs (posix sigint signal or win32 console event)
 
    In the single-threaded RTS we don't do anything here; we only have
    one thread anyway, and the event that caused us to want to wake up
@@ -2916,10 +2936,11 @@ interruptStgRts(void)
 #if defined(THREADED_RTS)
 void wakeUpRts(void)
 {
-    // This forces the IO Manager thread to wakeup, which will
-    // in turn ensure that some OS thread wakes up and runs the
-    // scheduler loop, which will cause a GC and deadlock check.
-    wakeupIOManager();
+    /* Our current thread may not have a Task, in particular it will not when
+     * called from interruptStgRts or via wakeUpRtsViaTicker. This is ok,
+     * prodOneCapability does not require one.
+     */
+    prodOneCapability();
 }
 #endif
 
