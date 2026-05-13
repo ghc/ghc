@@ -169,7 +169,7 @@ go label mods cnd =
     setTargets [tgt]
 
     hsc_env <- getSession
-    (_, nodes) <- liftIO $ downsweep hsc_env mkUnknownDiagnostic Nothing [] [] False
+    (_, nodes) <- liftIO $ downsweep hsc_env mkUnknownDiagnostic Nothing [] Nothing [] False
 
     it label $ cnd (mgModSummaries nodes)
 

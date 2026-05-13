@@ -232,7 +232,7 @@ depanalPartial diag_wrapper msg excluded_mods allow_dup_roots = do
     liftIO $ flushFinderCaches (hsc_FC hsc_env) (hsc_unit_env hsc_env)
 
     (errs, mod_graph) <- liftIO $ downsweep
-      hsc_env diag_wrapper msg (mgModSummaries old_graph)
+      hsc_env diag_wrapper msg (mgModSummaries old_graph) Nothing
       excluded_mods allow_dup_roots
     return (unionManyMessages errs, mod_graph)
 

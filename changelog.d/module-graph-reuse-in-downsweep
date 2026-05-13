@@ -1,0 +1,9 @@
+section: compiler
+synopsis: Allow `downsweep` to use nodes of an existing module graph
+issues: #27054
+mrs: !16028
+description: {
+    This contribution enables `downsweep` to use the nodes of a module
+    graph obtained from a previous downsweeping round, which allows GHC
+    API applications to build module graphs somewhat incrementally.
+}

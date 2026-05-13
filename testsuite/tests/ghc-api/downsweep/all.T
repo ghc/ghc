@@ -14,3 +14,10 @@ test('OldModLocation',
      ],
      compile_and_run,
      ['-package ghc'])
+
+test('IncrementalDownsweep',
+     [ extra_files(['IncrementalDownsweep.modules/'])
+     , extra_run_opts('"' + config.libdir + '"')
+     ],
+     compile_and_run,
+     ['-package ghc'])

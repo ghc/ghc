@@ -67,7 +67,7 @@ main = do
           keyC = msKey msC
 
       let mkGraph s = do
-            ([], nodes) <- downsweepFromRootNodes hsc_env mempty [] True DownsweepUseFixed s []
+            ([], nodes) <- downsweepFromRootNodes hsc_env mempty Nothing [] True DownsweepUseFixed s []
             return $ mkModuleGraph nodes
 
       graph <- liftIO $ mkGraph [ModuleNodeCompile msC]

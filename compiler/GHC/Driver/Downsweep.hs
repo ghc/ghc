@@ -146,6 +146,10 @@ The result is having a uniform graph available for the whole compilation pipelin
 -- an import of this module mean.
 type DownsweepCache = M.Map (UnitId, PkgQual, ModuleNameWithIsBoot) [Either DriverMessages ModuleNodeInfo]
 
+moduleGraphNodeMap :: ModuleGraph -> M.Map NodeKey ModuleGraphNode
+moduleGraphNodeMap graph
+    = M.fromList [(mkNodeKey node, node) | node <- mgModSummaries' graph]
+
 -----------------------------------------------------------------------------
 --
 -- | Downsweep (dependency analysis) for --make mode
@@ -157,6 +161,13 @@ type DownsweepCache = M.Map (UnitId, PkgQual, ModuleNameWithIsBoot) [Either Driv
 -- We pass in the previous collection of summaries, which is used as a
 -- cache to avoid recalculating a module summary if the source is
 -- unchanged.
+--
+-- Downsweeping can start from scratch for from a given module graph. In the
+-- latter case, the given graph is fully included in the resulting graph, even
+-- if parts of it are not reachable from any of the given roots. When an import
+-- is processed, the source of the imported module is not consulted if this
+-- module is already mentioned in the given graph. The sources of the root
+-- modules are always consulted, though.
 --
 -- The returned ModuleGraph has one node for each home-package
 -- module, plus one for any hs-boot files.  The imports of these nodes
@@ -172,6 +183,8 @@ downsweep :: HscEnv
           -> Maybe Messager
           -> [ModSummary]
           -- ^ Old summaries
+          -> Maybe ModuleGraph
+          -- ^ Optionally a module graph to extend
           -> [ModuleName]       -- Ignore dependencies on these; treat
                                 -- them as if they were package modules
           -> Bool               -- True <=> allow multiple targets to have
@@ -181,7 +194,7 @@ downsweep :: HscEnv
                 -- The non-error elements of the returned list all have distinct
                 -- (Modules, IsBoot) identifiers, unless the Bool is true in
                 -- which case there can be repeats
-downsweep hsc_env diag_wrapper msg old_summaries excl_mods allow_dup_roots = do
+downsweep hsc_env diag_wrapper msg old_summaries maybe_base_graph excl_mods allow_dup_roots = do
   n_jobs <- mkWorkerLimit (hsc_dflags hsc_env)
   (root_errs, root_summaries) <- rootSummariesParallel n_jobs hsc_env diag_wrapper msg summary
   let closure_errs = checkHomeUnitsClosed unit_env
@@ -191,7 +204,7 @@ downsweep hsc_env diag_wrapper msg old_summaries excl_mods allow_dup_roots = do
 
   case all_errs of
     [] -> do
-       (downsweep_errs, downsweep_nodes) <- downsweepFromRootNodes hsc_env old_summary_map excl_mods allow_dup_roots DownsweepUseCompile (map ModuleNodeCompile root_summaries) []
+       (downsweep_errs, downsweep_nodes) <- downsweepFromRootNodes hsc_env old_summary_map maybe_base_graph excl_mods allow_dup_roots DownsweepUseCompile (map ModuleNodeCompile root_summaries) []
 
        let (other_errs, unit_nodes) = partitionEithers $ HUG.unitEnv_foldWithKey (\nodes uid hue -> nodes ++ unitModuleNodes downsweep_nodes uid hue) [] (hsc_HUG hsc_env)
 
@@ -232,7 +245,7 @@ downsweep hsc_env diag_wrapper msg old_summaries excl_mods allow_dup_roots = do
 downsweepThunk :: HscEnv -> ModSummary -> IO ModuleGraph
 downsweepThunk hsc_env mod_summary = unsafeInterleaveIO $ do
   debugTraceMsg (hsc_logger hsc_env) 3 $ text "Computing Module Graph thunk..."
-  ~(errs, mg) <- downsweepFromRootNodes hsc_env mempty [] True DownsweepUseFixed [ModuleNodeCompile mod_summary] []
+  ~(errs, mg) <- downsweepFromRootNodes hsc_env mempty Nothing [] True DownsweepUseFixed [ModuleNodeCompile mod_summary] []
   let dflags = hsc_dflags hsc_env
   liftIO $ printOrThrowDiagnostics (hsc_logger hsc_env)
                                    (initPrintConfig dflags)
@@ -360,7 +373,7 @@ downsweepInstalledModules hsc_env mods = do
             _ -> throwGhcException $ ProgramError $ showSDoc (hsc_dflags hsc_env) $ text "downsweepInstalledModules: Could not find installed module" <+> ppr i
 
     nodes <- mapM process installed_mods
-    (errs, mg) <- downsweepFromRootNodes hsc_env mempty [] True DownsweepUseFixed nodes external_uids
+    (errs, mg) <- downsweepFromRootNodes hsc_env mempty Nothing [] True DownsweepUseFixed nodes external_uids
 
     -- Similarly here, we should really not get any errors, but print them out if we do.
     let dflags = hsc_dflags hsc_env
@@ -385,19 +398,21 @@ data DownsweepMode = DownsweepUseCompile | DownsweepUseFixed
 -- all the dependencies, all the way to the leaf units.
 downsweepFromRootNodes :: HscEnv
                   -> M.Map (UnitId, OsPath) ModSummary
+                  -> Maybe ModuleGraph
                   -> [ModuleName]
                   -> Bool
                   -> DownsweepMode -- ^ Whether to create fixed or compile nodes for dependencies
                   -> [ModuleNodeInfo] -- ^ The starting ModuleNodeInfo
                   -> [UnitId] -- ^ The starting units
                   -> IO ([DriverMessages], [ModuleGraphNode])
-downsweepFromRootNodes hsc_env old_summaries excl_mods allow_dup_roots mode root_nodes root_uids
+downsweepFromRootNodes hsc_env old_summaries maybe_base_graph excl_mods allow_dup_roots mode root_nodes root_uids
    = do
        let root_map = mkRootMap root_nodes
        checkDuplicates root_map
        let env = DownsweepEnv hsc_env mode old_summaries excl_mods
        (deps', map0) <- runDownsweepM env  $ do
-                    (module_deps, map0) <- loopModuleNodeInfos root_nodes (M.empty, root_map)
+                    let base_nodes = maybe M.empty moduleGraphNodeMap maybe_base_graph
+                    (module_deps, map0) <- loopModuleNodeInfos root_nodes (base_nodes, root_map)
                     let all_deps = loopUnit hsc_env module_deps root_uids
                     let all_instantiations =  getHomeUnitInstantiations hsc_env
                     deps' <- loopInstantiations all_instantiations all_deps
