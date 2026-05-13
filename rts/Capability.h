@@ -350,10 +350,6 @@ bool yieldCapability (Capability** pCap, Task *task, bool gcAllowed);
 void prodOneCapability (void);
 void prodCapability (Capability *cap);
 
-// Similar to prodOneCapability(), but prods all of them.
-//
-void prodAllCapabilities (void);
-
 // Attempt to gain control of a Capability if it is free.
 //
 bool tryGrabCapability (Capability *cap, Task *task);

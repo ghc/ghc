@@ -1109,6 +1109,16 @@ prodCapability (Capability *cap)
     RELEASE_LOCK(&cap->lock);
 }
 
+/* Ensure at least one capability is not idle. Used to wake up the RTS
+ * in cases where we anticipate that all capabilities may be idle. In
+ * particular it is used for the ctl-c handler, and after the idle GC
+ * timeout to initiate idle GC. */
+void
+prodOneCapability (void)
+{
+    prodCapability(getCapability(0));
+}
+
 #endif /* THREADED_RTS */
 
 /* ----------------------------------------------------------------------------
