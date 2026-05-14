@@ -1,0 +1,12 @@
+#include "Cmm.h"
+
+// Exercises MO_S_Mul2 W16: signExtendReg W16 W32 must emit SXTH to
+// sign-extend the 16-bit inputs to 32-bit before SMULL.
+testMul2W16 (W_ buffer) {
+    I16 a, b, needed, hi, lo;
+    a = I16[buffer];
+    b = I16[buffer + 2];
+    (needed, hi, lo) = prim %mul2_16(a, b);
+    I16[buffer + 4] = lo;
+    return();
+}
