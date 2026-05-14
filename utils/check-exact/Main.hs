@@ -646,7 +646,7 @@ addLocaLDecl3 :: Changer
 addLocaLDecl3 libdir top = do
   Right newDecl <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
   let
-      doAddLocal = replaceDecls (anchorEof lp) [parent',d2']
+      doAddLocal = replaceDecls (addModuleCommentOrigDeltas lp) [parent',d2']
         where
          lp = top
          (de1:d2:_) = hsDecls lp
@@ -667,7 +667,7 @@ addLocaLDecl4 libdir lp = do
   Right newDecl <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
   Right newSig  <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
   let
-      doAddLocal = replaceDecls (anchorEof lp) (parent':ds)
+      doAddLocal = replaceDecls (addModuleCommentOrigDeltas lp) (parent':ds)
         where
           (parent:ds) = hsDecls (makeDeltaAst lp)
 
@@ -781,7 +781,7 @@ rmDecl3 _libdir lp = do
 rmDecl4 :: Changer
 rmDecl4 _libdir lp = do
   let
-      doRmDecl = replaceDecls (anchorEof lp) [de1',sd1]
+      doRmDecl = replaceDecls (addModuleCommentOrigDeltas lp) [de1',sd1]
         where
          [de1] = hsDecls lp
          (de1',Just sd1) = modifyValD (getLocA de1) de1 $ \_m [sd1a,sd2] ->

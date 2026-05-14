@@ -65,7 +65,7 @@ module Transform
         , balanceComments
         , balanceCommentsList
         , balanceCommentsListA
-        , anchorEof
+        , addModuleCommentOrigDeltas
 
         -- ** Managing lists, pure functions
         , captureOrderBinds
@@ -724,8 +724,8 @@ balanceSameLineComments (L la (Match anm mctxt pats (GRHSs x grhss lb)))
 
 -- ---------------------------------------------------------------------
 
-anchorEof :: ParsedSource -> ParsedSource
-anchorEof (L l m@(HsModule (XModulePs an _lo _ _) _mn _exps _imps _decls)) = L l (m { hsmodExt = (hsmodExt m){ hsmodAnn = an' } })
+addModuleCommentOrigDeltas :: ParsedSource -> ParsedSource
+addModuleCommentOrigDeltas (L l m@(HsModule (XModulePs an _lo _ _) _mn _exps _imps _decls)) = L l (m { hsmodExt = (hsmodExt m){ hsmodAnn = an' } })
   where
     an' = addCommentOrigDeltasAnn an
 
