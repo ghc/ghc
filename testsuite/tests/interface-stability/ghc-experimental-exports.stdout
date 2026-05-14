@@ -6505,7 +6505,7 @@ module GHC.RTS.Flags.Experimental where
   type TickyFlags :: *
   data TickyFlags = TickyFlags {showTickyStats :: GHC.Internal.Types.Bool, tickyFile :: GHC.Internal.Maybe.Maybe GHC.Internal.IO.FilePath}
   type TraceFlags :: *
-  data TraceFlags = TraceFlags {tracing :: DoTrace, timestamp :: GHC.Internal.Types.Bool, traceScheduler :: GHC.Internal.Types.Bool, traceGc :: GHC.Internal.Types.Bool, traceNonmovingGc :: GHC.Internal.Types.Bool, sparksSampled :: GHC.Internal.Types.Bool, sparksFull :: GHC.Internal.Types.Bool, user :: GHC.Internal.Types.Bool}
+  data TraceFlags = TraceFlags {tracing :: DoTrace, timestamp :: GHC.Internal.Types.Bool, traceScheduler :: GHC.Internal.Types.Bool, traceGc :: GHC.Internal.Types.Bool, traceNonmovingGc :: GHC.Internal.Types.Bool, sparksSampled :: GHC.Internal.Types.Bool, sparksFull :: GHC.Internal.Types.Bool, user :: GHC.Internal.Types.Bool, traceIpe :: GHC.Internal.Types.Bool}
   getCCFlags :: GHC.Internal.Types.IO CCFlags
   getConcFlags :: GHC.Internal.Types.IO ConcFlags
   getDebugFlags :: GHC.Internal.Types.IO DebugFlags

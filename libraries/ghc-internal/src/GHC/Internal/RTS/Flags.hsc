@@ -359,6 +359,8 @@ data TraceFlags = TraceFlags
     , sparksSampled  :: Bool -- ^ trace spark events by a sampled method
     , sparksFull     :: Bool -- ^ trace spark events 100% accurately
     , user           :: Bool -- ^ trace user events (emitted from Haskell code)
+    , traceIpe       :: Bool -- ^ trace IPE events
+                             --   @since ghc-experimental-10.0.0
     } deriving ( Show -- ^ @since base-4.8.0.0
                , Generic -- ^ @since base-4.15.0.0
                )
@@ -628,7 +630,7 @@ getTraceFlags :: IO TraceFlags
 getTraceFlags = do
 #if defined(javascript_HOST_ARCH)
   -- The JS backend does not currently have trace flags
-  return (TraceFlags TraceNone False False False False False False False)
+  return (TraceFlags TraceNone False False False False False False False False)
 #else
   let ptr = (#ptr RTS_FLAGS, TraceFlags) rtsFlagsPtr
   TraceFlags <$> (toEnum . fromIntegral
@@ -647,6 +649,8 @@ getTraceFlags = do
                    (#{peek TRACE_FLAGS, sparks_full} ptr :: IO CBool))
              <*> (toBool <$>
                    (#{peek TRACE_FLAGS, user} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek TRACE_FLAGS, ipe} ptr :: IO CBool))
 #endif
 
 getTickyFlags :: IO TickyFlags
