@@ -213,7 +213,7 @@ module Control.Concurrent.QSemN where
   waitQSemN :: QSemN -> GHC.Internal.Types.Int -> GHC.Internal.Types.IO ()
 
 module Control.Exception where
-  -- Safety: Trustworthy
+  -- Safety: Safe
   type AllocationLimitExceeded :: *
   data AllocationLimitExceeded = AllocationLimitExceeded
   type ArithException :: *
@@ -508,7 +508,7 @@ module Control.Monad.Fix where
   fix :: forall a. (a -> a) -> a
 
 module Control.Monad.IO.Class where
-  -- Safety: Trustworthy
+  -- Safety: Safe
   type MonadIO :: (* -> *) -> Constraint
   class GHC.Internal.Base.Monad m => MonadIO m where
     liftIO :: forall a. GHC.Internal.Types.IO a -> m a
@@ -994,7 +994,7 @@ module Data.Eq where
     {-# MINIMAL (==) | (/=) #-}
 
 module Data.Fixed where
-  -- Safety: Trustworthy
+  -- Safety: Safe
   type Centi :: *
   type Centi = Fixed E2
   type Deci :: *
@@ -1438,7 +1438,7 @@ module Data.List where
   zipWith7 :: forall a b c d e f g h. (a -> b -> c -> d -> e -> f -> g -> h) -> [a] -> [b] -> [c] -> [d] -> [e] -> [f] -> [g] -> [h]
 
 module Data.List.NonEmpty where
-  -- Safety: Trustworthy
+  -- Safety: Safe
   (!!) :: forall a. GHC.Internal.Stack.Types.HasCallStack => NonEmpty a -> GHC.Internal.Types.Int -> a
   (<|) :: forall a. a -> NonEmpty a -> NonEmpty a
   type NonEmpty :: * -> *
@@ -10291,7 +10291,7 @@ module System.Posix.Types where
 
 
 module System.Timeout where
-  -- Safety: Trustworthy
+  -- Safety: Safe
   type Timeout :: *
   newtype Timeout = ...
   timeout :: forall a. GHC.Internal.Types.Int -> GHC.Internal.Types.IO a -> GHC.Internal.Types.IO (GHC.Internal.Maybe.Maybe a)
@@ -10610,14 +10610,14 @@ instance forall x y z. Data.Bitraversable.Bitraversable ((,,,,) x y z) -- Define
 instance forall x y z w. Data.Bitraversable.Bitraversable ((,,,,,) x y z w) -- Defined in ‘Data.Bitraversable’
 instance forall x y z w v. Data.Bitraversable.Bitraversable ((,,,,,,) x y z w v) -- Defined in ‘Data.Bitraversable’
 instance Data.Bitraversable.Bitraversable Data.Semigroup.Arg -- Defined in ‘Data.Semigroup’
-instance forall (n :: GHC.Internal.TypeNats.Nat). GHC.Internal.TypeNats.KnownNat n => Data.Fixed.HasResolution n -- Defined in ‘Data.Fixed’
-instance Data.Fixed.HasResolution Data.Fixed.E0 -- Defined in ‘Data.Fixed’
-instance Data.Fixed.HasResolution Data.Fixed.E1 -- Defined in ‘Data.Fixed’
-instance Data.Fixed.HasResolution Data.Fixed.E12 -- Defined in ‘Data.Fixed’
-instance Data.Fixed.HasResolution Data.Fixed.E2 -- Defined in ‘Data.Fixed’
-instance Data.Fixed.HasResolution Data.Fixed.E3 -- Defined in ‘Data.Fixed’
-instance Data.Fixed.HasResolution Data.Fixed.E6 -- Defined in ‘Data.Fixed’
-instance Data.Fixed.HasResolution Data.Fixed.E9 -- Defined in ‘Data.Fixed’
+instance [safe] forall (n :: GHC.Internal.TypeNats.Nat). GHC.Internal.TypeNats.KnownNat n => Data.Fixed.HasResolution n -- Defined in ‘Data.Fixed’
+instance [safe] Data.Fixed.HasResolution Data.Fixed.E0 -- Defined in ‘Data.Fixed’
+instance [safe] Data.Fixed.HasResolution Data.Fixed.E1 -- Defined in ‘Data.Fixed’
+instance [safe] Data.Fixed.HasResolution Data.Fixed.E12 -- Defined in ‘Data.Fixed’
+instance [safe] Data.Fixed.HasResolution Data.Fixed.E2 -- Defined in ‘Data.Fixed’
+instance [safe] Data.Fixed.HasResolution Data.Fixed.E3 -- Defined in ‘Data.Fixed’
+instance [safe] Data.Fixed.HasResolution Data.Fixed.E6 -- Defined in ‘Data.Fixed’
+instance [safe] Data.Fixed.HasResolution Data.Fixed.E9 -- Defined in ‘Data.Fixed’
 instance forall (f :: * -> *) (g :: * -> *). (Data.Foldable1.Foldable1 f, Data.Foldable1.Foldable1 g) => Data.Foldable1.Foldable1 (f GHC.Internal.Generics.:*: g) -- Defined in ‘Data.Foldable1’
 instance forall (f :: * -> *) (g :: * -> *). (Data.Foldable1.Foldable1 f, Data.Foldable1.Foldable1 g) => Data.Foldable1.Foldable1 (f GHC.Internal.Generics.:+: g) -- Defined in ‘Data.Foldable1’
 instance forall (f :: * -> *) (g :: * -> *). (Data.Foldable1.Foldable1 f, Data.Foldable1.Foldable1 g) => Data.Foldable1.Foldable1 (f GHC.Internal.Generics.:.: g) -- Defined in ‘Data.Foldable1’
@@ -11272,7 +11272,7 @@ instance forall k (s :: k). GHC.Internal.Classes.Eq (GHC.Internal.Data.Proxy.Pro
 instance GHC.Internal.Classes.Eq ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.SomeTypeRep -- Defined in ‘ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal’
 instance forall k (a :: k). GHC.Internal.Classes.Eq (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.TypeRep a) -- Defined in ‘ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal’
 instance forall a b. (GHC.Internal.Classes.Eq a, GHC.Internal.Classes.Eq b) => GHC.Internal.Classes.Eq (GHC.Internal.Data.Either.Either a b) -- Defined in ‘GHC.Internal.Data.Either’
-instance forall k (a :: k). GHC.Internal.Classes.Eq (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
+instance [safe] forall k (a :: k). GHC.Internal.Classes.Eq (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Classes.Eq (f (g a)) => GHC.Internal.Classes.Eq (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a. GHC.Internal.Classes.Eq a => GHC.Internal.Classes.Eq (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
 instance [safe] forall k (f :: k -> *) (a :: k) (g :: k -> *). (GHC.Internal.Classes.Eq (f a), GHC.Internal.Classes.Eq (g a)) => GHC.Internal.Classes.Eq (Data.Functor.Product.Product f g a) -- Defined in ‘Data.Functor.Product’
@@ -11398,7 +11398,7 @@ instance forall (c :: GHC.Internal.Types.Char). GHC.Internal.Classes.Eq (GHC.Int
 instance forall (s :: GHC.Internal.Types.Symbol). GHC.Internal.Classes.Eq (GHC.Internal.TypeLits.SSymbol s) -- Defined in ‘GHC.Internal.TypeLits’
 instance GHC.Internal.Classes.Eq GHC.Internal.TypeLits.SomeChar -- Defined in ‘GHC.Internal.TypeLits’
 instance GHC.Internal.Classes.Eq GHC.Internal.TypeLits.SomeSymbol -- Defined in ‘GHC.Internal.TypeLits’
-instance GHC.Internal.Classes.Eq System.Timeout.Timeout -- Defined in ‘System.Timeout’
+instance [safe] GHC.Internal.Classes.Eq System.Timeout.Timeout -- Defined in ‘System.Timeout’
 instance GHC.Internal.Classes.Eq GHC.Internal.Text.Read.Lex.Lexeme -- Defined in ‘GHC.Internal.Text.Read.Lex’
 instance GHC.Internal.Classes.Eq GHC.Internal.Text.Read.Lex.Number -- Defined in ‘GHC.Internal.Text.Read.Lex’
 instance forall a. GHC.Internal.Classes.Ord a => GHC.Internal.Classes.Ord (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.Base’
@@ -11446,7 +11446,7 @@ instance forall k (s :: k). GHC.Internal.Classes.Ord (GHC.Internal.Data.Proxy.Pr
 instance GHC.Internal.Classes.Ord ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.SomeTypeRep -- Defined in ‘ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal’
 instance forall k (a :: k). GHC.Internal.Classes.Ord (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.TypeRep a) -- Defined in ‘ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal’
 instance forall a b. (GHC.Internal.Classes.Ord a, GHC.Internal.Classes.Ord b) => GHC.Internal.Classes.Ord (GHC.Internal.Data.Either.Either a b) -- Defined in ‘GHC.Internal.Data.Either’
-instance forall k (a :: k). GHC.Internal.Classes.Ord (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
+instance [safe] forall k (a :: k). GHC.Internal.Classes.Ord (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Classes.Ord (f (g a)) => GHC.Internal.Classes.Ord (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a. GHC.Internal.Classes.Ord a => GHC.Internal.Classes.Ord (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
 instance [safe] forall k (f :: k -> *) (a :: k) (g :: k -> *). (GHC.Internal.Classes.Ord (f a), GHC.Internal.Classes.Ord (g a)) => GHC.Internal.Classes.Ord (Data.Functor.Product.Product f g a) -- Defined in ‘Data.Functor.Product’
@@ -11756,7 +11756,7 @@ instance GHC.Internal.Data.Data.Data GHC.Internal.Word.Word64 -- Defined in ‘G
 instance GHC.Internal.Data.Data.Data GHC.Internal.Word.Word8 -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Foreign.Ptr.WordPtr -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (GHC.Internal.Functor.ZipList.ZipList a) -- Defined in ‘GHC.Internal.Data.Data’
-instance forall k (a :: k). (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable k, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a) => GHC.Internal.Data.Data.Data (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
+instance [safe] forall k (a :: k). (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable k, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a) => GHC.Internal.Data.Data.Data (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable f, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable g, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable k1, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable k2, GHC.Internal.Data.Data.Data (f (g a))) => GHC.Internal.Data.Data.Data (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable f, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable g, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable k, GHC.Internal.Data.Data.Data (f a), GHC.Internal.Data.Data.Data (g a)) => GHC.Internal.Data.Data.Data (Data.Functor.Product.Product f g a) -- Defined in ‘Data.Functor.Product’
 instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable f, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable g, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable k, GHC.Internal.Data.Data.Data (f a), GHC.Internal.Data.Data.Data (g a)) => GHC.Internal.Data.Data.Data (Data.Functor.Sum.Sum f g a) -- Defined in ‘Data.Functor.Sum’
@@ -11976,7 +11976,7 @@ instance GHC.Internal.Enum.Enum GHC.Internal.Unicode.GeneralCategory -- Defined 
 instance forall k (a :: k) (b :: k). (a ~ b) => GHC.Internal.Enum.Enum (a GHC.Internal.Data.Type.Equality.:~: b) -- Defined in ‘GHC.Internal.Data.Type.Equality’
 instance forall k1 k2 (a :: k1) (b :: k2). (a ~~ b) => GHC.Internal.Enum.Enum (a GHC.Internal.Data.Type.Equality.:~~: b) -- Defined in ‘GHC.Internal.Data.Type.Equality’
 instance forall k (s :: k). GHC.Internal.Enum.Enum (GHC.Internal.Data.Proxy.Proxy s) -- Defined in ‘GHC.Internal.Data.Proxy’
-instance forall k (a :: k). GHC.Internal.Enum.Enum (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
+instance [safe] forall k (a :: k). GHC.Internal.Enum.Enum (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Enum.Enum (f (g a)) => GHC.Internal.Enum.Enum (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a. GHC.Internal.Enum.Enum a => GHC.Internal.Enum.Enum (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
 instance GHC.Internal.Enum.Enum GHC.Internal.Int.Int16 -- Defined in ‘GHC.Internal.Int’
@@ -12069,7 +12069,7 @@ instance GHC.Internal.Exception.Type.Exception GHC.Internal.Data.Dynamic.Dynamic
 instance [safe] GHC.Internal.Exception.Type.Exception ghc-internal-10.100.0:GHC.Internal.IO.Handle.Lock.Common.FileLockingNotSupported -- Defined in ‘ghc-internal-10.100.0:GHC.Internal.IO.Handle.Lock.Common’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.JS.Prim.JSException -- Defined in ‘GHC.Internal.JS.Prim’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.JS.Prim.WouldBlockException -- Defined in ‘GHC.Internal.JS.Prim’
-instance GHC.Internal.Exception.Type.Exception System.Timeout.Timeout -- Defined in ‘System.Timeout’
+instance [safe] GHC.Internal.Exception.Type.Exception System.Timeout.Timeout -- Defined in ‘System.Timeout’
 instance forall k a (b :: k). GHC.Internal.Float.Floating a => GHC.Internal.Float.Floating (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Float.Floating (Data.Complex.Complex a) -- Defined in ‘Data.Complex’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Float.Floating (f (g a)) => GHC.Internal.Float.Floating (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
@@ -12402,7 +12402,7 @@ instance GHC.Internal.Ix.Ix GHC.Internal.IO.Device.SeekMode -- Defined in ‘GHC
 instance GHC.Internal.Ix.Ix GHC.Internal.IO.IOMode.IOMode -- Defined in ‘GHC.Internal.IO.IOMode’
 instance forall k a (b :: k). GHC.Internal.Num.Num a => GHC.Internal.Num.Num (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Num.Num (Data.Complex.Complex a) -- Defined in ‘Data.Complex’
-instance forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Num.Num (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
+instance [safe] forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Num.Num (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Num.Num (f (g a)) => GHC.Internal.Num.Num (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a b. GHC.Internal.Num.Num a => GHC.Internal.Num.Num (Data.Functor.Contravariant.Op a b) -- Defined in ‘Data.Functor.Contravariant’
 instance forall a. GHC.Internal.Num.Num a => GHC.Internal.Num.Num (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
@@ -12505,7 +12505,7 @@ instance forall k (a :: k) (b :: k). (a ~ b) => GHC.Internal.Read.Read (a GHC.In
 instance forall k1 k2 (a :: k1) (b :: k2). (a ~~ b) => GHC.Internal.Read.Read (a GHC.Internal.Data.Type.Equality.:~~: b) -- Defined in ‘GHC.Internal.Data.Type.Equality’
 instance forall k (t :: k). GHC.Internal.Read.Read (GHC.Internal.Data.Proxy.Proxy t) -- Defined in ‘GHC.Internal.Data.Proxy’
 instance forall a b. (GHC.Internal.Read.Read a, GHC.Internal.Read.Read b) => GHC.Internal.Read.Read (GHC.Internal.Data.Either.Either a b) -- Defined in ‘GHC.Internal.Data.Either’
-instance forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Read.Read (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
+instance [safe] forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Read.Read (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Read.Read (f (g a)) => GHC.Internal.Read.Read (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
 instance [safe] forall k (f :: k -> *) (a :: k) (g :: k -> *). (GHC.Internal.Read.Read (f a), GHC.Internal.Read.Read (g a)) => GHC.Internal.Read.Read (Data.Functor.Product.Product f g a) -- Defined in ‘Data.Functor.Product’
@@ -12587,7 +12587,7 @@ instance GHC.Internal.Read.Read GHC.Internal.IO.Handle.Types.NewlineMode -- Defi
 instance GHC.Internal.Read.Read GHC.Internal.IO.Device.SeekMode -- Defined in ‘System.IO’
 instance forall k a (b :: k). GHC.Internal.Real.Fractional a => GHC.Internal.Real.Fractional (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Real.Fractional (Data.Complex.Complex a) -- Defined in ‘Data.Complex’
-instance forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Real.Fractional (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
+instance [safe] forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Real.Fractional (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Real.Fractional (f (g a)) => GHC.Internal.Real.Fractional (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a b. GHC.Internal.Real.Fractional a => GHC.Internal.Real.Fractional (Data.Functor.Contravariant.Op a b) -- Defined in ‘Data.Functor.Contravariant’
 instance forall a. GHC.Internal.Real.Fractional a => GHC.Internal.Real.Fractional (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
@@ -12635,7 +12635,7 @@ instance GHC.Internal.Real.Integral GHC.Internal.Foreign.C.Types.CULong -- Defin
 instance GHC.Internal.Real.Integral GHC.Internal.Foreign.C.Types.CUShort -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Real.Integral GHC.Internal.Foreign.C.Types.CWchar -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance forall k a (b :: k). GHC.Internal.Real.Real a => GHC.Internal.Real.Real (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
-instance forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Real.Real (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
+instance [safe] forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Real.Real (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Real.Real (f (g a)) => GHC.Internal.Real.Real (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a. GHC.Internal.Real.Real a => GHC.Internal.Real.Real (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
 instance GHC.Internal.Real.Real GHC.Internal.Int.Int16 -- Defined in ‘GHC.Internal.Int’
@@ -12683,7 +12683,7 @@ instance GHC.Internal.Real.Real GHC.Internal.Foreign.C.Types.CWchar -- Defined i
 instance GHC.Internal.Real.Real GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Real.Real GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Float’
 instance forall k a (b :: k). GHC.Internal.Real.RealFrac a => GHC.Internal.Real.RealFrac (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
-instance forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Real.RealFrac (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
+instance [safe] forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Real.RealFrac (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Real.RealFrac (f (g a)) => GHC.Internal.Real.RealFrac (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a. GHC.Internal.Real.RealFrac a => GHC.Internal.Real.RealFrac (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
 instance forall a. GHC.Internal.Real.RealFrac a => GHC.Internal.Real.RealFrac (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
@@ -12784,7 +12784,7 @@ instance GHC.Internal.Show.Show ghc-internal-10.100.0:GHC.Internal.Data.Typeable
 instance forall k (a :: k). GHC.Internal.Show.Show (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.TypeRep a) -- Defined in ‘ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal’
 instance GHC.Internal.Show.Show GHC.Internal.Data.Dynamic.Dynamic -- Defined in ‘GHC.Internal.Data.Dynamic’
 instance forall a b. (GHC.Internal.Show.Show a, GHC.Internal.Show.Show b) => GHC.Internal.Show.Show (GHC.Internal.Data.Either.Either a b) -- Defined in ‘GHC.Internal.Data.Either’
-instance forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Show.Show (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
+instance [safe] forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Show.Show (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Show.Show (f (g a)) => GHC.Internal.Show.Show (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
 instance [safe] forall k (f :: k -> *) (a :: k) (g :: k -> *). (GHC.Internal.Show.Show (f a), GHC.Internal.Show.Show (g a)) => GHC.Internal.Show.Show (Data.Functor.Product.Product f g a) -- Defined in ‘Data.Functor.Product’
@@ -12919,10 +12919,10 @@ instance forall (c :: GHC.Internal.Types.Char). GHC.Internal.Show.Show (GHC.Inte
 instance forall (s :: GHC.Internal.Types.Symbol). GHC.Internal.Show.Show (GHC.Internal.TypeLits.SSymbol s) -- Defined in ‘GHC.Internal.TypeLits’
 instance GHC.Internal.Show.Show GHC.Internal.TypeLits.SomeChar -- Defined in ‘GHC.Internal.TypeLits’
 instance GHC.Internal.Show.Show GHC.Internal.TypeLits.SomeSymbol -- Defined in ‘GHC.Internal.TypeLits’
-instance GHC.Internal.Show.Show System.Timeout.Timeout -- Defined in ‘System.Timeout’
+instance [safe] GHC.Internal.Show.Show System.Timeout.Timeout -- Defined in ‘System.Timeout’
 instance GHC.Internal.Show.Show GHC.Internal.Text.Read.Lex.Lexeme -- Defined in ‘GHC.Internal.Text.Read.Lex’
 instance GHC.Internal.Show.Show GHC.Internal.Text.Read.Lex.Number -- Defined in ‘GHC.Internal.Text.Read.Lex’
 instance [safe] forall a b. GHC.Internal.Show.Show (a -> b) -- Defined in ‘Text.Show.Functions’
 instance GHC.Internal.StaticPtr.IsStatic GHC.Internal.StaticPtr.StaticPtr -- Defined in ‘GHC.Internal.StaticPtr’
 instance GHC.Internal.TH.Lift.Lift Data.Array.Byte.ByteArray -- Defined in ‘Data.Array.Byte’
-instance forall k (a :: k). GHC.Internal.TH.Lift.Lift (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
+instance [safe] forall k (a :: k). GHC.Internal.TH.Lift.Lift (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
