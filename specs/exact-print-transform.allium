@@ -1,0 +1,757 @@
+-- allium: 3
+-- exact-print-transform.allium
+--
+-- Scope: The Transform monad and operations for modifying an annotated
+--        ParsedSource while preserving layout and comments.
+-- Includes: HasDecls, declaration insertion/removal, comment balancing,
+--           delta-position management, entry-point transfer
+-- Excludes:
+--   - Printing (see exact-print-printing.allium)
+--   - Core annotation types (see exact-print-core.allium)
+
+use "./exact-print-core.allium" as core
+
+------------------------------------------------------------
+-- External Entities
+------------------------------------------------------------
+
+-- A declaration node (LHsDecl GhcPs) or a container node that holds a
+-- declaration list. The annotation field is the link to the EPA machinery
+-- that the transform operations manipulate.
+--
+-- kind values as declaration items:
+--   val_bind  — a function or pattern binding (ValD / LHsBind)
+--   type_sig  — a type signature (SigD)
+--   other     — any other top-level declaration
+--
+-- kind values as declaration containers (nodes passed to GetDeclarations /
+-- ReplaceDeclarations):
+--   match     — a single Match equation inside a FunBind; local_decls is its where-clause
+--   let_expr  — an HsLet expression; local_decls is its let-bindings
+--   let_stmt  — a LetStmt inside a do-block; local_decls is its let-bindings
+--   class_body  — a ClassDecl; local_decls lists sigs, methods, assoc types and
+--                 assoc type defaults (uses ClassSortKey for ordering)
+--   inst_body   — a ClsInstDecl; same contents as class_body
+--
+-- pat_bind where-clauses are accessed via hsDeclsPatBind / replaceDeclsPatBind,
+-- which follow the same AnnSortKey mechanism as the match / let_* contexts.
+--
+-- Module-level ParsedSource is handled by GetDeclarations(ParsedSource); its
+-- declaration list is a plain ordered list without the mixed bind/sig mechanism.
+external entity Declaration {
+    annotation: core/NodeAnnotation
+    kind: val_bind | type_sig | other | match | let_expr | let_stmt | class_body | inst_body
+    local_decls: List<Declaration>
+        -- For match / let_expr / let_stmt / pat_bind contexts: the mixed list of
+        -- val_bind and type_sig items.  Order is controlled by a BindSortKey.
+        -- For class_body / inst_body contexts: the mixed list of sigs, methods,
+        -- associated types and associated type defaults.  Order is controlled by
+        -- a ClassSortKey.
+        -- Empty when kind = val_bind | type_sig | other.
+}
+
+------------------------------------------------------------
+-- Enumerations
+------------------------------------------------------------
+
+-- Discriminates the kinds of items that can appear in an interleaved
+-- bind/signature declaration list (HsLocalBinds / ValBinds contexts).
+-- Corresponds to GHC's BindTag.
+enum SortItemKind {
+    bind_tag   -- a val_bind (function or pattern binding)
+    sig_tag    -- a type_sig
+}
+
+-- Discriminates the kinds of items that can appear in an interleaved
+-- class or instance body (ClassDecl / ClsInstDecl contexts).
+-- Corresponds to GHC's DeclTag.
+enum ClassDeclItemKind {
+    class_method    -- a method binding (ValD inside a class / instance)
+    class_sig       -- a class method signature (SigD)
+    class_at        -- an associated type declaration (FamilyDecl)
+    class_at_def    -- an associated type default (TyFamInstDecl)
+}
+
+-- Direction in which an InsertionPoint references the surrounding list.
+enum InsertionAnchor {
+    at_start
+    at_end
+    after_item
+    before_item
+}
+
+------------------------------------------------------------
+-- Value Types
+------------------------------------------------------------
+
+-- Describes where a new declaration should be inserted relative to
+-- an existing list.
+value InsertionPoint {
+    anchor: InsertionAnchor
+    reference_item: Declaration?   -- present when anchor = after_item | before_item
+}
+
+-- A single entry produced by CaptureOrderBinds, tagging an item in the
+-- original bind/sig list as either a binding or a signature so the
+-- printer can re-interleave them in source order.
+value SortItem {
+    tag: SortItemKind
+}
+
+-- A single entry produced by CaptureOrderClassDecls, tagging an item in
+-- a class or instance body so the printer can re-interleave the four
+-- separate sub-lists (methods, sigs, assoc types, assoc type defaults).
+value ClassSortItem {
+    tag: ClassDeclItemKind
+}
+
+------------------------------------------------------------
+-- Entities and Variants
+------------------------------------------------------------
+
+-- State carried through a Transform computation.
+-- The counter allocates unique synthetic source spans for new AST nodes;
+-- the log records human-readable trace entries for debugging.
+entity TransformState {
+    unique_span_counter: Integer
+    log: List<String>
+}
+
+-- The result of running a Transform computation.
+entity TransformResult {
+    transformed: Declaration
+    final_counter: Integer
+    log: List<String>
+}
+
+-- The list of declarations attached to a node (module, let, where, class
+-- body, instance body). Created by GetDeclarations and consumed by
+-- ReplaceDeclarations, InsertDeclaration and RemoveDeclaration.
+entity DeclarationList {
+    owner: Declaration?            -- null when the list belongs to a ParsedSource root
+    items: List<Declaration>
+}
+
+-- A read of a node's entry delta position; carries the resolved DeltaPos
+-- (either the node's own or the SameLine(1) default).
+entity DeltaPosResult {
+    dp: core/DeltaPos
+}
+
+-- A captured ordering of bindings and signatures within a HsLocalBinds
+-- declaration list (match where-clause, let expression, let statement,
+-- or pat-bind where-clause).
+--
+-- mode = span_order (NoAnnSortKey in GHC):
+--   The printer reconstructs the interleaved list by sorting the two
+--   separate sub-lists (binds, sigs) by their original source spans.
+--   This is the state immediately after parsing, while source spans are
+--   still trustworthy.
+--
+-- mode = tag_order (AnnSortKey [BindTag] in GHC):
+--   The printer uses the items list as a merge selector: each tag says
+--   whether to draw the next element from the binds sub-list (bind_tag)
+--   or the sigs sub-list (sig_tag).  This mode is set whenever
+--   ReplaceDeclarations or replaceDeclsValbinds is called, because after
+--   structural edits source spans can no longer be trusted for ordering.
+entity SortKey {
+    mode: span_order | tag_order
+    items: List<SortItem>   -- only meaningful when mode = tag_order
+}
+
+-- A captured ordering for the body of a ClassDecl or ClsInstDecl.
+-- The four sub-lists (methods, sigs, associated types, assoc type defaults)
+-- are stored separately in the GHC AST; this key records how they were
+-- interleaved in the original source.
+-- Uses the same span_order / tag_order duality as SortKey.
+entity ClassSortKey {
+    mode: span_order | tag_order
+    items: List<ClassSortItem>   -- only meaningful when mode = tag_order
+}
+
+------------------------------------------------------------
+-- Rules
+------------------------------------------------------------
+
+-- Obtain the list of top-level declarations from a ParsedSource or a
+-- node that contains declarations (match, class body, instance body, etc.).
+-- This is a read-only operation; it does not modify the AST.
+rule GetDeclarations {
+    when: GetDeclarations(node)
+
+    ensures: DeclarationList.created(
+        owner: node,
+        items: node.local_decls
+    )
+}
+
+-- Replace the declaration list of a node with a new list.
+-- Annotations (delta positions, comments) on surviving declarations are
+-- preserved; the caller is responsible for setting entry DPs on new items.
+--
+-- For nodes whose local_decls holds a mixed bind/sig list (match,
+-- let_expr, let_stmt, pat_bind), this also implicitly recaptures the
+-- sort ordering as tag_order, based on the order of new_decls.  The
+-- caller therefore controls the printed order by choosing the order of
+-- elements in new_decls — no explicit CaptureOrderBinds call is needed.
+-- Callers who wish to reorder local binds simply supply new_decls in the
+-- desired order; the printer will honour that order regardless of the
+-- original source spans.
+rule ReplaceDeclarations {
+    when: ReplaceDeclarations(node, new_decls)
+
+    ensures: node.local_decls = new_decls
+
+    @guidance
+        -- replaceDeclsValbinds (the implementation of ReplaceDeclarations
+        -- for HsLocalBinds nodes) separates new_decls into two sub-lists
+        -- (binds via decl2Bind, sigs via decl2Sig) and calls
+        -- captureOrderBinds new_decls to record the interleaving as an
+        -- AnnSortKey [BindTag].  This replaces any prior NoAnnSortKey or
+        -- AnnSortKey that was in the ValBinds extension point.
+        --
+        -- For class_body / inst_body nodes, replaceDeclsClassDecl uses
+        -- partitionWithSortKey to separate into four sub-lists and builds
+        -- an AnnSortKey [DeclTag] in a single pass.
+}
+
+-- Insert a declaration into a declaration list at the specified point.
+-- The entry delta position of the inserted declaration must have been set
+-- by the caller before insertion.
+-- As a side-effect, the existing declarations are comment-balanced before
+-- the insertion (equivalent to calling BalanceCommentsList on them first).
+rule InsertDeclaration {
+    when: InsertDeclaration(node, decl, point)
+
+    requires: decl.annotation.anchor.kind = relative
+
+    -- decl is now a member of the list
+    ensures: node.local_decls.add(decl)
+
+    -- at_start: the declaration that was previously first is bumped down
+    -- to preserve spacing (its entry DP is set to DifferentLine 2 0)
+    ensures: point.anchor = at_start and node.local_decls.count > 0
+        implies node.local_decls.first.annotation.anchor.kind = relative
+
+    @guidance
+        -- The position is resolved from point.anchor:
+        --   at_start:    prepend; if the list was non-empty the previously-first
+        --                declaration has its entry DP forced to DifferentLine(2,0)
+        --                to make room. (insertAtStart / setEntryDP)
+        --   at_end:      append; no adjustment to existing declarations.
+        --   after_item:  insert immediately after point.reference_item, matched
+        --                by SrcSpan. If not found, decl goes at the end.
+        --   before_item: insert immediately before point.reference_item, matched
+        --                by SrcSpan. If not found, decl goes at the start.
+        --
+        -- All four forms call balanceCommentsList on the existing declarations
+        -- before inserting, so comments are correctly owned before the list
+        -- is structurally changed.
+}
+
+-- Remove a declaration from a declaration list.
+-- After removal the caller must call TransferEntryDP or SetEntryDP on the
+-- declaration that is now first, to absorb the gap left by the removed item.
+rule RemoveDeclaration {
+    when: RemoveDeclaration(node, decl)
+
+    requires: decl in node.local_decls
+
+    ensures: node.local_decls.remove(decl)
+}
+
+-- Set the entry delta position of a located node.
+-- The entry DP positions the node's first token (its anchor) relative to
+-- its surroundings.  The two kinds of DeltaPos have different reference points:
+--
+-- SameLine(col):
+--   The node starts on the same line as the preceding token.
+--   col is the gap between the end of the preceding token and the start of
+--   this node's first token.  Reference point: end of preceding token.
+--   col must be >= 0 — a node cannot back up past the preceding token on
+--   the same line.
+--
+-- DifferentLine(lines, col):
+--   The node starts `lines` lines below the preceding token.
+--   col is a SIGNED offset from the left border of the enclosing layout
+--   block (its LayoutStartCol / indentation level).  The printed absolute
+--   column of the node is (layout_margin + col).
+--   Reference point: left border of the enclosing layout block, NOT the
+--   preceding token.
+--   col may be negative when the node terminates the layout block by
+--   appearing to the LEFT of the block's margin (e.g. `in`, `where`, `of`
+--   keywords that close a layout context).
+--   lines must be > 0 — the node must appear on a strictly later line.
+--
+-- The different reference points are what enables splice invariance: moving
+-- a fragment only requires updating the root's entry DP.  All descendants
+-- store DifferentLine.col relative to their own enclosing block margin, so
+-- they re-root automatically when the anchor column changes.
+--
+-- Leading comments in node.annotation.anchor.leading_comments are printed
+-- before the anchor and are unaffected by the layout margin.
+rule SetEntryDP {
+    when: SetEntryDP(node, dp)
+
+    requires: (dp.kind = same_line and dp.col >= 0)
+              or (dp.kind = different_line and dp.lines > 0)
+
+    ensures: node.annotation.anchor.delta = dp
+    ensures: node.annotation.anchor.kind = relative
+}
+
+-- Read the entry delta position of a located node.
+-- Returns SameLine(0,1) as a default when the node has no delta anchor.
+rule GetEntryDP {
+    when: GetEntryDP(node)
+
+    ensures: DeltaPosResult.created(
+        dp: node.annotation.anchor.delta
+    )
+}
+
+-- Transfer the entry delta position and prior comments from one node to
+-- another. Used when reordering or replacing declarations so that the
+-- surviving element inherits the spacing and leading comments of the one
+-- it replaces.
+rule TransferEntryDP {
+    when: TransferEntryDP(source_node, target_node)
+
+    -- The source's delta moves to the target's anchor.
+    ensures: target_node.annotation.anchor.delta = source_node.annotation.anchor.delta
+
+    -- When both anchors are relative, the target's original_span is preserved:
+    -- the source's delta moves but the target's own source position stays.
+    -- This matters for re-anchoring in mixed absolute/delta print contexts.
+    ensures:
+        source_node.annotation.anchor.kind = relative
+        and target_node.annotation.anchor.kind = relative
+        implies target_node.annotation.anchor.original_span
+                    = target_node.annotation.anchor.original_span
+
+    -- Prior comments from source_node are prepended to target_node's comments.
+    -- When source_node has no prior comments, target_node's comments are
+    -- left unchanged.
+    ensures:
+        source_node.annotation.comments.prior.count > 0
+        implies target_node.annotation.comments.prior =
+            source_node.annotation.comments.prior
+                + target_node.annotation.comments.prior
+
+    @guidance
+        -- Implemented by transferEntryDP in Transform.hs.
+        -- The new anchor is EpaDelta ss2 dp cs where:
+        --   ss2 = the TARGET's original SrcSpan (preserved, not overwritten)
+        --   dp  = the SOURCE's delta
+        --   cs  = the SOURCE's EpaDelta leading comments
+        -- The combine helper copies the source annotation data (an1) to the
+        -- target only when both nodes share the same annotation type (same
+        -- Typeable instance); it falls back to the target's annotation otherwise.
+        -- Open issue: when both source and target have prior comments, the
+        -- result is simple concatenation (cs1 <> cs2); the correct ordering
+        -- in that case is not yet resolved (see TODO in Transform.hs).
+}
+
+-- Balance comment ownership across a list of declarations.
+-- After parsing or after structural edits, comments may be attached to the
+-- wrong declaration. BalanceCommentsList migrates comments between adjacent
+-- declarations so that each comment ends up owned by the declaration it
+-- visually precedes in the source.
+--
+-- Doc declarations (Haddock comments treated as declarations) are filtered
+-- out before balancing; they are never candidates for migration.
+rule BalanceCommentsList {
+    when: BalanceCommentsList(decls)
+
+    requires: decls.count >= 2
+
+    -- The count is preserved; no declarations are added or removed.
+    -- The strongest machine-checkable postcondition available without
+    -- span arithmetic: every declaration's comment lists remain non-null
+    -- (the lists exist, even if empty after migration).
+    ensures: decls.count >= 2
+    ensures:
+        for d in decls:
+            d.annotation.comments.prior.count  >= 0
+    ensures:
+        for d in decls:
+            d.annotation.comments.following.count >= 0
+
+    @guidance
+        -- ## Ownership rule
+        -- A comment belongs to declaration D if it is closer (in source lines)
+        -- to D than to D's successor. The threshold is 1 blank line: a comment
+        -- 0 or 1 lines below D's last token stays with D as a following comment;
+        -- a comment more than 1 line below D migrates to the successor's prior
+        -- comment list.
+        --
+        -- ## General case (non-FunBind pairs)
+        -- For each consecutive pair (first, second):
+        --   1. first's following comments that are > 1 line below first's end
+        --      are moved to second's prior list.
+        --   2. second's prior comments that are <= 1 line below first's end
+        --      are moved to first's following list.
+        -- The pass is a single left-to-right sweep: balanceCommentsList'
+        -- processes (a, b), updates both, then recurses on (b', rest).
+        --
+        -- ## FunBind case (packed vs unpacked)
+        -- In Haskell a function binding (FunBind / ValD) is a wrapper around
+        -- a MatchGroup — a list of Matches. Each Match is one equation of the
+        -- function, all sharing the same name, distinguished by the patterns
+        -- they match. For example:
+        --
+        --   f []     = 0          -- Match 1
+        --   f (x:xs) = 1 + f xs   -- Match 2
+        --
+        -- This creates one FunBind containing a MatchGroup with two Matches.
+        --
+        -- When balancing at the top-level declaration list the FunBind is
+        -- treated as a single unit (packed form): comments between the FunBind
+        -- and its neighbour are balanced at the FunBind boundary, not between
+        -- individual Matches.
+        --
+        -- Inside that outer balance, the FunBind is unpacked and its Matches
+        -- are balanced against each other:
+        --   - Comments on the FunBind's own span are distributed: those before
+        --     the first Match's start go to the first Match as prior comments;
+        --     those after the last Match's end go to the last Match as following
+        --     comments; interior comments go to the first Match.
+        --   - The Match list is then balanced pairwise (balanceCommentsListA),
+        --     applying the same ownership rule within the function.
+        --   - Comments on the last Match that are on the same line as its end
+        --     are pushed down into the GRHS (guard/right-hand-side) of that
+        --     Match, so they survive re-indentation.
+        --   - If there is only one Match, its leading comments are lifted back
+        --     to the FunBind level (moveLeadingComments).
+        --
+        -- ## Idempotency
+        -- The operation is idempotent: running BalanceCommentsList a second
+        -- time on already-balanced output produces the same result. This holds
+        -- because all comments are already on the correct side of the 1-line
+        -- threshold after the first pass.
+}
+
+-- Modify the local declarations inside a function binding (ValD/FunBind).
+-- Gives the caller the current sub-declarations and applies the result.
+rule ModifyValD {
+    when: ModifyValD(target_loc, decl, new_local_decls)
+
+    requires: decl.kind = val_bind
+
+    ensures: decl.local_decls = new_local_decls
+}
+
+-- Allocate a fresh synthetic source location for a new AST node.
+-- Synthetic spans have line number -1 so they can be detected and
+-- distinguished from real parser-produced spans.
+rule AllocateUniqueSrcSpan {
+    when: AllocateUniqueSrcSpan(state)
+
+    ensures: core/EpaLocation.created(
+        kind: absolute,
+        original_span: core/AbsoluteSpan {
+            start: core/SourcePos { line: -1, col: state.unique_span_counter },
+            end:   core/SourcePos { line: -1, col: state.unique_span_counter }
+        }
+    )
+    ensures: state.unique_span_counter = state.unique_span_counter + 1
+    ensures: state.log.add("AllocateUniqueSrcSpan")
+}
+
+-- Capture the line spacing between consecutive declarations in a list.
+-- Sets the entry DP of each declaration (except the first) to reflect
+-- the number of blank lines between it and its predecessor.
+-- Must be called before removing or reordering declarations, so that
+-- spacing is encoded in relative form and survives structural edits.
+rule CaptureLineSpacing {
+    when: CaptureLineSpacing(decls)
+
+    requires: decls.count >= 1
+
+    ensures:
+        for d in decls:
+            d.annotation.anchor.kind = relative
+
+    @guidance
+        -- Walks the declarations in order; for each consecutive pair, the
+        -- later declaration's entry delta lines is set to
+        --   later.original_start_line - earlier.original_end_line
+        -- The first declaration retains its existing entry DP.
+}
+
+-- Capture the spacing between match equations within a function binding.
+-- Like CaptureLineSpacing but scoped to the match list of a FunBind.
+rule CaptureMatchLineSpacing {
+    when: CaptureMatchLineSpacing(decl)
+
+    requires: decl.kind = val_bind
+
+    ensures:
+        for m in decl.local_decls:
+            m.annotation.anchor.kind = relative
+}
+
+-- Capture the spacing between a type signature's name list and its type.
+-- Required before removing names from a multi-name type signature so the
+-- remaining name and the `::` separator retain correct spacing.
+rule CaptureTypeSigSpacing {
+    when: CaptureTypeSigSpacing(sig)
+
+    requires: sig.kind = type_sig
+
+    ensures: sig.annotation.anchor.kind = relative
+}
+
+-- Convert the comments in the module-level annotation from absolute span
+-- form (EpaSpan) to relative delta form (EpaDelta).
+-- Must be called on the top-level ParsedSource before replacing its
+-- declaration list, so that trailing comments and whitespace after the
+-- last declaration survive in a position-independent form.
+rule AddModuleCommentOrigDeltas {
+    when: AddModuleCommentOrigDeltas(module)
+
+    ensures:
+        for c in module.annotation.comments.prior:
+            c.location.kind = relative
+    ensures:
+        for c in module.annotation.comments.following:
+            c.location.kind = relative
+}
+
+-- Capture the ordering of binds and signatures within a mixed HsLocalBinds
+-- declaration list so the printer knows how to re-interleave the two
+-- separate sub-lists (binds bag, sigs list).
+--
+-- Applies to any context whose local_decls holds a mixed bind/sig list:
+-- match where-clauses, let expressions, let statements in do-blocks, and
+-- pat-bind where-clauses.
+--
+-- This rule is called implicitly by ReplaceDeclarations for these contexts;
+-- callers who reorder a list via ReplaceDeclarations do not need to call
+-- CaptureOrderBinds themselves.  CaptureOrderBinds is available for use
+-- cases where the caller constructs a new AnnSortKey without going through
+-- ReplaceDeclarations (e.g. incremental updates to existing ValBinds nodes).
+rule CaptureOrderBinds {
+    when: CaptureOrderBinds(decls)
+
+    ensures: SortKey.created(
+        mode: tag_order,
+        items: tagDecls(decls)
+    )
+
+    @guidance
+        -- tagDecls maps each declaration to a SortItem:
+        --   val_bind kinds → SortItem{tag: bind_tag}
+        --   type_sig kinds → SortItem{tag: sig_tag}
+        -- other kinds are not expected to appear in a bind/sig list.
+        --
+        -- The resulting tag list is an index into a merge of the two
+        -- sub-lists that the GHC AST stores separately (LHsBinds and
+        -- [LSig]).  Reading the list left-to-right and following the
+        -- bind_tag / sig_tag instructions reconstructs the original
+        -- interleaved order. A reordered list produces a different tag
+        -- sequence, which causes the printer to output in the new order.
+        --
+        -- In GHC, captureOrderBinds (Utils.hs) produces AnnSortKey [BindTag]
+        -- by mapping each LHsDecl: ValD → BindTag, SigD → SigDTag.
+        -- The resulting AnnSortKey is stored in the XValBinds extension point
+        -- of the enclosing ValBinds node, not returned as a separate value.
+}
+
+-- Capture the ordering of items within a class or instance body so the
+-- printer knows how to re-interleave the four separate sub-lists (methods,
+-- sigs, associated types, assoc type defaults).
+--
+-- Like CaptureOrderBinds, this is called implicitly by ReplaceDeclarations
+-- when the node is a class_body or inst_body.
+rule CaptureOrderClassDecls {
+    when: CaptureOrderClassDecls(decls)
+
+    ensures: ClassSortKey.created(
+        mode: tag_order,
+        items: tagClassDecls(decls)
+    )
+
+    @guidance
+        -- tagClassDecls maps each declaration to a ClassSortItem:
+        --   method binding (ValD)           → ClassSortItem{tag: class_method}
+        --   class signature (SigD)          → ClassSortItem{tag: class_sig}
+        --   assoc type decl (FamilyDecl)    → ClassSortItem{tag: class_at}
+        --   assoc type default (TyFamInstD) → ClassSortItem{tag: class_at_def}
+        --
+        -- In GHC, replaceDeclsClassDecl (Utils.hs) calls partitionWithSortKey
+        -- which builds an AnnSortKey [DeclTag] in a single left-to-right pass.
+        -- withSortKey (ExactPrint.hs) is the printer-side counterpart: it
+        -- merges the four separate lists in the order recorded by the key.
+}
+
+-- Run a complete Transform computation: apply a sequence of edits to a
+-- root declaration node, returning the rewritten declaration alongside
+-- the final counter and log.
+rule RunTransform {
+    when: RunTransform(state, root)
+
+    ensures: TransformResult.created(
+        transformed: root,
+        final_counter: state.unique_span_counter,
+        log: state.log
+    )
+}
+
+------------------------------------------------------------
+-- Invariants
+------------------------------------------------------------
+
+invariant UniqueSrcSpanIdentification {
+    -- A synthetic span can always be detected by its line number.
+    -- The exact-print machinery reserves line = -1 for spans allocated
+    -- by AllocateUniqueSrcSpan; the parser never produces -1 as a real
+    -- source line.
+    for loc in core/EpaLocation:
+        loc.kind = absolute implies loc.original_span.start.line >= -1
+}
+
+invariant InsertionPointAnchorWellFormed {
+    -- The reference_item / index fields are only meaningful for the
+    -- anchors that name them; the other forms (at_start, at_end) carry
+    -- neither.
+    for p in InsertionPoint:
+        p.anchor in {after_item, before_item} implies p.reference_item != null
+}
+
+
+invariant TransformStateNonNegativeCounter {
+    -- The unique span counter only ever grows; it never wraps to a
+    -- negative value during a single transform.
+    for s in TransformState:
+        s.unique_span_counter >= 0
+}
+
+invariant TransformResultMatchesCounter {
+    -- The final counter recorded on a TransformResult is at least as
+    -- large as zero (counters never go negative; see above) and the
+    -- log is a real list.
+    for r in TransformResult:
+        r.final_counter >= 0 and r.log.count >= 0 and r.transformed != null
+}
+
+invariant DeltaPosResultHasDp {
+    -- GetEntryDP always returns a DeltaPos; either the node's own or the
+    -- SameLine(0,1) default supplied by the rule.
+    for r in DeltaPosResult:
+        r.dp != null
+}
+
+invariant DeclarationListItemsKnown {
+    -- A DeclarationList always reports its items, even when empty.
+    for dl in DeclarationList:
+        dl.items.count >= 0
+}
+
+invariant DeclarationListOwnerOptional {
+    -- The owner is the declaration that contains the list (a ValD, a
+    -- class body, a where clause, etc.). It is null when the list is
+    -- the top-level declarations of a ParsedSource root.
+    for dl in DeclarationList:
+        dl.owner = null or dl.owner != null
+}
+
+invariant LocalDeclsAreBindsOrSigs {
+    -- Local declarations inside a match / let_expr / let_stmt context are
+    -- a restricted subset: only function bindings and type signatures may
+    -- appear. The other / match / let_* / class_body / inst_body kinds are
+    -- container kinds that carry local_decls but are never items within them.
+    for d in Declaration:
+        d.kind in {match, let_expr, let_stmt} implies
+            d.local_decls.all(ld => ld.kind in {val_bind, type_sig})
+}
+
+invariant SortKeyItemsTagged {
+    -- Every SortItem in a SortKey carries one of the two recognised tags.
+    for k in SortKey:
+        k.items.all(i => i.tag in {bind_tag, sig_tag})
+}
+
+invariant SortKeyTagsOnlyWhenTagOrder {
+    -- items is only meaningful in tag_order mode.
+    -- In span_order mode the list is empty (the printer uses source spans).
+    for k in SortKey:
+        k.mode = span_order implies k.items.count = 0
+}
+
+invariant ClassSortKeyItemsTagged {
+    -- Every ClassSortItem in a ClassSortKey carries one of the four
+    -- recognised class body item tags.
+    for k in ClassSortKey:
+        k.items.all(i => i.tag in {class_method, class_sig, class_at, class_at_def})
+}
+
+invariant ClassSortKeyTagsOnlyWhenTagOrder {
+    -- items is only meaningful in tag_order mode.
+    for k in ClassSortKey:
+        k.mode = span_order implies k.items.count = 0
+}
+
+------------------------------------------------------------
+-- Actor Declarations
+------------------------------------------------------------
+
+actor TransformCaller {
+    identified_by: Declaration
+}
+
+------------------------------------------------------------
+-- Surfaces
+------------------------------------------------------------
+
+-- The surface of operations a Transform-monad caller drives.
+-- Tools such as HLS plugins and refactoring scripts invoke these
+-- operations directly; each maps to a rule above.
+surface TransformApi {
+    facing caller: TransformCaller
+
+    exposes:
+        caller.kind
+
+    provides:
+        GetDeclarations(node: Declaration)
+        ReplaceDeclarations(node: Declaration, new_decls: List<Declaration>)
+        InsertDeclaration(node: Declaration, decl: Declaration, point: InsertionPoint)
+        RemoveDeclaration(node: Declaration, decl: Declaration)
+        SetEntryDP(node: Declaration, dp: core/DeltaPos)
+        GetEntryDP(node: Declaration)
+        TransferEntryDP(source_node: Declaration, target_node: Declaration)
+        BalanceCommentsList(decls: List<Declaration>)
+        ModifyValD(target_loc: Declaration, decl: Declaration, new_local_decls: List<Declaration>)
+        AllocateUniqueSrcSpan(state: TransformState)
+        CaptureLineSpacing(decls: List<Declaration>)
+        CaptureMatchLineSpacing(decl: Declaration)
+        CaptureTypeSigSpacing(sig: Declaration)
+        AddModuleCommentOrigDeltas(module: Declaration)
+        CaptureOrderBinds(decls: List<Declaration>)
+        CaptureOrderClassDecls(decls: List<Declaration>)
+        RunTransform(state: TransformState, root: Declaration)
+
+    @guarantee InsertionRequiresDelta
+        -- All declarations passed to InsertDeclaration carry an anchor
+        -- with kind = relative. Inserting an absolute-form node would
+        -- lose its layout relationship to its new neighbours.
+
+    @guarantee BalanceIsIdempotent
+        -- BalanceCommentsList is idempotent: a second invocation on the
+        -- output of a first produces the same result.
+
+    @guarantee SpacingCapturedBeforeStructuralEdit
+        -- Callers run CaptureLineSpacing (and its match / type-sig
+        -- siblings) before any structural edit that would invalidate
+        -- the absolute spans the spacing is derived from.
+
+    @guarantee ReplacePreservesCallerOrder
+        -- After ReplaceDeclarations(node, new_decls), the printer will
+        -- output the declarations in the same order as new_decls,
+        -- regardless of their original source spans.  This is the
+        -- mechanism that enables list re-arrangement: a caller reorders
+        -- elements in new_decls and the printer honours that order.
+        -- The same guarantee holds for class_body / inst_body nodes
+        -- using CaptureOrderClassDecls.
+}

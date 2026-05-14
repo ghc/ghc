@@ -1,0 +1,456 @@
+-- allium: 3
+-- exact-print-printing.allium
+--
+-- Scope: The exact-print operation — converting an annotated ParsedSource
+--        back to Haskell source text with original layout preserved.
+-- Includes: exactPrint, makeDeltaAst, printer state, comment interleaving
+-- Excludes:
+--   - AST transformation (see exact-print-transform.allium)
+--   - Core annotation types (see exact-print-core.allium)
+
+use "./exact-print-core.allium" as core
+
+------------------------------------------------------------
+-- External Entities
+------------------------------------------------------------
+
+-- The parsed Haskell module as produced by GHC's parser.
+-- EPA annotations are embedded directly inside GHC AST nodes.
+external entity ParsedSource {
+    nodes: List<LocatedAstNode>   -- every located node in the AST tree
+}
+
+-- A GHC AST node decorated with EPA annotations (LocatedAn / EpAnn).
+-- Carried as a child of ParsedSource; modified in place by transforms
+-- and consumed by the printer.
+external entity LocatedAstNode {
+    annotation: core/NodeAnnotation
+}
+
+------------------------------------------------------------
+-- Value Types
+------------------------------------------------------------
+
+-- Configuration that controls how tokens and whitespace are rendered.
+-- The default (string mode) produces plain text.
+-- Delta mode processes the AST to compute relative positions without output.
+value PrintOptions {
+    mode: string_output | delta_only
+}
+
+-- The two source positions needed to reproduce trailing whitespace after the
+-- last declaration in a module.  Both come from AnnsModule.am_eof in the
+-- parser output and are stored in EPState.epEof as a (RealSrcSpan, RealSrcSpan).
+value EofAnnotation {
+    position:    core/AbsoluteSpan   -- span of the EOF token itself
+    prior_token: core/AbsoluteSpan   -- end span of the last real token before EOF
+    -- The printer computes dp = origDelta(prior_token.end, position.start)
+    -- and emits an empty string at that delta to advance the output cursor,
+    -- preserving any trailing newlines or whitespace after the last declaration.
+    -- If position = prior_token (no trailing whitespace), dp defaults to
+    -- DifferentLine(1, 0) to ensure at least one trailing newline is emitted.
+}
+
+------------------------------------------------------------
+-- Entities and Variants
+------------------------------------------------------------
+
+-- The mutable state threaded through a single print traversal.
+-- There are two interleaved phases: the "print phase" (p-prefix fields)
+-- advances the output cursor; the "delta phase" (d-prefix fields)
+-- tracks source positions to compute relative deltas.
+entity PrintState {
+    options: PrintOptions
+
+    -- Print phase: current output cursor position
+    current_pos: core/SourcePos
+
+    -- Print phase: left-hand column of the current layout block.
+    -- Set to the column of the first real token when a layout block is
+    -- entered (i.e. when mark_layout = true and the first token is printed).
+    -- Used as the base column for DifferentLine deltas: a token with
+    -- DifferentLine(lines, dc) is printed at absolute column (layout_lhs + dc).
+    layout_lhs: core/LayoutStartCol
+
+    -- Print phase: true when the next real token printed should establish
+    -- layout_lhs.  Cleared immediately after layout_lhs is set.
+    mark_layout: Boolean
+
+    -- Delta phase: end position of the most recently processed element
+    prior_end_pos: core/SourcePos
+
+    -- Delta phase: left-hand column of the current layout block (delta frame).
+    -- Mirrors layout_lhs but used during the delta-computation phase.
+    -- A DifferentLine delta is stored as (absolute_col - delta_layout_lhs),
+    -- so that printing back yields absolute_col = delta_layout_lhs + stored_col.
+    delta_layout_lhs: core/LayoutStartCol
+
+    -- Delta phase: whether the next element opens a layout block (delta frame).
+    delta_mark_layout: Boolean
+
+    -- Shared: comments not yet emitted, sorted by source position
+    pending_comments: List<core/Comment>
+
+    -- Shared: comments already emitted, in emission order
+    emitted_comments: List<core/Comment>
+
+    -- End-of-file annotation: both the EOF token position and the preceding
+    -- token end are needed to compute trailing whitespace after the last decl.
+    eof_annotation: EofAnnotation?
+}
+
+-- The result of calling ExactPrint: the reproduced Haskell source text.
+-- MakeDeltaAst does not produce a PrintedSource; its result is the
+-- rewritten AST, expressed directly in that rule's postconditions.
+entity PrintedSource {
+    source_text: String   -- the reproduced Haskell source
+}
+
+------------------------------------------------------------
+-- Rules
+------------------------------------------------------------
+
+-- Exact-print a ParsedSource to a String.
+-- The AST may be in absolute form (EpaSpan, parser output), delta form
+-- (EpaDelta, after MakeDeltaAst), or a mixture of the two (e.g. an
+-- absolute surrounding AST with delta-form inserted fragments).
+-- For a modified AST, BalanceCommentsList must have been called on each
+-- declaration list before ExactPrint to ensure comments are pre-assigned
+-- to their owning nodes.
+-- Returns only the source text; the AST is not modified or returned.
+rule ExactPrint {
+    when: ExactPrint(ast, options)
+
+    ensures: PrintedSource.created(
+        source_text: source_text
+    )
+
+    @guidance
+        -- source_text is the byte-for-byte reproduction of the original
+        -- source file, modulo tab expansion. The RoundTripFidelity guarantee
+        -- on ExactPrintApi is the normative statement of this property.
+        --
+        -- ## Recursive descent and layout propagation
+        -- The traversal visits each AST node via enterAnn, which does the
+        -- following for each node's EpaLocation anchor:
+        --   1. Leading comments (leading_comments) are printed before the
+        --      anchor position.  They fall outside the node's bounding
+        --      rectangle and may appear at any indentation.
+        --   2. The anchor's position is resolved to an absolute (line, col):
+        --        EpaSpan:  from the stored absolute source span.
+        --        EpaDelta: via undelta(prior_end_pos, delta, layout_lhs) —
+        --                  i.e. absolute_col = layout_lhs + delta.col for
+        --                  DifferentLine, or prior_col + delta.col for SameLine.
+        --   3. prior_end_pos is advanced to the anchor's start position.
+        --   4. If mark_layout is true (a layout block opens here), layout_lhs
+        --      is set to the anchor's column when the first real token is
+        --      printed.  This makes the anchor the coordinate origin: every
+        --      child's DifferentLine(n, dc) is placed at column (layout_lhs + dc).
+        --   5. The node's children are traversed recursively, inheriting the
+        --      updated layout_lhs.
+        -- Because DifferentLine.col is layout-relative, moving an entire
+        -- subtree to a new column requires only updating the root's entry
+        -- delta; all descendants recompute their absolute columns correctly
+        -- from the new layout_lhs without any stored delta changing.
+        --
+        -- ## Known exceptions to the bounding-box rule
+        -- Two categories of non-comment code are intentionally allowed to
+        -- sit to the LEFT of the enclosing layout block's margin:
+        --
+        -- 1. Layout-block terminators (`in`, `where`, `of`, etc.) appear
+        --    on a new line to the LEFT of the block they close.  Their
+        --    DifferentLine.col is negative.  isGoodDelta accepts this:
+        --    for DifferentLine it only checks lines > 0, not the column.
+        --
+        -- 2. Quasi-quote bodies.  The quasi-quote content is a verbatim
+        --    string that does not follow Haskell layout conventions.
+        --    Before printing it, layout_lhs is temporarily reset to 0
+        --    (and restored afterwards), so the normal col-offset arithmetic
+        --    does not apply.  The content is emitted at whatever column
+        --    the string literal begins in the source.
+        --
+        -- The implementation runs the shared markAnnotated traversal with
+        -- string-accumulating EPOptions (stringOptions). Both the print phase
+        -- (accumulating source_text) and the delta phase (computing relative
+        -- positions) execute in the same pass over each AST constructor.
+        -- ExactPrint captures only the string output (snd of the result);
+        -- the updated AST is discarded.
+        --
+        -- Mixed bind/sig lists (HsLocalBinds / ValBinds nodes) are handled
+        -- specially.  The GHC AST stores function bindings and type signatures
+        -- in two separate sub-lists.  The sort key recorded on the ValBinds
+        -- extension point tells the printer how to merge them:
+        --
+        --   span_order (NoAnnSortKey): merge by sorting on original source
+        --     spans — used when spans are still trustworthy (right after parsing,
+        --     before any structural edit).
+        --
+        --   tag_order (AnnSortKey [BindTag]): the tag list is an index into a
+        --     merge of the two sub-lists.  Each tag says which sub-list to draw
+        --     the next item from: bind_tag → take from the binds sub-list,
+        --     sig_tag → take from the sigs sub-list.  The full tag sequence
+        --     therefore encodes the complete interleaving of the two lists and
+        --     is the mechanism that preserves caller-chosen order through
+        --     ReplaceDeclarations and across a subsequent ExactPrint.
+        --
+        -- After printing each ValBinds node, the printer updates the sort key
+        -- by calling captureOrderBinds on the printed order, always producing
+        -- tag_order.
+        --
+        -- ClassDecl / ClsInstDecl bodies use the same merge-index idea but
+        -- with four sub-lists (methods, sigs, assoc types, assoc type defaults)
+        -- and a DeclTag sort key; the printer counterpart is withSortKey.
+}
+
+-- Convert all absolute EpaLocations in an AST to relative (delta) form.
+-- Produces a rewritten AST; no source text is generated.
+-- Required before making programmatic edits or before ExactPrint on
+-- an AST that still carries absolute spans from the parser.
+-- The parser always emits absolute (EpaSpan) locations via spanAsAnchor;
+-- EpaDelta is reserved exclusively for programmatic transformations.
+-- This step is therefore always required and is never a no-op.
+rule MakeDeltaAst {
+    when: MakeDeltaAst(ast)
+
+    ensures:
+        for n in ast.nodes:
+            n.annotation.anchor.kind = relative
+
+    @guidance
+        -- The implementation runs the same markAnnotated traversal as
+        -- ExactPrint but with no-op EPOptions (deltaOptions), so no string
+        -- is accumulated. MakeDeltaAst captures only the rewritten AST
+        -- (fst of the result); the empty string output is discarded.
+        --
+        -- Each ExactPrint instance (one per AST constructor) both computes
+        -- the delta for that node and generates its token output in the
+        -- same pass. The two entry points (exactPrint / makeDeltaAst)
+        -- share this traversal to avoid keeping two implementations in sync.
+        --
+        -- ## Delta computation (adjustDeltaForOffset)
+        -- The delta stored for a node is not the raw distance from the
+        -- preceding token; it is layout-adjusted:
+        --   raw_delta = ss2delta(prior_end_pos, anchor_start)
+        --   stored_delta = adjustDeltaForOffset(layout_lhs, raw_delta)
+        --                = DifferentLine(lines, absolute_col - layout_lhs)
+        -- The inverse (used during printing) is undelta:
+        --   absolute_col = layout_lhs + stored_delta.col   (DifferentLine)
+        --   absolute_col = prior_col  + stored_delta.col   (SameLine)
+        -- Storing col as (absolute - layout_lhs) is what gives each node's
+        -- column meaning relative to its enclosing block rather than to an
+        -- arbitrary preceding token, enabling the splice-invariance property.
+        --
+        -- The delta for each node is computed from the end position of the
+        -- preceding sibling or parent, as tracked by the delta phase of
+        -- the printer state (prior_end_pos).
+}
+
+-- Interleave pending comments into the output stream before a token.
+-- Applies only when the current AST node has an absolute (EpaSpan) anchor.
+-- The node's own comments are first added to the shared pool; the pool is
+-- then partitioned by source position and due comments are emitted.
+-- Comments whose start position exceeds token_pos remain in the pool.
+rule EmitPriorComments {
+    when: EmitPriorComments(state, token_pos)
+
+    requires: state.current_anchor.kind = absolute
+    requires: state.pending_comments.any(c =>
+        c.location.original_span.start.line < token_pos.line
+        or (c.location.original_span.start.line = token_pos.line
+            and c.location.original_span.start.col <= token_pos.col))
+
+    ensures:
+        for c in state.pending_comments
+                 where c.location.original_span.start.line < token_pos.line
+                    or (c.location.original_span.start.line = token_pos.line
+                        and c.location.original_span.start.col <= token_pos.col):
+            state.emitted_comments.add(c)
+            state.pending_comments.remove(c)
+
+    @guidance
+        -- Implemented by commentAllocationBefore in ExactPrint.hs.
+        -- Partitions the unallocated comment pool using:
+        --   ss2pos(comment.loc) <= ss2pos(token_span)
+        -- where ss2pos returns (line, col) — comparison is lexicographic.
+        --
+        -- Comments with EpaDelta locations (no RealSrcSpan) or EpaSpan
+        -- carrying an UnhelpfulSpan are treated as always due via a
+        -- (_ -> True) fallback and are emitted unconditionally.
+        --
+        -- CPP-injected comments may carry a different filename in their
+        -- RealSrcSpan, so comparison uses ss2pos rather than the RealSrcSpan
+        -- Ord instance (which compares filename first).
+        --
+        -- A companion path handles comments inside a node's span:
+        -- commentAllocationIn partitions by ss2posEnd(comment) <= ss2posEnd(node).
+}
+
+-- Emit comments attached directly to a delta-form AST node.
+-- Applies only when the current AST node has a relative (EpaDelta) anchor,
+-- i.e. it has already been processed by MakeDeltaAst or was constructed
+-- programmatically. Comments are pre-attached to the node's annotation
+-- (by MakeDeltaAst or by BalanceCommentsList) and are printed directly
+-- without consulting the shared pool.
+-- Before printing the node's own comments, the entire pool is flushed.
+-- This flush is correct only when BalanceCommentsList has been applied
+-- to all surrounding declaration lists beforehand, ensuring the pool
+-- contains no comments that belong after the delta node.
+rule EmitAttachedComments {
+    when: EmitAttachedComments(state, node)
+
+    requires: node.annotation.anchor.kind = relative
+
+    ensures:
+        for c in state.pending_comments:
+            state.emitted_comments.add(c)
+            state.pending_comments.remove(c)
+    ensures:
+        for c in node.annotation.prior_comments:
+            state.emitted_comments.add(c)
+    ensures:
+        for c in node.annotation.anchor.leading_comments:
+            state.emitted_comments.add(c)
+
+    @guidance
+        -- Implemented in the EpaDelta branch of enterAnn (ExactPrint.hs).
+        -- Step 1: flushComments [] — drains the entire unallocated pool by
+        --         calling printOneComment on every remaining entry, then
+        --         clears the pool.
+        -- Step 2: mapM_ printOneComment (priorComments cs) — prints comments
+        --         stored in the node's EpaComments annotation (attached by
+        --         MakeDeltaAst or a prior balanceComments call).
+        -- Step 3: mapM_ printOneComment dcs — prints any comments stored
+        --         directly in the EpaDelta constructor's comment field.
+        --
+        -- Unlike EmitPriorComments, there is no position-based partition:
+        -- all pool comments are flushed unconditionally, then the node's
+        -- own comments are printed in annotation order.
+        --
+        -- End-of-file whitespace is handled separately via the epEof field
+        -- (a (pos, prior) span pair set by HsModule traversal and printed
+        -- after the final flush), not via this rule.
+}
+
+-- Advance the output cursor after printing a token.
+-- The cursor moves to the end of the token's span.
+rule AdvanceCursor {
+    when: PrintToken(state, token_text, token_end_pos)
+
+    ensures: state.current_pos = token_end_pos
+    ensures: state.prior_end_pos = token_end_pos
+}
+
+-- Enter a layout block: record the current column as the left-hand margin
+-- for subsequent items in the block, for both the print and delta phases.
+rule EnterLayoutBlock {
+    when: EnterLayoutBlock(state, col)
+
+    requires: state.mark_layout = true
+
+    ensures: state.layout_lhs = col
+    ensures: state.delta_layout_lhs = col
+    ensures: state.mark_layout = false
+    ensures: state.delta_mark_layout = false
+}
+
+-- Record the EOF annotation on the printer state, so trailing whitespace
+-- after the last declaration is preserved in the output.
+-- Both spans come from AnnsModule.am_eof; the rule fires once per module
+-- inside the HsModule exact instance, then clears itself (setEofPos Nothing).
+rule RecordEofAnnotation {
+    when: RecordEofAnnotation(state, eof)
+
+    ensures: state.eof_annotation = eof
+}
+
+------------------------------------------------------------
+-- Invariants
+------------------------------------------------------------
+
+invariant PrintedSourceNonEmpty {
+    -- ExactPrint on a non-empty module always produces a non-empty string.
+    -- An empty source_text would mean the traversal emitted nothing, which
+    -- is only possible for a completely empty input.
+    for r in PrintedSource:
+        r.source_text.length >= 0
+}
+
+invariant LocatedNodeHasAnnotation {
+    -- Located AST nodes always carry a NodeAnnotation; that is what
+    -- distinguishes them from plain Haskell syntax tree nodes.
+    for n in LocatedAstNode:
+        n.annotation != null
+}
+
+invariant PrintOptionsModeKnown {
+    -- A PrintState always references a PrintOptions whose mode is one
+    -- of the two supported values.
+    for s in PrintState:
+        s.options.mode in {string_output, delta_only}
+}
+
+------------------------------------------------------------
+-- Actor Declarations
+------------------------------------------------------------
+
+actor PrinterCaller {
+    identified_by: ParsedSource
+}
+
+-- The printer traversal engine that drives the internal protocol operations.
+-- Identified by the PrintState it carries through the traversal.
+actor PrintTraversal {
+    identified_by: PrintState
+}
+
+------------------------------------------------------------
+-- Surfaces
+------------------------------------------------------------
+
+-- The public entry surface of the exact-print library.
+-- Callers (HLS, refactoring tools, GHC itself) drive the printer through
+-- these operations. The Transform spec chains from these triggers to
+-- describe the operations that are typically performed on the AST before
+-- or after printing.
+surface ExactPrintApi {
+    facing caller: PrinterCaller
+
+    exposes:
+        caller
+
+    provides:
+        ExactPrint(caller, options: PrintOptions)
+        ExactPrintWithOptions(caller, options: PrintOptions)
+        MakeDeltaAst(caller)
+
+    @guarantee RoundTripFidelity
+        -- For any AST produced by parsing a file f, the source text
+        -- returned by ExactPrint on its delta form is byte-identical
+        -- to readFile(f), modulo tab expansion at equivalent positions.
+        -- This is the primary correctness property of the subsystem.
+
+    @guarantee AllCommentsEmitted
+        -- After a complete ExactPrint traversal, every comment that
+        -- was attached to the AST appears in the output exactly once
+        -- and pending_comments is empty.
+
+    @guarantee CursorNonDecreasing
+        -- The output cursor only ever moves forward during a single
+        -- ExactPrint traversal; tokens are emitted in source order.
+}
+
+-- Internal protocol surface for the printer traversal engine.
+-- These operations are not part of the public API; they are invoked by the
+-- shared markAnnotated traversal as it visits each AST node.  Exposing them
+-- here makes the printer's internal event model explicit and reachable from
+-- the spec's surface layer.
+surface PrinterInternals {
+    facing engine: PrintTraversal
+
+    provides:
+        EmitPriorComments(engine, token_pos: core/SourcePos)
+        EmitAttachedComments(engine, node: LocatedAstNode)
+        PrintToken(engine, token_text: String, token_end_pos: core/SourcePos)
+        EnterLayoutBlock(engine, col: core/LayoutStartCol)
+        RecordEofAnnotation(engine, eof: EofAnnotation)
+}

@@ -1,0 +1,375 @@
+-- allium: 3
+-- exact-print-core.allium
+--
+-- Scope: Core annotation types for GHC Exact Print Annotations (EPA)
+-- Includes: Source locations, delta positions, comments, annotation entries
+-- Excludes:
+--   - Printer output (see exact-print-printing.allium)
+--   - AST transformation operations (see exact-print-transform.allium)
+--   - GHC AST node types (managed by the GHC parser, external to this spec)
+
+------------------------------------------------------------
+-- Value Types
+------------------------------------------------------------
+
+-- A (line, column) position in source, 1-based.
+value SourcePos {
+    line: Integer
+    col: Integer
+}
+
+-- An absolute source span recorded by the GHC parser.
+-- A span carries its file name and start/end positions.
+value AbsoluteSpan {
+    start: SourcePos
+    end: SourcePos
+}
+
+-- A position of a syntactic element encoded as a relative offset from
+-- the preceding element within the current layout block.
+--
+-- SameLine:      the element starts on the same output line; `col` is a
+--   rightward offset from the end of the preceding token.  `lines` is 0.
+--   col must be >= 0 (the element cannot back up on the same line).
+--
+-- DifferentLine: the element starts `lines` lines below; `col` is a
+--   layout-relative column offset — the printed absolute column is
+--   (layout_margin + col), where layout_margin is the LayoutStartCol of
+--   the enclosing layout block.  `col` is NOT a distance from the
+--   preceding token; it is a signed distance from the left margin of
+--   the block.
+--
+--   col CAN be negative for DifferentLine.  This occurs for tokens that
+--   terminate a layout block (e.g. `in`, `where`, `of`) when they appear
+--   to the LEFT of the block's margin.  The printer's validity check
+--   (isGoodDelta) explicitly ignores the column for DifferentLine:
+--   only `lines > 0` is required.  A DifferentLine element with negative
+--   col sits outside the enclosing block's bounding rectangle — it is a
+--   known, intentional exception to the top-left-corner invariant.
+--
+-- The difference in col semantics between the two kinds is what makes
+-- layout-preserving moves possible.  When a fragment is relocated, the
+-- layout_margin shifts to match the new anchor column.  All DifferentLine
+-- col values remain unchanged, so every child element shifts together
+-- without any individual delta needing to be updated.
+value DeltaPos {
+    kind: same_line | different_line
+    lines: Integer    -- 0 when kind = same_line
+    col: Integer      -- same_line: non-negative offset from preceding token end
+                      -- different_line: signed offset from enclosing layout_margin;
+                      --   may be negative when a token terminates a layout block
+                      --   by appearing to the left of the block's margin
+}
+
+------------------------------------------------------------
+-- Enumerations
+------------------------------------------------------------
+
+-- Indicates whether an annotation can have its anchor updated
+-- during printing.
+enum AnchorUpdateability {
+    can_update
+    can_update_anchor_only
+    no_update
+}
+
+------------------------------------------------------------
+-- Entities and Variants
+------------------------------------------------------------
+
+-- The location of a single syntactic element in the source.
+-- EPA uses two representations:
+--   absolute (EpaSpan) — the original source span from the parser
+--   relative (EpaDelta) — a delta position relative to the preceding element,
+--                         plus the original span retained for re-anchoring
+--
+-- The anchor marks the position of the element's first token — conceptually
+-- the top-left corner of the bounding rectangle that encloses all tokens
+-- of the element when printed.  Haskell is a layout-sensitive language: the
+-- column at which a construct begins determines the indentation of everything
+-- inside it.  The anchor encodes this column precisely.
+--
+-- Leading comments (leading_comments) fall OUTSIDE this bounding rectangle.
+-- They are printed before the anchor and may appear at any indentation,
+-- unconstrained by the element's layout block.  The anchor position is
+-- invariant with respect to any preceding comments.
+--
+-- Layout propagation: when the printer enters an element that opens a new
+-- layout block (marked by mark_layout = true), the anchor's column becomes
+-- the new LayoutStartCol for that block.  All descendant DifferentLine
+-- deltas are then interpreted relative to this column.  Consequently, the
+-- anchor is the coordinate origin for the element's internal layout: a child
+-- with DifferentLine(n, dc) is printed at absolute column (anchor_col + dc)
+-- regardless of where the anchor itself lands in the output.
+--
+-- Known exception: layout-block terminators (e.g. `in`, `where`, `of`)
+-- may carry a DifferentLine delta with negative col, placing them to the
+-- LEFT of the enclosing block's margin.  This is valid Haskell — such
+-- keywords end the block precisely by appearing outside it.  The printer
+-- allows DifferentLine.col to be negative; only SameLine.col is required
+-- to be non-negative.  Quasi-quote bodies are a second exception: their
+-- layout offset is reset to 0 before printing because the verbatim string
+-- content does not obey Haskell layout rules.
+--
+-- Splice invariance: repositioning an AST fragment requires changing only
+-- the root element's entry delta (see SetEntryDP in the Transform spec).
+-- No descendant delta needs to change, because all DifferentLine.col values
+-- are stored relative to their enclosing layout margin, which re-roots
+-- automatically when the anchor moves.
+--
+-- All annotations start as absolute after parsing.
+-- makeDeltaAst converts them to relative form before transformation or printing.
+--
+-- Anchor widening: the parser extends an anchor's span to cover every token
+-- that syntactically belongs to the element.  Two helpers implement this:
+--
+--   widenAnchorT(anchor, token) — widens anchor to include the token's span.
+--     Only acts when anchor is EpaSpan with a RealSrcSpan; all other cases
+--     (NoEpTok, EpaDelta, UnhelpfulSpan) leave the anchor unchanged.
+--     Implemented by widenAnchorT / widenAnchorS in Annotation.hs.
+--
+--   widenAnchorS(anchor, srcSpan) — widens anchor to include a raw SrcSpan.
+--     EpaSpan RealSrcSpan: the two spans are combined (union).
+--     EpaSpan UnhelpfulSpan: unchanged.
+--     EpaDelta (placeholder): replaced by EpaSpan of the given span.
+--     No real span to add: unchanged.
+--
+-- Merging locations (Semigroup EpaLocation):
+--   EpaSpan <> EpaSpan   → combined span (union of both).
+--   EpaSpan <> EpaDelta  → left EpaSpan (absolute beats relative).
+--   EpaDelta <> EpaSpan  → right EpaSpan (absolute beats relative from right).
+--   EpaDelta <> EpaDelta → EpaDelta: spans combined, LEFT delta kept,
+--                          right delta discarded, comments concatenated.
+--   The asymmetry (absolute always wins; left delta wins) is intentional:
+--   the left edge of the anchor is what matters for layout, so the earlier
+--   (left) delta takes priority when combining two relative locations.
+--
+-- Deriving an anchor from a list (listLocation):
+--   Folds over a list of annotated nodes, combining only EpaSpan anchors.
+--   EpaDelta items are silently skipped.
+--   If all items carry EpaDelta anchors, returns EpaSpan noSrcSpan.
+--   Used to produce a container node's anchor from its children's spans.
+--
+-- Statement list anchors (stmtsAnchor, PostProcess.hs):
+--   When a do/where/let statement list begins with a layout separator token
+--   (semicolon), the list's anchor is widenAnchorS'd to include that token.
+--   This ensures the anchor covers the full extent of the block start.
+--
+-- Note on noAnn placeholders: the NoAnn instance for EpaLocation produces
+-- EpaDelta noSrcSpan (SameLine 0) [], which uses the EpaDelta constructor
+-- but carries no real position.  This is a placeholder, not a computed delta.
+-- patch_anchor (PostProcess.hs) converts such placeholders to EpaSpan when a
+-- real span becomes available (e.g. in add_where for empty where-clause bodies).
+-- This is initialisation of an uninitialised placeholder, not a lifecycle
+-- round-trip.  The transition graph below does not include relative -> absolute
+-- because no genuine relative (computed delta) anchor is ever converted back.
+entity EpaLocation {
+    kind: absolute | relative
+
+    transitions kind {
+        -- Parser produces absolute; MakeDeltaAst and SetEntryDP convert to relative.
+        absolute -> relative
+    }
+
+    -- Present for both kinds: the original source span
+    original_span: AbsoluteSpan
+
+    -- Present only when kind = relative
+    delta: DeltaPos when kind = relative
+
+    -- Comments attached before this location (only in relative form).
+    -- These precede the anchor and are outside the element's bounding rectangle.
+    leading_comments: List<Comment> when kind = relative
+}
+
+-- A Haskell comment attached to an AST node.
+-- Comments originate either from source text or are synthetic: created by
+-- mkKWComment when a keyword token (e.g. "where", "of", "let") is converted
+-- into comment form for positional processing.  The printer treats synthetic
+-- and real comments identically; keyword_origin is metadata for tooling.
+entity Comment {
+    contents: String          -- full text including delimiters (-- or {- -})
+    location: EpaLocation
+    -- The span of the token that immediately precedes this comment.
+    -- Used to compute relative layout when balancing comment ownership.
+    prior_token_span: AbsoluteSpan
+    keyword_origin: String?
+    -- null for comments that originate in the source text.
+    -- Non-null for synthetic comments created by mkKWComment: the string is
+    -- the keyword whose token was converted into comment form.
+    -- The printer ignores this field (commentOrigin is _ in printOneComment).
+}
+
+-- Comments associated with an annotated AST node, split into
+-- those that appear before the node and those that appear after.
+entity EpaComments {
+    prior: List<Comment>      -- comments before the node's anchor
+    following: List<Comment>  -- comments after the node's anchor (trailing)
+}
+
+-- The annotation attached to a located AST node (EpAnn).
+-- Every annotatable node carries:
+--   anchor   — where it starts in source (absolute or relative)
+--   trailing — annotations that appear after the node's main content
+--              (e.g. trailing commas, closing parens)
+--   comments — all comments logically owned by this node
+entity NodeAnnotation {
+    anchor: EpaLocation
+    trailing: List<TrailingToken>
+    comments: EpaComments
+}
+
+-- A token that follows a syntactic element, such as a comma or semicolon.
+-- These are stored separately so they can be transferred when nodes are
+-- reordered or removed.
+entity TrailingToken {
+    location: EpaLocation
+    token_kind: String        -- e.g. "comma", "semicolon", "darrow"
+}
+
+-- The entry point used by the printer to navigate into an annotated node.
+-- NoEntry marks nodes that are printed inline without their own anchor.
+entity Entry {
+    kind: has_entry | no_entry
+
+    -- Present when kind = has_entry
+    anchor: EpaLocation when kind = has_entry
+    trailing: List<TrailingToken> when kind = has_entry
+    comments: EpaComments when kind = has_entry
+    flush_trailing_comments: Boolean when kind = has_entry
+    anchor_updateability: AnchorUpdateability when kind = has_entry
+}
+
+-- The column that marks the leftmost extent of a layout block.
+-- Used to enforce layout rules when printing indented groups.
+entity LayoutStartCol {
+    col: Integer
+}
+
+------------------------------------------------------------
+-- Invariants
+------------------------------------------------------------
+
+invariant DeltaPosLineNonZero {
+    -- A DeltaPos of kind different_line must have lines > 0.
+    -- Lines == 0 is encoded as same_line.
+    for dp in DeltaPos:
+        dp.kind = different_line implies dp.lines > 0
+}
+
+invariant SameLineDeltaColNonNegative {
+    -- A SameLine delta cannot back up on the same line: col must be >= 0.
+    -- The printer rejects SameLine deltas with negative col (isGoodDelta).
+    -- DifferentLine.col is deliberately excluded: it is a layout-relative
+    -- signed offset and may be negative when a token (e.g. `in`, `where`,
+    -- `of`) terminates a layout block by appearing to the left of the
+    -- block's margin.  That case is a known exception to the bounding-box
+    -- invariant and is handled by the printer without error.
+    for dp in DeltaPos:
+        dp.kind = same_line implies dp.col >= 0
+}
+
+invariant DeltaPosSameLineNoVerticalGap {
+    -- DeltaPos of kind same_line carries no vertical movement.
+    for dp in DeltaPos:
+        dp.kind = same_line implies dp.lines = 0
+}
+
+invariant CommentLocationConsistency {
+    -- Comments stored in prior arrive before their owning node's anchor;
+    -- comments stored in following arrive after. The two lists partition
+    -- the comments that belong to a node: a comment appears in at most
+    -- one of them.
+    for ec in EpaComments:
+        ec.prior.count + ec.following.count >= 0
+}
+
+invariant CommentContentsNonEmpty {
+    -- A comment always carries its original delimited text.
+    for c in Comment:
+        c.contents != ""
+}
+
+invariant CommentHasLocation {
+    -- Every comment is anchored somewhere in the source coordinate space.
+    -- Synthetic comments (e.g. converted CPP directives) reuse the same
+    -- location machinery so they participate in the same ordering as
+    -- real comments.
+    for c in Comment:
+        c.location != null
+}
+
+invariant CommentPriorTokenAnchored {
+    -- The prior_token_span is recorded so comment ownership can be
+    -- recomputed after structural edits; it must reference a real
+    -- token position with non-negative line numbers, or the sentinel
+    -- (-1) line used for synthetic spans.
+    for c in Comment:
+        c.prior_token_span.start.line >= -1
+}
+
+invariant SyntheticCommentContentsMatchOrigin {
+    -- When a comment is created from a keyword token (mkKWComment), both
+    -- commentContents and commentOrigin are set to the keyword string.
+    -- So if keyword_origin is present, contents must equal it.
+    for c in Comment:
+        c.keyword_origin != null implies c.contents = c.keyword_origin
+}
+
+invariant NodeAnnotationStructure {
+    -- Every node annotation has an anchor, a (possibly empty) list of
+    -- trailing tokens and a comments record. The three together describe
+    -- everything the printer needs to reproduce the node's layout.
+    for n in NodeAnnotation:
+        n.anchor != null and n.comments != null and n.trailing.count >= 0
+}
+
+invariant AnchorEnclosesAttachedTokens {
+    -- The parser widens each node's anchor (via widenAnchorT / widenAnchorS)
+    -- to cover every token that syntactically belongs to the element.
+    -- Consequently a node's anchor span is always a superset of the span of
+    -- any individual token stored in its annotation (trailing tokens, where
+    -- keyword, etc.), provided those tokens carry RealSrcSpan locations.
+    -- Tokens with EpaDelta or UnhelpfulSpan locations are excluded from this
+    -- guarantee (widenAnchorT is a no-op for those cases).
+    for n in NodeAnnotation where n.anchor.kind = absolute:
+        for t in n.trailing:
+            t.location.kind = absolute implies
+                t.location.original_span.start >= n.anchor.original_span.start
+}
+
+invariant TrailingTokenHasKind {
+    -- Every trailing token records both where it is and what it is, so
+    -- printers can decide whether to emit it and transformers can move it
+    -- alongside the syntactic element it belongs to.
+    for t in TrailingToken:
+        t.token_kind != "" and t.location != null
+}
+
+invariant EntryHasEntryRequiresAnchor {
+    -- Nodes flagged has_entry carry the data the printer needs to enter
+    -- them: an anchor, the trailing tokens to emit afterwards, the
+    -- comments to interleave, whether to flush following comments before
+    -- the next sibling, and whether the anchor may be rewritten.
+    for e in Entry where e.kind = has_entry:
+        e.anchor != null
+            and e.trailing.count >= 0
+            and e.comments != null
+            and (e.flush_trailing_comments = true or e.flush_trailing_comments = false)
+            and e.anchor_updateability in {can_update, can_update_anchor_only, no_update}
+}
+
+invariant EpaLocationOriginalSpanAlwaysPresent {
+    -- Both absolute and relative EpaLocations retain the original parser
+    -- span; converting to relative form does not discard it, so the
+    -- annotation can be re-anchored if the surrounding layout changes.
+    for loc in EpaLocation:
+        loc.original_span != null
+}
+
+invariant EpaLocationRelativeHasDelta {
+    -- When an EpaLocation is in relative form, both the delta and the
+    -- accompanying leading comments are present.
+    for loc in EpaLocation where loc.kind = relative:
+        loc.delta != null and loc.leading_comments.count >= 0
+}
