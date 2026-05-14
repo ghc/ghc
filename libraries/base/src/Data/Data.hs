@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE Safe #-}
 
 -- |
@@ -100,6 +102,8 @@ module Data.Data (
 import GHC.Internal.Data.Data
 import Data.Typeable
 
+#if __GLASGOW_HASKELL__ >= 1001
+
 import GHC.Real (toRational)
 import GHC.Float (Double)
 import Data.Eq ((==))
@@ -134,3 +138,5 @@ readConstr dt str =
 
     ffloat :: Double -> Constr
     ffloat =  mkPrimCon dt str . FloatConstr . toRational
+
+#endif

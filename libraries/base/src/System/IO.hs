@@ -899,6 +899,8 @@ rw_flags     = output_flags .|. o_RDWR
 -- > input^D
 -- output
 
+#if __GLASGOW_HASKELL__ >= 1001
+
 {-NOTE:
     The following instances are technically orphans, but practically they are
     not, since ordinary users should not use @ghc-internal@ directly and thus
@@ -919,3 +921,5 @@ deriving instance Read Newline
 
 -- | @since base-4.3.0.0
 deriving instance Read NewlineMode
+
+#endif

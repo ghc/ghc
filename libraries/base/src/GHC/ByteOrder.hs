@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE Safe #-}
 
 {-# LANGUAGE StandaloneDeriving #-}
@@ -25,6 +27,8 @@ module GHC.ByteOrder
 
 import GHC.Internal.ByteOrder
 
+#if __GLASGOW_HASKELL__ >= 1001
+
 import Text.Read
 
 {-NOTE:
@@ -35,3 +39,5 @@ import Text.Read
 
 -- | @since base-4.11.0.0
 deriving instance Read ByteOrder
+
+#endif

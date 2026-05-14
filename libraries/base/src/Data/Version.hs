@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE Safe #-}
 
 {-# LANGUAGE StandaloneDeriving #-}
@@ -38,6 +40,8 @@ module Data.Version (
 
 import GHC.Internal.Data.Version
 
+#if __GLASGOW_HASKELL__ >= 1001
+
 import Control.Applicative (pure, (*>))
 import Data.Functor (fmap)
 import Data.Char (isDigit, isAlphaNum)
@@ -59,3 +63,5 @@ parseVersion :: ReadP Version
 parseVersion = do branch <- sepBy1 (fmap read (munch1 isDigit)) (char '.')
                   tags   <- many (char '-' *> munch1 isAlphaNum)
                   pure (Version branch tags)
+
+#endif

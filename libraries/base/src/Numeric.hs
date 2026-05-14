@@ -1,4 +1,11 @@
+{-# LANGUAGE CPP #-}
+
+#if __GLASGOW_HASKELL__ >= 1001
 {-# LANGUAGE Trustworthy #-}
+#else
+{-# LANGUAGE Safe #-}
+#endif
+
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 
@@ -50,6 +57,8 @@ module Numeric
      ) where
 
 import GHC.Internal.Numeric
+
+#if __GLASGOW_HASKELL__ >= 1001
 
 import GHC.Types (Char (C#))
 import GHC.Err (error, errorWithoutStackTrace)
@@ -326,3 +335,5 @@ showOct = showIntAtBase 8  intToDigit
 -- | Show /non-negative/ 'Integral' numbers in base 2.
 showBin :: Integral a => a -> ShowS
 showBin = showIntAtBase 2  intToDigit
+
+#endif
