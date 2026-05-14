@@ -1,0 +1,13 @@
+#include "Cmm.h"
+
+// Exercises MO_S_Mul2 W32, which uses SMULL (Xd = Wn * Wm).
+// After the fix, signExtendReg W32 W32 is a noop (no SXTW needed),
+// but the SMULL instruction itself must still appear.
+testMul2W32 (W_ buffer) {
+    I32 a, b, needed, hi, lo;
+    a = I32[buffer];
+    b = I32[buffer + 4];
+    (needed, hi, lo) = prim %mul2_32(a, b);
+    I32[buffer + 8] = lo;
+    return();
+}
