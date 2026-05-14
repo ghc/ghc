@@ -257,3 +257,6 @@ test('CCallConv', [req_c], compile_and_run, ['CCallConv_c.c'])
 test('T25364', normal, compile_and_run, [''])
 test('T26061', normal, compile_and_run, [''])
 test('T26537', js_broken(26558), compile_and_run, ['-O2 -fregs-graph'])
+# AArch64-specific runtime tests
+test('aarch64-ushr-subword-run', [unless(arch('aarch64'), skip)], compile_and_run, ['-O'])
+test('aarch64-subword-ops', [unless(arch('aarch64'), skip)], compile_and_run, ['-O'])
