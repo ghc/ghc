@@ -211,6 +211,8 @@ data DebugFlags = DebugFlags
     , squeeze        :: Bool -- ^ @z@ stack squeezing & lazy blackholing
     , hpc            :: Bool -- ^ @c@ coverage
     , sparks         :: Bool -- ^ @r@
+    , ipe            :: Bool -- ^ @I@
+                             --   @since ghc-experimental-10.0.0
     } deriving ( Show -- ^ @since base-4.8.0.0
                , Generic -- ^ @since base-4.15.0.0
                )
@@ -590,6 +592,8 @@ getDebugFlags = do
                    (#{peek DEBUG_FLAGS, hpc} ptr :: IO CBool))
              <*> (toBool <$>
                    (#{peek DEBUG_FLAGS, sparks} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek DEBUG_FLAGS, ipe} ptr :: IO CBool))
 
 getCCFlags :: IO CCFlags
 getCCFlags = do
