@@ -260,6 +260,12 @@ test('T26537', js_broken(26558), compile_and_run, ['-O2 -fregs-graph'])
 # AArch64-specific runtime tests
 test('aarch64-ushr-subword-run', [unless(arch('aarch64'), skip)], compile_and_run, ['-O'])
 test('aarch64-subword-ops', [unless(arch('aarch64'), skip)], compile_and_run, ['-O'])
+test('aarch64-sxtw-run',
+     [ extra_files(['aarch64-sxtw-cmm.cmm']),
+       unless(arch('aarch64'), skip),
+       when(unregisterised(), skip)],
+     multi_compile_and_run,
+     ['aarch64-sxtw-run', [('aarch64-sxtw-cmm.cmm', '')], '-O'])
 test('T27046',
      [ req_cmm
      , when(arch('i386'), skip) # i386 does not support MO_S_Mul2 W64
