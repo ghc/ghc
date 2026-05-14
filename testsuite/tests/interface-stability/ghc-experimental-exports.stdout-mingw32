@@ -7815,7 +7815,7 @@ module GHC.RTS.Flags.Experimental where
   type ConcFlags :: *
   data ConcFlags = ConcFlags {ctxtSwitchTime :: RtsTime, ctxtSwitchTicks :: GHC.Internal.Types.Int}
   type DebugFlags :: *
-  data DebugFlags = DebugFlags {scheduler :: GHC.Internal.Types.Bool, interpreter :: GHC.Internal.Types.Bool, weak :: GHC.Internal.Types.Bool, gccafs :: GHC.Internal.Types.Bool, gc :: GHC.Internal.Types.Bool, nonmoving_gc :: GHC.Internal.Types.Bool, block_alloc :: GHC.Internal.Types.Bool, sanity :: GHC.Internal.Types.Bool, stable :: GHC.Internal.Types.Bool, prof :: GHC.Internal.Types.Bool, linker :: GHC.Internal.Types.Bool, apply :: GHC.Internal.Types.Bool, stm :: GHC.Internal.Types.Bool, squeeze :: GHC.Internal.Types.Bool, hpc :: GHC.Internal.Types.Bool, sparks :: GHC.Internal.Types.Bool}
+  data DebugFlags = DebugFlags {scheduler :: GHC.Internal.Types.Bool, interpreter :: GHC.Internal.Types.Bool, weak :: GHC.Internal.Types.Bool, gccafs :: GHC.Internal.Types.Bool, gc :: GHC.Internal.Types.Bool, nonmoving_gc :: GHC.Internal.Types.Bool, block_alloc :: GHC.Internal.Types.Bool, sanity :: GHC.Internal.Types.Bool, stable :: GHC.Internal.Types.Bool, prof :: GHC.Internal.Types.Bool, linker :: GHC.Internal.Types.Bool, apply :: GHC.Internal.Types.Bool, stm :: GHC.Internal.Types.Bool, squeeze :: GHC.Internal.Types.Bool, hpc :: GHC.Internal.Types.Bool, sparks :: GHC.Internal.Types.Bool, ipe :: GHC.Internal.Types.Bool}
   type DoCostCentres :: *
   data DoCostCentres = CostCentresNone | CostCentresSummary | CostCentresVerbose | CostCentresAll | CostCentresJSON
   type DoHeapProfile :: *
