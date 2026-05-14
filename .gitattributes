@@ -2,3 +2,4 @@
 # don't convert anything on checkout
 * text=auto eol=lf
 testsuite/tests/parser/should_run/T25375.hs text=auto eol=crlf
+testsuite/**/all.T merge=union
