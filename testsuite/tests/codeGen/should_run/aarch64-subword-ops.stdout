@@ -1,0 +1,40 @@
+-- MO_U_Shr variable shift
+64
+15
+66
+16384
+255
+4660
+-- MO_S_Shr variable shift
+-1
+-64
+63
+8
+-1
+-16384
+127
+-- MO_Shl variable shift
+1
+16
+254
+16
+1
+256
+65534
+9024
+-- MO_U_Quot
+25
+28
+1
+255
+333
+-- register clobbering: shift + reuse
+64
+99
+16384
+4951
+-- register clobbering: quot + reuse
+235
+34
+1336
+510

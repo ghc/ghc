@@ -279,3 +279,6 @@ test('T27072d', [req_c, only_ways(['dyn']), when(not opsys('darwin'), skip),
 # Skipped on Darwin (Apple linker doesn't support --wrap).
 test('T27072w', [req_c, js_skip, when(opsys('darwin'), skip)],
      compile_and_run, ['T27072w_c.c -no-hs-main -optl-Wl,--wrap=hs_spt_remove'])
+# AArch64-specific runtime tests
+test('aarch64-ushr-subword-run', [unless(arch('aarch64'), skip)], compile_and_run, ['-O'])
+test('aarch64-subword-ops', [unless(arch('aarch64'), skip)], compile_and_run, ['-O'])

@@ -23,3 +23,11 @@ test('avx512-int64-minmax', [unless(arch('x86_64'), skip),
                              when(unregisterised(), skip)], compile_grep_asm, ['hs', True, '-mavx512vl'])
 test('avx512-word64-minmax', [unless(arch('x86_64'), skip),
                               when(unregisterised(), skip)], compile_grep_asm, ['hs', True, '-mavx512vl'])
+is_aarch64_codegen = [
+    unless(arch('aarch64'), skip),
+    when(unregisterised(), skip),
+]
+
+# AArch64-specific tests
+test('aarch64-ushr-subword', is_aarch64_codegen, compile_grep_asm, ['hs', True, '-O'])
+test('aarch64-shl-subword', is_aarch64_codegen, compile_grep_asm, ['hs', True, '-O'])
