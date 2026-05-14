@@ -20,3 +20,26 @@ test(
     multimod_compile_and_run,
     ['TraceIpe', ''],
 )
+
+# Compile and run with default RTS options
+test(
+    'T25275_C',
+    [
+        only_ways(['debug']),
+        extra_files(['DebugIpe.hs']),
+    ],
+    multimod_compile_and_run,
+    ['DebugIpe', ''],
+)
+
+# Compile and run with -DI
+test(
+    'T25275_D',
+    [
+        only_ways(['debug']),
+        extra_files(['DebugIpe.hs']),
+        extra_run_opts('+RTS -DI -RTS'),
+    ],
+    multimod_compile_and_run,
+    ['DebugIpe', ''],
+)
