@@ -1,0 +1,41 @@
+#include "Cmm.h"
+
+// MO_S_Mul2 W32: signExtendReg W32 W32 is a noop (inputs already W32).
+// Tests the SMULL path with values whose bit 15 != bit 31 (the old SXTH
+// bug would corrupt these).
+runMul2W32zh (W_ x) {
+    I32 a, b, needed, hi, lo;
+    a = %lobits32(x);
+    b = 2::I32;
+    (needed, hi, lo) = prim %mul2_32(a, b);
+    return(TO_W_(lo));
+}
+
+// MO_S_Mul2 W16: signExtendReg W16 W32 emits SXTH before SMULL.
+runMul2W16zh (W_ x) {
+    I16 a, b, needed, hi, lo;
+    a = %lobits16(x);
+    b = 2::I16;
+    (needed, hi, lo) = prim %mul2_16(a, b);
+    return(TO_W_(lo));
+}
+
+// MO_S_Mul2 W8: signExtendReg W8 W32 emits SXTB before SMULL.
+runMul2W8zh (W_ x) {
+    I8 a, b, needed, hi, lo;
+    a = %lobits8(x);
+    b = 2::I8;
+    (needed, hi, lo) = prim %mul2_8(a, b);
+    return(TO_W_(lo));
+}
+
+// MO_S_Mul2 W16 returning (needed, hi, lo) as a packed triple.
+// Tests the CSET NE overflow detection: needed=1 when overflow occurs.
+// Returns (needed << 32) | (lo & 0xFFFF) so the Haskell side can inspect both.
+runMul2W16Overflowzh (W_ x, W_ y) {
+    I16 a, b, needed, hi, lo;
+    a = %lobits16(x);
+    b = %lobits16(y);
+    (needed, hi, lo) = prim %mul2_16(a, b);
+    return(TO_W_(needed) * 0x100000000 + (TO_W_(lo) `and` 0xFFFF));
+}
