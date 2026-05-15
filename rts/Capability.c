@@ -89,7 +89,7 @@ STATIC_INLINE bool
 globalWorkToDo (void)
 {
     return getSchedState() >= SCHED_INTERRUPTING
-      || getRecentActivity() == ACTIVITY_INACTIVE; // need to check for deadlock
+        || isIdleGcPending();
 }
 #endif
 
