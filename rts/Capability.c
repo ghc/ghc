@@ -31,6 +31,7 @@
 #include "sm/OSMem.h"
 #include "sm/BlockAlloc.h" // for countBlocks()
 #include "IOManager.h"
+#include "IdleGC.h"
 
 #include <string.h>
 
