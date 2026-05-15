@@ -23,6 +23,7 @@
 #include "Timer.h"
 #include "Proftimer.h"
 #include "Schedule.h"
+#include "IdleGC.h"
 #include "Ticker.h"
 #include "Capability.h"
 #include "RtsSignals.h"
