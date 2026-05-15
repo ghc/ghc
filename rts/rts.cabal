@@ -423,6 +423,7 @@ library
                  HsFFI.c
                  Inlines.c
                  Interpreter.c
+                 IdleGC.c
                  IOManager.c
                  LdvProfile.c
                  Libdw.c

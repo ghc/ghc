@@ -40,6 +40,7 @@
 #include "RaiseAsync.h"
 #include "Threads.h"
 #include "Timer.h"
+#include "IdleGC.h"
 #include "ThreadPaused.h"
 #include "ThreadLabels.h"
 #include "Messages.h"
@@ -81,14 +82,6 @@ uint64_t allocated_bytes_at_heapoverflow = 0;
  * thread, if it is still alive.
  */
 bool heap_overflow = false;
-
-/* flag that tracks whether we have done any execution in this time slice.
- * LOCK: currently none, perhaps we should lock (but needs to be
- * updated in the fast path of the scheduler).
- *
- * NB. must be StgWord, we do xchg() on it.
- */
-StgWord recent_activity = ACTIVITY_YES;
 
 /* if this flag is set as well, give up execution
  * LOCK: none (changes monotonically)
