@@ -1,7 +1,13 @@
 module Example.SQL (
   SqlQuery (..),
   SqlValue (..),
-  interpolateString,
+
+  -- * String interpolation
+  interpolateRaw,
+  interpolateValue,
+  interpolateAppend,
+  interpolateEmpty,
+  interpolateFinalize,
 ) where
 
 import Data.String (IsString (..))
@@ -41,12 +47,17 @@ instance ToSqlQuery String where
 instance ToSqlQuery Int where
   toSqlQuery x = SqlQuery{sqlText = "?", sqlValues = [SqlInt x]}
 
-interpolateString ::
-  ( (forall a. ToSqlQuery a => a -> SqlQuery) ->
-    (String -> SqlQuery) ->
-    (SqlQuery -> SqlQuery -> SqlQuery) ->
-    SqlQuery ->
-    SqlQuery
-  ) ->
-  SqlQuery
-interpolateString f = f toSqlQuery fromString (<>) mempty
+interpolateRaw :: String -> SqlQuery
+interpolateRaw = fromString
+
+interpolateValue :: ToSqlQuery a => a -> SqlQuery
+interpolateValue = toSqlQuery
+
+interpolateAppend :: SqlQuery -> SqlQuery -> SqlQuery
+interpolateAppend = mappend
+
+interpolateEmpty :: SqlQuery
+interpolateEmpty = mempty
+
+interpolateFinalize :: SqlQuery -> SqlQuery
+interpolateFinalize = id

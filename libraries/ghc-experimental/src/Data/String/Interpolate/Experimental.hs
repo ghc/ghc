@@ -14,8 +14,13 @@ See the proposal for motivation and explanations:
 https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0570-string-interpolation.rst
 -}
 module Data.String.Interpolate.Experimental (
-  SimpleStringInterpolator,
-  interpolateString,
+  interpolateRaw,
+  interpolateValue,
+  interpolateAppend,
+  interpolateEmpty,
+  interpolateFinalize,
+
+  -- * Interpolate class
   Interpolate (..),
 ) where
 

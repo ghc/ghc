@@ -12,57 +12,85 @@
 --
 -----------------------------------------------------------------------------
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableSuperClasses #-}
 
 module GHC.Internal.Data.String.Interpolate (
-  SimpleStringInterpolator,
-  interpolateString,
+  interpolateRaw,
+  interpolateValue,
+  interpolateAppend,
+  interpolateEmpty,
+  interpolateFinalize,
+
+  -- * StringBuilder
+  StringBuilder (..),
+  buildString,
+
+  -- * Interpolate class
   Interpolate (..),
 ) where
 
 import GHC.Internal.Base
-import GHC.Internal.Data.Maybe (Maybe (..))
+import GHC.Internal.Data.Monoid (Endo (..))
 import GHC.Internal.Data.String (IsString, fromString)
-import GHC.Internal.Show (ShowS, showChar, showString, shows)
+import GHC.Internal.Show (show)
 import GHC.Internal.Types
 
-type SimpleStringInterpolator s =
-  ( forall ss.
-    (forall a. Interpolate a => a -> s)
-    -> (s -> s)
-    -> (s -> ss -> ss)
-    -> ss
-    -> ss
-  )
-  -> s
+interpolateRaw :: String -> StringBuilder
+interpolateRaw = fromString
+{-# INLINE [1] interpolateRaw #-}
 
-interpolateString :: (IsString s, Monoid s) => SimpleStringInterpolator s
-interpolateString f = mconcat $ f (fromString . interpolate) id (:) []
-{-# INLINE interpolateString #-}
+interpolateValue :: Interpolate a => a -> StringBuilder
+interpolateValue = interpolate
+{-# INLINE [1] interpolateValue #-}
+
+interpolateAppend :: StringBuilder -> StringBuilder -> StringBuilder
+interpolateAppend = mappend
+{-# INLINE [1] interpolateAppend #-}
+
+interpolateEmpty :: StringBuilder
+interpolateEmpty = mempty
+{-# INLINE [1] interpolateEmpty #-}
+
+interpolateFinalize :: StringBuilder -> String
+interpolateFinalize = buildString
+{-# INLINE [1] interpolateFinalize #-}
+
+{----- StringBuilder -----}
+
+newtype StringBuilder = StringBuilder (Endo String)
+  deriving newtype (Semigroup, Monoid)
+instance IsString StringBuilder where
+  fromString s = StringBuilder (Endo (s <>))
+  {-# INLINE [1] fromString #-}
+
+buildString :: StringBuilder -> String
+buildString (StringBuilder (Endo f)) = f ""
+{-# INLINE [1] buildString #-}
+
+{---- Interpolate ----}
 
 class Interpolate a where
-  {-# MINIMAL interpolate | interpolateS #-}
-
-  interpolate :: a -> String
-  interpolate x = interpolateS x ""
-
-  interpolateS :: a -> ShowS
-  interpolateS x s = interpolate x <> s
+  interpolate :: (IsString s, Monoid s) => a -> s
 
 instance Interpolate String where
-  interpolateS = showString
+  interpolate = fromString
+  {-# INLINE [1] interpolate #-}
 instance Interpolate Char where
-  interpolateS = showChar
-
-#define INTERPOLATE_WITH_SHOW(x) \
-  instance Interpolate x where \
-    interpolateS = shows
-INTERPOLATE_WITH_SHOW(Int)
-INTERPOLATE_WITH_SHOW(Double)
-INTERPOLATE_WITH_SHOW(Bool)
--- FIXME(bchinn): More instances
-
-instance Interpolate a => Interpolate (Maybe a) where
-  interpolateS Nothing = showString "Nothing"
-  interpolateS (Just a) = showString "Just (" . interpolateS a . showChar ')'
+  interpolate c = fromString [c]
+  {-# INLINE [1] interpolate #-}
+instance Interpolate Int where
+  interpolate = fromString . show
+  {-# INLINE [1] interpolate #-}
+instance Interpolate Double where
+  interpolate = fromString . show
+  {-# INLINE [1] interpolate #-}
+instance Interpolate Bool where
+  interpolate = fromString . show
+  {-# INLINE [1] interpolate #-}

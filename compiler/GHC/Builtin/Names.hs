@@ -282,7 +282,11 @@ basicKnownKeyNames
         fromStringName,
 
         -- Interpolated strings
-        interpolateStringName,
+        interpolateRawName,
+        interpolateValueName,
+        interpolateAppendName,
+        interpolateEmptyName,
+        interpolateFinalizeName,
 
         -- Enum stuff
         enumFromName, enumFromThenName,
@@ -1090,8 +1094,17 @@ minusName         = varQual gHC_INTERNAL_NUM (fsLit "-")           minusClassOpK
 negateName        = varQual gHC_INTERNAL_NUM (fsLit "negate")      negateClassOpKey
 
 -- Module GHC.Internal.Data.String.Interpolate
-interpolateStringName :: Name
-interpolateStringName = varQual gHC_INTERNAL_DATA_STRING_INTERPOLATE (fsLit "interpolateString") interpolateStringKey
+interpolateRawName
+  , interpolateValueName
+  , interpolateAppendName
+  , interpolateEmptyName
+  , interpolateFinalizeName
+  :: Name
+interpolateRawName      = varQual gHC_INTERNAL_DATA_STRING_INTERPOLATE (fsLit "interpolateRaw"     ) interpolateRawKey
+interpolateValueName    = varQual gHC_INTERNAL_DATA_STRING_INTERPOLATE (fsLit "interpolateValue"   ) interpolateValueKey
+interpolateAppendName   = varQual gHC_INTERNAL_DATA_STRING_INTERPOLATE (fsLit "interpolateAppend"  ) interpolateAppendKey
+interpolateEmptyName    = varQual gHC_INTERNAL_DATA_STRING_INTERPOLATE (fsLit "interpolateEmpty"   ) interpolateEmptyKey
+interpolateFinalizeName = varQual gHC_INTERNAL_DATA_STRING_INTERPOLATE (fsLit "interpolateFinalize") interpolateFinalizeKey
 
 ---------------------------------
 -- ghc-bignum
@@ -2392,8 +2405,17 @@ proxyHashKey :: Unique
 proxyHashKey = mkPreludeMiscIdUnique 502
 
 -- String interpolation
-interpolateStringKey :: Unique
-interpolateStringKey = mkPreludeMiscIdUnique 576
+interpolateRawKey
+  , interpolateValueKey
+  , interpolateAppendKey
+  , interpolateEmptyKey
+  , interpolateFinalizeKey
+  :: Unique
+interpolateRawKey = mkPreludeMiscIdUnique 576
+interpolateValueKey = mkPreludeMiscIdUnique 577
+interpolateAppendKey = mkPreludeMiscIdUnique 578
+interpolateEmptyKey = mkPreludeMiscIdUnique 579
+interpolateFinalizeKey = mkPreludeMiscIdUnique 580
 
 ---------------- Template Haskell -------------------
 --      GHC.Builtin.Names.TH: USES IdUniques 200-499

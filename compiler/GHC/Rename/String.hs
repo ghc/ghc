@@ -8,14 +8,12 @@ import GHC.Prelude
 
 import Data.Maybe (isNothing)
 import qualified GHC.Builtin.Names as Builtin
-import GHC.Builtin.Types (stringTyConName)
 import GHC.Data.StringMeta (StringMeta (..))
 import GHC.Hs
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.Rename.Env (lookupNameWithQualifier)
-import GHC.Rename.Pat (rnOverLit)
+import GHC.Rename.Env (lookupNameWithQualifier, lookupSyntaxName)
 import GHC.Tc.Utils.Monad
-import GHC.Types.Name (mkVarOcc)
+import GHC.Types.Name (Name)
 import GHC.Types.Name.Set (FreeNames, emptyFNs, plusFNs)
 import GHC.Types.SrcLoc (unLoc)
 
@@ -59,58 +57,46 @@ rewriteInterString ::
   [HsInterStringPart GhcRn] ->
   RnM (HsExpr GhcRn, FreeNames)
 rewriteInterString meta parts = do
-  overloaded <- xoptM LangExt.OverloadedStrings
-  convertName <- newName (mkVarOcc "convert")
-  rawName <- newName (mkVarOcc "raw")
-  mappendName <- newName (mkVarOcc "mappend")
-  memptyName <- newName (mkVarOcc "mempty")
+  mkOverloaded <- get_mkOverloaded
 
-  (interpolateStringName, fvs1) <-
-    case strMetaQualified meta of
-      Just modName -> lookupNameWithQualifier Builtin.interpolateStringName modName
-      Nothing -> pure (Builtin.interpolateStringName, emptyFNs)
-  (parts', fvs2) <- unzip <$> mapM (rewritePart overloaded convertName rawName) parts
+  let lookupName' = lookupName (strMetaQualified meta)
+  (rawName, fns1) <- lookupName' Builtin.interpolateRawName
+  (convertName, fns2) <- lookupName' Builtin.interpolateValueName
+  (appendName, fns3) <- lookupName' Builtin.interpolateAppendName
+  (emptyName, fns4) <- lookupName' Builtin.interpolateEmptyName
+  (finalizeName, fns5) <- lookupName' Builtin.interpolateFinalizeName
+
   let expr =
-        (if not overloaded && isNothing (strMetaQualified meta) then addSig else id)
-          . nlHsApp (nlHsVar interpolateStringName)
-          . mkLam
-              [ nlVarPat convertName
-              , nlVarPat rawName
-              , nlVarPat mappendName
-              , nlVarPat memptyName
-              ]
-          $ foldr (\p acc -> nlHsApps mappendName [p, acc]) (nlHsVar memptyName) parts'
+        unLoc
+          . mkOverloaded
+          . nlHsApp (nlHsVar finalizeName)
+          . foldr (\p acc -> nlHsApps appendName [p, acc]) (nlHsVar emptyName)
+          $ map (rewritePart convertName rawName) parts
 
-  pure (unLoc expr, plusFNs $ [fvs1] ++ fvs2)
+  pure (expr, plusFNs [fns1, fns2, fns3, fns4, fns5])
   where
-    mkLam pats body = mkHsLam (noLocA pats) body
+    rewritePart convertName rawName = \case
+      HsInterStringRaw st s -> nlHsApps rawName [nlHsLit $ HsString st s]
+      HsInterStringExpr _ e -> nlHsApps convertName [e]
 
-    rewritePart overloaded convertName rawName = \case
-      HsInterStringRaw st s -> do
-        (lit, fvs) <- mkStringLit overloaded st s
-        pure (nlHsApps rawName [lit], fvs)
-      HsInterStringExpr _ e ->
-        pure (nlHsApps convertName [e], emptyFNs)
+    -- Handle -XOverloadedStrings
+    get_mkOverloaded = do
+      overloaded <- xoptM LangExt.OverloadedStrings
+      pure $
+        if overloaded && isNothing (strMetaQualified meta)
+          then nlHsApp (nlHsVar Builtin.fromStringName)
+          else id
 
-    -- Add ":: String" to the given expression
-    addSig e =
-      noLocA . ExprWithTySig noExtField e $
-        HsWC
-          { hswc_ext = []
-          , hswc_body =
-              noLocA
-                HsSig
-                  { sig_ext   = noExtField
-                  , sig_bndrs = HsOuterImplicit []
-                  , sig_body  = nlHsTyVar NotPromoted stringTyConName
-                  }
-          }
-
-    mkStringLit overloaded st s = do
-      if overloaded
-        then do
-          -- FIXME(bchinn): allow -XRebindableSyntax -- lookupSyntaxName
-          (expr, fvs) <- rnOverLit noExtField $ OverLit noExtField (HsIsString st s)
-          pure (noLocA expr, fvs)
-        else
-          pure (nlHsLit $ HsString st s, emptyFNs)
+-- | Look up the given name in the following places:
+--     1. If the given module is provided, in the module
+--     2. If -XRebindableSyntax, any name in scope
+--     3. Otherwise, return the built-in name.
+lookupName :: Maybe ModuleName -> Name -> RnM (Name, FreeNames)
+lookupName mQualMod name
+  | Just mod <- mQualMod =
+      lookupNameWithQualifier name mod
+  | otherwise = do
+      isRebindable <- xoptM LangExt.RebindableSyntax
+      if isRebindable
+        then lookupSyntaxName name
+        else pure (name, emptyFNs)

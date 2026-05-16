@@ -2,10 +2,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StringInterpolation #-}
+{-# LANGUAGE TypeFamilies #-}
 
 import Data.String.Interpolate.Experimental
 import Data.Text (Text)
 import Data.Text qualified as Text
+import Data.Text.Lazy.Builder qualified as LazyText
+import Data.Text.Lazy.Builder.Int qualified as LazyText
+import Data.Text.Lazy.Builder.RealFloat qualified as LazyText
+import Data.Text.Lazy qualified as LazyText
 
 main :: IO ()
 main = mapM_ runTest allTests
@@ -30,14 +35,14 @@ allTests =
   [ TestCase -- Text
       { label =
           """
-          let s = "world"; x = True in s <> s" hello ${s} ${x}" :: Text
+          let s = "world" :: Text; x = True in s <> s" hello ${s} ${x}" :: Text
           """
       , expression =
-          let s = "world"; x = True in s <> s" hello ${s} ${x}" :: Text
+          let s = "world" :: Text; x = True in s <> s" hello ${s} ${x}" :: Text
       }
   -- FIXME(bchinn): overloaded interpolated multiline string
   ]
 
 -- Remove when text provides this instance
 instance Interpolate Text where
-  interpolateS = interpolateS . Text.unpack
+  interpolate = interpolate . Text.unpack
