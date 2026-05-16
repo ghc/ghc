@@ -97,6 +97,12 @@ entity PrintState {
     -- End-of-file annotation: both the EOF token position and the preceding
     -- token end are needed to compute trailing whitespace after the last decl.
     eof_annotation: EofAnnotation?
+
+    -- Layout origin for the current list block, set by SetListAnchor when
+    -- a node's AnnList carries al_anchor.  Consumed (cleared to null) by the
+    -- first real token printed inside the list, which uses it as layout_lhs
+    -- for the block.  Null when no list anchor is pending.
+    extra_dp: core/EpaLocation?
 }
 
 -- The result of calling ExactPrint: the reproduced Haskell source text.
@@ -305,11 +311,13 @@ rule EmitAttachedComments {
             state.emitted_comments.add(c)
             state.pending_comments.remove(c)
     ensures:
-        for c in node.annotation.prior_comments:
-            state.emitted_comments.add(c)
+        for epa_c in node.annotation.comments.prior:
+            for c in tokComment(epa_c):
+                state.emitted_comments.add(c)
     ensures:
-        for c in node.annotation.anchor.leading_comments:
-            state.emitted_comments.add(c)
+        for epa_c in node.annotation.anchor.leading_comments:
+            for c in tokComment(epa_c):
+                state.emitted_comments.add(c)
 
     @guidance
         -- Implemented in the EpaDelta branch of enterAnn (ExactPrint.hs).
@@ -361,6 +369,198 @@ rule RecordEofAnnotation {
     when: RecordEofAnnotation(state, eof)
 
     ensures: state.eof_annotation = eof
+}
+
+-- Establish the layout origin for a list block before printing its items.
+-- When a node's AnnList annotation carries al_anchor, that anchor is
+-- registered as the ExtraDP for the traversal.  The first real token printed
+-- inside the list consumes ExtraDP and uses it as the layout column, so that
+-- all subsequent items in the list are placed relative to al_anchor rather
+-- than relative to the enclosing block's margin.
+--
+-- After the list is printed, the computed delta for al_anchor is written back
+-- (SetListAnchorDelta), completing the absolute→relative lifecycle for the
+-- list's own layout origin independently of the surrounding node anchor.
+--
+-- This rule fires only when al_anchor is present and the list is non-empty.
+-- Empty lists and parenthesised lists (where items are comma-separated, not
+-- layout-indented) do not set ExtraDP.
+rule SetListAnchor {
+    when: SetListAnchor(state, ann_list)
+
+    requires: ann_list.al_anchor != null
+
+    ensures: state.extra_dp = ann_list.al_anchor
+
+    @guidance
+        -- Implemented by the al_anchor branch in the exact instance for
+        -- HsValBinds / HsLocalBinds and similar list nodes (ExactPrint.hs).
+        -- setExtraDP (Just anc) stores al_anchor in epExtraDP on the printer
+        -- state.  markAnnotatedWithLayout then reads it when printing the
+        -- first item, consuming it via getExtraDP / setExtraDP Nothing.
+        -- The zero-column invariant on list items (ListItemsAtZeroColumnOffset
+        -- in exact-print-core.allium) means al_anchor.col is the only value
+        -- that needs to change when the list is relocated.
+}
+
+-- Convert a non-doc EpaComment into exactly one printer Comment.
+-- Applies to line comments, block comments and doc-options comments.
+rule TokComment {
+    when: TokComment(epa_comment)
+    requires: epa_comment.tok.kind != doc_comment
+    ensures: core/Comment.created(
+        contents: epa_comment.tok.text,
+        location: epa_comment.location,
+        prior_token_span: epa_comment.prior_token_span,
+        keyword_origin: null
+    )
+    @guidance
+        -- Implemented by the non-EpaDocComment branch of tokComment (Utils.hs).
+        -- ghcCommentText flattens the EpaCommentTok ADT to a String.
+        -- normaliseCommentText strips \r characters introduced by the Windows lexer.
+        -- The NoCommentsLocation from the GenLocated wrapper is carried through unchanged.
+}
+
+-- Convert an EpaDocComment into one printer Comment per Haddock doc chunk.
+-- EpaDocComment is the only comment kind that expands to multiple Comments;
+-- all other kinds are handled by TokComment above.
+rule TokCommentDoc {
+    when: TokComment(epa_comment)
+    requires: epa_comment.tok.kind = doc_comment
+    ensures:
+        for chunk in docChunks(epa_comment):
+            core/Comment.created(
+                contents: chunk.text,
+                location: chunk.location,
+                prior_token_span: chunk.prior_token_span,
+                keyword_origin: null
+            )
+    @guidance
+        -- Implemented by the EpaDocComment branch of tokComment, which calls
+        -- hsDocStringComments (Utils.hs).
+        -- docChunks is a black box: it decomposes the HsDocString carried by the
+        -- EpaDocComment into a sequence of DocChunks, one per LHsDocStringChunk.
+        -- The first chunk's prior_token_span = epa_comment.prior_token_span;
+        -- subsequent chunks use the end span of their predecessor chunk as their
+        -- prior_token_span. All chunks have keyword_origin = null.
+}
+
+-- Keyword tokens that lack a natural annotation slot in the surrounding EpAnn
+-- structure are routed through the comment machinery so they are printed at
+-- the correct source position.
+--
+-- This rule covers the full inject → print → recapture lifecycle:
+--
+--   Inject: each present EpToken becomes a synthetic Comment (contents =
+--   keyword_origin = kw) and is added to the unallocated comment pool.
+--
+--   Absolute-span path (ExactPrint): the comment is drained from the pool
+--   in source-position order by EmitPriorComments and printed in place.
+--   No structural change to the AST is needed.
+--
+--   Delta path (MakeDeltaAst): the comment is printed by printOneComment,
+--   which records a delta-form copy on the applied-comments stack via
+--   applyComment. After the adjacent token is printed, takeAppliedComments
+--   harvests the stack and the comments are embedded in that token's EpaDelta
+--   constructor (via comment2LEpaComment), so the keyword's computed delta
+--   is stored directly on the token that consumed it.
+rule KeywordTokensToComments {
+    when: EpTokensToComments(engine, kw, tokens)
+
+    ensures:
+        for tok in tokens where tok.kind = present:
+            state.pending_comments.add(core/Comment.created(
+                contents: kw,
+                location: epaToNoCommentsLocation(tok.location),
+                prior_token_span: tok.location.original_span,
+                keyword_origin: kw
+            ))
+
+    @guidance
+        -- Implemented by epTokensToComments (ExactPrint.hs) + mkKWComment (Utils.hs).
+        --
+        -- EpToken carries EpaLocation; epaToNoCommentsLocation converts it to
+        -- NoCommentsLocation (required by Comment.location). This conversion panics
+        -- if the EpaDelta carries a non-empty comment list — in practice parser-output
+        -- EpTokens never carry embedded comments so this is always safe.
+        --
+        -- mkKWComment normalises the token location before creating the Comment:
+        --   EpaSpan (RealSrcSpan ss): location unchanged; prior_token_span = ss
+        --     (the token's own span — note this differs from source comments, where
+        --     prior_token_span is the PRECEDING token; here the keyword IS the token).
+        --   EpaDelta:                 location unchanged; prior_token_span = placeholderRealSpan.
+        --   EpaSpan (UnhelpfulSpan):  location replaced with EpaDelta noSrcSpan (SameLine 0)
+        --                             NoComments; prior_token_span = placeholderRealSpan.
+        -- The ensures clause models the common RealSrcSpan case from the parser.
+        --
+        -- addComments is called with sortNeeded=True.  The sort is skipped if any
+        -- existing pool comment already has an EpaDelta location (noDelta check),
+        -- to avoid a runtime error on uncomparable delta positions.
+        --
+        -- Delta recapture detail:
+        --   printOneComment → updateAndApplyComment rewrites the comment's location
+        --   to EpaDelta form and records it via applyComment on the epCommentsApplied
+        --   stack.  printStringAtRsC (CaptureComments) calls takeAppliedComments after
+        --   emitting the adjacent token, then calls comment2LEpaComment on each
+        --   harvested Comment.  comment2LEpaComment discards keyword_origin (the _mk
+        --   field is _-bound) and always produces EpaLineComment regardless of the
+        --   original comment kind.  The resulting [LEpaComment] is embedded in the
+        --   EpaDelta constructor of the adjacent token's returned EpaLocation.
+}
+
+-- After traversing a CanUpdateAnchor node, the comments applied during
+-- printing are harvested and written back into the node's annotation in
+-- delta form. This is the step by which MakeDeltaAst converts each node's
+-- EpaComments from absolute to delta form: every CanUpdateAnchor node ends
+-- the traversal with its annotation.comments replaced by a freshly built
+-- EpaComments carrying computed delta positions.
+--
+-- The conversion is lossy in two ways:
+--   1. Kind erased: all comment kinds become line_comment (EpaLineComment).
+--      Block, doc and doc-options comments lose their original kind.
+--   2. keyword_origin dropped: the _mk field of Comment is wildcard-bound
+--      in comment2LEpaComment; synthetic keyword comments lose their marker.
+rule WriteBackComments {
+    when: WriteBackComments(engine, node, prior_comments, post_comments)
+
+    requires: node.annotation.anchor_updateability = can_update
+
+    ensures:
+        node.annotation.comments.kind = unbalanced when post_comments.count = 0
+                                        else balanced
+    ensures:
+        for c in prior_comments:
+            node.annotation.comments.prior.add(core/EpaComment.created(
+                tok: { kind: line_comment, text: c.contents },
+                location: c.location,
+                prior_token_span: c.prior_token_span
+            ))
+    ensures:
+        for c in post_comments:
+            node.annotation.comments.following.add(core/EpaComment.created(
+                tok: { kind: line_comment, text: c.contents },
+                location: c.location,
+                prior_token_span: c.prior_token_span
+            ))
+
+    @guidance
+        -- Implemented by mkEpaComments + comment2LEpaComment (Utils.hs), called
+        -- from the CanUpdateAnchor branch of enterAnn (ExactPrint.hs):
+        --   setAnnotationAnchor a' newAnchor trailing' (mkEpaComments priorCs postCs)
+        --
+        -- mkEpaComments selects the EpAnnComments constructor by whether postCs is empty:
+        --   postCs = []  → EpaComments priorCs                   (kind = unbalanced)
+        --   postCs ≠ []  → EpaCommentsBalanced priorCs postCs    (kind = balanced)
+        -- WriteBackComments can therefore produce either form — unlike the parser
+        -- (always unbalanced) and unlike balanceComments (always produces balanced).
+        --
+        -- priorCs = takeAppliedComments    — comments recorded while printing the
+        --           anchor token (no stack pop: the frame stays for postCs).
+        -- postCs  = takeAppliedCommentsPop — comments recorded after the node's
+        --           content; the Pop variant removes the frame pushed by
+        --           pushAppliedComments at the start of enterAnn.
+        -- Both take* functions reverse the stack on return so results are
+        -- in emission order.
 }
 
 ------------------------------------------------------------
@@ -453,4 +653,8 @@ surface PrinterInternals {
         PrintToken(engine, token_text: String, token_end_pos: core/SourcePos)
         EnterLayoutBlock(engine, col: core/LayoutStartCol)
         RecordEofAnnotation(engine, eof: EofAnnotation)
+        TokComment(engine, epa_comment: core/EpaComment)
+        EpTokensToComments(engine, kw: String, tokens: List<core/EpToken>)
+        WriteBackComments(engine, node: LocatedAstNode, prior_comments: List<core/Comment>, post_comments: List<core/Comment>)
+        SetListAnchor(engine, ann_list: core/AnnList)
 }

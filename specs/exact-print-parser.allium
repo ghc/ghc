@@ -1,0 +1,187 @@
+-- allium: 3
+-- exact-print-parser.allium
+--
+-- Scope: The GHC parser's role in the Exact Print Annotations (EPA) system.
+--        Models how the parser allocates comments to AST nodes and populates
+--        the annotation fields that the exact printer later consumes.
+-- Includes: Parser comment queue, comment allocation functions, the Anno/XRec
+--           mechanism that binds annotation types to AST node types.
+-- Excludes:
+--   - Core annotation types (see exact-print-core.allium)
+--   - Printer output (see exact-print-printing.allium)
+--   - AST transformation (see exact-print-transform.allium)
+
+use "./exact-print-core.allium" as core
+
+------------------------------------------------------------
+-- Architectural note: Anno type family and XRec
+------------------------------------------------------------
+--
+-- GHC uses a "Trees That Grow" (TTG) design: every AST node type is
+-- parameterised over the compiler pass, allowing each pass to attach
+-- different information.  For the parsed phase (GhcPs), located nodes
+-- use the Anno type family to select the right EpAnn specialisation:
+--
+--   type instance XRec (GhcPass p) a = GenLocated (Anno a) a
+--   type instance Anno RdrName        = SrcSpanAnnN   -- EpAnn NameAnn
+--   type instance Anno (HsDecl GhcPs) = SrcSpanAnnA   -- EpAnn AnnListItem
+--   ... etc.
+--
+-- The annotation type is therefore determined statically by the type of
+-- the AST node, not chosen at runtime.  This means:
+--   - Each AST node kind has exactly one annotation type.
+--   - The EpAnn specialisation is embedded directly in the node's location
+--     type; there is no separate annotation map.
+--   - Adding a new AST node requires adding an Anno instance to choose
+--     the right EpAnn payload.
+--
+-- This spec does not enumerate all Anno instances (there are many dozens),
+-- but the core specialisations are documented in exact-print-core.allium
+-- under the SrcSpanAnn* aliases.
+
+------------------------------------------------------------
+-- Value Types
+------------------------------------------------------------
+
+-- The three comment-related fields of the GHC parser state (PState).
+-- Together they form the unallocated comment pool: comments seen in the
+-- token stream that have not yet been attached to an AST node.
+--
+-- The parser drains this pool incrementally as it reduces each AST node,
+-- calling getCommentsFor / getPriorCommentsFor to move comments from
+-- comment_q into the node's EpAnn.comments field.  getFinalCommentsFor
+-- drains whatever remains at EOF.
+--
+-- Modelled as an entity (not a value) because it is mutated in place
+-- as the parser reduces each grammar production.
+entity ParserCommentState {
+    comment_q:       List<core/EpaComment>   -- comments seen but not yet allocated
+    header_comments: List<core/EpaComment>?  -- file-header comments, held separately
+    eof_pos:         core/AbsoluteSpan?      -- final file position and preceding-token span
+}
+
+------------------------------------------------------------
+-- Entities
+------------------------------------------------------------
+
+-- An AST node after the parser has attached exact-print annotations.
+-- Represents any GenLocated (Anno a) a for the GhcPs pass.
+-- The annotation payload type varies by node kind (see the Anno note above).
+entity AnnotatedNode {
+    annotation: core/EpAnn    -- EpAnn (Anno a): anchor, payload, comments
+    -- The payload contents (the AST node itself) are opaque to this spec.
+}
+
+------------------------------------------------------------
+-- Rules
+------------------------------------------------------------
+
+-- The parser allocates comments from comment_q to each AST node as it
+-- is reduced.  getCommentsFor is the common case: enclosed comments only.
+rule AllocateEnclosedComments {
+    when: GetCommentsFor(parser_state, node_span, node)
+    requires: parser_state.comment_q.any(c => spans_inside(c.location, node_span))
+    ensures:
+        for c in parser_state.comment_q where spans_inside(c.location, node_span):
+            node.annotation.comments.prior.add(c)
+    ensures:
+        for c in parser_state.comment_q where spans_inside(c.location, node_span):
+            parser_state.comment_q.remove(c)
+    @guidance
+        -- Implemented by getCommentsFor in GHC.Parser.
+        -- allocateComments in Lexer enforces that only comments genuinely
+        -- inside the span are returned; the span check is conservative.
+        -- Comments are removed from comment_q atomically with allocation.
+}
+
+-- getPriorCommentsFor is used for top-level declarations to capture
+-- documentation comments that precede the declaration's span.
+rule AllocatePriorComments {
+    when: GetPriorCommentsFor(parser_state, node_span, node)
+    ensures:
+        for c in parser_state.comment_q
+                where spans_before_or_inside(c.location, node_span):
+            node.annotation.comments.prior.add(c)
+    ensures:
+        for c in parser_state.comment_q
+                where spans_before_or_inside(c.location, node_span):
+            parser_state.comment_q.remove(c)
+    @guidance
+        -- Implemented by getPriorCommentsFor in GHC.Parser.
+        -- Used for top-level declarations so that a Haddock comment
+        -- immediately preceding the decl is kept with it even if the
+        -- comment's span falls just outside the decl's span.
+}
+
+-- At EOF, the parser drains the comment queue entirely and returns
+-- header_comments, remaining comment_q, and eof_pos for insertion
+-- into the HsModule annotation.
+rule AllocateFinalComments {
+    when: GetFinalCommentsFor(parser_state, module_node)
+    ensures:
+        for c in parser_state.header_comments:
+            module_node.annotation.comments.prior.add(c)
+    ensures:
+        for c in parser_state.comment_q:
+            module_node.annotation.comments.prior.add(c)
+    ensures: parser_state.comment_q.count = 0
+    @guidance
+        -- Implemented by getFinalCommentsFor in GHC.Parser.
+        -- The result is inserted into the HsModule AST node, which is the
+        -- root of the parse tree.  header_comments accumulates comments at
+        -- the top of the file before the first top-level declaration is seen.
+        -- eof_pos is also returned here so the exact printer knows how much
+        -- trailing whitespace to emit after the last token.
+}
+
+-- As the parser processes the token stream, comments are added to
+-- comment_q as they are seen.  When the first top-level declaration
+-- is about to be reduced, any accumulated comments are moved to
+-- header_comments.
+rule CaptureHeaderComments {
+    when: FirstTopLevelDecl(parser_state)
+    requires: parser_state.header_comments = null
+    ensures:
+        for c in parser_state.comment_q:
+            parser_state.header_comments.add(c)
+    ensures: parser_state.comment_q.count = 0
+    @guidance
+        -- Comments seen before the first top-level declaration are held
+        -- in header_comments rather than comment_q so they are not
+        -- accidentally consumed by getCommentsFor when the first decl is reduced.
+}
+
+------------------------------------------------------------
+-- Actors
+------------------------------------------------------------
+
+actor Parser {
+    identified_by: ParserCommentState
+}
+
+------------------------------------------------------------
+-- Surfaces
+------------------------------------------------------------
+
+-- The interface between the GHC parser and the EPA comment allocation system.
+-- The parser is both the producer of annotations (it populates EpAnn fields)
+-- and the consumer of the comment queue (it drains comment_q as it reduces nodes).
+surface ParserAnnotationBoundary {
+    facing parser: Parser
+
+    provides:
+        GetCommentsFor(parser_state, node_span, node)
+        GetPriorCommentsFor(parser_state, node_span, node)
+        GetFinalCommentsFor(parser_state, module_node)
+        FirstTopLevelDecl(parser_state)
+
+    @guarantee CommentsAllocatedAtMostOnce
+        -- Each LEpaComment in comment_q is allocated to exactly one AST node.
+        -- Once removed from comment_q it is never re-added.
+        -- This guarantees that printing the tree emits each comment exactly once.
+
+    @guarantee HeaderCommentsAllocatedToModule
+        -- header_comments are always placed in the HsModule annotation, never
+        -- in any sub-node.  This preserves the invariant that file-level
+        -- documentation comments appear at the top of the printed output.
+}

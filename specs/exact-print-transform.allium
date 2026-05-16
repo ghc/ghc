@@ -739,7 +739,13 @@ surface TransformApi {
 
     @guarantee BalanceIsIdempotent
         -- BalanceCommentsList is idempotent: a second invocation on the
-        -- output of a first produces the same result.
+        -- output of a first produces the same result.  The structural
+        -- reason is that core/EpaComments.balanced is a terminal state:
+        -- no transition out of balanced is defined, so balanceComments
+        -- on an already-balanced node finds nothing to move and returns
+        -- it unchanged.  Callers may invoke BalanceCommentsList multiple
+        -- times on the same list without accumulating errors or
+        -- duplicating comments.
 
     @guarantee SpacingCapturedBeforeStructuralEdit
         -- Callers run CaptureLineSpacing (and its match / type-sig

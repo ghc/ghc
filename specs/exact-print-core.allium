@@ -61,6 +61,60 @@ value DeltaPos {
                       --   by appearing to the left of the block's margin
 }
 
+-- The content of a comment token captured by the GHC parser.
+-- For doc_comment the implementation carries a structured HsDocString; the text
+-- field holds a Haddock-rendered string.  An EpaDocComment may expand into
+-- multiple printer Comment values (one per doc chunk) via tokComment.
+-- For all other kinds, text is the literal source text including delimiters.
+value EpaCommentTok {
+    kind: CommentTokKind
+    text: String
+}
+
+-- A single rendered chunk from an EpaDocComment. An EpaDocComment decomposes
+-- into one DocChunk per LHsDocStringChunk; all other comment kinds do not use
+-- this type.
+value DocChunk {
+    text: String                    -- rendered text of the chunk, including the -- prefix
+    location: NoCommentsLocation    -- source span of this chunk
+    prior_token_span: AbsoluteSpan  -- span of the token immediately before this chunk
+}
+
+-- A keyword token stored in a GHC AST annotation.  Either present (with a
+-- source location) or absent (the token does not appear in the source).
+-- The Haskell type is parameterised by a type-level symbol (the token text);
+-- that parameter is not modelled here — the keyword string is passed
+-- separately to EpTokensToComments.
+-- The location is EpaLocation (not NoCommentsLocation); when a token's
+-- location is converted for use in comment machinery, epaToNoCommentsLocation
+-- is applied — which panics if the EpaDelta carries a non-empty comment list.
+-- In practice, EpToken locations in the parser output carry no embedded
+-- comments, so this conversion is always safe.
+value EpToken {
+    kind: present | absent
+    location: EpaLocation when kind = present
+}
+
+-- A token that may appear in either ASCII or Unicode form.
+-- The Haskell type is EpUniToken tok utok, parameterised by two type-level
+-- symbols for the two surface forms (e.g. "=>" and "⇒").
+-- Those parameters are not modelled here; only presence and form are captured.
+value EpUniToken {
+    kind: present_ascii | present_unicode | absent
+    location: EpaLocation when kind in {present_ascii, present_unicode}
+}
+
+-- Named aliases for commonly used EpUniToken specialisations.
+-- In the implementation these are Haskell type aliases
+-- (type TokDarrow = EpUniToken "=>" "⇒", etc.).
+-- They are modelled here as value types wrapping EpUniToken so that
+-- the spec can reference them by name matching the source code.
+value TokDcolon { token: EpUniToken }  -- '::' or '∷'
+value TokDarrow { token: EpUniToken }  -- '=>' or '⇒'
+value TokRarrow { token: EpUniToken }  -- '->' or '→'
+value TokForall { token: EpUniToken }  -- 'forall' or '∀'
+value TokStar   { token: EpUniToken }  -- '*' or '★'
+
 ------------------------------------------------------------
 -- Enumerations
 ------------------------------------------------------------
@@ -71,6 +125,101 @@ enum AnchorUpdateability {
     can_update
     can_update_anchor_only
     no_update
+}
+
+-- The kind of a comment token as captured by the GHC parser.
+enum CommentTokKind {
+    doc_comment    -- a Haddock documentation string (-- | ... or {-| ... -})
+    doc_options    -- a doc options pragma ({-# OPTIONS_HADDOCK ... #-})
+    line_comment   -- an ordinary line comment (-- ...)
+    block_comment  -- an ordinary block comment ({- ... -})
+}
+
+-- The kind of a trailing annotation: which punctuation token it represents.
+enum TrailingAnnKind {
+    semi    -- trailing ';' separating declarations or statements
+    comma   -- trailing ',' separating list elements
+    vbar    -- trailing '|' separating alternatives
+    darrow  -- trailing '=>' or '⇒' ending a constraint list
+}
+
+-- The bracket style surrounding a list annotation.
+-- list_none means the block is layout-delimited (no explicit brackets).
+-- list_banana covers the UnicodeSyntax parallel-array forms (| |) / ⦇ ⦈.
+enum AnnListBrackets {
+    list_parens   -- '(' ')'
+    list_braces   -- '{' '}'
+    list_square   -- '[' ']'
+    list_banana   -- '(|' '|)' or '⦇' '⦈'
+    list_none     -- no brackets; block is layout-delimited
+}
+
+-- Which syntactic bracket pair (if any) wraps a name occurrence.
+enum NameAdornmentKind {
+    name_parens       -- '(' name ')'
+    name_parens_hash  -- '(#' name '#)'
+    name_backquotes   -- '`' name '`'
+    name_square       -- '[' name ']'
+    name_no_adornment -- bare name, no surrounding brackets
+}
+
+-- Which form a NameAnn takes.
+enum NameAnnKind {
+    name_ann          -- ordinary adornment + name location
+    name_ann_commas   -- tuple/unboxed-sum with repeated commas
+    name_ann_bars     -- unboxed tuple/sum with bars
+    name_ann_only     -- adornment only, no name location
+    name_ann_rarrow   -- arrow form, optionally parenthesised
+    name_ann_quote    -- tick-quoted Template Haskell name
+    name_ann_trailing -- trailing glue only
+}
+
+-- Merge selector for AnnSortKey in ValBinds.
+-- Each slot in the tag sequence is either a bind or a signature.
+-- Walking the tag list in order, pulling from the bind list on bind_tag
+-- and from the sig list on sig_tag, reconstructs the original source order.
+enum BindTag {
+    bind_tag  -- this slot is an HsBind
+    sig_tag   -- this slot is an HSig
+}
+
+-- Merge selector for AnnSortKey in ClassDecl / ClsInstDecl.
+-- Four interleaved lists: methods, signatures, associated types,
+-- and associated type defaults.
+enum DeclTag {
+    cls_method  -- class method (HsBind)
+    cls_sig     -- class signature (Sig)
+    cls_at      -- associated type (TyFamInstDecl)
+    cls_atd     -- associated type default (TyFamDefltDecl)
+}
+
+-- Whether a token was written using Unicode syntax or ASCII syntax.
+-- Implicit in EpUniToken.kind (present_ascii vs present_unicode) but
+-- named here for traceability with the GHC source.
+enum IsUnicodeSyntax {
+    unicode_syntax  -- Unicode form was used (e.g. '⇒', '→', '∀')
+    normal_syntax   -- ASCII form was used (e.g. '=>', '->', 'forall')
+}
+
+-- Whether a Template Haskell bracket token includes the optional 'e'.
+-- [| ... |]  vs  [e| ... |]
+-- [|| ... ||] vs  [e|| ... ||]
+enum HasE {
+    has_e  -- the 'e' variant was written
+    no_e   -- the plain variant was written
+}
+
+-- Which parenthesis style is used in an AnnParen annotation.
+enum AnnParenKind {
+    ann_parens       -- ordinary '(' ')'
+    ann_parens_hash  -- unboxed '(#' '#)'
+}
+
+-- How a layout block was introduced.
+enum EpLayoutKind {
+    explicit_braces  -- user wrote literal '{ }' braces
+    virtual_braces   -- layout algorithm inserted virtual braces
+    no_layout        -- empty or compiler-generated block; no layout info
 }
 
 ------------------------------------------------------------
@@ -179,7 +328,21 @@ entity EpaLocation {
 
     -- Comments attached before this location (only in relative form).
     -- These precede the anchor and are outside the element's bounding rectangle.
-    leading_comments: List<Comment> when kind = relative
+    leading_comments: List<EpaComment> when kind = relative
+}
+
+-- The location type used for EpaComment. Structurally identical to EpaLocation
+-- but carries no leading_comments field. This breaks the otherwise-recursive
+-- structure: a comment's own location cannot itself carry embedded comments.
+entity NoCommentsLocation {
+    kind: absolute | relative
+
+    transitions kind {
+        absolute -> relative
+    }
+
+    original_span: AbsoluteSpan
+    delta: DeltaPos when kind = relative
 }
 
 -- A Haskell comment attached to an AST node.
@@ -189,7 +352,7 @@ entity EpaLocation {
 -- and real comments identically; keyword_origin is metadata for tooling.
 entity Comment {
     contents: String          -- full text including delimiters (-- or {- -})
-    location: EpaLocation
+    location: NoCommentsLocation
     -- The span of the token that immediately precedes this comment.
     -- Used to compute relative layout when balancing comment ownership.
     prior_token_span: AbsoluteSpan
@@ -200,50 +363,444 @@ entity Comment {
     -- The printer ignores this field (commentOrigin is _ in printOneComment).
 }
 
--- Comments associated with an annotated AST node, split into
--- those that appear before the node and those that appear after.
+-- The comment type embedded in the GHC AST (in EpAnn nodes), produced by the
+-- parser. This is distinct from Comment, which is check-exact's printer working
+-- type.
+--
+-- During printing, tokComment converts each EpaComment into one or more Comment
+-- values. EpaDocComment is the only variant that can produce multiple Comments
+-- (one per Haddock doc chunk). All other variants produce exactly one Comment.
+--
+-- The location uses NoCommentsLocation rather than EpaLocation because a
+-- comment's own position must not carry further embedded comments.
+entity EpaComment {
+    tok: EpaCommentTok
+    location: NoCommentsLocation
+    prior_token_span: AbsoluteSpan
+    -- Span of the token immediately preceding this comment in the source stream.
+    -- Carried forward into Comment.prior_token_span by tokComment, and used
+    -- during printing to compute the comment's relative delta position.
+}
+
+-- Comments associated with an annotated AST node.
+--
+-- The GHC parser always produces the unbalanced form: all comments
+-- associated with a node are placed in prior; the following list does
+-- not exist.  The transform layer (balanceComments / balanceCommentsList)
+-- redistributes comments between adjacent nodes, moving any comments
+-- that logically trail the first node from the second node's prior list
+-- into the first node's following list.  This upgrades the first node
+-- to the balanced form.  The transition is one-way; no operation in the
+-- implementation converts balanced back to unbalanced.
+--
+-- emptyComments is always unbalanced (EpaComments []).
+--
+-- Idempotency: balanced is an absorbing (terminal) state in the transition
+-- graph.  balanceComments on an already-balanced node finds no comments to
+-- move — they are already on the correct side — so no transition fires and
+-- the node is returned unchanged.  This makes it safe to call
+-- balanceComments or balanceCommentsList multiple times on the same node or
+-- list without accumulating errors or duplicating comments.
+--
+-- Semigroup merge (used when combining annotations):
+--   unbalanced <> unbalanced → unbalanced  (prior lists concatenated)
+--   unbalanced <> balanced   → balanced    (unbalanced prior prepended to balanced prior)
+--   balanced   <> unbalanced → balanced    (unbalanced prior appended to balanced prior)
+--   balanced   <> balanced   → balanced    (priors concatenated, followings concatenated)
+--   The balanced form is preserved whenever either operand is balanced.
 entity EpaComments {
-    prior: List<Comment>      -- comments before the node's anchor
-    following: List<Comment>  -- comments after the node's anchor (trailing)
+    kind: unbalanced | balanced
+
+    transitions kind {
+        -- Parser produces unbalanced. balanceComments upgrades to balanced.
+        -- balanced is terminal: no further transition is possible, which is
+        -- what makes repeated calls to balanceComments safe (idempotent).
+        unbalanced -> balanced
+    }
+
+    prior: List<EpaComment>
+    following: List<EpaComment> when kind = balanced
 }
 
 -- The annotation attached to a located AST node (EpAnn).
 -- Every annotatable node carries:
 --   anchor   — where it starts in source (absolute or relative)
---   trailing — annotations that appear after the node's main content
---              (e.g. trailing commas, closing parens)
+--   trailing — glue tokens that follow the node in its list context
 --   comments — all comments logically owned by this node
+--
+-- Bounding box: the anchor's span is the bounding box of everything that
+-- belongs to the node's own content (excluding leading comments, which
+-- precede the anchor). The starting SrcLoc is the top-left corner of this
+-- box. The parser widens the anchor via widenAnchorT / widenAnchorS to cover
+-- every token that syntactically belongs to the node.
+--
+-- Trailing annotations are NOT part of this bounding box. Items such as
+-- trailing commas, semicolons, vbars and darrows follow the node's last
+-- token; they are stored in trailing precisely because they belong to the
+-- surrounding list structure, not to the node itself.
+--
+-- Editing consequence: a tool moving, deleting or duplicating a node works
+-- within the anchor span. The trailing list can be transferred or discarded
+-- independently, giving a clean separation between the node and the glue
+-- tokens that connect it to its neighbours.
+--
+-- The trailing field is not stored directly on EpAnn. Instead the printer
+-- extracts it uniformly from the annotation via the HasTrailing contract
+-- (see the Contracts section). Different annotation types store their
+-- trailing glue in different fields (lann_trailing, al_trailing,
+-- nann_trailing, ...) but all expose it through the same interface.
 entity NodeAnnotation {
     anchor: EpaLocation
-    trailing: List<TrailingToken>
+    trailing: List<TrailingAnn>   -- via HasTrailing.trailing(anns)
     comments: EpaComments
 }
 
--- A token that follows a syntactic element, such as a comma or semicolon.
--- These are stored separately so they can be transferred when nodes are
--- reordered or removed.
-entity TrailingToken {
-    location: EpaLocation
-    token_kind: String        -- e.g. "comma", "semicolon", "darrow"
+-- A trailing punctuation annotation: a token that follows an AST node in a
+-- list context but lies outside the node's bounding box (i.e. after its
+-- anchor's end span). Stored separately from the node's own annotation so
+-- it can be transferred or discarded independently during editing.
+--
+-- semi, comma and vbar each wrap an EpToken (which may be absent — NoEpTok —
+-- when synthesised programmatically). darrow wraps an EpUniToken because
+-- '=>' and '⇒' are both valid and the exact form must be preserved.
+entity TrailingAnn {
+    kind: TrailingAnnKind
+    token: EpToken when kind in {semi, comma, vbar}
+    darrow_token: EpUniToken when kind = darrow
 }
 
 -- The entry point used by the printer to navigate into an annotated node.
 -- NoEntry marks nodes that are printed inline without their own anchor.
+--
+-- Entry is constructed from EpAnn ann via fromAnn / mkEntry:
+--   fromAnn (EpAnn anc a cs) = mkEntry anc (HasTrailing.trailing a) cs
+-- The trailing list is populated by HasTrailing.trailing, so Entry is
+-- independent of the specific annotation type.
 entity Entry {
     kind: has_entry | no_entry
 
     -- Present when kind = has_entry
     anchor: EpaLocation when kind = has_entry
-    trailing: List<TrailingToken> when kind = has_entry
+    trailing: List<TrailingAnn> when kind = has_entry
     comments: EpaComments when kind = has_entry
     flush_trailing_comments: Boolean when kind = has_entry
     anchor_updateability: AnchorUpdateability when kind = has_entry
+}
+
+-- Annotation for a list container (e.g. a where clause, do block, export
+-- list, or type-level list). Carried as the `anns` field of an EpAnn node
+-- whose children are the list items.
+--
+-- al_anchor is the layout origin for the list.  When present it records the
+-- source position of the first item of the list.  All direct items in the
+-- list are stored with DifferentLine.col = 0 — a zero signed offset from
+-- this layout origin.  This zero-column invariant is the key design property:
+--
+--   * Items can be freely reordered within the list without updating any
+--     individual delta value, because every item already has col = 0.
+--   * The entire list can be relocated to a different indentation by
+--     updating only al_anchor; all items self-correct via
+--     absolute_col = al_anchor.col + 0.
+--
+-- This is the same splice-invariance property described for DeltaPos, applied
+-- specifically to list blocks.  al_anchor is the single coordinate origin
+-- for the list.
+--
+-- al_anchor is absent for lists that do not use layout-based indentation
+-- (e.g. parenthesised lists where items are separated by commas rather
+-- than by indentation).
+--
+-- al_rest is a type-parameterised field carrying annotation specific to the
+-- list kind.  Typical payloads: () for plain lists, EpToken "where" for
+-- where-clause lists, [EpToken ","] for comma-separated lists.  It is not
+-- modelled further here because the printer accesses it through type-specific
+-- lenses rather than through a shared interface.
+entity AnnList {
+    al_anchor:   EpaLocation?
+    al_brackets: AnnListBrackets
+    al_semis:    List<EpToken>    -- semicolons between items in the list
+    al_trailing: List<TrailingAnn>
+    -- al_rest is omitted: it is opaque and payload-specific
 }
 
 -- The column that marks the leftmost extent of a layout block.
 -- Used to enforce layout rules when printing indented groups.
 entity LayoutStartCol {
     col: Integer
+}
+
+-- The annotation for a single item in a list (SrcSpanAnnA = EpAnn AnnListItem).
+-- This is the simplest instance of the HasTrailing contract: the annotation
+-- exists solely to carry trailing glue tokens. Most list items in the GHC AST
+-- use this annotation type.
+value AnnListItem {
+    trailing: List<TrailingAnn>
+}
+
+-- The bracketing adornment for a name occurrence.  Each non-bare adornment
+-- carries actual EpToken positions for its open and close brackets, because
+-- the printer needs to emit them at their recorded locations.
+value NameAdornment {
+    kind:        NameAdornmentKind
+    open_token:  EpToken when kind != name_no_adornment
+    close_token: EpToken when kind != name_no_adornment
+}
+
+-- Annotation for a name occurrence.  A name in Haskell source can appear in
+-- many syntactic guises — plain, parenthesised as an operator, backquoted,
+-- inside unboxed-tuple brackets, tick-quoted for Template Haskell, or as a
+-- bare arrow form.  NameAnn captures this messy reality: one entity kind per
+-- syntactic form.  All forms carry trailing so NameAnn satisfies HasTrailing
+-- and the printer can extract trailing glue uniformly without case analysis.
+entity NameAnn {
+    kind: NameAnnKind
+
+    -- name_ann: ordinary adornment with a name location.
+    -- Covers plain names, parenthesised operators, backquoted identifiers,
+    -- and square-bracketed Template Haskell names.
+    adornment: NameAdornment when kind in {name_ann, name_ann_commas, name_ann_only}
+    name_loc:  EpaLocation   when kind = name_ann
+
+    -- name_ann_commas: tuple/unboxed-sum constructor such as (,,) or (# ,, #).
+    -- The adornment gives the bracket style; commas record each separator.
+    commas: List<EpToken> when kind = name_ann_commas
+
+    -- name_ann_bars: unboxed tuple/sum constructor such as (# | #).
+    -- The open/close '(#' '#)' tokens are fixed so captured directly.
+    open_hash:  EpToken       when kind = name_ann_bars  -- '(#'
+    bars:       List<EpToken> when kind = name_ann_bars
+    close_hash: EpToken       when kind = name_ann_bars  -- '#)'
+
+    -- name_ann_rarrow: arrow used as a name, optionally parenthesised.
+    -- arrow may be ASCII '->' or Unicode '→' (EpUniToken).
+    open_paren:  EpToken?  when kind = name_ann_rarrow
+    arrow:       EpUniToken when kind = name_ann_rarrow
+    close_paren: EpToken?  when kind = name_ann_rarrow
+
+    -- name_ann_quote: tick-quoted Template Haskell name ('Name or ''TypeName).
+    -- quoted is the full annotation of the name being quoted; it is
+    -- itself a NameAnn (SrcSpanAnnN = EpAnn NameAnn in the implementation).
+    quote:  EpToken when kind = name_ann_quote  -- '\''
+    quoted: NameAnn when kind = name_ann_quote  -- recursive
+
+    -- All forms carry trailing glue (nann_trailing in every constructor).
+    trailing: List<TrailingAnn>
+}
+
+-- Annotation for pragma source locations.  Covers all {-# ... #-} pragma
+-- forms (LANGUAGE, OPTIONS_GHC, WARNING, DEPRECATED, etc.).
+-- apr_open records the '{-#' opener as a raw EpaLocation rather than an
+-- EpToken because the specific pragma keyword (e.g. "LANGUAGE") appears
+-- immediately after the opener and is captured by apr_loc1/apr_loc2.
+-- apr_squares, apr_type and apr_module are absent (NoEpTok) for pragma
+-- forms that do not use those syntactic elements.
+value AnnPragma {
+    open:    EpaLocation     -- '{-#' and pragma keyword position
+    close:   EpToken         -- '#-}'
+    squares: EpToken         -- '[' (absent if not used by this pragma form)
+    squares_close: EpToken   -- ']' (absent if not used by this pragma form)
+    loc1:    EpaLocation     -- first interior location (e.g. pragma argument)
+    loc2:    EpaLocation     -- second interior location (e.g. second argument)
+    type_kw:   EpToken       -- 'type' keyword token (absent if not applicable)
+    module_kw: EpToken       -- 'module' keyword token (absent if not applicable)
+}
+
+-- Merge key for reconstructing the original source order of interleaved
+-- mixed lists after AST edits.
+--
+-- When the AST is freshly parsed, SrcSpans are authoritative and no explicit
+-- key is needed (no_key).  After edits that introduce nodes with unreliable
+-- SrcSpans (copies, freshly-synthesised nodes, delta-form locations), the
+-- original interleaving order is recorded as an explicit tag sequence (has_key).
+--
+-- The tag type is BindTag for ValBinds (binds vs signatures) and DeclTag for
+-- ClassDecl / ClsInstDecl (methods, sigs, assoc types, assoc type defaults).
+-- Allium has no generics, so the tag list is typed as List<Any>; concrete uses
+-- always bind it to either BindTag or DeclTag.
+value AnnSortKey {
+    kind: no_key | has_key
+    tags: List<Any> when kind = has_key
+}
+
+-- Annotation for a parenthesised expression or pattern.
+-- Carries exactly the open and close bracket tokens; no trailing.
+-- HasTrailing instance always returns [].
+entity AnnParen {
+    kind:        AnnParenKind
+    open_token:  EpToken
+    close_token: EpToken
+}
+
+-- Annotation for a constraint context (e.g. `C a =>` or `(C a, D b) =>`).
+-- ac_open and ac_close are lists because a context can be wrapped in
+-- multiple layers of parentheses in the source (e.g. `((C a)) =>`).
+-- ac_darrow is absent when the context is empty or syntactically suppressed.
+value AnnContext {
+    darrow:  EpUniToken?       -- '=>' or '⇒', absent if no constraint arrow
+    opens:   List<EpToken>    -- zero or more '(' tokens
+    closes:  List<EpToken>    -- zero or more ')' tokens (matching opens)
+}
+
+-- Records how a layout block was introduced.
+-- Used on do-blocks, where-clauses, let-blocks, and similar constructs.
+entity EpLayout {
+    kind:         EpLayoutKind
+    open_brace:   EpToken  when kind = explicit_braces  -- '{'
+    close_brace:  EpToken  when kind = explicit_braces  -- '}'
+    layout_col:   Integer  when kind = virtual_braces   -- 1-based column
+}
+
+-- Unit annotation for AST nodes that carry no annotation tokens.
+-- Used as EpAnn NoEpAnns: the node has an anchor and comments but
+-- no syntactic tokens of its own to record.
+-- HasTrailing instance always returns [].
+value NoEpAnns {
+}
+
+-- The central annotation wrapper for every located AST node.
+-- Parameterised by the annotation payload type `ann`; Allium has no
+-- generics so the payload is typed as Any.  In practice `ann` is always
+-- one of the concrete annotation types declared in this module.
+--
+-- fromAnn (EpAnn anc a cs) = mkEntry anc (HasTrailing.trailing a) cs
+-- This is the bridge between EpAnn and the printer's Entry type.
+--
+-- Commonly used specialisations (Haskell type aliases):
+--   SrcSpanAnnA  = EpAnn AnnListItem          -- most expressions, patterns, decls
+--   SrcSpanAnnN  = EpAnn NameAnn              -- name occurrences
+--   SrcSpanAnnL  = EpAnn (AnnList ())         -- plain layout lists
+--   SrcSpanAnnLC = EpAnn (AnnList [EpToken])  -- comma-separated lists
+--   SrcSpanAnnLS = EpAnn (AnnList ())         -- statement lists
+--   SrcSpanAnnLW = EpAnn (AnnList EpToken)    -- where-clause lists
+--   SrcSpanAnnLI = EpAnn (AnnList (EpToken, [EpToken]))  -- hiding import lists
+--   SrcSpanAnnP  = EpAnn AnnPragma            -- pragma nodes
+--   SrcSpanAnnC  = EpAnn AnnContext           -- constraint contexts
+--   EpAnnCO      = EpAnn NoEpAnns             -- comment-only nodes
+value EpAnn {
+    entry:    EpaLocation   -- bounding-box anchor (top-left of the node)
+    anns:     Any           -- annotation payload (concrete type varies by node kind)
+    comments: EpaComments   -- comments enclosed within this node's span
+}
+
+-- LEpaComment = GenLocated NoCommentsLocation EpaComment
+-- The located comment type used in comment lists throughout the AST.
+-- A located comment pairs an EpaComment with a NoCommentsLocation
+-- (i.e. an EpaLocation' with no attached comment list, preventing
+-- circular nesting of comments-within-comments).
+--
+-- Located AST node aliases (GenLocated SrcSpanAnn*):
+--   LocatedA  = GenLocated SrcSpanAnnA   -- most expressions, patterns, decls
+--   LocatedN  = GenLocated SrcSpanAnnN   -- name occurrences
+--   LocatedL  = GenLocated SrcSpanAnnL   -- plain layout lists
+--   LocatedLC = GenLocated SrcSpanAnnLC  -- comma-separated lists
+--   LocatedLS = GenLocated SrcSpanAnnLS  -- statement lists
+--   LocatedLW = GenLocated SrcSpanAnnLW  -- where-clause lists
+--   LocatedLI = GenLocated SrcSpanAnnLI  -- hiding import lists
+--   LocatedP  = GenLocated SrcSpanAnnP   -- pragma nodes
+--   LocatedC  = GenLocated SrcSpanAnnC   -- constraint contexts
+--   LocatedE  = GenLocated EpaLocation   -- nodes located by raw EpaLocation
+--   LocatedAn an = GenLocated (EpAnn an) -- generic parameterised form
+
+------------------------------------------------------------
+-- Contracts
+------------------------------------------------------------
+
+-- HasTrailing generalises the bounding-box / glue-separation principle to all
+-- annotation types. Any annotation type that participates in the printer's
+-- entry model must satisfy this contract: it must be able to expose its
+-- trailing glue tokens uniformly, regardless of what else it carries.
+--
+-- The printer never inspects a specific annotation type directly for trailing
+-- tokens. Instead, fromAnn (via mkEntry) calls trailing to extract the glue
+-- list, and setAnnotationAnchor calls setTrailing to write it back after a
+-- node is printed. This makes Entry construction and anchor write-back work
+-- identically for all annotation types without case analysis on the type.
+--
+-- Known instances and their trailing fields:
+--   AnnListItem  — lann_trailing  (the whole annotation is trailing glue)
+--   AnnList      — al_trailing    (trailing after the whole list)
+--   NameAnn      — nann_trailing  (trailing after a name)
+--   AnnContext   — derived from its closing tokens
+--   NoEpAnns, EpaLocation, AnnParen, AnnsIf, ... — trivial: always []
+contract HasTrailing {
+    trailing:    (a: Any) -> List<TrailingAnn>
+    setTrailing: (a: Any, ts: List<TrailingAnn>) -> Any
+
+    @invariant SetTrailingRoundTrip
+        -- trailing(setTrailing(a, ts)) = ts for any annotation a and list ts.
+        -- setTrailing preserves all fields of a other than the trailing list.
+
+    @guidance
+        -- Implemented as a Haskell typeclass HasTrailing in ExactPrint.hs.
+        --
+        -- Entry construction:
+        --   fromAnn (EpAnn anc a cs) = mkEntry anc (trailing a) cs
+        --
+        -- Anchor and trailing write-back (CanUpdateAnchor path in enterAnn):
+        --   setAnchorEpa (EpAnn _ an _) anc ts cs
+        --     = EpAnn anc (setTrailing an ts) cs
+        --
+        -- setTrailing is also used by setAnchorEpaL for AnnList nodes, which
+        -- additionally clears al_anchor (set to Nothing) when updating the
+        -- anchor, so that the list's layout origin is recomputed on the next
+        -- MakeDeltaAst pass rather than retaining a stale value.
+}
+
+-- Constructs a synthetic annotation wrapping a bare SrcSpan.
+-- Used when inserting freshly-synthesised AST nodes that have a known
+-- source location but no annotation tokens.
+-- noAnnSrcSpan noSrcSpan produces the canonical "no location" annotation.
+contract HasAnnotation {
+    noAnnSrcSpan: (loc: Any) -> Any
+
+    @invariant NoAnnSrcSpanPreservesSpan
+        -- getHasLoc (noAnnSrcSpan l) = l for any SrcSpan l.
+        -- The constructed annotation wraps l faithfully; it adds no
+        -- extra extent beyond the supplied span.
+
+    @guidance
+        -- Implemented as a Haskell typeclass HasAnnotation in Annotation.hs.
+        -- Three instances: SrcSpan (identity), EpaLocation (EpaSpan wrap),
+        -- EpAnn ann (EpAnn (spanAsAnchor l) noAnn emptyComments).
+}
+
+-- Provides the "empty" annotation value for an annotation type.
+-- The equivalent of mempty without requiring Semigroup.
+-- Used by HasAnnotation (EpAnn ann) to supply the noAnn payload,
+-- and directly wherever a placeholder annotation is needed.
+contract NoAnn {
+    -- noAnn is a zero-argument constant (no callable signature in Allium).
+    -- Each instance supplies a fixed "empty" value for its annotation type.
+
+    @invariant NoAnnIsNeutral
+        -- noAnn is the identity element for annotation combination where
+        -- combination is defined: combining any annotation with noAnn
+        -- produces the original annotation unchanged.
+
+    @guidance
+        -- Implemented as a Haskell typeclass NoAnn in Annotation.hs.
+        -- Every concrete annotation type has a NoAnn instance.
+        -- NameAnn instance: noAnn = NameAnnTrailing [].
+        -- NoEpAnns instance: noAnn = NoEpAnns.
+        -- AnnListItem instance: noAnn = AnnListItem [].
+}
+
+-- Extracts a SrcSpan from any located construct.
+-- Used throughout the printer and transform layers wherever a raw
+-- SrcSpan is needed from a value that carries richer location info.
+contract HasLoc {
+    getHasLoc: (a: Any) -> Any   -- returns SrcSpan
+
+    @invariant HasLocIdempotent
+        -- getHasLoc (L l x) = getHasLoc l for any GenLocated l x.
+        -- Extracting the location of a located node extracts the location
+        -- of its annotation, not of the node's contents.
+
+    @guidance
+        -- Implemented as a Haskell typeclass HasLoc in Annotation.hs.
+        -- Key instances: SrcSpan (identity), GenLocated l a (delegates to l),
+        -- EpAnn a (extracts from entry EpaLocation), EpaLocation (fromSpan).
+        -- Maybe instance: Nothing produces noSrcSpan.
 }
 
 ------------------------------------------------------------
@@ -275,13 +832,16 @@ invariant DeltaPosSameLineNoVerticalGap {
         dp.kind = same_line implies dp.lines = 0
 }
 
-invariant CommentLocationConsistency {
-    -- Comments stored in prior arrive before their owning node's anchor;
-    -- comments stored in following arrive after. The two lists partition
-    -- the comments that belong to a node: a comment appears in at most
-    -- one of them.
-    for ec in EpaComments:
-        ec.prior.count + ec.following.count >= 0
+invariant EpaCommentsParserProducesUnbalanced {
+    -- The GHC parser always produces the unbalanced form.  Balanced
+    -- EpaComments nodes are created exclusively by the transform layer
+    -- (balanceComments / balanceCommentsList / setFollowingComments).
+    -- This is a lifecycle invariant: any EpaComments directly attached
+    -- to a freshly parsed (pre-transform) AST is of kind unbalanced.
+    -- setFollowingComments on an unbalanced node upgrades it in place:
+    --   EpaComments prior → EpaCommentsBalanced prior cs
+    -- setFollowingComments on a balanced node replaces the following list:
+    --   EpaCommentsBalanced prior _ → EpaCommentsBalanced prior cs
 }
 
 invariant CommentContentsNonEmpty {
@@ -316,39 +876,46 @@ invariant SyntheticCommentContentsMatchOrigin {
         c.keyword_origin != null implies c.contents = c.keyword_origin
 }
 
+invariant ListAnchorIsLayoutOrigin {
+    -- When al_anchor is present and in relative form, it establishes the
+    -- layout column (layout_lhs) for the list block.  All DifferentLine
+    -- deltas within direct list items are interpreted relative to this
+    -- column: absolute_col = al_anchor.col + item.delta.col.
+    -- Because item.delta.col = 0 for all direct items (see the
+    -- ListItemsAtZeroColumnOffset design note on AnnList), al_anchor.col
+    -- uniquely determines the printed column of every item in the list.
+    for al in AnnList where al.al_anchor != null:
+        al.al_anchor.original_span != null
+}
+
 invariant NodeAnnotationStructure {
     -- Every node annotation has an anchor, a (possibly empty) list of
-    -- trailing tokens and a comments record. The three together describe
+    -- trailing annotations and a comments record. The three together describe
     -- everything the printer needs to reproduce the node's layout.
     for n in NodeAnnotation:
         n.anchor != null and n.comments != null and n.trailing.count >= 0
 }
 
-invariant AnchorEnclosesAttachedTokens {
-    -- The parser widens each node's anchor (via widenAnchorT / widenAnchorS)
-    -- to cover every token that syntactically belongs to the element.
-    -- Consequently a node's anchor span is always a superset of the span of
-    -- any individual token stored in its annotation (trailing tokens, where
-    -- keyword, etc.), provided those tokens carry RealSrcSpan locations.
-    -- Tokens with EpaDelta or UnhelpfulSpan locations are excluded from this
-    -- guarantee (widenAnchorT is a no-op for those cases).
+invariant TrailingAnnsOutsideBoundingBox {
+    -- Trailing annotations lie outside the node's bounding box: each present
+    -- trailing token starts at or after the anchor's end position.
+    -- This is the structural consequence of the bounding-box / glue-separation
+    -- design: the anchor span covers everything the node owns; trailing
+    -- annotations are glue belonging to the surrounding list structure.
+    -- Only checked for absolute-form anchors (delta-form anchors have no
+    -- comparable absolute span until undelta is applied during printing).
     for n in NodeAnnotation where n.anchor.kind = absolute:
-        for t in n.trailing:
-            t.location.kind = absolute implies
-                t.location.original_span.start >= n.anchor.original_span.start
-}
-
-invariant TrailingTokenHasKind {
-    -- Every trailing token records both where it is and what it is, so
-    -- printers can decide whether to emit it and transformers can move it
-    -- alongside the syntactic element it belongs to.
-    for t in TrailingToken:
-        t.token_kind != "" and t.location != null
+        for t in n.trailing where t.kind in {semi, comma, vbar}:
+            t.token.kind = present implies
+                t.token.location.original_span.start >= n.anchor.original_span.end
+        for t in n.trailing where t.kind = darrow:
+            t.darrow_token.kind in {present_ascii, present_unicode} implies
+                t.darrow_token.location.original_span.start >= n.anchor.original_span.end
 }
 
 invariant EntryHasEntryRequiresAnchor {
     -- Nodes flagged has_entry carry the data the printer needs to enter
-    -- them: an anchor, the trailing tokens to emit afterwards, the
+    -- them: an anchor, the trailing annotations to emit afterwards, the
     -- comments to interleave, whether to flush following comments before
     -- the next sibling, and whether the anchor may be rewritten.
     for e in Entry where e.kind = has_entry:
@@ -372,4 +939,27 @@ invariant EpaLocationRelativeHasDelta {
     -- accompanying leading comments are present.
     for loc in EpaLocation where loc.kind = relative:
         loc.delta != null and loc.leading_comments.count >= 0
+}
+
+invariant NoCommentsLocationOriginalSpanAlwaysPresent {
+    -- NoCommentsLocation retains the original parser span in both absolute
+    -- and relative form, mirroring the guarantee on EpaLocation.
+    for loc in NoCommentsLocation:
+        loc.original_span != null
+}
+
+invariant EpaCommentTokTextNonEmpty {
+    -- Every comment token carries non-empty text: the literal source text
+    -- (for line and block comments) or the Haddock-rendered string (for doc
+    -- comments). A zero-length comment has no source representation.
+    for t in EpaCommentTok:
+        t.text != ""
+}
+
+invariant EpaCommentPriorTokenAnchored {
+    -- The prior_token_span records the end position of the token immediately
+    -- before the comment in the source. Line -1 is the sentinel used for
+    -- synthetic (non-source) spans; all real parser spans have line >= 1.
+    for c in EpaComment:
+        c.prior_token_span.start.line >= -1
 }
