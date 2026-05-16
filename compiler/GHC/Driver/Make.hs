@@ -1619,7 +1619,13 @@ downsweep_imports hsc_env old_summaries old_graph excl_mods allow_dup_roots (roo
        -- for dependencies of modules that have -XTemplateHaskell,
        -- otherwise those modules will fail to compile.
        -- See Note [-fno-code mode] #8025
-       th_enabled_nodes <- enableCodeGenForTH logger tmpfs unit_env all_nodes
+       let dflags = hsc_dflags hsc_env
+           do_enable_code_gen_for_th = backendGeneratesCode (backend dflags) || ghcMode dflags /= MkDepend
+       th_enabled_nodes <-
+         if do_enable_code_gen_for_th
+           then enableCodeGenForTH logger tmpfs unit_env all_nodes
+           else pure all_nodes -- if codegen is off, we do not have to modify module nodes.
+
        if null all_root_errs
          then return (all_errs, th_enabled_nodes)
          else pure $ (all_root_errs, [])
