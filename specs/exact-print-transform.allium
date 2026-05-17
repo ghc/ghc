@@ -138,6 +138,15 @@ entity DeltaPosResult {
     dp: core/DeltaPos
 }
 
+-- The result of a ModifyValD operation.
+-- modified_decl is the val_bind with its local declarations replaced.
+-- extracted is an optional declaration surfaced by the caller from inside
+-- the where-clause; null when the caller returns Nothing.
+entity ModifyValDResult {
+    modified_decl: Declaration
+    extracted: Declaration?
+}
+
 -- A captured ordering of bindings and signatures within a HsLocalBinds
 -- declaration list (match where-clause, let expression, let statement,
 -- or pat-bind where-clause).
@@ -358,18 +367,26 @@ rule TransferEntryDP {
 -- declarations so that each comment ends up owned by the declaration it
 -- visually precedes in the source.
 --
--- Doc declarations (Haddock comments treated as declarations) are filtered
--- out before balancing; they are never candidates for migration.
+-- The operation is total: empty and single-element lists are returned
+-- unchanged (there are no adjacent pairs to balance).
+--
+-- Doc declarations (DocDecl nodes inserted by haddock mode) are silently
+-- excluded from balancing. They must not receive migrated comments because:
+--   - their comment content is already present at the normal comment
+--     attachment sites (DocDecls are a derived, secondary representation);
+--   - haddock processing is lossy and does not preserve all haddock-like
+--     comments, so a DocDecl cannot be the authoritative comment owner;
+--   - DocDecls are not printed by exactPrint, so any comment migrated onto
+--     one would be silently dropped at print time.
 rule BalanceCommentsList {
     when: BalanceCommentsList(decls)
 
-    requires: decls.count >= 2
+    -- No precondition: the rule is safe to call on lists of any length,
+    -- including empty and single-element lists.
 
-    -- The count is preserved; no declarations are added or removed.
     -- The strongest machine-checkable postcondition available without
-    -- span arithmetic: every declaration's comment lists remain non-null
-    -- (the lists exist, even if empty after migration).
-    ensures: decls.count >= 2
+    -- span arithmetic: every non-doc declaration's comment lists exist
+    -- (even if empty after migration).
     ensures:
         for d in decls:
             d.annotation.comments.prior.count  >= 0
@@ -431,32 +448,58 @@ rule BalanceCommentsList {
         -- threshold after the first pass.
 }
 
--- Modify the local declarations inside a function binding (ValD/FunBind).
--- Gives the caller the current sub-declarations and applies the result.
+-- Scoped atomic read-modify-write on the local declarations of a val_bind.
+-- The rule locates the match at target_loc within decl, presents its current
+-- local declarations to the caller, applies the replacement, and optionally
+-- surfaces an extracted value alongside the modified decl.
+--
+-- This differs from ReplaceDeclarations in two ways:
+--   1. The replacement is computed from the current local decls (read-then-write
+--      is atomic — callers cannot observe or modify them separately).
+--   2. The result carries an optional extracted value chosen by the caller,
+--      allowing a declaration to be removed from the where-clause and returned
+--      in the same operation.
 rule ModifyValD {
-    when: ModifyValD(target_loc, decl, new_local_decls)
+    when: ModifyValD(target_loc, decl)
 
     requires: decl.kind = val_bind
 
-    ensures: decl.local_decls = new_local_decls
-}
-
--- Allocate a fresh synthetic source location for a new AST node.
--- Synthetic spans have line number -1 so they can be detected and
--- distinguished from real parser-produced spans.
-rule AllocateUniqueSrcSpan {
-    when: AllocateUniqueSrcSpan(state)
-
-    ensures: core/EpaLocation.created(
-        kind: absolute,
-        original_span: core/AbsoluteSpan {
-            start: core/SourcePos { line: -1, col: state.unique_span_counter },
-            end:   core/SourcePos { line: -1, col: state.unique_span_counter }
-        }
+    -- Produces a ModifyValDResult whose modified_decl is decl with its
+    -- local declarations replaced by the caller-computed list, and whose
+    -- extracted field carries whatever the caller chose to surface (null
+    -- if the caller returned nothing).
+    ensures: ModifyValDResult.created(
+        modified_decl: decl
     )
-    ensures: state.unique_span_counter = state.unique_span_counter + 1
-    ensures: state.log.add("AllocateUniqueSrcSpan")
+
+    @guidance
+        -- The caller supplies a callback (match, current_decls) -> (new_decls, extracted).
+        -- The rule presents the current local declarations of the match at target_loc
+        -- to that callback, then applies new_decls to decl and surfaces extracted.
+        --
+        -- For a PatBind, target_loc must equal the binding's own SrcSpan;
+        -- current_decls is the entire where-clause of the pattern binding.
+        -- (The match argument to the callback is a dummy error value for PatBind
+        -- and should not be forced.)
+        --
+        -- For a FunBind, the rule walks all Match equations and applies the
+        -- callback only to the equation whose SrcSpan equals target_loc;
+        -- other equations are left unchanged.
+        --
+        -- If target_loc matches no equation, decl is returned unmodified
+        -- and extracted is null.
+        --
+        -- Implementation: modifyValD in Transform.hs. The third argument is
+        -- the Haskell callback (PMatch -> [Decl] -> ([Decl], Maybe t)); the rule
+        -- abstracts over the Haskell-specific callback shape and Maybe threading.
 }
+
+-- Note: uniqueSrcSpanT (AllocateUniqueSrcSpan) is not modelled here.
+-- It is exported from Transform for backwards-compatible API reasons but
+-- is not called anywhere within check-exact. The doc comment on the
+-- function says "This should no longer be needed, we use an EpaDelta
+-- location instead." New AST nodes should be given EpaDelta locations
+-- directly; callers who still use uniqueSrcSpanT should migrate.
 
 -- Capture the line spacing between consecutive declarations in a list.
 -- Sets the entry DP of each declaration (except the first) to reflect
@@ -510,12 +553,23 @@ rule CaptureTypeSigSpacing {
 rule AddModuleCommentOrigDeltas {
     when: AddModuleCommentOrigDeltas(module)
 
+    -- Only comments whose location is an absolute real source span are
+    -- converted. Comments already in EpaDelta form are left unchanged
+    -- (still relative). Comments with an UnhelpfulSpan location have no
+    -- real source position and are also left unchanged (still absolute).
     ensures:
-        for c in module.annotation.comments.prior:
+        for c in module.annotation.comments.prior
+            where c.location.kind = absolute and c.location.original_span.is_real:
             c.location.kind = relative
     ensures:
-        for c in module.annotation.comments.following:
+        for c in module.annotation.comments.following
+            where c.location.kind = absolute and c.location.original_span.is_real:
             c.location.kind = relative
+
+    @guidance
+        -- Implemented by commentOrigDelta (Utils.hs). The catch-all branch
+        -- (commentOrigDelta c = c) leaves EpaDelta and UnhelpfulSpan locations
+        -- unchanged; only EpaSpan (RealSrcSpan ...) locations are rewritten.
 }
 
 -- Capture the ordering of binds and signatures within a mixed HsLocalBinds
@@ -605,8 +659,9 @@ rule RunTransform {
 invariant UniqueSrcSpanIdentification {
     -- A synthetic span can always be detected by its line number.
     -- The exact-print machinery reserves line = -1 for spans allocated
-    -- by AllocateUniqueSrcSpan; the parser never produces -1 as a real
-    -- source line.
+    -- by uniqueSrcSpanT (kept for backwards-compatible API export only;
+    -- new code uses EpaDelta locations instead). The parser never
+    -- produces -1 as a real source line.
     for loc in core/EpaLocation:
         loc.kind = absolute implies loc.original_span.start.line >= -1
 }
@@ -722,8 +777,7 @@ surface TransformApi {
         GetEntryDP(node: Declaration)
         TransferEntryDP(source_node: Declaration, target_node: Declaration)
         BalanceCommentsList(decls: List<Declaration>)
-        ModifyValD(target_loc: Declaration, decl: Declaration, new_local_decls: List<Declaration>)
-        AllocateUniqueSrcSpan(state: TransformState)
+        ModifyValD(target_loc: Declaration, decl: Declaration)
         CaptureLineSpacing(decls: List<Declaration>)
         CaptureMatchLineSpacing(decl: Declaration)
         CaptureTypeSigSpacing(sig: Declaration)

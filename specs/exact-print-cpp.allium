@@ -1,0 +1,560 @@
+-- allium: 3
+-- exact-print-cpp.allium
+--
+-- Scope: CPP (C Pre-Processor) support for GHC exact-print.
+--        Documents how source files using {-# LANGUAGE CPP #-} are parsed so
+--        that CPP directives, LINE pragmas, and shebang lines are preserved as
+--        synthetic comments and survive an exact-print round-trip.
+-- Includes: CPP option configuration, directive extraction, three-way token
+--           merge, CPP-aware comment ordering, the top-level parsing entry
+--           point that branches on the Cpp language extension, and comment
+--           re-insertion into the parsed AST.
+-- Excludes:
+--   - Core annotation types (see exact-print-core.allium)
+--   - General comment interleaving during printing (see exact-print-printing.allium)
+--   - AST transformation (see exact-print-transform.allium)
+
+use "./exact-print-core.allium" as core
+
+------------------------------------------------------------
+-- External Entities
+------------------------------------------------------------
+
+-- The parsed Haskell module as produced by GHC's parser.
+-- When CPP is enabled, the parser sees the preprocessed text, not the original
+-- source.  CPP directives are separately extracted and re-inserted as synthetic
+-- comments by InsertCppComments before exact-printing.
+external entity ParsedSource {
+    nodes: List<LocatedAstNode>
+}
+
+-- A GHC AST node decorated with EPA annotations.
+external entity LocatedAstNode {
+    annotation: core/NodeAnnotation
+}
+
+------------------------------------------------------------
+-- Value Types
+------------------------------------------------------------
+
+-- The three parallel token streams threaded through the merge algorithm.
+-- Each stream covers the same source file from a different perspective.
+-- Tokens are represented as opaque strings; precise GHC token types are
+-- implementation details described in @guidance.
+value CppTokenStreams {
+    directive_toks: List<String>
+        -- CPP directive lines from the original source, each wrapped as an
+        -- ITlineComment token carrying the real source filename.
+        -- Produced by GetPreprocessorAsComments.
+    orig_src_toks:  List<String>
+        -- The original source file tokenised after stripping all '#'-prefixed
+        -- lines (so the lexer sees no directives).
+        -- Produced by tokeniseOriginalSrc / stripPreprocessorDirectives.
+    post_cpp_toks:  List<String>
+        -- The token stream that GHC sees after the C preprocessor has run;
+        -- macro-expanded text may appear here in place of the original directives.
+        -- Produced by lexTokenStream on the preprocessed buffer.
+}
+
+------------------------------------------------------------
+-- Enumerations
+------------------------------------------------------------
+
+-- Identifies the origin of a synthetic comment injected during CPP handling.
+-- The origin corresponds to the fake filename embedded in the comment's
+-- RealSrcSpan by the injection function.  This fake filename is the signal
+-- that CPP-era comment ordering must use ss2pos (line+col) rather than the
+-- full RealSrcSpan Ord instance (which compares filename first).
+enum CppCommentOrigin {
+    cpp          -- '#'-prefixed directive line; fake filename "CPP"
+    line_pragma  -- {-# LINE ... #-} pragma replaced by spaces; fake filename "LINE"
+    shebang      -- '#!' interpreter directive replaced by ""; fake filename "SHEBANG"
+}
+
+------------------------------------------------------------
+-- Entities and Variants
+------------------------------------------------------------
+
+-- Configuration passed to the C preprocessor when expanding a source file.
+-- All fields default to empty lists (see default_cpp_options below).
+-- Identified as the actor in the CppPreprocessingApi surface.
+entity CppOptions {
+    cpp_define:  List<String>   -- -D flags: preprocessor macro definitions
+    cpp_include: List<String>   -- -I flags: include-path search directories
+    cpp_file:    List<String>   -- -include flags: files pre-included before the source
+}
+
+-- Output of StripLinePragmas: the source with LINE pragmas and shebang lines
+-- replaced by whitespace, together with the synthetic comments produced for
+-- each replaced line.  The cleaned_text can be fed to GHC's lexer without
+-- triggering pragma errors.
+entity StrippedSource {
+    cleaned_text:      String                -- source with pragma/shebang lines neutralised
+    injected_comments: List<core/EpaComment> -- LINE and SHEBANG synthetic comments
+}
+
+-- A set of synthetic comments produced by one step of the CPP pipeline.
+-- Used as the result type of GetPreprocessorAsComments, GetCppTokens, and
+-- GetCppTokensAsComments; each creates a distinct instance carrying the
+-- comments from its step of the pipeline.
+-- The origin field records which injection path produced the comments,
+-- corresponding to the fake filename embedded in each comment's RealSrcSpan.
+entity MergedCppComments {
+    comments: List<core/EpaComment>
+    origin:   CppCommentOrigin
+}
+
+-- Output of GetPreprocessedSrcDirect: the C-preprocessor-expanded source text
+-- ready to be fed to GHC's Haskell parser.
+entity PreprocessedSource {
+    text: String
+}
+
+-- Output of ParseModuleEpAnnsWithCpp: the parsed AST together with the
+-- synthetic comments representing CPP directives, LINE pragmas, or shebang
+-- lines that were stripped before parsing.  The comments must be re-inserted
+-- into the AST via InsertCppComments before exact-printing.
+entity CppParseResult {
+    parsed_source:     ParsedSource
+    injected_comments: List<core/EpaComment>
+    cpp_was_enabled:   Boolean
+        -- true when {-# LANGUAGE CPP #-} was active; false when the non-CPP
+        -- path (stripLinePragmas) was taken instead.
+}
+
+------------------------------------------------------------
+-- Defaults
+------------------------------------------------------------
+
+default CppOptions default_cpp_options = {
+    cpp_define:  {},
+    cpp_include: {},
+    cpp_file:    {}
+}
+
+------------------------------------------------------------
+-- Contracts
+------------------------------------------------------------
+
+-- Comment ordering in the CPP pipeline MUST compare only by (line, col)
+-- position and must ignore the filename component of a RealSrcSpan.
+-- The injection functions embed fake filenames into comment spans:
+--   "CPP"     — getPreprocessorAsComments (directive lines from GetPreprocessorAsComments)
+--   "LINE"    — stripLinePragmas ({-# LINE ... #-} pragma handling)
+--   "SHEBANG" — stripLinePragmas (#! shebang line handling)
+-- Mixing real and fake filenames under the standard RealSrcSpan Ord instance
+-- (which compares filename first) produces incorrect relative ordering.
+contract CppAwareComparison {
+    compare_comments: (a: core/EpaComment, b: core/EpaComment) -> ordering
+    sort_comments:    (comments: List<core/EpaComment>) -> List<core/EpaComment>
+
+    @invariant FilenameIgnored
+        -- Both operations project (line, col) via ss2pos and order solely
+        -- on that pair.  The filename field of any RealSrcSpan — whether a
+        -- real source filename or one of the three fake CPP filenames — is
+        -- never read during the comparison.
+        -- Implementation: cmpComments / sortComments / sortEpaComments in
+        -- utils/check-exact/Utils.hs:517-529 and the Comment Ord instance in
+        -- utils/check-exact/Types.hs:39-45.
+
+    @invariant OrderPreserved
+        -- sort_comments is stable: two comments at equal (line, col) retain
+        -- their relative order from the input list.
+}
+
+------------------------------------------------------------
+-- Rules
+------------------------------------------------------------
+
+-- ── Preprocessing phase ──────────────────────────────────────────────────────
+
+-- Scan source text for GHC LINE pragmas ({-# LINE … #-}) and shebang lines
+-- (#!).  Each matched line is:
+--   • replaced in cleaned_text with spaces (LINE pragma) or the empty string
+--     (shebang), preserving the column positions of all surrounding tokens; and
+--   • converted into a synthetic LEpaComment whose RealSrcSpan carries the
+--     fake filename "LINE" or "SHEBANG".
+-- The cleaned_text is safe to feed directly to GHC's lexer.
+rule StripLinePragmas {
+    when: StripLinePragmas(source)
+
+    ensures: StrippedSource.created(
+        cleaned_text:      stripped_pragma_text(source),
+        injected_comments: pragma_and_shebang_comments(source)
+    )
+
+    @guidance
+        -- Implementation: stripLinePragmas / findLines / checkLine in
+        -- utils/check-exact/Preprocess.hs:61-93.
+        --
+        -- findLines zips line numbers with lines then calls checkLine per line:
+        --
+        --   "{-# LINE" prefix:
+        --     getPragma extracts pragma text up to (and including) "#-}".
+        --     size = length extracted_pragma_text.
+        --     mSrcLoc = mkSrcLoc (mkFastString "LINE").
+        --     ss = mkSrcSpan (mSrcLoc line 1) (mSrcLoc line (size+1)).
+        --     Comment: mkLEpaComment pragma_text (spanAsAnchor ss) (realSrcSpan ss).
+        --     Replacement text: spaces for the pragma, original text kept after "#-}".
+        --     Column positions of any tokens after the pragma are preserved.
+        --
+        --   "#!" prefix:
+        --     mSrcLoc = mkSrcLoc (mkFastString "SHEBANG").
+        --     ss = mkSrcSpan (mSrcLoc line 1) (mSrcLoc line (length s)).
+        --     Comment: mkLEpaComment full_line_text (spanAsAnchor ss) (realSrcSpan ss).
+        --     Replacement text: "".
+        --
+        --   All other lines: pass through unchanged, no comment produced.
+        --
+        -- Returns (unlines cleaned_lines, catMaybes comment_list).
+}
+
+-- Read the original source file and extract every line whose first character
+-- is '#'.  Each such directive line is wrapped as a Located ITlineComment
+-- token carrying the real source filename and the line's 1-based position.
+-- These tokens form the directive_toks stream fed to GetCppTokens.
+rule GetPreprocessorAsComments {
+    when: GetPreprocessorAsComments(file)
+
+    ensures: MergedCppComments.created(
+        comments: directive_line_comments(file),
+        origin:   cpp
+    )
+
+    @guidance
+        -- Implementation: getPreprocessorAsComments in
+        -- utils/check-exact/Preprocess.hs:265-278.
+        --
+        -- Steps:
+        --   1. fcontents ← readFileGhc file.
+        --   2. directives = filter (#-prefix) (zip [1..] (lines fcontents)).
+        --      Lines whose first character is '#' are kept; all others dropped.
+        --   3. For each (lineNum, line):
+        --        start = mkSrcLoc (mkFastString srcFile) lineNum 1
+        --        end   = mkSrcLoc (mkFastString srcFile) lineNum (length line)
+        --        l     = mkSrcSpan start end
+        --        tok   = L l (ITlineComment line (makeBufSpan l))
+        --   4. Return [(tok, line)] — the list of (Located Token, String) pairs.
+        --
+        -- Unlike StripLinePragmas, this function uses the real source filename
+        -- in its spans; comments produced here will mix real and fake filenames
+        -- once combined with the LINE/SHEBANG comments in InsertCppComments, which
+        -- is why CppAwareComparison (ss2pos ordering) is required throughout.
+}
+
+-- Run GHC's C preprocessor on the source file, injecting the caller-supplied
+-- CppOptions as -D / -I / -include flags into a temporary copy of DynFlags.
+-- Returns the preprocessed source text.
+rule GetPreprocessedSrcDirect {
+    when: GetPreprocessedSrcDirect(opts, file)
+
+    ensures: PreprocessedSource.created(
+        text: preprocess_source_text(opts, file)
+    )
+
+    @guidance
+        -- Implementation: getPreprocessedSrcDirect / getPreprocessedSrcDirectPrim
+        -- in utils/check-exact/Preprocess.hs:202-223.
+        --
+        -- injectCppOptions (Preprocess.hs:233-241) converts CppOptions into DynFlags:
+        --   cpp_define  → "-D" ++ define  → toolSettings_opt_P / _opt_JSP / _opt_CmmP
+        --   cpp_include → "-I" ++ dir     → same three tool settings
+        --   cpp_file    → "-include" ++ f → same three tool settings
+        --   Fingerprints are recomputed after each flag (cache invalidation).
+        --
+        -- GHC.preprocess new_env src_fn Nothing (Just (Cpp HsSrcFile)) runs the
+        -- C preprocessor and writes output to a temp file.
+        -- The temp file is then read back with hGetStringBuffer (for the buffer)
+        -- and readFileGhc (for the string).
+        -- getPreprocessedSrcDirect discards the StringBuffer and returns (text, dflags).
+}
+
+-- Merge three parallel token streams and identify the CPP directive tokens that
+-- the preprocessor consumed (present in orig_src_toks but absent from post_cpp_toks).
+-- Each identified missing token is converted to an ITlineComment, then the
+-- directive_toks and missing-as-comments sets are merged by source location.
+rule GetCppTokens {
+    when: GetCppTokens(streams)
+
+    ensures: MergedCppComments.created(
+        comments: merge_cpp_token_streams(streams),
+        origin:   cpp
+    )
+
+    @guidance
+        -- Implementation: getCppTokens in utils/check-exact/Preprocess.hs:146-171.
+        --
+        -- NOTE: this algorithm is correct ONLY when CPP runs in -nomacro mode
+        -- (no macro expansion).  Macro expansion replaces tokens with expanded
+        -- text; those expanded tokens are not present in orig_src_toks and
+        -- cannot be recovered by source-span matching.
+        --
+        -- Algorithm:
+        --   locFn (L l1 _, _) (L l2 _, _) = compare (rs l1) (rs l2)
+        --   m1Toks = mergeBy locFn post_cpp_toks directive_toks
+        --
+        --   origSpans = map (rs . getLoc . fst) orig_src_toks
+        --   m1Spans   = map (rs . getLoc . fst) m1Toks
+        --   missingSpans = Set.fromList origSpans Set.\\ Set.fromList m1Spans
+        --     (spans present in original but absent from the merged set)
+        --
+        --   missingToks = filter (Set.member . rs . getLoc . fst) orig_src_toks
+        --   missingAsComments = map mkCommentTok missingToks
+        --     where mkCommentTok (L l _, s) =
+        --             (L l (ITlineComment s (makeBufSpan l)), s)
+        --
+        --   result = mergeBy locFn directive_toks missingAsComments
+        --
+        -- GHC.Token has no Ord instance; set operations are performed on
+        -- RealSrcSpan values rather than token payloads.
+}
+
+-- Orchestrate the full CPP comment extraction for a source file:
+-- run the preprocessor, extract directive lines from the original source,
+-- tokenise the directive-stripped original and the preprocessed output,
+-- merge the three streams via GetCppTokens, then filter and convert the
+-- result to LEpaComment values ready for injection into the AST.
+rule GetCppTokensAsComments {
+    when: GetCppTokensAsComments(opts, file)
+
+    ensures: MergedCppComments.created(
+        comments: cpp_comments_for_file(opts, file),
+        origin:   cpp
+    )
+
+    @guidance
+        -- Implementation: getCppTokensAsComments in
+        -- utils/check-exact/Preprocess.hs:99-119.
+        --
+        -- Steps:
+        --   1. source ← hGetStringBuffer file     (original source as StringBuffer)
+        --   2. (_, strSrcBuf, flags2') ← getPreprocessedSrcDirectPrim opts file
+        --      flags2 = initParserOpts flags2'
+        --   3. directiveToks ← getPreprocessorAsComments file
+        --      (directive lines from the original; real filename, ITlineComment)
+        --   4. nonDirectiveToks ← tokeniseOriginalSrc startLoc flags2 source
+        --      tokeniseOriginalSrc calls stripPreprocessorDirectives (replaces
+        --      '#'-prefixed lines with "") before lexing, so the lexer sees no
+        --      directives and does not choke on them.
+        --   5. ts ← lexTokenStream flags2 strSrcBuf startLoc
+        --      toks = addSourceToTokens startLoc source ts
+        --   6. cppCommentToks = getCppTokens directiveToks nonDirectiveToks toks
+        --   7. Return filter goodComment
+        --             $ map (commentToAnnotation . toRealLocated . fst) cppCommentToks
+        --      goodComment rejects empty-string comments and single-item lists
+        --      with an empty Comment.
+}
+
+-- ── Parsing phase ────────────────────────────────────────────────────────────
+
+-- Top-level CPP-aware parse entry point.  Branches on whether the
+-- {-# LANGUAGE CPP #-} extension is enabled in the source file's DynFlags:
+--
+--   CPP enabled  (useCpp = true):
+--     Run the C preprocessor to expand the source.
+--     Extract CPP directive lines as synthetic comments (GetCppTokensAsComments).
+--     Parse the preprocessed text.
+--     Return (preprocessed_ast, cpp_directive_comments, cpp_was_enabled=true).
+--
+--   CPP disabled (useCpp = false):
+--     Read the raw file.
+--     Strip LINE pragmas and shebang lines (StripLinePragmas).
+--     Parse the stripped text.
+--     Return (stripped_ast, pragma_comments, cpp_was_enabled=false).
+--
+-- In both branches the injected_comments in the returned CppParseResult must
+-- be passed to InsertCppComments before the AST can be exactly printed.
+rule ParseModuleEpAnnsWithCpp {
+    when: ParseModuleEpAnnsWithCpp(opts, libdir, file)
+
+    ensures:
+        if cpp_extension_enabled(file):
+            CppParseResult.created(
+                parsed_source:     parse_preprocessed_source(opts, file),
+                injected_comments: cpp_comments_for_file(opts, file),
+                cpp_was_enabled:   true
+            )
+        else:
+            CppParseResult.created(
+                parsed_source:     parse_stripped_source(file),
+                injected_comments: pragma_and_shebang_comments(file),
+                cpp_was_enabled:   false
+            )
+
+    @guidance
+        -- Implementation: parseModuleEpAnnsWithCpp / parseModuleEpAnnsWithCppInternal
+        -- in utils/check-exact/Parsers.hs:216-264.
+        --
+        -- parseModuleEpAnnsWithCpp wraps parseModuleEpAnnsWithCppInternal in
+        -- ghcWrapper (GHC.runGhc (Just libdir)), converting the GHC.Ghc action
+        -- to IO.
+        --
+        -- parseModuleEpAnnsWithCppInternal:
+        --   useCpp = GHC.xopt LangExt.Cpp dflags
+        --
+        --   CPP branch:
+        --     (contents, dflags1) ← getPreprocessedSrcDirect opts file
+        --     cppComments ← getCppTokensAsComments opts file
+        --     (fileContents, injectedComments, dflags') = (contents, cppComments, dflags1)
+        --
+        --   No-CPP branch:
+        --     txt ← readFileGhc file
+        --     (contents1, lp) = stripLinePragmas txt
+        --     (fileContents, injectedComments, dflags') = (contents1, lp, dflags)
+        --
+        --   Both branches:
+        --     parseFile dflags' file fileContents → GHC.POk _ pmod | GHC.PFailed pst
+        --     On success: Right (injectedComments, dflags', fixModuleComments pmod)
+        --     On failure: Left (GhcPsMessage <$> getPsErrorMessages pst)
+        --
+        -- The returned triple is (injected_comments, DynFlags, ParsedSource).
+        -- DynFlags is not modelled in this spec (it is an opaque GHC internal).
+}
+
+-- ── Comment insertion phase ───────────────────────────────────────────────────
+
+-- Insert the injected CPP, LINE, and SHEBANG synthetic comments into the parsed
+-- AST at the positions determined by source span containment.
+--
+-- The insertion algorithm:
+--   1. Sort all comments (existing module-level comments + injected_comments)
+--      using the CPP-aware comparator (ss2pos, ignoring filenames).
+--   2. Traverse the AST bottom-up (everywhereM), allocating comments to the
+--      innermost EpAnn node (AnnListItem, AnnList, or GrhsAnn) whose anchor
+--      span encloses the comment's source position.
+--   3. Comments not allocated in step 2 are distributed among module-level
+--      positions by insertTopLevelCppComments: before the 'where' keyword,
+--      inside the explicit-brace layout, in exports, imports, and top-level
+--      declarations.
+--
+-- After this rule, the AST is ready for ExactPrint and the round-trip
+-- guarantee holds.
+rule InsertCppComments {
+    when: InsertCppComments(module, injected_comments)
+
+    ensures:
+        module.nodes = allocate_comments_to_nodes(module.nodes, injected_comments)
+
+    @guidance
+        -- Implementation: insertCppComments in utils/check-exact/Utils.hs:226-238.
+        --
+        -- Function signature:
+        --   insertCppComments :: ParsedSource -> [LEpaComment] -> ParsedSource
+        --
+        -- Setup (before the traversal):
+        --   Strip existing module-level comments from the module annotation and
+        --   merge them with injected_comments:
+        --     cs = sortEpaComments (priorComments cst ++ getFollowingComments cst ++ cs0)
+        --   Reset the module annotation to emptyComments (comments re-inserted later).
+        --
+        -- Step 2 — bottom-up traversal (everywhereM, lowest nodes processed first):
+        --   addComments :: EpAnn ann -> State [LEpaComment] (EpAnn ann)
+        --   For each EpAnn with anchor = EpaSpan (RealSrcSpan s):
+        --     (rest, these) = GHC.Parser.Lexer.allocateComments s unAllocated
+        --     cs' = workInComments existing_comments these
+        --     workInComments merges new and existing, preserving balance:
+        --       if no following comments: EpaComments (sorted prior ++ new)
+        --       else:                     epaCommentsBalanced prior_half following_half
+        --         split at the position of the first existing following comment.
+        --
+        -- Step 3 — insertTopLevelCppComments (Utils.hs:277-324):
+        --   Handles the module annotation and the named sub-parts (module name,
+        --   explicit braces, exports, imports, declarations) using ss2pos
+        --   comparisons to distribute remaining comments to the correct positions.
+        --
+        -- The bottom-up order in step 2 ensures inner spans claim comments
+        -- first; outer spans receive only what remains.  This mirrors
+        -- allocateComments from GHC.Parser.Lexer, which partitions by containment.
+}
+
+------------------------------------------------------------
+-- Invariants
+------------------------------------------------------------
+
+invariant DefaultCppOptionsAllEmpty {
+    default_cpp_options.cpp_define.count = 0
+    and default_cpp_options.cpp_include.count = 0
+    and default_cpp_options.cpp_file.count = 0
+}
+
+invariant CppParseResultKnownBranch {
+    -- A CppParseResult always reflects exactly one of the two parsing paths:
+    -- the CPP-enabled path (cpp_was_enabled = true) or the no-CPP path
+    -- (cpp_was_enabled = false).  There is no third state.
+    for r in CppParseResult:
+        r.cpp_was_enabled = true or r.cpp_was_enabled = false
+}
+
+------------------------------------------------------------
+-- Actor Declarations
+------------------------------------------------------------
+
+actor CppCaller {
+    identified_by: CppOptions
+}
+
+
+------------------------------------------------------------
+-- Surfaces
+------------------------------------------------------------
+
+-- Internal protocol surface for the CPP preprocessing sub-steps.
+-- These operations are invoked by ParseModuleEpAnnsWithCpp; they are not
+-- part of the public API but are specified here so that each component of
+-- the pipeline can be documented and tested in isolation.
+-- Mirrors the role of PrinterInternals in exact-print-printing.allium.
+-- The caller's CppOptions entity provides the preprocessor configuration
+-- for the two operations that accept it (GetPreprocessedSrcDirect and
+-- GetCppTokensAsComments); the remaining operations are file- or source-only.
+surface CppPreprocessingInternals {
+    facing caller: CppCaller
+
+    provides:
+        StripLinePragmas(source: String)
+        GetPreprocessorAsComments(file: String)
+        GetPreprocessedSrcDirect(caller, file: String)
+        GetCppTokens(streams: CppTokenStreams)
+        GetCppTokensAsComments(caller, file: String)
+
+    @guidance
+        -- StripLinePragmas and GetCppTokensAsComments are the two branches of
+        -- ParseModuleEpAnnsWithCpp and are never both invoked for the same file.
+        -- GetPreprocessedSrcDirect → GetCppTokensAsComments (which internally
+        -- calls GetPreprocessorAsComments + GetCppTokens) is the CPP path.
+        -- StripLinePragmas is the non-CPP path.
+}
+
+-- Public entry surface for CPP-aware parsing and comment insertion.
+-- Callers (test runners, refactoring tools, check-exact) use these two
+-- operations in sequence: ParseModuleEpAnnsWithCpp to obtain the parsed AST
+-- and injected synthetic comments, then InsertCppComments to splice the
+-- comments into the AST before exact-printing.
+surface CppPreprocessingApi {
+    facing caller: CppCaller
+
+    provides:
+        ParseModuleEpAnnsWithCpp(caller, libdir: String, file: String)
+        InsertCppComments(module: ParsedSource, injected_comments: List<core/EpaComment>)
+
+    contracts:
+        demands CppAwareComparison
+
+    @guarantee RoundTripWithCpp
+        -- For any Haskell source file f using {-# LANGUAGE CPP #-}, the
+        -- composition ExactPrint(InsertCppComments(ParseModuleEpAnnsWithCpp(f)))
+        -- reproduces f byte-for-byte (modulo tab expansion at equivalent positions).
+        -- This extends the RoundTripFidelity guarantee from ExactPrintApi
+        -- (exact-print-printing.allium) to CPP-enabled sources.
+
+    @guarantee DirectivesPreservedAsComments
+        -- Every '#'-prefixed line in the original source f appears as a comment
+        -- in the injected_comments returned by ParseModuleEpAnnsWithCpp(f).
+        -- No CPP directive line is silently discarded.
+
+    @guarantee NomacroOnly
+        -- The three-way token merge (GetCppTokens) is correct only when CPP
+        -- runs without macro expansion (-nomacro mode).  CPP macros that expand
+        -- to new tokens produce spans not present in orig_src_toks; those
+        -- expanded tokens cannot be recovered by span-based identification.
+        -- Sources using such macros are outside the scope of RoundTripWithCpp.
+}

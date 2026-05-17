@@ -116,7 +116,7 @@ entity PrintedSource {
 -- Rules
 ------------------------------------------------------------
 
--- Exact-print a ParsedSource to a String.
+-- Exact-print a ParsedSource to a String using hardwired string-output options.
 -- The AST may be in absolute form (EpaSpan, parser output), delta form
 -- (EpaDelta, after MakeDeltaAst), or a mixture of the two (e.g. an
 -- absolute surrounding AST with delta-form inserted fragments).
@@ -125,7 +125,7 @@ entity PrintedSource {
 -- to their owning nodes.
 -- Returns only the source text; the AST is not modified or returned.
 rule ExactPrint {
-    when: ExactPrint(ast, options)
+    when: ExactPrint(ast)
 
     ensures: PrintedSource.created(
         source_text: source_text
@@ -208,18 +208,60 @@ rule ExactPrint {
         -- and a DeclTag sort key; the printer counterpart is withSortKey.
 }
 
--- Convert all absolute EpaLocations in an AST to relative (delta) form.
+-- Exact-print with caller-supplied options, returning both the accumulated
+-- output and the rewritten AST.
+-- Unlike ExactPrint, the options are not hardwired: the caller supplies an
+-- EPOptions value that controls how tokens and whitespace are accumulated.
+-- The two standard presets are string_output (accumulate to String) and
+-- delta_only (discard output, used by MakeDeltaAst).
+-- Returns the rewritten AST alongside the accumulated output; the AST is
+-- not discarded as it is in ExactPrint.
+rule ExactPrintWithOptions {
+    when: ExactPrintWithOptions(ast, options)
+
+    ensures: PrintedSource.created(
+        source_text: source_text
+    )
+    -- The AST is returned with its can_update anchors rewritten to delta form,
+    -- as in MakeDeltaAst. (ExactPrint discards this; ExactPrintWithOptions exposes it.)
+    ensures:
+        for n in ast.nodes where n.annotation.anchor_updateability = can_update:
+            n.annotation.anchor.kind = relative
+
+    @guidance
+        -- Implementation: exactPrintWithOptions in ExactPrint.hs.
+        -- Runs the same markAnnotated traversal as ExactPrint but with a
+        -- caller-supplied EPOptions m b instead of the hardwired stringOptions.
+        -- Returns m (ast, b) — the monadic action produces both the rewritten
+        -- AST (fst) and the accumulated b (snd), where b is String for
+        -- string_output and () for delta_only.
+        --
+        -- The options parameter abstracts over EPOptions: the two standard
+        -- presets (stringOptions / deltaOptions) correspond to the two
+        -- PrintOptions.mode values (string_output / delta_only).
+        -- Callers may supply custom callbacks for token and whitespace
+        -- accumulation; the spec models only the two standard presets.
+}
+
+-- Convert absolute EpaLocations in an AST to relative (delta) form.
 -- Produces a rewritten AST; no source text is generated.
 -- Required before making programmatic edits or before ExactPrint on
 -- an AST that still carries absolute spans from the parser.
 -- The parser always emits absolute (EpaSpan) locations via spanAsAnchor;
 -- EpaDelta is reserved exclusively for programmatic transformations.
--- This step is therefore always required and is never a no-op.
+--
+-- Only nodes whose annotation_updateability = can_update have their anchor
+-- converted. Nodes with can_update_anchor_only or no_update are left
+-- unchanged (see AnchorUpdateability in exact-print-core.allium).
+-- In practice, the sole can_update_anchor_only node reachable from a
+-- ParsedSource is the bare Located (HsModule GhcPs) wrapper
+-- (i.e. ParsedSource itself); its SrcSpan is never written back even
+-- though its inner HsModule GhcPs annotation is fully updated.
 rule MakeDeltaAst {
     when: MakeDeltaAst(ast)
 
     ensures:
-        for n in ast.nodes:
+        for n in ast.nodes where n.annotation.anchor_updateability = can_update:
             n.annotation.anchor.kind = relative
 
     @guidance
@@ -285,7 +327,10 @@ rule EmitPriorComments {
         --
         -- CPP-injected comments may carry a different filename in their
         -- RealSrcSpan, so comparison uses ss2pos rather than the RealSrcSpan
-        -- Ord instance (which compares filename first).
+        -- Ord instance (which compares filename first).  The three fake
+        -- filenames are "CPP", "LINE", and "SHEBANG"; see the CppAwareComparison
+        -- contract in exact-print-cpp.allium for the normative statement of this
+        -- requirement and the CppCommentOrigin enum for the origin taxonomy.
         --
         -- A companion path handles comments inside a node's span:
         -- commentAllocationIn partitions by ss2posEnd(comment) <= ss2posEnd(node).
@@ -421,9 +466,9 @@ rule TokComment {
         -- The NoCommentsLocation from the GenLocated wrapper is carried through unchanged.
 }
 
--- Convert an EpaDocComment into one printer Comment per Haddock doc chunk.
--- EpaDocComment is the only comment kind that expands to multiple Comments;
--- all other kinds are handled by TokComment above.
+-- Convert an EpaDocComment into zero or more printer Comments.
+-- EpaDocComment is the only comment kind whose expansion count varies;
+-- all other kinds produce exactly one Comment (handled by TokComment above).
 rule TokCommentDoc {
     when: TokComment(epa_comment)
     requires: epa_comment.tok.kind = doc_comment
@@ -437,12 +482,26 @@ rule TokCommentDoc {
             )
     @guidance
         -- Implemented by the EpaDocComment branch of tokComment, which calls
-        -- hsDocStringComments (Utils.hs).
-        -- docChunks is a black box: it decomposes the HsDocString carried by the
-        -- EpaDocComment into a sequence of DocChunks, one per LHsDocStringChunk.
-        -- The first chunk's prior_token_span = epa_comment.prior_token_span;
-        -- subsequent chunks use the end span of their predecessor chunk as their
-        -- prior_token_span. All chunks have keyword_origin = null.
+        -- hsDocStringComments (Utils.hs). The number of Comments produced
+        -- depends on which HsDocString constructor the EpaDocComment carries:
+        --
+        -- MultiLineDocString dec (x :| xs):
+        --   Produces 1 + length(xs) Comments, one per LHsDocStringChunk.
+        --   The first chunk uses the decorator prefix ("-- |", "-- ^", etc.)
+        --   and epa_comment.prior_token_span as its prior_token_span.
+        --   Subsequent chunks use the end span of their predecessor as their
+        --   prior_token_span. All chunks have keyword_origin = null.
+        --   This is the "multiple Comments" case.
+        --
+        -- NestedDocString dec chunk:
+        --   Produces exactly 1 Comment in block-comment form ("{- ... -}").
+        --   location = epa_comment.location (the EpaDocComment's own location).
+        --   prior_token_span = epa_comment.prior_token_span.
+        --
+        -- GeneratedDocString _:
+        --   Produces 0 Comments. This constructor is generated by the
+        --   compiler and should not appear in user-written source; it is
+        --   silently dropped.
 }
 
 -- Keyword tokens that lack a natural annotation slot in the surrounding EpAnn
@@ -619,7 +678,7 @@ surface ExactPrintApi {
         caller
 
     provides:
-        ExactPrint(caller, options: PrintOptions)
+        ExactPrint(caller)
         ExactPrintWithOptions(caller, options: PrintOptions)
         MakeDeltaAst(caller)
 
