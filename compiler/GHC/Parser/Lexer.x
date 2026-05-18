@@ -2274,8 +2274,9 @@ tok_quoted_label span buf len _buf2 = do
 tok_qstrings :: Action -> Action
 tok_qstrings lex_str span0 buf0 len0 endBuf0 = do
   let modName = ModuleName $ lexemeToFastString buf0 modNameLen
-  (src, meta, s) <- unITstring <$> lex_str strSpan strBuf strLen endBuf0
-  pure $ L span0 $ ITstring src meta{strMetaQualified = Just modName} s
+  (span1, src, meta, s) <- unITstring <$> lex_str strSpan strBuf strLen endBuf0
+  let span2 = mkPsSpan (psSpanStart span0) (psSpanEnd span1)
+  pure $ L span2 $ ITstring src meta{strMetaQualified = Just modName} s
   where
     -- The buffer/span starting at the string literal
     (strBuf, strSpanStart) =
@@ -2298,7 +2299,7 @@ tok_qstrings lex_str span0 buf0 len0 endBuf0 = do
     strSpan = mkPsSpan strSpanStart (psSpanEnd span0)
 
     unITstring = \case
-      L _ (ITstring src meta s) -> (src, meta, s)
+      L span1 (ITstring src meta s) -> (span1, src, meta, s)
       tok -> panic $ "tok_qstrings got unexpected token: " ++ show tok
 
 tok_char :: Action
