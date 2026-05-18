@@ -114,7 +114,7 @@ enable the quotation subset of Template Haskell (i.e. without top-level splices)
 -  A quasi-quotation can appear in a pattern, type, expression, or
    declaration context and is also written in Oxford brackets:
 
-   -  ``[varid| ... |]``, where the "..." is an arbitrary string; a full
+   -  ``[⟨varid⟩| ... |]``, where the "..." is an arbitrary string; a full
       description of the quasi-quotation facility is given in
       :ref:`th-quasiquotation`.
 

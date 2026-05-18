@@ -65,19 +65,19 @@ The following syntax is stolen:
     :ref:`discussion on quasi-quoting <quasi-quotes-list-comprehension-ambiguity>`
     for details.
 
-``$(``, ``$$(``, ``$varid``, ``$$varid``
+``$(``, ``$$(``, ``$⟨varid⟩``, ``$$⟨varid⟩``
     .. index::
        single: Template Haskell
 
     Stolen by: :extension:`TemplateHaskell`
 
-``[varid|``
+``[⟨varid⟩|``
     .. index::
        single: quasi-quotation
 
     Stolen by: :extension:`QuasiQuotes`
 
-⟨varid⟩, ``#``\ ⟨char⟩, ``#``, ⟨string⟩, ``#``, ⟨integer⟩, ``#``, ⟨float⟩, ``#``, ⟨float⟩, ``##``
+⟨varid⟩``#``, ⟨char⟩``#``, ⟨string⟩``#``, ⟨integer⟩``#``, ⟨float⟩``#``, ⟨float⟩``##``
     Stolen by: :extension:`MagicHash`
 
 ⟨integer⟩, ``#(Int|Word)(8|16|32|64)?``
