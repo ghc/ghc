@@ -1,4 +1,4 @@
-LIBRARY libHSghc-internal-@ProjectVersionForLib@.0-ghc@ProjectVersion@.dll
+LIBRARY @GhcInternalDll@
 
 EXPORTS
     init_ghc_hs_iface
