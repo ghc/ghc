@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -139,10 +140,12 @@ module GHC.Base
     ) where
 
 import GHC.Internal.Base hiding ( NonEmpty(..) )
+import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
+#if __GLASGOW_HASKELL__ >= 1000
 import GHC.Internal.Classes
 import GHC.Internal.CString
-import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
 import GHC.Internal.Magic.Dict ( WithDict(..) )
+#endif
 import GHC.Prim hiding
   (
   -- Hide dataToTag# ops because they are expected to break for
@@ -273,6 +276,7 @@ import GHC.Prim hiding
   , minWord8X16#
   , minWord8X32#
   , minWord8X64#
+#if __GLASGOW_HASKELL__ >= 1000
   -- Don't re-export vector logical primops
   , andDoubleX2#
   , andDoubleX4#
@@ -389,13 +393,16 @@ import GHC.Prim hiding
   , sqrtDoubleX4#
   , sqrtFloatX16#
   , sqrtDoubleX8#
+#endif
   )
 
 import GHC.Prim.Ext
 import GHC.Prim.PtrEq
 import GHC.Internal.Err
 import GHC.Internal.IO (seq#)
+#if __GLASGOW_HASKELL__ >= 1000
 import GHC.Internal.Magic
+#endif
 import GHC.Internal.Maybe
 import GHC.Types hiding (
   Unit#,

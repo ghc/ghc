@@ -7,7 +7,7 @@ module GHC.Weak.Finalize
       -- this handler will be ignored.
       setFinalizerExceptionHandler
     , getFinalizerExceptionHandler
-    , printToHandleFinalizerExceptionHandler
+    , GHC.Weak.Finalize.printToHandleFinalizerExceptionHandler
       -- * Internal
     , GHC.Weak.Finalize.runFinalizerBatch
     ) where

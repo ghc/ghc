@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ExplicitNamespaces #-}
@@ -176,14 +177,16 @@ import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Traversable ( Traversable(..) )
 import GHC.Internal.Data.Tuple
 
-import GHC.Internal.Base hiding ( foldr, mapM, sequence )
+#if __GLASGOW_HASKELL__ >= 1000
 import GHC.Internal.Classes
 import GHC.Internal.Err
+import GHC.Internal.Prim (seq)
+import GHC.Internal.Types
+#endif
+import GHC.Internal.Base hiding ( foldr, mapM, sequence )
 import Text.Read
 import GHC.Internal.Enum
 import GHC.Internal.Num
-import GHC.Internal.Prim (seq)
 import GHC.Internal.Real
 import GHC.Internal.Float
 import GHC.Internal.Show
-import GHC.Internal.Types

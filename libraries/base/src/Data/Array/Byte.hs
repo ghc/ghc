@@ -8,6 +8,7 @@
 --
 -- Derived from @primitive@ package.
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -32,7 +33,9 @@ import GHC.Internal.Show (intToDigit)
 import GHC.Internal.ST (ST(..), runST)
 import GHC.Internal.Word (Word8(..))
 import GHC.Internal.TH.Syntax
-import GHC.Internal.TH.Monad
+#if __GLASGOW_HASKELL__ >= 1000
+import GHC.Internal.TH.Monad (unsafeCodeCoerce)
+#endif
 import GHC.Internal.TH.Lift
 import GHC.Internal.ForeignPtr
 import Prelude

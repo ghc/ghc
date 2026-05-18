@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 
 -- |
@@ -50,4 +51,6 @@ module Control.Arrow
      ) where
 
 import GHC.Internal.Control.Arrow
+#if __GLASGOW_HASKELL__ >= 1000
 import GHC.Internal.Control.Monad.Fix (ArrowLoop(..))
+#endif

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -44,4 +45,6 @@ module GHC.Unicode
      ) where
 
 import GHC.Internal.Unicode
+#if __GLASGOW_HASKELL__ >= 1000
 import GHC.Internal.Unicode.Version
+#endif

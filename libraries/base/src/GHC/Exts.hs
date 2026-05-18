@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -246,6 +247,7 @@ import GHC.Prim hiding
   , minWord8X16#
   , minWord8X32#
   , minWord8X64#
+#if __GLASGOW_HASKELL__ >= 1000
   -- Don't re-export vector logical primops
   , andDoubleX2#
   , andDoubleX4#
@@ -362,6 +364,7 @@ import GHC.Prim hiding
   , sqrtDoubleX4#
   , sqrtFloatX16#
   , sqrtDoubleX8#
+#endif
   )
 
 import GHC.Prim.Ext

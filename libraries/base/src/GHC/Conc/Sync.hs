@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -89,4 +90,6 @@ module GHC.Conc.Sync
         ) where
 
 import GHC.Internal.Conc.Sync
+#if __GLASGOW_HASKELL__ >= 1000
 import GHC.Internal.STM
+#endif

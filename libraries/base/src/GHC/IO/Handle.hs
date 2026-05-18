@@ -1,4 +1,10 @@
+{-# LANGUAGE CPP #-}
+#if __GLASGOW_HASKELL__ < 1000
+{-# LANGUAGE Trustworthy #-}
+#else
 {-# LANGUAGE Safe #-}
+#endif
+{-# LANGUAGE RecordWildCards #-}
 
 -- |
 --
@@ -75,3 +81,19 @@ module GHC.IO.Handle
      ) where
 
 import GHC.Internal.IO.Handle
+
+#if __GLASGOW_HASKELL__ < 1000
+
+import GHC.Internal.Base (($), IO, return)
+import GHC.Internal.IO.Handle.Types (Handle__ (..))
+import GHC.Internal.IO.Handle.Internals (withHandle_)
+
+-- | Return the current 'NewlineMode' for the specified 'Handle'.
+--
+-- @since 4.23.0.0
+hGetNewlineMode :: Handle -> IO NewlineMode
+hGetNewlineMode hdl =
+  withHandle_ "hGetNewlineMode" hdl $ \Handle__{..} ->
+    return NewlineMode{ inputNL = haInputNL, outputNL = haOutputNL }
+
+#endif

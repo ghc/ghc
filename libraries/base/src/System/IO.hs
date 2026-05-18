@@ -279,7 +279,11 @@ import GHC.IO.StdHandles
            stdout,
            stderr
        )
+#if __GLASGOW_HASKELL__ < 1000
+import GHC.Internal.System.IO (fixIO)
+#else
 import GHC.Internal.Control.Monad.Fix (fixIO)
+#endif
 import Control.Monad (return, (>>=))
 import Control.Exception (ioError)
 import Data.Eq ((==))

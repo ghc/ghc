@@ -119,7 +119,9 @@ module GHC.Conc
 
 import GHC.Internal.Conc.IO
 import GHC.Internal.Conc.Sync
+#if __GLASGOW_HASKELL__ >= 1000
 import GHC.Internal.STM
+#endif
 
 #if !defined(mingw32_HOST_OS)
 import GHC.Internal.Conc.Signal

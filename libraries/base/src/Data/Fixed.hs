@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE PolyKinds #-}
@@ -91,7 +92,11 @@ import GHC.Internal.TypeLits (KnownNat, natVal)
 import GHC.Internal.Read
 import GHC.Internal.Text.ParserCombinators.ReadPrec
 import GHC.Internal.Text.Read.Lex
-import qualified GHC.Internal.TH.Monad as TH
+#if __GLASGOW_HASKELL__ < 1000
+import GHC.Internal.TH.Syntax (unsafeCodeCoerce)
+#else
+import GHC.Internal.TH.Monad (unsafeCodeCoerce)
+#endif
 import qualified GHC.Internal.TH.Lift as TH
 import Data.Typeable
 import Prelude
@@ -147,7 +152,7 @@ instance (Typeable k,Typeable a) => Data (Fixed (a :: k)) where
 -- @since template-haskell-2.19.0.0
 -- @since base-4.21.0.0
 instance TH.Lift (Fixed a) where
-  liftTyped x = TH.unsafeCodeCoerce (TH.lift x)
+  liftTyped x = unsafeCodeCoerce (TH.lift x)
   lift (MkFixed x) = [| MkFixed x |]
 
 -- | Types which can be used as a resolution argument to the 'Fixed' type constructor must implement the 'HasResolution'  typeclass.

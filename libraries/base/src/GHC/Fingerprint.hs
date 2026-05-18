@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 
 module GHC.Fingerprint (
@@ -9,6 +10,8 @@ module GHC.Fingerprint (
    ) where
 
 import GHC.Internal.Fingerprint
+
+#if __GLASGOW_HASKELL__ >= 1000
 
 import Data.Function (($))
 import Control.Monad (return, when)
@@ -51,3 +54,5 @@ getFileHash path = withBinaryFile path ReadMode $ \ hdl ->
                  )
             return (if isFinished then Just chunkSize else Nothing)
     in fingerprintBufferedStream readChunk
+
+#endif

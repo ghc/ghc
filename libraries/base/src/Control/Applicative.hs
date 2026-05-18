@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -64,8 +65,13 @@ import GHC.Internal.Data.Data (Data)
 
 import GHC.Internal.Base (
     Alternative(..), Applicative(..), Functor(..), Monad(..), MonadPlus(..),
-    ap, const, liftA, liftA3, liftM, liftM2, thenA, (.), (<**>),
+    ap, const, liftA, liftA3, liftM, liftM2, (.), (<**>),
   )
+#if __GLASGOW_HASKELL__ < 1000
+import GHC.Internal.Base (id)
+#else
+import GHC.Internal.Base (thenA)
+#endif
 import GHC.Internal.Functor.ZipList (ZipList(..))
 import GHC.Internal.Types
 import GHC.Generics
@@ -148,3 +154,19 @@ deriving instance (Typeable (a :: Type -> Type -> Type), Typeable b, Typeable c,
 
 optional :: Alternative f => f a -> f (Maybe a)
 optional v = Just <$> v <|> pure Nothing
+
+#if __GLASGOW_HASKELL__ < 1000
+
+-- | Sequence two `Applicative` actions, discarding the result of the first one.
+--
+-- Defined as `thenA fa fb = (id <$ fa) <*> fb`.
+--
+-- This can be used to explicitly define `(*>) = thenA`, which is the default
+-- definition.
+--
+-- @since 4.23.0.0
+thenA :: Applicative f => f a -> f b -> f b
+thenA fa fb = (id <$ fa) <*> fb
+{-# INLINEABLE thenA #-}
+
+#endif
