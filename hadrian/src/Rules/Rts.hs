@@ -13,11 +13,19 @@ rtsRules = priority 3 $ do
     -- to be linked into the rts dll.
     forM_ [Stage1, Stage2, Stage3 ] $ \ stage -> do
         let buildPath = root -/- buildDir (rtsContext stage)
-        buildPath -/- "libHSghc-internal.dll.a" %> buildGhcInternalImportLib
+        buildPath -/- "libHSghc-internal-*.def" %> buildGhcInternalImportDef
+        buildPath -/- "libHSghc-internal-*.dll.a" %> buildGhcInternalImportLib
+
+buildGhcInternalImportDef :: FilePath -> Action ()
+buildGhcInternalImportDef target = do
+    templateIn <- readFile' "rts/win32/libHSghc-internal.def.in"
+    let dllName = takeFileName target -<.> "dll"
+        templateOut = replace "@GhcInternalDll@" dllName templateIn
+    writeFile' target templateOut
 
 buildGhcInternalImportLib :: FilePath -> Action ()
 buildGhcInternalImportLib target = do
-    let input  = "rts/win32/libHSghc-internal.def"
+    let input = dropExtensions target <.> "def" -- the .def file
         output = target -- the .dll.a import lib
     need [input]
     runBuilder Dlltool ["-d", input, "-l", output] [input] [output]

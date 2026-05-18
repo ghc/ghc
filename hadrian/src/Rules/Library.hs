@@ -9,6 +9,7 @@ import GHC.Toolchain.Target (Target(tgtArchOs))
 
 import Base
 import Context
+import qualified Data.List as List
 import Expression hiding (way, package, stage)
 import Oracles.ModuleFiles
 import Packages
@@ -20,6 +21,7 @@ import Utilities
 import Data.Time.Clock
 import Rules.Generate (generatedDependencies)
 import Oracles.Flag
+import Way.Type (wayToUnits)
 
 
 -- * Library 'Rules'
@@ -203,12 +205,31 @@ extraObjects context
 
     | package context == rts = do
           target   <- interpretInContext context getStagedTarget
-          builddir <- buildPath context
-          return [ builddir -/- "libHSghc-internal.dll.a"
-                 | archOS_OS (tgtArchOs target) == OSMinGW32
-                 , Dynamic `wayUnit` way context ]
+          if not (archOS_OS (tgtArchOs target) == OSMinGW32
+                && Dynamic `wayUnit` way context)
+          then return []
+          else do
+            -- Find the ghc-internal library file name. Note that the
+            -- ghc-internal's .dll.a file is placed in the RTS build dir and not
+            -- the ghc-internal build dir as we only use it when building the
+            -- RTS and not other libraries.
+            ghcInternalDllName <- takeFileName <$> pkgLibraryFile Context {
+                    stage = stage context,
+                    way = rtsWayToLibraryWay (way context),
+                    iplace = iplace context,
+                    package = ghcInternal
+                }
+
+            builddir <- buildPath context
+            return [ builddir -/- ghcInternalDllName <> ".a"]
 
     | otherwise = return []
+
+-- | The rts is compiled in many different ways, but libraries are only built in
+-- (non)Dynamic and (non)Profiled ways. This function converts the rts way into
+-- compatible library way.
+rtsWayToLibraryWay :: Way -> Way
+rtsWayToLibraryWay = wayFromUnits . List.intersect [Dynamic, Profiling] . wayToUnits
 
 -- | Return all the object files to be put into the library we're building for
 -- the given 'Context'.
