@@ -922,3 +922,8 @@ TestNamedDefaults:
 PprModifiers:
 	$(CHECK_PPR)   $(LIBDIR) PprModifiers.hs
 	$(CHECK_EXACT) $(LIBDIR) PprModifiers.hs
+
+.PHONY: PprQualifiedStrings
+PprQualifiedStrings:
+	$(CHECK_PPR)   $(LIBDIR) PprQualifiedStrings.hs
+	$(CHECK_EXACT) $(LIBDIR) PprQualifiedStrings.hs
