@@ -11,6 +11,7 @@ module GHC.Core.Utils (
         -- * Constructing expressions
         mkCast, mkCastMCo, mkPiMCo,
         mkTick, mkTicks, mkTickNoHNF, tickHNFArgs,
+        mkTickCpe,
         bindNonRec, needsCaseBinding, needsCaseBindingL,
         mkAltExpr, mkDefaultCase, mkSingleAltCase,
 
@@ -304,7 +305,18 @@ mkCast expr co
 -- | Wraps the given expression in the source annotation, dropping the
 -- annotation if possible.
 mkTick :: CoreTickish -> CoreExpr -> CoreExpr
-mkTick t orig_expr = mkTick' id orig_expr
+mkTick = mk_tick False
+
+-- | A version of 'mkTick' that preserves ANF, for use in Core Prep.
+--
+-- See Note [mkTick breaks ANF] in GHC.CoreToStg.Prep.
+mkTickCpe :: CoreTickish -> CoreExpr -> CoreExpr
+mkTickCpe = mk_tick True
+
+-- | Internal function used to define both 'mkTick' and 'mkTickCpe'
+-- without duplication.
+mk_tick :: Bool -> CoreTickish -> CoreExpr -> CoreExpr
+mk_tick preserve_anf t orig_expr = mkTick' id orig_expr
  where
   -- Some ticks (cost-centres) can be split in two, with the
   -- non-counting part having laxer placement properties.
@@ -362,7 +374,7 @@ mkTick t orig_expr = mkTick' id orig_expr
       -- floated, and the lambda may then be in a position to be
       -- beta-reduced.
       | canSplit
-      -> Tick (mkNoScope t) $ rest $ Lam x $ mkTick (mkNoCount t) e
+      -> Tick (mkNoScope t) $ rest $ Lam x $ mk_tick preserve_anf (mkNoCount t) e
 
     App f arg
       -- Always float through type applications.
@@ -371,7 +383,9 @@ mkTick t orig_expr = mkTick' id orig_expr
 
       -- We can also float through constructor applications, placement
       -- permitting. Again we can split.
-      | isSaturatedConApp expr && (tickishPlace t==PlaceCostCentre || canSplit)
+      | not preserve_anf -- this optimisation breaks ANF;
+                         -- see Note [mkTick breaks ANF] in GHC.CoreToStg.Prep
+      , isSaturatedConApp expr && (tickishPlace t==PlaceCostCentre || canSplit)
       -> if tickishPlace t == PlaceCostCentre
          then rest $ tickHNFArgs t expr
          else Tick (mkNoScope t) $ rest $ tickHNFArgs (mkNoCount t) expr
