@@ -2149,7 +2149,7 @@ primop  SizeofMutableByteArrayOp "sizeofMutableByteArray#" GenPrimOp
 
 primop  GetSizeofMutableByteArrayOp "getSizeofMutableByteArray#" GenPrimOp
    MutableByteArray# s -> State# s -> (# State# s, Int# #)
-   {Return the number of elements in the array, correctly accounting for
+   {Return the number of bytes in the array, correctly accounting for
    the effect of 'shrinkMutableByteArray#' and 'resizeMutableByteArray#'.
 
    @since 0.5.0.0}
