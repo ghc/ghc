@@ -3145,6 +3145,12 @@ instance ExactPrint (HsExpr GhcPs) where
     body' <- markAnnotated body
     return (HsQual noExtField ctxt' body')
 
+  exact (HsQualLit _ (QualLit _ modu (HsQualString src fs))) = do
+    modu' <- markAnnotated modu
+    printStringAdvanceA "."
+    printSourceTextAA src (show (unpackFS fs))
+    return (HsQualLit noExtField (QualLit noExtField modu' (HsQualString src fs)))
+
   exact x = error $ "exact HsExpr for:" ++ showAst x
 
 -- ---------------------------------------------------------------------
