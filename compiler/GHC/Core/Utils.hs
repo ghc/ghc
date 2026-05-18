@@ -11,6 +11,7 @@ module GHC.Core.Utils (
         -- * Constructing expressions
         mkCast, mkCastMCo, mkPiMCo,
         mkTick, mkTicks, mkTickNoHNF, tickHNFArgs,
+        mkTickCpe,
         bindNonRec, needsCaseBinding, needsCaseBindingL,
         mkAltExpr, mkDefaultCase, mkSingleAltCase,
 
@@ -319,7 +320,18 @@ mkCast expr co
 --   * Split profiling ticks into counting/scoping parts so that the two parts
 --     can be placed independently into the AST.
 mkTick :: CoreTickish -> CoreExpr -> CoreExpr
-mkTick t orig_expr = mkTick' orig_expr
+mkTick = mk_tick False
+
+-- | A version of 'mkTick' that preserves ANF, for use in Core Prep.
+--
+-- See Note [mkTick breaks ANF] in GHC.CoreToStg.Prep.
+mkTickCpe :: CoreTickish -> CoreExpr -> CoreExpr
+mkTickCpe = mk_tick True
+
+-- | Internal function used to define both 'mkTick' and 'mkTickCpe'
+-- without duplication.
+mk_tick :: Bool -> CoreTickish -> CoreExpr -> CoreExpr
+mk_tick preserve_anf t orig_expr = mkTick' orig_expr
  where
   -- Some ticks (cost-centres) can be split in two, with the
   -- non-counting part having laxer placement properties.
@@ -343,7 +355,7 @@ mkTick t orig_expr = mkTick' orig_expr
       -- Push SCCs into lambdas.
       -- See (PSCC2) in Note [Pushing SCCs inwards].
       | can_split
-      -> Tick (mkNoScope t) $ Lam x $ mkTick (mkNoCount t) e
+      -> Tick (mkNoScope t) $ Lam x $ mk_tick preserve_anf (mkNoCount t) e
 
     App f arg
       -- All ticks float inwards through non-runtime arguments, as per
@@ -353,7 +365,9 @@ mkTick t orig_expr = mkTick' orig_expr
 
       -- Push SCCs into saturated constructor applications.
       -- See (PSCC3) in Note [Pushing SCCs inwards].
-      | isSaturatedConApp expr
+      | not preserve_anf -- this optimisation breaks ANF;
+                         -- see Note [mkTick breaks ANF] in GHC.CoreToStg.Prep
+      , isSaturatedConApp expr
       , tickishPlace t == PlaceCostCentre || can_split
       -> if tickishPlace t == PlaceCostCentre
          then tickHNFArgs t expr

@@ -801,7 +801,9 @@ cpeBodyF env (Tick tickish expr)
        ; return (FloatTick tickish `consFloat` floats, body) }
   | otherwise
   = do { body <- cpeBody env expr
-       ; return (emptyFloats, mkTick tickish' body) }
+       ; return (emptyFloats, mkTickCpe tickish' body) }
+    -- Use mkTickCpe and not mkTick, as the latter may break ANF (#27182).
+    -- See (TickANF2) in Note [mkTick breaks ANF].
   where
     tickish' | Breakpoint ext bid fvs <- tickish
              -- See also 'substTickish'
@@ -904,6 +906,28 @@ cpeBodyF env (Case scrut bndr ty alts)
        = do { (env2, bs') <- cpCloneBndrs env bs
             ; rhs' <- cpeBody env2 rhs
             ; return (Alt con bs' rhs') }
+
+{- Note [mkTick breaks ANF]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+mkTick does not preserve the ANF property as required by Core Prep (see
+Note [CorePrep invariants]), as seen in #27182. Given:
+
+  mkTick scc<foo> (\ (eta :: Char -> Bool) -> BindP (p :: Int) eta)
+
+mkTick will push the SCC into the constructor application, resulting in:
+
+  \ (eta :: Char -> Bool) -> BindP (p :: Int) (scc<oneM> eta)
+
+To avoid this problem (at least until 'mkTick' is more thoroughly reworked to
+avoid this infelicity, see #27141), we define a variant of 'mkTick', called
+'mkTickCpe', which does not push ticks into constructor applications (this is
+the only optimisation done by 'mkTick' that can break ANF).
+
+We prefer using a small variant of 'mkTick' rather than using the 'Tick'
+constructor, as the latter can slightly degrade profiling reports by failing to
+combine ticks (can result in spurious cost centres with 0 entries appearing in
+profiling reports).
+-}
 
 -- ---------------------------------------------------------------------------
 --              CpeBody: produces a result satisfying CpeBody
@@ -1207,7 +1231,7 @@ cpeApp top_env expr
     rebuild_app' env (a : as) fun' floats ss rt_ticks req_depth = case a of
       -- See Note [Ticks and mandatory eta expansion]
       _ | not (null rt_ticks), req_depth <= 0
-        -> let tick_fun = foldr mkTick fun' rt_ticks
+        -> let tick_fun = foldr mkTickCpe fun' rt_ticks
            in rebuild_app' env (a : as) tick_fun floats ss rt_ticks req_depth
 
       AIApp (Type arg_ty)
@@ -2305,7 +2329,7 @@ wrapBinds floats body
     mk_bind (UnsafeEqualityCase scrut b con bs) body
       = mkSingleAltCase scrut b con bs body
     mk_bind (FloatTick tickish) body
-      = mkTick tickish body
+      = mkTickCpe tickish body
 
 -- | Put floats at top-level
 deFloatTop :: Floats -> [CoreBind]
@@ -2733,7 +2757,7 @@ newVar env ty
 wrapTicks :: Floats -> CoreExpr -> (Floats, CoreExpr)
 wrapTicks floats expr
   | (floats1, ticks1) <- fold_fun go floats
-  = (floats1, foldrOL mkTick expr ticks1)
+  = (floats1, foldrOL mkTickCpe expr ticks1)
   where fold_fun f floats =
            let (binds, ticks) = foldlOL f (nilOL,nilOL) (fs_binds floats)
            in (floats { fs_binds = binds }, ticks)
@@ -2753,8 +2777,8 @@ wrapTicks floats expr
 
         wrap t (Float bind bound info) = Float (wrapBind t bind) bound info
         wrap _ f                 = pprPanic "Unexpected FloatingBind" (ppr f)
-        wrapBind t (NonRec binder rhs) = NonRec binder (mkTick t rhs)
-        wrapBind t (Rec pairs)         = Rec (mapSnd (mkTick t) pairs)
+        wrapBind t (NonRec binder rhs) = NonRec binder (mkTickCpe t rhs)
+        wrapBind t (Rec pairs)         = Rec (mapSnd (mkTickCpe t) pairs)
 
 ------------------------------------------------------------------------------
 -- Numeric literals
