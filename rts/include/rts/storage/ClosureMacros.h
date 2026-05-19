@@ -322,8 +322,10 @@ EXTERN_INLINE bool LOOKS_LIKE_PTR (const void* p)
 EXTERN_INLINE bool LOOKS_LIKE_INFO_PTR_NOT_NULL (StgWord p);
 EXTERN_INLINE bool LOOKS_LIKE_INFO_PTR_NOT_NULL (StgWord p)
 {
+NO_WARN(-Warray-bounds,
     StgInfoTable *info = INFO_PTR_TO_STRUCT((StgInfoTable *)p);
     return info->type != INVALID_OBJECT && info->type < N_CLOSURE_TYPES;
+)
 }
 
 EXTERN_INLINE bool LOOKS_LIKE_INFO_PTR (StgWord p);
