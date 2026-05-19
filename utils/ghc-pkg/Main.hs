@@ -1809,7 +1809,7 @@ checkConsistency verbosity my_flags = do
               all_ps = map mungedId pkgs1
 
   let not_broken_pkgs = filterOut broken_pkgs pkgs
-      (_, trans_broken_pkgs) = closure [] not_broken_pkgs
+      trans_broken_pkgs = brokenPackages not_broken_pkgs
 
       all_broken_pkgs :: [InstalledPackageInfo]
       all_broken_pkgs = broken_pkgs ++ trans_broken_pkgs
@@ -1828,26 +1828,26 @@ checkConsistency verbosity my_flags = do
   when (not (null all_broken_pkgs)) $ exitWith (ExitFailure 1)
 
 
-closure :: [InstalledPackageInfo] -> [InstalledPackageInfo]
-        -> ([InstalledPackageInfo], [InstalledPackageInfo])
-closure pkgs db_stack = go pkgs db_stack
- where
-   go avail not_avail =
-     case partition (depsAvailable avail) not_avail of
-        ([],        not_avail') -> (avail, not_avail')
-        (new_avail, not_avail') -> go (new_avail ++ avail) not_avail'
-
-   depsAvailable :: [InstalledPackageInfo] -> InstalledPackageInfo
-                 -> Bool
-   depsAvailable pkgs_ok pkg = null dangling
-        where dangling = filter (`notElem` pids) (depends pkg)
-              pids = map installedUnitId pkgs_ok
-
-        -- we want mutually recursive groups of package to show up
-        -- as broken. (#1750)
-
+-- | Compute the set of transitive broken packages.
+--
+-- A package is assumed to be broken if any of its dependencies is not
+-- found in the 'db_stack' after a transitive reduction.
 brokenPackages :: [InstalledPackageInfo] -> [InstalledPackageInfo]
-brokenPackages pkgs = snd (closure [] pkgs)
+brokenPackages db_stack = go Set.empty db_stack
+  where
+    go avail_ids not_avail =
+      case partition (depsAvailable avail_ids) not_avail of
+        ([],        not_avail') -> not_avail'
+        (new_avail, not_avail') -> go (add new_avail avail_ids) not_avail'
+
+    add new_avail avail_ids =
+      foldl' (flip Set.insert) avail_ids (map installedUnitId new_avail)
+
+    depsAvailable :: Set.Set UnitId -> InstalledPackageInfo -> Bool
+    depsAvailable pids pkg = all (`Set.member` pids) (depends pkg)
+
+      -- we want mutually recursive groups of package to show up
+      -- as broken. (#1750)
 
 -----------------------------------------------------------------------------
 -- Sanity-check a new package config, and automatically build GHCi libs
