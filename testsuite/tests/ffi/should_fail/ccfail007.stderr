@@ -1,0 +1,6 @@
+ccfail007.hs:3:1: error: [GHC-41843]
+    • Unacceptable result type in foreign declaration:
+        IO result type expected
+    • When checking declaration:
+        foreign import ccall safe "wrapper" f :: (Int -> Int) -> Int
+

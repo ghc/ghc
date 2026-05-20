@@ -1,0 +1,4 @@
+ccfail009.hs:7:1: error: [GHC-26133]
+    • The safe/unsafe annotation should not be used with `foreign import prim'.
+    • When checking declaration:
+        foreign import prim unsafe "my_primop" myPrimop :: Int# -> Int#

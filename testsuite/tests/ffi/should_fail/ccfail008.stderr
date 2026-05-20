@@ -1,0 +1,6 @@
+ccfail008.hs:3:1: error: [GHC-07641]
+    • Unacceptable type in foreign declaration:
+        At least one argument expected
+    • When checking declaration:
+        foreign import ccall safe "dynamic" f :: IO Int
+

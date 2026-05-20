@@ -1,0 +1,4 @@
+TH_cvt_InvalidTyFamInstLHS.hs:7:2: error: [GHC-78486]
+    Invalid type family instance LHS: WildCardT
+    When splicing a TH declaration: type instance _ = Int
+

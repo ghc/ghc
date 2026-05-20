@@ -6252,7 +6252,7 @@ pprConversionFailReason = \case
   ImplicitParamsWithOtherBinds ->
     text "Implicit parameters mixed with other bindings"
   InvalidCCallImpent from ->
-    text (show from) <+> text "is not a valid ccall impent"
+    text (show from) <+> text "is not a valid ccall import entity"
   RecGadtNoCons ->
     quotes (text "RecGadtC") <+> text "must have at least one constructor name"
   GadtNoCons ->
@@ -6459,9 +6459,6 @@ pprImportLookup = \case
        2 (ppr rdr)
   ImportLookupIllegal ->
     text "Illegal import item"
-  ImportLookupAmbiguous rdr gres ->
-    hang (text "Ambiguous name" <+> quotes (ppr rdr) <+> text "in import item. It could refer to:")
-       2 (vcat (map (ppr . greOccName) gres))
 
 pprUnusedImport :: ImportDecl GhcRn -> UnusedImportReason -> SDoc
 pprUnusedImport decl = \case

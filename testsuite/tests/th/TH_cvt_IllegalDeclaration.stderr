@@ -1,0 +1,5 @@
+TH_cvt_IllegalDeclaration.hs:7:2: error: [GHC-23882]
+    Illegal declaration in an instance declaration: data Bar
+    When splicing a TH declaration: instance Foo
+    where {data Bar}
+
