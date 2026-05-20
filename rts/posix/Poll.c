@@ -195,6 +195,13 @@ void syncIOCancelPoll(Capability *cap, StgTSO *tso)
      * status, as that is done by removeFromQueues (in the throwTo* functions).
      */
     tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
+
+    /* We are in the TSO case, where the aiop was only reachable from the TSO
+     * itself, and thus it is now no longer be reachable at all.
+     */
+    IF_NONMOVING_WRITE_BARRIER_ENABLED {
+        updateRemembSetPushClosure(cap, (StgClosure *)aiop);
+    }
 }
 
 
@@ -253,7 +260,6 @@ static void notifyIOCompletion(Capability *cap, StgAsyncIOOp *aiop)
                            " blocked on an invalid fd", tso->id);
                 raiseAsync(cap, tso, (StgClosure *)blockedOnBadFD_closure,
                            false, NULL);
-                break;
             } else {
                 /* We should be guaranteed that the tso is still on the same
                  * cap because the tso was not on the run queue of any cap and
@@ -263,6 +269,12 @@ static void notifyIOCompletion(Capability *cap, StgAsyncIOOp *aiop)
                 tso->why_blocked = NotBlocked;
                 tso->_link       = END_TSO_QUEUE;
                 pushOnRunQueue(cap, tso);
+            }
+            /* For the TSO case, the aiop was only reachable from the TSO
+             * itself, and thus it is now no longer be reachable at all.
+             */
+            IF_NONMOVING_WRITE_BARRIER_ENABLED {
+                updateRemembSetPushClosure(cap, (StgClosure *)aiop);
             }
             break;
         }
