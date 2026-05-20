@@ -1,0 +1,6 @@
+TH_cvt_DefaultDataInstDecl.hs:7:2: error: [GHC-39639]
+    Default data instance declarations are not allowed:
+    [data instance Bar]
+    When splicing a TH declaration: class Foo
+    where {data Bar}
+

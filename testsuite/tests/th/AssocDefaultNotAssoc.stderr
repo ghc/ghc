@@ -1,0 +1,4 @@
+AssocDefaultNotAssoc.hs:9:2: error: [GHC-78822]
+    • Class ‘Cls’ does not have an associated type ‘F’
+    • In the class declaration for ‘Cls’
+
