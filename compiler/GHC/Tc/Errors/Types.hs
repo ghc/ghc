@@ -2157,7 +2157,7 @@ data TcRnMessage where
      Example(s):
      foreign import prim unsafe "my_primop_cmm" :: ...
 
-    Test cases: None
+    Test cases: ffi/should_fail/ccfail009
   -}
   TcRnForeignImportPrimSafeAnn :: ForeignImport GhcRn -> TcRnMessage
 
@@ -2215,6 +2215,9 @@ data TcRnMessage where
 
     Test cases: ffi/should_fail/T3066
                 ffi/should_fail/ccfail004
+                ffi/should_fail/ccfail006
+                ffi/should_fail/ccfail007
+                ffi/should_fail/ccfail008
                 ffi/should_fail/T10461
                 ffi/should_fail/T7506
                 ffi/should_fail/T5664
@@ -6619,14 +6622,6 @@ data ImportLookupReason where
       ImportLookupIllegal
   -}
   ImportLookupIllegal :: ImportLookupReason
-  {-| An item in an import list matches multiple names exported from that module.
-
-    Test cases:
-      None
-  -}
-  ImportLookupAmbiguous :: !RdrName -- ^ The name extracted from the import item
-                        -> ![GlobalRdrElt] -- ^ The potential matches
-                        -> ImportLookupReason
   deriving (Generic)
 
 -- | Distinguish record fields from other names for pretty-printing.
@@ -7009,8 +7004,9 @@ data AddTopDeclsError
       'addTopDecls' is not a function, value, annotation, or foreign import declaration.
 
        Example(s):
+       [d| data Foo |] >>= addTopDecls
 
-       Test cases:
+       Test cases: th/TH_InvalidTopDecl
     -}
     InvalidTopDecl !(HsDecl GhcPs)
     {-| UnexpectedDeclarationSplice is an error that occurs when a Template Haskell
