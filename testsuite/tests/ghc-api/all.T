@@ -81,3 +81,6 @@ test('T26910', [ extra_run_opts(f'"{config.libdir}"')
 test('TypeMapStringLiteral', normal, compile_and_run, ['-package ghc'])
 
 test('T25121_status', normal, compile_and_run, ['-package ghc'])
+test('T27273', [extra_run_opts(f'"{config.libdir}"')],
+               compile_and_run,
+               ['-package ghc'])

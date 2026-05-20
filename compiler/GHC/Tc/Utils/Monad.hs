@@ -790,9 +790,10 @@ withoutTcMPlugins thing_inside = do
       tcg_env <- getGblEnv
       writeTcRef (tcg_plugins tcg_env) $
         TcMPluginsRunning emptyRunningTcMPlugins
-    teardown = do
-      tcg_env <- getGblEnv
-      writeTcRef (tcg_plugins tcg_env) TcMPluginsStopped
+    teardown =
+      -- Don't set 'tcg_plugins' to 'TcMPluginsStopped', as that should only
+      -- be used when there were 'TcM' plugins to start with (#27273).
+      return ()
 
 -- | Initialise 'TcM' plugins.
 initTcMPlugins :: HscEnv -> TcM ()
@@ -946,32 +947,20 @@ shutdownTcMPlugins = \case
       runPluginShutdowns (tcs ++ defs)
 
 solverTcMPlugins :: HasDebugCallStack => TcMPluginsState -> [TcPluginSolver]
-solverTcMPlugins = \case
-  TcMPluginsUninitialised -> panic "solverTcMPlugins: TcM plugins not started"
-  TcMPluginsStopped -> panic "solverTcMPlugins: TcM plugins already stopped"
-  TcMPluginsRunning plugins ->
-    tcmp_solvers (tcMPluginsRunActions plugins)
+solverTcMPlugins =
+  tcmp_solvers . tcMPluginsRunActions . runningTcMPlugins
 
 rewriterTcMPlugins :: HasDebugCallStack => TcMPluginsState -> UniqFM TyCon [TcPluginRewriter]
-rewriterTcMPlugins = \case
-  TcMPluginsUninitialised -> panic "rewriterTcMPlugins: TcM plugins not started"
-  TcMPluginsStopped -> panic "rewriterTcMPlugins: TcM plugins already stopped"
-  TcMPluginsRunning plugins ->
-    tcmp_rewriters (tcMPluginsRunActions plugins)
+rewriterTcMPlugins =
+  tcmp_rewriters . tcMPluginsRunActions . runningTcMPlugins
 
 defaultingTcMPlugins :: HasDebugCallStack => TcMPluginsState -> [FillDefaulting]
-defaultingTcMPlugins = \case
-  TcMPluginsUninitialised -> panic "defaultingTcMPlugins: TcM plugins not started"
-  TcMPluginsStopped -> panic "defaultingTcMPlugins: TcM plugins already stopped"
-  TcMPluginsRunning plugins ->
-    tcmp_defaulters (tcMPluginsRunActions plugins)
+defaultingTcMPlugins =
+  tcmp_defaulters . tcMPluginsRunActions . runningTcMPlugins
 
 holeFitTcMPlugins :: HasDebugCallStack => TcMPluginsState -> [HoleFitPlugin]
-holeFitTcMPlugins = \case
-  TcMPluginsUninitialised -> panic "holeFitTcMPlugins: TcM plugins not started"
-  TcMPluginsStopped -> panic "holeFitTcMPlugins: TcM plugins already stopped"
-  TcMPluginsRunning plugins ->
-    tcmp_hole_fits (tcMPluginsRunActions plugins)
+holeFitTcMPlugins =
+  tcmp_hole_fits . tcMPluginsRunActions . runningTcMPlugins
 
 {-
 ************************************************************************

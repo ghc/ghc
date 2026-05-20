@@ -1250,14 +1250,17 @@ emptyTcMPluginsShutdown = TcMPluginsShutdown
 data TcMPluginsState
   -- | The 'TcM' plugins have not been started.
   = TcMPluginsUninitialised
-  -- | The 'TcM' plugins have been initialised and not yet stopped.
+  -- | The 'TcM' plugins have been initialised and not yet stopped,
+  -- or there were no 'TcM' plugins to start with.
   --
   -- We may be in the middle of typechecker, or have finished typechecking
   -- and be in the middle of desugaring.
   | TcMPluginsRunning !RunningTcMPlugins
-  -- | The 'TcM' plugins have been stopped.
+  -- | There were 'TcM' plugins that were running, but they have been stopped.
   | TcMPluginsStopped
 
+-- | A (possibly empty) collection of 'TcM' plugin @run@, @post-tc@ and
+-- @shutdown@ actions.
 data RunningTcMPlugins =
   RunningTcMPlugins
     { rtcmp_run      :: TcMPluginsRun
@@ -1281,11 +1284,20 @@ tcMPluginsShutdownActions = rtcmp_shutdown
 
 -- | Retrieve the 'TcM' plugins from a 'TcMPluginsState'.
 --
--- Assumes the plugins have been already started and not yet stopped.
+-- Assumes the plugins (if any) have been already started and not yet stopped.
 runningTcMPlugins
    :: HasDebugCallStack
    => TcMPluginsState -> RunningTcMPlugins
 runningTcMPlugins = \case
-  TcMPluginsUninitialised -> panic "runningTcMPlugins: TcM plugins not started"
-  TcMPluginsStopped -> panic "runningTcMPlugins: TcM plugins already stopped"
+  TcMPluginsUninitialised ->
+    pprPanic "TcM plugins have not been started" $
+      vcat [ text "If you are a GHC API user, make sure to use an appropriate 'TcMPluginHandling'"
+           , text "to ensure that TcM plugins (if any) are initialised before typechecking."
+           ]
+  TcMPluginsStopped ->
+    pprPanic "TcM plugins already stopped" $
+      vcat [ text "If you are a GHC API user and want to proceed to desugaring after typechecking,"
+           , text "make sure you are not using the 'StartAndStopTcMPlugins' 'TcMPluginHandling',"
+           , text "as that stops TcM plugins after typechecking."
+           ]
   TcMPluginsRunning plugins -> plugins
