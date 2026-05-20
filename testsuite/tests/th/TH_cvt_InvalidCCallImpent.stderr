@@ -1,0 +1,5 @@
+TH_cvt_InvalidCCallImpent.hs:7:2: error: [GHC-60220]
+    "foo bar baz" is not a valid ccall impent
+    When splicing a TH declaration:
+      foreign import ccall safe "foo bar baz" myFun :: T
+

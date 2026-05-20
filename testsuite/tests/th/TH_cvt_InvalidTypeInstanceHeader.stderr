@@ -1,0 +1,4 @@
+TH_cvt_InvalidTypeInstanceHeader.hs:7:2: error: [GHC-37056]
+    Invalid type instance header: WildCardT
+    When splicing a TH declaration: data instance _
+

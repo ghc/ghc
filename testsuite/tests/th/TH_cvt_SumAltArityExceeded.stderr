@@ -1,0 +1,4 @@
+TH_cvt_SumAltArityExceeded.hs:7:2: error: [GHC-68444]
+    Sum alternative 3 exceeds its arity, 2
+    When splicing a TH declaration: x = (# | |1 #)
+

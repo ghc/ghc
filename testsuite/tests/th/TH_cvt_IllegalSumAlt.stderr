@@ -1,0 +1,5 @@
+TH_cvt_IllegalSumAlt.hs:7:2: error: [GHC-63966]
+    Illegal sum alternative: 0
+      Sum alternatives must start from 1
+    When splicing a TH declaration: x = (# 1| | #)
+
