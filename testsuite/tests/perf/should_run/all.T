@@ -30,6 +30,13 @@ test('T10359',
      compile_and_run,
      ['-O'])
 
+test('T11226',
+     [collect_runtime_residency(10),
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O2'])
+
 test('T14955',
      [collect_stats('bytes allocated',5),
       only_ways(['normal'])
