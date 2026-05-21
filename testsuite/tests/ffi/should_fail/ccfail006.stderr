@@ -1,0 +1,14 @@
+ccfail006.hs:7:1: error: [GHC-43510]
+    • Unacceptable argument type in foreign declaration:
+        ‘Bool’ cannot be marshalled in a foreign call
+        foreign import prim only accepts simple unlifted types
+    • When checking declaration:
+        foreign import prim safe "foo" foo :: Bool -> Int#
+
+ccfail006.hs:8:1: error: [GHC-43510]
+    • Unacceptable result type in foreign declaration:
+        ‘Bool’ cannot be marshalled in a foreign call
+        foreign import prim only accepts simple unlifted types
+    • When checking declaration:
+        foreign import prim safe "bar" bar :: Int# -> Bool
+
