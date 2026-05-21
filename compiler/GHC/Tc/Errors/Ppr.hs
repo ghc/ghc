@@ -6418,9 +6418,6 @@ pprImportLookup = \case
        2 (ppr rdr)
   ImportLookupIllegal ->
     text "Illegal import item"
-  ImportLookupAmbiguous rdr gres ->
-    hang (text "Ambiguous name" <+> quotes (ppr rdr) <+> text "in import item. It could refer to:")
-       2 (vcat (map (ppr . greOccName) gres))
 
 pprUnusedImport :: ImportDecl GhcRn -> UnusedImportReason -> SDoc
 pprUnusedImport decl = \case

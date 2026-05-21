@@ -6576,14 +6576,6 @@ data ImportLookupReason where
       ImportLookupIllegal
   -}
   ImportLookupIllegal :: ImportLookupReason
-  {-| An item in an import list matches multiple names exported from that module.
-
-    Test cases:
-      None
-  -}
-  ImportLookupAmbiguous :: !RdrName -- ^ The name extracted from the import item
-                        -> ![GlobalRdrElt] -- ^ The potential matches
-                        -> ImportLookupReason
   deriving (Generic)
 
 -- | Distinguish record fields from other names for pretty-printing.

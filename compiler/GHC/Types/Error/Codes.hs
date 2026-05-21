@@ -807,7 +807,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   -- TcRnImportLookup/ImportLookupReason
   GhcDiagnosticCode "ImportLookupQualified"                         = 48795
   GhcDiagnosticCode "ImportLookupIllegal"                           = 14752
-  GhcDiagnosticCode "ImportLookupAmbiguous"                         = 92057
+  GhcDiagnosticCode "ImportLookupAmbiguous"                         = Outdated 92057
 
   -- TcRnUnusedImport/UnusedImportReason
   GhcDiagnosticCode "UnusedImportNone"                              = 66111
