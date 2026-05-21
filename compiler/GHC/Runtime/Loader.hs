@@ -215,9 +215,10 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
             True ->
      do { eith_plugin <- getValueSafely hsc_env name (mkTyConTy plugin_tycon)
         ; case eith_plugin of
-            Left actual_type ->
+            Left actual_type -> do
+                unit_index <- hscUnitIndex hsc_env
                 throwGhcExceptionIO (CmdLineError $
-                    showSDocForUser dflags (ue_homeUnitState (hsc_unit_env hsc_env))
+                    showSDocForUser dflags unit_index
                       alwaysQualify $ hsep
                           [ text "The value", ppr name
                           , text "with type", ppr actual_type
@@ -367,11 +368,12 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
                         _     -> panic "lookupRdrNameInModule"
 
                 Nothing -> throwCmdLineErrorS dflags $ hsep [text "Could not determine the exports of the module", ppr mod_name]
-        err ->
+        err -> do
+          unit_index <- hscUnitIndex hsc_env
           let opts   = initIfaceMessageOpts dflags
               err_txt = missingInterfaceErrorDiagnostic opts
-                      $ cannotFindModule hsc_env mod_name err
-          in throwCmdLineErrorS dflags err_txt
+                      $ cannotFindModule hsc_env unit_index mod_name err
+          throwCmdLineErrorS dflags err_txt
   where
     doc = text "contains a name used in an invocation of lookupRdrNameInModule"
 

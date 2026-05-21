@@ -82,8 +82,9 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
        ; let builtin_passes = getCoreToDo dflags hpt_rule_base extra_vars
              uniq_tag = SimplTag
 
+       ; unit_index <- liftIO $ hscUnitIndex hsc_env
        ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base uniq_tag mod
-                                    name_ppr_ctx loc $
+                                    (name_ppr_ctx unit_index) loc $
                            do { hsc_env' <- getHscEnv
                               ; all_passes <- withPlugins (hsc_plugins hsc_env')
                                                 installCoreToDos
@@ -103,7 +104,7 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
     extra_vars     = interactiveInScope (hsc_IC hsc_env)
     home_pkg_rules = hugRulesBelow hsc_env (moduleUnitId mod)
                       (GWIB { gwib_mod = moduleName mod, gwib_isBoot = NotBoot })
-    name_ppr_ctx   = mkNamePprCtx ptc unit_env rdr_env
+    name_ppr_ctx unit_index  = mkNamePprCtx ptc unit_index unit_env rdr_env
     ptc            = initPromotionTickContext dflags
     -- mod: get the module out of the current HscEnv so we can retrieve it from the monad.
     -- This is very convienent for the users of the monad (e.g. plugins do not have to
@@ -445,6 +446,7 @@ doCorePass :: CoreToDo -> ModGuts -> CoreM ModGuts
 doCorePass pass guts = do
   logger    <- getLogger
   hsc_env   <- getHscEnv
+  unit_index <- liftIO $ hscUnitIndex hsc_env
   dflags    <- getDynFlags
   us        <- getUniqueSupplyM
   p_fam_env <- getPackageFamInstEnv
@@ -460,6 +462,7 @@ doCorePass pass guts = do
   let name_ppr_ctx =
         mkNamePprCtx
           (initPromotionTickContext dflags)
+          unit_index
           (hsc_unit_env hsc_env)
           rdr_env
 

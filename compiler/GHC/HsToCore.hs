@@ -147,10 +147,12 @@ deSugar hsc_env
                             tcg_self_boot    = self_boot
                             })
 
-  = do { let dflags = hsc_dflags hsc_env
+  = do {  unit_index <- hscUnitIndex hsc_env
+        ; let
+             dflags = hsc_dflags hsc_env
              logger = hsc_logger hsc_env
              ptc = initPromotionTickContext (hsc_dflags hsc_env)
-             name_ppr_ctx = mkNamePprCtx ptc (hsc_unit_env hsc_env) rdr_env
+             name_ppr_ctx = mkNamePprCtx ptc unit_index (hsc_unit_env hsc_env) rdr_env
         ; withTiming logger
                      (text "Desugar"<+>brackets (ppr mod))
                      (const ()) $

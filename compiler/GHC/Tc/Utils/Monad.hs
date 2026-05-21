@@ -1162,7 +1162,8 @@ getNamePprCtx
   = do { ptc <- initPromotionTickContext <$> getDynFlags
        ; rdr_env <- getGlobalRdrEnv
        ; hsc_env <- getTopEnv
-       ; return $ mkNamePprCtx ptc (hsc_unit_env hsc_env) rdr_env }
+       ; unit_index <- liftIO $ hscUnitIndex hsc_env
+       ; return $ mkNamePprCtx ptc unit_index (hsc_unit_env hsc_env) rdr_env }
 
 -- | Like logInfoTcRn, but for user consumption
 printForUserTcRn :: SDoc -> TcRn ()
@@ -1425,9 +1426,10 @@ add_long_err_at loc msg = mk_long_err_at loc msg >>= reportDiagnostic
     mk_long_err_at :: SrcSpan -> TcRnMessageDetailed -> TcRn (MsgEnvelope TcRnMessage)
     mk_long_err_at loc msg
       = do { name_ppr_ctx <- getNamePprCtx ;
-             unit_state <- hsc_units <$> getTopEnv ;
+             env <- getTopEnv ;
+             unit_index <- liftIO $ hscUnitIndex env ;
              return $ mkErrorMsgEnvelope loc name_ppr_ctx
-                    $ TcRnMessageWithInfo unit_state msg
+                    $ TcRnMessageWithInfo unit_index msg
                     }
 
 mkTcRnMessage :: SrcSpan
@@ -2084,17 +2086,19 @@ addDiagnostic msg = add_diagnostic (mkDetailedMessage (ErrInfo [] Nothing noHint
 -- | Display a diagnostic for a given source location.
 addDiagnosticAt :: SrcSpan -> TcRnMessage -> TcRn ()
 addDiagnosticAt loc msg = do
-  unit_state <- hsc_units <$> getTopEnv
+  env <- getTopEnv
+  unit_index <- liftIO $ hscUnitIndex env
   let detailed_msg = mkDetailedMessage (ErrInfo [] Nothing noHints) msg
-  mkTcRnMessage loc (TcRnMessageWithInfo unit_state detailed_msg) >>= reportDiagnostic
+  mkTcRnMessage loc (TcRnMessageWithInfo unit_index detailed_msg) >>= reportDiagnostic
 
 -- | Display a diagnostic, with an optional flag, for the current source
 -- location.
 add_diagnostic :: TcRnMessageDetailed -> TcRn ()
 add_diagnostic msg
   = do { loc <- getSrcSpanM
-       ; unit_state <- hsc_units <$> getTopEnv
-       ; mkTcRnMessage loc (TcRnMessageWithInfo unit_state msg) >>= reportDiagnostic
+       ; env <- getTopEnv
+       ; unit_index <- liftIO $ hscUnitIndex env
+       ; mkTcRnMessage loc (TcRnMessageWithInfo unit_index msg) >>= reportDiagnostic
        }
 
 {-

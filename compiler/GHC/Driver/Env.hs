@@ -6,6 +6,8 @@ module GHC.Driver.Env
    , setModuleGraph
    , hscUpdateFlags
    , hscSetFlags
+   , hscUnitIndex
+   , hscUnitIndexCache
    , hsc_home_unit
    , hsc_home_unit_maybe
    , hsc_units
@@ -411,6 +413,12 @@ hscSetActiveUnitId uid e = e
 
 hscActiveUnitId :: HscEnv -> UnitId
 hscActiveUnitId e = ue_currentUnit (hsc_unit_env e)
+
+hscUnitIndex :: HscEnv -> IO UnitIndex
+hscUnitIndex = ueUnitIndex . hsc_unit_env
+
+hscUnitIndexCache :: HscEnv -> UnitIndexCache
+hscUnitIndexCache = ue_unit_index_cache . hsc_unit_env
 
 -- | Discard the contents of the InteractiveContext, but keep the DynFlags and
 -- the loaded plugins.  It will also keep ic_int_print and ic_monad if their

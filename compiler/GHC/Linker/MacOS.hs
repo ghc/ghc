@@ -86,7 +86,7 @@ rpath_parser = do
 getUnitFrameworkOpts :: UnitEnv -> [UnitId] -> IO [String]
 getUnitFrameworkOpts unit_env dep_packages
   | platformUsesFrameworks (ue_platform unit_env) = do
-        ps <- mayThrowUnitErr (preloadUnitsInfo' unit_env dep_packages)
+        ps <- mayThrowUnitErrIO (preloadUnitsInfo' unit_env dep_packages)
         let pkg_framework_path_opts = map ("-F" ++) (collectFrameworksDirs ps)
             pkg_framework_opts      = concat [ ["-framework", fw]
                                              | fw <- collectFrameworks ps

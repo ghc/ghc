@@ -61,7 +61,7 @@ import qualified GHC.Types.SrcLoc as SrcLoc
 import qualified GHC.Types.Unique.Map as UniqMap
 import GHC.Unit.Module.Deps (dep_orphs)
 import GHC.Unit.Module.ModIface
-import GHC.Unit.State (PackageName (..), UnitState)
+import GHC.Unit.State (PackageName (..), UnitState, UnitIndex)
 import GHC.Utils.Outputable (SDocContext)
 import qualified GHC.Utils.Outputable as O
 import qualified GHC.Utils.Outputable as Outputable
@@ -78,6 +78,7 @@ import Haddock.Utils (replace)
 createInterface1
   :: MonadIO m
   => [Flag]
+  -> UnitIndex
   -> UnitState
   -> ModSummary
   -> ModIface
@@ -86,7 +87,7 @@ createInterface1
   -> ([ClsInst], [FamInst])
   -> WarningMap
   -> IfM m Interface
-createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instances, fam_instances) depWarnings =
+createInterface1 flags unit_index unit_state mod_sum mod_iface ifaces inst_ifaces (instances, fam_instances) depWarnings =
   let
     ModSummary
       { -- Cached flags from OPTIONS, INCLUDE and LANGUAGE
@@ -96,11 +97,12 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
       , ms_location = modl
       } = mod_sum
    in
-    createInterface1' flags unit_state ms_hspp_opts (ml_hie_file modl) mod_iface ifaces inst_ifaces (instances, fam_instances) depWarnings
+    createInterface1' flags unit_index unit_state ms_hspp_opts (ml_hie_file modl) mod_iface ifaces inst_ifaces (instances, fam_instances) depWarnings
 
 createInterface1'
   :: MonadIO m
   => [Flag]
+  -> UnitIndex
   -> UnitState
   -> DynFlags
   -> FilePath
@@ -110,7 +112,7 @@ createInterface1'
   -> ([ClsInst], [FamInst])
   -> WarningMap
   -> IfM m Interface
-createInterface1' flags unit_state dflags hie_file mod_iface ifaces inst_ifaces (instances, fam_instances) depWarnings = do
+createInterface1' flags unit_index unit_state dflags hie_file mod_iface ifaces inst_ifaces (instances, fam_instances) depWarnings = do
   let
     sDocContext = DynFlags.initSDocContext dflags Outputable.defaultUserStyle
     mLanguage = language dflags
@@ -121,7 +123,7 @@ createInterface1' flags unit_state dflags hie_file mod_iface ifaces inst_ifaces 
     safety = getSafeMode (mi_trust mod_iface)
 
     (pkg_name_fs, _) =
-      modulePackageInfo unit_state flags (Just mdl)
+      modulePackageInfo unit_index unit_state flags (Just mdl)
 
     pkg_name :: Maybe Package
     pkg_name =

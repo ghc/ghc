@@ -19,7 +19,7 @@ import GHC.Prelude
 import GHC.Types.Name (Name)
 import GHC.Types.TyThing (TyThing)
 import GHC.Unit.Types (Module, InstalledModule, UnitId, Unit)
-import GHC.Unit.State (UnitState, ModuleSuggestion, ModuleOrigin, UnusableUnit, UnitInfo)
+import GHC.Unit.State (UnitIndex, ModuleSuggestion, ModuleOrigin, UnusableUnit, UnitInfo)
 import GHC.Exception.Type (SomeException)
 import GHC.Unit.Types ( IsBootInterface )
 import Language.Haskell.Syntax.Module.Name ( ModuleName )
@@ -54,7 +54,7 @@ data MissingInterfaceError
   | HomeModError !InstalledModule !ModLocation
   | DynamicHashMismatchError !Module !ModLocation
 
-  | CantFindErr !UnitState FindingModuleOrInterface CantFindInstalled
+  | CantFindErr !UnitIndex FindingModuleOrInterface CantFindInstalled
 
   | BadIfaceFile ReadInterfaceError
   | FailedToLoadDynamicInterface Module ReadInterfaceError

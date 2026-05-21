@@ -333,7 +333,8 @@ rnImportDecl this_mod
 
     hsc_env <- getTopEnv
     unit_env <- hsc_unit_env <$> getTopEnv
-    let pkg_qual = renameRawPkgQual unit_env imp_mod_name raw_pkg_qual
+    unit_index <- liftIO $ ueUnitIndex unit_env
+    let pkg_qual = renameRawPkgQual unit_env unit_index imp_mod_name raw_pkg_qual
 
     -- Check for self-import, which confuses the typechecker (#9032)
     -- ghc --make rejects self-import cycles already, but batch-mode may not
@@ -443,14 +444,14 @@ rnImportDecl this_mod
 
 
 -- | Rename raw package imports
-renameRawPkgQual :: UnitEnv -> ModuleName -> RawPkgQual -> PkgQual
-renameRawPkgQual unit_env mn = \case
+renameRawPkgQual :: UnitEnv -> UnitIndex -> ModuleName -> RawPkgQual -> PkgQual
+renameRawPkgQual unit_env unit_index mn = \case
   NoRawPkgQual -> NoPkgQual
-  RawPkgQual p -> renamePkgQual unit_env mn (Just (sl_fs p))
+  RawPkgQual p -> renamePkgQual unit_env unit_index mn (Just (sl_fs p))
 
 -- | Rename raw package imports
-renamePkgQual :: UnitEnv -> ModuleName -> Maybe FastString -> PkgQual
-renamePkgQual unit_env mn mb_pkg = case mb_pkg of
+renamePkgQual :: UnitEnv -> UnitIndex -> ModuleName -> Maybe FastString -> PkgQual
+renamePkgQual unit_env unit_index mn mb_pkg = case mb_pkg of
   Nothing -> NoPkgQual
   Just pkg_fs
     | Just uid <- homeUnitId <$> ue_homeUnit unit_env
@@ -460,7 +461,7 @@ renamePkgQual unit_env mn mb_pkg = case mb_pkg of
     | Just (uid, _) <- find (fromMaybe False . fmap (== pkg_fs) . snd) home_names
     -> ThisPkg uid
 
-    | Just uid <- resolvePackageImport unit_state mn (PackageName pkg_fs)
+    | Just uid <- resolvePackageImport unit_index unit_state mn (PackageName pkg_fs)
     -> OtherPkg uid
 
     | otherwise

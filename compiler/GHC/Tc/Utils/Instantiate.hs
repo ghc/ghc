@@ -1142,13 +1142,14 @@ dupInstErr :: ClsInst -> ClsInst -> TcRn ()
 dupInstErr ispec dup_ispec
   = addClsInstsErr TcRnDupInstanceDecls (ispec NE.:| [dup_ispec])
 
-addClsInstsErr :: (UnitState -> NE.NonEmpty ClsInst -> TcRnMessage)
+addClsInstsErr :: (UnitIndex -> NE.NonEmpty ClsInst -> TcRnMessage)
                -> NE.NonEmpty ClsInst
                -> TcRn ()
 addClsInstsErr mkErr ispecs = do
-   unit_state <- hsc_units <$> getTopEnv
+   env <- getTopEnv
+   unit_index <- liftIO $ hscUnitIndex env
    setSrcSpan (getSrcSpan (NE.head sorted)) $
-      addErr $ mkErr unit_state sorted
+      addErr $ mkErr unit_index sorted
  where
    sorted = NE.sortBy (SrcLoc.leftmost_smallest `on` getSrcSpan) ispecs
    -- The sortBy just arranges that instances are displayed in order

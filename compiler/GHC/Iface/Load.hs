@@ -323,7 +323,9 @@ loadSrcInterface_maybe doc mod want_boot maybe_pkg
        case res of
            Found _ mod -> initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
            -- TODO: Make sure this error message is good
-           err         -> return (Failed (cannotFindModule hsc_env mod err))
+           err         -> do
+            unit_index <- liftIO $ hscUnitIndex hsc_env
+            return (Failed (cannotFindModule hsc_env unit_index mod err))
 
 -- | Load interface directly for a fully qualified 'Module'.  (This is a fairly
 -- rare operation, but in particular it is used to load orphan modules
@@ -896,6 +898,7 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
       logger     = hsc_logger hsc_env
       hooks      = hsc_hooks hsc_env
 
+  unit_index <- hscUnitIndex hsc_env
 
   trace_if logger (sep [hsep [text "Reading",
                            if hi_boot_file == IsBoot
@@ -914,13 +917,13 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
               && not (isOneShot (ghcMode dflags))
             then return (Failed (HomeModError mod loc))
             else do
-                r <- read_file hooks logger name_cache unit_state dflags wanted_mod (ml_hi_file loc)
+                r <- read_file hooks logger name_cache unit_index unit_state dflags wanted_mod (ml_hi_file loc)
                 case r of
                   Failed err
                     -> return (Failed $ BadIfaceFile err)
                   Succeeded (iface,_fp)
                     -> do
-                        r2 <- load_dynamic_too_maybe hooks logger name_cache unit_state
+                        r2 <- load_dynamic_too_maybe hooks logger name_cache unit_index unit_state
                                                  (setDynamicNow dflags) wanted_mod
                                                  iface loc
                         case r2 of
@@ -929,27 +932,27 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
       err -> do
           trace_if logger (text "...not found")
           return $ Failed $ cannotFindInterface
-                              unit_state
+                              unit_index
                               mhome_unit
                               profile
                               (moduleName mod)
                               err
 
 -- | Check if we need to try the dynamic interface for -dynamic-too
-load_dynamic_too_maybe :: Hooks -> Logger -> NameCache -> UnitState -> DynFlags
+load_dynamic_too_maybe :: Hooks -> Logger -> NameCache -> UnitIndex -> UnitState -> DynFlags
                        -> Module -> ModIface -> ModLocation
                        -> IO (MaybeErr MissingInterfaceError ())
-load_dynamic_too_maybe hooks logger name_cache unit_state dflags wanted_mod iface loc
+load_dynamic_too_maybe hooks logger name_cache unit_index unit_state dflags wanted_mod iface loc
   -- Indefinite interfaces are ALWAYS non-dynamic.
   | not (moduleIsDefinite (mi_module iface)) = return (Succeeded ())
-  | gopt Opt_BuildDynamicToo dflags = load_dynamic_too hooks logger name_cache unit_state dflags wanted_mod iface loc
+  | gopt Opt_BuildDynamicToo dflags = load_dynamic_too hooks logger name_cache unit_index unit_state dflags wanted_mod iface loc
   | otherwise = return (Succeeded ())
 
-load_dynamic_too :: Hooks -> Logger -> NameCache -> UnitState -> DynFlags
+load_dynamic_too :: Hooks -> Logger -> NameCache -> UnitIndex -> UnitState -> DynFlags
                  -> Module -> ModIface -> ModLocation
                  -> IO (MaybeErr MissingInterfaceError ())
-load_dynamic_too hooks logger name_cache unit_state dflags wanted_mod iface loc = do
-  read_file hooks logger name_cache unit_state dflags wanted_mod (ml_dyn_hi_file loc) >>= \case
+load_dynamic_too hooks logger name_cache unit_index unit_state dflags wanted_mod iface loc = do
+  read_file hooks logger name_cache unit_index unit_state dflags wanted_mod (ml_dyn_hi_file loc) >>= \case
     Succeeded (dynIface, _)
      | mi_mod_hash iface == mi_mod_hash dynIface
      -> return (Succeeded ())
@@ -963,10 +966,10 @@ load_dynamic_too hooks logger name_cache unit_state dflags wanted_mod iface loc 
 
 
 
-read_file :: Hooks -> Logger -> NameCache -> UnitState -> DynFlags
+read_file :: Hooks -> Logger -> NameCache -> UnitIndex -> UnitState -> DynFlags
           -> Module -> FilePath
           -> IO (MaybeErr ReadInterfaceError (ModIface, FilePath))
-read_file hooks logger name_cache unit_state dflags wanted_mod file_path = do
+read_file hooks logger name_cache unit_index unit_state dflags wanted_mod file_path = do
 
   -- Figure out what is recorded in mi_module.  If this is
   -- a fully definite interface, it'll match exactly, but
@@ -975,7 +978,7 @@ read_file hooks logger name_cache unit_state dflags wanted_mod file_path = do
         case getModuleInstantiation wanted_mod of
             (_, Nothing) -> wanted_mod
             (_, Just indef_mod) ->
-              instModuleToModule unit_state
+              instModuleToModule unit_index unit_state
                 (uninstantiateInstantiatedModule indef_mod)
   read_result <- readIface hooks logger dflags name_cache wanted_mod' file_path
   case read_result of
@@ -1100,7 +1103,7 @@ For some background on this choice see #15269.
 -}
 
 -- | Read binary interface, and print it out
-showIface :: Logger -> DynFlags -> UnitState -> NameCache -> FilePath -> IO ()
+showIface :: Logger -> DynFlags -> UnitIndex -> NameCache -> FilePath -> IO ()
 showIface logger dflags unit_state name_cache filename = do
    let profile = targetProfile dflags
        printer = logOutput logger . withPprStyle defaultDumpStyle
@@ -1123,7 +1126,7 @@ showIface logger dflags unit_state name_cache filename = do
 
 -- | Show a ModIface but don't display details; suitable for ModIfaces stored in
 -- the EPT.
-pprModIfaceSimple :: UnitState -> ModIface -> SDoc
+pprModIfaceSimple :: UnitIndex -> ModIface -> SDoc
 pprModIfaceSimple unit_state iface =
     ppr (mi_module iface)
     $$ pprDeps unit_state (mi_deps iface)
@@ -1132,7 +1135,7 @@ pprModIfaceSimple unit_state iface =
 -- | Show a ModIface
 --
 -- The UnitState is used to pretty-print units
-pprModIface :: UnitState -> ModIface -> SDoc
+pprModIface :: UnitIndex -> ModIface -> SDoc
 pprModIface unit_state iface
  = vcat $ [ text "interface"
                 <+> ppr (mi_module iface) <+> pp_hsc_src (mi_hsc_src iface)

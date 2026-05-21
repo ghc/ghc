@@ -7,6 +7,7 @@ module GHC.Linker.Unit
    , getUnitLinkOpts
    , getLibs
    , getUnitDepends
+   , getUnitDepends'
    )
 where
 
@@ -48,7 +49,7 @@ instance Monoid UnitLinkOpts where
 -- returning (package hs lib options, extra library options, other flags)
 getUnitLinkOpts :: GhcNameVersion -> Ways -> Maybe (ExecutableLinkMode, Bool, Platform) -> UnitEnv -> [UnitId] -> IO UnitLinkOpts
 getUnitLinkOpts namever ways mExecutableLinkMode unit_env pkgs = do
-    ps <- mayThrowUnitErr $ preloadUnitsInfo' unit_env pkgs
+    ps <- mayThrowUnitErrIO $ preloadUnitsInfo' unit_env pkgs
     collectLinkOpts namever ways mExecutableLinkMode ps
 
 collectLinkOpts :: GhcNameVersion -> Ways -> Maybe (ExecutableLinkMode, Bool, Platform) -> [UnitInfo] -> IO UnitLinkOpts
@@ -100,15 +101,22 @@ collectArchives namever ways pc =
 
 getLibs :: GhcNameVersion -> Ways -> UnitEnv -> [UnitId] -> IO [(String,String)]
 getLibs namever ways unit_env pkgs = do
-  ps <- mayThrowUnitErr $ preloadUnitsInfo' unit_env pkgs
+  ps <- mayThrowUnitErrIO $ preloadUnitsInfo' unit_env pkgs
   fmap concat . forM ps $ \p -> do
     let candidates = [ (l </> f, f) | l <- collectLibraryDirs ways [p]
                                     , f <- (\n -> "lib" ++ n ++ ".a") <$> unitHsLibs namever ways p ]
     filterM (doesFileExist . fst) candidates
 
-getUnitDepends :: HasDebugCallStack => UnitEnv -> UnitId -> [UnitId]
-getUnitDepends unit_env pkg =
-    let unit_state = ue_homeUnitState unit_env
-        unit_info = unsafeLookupUnitId unit_state pkg
-    in (unitDepends unit_info)
+getUnitDepends :: HasDebugCallStack => UnitEnv -> UnitId -> IO [UnitId]
+getUnitDepends unit_env pkg = do
+    unit_index <- ueUnitIndex unit_env
+    let unit_info = unsafeLookupUnitId unit_index pkg
+    pure (unitDepends unit_info)
+
+getUnitDepends' :: HasDebugCallStack => UnitIndex -> UnitId -> [UnitId]
+getUnitDepends' unit_index pkg =
+    let
+      unit_info = unsafeLookupUnitId unit_index pkg
+    in
+      (unitDepends unit_info)
 

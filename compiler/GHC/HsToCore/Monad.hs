@@ -120,6 +120,7 @@ import GHC.Data.OrdList
 import Data.IORef
 
 import GHC.IO.Unsafe (unsafeInterleaveIO)
+import GHC.Unit.State (UnitIndex)
 
 {-
 ************************************************************************
@@ -262,6 +263,7 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
            -- ToDo: what becomes of the values put into these ref-cells?
 
        ; eps <- liftIO $ hscEPS hsc_env
+       ; unit_index <- liftIO $ hscUnitIndex hsc_env
        ; let unit_env = hsc_unit_env hsc_env
              this_mod = tcg_mod tcg_env
              type_env = tcg_type_env tcg_env
@@ -291,7 +293,7 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
        --
        -- See Note [Stop TcM plugins after desugaring] in GHC.Driver.Main.
        ; let tcm_plugin_env = tcMPluginsRunActions $ runningTcMPlugins tcm_plugins
-       ; return $ mkDsEnvs unit_env this_mod rdr_env type_env fam_inst_env
+       ; return $ mkDsEnvs unit_index unit_env this_mod rdr_env type_env fam_inst_env
                            tcm_plugin_env ptc msg_var cc_st_var statics_var
                            next_wrapper_num_var ds_complete_matches
        }
@@ -343,6 +345,7 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
        ; msg_var          <- newIORef emptyMessages
        ; statics_var      <- newIORef nilOL
        ; eps <- liftIO $ hscEPS hsc_env
+       ; unit_index <- liftIO $ hscUnitIndex hsc_env
        ; let unit_env = hsc_unit_env hsc_env
              type_env = typeEnvFromEntities ids tycons patsyns fam_insts
              ptc = initPromotionTickContext (hsc_dflags hsc_env)
@@ -353,7 +356,7 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
             localAndImportedCompleteMatches local_complete_matches eps
        ; let
             tcm_plugins = emptyTcMPluginsRun
-            envs  = mkDsEnvs unit_env this_mod rdr_env type_env
+            envs  = mkDsEnvs unit_index unit_env this_mod rdr_env type_env
                              fam_inst_env tcm_plugins ptc
                              msg_var cc_st_var statics_var
                              next_wrapper_num ds_complete_matches
@@ -406,14 +409,14 @@ initTcDsForSolver thing_inside
            Just ret -> pure ret
            Nothing  -> pprPanic "initTcDsForSolver" (vcat $ pprMsgEnvelopeBagWithLocDefault (getErrorMessages msgs)) }
 
-mkDsEnvs :: UnitEnv -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
+mkDsEnvs :: UnitIndex -> UnitEnv -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
          -> TcMPluginsRun
          -> PromotionTickContext
          -> IORef (Messages DsMessage) -> IORef CostCentreState
          -> IORef (OrdList (Id,CoreExpr))
          -> IORef (ModuleEnv Int) -> DsCompleteMatches
          -> (DsGblEnv, DsLclEnv)
-mkDsEnvs unit_env mod rdr_env type_env fam_inst_env tcm_plugins ptc msg_var
+mkDsEnvs unit_index unit_env mod rdr_env type_env fam_inst_env tcm_plugins ptc msg_var
          cc_st_var statics_var next_wrapper_num complete_matches
   = let if_genv = IfGblEnv { if_doc       = text "mkDsEnvs"
   -- Failing tests here are `ghci` and `T11985` if you get this wrong.
@@ -431,7 +434,7 @@ mkDsEnvs unit_env mod rdr_env type_env fam_inst_env tcm_plugins ptc msg_var
                            , ds_gbl_rdr_env  = rdr_env
                            , ds_tcm_plugins = tcm_plugins
                            , ds_if_env  = (if_genv, if_lenv)
-                           , ds_name_ppr_ctx = mkNamePprCtx ptc unit_env rdr_env
+                           , ds_name_ppr_ctx = mkNamePprCtx ptc unit_index unit_env rdr_env
                            , ds_msgs    = msg_var
                            , ds_complete_matches = complete_matches
                            , ds_cc_st   = cc_st_var

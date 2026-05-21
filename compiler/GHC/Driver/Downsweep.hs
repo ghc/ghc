@@ -184,8 +184,9 @@ downsweep :: HscEnv
 downsweep hsc_env diag_wrapper msg old_summaries excl_mods allow_dup_roots = do
   n_jobs <- mkWorkerLimit (hsc_dflags hsc_env)
   (root_errs, root_summaries) <- rootSummariesParallel n_jobs hsc_env diag_wrapper msg summary
-  let closure_errs = checkHomeUnitsClosed unit_env
-      unit_env = hsc_unit_env hsc_env
+  let unit_env = hsc_unit_env hsc_env
+  unit_index <- ueUnitIndex unit_env
+  let closure_errs = checkHomeUnitsClosed unit_index (ue_home_unit_graph unit_env)
 
       all_errs = closure_errs ++ root_errs
 
@@ -267,7 +268,8 @@ downsweepInteractiveImports hsc_env ic = unsafeInterleaveIO $ do
   -- :load. Any home package modules need to already be in here.
   let cached_nodes = Map.fromList [ (mkNodeKey n, n) | n <- mg_mss (hsc_mod_graph hsc_env) ]
 
-  (module_edges, graph) <- loopFromInteractive hsc_env (map mkEdge imps) cached_nodes
+  unit_index <- liftIO $ hscUnitIndex hsc_env
+  (module_edges, graph) <- loopFromInteractive hsc_env (map (mkEdge unit_index) imps) cached_nodes
   let interactive_node = ModuleNode module_edges node_type
 
   let all_nodes  = M.elems graph
@@ -275,9 +277,9 @@ downsweepInteractiveImports hsc_env ic = unsafeInterleaveIO $ do
 
   where
  --
-    mkEdge :: InteractiveImport -> Either ModuleNodeEdge (UnitId, ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName))
+    mkEdge :: UnitIndex -> InteractiveImport -> Either ModuleNodeEdge (UnitId, ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName))
     -- A simple edge to a module from the same home unit
-    mkEdge (IIModule n) =
+    mkEdge _unit_index (IIModule n) =
       let
         mod_node_key = ModNodeKeyWithUid
           { mnkModuleName = GWIB (moduleName n) NotBoot
@@ -290,11 +292,11 @@ downsweepInteractiveImports hsc_env ic = unsafeInterleaveIO $ do
           ModuleNodeEdge NormalLevel (NodeKey_Module mod_node_key)
       in Left mod_node_edge
     -- A complete import statement
-    mkEdge (IIDecl i) =
+    mkEdge unit_index (IIDecl i) =
       let lvl = convImportLevel (ideclLevelSpec i)
           wanted_mod = unLoc (ideclName i)
           is_boot = ideclSource i
-          mb_pkg = renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName i) (ideclPkgQual i)
+          mb_pkg = renameRawPkgQual (hsc_unit_env hsc_env) unit_index (unLoc $ ideclName i) (ideclPkgQual i)
           unitId = homeUnitId $ hsc_home_unit hsc_env
       in Right (unitId, lvl, mb_pkg, GWIB (noLoc wanted_mod) is_boot)
 
@@ -325,7 +327,9 @@ loopFromInteractive hsc_env (edge:edges) cached_nodes =
         -- module graph. We can construct the module graph for those here by calling loopUnit.
         External uid -> do
           let hsc_env' = hscSetActiveHomeUnit home_unit hsc_env
-              cached_nodes' = loopUnit hsc_env' cached_nodes [uid]
+          unit_index <- hscUnitIndex hsc_env'
+          let
+              cached_nodes' = loopUnit hsc_env' unit_index cached_nodes [uid]
               edge = ModuleNodeEdge lvl (NodeKey_ExternalUnit uid)
           (edges, cached_nodes') <- loopFromInteractive hsc_env edges cached_nodes'
           return (edge : edges, cached_nodes')
@@ -393,12 +397,13 @@ downsweepFromRootNodes :: HscEnv
                   -> IO ([DriverMessages], [ModuleGraphNode])
 downsweepFromRootNodes hsc_env old_summaries excl_mods allow_dup_roots mode root_nodes root_uids
    = do
+       unit_index <- hscUnitIndex hsc_env
        let root_map = mkRootMap root_nodes
        checkDuplicates root_map
-       let env = DownsweepEnv hsc_env mode old_summaries excl_mods
+       let env = DownsweepEnv hsc_env unit_index mode old_summaries excl_mods
        (deps', map0) <- runDownsweepM env  $ do
                     (module_deps, map0) <- loopModuleNodeInfos root_nodes (M.empty, root_map)
-                    let all_deps = loopUnit hsc_env module_deps root_uids
+                    let all_deps = loopUnit hsc_env unit_index module_deps root_uids
                     let all_instantiations =  getHomeUnitInstantiations hsc_env
                     deps' <- loopInstantiations all_instantiations all_deps
                     return (deps', map0)
@@ -441,6 +446,7 @@ calcDeps ms =
 type DownsweepM a = ReaderT DownsweepEnv IO a
 data DownsweepEnv = DownsweepEnv {
       downsweep_hsc_env :: HscEnv
+    , downsweep_unit_index :: UnitIndex
     , _downsweep_mode :: DownsweepMode
     , _downsweep_old_summaries :: M.Map (UnitId, OsPath) ModSummary
     , _downsweep_excl_mods :: [ModuleName]
@@ -456,9 +462,10 @@ loopInstantiations :: [(UnitId, InstantiatedUnit)]
 loopInstantiations [] done = pure done
 loopInstantiations ((home_uid, iud) :xs) done = do
   hsc_env <- asks downsweep_hsc_env
+  unit_index <- asks downsweep_unit_index
   let home_unit = ue_unitHomeUnit home_uid (hsc_unit_env hsc_env)
   let hsc_env' = hscSetActiveHomeUnit home_unit hsc_env
-      done' = loopUnit hsc_env' done [instUnitInstanceOf iud]
+      done' = loopUnit hsc_env' unit_index done [instUnitInstanceOf iud]
       payload = InstantiationNode home_uid iud
   loopInstantiations xs (M.insert (mkNodeKey payload) payload done')
 
@@ -538,8 +545,9 @@ loopFixedNodeKey home_uid done (Right uid) = do
   -- Set active unit so that looking loopUnit finds the correct
   -- -package flags in the unit state.
   hsc_env <- asks downsweep_hsc_env
+  unit_index <- asks downsweep_unit_index
   let hsc_env' = hscSetActiveUnitId home_uid hsc_env
-  return $ loopUnit hsc_env' done [uid]
+  return $ loopUnit hsc_env' unit_index done [uid]
 
 mkFixedEdge :: Either (ImportLevel, ModNodeKeyWithUid) (ImportLevel, UnitId) -> ModuleNodeEdge
 mkFixedEdge (Left (lvl, key)) = mkModuleEdge lvl (NodeKey_Module key)
@@ -582,7 +590,7 @@ downsweepSummarise :: HomeUnit
                    -> Maybe (StringBuffer, UTCTime)
                    -> DownsweepM SummariseResult
 downsweepSummarise home_unit is_boot wanted_mod mb_pkg maybe_buf = do
-  DownsweepEnv hsc_env mode old_summaries excl_mods <- ask
+  DownsweepEnv hsc_env _unit_index mode old_summaries excl_mods <- ask
   case mode of
     DownsweepUseCompile -> liftIO $ summariseModule hsc_env home_unit old_summaries is_boot wanted_mod mb_pkg maybe_buf excl_mods
     DownsweepUseFixed -> liftIO $ summariseModuleInterface hsc_env home_unit is_boot wanted_mod mb_pkg excl_mods
@@ -625,7 +633,8 @@ loopImports ((home_uid, imp, mb_pkg, gwib) : ss) done summarised
             -- Pass an updated hsc_env to loopUnit, as each unit might
             -- have a different visible package database.
             let hsc_env' = hscSetActiveHomeUnit home_unit hsc_env
-            let done' = loopUnit hsc_env' done [uid]
+            unit_index <- asks downsweep_unit_index
+            let done' = loopUnit hsc_env' unit_index done [uid]
             (other_deps, done'', summarised') <- loopImports ss done' summarised
             return (mkModuleEdge imp (NodeKey_ExternalUnit uid) : other_deps, done'', summarised')
            FoundInstantiation iud -> do
@@ -644,14 +653,14 @@ loopImports ((home_uid, imp, mb_pkg, gwib) : ss) done summarised
     GWIB { gwib_mod = L loc mod, gwib_isBoot = is_boot } = gwib
     wanted_mod = L loc mod
 
-loopUnit :: HscEnv -> Map.Map NodeKey ModuleGraphNode -> [UnitId] -> Map.Map NodeKey ModuleGraphNode
-loopUnit _ cache [] = cache
-loopUnit lcl_hsc_env cache (u:uxs) = do
+loopUnit :: HscEnv -> UnitIndex -> Map.Map NodeKey ModuleGraphNode -> [UnitId] -> Map.Map NodeKey ModuleGraphNode
+loopUnit _           _          cache [] = cache
+loopUnit lcl_hsc_env unit_index cache (u:uxs) = do
    let nk = (NodeKey_ExternalUnit u)
    case Map.lookup nk cache of
-     Just {} -> loopUnit lcl_hsc_env cache uxs
-     Nothing -> case unitDepends <$> lookupUnitId (hsc_units lcl_hsc_env) u of
-                 Just us -> loopUnit lcl_hsc_env (loopUnit lcl_hsc_env (Map.insert nk (UnitNode us u) cache) us) uxs
+     Just {} -> loopUnit lcl_hsc_env unit_index cache uxs
+     Nothing -> case unitDepends <$> lookupUnitId unit_index u of
+                 Just us -> loopUnit lcl_hsc_env unit_index (loopUnit lcl_hsc_env unit_index (Map.insert nk (UnitNode us u) cache) us) uxs
                  Nothing -> pprPanic "loopUnit" (text "Malformed package database, missing " <+> ppr u)
 
 multiRootsErr :: SourceErrorContext -> [ModuleNodeInfo] -> IO ()
@@ -800,12 +809,12 @@ rootSummariesParallel n_jobs hsc_env diag_wrapper msg get_summary = do
 -- then any dependency of p, which transitively depends on q is also a home unit.
 --
 -- See Note [Multiple Home Units], section 'Closure Property'.
-checkHomeUnitsClosed ::  UnitEnv -> [DriverMessages]
-checkHomeUnitsClosed ue
+checkHomeUnitsClosed :: UnitIndex -> HomeUnitGraph -> [DriverMessages]
+checkHomeUnitsClosed unit_index hug
     | Set.null bad_unit_ids = []
     | otherwise = [singleMessage $ mkPlainErrorMsgEnvelope rootLoc $ DriverHomePackagesNotClosed (Set.toList bad_unit_ids)]
   where
-    home_id_set = HUG.allUnits $ ue_home_unit_graph ue
+    home_id_set = HUG.allUnits hug
     bad_unit_ids = upwards_closure Set.\\ home_id_set {- Remove all home units reached, keep only bad nodes -}
     rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
 
@@ -818,14 +827,14 @@ checkHomeUnitsClosed ue
 
     all_unit_direct_deps :: UniqMap UnitId (Set.Set UnitId)
     all_unit_direct_deps
-      = HUG.unitEnv_foldWithKey go emptyUniqMap $ ue_home_unit_graph ue
+      = HUG.unitEnv_foldWithKey go emptyUniqMap hug
       where
         go rest this this_uis =
            plusUniqMap_C Set.union
              (addToUniqMap_C Set.union external_depends this (Set.fromList $ this_deps))
              rest
            where
-             external_depends = mapUniqMap (Set.fromList . unitDepends) (unitInfoMap this_units)
+             external_depends = mapUniqMap (Set.fromList . unitDepends) (unitInfoMap unit_index)
              this_units = homeUnitEnv_units this_uis
              this_deps = [ toUnitId unit | (unit,Just _) <- explicitUnits this_units]
 
@@ -1544,7 +1553,8 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
               sec = initSourceErrorContext pi_local_dflags
           mimps <- getImports popts sec imp_prelude pi_hspp_buf pi_hspp_fn src_fn
           return (first (mkMessages . fmap mkDriverPsHeaderMessage . getMessages) mimps)
-  let rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
+  unit_index <- liftIO $ hscUnitIndex hsc_env
+  let rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env) unit_index
   let rn_imps = fmap (\(sp, pk, lmn@(L _ mn)) -> (sp, rn_pkg_qual mn pk, lmn))
   let pi_srcimps = pi_srcimps'
   let pi_theimps = rn_imps pi_theimps'

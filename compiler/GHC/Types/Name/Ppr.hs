@@ -69,12 +69,12 @@ with some holes, we should try to give the user some more useful information.
 
 -- | Creates some functions that work out the best ways to format
 -- names for the user according to a set of heuristics.
-mkNamePprCtx :: Outputable info => PromotionTickContext -> UnitEnv -> GlobalRdrEnvX info -> NamePprCtx
-mkNamePprCtx ptc unit_env env
+mkNamePprCtx :: Outputable info => PromotionTickContext -> UnitIndex -> UnitEnv -> GlobalRdrEnvX info -> NamePprCtx
+mkNamePprCtx ptc unit_index unit_env env
  = QueryQualify
       (mkQualName env)
-      (mkQualModule unit_state unit_env)
-      (mkQualPackage unit_state)
+      (mkQualModule unit_index unit_state (ue_home_unit_graph unit_env))
+      (mkQualPackage unit_index unit_state)
       (mkPromTick ptc env)
   where
   unit_state = ue_homeUnitState unit_env
@@ -215,12 +215,12 @@ Side note (int-index):
 -- | Creates a function for formatting modules based on two heuristics:
 -- (1) if the module is the current module, don't qualify, and (2) if there
 -- is only one exposed package which exports this module, don't qualify.
-mkQualModule :: UnitState -> UnitEnv -> QueryQualifyModule
-mkQualModule unit_state unitEnv mod
+mkQualModule :: UnitIndex -> UnitState -> HomeUnitGraph -> QueryQualifyModule
+mkQualModule unit_index unit_state hug mod
        -- Check whether the unit of the module is in the HomeUnitGraph.
        -- If it is, then we consider this 'mod' to be "local" and don't
        -- want to qualify it.
-     | HUG.memberHugUnit (moduleUnit mod) (ue_home_unit_graph unitEnv) = False
+     | HUG.memberHugUnit (moduleUnit mod) hug = False
 
      | [(_, pkgconfig)] <- lookup,
        mkUnit pkgconfig == moduleUnit mod
@@ -229,27 +229,27 @@ mkQualModule unit_state unitEnv mod
      = False
 
      | otherwise = True
-     where lookup = lookupModuleInAllUnits unit_state (moduleName mod)
+     where lookup = lookupModuleInAllUnits unit_index unit_state (moduleName mod)
 
 -- | Creates a function for formatting packages based on two heuristics:
 -- (1) don't qualify if the package in question is "main", and (2) only qualify
 -- with a unit id if the package ID would be ambiguous.
-mkQualPackage :: UnitState -> QueryQualifyPackage
-mkQualPackage pkgs uid
+mkQualPackage :: UnitIndex -> UnitState -> QueryQualifyPackage
+mkQualPackage unitIndex pkgs uid
      | uid == mainUnit || uid == interactiveUnit
         -- Skip the lookup if it's main, since it won't be in the package
         -- database!
      = False
      | Just pkgid <- mb_pkgid
-     , searchPackageId pkgs pkgid `lengthIs` 1
+     , searchPackageId unitIndex pkgid `lengthIs` 1
         -- this says: we are given a package pkg-0.1@MMM, are there only one
         -- exposed packages whose package ID is pkg-0.1?
      = False
      | otherwise
      = True
-     where mb_pkgid = fmap unitPackageId (lookupUnit pkgs uid)
+     where mb_pkgid = fmap unitPackageId (lookupUnit unitIndex pkgs uid)
 
 -- | A function which only qualifies package names if necessary; but
 -- qualifies all other identifiers.
-pkgQual :: UnitState -> NamePprCtx
-pkgQual pkgs = alwaysQualify { queryQualifyPackage = mkQualPackage pkgs }
+pkgQual :: UnitIndex -> UnitState -> NamePprCtx
+pkgQual unitIndex pkgs = alwaysQualify { queryQualifyPackage = mkQualPackage unitIndex pkgs }

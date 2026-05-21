@@ -60,7 +60,7 @@ linkStaticLib logger dflags unit_env o_files dep_units = do
   output_exists <- doesFileExist full_output_fn
   (when output_exists) $ removeFile full_output_fn
 
-  pkg_cfgs_init <- mayThrowUnitErr (preloadUnitsInfo' unit_env dep_units)
+  pkg_cfgs_init <- mayThrowUnitErrIO (preloadUnitsInfo' unit_env dep_units)
 
   let pkg_cfgs
         | gopt Opt_LinkRts dflags

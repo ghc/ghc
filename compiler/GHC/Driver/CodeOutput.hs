@@ -78,7 +78,7 @@ codeOutput
     -> TmpFs
     -> LlvmConfigCache
     -> DynFlags
-    -> UnitState
+    -> UnitIndex
     -> Module
     -> FilePath
     -> ModLocation
@@ -267,7 +267,7 @@ outputForeignStubs
     :: Logger
     -> TmpFs
     -> DynFlags
-    -> UnitState
+    -> UnitIndex
     -> Module
     -> ModLocation
     -> ForeignStubs

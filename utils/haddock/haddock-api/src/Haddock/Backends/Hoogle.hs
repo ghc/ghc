@@ -52,8 +52,8 @@ prefix =
   , ""
   ]
 
-ppHoogle :: DynFlags -> UnitState -> String -> Version -> String -> Maybe (Doc RdrName) -> [Interface] -> FilePath -> IO ()
-ppHoogle dflags unit_state package version synopsis prologue ifaces odir = do
+ppHoogle :: DynFlags -> UnitIndex -> String -> Version -> String -> Maybe (Doc RdrName) -> [Interface] -> FilePath -> IO ()
+ppHoogle dflags unit_index package version synopsis prologue ifaces odir = do
   let
     -- Since Hoogle is line based, we want to avoid breaking long lines.
     dflags' = dflags{pprCols = maxBound}
@@ -66,17 +66,17 @@ ppHoogle dflags unit_state package version synopsis prologue ifaces odir = do
         ++ [ "@version " ++ showVersion version
            | not (null (versionBranch version))
            ]
-        ++ concat [ppModule dflags' sDocContext unit_state i | i <- ifaces, OptHide `notElem` ifaceOptions i]
+        ++ concat [ppModule dflags' sDocContext unit_index i | i <- ifaces, OptHide `notElem` ifaceOptions i]
   createDirectoryIfMissing True odir
   writeUtf8File (odir </> filename) (unlines contents)
 
-ppModule :: DynFlags -> SDocContext -> UnitState -> Interface -> [String]
-ppModule dflags sDocContext unit_state iface =
+ppModule :: DynFlags -> SDocContext -> UnitIndex -> Interface -> [String]
+ppModule dflags sDocContext unit_index iface =
   ""
     : ppDocumentation sDocContext (ifaceDoc iface)
     ++ ["module " ++ moduleString (ifaceMod iface)]
     ++ concatMap ppExportItem (ifaceRnExportItems iface)
-    ++ concatMap (ppInstance dflags unit_state) (ifaceInstances iface)
+    ++ concatMap (ppInstance dflags unit_index) (ifaceInstances iface)
 
 -- | If the export item is an 'ExportDecl', get the attached Hoogle textual
 -- database entries for that export declaration.
@@ -255,7 +255,7 @@ ppFam sDocContext decl@(FamilyDecl{fdInfo = info}) =
       ClosedTypeFamily{} -> decl{fdInfo = OpenTypeFamily}
       _ -> decl
 
-ppInstance :: DynFlags -> UnitState -> ClsInst -> [String]
+ppInstance :: DynFlags -> UnitIndex -> ClsInst -> [String]
 ppInstance dflags unit_state x =
   [dropComment $ outWith (showSDocForUser dflags unit_state alwaysQualify) cls]
   where

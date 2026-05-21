@@ -129,16 +129,14 @@ initMulti unitArgsFiles lintDynFlagsAndSrcs = do
   let home_units = HUG.allUnits initial_home_graph
 
   home_unit_graph <- forM initial_home_graph $ \homeUnitEnv -> do
-    let cached_unit_dbs = homeUnitEnv_unit_dbs homeUnitEnv
-        hue_flags = homeUnitEnv_dflags homeUnitEnv
+    let hue_flags = homeUnitEnv_dflags homeUnitEnv
         dflags = homeUnitEnv_dflags homeUnitEnv
-    (dbs,unit_state,home_unit,mconstants) <- liftIO $ State.initUnits logger hue_flags cached_unit_dbs home_units
+    (unit_state,home_unit,mconstants) <- liftIO $ State.initUnits logger (hscUnitIndexCache hsc_env) hue_flags home_units
 
     updated_dflags <- liftIO $ updatePlatformConstants dflags mconstants
     emptyHpt <- liftIO $ emptyHomePackageTable
     pure $ HomeUnitEnv
       { homeUnitEnv_units = unit_state
-      , homeUnitEnv_unit_dbs = Just dbs
       , homeUnitEnv_dflags = updated_dflags
       , homeUnitEnv_hpt = emptyHpt
       , homeUnitEnv_home_unit = Just home_unit
@@ -147,7 +145,7 @@ initMulti unitArgsFiles lintDynFlagsAndSrcs = do
   checkUnitCycles initial_dflags home_unit_graph
 
   let dflags = homeUnitEnv_dflags $ HUG.unitEnv_lookup mainUnitId home_unit_graph
-  unitEnv <- assertUnitEnvInvariant <$> (liftIO $ initUnitEnv mainUnitId home_unit_graph (ghcNameVersion dflags) (targetPlatform dflags))
+  unitEnv <- assertUnitEnvInvariant <$> (liftIO $ initUnitEnv mainUnitId (hscUnitIndexCache hsc_env ) home_unit_graph (ghcNameVersion dflags) (targetPlatform dflags))
   let final_hsc_env = hsc_env { hsc_unit_env = unitEnv }
 
   GHC.setSession final_hsc_env
@@ -234,12 +232,13 @@ offsetDynFlags dflags =
               | otherwise = f
 
 
+-- TODO: bad
 createUnitEnvFromFlags :: NE.NonEmpty DynFlags -> IO (HomeUnitGraph, UnitId)
 createUnitEnvFromFlags unitDflags = do
   unitEnvList <- forM unitDflags $ \dflags -> do
     emptyHpt <- emptyHomePackageTable
     let newInternalUnitEnv =
-          HUG.mkHomeUnitEnv emptyUnitState Nothing dflags emptyHpt Nothing
+          HUG.mkHomeUnitEnv emptyUnitState dflags emptyHpt Nothing
     return (homeUnitId_ dflags, newInternalUnitEnv)
   let activeUnit = fst $ NE.head unitEnvList
   return (HUG.hugFromList (NE.toList unitEnvList), activeUnit)

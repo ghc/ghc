@@ -317,12 +317,13 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
         | otherwise
         -> return (Right Nothing)
 
-    fail ->
+    fail -> do
+      unit_index <- hscUnitIndex hsc_env
       return $
         Left $
           mkPlainErrorMsgEnvelope srcloc $
           GhcDriverMessage $ DriverInterfaceError $
-             (Can'tFindInterface (cannotFindModule hsc_env imp fail) (LookingForModule imp is_boot))
+             (Can'tFindInterface (cannotFindModule hsc_env unit_index imp fail) (LookingForModule imp is_boot))
 
 -----------------------------
 writeDependency :: FilePath -> Handle -> [FilePath] -> FilePath -> IO ()

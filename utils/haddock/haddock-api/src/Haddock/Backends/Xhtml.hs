@@ -79,7 +79,8 @@ import Haddock.Version
 --------------------------------------------------------------------------------
 
 ppHtml
-  :: UnitState
+  :: UnitIndex
+  -> UnitState
   -> String
   -- ^ Title
   -> Maybe String
@@ -119,6 +120,7 @@ ppHtml
   -- ^ Also write Quickjump index
   -> IO ()
 ppHtml
+  unit_index
   state
   doctitle
   maybe_package
@@ -145,6 +147,7 @@ ppHtml
 
     when (isNothing maybe_contents_url) $
       ppHtmlContents
+        unit_index
         state
         odir
         doctitle
@@ -386,7 +389,8 @@ moduleInfo iface =
 --------------------------------------------------------------------------------
 
 ppHtmlContents
-  :: UnitState
+  :: UnitIndex
+  -> UnitState
   -> FilePath
   -> String
   -> Maybe String
@@ -405,6 +409,7 @@ ppHtmlContents
   -- ^ How to qualify names
   -> IO ()
 ppHtmlContents
+  unit_index
   state
   odir
   doctitle
@@ -423,6 +428,7 @@ ppHtmlContents
     let trees =
           [ ( piPackageInfo pinfo
             , mkModuleTree
+                unit_index
                 state
                 showPkgs
                 [ (instMod iface, toInstalledDescription iface)
@@ -435,6 +441,7 @@ ppHtmlContents
         sig_trees =
           [ ( piPackageInfo pinfo
             , mkModuleTree
+                unit_index
                 state
                 showPkgs
                 [ (instMod iface, toInstalledDescription iface)

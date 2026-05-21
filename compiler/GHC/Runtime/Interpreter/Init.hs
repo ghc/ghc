@@ -85,6 +85,7 @@ initInterpreter dflags tmpfs logger platform finder_cache unit_env opts = do
         libdir <- liftIO $ last <$> Loader.getGccSearchDirectory logger (interpLdConfig opts) "libraries"
         let profiled = interpWays opts `hasWay` WayProf
             way_tag = if profiled then "_p" else ""
+        unit_index <- liftIO $ ueUnitIndex unit_env
         let cfg =
               WasmInterpConfig
                 { wasmInterpDyLD = interpWasmDyld opts
@@ -102,6 +103,7 @@ initInterpreter dflags tmpfs logger platform finder_cache unit_env opts = do
                 , wasmInterpProfiled = profiled
                 , wasmInterpHsSoSuffix = way_tag ++ dynLibSuffix (interpNameVer opts)
                 , wasmInterpUnitState = ue_homeUnitState unit_env
+                , wasmInterpUnitIndex = unit_index
                 }
         pure $ Just $ Interp (ExternalInterp $ ExtWasm $ ExtInterpState cfg s) loader lookup_cache fs_cache
 #endif

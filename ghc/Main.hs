@@ -261,11 +261,13 @@ main' postLoadMode units dflags0 args flagWarnings = do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
     case postLoadMode of
-       ShowInterface f        -> liftIO $ showIface logger
-                                                    (hsc_dflags hsc_env)
-                                                    (hsc_units  hsc_env)
-                                                    (hsc_NC     hsc_env)
-                                                    f
+       ShowInterface f        -> liftIO $ do
+                                   unit_index <- hscUnitIndex hsc_env
+                                   showIface logger
+                                     (hsc_dflags hsc_env)
+                                     unit_index
+                                     (hsc_NC     hsc_env)
+                                     f
        DoMake                 -> doMake units srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)
        StopBefore p           -> liftIO (oneShot hsc_env p srcs)
@@ -443,9 +445,9 @@ dumpFastStringStats logger = do
    x `pcntOf` y = int ((x * 100) `quot` y) Outputable.<> char '%'
 
 showUnits, dumpUnits, dumpUnitsSimple :: HscEnv -> IO ()
-showUnits       hsc_env = putStrLn (showSDoc (hsc_dflags hsc_env) (pprUnits (hsc_units hsc_env)))
-dumpUnits       hsc_env = putMsg (hsc_logger hsc_env) (pprUnits (hsc_units hsc_env))
-dumpUnitsSimple hsc_env = putMsg (hsc_logger hsc_env) (pprUnitsSimple (hsc_units hsc_env))
+showUnits       hsc_env = hscUnitIndex hsc_env >>= \ unit_index -> putStrLn (showSDoc (hsc_dflags hsc_env) (pprUnits unit_index))
+dumpUnits       hsc_env = hscUnitIndex hsc_env >>= \ unit_index -> putMsg (hsc_logger hsc_env) (pprUnits unit_index)
+dumpUnitsSimple hsc_env = hscUnitIndex hsc_env >>= \ unit_index -> putMsg (hsc_logger hsc_env) (pprUnitsSimple unit_index (hsc_units hsc_env))
 
 -- -----------------------------------------------------------------------------
 -- Frontend plugin support
@@ -485,7 +487,7 @@ abiHash strs = do
   let dflags    = hsc_dflags hsc_env
 
   liftIO $ do
-
+  unit_index <- hscUnitIndex hsc_env
   let find_it str = do
          let modname = mkModuleName str
          r <- findImportedModule hsc_env modname NoPkgQual
@@ -494,7 +496,7 @@ abiHash strs = do
            _error    ->
             let opts   = initIfaceMessageOpts dflags
                 err_txt = missingInterfaceErrorDiagnostic opts
-                        $ cannotFindModule hsc_env modname r
+                        $ cannotFindModule hsc_env unit_index modname r
             in throwGhcException . CmdLineError $ showSDoc dflags err_txt
 
   mods <- mapM find_it strs

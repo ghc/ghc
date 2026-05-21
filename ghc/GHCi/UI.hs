@@ -310,15 +310,18 @@ flagWordBreakChars = " \t\n"
 showSDocForUser' :: GHC.GhcMonad m => SDoc -> m String
 showSDocForUser' doc = do
     dflags <- getDynFlags
-    unit_state <- hsc_units <$> GHC.getSession
+    env <- GHC.getSession
+    unit_index <- liftIO $ hscUnitIndex env
     name_ppr_ctx <- GHC.getNamePprCtx
-    pure $ showSDocForUser dflags unit_state name_ppr_ctx doc
+
+    pure $ showSDocForUser dflags unit_index name_ppr_ctx doc
 
 showSDocForUserQualify :: GHC.GhcMonad m => SDoc -> m String
 showSDocForUserQualify doc = do
     dflags <- getDynFlags
-    unit_state <- hsc_units <$> GHC.getSession
-    pure $ showSDocForUser dflags unit_state alwaysQualify doc
+    env <- GHC.getSession
+    unit_index <- liftIO $ hscUnitIndex env
+    pure $ showSDocForUser dflags unit_index alwaysQualify doc
 
 
 keepGoing :: (String -> GHCi ()) -> (String -> InputT GHCi CmdExecOutcome)
@@ -761,20 +764,13 @@ installInteractiveHomeUnits = do
         }
 
   let
-    cached_unit_dbs =
-        concat
-      . catMaybes
-      . fmap homeUnitEnv_unit_dbs
-      $ Foldable.toList
-      $ hsc_HUG hsc_env
-
     all_unit_ids =
       S.insert interactiveGhciUnitId $
       S.insert interactiveSessionUnitId $
       hsc_all_home_unit_ids hsc_env
 
-  ghciPromptUnit  <- setupHomeUnitFor logger dflagsPrompt  all_unit_ids cached_unit_dbs
-  ghciSessionUnit <- setupHomeUnitFor logger dflagsSession all_unit_ids cached_unit_dbs
+  ghciPromptUnit  <- setupHomeUnitFor logger dflagsPrompt  all_unit_ids
+  ghciSessionUnit <- setupHomeUnitFor logger dflagsSession all_unit_ids
   let
     -- Setup up the HUG, install the interactive home units
     withInteractiveUnits =
@@ -796,12 +792,13 @@ installInteractiveHomeUnits = do
 
   pure ()
   where
-    setupHomeUnitFor :: GHC.GhcMonad m => Logger -> DynFlags -> S.Set UnitId -> [UnitDatabase UnitId] -> m HomeUnitEnv
-    setupHomeUnitFor logger dflags all_home_units cached_unit_dbs = do
-      (dbs,unit_state,home_unit,_mconstants) <-
-        liftIO $ initUnits logger dflags (Just cached_unit_dbs) all_home_units
+    setupHomeUnitFor :: GHC.GhcMonad m => Logger -> DynFlags -> S.Set UnitId -> m HomeUnitEnv
+    setupHomeUnitFor logger dflags all_home_units = do
+      env <- GHC.getSession
+      (unit_state,home_unit,_mconstants) <-
+        liftIO $ initUnits logger (hscUnitIndexCache env) dflags all_home_units
       hpt <- liftIO emptyHomePackageTable
-      pure (HUG.mkHomeUnitEnv unit_state (Just dbs) dflags hpt (Just home_unit))
+      pure (HUG.mkHomeUnitEnv unit_state dflags hpt (Just home_unit))
 
 reportError :: GhciMonad m => GhciCommandMessage -> m ()
 reportError err = do
@@ -2849,12 +2846,11 @@ isSafeModule m = do
 
     packageTrusted hsc_env md
         | isHomeModule (hsc_home_unit hsc_env) md = True
-        | otherwise = unitIsTrusted $ unsafeLookupUnit (hsc_units hsc_env) (moduleUnit md)
+        | otherwise = isUnitTrustedInUnit (hsc_units hsc_env) (toUnitId $ moduleUnit md)
 
     tallyPkgs hsc_env deps | not (packageTrustOn dflags) = (S.empty, S.empty)
                           | otherwise = S.partition part deps
-        where part pkg   = unitIsTrusted $ unsafeLookupUnitId unit_state pkg
-              unit_state = hsc_units hsc_env
+        where part pkg   = isUnitTrustedInUnit (hsc_units hsc_env) pkg
               dflags     = hsc_dflags hsc_env
 
 -----------------------------------------------------------------------------

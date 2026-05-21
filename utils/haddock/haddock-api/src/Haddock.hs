@@ -212,6 +212,8 @@ haddockWithGhc ghc args = handleTopExceptions $ do
     let logger = setLogFlags logger' (initLogFlags dflags)
     let parserOpts = Parser.initParserOpts dflags
     !unit_state <- hsc_units <$> getSession
+    env <- getSession
+    unit_index <- liftIO $ hscUnitIndex env
 
     -- If any --show-interface was used, show the given interfaces
     forM_ (optShowInterfaceFile flags) $ \path -> liftIO $ do
@@ -238,7 +240,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
           }
 
       -- Render the interfaces.
-      liftIO $ renderStep dflags parserOpts logger unit_state flags sinceQual qual packages ifaces
+      liftIO $ renderStep dflags parserOpts logger unit_index unit_state flags sinceQual qual packages ifaces
 
     -- If we were not given any input files, error if documentation was
     -- requested
@@ -251,7 +253,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
       packages <- liftIO $ readInterfaceFiles name_cache (readIfaceArgs flags) noChecks
 
       -- Render even though there are no input files (usually contents/index).
-      liftIO $ renderStep dflags parserOpts logger unit_state flags sinceQual qual packages []
+      liftIO $ renderStep dflags parserOpts logger unit_index unit_state flags sinceQual qual packages []
 
 -- | Run the GHC action using a temporary output directory
 withTempOutputDir :: Ghc a -> Ghc a
@@ -307,6 +309,7 @@ renderStep
   :: DynFlags
   -> ParserOpts
   -> Logger
+  -> UnitIndex
   -> UnitState
   -> [Flag]
   -> SinceQual
@@ -314,7 +317,7 @@ renderStep
   -> [(DocPaths, Visibility, FilePath, InterfaceFile)]
   -> [Interface]
   -> IO ()
-renderStep dflags parserOpts logger unit_state flags sinceQual nameQual pkgs interfaces = do
+renderStep dflags parserOpts logger unit_index unit_state flags sinceQual nameQual pkgs interfaces = do
   updateHTMLXRefs (map (\(docPath, _ifaceFilePath, _showModules, ifaceFile) ->
                           ( case baseUrl flags of
                               Nothing  -> docPathsHtml docPath
@@ -330,12 +333,12 @@ renderStep dflags parserOpts logger unit_state flags sinceQual nameQual pkgs int
       (DocPaths {docPathsSources=Just path}, _, _, ifile) <- pkgs
       iface <- ifInstalledIfaces ifile
       return (instMod iface, path)
-  render dflags parserOpts logger unit_state flags sinceQual nameQual interfaces installedIfaces extSrcMap
+  render dflags parserOpts logger unit_index unit_state flags sinceQual nameQual interfaces installedIfaces extSrcMap
   where
     -- get package name from unit-id
     packageName :: Unit -> String
     packageName unit =
-      case lookupUnit unit_state unit of
+      case lookupUnit unit_index unit_state unit of
         Nothing  -> show unit
         Just pkg -> unitPackageNameString pkg
 
@@ -344,6 +347,7 @@ render
   :: DynFlags
   -> ParserOpts
   -> Logger
+  -> UnitIndex
   -> UnitState
   -> [Flag]
   -> SinceQual
@@ -352,7 +356,7 @@ render
   -> [(FilePath, PackageInterfaces)]
   -> Map Module FilePath
   -> IO ()
-render dflags parserOpts logger unit_state flags sinceQual qual ifaces packages extSrcMap = do
+render dflags parserOpts logger unit_index unit_state flags sinceQual qual ifaces packages extSrcMap = do
   let
     packageInfo = PackageInfo { piPackageName    = fromMaybe (PackageName mempty)
                                                  $ optPackageName flags
@@ -404,7 +408,7 @@ render dflags parserOpts logger unit_state flags sinceQual qual ifaces packages 
     pkgMod           = fmap ifaceMod (listToMaybe ifaces)
     pkgKey           = fmap moduleUnit pkgMod
     pkgStr           = fmap unitString pkgKey
-    pkgNameVer       = modulePackageInfo unit_state flags pkgMod
+    pkgNameVer       = modulePackageInfo unit_index unit_state flags pkgMod
     pkgName          = fmap (unpackFS . (\(PackageName n) -> n)) (fst pkgNameVer)
     sincePkg         = case sinceQual of
                          External -> pkgName
@@ -454,7 +458,7 @@ render dflags parserOpts logger unit_state flags sinceQual qual ifaces packages 
     -- records the *wired in* identity base.  So untranslate it
     -- so that we can service the request.
     unwire :: Module -> Module
-    unwire m = m { moduleUnit = unwireUnit unit_state (moduleUnit m) }
+    unwire m = m { moduleUnit = unwireUnit unit_index (moduleUnit m) }
 
   reexportedIfaces <- concat `fmap` (for (reexportFlags flags) $ \mod_str -> do
     let warn' = hPutStrLn stderr . ("Warning: " ++)
@@ -493,7 +497,7 @@ render dflags parserOpts logger unit_state flags sinceQual qual ifaces packages 
   when (Flag_GenContents `elem` flags) $ do
     withTiming logger "ppHtmlContents" (const ()) $ do
       _ <- {-# SCC ppHtmlContents #-}
-           ppHtmlContents unit_state odir title pkgStr
+           ppHtmlContents unit_index unit_state odir title pkgStr
                      themes opt_mathjax opt_index_url sourceUrls' opt_wiki_urls
                      allVisiblePackages True prologue pretty
                      sincePkg (makeContentsQual qual)
@@ -512,7 +516,7 @@ render dflags parserOpts logger unit_state flags sinceQual qual ifaces packages 
   when (Flag_Html `elem` flags) $ do
     withTiming logger "ppHtml" (const ()) $ do
       _ <- {-# SCC ppHtml #-}
-           ppHtml unit_state title pkgStr visibleIfaces reexportedIfaces odir
+           ppHtml unit_index unit_state title pkgStr visibleIfaces reexportedIfaces odir
                   prologue
                   themes opt_mathjax sourceUrls' opt_wiki_urls opt_base_url
                   opt_contents_url opt_index_url unicode sincePkg packageInfo
@@ -533,7 +537,7 @@ render dflags parserOpts logger unit_state flags sinceQual qual ifaces packages 
 
             pkgVer =
               fromMaybe (makeVersion []) mpkgVer
-          in ppHoogle dflags unit_state pkgNameStr pkgVer title (fmap _doc prologue)
+          in ppHoogle dflags unit_index pkgNameStr pkgVer title (fmap _doc prologue)
                visibleIfaces odir
       _ -> putStrLn . unlines $
           [ "haddock: Unable to find a package providing module "

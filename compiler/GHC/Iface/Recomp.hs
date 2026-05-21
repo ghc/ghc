@@ -616,11 +616,12 @@ checkMergedSignatures :: HscEnv -> ModSummary -> IfaceSelfRecomp -> IO Recompile
 checkMergedSignatures hsc_env mod_summary self_recomp = do
     let logger     = hsc_logger hsc_env
     let unit_state = hsc_units hsc_env
+    unit_index <- hscUnitIndex hsc_env
     let old_merged = sort [ mod | UsageMergedRequirement{ usg_mod = mod } <- mi_sr_usages self_recomp ]
         new_merged = case lookupUniqMap (requirementContext unit_state)
                           (ms_mod_name mod_summary) of
                         Nothing -> []
-                        Just r -> sort $ map (instModuleToModule unit_state) r
+                        Just r -> sort $ map (instModuleToModule unit_index unit_state) r
     if old_merged == new_merged
         then up_to_date logger (text "signatures to merge in unchanged" $$ ppr new_merged)
         else return $ needsRecompileBecause SigsMergeChanged

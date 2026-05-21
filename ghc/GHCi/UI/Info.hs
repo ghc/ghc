@@ -260,7 +260,8 @@ collectInfo :: (GhcMonad m) => Map Module ModInfo -> [Module]
                -> m (Map Module ModInfo)
 collectInfo ms loaded = do
     df <- getDynFlags
-    unit_state <- hsc_units <$> getSession
+    hsc_env <- getSession
+    unit_index <- liftIO $ hscUnitIndex hsc_env
     liftIO (filterM cacheInvalid loaded) >>= \case
         [] -> return ms
         invalidated -> do
@@ -268,13 +269,13 @@ collectInfo ms loaded = do
                               show (length invalidated) ++
                               " module(s) ... "))
 
-            foldM (go df unit_state) ms invalidated
+            foldM (go df unit_index) ms invalidated
   where
-    go df unit_state m name = do { info <- getModInfo name; return (M.insert name info m) }
+    go df unit_index m name = do { info <- getModInfo name; return (M.insert name info m) }
                    `MC.catch`
                    (\(e :: SomeException) -> do
                          liftIO $ putStrLn
-                                $ showSDocForUser df unit_state alwaysQualify
+                                $ showSDocForUser df unit_index alwaysQualify
                                 $ "Error while getting type info from" <+>
                                   ppr name <> ":" <+> text (show e)
                          return m)

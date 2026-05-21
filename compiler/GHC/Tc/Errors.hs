@@ -14,7 +14,7 @@ import GHC.Prelude
 
 import GHC.Builtin.Names (hasFieldClassName)
 
-import GHC.Driver.Env (hsc_units)
+import GHC.Driver.Env (hscUnitIndex)
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Driver.Config.Diagnostic
@@ -1449,14 +1449,15 @@ mkErrorReport :: CtLocEnv
               -> TcM (MsgEnvelope TcRnMessage)
 mkErrorReport tcl_env msg mb_ctxt supp hints
   = do { mb_context <- traverse (\ ctxt -> tidyErrCtxt (cec_tidy ctxt) (ctl_ctxt tcl_env)) mb_ctxt
-       ; unit_state <- hsc_units <$> getTopEnv
+       ; env <- getTopEnv
+       ; unit_index <- liftIO $ hscUnitIndex env
        ; hfdc <- getHoleFitDispConfig
        ; let
            err_info = ErrInfo (fromMaybe [] mb_context) (Just (hfdc, supp)) hints
            detailed_msg = mkDetailedMessage err_info msg
        ; mkTcRnMessage
            (RealSrcSpan (ctl_loc tcl_env) Strict.Nothing)
-           (TcRnMessageWithInfo unit_state $ detailed_msg) }
+           (TcRnMessageWithInfo unit_index $ detailed_msg) }
 
 {- Note [Always warn with -fdefer-type-errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

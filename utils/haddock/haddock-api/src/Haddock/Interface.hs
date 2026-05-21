@@ -290,12 +290,13 @@ processModule verbosity modSummary flags ifaceMap instIfaceMap warningMap = do
 
       pure (hm_iface hmi, (cls_insts, fam_insts))
 
+  unit_index <- liftIO $ hscUnitIndex hsc_env
   !interface <- do
     logger <- getLogger
     {-# SCC createInterface #-}
       withTiming logger "createInterface" (const ()) $
         runIfM (liftIO . fmap dropErr . lookupGlobal_maybe hsc_env) $
-          createInterface1 flags unit_state modSummary mod_iface ifaceMap instIfaceMap insts warningMap
+          createInterface1 flags unit_index unit_state modSummary mod_iface ifaceMap instIfaceMap insts warningMap
 
   let
     (haddockable, haddocked) =
@@ -391,12 +392,13 @@ createOneShotIface verbosity flags instIfaceMap moduleNameStr = do
                       Found ml _ -> ml_hie_file ml
                       _ -> throwE "createOneShotIface: module not found"
   let inst_warning_map = Map.unions $ map instWarningMap (Map.elems instIfaceMap)
+  unit_index <- liftIO $ hscUnitIndex hsc_env
   !interface <- do
     logger <- getLogger
     {-# SCC createInterface #-}
       withTiming logger "createInterface" (const ()) $
         runIfM (liftIO . fmap dropErr . lookupGlobal_maybe hsc_env) $
-          createInterface1' flags (hsc_units hsc_env) dflags' hieFilePath iface mempty instIfaceMap insts inst_warning_map
+          createInterface1' flags unit_index (hsc_units hsc_env) dflags' hieFilePath iface mempty instIfaceMap insts inst_warning_map
 
   pure [interface]
 

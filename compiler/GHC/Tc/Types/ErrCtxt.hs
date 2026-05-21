@@ -38,7 +38,7 @@ import GHC.Core.PatSyn   ( PatSyn )
 import GHC.Core.TyCon    ( TyCon )
 import GHC.Core.TyCo.Rep ( Type, ThetaType, PredType )
 
-import {-# SOURCE #-} GHC.Unit.State ( UnitState ) -- Break the module graph cycle for accesing HsCtxt in GHC.Hs.Expr
+import {-# SOURCE #-} GHC.Unit.State ( UnitIndex ) -- Break the module graph cycle for accesing HsCtxt in GHC.Hs.Expr
 
 import GHC.Data.FastString  ( FastString )
 import GHC.Utils.Outputable
@@ -373,9 +373,9 @@ data HsCtxt
   | ReifyInstancesCtxt !TH.Name ![TH.Type]
 
   -- | While merging Backpack signatures.
-  | MergeSignaturesCtxt !UnitState !ModuleName ![InstantiatedModule]
+  | MergeSignaturesCtxt !UnitIndex !ModuleName ![InstantiatedModule]
   -- | While checking that a module implements a Backpack signature.
-  | CheckImplementsCtxt !UnitState !Module !InstantiatedModule
+  | CheckImplementsCtxt !UnitIndex !Module !InstantiatedModule
 
 
 isHsCtxtLandmark :: HsCtxt -> Bool

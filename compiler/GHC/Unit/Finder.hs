@@ -182,7 +182,8 @@ findImportedModule hsc_env mod pkg_qual =
       dflags    = hsc_dflags hsc_env
       fopts     = initFinderOpts dflags
   in do
-    findImportedModuleNoHsc fc fopts (hsc_unit_env hsc_env) mhome_unit mod pkg_qual
+    unit_index <- hscUnitIndex hsc_env
+    findImportedModuleNoHsc fc fopts unit_index (hsc_unit_env hsc_env) mhome_unit mod pkg_qual
 
 findImportedModuleWithIsBoot :: HscEnv -> ModuleName -> IsBootInterface -> PkgQual -> IO FindResult
 findImportedModuleWithIsBoot hsc_env mod is_boot pkg_qual = do
@@ -194,12 +195,13 @@ findImportedModuleWithIsBoot hsc_env mod is_boot pkg_qual = do
 findImportedModuleNoHsc
   :: FinderCache
   -> FinderOpts
+  -> UnitIndex
   -> UnitEnv
   -> Maybe HomeUnit
   -> ModuleName
   -> PkgQual
   -> IO FindResult
-findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
+findImportedModuleNoHsc fc fopts unit_index ue mhome_unit mod_name mb_pkg =
   case mb_pkg of
     NoPkgQual  -> unqual_import
     ThisPkg uid | (homeUnitId <$> mhome_unit) == Just uid -> home_import
@@ -221,7 +223,7 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
       -- If the module is reexported, then look for it as if it was from the perspective
       -- of that package which reexports it.
       | Just real_mod_name <- lookupUniqMap (finder_reexportedModules opts) mod_name =
-        findImportedModuleNoHsc fc opts ue (Just $ DefiniteHomeUnit uid Nothing) real_mod_name NoPkgQual
+        findImportedModuleNoHsc fc opts unit_index ue (Just $ DefiniteHomeUnit uid Nothing) real_mod_name NoPkgQual
       | elementOfUniqSet mod_name (finder_hiddenModules opts) =
         return (mkHomeHidden uid)
       | otherwise =
@@ -232,11 +234,11 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
     -- first before looking at the packages in order.
     any_home_import = foldr1 orIfNotFound (home_import:| map home_pkg_import other_fopts)
 
-    pkg_import    = findExposedPackageModule fc fopts units  mod_name mb_pkg
+    pkg_import    = findExposedPackageModule fc fopts unit_index units  mod_name mb_pkg
 
     unqual_import = any_home_import
                     `orIfNotFound`
-                    findExposedPackageModule fc fopts units mod_name NoPkgQual
+                    findExposedPackageModule fc fopts unit_index units mod_name NoPkgQual
 
     units     = case mhome_unit of
                   Nothing -> ue_homeUnitState ue
@@ -249,33 +251,34 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
 -- plugin.  This consults the same set of exposed packages as
 -- 'findImportedModule', unless @-hide-all-plugin-packages@ or
 -- @-plugin-package@ are specified.
-findPluginModuleNoHsc :: FinderCache -> FinderOpts -> UnitState -> Maybe HomeUnit -> ModuleName -> IO FindResult
-findPluginModuleNoHsc fc fopts units (Just home_unit) mod_name =
+findPluginModuleNoHsc :: FinderCache -> FinderOpts -> UnitIndex -> UnitState -> Maybe HomeUnit -> ModuleName -> IO FindResult
+findPluginModuleNoHsc fc fopts unit_index units (Just home_unit) mod_name =
   findHomeModule fc fopts home_unit mod_name
   `orIfNotFound`
-  findExposedPluginPackageModule fc fopts units mod_name
-findPluginModuleNoHsc fc fopts units Nothing mod_name =
-  findExposedPluginPackageModule fc fopts units mod_name
+  findExposedPluginPackageModule fc fopts unit_index units mod_name
+findPluginModuleNoHsc fc fopts  unit_index units Nothing mod_name =
+  findExposedPluginPackageModule fc fopts unit_index units mod_name
 
 findPluginModule :: HscEnv -> ModuleName -> IO FindResult
 findPluginModule hsc_env mod_name = do
   let fc = hsc_FC hsc_env
   let units = hsc_units hsc_env
   let mhome_unit = hsc_home_unit_maybe hsc_env
-  findPluginModuleNoHsc fc (initFinderOpts (hsc_dflags hsc_env)) units mhome_unit mod_name
+  unit_index <- hscUnitIndex hsc_env
+  findPluginModuleNoHsc fc (initFinderOpts (hsc_dflags hsc_env)) unit_index units mhome_unit mod_name
 
 
 -- | A version of findExactModule which takes the exact parts of the HscEnv it needs
 -- directly.
-findExactModuleNoHsc :: FinderCache -> FinderOpts -> UnitEnvGraph FinderOpts -> UnitState -> Maybe HomeUnit -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
-findExactModuleNoHsc fc fopts other_fopts unit_state mhome_unit mod is_boot = do
+findExactModuleNoHsc :: FinderCache -> FinderOpts -> UnitEnvGraph FinderOpts -> UnitIndex -> Maybe HomeUnit -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
+findExactModuleNoHsc fc fopts other_fopts unit_index mhome_unit mod is_boot = do
   res <- case mhome_unit of
     Just home_unit
      | isHomeInstalledModule home_unit mod
         -> findInstalledHomeModule fc fopts (homeUnitId home_unit) (moduleName mod)
      | Just home_fopts <- HUG.unitEnv_lookup_maybe (moduleUnit mod) other_fopts
         -> findInstalledHomeModule fc home_fopts (moduleUnit mod) (moduleName mod)
-    _ -> findPackageModule fc unit_state fopts mod
+    _ -> findPackageModule fc unit_index fopts mod
   case (res, is_boot) of
     (InstalledFound loc, IsBoot) -> return (InstalledFound (addBootSuffixLocn loc))
     _ -> return res
@@ -290,10 +293,10 @@ findExactModule :: HscEnv -> InstalledModule -> IsBootInterface -> IO InstalledF
 findExactModule hsc_env mod is_boot = do
   let dflags = hsc_dflags hsc_env
   let fc = hsc_FC hsc_env
-  let unit_state = hsc_units hsc_env
   let home_unit = hsc_home_unit_maybe hsc_env
   let other_fopts = initFinderOpts . homeUnitEnv_dflags <$> (hsc_HUG hsc_env)
-  findExactModuleNoHsc fc (initFinderOpts dflags) other_fopts unit_state home_unit mod is_boot
+  unit_index <- hscUnitIndex hsc_env
+  findExactModuleNoHsc fc (initFinderOpts dflags) other_fopts unit_index home_unit mod is_boot
 
 
 -- -----------------------------------------------------------------------------
@@ -334,15 +337,15 @@ homeSearchCache fc home_unit mod_name do_this = do
   let mod = mkModule home_unit mod_name
   modLocationCache fc mod do_this
 
-findExposedPackageModule :: FinderCache -> FinderOpts -> UnitState -> ModuleName -> PkgQual -> IO FindResult
-findExposedPackageModule fc fopts units mod_name mb_pkg =
+findExposedPackageModule :: FinderCache -> FinderOpts -> UnitIndex -> UnitState -> ModuleName -> PkgQual -> IO FindResult
+findExposedPackageModule fc fopts unit_index units mod_name mb_pkg =
   findLookupResult fc fopts
-    $ lookupModuleWithSuggestions units mod_name mb_pkg
+    $ lookupModuleWithSuggestions unit_index units mod_name mb_pkg
 
-findExposedPluginPackageModule :: FinderCache -> FinderOpts -> UnitState -> ModuleName -> IO FindResult
-findExposedPluginPackageModule fc fopts units mod_name =
+findExposedPluginPackageModule :: FinderCache -> FinderOpts -> UnitIndex -> UnitState -> ModuleName -> IO FindResult
+findExposedPluginPackageModule fc fopts unit_index units mod_name =
   findLookupResult fc fopts
-    $ lookupPluginModuleWithSuggestions units mod_name NoPkgQual
+    $ lookupPluginModuleWithSuggestions unit_index units mod_name NoPkgQual
 
 findLookupResult :: FinderCache -> FinderOpts -> LookupResult -> IO FindResult
 findLookupResult fc fopts r = case r of
@@ -520,10 +523,10 @@ augmentImports work_dir (fp:fps)
   | otherwise            = (work_dir </> fp) : augmentImports work_dir fps
 
 -- | Search for a module in external packages only.
-findPackageModule :: FinderCache -> UnitState -> FinderOpts -> InstalledModule -> IO InstalledFindResult
-findPackageModule fc unit_state fopts mod = do
+findPackageModule :: FinderCache -> UnitIndex -> FinderOpts -> InstalledModule -> IO InstalledFindResult
+findPackageModule fc unit_index fopts mod = do
   let pkg_id = moduleUnit mod
-  case lookupUnitId unit_state pkg_id of
+  case lookupUnitId unit_index pkg_id of
      Nothing -> return (InstalledNoPackage pkg_id)
      Just u  -> findPackageModule_ fc fopts mod u
 

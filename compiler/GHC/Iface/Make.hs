@@ -151,9 +151,9 @@ mkFullIface hsc_env partial_iface mb_stg_infos mb_cmm_infos stubs foreign_files 
       addFingerprints hsc_env $ set_mi_simplified_core mi_simplified_core $ set_mi_decls decls partial_iface
 
     -- Debug printing
-    let unit_state = hsc_units hsc_env
+    unit_index <- hscUnitIndex hsc_env
     putDumpFileMaybe (hsc_logger hsc_env) Opt_D_dump_hi "FINAL INTERFACE" FormatText
-      (pprModIface unit_state full_iface)
+      (pprModIface unit_index full_iface)
     final_iface <- shareIface (hsc_NC hsc_env) (flagsToIfCompression $ hsc_dflags hsc_env) full_iface
     return final_iface
 

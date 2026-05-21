@@ -402,7 +402,8 @@ failIllegalTyVar :: WithUserRdr Name -> TcM a
       required_type_arguments <- xoptM LangExt.RequiredTypeArguments
       (imp_errs, hints) <- get_suggestions required_type_arguments what_looking whatName rdr
       hfdc <- getHoleFitDispConfig
-      unit_state <- hsc_units <$> getTopEnv
+      env <- getTopEnv
+      unit_index <- liftIO $ hscUnitIndex env
       let
         want_simple = want_simple_msg hints
         msg = TcRnIllegalTermLevelUse want_simple rdr nm err
@@ -415,7 +416,7 @@ failIllegalTyVar :: WithUserRdr Name -> TcM a
                              NE.nonEmpty imp_errs
                        , errInfoHints = hints
                        }
-      failWithTc $ TcRnMessageWithInfo unit_state (mkDetailedMessage info msg)
+      failWithTc $ TcRnMessageWithInfo unit_index (mkDetailedMessage info msg)
 
     get_suggestions required_type_arguments what_looking ns rdr = do
       show_helpful_errors <- goptM Opt_HelpfulErrors

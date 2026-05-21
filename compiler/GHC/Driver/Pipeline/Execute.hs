@@ -272,7 +272,7 @@ runGenericAsPhase run_as extra_opts with_cpp pipe_env hsc_env location input_fn 
         all_includes <- if not with_cpp
           then pure []
           else do
-            pkg_include_dirs <- mayThrowUnitErr (collectIncludeDirs <$> preloadUnitsInfo unit_env)
+            pkg_include_dirs <- mayThrowUnitErrIO (fmap collectIncludeDirs <$> preloadUnitsInfo unit_env)
             let global_includes = [ GHC.SysTools.Option ("-I" ++ p)
                                   | p <- includePathsGlobal cmdline_include_paths ++ pkg_include_dirs]
             let local_includes = [ GHC.SysTools.Option ("-iquote" ++ p)
@@ -387,7 +387,7 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
   -- add package include paths even if we're just compiling .c
   -- files; this is the Value Add(TM) that using ghc instead of
   -- gcc gives you :)
-  ps <- mayThrowUnitErr (preloadUnitsInfo' unit_env pkgs)
+  ps <- mayThrowUnitErrIO (preloadUnitsInfo' unit_env pkgs)
   let pkg_include_dirs     = collectIncludeDirs ps
   let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
         (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
@@ -672,9 +672,10 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   -- gather the imports and module name
   (hspp_buf,mod_name,imps,src_imps) <- do
     buf <- hGetStringBuffer input_fn
+    unit_index <- liftIO $ hscUnitIndex hsc_env
     let imp_prelude = xopt LangExt.ImplicitPrelude dflags
         popts = initParserOpts dflags
-        rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
+        rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env) unit_index
         rn_imps = fmap (\(s, rpk, lmn@(L _ mn)) -> (s, rn_pkg_qual mn rpk, lmn))
         sec = initSourceErrorContext dflags
     eimps <- getImports popts sec imp_prelude buf input_fn (basename <.> suff)

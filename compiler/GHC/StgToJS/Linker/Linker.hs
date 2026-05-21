@@ -469,7 +469,7 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache
 
   -- all the units we want to link together, including their dependencies,
   -- preload units, and backpack instantiations
-  all_units_infos <- mayThrowUnitErr (preloadUnitsInfo' unit_env root_units)
+  all_units_infos <- mayThrowUnitErrIO (preloadUnitsInfo' unit_env root_units)
 
   let all_units = fmap unitId all_units_infos
 
@@ -666,10 +666,11 @@ renderLinkerStats s =
 
 getPackageArchives :: StgToJSConfig -> UnitEnv -> [UnitId] -> IO [FilePath]
 getPackageArchives cfg unit_env units = do
+  unit_index <- ueUnitIndex unit_env
   fmap concat $ forM units $ \u -> do
     let archives = [ ST.unpack p </> "lib" ++ ST.unpack l ++ profSuff <.> "a"
-                   | p <- getInstalledPackageLibDirs ue_state u
-                   , l <- getInstalledPackageHsLibs  ue_state u
+                   | p <- getInstalledPackageLibDirs unit_index u
+                   , l <- getInstalledPackageHsLibs  unit_index u
                    ]
     foundArchives <- filterM doesFileExist archives
     if | not (null archives)
@@ -679,8 +680,6 @@ getPackageArchives cfg unit_env units = do
        | otherwise
        -> pure foundArchives
   where
-    ue_state = ue_homeUnitState unit_env
-
     -- XXX the profiling library name is probably wrong now
     profSuff | csProf cfg = "_p"
              | otherwise  = ""

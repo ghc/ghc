@@ -717,10 +717,10 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
               let foreign_stubs st = foreign_stubs0
                                      `appendStubC` prof_init
                                      `appendStubC` cgIPEStub st
-
+              unit_index <- hscUnitIndex hsc_env
               (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cmm_cg_infos)
                   <- {-# SCC "codeOutput" #-}
-                    codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) this_mod output_filename mod_loc
+                    codeOutput logger tmpfs llvm_config dflags unit_index this_mod output_filename mod_loc
                     foreign_stubs foreign_files dependencies (initDUniqSupply 'n' 0) rawcmms1
               return  ( output_filename, stub_c_exists, foreign_fps
                       , Just stg_cg_infos, Just cmm_cg_infos)
@@ -752,9 +752,10 @@ hscInteractive hsc_env cgguts location = do
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
     let tmpfs  = hsc_tmpfs hsc_env
+    unit_index <- hscUnitIndex hsc_env
     ------------------ Create f-x-dynamic C-side stuff -----
     (_istub_h_exists, istub_c_exists)
-        <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) (cgi_module cgguts) location (cgi_foreign cgguts)
+        <- outputForeignStubs logger tmpfs dflags unit_index (cgi_module cgguts) location (cgi_foreign cgguts)
     return (istub_c_exists, comp_bc)
 
 
@@ -922,8 +923,9 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
                   let ip_init = ipInitCode do_info_table platform cmm_mod
                   in NoStubs `appendStubC` ip_init
               | otherwise     = NoStubs
+        unit_index <- hscUnitIndex hsc_env
         (_output_filename, (_stub_h_exists, stub_c_exists), _foreign_fps, _caf_infos)
-          <- codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) cmm_mod output_filename no_loc foreign_stubs [] S.empty
+          <- codeOutput logger tmpfs llvm_config dflags unit_index cmm_mod output_filename no_loc foreign_stubs [] S.empty
              dus1 rawCmms
         return stub_c_exists
   where

@@ -671,15 +671,12 @@ setUnitDynFlagsNoCheck uid dflags1 = do
   logger <- getLogger
   hsc_env <- getSession
 
-  let old_hue = ue_findHomeUnitEnv uid (hsc_unit_env hsc_env)
-  let cached_unit_dbs = homeUnitEnv_unit_dbs old_hue
-  (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags1 cached_unit_dbs (hsc_all_home_unit_ids hsc_env)
+  (unit_state,home_unit,mconstants) <- liftIO $ initUnits logger (hscUnitIndexCache hsc_env) dflags1 (hsc_all_home_unit_ids hsc_env)
   updated_dflags <- liftIO $ updatePlatformConstants dflags1 mconstants
 
   let upd hue =
        hue
           { homeUnitEnv_units = unit_state
-          , homeUnitEnv_unit_dbs = Just dbs
           , homeUnitEnv_dflags = updated_dflags
           , homeUnitEnv_home_unit = Just home_unit
           }
@@ -759,17 +756,16 @@ setProgramDynFlags_ invalidate_needed dflags = do
         old_unit_env <- ue_setFlags dflags0 . hsc_unit_env <$> getSession
 
         home_unit_graph <- forM (ue_home_unit_graph old_unit_env) $ \homeUnitEnv -> do
-          let cached_unit_dbs = homeUnitEnv_unit_dbs homeUnitEnv
+          let
               dflags = homeUnitEnv_dflags homeUnitEnv
               old_hpt = homeUnitEnv_hpt homeUnitEnv
               home_units = HUG.allUnits (ue_home_unit_graph old_unit_env)
 
-          (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags cached_unit_dbs home_units
+          (unit_state,home_unit,mconstants) <- liftIO $ initUnits logger (ue_unit_index_cache old_unit_env) dflags home_units
 
           updated_dflags <- liftIO $ updatePlatformConstants dflags0 mconstants
           pure HomeUnitEnv
             { homeUnitEnv_units = unit_state
-            , homeUnitEnv_unit_dbs = Just dbs
             , homeUnitEnv_dflags = updated_dflags
             , homeUnitEnv_hpt = old_hpt
             , homeUnitEnv_home_unit = Just home_unit
@@ -783,6 +779,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
               , ue_current_unit    = ue_currentUnit old_unit_env
               , ue_module_graph    = ue_module_graph old_unit_env
               , ue_eps             = ue_eps old_unit_env
+              , ue_unit_index_cache      = ue_unit_index_cache old_unit_env
               }
         modifySession $ \h -> hscSetFlags dflags1 h{ hsc_unit_env = unit_env }
     else modifySession (hscSetFlags dflags0)
@@ -840,6 +837,7 @@ setProgramHUG_ invalidate_needed new_hug0 = do
             , ue_current_unit    = ue_currentUnit unit_env0
             , ue_eps             = ue_eps unit_env0
             , ue_module_graph    = ue_module_graph unit_env0
+            , ue_unit_index_cache      = ue_unit_index_cache unit_env0
             }
       modifySession $ \h ->
         -- hscSetFlags takes care of updating the logger as well.
@@ -881,19 +879,17 @@ setProgramHUG_ invalidate_needed new_hug0 = do
 
     updateHomeUnit :: GhcMonad m => Logger -> UnitEnv -> HomeUnitGraph -> (UnitId -> HomeUnitEnv -> m HomeUnitEnv)
     updateHomeUnit logger unit_env updates = \uid homeUnitEnv -> do
-      let cached_unit_dbs = homeUnitEnv_unit_dbs homeUnitEnv
-          dflags = case HUG.unitEnv_lookup_maybe uid updates of
+      let dflags = case HUG.unitEnv_lookup_maybe uid updates of
             Nothing -> homeUnitEnv_dflags homeUnitEnv
             Just env -> homeUnitEnv_dflags env
           old_hpt = homeUnitEnv_hpt homeUnitEnv
           home_units = HUG.allUnits (ue_home_unit_graph unit_env)
 
-      (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags cached_unit_dbs home_units
+      (unit_state,home_unit,mconstants) <- liftIO $ initUnits logger (ue_unit_index_cache unit_env) dflags home_units
 
       updated_dflags <- liftIO $ updatePlatformConstants dflags mconstants
       pure HomeUnitEnv
         { homeUnitEnv_units = unit_state
-        , homeUnitEnv_unit_dbs = Just dbs
         , homeUnitEnv_dflags = updated_dflags
         , homeUnitEnv_hpt = old_hpt
         , homeUnitEnv_home_unit = Just home_unit
@@ -1702,13 +1698,17 @@ findQualifiedModule pkgqual mod_name = withSession $ \hsc_env -> do
            case res of
              Found loc m | notHomeModuleMaybe mhome_unit m -> return m
                          | otherwise -> modNotLoadedError dflags m loc
-             err -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err
+             err -> do
+              unit_index <- liftIO $ hscUnitIndex hsc_env
+              throwOneError sec $ noModError hsc_env unit_index noSrcSpan mod_name err
 
     _ -> liftIO $ do
       res <- findImportedModule hsc_env mod_name pkgqual
       case res of
         Found _ m -> return m
-        err       -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err
+        err       -> do
+          unit_index <- liftIO $ hscUnitIndex hsc_env
+          throwOneError sec $ noModError hsc_env unit_index noSrcSpan mod_name err
 
 
 modNotLoadedError :: DynFlags -> Module -> ModLocation -> IO a
@@ -1718,10 +1718,14 @@ modNotLoadedError dflags m loc = throwGhcExceptionIO $ CmdLineError $ showSDoc d
    parens (text (expectJust (ml_hs_file loc)))
 
 renamePkgQualM :: GhcMonad m => ModuleName -> Maybe FastString -> m PkgQual
-renamePkgQualM mn p = withSession $ \hsc_env -> pure (renamePkgQual (hsc_unit_env hsc_env) mn p)
+renamePkgQualM mn p = withSession $ \hsc_env -> do
+  unit_index <- liftIO $ hscUnitIndex hsc_env
+  pure (renamePkgQual (hsc_unit_env hsc_env) unit_index mn p)
 
 renameRawPkgQualM :: GhcMonad m => ModuleName -> RawPkgQual -> m PkgQual
-renameRawPkgQualM mn p = withSession $ \hsc_env -> pure (renameRawPkgQual (hsc_unit_env hsc_env) mn p)
+renameRawPkgQualM mn p = withSession $ \hsc_env -> do
+  unit_index <- liftIO $ hscUnitIndex hsc_env
+  pure (renameRawPkgQual (hsc_unit_env hsc_env) unit_index mn p)
 
 -- | Like 'findModule', but differs slightly when the module refers to
 -- a source file, and the file has not been loaded via 'load'.  In
@@ -1746,10 +1750,11 @@ lookupQualifiedModule NoPkgQual mod_name = withSession $ \hsc_env -> do
       let dflags = hsc_dflags hsc_env
       let sec    = initSourceErrorContext dflags
       let fopts  = initFinderOpts dflags
-      res <- findExposedPackageModule fc fopts units mod_name NoPkgQual
+      unit_index <- hscUnitIndex hsc_env
+      res <- findExposedPackageModule fc fopts unit_index units mod_name NoPkgQual
       case res of
         Found _ m -> return m
-        err       -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err
+        err       -> throwOneError sec $ noModError hsc_env unit_index noSrcSpan mod_name err
 lookupQualifiedModule pkgqual mod_name = findQualifiedModule pkgqual mod_name
 
 lookupLoadedHomeModule :: GhcMonad m => UnitId -> ModuleName -> m (Maybe Module)
@@ -1796,10 +1801,11 @@ lookupAllQualifiedModuleNames NoPkgQual mod_name = withSession $ \hsc_env -> do
       let dflags = hsc_dflags hsc_env
       let sec    = initSourceErrorContext dflags
       let fopts  = initFinderOpts dflags
-      res <- findExposedPackageModule fc fopts units mod_name NoPkgQual
+      unit_index <- hscUnitIndex hsc_env
+      res <- findExposedPackageModule fc fopts unit_index units mod_name NoPkgQual
       case res of
         Found _ m -> return [m]
-        err       -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err
+        err       -> throwOneError sec $ noModError hsc_env unit_index noSrcSpan mod_name err
 lookupAllQualifiedModuleNames pkgqual mod_name = do
   m <- findQualifiedModule pkgqual mod_name
   pure [m]
