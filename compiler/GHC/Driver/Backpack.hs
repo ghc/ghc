@@ -194,8 +194,8 @@ withBkpSession cid insts deps session_type do_this = do
                  | otherwise = sub_comp (key_base p)
 
         mk_temp_env hsc_env =
-          hscUpdateFlags (\dflags -> mk_temp_dflags (hsc_units hsc_env) dflags) hsc_env
-        mk_temp_dflags unit_state dflags = dflags
+          hscUpdateFlags (\dflags -> mk_temp_dflags dflags) hsc_env
+        mk_temp_dflags dflags = dflags
             { backend = case session_type of
                             TcSession -> noBackend
                             _         -> backend dflags
@@ -243,8 +243,8 @@ withBkpSession cid insts deps session_type do_this = do
             -- Synthesize the flags
             , packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
               let uid = unwireUnit unit_index
-                        $ improveUnit unit_index unit_state
-                        $ renameHoleUnit unit_index unit_state (listToUFM insts) uid0
+                        $ improveUnit unit_index
+                        $ renameHoleUnit unit_index (listToUFM insts) uid0
               in ExposePackage
                 (showSDoc dflags
                     (text "-unit-id" <+> ppr uid <+> ppr rn))
@@ -314,7 +314,7 @@ buildUnit session cid insts lunit = do
     -- The compilation dependencies are just the appropriately filled
     -- in unit IDs which must be compiled before we can compile.
     let hsubst = listToUFM insts
-        deps0 = map (renameHoleUnit unit_index (hsc_units hsc_env) hsubst) raw_deps
+        deps0 = map (renameHoleUnit unit_index hsubst) raw_deps
 
     -- Build dependencies OR make sure they make sense. BUT NOTE,
     -- we can only check the ones that are fully filled; the rest
@@ -326,7 +326,7 @@ buildUnit session cid insts lunit = do
             _ -> compileInclude (length deps0) (i, dep)
 
     -- IMPROVE IT
-    let deps = map (improveUnit unit_index (hsc_units hsc_env)) deps0
+    let deps = map (improveUnit unit_index) deps0
 
     mb_old_eps <- case session of
                     TcSession -> fmap Just getEpsGhc
@@ -357,7 +357,6 @@ buildUnit session cid insts lunit = do
         linkables <- liftIO $ catMaybes <$> concatHpt takeLinkables (hsc_HPT hsc_env)
         let
             obj_files = concatMap linkableFiles linkables
-            state     = hsc_units hsc_env
 
             compat_fs = unitIdFS cid
             compat_pn = PackageName compat_fs

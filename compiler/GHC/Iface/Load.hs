@@ -891,7 +891,6 @@ findAndReadIface
 findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
 
   let profile = targetProfile dflags
-      unit_state = hsc_units hsc_env
       name_cache = hsc_NC hsc_env
       mhome_unit  = hsc_home_unit_maybe hsc_env
       dflags     = hsc_dflags hsc_env
@@ -917,13 +916,13 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
               && not (isOneShot (ghcMode dflags))
             then return (Failed (HomeModError mod loc))
             else do
-                r <- read_file hooks logger name_cache unit_index unit_state dflags wanted_mod (ml_hi_file loc)
+                r <- read_file hooks logger name_cache unit_index dflags wanted_mod (ml_hi_file loc)
                 case r of
                   Failed err
                     -> return (Failed $ BadIfaceFile err)
                   Succeeded (iface,_fp)
                     -> do
-                        r2 <- load_dynamic_too_maybe hooks logger name_cache unit_index unit_state
+                        r2 <- load_dynamic_too_maybe hooks logger name_cache unit_index
                                                  (setDynamicNow dflags) wanted_mod
                                                  iface loc
                         case r2 of
@@ -939,20 +938,20 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
                               err
 
 -- | Check if we need to try the dynamic interface for -dynamic-too
-load_dynamic_too_maybe :: Hooks -> Logger -> NameCache -> UnitIndex -> UnitState -> DynFlags
+load_dynamic_too_maybe :: Hooks -> Logger -> NameCache -> UnitIndex -> DynFlags
                        -> Module -> ModIface -> ModLocation
                        -> IO (MaybeErr MissingInterfaceError ())
-load_dynamic_too_maybe hooks logger name_cache unit_index unit_state dflags wanted_mod iface loc
+load_dynamic_too_maybe hooks logger name_cache unit_index dflags wanted_mod iface loc
   -- Indefinite interfaces are ALWAYS non-dynamic.
   | not (moduleIsDefinite (mi_module iface)) = return (Succeeded ())
-  | gopt Opt_BuildDynamicToo dflags = load_dynamic_too hooks logger name_cache unit_index unit_state dflags wanted_mod iface loc
+  | gopt Opt_BuildDynamicToo dflags = load_dynamic_too hooks logger name_cache unit_index dflags wanted_mod iface loc
   | otherwise = return (Succeeded ())
 
-load_dynamic_too :: Hooks -> Logger -> NameCache -> UnitIndex -> UnitState -> DynFlags
+load_dynamic_too :: Hooks -> Logger -> NameCache -> UnitIndex -> DynFlags
                  -> Module -> ModIface -> ModLocation
                  -> IO (MaybeErr MissingInterfaceError ())
-load_dynamic_too hooks logger name_cache unit_index unit_state dflags wanted_mod iface loc = do
-  read_file hooks logger name_cache unit_index unit_state dflags wanted_mod (ml_dyn_hi_file loc) >>= \case
+load_dynamic_too hooks logger name_cache unit_index dflags wanted_mod iface loc = do
+  read_file hooks logger name_cache unit_index dflags wanted_mod (ml_dyn_hi_file loc) >>= \case
     Succeeded (dynIface, _)
      | mi_mod_hash iface == mi_mod_hash dynIface
      -> return (Succeeded ())
@@ -966,10 +965,10 @@ load_dynamic_too hooks logger name_cache unit_index unit_state dflags wanted_mod
 
 
 
-read_file :: Hooks -> Logger -> NameCache -> UnitIndex -> UnitState -> DynFlags
+read_file :: Hooks -> Logger -> NameCache -> UnitIndex -> DynFlags
           -> Module -> FilePath
           -> IO (MaybeErr ReadInterfaceError (ModIface, FilePath))
-read_file hooks logger name_cache unit_index unit_state dflags wanted_mod file_path = do
+read_file hooks logger name_cache unit_index dflags wanted_mod file_path = do
 
   -- Figure out what is recorded in mi_module.  If this is
   -- a fully definite interface, it'll match exactly, but
@@ -978,7 +977,7 @@ read_file hooks logger name_cache unit_index unit_state dflags wanted_mod file_p
         case getModuleInstantiation wanted_mod of
             (_, Nothing) -> wanted_mod
             (_, Just indef_mod) ->
-              instModuleToModule unit_index unit_state
+              instModuleToModule unit_index
                 (uninstantiateInstantiatedModule indef_mod)
   read_result <- readIface hooks logger dflags name_cache wanted_mod' file_path
   case read_result of
