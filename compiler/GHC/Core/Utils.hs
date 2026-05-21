@@ -345,7 +345,7 @@ mkTick t orig_expr = mkTick' id orig_expr
     -- unfoldings. We therefore make an effort to put everything into
     -- the right place no matter what we start with.
     Cast e co   -> mkCast (mkTick' rest e) co
-    Coercion co -> Tick t $ rest (Coercion co)
+    Coercion co -> Coercion co
 
     Lam x e
       -- Always float through type lambdas. Even for non-type lambdas,
