@@ -907,6 +907,11 @@ Test25885:
 	$(CHECK_PPR)   $(LIBDIR) Test25885.hs
 	$(CHECK_EXACT) $(LIBDIR) Test25885.hs
 
+.PHONY: Test27291
+Test27291:
+	$(CHECK_PPR)   $(LIBDIR) Test27291.hs
+	$(CHECK_EXACT) $(LIBDIR) Test27291.hs
+
 .PHONY: TestLevelImports
 TestLevelImports:
 	$(CHECK_PPR)   $(LIBDIR) TestLevelImports.hs
