@@ -397,8 +397,8 @@ icInScopeTTs ictxt = filter in_scope_unqualified (ic_tythings ictxt)
         ]
 
 -- | Get the NamePprCtx function based on the flags and this InteractiveContext
-icNamePprCtx :: UnitEnv -> InteractiveContext -> NamePprCtx
-icNamePprCtx unit_env ictxt = mkNamePprCtx ptc unit_env (icReaderEnv ictxt)
+icNamePprCtx :: UnitIndex -> UnitEnv -> InteractiveContext -> NamePprCtx
+icNamePprCtx unit_index unit_env ictxt = mkNamePprCtx ptc unit_index unit_env (icReaderEnv ictxt)
   where ptc = initPromotionTickContext (ic_dflags ictxt)
 
 -- | extendInteractiveContext is called with new TyThings recently defined to update the

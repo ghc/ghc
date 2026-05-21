@@ -113,8 +113,8 @@ doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
     let hscpp_opts = picPOpts dflags
     let cmdline_include_paths = offsetIncludePaths dflags (includePaths dflags)
     let unit_state = ue_homeUnitState unit_env
-    pkg_include_dirs <- mayThrowUnitErr
-                        (collectIncludeDirs <$> preloadUnitsInfo unit_env)
+    pkg_include_dirs <- mayThrowUnitErrIO
+                        (fmap collectIncludeDirs <$> preloadUnitsInfo unit_env)
     -- MP: This is not quite right, the headers which are supposed to be installed in
     -- the package might not be the same as the provided include paths, but it's a close
     -- enough approximation for things to work. A proper solution would be to have to declare which paths should
@@ -185,9 +185,11 @@ doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
     -- Default CPP defines in Haskell source
     ghcVersionH <- getGhcVersionIncludeFlags dflags unit_env
 
+    unit_index <- ueUnitIndex unit_env
+
     -- MIN_VERSION macros
     let uids = explicitUnits unit_state
-        pkgs = mapMaybe (lookupUnit unit_state . fst) uids
+        pkgs = mapMaybe (lookupUnit unit_index unit_state . fst) uids
     mb_macro_include <-
         if not (null pkgs) && gopt Opt_VersionMacros dflags
             then do macro_stub <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "h"
@@ -288,14 +290,16 @@ getGhcVersionPathName dflags unit_env = case ghcVersionFile dflags of
   -- use a wrong file. See #25106 where a globally installed
   -- /usr/include/ghcversion.h file was used instead of the one provided
   -- by the rts.
-  Nothing -> case lookupUnitId (ue_homeUnitState unit_env) rtsUnitId of
-    Nothing   -> pure Nothing
-    Just info -> do
-      let candidates = (</> "ghcversion.h") <$> collectIncludeDirs [info]
-      found <- filterM doesFileExist candidates
-      case found of
-        [] -> pure Nothing
-        (x:_) -> pure (Just x)
+  Nothing -> do
+    unit_index <- ueUnitIndex unit_env
+    case lookupUnitId unit_index rtsUnitId of
+      Nothing   -> pure Nothing
+      Just info -> do
+        let candidates = (</> "ghcversion.h") <$> collectIncludeDirs [info]
+        found <- filterM doesFileExist candidates
+        case found of
+          [] -> pure Nothing
+          (x:_) -> pure (Just x)
 
 applyCDefs :: DefunctionalizedCDefs -> Logger -> DynFlags -> IO [String]
 applyCDefs NoCDefs _ _ = return []

@@ -323,7 +323,9 @@ loadSrcInterface_maybe doc mod want_boot maybe_pkg
        case res of
            Found _ mod -> initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
            -- TODO: Make sure this error message is good
-           err         -> return (Failed (cannotFindModule hsc_env mod err))
+           err         -> do
+            unit_index <- liftIO $ hscUnitIndex hsc_env
+            return (Failed (cannotFindModule hsc_env unit_index mod err))
 
 -- | Load interface directly for a fully qualified 'Module'.  (This is a fairly
 -- rare operation, but in particular it is used to load orphan modules
@@ -889,13 +891,13 @@ findAndReadIface
 findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
 
   let profile = targetProfile dflags
-      unit_state = hsc_units hsc_env
       name_cache = hsc_NC hsc_env
       mhome_unit  = hsc_home_unit_maybe hsc_env
       dflags     = hsc_dflags hsc_env
       logger     = hsc_logger hsc_env
       hooks      = hsc_hooks hsc_env
 
+  unit_index <- hscUnitIndex hsc_env
 
   trace_if logger (sep [hsep [text "Reading",
                            if hi_boot_file == IsBoot
@@ -929,7 +931,7 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
       err -> do
           trace_if logger (text "...not found")
           return $ Failed $ cannotFindInterface
-                              unit_state
+                              unit_index
                               mhome_unit
                               profile
                               (moduleName mod)
@@ -1100,7 +1102,7 @@ For some background on this choice see #15269.
 -}
 
 -- | Read binary interface, and print it out
-showIface :: Logger -> DynFlags -> UnitState -> NameCache -> FilePath -> IO ()
+showIface :: Logger -> DynFlags -> UnitIndex -> NameCache -> FilePath -> IO ()
 showIface logger dflags unit_state name_cache filename = do
    let profile = targetProfile dflags
        printer = logOutput logger . withPprStyle defaultDumpStyle
@@ -1123,7 +1125,7 @@ showIface logger dflags unit_state name_cache filename = do
 
 -- | Show a ModIface but don't display details; suitable for ModIfaces stored in
 -- the EPT.
-pprModIfaceSimple :: UnitState -> ModIface -> SDoc
+pprModIfaceSimple :: UnitIndex -> ModIface -> SDoc
 pprModIfaceSimple unit_state iface =
     ppr (mi_module iface)
     $$ pprDeps unit_state (mi_deps iface)
@@ -1132,7 +1134,7 @@ pprModIfaceSimple unit_state iface =
 -- | Show a ModIface
 --
 -- The UnitState is used to pretty-print units
-pprModIface :: UnitState -> ModIface -> SDoc
+pprModIface :: UnitIndex -> ModIface -> SDoc
 pprModIface unit_state iface
  = vcat $ [ text "interface"
                 <+> ppr (mi_module iface) <+> pp_hsc_src (mi_hsc_src iface)

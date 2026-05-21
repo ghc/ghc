@@ -261,7 +261,8 @@ jsLinkInterp logger tmpfs tmp_dir cfg unit_env inst = do
   let ghci_unit_id = instGhciUnitId (instExtra inst)
 
   -- compute unit dependencies of ghc_unit_id
-  let unit_map = unitInfoMap (ue_homeUnitState unit_env)
+  unit_index <- ueUnitIndex unit_env
+  let unit_map = unitInfoMap unit_index
   dep_units <- mayThrowUnitErr $ closeUnitDeps unit_map [(ghci_unit_id,Nothing)]
   let units = dep_units ++ [ghci_unit_id]
 

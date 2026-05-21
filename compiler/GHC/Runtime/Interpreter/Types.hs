@@ -234,4 +234,5 @@ data WasmInterpConfig = WasmInterpConfig
   , wasmInterpProfiled       :: !Bool      -- ^ Are we profiling yet?
   , wasmInterpHsSoSuffix     :: !String    -- ^ Shared lib filename common suffix sans .so, e.g. p-ghc9.13.20241001
   , wasmInterpUnitState      :: !UnitState
+  , wasmInterpUnitIndex      :: !UnitIndex
   }

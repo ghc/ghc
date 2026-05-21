@@ -160,7 +160,7 @@ linkExecutable logger tmpfs opts unit_env o_files dep_units = do
     -- get the full list of packages to link with, by combining the
     -- explicit packages with the auto packages and all of their
     -- dependencies, and eliminating duplicates.
-    pkgs <- mayThrowUnitErr (preloadUnitsInfo' unit_env dep_units)
+    pkgs <- mayThrowUnitErrIO (preloadUnitsInfo' unit_env dep_units)
     let pkg_lib_paths     = collectLibraryDirs ways_ pkgs
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
         get_pkg_lib_path_opts l
@@ -215,7 +215,8 @@ linkExecutable logger tmpfs opts unit_env o_files dep_units = do
     let lib_paths = leLibraryPaths opts
     let lib_path_opts = map ("-L"++) lib_paths
 
-    extraLinkObj <- maybeToList <$> mkExtraObjToLinkIntoBinary logger tmpfs opts unit_state
+    unit_index <- ueUnitIndex unit_env
+    extraLinkObj <- maybeToList <$> mkExtraObjToLinkIntoBinary logger tmpfs opts unit_index unit_state
     noteLinkObjs <- mkNoteObjsToLinkIntoBinary logger tmpfs opts unit_env dep_units
 
     let
@@ -347,15 +348,15 @@ linkExecutable logger tmpfs opts unit_env o_files dep_units = do
     when (platformOS platform == OSDarwin && leRPath opts) $
       GHC.Linker.MacOS.runInjectRPaths logger (leOtoolConfig opts) (leInstallNameConfig opts) pkg_lib_paths output_fn
 
-mkExtraObj :: Logger -> TmpFs -> TempDir -> CcConfig -> UnitState -> Suffix -> String -> IO FilePath
-mkExtraObj logger tmpfs tmpdir cc_config unit_state extn xs
+mkExtraObj :: Logger -> TmpFs -> TempDir -> CcConfig -> UnitIndex -> UnitState -> Suffix -> String -> IO FilePath
+mkExtraObj logger tmpfs tmpdir cc_config unit_index unit_state extn xs
  = do
       -- Pass a different set of options to the C compiler depending one whether
       -- we're compiling C or assembler. When compiling C, we pass the usual
       -- set of include directories and PIC flags.
       let cOpts = map Option (ccPicOpts cc_config)
                   ++ map (FileOption "-I" . ST.unpack)
-                         (unitIncludeDirs $ unsafeLookupUnit unit_state rtsUnit)
+                         (unitIncludeDirs $ unsafeLookupUnit unit_index unit_state rtsUnit)
       cFile <- newTempName logger tmpfs tmpdir TFL_CurrentModule extn
       oFile <- newTempName logger tmpfs tmpdir TFL_GhcSession "o"
       writeFile cFile xs
@@ -376,8 +377,8 @@ mkExtraObj logger tmpfs tmpdir cc_config unit_state extn xs
 -- of the RTS, but that made it hard to change the -rtsopts setting,
 -- so now we generate and compile a main() stub as part of every
 -- binary and pass the -rtsopts setting directly to the RTS (#5373)
-mkExtraObjToLinkIntoBinary :: Logger -> TmpFs -> ExecutableLinkOpts -> UnitState -> IO (Maybe FilePath)
-mkExtraObjToLinkIntoBinary logger tmpfs opts unit_state = do
+mkExtraObjToLinkIntoBinary :: Logger -> TmpFs -> ExecutableLinkOpts -> UnitIndex -> UnitState -> IO (Maybe FilePath)
+mkExtraObjToLinkIntoBinary logger tmpfs opts unit_index unit_state = do
   when (leNoHsMain opts && leHaveRtsOptsFlags opts) $
      logInfo logger $ withPprStyle defaultUserStyle
          (text "Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main." $$
@@ -396,7 +397,7 @@ mkExtraObjToLinkIntoBinary logger tmpfs opts unit_state = do
   where
     tmpdir = leTempDir opts
     cc_config = leCcConfig opts
-    mk_extra_obj = fmap Just . mkExtraObj logger tmpfs tmpdir cc_config unit_state "c" . renderWithContext defaultSDocContext
+    mk_extra_obj = fmap Just . mkExtraObj logger tmpfs tmpdir cc_config unit_index unit_state "c" . renderWithContext defaultSDocContext
 
     exeMain = vcat [
         text "#include <Rts.h>",
@@ -432,8 +433,9 @@ mkNoteObjsToLinkIntoBinary :: Logger -> TmpFs -> ExecutableLinkOpts -> UnitEnv -
 mkNoteObjsToLinkIntoBinary logger tmpfs opts unit_env dep_packages = do
    link_info <- initLinkInfo opts unit_env dep_packages
 
+   unit_index <- ueUnitIndex unit_env
    if (platformSupportsSavingLinkOpts (platformOS platform ))
-     then fmap (:[]) $ mkExtraObj logger tmpfs tmpdir cc_config unit_state "s" (renderWithContext defaultSDocContext (link_opts link_info))
+     then fmap (:[]) $ mkExtraObj logger tmpfs tmpdir cc_config unit_index unit_state "s" (renderWithContext defaultSDocContext (link_opts link_info))
      else return []
 
   where
@@ -476,7 +478,7 @@ initLinkInfo opts unit_env dep_packages = do
     pkg_frameworks <- if not (platformUsesFrameworks (ue_platform unit_env))
       then return []
       else do
-         ps <- mayThrowUnitErr (preloadUnitsInfo' unit_env dep_packages)
+         ps <- mayThrowUnitErrIO (preloadUnitsInfo' unit_env dep_packages)
          return (collectFrameworks ps)
     pure $ LinkInfo
       { liPkgLinkOpts = package_link_opts

@@ -283,7 +283,7 @@ noDependencies = Deps
   }
 
 -- | Pretty-print unit dependencies
-pprDeps :: UnitState -> Dependencies -> SDoc
+pprDeps :: UnitIndex -> Dependencies -> SDoc
 pprDeps unit_state (Deps { dep_direct_mods_ = dmods
                          , dep_boot_mods_ = bmods
                          , dep_plugin_pkgs_ = plgns

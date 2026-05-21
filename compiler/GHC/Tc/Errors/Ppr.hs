@@ -156,10 +156,10 @@ instance Diagnostic TcRnMessage where
   diagnosticMessage opts = \case
     TcRnUnknownMessage (UnknownDiagnostic f _ m)
       -> diagnosticMessage (f opts) m
-    TcRnMessageWithInfo unit_state msg_with_info
+    TcRnMessageWithInfo unit_index msg_with_info
       -> case msg_with_info of
            TcRnMessageDetailed err_info msg
-             -> messageWithInfoDiagnosticMessage unit_state err_info
+             -> messageWithInfoDiagnosticMessage unit_index err_info
                   (tcOptsShowContext opts)
                   (diagnosticMessage opts msg)
     TcRnWithHsDocContext ctxt msg
@@ -562,14 +562,14 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            hang (text "Orphan family instance:")
               2 (pprFamInst fam_inst)
-    TcRnFunDepConflict unit_state sorted
+    TcRnFunDepConflict unit_index sorted
       -> let herald = text "Functional dependencies conflict between instance declarations:"
          in mkSimpleDecorated $
-              pprWithUnitState unit_state $ (hang herald 2 (pprInstances $ NE.toList sorted))
-    TcRnDupInstanceDecls unit_state sorted
+              pprWithUnitState unit_index $ (hang herald 2 (pprInstances $ NE.toList sorted))
+    TcRnDupInstanceDecls unit_index sorted
       -> let herald = text "Duplicate instance declarations:"
          in mkSimpleDecorated $
-              pprWithUnitState unit_state $ (hang herald 2 (pprInstances $ NE.toList sorted))
+              pprWithUnitState unit_index $ (hang herald 2 (pprInstances $ NE.toList sorted))
     TcRnConflictingFamInstDecls sortedNE
       -> let sorted = NE.toList sortedNE
          in mkSimpleDecorated $
@@ -1265,11 +1265,11 @@ instance Diagnostic TcRnMessage where
       in mkSimpleDecorated $
         text "While merging export lists, could not unify"
         <+> ppr name1 <+> text "with" <+> ppr name2 $$ extra
-    TcRnHsigMissingModuleExport occ unit_state impl_mod
+    TcRnHsigMissingModuleExport occ unit_index impl_mod
       -> mkSimpleDecorated $
             quotes (ppr occ)
         <+> text "is exported by the hsig file, but not exported by the implementing module"
-        <+> quotes (pprWithUnitState unit_state $ ppr impl_mod)
+        <+> quotes (pprWithUnitState unit_index $ ppr impl_mod)
     TcRnBadGenericMethod clas op
       -> mkSimpleDecorated $
         hsep [text "Class", quotes (ppr clas),
@@ -3687,21 +3687,21 @@ pprConstraintsInclude cts
     pprConstraint (constraint, loc) =
       ppr constraint <+> nest 2 (parens (text "from" <+> ppr loc))
 
-messageWithInfoDiagnosticMessage :: UnitState
+messageWithInfoDiagnosticMessage :: UnitIndex
                                  -> ErrInfo
                                  -> Bool
                                  -> DecoratedSDoc
                                  -> DecoratedSDoc
-messageWithInfoDiagnosticMessage unit_state (ErrInfo {..}) show_ctxt important =
-  let ctxt = pprWithUnitState unit_state
+messageWithInfoDiagnosticMessage unit_index (ErrInfo {..}) show_ctxt important =
+  let ctxt = pprWithUnitState unit_index
            $ vcat $ map pprHsCtxt  [ ctx | ctx <- errInfoContext, show_ctxt ]
 
       supp = case errInfoSupplementary of
         Nothing -> empty
         Just (hfdc, supp_msgs) ->
-          pprWithUnitState unit_state $
+          pprWithUnitState unit_index $
           vcat $ map (pprSolverReportSupplementary hfdc) supp_msgs
-  in mapDecoratedSDoc (pprWithUnitState unit_state) important
+  in mapDecoratedSDoc (pprWithUnitState unit_index) important
        `unionDecoratedSDoc`
      mkDecorated [ctxt, supp]
 
@@ -7978,16 +7978,16 @@ pprHsCtxt = \case
       ppr_th :: TH.Ppr a => a -> SDoc
       ppr_th x = text (TH.pprint x)
 
-  MergeSignaturesCtxt unit_state mod_name reqs ->
-    pprWithUnitState unit_state $
+  MergeSignaturesCtxt unit_index mod_name reqs ->
+    pprWithUnitState unit_index $
     if null reqs
     then  text "While checking the local signature" <+> ppr mod_name <+>
           text "for consistency"
     else   hang (text "While merging the signatures from" <> colon)
               2 (vcat [ bullet <+> ppr req | req <- reqs ] $$
                  bullet <+> text "...and the local signature for" <+> ppr mod_name)
-  CheckImplementsCtxt unit_state impl_mod (Module req_uid req_mod_name) ->
-    pprWithUnitState unit_state $
+  CheckImplementsCtxt unit_index impl_mod (Module req_uid req_mod_name) ->
+    pprWithUnitState unit_index $
       text "While checking that" <+> quotes (ppr impl_mod) <+>
       text "implements signature" <+> quotes (ppr req_mod_name) <+>
       text "in" <+> quotes (ppr req_uid) <> dot

@@ -553,7 +553,6 @@ checkNativeLibraryLinkingNeeded staticLink _ dflags unit_env linkables pkg_deps 
         -- modification times on all of the objects and libraries, then omit
         -- linking (unless the -fforce-recomp flag was given).
   let platform   = ue_platform unit_env
-      unit_state = ue_homeUnitState unit_env
       arch_os    = platformArchOS platform
       exe_file   = exeFileName arch_os staticLink (outputFile_ dflags)
       -- For the JS backend, exe_file is a directory (*.jsexe).  A directory's
@@ -563,6 +562,7 @@ checkNativeLibraryLinkingNeeded staticLink _ dflags unit_env linkables pkg_deps 
       exe_time_file
         | ArchJavaScript <- platformArch platform = exe_file </> "out.js"
         | otherwise                               = exe_file
+  unit_index <- ueUnitIndex unit_env
   exe_file_os <- SysOsPath.encodeFS exe_time_file
   e_exe_time <- modificationTimeIfExists exe_file_os
   case e_exe_time of
@@ -582,14 +582,14 @@ checkNativeLibraryLinkingNeeded staticLink _ dflags unit_env linkables pkg_deps 
         -- to decide if we need to relink or not.
         let pkg_hslibs acc uid
               | uid `elementOfUniqDSet` acc = acc
-              | Just c <- lookupUnitId unit_state uid =
+              | Just c <- lookupUnitId unit_index uid =
                   foldl' @[] pkg_hslibs (addOneToUniqDSet acc uid) (unitDepends c)
               | otherwise = acc
 
             all_pkg_deps = foldl' @[] pkg_hslibs emptyUniqDSet pkg_deps
 
         let pkg_hslibs  = [ (collectLibraryDirs (ways dflags) [c], lib)
-                          | Just c <- map (lookupUnitId unit_state) (uniqDSetToList all_pkg_deps),
+                          | Just c <- map (lookupUnitId unit_index) (uniqDSetToList all_pkg_deps),
                             lib <- unitHsLibs (ghcNameVersion dflags) (ways dflags) c ]
 
         pkg_libfiles <- mapM (uncurry (findHSLib platform (ways dflags))) pkg_hslibs

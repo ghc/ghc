@@ -51,11 +51,11 @@ import GHC.Core.DataCon
 import GHC.Data.FastString
 
 -- | Retrieve library directories provided by the @UnitId@ in @UnitState@
-getInstalledPackageLibDirs :: UnitState -> UnitId -> [ShortText]
+getInstalledPackageLibDirs :: UnitIndex -> UnitId -> [ShortText]
 getInstalledPackageLibDirs us = maybe mempty unitLibraryDirsStatic . lookupUnitId us
 
 -- | Retrieve the names of the libraries provided by @UnitId@
-getInstalledPackageHsLibs :: UnitState -> UnitId -> [ShortText]
+getInstalledPackageHsLibs :: UnitIndex -> UnitId -> [ShortText]
 getInstalledPackageHsLibs us = maybe mempty unitLibraries . lookupUnitId us
 
 -- | A constant holding the JavaScript executable Filename extension

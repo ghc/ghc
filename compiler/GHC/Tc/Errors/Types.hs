@@ -212,7 +212,7 @@ import GHC.Types.Var.Set (TyVarSet, VarSet)
 import GHC.Types.DefaultEnv (ClassDefaults)
 
 import GHC.Unit.Types (Module)
-import GHC.Unit.State (UnitState)
+import GHC.Unit.State (UnitIndex)
 import GHC.Unit.Module.ModIface (ModIface)
 
 import GHC.Utils.Outputable
@@ -337,8 +337,8 @@ data TcRnMessage where
       and it wraps a 'TcRnMessageDetailed', which includes any extra context associated
       with this diagnostic.
   -}
-  TcRnMessageWithInfo :: !UnitState
-                      -- ^ The 'UnitState' will allow us to pretty-print
+  TcRnMessageWithInfo :: !UnitIndex
+                      -- ^ The 'UnitIndex' will allow us to pretty-print
                       -- some diagnostics with more detail.
                       -> !TcRnMessageDetailed
                       -> TcRnMessage
@@ -1386,7 +1386,7 @@ data TcRnMessage where
                   typecheck/should_fail/tcfail096
                   typecheck/should_fail/tcfail202
   -}
-  TcRnFunDepConflict :: !UnitState -> NE.NonEmpty ClsInst -> TcRnMessage
+  TcRnFunDepConflict :: !UnitIndex -> NE.NonEmpty ClsInst -> TcRnMessage
 
   {-| TcRnDupInstanceDecls is an error that occurs when there are duplicate instance
       declarations.
@@ -1412,7 +1412,7 @@ data TcRnMessage where
                   module/mod52
                   module/mod44
   -}
-  TcRnDupInstanceDecls :: !UnitState -> NE.NonEmpty ClsInst -> TcRnMessage
+  TcRnDupInstanceDecls :: !UnitIndex -> NE.NonEmpty ClsInst -> TcRnMessage
 
   {-| TcRnConflictingFamInstDecls is an error that occurs when there are conflicting
       family instance declarations.
@@ -2711,7 +2711,7 @@ data TcRnMessage where
       bkpfail01, bkpfail05, bkpfail09, bkpfail16, bkpfail35, bkpcabal06
   -}
   TcRnHsigMissingModuleExport :: !OccName -- ^ The missing name
-                              -> !UnitState -- ^ The module's unit state
+                              -> !UnitIndex -- ^ The module's unit state
                               -> !Module -- ^ The implementation module
                               -> TcRnMessage
 

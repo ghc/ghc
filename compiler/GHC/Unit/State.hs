@@ -1,12 +1,31 @@
 -- (c) The University of Glasgow, 2006
 
-
 -- | Unit manipulation
 module GHC.Unit.State (
         module GHC.Unit.Info,
 
         -- * Reading the package config, and processing cmdline args
-        UnitState(..),
+        UnitIndexCache(..),
+        initUnitIndexCache,
+        readUnitIndex,
+        modifyUnitIndex,
+        cacheDatabase,
+
+        UnitIndex,
+        emptyUnitIndex,
+        cacheUnitDatabase,
+        unitInfoMap,
+
+        UnitState,
+        packageNameMap,
+        -- wireMap,
+        -- unwireMap,
+        preloadUnits,
+        explicitUnits,
+        homeUnitDepends,
+        moduleNameProvidersMap,
+        pluginModuleNameProvidersMap,
+        requirementContext,
         UnitDatabase (..),
         UnitErr (..),
         emptyUnitState,
@@ -16,6 +35,7 @@ module GHC.Unit.State (
         getUnitDbRefs,
         resolveUnitDatabase,
         listUnitInfo,
+        isUnitTrustedInUnit,
 
         -- * Querying the package config
         UnitInfoMap,
@@ -45,6 +65,7 @@ module GHC.Unit.State (
         closeUnitDeps,
         closeUnitDeps',
         mayThrowUnitErr,
+        mayThrowUnitErrIO,
 
         -- * Module hole substitution
         ShHoleSubst,
@@ -118,6 +139,10 @@ import Data.Monoid (First(..))
 import qualified Data.Semigroup as Semigroup
 import qualified Data.Set as Set
 import Control.Applicative
+import Data.Map.Strict (Map)
+import Data.IORef (IORef)
+import qualified Data.IORef as IORef
+import qualified Data.Map.Strict as Map
 
 -- ---------------------------------------------------------------------------
 -- The Unit state
@@ -342,22 +367,17 @@ data UnitConfig = UnitConfig
    , unitConfigHideAll        :: !Bool     -- ^ Hide all units by default
    , unitConfigHideAllPlugins :: !Bool     -- ^ Hide all plugins units by default
 
-   , unitConfigDBCache      :: Maybe [UnitDatabase UnitId]
-      -- ^ Cache of databases to use, in the order they were specified on the
-      -- command line (later databases shadow earlier ones).
-      -- If Nothing, databases will be found using `unitConfigFlagsDB`.
-
    -- command-line flags
    , unitConfigFlagsDB      :: [PackageDBFlag]     -- ^ Unit databases flags
    , unitConfigFlagsExposed :: [PackageFlag]       -- ^ Exposed units
    , unitConfigFlagsIgnored :: [IgnorePackageFlag] -- ^ Ignored units
    , unitConfigFlagsTrusted :: [TrustFlag]         -- ^ Trusted units
    , unitConfigFlagsPlugins :: [PackageFlag]       -- ^ Plugins exposed units
-   , unitConfigHomeUnits    :: Set.Set UnitId
+   , unitConfigHomeUnits    :: Set.Set UnitId      -- ^ Set of all home unit ids
    }
 
-initUnitConfig :: DynFlags -> Maybe [UnitDatabase UnitId] -> Set.Set UnitId -> UnitConfig
-initUnitConfig dflags cached_dbs home_units =
+initUnitConfig :: DynFlags -> Set.Set UnitId -> UnitConfig
+initUnitConfig dflags home_units =
    let !hu_id             = homeUnitId_ dflags
        !hu_instanceof     = homeUnitInstanceOf_ dflags
        !hu_instantiations = homeUnitInstantiations_ dflags
@@ -394,7 +414,6 @@ initUnitConfig dflags cached_dbs home_units =
       , unitConfigHideAll        = gopt Opt_HideAllPackages dflags
       , unitConfigHideAllPlugins = gopt Opt_HideAllPluginPackages dflags
 
-      , unitConfigDBCache      = cached_dbs
       , unitConfigFlagsDB      = map (offsetPackageDb (workingDirectory dflags)) $ packageDBFlags dflags
       , unitConfigFlagsExposed = packageFlags dflags
       , unitConfigFlagsIgnored = ignorePackageFlags dflags
@@ -409,6 +428,74 @@ initUnitConfig dflags cached_dbs home_units =
     offsetPackageDb (Just offset) (PackageDB (PkgDbPath p)) | OsPath.isRelative p = PackageDB (PkgDbPath (OsPath.unsafeEncodeUtf offset OsPath.</> p))
     offsetPackageDb _ p = p
 
+-- ----------------------------------------------------------------------------
+-- UnitIndex
+-- ----------------------------------------------------------------------------
+
+newtype UnitIndexCache = UnitIndexCache
+  {  uic_unitIndex :: IORef UnitIndex
+  }
+
+initUnitIndexCache :: IO UnitIndexCache
+initUnitIndexCache = UnitIndexCache <$> IORef.newIORef emptyUnitIndex
+
+readUnitIndex :: UnitIndexCache -> IO UnitIndex
+readUnitIndex uic = IORef.readIORef $ uic_unitIndex uic
+
+modifyUnitIndex :: (UnitIndex -> UnitIndex) -> UnitIndexCache -> IO ()
+modifyUnitIndex f uic = IORef.modifyIORef' (uic_unitIndex uic) f
+
+cacheDatabase :: UnitIndexCache -> UnitDatabase UnitId -> IO ()
+cacheDatabase cache db =
+  modifyUnitIndex (cacheUnitDatabase db) cache
+
+cacheUnitInfos :: UnitIndexCache -> UnitInfoMap -> IO ()
+cacheUnitInfos cache uim =
+  modifyUnitIndex (addUnitInfos uim) cache
+
+cacheWiringMaps :: UnitIndexCache -> WiringMap -> UnwiringMap -> IO ()
+cacheWiringMaps cache wm uwm =
+  modifyUnitIndex (updateWiringMap wm uwm) cache
+
+data UnitIndex = UnitIndex
+  { ui_unitInfoMap :: !(UnitInfoMap)
+  , ui_cachedDatabases :: !(Map OsPath (UnitDatabase UnitId))
+  , ui_wireMap :: !WiringMap
+  , ui_unwireMap :: !UnwiringMap
+  }
+
+cacheUnitDatabase :: UnitDatabase UnitId -> UnitIndex -> UnitIndex
+cacheUnitDatabase db unit_index = unit_index
+  { ui_cachedDatabases = Map.insert (unitDatabasePath db) db (ui_cachedDatabases unit_index)
+  }
+
+emptyUnitIndex :: UnitIndex
+emptyUnitIndex = UnitIndex
+  { ui_unitInfoMap = emptyUniqMap
+  , ui_cachedDatabases = Map.empty
+  , ui_wireMap = emptyUniqMap
+  , ui_unwireMap = emptyUniqMap
+  }
+
+addUnitInfos :: UnitInfoMap -> UnitIndex -> UnitIndex
+addUnitInfos uim ui = ui
+  { ui_unitInfoMap = uim `plusUniqMap` ui_unitInfoMap ui
+  }
+
+-- todo @fendor, this needs to throw an error if the condition is violated
+updateWiringMap :: WiringMap -> UnwiringMap -> UnitIndex -> UnitIndex
+updateWiringMap wm uwm ui = ui
+  { ui_wireMap = ui_wireMap ui `plusUniqMap` wm
+  , ui_unwireMap = ui_unwireMap ui `plusUniqMap` uwm
+  }
+
+-- TODO: for backwards compatibility
+unitInfoMap :: UnitIndex -> UnitInfoMap
+unitInfoMap = ui_unitInfoMap
+
+-- ----------------------------------------------------------------------------
+-- UnitState
+-- ----------------------------------------------------------------------------
 
 -- | Map from 'ModuleName' to a set of module providers (i.e. a 'Module' and
 -- its 'ModuleOrigin').
@@ -420,12 +507,12 @@ type ModuleNameProvidersMap =
     UniqMap ModuleName (UniqMap Module ModuleOrigin)
 
 data UnitState = UnitState {
-  -- | A mapping of 'Unit' to 'UnitInfo'.  This list is adjusted
-  -- so that only valid units are here.  'UnitInfo' reflects
-  -- what was stored *on disk*, except for the 'trusted' flag, which
-  -- is adjusted at runtime.  (In particular, some units in this map
-  -- may have the 'exposed' flag be 'False'.)
-  unitInfoMap :: UnitInfoMap,
+  -- -- | A mapping of 'Unit' to 'UnitInfo'.  This list is adjusted
+  -- -- so that only valid units are here.  'UnitInfo' reflects
+  -- -- what was stored *on disk*, except for the 'trusted' flag, which
+  -- -- is adjusted at runtime.  (In particular, some units in this map
+  -- -- may have the 'exposed' flag be 'False'.)
+  -- unitInfoMap :: UnitInfoMap,
 
   -- | A mapping of 'PackageName' to 'UnitId'. If several units have the same
   -- package name (e.g. different instantiations), then we return one of them...
@@ -433,11 +520,11 @@ data UnitState = UnitState {
   -- And also to resolve package qualifiers with the PackageImports extension.
   packageNameMap            :: UniqFM PackageName UnitId,
 
-  -- | A mapping from database unit keys to wired in unit ids.
-  wireMap :: UniqMap UnitId UnitId,
+  -- -- | A mapping from database unit keys to wired in unit ids.
+  -- wireMap :: WiringMap,
 
-  -- | A mapping from wired in unit ids to unit keys from the database.
-  unwireMap :: UniqMap UnitId UnitId,
+  -- -- | A mapping from wired in unit ids to unit keys from the database.
+  -- unwireMap :: UnwiringMap,
 
   -- | The units we're going to link in eagerly.  This list
   -- should be in reverse dependency order; that is, a unit
@@ -473,22 +560,31 @@ data UnitState = UnitState {
   --
   -- This should only be true when we are type-checking an indefinite unit.
   -- See Note [About units] in GHC.Unit.
-  allowVirtualUnits :: !Bool
+  allowVirtualUnits :: !Bool,
+
+  trustedUnits :: Set.Set UnitId,
+  distrustedUnits :: Set.Set UnitId
   }
+
+isUnitTrustedInUnit :: UnitState -> UnitId -> Bool
+isUnitTrustedInUnit us u = u `Set.member` trustedUnits us
 
 emptyUnitState :: UnitState
 emptyUnitState = UnitState {
-    unitInfoMap    = emptyUniqMap,
-    packageNameMap = emptyUFM,
-    wireMap        = emptyUniqMap,
-    unwireMap      = emptyUniqMap,
+    -- unitInfoMap    = emptyUniqMap,
+
+    -- wireMap        = emptyUniqMap,
+    -- unwireMap      = emptyUniqMap,
     preloadUnits   = [],
     explicitUnits  = [],
     homeUnitDepends = Set.empty,
+    packageNameMap = emptyUFM,
     moduleNameProvidersMap       = emptyUniqMap,
     pluginModuleNameProvidersMap = emptyUniqMap,
     requirementContext           = emptyUniqMap,
-    allowVirtualUnits = False
+    allowVirtualUnits = False,
+    trustedUnits = Set.empty,
+    distrustedUnits = Set.empty
     }
 
 -- | Unit database
@@ -503,8 +599,8 @@ instance Outputable u => Outputable (UnitDatabase u) where
 type UnitInfoMap = UniqMap UnitId UnitInfo
 
 -- | Find the unit we know about with the given unit, if any
-lookupUnit :: UnitState -> Unit -> Maybe UnitInfo
-lookupUnit pkgs = lookupUnit' (allowVirtualUnits pkgs) (unitInfoMap pkgs)
+lookupUnit :: UnitIndex -> UnitState -> Unit -> Maybe UnitInfo
+lookupUnit unitIndex pkgs = lookupUnit' (allowVirtualUnits pkgs) (unitInfoMap unitIndex)
 
 -- | A more specialized interface, which doesn't require a 'UnitState' (so it
 -- can be used while we're initializing 'DynFlags')
@@ -515,7 +611,7 @@ lookupUnit pkgs = lookupUnit' (allowVirtualUnits pkgs) (unitInfoMap pkgs)
 lookupUnit' :: Bool -> UnitInfoMap -> Unit -> Maybe UnitInfo
 lookupUnit' allowOnTheFlyInst pkg_map u = case u of
    HoleUnit   -> error "Hole unit"
-   RealUnit i -> lookupUniqMap pkg_map (unDefinite i)
+   RealUnit i -> lookupUnitId' pkg_map (unDefinite i)
    VirtUnit i
       | allowOnTheFlyInst
       -> -- lookup UnitInfo of the indefinite unit to be instantiated and
@@ -528,10 +624,10 @@ lookupUnit' allowOnTheFlyInst pkg_map u = case u of
          -- units. Even if they are real, installed units, they can't use the
          -- `RealUnit` constructor (it is reserved for definite units) so we use
          -- the `VirtUnit` constructor.
-         lookupUniqMap pkg_map (virtualUnitId i)
+         lookupUnitId' pkg_map (virtualUnitId i)
 
 -- | Find the unit we know about with the given unit id, if any
-lookupUnitId :: UnitState -> UnitId -> Maybe UnitInfo
+lookupUnitId :: UnitIndex -> UnitId -> Maybe UnitInfo
 lookupUnitId state uid = lookupUnitId' (unitInfoMap state) uid
 
 -- | Find the unit we know about with the given unit id, if any
@@ -540,14 +636,14 @@ lookupUnitId' db uid = lookupUniqMap db uid
 
 
 -- | Looks up the given unit in the unit state, panicking if it is not found
-unsafeLookupUnit :: HasDebugCallStack => UnitState -> Unit -> UnitInfo
-unsafeLookupUnit state u = case lookupUnit state u of
+unsafeLookupUnit :: HasDebugCallStack => UnitIndex -> UnitState -> Unit -> UnitInfo
+unsafeLookupUnit unitIndex state u = case lookupUnit unitIndex state u of
    Just info -> info
    Nothing   -> pprPanic "unsafeLookupUnit" (ppr u)
 
 -- | Looks up the given unit id in the unit state, panicking if it is not found
-unsafeLookupUnitId :: HasDebugCallStack => UnitState -> UnitId -> UnitInfo
-unsafeLookupUnitId state uid = case lookupUnitId state uid of
+unsafeLookupUnitId :: HasDebugCallStack => UnitIndex -> UnitId -> UnitInfo
+unsafeLookupUnitId unitIndex uid = case lookupUnitId unitIndex uid of
    Just info -> info
    Nothing   -> pprPanic "unsafeLookupUnitId" (ppr uid)
 
@@ -560,22 +656,22 @@ lookupPackageName :: UnitState -> PackageName -> Maybe UnitId
 lookupPackageName pkgstate n = lookupUFM (packageNameMap pkgstate) n
 
 -- | Search for units with a given package ID (e.g. \"foo-0.1\")
-searchPackageId :: UnitState -> PackageId -> [UnitInfo]
+searchPackageId :: UnitIndex -> PackageId -> [UnitInfo]
 searchPackageId pkgstate pid = filter ((pid ==) . unitPackageId)
                                (listUnitInfo pkgstate)
 
 -- | Find the UnitId which an import qualified by a package import comes from.
 -- Compared to 'lookupPackageName', this function correctly accounts for visibility,
 -- renaming and thinning.
-resolvePackageImport :: UnitState -> ModuleName -> PackageName -> Maybe UnitId
-resolvePackageImport unit_st mn pn = do
+resolvePackageImport :: UnitIndex -> UnitState -> ModuleName -> PackageName -> Maybe UnitId
+resolvePackageImport unit_index unit_st mn pn = do
   -- 1. Find all modules providing the ModuleName (this accounts for visibility/thinning etc)
   providers <- filterUniqMap originVisible <$> lookupUniqMap (moduleNameProvidersMap unit_st) mn
   -- 2. Get the UnitIds of the candidates
   let candidates_uid = concatMap to_uid $ sortOn fst $ nonDetUniqMapToList providers
   -- 3. Get the package names of the candidates
   let candidates_units = map (\ui -> ((unitPackageName ui), unitId ui))
-                              $ mapMaybe (\uid -> lookupUniqMap (unitInfoMap unit_st) uid) candidates_uid
+                              $ mapMaybe (\uid -> lookupUniqMap (unitInfoMap unit_index) uid) candidates_uid
   -- 4. Check to see if the PackageName helps us disambiguate any candidates.
   lookup pn candidates_units
 
@@ -615,7 +711,7 @@ mkUnitInfoMap infos = foldl' add emptyUniqMap infos
 -- this function, although all units in this map are "visible", this
 -- does not imply that the exposed-modules of the unit are available
 -- (they may have been thinned or renamed).
-listUnitInfo :: UnitState -> [UnitInfo]
+listUnitInfo :: UnitIndex -> [UnitInfo]
 listUnitInfo state = nonDetEltsUniqMap (unitInfoMap state)
 
 -- ----------------------------------------------------------------------------
@@ -628,20 +724,23 @@ listUnitInfo state = nonDetEltsUniqMap (unitInfoMap state)
 -- 'initUnits' can be called again subsequently after updating the
 -- 'packageFlags' field of the 'DynFlags', and it will update the
 -- 'unitState' in 'DynFlags'.
-initUnits :: Logger -> DynFlags -> Maybe [UnitDatabase UnitId] -> Set.Set UnitId -> IO ([UnitDatabase UnitId], UnitState, HomeUnit, Maybe PlatformConstants)
-initUnits logger dflags cached_dbs home_units = do
+initUnits :: Logger -> UnitIndexCache -> DynFlags -> Set.Set UnitId -> IO (UnitState, HomeUnit, Maybe PlatformConstants)
+initUnits logger unitIndexCache dflags home_units = do
 
-  let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
+  -- TODO: force unitInfoMap
+  let forceUnitInfoMap state = (unitInfoMap state) `seq` state
 
-  (unit_state,dbs) <- withTiming logger (text "initializing unit database")
-                   forceUnitInfoMap
-                 $ mkUnitState logger (initUnitConfig dflags cached_dbs home_units)
+  (unit_state,_dbs) <- withTiming logger (text "initializing unit database")
+                      (const ())
+                 $ mkUnitState logger unitIndexCache (initUnitConfig dflags home_units)
 
+  modifyUnitIndex forceUnitInfoMap unitIndexCache
+  !unit_index <- readUnitIndex unitIndexCache
   putDumpFileMaybe logger Opt_D_dump_mod_map "Module Map"
     FormatText (updSDocContext (\ctx -> ctx {sdocLineLength = 200})
                 $ pprModuleMap (moduleNameProvidersMap unit_state))
 
-  let home_unit = mkHomeUnit unit_state
+  let home_unit = mkHomeUnit unit_index
                              (homeUnitId_ dflags)
                              (homeUnitInstanceOf_ dflags)
                              (homeUnitInstantiations_ dflags)
@@ -659,14 +758,14 @@ initUnits logger dflags cached_dbs home_units = do
       -- uncommon) case, e.g. building a C utility program (not depending on the
       -- RTS) before building the RTS. In any case, we will fail later on if we
       -- really need to use the platform constants but they have not been loaded.
-      case lookupUnitId unit_state rtsUnitId of
+      case lookupUnitId unit_index rtsUnitId of
         Nothing   -> return Nothing
         Just info -> lookupPlatformConstants (fmap ST.unpack (unitIncludeDirs info))
 
-  return (dbs,unit_state,home_unit,mconstants)
+  return (unit_state,home_unit,mconstants)
 
 mkHomeUnit
-    :: UnitState
+    :: UnitIndex
     -> UnitId                 -- ^ Home unit id
     -> Maybe UnitId           -- ^ Home unit instance of
     -> [(ModuleName, Module)] -- ^ Home unit instantiations
@@ -675,7 +774,7 @@ mkHomeUnit unit_state hu_id hu_instanceof hu_instantiations_ =
     let
         -- Some wired units can be used to instantiate the home unit. We need to
         -- replace their unit keys with their wired unit ids.
-        wmap              = wireMap unit_state
+        wmap              = ui_wireMap unit_state
         hu_instantiations = map (fmap (upd_wired_in_mod wmap)) hu_instantiations_
     in case (hu_instanceof, hu_instantiations) of
       (Nothing,[]) -> DefiniteHomeUnit hu_id Nothing
@@ -696,12 +795,22 @@ mkHomeUnit unit_state hu_id hu_instanceof hu_instantiations_ =
 -- -----------------------------------------------------------------------------
 -- Reading the unit database(s)
 
-readUnitDatabases :: Logger -> UnitConfig -> IO [UnitDatabase UnitId]
-readUnitDatabases logger cfg = do
+readUnitDatabases :: Logger -> UnitIndexCache -> UnitConfig -> IO [UnitDatabase UnitId]
+readUnitDatabases logger unitIndexCache cfg = do
   conf_refs <- getUnitDbRefs cfg
   confs     <- liftM catMaybes $ mapM (resolveUnitDatabase cfg) conf_refs
-  mapM (readUnitDatabase logger cfg) confs
+  mapM (readOrGetUnitDatabase logger unitIndexCache cfg) confs
 
+readOrGetUnitDatabase :: Logger -> UnitIndexCache -> UnitConfig -> OsPath -> IO (UnitDatabase UnitId)
+readOrGetUnitDatabase logger unitIndexCache cfg conf = do
+  unitIndex <- readUnitIndex unitIndexCache
+  case Map.lookup conf (ui_cachedDatabases unitIndex) of
+    Nothing -> do
+      new_db <- readUnitDatabase logger cfg conf
+      cacheDatabase unitIndexCache new_db
+      pure new_db
+    Just cached_db ->
+      pure cached_db
 
 getUnitDbRefs :: UnitConfig -> IO [PkgDbRef]
 getUnitDbRefs cfg = do
@@ -834,11 +943,6 @@ readUnitDatabase logger cfg conf_file = do
              else return (Just []) -- ghc-pkg will create it when it's updated
         else return Nothing
 
-distrustAllUnits :: [UnitInfo] -> [UnitInfo]
-distrustAllUnits pkgs = map distrust pkgs
-  where
-    distrust pkg = pkg{ unitIsTrusted = False }
-
 mungeUnitInfo :: OsPath -> OsPath
                    -> UnitInfo -> UnitInfo
 mungeUnitInfo top_dir pkgroot =
@@ -874,22 +978,22 @@ applyTrustFlag
    :: UnitPrecedenceMap
    -> UnusableUnits
    -> [UnitInfo]
+   -> (Set.Set UnitId, Set.Set UnitId)
    -> TrustFlag
-   -> MaybeErr UnitErr [UnitInfo]
-applyTrustFlag prec_map unusable pkgs flag =
+   -> MaybeErr UnitErr (Set.Set UnitId, Set.Set UnitId)
+applyTrustFlag prec_map unusable pkgs (trusted, distrusted) flag =
   case flag of
     -- we trust all matching packages. Maybe should only trust first one?
     -- and leave others the same or set them untrusted
     TrustPackage str ->
        case selectPackages prec_map (PackageArg str) pkgs unusable of
          Left ps       -> Failed (TrustFlagErr flag ps)
-         Right (ps,qs) -> Succeeded (map trust ps ++ qs)
-          where trust p = p {unitIsTrusted=True}
+         Right (ps,_) -> Succeeded (foldl' (\ acc -> flip Set.insert acc . unitId) trusted ps, distrusted)
 
     DistrustPackage str ->
        case selectPackages prec_map (PackageArg str) pkgs unusable of
          Left ps       -> Failed (TrustFlagErr flag ps)
-         Right (ps,qs) -> Succeeded (distrustAllUnits ps ++ qs)
+         Right (ps,_) -> Succeeded (trusted, foldl' (\ acc -> flip Set.insert acc . unitId) distrusted ps)
 
 applyPackageFlag
    :: UnitPrecedenceMap
@@ -1093,6 +1197,7 @@ pprTrustFlag flag = case flag of
 -- See Note [Wired-in units] in GHC.Unit.Types
 
 type WiringMap = UniqMap UnitId UnitId
+type UnwiringMap = UniqMap UnitId UnitId
 
 findWiredInUnits
    :: Logger
@@ -1468,9 +1573,10 @@ validateDatabase cfg pkg_map1 =
 
 mkUnitState
     :: Logger
+    -> UnitIndexCache
     -> UnitConfig
     -> IO (UnitState,[UnitDatabase UnitId])
-mkUnitState logger cfg = do
+mkUnitState logger unitIndexCache cfg = do
 {-
    Plan.
 
@@ -1525,14 +1631,16 @@ mkUnitState logger cfg = do
 -}
 
   -- if databases have not been provided, read the database flags
-  raw_dbs <- case unitConfigDBCache cfg of
-               Nothing  -> readUnitDatabases logger cfg
-               Just dbs -> return dbs
+  raw_dbs <- readUnitDatabases logger unitIndexCache cfg
 
   -- distrust all units if the flag is set
-  let distrust_all db = db { unitDatabaseUnits = distrustAllUnits (unitDatabaseUnits db) }
-      dbs | unitConfigDistrustAll cfg = map distrust_all raw_dbs
-          | otherwise                 = raw_dbs
+  let distrust_all distrusted db = foldl' (\ acc -> flip Set.insert acc . unitId) distrusted (unitDatabaseUnits db)
+      distrustedUnits
+          | unitConfigDistrustAll cfg = foldl' distrust_all Set.empty raw_dbs
+          | otherwise                 = Set.empty
+
+      trustedUnits = Set.empty
+      dbs = raw_dbs
 
 
   -- This, and the other reverse's that you will see, are due to the fact that
@@ -1557,9 +1665,12 @@ mkUnitState logger cfg = do
 
   -- Apply trust flags (these flags apply regardless of whether
   -- or not packages are visible or not)
-  pkgs1 <- mayThrowUnitErr
-            $ foldM (applyTrustFlag prec_map unusable)
-                 (nonDetEltsUniqMap pkg_map2) (reverse (unitConfigFlagsTrusted cfg))
+  (trusted, distrusted) <- mayThrowUnitErr
+            $ foldM (applyTrustFlag prec_map unusable (nonDetEltsUniqMap pkg_map2))
+                 (trustedUnits, distrustedUnits) (reverse (unitConfigFlagsTrusted cfg))
+
+  -- TODO: Ill just trust this get's rewritten to avoid the 'mkUnitInfoMap'
+  let pkgs1 = nonDetEltsUniqMap pkg_map2
   let prelim_pkg_db = mkUnitInfoMap pkgs1
 
   --
@@ -1626,7 +1737,12 @@ mkUnitState logger cfg = do
   -- package arguments we need to key against the old versions.
   --
   (pkgs2, wired_map) <- findWiredInUnits logger prec_map pkgs1 vis_map2
+
+  let unwired_map = listToUniqMap [ (v,k) | (k,v) <- nonDetUniqMapToList wired_map ]
+  -- TODO: Ill just trust this get's rewritten to avoid the 'mkUnitInfoMap'
   let pkg_db = mkUnitInfoMap pkgs2
+
+  cacheUnitInfos unitIndexCache pkg_db
 
   -- Update the visibility map, so we treat wired packages as visible.
   let vis_map = updateVisibilityMap wired_map vis_map2
@@ -1701,19 +1817,23 @@ mkUnitState logger cfg = do
       mod_map2 = mkUnusableModuleNameProvidersMap unusable
       mod_map = mod_map2 `plusUniqMap` mod_map1
 
+  cacheWiringMaps unitIndexCache wired_map unwired_map
+
   -- Force the result to avoid leaking input parameters
   let !state = UnitState
          { preloadUnits                 = dep_preload
          , explicitUnits                = explicit_pkgs
          , homeUnitDepends              = home_unit_deps
-         , unitInfoMap                  = pkg_db
+        --  , unitInfoMap                  = pkg_db
          , moduleNameProvidersMap       = mod_map
          , pluginModuleNameProvidersMap = mkModuleNameProvidersMap logger cfg pkg_db plugin_vis_map
          , packageNameMap               = pkgname_map
-         , wireMap                      = wired_map
-         , unwireMap                    = listToUniqMap [ (v,k) | (k,v) <- nonDetUniqMapToList wired_map ]
+        --  , wireMap                      = wired_map
+        --  , unwireMap                    = unwired_map
          , requirementContext           = req_ctx
          , allowVirtualUnits            = unitConfigAllowVirtual cfg
+         , trustedUnits = trusted
+         , distrustedUnits = distrusted
          }
   return (state, raw_dbs)
 
@@ -1732,9 +1852,9 @@ selectHomeUnits home_units flags = foldl' go Set.empty flags
 
 -- | Given a wired-in 'Unit', "unwire" it into the 'Unit'
 -- that it was recorded as in the package database.
-unwireUnit :: UnitState -> Unit -> Unit
+unwireUnit :: UnitIndex -> Unit -> Unit
 unwireUnit state uid@(RealUnit (Definite def_uid)) =
-    maybe uid (RealUnit . Definite) (lookupUniqMap (unwireMap state) def_uid)
+    maybe uid (RealUnit . Definite) (lookupUniqMap (ui_unwireMap state) def_uid)
 unwireUnit _ uid = uid
 
 -- -----------------------------------------------------------------------------
@@ -1886,14 +2006,15 @@ mkModMap pkg mod = unitUniqMap (mkModule pkg mod)
 
 -- | Takes a 'ModuleName', and if the module is in any package returns
 -- list of modules which take that name.
-lookupModuleInAllUnits :: UnitState
+lookupModuleInAllUnits :: UnitIndex -- TODO: definitely wrong
+                          -> UnitState
                           -> ModuleName
                           -> [(Module, UnitInfo)]
-lookupModuleInAllUnits pkgs m
-  = case lookupModuleWithSuggestions pkgs m NoPkgQual of
+lookupModuleInAllUnits unitIndex pkgs m
+  = case lookupModuleWithSuggestions unitIndex pkgs m NoPkgQual of
       LookupFound a b -> [(a,fst b)]
       LookupMultiple rs -> map f rs
-        where f (m,_) = (m, expectJust (lookupUnit pkgs (moduleUnit m)))
+        where f (m,_) = (m, expectJust (lookupUnit unitIndex pkgs (moduleUnit m)))
       _ -> []
 
 -- | The result of performing a lookup
@@ -1915,19 +2036,20 @@ data LookupResult =
 data ModuleSuggestion = SuggestVisible ModuleName Module ModuleOrigin
                       | SuggestHidden ModuleName Module ModuleOrigin
 
-lookupModuleWithSuggestions :: UnitState
+lookupModuleWithSuggestions :: UnitIndex
+                            -> UnitState
                             -> ModuleName
                             -> PkgQual
                             -> LookupResult
-lookupModuleWithSuggestions pkgs
-  = lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs)
+lookupModuleWithSuggestions unitIndex pkgs
+  = lookupModuleWithSuggestions' unitIndex pkgs (moduleNameProvidersMap pkgs)
 
 -- | The package which the module **appears** to come from, this could be
 -- the one which reexports the module from it's original package. This function
 -- is currently only used for -Wunused-packages
-lookupModulePackage :: UnitState -> ModuleName -> PkgQual -> Maybe [UnitInfo]
-lookupModulePackage pkgs mn mfs =
-    case lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs) mn mfs of
+lookupModulePackage :: UnitIndex -> UnitState -> ModuleName -> PkgQual -> Maybe [UnitInfo]
+lookupModulePackage unitIndex pkgs mn mfs =
+    case lookupModuleWithSuggestions' unitIndex pkgs (moduleNameProvidersMap pkgs) mn mfs of
       LookupFound _ (orig_unit, origin) ->
         case origin of
           ModOrigin {fromOrigUnit, fromExposedReexport} ->
@@ -1942,19 +2064,21 @@ lookupModulePackage pkgs mn mfs =
 
       _ -> Nothing
 
-lookupPluginModuleWithSuggestions :: UnitState
+lookupPluginModuleWithSuggestions :: UnitIndex
+                                  -> UnitState
                                   -> ModuleName
                                   -> PkgQual
                                   -> LookupResult
-lookupPluginModuleWithSuggestions pkgs
-  = lookupModuleWithSuggestions' pkgs (pluginModuleNameProvidersMap pkgs)
+lookupPluginModuleWithSuggestions unitIndex pkgs
+  = lookupModuleWithSuggestions' unitIndex pkgs (pluginModuleNameProvidersMap pkgs)
 
-lookupModuleWithSuggestions' :: UnitState
+lookupModuleWithSuggestions' :: UnitIndex
+                            -> UnitState
                             -> ModuleNameProvidersMap
                             -> ModuleName
                             -> PkgQual
                             -> LookupResult
-lookupModuleWithSuggestions' pkgs mod_map name mb_pn
+lookupModuleWithSuggestions' unitIndex pkgs mod_map name mb_pn
   = case lookupUniqMap mod_map name of
         Nothing -> LookupNotFound suggestions
         Just xs ->
@@ -1986,9 +2110,9 @@ lookupModuleWithSuggestions' pkgs mod_map name mb_pn
               reexports = sortOn unitId fromHiddenReexport
 
               origUnit :: Maybe UnitInfo
-              origUnit = origAvailableUnderSameName >> lookupUnit pkgs (moduleUnit m)
+              origUnit = origAvailableUnderSameName >> lookupUnit unitIndex pkgs (moduleUnit m)
 
-    unit_lookup p = lookupUnit pkgs p `orElse` pprPanic "lookupModuleWithSuggestions" (ppr p <+> ppr name)
+    unit_lookup p = lookupUnit unitIndex pkgs p `orElse` pprPanic "lookupModuleWithSuggestions" (ppr p <+> ppr name)
     mod_unit = unit_lookup . moduleUnit
 
     -- Filters out origins which are not associated with the given package
@@ -2084,6 +2208,15 @@ mayThrowUnitErr = \case
                     $ ppr e
     Succeeded a -> return a
 
+mayThrowUnitErrIO :: IO (MaybeErr UnitErr a) -> IO a
+mayThrowUnitErrIO act = act >>= \case
+    Failed e    -> throwGhcExceptionIO
+                    $ CmdLineError
+                    $ renderWithContext defaultSDocContext
+                    $ withPprStyle defaultUserStyle
+                    $ ppr e
+    Succeeded a -> return a
+
 instance Outputable UnitErr where
     ppr = \case
         CloseUnitErr p mb_parent
@@ -2130,7 +2263,7 @@ requirementMerges pkgstate mod_name =
 -- Component name is only displayed if it isn't the default library
 --
 -- To do this we need to query a unit database.
-pprUnitIdForUser :: UnitState -> UnitId -> SDoc
+pprUnitIdForUser :: UnitIndex -> UnitId -> SDoc
 pprUnitIdForUser state uid@(UnitId fs) =
    case lookupUnitPprInfo state uid of
       Nothing -> ftext fs -- we didn't find the unit at all
@@ -2139,17 +2272,17 @@ pprUnitIdForUser state uid@(UnitId fs) =
 pprUnitInfoForUser :: UnitInfo -> SDoc
 pprUnitInfoForUser info = ppr (mkUnitPprInfo unitIdFS info)
 
-lookupUnitPprInfo :: UnitState -> UnitId -> Maybe UnitPprInfo
+lookupUnitPprInfo :: UnitIndex -> UnitId -> Maybe UnitPprInfo
 lookupUnitPprInfo state uid = fmap (mkUnitPprInfo unitIdFS) (lookupUnitId state uid)
 
 -- -----------------------------------------------------------------------------
 -- Displaying packages
 
 -- | Show (very verbose) package info
-pprUnits :: UnitState -> SDoc
+pprUnits :: UnitIndex -> SDoc
 pprUnits = pprUnitsWith pprUnitInfo
 
-pprUnitsWith :: (UnitInfo -> SDoc) -> UnitState -> SDoc
+pprUnitsWith :: (UnitInfo -> SDoc) -> UnitIndex -> SDoc
 pprUnitsWith pprIPI pkgstate =
     vcat (intersperse (text "---") (map pprIPI (listUnitInfo pkgstate)))
 
@@ -2157,11 +2290,12 @@ pprUnitsWith pprIPI pkgstate =
 --
 -- The idea is to only print package id, and any information that might
 -- be different from the package databases (exposure, trust)
-pprUnitsSimple :: UnitState -> SDoc
-pprUnitsSimple = pprUnitsWith pprIPI
-    where pprIPI ipi = let i = unitIdFS (unitId ipi)
-                           e = if unitIsExposed ipi then text "E" else text " "
-                           t = if unitIsTrusted ipi then text "T" else text " "
+pprUnitsSimple :: UnitIndex -> UnitState -> SDoc
+pprUnitsSimple unit_index unit_state = pprUnitsWith pprIPI unit_index
+    where pprIPI ipi = let u = unitId ipi
+                           i = unitIdFS u
+                           e = if unitIsExposed ipi                then text "E" else text " "
+                           t = if isUnitTrustedInUnit unit_state u then text "T" else text " "
                        in e <> t <> text "  " <> ftext i
 
 -- | Show the mapping of modules to where they come from.
@@ -2183,6 +2317,7 @@ fsPackageName info = fs
 -- | Return a `UnitId` which either wraps the `InstantiatedUnit` unchanged.
 instUnitToUnit :: InstantiatedUnit -> Unit
 instUnitToUnit iuid =
+
     -- NB: suppose that we want to compare the instantiated
     -- unit p[H=impl:H] against p+abcd (where p+abcd
     -- happens to be the existing, installed version of
@@ -2200,14 +2335,14 @@ type ShHoleSubst = ModuleNameEnv Module
 -- directly on a 'nameModule', see Note [Representation of module/name variables].
 -- @p[A=\<A>]:B@ maps to @p[A=q():A]:B@ with @A=q():A@;
 -- similarly, @\<A>@ maps to @q():A@.
-renameHoleModule :: UnitState -> ShHoleSubst -> Module -> Module
+renameHoleModule :: UnitIndex -> ShHoleSubst -> Module -> Module
 renameHoleModule state = renameHoleModule' (unitInfoMap state)
 
 -- | Substitutes holes in a 'Unit', suitable for renaming when
 -- an include occurs; see Note [Representation of module/name variables].
 --
 -- @p[A=\<A>]@ maps to @p[A=\<B>]@ with @A=\<B>@.
-renameHoleUnit :: UnitState -> ShHoleSubst -> Unit -> Unit
+renameHoleUnit :: UnitIndex -> ShHoleSubst -> Unit -> Unit
 renameHoleUnit state = renameHoleUnit' (unitInfoMap state)
 
 -- | Like 'renameHoleModule', but requires only 'UnitInfoMap'
@@ -2243,7 +2378,7 @@ instModuleToModule (Module iuid mod_name) =
     mkModule (instUnitToUnit iuid) mod_name
 
 -- | Print unit-ids with UnitInfo found in the given UnitState
-pprWithUnitState :: UnitState -> SDoc -> SDoc
+pprWithUnitState :: UnitIndex -> SDoc -> SDoc
 pprWithUnitState state = updSDocContext (\ctx -> ctx
    { sdocUnitIdForUser = \fs -> pprUnitIdForUser state (UnitId fs)
    })

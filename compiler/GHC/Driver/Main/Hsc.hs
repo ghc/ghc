@@ -106,20 +106,21 @@ import System.IO
 newHscEnv :: FilePath -> DynFlags -> IO HscEnv
 newHscEnv top_dir dflags = do
   hpt <- emptyHomePackageTable
-  newHscEnvWithHUG top_dir dflags (homeUnitId_ dflags) (home_unit_graph hpt)
+  uic <- initUnitIndexCache
+  newHscEnvWithHUG top_dir dflags (homeUnitId_ dflags) uic (home_unit_graph hpt)
   where
     home_unit_graph hpt = HUG.unitEnv_singleton
                         (homeUnitId_ dflags)
-                        (HUG.mkHomeUnitEnv emptyUnitState Nothing dflags hpt Nothing)
+                        (HUG.mkHomeUnitEnv emptyUnitState dflags hpt Nothing)
 
-newHscEnvWithHUG :: FilePath -> DynFlags -> UnitId -> HomeUnitGraph -> IO HscEnv
-newHscEnvWithHUG top_dir top_dynflags cur_unit home_unit_graph = do
+newHscEnvWithHUG :: FilePath -> DynFlags -> UnitId -> UnitIndexCache -> HomeUnitGraph -> IO HscEnv
+newHscEnvWithHUG top_dir top_dynflags cur_unit unit_index home_unit_graph = do
     nc_var  <- newNameCache
     fc_var  <- initFinderCache
     logger  <- initLogger
     tmpfs   <- initTmpFs
     let dflags = homeUnitEnv_dflags $ HUG.unitEnv_lookup cur_unit home_unit_graph
-    unit_env <- initUnitEnv cur_unit home_unit_graph (ghcNameVersion dflags) (targetPlatform dflags)
+    unit_env <- initUnitEnv cur_unit unit_index home_unit_graph (ghcNameVersion dflags) (targetPlatform dflags)
     llvm_config <- initLlvmConfigCache top_dir
     return HscEnv { hsc_dflags         = top_dynflags
                   , hsc_logger         = setLogFlags logger (initLogFlags top_dynflags)

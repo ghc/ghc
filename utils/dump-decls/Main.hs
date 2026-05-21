@@ -9,7 +9,7 @@ import GHC.Unit.State (lookupUnitId, lookupPackageName)
 import GHC.Unit.Info (UnitInfo, unitExposedModules, unitId, PackageName(..))
 import GHC.Unit.Types (UnitId)
 import GHC.Data.FastString (fsLit)
-import GHC.Driver.Env (hsc_units, hscEPS)
+import GHC.Driver.Env (hsc_units, hscEPS, hscUnitIndex)
 import GHC.Utils.Outputable
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 import GHC.Types.TyThing (tyThingParent_maybe)
@@ -48,11 +48,13 @@ run root pkg_nm = runGhc (Just root) $ do
         return dflags'
 
     _ <- setProgramDynFlags dflags
-    unit_state <- hsc_units <$> getSession
+    env <- getSession
+    let unit_state = hsc_units env
+    unit_index <- liftIO $ hscUnitIndex env
     unit_id <- case lookupPackageName unit_state (PackageName $ fsLit pkg_nm) of
                     Just unit_id -> return unit_id
                     Nothing -> fail "failed to find package"
-    unit_info <- case lookupUnitId unit_state unit_id of
+    unit_info <- case lookupUnitId unit_index unit_id of
       Just unit_info -> return unit_info
       Nothing -> fail "unknown package"
 
@@ -60,7 +62,7 @@ run root pkg_nm = runGhc (Just root) $ do
     insts_doc <- reportInstances
 
     name_ppr_ctx <- GHC.getNamePprCtx
-    let rendered = showSDocForUser dflags unit_state name_ppr_ctx (vcat [decls_doc, insts_doc])
+    let rendered = showSDocForUser dflags unit_index name_ppr_ctx (vcat [decls_doc, insts_doc])
     liftIO $ putStrLn rendered
 
 ignoredModules :: [ModuleName]

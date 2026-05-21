@@ -27,14 +27,15 @@ batchMultiMsg :: Messager
 batchMultiMsg = batchMsgWith (\_ _ _ node -> brackets (ppr (mgNodeUnitId node)))
 
 batchMsgWith :: (HscEnv -> (Int, Int) -> RecompileRequired -> ModuleGraphNode -> SDoc) -> Messager
-batchMsgWith extra hsc_env_start mod_index recomp node =
+batchMsgWith extra hsc_env_start mod_index recomp node = do
+      unit_index <- hscUnitIndex hsc_env
       case recomp of
         UpToDate
           | logVerbAtLeast logger 2 -> showMsg (text "Skipping") empty
           | otherwise -> return ()
         NeedsRecompile reason0 -> showMsg (text herald) $ case reason0 of
           MustCompile            -> empty
-          (RecompBecause reason) -> text " [" <> pprWithUnitState state (ppr reason) <> text "]"
+          (RecompBecause reason) -> text " [" <> pprWithUnitState unit_index (ppr reason) <> text "]"
     where
         herald = case node of
                     LinkNode {} -> "Linking"
@@ -44,7 +45,6 @@ batchMsgWith extra hsc_env_start mod_index recomp node =
         hsc_env = hscSetActiveUnitId (mgNodeUnitId node) hsc_env_start
         dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env
-        state  = hsc_units hsc_env
         showMsg msg reason =
             compilationProgressMsg logger $
             (showModuleIndex mod_index <>

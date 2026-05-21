@@ -71,7 +71,7 @@ import GHC.ByteCode.Linker
 import GHC.ByteCode.Serialize
 import GHC.ByteCode.Types
 
-import GHC.Linker.Unit (getUnitDepends)
+import GHC.Linker.Unit (getUnitDepends')
 
 import GHC.Stack.CCS
 import GHC.SysTools
@@ -185,7 +185,7 @@ getLoaderState :: Interp -> IO (Maybe LoaderState)
 getLoaderState interp = readMVar (loader_state (interpLoader interp))
 
 
-emptyLoaderState :: UnitEnv -> LoaderState
+emptyLoaderState :: UnitIndex -> LoaderState
 emptyLoaderState unit_env = LoaderState
    { bco_loader_state = emptyBytecodeLoaderState
    , pkgs_loaded = init_pkgs deps
@@ -199,7 +199,7 @@ emptyLoaderState unit_env = LoaderState
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
   where
-    deps = getUnitDepends unit_env rtsUnitId
+    deps = getUnitDepends' unit_env rtsUnitId
     pkg_to_dfm unit_id = (unit_id, (LoadedPkgInfo unit_id [] [] [] emptyUniqDSet))
     init_pkgs deps = let addToUDFM' (k, v) m = addToUDFM m k v
                      in foldr addToUDFM' emptyUDFM $ [
@@ -362,7 +362,8 @@ initLoaderState interp hsc_env = do
 reallyInitLoaderState :: Interp -> HscEnv -> IO LoaderState
 reallyInitLoaderState interp hsc_env = do
   -- Initialise the linker state
-  let pls0 = emptyLoaderState (hsc_unit_env hsc_env)
+  unit_index <- hscUnitIndex hsc_env
+  let pls0 = emptyLoaderState unit_index
 
   case platformArch (targetPlatform (hsc_dflags hsc_env)) of
     -- FIXME: we don't initialize anything with the JS interpreter.
@@ -1224,8 +1225,9 @@ loadMoreUnits
   -> PkgsLoaded   -- ^ Existing loaded packages (used for memoization)
   -> IO ([UnitInfo], PkgsLoaded)
   -- ^ Reverse topologically-sorted new package infos + updated PkgsLoaded
-loadMoreUnits hsc_env new_pks pkgs_loaded_init =
-  downsweep ([], pkgs_loaded_init) new_pks
+loadMoreUnits hsc_env new_pks pkgs_loaded_init = do
+  unit_index <- hscUnitIndex hsc_env
+  downsweep unit_index ([], pkgs_loaded_init) new_pks
   where
     -- The downsweep process takes an initial 'PkgsLoaded' and uses it
     -- to memoize new packages to load when recursively downsweeping
@@ -1239,16 +1241,16 @@ loadMoreUnits hsc_env new_pks pkgs_loaded_init =
     -- dependencies go into that list. There are no duplicate items in
     -- this list due to memoization.
     downsweep ::
-      ([UnitInfo], PkgsLoaded) -> [UnitId] -> IO ([UnitInfo], PkgsLoaded)
-    downsweep = foldlM downsweep_one
+      UnitIndex -> ([UnitInfo], PkgsLoaded) -> [UnitId] -> IO ([UnitInfo], PkgsLoaded)
+    downsweep unit_index = foldlM (downsweep_one unit_index)
 
     downsweep_one ::
-      ([UnitInfo], PkgsLoaded) -> UnitId -> IO ([UnitInfo], PkgsLoaded)
-    downsweep_one (pkgs_info_list, pkgs) new_pkg
+      UnitIndex -> ([UnitInfo], PkgsLoaded) -> UnitId -> IO ([UnitInfo], PkgsLoaded)
+    downsweep_one unit_index (pkgs_info_list, pkgs) new_pkg
       | new_pkg `elemUDFM` pkgs = pure (pkgs_info_list, pkgs)
-      | Just new_pkg_info <- lookupUnitId (hsc_units hsc_env) new_pkg = do
+      | Just new_pkg_info <- lookupUnitId unit_index new_pkg = do
           let new_pkg_deps = unitDepends new_pkg_info
-          (pkgs_info_list', pkgs') <- downsweep (pkgs_info_list, pkgs) new_pkg_deps
+          (pkgs_info_list', pkgs') <- downsweep unit_index (pkgs_info_list, pkgs) new_pkg_deps
           let new_pkg_trans_deps =
                 unionManyUniqDSets
                   [ addOneToUniqDSet (loaded_pkg_trans_deps loaded_pkg_info) dep_pkg

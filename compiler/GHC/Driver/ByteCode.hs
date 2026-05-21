@@ -24,7 +24,8 @@ outputAndCompileForeign hsc_env mod_name location foreign_files foreign_stubs = 
   let dflags   = hsc_dflags hsc_env
       logger   = hsc_logger hsc_env
       tmpfs    = hsc_tmpfs hsc_env
-  (_, has_stub) <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) mod_name location foreign_stubs
+  unit_index <- hscUnitIndex hsc_env
+  (_, has_stub) <- outputForeignStubs logger tmpfs dflags unit_index mod_name location foreign_stubs
   compile_for_interpreter hsc_env $ \ i_env -> do
     stub_o <- traverse (compileForeign i_env LangC) has_stub
     foreign_files_o <- traverse (uncurry (compileForeign i_env)) foreign_files

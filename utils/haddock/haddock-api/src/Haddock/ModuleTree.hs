@@ -16,14 +16,14 @@ module Haddock.ModuleTree (ModuleTree (..), mkModuleTree) where
 import qualified Control.Applicative as A
 import GHC (Name)
 import GHC.Unit.Module (Module, moduleName, moduleNameString, moduleUnit, unitString)
-import GHC.Unit.State (UnitState, lookupUnit, unitPackageIdString)
+import GHC.Unit.State (UnitIndex, UnitState, lookupUnit, unitPackageIdString)
 
 import Haddock.Types (MDoc)
 
 data ModuleTree = Node String (Maybe Module) (Maybe String) (Maybe String) (Maybe (MDoc Name)) [ModuleTree]
 
-mkModuleTree :: UnitState -> Bool -> [(Module, Maybe (MDoc Name))] -> [ModuleTree]
-mkModuleTree state showPkgs mods =
+mkModuleTree :: UnitIndex -> UnitState -> Bool -> [(Module, Maybe (MDoc Name))] -> [ModuleTree]
+mkModuleTree unit_index state showPkgs mods =
   foldr fn [] [(mdl, splitModule mdl, modPkg mdl, modSrcPkg mdl, short) | (mdl, short) <- mods]
   where
     modPkg mod_
@@ -33,7 +33,7 @@ mkModuleTree state showPkgs mods =
       | showPkgs =
           fmap
             unitPackageIdString
-            (lookupUnit state (moduleUnit mod_))
+            (lookupUnit unit_index state (moduleUnit mod_))
       | otherwise = Nothing
     fn (m, mod_, pkg, srcPkg, short) = addToTrees mod_ m pkg srcPkg short
 

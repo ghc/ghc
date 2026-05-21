@@ -169,6 +169,7 @@ depanalE :: GhcMonad m =>     -- New for #17459
             -> m (DriverMessages, ModuleGraph)
 depanalE diag_wrapper msg excluded_mods allow_dup_roots = do
     hsc_env <- getSession
+    unit_index <- liftIO $ hscUnitIndex hsc_env
     (errs, mod_graph) <- depanalPartial diag_wrapper msg excluded_mods allow_dup_roots
     if isEmptyMessages errs
       then do
@@ -178,7 +179,7 @@ depanalE diag_wrapper msg excluded_mods allow_dup_roots = do
               unknown_module_err <- warnUnknownModules (hscSetActiveUnitId k hsc_env) (homeUnitEnv_dflags hue) mod_graph
 
               let unused_home_mod_err = warnMissingHomeModules (homeUnitEnv_dflags hue) (hsc_targets hsc_env) mod_graph
-                  unused_pkg_err = warnUnusedPackages (homeUnitEnv_units hue) (homeUnitEnv_dflags hue) mod_graph
+                  unused_pkg_err = warnUnusedPackages unit_index (homeUnitEnv_units hue) (homeUnitEnv_dflags hue) mod_graph
 
 
               return $ errs `unionMessages` unused_home_mod_err
@@ -451,15 +452,15 @@ loadWithCache cache diag_wrapper how_much = do
 -- actually loaded packages. All the packages, specified on command line,
 -- but never loaded, are probably unused dependencies.
 
-warnUnusedPackages :: UnitState -> DynFlags -> ModuleGraph -> DriverMessages
-warnUnusedPackages us dflags mod_graph =
+warnUnusedPackages :: UnitIndex -> UnitState -> DynFlags -> ModuleGraph -> DriverMessages
+warnUnusedPackages unit_index us dflags mod_graph =
     let diag_opts = initDiagOpts dflags
 
         home_mod_sum = filter (\ms -> homeUnitId_ dflags == ms_unitid ms) (mgModSummaries mod_graph)
 
     -- Only need non-source imports here because SOURCE imports are always HPT
         loadedPackages = concat $
-          mapMaybe (\(_st, fs, mn) -> lookupModulePackage us (unLoc mn) fs)
+          mapMaybe (\(_st, fs, mn) -> lookupModulePackage unit_index us (unLoc mn) fs)
             $ concatMap ms_imps home_mod_sum
 
         used_args = Set.fromList (map unitId loadedPackages)
@@ -468,7 +469,7 @@ warnUnusedPackages us dflags mod_graph =
                   -- The units which we depend on via the command line explicitly
                   flag <- mflag
                   -- Which we can find the UnitInfo for (should be all of them)
-                  ui <- lookupUnit us u
+                  ui <- lookupUnit unit_index us u
                   -- Which are not explicitly used
                   guard (Set.notMember (unitId ui) used_args)
                   -- Exclude units with no exposed modules. This covers packages which only
@@ -1449,12 +1450,12 @@ withDeferredDiagnostics f = do
       (\_ -> popLogHookM >> printDeferredDiagnostics)
       (\_ -> f)
 
-noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope GhcMessage
+noModError :: HscEnv -> UnitIndex -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope GhcMessage
 -- ToDo: we don't have a proper line number for this error
-noModError hsc_env loc wanted_mod err
+noModError hsc_env unit_index loc wanted_mod err
   = mkPlainErrorMsgEnvelope loc $ GhcDriverMessage $
     DriverInterfaceError $
-    (Can'tFindInterface (cannotFindModule hsc_env wanted_mod err) (LookingForModule wanted_mod NotBoot))
+    (Can'tFindInterface (cannotFindModule hsc_env unit_index wanted_mod err) (LookingForModule wanted_mod NotBoot))
 
 {-
 noHsFileErr :: SrcSpan -> String -> DriverMessages

@@ -321,7 +321,7 @@ data DriverMessage where
       tests/safeHaskell/check/pkg01/ImpSafeOnly08
 
   -}
-  DriverPackageNotTrusted :: !UnitState -> !UnitId -> DriverMessage
+  DriverPackageNotTrusted :: !UnitIndex -> !UnitId -> DriverMessage
 
   {-| DriverCannotImportFromUntrustedPackage is an error that occurs in the context of
       Safe Haskell when trying to import a module coming from an untrusted package.
@@ -365,7 +365,7 @@ data DriverMessage where
       tests/safeHaskell/unsafeLibs/Dep10
 
   -}
-  DriverCannotImportFromUntrustedPackage :: !UnitState -> !Module -> DriverMessage
+  DriverCannotImportFromUntrustedPackage :: !UnitIndex -> !Module -> DriverMessage
 
   DriverRedirectedNoMain :: !ModuleName -> DriverMessage
 

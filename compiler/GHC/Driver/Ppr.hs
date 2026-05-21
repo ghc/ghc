@@ -28,7 +28,7 @@ showPpr :: Outputable a => DynFlags -> a -> String
 showPpr dflags thing = showSDoc dflags (ppr thing)
 
 -- | Allows caller to specify the NamePprCtx to use
-showSDocForUser :: DynFlags -> UnitState -> NamePprCtx -> SDoc -> String
+showSDocForUser :: DynFlags -> UnitIndex -> NamePprCtx -> SDoc -> String
 showSDocForUser dflags unit_state name_ppr_ctx doc = renderWithContext (initSDocContext dflags sty) doc'
    where
       sty  = mkUserStyle name_ppr_ctx AllTheWay

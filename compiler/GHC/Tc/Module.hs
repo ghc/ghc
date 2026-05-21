@@ -280,9 +280,11 @@ tcRnModuleTcRnM hsc_env mod_sum
         ; when (notNull prel_imports) $ do
             addDiagnostic TcRnImplicitImportOfPrelude
 
+        ; unit_index <- liftIO $ hscUnitIndex hsc_env
+
         ; -- TODO This is a little skeevy; maybe handle a bit more directly
           let { simplifyImport (L _ idecl) =
-                  ( renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName idecl) (ideclPkgQual idecl)
+                  ( renameRawPkgQual (hsc_unit_env hsc_env) unit_index (unLoc $ ideclName idecl) (ideclPkgQual idecl)
                   , reLoc $ ideclName idecl)
               }
         ; raw_sig_imports <- liftIO
@@ -2148,11 +2150,13 @@ runTcInteractive tcm_plugin_handling hsc_env thing_inside
               iface <- loadModuleInterface (text "runTcInteractive") m
               pure $ mi_module iface : dep_orphs (mi_deps iface)
 
+       ; unit_index <- liftIO $ hscUnitIndex hsc_env
+
        ; !orphs <- fmap (force . concat) . forM (ic_imports icxt) $ \i ->
             case i of                   -- force above: see #15111
                 IIModule n -> getOrphansForModule n
                 IIDecl i   -> getOrphansForModuleName (unLoc (ideclName i))
-                                         (renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName i) (ideclPkgQual i))
+                                         (renameRawPkgQual (hsc_unit_env hsc_env) unit_index (unLoc $ ideclName i) (ideclPkgQual i))
 
 
        ; (home_insts, home_fam_insts) <- liftIO $ UnitEnv.hugAllInstances (hsc_unit_env hsc_env)
@@ -3057,7 +3061,8 @@ rnDump rn = dumpOptTcRn Opt_D_dump_rn "Renamer" FormatHaskell (ppr rn)
 
 tcDump :: TcGblEnv -> TcRn ()
 tcDump env
- = do { unit_state <- hsc_units <$> getTopEnv ;
+ = do { env <- getTopEnv ;
+        unit_state <- liftIO $ hscUnitIndex env ;
         logger <- getLogger ;
 
         -- Dump short output if -ddump-types or -ddump-tc

@@ -40,6 +40,7 @@ module GHC.Unit.Env
     ( UnitEnv (..)
     , initUnitEnv
     , ueEPS -- Not really needed, get directly type families and rule base!
+    , ueUnitIndex
     , updateHug
     -- * Unit Env helper functions
     , ue_currentHomeUnitEnv
@@ -80,7 +81,6 @@ module GHC.Unit.Env
 
     -- ** Queries on the current active home unit
     , ue_homeUnitState
-    , ue_unit_dbs
     , ue_homeUnit
     , ue_unitFlags
 
@@ -174,21 +174,27 @@ data UnitEnv = UnitEnv
 
     , ue_namever   :: !GhcNameVersion
         -- ^ GHC name/version (used for dynamic library suffix)
+
+    , ue_unit_index_cache :: !UnitIndexCache
     }
 
 ueEPS :: UnitEnv -> IO ExternalPackageState
 ueEPS = eucEPS . ue_eps
 
-initUnitEnv :: UnitId -> HomeUnitGraph -> GhcNameVersion -> Platform -> IO UnitEnv
-initUnitEnv cur_unit hug namever platform = do
+ueUnitIndex :: UnitEnv -> IO UnitIndex
+ueUnitIndex = readUnitIndex . ue_unit_index_cache
+
+initUnitEnv :: UnitId -> UnitIndexCache -> HomeUnitGraph -> GhcNameVersion -> Platform -> IO UnitEnv
+initUnitEnv cur_unit unit_index hug namever platform = do
   eps <- initExternalUnitCache
   return $ UnitEnv
-    { ue_eps             = eps
-    , ue_home_unit_graph = hug
-    , ue_module_graph    = emptyMG
-    , ue_current_unit    = cur_unit
-    , ue_platform        = platform
-    , ue_namever         = namever
+    { ue_eps              = eps
+    , ue_home_unit_graph  = hug
+    , ue_module_graph     = emptyMG
+    , ue_current_unit     = cur_unit
+    , ue_platform         = platform
+    , ue_namever          = namever
+    , ue_unit_index_cache = unit_index
     }
 
 updateHug :: (HomeUnitGraph -> HomeUnitGraph) -> UnitEnv -> UnitEnv
@@ -209,9 +215,10 @@ updateHug = ue_updateHUG
 -- | Lookup 'UnitInfo' for every preload unit from the UnitState, for every unit
 -- used to instantiate the home unit, and for every unit explicitly passed in
 -- the given list of UnitId.
-preloadUnitsInfo' :: UnitEnv -> [UnitId] -> MaybeErr UnitErr [UnitInfo]
-preloadUnitsInfo' unit_env ids0 = all_infos
-  where
+preloadUnitsInfo' :: UnitEnv -> [UnitId] -> IO (MaybeErr UnitErr [UnitInfo])
+preloadUnitsInfo' unit_env ids0 = do
+  unit_index <- ueUnitIndex unit_env
+  let
     unit_state = HUG.homeUnitEnv_units (ue_currentHomeUnitEnv unit_env)
     ids      = ids0 ++ inst_ids
     inst_ids = case ue_homeUnit unit_env of
@@ -222,16 +229,18 @@ preloadUnitsInfo' unit_env ids0 = all_infos
        -- Fixes #14525
        | isHomeUnitIndefinite home_unit -> []
        | otherwise -> map (toUnitId . moduleUnit . snd) (homeUnitInstantiations home_unit)
-    pkg_map = unitInfoMap unit_state
+    pkg_map = unitInfoMap unit_index
     preload = preloadUnits unit_state
 
     all_pkgs  = closeUnitDeps' pkg_map preload (ids `zip` repeat Nothing)
-    all_infos = map (unsafeLookupUnitId unit_state) <$> all_pkgs
+    all_infos = map (unsafeLookupUnitId unit_index) <$> all_pkgs
+
+  pure all_infos
 
 
 -- | Lookup 'UnitInfo' for every preload unit from the UnitState and for every
 -- unit used to instantiate the home unit.
-preloadUnitsInfo :: UnitEnv -> MaybeErr UnitErr [UnitInfo]
+preloadUnitsInfo :: UnitEnv -> IO (MaybeErr UnitErr [UnitInfo])
 preloadUnitsInfo unit_env = preloadUnitsInfo' unit_env []
 
 -- -- | Test if the module comes from the home unit
@@ -257,9 +266,6 @@ ue_findHomeUnitEnv uid e = case HUG.lookupHugUnitId uid (ue_home_unit_graph e) o
 
 ue_homeUnitState :: HasDebugCallStack => UnitEnv -> UnitState
 ue_homeUnitState = HUG.homeUnitEnv_units . ue_currentHomeUnitEnv
-
-ue_unit_dbs :: UnitEnv ->  Maybe [UnitDatabase UnitId]
-ue_unit_dbs = HUG.homeUnitEnv_unit_dbs . ue_currentHomeUnitEnv
 
 -- -------------------------------------------------------
 -- Query and modify Home Package Table in HomeUnitEnv

@@ -51,7 +51,7 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
         verbFlags = getVerbFlags dflags
         o_file = outputFile_ dflags
 
-    pkgs_with_rts <- mayThrowUnitErr (preloadUnitsInfo' unit_env dep_packages)
+    pkgs_with_rts <- mayThrowUnitErrIO (preloadUnitsInfo' unit_env dep_packages)
 
     let pkg_lib_paths = collectLibraryDirs (ways dflags) pkgs_with_rts
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths

@@ -195,7 +195,8 @@ hscCheckSafe' :: Module -> SrcSpan
 hscCheckSafe' m l = do
     hsc_env <- getHscEnv
     let home_unit = hsc_home_unit hsc_env
-    (tw, pkgs) <- isModSafe home_unit m l
+    unit_index <- liftIO $ hscUnitIndex hsc_env
+    (tw, pkgs) <- isModSafe unit_index home_unit m l
     case tw of
         False                           -> return (Nothing, pkgs)
         True | isHomeModule home_unit m -> return (Nothing, pkgs)
@@ -203,8 +204,8 @@ hscCheckSafe' m l = do
              -- Not necessary if that is reflected in dependencies
              | otherwise   -> return (Just $ toUnitId (moduleUnit m), pkgs)
   where
-    isModSafe :: HomeUnit -> Module -> SrcSpan -> Hsc (Bool, Set UnitId)
-    isModSafe home_unit m l = do
+    isModSafe :: UnitIndex -> HomeUnit -> Module -> SrcSpan -> Hsc (Bool, Set UnitId)
+    isModSafe unit_index home_unit m l = do
         hsc_env <- getHscEnv
         dflags <- getDynFlags
         iface <- lookup' m
@@ -245,13 +246,13 @@ hscCheckSafe' m l = do
                 where
                     state = hsc_units hsc_env
                     inferredImportWarn diag_opts = singleMessage
-                        $ mkMsgEnvelope diag_opts l (pkgQual state)
+                        $ mkMsgEnvelope diag_opts l (pkgQual unit_index state)
                         $ GhcDriverMessage $ DriverInferredSafeImport m
                     pkgTrustErr = singleMessage
-                      $ mkErrorMsgEnvelope l (pkgQual state)
-                      $ GhcDriverMessage $ DriverCannotImportFromUntrustedPackage state m
+                      $ mkErrorMsgEnvelope l (pkgQual unit_index state)
+                      $ GhcDriverMessage $ DriverCannotImportFromUntrustedPackage unit_index m
                     modTrustErr = singleMessage
-                      $ mkErrorMsgEnvelope l (pkgQual state)
+                      $ mkErrorMsgEnvelope l (pkgQual unit_index state)
                       $ GhcDriverMessage $ DriverCannotImportUnsafeModule m
 
     -- Check the package a module resides in is trusted. Safe compiled
@@ -268,7 +269,7 @@ hscCheckSafe' m l = do
             Sf_Safe | not trust_own_pkg         -> True
             Sf_SafeInferred | not trust_own_pkg -> True
             _ | isHomeModule home_unit mod      -> True
-            _ -> unitIsTrusted $ unsafeLookupUnit unit_state (moduleUnit m)
+            _ -> isUnitTrustedInUnit unit_state (toUnitId $ moduleUnit m)
 
     lookup' :: Module -> Hsc (Maybe ModIface)
     lookup' m = do
@@ -286,17 +287,18 @@ hscCheckSafe' m l = do
 checkPkgTrust :: Set UnitId -> Hsc ()
 checkPkgTrust pkgs = do
     hsc_env <- getHscEnv
+    unit_index <- liftIO $ hscUnitIndex hsc_env
     let sec = initSourceErrorContext (hsc_dflags hsc_env)
         errors = S.foldr go emptyBag pkgs
         state  = hsc_units hsc_env
         go pkg acc
-            | unitIsTrusted $ unsafeLookupUnitId state pkg
+            | isUnitTrustedInUnit (hsc_units hsc_env) pkg
             = acc
             | otherwise
             = (`consBag` acc)
-                     $ mkErrorMsgEnvelope noSrcSpan (pkgQual state)
+                     $ mkErrorMsgEnvelope noSrcSpan (pkgQual unit_index state)
                      $ GhcDriverMessage
-                     $ DriverPackageNotTrusted state pkg
+                     $ DriverPackageNotTrusted unit_index pkg
     if isEmptyBag errors
       then return ()
       else liftIO $ throwErrors sec $ mkMessages errors
@@ -562,4 +564,3 @@ hscParseThingWithLocation source linenumber parser str = do
                 liftIO $ putDumpFileMaybe logger Opt_D_dump_parsed_ast "Parser AST"
                             FormatHaskell (showAstData NoBlankSrcSpan NoBlankEpAnnotations thing)
                 return thing
-

@@ -80,7 +80,8 @@ getInsts = withSession $ \hsc_env ->
 
 getNamePprCtx :: GhcMonad m => m NamePprCtx
 getNamePprCtx = withSession $ \hsc_env -> do
-  return $ icNamePprCtx (hsc_unit_env hsc_env) (hsc_IC hsc_env)
+  unit_index <- liftIO $ hscUnitIndex hsc_env
+  return $ icNamePprCtx unit_index (hsc_unit_env hsc_env) (hsc_IC hsc_env)
 
 -- | Container for information about a 'Module'.
 data ModuleInfo = ModuleInfo {
@@ -175,7 +176,8 @@ mkNamePprCtxForModule ::
   ModuleInfo ->
   m NamePprCtx
 mkNamePprCtxForModule mod minf = withSession $ \hsc_env -> do
-  let name_ppr_ctx = mkNamePprCtx ptc (hsc_unit_env hsc_env) (availsToGlobalRdrEnv hsc_env mod (minf_exports minf))
+  unit_index <- liftIO $ hscUnitIndex hsc_env
+  let name_ppr_ctx = mkNamePprCtx ptc unit_index (hsc_unit_env hsc_env) (availsToGlobalRdrEnv hsc_env mod (minf_exports minf))
       ptc = initPromotionTickContext (hsc_dflags hsc_env)
   return name_ppr_ctx
 

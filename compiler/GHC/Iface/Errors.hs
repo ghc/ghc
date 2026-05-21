@@ -27,20 +27,20 @@ badIfaceFile file err
   = vcat [text "Bad interface file:" <+> text file,
           nest 4 err]
 
-cannotFindInterface :: UnitState -> Maybe HomeUnit -> Profile
+cannotFindInterface :: UnitIndex -> Maybe HomeUnit -> Profile
                     -> ModuleName -> InstalledFindResult -> MissingInterfaceError
-cannotFindInterface us mhu p mn ifr =
-  CantFindErr us FindingInterface $
-  cantFindInstalledErr us mhu p mn ifr
+cannotFindInterface ui mhu p mn ifr =
+  CantFindErr ui FindingInterface $
+  cantFindInstalledErr ui mhu p mn ifr
 
 cantFindInstalledErr
-    :: UnitState
+    :: UnitIndex
     -> Maybe HomeUnit
     -> Profile
     -> ModuleName
     -> InstalledFindResult
     -> CantFindInstalled
-cantFindInstalledErr unit_state mhome_unit profile mod_name find_result
+cantFindInstalledErr unit_index mhome_unit profile mod_name find_result
   = CantFindInstalled mod_name more_info
   where
     build_tag  = waysBuildTag (profileWays profile)
@@ -48,7 +48,7 @@ cantFindInstalledErr unit_state mhome_unit profile mod_name find_result
     more_info
       = case find_result of
             InstalledNoPackage pkg
-                -> NoUnitIdMatching pkg (searchPackageId unit_state (PackageId (unitIdFS pkg)))
+                -> NoUnitIdMatching pkg (searchPackageId unit_index (PackageId (unitIdFS pkg)))
 
             InstalledNotFound files mb_pkg
                 | Just pkg <- mb_pkg
@@ -75,31 +75,34 @@ cantFindInstalledErr unit_state mhome_unit profile mod_name find_result
 
 
 
-cannotFindModule :: HscEnv -> ModuleName -> FindResult -> MissingInterfaceError
-cannotFindModule hsc_env = cannotFindModule'
+cannotFindModule :: HscEnv -> UnitIndex -> ModuleName -> FindResult -> MissingInterfaceError
+cannotFindModule hsc_env unit_index = cannotFindModule'
     (hsc_unit_env hsc_env)
+    unit_index
     (targetProfile (hsc_dflags hsc_env))
 
 
-cannotFindModule' :: UnitEnv -> Profile -> ModuleName -> FindResult
+cannotFindModule' :: UnitEnv -> UnitIndex -> Profile -> ModuleName -> FindResult
                   -> MissingInterfaceError
-cannotFindModule' unit_env profile mod res =
-  CantFindErr (ue_homeUnitState unit_env) FindingModule $
+cannotFindModule' unit_env unit_index profile mod res =
+  CantFindErr unit_index FindingModule $
   cantFindErr unit_env
+              unit_index
               profile
               mod
               res
 
 cantFindErr
     :: UnitEnv
+    -> UnitIndex
     -> Profile
     -> ModuleName
     -> FindResult
     -> CantFindInstalled
-cantFindErr _ _ mod_name (FoundMultiple mods)
+cantFindErr _ _ _ mod_name (FoundMultiple mods)
   = CantFindInstalled mod_name (MultiplePackages mods)
 
-cantFindErr unit_env profile mod_name find_result
+cantFindErr unit_env unit_index profile mod_name find_result
   = CantFindInstalled mod_name more_info
   where
     mhome_unit = ue_homeUnit unit_env

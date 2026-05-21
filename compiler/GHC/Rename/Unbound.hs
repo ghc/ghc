@@ -40,7 +40,7 @@ import GHC.Prelude
 
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
-import GHC.Driver.Env (hsc_units)
+import GHC.Driver.Env (hscUnitIndex)
 import GHC.Driver.Env.Types
 
 import {-# SOURCE #-} GHC.Tc.Errors.Hole ( getHoleFitDispConfig )
@@ -182,14 +182,15 @@ unboundNameOrTermInType if_term_in_type looking_for rdr_name hints
 
 unknownNameSuggestionsMessage :: TcRnMessage -> [ImportError] -> [GhcHint] -> RnM TcRnMessage
 unknownNameSuggestionsMessage msg imp_errs hints
-  = do { unit_state <- hsc_units <$> getTopEnv
+  = do { env <- getTopEnv
+       ; unit_index <- liftIO $ hscUnitIndex env
        ; hfdc <- getHoleFitDispConfig
        ; let supp = case NE.nonEmpty imp_errs of
                        Nothing -> Nothing
                        Just ne_imp_errs ->
                          (Just (hfdc, [SupplementaryImportErrors ne_imp_errs]))
        ; return $
-           TcRnMessageWithInfo unit_state $
+           TcRnMessageWithInfo unit_index $
              mkDetailedMessage (ErrInfo [] supp hints) msg
        }
 

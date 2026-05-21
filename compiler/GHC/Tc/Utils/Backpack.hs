@@ -528,12 +528,12 @@ mergeSignatures
     let mod_name   = moduleName outer_mod
     let unit_state = hsc_units hsc_env
     let dflags     = hsc_dflags hsc_env
-
+    unit_index <- liftIO $ hscUnitIndex hsc_env
     -- STEP 1: Figure out all of the external signature interfaces
     -- we are going to merge in.
     let reqs = requirementMerges unit_state mod_name
 
-    addErrCtxt (MergeSignaturesCtxt unit_state mod_name reqs) $ do
+    addErrCtxt (MergeSignaturesCtxt unit_index mod_name reqs) $ do
 
     -- STEP 2: Read in the RAW forms of all of these interfaces
     ireq_ifaces0 <- liftIO $ forM reqs $ \(Module iuid mod_name) -> do
@@ -561,7 +561,7 @@ mergeSignatures
             let insts = instUnitInsts iuid
                 isFromSignaturePackage =
                     let inst_uid = instUnitInstanceOf iuid
-                        pkg = unsafeLookupUnitId unit_state inst_uid
+                        pkg = unsafeLookupUnitId unit_index inst_uid
                     in null (unitExposedModules pkg)
             -- 3(a). Rename the exports according to how the dependency
             -- was instantiated.  The resulting export list will be accurate
@@ -916,10 +916,10 @@ exportOccs = concatMap (map nameOccName . availNames)
 checkImplements :: HasDebugCallStack => Module -> InstantiatedModule -> TcRn TcGblEnv
 checkImplements impl_mod req_mod@(Module uid mod_name) = do
   hsc_env <- getTopEnv
-  let unit_state = hsc_units hsc_env
-      home_unit  = hsc_home_unit hsc_env
+  unit_index <- liftIO $ hscUnitIndex hsc_env
+  let home_unit  = hsc_home_unit hsc_env
       other_home_units = hsc_all_home_unit_ids hsc_env
-  addErrCtxt (CheckImplementsCtxt unit_state impl_mod req_mod) $ do
+  addErrCtxt (CheckImplementsCtxt unit_index impl_mod req_mod) $ do
     let insts = instUnitInsts uid
 
     -- STEP 1: Load the implementing interface, and make a RdrEnv
@@ -978,7 +978,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
     -- we need.  (Notice we IGNORE the Modules in the AvailInfos.)
     forM_ (exportOccs (mi_exports isig_iface)) $ \occ ->
         case lookupGRE impl_gr (LookupOccName occ SameNameSpace) of
-            [] -> addErr $ TcRnHsigMissingModuleExport occ unit_state impl_mod
+            [] -> addErr $ TcRnHsigMissingModuleExport occ unit_index impl_mod
             _ -> return ()
     failIfErrsM
 

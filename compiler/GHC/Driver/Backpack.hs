@@ -93,7 +93,7 @@ import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable
 
--- | Entry point to compile a Backpack file.
+-- | Entry point to compile a Backpack fi le.
 doBackpack :: [FilePath] -> Ghc ()
 doBackpack [src_filename] = do
     -- Apply options from file to dflags
@@ -174,6 +174,8 @@ withBkpSession :: UnitId
                -> BkpM a
 withBkpSession cid insts deps session_type do_this = do
     dflags <- getDynFlags
+    env <- getSession
+    unit_index <- liftIO $ hscUnitIndex env
     let cid_fs = unitFS cid
         is_primary = False
         uid_str = unpackFS (mkInstantiatedUnitHash cid insts)
@@ -193,7 +195,7 @@ withBkpSession cid insts deps session_type do_this = do
                  | otherwise = sub_comp (key_base p)
 
         mk_temp_env hsc_env =
-          hscUpdateFlags (\dflags -> mk_temp_dflags (hsc_units hsc_env) dflags) hsc_env
+          hscUpdateFlags (\dflags -> mk_temp_dflags unit_index dflags) hsc_env
         mk_temp_dflags unit_state dflags = dflags
             { backend = case session_type of
                             TcSession -> noBackend
@@ -307,10 +309,12 @@ buildUnit session cid insts lunit = do
     let deps_w_rns = hsunitDeps (session == TcSession) (unLoc lunit)
         raw_deps = map fst deps_w_rns
     hsc_env <- getSession
+
+    unit_index <- liftIO $ hscUnitIndex hsc_env
     -- The compilation dependencies are just the appropriately filled
     -- in unit IDs which must be compiled before we can compile.
     let hsubst = listToUFM insts
-        deps = map (renameHoleUnit (hsc_units hsc_env) hsubst) raw_deps
+        deps = map (renameHoleUnit unit_index hsubst) raw_deps
 
     -- Build dependencies OR make sure they make sense. BUT NOTE,
     -- we can only check the ones that are fully filled; the rest
@@ -350,7 +354,6 @@ buildUnit session cid insts lunit = do
         linkables <- liftIO $ catMaybes <$> concatHpt takeLinkables (hsc_HPT hsc_env)
         let
             obj_files = concatMap linkableFiles linkables
-            state     = hsc_units hsc_env
 
             compat_fs = unitIdFS cid
             compat_pn = PackageName compat_fs
@@ -376,7 +379,7 @@ buildUnit session cid insts lunit = do
                         -- really used for anything, so we leave it
                         -- blank for now.
                         TcSession -> []
-                        _ -> map (toUnitId . unwireUnit state)
+                        _ -> map (toUnitId . unwireUnit unit_index)
                                 $ deps ++ [ moduleUnit mod
                                           | (_, mod) <- insts
                                           , not (isHoleModule mod) ],
@@ -432,18 +435,24 @@ compileExe lunit = do
 addUnit :: GhcMonad m => UnitInfo -> m ()
 addUnit u = do
     hsc_env <- getSession
+    let unitIndexCache = hscUnitIndexCache hsc_env
     logger <- getLogger
     let dflags0 = hsc_dflags hsc_env
     let old_unit_env = hsc_unit_env hsc_env
-    newdbs <- case ue_unit_dbs old_unit_env of
-        Nothing  -> panic "addUnit: called too early"
-        Just dbs ->
-         let newdb = UnitDatabase
-               { unitDatabasePath  = unsafeEncodeUtf $ "(in memory " ++ showSDoc dflags0 (ppr (unitId u)) ++ ")"
-               , unitDatabaseUnits = [u]
-               }
-         in return (dbs ++ [newdb]) -- added at the end because ordering matters
-    (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags0 (Just newdbs) (hsc_all_home_unit_ids hsc_env)
+
+    -- TODO @fendor: provide an API to programmatically add an in-memory DB
+    let newdb = UnitDatabase
+          { unitDatabasePath  = unsafeEncodeUtf $ "(in memory " ++ showSDoc dflags0 (ppr (unitId u)) ++ ")"
+          , unitDatabaseUnits = [u]
+          }
+
+    liftIO $ cacheDatabase unitIndexCache newdb
+    -- added at the end because ordering matters
+    let dflags1 = dflags0
+          { packageDBFlags = packageDBFlags dflags0 ++ [PackageDB (PkgDbPath (unitDatabasePath newdb))]
+          }
+
+    (unit_state,home_unit,mconstants) <- liftIO $ initUnits logger (ue_unit_index_cache old_unit_env) dflags1 (hsc_all_home_unit_ids hsc_env)
 
     -- update platform constants
     dflags <- liftIO $ updatePlatformConstants dflags0 mconstants
@@ -456,22 +465,24 @@ addUnit u = do
           , ue_home_unit_graph =
                 HUG.unitEnv_singleton
                     (homeUnitId home_unit)
-                    (HUG.mkHomeUnitEnv unit_state (Just dbs) dflags (ue_hpt old_unit_env) (Just home_unit))
+                    (HUG.mkHomeUnitEnv unit_state dflags (ue_hpt old_unit_env) (Just home_unit))
           , ue_eps       = ue_eps old_unit_env
           , ue_module_graph = ue_module_graph old_unit_env
+          , ue_unit_index_cache = ue_unit_index_cache old_unit_env
           }
     setSession $ hscSetFlags dflags $ hsc_env { hsc_unit_env = unit_env }
 
 compileInclude :: Int -> (Int, Unit) -> BkpM ()
 compileInclude n (i, uid) = do
     hsc_env <- getSession
+    unit_index <- liftIO $ hscUnitIndex hsc_env
     let pkgs = hsc_units hsc_env
     msgInclude (i, n) uid
     -- Check if we've compiled it already
     case uid of
       HoleUnit   -> return ()
       RealUnit _ -> return ()
-      VirtUnit i -> case lookupUnit pkgs uid of
+      VirtUnit i -> case lookupUnit unit_index pkgs uid of
         Nothing -> innerBkpM $ compileUnit (instUnitInstanceOf i) (instUnitInsts i)
         Just _  -> return ()
 
@@ -569,16 +580,16 @@ backpackProgressMsg level logger msg =
 mkBackpackMsg :: BkpM Messager
 mkBackpackMsg = do
     level <- getBkpLevel
-    return $ \hsc_env mod_index recomp node ->
+    return $ \hsc_env mod_index recomp node -> do
+      unit_index <- liftIO $ hscUnitIndex hsc_env
       let dflags = hsc_dflags hsc_env
           logger = hsc_logger hsc_env
-          state = hsc_units hsc_env
           showMsg msg reason =
-            backpackProgressMsg level logger $ pprWithUnitState state $
+            backpackProgressMsg level logger $ pprWithUnitState unit_index $
                 showModuleIndex mod_index <>
                 msg <> showModMsg dflags node
                     <> reason
-      in case node of
+      case node of
         InstantiationNode _ _ ->
           case recomp of
             UpToDate
@@ -586,7 +597,7 @@ mkBackpackMsg = do
               | otherwise -> return ()
             NeedsRecompile reason0 -> showMsg (text "Instantiating ") $ case reason0 of
               MustCompile -> empty
-              RecompBecause reason -> text " [" <> pprWithUnitState state (ppr reason) <> text "]"
+              RecompBecause reason -> text " [" <> pprWithUnitState unit_index (ppr reason) <> text "]"
         ModuleNode {} ->
           case recomp of
             UpToDate
@@ -594,7 +605,7 @@ mkBackpackMsg = do
               | otherwise -> return ()
             NeedsRecompile reason0 -> showMsg (text "Compiling ") $ case reason0 of
               MustCompile -> empty
-              RecompBecause reason -> text " [" <> pprWithUnitState state (ppr reason) <> text "]"
+              RecompBecause reason -> text " [" <> pprWithUnitState unit_index (ppr reason) <> text "]"
         LinkNode _ _ -> showMsg (text "Linking ")  empty
         UnitNode {} -> showMsg (text "Package ") empty
 
@@ -623,10 +634,10 @@ msgUnitId :: Unit -> BkpM ()
 msgUnitId pk = do
     logger <- getLogger
     hsc_env <- getSession
+    unit_index <- liftIO $ hscUnitIndex hsc_env
     level <- getBkpLevel
-    let state = hsc_units hsc_env
     liftIO . backpackProgressMsg level logger
-        $ pprWithUnitState state
+        $ pprWithUnitState unit_index
         $ text "Instantiating "
            <> withPprStyle backpackStyle (ppr pk)
 
@@ -635,10 +646,10 @@ msgInclude :: (Int,Int) -> Unit -> BkpM ()
 msgInclude (i,n) uid = do
     logger <- getLogger
     hsc_env <- getSession
+    unit_index <- liftIO $ hscUnitIndex hsc_env
     level <- getBkpLevel
-    let state = hsc_units hsc_env
     liftIO . backpackProgressMsg level logger
-        $ pprWithUnitState state
+        $ pprWithUnitState unit_index
         $ showModuleIndex (i, n) <> text "Including "
             <> withPprStyle backpackStyle (ppr uid)
 
@@ -876,13 +887,14 @@ hsModuleToModSummary home_keys pn hsc_src modname
     hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file_ospath location)
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file_ospath location)
 
+    unit_index <- liftIO $ hscUnitIndex hsc_env
     -- Also copied from 'getImports'
     let (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
 
         implicit_prelude = xopt LangExt.ImplicitPrelude dflags
         generated_imports = mkPrelImports modname implicit_prelude imps
 
-        rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env) modname
+        rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env) unit_index modname
         convImport (L _ i) = (convImportLevel (ideclLevelSpec i), rn_pkg_qual (ideclPkgQual i), reLoc $ ideclName i)
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env hsc_src modname
