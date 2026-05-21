@@ -49,7 +49,6 @@
 [GHC-68077] is untested (constructor = XWarningTxt)
 [GHC-28709] is untested (constructor = MalformedType)
 [GHC-91901] is untested (constructor = InstHeadMultiParam)
-[GHC-78822] is untested (constructor = AssocDefaultNotAssoc)
 [GHC-64852] is untested (constructor = BadSourceImport)
 [GHC-94559] is untested (constructor = CouldntFindInFiles)
 [GHC-22211] is untested (constructor = MissingPackageFiles)
