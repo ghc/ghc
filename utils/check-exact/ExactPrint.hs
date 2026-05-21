@@ -4595,9 +4595,9 @@ instance ExactPrint (IE GhcPs) where
     return (IEThingAbs depr' thing' doc')
   exact (IEThingAll x thing doc) = do
     depr' <- markAnnotated (ieta_warning x)
-    ns_spec' <- markAnnotated (ieta_ns_spec x)
     thing' <- markAnnotated thing
     op' <- markEpToken (ieta_tok_lpar x)
+    ns_spec' <- markAnnotated (ieta_ns_spec x)
     dd' <- markEpToken (ieta_tok_wc x)
     cp' <- markEpToken (ieta_tok_rpar x)
     doc' <- markAnnotated doc
