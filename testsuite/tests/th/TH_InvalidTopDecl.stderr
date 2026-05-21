@@ -1,0 +1,4 @@
+TH_InvalidTopDecl.hs:6:2: error: [GHC-52886]
+    Only function, value, annotation, and foreign import declarations
+    may be added with ‘addTopDecls’.
+

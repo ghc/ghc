@@ -6961,8 +6961,9 @@ data AddTopDeclsError
       'addTopDecls' is not a function, value, annotation, or foreign import declaration.
 
        Example(s):
+       [d| data Foo |] >>= addTopDecls
 
-       Test cases:
+       Test cases: th/TH_InvalidTopDecl
     -}
     InvalidTopDecl !(HsDecl GhcPs)
     {-| UnexpectedDeclarationSplice is an error that occurs when a Template Haskell
