@@ -27,6 +27,7 @@ module MiniQuickCheck
   , (===)
   , propertyCompare
   , propertyAnd
+  , propertyTrue
   , getCheck
 
     -- * QuickCheck test tree
@@ -143,6 +144,10 @@ infix 4 ===
 -- | Conjunction of two property checks.
 propertyAnd :: PropertyCheck -> PropertyCheck -> PropertyCheck
 propertyAnd = PropertyAnd
+
+-- | A property check that trivially holds. Useful to mark a case to skip.
+propertyTrue :: PropertyCheck
+propertyTrue = PropertyBinaryOp True "trivially" "" ""
 
 --------------------------------------------------------------------------------
 -- Test tree

@@ -82,11 +82,10 @@ testMultiplicative _ = Group "Multiplicative"
 testDivisible :: forall a . (Show a, Eq a, Bounded a, Integral a, Num a, Arbitrary a, Typeable a)
               => Proxy a -> Test
 testDivisible _ = Group "Divisible"
-    [ Property "(x `div` y) * y + (x `mod` y) == x" $ \(a :: a) (NonZero b) ->
-            -- See Note [Skipping minBound `div` (-1)].
-            if (minBound :: a) < 0 && a == minBound && b == (-1)
-              then True === True
-              else a === (a `div` b) * b + (a `mod` b)
+    [ Property "(x `div` y) * y + (x `mod` y) == x" $
+        -- 'safeDivArgs' skips (minBound, -1) for signed types; see
+        -- Note [Skipping signed quot/rem on minBound `quot` (-1)].
+        safeDivArgs (\(a :: a) b -> a === (a `div` b) * b + (a `mod` b))
     ]
 
 -- | Divisibility test for unbounded Integral types (Integer). No overflow
@@ -97,21 +96,6 @@ testDivisibleUnbounded _ = Group "Divisible"
     [ Property "(x `div` y) * y + (x `mod` y) == x" $ \(a :: a) (NonZero b) ->
             a === (a `div` b) * b + (a `mod` b)
     ]
-
--- Note [Skipping minBound `div` (-1)]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- For a fixed-width *signed* Integral type, `minBound `div` (-1)` raises
--- ArithException(Overflow) because `-minBound` is not representable in the
--- type (e.g., for Int8, `-(-128)` would be 128, out of range). The div/mod
--- identity property cannot hold there, so we skip exactly that one pair.
---
--- We detect "signed Bounded" with `(minBound :: a) < 0`: True for Int{N},
--- False for Word{N}. This way unsigned Bounded types lose no coverage,
--- and only the genuine overflow sample is skipped for signed types.
---
--- For the unbounded `Integer`, no overflow can occur and we use a separate
--- 'testDivisibleUnbounded' (without the Bounded constraint or the skip).
--- See #27222.
 
 testOperatorPrecedence :: forall a . (Show a, Eq a, Prelude.Num a, Integral a, Num a,  Arbitrary a, Typeable a)
                        => Proxy a -> Test
@@ -263,8 +247,29 @@ instance TestPrimop LowerBitsAreDefined where
         valR = wWord# (undefinedBehavior r x0) .&. mask
     in  valL === valR
 
-twoNonZero :: (a -> a -> b) -> a -> NonZero a -> b
-twoNonZero f x (NonZero y) = f x y
+-- | Discharge a property over a non-zero divisor. For signed types, also
+-- skip the @(minBound, -1)@ pair, where signed quot/rem is platform
+-- dependent. For unsigned types (where @minBound = 0@), no additional skip
+-- happens.
+-- See Note [Skipping signed quot/rem on minBound `quot` (-1)].
+safeDivArgs
+  :: (Bounded a, Ord a, Num a)
+  => (a -> a -> PropertyCheck)
+  -> a -> NonZero a -> PropertyCheck
+safeDivArgs f x (NonZero y)
+  | x == minBound, x < 0, y == (-1) = propertyTrue
+  | otherwise                       = f x y
+
+-- Note [Skipping signed quot/rem on minBound `quot` (-1)]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- For a fixed-width signed integer type, `minBound `quot` (-1)` is platform
+-- dependent: the mathematical result `-minBound` is not representable in the
+-- type. On x86, IDIV traps; LLVM's sdiv is undefined behavior in this case; on
+-- AArch64/RISC-V, SDIV wraps to minBound.
+--
+-- Without the skip quickcheck eventually picks `(minBound, -1)` and the test
+-- crashes on the affected primops on platforms where signed quot/rem traps.
+-- See #27222.
 
 main :: IO ()
 main = runTestsMain (Iterations 1000) (Group "ALL" [testNumberRefs, testPrimops])
@@ -535,7 +540,7 @@ instance TestPrimop (Char# -> Int#) where
 
 instance TestPrimop (Int# -> Int# -> Int#) where
   testPrimop s l r = Property s $ \ (uInt#-> x0) (uInt#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uInt#-> x0) (uInt#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uInt#-> x0) (uInt#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
   testPrimopShift s l r = Property s $ \ (uInt#-> x0) (BoundedShiftAmount @Int shift) -> wInt# (l x0 (uInt# shift)) === wInt# (r x0 (uInt# shift))
 
 -- | Compare two 'mulIntMayOflo#'-like primops only on whether their result
@@ -565,11 +570,11 @@ testPrimopMayOflo s l r =
 
 instance TestPrimop (Int# -> Int# -> (# Int#,Int# #)) where
   testPrimop s l r = Property s $ \ (uInt#-> x0) (uInt#-> x1) -> WTUP2(wInt#,wInt#, (l x0 x1)) === WTUP2(wInt#,wInt#, (r x0 x1))
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uInt#-> x0) (uInt#-> x1) -> WTUP2(wInt#,wInt#, (l x0 x1)) === WTUP2(wInt#,wInt#, (r x0 x1))
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uInt#-> x0) (uInt#-> x1) -> WTUP2(wInt#,wInt#, (l x0 x1)) === WTUP2(wInt#,wInt#, (r x0 x1))
 
 instance TestPrimop (Int# -> Int# -> (# Int#,Int#,Int# #)) where
   testPrimop s l r = Property s $ \ (uInt#-> x0) (uInt#-> x1) -> WTUP3(wInt#,wInt#,wInt#, (l x0 x1)) === WTUP3(wInt#,wInt#,wInt#, (r x0 x1))
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uInt#-> x0) (uInt#-> x1) -> WTUP3(wInt#,wInt#,wInt#, (l x0 x1)) === WTUP3(wInt#,wInt#,wInt#, (r x0 x1))
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uInt#-> x0) (uInt#-> x1) -> WTUP3(wInt#,wInt#,wInt#, (l x0 x1)) === WTUP3(wInt#,wInt#,wInt#, (r x0 x1))
 
 instance TestPrimop (Int# -> Char#) where
   testPrimop s l r = Property s $ \ (uInt#-> x0) -> wChar# (l x0) === wChar# (r x0)
@@ -598,15 +603,15 @@ instance TestPrimop (Int16# -> Int# -> Int16#) where
 
 instance TestPrimop (Int16# -> Int16# -> Int#) where
   testPrimop s l r = Property s $ \ (uInt16#-> x0) (uInt16#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uInt16#-> x0) (uInt16#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uInt16#-> x0) (uInt16#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
 
 instance TestPrimop (Int16# -> Int16# -> Int16#) where
   testPrimop s l r = Property s $ \ (uInt16#-> x0) (uInt16#-> x1) -> wInt16# (l x0 x1) === wInt16# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uInt16#-> x0) (uInt16#-> x1) -> wInt16# (l x0 x1) === wInt16# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uInt16#-> x0) (uInt16#-> x1) -> wInt16# (l x0 x1) === wInt16# (r x0 x1)
 
 instance TestPrimop (Int16# -> Int16# -> (# Int16#,Int16# #)) where
   testPrimop s l r = Property s $ \ (uInt16#-> x0) (uInt16#-> x1) -> WTUP2(wInt16#,wInt16#, (l x0 x1)) === WTUP2(wInt16#,wInt16#, (r x0 x1))
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uInt16#-> x0) (uInt16#-> x1) -> WTUP2(wInt16#,wInt16#, (l x0 x1)) === WTUP2(wInt16#,wInt16#, (r x0 x1))
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uInt16#-> x0) (uInt16#-> x1) -> WTUP2(wInt16#,wInt16#, (l x0 x1)) === WTUP2(wInt16#,wInt16#, (r x0 x1))
 
 instance TestPrimop (Int16# -> Int#) where
   testPrimop s l r = Property s $ \ (uInt16#-> x0) -> wInt# (l x0) === wInt# (r x0)
@@ -623,15 +628,15 @@ instance TestPrimop (Int32# -> Int# -> Int32#) where
 
 instance TestPrimop (Int32# -> Int32# -> Int#) where
   testPrimop s l r = Property s $ \ (uInt32#-> x0) (uInt32#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uInt32#-> x0) (uInt32#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uInt32#-> x0) (uInt32#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
 
 instance TestPrimop (Int32# -> Int32# -> Int32#) where
   testPrimop s l r = Property s $ \ (uInt32#-> x0) (uInt32#-> x1) -> wInt32# (l x0 x1) === wInt32# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uInt32#-> x0) (uInt32#-> x1) -> wInt32# (l x0 x1) === wInt32# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uInt32#-> x0) (uInt32#-> x1) -> wInt32# (l x0 x1) === wInt32# (r x0 x1)
 
 instance TestPrimop (Int32# -> Int32# -> (# Int32#,Int32# #)) where
   testPrimop s l r = Property s $ \ (uInt32#-> x0) (uInt32#-> x1) -> WTUP2(wInt32#,wInt32#, (l x0 x1)) === WTUP2(wInt32#,wInt32#, (r x0 x1))
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uInt32#-> x0) (uInt32#-> x1) -> WTUP2(wInt32#,wInt32#, (l x0 x1)) === WTUP2(wInt32#,wInt32#, (r x0 x1))
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uInt32#-> x0) (uInt32#-> x1) -> WTUP2(wInt32#,wInt32#, (l x0 x1)) === WTUP2(wInt32#,wInt32#, (r x0 x1))
 
 instance TestPrimop (Int32# -> Int#) where
   testPrimop s l r = Property s $ \ (uInt32#-> x0) -> wInt# (l x0) === wInt# (r x0)
@@ -648,11 +653,11 @@ instance TestPrimop (Int64# -> Int# -> Int64#) where
 
 instance TestPrimop (Int64# -> Int64# -> Int#) where
   testPrimop s l r = Property s $ \ (uInt64#-> x0) (uInt64#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uInt64#-> x0) (uInt64#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uInt64#-> x0) (uInt64#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
 
 instance TestPrimop (Int64# -> Int64# -> Int64#) where
   testPrimop s l r = Property s $ \ (uInt64#-> x0) (uInt64#-> x1) -> wInt64# (l x0 x1) === wInt64# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uInt64#-> x0) (uInt64#-> x1) -> wInt64# (l x0 x1) === wInt64# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uInt64#-> x0) (uInt64#-> x1) -> wInt64# (l x0 x1) === wInt64# (r x0 x1)
 
 instance TestPrimop (Int64# -> Int#) where
   testPrimop s l r = Property s $ \ (uInt64#-> x0) -> wInt# (l x0) === wInt# (r x0)
@@ -669,15 +674,15 @@ instance TestPrimop (Int8# -> Int# -> Int8#) where
 
 instance TestPrimop (Int8# -> Int8# -> Int#) where
   testPrimop s l r = Property s $ \ (uInt8#-> x0) (uInt8#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uInt8#-> x0) (uInt8#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uInt8#-> x0) (uInt8#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
 
 instance TestPrimop (Int8# -> Int8# -> Int8#) where
   testPrimop s l r = Property s $ \ (uInt8#-> x0) (uInt8#-> x1) -> wInt8# (l x0 x1) === wInt8# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uInt8#-> x0) (uInt8#-> x1) -> wInt8# (l x0 x1) === wInt8# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uInt8#-> x0) (uInt8#-> x1) -> wInt8# (l x0 x1) === wInt8# (r x0 x1)
 
 instance TestPrimop (Int8# -> Int8# -> (# Int8#,Int8# #)) where
   testPrimop s l r = Property s $ \ (uInt8#-> x0) (uInt8#-> x1) -> WTUP2(wInt8#,wInt8#, (l x0 x1)) === WTUP2(wInt8#,wInt8#, (r x0 x1))
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uInt8#-> x0) (uInt8#-> x1) -> WTUP2(wInt8#,wInt8#, (l x0 x1)) === WTUP2(wInt8#,wInt8#, (r x0 x1))
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uInt8#-> x0) (uInt8#-> x1) -> WTUP2(wInt8#,wInt8#, (l x0 x1)) === WTUP2(wInt8#,wInt8#, (r x0 x1))
 
 instance TestPrimop (Int8# -> Int#) where
   testPrimop s l r = Property s $ \ (uInt8#-> x0) -> wInt# (l x0) === wInt# (r x0)
@@ -694,19 +699,19 @@ instance TestPrimop (Word# -> Int# -> Word#) where
 
 instance TestPrimop (Word# -> Word# -> Int#) where
   testPrimop s l r = Property s $ \ (uWord#-> x0) (uWord#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uWord#-> x0) (uWord#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uWord#-> x0) (uWord#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
 
 instance TestPrimop (Word# -> Word# -> Word#) where
   testPrimop s l r = Property s $ \ (uWord#-> x0) (uWord#-> x1) -> wWord# (l x0 x1) === wWord# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uWord#-> x0) (uWord#-> x1) -> wWord# (l x0 x1) === wWord# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uWord#-> x0) (uWord#-> x1) -> wWord# (l x0 x1) === wWord# (r x0 x1)
 
 instance TestPrimop (Word# -> Word# -> (# Word#,Int# #)) where
   testPrimop s l r = Property s $ \ (uWord#-> x0) (uWord#-> x1) -> WTUP2(wWord#,wInt#, (l x0 x1)) === WTUP2(wWord#,wInt#, (r x0 x1))
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uWord#-> x0) (uWord#-> x1) -> WTUP2(wWord#,wInt#, (l x0 x1)) === WTUP2(wWord#,wInt#, (r x0 x1))
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uWord#-> x0) (uWord#-> x1) -> WTUP2(wWord#,wInt#, (l x0 x1)) === WTUP2(wWord#,wInt#, (r x0 x1))
 
 instance TestPrimop (Word# -> Word# -> (# Word#,Word# #)) where
   testPrimop s l r = Property s $ \ (uWord#-> x0) (uWord#-> x1) -> WTUP2(wWord#,wWord#, (l x0 x1)) === WTUP2(wWord#,wWord#, (r x0 x1))
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uWord#-> x0) (uWord#-> x1) -> WTUP2(wWord#,wWord#, (l x0 x1)) === WTUP2(wWord#,wWord#, (r x0 x1))
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uWord#-> x0) (uWord#-> x1) -> WTUP2(wWord#,wWord#, (l x0 x1)) === WTUP2(wWord#,wWord#, (r x0 x1))
 
 instance TestPrimop (Word# -> Int#) where
   testPrimop s l r = Property s $ \ (uWord#-> x0) -> wInt# (l x0) === wInt# (r x0)
@@ -732,15 +737,15 @@ instance TestPrimop (Word16# -> Int# -> Word16#) where
 
 instance TestPrimop (Word16# -> Word16# -> Int#) where
   testPrimop s l r = Property s $ \ (uWord16#-> x0) (uWord16#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uWord16#-> x0) (uWord16#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uWord16#-> x0) (uWord16#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
 
 instance TestPrimop (Word16# -> Word16# -> Word16#) where
   testPrimop s l r = Property s $ \ (uWord16#-> x0) (uWord16#-> x1) -> wWord16# (l x0 x1) === wWord16# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uWord16#-> x0) (uWord16#-> x1) -> wWord16# (l x0 x1) === wWord16# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uWord16#-> x0) (uWord16#-> x1) -> wWord16# (l x0 x1) === wWord16# (r x0 x1)
 
 instance TestPrimop (Word16# -> Word16# -> (# Word16#,Word16# #)) where
   testPrimop s l r = Property s $ \ (uWord16#-> x0) (uWord16#-> x1) -> WTUP2(wWord16#,wWord16#, (l x0 x1)) === WTUP2(wWord16#,wWord16#, (r x0 x1))
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uWord16#-> x0) (uWord16#-> x1) -> WTUP2(wWord16#,wWord16#, (l x0 x1)) === WTUP2(wWord16#,wWord16#, (r x0 x1))
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uWord16#-> x0) (uWord16#-> x1) -> WTUP2(wWord16#,wWord16#, (l x0 x1)) === WTUP2(wWord16#,wWord16#, (r x0 x1))
 
 instance TestPrimop (Word16# -> Int16#) where
   testPrimop s l r = Property s $ \ (uWord16#-> x0) -> wInt16# (l x0) === wInt16# (r x0)
@@ -757,15 +762,15 @@ instance TestPrimop (Word32# -> Int# -> Word32#) where
 
 instance TestPrimop (Word32# -> Word32# -> Int#) where
   testPrimop s l r = Property s $ \ (uWord32#-> x0) (uWord32#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uWord32#-> x0) (uWord32#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uWord32#-> x0) (uWord32#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
 
 instance TestPrimop (Word32# -> Word32# -> Word32#) where
   testPrimop s l r = Property s $ \ (uWord32#-> x0) (uWord32#-> x1) -> wWord32# (l x0 x1) === wWord32# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uWord32#-> x0) (uWord32#-> x1) -> wWord32# (l x0 x1) === wWord32# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uWord32#-> x0) (uWord32#-> x1) -> wWord32# (l x0 x1) === wWord32# (r x0 x1)
 
 instance TestPrimop (Word32# -> Word32# -> (# Word32#,Word32# #)) where
   testPrimop s l r = Property s $ \ (uWord32#-> x0) (uWord32#-> x1) -> WTUP2(wWord32#,wWord32#, (l x0 x1)) === WTUP2(wWord32#,wWord32#, (r x0 x1))
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uWord32#-> x0) (uWord32#-> x1) -> WTUP2(wWord32#,wWord32#, (l x0 x1)) === WTUP2(wWord32#,wWord32#, (r x0 x1))
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uWord32#-> x0) (uWord32#-> x1) -> WTUP2(wWord32#,wWord32#, (l x0 x1)) === WTUP2(wWord32#,wWord32#, (r x0 x1))
 
 instance TestPrimop (Word32# -> Int32#) where
   testPrimop s l r = Property s $ \ (uWord32#-> x0) -> wInt32# (l x0) === wInt32# (r x0)
@@ -782,11 +787,11 @@ instance TestPrimop (Word64# -> Int# -> Word64#) where
 
 instance TestPrimop (Word64# -> Word64# -> Int#) where
   testPrimop s l r = Property s $ \ (uWord64#-> x0) (uWord64#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uWord64#-> x0) (uWord64#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uWord64#-> x0) (uWord64#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
 
 instance TestPrimop (Word64# -> Word64# -> Word64#) where
   testPrimop s l r = Property s $ \ (uWord64#-> x0) (uWord64#-> x1) -> wWord64# (l x0 x1) === wWord64# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uWord64#-> x0) (uWord64#-> x1) -> wWord64# (l x0 x1) === wWord64# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uWord64#-> x0) (uWord64#-> x1) -> wWord64# (l x0 x1) === wWord64# (r x0 x1)
 
 instance TestPrimop (Word64# -> Int64#) where
   testPrimop s l r = Property s $ \ (uWord64#-> x0) -> wInt64# (l x0) === wInt64# (r x0)
@@ -803,15 +808,15 @@ instance TestPrimop (Word8# -> Int# -> Word8#) where
 
 instance TestPrimop (Word8# -> Word8# -> Int#) where
   testPrimop s l r = Property s $ \ (uWord8#-> x0) (uWord8#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uWord8#-> x0) (uWord8#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uWord8#-> x0) (uWord8#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
 
 instance TestPrimop (Word8# -> Word8# -> Word8#) where
   testPrimop s l r = Property s $ \ (uWord8#-> x0) (uWord8#-> x1) -> wWord8# (l x0 x1) === wWord8# (r x0 x1)
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uWord8#-> x0) (uWord8#-> x1) -> wWord8# (l x0 x1) === wWord8# (r x0 x1)
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uWord8#-> x0) (uWord8#-> x1) -> wWord8# (l x0 x1) === wWord8# (r x0 x1)
 
 instance TestPrimop (Word8# -> Word8# -> (# Word8#,Word8# #)) where
   testPrimop s l r = Property s $ \ (uWord8#-> x0) (uWord8#-> x1) -> WTUP2(wWord8#,wWord8#, (l x0 x1)) === WTUP2(wWord8#,wWord8#, (r x0 x1))
-  testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uWord8#-> x0) (uWord8#-> x1) -> WTUP2(wWord8#,wWord8#, (l x0 x1)) === WTUP2(wWord8#,wWord8#, (r x0 x1))
+  testPrimopDivLike s l r = Property s $ safeDivArgs $ \ (uWord8#-> x0) (uWord8#-> x1) -> WTUP2(wWord8#,wWord8#, (l x0 x1)) === WTUP2(wWord8#,wWord8#, (r x0 x1))
 
 instance TestPrimop (Word8# -> Int8#) where
   testPrimop s l r = Property s $ \ (uWord8#-> x0) -> wInt8# (l x0) === wInt8# (r x0)
