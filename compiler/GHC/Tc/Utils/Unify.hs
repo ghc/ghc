@@ -4240,6 +4240,8 @@ checkTyEqRhs flags rhs
   = recurseIntoFamTyConApp flags tc tys
   | otherwise
   = check_ty_eq_rhs flags rhs
+-- Prevent dictionary-passing when checkTyEqRhs is used in TcM in other modules:
+{-# SPECIALIZE checkTyEqRhs :: TyEqFlags TcM a -> TcType -> TcM (PuResult a Reduction) #-}
 
 {- Note [Special case for top-level of Given equality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
