@@ -60,12 +60,13 @@ getNth xs n = assertPpr (xs `lengthExceeds` n) (ppr n $$ ppr xs) $
 --
 -- Uses a set internally to record duplicates. This makes it slightly slower for
 -- very small lists but avoids quadratic behaviour for large lists.
-unionListsOrd :: (HasDebugCallStack, Outputable a, Ord a) => [a] -> [a] -> [a]
+unionListsOrd :: Ord a => [a] -> [a] -> [a]
 unionListsOrd xs ys
-  -- Since both arguments don't have internal duplicates we can just take all of xs
-  -- and every element of ys that's not already in xs.
+  -- Since both arguments don't have internal duplicates we can just take all of ys
+  -- and every element of xs that's not already in ys.
   = let set_ys = S.fromList ys
     in (filter (\e -> not $ S.member e set_ys) xs) ++ ys
+{-# INLINABLE unionListsOrd #-} -- Ensure the function can be specialized.
 
 -- | Assumes that the arguments contain no duplicates
 unionLists :: (HasDebugCallStack, Outputable a, Eq a) => [a] -> [a] -> [a]
@@ -108,6 +109,7 @@ minusList xs [y] = filter (/= y) xs
 minusList xs ys = filter (`S.notMember` yss) xs
   where
     yss = S.fromList ys
+{-# INLINABLE minusList #-} -- Ensure the function can be specialized.
 
 {-
 ************************************************************************
