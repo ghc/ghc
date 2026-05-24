@@ -1,0 +1,4 @@
+section: wasm-backend
+synopsis: Ensure post-linker output is synchronous ESM and fix loading in ServiceWorker
+issues: #27257
+mrs: !16093
