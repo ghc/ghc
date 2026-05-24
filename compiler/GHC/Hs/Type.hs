@@ -17,7 +17,7 @@ module GHC.Hs.Type (
         Mult,
         HsFunArr(..), HsModifiedFunArr, HsModifiedFunArrOf(..),
         EpArrowOrColon(..),
-        pprHsModifiedFunArr, pprHsModifier, pprHsModifiers,
+        pprHsModifiedFunArr, pprHsModifier, pprLHsModifiers,
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
         HsTypeGhcPsExt(..),
@@ -530,8 +530,8 @@ pprHsModifiedFunArr :: (Outputable mult, OutputableBndrId pass)
                     -> SDoc
 pprHsModifiedFunArr (HsModifiedFunArr _ mods arr) =
   -- `pprArrowWithModifiers` prepends % to the modifiers it's passed, and
-  -- `pprHsModifiers` does the same. So we can't pass the modifiers in to it.
-  pprHsModifiers mods <+> pprArrowWithModifiers [] visArgTypeLike mult
+  -- `pprLHsModifiers` does the same. So we can't pass the modifiers in to it.
+  pprLHsModifiers mods <+> pprArrowWithModifiers [] visArgTypeLike mult
  where
   mult = case arr of
     HsStandardArr _ -> Many
@@ -550,7 +550,7 @@ instance OutputableBndrId p
 
       ppr_mult :: HsModifiedFunArr (GhcPass p) -> SDoc -> SDoc
       ppr_mult (HsModifiedFunArr _ mods _) tyDoc =
-        pprHsModifiers mods <+> dcolon <+> tyDoc
+        pprLHsModifiers mods <+> dcolon <+> tyDoc
 
 ---------------------
 hsWcScopedTvs :: LHsSigWcType GhcRn -> [Name]
@@ -1178,7 +1178,7 @@ instance Outputable OpName where
 -}
 
 -- | There's no 'Outputable' instance for 'HsModifierOf', because it's rare to
--- want to ppr just one of them. For a list, 'pprHsModifiers' gives the expected
+-- want to ppr just one of them. For a list, 'pprLHsModifiers' gives the expected
 -- output: @%a %b@ rather than @[%a, %b]@.
 pprHsModifier :: forall p ty . (OutputableBndrId p, Outputable ty) => HsModifierOf ty (GhcPass p) -> SDoc
 pprHsModifier (HsModifier x ty) = char '%' <> case ghcPass @p of
@@ -1189,8 +1189,8 @@ pprHsModifier (HsModifier x ty) = char '%' <> case ghcPass @p of
     maybe_as_1 ModifierPrintsAs1 _ = char '1'
     maybe_as_1 ModifierPrintsAsSelf ty = ppr ty
 
-pprHsModifiers :: (OutputableBndrId p, Outputable ty) => [HsModifierOf ty (GhcPass p)] -> SDoc
-pprHsModifiers mods = hsep $ pprHsModifier <$> mods
+pprLHsModifiers :: (OutputableBndrId p, Outputable ty) => [LHsModifierOf ty (GhcPass p)] -> SDoc
+pprLHsModifiers mods = hsep $ pprHsModifier <$> fmap unLoc mods
 
 instance OutputableBndrId p => Outputable (HsBndrVar (GhcPass p)) where
   ppr (HsBndrVar _ name) = ppr name
@@ -1588,3 +1588,4 @@ type instance Anno HsIPName = EpAnnCO
 type instance Anno (HsConDeclRecField (GhcPass p)) = SrcSpanAnnA
 
 type instance Anno (FieldOcc (GhcPass p)) = SrcSpanAnnA
+type instance Anno (HsModifierOf ty (GhcPass p)) = SrcSpanAnnA

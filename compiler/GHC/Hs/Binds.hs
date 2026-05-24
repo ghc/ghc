@@ -548,7 +548,7 @@ ppr_monobind :: forall idL idR.
              => HsBindLR (GhcPass idL) (GhcPass idR) -> SDoc
 
 ppr_monobind (PatBind { pat_lhs = pat, pat_mods = mods, pat_rhs = grhss })
-  = pprHsModifiers mods
+  = pprLHsModifiers mods
     <+> pprPatBind pat grhss
 ppr_monobind (VarBind { var_id = var, var_rhs = rhs })
   = sep [pprBndr CasePatBind var, nest 2 $ equals <+> pprExpr (unLoc rhs)]
@@ -828,7 +828,7 @@ instance OutputableBndrId p => Outputable (Sig (GhcPass p)) where
 ppr_sig :: forall p. (IsPass p, OutputableBndrId p)
         => Sig (GhcPass p) -> SDoc
 ppr_sig (TypeSig _ mods vars ty) =
-  pprHsModifiers mods $$ pprVarSig (map unLoc vars) (ppr ty)
+  pprLHsModifiers mods $$ pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (ClassOpSig _ is_deflt vars ty)
   | is_deflt                 = text "default" <+> pprVarSig (map unLoc vars) (ppr ty)
   | otherwise                = pprVarSig (map unLoc vars) (ppr ty)

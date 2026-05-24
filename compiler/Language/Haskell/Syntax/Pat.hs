@@ -189,7 +189,7 @@ data Pat p
   -- ^ Type abstraction which brings into scope type variables associated with invisible forall.
   -- E.g. @fn \@t ... = rhs@. Used by @-XTypeAbstractions@.
 
-  | ModifiedPat (XModifiedPat p) [HsModifier p] (LPat p)
+  | ModifiedPat (XModifiedPat p) [LHsModifier p] (LPat p)
   -- ^ Pattern with attached modifiers. See Note [Overview of Modifiers] and
   -- Note [Modifiers on patterns vs bindings].
   -- E.g. @(%X x) = ...@

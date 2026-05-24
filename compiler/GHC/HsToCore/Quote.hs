@@ -1465,7 +1465,7 @@ repTy (HsFunTy _ w f a) = do
   where
     getSingleMult (HsModifiedFunArr _ mods arr) mk_var = case (arr, mods) of
       (HsStandardArr _, []) -> pure Nothing
-      (HsStandardArr _, [HsModifier _ m]) -> pure $ Just m
+      (HsStandardArr _, [L _ (HsModifier _ m)]) -> pure $ Just m
       (HsStandardArr _, mods) -> notHandled $ ThUnexpectedModifier mods
       (HsLinearArr _, []) -> pure $ Just $ noLocA $ mk_var $ noLocA $ noUserRdr oneDataConName
       (HsLinearArr _, mods) -> notHandled $ ThUnexpectedModifier mods
@@ -1761,7 +1761,7 @@ repE e@(HsStar{}) = notHandled (ThExpressionForm e)
 repFunArrMult :: HsModifiedFunArrOf (LocatedA (HsExpr GhcRn)) GhcRn -> MetaM (Core (M TH.Exp))
 repFunArrMult (HsModifiedFunArr _ mods arr) = case (arr, mods) of
   (HsStandardArr _, []) -> repConName unrestrictedFunTyConName
-  (HsStandardArr _, [HsModifier _ m]) -> do
+  (HsStandardArr _, [L _ (HsModifier _ m)]) -> do
     fun <- repConName fUNTyConName
     mult' <- repLE m
     repApp fun mult'
@@ -2925,7 +2925,7 @@ verifyLinearFields isPrefixConGADT ps = do
   where
     hsMultIsLinear linear (HsModifiedFunArr _ mods arr) = case (arr, mods) of
       (HsStandardArr _, []) -> pure linear
-      (HsStandardArr _, [HsModifier ModifierPrintsAs1 _]) -> pure True
+      (HsStandardArr _, [L _ (HsModifier ModifierPrintsAs1 _)]) -> pure True
       (HsStandardArr _, [_]) -> pure False
       (HsStandardArr _, mods) -> notHandled $ ThUnexpectedModifier mods
       (HsLinearArr _, []) -> pure True

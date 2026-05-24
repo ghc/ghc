@@ -823,6 +823,7 @@ class ( HiePass (NoGhcTcPass p)
       , Data (FieldOcc (GhcPass p))
       , Data (HsTupArg (GhcPass p))
       , Data (IPBind (GhcPass p))
+      , Data (HsModifier (GhcPass p))
       , ToHie (Context (Located (IdGhcP p)))
       , ToHie (Context (Located (IdOccGhcP p)))
       , Anno (IdGhcP p) ~ SrcSpanAnnN
@@ -982,7 +983,7 @@ toHieHsStmtContext ctxt
       TransStmtCtxt a -> toHieHsStmtContext  @p a
       _               -> pure []
 
-instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
+instance (Data (HsModifier (GhcPass p)), HiePass p) => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
   toHie (PS rsp scope pscope lpat@(L ospan opat)) =
     concatM $ getTypeNode lpat : case opat of
       OrPat _ pats ->
@@ -1977,10 +1978,13 @@ instance ToHie (LocatedA (HsType GhcRn)) where
       HsStarTy _ -> []
       XHsType _ -> []
 
+instance (Data (HsModifierOf ty (GhcPass p)), ToHie ty) => ToHie (LocatedA (HsModifierOf ty (GhcPass p))) where
+  toHie (L span m@(HsModifier _ ty)) = concatM $ makeNodeA m span : [ toHie ty ]
+
 instance ToHie ty => ToHie (HsModifierOf ty pass) where
   toHie (HsModifier _ ty) = toHie ty
 
-instance ToHie ty => ToHie (HsModifiedFunArrOf ty pass) where
+instance (Data (HsModifierOf ty (GhcPass p)), ToHie ty) => ToHie (HsModifiedFunArrOf ty (GhcPass p)) where
   toHie (HsModifiedFunArr _ mods _) = concatM $ toHie <$> mods
 
 instance (ToHie tm, ToHie ty) => ToHie (HsArg (GhcPass p) tm ty) where

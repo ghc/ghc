@@ -445,20 +445,20 @@ isRnKindLevel (RTKE { rtke_level = KindLevel }) = True
 isRnKindLevel _                                 = False
 
 --------------
-rnModifierContext :: HsDocContext -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeNames)
+rnModifierContext :: HsDocContext -> LHsModifier GhcPs -> RnM (LHsModifier GhcRn, FreeNames)
 rnModifierContext ctxt = rnModifier (mkTyKiEnv ctxt TypeLevel RnTypeBody)
 
-rnModifiersContext :: HsDocContext -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeNames)
+rnModifiersContext :: HsDocContext -> [LHsModifier GhcPs] -> RnM ([LHsModifier GhcRn], FreeNames)
 rnModifiersContext ctxt = rnModifiers (mkTyKiEnv ctxt TypeLevel RnTypeBody)
 
-rnModifiersContextAndWarn :: HsDocContext -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeNames)
+rnModifiersContextAndWarn :: HsDocContext -> [LHsModifier GhcPs] -> RnM ([LHsModifier GhcRn], FreeNames)
 rnModifiersContextAndWarn ctxt = rnModifiersAndWarn (mkTyKiEnv ctxt TypeLevel RnTypeBody)
 
 rnModifierWith :: (mPs -> Maybe mRn)
                -> (mPs -> RnM (mRn, FreeNames))
-               -> HsModifierOf mPs GhcPs
-               -> RnM (HsModifierOf mRn GhcRn, FreeNames)
-rnModifierWith acceptLiteral1 rn (HsModifier _ ty) = do
+               -> LHsModifierOf mPs GhcPs
+               -> RnM (LHsModifierOf mRn GhcRn, FreeNames)
+rnModifierWith acceptLiteral1 rn (L l (HsModifier _ ty)) = do
   -- If we see a %1 modifier, and have LinearTypes enabled, treat it the same as
   -- %One. Only %1 counts, not e.g. %01. See #18888. With NoLinearTypes, it's
   -- not special and means the same as %(1 :: Nat), but we still mark it
@@ -466,15 +466,15 @@ rnModifierWith acceptLiteral1 rn (HsModifier _ ty) = do
   linearEnabled <- xoptM LangExt.LinearTypes
   case acceptLiteral1 ty of
     Just literal1Rn
-      | linearEnabled -> return (HsModifier ModifierPrintsAs1 literal1Rn, mempty)
+      | linearEnabled -> return (L l (HsModifier ModifierPrintsAs1 literal1Rn), mempty)
       | otherwise -> do
           (ty', fns) <- rn ty
-          return (HsModifier ModifierPrintsAs1 ty', fns)
+          return (L l (HsModifier ModifierPrintsAs1 ty'), fns)
     Nothing -> do
       (ty', fns) <- rn ty
-      return (HsModifier ModifierPrintsAsSelf ty', fns)
+      return (L l (HsModifier ModifierPrintsAsSelf ty'), fns)
 
-rnModifier :: RnTyKiEnv -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeNames)
+rnModifier :: RnTyKiEnv -> LHsModifier GhcPs -> RnM (LHsModifier GhcRn, FreeNames)
 rnModifier env =
   rnModifierWith (\ty -> if isLiteral1 ty then Just oneType else Nothing)
                  (rnLHsTyKi env)
@@ -485,28 +485,28 @@ rnModifier env =
       _ -> False
     oneType = noLocA $ HsTyVar noAnn NotPromoted $ noLocA $ noUserRdr oneDataConName
 
-rnModifierAndWarn :: RnTyKiEnv -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeNames)
+rnModifierAndWarn :: RnTyKiEnv -> LHsModifier GhcPs -> RnM (LHsModifier GhcRn, FreeNames)
 rnModifierAndWarn env mod = do
   (mod', fns) <- rnModifier env mod
   warn_unrecognised <- woptM Opt_WarnUnrecognisedModifiers
-  let HsModifier modPrintsAs _ = mod'
+  let (L _ mod''@(HsModifier modPrintsAs _)) = mod'
       suggestLinear = case modPrintsAs of
         ModifierPrintsAs1 -> SuggestLinear
         ModifierPrintsAsSelf -> DontSuggestLinear
-  diagnosticTc warn_unrecognised $ TcRnUnrecognisedModifier mod' suggestLinear
+  diagnosticTc warn_unrecognised $ TcRnUnrecognisedModifier mod'' suggestLinear
   return (mod', fns)
 
-rnModifiersWith :: (HsModifierOf mPs GhcPs -> RnM (HsModifierOf mRn GhcRn, FreeNames))
-                -> [HsModifierOf mPs GhcPs]
-                -> RnM ([HsModifierOf mRn GhcRn], FreeNames)
+rnModifiersWith :: (LHsModifierOf mPs GhcPs -> RnM (LHsModifierOf mRn GhcRn, FreeNames))
+                -> [LHsModifierOf mPs GhcPs]
+                -> RnM ([LHsModifierOf mRn GhcRn], FreeNames)
 rnModifiersWith rnSingle mods = do
   (mods', fns) <- unzip <$> traverse rnSingle mods
   return (mods', mconcat fns)
 
-rnModifiers :: RnTyKiEnv -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeNames)
+rnModifiers :: RnTyKiEnv -> [LHsModifier GhcPs] -> RnM ([LHsModifier GhcRn], FreeNames)
 rnModifiers env = rnModifiersWith (rnModifier env)
 
-rnModifiersAndWarn :: RnTyKiEnv -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeNames)
+rnModifiersAndWarn :: RnTyKiEnv -> [LHsModifier GhcPs] -> RnM ([LHsModifier GhcRn], FreeNames)
 rnModifiersAndWarn env = rnModifiersWith (rnModifierAndWarn env)
 
 rnLHsType  :: HsDocContext -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)
@@ -782,7 +782,7 @@ and it is not, the program is not well-staged, otherwise it is".
 [1]: https://github.com/ghc-proposals/ghc-proposals/blob/8e4d0e9340c04b904373f9dfe5cbcebc354cd01f/proposals/0682-explicit-level-imports.rst
 -}
 
-rnHsModifiedFunArrWith :: (HsModifierOf multPs GhcPs -> RnM (HsModifierOf multRn GhcRn, FreeNames))
+rnHsModifiedFunArrWith :: (LHsModifierOf multPs GhcPs -> RnM (LHsModifierOf multRn GhcRn, FreeNames))
                        -> HsModifiedFunArrOf multPs GhcPs
                        -> RnM (HsModifiedFunArrOf multRn GhcRn, FreeNames)
 rnHsModifiedFunArrWith rn (HsModifiedFunArr _ mods arr) = do
@@ -2236,10 +2236,10 @@ extract_lhs_sig_ty :: LHsSigType GhcPs -> FreeKiTyVars
 extract_lhs_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
   extractHsOuterTvBndrs outer_bndrs $ extract_lty body []
 
-extract_hs_modifier :: HsModifier GhcPs -> FreeKiTyVars -> FreeKiTyVars
-extract_hs_modifier (HsModifier _ ty) acc = extract_lty ty acc
+extract_hs_modifier :: LHsModifier GhcPs -> FreeKiTyVars -> FreeKiTyVars
+extract_hs_modifier (L _ (HsModifier _ ty)) acc = extract_lty ty acc
 
-extract_hs_modifiers :: [HsModifier GhcPs] -> FreeKiTyVars -> FreeKiTyVars
+extract_hs_modifiers :: [LHsModifier GhcPs] -> FreeKiTyVars -> FreeKiTyVars
 extract_hs_modifiers mods acc = foldr extract_hs_modifier acc mods
 
 extract_hs_modified_fun_arr :: HsModifiedFunArr GhcPs -> FreeKiTyVars -> FreeKiTyVars
