@@ -39,17 +39,11 @@ export class JSValManager {
 // To benchmark different setImmediate() implementations in the
 // browser, use https://github.com/jphpsf/setImmediate-shim-demo as a
 // starting point.
-export const setImmediate = await (async () => {
-  // node, bun, or other scripts might have set this up in the browser
+export const setImmediate = (() => {
+  // node, deno, bun, or other scripts might have set this up in the
+  // browser
   if (globalThis.setImmediate) {
     return globalThis.setImmediate;
-  }
-
-  // deno
-  if (globalThis.Deno) {
-    try {
-      return (await import("node:timers")).setImmediate;
-    } catch {}
   }
 
   // https://developer.mozilla.org/en-US/docs/Web/API/Scheduler/postTask
