@@ -211,7 +211,7 @@ data HsBindLR idL idR
   | PatBind {
         pat_ext    :: XPatBind idL idR,
         pat_lhs    :: LPat idL,
-        pat_mods   :: [HsModifier idL],
+        pat_mods   :: [LHsModifier idL],
         -- ^ See Note [Modifiers on bindings].
         pat_rhs    :: GRHSs idR (LHsExpr idR)
     }
@@ -304,7 +304,7 @@ data Sig pass
       -- more specific.
     TypeSig
        (XTypeSig pass)
-       [HsModifier pass]     -- Attached modifiers
+       [LHsModifier pass]    -- Attached modifiers
        [LIdP pass]           -- LHS of the signature; e.g.  f,g,h :: blah
        (LHsSigWcType pass)   -- RHS of the signature; can have wildcards
 

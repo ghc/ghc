@@ -834,6 +834,7 @@ type instance Anno (BooleanFormula DocNameI) = SrcSpanAnnL
 type instance Anno (OverlapMode DocNameI) = EpAnn AnnPragma
 type instance Anno (CType DocNameI) = EpAnn AnnPragma
 type instance Anno (Header DocNameI) = EpAnn AnnPragma
+type instance Anno (HsModifierOf (LocatedA (HsType DocNameI)) DocNameI) = SrcSpanAnnA
 
 type XRecCond a =
   ( XParTy a ~ (EpToken "(", EpToken ")")

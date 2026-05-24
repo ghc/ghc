@@ -295,7 +295,7 @@ no_anon_wc_ty lty = go lty
       HsFunTy _ w ty1 ty2            -> go ty1 && go ty2 && go_mult w
         where
           go_mult (HsModifiedFunArr _ mods _) = all go_mod mods
-          go_mod (HsModifier _ ty) = go ty
+          go_mod (L _ (HsModifier _ ty)) = go ty
       HsListTy _ ty                  -> go ty
       HsTupleTy _ _ tys              -> gos tys
       HsSumTy _ tys                  -> gos tys

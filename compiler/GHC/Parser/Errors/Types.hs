@@ -596,7 +596,7 @@ data PsErrTypeSyntaxDetails
       !(HsModifiedFunArrOf (LocatedA (PatBuilder GhcPs)) GhcPs)
       !(LocatedA (PatBuilder GhcPs))
   | PETS_Multiplicity
-      ![HsModifierOf (LocatedA (PatBuilder GhcPs)) GhcPs]
+      ![LHsModifierOf (LocatedA (PatBuilder GhcPs)) GhcPs]
   | PETS_ForallTelescope
       !(HsForAllTelescope GhcPs)
       !(LocatedA (PatBuilder GhcPs))

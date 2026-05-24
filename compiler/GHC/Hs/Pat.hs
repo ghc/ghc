@@ -478,7 +478,7 @@ pprPat (InvisPat x tp) = char '@' <> delimit (ppr tp)
       GhcRn -> x == InferredSpec
       GhcTc -> False
     needs_parens = hsTypeNeedsParens appPrec $ unLoc $ hstp_body tp
-pprPat (ModifiedPat _ mods pat) = pprHsModifiers mods <+> ppr pat
+pprPat (ModifiedPat _ mods pat) = pprLHsModifiers mods <+> ppr pat
 
 pprPat (XPat ext) = case ghcPass @p of
   GhcRn -> case ext of

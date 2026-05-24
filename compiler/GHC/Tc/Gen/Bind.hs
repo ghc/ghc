@@ -1375,7 +1375,7 @@ tcMonoBinds is_rec sig_fn no_gen
                 , mbis ) }
   where
     bndrs = collectPatBinders CollNoDictBinders pat
-    lift_mod (HsModifier x t) = HsModifier x t
+    lift_mod (L l (HsModifier x t)) = L l (HsModifier x t)
 
 -- GENERAL CASE
 tcMonoBinds _ sig_fn no_gen binds
@@ -1480,7 +1480,7 @@ switch to inference when we have no signature for any of the binders.
 
 data TcMonoBind         -- Half completed; LHS done, RHS not done
   = TcFunBind  MonoBindInfo  SrcSpan Mult (MatchGroup GhcRn (LHsExpr GhcRn))
-  | TcPatBind [MonoBindInfo] (LPat GhcTc) Mult [HsModifier GhcRn] (GRHSs GhcRn (LHsExpr GhcRn))
+  | TcPatBind [MonoBindInfo] (LPat GhcTc) Mult [LHsModifier GhcRn] (GRHSs GhcRn (LHsExpr GhcRn))
               TcSigmaTypeFRR
 
 tcLhs :: TcSigFun -> LetBndrSpec -> HsBind GhcRn -> TcM TcMonoBind
@@ -1616,13 +1616,13 @@ tcRhs (TcPatBind infos pat' mult mods grhss pat_ty)
                                                   , patBindMult = mult }
                            , pat_mods = lift_mod <$> mods } )}
   where
-    lift_mod (HsModifier x t) = HsModifier x t
+    lift_mod (L l (HsModifier x t)) = L l (HsModifier x t)
 
 
 -- | @'tcMultiplicityOnPatBind' mods@ takes a list of modifiers that may contain
 -- a multiplicity. If present the multiplicity is returned, otherwise a fresh
 -- unification variable is generated so that multiplicity can be inferred.
-tcMultiplicityOnPatBind :: [HsModifier GhcRn] -> TcM Mult
+tcMultiplicityOnPatBind :: [LHsModifier GhcRn] -> TcM Mult
 tcMultiplicityOnPatBind mods = do
   mult <- tcModifiersMult mods
   maybe newMultiplicityVar pure mult
