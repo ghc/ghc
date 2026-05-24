@@ -780,7 +780,7 @@ recordPatSynErr loc pat =
     addFatalError $ mkPlainErrorMsgEnvelope loc $
       (PsErrRecordSyntaxInPatSynDecl pat)
 
-mkConDeclH98 :: (TokDarrow, (TokForall, EpToken ".")) -> [HsModifier GhcPs]
+mkConDeclH98 :: (TokDarrow, (TokForall, EpToken ".")) -> [LHsModifier GhcPs]
              -> LocatedN RdrName -> Maybe [LHsTyVarBndr Specificity GhcPs]
                 -> Maybe (LHsContext GhcPs) -> HsConDeclH98Details GhcPs
                 -> ConDecl GhcPs
@@ -803,7 +803,7 @@ mkConDeclH98 (tdarrow, (tforall,tdot)) mods name mb_forall mb_cxt args
 --   records whether this is a prefix or record GADT constructor. See
 --   Note [GADT abstract syntax] in "GHC.Hs.Decls" for more details.
 mkGadtDecl :: SrcSpan
-           -> [HsModifier GhcPs]
+           -> [LHsModifier GhcPs]
            -> NonEmpty (LocatedN RdrName)
            -> TokDcolon
            -> LHsSigType GhcPs
@@ -1474,7 +1474,7 @@ patIsRec e = e == mkUnqual varName (fsLit "rec")
 --
 -- See Note [Modifiers on patterns vs bindings] in Language.Haskell.Syntax.Pat.
 extract_pat_builder_modifiers
-  :: LocatedA (PatBuilder p) -> (LocatedA (PatBuilder p), [HsModifier p])
+  :: LocatedA (PatBuilder p) -> (LocatedA (PatBuilder p), [LHsModifier p])
 extract_pat_builder_modifiers = \case
   L _ (PatBuilderModifiers m p) -> (p, m)
   x -> (x, [])
@@ -1547,7 +1547,7 @@ makeFunBind fn ms
 checkPatBind :: SrcSpan
              -> LPat GhcPs
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
-             -> [HsModifier GhcPs]
+             -> [LHsModifier GhcPs]
              -> P (HsBind GhcPs)
 checkPatBind loc (L _ (BangPat an (L _ (VarPat _ v))))
                         (L _match_span grhss) []
@@ -1838,7 +1838,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
     :: SrcSpan -> ArrowParsingMode lhs b -> LocatedA lhs -> HsModifiedFunArrOf (LocatedA b) GhcPs -> LocatedA b -> PV (LocatedA b)
   -- | Disambiguate "%m" to the left of "->" (multiplicity)
   mkHsMultPV
-    :: Located [HsModifierOf (LocatedA b) GhcPs] -> TokRarrow -> PV (HsModifiedFunArrOf (LocatedA b) GhcPs)
+    :: Located [LHsModifierOf (LocatedA b) GhcPs] -> TokRarrow -> PV (HsModifiedFunArrOf (LocatedA b) GhcPs)
   -- | Disambiguate "forall a. b" and "forall a -> b" (forall telescope)
   mkHsForallPV :: SrcSpan -> HsForAllTelescope GhcPs -> LocatedA b -> PV (LocatedA b)
   -- | Disambiguate "(a,b,c)" to the left of "=>" (constraint list)
@@ -1859,7 +1859,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsEmbTyPV :: SrcSpan -> EpToken "type" -> LHsType GhcPs -> PV (LocatedA b)
   -- | Disambiguate modifiers (%a)
   mkHsModifiedPV
-    :: SrcSpan -> [HsModifier GhcPs] -> LocatedA b -> PV (LocatedA b)
+    :: SrcSpan -> [LHsModifier GhcPs] -> LocatedA b -> PV (LocatedA b)
   -- | Validate infixexp LHS to reject unwanted {-# SCC ... #-} pragmas
   rejectPragmaPV :: LocatedA b -> PV ()
 
@@ -1980,7 +1980,7 @@ instance DisambECP (HsCmd GhcPs) where
       ArrowIsFunType -> ppr a <+> pprHsModifiedFunArr arr <+> ppr b
   mkHsMultPV lMods tok = case unLoc lMods of
     [] -> pure $ HsModifiedFunArr noExtField [] $ HsStandardArr (EpArrow tok)
-    mods -> cmdFail (getLoc lMods) $ pprHsModifiers mods
+    mods -> cmdFail (getLoc lMods) $ pprLHsModifiers mods
   mkHsForallPV l tele cmd = cmdFail l $
     pprHsForAll tele Nothing <+> ppr cmd
   checkContextPV ctxt = cmdFail (getLocA ctxt) $ ppr ctxt
@@ -1994,7 +1994,7 @@ instance DisambECP (HsCmd GhcPs) where
     text "!" <> ppr c
   mkSumOrTuplePV l boxity a _ = cmdFail (locA l) (pprSumOrTuple boxity a)
   mkHsEmbTyPV l _ ty = cmdFail l (text "type" <+> ppr ty)
-  mkHsModifiedPV l mods _ = cmdFail l (text "modifiers" <+> pprHsModifiers mods)
+  mkHsModifiedPV l mods _ = cmdFail l (text "modifiers" <+> pprLHsModifiers mods)
   rejectPragmaPV _ = return ()
 
 cmdFail :: SrcSpan -> SDoc -> PV a
@@ -3740,7 +3740,7 @@ mkLHsOpTy x op y =
   let loc = locA x `combineSrcSpans` locA op `combineSrcSpans` locA y
   in L (noAnnSrcSpan loc) (HsOpTy noExtField x op y)
 
-mkMultField :: [HsModifier GhcPs] -> TokDcolon -> LHsType GhcPs -> HsConDeclField GhcPs
+mkMultField :: [LHsModifier GhcPs] -> TokDcolon -> LHsType GhcPs -> HsConDeclField GhcPs
 mkMultField mods col t = mkConDeclField (HsModifiedFunArr noExtField mods $ HsStandardArr (EpColon col)) t
 
 -----------------------------------------------------------------------------
@@ -3893,10 +3893,14 @@ mkListSyntaxTy1 brkOpen t brkClose =
 parseError :: HsExpr GhcPs
 parseError = HsHole HoleError
 
-addModifiersToDecl :: Located [HsModifier GhcPs]
+addModifiersToDecl :: Located [LHsModifier GhcPs]
+                   -> [TrailingAnn]
                    -> LHsDecl GhcPs
                    -> P (LHsDecl GhcPs)
-addModifiersToDecl (L lMods mods) (L (EpAnn lDecl anns1 cs1) topDecl) = do
+addModifiersToDecl (L lMods mods') semis (L (EpAnn lDecl anns1 cs1) topDecl) = do
+  let mods = case mods' of
+               L l h:t -> reverse $ L (addAnnsA l semis emptyComments) h : t
+               [] -> []
   cs <- getCommentsFor srcSpan
   let newLoc = EpAnn (spanAsAnchor srcSpan) anns1 (cs Semi.<> cs1)
   fmap (L newLoc) $ case topDecl of

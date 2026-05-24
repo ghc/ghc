@@ -1306,7 +1306,7 @@ topdecl :: { LHsDecl GhcPs }
         | annotation { $1 }
         | decl_no_th                            { $1 }
         | modifiers1 semis1 topdecl             {% do { hintModifiers (getLoc $1)
-                                                      ; addModifiersToDecl (fmap reverse $1) $3 }}
+                                                      ; addModifiersToDecl $1 (reverse $ unLoc $2) $3 }}
 
         -- Template Haskell Extension
         -- The $(..) form is one possible form of infixexp
@@ -1404,26 +1404,26 @@ sks_vars :: { Located [LocatedN RdrName] }  -- Returned in reverse order
              return (sLL $1 $> ($3 : h' : t)) }
   | oqtycon { sL1 $1 [$1] }
 
-modifier :: { Located (HsModifier GhcPs) }
-  : PREFIX_PERCENT atype     { sLL $1 $2 (HsModifier (epTok $1) $2) }
+modifier :: { LHsModifier GhcPs }
+  : PREFIX_PERCENT atype     { sLLa $1 $2 (HsModifier (epTok $1) $2) }
 
-modifiers :: { Located [HsModifier GhcPs] }
+modifiers :: { Located [LHsModifier GhcPs] }
   : modifiers1               { $1 }
   | {- empty -}              { sL0 [] }
 
-modifiers1 :: { Located [HsModifier GhcPs] }
-  : modifiers modifier       { sLL $1 $2 (unLoc $2 : unLoc $1) }
+modifiers1 :: { Located [LHsModifier GhcPs] }
+  : modifiers modifier       { sLL $1 $2 ($2 : unLoc $1) }
 
-expModifier :: { forall b. DisambECP b => PV (Located (HsModifierOf (LocatedA b) GhcPs)) }
+expModifier :: { forall b. DisambECP b => PV (Located (LHsModifierOf (LocatedA b) GhcPs)) }
   : PREFIX_PERCENT aexp      { unECP $2 >>= \ $2 ->
-                               return $ sLL $1 $2 (HsModifier (epTok $1) $2) }
+                               return $ sLL $1 $2 (sLLa $1 $2 $ HsModifier (epTok $1) $2) }
 
 -- | Modifiers that hold Exprs instead of Types (attached to expression arrows).
-expModifiers :: { forall b. DisambECP b => PV (Located [HsModifierOf (LocatedA b) GhcPs]) }
+expModifiers :: { forall b. DisambECP b => PV (Located [LHsModifierOf (LocatedA b) GhcPs]) }
   : expModifiers1            { $1 }
   | {- empty -}              { return $ sL0 [] }
 
-expModifiers1 :: { forall b. DisambECP b => PV (Located [HsModifierOf (LocatedA b) GhcPs]) }
+expModifiers1 :: { forall b. DisambECP b => PV (Located [LHsModifierOf (LocatedA b) GhcPs]) }
   : expModifiers expModifier { $1 >>= \ $1 ->
                                $2 >>= \ $2 ->
                                return $ sLL $1 $2 (unLoc $2 : unLoc $1) }

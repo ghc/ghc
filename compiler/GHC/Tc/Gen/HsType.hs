@@ -980,11 +980,11 @@ tcMult = tc_mult typeLevelMode
 tcMultDefault :: Mult -> HsModifiedFunArr GhcRn -> TcM Mult
 tcMultDefault def ann = fromMaybe def <$> tcMult ann
 
-tcModifiersAndWarn :: [HsModifier GhcRn] -> TcM [TcType]
+tcModifiersAndWarn :: [LHsModifier GhcRn] -> TcM [TcType]
 tcModifiersAndWarn mods =
   tc_modifiers typeLevelMode mods Nothing (const $ Left DontSuggestLinear)
 
-tcModifiersMult :: [HsModifier GhcRn] -> TcM (Maybe Mult)
+tcModifiersMult :: [LHsModifier GhcRn] -> TcM (Maybe Mult)
 tcModifiersMult = tc_modifiers_mult typeLevelMode
 
 -- | Info about the context in which we're checking a type. Currently,
@@ -1428,7 +1428,7 @@ tc_mult mode (HsModifiedFunArr _ mods arr) = do
 -- modifiers generate warnings but are otherwise ignored.
 --
 -- See Note [Typechecking Multiplicity modifiers].
-tc_modifiers_mult :: TcTyMode -> [HsModifier GhcRn] -> TcM (Maybe Mult)
+tc_modifiers_mult :: TcTyMode -> [LHsModifier GhcRn] -> TcM (Maybe Mult)
 tc_modifiers_mult mode mods = do
   modifiers <- xoptM LangExt.Modifiers
   linearTypes <- xoptM LangExt.LinearTypes
@@ -1452,7 +1452,7 @@ tc_modifiers_mult mode mods = do
 
     go_check = case mods of
       [] -> pure Nothing
-      [HsModifier _ m] -> Just <$> tc_check_lhs_type mode m multiplicityTy
+      [L _ (HsModifier _ m)] -> Just <$> tc_check_lhs_type mode m multiplicityTy
       _ -> failWithTc TcRnTooManyMultiplicities
 
 -- | Typecheck a single modifier.
@@ -1477,12 +1477,12 @@ tc_modifiers_mult mode mods = do
 -- * @Int %(m :: Multiplicity) -> Int@, we return @'Just' m@
 -- * @Int %True -> Int@, we return 'Nothing' and emit a warning.
 tc_modifier :: TcTyMode
-            -> HsModifier GhcRn
+            -> LHsModifier GhcRn
             -> Maybe Name -- ^ If modifier has unknown kind, suggest this one.
             -> (TcKind -> Either SuggestLinear ())
                -- ^ Given the Kind of a modifier, is the modifier expected?
             -> TcM (Maybe TcType)
-tc_modifier mode mod@(HsModifier modPrintsAs ty) mSuggestKind check_expected_kind = do
+tc_modifier mode (L _ mod@(HsModifier modPrintsAs ty)) mSuggestKind check_expected_kind = do
   (inf_ty, inf_kind) <- tc_infer_lhs_type mode ty
   -- bug: zonking here means that (1) is rejected, but (2) is accepted.
   --     (1): Int %(m :: Multiplicity) -> Int %m -> Int
@@ -1505,7 +1505,7 @@ tc_modifier mode mod@(HsModifier modPrintsAs ty) mSuggestKind check_expected_kin
         pure Nothing
 
 tc_modifiers :: TcTyMode
-             -> [HsModifier GhcRn]
+             -> [LHsModifier GhcRn]
              -> Maybe Name
              -> (TcKind -> Either SuggestLinear ())
              -> TcM [TcType]

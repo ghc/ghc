@@ -1897,13 +1897,13 @@ cvtTypeKind typeOrKind ty
     }
 
 hsTypeToArrow :: LHsType GhcPs -> HsModifiedFunArr GhcPs
-hsTypeToArrow w = HsModifiedFunArr noExtField mods arr
+hsTypeToArrow (L l w) = HsModifiedFunArr noExtField mods arr
  where
-  (mods, arr) = case unLoc w of
+  (mods, arr) = case w of
                      HsTyVar _ _ (L _ (isExact_maybe -> Just n))
                         | n == oneDataConName -> ([], HsLinearArr noAnn)
                         | n == manyDataConName -> ([], HsStandardArr (EpArrow noAnn))
-                     _ -> ([HsModifier noAnn w], HsStandardArr (EpArrow noAnn))
+                     _ -> ([L l (HsModifier noAnn (L l w))], HsStandardArr (EpArrow noAnn))
 
 -- ConT/InfixT can contain both data constructor (i.e., promoted) names and
 -- other (i.e, unpromoted) names, as opposed to PromotedT, which can only

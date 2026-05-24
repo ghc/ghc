@@ -200,9 +200,9 @@ instance Diagnostic DsMessage where
              ThDataConVisibleForall
                -> mkMsg "Visible forall in data constructors" empty
              ThUnexpectedModifier mods
-               -> mkMsg "Modifier" $ text "At most one modifier is supported" $$ pprHsModifiers mods
+               -> mkMsg "Modifier" $ text "At most one modifier is supported" $$ pprLHsModifiers mods
              ThUnexpectedModifierExpr mods
-               -> mkMsg "Modifier" $ text "At most one modifier is supported" $$ pprHsModifiers mods
+               -> mkMsg "Modifier" $ text "At most one modifier is supported" $$ pprLHsModifiers mods
          where
            mkMsg what doc =
              mkSimpleDecorated $

@@ -1897,9 +1897,9 @@ ppr_tylit (HsString  _ s) = toHtml (show s)
 ppr_tylit (HsChar    _ c) = toHtml (show c)
 ppr_tylit _               = error "ppr_tylit: unsupported lit"
 
-ppr_modifiers :: [HsModifier DocNameI] -> Unicode -> Qualification -> HideEmptyContexts -> Html
+ppr_modifiers :: [LHsModifier DocNameI] -> Unicode -> Qualification -> HideEmptyContexts -> Html
 ppr_modifiers mods unicode qual emptyCtxts = foldr ((<+>) . ppr_modifier) mempty mods
   where
-    ppr_modifier (HsModifier ModifierPrintsAs1 _) = multAnnotation <> char '1'
-    ppr_modifier (HsModifier ModifierPrintsAsSelf ty) =
+    ppr_modifier (L _ (HsModifier ModifierPrintsAs1 _)) = multAnnotation <> char '1'
+    ppr_modifier (L _ (HsModifier ModifierPrintsAsSelf ty)) =
       multAnnotation <> ppr_mono_lty ty unicode qual emptyCtxts

@@ -513,7 +513,7 @@ instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
 
     ppr (DataDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdFixity = fixity
                   , tcdDataDefn = defn, tcdModifiers = mods })
-      = pprHsModifiers mods
+      = pprLHsModifiers mods
         $$ pp_data_defn (pp_vanilla_decl_head ltycon tyvars fixity) defn
 
     ppr (ClassDecl {tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars,
@@ -530,7 +530,7 @@ instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
                                      map (pprTyFamDefltDecl . unLoc) at_defs ++
                                      pprLHsBindsForUser methods sigs) ]
       where
-        top_matter = pprHsModifiers mods
+        top_matter = pprLHsModifiers mods
                     $$  text "class"
                     <+> pp_vanilla_decl_head lclas tyvars fixity context
                     <+> pprFundeps (map unLoc fds)
@@ -888,7 +888,7 @@ pprConDecl (ConDeclH98 { con_name = L _ con
                        , con_modifiers = mods
                        , con_doc = doc })
   = pprMaybeWithDoc doc $
-    sep [ pprHsModifiers mods
+    sep [ pprLHsModifiers mods
         , pprHsForAll (mkHsForAllInvisTele noAnn ex_tvs) mcxt
         , ppr_details args ]
   where
@@ -907,7 +907,7 @@ pprConDecl (ConDeclGADT { con_names = cons
                         , con_inner_bndrs = inner_bndrs
                         , con_mb_cxt = mcxt, con_g_args = args
                         , con_res_ty = res_ty, con_modifiers = mods, con_doc = doc })
-  = pprMaybeWithDoc doc $ pprHsModifiers mods <+> ppr_con_names (toList cons) <+> dcolon
+  = pprMaybeWithDoc doc $ pprLHsModifiers mods <+> ppr_con_names (toList cons) <+> dcolon
     <+> (sep [pprHsOuterSigTyVarBndrs outer_bndrs
                 <+> hsep (map pprHsForAllTelescope inner_bndrs)
                 <+> pprLHsContext mcxt,
@@ -1061,7 +1061,7 @@ instance OutputableBndrId p
                map (pprDataFamInstDecl NotTopLevel . unLoc) adts ++
                pprLHsBindsForUser binds sigs ]
       where
-        top_matter = pprHsModifiers mods
+        top_matter = pprLHsModifiers mods
                   $$ text "instance" <+> maybe empty ppr (cidDeprecation cid)
                                      <+> ppOverlapPragma mbOverlap
                                      <+> ppr inst_ty
@@ -1243,7 +1243,7 @@ type instance XXDefaultDecl    (GhcPass _) = DataConCantHappen
 instance OutputableBndrId p
        => Outputable (DefaultDecl (GhcPass p)) where
     ppr (DefaultDecl _ mods cl tys)
-      = pprHsModifiers mods
+      = pprLHsModifiers mods
       $$ text "default" <+> maybe id ((<+>) . ppr) cl (parens (interpp'SP tys))
 
 {-
@@ -1276,11 +1276,11 @@ type instance XXForeignExport  (GhcPass _) = DataConCantHappen
 instance OutputableBndrId p
        => Outputable (ForeignDecl (GhcPass p)) where
   ppr (ForeignImport { fd_name = n, fd_sig_ty = ty, fd_fi = fimport, fd_modifiers = mods })
-    = pprHsModifiers mods $$
+    = pprLHsModifiers mods $$
       hang (text "foreign import" <+> ppr fimport <+> ppr n)
          2 (dcolon <+> ppr ty)
   ppr (ForeignExport { fd_name = n, fd_sig_ty = ty, fd_fe = fexport, fd_modifiers = mods }) =
-    pprHsModifiers mods $$
+    pprLHsModifiers mods $$
     hang (text "foreign export" <+> ppr fexport <+> ppr n)
        2 (dcolon <+> ppr ty)
 

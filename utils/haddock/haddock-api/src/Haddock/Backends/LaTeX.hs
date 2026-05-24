@@ -1385,11 +1385,11 @@ ppr_tylit _               _ = error "ppr_tylit: unsupported lit"
 -- XXX: Ok in verbatim, but not otherwise
 -- XXX: Do something with Unicode parameter?
 
-ppr_modifiers :: [HsModifier DocNameI] -> Bool -> LaTeX
+ppr_modifiers :: [LHsModifier DocNameI] -> Bool -> LaTeX
 ppr_modifiers mods unicode = foldr ((<+>) . ppr_modifier) empty mods
   where
-    ppr_modifier (HsModifier ModifierPrintsAs1 _) = multAnnotation <> char '1'
-    ppr_modifier (HsModifier ModifierPrintsAsSelf ty) =
+    ppr_modifier (L _ (HsModifier ModifierPrintsAs1 _)) = multAnnotation <> char '1'
+    ppr_modifier (L _ (HsModifier ModifierPrintsAsSelf ty)) =
       multAnnotation <> ppr_mono_lty ty unicode
 
 -------------------------------------------------------------------------------

@@ -30,7 +30,7 @@ module Language.Haskell.Syntax.Type (
         HsTyPat(..), LHsTyPat,
         HsTupleSort(..),
         HsContext, LHsContext,
-        HsModifierOf(..), HsModifier, XModifier,
+        HsModifierOf(..), LHsModifierOf,  HsModifier, LHsModifier, XModifier,
         HsLit(..),
         HsIPName(..), hsIPNameFS,
         HsArg(..), XValArg, XTypeArg, XArgPar, XXArg,
@@ -272,11 +272,16 @@ type LHsContext pass = XRec pass (HsContext pass)
 -- | Haskell Context
 type HsContext pass = [LHsType pass]
 
+
+-- | Located Modifier
+type LHsModifierOf ty pass = XRec pass (HsModifierOf ty pass)
+
 -- | Modifier. Usually a modifier holds an 'LHsType', but inside expressions, it
 -- has an 'LHsExpr'. See Note [Overview of Modifiers].
 data HsModifierOf ty pass = HsModifier !(XModifier pass) ty
 type family XModifier pass
 
+type LHsModifier pass = XRec pass (HsModifier pass)
 type HsModifier pass = HsModifierOf (LHsType (NoGhcTc pass)) pass
 
 {-
@@ -977,7 +982,7 @@ type HsModifiedFunArr pass = HsModifiedFunArrOf (LHsType (NoGhcTc pass)) pass
 data HsModifiedFunArrOf mult pass
   = HsModifiedFunArr
       !(XHsModifiedFunArr mult pass) -- ^ extension field
-      [HsModifierOf mult pass] -- ^ attached modifiers
+      [LHsModifierOf mult pass] -- ^ attached modifiers
       (HsFunArr pass) -- ^ the actual arrow
 
 type family XHsModifiedFunArr mult p

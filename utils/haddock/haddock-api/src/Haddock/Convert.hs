@@ -1098,15 +1098,15 @@ synifyMultArrow boundTvs t = HsModifiedFunArr noExtField mods (HsStandardArr noE
   mods = case t of
     ManyTy -> []
     -- We turn OneTy into `%1 ->`, not into `⊸` or `%One ->`.
-    OneTy -> [HsModifier ModifierPrintsAs1 $ synifyType WithinType boundTvs t]
-    _ -> [HsModifier ModifierPrintsAsSelf $ synifyType WithinType boundTvs t]
+    OneTy -> [noLocA $ HsModifier ModifierPrintsAs1 $ synifyType WithinType boundTvs t]
+    _ -> [noLocA $ HsModifier ModifierPrintsAsSelf $ synifyType WithinType boundTvs t]
 
 synifyMultRec :: TyVarSet -> Mult -> HsModifiedFunArr GhcRn
 synifyMultRec boundTvs t = HsModifiedFunArr noExtField mods (HsStandardArr noExtField)
  where
   mods = case t of
     OneTy -> []
-    ty -> [HsModifier ModifierPrintsAsSelf $ synifyType WithinType boundTvs ty]
+    ty -> [noLocA $ HsModifier ModifierPrintsAsSelf $ synifyType WithinType boundTvs ty]
 
 synifyPatSynType :: PatSyn -> LHsType GhcRn
 synifyPatSynType ps =
