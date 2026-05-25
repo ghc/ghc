@@ -169,7 +169,7 @@ Both these tasks are done in zapSubstEnv.
 
 Currently, `seInlineDepth` is entirely unused! (It was previously used to avoid
 repeatedly optimising coercions.)  But it's cheap to maintain and might prove
-useful, so I have no removed it.
+useful, so I have not removed it.
 -}
 
 data SimplEnv

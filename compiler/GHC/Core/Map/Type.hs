@@ -137,8 +137,8 @@ instance Eq (DeBruijn Coercion) where
 
 eqDeBruijnCoercion :: DeBruijn Coercion -> DeBruijn Coercion -> Bool
 eqDeBruijnCoercion (D env1 co1) (D env2 co2)
-  = eqDeBruijnType (D env1 (coercionType co1)) (D env2 (coercionType co2))
-
+  =  eqDeBruijnType (D env1 (coercionLKind co1)) (D env2 (coercionLKind co2))
+  && eqDeBruijnType (D env1 (coercionRKind co1)) (D env2 (coercionRKind co2))
 
 {-
 ************************************************************************

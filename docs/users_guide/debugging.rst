@@ -270,7 +270,8 @@ subexpression elimination pass.
         shorter
     :type: dynamic
 
-    Affects both :ghc-flag:`-fopt-coercion` and :ghc-flag:`-fopt-refl-coercion`.
+    Affects :ghc-flag:`-fopt-coercion`, :ghc-flag:`-fopt-reflco-simpleopt`,
+    and :ghc-flag:`-fopt-reflco-simplifier`.
     Adds compile-time checks that these coercion optimisers don't change types;
     and adds a trace message if they succeeds in shrinking (or expanding) the
     coercion.  If you add :ghc-flag:`-dppr-debug` you can see the shrunk/expanded

@@ -1431,7 +1431,8 @@ simplCoercionF env co cont
 
 simplCoercion :: SimplEnv -> InCoercion -> SimplM OutCoercion
 simplCoercion env co
-  = do { let out_co | sm_opt_refl_co mode
+  = do { -- See Note [Avoid re-optimising coercions]
+         let out_co | sm_opt_refl_co mode
                     = if isEmptyTCvSubst subst
                       then co
                       else optCoRefl chk_opts subst co
@@ -1447,44 +1448,22 @@ simplCoercion env co
     subst    = getTCvSubst env
 
 
-{-    Old code where we did some coercion optimisation
-
-  = seqCo opt_co `seq` return opt_co
-  where
-    -- See Note [Optimising coercions]
-    -- NB: substCo has a short-cut when both type and coercion substs are empty
-    opt_co | subst_only  = Coercion.substCo subst co
-           | otherwise   = optCoercion opts subst co
-
-    subst = getTCvSubst env
-    opts  = seOptCoercionOpts env
-    subst_only = isEmptyTvSubst subst || reSimplifying env
-
-Note [Optimising coercions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Avoid re-optimising coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Some programs have very big coercions and we'd like to avoid repeatedly
-re-optimising them:
+/re-optimising/ them:
 
-* If the type-substitution is empty (common when no further transformations
-  are taking place) then there is generally no point in re-optimising.
-  If there is a type substitution, however, Refls may appear.
-  Example where this isEmptyTCvSubst test really helped: T5030.
+If the type-substitution is empty (common when no further transformations
+are taking place) then there is generally no point in re-optimising.
+If there is a type substitution, however, Refls may appear.
+Example where this isEmptyTCvSubst test really helped: T5030.
 
-  Actually, if this is a "freshly-made" coercion (one built in the previous
-  iteration of the Simplifier, or a previous pass) then perhaps optimisations
-  /could/ occur; but we check for reflexivity in `rebuild_go`, and that's the
-  big win. Otherwise having a bigger-than necessary coercion is no so bad.
+Actually, if this is a "freshly-made" coercion (one built in the previous
+iteration of the Simplifier, or a previous pass) then perhaps optimisations
+/could/ occur; but we check for reflexivity in `rebuild_go`, and that's the
+big win. Otherwise having a bigger-than necessary coercion is no so bad.
 
-  And right at the start, we might have a big coercion coming out of the typechecker, and
-  we should have a go at running the coercion optimiser on it, even if there is no type
-  substitution. We rely on doing this in the simple optimiser.
-
-* If (reSimplifying env) is True, we are in the body of an inlined function
-  so we (conservatively) and we don't want to simplify again; doing so repeatedly
-  risks non-linear behaviour.  See Note [Inline depth] in GHC.Core.Opt.Simplify.Env.
-
-  But if the inlining did a type substitution maybe we should re-optimise?
-
+See also Note [Coercion optimisation] in GHC.Core.Corecion.Opt.
 -}
 
 -----------------------------------

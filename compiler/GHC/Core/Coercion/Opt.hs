@@ -49,13 +49,45 @@ of the coercions that the compiler carries around -- they are just proofs,
 and serve no runtime need. So the purpose of coercion optimisation is simply
 to shrink coercions and thereby reduce compile time and .hi file sizes.
 
-See the paper
-   Evidence normalization in Systtem FV (RTA'13)
-   https://simon.peytonjones.org/evidence-normalization/
-The paper is also in the GHC repo, in docs/opt-coercion.
-
 However, although powerful and occasionally very effective, coercion
-optimisation can itself be very expensive (#26679).  So we apply it sparingly:
+optimisation can itself be very expensive (#26679).  So we apply it sparingly.
+
+We have two coercion optimisiers, both defined in this module:
+
+* The Big Hammer: `optCoProgram`, applies all the tricks in the paper
+     Evidence normalization in Systtem FV (RTA'13)
+     https://simon.peytonjones.org/evidence-normalization/
+  The paper is also in the GHC repo, in docs/opt-coercion.
+
+  It can be pretty expensive.
+
+  The Big Hammer is run as a separate Core-to-Core pass, when `-fopt-coercion` is on.
+
+  This Core-to-Core pass runs right after the first (gentle) run of the
+  Simplifier (see GHC.Core.Opt.Pipeline.getCoreToDo).  Why after the Simplifier
+  not before?  There are some test programs (e.g. T5030, T13386) where running
+  the Simplifier collapses a lot of coercions, so avoiding the need to optimise
+  them at all.
+
+  Currently `-fopt-coercion` is switchfed on only by -O2 (see
+  `GHC.Driver.DynFlags.optLevelFlags`), but I did not do a lot of
+  experimentation around this decision.
+
+* The Little Hammer: `optCoRefl`, is supposed to be a lot cheaper. It eliminates
+  reflexive chains in (co1; co2; ...; con), and it also applies the current
+  substitution.
+
+  It works on individual expressions, and is called by
+  * The simple optimiser (if `-fopt-reflco-simpleopt`  is on)
+  * The main Simplifier  (if `-fopt-reflco-simplifier` is on)
+
+  Currently `-fopt-reflco-simpleopt` is always OFF, to avoid walking over big
+  coercions that will be collapsed after some inlining by the Simplifier
+  (e.g. T5030).
+
+  Currently `-fopt-reflco-simplifier` is always ON
+
+In addition we check for reflexivity in a few places.
 
 * In the Simplifier, function `rebuild_go`, we use `isReflexiveCo` (which
   computes the type of the coercion) to eliminate reflexive coercions, just
@@ -64,16 +96,13 @@ optimisation can itself be very expensive (#26679).  So we apply it sparingly:
   (More precisely, we use `isReflexiveCoIgnoringMultiplicity;
    c.f. GHC.Core.Coercion.Opt.opt_univ.)
 
-* We have a whole pass, `optCoProgram` that runs the coercion optimiser on all
-  the coercions in the program.
+* Similarly in GHC.Core.SimpleOpt.mk_cast.
 
-  - We run it once in all optimisation levels
-    (see GHC.Driver.DynFlags.optLevelFlags)
-
-  - We run it early in the optimisation pipeline
-    (see GHC.Core.Opt.Pipeline.getCoreToDo).
-    Controlled by a flag `-fopt-coercion`, on by default
-
+Finally, there is a debug flag `-dcheck-opt-co` (off by default), that
+* Adds a consistency check to both coercion optimisers, checking that they
+  don't change the type of the coercion
+* Spits out a trace if the optimiser makes the coercion lot bigger or smaller.
+  (Add `-dppr-debug` to see the coercions themselves.)
 
 Note [Optimising coercion optimisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -192,14 +221,9 @@ We use the following invariants:
 
 {- **********************************************************************
 %*                                                                      *
-                    optCoercionPgm
+                    optCoProgram
 %*                                                                      *
 %********************************************************************* -}
-
-optTransCo :: HasDebugCallStack => InScopeSet
-           -> NormalCo -> NormalCo -> NormalCo
-optTransCo in_scope co1 co2
-  = opt_trans in_scope co1 co2
 
 optCoProgram :: Bool   -- True <=> do extra checks/tracking
              -> CoreProgram -> CoreProgram
@@ -218,6 +242,7 @@ optCoProgram do_checks binds
        -- forward references.  See Note [Glomming] in GHC.Core.Opt.OccurAnal
 
 optCoExpr :: (Bool, InScopeSet) -> CoreExpr -> CoreExpr
+-- Side note: use a tuple to reduce clutter; but strict to make sure it's unboxed
 optCoExpr !_ e@(Var {})    = e
 optCoExpr _  e@(Lit {})    = e
 optCoExpr _  e@(Type {})   = e
@@ -247,9 +272,15 @@ optCo :: (Bool, InScopeSet) -> Coercion -> Coercion
 optCo (do_checks, is) co = optCoercionChecking do_checks (mkEmptySubst is) co
 
 
+optTransCo :: HasDebugCallStack => InScopeSet
+           -> NormalCo -> NormalCo -> NormalCo
+-- An entry point to use when the simplifier builds a TransCo
+optTransCo in_scope co1 co2
+  = opt_trans in_scope co1 co2
+
 {- **********************************************************************
 %*                                                                      *
-                    optCoercionRefls
+                    optCoRefl
 %*                                                                      *
 %********************************************************************* -}
 
@@ -274,7 +305,7 @@ optCoRefl :: Bool -> Subst -> Coercion -> Coercion
 optCoRefl check_stuff subst in_co
   | not check_stuff
   = opt_co_refl subst in_co
-  | otherwise  -- Do expensive checks
+  | otherwise  -- Do expensive sanity checks
   = let out_co = opt_co_refl subst in_co
         (Pair in_l in_r) = coercionKind in_co
         (Pair out_l out_r) = coercionKind out_co
@@ -322,14 +353,10 @@ opt_co_refl subst co
 
     go_s cos = map go cos
 
-    -- See Note [Substituting in a coercion hole]
-    go_hole h@(CH { ch_co_var = cv })
-      = h { ch_co_var = updateVarType go_ty cv }
-
-    go (Refl ty)                     = Refl $!! substTy subst ty
+    go (Refl ty)                     = Refl $!! go_ty ty
     go (GRefl r ty mco)              = GRefl r $!! go_ty ty $!! go_m mco
     go (CoVarCo cv)                  = substCoVar subst cv
-    go (HoleCo h)                    = HoleCo    $!! go_hole h
+    go (HoleCo h)                    = pprPanic "HoleCo in optCoRefl" (ppr h)
     go (SymCo co)                    = mkSymCo   $!! go co
     go (KindCo co)                   = mkKindCo  $!! go co
     go (SubCo co)                    = mkSubCo   $!! go co
@@ -365,12 +392,15 @@ opt_co_refl subst co
          role = coercionRole out_co1
 
     get_in :: InCoercion -> [OutCoercion] -> [OutCoercion]
+    -- Postcondition: The output list is non-empty and contains no (top-level) TransCos
     get_in (TransCo co1 co2)         cos = get_in co1 (get_in co2 cos)
     get_in (SymCo (TransCo co1 co2)) cos = get_in (mkSymCo co2) (get_in (mkSymCo co1) cos)
     get_in co                        cos = get_out (go co) cos
 
     get_out :: OutCoercion -> [OutCoercion] -> [OutCoercion]
-    -- Maybe `go` returned an OutCoercion that is a `TransCo`
+    -- Postcondition: the output list is non-empty and contains no (top-level) TransCos
+    -- We need `get_out` in case `go` returned an OutCoercion that is a `TransCo`;
+    --    see the call in `get_in`.
     get_out (TransCo co1 co2)         cos = get_out co1 (get_out co2 cos)
     get_out (SymCo (TransCo co1 co2)) cos = get_out (mkSymCo co2) (get_out (mkSymCo co1) cos)
     get_out co                        cos = co : cos
@@ -387,6 +417,7 @@ opt_co_refl subst co
                  rk1 = coercionRKind co1
                  gs' = GS (co0 `mkTransCo` co1) (insertTM rk1 gs' tm)
 
+-- See Note [Optimising TransCo sequences]
 data GobbleState = GS OutCoercion !(TypeMap GobbleState)
 
 {- Note [Optimising TransCo sequences]
@@ -672,7 +703,7 @@ opt_co4' env sym rep r (CoVarCo cv)
           -- cv1 might have a substituted kind!
 
 opt_co4' _ _ _ _ (HoleCo h)
-  = pprPanic "opt_univ fell into a hole" (ppr h)
+  = pprPanic "HoleCo in the coercion optimiser" (ppr h)
 
 opt_co4' env sym rep r (AxiomCo con cos)
     -- Do *not* push sym inside top-level axioms

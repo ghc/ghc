@@ -1295,9 +1295,11 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_DoCleverArgEtaExpansion) -- See Note [Eta expansion of arguments in CorePrep]
     , ([0,1,2], Opt_DoEtaReduction)          -- See Note [Eta-reduction in -O0]
     , ([0,1,2], Opt_ProfManualCcs )
-    , ([0,1,2], Opt_OptReflCoercion )    -- See Note [Coercion optimisation] in GHC.Core.Coercion.Opt
-    , ([2], Opt_OptCoercion )    -- See Note [Coercion optimisation] in GHC.Core.Coercion.Opt
-    , ([2], Opt_DictsStrict)
+
+    , ([],      Opt_OptReflCoSimpleOpt )     -- See Note [Coercion optimisation]
+    , ([0,1,2], Opt_OptReflCoSimplifier )    --      in GHC.Core.Coercion.Opt
+    , ([2],     Opt_OptCoercion )
+
 
     , ([0],     Opt_IgnoreInterfacePragmas)
     , ([0],     Opt_OmitInterfacePragmas)
@@ -1340,6 +1342,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_SolveConstantDicts)
     , ([1,2],   Opt_NumConstantFolding)
 
+    , ([2],     Opt_DictsStrict)
     , ([2],     Opt_LiberateCase)
     , ([2],     Opt_SpecConstr)
     , ([2],     Opt_FastPAPCalls)

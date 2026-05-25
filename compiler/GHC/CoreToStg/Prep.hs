@@ -2220,7 +2220,7 @@ decideFloatInfo FIA{fia_levity=lev, fia_demand=dmd, fia_is_hnf=is_hnf,
                     fia_is_triv=is_triv, fia_is_string=is_string, fia_is_coercion = is_coercion,
                     fia_is_dc_worker=is_dc_worker, fia_ok_for_spec=ok_for_spec}
   -- NB: this function should line up with exprIsTopLevelBindable
-  -- ToDo: explain a bit more
+  --     It should only return TopLvlFloatable for exprIsTopLevelBindable RHSs
   | Lifted <- lev, is_hnf, not is_triv = (LetBound, TopLvlFloatable)
       -- is_lifted: We currently don't allow unlifted values at the
       --            top-level or inside letrecs

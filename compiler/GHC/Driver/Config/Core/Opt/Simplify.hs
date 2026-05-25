@@ -72,7 +72,7 @@ initSimplMode dflags phase name = SimplMode
   , sm_rule_opts    = initRuleOpts dflags
   , sm_case_folding = gopt Opt_CaseFolding dflags
   , sm_case_merge   = gopt Opt_CaseMerge dflags
-  , sm_opt_refl_co  = gopt Opt_OptReflCoercion dflags
+  , sm_opt_refl_co  = gopt Opt_OptReflCoSimplifier dflags
   , sm_check_opt_co = dopt Opt_D_opt_co dflags
   }
 

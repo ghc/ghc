@@ -645,7 +645,10 @@ data GeneralFlag
    | Opt_InlineGenericsAggressively
    | Opt_StaticArgumentTransformation
    | Opt_OptCoercion            -- Run the big-hammer coercion optimiser `optCoercion`
-   | Opt_OptReflCoercion        -- Use the cheap "refl" coercion optimiser `optCoRefl`
+   | Opt_OptReflCoSimpleOpt     -- Run the cheap "refl" coercion optimiser `optCoRefl`
+                                --     in the simple optimiser
+   | Opt_OptReflCoSimplifier    -- Run the cheap "refl" coercion optimiser `optCoRefl`
+                                --     in the main Simplifier
    | Opt_CSE
    | Opt_StgCSE
    | Opt_StgLiftLams
@@ -917,7 +920,8 @@ optimisationFlags = EnumSet.fromList
    , Opt_StaticArgumentTransformation
    , Opt_PolymorphicSpecialisation
    , Opt_OptCoercion
-   , Opt_OptReflCoercion
+   , Opt_OptReflCoSimpleOpt
+   , Opt_OptReflCoSimplifier
    , Opt_CSE
    , Opt_StgCSE
    , Opt_StgLiftLams

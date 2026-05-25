@@ -568,7 +568,8 @@ add_cast env co1 as
 --        | ty2 `eqTypeIgnoringMultiplicity` coercionLKind opt_co1
 --                    -> rest
 -- ToDo: do we want to call optTransCo here?
-        | otherwise -> CastIt (optTransCo in_scope opt_co1 co2) tyR : rest
+--        | otherwise -> CastIt (optTransCo in_scope opt_co1 co2) tyR : rest
+        | otherwise -> CastIt (mkTransCo opt_co1 co2) tyR : rest
       _             -> CastIt opt_co1 tyR : as
   where
     in_scope = soeInScope env
