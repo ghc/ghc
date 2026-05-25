@@ -25,13 +25,13 @@ module GHC.Core.Opt.Simplify.Utils (
         StaticEnv(..),
         isSimplified, contIsStop,
         contIsDupable, contResultType, contHoleType, contHoleScaling,
-        contIsTrivial, contArgs, contIsRhs,
+        contIsTrivial, contArgs, contIsRhs, mkBottomCont,
         hasArgs, countArgs, contOutArgs, dropContArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
         interestingCallContext,
 
         -- ArgInfo
-        ArgInfo(..), ArgSpec(..), mkArgInfo,
+        ArgInfo(..), ArgSpec(..), RemainingArgDmds, mkArgInfo,
         addValArgTo, addTyArgTo,
         argInfoExpr, argSpecArg,
         pushOutArgs, pushArgSpecs,
@@ -54,8 +54,10 @@ import GHC.Core.Opt.Stats ( Tick(..) )
 import qualified GHC.Core.Subst
 import GHC.Core.Ppr
 import GHC.Core.TyCo.Ppr ( pprParendType )
+import GHC.Core.TyCo.Compare ( eqTypeIgnoringMultiplicity )
 import GHC.Core.FVs
 import GHC.Core.Utils
+import GHC.Core.Make( mkWildValBinder )
 import GHC.Core.Opt.Arity
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
@@ -75,6 +77,8 @@ import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.Name.Env
 
+import GHC.Data.List.Infinite ( Infinite(..) )
+import qualified GHC.Data.List.Infinite as Inf
 import GHC.Data.OrdList ( isNilOL )
 import GHC.Data.FastString ( fsLit )
 
@@ -205,10 +209,10 @@ data SimplCont
 
   | StrictArg           -- (StrictArg (f e1 ..en) K)[e] = K[ f e1 .. en e ]
       { sc_dup :: DupFlag
-      , sc_fun  :: ArgInfo     -- Specifies f, e1..en, Whether f has rules, etc
+      , sc_fun  :: ArgInfo     -- Specifies f, e1..en, whether f has rules, etc
                                --     plus demands and discount flags for *this* arg
                                --          and further args
-                               --     So ai_dmds and ai_discs are never empty
+                               --     Invariant: ai_dmds and ai_discs are never empty
       , sc_fun_ty :: OutType   -- Type of the function (f e1 .. en),
                                -- presumably (arg_ty -> res_ty)
                                -- where res_ty is expected by sc_cont
@@ -348,32 +352,41 @@ doesn't matter because we'll never compute them all.
 
 data ArgInfo
   = ArgInfo {
-        ai_fun   :: OutId,      -- The function
-        ai_args  :: [ArgSpec],  -- ...applied to these args (which are in *reverse* order)
+        ai_fun   :: OutId,      -- ^ The function
+        ai_args  :: [ArgSpec],  -- ^ ...applied to these args (which are in *reverse* order)
                                 -- NB: all these argumennts are already simplified
 
-        ai_rules :: [CoreRule], -- Rules for this function
-        ai_encl  :: Bool,       -- Flag saying whether this function
-                                -- or an enclosing one has rules (recursively)
-                                --      True => be keener to inline in all args
+        ai_rules :: [CoreRule], -- ^ Rules for this function
+        ai_encl  :: Bool,
+          -- ^ Flag saying whether this function or an enclosing one has rules
+          -- (recursively)
+          --
+          -- @True@ means: be keener to inline in all args
 
-        ai_dmds :: [Demand],    -- Demands on remaining value arguments (beyond ai_args)
-                                --   Usually infinite, but if it is finite it guarantees
-                                --   that the function diverges after being given
-                                --   that number of args
+        ai_dmds :: RemainingArgDmds,
+          -- ^ Demands on remaining value arguments (beyond 'ai_args')
 
-        ai_discs :: [Int]       -- Discounts for remaining value arguments (beyond ai_args)
-                                --   non-zero => be keener to inline
-                                --   Always infinite
+        ai_discs :: Infinite Int
+          -- ^ Discounts for remaining value arguments (beyond 'ai_args')
+          --
+          -- A non-zero value means: be keener to inline
     }
 
-data ArgSpec
-  = ValArg { as_dmd  :: Demand        -- Demand placed on this argument
-           , as_arg  :: OutExpr       -- Apply to this (coercion or value); c.f. ApplyToVal
-           , as_hole_ty :: OutType }  -- Type of the function (presumably t1 -> t2)
+-- | 'RemainingArgDmds' gives the demands on any remaining value arguments.
+--
+-- It is usually infinite (with 'topDmd's in the tail), but if it is finite it
+-- guarantees that the function diverges after being applied to that number
+-- of arguments.
+type RemainingArgDmds = [Demand]
 
-  | TyArg { as_arg_ty  :: OutType     -- Apply to this type; c.f. ApplyToTy
-          , as_hole_ty :: OutType }   -- Type of the function (presumably forall a. blah)
+data ArgSpec
+  -- | A value argument
+  = ValArg { as_dmd  :: Demand        -- ^ Demand placed on this argument
+           , as_arg  :: OutExpr       -- ^ Apply to this (coercion or value); c.f. 'ApplyToVal'
+           , as_hole_ty :: OutType }  -- ^ Type of the function (presumably @t1 -> t2@ for 'ValArg' or @forall a. blah@ for 'TyArg')
+  -- | A type argument
+  | TyArg { as_arg_ty  :: OutType     -- ^ Apply to this type; c.f. 'ApplyToTy'
+          , as_hole_ty :: OutType }   -- ^ Type of the function (presumably @t1 -> t2@ for 'ValArg' or @forall a. blah@ for 'TyArg')
 
 instance Outputable ArgInfo where
   ppr (ArgInfo { ai_fun = fun, ai_args = args, ai_dmds = dmds, ai_rules = rules })
@@ -389,7 +402,7 @@ instance Outputable ArgSpec where
 
 addValArgTo :: ArgInfo ->  OutExpr -> OutType -> ArgInfo
 addValArgTo ai arg hole_ty
-  | ArgInfo { ai_dmds = dmd:dmds, ai_discs = _:discs } <- ai
+  | ArgInfo { ai_dmds = dmd:dmds, ai_discs = Inf _ discs } <- ai
       -- Pop the top demand and and discounts off
   , let arg_spec = ValArg { as_arg = arg, as_hole_ty = hole_ty, as_dmd = dmd }
   = ai { ai_args    = arg_spec : ai_args ai
@@ -492,12 +505,23 @@ contIsDupable (TickIt _ k)                 = contIsDupable k
 contIsTrivial :: SimplCont -> Bool
 contIsTrivial (Stop {})                                         = True
 contIsTrivial (ApplyToTy { sc_cont = k })                       = contIsTrivial k
--- This one doesn't look right.  A value application is not trivial
--- contIsTrivial (ApplyToVal { sc_arg = Coercion _, sc_cont = k }) = contIsTrivial k
 contIsTrivial (CastIt { sc_cont = k })                          = contIsTrivial k
 contIsTrivial _                                                 = False
 
 -------------------
+contStop :: SimplCont -> SimplCont
+-- ^ Get the 'Stop' at the tail of the continuation
+--
+-- Always returns a continuation of form @(Stop ...)@.
+contStop stop@(Stop {})               = stop
+contStop (CastIt { sc_cont = k })     = contStop k
+contStop (StrictBind { sc_cont = k }) = contStop k
+contStop (StrictArg { sc_cont = k })  = contStop k
+contStop (Select { sc_cont = k })     = contStop k
+contStop (ApplyToTy  { sc_cont = k }) = contStop k
+contStop (ApplyToVal { sc_cont = k }) = contStop k
+contStop (TickIt _ k)                 = contStop k
+
 contResultType :: SimplCont -> OutType
 contResultType (Stop ty _ _)                = ty
 contResultType (CastIt { sc_cont = k })     = contResultType k
@@ -652,6 +676,35 @@ contEvalContext bndrs cont = go cont
     -- and case binder dmds, see addCaseBndrDmd. No priority right now.
 
 -------------------
+mkBottomCont ::SimplCont -> SimplCont
+-- ^ Given a continuation `cont`, return a `cont` /of the same type/,
+-- looking like @(case \<hole\> of {})@.
+--
+-- This is used when we are going to fill in the @<hole>@ with bottom.
+-- See (TC2,3) in Note [Trimming the continuation for bottoming functions]
+--
+-- Don't bother to trim, making a @case <hole> of {}@, if we have only
+-- an essentially-trivial continuation; e.g. @(<hole> \@ty |> co)@.
+mkBottomCont cont = go cont
+  where
+    go k@(Stop {})                    = k
+    go (TickIt t k')                  = TickIt t (go k')
+    go k@(CastIt    { sc_cont = k' }) = k { sc_cont = go k' }
+    go k@(ApplyToTy { sc_cont = k' }) = k { sc_cont = go k' }
+    go k@(Select { sc_alts = [], sc_cont = Stop {} }) = k  -- Optimisation only
+    go k | Stop res_ty _ _ <- stop_cont
+         , hole_ty `eqTypeIgnoringMultiplicity` res_ty
+         = stop_cont
+         | otherwise
+         = Select { sc_alts = []
+                  , sc_bndr = mkWildValBinder OneTy hole_ty
+                  , sc_env  = Simplified OkDup
+                  , sc_cont = stop_cont }
+         where
+           hole_ty   = contHoleType k
+           stop_cont = contStop k
+
+-------------------
 mkArgInfo :: SimplEnv -> Id -> [CoreRule] -> SimplCont -> ArgInfo
 mkArgInfo env fun rules_for_fun cont
   | n_val_args < idArity fun            -- Note [Unsaturated functions]
@@ -672,16 +725,17 @@ mkArgInfo env fun rules_for_fun cont
 
     fun_has_rules = not (null rules_for_fun)
 
-    vanilla_discounts, arg_discounts :: [Int]
-    vanilla_discounts = repeat 0
+    vanilla_discounts, arg_discounts :: Infinite Int
+    vanilla_discounts = Inf.repeat 0
     arg_discounts = case idUnfolding fun of
                         CoreUnfolding {uf_guidance = UnfIfGoodArgs {ug_args = discounts}}
-                              -> discounts ++ vanilla_discounts
+                              -> discounts Inf.++ vanilla_discounts
                         _     -> vanilla_discounts
 
-    vanilla_dmds, arg_dmds :: [Demand]
+    vanilla_dmds :: RemainingArgDmds
     vanilla_dmds  = repeat topDmd
 
+    arg_dmds :: RemainingArgDmds
     arg_dmds
       | not (seInline env)
       = vanilla_dmds -- See Note [Do not expose strictness if sm_inline=False]
@@ -689,26 +743,22 @@ mkArgInfo env fun rules_for_fun cont
       = -- add_type_str fun_ty $
         case splitDmdSig (idDmdSig fun) of
           (demands, result_info)
-                | not (demands `lengthExceeds` n_val_args)
-                ->      -- Enough args, use the strictness given.
-                        -- For bottoming functions we used to pretend that the arg
-                        -- is lazy, so that we don't treat the arg as an
-                        -- interesting context.  This avoids substituting
-                        -- top-level bindings for (say) strings into
-                        -- calls to error.  But now we are more careful about
-                        -- inlining lone variables, so its ok
-                        -- (see GHC.Core.Op.Simplify.Utils.analyseCont)
-                   if isDeadEndDiv result_info then
-                        demands  -- Finite => result is bottom
-                   else
-                        demands ++ vanilla_dmds
+               | not (demands `lengthExceeds` n_val_args)
+               -> remaining_dmds     -- Enough args, use the strictness given.
                | otherwise
                -> warnPprTrace True "More demands than arity" (ppr fun <+> ppr (idArity fun)
                                 <+> ppr n_val_args <+> ppr demands) $
                   vanilla_dmds      -- Not enough args, or no strictness
 
-    add_type_strictness :: Type -> [Demand] -> [Demand]
-    -- If the function arg types are strict, record that in the 'strictness bits'
+                where
+                  remaining_dmds :: RemainingArgDmds
+                  -- isDeadEndDiv: if remaining_dmds is finite, result is bottom
+                  -- See (TC1) in Note [Trimming the continuation for bottoming functions]
+                  remaining_dmds | isDeadEndDiv result_info = demands
+                                 | otherwise                = demands ++ vanilla_dmds
+
+    add_type_strictness :: Type -> RemainingArgDmds -> RemainingArgDmds
+    -- If the function arg /types/ are strict, record that in the RemainingArgDmds
     -- No need to instantiate because unboxed types (which dominate the strict
     --   types) can't instantiate type variables.
     -- add_type_strictness is done repeatedly (for each call);
@@ -915,16 +965,16 @@ the incentive to disappear when we inline `f`!
 lazyArgContext :: ArgInfo -> CallCtxt
 -- Use this for lazy arguments
 lazyArgContext (ArgInfo { ai_encl = encl_rules, ai_discs = discs })
-  | encl_rules                = RuleArgCtxt
-  | disc:_ <- discs, disc > 0 = DiscArgCtxt  -- Be keener here
-  | otherwise                 = BoringCtxt   -- Nothing interesting
+  | encl_rules                    = RuleArgCtxt
+  | Inf disc _ <- discs, disc > 0 = DiscArgCtxt  -- Be keener here
+  | otherwise                     = BoringCtxt   -- Nothing interesting
 
 strictArgContext :: ArgInfo -> CallCtxt
 strictArgContext (ArgInfo { ai_encl = encl_rules, ai_discs = discs })
 -- Use this for strict arguments
-  | encl_rules                = RuleArgCtxt
-  | disc:_ <- discs, disc > 0 = DiscArgCtxt  -- Be keener here
-  | otherwise                 = RhsCtxt NonRecursive
+  | encl_rules                    = RuleArgCtxt
+  | Inf disc _ <- discs, disc > 0 = DiscArgCtxt  -- Be keener here
+  | otherwise                     = RhsCtxt NonRecursive
       -- Why RhsCtxt?  if we see f (g x), and f is strict, we
       -- want to be a bit more eager to inline g, because it may
       -- expose an eval (on x perhaps) that can be eliminated or

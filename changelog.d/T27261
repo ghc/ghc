@@ -1,0 +1,10 @@
+section: compiler
+issues: #27261
+mrs: !16084
+synopsis:
+  Avoid a crash in ``mkDupableContWithDmds`` when given empty demands
+description:
+  The case of an empty list of remaining argument demands is now explicitly
+  handled by trimming the simplifier continuation, to avoid a compiler crash
+  of the form ``Non-exhaustive patterns in dmd : cont_dmds`` or ``expectNonEmpty``
+  in ``mkDupableContWithDmds``.
