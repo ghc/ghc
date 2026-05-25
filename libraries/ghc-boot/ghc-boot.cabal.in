@@ -51,6 +51,7 @@ Library
 
     exposed-modules:
             GHC.BaseDir
+            GHC.Data.ShortByteString
             GHC.Data.ShortText
             GHC.Data.SizedSeq
             GHC.Data.SmallArray

@@ -9,9 +9,9 @@ import Prelude -- See note [Why do we import Prelude here?]
 
 import Control.Exception
 import Data.ByteString.Short (ShortByteString)
-import qualified Data.ByteString.Short as SBS
 import Data.Word
 import Foreign
+import GHC.Data.ShortByteString
 import GHC.Foreign (CString)
 import GHC.Utils.Encoding.UTF8 (utf8DecodeShortByteString)
 import GHCi.ObjLink (lookupSymbol)
@@ -31,17 +31,19 @@ hpcAddModule ::
   -- ^ Name of the ticks array found in the c-stub.
   IO ()
 hpcAddModule modlName ticks hash tickboxes = do
-  SBS.useAsCString modlName $ \modlNameLiteral -> do
-    -- we need to find the reference to the ticks array.
-    lookupSymbol tickboxes >>= \ case
-      Nothing -> do
-        -- the symbol is not found, this is a bug!
-        throwIO $ ErrorCall $ "hpcAddModule: failed to find symbol " <> utf8DecodeShortByteString tickboxes
-      Just tickBoxRef -> do
-        -- Calling 'hs_hpc_module' multiple times is safe, it will add the module only once.
-        hpc_register_module modlNameLiteral (fromIntegral ticks) (fromIntegral hash) (castPtr tickBoxRef)
-        -- calling 'hpc_startup' multiple times is safe, it will only be initialised once.
-        hpc_startup
+  -- we need to find the reference to the ticks array.
+  lookupSymbol tickboxes >>= \ case
+    Nothing -> do
+      -- the symbol is not found, this is a bug!
+      throwIO $ ErrorCall $ "hpcAddModule: failed to find symbol " <> utf8DecodeShortByteString tickboxes
+    Just tickBoxRef -> do
+      -- hs_hpc_module stores the module name pointer in the RTS hash table
+      -- until exitHpc, so pass a malloced C string.
+      modlNameLiteral <- newCStringFromSBS modlName
+      -- Calling 'hs_hpc_module' multiple times is safe, it will add the module only once.
+      hpc_register_module modlNameLiteral (fromIntegral ticks) (fromIntegral hash) (castPtr tickBoxRef)
+      -- calling 'hpc_startup' multiple times is safe, it will only be initialised once.
+      hpc_startup
 
 foreign import ccall unsafe "hs_hpc_module"
     hpc_register_module :: CString -> Word32 -> Word32 -> Ptr Word64 -> IO ()

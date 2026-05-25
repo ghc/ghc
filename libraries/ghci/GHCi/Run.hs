@@ -37,6 +37,9 @@ import Control.Monad
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Short.Internal as BS
 import qualified Data.ByteString.Unsafe as B
+#if defined(PROFILING)
+import GHC.Data.ShortByteString
+#endif
 import GHC.Exts
 import qualified GHC.Exts.Heap as Heap
 import GHC.Stack
@@ -446,13 +449,6 @@ mkCostCentres mod ccs = do
     c_name <- newCStringFromSBS decl_path
     c_srcspan <- newCStringFromSBS srcspan
     toRemotePtr <$> c_mkCostCentre c_name c_module c_srcspan
-
-  newCStringFromSBS sbs = do
-    let len = BS.length sbs
-    buf <- mallocBytes $ len + 1
-    BS.copyToPtr sbs 0 buf (fromIntegral len)
-    pokeByteOff buf len (0 :: Word8)
-    pure buf
 
 foreign import ccall unsafe "mkCostCentre"
   c_mkCostCentre :: Ptr CChar -> Ptr CChar -> Ptr CChar -> IO (Ptr CostCentre)
