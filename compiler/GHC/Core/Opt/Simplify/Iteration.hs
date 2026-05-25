@@ -62,6 +62,7 @@ import GHC.Types.Var    ( isTyCoVar )
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey, seqHashKey )
 
+import qualified GHC.Data.List.Infinite as Inf
 import GHC.Data.Maybe   ( isNothing, orElse, mapMaybe )
 import GHC.Data.FastString
 import GHC.Unit.Module ( moduleName )
@@ -2444,24 +2445,9 @@ rebuildCall env arg_info _cont
 
 ---------- Bottoming applications --------------
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_dmds = [] }) cont
-  -- When we run out of strictness args, it means
-  -- that the call is definitely bottom; see GHC.Core.Opt.Simplify.Utils.mkArgInfo
-  -- Then we want to discard the entire strict continuation.  E.g.
-  --    * case (error "hello") of { ... }
-  --    * (error "Hello") arg
-  --    * f (error "Hello") where f is strict
-  --    etc
-  -- Then, especially in the first of these cases, we'd like to discard
-  -- the continuation, leaving just the bottoming expression.  But the
-  -- type might not be right, so we may have to add a coerce.
-  | not (contIsTrivial cont)     -- Only do this if there is a non-trivial
-                                 -- continuation to discard, else we do it
-                                 -- again and again!
-  = seqType cont_ty `seq`        -- See Note [Avoiding space leaks in OutType]
-    return (emptyFloats env, castBottomExpr res cont_ty)
-  where
-    res     = argInfoExpr fun rev_args
-    cont_ty = contResultType cont
+  -- When we run out of demands, it means that the call is definitely bottom.
+  -- See (TC2) in Note [Trimming the continuation for bottoming functions]
+  = rebuild env (argInfoExpr fun rev_args) (mkBottomCont cont)
 
 ---------- Simplify type applications --------------
 rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont })
@@ -4045,6 +4031,41 @@ When we have
 then we can just duplicate those alts because the A and C cases
 will disappear immediately.  This is more direct than creating
 join points and inlining them away.  See #4930.
+
+Note [Trimming the continuation for bottoming functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose
+   f :: Int -> Int -> Int
+   f x = error "urk"
+
+   foo = f 3 4
+
+f's demand signature say "after one arg I return bottom".  We can drop
+the remaining arguments, thus
+
+   foo = case f 3 of {}
+
+This trimming can also be done with other continuations:
+   * case (error "hello") of { ... }
+   * f (error "Hello") where f is strict
+   etc
+
+We implement the trimming in three parts:
+
+(TC1) In `mkArgInfo`, for a bottoming function, we make a list of `RemainingArgDmds`
+  with a finite list of elements (in the example above, just one).
+
+  For comparison, note that, for non-bottoming functions, the `RemainingArgDmds`
+  always finishes with an infinite list of `topDmd`.
+
+(TC2) In `rebuildCall`, when we run out of `RemainingArgDmds` we discard the
+  remaining continuation.
+
+  After discarding the continuation, the types might not match, in which case
+  we leave behind a (case <hole> of {}) wrapper.  See the call to `mkBottomCont`.
+
+(TC3) In `mkDupableContWithDmds`, we similarly discard the continuation when
+  we run out of `RemainingArgDmds`.
 -}
 
 --------------------
@@ -4079,16 +4100,23 @@ mkDupableCont env cont
   = mkDupableContWithDmds (zapSubstEnv env) (repeat topDmd) cont
 
 mkDupableContWithDmds
-   :: SimplEnvIS  -> [Demand]  -- Demands on arguments; always infinite
+   :: SimplEnvIS -> RemainingArgDmds
    -> SimplCont -> SimplM ( SimplFloats, SimplCont)
 
-mkDupableContWithDmds env _ cont
+mkDupableContWithDmds env remaining_dmds cont
   -- Check the invariant
   | assertPpr (checkSimplEnvIS env) (pprBadSimplEnvIS env) False
   = pprPanic "mkDupableContWithDmds" empty
 
   | contIsDupable cont
   = return (emptyFloats env, cont)
+
+  -- No more demands => function is definitely bottom
+  --                 => simply trim the continuation
+  -- c.f. the null-demands case in `rebuildCall`
+  -- See (TC3) in Note [Trimming the continuation for bottoming functions]
+  | null remaining_dmds
+  = return (emptyFloats env, mkBottomCont cont)
 
 mkDupableContWithDmds _ _ (Stop {}) = panic "mkDupableCont"     -- Handled by previous eqn
 
@@ -4134,7 +4162,8 @@ mkDupableContWithDmds env _
   , thumbsUpPlanA cont
   = -- Use Plan A of Note [Duplicating StrictArg]
 --    pprTrace "Using plan A" (ppr (ai_fun fun) $$ text "args" <+> ppr (ai_args fun) $$ text "cont" <+> ppr cont) $
-    do { let _ :| dmds = expectNonEmpty $ ai_dmds fun
+    do { let _ :| dmds = expectNonEmpty (ai_dmds fun)   -- See Invariant of StrictArg;
+                                                        -- ai_dmds is never empty
        ; (floats1, cont')  <- mkDupableContWithDmds env dmds cont
                               -- Use the demands from the function to add the right
                               -- demand info on any bindings we make for further args
@@ -4180,7 +4209,10 @@ mkDupableContWithDmds env dmds
         --              let a = ...arg...
         --              in [...hole...] a
         -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
-    do  { let dmd:|cont_dmds = expectNonEmpty dmds
+    do  { let dmd:|cont_dmds =
+                -- We took care to handle an empty demand list at the start,
+                -- ensuring this call to 'expectNonEmpty' does not panic (#27261).
+                expectNonEmpty dmds
         ; (floats1, cont') <- mkDupableContWithDmds env cont_dmds cont
         ; let env' = env `setInScopeFromF` floats1
         ; arg' <- simplArg env' Nothing hole_ty se arg arg_mco
@@ -4251,7 +4283,7 @@ mkDupableStrictBind env arg_bndr join_rhs res_ty
        ; let arg_info = ArgInfo { ai_fun   = join_bndr
                                 , ai_rules = [], ai_args  = []
                                 , ai_encl  = False, ai_dmds  = repeat topDmd
-                                , ai_discs = repeat 0 }
+                                , ai_discs = Inf.repeat 0 }
        ; return ( addJoinFloats (emptyFloats env) $
                   unitJoinFloat                   $
                   NonRec join_bndr                $
