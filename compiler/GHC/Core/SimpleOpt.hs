@@ -35,7 +35,7 @@ import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSub
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
 import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
-import GHC.Core.Coercion.Opt( optCoRefl, optTransCo )
+import GHC.Core.Coercion.Opt( optCoRefl )
 
 import GHC.Types.Literal
 import GHC.Types.Id
@@ -308,13 +308,13 @@ type SimpleClo = (SimpleOptEnv, InExpr)
 
 data SimpleContItem
   = ApplyToArg SimpleClo
-  | CastIt OutCoercion OutType
+  | CastIt OutCoercion
        -- The OutType is the corecionRKind of the coercion
        -- Used to make reflexivity checking more efficient
 
 instance Outputable SimpleContItem where
   ppr (ApplyToArg (_, arg)) = text "ARG" <+> ppr arg
-  ppr (CastIt co _) = text "CAST" <+> ppr co
+  ppr (CastIt co)           = text "CAST" <+> ppr co
 
 data SimpleOptEnv
   = SOE { soe_opts :: {-# UNPACK #-} !SimpleOpts
@@ -488,7 +488,7 @@ simple_app env e0@(Lam {}) as0@(_:_)
       where (env', b') = subst_opt_bndr env b
 
     -- See Note [Eliminate casts in function position]
-    do_beta env e@(Lam b _) as@(CastIt out_co _ : rest)
+    do_beta env e@(Lam b _) as@(CastIt out_co : rest)
       | isNonCoVarId b
       -- Optimise the inner lambda to make it an 'OutExpr', which makes it
       -- possible to call 'pushCoercionIntoLambda' with the 'OutCoercion' 'co'.
@@ -563,18 +563,10 @@ add_cast env co1 as
   = as
   | otherwise
   = case as of
-      CastIt co2 _ : rest
--- ToDo: get rid of the type field in CastIt?
---        | ty2 `eqTypeIgnoringMultiplicity` coercionLKind opt_co1
---                    -> rest
--- ToDo: do we want to call optTransCo here?
---        | otherwise -> CastIt (optTransCo in_scope opt_co1 co2) tyR : rest
-        | otherwise -> CastIt (mkTransCo opt_co1 co2) tyR : rest
-      _             -> CastIt opt_co1 tyR : as
+      CastIt co2 : rest -> CastIt (mkTransCo opt_co1 co2) : rest
+      _                 -> CastIt opt_co1 : as
   where
-    in_scope = soeInScope env
     opt_co1 = simple_opt_co env co1
-    tyR     = coercionRKind opt_co1
 
 rebuild_app :: HasDebugCallStack
             => SimpleOptEnv -> OutExpr -> [SimpleContItem] -> OutExpr
@@ -583,7 +575,7 @@ rebuild_app env fun args = foldl mk_app fun args
     in_scope = soeInScope env
     mk_app out_fun = \case
       ApplyToArg arg -> App out_fun (simple_opt_clo in_scope arg)
-      CastIt co _    -> mk_cast out_fun co
+      CastIt co      -> mk_cast out_fun co
 
 mk_cast :: CoreExpr -> CoercionR -> CoreExpr
 -- Does a full reflexivity check, unlike GHC.Core.Utils.mkCast,
