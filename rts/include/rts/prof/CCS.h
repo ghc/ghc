@@ -220,9 +220,14 @@ extern CostCentre * RTS_VAR(CC_LIST);               // registered CC list
 #define CCS_ALLOC(ccs, size) (ccs)->mem_alloc += ((size)-sizeofW(StgProfHeader))
 #define ENTER_CCS_THUNK(cap,p) cap->r.rCCCS = p->header.prof.ccs
 
+/* Allow using CCS_SYSTEM somewhat consistently with/without profiling mode */
+#define CCS_SYSTEM_OR_NULL CCS_SYSTEM
+
 #else /* !PROFILING */
 
 #define CCS_ALLOC(ccs, amount) doNothing()
 #define ENTER_CCS_THUNK(cap,p) doNothing()
+
+#define CCS_SYSTEM_OR_NULL NULL
 
 #endif /* PROFILING */
