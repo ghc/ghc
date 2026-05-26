@@ -10,6 +10,8 @@
 
 #include <windows.h>
 
+#include "BeginPrivate.h"
+
 /* This is a fixed-size queue. */
 #define WORKQUEUE_SIZE 16
 
@@ -34,3 +36,5 @@ extern HANDLE     GetWorkQueueHandle ( WorkQueue* pq );
 extern BOOL       GetWork            ( WorkQueue* pq, void** ppw );
 extern BOOL       FetchWork          ( WorkQueue* pq, void** ppw );
 extern int        SubmitWork         ( WorkQueue* pq, void*   pw );
+
+#include "EndPrivate.h"
