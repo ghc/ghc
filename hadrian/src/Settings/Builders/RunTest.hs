@@ -241,7 +241,6 @@ runTestBuilderArgs = builder Testsuite ? do
 
     -- MP: TODO, these should be queried from the test compiler?
     bignumBackend <- getBignumBackend
-    bignumCheck   <- getBignumCheck
 
     keepFiles <- expr (testKeepFiles <$> userSetting defaultTestArgs)
 
@@ -307,7 +306,7 @@ runTestBuilderArgs = builder Testsuite ? do
             , arg "-e", arg $ "ghc_compiler_always_flags=" ++ quote ghcFlags
             , arg "-e", arg $ asBool "ghc_with_dynamic_rts="  (hasDynamicRts)
             , arg "-e", arg $ asBool "config.ghc_with_threaded_rts=" (hasThreadedRts)
-            , arg "-e", arg $ asBool "config.have_fast_bignum=" (bignumBackend /= "native" && not bignumCheck)
+            , arg "-e", arg $ asBool "config.have_fast_bignum=" (bignumBackend /= "native")
             , arg "-e", arg $ asBool "config.target_has_smp=" targetWithSMP
             , arg "-e", arg $ "config.ghc_dynamic=" ++ show hasDynamic
             , arg "-e", arg $ "config.leading_underscore=" ++ show leadingUnderscore

@@ -1,0 +1,11 @@
+section: packaging
+synopsis: Remove the Check backend of ghc-bignum
+issues: #27305
+mrs: !16106
+
+description: {
+    The Check backend of ghc-bignum (now part of ghc-internal), which compared
+    the results of the selected backend against the Native backend, has been
+    removed along with the ``bignum-check`` cabal flag and the ``check-``
+    prefix in Hadrian's ``--bignum`` option.
+}

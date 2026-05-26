@@ -61,11 +61,6 @@ Flag bignum-gmp
     Manual: True
     Default: False
 
-Flag bignum-check
-    Description: Validate results of the enabled backend against native backend.
-    Manual: True
-    Default: False
-
 Flag need-atomic
     Description: Enable linking with "atomic" library (for 64-bit atomic ops on armel, #20549)
     Manual: True
@@ -394,17 +389,11 @@ Library
     if flag(bignum-native)
         cpp-options: -DBIGNUM_NATIVE
 
-    if flag(bignum-check)
-        cpp-options: -DBIGNUM_CHECK
-        other-modules:
-           GHC.Internal.Bignum.Backend.Check
-
     exposed-modules:
       GHC.Internal.Bignum.Primitives
       GHC.Internal.Bignum.WordArray
       GHC.Internal.Bignum.BigNat
       GHC.Internal.Bignum.Backend
-      GHC.Internal.Bignum.Backend.Selected
       GHC.Internal.Bignum.Backend.Native
       GHC.Internal.Bignum.Natural
       GHC.Internal.Bignum.Integer

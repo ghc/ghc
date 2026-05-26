@@ -1,7 +1,7 @@
 module CommandLine (
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, lookupFreeze2, lookupSkipDepends,
     lookupBignum,
-    cmdBignum, cmdBignumCheck, cmdProgressInfo, cmdCompleteSetting,
+    cmdBignum, cmdProgressInfo, cmdCompleteSetting,
     cmdDocsArgs, cmdUnitIdHash, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs,
     cmdPrefix, cmdChangelogVersion, DocArgs(..), defaultDocArgs,
     cmdKeepResponseFiles
@@ -32,7 +32,6 @@ data CommandLineArgs = CommandLineArgs
     , skipDepends    :: Bool
     , unitIdHash     :: Bool
     , bignum         :: Maybe String
-    , bignumCheck    :: Bool
     , progressInfo   :: ProgressInfo
     , buildRoot      :: BuildRoot
     , testArgs       :: TestArgs
@@ -54,7 +53,6 @@ defaultCommandLineArgs = CommandLineArgs
     , skipDepends    = False
     , unitIdHash     = False
     , bignum         = Nothing
-    , bignumCheck    = False
     , progressInfo   = Brief
     , buildRoot      = BuildRoot "_build"
     , testArgs       = defaultTestArgs
@@ -132,10 +130,7 @@ readFlavour ms = Right $ \flags -> flags { flavour = lower <$> ms }
 
 readBignum :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readBignum Nothing   = Right id
-readBignum (Just ms) = Right $ \flags -> case break (== '-') (lower ms) of
-   (backend,"")          -> flags { bignum = Just backend }
-   ("check",'-':backend) -> flags { bignum = Just backend, bignumCheck = True }
-   _                     -> flags { bignum = Just (lower ms) }
+readBignum (Just ms) = Right $ \flags -> flags { bignum = Just (lower ms) }
 
 readBuildRoot :: FilePath -> Either String (CommandLineArgs -> CommandLineArgs)
 readBuildRoot ms =
@@ -302,7 +297,7 @@ optDescrs =
     , Option [] ["skip-depends"] (NoArg readSkipDepends)
       "Skip rebuilding dependency information."
     , Option [] ["bignum"] (OptArg readBignum "BACKEND")
-      "Select bignum backend: native, gmp (default), check-gmp (gmp compared to native)."
+      "Select bignum backend: native, gmp (default)."
     , Option [] ["progress-info"] (ReqArg readProgressInfo "STYLE")
       "Progress info style (None, Brief, Normal or Unicorn)."
     , Option [] ["docs"] (ReqArg readDocsArg "TARGET")
@@ -428,9 +423,6 @@ cmdUnitIdHash = unitIdHash <$> cmdLineArgs
 
 cmdBignum :: Action (Maybe String)
 cmdBignum = bignum <$> cmdLineArgs
-
-cmdBignumCheck :: Action Bool
-cmdBignumCheck = bignumCheck <$> cmdLineArgs
 
 cmdKeepResponseFiles :: Action Bool
 cmdKeepResponseFiles = keepResponseFiles <$> cmdLineArgs

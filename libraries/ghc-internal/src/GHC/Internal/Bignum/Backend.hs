@@ -7,9 +7,12 @@ module GHC.Internal.Bignum.Backend
    )
 where
 
-#if defined(BIGNUM_CHECK)
-import GHC.Internal.Bignum.Backend.Check    as Backend
-#else
-import GHC.Internal.Bignum.Backend.Selected as Backend
-#endif
+#if defined(BIGNUM_NATIVE)
+import GHC.Internal.Bignum.Backend.Native as Backend
 
+#elif defined(BIGNUM_GMP)
+import GHC.Internal.Bignum.Backend.GMP as Backend
+
+#else
+#error Undefined BigNum backend. Use a flag to select it (e.g. gmp, native)`
+#endif

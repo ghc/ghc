@@ -14,7 +14,7 @@ module GHC.Internal.Bignum.Backend.Native where
 #include "MachDeps.h"
 #include "WordSize.h"
 
-#if defined(BIGNUM_NATIVE) || defined(BIGNUM_CHECK)
+#if defined(BIGNUM_NATIVE)
 import {-# SOURCE #-} GHC.Internal.Bignum.BigNat
 import {-# SOURCE #-} GHC.Internal.Bignum.Natural
 import {-# SOURCE #-} GHC.Internal.Bignum.Integer

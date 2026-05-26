@@ -240,14 +240,10 @@ ghcInternalArgs = package ghcInternal ? do
     includesGmp <- getSetting GmpIncludeDir
 
     backend <- getBignumBackend
-    check   <- getBignumCheck
 
     mconcat
           [ -- select bignum backend
             builder (Cabal Flags) ? arg ("bignum-" <> backend)
-
-          , -- check the selected backend against native backend
-            builder (Cabal Flags) ? check `cabalFlag` "bignum-check"
 
             -- backend specific
           , case backend of

@@ -3,7 +3,7 @@
 module Settings (
     getExtraArgs, getArgs, getLibraryWays, getRtsWays, flavour, knownPackages,
     findPackageByName, unsafeFindPackageByName, unsafeFindPackageByPath,
-    isLibrary, stagePackages, getBignumBackend, getBignumCheck, completeSetting,
+    isLibrary, stagePackages, getBignumBackend, completeSetting,
     queryBuildTarget, queryHostTarget, queryTargetTarget,
     queryBuild, queryHost, queryTarget,
     queryArch, queryOS, queryVendor
@@ -45,11 +45,6 @@ getRtsWays = expr flavour >>= rtsWays
 
 getBignumBackend :: Expr String
 getBignumBackend = bignumBackend <$> expr flavour
-
-getBignumCheck :: Expr Bool
-getBignumCheck = expr $ cmdBignum >>= \case
-   Nothing -> bignumCheck <$> flavour
-   Just _  -> cmdBignumCheck
 
 stagePackages :: Stage -> Action [Package]
 stagePackages stage = do

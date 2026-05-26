@@ -293,7 +293,6 @@ defaultFlavour = Flavour
     , extraArgs          = defaultExtraArgs
     , packages           = defaultPackages
     , bignumBackend      = defaultBignumBackend
-    , bignumCheck        = False
     , textWithSIMDUTF    = False
     , libraryWays        = defaultLibraryWays
     , rtsWays            = defaultRtsWays

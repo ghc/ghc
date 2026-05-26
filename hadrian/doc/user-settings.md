@@ -26,8 +26,6 @@ data Flavour = Flavour {
     packages :: Stage -> Action [Package],
     -- | Bignum backend: 'native', 'gmp', etc.
     bignumBackend :: String,
-    -- | Check selected bignum backend against native backend
-    bignumCheck :: Bool,
     -- | Build the @text@ package with @simdutf@ support. Disabled by
     -- default due to packaging difficulties described in #20724.
     textWithSIMDUTF :: Bool,
