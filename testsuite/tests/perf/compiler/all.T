@@ -678,7 +678,7 @@ test ('T18140',
       ['-v0 -O'])
 test('T10421',
     [ only_ways(['normal']),
-      collect_compiler_runtime(1)
+      collect_compiler_runtime(2) # 1% tolerance was too small (#27289)
     ],
     multimod_compile,
     ['T10421', '-v0 -O'])
