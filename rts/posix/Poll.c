@@ -463,6 +463,9 @@ void awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
             int ncompletions = res;
             ASSERT(ncompletions <= (int)nfds);
             processIOCompletions(iomgr, ncompletions);
+            // FIXME: do we also need to check for timeout completions now?
+            // we have a non-empty queue, but if !wait then we have also moved
+            // on and so we sould check for timeouts.
 
         } else if (errno == EINTR) {
             /* We got interrupted by a signal. In the non-threaded RTS, if the
