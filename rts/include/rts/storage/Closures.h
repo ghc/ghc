@@ -829,11 +829,11 @@ typedef struct {
       // here due to portability concerns for this C bitfield.
     uint16_t notify_type: 2;
 
-      // The outcome:
-      // 0: still in-progress, no detail
-      // 1: success, result field contains the result code
-      // 2: failed, error field contains the error code
-      // 3: cancelled, no detail
+      // The outcome (see enum IOOpOutcome):
+      // 0: IOOpOutcomeInFlight: still in-progress, no further detail.
+      // 1: IOOpOutcomeSuccess: result field contains the result code.
+      // 2: IOOpOutcomeFailed: error field contains the error code.
+      // 3: IOOpOutcomeCancelled: cancelled, no further detail.
     uint16_t outcome: 2;
 
       // 12 bits going spare!
