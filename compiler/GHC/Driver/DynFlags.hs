@@ -1297,8 +1297,8 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([0,1,2], Opt_ProfManualCcs )
 
     , ([],      Opt_OptReflCoSimpleOpt )     -- See Note [Coercion optimisation]
-    , ([0,1,2], Opt_OptReflCoSimplifier )    --      in GHC.Core.Coercion.Opt
-    , ([0,1,2], Opt_OptCoercion )
+    , ([2],     Opt_OptReflCoSimplifier )    --      in GHC.Core.Coercion.Opt
+    , ([2],     Opt_OptCoercion )
 
 
     , ([0],     Opt_IgnoreInterfacePragmas)
