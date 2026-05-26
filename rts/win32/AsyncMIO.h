@@ -12,6 +12,8 @@
 
 #include "Rts.h"
 
+#include "BeginPrivate.h"
+
 extern unsigned int
 addIORequest(int   fd,
              bool  forWriting,
@@ -28,3 +30,5 @@ extern int awaitRequests(bool wait);
 extern void abandonRequestWait(void);
 extern void resetAbandonRequestWait(void);
 extern HsInt rts_EINTR(void);
+
+#include "EndPrivate.h"
