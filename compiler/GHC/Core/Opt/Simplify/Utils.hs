@@ -76,7 +76,6 @@ import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.Name.Env
 
-import GHC.Data.OrdList ( isNilOL )
 import GHC.Data.FastString ( fsLit )
 
 import GHC.Utils.Misc
@@ -2380,14 +2379,9 @@ new binding is abstracted.  Several points worth noting
 abstractFloats :: UnfoldingOpts -> TopLevelFlag -> [OutTyVar] -> SimplFloats
               -> OutExpr -> SimplM ([OutBind], OutExpr)
 abstractFloats uf_opts top_lvl main_tvs floats body
-  | assert (notNull body_floats) $
-    assert (isNilOL (sfJoinFloats floats)) $
-    any isCoVar (bindersOfBinds body_floats)   -- ToDo: Explain this case
-  = return ([], wrapFloats floats body)
-  | otherwise
   = do  { let sccs = concatMap to_sccs body_floats
         ; (subst, float_binds) <- mapAccumLM abstract empty_subst sccs
-        ; return (float_binds, GHC.Core.Subst.substExpr subst body) }
+        ; return (catMaybes float_binds, GHC.Core.Subst.substExpr subst body) }
   where
     is_top_lvl  = isTopLevel top_lvl
     body_floats = letFloatBinds (sfLetFloats floats)
@@ -2404,12 +2398,18 @@ abstractFloats uf_opts top_lvl main_tvs floats body
                        (\(_id,_rhs,fvs) -> nonDetStrictFoldVarSet ((:) . getName) [] fvs) -- Wrinkle (AB3)
                        (zip3 ids rhss (map exprFreeVars rhss))
 
-    abstract :: GHC.Core.Subst.Subst -> SCC (Id, CoreExpr, VarSet) -> SimplM (GHC.Core.Subst.Subst, OutBind)
+    abstract :: GHC.Core.Subst.Subst -> SCC (Id, CoreExpr, VarSet)
+             -> SimplM (GHC.Core.Subst.Subst, Maybe OutBind)
     abstract subst (AcyclicSCC (id, rhs, _empty_var_set))
-      = do { (poly_id1, poly_app) <- mk_poly1 tvs_here id
+      | Coercion co <- rhs  -- Coercions: can't abstract, so just substitute
+      = return (GHC.Core.Subst.extendCvSubst subst id co, Nothing)
+
+      | otherwise
+      = assertPpr (isId id) (ppr id) $
+        do { (poly_id1, poly_app) <- mk_poly1 tvs_here id
            ; let (poly_id2, poly_rhs) = mk_poly2 poly_id1 tvs_here rhs'
                  !subst' = GHC.Core.Subst.extendIdSubst subst id poly_app
-           ; return (subst', NonRec poly_id2 poly_rhs) }
+           ; return (subst', Just $ NonRec poly_id2 poly_rhs) }
       where
         rhs' = GHC.Core.Subst.substExpr subst rhs
 
@@ -2422,7 +2422,7 @@ abstractFloats uf_opts top_lvl main_tvs floats body
                  poly_pairs = [ mk_poly2 poly_id tvs_here rhs'
                               | (poly_id, rhs) <- poly_ids `zip` rhss
                               , let rhs' = GHC.Core.Subst.substExpr subst' rhs ]
-           ; return (subst', Rec poly_pairs) }
+           ; return (subst', Just $ Rec poly_pairs) }
       where
         (ids,rhss,_fvss) = unzip3 trpls
 

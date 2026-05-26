@@ -367,6 +367,7 @@ simplLazyBind top_lvl is_rec (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
                                                                 tvs' body_floats2 body2
                         ; let poly_floats = foldl' extendFloats (emptyFloats env) poly_binds
                         ; return (poly_floats, body3) }
+        ; tickLetFloatFromLet rhs_floats
 
         ; let env1 = env `setInScopeFromF` rhs_floats
         ; rhs' <- rebuildLam env1 tvs' body3 rhs_cont
@@ -632,6 +633,7 @@ tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
 
         ; (rhs_floats, work_rhs) <- prepareBinding env top_lvl is_rec is_strict
                                                    work_id (emptyFloats env) rhs
+        ; tickLetFloatFromLet rhs_floats
 
         ; work_unf <- mk_worker_unfolding top_lvl work_id work_rhs
 
@@ -751,13 +753,17 @@ prepareBinding env top_lvl is_rec strict_bind bndr rhs_floats rhs
        ; let all_floats = rhs_floats1 `addLetFloats` anf_floats
        ; if doFloatFromRhs (seFloatEnable env) top_lvl is_rec strict_bind all_floats rhs2
          then -- Float!
-              do { tick LetFloatFromLet
-                 ; return (all_floats, rhs2) }
+              return (all_floats, rhs2)
 
          else -- Abandon floating altogether; revert to original rhs
               -- Since we have already built rhs1, we just need to add
               -- rhs_floats1 to it
               return (emptyFloats env, wrapFloats rhs_floats1 rhs1) }
+
+tickLetFloatFromLet :: SimplFloats -> SimplM ()
+tickLetFloatFromLet floats
+  | isEmptyFloats floats = return ()
+  | otherwise            = tick LetFloatFromLet
 
 {- Note [prepareRhs]
 ~~~~~~~~~~~~~~~~~~~~
@@ -1695,6 +1701,8 @@ completeBindX env from_what bndr rhs body cont
 
         ; (rhs_floats, rhs1) <- prepareBinding env NotTopLevel NonRecursive is_strict
                                                bndr2 (emptyFloats env) rhs
+        ; tickLetFloatFromLet rhs_floats
+
               -- NB: it makes a surprisingly big difference (5% in compiler allocation
               -- in T9630) to pass 'env' rather than 'env1'.  It's fine to pass 'env',
               -- because this is completeBindX, so bndr is not in scope in the RHS.
