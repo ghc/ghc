@@ -12,6 +12,8 @@
 
 #include <windows.h>
 
+#include "BeginPrivate.h"
+
 /*
  The IOManager subsystem provides a non-blocking view
  of I/O operations. It lets one (or more) OS thread(s)
@@ -107,3 +109,5 @@ extern int AddProcRequest ( void*          proc,
 extern void abandonWorkRequest ( int reqID );
 
 extern void interruptIOManagerEvent ( void );
+
+#include "EndPrivate.h"
