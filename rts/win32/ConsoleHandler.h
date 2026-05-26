@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "BeginPrivate.h"
+
 /*
  * Console control handlers lets an application handle Ctrl+C, Ctrl+Break etc.
  * in Haskell under Win32. Akin to the Unix signal SIGINT.
@@ -69,3 +71,5 @@ extern int rts_waitConsoleHandlerCompletion(void);
  * Tear down and shut down user signal processing.
  */
 extern void finiUserSignals(void);
+
+#include "EndPrivate.h"

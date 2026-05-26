@@ -12,7 +12,12 @@
 
 /* Communicating with the IO manager thread (see GHC.Conc).
  */
+void ioManagerFinished (void);
+
+#include "BeginPrivate.h"
+
 void ioManagerWakeup (void);
 void ioManagerDie (void);
 void ioManagerStart (void);
-void ioManagerFinished (void);
+
+#include "EndPrivate.h"
