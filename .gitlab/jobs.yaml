@@ -28,7 +28,9 @@
     "needs": [],
     "rules": [],
     "script": [
-      "env",
+      "echo \"PATH=$PATH\"",
+      "echo \"MSYSTEM=$MSYSTEM\"",
+      "echo \"ACLOCAL_PATH=$ACLOCAL_PATH\"",
       "bash .gitlab/ci.sh setup",
       "bash .gitlab/ci.sh configure",
       "bash .gitlab/ci.sh build_hadrian",

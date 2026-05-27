@@ -576,6 +576,9 @@ function build_hadrian() {
   else
     case "$(uname)" in
         MSYS_*|MINGW*)
+          echo "PATH=$PATH"
+          echo "MSYSTEM=$MSYSTEM"
+          echo "ACLOCAL_PATH=$ACLOCAL_PATH"
           run_hadrian test:all_deps reloc-binary-dist -V
           mv _build/reloc-bindist/ghc*.tar.xz "$BIN_DIST_NAME.tar.xz"
           ;;
