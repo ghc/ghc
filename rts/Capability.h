@@ -72,6 +72,10 @@ struct Capability_ {
     // Has there been any activity on this Capability since the last GC?
     uint32_t idle;
 
+    // The timestamp (as a ticker tick count) when this Capability went idle,
+    // or 0 if is not idle. See Note [Design of idle GC tracking].
+    int32_t idle_since_tick;
+
     bool disabled;
 
     // The run queue.  The Task owning this Capability has exclusive
