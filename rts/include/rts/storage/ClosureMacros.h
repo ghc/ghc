@@ -382,6 +382,18 @@ EXTERN_INLINE StgOffset BLACKHOLE_sizeW ( void );
 EXTERN_INLINE StgOffset BLACKHOLE_sizeW ( void )
 { return sizeofW(StgInd); } // a BLACKHOLE is a kind of indirection
 
+/* -----------------------------------------------------------------------------
+   Blackhole predicates
+   -------------------------------------------------------------------------- */
+
+#define IS_BLACKHOLE_INFO(info) \
+    ((info) == &stg_BLACKHOLE_info || \
+     (info) == &__stg_EAGER_BLACKHOLE_info || \
+     (info) == &stg_CAF_BLACKHOLE_info)
+
+#define IS_BLACKHOLE_OR_WHITEHOLE_INFO(info) \
+    (IS_BLACKHOLE_INFO(info) || (info) == &stg_WHITEHOLE_info)
+
 /* --------------------------------------------------------------------------
    Sizes of closures
    ------------------------------------------------------------------------*/
