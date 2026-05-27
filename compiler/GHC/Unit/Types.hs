@@ -250,9 +250,7 @@ data GenUnit uid
 --
 -- This unit may be indefinite or not (i.e. with remaining holes or not). If it
 -- is definite, we don't know if it has already been compiled and installed in a
--- database. Nevertheless, we have a mechanism called "improvement" to try to
--- match a fully instantiated unit with existing compiled and installed units:
--- see Note [VirtUnit to RealUnit improvement].
+-- database.
 --
 -- An indefinite unit identifier pretty-prints to something like
 -- @p[H=<H>,A=aimpl:A>]@ (@p@ is the 'UnitId', and the
