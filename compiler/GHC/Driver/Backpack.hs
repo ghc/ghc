@@ -241,7 +241,6 @@ withBkpSession cid insts deps session_type do_this = do
             -- Synthesize the flags
             , packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
               let uid = unwireUnit unit_state
-                        $ improveUnit unit_state
                         $ renameHoleUnit unit_state (listToUFM insts) uid0
               in ExposePackage
                 (showSDoc dflags
@@ -310,19 +309,16 @@ buildUnit session cid insts lunit = do
     -- The compilation dependencies are just the appropriately filled
     -- in unit IDs which must be compiled before we can compile.
     let hsubst = listToUFM insts
-        deps0 = map (renameHoleUnit (hsc_units hsc_env) hsubst) raw_deps
+        deps = map (renameHoleUnit (hsc_units hsc_env) hsubst) raw_deps
 
     -- Build dependencies OR make sure they make sense. BUT NOTE,
     -- we can only check the ones that are fully filled; the rest
     -- we have to defer until we've typechecked our local signature.
     -- TODO: work this into GHC.Driver.Make!!
-    forM_ (zip [1..] deps0) $ \(i, dep) ->
+    forM_ (zip [1..] deps) $ \(i, dep) ->
         case session of
             TcSession -> return ()
-            _ -> compileInclude (length deps0) (i, dep)
-
-    -- IMPROVE IT
-    let deps = map (improveUnit (hsc_units hsc_env)) deps0
+            _ -> compileInclude (length deps) (i, dep)
 
     mb_old_eps <- case session of
                     TcSession -> fmap Just getEpsGhc
