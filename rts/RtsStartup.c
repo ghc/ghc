@@ -37,6 +37,7 @@
 #include "IPE.h"
 #include "ProfHeap.h"
 #include "Timer.h"
+#include "IdleGC.h"
 #include "Globals.h"
 #include "FileLock.h"
 #include "LinkerInternals.h"
@@ -367,6 +368,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
      * moreCapabilities will attempt to acquire it.
      */
     initTimer();
+    initIdleGc();
 
     /* initialise scheduler data structures (needs to be done before
      * initStorage()).

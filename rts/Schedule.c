@@ -130,7 +130,7 @@ static Capability *schedule (Capability *initialCapability, Task *task);
 //
 static void scheduleFindWork (Capability **pcap);
 #if defined(THREADED_RTS)
-static void scheduleYield (Capability **pcap, Task *task);
+static bool scheduleYield (Capability **pcap, Task *task);
 #endif
 #if defined(THREADED_RTS)
 static bool requestSync (Capability **pcap, Task *task,
@@ -141,7 +141,7 @@ static void startWorkerTasks (uint32_t from USED_IF_THREADS,
 #endif
 static void scheduleCheckBlockedThreads (Capability *cap);
 static void scheduleProcessInbox(Capability **cap);
-static void scheduleDetectDeadlock (Capability **pcap, Task *task);
+static void scheduleIdleGcAndDetectDeadlock (Capability **pcap, Task *task);
 static void schedulePushWork(Capability *cap, Task *task);
 #if defined(THREADED_RTS)
 static void scheduleActivateSpark(Capability *cap);
@@ -189,6 +189,22 @@ schedule (Capability *initialCapability, Task *task)
   StgThreadReturnCode ret;
   uint32_t prev_what_next;
   bool ready_to_gc;
+
+  // Track an approximation of whether this capability has run any Haskell
+  // threads since waking up from being idle. This is used in idle GC tracking:
+  // in notifyIdleGcCapabilityIsActive(). See Note [Design of idle GC tracking].
+  //
+  // It is used by notifyIdleGcCapabilityIsActive() as an optimisation, and it
+  // allows false positives but not false negatives. That is, it is ok to pass
+  // cap_just_awoke == true when that is not the case, whereas passing
+  // cap_just_awoke == false when that's not the case violates the contract.
+  //
+  // In the threaded RTS, it's a bit expensive and fiddly to track if the
+  // Capability went idle, but knowing that the Task went idle is a valid
+  // over-approximation. So that's what we use.
+  //
+  // In the non-threaded RTS it is straightforward to do precisely.
+  bool cap_just_awoke = true;
 
   cap = initialCapability;
   t = NULL;
@@ -288,11 +304,11 @@ schedule (Capability *initialCapability, Task *task)
        (pushes threads, wakes up idle capabilities for stealing) */
     schedulePushWork(cap,task);
 
-    scheduleDetectDeadlock(&cap,task);
+    scheduleIdleGcAndDetectDeadlock(&cap,task);
 
     // Normally, the only way we can get here with no threads to
     // run is if a keyboard interrupt received during
-    // scheduleCheckBlockedThreads() or scheduleDetectDeadlock().
+    // scheduleCheckBlockedThreads() or scheduleIdleGcAndDetectDeadlock().
     // Additionally, it is not fatal for the
     // threaded RTS to reach here with no threads to run.
     //
@@ -305,7 +321,16 @@ schedule (Capability *initialCapability, Task *task)
     // waiting on an async I/O to complete with WinIO.
 
 #if defined(THREADED_RTS)
-    scheduleYield(&cap,task);
+    bool task_yielded = scheduleYield(&cap,task);
+
+    /* Set cap_just_awoke if the current _Task_ yielded the capability. This is
+     * an over-approximation of the _Capability_ going idle: every time the
+     * Capability goes idle the Task does, but there are cases where the Task
+     * goes idle but the Capability does not, see shouldYieldCapability. Thus
+     * we have false positives but not false negatives. See the comment on
+     * the declaration of cap_just_awoke for details of why this is fine.
+     */
+    cap_just_awoke = task_yielded;
 
     if (emptyRunQueue(cap)) continue; // look for work again
 #endif
@@ -317,9 +342,10 @@ schedule (Capability *initialCapability, Task *task)
            any outstanding I/O requests we'll block here.  If there are not
            then this is a user error and we will abort soon.  */
         /* TODO: see if we can rationalise these two awaitCompletedTimeoutsOrIO
-         *       calls before and after scheduleDetectDeadlock().
+         *       calls before and after scheduleIdleGcAndDetectDeadlock().
          */
         awaitCompletedTimeoutsOrIO(cap);
+        cap_just_awoke = true;
 #else
         ASSERT(getSchedState() >= SCHED_INTERRUPTING);
 #endif
@@ -439,7 +465,8 @@ run_thread:
     dirty_STACK(cap,t->stackobj);
 
     // Let the idle gc tracker know that we're running a thread again
-    notifyIdleGcActive();
+    notifyIdleGcCapabilityIsActive(cap, cap_just_awoke);
+    cap_just_awoke = false; // reset now that we've run a thread.
 
     traceEventRunThread(cap, t);
 
@@ -660,11 +687,13 @@ shouldYieldCapability (Capability *cap, Task *task, bool didGcLast)
 //    - we need to yield this Capability to someone else
 //      (see shouldYieldCapability())
 //
+// Return whether the task did yield the capability.
+//
 // Careful: the scheduler loop is quite delicate.  Make sure you run
 // the tests in testsuite/concurrent (all ways) after modifying this,
 // and also check the benchmarks in nofib/parallel for regressions.
 
-static void
+static bool
 scheduleYield (Capability **pcap, Task *task)
 {
     Capability *cap = *pcap;
@@ -676,7 +705,7 @@ scheduleYield (Capability **pcap, Task *task)
         (!emptyRunQueue(cap) ||
          !emptyInbox(cap) ||
          getSchedState() >= SCHED_INTERRUPTING)) {
-        return;
+        return false;
     }
 
     // otherwise yield (sleep), and keep yielding if necessary.
@@ -695,7 +724,7 @@ scheduleYield (Capability **pcap, Task *task)
     // point, the caller has to check.
 
     *pcap = cap;
-    return;
+    return true;
 }
 #endif
 
@@ -877,7 +906,7 @@ scheduleCheckBlockedThreads(Capability *cap USED_IF_NOT_THREADS)
      * can wait indefinitely for something to happen.
      *
      * TODO: see if we can rationalise these two awaitCompletedTimeoutsOrIO
-     * calls before and after scheduleDetectDeadlock()
+     * calls before and after scheduleIdleGcAndDetectDeadlock()
      *
      * TODO: this test anyPendingTimeoutsOrIO does not have a proper
      * implementation the WinIO I/O manager!
@@ -913,7 +942,7 @@ scheduleCheckBlockedThreads(Capability *cap USED_IF_NOT_THREADS)
  * ------------------------------------------------------------------------- */
 
 static void
-scheduleDetectDeadlock (Capability **pcap, Task *task)
+scheduleIdleGcAndDetectDeadlock (Capability **pcap, Task *task)
 {
     Capability *cap = *pcap;
     /*
@@ -1898,7 +1927,9 @@ delete_threads_and_gc:
 
     traceSparkCounters(cap);
 
-    notifyIdleGcDone(force_major);
+    if (deadlock_detect) {
+        notifyIdleGcCompleted();
+    }
 
 #if defined(THREADED_RTS)
     // Stable point where we can do a global check on our spark counters

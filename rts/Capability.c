@@ -1010,6 +1010,7 @@ yieldCapability
     }
 
     debugTrace(DEBUG_sched, "giving up capability %d", cap->no);
+    notifyIdleGcCapabilityIsIdle(cap);
 
     // We must now release the capability and wait to be woken up again.
     task->wakeup = false;

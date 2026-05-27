@@ -194,6 +194,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.gccafs          = false;
     RtsFlags.DebugFlags.gc              = false;
     RtsFlags.DebugFlags.nonmoving_gc    = false;
+    RtsFlags.DebugFlags.idlegc          = false;
     RtsFlags.DebugFlags.block_alloc     = false;
     RtsFlags.DebugFlags.sanity          = false;
     RtsFlags.DebugFlags.zero_on_gc      = false;
@@ -489,6 +490,7 @@ usage_text[] = {
 "  -DG  DEBUG: gccafs",
 "  -Dg  DEBUG: gc",
 "  -Dn  DEBUG: non-moving gc",
+"  -Dd  DEBUG: idle gc",
 "  -Db  DEBUG: block",
 "  -DS  DEBUG: sanity",
 "  -DZ  DEBUG: zero freed memory during GC",
@@ -1945,7 +1947,8 @@ static void normaliseRtsOpts (void)
 
     if (RtsFlags.ConcFlags.ctxtSwitchTime > 0 && RtsFlags.MiscFlags.tickInterval != 0) {
         RtsFlags.ConcFlags.ctxtSwitchTicks =
-            RtsFlags.ConcFlags.ctxtSwitchTime /
+            /* Round up, to avoid getting 0 when using a large tick interval. */
+            (RtsFlags.ConcFlags.ctxtSwitchTime + RtsFlags.MiscFlags.tickInterval - 1) /
             RtsFlags.MiscFlags.tickInterval;
     } else {
         RtsFlags.ConcFlags.ctxtSwitchTicks = 0;
@@ -1953,7 +1956,8 @@ static void normaliseRtsOpts (void)
 
     if (RtsFlags.ProfFlags.heapProfileInterval > 0 && RtsFlags.MiscFlags.tickInterval != 0) {
         RtsFlags.ProfFlags.heapProfileIntervalTicks =
-            RtsFlags.ProfFlags.heapProfileInterval /
+            /* Round up, to avoid getting 0 when using a large tick interval. */
+            (RtsFlags.ProfFlags.heapProfileInterval + RtsFlags.MiscFlags.tickInterval - 1) /
             RtsFlags.MiscFlags.tickInterval;
     } else {
         RtsFlags.ProfFlags.heapProfileIntervalTicks = 0;
@@ -1962,7 +1966,8 @@ static void normaliseRtsOpts (void)
 #if defined(THREADED_RTS)
     if (RtsFlags.TraceFlags.eventlogFlushTime > 0 && RtsFlags.MiscFlags.tickInterval != 0) {
         RtsFlags.TraceFlags.eventlogFlushTicks =
-            RtsFlags.TraceFlags.eventlogFlushTime /
+            /* Round up, to avoid getting 0 when using a large tick interval. */
+            (RtsFlags.TraceFlags.eventlogFlushTime + RtsFlags.MiscFlags.tickInterval - 1) /
             RtsFlags.MiscFlags.tickInterval;
     } else {
         RtsFlags.TraceFlags.eventlogFlushTicks = 0;
@@ -2267,6 +2272,9 @@ static void read_debug_flags(const char* arg)
             break;
         case 'n':
             RtsFlags.DebugFlags.nonmoving_gc = true;
+            break;
+        case 'd':
+            RtsFlags.DebugFlags.idlegc = true;
             break;
         case 'b':
             RtsFlags.DebugFlags.block_alloc = true;
