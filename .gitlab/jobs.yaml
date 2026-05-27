@@ -26,7 +26,11 @@
     "dependencies": [],
     "image": null,
     "needs": [],
-    "rules": [],
+    "rules": [
+      {
+        "when": "always"
+      }
+    ],
     "script": [
       "echo \"PATH=$PATH\"",
       "echo \"MSYSTEM=$MSYSTEM\"",
