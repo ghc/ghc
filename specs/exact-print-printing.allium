@@ -504,14 +504,29 @@ rule TokCommentDoc {
         --   silently dropped.
 }
 
--- Keyword tokens that lack a natural annotation slot in the surrounding EpAnn
--- structure are routed through the comment machinery so they are printed at
--- the correct source position.
+-- Optional parentheses around the operator in an infix declaration head are
+-- routed through the comment machinery so they are printed at the correct
+-- source position. The kw argument is always the literal "(" or ")"; this
+-- rule is not used for arbitrary keyword tokens such as `where`, `let` or
+-- `of`, which have natural annotation slots in their surrounding EpAnn
+-- structure.
+--
+-- Infix type-level declarations (type synonyms, data types, class
+-- declarations, type families and GADT constructors) and infix function
+-- patterns may carry optional parens around the operator in the declaration
+-- head. These parens are stored as lists of EpToken values (ops, cps) on
+-- the declaration annotation. The structural traversal visits the infix
+-- head in an order that does not naturally interleave with these
+-- surrounding parens, so they are injected into the unallocated comment
+-- pool as synthetic Comment values; the pool's source-position ordering
+-- then emits them at the right place relative to the operator and its
+-- arguments.
 --
 -- This rule covers the full inject → print → recapture lifecycle:
 --
 --   Inject: each present EpToken becomes a synthetic Comment (contents =
---   keyword_origin = kw) and is added to the unallocated comment pool.
+--   keyword_origin = kw, where kw is "(" or ")") and is added to the
+--   unallocated comment pool.
 --
 --   Absolute-span path (ExactPrint): the comment is drained from the pool
 --   in source-position order by EmitPriorComments and printed in place.
@@ -521,10 +536,10 @@ rule TokCommentDoc {
 --   which records a delta-form copy on the applied-comments stack via
 --   applyComment. After the adjacent token is printed, takeAppliedComments
 --   harvests the stack and the comments are embedded in that token's EpaDelta
---   constructor (via comment2LEpaComment), so the keyword's computed delta
+--   constructor (via comment2LEpaComment), so the paren's computed delta
 --   is stored directly on the token that consumed it.
-rule KeywordTokensToComments {
-    when: EpTokensToComments(engine, kw, tokens)
+rule ParenTokensToComments {
+    when: ParenTokensToComments(engine, kw, tokens)
 
     ensures:
         for tok in tokens where tok.kind = present:
@@ -537,6 +552,15 @@ rule KeywordTokensToComments {
 
     @guidance
         -- Implemented by epTokensToComments (ExactPrint.hs) + mkKWComment (Utils.hs).
+        -- The six call sites are the infix declaration heads in:
+        --   - Match FunRhs Prefix   (opens, closes in AnnFunRhs)
+        --   - SynDecl               (ops, cps in AnnSynDecl)
+        --   - ClassDecl/top_matter  (ops, cps in AnnClassDecl)
+        --   - FamilyDecl            (ops, cps in AnnFamilyDecl)
+        --   - HsDataDefn            (ops, cps in AnnDataDefn, via exactDataDefn)
+        --   - ConDeclGADT           (ops, cps in AnnConDeclGADT)
+        -- In every case kw is "(" or ")" and tokens is the list of paren
+        -- tokens (open or close) recorded on the declaration's annotation.
         --
         -- EpToken carries EpaLocation; epaToNoCommentsLocation converts it to
         -- NoCommentsLocation (required by Comment.location). This conversion panics
@@ -713,7 +737,7 @@ surface PrinterInternals {
         EnterLayoutBlock(engine, col: core/LayoutStartCol)
         RecordEofAnnotation(engine, eof: EofAnnotation)
         TokComment(engine, epa_comment: core/EpaComment)
-        EpTokensToComments(engine, kw: String, tokens: List<core/EpToken>)
+        ParenTokensToComments(engine, kw: String, tokens: List<core/EpToken>)
         WriteBackComments(engine, node: LocatedAstNode, prior_comments: List<core/Comment>, post_comments: List<core/Comment>)
         SetListAnchor(engine, ann_list: core/AnnList)
 }

@@ -20,7 +20,7 @@ use "./exact-print-core.allium" as core
 -- that the transform operations manipulate.
 --
 -- kind values as declaration items:
---   val_bind  — a function or pattern binding (ValD / LHsBind)
+--   val_bind  — a function binding (FunBind inside ValD / LHsBind)
 --   type_sig  — a type signature (SigD)
 --   other     — any other top-level declaration
 --
@@ -29,21 +29,38 @@ use "./exact-print-core.allium" as core
 --   match     — a single Match equation inside a FunBind; local_decls is its where-clause
 --   let_expr  — an HsLet expression; local_decls is its let-bindings
 --   let_stmt  — a LetStmt inside a do-block; local_decls is its let-bindings
+--   pat_bind  — a pattern binding (PatBind inside ValD); local_decls is its
+--               where-clause, accessed via hsDeclsPatBind / replaceDeclsPatBind
+--               (Transform.hs:935-969).  These follow the same AnnSortKey
+--               mechanism as the match / let_* contexts (they all bottom out
+--               in replaceDeclsValbinds, sharing the same ValBinds extension
+--               point and SortKey).
 --   class_body  — a ClassDecl; local_decls lists sigs, methods, assoc types and
 --                 assoc type defaults (uses ClassSortKey for ordering)
 --   inst_body   — a ClsInstDecl; same contents as class_body
 --
--- pat_bind where-clauses are accessed via hsDeclsPatBind / replaceDeclsPatBind,
--- which follow the same AnnSortKey mechanism as the match / let_* contexts.
+-- ## Relationship between local_decls and SortKey
+-- For match / let_expr / let_stmt / pat_bind containers the ordering of
+-- local_decls is governed by the SortKey associated with that container's
+-- underlying ValBinds extension point.  Immediately after parsing the key
+-- is in span_order (NoAnnSortKey) — the printer derives ordering from
+-- RealSrcSpans.  On the first ReplaceDeclarations or CaptureOrderBinds call
+-- the key transitions to tag_order (AnnSortKey [BindTag]) — the printer
+-- replays the tag sequence to interleave the separate binds and sigs
+-- sub-lists.  See entity SortKey for the two modes.
+--
+-- For class_body / inst_body containers the analogous mechanism uses
+-- ClassSortKey over four sub-lists rather than two.
 --
 -- Module-level ParsedSource is handled by GetDeclarations(ParsedSource); its
 -- declaration list is a plain ordered list without the mixed bind/sig mechanism.
 external entity Declaration {
     annotation: core/NodeAnnotation
-    kind: val_bind | type_sig | other | match | let_expr | let_stmt | class_body | inst_body
+    kind: val_bind | type_sig | other | match | let_expr | let_stmt | pat_bind | class_body | inst_body
     local_decls: List<Declaration>
         -- For match / let_expr / let_stmt / pat_bind contexts: the mixed list of
-        -- val_bind and type_sig items.  Order is controlled by a BindSortKey.
+        -- val_bind and type_sig items.  Order is controlled by a SortKey
+        -- (see the SortKey entity).
         -- For class_body / inst_body contexts: the mixed list of sigs, methods,
         -- associated types and associated type defaults.  Order is controlled by
         -- a ClassSortKey.
@@ -185,6 +202,14 @@ entity ClassSortKey {
 -- Obtain the list of top-level declarations from a ParsedSource or a
 -- node that contains declarations (match, class body, instance body, etc.).
 -- This is a read-only operation; it does not modify the AST.
+--
+-- For match / let_expr / let_stmt / pat_bind containers, the returned
+-- items is the merge of the underlying val_bind and type_sig sub-collections
+-- (HsLocalBinds / ValBinds keeps binds in a Bag LHsBind and sigs in a
+-- separate [LSig]; this rule presents them as a single source-ordered
+-- List<Declaration>).  The merge is governed by the resident SortKey on
+-- the enclosing ValBinds extension point — see the @guidance below and
+-- the SortKey entity for the two ordering modes.
 rule GetDeclarations {
     when: GetDeclarations(node)
 
@@ -192,6 +217,46 @@ rule GetDeclarations {
         owner: node,
         items: node.local_decls
     )
+
+    -- For mixed bind/sig containers, items is the merge of the underlying
+    -- val_bind and type_sig sub-collections under the container's SortKey.
+    ensures:
+        node.kind in {match, let_expr, let_stmt, pat_bind}
+            implies DeclarationList.created(
+                owner: node,
+                items: mergeBindsAndSigs(node)
+            )
+
+    @guidance
+        -- ## Container kinds requiring a merge
+        -- For match / let_expr / let_stmt / pat_bind nodes the underlying
+        -- HsLocalBinds / ValBinds stores binds and sigs in two separate
+        -- sub-collections — a Bag LHsBind and a [LSig].  GetDeclarations
+        -- normalises these into a single source-ordered List<Declaration>
+        -- via hsDeclsLocalBinds → hsDeclsValBinds → orderedDeclsBinds
+        -- (Utils.hs:656-693):
+        --
+        --   span_order (NoAnnSortKey):
+        --     Sorts the combined list of binds ++ sigs by the RealSrcSpan
+        --     of each item.  This is the state immediately after parsing.
+        --
+        --   tag_order (AnnSortKey [BindTag]):
+        --     Replays the tag sequence in the key, drawing from the binds
+        --     sub-list for each bind_tag and the sigs sub-list for each
+        --     sig_tag.  This is the state after any ReplaceDeclarations or
+        --     replaceDeclsValbinds call.
+        --
+        -- ## Empty cases
+        -- HsIPBinds and EmptyLocalBinds return an empty list rather than
+        -- failing.  Pat-bind where-clauses use hsDeclsPatBind (Transform.hs:935-945)
+        -- which unwraps to the same hsDeclsLocalBinds path.
+        --
+        -- ## Containers that do not require a merge
+        -- Module-level ParsedSource and class_body / inst_body containers
+        -- already store their declaration list in a single ordered
+        -- collection; no merge is performed.  (class_body / inst_body do
+        -- carry a ClassSortKey, but the four sub-lists are merged only
+        -- during printing, not by GetDeclarations.)
 }
 
 -- Replace the declaration list of a node with a new list.
@@ -211,6 +276,28 @@ rule ReplaceDeclarations {
 
     ensures: node.local_decls = new_decls
 
+    -- For mixed bind/sig containers, the resident SortKey transitions to
+    -- tag_order with a tag sequence derived from new_decls.  This is what
+    -- captureOrderBinds (called inside replaceDeclsValbinds, Transform.hs:1089/1097)
+    -- produces, and it replaces any prior NoAnnSortKey or AnnSortKey that
+    -- was in the ValBinds extension point — see rule CaptureOrderBinds.
+    ensures:
+        node.kind in {match, let_expr, let_stmt, pat_bind}
+            implies SortKey.created(
+                mode: tag_order,
+                items: tagDecls(new_decls)
+            )
+
+    -- When new_decls is empty, the underlying HsLocalBinds collapses to
+    -- EmptyLocalBinds (Transform.hs:1082).  This is NOT a no-op on the
+    -- container structure: the `where` keyword annotation is dropped along
+    -- with the ValBinds extension point.  Callers replacing with [] should
+    -- be aware that the resulting node no longer carries a where-clause.
+    ensures:
+        node.kind in {match, let_expr, let_stmt, pat_bind}
+            and new_decls.count = 0
+            implies node.local_decls.count = 0
+
     @guidance
         -- replaceDeclsValbinds (the implementation of ReplaceDeclarations
         -- for HsLocalBinds nodes) separates new_decls into two sub-lists
@@ -219,9 +306,17 @@ rule ReplaceDeclarations {
         -- AnnSortKey [BindTag].  This replaces any prior NoAnnSortKey or
         -- AnnSortKey that was in the ValBinds extension point.
         --
+        -- Empty new_decls: replaceDeclsValbinds _ _ [] = EmptyLocalBinds,
+        -- which has no `where` annotation. Round-trip:
+        --   replaceDecls node [] →   no where-clause printed
+        --   replaceDecls node [d] →  where-clause is re-introduced (the
+        --                            caller-supplied entry DP on d controls
+        --                            the spacing).
+        --
         -- For class_body / inst_body nodes, replaceDeclsClassDecl uses
         -- partitionWithSortKey to separate into four sub-lists and builds
-        -- an AnnSortKey [DeclTag] in a single pass.
+        -- an AnnSortKey [DeclTag] in a single pass — symmetric to the bind/sig
+        -- case but with ClassSortKey instead of SortKey.
 }
 
 -- Insert a declaration into a declaration list at the specified point.
@@ -712,12 +807,13 @@ invariant DeclarationListOwnerOptional {
 }
 
 invariant LocalDeclsAreBindsOrSigs {
-    -- Local declarations inside a match / let_expr / let_stmt context are
-    -- a restricted subset: only function bindings and type signatures may
-    -- appear. The other / match / let_* / class_body / inst_body kinds are
-    -- container kinds that carry local_decls but are never items within them.
+    -- Local declarations inside a match / let_expr / let_stmt / pat_bind
+    -- context are a restricted subset: only function bindings and type
+    -- signatures may appear. The other / match / let_* / pat_bind /
+    -- class_body / inst_body kinds are container kinds that carry
+    -- local_decls but are never items within them.
     for d in Declaration:
-        d.kind in {match, let_expr, let_stmt} implies
+        d.kind in {match, let_expr, let_stmt, pat_bind} implies
             d.local_decls.all(ld => ld.kind in {val_bind, type_sig})
 }
 
