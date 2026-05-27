@@ -1,0 +1,10 @@
+section: compiler
+synopsis: Drop `preloadClosure` from `UnitState`
+issues: #27308
+mrs: !16108
+
+description: {
+    Drop `preloadClosure` from `UnitState` as it is always set to the empty set.
+    This allows to simplify the `UnitState` and related functions.
+}
+

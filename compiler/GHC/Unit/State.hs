@@ -7,7 +7,6 @@ module GHC.Unit.State (
 
         -- * Reading the package config, and processing cmdline args
         UnitState(..),
-        PreloadUnitClosure,
         UnitDatabase (..),
         UnitErr (..),
         emptyUnitState,
@@ -29,7 +28,6 @@ module GHC.Unit.State (
 
         lookupPackageName,
         resolvePackageImport,
-        improveUnit,
         searchPackageId,
         listVisibleModuleNames,
         lookupModuleInAllUnits,
@@ -89,7 +87,6 @@ import GHC.Unit.Home
 
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
-import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.Map
 import GHC.Types.Unique
@@ -268,8 +265,6 @@ originEmpty :: ModuleOrigin -> Bool
 originEmpty (ModOrigin Nothing [] [] False) = True
 originEmpty _ = False
 
-type PreloadUnitClosure = UniqSet UnitId
-
 -- | 'UniqFM' map from 'Unit' to a 'UnitVisibility'.
 type VisibilityMap = UniqMap Unit UnitVisibility
 
@@ -432,13 +427,6 @@ data UnitState = UnitState {
   -- may have the 'exposed' flag be 'False'.)
   unitInfoMap :: UnitInfoMap,
 
-  -- | The set of transitively reachable units according
-  -- to the explicitly provided command line arguments.
-  -- A fully instantiated VirtUnit may only be replaced by a RealUnit from
-  -- this set.
-  -- See Note [VirtUnit to RealUnit improvement]
-  preloadClosure :: PreloadUnitClosure,
-
   -- | A mapping of 'PackageName' to 'UnitId'. If several units have the same
   -- package name (e.g. different instantiations), then we return one of them...
   -- This is used when users refer to packages in Backpack includes.
@@ -491,7 +479,6 @@ data UnitState = UnitState {
 emptyUnitState :: UnitState
 emptyUnitState = UnitState {
     unitInfoMap    = emptyUniqMap,
-    preloadClosure = emptyUniqSet,
     packageNameMap = emptyUFM,
     wireMap        = emptyUniqMap,
     unwireMap      = emptyUniqMap,
@@ -517,7 +504,7 @@ type UnitInfoMap = UniqMap UnitId UnitInfo
 
 -- | Find the unit we know about with the given unit, if any
 lookupUnit :: UnitState -> Unit -> Maybe UnitInfo
-lookupUnit pkgs = lookupUnit' (allowVirtualUnits pkgs) (unitInfoMap pkgs) (preloadClosure pkgs)
+lookupUnit pkgs = lookupUnit' (allowVirtualUnits pkgs) (unitInfoMap pkgs)
 
 -- | A more specialized interface, which doesn't require a 'UnitState' (so it
 -- can be used while we're initializing 'DynFlags')
@@ -525,16 +512,15 @@ lookupUnit pkgs = lookupUnit' (allowVirtualUnits pkgs) (unitInfoMap pkgs) (prelo
 -- Parameters:
 --    * a boolean specifying whether or not to look for on-the-fly renamed interfaces
 --    * a 'UnitInfoMap'
---    * a 'PreloadUnitClosure'
-lookupUnit' :: Bool -> UnitInfoMap -> PreloadUnitClosure -> Unit -> Maybe UnitInfo
-lookupUnit' allowOnTheFlyInst pkg_map closure u = case u of
+lookupUnit' :: Bool -> UnitInfoMap -> Unit -> Maybe UnitInfo
+lookupUnit' allowOnTheFlyInst pkg_map u = case u of
    HoleUnit   -> error "Hole unit"
    RealUnit i -> lookupUniqMap pkg_map (unDefinite i)
    VirtUnit i
       | allowOnTheFlyInst
       -> -- lookup UnitInfo of the indefinite unit to be instantiated and
          -- instantiate it on-the-fly
-         fmap (renameUnitInfo pkg_map closure (instUnitInsts i))
+         fmap (renameUnitInfo pkg_map (instUnitInsts i))
            (lookupUniqMap pkg_map (instUnitInstanceOf i))
 
       | otherwise
@@ -908,7 +894,6 @@ applyTrustFlag prec_map unusable pkgs flag =
 applyPackageFlag
    :: UnitPrecedenceMap
    -> UnitInfoMap
-   -> PreloadUnitClosure
    -> UnusableUnits
    -> Bool -- if False, if you expose a package, it implicitly hides
            -- any previously exposed packages with the same name
@@ -917,10 +902,10 @@ applyPackageFlag
    -> PackageFlag             -- flag to apply
    -> MaybeErr UnitErr VisibilityMap -- Now exposed
 
-applyPackageFlag prec_map pkg_map closure unusable no_hide_others pkgs vm flag =
+applyPackageFlag prec_map pkg_map unusable no_hide_others pkgs vm flag =
   case flag of
     ExposePackage _ arg (ModRenaming b rns) ->
-       case findPackages prec_map pkg_map closure arg pkgs unusable of
+       case findPackages prec_map pkg_map arg pkgs unusable of
          Left ps     -> Failed (PackageFlagErr flag ps)
          Right (p:_) -> Succeeded vm'
           where
@@ -984,7 +969,7 @@ applyPackageFlag prec_map pkg_map closure unusable no_hide_others pkgs vm flag =
          _ -> panic "applyPackageFlag"
 
     HidePackage str ->
-       case findPackages prec_map pkg_map closure (PackageArg str) pkgs unusable of
+       case findPackages prec_map pkg_map (PackageArg str) pkgs unusable of
          Left ps  -> Failed (PackageFlagErr flag ps)
          Right ps -> Succeeded $ foldl' delFromUniqMap vm (map mkUnit ps)
 
@@ -993,12 +978,11 @@ applyPackageFlag prec_map pkg_map closure unusable no_hide_others pkgs vm flag =
 -- if the 'UnitArg' has a renaming associated with it.
 findPackages :: UnitPrecedenceMap
              -> UnitInfoMap
-             -> PreloadUnitClosure
              -> PackageArg -> [UnitInfo]
              -> UnusableUnits
              -> Either [(UnitInfo, UnusableUnitReason)]
                 [UnitInfo]
-findPackages prec_map pkg_map closure arg pkgs unusable
+findPackages prec_map pkg_map arg pkgs unusable
   = let ps = mapMaybe (finder arg) pkgs
     in if null ps
         then Left (mapMaybe (\(x,y) -> finder arg x >>= \x' -> return (x',y))
@@ -1016,7 +1000,7 @@ findPackages prec_map pkg_map closure arg pkgs unusable
             -> Just p
           VirtUnit inst
             | instUnitInstanceOf inst == unitId p
-            -> Just (renameUnitInfo pkg_map closure (instUnitInsts inst) p)
+            -> Just (renameUnitInfo pkg_map (instUnitInsts inst) p)
           _ -> Nothing
 
 selectPackages :: UnitPrecedenceMap -> PackageArg -> [UnitInfo]
@@ -1031,10 +1015,10 @@ selectPackages prec_map arg pkgs unusable
         else Right (sortByPreference prec_map ps, rest)
 
 -- | Rename a 'UnitInfo' according to some module instantiation.
-renameUnitInfo :: UnitInfoMap -> PreloadUnitClosure -> [(ModuleName, Module)] -> UnitInfo -> UnitInfo
-renameUnitInfo pkg_map closure insts conf =
+renameUnitInfo :: UnitInfoMap -> [(ModuleName, Module)] -> UnitInfo -> UnitInfo
+renameUnitInfo pkg_map insts conf =
     let hsubst = listToUFM insts
-        smod  = renameHoleModule' pkg_map closure hsubst
+        smod  = renameHoleModule' pkg_map hsubst
         new_insts = map (\(k,v) -> (k,smod v)) (unitInstantiations conf)
     in conf {
         unitInstantiations = new_insts,
@@ -1632,7 +1616,7 @@ mkUnitState logger cfg = do
   -- user tries to enable an unusable package, we should let them know.
   --
   vis_map2 <- mayThrowUnitErr
-                $ foldM (applyPackageFlag prec_map prelim_pkg_db emptyUniqSet unusable
+                $ foldM (applyPackageFlag prec_map prelim_pkg_db unusable
                         (unitConfigHideAll cfg) pkgs1)
                             vis_map1 other_flags
 
@@ -1661,7 +1645,7 @@ mkUnitState logger cfg = do
                         | otherwise = vis_map2
                 plugin_vis_map2
                     <- mayThrowUnitErr
-                        $ foldM (applyPackageFlag prec_map prelim_pkg_db emptyUniqSet unusable
+                        $ foldM (applyPackageFlag prec_map prelim_pkg_db unusable
                                 hide_plugin_pkgs pkgs1)
                              plugin_vis_map1
                              (reverse (unitConfigFlagsPlugins cfg))
@@ -1713,7 +1697,7 @@ mkUnitState logger cfg = do
                     $ closeUnitDeps pkg_db
                     $ zip (map toUnitId preload3) (repeat Nothing)
 
-  let mod_map1 = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet vis_map
+  let mod_map1 = mkModuleNameProvidersMap logger cfg pkg_db vis_map
       mod_map2 = mkUnusableModuleNameProvidersMap unusable
       mod_map = mod_map2 `plusUniqMap` mod_map1
 
@@ -1723,9 +1707,8 @@ mkUnitState logger cfg = do
          , explicitUnits                = explicit_pkgs
          , homeUnitDepends              = home_unit_deps
          , unitInfoMap                  = pkg_db
-         , preloadClosure               = emptyUniqSet
          , moduleNameProvidersMap       = mod_map
-         , pluginModuleNameProvidersMap = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet plugin_vis_map
+         , pluginModuleNameProvidersMap = mkModuleNameProvidersMap logger cfg pkg_db plugin_vis_map
          , packageNameMap               = pkgname_map
          , wireMap                      = wired_map
          , unwireMap                    = listToUniqMap [ (v,k) | (k,v) <- nonDetUniqMapToList wired_map ]
@@ -1765,10 +1748,9 @@ mkModuleNameProvidersMap
   :: Logger
   -> UnitConfig
   -> UnitInfoMap
-  -> PreloadUnitClosure
   -> VisibilityMap
   -> ModuleNameProvidersMap
-mkModuleNameProvidersMap logger cfg pkg_map closure vis_map =
+mkModuleNameProvidersMap logger cfg pkg_map vis_map =
     -- What should we fold on?  Both situations are awkward:
     --
     --    * Folding on the visibility map means that we won't create
@@ -1840,7 +1822,7 @@ mkModuleNameProvidersMap logger cfg pkg_map closure vis_map =
     hiddens = [(m, mkModMap pk m ModHidden) | m <- hidden_mods]
 
     pk = mkUnit pkg
-    unit_lookup uid = lookupUnit' (unitConfigAllowVirtual cfg) pkg_map closure uid
+    unit_lookup uid = lookupUnit' (unitConfigAllowVirtual cfg) pkg_map uid
                         `orElse` pprPanic "unit_lookup" (ppr uid)
 
     exposed_mods = unitExposedModules pkg
@@ -2191,44 +2173,16 @@ fsPackageName info = fs
    where
       PackageName fs = unitPackageName info
 
-
--- | Given a fully instantiated 'InstantiatedUnit', improve it into a
--- 'RealUnit' if we can find it in the package database.
-improveUnit :: UnitState -> Unit -> Unit
-improveUnit state u = improveUnit' (unitInfoMap state) (preloadClosure state) u
-
--- | Given a fully instantiated 'InstantiatedUnit', improve it into a
--- 'RealUnit' if we can find it in the package database.
-improveUnit' :: UnitInfoMap -> PreloadUnitClosure -> Unit -> Unit
-improveUnit' _       _       uid@(RealUnit _) = uid -- short circuit
-improveUnit' pkg_map closure uid =
-    -- Do NOT lookup indefinite ones, they won't be useful!
-    case lookupUnit' False pkg_map closure uid of
-        Nothing  -> uid
-        Just pkg ->
-            -- Do NOT improve if the indefinite unit id is not
-            -- part of the closure unique set.  See
-            -- Note [VirtUnit to RealUnit improvement]
-            if unitId pkg `elementOfUniqSet` closure
-                then mkUnit pkg
-                else uid
-
--- | Check the database to see if we already have an installed unit that
--- corresponds to the given 'InstantiatedUnit'.
---
--- Return a `UnitId` which either wraps the `InstantiatedUnit` unchanged or
--- references a matching installed unit.
---
--- See Note [VirtUnit to RealUnit improvement]
-instUnitToUnit :: UnitState -> InstantiatedUnit -> Unit
-instUnitToUnit state iuid =
+-- | Return a `UnitId` which either wraps the `InstantiatedUnit` unchanged.
+instUnitToUnit :: InstantiatedUnit -> Unit
+instUnitToUnit iuid =
     -- NB: suppose that we want to compare the instantiated
     -- unit p[H=impl:H] against p+abcd (where p+abcd
     -- happens to be the existing, installed version of
     -- p[H=impl:H].  If we *only* wrap in p[H=impl:H]
     -- VirtUnit, they won't compare equal; only
     -- after improvement will the equality hold.
-    improveUnit state $ VirtUnit iuid
+    VirtUnit iuid
 
 
 -- | Substitution on module variables, mapping module names to module
@@ -2240,30 +2194,30 @@ type ShHoleSubst = ModuleNameEnv Module
 -- @p[A=\<A>]:B@ maps to @p[A=q():A]:B@ with @A=q():A@;
 -- similarly, @\<A>@ maps to @q():A@.
 renameHoleModule :: UnitState -> ShHoleSubst -> Module -> Module
-renameHoleModule state = renameHoleModule' (unitInfoMap state) (preloadClosure state)
+renameHoleModule state = renameHoleModule' (unitInfoMap state)
 
 -- | Substitutes holes in a 'Unit', suitable for renaming when
 -- an include occurs; see Note [Representation of module/name variables].
 --
 -- @p[A=\<A>]@ maps to @p[A=\<B>]@ with @A=\<B>@.
 renameHoleUnit :: UnitState -> ShHoleSubst -> Unit -> Unit
-renameHoleUnit state = renameHoleUnit' (unitInfoMap state) (preloadClosure state)
+renameHoleUnit state = renameHoleUnit' (unitInfoMap state)
 
--- | Like 'renameHoleModule', but requires only 'ClosureUnitInfoMap'
+-- | Like 'renameHoleModule', but requires only 'UnitInfoMap'
 -- so it can be used by "GHC.Unit.State".
-renameHoleModule' :: UnitInfoMap -> PreloadUnitClosure -> ShHoleSubst -> Module -> Module
-renameHoleModule' pkg_map closure env m
+renameHoleModule' :: UnitInfoMap -> ShHoleSubst -> Module -> Module
+renameHoleModule' pkg_map env m
   | not (isHoleModule m) =
-        let uid = renameHoleUnit' pkg_map closure env (moduleUnit m)
+        let uid = renameHoleUnit' pkg_map env (moduleUnit m)
         in mkModule uid (moduleName m)
   | Just m' <- lookupUFM env (moduleName m) = m'
   -- NB m = <Blah>, that's what's in scope.
   | otherwise = m
 
--- | Like 'renameHoleUnit, but requires only 'ClosureUnitInfoMap'
+-- | Like 'renameHoleUnit', but requires only 'UnitInfoMap'
 -- so it can be used by "GHC.Unit.State".
-renameHoleUnit' :: UnitInfoMap -> PreloadUnitClosure -> ShHoleSubst -> Unit -> Unit
-renameHoleUnit' pkg_map closure env uid =
+renameHoleUnit' :: UnitInfoMap -> ShHoleSubst -> Unit -> Unit
+renameHoleUnit' pkg_map env uid =
     case uid of
       (VirtUnit
         InstantiatedUnit{ instUnitInstanceOf = cid
@@ -2271,20 +2225,15 @@ renameHoleUnit' pkg_map closure env uid =
                         , instUnitHoles      = fh })
           -> if isNullUFM (intersectUFM_C const (udfmToUfm (getUniqDSet fh)) env)
                 then uid
-                -- Functorially apply the substitution to the instantiation,
-                -- then check the 'ClosureUnitInfoMap' to see if there is
-                -- a compiled version of this 'InstantiatedUnit' we can improve to.
-                -- See Note [VirtUnit to RealUnit improvement]
-                else improveUnit' pkg_map closure $
-                        mkVirtUnit cid
-                            (map (\(k,v) -> (k, renameHoleModule' pkg_map closure env v)) insts)
+                else mkVirtUnit cid
+                          (map (\(k,v) -> (k, renameHoleModule' pkg_map env v)) insts)
       _ -> uid
 
 -- | Injects an 'InstantiatedModule' to 'Module' (see also
 -- 'instUnitToUnit'.
-instModuleToModule :: UnitState -> InstantiatedModule -> Module
-instModuleToModule pkgstate (Module iuid mod_name) =
-    mkModule (instUnitToUnit pkgstate iuid) mod_name
+instModuleToModule :: InstantiatedModule -> Module
+instModuleToModule (Module iuid mod_name) =
+    mkModule (instUnitToUnit iuid) mod_name
 
 -- | Print unit-ids with UnitInfo found in the given UnitState
 pprWithUnitState :: UnitState -> SDoc -> SDoc
