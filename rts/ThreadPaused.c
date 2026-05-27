@@ -183,6 +183,30 @@ stackSqueeze(Capability *cap, StgTSO *tso, StgPtr bottom)
     }
 }
 
+/*
+ * Check whether tso is the owner of the black hole bh.
+ *
+ * We must call this from the capability that runs tso,
+ * since that guarantees that the writes to bh->indirectee
+ * by tso claiming ownership have been visible. If another
+ * tso has claimed it again afterwards we can safely suspend
+ * our work.
+ */
+static bool
+threadPausedBlackHoleOwner(StgTSO *tso, StgClosure *bh)
+{
+    StgClosure *ind = RELAXED_LOAD(&((StgInd*)bh)->indirectee);
+    if (ind == (StgClosure*)tso) {
+        return true;
+    }
+    const StgInfoTable *ind_info = GET_INFO(UNTAG_CLOSURE(ind));
+    if (ind_info == &stg_BLOCKING_QUEUE_CLEAN_info
+        || ind_info == &stg_BLOCKING_QUEUE_DIRTY_info) {
+        return ((StgBlockingQueue*)UNTAG_CLOSURE(ind))->owner == tso;
+    }
+    return false;
+}
+
 /* -----------------------------------------------------------------------------
  * Pausing a thread
  *
@@ -255,11 +279,10 @@ threadPaused(Capability *cap, StgTSO *tso)
             // Note [suspend duplicate work]
             // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             // If the info table is a WHITEHOLE or a BLACKHOLE, then
-            // another thread has claimed it (via the SET_INFO()
-            // below), or is in the process of doing so.  In that case
-            // we want to suspend the work that the current thread has
-            // done on this thunk and wait until the other thread has
-            // finished.
+            // some thread has claimed it, or is in the process of doing
+            // so. In that case we want to suspend the work that the
+            // current thread has done on this thunk and wait until the
+            // other thread has finished.
             //
             // If eager blackholing is taking place, it could be the
             // case that the blackhole points to the current
@@ -287,8 +310,8 @@ threadPaused(Capability *cap, StgTSO *tso)
             // Note that great care is required when entering computations
             // suspended by this mechanism. See Note [AP_STACKs must be eagerly
             // blackholed] for details.
-            if (((bh_info == &stg_BLACKHOLE_info)
-                 && (RELAXED_LOAD(&((StgInd*)bh)->indirectee) != (StgClosure*)tso))
+            if ((IS_BLACKHOLE_INFO(bh_info)
+                && !threadPausedBlackHoleOwner(tso, bh))
                 || (bh_info == &stg_WHITEHOLE_info))
             {
                 debugTrace(DEBUG_squeeze,
@@ -318,14 +341,14 @@ threadPaused(Capability *cap, StgTSO *tso)
             // If we have a frame that is already eagerly blackholed, we
             // shouldn't overwrite its payload: There may already be a blocking
             // queue (see #26324).
-            if(frame_info == &stg_bh_upd_frame_info) {
-                // eager black hole: we do nothing
+            if(frame_info == &stg_bh_upd_frame_info
+               || IS_BLACKHOLE_INFO(bh_info)) {
+                // already a black hole: we do nothing
 
-                // it should be a black hole that we own
-                ASSERT(bh_info == &stg_BLACKHOLE_info ||
-                       bh_info == &__stg_EAGER_BLACKHOLE_info ||
-                       bh_info == &stg_CAF_BLACKHOLE_info);
-                ASSERT(blackHoleOwner(bh) == tso || blackHoleOwner(bh) == NULL);
+                // it should be a black hole (but we may not own it, as another
+                // thread could have raced us to claim it)
+                ASSERT(IS_BLACKHOLE_INFO(bh_info));
+
             } else {
                 // lazy black hole
 

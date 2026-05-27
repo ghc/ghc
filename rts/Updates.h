@@ -190,9 +190,9 @@
  * frame is encountered, it checks the info table of the updatee and:
  *
  *  - if it is `BLACKHOLE`, then the thunk has already been claimed for evaluation
- *    by another thread, and the yielding thread is instead added to the
- *    `BLACKHOLE`'s blocking queue (see Note [suspend duplicate work] in
- *    `ThreadPaused.c`).
+ *    by some thread. If that's not the yielding thread itself, the yielding thread
+ *    is added to the `BLACKHOLE`'s blocking queue (see Note [suspend duplicate
+ *    work] in `ThreadPaused.c`).
  *
  *  - if not, then it blackholes the thunk as done in eager blackholing (but
  *    using the `BLACKHOLE_info` info table instead of `EAGER_BLACKHOLE_info`).
