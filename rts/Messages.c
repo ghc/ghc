@@ -188,10 +188,7 @@ uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
     // BLACKHOLE has already been updated, and GC has shorted out the
     // indirection, so the pointer no longer points to a BLACKHOLE at
     // all.
-    if (bh_info != &stg_BLACKHOLE_info &&
-        bh_info != &stg_CAF_BLACKHOLE_info &&
-        bh_info != &__stg_EAGER_BLACKHOLE_info &&
-        bh_info != &stg_WHITEHOLE_info) {
+    if (!IS_BLACKHOLE_OR_WHITEHOLE_INFO(bh_info)) {
         return 0;
     }
 
@@ -350,10 +347,7 @@ StgTSO * blackHoleOwner (StgClosure *bh)
 
     info = RELAXED_LOAD(&bh->header.info);
 
-    if (info != &stg_BLACKHOLE_info &&
-        info != &stg_CAF_BLACKHOLE_info &&
-        info != &__stg_EAGER_BLACKHOLE_info &&
-        info != &stg_WHITEHOLE_info) {
+    if (!IS_BLACKHOLE_OR_WHITEHOLE_INFO(info)) {
         return NULL;
     }
 

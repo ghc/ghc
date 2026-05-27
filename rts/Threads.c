@@ -474,7 +474,7 @@ checkBlockingQueues (Capability *cap, StgTSO *tso)
         // thing the result would be the same in almost all cases. See #20093.
         p = UNTAG_CLOSURE(bq->bh);
         const StgInfoTable *pinfo = ACQUIRE_LOAD(&p->header.info);
-        if (pinfo != &stg_BLACKHOLE_info ||
+        if (!IS_BLACKHOLE_INFO(pinfo) ||
             (RELAXED_LOAD(&((StgInd *)p)->indirectee) != (StgClosure*)bq))
         {
             wakeBlockingQueue(cap,bq);
@@ -498,10 +498,7 @@ updateThunk (Capability *cap, StgTSO *tso, StgClosure *thunk, StgClosure *val)
     const StgInfoTable *i;
 
     i = ACQUIRE_LOAD(&thunk->header.info);
-    if (i != &stg_BLACKHOLE_info &&
-        i != &stg_CAF_BLACKHOLE_info &&
-        i != &__stg_EAGER_BLACKHOLE_info &&
-        i != &stg_WHITEHOLE_info) {
+    if (!IS_BLACKHOLE_OR_WHITEHOLE_INFO(i)) {
         updateWithIndirection(cap, thunk, val);
         return;
     }
