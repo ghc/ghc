@@ -13,6 +13,67 @@ information directly into every AST node to allow the tree to be reprinted _exac
 original source, byte-for-byte (modulo tab expansion).  When a tool modifies the AST it adjusts
 only the annotations it needs to change; all surrounding nodes reprint themselves unchanged.
 
+## Background: the syntax tree
+
+The AST of the source program is represented using the data types defined in `Language.Haskell.Syntax.*`.
+This data type uses the "Trees That Grow (TTG)" plan;
+see [Implementing trees that grow](https://gitlab.haskell.org/ghc/ghc/-/wikis/implementing-trees-that-grow)
+
+For example, in (GHC-independent) `Language.Haskell.Syntax.Expr`:
+```
+data HsExpr p
+  = ... many constructors including ...
+  | HsLet       (XLet p)
+                (HsLocalBinds p)
+                (LHsExpr  p)
+
+type family XLet p
+type LHsExpr p = XRec p (HsExpr p)
+
+```
+Note that
+* The `(XLet p)` field is the *extension field* of the `HsLet` data constructor,
+  where `XLet` is a type family.
+* Almost every node is wrapped in an `XRec`, another type family. That makes it easy
+  for clients to attach arbitrary information to each node.
+
+GHC specialises this data a type in `GHC.Hs.*`, as follows:
+```
+data Pass = Parsed | Renamed | Typechecked
+
+data GhcPass (c :: Pass) where
+  GhcPs :: GhcPass 'Parsed
+  GhcRn :: GhcPass 'Renamed
+  GhcTc :: GhcPass 'Typechecked
+
+type family XRec p a = r | r -> a
+type instance XRec (GhcPass p) t = XRecGhc t
+
+-- (XRecGhc tree) wraps `tree` in a GHC-specific,
+-- but pass-independent, source location
+type XRecGhc t = GenLocated (Anno t) t
+
+data GenLocated l e = L l e
+type family Anno t
+```
+So, via `XRec`, every node `e :: t` in the GHC-specific version of HsSyn is wrapped in
+a `L ann e`, where `ann :: Anno t` is the annotation on the node.
+
+Notice that there are two places we can hang information:
+* (EXT) **Constructor-specific punctuation**: the extension field of each data constructor
+  can contain information that is specific to that constructor.  Example: the location
+  of the keywords `let` and `in` for the `HsLet` construct.
+
+* (XREC) **Entire-node information**: the `Anno t` field that wraps almost every node in the
+  syntax tree can contain information that is needed for *every* node.  Classic example:
+  the `SrcSpan` of the node.
+
+**NOTE**: currently there is information in (XREC) that more properly belongs in (EXT).
+A refactoring project is under way to put this right.
+
+
+## File layout
+
 The subsystem lives primarily in `utils/check-exact/` and is exposed through three main layers:
 
 | Layer | Key operation | Purpose |
