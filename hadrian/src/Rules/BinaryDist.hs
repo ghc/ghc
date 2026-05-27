@@ -3,18 +3,19 @@ module Rules.BinaryDist where
 
 import CommandLine
 import Context
+import Data.Either
+import qualified Data.Set as Set
 import Expression
+import Hadrian.Oracles.Path (fixUnixPathsOnWindows)
+import Oracles.Flavour
 import Oracles.Setting
 import Packages
+import Rules.Generate (generateSettings)
 import Settings
+import qualified System.Directory.Extra as IO
 import Settings.Program (programContext)
 import Target
 import Utilities
-import qualified System.Directory.Extra as IO
-import Data.Either
-import qualified Data.Set as Set
-import Oracles.Flavour
-import Rules.Generate (generateSettings)
 
 {-
 Note [Binary distributions]
@@ -343,7 +344,25 @@ bindistRules = do
         ghcRoot <- topDirectory
         copyFile (ghcRoot -/- "aclocal.m4") (ghcRoot -/- "distrib" -/- "aclocal.m4")
         copyDirectory (ghcRoot -/- "m4") (ghcRoot -/- "distrib")
-        buildWithCmdOptions [] $
+
+        -- Note [Autoreconf unix paths from ACLOCAL_PATH]
+        -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        -- On Windows, autoreconf fails when the ACLOCAL_PATH env variable contains Windows-
+        -- style paths. This happens because MSYS2 automatically converts env variables to
+        -- Windows-style paths. To fix this, we convert ACLOCAL_PATH back to Unix style.
+        -- This is done both in the boot Python script and here when building a bindist.
+        win_host <- isWinHost
+        env <- if not win_host
+          then pure []
+          else do
+            aclocalPathMay <- getEnv "ACLOCAL_PATH"
+            case aclocalPathMay of
+              Nothing -> pure []
+              Just aclocalPath -> do
+                unixAclocalPath <- fixUnixPathsOnWindows aclocalPath
+                pure [AddEnv "ACLOCAL_PATH" unixAclocalPath]
+
+        buildWithCmdOptions env $
             target (vanillaContext Stage1 ghc) (Autoreconf $ ghcRoot -/- "distrib") [] []
         -- We clean after ourselves, moving the configure script we generated in
         -- our bindist dir

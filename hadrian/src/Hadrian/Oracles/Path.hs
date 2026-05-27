@@ -1,6 +1,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Hadrian.Oracles.Path (
-    lookupInPath, fixAbsolutePathOnWindows, pathOracle
+    lookupInPath, fixAbsolutePathOnWindows, fixUnixPathsOnWindows,
+    pathOracle
     ) where
 
 import Control.Monad
@@ -33,6 +34,14 @@ fixAbsolutePathOnWindows path =
     else
         return path
 
+-- | Fix a unix path list on Windows:
+-- * "C:\\foo\\bar;C:\\msys2\\bin" => "/c/foo/bar:/c/msys2/bin"
+fixUnixPathsOnWindows :: FilePath -> Action FilePath
+fixUnixPathsOnWindows paths =
+    if isWindows
+    then askOracle $ UnixPathList paths
+    else return paths
+
 newtype LookupInPath = LookupInPath String
     deriving (Binary, Eq, Hashable, NFData, Show)
 type instance RuleResult LookupInPath = String
@@ -40,6 +49,10 @@ type instance RuleResult LookupInPath = String
 newtype WindowsPath = WindowsPath FilePath
     deriving (Binary, Eq, Hashable, NFData, Show)
 type instance RuleResult WindowsPath = String
+
+newtype UnixPathList = UnixPathList FilePath
+    deriving (Binary, Eq, Hashable, NFData, Show)
+type instance RuleResult UnixPathList = String
 
 -- | Oracles for looking up paths. These are slow and require caching.
 pathOracle :: Rules ()
@@ -49,6 +62,12 @@ pathOracle = do
         let windowsPath = unifyPath $ dropWhileEnd isSpace out
         putVerbose $ "| Windows path mapping: " ++ path ++ " => " ++ windowsPath
         return windowsPath
+
+    void $ addOracleCache $ \(UnixPathList paths) -> do
+        Stdout out <- quietly $ cmd ["cygpath", "-p", "-u", paths]
+        let unixPaths = unifyPath $ dropWhileEnd isSpace out
+        putVerbose $ "| Unix path mapping: " ++ paths ++ " => " ++ unixPaths
+        return unixPaths
 
     void $ addOracleCache $ \(LookupInPath name) -> do
         path <- liftIO getSearchPath

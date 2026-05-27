@@ -52,9 +52,8 @@ def autoreconf():
     # Run autoreconf on everything that needs it.
     processes = {}
     if os.name == 'nt':
-        # Get the normalized ACLOCAL_PATH for Windows
-        # This is necessary since on Windows this will be a Windows
-        # path, which autoreconf doesn't know doesn't know how to handle.
+        # Convert ACLOCAL_PATH env variable to unix style paths on Windows
+        # See Note [Autoreconf unix paths from ACLOCAL_PATH]
         ac_local = os.getenv('ACLOCAL_PATH', '')
         ac_local_arg = re.sub(r';', r':', ac_local)
         ac_local_arg = re.sub(r'\\', r'/', ac_local_arg)
