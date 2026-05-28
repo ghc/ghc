@@ -2920,11 +2920,11 @@ isSafeModule m = do
 
     packageTrusted hsc_env md
         | isHomeModule (hsc_home_unit hsc_env) md = True
-        | otherwise = unitIsTrusted $ unsafeLookupUnit (hsc_units hsc_env) (moduleUnit md)
+        | otherwise = isUnitTrusted (hsc_units hsc_env) (moduleUnit md)
 
     tallyPkgs hsc_env deps | not (packageTrustOn dflags) = (S.empty, S.empty)
                           | otherwise = S.partition part deps
-        where part pkg   = unitIsTrusted $ unsafeLookupUnitId unit_state pkg
+        where part pkg   = isUnitIdTrusted unit_state pkg
               unit_state = hsc_units hsc_env
               dflags     = hsc_dflags hsc_env
 
