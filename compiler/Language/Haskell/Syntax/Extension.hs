@@ -108,7 +108,7 @@ dataConCantHappen x = case x of {}
 -- See Note [XRec and SrcSpans in the AST]
 type family XRec p a = r | r -> a
 
-type family Anno a = b -- See Note [XRec and Anno in the AST] in GHC.Parser.Annotation
+type family Anno a -- See Note [XRec and Anno in the AST] in GHC.Parser.Annotation
 
 {-
 Note [XRec and SrcSpans in the AST]
