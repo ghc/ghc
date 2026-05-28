@@ -1,0 +1,8 @@
+section: bytecode
+synopsis: Add support for textual output of bytecode file content
+issues: #26909
+mrs: !16386
+description: {
+    There is now an option `--show-byte-code` for outputting relevant
+    content of a bytecode file in textual form.
+}

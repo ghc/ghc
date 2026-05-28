@@ -6,7 +6,7 @@
 {- | This module implements the serialization of bytecode objects to and from disk.
 -}
 module GHC.ByteCode.Serialize
-  ( writeBinByteCode, readBinByteCode
+  ( writeBinByteCode, readBinByteCode, readOnDiskModuleByteCode
   , ModuleByteCode(..)
   , BytecodeLibX(..)
   , BytecodeLib

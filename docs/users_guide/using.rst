@@ -453,6 +453,13 @@ The available mode flags are:
 
     Read an interface file and dump relevent parts of it as text to ``stdout``.
 
+.. ghc-flag:: --show-byte-code ⟨file⟩
+    :shortdesc: display contents of a bytecode file.
+    :type: mode
+    :category: modes
+
+    Read a bytecode file and dump relevant parts of it as text to ``stdout``.
+
 .. ghc-flag:: --supported-extensions
               --supported-languages
     :shortdesc: display the supported language extensions
