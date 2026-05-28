@@ -7,6 +7,7 @@ module GHCi.ResolvedBCO
   , isLittleEndian
   , BCOByteArray(..)
   , mkBCOByteArray
+  , fromBCOByteArray
   ) where
 
 #include "MachDeps.h"
@@ -20,7 +21,6 @@ import GHCi.BreakArray
 import Control.Monad
 import Data.Array.Base (foldrArray, listArray)
 import Data.ByteString.Builder.Extra
-import Foreign.Storable
 #endif
 
 import Data.Binary (Binary(..))
@@ -32,6 +32,7 @@ import GHC.Generics
 
 import GHC.Exts
 import Data.Array.Base (UArray(..))
+import Foreign.Storable
 import qualified GHC.Exts.Heap as Heap
 
 #include "MachDeps.h"
@@ -91,13 +92,11 @@ data BCOByteArray a
         getBCOByteArray :: !ByteArray#
   }
 
-#if SIZEOF_HSWORD == 4
 fromBCOByteArray :: forall a . Storable a => BCOByteArray a -> UArray Int a
 fromBCOByteArray (BCOByteArray ba#) = UArray 0 (n - 1) n ba#
   where
     len# = sizeofByteArray# ba#
     n = (I# len#) `div` sizeOf (undefined :: a)
-#endif
 
 mkBCOByteArray :: UArray Int a -> BCOByteArray a
 mkBCOByteArray (UArray _ _ _ arr) = BCOByteArray arr
