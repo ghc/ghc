@@ -940,7 +940,7 @@ instance HiePass p => ToHie (Located (PatSynBind (GhcPass p) (GhcPass p))) where
                                              [PatSynFieldContext (RecordPatSynField (GhcPass p))]
           toBind (PrefixCon _ args) = PrefixCon noExtField $ map (C Use) args
           toBind (InfixCon _ a b) = InfixCon noExtField (C Use a) (C Use b)
-          toBind (RecCon _ r) = RecCon noExtField $ map (PSC detSpan) r
+          toBind (RecCon x r) = RecCon x $ map (PSC detSpan) r
 
 instance ToHie a => ToHie (WithUserRdr a) where
   toHie (WithUserRdr _ a) = toHie a
@@ -1807,7 +1807,7 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
     where scaled_args_scope :: [HsConDeclField GhcRn] -> Scope
           scaled_args_scope = foldr combineScopes NoScope . map (mkScope . cdf_type)
 
-instance ToHie (LocatedL [LocatedA (HsConDeclRecField GhcRn)]) where
+instance ToHie (LocatedA [LocatedA (HsConDeclRecField GhcRn)]) where
   toHie (L span decls) = concatM $
     [ locOnly (locA span)
     , toHie decls
@@ -2079,7 +2079,7 @@ instance ToHie PendingRnSplice where
   toHie (PendingRnSplice _ e) = toHie e
 
 instance (HiePass p, Data (IdGhcP p))
-  => ToHie (GenLocated SrcSpanAnnL (BooleanFormula (GhcPass p))) where
+  => ToHie (GenLocated SrcSpanAnnBF (BooleanFormula (GhcPass p))) where
     toHie (L span form) =  concatM $ makeNode form (locA span) : case form of
       Var a ->
         [ toHie $ C Use a
@@ -2291,8 +2291,8 @@ instance ToHie (LocatedA (ImportDecl GhcRn)) where
         , maybe (pure []) goIE hidden
         ]
     where
-      goIE (hiding, (L sp liens)) = concatM $
-        [ locOnly (locA sp)
+      goIE (hiding, liens) = concatM $
+        [ locOnly (locA (listLocation liens))
         , toHie $ map (IEC c) liens
         ]
         where

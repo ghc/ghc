@@ -13,6 +13,10 @@
       (EpaSpan { DumpSemis.hs:1:1-6 }))
      (EpTok
       (EpaSpan { DumpSemis.hs:1:18-22 }))
+     ((,,)
+      (NoEpTok)
+      (NoEpTok)
+      [])
      [(AddSemiAnn
        (EpTok
         (EpaSpan { DumpSemis.hs:4:1 })))
@@ -70,18 +74,19 @@
       []))
     (ImportDecl
      (XImportDeclPass
-      (EpAnn
-       (EpaSpan { DumpSemis.hs:5:1-19 })
-       (EpAnnImportDecl
-        (EpTok
-         (EpaSpan { DumpSemis.hs:5:1-6 }))
-        (Nothing)
-        (Nothing)
-        (Nothing)
-        (Nothing)
-        (Nothing)
-        (Nothing))
-       (EpaComments
+      (EpAnnImportDecl
+       (EpTok
+        (EpaSpan { DumpSemis.hs:5:1-6 }))
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       ((,,,)
+        (NoEpTok)
+        (EpTok (EpaSpan { DumpSemis.hs:5:18 }))
+        (EpTok (EpaSpan { DumpSemis.hs:5:19 }))
         []))
       (NoSourceText)
       (False))
@@ -102,24 +107,7 @@
      (Just
       ((,)
        (Exactly)
-       (L
-        (EpAnn
-         (EpaSpan { DumpSemis.hs:5:18-19 })
-         (AnnList
-          (Nothing)
-          (ListParens
-           (EpTok
-            (EpaSpan { DumpSemis.hs:5:18 }))
-           (EpTok
-            (EpaSpan { DumpSemis.hs:5:19 })))
-          []
-          ((,)
-           (NoEpTok)
-           [])
-          [])
-         (EpaComments
-          []))
-        [])))))
+       []))))
   ,(L
     (EpAnn
      (EpaSpan { DumpSemis.hs:7:1-16 })
@@ -137,18 +125,19 @@
       []))
     (ImportDecl
      (XImportDeclPass
-      (EpAnn
-       (EpaSpan { DumpSemis.hs:7:1-16 })
-       (EpAnnImportDecl
-        (EpTok
-         (EpaSpan { DumpSemis.hs:7:1-6 }))
-        (Nothing)
-        (Nothing)
-        (Nothing)
-        (Nothing)
-        (Nothing)
-        (Nothing))
-       (EpaComments
+      (EpAnnImportDecl
+       (EpTok
+        (EpaSpan { DumpSemis.hs:7:1-6 }))
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       ((,,,)
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
         []))
       (NoSourceText)
       (False))
@@ -243,10 +232,8 @@
               []))
             (HsTupleTy
              (AnnParens
-              (EpTok
-               (EpaSpan { DumpSemis.hs:9:11 }))
-              (EpTok
-               (EpaSpan { DumpSemis.hs:9:12 })))
+              (EpTok (EpaSpan { DumpSemis.hs:9:11 }))
+              (EpTok (EpaSpan { DumpSemis.hs:9:12 })))
              (HsBoxedOrConstraintTuple)
              []))))))))))
   ,(L
@@ -554,10 +541,8 @@
               []))
             (HsTupleTy
              (AnnParens
-              (EpTok
-               (EpaSpan { DumpSemis.hs:14:11 }))
-              (EpTok
-               (EpaSpan { DumpSemis.hs:14:12 })))
+              (EpTok (EpaSpan { DumpSemis.hs:14:11 }))
+              (EpTok (EpaSpan { DumpSemis.hs:14:12 })))
              (HsBoxedOrConstraintTuple)
              []))))))))))
   ,(L
@@ -829,10 +814,8 @@
               []))
             (HsTupleTy
              (AnnParens
-              (EpTok
-               (EpaSpan { DumpSemis.hs:21:11 }))
-              (EpTok
-               (EpaSpan { DumpSemis.hs:21:12 })))
+              (EpTok (EpaSpan { DumpSemis.hs:21:11 }))
+              (EpTok (EpaSpan { DumpSemis.hs:21:12 })))
              (HsBoxedOrConstraintTuple)
              []))))))))))
   ,(L
@@ -1609,14 +1592,10 @@
                (EpUniTok
                 (EpaSpan { DumpSemis.hs:31:22-23 })
                 (NormalSyntax)))
-              [(EpTok
-                (EpaSpan { DumpSemis.hs:31:6 }))
-              ,(EpTok
-                (EpaSpan { DumpSemis.hs:31:7 }))]
-              [(EpTok
-                (EpaSpan { DumpSemis.hs:31:19 }))
-              ,(EpTok
-                (EpaSpan { DumpSemis.hs:31:20 }))])
+              [(EpTok (EpaSpan { DumpSemis.hs:31:6 }))
+              ,(EpTok (EpaSpan { DumpSemis.hs:31:7 }))]
+              [(EpTok (EpaSpan { DumpSemis.hs:31:19 }))
+              ,(EpTok (EpaSpan { DumpSemis.hs:31:20 }))])
              (EpaComments
               []))
             [(L

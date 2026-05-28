@@ -11,6 +11,10 @@
      (NoEpTok)
      (NoEpTok)
      (NoEpTok)
+     ((,,)
+      (NoEpTok)
+      (NoEpTok)
+      [])
      []
      []
      (Just
@@ -35,20 +39,21 @@
       []))
     (ImportDecl
      (XImportDeclPass
-      (EpAnn
-       (EpaSpan { mod185.hs:3:1-24 })
-       (EpAnnImportDecl
+      (EpAnnImportDecl
+       (EpTok
+        (EpaSpan { mod185.hs:3:1-6 }))
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Just
         (EpTok
-         (EpaSpan { mod185.hs:3:1-6 }))
-        (Nothing)
-        (Nothing)
-        (Nothing)
-        (Just
-         (EpTok
-          (EpaSpan { mod185.hs:3:16-24 })))
-        (Nothing)
-        (Nothing))
-       (EpaComments
+         (EpaSpan { mod185.hs:3:16-24 })))
+       (Nothing)
+       (Nothing)
+       ((,,,)
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
         []))
       (NoSourceText)
       (False))

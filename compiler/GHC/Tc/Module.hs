@@ -294,7 +294,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                                                      ++ import_decls))
         ; let { mkImport mod_name = noLocA
                 $ (simpleImportDecl mod_name)
-                  { ideclImportList = Just (Exactly, noLocA [])}}
+                  { ideclImportList = Just (Exactly, [])}}
         ; let { withReason t imps = map (,text t) imps }
         ; let { all_imports = withReason "is implicitly imported" prel_imports
                   ++ withReason "is directly imported" import_decls
@@ -559,7 +559,7 @@ tcRnImports hsc_env import_decls
 -}
 
 tcRnSrcDecls :: Bool  -- False => no 'module M(..) where' header at all
-             -> Maybe (LocatedLI [LIE GhcPs])
+             -> Maybe [LIE GhcPs]
              -> [LHsDecl GhcPs]               -- Declarations
              -> TcM TcGblEnv
 tcRnSrcDecls explicit_mod_hdr export_ies decls
@@ -1884,8 +1884,8 @@ checkMainType tcg_env
                       tcSubTypeSigma eq_orig ctxt main_ty io_ty
        ; return lie } } } }
 
-checkMain :: Bool  -- False => no 'module M(..) where' header at all
-          -> Maybe (LocatedLI [LIE GhcPs])  -- Export specs of Main module
+checkMain :: Bool              -- False => no 'module M(..) where' header at all
+          -> Maybe [LIE GhcPs] -- Export specs of Main module
           -> TcM TcGblEnv
 -- If we are in module Main, check that 'main' is exported,
 -- and generate the runMainIO binding that calls it

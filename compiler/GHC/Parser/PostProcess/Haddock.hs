@@ -265,7 +265,14 @@ instance HasHaddock (Located (HsModule GhcPs)) where
     --    ) where
     --
     -- Only do this when the export list exists.
-    hsmodExports' <- traverse @Maybe addHaddock (hsmodExports mod)
+    let (_, close_paren, _) = am_exports mod_anns
+    hsmodExports' <- traverse @Maybe
+      (\exports ->
+        extendHdkA (getEpTokenSrcSpan close_paren) $ do
+          exports' <- addHaddockInterleaveItems EpNoLayout mkDocIE exports
+          registerEpTokenHdkA close_paren  -- ) position, not end-of-last-item
+          pure exports')
+      (hsmodExports mod)
 
     -- Step 3, register the import section to reject invalid comments:
     --
@@ -296,19 +303,6 @@ lexHsDocString = lexHsDoc parseIdentifier
 
 lexLHsDocString :: Located HsDocString -> LHsDoc GhcPs
 lexLHsDocString = fmap lexHsDocString
-
--- | Only for module exports, not module imports.
---
---    module M (a, b, c) where   -- use on this [LIE GhcPs]
---    import I (a, b, c)         -- do not use here!
---
--- Imports cannot have documentation comments anyway.
-instance HasHaddock (LocatedLI [LocatedA (IE GhcPs)]) where
-  addHaddock (L l_exports exports) =
-    extendHdkA (locA l_exports) $ do
-      exports' <- addHaddockInterleaveItems EpNoLayout mkDocIE exports
-      registerLocHdkA (srcLocSpan (srcSpanEnd (locA l_exports))) -- Do not consume comments after the closing parenthesis
-      pure $ L l_exports exports'
 
 -- Needed to use 'addHaddockInterleaveItems' in 'instance HasHaddock (Located [LIE GhcPs])'.
 instance HasHaddock (LocatedA (IE GhcPs)) where

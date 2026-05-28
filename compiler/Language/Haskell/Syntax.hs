@@ -69,7 +69,7 @@ data HsModule p
       hsmodName :: Maybe (XRec p ModuleName),
         -- ^ @Nothing@: \"module X where\" is omitted (in which case the next
         --     field is Nothing too)
-      hsmodExports :: Maybe (XRec p [LIE p]),
+      hsmodExports :: Maybe [LIE p],
         -- ^ Export list
         --
         --  - @Nothing@: export list omitted, so export everything

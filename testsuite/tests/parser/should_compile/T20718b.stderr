@@ -13,6 +13,10 @@
       (EpaSpan { T20718b.hs:4:1-6 }))
      (EpTok
       (EpaSpan { T20718b.hs:4:16-20 }))
+     ((,,)
+      (NoEpTok)
+      (NoEpTok)
+      [])
      []
      []
      (Just

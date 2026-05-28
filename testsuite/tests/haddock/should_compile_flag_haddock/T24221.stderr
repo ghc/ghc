@@ -13,6 +13,10 @@
       (EpaSpan { T24221.hs:1:1-6 }))
      (EpTok
       (EpaSpan { T24221.hs:1:15-19 }))
+     ((,,)
+      (NoEpTok)
+      (NoEpTok)
+      [])
      []
      []
      (Just
@@ -934,18 +938,13 @@
            []
            (Nothing)
            (RecCon
-            (NoExtField)
+            ((,)
+             (EpTok (EpaSpan { T24221.hs:28:10 }))
+             (EpTok (EpaSpan { T24221.hs:29:22 })))
             (L
              (EpAnn
-              (EpaSpan { T24221.hs:(28,10)-(29,22) })
-              (AnnList
-               (Just
-                (EpaSpan { T24221.hs:28:12-20 }))
-               (ListBraces
-                (EpTok (EpaSpan { T24221.hs:28:10 }))
-                (EpTok (EpaSpan { T24221.hs:29:22 })))
-               []
-               (())
+              (EpaSpan { T24221.hs:(28,12)-(29,20) })
+              (AnnListItem
                [])
               (EpaComments
                []))
@@ -1176,18 +1175,13 @@
            []
            (Nothing)
            (RecCon
-            (NoExtField)
+            ((,)
+             (EpTok (EpaSpan { T24221.hs:33:5 }))
+             (EpTok (EpaSpan { T24221.hs:34:17 })))
             (L
              (EpAnn
-              (EpaSpan { T24221.hs:(33,5)-(34,17) })
-              (AnnList
-               (Just
-                (EpaSpan { T24221.hs:33:7-15 }))
-               (ListBraces
-                (EpTok (EpaSpan { T24221.hs:33:5 }))
-                (EpTok (EpaSpan { T24221.hs:34:17 })))
-               []
-               (())
+              (EpaSpan { T24221.hs:(33,7)-(34,15) })
+              (AnnListItem
                [])
               (EpaComments
                []))
@@ -1430,18 +1424,13 @@
            []
            (Nothing)
            (RecCon
-            (NoExtField)
+            ((,)
+             (EpTok (EpaSpan { T24221.hs:38:10 }))
+             (EpTok (EpaSpan { T24221.hs:43:3 })))
             (L
              (EpAnn
-              (EpaSpan { T24221.hs:(38,10)-(43,3) })
-              (AnnList
-               (Just
-                (EpaSpan { T24221.hs:40:5-13 }))
-               (ListBraces
-                (EpTok (EpaSpan { T24221.hs:38:10 }))
-                (EpTok (EpaSpan { T24221.hs:43:3 })))
-               []
-               (())
+              (EpaSpan { T24221.hs:(40,5)-(42,13) })
+              (AnnListItem
                [])
               (EpaComments
                []))

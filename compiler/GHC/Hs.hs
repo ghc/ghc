@@ -30,7 +30,7 @@ module GHC.Hs (
         module GHC.Parser.Annotation,
 
         HsModule(..), AnnsModule(..),
-        HsParsedModule(..), XModulePs(..)
+        HsParsedModule(..), XModulePs(..), AnnListExportDecl
 ) where
 
 -- friends:
@@ -62,13 +62,13 @@ import Data.Data hiding ( Fixity )
 -- | Haskell Module extension point: GHC specific
 data XModulePs
   = XModulePs {
-      hsmodAnn :: EpAnn AnnsModule,
-      hsmodLayout :: EpLayout,
+      hsmodAnn :: !(EpAnn AnnsModule),
+      hsmodLayout :: !EpLayout,
         -- ^ Layout info for the module.
         -- For incomplete modules (e.g. the output of parseHeader), it is EpNoLayout.
-      hsmodDeprecMessage :: Maybe (LWarningTxt GhcPs),
+      hsmodDeprecMessage :: !(Maybe (LWarningTxt GhcPs)),
         -- ^ reason\/explanation for warning/deprecation of this module
-      hsmodHaddockModHeader :: Maybe (LHsDoc GhcPs)
+      hsmodHaddockModHeader :: !(Maybe (LHsDoc GhcPs))
         -- ^ Haddock module info and description, unparsed
    }
    deriving Data
@@ -80,19 +80,24 @@ type instance XXModule p = DataConCantHappen
 
 deriving instance Data (HsModule GhcPs)
 
+-- | EPA annotations around a module export list. Captures the
+-- | surrounding parens, and any trailing commas after the export list
+type AnnListExportDecl = (EpToken "(", EpToken ")", [EpToken ","])
+
 data AnnsModule
   = AnnsModule {
-    am_sig :: EpToken "signature",
-    am_mod :: EpToken "module",
-    am_where :: EpToken "where",
-    am_decls :: [TrailingAnn],                 -- ^ Semis before the start of top decls
-    am_cs :: [LEpaComment],                    -- ^ Comments before start of top decl,
-                                               --   used in exact printing only
-    am_eof :: Maybe (RealSrcSpan, RealSrcSpan) -- ^ End of file and end of prior token
+    am_sig     :: !(EpToken "signature"),
+    am_mod     :: !(EpToken "module"),
+    am_where   :: !(EpToken "where"),
+    am_exports :: !AnnListExportDecl,
+    am_decls   :: [TrailingAnn],                  -- ^ Semis before the start of top decls
+    am_cs      :: [LEpaComment],                  -- ^ Comments before start of top decl,
+                                                  --   used in exact printing only
+    am_eof :: !(Maybe (RealSrcSpan, RealSrcSpan)) -- ^ End of file and end of prior token
     } deriving (Data, Eq)
 
 instance NoAnn AnnsModule where
-  noAnn = AnnsModule NoEpTok NoEpTok NoEpTok [] [] Nothing
+  noAnn = AnnsModule NoEpTok NoEpTok NoEpTok (NoEpTok, NoEpTok, []) [] [] Nothing
 
 instance Outputable (HsModule GhcPs) where
     ppr (HsModule { hsmodExt = XModulePs { hsmodHaddockModHeader = mbDoc }
@@ -114,7 +119,7 @@ instance Outputable (HsModule GhcPs) where
               Nothing -> pp_header (text "where")
               Just es -> vcat [
                            pp_header lparen,
-                           nest 8 (pprWithCommas ppr (unLoc es)),
+                           nest 8 (pprWithCommas ppr es),
                            nest 4 (text ") where")
                           ],
             pp_nonnull imports,

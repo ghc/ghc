@@ -879,12 +879,12 @@ unitdecl :: { LHsUnitDecl PackageName }
                    NotBoot -> HsSrcFile
                    IsBoot  -> HsBootFile)
                  (reLoc $3)
-                 (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $7) $4 Nothing) (Just $3) $5 (fst $ sndOf3 $7) (snd $ sndOf3 $7))) }
+                 (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $7) $4 Nothing) (Just $3) (snd $5) (fst $ sndOf3 $7) (snd $ sndOf3 $7))) }
         | 'signature' modid maybe_warning_pragma maybeexports 'where' body
              { sL1 $1 $ DeclD
                  HsigFile
                  (reLoc $2)
-                 (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $6) $3 Nothing) (Just $2) $4 (fst $ sndOf3 $6) (snd $ sndOf3 $6))) }
+                 (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $6) $3 Nothing) (Just $2) (snd $4) (fst $ sndOf3 $6) (snd $ sndOf3 $6))) }
         | 'dependency' unitid mayberns
              { sL1 $1 $ IncludeD (IncludeDecl { idUnitId = $2
                                               , idModRenaming = $3
@@ -908,9 +908,9 @@ signature :: { Located (HsModule GhcPs) }
        : 'signature' modid maybe_warning_pragma maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
                 acs loc (\loc cs-> (L loc (HsModule (XModulePs
-                                               (EpAnn (spanAsAnchor loc) (AnnsModule (epTok $1) NoEpTok (epTok $5) (fstOf3 $6) [] Nothing) cs)
+                                                     (EpAnn (spanAsAnchor loc) (AnnsModule (epTok $1) NoEpTok (epTok $5) (fst $4) (fstOf3 $6) [] Nothing) cs)
                                                (thdOf3 $6) $3 Nothing)
-                                            (Just $2) $4 (fst $ sndOf3 $6)
+                                           (Just $2) (snd $4) (fst $ sndOf3 $6)
                                             (snd $ sndOf3 $6)))
                     ) }
 
@@ -918,15 +918,15 @@ module :: { Located (HsModule GhcPs) }
        : 'module' modid maybe_warning_pragma maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
                 acsFinal (\cs eof -> (L loc (HsModule (XModulePs
-                                                     (EpAnn (spanAsAnchor loc) (AnnsModule NoEpTok (epTok $1) (epTok $5) (fstOf3 $6) [] eof) cs)
+                                                       (EpAnn (spanAsAnchor loc) (AnnsModule NoEpTok (epTok $1) (epTok $5) (fst $4) (fstOf3 $6) [] eof) cs)
                                                      (thdOf3 $6) $3 Nothing)
-                                                  (Just $2) $4 (fst $ sndOf3 $6)
+                                             (Just $2) (snd $4) (fst $ sndOf3 $6)
                                                   (snd $ sndOf3 $6))
                     )) }
         | body2
                 {% fileSrcSpan >>= \ loc ->
                    acsFinal (\cs eof -> (L loc (HsModule (XModulePs
-                                                        (EpAnn (spanAsAnchor loc) (AnnsModule NoEpTok NoEpTok NoEpTok (fstOf3 $1) [] eof) cs)
+                                                         (EpAnn (spanAsAnchor loc) (AnnsModule NoEpTok NoEpTok NoEpTok (NoEpTok, NoEpTok, []) (fstOf3 $1) [] eof) cs)
                                                         (thdOf3 $1) Nothing Nothing)
                                                      Nothing Nothing
                                                      (fst $ sndOf3 $1) (snd $ sndOf3 $1)))) }
@@ -966,16 +966,16 @@ header  :: { Located (HsModule GhcPs) }
         : 'module' modid maybe_warning_pragma maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs loc (\loc cs -> (L loc (HsModule (XModulePs
-                                                   (EpAnn (spanAsAnchor loc) (AnnsModule NoEpTok (epTok  $1) (epTok $5) [] [] Nothing) cs)
+                                                         (EpAnn (spanAsAnchor loc) (AnnsModule NoEpTok (epTok  $1) (epTok $5) (fst $4) [] [] Nothing) cs)
                                                    EpNoLayout $3 Nothing)
-                                                (Just $2) $4 $6 []
+                                               (Just $2) (snd $4) $6 []
                           ))) }
         | 'signature' modid maybe_warning_pragma maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs loc (\loc cs -> (L loc (HsModule (XModulePs
-                                                   (EpAnn (spanAsAnchor loc) (AnnsModule NoEpTok (epTok $1) (epTok $5) [] [] Nothing) cs)
+                                                         (EpAnn (spanAsAnchor loc) (AnnsModule NoEpTok (epTok $1) (epTok $5) (fst $4) [] [] Nothing) cs)
                                                    EpNoLayout $3 Nothing)
-                                                (Just $2) $4 $6 []
+                                               (Just $2) (snd $4) $6 []
                           ))) }
         | header_body2
                 {% fileSrcSpan >>= \ loc ->
@@ -999,10 +999,10 @@ header_top_importdecls :: { [LImportDecl GhcPs] }
 -----------------------------------------------------------------------------
 -- The Export List
 
-maybeexports :: { (Maybe (LocatedLI [LIE GhcPs])) }
-        :  '(' exportlist ')'       {% fmap Just $ amsr (sLL $1 $> (fromOL $ snd $2))
-                                        (AnnList Nothing (ListParens (epTok $1) (epTok $3)) [] (noAnn,fst $2) []) }
-        |  {- empty -}              { Nothing }
+maybeexports :: { (AnnListExportDecl, Maybe [LIE GhcPs]) }
+        :  '(' exportlist ')'       { (((epTok $1),(epTok $3), fst $2)
+                                      , Just (fromOL $ snd $2)) }
+        |  {- empty -}              { ((NoEpTok, NoEpTok, []), Nothing) }
 
 exportlist :: { ([EpToken ","], OrdList (LIE GhcPs)) }
         : exportlist1     { ([], $1) }
@@ -1149,17 +1149,18 @@ importdecl :: { LImportDecl GhcPs }
                              , importDeclAnnQualified = fst $ qualSpec
                              , importDeclAnnPackage   = fst $6
                              , importDeclAnnAs        = fst $10
+                             , importDeclImportList   = fst $ unLoc $11
                              }
                   ; let loc = (comb6 $1 $7 $8 $9 (snd $10) $11);
-                  ; fmap reLoc $ acs loc (\loc cs -> L loc $
-                      ImportDecl { ideclExt = XImportDeclPass (EpAnn (spanAsAnchor loc) anns cs) (snd $ fst $2) False
+                  ; amsA' $ L loc $
+                      ImportDecl { ideclExt = XImportDeclPass anns (snd $ fst $2) False
                                   , ideclName = $7, ideclPkgQual = snd $6
                                   , ideclSource = snd $2
                                   , ideclLevelSpec = snd $ levelSpec
                                   , ideclSafe = snd $4
                                   , ideclQualified = snd $ qualSpec
                                   , ideclAs = unLoc (snd $10)
-                                  , ideclImportList = unLoc $11 })
+                                  , ideclImportList = snd $ unLoc $11 }
                   }
                 }
 
@@ -1193,19 +1194,17 @@ optqualified :: { Maybe (EpToken "qualified") }
 maybeas :: { (Maybe (EpToken "as"),Located (Maybe (LocatedA ModuleName))) }
         : 'as' modid                           { (Just (epTok $1)
                                                  ,sLL $1 $> (Just $2)) }
-        | {- empty -}                          { (Nothing,noLoc Nothing) }
+        | {- empty -}                          { (Nothing, noLoc Nothing) }
 
-maybeimpspec :: { Located (Maybe (ImportListInterpretation, LocatedLI [LIE GhcPs])) }
-        : impspec                  { fmap Just $1 }
-        | {- empty -}              { noLoc Nothing }
+maybeimpspec :: { Located (AnnListImportDecl, Maybe (ImportListInterpretation, [LIE GhcPs])) }
+        : impspec                  { sL1 $1 (fst $ unLoc $1, Just (snd $ unLoc $1)) }
+        | {- empty -}              { noLoc (noAnn, Nothing) }
 
-impspec :: { Located (ImportListInterpretation, LocatedLI [LIE GhcPs]) }
-        :  '(' importlist ')'               {% do { es <- amsr (sLL $1 $> $ fromOL $ snd $2)
-                                                               (AnnList Nothing (ListParens (epTok $1) (epTok $3)) [] (noAnn,fst $2) [])
-                                                  ; return $ sLL $1 $> (Exactly, es)} }
-        |  'hiding' '(' importlist ')'      {% do { es <- amsr (sLL $1 $> $ fromOL $ snd $3)
-                                                               (AnnList Nothing (ListParens (epTok $2) (epTok $4)) [] (epTok $1,fst $3) [])
-                                                  ; return $ sLL $1 $> (EverythingBut, es)} }
+impspec :: { Located (AnnListImportDecl, (ImportListInterpretation, [LIE GhcPs])) }
+        :  '(' importlist ')'               { sLL $1 $> ((noAnn, epTok $1, epTok $3, fst $2),
+                                                         (Exactly, fromOL $ snd $2)) }
+        |  'hiding' '(' importlist ')'      { sLL $1 $> ((epTok $1, epTok $2, epTok $4, fst $3),
+                                                         (EverythingBut, fromOL $ snd $3)) }
 
 importlist :: { ([EpToken ","], OrdList (LIE GhcPs)) }
         : importlist1     { ([], $1) }
@@ -1758,28 +1757,28 @@ role : VARID             { sL1 $1 $ Just $ getVARID $1 }
 -- Glasgow extension: pattern synonyms
 pattern_synonym_decl :: { LHsDecl GhcPs }
         : 'pattern' pattern_synonym_lhs '=' pat_syn_pat
-         {%      let (name, args, (mo, mc) ) = $2 in
+         {%      let (name, args) = $2 in
                  amsA' (sLL $1 $> . ValD noExtField $ mkPatSynBind name args $4
                                                     ImplicitBidirectional
-                      (AnnPSB (epTok $1) mo mc Nothing (Just (epTok $3)))) }
+                      (AnnPSB (epTok $1) Nothing (Just (epTok $3)))) }
 
         | 'pattern' pattern_synonym_lhs '<-' pat_syn_pat
-         {%    let (name, args, (mo,mc)) = $2 in
+         {%    let (name, args) = $2 in
                amsA' (sLL $1 $> . ValD noExtField $ mkPatSynBind name args $4 Unidirectional
-                       (AnnPSB (epTok $1) mo mc (Just (epUniTok $3)) Nothing)) }
+                       (AnnPSB (epTok $1) (Just (epUniTok $3)) Nothing)) }
 
         | 'pattern' pattern_synonym_lhs '<-' pat_syn_pat where_decls
-            {% do { let (name, args, (mo,mc)) = $2
+            {% do { let (name, args) = $2
                   ; mg <- mkPatSynMatchGroup name $5
                   ; amsA' (sLL $1 $> . ValD noExtField $
                            mkPatSynBind name args $4 (ExplicitBidirectional mg)
-                            (AnnPSB (epTok $1) mo mc (Just (epUniTok $3)) Nothing))
+                            (AnnPSB (epTok $1) (Just (epUniTok $3)) Nothing))
                    }}
 
-pattern_synonym_lhs :: { (LocatedN RdrName, HsPatSynDetails GhcPs, (Maybe (EpToken "{"), Maybe (EpToken "}"))) }
-        : con vars0 { ($1, PrefixCon noExtField $2, noAnn) }
-        | varid conop varid { ($2, InfixCon noExtField $1 $3, noAnn) }
-        | con '{' cvars1 '}' { ($1, RecCon noExtField $3, (Just (epTok $2), Just (epTok $4))) }
+pattern_synonym_lhs :: { (LocatedN RdrName, HsPatSynDetails GhcPs) }
+        : con vars0 { ($1, PrefixCon noExtField $2) }
+        | varid conop varid { ($2, InfixCon noExtField $1 $3) }
+        | con '{' cvars1 '}' { ($1, RecCon (epTok $2, epTok $4) $3) }
 
 vars0 :: { [LocatedN RdrName] }
         : {- empty -}                 { [] }
@@ -2380,7 +2379,7 @@ atype :: { LHsType GhcPs }
         | PREFIX_TILDE atype             {% amsA' (sLL $1 $> (mkBangTy (glR $1) SrcLazy $2)) }
         | PREFIX_BANG  atype             {% amsA' (sLL $1 $> (mkBangTy (glR $1) SrcStrict $2)) }
 
-        | '{' fielddecls '}'             {% do { decls <- amsA' (sLL $1 $> $ XHsType $ HsRecTy (AnnList (listAsAnchorM $2) (ListBraces (epTok $1) (epTok $3)) [] noAnn []) $2)
+        | '{' fielddecls '}'             {% do { decls <- amsA' (sLL $1 $> $ XHsType $ HsRecTy (epTok $1, epTok $3) $2)
                                                ; checkRecordSyntax decls }}
                                                         -- Constructor sigs only
 
@@ -2637,15 +2636,15 @@ usum_constr :: { (LHsType GhcPs, Int, Int) } -- constructor for the data decls S
          : ktype bars { ($1, 1, (snd $2 + 1)) }
          | bars ktype bars0 { ($2, snd $1 + 1, snd $1 + snd $3 + 1) }
 
-fielddecls :: { [LHsConDeclRecField GhcPs] }
-        : {- empty -}     { [] }
+fielddecls :: { Located [LHsConDeclRecField GhcPs] }
+        : {- empty -}     { noLoc [] }
         | fielddecls1     { $1 }
 
-fielddecls1 :: { [LHsConDeclRecField GhcPs] }
+fielddecls1 :: { Located [LHsConDeclRecField GhcPs] }
         : fielddecl ',' fielddecls1
             {% do { h <- addTrailingCommaA $1 (epTok $2)
-                  ; return (h : $3) }}
-        | fielddecl   { [$1] }
+                  ; return $ sLL $1 $> (h : unLoc $3) }}
+        | fielddecl   { sL1 $1 [$1] }
 
 fielddecl :: { LHsConDeclRecField GhcPs }
                                               -- A list because of   f,g :: Int
@@ -3172,7 +3171,7 @@ aexp1   :: { ECP }
                                    unECP $1 >>= \ $1 ->
                                    $3 >>= \ $3 ->
                                    mkHsRecordPV overloaded (comb2 $1 $>) (comb2 $2 $4) $1 $3
-                                        (Just (epTok $2), Just (epTok $4))
+                                        (epTok $2, epTok $4)
                                }
 
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
@@ -3812,7 +3811,7 @@ name_boolformula_opt :: { LBooleanFormula GhcPs }
 name_boolformula :: { LBooleanFormula GhcPs }
         : name_boolformula_and      { $1 }
         | name_boolformula_and '|' name_boolformula
-                           {% do { h <- addTrailingVbarL $1 (epTok $2)
+                           {% do { h <- addTrailingVbarBF $1 (epTok $2)
                                  ; return (sLLa $1 $> (Or [h,$3])) } }
 
 name_boolformula_and :: { LBooleanFormula GhcPs }
@@ -3822,12 +3821,12 @@ name_boolformula_and :: { LBooleanFormula GhcPs }
 name_boolformula_and_list :: { NonEmpty (LBooleanFormula GhcPs) }
         : name_boolformula_atom                               { NE.singleton $1 }
         | name_boolformula_atom ',' name_boolformula_and_list
-            {% do { h <- addTrailingCommaL $1 (epTok $2)
+            {% do { h <- addTrailingCommaBF $1 (epTok $2)
                   ; return (h NE.<| $3) } }
 
 name_boolformula_atom :: { LBooleanFormula GhcPs }
         : '(' name_boolformula ')'  {% amsr (sLL $1 $> (Parens $2))
-                                      (AnnList Nothing (ListParens (epTok $1) (epTok $3)) [] noAnn []) }
+                                            (AnnBooleanFormula (epTok $1) (epTok $3) [])  }
         | name_var                  { sL1a $1 (Var $1) }
 
 namelist :: { Located [LocatedN RdrName] }
@@ -4436,10 +4435,6 @@ sLL !x !y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
 sLLa :: (HasLoc a, HasLoc b, NoAnn t) => a -> b -> c -> LocatedAn t c
 sLLa !x !y = sL (noAnnSrcSpan $ comb2 x y) -- #define LL   sL (comb2 $1 $>)
 
-{-# INLINE sLLl #-}
-sLLl :: (HasLoc a, HasLoc b) => a -> b -> c -> LocatedL c
-sLLl !x !y = sL (noAnnSrcSpan $ comb2 x y) -- #define LL   sL (comb2 $1 $>)
-
 {-# INLINE sLLld #-}
 sLLld :: (HasLoc a, HasLoc b) => a -> b -> c -> LocatedLW c
 sLLld !x !y = sL (noAnnSrcSpan $ comb2 x y) -- #define LL   sL (comb2 $1 $>)
@@ -4777,16 +4772,16 @@ addTrailingAnnA (L anns a) tok ta = do
 
 -- -------------------------------------
 
-addTrailingVbarL :: MonadP m => LocatedL a -> EpToken "|" -> m (LocatedL a)
-addTrailingVbarL  la tok = addTrailingAnnL la (AddVbarAnn tok)
+addTrailingVbarBF :: MonadP m => LocatedBF a -> EpToken "|" -> m (LocatedBF a)
+addTrailingVbarBF  la tok = addTrailingAnnBF la (AddVbarAnn tok)
 
-addTrailingCommaL :: MonadP m => LocatedL a -> EpToken "," -> m (LocatedL a)
-addTrailingCommaL  la tok = addTrailingAnnL la (AddCommaAnn tok)
+addTrailingCommaBF :: MonadP m => LocatedBF a -> EpToken "," -> m (LocatedBF a)
+addTrailingCommaBF  la tok = addTrailingAnnBF la (AddCommaAnn tok)
 
-addTrailingAnnL :: MonadP m => LocatedL a -> TrailingAnn -> m (LocatedL a)
-addTrailingAnnL (L anns a) ta = do
+addTrailingAnnBF :: MonadP m => LocatedBF a -> TrailingAnn -> m (LocatedBF a)
+addTrailingAnnBF (L anns a) ta = do
   !cs <- getCommentsFor (locA anns)
-  let anns' = addTrailingAnnToL ta cs anns
+  let anns' = addTrailingAnnToBF ta cs anns
   return (L anns' a)
 
 -- -------------------------------------

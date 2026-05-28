@@ -13,6 +13,10 @@
       (EpaSpan { AnnotationNoListTuplePuns.hs:3:1-6 }))
      (EpTok
       (EpaSpan { AnnotationNoListTuplePuns.hs:3:34-38 }))
+     ((,,)
+      (NoEpTok)
+      (NoEpTok)
+      [])
      []
      []
      (Just
@@ -214,6 +218,10 @@
       (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:3:1-6 }))
      (EpTok
       (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:3:34-38 }))
+     ((,,)
+      (NoEpTok)
+      (NoEpTok)
+      [])
      []
      []
      (Just

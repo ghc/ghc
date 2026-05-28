@@ -777,7 +777,7 @@ type instance XXConDecl (GhcPass _) = DataConCantHappen
 
 type instance XPrefixConGADT       (GhcPass _) = NoExtField
 
-type instance XRecConGADT          GhcPs = TokRarrow
+type instance XRecConGADT          GhcPs = (EpToken "{", EpToken "}", TokRarrow)
 type instance XRecConGADT          GhcRn = NoExtField
 type instance XRecConGADT          GhcTc = NoExtField
 
@@ -811,7 +811,7 @@ getConNames ConDeclGADT {con_names = names} = toList names
 -- | Return @'Just' fields@ if a data constructor declaration uses record
 -- syntax (i.e., 'RecCon'), where @fields@ are the field selectors.
 -- Otherwise, return 'Nothing'.
-getRecConArgs_maybe :: ConDecl GhcRn -> Maybe (LocatedL [LHsConDeclRecField GhcRn])
+getRecConArgs_maybe :: ConDecl GhcRn -> Maybe (LocatedA [LHsConDeclRecField GhcRn])
 getRecConArgs_maybe (ConDeclH98{con_args = args}) = case args of
   PrefixCon{}   -> Nothing
   RecCon _ flds -> Just flds
@@ -1498,7 +1498,7 @@ type instance Anno (DerivClauseTys (GhcPass _)) = SrcSpanAnnC
 type instance Anno (StandaloneKindSig (GhcPass p)) = SrcSpanAnnA
 type instance Anno (ConDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno Bool = EpAnnCO
-type instance Anno [LocatedA (HsConDeclRecField (GhcPass _))] = SrcSpanAnnL
+type instance Anno [LocatedA (HsConDeclRecField (GhcPass _))] = SrcSpanAnnA
 type instance Anno (FamEqn p (LocatedA (HsType p))) = SrcSpanAnnA
 type instance Anno (TyFamInstDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (DataFamInstDecl (GhcPass p)) = SrcSpanAnnA

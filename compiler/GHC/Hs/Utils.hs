@@ -540,12 +540,12 @@ nlInfixConPat con l r = noLocA $ ConPat
   { pat_con = noLocA con
   , pat_args = InfixCon noExtField (parenthesizePat opPrec l)
                                    (parenthesizePat opPrec r)
-  , pat_con_ext = noAnn
+  , pat_con_ext = noExtField
   }
 
 nlConPat :: RdrName -> [LPat GhcPs] -> LPat GhcPs
 nlConPat con pats = noLocA $ ConPat
-  { pat_con_ext = noAnn
+  { pat_con_ext = noExtField
   , pat_con = noLocA con
   , pat_args = PrefixCon noExtField (map (parenthesizePat appPrec) pats)
   }
@@ -559,14 +559,14 @@ nlConPatName con pats = noLocA $ ConPat
 
 nlNullaryConPat :: RdrName -> LPat GhcPs
 nlNullaryConPat con = noLocA $ ConPat
-  { pat_con_ext = noAnn
+  { pat_con_ext = noExtField
   , pat_con = noLocA con
   , pat_args = PrefixCon noExtField []
   }
 
 nlWildConPat :: DataCon -> LPat GhcPs
 nlWildConPat con = noLocA $ ConPat
-  { pat_con_ext = noAnn
+  { pat_con_ext = noExtField
   , pat_con = noLocA $ getRdrName con
   , pat_args = PrefixCon noExtField $
      replicate (dataConSourceArity con)
@@ -1658,7 +1658,7 @@ hsConDeclsBinders cons = go emptyFieldIndices cons
     get_flds_gadt seen (PrefixConGADT _ []) = (Just [], seen)
     get_flds_gadt seen _ = (Nothing, seen)
 
-    get_flds :: FieldIndices p -> LocatedL [LHsConDeclRecField (GhcPass p)]
+    get_flds :: FieldIndices p -> LocatedA [LHsConDeclRecField (GhcPass p)]
              -> ([Located Int], FieldIndices p)
     get_flds seen flds =
       foldr add_fld ([], seen) fld_names

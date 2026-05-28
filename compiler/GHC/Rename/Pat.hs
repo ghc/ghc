@@ -748,12 +748,12 @@ rnHsRecPatsAndThen :: NameMaker
                    -> HsRecFields GhcPs (LPat GhcPs)
                    -> CpsRn (HsRecFields GhcRn (LPat GhcRn))
 rnHsRecPatsAndThen mk (L _ con)
-     hs_rec_fields@(HsRecFields { rec_dotdot = dd })
+     hs_rec_fields@(HsRecFields { rec_ext = x, rec_dotdot = dd })
   = do { flds <- liftCpsFV $ rnHsRecFields (HsRecFieldPat con) mkVarPat
                                             hs_rec_fields
        ; flds' <- mapM rn_field (flds `zip` [1..])
        ; check_unused_wildcard (lHsRecFieldsImplicits flds' <$> unLoc <$> dd)
-       ; return (HsRecFields { rec_ext = noExtField, rec_flds = flds', rec_dotdot = dd }) }
+       ; return (HsRecFields { rec_ext = x, rec_flds = flds', rec_dotdot = dd }) }
   where
     mkVarPat l n = VarPat noExtField (L (noAnnSrcSpan l) n)
     rn_field (L l fld, n') =

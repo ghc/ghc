@@ -571,12 +571,12 @@ mergeSignatures
             as1 <- tcRnModExports insts ireq_iface
             -- 3(b). Thin the interface if it comes from a signature package.
             (thinned_iface, as2) <- case mb_exports of
-                    Just (L loc _)
+                    Just es
                       -- Check if the package containing this signature is
                       -- a signature package (i.e., does not expose any
                       -- modules.)  If so, we can thin it.
                       | isFromSignaturePackage
-                      -> setSrcSpanA loc $ do
+                      -> setSrcSpan (locA (listLocation es)) $ do
                         -- Suppress missing errors; they might be used to refer
                         -- to entities from other signatures we are merging in.
                         -- If an identifier truly doesn't exist in any of the

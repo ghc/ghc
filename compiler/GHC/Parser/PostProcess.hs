@@ -812,14 +812,14 @@ mkGadtDecl loc mods names dcol ty = do
 
   (args, res_ty, (ops, cps), csa) <-
     case body_ty of
-     L ll (HsFunTy _ hsArr (L (EpAnn anc _ cs) (XHsType (HsRecTy an rf))) res_ty) -> do
+     L ll (HsFunTy _ hsArr (L (EpAnn _ _ cs) (XHsType (HsRecTy (oc,cc) (L l rf)))) res_ty) -> do
        arr <- case hsArr of
          HsModifiedFunArr _ [] (HsStandardArr (EpArrow arr)) -> return arr
          _ -> do addError $ mkPlainErrorMsgEnvelope (getLocA body_ty) $
                                  (PsErrIllegalGadtRecordModifier hsArr)
                  return noAnn
 
-       return ( RecConGADT arr (L (EpAnn anc an cs) rf), res_ty
+       return ( RecConGADT (oc, cc, arr) (L (EpAnn (spanAsAnchor l) noAnn cs) rf), res_ty
               , ([], []), epAnnComments ll)
      _ -> do
        let ((ops, cps), cs, arg_types, res_type) = splitHsFunType body_ty
@@ -1366,7 +1366,7 @@ checkPat :: SrcSpanAnnA -> EpAnnComments -> LocatedA (PatBuilder GhcPs) -> [LPat
 checkPat loc cs (L l e@(PatBuilderVar (L ln c))) args
   | isRdrDataCon c || isRdrTc c
   = return (L loc $ ConPat
-      { pat_con_ext = noAnn -- AZ: where should this come from?
+      { pat_con_ext = noExtField
       , pat_con = L ln c
       , pat_args = PrefixCon noExtField args
       }, comments l Semi.<> cs)
@@ -1424,7 +1424,7 @@ checkAPat loc e0 = do
          l <- checkLPat l
          r <- checkLPat r
          return $ ConPat
-           { pat_con_ext = noAnn
+           { pat_con_ext = noExtField
            , pat_con = L cl c
            , pat_args = InfixCon noExtField l r
            }
@@ -1826,7 +1826,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
     SrcSpan ->
     LocatedA b ->
     ([Fbind b], Maybe SrcSpan) ->
-    (Maybe (EpToken "{"), Maybe (EpToken "}")) ->
+    (EpToken "{", EpToken "}") ->
     PV (LocatedA b)
   -- | Disambiguate "-a" (negation)
   mkHsNegAppPV :: SrcSpan -> LocatedA b -> EpToken "-" -> PV (LocatedA b)
@@ -1964,11 +1964,11 @@ instance DisambECP (HsCmd GhcPs) where
   mkHsExplicitListPV l xs _ = cmdFail l $
     brackets (pprWithCommas ppr xs)
   mkHsSplicePV (L l sp) = cmdFail l (pprUntypedSplice True Nothing sp)
-  mkHsRecordPV _ l _ a (fbinds, ddLoc) _ = do
+  mkHsRecordPV _ l _ a (fbinds, ddLoc) anns = do
     let (fs, ps) = partitionEithers fbinds
     if not (null ps)
       then addFatalError $ mkPlainErrorMsgEnvelope l $ PsErrOverloadedRecordDotInvalid
-      else cmdFail l $ ppr a <+> ppr (mk_rec_fields fs ddLoc)
+      else cmdFail l $ ppr a <+> ppr (mk_rec_fields anns fs ddLoc)
   mkHsNegAppPV l a _ = cmdFail l (text "-" <> ppr a)
   mkHsSectionR_PV l op c = cmdFail l $
     let pp_op = fromMaybe (panic "cannot print infix operator")
@@ -2173,7 +2173,7 @@ instance DisambECP (PatBuilder GhcPs) where
      then addFatalError $ mkPlainErrorMsgEnvelope l PsErrOverloadedRecordDotInvalid
      else do
        !cs <- getCommentsFor l
-       r <- mkPatRec a (mk_rec_fields fs ddLoc) anns
+       r <- mkPatRec a (mk_rec_fields anns fs ddLoc)
        checkRecordSyntax (L (EpAnn (spanAsAnchor l) noAnn cs) r)
   mkHsNegAppPV l (L lp p) anns = do
     lit <- case p of
@@ -2402,17 +2402,16 @@ checkUnboxedLitPat (L loc lit) =
 mkPatRec ::
   LocatedA (PatBuilder GhcPs) ->
   HsRecFields GhcPs (LocatedA (PatBuilder GhcPs)) ->
-  (Maybe (EpToken "{"), Maybe (EpToken "}")) ->
   PV (PatBuilder GhcPs)
-mkPatRec (unLoc -> PatBuilderVar c) (HsRecFields x fs dd) anns
+mkPatRec (unLoc -> PatBuilderVar c) (HsRecFields an fs dd)
   | isRdrDataCon (unLoc c)
   = do fs <- mapM checkPatField fs
        return $ PatBuilderPat $ ConPat
-         { pat_con_ext = anns
+         { pat_con_ext = noExtField
          , pat_con = c
-         , pat_args = RecCon noExtField (HsRecFields x fs dd)
+         , pat_args = RecCon noAnn (HsRecFields an fs dd)
          }
-mkPatRec p _ _ =
+mkPatRec p _ =
   addFatalError $ mkPlainErrorMsgEnvelope (getLocA p) $
                     (PsErrInvalidRecordCon (unLoc p))
 
@@ -2456,8 +2455,8 @@ dataConBuilderDetails :: LocatedA DataConBuilder -> HsConDeclH98Details GhcPs
 -- Detect when the record syntax is used:
 --   data T = MkT { ... }
 dataConBuilderDetails (L _ (PrefixDataConBuilder flds _))
-  | [L (EpAnn anc _ cs) (XHsType (HsRecTy an fields))] <- toList flds
-  = RecCon noExtField (L (EpAnn anc an cs) fields)
+  | [L (EpAnn _ _ cs) (XHsType (HsRecTy an (L l fields)))] <- toList flds
+  = RecCon an (L (EpAnn (spanAsAnchor l) noAnn cs) fields)
 
 -- Normal prefix constructor, e.g.  data T = MkT A B C
 dataConBuilderDetails (L _ (PrefixDataConBuilder flds _))
@@ -2999,7 +2998,7 @@ mkRecConstrOrUpdate
         -> LHsExpr GhcPs
         -> SrcSpan
         -> ([Fbind (HsExpr GhcPs)], Maybe SrcSpan)
-        -> (Maybe (EpToken "{"), Maybe (EpToken "}"))
+        -> (EpToken "{", EpToken "}")
         -> PV (HsExpr GhcPs)
 mkRecConstrOrUpdate _ (L _ (HsVar _ (L l c))) _lrec (fbinds,dd) anns
   | isRdrDataCon c
@@ -3008,13 +3007,13 @@ mkRecConstrOrUpdate _ (L _ (HsVar _ (L l c))) _lrec (fbinds,dd) anns
       case ps of
           p:_ -> addFatalError $ mkPlainErrorMsgEnvelope (getLocA p) $
               PsErrOverloadedRecordDotInvalid
-          _ -> return (mkRdrRecordCon (L l c) (mk_rec_fields fs dd) anns)
+          _ -> return (mkRdrRecordCon (L l c) (mk_rec_fields anns fs dd))
 mkRecConstrOrUpdate overloaded_update exp _ (fs,dd) anns
   | Just dd_loc <- dd = addFatalError $ mkPlainErrorMsgEnvelope dd_loc $
                                           PsErrDotsInRecordUpdate
   | otherwise = mkRdrRecordUpd overloaded_update exp fs anns
 
-mkRdrRecordUpd :: Bool -> LHsExpr GhcPs -> [Fbind (HsExpr GhcPs)] -> (Maybe (EpToken "{"), Maybe (EpToken "}"))
+mkRdrRecordUpd :: Bool -> LHsExpr GhcPs -> [Fbind (HsExpr GhcPs)] -> (EpToken "{", EpToken "}")
   -> PV (HsExpr GhcPs)
 mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
   -- We do not need to know if OverloadedRecordDot is in effect. We do
@@ -3076,14 +3075,15 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
           punnedVar f  = if not pun then arg else noLocA . HsVar noExtField . noLocA . mkRdrUnqual . mkVarOccFS $ f
 
 mkRdrRecordCon
-  :: LocatedN RdrName -> HsRecordBinds GhcPs -> (Maybe (EpToken "{"), Maybe (EpToken "}")) -> HsExpr GhcPs
-mkRdrRecordCon con flds anns
-  = RecordCon { rcon_ext = anns, rcon_con = con, rcon_flds = flds }
+  :: LocatedN RdrName -> HsRecordBinds GhcPs -> HsExpr GhcPs
+mkRdrRecordCon con flds
+  = RecordCon { rcon_ext = noExtField, rcon_con = con, rcon_flds = flds }
 
-mk_rec_fields :: [LocatedA (HsRecField GhcPs arg)] -> Maybe SrcSpan -> HsRecFields GhcPs arg
-mk_rec_fields fs Nothing = HsRecFields { rec_ext = noExtField, rec_flds = fs, rec_dotdot = Nothing }
-mk_rec_fields fs (Just s)  = HsRecFields { rec_ext = noExtField, rec_flds = fs
-                                     , rec_dotdot = Just (L (l2l s) (RecFieldsDotDot $ length fs)) }
+mk_rec_fields
+  :: (EpToken "{", EpToken  "}") -> [LocatedA (HsRecField GhcPs arg)] -> Maybe SrcSpan -> HsRecFields GhcPs arg
+mk_rec_fields an fs Nothing  = HsRecFields { rec_ext = an, rec_flds = fs, rec_dotdot = Nothing }
+mk_rec_fields an fs (Just s) = HsRecFields { rec_ext = an, rec_flds = fs
+                                           , rec_dotdot = Just (L (l2l s) (RecFieldsDotDot $ length fs)) }
 
 mk_rec_upd_field :: HsRecField GhcPs (LHsExpr GhcPs) -> HsRecUpdField GhcPs GhcPs
 mk_rec_upd_field (HsFieldBind noAnn (L loc (FieldOcc _ rdr)) arg pun)

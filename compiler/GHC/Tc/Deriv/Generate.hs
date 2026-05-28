@@ -594,10 +594,10 @@ unliftedCompare lt_op eq_op a_expr b_expr lt eq gt
 nlConWildPat :: DataCon -> LPat GhcPs
 -- The pattern (K {})
 nlConWildPat con = noLocA $ ConPat
-  { pat_con_ext = noAnn
+  { pat_con_ext = noExtField
   , pat_con = noLocA $ getRdrName con
-  , pat_args = RecCon noExtField $ HsRecFields
-      { rec_ext = noExtField
+  , pat_args = RecCon noAnn $ HsRecFields
+      { rec_ext = noAnn
       , rec_flds = []
       , rec_dotdot = Nothing }
   }

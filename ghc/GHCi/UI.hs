@@ -3279,10 +3279,10 @@ iiSubsumes (IIDecl d1) (IIDecl d2)      -- A bit crude
      && (not (isImportDeclQualified (ideclQualified d1)) || isImportDeclQualified (ideclQualified d2))
      && (ideclImportList d1 `hidingSubsumes` ideclImportList d2)
   where
-     _                    `hidingSubsumes` Just (Exactly,L _ []) = True
-     Just (Exactly, L _ xs) `hidingSubsumes` Just (Exactly,L _ ys)
-                                                           = all (`elem` xs) ys
-     h1                   `hidingSubsumes` h2              = h1 == h2
+     _                  `hidingSubsumes` Just (Exactly, []) = True
+     Just (Exactly, xs) `hidingSubsumes` Just (Exactly, ys)
+                                                            = all (`elem` xs) ys
+     h1                 `hidingSubsumes` h2                 = h1 == h2
 iiSubsumes _ _ = False
 
 

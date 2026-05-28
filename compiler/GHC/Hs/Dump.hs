@@ -69,13 +69,13 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` annotationAnnList
               `extQ` annotationAnnListWhere
               `extQ` annotationAnnListCommas
-              `extQ` annotationAnnListIE
-              `extQ` annotationEpAnnImportDecl
               `extQ` annotationNoEpAnns
               `extQ` annotationExprBracket
               `extQ` annotationTypedBracket
               `extQ` epTokenOC
               `extQ` epTokenCC
+              `extQ` epTokenOpenP
+              `extQ` epTokenCloseP
               `extQ` epTokenInstance
               `extQ` epTokenForall
               `extQ` annParen
@@ -95,10 +95,10 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` bagName `extQ` bagRdrName `extQ` bagVar `extQ` nameSet
               `ext2Q` located
               `extQ` srcSpanAnnA
-              `extQ` srcSpanAnnL
               `extQ` srcSpanAnnP
               `extQ` srcSpanAnnC
               `extQ` srcSpanAnnN
+              `extQ` srcSpanAnnBF
 
       where generic :: Data a => a -> SDoc
             generic t = parens $ text (showConstr (toConstr t))
@@ -291,6 +291,12 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
             epTokenCC :: EpToken "}" -> SDoc
             epTokenCC = epToken'
 
+            epTokenOpenP :: EpToken "(" -> SDoc
+            epTokenOpenP = epToken'
+
+            epTokenCloseP :: EpToken ")" -> SDoc
+            epTokenCloseP = epToken'
+
             epTokenInstance :: EpToken "instance" -> SDoc
             epTokenInstance = epToken'
 
@@ -370,12 +376,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
             annotationAnnListCommas :: EpAnn (AnnList [EpToken ","]) -> SDoc
             annotationAnnListCommas = annotation' (text "EpAnn (AnnList [EpToken \",\"])")
 
-            annotationAnnListIE :: EpAnn (AnnList (EpToken "hiding", [EpToken ","])) -> SDoc
-            annotationAnnListIE = annotation' (text "EpAnn (AnnList (EpToken \"hiding\", [EpToken \",\"]))")
-
-            annotationEpAnnImportDecl :: EpAnn EpAnnImportDecl -> SDoc
-            annotationEpAnnImportDecl = annotation' (text "EpAnn EpAnnImportDecl")
-
             annotationNoEpAnns :: EpAnn NoEpAnns -> SDoc
             annotationNoEpAnns = annotation' (text "EpAnn NoEpAnns")
 
@@ -391,9 +391,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
             srcSpanAnnA :: EpAnn AnnListItem -> SDoc
             srcSpanAnnA = locatedAnn'' (text "SrcSpanAnnA")
 
-            srcSpanAnnL :: EpAnn (AnnList ()) -> SDoc
-            srcSpanAnnL = locatedAnn'' (text "SrcSpanAnnL")
-
             srcSpanAnnP :: EpAnn AnnPragma -> SDoc
             srcSpanAnnP = locatedAnn'' (text "SrcSpanAnnP")
 
@@ -402,6 +399,10 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             srcSpanAnnN :: EpAnn NameAnn -> SDoc
             srcSpanAnnN = locatedAnn'' (text "SrcSpanAnnN")
+
+            srcSpanAnnBF :: EpAnn AnnBooleanFormula -> SDoc
+            srcSpanAnnBF = locatedAnn'' (text "SrcSpanAnnBF")
+
 
             locatedAnn'' :: forall a. (Typeable a, Data a)
               => SDoc -> EpAnn a -> SDoc

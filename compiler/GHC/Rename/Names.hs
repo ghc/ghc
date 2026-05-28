@@ -1188,14 +1188,14 @@ filterImports
     -> ModIface
     -> ImpDeclSpec
          -- ^ Import spec
-    -> Maybe (ImportListInterpretation, LocatedLI [LIE GhcPs])
+    -> Maybe (ImportListInterpretation, [LIE GhcPs])
          -- ^ Whether this is a "hiding" import list
-    -> RnM (Maybe (ImportListInterpretation, LocatedLI [LIE GhcRn]), -- Import spec w/ Names
+    -> RnM (Maybe (ImportListInterpretation, [LIE GhcRn]), -- Import spec w/ Names
             ImpUserList,                      -- same, but designed for storage in interfaces
             GlobalRdrEnv)                   -- Same again, but in GRE form
 filterImports hsc_env iface decl_spec Nothing
   = return (Nothing, ImpUserAll, importsFromIface hsc_env iface decl_spec Nothing)
-filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
+filterImports hsc_env iface decl_spec (Just (want_hiding, import_items))
   = do  -- check for errors, convert RdrNames to Names
         items1 <- mapM lookup_lie import_items
 
@@ -1214,7 +1214,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                 let hidden_names = mkNameSet $ concatMap (map greName . snd) items2
                 in (importsFromIface hsc_env iface decl_spec (Just hidden_names), ImpUserEverythingBut hidden_names)
 
-        return (Just (want_hiding, L l (map fst items2)), imp_user_list, gres)
+        return (Just (want_hiding, map fst items2), imp_user_list, gres)
   where
     import_mod = mi_module iface
     all_avails = mi_exports iface
@@ -1998,7 +1998,7 @@ findImportUsage imports used_gres
 
         (unused_names, unused_wcs)   -- Not trivial; see eg #7454
           = case imps of
-              Just (Exactly, L _ imp_ies) ->
+              Just (Exactly, imp_ies) ->
                 let unused = foldr (add_unused . unLoc) emptyUnusedNames imp_ies
                     nms = nameSetElemsStable (collectUnusedNames unused)
                     wcs = collectUnusedWildcards unused
@@ -2203,11 +2203,11 @@ warnUnusedImport :: GlobalRdrEnv -> ImportDeclUsage -> RnM ()
 warnUnusedImport rdr_env (L loc decl, used, unused, unused_wcs)
 
   -- Do not warn for 'import M()'
-  | Just (Exactly, L _ []) <- ideclImportList decl
+  | Just (Exactly, []) <- ideclImportList decl
   = return ()
 
   -- Note [Do not warn about Prelude hiding]
-  | Just (EverythingBut, L _ hides) <- ideclImportList decl
+  | Just (EverythingBut, hides) <- ideclImportList decl
   , not (null hides)
   , pRELUDE_NAME == unLoc (ideclName decl)
   = return ()
@@ -2222,7 +2222,7 @@ warnUnusedImport rdr_env (L loc decl, used, unused, unused_wcs)
 
   -- Some imports are unused: make the `SrcSpan` cover only the unused
   -- items instead of the whole import statement
-  | Just (_, L _ imports) <- ideclImportList decl
+  | Just (_, imports) <- ideclImportList decl
   , let unused_locs = [ locA loc | L loc ie <- imports
                                  , name <- ieNames ie
                                  , name `elem` unused ]
@@ -2293,7 +2293,7 @@ getMinimalImports ie_decls
            ; iface <- loadSrcInterface doc mod_name is_boot pkg_qual
            ; let used_avails = gresToAvailInfo used_gres
            ; lies <- map (L l) <$> concatMapM (to_ie rdr_env iface) used_avails
-           ; return (L l (decl { ideclImportList = Just (Exactly, L (l2l l) lies) })) }
+           ; return (L l (decl { ideclImportList = Just (Exactly, lies) })) }
       where
         doc = text "Compute minimal imports for" <+> ppr decl
 
@@ -2355,8 +2355,8 @@ getMinimalImports ie_decls
         idecl = unLoc decl
 
     merge :: NonEmpty (LImportDecl GhcRn) -> LImportDecl GhcRn
-    merge decls@((L l decl) :| _) = L l (decl { ideclImportList = Just (Exactly, L (noAnnSrcSpan (locA l)) lies) })
-      where lies = concatMap (unLoc . snd) $ mapMaybe (ideclImportList . unLoc) $ NE.toList decls
+    merge decls@((L l decl) :| _) = L l (decl { ideclImportList = Just (Exactly, lies) })
+      where lies = concatMap snd $ mapMaybe (ideclImportList . unLoc) $ NE.toList decls
 
 classifyGREs :: [GlobalRdrElt] -> ([GlobalRdrElt], [FieldGlobalRdrElt])
 classifyGREs = partition (not . isRecFldGRE)
