@@ -1,0 +1,7 @@
+section: packaging
+issues: #27312
+mrs: !16114
+synopsis:
+  bump directory submodule to v1.3.11.0
+description:
+  This submodule bump relaces some version constraints for directory.
