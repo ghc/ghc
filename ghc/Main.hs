@@ -73,6 +73,8 @@ import GHC.SysTools.BaseDir
 import GHC.Iface.Load
 import GHC.Iface.Recomp.Binary ( fingerprintBinMem )
 
+import GHC.ByteCode.Show ( showByteCode )
+
 import GHC.Tc.Utils.Monad      ( initIfaceCheck )
 import GHC.Iface.Errors.Ppr
 
@@ -267,6 +269,7 @@ main' postLoadMode units dflags0 args flagWarnings = do
                                                     (hsc_units  hsc_env)
                                                     (hsc_NC     hsc_env)
                                                     f
+       ShowByteCode f         -> liftIO $ showByteCode logger hsc_env f
        DoMake                 -> doMake units srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)
        StopBefore p           -> liftIO (oneShot hsc_env p srcs)

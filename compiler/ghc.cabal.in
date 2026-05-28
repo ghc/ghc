@@ -217,6 +217,7 @@ Library
         GHC.ByteCode.Linker
         GHC.ByteCode.Recomp.Binary
         GHC.ByteCode.Serialize
+        GHC.ByteCode.Show
         GHC.ByteCode.Types
         GHC.Cmm
         GHC.Cmm.BlockId
