@@ -856,10 +856,11 @@ installInteractiveHomeUnits dflags = do
   where
     setupHomeUnitFor :: GHC.GhcMonad m => Logger -> DynFlags -> S.Set UnitId -> m HomeUnitEnv
     setupHomeUnitFor logger dflags all_home_units = do
-      (dbs,unit_state,home_unit,_mconstants) <-
-        liftIO $ initUnits logger dflags Nothing all_home_units
+      env <- GHC.getSession
+      (unit_state,home_unit,_mconstants) <-
+        liftIO $ initUnits logger dflags (hscEUDC env) all_home_units
       hpt <- liftIO emptyHomePackageTable
-      pure (HUG.mkHomeUnitEnv unit_state (Just dbs) dflags hpt (Just home_unit))
+      pure (HUG.mkHomeUnitEnv unit_state dflags hpt (Just home_unit))
 
     concatPackageDbStacksUsingLongestCommonPrefix :: [[PackageDBFlag]] -> [PackageDBFlag]
     concatPackageDbStacksUsingLongestCommonPrefix stacks =

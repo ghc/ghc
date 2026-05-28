@@ -92,6 +92,7 @@ import GHC.Types.Error (mkUnknownDiagnostic)
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable
+import GHC.Unit.External.Database (cacheExternalUnitDatabase)
 
 -- | Entry point to compile a Backpack file.
 doBackpack :: [FilePath] -> Ghc ()
@@ -435,18 +436,24 @@ addUnit u = do
     logger <- getLogger
     let dflags0 = hsc_dflags hsc_env
     let old_unit_env = hsc_unit_env hsc_env
-    newdbs <- case ue_unit_dbs old_unit_env of
-        Nothing  -> panic "addUnit: called too early"
-        Just dbs ->
-         let newdb = UnitDatabase
-               { unitDatabasePath  = unsafeEncodeUtf $ "(in memory " ++ showSDoc dflags0 (ppr (unitId u)) ++ ")"
-               , unitDatabaseUnits = [u]
-               }
-         in return (dbs ++ [newdb]) -- added at the end because ordering matters
-    (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags0 (Just newdbs) (hsc_all_home_unit_ids hsc_env)
+
+    -- TODO @fendor: provide an API to programmatically add an in-memory DB
+    let newdb = UnitDatabase
+          { unitDatabasePath  = unsafeEncodeUtf $ "(in memory " ++ showSDoc dflags0 (ppr (unitId u)) ++ ")"
+          , unitDatabaseUnits = [u]
+          }
+    let eud = hscEUDC hsc_env
+    liftIO $ cacheExternalUnitDatabase eud newdb
+    -- added at the end because ordering matters
+    let dflags1 = dflags0
+          { packageDBFlags = packageDBFlags dflags0 ++ [PackageDB (PkgDbPath (unitDatabasePath newdb))]
+          }
+
+    (unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags1 eud (hsc_all_home_unit_ids hsc_env)
+
 
     -- update platform constants
-    dflags <- liftIO $ updatePlatformConstants dflags0 mconstants
+    dflags <- liftIO $ updatePlatformConstants dflags1 mconstants
 
     let unit_env = UnitEnv
           { ue_platform  = targetPlatform dflags
@@ -456,9 +463,10 @@ addUnit u = do
           , ue_home_unit_graph =
                 HUG.unitEnv_singleton
                     (homeUnitId home_unit)
-                    (HUG.mkHomeUnitEnv unit_state (Just dbs) dflags (ue_hpt old_unit_env) (Just home_unit))
+                    (HUG.mkHomeUnitEnv unit_state dflags (ue_hpt old_unit_env) (Just home_unit))
           , ue_eps       = ue_eps old_unit_env
           , ue_module_graph = ue_module_graph old_unit_env
+          , ue_eud       = ue_eud old_unit_env
           }
     setSession $ hscSetFlags dflags $ hsc_env { hsc_unit_env = unit_env }
 

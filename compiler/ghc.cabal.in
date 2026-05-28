@@ -966,6 +966,7 @@ Library
         GHC.Unit
         GHC.Unit.Env
         GHC.Unit.External
+        GHC.Unit.External.Database
         GHC.Unit.Finder
         GHC.Unit.Finder.Types
         GHC.Unit.Home
