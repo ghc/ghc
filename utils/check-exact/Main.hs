@@ -183,6 +183,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Test17519.hs" Nothing
  -- "../../testsuite/tests/printer/InTreeAnnotations1.hs" Nothing
  -- "../../testsuite/tests/printer/Test19798.hs" Nothing
+ "../../testsuite/tests/printer/Test10309.hs" Nothing
 
  -- "../../testsuite/tests/qualifieddo/should_compile/qdocompile001.hs" Nothing
  -- "../../testsuite/tests/typecheck/should_fail/StrictBinds.hs" Nothing
@@ -218,7 +219,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Test22771.hs" Nothing
  -- "../../testsuite/tests/printer/Test23465.hs" Nothing
  -- "../../testsuite/tests/printer/Test25454.hs" Nothing
- "../../testsuite/tests/printer/PprModifiers.hs" Nothing
+ -- "../../testsuite/tests/printer/PprModifiers.hs" Nothing
 
 -- cloneT does not need a test, function can be retired
 
@@ -886,15 +887,13 @@ addHiding1 _libdir (L l p) = do
           n2 = L noAnnSrcSpanDP0 (mkVarUnqual (mkFastString "n2"))
           v1 = L (addComma $ noAnnSrcSpanDP0) (IEVar Nothing (L noAnnSrcSpanDP0 (IEName noExtField n1)) Nothing)
           v2 = L (           noAnnSrcSpanDP0) (IEVar Nothing (L noAnnSrcSpanDP0 (IEName noExtField n2)) Nothing)
-          impHiding = L (EpAnn d0
-                               (AnnList Nothing
-                                        (ListParens (EpTok d1) (EpTok d0))
-                                        []
-                                        (EpTok d1,[])
-                                        [])
-                                 emptyComments) [v1,v2]
-          imp1' = imp1 { ideclImportList = Just (EverythingBut,impHiding)}
-          imp2' = setEntryDP imp2 (DifferentLine 2 0)
+          impHiding = [v1,v2]
+          impAnnList = (EpTok d1, EpTok d1, EpTok d0, [])
+          imp1' = imp1 { ideclExt
+                           = (ideclExt imp1) { ideclAnn
+                                 = (ideclAnn $ ideclExt imp1) {importDeclImportList = impAnnList }}
+                       , ideclImportList = Just (EverythingBut, impHiding)}
+          imp2' = imp2
           p' = p { hsmodImports = [L li imp1',imp2']}
         return (L l p')
 
@@ -910,21 +909,18 @@ addHiding2 _libdir top = do
         let (L l p) = top
         let
           [L li imp1] = hsmodImports p
-          Just (_,L _lh ns) = ideclImportList imp1
-          lh' = (EpAnn d0
-                       (AnnList Nothing
-                                (ListParens (EpTok d1) (EpTok d0))
-                                []
-                                (EpTok d1, [])
-                                [])
-                         emptyComments)
+          Just (_, ns) = ideclImportList imp1
           n1 = L (noAnnSrcSpanDP0) (mkVarUnqual (mkFastString "n1"))
           n2 = L (noAnnSrcSpanDP0) (mkVarUnqual (mkFastString "n2"))
           v1 = L (addComma $ noAnnSrcSpanDP0) (IEVar Nothing (L noAnnSrcSpanDP0 (IEName noExtField n1)) Nothing)
           v2 = L (           noAnnSrcSpanDP0) (IEVar Nothing (L noAnnSrcSpanDP0 (IEName noExtField n2)) Nothing)
           L ln n = last ns
           n' = L (addComma ln) n
-          imp1' = imp1 { ideclImportList = Just (EverythingBut, L lh' (init ns ++ [n',v1,v2]))}
+          impAnnList = (EpTok d1, EpTok d1, EpTok d0, [])
+          imp1' = imp1 { ideclExt
+                           = (ideclExt imp1) { ideclAnn
+                                 = (ideclAnn $ ideclExt imp1) {importDeclImportList = impAnnList }}
+                       , ideclImportList = Just (EverythingBut, init ns ++ [n',v1,v2])}
           p' = p { hsmodImports = [L li imp1']}
         return (L l p')
 

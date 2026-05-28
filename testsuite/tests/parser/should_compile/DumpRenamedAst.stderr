@@ -2703,17 +2703,18 @@
       []))
     (ImportDecl
      (XImportDeclPass
-      (EpAnn
-       (EpaDelta { <no location info> } (SameLine 0) [])
-       (EpAnnImportDecl
+      (EpAnnImportDecl
+       (NoEpTok)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       ((,,,)
         (NoEpTok)
-        (Nothing)
-        (Nothing)
-        (Nothing)
-        (Nothing)
-        (Nothing)
-        (Nothing))
-       (EpaComments
+        (NoEpTok)
+        (NoEpTok)
         []))
       (NoSourceText)
       (True))
@@ -2741,18 +2742,19 @@
       []))
     (ImportDecl
      (XImportDeclPass
-      (EpAnn
-       (EpaSpan { DumpRenamedAst.hs:5:1-16 })
-       (EpAnnImportDecl
-        (EpTok
-         (EpaSpan { DumpRenamedAst.hs:5:1-6 }))
-        (Nothing)
-        (Nothing)
-        (Nothing)
-        (Nothing)
-        (Nothing)
-        (Nothing))
-       (EpaComments
+      (EpAnnImportDecl
+       (EpTok
+        (EpaSpan { DumpRenamedAst.hs:5:1-6 }))
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       ((,,,)
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
         []))
       (NoSourceText)
       (False))
@@ -2780,18 +2782,19 @@
       []))
     (ImportDecl
      (XImportDeclPass
-      (EpAnn
-       (EpaSpan { DumpRenamedAst.hs:7:1-23 })
-       (EpAnnImportDecl
-        (EpTok
-         (EpaSpan { DumpRenamedAst.hs:7:1-6 }))
-        (Nothing)
-        (Nothing)
-        (Nothing)
-        (Nothing)
-        (Nothing)
-        (Nothing))
-       (EpaComments
+      (EpAnnImportDecl
+       (EpTok
+        (EpaSpan { DumpRenamedAst.hs:7:1-6 }))
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       ((,,,)
+        (NoEpTok)
+        (EpTok (EpaSpan { DumpRenamedAst.hs:7:18 }))
+        (EpTok (EpaSpan { DumpRenamedAst.hs:7:23 }))
         []))
       (NoSourceText)
       (False))
@@ -2812,50 +2815,33 @@
      (Just
       ((,)
        (Exactly)
-       (L
-        (EpAnn
-         (EpaSpan { DumpRenamedAst.hs:7:18-23 })
-         (AnnList
-          (Nothing)
-          (ListParens
-           (EpTok
-            (EpaSpan { DumpRenamedAst.hs:7:18 }))
-           (EpTok
-            (EpaSpan { DumpRenamedAst.hs:7:23 })))
-          []
-          ((,)
-           (NoEpTok)
+       [(L
+         (EpAnn
+          (EpaSpan { DumpRenamedAst.hs:7:19-22 })
+          (AnnListItem
            [])
-          [])
-         (EpaComments
-          []))
-        [(L
-          (EpAnn
-           (EpaSpan { DumpRenamedAst.hs:7:19-22 })
-           (AnnListItem
-            [])
-           (EpaComments
-            []))
-          (IEThingAbs
-           (Nothing)
-           (L
-            (EpAnn
-             (EpaSpan { DumpRenamedAst.hs:7:19-22 })
-             (AnnListItem
-              [])
-             (EpaComments
-              []))
-            (IEName
-             (NoExtField)
-             (L
-              (EpAnn
-               (EpaSpan { DumpRenamedAst.hs:7:19-22 })
-               (NameAnnTrailing
-                [])
-               (EpaComments
-                []))
-              {Name: GHC.Internal.Types.Type})))
-           (Nothing)))])))))]
+          (EpaComments
+           []))
+         (IEThingAbs
+          (Nothing)
+          (L
+           (EpAnn
+            (EpaSpan { DumpRenamedAst.hs:7:19-22 })
+            (AnnListItem
+             [])
+            (EpaComments
+             []))
+           (IEName
+            (NoExtField)
+            (L
+             (EpAnn
+              (EpaSpan { DumpRenamedAst.hs:7:19-22 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
+             {Name: GHC.Internal.Types.Type})))
+          (Nothing)))]))))]
   (Nothing)
   (Nothing)
   (Just

@@ -2683,8 +2683,8 @@ rnConDeclGADTDetails con doc (RecConGADT _ flds)
 rnRecHsConDeclRecFields ::
      Name
   -> HsDocContext
-  -> LocatedL [LHsConDeclRecField GhcPs]
-  -> RnM (LocatedL [LHsConDeclRecField GhcRn], FreeNames)
+  -> LocatedA [LHsConDeclRecField GhcPs]
+  -> RnM (LocatedA [LHsConDeclRecField GhcRn], FreeNames)
 rnRecHsConDeclRecFields con doc (L l fields)
   = do  { fls <- lookupConstructorFields (noUserRdr con)
         ; (new_fields, fvs) <- rnHsConDeclRecFields doc fls fields
@@ -2727,7 +2727,7 @@ extendPatSynEnv dup_fields_ok has_sel val_decls local_fix_env thing = do {
           bnd_name <- newTopSrcBinder (L (l2l bind_loc) n)
           let field_occs = map ((\ f -> L (noAnnSrcSpan $ getLocA (foLabel f)) f) . recordPatSynField) as
           flds <- mapM (newRecordFieldLabel dup_fields_ok has_sel [bnd_name]) field_occs
-          let con_info = mkConInfo ConIsPatSyn (conDetailsVisArity (RecCon noExtField as)) flds
+          let con_info = mkConInfo ConIsPatSyn (conDetailsVisArity (RecCon noAnn as)) flds
           return ((PatSynName bnd_name, con_info) : names)
       | L bind_loc (PatSynBind _ (PSB { psb_id = L _ n, psb_args = as })) <- bind
       = do

@@ -940,8 +940,8 @@ mkOneRecordSelector all_cons idDetails fl has_sel
                                  (L loc' (mkHsVar (L locn field_var)))
     mk_sel_pat con =
       let con_lname = L locn (noUserRdr (getName con))
-      in ConPat NoExtField con_lname (RecCon noExtField rec_fields)
-    rec_fields = HsRecFields { rec_ext = noExtField, rec_flds = [rec_field], rec_dotdot = Nothing }
+      in ConPat NoExtField con_lname (RecCon noAnn rec_fields)
+    rec_fields = HsRecFields { rec_ext = noAnn, rec_flds = [rec_field], rec_dotdot = Nothing }
     rec_field  = noLocA (HsFieldBind
                         { hfbAnn = noAnn
                         , hfbLHS

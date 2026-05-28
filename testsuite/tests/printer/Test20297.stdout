@@ -13,6 +13,10 @@
       (EpaSpan { Test20297.hs:2:1-6 }))
      (EpTok
       (EpaSpan { Test20297.hs:2:18-22 }))
+     ((,,)
+      (NoEpTok)
+      (NoEpTok)
+      [])
      []
      []
      (Just
@@ -454,6 +458,10 @@
       (EpaSpan { Test20297.ppr.hs:2:1-6 }))
      (EpTok
       (EpaSpan { Test20297.ppr.hs:2:18-22 }))
+     ((,,)
+      (NoEpTok)
+      (NoEpTok)
+      [])
      []
      []
      (Just

@@ -13,6 +13,10 @@
       (EpaSpan { T20846.hs:1:1-6 }))
      (EpTok
       (EpaSpan { T20846.hs:1:15-19 }))
+     ((,,)
+      (NoEpTok)
+      (NoEpTok)
+      [])
      []
      []
      (Just
@@ -116,10 +120,8 @@
               (EpaSpan { T20846.hs:4:1-6 })
               (NameAnn
                (NameParens
-                (EpTok
-                 (EpaSpan { T20846.hs:4:1 }))
-                (EpTok
-                 (EpaSpan { T20846.hs:4:6 })))
+                (EpTok (EpaSpan { T20846.hs:4:1 }))
+                (EpTok (EpaSpan { T20846.hs:4:6 })))
                (EpaSpan { T20846.hs:4:2-5 })
                [])
               (EpaComments

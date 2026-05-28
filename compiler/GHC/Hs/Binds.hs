@@ -145,14 +145,12 @@ type instance XXPatSynBind (GhcPass idL) (GhcPass idR) = DataConCantHappen
 data AnnPSB
   = AnnPSB {
       ap_pattern :: EpToken "pattern",
-      ap_openc   :: Maybe (EpToken "{"),
-      ap_closec  :: Maybe (EpToken "}"),
       ap_larrow  :: Maybe (EpUniToken "<-" "←"),
       ap_equal   :: Maybe (EpToken "=")
     } deriving Data
 
 instance NoAnn AnnPSB where
-  noAnn = AnnPSB noAnn noAnn noAnn noAnn noAnn
+  noAnn = AnnPSB noAnn noAnn noAnn
 
 -- ---------------------------------------------------------------------
 

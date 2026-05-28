@@ -192,8 +192,8 @@ type ExportOccMap = OccEnv (Name, IE GhcPs)
         --   it came from.  It's illegal to export two distinct things
         --   that have the same occurrence name
 
-rnExports :: Bool       -- False => no 'module M(..) where' header at all
-          -> Maybe (LocatedLI [LIE GhcPs]) -- Nothing => no explicit export list
+rnExports :: Bool              -- False => no 'module M(..) where' header at all
+          -> Maybe [LIE GhcPs] -- Nothing => no explicit export list
           -> RnM TcGblEnv
 
         -- Complains if two distinct exports have same OccName
@@ -225,8 +225,8 @@ rnExports explicit_mod exports
         ; let real_exports
                  | explicit_mod = exports
                  | has_main
-                          = Just (noLocA [noLocA (IEVar Nothing
-                                     (noLocA (IEName noExtField $ noLocA default_main)) Nothing)])
+                          = Just [noLocA (IEVar Nothing
+                                     (noLocA (IEName noExtField $ noLocA default_main)) Nothing)]
                         -- ToDo: the 'noLoc' here is unhelpful if 'main'
                         --       turns out to be out of scope
                  | otherwise = Nothing
@@ -302,7 +302,7 @@ the default export. In the latter case the warning text is stored in the
 of a user-defined warning on default.
 -}
 
-exports_from_avail :: Maybe (LocatedLI [LIE GhcPs])
+exports_from_avail :: Maybe [LIE GhcPs]
                          -- ^ 'Nothing' means no explicit export list
                    -> GlobalRdrEnv
                    -> ImportAvails
@@ -341,7 +341,7 @@ exports_from_avail Nothing rdr_env _imports _this_mod
     fix_faminst avail = avail
 
 
-exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
+exports_from_avail (Just rdr_items) rdr_env imports this_mod
   = do (ie_avails, ie_dflts, export_warn_spans, dont_warn_export)
          <- accumExports do_litem rdr_items
        let final_exports = nubAvails (concatMap snd ie_avails) -- Combine families

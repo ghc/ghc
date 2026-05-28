@@ -13,6 +13,10 @@
       (EpaSpan { ZeroWidthSemi.hs:1:1-6 }))
      (EpTok
       (EpaSpan { ZeroWidthSemi.hs:1:22-26 }))
+     ((,,)
+      (NoEpTok)
+      (NoEpTok)
+      [])
      []
      []
      (Just

@@ -525,7 +525,7 @@ rnExpr (RecordCon { rcon_con = con_rdr
        ; let qcon = WithUserRdr (unLoc con_rdr) con_name
        ; (flds, fvs)   <- rnHsRecFields (HsRecFieldCon qcon) mk_hs_var rec_binds
        ; (flds', fvss) <- mapAndUnzipM rn_field flds
-       ; let rec_binds' = HsRecFields { rec_ext = noExtField, rec_flds = flds', rec_dotdot = dd }
+       ; let rec_binds' = HsRecFields { rec_ext = noAnn, rec_flds = flds', rec_dotdot = dd }
        ; return (RecordCon { rcon_ext = noExtField
                            , rcon_con = L con_loc qcon
                            , rcon_flds = rec_binds' }

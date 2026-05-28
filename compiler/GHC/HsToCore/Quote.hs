@@ -2938,7 +2938,7 @@ repPrefixConArgs isPrefixConGADT ps = do
   repListM bangTypeTyConName repConDeclField ps
 
 -- Desugar the arguments in a data constructor declared with record syntax.
-repRecConArgs :: LocatedL [LHsConDeclRecField GhcRn]
+repRecConArgs :: LocatedA [LHsConDeclRecField GhcRn]
               -> MetaM (Core [M TH.VarBangType])
 repRecConArgs lips = do
   let ips = map unLoc (unLoc lips)

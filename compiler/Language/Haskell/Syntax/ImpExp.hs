@@ -56,7 +56,7 @@ data ImportDecl pass
       ideclSafe       :: Bool,          -- ^ True => safe import
       ideclQualified  :: ImportDeclQualifiedStyle, -- ^ If/how the import is qualified.
       ideclAs         :: Maybe (XRec pass ModuleName),  -- ^ as Module
-      ideclImportList :: Maybe (ImportListInterpretation, XRec pass [LIE pass])
+      ideclImportList :: Maybe (ImportListInterpretation, [LIE pass])
                                        -- ^ Explicit import list (EverythingBut => hiding, names)
     }
   | XImportDecl !(XXImportDecl pass)

@@ -27,11 +27,12 @@ module GHC.Parser.Annotation (
   EpAnnCO,
 
   -- ** Annotations in 'GenLocated'
-  LocatedA, LocatedL, LocatedC, LocatedN, LocatedAn, LocatedP,
-  LocatedLC, LocatedLS, LocatedLW, LocatedLI,
-  SrcSpanAnnA, SrcSpanAnnL, SrcSpanAnnP, SrcSpanAnnC, SrcSpanAnnN,
-  SrcSpanAnnLC, SrcSpanAnnLW, SrcSpanAnnLS, SrcSpanAnnLI,
-  LocatedE,
+  LocatedA, LocatedC, LocatedN, LocatedAn, LocatedP,
+  LocatedLC, LocatedLS, LocatedLW,
+  LocatedE, LocatedBF,
+  SrcSpanAnnA, SrcSpanAnnP, SrcSpanAnnC, SrcSpanAnnN,
+  SrcSpanAnnLC, SrcSpanAnnLW, SrcSpanAnnLS,
+  SrcSpanAnnBF,
 
   -- ** Annotation data types used in 'GenLocated'
 
@@ -39,13 +40,16 @@ module GHC.Parser.Annotation (
   AnnParen(..),
   AnnPragma(..),
   AnnContext(..),
+  AnnBooleanFormula(..),
   NameAnn(..), NameAdornment(..),
   NoEpAnns(..),
+
   AnnSortKey(..), DeclTag(..), BindTag(..),
 
   -- ** Trailing annotations in lists
   TrailingAnn(..), ta_location,
   addTrailingAnnToA, addTrailingAnnToL, addTrailingCommaToN,
+  addTrailingAnnToBF,
   noTrailingN,
 
   -- ** Utilities for converting between different 'GenLocated' when
@@ -429,24 +433,22 @@ emptyComments = EpaComments []
 type LocatedA = GenLocated SrcSpanAnnA
 type LocatedN = GenLocated SrcSpanAnnN
 
-type LocatedL = GenLocated SrcSpanAnnL
 type LocatedLC = GenLocated SrcSpanAnnLC
 type LocatedLS = GenLocated SrcSpanAnnLS
 type LocatedLW = GenLocated SrcSpanAnnLW
-type LocatedLI = GenLocated SrcSpanAnnLI
 type LocatedP = GenLocated SrcSpanAnnP
 type LocatedC = GenLocated SrcSpanAnnC
+type LocatedBF = GenLocated SrcSpanAnnBF
 
 type SrcSpanAnnA = EpAnn AnnListItem
 type SrcSpanAnnN = EpAnn NameAnn
 
-type SrcSpanAnnL = EpAnn (AnnList ())
 type SrcSpanAnnLC = EpAnn (AnnList [EpToken ","])
 type SrcSpanAnnLS = EpAnn (AnnList ())
 type SrcSpanAnnLW = EpAnn (AnnList (EpToken "where"))
-type SrcSpanAnnLI = EpAnn (AnnList (EpToken "hiding", [EpToken ","]))
 type SrcSpanAnnP = EpAnn AnnPragma
 type SrcSpanAnnC = EpAnn AnnContext
+type SrcSpanAnnBF = EpAnn AnnBooleanFormula
 
 type LocatedE = GenLocated EpaLocation
 
@@ -529,6 +531,8 @@ data AnnListItem
 -- | Annotation for the "container" of a list. This captures
 -- surrounding items such as braces if present, and introductory
 -- keywords such as 'where'.
+
+-- AZ: goal: only used when there is layout, so vertical alignment matters
 data AnnList a
   = AnnList {
       al_anchor    :: !(Maybe EpaLocation), -- ^ start point of a list having layout
@@ -570,6 +574,16 @@ data AnnContext
       ac_close     :: [EpToken ")"]  -- ^ zero or more closing parentheses.
       } deriving (Data)
 
+-- ---------------------------------------------------------------------
+-- | Exact print annotation for the 'BooleanFormula' data type.
+
+data AnnBooleanFormula
+  = AnnBooleanFormula {
+      abf_open      :: (EpToken "("), -- ^ opening parenthesis.
+      abf_close     :: (EpToken ")"), -- ^ closing parenthesis.
+      abf_trailing  :: ![TrailingAnn] -- ^ items appearing after the
+                                      -- item, such as '|', ','
+      } deriving (Data,Eq)
 
 -- ---------------------------------------------------------------------
 -- Annotations for names
@@ -775,6 +789,14 @@ addTrailingAnnToL t cs n = n { anns = addTrailing (anns n)
   where
     -- See Note [list append in addTrailing*]
     addTrailing n = n { al_trailing = al_trailing n ++ [t]}
+
+addTrailingAnnToBF :: TrailingAnn -> EpAnnComments
+                  -> EpAnn AnnBooleanFormula -> EpAnn AnnBooleanFormula
+addTrailingAnnToBF t cs n = n { anns = addTrailing (anns n)
+                              , comments = comments n <> cs }
+  where
+    -- See Note [list append in addTrailing*]
+    addTrailing n = n { abf_trailing = abf_trailing n ++ [t]}
 
 -- | Helper function used in the parser to add a 'TrailingAnn' items
 -- to an existing annotation.
@@ -1146,6 +1168,9 @@ instance NoAnn AnnListItem where
 
 instance NoAnn AnnContext where
   noAnn = AnnContext Nothing [] []
+
+instance NoAnn AnnBooleanFormula where
+  noAnn = AnnBooleanFormula noAnn noAnn []
 
 instance NoAnn a => NoAnn (AnnList a) where
   noAnn = AnnList Nothing ListNone noAnn noAnn []

@@ -13,6 +13,10 @@
      (NoEpTok)
      (EpTok
       (EpaSpan { T23315.hsig:1:18-22 }))
+     ((,,)
+      (NoEpTok)
+      (NoEpTok)
+      [])
      []
      []
      (Nothing))
@@ -103,10 +107,8 @@
             []))
           (HsTupleTy
            (AnnParens
-            (EpTok
-             (EpaSpan { T23315.hsig:3:6 }))
-            (EpTok
-             (EpaSpan { T23315.hsig:3:7 })))
+            (EpTok (EpaSpan { T23315.hsig:3:6 }))
+            (EpTok (EpaSpan { T23315.hsig:3:7 })))
            (HsBoxedOrConstraintTuple)
            []))))))))
   ,(L

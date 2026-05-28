@@ -310,18 +310,20 @@ insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports
     (mexports', an3, cs1) =
       case mexports of
         Nothing -> (Nothing, an2, cs0b)
-        Just (L l exports) -> (Just (L l exports'), an3', cse)
-                         where
-                           hc1' = workInComments (comments an2) csh'
-                           an3' = an2 { comments = hc1' }
-                           (csh', cs0b') = case annListBracketsLocs $ al_brackets $ anns l of
-                               (EpaSpan (RealSrcSpan s _),_) ->(h, n)
-                                 where
-                                   (h,n) = break (\(L ll _) -> (ss2pos $ epaLocationRealSrcSpan ll) > (ss2pos s) )
-                                       cs0b
+        Just exports -> (Just exports', an3', cse)
+           where
+             (csh', cs0b') = case am_exports $ anns an2 of
+               (tokOP, _tokCP, _tokCommas) ->
+                 case tokOP of
+                   (EpTok (EpaSpan (RealSrcSpan s _))) -> (h, n)
+                     where
+                       (h,n) = break (\(L ll _) -> (ss2pos $ epaLocationRealSrcSpan ll) > (ss2pos s) )
+                                     cs0b
 
-                               _ -> ([], cs0b)
-                           (exports', cse) = allocPreceding exports cs0b'
+                   _ -> ([], cs0b)
+             hc1' = workInComments (comments an2) csh'
+             an3' = an2 { comments = hc1' }
+             (exports', cse) = allocPreceding exports cs0b'
     (imports0, cs2) = allocPreceding imports cs1
     (imports', hc0i) = balanceFirstLocatedAComments imports0
 

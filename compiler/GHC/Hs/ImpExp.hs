@@ -74,7 +74,7 @@ type instance XCImportDecl  GhcRn = XImportDeclPass
 type instance XCImportDecl  GhcTc = DataConCantHappen
 
 data XImportDeclPass = XImportDeclPass
-    { ideclAnn        :: EpAnn EpAnnImportDecl
+    { ideclAnn        :: EpAnnImportDecl
     , ideclSourceText :: SourceText -- Note [Pragma source text] in "GHC.Types.SourceText"
     , ideclGenerated   :: Bool -- ^ See Note [Generated imports]
     }
@@ -93,7 +93,6 @@ Plugins may also introduce generated imports.
 type instance XXImportDecl  (GhcPass _) = DataConCantHappen
 
 type instance Anno ModuleName = SrcSpanAnnA
-type instance Anno [LocatedA (IE (GhcPass p))] = SrcSpanAnnLI
 
 deriving instance Data (IEWrappedName GhcPs)
 deriving instance Data (IEWrappedName GhcRn)
@@ -115,6 +114,8 @@ deriving instance Eq (NamespaceSpecifier GhcTc)
 
 -- API Annotations types
 
+type AnnListImportDecl = (EpToken "hiding", EpToken "(", EpToken ")", [EpToken ","])
+
 data EpAnnImportDecl = EpAnnImportDecl
   { importDeclAnnImport    :: EpToken "import" -- ^ The location of the @import@ keyword
   , importDeclAnnPragma    :: Maybe (EpaLocation, EpToken "#-}") -- ^ The locations of @{-# SOURCE@ and @#-}@ respectively
@@ -123,11 +124,12 @@ data EpAnnImportDecl = EpAnnImportDecl
   , importDeclAnnQualified :: Maybe (EpToken "qualified") -- ^ The location of the @qualified@ keyword
   , importDeclAnnPackage   :: Maybe EpaLocation -- ^ The location of the package name (when using @-XPackageImports@)
   , importDeclAnnAs        :: Maybe (EpToken "as") -- ^ The location of the @as@ keyword
+  , importDeclImportList   :: AnnListImportDecl
   } deriving (Data)
 
 
 instance NoAnn EpAnnImportDecl where
-  noAnn = EpAnnImportDecl noAnn  Nothing Nothing  noAnn  Nothing  Nothing  Nothing
+  noAnn = EpAnnImportDecl noAnn  Nothing Nothing  noAnn  Nothing  Nothing  Nothing noAnn
 
 data EpAnnLevel = EpAnnLevelSplice (EpToken "splice")
                 | EpAnnLevelQuote (EpToken "quote")
@@ -208,9 +210,9 @@ instance (OutputableBndrId p
                   SourceText src -> ftext src <+> text "#-}"
         ppr_imp _ NotBoot = empty
 
-        pp_spec Nothing             = empty
-        pp_spec (Just (Exactly, (L _ ies))) = ppr_ies ies
-        pp_spec (Just (EverythingBut, (L _ ies))) = text "hiding" <+> ppr_ies ies
+        pp_spec Nothing                     = empty
+        pp_spec (Just (Exactly,       ies)) = ppr_ies ies
+        pp_spec (Just (EverythingBut, ies)) = text "hiding" <+> ppr_ies ies
 
         ppr_ies []  = text "()"
         ppr_ies ies = char '(' <+> interpp'SP ies <+> char ')'

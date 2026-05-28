@@ -4411,7 +4411,7 @@ tcConArg exp_kind isPrefixConGADT (CDF (_, src) unp str w bty _)
         ; return (Scaled w' arg_ty, HsSrcBang src unp str) }
 
 tcRecHsConDeclRecFields :: ConArgKind
-                   -> LocatedL [LHsConDeclRecField GhcRn]
+                   -> LocatedA [LHsConDeclRecField GhcRn]
                    -> TcM [(Scaled TcType, HsSrcBang)]
 tcRecHsConDeclRecFields exp_kind fields
   = mapM (tcConArg exp_kind IsNotPrefixConGADT) btys

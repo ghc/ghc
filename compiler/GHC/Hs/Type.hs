@@ -502,8 +502,8 @@ data HsTypeGhcPsExt
                 (LHsType GhcPs)
     -- See Note [Parsing data type declarations]
 
-  | HsRecTy     (AnnList ())
-                [LHsConDeclRecField GhcPs]
+  | HsRecTy     (EpToken "{", EpToken "}")
+                (Located [LHsConDeclRecField GhcPs])
     -- See Note [Parsing data type declarations]
 
 {- Note [Parsing data type declarations]
@@ -743,7 +743,7 @@ type instance XXArg (GhcPass _) = DataConCantHappen
 
 type instance XPrefixCon      (GhcPass p) = NoExtField
 type instance XInfixCon       (GhcPass p) = NoExtField
-type instance XRecCon         (GhcPass p) = NoExtField
+type instance XRecCon         (GhcPass p) = (EpToken "{", EpToken "}")
 type instance XXHsConDetails  (GhcPass p) = DataConCantHappen
 
 -- | Compute the 'SrcSpan' associated with an 'LHsTypeArg'.
@@ -1477,7 +1477,7 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
   GhcPs -> case t of
     HsCoreTy ty     -> ppr ty
     HsBangTy _ b ty -> ppr b <> ppr_mono_lty ty
-    HsRecTy _ flds  -> pprHsConDeclRecFields flds
+    HsRecTy _ flds  -> pprHsConDeclRecFields (unLoc flds)
   GhcRn -> ppr t
 
 ppr_infix_ty :: (OutputableBndrId p) => LHsType (GhcPass p) -> Maybe SDoc

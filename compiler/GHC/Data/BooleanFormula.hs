@@ -25,7 +25,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc (unLoc)
 import GHC.Utils.Outputable
-import GHC.Parser.Annotation ( SrcSpanAnnL )
+import GHC.Parser.Annotation ( SrcSpanAnnBF )
 import GHC.Hs.Extension (GhcPass (..), OutputableBndrId)
 import Language.Haskell.Syntax.Extension (Anno, LIdP, IdP)
 import Language.Haskell.Syntax.BooleanFormula
@@ -35,7 +35,7 @@ import Language.Haskell.Syntax.BooleanFormula
 -- Boolean formula type and smart constructors
 ----------------------------------------------------------------------
 
-type instance Anno (BooleanFormula (GhcPass p)) = SrcSpanAnnL
+type instance Anno (BooleanFormula (GhcPass p)) = SrcSpanAnnBF
 
 -- if we had Functor/Traversable (LbooleanFormula p) we could use that
 -- as a constraint and we wouldn't need to specialize to just GhcPass p,

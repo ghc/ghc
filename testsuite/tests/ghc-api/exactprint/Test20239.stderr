@@ -13,6 +13,10 @@
       (EpaSpan { Test20239.hs:1:1-6 }))
      (EpTok
       (EpaSpan { Test20239.hs:1:18-22 }))
+     ((,,)
+      (NoEpTok)
+      (NoEpTok)
+      [])
      []
      []
      (Just
@@ -249,10 +253,8 @@
                    []))
                  (HsParTy
                   ((,)
-                   (EpTok
-                    (EpaSpan { Test20239.hs:7:50 }))
-                   (EpTok
-                    (EpaSpan { Test20239.hs:7:86 })))
+                   (EpTok (EpaSpan { Test20239.hs:7:50 }))
+                   (EpTok (EpaSpan { Test20239.hs:7:86 })))
                   (L
                    (EpAnn
                     (EpaSpan { Test20239.hs:7:51-85 })
@@ -326,10 +328,8 @@
                          []))
                        (HsParTy
                         ((,)
-                         (EpTok
-                          (EpaSpan { Test20239.hs:7:68 }))
-                         (EpTok
-                          (EpaSpan { Test20239.hs:7:85 })))
+                         (EpTok (EpaSpan { Test20239.hs:7:68 }))
+                         (EpTok (EpaSpan { Test20239.hs:7:85 })))
                         (L
                          (EpAnn
                           (EpaSpan { Test20239.hs:7:69-84 })
@@ -395,10 +395,8 @@
                              []))
                            (HsTupleTy
                             (AnnParens
-                             (EpTok
-                              (EpaSpan { Test20239.hs:7:83 }))
-                             (EpTok
-                              (EpaSpan { Test20239.hs:7:84 })))
+                             (EpTok (EpaSpan { Test20239.hs:7:83 }))
+                             (EpTok (EpaSpan { Test20239.hs:7:84 })))
                             (HsBoxedOrConstraintTuple)
                             []))))))))))))
                 (Nothing))])

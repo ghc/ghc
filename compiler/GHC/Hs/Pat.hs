@@ -126,7 +126,7 @@ type instance XSumPat GhcPs = EpAnnSumPat
 type instance XSumPat GhcRn = NoExtField
 type instance XSumPat GhcTc = [Type]
 
-type instance XConPat GhcPs = (Maybe (EpToken "{"), Maybe (EpToken "}"))
+type instance XConPat GhcPs = NoExtField
 type instance XConPat GhcRn = NoExtField
 type instance XConPat GhcTc = ConPatTc
 
@@ -176,9 +176,7 @@ type instance ConLikeP GhcPs = RdrName          -- IdOccP GhcPs
 type instance ConLikeP GhcRn = WithUserRdr Name -- IdOccP GhcRn
 type instance ConLikeP GhcTc = ConLike
 
-type instance XHsRecFields GhcPs = NoExtField
-type instance XHsRecFields GhcRn = NoExtField
-type instance XHsRecFields GhcTc = NoExtField
+type instance XHsRecFields (GhcPass p) = (EpToken "{", EpToken  "}")
 
 type instance XHsFieldBind _ = Maybe (EpToken "=")
 
