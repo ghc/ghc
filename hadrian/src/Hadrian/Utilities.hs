@@ -14,7 +14,7 @@ module Hadrian.Utilities (
 
     -- * Paths
     BuildRoot (..), buildRoot, buildRootRules, isGeneratedSource,
-    KeepResponseFiles (..), keepResponseFiles, withResponseFile,
+    KeepResponseFiles (..), keepResponseFiles, withResponseFile, withResponseFileOnWindows,
 
     -- * File system operations
     copyFile, copyFileUntracked, createFileLink, fixFile,
@@ -48,8 +48,11 @@ import Data.Typeable (TypeRep, typeOf)
 import Development.Shake hiding (Normal)
 import Development.Shake.Classes
 import Development.Shake.FilePath
+import GHC.ResponseFile (escapeArgs)
 import System.Environment (lookupEnv)
+import System.Info.Extra (isWindows)
 import System.IO (hClose, openTempFile)
+import System.IO.Error (isPermissionError)
 
 import qualified Data.ByteString        as BS
 import qualified Control.Exception.Base as IO
@@ -57,8 +60,7 @@ import qualified Data.HashMap.Strict    as Map
 import qualified System.Directory.Extra as IO
 import qualified System.Info.Extra      as IO
 import qualified System.IO              as IO
-import System.IO.Error (isPermissionError)
-import qualified System.FilePath.Posix as Posix
+import qualified System.FilePath.Posix  as Posix
 
 -- | Extract a value from a singleton list, or terminate with an error message
 -- if the list does not contain exactly one value.
@@ -327,6 +329,21 @@ keepResponseFiles :: Action Bool
 keepResponseFiles = do
     KeepResponseFiles keep <- userSetting (KeepResponseFiles False)
     return keep
+
+-- | Run an action either with command arguments direcly or by, on Windows,
+-- placing those arguments into a response file escaped with @GHC.ResponseFile.escapeArgs@.
+--
+-- With @--keep-response-files@, the file is left on disk (if used)
+withResponseFileOnWindows ::
+    ([String] -> Action a)  -- ^ Action to perform given arguments (of the form @["\@reponseFilePath"]@ on Windows)
+    -> [String]             -- ^ Command arguments
+    -> Action a
+withResponseFileOnWindows action commandArgs = do
+    if isWindows
+        then withResponseFile $ \tmp -> do
+                writeFile' tmp (escapeArgs commandArgs)
+                action ['@' : tmp]
+        else action commandArgs
 
 -- | Run an action with a response file path.
 --
