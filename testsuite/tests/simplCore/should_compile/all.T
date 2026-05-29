@@ -541,3 +541,4 @@ test('T25883d', [extra_files(['T25883d_import.hs'])], multimod_compile_filter, [
 test('T26681',  normal, compile, ['-O'])
 test('T26903', [grep_errmsg(r'reverse')], compile, ['-O -dno-typeable-binds -ddump-simpl -dsuppress-uniques -dsuppress-all'])
 test('T26682',  normal, multimod_compile, ['T26682', '-O -v0'])
+test('T27261', [extra_files(['T27261_aux.hs'])], multimod_compile, ['T27261', '-v0 -O'])
