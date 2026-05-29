@@ -2919,15 +2919,15 @@ uType env@(UE { u_role = role }) orig_ty1 orig_ty2
       = go_app (isNextArgVisible s1) ty1 s1 t1 ty2 s2 t2
 
     go ty1@(AppTy s1 t1) ty2@(TyConApp tc2 ts2)
-      | Just (ts2', t2') <- snocView ts2
+      | Just (ts2', t2', vis) <- snocViewTyConArgs tc2 ts2
       = assert (not (tyConMustBeSaturated tc2)) $
-        go_app (isNextTyConArgVisible tc2 ts2')
+        go_app vis
                ty1 s1 t1 ty2 (TyConApp tc2 ts2') t2'
 
     go ty1@(TyConApp tc1 ts1) ty2@(AppTy s2 t2)
-      | Just (ts1', t1') <- snocView ts1
+      | Just (ts1', t1', vis) <- snocViewTyConArgs tc1 ts1
       = assert (not (tyConMustBeSaturated tc1)) $
-        go_app (isNextTyConArgVisible tc1 ts1')
+        go_app vis
                ty1 (TyConApp tc1 ts1') t1' ty2 s2 t2
 
     go ty1@(CoercionTy co1) ty2@(CoercionTy co2)

@@ -195,7 +195,8 @@ module GHC.Tc.Utils.TcType (
 
   ---------------------------------
   -- argument visibility
-  tyConVisibilities, isNextTyConArgVisible, isNextArgVisible
+  tyConVisibilities, isNextTyConArgVisible, isNextArgVisible,
+  snocViewTyConArgs
 
   ) where
 
@@ -2211,6 +2212,25 @@ tyConVisibilities tc = tc_binder_viss ++ tc_return_kind_viss ++ repeat True
 isNextTyConArgVisible :: TyCon -> [Type] -> Bool
 isNextTyConArgVisible tc tys
   = tyConVisibilities tc `getNth` length tys
+
+-- | Split the (non-empty) argument list of a 'TyConApp' into its @init@ and
+-- @last@, additionally reporting whether the @last@ argument is visible for
+-- @tc@ (cf. 'isNextTyConArgVisible'). 'Nothing' for an empty list.
+--
+-- Traverses the argument list only once. The equivalent 'snocView' followed by
+-- 'isNextTyConArgVisible' walks it twice (once to split off the last element,
+-- again to compute the prefix length). See #27309.
+snocViewTyConArgs :: TyCon -> [Type] -> Maybe ([Type], Type, Bool)
+snocViewTyConArgs tc tys
+  | null tys  = Nothing
+  | otherwise = Just (go (tyConVisibilities tc) tys)
+  where
+    -- 'tyConVisibilities' is infinite and 'tys' is non-empty here, so the
+    -- last clause is unreachable; it merely silences the pattern-match warning.
+    go :: [Bool] -> [Type] -> ([Type], Type, Bool)
+    go (v:_)  [t]    = ([], t, v)
+    go (_:vs) (t:ts) = case go vs ts of (ts', tl, vl) -> (t:ts', tl, vl)
+    go _ _           = panic "snocViewTyConArgs"
 
 -- | Should this type be applied to a visible argument?
 -- E.g. (s t): is `t` a visible argument of `s`?
