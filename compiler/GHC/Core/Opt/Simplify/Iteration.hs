@@ -23,7 +23,7 @@ import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Inline
 import GHC.Core.Opt.Simplify.Utils
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr, zapLambdaBndrs )
-import GHC.Core.Make       ( FloatBind, mkImpossibleExpr, castBottomExpr )
+import GHC.Core.Make       ( FloatBind, mkImpossibleExpr )
 import qualified GHC.Core.Make
 import GHC.Core.Coercion hiding ( substCo, substCoVar )
 import GHC.Core.Reduction
@@ -2399,24 +2399,9 @@ rebuildCall env arg_info _cont
 
 ---------- Bottoming applications --------------
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_dmds = [] }) cont
-  -- When we run out of strictness args, it means
-  -- that the call is definitely bottom; see GHC.Core.Opt.Simplify.Utils.mkArgInfo
-  -- Then we want to discard the entire strict continuation.  E.g.
-  --    * case (error "hello") of { ... }
-  --    * (error "Hello") arg
-  --    * f (error "Hello") where f is strict
-  --    etc
-  -- Then, especially in the first of these cases, we'd like to discard
-  -- the continuation, leaving just the bottoming expression.  But the
-  -- type might not be right, so we may have to add a coerce.
-  | not (contIsTrivial cont)     -- Only do this if there is a non-trivial
-                                 -- continuation to discard, else we do it
-                                 -- again and again!
-  = seqType cont_ty `seq`        -- See Note [Avoiding space leaks in OutType]
-    return (emptyFloats env, castBottomExpr res cont_ty)
-  where
-    res     = argInfoExpr fun rev_args
-    cont_ty = contResultType cont
+  -- When we run out of demands, it means that the call is definitely bottom.
+  -- See (TC2) in Note [Trimming the continuation for bottoming functions]
+  = rebuild env (argInfoExpr fun rev_args) (mkBottomCont env cont)
 
 ---------- Simplify type applications --------------
 rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont })
@@ -3858,6 +3843,41 @@ When we have
 then we can just duplicate those alts because the A and C cases
 will disappear immediately.  This is more direct than creating
 join points and inlining them away.  See #4930.
+
+Note [Trimming the continuation for bottoming functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose
+   f :: Int -> Int -> Int
+   f x = error "urk"
+
+   foo = f 3 4
+
+f's demand signature say "after one arg I return bottom".  We can drop
+the remaining arguments, thus
+
+   foo = case f 3 of {}
+
+This trimming can also be done with other continuations:
+   * case (error "hello") of { ... }
+   * f (error "Hello") where f is strict
+   etc
+
+We implement the trimming in three parts:
+
+(TC1) In `mkArgInfo`, for a bottoming function, we make a list of `RemainingArgDmds`
+  with a finite list of elements (in the example above, just one).
+
+  For comparison, note that, for non-bottoming functions, the `RemainingArgDmds`
+  always finishes with an infinite list of `topDmd`.
+
+(TC2) In `rebuildCall`, when we run out of `RemainingArgDmds` we discard the
+  remaining continuation.
+
+  After discarding the continuation, the types might not match, in which case
+  we leave behind a (case <hole> of {}) wrapper.  See the call to `mkBottomCont`.
+
+(TC3) In `mkDupableContWithDmds`, we similarly discard the continuation when
+  we run out of `RemainingArgDmds`.
 -}
 
 --------------------
@@ -3904,6 +3924,13 @@ mkDupableContWithDmds env _ cont
   = return (emptyFloats env, cont)
 
 mkDupableContWithDmds _ _ (Stop {}) = panic "mkDupableCont"     -- Handled by previous eqn
+
+mkDupableContWithDmds env dmds cont
+  -- No more demands => function is definitely bottom
+  --                 => simply trim the continuation
+  -- c.f. the null-demands case in `rebuildCall`
+  -- See (TC3) in Note [Trimming the continuation for bottoming functions]
+  | [] <- dmds = return (emptyFloats env, mkBottomCont env cont)
 
 mkDupableContWithDmds env dmds (CastIt { sc_co = co, sc_opt = opt, sc_cont = cont })
   = do  { (floats, cont') <- mkDupableContWithDmds env dmds cont
@@ -3980,7 +4007,7 @@ mkDupableContWithDmds env dmds
         ; return (floats, ApplyToTy { sc_cont = cont'
                                     , sc_arg_ty = arg_ty, sc_hole_ty = hole_ty }) }
 
-mkDupableContWithDmds env dmds
+mkDupableContWithDmds env (dmd : cont_dmds)
     (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_env = se
                 , sc_cont = cont, sc_hole_ty = hole_ty })
   =     -- e.g.         [...hole...] (...arg...)
@@ -3988,8 +4015,7 @@ mkDupableContWithDmds env dmds
         --              let a = ...arg...
         --              in [...hole...] a
         -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
-    do  { let dmd:|cont_dmds = expectNonEmpty dmds
-        ; (floats1, cont') <- mkDupableContWithDmds env cont_dmds cont
+    do  { (floats1, cont') <- mkDupableContWithDmds env cont_dmds cont
         ; let env' = env `setInScopeFromF` floats1
         ; (_, se', arg') <- simplLazyArg env' dup hole_ty Nothing se arg
         ; (let_floats2, arg'') <- makeTrivial env NotTopLevel dmd (fsLit "karg") arg'
@@ -4003,7 +4029,6 @@ mkDupableContWithDmds env dmds
                                          -- See Note [StaticEnv invariant] in GHC.Core.Opt.Simplify.Utils
                               , sc_dup = OkToDup, sc_cont = cont'
                               , sc_hole_ty = hole_ty }) }
-
 mkDupableContWithDmds env _
     (Select { sc_bndr = case_bndr, sc_alts = alts, sc_env = se, sc_cont = cont })
   =     -- e.g.         (case [...hole...] of { pi -> ei })
