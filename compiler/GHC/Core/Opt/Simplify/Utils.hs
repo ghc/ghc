@@ -24,7 +24,7 @@ module GHC.Core.Opt.Simplify.Utils (
         SimplCont(..), DupFlag(..), FromWhat(..), StaticEnv,
         isSimplified, contIsStop,
         contIsDupable, contResultType, contHoleType, contHoleScaling,
-        contIsTrivial, contArgs, contIsRhs,
+        contIsTrivial, contArgs, contIsRhs, mkBottomCont,
         countArgs, contOutArgs, dropContArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
         interestingCallContext,
@@ -86,6 +86,8 @@ import Control.Monad    ( guard, when )
 import Data.List        ( sortBy )
 import Data.Maybe
 import Data.Graph
+import GHC.Core.TyCo.Compare (eqTypeIgnoringMultiplicity)
+import GHC.Core.Make (mkWildValBinder)
 
 {- *********************************************************************
 *                                                                      *
@@ -462,6 +464,20 @@ contIsTrivial (CastIt { sc_cont = k })                          = contIsTrivial 
 contIsTrivial _                                                 = False
 
 -------------------
+contStop :: SimplCont -> SimplCont
+-- ^ Get the 'Stop' at the tail of the continuation
+--
+-- Always returns a continuation of form @(Stop ...)@.
+contStop stop@(Stop {})               = stop
+contStop (CastIt { sc_cont = k })     = contStop k
+contStop (StrictBind { sc_cont = k }) = contStop k
+contStop (StrictArg { sc_cont = k })  = contStop k
+contStop (Select { sc_cont = k })     = contStop k
+contStop (ApplyToTy  { sc_cont = k }) = contStop k
+contStop (ApplyToVal { sc_cont = k }) = contStop k
+contStop (TickIt _ k)                 = contStop k
+
+-------------------
 contResultType :: SimplCont -> OutType
 contResultType (Stop ty _ _)                = ty
 contResultType (CastIt { sc_cont = k })     = contResultType k
@@ -606,6 +622,39 @@ contEvalContext k = case k of
   Select{}                   -> topSubDmd
     -- Perhaps reconstruct the demand on the scrutinee by looking at field
     -- and case binder dmds, see addCaseBndrDmd. No priority right now.
+
+-------------------
+mkBottomCont ::StaticEnv -> SimplCont -> SimplCont
+-- ^ Given a continuation `cont`, return a `cont` /of the same type/,
+-- looking like @(case \<hole\> of {})@.
+--
+-- This is used when we are going to fill in the @<hole>@ with bottom.
+-- See (TC2,3) in Note [Trimming the continuation for bottoming functions]
+--
+-- Don't bother to trim, making a @case <hole> of {}@, if we have only
+-- an essentially-trivial continuation; e.g. @(<hole> \@ty |> co)@.
+mkBottomCont se cont = go cont
+  where
+    go k@(Stop {})                    = k
+    go (TickIt t k')                  = TickIt t (go k')
+    go k@(CastIt    { sc_cont = k' }) = k { sc_cont = go k' }
+    go k@(ApplyToTy { sc_cont = k' }) = k { sc_cont = go k' }
+    go k@(Select { sc_alts = [], sc_cont = Stop {} }) = k  -- Optimisation only
+    go k | Stop res_ty _ _ <- stop_cont
+         = if  hole_ty `eqTypeIgnoringMultiplicity` res_ty
+              then stop_cont
+              else Select { sc_alts = []
+                          , sc_bndr = mkWildValBinder OneTy hole_ty
+                          , sc_dup  = OkToDup
+                          , sc_env  = zapSubstEnv se
+                          -- `hole_ty` is an `OutType`, but `sc_bndr` is an `InId`;
+                          -- so we must zap the substitution in `sc_env`.
+                          , sc_cont = stop_cont }
+         | otherwise = panic "stop_cont is not Stop {}"
+         where
+           hole_ty   = contHoleType k
+           stop_cont = contStop k
+
 
 -------------------
 mkArgInfo :: SimplEnv -> Id -> [CoreRule] -> SimplCont -> ArgInfo
