@@ -195,7 +195,7 @@ module GHC.Tc.Utils.TcType (
 
   ---------------------------------
   -- argument visibility
-  tyConVisibilities, isNextTyConArgVisible, isNextArgVisible,
+  tyConVisibilities, isNextArgVisible,
   snocViewTyConArgs
 
   ) where
@@ -232,7 +232,7 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types ( coercibleClass, eqClass, heqClass, unitTyConKey
                          , listTyCon, constraintKind )
 import GHC.Data.Maybe
-import GHC.Data.List.SetOps ( getNth, findDupsEq )
+import GHC.Data.List.SetOps ( findDupsEq )
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -2208,18 +2208,13 @@ tyConVisibilities tc = tc_binder_viss ++ tc_return_kind_viss ++ repeat True
     tc_binder_viss      = map isVisibleTyConBinder (tyConBinders tc)
     tc_return_kind_viss = map isVisiblePiTyBinder (fst $ tcSplitPiTys (tyConResKind tc))
 
--- | If the tycon is applied to the types, is the next argument visible?
-isNextTyConArgVisible :: TyCon -> [Type] -> Bool
-isNextTyConArgVisible tc tys
-  = tyConVisibilities tc `getNth` length tys
-
 -- | Split the (non-empty) argument list of a 'TyConApp' into its @init@ and
 -- @last@, additionally reporting whether the @last@ argument is visible for
--- @tc@ (cf. 'isNextTyConArgVisible'). 'Nothing' for an empty list.
+-- @tc@ (i.e. its entry in 'tyConVisibilities'). 'Nothing' for an empty list.
 --
--- Traverses the argument list only once. The equivalent 'snocView' followed by
--- 'isNextTyConArgVisible' walks it twice (once to split off the last element,
--- again to compute the prefix length). See #27309.
+-- Traverses the argument list only once. Splitting off the last element and
+-- then looking up its visibility by prefix length walks the list twice. See
+-- #27309.
 snocViewTyConArgs :: TyCon -> [Type] -> Maybe ([Type], Type, Bool)
 snocViewTyConArgs tc tys
   | null tys  = Nothing
