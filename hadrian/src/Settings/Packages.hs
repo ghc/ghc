@@ -124,6 +124,7 @@ packageArgs = do
                   -- We build a threaded stage N, N>1 if the configuration calls
                   -- for it.
                   (compilerStageOption ghcThreaded `cabalFlag` "threaded")
+            , notStage0 `cabalFlag` "ghc-debug"
             ]
           ]
 
