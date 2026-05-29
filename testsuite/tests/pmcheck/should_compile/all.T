@@ -93,6 +93,14 @@ test('T21360', normal, compile, [overlapping_incomplete+'-Wincomplete-record-upd
 test('T21360b', normal, compile, [overlapping_incomplete+'-Wincomplete-record-updates'])
 test('T23520', normal, compile, [overlapping_incomplete+'-Wincomplete-record-updates'])
 test('T25164', [extra_files(['T25164_aux.hs']), req_th], multimod_compile, ['T25164', '-v0'])
+test(
+    'T27314',
+    [ omit_ways(llvm_ways), # -finfo-table-map does not work with -fllvm (#26435)
+      when(js_arch(), skip) # javascript doesn't support -finfo-table-map yet and yields a warning we don't want to handle here
+    ],
+    compile,
+    ['-Wincomplete-uni-patterns -finfo-table-map']
+)
 
 # Other tests
 test('pmc001', [], compile, [overlapping_incomplete])
