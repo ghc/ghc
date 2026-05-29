@@ -39,7 +39,6 @@ import Packages
 import GHC.IO.Encoding (getFileSystemEncoding)
 import qualified Data.ByteString as BS
 import qualified GHC.Foreign as GHC
-import GHC.ResponseFile
 
 import GHC.Toolchain (Target(..))
 import qualified GHC.Toolchain as Toolchain
@@ -346,7 +345,15 @@ instance H.Builder Builder where
 
                 Haddock BuildPackage -> runHaddock path buildArgs buildInputs
 
-                Ghc _ _ -> runGhcWithResponse path buildArgs buildInputs buildOptions
+                Ghc _ _ ->
+                  -- Use a response file for ghc invocations to avoid issues with command line
+                  -- size limit on Windows (#26637).
+                  -- NB: we can't put the buildArgs in a response file, because some flags require
+                  -- empty arguments (such as the -dep-suffix flag), but that isn't supported
+                  -- yet due to #26560.
+                  withResponseFileOnWindows
+                    (\buildInputs' -> cmd [path] buildArgs buildInputs' buildOptions)
+                    buildInputs
 
                 HsCpp    -> captureStdout
 
@@ -380,29 +387,15 @@ instance H.Builder Builder where
 
                 _  -> cmd' [path] buildArgs buildOptions
 
--- | Invoke @haddock@ given a path to it and a list of arguments. The arguments
--- are passed in a response file.
+-- | Invoke @haddock@ given a path to it and a list of arguments. On Windows,
+-- the input file arguments are passed as a response file.
 runHaddock :: FilePath    -- ^ path to @haddock@
       -> [String]
       -> [FilePath]  -- ^ input file paths
       -> Action ()
-runHaddock haddockPath flagArgs fileInputs = withResponseFile $ \tmp -> do
-    writeFile' tmp $ escapeArgs fileInputs
-    cmd [haddockPath] flagArgs ('@' : tmp)
-
--- | Use a response file for ghc invocations to avoid issues with command line
--- size limit on Windows (#26637).
-runGhcWithResponse :: FilePath -- ^ Path to ghc
-  -> [String] -- ^ Arguments passed on the command line
-  -> [FilePath] -- ^ Input file paths (passed via response file)
-  -> [CmdOption]
-  -> Action ()
-runGhcWithResponse ghcPath buildArgs buildInputs buildOptions = withResponseFile $ \tmp -> do
-  -- We can't put the buildArgs in a response file, because some flags require
-  -- empty arguments (such as the -dep-suffix flag), but that isn't supported
-  -- yet due to #26560.
-  writeFile' tmp (escapeArgs buildInputs)
-  cmd [ghcPath] buildArgs ('@' : tmp) buildOptions
+runHaddock haddockPath flagArgs fileInputs = withResponseFileOnWindows
+  (cmd [haddockPath] flagArgs)
+  fileInputs
 
 -- TODO: Some builders are required only on certain platforms. For example,
 -- 'Objdump' is only required on OpenBSD and AIX. Add support for platform
