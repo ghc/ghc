@@ -1000,8 +1000,9 @@ makeDictsCoherent (Case scrut bndr ty alts)
       , let expr' = makeDictsCoherent expr ]
 makeDictsCoherent (Cast expr co)
   = Cast (makeDictsCoherent expr) co
-makeDictsCoherent (Tick tick expr)
-  = Tick tick (makeDictsCoherent expr)
+makeDictsCoherent (Tick _tick expr)
+  -- See Wrinkle (UD1) in Note [Unique dictionaries in the TmOracle CoreMap]
+  = makeDictsCoherent expr
 makeDictsCoherent ty@(Type {})
   = ty
 makeDictsCoherent co@(Coercion {})
@@ -1061,6 +1062,25 @@ In the end, replacing dictionaries with an error value in the pattern-match
 checker was the most self-contained, although we might want to revisit once
 we implement a more robust approach to computing equality in the pattern-match
 checker (see #19272).
+
+Wrinkle (UD1): ticks
+--------------------
+'makeDictsCoherent' also drops all ticks. The CoreMap key represents
+value-level equality, which ticks never affect.
+
+Example (#27314): with -finfo-table-map every record-selector use site is
+wrapped in a 'SourceNote' carrying that site's span (see
+Note [Record-selector ticks] in GHC.HsToCore.Ticks). Given
+
+    data Box = Box { unBox :: Maybe Int }
+    f b = case unBox b of
+      Nothing -> 0
+      Just _  -> let Just x = unBox b in x
+
+the two `unBox b`s carry different SourceNote spans. Without tick stripping
+the CoreMap treats them as distinct expressions. Long-distance information
+from the outer `Just _` branch therefore never reaches the let-pattern, and
+`Just x = unBox b` is wrongly reported as non-exhaustive.
 -}
 
 {- Note [The Pos/Neg invariant]
