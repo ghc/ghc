@@ -189,6 +189,8 @@ stagedPackages stage = do
         , ghcToolchainBin
         , hpcBin
         , if winTarget then win32 else unix
+        , ghc_debug_convention
+        , ghc_debug_stub
         , runGhc
         ]
       , when (winTarget && not cross)
