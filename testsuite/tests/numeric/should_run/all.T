@@ -11,7 +11,7 @@ test('arith001', normal, compile_and_run, [''])
 test('arith002', normal, compile_and_run, [''])
 test('arith003', normal, compile_and_run, [''])
 test('arith004', normal, compile_and_run, [''])
-test('arith005', normal, compile_and_run, [''])
+test('arith005', [when(arch('riscv64'), expect_broken(27303))], compile_and_run, [''])
 test('arith006', normal, compile_and_run, [''])
 test('arith007', normal, compile_and_run, [''])
 
@@ -45,7 +45,7 @@ test('arith018', normal, compile_and_run, [''])
 test('arith019', normal, compile_and_run, [''])
 test('expfloat', normal, compile_and_run, [''])
 
-test('FloatFnInverses', normal, compile_and_run, [''])
+test('FloatFnInverses', [when(arch('riscv64'), expect_broken(27306))], compile_and_run, [''])
 
 test('T1603', skip, compile_and_run, [''])
 test('T3676', expect_broken(3676), compile_and_run, [''])
