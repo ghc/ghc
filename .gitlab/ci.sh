@@ -708,6 +708,15 @@ function test_hadrian() {
     # ---
     # > main = putStrLn "hello world"
     run diff -w expected actual
+
+    run_hadrian \
+      test \
+      --summary-junit=./junit.xml \
+      --test-have-intree-files \
+      --test-compiler="${test_compiler}" \
+      "runtest.opts+=${RUNTEST_ARGS:-}" \
+      "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
+      || fail "hadrian cross-compiled testsuite ($CROSS_TARGET)"
   elif [[ -n "${REINSTALL_GHC:-}" ]]; then
     run_hadrian \
       test \

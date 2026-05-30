@@ -2430,7 +2430,7 @@
       "CROSS_EMULATOR": "qemu-aarch64 -L /usr/aarch64-linux-gnu",
       "CROSS_TARGET": "aarch64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "",
+      "RUNTEST_ARGS": "-e config.timeout=1500",
       "TEST_ENV": "x86_64-linux-deb13-cross_aarch64-linux-gnu-validate",
       "XZ_OPT": "-9"
     }
@@ -2748,7 +2748,7 @@
       "CROSS_EMULATOR": "qemu-riscv64 -L /usr/riscv64-linux-gnu",
       "CROSS_TARGET": "riscv64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "",
+      "RUNTEST_ARGS": "-e config.timeout=1500",
       "TEST_ENV": "x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate",
       "XZ_OPT": "-9"
     }
@@ -3637,7 +3637,7 @@
       "CROSS_EMULATOR": "qemu-loongarch64 -L /usr/loongarch64-linux-gnu",
       "CROSS_TARGET": "loongarch64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "",
+      "RUNTEST_ARGS": "-e config.timeout=1500",
       "TEST_ENV": "x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate",
       "XZ_OPT": "-9"
     }
@@ -6343,7 +6343,7 @@
       "CROSS_EMULATOR": "qemu-aarch64 -L /usr/aarch64-linux-gnu",
       "CROSS_TARGET": "aarch64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "",
+      "RUNTEST_ARGS": "-e config.timeout=1500",
       "TEST_ENV": "x86_64-linux-deb13-cross_aarch64-linux-gnu-validate"
     }
   },
@@ -6657,7 +6657,7 @@
       "CROSS_EMULATOR": "qemu-riscv64 -L /usr/riscv64-linux-gnu",
       "CROSS_TARGET": "riscv64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "",
+      "RUNTEST_ARGS": "-e config.timeout=1500",
       "TEST_ENV": "x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate"
     }
   },
@@ -7533,7 +7533,7 @@
       "CROSS_EMULATOR": "qemu-loongarch64 -L /usr/loongarch64-linux-gnu",
       "CROSS_TARGET": "loongarch64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "",
+      "RUNTEST_ARGS": "-e config.timeout=1500",
       "TEST_ENV": "x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate"
     }
   },

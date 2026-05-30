@@ -139,7 +139,7 @@ bignumString Native = "native"
 data CrossEmulator
   = NoEmulator
   | NoEmulatorNeeded
-  | Emulator String
+  | Emulator String (Maybe Int) -- ^ emulator command; optional timeout override (seconds)
 
 -- | A BuildConfig records all the options which can be modified to affect the
 -- bindists produced by the compiler.
@@ -884,12 +884,15 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
             | Just _ <- crossTarget buildConfig
                            -> "CROSS_EMULATOR" =: "NOT_SET"
             | otherwise    -> mempty
-          Emulator s       -> "CROSS_EMULATOR" =: s
+          Emulator s _     -> "CROSS_EMULATOR" =: s
           NoEmulatorNeeded -> mempty
       , if withNuma buildConfig then "ENABLE_NUMA" =: "1" else mempty
       , let runtestArgs =
                 [ "--way=nonmoving --way=nonmoving_thr --way=nonmoving_thr_sanity"
                 | validateNonmovingGc buildConfig
+                ] ++
+                [ "-e config.timeout=" ++ show t
+                | Emulator _ (Just t) <- [crossEmulator buildConfig]
                 ]
         in "RUNTEST_ARGS" =: unwords runtestArgs
       , if testsuiteUsePerf buildConfig then "RUNTEST_ARGS" =: "--config perf_path=perf" else mempty
@@ -1261,13 +1264,13 @@ alpine_aarch64 = [
 cross_jobs :: [JobGroup Job]
 cross_jobs = [
     -- x86 -> aarch64
-    validateBuilds Amd64 (Linux Debian13) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
+    validateBuilds Amd64 (Linux Debian13) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu" (Just 1500)) Nothing)
 
     -- x86_64 -> riscv
-  , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian13Riscv) (crossConfig "riscv64-linux-gnu" (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing))
+  , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian13Riscv) (crossConfig "riscv64-linux-gnu" (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu" (Just 1500)) Nothing))
 
     -- x86_64 -> loongarch64
-  , addValidateRule LoongArch64 (validateBuilds Amd64 (Linux Ubuntu2404LoongArch64) (crossConfig "loongarch64-linux-gnu" (Emulator "qemu-loongarch64 -L /usr/loongarch64-linux-gnu") Nothing))
+  , addValidateRule LoongArch64 (validateBuilds Amd64 (Linux Ubuntu2404LoongArch64) (crossConfig "loongarch64-linux-gnu" (Emulator "qemu-loongarch64 -L /usr/loongarch64-linux-gnu" (Just 1500)) Nothing))
 
     -- Javascript
   , addValidateRule JSBackend (validateBuilds Amd64 (Linux Debian11Js) javascriptConfig)
@@ -1288,7 +1291,7 @@ cross_jobs = [
         (validateBuilds AArch64 (Linux Debian12Wine) (winAarch64Config {llvmBootstrap = True}))
   ]
   where
-    javascriptConfig = (crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure"))
+    javascriptConfig = (crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator" Nothing) (Just "emconfigure"))
                          { bignumBackend = Native }
 
     makeWinArmJobs = modifyJobs
@@ -1327,7 +1330,7 @@ cross_jobs = [
             llvm_prefix = "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-"
             cflags = "-fuse-ld=" ++ llvm_prefix ++ "ld --rtlib=compiler-rt"
 
-    winAarch64Config = (crossConfig "aarch64-unknown-mingw32" (Emulator "/opt/wine-arm64ec-msys2-deb12/bin/wine") Nothing)
+    winAarch64Config = (crossConfig "aarch64-unknown-mingw32" (Emulator "/opt/wine-arm64ec-msys2-deb12/bin/wine" Nothing) Nothing)
                          { bignumBackend = Native }
 
     make_wasm_jobs cfg =
