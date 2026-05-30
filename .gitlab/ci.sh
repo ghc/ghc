@@ -709,6 +709,7 @@ function test_hadrian() {
     # > main = putStrLn "hello world"
     run diff -w expected actual
 
+    EXTRA_HC_OPTS="${EXTRA_HC_OPTS:+${EXTRA_HC_OPTS} }-fexternal-interpreter"
     run_hadrian \
       test \
       --summary-junit=./junit.xml \
