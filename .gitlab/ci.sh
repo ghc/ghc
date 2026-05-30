@@ -709,7 +709,27 @@ function test_hadrian() {
     # > main = putStrLn "hello world"
     run diff -w expected actual
 
-    EXTRA_HC_OPTS="${EXTRA_HC_OPTS:+${EXTRA_HC_OPTS} }-fexternal-interpreter"
+    if [[ "${CROSS_EMULATOR:-}" == qemu-* ]]; then
+      cat > "${TOP}/tmp/iserv_main.hs" <<'EOF'
+import GHCi.Server (defaultServer)
+main :: IO ()
+main = defaultServer
+EOF
+      local iserv_bin="${TOP}/tmp/ghc-iserv-cross"
+      run "${test_compiler}" \
+        -package ghci \
+        -threaded \
+        -optl-Wl,--export-dynamic \
+        "${TOP}/tmp/iserv_main.hs" \
+        -o "${iserv_bin}"
+      local iserv_wrapper="${TOP}/tmp/iserv-wrapper.sh"
+      cat > "${iserv_wrapper}" <<EOF
+#!/usr/bin/env bash
+exec ${CROSS_EMULATOR} "${iserv_bin}" "\$@"
+EOF
+      chmod +x "${iserv_wrapper}"
+      export EXTRA_HC_OPTS="${EXTRA_HC_OPTS:+${EXTRA_HC_OPTS} }-fexternal-interpreter -pgmi ${iserv_wrapper}"
+    fi
     run_hadrian \
       test \
       --summary-junit=./junit.xml \
