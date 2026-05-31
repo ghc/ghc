@@ -730,11 +730,13 @@ EOF
       chmod +x "${iserv_wrapper}"
       export EXTRA_HC_OPTS="${EXTRA_HC_OPTS:+${EXTRA_HC_OPTS} }-fexternal-interpreter -pgmi ${iserv_wrapper}"
     fi
+    local cross_arch="${CROSS_TARGET%%-*}"
     run_hadrian \
       test \
       --summary-junit=./junit.xml \
       --test-have-intree-files \
       --test-compiler="${test_compiler}" \
+      "runtest.opts+=-e config.arch='${cross_arch}'" \
       "runtest.opts+=${RUNTEST_ARGS:-}" \
       "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
       || fail "hadrian cross-compiled testsuite ($CROSS_TARGET)"
