@@ -2311,6 +2311,12 @@ instance ToHie (IEContext (LocatedA (IE GhcRn))) where
         [ toHie $ IEC c n
         , toHie $ map (IEC c) ns
         ]
+      IEPattern _ (L l p) ->
+        [ toHie $ C (IEThing c) (L l p)
+        ]
+      IEDefault _ (L l p) ->
+        [ toHie $ C (IEThing c) (L l p)
+        ]
       IEModuleContents _ n ->
         [ toHie $ IEC c n
         ]
@@ -2321,19 +2327,7 @@ instance ToHie (IEContext (LocatedA (IE GhcRn))) where
 
 instance ToHie (IEContext (LocatedA (IEWrappedName GhcRn))) where
   toHie (IEC c (L span iewn)) = concatM $ makeNodeA iewn span : case iewn of
-      IEDefault _ (L l p) ->
-        [ toHie $ C (IEThing c) (L l p)
-        ]
-      IEName _ (L l n) ->
-        [ toHie $ C (IEThing c) (L l n)
-        ]
-      IEPattern _ (L l p) ->
-        [ toHie $ C (IEThing c) (L l p)
-        ]
-      IEType _ (L l n) ->
-        [ toHie $ C (IEThing c) (L l n)
-        ]
-      IEData _ (L l n) ->
+      IEName _ _ (L l n) ->
         [ toHie $ C (IEThing c) (L l n)
         ]
 

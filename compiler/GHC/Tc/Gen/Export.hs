@@ -226,7 +226,7 @@ rnExports explicit_mod exports
                  | explicit_mod = exports
                  | has_main
                           = Just (noLocA [noLocA (IEVar Nothing
-                                     (noLocA (IEName noExtField $ noLocA default_main)) Nothing)])
+                                     (noLocA (IEName noExtField (NoNamespaceSpecifier noExtField) $ noLocA default_main)) Nothing)])
                         -- ToDo: the 'noLoc' here is unhelpful if 'main'
                         --       turns out to be out of scope
                  | otherwise = Nothing
@@ -558,7 +558,6 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     lookup_ie expacc@ExportAccum{
             expacc_exp_occs   = occs,
-            expacc_exp_dflts  = exp_dflts,
             expacc_warn_spans = export_warn_spans,
             expacc_dont_warn  = dont_warn_export
           } (L loc ie@(IEThingAbs warn_txt_ps l doc))
@@ -566,29 +565,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
              for mb_gre $ \ gre -> do
                let avail = availFromGRE gre
                    name = greName gre
-
-               (mb_avail, occs', exp_dflts') <-
-                 case unLoc l of
-                   -- see Note [Default exports]
-                   IEDefault {} -> do
-                     defaults <- tcg_default <$> getGblEnv
-                     case lookupUFM_Directly defaults (nameUnique name) of
-                       Nothing ->
-                        do addErr $ TcRnExportHiddenDefault ie
-                           return (Nothing, occs, exp_dflts)
-                       Just cls_dflts -> do
-                         let cls = cd_class cls_dflts
-                         case lookupNameEnv exp_dflts (className cls) of
-                           Just (_, ie') -> do
-                             addDiagnostic $
-                               TcRnDuplicateNamedDefaultExport (classTyCon cls) ie ie'
-                             return (Nothing, occs, exp_dflts)
-                           Nothing ->
-                            return $ (Nothing, occs, extendNameEnv exp_dflts (className cls) (cls_dflts, ie))
-                   _ -> do
-                    occs' <- check_occs occs ie [gre]
-                    return (Just avail, occs', exp_dflts)
-
+               occs' <- check_occs occs ie [gre]
                checkThLocalNameNoLift (ieLWrappedUserRdrName l name)
                (export_warn_spans', dont_warn_export', warn_txt_rn)
                  <- process_warning export_warn_spans
@@ -599,11 +576,10 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
                doc' <- traverse rnLHsDoc doc
                return ( expacc{ expacc_exp_occs   = occs'
-                              , expacc_exp_dflts  = exp_dflts'
                               , expacc_warn_spans = export_warn_spans'
                               , expacc_dont_warn  = dont_warn_export' }
                       , L loc (IEThingAbs warn_txt_rn (replaceLWrappedName l name) doc')
-                      , mb_avail )
+                      , Just avail)
 
     lookup_ie expacc@ExportAccum{
             expacc_exp_occs   = occs,
@@ -671,6 +647,70 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                               , expacc_dont_warn  = dont_warn_export' }
                       , L loc (IEThingWith (warn_txt_rn, ann) (replaceLWrappedName l name) wc subs doc')
                       , Just $ AvailTC name all_names )
+    lookup_ie expacc@ExportAccum{
+            expacc_exp_occs   = occs,
+            expacc_warn_spans = export_warn_spans,
+            expacc_dont_warn  = dont_warn_export
+          } (L loc ie@(IEPattern (warn_txt_ps, _) (L lrdr rdr)))
+        = do mb_gre <- lookupGreAvailRn WL_ConLike rdr
+             for mb_gre $ \ gre -> do
+               let avail = availFromGRE gre
+                   name = greName gre
+
+               checkThLocalNameNoLift (L lrdr (WithUserRdr rdr name))
+               occs' <- check_occs occs ie [gre]
+               (export_warn_spans', dont_warn_export', warn_txt_rn)
+                 <- process_warning export_warn_spans
+                                    dont_warn_export
+                                    [name]
+                                    warn_txt_ps
+                                    (locA loc)
+
+               return ( expacc{ expacc_exp_occs   = occs'
+                              , expacc_warn_spans = export_warn_spans'
+                              , expacc_dont_warn  = dont_warn_export' }
+                      , L loc (IEPattern warn_txt_rn (L lrdr name))
+                      , Just avail )
+
+    lookup_ie expacc@ExportAccum{
+            expacc_exp_dflts  = exp_dflts,
+            expacc_warn_spans = export_warn_spans,
+            expacc_dont_warn  = dont_warn_export
+          } (L loc ie@(IEDefault (warn_txt_ps, _) (L lrdr rdr)))
+                   -- see Note [Default exports]
+        = do mb_gre <- lookupGreAvailRn WL_TyCon rdr
+             for mb_gre $ \ gre -> do
+               let name = greName gre
+               defaults <- tcg_default <$> getGblEnv
+
+               exp_dflts' <-
+                 case lookupUFM_Directly defaults (nameUnique name) of
+                   Nothing ->
+                    do addErr $ TcRnExportHiddenDefault ie
+                       return (exp_dflts)
+                   Just cls_dflts -> do
+                     let cls = cd_class cls_dflts
+                     case lookupNameEnv exp_dflts (className cls) of
+                       Just (_, ie') -> do
+                         addDiagnostic $
+                           TcRnDuplicateNamedDefaultExport (classTyCon cls) ie ie'
+                         return (exp_dflts)
+                       Nothing ->
+                        return $ (extendNameEnv exp_dflts (className cls) (cls_dflts, ie))
+
+               checkThLocalNameNoLift (L lrdr (WithUserRdr rdr name))
+               (export_warn_spans', dont_warn_export', warn_txt_rn)
+                 <- process_warning export_warn_spans
+                                    dont_warn_export
+                                    [name]
+                                    warn_txt_ps
+                                    (locA loc)
+
+               return ( expacc{ expacc_exp_dflts  = exp_dflts'
+                              , expacc_warn_spans = export_warn_spans'
+                              , expacc_dont_warn  = dont_warn_export' }
+                      , L loc (IEDefault warn_txt_rn (L lrdr name))
+                      , Nothing )
 
     lookup_ie _ _ = panic "lookup_ie"    -- Other cases covered earlier
 
@@ -800,12 +840,11 @@ ieLWrappedUserRdrName l n = fmap (\rdr -> WithUserRdr rdr n) $ ieLWrappedName l
 -- | In what namespaces should we go looking for an import/export item
 -- that is out of scope, for suggestions in error messages?
 ieWrappedNameWhatLooking :: IEWrappedName GhcPs -> WhatLooking
-ieWrappedNameWhatLooking = \case
-  IEName {}    -> WL_TyCon_or_TermVar
-  IEDefault {} -> WL_TyCon
-  IEType {}    -> WL_Type
-  IEData {}    -> WL_Term
-  IEPattern {} -> WL_ConLike
+ieWrappedNameWhatLooking wname =
+  case ieWrappedNamespaceSpecifier wname of
+    NoNamespaceSpecifier{}   -> WL_TyCon_or_TermVar
+    TypeNamespaceSpecifier{} -> WL_Type
+    DataNamespaceSpecifier{} -> WL_Term
 
 ieLWrappedNameWhatLooking :: LIEWrappedName GhcPs -> WhatLooking
 ieLWrappedNameWhatLooking = ieWrappedNameWhatLooking . unLoc
@@ -882,9 +921,9 @@ lookupChildrenExport parent_gre child_gres rdr_items = mapAndReportM doOne rdr_i
               -> RnM (LIEWrappedName GhcRn, GlobalRdrElt)
         doOne n = do
 
-          let all_ns = case unLoc n of
-                IEName{} -> True    -- Ignore the namespace iff the name is unadorned
-                _        -> False
+          let all_ns = case ieWrappedNamespaceSpecifier (unLoc n) of
+                NoNamespaceSpecifier{} -> True    -- Ignore the namespace iff the name is unadorned
+                _                      -> False
           let bareName = lieWrappedName n
                 -- Do not report export list declaration deprecations
           name <-  lookupSubBndrOcc_helper False all_ns ExportDeprecationWarnings

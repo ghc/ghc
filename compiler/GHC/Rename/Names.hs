@@ -25,7 +25,9 @@ module GHC.Rename.Names (
         renamePkgQual, renameRawPkgQual,
         classifyGREs,
         ImportDeclUsage,
-        rnNamespaceSpecifier
+        rnNamespaceSpecifier,
+        replaceWrappedName,
+        replaceLWrappedName,
     ) where
 
 import GHC.Prelude hiding ( head, init, last, tail )
@@ -1182,6 +1184,12 @@ rnNamespaceSpecifier (NoNamespaceSpecifier _)   = NoNamespaceSpecifier noExtFiel
 rnNamespaceSpecifier (TypeNamespaceSpecifier x) = TypeNamespaceSpecifier x
 rnNamespaceSpecifier (DataNamespaceSpecifier x) = DataNamespaceSpecifier x
 
+replaceWrappedName :: IEWrappedName GhcPs -> IdP GhcRn -> IEWrappedName GhcRn
+replaceWrappedName (IEName x ns_spec (L l _)) n = IEName x (rnNamespaceSpecifier ns_spec) (L l n)
+
+replaceLWrappedName :: LIEWrappedName GhcPs -> IdP GhcRn -> LIEWrappedName GhcRn
+replaceLWrappedName (L l n) n' = L l (replaceWrappedName n n')
+
 filterImports
     :: HasDebugCallStack
     => HscEnv
@@ -1316,6 +1324,19 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                       = mapMaybe mk_depr_export_warning gres
                   | otherwise = []
             return ( [ (IEVar Nothing (L l (replaceWrappedName n name)) noDocstring, [gre])
+                     | gre <- gres
+                     , let name = greName gre ]
+                   , export_depr_warns )
+
+        IEPattern _ (L l n) -> do
+            -- See Note [Importing DuplicateRecordFields]
+            xs <- lookup_names ie n
+            let gres = map imp_item $ NE.toList xs
+                export_depr_warns
+                  | want_hiding == Exactly
+                      = mapMaybe mk_depr_export_warning gres
+                  | otherwise = []
+            return ( [ (IEPattern Nothing (L l name), [gre])
                      | gre <- gres
                      , let name = greName gre ]
                    , export_depr_warns )
@@ -1700,9 +1721,9 @@ lookupChildren all_kids rdr_items = (fails, successes)
 
     do_one :: LIEWrappedName GhcPs -> MaybeErr LookupChildError (NonEmpty (LocatedA GlobalRdrElt))
     do_one item@(L l r) =
-      case r of
-        IEName{}
-          -- IEName (unadorned name) places no restriction on the namespace of
+      case ieWrappedNamespaceSpecifier r of
+        NoNamespaceSpecifier{}
+          -- An unadorned name places no restriction on the namespace of
           -- the imported entity, so we look in both `val_gres` and `typ_gres`.
           -- In case of conflict (punning), the value namespace takes priority.
           -- See Note [Prioritise the value namespace in subordinate import lists]
@@ -1710,24 +1731,22 @@ lookupChildren all_kids rdr_items = (fails, successes)
           | (gre:gres) <- typ_gres -> Succeeded $ fmap (L l) (gre:|gres)
           | otherwise              -> Failed $ LookupChildNotFound item
 
-        IEType{}
-          -- IEType ('type' namespace specifier) restricts the lookup to the
+        TypeNamespaceSpecifier{}
+          -- The 'type' namespace specifier restricts the lookup to the
           -- type namespace, i.e. to `typ_gres`. In case of failure, we check
           -- `val_gres` to produce a more helpful error message.
           | (gre:gres) <- typ_gres -> Succeeded $ fmap (L l) (gre:|gres)
           | (gre:_)    <- val_gres -> Failed $ LookupChildNonType item gre
           | otherwise              -> Failed $ LookupChildNotFound item
 
-        IEData{}
-          -- IEData ('data' namespace specifier) restricts the lookup to the
+        DataNamespaceSpecifier{}
+          -- The 'data' namespace specifier restricts the lookup to the
           -- data namespace, i.e. to `val_gres`. In case of failure, we check
           -- `typ_gres` to produce a more helpful error message.
           | (gre:gres) <- val_gres -> Succeeded $ fmap (L l) (gre:|gres)
           | (gre:_)    <- typ_gres -> Failed $ LookupChildNonData item gre
           | otherwise              -> Failed $ LookupChildNotFound item
 
-        IEPattern{} -> panic "lookupChildren: IEPattern"  -- Never happens (invalid syntax)
-        IEDefault{} -> panic "lookupChildren: IEDefault"  -- Never happens (invalid syntax)
       where
         fs = (occNameFS . rdrNameOcc . ieWrappedName) r
         gres = fromMaybe [] (lookupFsEnv kid_env fs)
@@ -2388,16 +2407,20 @@ printMinimalImports hsc_src imports_w_usage
 
 
 to_ie_post_rn_var :: LocatedA (IdP GhcRn) -> LIEWrappedName GhcRn
-to_ie_post_rn_var (L l n)
-  | isDataOcc $ occName n = L l (IEPattern noAnn      (L (l2l l) n))
-  | otherwise             = L l (IEName    noExtField (L (l2l l) n))
+to_ie_post_rn_var (L l n) = L l (IEName noExtField ns_spec (L (l2l l) n))
+  where
+    ns_spec
+      | isDataOcc $ occName n = DataNamespaceSpecifier noAnn
+      | otherwise             = NoNamespaceSpecifier noExtField
 
 
 to_ie_post_rn :: LocatedA (IdP GhcRn) -> LIEWrappedName GhcRn
-to_ie_post_rn (L l n)
-  | isTcOcc occ && isSymOcc occ = L l (IEType noAnn      (L (l2l l) n))
-  | otherwise                   = L l (IEName noExtField (L (l2l l) n))
-  where occ = occName n
+to_ie_post_rn (L l n) = L l (IEName noExtField ns_spec (L (l2l l) n))
+  where
+    occ = occName n
+    ns_spec
+      | isTcOcc occ && isSymOcc occ = TypeNamespaceSpecifier noAnn
+      | otherwise                   = NoNamespaceSpecifier noExtField
 
 {-
 Note [Partial export]

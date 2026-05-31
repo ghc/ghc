@@ -1036,15 +1036,15 @@ export  :: { LIE GhcPs }
         : maybe_warning_pragma qcname_ext export_subspec {% do { let { span = (maybe comb2 comb3 $1) $2 $> }
                                                           ; impExp <- mkModuleExp $1 (fst $ unLoc $3) $2 (snd $ unLoc $3)
                                                           ; return $ reLoc $ sL span $ impExp } }
-        | maybe_warning_pragma 'module' modid            {% do { let { span = (maybe comb2 comb3 $1) $2 $>
-                                                                     ; anchor = (maybe glR (\loc -> spanAsAnchor . comb2 loc) $1) $2 }
+        | maybe_warning_pragma 'module' modid            {% do { let { span = (maybe comb2 comb3 $1) $2 $> }
                                                           ; locImpExp <- return (sL span (IEModuleContents ($1, (epTok $2)) $3))
                                                           ; return $ reLoc $ locImpExp } }
         | maybe_warning_pragma 'pattern' qcon            {% do { warnPatternNamespaceSpecifier (getLoc $2)
                                                                ; let span = (maybe comb2 comb3 $1) $2 $>
-                                                               ; return $ reLoc $ sL span $ IEVar $1 (sLLa $2 $> (IEPattern (epTok $2) $3)) Nothing } }
+                                                               ; locImpExp <- return (sL span (IEPattern ($1, epTok $2) $3))
+                                                               ; return $ reLoc $ locImpExp } }
         | maybe_warning_pragma 'default' qtycon          {% do { let { span = (maybe comb2 comb3 $1) $2 $> }
-                                                          ; locImpExp <- return (sL span (IEThingAbs $1 (sLLa $2 $> (IEDefault (epTok $2) $3)) Nothing))
+                                                          ; locImpExp <- return (sL span (IEDefault ($1, epTok $2) $3))
                                                           ; return $ reLoc $ locImpExp } }
         | maybe_warning_pragma 'type' '..'               {% do { let { span = (maybe comb2 comb3 $1) $2 $> }
                                                           ; locImpExp <- mkWholeTypeWcImpExp span $1 (epTok $2) (epTok $3)
@@ -1233,7 +1233,7 @@ import  :: { OrdList (LIE GhcPs) }
         : qcname_ext export_subspec {% fmap (unitOL . reLoc . (sLL $1 $>)) $ mkModuleImp Nothing (fst $ unLoc $2) $1 (snd $ unLoc $2) }
         | 'module' modid            {% fmap (unitOL . reLoc) $ return (sLL $1 $> (IEModuleContents (Nothing, (epTok $1)) $2)) }
         | 'pattern' qcon            {% do { warnPatternNamespaceSpecifier (getLoc $1)
-                                          ; return $ unitOL $ reLoc $ sLL $1 $> $ IEVar Nothing (sLLa $1 $> (IEPattern (epTok $1) $2)) Nothing } }
+                                          ; return $ unitOL $ reLoc $ sLL $1 $> (IEPattern (Nothing, epTok $1) $2) } }
         | 'type' '..'               {% fmap (unitOL . reLoc) $ mkWholeTypeWcImpExp (comb2 $1 $>) Nothing (epTok $1) (epTok $2) }
         | 'data' '..'               {% fmap (unitOL . reLoc) $ mkWholeDataWcImpExp (comb2 $1 $>) Nothing (epTok $1) (epTok $2) }
         | '..'                      {% do { addError $ mkPlainErrorMsgEnvelope (gl $1) PsErrPlainWildcardImport

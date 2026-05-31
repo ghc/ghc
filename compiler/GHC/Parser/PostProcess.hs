@@ -3362,10 +3362,7 @@ mkModuleImpExp ctx warning (top, tcp) (L l specname) subs = do
     ieNameVal ImpExpQcWildcard{}  = panic "ieNameVal got wildcard"
 
     ieNameFromSpec :: ImpExpQcSpec -> IEWrappedName GhcPs
-    ieNameFromSpec (ImpExpQcName m_kw name) = case m_kw of
-        Nothing                          -> IEName noExtField name
-        Just (ExplicitTypeNamespace tok) -> IEType tok name
-        Just (ExplicitDataNamespace tok) -> IEData tok name
+    ieNameFromSpec (ImpExpQcName m_kw name) = IEName noExtField (namespaceSpecifierFromKw m_kw) name
     ieNameFromSpec ImpExpQcWildcard{} = panic "ieNameFromSpec got wildcard"
 
     namespaceSpecifierFromKw :: Maybe ExplicitNamespaceKeyword -> NamespaceSpecifier GhcPs

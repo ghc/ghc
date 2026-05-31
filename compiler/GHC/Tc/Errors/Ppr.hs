@@ -697,12 +697,10 @@ instance Diagnostic TcRnMessage where
               child_name_fs   = occNameFS (rdrNameOcc child_name)
               suggest_patsyn  = allow_patsyn && could_be_patsyn
               could_be_patsyn =
-                case unLoc wname of
-                  IEName{} -> isLexCon child_name_fs
-                  IEData{} -> isLexCon child_name_fs
-                  IEPattern{} -> True
-                  IEType{}    -> False
-                  IEDefault{} -> False
+                case ieWrappedNamespaceSpecifier (unLoc wname) of
+                  NoNamespaceSpecifier{}   -> isLexCon child_name_fs
+                  DataNamespaceSpecifier{} -> isLexCon child_name_fs
+                  TypeNamespaceSpecifier{} -> False
               basic_msg =
                 what_parent <+> quotes (ppr parent_name)
                 <+> "does not define a child named" <+> quotes (ppr child_name)
@@ -3340,12 +3338,10 @@ instance Diagnostic TcRnMessage where
         BadImportAvailTyCon
           -- The three cases (TyOp, DataKw, PatternKw) are laid out
           -- in Note [Reasons for BadImportAvailTyCon] in GHC.Tc.Errors.Types
-          | isSymOcc occ    -> could_change_item ImportItemAddType        -- Case (TyOp)
-          | otherwise       ->  -- Non-operator cases
-              case unLoc (ieLIEWrappedName ie) of
-                IEData{}    -> could_change_item ImportItemRemoveData     -- Case (DataKw)
-                IEPattern{} -> could_change_item ImportItemRemovePattern  -- Case (PatternKw)
-                _           -> panic "diagnosticHints: unexpected BadImportAvailTyCon"
+          | isSymOcc occ         -> could_change_item ImportItemAddType        -- Case (TyOp)
+          | iePatternNameSpec ie -> could_change_item ImportItemRemovePattern  -- Case (PatternKw)
+          | ieDataNameSpec ie    -> could_change_item ImportItemRemoveData     -- Case (DataKw)
+          | otherwise            -> panic "diagnosticHints: unexpected BadImportAvailTyCon"
 
         BadImportAvailDataCon par  ->
           [ ImportSuggestion occ $

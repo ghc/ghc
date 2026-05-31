@@ -122,6 +122,8 @@ data IE pass
         -- module Mod ( Test(f, g) )
         -- import Mod ( Test(f, g) )
         -- @
+  | IEPattern (XIEPattern pass) (LIdP pass)   -- ^ @pattern X@
+  | IEDefault (XIEDefault pass) (LIdP pass)   -- ^ @default X ()@, see Note [Named default declarations] in GHC.Tc.Gen.Default
   | IEModuleContents  (XIEModuleContents pass) (XRec pass ModuleName)
         -- ^ Export of entire module. Can only occur in export list.
         --
@@ -178,11 +180,7 @@ data IEWildcard
 -- adornments. Used primarily for accurate pretty printing of
 -- ParsedSource, and API Annotation placement.
 data IEWrappedName p
-  = IEName    (XIEName p)    (LIdP p)  -- ^ unadorned name, e.g @myFun@
-  | IEDefault (XIEDefault p) (LIdP p)  -- ^ @default X ()@, see Note [Named default declarations] in GHC.Tc.Gen.Default
-  | IEPattern (XIEPattern p) (LIdP p)  -- ^ @pattern X@
-  | IEType    (XIEType p)    (LIdP p)  -- ^ @type (:+:)@
-  | IEData    (XIEData p)    (LIdP p)  -- ^ @data (:+:)@
+  = IEName (XIEName p) (NamespaceSpecifier p) (LIdP p)
   | XIEWrappedName !(XXIEWrappedName p)
 
 -- | Located name with possible adornment

@@ -224,8 +224,6 @@ instance (OutputableBndrId p
 -}
 
 type instance XIEName    (GhcPass _) = NoExtField
-type instance XIEDefault (GhcPass _) = EpToken "default"
-type instance XIEPattern (GhcPass _) = EpToken "pattern"
 type instance XIEType    (GhcPass _) = EpToken "type"
 type instance XIEData    (GhcPass _) = EpToken "data"
 type instance XXIEWrappedName (GhcPass _) = DataConCantHappen
@@ -281,6 +279,20 @@ type instance XIEModuleContents  GhcPs = (Maybe (LWarningTxt GhcPs), EpToken "mo
 type instance XIEModuleContents  GhcRn = Maybe (LWarningTxt GhcRn)
 type instance XIEModuleContents  GhcTc = NoExtField
 
+-- The additional field of type 'Maybe (WarningTxt pass)' holds information
+-- about export deprecation annotations and is thus set to Nothing when `IE`
+-- is used in an import list (since export deprecation can only be used in exports)
+type instance XIEDefault  GhcPs = (Maybe (LWarningTxt GhcPs), EpToken "default")
+type instance XIEDefault  GhcRn = Maybe (LWarningTxt GhcRn)
+type instance XIEDefault  GhcTc = NoExtField
+
+-- The additional field of type 'Maybe (WarningTxt pass)' holds information
+-- about export deprecation annotations and is thus set to Nothing when `IE`
+-- is used in an import list (since export deprecation can only be used in exports)
+type instance XIEPattern  GhcPs = (Maybe (LWarningTxt GhcPs), EpToken "pattern")
+type instance XIEPattern  GhcRn = Maybe (LWarningTxt GhcRn)
+type instance XIEPattern  GhcTc = NoExtField
+
 data IEWholeNamespaceExt pass =
   IEWholeNamespaceExt {
     iewn_warning :: Maybe (LWarningTxt pass),
@@ -299,15 +311,30 @@ type instance XXIE               (GhcPass _) = DataConCantHappen
 
 type instance Anno (LocatedA (IE (GhcPass p))) = SrcSpanAnnA
 
-ieLIEWrappedName :: IE (GhcPass p) -> LIEWrappedName (GhcPass p)
-ieLIEWrappedName (IEVar _ n _)           = n
-ieLIEWrappedName (IEThingAbs  _ n _)     = n
-ieLIEWrappedName (IEThingWith _ n _ _ _) = n
-ieLIEWrappedName (IEThingAll  _ _ n _)   = n
-ieLIEWrappedName _ = panic "ieLIEWrappedName failed pattern match!"
-
 ieName :: IE (GhcPass p) -> IdP (GhcPass p)
-ieName = lieWrappedName . ieLIEWrappedName
+ieName (IEVar _ n _)           = lieWrappedName n
+ieName (IEThingAbs  _ n _)     = lieWrappedName n
+ieName (IEThingWith _ n _ _ _) = lieWrappedName n
+ieName (IEThingAll  _ _ n _)   = lieWrappedName n
+ieName (IEPattern _ n)         = unLoc n
+ieName _ = panic "ieName failed pattern match!"
+
+ieDataNameSpec :: IE (GhcPass p) -> Bool
+ieDataNameSpec ie =
+  case ie of
+    IEVar _ n _           -> isData n
+    IEThingAbs  _ n _     -> isData n
+    IEThingWith _ n _ _ _ -> isData n
+    IEThingAll  _ _ n _   -> isData n
+    _ -> False
+  where
+    isData (L _ n) = case ieWrappedNamespaceSpecifier n of
+      DataNamespaceSpecifier{} -> True
+      _ -> False
+
+iePatternNameSpec :: IE (GhcPass p) -> Bool
+iePatternNameSpec IEPattern{} = True
+iePatternNameSpec _ = False
 
 ieNames :: IE (GhcPass p) -> [IdP (GhcPass p)]
 ieNames (IEVar       _ (L _ n) _)      = [ieWrappedName n]
@@ -315,6 +342,8 @@ ieNames (IEThingAbs  _ (L _ n) _)      = [ieWrappedName n]
 ieNames (IEThingAll  _ _ (L _ n) _)    = [ieWrappedName n]
 ieNames (IEThingWith _ (L _ n) _ ns _) = ieWrappedName n : map (ieWrappedName . unLoc) ns
 ieNames (IEWholeNamespace x _)         = iewn_names x
+ieNames (IEPattern _ (L _ n))          = [n]
+ieNames (IEDefault _ (L _ n))          = [n]
 ieNames (IEModuleContents {})     = []
 ieNames (IEGroup          {})     = []
 ieNames (IEDoc            {})     = []
@@ -328,40 +357,32 @@ ieDeprecation = fmap unLoc . ie_deprecation (ghcPass @p)
     ie_deprecation GhcPs (IEThingAbs xie _ _) = xie
     ie_deprecation GhcPs (IEThingAll xie _ _ _) = ieta_warning xie
     ie_deprecation GhcPs (IEThingWith (xie, _) _ _ _ _) = xie
+    ie_deprecation GhcPs (IEPattern (xie, _) _) = xie
+    ie_deprecation GhcPs (IEDefault (xie, _) _) = xie
     ie_deprecation GhcPs (IEModuleContents (xie, _) _) = xie
     ie_deprecation GhcRn (IEVar xie _ _) = xie
     ie_deprecation GhcRn (IEThingAbs xie _ _) = xie
     ie_deprecation GhcRn (IEThingAll xie _ _ _) = ieta_warning xie
     ie_deprecation GhcRn (IEThingWith (xie, _) _ _ _ _) = xie
+    ie_deprecation GhcRn (IEPattern xie _) = xie
+    ie_deprecation GhcRn (IEDefault xie _) = xie
     ie_deprecation GhcRn (IEModuleContents xie _) = xie
     ie_deprecation _ _ = Nothing
 
 ieWrappedLName :: IEWrappedName (GhcPass p) -> LIdP (GhcPass p)
-ieWrappedLName (IEDefault _ (L l n)) = L l n
-ieWrappedLName (IEName    _ (L l n)) = L l n
-ieWrappedLName (IEPattern _ (L l n)) = L l n
-ieWrappedLName (IEType    _ (L l n)) = L l n
-ieWrappedLName (IEData    _ (L l n)) = L l n
+ieWrappedLName (IEName _ _ ln) = ln
 
 ieWrappedName :: IEWrappedName (GhcPass p) -> IdP (GhcPass p)
 ieWrappedName = unLoc . ieWrappedLName
 
+ieWrappedNamespaceSpecifier :: IEWrappedName (GhcPass p) -> NamespaceSpecifier (GhcPass p)
+ieWrappedNamespaceSpecifier (IEName _ ns_spec _) = ns_spec
 
 lieWrappedName :: LIEWrappedName (GhcPass p) -> IdP (GhcPass p)
 lieWrappedName (L _ n) = ieWrappedName n
 
 ieLWrappedName :: LIEWrappedName (GhcPass p) -> LIdP (GhcPass p)
 ieLWrappedName (L _ n) = ieWrappedLName n
-
-replaceWrappedName :: IEWrappedName GhcPs -> IdP GhcRn -> IEWrappedName GhcRn
-replaceWrappedName (IEDefault r (L l _)) n = IEDefault r (L l n)
-replaceWrappedName (IEName    x (L l _)) n = IEName    x (L l n)
-replaceWrappedName (IEPattern r (L l _)) n = IEPattern r (L l n)
-replaceWrappedName (IEType    r (L l _)) n = IEType    r (L l n)
-replaceWrappedName (IEData    r (L l _)) n = IEData    r (L l n)
-
-replaceLWrappedName :: LIEWrappedName GhcPs -> IdP GhcRn -> LIEWrappedName GhcRn
-replaceLWrappedName (L l n) n' = L l (replaceWrappedName n n')
 
 exportDocstring :: LHsDoc pass -> SDoc
 exportDocstring doc = braces (text "docstring: " <> ppr doc)
@@ -395,6 +416,10 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
               IEWildcard pos ->
                 let (bs, as) = splitAt pos (map (ppr . unLoc) withs)
                 in bs ++ [text ".."] ++ as
+    ppr ie@(IEDefault _ (L _ n))
+        = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ text "default" <+> pprPrefixOcc n]
+    ppr ie@(IEPattern _ (L _ n))
+        = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ text "pattern" <+> pprPrefixOcc n]
     ppr ie@(IEModuleContents _ mod')
         = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ text "module" <+> ppr mod']
     ppr (IEWholeNamespace _ ns_spec) = ppr ns_spec <+> text ".."
@@ -411,11 +436,7 @@ instance OutputableBndrId p => OutputableBndr (IEWrappedName (GhcPass p)) where
   pprInfixOcc  w = pprInfixOcc  (ieWrappedName w)
 
 instance OutputableBndrId p => Outputable (IEWrappedName (GhcPass p)) where
-  ppr (IEDefault _ (L _ n)) = text "default" <+> pprPrefixOcc n
-  ppr (IEName    _ (L _ n)) = pprPrefixOcc n
-  ppr (IEPattern _ (L _ n)) = text "pattern" <+> pprPrefixOcc n
-  ppr (IEType    _ (L _ n)) = text "type"    <+> pprPrefixOcc n
-  ppr (IEData    _ (L _ n)) = text "data"    <+> pprPrefixOcc n
+  ppr (IEName _ ns_spec (L _ n)) = ppr ns_spec <+> pprPrefixOcc n
 
 pprImpExp :: (HasOccName name, OutputableBndr name) => name -> SDoc
 pprImpExp name = type_pref <+> pprPrefixOcc name

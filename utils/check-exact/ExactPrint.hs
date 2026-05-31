@@ -4609,7 +4609,16 @@ instance ExactPrint (IE GhcPs) where
     cp' <- markEpToken cp
     doc' <- markAnnotated doc
     return (IEThingWith (depr', (op',dd',c',cp')) thing' wc' withs' doc')
-
+  exact (IEPattern (depr, r) n) = do
+    depr' <- markAnnotated depr
+    r' <- markEpToken r
+    n' <- markAnnotated n
+    return (IEPattern (depr', r') n')
+  exact (IEDefault (depr, r) n) = do
+    depr' <- markAnnotated depr
+    r' <- markEpToken r
+    n' <- markAnnotated n
+    return (IEDefault (depr', r') n')
   exact (IEModuleContents (depr, an) m) = do
     depr' <- markAnnotated depr
     an0 <- markEpToken an
@@ -4637,25 +4646,10 @@ instance ExactPrint (IEWrappedName GhcPs) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (IEName x n) = do
+  exact (IEName x ns_spec n) = do
+    ns_spec' <- exactNsSpec ns_spec
     n' <- markAnnotated n
-    return (IEName x n')
-  exact (IEDefault r n) = do
-    r' <- markEpToken r
-    n' <- markAnnotated n
-    return (IEDefault r' n')
-  exact (IEPattern r n) = do
-    r' <- markEpToken r
-    n' <- markAnnotated n
-    return (IEPattern r' n')
-  exact (IEType r n) = do
-    r' <- markEpToken r
-    n' <- markAnnotated n
-    return (IEType r' n')
-  exact (IEData r n) = do
-    r' <- markEpToken r
-    n' <- markAnnotated n
-    return (IEData r' n')
+    return (IEName x ns_spec' n')
 
 -- ---------------------------------------------------------------------
 

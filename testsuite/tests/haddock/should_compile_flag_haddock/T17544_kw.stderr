@@ -82,6 +82,8 @@
           []))
         (IEName
          (NoExtField)
+         (NoNamespaceSpecifier
+          (NoExtField))
          (L
           (EpAnn
            (EpaSpan { T17544_kw.hs:9:3-5 })
@@ -121,6 +123,8 @@
           []))
         (IEName
          (NoExtField)
+         (NoNamespaceSpecifier
+          (NoExtField))
          (L
           (EpAnn
            (EpaSpan { T17544_kw.hs:10:3-5 })
@@ -158,6 +162,8 @@
           []))
         (IEName
          (NoExtField)
+         (NoNamespaceSpecifier
+          (NoExtField))
          (L
           (EpAnn
            (EpaSpan { T17544_kw.hs:11:3-5 })
