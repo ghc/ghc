@@ -1044,6 +1044,9 @@ ppr_hse hse
       pprCtxt (FunAppCtxt (FunAppCtxtExpr _ e) _) = ppr_builder "<FunAppCtxt>:"  (ppr e)
       pprCtxt _ = ppr_builder "<MiscHsCtxt>:" empty
 
+instance IsPass p => Outputable (HsExpansion (GhcPass p)) where
+  ppr = ppr_hse
+
 instance Outputable XXExprGhcRn where
   ppr (HsRecSelRn f)        = pprPrefixOcc f
   ppr (ExpandedThingRn hse) = ppr_hse hse

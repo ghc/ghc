@@ -1564,15 +1564,27 @@ repLEs es = repListM expTyConName repLE es
 repLE :: LHsExpr GhcRn -> MetaM (Core (M TH.Exp))
 repLE (L loc e) = mapReaderT (putSrcSpanDs (locA loc)) (repE e)
 
-repE :: HsExpr GhcRn -> MetaM (Core (M TH.Exp))
-repE (HsVar _ (L _ (WithUserRdr _ x))) =
-  do { mb_val <- lift $ dsLookupMetaEnv x
-     ; case mb_val of
-        Nothing            -> do { str <- lift $ globalVar x
-                                 ; repVarOrCon x str }
-        Just (DsBound y)   -> repVarOrCon x (coreVar y)
-        Just (DsSplice e)  -> do { e' <- lift $ dsExpr e
-                                 ; return (MkC e') } }
+repE :: forall p. (IsPass p) => HsExpr (GhcPass p) -> MetaM (Core (M TH.Exp))
+repE e@(HsVar _ n) = case (ghcPass @p , n) of
+  (GhcPs, _) -> panic "repE : GhcPs HsVar Shouldn't happen"
+  (GhcTc, n) -> let x = idName (unLoc n) in
+    do { mb_val <- lift $ dsLookupMetaEnv x
+       ; case mb_val of
+           Nothing            -> do { str <- lift $ globalVar x
+                                    ; repVarOrCon x str }
+           Just (DsBound y)   -> repVarOrCon x (coreVar y)
+           Just (DsSplice e)  -> do { e' <- lift $ dsExpr e
+                                    ; return (MkC e') } }
+  (GhcRn, (L _ (WithUserRdr _ x))) ->
+    do { mb_val <- lift $ dsLookupMetaEnv x
+       ; case mb_val of
+           Nothing            -> do { str <- lift $ globalVar x
+                                    ; repVarOrCon x str }
+           Just (DsBound y)   -> repVarOrCon x (coreVar y)
+           Just (DsSplice e)  -> do { e' <- lift $ dsExpr e
+                                    ; return (MkC e') } }
+
+
 repE (HsHole (HoleVar (L _ uv))) = do
   name <- repRdrName uv
   repUnboundVar name
@@ -1583,7 +1595,11 @@ repE (HsOverLabel _ s) = repOverLabel s
 
         -- Remember, we're desugaring renamer output here, so
         -- HsOverlit can definitely occur
-repE (HsOverLit _ l) = do { a <- repOverloadedLiteral l; repLit a }
+repE (HsOverLit _ l) = case (ghcPass @p, l) of
+  (GhcPs, _) -> panic "repE : GhcPs HsOverLit shouldn't happen"
+  (GhcRn, l) -> do { a <- repOverloadedLiteral l; repLit a }
+  (GhcTc, l) -> do { a <- repOverloadedLiteral l; repLit a }
+
 repE (HsLit _ l)     = do { a <- repLiteral l;           repLit a }
 repE (HsQualLit _ l) = repQualLit l
 repE (HsLam _ LamSingle (MG { mg_alts = L _ [m] })) = repLambda m
@@ -2158,7 +2174,7 @@ repExplBidirPatSynDir (MkC cls) = rep2 explBidirPatSynName [cls]
 -- Haskell Template's Meta.Exp type so we punt if it isn't a simple thing like
 -- (\ p1 .. pn -> exp) by causing an error.
 
-repLambda :: LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Exp))
+repLambda :: forall p. IsPass p => LMatch (GhcPass p) (LHsExpr (GhcPass p)) -> MetaM (Core (M TH.Exp))
 repLambda (L _ (Match { m_pats = L _ ps
                       , m_grhss = GRHSs _ (L _ (GRHS _ [] e) :| [])
                                               (EmptyLocalBinds _) } ))
@@ -2185,10 +2201,10 @@ repLPs ps = repListM patTyConName repLP ps
 repLPs1 :: NonEmpty (LPat GhcRn) -> MetaM (Core (NonEmpty (M TH.Pat)))
 repLPs1 ps = repNonEmptyM patTyConName repLP ps
 
-repLP :: LPat GhcRn -> MetaM (Core (M TH.Pat))
+repLP :: forall p. IsPass p => LPat (GhcPass p) -> MetaM (Core (M TH.Pat))
 repLP p = repP (unLoc p)
 
-repP :: Pat GhcRn -> MetaM (Core (M TH.Pat))
+repP :: forall p. IsPass p => Pat (GhcPass p) -> MetaM (Core (M TH.Pat))
 repP (WildPat _)        = repPwild
 repP (LitPat _ l)       = do { l2 <- repLiteral l; repPlit l2 }
 repP (VarPat _ x)       = do { x' <- lookupBinder (unLoc x); repPvar x' }
@@ -3067,7 +3083,7 @@ repTyVarSig (MkC bndr) = rep2 tyVarSigName [bndr]
 ----------------------------------------------------------
 --              Literals
 
-repLiteral ::  HsLit GhcRn -> MetaM (Core TH.Lit)
+repLiteral ::  forall p. IsPass p => HsLit (GhcPass p) -> MetaM (Core TH.Lit)
 repLiteral (HsStringPrim _ bs)
   = do word8_ty <- lookupType word8TyConName
        let w8s = unpack bs
@@ -3112,7 +3128,7 @@ mk_string s = return $ HsString NoSourceText s
 mk_char :: Char -> MetaM (HsLit GhcRn)
 mk_char c = return $ HsChar NoSourceText c
 
-repOverloadedLiteral :: HsOverLit GhcRn -> MetaM (Core TH.Lit)
+repOverloadedLiteral :: forall p. (IsPass p) => HsOverLit (GhcPass p) -> MetaM (Core TH.Lit)
 repOverloadedLiteral (OverLit { ol_val = val})
   = repOverLiteralVal val
     -- The type Rational will be in the environment, because
@@ -3134,7 +3150,7 @@ repOverLiteralVal lit = do
 
   rep2_nw lit_name [lit_expr]
 
-repQualLit :: HsQualLit GhcRn -> MetaM (Core (M TH.Exp))
+repQualLit :: forall p. IsPass p => HsQualLit (GhcPass p) -> MetaM (Core (M TH.Exp))
 repQualLit QualLit{ql_mod = modName, ql_val = lit} = do
   modNameStr <- coreStringLit (moduleNameFS modName)
   funNameStr <- coreStringLit (mkFastString . occNameString . nameOccName $ funName)

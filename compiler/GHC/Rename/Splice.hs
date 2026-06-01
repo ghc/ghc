@@ -147,7 +147,9 @@ rnTypedBracket e br_body
        ; mb_b <- tcExpand b
        ; case mb_b of
            Nothing -> return (HsTypedBracket noExtField body', fvs_e)
-           Just hse -> return (HsTypedBracket noExtField (L loc (XExpr (ExpandedThingRn hse))), fvs_e)
+           Just hse ->
+             do traceRn "Expanded Typed TH Bracket" (ppr hse)
+                return (HsTypedBracket noExtField (L loc (XExpr (ExpandedThingRn hse))), fvs_e)
        }
 
 rnUntypedBracket :: HsExpr GhcPs -> HsQuote GhcPs -> RnM (HsExpr GhcRn, FreeNames)
