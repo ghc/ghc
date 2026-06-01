@@ -1,0 +1,6 @@
+ghc: unrecognised flag: -mavx22
+did you mean one of:
+  -mavx2
+  -mavx
+
+Usage: For basic information, try the `--help' option.

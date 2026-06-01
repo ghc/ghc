@@ -1,0 +1,1 @@
+{"tag":"enabled-cpu-features","version":1,"target":"TARGET","features":["SSE","SSE2","SSE3","SSSE3","SSE4.1","SSE4.2","AVX","FMA"],"as_m_flags":["-mfma"]}

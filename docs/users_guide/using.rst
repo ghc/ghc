@@ -488,6 +488,16 @@ The available mode flags are:
     List the flags passed to the C compiler for the linking step
     during GHC build.
 
+.. ghc-flag:: --print-enabled-cpu-features
+    :shortdesc: display the effective enabled CPU features for code generation
+    :type: mode
+    :category: modes
+
+    Print a JSON object describing the CPU features currently enabled for code
+    generation, together with a set of ``-m...`` flags that reproduce the
+    effective feature set for the current target.
+    Dynamic options such as ``-mavx2`` and ``-mbmi2`` are respected.
+
 .. ghc-flag:: --print-debug-on
     :shortdesc: print whether GHC was built with ``-DDEBUG``
     :type: mode

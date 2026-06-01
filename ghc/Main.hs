@@ -229,55 +229,64 @@ main' postLoadMode units dflags0 args flagWarnings = do
        liftIO $ exitWith (ExitFailure 1)) $ do
          liftIO $ printOrThrowDiagnostics logger4 (initPrintConfig dflags4) diag_opts flagWarnings'
 
-  liftIO $ showBanner postLoadMode dflags4
+  case postLoadMode of
+    PrintEnabledCpuFeatures -> liftIO $ do
+      -- This mode bypasses parseTargetFiles/checkOptions, so reject any
+      -- leftover flag-like arguments (e.g. a mistyped -mavx22) ourselves;
+      -- otherwise the typo would be silently ignored.
+      let unknown_opts = [ f | f@('-':_) <- map unLoc fileish_args ]
+      when (not (null unknown_opts)) (unknownFlagsErr unknown_opts)
+      putStrLn (showEnabledCpuFeatures dflags4)
+    _ -> do
+      liftIO $ showBanner postLoadMode dflags4
 
-  let (dflags5, srcs, objs) = parseTargetFiles dflags4 (map unLoc fileish_args)
+      let (dflags5, srcs, objs) = parseTargetFiles dflags4 (map unLoc fileish_args)
 
-  -- we've finished manipulating the DynFlags, update the session
-  _ <- GHC.setSessionDynFlags dflags5
-  dflags6 <- GHC.getSessionDynFlags
+      -- we've finished manipulating the DynFlags, update the session
+      _ <- GHC.setSessionDynFlags dflags5
+      dflags6 <- GHC.getSessionDynFlags
 
-  -- Must do this before loading plugins
-  liftIO $ initUniqSupply (initialUnique dflags6) (uniqueIncrement dflags6)
+      -- Must do this before loading plugins
+      liftIO $ initUniqSupply (initialUnique dflags6) (uniqueIncrement dflags6)
 
-  -- Initialise plugins here because the plugin author might already expect this
-  -- subsequent call to `getLogger` to be affected by a plugin.
-  initializeSessionPlugins
-  hsc_env <- getSession
-  logger <- getLogger
+      -- Initialise plugins here because the plugin author might already expect this
+      -- subsequent call to `getLogger` to be affected by a plugin.
+      initializeSessionPlugins
+      hsc_env <- getSession
+      logger <- getLogger
 
 
-        ---------------- Display configuration -----------
-  case verbosity dflags6 of
-    v | v == 4 -> liftIO $ dumpUnitsSimple hsc_env
-      | v >= 5 -> liftIO $ dumpUnits       hsc_env
-      | otherwise -> return ()
+            ---------------- Display configuration -----------
+      case verbosity dflags6 of
+        v | v == 4 -> liftIO $ dumpUnitsSimple hsc_env
+          | v >= 5 -> liftIO $ dumpUnits       hsc_env
+          | otherwise -> return ()
 
-        ---------------- Final sanity checking -----------
-  liftIO $ checkOptions postLoadMode dflags6 srcs objs units
+            ---------------- Final sanity checking -----------
+      liftIO $ checkOptions postLoadMode dflags6 srcs objs units
 
-  ---------------- Do the business -----------
-  handleSourceError (\e -> do
-       GHC.printException e
-       liftIO $ exitWith (ExitFailure 1)) $ do
-    case postLoadMode of
-       ShowInterface f        -> liftIO $ showIface logger
-                                                    (hsc_dflags hsc_env)
-                                                    (hsc_units  hsc_env)
-                                                    (hsc_NC     hsc_env)
-                                                    f
-       DoMake                 -> doMake units srcs
-       DoMkDependHS           -> doMkDependHS (map fst srcs)
-       StopBefore p           -> liftIO (oneShot hsc_env p srcs)
-       DoInteractive          -> ghciUI units srcs Nothing
-       DoEval exprs           -> ghciUI units srcs $ Just $ reverse exprs
-       DoRun                  -> doRun units srcs args
-       DoAbiHash              -> abiHash (map fst srcs)
-       ShowPackages           -> liftIO $ showUnits hsc_env
-       DoFrontend f           -> doFrontend f srcs
-       DoBackpack             -> doBackpack (map fst srcs)
+      ---------------- Do the business -----------
+      handleSourceError (\e -> do
+           GHC.printException e
+           liftIO $ exitWith (ExitFailure 1)) $ do
+        case postLoadMode of
+           ShowInterface f        -> liftIO $ showIface logger
+                                                        (hsc_dflags hsc_env)
+                                                        (hsc_units  hsc_env)
+                                                        (hsc_NC     hsc_env)
+                                                        f
+           DoMake                 -> doMake units srcs
+           DoMkDependHS           -> doMkDependHS (map fst srcs)
+           StopBefore p           -> liftIO (oneShot hsc_env p srcs)
+           DoInteractive          -> ghciUI units srcs Nothing
+           DoEval exprs           -> ghciUI units srcs $ Just $ reverse exprs
+           DoRun                  -> doRun units srcs args
+           DoAbiHash              -> abiHash (map fst srcs)
+           ShowPackages           -> liftIO $ showUnits hsc_env
+           DoFrontend f           -> doFrontend f srcs
+           DoBackpack             -> doBackpack (map fst srcs)
 
-  liftIO $ dumpFinalStats logger
+      liftIO $ dumpFinalStats logger
 
 doRun :: [String] -> [(FilePath, Maybe Phase)] -> [Located String] -> Ghc ()
 doRun units srcs args = do
@@ -515,4 +524,3 @@ abiHash strs = do
   f <- fingerprintBinMem bh
 
   putStrLn (showPpr dflags f)
-

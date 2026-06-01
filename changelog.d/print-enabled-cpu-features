@@ -1,0 +1,16 @@
+section: compiler
+synopsis: Add --print-enabled-cpu-features flag
+issues: #25450
+mrs: !16117
+
+description:
+  GHC now supports a new mode flag ``--print-enabled-cpu-features``, which
+  prints a JSON object describing the CPU features currently enabled for code
+  generation, together with a set of ``-m...`` flags that reproduce the
+  effective feature set for the current target.
+  Dynamic options such as ``-mavx2`` and ``-mbmi2`` are respected. ::
+
+    $ ghc -mavx2 --print-enabled-cpu-features
+    {"tag":"enabled-cpu-features","version":1,"target":"x86_64-linux-gnu",
+     "features":["SSE","SSE2","SSE3","SSSE3","SSE4.1","SSE4.2","AVX","AVX2"],
+     "as_m_flags":["-mavx2"]}
