@@ -1403,9 +1403,9 @@ scheduleNeedHeapProfile( bool ready_to_gc )
 {
     // When we have +RTS -i0 and we're heap profiling, do a census at
     // every GC.  This lets us get repeatable runs for debugging.
-    if (RELAXED_LOAD(&performHeapProfile) ||
-        (RtsFlags.ProfFlags.heapProfileInterval==0 &&
-         RtsFlags.ProfFlags.doHeapProfile && ready_to_gc)) {
+    if (RtsFlags.ProfFlags.doHeapProfile
+        && ((RtsFlags.ProfFlags.heapProfileInterval==0 && ready_to_gc)
+            || RELAXED_LOAD(&performHeapProfile))) {
         return true;
     } else {
         return false;
