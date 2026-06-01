@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-module GHC.Driver.Session.Lint (checkOptions) where
+module GHC.Driver.Session.Lint (checkOptions, unknownFlagsErr) where
 
 import GHC.Driver.Backend
 import GHC.Driver.Phases

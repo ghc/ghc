@@ -78,6 +78,7 @@ isShowGhciUsageMode _ = False
 data PostLoadMode
   = ShowInterface FilePath  -- ghc --show-iface
   | ShowByteCode FilePath   -- ghc --show-byte-code
+  | PrintEnabledCpuFeatures -- ghc --print-enabled-cpu-features
   | DoMkDependHS            -- ghc -M
   | StopBefore StopPhase    -- ghc -E | -C | -S
                             -- StopBefore StopLn is the default
@@ -91,12 +92,13 @@ data PostLoadMode
   | DoFrontend ModuleName   -- ghc --frontend Plugin.Module
 
 doMkDependHSMode, doMakeMode, doInteractiveMode, doRunMode,
-  doAbiHashMode, showUnitsMode :: Mode
+  doAbiHashMode, printEnabledCpuFeaturesMode, showUnitsMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
 doInteractiveMode = mkPostLoadMode DoInteractive
 doRunMode = mkPostLoadMode DoRun
 doAbiHashMode = mkPostLoadMode DoAbiHash
+printEnabledCpuFeaturesMode = mkPostLoadMode PrintEnabledCpuFeatures
 showUnitsMode = mkPostLoadMode ShowPackages
 
 showInterfaceMode :: FilePath -> Mode
@@ -207,6 +209,8 @@ mode_flags =
   , defFlag "-show-options"         (PassFlag (setMode showOptionsMode))
   , defFlag "-supported-languages"  (PassFlag (setMode showSupportedExtensionsMode))
   , defFlag "-supported-extensions" (PassFlag (setMode showSupportedExtensionsMode))
+  , defFlag "-print-enabled-cpu-features"
+                                     (PassFlag (setMode printEnabledCpuFeaturesMode))
   , defFlag "-show-packages"        (PassFlag (setMode showUnitsMode))
   ] ++
   [ defFlag k'                      (PassFlag (setMode (printSetting k)))

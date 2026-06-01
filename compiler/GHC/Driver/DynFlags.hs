@@ -1621,6 +1621,7 @@ initPromotionTickContext dflags =
 
 -- -----------------------------------------------------------------------------
 -- SSE, AVX, FMA
+-- See Note [Keeping enabledCpuFeatures in sync] in GHC.Driver.Session
 
 isSse3Enabled :: DynFlags -> Bool
 isSse3Enabled dflags = sseAvxVersion dflags >= Just SSE3 || isAvxEnabled dflags
@@ -1711,11 +1712,14 @@ We handle this as follows:
 
 -- -----------------------------------------------------------------------------
 -- LA664
+-- See Note [Keeping enabledCpuFeatures in sync] in GHC.Driver.Session
+
 isLa664Enabled :: DynFlags -> Bool
 isLa664Enabled dflags = la664 dflags
 
 -- -----------------------------------------------------------------------------
 -- BMI2
+-- See Note [Keeping enabledCpuFeatures in sync] in GHC.Driver.Session
 
 isBmiEnabled :: DynFlags -> Bool
 isBmiEnabled dflags = case platformArch (targetPlatform dflags) of
