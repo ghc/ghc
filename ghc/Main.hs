@@ -34,6 +34,7 @@ import GHC.Driver.Config.Logger (initLogFlags)
 import GHC.Driver.Config.Diagnostic
 
 import GHC.Platform
+import GHC.Platform.CpuFeatures
 import GHC.Platform.Host
 
 #if defined(HAVE_INTERPRETER)
@@ -55,6 +56,7 @@ import GHC.Types.Unique.Supply
 import GHC.Types.PkgQual
 
 import GHC.Utils.Error
+import GHC.Utils.Json
 import GHC.Utils.Panic
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Monad       ( liftIO )
@@ -278,6 +280,7 @@ main' postLoadMode units dflags0 args flagWarnings = do
        DoRun                  -> doRun units srcs args
        DoAbiHash              -> abiHash (map fst srcs)
        ShowPackages           -> liftIO $ showUnits hsc_env
+       PrintEnabledCpuFeatures -> liftIO $ showEnabledCpuFeatures (hsc_dflags hsc_env)
        DoFrontend f           -> doFrontend f srcs
        DoBackpack             -> doBackpack (map fst srcs)
 
@@ -361,6 +364,24 @@ showInfo :: DynFlags -> IO ()
 showInfo dflags = do
         let sq x = " [" ++ x ++ "\n ]"
         putStrLn $ sq $ intercalate "\n ," $ map show $ compilerInfo dflags
+
+showEnabledCpuFeatures :: DynFlags -> IO ()
+showEnabledCpuFeatures dflags = putStrLn $ showSDocUnsafe $ renderJSON $ JSObject
+  [ ("tag", JSString "enabled-cpu-features")
+    -- Schema version of this JSON object; bump it whenever the shape or
+    -- meaning of the fields changes, so consumers can detect incompatibility.
+  , ("version", JSInt 1)
+  , ("features", JSArray (map JSString features))
+  ]
+  where
+    features = case targetCpuFeatures dflags of
+      X86CpuFeatures feats ->
+        [ flagName feat | feat <- [minBound .. maxBound], x86FeatureEnabled feats feat ]
+      GenericCpuFeatures { genericFma = fma } ->
+           [ flagName Feat_FMA | fma ]
+        ++ [ "la664" | platformArch (targetPlatform dflags) == ArchLoongArch64
+                     , isLa664Enabled dflags ]
+    flagName = fst . cpuFeatureFlag
 
 -- TODO use GHC.Utils.Error once that is disentangled from all the other GhcMonad stuff?
 showSupportedExtensions :: Maybe String -> IO ()

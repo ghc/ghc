@@ -1,0 +1,1 @@
+{"tag":"enabled-cpu-features","version":1,"features":["sse","sse2","sse3","ssse3","sse4","sse4.2","avx","avx2"]}

@@ -31,6 +31,7 @@ module GHC.Platform.CpuFeatures
 
     -- *** Querying x86 features
     -- | These are not independent; see Note [CPU features].
+  , x86FeatureEnabled
   , x86Ssse3Enabled
   , x86Sse4_1Enabled
   , x86Sse4_2Enabled
@@ -50,7 +51,7 @@ import GHC.Platform.ArchOS
 import GHC.Data.EnumSet (EnumSet)
 import qualified GHC.Data.EnumSet as EnumSet
 
-import Data.Maybe (isJust)
+import Data.Maybe (fromMaybe, isJust)
 
 {- Note [CPU features]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -327,6 +328,32 @@ x86Avx512VLEnabled = maybe False avx512vl . x86Avx512Exts . x86SseAvx
 
 x86Bmi2Enabled :: X86Features -> Bool
 x86Bmi2Enabled = (>= Just BMI2) . x86Bmi
+
+-- | Whether the given feature is enabled, including by implication.
+x86FeatureEnabled :: X86Features -> CpuFeature -> Bool
+x86FeatureEnabled feats = \case
+  Feat_SSE      -> sse >= SSE1
+  Feat_SSE2     -> sse >= SSE2
+  Feat_SSE3     -> sse >= SSE3
+  Feat_SSSE3    -> sse >= SSSE3
+  Feat_SSE4     -> sse >= SSE4
+  Feat_SSE4_2   -> sse >= SSE42
+  Feat_AVX      -> x86AvxEnabled feats
+  Feat_AVX2     -> x86Avx2Enabled feats
+  Feat_AVX512F  -> x86Avx512FEnabled feats
+  Feat_AVX512BW -> avx512bw exts
+  Feat_AVX512CD -> avx512cd exts
+  Feat_AVX512DQ -> avx512dq exts
+  Feat_AVX512ER -> avx512er exts
+  Feat_AVX512PF -> avx512pf exts
+  Feat_AVX512VL -> avx512vl exts
+  Feat_FMA      -> x86FmaEnabled feats
+  Feat_BMI      -> x86Bmi feats >= Just BMI1
+  Feat_BMI2     -> x86Bmi feats >= Just BMI2
+  Feat_GFNI     -> x86Gfni feats
+  where
+    sse  = x86SseVersion (x86SseAvx feats)
+    exts = fromMaybe noAvx512Exts (x86Avx512Exts (x86SseAvx feats))
 
 --------------------------------------------------------------------------------
 -- Comparing x86 feature sets

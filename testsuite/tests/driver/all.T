@@ -223,6 +223,31 @@ test('T9938B', [], makefile_test, [])
 test('T9963', exit_code(1), run_command,
      ['{compiler} --interactive -ignore-dot-ghci --print-libdir'])
 
+test('print_enabled_cpu_features',
+     [unless(arch('x86_64') or arch('i386'), skip)],
+     run_command,
+     ['{compiler} --print-enabled-cpu-features'])
+
+test('print_enabled_cpu_features_avx2',
+     [unless(arch('x86_64') or arch('i386'), skip)],
+     run_command,
+     ['{compiler} -mavx2 --print-enabled-cpu-features'])
+
+test('print_enabled_cpu_features_bmi2',
+     [unless(arch('x86_64') or arch('i386'), skip)],
+     run_command,
+     ['{compiler} -mbmi2 --print-enabled-cpu-features'])
+
+test('print_enabled_cpu_features_fma',
+     [unless(arch('x86_64') or arch('i386'), skip)],
+     run_command,
+     ['{compiler} -mfma --print-enabled-cpu-features'])
+
+test('print_enabled_cpu_features_avx512',
+     [unless(arch('x86_64'), skip)],
+     run_command,
+     ['{compiler} -mavx512dq -mavx512vl --print-enabled-cpu-features'])
+
 test('T10219', normal, run_command,
      # `-x hspp` in make mode should work.
      # Note: need to specify `-x hspp` before the filename.
