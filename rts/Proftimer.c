@@ -78,7 +78,10 @@ startHeapProfTimer( void )
 
 void
 pauseHeapProfTimer ( void ) {
-    RELAXED_STORE_ALWAYS(&do_heap_prof_ticks, false);
+    if (RtsFlags.ProfFlags.doHeapProfile &&
+        RtsFlags.ProfFlags.heapProfileIntervalTicks > 0) {
+        RELAXED_STORE_ALWAYS(&do_heap_prof_ticks, false);
+    }
 }
 
 
