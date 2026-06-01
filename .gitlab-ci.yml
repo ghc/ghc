@@ -194,8 +194,9 @@ workflow:
 # https://gitlab.com/gitlab-org/gitlab/-/issues/32837). This leads to the
 # hack in this MR where by default all jobs are `interruptible: True`, but
 # for pipelines we definitely want to run, there is a dummy job which
-# happens first, which is `interreuptible: False`. This has the effect of
-# dirtying the whole pipeline and
+# happens first, which is `interruptible: False`. This has the effect of
+# dirtying the whole pipeline and preventing another push to master from
+# cancelling it.
 #
 # For now, this patch solves the immediate problem of making sure nightly
 # jobs are not cancelled.
