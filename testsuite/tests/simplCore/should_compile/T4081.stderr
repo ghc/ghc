@@ -1,0 +1,29 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 40, types: 25, coercions: 0, joins: 0/1}
+
+$wfoo
+  = \ ww ww1 ->
+      letrec {
+        $wblah
+          = \ ww2 ->
+              case ww2 of ds {
+                __DEFAULT ->
+                  case $wblah (-# ds 1#) of ww3 { __DEFAULT -> +# ww ww3 };
+                0# -> 0#
+              }; } in
+      $wblah ww1
+
+foo
+  = \ ds y ->
+      case ds of { T ww ->
+      case ww of { I# ww1 ->
+      case y of { I# ww2 ->
+      case $wfoo ww1 ww2 of ww3 { __DEFAULT -> I# ww3 }
+      }
+      }
+      }
+
+
+

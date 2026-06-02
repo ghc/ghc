@@ -601,4 +601,6 @@ test('T25718a', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress
 test('T25718b', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-all -dno-typeable-binds'])
 test('T25718c', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-all -dno-typeable-binds'])
 test('T19166', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-all -dno-typeable-binds'])
+# #4081: the strict field of T should be unboxed once, outside the loop.
+test('T4081', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-all -dno-typeable-binds'])
 test('T27261', [extra_files(['T27261_aux.hs'])], multimod_compile, ['T27261', '-v0 -O'])
