@@ -963,7 +963,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
               header_ = ppConstrHdr forall_ tyVars context unicode
            in case det of
                 -- Prefix constructor, e.g. 'Just a'
-                PrefixCon args
+                PrefixCon _ args
                   | hasArgDocs -> header_ <+> ppOcc
                   | otherwise ->
                       hsep
@@ -972,9 +972,9 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
                         , hsep (map (ppLParendType unicode . hsConDeclFieldToHsTypeNoMult) args)
                         ]
                 -- Record constructor, e.g. 'Identity { runIdentity :: a }'
-                RecCon _ -> header_ <+> ppOcc
+                RecCon _ _ -> header_ <+> ppOcc
                 -- Infix constructor, e.g. 'a :| [a]'
-                InfixCon arg1 arg2
+                InfixCon _ arg1 arg2
                   | hasArgDocs -> header_ <+> ppOcc
                   | otherwise ->
                       hsep
@@ -1002,11 +1002,11 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
         _ -> empty
       ConDeclH98{con_args = con_args'} -> case con_args' of
         -- H98 record declarations
-        RecCon (L _ fields) -> doRecordFields fields
+        RecCon _ (L _ fields) -> doRecordFields fields
         -- H98 prefix data constructors
-        PrefixCon args | hasArgDocs -> doConstrArgsWithDocs (map hsConDeclFieldToHsTypeNoMult args)
+        PrefixCon _ args | hasArgDocs -> doConstrArgsWithDocs (map hsConDeclFieldToHsTypeNoMult args)
         -- H98 infix data constructor
-        InfixCon arg1 arg2 | hasArgDocs -> doConstrArgsWithDocs (map hsConDeclFieldToHsTypeNoMult [arg1, arg2])
+        InfixCon _ arg1 arg2 | hasArgDocs -> doConstrArgsWithDocs (map hsConDeclFieldToHsTypeNoMult [arg1, arg2])
         _ -> empty
 
     doRecordFields fields =

@@ -607,6 +607,7 @@
                     (Unqual
                      {OccName: Foo}))
                    (PrefixCon
+                    (NoExtField)
                     [])))
                 ,(L
                   (EpAnn
@@ -629,6 +630,7 @@
                     (Unqual
                      {OccName: Foo}))
                    (PrefixCon
+                    (NoExtField)
                     [])))])
                (GRHSs
                 (EpaComments
@@ -1214,6 +1216,7 @@
                     (Unqual
                      {OccName: Foo}))
                    (PrefixCon
+                    (NoExtField)
                     [])))
                 ,(L
                   (EpAnn
@@ -1236,6 +1239,7 @@
                     (Unqual
                      {OccName: Foo}))
                    (PrefixCon
+                    (NoExtField)
                     [])))])
                (GRHSs
                 (EpaComments

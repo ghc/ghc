@@ -430,9 +430,9 @@ conArgDocs (ConDeclGADT{con_g_args = args, con_res_ty = res_ty}) =
 
 h98ConArgDocs :: HsConDeclH98Details GhcRn -> IntMap (HsDoc GhcRn)
 h98ConArgDocs con_args = case con_args of
-  PrefixCon args     -> con_arg_docs 0 $ map cdf_doc args
-  InfixCon arg1 arg2 -> con_arg_docs 0 [ cdf_doc arg1, cdf_doc arg2 ]
-  RecCon _           -> IM.empty
+  PrefixCon _ args     -> con_arg_docs 0 $ map cdf_doc args
+  InfixCon _ arg1 arg2 -> con_arg_docs 0 [ cdf_doc arg1, cdf_doc arg2 ]
+  RecCon _ _           -> IM.empty
 
 gadtConArgDocs :: HsConDeclGADTDetails GhcRn -> HsType GhcRn -> IntMap (HsDoc GhcRn)
 gadtConArgDocs con_args res_ty = case con_args of

@@ -596,7 +596,7 @@ nlConWildPat :: DataCon -> LPat GhcPs
 nlConWildPat con = noLocA $ ConPat
   { pat_con_ext = noAnn
   , pat_con = noLocA $ getRdrName con
-  , pat_args = RecCon $ HsRecFields
+  , pat_args = RecCon noExtField $ HsRecFields
       { rec_ext = noExtField
       , rec_flds = []
       , rec_dotdot = Nothing }

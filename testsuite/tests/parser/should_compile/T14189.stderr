@@ -80,6 +80,7 @@
              []
              (Nothing)
              (PrefixCon
+              (NoExtField)
               [(CDF
                 ((,)
                  ((,,)
@@ -141,6 +142,7 @@
              []
              (Nothing)
              (PrefixCon
+              (NoExtField)
               [])
              (Nothing)))
           ,(L
@@ -165,6 +167,7 @@
              []
              (Nothing)
              (RecCon
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { T14189.hs:6:31-42 })

@@ -44,7 +44,7 @@ import GHC.Hs.Type
 import GHC.Hs.Pat
 import GHC.Hs.ImpExp
 import GHC.Parser.Annotation
-import GHC.Types.Name.Reader (WithUserRdr(..))
+import GHC.Types.Name.Reader (WithUserRdr(..) )
 import GHC.Types.InlinePragma (ActivationGhc)
 import GHC.Utils.Misc (abstractConstr)
 import GHC.Data.BooleanFormula (BooleanFormula(..))
@@ -203,6 +203,11 @@ deriving instance Data (DerivClauseTys GhcTc)
 deriving instance Data (ConDecl GhcPs)
 deriving instance Data (ConDecl GhcRn)
 deriving instance Data (ConDecl GhcTc)
+
+-- HsConDetails instances
+deriving instance (Data arg, Data rec) => Data (HsConDetails GhcPs arg rec)
+deriving instance (Data arg, Data rec) => Data (HsConDetails GhcRn arg rec)
+deriving instance (Data arg, Data rec) => Data (HsConDetails GhcTc arg rec)
 
 -- deriving instance DataIdLR p p => Data (HsConDeclGADTDetails p)
 deriving instance Data (HsConDeclGADTDetails GhcPs)

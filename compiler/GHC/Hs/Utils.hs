@@ -538,8 +538,8 @@ nlConVarPatName con vars = nlConPatName con (map nlVarPat vars)
 nlInfixConPat :: RdrName -> LPat GhcPs -> LPat GhcPs -> LPat GhcPs
 nlInfixConPat con l r = noLocA $ ConPat
   { pat_con = noLocA con
-  , pat_args = InfixCon (parenthesizePat opPrec l)
-                        (parenthesizePat opPrec r)
+  , pat_args = InfixCon noExtField (parenthesizePat opPrec l)
+                                   (parenthesizePat opPrec r)
   , pat_con_ext = noAnn
   }
 
@@ -547,28 +547,28 @@ nlConPat :: RdrName -> [LPat GhcPs] -> LPat GhcPs
 nlConPat con pats = noLocA $ ConPat
   { pat_con_ext = noAnn
   , pat_con = noLocA con
-  , pat_args = PrefixCon (map (parenthesizePat appPrec) pats)
+  , pat_args = PrefixCon noExtField (map (parenthesizePat appPrec) pats)
   }
 
 nlConPatName :: Name -> [LPat GhcRn] -> LPat GhcRn
 nlConPatName con pats = noLocA $ ConPat
   { pat_con_ext = noExtField
   , pat_con = noLocA (noUserRdr con)
-  , pat_args = PrefixCon (map (parenthesizePat appPrec) pats)
+  , pat_args = PrefixCon noExtField (map (parenthesizePat appPrec) pats)
   }
 
 nlNullaryConPat :: RdrName -> LPat GhcPs
 nlNullaryConPat con = noLocA $ ConPat
   { pat_con_ext = noAnn
   , pat_con = noLocA con
-  , pat_args = PrefixCon []
+  , pat_args = PrefixCon noExtField []
   }
 
 nlWildConPat :: DataCon -> LPat GhcPs
 nlWildConPat con = noLocA $ ConPat
   { pat_con_ext = noAnn
   , pat_con = noLocA $ getRdrName con
-  , pat_args = PrefixCon $
+  , pat_args = PrefixCon noExtField $
      replicate (dataConSourceArity con)
                nlWildPat
   }
@@ -1530,7 +1530,7 @@ hsPatSynSelectors (XValBindsLR (HsVBG grps _))
 
 addPatSynSelector :: forall p. UnXRec p => LHsBind p -> [FieldOcc p] -> [FieldOcc p]
 addPatSynSelector bind sels
-  | PatSynBind _ (PSB { psb_args = RecCon as }) <- unXRec @p bind
+  | PatSynBind _ (PSB { psb_args = RecCon _ as }) <- unXRec @p bind
   = map recordPatSynField as ++ sels
   | otherwise = sels
 
@@ -1648,8 +1648,8 @@ hsConDeclsBinders cons = go emptyFieldIndices cons
 
     get_flds_h98 :: FieldIndices p -> HsConDeclH98Details (GhcPass p)
                  -> (Maybe [Located Int], FieldIndices p)
-    get_flds_h98 seen (RecCon flds) = first Just $ get_flds seen flds
-    get_flds_h98 seen (PrefixCon []) = (Just [], seen)
+    get_flds_h98 seen (RecCon _ flds) = first Just $ get_flds seen flds
+    get_flds_h98 seen (PrefixCon _ []) = (Just [], seen)
     get_flds_h98 seen _ = (Nothing, seen)
 
     get_flds_gadt :: FieldIndices p -> HsConDeclGADTDetails (GhcPass p)
@@ -1846,17 +1846,17 @@ lPatImplicits = hs_lpat
     hs_pat _ = []
 
     details :: HsConPatDetails GhcRn -> [(SrcSpan, [ImplicitFieldBinders])]
-    details (PrefixCon ps) = hs_lpats ps
-    details (RecCon (HsRecFields { rec_dotdot = Nothing, rec_flds }))
+    details (PrefixCon _ ps) = hs_lpats ps
+    details (RecCon _ (HsRecFields { rec_dotdot = Nothing, rec_flds }))
       = hs_lpats $ map (hfbRHS . unLoc) rec_flds
-    details (RecCon (HsRecFields { rec_dotdot = Just (L err_loc rec_dotdot), rec_flds }))
+    details (RecCon _ (HsRecFields { rec_dotdot = Just (L err_loc rec_dotdot), rec_flds }))
           = [(l2l err_loc, implicit_field_binders)]
           ++ hs_lpats explicit_pats
 
           where (explicit_pats, implicit_field_binders)
                   = rec_field_expl_impl rec_flds rec_dotdot
 
-    details (InfixCon p1 p2) = hs_lpat p1 ++ hs_lpat p2
+    details (InfixCon _ p1 p2) = hs_lpat p1 ++ hs_lpat p2
 
 lHsRecFieldsImplicits :: [LHsRecField GhcRn (LPat GhcRn)]
                       -> RecFieldsDotDot

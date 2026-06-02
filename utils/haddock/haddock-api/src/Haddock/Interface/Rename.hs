@@ -791,14 +791,14 @@ renameHsConDeclField cdf = do
 renameH98Details
   :: HsConDeclH98Details GhcRn
   -> RnM (HsConDeclH98Details DocNameI)
-renameH98Details (RecCon (L l fields)) = do
+renameH98Details (RecCon x (L l fields)) = do
   fields' <- mapM renameHsConDeclRecFieldField fields
-  return (RecCon (L (locA l) fields'))
-renameH98Details (PrefixCon ps) = PrefixCon <$> mapM renameHsConDeclField ps
-renameH98Details (InfixCon a b) = do
+  return (RecCon x (L (locA l) fields'))
+renameH98Details (PrefixCon x ps) = PrefixCon x <$> mapM renameHsConDeclField ps
+renameH98Details (InfixCon x a b) = do
   a' <- renameHsConDeclField a
   b' <- renameHsConDeclField b
-  return (InfixCon a' b')
+  return (InfixCon x a' b')
 
 renameGADTDetails
   :: HsConDeclGADTDetails GhcRn

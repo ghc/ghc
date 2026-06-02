@@ -811,12 +811,12 @@ zonk_bind (PatSynBind x bind@(PSB { psb_id   = L loc id
 
 zonkPatSynDetails :: HsPatSynDetails GhcTc
                   -> ZonkTcM (HsPatSynDetails GhcTc)
-zonkPatSynDetails (PrefixCon as)
-  = PrefixCon <$> traverse zonkLIdOcc as
-zonkPatSynDetails (InfixCon a1 a2)
-  = InfixCon <$> zonkLIdOcc a1 <*> zonkLIdOcc a2
-zonkPatSynDetails (RecCon flds)
-  = RecCon <$> mapM zonkPatSynField flds
+zonkPatSynDetails (PrefixCon x as)
+  = PrefixCon x <$> traverse zonkLIdOcc as
+zonkPatSynDetails (InfixCon x a1 a2)
+  = InfixCon x <$> zonkLIdOcc a1 <*> zonkLIdOcc a2
+zonkPatSynDetails (RecCon x flds)
+  = RecCon x <$> mapM zonkPatSynField flds
 
 zonkPatSynField :: RecordPatSynField GhcTc -> ZonkTcM (RecordPatSynField GhcTc)
 zonkPatSynField (RecordPatSynField x y) =
@@ -1650,21 +1650,21 @@ zonk_pat pat@(QualLitPat {}) = pprPanic "zonk_pat" (ppr pat)
 ---------------------------
 zonkConStuff :: HsConPatDetails GhcTc
              -> ZonkBndrTcM (HsConPatDetails GhcTc)
-zonkConStuff (PrefixCon pats)
+zonkConStuff (PrefixCon x pats)
   = do  { pats' <- zonkPats pats
-        ; return (PrefixCon pats') }
+        ; return (PrefixCon x pats') }
 
-zonkConStuff (InfixCon p1 p2)
+zonkConStuff (InfixCon x p1 p2)
   = do  { p1' <- zonkPat p1
         ; p2' <- zonkPat p2
-        ; return (InfixCon p1' p2') }
+        ; return (InfixCon x p1' p2') }
 
-zonkConStuff (RecCon (HsRecFields x rpats dd))
+zonkConStuff (RecCon xx (HsRecFields x rpats dd))
   = do  { pats' <- zonkPats (map (hfbRHS . unLoc) rpats)
         ; let rpats' = zipWith (\(L l rp) p' ->
                                   L l (rp { hfbRHS = p' }))
                                rpats pats'
-        ; return (RecCon (HsRecFields x rpats' dd)) }
+        ; return (RecCon xx (HsRecFields x rpats' dd)) }
         -- Field selectors have declared types; hence no zonking
 
 ---------------------------

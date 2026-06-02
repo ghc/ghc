@@ -489,7 +489,7 @@ collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ _ ty <- bndrs]
 -}
 
 -- | Haskell Pattern Synonym Details
-type HsPatSynDetails pass = HsConDetails (LIdP pass) [RecordPatSynField pass]
+type HsPatSynDetails pass = HsConDetails pass (LIdP pass) [RecordPatSynField pass]
 
 -- See Note [Record PatSyn Fields]
 -- | Record Pattern Synonym Field

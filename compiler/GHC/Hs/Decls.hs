@@ -813,9 +813,9 @@ getConNames ConDeclGADT {con_names = names} = toList names
 -- Otherwise, return 'Nothing'.
 getRecConArgs_maybe :: ConDecl GhcRn -> Maybe (LocatedL [LHsConDeclRecField GhcRn])
 getRecConArgs_maybe (ConDeclH98{con_args = args}) = case args of
-  PrefixCon{} -> Nothing
-  RecCon flds -> Just flds
-  InfixCon{}  -> Nothing
+  PrefixCon{}   -> Nothing
+  RecCon _ flds -> Just flds
+  InfixCon{}    -> Nothing
 getRecConArgs_maybe (ConDeclGADT{con_g_args = args}) = case args of
   PrefixConGADT{} -> Nothing
   RecConGADT _ flds -> Just flds
@@ -894,13 +894,13 @@ pprConDecl (ConDeclH98 { con_name = L _ con
   where
     -- In ppr_details: let's not print the multiplicities (they are always 1, by
     -- definition) as they do not appear in an actual declaration.
-    ppr_details (InfixCon t1 t2) = hsep [pprHsConDeclFieldNoMult t1,
-                                         pprInfixOcc con,
-                                         pprHsConDeclFieldNoMult t2]
-    ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc con
-                                    : map pprHsConDeclFieldNoMult tys)
-    ppr_details (RecCon fields)  = pprPrefixOcc con
-                                    <+> pprHsConDeclRecFields (unLoc fields)
+    ppr_details (InfixCon _ t1 t2) = hsep [pprHsConDeclFieldNoMult t1,
+                                           pprInfixOcc con,
+                                           pprHsConDeclFieldNoMult t2]
+    ppr_details (PrefixCon _ tys)  = hsep (pprPrefixOcc con
+                                      : map pprHsConDeclFieldNoMult tys)
+    ppr_details (RecCon _ fields)  = pprPrefixOcc con
+                                      <+> pprHsConDeclRecFields (unLoc fields)
 
 pprConDecl (ConDeclGADT { con_names = cons
                         , con_outer_bndrs = L _ outer_bndrs

@@ -965,9 +965,9 @@ extractPatternSyn nm t tvs cons =
       let args =
             case con of
               ConDeclH98{con_args = con_args'} -> case con_args' of
-                PrefixCon args' -> map cdf_type args'
-                RecCon (L _ fields) -> cdf_type . cdrf_spec . unLoc <$> fields
-                InfixCon arg1 arg2 -> map cdf_type [arg1, arg2]
+                PrefixCon _ args' -> map cdf_type args'
+                RecCon _ (L _ fields) -> cdf_type . cdrf_spec . unLoc <$> fields
+                InfixCon _ arg1 arg2 -> map cdf_type [arg1, arg2]
               ConDeclGADT{con_g_args = con_args'} -> case con_args' of
                 PrefixConGADT _ args' -> map cdf_type args'
                 RecConGADT _ (L _ fields) -> cdf_type . cdrf_spec . unLoc <$> fields

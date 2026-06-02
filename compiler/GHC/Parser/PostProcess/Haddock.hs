@@ -733,28 +733,28 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
           getMixed :: HdkA (LocatedA (ConDecl GhcPs))
           getMixed =
             case con_args of
-              PrefixCon ts -> do
+              PrefixCon x ts -> do
                 con_doc' <- getConDoc (getLocA con_name)
                 ts' <- traverse addHaddock ts
                 pure $ L l_con_decl $
                   ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_modifiers,
                                con_doc = lexLHsDocString <$> con_doc',
-                               con_args = PrefixCon ts' }
-              InfixCon t1 t2 -> do
+                               con_args = PrefixCon x ts' }
+              InfixCon x t1 t2 -> do
                 t1' <- addHaddock t1
                 con_doc' <- getConDoc (getLocA con_name)
                 t2' <- addHaddock t2
                 pure $ L l_con_decl $
                   ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_modifiers,
                                con_doc = lexLHsDocString <$> con_doc',
-                               con_args = InfixCon t1' t2' }
-              RecCon (L l_rec flds) -> do
+                               con_args = InfixCon x t1' t2' }
+              RecCon x (L l_rec flds) -> do
                 con_doc' <- getConDoc (getLocA con_name)
                 flds' <- traverse addHaddock flds
                 pure $ L l_con_decl $
                   ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_modifiers,
                                con_doc = lexLHsDocString <$> con_doc',
-                               con_args = RecCon (L l_rec flds') }
+                               con_args = RecCon x (L l_rec flds') }
         in
           hoistHdkA
             (\m -> do { a <- onlyTrailingOrLeading (locA l_con_decl)

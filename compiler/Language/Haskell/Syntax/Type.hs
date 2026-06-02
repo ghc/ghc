@@ -41,7 +41,7 @@ module Language.Haskell.Syntax.Type (
 
         HsConDeclRecField(..), LHsConDeclRecField,
 
-        HsConDetails(..),
+        HsConDetails(..), XPrefixCon, XRecCon, XInfixCon, XXHsConDetails,
         HsConDeclField(..),
 
         FieldOcc(..), LFieldOcc,
@@ -1124,11 +1124,16 @@ data HsConDeclRecField pass
 -- a separate data type entirely (see 'HsConDeclGADTDetails' in
 -- "GHC.Hs.Decls"). This is because GADT constructors cannot be declared with
 -- infix syntax, unlike the concepts above (#18844).
-data HsConDetails arg rec
-  = PrefixCon [arg]             -- C @t1 @t2 p1 p2 p3
-  | RecCon    rec               -- C { x = p1, y = p2 }
-  | InfixCon  arg arg           -- p1 `C` p2
-  deriving Data
+data HsConDetails p arg rec
+  = PrefixCon !(XPrefixCon p) [arg]    -- C @t1 @t2 p1 p2 p3
+  | RecCon    !(XRecCon p)    rec      -- C { x = p1, y = p2 }
+  | InfixCon  !(XInfixCon p)  arg arg  -- p1 `C` p2
+  | XHsConDetails !(XXHsConDetails p)
+
+type family XPrefixCon      p
+type family XRecCon         p
+type family XInfixCon       p
+type family XXHsConDetails  p
 
 -- | Constructor declaration field specification, see Note [HsConDeclField on pass]
 data HsConDeclField pass

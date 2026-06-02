@@ -2212,10 +2212,10 @@ kcConH98Args :: ConArgKind                       -- Expected kind of the argumen
              -> HsConDeclH98Details GhcRn
              -> TcM ()
 kcConH98Args exp_kind con_args = case con_args of
-  PrefixCon tys     -> kcConArgTys exp_kind tys
-  InfixCon ty1 ty2  -> kcConArgTys exp_kind [ty1, ty2]
-  RecCon (L _ flds) -> kcConArgTys exp_kind $
-                       map (cdrf_spec . unLoc) flds
+  PrefixCon _ tys     -> kcConArgTys exp_kind tys
+  InfixCon _ ty1 ty2  -> kcConArgTys exp_kind [ty1, ty2]
+  RecCon _ (L _ flds) -> kcConArgTys exp_kind $
+                         map (cdrf_spec . unLoc) flds
 
 -- Kind-check the types of arguments to a GADT data constructor.
 kcConGADTArgs :: ConArgKind                       -- Expected kind of the argument(s)
@@ -4380,13 +4380,13 @@ tcConH98Args :: ConArgKind   -- expected kind of arguments
                              -- might have a specific kind
              -> HsConDeclH98Details GhcRn
              -> TcM [(Scaled TcType, HsSrcBang)]
-tcConH98Args exp_kind (PrefixCon btys)
+tcConH98Args exp_kind (PrefixCon _ btys)
   = mapM (tcConArg exp_kind IsNotPrefixConGADT) btys
-tcConH98Args exp_kind (InfixCon bty1 bty2)
+tcConH98Args exp_kind (InfixCon _ bty1 bty2)
   = do { bty1' <- tcConArg exp_kind IsNotPrefixConGADT bty1
        ; bty2' <- tcConArg exp_kind IsNotPrefixConGADT bty2
        ; return [bty1', bty2'] }
-tcConH98Args exp_kind (RecCon fields)
+tcConH98Args exp_kind (RecCon _ fields)
   = tcRecHsConDeclRecFields exp_kind fields
 
 tcConGADTArgs :: ConArgKind   -- expected kind of arguments

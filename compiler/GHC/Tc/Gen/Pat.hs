@@ -545,12 +545,12 @@ pat_to_type (NPat _ (L _ ol) _ _)
   = do { let lit = tyLitFromOverloadedLit (ol_val ol)
        ; pure $ noLocA (HsTyLit noExtField lit) }
 
-pat_to_type (ConPat _ lname (InfixCon left right))
+pat_to_type (ConPat _ lname (InfixCon _ left right))
   = do { lty <- pat_to_type (unLoc left)
        ; rty <- pat_to_type (unLoc right)
        ; let { t = noLocA (mkHsOpTy NotPromoted lty lname rty)}
        ; pure t }
-pat_to_type (ConPat _ lname (PrefixCon args))
+pat_to_type (ConPat _ lname (PrefixCon _ args))
   = do { let { appHead = noLocA (HsTyVar noAnn NotPromoted lname) }
        ; foldM apply_arg appHead args }
       where
@@ -1613,7 +1613,7 @@ tcConValArgs :: ConLike
              -> [Scaled TcSigmaTypeFRR]
              -> Checker (HsConPatDetails GhcRn) (HsConPatDetails GhcTc)
 tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
-  PrefixCon arg_pats -> do
+  PrefixCon x arg_pats -> do
         -- NB: Type arguments already dealt with by splitConTyArgs, tcConTyArgs.
         -- See Note [Type applications in patterns]
         { report_invis_arg_pats arg_pats
@@ -1622,7 +1622,7 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
 
         -- Return only /value/ patterns, all /type/ patterns are discarded.
         -- This is also what tcMatchPats does, and Note [tcMatchPats] explains why.
-        ; return (PrefixCon arg_pats', res) }
+        ; return (PrefixCon x arg_pats', res) }
       where
         -- Report @-patterns as errors. The valid ones have been dealt with
         -- outside tcConValArgs. At this point we are expecting patterns for
@@ -1635,16 +1635,16 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
             addErrTc (TcRnIllegalInvisibleTypePattern tp InvisPatNoForall)
           unless (null bad_ps) failM
 
-  InfixCon p1 p2 -> do
+  InfixCon x p1 p2 -> do
         { let [arg_ty1,arg_ty2] = arg_tys       -- This can't fail after splitConTyArgs
         ; ([p1',p2'], res) <- tcMultiple tcConArg penv [(p1,arg_ty1),(p2,arg_ty2)]
                                                   thing_inside
-        ; return (InfixCon p1' p2', res) }
+        ; return (InfixCon x p1' p2', res) }
 
-  RecCon (HsRecFields x rpats dd) -> do
+  RecCon xx (HsRecFields x rpats dd) -> do
         { check_omitted_fields_multiplicity
         ; (rpats', res) <- tcMultiple tc_field penv rpats thing_inside
-        ; return ((RecCon (HsRecFields x rpats' dd)), res) }
+        ; return ((RecCon xx (HsRecFields x rpats' dd)), res) }
     where
       tc_field :: Checker (LHsRecField GhcRn (LPat GhcRn))
                           (LHsRecField GhcTc (LPat GhcTc))
@@ -1710,10 +1710,10 @@ splitConTyArgs :: ConLike -> HsConPatDetails GhcRn
                       , HsConPatDetails GhcRn )     -- Value arguments
 -- See Note [Type applications in patterns] (W4)
 -- This function is monadic only to emit error messages
-splitConTyArgs con_like (PrefixCon arg_pats) = do
+splitConTyArgs con_like (PrefixCon _ arg_pats) = do
   check_con_pat_arity con_like (count isVisArgLPat arg_pats)
   split_con_ty_args Prefix con_like arg_pats
-splitConTyArgs con_like (InfixCon arg1 arg2) = do
+splitConTyArgs con_like (InfixCon _ arg1 arg2) = do
   -- should not occur: (@a :+ b), (a :+ @b), or (@a :+ @b)
   massert (isVisArgLPat arg1 && isVisArgLPat arg2)
   check_con_pat_arity con_like 2
@@ -1738,8 +1738,8 @@ split_con_ty_args fixity con_like arg_pats = do
           -- See Note [DataCon user type variable binders] in GHC.Core.DataCon
           -- especially INVARIANT(dataConTyVars).
 
-    mk_details Infix [a,b] = InfixCon a b
-    mk_details _     ps    = PrefixCon ps
+    mk_details Infix [a,b] = InfixCon noExtField a b
+    mk_details _     ps    = PrefixCon noExtField ps
       -- InfixCon becomes PrefixCon if there are fewer than 2 value arguments.
       -- Test case: T25127_infix
 

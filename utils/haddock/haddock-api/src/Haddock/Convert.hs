@@ -600,10 +600,10 @@ synifyDataCon use_gadt_syntax dc =
     mk_h98_arg_tys :: Either String (HsConDeclH98Details GhcRn)
     mk_h98_arg_tys = case (use_named_field_syntax, use_infix_syntax) of
       (True, True) -> Left "synifyDataCon: contradiction!"
-      (True, False) -> return $ RecCon (noLocA field_tys)
-      (False, False) -> return $ PrefixCon linear_tys
+      (True, False) -> return $ RecCon noExtField (noLocA field_tys)
+      (False, False) -> return $ PrefixCon noExtField linear_tys
       (False, True) -> case linear_tys of
-        [a, b] -> return $ InfixCon a b
+        [a, b] -> return $ InfixCon noExtField a b
         _ -> Left "synifyDataCon: infix with non-2 args?"
 
     mk_gadt_arg_tys :: HsConDeclGADTDetails GhcRn

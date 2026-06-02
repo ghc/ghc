@@ -30,7 +30,7 @@ import Data.Functor
 import Data.List (maximumBy, (\\))
 import Data.Ord
 import qualified Data.Set as Set
-import GHC hiding (Header)
+import GHC
 import GHC.Data.EnumSet as EnumSet
 import GHC.Data.FastString (unpackFS)
 import GHC.Driver.Session

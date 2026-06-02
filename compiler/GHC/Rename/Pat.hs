@@ -582,7 +582,7 @@ rnPatAndThen _ (QualLitPat x lit) = do
     ConPat
       noExtField
       (noLocA $ noUserRdr trueDataConName)
-      (PrefixCon [])
+      (PrefixCon noExtField [])
 
 rnPatAndThen _ (NPat x (L l lit) mb_neg _eq)
   = do { (lit', mb_neg') <- liftCpsFV $ rnOverLit lit
@@ -707,30 +707,30 @@ rnConPatAndThen :: NameMaker
                 -> HsConPatDetails GhcPs
                 -> CpsRn (Pat GhcRn)
 
-rnConPatAndThen mk con (PrefixCon pats)
+rnConPatAndThen mk con (PrefixCon x pats)
   = do  { con' <- lookupConCps con
         ; pats' <- rnLArgPatsAndThen mk pats
         ; return $ ConPat
             { pat_con_ext = noExtField
             , pat_con = con'
-            , pat_args = PrefixCon pats'
+            , pat_args = PrefixCon x pats'
             }
         }
 
-rnConPatAndThen mk con (InfixCon pat1 pat2)
+rnConPatAndThen mk con (InfixCon _ pat1 pat2)
   = do  { con' <- lookupConCps con
         ; pat1' <- rnLPatAndThen mk pat1
         ; pat2' <- rnLPatAndThen mk pat2
         ; fixity <- liftCps $ lookupFixityRn (getName con')
         ; liftCps $ mkConOpPatRn con' fixity pat1' pat2' }
 
-rnConPatAndThen mk con (RecCon rpats)
+rnConPatAndThen mk con (RecCon x rpats)
   = do  { con' <- lookupConCps con
         ; rpats' <- rnHsRecPatsAndThen mk con' rpats
         ; return $ ConPat
             { pat_con_ext = noExtField
             , pat_con     = con'
-            , pat_args    = RecCon rpats'
+            , pat_args    = RecCon x rpats'
             }
         }
 checkUnusedRecordWildcardCps :: SrcSpan

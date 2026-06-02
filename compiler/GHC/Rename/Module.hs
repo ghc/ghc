@@ -2090,7 +2090,7 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
            }
 
     has_labelled_fields (ConDeclGADT { con_g_args = RecConGADT _ _ }) = True
-    has_labelled_fields (ConDeclH98 { con_args = RecCon flds })
+    has_labelled_fields (ConDeclH98 { con_args = RecCon _ flds })
       = not (null (unLoc flds))
     has_labelled_fields _ = False
 
@@ -2098,8 +2098,8 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
       = any isSrcStrict (con_arg_bangs condecl)
 
     con_arg_bangs (ConDeclGADT { con_g_args = PrefixConGADT _ args }) = map cdf_bang args
-    con_arg_bangs (ConDeclH98 { con_args = PrefixCon args }) = map cdf_bang args
-    con_arg_bangs (ConDeclH98 { con_args = InfixCon arg1 arg2 }) = [cdf_bang arg1, cdf_bang arg2]
+    con_arg_bangs (ConDeclH98 { con_args = PrefixCon _ args }) = map cdf_bang args
+    con_arg_bangs (ConDeclH98 { con_args = InfixCon _ arg1 arg2 }) = [cdf_bang arg1, cdf_bang arg2]
     con_arg_bangs _ = []
 
 {-
@@ -2657,16 +2657,16 @@ rnConDeclH98Details ::
    -> HsDocContext
    -> HsConDeclH98Details GhcPs
    -> RnM (HsConDeclH98Details GhcRn, FreeNames)
-rnConDeclH98Details _ doc (PrefixCon tys)
+rnConDeclH98Details _ doc (PrefixCon x tys)
   = do { (new_tys, fvs) <- mapFvRn (rnHsConDeclField doc) tys
-       ; return (PrefixCon new_tys, fvs) }
-rnConDeclH98Details _ doc (InfixCon ty1 ty2)
+       ; return (PrefixCon x new_tys, fvs) }
+rnConDeclH98Details _ doc (InfixCon x ty1 ty2)
   = do { (new_ty1, fvs1) <- rnHsConDeclField doc ty1
        ; (new_ty2, fvs2) <- rnHsConDeclField doc ty2
-       ; return (InfixCon new_ty1 new_ty2, fvs1 `plusFN` fvs2) }
-rnConDeclH98Details con doc (RecCon flds)
+       ; return (InfixCon x new_ty1 new_ty2, fvs1 `plusFN` fvs2) }
+rnConDeclH98Details con doc (RecCon x flds)
   = do { (new_flds, fvs) <- rnRecHsConDeclRecFields con doc flds
-       ; return (RecCon new_flds, fvs) }
+       ; return (RecCon x new_flds, fvs) }
 
 rnConDeclGADTDetails ::
       Name
@@ -2722,12 +2722,12 @@ extendPatSynEnv dup_fields_ok has_sel val_decls local_fix_env thing = do {
             -> TcM [(ConLikeName, ConInfo)]
     new_ps' bind names
       | (L bind_loc (PatSynBind _ (PSB { psb_id = L _ n
-                                       , psb_args = RecCon as }))) <- bind
+                                       , psb_args = RecCon _ as }))) <- bind
       = do
           bnd_name <- newTopSrcBinder (L (l2l bind_loc) n)
           let field_occs = map ((\ f -> L (noAnnSrcSpan $ getLocA (foLabel f)) f) . recordPatSynField) as
           flds <- mapM (newRecordFieldLabel dup_fields_ok has_sel [bnd_name]) field_occs
-          let con_info = mkConInfo ConIsPatSyn (conDetailsVisArity (RecCon as)) flds
+          let con_info = mkConInfo ConIsPatSyn (conDetailsVisArity (RecCon noExtField as)) flds
           return ((PatSynName bnd_name, con_info) : names)
       | L bind_loc (PatSynBind _ (PSB { psb_id = L _ n, psb_args = as })) <- bind
       = do
@@ -2739,9 +2739,9 @@ extendPatSynEnv dup_fields_ok has_sel val_decls local_fix_env thing = do {
 
 conDetailsVisArity :: HsPatSynDetails (GhcPass p) -> VisArity
 conDetailsVisArity = \case
-  PrefixCon args -> length args
-  RecCon flds -> length flds
-  InfixCon _ _ -> 2
+  PrefixCon _ args -> length args
+  RecCon _ flds -> length flds
+  InfixCon _ _ _ -> 2
 
 {-
 *********************************************************

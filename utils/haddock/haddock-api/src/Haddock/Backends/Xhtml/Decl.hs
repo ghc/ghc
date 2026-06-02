@@ -1355,13 +1355,13 @@ ppShortConstrParts summary dataInst con unicode qual =
             header_ = ppConstrHdr forall_ tyVars context unicode qual
          in case det of
               -- Prefix constructor, e.g. 'Just a'
-              PrefixCon args ->
+              PrefixCon _ args ->
                 ( header_ <+> hsep (ppOcc : map (ppLParendType unicode qual HideEmptyContexts . hsConDeclFieldToHsTypeNoMult) args)
                 , noHtml
                 , noHtml
                 )
               -- Record constructor, e.g. 'Identity { runIdentity :: a }'
-              RecCon (L _ fields) ->
+              RecCon _ (L _ fields) ->
                 ( header_ +++ ppOcc <+> char '{'
                 , shortSubDecls
                     dataInst
@@ -1371,7 +1371,7 @@ ppShortConstrParts summary dataInst con unicode qual =
                 , char '}'
                 )
               -- Infix constructor, e.g. 'a :| [a]'
-              InfixCon arg1 arg2 ->
+              InfixCon _ arg1 arg2 ->
                 ( header_
                     <+> hsep
                       [ ppLParendType unicode qual HideEmptyContexts (hsConDeclFieldToHsTypeNoMult arg1)
@@ -1432,7 +1432,7 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con) =
               header_ = ppConstrHdr forall_ tyVars context unicode qual
            in case det of
                 -- Prefix constructor, e.g. 'Just a'
-                PrefixCon args
+                PrefixCon _ args
                   | hasArgDocs -> header_ <+> ppOcc <+> fixity
                   | otherwise ->
                       hsep
@@ -1441,9 +1441,9 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con) =
                         , fixity
                         ]
                 -- Record constructor, e.g. 'Identity { runIdentity :: a }'
-                RecCon _ -> header_ <+> ppOcc <+> fixity
+                RecCon _ _ -> header_ <+> ppOcc <+> fixity
                 -- Infix constructor, e.g. 'a :| [a]'
-                InfixCon arg1 arg2
+                InfixCon _ arg1 arg2
                   | hasArgDocs -> header_ <+> ppOcc <+> fixity
                   | otherwise ->
                       hsep
@@ -1473,11 +1473,11 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con) =
         _ -> []
       ConDeclH98{con_args = con_args'} -> case con_args' of
         -- H98 record declarations
-        RecCon (L _ fields) -> [doRecordFields fields]
+        RecCon _ (L _ fields) -> [doRecordFields fields]
         -- H98 prefix data constructors
-        PrefixCon args | hasArgDocs -> [doConstrArgsWithDocs args]
-        -- H98 infix data constructor
-        InfixCon arg1 arg2 | hasArgDocs -> [doConstrArgsWithDocs [arg1, arg2]]
+        PrefixCon _ args | hasArgDocs -> [doConstrArgsWithDocs args]
+        -- H98 inf ix data constructor
+        InfixCon _ arg1 arg2 | hasArgDocs -> [doConstrArgsWithDocs [arg1, arg2]]
         _ -> []
 
     doRecordFields fields =
