@@ -212,7 +212,7 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
     -- Note [Record patterns]
     select_arg_vars :: [Id] -> NonEmpty (ConArgPats, EquationInfo) -> [Id]
     select_arg_vars arg_vars ((arg_pats, _) :| _)
-      | RecCon flds <- arg_pats
+      | RecCon _ flds <- arg_pats
       , let rpats = rec_flds flds
       , not (null rpats)     -- Treated specially; cf conArgPats
       = assertPpr (fields1 `equalLength` arg_vars)
@@ -229,10 +229,10 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
 compatible_pats :: (ConArgPats,a) -> (ConArgPats,a) -> Bool
 -- Two constructors have compatible argument patterns if the number
 -- and order of sub-matches is the same in both cases
-compatible_pats (RecCon flds1, _) (RecCon flds2, _) = same_fields flds1 flds2
-compatible_pats (RecCon flds1, _) _                 = null (rec_flds flds1)
-compatible_pats _                 (RecCon flds2, _) = null (rec_flds flds2)
-compatible_pats _                 _                 = True -- Prefix or infix con
+compatible_pats (RecCon _ flds1, _) (RecCon _ flds2, _) = same_fields flds1 flds2
+compatible_pats (RecCon _ flds1, _) _                   = null (rec_flds flds1)
+compatible_pats _                   (RecCon _ flds2, _) = null (rec_flds flds2)
+compatible_pats _                   _                   = True -- Prefix or infix con
 
 same_fields :: HsRecFields GhcTc (LPat GhcTc) -> HsRecFields GhcTc (LPat GhcTc)
             -> Bool
@@ -246,9 +246,9 @@ same_fields flds1 flds2
 selectConMatchVars :: [Scaled Type] -> ConArgPats -> DsM [Id]
 selectConMatchVars arg_tys con
   = case con of
-      RecCon {}      -> newSysLocalsDs arg_tys
-      PrefixCon ps   -> selectMatchVars (zipMults arg_tys ps)
-      InfixCon p1 p2 -> selectMatchVars (zipMults arg_tys [p1, p2])
+      RecCon {}        -> newSysLocalsDs arg_tys
+      PrefixCon _ ps   -> selectMatchVars (zipMults arg_tys ps)
+      InfixCon _ p1 p2 -> selectMatchVars (zipMults arg_tys [p1, p2])
   where
     zipMults = zipWithEqual (\a b -> (scaledMult a, unLoc b))
 
@@ -257,9 +257,9 @@ conArgPats :: [Scaled Type]-- Instantiated argument types
                           -- are probably never looked at anyway
            -> ConArgPats
            -> [LPat GhcTc]
-conArgPats _arg_tys (PrefixCon ps) = ps
-conArgPats _arg_tys (InfixCon p1 p2) = [p1, p2]
-conArgPats  arg_tys (RecCon (HsRecFields { rec_flds = rpats }))
+conArgPats _arg_tys (PrefixCon _ ps) = ps
+conArgPats _arg_tys (InfixCon _ p1 p2) = [p1, p2]
+conArgPats  arg_tys (RecCon _ (HsRecFields { rec_flds = rpats }))
   | null rpats = map (noLocA . WildPat . scaledThing) arg_tys
         -- Important special case for C {}, which can be used for a
         -- datacon that isn't declared to have fields at all

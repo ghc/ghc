@@ -1401,14 +1401,14 @@ instance (CollectFldBinders e) => CollectFldBinders (GenLocated l e) where
   collectFldBinds = collectFldBinds . unLoc
 instance CollectFldBinders (Pat GhcTc) where
   collectFldBinds = go emptyDVarSet where
-    go sels ConPat{ pat_args = RecCon HsRecFields{ rec_flds } } =
+    go sels ConPat{ pat_args = RecCon _ HsRecFields{ rec_flds } } =
       plusVarEnvList (map fld_binds rec_flds)
         where fld_binds (L _ HsFieldBind{ hfbLHS = L _ FieldOcc{ foLabel = L _ sel }
                                         , hfbRHS = L _ rhs })
                 = go (extendDVarSet sels sel) rhs
-    go sels ConPat{ pat_args = PrefixCon ps } =
+    go sels ConPat{ pat_args = PrefixCon _ ps } =
       plusVarEnvList (map (go sels . unLoc) ps)
-    go sels ConPat{ pat_args = InfixCon (L _ p1) (L _ p2) } =
+    go sels ConPat{ pat_args = InfixCon _ (L _ p1) (L _ p2) } =
       go sels p1 `plusVarEnv` go sels p2
     go sels (VarPat _ (L _ var)) | isEmptyDVarSet sels = emptyVarEnv
                                  | otherwise = unitVarEnv var sels

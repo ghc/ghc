@@ -741,6 +741,11 @@ type instance XArgPar (GhcPass _) = SrcSpan
 
 type instance XXArg (GhcPass _) = DataConCantHappen
 
+type instance XPrefixCon      (GhcPass p) = NoExtField
+type instance XInfixCon       (GhcPass p) = NoExtField
+type instance XRecCon         (GhcPass p) = NoExtField
+type instance XXHsConDetails  (GhcPass p) = DataConCantHappen
+
 -- | Compute the 'SrcSpan' associated with an 'LHsTypeArg'.
 lhsTypeArgSrcSpan :: LHsTypeArg GhcPs -> SrcSpan
 lhsTypeArgSrcSpan arg = case arg of
@@ -1295,10 +1300,10 @@ instance OutputableBndr HsIPName where
     pprPrefixOcc n = ppr n
 
 instance (Outputable arg, Outputable rec)
-         => Outputable (HsConDetails arg rec) where
-  ppr (PrefixCon args) = text "PrefixCon:" <+> ppr args
-  ppr (RecCon rec)     = text "RecCon:" <+> ppr rec
-  ppr (InfixCon l r)   = text "InfixCon:" <+> ppr [l, r]
+         => Outputable (HsConDetails (GhcPass p) arg rec) where
+  ppr (PrefixCon _ args) = text "PrefixCon:" <+> ppr args
+  ppr (RecCon _ rec)     = text "RecCon:" <+> ppr rec
+  ppr (InfixCon _ l r)   = text "InfixCon:" <+> ppr [l, r]
 
 pprHsConDeclFieldWith :: (OutputableBndrId p)
                       => (HsModifiedFunArr (GhcPass p) -> SDoc -> SDoc)

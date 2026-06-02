@@ -944,9 +944,15 @@ type instance XXCType DocNameI = DataConCantHappen
 type instance XHeader  DocNameI = NoExtField
 type instance XXHeader DocNameI = DataConCantHappen
 
+
 type instance XConDeclGADT DocNameI = NoExtField
 type instance XConDeclH98 DocNameI = NoExtField
 type instance XXConDecl DocNameI = DataConCantHappen
+
+type instance XPrefixCon DocNameI = NoExtField
+type instance XRecCon DocNameI = NoExtField
+type instance XInfixCon DocNameI = NoExtField
+type instance XXHsConDetails DocNameI = DataConCantHappen
 
 type instance XPrefixConGADT DocNameI = NoExtField
 type instance XRecConGADT DocNameI = NoExtField

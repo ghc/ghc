@@ -161,6 +161,7 @@
              []
              (Nothing)
              (PrefixCon
+              (NoExtField)
               [(CDF
                 ((,)
                  ((,,)
@@ -223,6 +224,7 @@
              []
              (Nothing)
              (PrefixCon
+              (NoExtField)
               [(CDF
                 ((,)
                  ((,,)

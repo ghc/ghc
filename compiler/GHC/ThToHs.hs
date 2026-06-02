@@ -469,13 +469,13 @@ cvtDec (TH.PatSynD nm args dir pat)
        ; returnJustLA $ Hs.ValD noExtField $ PatSynBind noExtField $
            PSB noAnn nm' args' pat' dir' }
   where
-    cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixCon <$> mapM vNameN args
-    cvtArgs (TH.InfixPatSyn a1 a2) = Hs.InfixCon <$> vNameN a1 <*> vNameN a2
+    cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixCon noExtField <$> mapM vNameN args
+    cvtArgs (TH.InfixPatSyn a1 a2) = Hs.InfixCon noExtField <$> vNameN a1 <*> vNameN a2
     cvtArgs (TH.RecordPatSyn sels)
       = do { let mk_fld = fldNameN (nameBase nm)
            ; sels' <- mapM (fmap (\ (L li i) -> FieldOcc noExtField (L li i)) . mk_fld) sels
            ; vars' <- mapM (vNameN . mkNameS . nameBase) sels
-           ; return $ Hs.RecCon $ zipWith RecordPatSynField sels' vars' }
+           ; return $ Hs.RecCon noExtField $ zipWith RecordPatSynField sels' vars' }
 
     -- cvtDir :: LocatedN RdrName -> (PatSynDir -> CvtM (HsPatSynDir RdrName))
     cvtDir _ Unidir          = return Unidirectional
@@ -707,12 +707,12 @@ cvtConstr :: TH.Name -- ^ name of first constructor of parent type
 cvtConstr _ do_con_name (NormalC c strtys)
   = do  { c'   <- do_con_name c
         ; tys' <- mapM cvt_arg strtys
-        ; returnLA $ mkConDeclH98 noAnn [] c' Nothing Nothing (PrefixCon tys') }
+        ; returnLA $ mkConDeclH98 noAnn [] c' Nothing Nothing (PrefixCon noExtField tys') }
 
 cvtConstr parent_con do_con_name (RecC c varstrtys)
   = do  { c'    <- do_con_name c
         ; args' <- mapM (cvt_id_arg parent_con) varstrtys
-        ; con_decl <- wrapParLA (mkConDeclH98 noAnn [] c' Nothing Nothing . RecCon) args'
+        ; con_decl <- wrapParLA (mkConDeclH98 noAnn [] c' Nothing Nothing . RecCon noExtField) args'
         ; returnLA con_decl }
 
 cvtConstr _ do_con_name (InfixC st1 c st2)
@@ -720,7 +720,7 @@ cvtConstr _ do_con_name (InfixC st1 c st2)
         ; st1' <- cvt_arg st1
         ; st2' <- cvt_arg st2
         ; returnLA $ mkConDeclH98 noAnn [] c' Nothing Nothing
-                       (InfixCon st1' st2') }
+                       (InfixCon noExtField st1' st2') }
 
 cvtConstr parent_con do_con_name (ForallC tvs ctxt con)
   = do  { tvs'      <- cvtTvs tvs
@@ -1520,7 +1520,7 @@ cvtp (ConP s ts ps)    = do { s' <- dNameN s
                             ; return $ ConPat
                                 { pat_con_ext = noAnn
                                 , pat_con = s'
-                                , pat_args = PrefixCon pps
+                                , pat_args = PrefixCon noExtField pps
                                 }
                             }
 cvtp (InfixP p1 s p2)  = do { s' <- dNameN s; p1' <- cvtPat p1; p2' <- cvtPat p2
@@ -1528,7 +1528,7 @@ cvtp (InfixP p1 s p2)  = do { s' <- dNameN s; p1' <- cvtPat p1; p2' <- cvtPat p2
                               ConPat
                                 { pat_con_ext = noAnn
                                 , pat_con = s'
-                                , pat_args = InfixCon
+                                , pat_args = InfixCon noExtField
                                     (parenthesizePat opPrec p1')
                                     (parenthesizePat opPrec p2')
                                 }
@@ -1548,7 +1548,7 @@ cvtp (RecP c fs)       = do { c' <- cNameN c; fs' <- mapM cvtPatFld fs
                             ; return $ ConPat
                                 { pat_con_ext = noAnn
                                 , pat_con = c'
-                                , pat_args = Hs.RecCon $ HsRecFields noExtField fs' Nothing
+                                , pat_args = Hs.RecCon noExtField $ HsRecFields noExtField fs' Nothing
                                 }
                             }
 cvtp (ListP ps)        = do { ps' <- cvtPats ps
@@ -1594,7 +1594,7 @@ cvtOpAppP x op y
        ; return $ ConPat
           { pat_con_ext = noAnn
           , pat_con = op'
-          , pat_args = InfixCon x y'
+          , pat_args = InfixCon noExtField x y'
           }
        }
 

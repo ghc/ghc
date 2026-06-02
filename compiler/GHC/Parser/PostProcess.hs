@@ -738,9 +738,9 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
            -- conAnn should only be AnnOpenP, AnnCloseP, so the rest should be empty
            ; let ann_fun = mk_ann_funrhs [] []
            ; match <- case details of
-               PrefixCon pats -> return $ Match { m_ext = noExtField
-                                                , m_ctxt = ctxt, m_pats = L l pats
-                                                , m_grhss = rhs }
+               PrefixCon _ pats -> return $ Match { m_ext = noExtField
+                                                  , m_ctxt = ctxt, m_pats = L l pats
+                                                  , m_grhss = rhs }
                    where
                      l = listLocation pats
                      ctxt = FunRhs { mc_fun = ln
@@ -748,10 +748,10 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
                                    , mc_strictness = NoSrcStrict
                                    , mc_an = ann_fun }
 
-               InfixCon p1 p2 -> return $ Match { m_ext = noExtField
-                                                , m_ctxt = ctxt
-                                                , m_pats = L l [p1, p2]
-                                                , m_grhss = rhs }
+               InfixCon _ p1 p2 -> return $ Match { m_ext = noExtField
+                                                  , m_ctxt = ctxt
+                                                  , m_pats = L l [p1, p2]
+                                                  , m_grhss = rhs }
                    where
                      l = listLocation [p1, p2]
                      ctxt = FunRhs { mc_fun = ln
@@ -1368,7 +1368,7 @@ checkPat loc cs (L l e@(PatBuilderVar (L ln c))) args
   = return (L loc $ ConPat
       { pat_con_ext = noAnn -- AZ: where should this come from?
       , pat_con = L ln c
-      , pat_args = PrefixCon args
+      , pat_args = PrefixCon noExtField args
       }, comments l Semi.<> cs)
   | (not (null args) && patIsRec c) = do
       ctx <- askParseContext
@@ -1426,7 +1426,7 @@ checkAPat loc e0 = do
          return $ ConPat
            { pat_con_ext = noAnn
            , pat_con = L cl c
-           , pat_args = InfixCon l r
+           , pat_args = InfixCon noExtField l r
            }
 
    PatBuilderPar lpar e rpar -> do
@@ -2410,7 +2410,7 @@ mkPatRec (unLoc -> PatBuilderVar c) (HsRecFields x fs dd) anns
        return $ PatBuilderPat $ ConPat
          { pat_con_ext = anns
          , pat_con = c
-         , pat_args = RecCon (HsRecFields x fs dd)
+         , pat_args = RecCon noExtField (HsRecFields x fs dd)
          }
 mkPatRec p _ _ =
   addFatalError $ mkPlainErrorMsgEnvelope (getLocA p) $
@@ -2457,15 +2457,15 @@ dataConBuilderDetails :: LocatedA DataConBuilder -> HsConDeclH98Details GhcPs
 --   data T = MkT { ... }
 dataConBuilderDetails (L _ (PrefixDataConBuilder flds _))
   | [L (EpAnn anc _ cs) (XHsType (HsRecTy an fields))] <- toList flds
-  = RecCon (L (EpAnn anc an cs) fields)
+  = RecCon noExtField (L (EpAnn anc an cs) fields)
 
 -- Normal prefix constructor, e.g.  data T = MkT A B C
 dataConBuilderDetails (L _ (PrefixDataConBuilder flds _))
-  = PrefixCon (map hsPlainTypeField (toList flds))
+  = PrefixCon noExtField (map hsPlainTypeField (toList flds))
 
 -- Infix constructor, e.g. data T = Int :! Bool
 dataConBuilderDetails (L (EpAnn _ _ csl) (InfixDataConBuilder (L (EpAnn anc ann csll) lhs) _ rhs))
-  = InfixCon (hsPlainTypeField (L (EpAnn anc ann (csl Semi.<> csll)) lhs)) (hsPlainTypeField rhs)
+  = InfixCon noExtField (hsPlainTypeField (L (EpAnn anc ann (csl Semi.<> csll)) lhs)) (hsPlainTypeField rhs)
 
 
 instance DisambTD DataConBuilder where
@@ -2540,7 +2540,7 @@ checkNotPromotedDataCon loc IsPromoted (L _ name) =
 
 mkUnboxedSumCon :: LHsType GhcPs -> ConTag -> Arity -> (LocatedN RdrName, HsConDeclH98Details GhcPs)
 mkUnboxedSumCon t tag arity =
-  (noLocA (getRdrName (sumDataCon tag arity)), PrefixCon [hsPlainTypeField t])
+  (noLocA (getRdrName (sumDataCon tag arity)), PrefixCon noExtField [hsPlainTypeField t])
 
 {- Note [Ambiguous syntactic categories]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

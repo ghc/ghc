@@ -293,10 +293,10 @@ ppCtor sDocContext dat subdocs con@ConDeclH98{con_args = con_args'} =
   -- AZ:TODO get rid of the concatMap
   concatMap (lookupCon sDocContext subdocs) [con_name con] ++ f con_args'
   where
-    f (PrefixCon args) = [typeSig name $ (map cdf_type args) ++ [resType]]
-    f (InfixCon a1 a2) = f $ PrefixCon [a1, a2]
-    f (RecCon (L _ recs)) =
-      f (PrefixCon $ map (cdrf_spec . unLoc) recs)
+    f (PrefixCon _ args) = [typeSig name $ (map cdf_type args) ++ [resType]]
+    f (InfixCon x a1 a2) = f $ PrefixCon x [a1, a2]
+    f (RecCon _ (L _ recs)) =
+      f (PrefixCon noExtField $ map (cdrf_spec . unLoc) recs)
         ++ concat
           [ (concatMap (lookupCon sDocContext subdocs . noLocA . unLoc . foLabel . unLoc) (cdrf_names r))
             ++ [out sDocContext (map (foExt . unLoc) $ cdrf_names r) `typeSig` [resType, cdf_type $ cdrf_spec r]]

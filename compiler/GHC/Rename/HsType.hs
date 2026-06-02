@@ -1599,7 +1599,7 @@ mkConOpPatRn :: LocatedN (WithUserRdr Name)
              -> Fixity -> LPat GhcRn -> LPat GhcRn
              -> RnM (Pat GhcRn)
 
-mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p1a p1b))) p2
+mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon x p1a p1b))) p2
   = do  { fix1 <- lookupFixityRn (getName op1)
         ; let (nofix_error, associate_right) = compareFixity fix1 fix2
 
@@ -1609,7 +1609,7 @@ mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p1a p1b))) p2
                 ; return $ ConPat
                     { pat_con_ext = noExtField
                     , pat_con  = op2
-                    , pat_args = InfixCon p1 p2
+                    , pat_args = InfixCon x p1 p2
                     }
                 }
 
@@ -1618,14 +1618,14 @@ mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p1a p1b))) p2
                 ; return $ ConPat
                     { pat_con_ext = noExtField
                     , pat_con = op1
-                    , pat_args = InfixCon p1a (L loc new_p)
+                    , pat_args = InfixCon x p1a (L loc new_p)
                     }
                 }
                 -- XXX loc right?
           else return $ ConPat
                  { pat_con_ext = noExtField
                  , pat_con = op2
-                 , pat_args = InfixCon p1 p2
+                 , pat_args = InfixCon x p1 p2
                  }
         }
 
@@ -1634,12 +1634,12 @@ mkConOpPatRn op _ p1 p2                         -- Default case, no rearrangemen
     return $ ConPat
       { pat_con_ext = noExtField
       , pat_con = op
-      , pat_args = InfixCon p1 p2
+      , pat_args = InfixCon noExtField p1 p2
       }
 
 not_op_pat :: Pat GhcRn -> Bool
-not_op_pat (ConPat NoExtField _ (InfixCon _ _)) = False
-not_op_pat _                                    = True
+not_op_pat (ConPat NoExtField _ (InfixCon _ _ _)) = False
+not_op_pat _                                      = True
 
 --------------------------------------
 checkPrecMatch :: Name -> MatchGroup GhcRn body -> RnM ()
@@ -1667,7 +1667,7 @@ checkPrecMatch op (MG { mg_alts = (L _ ms) })
         -- second eqn.
 
 checkPrec :: Name -> Pat GhcRn -> Bool -> IOEnv (Env TcGblEnv TcLclEnv) ()
-checkPrec op (ConPat NoExtField op1 (InfixCon _ _)) right = do
+checkPrec op (ConPat NoExtField op1 (InfixCon _ _ _)) right = do
     op_fix@(Fixity op_prec  op_dir) <- lookupFixityRn op
     op1_fix@(Fixity op1_prec op1_dir) <- lookupFixityRn (getName op1)
     let

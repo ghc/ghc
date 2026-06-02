@@ -2073,9 +2073,9 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
     -- their pattern-only bound right hand sides have different names,
     -- we want to treat them the same in TH. This is the reason why we
     -- need an adjusted mkGenArgSyms in the `RecCon` case below.
-    mkGenArgSyms (PrefixCon args)     = mkGenSyms (map unLoc args)
-    mkGenArgSyms (InfixCon arg1 arg2) = mkGenSyms [unLoc arg1, unLoc arg2]
-    mkGenArgSyms (RecCon fields)
+    mkGenArgSyms (PrefixCon _ args)     = mkGenSyms (map unLoc args)
+    mkGenArgSyms (InfixCon _ arg1 arg2) = mkGenSyms [unLoc arg1, unLoc arg2]
+    mkGenArgSyms (RecCon _ fields)
       = do { let pats = map (unLoc . recordPatSynPatVar) fields
                  sels = map (unLoc . foLabel . recordPatSynField) fields
            ; ss <- mkGenSyms sels
@@ -2087,7 +2087,7 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
 
     wrapGenArgSyms :: HsPatSynDetails GhcRn
                    -> [GenSymBind] -> Core (M TH.Dec) -> MetaM (Core (M TH.Dec))
-    wrapGenArgSyms (RecCon _) _  dec = return dec
+    wrapGenArgSyms (RecCon _ _) _  dec = return dec
     wrapGenArgSyms _          ss dec = wrapGenSyms ss dec
 
 rep_bind (L _ (VarBind { var_ext = x })) = dataConCantHappen x
@@ -2101,14 +2101,14 @@ repPatSynD (MkC syn) (MkC args) (MkC dir) (MkC pat)
   = rep2 patSynDName [syn, args, dir, pat]
 
 repPatSynArgs :: HsPatSynDetails GhcRn -> MetaM (Core (M TH.PatSynArgs))
-repPatSynArgs (PrefixCon args)
+repPatSynArgs (PrefixCon _ args)
   = do { args' <- repList nameTyConName lookupLOcc args
        ; repPrefixPatSynArgs args' }
-repPatSynArgs (InfixCon arg1 arg2)
+repPatSynArgs (InfixCon _ arg1 arg2)
   = do { arg1' <- lookupLOcc arg1
        ; arg2' <- lookupLOcc arg2
        ; repInfixPatSynArgs arg1' arg2' }
-repPatSynArgs (RecCon fields)
+repPatSynArgs (RecCon _ fields)
   = do { sels' <- repList nameTyConName (lookupOcc . unLoc . foLabel) sels
        ; repRecordPatSynArgs sels' }
   where sels = map recordPatSynField fields
@@ -2206,14 +2206,14 @@ repP (SumPat _ p alt arity) = do { p1 <- repLP p
 repP (ConPat NoExtField dc details)
  = do { con_str <- lookupWithUserRdrLOcc dc
       ; case details of
-         PrefixCon ps -> do { ts' <- repListM typeTyConName (repTy . unLoc . hstp_body) (takeHsConPatTyArgs ps)
-                            ; ps' <- repLPs (dropHsConPatTyArgs ps)
-                            ; repPcon con_str ts' ps' }
-         RecCon rec   -> do { fps <- repListM fieldPatTyConName rep_fld (rec_flds rec)
-                            ; repPrec con_str fps }
-         InfixCon p1 p2 -> do { p1' <- repLP p1;
-                                p2' <- repLP p2;
-                                repPinfix p1' con_str p2' }
+         PrefixCon _ ps -> do { ts' <- repListM typeTyConName (repTy . unLoc . hstp_body) (takeHsConPatTyArgs ps)
+                              ; ps' <- repLPs (dropHsConPatTyArgs ps)
+                              ; repPcon con_str ts' ps' }
+         RecCon _ rec   -> do { fps <- repListM fieldPatTyConName rep_fld (rec_flds rec)
+                              ; repPrec con_str fps }
+         InfixCon _ p1 p2 -> do { p1' <- repLP p1;
+                                  p2' <- repLP p2;
+                                  repPinfix p1' con_str p2' }
    }
  where
    rep_fld :: LHsRecField GhcRn (LPat GhcRn) -> MetaM (Core (M (TH.Name, TH.Pat)))
@@ -2885,15 +2885,15 @@ repH98DataCon :: LocatedN Name
 repH98DataCon con details
     = do con' <- lookupLOcc con -- See Note [Binders and occurrences]
          case details of
-           PrefixCon ps -> do
+           PrefixCon _ ps -> do
              arg_tys <- repPrefixConArgs IsNotPrefixConGADT ps
              rep2 normalCName [unC con', unC arg_tys]
-           InfixCon st1 st2 -> do
+           InfixCon _ st1 st2 -> do
              verifyLinearFields IsNotPrefixConGADT [st1, st2]
              arg1 <- repConDeclField st1
              arg2 <- repConDeclField st2
              rep2 infixCName [unC arg1, unC con', unC arg2]
-           RecCon ips -> do
+           RecCon _ ips -> do
              arg_vtys <- repRecConArgs ips
              rep2 recCName [unC con', unC arg_vtys]
 

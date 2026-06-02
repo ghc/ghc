@@ -275,12 +275,13 @@ isVisArgLPat :: forall p. (UnXRec p) => LPat p -> Bool
 isVisArgLPat = isVisArgPat . unXRec @p
 
 -- | Haskell Constructor Pattern Details
-type HsConPatDetails p = HsConDetails (LPat p) (HsRecFields p (LPat p))
+type HsConPatDetails p = HsConDetails p (LPat p) (HsRecFields p (LPat p))
 
 hsConPatArgs :: forall p . (UnXRec p) => HsConPatDetails p -> [LPat p]
-hsConPatArgs (PrefixCon ps)   = ps
-hsConPatArgs (RecCon fs)      = Data.List.map (hfbRHS . unXRec @p) (rec_flds fs)
-hsConPatArgs (InfixCon p1 p2) = [p1,p2]
+hsConPatArgs (PrefixCon _ ps)   = ps
+hsConPatArgs (RecCon _ fs)      = Data.List.map (hfbRHS . unXRec @p) (rec_flds fs)
+hsConPatArgs (InfixCon _ p1 p2) = [p1,p2]
+hsConPatArgs (XHsConDetails _) = []
 
 takeHsConPatTyArgs :: forall p. (UnXRec p) => [LPat p] -> [HsTyPat (NoGhcTc p)]
 takeHsConPatTyArgs (p : ps)

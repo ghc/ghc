@@ -369,14 +369,14 @@ restrictCons names decls = [L p d | L p (Just d) <- fmap keep <$> decls]
           case d of
             ConDeclH98{con_args = con_args'} -> case con_args' of
               PrefixCon{} -> Just d
-              RecCon fields
+              RecCon _ fields
                 | all field_avail (unLoc fields) -> Just d
-                | otherwise -> Just (d{con_args = PrefixCon (field_types $ unLoc fields)})
+                | otherwise -> Just (d{con_args = PrefixCon noExtField (field_types $ unLoc fields)})
               -- if we have *all* the field names available, then
               -- keep the record declaration.  Otherwise degrade to
               -- a constructor declaration.  This isn't quite right, but
               -- it's the best we can do.
-              InfixCon _ _ -> Just d
+              InfixCon _ _ _ -> Just d
             ConDeclGADT{con_g_args = con_args'} -> case con_args' of
               PrefixConGADT{} -> Just d
               RecConGADT _ fields

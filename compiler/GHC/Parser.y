@@ -1777,9 +1777,9 @@ pattern_synonym_decl :: { LHsDecl GhcPs }
                    }}
 
 pattern_synonym_lhs :: { (LocatedN RdrName, HsPatSynDetails GhcPs, (Maybe (EpToken "{"), Maybe (EpToken "}"))) }
-        : con vars0 { ($1, PrefixCon $2, noAnn) }
-        | varid conop varid { ($2, InfixCon $1 $3, noAnn) }
-        | con '{' cvars1 '}' { ($1, RecCon $3, (Just (epTok $2), Just (epTok $4))) }
+        : con vars0 { ($1, PrefixCon noExtField $2, noAnn) }
+        | varid conop varid { ($2, InfixCon noExtField $1 $3, noAnn) }
+        | con '{' cvars1 '}' { ($1, RecCon noExtField $3, (Just (epTok $2), Just (epTok $4))) }
 
 vars0 :: { [LocatedN RdrName] }
         : {- empty -}                 { [] }

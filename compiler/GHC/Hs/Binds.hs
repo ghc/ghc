@@ -613,19 +613,19 @@ instance (OutputableBndrId l, OutputableBndrId r)
       ppr_simple syntax = syntax <+> pprLPat pat
 
       ppr_details = case details of
-          InfixCon v1 v2 -> hsep [ppr_v v1, pprInfixOcc psyn, ppr_v  v2]
+          InfixCon _ v1 v2 -> hsep [ppr_v v1, pprInfixOcc psyn, ppr_v  v2]
             where
                 ppr_v v = case ghcPass @r of
                     GhcPs -> ppr v
                     GhcRn -> ppr v
                     GhcTc -> ppr v
-          PrefixCon vs   -> hsep (pprPrefixOcc psyn : map ppr_v vs)
+          PrefixCon _ vs   -> hsep (pprPrefixOcc psyn : map ppr_v vs)
             where
                 ppr_v v = case ghcPass @r of
                     GhcPs -> ppr v
                     GhcRn -> ppr v
                     GhcTc -> ppr v
-          RecCon vs      -> pprPrefixOcc psyn
+          RecCon _ vs      -> pprPrefixOcc psyn
                             <> braces (sep (punctuate comma (map ppr_v vs)))
             where
                 ppr_v v = case ghcPass @r of

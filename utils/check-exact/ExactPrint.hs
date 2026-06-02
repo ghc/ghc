@@ -2330,21 +2330,21 @@ instance ExactPrint (PatSynBind GhcPs GhcPs) where
     ap' <- markEpToken ap
     (ao', ac', psyn', details') <-
       case details of
-        InfixCon v1 v2 -> do
+        InfixCon x v1 v2 -> do
           v1' <- markAnnotated v1
           psyn' <- markAnnotated psyn
           v2' <- markAnnotated v2
-          return (ao, ac, psyn',InfixCon v1' v2')
-        PrefixCon vs -> do
+          return (ao, ac, psyn', InfixCon x v1' v2')
+        PrefixCon x vs -> do
           psyn' <- markAnnotated psyn
           vs' <- markAnnotated vs
-          return (ao, ac, psyn', PrefixCon vs')
-        RecCon vs -> do
+          return (ao, ac, psyn', PrefixCon x vs')
+        RecCon x vs -> do
           psyn' <- markAnnotated psyn
           ao' <- mapM markEpToken ao
           vs' <- markAnnotated vs
           ac' <- mapM markEpToken ac
-          return (ao', ac', psyn', RecCon vs')
+          return (ao', ac', psyn', RecCon x vs')
 
     (al', ae', pat', dir') <-
       case dir of
@@ -4302,19 +4302,19 @@ instance ExactPrint (ConDecl GhcPs) where
     where
     -- In ppr_details: let's not print the multiplicities (they are always 1, by
     -- definition) as they do not appear in an actual declaration.
-      exact_details (InfixCon t1 t2) = do
+      exact_details (InfixCon x t1 t2) = do
         t1' <- markAnnotated t1
         con' <- markAnnotated con
         t2' <- markAnnotated t2
-        return (con', InfixCon t1' t2')
-      exact_details (PrefixCon tys) = do
+        return (con', InfixCon x t1' t2')
+      exact_details (PrefixCon x tys) = do
         con' <- markAnnotated con
         tys' <- markAnnotated tys
-        return (con', PrefixCon tys')
-      exact_details (RecCon fields) = do
+        return (con', PrefixCon x tys')
+      exact_details (RecCon x fields) = do
         con' <- markAnnotated con
         fields' <- markAnnotated fields
-        return (con', RecCon fields')
+        return (con', RecCon x fields')
 
   -- -----------------------------------
 
@@ -4849,11 +4849,11 @@ sourceTextToString (SourceText txt) _ = unpackFS txt
 exactUserCon :: (Monad m, Monoid w, ExactPrint con)
   => (Maybe (EpToken "{"), Maybe (EpToken "}")) -> con -> HsConPatDetails GhcPs
   -> EP w m ((Maybe (EpToken "{"), Maybe (EpToken "}")), con, HsConPatDetails GhcPs)
-exactUserCon an c (InfixCon p1 p2) = do
+exactUserCon an c (InfixCon x p1 p2) = do
   p1' <- markAnnotated p1
   c' <- markAnnotated c
   p2' <- markAnnotated p2
-  return (an, c', InfixCon p1' p2')
+  return (an, c', InfixCon x p1' p2')
 exactUserCon (open,close) c details = do
   c' <- markAnnotated c
   open' <- mapM markEpToken open
@@ -4863,16 +4863,16 @@ exactUserCon (open,close) c details = do
 
 exactConArgs :: (Monad m, Monoid w)
   => HsConPatDetails GhcPs -> EP w m (HsConPatDetails GhcPs)
-exactConArgs (PrefixCon pats) = do
+exactConArgs (PrefixCon x pats) = do
   pats' <- markAnnotated pats
-  return (PrefixCon pats')
-exactConArgs (InfixCon p1 p2) = do
+  return (PrefixCon x pats')
+exactConArgs (InfixCon x p1 p2) = do
   p1' <- markAnnotated p1
   p2' <- markAnnotated p2
-  return (InfixCon p1' p2')
-exactConArgs (RecCon rpats) = do
+  return (InfixCon x p1' p2')
+exactConArgs (RecCon x rpats) = do
   rpats' <- markAnnotated rpats
-  return (RecCon rpats')
+  return (RecCon x rpats')
 
 -- ---------------------------------------------------------------------
 
