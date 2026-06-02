@@ -43,7 +43,7 @@ Runtime System
 Code Generation
 ~~~~~~~~~~~~~~~
 
-- aarch64: use ``ASR`` not ``LSR`` for ``MO_U_Shr`` at ``W8/W16`` (:ghc-ticet:`26979`)
+- aarch64: use ``ASR`` not ``LSR`` for ``MO_U_Shr`` at ``W8/W16`` (:ghc-ticket:`26979`)
 - fix finalizers on multiple platforms (:ghc-ticket:`27072`)
 
 Bytecode Compiler
