@@ -1,0 +1,134 @@
+.. _release-9-12-5:
+
+Version 9.12.5
+==============
+
+The significant changes to the various parts of the compiler are listed in the
+following sections. See the `migration guide
+<https://gitlab.haskell.org/ghc/ghc/-/wikis/migration/9.12>`_ on the GHC Wiki
+for specific guidance on migrating programs to this release.
+
+Compiler
+~~~~~~~~
+
+This release of GHC supports LLVM versions 13 through 19.
+
+- When there are no remaining argument demands, bottoming applications are now being trimmed to avoid panics (:ghc-ticket:`27261`)
+- Implement version 2 of the ghc ``semaphore`` protocol for GHC's ``-jsem`` jobserver on Linux and other ``POSIX`` platforms (:ghc-ticket:`25087`, :ghc-ticket:`27253`)
+- several improvements to the pattern match checker (:ghc-ticket:`25926`, :ghc-ticket:`27124`)
+- Avoid putting ticks around coercions (:ghc-ticket:`27121`)
+- Let the driver recognise ``.dyn_o`` as valid object files to allow plugins with this suffix to run. (:ghc-ticket:`24486`)
+- Don't move ticks in between a join point and its jumps (:ghc-ticket:`26929`, :ghc-ticket:`26642`, :ghc-ticket:`26693`)
+- Remove ``StgAsyncResult`` to fix crash/leaks (:ghc-ticket:`26341`)
+- ffi: collapse void pointer chains in capi wrappers (:ghc-ticket:`26852`)
+- aarch64: fix ``MOVK reguUsageOfInstr``  to mark dst as both read and written (:ghc-ticket:`26980`)
+- Fix ``dsuppress-uniques`` for free variables in demand signatures (:ghc-ticket:`27106`)
+- demand analysis: take stable unfoldings into account when determining argument demands (:ghc-ticket:`26416`)
+
+Runtime System
+~~~~~~~~~~~~~~
+
+- prevent the WinIO manager from swallowing exceptions in overlapped ``IO`` (:ghc-ticket:`27283`)
+- several fixes for blackholes (:ghc-ticket:`27261`)
+- add ``--optimistic-linking`` flag which binds unknown symbols in the runtime linker to ``0xDEADBEEF`` instead of failing (:ghc-ticket:`25240`)
+- add a few missing i386 relocations in the rts linker
+- handle heap allocation failures in I/O primops (:ghc-ticket:`24105`)
+- small fixes to allow more configurations to succesfully build (debugging RTS with optimizations)
+- fix race conditions between ``flushEventLog`` acquiring/releasing the ``state_change`` mutex
+- align stack to 64-byte boundary in StgRun on x65 (:ghc-ticket:`26595`, ghc-ticket:`26822`)
+- carefully SLIDE off the end of a stack chunk (:ghc-ticket:`27001`)
+- Fix missing profiling header for origin_thunk frame (:ghc-ticket:`27007`)
+
+
+Code Generation
+~~~~~~~~~~~~~~~
+
+- aarch64: use ``ASR`` not ``LSR`` for ``MO_U_Shr`` at ``W8/W16`` (:ghc-ticet:`26979`)
+- fix finalizers on multiple platforms (:ghc-ticket:`27072`)
+
+Bytecode Compiler
+~~~~~~~~~~~~~~~~~
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+``ghc-internal`` library
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- update to unicode 17.0.0
+
+``ghc-experimental`` library
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+``ghc-pkg``
+~~~~~~~~~~~~
+
+``ghc-toolchain``
+~~~~~~~~~~~~~~~~~
+
+Packaging and Build System
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- bumped ``process`` submodule to 1.6.29.0
+- bumped ``semaphore-compat`` submodule to 2.0.0
+- accept ``happy`` version 2.2
+- hadrian: don't include package hash in haddock library
+- configure: fix check for ``--target`` support in stage0 ``CC`` (:ghc-ticket:`26999`)
+
+Wasm Backend
+~~~~~~~~~~~~
+
+- ensure post-linker output is synchronous ESM (:ghc-ticket:`27257`)
+
+Included libraries
+~~~~~~~~~~~~~~~~~~
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    compiler/ghc.cabal:                                  The compiler itself
+    libraries/array/array.cabal:                         Dependency of ``ghc`` library
+    libraries/base/base.cabal:                           Core library
+    libraries/binary/binary.cabal:                       Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:               Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:                   Dependency of ``ghc-pkg`` utility
+    libraries/Cabal/Cabal-syntax/Cabal-syntax.cabal:     Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal:    Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:                     Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:                 Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:               Dependency of ``ghc`` and ``haskeline`` library
+    libraries/file-io/file-io.cabal:                     Dependency of ``directory`` library
+    libraries/filepath/filepath.cabal:                   Dependency of ``ghc`` library
+    libraries/ghc-boot/ghc-boot.cabal:                   Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal:             Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal:             Core library
+    libraries/ghc-experimental/ghc-experimental.cabal:   Core library
+    libraries/ghc-heap/ghc-heap.cabal:                   GHC heap-walking library
+    libraries/ghci/ghci.cabal:                           The REPL interface
+    libraries/ghc-internal/ghc-internal.cabal:           Core library
+    libraries/ghc-platform/ghc-platform.cabal:           Internal library
+    libraries/ghc-prim/ghc-prim.cabal:                   Core library
+    libraries/haskeline/haskeline.cabal:                 Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                             Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal:             Core library
+    libraries/mtl/mtl.cabal:                             Dependency of ``Cabal`` library
+    libraries/os-string/os-string.cabal:                 Dependency of ``filepath`` library
+    libraries/parsec/parsec.cabal:                       Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:                       Dependency of ``ghc`` library
+    libraries/process/process.cabal:                     Dependency of ``ghc`` library
+    libraries/semaphore-compat/semaphore-compat.cabal:   Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                             Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal:   Core library
+    libraries/terminfo/terminfo.cabal:                   Dependency of ``haskeline`` library
+    libraries/text/text.cabal:                           Dependency of ``Cabal`` library
+    libraries/time/time.cabal:                           Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal:           Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:                           Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:                         Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:                         Dependency of ``haddock`` executable
+    utils/haddock/haddock-api/haddock-api.cabal:         Dependency of ``haddock`` executable
+    utils/haddock/haddock-library/haddock-library.cabal: Dependency of ``haddock`` executable
