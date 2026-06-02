@@ -187,6 +187,7 @@ Library
     else
       c-sources:
         cbits/cutils.c
+        cbits/cpu_features_x86.c
         cbits/genSym.c
         cbits/keepCAFsForGHCi.c
 
@@ -514,6 +515,7 @@ Library
         GHC.Driver.Config.StgToCmm
         GHC.Driver.Config.Tidy
         GHC.Driver.Config.StgToJS
+        GHC.Driver.CpuFeatures
         GHC.Driver.DynFlags
         GHC.Driver.IncludeSpecs
         GHC.Driver.Downsweep

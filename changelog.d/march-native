@@ -1,0 +1,12 @@
+section: compiler
+synopsis: Add -march=native flag
+issues: #25450
+mrs: !16126
+
+description:
+  GHC now supports ``-march=native`` on x86 and x86_64. It probes the CPU of the
+  machine running GHC and enables all of the corresponding ``-m...`` CPU-feature
+  options automatically (such as ``-msse4.2``, ``-mavx2``, ``-mbmi2`` and
+  ``-mfma``), for both the native code generator and the LLVM backend. The
+  detected features are enabled in addition to any explicitly requested feature
+  flags. The flag is rejected for non-x86 targets and when cross-compiling.

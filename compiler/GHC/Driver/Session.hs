@@ -245,6 +245,8 @@ import GHC.Platform
 import GHC.Platform.Ways
 import GHC.Platform.Profile
 import GHC.Platform.ArchOS
+import GHC.Platform.Host (hostPlatformArch)
+import qualified GHC.Driver.CpuFeatures as Cpu
 
 import GHC.Unit.Types
 import GHC.Unit.Parser
@@ -906,8 +908,12 @@ parseDynamicFlagsFull activeFlags cmdline logger dflags0 args = do
   unless (null errs) $ liftIO $ throwGhcExceptionIO $ errorsToGhcException $
     map ((rdr . ppr . getLoc &&& unLoc) . errMsg) $ errs
 
+  -- Apply -march=native: probe the host CPU and enable the matching feature
+  -- flags. This needs IO (CPUID), so it cannot live in the pure flag handlers.
+  dflags1' <- applyMarchNative dflags1
+
   -- check for disabled flags in safe haskell
-  let (dflags2, sh_warns) = safeFlagCheck cmdline dflags1
+  let (dflags2, sh_warns) = safeFlagCheck cmdline dflags1'
       theWays = ways dflags2
 
   unless (allowed_combination theWays) $ liftIO $
@@ -1743,6 +1749,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "mavx512vl"    (noArg (\d -> d { avx512vl = True }))
   , make_ord_flag defGhcFlag "mfma"         (noArg (\d -> d { fma = True }))
   , make_ord_flag defGhcFlag "mgfni"        (noArg (\d -> d { gfni = True }))
+  , make_ord_flag defGhcFlag "march=native" (noArg (\d -> d { marchNative = True }))
 
 
   , make_ord_flag defGhcFlag "mla664"       (noArg (\d -> d { la664 = True }))
@@ -3806,6 +3813,59 @@ x86AsMFlags dflags =
       | otherwise = []
 
     gfniFlags = [ "-mgfni" | gfni dflags ]
+
+-- | Apply a requested @-march=native@ by probing the host CPU and enabling the
+-- matching CPU-feature flags.
+--
+-- This runs in 'parseDynamicFlagsFull' rather than in a flag handler because the
+-- CPUID probe needs 'IO', whereas flag handlers are pure. The detected features
+-- are folded into the existing feature 'DynFlags' so that 'makeDynFlagsConsistent'
+-- and the backends treat them exactly like the corresponding @-m...@ flags.
+applyMarchNative :: MonadIO m => DynFlags -> m DynFlags
+applyMarchNative dflags
+  | not (marchNative dflags) = return dflags
+  | otherwise = do
+      let arch = platformArch (targetPlatform dflags)
+      unless (arch == ArchX86 || arch == ArchX86_64) $ liftIO $
+        throwGhcExceptionIO $ CmdLineError
+          "-march=native is only supported on x86 and x86_64 targets"
+      unless (arch == hostPlatformArch) $ liftIO $
+        throwGhcExceptionIO $ CmdLineError
+          "-march=native is not supported when cross-compiling"
+      return (applyX86CpuFeatures Cpu.cachedX86CpuFeatures dflags)
+
+-- | Enable the 'DynFlags' CPU-feature fields corresponding to a probed set of
+-- host x86 features. SSE/AVX and BMI levels are collapsed to their maximum,
+-- since 'sseAvxVersion' and 'bmiVersion' each record a single level.
+applyX86CpuFeatures :: [Cpu.X86CpuFeature] -> DynFlags -> DynFlags
+applyX86CpuFeatures feats dflags = dflags
+  { sseAvxVersion = foldr (max . Just) (sseAvxVersion dflags) sseLevels
+  , bmiVersion    = foldr (max . Just) (bmiVersion dflags)    bmiLevels
+  , avx512f  = avx512f dflags  || has Cpu.AVX512F
+  , avx512bw = avx512bw dflags || has Cpu.AVX512BW
+  , avx512cd = avx512cd dflags || has Cpu.AVX512CD
+  , avx512dq = avx512dq dflags || has Cpu.AVX512DQ
+  , avx512vl = avx512vl dflags || has Cpu.AVX512VL
+  , fma      = fma dflags      || has Cpu.FMA
+  , gfni     = gfni dflags     || has Cpu.GFNI
+  }
+  where
+    has feat = feat `elem` feats
+    sseLevels = [ lvl | feat <- feats, Just lvl <- [sseLevelOf feat] ]
+    bmiLevels = [ lvl | feat <- feats, Just lvl <- [bmiLevelOf feat] ]
+    sseLevelOf feat = case feat of
+      Cpu.SSE2   -> Just SSE2
+      Cpu.SSE3   -> Just SSE3
+      Cpu.SSSE3  -> Just SSSE3
+      Cpu.SSE4_1 -> Just SSE4
+      Cpu.SSE4_2 -> Just SSE42
+      Cpu.AVX    -> Just AVX1
+      Cpu.AVX2   -> Just AVX2
+      _          -> Nothing
+    bmiLevelOf feat = case feat of
+      Cpu.BMI1 -> Just BMI1
+      Cpu.BMI2 -> Just BMI2
+      _        -> Nothing
 
 -- | Query if the target RTS has the given 'Ways'. It's computed from
 -- the @"RTS ways"@ field in the settings file.

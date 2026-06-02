@@ -470,6 +470,8 @@ data DynFlags = DynFlags {
   fma                   :: Bool, -- ^ Enable FMA instructions.
   gfni                  :: Bool, -- ^ Enable GFNI Instructions.
   la664                 :: Bool, -- ^ Enable LA664 instructions
+  marchNative           :: Bool, -- ^ @-march=native@ was requested; the host
+                                 -- CPU features are applied during flag parsing.
 
   -- Constants used to control the amount of optimization done.
 
@@ -760,6 +762,7 @@ defaultDynFlags mySettings =
         gfni = False,
         -- For LoongArch, la464 is used by default.
         la664 = False,
+        marchNative = False,
 
         maxInlineAllocSize = 128,
         maxInlineMemcpyInsns = 32,

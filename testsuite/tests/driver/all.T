@@ -7,6 +7,12 @@ def normalise_unknown_flag(msg):
     m = re.search(r'unrecognised flag: \S+', msg)
     return m.group(0) + '\n' if m else msg
 
+def normalise_march_native_error(msg):
+    # Keep only the stable '-march=native ...' diagnostic; the program-name
+    # prefix and any usage trailer vary across configurations.
+    m = re.search(r'-march=native is [^\n]+', msg)
+    return m.group(0) + '\n' if m else msg
+
 test('driver011', [extra_files(['A011.hs'])], makefile_test, ['test011'])
 
 test('driver012', [extra_files(['A012.hs'])], makefile_test, ['test012'])
@@ -264,6 +270,45 @@ test('print_enabled_cpu_features_unknown_flag',
      [normalise_fun(normalise_unknown_flag), exit_code(1)],
      run_command,
      ['{compiler} -mavx22 --print-enabled-cpu-features'])
+
+# -march=native enables at least the x86_64 baseline (SSE2). The full feature
+# set is host-dependent, so we only assert the always-present baseline.
+test('march_native',
+     [unless(arch('x86_64') or arch('i386'), skip)],
+     run_command,
+     ['{compiler} -march=native --print-enabled-cpu-features | grep -o SSE2'])
+
+# On non-x86 targets -march=native must be rejected.
+test('march_native_unsupported_arch',
+     [when(arch('x86_64') or arch('i386'), skip),
+      normalise_errmsg_fun(normalise_march_native_error), exit_code(1)],
+     run_command,
+     ['{compiler} -march=native --print-enabled-cpu-features'])
+
+# -march=native is additive: its feature set is a superset of the default set.
+# We extract the "features" arrays with and without the flag and assert that no
+# baseline feature is dropped: 'grep -vxF -f native.txt base.txt' prints any
+# baseline feature absent from the -march=native set, of which we expect none.
+# (grep exits 1 when it prints nothing, so '|| true' keeps the success case from
+# failing the test; the empty-stdout check is what enforces the assertion.)
+# This avoids hard-coding the host-specific feature set.
+test('march_native_superset',
+     [unless(arch('x86_64') or arch('i386'), skip)],
+     run_command,
+     ['{compiler} --print-enabled-cpu-features | '
+      'sed \'s/.*"features":\\[//;s/].*//;s/"//g\' | tr \',\' \'\\n\' > base.txt && '
+      '{compiler} -march=native --print-enabled-cpu-features | '
+      'sed \'s/.*"features":\\[//;s/].*//;s/"//g\' | tr \',\' \'\\n\' > native.txt && '
+      '(grep -vxF -f native.txt base.txt || true)'])
+
+# -march=native is additive with explicit -m flags, regardless of order: an
+# explicitly requested feature (here AVX2, forced on independent of the host) is
+# still present whether the flag comes before or after -march=native.
+test('march_native_additive',
+     [unless(arch('x86_64') or arch('i386'), skip)],
+     run_command,
+     ['{compiler} -mavx2 -march=native --print-enabled-cpu-features | grep -o AVX2 && '
+      '{compiler} -march=native -mavx2 --print-enabled-cpu-features | grep -o AVX2'])
 
 test('T10219', normal, run_command,
      # `-x hspp` in make mode should work.

@@ -496,7 +496,9 @@ The available mode flags are:
     Print a JSON object describing the CPU features currently enabled for code
     generation, together with a set of ``-m...`` flags that reproduce the
     effective feature set for the current target.
-    Dynamic options such as ``-mavx2`` and ``-mbmi2`` are respected.
+    Dynamic options such as ``-mavx2`` and ``-mbmi2`` are respected, so this flag
+    can also be used to inspect which features :ghc-flag:`-march=native` detected
+    and enabled.
 
 .. ghc-flag:: --print-debug-on
     :shortdesc: print whether GHC was built with ``-DDEBUG``
@@ -1853,6 +1855,34 @@ Some flags only make sense for particular target platforms.
     GHC currently does not use LA664 specific instructions,
     so this flag has no effect when used with the :ref:`native code generator <native-code-gen>`
     or the :ref:`LLVM backend <llvm-code-gen>`.
+
+.. ghc-flag:: -march=native
+    :shortdesc: (x86 only) Enable all CPU features supported by the host
+    :type: dynamic
+    :category: platform-options
+
+    (x86/x86_64 only) Probe the CPU of the machine running GHC and enable all of
+    the corresponding ``-m...`` CPU-feature options automatically (for example
+    ``-msse4.2``, ``-mavx2``, ``-mbmi2``, ``-mfma``). The detected features apply
+    to both the :ref:`native code generator <native-code-gen>` and the
+    :ref:`LLVM backend <llvm-code-gen>`.
+
+    The detected features are enabled *in addition* to any CPU-feature flags you
+    pass explicitly, regardless of their order on the command line; ``-march=native``
+    never disables a feature.
+
+    The features that were detected and enabled can be inspected with
+    :ghc-flag:`--print-enabled-cpu-features`.
+
+    .. warning::
+
+        Code compiled with ``-march=native`` may use instructions that are not
+        available on other CPUs, and is therefore not portable to a different
+        machine.
+
+    Only x86 and x86_64 targets are supported so far; the flag is rejected on
+    other targets. It is also rejected when cross-compiling, since the host CPU
+    is then unrelated to the target.
 
 Haddock
 -------

@@ -75,6 +75,7 @@
 -instantiated-with
 -keep-hi-file
 -keep-o-file
+-march=native
 -n
 -no-keep-hi-file
 -no-keep-o-file
