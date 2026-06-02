@@ -48,7 +48,9 @@
 
  The idle GC is also the only occasion when deadlock detection is performed.
  So note that disabling idle GC with RTS flag `-I0` will also disable deadlock
- detection. See Note [Deadlock detection] for further details.
+ detection.
+
+TODO: refer to the deadlock detection note for further details, once that note exists.
 */
 
 /*
@@ -209,22 +211,30 @@ static void unpauseTimerUnlessProfiling(void);
 
 void initIdleGc(void)
 {
-    /* Use division rounding up (a+b-1)/b, to avoid getting 0 ticks, as this
-     * would give unexpected results.
-     */
-    idlegc_delay_ticks =
-        (RtsFlags.GcFlags.idleGCDelayTime + RtsFlags.MiscFlags.tickInterval - 1)
-      / RtsFlags.MiscFlags.tickInterval;
+    if (RtsFlags.GcFlags.doIdleGC) {
+        /* Use division rounding up (a+b-1)/b, to avoid getting 0 ticks, as this
+         * would give unexpected results.
+         */
+        idlegc_delay_ticks =
+            (RtsFlags.GcFlags.idleGCDelayTime + RtsFlags.MiscFlags.tickInterval - 1)
+          / RtsFlags.MiscFlags.tickInterval;
 
-    inter_idlegc_delay_ticks =
-        (RtsFlags.GcFlags.interIdleGCWait + RtsFlags.MiscFlags.tickInterval - 1)
-      / RtsFlags.MiscFlags.tickInterval;
+        inter_idlegc_delay_ticks =
+            (RtsFlags.GcFlags.interIdleGCWait + RtsFlags.MiscFlags.tickInterval - 1)
+          / RtsFlags.MiscFlags.tickInterval;
 
-    /* The -Iw<n> parameter is supposed to control times *between* idle GCs,
-     * not time since program start. So by initialising to the negative of the
-     * interval then we can do an idle GC almost immediately if needed.
-     */
-    shared_last_idlegc_tick = -inter_idlegc_delay_ticks;
+        /* The -Iw<n> parameter is supposed to control times *between* idle GCs,
+         * not time since program start. So by initialising to the negative of the
+         * interval then we can do an idle GC almost immediately if needed.
+         */
+        shared_last_idlegc_tick = -inter_idlegc_delay_ticks;
+    } else {
+        /* When idle GC is disabled, we turn off the timer tick after one tick
+         * of all caps being idle.
+         */
+        idlegc_delay_ticks = 1;
+        inter_idlegc_delay_ticks = 0;
+    }
 
     debugTrace(DEBUG_idlegc,
                "Idle GC (tick %d): initialising, delay ticks = %d,"
@@ -379,14 +389,14 @@ void handleIdleGcTick(void)
      */
     if (RtsFlags.GcFlags.doIdleGC) {
         debugTrace(DEBUG_idlegc, "Idle GC (tick %d): transition to PENDING",
-			         RELAXED_LOAD_ALWAYS(&shared_current_tick));
+                   RELAXED_LOAD_ALWAYS(&shared_current_tick));
         RELAXED_STORE_ALWAYS(&shared_idlegc_state, IDLEGC_STATE_PENDING);
 #if defined(THREADED_RTS)
         wakeUpRts();
 #endif
     } else {
         debugTrace(DEBUG_idlegc, "Idle GC (tick %d): transition to DONE",
-			         RELAXED_LOAD_ALWAYS(&shared_current_tick));
+                   RELAXED_LOAD_ALWAYS(&shared_current_tick));
         RELAXED_STORE_ALWAYS(&shared_idlegc_state, IDLEGC_STATE_DONE);
     }
 
@@ -405,7 +415,7 @@ static void pauseTimerUnlessProfiling(void)
 #endif
     {
         debugTrace(DEBUG_idlegc, "Idle GC (tick %d): pausing the ticker",
-			         RELAXED_LOAD_ALWAYS(&shared_current_tick));
+                                 RELAXED_LOAD_ALWAYS(&shared_current_tick));
         stopTimer();
 
         /* Save the time at which we pause, so we can account for ticks missed
