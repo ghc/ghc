@@ -121,6 +121,11 @@ SED    ?= sed
 LN     ?= ln
 LN_S   ?= $(LN) -s
 LN_SF  ?= $(LN) -sf
+ifeq ($(UNAME), FreeBSD)
+TAR    ?= gtar
+else
+TAR    ?= tar
+endif
 
 ifeq ($(UNAME), Darwin)
 DLL       := *.dylib
@@ -1020,7 +1025,7 @@ stage3: $(foreach platform,$(STAGE3_PLATFORMS),stage3-$(platform))
 
 $(DIST_DIR)/ghc.tar.gz: stage2
 	@echo "::group::Creating ghc.tar.gz..."
-	@tar czf $@ \
+	@$(TAR) czf $@ \
 		--directory=$(DIST_DIR) \
 		$(foreach exe,$(STAGE2_EXECUTABLES),bin/$(exe)$(EXE_EXT)) \
 		$(shell if [ "$(DYNAMIC)" = 1 ] ; then echo "bin/ghc-iserv-dyn$(EXE_EXT)" ; fi) \
@@ -1036,7 +1041,7 @@ $(DIST_DIR)/cabal.tar.gz: stable-cabal
 	@echo "::group::Creating cabal.tar.gz..."
 	@mkdir -p $(DIST_DIR)/bin
 	@cp $(CABAL) $(DIST_DIR)/bin/
-	@tar czf $@ \
+	@$(TAR) czf $@ \
 		--directory=$(DIST_DIR) \
 		bin/cabal
 	@echo "::endgroup::"
@@ -1045,7 +1050,7 @@ $(DIST_DIR)/haskell-toolchain.tar.gz: stable-cabal stage2 stage3-javascript-unkn
 	@echo "::group::Creating haskell-toolchain.tar.gz..."
 	@mkdir -p $(DIST_DIR)/bin
 	@cp $(CABAL) $(DIST_DIR)/bin/
-	@tar czf $@ \
+	@$(TAR) czf $@ \
 		--directory=$(DIST_DIR) \
 		$(foreach exe,$(STAGE2_EXECUTABLES),bin/$(exe)$(EXE_EXT)) \
 		lib/ghc-usage.txt \
@@ -1061,7 +1066,7 @@ $(DIST_DIR)/haskell-toolchain.tar.gz: stable-cabal stage2 stage3-javascript-unkn
 
 $(DIST_DIR)/tests.tar.gz:
 	@echo "::group::Creating tests.tar.gz..."
-	@tar czf $@ \
+	@$(TAR) czf $@ \
 		testsuite
 	@echo "::endgroup::"
 
