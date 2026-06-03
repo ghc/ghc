@@ -10,7 +10,6 @@ import GHC.Hs
 
 import GHC.Iface.Syntax
 
-import GHC.Types.SourceText
 import GHC.Types.SrcLoc ( unLoc )
 
 import GHC.Unit.Module.Warnings
@@ -26,9 +25,9 @@ toIfaceWarningTxt :: WarningTxt GhcRn -> IfaceWarningTxt
 toIfaceWarningTxt (WarningTxt src mb_cat strs) = IfWarningTxt src (unLoc . iwc_wc . unLoc <$> mb_cat) (map (toIfaceStringLiteralWithNames . unLoc) strs)
 toIfaceWarningTxt (DeprecatedTxt src strs) = IfDeprecatedTxt src (map (toIfaceStringLiteralWithNames . unLoc) strs)
 
-toIfaceStringLiteralWithNames :: WithHsDocIdentifiers StringLiteral GhcRn -> (IfaceStringLiteral, [IfExtName])
+toIfaceStringLiteralWithNames :: WithHsDocIdentifiers (StringLiteral GhcRn) GhcRn -> (IfaceStringLiteral, [IfExtName])
 toIfaceStringLiteralWithNames (WithHsDocIdentifiers src names) = (toIfaceStringLiteral src, map unLoc names)
 
-toIfaceStringLiteral :: StringLiteral -> IfaceStringLiteral
-toIfaceStringLiteral (StringLiteral sl fs _) = IfStringLiteral sl fs
-
+toIfaceStringLiteral :: StringLiteral (GhcPass p) -> IfaceStringLiteral
+toIfaceStringLiteral sLit =
+  IfStringLiteral (stringLitSourceText sLit) (sl_fs sLit)

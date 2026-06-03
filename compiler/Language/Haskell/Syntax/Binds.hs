@@ -25,10 +25,9 @@ import Language.Haskell.Syntax.Basic (Fixity)
 import Language.Haskell.Syntax.Binds.InlinePragma (InlinePragma)
 import Language.Haskell.Syntax.BooleanFormula (LBooleanFormula)
 import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Lit (StringLiteral)
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.ImpExp (NamespaceSpecifier)
-
-import GHC.Types.SourceText (StringLiteral)
 
 import Data.Bool
 import Data.Maybe
@@ -381,7 +380,7 @@ data Sig pass
 
   | SCCFunSig  (XSCCFunSig pass)
                (LIdP pass)    -- Function name
-               (Maybe (XRec pass StringLiteral))
+               (Maybe (XRec pass (StringLiteral pass)))
        -- | A complete match pragma
        --
        -- > {-# COMPLETE C, D [:: T] #-}

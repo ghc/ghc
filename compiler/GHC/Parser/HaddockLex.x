@@ -11,13 +11,13 @@ import GHC.Parser.Lexer
 import GHC.Parser.Lexer.Interface (adjustChar)
 import GHC.Parser.Annotation
 import GHC.Types.SrcLoc
-import GHC.Types.SourceText
 import GHC.Data.StringBuffer
 import qualified GHC.Data.Strict as Strict
 import GHC.Types.Name.Reader
 import GHC.Utils.Error
 import GHC.Utils.Encoding
 import GHC.Hs.Extension
+import GHC.Hs.Lit
 
 import qualified GHC.Data.EnumSet as EnumSet
 
@@ -132,12 +132,12 @@ advanceSrcLocBS !loc bs = case utf8UnconsByteString bs of
 
 -- | Lex 'StringLiteral' for warning messages
 lexStringLiteral :: P (LocatedN RdrName) -- ^ A precise identifier parser
-                 -> Located StringLiteral
-                 -> Located (WithHsDocIdentifiers StringLiteral GhcPs)
-lexStringLiteral identParser (L l sl@(StringLiteral _ fs _))
+                 -> Located (StringLiteral GhcPs)
+                 -> Located (WithHsDocIdentifiers (StringLiteral GhcPs) GhcPs)
+lexStringLiteral identParser (L l sl)
   = L l (WithHsDocIdentifiers sl idents)
   where
-    bs = bytesFS fs
+    bs = bytesFS (sl_fs sl)
 
     idents = mapMaybe (uncurry (validateIdentWith identParser)) plausibleIdents
 

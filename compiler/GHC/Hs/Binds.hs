@@ -33,6 +33,7 @@ import {-# SOURCE #-} GHC.Hs.Pat  (pprLPat )
 import GHC.Hs.Extension
 import GHC.Hs.Type
 import GHC.Hs.ImpExp ()
+import GHC.Hs.Lit
 
 import GHC.Tc.Types.Evidence
 
@@ -1019,4 +1020,4 @@ type instance Anno (RuleBndr (GhcPass p)) = EpAnnCO
 
 type instance Anno (FixitySig (GhcPass p)) = SrcSpanAnnA
 
-type instance Anno StringLiteral = EpAnnCO
+type instance Anno (StringLiteral (GhcPass p)) = SrcSpanAnnA

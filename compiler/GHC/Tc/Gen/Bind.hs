@@ -63,7 +63,6 @@ import GHC.Builtin.Types ( mkConstraintTupleTy )
 import GHC.Builtin.Types.Prim
 import GHC.Unit.Module
 
-import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
