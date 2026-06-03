@@ -1,4 +1,6 @@
+{-# LANGUAGE ImpredicativeTypes #-}
 {-# LANGUAGE TypeFamilies #-}
+
 module Hadrian.Utilities (
     -- * List manipulation
     fromSingleton, replaceEq, minusOrd, intersectOrd, lookupAll, chunksOfSize,
@@ -14,7 +16,7 @@ module Hadrian.Utilities (
 
     -- * Paths
     BuildRoot (..), buildRoot, buildRootRules, isGeneratedSource,
-    KeepResponseFiles (..), keepResponseFiles, withResponseFile, withResponseFileOnWindows,
+    KeepResponseFiles (..), keepResponseFiles, withResponseFile, withResponseFileIfLongCmd,
 
     -- * File system operations
     copyFile, copyFileUntracked, createFileLink, fixFile,
@@ -50,7 +52,6 @@ import Development.Shake.Classes
 import Development.Shake.FilePath
 import GHC.ResponseFile (escapeArgs)
 import System.Environment (lookupEnv)
-import System.Info.Extra (isWindows)
 import System.IO (hClose, openTempFile)
 import System.IO.Error (isPermissionError)
 
@@ -61,6 +62,8 @@ import qualified System.Directory.Extra as IO
 import qualified System.Info.Extra      as IO
 import qualified System.IO              as IO
 import qualified System.FilePath.Posix  as Posix
+import Development.Shake.Command (CmdArgument (..), IsCmdArgument (toCmdArgument))
+import Extra (isWindows)
 
 -- | Extract a value from a singleton list, or terminate with an error message
 -- if the list does not contain exactly one value.
@@ -330,20 +333,21 @@ keepResponseFiles = do
     KeepResponseFiles keep <- userSetting (KeepResponseFiles False)
     return keep
 
--- | Run an action either with command arguments direcly or by, on Windows,
--- placing those arguments into a response file escaped with @GHC.ResponseFile.escapeArgs@.
+-- | Run an command with the given arguments. If the command is too long then the
+-- response file arguments are placed into a response file and escaped with @GHC.ResponseFile.escapeArgs@.
 --
 -- With @--keep-response-files@, the file is left on disk (if used)
-withResponseFileOnWindows ::
-    ([String] -> Action a)  -- ^ Action to perform given arguments (of the form @["\@reponseFilePath"]@ on Windows)
-    -> [String]             -- ^ Command arguments
-    -> Action a
-withResponseFileOnWindows action commandArgs = do
+withResponseFileIfLongCmd :: (CmdResult c) =>
+    CmdArgument     -- ^ Command and arguments before the response file arguments.
+    -> [String]     -- ^ Response file aruguments.
+    -> CmdArgument  -- ^ Command arguments after the response file arguments.
+    -> Action c
+withResponseFileIfLongCmd argsPre argsResp argsPost = do
     if isWindows
         then withResponseFile $ \tmp -> do
-                writeFile' tmp (escapeArgs commandArgs)
-                action ['@' : tmp]
-        else action commandArgs
+                writeFile' tmp (escapeArgs argsResp)
+                cmd argsPre ['@' : tmp] argsPost
+        else cmd argsPre argsResp argsPost
 
 -- | Run an action with a response file path.
 --

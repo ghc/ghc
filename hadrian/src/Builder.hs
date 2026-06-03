@@ -351,9 +351,10 @@ instance H.Builder Builder where
                   -- NB: we can't put the buildArgs in a response file, because some flags require
                   -- empty arguments (such as the -dep-suffix flag), but that isn't supported
                   -- yet due to #26560.
-                  withResponseFileOnWindows
-                    (\buildInputs' -> cmd [path] buildArgs buildInputs' buildOptions)
+                  withResponseFileIfLongCmd
+                    (toCmdArgument [path] <> toCmdArgument buildArgs)
                     buildInputs
+                    (toCmdArgument buildOptions)
 
                 HsCpp    -> captureStdout
 
@@ -393,9 +394,10 @@ runHaddock :: FilePath    -- ^ path to @haddock@
       -> [String]
       -> [FilePath]  -- ^ input file paths
       -> Action ()
-runHaddock haddockPath flagArgs fileInputs = withResponseFileOnWindows
-  (cmd [haddockPath] flagArgs)
+runHaddock haddockPath flagArgs fileInputs = withResponseFileIfLongCmd
+  (toCmdArgument [haddockPath] <> toCmdArgument flagArgs)
   fileInputs
+  (CmdArgument [])
 
 -- TODO: Some builders are required only on certain platforms. For example,
 -- 'Objdump' is only required on OpenBSD and AIX. Add support for platform
