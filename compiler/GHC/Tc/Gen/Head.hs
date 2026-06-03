@@ -625,7 +625,7 @@ tcInferOverLit lit@(OverLit { ol_val = val
              from_expr = mkHsWrap (mkWpCastN co2 <.> wrap1) $
                          mkHsVar (L loc from_id)
              witness = HsApp noExtField (L (l2l loc) from_expr) lit_expr
-             lit' = OverLit { ol_val = val
+             lit' = OverLit { ol_val = tcOverLitVal val
                             , ol_ext = OverLitTc { ol_rebindable = rebindable
                                                  , ol_witness = witness
                                                  , ol_type = res_ty } }

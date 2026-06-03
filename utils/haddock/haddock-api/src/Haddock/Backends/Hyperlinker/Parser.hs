@@ -23,12 +23,13 @@ import GHC.Parser.Lexer as Lexer
   , lexer
   )
 import qualified GHC.Types.Error as E
-import GHC.Types.SourceText
 import GHC.Types.SrcLoc
 import GHC.Utils.Error (panicMessage)
 
 import Haddock.Backends.Hyperlinker.Types as T
 import Haddock.GhcUtils
+
+import Language.Haskell.Syntax.Lit
 
 -- | Turn source code string into a stream of more descriptive tokens.
 --

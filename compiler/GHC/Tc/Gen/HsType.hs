@@ -138,7 +138,6 @@ import qualified Data.List.NonEmpty as NE
 import Data.List ( mapAccumL )
 import Control.Monad
 import Data.Tuple( swap )
-import GHC.Types.SourceText
 
 {-
         ----------------------------
@@ -4939,7 +4938,7 @@ promotionErr name err
 ************************************************************************
 -}
 
-tyLitFromOverloadedLit :: OverLitVal -> HsLit GhcRn
-tyLitFromOverloadedLit (HsIntegral n)     = HsNatural noExtField n
-tyLitFromOverloadedLit (HsIsString src s) = HsString src s
-tyLitFromOverloadedLit (HsFractional fl)  = HsDouble noExtField fl
+tyLitFromOverloadedLit :: OverLitVal GhcRn -> HsLit GhcRn
+tyLitFromOverloadedLit (HsIntegral   n) = HsNatural noExtField n
+tyLitFromOverloadedLit (HsFractional f) = HsDouble  noExtField f
+tyLitFromOverloadedLit (HsIsString   s) = HsString  (sl_src s) (sl_fs s)

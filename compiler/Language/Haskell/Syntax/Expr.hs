@@ -22,8 +22,6 @@ import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Binds
 
 -- others:
-import GHC.Types.SourceText (StringLiteral)
-
 import GHC.Data.FastString (FastString)
 
 -- libraries:
@@ -560,7 +558,7 @@ data DotFieldOcc p
 -- | A pragma, written as {-# ... #-}, that may appear within an expression.
 data HsPragE p
   = HsPragSCC   (XSCC p)
-                StringLiteral         -- "set cost centre" SCC pragma
+                (StringLiteral p) -- "set cost centre" SCC pragma
 
   | XHsPragE !(XXPragE p)
 

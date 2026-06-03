@@ -1336,6 +1336,7 @@ type instance XCRuleDecls    GhcTc = SourceText
 
 type instance XXRuleDecls    (GhcPass _) = DataConCantHappen
 
+-- Note [Pragma source text] in "GHC.Types.SourceText"
 type instance XHsRule       GhcPs = ((ActivationAnn, EpToken "="), SourceText)
 type instance XHsRule       GhcRn = (HsRuleRn, SourceText)
 type instance XHsRule       GhcTc = (HsRuleRn, SourceText)

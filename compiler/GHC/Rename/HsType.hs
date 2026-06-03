@@ -479,6 +479,7 @@ rnModifier env =
   rnModifierWith (\ty -> if isLiteral1 ty then Just oneType else Nothing)
                  (rnLHsTyKi env)
   where
+    isLiteral1 :: GenLocated l (HsType GhcPs) -> Bool
     isLiteral1 ty = case ty of
       (L _ (HsTyLit _ (HsNatural _ il)))
         | SourceText (unpackFS -> "1") <- il_text il -> True

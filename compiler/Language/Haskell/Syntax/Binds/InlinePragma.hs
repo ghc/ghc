@@ -76,8 +76,6 @@ data InlineSpec -- What the user's INLINE pragma looked like
   | Inlinable   -- User wrote INLINABLE
   | NoInline    -- User wrote NOINLINE
   | Opaque      -- User wrote OPAQUE
-                -- Each of the above keywords is accompanied with
-                -- a string of type SourceText written by the user
   | NoUserInlinePrag -- User did not write any of INLINE/INLINABLE/NOINLINE
                      -- e.g. in `defaultInlinePragma` or when created by CSE
   deriving( Eq, Data, Show )

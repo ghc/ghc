@@ -72,7 +72,6 @@ import GHC.Types.Hint
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Basic  ( TyConFlavour (..), convImportLevel )
-import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.PkgQual
 import GHC.Types.GREInfo (ConInfo(..), ConFieldInfo (..), ConLikeInfo (ConIsData))
@@ -320,7 +319,7 @@ rnImportDecl this_mod
 
     case raw_pkg_qual of
       NoRawPkgQual -> pure ()
-      RawPkgQual _ -> do
+      RawPkgQual {} -> do
         pkg_imports <- xoptM LangExt.PackageImports
         when (not pkg_imports) $ addErr TcRnPackageImportsDisabled
 
@@ -446,7 +445,7 @@ rnImportDecl this_mod
 renameRawPkgQual :: UnitEnv -> ModuleName -> RawPkgQual -> PkgQual
 renameRawPkgQual unit_env mn = \case
   NoRawPkgQual -> NoPkgQual
-  RawPkgQual p -> renamePkgQual unit_env mn (Just (sl_fs p))
+  RawPkgQual _ fs -> renamePkgQual unit_env mn $ Just fs
 
 -- | Rename raw package imports
 renamePkgQual :: UnitEnv -> ModuleName -> Maybe FastString -> PkgQual

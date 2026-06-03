@@ -229,8 +229,7 @@ data CType pass
       FastString
   | XCType !(XXCType pass)
 
--- The filename for a C header file
--- See Note [Pragma source text] in "GHC.Types.SourceText"
+-- | The filename for a C header file
 data Header pass
   = Header
       (XHeader pass)

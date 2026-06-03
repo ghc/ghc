@@ -1,5 +1,6 @@
 module GHC.Types.PkgQual where
 
+import GHC.Data.FastString
 import GHC.Prelude
 import GHC.Types.SourceText
 import GHC.Unit.Types
@@ -10,8 +11,10 @@ import Data.Data
 
 -- | Package-qualifier as it was parsed
 data RawPkgQual
-  = NoRawPkgQual             -- ^ No package qualifier
-  | RawPkgQual StringLiteral -- ^ Raw package qualifier string.
+  = NoRawPkgQual -- ^ No package qualifier
+  | RawPkgQual
+      SourceText -- ^ Raw package qualifier string from source.
+      FastString -- ^ Raw package qualifier.
   deriving (Data)
 
 -- | Package-qualifier after renaming
@@ -27,8 +30,8 @@ data PkgQual
 instance Outputable RawPkgQual where
   ppr = \case
     NoRawPkgQual -> empty
-    RawPkgQual (StringLiteral st p _)
-      -> pprWithSourceText st (doubleQuotes (ftext p))
+    RawPkgQual st fs ->
+      pprWithSourceText st $ doubleQuotes (ppr fs)
 
 instance Outputable PkgQual where
   ppr = \case
