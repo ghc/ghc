@@ -289,23 +289,25 @@ bindistRules = do
         copyFile ("hadrian" -/- "cfg" -/- "default.target.in") (bindistFilesDir -/- "default.target.in")
         copyFile ("hadrian" -/- "cfg" -/- "default.host.target.in") (bindistFilesDir -/- "default.host.target.in")
 
-        -- todo: do we need these wrappers on windows
-        forM_ bin_targets $ \(pkg, _) -> do
-          needed_wrappers <- pkgToWrappers pkg
-          forM_ needed_wrappers $ \wrapper_name -> do
-            let suffix = if useGhcPrefix pkg
-                           then "ghc-" ++ version
-                           else version
-            wrapper_content <- wrapper wrapper_name
-            let unversioned_wrapper_path = bindistFilesDir -/- "wrappers" -/- wrapper_name
-                versioned_wrapper = wrapper_name ++ "-" ++ suffix
-                versioned_wrapper_path = bindistFilesDir -/- "wrappers" -/- versioned_wrapper
-            -- Write the wrapper to the versioned path
-            writeFile' versioned_wrapper_path wrapper_content
-            -- Create a symlink from the non-versioned to the versioned.
-            liftIO $ do
-              IO.removeFile unversioned_wrapper_path <|> return ()
-              IO.createFileLink versioned_wrapper unversioned_wrapper_path
+        -- These wrapper scripts are only necessary in the configure/install
+        -- workflow which is not supported on windows.
+        unless windowsHost $ do
+          forM_ bin_targets $ \(pkg, _) -> do
+            needed_wrappers <- pkgToWrappers pkg
+            forM_ needed_wrappers $ \wrapper_name -> do
+              let suffix = if useGhcPrefix pkg
+                            then "ghc-" ++ version
+                            else version
+              wrapper_content <- wrapper wrapper_name
+              let unversioned_wrapper_path = bindistFilesDir -/- "wrappers" -/- wrapper_name
+                  versioned_wrapper = wrapper_name ++ "-" ++ suffix
+                  versioned_wrapper_path = bindistFilesDir -/- "wrappers" -/- versioned_wrapper
+              -- Write the wrapper to the versioned path
+              writeFile' versioned_wrapper_path wrapper_content
+              -- Create a symlink from the non-versioned to the versioned.
+              liftIO $ do
+                IO.removeFile unversioned_wrapper_path <|> return ()
+                IO.createFileLink versioned_wrapper unversioned_wrapper_path
 
     let buildBinDist compressor = do
           win_target <- isWinTarget
