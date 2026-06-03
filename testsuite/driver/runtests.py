@@ -133,7 +133,7 @@ if args.unexpected_output_dir:
     config.unexpected_output_dir = Path(args.unexpected_output_dir)
 
 if args.only:
-    config.only = args.only
+    config.only = set(args.only)
     config.run_only_some_tests = True
 
 if args.skip:
