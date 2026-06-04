@@ -1,0 +1,11 @@
+section: compiler
+issues: #27225
+mrs: !16123
+synopsis:
+  Don't drop cost centres around variables of type `IO ()`
+description:
+  The logic to drop cost centres (and other ticks) around variables of non-function
+  type has been updated to be more conservative: it now only drops ticks when
+  the variable's type is definitely not a function type, even after looking
+  through newtypes or reducing type families. This ensures we don't erroneously
+  drop valid cost centres (which loses valuable profiling information).

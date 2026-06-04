@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf #-}
 
 {-# LANGUAGE FlexibleContexts #-}
 
@@ -33,6 +34,7 @@ import GHC.Types.Basic (Arity, RepArity)
 import GHC.Core.DataCon
 import GHC.Core.Coercion
 import GHC.Core.TyCon
+import GHC.Core.TyCon.Set
 import GHC.Core.TyCon.RecWalk
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
@@ -686,19 +688,50 @@ primRepToType = anyTypeOfKind . mkTYPEapp . primRepToRuntimeRep
 
 --------------
 mightBeFunTy :: Type -> Bool
--- Return False only if we are *sure* it's a data type
--- Look through newtypes etc as much as possible. Used to
--- decide if we need to enter a closure via a slow call.
+-- ^ Might this type be a function type, including after looking through
+-- newtypes and reducing type family applications?
 --
--- AK: It would be nice to figure out and document the difference
--- between this and isFunTy at some point.
+-- In particular, returns @True@ for @IO a@: after unwrapping the newtype,
+-- we get @State# RealWorld -> (# State# RealWorld, a #)@, which is indeed a
+-- function type.
+--
+-- This function is conservative: it returns @False@ only if the type is
+-- **definitely not** a function type. It returns @True@ when it's not sure,
+-- e.g. for a type family application.
+--
+-- This function is generally used when we can perform certain optimisations
+-- when we are sure a type is not a function type (i.e. operationally does not
+-- take a value argument at runtime).
+--
+-- This is different from 'isFunTy', which only returns @True@ when the type
+-- is a function arrow on-the-nose (without looking through newtypes).
+-- In particular, 'isFunTy' returns @False@ for @IO ()@ as well as for all
+-- type family applications.
 mightBeFunTy ty
-  -- Currently ghc has no unlifted functions.
+  -- GHC (currently) has no unlifted functions, so an unlifted type is
+  -- definitely not a function type.
   | definitelyUnliftedType ty
   = False
-  | [BoxedRep _] <- typePrimRep ty
-  , Just tc <- tyConAppTyCon_maybe (unwrapType ty)
-  , isBoxedDataTyCon tc
-  = False
+  | Just tc <- tyConAppTyCon_maybe (unwrap_type ty)
+  -- A proper datatype (such as 'Int' or 'Maybe Bool') is definitely not
+  -- a function type. (This does not include newtypes nor type families.)
+  = not $ isBoxedDataTyCon tc
   | otherwise
   = True
+
+  where
+    -- Use 'unwrapType' to look through casts, newtypes and foralls.
+    -- Separately, look through unary classes (supposed to be transparent as per
+    -- Note [Unary class magic] in GHC.Core.TyCon). We don't try to reduce type
+    -- family applications, as we don't have a FamInstEnv to hand.
+    unwrap_type = go emptyTyConSet
+      where
+        go seen_tcs ty
+          | Just (tc, tys) <- splitTyConApp_maybe (unwrapType ty)
+          , Just (_cls, unary_dc) <- isUnaryClassTyCon_maybe tc
+          , [inst_meth_ty] <- map scaledThing (dataConInstArgTys unary_dc tys)
+          = if tc `elemTyConSet` seen_tcs
+            then ty -- cycle detected: bail out
+            else go (seen_tcs `extendTyConSet` tc) inst_meth_ty
+          | otherwise
+          = ty

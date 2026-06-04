@@ -102,7 +102,7 @@ import GHC.Types.Basic( Arity )
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Types.Demand
-import GHC.Types.RepType (isZeroBitTy)
+import GHC.Types.RepType (isZeroBitTy, mightBeFunTy)
 
 import GHC.Data.FastString
 import GHC.Data.Maybe
@@ -402,7 +402,13 @@ mk_tick preserve_anf t orig_expr = mkTick' id orig_expr
         -- definition site.  When the variable refers to a function, however,
         -- an SCC annotation on the variable affects the cost-centre stack
         -- when the function is called, so we must retain those.
-        notFunction = not (isFunTy (idType x))
+        -- We must keep the tick around anything that might be a function,
+        -- including:
+        --
+        --  1. Definite function types such as 'Int -> Bool'.
+        --  2. Newtypes around function types, e.g. 'IO ()'. (#27225)
+        --  3. Type family applications that reduce to (1) or (2).
+        notFunction = not (mightBeFunTy (idType x))
 
     Lit{}
       | tickishPlace t == PlaceCostCentre
