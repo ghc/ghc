@@ -289,7 +289,7 @@ instance HasHaddock (Located (HsModule GhcPs)) where
     pure $ L l_mod $
       mod { hsmodExports = hsmodExports'
           , hsmodDecls = hsmodDecls'
-          , hsmodExt = (hsmodExt mod) { hsmodHaddockModHeader = headerDocs } }
+          , hsmodExt = (hsmodExt mod) { hsmodHaddockModHeader = headerDocs } }
 
 lexHsDocString :: HsDocString -> HsDoc GhcPs
 lexHsDocString = lexHsDoc parseIdentifier
