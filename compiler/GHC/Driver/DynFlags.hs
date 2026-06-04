@@ -576,7 +576,8 @@ defaultDynFlags mySettings =
         verbosity               = 0,
         debugLevel              = 0,
         simplPhases             = 2,
-        maxSimplIterations      = 4,
+        maxSimplIterations      = 2,  -- The -O0 default. 'updOptLevel' raises this to 4 at -O1/-O2. See
+                                      -- Note [Simplifier iterations and the optimisation level].
         ruleCheck               = Nothing,
         binBlobThreshold        = Just 500000, -- 500K is a good default (see #16190)
         maxRelevantBinds        = Just 6,

@@ -914,11 +914,12 @@ as such you shouldn't need to set any of them explicitly. A flag
     :ghc-flag:`-Wincomplete-patterns` and :ghc-flag:`-Wincomplete-uni-patterns`.
 
 .. ghc-flag:: -fmax-simplifier-iterations=⟨n⟩
-    :shortdesc: *default: 4.* Set the max iterations for the simplifier.
+    :shortdesc: *default: 2 at :ghc-flag:`-O0`, 4 otherwise.* Set the max iterations
+        for the simplifier.
     :type: dynamic
     :category:
 
-    :default: 4
+    :default: 2 at :ghc-flag:`-O0`, 4 at :ghc-flag:`-O1` and :ghc-flag:`-O2`
 
     Sets the maximal number of iterations for the simplifier.
 

@@ -786,15 +786,45 @@ setInteractivePrint f d = d { interactivePrint = Just f}
 -----------------------------------------------------------------------------
 -- Setting the optimisation level
 
+{- Note [Simplifier iterations and the optimisation level]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At -O0 the only Core-to-Core pass that runs is the final simplifier pass (see
+'GHC.Core.Opt.Pipeline.getCoreToDo'); every optimisation-specific pass is gated
+off. We therefore want as few simplifier iterations as possible at -O0, since
+the later iterations only chase optimisation opportunities the user opted out of
+by choosing -O0.
+
+We cannot drop to a *single* iteration, though. The final simplifier pass is
+still load-bearing for correctness: a single iteration can leave a recursive
+superclass dictionary with an unreduced superclass selector applied to it, which
+then builds an infinite dictionary tower and diverges (<<loop>> at -O, OOM at
+-O0). See #21973 and test T21973b. The fix needs (at least) two iterations: the
+first inlines the dictionary functions to expose a constructor, and the second
+reduces the superclass selector against it, making the recursive dictionary
+dead. Empirically two iterations suffice across the known reproducers; the
+simplifier offers no proof of a fixed bound, so we keep a small margin rather
+than the bare minimum.
+
+So we tie 'maxSimplIterations' to the optimisation level: 2 iterations at -O0
+and 4 at -O1/-O2. This is a noticeable win for unoptimised compilation, and most
+noticeable for the byte-code interpreter (GHCi), which defaults to -O0 and codegen
+does less work compared to other backends.
+
+An explicit -fmax-simplifier-iterations=⟨n⟩ still overrides this, as long as it
+appears after the -O flag on the command line (the usual flag-ordering rule for
+options that -O adjusts).
+-}
+
 updOptLevelChanged :: Int -> DynFlags -> (DynFlags, Bool)
 -- ^ Sets the 'DynFlags' to be appropriate to the optimisation level and signals if any changes took place
 updOptLevelChanged n dfs
-  = (dfs3, changed1 || changed2 || changed3)
+  = (dfs4, changed1 || changed2 || changed3 || changed4)
   where
    final_n = max 0 (min 2 n)    -- Clamp to 0 <= n <= 2
    (dfs1, changed1) = foldr unset (dfs , False) remove_gopts
    (dfs2, changed2) = foldr set   (dfs1, False) extra_gopts
    (dfs3, changed3) = setLlvmOptLevel dfs2
+   (dfs4, changed4) = setSimplIterations dfs3
 
    extra_gopts  = [ f | (ns,f) <- optLevelFlags, final_n `elem` ns ]
    remove_gopts = [ f | (ns,f) <- optLevelFlags, final_n `notElem` ns ]
@@ -812,6 +842,14 @@ updOptLevelChanged n dfs
 
    setLlvmOptLevel dfs
      | llvmOptLevel dfs /= llvm_n = (dfs{ llvmOptLevel = llvm_n }, True)
+     | otherwise = (dfs, False)
+
+   -- See Note [Simplifier iterations and the optimisation level]
+   simpl_iters = if final_n == 0 then 2 else 4
+
+   setSimplIterations dfs
+     | maxSimplIterations dfs /= simpl_iters =
+         (dfs{ maxSimplIterations = simpl_iters }, True)
      | otherwise = (dfs, False)
 
 updOptLevel :: Int -> DynFlags -> DynFlags

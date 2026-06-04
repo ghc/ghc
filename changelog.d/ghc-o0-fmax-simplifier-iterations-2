@@ -1,0 +1,13 @@
+section: compiler
+synopsis: Set ``-fmax-simplifier-iterations=2`` for ``-O0``
+issues: #27326
+mrs: !16137
+
+description: {
+  The maximum number of simplifier iterations
+  (``-fmax-simplifier-iterations``) is now tied to the optimisation
+  level: at most 2 iterations at ``-O0`` (previously 4) and still 4 at
+  ``-O1``/``-O2``. This speeds up unoptimised compilation. An explicit
+  ``-fmax-simplifier-iterations=⟨n⟩`` still overrides the default, as
+  long as it appears after the ``-O`` flag on the command line.
+}
