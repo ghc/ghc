@@ -1904,16 +1904,31 @@ isForAllTy_co ty
 
   | otherwise = False
 
--- | Is this a function or forall?
+-- | Is this type a @FunTy@ or a @ForAllTy@, after expanding type synonyms?
+--
+-- Does not look through newtypes nor reduce type family applications.
 isPiTy :: Type -> Bool
 isPiTy ty = case coreFullView ty of
   ForAllTy {} -> True
   FunTy {}    -> True
   _           -> False
 
--- | Is this a function?
--- Note: `forall {b}. Show b => b -> IO b` will not be considered a function by this function.
---       It would merely be a forall wrapping a function type.
+-- | Is this type a function type (e.g. @X -> Y@ or @X => Y@),
+-- after expanding type synonyms?
+--
+-- Note:
+--
+--  - Does not look through newtypes, so 'isFunTy' is 'False' for @IO ()@,
+--    despite the latter being operationally a function (after expanding newtypes).
+--  - Does not reduce type family applications, so 'isFunTy' is 'False' for
+--    @Id (Int -> Bool)@ (where 'Id' is the identity type family).
+--  - Does not consider @ForAllTy@ to be a function type (even when the argument
+--    is a required argument), nor does it look through foralls.
+--    Hence both 'isFunTy' is 'False' for both @forall b. Show b => b -> b@
+--    and for @forall a -> Int@.
+--
+-- See also 'mightBeFunTy', when you want to know whether something could
+-- be a function (taking a value argument) at runtime.
 isFunTy :: Type -> Bool
 isFunTy ty
   | FunTy {} <- coreFullView ty = True
