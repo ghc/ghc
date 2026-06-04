@@ -50,6 +50,7 @@ GHC.Core.TyCo.Tidy
 GHC.Core.TyCon
 GHC.Core.TyCon.Env
 GHC.Core.TyCon.RecWalk
+GHC.Core.TyCon.Set
 GHC.Core.Type
 GHC.Core.Unfold
 GHC.Core.Unfold.Make

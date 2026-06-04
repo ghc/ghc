@@ -103,7 +103,7 @@ import GHC.Types.Basic( Arity )
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Types.Demand
-import GHC.Types.RepType (isZeroBitTy)
+import GHC.Types.RepType (isZeroBitTy, mightBeFunTy)
 
 import GHC.Data.FastString
 import GHC.Data.Maybe
@@ -390,8 +390,13 @@ mk_tick preserve_anf t orig_expr = mkTick' orig_expr
       -> Case scrut bndr ty [Alt ac abs (mkTick' rhs)]
 
     Var x
-       -- Don't drop any ticks around a function
-      | isFunTy (idType x)
+       -- Don't drop any ticks around anything that might be a function,
+       -- including:
+       --
+       --  1. Definite function types such as 'Int -> Bool'.
+       --  2. Newtypes around function types, e.g. 'IO ()'. (#27225)
+       --  3. Type family applications that reduce to (1) or (2).
+      | mightBeFunTy (idType x)
       -> Tick t expr
       -- Drop SCCs around non-function variables.
       -- See (PSCC1) in Note [Pushing SCCs inwards].
