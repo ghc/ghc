@@ -1,5 +1,5 @@
 {-# LANGUAGE LinearTypes, NoMonoLocalBinds #-}
-{-# LANGUAGE UndecidableInstances, Rank2Types,
+{-# LANGUAGE UndecidableInstances, RankNTypes,
     KindSignatures, EmptyDataDecls, MultiParamTypeClasses, CPP #-}
 
 module T1735_Help.Basics where

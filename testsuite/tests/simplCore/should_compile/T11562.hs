@@ -1,5 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}

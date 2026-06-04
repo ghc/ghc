@@ -1,8 +1,20 @@
 Running with -XNoAlternativeLayoutRule
+on the commandline: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XNoAlternativeLayoutRule is deprecated: AlternativeLayoutRule has been deprecated, and need not be disabled.
+
 Running with -XAlternativeLayoutRule
+on the commandline: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XAlternativeLayoutRule is deprecated: It has never been fully implemented or adequately documented.
+
 layout003.hs:11:4: error: [GHC-58481] parse error on input ‘|’
 
 Running with -XAlternativeLayoutRule -XAlternativeLayoutRuleTransitional
+on the commandline: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XAlternativeLayoutRuleTransitional is deprecated: It has never been fully implemented or adequately documented.
+
+on the commandline: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XAlternativeLayoutRule is deprecated: It has never been fully implemented or adequately documented.
+
 layout003.hs:11:4: warning: [GHC-93617] [-Walternative-layout-rule-transitional (in -Wdefault)]
     transitional layout will not be accepted in the future:
     `|' at the same depth as implicit layout block

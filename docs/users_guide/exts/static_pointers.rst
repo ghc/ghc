@@ -119,7 +119,7 @@ above limitations induce no loss of generality: ::
 
     {-# LANGUAGE ConstraintKinds           #-}
     {-# LANGUAGE ExistentialQuantification #-}
-    {-# LANGUAGE Rank2Types                #-}
+    {-# LANGUAGE RankNTypes                #-}
     {-# LANGUAGE StandaloneDeriving        #-}
     {-# LANGUAGE StaticPointers            #-}
 
