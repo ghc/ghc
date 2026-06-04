@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, Rank2Types #-}
+{-# LANGUAGE ImplicitParams, RankNTypes #-}
 
 -- !!! Implicit parameters, and Rank-2 types
 -- This one made the 5.00.1 not print anything

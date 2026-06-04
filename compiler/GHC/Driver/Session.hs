@@ -2315,7 +2315,7 @@ wWarningFlagsDeps :: [(Deprecation, FlagSpec WarningFlag)]
 wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
 -- See Note [Updating flag description in the User's Guide]
 -- See Note [Supporting CLI completion]
-  Opt_WarnAlternativeLayoutRuleTransitional -> warnSpec x
+  Opt_WarnAlternativeLayoutRuleTransitional -> depWarnSpec x "AlternativeLayoutRule has been deprecated"
   Opt_WarnAmbiguousFields -> warnSpec x
   Opt_WarnAutoOrphans -> depWarnSpec x "it has no effect"
   Opt_WarnCPPUndef -> warnSpec x
@@ -2802,7 +2802,9 @@ makeExtensionFlag name depr ext = (deprecation depr, spec)
                 ExtensionFlagDeprecatedCond cond str
                   -> \f -> when (f == cond) (deprecate str)
                 ExtensionFlagDeprecated str
-                  -> const (deprecate str)
+                  -> \f -> deprecate $ if f == turnOn
+                                       then str
+                                       else name ++ " has been deprecated, and need not be disabled."
 
 extensionEffect :: LangExt.Extension -> (TurnOnFlag -> DynP ())
 extensionEffect = \case

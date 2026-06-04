@@ -92,7 +92,7 @@ Library
         NegativeLiterals
         NondecreasingIndentation
         OverloadedStrings
-        ParallelArrays
+        ParallelListComp
         PolyKinds
         RankNTypes
         RecordWildCards

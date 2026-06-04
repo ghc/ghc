@@ -1,3 +1,15 @@
 Running with -XNoAlternativeLayoutRule
+on the commandline: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XNoAlternativeLayoutRule is deprecated: AlternativeLayoutRule has been deprecated, and need not be disabled.
+
 Running with -XAlternativeLayoutRule
+on the commandline: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XAlternativeLayoutRule is deprecated: It has never been fully implemented or adequately documented.
+
 Running with -XAlternativeLayoutRule -XAlternativeLayoutRuleTransitional
+on the commandline: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XAlternativeLayoutRuleTransitional is deprecated: It has never been fully implemented or adequately documented.
+
+on the commandline: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XAlternativeLayoutRule is deprecated: It has never been fully implemented or adequately documented.
+

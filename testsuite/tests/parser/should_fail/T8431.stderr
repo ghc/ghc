@@ -1,2 +1,5 @@
+on the commandline: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XAlternativeLayoutRule is deprecated: It has never been fully implemented or adequately documented.
 
 T8431.hs:1:1: error: [GHC-58481] parse error on input ‘)’
+

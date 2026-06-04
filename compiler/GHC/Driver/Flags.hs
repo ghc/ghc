@@ -97,8 +97,14 @@ data Deprecation = NotDeprecated | Deprecated deriving (Eq, Ord)
 data ExtensionDeprecation
   = ExtensionNotDeprecated
   | ExtensionDeprecatedFor [LangExt.Extension]
+    -- ^ Both turning on and turning off the flag are deprecated, with a message
+    -- suggesting turning on or off the conjunction of the given extensions
+    -- instead.
   | ExtensionFlagDeprecatedCond TurnOnFlag String
+    -- ^ Only one direction is deprecated, as specified by the 'TurnOnFlag'.
   | ExtensionFlagDeprecated String
+    -- ^ Both turning on and turning off the flag are deprecated, with the given
+    -- message when the flag is enabled and a default message when it is disabled.
   deriving Eq
 
 -- | Always returns 'Deprecated' even when the flag is
@@ -109,18 +115,34 @@ deprecation _ = Deprecated
 
 extensionDeprecation :: LangExt.Extension -> ExtensionDeprecation
 extensionDeprecation = \case
-  LangExt.TypeInType           -> ExtensionDeprecatedFor [LangExt.DataKinds, LangExt.PolyKinds]
-  LangExt.NullaryTypeClasses   -> ExtensionDeprecatedFor [LangExt.MultiParamTypeClasses]
-  LangExt.RelaxedPolyRec       -> ExtensionFlagDeprecatedCond turnOff
-                                    "You can't turn off RelaxedPolyRec any more"
-  LangExt.DatatypeContexts     -> ExtensionFlagDeprecatedCond turnOn
-                                    "It was widely considered a misfeature, and has been removed from the Haskell language."
-  LangExt.AutoDeriveTypeable   -> ExtensionFlagDeprecatedCond turnOn
-                                    "Typeable instances are created automatically for all types since GHC 8.2."
-  LangExt.OverlappingInstances -> ExtensionFlagDeprecated
-                                    "instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS"
-  _                            -> ExtensionNotDeprecated
+  LangExt.AlternativeLayoutRule             -> ExtensionFlagDeprecated
+                                                 "It has never been fully implemented or adequately documented."
+  LangExt.AlternativeLayoutRuleTransitional -> ExtensionFlagDeprecated
+                                                 "It has never been fully implemented or adequately documented."
+  LangExt.AutoDeriveTypeable                -> ExtensionFlagDeprecatedCond turnOn
+                                                 "Typeable instances are created automatically for all types since GHC 8.2."
+  LangExt.DatatypeContexts                  -> ExtensionFlagDeprecatedCond turnOn
+                                                 "It was widely considered a misfeature, and has been removed from the Haskell language."
+  LangExt.NullaryTypeClasses                -> ExtensionDeprecatedFor [LangExt.MultiParamTypeClasses]
+  LangExt.OverlappingInstances              -> ExtensionFlagDeprecated
+                                                 "instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS"
+  LangExt.ParallelArrays                    -> ExtensionDeprecatedFor [LangExt.ParallelListComp]
+  LangExt.RelaxedPolyRec                    -> ExtensionFlagDeprecatedCond turnOff
+                                                 "You can't turn off RelaxedPolyRec any more"
+  LangExt.TypeInType                        -> ExtensionDeprecatedFor [LangExt.DataKinds, LangExt.PolyKinds]
+  _                                         -> ExtensionNotDeprecated
 
+-- | Was this extension known by any other names in the past, which have now
+-- been deprecated? (This does not imply that the main extension itself has been
+-- deprecated. It lists only names that do not correspond to 'LangExt.Extension'
+-- constructors.)
+extensionDeprecatedNames :: LangExt.Extension -> [String]
+extensionDeprecatedNames = \case
+  LangExt.RankNTypes          -> ["Rank2Types", "PolymorphicComponents"]
+  LangExt.RecursiveDo         -> ["DoRec"]
+  LangExt.NamedFieldPuns      -> ["RecordPuns"]
+  LangExt.ScopedTypeVariables -> ["PatternSignatures"]
+  _ -> []
 
 extensionName :: LangExt.Extension -> String
 extensionName = \case
@@ -267,14 +289,6 @@ extensionName = \case
 extensionAlternateNames :: LangExt.Extension -> [String]
 extensionAlternateNames = \case
   LangExt.GeneralizedNewtypeDeriving -> ["GeneralisedNewtypeDeriving"]
-  LangExt.RankNTypes                 -> ["Rank2Types", "PolymorphicComponents"]
-  _ -> []
-
-extensionDeprecatedNames :: LangExt.Extension -> [String]
-extensionDeprecatedNames = \case
-  LangExt.RecursiveDo         -> ["DoRec"]
-  LangExt.NamedFieldPuns      -> ["RecordPuns"]
-  LangExt.ScopedTypeVariables -> ["PatternSignatures"]
   _ -> []
 
 -- | All the names by which an extension is known.

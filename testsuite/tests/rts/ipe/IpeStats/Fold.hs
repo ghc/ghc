@@ -1,6 +1,6 @@
 -- Just a big file we use to test IPE stats from -dipe-stats
 -- Copied from testsuite/tests/haddock/perf/Fold.hs
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -19,7 +19,7 @@
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
 -- Stability   :  provisional
--- Portability :  Rank2Types
+-- Portability :  RankNTypes
 --
 -- A @'Fold' s a@ is a generalization of something 'Foldable'. It allows
 -- you to extract multiple results from a container. A 'Foldable' container

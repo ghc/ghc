@@ -12,14 +12,6 @@ Arbitrary-rank polymorphism
 
     Allow types of arbitrary rank.
 
-.. extension:: Rank2Types
-    :shortdesc: Enable rank-2 types.
-
-    :since: 6.8.1
-    :status: Deprecated
-
-    A deprecated alias of :extension:`RankNTypes`.
-
 GHC's type system supports *arbitrary-rank* explicit universal
 quantification in types. For example, all the following types are legal: ::
 
@@ -83,9 +75,24 @@ arguments. As the types of ``h1`` and ``k1`` are not allowed in Haskell-98, we a
 require users to enable :extension:`RankNTypes` to write them (which seems more
 sensible than inventing a separate extension just for this case).
 
-The obsolete language option :extension:`Rank2Types` is a synonym for
-:extension:`RankNTypes`. They used to specify finer distinctions that GHC no
-longer makes.
+The deprecated language options :extension:`Rank2Types` and
+:extension:`PolymorphicComponents` are synonyms for :extension:`RankNTypes`.
+They used to specify finer distinctions that GHC no longer makes.
+
+.. extension:: Rank2Types
+    :shortdesc: Enable rank-N types.
+
+    :since: 6.8.1
+    :status: Deprecated
+
+    A deprecated alias of :extension:`RankNTypes`.
+
+.. extension:: PolymorphicComponents
+    :shortdesc: Enable rank-N types.
+
+    :status: Deprecated
+
+    A deprecated alias of :extension:`RankNTypes`.
 
 .. _univ:
 

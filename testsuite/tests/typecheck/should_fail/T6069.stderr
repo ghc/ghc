@@ -1,3 +1,6 @@
+T6069.hs:1:14: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XRank2Types is deprecated: use -XRankNTypes or pragma {-# LANGUAGE RankNTypes #-} instead
+
 T6069.hs:13:15: error: [GHC-83865]
     • Couldn't match type: forall s. ST s b0
                      with: ST s0 Int

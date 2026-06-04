@@ -1,12 +1,24 @@
 Running with -XNoAlternativeLayoutRule
+on the commandline: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XNoAlternativeLayoutRule is deprecated: AlternativeLayoutRule has been deprecated, and need not be disabled.
+
 layout006.hs:12:4: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
     In an equation for ‘f’: f | True = ...
 
 Running with -XAlternativeLayoutRule
+on the commandline: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XAlternativeLayoutRule is deprecated: It has never been fully implemented or adequately documented.
+
 layout006.hs:12:2: error: [GHC-58481] parse error on input ‘|’
 
 Running with -XAlternativeLayoutRule -XAlternativeLayoutRuleTransitional
+on the commandline: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XAlternativeLayoutRuleTransitional is deprecated: It has never been fully implemented or adequately documented.
+
+on the commandline: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XAlternativeLayoutRule is deprecated: It has never been fully implemented or adequately documented.
+
 layout006.hs:12:2: warning: [GHC-93617] [-Walternative-layout-rule-transitional (in -Wdefault)]
     transitional layout will not be accepted in the future:
     `|' at the same depth as implicit layout block

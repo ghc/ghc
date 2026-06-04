@@ -10,7 +10,7 @@ Technically
             Int -> forall a. a->a
 is still a rank-1 type, but it's not Haskell 98 (#5957).  So the
 validity checker allow a forall after an arrow only if we allow it
-before -- that is, with Rank2Types or RankNTypes
+before -- that is, with RankNTypes.
 -}
 
 data Rank = ArbitraryRank -- Any rank ok

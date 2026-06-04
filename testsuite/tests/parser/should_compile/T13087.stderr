@@ -1,0 +1,3 @@
+T13087.hs:1:14: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XAlternativeLayoutRule is deprecated: It has never been fully implemented or adequately documented.
+

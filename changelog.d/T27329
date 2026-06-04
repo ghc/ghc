@@ -1,0 +1,15 @@
+section: language
+synopsis: Deprecate various language extensions
+issues: #27329
+mrs: !16145
+
+description: {
+    The following language extensions have been marked as deprecated,
+    meaning they will now issue a warning with :ghc-flag:`-Wdeprecated-flags`:
+
+    - :extension:`AlternativeLayoutRule`
+    - :extension:`AlternativeLayoutRuleTransitional`
+    - :extension:`ParallelArrays`
+    - :extension:`PolymorphicComponents`
+    - :extension:`Rank2Types`
+}
