@@ -232,7 +232,7 @@ rnWcBodyTyKi level ctxt nwc_rdrs hs_ty
                                 , hst_tele = tele', hst_body = hs_body' }
                     , fvs) }
 
-    rn_ty env (HsQualTy { hst_ctxt = L cx hs_ctxt
+    rn_ty env (HsQualTy { hst_ctxt = L cx (HsContext ac hs_ctxt)
                         , hst_body = hs_ty })
       | Just (hs_ctxt1, hs_ctxt_last) <- snocView hs_ctxt
       , L lx (HsWildCardTy h)  <- ignoreParens hs_ctxt_last
@@ -241,7 +241,7 @@ rnWcBodyTyKi level ctxt nwc_rdrs hs_ty
            ; let hs_ctxt' = hs_ctxt1' ++ [L lx (HsWildCardTy h)]
            ; (hs_ty', fvs2) <- rnLHsTyKi env hs_ty
            ; return (HsQualTy { hst_xqual = noExtField
-                              , hst_ctxt = L cx hs_ctxt'
+                              , hst_ctxt = L cx (HsContext ac hs_ctxt')
                               , hst_body = hs_ty' }
                     , fvs1 `plusFN` fvs2) }
 
@@ -249,7 +249,7 @@ rnWcBodyTyKi level ctxt nwc_rdrs hs_ty
       = do { (hs_ctxt', fvs1) <- mapFvRn (rn_top_constraint env) hs_ctxt
            ; (hs_ty', fvs2)   <- rnLHsTyKi env hs_ty
            ; return (HsQualTy { hst_xqual = noExtField
-                              , hst_ctxt = L cx hs_ctxt'
+                              , hst_ctxt = L cx (HsContext ac hs_ctxt')
                               , hst_body = hs_ty' }
                     , fvs1 `plusFN` fvs2) }
 
@@ -259,7 +259,7 @@ rnWcBodyTyKi level ctxt nwc_rdrs hs_ty
     rn_top_constraint env = rnLHsTyKi (env { rtke_what = RnTopConstraint })
 
 
-checkExtraConstraintWildCard :: RnTyKiEnv -> HsContext GhcPs -> RnM ()
+checkExtraConstraintWildCard :: RnTyKiEnv -> [LHsType GhcPs] -> RnM ()
 -- Rename the extra-constraint spot in a type signature
 --    (blah, _) => type
 -- Check that extra-constraints are allowed at all, and
@@ -553,11 +553,11 @@ rnLHsTypeArgs doc args = mapFvRn (rnLHsTypeArg doc) args
 --------------
 rnTyKiContext :: RnTyKiEnv -> LHsContext GhcPs
               -> RnM (LHsContext GhcRn, FreeNames)
-rnTyKiContext env (L loc cxt)
+rnTyKiContext env (L loc (HsContext ac cxt))
   = do { traceRn "rncontext" (ppr cxt)
        ; let env' = env { rtke_what = RnConstraint }
        ; (cxt', fvs) <- mapFvRn (rnLHsTyKi env') cxt
-       ; return (L loc cxt', fvs) }
+       ; return (L loc (HsContext ac cxt'), fvs) }
 
 rnContext :: HsDocContext -> LHsContext GhcPs
           -> RnM (LHsContext GhcRn, FreeNames)
@@ -2171,7 +2171,7 @@ extractDataDefnKindVars (HsDataDefn { dd_kindSig = ksig })
   = maybe [] extractHsTyRdrTyVars ksig
 
 extract_lctxt :: LHsContext GhcPs -> FreeKiTyVars -> FreeKiTyVars
-extract_lctxt ctxt = extract_ltys (unLoc ctxt)
+extract_lctxt ctxt = extract_ltys (hsc_ctxt $ unLoc ctxt)
 
 extract_scaled_ltys :: [HsConDeclField GhcPs]
                     -> FreeKiTyVars -> FreeKiTyVars

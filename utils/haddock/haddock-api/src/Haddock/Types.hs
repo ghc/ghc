@@ -814,7 +814,7 @@ instance WrapXRec DocNameI (HsType DocNameI) where
 
 type instance Anno DocName = SrcSpanAnnN
 type instance Anno (HsTyVarBndr flag DocNameI) = SrcSpanAnnA
-type instance Anno [LocatedA (HsType DocNameI)] = SrcSpanAnnC
+type instance Anno [LocatedA (HsType DocNameI)] = SrcSpanAnnA
 type instance Anno (HsType DocNameI) = SrcSpanAnnA
 type instance Anno (DataFamInstDecl DocNameI) = SrcSpanAnnA
 type instance Anno (DerivStrategy DocNameI) = EpAnn NoEpAnns
@@ -838,6 +838,7 @@ type instance Anno (OverlapMode DocNameI) = EpAnn AnnPragma
 type instance Anno (CType DocNameI) = EpAnn AnnPragma
 type instance Anno (Header DocNameI) = EpAnn AnnPragma
 type instance Anno (HsModifierOf (LocatedA (HsType DocNameI)) DocNameI) = SrcSpanAnnA
+type instance Anno (HsContextDetails DocNameI a) = SrcSpanAnnA
 
 type XRecCond a =
   ( XParTy a ~ (EpToken "(", EpToken ")")
@@ -1025,6 +1026,9 @@ type instance XCInjectivityAnn DocNameI = NoExtField
 type instance XCFunDep DocNameI = NoExtField
 
 type instance XCTyFamInstDecl DocNameI = NoExtField
+
+type instance XHsContext DocNameI = NoExtField
+type instance XXHsContextDetails DocNameI = DataConCantHappen
 
 -----------------------------------------------------------------------------
 

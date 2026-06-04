@@ -1290,11 +1290,6 @@ unTPRnRaw ::
   RnM (r, FreeNames)
 unTPRnRaw (MkTPRnM m) doc_ctxt locals = unCpsRn $ runWriterT $ runReaderT m (doc_ctxt, locals)
 
-wrapSrcSpanTPRnM :: (a -> TPRnM b) -> LocatedAn ann a -> TPRnM (LocatedAn ann b)
-wrapSrcSpanTPRnM fn (L loc a) = do
-  a' <- fn a
-  pure (L loc a')
-
 lookupTypeOccTPRnM :: RdrName -> TPRnM Name
 lookupTypeOccTPRnM rdr_name = liftRnFV $ do
   gre <- lookupTypeOccRn rdr_name
@@ -1355,10 +1350,10 @@ rn_ty_pat (HsForAllTy an tele body) = liftTPRnRaw $ \ctxt locals thing_inside ->
       delLocalNames tele_names $ -- locally bound names do not scope over the continuation
         thing_inside ((HsForAllTy an tele' body'), tpb)
 
-rn_ty_pat (HsQualTy an lctx body) = do
-  lctx' <- wrapSrcSpanTPRnM (mapM rn_lty_pat) lctx
+rn_ty_pat (HsQualTy an (L l (HsContext ac ctx)) body) = do
+  ctx' <- mapM rn_lty_pat ctx
   body' <- rn_lty_pat body
-  pure (HsQualTy an lctx' body')
+  pure (HsQualTy an (L l (HsContext ac ctx')) body')
 
 rn_ty_pat (HsAppTy _ fun_ty arg_ty) = do
   fun_ty' <- rn_lty_pat fun_ty

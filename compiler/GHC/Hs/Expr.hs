@@ -1005,10 +1005,10 @@ ppr_expr (HsEmbTy _ ty)
 ppr_expr (HsStar _)
   = starLit
 
-ppr_expr (HsQual _ ctxt ty)
-  = sep [ppr_context ctxt, ppr_lexpr ty]
+ppr_expr (HsQual _ (L _ ctxt) ty)
+  = sep [ppr_context (hsc_ctxt ctxt), ppr_lexpr ty]
   where
-    ppr_context (L _ ctxt) =
+    ppr_context ctxt =
       case ctxt of
         []       -> parens empty             <+> darrow
         [L _ ty] -> ppr_expr ty              <+> darrow
@@ -2647,7 +2647,7 @@ instance UnXRec p => Outputable (DotFieldOcc p) where
 -}
 
 type instance Anno (HsExpr (GhcPass p)) = SrcSpanAnnA
-type instance Anno [LocatedA (HsExpr (GhcPass p))] = SrcSpanAnnC
+type instance Anno [LocatedA (HsExpr (GhcPass p))] = SrcSpanAnnA
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr))))] = SrcSpanAnnLW
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr))))] = SrcSpanAnnLW
 

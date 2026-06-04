@@ -728,9 +728,10 @@ cvtConstr parent_con do_con_name (ForallC tvs ctxt con)
         ; L _ con'  <- cvtConstr parent_con do_con_name con
         ; returnLA $ add_forall tvs' ctxt' con' }
   where
+    add_cxt :: LHsContext GhcPs -> Maybe (LHsContext GhcPs) -> Maybe (LHsContext GhcPs)
     add_cxt lcxt         Nothing           = mkHsContextMaybe lcxt
-    add_cxt (L loc cxt1) (Just (L _ cxt2))
-      = Just (L loc (cxt1 ++ cxt2))
+    add_cxt (L loc (HsContext _ cxt1)) (Just (L _ (HsContext _ cxt2)))
+      = Just (L loc (HsContext noAnn (cxt1 ++ cxt2)))
 
     -- Nested foralls end up flattened (see tests/th/GadtConSigs_th_dump1.stderr)
     -- but it doesn't seem to matter.
@@ -1224,7 +1225,7 @@ cvtl e = wrapLA (cvt e)
                        ; return $ HsEmbTy noAnn (mkHsWildCardBndrs t') }
     cvt (ConstrainedE ctx body) = do { ctx' <- mapM cvtl ctx
                                      ; body' <- cvtl body
-                                     ; return $ HsQual noExtField (L noAnn ctx') body' }
+                                     ; return $ HsQual noExtField (noLocA (HsContext noAnn ctx')) body' }
     cvt (ForallE tvs body) =
       do { tvs' <- cvtTvs tvs
          ; body' <- cvtl body
@@ -1643,7 +1644,7 @@ cvtRole TH.InferR            = Nothing
 
 cvtContext :: PprPrec -> TH.Cxt -> CvtM (LHsContext GhcPs)
 cvtContext p tys = do { preds' <- mapM cvtPred tys
-                      ; parenthesizeHsContext p <$> returnLA preds' }
+                      ; parenthesizeHsContext p <$> returnLA (HsContext noAnn preds') }
 
 cvtPred :: TH.Pred -> CvtM (LHsType GhcPs)
 cvtPred = cvtType
@@ -1660,7 +1661,7 @@ cvtDerivClauseTys tys
            [ty'@(L l (HsSig { sig_bndrs = HsOuterImplicit{}
                             , sig_body  = L _ (HsTyVar _ NotPromoted _) }))]
                  -> return $ L (l2l l) $ DctSingle noExtField ty'
-           _     -> returnLA $ DctMulti noExtField tys' }
+           _     -> returnLA $ DctMulti noAnn tys' }
 
 cvtDerivClause :: TH.DerivClause
                -> CvtM (LHsDerivingClause GhcPs)
@@ -2046,7 +2047,7 @@ cvtPatSynSigTy :: TH.Type -> CvtM (LHsSigType GhcPs)
 cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
   | null exis, null provs = cvtSigType (ForallT univs reqs ty)
   | null univs, null reqs = do { ty' <- cvtType (ForallT exis provs ty)
-                               ; ctxt' <- returnLA []
+                               ; ctxt' <- returnLA (HsContext noAnn [])
                                ; cxtTy <- wrapParLA mkHsImplicitSigType $
                                           HsQualTy { hst_ctxt = ctxt'
                                                    , hst_xqual = noExtField
@@ -2054,7 +2055,7 @@ cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
                                ; returnLA cxtTy }
   | null reqs             = do { univs' <- cvtTvs univs
                                ; ty'    <- cvtType (ForallT exis provs ty)
-                               ; ctxt'  <- returnLA []
+                               ; ctxt'  <- returnLA (HsContext noAnn [])
                                ; let cxtTy = HsQualTy { hst_ctxt = ctxt'
                                                       , hst_xqual = noExtField
                                                       , hst_body = ty' }
@@ -2153,7 +2154,7 @@ mkHsQualTy ctxt loc ctxt' ty
 -- they're empty.
 mkHsContextMaybe :: LHsContext GhcPs -> Maybe (LHsContext GhcPs)
 mkHsContextMaybe lctxt@(L _ ctxt)
-  | null ctxt = Nothing
+  | null (hsc_ctxt ctxt) = Nothing
   | otherwise = Just lctxt
 
 mkHsOuterFamEqnTyVarBndrs :: Maybe [LHsTyVarBndr () GhcPs] -> HsOuterFamEqnTyVarBndrs GhcPs

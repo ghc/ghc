@@ -1622,7 +1622,7 @@ instance ToHie (LocatedA (TyClDecl GhcRn)) where
         , toHie defn
         ]
         where
-          quant_scope = mkScope $ fromMaybe (noLocA []) $ dd_ctxt defn
+          quant_scope = mkScope $ fromMaybe (noLocA (HsContext noAnn [])) $ dd_ctxt defn
           rhs_scope = sig_sc `combineScopes` con_sc `combineScopes` deriv_sc
           sig_sc = maybe NoScope mkScope $ dd_kindSig defn
           con_sc = foldr combineScopes NoScope $ mkScope <$> dd_cons defn
@@ -1647,7 +1647,7 @@ instance ToHie (LocatedA (TyClDecl GhcRn)) where
         , toHie deftyps
         ]
         where
-          context_scope = mkScope $ fromMaybe (noLocA []) context
+          context_scope = mkScope $ fromMaybe (noLocA (HsContext noAnn [])) context
           rhs_scope = foldl1' combineScopes $ NE.map mkScope
             ( getHasLocList deps :| getHasLocList sigs : getHasLocList meths : getHasLocList typs : getHasLocList deftyps : [])
 
@@ -1739,7 +1739,7 @@ instance ToHie (LocatedAn NoEpAnns (HsDerivingClause GhcRn)) where
         , toHie dct
         ]
 
-instance ToHie (LocatedC (DerivClauseTys GhcRn)) where
+instance ToHie (LocatedA (DerivClauseTys GhcRn)) where
   toHie (L span dct) = concatM $ makeNodeA dct span : case dct of
       DctSingle _ ty -> [ toHie $ TS (ResolvedScopes []) ty ]
       DctMulti _ tys -> [ toHie $ map (TS (ResolvedScopes [])) tys ]
@@ -2015,14 +2015,14 @@ instance ToHie (TScoped (LHsQTyVars GhcRn)) where
       varLoc = getHasLocList vars
       bindings = map (C $ TyVarBind (mkScope varLoc) sc) implicits
 
-instance ToHie (LocatedC [LocatedA (HsType GhcRn)]) where
-  toHie (L span tys) = concatM $
-      [ locOnly (locA span)
-      , toHie tys
-      ]
+instance ToHie (LocatedA (HsContextDetails (GhcPass p) (LocatedA (HsType GhcRn)))) where
+  toHie (L span (HsContext _ tys)) = concatM $
+    [ locOnly (locA span)
+    , toHie tys
+    ]
 
-instance HiePass p => ToHie (LocatedC [LocatedA (HsExpr (GhcPass p))]) where
-  toHie (L span exprs) = concatM $
+instance HiePass p => ToHie (LocatedA (HsContextDetails (GhcPass p) (LocatedA (HsExpr (GhcPass p))))) where
+  toHie (L span (HsContext _ exprs)) = concatM $
     [ locOnly (locA span)
     , toHie exprs
     ]

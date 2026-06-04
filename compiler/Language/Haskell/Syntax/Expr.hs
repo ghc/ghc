@@ -534,7 +534,7 @@ data HsExpr p
   -- Constrained types @ctx => t@.
   -- Used with @RequiredTypeArguments@, e.g. @fn (Bounded a => a)@.
   -- See Note [Types in terms]
-  | HsQual (XQual p) (XRec p [LHsExpr p]) (LHsExpr p)
+  | HsQual (XQual p) (XRec p (HsContextDetails p (LHsExpr p)))  (LHsExpr p)
 
   -- | Function types @a -> b@.
   -- Used with @RequiredTypeArguments@, e.g. @fn (Int -> Bool)@.

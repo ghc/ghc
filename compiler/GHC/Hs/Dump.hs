@@ -96,7 +96,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `ext2Q` located
               `extQ` srcSpanAnnA
               `extQ` srcSpanAnnP
-              `extQ` srcSpanAnnC
               `extQ` srcSpanAnnN
               `extQ` srcSpanAnnBF
 
@@ -393,9 +392,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             srcSpanAnnP :: EpAnn AnnPragma -> SDoc
             srcSpanAnnP = locatedAnn'' (text "SrcSpanAnnP")
-
-            srcSpanAnnC :: EpAnn AnnContext -> SDoc
-            srcSpanAnnC = locatedAnn'' (text "SrcSpanAnnC")
 
             srcSpanAnnN :: EpAnn NameAnn -> SDoc
             srcSpanAnnN = locatedAnn'' (text "SrcSpanAnnN")

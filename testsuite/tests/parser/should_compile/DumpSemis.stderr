@@ -1587,113 +1587,115 @@
            (L
             (EpAnn
              (EpaSpan { DumpSemis.hs:31:6-20 })
-             (AnnContext
-              (Just
-               (EpUniTok
-                (EpaSpan { DumpSemis.hs:31:22-23 })
-                (NormalSyntax)))
+             (AnnListItem
+              [(AddDarrowAnn
+                (EpUniTok
+                 (EpaSpan { DumpSemis.hs:31:22-23 })
+                 (NormalSyntax)))])
+             (EpaComments
+              []))
+            (HsContext
+             ((,)
               [(EpTok (EpaSpan { DumpSemis.hs:31:6 }))
               ,(EpTok (EpaSpan { DumpSemis.hs:31:7 }))]
               [(EpTok (EpaSpan { DumpSemis.hs:31:19 }))
               ,(EpTok (EpaSpan { DumpSemis.hs:31:20 }))])
-             (EpaComments
-              []))
-            [(L
-              (EpAnn
-               (EpaSpan { DumpSemis.hs:31:8-11 })
-               (AnnListItem
-                [(AddCommaAnn
-                  (EpTok
-                   (EpaSpan { DumpSemis.hs:31:12 })))])
-               (EpaComments
-                []))
-              (HsAppTy
-               (NoExtField)
-               (L
-                (EpAnn
-                 (EpaSpan { DumpSemis.hs:31:8-9 })
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  []))
-                (HsTyVar
-                 (NoEpTok)
-                 (NotPromoted)
-                 (L
-                  (EpAnn
-                   (EpaSpan { DumpSemis.hs:31:8-9 })
-                   (NameAnnTrailing
-                    [])
-                   (EpaComments
-                    []))
-                  (Unqual
-                   {OccName: Eq}))))
-               (L
-                (EpAnn
-                 (EpaSpan { DumpSemis.hs:31:11 })
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  []))
-                (HsTyVar
-                 (NoEpTok)
-                 (NotPromoted)
-                 (L
-                  (EpAnn
-                   (EpaSpan { DumpSemis.hs:31:11 })
-                   (NameAnnTrailing
-                    [])
-                   (EpaComments
-                    []))
-                  (Unqual
-                   {OccName: a}))))))
-            ,(L
-              (EpAnn
-               (EpaSpan { DumpSemis.hs:31:14-18 })
-               (AnnListItem
-                [])
-               (EpaComments
-                []))
-              (HsAppTy
-               (NoExtField)
-               (L
-                (EpAnn
-                 (EpaSpan { DumpSemis.hs:31:14-16 })
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  []))
-                (HsTyVar
-                 (NoEpTok)
-                 (NotPromoted)
-                 (L
-                  (EpAnn
-                   (EpaSpan { DumpSemis.hs:31:14-16 })
-                   (NameAnnTrailing
-                    [])
-                   (EpaComments
-                    []))
-                  (Unqual
-                   {OccName: Ord}))))
-               (L
-                (EpAnn
-                 (EpaSpan { DumpSemis.hs:31:18 })
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  []))
-                (HsTyVar
-                 (NoEpTok)
-                 (NotPromoted)
-                 (L
-                  (EpAnn
-                   (EpaSpan { DumpSemis.hs:31:18 })
-                   (NameAnnTrailing
-                    [])
-                   (EpaComments
-                    []))
-                  (Unqual
-                   {OccName: a}))))))])
+             [(L
+               (EpAnn
+                (EpaSpan { DumpSemis.hs:31:8-11 })
+                (AnnListItem
+                 [(AddCommaAnn
+                   (EpTok
+                    (EpaSpan { DumpSemis.hs:31:12 })))])
+                (EpaComments
+                 []))
+               (HsAppTy
+                (NoExtField)
+                (L
+                 (EpAnn
+                  (EpaSpan { DumpSemis.hs:31:8-9 })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   []))
+                 (HsTyVar
+                  (NoEpTok)
+                  (NotPromoted)
+                  (L
+                   (EpAnn
+                    (EpaSpan { DumpSemis.hs:31:8-9 })
+                    (NameAnnTrailing
+                     [])
+                    (EpaComments
+                     []))
+                   (Unqual
+                    {OccName: Eq}))))
+                (L
+                 (EpAnn
+                  (EpaSpan { DumpSemis.hs:31:11 })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   []))
+                 (HsTyVar
+                  (NoEpTok)
+                  (NotPromoted)
+                  (L
+                   (EpAnn
+                    (EpaSpan { DumpSemis.hs:31:11 })
+                    (NameAnnTrailing
+                     [])
+                    (EpaComments
+                     []))
+                   (Unqual
+                    {OccName: a}))))))
+             ,(L
+               (EpAnn
+                (EpaSpan { DumpSemis.hs:31:14-18 })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 []))
+               (HsAppTy
+                (NoExtField)
+                (L
+                 (EpAnn
+                  (EpaSpan { DumpSemis.hs:31:14-16 })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   []))
+                 (HsTyVar
+                  (NoEpTok)
+                  (NotPromoted)
+                  (L
+                   (EpAnn
+                    (EpaSpan { DumpSemis.hs:31:14-16 })
+                    (NameAnnTrailing
+                     [])
+                    (EpaComments
+                     []))
+                   (Unqual
+                    {OccName: Ord}))))
+                (L
+                 (EpAnn
+                  (EpaSpan { DumpSemis.hs:31:18 })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   []))
+                 (HsTyVar
+                  (NoEpTok)
+                  (NotPromoted)
+                  (L
+                   (EpAnn
+                    (EpaSpan { DumpSemis.hs:31:18 })
+                    (NameAnnTrailing
+                     [])
+                    (EpaComments
+                     []))
+                   (Unqual
+                    {OccName: a}))))))]))
            (L
             (EpAnn
              (EpaSpan { DumpSemis.hs:31:25-30 })

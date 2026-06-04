@@ -693,7 +693,7 @@ rDoc = maybeDoc . fmap latexStripTrailingWhitespace
 
 ppClassHdr
   :: Bool
-  -> Maybe (LocatedC [LHsType DocNameI])
+  -> Maybe (LHsContext DocNameI)
   -> DocName
   -> LHsQTyVars DocNameI
   -> [LHsFunDep DocNameI]
@@ -701,7 +701,7 @@ ppClassHdr
   -> LaTeX
 ppClassHdr summ lctxt n tvs fds unicode =
   keyword "class"
-    <+> (if not (null $ fromMaybeContext lctxt) then ppLContext lctxt unicode else empty)
+    <+> (if not (null $ hsc_ctxt $ fromMaybeContext lctxt) then ppLContext lctxt unicode else empty)
     <+> ppAppDocNameNames summ n (tyvarNames tvs)
     <+> ppFds fds unicode
 
@@ -921,7 +921,7 @@ ppConstrHdr forall_ tvs ctxt unicode = ppForall <> ppCtxt
       | otherwise = ppHsForAllTelescope (mkHsForAllInvisTeleI tvs) unicode
 
     ppCtxt
-      | null ctxt = empty
+      | null (hsc_ctxt ctxt) = empty
       | otherwise = ppContextNoArrow ctxt unicode <+> darrow unicode <> space
 
 -- | Pretty-print a constructor
@@ -1185,7 +1185,7 @@ ppContextNoLocsMaybe cxt unicode = Just $ pp_hs_context cxt unicode
 ppContextNoArrow :: HsContext DocNameI -> Bool -> LaTeX
 ppContextNoArrow cxt unicode =
   Maybe.fromMaybe empty $
-    ppContextNoLocsMaybe (map unLoc cxt) unicode
+    ppContextNoLocsMaybe (map unLoc (hsc_ctxt cxt)) unicode
 
 ppContextNoLocs :: [HsType DocNameI] -> Bool -> LaTeX
 ppContextNoLocs cxt unicode =
@@ -1193,7 +1193,7 @@ ppContextNoLocs cxt unicode =
     ppContextNoLocsMaybe cxt unicode
 
 ppContext :: HsContext DocNameI -> Bool -> LaTeX
-ppContext cxt unicode = ppContextNoLocs (map unLoc cxt) unicode
+ppContext cxt unicode = ppContextNoLocs (map unLoc (hsc_ctxt cxt)) unicode
 
 pp_hs_context :: [HsType DocNameI] -> Bool -> LaTeX
 pp_hs_context [] _ = empty

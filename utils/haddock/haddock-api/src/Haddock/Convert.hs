@@ -686,7 +686,7 @@ synifyTcIdSig boundTvs (i, dm) =
     defSig t = synifySigType ImplicitizeForAll boundTvs t
 
 synifyCtx :: [PredType] -> LHsContext GhcRn
-synifyCtx ts = noLocA (map (synifyType WithinType emptyVarSet) ts)
+synifyCtx ts = noLocA (HsContext noAnn (map (synifyType WithinType emptyVarSet) ts))
 
 synifyTyVars :: [TyVar] -> LHsQTyVars GhcRn
 synifyTyVars ktvs =

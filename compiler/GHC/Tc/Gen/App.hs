@@ -1140,10 +1140,10 @@ expr_to_type earg =
     go (L l (HsForAll _ tele expr)) =
       do { ty <- go expr
          ; return (L l (HsForAllTy noExtField tele ty))}
-    go (L l (HsQual _ (L ann ctxt) expr)) =
+    go (L l (HsQual _ (L lc (HsContext an ctxt)) expr)) =
       do { ctxt' <- mapM go ctxt
          ; ty <- go expr
-         ; return (L l (HsQualTy noExtField (L ann ctxt') ty)) }
+         ; return (L l (HsQualTy noExtField (L lc (HsContext an ctxt')) ty)) }
     go (L l (HsVar _ lname)) =
       -- GHC Proposal #281, section 7.5 "T2T-Mapping":
       --   variables and constructors (regardless of their namespace)

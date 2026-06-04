@@ -2021,7 +2021,7 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
                            , dd_kindSig = m_sig, dd_derivs = derivs })
   = do  { -- DatatypeContexts (i.e., stupid contexts) can't be combined with
           -- GADT syntax. See Note [The stupid context] in GHC.Core.DataCon.
-          checkTc (h98_style || null (fromMaybeContext context))
+          checkTc (h98_style || null (hsc_ctxt $ fromMaybeContext context))
                   (TcRnStupidThetaInGadt doc)
 
         -- Check restrictions on "type data" declarations.
@@ -2071,7 +2071,7 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
     -- on the declaration.  See Note [Type data declarations].
     check_type_data
       = do { unlessXOptM LangExt.TypeData $ failWith TcRnIllegalTypeData
-           ; unless (null (fromMaybeContext context)) $
+           ; unless (null (hsc_ctxt $ fromMaybeContext context)) $
                failWith $ TcRnTypeDataForbids TypeDataForbidsDatatypeContexts
            ; mapM_ (addLocM check_type_data_condecl) condecls
            ; unless (null derivs) $

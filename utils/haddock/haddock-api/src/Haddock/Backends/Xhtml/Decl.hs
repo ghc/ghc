@@ -332,7 +332,7 @@ ppSubSigLike unicode qual typ argDocs subdocs sep emptyCtxts = do_sig_args 0 sep
       where
         leader' = leader <+> ppForAllPart unicode qual tele
     do_args n leader (HsQualTy _ lctxt ltype)
-      | null (unLoc lctxt) =
+      | null (hsc_ctxt $ unLoc lctxt) =
           do_largs n leader ltype
       | otherwise =
           (leader <+> ppLContextNoArrow lctxt unicode qual emptyCtxts, Nothing, [])
@@ -707,7 +707,7 @@ ppLContext
   -> Qualification
   -> HideEmptyContexts
   -> Html
-ppLContext Nothing u q h = ppContext [] u q h
+ppLContext Nothing u q h = ppContext (HsContext noExtField []) u q h
 ppLContext (Just c) u q h = ppContext (unLoc c) u q h
 
 ppLContextNoArrow
@@ -721,7 +721,7 @@ ppLContextNoArrow c u q h = ppContextNoArrow (unLoc c) u q h
 ppContextNoArrow :: HsContext DocNameI -> Unicode -> Qualification -> HideEmptyContexts -> Html
 ppContextNoArrow cxt unicode qual emptyCtxts =
   Maybe.fromMaybe noHtml $
-    ppContextNoLocsMaybe (map unLoc cxt) unicode qual emptyCtxts
+    ppContextNoLocsMaybe (map unLoc (hsc_ctxt cxt)) unicode qual emptyCtxts
 
 ppContextNoLocs :: [HsType DocNameI] -> Unicode -> Qualification -> HideEmptyContexts -> Html
 ppContextNoLocs cxt unicode qual emptyCtxts =
@@ -736,7 +736,7 @@ ppContextNoLocsMaybe [] _ _ emptyCtxts =
 ppContextNoLocsMaybe cxt unicode qual _ = Just $ ppHsContext cxt unicode qual
 
 ppContext :: HsContext DocNameI -> Unicode -> Qualification -> HideEmptyContexts -> Html
-ppContext cxt unicode qual emptyCtxts = ppContextNoLocs (map unLoc cxt) unicode qual emptyCtxts
+ppContext cxt unicode qual emptyCtxts = ppContextNoLocs (map unLoc (hsc_ctxt cxt)) unicode qual emptyCtxts
 
 ppHsContext :: [HsType DocNameI] -> Unicode -> Qualification -> Html
 ppHsContext [] _ _ = noHtml
@@ -751,7 +751,7 @@ ppHsContext cxt unicode qual = parenBreakableList (map (ppType unicode qual Hide
 
 ppClassHdr
   :: Bool
-  -> Maybe (LocatedC [LHsType DocNameI])
+  -> Maybe (LHsContext DocNameI)
   -> DocName
   -> LHsQTyVars DocNameI
   -> [LHsFunDep DocNameI]
@@ -760,7 +760,7 @@ ppClassHdr
   -> Html
 ppClassHdr summ lctxt n tvs fds unicode qual =
   keyword "class"
-    <+> (if not (null $ fromMaybeContext lctxt) then ppLContext lctxt unicode qual HideEmptyContexts else noHtml)
+    <+> (if not (null $ hsc_ctxt $ fromMaybeContext lctxt) then ppLContext lctxt unicode qual HideEmptyContexts else noHtml)
     <+> ppAppDocNameTyVarBndrs summ unicode qual n (hsQTvExplicitBinders tvs)
     <+> ppFds fds unicode qual
 
@@ -1527,7 +1527,7 @@ ppConstrHdr forall_ tvs ctxt unicode qual = ppForall +++ ppCtxt
       | otherwise = ppForAllPart unicode qual (HsForAllInvis noExtField tvs)
 
     ppCtxt
-      | null ctxt = noHtml
+      | null (hsc_ctxt ctxt) = noHtml
       | otherwise =
           ppContextNoArrow ctxt unicode qual HideEmptyContexts
             <+> darrow unicode
@@ -1763,16 +1763,18 @@ patSigContext sig_typ
   where
     typ = sig_body (unLoc sig_typ)
 
+    hasNonEmptyContext :: LHsType DocNameI -> Bool
     hasNonEmptyContext t =
       case unLoc t of
         HsForAllTy _ _ s -> hasNonEmptyContext s
-        HsQualTy _ cxt s -> if null (unLoc cxt) then hasNonEmptyContext s else True
+        HsQualTy _ cxt s -> if null (hsc_ctxt $ unLoc cxt) then hasNonEmptyContext s else True
         HsFunTy _ _ _ s -> hasNonEmptyContext s
         _ -> False
+    isFirstContextEmpty :: LHsType DocNameI -> Bool
     isFirstContextEmpty t =
       case unLoc t of
         HsForAllTy _ _ s -> isFirstContextEmpty s
-        HsQualTy _ cxt _ -> null (unLoc cxt)
+        HsQualTy _ cxt _ -> null (hsc_ctxt $ unLoc cxt)
         HsFunTy _ _ _ s -> isFirstContextEmpty s
         _ -> False
 

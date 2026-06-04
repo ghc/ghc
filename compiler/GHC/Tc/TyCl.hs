@@ -4005,7 +4005,7 @@ dataDeclChecks :: Name
                -> Maybe (LHsContext GhcRn) -> DataDefnCons (LConDecl GhcRn)
                -> TcM Bool
 dataDeclChecks tc_name mctxt cons
-  = do { let stupid_theta = fromMaybeContext mctxt
+  = do { let stupid_theta = hsc_ctxt $ fromMaybeContext mctxt
          -- Check that we don't use GADT syntax in H98 world
        ;  gadtSyntax_ok <- xoptM LangExt.GADTSyntax
        ; let gadt_syntax = anyLConIsGadt cons

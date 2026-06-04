@@ -1239,12 +1239,12 @@ checkContext orig_t@(L (EpAnn l _ cs) _orig_t) =
   check (_opi,_cpi,_csi) _t = unprocessed
 
   unprocessed =
-    return (L (EpAnn l (AnnContext Nothing [] []) emptyComments) [orig_t])
+    return (L (EpAnn l noAnn emptyComments) (HsContext noAnn [orig_t]))
 
 
   mkCTuple (oparens, cparens, cs) ts =
     -- Append parens so that the original order in the source is maintained
-    return (L (EpAnn l (AnnContext Nothing oparens cparens) cs) ts)
+    return (L (EpAnn l noAnn cs) (HsContext (oparens, cparens) ts))
 
 -- | The same as `checkContext`, but for expressions.
 --
@@ -1257,12 +1257,12 @@ checkContext orig_t@(L (EpAnn l _ cs) _orig_t) =
 --     (Eq a)               -->  [Eq a]
 --     (((Eq a)))           -->  [Eq a]
 -- @
-checkContextExpr :: LHsExpr GhcPs -> PV (LocatedC [LHsExpr GhcPs])
+checkContextExpr :: LHsExpr GhcPs -> PV (LocatedA (HsContextDetails GhcPs (LHsExpr GhcPs)))
 checkContextExpr orig_expr@(L (EpAnn l _ cs) _) =
   check ([],[], cs) orig_expr
   where
     check :: ([EpToken "("],[EpToken ")"],EpAnnComments)
-        -> LHsExpr GhcPs -> PV (LocatedC [LHsExpr GhcPs])
+        -> LHsExpr GhcPs -> PV (LocatedA (HsContextDetails GhcPs (LHsExpr GhcPs)))
     check (oparens,cparens,cs) (L _ (ExplicitTuple (AnnParens open_tok close_tok) tup_args Boxed))
              -- Neither unboxed tuples (#e1,e2#) nor tuple sections (e1,,e2,) can be a context
       | Just es <- tupArgsPresent_maybe tup_args
@@ -1275,11 +1275,11 @@ checkContextExpr orig_expr@(L (EpAnn l _ cs) _) =
     check _ _ = unprocessed
 
     unprocessed =
-      return (L (EpAnn l (AnnContext Nothing [] []) emptyComments) [orig_expr])
+      return (L (EpAnn l noAnn emptyComments) (HsContext noAnn [orig_expr]))
 
     mkCTuple (oparens, cparens, cs) ts =
       -- Append parens so that the original order in the source is maintained
-      return (L (EpAnn l (AnnContext Nothing oparens cparens) cs) ts)
+      return (L (EpAnn l noAnn cs) (HsContext (oparens, cparens) ts))
 
 checkImportDecl :: Maybe (EpToken "qualified")
                 -> Maybe (EpToken "qualified")
@@ -1842,9 +1842,9 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   -- | Disambiguate "forall a. b" and "forall a -> b" (forall telescope)
   mkHsForallPV :: SrcSpan -> HsForAllTelescope GhcPs -> LocatedA b -> PV (LocatedA b)
   -- | Disambiguate "(a,b,c)" to the left of "=>" (constraint list)
-  checkContextPV :: LocatedA b -> PV (LocatedC [LocatedA b])
+  checkContextPV :: LocatedA b -> PV (LocatedA (HsContextDetails GhcPs (LocatedA b)))
   -- | Disambiguate "a => b" (constraint context)
-  mkQualPV :: SrcSpan -> LocatedC [LocatedA b] -> LocatedA b -> PV (LocatedA b)
+  mkQualPV :: SrcSpan -> LocatedA (HsContextDetails GhcPs (LocatedA b)) -> LocatedA b -> PV (LocatedA b)
   -- | Disambiguate "a@b" (as-pattern)
   mkHsAsPatPV
     :: SrcSpan -> LocatedN RdrName -> EpToken "@" -> LocatedA b -> PV (LocatedA b)
@@ -2109,9 +2109,9 @@ instance DisambECP (HsExpr GhcPs) where
     return $ L (noAnnSrcSpan l) $
       HsForAll noExtField (setTelescopeBndrsNameSpace varName telescope) ty
   checkContextPV = checkContextExpr
-  mkQualPV l qual ty =
+  mkQualPV l ctxt ty =
     return $ L (noAnnSrcSpan l) $
-      HsQual noExtField qual ty
+      HsQual noExtField ctxt ty
   mkHsModifiedPV l _ _ = do
     addError $ mkPlainErrorMsgEnvelope l $ PsErrModifierSyntax DontSuggestModifiers
     return $ L (noAnnSrcSpan l) parseError

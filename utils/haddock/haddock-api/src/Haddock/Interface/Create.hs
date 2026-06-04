@@ -977,7 +977,7 @@ extractPatternSyn nm t tvs cons =
             case con of
               ConDeclH98{con_mb_cxt = Just cxt} -> noLocA (HsQualTy noExtField cxt typ)
               _ -> typ
-          typ'' = noLocA (HsQualTy noExtField (noLocA []) typ')
+          typ'' = noLocA (HsQualTy noExtField (noLocA emptyContext) typ')
        in PatSynSig noAnn [noLocA nm] (mkEmptySigType typ'')
 
     longArrow :: [LHsType GhcRn] -> LHsType GhcRn -> LHsType GhcRn

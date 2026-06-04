@@ -509,7 +509,7 @@ makeDerivSpecs deriv_infos deriv_decls
         ; eqns2 <- mapM (recoverM (pure Nothing) . deriveStandalone) deriv_decls
         ; return $ concat eqns1 ++ catMaybes eqns2 }
   where
-    deriv_clause_preds :: LDerivClauseTys GhcRn -> LocatedC [LHsSigType GhcRn]
+    deriv_clause_preds :: LDerivClauseTys GhcRn -> LocatedA [LHsSigType GhcRn]
     deriv_clause_preds (L loc dct) = case dct of
       DctSingle _ ty -> L loc [ty]
       DctMulti _ tys -> L loc tys
@@ -520,7 +520,7 @@ deriveClause :: TyCon
              -> [(Name, TcTyVar)]  -- Scoped type variables taken from tcTyConScopedTyVars
                                    -- See Note [Scoped tyvars in a TcTyCon] in "GHC.Core.TyCon"
              -> Maybe (LDerivStrategy GhcRn)
-             -> LocatedC [LHsSigType GhcRn]
+             -> LocatedA [LHsSigType GhcRn]
                 -- ^ The location refers to the @(Show, Eq)@ part of @deriving (Show, Eq)@.
              -> HsCtxt
              -> TcM [EarlyDerivSpec]
@@ -809,7 +809,7 @@ tcStandaloneDerivInstType ctxt
     (HsWC { hswc_body = deriv_ty@(L loc (HsSig { sig_bndrs = outer_bndrs
                                                , sig_body = deriv_ty_body }))})
   | (theta, rho) <- splitLHsQualTy deriv_ty_body
-  , [wc_pred] <- fromMaybeContext theta
+  , [wc_pred] <- hsc_ctxt $ fromMaybeContext theta
   , L wc_span (HsWildCardTy _) <- ignoreParens wc_pred
   = do dfun_ty <- tcHsClsInstType ctxt $ L loc $
                   HsSig { sig_ext   = noExtField

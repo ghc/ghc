@@ -545,6 +545,15 @@ deriving instance Data (HsModifierOf (LocatedA (HsExpr GhcPs)) GhcPs)
 deriving instance Data (HsModifierOf (LocatedA (HsExpr GhcRn)) GhcRn)
 deriving instance Data (HsModifierOf (LocatedA (HsExpr GhcTc)) GhcTc)
 
+-- deriving instance Data (HsContext p)
+deriving instance Data (HsContextDetails GhcPs (LocatedA (HsType GhcPs)))
+deriving instance Data (HsContextDetails GhcRn (LocatedA (HsType GhcRn)))
+deriving instance Data (HsContextDetails GhcTc (LocatedA (HsType GhcTc)))
+
+deriving instance Data (HsContextDetails GhcPs (LocatedA (HsExpr GhcPs)))
+deriving instance Data (HsContextDetails GhcRn (LocatedA (HsExpr GhcRn)))
+deriving instance Data (HsContextDetails GhcTc (LocatedA (HsExpr GhcTc)))
+
 -- deriving instance Data (HsBndrVis p)
 deriving instance Data (HsBndrVis GhcPs)
 deriving instance Data (HsBndrVis GhcRn)
