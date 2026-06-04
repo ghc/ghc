@@ -44,7 +44,7 @@ okSymChar c
       _                    -> False
 
 startsVarSym, startsVarId, startsConSym, startsConId :: Char -> Bool
-startsVarSym c = okSymChar c && c /= ':' -- Infix Ids
+startsVarSym c = okSymChar c && c /= ':' -- Infix Ids
 startsConSym c = c == ':'                -- Infix data constructors
 startsVarId c  = c == '_' || case generalCategory c of  -- Ordinary Ids
   LowercaseLetter -> True

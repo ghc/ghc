@@ -293,22 +293,22 @@ ppr_termM1 Prim{valRaw=words, ty=ty} =
     return $ repPrim (tyConAppTyCon ty) words
 ppr_termM1 Suspension{ty=ty, bound_to=Nothing, infoprov=mipe} =
   return $ hcat $
-    [ char '_'
-    , whenPprDebug $
+    [ char '_'
+    , whenPprDebug $
         space <>
         dcolon <>
         pprSigmaType ty
-    ] ++
-    [ whenPprDebug $
+    ] ++
+    [ whenPprDebug $
         space <>
         char '<' <>
         text (ipSrcFile ipe) <>
         char ':' <>
         text (ipSrcSpan ipe) <>
         char '>'
-    | Just ipe <- [mipe]
+    | Just ipe <- [mipe]
     , not $ null $ ipSrcFile ipe
-    ]
+    ]
 ppr_termM1 Suspension{ty=ty, bound_to=Just n}
   | otherwise = return$ parens$ ppr n <> dcolon <> pprSigmaType ty
 ppr_termM1 Term{}        = panic "ppr_termM1 - Term"

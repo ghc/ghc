@@ -413,7 +413,7 @@ defaultLogAction = defaultLogActionWithHandles stdout stderr
 
 -- | The default 'LogAction' parametrized over the standard output and standard error handles.
 -- Allows clients to replicate the log message formatting of GHC with custom handles.
-defaultLogActionWithHandles :: Handle {-^ Handle for standard output -} -> Handle {-^ Handle for standard errors -} -> LogAction
+defaultLogActionWithHandles :: Handle {-^ Handle for standard output -} -> Handle {-^ Handle for standard errors -} -> LogAction
 defaultLogActionWithHandles out err logflags msg_class srcSpan msg
   | log_dopt Opt_D_dump_json logflags = jsonLogActionWithHandle out logflags msg_class srcSpan msg
   | otherwise = case msg_class of

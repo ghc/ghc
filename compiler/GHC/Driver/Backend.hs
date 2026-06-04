@@ -184,7 +184,7 @@ import GHC.Platform
 -- about enumerating them.  Just one set of error messages has been
 -- ported to have an open-world assumption: these are the error
 -- messages associated with type checking of foreign imports and
--- exports.  To allow other errors to be issued with an open-world
+-- exports.  To allow other errors to be issued with an open-world
 -- assumption, use functions `backendValidityOfCImport` and
 -- `backendValidityOfCExport` as models, and have a look at how the
 -- 'expected back ends' are used in modules "GHC.Tc.Gen.Foreign" and
@@ -225,11 +225,11 @@ platformJSSupported platform
   | otherwise                               = False
 
 
--- | A value of type @Backend@ represents one of GHC's back ends.
+-- | A value of type @Backend@ represents one of GHC's back ends.
 -- The set of back ends cannot be extended except by modifying the
 -- definition of @Backend@ in this module.
 --
--- The @Backend@ type is abstract; that is, its value constructors are
+-- The @Backend@ type is abstract; that is, its value constructors are
 -- not exported.  It's crucial that they not be exported, because a
 -- value of type @Backend@ carries only the back end's /name/, not its
 -- behavior or properties.  If @Backend@ were not abstract, then code

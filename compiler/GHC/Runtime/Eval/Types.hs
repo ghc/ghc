@@ -75,7 +75,7 @@ enableGhcStepMode _               = EvalStepSingle
 -- and the SrcSpan of a breakpoint we hit, return @True@ if we should stop at
 -- this breakpoint.
 --
--- In particular, this will always be @False@ for @'RunToCompletion'@ and
+-- In particular, this will always be @False@ for @'RunToCompletion'@ and
 -- @'RunAndLogSteps'@. We'd need further information e.g. about the user
 -- breakpoints to determine whether to break in those modes.
 breakHere :: Bool       -- ^ Was this breakpoint explicitly active (in the @BreakArray@s)?

@@ -177,7 +177,7 @@ resolveFunctionBreakpoint inp = do
 -- for
 --   (a) this binder only (it maybe a top-level or a nested declaration)
 --   (b) that do not have an enclosing breakpoint
-findBreakForBind :: String {-^ Name of bind to break at -} -> ModBreaks -> [(BreakTickIndex, RealSrcSpan)]
+findBreakForBind :: String {-^ Name of bind to break at -} -> ModBreaks -> [(BreakTickIndex, RealSrcSpan)]
 findBreakForBind str_name modbreaks = filter (not . enclosed) ticks
   where
     ticks = [ (index, span)
@@ -226,7 +226,7 @@ getModBreak m = do
 -- source breakpoint, it means all *ocurrences* of that breakpoint across
 -- modules should be stopped at -- hence we keep a trie from BreakpointId to
 -- the list of internal break ids using it.
--- See also Note [Breakpoint identifiers]
+-- See also Note [Breakpoint identifiers]
 type BreakpointOccurrences = ModuleEnv (IntMap.IntMap [InternalBreakpointId])
 
 -- | Lookup all InternalBreakpointIds matching the given BreakpointId
