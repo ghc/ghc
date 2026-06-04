@@ -1,0 +1,7 @@
+Cost-centre stack backtrace:
+  GHC.Internal.TopHandler.runMainIO1 (<no location info>)
+  Main.Main.main (T27225b.hs:29:1-4)
+  Main.Main.top (T27225b.hs:25:1-3)
+  Main.Main.middle (T27225b.hs:21:1-6)
+  Main.Main.bottom (T27225b.hs:15:1-6)
+
