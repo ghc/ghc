@@ -1188,7 +1188,7 @@ tcHsType mode t@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
            ; return (mkForAllTys tv_bndrs ty') }
 
 tcHsType mode t@(HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
-  | null (unLoc ctxt)
+  | null (hsc_ctxt $ unLoc ctxt)
   = tcLHsType mode rn_ty exp_kind
     -- See Note [Body kind of a HsQualTy], point (BK1)
   | Check kind <- exp_kind     -- Checking mode
@@ -2150,7 +2150,7 @@ tcLHsPredType :: LHsType GhcRn -> TcM PredType
 tcLHsPredType pred = tc_lhs_pred typeLevelMode pred
 
 tc_hs_context :: TcTyMode -> LHsContext GhcRn -> TcM [PredType]
-tc_hs_context mode ctxt = mapM (tc_lhs_pred mode) (unLoc ctxt)
+tc_hs_context mode ctxt = mapM (tc_lhs_pred mode) (hsc_ctxt $ unLoc ctxt)
 
 tc_lhs_pred :: TcTyMode -> LHsType GhcRn -> TcM PredType
 tc_lhs_pred mode pred = tc_check_lhs_type mode pred constraintKind
@@ -4451,7 +4451,7 @@ tcHsPartialSigType ctxt sig_ty
 
 tcPartialContext :: TcTyMode -> Maybe (LHsContext GhcRn) -> TcM (TcThetaType, Maybe TcType)
 tcPartialContext _ Nothing = return ([], Nothing)
-tcPartialContext mode (Just (L _ hs_theta))
+tcPartialContext mode (Just (L _ (HsContext _ hs_theta)))
   | Just (hs_theta1, hs_ctxt_last) <- snocView hs_theta
   , L wc_loc ty@(HsWildCardTy _) <- ignoreParens hs_ctxt_last
   = do { wc_tv_ty <- setSrcSpanA wc_loc $

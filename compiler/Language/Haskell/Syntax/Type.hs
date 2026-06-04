@@ -29,7 +29,7 @@ module Language.Haskell.Syntax.Type (
         HsSigType(..), LHsSigType, LHsSigWcType, LHsWcType,
         HsTyPat(..), LHsTyPat,
         HsTupleSort(..),
-        HsContext, LHsContext,
+        HsContext, LHsContext, HsContextDetails(..), XHsContext, XXHsContextDetails,
         HsModifierOf(..), LHsModifierOf,  HsModifier, LHsModifier, XModifier,
         HsLit(..),
         HsIPName(..), hsIPNameFS,
@@ -270,8 +270,17 @@ quantified in left-to-right order in kind signatures is nice since:
 type LHsContext pass = XRec pass (HsContext pass)
 
 -- | Haskell Context
-type HsContext pass = [LHsType pass]
+type HsContext pass = HsContextDetails pass (LHsType pass)
 
+data HsContextDetails pass arg
+  = HsContext
+    { hsc_ext  :: !(XHsContext pass)
+    , hsc_ctxt :: [arg]
+    }
+  | XHsContextDetails !(XXHsContextDetails pass)
+
+type family XHsContext  p
+type family XXHsContextDetails p
 
 -- | Located Modifier
 type LHsModifierOf ty pass = XRec pass (HsModifierOf ty pass)

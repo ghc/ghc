@@ -648,7 +648,7 @@ instance HasHaddock (LocatedAn NoEpAnns (HsDerivingClause GhcPs)) where
 --          deriving ( Eq  -- ^ Comment on Eq
 --                   , C a -- ^ Comment on C a
 --                   )
-instance HasHaddock (LocatedC (DerivClauseTys GhcPs)) where
+instance HasHaddock (LocatedA (DerivClauseTys GhcPs)) where
   addHaddock (L l_dct dct) =
     extendHdkA (locA l_dct) $
     case dct of

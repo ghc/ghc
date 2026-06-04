@@ -496,10 +496,10 @@ renameHsBndrKind :: HsBndrKind GhcRn -> RnM (HsBndrKind DocNameI)
 renameHsBndrKind (HsBndrNoKind _) = return (HsBndrNoKind noExtField)
 renameHsBndrKind (HsBndrKind _ k) = HsBndrKind noExtField <$> renameLKind k
 
-renameLContext :: LocatedC [LHsType GhcRn] -> RnM (LocatedC [LHsType DocNameI])
-renameLContext (L loc context) = do
+renameLContext :: LHsContext GhcRn -> RnM (LHsContext DocNameI)
+renameLContext (L loc (HsContext _ context)) = do
   context' <- mapM renameLType context
-  return (L loc context')
+  return (L loc (HsContext noExtField context'))
 
 renameInstHead :: InstHead GhcRn -> RnM (InstHead DocNameI)
 renameInstHead InstHead{..} = do

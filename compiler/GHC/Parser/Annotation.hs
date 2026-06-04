@@ -27,10 +27,10 @@ module GHC.Parser.Annotation (
   EpAnnCO,
 
   -- ** Annotations in 'GenLocated'
-  LocatedA, LocatedC, LocatedN, LocatedAn, LocatedP,
+  LocatedA, LocatedN, LocatedAn, LocatedP,
   LocatedLC, LocatedLS, LocatedLW,
   LocatedE, LocatedBF,
-  SrcSpanAnnA, SrcSpanAnnP, SrcSpanAnnC, SrcSpanAnnN,
+  SrcSpanAnnA, SrcSpanAnnP, SrcSpanAnnN,
   SrcSpanAnnLC, SrcSpanAnnLW, SrcSpanAnnLS,
   SrcSpanAnnBF,
 
@@ -39,7 +39,6 @@ module GHC.Parser.Annotation (
   AnnListItem(..), AnnList(..), AnnListBrackets(..),
   AnnParen(..),
   AnnPragma(..),
-  AnnContext(..),
   AnnBooleanFormula(..),
   NameAnn(..), NameAdornment(..),
   NoEpAnns(..),
@@ -437,7 +436,7 @@ type LocatedLC = GenLocated SrcSpanAnnLC
 type LocatedLS = GenLocated SrcSpanAnnLS
 type LocatedLW = GenLocated SrcSpanAnnLW
 type LocatedP = GenLocated SrcSpanAnnP
-type LocatedC = GenLocated SrcSpanAnnC
+-- type LocatedC = GenLocated SrcSpanAnnC
 type LocatedBF = GenLocated SrcSpanAnnBF
 
 type SrcSpanAnnA = EpAnn AnnListItem
@@ -447,7 +446,6 @@ type SrcSpanAnnLC = EpAnn (AnnList [EpToken ","])
 type SrcSpanAnnLS = EpAnn (AnnList ())
 type SrcSpanAnnLW = EpAnn (AnnList (EpToken "where"))
 type SrcSpanAnnP = EpAnn AnnPragma
-type SrcSpanAnnC = EpAnn AnnContext
 type SrcSpanAnnBF = EpAnn AnnBooleanFormula
 
 type LocatedE = GenLocated EpaLocation
@@ -562,17 +560,6 @@ data AnnParen
   = AnnParens       (EpToken "(")  (EpToken ")")  -- ^ '(', ')'
   | AnnParensHash   (EpToken "(#") (EpToken "#)") -- ^ '(#', '#)'
   deriving Data
-
--- ---------------------------------------------------------------------
-
--- | Exact print annotation for the 'Context' data type.
-data AnnContext
-  = AnnContext {
-      ac_darrow    :: Maybe TokDarrow,
-                      -- ^ location of the '=>', if present.
-      ac_open      :: [EpToken "("], -- ^ zero or more opening parentheses.
-      ac_close     :: [EpToken ")"]  -- ^ zero or more closing parentheses.
-      } deriving (Data)
 
 -- ---------------------------------------------------------------------
 -- | Exact print annotation for the 'BooleanFormula' data type.
@@ -1166,9 +1153,6 @@ instance NoAnn NoEpAnns where
 instance NoAnn AnnListItem where
   noAnn = AnnListItem []
 
-instance NoAnn AnnContext where
-  noAnn = AnnContext Nothing [] []
-
 instance NoAnn AnnBooleanFormula where
   noAnn = AnnBooleanFormula noAnn noAnn []
 
@@ -1210,9 +1194,6 @@ instance Outputable EpAnnComments where
 
 instance (NamedThing (Located a)) => NamedThing (LocatedAn an a) where
   getName (L l a) = getName (L (locA l) a)
-
-instance Outputable AnnContext where
-  ppr (AnnContext a o c) = text "AnnContext" <+> ppr a <+> ppr o <+> ppr c
 
 instance Outputable BindTag where
   ppr tag = text $ show tag

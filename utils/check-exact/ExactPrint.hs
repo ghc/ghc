@@ -291,17 +291,6 @@ instance HasTrailing AnnPragma where
   trailing _ = []
   setTrailing a _ = a
 
-instance HasTrailing AnnContext where
-  trailing (AnnContext ma _opens _closes)
-    = case ma of
-      Just r -> [AddDarrowAnn r]
-      _ -> []
-
-  setTrailing a [AddDarrowAnn r] = a{ac_darrow = Just r}
-  setTrailing a [] = a{ac_darrow = Nothing}
-  setTrailing a ts = error $ "Cannot setTrailing " ++ showAst ts ++ " for " ++ showAst a
-
-
 instance HasTrailing AnnParen where
   trailing _ = []
   setTrailing a _ = a
@@ -3153,10 +3142,10 @@ instance ExactPrint (HsExpr GhcPs) where
     body' <- markAnnotated body
     return (HsForAll noExtField tele' body')
 
-  exact (HsQual _ ctxt body) = do
+  exact (HsQual x ctxt body) = do
     ctxt' <- markAnnotated ctxt
     body' <- markAnnotated body
-    return (HsQual noExtField ctxt' body')
+    return (HsQual x ctxt' body')
 
   exact (HsQualLit _ (QualLit _ modu (HsQualString src fs))) = do
     modu' <- markAnnotated modu
@@ -3955,10 +3944,10 @@ instance ExactPrint (HsType GhcPs) where
     return (HsForAllTy { hst_xforall = an
                        , hst_tele = tele', hst_body = ty' })
 
-  exact (HsQualTy an ctxt ty) = do
+  exact (HsQualTy x ctxt ty) = do
     ctxt' <- markAnnotated ctxt
     ty' <- markAnnotated ty
-    return (HsQualTy an ctxt' ty')
+    return (HsQualTy x ctxt' ty')
   exact (HsTyVar an promoted name) = do
     an0 <- if (promoted == IsPromoted)
              then markEpToken an
@@ -4114,15 +4103,16 @@ instance ExactPrint (DerivStrategy GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance (ExactPrint a) => ExactPrint (LocatedC a) where
-  getAnnotationEntry (L sann _) = fromAnn sann
-  setAnnotationAnchor = setAnchorAn
+instance (ExactPrint a) => ExactPrint (HsContextDetails GhcPs a) where
+  getAnnotationEntry _ = NoEntryVal
+  setAnnotationAnchor a _ _ _ = a
 
-  exact (L (EpAnn anc (AnnContext ma opens closes) cs) a) = do
+  exact (HsContext (opens, closes) tys) = do
     opens' <- mapM markEpToken opens
-    a' <- markAnnotated a
+    tys' <- mapM markAnnotated tys
     closes' <- mapM markEpToken closes
-    return (L (EpAnn anc (AnnContext ma opens' closes') cs) a')
+    return (HsContext (opens', closes') tys')
+
 
 -- ---------------------------------------------------------------------
 
@@ -4133,9 +4123,11 @@ instance ExactPrint (DerivClauseTys GhcPs) where
   exact (DctSingle x ty) = do
     ty' <- markAnnotated ty
     return (DctSingle x ty')
-  exact (DctMulti x tys) = do
+  exact (DctMulti (op,cp) tys) = do
+    op' <- markEpToken op
     tys' <- mapM markAnnotated tys
-    return (DctMulti x tys')
+    cp' <- markEpToken cp
+    return (DctMulti (op',cp') tys')
 
 -- ---------------------------------------------------------------------
 

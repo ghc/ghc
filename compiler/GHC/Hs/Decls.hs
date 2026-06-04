@@ -749,7 +749,7 @@ derivStrategyName = text . go
     go ViaStrategy      {} = "via"
 
 type instance XDctSingle (GhcPass _) = NoExtField
-type instance XDctMulti  (GhcPass _) = NoExtField
+type instance XDctMulti  (GhcPass _) = (EpToken "(", EpToken ")")
 type instance XXDerivClauseTys (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p => Outputable (DerivClauseTys (GhcPass p)) where
@@ -822,7 +822,7 @@ getRecConArgs_maybe (ConDeclGADT{con_g_args = args}) = case args of
 
 hsConDeclTheta :: Maybe (LHsContext (GhcPass p)) -> [LHsType (GhcPass p)]
 hsConDeclTheta Nothing            = []
-hsConDeclTheta (Just (L _ theta)) = theta
+hsConDeclTheta (Just (L _ (HsContext _ theta))) = theta
 
 ppDataDefnHeader
  :: (OutputableBndrId p)
@@ -1494,7 +1494,7 @@ type instance Anno (FamilyDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (InjectivityAnn (GhcPass p)) = EpAnnCO
 type instance Anno (CType (GhcPass p)) = SrcSpanAnnP
 type instance Anno (HsDerivingClause (GhcPass p)) = EpAnnCO
-type instance Anno (DerivClauseTys (GhcPass _)) = SrcSpanAnnC
+type instance Anno (DerivClauseTys (GhcPass _)) = SrcSpanAnnA
 type instance Anno (StandaloneKindSig (GhcPass p)) = SrcSpanAnnA
 type instance Anno (ConDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno Bool = EpAnnCO

@@ -34,7 +34,7 @@ module GHC.Hs.Type (
         HsTyPatRnBuilder(..), tpBuilderExplicitTV, tpBuilderPatSig, buildHsTyPatRn, builderFromHsTyPatRn,
         HsSigType(..), LHsSigType, LHsSigWcType, LHsWcType,
         HsTupleSort(..),
-        HsContext, LHsContext, fromMaybeContext,
+        HsContext, LHsContext, HsContextDetails(..), fromMaybeContext, emptyContext,
         HsModifierOf(..), HsModifier, ModifierPrintsAs(..),
         HsLit(..),
         HsIPName(..), hsIPNameFS,
@@ -137,7 +137,13 @@ import GHC.Data.Bag
 -}
 
 fromMaybeContext :: Maybe (LHsContext (GhcPass p)) -> HsContext (GhcPass p)
-fromMaybeContext mctxt = unLoc $ fromMaybe (noLocA []) mctxt
+fromMaybeContext mctxt = unLoc $ fromMaybe (noLocA (HsContext noAnn [])) mctxt
+
+emptyContext :: HsContext (GhcPass p)
+emptyContext = HsContext noAnn []
+
+type instance XHsContext  (GhcPass _) = ([EpToken "("], [EpToken ")"])
+type instance XXHsContextDetails (GhcPass _) = DataConCantHappen
 
 type instance XHsForAllVis   (GhcPass _) = EpAnn (TokForall, TokRarrow)
                                            -- Location of 'forall' and '->'
@@ -1305,6 +1311,10 @@ instance (Outputable arg, Outputable rec)
   ppr (RecCon _ rec)     = text "RecCon:" <+> ppr rec
   ppr (InfixCon _ l r)   = text "InfixCon:" <+> ppr [l, r]
 
+instance Outputable arg
+          => Outputable (HsContextDetails (GhcPass p) arg) where
+  ppr (HsContext _ ctxt) = ppr ctxt
+
 pprHsConDeclFieldWith :: (OutputableBndrId p)
                       => (HsModifiedFunArr (GhcPass p) -> SDoc -> SDoc)
                       -> HsConDeclField (GhcPass p) -> SDoc
@@ -1387,10 +1397,10 @@ pprLHsContext (Just lctxt) = pprLHsContextAlways lctxt
 pprLHsContextAlways :: (OutputableBndrId p)
                     => LHsContext (GhcPass p) -> SDoc
 pprLHsContextAlways (L _ ctxt)
-  = case ctxt of
-      []       -> parens empty             <+> darrow
-      [L _ ty] -> ppr_mono_ty ty           <+> darrow
-      _        -> parens (interpp'SP ctxt) <+> darrow
+  = case hsc_ctxt ctxt of
+      []       -> parens empty            <+> darrow
+      [L _ ty] -> ppr_mono_ty ty          <+> darrow
+      cs        -> parens (interpp'SP cs) <+> darrow
 
 pprHsConDeclRecFields :: forall p. OutputableBndrId p
                  => [LHsConDeclRecField (GhcPass p)] -> SDoc
@@ -1568,9 +1578,9 @@ parenthesizeHsType p lty@(L loc ty)
 -- with an 'HsParTy' to form a parenthesized @ctxt@. Otherwise, it simply
 -- returns @ctxt@ unchanged.
 parenthesizeHsContext :: IsPass p => PprPrec -> LHsContext (GhcPass p) -> LHsContext (GhcPass p)
-parenthesizeHsContext p lctxt@(L loc ctxt) =
+parenthesizeHsContext p lctxt@(L loc (HsContext x ctxt)) =
   case ctxt of
-    [c] -> L loc [parenthesizeHsType p c]
+    [c] -> L loc (HsContext x [parenthesizeHsType p c])
     _   -> lctxt -- Other contexts are already "parenthesized" by virtue of
                  -- being tuples.
 {-
@@ -1581,7 +1591,7 @@ parenthesizeHsContext p lctxt@(L loc ctxt) =
 ************************************************************************
 -}
 
-type instance Anno [LocatedA (HsType (GhcPass p))] = SrcSpanAnnC
+type instance Anno (HsContextDetails (GhcPass p) a) = SrcSpanAnnA
 type instance Anno (HsType (GhcPass p)) = SrcSpanAnnA
 type instance Anno (HsSigType (GhcPass p)) = SrcSpanAnnA
 type instance Anno (HsKind (GhcPass p)) = SrcSpanAnnA

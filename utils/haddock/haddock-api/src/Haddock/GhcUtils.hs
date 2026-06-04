@@ -38,7 +38,7 @@ import Data.Char (isSpace)
 import Data.Foldable (toList)
 import qualified Data.List as List
 import Data.List.NonEmpty (NonEmpty (..))
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (mapMaybe)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text.Encoding
@@ -324,7 +324,7 @@ addClassContext cls tvs0 (L pos (ClassOpSig _ _ lname ltype)) =
         loc
         ( HsQualTy
             { hst_xqual = noExtField
-            , hst_ctxt = add_ctxt (noLocA [])
+            , hst_ctxt = add_ctxt (noLocA emptyContext)
             , hst_body = L loc ty
             }
         )
@@ -333,7 +333,7 @@ addClassContext cls tvs0 (L pos (ClassOpSig _ _ lname ltype)) =
                    (noUserRdr cls)
                    (lHsQTyVarsToTypes tvs0)
 
-    add_ctxt (L loc preds) = L loc (extra_pred : preds)
+    add_ctxt (L loc (HsContext ac preds)) = L loc (HsContext ac (extra_pred : preds))
 addClassContext _ _ sig = sig -- E.g. a MinimalSig is fine
 
 lHsQTyVarsToTypes :: LHsQTyVars GhcRn -> [LHsTypeArg GhcRn]
@@ -465,7 +465,10 @@ reparenTypePrec = go
     go p (HsQualTy x ctxt ty) =
       let p' [_] = PREC_CTX
           p' _ = PREC_TOP -- parens will get added anyways later...
-          ctxt' = mapXRec @a (\xs -> map (goL (p' xs)) xs) ctxt
+          fctxt :: HsContextDetails a (XRec a (HsType a)) -> HsContextDetails a (XRec a (HsType a))
+          fctxt (HsContext ac ctx) = HsContext ac ((\xs -> map (goL (p' xs)) xs) ctx)
+          fctxt (XHsContextDetails ext) = (XHsContextDetails ext)
+          ctxt' = mapXRec @a fctxt ctxt
        in paren p PREC_CTX $ HsQualTy x ctxt' (goL PREC_TOP ty)
     go p (HsFunTy x w ty1 ty2) =
       paren p PREC_FUN $ HsFunTy x w (goL PREC_FUN ty1) (goL PREC_TOP ty2)
@@ -873,4 +876,5 @@ defaultRuntimeRepVars = go emptyVarEnv
     go _ ty@(CoercionTy{}) = ty
 
 fromMaybeContext :: Maybe (LHsContext DocNameI) -> HsContext DocNameI
-fromMaybeContext mctxt = unLoc $ fromMaybe (noLocA []) mctxt
+fromMaybeContext Nothing = HsContext noExtField []
+fromMaybeContext (Just ctxt) = unLoc ctxt

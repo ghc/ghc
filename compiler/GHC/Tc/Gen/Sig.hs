@@ -310,7 +310,7 @@ no_anon_wc_ty lty = go lty
                  , hst_body = ty } -> no_anon_wc_tele tele
                                         && go ty
       HsQualTy { hst_ctxt = ctxt
-               , hst_body = ty }  -> gos (unLoc ctxt) && go ty
+               , hst_body = ty }  -> gos (hsc_ctxt $ unLoc ctxt) && go ty
       HsSpliceTy (HsUntypedSpliceTop _ ty) _ -> go ty
       HsSpliceTy (HsUntypedSpliceNested _) _ -> True
       HsTyLit{} -> True

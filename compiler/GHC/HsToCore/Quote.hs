@@ -908,7 +908,7 @@ repC (L l (ConDeclGADT { con_names  = cons
         loop last_bndrs' (bndrs : bndrs_s) =
           addHsTyVarBinds FreshNamesOnly bndrs $ \bndrs' -> do
             body_c' <- loop bndrs' bndrs_s
-            ctxt' <- repContext []
+            ctxt' <- repContext emptyContext
             rep2 forallCName [unC last_bndrs', unC ctxt', unC body_c']
     in loop outer_bndrs' invis_inner_bndrs
 
@@ -927,7 +927,7 @@ repC (L l (ConDeclGADT { con_names  = cons
     get_invis_bndrs HsForAllInvis { hsf_invis_bndrs = tvbs } = Just tvbs
 
 repMbContext :: Maybe (LHsContext GhcRn) -> MetaM (Core (M TH.Cxt))
-repMbContext Nothing          = repContext []
+repMbContext Nothing          = repContext emptyContext
 repMbContext (Just (L _ cxt)) = repContext cxt
 
 repSrcUnpackedness :: SrcUnpackedness -> MetaM (Core (M TH.SourceUnpackedness))
@@ -1063,7 +1063,7 @@ rep_ty_sig' (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body}))
   = do { th_explicit_tvs <- rep_ty_sig_outer_tvs outer_bndrs
        ; th_ctxt <- repLContext ctxt
        ; th_tau  <- repLTy tau
-       ; if nullOuterExplicit outer_bndrs && null (fromMaybeContext ctxt)
+       ; if nullOuterExplicit outer_bndrs && null (hsc_ctxt $ fromMaybeContext ctxt)
             then return th_tau
             else repTForall th_explicit_tvs th_ctxt th_tau }
 
@@ -1375,11 +1375,11 @@ repHsBndrVar (HsBndrWildCard _) = do
 -- represent a type context
 --
 repLContext :: Maybe (LHsContext GhcRn) -> MetaM (Core (M TH.Cxt))
-repLContext Nothing = repContext []
+repLContext Nothing = repContext emptyContext
 repLContext (Just ctxt) = repContext (unLoc ctxt)
 
 repContext :: HsContext GhcRn -> MetaM (Core (M TH.Cxt))
-repContext ctxt = do preds <- repListM typeTyConName repLTy ctxt
+repContext ctxt = do preds <- repListM typeTyConName repLTy (hsc_ctxt ctxt)
                      repCtxt preds
 
 repHsSigType :: LHsSigType GhcRn -> MetaM (Core (M TH.Type))
@@ -1388,7 +1388,7 @@ repHsSigType (L _ (HsSig { sig_bndrs = outer_bndrs, sig_body = body }))
   = addHsOuterSigTyVarBinds outer_bndrs $ \ th_outer_bndrs ->
     do { th_ctxt <- repLContext ctxt
        ; th_tau  <- repLTy tau
-       ; if nullOuterExplicit outer_bndrs && null (fromMaybeContext ctxt)
+       ; if nullOuterExplicit outer_bndrs && null (hsc_ctxt $ fromMaybeContext ctxt)
          then pure th_tau
          else repTForall th_outer_bndrs th_ctxt th_tau }
 
@@ -1725,7 +1725,7 @@ repE (HsEmbTy _ t) = do
   t1 <- repLTy (hswc_body t)
   rep2 typeEName [unC t1]
 repE (HsQual _ (L _ ctx) body) = do
-  ctx' <- repLEs ctx
+  ctx' <- repLEs (hsc_ctxt ctx)
   body' <- repLE body
   rep2 constrainedEName [unC ctx', unC body']
 repE (HsForAll _ tele body) =

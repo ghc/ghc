@@ -605,11 +605,11 @@ rnExpr (HsStar x)
   = do { checkTypeSyntaxExtension StarKindSyntax
        ; return (HsStar x, emptyFNs) }
 
-rnExpr (HsQual _ (L ann ctxt) ty)
+rnExpr (HsQual x (L l (HsContext an ctxt)) ty)
   = do { (ctxt', fvs_ctxt) <- mapAndUnzipM rnLExpr ctxt
        ; (ty', fvs_ty) <- rnLExpr ty
        ; checkTypeSyntaxExtension ContextArrowSyntax
-       ; return (HsQual noExtField (L ann ctxt') ty', plusFNs fvs_ctxt `plusFN` fvs_ty) }
+       ; return (HsQual x (L l (HsContext an ctxt')) ty', plusFNs fvs_ctxt `plusFN` fvs_ty) }
 
 rnExpr (HsForAll _ tele expr)
   = bindHsForAllTelescope HsTypeCtx tele $ \tele' ->

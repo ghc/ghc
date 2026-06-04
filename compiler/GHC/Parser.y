@@ -1686,7 +1686,7 @@ opt_at_kind_inj_sig :: { Located ((TokDcolon, EpToken "=", EpToken "|"), ( LFami
 --      T Int [a]                       -- for associated types
 -- Rather a lot of inlining here, else we get reduce/reduce errors
 tycl_hdr :: { Located (Maybe (LHsContext GhcPs), LHsType GhcPs) }
-        : context '=>' type         {% acs (comb2 $1 $>) (\loc cs -> (L loc (Just (addTrailingDarrowC $1 $2 cs), $3))) }
+        : context '=>' type         {% acs (comb2 $1 $>) (\loc cs -> (L loc (Just (addTrailingDarrowA $1 (epUniTok $2) cs), $3))) }
         | type                      { sL1 $1 (Nothing, $1) }
 
 datafam_inst_hdr :: { Located (Maybe (LHsContext GhcPs), HsOuterFamEqnTyVarBndrs GhcPs, LHsType GhcPs) }
@@ -1694,7 +1694,7 @@ datafam_inst_hdr :: { Located (Maybe (LHsContext GhcPs), HsOuterFamEqnTyVarBndrs
                                                        >> fromSpecTyVarBndrs $2
                                                          >>= \tvbs ->
                                                              (acs (comb2 $1 $>) (\loc cs -> (L loc
-                                                                                  (Just ( addTrailingDarrowC $4 $5 cs)
+                                                                                  (Just ( addTrailingDarrowA $4 (epUniTok $5) cs)
                                                                                         , mkHsOuterExplicit (EpAnn (glEE $1 $3) (epUniTok $1, epTok $3) emptyComments) tvbs, $6))))
                                                     }
         | 'forall' tv_bndrs '.' type   {% do { hintExplicitForall $1
@@ -1703,7 +1703,7 @@ datafam_inst_hdr :: { Located (Maybe (LHsContext GhcPs), HsOuterFamEqnTyVarBndrs
                                              ; !cs <- getCommentsFor loc
                                              ; return (sL loc (Nothing, mkHsOuterExplicit (EpAnn (glEE $1 $3) (epUniTok $1, epTok $3) cs) tvbs, $4))
                                        } }
-        | context '=>' type         {% acs (comb2 $1 $>) (\loc cs -> (L loc (Just (addTrailingDarrowC $1 $2 cs), mkHsOuterImplicit, $3))) }
+        | context '=>' type         {% acs (comb2 $1 $>) (\loc cs -> (L loc (Just (addTrailingDarrowA $1 (epUniTok $2) cs), mkHsOuterImplicit, $3))) }
         | type                      { sL1 $1 (Nothing, mkHsOuterImplicit, $1) }
 
 
@@ -2277,7 +2277,7 @@ ctype   :: { LHsType GhcPs }
                                                          , hst_xforall = noExtField
                                                          , hst_body = $2 } }
         | context '=>' ctype          {% acsA (comb2 $1 $>) (\loc cs -> (L loc $
-                                            HsQualTy { hst_ctxt = addTrailingDarrowC $1 $2 cs
+                                            HsQualTy { hst_ctxt = addTrailingDarrowA $1 (epUniTok $2) cs
                                                      , hst_xqual = NoExtField
                                                      , hst_body = $3 })) }
 
@@ -2294,7 +2294,7 @@ ctype   :: { LHsType GhcPs }
 context :: { LHsContext GhcPs }
         :  btype                        {% checkContext $1 }
 
-expcontext :: {forall b. DisambECP b => PV (LocatedC [LocatedA b])}
+expcontext :: {forall b. DisambECP b => PV (LocatedA (HsContextDetails GhcPs (LocatedA b)))}
         : infixexp                      { unECP $1 >>= \ $1 ->
                                           checkContextPV $1 }
 
@@ -2692,10 +2692,8 @@ deriv_clause_types :: { LDerivClauseTys GhcPs }
         : qtycon              { let { tc = sL1a $1 $ mkHsImplicitSigType $
                                            sL1a $1 $ HsTyVar noAnn NotPromoted $1 } in
                                 sL1a $1 (DctSingle noExtField tc) }
-        | '(' ')'             {% amsr (sLL $1 $> (DctMulti noExtField []))
-                                      (AnnContext Nothing [epTok $1] [epTok $2]) }
-        | '(' deriv_types ')' {% amsr (sLL $1 $> (DctMulti noExtField $2))
-                                      (AnnContext Nothing [epTok $1] [epTok $3])}
+        | '(' ')'             {% amsA' (sLL $1 $> (DctMulti (epTok $1, epTok $2) [])) }
+        | '(' deriv_types ')' {% amsA' (sLL $1 $> (DctMulti (epTok $1, epTok $3) $2)) }
 
 -----------------------------------------------------------------------------
 -- Value definitions
@@ -2957,7 +2955,7 @@ infixexp2 :: { ECP }
                                 { ECP $
                                         $1 >>= \ $1 ->
                                   unECP $3 >>= \ $3 ->
-                                  mkQualPV (comb2 $1 $>) (addTrailingDarrowC $1 $2 emptyComments) $3}
+                                  mkQualPV (comb2 $1 $>) (addTrailingDarrowA $1 (epUniTok $2) emptyComments) $3}
 
         | forall_telescope infixexp2s
                                 { ECP $
@@ -4760,6 +4758,11 @@ addTrailingSemiA  la span = addTrailingAnnA la span AddSemiAnn
 addTrailingCommaA :: MonadP m => LocatedA a -> EpToken "," -> m (LocatedA a)
 addTrailingCommaA la span = addTrailingAnnA la span AddCommaAnn
 
+addTrailingDarrowA :: LocatedA (HsContextDetails GhcPs (LocatedA b)) -> TokDarrow -> EpAnnComments
+                   -> LocatedA (HsContextDetails GhcPs (LocatedA b))
+addTrailingDarrowA (L la ctxt) lt cs =
+  L (addTrailingAnnToA (AddDarrowAnn lt) cs la) ctxt
+
 addTrailingAnnA :: (MonadP m, HasLoc tok) => LocatedA a -> tok -> (tok -> TrailingAnn) -> m (LocatedA a)
 addTrailingAnnA (L anns a) tok ta = do
   let cs = emptyComments
@@ -4799,14 +4802,6 @@ addTrailingCommaN (L anns a) span = do
 addTrailingCommaS :: Located StringLiteral -> EpaLocation -> Located StringLiteral
 addTrailingCommaS (L l sl) span
     = L (widenSpanL l [span]) (sl { sl_tc = Just (epaToNoCommentsLocation span) })
-
--- -------------------------------------
-
-addTrailingDarrowC :: LocatedC a -> Located Token -> EpAnnComments -> LocatedC a
-addTrailingDarrowC (L (EpAnn lr (AnnContext _ o c) csc) a) lt cs =
-  let
-    u = if (isUnicode lt) then UnicodeSyntax else NormalSyntax
-  in L (EpAnn lr (AnnContext (Just (epUniTok lt)) o c) (cs Semi.<> csc)) a
 
 -- -------------------------------------
 

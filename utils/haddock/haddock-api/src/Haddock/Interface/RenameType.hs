@@ -146,7 +146,9 @@ renameLContext (L l ctxt) = do
   return (L l ctxt')
 
 renameContext :: HsContext GhcRn -> Rename (IdP GhcRn) (HsContext GhcRn)
-renameContext = renameLTypes
+renameContext (HsContext ac tys) = do
+  tys' <- renameLTypes tys
+  return (HsContext ac tys')
 
 renameForAllTelescope
   :: HsForAllTelescope GhcRn
