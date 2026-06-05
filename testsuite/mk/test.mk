@@ -109,9 +109,11 @@ endif
 HAVE_GDB := $(shell if gdb --version > /dev/null 2> /dev/null; then echo YES; else echo NO; fi)
 HAVE_READELF := $(shell if readelf --version > /dev/null 2> /dev/null; then echo YES; else echo NO; fi)
 
-# we need a better way to find which backend is selected and if --check flag is
-# used
-BIGNUM_GMP := $(shell "$(GHC_PKG)" field ghc-bignum exposed-modules | grep GMP)
+# Detect whether the fast (GMP) bignum backend is in use. The GMP backend module
+# in ghc-internal is hidden, so we look instead for the gmp library it links
+# against: GMP_LIBS adds gmp to ghc-internal's extra-libraries only on a GMP
+# build.
+BIGNUM_GMP := $(shell "$(GHC_PKG)" field ghc-internal extra-libraries 2>/dev/null | grep gmp)
 
 ifeq "$(filter thr, $(GhcRTSWays))" "thr"
 RUNTEST_OPTS += -e config.ghc_with_threaded_rts=True
