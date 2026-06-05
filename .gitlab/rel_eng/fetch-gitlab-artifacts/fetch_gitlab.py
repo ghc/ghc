@@ -3,6 +3,7 @@ from pathlib import Path
 import subprocess
 import gitlab
 import json
+import traceback
 
 logging.basicConfig(level=logging.INFO)
 
@@ -154,6 +155,7 @@ def fetch_artifacts(release: str, pipeline_id: int,
                 bindist.replace(dest)
         except Exception as e:
             logging.error(f'Error fetching job {job.name}: {e}')
+            traceback.print_exc()
             pass
 
 def main():

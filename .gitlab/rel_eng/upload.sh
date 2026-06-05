@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 #! nix-shell -i bash -p moreutils lzip zip lftp gnupg
 
 set -Eeuo pipefail
