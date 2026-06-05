@@ -42,7 +42,7 @@ spec :: Spec
 spec = do
   describe "parseString" $ do
     let infix 1 `shouldParseTo`
-        shouldParseTo :: String -> Doc String -> Expectation
+        shouldParseTo :: HasCallStack => String -> Doc String -> Expectation
         shouldParseTo input ast = parseString input `shouldBe` ast
 
     it "is total" $ do
@@ -529,7 +529,7 @@ spec = do
 
   describe "parseParas" $ do
     let infix 1 `shouldParseTo`
-        shouldParseTo :: String -> Doc String -> Expectation
+        shouldParseTo :: HasCallStack => String -> Doc String -> Expectation
         shouldParseTo input ast = _doc (parseParas input) `shouldBe` ast
 
     it "is total" $ do
@@ -929,7 +929,7 @@ spec = do
         "* foo\n\n    1. bar"
           `shouldParseTo` DocUnorderedList
             [ DocParagraph "foo"
-                <> DocOrderedList [(1, DocParagraph "bar")]
+                <> DocOrderedList Nothing [DocParagraph "bar"]
             ]
 
       it "can nest a code block inside" $ do
@@ -985,7 +985,7 @@ spec = do
             [ DocParagraph "foo"
                 <> DocUnorderedList [DocParagraph "bar"]
             ]
-          <> DocOrderedList [(1, DocParagraph "baz")]
+          <> DocOrderedList Nothing [DocParagraph "baz"]
 
       it "allows arbitrary initial indent of a list" $
         do
@@ -1013,20 +1013,20 @@ spec = do
                   <> DocDefList [("bar", "barv")]
               )
             ]
-          <> DocOrderedList [(1, DocParagraph "baz")]
+          <> DocOrderedList Nothing [DocParagraph "baz"]
 
       it "list order is preserved in presence of nesting + extra text" $ do
         "1. Foo\n\n    > Some code\n\n2. Bar\n\nSome text"
-          `shouldParseTo` DocOrderedList
-            [ (1, DocParagraph "Foo" <> DocCodeBlock "Some code")
-            , (2, DocParagraph "Bar")
+          `shouldParseTo` DocOrderedList Nothing
+            [ DocParagraph "Foo" <> DocCodeBlock "Some code"
+            , DocParagraph "Bar"
             ]
           <> DocParagraph (DocString "Some text")
 
         "1. Foo\n\n2. Bar\n\nSome text"
-          `shouldParseTo` DocOrderedList
-            [ (1, DocParagraph "Foo")
-            , (2, DocParagraph "Bar")
+          `shouldParseTo` DocOrderedList Nothing
+            [ DocParagraph "Foo"
+            , DocParagraph "Bar"
             ]
           <> DocParagraph (DocString "Some text")
 
@@ -1117,10 +1117,10 @@ spec = do
             , " (1) two"
             , " 3. three"
             ]
-          `shouldParseTo` DocOrderedList
-            [ (1, DocParagraph "one")
-            , (1, DocParagraph "two")
-            , (3, DocParagraph "three")
+          `shouldParseTo` DocOrderedList Nothing
+            [ DocParagraph "one"
+            , DocParagraph "two"
+            , DocParagraph "three"
             ]
 
       it "ignores empty lines between list items" $
@@ -1130,13 +1130,13 @@ spec = do
             , ""
             , "2. two"
             ]
-          `shouldParseTo` DocOrderedList
-            [ (1, DocParagraph "one")
-            , (2, DocParagraph "two")
+          `shouldParseTo` DocOrderedList Nothing
+            [ DocParagraph "one"
+            , DocParagraph "two"
             ]
 
       it "accepts an empty list item" $ do
-        "1." `shouldParseTo` DocOrderedList [(1, DocParagraph DocEmpty)]
+        "1." `shouldParseTo` DocOrderedList Nothing [DocParagraph DocEmpty]
 
       it "accepts multi-line list items" $
         do
@@ -1146,13 +1146,13 @@ spec = do
             , "1. point two"
             , "more two"
             ]
-          `shouldParseTo` DocOrderedList
-            [ (1, DocParagraph "point one\n  more one")
-            , (1, DocParagraph "point two\nmore two")
+          `shouldParseTo` DocOrderedList Nothing
+            [ DocParagraph "point one\n  more one"
+            , DocParagraph "point two\nmore two"
             ]
 
       it "accepts markup in list items" $ do
-        "1. /foo/" `shouldParseTo` DocOrderedList [(1, DocParagraph (DocEmphasis "foo"))]
+        "1. /foo/" `shouldParseTo` DocOrderedList Nothing [DocParagraph (DocEmphasis "foo")]
 
       it "requires empty lines between list and other paragraphs" $
         do
@@ -1164,8 +1164,21 @@ spec = do
             , "baz"
             ]
           `shouldParseTo` DocParagraph "foo"
-          <> DocOrderedList [(1, DocParagraph "bar")]
+          <> DocOrderedList Nothing [DocParagraph "bar"]
           <> DocParagraph "baz"
+
+      context "when the first list index is not 1" $ do
+        it "keep track of the first list index" $ do
+          unlines [
+              " 0. foo"
+            , " 1. bar"
+            , " 2. baz"
+            ]
+          `shouldParseTo` DocOrderedList (Just 0) [
+              DocParagraph "foo"
+            , DocParagraph "bar"
+            , DocParagraph "baz"
+            ]
 
     context "when parsing definition lists" $ do
       it "parses a simple list" $
@@ -1262,9 +1275,9 @@ spec = do
             [ DocParagraph "bullet"
             , DocParagraph "different bullet"
             ]
-          <> DocOrderedList
-            [ (1, DocParagraph "ordered")
-            , (2, DocParagraph "different bullet")
+          <> DocOrderedList Nothing
+            [ DocParagraph "ordered"
+            , DocParagraph "different bullet"
             ]
           <> DocDefList
             [ ("cat", "kitten")

@@ -80,7 +80,7 @@ overIdentifier f d = g d
     g (DocMonospaced x) = DocMonospaced $ g x
     g (DocBold x) = DocBold $ g x
     g (DocUnorderedList x) = DocUnorderedList $ fmap g x
-    g (DocOrderedList x) = DocOrderedList $ fmap (\(index, a) -> (index, g a)) x
+    g (DocOrderedList index x) = DocOrderedList index $ fmap g x
     g (DocDefList x) = DocDefList $ fmap (\(y, z) -> (g y, g z)) x
     g (DocCodeBlock x) = DocCodeBlock $ g x
     g (DocHyperlink (Hyperlink u x)) = DocHyperlink (Hyperlink u (fmap g x))
@@ -647,27 +647,28 @@ unorderedList indent = DocUnorderedList <$> p
 
 -- | Parses ordered lists (numbered or dashed).
 orderedList :: Text -> Parser (DocH mod Identifier)
-orderedList indent = DocOrderedList <$> p
+orderedList indent = do
+  index <- guarded (/= 1) <$> marker
+  DocOrderedList index <$> itemContent
   where
-    p = do
-      index <- paren <|> dot
-      innerList' indent p index
+
+    item :: Parser [DocH mod Identifier]
+    item = marker *> itemContent
+
+    itemContent :: Parser [DocH mod Identifier]
+    itemContent = innerList indent item
+
+    marker :: Parser Int
+    marker = dot <|> paren
+
+    dot :: Parser Int
     dot = (decimal :: Parser Int) <* "."
+
+    paren :: Parser Int
     paren = "(" *> decimal <* ")"
 
--- | Like 'innerList' but takes the parsed index of the list item
-innerList'
-  :: Text
-  -> Parser [(Int, DocH mod Identifier)]
-  -> Int
-  -> Parser [(Int, DocH mod Identifier)]
-innerList' indent item index = do
-  c <- takeLine
-  (cs, items) <- more indent item
-  let contents = docParagraph . parseText . dropNLs . T.unlines $ c : cs
-  return $ case items of
-    Left p -> [(index, contents `docAppend` p)]
-    Right i -> (index, contents) : i
+guarded :: Alternative m => (a -> Bool) -> a -> m a
+guarded p a = if p a then pure a else empty
 
 -- | Generic function collecting any further lines belonging to the
 -- list entry and recursively collecting any further lists in the

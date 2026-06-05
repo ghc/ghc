@@ -48,8 +48,8 @@ emptyMeta = Meta Nothing
 docAppend :: DocH mod id -> DocH mod id -> DocH mod id
 docAppend (DocDefList ds1) (DocDefList ds2) = DocDefList (ds1 ++ ds2)
 docAppend (DocDefList ds1) (DocAppend (DocDefList ds2) d) = DocAppend (DocDefList (ds1 ++ ds2)) d
-docAppend (DocOrderedList ds1) (DocOrderedList ds2) = DocOrderedList (ds1 ++ ds2)
-docAppend (DocOrderedList ds1) (DocAppend (DocOrderedList ds2) d) = DocAppend (DocOrderedList (ds1 ++ ds2)) d
+docAppend (DocOrderedList index ds1) (DocOrderedList _ ds2) = DocOrderedList index (ds1 ++ ds2)
+docAppend (DocOrderedList index ds1) (DocAppend (DocOrderedList _ ds2) d) = DocAppend (DocOrderedList index (ds1 ++ ds2)) d
 docAppend (DocUnorderedList ds1) (DocUnorderedList ds2) = DocUnorderedList (ds1 ++ ds2)
 docAppend (DocUnorderedList ds1) (DocAppend (DocUnorderedList ds2) d) = DocAppend (DocUnorderedList (ds1 ++ ds2)) d
 docAppend DocEmpty d = d

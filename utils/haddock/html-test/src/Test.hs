@@ -249,6 +249,9 @@ using double quotes: "Foo".  We can add emphasis /like this/.
 
    [pineapple] a fruit grown in the tropics
 
+   0. ordered list
+   1. (zero indexed)
+
 @
      This is a block of code, which can include other markup: 'R'
      formatting

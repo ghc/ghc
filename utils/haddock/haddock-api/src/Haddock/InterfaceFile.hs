@@ -557,8 +557,9 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
   put_ bh (DocUnorderedList ai) = do
     putByte bh 8
     put_ bh ai
-  put_ bh (DocOrderedList aj) = do
+  put_ bh (DocOrderedList index aj) = do
     putByte bh 9
+    put_ bh index
     put_ bh aj
   put_ bh (DocDefList ak) = do
     putByte bh 10
@@ -644,8 +645,9 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
         ai <- get bh
         return (DocUnorderedList ai)
       9 -> do
+        index <- get bh
         aj <- get bh
-        return (DocOrderedList aj)
+        return (DocOrderedList index aj)
       10 -> do
         ak <- get bh
         return (DocDefList ak)

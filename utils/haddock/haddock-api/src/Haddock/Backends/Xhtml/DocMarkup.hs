@@ -125,8 +125,13 @@ parHtmlMarkup qual insertAnchors ppId =
         htmlPrompt = (thecode . toHtml $ (">>> " :: LText.Text)) ! [theclass "prompt"]
         htmlExpression = (strong . thecode . toHtml $ expression ++ "\n") ! [theclass "userinput"]
 
-    makeOrdList :: HTML a => [(Int, a)] -> Html
-    makeOrdList items = olist << map (\(index, a) -> li ! [intAttr "value" index] << a) items
+    makeOrdList :: HTML a => Maybe Int -> [a] -> Html
+    makeOrdList index items = case index of
+      Nothing -> ordList items
+      Just n -> ordListWithIndices  (zip [n..] items)
+
+    ordListWithIndices :: HTML a => [(Int, a)] -> Html
+    ordListWithIndices items = olist << map (\(index, a) -> li ! [intAttr "value" index] << a) items
 
 -- | We use this intermediate type to transform the input 'Doc' tree
 -- in an arbitrary way before rendering, such as grouping some
@@ -325,5 +330,5 @@ cleanup = overDoc (markup fmtUnParagraphLists)
     fmtUnParagraphLists =
       idMarkup
         { markupUnorderedList = DocUnorderedList . map unParagraph
-        , markupOrderedList = DocOrderedList . map (\(index, a) -> (index, unParagraph a))
+        , markupOrderedList = \ index -> DocOrderedList index . map unParagraph
         }

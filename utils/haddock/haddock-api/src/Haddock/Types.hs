@@ -601,7 +601,7 @@ instance
     DocBold a -> a `deepseq` ()
     DocMonospaced a -> a `deepseq` ()
     DocUnorderedList a -> a `deepseq` ()
-    DocOrderedList a -> a `deepseq` ()
+    DocOrderedList index a -> index `deepseq` a `deepseq` ()
     DocDefList a -> a `deepseq` ()
     DocCodeBlock a -> a `deepseq` ()
     DocHyperlink a -> a `deepseq` ()

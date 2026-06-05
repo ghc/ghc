@@ -121,13 +121,6 @@ processModuleHeader mLanguage parserOpts sDocContext pkgName safety mayLang extS
   where
     failure = (emptyHaddockModInfo, Nothing)
 
-traverseSnd :: (Traversable t, Applicative f) => (a -> f b) -> t (x, a) -> f (t (x, b))
-traverseSnd f =
-  traverse
-    ( \(x, a) ->
-        (\b -> (x, b)) <$> f a
-    )
-
 -- | Takes a 'GlobalRdrEnv' which (hopefully) contains all the
 -- definitions and a parsed comment and we attempt to make sense of
 -- where the identifiers in the comment point to. We're in effect
@@ -176,7 +169,7 @@ rename sDocContext renamer = rn
       DocBold db -> DocBold <$> rn db
       DocMonospaced dm -> DocMonospaced <$> rn dm
       DocUnorderedList docs -> DocUnorderedList <$> traverse rn docs
-      DocOrderedList docs -> DocOrderedList <$> traverseSnd rn docs
+      DocOrderedList index docs -> DocOrderedList index <$> traverse rn docs
       DocDefList list -> DocDefList <$> traverse (\(a, b) -> (,) <$> rn a <*> rn b) list
       DocCodeBlock dcb -> DocCodeBlock <$> rn dcb
       DocIdentifierUnchecked x -> pure (DocIdentifierUnchecked x)
