@@ -803,7 +803,7 @@ test('RecordUpdPerf',
 
 test('T22744',
      [ collect_compiler_stats('peak_megabytes_allocated',20),
-       req_interp,
+       req_th,
        pre_cmd('$MAKE -s --no-print-directory T22744'),
        extra_files(['genT22744']),
        pre_cmd_timeout_multiplier(5),
