@@ -2303,12 +2303,6 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
     cap = rts_lock();
     task = cap->running_task;
 
-
-    // N.B. We must stop the interval timer while we are changing the
-    // capabilities array lest handle_tick may try to context switch
-    // an old capability. See #17289.
-    stopTimer();
-
     stopAllCapabilities(&cap, task);
 
     if (new_n_capabilities < enabled_capabilities)
@@ -2364,9 +2358,7 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
             tracingAddCapabilities(n_capabilities, new_n_capabilities);
 #endif
 
-            // Resize the capabilities array
-            // NB. after this, capabilities points somewhere new.  Any pointers
-            // of type (Capability *) are now invalid.
+            // Allocate and initialise the extra capabilities
             moreCapabilities(n_capabilities, new_n_capabilities);
 
             // Resize and update storage manager data structures
@@ -2393,8 +2385,6 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
 
     // Notify IO manager that the number of capabilities has changed.
     notifyIOManagerCapabilitiesChanged(&cap);
-
-    startTimer();
 
     rts_unlock(cap);
 
