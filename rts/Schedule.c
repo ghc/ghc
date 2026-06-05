@@ -37,6 +37,7 @@
 #include "win32/AsyncWinIO.h"
 #endif
 #include "Trace.h"
+#include "eventlog/EventLog.h"
 #include "RaiseAsync.h"
 #include "Threads.h"
 #include "Timer.h"
@@ -2100,23 +2101,30 @@ forkProcess(HsStablePtr *entry
     ACQUIRE_LOCK(&all_tasks_mutex);
 #endif
 
-    stopTimer(); // See #4074
-
 #if defined(TRACING)
-    flushAllCapsEventsBufs(); // so that child won't inherit dirty file buffers
+#if defined(HAVE_PREEMPTION)
+    // We must hold the eventlog global mutex over the fork to prevent the
+    // timer thread from trying to post events. While holding the mutex we need
+    // to flush the eventlogs (global and per-cap) so that child won't inherit
+    // dirty eventlog buffers or file buffers.
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
+#endif
+    flushAllCapsEventsBufs_();
 #endif
 
     pid = fork();
 
     if (pid) { // parent
 
-        startTimer(); // #4074
-
         RELEASE_LOCK(&sched_mutex);
         RELEASE_LOCK(&sm_mutex);
         RELEASE_LOCK(&stable_ptr_mutex);
         RELEASE_LOCK(&stable_name_mutex);
         RELEASE_LOCK(&task->lock);
+
+#if defined(TRACING) && defined(HAVE_PREEMPTION)
+        RELEASE_LOCK_ALWAYS(&eventBufMutex);
+#endif
 
 #if defined(THREADED_RTS)
         /* N.B. releaseCapability_ below may need to take all_tasks_mutex */
