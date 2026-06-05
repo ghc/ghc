@@ -6,15 +6,15 @@ docs:
 '<>', ':=:', 'Bool'
 -}
               identifiers:
-                {DocsInHiFile.hs:4:2-3}
+                {EpAnn EpaSpan DocsInHiFile.hs:4:2-3 NameAnnTrailing [] EpaComments []}
                 GHC.Internal.Base.<>
-                {DocsInHiFile.hs:2:6-9}
+                {EpAnn EpaSpan DocsInHiFile.hs:2:6-9 NameAnnTrailing [] EpaComments []}
                 GHC.Internal.Data.Foldable.elem
-                {DocsInHiFile.hs:2:14-18}
+                {EpAnn EpaSpan DocsInHiFile.hs:2:14-18 NameAnnTrailing [] EpaComments []}
                 GHC.Internal.System.IO.print
-                {DocsInHiFile.hs:2:6-9}
+                {EpAnn EpaSpan DocsInHiFile.hs:2:6-9 NameAnnTrailing [] EpaComments []}
                 elem
-                {DocsInHiFile.hs:4:15-18}
+                {EpAnn EpaSpan DocsInHiFile.hs:4:15-18 NameAnnTrailing [] EpaComments []}
                 GHC.Internal.Types.Bool
        export docs:
          []
@@ -34,7 +34,7 @@ docs:
           $fShowD -> [text:
                         -- ^ 'Show' instance
                       identifiers:
-                        {DocsInHiFile.hs:22:25-28}
+                        {EpAnn EpaSpan DocsInHiFile.hs:22:25-28 NameAnnTrailing [] EpaComments []}
                         GHC.Internal.Show.Show],
           p -> [text:
                   -- | A class method
@@ -48,7 +48,7 @@ docs:
           D0 -> [text:
                    -- ^ A constructor for 'D'. '
                  identifiers:
-                   {DocsInHiFile.hs:20:32}
+                   {EpAnn EpaSpan DocsInHiFile.hs:20:32 NameAnnTrailing [] EpaComments []}
                    D],
           D -> [text:
                   -- | A datatype.
@@ -56,9 +56,9 @@ docs:
           elem -> [text:
                      -- | '()', 'elem'.
                    identifiers:
-                     {DocsInHiFile.hs:14:13-16}
+                     {EpAnn EpaSpan DocsInHiFile.hs:14:13-16 NameAnnTrailing [] EpaComments []}
                      GHC.Internal.Data.Foldable.elem
-                     {DocsInHiFile.hs:14:13-16}
+                     {EpAnn EpaSpan DocsInHiFile.hs:14:13-16 NameAnnTrailing [] EpaComments []}
                      elem]]
        arg docs:
          [p -> 0:
@@ -69,7 +69,7 @@ docs:
                    text:
                      -- ^ First summand for 'add'
                    identifiers:
-                     {DocsInHiFile.hs:25:36-38}
+                     {EpAnn EpaSpan DocsInHiFile.hs:25:36-38 NameAnnTrailing [] EpaComments []}
                      add
                  1:
                    text:

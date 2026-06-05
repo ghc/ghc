@@ -53,12 +53,11 @@ module Language.Haskell.Syntax.Type (
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsUntypedSplice )
 
 import Language.Haskell.Syntax.Basic ( SrcStrictness, SrcUnpackedness )
+import Language.Haskell.Syntax.Doc (LHsDoc)
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Specificity
 import Language.Haskell.Syntax.Lit
 
-
-import GHC.Hs.Doc (LHsDoc)
 import GHC.Data.FastString (FastString)
 
 import Data.Data hiding ( Fixity, Prefix, Infix )

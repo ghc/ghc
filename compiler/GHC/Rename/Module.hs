@@ -324,11 +324,11 @@ rnWarningTxt (WarningTxt st mb_cat wst) = do
       unless (validWarningCategory cat) $
         addErrAt (locA loc) (TcRnInvalidWarningCategory cat)
       pure . Just $ L x (InWarningCategory y (L loc cat))
-  wst' <- traverse (traverse rnHsDoc) wst
+  wst' <- traverse (traverse rnHsDocIdentifiersOnly) wst
   pure . WarningTxt st mb_cat' $ fmap rnWithHsDocIdentifiers <$> wst'
 
 rnWarningTxt (DeprecatedTxt st wst) = do
-  wst' <- traverse (traverse rnHsDoc) wst
+  wst' <- traverse (traverse rnHsDocIdentifiersOnly) wst
   pure . DeprecatedTxt st $ fmap rnWithHsDocIdentifiers <$> wst'
 
 rnWithHsDocIdentifiers ::

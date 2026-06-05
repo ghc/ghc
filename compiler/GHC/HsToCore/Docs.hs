@@ -541,9 +541,9 @@ collectDocs :: forall p. UnXRec p => [LHsDecl p] -> [(LHsDecl p, [HsDoc p])]
 collectDocs = go [] Nothing
   where
     go docs mprev decls = case (decls, mprev) of
-      ((unXRec @p -> DocD _ (DocCommentNext s)) : ds, Nothing)   -> go (unLoc s:docs) Nothing ds
-      ((unXRec @p -> DocD _ (DocCommentNext s)) : ds, Just prev) -> finished prev docs $ go [unLoc s] Nothing ds
-      ((unXRec @p -> DocD _ (DocCommentPrev s)) : ds, mprev)     -> go (unLoc s:docs) mprev ds
+      ((unXRec @p -> DocD _ (DocCommentNext s)) : ds, Nothing)   -> go (unXRec @p s:docs) Nothing ds
+      ((unXRec @p -> DocD _ (DocCommentNext s)) : ds, Just prev) -> finished prev docs $ go [unXRec @p s] Nothing ds
+      ((unXRec @p -> DocD _ (DocCommentPrev s)) : ds, mprev)     -> go (unXRec @p s:docs) mprev ds
       (d                                  : ds, Nothing)   -> go docs (Just d) ds
       (d                                  : ds, Just prev) -> finished prev docs $ go [] (Just d) ds
       ([]                                     , Nothing)   -> []

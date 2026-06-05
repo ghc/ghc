@@ -669,7 +669,7 @@ fromIfaceWarningTxt = \case
     IfDeprecatedTxt src strs -> DeprecatedTxt src (noLocA <$> map fromIfaceStringLiteralWithNames strs)
 
 fromIfaceStringLiteralWithNames :: (IfaceStringLiteral, [IfExtName]) -> WithHsDocIdentifiers (StringLiteral GhcRn) GhcRn
-fromIfaceStringLiteralWithNames (str, names) = WithHsDocIdentifiers (fromIfaceStringLiteral str) (map noLoc names)
+fromIfaceStringLiteralWithNames (str, names) = WithHsDocIdentifiers (fromIfaceStringLiteral str) (map noLocA names)
 
 fromIfaceStringLiteral :: IfaceStringLiteral -> StringLiteral GhcRn
 fromIfaceStringLiteral (IfStringLiteral st fs) = StringLiteral st fs

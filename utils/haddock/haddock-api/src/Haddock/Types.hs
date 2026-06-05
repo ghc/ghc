@@ -820,6 +820,8 @@ type instance Anno (DataFamInstDecl DocNameI) = SrcSpanAnnA
 type instance Anno (DerivStrategy DocNameI) = EpAnn NoEpAnns
 type instance Anno (FieldOcc DocNameI) = SrcSpanAnnA
 type instance Anno (HsConDeclRecField DocNameI) = SrcSpan
+type instance Anno (HsDocString DocNameI) = SrcSpan
+type instance Anno (WithHsDocIdentifiers (HsDocString DocNameI) DocNameI) = SrcSpan
 type instance Anno (Located (HsConDeclRecField DocNameI)) = SrcSpan
 type instance Anno [Located (HsConDeclRecField DocNameI)] = SrcSpan
 type instance Anno (ConDecl DocNameI) = SrcSpan
@@ -1017,6 +1019,11 @@ type instance XXConDeclRecField DocNameI = DataConCantHappen
 
 type instance XConDeclField DocNameI = NoExtField
 type instance XXConDeclField DocNameI = DataConCantHappen
+
+type instance XMultiLineDocString DocNameI = NoExtField
+type instance XNestedDocString    DocNameI = NoExtField
+type instance XGeneratedDocString DocNameI = NoExtField
+type instance XXHsDocString       DocNameI = DataConCantHappen
 
 type instance XXPat DocNameI = DataConCantHappen
 type instance XXHsBindsLR DocNameI a = DataConCantHappen

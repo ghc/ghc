@@ -16,6 +16,7 @@ therefore, is almost nothing but re-exporting.
 module Language.Haskell.Syntax (
         module Language.Haskell.Syntax.Binds,
         module Language.Haskell.Syntax.Decls,
+        module Language.Haskell.Syntax.Doc,
         module Language.Haskell.Syntax.Expr,
         module Language.Haskell.Syntax.ImpExp,
         module Language.Haskell.Syntax.Lit,
@@ -28,6 +29,7 @@ module Language.Haskell.Syntax (
 
 import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Binds
+import Language.Haskell.Syntax.Doc
 import Language.Haskell.Syntax.Expr
 import Language.Haskell.Syntax.ImpExp
 import Language.Haskell.Syntax.Module.Name

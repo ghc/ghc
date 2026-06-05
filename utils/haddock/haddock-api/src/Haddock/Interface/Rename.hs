@@ -301,8 +301,13 @@ renameDocumentation :: Documentation Name -> RnM (Documentation DocName)
 renameDocumentation (Documentation mDoc mWarning) =
   Documentation <$> mapM renameDoc mDoc <*> mapM renameDoc mWarning
 
-renameLDocHsSyn :: Located (WithHsDocIdentifiers HsDocString a) -> RnM (Located (WithHsDocIdentifiers HsDocString b))
-renameLDocHsSyn (L l doc) = return (L l (WithHsDocIdentifiers (hsDocString doc) []))
+renameLDocHsSyn :: LHsDoc GhcRn -> RnM (LHsDoc DocNameI)
+renameLDocHsSyn (L l doc) = return (L l (WithHsDocIdentifiers (renameHsDocString $ hsDocString doc) []))
+
+renameHsDocString :: HsDocString GhcRn -> HsDocString DocNameI
+renameHsDocString (MultiLineDocString _ dec xs) = MultiLineDocString noExtField dec xs
+renameHsDocString (NestedDocString _ dec x) = NestedDocString noExtField dec x
+renameHsDocString (GeneratedDocString _ x) = GeneratedDocString noExtField x
 
 renameDoc :: Traversable t => t (Wrap Name) -> RnM (t (Wrap DocName))
 renameDoc = traverse (traverse renameName)

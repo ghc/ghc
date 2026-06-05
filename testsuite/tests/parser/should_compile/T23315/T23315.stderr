@@ -51,6 +51,7 @@
        { T23315.hsig:2:1-12 }
        (WithHsDocIdentifiers
         (MultiLineDocString
+         (NoExtField)
          (HsDocStringNext)
          (:|
           (L
@@ -125,6 +126,7 @@
        { T23315.hsig:4:1-14 }
        (WithHsDocIdentifiers
         (MultiLineDocString
+         (NoExtField)
          (HsDocStringPrevious)
          (:|
           (L

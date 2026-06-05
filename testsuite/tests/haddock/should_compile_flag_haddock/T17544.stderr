@@ -212,6 +212,7 @@
                 { T17544.hs:7:5-23 }
                 (WithHsDocIdentifiers
                  (MultiLineDocString
+                  (NoExtField)
                   (HsDocStringPrevious)
                   (:|
                    (L
@@ -397,6 +398,7 @@
           { T17544.hs:11:3-20 }
           (WithHsDocIdentifiers
            (MultiLineDocString
+            (NoExtField)
             (HsDocStringPrevious)
             (:|
              (L
@@ -581,6 +583,7 @@
        { T17544.hs:15:1-18 }
        (WithHsDocIdentifiers
         (MultiLineDocString
+         (NoExtField)
          (HsDocStringPrevious)
          (:|
           (L
@@ -3171,6 +3174,7 @@
        { T17544.hs:56:1-38 }
        (WithHsDocIdentifiers
         (MultiLineDocString
+         (NoExtField)
          (HsDocStringPrevious)
          (:|
           (L

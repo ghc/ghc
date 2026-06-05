@@ -1513,7 +1513,7 @@ putDoc doc_loc s = do
     resolved_doc_loc <- resolve_loc doc_loc
     is_local <- checkLocalName resolved_doc_loc
     unless is_local $ failWithTc $ TcRnTHError $ AddDocToNonLocalDefn doc_loc
-    let ds = mkGeneratedHsDocString s
+    let ds = mkGeneratedHsDocStringGhc s
         hd = lexHsDoc parseIdentifier ds
     hd' <- rnHsDoc hd
     updTcRef th_doc_var (Map.insert resolved_doc_loc hd')

@@ -155,6 +155,7 @@
              { T24221.hs:4:3-20 }
              (WithHsDocIdentifiers
               (MultiLineDocString
+               (NoExtField)
                (HsDocStringNext)
                (:|
                 (L
@@ -232,6 +233,7 @@
              { T24221.hs:6:3-20 }
              (WithHsDocIdentifiers
               (MultiLineDocString
+               (NoExtField)
                (HsDocStringNext)
                (:|
                 (L
@@ -342,6 +344,7 @@
              { T24221.hs:8:3-33 }
              (WithHsDocIdentifiers
               (MultiLineDocString
+               (NoExtField)
                (HsDocStringNext)
                (:|
                 (L
@@ -498,6 +501,7 @@
              { T24221.hs:12:15-45 }
              (WithHsDocIdentifiers
               (MultiLineDocString
+               (NoExtField)
                (HsDocStringPrevious)
                (:|
                 (L
@@ -618,6 +622,7 @@
                { T24221.hs:15:10-26 }
                (WithHsDocIdentifiers
                 (MultiLineDocString
+                 (NoExtField)
                  (HsDocStringPrevious)
                  (:|
                   (L
@@ -665,6 +670,7 @@
                { T24221.hs:17:10-27 }
                (WithHsDocIdentifiers
                 (MultiLineDocString
+                 (NoExtField)
                  (HsDocStringPrevious)
                  (:|
                   (L
@@ -678,6 +684,7 @@
              { T24221.hs:16:10-40 }
              (WithHsDocIdentifiers
               (MultiLineDocString
+               (NoExtField)
                (HsDocStringPrevious)
                (:|
                 (L
@@ -798,6 +805,7 @@
                { T24221.hs:20:3-19 }
                (WithHsDocIdentifiers
                 (MultiLineDocString
+                 (NoExtField)
                  (HsDocStringNext)
                  (:|
                   (L
@@ -845,6 +853,7 @@
                { T24221.hs:24:3-20 }
                (WithHsDocIdentifiers
                 (MultiLineDocString
+                 (NoExtField)
                  (HsDocStringNext)
                  (:|
                   (L
@@ -858,6 +867,7 @@
              { T24221.hs:22:3-33 }
              (WithHsDocIdentifiers
               (MultiLineDocString
+               (NoExtField)
                (HsDocStringNext)
                (:|
                 (L
@@ -1018,6 +1028,7 @@
                    { T24221.hs:28:24-39 }
                    (WithHsDocIdentifiers
                     (MultiLineDocString
+                     (NoExtField)
                      (HsDocStringPrevious)
                      (:|
                       (L
@@ -1094,6 +1105,7 @@
                    { T24221.hs:29:24-39 }
                    (WithHsDocIdentifiers
                     (MultiLineDocString
+                     (NoExtField)
                      (HsDocStringPrevious)
                      (:|
                       (L
@@ -1255,6 +1267,7 @@
                    { T24221.hs:33:20-35 }
                    (WithHsDocIdentifiers
                     (MultiLineDocString
+                     (NoExtField)
                      (HsDocStringPrevious)
                      (:|
                       (L
@@ -1331,6 +1344,7 @@
                    { T24221.hs:34:20-35 }
                    (WithHsDocIdentifiers
                     (MultiLineDocString
+                     (NoExtField)
                      (HsDocStringPrevious)
                      (:|
                       (L
@@ -1344,6 +1358,7 @@
              { T24221.hs:32:10-29 }
              (WithHsDocIdentifiers
               (MultiLineDocString
+               (NoExtField)
                (HsDocStringPrevious)
                (:|
                 (L
@@ -1504,6 +1519,7 @@
                    { T24221.hs:39:5-20 }
                    (WithHsDocIdentifiers
                     (MultiLineDocString
+                     (NoExtField)
                      (HsDocStringNext)
                      (:|
                       (L
@@ -1580,6 +1596,7 @@
                    { T24221.hs:41:5-20 }
                    (WithHsDocIdentifiers
                     (MultiLineDocString
+                     (NoExtField)
                      (HsDocStringNext)
                      (:|
                       (L
@@ -1593,6 +1610,7 @@
              { T24221.hs:37:3-22 }
              (WithHsDocIdentifiers
               (MultiLineDocString
+               (NoExtField)
                (HsDocStringNext)
                (:|
                 (L

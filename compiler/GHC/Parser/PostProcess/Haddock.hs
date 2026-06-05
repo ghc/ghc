@@ -298,10 +298,10 @@ instance HasHaddock (Located (HsModule GhcPs)) where
           , hsmodDecls = hsmodDecls'
           , hsmodExt = (hsmodExt mod) { hsmodHaddockModHeader = headerDocs } }
 
-lexHsDocString :: HsDocString -> HsDoc GhcPs
+lexHsDocString :: HsDocString GhcPs -> HsDoc GhcPs
 lexHsDocString = lexHsDoc parseIdentifier
 
-lexLHsDocString :: Located HsDocString -> LHsDoc GhcPs
+lexLHsDocString :: Located (HsDocString GhcPs) -> LHsDoc GhcPs
 lexLHsDocString = fmap lexHsDocString
 
 -- Needed to use 'addHaddockInterleaveItems' in 'instance HasHaddock (Located [LIE GhcPs])'.
@@ -776,7 +776,7 @@ onlyTrailingOrLeading l = peekHdkM $ do
 -- data/newtype declaration.
 getConDoc
   :: SrcSpan  -- Location of the data constructor
-  -> HdkA (Maybe (Located HsDocString))
+  -> HdkA (Maybe (Located (HsDocString GhcPs)))
 getConDoc l = extendHdkA l $ liftHdkA $ getPrevNextDoc l
 
 instance HasHaddock (LocatedA (HsConDeclRecField GhcPs)) where
@@ -1170,7 +1170,7 @@ data HdkSt =
 -- | Warnings accumulated in HdkM.
 data HdkWarn
   = HdkWarnInvalidComment (PsLocated HdkComment)
-  | HdkWarnExtraComment (Located HsDocString)
+  | HdkWarnExtraComment (Located (HsDocString GhcPs))
 
 -- Restrict the range in which a HdkM computation will look up comments:
 --
@@ -1237,7 +1237,7 @@ peekHdkM m =
       (a, _) -> (a, s)
 
 -- Get the docnext or docprev comment for an AST node at the given source span.
-getPrevNextDoc :: SrcSpan -> HdkM (Maybe (Located HsDocString))
+getPrevNextDoc :: SrcSpan -> HdkM (Maybe (Located (HsDocString GhcPs)))
 getPrevNextDoc l = do
   let (l_start, l_end) = (srcSpanStart l, srcSpanEnd l)
       before_t = locRangeTo (getBufPos l_start)
@@ -1251,7 +1251,7 @@ appendHdkWarning e = HdkM $ \_ hdk_st ->
   let hdk_st' = hdk_st { hdk_st_warnings = e : hdk_st_warnings hdk_st }
   in ((), hdk_st')
 
-selectDocString :: [Located HsDocString] -> HdkM (Maybe (Located HsDocString))
+selectDocString :: [Located (HsDocString GhcPs)] -> HdkM (Maybe (Located (HsDocString GhcPs)))
 selectDocString = select . filterOut (isEmptyDocString . unLoc)
   where
     select [] = return Nothing
@@ -1260,7 +1260,7 @@ selectDocString = select . filterOut (isEmptyDocString . unLoc)
       reportExtraDocs extra_docs
       return (Just doc)
 
-reportExtraDocs :: [Located HsDocString] -> HdkM ()
+reportExtraDocs :: [Located (HsDocString GhcPs)] -> HdkM ()
 reportExtraDocs =
   traverse_ (\extra_doc -> appendHdkWarning (HdkWarnExtraComment extra_doc))
 
@@ -1320,11 +1320,11 @@ mkDocIE (L l_comment hdk_comment) =
   where l = noAnnSrcSpan span
         span = mkSrcSpanPs l_comment
 
-mkDocNext :: PsLocated HdkComment -> Maybe (Located HsDocString)
+mkDocNext :: PsLocated HdkComment -> Maybe (Located (HsDocString GhcPs))
 mkDocNext (L l (HdkCommentNext doc)) = Just (L (mkSrcSpanPs l) doc)
 mkDocNext _ = Nothing
 
-mkDocPrev :: PsLocated HdkComment -> Maybe (Located HsDocString)
+mkDocPrev :: PsLocated HdkComment -> Maybe (Located (HsDocString GhcPs))
 mkDocPrev (L l (HdkCommentPrev doc)) = Just (L (mkSrcSpanPs l) doc)
 mkDocPrev _ = Nothing
 
@@ -1448,7 +1448,7 @@ instance Monoid ColumnBound where
 *                                                                      *
 ********************************************************************* -}
 
-mkLHsDocTy :: LHsType GhcPs -> Maybe (Located HsDocString) -> LHsType GhcPs
+mkLHsDocTy :: LHsType GhcPs -> Maybe (Located (HsDocString GhcPs)) -> LHsType GhcPs
 mkLHsDocTy t Nothing = t
 mkLHsDocTy t (Just doc) = L (getLoc t) (HsDocTy noExtField t $ lexLHsDocString doc)
 

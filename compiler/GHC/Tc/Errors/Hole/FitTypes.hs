@@ -11,6 +11,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Types.Name.Reader
 
 import GHC.Hs.Doc
+import GHC.Hs.Extension.Pass (GhcTc)
 import GHC.Types.Id
 
 import GHC.Utils.Outputable
@@ -85,7 +86,7 @@ data TcHoleFit =
           , hfWrap :: [TcType] -- ^ The wrapper for the match
           , hfMatches :: [TcType]
           -- ^ What the refinement variables got matched with, if anything
-          , hfDoc :: Maybe [HsDocString]
+          , hfDoc :: Maybe [HsDocString GhcTc]
           -- ^ Documentation of this HoleFit, if available
           }
 

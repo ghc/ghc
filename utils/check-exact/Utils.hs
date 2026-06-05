@@ -454,8 +454,8 @@ tokComment t@(L lt c) =
     (GHC.EpaComment (EpaDocComment dc) pt) -> hsDocStringComments (noCommentsToEpaLocation lt) pt dc
     _ -> [mkComment (normaliseCommentText (ghcCommentText t)) lt (ac_prior_tok c)]
 
-hsDocStringComments :: EpaLocation -> RealSrcSpan -> GHC.HsDocString -> [Comment]
-hsDocStringComments _ pt (MultiLineDocString dec (x :| xs)) =
+hsDocStringComments :: EpaLocation -> RealSrcSpan -> HsDocString GhcPs -> [Comment]
+hsDocStringComments _ pt (MultiLineDocString _ dec (x :| xs)) =
   let
     decStr = printDecorator dec
     L lx x' = dedentDocChunkBy (3 + length decStr) x
@@ -465,19 +465,19 @@ hsDocStringComments _ pt (MultiLineDocString dec (x :| xs)) =
       = Comment ("--" ++ unpackHDSC chunk) (spanAsAnchor l) pt' Nothing : docChunk (rs l) cs
   in
     (Comment str (spanAsAnchor lx) pt Nothing : docChunk (rs lx) (map dedentDocChunk xs))
-hsDocStringComments anc pt (NestedDocString dec@(HsDocStringNamed _) (L _ chunk))
+hsDocStringComments anc pt (NestedDocString _ dec@(HsDocStringNamed _) (L _ chunk))
   = [Comment ("{- " ++ printDecorator dec ++ unpackHDSC chunk ++ "-}") (epaToNoCommentsLocation anc) pt Nothing ]
-hsDocStringComments anc pt (NestedDocString dec (L _ chunk))
+hsDocStringComments anc pt (NestedDocString _ dec (L _ chunk))
   = [Comment ("{-" ++ printDecorator dec ++ unpackHDSC chunk ++ "-}") (epaToNoCommentsLocation anc) pt Nothing ]
 
-hsDocStringComments _ _ (GeneratedDocString _) = [] -- Should not appear in user-written code
+hsDocStringComments _ _ (GeneratedDocString _ _) = [] -- Should not appear in user-written code
 
 -- At the moment the locations of the 'HsDocStringChunk's are from the start of
 -- the string part, leaving aside the "--". So we need to subtract 2 columns from it
-dedentDocChunk :: LHsDocStringChunk -> LHsDocStringChunk
+dedentDocChunk :: LHsDocStringChunk GhcPs -> LHsDocStringChunk GhcPs
 dedentDocChunk chunk = dedentDocChunkBy 2 chunk
 
-dedentDocChunkBy :: Int -> LHsDocStringChunk -> LHsDocStringChunk
+dedentDocChunkBy :: Int -> LHsDocStringChunk GhcPs -> LHsDocStringChunk GhcPs
 dedentDocChunkBy  dedent (L (RealSrcSpan l mb) c) = L (RealSrcSpan l' mb) c
   where
     f = srcSpanFile l

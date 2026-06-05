@@ -3,9 +3,9 @@ docs:
          Just text:
                 -- | 'foo#' `Bar##` `*##`
               identifiers:
-                {MagicHashInHaddocks.hs:3:14-18}
+                {EpAnn EpaSpan MagicHashInHaddocks.hs:3:14-18 NameAnnTrailing [] EpaComments []}
                 Bar##
-                {MagicHashInHaddocks.hs:3:7-10}
+                {EpAnn EpaSpan MagicHashInHaddocks.hs:3:7-10 NameAnnTrailing [] EpaComments []}
                 foo#
        export docs:
          []

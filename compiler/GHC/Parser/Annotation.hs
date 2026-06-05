@@ -99,7 +99,9 @@ import GHC.Data.FastString
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import GHC.Types.Name
 import GHC.Types.SrcLoc
-import GHC.Hs.DocString
+import GHC.Hs.DocString () -- Required for Data, Eq, Show instances
+import GHC.Hs.Extension.Pass (GhcPs)
+import Language.Haskell.Syntax.Doc
 import GHC.Utils.Misc
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
@@ -314,7 +316,7 @@ data EpaComment =
 
 data EpaCommentTok =
   -- Documentation annotations
-    EpaDocComment      HsDocString -- ^ a docstring that can be pretty printed using pprHsDocString
+    EpaDocComment      (HsDocString GhcPs) -- ^ a docstring that can be pretty printed using pprHsDocString
   | EpaDocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
   | EpaLineComment     String     -- ^ comment starting by "--"
   | EpaBlockComment    String     -- ^ comment in {- -}

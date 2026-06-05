@@ -201,7 +201,7 @@ createInterface1' flags unit_state dflags hie_file mod_iface ifaces inst_ifaces 
       instanceMap = Map.fromList [(l, n) | n <- local_instances, RealSrcSpan l _ <- [getSrcSpan n]]
 
   -- See Note [Exporting built-in items]
-  let builtinTys = DsiSectionHeading 1 (WithHsDocIdentifiers (mkGeneratedHsDocString "Builtin syntax") [])
+  let builtinTys = DsiSectionHeading 1 (WithHsDocIdentifiers (mkGeneratedHsDocStringGhc "Builtin syntax") [])
       bonus_ds mods
         | mdl == gHC_PRIM =
             [ builtinTys
@@ -358,10 +358,10 @@ parseWarning parserOpts sDocContext w = case w of
   IfWarningTxt  _ _ msg -> format "Warning: " (map dstToDoc msg)
   where
     dstToDoc :: (IfaceStringLiteral, [Name]) -> HsDoc GhcRn
-    dstToDoc ((IfStringLiteral _ fs), ids) = WithHsDocIdentifiers (fsToDoc fs) (map noLoc ids)
+    dstToDoc ((IfStringLiteral _ fs), ids) = WithHsDocIdentifiers (fsToDoc fs) (map noLocA ids)
 
-    fsToDoc :: FastString -> HsDocString
-    fsToDoc fs = GeneratedDocString $ HsDocStringChunk (bytesFS fs)
+    fsToDoc :: FastString -> HsDocString GhcRn
+    fsToDoc fs = GeneratedDocString noExtField $ mkHsDocStringChunkUtf8ByteString (bytesFS fs)
 
     format x bs =
       DocWarning . DocParagraph . DocAppend (DocString (fastStringToText x))

@@ -660,6 +660,12 @@ type family XXQualLit x
 type family XQualLitString  x
 type family XXQualLitVal x
 
+-- Type families for the HsDocString extension points
+type family XMultiLineDocString x
+type family XNestedDocString x
+type family XGeneratedDocString x
+type family XXHsDocString x
+
 -- =====================================================================
 -- Type families for the HsPat extension points
 
