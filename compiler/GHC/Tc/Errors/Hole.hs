@@ -542,7 +542,7 @@ addHoleFitDocs fits =
             { Nothing -> return (Set.insert (nameOrigin name) mods_without_docs, TcHoleFit fit)
             ; Just docs -> do
                 { let doc = lookupUniqMap (docs_decls docs) name
-                ; return $ (mods_without_docs, TcHoleFit (fit {hfDoc = map hsDocString <$> doc})) }}}
+                ; return $ (mods_without_docs, TcHoleFit (fit {hfDoc = map (tcHsDocString . hsDocString) <$> doc})) }}}
    upd _ mods_without_docs fit@(RawHoleFit {}) = pure (mods_without_docs, fit)
    nameOrigin name = case nameModule_maybe name of
      Just m  -> Right m

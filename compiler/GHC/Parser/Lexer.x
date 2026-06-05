@@ -121,9 +121,13 @@ import GHC.Utils.Misc ( readSignificandExponentPair, readHexSignificandExponentP
 import GHC.Types.SrcLoc
 import GHC.Types.SourceText
 import GHC.Types.InlinePragma ( InlineSpec(..), RuleMatchInfo(..))
-import GHC.Hs.Doc
+
+import GHC.Hs.DocString (mkHsDocStringChunk)
 import GHC.Hs.Extension (GhcPs)
 import GHC.Hs.Lit
+
+import Language.Haskell.Syntax.Doc
+import Language.Haskell.Syntax.Extension (noExtField)
 
 import GHC.Parser.CharClass
 
@@ -978,11 +982,11 @@ data Token
   | ITeof                        -- ^ end of file token
 
   -- Documentation annotations. See Note [PsSpan in Comments]
-  | ITdocComment   HsDocString PsSpan -- ^ The HsDocString contains more details about what
-                                      -- this is and how to pretty print it
-  | ITdocOptions   String      PsSpan -- ^ doc options (prune, ignore-exports, etc)
-  | ITlineComment  String      PsSpan -- ^ comment starting by "--"
-  | ITblockComment String      PsSpan -- ^ comment in {- -}
+  | ITdocComment   (HsDocString GhcPs) PsSpan -- ^ The HsDocString contains more details about what
+                                              -- this is and how to pretty print it
+  | ITdocOptions   String              PsSpan -- ^ doc options (prune, ignore-exports, etc)
+  | ITlineComment  String              PsSpan -- ^ comment starting by "--"
+  | ITblockComment String              PsSpan -- ^ comment in {- -}
 
   deriving Show
 
@@ -1411,7 +1415,7 @@ multiline_doc_comment span buf _len _buf2 = {-# SCC "multiline_doc_comment" #-} 
             lineSpan = mkSrcSpanPs $ mkPsSpan start_loc end_loc
             locatedLine = L lineSpan (mkHsDocStringChunk $ reverse curLine)
             commentLines = NE.reverse $ locatedLine :| prevLines
-            endComment = docCommentEnd input (docType (\dec -> MultiLineDocString dec commentLines)) buf span
+            endComment = docCommentEnd input (docType (\dec -> MultiLineDocString noExtField dec commentLines)) buf span
 
     -- Check if the next line of input belongs to this doc comment as well.
     -- A doc comment continues onto the next line when the following
@@ -1468,7 +1472,7 @@ nested_doc_comment span buf _len _buf2 = {-# SCC "nested_doc_comment" #-} withLe
     worker input@(AI start_loc _) docType _checkNextLine = nested_comment_logic endComment "" input (mkPsSpan start_loc (psSpanEnd span))
       where
         endComment input lcomment
-          = docCommentEnd input (docType (\d -> NestedDocString d (mkHsDocStringChunk . dropTrailingDec <$> lcomment))) buf span
+          = docCommentEnd input (docType (\d -> NestedDocString noExtField d (mkHsDocStringChunk . dropTrailingDec <$> lcomment))) buf span
 
         dropTrailingDec [] = []
         dropTrailingDec "-}" = ""
@@ -1555,7 +1559,7 @@ See #314 for more background on the bug this fixes.
 -}
 
 {-# INLINE withLexedDocType #-}
-withLexedDocType :: (AlexInput -> ((HsDocStringDecorator -> HsDocString) -> (HdkComment, Token)) -> Bool -> P (PsLocated Token))
+withLexedDocType :: (AlexInput -> ((HsDocStringDecorator -> HsDocString GhcPs) -> (HdkComment, Token)) -> Bool -> P (PsLocated Token))
                  -> P (PsLocated Token)
 withLexedDocType lexDocComment = do
   input@(AI _ buf) <- getInput
@@ -1585,17 +1589,17 @@ withLexedDocType lexDocComment = do
             | otherwise -> go (c:acc) input'
           Nothing -> Nothing
 
-mkHdkCommentNext, mkHdkCommentPrev  :: PsSpan -> (HsDocStringDecorator -> HsDocString) -> (HdkComment, Token)
+mkHdkCommentNext, mkHdkCommentPrev  :: PsSpan -> (HsDocStringDecorator -> HsDocString GhcPs) -> (HdkComment, Token)
 mkHdkCommentNext loc mkDS =  (HdkCommentNext ds,ITdocComment ds loc)
   where ds = mkDS HsDocStringNext
 mkHdkCommentPrev loc mkDS =  (HdkCommentPrev ds,ITdocComment ds loc)
   where ds = mkDS HsDocStringPrevious
 
-mkHdkCommentNamed :: PsSpan -> String -> (HsDocStringDecorator -> HsDocString) -> (HdkComment, Token)
+mkHdkCommentNamed :: PsSpan -> String -> (HsDocStringDecorator -> HsDocString GhcPs) -> (HdkComment, Token)
 mkHdkCommentNamed loc name mkDS = (HdkCommentNamed name ds, ITdocComment ds loc)
   where ds = mkDS (HsDocStringNamed name)
 
-mkHdkCommentSection :: PsSpan -> Int -> (HsDocStringDecorator -> HsDocString) -> (HdkComment, Token)
+mkHdkCommentSection :: PsSpan -> Int -> (HsDocStringDecorator -> HsDocString GhcPs) -> (HdkComment, Token)
 mkHdkCommentSection loc n mkDS = (HdkCommentSection n ds, ITdocComment ds loc)
   where ds = mkDS (HsDocStringGroup n)
 
@@ -2480,10 +2484,10 @@ pWarningFlags opts = diag_warning_flags (pDiagOpts opts)
 -- 'HsDocString's spans over the contents of the docstring - i.e. it does not
 -- include the decorator ("-- |", "{-|" etc.)
 data HdkComment
-  = HdkCommentNext HsDocString
-  | HdkCommentPrev HsDocString
-  | HdkCommentNamed String HsDocString
-  | HdkCommentSection Int HsDocString
+  = HdkCommentNext (HsDocString GhcPs)
+  | HdkCommentPrev (HsDocString GhcPs)
+  | HdkCommentNamed String (HsDocString GhcPs)
+  | HdkCommentSection Int (HsDocString GhcPs)
   deriving Show
 
 data PState = PState {

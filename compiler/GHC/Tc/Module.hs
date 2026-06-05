@@ -310,9 +310,10 @@ tcRnModuleTcRnM hsc_env mod_sum
         -- 'getDoc'.
         -- We will rename it properly after renaming everything else so that
         -- haddock can link the identifiers
+        ; let noHdrIds (L loc (WithHsDocIdentifiers str _)) =
+                L loc (WithHsDocIdentifiers (rnHsDocString str) [])
         ; tcg_env <- return (tcg_env
-                              { tcg_hdr_info = (fmap (\(WithHsDocIdentifiers str _) -> WithHsDocIdentifiers str [])
-                                                <$> maybe_doc_hdr , maybe_mod ) })
+                              { tcg_hdr_info = (noHdrIds <$> maybe_doc_hdr, maybe_mod) })
         ; -- If the whole module is warned about or deprecated
           -- (via mod_deprec) record that in tcg_warns. If we do thereby add
           -- a WarnAll, it will override any subsequent deprecations added to tcg_warns

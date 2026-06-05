@@ -48,6 +48,7 @@ import qualified GHC.Data.BooleanFormula as BF
 import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
 import GHC.Hs.Decls.Overlap (OverlapMode(..))
+import GHC.Hs.Type () -- Required for HsConDetails type-family instances
 import GHC.TypeLits
 import GHC.Types.ForeignCall
 import GHC.Types.InlinePragma (ActivationGhc, inlinePragmaActivation, inlinePragmaSource)
@@ -1690,22 +1691,21 @@ markEpAnnLevel (EpAnnLevelQuote tok) = EpAnnLevelQuote <$> markEpToken tok
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint HsDocString where
+instance ExactPrint (HsDocString GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (MultiLineDocString decorator (x :| xs)) = do
+  exact (MultiLineDocString v decorator (x :| xs)) = do
     printStringAdvance ("-- " ++ printDecorator decorator)
     pe <- getPriorEndD
     debugM $ "MultiLineDocString: (pe,x)=" ++ showAst (pe,x)
     x' <- markAnnotated x
-    xs' <- mapM markAnnotated (map dedentDocChunk xs)
-    return (MultiLineDocString decorator (x' :| xs'))
+    xs' <- markAnnotated (map dedentDocChunk xs)
+    return (MultiLineDocString v decorator (x' :| xs'))
   exact x = do
     -- TODO: can this happen?
     debugM $ "Not exact printing:" ++ showAst x
     return x
-
 
 instance ExactPrint HsDocStringChunk where
   getAnnotationEntry _ = NoEntryVal
@@ -4565,6 +4565,11 @@ instance ExactPrint (LocatedBF (BF.BooleanFormula GhcPs)) where
     bf' <- markAnnotated bf
     cp' <- markEpToken cp
     return (L (an {anns = AnnBooleanFormula op' cp' ta}) bf')
+
+instance ExactPrint [Located HsDocStringChunk] where
+  getAnnotationEntry _ = NoEntryVal
+  setAnnotationAnchor a _ _ _ = a
+  exact fs = mapM markAnnotated fs
 
 instance ExactPrint [LocatedA (HsExpr GhcPs)] where
   getAnnotationEntry _ = NoEntryVal

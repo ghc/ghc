@@ -561,6 +561,7 @@ Library
         GHC.Hs.Expr
         GHC.Hs.Syn.Type
         GHC.Hs.Extension
+        GHC.Hs.Extension.Pass
         GHC.Hs.ImpExp
         GHC.Hs.Instances
         GHC.Hs.Lit
@@ -1039,6 +1040,7 @@ Library
         Language.Haskell.Syntax.Decls
         Language.Haskell.Syntax.Decls.Foreign
         Language.Haskell.Syntax.Decls.Overlap
+        Language.Haskell.Syntax.Doc
         Language.Haskell.Syntax.Expr
         Language.Haskell.Syntax.Extension
         Language.Haskell.Syntax.ImpExp

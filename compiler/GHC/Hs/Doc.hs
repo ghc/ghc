@@ -1,5 +1,9 @@
 -- | Types and functions for raw and lexed docstrings.
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module GHC.Hs.Doc
   ( HsDoc
@@ -32,6 +36,7 @@ import GHC.Data.EnumSet (EnumSet)
 import GHC.Types.Avail
 import GHC.Types.Name.Set
 import GHC.Driver.Flags
+import GHC.Parser.Annotation
 
 import Control.DeepSeq
 import Data.Data
@@ -49,30 +54,17 @@ import Data.Function
 
 import GHC.Hs.DocString
 
+import Language.Haskell.Syntax.Doc
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Module.Name
 
--- | A docstring with the (probable) identifiers found in it.
-type HsDoc = WithHsDocIdentifiers HsDocString
+type instance Anno (WithHsDocIdentifiers (HsDocString (GhcPass pass)) (GhcPass pass)) = SrcSpan
 
--- | Annotate a value with the probable identifiers found in it
--- These will be used by haddock to generate links.
---
--- The identifiers are bundled along with their location in the source file.
--- This is useful for tooling to know exactly where they originate.
---
--- This type is currently used in two places - for regular documentation comments,
--- with 'a' set to 'HsDocString', and for adding identifier information to
--- warnings, where 'a' is 'StringLiteral'
-data WithHsDocIdentifiers a pass = WithHsDocIdentifiers
-  { hsDocString      :: !a
-  , hsDocIdentifiers :: ![Located (IdP pass)]
-  }
+deriving instance (Data pass, Data (LIdP pass), Data a) => Data (WithHsDocIdentifiers a pass)
+deriving instance (Eq (LIdP pass), Eq a) => Eq (WithHsDocIdentifiers a pass)
 
-deriving instance (Data pass, Data (IdP pass), Data a) => Data (WithHsDocIdentifiers a pass)
-deriving instance (Eq (IdP pass), Eq a) => Eq (WithHsDocIdentifiers a pass)
-instance (NFData (IdP pass), NFData a) => NFData (WithHsDocIdentifiers a pass) where
-  rnf (WithHsDocIdentifiers d i) = rnf d `seq` rnf i
+instance (UnXRec pass, NFData (IdP pass), NFData a) => NFData (WithHsDocIdentifiers a pass) where
+  rnf (WithHsDocIdentifiers d i) = rnf d `seq` rnf (map (unXRec @pass) i)
 
 -- | For compatibility with the existing @-ddump-parsed' output, we only show
 -- the docstring.
@@ -83,37 +75,36 @@ instance Outputable a => Outputable (WithHsDocIdentifiers a pass) where
 
 instance Binary a => Binary (WithHsDocIdentifiers a GhcRn) where
   put_ bh (WithHsDocIdentifiers s ids) = do
-    put_ bh s
-    put_ bh $ BinLocated <$> (sortBy  (stableNameCmp `on` getName) ids)
+      put_ bh s
+      put_ bh $ BinLocated . (\(L l e) -> L (locA l) e) <$> (sortBy (stableNameCmp `on` getName) ids)
   get bh =
-    liftA2 WithHsDocIdentifiers (get bh) (fmap unBinLocated <$> get bh)
+    liftA2 WithHsDocIdentifiers (get bh) (fmap reLoc . fmap unBinLocated <$> get bh)
+
 
 -- | Extract a mapping from the lexed identifiers to the names they may
 -- correspond to.
 hsDocIds :: WithHsDocIdentifiers a GhcRn -> NameSet
 hsDocIds (WithHsDocIdentifiers _ ids) = mkNameSet $ map unLoc ids
 
--- | Pretty print a thing with its doc
+-- | Pretty print a thing with its doc.
 -- The docstring will include the comment decorators '-- |', '{-|' etc
 -- and will come either before or after depending on how it was written
 -- i.e it will come after the thing if it is a '-- ^' or '{-^' and before
 -- otherwise.
-pprWithDoc :: LHsDoc name -> SDoc -> SDoc
+pprWithDoc :: LHsDoc (GhcPass pass) -> SDoc -> SDoc
 pprWithDoc doc = pprWithDocString (hsDocString $ unLoc doc)
 
 -- | See 'pprWithHsDoc'
-pprMaybeWithDoc :: Maybe (LHsDoc name) -> SDoc -> SDoc
+pprMaybeWithDoc :: Maybe (LHsDoc (GhcPass pass)) -> SDoc -> SDoc
 pprMaybeWithDoc Nothing    = id
 pprMaybeWithDoc (Just doc) = pprWithDoc doc
 
 -- | Print a doc with its identifiers, useful for debugging
-pprHsDocDebug :: (Outputable (IdP name)) => HsDoc name -> SDoc
+pprHsDocDebug :: (Outputable (IdGhcP pass), Outputable (Anno (IdGhcP pass))) => HsDoc (GhcPass pass) -> SDoc
 pprHsDocDebug (WithHsDocIdentifiers s ids) =
     vcat [ text "text:" $$ nest 2 (pprHsDocString s)
          , text "identifiers:" $$ nest 2 (vcat (map pprLocatedAlways ids))
          ]
-
-type LHsDoc pass = Located (HsDoc pass)
 
 -- | A simplified version of 'HsImpExp.IE'.
 data DocStructureItem

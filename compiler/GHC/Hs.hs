@@ -42,7 +42,6 @@ import GHC.Hs.Binds
 import GHC.Hs.Expr
 import GHC.Hs.ImpExp
 import GHC.Hs.Lit
-import Language.Haskell.Syntax
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
 import GHC.Hs.Pat
@@ -50,6 +49,8 @@ import GHC.Hs.Type
 import GHC.Hs.Utils
 import GHC.Hs.Doc
 import GHC.Hs.Instances () -- For Data instances
+
+import Language.Haskell.Syntax
 
 -- others:
 import GHC.Utils.Outputable

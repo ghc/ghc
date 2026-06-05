@@ -6,21 +6,22 @@
 
 {-# OPTIONS_GHC -Wno-orphans #-} -- Outputable
 
-module GHC.Hs.Extension where
+module GHC.Hs.Extension
+  ( module GHC.Hs.Extension
+  , module GHC.Hs.Extension.Pass
+  ) where
 
 -- This module captures the type families to precisely identify the extension
 -- points for GHC.Hs syntax
 
 import GHC.Prelude
 
-import Data.Data hiding ( Fixity )
 import Language.Haskell.Syntax.Extension
+import GHC.Hs.Extension.Pass
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Var
 import GHC.Utils.Outputable hiding ((<>))
-import GHC.Types.SrcLoc (GenLocated(..), unLoc)
-import GHC.Utils.Panic
 import GHC.Parser.Annotation
 
 {-
@@ -85,31 +86,15 @@ saying that NoGhcTcPass is idempotent.
 
 -}
 
--- See Note [XRec and Anno in the AST] in GHC.Parser.Annotation
-type instance XRec (GhcPass p) a = XRecGhc a
-
--- (XRecGhc tree) wraps `tree` in a GHC-specific,
--- but pass-independent, source location
-type XRecGhc a = GenLocated (Anno a) a
-
 type instance Anno RdrName = SrcSpanAnnN
 type instance Anno Name    = SrcSpanAnnN
 type instance Anno Id      = SrcSpanAnnN
-
 type instance Anno (WithUserRdr a) = Anno a
 
 type IsSrcSpanAnn p a = ( Anno (IdGhcP p) ~ EpAnn a,
                           Anno (IdOccGhcP p) ~ EpAnn a,
                           NoAnn a,
                           IsPass p)
-
-instance UnXRec (GhcPass p) where
-  unXRec = unLoc
-instance MapXRec (GhcPass p) where
-  mapXRec = fmap
-
--- instance WrapXRec (GhcPass p) a where
---   wrapXRec = noLocA
 
 {-
 Note [DataConCantHappen and strict fields]
@@ -142,28 +127,6 @@ more on how this works.)
 Bottom line: if you add a TTG extension constructor that uses DataConCantHappen, make
 sure that any uses of it as a field are strict.
 -}
-
--- | Used as a data type index for the hsSyn AST; also serves
--- as a singleton type for Pass
-data GhcPass (c :: Pass) where
-  GhcPs :: GhcPass 'Parsed
-  GhcRn :: GhcPass 'Renamed
-  GhcTc :: GhcPass 'Typechecked
-
--- This really should never be entered, but the data-deriving machinery
--- needs the instance to exist.
-instance Typeable p => Data (GhcPass p) where
-  gunfold _ _ _ = panic "instance Data GhcPass"
-  toConstr  _   = panic "instance Data GhcPass"
-  dataTypeOf _  = panic "instance Data GhcPass"
-
-data Pass = Parsed | Renamed | Typechecked
-         deriving (Data)
-
--- Type synonyms as a shorthand for tagging
-type GhcPs   = GhcPass 'Parsed      -- Output of parser
-type GhcRn   = GhcPass 'Renamed     -- Output of renamer
-type GhcTc   = GhcPass 'Typechecked -- Output of typechecker
 
 -- | Allows us to check what phase we're in at GHC's runtime.
 -- For example, this class allows us to write

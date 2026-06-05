@@ -1,11 +1,17 @@
-module GHC.Rename.Doc ( rnHsDoc, rnLHsDoc, rnLDocDecl, rnDocDecl ) where
+module GHC.Rename.Doc
+  ( rnHsDoc
+  , rnHsDocIdentifiersOnly
+  , rnHsDocString
+  , rnLHsDoc
+  , rnLDocDecl
+  , rnDocDecl
+  ) where
 
 import GHC.Prelude
 
 import GHC.Tc.Types
 import GHC.Hs
 import GHC.Types.Name.Reader
-import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Tc.Utils.Monad (getGblEnv)
 
@@ -29,14 +35,19 @@ rnDocDecl (DocGroup i doc) = do
   doc' <- rnLHsDoc doc
   pure $ (DocGroup i doc')
 
-rnHsDoc :: WithHsDocIdentifiers a GhcPs -> RnM (WithHsDocIdentifiers a GhcRn)
+rnHsDoc :: HsDoc GhcPs -> RnM (HsDoc GhcRn)
 rnHsDoc (WithHsDocIdentifiers s ids) = do
+  gre <- tcg_rdr_env <$> getGblEnv
+  pure (WithHsDocIdentifiers (rnHsDocString s) (rnHsDocIdentifiers gre ids))
+
+rnHsDocIdentifiersOnly :: WithHsDocIdentifiers a GhcPs -> RnM (WithHsDocIdentifiers a GhcRn)
+rnHsDocIdentifiersOnly (WithHsDocIdentifiers s ids) = do
   gre <- tcg_rdr_env <$> getGblEnv
   pure (WithHsDocIdentifiers s (rnHsDocIdentifiers gre ids))
 
 rnHsDocIdentifiers :: GlobalRdrEnv
-                   -> [Located RdrName]
-                   -> [Located Name]
+                   -> [LIdP GhcPs]
+                   -> [LIdP GhcRn]
 rnHsDocIdentifiers gre_env ns =
   [ L l $ greName gre
   | L l rdr_name <- ns

@@ -40,7 +40,7 @@ import GHC.Unit.Module.Warnings
 
 import Data.Data
 import Data.Maybe
-import GHC.Hs.Doc (LHsDoc)
+import Language.Haskell.Syntax.Doc (LHsDoc)
 
 
 {-
@@ -365,7 +365,7 @@ replaceWrappedName (IEData    r (L l _)) n = IEData    r (L l n)
 replaceLWrappedName :: LIEWrappedName GhcPs -> IdP GhcRn -> LIEWrappedName GhcRn
 replaceLWrappedName (L l n) n' = L l (replaceWrappedName n n')
 
-exportDocstring :: LHsDoc pass -> SDoc
+exportDocstring :: LHsDoc (GhcPass p) -> SDoc
 exportDocstring doc = braces (text "docstring: " <> ppr doc)
 
 instance OutputableBndrId p => Outputable (IE (GhcPass p)) where

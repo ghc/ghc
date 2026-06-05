@@ -2357,6 +2357,6 @@ instance ToHie (LocatedA (DocDecl GhcRn)) where
     DocCommentNamed _ d -> [ toHie d ]
     DocGroup _ d -> [ toHie d ]
 
-instance ToHie (LHsDoc GhcRn) where
+instance ToHie (Located (HsDoc GhcRn)) where
   toHie (L span d@(WithHsDocIdentifiers _ ids)) =
     concatM $ makeNode d span : [toHie $ map (C Use) ids]

@@ -12,11 +12,11 @@ docs:
           fα -> [text:
                    -- ^ Documentation for 'R'\'s 'fα' field.
                  identifiers:
-                   {NoExportList.hs:14:38}
+                   {EpAnn EpaSpan NoExportList.hs:14:38 NameAnnTrailing [] EpaComments []}
                    R
-                   {NoExportList.hs:14:38}
+                   {EpAnn EpaSpan NoExportList.hs:14:38 NameAnnTrailing [] EpaComments []}
                    R
-                   {NoExportList.hs:14:45-46}
+                   {EpAnn EpaSpan NoExportList.hs:14:45-46 NameAnnTrailing [] EpaComments []}
                    fα]]
        arg docs:
          []

@@ -279,7 +279,7 @@ ghcPrimDeclDocs = emptyDocs
                else Avail name
     declAvail _ = Nothing
 
-    mkHsDoc s = WithHsDocIdentifiers (mkGeneratedHsDocString s) []
+    mkHsDoc s = WithHsDocIdentifiers (mkGeneratedHsDocStringGhc s) []
 
 ghcPrimNames :: FastStringEnv Name
 ghcPrimNames

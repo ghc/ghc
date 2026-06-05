@@ -97,6 +97,7 @@ import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Decls.Foreign
 import Language.Haskell.Syntax.Binds.InlinePragma (Activation)
 import Language.Haskell.Syntax.Decls.Overlap (OverlapMode)
+import Language.Haskell.Syntax.Doc (LHsDoc, WithHsDocIdentifiers)
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Lit (StringLiteral)
 import Language.Haskell.Syntax.Specificity (Specificity)
@@ -104,8 +105,6 @@ import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.ImpExp (NamespaceSpecifier)
 
 import GHC.Data.FastString (FastString)
-import GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
-import GHC.Hs.Doc (WithHsDocIdentifiers)
 
 import Control.DeepSeq
 import Control.Monad
@@ -1416,7 +1415,7 @@ data DocDecl pass
   | DocCommentNamed String (LHsDoc pass)
   | DocGroup Int (LHsDoc pass)
 
-deriving instance (Data pass, Data (IdP pass)) => Data (DocDecl pass)
+deriving instance (Data pass, Data (IdP pass), Data (LHsDoc pass)) => Data (DocDecl pass)
 
 docDeclDoc :: DocDecl pass -> LHsDoc pass
 docDeclDoc (DocCommentNext d) = d

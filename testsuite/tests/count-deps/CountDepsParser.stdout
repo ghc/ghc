@@ -108,6 +108,7 @@ GHC.Hs.Doc
 GHC.Hs.DocString
 GHC.Hs.Expr
 GHC.Hs.Extension
+GHC.Hs.Extension.Pass
 GHC.Hs.ImpExp
 GHC.Hs.Instances
 GHC.Hs.Lit
@@ -279,6 +280,7 @@ Language.Haskell.Syntax.BooleanFormula
 Language.Haskell.Syntax.Decls
 Language.Haskell.Syntax.Decls.Foreign
 Language.Haskell.Syntax.Decls.Overlap
+Language.Haskell.Syntax.Doc
 Language.Haskell.Syntax.Expr
 Language.Haskell.Syntax.Extension
 Language.Haskell.Syntax.ImpExp

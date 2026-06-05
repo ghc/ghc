@@ -113,8 +113,8 @@ import GHC.Utils.Binary
 import GHC.Types.Arity
 
 import qualified GHC.LanguageExtensions as LangExt
-import {-# SOURCE #-} Language.Haskell.Syntax.Type (PromotionFlag(..), isPromoted)
-import {-# SOURCE #-} Language.Haskell.Syntax.Expr (HsDoFlavour)
+import Language.Haskell.Syntax.Type (PromotionFlag(..), isPromoted)
+import Language.Haskell.Syntax.Expr (HsDoFlavour)
 
 import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.ImpExp (ImportDeclLevel(..), ImportDeclLevelStyle(..))
