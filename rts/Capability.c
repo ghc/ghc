@@ -443,13 +443,6 @@ void
 moreCapabilities (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
 {
 #if defined(THREADED_RTS)
-    // We must disable the timer while we do this since the tick handler may
-    // call contextSwitchAllCapabilities, which may see the capabilities array
-    // as we free it. The alternative would be to protect the capabilities
-    // array with a lock but this seems more expensive than necessary.
-    // See #17289.
-    stopTimer();
-
     if (to == 1) {
         // THREADED_RTS must work on builds that don't have a mutable
         // BaseReg (eg. unregisterised), so in this case
@@ -470,8 +463,6 @@ moreCapabilities (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
     }
 
     debugTrace(DEBUG_sched, "allocated %d more capabilities", to - from);
-
-    startTimer();
 #endif
 }
 
