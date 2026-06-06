@@ -1,10 +1,11 @@
+{-# OPTIONS_GHC -Wno-dodgy-imports #-}
 module GHC.Data.List.NonEmpty (module Data.List.NonEmpty, module GHC.Data.List.NonEmpty, toList) where
 
 import Prelude (Bool, (.))
 import Control.Applicative
 import qualified Control.Monad as List (zipWithM)
 import Data.Foldable (Foldable (toList))
-import Data.List.NonEmpty hiding (toList, unzip)
+import Data.List.NonEmpty hiding (toList, unzip, unzip3)
 import qualified Data.List as List
 import qualified GHC.Data.List as List
 

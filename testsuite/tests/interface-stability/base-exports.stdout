@@ -1521,9 +1521,24 @@ module Data.List.NonEmpty where
   unfold :: forall a b. (a -> (b, GHC.Internal.Maybe.Maybe a)) -> a -> NonEmpty b
   unfoldr :: forall a b. (a -> (b, GHC.Internal.Maybe.Maybe a)) -> a -> NonEmpty b
   unzip :: forall a b. NonEmpty (a, b) -> (NonEmpty a, NonEmpty b)
+  unzip3 :: forall a b c. NonEmpty (a, b, c) -> (NonEmpty a, NonEmpty b, NonEmpty c)
+  unzip4 :: forall a b c d. NonEmpty (a, b, c, d) -> (NonEmpty a, NonEmpty b, NonEmpty c, NonEmpty d)
+  unzip5 :: forall a b c d e. NonEmpty (a, b, c, d, e) -> (NonEmpty a, NonEmpty b, NonEmpty c, NonEmpty d, NonEmpty e)
+  unzip6 :: forall a b c d e f. NonEmpty (a, b, c, d, e, f) -> (NonEmpty a, NonEmpty b, NonEmpty c, NonEmpty d, NonEmpty e, NonEmpty f)
+  unzip7 :: forall a b c d e f g. NonEmpty (a, b, c, d, e, f, g) -> (NonEmpty a, NonEmpty b, NonEmpty c, NonEmpty d, NonEmpty e, NonEmpty f, NonEmpty g)
   xor :: NonEmpty GHC.Internal.Types.Bool -> GHC.Internal.Types.Bool
   zip :: forall a b. NonEmpty a -> NonEmpty b -> NonEmpty (a, b)
+  zip3 :: forall a b c. NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty (a, b, c)
+  zip4 :: forall a b c d. NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty d -> NonEmpty (a, b, c, d)
+  zip5 :: forall a b c d e. NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty d -> NonEmpty e -> NonEmpty (a, b, c, d, e)
+  zip6 :: forall a b c d e f. NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty d -> NonEmpty e -> NonEmpty f -> NonEmpty (a, b, c, d, e, f)
+  zip7 :: forall a b c d e f g. NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty d -> NonEmpty e -> NonEmpty f -> NonEmpty g -> NonEmpty (a, b, c, d, e, f, g)
   zipWith :: forall a b c. (a -> b -> c) -> NonEmpty a -> NonEmpty b -> NonEmpty c
+  zipWith3 :: forall a b c d. (a -> b -> c -> d) -> NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty d
+  zipWith4 :: forall a b c d e. (a -> b -> c -> d -> e) -> NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty d -> NonEmpty e
+  zipWith5 :: forall a b c d e f. (a -> b -> c -> d -> e -> f) -> NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty d -> NonEmpty e -> NonEmpty f
+  zipWith6 :: forall a b c d e f g. (a -> b -> c -> d -> e -> f -> g) -> NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty d -> NonEmpty e -> NonEmpty f -> NonEmpty g
+  zipWith7 :: forall a b c d e f g h. (a -> b -> c -> d -> e -> f -> g -> h) -> NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty d -> NonEmpty e -> NonEmpty f -> NonEmpty g -> NonEmpty h
 
 module Data.Maybe where
   -- Safety: Safe

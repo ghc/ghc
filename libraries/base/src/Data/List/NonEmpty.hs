@@ -99,10 +99,29 @@ module Data.List.NonEmpty (
    , nubOrdBy    -- :: (a -> a -> Ordering) -> NonEmpty a -> NonEmpty a
    -- * Indexing streams
    , (!!)        -- :: NonEmpty a -> Int -> a
+
    -- * Zipping and unzipping streams
-   , zip         -- :: NonEmpty a -> NonEmpty b -> NonEmpty (a,b)
-   , zipWith     -- :: (a -> b -> c) -> NonEmpty a -> NonEmpty b -> NonEmpty c
-   , unzip       -- :: Functor f => f (a,b) -> (f a, f b)
+   , zip
+   , zip3
+   , zip4
+   , zip5
+   , zip6
+   , zip7
+
+   , zipWith
+   , zipWith3
+   , zipWith4
+   , zipWith5
+   , zipWith6
+   , zipWith7
+
+   , unzip
+   , unzip3
+   , unzip4
+   , unzip5
+   , unzip6
+   , unzip7
+
    -- * Converting to and from a list
    , fromList    -- :: [a] -> NonEmpty a
    , toList      -- :: NonEmpty a -> [a]
@@ -116,7 +135,7 @@ import           Prelude             hiding (break, cycle, drop, dropWhile,
                                       last, length, map, repeat, reverse,
                                       scanl, scanl1, scanr, scanr1, span,
                                       splitAt, tail, take, takeWhile,
-                                      unzip, zip, zipWith, (!!), Applicative(..))
+                                      unzip, unzip3, zip, zip3, zipWith, zipWith3, (!!), Applicative(..))
 import qualified Prelude
 
 import           Control.Applicative (Applicative (..), Alternative (many))
@@ -560,11 +579,96 @@ isPrefixOf (y:ys) (x :| xs) = (y == x) && List.isPrefixOf ys xs
   | otherwise = error "NonEmpty.!! negative index"
 infixl 9 !!
 
+-- | The 'zip3' function takes three streams and returns a stream of
+-- corresponding triples.
+zip3 :: NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty (a, b, c)
+zip3 (x :| xs) (y :| ys) (z :| zs) = (x, y, z) :| List.zip3 xs ys zs
+
+-- | The 'zip4' function takes four streams and returns a stream of
+-- corresponding quadruples.
+zip4 :: NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty d -> NonEmpty (a, b, c, d)
+zip4 (x :| xs) (y :| ys) (z :| zs) (t :| ts) = (x, y, z, t) :| List.zip4 xs ys zs ts
+
+-- | The 'zip5' function takes five streams and returns a stream of
+-- corresponding quintuples.
+zip5 :: NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty d -> NonEmpty e -> NonEmpty (a, b, c, d, e)
+zip5 (x :| xs) (y :| ys) (z :| zs) (t :| ts) (u :| us) = (x, y, z, t, u) :| List.zip5 xs ys zs ts us
+
+-- | The 'zip6' function takes six streams and returns a stream of
+-- corresponding sextuples.
+zip6 :: NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty d -> NonEmpty e -> NonEmpty f -> NonEmpty (a, b, c, d, e, f)
+zip6 (x :| xs) (y :| ys) (z :| zs) (t :| ts) (u :| us) (v :| vs) = (x, y, z, t, u, v) :| List.zip6 xs ys zs ts us vs
+
+-- | The 'zip7' function takes seven streams and returns a stream of
+-- corresponding septuples.
+zip7 :: NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty d -> NonEmpty e -> NonEmpty f -> NonEmpty g -> NonEmpty (a, b, c, d, e, f, g)
+zip7 (x :| xs) (y :| ys) (z :| zs) (t :| ts) (u :| us) (v :| vs) (w :| ws) = (x, y, z, t, u, v, w) :| List.zip7 xs ys zs ts us vs ws
+
+-- | The 'zipWith3' function generalizes 'zip3'. Rather than tupling
+-- the elements, the elements are combined using the function
+-- passed as the first argument.
+zipWith3 :: (a -> b -> c -> d) -> NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty d
+zipWith3 f (x :| xs) (y :| ys) (z :| zs) = f x y z :| List.zipWith3 f xs ys zs
+
+-- | The 'zipWith4' function generalizes 'zip4'. Rather than tupling
+-- the elements, the elements are combined using the function
+-- passed as the first argument.
+zipWith4 :: (a -> b -> c -> d -> e) -> NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty d -> NonEmpty e
+zipWith4 f (x :| xs) (y :| ys) (z :| zs) (t :| ts) = f x y z t :| List.zipWith4 f xs ys zs ts
+
+-- | The 'zipWith5' function generalizes 'zip5'. Rather than tupling
+-- the elements, the elements are combined using the function
+-- passed as the first argument.
+zipWith5 :: (a -> b -> c -> d -> e -> f) -> NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty d -> NonEmpty e -> NonEmpty f
+zipWith5 f (x :| xs) (y :| ys) (z :| zs) (t :| ts) (u :| us) = f x y z t u :| List.zipWith5 f xs ys zs ts us
+
+-- | The 'zipWith6' function generalizes 'zip6'. Rather than tupling
+-- the elements, the elements are combined using the function
+-- passed as the first argument.
+zipWith6 :: (a -> b -> c -> d -> e -> f -> g) -> NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty d -> NonEmpty e -> NonEmpty f -> NonEmpty g
+zipWith6 f (x :| xs) (y :| ys) (z :| zs) (t :| ts) (u :| us) (v :| vs) = f x y z t u v :| List.zipWith6 f xs ys zs ts us vs
+
+-- | The 'zipWith7' function generalizes 'zip7'. Rather than tupling
+-- the elements, the elements are combined using the function
+-- passed as the first argument.
+zipWith7 :: (a -> b -> c -> d -> e -> f -> g -> h) -> NonEmpty a -> NonEmpty b -> NonEmpty c -> NonEmpty d -> NonEmpty e -> NonEmpty f -> NonEmpty g -> NonEmpty h
+zipWith7 f (x :| xs) (y :| ys) (z :| zs) (t :| ts) (u :| us) (v :| vs) (w :| ws) = f x y z t u v w :| List.zipWith7 f xs ys zs ts us vs ws
+
 -- | The 'unzip' function is the inverse of the 'zip' function.
 unzip :: NonEmpty (a, b) -> (NonEmpty a, NonEmpty b)
 unzip ((a, b) :| asbs) = (a :| as, b :| bs)
   where
     (as, bs) = List.unzip asbs
+
+-- | The 'unzip3' function is the inverse of the 'zip3' function.
+unzip3 :: NonEmpty (a, b, c) -> (NonEmpty a, NonEmpty b, NonEmpty c)
+unzip3 ((a, b, c) :| asbscs) = (a :| as, b :| bs, c :| cs)
+  where
+    (as, bs, cs) = List.unzip3 asbscs
+
+-- | The 'unzip4' function is the inverse of the 'zip4' function.
+unzip4 :: NonEmpty (a, b, c, d) -> (NonEmpty a, NonEmpty b, NonEmpty c, NonEmpty d)
+unzip4 ((a, b, c, d) :| asbscsds) = (a :| as, b :| bs, c :| cs, d :| ds)
+  where
+    (as, bs, cs, ds) = List.unzip4 asbscsds
+
+-- | The 'unzip5' function is the inverse of the 'zip5' function.
+unzip5 :: NonEmpty (a, b, c, d, e) -> (NonEmpty a, NonEmpty b, NonEmpty c, NonEmpty d, NonEmpty e)
+unzip5 ((a, b, c, d, e) :| asbscsdses) = (a :| as, b :| bs, c :| cs, d :| ds, e :| es)
+  where
+    (as, bs, cs, ds, es) = List.unzip5 asbscsdses
+
+-- | The 'unzip6' function is the inverse of the 'zip6' function.
+unzip6 :: NonEmpty (a, b, c, d, e, f) -> (NonEmpty a, NonEmpty b, NonEmpty c, NonEmpty d, NonEmpty e, NonEmpty f)
+unzip6 ((a, b, c, d, e, f) :| asbscsdsesfs) = (a :| as, b :| bs, c :| cs, d :| ds, e :| es, f :| fs)
+  where
+    (as, bs, cs, ds, es, fs) = List.unzip6 asbscsdsesfs
+
+-- | The 'unzip7' function is the inverse of the 'zip7' function.
+unzip7 :: NonEmpty (a, b, c, d, e, f, g) -> (NonEmpty a, NonEmpty b, NonEmpty c, NonEmpty d, NonEmpty e, NonEmpty f, NonEmpty g)
+unzip7 ((a, b, c, d, e, f, g) :| asbscsdsesfsgs) = (a :| as, b :| bs, c :| cs, d :| ds, e :| es, f :| fs, g :| gs)
+  where
+    (as, bs, cs, ds, es, fs, gs) = List.unzip7 asbscsdsesfsgs
 
 -- | The 'nub' function removes duplicate elements from a list. In
 -- particular, it keeps only the first occurrence of each element.
