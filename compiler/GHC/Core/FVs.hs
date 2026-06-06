@@ -242,7 +242,7 @@ exprFVs (Lit _)         = mempty
 exprFVs (Tick t expr)   = tickish_fvs t `mappend` exprFVs expr
 exprFVs (App fun arg)   = exprFVs fun `mappend` exprFVs arg
 exprFVs (Lam bndr body) = addCoreBndrFV bndr (exprFVs body)
-exprFVs (Cast expr co)  = exprFVs expr `mappend` shallowSelCoFV co
+exprFVs (Cast expr co)  = exprFVs expr `mappend` shallowSelCastCoFV co
 exprFVs (Case scrut bndr ty alts)
   = exprFVs scrut `mappend` shallowSelTypeFV ty `mappend`
     addCoreBndrFV bndr (mapUnionFV alt_fvs alts)
@@ -743,7 +743,7 @@ freeVars = go
         , AnnCast expr2 (cfvs, co) )
       where
         expr2 = go expr
-        cfvs  = tyCoVarsOfCoDSet co
+        cfvs  = tyCoVarsOfCastCoercionDSet co
 
     go (Tick tickish expr)
       = ( tickishFVs tickish `unionDVarSet` freeVarsOf expr2

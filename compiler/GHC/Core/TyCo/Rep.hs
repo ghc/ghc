@@ -33,6 +33,7 @@ module GHC.Core.TyCo.Rep (
         ForAllTyFlag(..), FunTyFlag(..),
 
         -- * Coercions
+        CastCoercion(..), TypedCastCoercion(..),
         Coercion(..), CoSel(..), FunSel(..),
         UnivCoProvenance(..),
         CoercionHole(..), CoercionPlusHoles(..), coHoleCoVar, setCoHoleCoVar,
@@ -63,7 +64,7 @@ module GHC.Core.TyCo.Rep (
         TyCoFolder(..), foldTyCo, noView,
 
         -- * Sizes
-        typeSize, typesSize, coercionSize,
+        typeSize, typesSize, coercionSize, castCoercionSize,
 
         -- * Multiplicities
         Scaled(..), scaledMult, scaledThing, mapScaledType, Mult
@@ -71,7 +72,7 @@ module GHC.Core.TyCo.Rep (
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprTyLit )
+import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprCastCo, pprTyLit )
 import {-# SOURCE #-} GHC.Builtin.Types
 import {-# SOURCE #-} GHC.Core.TyCo.FVs( tyCoVarsOfType ) -- Use in assertions
 import {-# SOURCE #-} GHC.Core.Type( chooseFunTyFlag, typeKind, typeTypeOrConstraint )
@@ -80,7 +81,7 @@ import {-# SOURCE #-} GHC.Core.Type( chooseFunTyFlag, typeKind, typeTypeOrConstr
 
 -- friends:
 import GHC.Types.Var
-import GHC.Types.Var.Set( elemVarSet )
+import GHC.Types.Var.Set
 import GHC.Types.Unique.Set
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
@@ -809,6 +810,71 @@ tcMkScaledFunTy (Scaled mult arg) res = tcMkVisFunTy mult arg res
             Coercions
 %*                                                                      *
 %************************************************************************
+
+Note [Zapped casts]
+~~~~~~~~~~~~~~~~~~~
+A "zapped cast" is a Cast that does not store the full Coercion being used to
+cast, but instead stores the type resulting from the cast and a set of CoVars
+used in the original coercion.  The CastCoercion type is used to represent
+the coercion argument to a cast; it may be either a full coercion (CCoercion)
+or zapped (ZCoercion).  Since this type is used when optimizing casts, it may
+also be reflexive (ReflCastCo) although we avoid constructing a Cast by a
+reflexive coercion (in mkCastCo).
+
+Zapping casts is motivated by performance (see #8095 and related tickets).
+Sometimes the structure of the coercion can be very large, for example when
+using type families that take many reduction steps, and when Core Lint is
+not being used, the full structure of the coercion is not needed.  We merely
+need the result type (to support exprType) and the set of coercion variables
+(to avoid floating a coercion out of the scope in which it is valid, see
+Note [The importance of tracking UnivCo dependencies]).
+
+Zapped casts are introduced in exactly two places:
+
+ - ds_hs_wrapper in GHC.HsToCore.Binds
+
+ - zonkEvTerm in GHC.Tc.Zonk.Type
+
+These use a heuristic based on the size of the coercion / RHS type to determine whether
+it is worth zapping. In particular, we do not want to zap in the case:
+
+    e |> axF @SmallType  -- where axF :: forall a. F a ~ BigType a
+
+which is much smaller than:
+
+    e |> Zap BigType []
+
+This arises in practice with the Rep type family from GHC Generics.
+
+We can convert a ZCoercion back into a normal Coercion using castCoToCo to
+produce a UnivCo; such coercions can be identified for debugging with the
+ZCoercionProv provenance. This is sometimes necessary in the optimizer, when a
+Cast needs to be moved elsewhere.  Since a UnivCo must store both the left and
+right hand side types, it is less compact than a ZCoercion, so it is best to
+avoid castCoToCo where possible.
+
+The `-fzap-casts` and `-fno-zap-casts` flags can be used to enable or disable
+cast zapping, for comparative performance testing or to ensure casts are not
+zapped when debugging the compiler.
+
+Zapping reduces the effectiveness of Core Lint, because it cannot check that
+the original coercion was well-typed.  Thus `-dcore-lint` will automatically
+imply `-fno-zap-casts` for the same module.  However, imported modules may still
+include zapped casts.
+TODO: probably the boot libraries ought to be distributed with `-fno-zap-casts`,
+so users can get full checks from `-dcore-lint`.
+
+ZCoercion discards the structure of the coercion, retaining only the set of variables
+on which it depends.  It is important we store only the "shallow" free CoVars in the
+set, because those are the ones on which the original coercions necessarily depended
+and which may be substituted away later. If we use the deep CoVars, we can end up
+retaining references to CoVars that are no longer in scope. See also
+Note [Shallow and deep free variables] in "GHC.Core.TyCo.FVs".
+
+ZCoercion represents the set of free coercion variables as a deterministic DCoVarSet.
+This is important for determinism (see Note [Deterministic UniqFM] in "GHC.Types.Unique.DFM")
+as the set will be stored in interface files.
+
 -}
 
 type CoercionN = Coercion       -- always Nominal
@@ -838,6 +904,18 @@ the same as Refl.  See `isReflKindCo`.
 
 type KindCoercion  = CoercionN    -- See Note [KindCoercion]
 type KindMCoercion = MCoercionN   -- See Note [KindCoercion]
+
+-- | Type of coercions used in a 'Cast', which may be an actual representational
+-- 'Coercion', or we may have discarded the coercion and retained only its type
+-- and free CoVars.  See Note [Zapped casts].
+data CastCoercion
+  = CCoercion CoercionR        -- Not zapped; the Coercion has Representational role
+  | ZCoercion Type DCoVarSet   -- Zapped; stores only the RHS type and free CoVars
+  | ReflCastCo
+  deriving Data.Data
+
+-- | A LHS type and a 'CastCoercion' from that LHS type to a RHS type.
+data TypedCastCoercion = TCC { tccLeftType :: Type, tccCastCoercion :: CastCoercion }
 
 -- | A 'Coercion' is concrete evidence of the equality/convertibility
 -- of two types.
@@ -976,6 +1054,9 @@ data FunSel  -- See Note [SelCo]
 
 instance Outputable Coercion where
   ppr = pprCo
+
+instance Outputable CastCoercion where
+  ppr = pprCastCo
 
 instance Outputable CoSel where
   ppr (SelTyCon n r) = text "Tc" <> parens (int n <> comma <> pprOneCharRole r)
@@ -1572,6 +1653,8 @@ data UnivCoProvenance
 
   | SubMultProv -- ^ A submultiplicity coercion
 
+  | ZCoercionProv  -- ^ See Note [Zapped casts].
+
   deriving (Eq, Ord, Data.Data)
   -- Why Ord?  See Note [Ord instance of IfaceType] in GHC.Iface.Type
 
@@ -1580,6 +1663,7 @@ instance Outputable UnivCoProvenance where
   ppr (ProofIrrelProv {})  = text "(proof irrel)"
   ppr (PluginProv str)     = parens (text "plugin" <+> brackets (text str))
   ppr SubMultProv          = text "(sub-mult)"
+  ppr ZCoercionProv        = text "(zapped)"
 
 instance NFData UnivCoProvenance where
   rnf p = p `seq` ()
@@ -1589,6 +1673,7 @@ instance Binary UnivCoProvenance where
   put_ bh ProofIrrelProv = putByte bh 2
   put_ bh (PluginProv a) = putByte bh 3 >> put_ bh a
   put_ bh SubMultProv    = putByte bh 4
+  put_ bh ZCoercionProv  = putByte bh 5
   get bh = do
       tag <- getByte bh
       case tag of
@@ -1597,6 +1682,7 @@ instance Binary UnivCoProvenance where
            3 -> do a <- get bh
                    return $ PluginProv a
            4 -> return SubMultProv
+           5 -> return ZCoercionProv
            _ -> panic ("get UnivCoProvenance " ++ show tag)
 
 
@@ -2061,6 +2147,11 @@ typeSize (CoercionTy co)            = coercionSize co
 
 typesSize :: [Type] -> Int
 typesSize tys = foldr ((+) . typeSize) 0 tys
+
+castCoercionSize :: CastCoercion -> Int
+castCoercionSize (CCoercion co) = coercionSize co
+castCoercionSize (ZCoercion ty cos) = typeSize ty + sizeDVarSet cos
+castCoercionSize ReflCastCo = 1
 
 coercionSize :: Coercion -> Int
 coercionSize (Refl ty)             = typeSize ty

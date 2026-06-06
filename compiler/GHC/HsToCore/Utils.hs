@@ -26,7 +26,7 @@ module GHC.HsToCore.Utils (
         mkCoPrimCaseMatchResult, mkCoAlgCaseMatchResult, mkCoSynCaseMatchResult,
         wrapBind, wrapBinds,
 
-        mkErrorAppDs, mkCastDs, mkFailExpr,
+        mkErrorAppDs, mkCastDs, mkCastDs_may_zap, mkFailExpr,
 
         seqVar,
 
@@ -62,6 +62,7 @@ import GHC.Core.PatSyn
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep( Scaled(..) )
+import GHC.Core.TyCo.FVs
 import GHC.Builtin.Types
 import GHC.Core.ConLike
 import GHC.Types.Unique.Set
@@ -472,7 +473,18 @@ mkCastDs :: CoreExpr -> Coercion -> CoreExpr
 -- So here we do not make the assertion checks that we make in
 -- GHC.Core.Utils.mkCast; and we do less peephole optimisation too
 mkCastDs e co | isReflCo co = e
-              | otherwise   = Cast e co
+              | otherwise   = Cast e (CCoercion co)
+
+mkCastDs_may_zap :: CoreExpr -> Coercion -> CoreExpr
+-- See Note [Zapped casts] in GHC.Core.TyCo.Rep
+mkCastDs_may_zap e co
+  | isReflCo co = e
+  -- AMG TODO: why is this comparison different to the type comparison in zonkEvTerm?
+  | coercionSize co > castCoercionSize zapped_co = Cast e zapped_co
+  | otherwise = Cast e (CCoercion co)
+  where
+    zapped_co = ZCoercion (coercionRKind co) (shallowCoVarsOfCo co)
+
 
 {-
 ************************************************************************

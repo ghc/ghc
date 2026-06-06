@@ -26,7 +26,9 @@ import GHC.Prelude
 import GHC.Data.TrieMap
 import GHC.Core.Map.Type
 import GHC.Core
+import GHC.Core.Coercion
 import GHC.Core.Type
+import GHC.Core.Utils
 import GHC.Types.Tickish
 import GHC.Types.Var
 
@@ -135,7 +137,7 @@ data CoreMapX a
        , cm_lit   :: LiteralMap a
        , cm_co    :: CoercionMapG a
        , cm_type  :: TypeMapG a
-       , cm_cast  :: CoreMapG (CoercionMapG a)
+       , cm_cast  :: CoreMapG (CastCoercionMapG a)
        , cm_tick  :: CoreMapG (TickishMap a)
        , cm_app   :: CoreMapG (CoreMapG a)
        , cm_lam   :: CoreMapG (BndrMap a)    -- Note [Binders]
@@ -155,7 +157,7 @@ eqDeBruijnExpr (D env1 e1) (D env2 e2) = go e1 e2 where
     go (Type t1)    (Type t2)        = eqDeBruijnType (D env1 t1) (D env2 t2)
     -- See Note [Alpha-equality for Coercion arguments]
     go (Coercion {}) (Coercion {}) = True
-    go (Cast e1 co1) (Cast e2 co2) = D env1 co1 == D env2 co2 && go e1 e2
+    go (Cast e1 co1) (Cast e2 co2) = D env1 (castCoercionRKind (exprType e1) co1) == D env2 (castCoercionRKind (exprType e2) co2) && go e1 e2
     go (App f1 a1)   (App f2 a2)   = go f1 f2 && go a1 a2
     go (Tick n1 e1) (Tick n2 e2)
       =  eqDeBruijnTickish (D env1 n1) (D env2 n2)
@@ -273,13 +275,14 @@ instance TrieMap CoreMapX where
 ftE :: (a->Bool) -> CoreMapX a -> CoreMapX a
 ftE f (CM { cm_var = cvar, cm_lit = clit
           , cm_co = cco, cm_type = ctype
-          , cm_cast = ccast , cm_app = capp
+          , cm_cast = ccast, cm_app = capp
           , cm_lam = clam, cm_letn = cletn
           , cm_letr = cletr, cm_case = ccase
           , cm_ecase = cecase, cm_tick = ctick })
   = CM { cm_var = filterTM f cvar, cm_lit = filterTM f clit
        , cm_co = filterTM f cco, cm_type = filterTM f ctype
-       , cm_cast = fmap (filterTM f) ccast, cm_app = fmap (filterTM f) capp
+       , cm_cast = fmap (filterTM f) ccast
+       , cm_app = fmap (filterTM f) capp
        , cm_lam = fmap (filterTM f) clam, cm_letn = fmap (fmap (filterTM f)) cletn
        , cm_letr = fmap (fmap (filterTM f)) cletr, cm_case = fmap (filterTM f) ccase
        , cm_ecase = fmap (filterTM f) cecase, cm_tick = fmap (filterTM f) ctick }
@@ -287,7 +290,7 @@ ftE f (CM { cm_var = cvar, cm_lit = clit
 mpE :: (a -> Maybe b) -> CoreMapX a -> CoreMapX b
 mpE f (CM { cm_var = cvar, cm_lit = clit
           , cm_co = cco, cm_type = ctype
-          , cm_cast = ccast , cm_app = capp
+          , cm_cast = ccast, cm_app = capp
           , cm_lam = clam, cm_letn = cletn
           , cm_letr = cletr, cm_case = ccase
           , cm_ecase = cecase, cm_tick = ctick })
@@ -338,7 +341,7 @@ lkE (D env expr) cm = go expr cm
     go (Lit l)              = cm_lit  >.> lookupTM l
     go (Type t)             = cm_type >.> lkG (D env t)
     go (Coercion c)         = cm_co   >.> lkG (D env c)
-    go (Cast e c)           = cm_cast >.> lkG (D env e) >=> lkG (D env c)
+    go (Cast e c)           = cm_cast >.> lkG (D env e) >=> lkG (D env (castCoercionRKind (exprType e) c))
     go (Tick tickish e)     = cm_tick >.> lkG (D env e) >=> lkTickish tickish
     go (App e1 e2)          = cm_app  >.> lkG (D env e2) >=> lkG (D env e1)
     go (Lam v e)            = cm_lam  >.> lkG (D (extendCME env v) e)
@@ -365,7 +368,7 @@ xtE (D env (Coercion c))         f m = m { cm_co   = cm_co m
                                                  |> xtG (D env c) f }
 xtE (D _   (Lit l))              f m = m { cm_lit  = cm_lit m  |> alterTM l f }
 xtE (D env (Cast e c))           f m = m { cm_cast = cm_cast m |> xtG (D env e)
-                                                 |>> xtG (D env c) f }
+                                                 |>> xtG (D env (castCoercionRKind (exprType e) c)) f }
 xtE (D env (Tick t e))           f m = m { cm_tick = cm_tick m |> xtG (D env e)
                                                  |>> xtTickish t f }
 xtE (D env (App e1 e2))          f m = m { cm_app = cm_app m |> xtG (D env e2)

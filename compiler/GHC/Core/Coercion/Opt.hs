@@ -4,6 +4,7 @@
 
 module GHC.Core.Coercion.Opt
    ( optCoercion, optTransCo
+   , optCastCoercion
    , OptCoercionOpts (..)
    )
 where
@@ -176,6 +177,16 @@ optTransCo opts in_scope co1 co2
   = opt_trans in_scope co1 co2
   | otherwise
   = co1 `mkTransCo` co2
+
+-- AMG TODO: not clear if coercionLKind or substTy is better choice here
+optCastCoercion :: OptCoercionOpts -> Subst -> TypedCastCoercion -> TypedCastCoercion
+optCastCoercion _    env (TCC tyL ReflCastCo) = TCC (substTy env tyL) ReflCastCo
+optCastCoercion opts env (TCC _ (CCoercion co)) = let co' = optCoercion opts env co
+                                                  in TCC (coercionLKind co') (CCoercion co')
+optCastCoercion _ env (TCC tyL (ZCoercion tyR cos))
+  | tyL `eqTypeIgnoringMultiplicity` tyR = TCC (substTy env tyL) ReflCastCo
+  | otherwise        = TCC (substTy env tyL) (ZCoercion (substTy env tyR) (substDCoVarSet env cos))
+
 
 optCoercion :: OptCoercionOpts -> Subst -> Coercion -> NormalCo
 -- ^ optCoercion applies a substitution to a coercion,

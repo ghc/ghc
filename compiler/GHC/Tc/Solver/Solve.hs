@@ -36,6 +36,8 @@ import GHC.Core.Predicate
 import GHC.Core.Reduction
 import GHC.Core.Coercion
 import GHC.Core.Class( classHasSCs )
+-- import GHC.Core.TyCo.FVs
+-- import GHC.Core.TyCo.Rep (Coercion(..))
 
 import GHC.Types.Id(  idType )
 import GHC.Types.Var( EvVar, tyVarKind )
@@ -1776,13 +1778,14 @@ finish_rewrite
              -- mkEvCast optimises ReflCo
              ev_rw_role = ctEvRewriteRole ev
              new_tm = assert (coercionRole co == ev_rw_role)
-                      evCast (evId old_evar) $   -- evCast optimises ReflCo
-                      downgradeRole Representational ev_rw_role co
+                      evCastCo (evId old_evar)   -- evCast optimises ReflCo
+                               (downgradeRole Representational ev_rw_role co)
+                               new_pred
        ; new_ev <- newGivenEv loc (new_pred, new_tm)
        ; continueWith $ CtGiven new_ev }
 
 finish_rewrite
-  ev@(CtWanted (WantedCt { ctev_rewriters = rewriters, ctev_dest = dest }))
+  ev@(CtWanted (WantedCt { ctev_pred = old_pred, ctev_rewriters = rewriters, ctev_dest = dest }))
   (Reduction co new_pred)
   new_rewriters
   = do { let loc = ctEvLoc ev
@@ -1791,11 +1794,14 @@ finish_rewrite
        ; mb_new_ev <- newWanted loc rewriters' new_pred
        ; massert (coercionRole co == ev_rw_role)
        ; setWantedDict dest EvCanonical $
-         evCast (getEvExpr mb_new_ev)                $
-         downgradeRole Representational ev_rw_role (mkSymCo co)
+         evCastCo (getEvExpr mb_new_ev)
+                  (downgradeRole Representational ev_rw_role (mkSymCo co))
+                  old_pred
        ; case mb_new_ev of
             Fresh  new_ev -> continueWith $ CtWanted new_ev
             Cached _      -> stopWith ev "Cached wanted" }
+
+
 
 {- *******************************************************************
 *                                                                    *

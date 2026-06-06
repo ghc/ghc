@@ -41,5 +41,5 @@ dsPrimCall fn_id co fcall = do
     let
         call_app = mkFCall ccall_uniq fcall (map Var args) io_res_ty
         rhs      = mkLams tvs (mkLams args call_app)
-        rhs'     = Cast rhs co
+        rhs'     = Cast rhs (CCoercion co)
     return ([(fn_id, rhs')], mempty, mempty)

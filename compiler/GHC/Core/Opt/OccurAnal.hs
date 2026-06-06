@@ -37,11 +37,11 @@ import GHC.Prelude hiding ( head, init, last, tail )
 import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils   ( exprIsTrivial, isDefaultAlt, isExpandableApp,
-                          mkCastMCo, mkTicks, BinderSwapDecision(..), scrutOkForBinderSwap )
+                          mkCastCo, mkTicks, BinderSwapDecision(..), scrutOkForBinderSwap )
 import GHC.Core.Opt.Arity   ( joinRhsArity, isOneShotBndr )
 import GHC.Core.Coercion
 import GHC.Core.Type
-import GHC.Core.TyCo.FVs    ( tyCoVarsOfMCo )
+import GHC.Core.TyCo.FVs    ( coVarsOfCastCo )
 
 import GHC.Data.Maybe( orElse )
 import GHC.Data.Graph.Directed ( SCC(..), Node(..)
@@ -2311,7 +2311,7 @@ occ_anal_lam_tail env expr@(Lam {})
 occ_anal_lam_tail env (Cast expr co)
   = let  WUD usage expr' = occ_anal_lam_tail env expr
          -- usage1: see Note [Gather occurrences of coercion variables]
-         usage1 = addManyOccs usage (coVarsOfCo co)
+         usage1 = addManyOccs usage (coVarsOfCastCo co)
 
          -- usage2: see Note [Occ-anal and cast worker/wrapper]
          usage2 = case expr of
@@ -2629,7 +2629,7 @@ occAnal env (Cast expr co)
   = let
       WUD usage expr' = occAnal env expr
       -- usage1: see Note [Gather occurrences of coercion variables]
-      usage1 = addManyOccs usage (coVarsOfCo co)
+      usage1 = addManyOccs usage (coVarsOfCastCo co)
       -- usage2: see (JCT1) in Note [Join points, casts, and ticks] in GHC.Core.
       usage2 = markAllNonTail_CastOrTick env usage1
     in
@@ -2998,7 +2998,7 @@ data OccEnv
            -- If  x :-> (y, co)  is in the env,
            -- then please replace x by (y |> mco)
            -- Invariant of course: idType x = exprType (y |> mco)
-           , occ_bs_env  :: !(IdEnv (OutId, MCoercion))
+           , occ_bs_env  :: !(IdEnv (OutId, CastCoercion))
               -- Domain is Global and Local Ids
               -- Range is just Local Ids
            , occ_bs_rng  :: !VarSet
@@ -3618,9 +3618,9 @@ addBndrSwap scrut case_bndr
   , scrut_var /= case_bndr
       -- Consider: case x of x { ... }
       -- Do not add [x :-> x] to occ_bs_env, else lookupBndrSwap will loop
-  = env { occ_bs_env = extendVarEnv swap_env scrut_var (case_bndr', mkSymMCo mco)
+  = env { occ_bs_env = extendVarEnv swap_env scrut_var (case_bndr', mkSymCastCo (idType scrut_var) mco)
         , occ_bs_rng = rng_vars `extendVarSet` case_bndr'
-                       `unionVarSet` tyCoVarsOfMCo mco }
+                       `unionVarSet` tyCoVarsOfCastCo mco }
 
   | otherwise
   = env
@@ -3639,7 +3639,7 @@ lookupBndrSwap env@(OccEnv { occ_bs_env = bs_env })  bndr
     -- Why do we iterate here?
     -- See (BS2) in Note [The binder-swap substitution]
     case lookupBndrSwap env bndr1 of
-      (fun, fun_id) -> (mkCastMCo fun mco, fun_id) }
+      (fun, fun_id) -> (mkCastCo fun mco, fun_id) }
 
 {- Historical note [Proxy let-bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

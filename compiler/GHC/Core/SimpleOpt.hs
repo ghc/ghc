@@ -3,7 +3,6 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-
 module GHC.Core.SimpleOpt (
         SimpleOpts (..), defaultSimpleOpts,
 
@@ -30,7 +29,7 @@ import GHC.Core.Unfold.Make
 import GHC.Core.Make
 import GHC.Core.Opt.OccurAnal( occurAnalyseExpr, occurAnalysePgm, zapLambdaBndrs )
 import GHC.Core.DataCon
-import GHC.Core.Coercion.Opt ( optCoercion, optTransCo, OptCoercionOpts (..) )
+import GHC.Core.Coercion.Opt ( optCoercion, optCastCoercion, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
 import GHC.Core.Predicate( isCoVarType )
@@ -304,11 +303,11 @@ simpleOptPgm opts this_mod binds rules =
 ----------------------
 type SimpleClo = (SimpleOptEnv, InExpr)
 
-data SimpleContItem = ApplyToArg SimpleClo | CastIt OutCoercion
+data SimpleContItem = ApplyToArg SimpleClo | CastIt OutType OutCastCoercion
 
 instance Outputable SimpleContItem where
   ppr (ApplyToArg (_, arg)) = text "ARG" <+> ppr arg
-  ppr (CastIt co) = text "CAST" <+> ppr co
+  ppr (CastIt _ co) = text "CAST" <+> ppr co
 
 data SimpleOptEnv
   = SOE { soe_opts :: {-# UNPACK #-} !SimpleOpts
@@ -424,6 +423,7 @@ simple_opt_expr env expr = go expr
       where
         (env', bndrs') = subst_opt_bndrs env bndrs
 
+
 ----------------------
 -- simple_app collects arguments for beta reduction
 simple_app :: HasDebugCallStack => SimpleOptEnv -> InExpr -> [SimpleContItem] -> CoreExpr
@@ -473,7 +473,7 @@ simple_app env e0@(Lam {}) as0@(_:_)
       where (env', b') = subst_opt_bndr env b
 
     -- See Note [Eliminate casts in function position]
-    do_beta env e@(Lam b _) as@(CastIt out_co:rest)
+    do_beta env e@(Lam b _) as@(CastIt ty out_co:rest)
       | isNonCoVarId b
       -- Optimise the inner lambda to make it an 'OutExpr', which makes it
       -- possible to call 'pushCoercionIntoLambda' with the 'OutCoercion' 'co'.
@@ -482,14 +482,14 @@ simple_app env e0@(Lam {}) as0@(_:_)
       -- we need to do this to avoid mixing 'InExpr' and 'OutExpr', or two
       -- 'InExpr' with different environments (getting this wrong caused #26588 & #26589.)
       , Lam out_b out_body <- simple_app env e []
-      , Just (b', body') <- pushCoercionIntoLambda (soeInScope env) out_b out_body out_co
+      , Just (b', body') <- pushCoercionIntoLambda (soeInScope env) out_b out_body ty out_co
       = do_beta (soeZapSubst env) (Lam b' body') rest
         -- soeZapSubst: we've already optimised everything (the lambda and 'rest') by now.
       | otherwise
       = rebuild_app env (simple_opt_expr env e) as
 
     do_beta env (Cast e co) as =
-      do_beta env e (add_cast env co as)
+      do_beta env e (add_cast env (TCC (exprType e) co) as)
 
     do_beta env body as
       = simple_app env body as
@@ -537,23 +537,24 @@ simple_app env (Let bind body) args
           expr' = Let bind' (simple_opt_expr env' body)
 
 simple_app env (Cast e co) as
-  = simple_app env e (add_cast env co as)
+  = simple_app env e (add_cast env (TCC (exprType e) co) as)
 
 simple_app env e as
   = rebuild_app env (simple_opt_expr env e) as
 
-add_cast :: SimpleOptEnv -> InCoercion -> [SimpleContItem] -> [SimpleContItem]
-add_cast env co1 as
-  | isReflCo co1
+-- FIXME (cast-zapping rebase): HEAD added optTransCo to further optimise the
+-- combined coercion when stacking. There is no optTransCastCo yet, so for now
+-- we use mkTransCastCo and leave the deeper optimisation as a TODO.
+add_cast :: SimpleOptEnv -> InTypedCastCoercion -> [SimpleContItem] -> [SimpleContItem]
+add_cast env (TCC tyL co1) as
+  | isReflCastCo co1'
   = as
   | otherwise
   = case as of
-      CastIt co2:rest -> CastIt (optTransCo opts in_scope opt_co1 co2):rest
-      _               -> CastIt opt_co1:as
+      CastIt _ co2:rest -> CastIt ty (co1' `mkTransCastCo` co2):rest
+      _                 -> CastIt ty co1':as
   where
-    opts     = so_co_opts (soe_opts env)
-    in_scope = soeInScope env
-    opt_co1  = optCoercion opts (soe_subst env) co1
+    TCC ty co1' = optCastCoercion (so_co_opts (soe_opts env)) (soe_subst env) (TCC tyL co1)
 
 rebuild_app :: HasDebugCallStack
             => SimpleOptEnv -> OutExpr -> [SimpleContItem] -> OutExpr
@@ -562,15 +563,19 @@ rebuild_app env fun args = foldl mk_app fun args
     in_scope = soeInScope env
     mk_app out_fun = \case
       ApplyToArg arg -> App out_fun (simple_opt_clo in_scope arg)
-      CastIt co      -> mk_cast out_fun co
+      CastIt _ co    -> mk_cast out_fun co
 
-mk_cast :: CoreExpr -> CoercionR -> CoreExpr
--- Does a full reflexivity check, unlike GHC.Core.Utils.mkCast,
--- which does the cheaper isReflCo only.
+mk_cast :: CoreExpr -> CastCoercion -> CoreExpr
+-- Like GHC.Core.Utils.mkCast, but does a full reflexivity check.
+-- mkCast doesn't do that because the Simplifier does (in simplCast)
 -- But in SimpleOpt it's nice to kill those nested casts (#18112)
+mk_cast (Cast e co1) co2        = mk_cast e (co1 `mkTransCastCo` co2)
+mk_cast (Tick t e)   co         = Tick t (mk_cast e co)
 mk_cast e co
-  | isReflexiveCo co = e
-  | otherwise        = Cast e co
+  | isReflexiveCastCo (TCC (exprType e) co)
+  = e
+  | otherwise
+  = Cast e co
 
 {- Note [Desugaring unlifted newtypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1512,7 +1517,7 @@ data-con wrappers, and that cure would be worse than the disease.
 This Note exists solely to document the problem.
 -}
 
-data ConCont = CC [CoreExpr] MCoercion
+data ConCont = CC [CoreExpr] CastCoercion
                   -- Substitution already applied
 
 -- | Returns @Just ([b1..bp], dc, [t1..tk], [x1..xn])@ if the argument
@@ -1534,7 +1539,7 @@ exprIsConApp_maybe :: HasDebugCallStack
                    => InScopeEnv -> CoreExpr
                    -> Maybe (InScopeSet, FloatBinds, DataCon, [Type], [CoreExpr])
 exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
-  = go (Left in_scope) emptyFloatBinds expr (CC [] MRefl)
+  = go (Left in_scope) emptyFloatBinds expr (CC [] ReflCastCo)
   where
     go :: Either InScopeSet Subst
              -- Left in-scope  means "empty substitution"
@@ -1547,10 +1552,10 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
     go subst floats (Tick t expr) cont
        | not (tickishIsCode t) = go subst floats expr cont
 
-    go subst floats (Cast expr co1) (CC args m_co2)
-       | Just (args', m_co1') <- pushCoArgs (subst_co subst co1) args
+    go subst floats (Cast expr co1) (CC args m_co2) -- TODO: is the subst_ty below needed?
+       | Just (args', TCC _ m_co1') <- pushCoArgs (TCC (subst_ty subst (exprType expr)) (subst_cast_co subst co1)) args
             -- See Note [Push coercions in exprIsConApp_maybe]
-       = go subst floats expr (CC args' (m_co1' `mkTransMCo` m_co2))
+       = go subst floats expr (CC args' (m_co1' `mkTransCastCo` m_co2))
 
     go subst floats (App fun arg) (CC args mco)
        | let arg_type = exprType arg
@@ -1683,8 +1688,11 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
     subst_extend_in_scope (Left in_scope) v = Left (in_scope `extendInScopeSet` v)
     subst_extend_in_scope (Right s) v = Right (s `extendSubstInScope` v)
 
-    subst_co (Left {}) co = co
-    subst_co (Right s) co = GHC.Core.Subst.substCo s co
+    subst_cast_co (Left {}) co = co
+    subst_cast_co (Right s) co = substCastCo s co
+
+    subst_ty (Left {}) ty = ty
+    subst_ty (Right s) ty = substTy s ty
 
     subst_expr (Left {}) e = e
     subst_expr (Right s) e = substExpr s e
@@ -1738,7 +1746,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
                  (right, _, _) -> pprPanic "case_bind did not preserve Left" (ppr in_scope $$ ppr arg $$ ppr right)
 
 -- See Note [exprIsConApp_maybe on literal strings]
-dealWithStringLiteral :: Var -> BS.ByteString -> MCoercion
+dealWithStringLiteral :: Var -> BS.ByteString -> CastCoercion
                       -> Maybe (DataCon, [Type], [CoreExpr])
 
 -- This is not possible with user-supplied empty literals, GHC.Core.Make.mkStringExprFS
@@ -1844,8 +1852,8 @@ exprIsLambda_maybe ise@(ISE in_scope_set _) (Cast casted_e co)
     -- Only do value lambdas.
     -- this implies that x is not in scope in gamma (makes this code simpler)
     , not (isTyVar x) && not (isCoVar x)
-    , assert (not $ x `elemVarSet` tyCoVarsOfCo co) True
-    , Just (x',e') <- pushCoercionIntoLambda in_scope_set x e co
+    , assert (not $ x `elemVarSet` tyCoVarsOfCastCo co) True
+    , Just (x',e') <- pushCoercionIntoLambda in_scope_set x e (exprType casted_e) co
     , let res = Just (x',e',ts)
     = --pprTrace "exprIsLambda_maybe:Cast" (vcat [ppr casted_e,ppr co,ppr res)])
       res

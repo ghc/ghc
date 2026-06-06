@@ -198,7 +198,7 @@ dsWasmJSDynamicExport sync fn_id co unitId = do
                 [Type $ mkTyVarTy tv | Bndr tv _ <- tv_bndrs]
             ]
   pure
-    ( [(fn_id, Cast wrap_rhs co)] ++ work_bs ++ adjustor_bs,
+    ( [(fn_id, Cast wrap_rhs (CCoercion co))] ++ work_bs ++ adjustor_bs,
       work_h `mappend` adjustor_h,
       work_c `mappend` adjustor_c,
       work_ids
@@ -331,7 +331,7 @@ dsWasmJSStaticImport fn_id co js_src' unitId sync = do
     Sync -> do
       rhs <- importBindingRHS unitId cfun_name tvs arg_tys orig_res_ty id
       pure
-        ( [(fn_id, Cast rhs co)],
+        ( [(fn_id, Cast rhs (CCoercion co))],
           CHeader commonCDecls,
           importCStub Sync cfun_name (map scaledThing arg_tys) res_ty js_src
         )
@@ -387,7 +387,7 @@ dsWasmJSStaticImport fn_id co js_src' unitId sync = do
                   ]
             )
       pure
-        ( [(fn_id, Cast rhs co)],
+        ( [(fn_id, Cast rhs (CCoercion co))],
           CHeader commonCDecls,
           importCStub Async cfun_name (map scaledThing arg_tys) jsval_ty js_src
         )

@@ -53,7 +53,7 @@ import GHC.Core.Opt.Simplify.Inline( smallEnoughToInline )
 import GHC.Core.Opt.Stats ( Tick(..) )
 import qualified GHC.Core.Subst
 import GHC.Core.Ppr
-import GHC.Core.TyCo.Ppr ( pprParendType )
+import GHC.Core.TyCo.Ppr ( pprParendType, pprCastCo )
 import GHC.Core.TyCo.Compare ( eqTypeIgnoringMultiplicity )
 import GHC.Core.FVs
 import GHC.Core.Utils
@@ -168,7 +168,7 @@ data SimplCont
 
 
   | CastIt              -- (CastIt co K)[e] = K[ e `cast` co ]
-      { sc_co   :: OutCoercion  -- The coercion simplified
+      { sc_co   :: OutTypedCastCoercion  -- The coercion simplified
                                 -- Invariant: never an identity coercion
       , sc_opt  :: Bool         -- True <=> sc_co has had optCoercion applied to it
                                 --      See Note [Avoid re-simplifying coercions]
@@ -176,11 +176,11 @@ data SimplCont
       , sc_cont :: SimplCont }
 
   | ApplyToVal         -- (ApplyToVal arg K)[e] = K[ e arg ]
-      { sc_hole_ty :: OutType    -- Type of the function, presumably (forall a. blah)
+      { sc_hole_ty :: OutType    -- Type of the function, presumably (t -> blah)
                                  -- See Note [The hole type in ApplyToTy]
       , sc_env  :: StaticEnv     -- See Note [StaticEnv]
       , sc_arg  :: CoreExpr      -- The argument
-      , sc_cast :: MOutCoercion  -- Wrap this OutCoercion around the (simplified) argument
+      , sc_cast :: OutCastCoercion  -- Wrap this OutCoercion around the (simplified) argument
                                  -- See Note [The sc_cast field of ApplyToVal]
       , sc_cont :: SimplCont }
 
@@ -305,7 +305,7 @@ instance Outputable SimplCont where
     where
       pps = [ppr interesting] ++ [ppr eval_sd | eval_sd /= topSubDmd]
   ppr (CastIt { sc_co = co, sc_cont = cont })
-    = (text "CastIt" <+> pprOptCo co) $$ ppr cont
+    = (text "CastIt" <+> pprCastCo (tccCastCoercion co)) $$ ppr cont
   ppr (TickIt t cont)
     = (text "TickIt" <+> ppr t) $$ ppr cont
   ppr (ApplyToTy  { sc_arg_ty = ty, sc_cont = cont })
@@ -431,7 +431,7 @@ pushOutArgs fun_ty (arg:args) cont
   = ApplyToTy { sc_hole_ty = fun_ty, sc_arg_ty = ty
               , sc_cont = pushOutArgs (piResultTy fun_ty ty) args cont }
   | otherwise
-  = ApplyToVal { sc_hole_ty = fun_ty, sc_cast = MRefl
+  = ApplyToVal { sc_hole_ty = fun_ty, sc_cast = ReflCastCo
                , sc_arg = arg, sc_env = Simplified NoDup
                , sc_cont = pushOutArgs (funResultTy fun_ty) args  cont}
 
@@ -443,7 +443,7 @@ pushArgSpec :: ArgSpec -> SimplCont -> SimplCont
 pushArgSpec (TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }) cont
   = ApplyToTy  { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont }
 pushArgSpec (ValArg { as_arg = arg, as_hole_ty = hole_ty }) cont
-  = ApplyToVal { sc_arg = arg, sc_env = Simplified NoDup, sc_cast = MRefl
+  = ApplyToVal { sc_arg = arg, sc_env = Simplified NoDup, sc_cast = ReflCastCo
                , sc_hole_ty = hole_ty, sc_cont = cont }
 
 argSpecArg :: ArgSpec -> OutExpr
@@ -535,7 +535,7 @@ contResultType (TickIt _ k)                 = contResultType k
 contHoleType :: SimplCont -> OutType
 contHoleType (Stop ty _ _)                    = ty
 contHoleType (TickIt _ k)                     = contHoleType k
-contHoleType (CastIt { sc_co = co })          = coercionLKind co
+contHoleType (CastIt { sc_co = co })          = tccLeftType co
 contHoleType (StrictBind { sc_bndr = b, sc_env = se }) = perhapsSubstTy se (idType b)
 contHoleType (StrictArg  { sc_fun_ty = ty })  = funArgTy ty
 contHoleType (ApplyToTy  { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
@@ -1644,7 +1644,7 @@ the former.
 
 preInlineUnconditionally
     :: SimplEnv -> TopLevelFlag -> InId
-    -> StaticEnv -> CoreExpr -> MOutCoercion  -- The argument
+    -> StaticEnv -> CoreExpr -> OutCastCoercion  -- The argument
     -> Maybe SimplEnv       -- Returned env has extended substitution
 -- Precondition: rhs satisfies the let-can-float invariant
 -- See Note [Core let-can-float invariant] in GHC.Core
@@ -1662,7 +1662,7 @@ preInlineUnconditionally env top_lvl bndr rhs_se rhs rhs_mco
 
   -- See Note [Stable unfoldings and preInlineUnconditionally]
   | not (isInlinePragma inline_prag)
-  , Just inl <- maybeUnfoldingTemplate unf   = assertPpr (isReflMCo rhs_mco) (ppr bndr) $
+  , Just inl <- maybeUnfoldingTemplate unf   = assertPpr (isReflCastCo rhs_mco) (ppr bndr) $
                                                Just $! (extend_subst_with inl)
 
   | otherwise                                = Nothing
@@ -1678,9 +1678,7 @@ preInlineUnconditionally env top_lvl bndr rhs_se rhs rhs_mco
     extend_subst_with inl_rhs
       = extendIdSubst env bndr $!
         case rhs_se of
-          Simplified _ -> case rhs_mco of
-                             MRefl  -> DoneEx inl_rhs NotJoinPoint -- Common case
-                             MCo co -> DoneEx (mkCast inl_rhs co) NotJoinPoint
+          Simplified _ -> DoneEx (mkCastCo inl_rhs rhs_mco) NotJoinPoint
           UnSimplified rhs_env -> ContEx rhs_env inl_rhs rhs_mco
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
@@ -2061,9 +2059,9 @@ rebuildLam env bndrs@(bndr:_) body cont
       | -- Note [Casts and lambdas]
         seCastSwizzle env
       , not (any bad bndrs)
-      = mkCast (mk_lams bndrs body) (mkPiCos Representational bndrs co)
+      = mkCastCo (mk_lams bndrs body) (mkPiCastCos Representational bndrs co)
       where
-        co_vars  = tyCoVarsOfCo co
+        co_vars  = tyCoVarsOfCastCo co
         bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars
 
     mk_lams bndrs body
@@ -2904,6 +2902,9 @@ mkCase1 _mode scrut case_bndr _ (alt1 : alts)      -- Identity case
     identity_alt :: CoreAlt -> Maybe (CoreExpr -> CoreExpr)
     identity_alt (Alt con args rhs) = check_eq con args rhs
 
+-- FIXME (cast-zapping rebase): HEAD restructured this into wrapper-returning
+-- identity_alt/check_eq/is_id helpers; below uses HEAD's structure with
+-- CastCoercion-aware FV and mkCastCo. Please review.
     check_eq :: AltCon -> [Var] -> CoreExpr -> Maybe (CoreExpr -> CoreExpr)
     -- (check_eq con args e) return True if
     --       e   looks like   (Tick (Cast (Tick (con args))))
@@ -2912,9 +2913,9 @@ mkCase1 _mode scrut case_bndr _ (alt1 : alts)      -- Identity case
     -- a wrapper function that can rebuild the tick/cast stuff
     -- See (EIC1) and (EIC2) in Note [Eliminate Identity Case]
     check_eq alt_con args (Cast e co)         -- See (EIC1)
-      = do { guard (not (any (`elemVarSet` tyCoVarsOfCo co) args))
+      = do { guard (not (any (`elemVarSet` tyCoVarsOfCastCo co) args))
            ; wrap <- check_eq alt_con args e
-           ; return (flip mkCast co . wrap) }
+           ; return (flip mkCastCo co . wrap) }
     check_eq alt_con args (Tick t e)          -- See (EIC2)
       = do { guard (tickishFloatable t)
            ; wrap <- check_eq alt_con args e

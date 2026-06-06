@@ -33,6 +33,7 @@ module GHC.Core.TyCo.Subst
         substTy, substTyAddInScope, substScaledTy,
         substTyUnchecked, substTysUnchecked, substScaledTysUnchecked, substThetaUnchecked,
         substTyWithUnchecked, substScaledTyUnchecked,
+        substCastCo, substTypedCastCo,
         substTyWithInScope,
         substTys, substScaledTys, substTheta,
         lookupTyVar,
@@ -838,6 +839,15 @@ lookupTyVar :: Subst -> TyVar  -> Maybe Type
 lookupTyVar (Subst _ _ tenv _) tv
   = assert (isTyVar tv )
     lookupVarEnv tenv tv
+
+substCastCo :: HasDebugCallStack => Subst -> CastCoercion -> CastCoercion
+substCastCo subst (CCoercion co)     = CCoercion (substCo subst co)
+substCastCo subst (ZCoercion ty cos) = ZCoercion (substTy subst ty) (substDCoVarSet subst cos)
+substCastCo _     ReflCastCo         = ReflCastCo
+
+substTypedCastCo :: HasDebugCallStack => Subst -> TypedCastCoercion -> TypedCastCoercion
+substTypedCastCo subst (TCC ty co) = TCC (substTy subst ty) (substCastCo subst co)
+
 
 -- | Substitute within a 'Coercion'
 -- The substitution has to satisfy the invariants described in

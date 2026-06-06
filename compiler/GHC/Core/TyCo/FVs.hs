@@ -9,6 +9,7 @@ module GHC.Core.TyCo.FVs
         tyCoVarsOfType, tyCoVarsOfTypes, tyCoVarsOfTypesList,
         tyCoVarsOfThings,
         tyCoVarsOfCo, tyCoVarsOfCos, tyCoVarsOfMCo,
+        tyCoVarsOfCastCo,
         tyCoVarsOfTyVarEnv, tyCoVarsOfCoVarEnv, tyCoVarsOfQuant,
         deepTcvFolder, deepTypeFV, deepTypesFV, deepCoFV,
 
@@ -16,6 +17,7 @@ module GHC.Core.TyCo.FVs
         tyCoVarsOfTypeDSet, tyCoVarsOfTypesDSet, tyCoVarsOfTypeList,
         tyCoVarsOfCoDSet, tyCoVarsOfCoList,
         tyCoVarsOfThingsDSet,
+        tyCoVarsOfCastCoercionDSet,
         deepDetTypeFV, deepDetTypesFV, deepDetCoFV,
 
         -- Selective
@@ -24,10 +26,13 @@ module GHC.Core.TyCo.FVs
         -- CoVars only
         coVarsOfType, coVarsOfTypes,
         coVarsOfCo, coVarsOfCos,
+        coVarsOfCastCo,
+        shallowCoVarsOfCo, shallowCoVarsOfCos, shallowCoVarsOfCastCo,
         coVarsOfCoDSet, coVarsOfCosDSet,
+        coVarsOfCastCoDSet,
 
         -- Shallow, deterministic, composable
-        shallowSelTypeFV, shallowSelCoFV,
+        shallowSelTypeFV, shallowSelCoFV, shallowSelCastCoFV,
 
         -- Almost devoid
         almostDevoidCoVarOfCo,
@@ -38,6 +43,7 @@ module GHC.Core.TyCo.FVs
 
         -- Any and No Free vars
         anyFreeVarsOfType, anyFreeVarsOfTypes, anyFreeVarsOfCo,
+        anyFreeVarsOfCastCo,
         noFreeVarsOfType, noFreeVarsOfTypes, noFreeVarsOfCo,
 
         -- * Free type constructors
@@ -198,6 +204,11 @@ in GHC.Tc.Solver.  Yuk.  This is not pretty.
           See Note [Shallow and deep free variables]
 *                                                                      *
 ********************************************************************* -}
+
+tyCoVarsOfCastCo :: CastCoercion -> TyCoVarSet
+tyCoVarsOfCastCo (CCoercion co)     = coVarsOfCo co
+tyCoVarsOfCastCo (ZCoercion ty cos) = tyCoVarsOfType ty `unionVarSet` dVarSetToVarSet cos
+tyCoVarsOfCastCo ReflCastCo         = emptyVarSet
 
 tyCoVarsOfType :: Type -> TyCoVarSet
 -- The "deep" TyCoVars of the the type
@@ -375,6 +386,11 @@ tyCoVarsOfCoList :: Coercion -> [TyCoVar]
 -- See Note [Computing deep free variables]
 tyCoVarsOfCoList ty = dVarSetElems $ tyCoVarsOfCoDSet ty
 
+tyCoVarsOfCastCoercionDSet :: CastCoercion -> DTyCoVarSet
+tyCoVarsOfCastCoercionDSet (CCoercion co) = tyCoVarsOfCoDSet co
+tyCoVarsOfCastCoercionDSet (ZCoercion ty cvs) = tyCoVarsOfTypeDSet ty `unionDVarSet` cvs
+tyCoVarsOfCastCoercionDSet ReflCastCo = emptyDVarSet
+
 -- | Returns free variables of types, including kind variables as
 -- a deterministically ordered list. For type synonyms it does /not/ expand the
 -- synonym.
@@ -434,6 +450,12 @@ shallowSelCoFV   :: Coercion -> SelectiveDFV
 -- See Note [Shallow and deep free variables]
 (shallowSelTypeFV, _, shallowSelCoFV, _) = foldTyCo selectiveTcvFolder
 
+shallowSelCastCoFV :: CastCoercion -> SelectiveDFV
+shallowSelCastCoFV (CCoercion co)     = shallowSelCoFV co
+shallowSelCastCoFV (ZCoercion ty cos) = shallowSelTypeFV ty <>
+                                          mapUnionFV (shallowSelCoFV . CoVarCo) (dVarSetElems cos) -- AMG TODO better way?
+shallowSelCastCoFV ReflCastCo         = mempty
+
 selectiveTcvFolder :: TyCoFolder SelectiveDFV
 -- This one takes an `InterestingVarFun`, and returns shallow free vars
 -- See `shallowTcvFolder` for the general pattern
@@ -452,6 +474,18 @@ selectiveTcvFolder
           | otherwise              = acc `extendDVarSet` v
 
     do_hole hole = shallowSelTypeFV (varType (coHoleCoVar hole))
+
+
+-- Only the shallow CoVars (no TyVars).
+shallowCoVarsOfCos :: [Coercion] -> DCoVarSet
+shallowCoVarsOfCos = runFVSelective isCoVar . mapUnionFV shallowSelCoFV
+
+shallowCoVarsOfCo :: Coercion -> DCoVarSet
+shallowCoVarsOfCo = runFVSelective isCoVar . shallowSelCoFV
+
+shallowCoVarsOfCastCo :: CastCoercion -> DCoVarSet
+shallowCoVarsOfCastCo = runFVSelective isCoVar . shallowSelCastCoFV
+
 
 
 {- *********************************************************************
@@ -480,11 +514,13 @@ coVarsOfType  :: Type       -> CoVarSet
 coVarsOfTypes :: [Type]     -> CoVarSet
 coVarsOfCo    :: Coercion   -> CoVarSet
 coVarsOfCos   :: [Coercion] -> CoVarSet
+coVarsOfCastCo :: CastCoercion -> CoVarSet
 
 coVarsOfType  ty  = runTyCoVars (deepCoVarTypeFV ty)
 coVarsOfTypes tys = runTyCoVars (deepCoVarTypesFV tys)
 coVarsOfCo    co  = runTyCoVars (deepCoVarCoFV co)
 coVarsOfCos   cos = runTyCoVars (deepCoVarCosFV cos)
+coVarsOfCastCo co = runTyCoVars (deepCoVarCastCoFV co)
 
 type CoVarFV  = FV BoundVars (EndoOS CoVarSet)
 
@@ -492,7 +528,13 @@ deepCoVarTypeFV  :: Type       -> CoVarFV
 deepCoVarTypesFV :: [Type]     -> CoVarFV
 deepCoVarCoFV  :: Coercion   -> CoVarFV
 deepCoVarCosFV :: [Coercion] -> CoVarFV
+deepCoVarCastCoFV :: CastCoercion -> CoVarFV
 (deepCoVarTypeFV, deepCoVarTypesFV, deepCoVarCoFV, deepCoVarCosFV) = foldTyCo deepCoVarFolder
+
+deepCoVarCastCoFV ReflCastCo = mempty
+deepCoVarCastCoFV (CCoercion co) = deepCoVarCoFV co
+deepCoVarCastCoFV (ZCoercion ty cos) = deepCoVarTypeFV ty <>
+                                         mapUnionFV (deepCoVarCoFV . CoVarCo) (dVarSetElems cos) -- AMG TODO better way?
 
 deepCoVarFolder :: TyCoFolder CoVarFV
 deepCoVarFolder = TyCoFolder { tcf_view = noView
@@ -521,6 +563,15 @@ coVarsOfCoDSet co = runTyCoVarsDSet (det_co co)
 
 coVarsOfCosDSet :: [Coercion] -> DCoVarSet
 coVarsOfCosDSet cos = runTyCoVarsDSet (det_cos cos)
+
+coVarsOfCastCoDSet :: CastCoercion -> DCoVarSet
+coVarsOfCastCoDSet co = runTyCoVarsDSet (det_cast_co co)
+
+det_cast_co :: CastCoercion -> DCoVarFV
+det_cast_co ReflCastCo         = mempty
+det_cast_co (CCoercion co)     = det_co co
+det_cast_co (ZCoercion ty cos) = det_ty ty <>
+                                   mapUnionFV (det_co . CoVarCo) (dVarSetElems cos) -- AMG TODO better way?
 
 det_ty  :: Type       -> DCoVarFV
 det_co  :: Coercion   -> DCoVarFV
@@ -871,6 +922,12 @@ anyFreeVarsOfTypes check_fv tys = DM.getAny (runFVTop (f tys))
 anyFreeVarsOfCo :: (TyCoVar -> Bool) -> Coercion -> Bool
 anyFreeVarsOfCo check_fv co = DM.getAny (runFVTop (f co))
   where (_, _, f, _) = foldTyCo (afvFolder check_fv)
+
+anyFreeVarsOfCastCo :: (TyCoVar -> Bool) -> CastCoercion -> Bool
+anyFreeVarsOfCastCo check_fv (CCoercion co) = anyFreeVarsOfCo check_fv co
+anyFreeVarsOfCastCo check_fv (ZCoercion ty cvs) =
+    anyFreeVarsOfType check_fv ty || anyDVarSet check_fv cvs
+anyFreeVarsOfCastCo _ ReflCastCo = False
 
 noFreeVarsOfType :: Type -> Bool
 noFreeVarsOfType ty = not $ DM.getAny (runFVTop (f ty))

@@ -813,7 +813,7 @@ cpeBodyF env (Tick tickish expr)
 
 cpeBodyF env (Cast expr co)
    = do { (floats, expr') <- cpeBodyF env expr
-        ; return (floats, Cast expr' (cpSubstCo env co)) }
+        ; return (floats, Cast expr' (substCastCo (cpe_subst env) co)) }
 
 cpeBodyF env expr@(Lam {})
    = do { let (bndrs,body) = collectBinders expr
@@ -948,7 +948,7 @@ cpeBody env expr
 -- ---------------------------------------------------------------------------
 
 data ArgInfo = AIApp  CoreArg -- NB: Not a CpeApp yet
-             | AICast Coercion
+             | AICast CastCoercion
              | AITick CoreTickish
 
 instance Outputable ArgInfo where
@@ -1256,7 +1256,7 @@ cpeApp top_env expr
       AICast co
         -> rebuild_app' env as (Cast fun' co') floats ss rt_ticks req_depth
         where
-           co' = cpSubstCo env co
+           co' = substCastCo (cpe_subst env) co
 
       -- See Note [Ticks and mandatory eta expansion]
       AITick tickish

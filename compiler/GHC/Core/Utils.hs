@@ -9,7 +9,7 @@ Utility functions on @Core@ syntax
 -- | Commonly useful utilities for manipulating the Core language
 module GHC.Core.Utils (
         -- * Constructing expressions
-        mkCast, mkCastMCo, mkPiMCo,
+        mkCast, mkCastZ, mkCastCo, mkCastMCo, mkPiMCo,
         mkTick, mkTicks, mkTickNoHNF, tickHNFArgs,
         mkTickCpe,
         bindNonRec, needsCaseBinding, needsCaseBindingL,
@@ -24,7 +24,7 @@ module GHC.Core.Utils (
 
         -- * Properties of expressions
         exprType, coreAltType, coreAltsType,
-        mkLamType, mkLamTypes,
+        mkLamType, mkLamTypes, mkPiMCos,
         mkFunctionType,
         exprIsTrivial, getIdFromTrivialExpr, getIdFromTrivialExpr_maybe,
         trivial_expr_fold,
@@ -82,6 +82,7 @@ import GHC.Core.Predicate( isEqPred )
 import GHC.Core.Predicate( isUnaryClass )
 import GHC.Core.FamInstEnv
 import GHC.Core.TyCo.Compare( eqType, eqTypeX, eqTypeIgnoringMultiplicity )
+import GHC.Core.TyCo.FVs
 import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.TyCon
@@ -144,7 +145,7 @@ exprType (Let bind body)
   , Type ty <- rhs           = substTyWithUnchecked [tv] [ty] (exprType body)
   | otherwise                = exprType body
 exprType (Case _ _ ty _)     = ty
-exprType (Cast _ co)         = coercionRKind co
+exprType (Cast e co)         = castCoercionRKind (exprType e) co
 exprType (Tick _ e)          = exprType e
 exprType (Lam binder expr)   = mkLamType binder (exprType expr)
 exprType e@(App _ _)
@@ -190,6 +191,12 @@ mkLamType v body_ty
    = mkFunctionType (idMult v) (idType v) body_ty
 
 mkLamTypes vs ty = foldr mkLamType ty vs
+
+mkPiMCos :: [Var] -> CastCoercion -> CastCoercion
+mkPiMCos _ ReflCastCo = ReflCastCo
+mkPiMCos vs (CCoercion co) = CCoercion (mkPiCos Representational vs co)
+mkPiMCos vs (ZCoercion ty cos) = ZCoercion (mkLamTypes vs ty) cos
+
 
 {-
 Note [Type bindings]
@@ -271,6 +278,11 @@ mkPiMCo v (MCo co) = MCo (mkPiCo Representational v co)
 *                                                                      *
 ********************************************************************* -}
 
+mkCastCo :: HasDebugCallStack => CoreExpr -> CastCoercion -> CoreExpr
+mkCastCo expr (CCoercion co)     = mkCast expr co
+mkCastCo expr (ZCoercion ty cos) = mkCastZ expr ty cos
+mkCastCo expr ReflCastCo         = expr
+
 -- | Wrap the given expression in the coercion safely, dropping
 -- identity coercions and coalescing nested coercions
 mkCast :: HasDebugCallStack => CoreExpr -> CoercionR -> CoreExpr
@@ -287,7 +299,7 @@ mkCast expr co
             , text "expr:" <+> ppr expr
             , callStackDoc ]) $
     case expr of
-      Cast expr co2 -> mkCast expr (mkTransCo co2 co)
+      Cast expr co2 -> mkCastCo expr (mkTransCastCoCo co2 co)
       Tick t expr   -> Tick t (mkCast expr co)
 
       Coercion e_co | isEqPred (coercionRKind co)
@@ -297,7 +309,18 @@ mkCast expr co
                       -> Coercion (mkCoCast e_co co)
 
       _ | isReflCo co -> expr
-        | otherwise   -> Cast expr co
+        | otherwise   -> Cast expr (CCoercion co)
+
+-- | Wrap the given expression in a zapped cast (see Note [Zapped casts] in
+-- GHC.Core.TyCo.Rep).
+mkCastZ :: HasDebugCallStack => CoreExpr -> Type -> DCoVarSet -> CoreExpr
+mkCastZ expr ty cos =
+    case expr of
+      Cast expr co -> mkCastZ expr ty (shallowCoVarsOfCastCo co `unionDVarSet` cos)
+      Tick t expr -> Tick t (mkCastZ expr ty cos)
+      Coercion e_co | isEqPred ty -> Coercion (mkCoCastCo e_co (ZCoercion ty cos))
+      _ -> Cast expr (ZCoercion ty cos)
+
 
 
 {- *********************************************************************
@@ -381,7 +404,7 @@ mk_tick preserve_anf t orig_expr = mkTick' orig_expr
     e@(Lit {}) | tickishIsCode t -> e
 
     -- All ticks can be floated through casts, as per Note [Tickish placement].
-    Cast e co   -> mkCast (mkTick' e) co
+    Cast e co   -> mkCastCo (mkTick' e) co
 
     -- Treat 'unsafeCoerce' as if it was a cast: float all ticks inwards.
     -- See Note [Push ticks into unsafeCoerce]
@@ -809,7 +832,7 @@ This makes it easy to find, though it makes matching marginally harder.
 
 data BinderSwapDecision
   = NoBinderSwap
-  | DoBinderSwap OutVar MCoercion
+  | DoBinderSwap OutVar CastCoercion
 
 scrutOkForBinderSwap :: OutExpr -> BinderSwapDecision
 -- If (scrutOkForBinderSwap e = DoBinderSwap v mco, then
@@ -824,8 +847,8 @@ scrutOkForBinderSwap :: OutExpr -> BinderSwapDecision
 scrutOkForBinderSwap e
   = case e of
       Tick _ e        -> scrutOkForBinderSwap e  -- Drop ticks
-      Var v           -> DoBinderSwap v MRefl
-      Cast (Var v) co -> DoBinderSwap v (MCo co)
+      Var v           -> DoBinderSwap v ReflCastCo
+      Cast (Var v) co -> DoBinderSwap v co
                          -- Cast: see Note [Case of cast]
       _               -> NoBinderSwap
 
@@ -2877,11 +2900,11 @@ c.f. add_evals in GHC.Core.Opt.Simplify.simplAlt
 -- | A cheap equality test which bales out fast!
 --      If it returns @True@ the arguments are definitely equal,
 --      otherwise, they may or may not be equal.
-cheapEqExpr :: Expr b -> Expr b -> Bool
+cheapEqExpr :: CoreExpr -> CoreExpr -> Bool
 cheapEqExpr = cheapEqExpr' (const False)
 
 -- | Cheap expression equality test, can ignore ticks by type.
-cheapEqExpr' :: (CoreTickish -> Bool) -> Expr b -> Expr b -> Bool
+cheapEqExpr' :: (CoreTickish -> Bool) -> CoreExpr -> CoreExpr -> Bool
 {-# INLINE cheapEqExpr' #-}
 cheapEqExpr' ignoreTick e1 e2
   = go e1 e2
@@ -2891,7 +2914,7 @@ cheapEqExpr' ignoreTick e1 e2
     go (Type t1)  (Type t2)        = t1 `eqType` t2
     go (Coercion c1) (Coercion c2) = c1 `eqCoercion` c2
     go (App f1 a1) (App f2 a2)     = f1 `go` f2 && a1 `go` a2
-    go (Cast e1 t1) (Cast e2 t2)   = e1 `go` e2 && t1 `eqCoercion` t2
+    go (Cast e1 co1) (Cast e2 co2) = e1 `go` e2 && eqCastCoercion (exprType e1) co1 co2
 
     go (Tick t1 e1) e2 | ignoreTick t1 = go e1 e2
     go e1 (Tick t2 e2) | ignoreTick t2 = go e1 e2
@@ -2987,7 +3010,7 @@ diffExpr _   env (Type t1)  (Type t2)  | eqTypeX env t1 t2              = []
 diffExpr _   env (Coercion co1) (Coercion co2)
                                        | eqCoercionX env co1 co2        = []
 diffExpr top env (Cast e1 co1)  (Cast e2 co2)
-  | eqCoercionX env co1 co2                = diffExpr top env e1 e2
+  | eqCastCoercionX env (exprType e1) co1 (exprType e2) co2 = diffExpr top env e1 e2
 diffExpr top env (Tick n1 e1)   e2
   | not (tickishIsCode n1)                 = diffExpr top env e1 e2
 diffExpr top env e1             (Tick n2 e2)

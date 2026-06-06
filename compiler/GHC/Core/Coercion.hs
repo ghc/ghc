@@ -16,6 +16,8 @@ module GHC.Core.Coercion (
         LeftOrRight(..),
         Var, CoVar, TyCoVar,
         Role(..), ltRole,
+        CastCoercion(..),
+        TypedCastCoercion(..),
 
         -- ** Functions over coercions
         coVarRType, coVarLType, coVarTypes,
@@ -23,6 +25,7 @@ module GHC.Core.Coercion (
         coercionType, mkCoercionType,
         coercionKind, coercionLKind, coercionRKind,coercionKinds,
         coercionRole, coercionKindRole,
+        castCoercionLKind, castCoercionRKind,
 
         -- ** Constructing coercions
         mkGReflCo, mkGReflMCo, mkReflCo, mkRepReflCo, mkNomReflCo,
@@ -30,7 +33,7 @@ module GHC.Core.Coercion (
         mkAxInstCo, mkUnbranchedAxInstCo,
         mkAxInstRHS, mkUnbranchedAxInstRHS,
         mkAxInstLHS, mkUnbranchedAxInstLHS,
-        mkPiCo, mkPiCos, mkCoCast,
+        mkPiCo, mkPiCos, mkCoCast, mkCoCastCo,
         mkSymCo, mkTransCo,
         mkSelCo, mkSelCoResRole, getNthFun, selectFromType, mkLRCo,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo,
@@ -45,6 +48,20 @@ module GHC.Core.Coercion (
         mkGReflRightCo, mkGReflLeftCo, mkCoherenceLeftCo, mkCoherenceRightCo,
         mkKindCo, forAllCoKindCo,
         castCoercionKind, castCoercionKind1, castCoercionKind2,
+
+        -- ** Cast coercions
+        castCoToCo,
+        mkTransCastCo, mkTransCastCoCo, mkTransCoCastCo,
+        mkSymCastCo,
+        mkPiCastCos,
+        isReflCastCo,
+        checkReflexiveCastCo,
+        coToCastCo,
+        mkForAllCastCo,
+        mkFunResCastCo,
+        mkFunCastCoNoFTF,
+        applyForAllTy,
+        decomposeFunCastCo,
 
         -- ** Decomposition
         instNewTyCon_maybe,
@@ -65,12 +82,13 @@ module GHC.Core.Coercion (
         isReflKindCo,isReflKindMCo,
         isReflCo, isReflCo_maybe,
         isReflexiveMCo, isReflexiveCo, isReflexiveCo_maybe,
+        isReflexiveCastCo,
         isReflCoVar_maybe, mkGReflLeftMCo, mkGReflRightMCo,
         mkCoherenceRightMCo,
 
         coToMCo, kindCoToMKindCo,
         mkTransMCo, mkTransMCoL, mkTransMCoR, mkCastTyMCo, mkSymMCo,
-        mkFunResMCo, mkPiMCos,
+        mkFunResMCo,
         isReflMCo, checkReflexiveMCo,
 
         -- ** Coercion variables
@@ -78,13 +96,15 @@ module GHC.Core.Coercion (
 
         -- ** Free variables
         tyCoVarsOfCo, tyCoVarsOfCos, coVarsOfCo,
-        coercionSize, anyFreeVarsOfCo,
+        tyCoVarsOfCastCo,
+        coercionSize, castCoercionSize, anyFreeVarsOfCo,
 
         -- ** Substitution
         CvSubstEnv, emptyCvSubstEnv,
         lookupCoVar,
         substCo, substCos, substCoVar, substCoVars, substCoWithInScope,
         substCoVarBndr,
+        substCastCo,
         extendTvSubstAndInScope, getCvSubstEnv,
 
         -- ** Lifting
@@ -100,10 +120,10 @@ module GHC.Core.Coercion (
         substRightCo, substLeftCo, swapLiftCoEnv, lcSubstLeft, lcSubstRight,
 
         -- ** Comparison
-        eqCoercion, eqCoercionX,
+        eqCoercion, eqCoercionX, eqCastCoercion, eqCastCoercionX,
 
         -- ** Forcing evaluation of coercions
-        seqCo,
+        seqCo, seqCos, seqCastCoercion,
 
         -- * Pretty-printing
         pprCo, pprParendCo,
@@ -373,13 +393,10 @@ mkCastTyMCo :: Type -> MCoercion -> Type
 mkCastTyMCo ty MRefl    = ty
 mkCastTyMCo ty (MCo co) = ty `mkCastTy` co
 
-mkPiMCos :: [Var] -> MCoercion -> MCoercion
-mkPiMCos _ MRefl = MRefl
-mkPiMCos vs (MCo co) = MCo (mkPiCos Representational vs co)
-
-mkFunResMCo :: Id -> MCoercionR -> MCoercionR
-mkFunResMCo _      MRefl    = MRefl
-mkFunResMCo arg_id (MCo co) = MCo (mkFunResCo Representational arg_id co)
+mkFunResMCo :: Id -> CastCoercion -> CastCoercion
+mkFunResMCo _      ReflCastCo    = ReflCastCo
+mkFunResMCo arg_id (CCoercion co) = CCoercion (mkFunResCo Representational arg_id co)
+mkFunResMCo arg_id (ZCoercion ty cos) = ZCoercion (mkFunctionType (idMult arg_id) (varType arg_id) ty) cos
 
 mkGReflLeftMCo :: Role -> Type -> MCoercionN -> Coercion
 mkGReflLeftMCo r ty MRefl    = mkReflCo r ty
@@ -437,6 +454,14 @@ decomposeFunCo co
   where
     Pair s1t1 s2t2 = coercionKind co
     all_ok = isFunTy s1t1 && isFunTy s2t2
+
+
+decomposeFunCastCo :: HasDebugCallStack => CastCoercion -> (CastCoercion, CastCoercion)
+decomposeFunCastCo (CCoercion co)      = let (_, arg_co, res_co) = decomposeFunCo co
+                                         in (CCoercion arg_co, CCoercion res_co)
+decomposeFunCastCo ReflCastCo          = (ReflCastCo, ReflCastCo)
+decomposeFunCastCo (ZCoercion tyR cos) = (ZCoercion (funArgTy tyR) cos, ZCoercion (funResultTy tyR) cos)
+
 
 {- Note [Pushing a coercion into a pi-type]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -827,6 +852,17 @@ mkFunCoNoFTF r w arg_co res_co
     Pair argl_ty argr_ty = coercionKind arg_co
     Pair resl_ty resr_ty = coercionKind res_co
 
+-- AMG TODO: more cases here, or maybe better to have a FunCo constructor of CastCoercion?
+mkFunCastCoNoFTF :: HasDebugCallStack => Role -> Mult -> Type -> CastCoercion -> Type -> CastCoercion -> CastCoercion
+mkFunCastCoNoFTF _ mult _ (ZCoercion arg_ty arg_cos) _ (ZCoercion res_ty res_cos) = ZCoercion (mkFunctionType mult arg_ty res_ty) (arg_cos `unionDVarSet` res_cos)
+mkFunCastCoNoFTF _ mult _ (ZCoercion arg_ty arg_cos) res_ty res_co = ZCoercion (mkFunctionType mult arg_ty (castCoercionRKind res_ty res_co)) (arg_cos `unionDVarSet` coVarsOfCastCoDSet res_co)
+mkFunCastCoNoFTF _ mult arg_ty arg_co _ (ZCoercion res_ty res_cos) = ZCoercion (mkFunctionType mult (castCoercionRKind arg_ty arg_co) res_ty) (res_cos `unionDVarSet` coVarsOfCastCoDSet arg_co)
+mkFunCastCoNoFTF r mult _ (CCoercion arg_co) _ (CCoercion res_co) = CCoercion (mkFunCoNoFTF r (multToCo mult) arg_co res_co)
+mkFunCastCoNoFTF _ _ _ ReflCastCo _ ReflCastCo = ReflCastCo
+mkFunCastCoNoFTF r mult _ (CCoercion arg_co) res_ty ReflCastCo = CCoercion (mkFunCoNoFTF r (multToCo mult) arg_co (mkReflCo r res_ty))
+mkFunCastCoNoFTF r mult arg_ty ReflCastCo _ (CCoercion res_co) = CCoercion (mkFunCoNoFTF r (multToCo mult) (mkReflCo r arg_ty) res_co)
+
+
 -- | Build a function 'Coercion' from two other 'Coercion's. That is,
 -- given @co1 :: a ~ b@ and @co2 :: x ~ y@ produce @co :: (a -> x) ~ (b -> y)@
 -- or @(a => x) ~ (b => y)@, depending on the kind of @a@/@b@.
@@ -952,6 +988,14 @@ mkForAllCo v visL visR kind_co co
 
   | otherwise
   = mk_forall_co v visL visR kind_co co
+
+mkForAllCastCo :: HasDebugCallStack => Role -> TyCoVar -> ForAllTyFlag -> ForAllTyFlag
+            -> Type -> CastCoercion -> CastCoercion
+mkForAllCastCo r v visL visR ty cco = case cco of
+    CCoercion co -> CCoercion (mkForAllCo v visL visR MRefl co)
+    ZCoercion ty cos -> ZCoercion (mkTyCoForAllTy v visR ty) cos
+    ReflCastCo | visL `eqForAllVis` visR -> ReflCastCo
+               | otherwise -> CCoercion (mk_forall_co v visL visR MRefl (mkReflCo r ty))
 
 -- mkForAllVisCos [tv{vis}] constructs a cast
 --   forall tv. res  ~R#   forall tv{vis} res`.
@@ -1172,6 +1216,14 @@ mkSymCo co@(ForAllCo { fco_kind = kco, fco_body = body_co })
   | isReflMCo kco          = co { fco_body = mkSymCo body_co }
 mkSymCo co                 = SymCo co
 
+-- | Variant of 'mkSymCo' that works on 'CastCoercion', and expects the LHS type
+-- of the input coercion (and hence the RHS type of the result coercion) to be
+-- passed in.
+mkSymCastCo :: Type -> CastCoercion -> CastCoercion
+mkSymCastCo _  (CCoercion co)    = CCoercion (mkSymCo co)
+mkSymCastCo ty (ZCoercion _ cos) = ZCoercion ty cos
+mkSymCastCo _  ReflCastCo        = ReflCastCo
+
 -- | mkTransCo creates a new 'Coercion' by composing the two
 --   given 'Coercion's transitively: (co1 ; co2)
 mkTransCo :: HasDebugCallStack => Coercion -> Coercion -> Coercion
@@ -1339,6 +1391,18 @@ mkInstCo co_fun co_arg
     substCo subst body_co
 mkInstCo co arg = InstCo co arg
 
+-- Given @tyR = forall tcv . body_ty@, produces @body_ty[arg/tcv]@
+-- AMG TODO: surely this must exist somewhere already?
+applyForAllTy :: Type -> Type -> Type
+applyForAllTy tyR arg =
+    let (tcv, body_ty) = splitForAllTyCoVar tyR
+        in_scope = mkInScopeSet $
+                     tyCoVarsOfType arg `unionVarSet` tyCoVarsOfType body_ty
+        subst = extendTCvSubst (mkEmptySubst in_scope) tcv arg
+    in substTy subst body_ty
+
+
+
 -- | Given @ty :: k1@, @co :: k1 ~ k2@,
 -- produces @co' :: ty ~r (ty |> co)@
 mkGReflRightCo :: Role -> Type -> KindCoercion -> Coercion
@@ -1501,6 +1565,7 @@ setNominalRole_maybe r co
                      ProofIrrelProv {} -> True   -- it's always safe
                      PluginProv {}     -> False  -- who knows? This choice is conservative.
                      SubMultProv {}    -> True
+                     ZCoercionProv {}  -> False
       = Just $ co { uco_role = Nominal }
     setNominalRole_maybe_helper _ = Nothing
 
@@ -1749,6 +1814,9 @@ castCoercionKind g h1 h2
 mkPiCos :: Role -> [Var] -> Coercion -> Coercion
 mkPiCos r vs co = foldr (mkPiCo r) co vs
 
+mkPiCastCos :: Role -> [Var] -> CastCoercion -> CastCoercion
+mkPiCastCos r vs co = foldr (mkPiCastCo r) co vs
+
 -- | Make a forall 'Coercion', where both types related by the coercion
 -- are quantified over the same variable.
 mkPiCo  :: Role -> Var -> Coercion -> Coercion
@@ -1762,6 +1830,16 @@ mkPiCo r v co | isTyVar v = mkHomoForAllCo v co
                             mkFunResCo r v co
               | otherwise = mkFunResCo r v co
 
+mkPiCastCo  :: Role -> Var -> CastCoercion -> CastCoercion
+mkPiCastCo _ _ ReflCastCo     = ReflCastCo
+mkPiCastCo r v (CCoercion co) = CCoercion (mkPiCo r v co)
+mkPiCastCo _ v (ZCoercion ty cos)
+  | isTyVar v = ZCoercion (mkTyCoForAllTy v vis ty) cos
+  | otherwise = ZCoercion (mkFunctionType (idMult v) (varType v) ty) cos
+  where
+    vis = coreTyLamForAllTyFlag
+
+
 mkFunResCo :: Role -> Id -> Coercion -> Coercion
 -- Given res_co :: res1 ~ res2,
 --   mkFunResCo r m arg res_co :: (arg -> res1) ~r (arg -> res2)
@@ -1771,6 +1849,13 @@ mkFunResCo role id res_co
   where
     arg_co = mkReflCo role (varType id)
     mult   = multToCo (idMult id)
+
+mkFunResCastCo :: Role -> Id -> CastCoercion -> CastCoercion
+mkFunResCastCo role id res_cco = case res_cco of
+    CCoercion res_co -> CCoercion (mkFunResCo role id res_co)
+    ZCoercion ty cos -> ZCoercion (mkFunctionType (idMult id) (varType id) ty) cos
+    ReflCastCo -> ReflCastCo
+
 
 -- mkCoCast (c :: s1 ~?r t1) (g :: (s1 ~?r t1) ~#R (s2 ~?r t2)) :: s2 ~?r t2
 -- The first coercion might be lifted or unlifted; thus the ~? above
@@ -1792,6 +1877,9 @@ mkCoCast c g
     -- g2 :: t1 ~# t2
     (tc, _) = splitTyConApp (coercionLKind g)
     co_list = decomposeCo (tyConArity tc) g (tyConRolesRepresentational tc)
+
+mkCoCastCo :: Coercion -> CastCoercion -> Coercion
+mkCoCastCo co g = mkCoCast co (castCoToCo (coercionType co) g) -- AMG TODO should be able to preserve ZCoercion here
 
 {- Note [castCoercionKind1]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1960,6 +2048,7 @@ eqCoercion = eqType `on` coercionType
 -- | Compare two 'Coercion's, with respect to an RnEnv2
 eqCoercionX :: RnEnv2 -> Coercion -> Coercion -> Bool
 eqCoercionX env = eqTypeX env `on` coercionType
+
 
 {-
 %************************************************************************
@@ -2435,6 +2524,11 @@ seqMCo :: MCoercion -> ()
 seqMCo MRefl    = ()
 seqMCo (MCo co) = seqCo co
 
+seqCastCoercion :: CastCoercion -> ()
+seqCastCoercion (CCoercion co) = seqCo co
+seqCastCoercion (ZCoercion ty cos) = seqType ty `seq` seqDVarSet cos
+seqCastCoercion ReflCastCo = ()
+
 seqCo :: Coercion -> ()
 seqCo (Refl ty)             = seqType ty
 seqCo (GRefl r ty mco)      = r `seq` seqType ty `seq` seqMCo mco
@@ -2838,3 +2932,93 @@ hasCoercionHole = Monoid.getAny . has_co_hole_ty
 setCoHoleType :: CoercionHole -> Type -> CoercionHole
 setCoHoleType h t = setCoHoleCoVar h (setVarType (coHoleCoVar h) t)
 
+
+
+{-
+%************************************************************************
+%*                                                                      *
+       Cast coercions
+%*                                                                      *
+%************************************************************************
+
+See Note [Zapped casts] in GHC.Core.TyCo.Rep.
+
+-}
+
+-- | Compute the left type of a 'CastCoercion'.  Corresponds to 'coercionLKind',
+-- but requires the type to be supplied by the caller because it cannot be
+-- recovered in the 'ZCoercion' case.
+castCoercionLKind :: HasDebugCallStack => Type -> CastCoercion -> Type
+castCoercionLKind _ (CCoercion co) = coercionLKind co -- AMG TODO: should we use provided lhs_ty instead? Not sure which is cheaper?
+castCoercionLKind lhs_ty (ZCoercion _ _) = lhs_ty
+castCoercionLKind lhs_ty ReflCastCo = lhs_ty
+
+-- | Compute the right type of a 'CastCoercion', like 'coercionRKind'.
+-- Corresponds to 'coercionRKind', but requires the type to be supplied by the
+-- caller because it cannot be recovered in the 'ReflCastCo' case.
+castCoercionRKind :: HasDebugCallStack => Type -> CastCoercion -> Type
+castCoercionRKind _ (CCoercion co) = coercionRKind co
+castCoercionRKind _ (ZCoercion rhs_ty _) = rhs_ty
+castCoercionRKind lhs_ty ReflCastCo = lhs_ty
+
+-- | Equality test on 'CastCoercion', where the LHS type is the same for both
+-- coercions, so we merely need to compare the RHS types.
+eqCastCoercion :: Type -> CastCoercion -> CastCoercion -> Bool
+eqCastCoercion _ ReflCastCo ReflCastCo = True
+eqCastCoercion lhs_ty cco1 cco2 = castCoercionRKind lhs_ty cco1 `eqType` castCoercionRKind lhs_ty cco2
+
+eqCastCoercionX :: RnEnv2 -> Type -> CastCoercion -> Type -> CastCoercion -> Bool
+eqCastCoercionX _ _ ReflCastCo _ ReflCastCo = True
+eqCastCoercionX env ty1 co1 ty2 co2 = eqTypeX env ty1 ty2
+                                   && eqTypeX env (castCoercionRKind ty1 co1) (castCoercionRKind ty2 co2)
+
+-- | Convert a 'CastCoercion' back into a 'Coercion', using a 'UnivCo' if we
+-- have discarded the original 'Coercion'.
+castCoToCo :: Type -> CastCoercion -> CoercionR
+castCoToCo _      (CCoercion co)         = co
+castCoToCo lhs_ty (ZCoercion rhs_ty cos) = mkUnivCo ZCoercionProv (map CoVarCo (dVarSetElems cos)) Representational lhs_ty rhs_ty
+castCoToCo lhs_ty ReflCastCo             = mkRepReflCo lhs_ty
+
+-- | Compose two 'CastCoercion's transitively, like 'mkTransCo'.  If either is
+-- zapped the whole result will be zapped.
+mkTransCastCo :: HasDebugCallStack => CastCoercion -> CastCoercion -> CastCoercion
+mkTransCastCo cco (CCoercion co)     = mkTransCastCoCo cco co
+mkTransCastCo cco (ZCoercion ty cos) = ZCoercion ty (shallowCoVarsOfCastCo cco `unionDVarSet` cos)
+mkTransCastCo cco ReflCastCo         = cco
+
+-- | Transitively compose a 'CastCoercion' followed by a 'Coercion'.
+mkTransCastCoCo :: HasDebugCallStack => CastCoercion -> Coercion -> CastCoercion
+mkTransCastCoCo (CCoercion co1)   co2 = CCoercion (mkTransCo co1 co2)
+mkTransCastCoCo (ZCoercion _ cos) co2 = ZCoercion (coercionRKind co2) (shallowCoVarsOfCo co2 `unionDVarSet` cos)
+mkTransCastCoCo ReflCastCo        co2 = CCoercion co2
+
+-- | Transitively compose a 'Coercion' followed by a 'CastCoercion'.
+mkTransCoCastCo :: HasDebugCallStack => Coercion -> CastCoercion -> CastCoercion
+mkTransCoCastCo co1 (CCoercion co2)    = CCoercion (mkTransCo co1 co2)
+mkTransCoCastCo co1 (ZCoercion ty cos) = ZCoercion ty (shallowCoVarsOfCo co1 `unionDVarSet` cos)
+mkTransCoCastCo co1 ReflCastCo         = CCoercion co1
+
+-- | Quickly check if a 'CastCoercion' is obviously reflexive.
+isReflCastCo :: CastCoercion -> Bool
+isReflCastCo (CCoercion co) = isReflCo co
+isReflCastCo ZCoercion{}    = False  -- it might be, but we can't tell
+isReflCastCo ReflCastCo     = True
+
+-- | Slowly checks if the coercion is reflexive. Don't call this in a loop,
+-- as it walks over the entire coercion.
+isReflexiveCastCo :: TypedCastCoercion -> Bool
+isReflexiveCastCo (TCC _      (CCoercion co))       = isReflexiveCo co
+isReflexiveCastCo (TCC lhs_ty (ZCoercion rhs_ty _)) = lhs_ty `eqType` rhs_ty
+isReflexiveCastCo (TCC _      ReflCastCo)           = True
+
+checkReflexiveCastCo :: TypedCastCoercion -> CastCoercion
+checkReflexiveCastCo co
+  | isReflexiveCastCo co = ReflCastCo
+  | otherwise            = tccCastCoercion co
+
+coToCastCo :: Coercion -> CastCoercion
+-- Convert a coercion to a CastCoercion, checking if it is obviously reflexive.
+-- It's not clear whether or not isReflexiveCo would be better here
+--    See #19815 for a bit of data and discussion on this point
+coToCastCo co | isReflCo co = ReflCastCo
+              | otherwise   = CCoercion co

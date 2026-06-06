@@ -16,9 +16,10 @@ module GHC.Core (
         -- * In/Out type synonyms
         InId, InBind, InExpr, InAlt, InArg, InType, InKind,
                InBndr, InVar, InCoercion, InTyVar, InCoVar, InTyCoVar,
+               InCastCoercion, InTypedCastCoercion,
         OutId, OutBind, OutExpr, OutAlt, OutArg, OutType, OutKind,
                OutBndr, OutVar, OutCoercion, OutCoercionR, OutTyVar, OutCoVar,
-               OutTyCoVar, MOutCoercion,
+               OutTyCoVar, OutCastCoercion, OutTypedCastCoercion, MOutCoercion,
 
         -- ** 'Expr' construction
         mkLet, mkLets, mkLetNonRec, mkLetRec, mkLams,
@@ -266,7 +267,7 @@ data Expr b
   | Let   (Bind b) (Expr b)
   | Case  (Expr b) b Type [Alt b]   -- See Note [Case expression invariants]
                                     -- and Note [Why does Case have a 'Type' field?]
-  | Cast  (Expr b) CoercionR        -- The Coercion has Representational role
+  | Cast  (Expr b) CastCoercion
   | Tick  CoreTickish (Expr b)
   | Type  Type
   | Coercion Coercion
@@ -1378,6 +1379,8 @@ type InExpr     = CoreExpr
 type InAlt      = CoreAlt
 type InArg      = CoreArg
 type InCoercion = Coercion
+type InCastCoercion = CastCoercion
+type InTypedCastCoercion = TypedCastCoercion
 
 -- Post-cloning or substitution
 type OutBndr      = CoreBndr
@@ -1389,6 +1392,8 @@ type OutBind      = CoreBind
 type OutExpr      = CoreExpr
 type OutAlt       = CoreAlt
 type OutArg       = CoreArg
+type OutCastCoercion = CastCoercion
+type OutTypedCastCoercion = TypedCastCoercion
 type MOutCoercion = MCoercion
 
 
@@ -2714,7 +2719,7 @@ data AnnExpr' bndr annot
   | AnnApp      (AnnExpr bndr annot) (AnnExpr bndr annot)
   | AnnCase     (AnnExpr bndr annot) bndr Type [AnnAlt bndr annot]
   | AnnLet      (AnnBind bndr annot) (AnnExpr bndr annot)
-  | AnnCast     (AnnExpr bndr annot) (annot, Coercion)
+  | AnnCast     (AnnExpr bndr annot) (annot, CastCoercion)
                    -- Put an annotation on the (root of) the coercion
   | AnnTick     CoreTickish (AnnExpr bndr annot)
   | AnnType     Type

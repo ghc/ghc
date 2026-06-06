@@ -1168,9 +1168,9 @@ getRenamings orig_bndrs binds rule_bndrs
     go [] = init_renamings
     go (bind : binds)
        | NonRec b rhs <- bind
-       , Just (v, mco) <- getCastedVar rhs
+       , Just (v, co) <- getCastedVar rhs
        , Just e <- lookupVarEnv renamings b
-       = extendVarEnv renamings v (mkCastMCo e (mkSymMCo mco))
+       = extendVarEnv renamings v (mkCastCo e co)
        | otherwise
        = renamings
        where
@@ -1188,9 +1188,9 @@ pickSpecBinds is_local known_bndrs (bind:binds)
         keep_me rhs = isEmptyVarSet (exprSomeFreeVars bad_var rhs)
         bad_var v = is_local v && not (v `elemVarSet` known_bndrs)
 
-getCastedVar :: CoreExpr -> Maybe (Var, MCoercionR)
-getCastedVar (Var v)           = Just (v, MRefl)
-getCastedVar (Cast (Var v) co) = Just (v, MCo co)
+getCastedVar :: CoreExpr -> Maybe (Var, CastCoercion)
+getCastedVar (Var v)           = Just (v, ReflCastCo)
+getCastedVar (Cast (Var v) co) = Just (v, mkSymCastCo (varType v) co)
 getCastedVar _                 = Nothing
 
 specFunInlinePrag :: Id -> InlinePragma GhcTc -> InlinePragma GhcTc -> InlinePragma GhcTc
@@ -1609,7 +1609,11 @@ ds_hs_wrapper hs_wrap
     go (WpEvLam ev)      k = k $ Lam ev
     go (WpTyLam tv)      k = k $ Lam tv
     go (WpCast co)       k = assert (coercionRole co == Representational) $
-                             k $ \e -> mkCastDs e co
+                              do { zap_casts <- hasZapCasts <$> getDynFlags
+                                 ; if zap_casts -- See Note [Zapped casts] in GHC.Core.TyCo.Rep
+                                   then k $ \e -> mkCastDs_may_zap e co
+                                   else k $ \e -> mkCastDs e co
+                                 }
     go (WpEvApp tm)      k = do { core_tm <- dsEvTerm tm
                                 ; k $ \e -> e `App` core_tm }
     go (WpLet ev_binds)  k = dsTcEvBinds ev_binds $ \bs ->
@@ -1726,6 +1730,7 @@ dsEvBind (EvBind { eb_lhs = v, eb_rhs = r, eb_info = info }) = do
 
 dsEvTerm :: EvTerm -> DsM CoreExpr
 dsEvTerm (EvExpr e)          = return e
+dsEvTerm (EvCastExpr e co _) = return (Cast e co)
 dsEvTerm (EvTypeable ty ev)  = dsEvTypeable ty ev
 dsEvTerm (EvFun { et_tvs = tvs, et_given = given
                 , et_binds = ev_binds, et_body = wanted_id })

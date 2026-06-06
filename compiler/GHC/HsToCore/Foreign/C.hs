@@ -118,7 +118,7 @@ dsCImport id co (CLabel cid) _ _ _ = do
    assert (fromJust resTy `eqType` addrPrimTy) $    -- typechecker ensures this
     let
         rhs = foRhs (Lit (LitLabel cid fod))
-        rhs' = Cast rhs co
+        rhs' = Cast rhs (CCoercion co)
     in
     return ([(id, rhs')], mempty, mempty)
 
@@ -212,7 +212,7 @@ dsCFExportDynamic id co0 cconv = do
                         , Lam stbl_value ccall_adj
                         ]
 
-        fed = (id `setInlineActivation` NeverActive, Cast io_app co0)
+        fed = (id `setInlineActivation` NeverActive, Cast io_app (CCoercion co0))
                -- Never inline the f.e.d. function, because the litlit
                -- might not be in scope in other modules.
 
@@ -316,7 +316,7 @@ dsFCall fn_id co fcall mDeclHeader = do
         work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args
         wrapper_body = foldr ($) (res_wrapper work_app) arg_wrappers
         wrap_rhs     = mkLams (tvs ++ args) wrapper_body
-        wrap_rhs'    = Cast wrap_rhs co
+        wrap_rhs'    = Cast wrap_rhs (CCoercion co)
         simpl_opts   = initSimpleOpts dflags
         fn_id_w_inl  = fn_id `setIdUnfolding` mkInlineUnfoldingWithArity simpl_opts
                                                 StableSystemSrc (length args)

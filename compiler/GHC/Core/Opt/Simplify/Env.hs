@@ -490,7 +490,7 @@ data SimplSR
 
   | ContEx SimplEnv
            InExpr
-           MOutCoercion  -- See Note [The sc_cast field of ApplyToVal]
+           OutCastCoercion  -- See Note [The sc_cast field of ApplyToVal]
       -- If   x :-> ContEx static_env e mco   is in the SimplISubst
       -- then replace occurrences of x by (subst static_env e) |> mco
 
@@ -1370,7 +1370,7 @@ getFullSubst in_scope (SimplEnv { seIdSubst = id_env, seTvSubst = tv_env, seCvSu
     -- A tiresome impedence-matcher
     to_expr (DoneEx e _)       = e
     to_expr (DoneId v)         = Var v
-    to_expr (ContEx env e mco) = mkCastMCo e' mco
+    to_expr (ContEx env e mco) = mkCastCo e' mco
       where
         e' = GHC.Core.Subst.substExprSC (getFullSubst in_scope env) e
 

@@ -15,6 +15,7 @@ other dynamic, non-language, flag settings:
   -fshow-warning-groups
   -fprefer-byte-code
   -fbreak-points
+  -fno-zap-casts
 warning settings:
   -Wpattern-namespace-specifier
 === :set
@@ -34,6 +35,7 @@ other dynamic, non-language, flag settings:
   -fshow-warning-groups
   -fprefer-byte-code
   -fbreak-points
+  -fno-zap-casts
 warning settings:
   -Wpattern-namespace-specifier
 Unit ID: b-0.0.0
@@ -51,6 +53,7 @@ other dynamic, non-language, flag settings:
   -fshow-warning-groups
   -fprefer-byte-code
   -fbreak-points
+  -fno-zap-casts
 warning settings:
   -Wpattern-namespace-specifier
 Unit ID: c-0.0.0
@@ -68,6 +71,7 @@ other dynamic, non-language, flag settings:
   -fshow-warning-groups
   -fprefer-byte-code
   -fbreak-points
+  -fno-zap-casts
 warning settings:
   -Wpattern-namespace-specifier
 Unit ID: d-0.0.0
@@ -85,5 +89,6 @@ other dynamic, non-language, flag settings:
   -fshow-warning-groups
   -fprefer-byte-code
   -fbreak-points
+  -fno-zap-casts
 warning settings:
   -Wpattern-namespace-specifier

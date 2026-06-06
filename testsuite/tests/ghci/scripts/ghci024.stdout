@@ -13,6 +13,7 @@ other dynamic, non-language, flag settings:
   -fshow-warning-groups
   -fprefer-byte-code
   -fbreak-points
+  -fno-zap-casts
 warning settings:
   -Wpattern-namespace-specifier
 ~~~~~~~~~~ Testing :set -a

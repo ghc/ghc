@@ -20,7 +20,7 @@ module GHC.Core.Ppr (
         pprCoreBinding, pprCoreBindings, pprCoreAlt,
         pprCoreBindingWithSize, pprCoreBindingsWithSize,
         pprCoreBinder, pprCoreBinders, pprId, pprIds,
-        pprRule, pprRules, pprOptCo,
+        pprRule, pprRules, pprOptCo, pprOptCastCoercion,
         pprOcc, pprOccWithTick
     ) where
 
@@ -32,12 +32,14 @@ import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Literal( pprLiteral )
 import GHC.Types.Name( pprInfixName, pprPrefixName )
 import GHC.Types.Var
+import GHC.Types.Var.Set
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.InlinePragma
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Core.DataCon
+import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Ppr
 import GHC.Core.Coercion
@@ -172,6 +174,20 @@ pprCoreExpr   expr = ppr_expr noParens expr
 noParens :: SDoc -> SDoc
 noParens pp = pp
 
+pprOptCastCoercion :: CastCoercion -> SDoc
+pprOptCastCoercion (CCoercion co) = pprOptCo co
+pprOptCastCoercion (ZCoercion ty cos) = pprOptZappedCo ty cos
+pprOptCastCoercion ReflCastCo         = text "ReflCastCo"
+
+pprOptZappedCo :: Type -> DCoVarSet -> SDoc
+pprOptZappedCo ty cos = sdocOption sdocSuppressCoercions $ \case
+              True  -> angleBrackets (text "ZapCo:" <> int (sizeDVarSet cos)) <+> dcolon <+> co_type
+              False -> parens $ sep [text "ZapCo", ppr cos, dcolon <+> co_type]
+    where
+      co_type = sdocOption sdocSuppressCoercionTypes $ \case
+          True -> int (typeSize ty) <+> text "..."
+          False -> ppr ty
+
 pprOptCo :: Coercion -> SDoc
 -- Print a coercion optionally; i.e. honouring -dsuppress-coercions
 pprOptCo co = sdocOption sdocSuppressCoercions $ \case
@@ -201,7 +217,7 @@ ppr_expr add_par (Coercion co) = add_par (text "CO:" <+> ppr co)
 ppr_expr add_par (Lit lit)     = pprLiteral add_par lit
 
 ppr_expr add_par (Cast expr co)
-  = add_par $ sep [pprParendExpr expr, text "`cast`" <+> pprOptCo co]
+  = add_par $ sep [pprParendExpr expr, text "`cast`" <+> pprOptCastCoercion co]
 
 ppr_expr add_par expr@(Lam _ _)
   = let

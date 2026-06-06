@@ -27,10 +27,10 @@ import qualified GHC.Core.Make
 import GHC.Core.Coercion hiding ( substCo, substCoVar )
 import qualified GHC.Core.Coercion as Coercion
 import GHC.Core.Reduction
-import GHC.Core.Coercion.Opt    ( optCoercion )
+import GHC.Core.Coercion.Opt    ( optCoercion, optCastCoercion )
 import GHC.Core.Type hiding ( substCo, substTy, substTyVar, extendTvSubst, extendCvSubst )
 import GHC.Core.TyCo.Compare( eqType )
-import GHC.Core.TyCo.Subst( isEmptyTvSubst )
+import GHC.Core.TyCo.Subst( isEmptyTvSubst, substTypedCastCo )
 import GHC.Core.FamInstEnv      ( FamInstEnv, topNormaliseType_maybe )
 import GHC.Core.DataCon
 import GHC.Core.Ppr     ( pprCoreExpr )
@@ -38,7 +38,7 @@ import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity ( ArityType, exprArity, arityTypeBotSigs_maybe
-                          , pushCoTyArg, pushCoValArg, exprIsDeadEnd
+                          , pushCastCoTyArg, pushCastCoValArg, exprIsDeadEnd
                           , typeArity, arityTypeArity, etaExpandAT )
 import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
 import GHC.Core.FVs     ( mkRuleInfo {- exprsFreeIds -} )
@@ -285,7 +285,7 @@ simplRecOrTopPair :: SimplEnv
 
 simplRecOrTopPair env bind_cxt old_bndr new_bndr rhs
   | Just env' <- preInlineUnconditionally env (bindContextLevel bind_cxt)
-                                          old_bndr (UnSimplified env) rhs MRefl
+                                          old_bndr (UnSimplified env) rhs ReflCastCo
   = {-#SCC "simplRecOrTopPair-pre-inline-uncond" #-}
     simplTrace "SimplBindr:inline-uncond1" (ppr old_bndr) $
     do { tick (PreInlineUnconditionally old_bndr)
@@ -657,7 +657,7 @@ tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
   where
     -- Force the occ_fs so that the old Id is not retained in the new Id.
     !occ_fs = getOccFS bndr
-    work_ty = coercionLKind co
+    work_ty = castCoercionLKind (exprType rhs) co
     info   = idInfo bndr
     work_arity = arityInfo info `min` typeArity work_ty
 
@@ -678,7 +678,7 @@ tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
     mk_worker_unfolding top_lvl work_id work_rhs
       = case realUnfoldingInfo info of -- NB: the real one, even for loop-breakers
            unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
-             | isStableSource src -> return (unf { uf_tmpl = mkCast unf_rhs (mkSymCo co) })
+             | isStableSource src -> return (unf { uf_tmpl = mkCastCo unf_rhs (mkSymCastCo (exprType rhs) co) })
            _ -> mkLetUnfolding env top_lvl VanillaSrc work_id False work_rhs
 
 tryCastWorkerWrapper env _ _ bndr rhs  -- All other bindings
@@ -1226,10 +1226,10 @@ simplExprF1 env (Coercion co)  cont = {-#SCC "simplCoercionF" #-} simplCoercionF
 
 simplExprF1 env (Cast body co) cont
   = do  { co1 <- {-#SCC "simplCast-simplCoercion" #-}
-                 simplCoercion env co
+                 simplCastCoercion env (TCC (exprType body) co)
 
         ; cont1 <- {-#SCC "simplCast-addCoerce" #-}
-                   if isReflCo co1
+                   if isReflCastCo (tccCastCoercion co1)
                    then return cont  -- See Note [Optimising reflexivity]
                    else pushCast env co1 cont
                         -- True <=> co1 is optimised
@@ -1265,7 +1265,7 @@ simplExprF1 env (App fun arg) cont
         simplExprF env fun $
         ApplyToVal { sc_arg = arg, sc_env = UnSimplified env
                    , sc_hole_ty = substTy env (exprType fun)
-                   , sc_cast = MRefl, sc_cont = cont }
+                   , sc_cast = ReflCastCo, sc_cont = cont }
 
 simplExprF1 env expr@(Lam {}) cont
   = {-#SCC "simplExprF1-Lam" #-}
@@ -1300,7 +1300,7 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
     do { ty' <- simplType env ty
        ; simplExprF (extendTvSubst env bndr ty') body cont }
 
-  | Just env' <- preInlineUnconditionally env NotTopLevel bndr (UnSimplified env) rhs MRefl
+  | Just env' <- preInlineUnconditionally env NotTopLevel bndr (UnSimplified env) rhs ReflCastCo
     -- Because of the let-can-float invariant, it's ok to
     -- inline freely, or to drop the binding if it is dead.
   = do { simplTrace "SimplBindr:inline-uncond2" (ppr bndr) $
@@ -1439,6 +1439,20 @@ re-optimising them:
 
 
 -}
+
+simplCastCoercion :: SimplEnv -> InTypedCastCoercion -> SimplM OutTypedCastCoercion
+simplCastCoercion env co
+  = do { let opt_co | reSimplifying env = substTypedCastCo subst co
+                    | otherwise         = optCastCoercion opts subst co
+             -- If (reSimplifying env) is True we have already simplified
+             -- this coercion once, and we don't want do so again; doing
+             -- so repeatedly risks non-linear behaviour
+             -- See Note [Inline depth] in GHC.Core.Opt.Simplify.Env
+       ; seqCastCoercion (tccCastCoercion opt_co) `seq` return opt_co }
+  where
+    subst = getTCvSubst env
+    opts  = seOptCoercionOpts env
+
 
 -----------------------------------
 -- | Push a TickIt context outwards past applications and cases, as
@@ -1610,12 +1624,13 @@ rebuild_go env expr cont
       Stop {}          -> return (emptyFloats env, expr)
       TickIt t cont    -> rebuild_go env (mkTick t expr) cont
       CastIt { sc_co = co, sc_opt = opt, sc_cont = cont }
-        | isReflexiveCo co'  -- Worth trying this because casts can
+        | isReflexiveCastCo co'
+                             -- Worth trying this because casts can
                              -- get stacked up by simplCast
         -> rebuild_go env expr cont
         | otherwise
-        -> rebuild_go env (mkCast expr co') cont
-           -- NB: mkCast implements the (Coercion co |> g) optimisation
+        -> rebuild_go env (mkCastCo expr (tccCastCoercion co')) cont
+           -- NB: mkCastCo implements the (Coercion co |> g) optimisation
         where
           co' = optOutCoercion env co opt
 
@@ -1764,40 +1779,40 @@ appropriately when /applying/ the substitution in `simplInId`.
 -}
 
 
-optOutCoercion :: SimplEnvIS -> OutCoercion -> Bool -> OutCoercion
+optOutCoercion :: SimplEnvIS -> OutTypedCastCoercion -> Bool -> OutTypedCastCoercion
 -- See Note [Avoid re-simplifying coercions]
 optOutCoercion env co already_optimised
   | already_optimised = co  -- See Note [Avoid re-simplifying coercions]
-  | otherwise         = optCoercion opts empty_subst co
+  | otherwise         = optCastCoercion opts empty_subst co
   where
     empty_subst = mkEmptySubst (seInScope env)
     opts = seOptCoercionOpts env
 
-addCastMCo :: MOutCoercion -> SimplCont -> SimplCont
+
+addCastMCo :: OutTypedCastCoercion -> SimplCont -> SimplCont
 -- Simpler, non-monadic version of pushCastMCo when we are certain that
 -- the cast should be at the top; i.e. cont is Stop or StrictArg
-addCastMCo MRefl    cont = cont
-addCastMCo (MCo co) cont = CastIt { sc_co = co, sc_opt = False, sc_cont = cont }
+addCastMCo (TCC _ ReflCastCo) cont = cont
+addCastMCo co                 cont = CastIt { sc_co = co, sc_opt = False, sc_cont = cont }
 
-pushCastMCo :: SimplEnv -> MOutCoercion -> SimplCont -> SimplM SimplCont
-pushCastMCo _env MRefl    cont = return cont
-pushCastMCo env  (MCo co) cont = pushCast env co cont
+pushCastMCo :: SimplEnv -> OutTypedCastCoercion -> SimplCont -> SimplM SimplCont
+pushCastMCo = pushCast
 
-pushCast :: SimplEnv -> OutCoercion -> SimplCont -> SimplM SimplCont
+-- AMG TODO: simplify Refl-checking here
+pushCast :: SimplEnv -> OutTypedCastCoercion -> SimplCont -> SimplM SimplCont
 pushCast env co cont
-  = go co True cont
+  = go_mco co True cont
   where
-
     -- ToDo:   pushCast Refl (ApplylToVal arg1 (ApplyToVal arg2 ...))
     --         will do lots of unnecessary work.
-    go :: OutCoercion -> Bool -> SimplCont -> SimplM SimplCont
-    go co1 _ (CastIt { sc_co = co2, sc_cont = cont })  -- See Note [Optimising reflexivity]
-      = go (mkTransCo co1 co2) False cont
+    go :: OutTypedCastCoercion -> Bool -> SimplCont -> SimplM SimplCont
+    go (TCC ty1 co1) _ (CastIt { sc_co = TCC _ co2, sc_cont = cont })  -- See Note [Optimising reflexivity]
+      = go (TCC ty1 (mkTransCastCo co1 co2)) False cont
                   -- False: (mkTransCo co1 co2) is not fully optimised
                   -- See Note [Avoid re-simplifying coercions]
 
     go co co_is_opt (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
-      | Just (tyL, arg_ty', m_co') <- pushCoTyArg co arg_ty
+      | Just (tyL, arg_ty', m_co') <- pushCastCoTyArg co arg_ty
       = {-#SCC "addCoerce-pushCoTyArg" #-}
         do { tail' <- go_mco m_co' co_is_opt tail
            ; return (ApplyToTy { sc_arg_ty  = arg_ty'
@@ -1816,28 +1831,28 @@ pushCast env co cont
       = -- pushCoValArg duplicates the coercion, so optimise first
         go (optOutCoercion (zapSubstEnv env) co co_is_opt) True cont
 
-      | Just (tyL, m_co1, m_co2) <- pushCoValArg co
+      | Just (tyL, m_co1, m_co2) <- pushCastCoValArg co
       = {-#SCC "addCoerce-pushCoValArg" #-}
         do { tail' <- go_mco m_co2 True tail
              -- Dealing with m_co1 is the entire reason for the sc_cast field
              -- of ApplyToVal; see Note [The sc_cast field of ApplyToVal]
            ; return (ApplyToVal { sc_arg  = arg
                                 , sc_env  = arg_se
-                                , sc_cast = arg_mco `mkTransMCo` m_co1
+                                , sc_cast = arg_mco `mkTransCastCo` tccCastCoercion m_co1
                                 , sc_cont = tail'
                                 , sc_hole_ty = tyL }) }
 
     go co co_is_opt cont
-      | isReflCo co = return cont  -- Having this at the end makes a huge
+      | isReflCastCo (tccCastCoercion co) = return cont  -- Having this at the end makes a huge
                                    -- difference in T12227, for some reason
                                    -- See Note [Optimising reflexivity]
       | otherwise = return (CastIt { sc_co = co, sc_opt = co_is_opt, sc_cont = cont })
 
         -- If the first parameter is MRefl, then simplifying revealed a
         -- reflexive coercion. Omit.
-    go_mco :: MOutCoercion -> Bool -> SimplCont -> SimplM SimplCont
-    go_mco MRefl    _   cont = return cont
-    go_mco (MCo co) opt cont = go co opt cont
+    go_mco :: OutTypedCastCoercion -> Bool -> SimplCont -> SimplM SimplCont
+    go_mco (TCC _ ReflCastCo)    _   cont = return cont
+    go_mco co opt cont = go co opt cont
 
 simplArg :: SimplEnvIS              -- ^ Used only for its InScopeSet
          -> Maybe ArgInfo           -- ^ Just <=> This arg `ai` occurs in an app
@@ -1846,20 +1861,17 @@ simplArg :: SimplEnvIS              -- ^ Used only for its InScopeSet
                                     --   continuation passed to 'simplExprC'
          -> OutType                 -- ^ Type of the function applied to this arg
          -> StaticEnv -> CoreExpr   -- ^ Expression with its static envt
-         -> MOutCoercion            -- Wrap this around the result
+         -> OutCastCoercion         -- Wrap this around the result
          -> SimplM OutExpr
-simplArg _ _ _ (Simplified {}) arg mco
-  = -- See Note [Avoid repeated simplification]
-    case mco of
-       MRefl  -> return arg       -- Vastly common case
-       MCo co -> return (mkCast arg co)
+simplArg _ _ _ (Simplified {}) arg co
+  = return $ mkCastCo arg co -- See Note [Avoid repeated simplification]
 simplArg env mb_arg_info fun_ty (UnSimplified arg_se) arg mco
   = do { let arg_env' = arg_se `setInScopeFromE` env
              arg_ty   = funArgTy fun_ty
              stop     = case mb_arg_info of
                            Nothing -> mkBoringStop arg_ty
                            Just ai -> mkLazyArgStop arg_ty ai
-             cont     = addCastMCo mco stop
+             cont     = addCastMCo (TCC arg_ty mco) stop -- AMG TODO is type correct? Could be exprType arg
        ; simplExprC arg_env' arg cont }
 
 {-
@@ -1913,7 +1925,7 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
        ; let from_what = FromBeta arg_levity
 
        ; case (arg_se, arg_mco) of
-           (UnSimplified arg_env, MRefl)
+           (UnSimplified arg_env, ReflCastCo)
              -- Optimisation: when there is no wrapping coercion use simplNonRecE
              -- so that the clever floating out of let-bindings can take place
              -- in this round of the Simplifier
@@ -2283,7 +2295,7 @@ simplInId env var cont
   = assertPpr (not (isCoVar var)) (ppr var) $
     case substId env var of
       ContEx se e mco
-        -> do { cont' <- pushCastMCo env mco cont
+        -> do { cont' <- pushCastMCo env (TCC (exprType e) mco) cont
               ; simplExprF (se `setInScopeFromE` env) e cont' }
         -- Don't trimJoinCont; haven't already simplified e,
         -- so the cont is not embodied in e
@@ -2321,7 +2333,7 @@ simplOutExpr env expr cont
 
   | Cast e co <- expr  -- The inlined expression may be (x |> co)
                        -- and the cast may cancel with `cont`
-  = do { cont' <- pushCast env co cont
+  = do { cont' <- pushCast env (TCC (exprType e) co) cont
        ; simplOutExpr env e cont' }
 
   | (Var v, args) <- collectArgs expr
@@ -2383,8 +2395,8 @@ simplOutId env fun cont
                    ; let (m,_,_) = splitFunTy fun_ty
                          env'  = arg_env `addNewInScopeIds` [s']
                          hole_ty = mkVisFunTy m realWorldStatePrimTy new_runrw_res_ty
-                   ; cont' <- pushCastMCo env' arg_mco $
-                              ApplyToVal { sc_arg = Var s', sc_cast = MRefl
+                   ; cont' <- pushCastMCo env' (TCC (exprType arg) arg_mco) $ -- AMG TODO: correct type? new_runrw_res_ty?
+                              ApplyToVal { sc_arg = Var s', sc_cast = ReflCastCo
                                          , sc_env = Simplified OkDup
                                          , sc_cont = inner_cont
                                          , sc_hole_ty = hole_ty }
@@ -2462,7 +2474,7 @@ rebuildCall env fun_info
   , seCaseCase env            -- But only when case-of-case is on.
                               -- See Note [Case-of-case and full laziness]
   = simplExprF (arg_env `setInScopeFromE` env) arg $
-    addCastMCo arg_mco $
+    addCastMCo (TCC (exprType arg) arg_mco) $ -- AMG TODO right type? Should it be funArgTy fun_ty or funResultTy fun_ty?
     StrictArg { sc_fun = fun_info, sc_fun_ty = fun_ty
               , sc_dup = NoDup
               , sc_cont = cont }
@@ -2866,7 +2878,7 @@ trySeqRules in_env scrut rhs cont
                           , as_dmd = seqDmd
                           , as_hole_ty = res3_ty } ]
     rule_cont = ApplyToVal { sc_env = UnSimplified in_env, sc_arg = rhs
-                           , sc_cast = MRefl
+                           , sc_cast = ReflCastCo
                            , sc_cont = cont, sc_hole_ty = res4_ty }
 
     out_args = [Type rhs_rep, Type scrut_ty, Type rhs_ty, no_cast_scrut]
@@ -3542,9 +3554,9 @@ improveSeq fam_envs (saf,env) scrut case_bndr case_bndr1 [Alt DEFAULT _ _]
   | SAF_In <- saf  -- improveSeq extends the substitution; not allowed for SAF_Out
   , Just (Reduction co ty2) <- topNormaliseType_maybe fam_envs (idType case_bndr1)
   = do { case_bndr2 <- newId (fsLit "nt") ManyTy ty2
-        ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co) NotJoinPoint
+        ; let rhs  = DoneEx (Var case_bndr2 `Cast` CCoercion (mkSymCo co)) NotJoinPoint
               env2 = extendIdSubst env case_bndr rhs
-        ; return (env2, scrut `Cast` co, case_bndr2) }
+        ; return (env2, scrut `Cast` CCoercion co, case_bndr2) }
 
 improveSeq _ (_,env) scrut _ case_bndr1 _
   = return (env, scrut, case_bndr1)
@@ -3706,9 +3718,9 @@ addAltUnfoldings env case_bndr bndr_swap con_app
     --      We add to `x` the unfolding  (K a b |> sym co)
     env2 | DoBinderSwap v mco <- bndr_swap
          = addBinderUnfolding env1 v $
-              if isReflMCo mco  -- isReflMCo: avoid calling mk_simple_unf
+              if isReflCastCo mco  -- isReflCastCo: avoid calling mk_simple_unf
               then con_app_unf  --            twice in the common case
-              else mk_simple_unf (mkCastMCo con_app (mkSymMCo mco))
+              else mk_simple_unf (mkCastCo con_app (mkSymCastCo (idType v) mco))
 
          | otherwise = env1
 
@@ -3971,7 +3983,7 @@ knownCon env scrut dc dc_args case_bndr alt_bndrs rhs cont
                , extendIdSubst env case_bndr (DoneEx scrut NotJoinPoint))
 
       | Just env' <- preInlineUnconditionally env NotTopLevel case_bndr
-                            (UnSimplified env) con_app MRefl
+                            (UnSimplified env) con_app ReflCastCo
       = return (emptyFloats env', env')
 
       | otherwise
@@ -4220,7 +4232,8 @@ mkDupableContWithDmds env dmds
         ; let all_floats = floats1 `addLetFloats` let_floats2
         ; return ( all_floats
                  , ApplyToVal { sc_arg = triv_arg, sc_env = Simplified OkDup
-                              , sc_cast = MRefl, sc_cont = cont', sc_hole_ty = hole_ty }) }
+                              , sc_cast = ReflCastCo
+                              , sc_cont = cont', sc_hole_ty = hole_ty }) }
 
 mkDupableContWithDmds env _
     (Select { sc_bndr = case_bndr, sc_alts = alts, sc_env = se, sc_cont = cont })

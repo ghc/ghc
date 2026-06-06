@@ -19,7 +19,7 @@ module GHC.Core.TyCo.Ppr
 
 
         -- * Pretty-printing coercions
-        pprCo, pprParendCo,
+        pprCo, pprParendCo, pprCastCo,
 
         debugPprType,
   ) where
@@ -134,6 +134,14 @@ tidyToIfaceTypeX env ty = toIfaceTypeX (mkVarSet free_tcvs) (tidyType env' ty)
 pprCo, pprParendCo :: Coercion -> SDoc
 pprCo       co = getPprStyle $ \ sty -> pprIfaceCoercion (tidyToIfaceCoSty co sty)
 pprParendCo co = getPprStyle $ \ sty -> pprParendIfaceCoercion (tidyToIfaceCoSty co sty)
+
+pprCastCo :: CastCoercion -> SDoc
+pprCastCo co = getPprStyle $ \ sty -> pprIfaceCastCoercion (tidyToIfaceCastCoSty co sty)
+
+tidyToIfaceCastCoSty :: CastCoercion -> PprStyle -> IfaceCastCoercion
+tidyToIfaceCastCoSty (CCoercion co)     sty = IfaceCCoercion (tidyToIfaceCoSty co sty)
+tidyToIfaceCastCoSty (ZCoercion ty cos) sty = IfaceZCoercion (tidyToIfaceType ty) (map (flip tidyToIfaceCoSty sty . CoVarCo) (dVarSetElems cos)) -- TODO
+tidyToIfaceCastCoSty ReflCastCo         _   = IfaceReflCastCo
 
 tidyToIfaceCoSty :: Coercion -> PprStyle -> IfaceCoercion
 tidyToIfaceCoSty co sty

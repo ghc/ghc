@@ -73,7 +73,7 @@ e, u :: 'Expr_' ::= {{ com Expressions, \coderef{GHC/Core.hs}{Expr} }}
   | let binding in e                             ::   :: Let  {{ com \ctor{Let}: Variable binding }}
   | join jbinding in e                           ::   :: Join {{ com \ctor{Let}: Join binding }}
   | case e as n return t of </ alti // | // i /> ::   :: Case {{ com \ctor{Case}: Pattern match }}
-  | e |> g                                       ::   :: Cast {{ com \ctor{Cast}: Cast }}
+  | e |> g                                       ::   :: Cast {{ com \ctor{Cast}: Cast (TODO update grammar for ZCoercion) }}
   | e { tick }                                   ::   :: Tick {{ com \ctor{Tick}: Internal note }}
     {{ tex {[[e]]}_{\{[[tick]]\} } }}
   | t                                            ::   :: Type {{ com \ctor{Type}: Type }}

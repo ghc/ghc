@@ -340,7 +340,7 @@ lvlExpr _   (_, AnnLit lit)     = return (Lit lit)
 
 lvlExpr env (_, AnnCast expr (_, co)) = do
     expr' <- lvlNonTailExpr env expr
-    return (Cast expr' (substCo (le_subst env) co))
+    return (Cast expr' (substCastCo (le_subst env) co))
 
 lvlExpr env (_, AnnTick tickish expr) = do
     expr' <- lvlNonTailExpr env expr
@@ -606,7 +606,7 @@ lvlMFE env strict_ctxt (_, AnnTick t e)
 
 lvlMFE env strict_ctxt (_, AnnCast e (_, co))
   = do  { e' <- lvlMFE env strict_ctxt e
-        ; return (Cast e' (substCo (le_subst env) co)) }
+        ; return (Cast e' (substCastCo (le_subst env) co)) }
 
 lvlMFE env strict_ctxt e@(_, AnnCase {})
   | strict_ctxt       -- Don't share cases in a strict context

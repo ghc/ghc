@@ -136,5 +136,5 @@ stlExpr subst (Var v)       = lookupIdSubst subst v
 stlExpr subst (App e1 e2)   = App (stlExpr subst e1) (stlExpr subst e2)
 stlExpr subst (Type ty)     = Type (substTy subst ty)
 stlExpr subst (Tick t e)    = Tick (substTickish subst t) (stlExpr subst e)
-stlExpr subst (Cast e co)   = Cast (stlExpr subst e) (substCo subst co)
+stlExpr subst (Cast e co)   = Cast (stlExpr subst e) (substCastCo subst co)
 stlExpr subst (Coercion co) = Coercion (substCo subst co)
