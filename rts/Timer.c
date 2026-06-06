@@ -28,11 +28,6 @@
 #include "RtsSignals.h"
 #include "rts/EventLogWriter.h"
 
-// See Note [No timer on wasm32]
-#if !defined(wasm32_HOST_ARCH)
-#define HAVE_PREEMPTION
-#endif
-
 // This global counter is used to allow multiple threads to stop the
 // timer temporarily with a stopTimer()/startTimer() pair.  If
 //      timer_enabled  == 0          timer is enabled

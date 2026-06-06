@@ -14,6 +14,46 @@
 
 #pragma once
 
+/* Note [Threads and preemption]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   All full-fat OSs that GHC works on have OS threads, and we use them even in
+   the non-threaded RTS for a few features:
+    * Haskell thread preemption;
+    * sample-based profiling;
+    * idle GC;
+    * periodic eventlog flushing.
+
+   We use defined(HAVE_PREEMPTION) to decide if these features are implemented
+   via OS threads.
+
+   On platforms like WASM/js we do not have OS threads in any conventional
+   sense, and the features above are either not available or are implemented
+   differently. See Note [No timer on wasm32].
+
+   In future if GHC is ported to platforms like bare-metal micro-controllers,
+   RTOSs or to run directly under hypervisors then such platforms may also not
+   have threads available and they should not define HAVE_PREEMPTION here. Or
+   for some micro-controller RTOSs like Zeypher one may have a choice about
+   whether to use threads or not (at a size cost). Here would be the right
+   place to control whether the feature list above is supported.
+ */
+#if defined(wasm32_HOST_ARCH)
+  // See Note [No timer on wasm32]
+  // To confuse matters, WASM _does_ have pthread.h but it doesnt work.
+#elif defined(HAVE_PTHREAD_H) || defined(HAVE_WINDOWS_H)
+#define HAVE_PREEMPTION
+#else
+#error Decide if this platform has threads and pre-emption or not.
+#endif
+// And JS does all of this differently, without using this bit of the RTS.
+
+// Configuration sanity check
+#if defined(THREADED_RTS) && !defined(HAVE_PREEMPTION)
+//TODO we would like to be able to assert this:
+// #error Configuration error: THREADED_RTS should imply HAVE_PREEMPTION
+// however at the moment we cannot due to issue #27346.
+#endif
+
 #if defined(HAVE_PTHREAD_H) && !defined(mingw32_HOST_OS)
 
 #if defined(CMINUSMINUS)
