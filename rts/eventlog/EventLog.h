@@ -34,6 +34,7 @@ void abortEventLogging(void); // #4512 - after fork child needs to abort
 void moreCapEventBufs (uint32_t from, uint32_t to);
 void flushLocalEventsBuf(Capability *cap);
 void flushAllCapsEventsBufs(void);
+void flushAllCapsEventsBufs_(void);
 void flushAllEventsBufs(Capability *cap);
 
 typedef void (*EventlogInitPost)(void);
