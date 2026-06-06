@@ -1607,13 +1607,20 @@ void flushLocalEventsBuf(Capability *cap)
 // Used during forkProcess.
 void flushAllCapsEventsBufs(void)
 {
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
+    flushAllCapsEventsBufs_();
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
+}
+
+// Unsafe version that does not acquire/release eventBufMutex. You must
+// hold the eventBufMutex, which you must acquire with ACQUIRE_LOCK_ALWAYS!
+void flushAllCapsEventsBufs_(void)
+{
     if (!event_log_writer) {
         return;
     }
 
-    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     printAndClearEventBuf(&eventBuf);
-    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 
     for (unsigned int i=0; i < getNumCapabilities(); i++) {
         flushLocalEventsBuf(getCapability(i));
