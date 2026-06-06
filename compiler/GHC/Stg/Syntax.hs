@@ -108,7 +108,54 @@ import GHC.Builtin.Types.Prim
       smallArrayPrimTyCon,
       smallMutableArrayPrimTyCon )
 
+-- This is a newtype because it is important to distinguish it from Type which
+-- Kind is otherwise equal to.
+-- See Note [Kinds in STG]
 newtype StgKind = MkStgKind { getStgKind :: Kind }
+
+{-
+Note [Kinds in STG]
+~~~~~~~~~~~~~~~~~~~
+
+Whereas Core is type-annotated, STG is kind-annotated. 
+
+Just as many different values may have a single type, so many different 
+types may have a single kind. So kinds are a "coarser approximation" to the
+values being manipulated; and that is what we want in STG.
+
+There are two reasons for this:
+
+(1) It is easier for third party projects to compile to STG. The type system of
+    another language might not be compatible with GHC's type system. In such a
+    case the kind system is often still compatible because it is so much coarser.
+    Example projects are Jaro Reinders' agda2stg and Csaba Hruska's external-stg.
+
+(2) It allows for more aggressive optimizations. In STG we may do
+    type-incorrect things that are kind-correct. For example consider
+    the following function:
+
+      f :: Either a b -> Either a c
+      f = \x -> case x of r
+                  Left x -> Left x
+                  Right _ -> error "urk"
+
+    We would want to avoid reallocating the 'Left' constructor:
+
+      f :: Either a b -> Either a c
+      f = \x -> case x of r
+                  Left _ -> r        <------------- NB
+                  Right _ -> error "urk"
+
+    This is not type-safe in Core, but it is kind-safe in STG. So, using
+    the coarser notion of kinds in STG allows us to do more aggressive
+    optimizations. Note, however, that we do not implement any such
+    optimizations yet.
+
+Note that the kinds do not always accurately reflect the final runtime
+representation. For example, on the JS backend the kind 'TYPE Int64Rep'
+might eventually be rewritten to 'TYPE (TupleRep [Int32Rep,Int32Rep])'
+because there is no 64 bit integer type in JS.
+-}
 
 {-
 ************************************************************************
