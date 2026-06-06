@@ -18,6 +18,13 @@
 #if defined(TRACING)
 
 extern bool eventlog_enabled;
+#if defined(HAVE_PREEMPTION)
+// Avoid using this mutex directly if at all possible. It is needed in the
+// implementation of forkProcess.
+//
+// All uses of this mutex must use ACQUIRE_LOCK_ALWAYS/RELEASE_LOCK_ALWAYS.
+extern Mutex eventBufMutex;
+#endif
 
 void initEventLogging(void);
 void restartEventLogging(void);
