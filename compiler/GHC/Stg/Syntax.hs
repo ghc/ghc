@@ -117,9 +117,9 @@ newtype StgKind = MkStgKind { getStgKind :: Kind }
 Note [Kinds in STG]
 ~~~~~~~~~~~~~~~~~~~
 
-Whereas Core is type-annotated, STG is kind-annotated. 
+Whereas Core is type-annotated, STG is kind-annotated.
 
-Just as many different values may have a single type, so many different 
+Just as many different values may have a single type, so many different
 types may have a single kind. So kinds are a "coarser approximation" to the
 values being manipulated; and that is what we want in STG.
 
