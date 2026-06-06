@@ -129,8 +129,11 @@ typedef struct _EventsBuf {
 static EventsBuf *capEventBuf; // one EventsBuf for each Capability
 
 static EventsBuf eventBuf; // an EventsBuf not associated with any Capability
-#if defined(THREADED_RTS)
-static Mutex eventBufMutex; // protected by this mutex
+#if defined(HAVE_PREEMPTION)
+// Note that this mutex is used even in the non-threaded RTS, since the timer
+// thread posts events and flushes. So _all_ uses of this mutex must use
+// ACQUIRE_LOCK_ALWAYS/RELEASE_LOCK_ALWAYS.
+Mutex eventBufMutex; // protects eventBuf above
 #endif
 
 // Event type
@@ -393,8 +396,10 @@ initEventLogging(void)
     moreCapEventBufs(0, get_n_capabilities());
 
     initEventsBuf(&eventBuf, EVENT_LOG_SIZE, (EventCapNo)(-1));
-#if defined(THREADED_RTS)
+#if defined(HAVE_PREEMPTION)
     initMutex(&eventBufMutex);
+#endif
+#if defined(THREADED_RTS)
     initMutex(&state_change_mutex);
 #endif
 }
@@ -416,7 +421,7 @@ startEventLogging_(void)
 {
     initEventLogWriter();
 
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     postHeaderEvents();
 
     /*
@@ -425,7 +430,7 @@ startEventLogging_(void)
      */
     printAndClearEventBuf(&eventBuf);
 
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 
     return true;
 }
@@ -495,7 +500,7 @@ endEventLogging(void)
 
     flushEventLog_(NULL);
 
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
 
     // Mark end of events (data).
     postEventTypeNum(&eventBuf, EVENT_DATA_END);
@@ -503,7 +508,7 @@ endEventLogging(void)
     // Flush the end of data marker.
     printAndClearEventBuf(&eventBuf);
 
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 
     stopEventLogWriter();
     event_log_writer = NULL;
@@ -666,7 +671,7 @@ void
 postCapEvent (EventTypeNum  tag,
               EventCapNo    capno)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     ensureRoomForEvent(&eventBuf, tag);
 
     postEventHeader(&eventBuf, tag);
@@ -685,14 +690,14 @@ postCapEvent (EventTypeNum  tag,
         barf("postCapEvent: unknown event tag %d", tag);
     }
 
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 void postCapsetEvent (EventTypeNum tag,
                       EventCapsetID capset,
                       StgWord info)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     ensureRoomForEvent(&eventBuf, tag);
 
     postEventHeader(&eventBuf, tag);
@@ -726,7 +731,7 @@ void postCapsetEvent (EventTypeNum tag,
         barf("postCapsetEvent: unknown event tag %d", tag);
     }
 
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 void postCapsetStrEvent (EventTypeNum tag,
@@ -740,14 +745,14 @@ void postCapsetStrEvent (EventTypeNum tag,
         return;
     }
 
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
 
     if (!hasRoomForVariableEvent(&eventBuf, size)){
         printAndClearEventBuf(&eventBuf);
 
         if (!hasRoomForVariableEvent(&eventBuf, size)){
             errorBelch("Event size exceeds buffer size, bail out");
-            RELEASE_LOCK(&eventBufMutex);
+            RELEASE_LOCK_ALWAYS(&eventBufMutex);
             return;
         }
     }
@@ -758,7 +763,7 @@ void postCapsetStrEvent (EventTypeNum tag,
 
     postBuf(&eventBuf, (StgWord8*) msg, strsize);
 
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 void postCapsetVecEvent (EventTypeNum tag,
@@ -783,14 +788,14 @@ void postCapsetVecEvent (EventTypeNum tag,
         }
     }
 
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
 
     if (!hasRoomForVariableEvent(&eventBuf, size)){
         printAndClearEventBuf(&eventBuf);
 
         if(!hasRoomForVariableEvent(&eventBuf, size)){
             errorBelch("Event size exceeds buffer size, bail out");
-            RELEASE_LOCK(&eventBufMutex);
+            RELEASE_LOCK_ALWAYS(&eventBufMutex);
             return;
         }
     }
@@ -804,7 +809,7 @@ void postCapsetVecEvent (EventTypeNum tag,
         postBuf(&eventBuf, (StgWord8*) argv[i], 1 + strlen(argv[i]));
     }
 
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 void postWallClockTime (EventCapsetID capset)
@@ -813,7 +818,7 @@ void postWallClockTime (EventCapsetID capset)
     StgWord64 sec;
     StgWord32 nsec;
 
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
 
     /* The EVENT_WALL_CLOCK_TIME event is intended to allow programs
        reading the eventlog to match up the event timestamps with wall
@@ -846,7 +851,7 @@ void postWallClockTime (EventCapsetID capset)
     postWord64(&eventBuf, sec);
     postWord32(&eventBuf, nsec);
 
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 /*
@@ -885,7 +890,7 @@ void postEventHeapInfo (EventCapsetID heap_capset,
                         W_          mblockSize,
                         W_          blockSize)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     ensureRoomForEvent(&eventBuf, EVENT_HEAP_INFO_GHC);
 
     postEventHeader(&eventBuf, EVENT_HEAP_INFO_GHC);
@@ -899,7 +904,7 @@ void postEventHeapInfo (EventCapsetID heap_capset,
     postWord64(&eventBuf, mblockSize);
     postWord64(&eventBuf, blockSize);
 
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 void postEventGcStats  (Capability    *cap,
@@ -952,7 +957,7 @@ void postTaskCreateEvent (EventTaskId taskId,
                           EventCapNo capno,
                           EventKernelThreadId tid)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     ensureRoomForEvent(&eventBuf, EVENT_TASK_CREATE);
 
     postEventHeader(&eventBuf, EVENT_TASK_CREATE);
@@ -961,14 +966,14 @@ void postTaskCreateEvent (EventTaskId taskId,
     postCapNo(&eventBuf, capno);
     postKernelThreadId(&eventBuf, tid);
 
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 void postTaskMigrateEvent (EventTaskId taskId,
                            EventCapNo capno,
                            EventCapNo new_capno)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     ensureRoomForEvent(&eventBuf, EVENT_TASK_MIGRATE);
 
     postEventHeader(&eventBuf, EVENT_TASK_MIGRATE);
@@ -977,28 +982,28 @@ void postTaskMigrateEvent (EventTaskId taskId,
     postCapNo(&eventBuf, capno);
     postCapNo(&eventBuf, new_capno);
 
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 void postTaskDeleteEvent (EventTaskId taskId)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     ensureRoomForEvent(&eventBuf, EVENT_TASK_DELETE);
 
     postEventHeader(&eventBuf, EVENT_TASK_DELETE);
     /* EVENT_TASK_DELETE (taskID) */
     postTaskId(&eventBuf, taskId);
 
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 void
 postEventNoCap (EventTypeNum tag)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     ensureRoomForEvent(&eventBuf, tag);
     postEventHeader(&eventBuf, tag);
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 void
@@ -1042,9 +1047,9 @@ void postLogMsg(EventsBuf *eb, EventTypeNum type, char *msg, va_list ap)
 
 void postMsg(char *msg, va_list ap)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     postLogMsg(&eventBuf, EVENT_LOG_MSG, msg, ap);
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 void postCapMsg(Capability *cap, char *msg, va_list ap)
@@ -1138,32 +1143,32 @@ void postConcUpdRemSetFlush(Capability *cap)
 
 void postConcMarkEnd(StgWord32 marked_obj_count)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     ensureRoomForEvent(&eventBuf, EVENT_CONC_MARK_END);
     postEventHeader(&eventBuf, EVENT_CONC_MARK_END);
     postWord32(&eventBuf, marked_obj_count);
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 void postNonmovingHeapCensus(uint16_t blk_size,
                              const struct NonmovingAllocCensus *census)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     postEventHeader(&eventBuf, EVENT_NONMOVING_HEAP_CENSUS);
     postWord16(&eventBuf, blk_size);
     postWord32(&eventBuf, census->n_active_segs);
     postWord32(&eventBuf, census->n_filled_segs);
     postWord32(&eventBuf, census->n_live_blocks);
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 void postNonmovingPrunedSegments(uint32_t pruned_segments, uint32_t free_segments)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     postEventHeader(&eventBuf, EVENT_NONMOVING_PRUNED_SEGMENTS);
     postWord32(&eventBuf, pruned_segments);
     postWord32(&eventBuf, free_segments);
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 void closeBlockMarker (EventsBuf *ebuf)
@@ -1224,7 +1229,7 @@ static HeapProfBreakdown getHeapProfBreakdown(void)
 
 void postHeapProfBegin(void)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     PROFILING_FLAGS *flags = &RtsFlags.ProfFlags;
     StgWord modSelector_len   =
         flags->modSelector ? strlen(flags->modSelector) : 0;
@@ -1258,42 +1263,42 @@ void postHeapProfBegin(void)
     postStringLen(&eventBuf, flags->ccsSelector, ccsSelector_len);
     postStringLen(&eventBuf, flags->retainerSelector, retainerSelector_len);
     postStringLen(&eventBuf, flags->bioSelector, bioSelector_len);
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 void postHeapProfSampleBegin(StgInt era)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     ensureRoomForEvent(&eventBuf, EVENT_HEAP_PROF_SAMPLE_BEGIN);
     postEventHeader(&eventBuf, EVENT_HEAP_PROF_SAMPLE_BEGIN);
     postWord64(&eventBuf, era);
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 
 void postHeapBioProfSampleBegin(StgInt era, StgWord64 time)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     ensureRoomForEvent(&eventBuf, EVENT_HEAP_BIO_PROF_SAMPLE_BEGIN);
     postEventHeader(&eventBuf, EVENT_HEAP_BIO_PROF_SAMPLE_BEGIN);
     postWord64(&eventBuf, era);
     postWord64(&eventBuf, time);
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 void postHeapProfSampleEnd(StgInt era)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     ensureRoomForEvent(&eventBuf, EVENT_HEAP_PROF_SAMPLE_END);
     postEventHeader(&eventBuf, EVENT_HEAP_PROF_SAMPLE_END);
     postWord64(&eventBuf, era);
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 void postHeapProfSampleString(const char *label,
                               StgWord64 residency)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     StgWord label_len = strlen(label);
     StgWord len = 1+8+label_len+1;
     CHECK(!ensureRoomForVariableEvent(&eventBuf, len));
@@ -1303,7 +1308,7 @@ void postHeapProfSampleString(const char *label,
     postWord8(&eventBuf, 0);
     postWord64(&eventBuf, residency);
     postStringLen(&eventBuf, label, label_len);
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 #if defined(PROFILING)
@@ -1313,7 +1318,7 @@ void postHeapProfCostCentre(StgWord32 ccID,
                             const char *srcloc,
                             StgBool is_caf)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     StgWord label_len = strlen(label);
     StgWord module_len = strlen(module);
     StgWord srcloc_len = strlen(srcloc);
@@ -1326,13 +1331,13 @@ void postHeapProfCostCentre(StgWord32 ccID,
     postStringLen(&eventBuf, module, module_len);
     postStringLen(&eventBuf, srcloc, srcloc_len);
     postWord8(&eventBuf, is_caf);
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 void postHeapProfSampleCostCentre(CostCentreStack *stack,
                                   StgWord64 residency)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     StgWord depth = 0;
     CostCentreStack *ccs;
     for (ccs = stack; ccs != NULL && ccs != CCS_MAIN; ccs = ccs->prevStack)
@@ -1351,7 +1356,7 @@ void postHeapProfSampleCostCentre(CostCentreStack *stack,
          depth>0 && ccs != NULL && ccs != CCS_MAIN;
          ccs = ccs->prevStack, depth--)
         postWord32(&eventBuf, ccs->cc->ccID);
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 
@@ -1359,7 +1364,7 @@ void postProfSampleCostCentre(Capability *cap,
                               CostCentreStack *stack,
                               StgWord64 tick)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     StgWord depth = 0;
     CostCentreStack *ccs;
     for (ccs = stack; ccs != NULL && ccs != CCS_MAIN; ccs = ccs->prevStack)
@@ -1377,7 +1382,7 @@ void postProfSampleCostCentre(Capability *cap,
          depth>0 && ccs != NULL && ccs != CCS_MAIN;
          ccs = ccs->prevStack, depth--)
         postWord32(&eventBuf, ccs->cc->ccID);
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 // This event is output at the start of profiling so the tick interval can
@@ -1385,11 +1390,11 @@ void postProfSampleCostCentre(Capability *cap,
 // can be calculated from how many samples there are.
 void postProfBegin(void)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     postEventHeader(&eventBuf, EVENT_PROF_BEGIN);
     // The interval that each tick was sampled, in nanoseconds
     postWord64(&eventBuf, TimeToNS(RtsFlags.MiscFlags.tickInterval));
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 #endif /* PROFILING */
 
@@ -1415,11 +1420,11 @@ static void postTickyCounterDef(EventsBuf *eb, StgEntCounter *p)
 
 void postTickyCounterDefs(StgEntCounter *counters)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     for (StgEntCounter *p = counters; p != NULL; p = p->link) {
         postTickyCounterDef(&eventBuf, p);
     }
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 static void postTickyCounterSample(EventsBuf *eb, StgEntCounter *p)
@@ -1443,13 +1448,13 @@ static void postTickyCounterSample(EventsBuf *eb, StgEntCounter *p)
 
 void postTickyCounterSamples(StgEntCounter *counters)
 {
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     ensureRoomForEvent(&eventBuf, EVENT_TICKY_COUNTER_SAMPLE);
     postEventHeader(&eventBuf, EVENT_TICKY_COUNTER_BEGIN_SAMPLE);
     for (StgEntCounter *p = counters; p != NULL; p = p->link) {
         postTickyCounterSample(&eventBuf, p);
     }
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 #endif /* TICKY_TICKY */
 void postIPE(const InfoProvEnt *ipe)
@@ -1459,7 +1464,7 @@ void postIPE(const InfoProvEnt *ipe)
 
     // See Note [Maximum event length].
     const StgWord MAX_IPE_STRING_LEN = 65535;
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     StgWord table_name_len = MIN(strlen(ipe->prov.table_name), MAX_IPE_STRING_LEN);
     StgWord closure_desc_len = MIN(strlen(closure_desc_buf), MAX_IPE_STRING_LEN);
     StgWord ty_desc_len = MIN(strlen(ipe->prov.ty_desc), MAX_IPE_STRING_LEN);
@@ -1489,7 +1494,7 @@ void postIPE(const InfoProvEnt *ipe)
     postBuf(&eventBuf, &colon, 1);
     postStringLen(&eventBuf, ipe->prov.src_span, src_span_len);
 
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 }
 
 void printAndClearEventBuf (EventsBuf *ebuf)
@@ -1606,9 +1611,9 @@ void flushAllCapsEventsBufs(void)
         return;
     }
 
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     printAndClearEventBuf(&eventBuf);
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 
     for (unsigned int i=0; i < getNumCapabilities(); i++) {
         flushLocalEventsBuf(getCapability(i));
@@ -1641,9 +1646,9 @@ static void flushEventLog_(Capability **cap USED_IF_THREADS)
       return;
     }
 
-    ACQUIRE_LOCK(&eventBufMutex);
+    ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
     printAndClearEventBuf(&eventBuf);
-    RELEASE_LOCK(&eventBufMutex);
+    RELEASE_LOCK_ALWAYS(&eventBufMutex);
 
 #if defined(THREADED_RTS)
     Task *task = newBoundTask();
