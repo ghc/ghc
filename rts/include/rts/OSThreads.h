@@ -250,8 +250,28 @@ extern bool timedWaitCondition    ( Condition* pCond, Mutex* pMut, Time timeout)
 //
 // Mutexes
 //
+// Even in the non-threaded RTS we use threads and mutexes! In particular the
+// timer/ticker is implemented using a thread. And using threads needs locks.
+// In particular we need locks for the data shared between the timer/ticker
+// thread and the thread running the main capability.
+#if defined(HAVE_PREEMPTION)
 extern void initMutex             ( Mutex* pMut );
 extern void closeMutex            ( Mutex* pMut );
+
+// The "always" variants do locking in the threaded and non-threaded RTS.
+// The normal variants below are no-ops in the non-threaded RTS.
+#define ACQUIRE_LOCK_ALWAYS(l) OS_ACQUIRE_LOCK(l)
+#define TRY_ACQUIRE_LOCK_ALWAYS(l) OS_TRY_ACQUIRE_LOCK(l)
+#define RELEASE_LOCK_ALWAYS(l) OS_RELEASE_LOCK(l)
+#define ASSERT_LOCK_HELD_ALWAYS(l) OS_ASSERT_LOCK_HELD(l)
+#else
+// And just to be a bit confusing, the always variants are still no-ops when we
+// do not HAVE_PREEMPTION, since then we don't have threads or mutexes at all.
+#define ACQUIRE_LOCK_ALWAYS(l)
+#define TRY_ACQUIRE_LOCK_ALWAYS(l) 0
+#define RELEASE_LOCK_ALWAYS(l)
+#define ASSERT_LOCK_HELD_ALWAYS(l)
+#endif
 
 // Processors and affinity
 void setThreadAffinity (uint32_t n, uint32_t m);
@@ -268,6 +288,7 @@ void releaseThreadNode (void);
 
 #else
 
+// No-ops in the non-threaded RTS. See also the _ALWAYS variants above.
 #define ACQUIRE_LOCK(l)
 #define TRY_ACQUIRE_LOCK(l) 0
 #define RELEASE_LOCK(l)
