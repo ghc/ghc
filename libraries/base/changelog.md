@@ -1,5 +1,8 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.21.2.0 *June 2026*
+  * System.Info.fullCompilerVersion: add 'since' annotation
+
 ## 4.21.2.0 *March 2026*
   * Expose `Backtraces` constructor and fields ([CLC proposal #199](https://github.com/haskell/core-libraries-committee/issues/199), [#26049](https://gitlab.haskell.org/ghc/ghc/-/issues/26049))
   * Store `StackTrace` and `StackSnapshot` in `Backtraces`, deferring decoding until display
