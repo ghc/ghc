@@ -993,8 +993,7 @@ pprStgOp :: StgOp -> SDoc
 pprStgOp (StgPrimOp  op)   = ppr op
 pprStgOp (StgPrimCallOp op _)= ppr op
 pprStgOp (StgFCallOp op _ _) = ppr op
--- TODO: how do we want to pretty print this?
-pprStgOp (StgTagToEnumOp tyc) = text "TagToEnumOp" <+> ppr tyc
+pprStgOp (StgTagToEnumOp _tyc) = text "tagToEnum#"
 
 instance Outputable StgOp where
   ppr = pprStgOp

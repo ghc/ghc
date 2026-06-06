@@ -184,7 +184,7 @@ genForeignCall _ctx
                (CCall (CCallSpec (StaticTarget ext tgt ForeignFunction)
                                    JavaScriptCallConv
                                    PlayRisky))
-               _t
+               _ki
                [obj]
                args
   | tgt == hdBuildObjectStr
@@ -195,12 +195,9 @@ genForeignCall _ctx
              , ExprInline
              )
 
-genForeignCall ctx (CCall (CCallSpec ccTarget cconv safety)) k tgt args = do
-  -- TODO: the 'unknown' here was originally the type constructor shown by 'showType'
-  -- but now we don't have access to that any more. I'm not sure if this is necessary
-  -- for the JS back end.
-  emitForeign (ctxSrcSpan ctx) lbl safety cconv (map showArgType args) unknown
-  (,exprResult) <$> parseFFIPattern catchExcep async isJsCc (unpackFS lbl) k tgt' args
+genForeignCall ctx (CCall (CCallSpec ccTarget cconv safety)) ki tgt args = do
+  emitForeign (ctxSrcSpan ctx) lbl safety cconv (map showArgType args) (showType (getStgKind ki))
+  (,exprResult) <$> parseFFIPattern catchExcep async isJsCc (unpackFS lbl) ki tgt' args
   where
     isJsCc = cconv == JavaScriptCallConv
 
