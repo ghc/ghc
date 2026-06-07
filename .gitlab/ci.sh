@@ -708,6 +708,17 @@ function test_hadrian() {
     # ---
     # > main = putStrLn "hello world"
     run diff -w expected actual
+
+    if [[ "${CI_MERGE_REQUEST_LABELS:-}" == *"cross-run-testsuite"* ]]; then
+      EXTRA_HC_OPTS="-fexternal-interpreter" run_hadrian \
+        test \
+        --summary-junit=./junit.xml \
+        --test-have-intree-files \
+        --test-compiler="${test_compiler}" \
+        "runtest.opts+=${RUNTEST_ARGS:-}" \
+        "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
+        || fail "hadrian cross full testsuite"
+    fi
   elif [[ -n "${REINSTALL_GHC:-}" ]]; then
     run_hadrian \
       test \

@@ -1,0 +1,14 @@
+section: packaging
+issues: #27372
+mrs: !16176
+synopsis: Run full testsuite for cross-compilers via 'cross-run-testsuite' MR label
+
+description: {
+  Adding the ``cross-run-testsuite`` label to a merge request causes the CI
+  pipeline to run the full testsuite for cross-compiler targets (riscv64,
+  aarch64-linux-gnu, loongarch64, aarch64-unknown-mingw32) in addition to
+  the existing smoke test. Results are expected to have failures under
+  emulation, but provide an overview and confidence in cross-compiler
+  correctness. The label is opt-in because emulated test runs take
+  significantly longer than native ones.
+}
