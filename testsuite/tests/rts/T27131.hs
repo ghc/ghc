@@ -30,16 +30,22 @@ foreign import ccall unsafe "has_local_stop_after_return"
 main :: IO ()
 main = do
   setNumCapabilities 2
-  checkFlag
-    "TSO_STOP_NEXT_BREAKPOINT"
-    rts_enableStopNextBreakpoint
-    rts_disableStopNextBreakpoint
-    c_hasLocalStopNextBreakpoint
-  checkFlag
-    "TSO_STOP_AFTER_RETURN"
-    rts_enableStopAfterReturn
-    rts_disableStopAfterReturn
-    c_hasLocalStopAfterReturn
+  -- Bind to capability 0 so it can't float between capabilities while the
+  -- target thread runs on capability 1.
+  doneVar <- newEmptyMVar
+  _ <- forkOn 0 $ do
+    checkFlag
+      "TSO_STOP_NEXT_BREAKPOINT"
+      rts_enableStopNextBreakpoint
+      rts_disableStopNextBreakpoint
+      c_hasLocalStopNextBreakpoint
+    checkFlag
+      "TSO_STOP_AFTER_RETURN"
+      rts_enableStopAfterReturn
+      rts_disableStopAfterReturn
+      c_hasLocalStopAfterReturn
+    putMVar doneVar ()
+  takeMVar doneVar
 
 checkFlag
   :: String
@@ -58,6 +64,7 @@ checkFlag label enable disable isMyThreadFlagSet = do
   ThreadId tid# <- forkOn 1 $ do
     replicateM_ 2 $ do
       replyVar <- takeMVar targetCheckVar
+      yield -- make sure we reprocess the mailbox
       isSet <- (/= 0) <$> isMyThreadFlagSet
       putMVar replyVar isSet
 
