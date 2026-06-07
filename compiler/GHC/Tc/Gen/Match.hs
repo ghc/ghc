@@ -376,7 +376,7 @@ tcGRHSNE ctxt tc_body grhss res_ty
 -}
 
 tcDoStmts :: HsDoFlavour
-          -> LocatedLW [LStmt GhcRn (LHsExpr GhcRn)]
+          -> LocatedA [LStmt GhcRn (LHsExpr GhcRn)]
           -> ExpRhoType
           -> TcM (HsExpr GhcTc)          -- Returns a HsDo
 tcDoStmts ListComp (L l stmts) res_ty

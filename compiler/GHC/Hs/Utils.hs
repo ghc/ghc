@@ -320,8 +320,8 @@ nlParPat p = noLocA (gParPat p)
 mkHsIntegral   :: IntegralLit -> HsOverLit GhcPs
 mkHsFractional :: FractionalLit -> HsOverLit GhcPs
 mkHsIsString   :: SourceText -> FastString -> HsOverLit GhcPs
-mkHsDo         :: HsDoFlavour -> LocatedLW [ExprLStmt GhcPs] -> HsExpr GhcPs
-mkHsDoAnns     :: HsDoFlavour -> LocatedLW [ExprLStmt GhcPs] -> AnnList EpaLocation -> HsExpr GhcPs
+mkHsDo         :: HsDoFlavour -> LocatedA [ExprLStmt GhcPs] -> HsExpr GhcPs
+mkHsDoAnns     :: HsDoFlavour -> LocatedA [ExprLStmt GhcPs] -> AnnList EpaLocation -> HsExpr GhcPs
 mkHsComp       :: HsDoFlavour -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                -> HsExpr GhcPs
 mkHsCompAnns   :: HsDoFlavour -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
@@ -349,12 +349,12 @@ mkTcBindStmt :: LPat GhcTc -> LocatedA (bodyR GhcTc)
 emptyRecStmt     :: (Anno [GenLocated
                              (Anno (StmtLR (GhcPass idL) GhcPs bodyR))
                              (StmtLR (GhcPass idL) GhcPs bodyR)]
-                        ~ SrcSpanAnnLW)
+                        ~ SrcSpanAnnA)
                  => StmtLR (GhcPass idL) GhcPs bodyR
 emptyRecStmtName :: (Anno [GenLocated
                              (Anno (StmtLR GhcRn GhcRn bodyR))
                              (StmtLR GhcRn GhcRn bodyR)]
-                        ~ SrcSpanAnnLW)
+                        ~ SrcSpanAnnA)
                  => StmtLR GhcRn GhcRn bodyR
 emptyRecStmtId   :: Stmt GhcTc (LocatedA (HsCmd GhcTc))
 
@@ -362,9 +362,9 @@ mkRecStmt :: forall (idL :: Pass) bodyR.
                     (Anno [GenLocated
                              (Anno (StmtLR (GhcPass idL) GhcPs bodyR))
                              (StmtLR (GhcPass idL) GhcPs bodyR)]
-                        ~ SrcSpanAnnLW)
+                        ~ SrcSpanAnnA)
                  => AnnList (EpToken "rec")
-                 -> LocatedLW [LStmtLR (GhcPass idL) GhcPs bodyR]
+                 -> LocatedA [LStmtLR (GhcPass idL) GhcPs bodyR]
                  -> StmtLR (GhcPass idL) GhcPs bodyR
 mkRecStmt anns stmts  = (emptyRecStmt' anns :: StmtLR (GhcPass idL) GhcPs bodyR)
                              { recS_stmts = stmts }

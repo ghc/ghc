@@ -69,6 +69,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` annotationAnnList
               `extQ` annotationAnnListWhere
               `extQ` annotationAnnListCommas
+              `extQ` annotationAnnListEpaLocation
               `extQ` annotationNoEpAnns
               `extQ` annotationExprBracket
               `extQ` annotationTypedBracket
@@ -374,6 +375,12 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             annotationAnnListCommas :: EpAnn (AnnList [EpToken ","]) -> SDoc
             annotationAnnListCommas = annotation' (text "EpAnn (AnnList [EpToken \",\"])")
+
+            annotationAnnListEpaLocation :: AnnList EpaLocation -> SDoc
+            annotationAnnListEpaLocation anns = case ba of
+             BlankEpAnnotations -> parens (text "blanked:" <+> text "AnnList EpaLocation")
+             NoBlankEpAnnotations -> parens $ text (showConstr (toConstr anns))
+                                               $$ vcat (gmapQ showAstData' anns)
 
             annotationNoEpAnns :: EpAnn NoEpAnns -> SDoc
             annotationNoEpAnns = annotation' (text "EpAnn NoEpAnns")

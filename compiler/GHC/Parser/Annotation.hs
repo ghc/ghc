@@ -28,10 +28,10 @@ module GHC.Parser.Annotation (
 
   -- ** Annotations in 'GenLocated'
   LocatedA, LocatedN, LocatedAn, LocatedP,
-  LocatedLC, LocatedLS, LocatedLW,
+  LocatedLW,
   LocatedE, LocatedBF,
   SrcSpanAnnA, SrcSpanAnnP, SrcSpanAnnN,
-  SrcSpanAnnLC, SrcSpanAnnLW, SrcSpanAnnLS,
+  SrcSpanAnnLW,
   SrcSpanAnnBF,
 
   -- ** Annotation data types used in 'GenLocated'
@@ -432,18 +432,13 @@ emptyComments = EpaComments []
 type LocatedA = GenLocated SrcSpanAnnA
 type LocatedN = GenLocated SrcSpanAnnN
 
-type LocatedLC = GenLocated SrcSpanAnnLC
-type LocatedLS = GenLocated SrcSpanAnnLS
 type LocatedLW = GenLocated SrcSpanAnnLW
 type LocatedP = GenLocated SrcSpanAnnP
--- type LocatedC = GenLocated SrcSpanAnnC
 type LocatedBF = GenLocated SrcSpanAnnBF
 
 type SrcSpanAnnA = EpAnn AnnListItem
 type SrcSpanAnnN = EpAnn NameAnn
 
-type SrcSpanAnnLC = EpAnn (AnnList [EpToken ","])
-type SrcSpanAnnLS = EpAnn (AnnList ())
 type SrcSpanAnnLW = EpAnn (AnnList (EpToken "where"))
 type SrcSpanAnnP = EpAnn AnnPragma
 type SrcSpanAnnBF = EpAnn AnnBooleanFormula

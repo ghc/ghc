@@ -287,7 +287,9 @@
                  (AnnList
                   (Just
                    (EpaSpan { DumpParsedAstComments.hs:16:3 }))
-                  (ListNone)
+                  (ListBraces
+                   (NoEpTok)
+                   (NoEpTok))
                   []
                   (EpaSpan { DumpParsedAstComments.hs:14:7-8 })
                   [])
@@ -296,12 +298,7 @@
                  (L
                   (EpAnn
                    (EpaSpan { DumpParsedAstComments.hs:16:3 })
-                   (AnnList
-                    (Just
-                     (EpaSpan { DumpParsedAstComments.hs:16:3 }))
-                    (ListNone)
-                    []
-                    (NoEpTok)
+                   (AnnListItem
                     [])
                    (EpaComments
                     []))

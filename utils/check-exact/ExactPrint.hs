@@ -1447,6 +1447,8 @@ instance (ExactPrint a) => ExactPrint (LocatedAn NoEpAnns a) where
     a' <- markAnnotated a
     return (L la a')
 
+-- ---------------------------------------------------------------------
+
 instance (ExactPrint a) => ExactPrint (Maybe a) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor ma _ _ _ = ma
@@ -2417,7 +2419,7 @@ exactMatch (Match an mctxt pats grhss) = do
             epTokensToComments "(" opens
             epTokensToComments ")" closes
             fun' <- markAnnotated fun
-            pats' <- mapM markAnnotated pats
+            pats' <- markAnnotated pats
             return (FunRhs fun' fixity strictness (AnnFunRhs strict' [] []), pats')
           Infix ->
             case pats of
@@ -2438,11 +2440,11 @@ exactMatch (Match an mctxt pats grhss) = do
               _ -> panic "FunRhs"
 
       LamAlt v -> do
-        pats' <- markAnnotated pats
+        pats' <- (mapM . mapM) markAnnotated pats
         return (LamAlt v, pats')
 
       CaseAlt -> do
-        pats' <- markAnnotated pats
+        pats' <- (mapM . mapM) markAnnotated pats
         return (CaseAlt, pats')
 
       _ -> do
@@ -2985,7 +2987,7 @@ instance ExactPrint (HsExpr GhcPs) where
 
   exact (HsDo an do_or_list_comp stmts) = do
     debugM $ "HsDo"
-    (an',stmts') <- markAnnListA' an $ \a -> exactDo a do_or_list_comp stmts
+    (an',stmts') <- exactDo an do_or_list_comp stmts
     return (HsDo an' do_or_list_comp stmts')
 
   exact (ExplicitList an es) = do
@@ -3101,9 +3103,9 @@ instance ExactPrint (HsExpr GhcPs) where
     s' <- markAnnotated s
     return (HsTypedSplice an s')
 
-  exact (HsUntypedSplice an s) = do
+  exact (HsUntypedSplice x s) = do
     s' <- markAnnotated s
-    return (HsUntypedSplice an s')
+    return (HsUntypedSplice x s')
 
   exact (HsProc (pr,r) p c) = do
     debugM $ "HsProc start"
@@ -3160,10 +3162,12 @@ instance ExactPrint (HsExpr GhcPs) where
 exactDo :: (Monad m, Monoid w, ExactPrint (LocatedAn an a))
         => AnnList EpaLocation -> HsDoFlavour -> LocatedAn an a
         -> EP w m (AnnList EpaLocation, LocatedAn an a)
-exactDo an (DoExpr m)    stmts = exactMdo an m "do"          >>= \an0 -> markMaybeDodgyStmts an0 stmts
+exactDo an (DoExpr m)    stmts = exactMdo an m "do" >>=
+                                 \an0 -> markMaybeDodgyStmts an0 stmts
 exactDo an GhciStmtCtxt  stmts = markLensFun an lal_rest (\l -> printStringAtAA l "do") >>=
                                  \an0 -> markMaybeDodgyStmts an0 stmts
-exactDo an (MDoExpr m)   stmts = exactMdo an m  "mdo" >>= \an0 -> markMaybeDodgyStmts an0 stmts
+exactDo an (MDoExpr m)   stmts = exactMdo an m  "mdo" >>=
+                                 \an0 -> markMaybeDodgyStmts an0 stmts
 exactDo an ListComp      stmts = markMaybeDodgyStmts an stmts
 exactDo an MonadComp     stmts = markMaybeDodgyStmts an stmts
 
@@ -3179,8 +3183,9 @@ markMaybeDodgyStmts :: (Monad m, Monoid w, ExactPrint (LocatedAn an a))
 markMaybeDodgyStmts an stmts =
   if notDodgy stmts
     then do
-      r <- markAnnotatedWithLayout stmts
-      return (an, r)
+      markAnnListA' an $ \a -> do
+         r <- markAnnotatedWithLayout stmts
+         return (a, r)
     else return (an, stmts)
 
 notDodgy :: GenLocated (EpAnn ann) a -> Bool
@@ -3465,19 +3470,21 @@ instance ExactPrint (HsCmd GhcPs) where
       e' <- markAnnotated e
       return (HsCmdLet (tkLet', tkIn') binds' e')
 
-  exact (HsCmdDo an es) = do
+  exact (HsCmdDo an (L l es)) = do
     debugM $ "HsCmdDo"
-    an0 <- markLensFun an lal_rest (\l -> printStringAtAA l "do")
-    es' <- markAnnotated es
-    return (HsCmdDo an0 es')
+    an0 <- markLensFun an lal_rest (\ll -> printStringAtAA ll "do")
+    (an1,es') <- markAnnList' an0 $ do
+      ee <- mapM markAnnotated es
+      return ee
+    return (HsCmdDo an1 (L l es'))
 
 -- ---------------------------------------------------------------------
 
 instance (
   ExactPrint (LocatedA (body GhcPs)),
                  Anno (StmtLR GhcPs GhcPs (LocatedA (body GhcPs))) ~ SrcSpanAnnA,
-           Anno [GenLocated SrcSpanAnnA (StmtLR GhcPs GhcPs (LocatedA (body GhcPs)))] ~ SrcSpanAnnLW,
-           (ExactPrint (LocatedLW [LocatedA (StmtLR GhcPs GhcPs (LocatedA (body GhcPs)))])))
+           Anno [GenLocated SrcSpanAnnA (StmtLR GhcPs GhcPs (LocatedA (body GhcPs)))] ~ SrcSpanAnnA,
+           (ExactPrint (LocatedA [LocatedA (StmtLR GhcPs GhcPs (LocatedA (body GhcPs)))])))
    => ExactPrint (StmtLR GhcPs GhcPs (LocatedA (body GhcPs))) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _s = a
@@ -4524,31 +4531,36 @@ instance (ExactPrint (Match GhcPs (LocatedA body)))
     an3 <- markLensBracketsC an2 lal_brackets
     return (L an3 a')
 
-instance ExactPrint (LocatedLW [LocatedA (StmtLR GhcPs GhcPs (LocatedA (HsExpr GhcPs)))]) where
-  getAnnotationEntry = entryFromLocatedA
-  setAnnotationAnchor = setAnchorAn
-  exact (L an stmts) = do
+instance ExactPrint [LocatedA (StmtLR GhcPs GhcPs (LocatedA (HsExpr GhcPs)))] where
+  getAnnotationEntry _ = NoEntryVal
+  setAnnotationAnchor a _ _ _ = a
+  exact stmts = do
     debugM $ "LocatedL [ExprLStmt"
-    (an'', stmts') <- markAnnList an $ do
-      case snocView stmts of
-        Just (initStmts, ls@(L _ (LastStmt _ _body _ _))) -> do
-          debugM $ "LocatedL [ExprLStmt: snocView"
-          ls' <- markAnnotated ls
-          initStmts' <- mapM markAnnotated initStmts
-          return (initStmts' ++ [ls'])
-        _ -> do
-          mapM markAnnotated stmts
-    return (L an'' stmts')
+    case snocView stmts of
+      Just (initStmts, ls@(L _ (LastStmt _ _body _ _))) -> do
+        debugM $ "LocatedL [ExprLStmt: snocView"
+        ls' <- markAnnotated ls
+        initStmts' <- markAnnotated initStmts
+        return (initStmts' ++ [ls'])
+      _ -> do
+        stmts' <- mapM markAnnotated stmts
+        return stmts'
 
-instance ExactPrint (LocatedLW [LocatedA (StmtLR GhcPs GhcPs (LocatedA (HsCmd GhcPs)))]) where
-  getAnnotationEntry = entryFromLocatedA
-  setAnnotationAnchor = setAnchorAn
-  exact (L ann es) = do
-    debugM $ "LocatedL [CmdLStmt"
-    an0 <- markLensBracketsO ann lal_brackets
-    es' <- mapM markAnnotated es
-    an1 <- markLensBracketsC an0 lal_brackets
-    return (L an1 es')
+-- TODO: harmonise with prior, on payload
+instance ExactPrint [LocatedA (StmtLR GhcPs GhcPs (LocatedA (HsCmd GhcPs)))] where
+  getAnnotationEntry _ = NoEntryVal
+  setAnnotationAnchor a _ _ _ = a
+  exact stmts = do
+    debugM $ "LocatedL [ExprLStmt"
+    case snocView stmts of
+      Just (initStmts, ls@(L _ (LastStmt _ _body _ _))) -> do
+        debugM $ "LocatedL [ExprLStmt: snocView"
+        ls' <- markAnnotated ls
+        initStmts' <- markAnnotated initStmts
+        return (initStmts' ++ [ls'])
+      _ -> do
+        stmts' <- markAnnotated stmts
+        return stmts'
 
 instance ExactPrint (LocatedBF (BF.BooleanFormula GhcPs)) where
   getAnnotationEntry = entryFromLocatedA

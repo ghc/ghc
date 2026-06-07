@@ -337,7 +337,9 @@
                  (AnnList
                   (Just
                    (EpaSpan { DumpSemis.hs:(11,3)-(12,3) }))
-                  (ListNone)
+                  (ListBraces
+                   (NoEpTok)
+                   (NoEpTok))
                   []
                   (EpaSpan { DumpSemis.hs:10:7-8 })
                   [])
@@ -346,12 +348,7 @@
                  (L
                   (EpAnn
                    (EpaSpan { DumpSemis.hs:(11,3)-(12,3) })
-                   (AnnList
-                    (Just
-                     (EpaSpan { DumpSemis.hs:(11,3)-(12,3) }))
-                    (ListNone)
-                    []
-                    (NoEpTok)
+                   (AnnListItem
                     [])
                    (EpaComments
                     []))
@@ -375,30 +372,25 @@
                        (AnnList
                         (Just
                          (EpaSpan { DumpSemis.hs:11:6-15 }))
-                        (ListNone)
-                        []
+                        (ListBraces
+                         (EpTok (EpaSpan { DumpSemis.hs:11:6 }))
+                         (EpTok (EpaSpan { DumpSemis.hs:11:15 })))
+                        [(EpTok
+                          (EpaSpan { DumpSemis.hs:11:8 }))
+                        ,(EpTok
+                          (EpaSpan { DumpSemis.hs:11:9 }))
+                        ,(EpTok
+                          (EpaSpan { DumpSemis.hs:11:10 }))
+                        ,(EpTok
+                          (EpaSpan { DumpSemis.hs:11:11 }))]
                         (EpaSpan { DumpSemis.hs:11:3-4 })
                         [])
                        (DoExpr
                         (Nothing))
                        (L
                         (EpAnn
-                         (EpaSpan { DumpSemis.hs:11:6-15 })
-                         (AnnList
-                          (Just
-                           (EpaSpan { DumpSemis.hs:11:8-13 }))
-                          (ListBraces
-                           (EpTok (EpaSpan { DumpSemis.hs:11:6 }))
-                           (EpTok (EpaSpan { DumpSemis.hs:11:15 })))
-                          [(EpTok
-                            (EpaSpan { DumpSemis.hs:11:8 }))
-                          ,(EpTok
-                            (EpaSpan { DumpSemis.hs:11:9 }))
-                          ,(EpTok
-                            (EpaSpan { DumpSemis.hs:11:10 }))
-                          ,(EpTok
-                            (EpaSpan { DumpSemis.hs:11:11 }))]
-                          (NoEpTok)
+                         (EpaSpan { DumpSemis.hs:11:8-13 })
+                         (AnnListItem
                           [])
                          (EpaComments
                           []))
@@ -649,26 +641,21 @@
                  (AnnList
                   (Just
                    (EpaSpan { DumpSemis.hs:(16,3)-(19,3) }))
-                  (ListNone)
-                  []
+                  (ListBraces
+                   (EpTok (EpaSpan { DumpSemis.hs:16:3 }))
+                   (EpTok (EpaSpan { DumpSemis.hs:19:3 })))
+                  [(EpTok
+                    (EpaSpan { DumpSemis.hs:16:5 }))
+                  ,(EpTok
+                    (EpaSpan { DumpSemis.hs:16:8 }))]
                   (EpaSpan { DumpSemis.hs:15:7-8 })
                   [])
                  (DoExpr
                   (Nothing))
                  (L
                   (EpAnn
-                   (EpaSpan { DumpSemis.hs:(16,3)-(19,3) })
-                   (AnnList
-                    (Just
-                     (EpaSpan { DumpSemis.hs:(16,5)-(18,5) }))
-                    (ListBraces
-                     (EpTok (EpaSpan { DumpSemis.hs:16:3 }))
-                     (EpTok (EpaSpan { DumpSemis.hs:19:3 })))
-                    [(EpTok
-                      (EpaSpan { DumpSemis.hs:16:5 }))
-                    ,(EpTok
-                      (EpaSpan { DumpSemis.hs:16:8 }))]
-                    (NoEpTok)
+                   (EpaSpan { DumpSemis.hs:(16,5)-(18,5) })
+                   (AnnListItem
                     [])
                    (EpaComments
                     []))
@@ -913,26 +900,21 @@
                  (AnnList
                   (Just
                    (EpaSpan { DumpSemis.hs:22:10-30 }))
-                  (ListNone)
-                  []
+                  (ListBraces
+                   (EpTok (EpaSpan { DumpSemis.hs:22:10 }))
+                   (EpTok (EpaSpan { DumpSemis.hs:22:30 })))
+                  [(EpTok
+                    (EpaSpan { DumpSemis.hs:22:12 }))
+                  ,(EpTok
+                    (EpaSpan { DumpSemis.hs:22:13 }))]
                   (EpaSpan { DumpSemis.hs:22:7-8 })
                   [])
                  (DoExpr
                   (Nothing))
                  (L
                   (EpAnn
-                   (EpaSpan { DumpSemis.hs:22:10-30 })
-                   (AnnList
-                    (Just
-                     (EpaSpan { DumpSemis.hs:22:12-28 }))
-                    (ListBraces
-                     (EpTok (EpaSpan { DumpSemis.hs:22:10 }))
-                     (EpTok (EpaSpan { DumpSemis.hs:22:30 })))
-                    [(EpTok
-                      (EpaSpan { DumpSemis.hs:22:12 }))
-                    ,(EpTok
-                      (EpaSpan { DumpSemis.hs:22:13 }))]
-                    (NoEpTok)
+                   (EpaSpan { DumpSemis.hs:22:12-28 })
+                   (AnnListItem
                     [])
                    (EpaComments
                     []))
