@@ -3144,15 +3144,17 @@ aexp    :: { ECP }
                                       return $ ECP $
                                         $2 >>= \ $2 ->
                                         mkHsDoPV (comb2 $1 $2)
+                                                 (stmtlistAnns $2)
                                                  (fmap mkModuleNameFS (getDO $1))
-                                                 $2
+                                                 (stmtlistStmts $2)
                                                  (glR $1)
                                                  (glR $2) }
         | MDO stmtlist             {% hintQualifiedDo $1 >> runPV $2 >>= \ $2 ->
                                        fmap ecpFromExp $
                                        amsA' (L (comb2 $1 $2)
-                                              (mkMDo (MDoExpr $ fmap mkModuleNameFS (getMDO $1))
-                                                     $2
+                                              (mkMDo (stmtlistAnns $2)
+                                                     (MDoExpr $ fmap mkModuleNameFS (getMDO $1))
+                                                     (stmtlistStmts $2)
                                                      (glR $1)
                                                      (glR $2))) }
         | 'proc' aexp '->' exp
@@ -3648,11 +3650,11 @@ apat    : aexp                  {% (checkPattern <=< runPV) (unECP $1) }
 -----------------------------------------------------------------------------
 -- Statement sequences
 
-stmtlist :: { forall b. DisambECP b => PV (LocatedLW [LocatedA (Stmt GhcPs (LocatedA b))]) }
+stmtlist :: { forall b. DisambECP b => PV (LocatedA ((EpToken "{", [EpToken ";"], EpToken "}"), Located [LocatedA (Stmt GhcPs (LocatedA b))])) }
         : '{'           stmts '}'       { $2 >>= \ $2 ->
-                                          amsr (sLL $1 $> (reverse $ snd $ unLoc $2)) (AnnList (stmtsAnchor $2) (ListBraces (epTok $1) (epTok $3)) (fromOL $ fst $ unLoc $2) noAnn []) }
-        |     vocurly   stmts close     { $2 >>= \ $2 -> amsr
-                                          (L (stmtsLoc $2) (reverse $ snd $ unLoc $2)) (AnnList (stmtsAnchor $2) ListNone (fromOL $ fst $ unLoc $2) noAnn []) }
+                                          amsA' (sLL $1 $> ((epTok $1, fromOL $ fst $ unLoc $2, epTok $3), sL1 $2 $ reverse $ snd $ unLoc $2))}
+        |     vocurly   stmts close     { $2 >>= \ $2 ->
+                                          amsA' (L (stmtsLoc $2) ((NoEpTok, fromOL $ fst $ unLoc $2, NoEpTok), sL1 $2 $ reverse $ snd $ unLoc $2))}
 
 --      do { ;; s ; s ; ; s ;; }
 -- The last Stmt should be an expression, but that's hard to enforce
@@ -3694,7 +3696,8 @@ e_stmt :: { LStmt GhcPs (LHsExpr GhcPs) }
 stmt  :: { forall b. DisambECP b => PV (LStmt GhcPs (LocatedA b)) }
         : qual                          { $1 }
         | 'rec' stmtlist                {  $2 >>= \ $2 ->
-                                           amsA' (sLL $1 $> $ mkRecStmt (hsDoAnn (epTok $1) $2) $2) }
+                                           amsA' (sLL $1 $> $ mkRecStmt (hsDoAnn (epTok $1) (stmtlistAnns $2) $2)
+                                                                        (stmtlistStmts $2)) }
 
 qual  :: { forall b. DisambECP b => PV (LStmt GhcPs (LocatedA b)) }
     : bindpat '<-' exp                   { unECP $3 >>= \ $3 ->
@@ -4717,9 +4720,9 @@ commentsPA la@(L l a) = do
   !cs <- getPriorCommentsFor (getLocA la)
   return (L (addCommentsToEpAnn l cs) a)
 
-hsDoAnn :: EpToken "rec" -> LocatedAn t b -> AnnList (EpToken "rec")
-hsDoAnn tok (L ll _)
-  = AnnList (Just $ spanAsAnchor (locA ll)) ListNone [] tok []
+hsDoAnn :: EpToken "rec" -> (EpToken "{", [EpToken ";"], EpToken "}") -> LocatedAn t b -> AnnList (EpToken "rec")
+hsDoAnn rec (ob, semis, cb) (L ll _)
+  = AnnList (Just $ spanAsAnchor (locA ll)) (ListBraces ob cb) semis rec []
 
 listAsAnchorM :: [LocatedAn t a] -> Maybe EpaLocation
 listAsAnchorM [] = Nothing
@@ -4742,6 +4745,17 @@ mzEpTok !l = if isZeroWidthSpan (gl l) then NoEpTok else (epTok l)
 
 epExplicitBraces :: Located Token -> Located Token -> EpLayout
 epExplicitBraces !t1 !t2 = EpExplicitBraces (epTok t1) (epTok t2)
+
+-- -------------------------------------
+
+stmtlistStmts :: LocatedA (a, Located [LocatedA (Stmt GhcPs (LocatedA b))])
+              -> LocatedA [LocatedA (Stmt GhcPs (LocatedA b))]
+stmtlistStmts (L la (_,L l stmts))
+  = L ((noAnnSrcSpan l) {comments = comments la}) stmts
+
+stmtlistAnns :: LocatedA ((EpToken "{", [EpToken ";"], EpToken "}"), a)
+             -> (EpToken "{", [EpToken ";"], EpToken "}")
+stmtlistAnns (L _ (an,_)) = an
 
 -- -------------------------------------
 

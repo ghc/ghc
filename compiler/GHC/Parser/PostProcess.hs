@@ -436,9 +436,9 @@ mkRoleAnnotDecl loc tycon roles anns
             addFatalError $ mkPlainErrorMsgEnvelope loc_role $
               (PsErrIllegalRoleName role nearby)
 
-mkMDo :: HsDoFlavour -> LocatedLW [ExprLStmt GhcPs] -> EpaLocation -> EpaLocation -> HsExpr GhcPs
-mkMDo ctxt stmts tok loc
-  = mkHsDoAnns ctxt stmts (AnnList (Just loc) ListNone [] tok [])
+mkMDo :: (EpToken "{", [EpToken ";"], EpToken "}") -> HsDoFlavour -> LocatedA [ExprLStmt GhcPs] -> EpaLocation -> EpaLocation -> HsExpr GhcPs
+mkMDo (ob, semis, cb) ctxt stmts tok loc
+  = mkHsDoAnns ctxt stmts (AnnList (Just loc) (ListBraces ob cb) semis tok [])
 
 -- | Converts a list of 'LHsTyVarBndr's annotated with their 'Specificity' to
 -- binders without annotations. Only accepts specified variables, and errors if
@@ -1733,7 +1733,7 @@ type AnnoBody b
     , Anno (Match GhcPs (LocatedA (Body b GhcPs))) ~ SrcSpanAnnA
     , Anno (StmtLR GhcPs GhcPs (LocatedA (Body (Body b GhcPs) GhcPs))) ~ SrcSpanAnnA
     , Anno [LocatedA (StmtLR GhcPs GhcPs
-                       (LocatedA (Body (Body (Body b GhcPs) GhcPs) GhcPs)))] ~ SrcSpanAnnLW
+                       (LocatedA (Body (Body (Body b GhcPs) GhcPs) GhcPs)))] ~ SrcSpanAnnA
     )
 
 -- | Disambiguate constructs that may appear when we do not know ahead of time whether we are
@@ -1795,8 +1795,9 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   -- | Disambiguate "do { ... }" (do notation)
   mkHsDoPV ::
     SrcSpan ->
+    (EpToken "{", [EpToken ";"], EpToken "}") ->
     Maybe ModuleName ->
-    LocatedLW [LStmt GhcPs (LocatedA b)] ->
+    LocatedA [LStmt GhcPs (LocatedA b)] ->
     EpaLocation -> -- Token
     EpaLocation -> -- Anchor
     PV (LocatedA b)
@@ -1948,10 +1949,10 @@ instance DisambECP (HsCmd GhcPs) where
     checkDoAndIfThenElse PsErrSemiColonsInCondCmd c semi1 a semi2 b
     !cs <- getCommentsFor l
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (mkHsCmdIf c a b anns)
-  mkHsDoPV l Nothing stmts tok_loc anc = do
+  mkHsDoPV l (ob,semis,cb) Nothing stmts tok_loc anc = do
     !cs <- getCommentsFor l
-    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsCmdDo (AnnList (Just anc) ListNone [] tok_loc []) stmts)
-  mkHsDoPV l (Just m)    _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l $ PsErrQualifiedDoInCmd m
+    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsCmdDo (AnnList (Just anc) (ListBraces ob cb) semis tok_loc []) stmts)
+  mkHsDoPV l _ (Just m) _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l $ PsErrQualifiedDoInCmd m
   mkHsParPV l lpar c rpar = do
     !cs <- getCommentsFor l
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsCmdPar (lpar, rpar) c)
@@ -2047,9 +2048,9 @@ instance DisambECP (HsExpr GhcPs) where
     checkDoAndIfThenElse PsErrSemiColonsInCondExpr c semi1 a semi2 b
     !cs <- getCommentsFor l
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (mkHsIf c a b anns)
-  mkHsDoPV l mod stmts loc_tok anc = do
+  mkHsDoPV l (ob,semis,cb) mod stmts loc_tok anc = do
     !cs <- getCommentsFor l
-    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsDo (AnnList (Just anc) ListNone [] loc_tok []) (DoExpr mod) stmts)
+    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsDo (AnnList (Just anc) (ListBraces ob cb) semis loc_tok []) (DoExpr mod) stmts)
   mkHsParPV l lpar e rpar = do
     !cs <- getCommentsFor l
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsPar (lpar, rpar) e)
@@ -2145,7 +2146,7 @@ instance DisambECP (PatBuilder GhcPs) where
     !cs <- getCommentsFor (locA l)
     return $ L (addCommentsToEpAnn l cs) (PatBuilderAppType p at (mkHsTyPat t))
   mkHsIfPV l _ _ _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l PsErrIfThenElseInPat
-  mkHsDoPV l _ _ _ _    = addFatalError $ mkPlainErrorMsgEnvelope l PsErrDoNotationInPat
+  mkHsDoPV l _ _ _ _ _   = addFatalError $ mkPlainErrorMsgEnvelope l PsErrDoNotationInPat
   mkHsParPV l lpar p rpar   = return $ L (noAnnSrcSpan l) (PatBuilderPar lpar p rpar)
   mkHsVarPV v@(getLoc -> l) = return $ L (l2l l) (PatBuilderVar v)
   mkHsLitPV lit@(L l a) = do

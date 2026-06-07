@@ -390,7 +390,9 @@
                             (AnnList
                              (Just
                               (EpaSpan { Test20297.hs:11:22-26 }))
-                             (ListNone)
+                             (ListBraces
+                              (NoEpTok)
+                              (NoEpTok))
                              []
                              (EpaSpan { Test20297.hs:11:19-20 })
                              [])
@@ -399,12 +401,7 @@
                             (L
                              (EpAnn
                               (EpaSpan { Test20297.hs:11:22-26 })
-                              (AnnList
-                               (Just
-                                (EpaSpan { Test20297.hs:11:22-26 }))
-                               (ListNone)
-                               []
-                               (NoEpTok)
+                              (AnnListItem
                                [])
                               (EpaComments
                                []))
@@ -817,7 +814,9 @@
                             (AnnList
                              (Just
                               (EpaSpan { Test20297.ppr.hs:9:20-24 }))
-                             (ListNone)
+                             (ListBraces
+                              (NoEpTok)
+                              (NoEpTok))
                              []
                              (EpaSpan { Test20297.ppr.hs:9:17-18 })
                              [])
@@ -826,12 +825,7 @@
                             (L
                              (EpAnn
                               (EpaSpan { Test20297.ppr.hs:9:20-24 })
-                              (AnnList
-                               (Just
-                                (EpaSpan { Test20297.ppr.hs:9:20-24 }))
-                               (ListNone)
-                               []
-                               (NoEpTok)
+                              (AnnListItem
                                [])
                               (EpaComments
                                []))

@@ -110,7 +110,7 @@ instance Outputable DataConBuilder where
   ppr (InfixDataConBuilder lhs data_con rhs) =
     ppr lhs <+> ppr data_con <+> ppr rhs
 
-type instance Anno [LocatedA (StmtLR GhcPs GhcPs (LocatedA (PatBuilder GhcPs)))] = SrcSpanAnnLW
+type instance Anno [LocatedA (StmtLR GhcPs GhcPs (LocatedA (PatBuilder GhcPs)))] = SrcSpanAnnA
 
 data ExplicitNamespaceKeyword
   = ExplicitTypeNamespace !(EpToken "type")
