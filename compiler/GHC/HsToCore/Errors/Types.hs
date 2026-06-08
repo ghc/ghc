@@ -188,14 +188,14 @@ data ThRejectionReason
   | ThNoUserInline
   | ThExoticFormOfType !(HsType GhcRn)
   | ThAmbiguousRecordSelectors !(HsExpr GhcRn)
-  | ThMonadComprehensionSyntax !(HsExpr GhcRn)
+  | forall p. (OutputableBndrId p) => ThMonadComprehensionSyntax !(HsExpr (GhcPass p))
   | ThCostCentres !(HsExpr GhcRn)
   | ThExpressionForm !(HsExpr GhcRn)
   | ThExoticStatement [Stmt GhcRn (LHsExpr GhcRn)]
-  | ThExoticLiteral !(HsLit GhcRn)
+  | forall p. (OutputableBndrId p) => ThExoticLiteral !(HsLit (GhcPass p))
   | ThExoticPattern !(Pat GhcRn)
   | ThUnsupportedTyLit !(HsLit GhcRn)
-  | ThGuardedLambdas !(Match GhcRn (LHsExpr GhcRn))
+  | forall p. (OutputableBndrId p) => ThGuardedLambdas !(Match (GhcPass p) (LHsExpr (GhcPass p)))
   | ThNegativeOverloadedPatterns !(Pat GhcRn)
   | ThHaddockDocumentation
   | ThWarningAndDeprecationPragmas [LIdP GhcRn]

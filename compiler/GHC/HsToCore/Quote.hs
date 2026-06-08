@@ -1555,13 +1555,13 @@ rep_splice splice_name
 --              Expressions
 -----------------------------------------------------------------------------
 
-repLEs :: [LHsExpr GhcRn] -> MetaM (Core [(M TH.Exp)])
+repLEs :: forall p. (IsPass p) => [LHsExpr (GhcPass p)] -> MetaM (Core [(M TH.Exp)])
 repLEs es = repListM expTyConName repLE es
 
 -- FIXME: some of these panics should be converted into proper error messages
 --        unless we can make sure that constructs, which are plainly not
 --        supported in TH already lead to error messages at an earlier stage
-repLE :: LHsExpr GhcRn -> MetaM (Core (M TH.Exp))
+repLE :: forall p. (IsPass p) => LHsExpr (GhcPass p) -> MetaM (Core (M TH.Exp))
 repLE (L loc e) = mapReaderT (putSrcSpanDs (locA loc)) (repE e)
 
 repE :: forall p. (IsPass p) => HsExpr (GhcPass p) -> MetaM (Core (M TH.Exp))
@@ -1671,7 +1671,7 @@ repE e@(HsDo _ ctxt (L _ sts))
 
 repE (ExplicitList _ es) = do { xs <- repLEs es; repListExp xs }
 repE (ExplicitTuple _ es boxity) =
-  let tupArgToCoreExp :: HsTupArg GhcRn -> MetaM (Core (Maybe (M TH.Exp)))
+  let tupArgToCoreExp :: forall p. (IsPass p) => HsTupArg (GhcPass p) -> MetaM (Core (Maybe (M TH.Exp)))
       tupArgToCoreExp a
         | (Present _ e) <- a = do { e' <- repLE e
                                   ; coreJustM expTyConName e' }
@@ -1749,7 +1749,7 @@ repE (HsForAll _ tele body) =
     HsForAllVis   _ tvs -> mk_forall forallVisEName tvs
     HsForAllInvis _ tvs -> mk_forall forallEName    tvs
   where
-    mk_forall :: RepTV flag flag' => Name -> [LHsTyVarBndr flag GhcRn] -> MetaM (Core (M TH.Exp))
+    mk_forall :: forall flag flag' p. (IsPass p, RepTV flag flag') => Name -> [LHsTyVarBndr flag (GhcPass p)] -> MetaM (Core (M TH.Exp))
     mk_forall forall_name tvs =
       addHsTyVarBinds FreshNamesOnly tvs $ \bndrs -> do
         body' <- repLE body
@@ -1774,7 +1774,9 @@ repE e@(HsUntypedBracket{}) = notHandled (ThExpressionForm e)
 repE e@(HsProc{}) = notHandled (ThExpressionForm e)
 repE e@(HsStar{}) = notHandled (ThExpressionForm e)
 
-repFunArrMult :: HsModifiedFunArrOf (LocatedA (HsExpr GhcRn)) GhcRn -> MetaM (Core (M TH.Exp))
+repFunArrMult :: forall p. (IsPass p)
+              => HsModifiedFunArrOf (LocatedA (HsExpr (GhcPass p))) (GhcPass p)
+              -> MetaM (Core (M TH.Exp))
 repFunArrMult (HsModifiedFunArr _ mods arr) = case (arr, mods) of
   (HsStandardArr _, []) -> repConName unrestrictedFunTyConName
   (HsStandardArr _, [L _ (HsModifier _ m)]) -> do
@@ -1819,7 +1821,7 @@ the choice in ExpandedThingRn, but it seems simpler to consult the flag (again).
 -----------------------------------------------------------------------------
 -- Building representations of auxiliary structures like Match, Clause, Stmt,
 
-repMatchTup ::  LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Match))
+repMatchTup ::  forall p. IsPass p => LMatch (GhcPass p) (LHsExpr (GhcPass p)) -> MetaM (Core (M TH.Match))
 repMatchTup (L _ (Match { m_pats = L _ [p]
                         , m_grhss = GRHSs _ guards wheres })) =
   do { ss1 <- mkGenSyms (collectPatBinders CollNoDictBinders p)
@@ -1832,7 +1834,7 @@ repMatchTup (L _ (Match { m_pats = L _ [p]
      ; wrapGenSyms (ss1++ss2) match }}}
 repMatchTup _ = panic "repMatchTup: case alt with more than one arg or with invisible pattern"
 
-repClauseTup ::  LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Clause))
+repClauseTup ::  forall p. IsPass p =>  LMatch (GhcPass p) (LHsExpr (GhcPass p)) -> MetaM (Core (M TH.Clause))
 repClauseTup (L _ (Match { m_pats = L _ ps
                          , m_grhss = GRHSs _ guards  wheres })) =
   do { ss1 <- mkGenSyms (collectPatsBinders CollNoDictBinders ps)
@@ -1844,7 +1846,7 @@ repClauseTup (L _ (Match { m_pats = L _ ps
      ; clause <- repClause ps1 gs ds
      ; wrapGenSyms (ss1++ss2) clause }}}
 
-repGuards :: NonEmpty (LGRHS GhcRn (LHsExpr GhcRn)) ->  MetaM (Core (M TH.Body))
+repGuards :: forall p. IsPass p =>  NonEmpty (LGRHS (GhcPass p) (LHsExpr (GhcPass p))) ->  MetaM (Core (M TH.Body))
 repGuards (L _ (GRHS _ [] e) :| [])
   = do {a <- repLE e; repNormal a }
 repGuards other
@@ -1853,7 +1855,7 @@ repGuards other
        ; gd <- repGuarded (nonEmptyCoreList' ys)
        ; wrapGenSyms (concat xs) gd }
 
-repLGRHS :: LGRHS GhcRn (LHsExpr GhcRn)
+repLGRHS :: forall p. IsPass p =>  LGRHS (GhcPass p) (LHsExpr (GhcPass p))
          -> MetaM ([GenSymBind], (Core (M (TH.Guard, TH.Exp))))
 repLGRHS (L _ (GRHS _ [L _ (BodyStmt _ e1 _ _)] e2))
   = do { guarded <- repLNormalGE e1 e2
@@ -1864,20 +1866,20 @@ repLGRHS (L _ (GRHS _ ss rhs))
        ; guarded <- repPatGE (nonEmptyCoreList ss') rhs'
        ; return (gs, guarded) }
 
-repFields :: HsRecordBinds GhcRn -> MetaM (Core [M TH.FieldExp])
+repFields :: forall p. IsPass p => HsRecordBinds (GhcPass p) -> MetaM (Core [M TH.FieldExp])
 repFields (HsRecFields { rec_flds = flds })
   = repListM fieldExpTyConName rep_fld flds
   where
-    rep_fld :: LHsRecField GhcRn (LHsExpr GhcRn)
+    rep_fld :: forall p. (IsPass p) => LHsRecField (GhcPass p) (LHsExpr (GhcPass p))
             -> MetaM (Core (M TH.FieldExp))
     rep_fld (L _ fld) = do { fn <- lookupOcc (hsRecFieldSel fld)
                            ; e  <- repLE (hfbRHS fld)
                            ; repFieldExp fn e }
 
-repUpdFields :: [LHsRecUpdField GhcRn GhcRn] -> MetaM (Core [M TH.FieldExp])
+repUpdFields :: forall p. IsPass p => [LHsRecUpdField (GhcPass p) (GhcPass p)] -> MetaM (Core [M TH.FieldExp])
 repUpdFields = repListM fieldExpTyConName rep_fld
   where
-    rep_fld :: LHsRecUpdField GhcRn GhcRn -> MetaM (Core (M TH.FieldExp))
+    rep_fld :: forall p. IsPass p => LHsRecUpdField (GhcPass p) (GhcPass p) -> MetaM (Core (M TH.FieldExp))
     rep_fld (L l fld) =
       let (FieldOcc _ (L _ sel_name)) = unLoc (hfbLHS fld)
       -- If we have an unbountName in the sel_name, that means we failed to
@@ -1920,10 +1922,10 @@ repUpdFields = repListM fieldExpTyConName rep_fld
 -- The helper function repSts computes the translation of each sub expression
 -- and a bunch of prefix bindings denoting the dynamic renaming.
 
-repLSts :: [LStmt GhcRn (LHsExpr GhcRn)] -> MetaM ([GenSymBind], [Core (M TH.Stmt)])
+repLSts :: forall p. IsPass p => [LStmt (GhcPass p) (LHsExpr (GhcPass p))] -> MetaM ([GenSymBind], [Core (M TH.Stmt)])
 repLSts stmts = repSts (map unLoc stmts)
 
-repSts :: [Stmt GhcRn (LHsExpr GhcRn)] -> MetaM ([GenSymBind], [Core (M TH.Stmt)])
+repSts :: forall p. IsPass p => [Stmt (GhcPass p) (LHsExpr (GhcPass p))] -> MetaM ([GenSymBind], [Core (M TH.Stmt)])
 repSts (BindStmt _ p e : ss) =
    do { e2 <- repLE e
       ; ss1 <- mkGenSyms (collectPatBinders CollNoDictBinders p)
@@ -1950,7 +1952,7 @@ repSts (ParStmt _ stmt_blocks _ _ : ss) =
       ; (ss2, zs) <- addBinds ss1 (repSts ss)
       ; return (ss1++ss2, z : zs) }
    where
-     rep_stmt_block :: ParStmtBlock GhcRn GhcRn
+     rep_stmt_block :: forall p. IsPass p => ParStmtBlock (GhcPass p) (GhcPass p)
                     -> MetaM ([GenSymBind], Core [(M TH.Stmt)])
      rep_stmt_block (ParStmtBlock _ stmts _ _) =
        do { (ss1, zs) <- repSts (map unLoc stmts)
@@ -1978,7 +1980,7 @@ repSts other = notHandled (ThExoticStatement other)
 --                      Bindings
 -----------------------------------------------------------
 
-repBinds :: HsLocalBinds GhcRn -> MetaM ([GenSymBind], Core [(M TH.Dec)])
+repBinds :: forall p. IsPass p => HsLocalBinds (GhcPass p) -> MetaM ([GenSymBind], Core [(M TH.Dec)])
 repBinds (EmptyLocalBinds _)
   = do  { core_list <- coreListM decTyConName []
         ; return ([], core_list) }
@@ -2003,7 +2005,7 @@ repBinds (HsValBinds _ decs)
                                 (de_loc (sort_by_loc prs))
         ; return (ss, core_list) }
 
-rep_implicit_param_bind :: LIPBind GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
+rep_implicit_param_bind :: forall p. IsPass p => LIPBind (GhcPass p) -> MetaM (SrcSpan, Core (M TH.Dec))
 rep_implicit_param_bind (L loc (IPBind _ (L _ n) (L _ rhs)))
  = do { name <- rep_implicit_param_name n
       ; rhs' <- repE rhs
@@ -2013,7 +2015,7 @@ rep_implicit_param_bind (L loc (IPBind _ (L _ n) (L _ rhs)))
 rep_implicit_param_name :: HsIPName -> MetaM (Core String)
 rep_implicit_param_name (HsIPName name) = coreStringLit name
 
-rep_val_binds :: HsValBinds GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
+rep_val_binds :: forall p. IsPass p => HsValBinds (GhcPass p) -> MetaM [(SrcSpan, Core (M TH.Dec))]
 -- Assumes: all the binders of the binding are already in the meta-env
 rep_val_binds (XValBindsLR (HsVBG binds sigs))
  = do { core1 <- rep_binds (concatMap snd binds)
@@ -2022,10 +2024,10 @@ rep_val_binds (XValBindsLR (HsVBG binds sigs))
 rep_val_binds (ValBinds _ _ _)
  = panic "rep_val_binds: ValBinds"
 
-rep_binds :: LHsBinds GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
+rep_binds :: forall p. IsPass p =>  LHsBinds (GhcPass p) -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_binds = mapM rep_bind
 
-rep_bind :: LHsBind GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
+rep_bind :: forall p. IsPass p => LHsBind (GhcPass p) -> MetaM (SrcSpan, Core (M TH.Dec))
 -- Assumes: all the binders of the binding are already in the meta-env
 
 -- Note GHC treats declarations of a variable (not a pattern)
@@ -2082,7 +2084,7 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
        ; patSynD'' <- wrapGenArgSyms args ss patSynD'
        ; return (locA loc, patSynD'') }
   where
-    mkGenArgSyms :: HsPatSynDetails GhcRn -> MetaM [GenSymBind]
+    mkGenArgSyms :: forall p. IsPass p => HsPatSynDetails (GhcPass p) -> MetaM [GenSymBind]
     -- for Record Pattern Synonyms we want to conflate the selector
     -- and the pattern-only names in order to provide a nicer TH
     -- API. Whereas inside GHC, record pattern synonym selectors and
@@ -2101,7 +2103,7 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
       = [ (pat, id) | (sel, id) <- genSyms, (sel', pat) <- selsPats
                     , sel == sel' ]
 
-    wrapGenArgSyms :: HsPatSynDetails GhcRn
+    wrapGenArgSyms :: forall p. IsPass p => HsPatSynDetails (GhcPass p)
                    -> [GenSymBind] -> Core (M TH.Dec) -> MetaM (Core (M TH.Dec))
     wrapGenArgSyms (RecCon _) _  dec = return dec
     wrapGenArgSyms _          ss dec = wrapGenSyms ss dec
@@ -2139,7 +2141,7 @@ repRecordPatSynArgs :: Core [TH.Name]
                     -> MetaM (Core (M TH.PatSynArgs))
 repRecordPatSynArgs (MkC sels) = rep2 recordPatSynName [sels]
 
-repPatSynDir :: HsPatSynDir GhcRn -> MetaM (Core (M TH.PatSynDir))
+repPatSynDir :: forall p. IsPass p => HsPatSynDir (GhcPass p) -> MetaM (Core (M TH.PatSynDir))
 repPatSynDir Unidirectional        = rep2 unidirPatSynName []
 repPatSynDir ImplicitBidirectional = rep2 implBidirPatSynName []
 repPatSynDir (ExplicitBidirectional (MG { mg_alts = (L _ clauses) }))
@@ -2195,10 +2197,10 @@ repLambda (L _ m) = notHandled (ThGuardedLambdas m)
 -- variable should already appear in the environment.
 
 -- Process a list of patterns
-repLPs :: [LPat GhcRn] -> MetaM (Core [(M TH.Pat)])
+repLPs :: forall p. IsPass p => [LPat (GhcPass p)] -> MetaM (Core [(M TH.Pat)])
 repLPs ps = repListM patTyConName repLP ps
 
-repLPs1 :: NonEmpty (LPat GhcRn) -> MetaM (Core (NonEmpty (M TH.Pat)))
+repLPs1 :: forall p. IsPass p => NonEmpty (LPat (GhcPass p)) -> MetaM (Core (NonEmpty (M TH.Pat)))
 repLPs1 ps = repNonEmptyM patTyConName repLP ps
 
 repLP :: forall p. IsPass p => LPat (GhcPass p) -> MetaM (Core (M TH.Pat))
