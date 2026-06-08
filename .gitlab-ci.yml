@@ -65,7 +65,7 @@ stages:
   - quick-build    # A very quick smoke-test to weed out broken commits
   - full-build     # Build all the things
   - packaging      # Source distribution, etc.
-  - testing        # head.hackage correctness and compiler performance testing
+  - testing        # Various tests
   - deploy         # push documentation
 
 # Note [The CI Story]
@@ -1141,6 +1141,44 @@ ghc-wasm-meta-unreg:
   variables:
     UPSTREAM_GHC_FLAVOUR: unreg
     UPSTREAM_GHC_JOB_NAME: x86_64-linux-alpine3_23-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+
+############################################################
+# Testing the compatibility of `base` with other GHCs
+############################################################
+
+base-with-other-ghcs-linux:
+  stage: testing
+  needs:
+    - job: x86_64-linux-deb13-validate
+      optional: true
+    - job: nightly-x86_64-linux-deb13-validate
+      optional: true
+    - job: release-x86_64-linux-deb13-release
+      optional: true
+  dependencies: null
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
+  tags:
+    - x86_64-linux
+  script: .gitlab/base-ci.sh x86_64-deb12-linux 9.14.1
+  rules:
+    - *full-ci
+
+base-with-other-ghcs-windows:
+  stage: testing
+  needs:
+    - job: x86_64-windows-validate
+      optional: true
+    - job: nightly-x86_64-windows-validate
+      optional: true
+    - job: release-x86_64-windows-release
+      optional: true
+  dependencies: null
+  image: null
+  tags:
+    - x86_64-windows
+  script: bash .gitlab/base-ci.sh x86_64-unknown-mingw32 9.14.1
+  rules:
+    - *full-ci
 
 ############################################################
 # Documentation deployment via GitLab Pages
