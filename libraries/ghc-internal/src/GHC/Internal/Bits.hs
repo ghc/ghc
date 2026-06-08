@@ -564,6 +564,15 @@ instance Bits Integer where
              | otherwise = integerShiftR x (fromIntegral (negate i))
    testBit x i = integerTestBit x (fromIntegral i)
    zeroBits    = integerZero
+   -- INLINE on setBit/clearBit/complementBit preserves constant folding;
+   -- see Note [INLINE for constant folding of bit operations] in
+   -- GHC.Internal.Bignum.Integer.
+   setBit x i = integerSetBit x (fromIntegral i)
+   {-# INLINE setBit #-}
+   clearBit x i = integerClearBit x (fromIntegral i)
+   {-# INLINE clearBit #-}
+   complementBit x i = integerComplementBit x (fromIntegral i)
+   {-# INLINE complementBit #-}
 
    bit (I# i)  = integerBit# (int2Word# i)
    popCount x  = I# (integerPopCount# x)
