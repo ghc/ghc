@@ -1722,7 +1722,7 @@ hasFieldClassNameKey = mkPreludeClassUnique 50
 -}
 
 addrPrimTyConKey, arrayPrimTyConKey, boolTyConKey,
-    byteArrayPrimTyConKey, charPrimTyConKey, charTyConKey, doublePrimTyConKey,
+    byteArrayPrimTyConKey, byteArrayLiftedPrimTyConKey, charPrimTyConKey, charTyConKey, doublePrimTyConKey,
     doubleTyConKey, floatPrimTyConKey, floatTyConKey, fUNTyConKey,
     intPrimTyConKey, intTyConKey, int8TyConKey, int16TyConKey,
     int8PrimTyConKey, int16PrimTyConKey, int32PrimTyConKey, int32TyConKey,
@@ -1740,6 +1740,7 @@ addrPrimTyConKey                        = mkPreludeTyConUnique  1
 arrayPrimTyConKey                       = mkPreludeTyConUnique  3
 boolTyConKey                            = mkPreludeTyConUnique  4
 byteArrayPrimTyConKey                   = mkPreludeTyConUnique  5
+byteArrayLiftedPrimTyConKey             = mkPreludeTyConUnique  45
 stringTyConKey                          = mkPreludeTyConUnique  6
 charPrimTyConKey                        = mkPreludeTyConUnique  7
 charTyConKey                            = mkPreludeTyConUnique  8
