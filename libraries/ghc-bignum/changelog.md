@@ -1,5 +1,9 @@
 # Changelog for `ghc-bignum` package
 
+## UNRELEASED
+
+- Add `integerSetBit[#]`, `integerClearBit[#]`, `integerComplementBit[#]` (#21176)
+
 ## 1.4
 
 - `ghc-bignum`'s implementation has been merged into `ghc-internal`.

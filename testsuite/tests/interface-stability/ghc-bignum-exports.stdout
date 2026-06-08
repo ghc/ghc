@@ -201,8 +201,12 @@ module GHC.Num.Integer where
   integerBit# :: GHC.Internal.Prim.Word# -> Integer
   integerCheck :: Integer -> GHC.Internal.Types.Bool
   integerCheck# :: Integer -> GHC.Internal.Bignum.Primitives.Bool#
+  integerClearBit :: Integer -> GHC.Internal.Types.Word -> Integer
+  integerClearBit# :: Integer -> GHC.Internal.Prim.Word# -> Integer
   integerCompare :: Integer -> Integer -> GHC.Internal.Types.Ordering
   integerComplement :: Integer -> Integer
+  integerComplementBit :: Integer -> GHC.Internal.Types.Word -> Integer
+  integerComplementBit# :: Integer -> GHC.Internal.Prim.Word# -> Integer
   integerDecodeDouble# :: GHC.Internal.Prim.Double# -> (# Integer, GHC.Internal.Prim.Int# #)
   integerDiv :: Integer -> Integer -> Integer
   integerDivMod :: Integer -> Integer -> (Integer, Integer)
@@ -266,6 +270,8 @@ module GHC.Num.Integer where
   integerQuotRem# :: Integer -> Integer -> (# Integer, Integer #)
   integerRecipMod# :: Integer -> GHC.Internal.Bignum.Natural.Natural -> (# GHC.Internal.Bignum.Natural.Natural | () #)
   integerRem :: Integer -> Integer -> Integer
+  integerSetBit :: Integer -> GHC.Internal.Types.Word -> Integer
+  integerSetBit# :: Integer -> GHC.Internal.Prim.Word# -> Integer
   integerShiftL :: Integer -> GHC.Internal.Types.Word -> Integer
   integerShiftL# :: Integer -> GHC.Internal.Prim.Word# -> Integer
   integerShiftR :: Integer -> GHC.Internal.Types.Word -> Integer

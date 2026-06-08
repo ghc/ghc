@@ -27,7 +27,7 @@ sections: {
   cmm               Cmm
   build-tools       Build tools
   base              ``base`` library
-  ghc-prim          ``ghc-prim`` library
+  ghc-internal      ``ghc-internal`` library
   ghc-lib           ``ghc`` library
   ghc-heap          ``ghc-heap`` library
   ghc-experimental  ``ghc-experimental`` library
