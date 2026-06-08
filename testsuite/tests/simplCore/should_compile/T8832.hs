@@ -23,3 +23,9 @@ T(w32,Word32)
 T(w64,Word64)
 
 T(z,Integer)
+
+zset :: Integer
+zset = setBit (bit 0) 0
+
+zcompl :: Integer
+zcompl = complementBit (bit 0) 0

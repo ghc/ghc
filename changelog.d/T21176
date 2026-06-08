@@ -1,0 +1,4 @@
+section: ghc-internal
+synopsis: Give ``setBit``, ``clearBit`` and ``complementBit`` explicit definitions in ``instance Bits Integer``, backed by new ``integerSetBit[#]``, ``integerClearBit[#]`` and ``integerComplementBit[#]`` functions. These avoid the intermediate ``Integer`` allocations of the previous default methods, although allocation is not eliminated entirely — notably the negative (``IN``) cases would require in-place mutation, which is left as future work. As a trade-off, constant folding of these operations now applies only to small (machine-word-sized) literal arguments; the previous default methods folded literal ``Integer`` arguments of any size via the ``integerOr``/``integerAnd``/``integerXor`` rules.
+issues: #21176
+mrs: !7772

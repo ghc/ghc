@@ -1,6 +1,7 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.24.0.0 *TBA*
+  * Give `setBit`, `clearBit` and `complementBit` explicit definitions in `instance Bits Integer`, reducing intermediate allocations. ([CLC proposal #423](https://github.com/haskell/core-libraries-committee/issues/423))
   * Add `Bounded` instances for `Double`, `Float`, `CDouble` and `CFloat`. ([CLC proposal #402](https://github.com/haskell/core-libraries-committee/issues/402))
   * Add `Data.List.NonEmpty.{zip{3..7},zipWith{3..7},unzip{3..7}}` ([CLC proposal #409)(https://github.com/haskell/core-libraries-committee/issues/409))
   * Ensure that `Data.List.elem` and `notElem` can be specialized even when no list fusion happens. ([CLC proposal #412)(https://github.com/haskell/core-libraries-committee/issues/412))
