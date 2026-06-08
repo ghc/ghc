@@ -1143,6 +1143,37 @@ ghc-wasm-meta-unreg:
     UPSTREAM_GHC_JOB_NAME: x86_64-linux-alpine3_23-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf
 
 ############################################################
+# Building `base` with GHC 9.14
+############################################################
+
+base-build-with-ghc-914:
+  stage: testing
+  needs:
+    - job: x86_64-linux-deb13-validate
+      optional: true
+    - job: nightly-x86_64-linux-deb13-validate
+      optional: true
+    - job: release-x86_64-linux-deb13-release
+      optional: true
+  dependencies: null
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
+  tags:
+    - x86_64-linux
+  script:
+    - |
+      ghc_version=9.14.1
+      url=https://downloads.haskell.org/~ghc/${ghc_version}/ghc-${ghc_version}-x86_64-deb12-linux.tar.xz
+      curl "$url" >ghc-${ghc_version}.tar.xz
+      tar -xJf ghc-${ghc_version}.tar.xz
+      cd ghc-${ghc_version}-x86_64-unknown-linux
+      ./configure --prefix "$PWD/../ghc"
+      make install
+      cd -
+      cabal build --with-compiler ghc/bin/ghc --allow-boot-library-installs -O0
+  rules:
+    - *full-ci
+
+############################################################
 # Documentation deployment via GitLab Pages
 ############################################################
 
