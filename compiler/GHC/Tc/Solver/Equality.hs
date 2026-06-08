@@ -2980,15 +2980,30 @@ But it's not so simple:
    we kick out g1. Now we have two constraints
        [W] g1        : F a ~ a Int  (arising from (F a ~ a Int))
        [W] g2{rw:g1} : F a ~ a Int  (arising from (F alpha ~ F a))
-   If we end up with g2 in the inert set (not g1) we'll get a very confusing
-   error message that we can solve (F a ~ a Int)
-       arising from F a ~ F a
+   If we solve `g1` from `g2` we end up with
+     g1 := g2
+     [W] g2{} : F a ~ a Int  (arising from (F alpha ~ F a))
+   and hence (since alpha := a) we report that we can't solve (F a ~ a Int)
+   arising from (F a ~ F a), which is extremely confusing. Moreover, it seems
+   wrong to "solve" `g1` using `g2` when `g2` has itself been rewritten by `g1`!
 
    TL;DR: Better to hang on to `g1` (with no rewriters), in preference
    to `g2` (which has a rewriter).
 
    See (WRW11) in Note [Wanteds rewrite Wanteds: rewriter-sets]
    in GHC.Tc.Types.Constraint.
+
+   Note that the decision to prefer a constraint without rewriters over one that
+   has rewriters can also have a /huge/ effect on performance. For instance, it
+   avoids an **exponential** blow-up in the size of coercions produced when
+   typechecking in T26426. In that program, we have coercions of the form:
+
+     co_i :: TaggedTypes as `Append` TaggedTypes '[ty]
+          ~# TaggedTypes (as `Append` '[ty])
+
+   and each 'co_{i+1}' contains the previous 'co_i' twice. Without preferring
+   Wanteds with no rewriters, we essentially end up inlining 'co_i' into 'co_{i+1}',
+   which results in exponentially-sized proof terms, growing like O(2^i).
 -}
 
 tryInertEqs :: EqCt -> SolverStage ()
