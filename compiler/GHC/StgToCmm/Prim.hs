@@ -858,6 +858,10 @@ emitPrimOp cfg primop =
   WriteByteArrayOp_Word8AsWord64 -> \args -> inlinePrimop $ \res ->
     doWriteByteArrayOp Nothing b8 res args
 
+  -- TODO: make these inline
+  LiftByteArrayOp -> \args -> externalPrimop primop args
+  UnliftByteArrayOp -> \args -> externalPrimop primop args
+
 -- Copying and setting byte arrays
   CopyByteArrayOp -> \[src,src_off,dst,dst_off,n] -> inlinePrimop $ \[] ->
     doCopyByteArrayOp src src_off dst dst_off n

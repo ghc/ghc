@@ -910,6 +910,11 @@ CLOSURE(stg_STM_AWOKEN_closure,stg_STM_AWOKEN);
 INFO_TABLE(stg_ARR_WORDS, 0, 0, ARR_WORDS, "ARR_WORDS", "ARR_WORDS")
 { ccall pbarf("ARR_WORDS object (%p) entered!", R1 "ptr") never returns; }
 
+INFO_TABLE(stg_ARR_WORDS_LIFTED, 0, 0, ARR_WORDS, "ARR_WORDS_LIFTED", "ARR_WORDS_LIFTED")
+{ R1 = UNTAG(R1) + 1;
+  jump %ENTRY_CODE(Sp(0)) [R1]; 
+}
+
 INFO_TABLE(stg_MUT_ARR_PTRS_CLEAN, 0, 0, MUT_ARR_PTRS_CLEAN, "MUT_ARR_PTRS_CLEAN", "MUT_ARR_PTRS_CLEAN")
 { ccall pbarf("MUT_ARR_PTRS_CLEAN object (%p) entered!", R1 "ptr") never returns; }
 

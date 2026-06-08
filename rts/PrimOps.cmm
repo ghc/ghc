@@ -49,6 +49,7 @@ import CLOSURE stable_ptr_table;
 import CLOSURE stg_AP_STACK_info;
 import CLOSURE stg_AP_info;
 import CLOSURE stg_ARR_WORDS_info;
+import CLOSURE stg_ARR_WORDS_LIFTED_info;
 import CLOSURE stg_BCO_info;
 import CLOSURE stg_C_FINALIZER_LIST_info;
 import CLOSURE stg_DEAD_WEAK_info;
@@ -118,6 +119,18 @@ stg_newByteArrayzh ( W_ n )
         jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
     return (p);
+}
+
+stg_unliftByteArrayzh ( P_ p )
+{
+    (P_ unlifted) = call stg_ap_0_fast(p);
+    return (UNTAG(unlifted));
+}
+
+stg_liftByteArrayzh ( P_ p )
+{
+    SET_INFO(p, stg_ARR_WORDS_LIFTED_info);
+    return (UNTAG(p) + 1);
 }
 
 #define BA_ALIGN 16

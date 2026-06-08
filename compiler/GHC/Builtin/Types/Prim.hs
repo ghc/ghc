@@ -27,7 +27,7 @@ module GHC.Builtin.Types.Prim(
         runtimeRep1TyVarInf, runtimeRep2TyVarInf,
         runtimeRep1Ty, runtimeRep2Ty, runtimeRep3Ty,
         levity1TyVar, levity2TyVar,
-        levity1TyVarInf, levity2TyVarInf,
+        levity1TyVarInf, levity2TyVarInf,byteArrayLiftedPrimTyConName, byteArrayLiftedPrimTy,
         levity1Ty, levity2Ty,
 
         alphaConstraintTyVar, alphaConstraintTy,
@@ -70,6 +70,7 @@ module GHC.Builtin.Types.Prim(
 
         arrayPrimTyCon, mkArrayPrimTy,
         byteArrayPrimTyCon,     byteArrayPrimTy,
+        byteArrayLiftedPrimTyCon,
         smallArrayPrimTyCon, mkSmallArrayPrimTy,
         mutableArrayPrimTyCon, mkMutableArrayPrimTy,
         mutableByteArrayPrimTyCon, mkMutableByteArrayPrimTy,
@@ -262,6 +263,7 @@ exposedPrimTyCons
   = [ addrPrimTyCon
     , arrayPrimTyCon
     , byteArrayPrimTyCon
+    , byteArrayLiftedPrimTyCon
     , smallArrayPrimTyCon
     , charPrimTyCon
     , doublePrimTyCon
@@ -305,7 +307,7 @@ charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int3
   wordPrimTyConName, word32PrimTyConName, word8PrimTyConName, word16PrimTyConName, word64PrimTyConName,
   addrPrimTyConName, floatPrimTyConName, doublePrimTyConName,
   statePrimTyConName, proxyPrimTyConName, realWorldTyConName,
-  arrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName,
+  arrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName, byteArrayLiftedPrimTyConName,
   mutableArrayPrimTyConName, mutableByteArrayPrimTyConName,
   smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName,
   tVarPrimTyConName, stablePtrPrimTyConName,
@@ -335,6 +337,7 @@ eqPhantPrimTyConName          = mkBuiltInPrimTc (fsLit "~P#") eqPhantPrimTyConKe
 realWorldTyConName            = mkPrimTc (fsLit "RealWorld") realWorldTyConKey realWorldTyCon
 arrayPrimTyConName            = mkPrimTc (fsLit "Array#") arrayPrimTyConKey arrayPrimTyCon
 byteArrayPrimTyConName        = mkPrimTc (fsLit "ByteArray#") byteArrayPrimTyConKey byteArrayPrimTyCon
+byteArrayLiftedPrimTyConName  = mkPrimTc (fsLit "ByteArrayLifted#") byteArrayLiftedPrimTyConKey byteArrayLiftedPrimTyCon
 smallArrayPrimTyConName       = mkPrimTc (fsLit "SmallArray#") smallArrayPrimTyConKey smallArrayPrimTyCon
 mutableArrayPrimTyConName     = mkPrimTc (fsLit "MutableArray#") mutableArrayPrimTyConKey mutableArrayPrimTyCon
 mutableByteArrayPrimTyConName = mkPrimTc (fsLit "MutableByteArray#") mutableByteArrayPrimTyConKey mutableByteArrayPrimTyCon
@@ -1262,12 +1265,13 @@ equalityTyCon Phantom          = eqPhantPrimTyCon
 ********************************************************************* -}
 
 arrayPrimTyCon, mutableArrayPrimTyCon, mutableByteArrayPrimTyCon,
-    byteArrayPrimTyCon,
+    byteArrayPrimTyCon, byteArrayLiftedPrimTyCon,
     smallArrayPrimTyCon, smallMutableArrayPrimTyCon :: TyCon
 arrayPrimTyCon             = pcPrimTyCon_LevPolyLastArg arrayPrimTyConName        [Representational]          unliftedRepTy
 mutableArrayPrimTyCon      = pcPrimTyCon_LevPolyLastArg mutableArrayPrimTyConName [Nominal, Representational] unliftedRepTy
 mutableByteArrayPrimTyCon  = pcPrimTyCon mutableByteArrayPrimTyConName  [Nominal] unliftedRepTy
 byteArrayPrimTyCon         = pcPrimTyCon0 byteArrayPrimTyConName        unliftedRepTy
+byteArrayLiftedPrimTyCon   = pcPrimTyCon0 byteArrayLiftedPrimTyConName liftedRepTy
 smallArrayPrimTyCon        = pcPrimTyCon_LevPolyLastArg smallArrayPrimTyConName        [Representational]          unliftedRepTy
 smallMutableArrayPrimTyCon = pcPrimTyCon_LevPolyLastArg smallMutableArrayPrimTyConName [Nominal, Representational] unliftedRepTy
 
@@ -1275,6 +1279,8 @@ mkArrayPrimTy :: Type -> Type
 mkArrayPrimTy elt           = TyConApp arrayPrimTyCon [getLevity elt, elt]
 byteArrayPrimTy :: Type
 byteArrayPrimTy             = mkTyConTy byteArrayPrimTyCon
+byteArrayLiftedPrimTy :: Type
+byteArrayLiftedPrimTy             = mkTyConTy byteArrayLiftedPrimTyCon
 mkSmallArrayPrimTy :: Type -> Type
 mkSmallArrayPrimTy elt = TyConApp smallArrayPrimTyCon [getLevity elt, elt]
 mkMutableArrayPrimTy :: Type -> Type -> Type
