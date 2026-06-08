@@ -1198,6 +1198,56 @@ Key point: equations that are not relevant do not need to be considered for fund
   and [W] I alpha ~ Int |> g2
   Here we definiteily want to take advantage of injectivity.
 
+(CF6) This machinery can also have a significant positive effect on the size of
+  proof terms. For example (simplification of T26426):
+
+      type family (++) a b where { '[] ++ ys = ys; (x:xs) ++ ys = x : (xs ++ ys) }
+      type family MapId a where { MapId '[] = '[]; MapId (x:xs) = x : MapId xs }
+
+      app :: (MapId xs ++ MapId ys ~ MapId (xs ++ ys)) => Proxy xs -> Proxy ys -> Proxy (xs ++ ys)
+
+      test :: Proxy [ty_1, ..., ty_n]
+      test =   Proxy @'[ty_1]
+         `app` Proxy @'[ty_2]
+         ...
+         `app` Proxy @'[ty_n]
+
+  Every `app` call gives rise to a Wanted of the form:
+
+    [W] MapId acc_i ++ MapId '[ty_i] ~ MapId (acc_i ++ '[ty_i])
+
+  while the overall result type gives us a Wanted of the form
+
+    [W] acc_n ++ '[ty_n] ~ [ty_1, ..., ty_n]
+
+  By using (CFFA) on this result Wanted, we deduce that we must have
+
+    acc_n ~ [ty_1, ..., ty_{n-1}]
+
+  which is a flat list. Repeating the process, (CFFA) allows us to deduce that
+
+    acc_i ~ [ty_1, ..., ty_{i-1}]
+
+  for all i. This allows the other Wanteds to be solved directly, giving rise to
+  proof terms with the typical triangular O(n^2) shape
+
+    co_i = (O(i) proof that MapId acc_i ++ MapId '[ty_i] ~ acc_{i+1})
+         ; (O(i) proof that acc_{i+1} ~ MapId (acc_i ++ '[ty_i]))
+
+  However, /without/ (CFFA), 'acc_i' is not unified with a flat list but is left
+  as the nested application:
+
+    acc_i ~ (... (('[ty_1] ++ '[ty_2]) ++ '[ty_3]) ... ++ '[ty_{i-1}])
+
+  This means that 'MapId acc_i' is stuck until we reduce the above, which takes
+  O(i^2) type family reduction steps, instead of O(i). The same applies to
+  the other proof term involving 'MapId (acc_i ++ '[ty_i])'.
+  Consequently, without (CFFA) the overall coercion size blows up to O(n^3).
+
+  The takeaway is that (CFFA) allows us to push in the (flat) result type,
+  instead of relying on recursively built sub-proof terms, which brings down
+  coercion sizes (in certain situations) from O(n^3) to O(n^2).
+
 Note [Cache-caused loops]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 It is very dangerous to cache a rewritten wanted family equation as 'solved' in

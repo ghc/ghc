@@ -87,6 +87,13 @@ test('T783',
       ],
       compile,[''])
 
+test ('T26426'
+     , [ only_ways(['normal'])
+       , collect_compiler_stats('bytes allocated',4) ]
+     , compile
+     , ['']
+     )
+
 test('T5321Fun',
      [ only_ways(['normal']),  # no optimisation for this one
        collect_compiler_runtime(2),
