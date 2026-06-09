@@ -53,8 +53,8 @@ extern StgClosure ZCMain_main_closure;
 #define stackOverflow_closure     ghc_hs_iface->stackOverflow_closure
 #define heapOverflow_closure      ghc_hs_iface->heapOverflow_closure
 #define allocationLimitExceeded_closure ghc_hs_iface->allocationLimitExceeded_closure
-#define blockedIndefinitelyOnMVar_closure ghc_hs_iface->blockedIndefinitelyOnMVar_closure
-#define blockedIndefinitelyOnSTM_closure ghc_hs_iface->blockedIndefinitelyOnSTM_closure
+#define blockedIndefinitelyOnMVarError_closure ghc_hs_iface->blockedIndefinitelyOnMVarError_closure
+#define blockedIndefinitelyOnSTMError_closure ghc_hs_iface->blockedIndefinitelyOnSTMError_closure
 #define cannotCompactFunction_closure ghc_hs_iface->cannotCompactFunction_closure
 #define cannotCompactPinned_closure ghc_hs_iface->cannotCompactPinned_closure
 #define cannotCompactMutable_closure ghc_hs_iface->cannotCompactMutable_closure

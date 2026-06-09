@@ -88,6 +88,55 @@ suspendComputation (Capability *cap, StgTSO *tso, StgUpdateFrame *stop_here)
 }
 
 /* -----------------------------------------------------------------------------
+   scheduleRaiseViaIO
+
+   Schedule `tso` to raise an exception by running `io_action`, an IO () that
+   performs `throwIO`.  Unlike throwToSingleThreaded (which injects an exception
+   *value* via raiseAsync), the exception is raised by throwIO *within* the
+   thread, so it acquires a backtrace of the thread's stack.  This is used by
+   resurrectThreads to deliver the "blocked indefinitely" exceptions
+   (BlockedIndefinitelyOnMVar, BlockedIndefinitelyOnSTM, NonTermination).
+
+   We push a "run this IO action" frame on top of the thread's existing
+   (suspended) stack and make it runnable; when the thread runs, throwIO raises
+   the exception and its own stack unwinding handles any CATCH_FRAME /
+   ATOMICALLY_FRAME (e.g. aborting a blocked STM transaction).
+
+   removeFromQueues takes care of unlinking the thread from any blocking queue
+   (notably the MVar blocked queue) and appends it to the run queue.  As with
+   throwToSingleThreaded, the caller must own the TSO (e.g. hold all
+   capabilities during GC); in particular this relies on the thread not being
+   scheduled between removeFromQueues' enqueue and our stack push.
+   -------------------------------------------------------------------------- */
+
+void
+scheduleRaiseViaIO (Capability *cap, StgTSO *tso, StgClosure *io_action)
+{
+    // Thread already dead?
+    if (tso->what_next == ThreadComplete || tso->what_next == ThreadKilled) {
+        return;
+    }
+
+    // Unlink from any blocking queues; sets why_blocked = NotBlocked and
+    // appends the thread to the run queue.
+    removeFromQueues(cap, tso);
+
+    StgStack *stack = tso->stackobj;
+
+    // We are about to mutate the stack, so dirty it for the GC write barrier
+    // (resurrectThreads runs right after GC).
+    dirty_TSO(cap, tso);
+    dirty_STACK(cap, stack);
+
+    // Push a frame that enters `io_action` and applies the resulting IO
+    // action to RealWorld.
+    stack->sp -= 3;
+    stack->sp[0] = (W_)&stg_enter_info;
+    stack->sp[1] = (W_)io_action;
+    stack->sp[2] = (W_)&stg_ap_v_info;
+}
+
+/* -----------------------------------------------------------------------------
    throwToSelf
 
    Useful for throwing an async exception in a thread from the

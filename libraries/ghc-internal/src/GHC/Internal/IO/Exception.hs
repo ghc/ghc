@@ -24,8 +24,12 @@
 -----------------------------------------------------------------------------
 
 module GHC.Internal.IO.Exception (
-  BlockedIndefinitelyOnMVar(..), blockedIndefinitelyOnMVar,
-  BlockedIndefinitelyOnSTM(..), blockedIndefinitelyOnSTM,
+  BlockedIndefinitelyOnMVar(..),
+  blockedIndefinitelyOnMVar,
+  blockedIndefinitelyOnMVarError,
+  BlockedIndefinitelyOnSTM(..),
+  blockedIndefinitelyOnSTM,
+  blockedIndefinitelyOnSTMError,
   Deadlock(..),
   AllocationLimitExceeded(..), allocationLimitExceeded,
   AssertionFailed(..),
@@ -84,6 +88,9 @@ instance Exception BlockedIndefinitelyOnMVar
 instance Show BlockedIndefinitelyOnMVar where
     showsPrec _ BlockedIndefinitelyOnMVar = showString "thread blocked indefinitely in an MVar operation"
 
+blockedIndefinitelyOnMVarError :: IO () -- for the RTS
+blockedIndefinitelyOnMVarError = throwIO BlockedIndefinitelyOnMVar
+
 blockedIndefinitelyOnMVar :: SomeException -- for the RTS
 blockedIndefinitelyOnMVar = toException BlockedIndefinitelyOnMVar
 
@@ -99,6 +106,9 @@ instance Exception BlockedIndefinitelyOnSTM
 -- | @since base-4.1.0.0
 instance Show BlockedIndefinitelyOnSTM where
     showsPrec _ BlockedIndefinitelyOnSTM = showString "thread blocked indefinitely in an STM transaction"
+
+blockedIndefinitelyOnSTMError :: IO () -- for the RTS
+blockedIndefinitelyOnSTMError = throwIO BlockedIndefinitelyOnSTM
 
 blockedIndefinitelyOnSTM :: SomeException -- for the RTS
 blockedIndefinitelyOnSTM = toException BlockedIndefinitelyOnSTM
