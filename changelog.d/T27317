@@ -1,0 +1,7 @@
+section: packaging
+synopsis: Enforce cabal-install >= 3.12 requirement upfront when building Hadrian
+issues: #27317
+mrs: !16132
+description:
+  We now enforce the cabal-install >= 3.12 requirement upfront when building
+  Hadrian, instead of silently accepting older versions and later failing.

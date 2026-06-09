@@ -23,8 +23,10 @@ fi
 CABVERSTR=$("$CABAL" --numeric-version)
 CABVER=( ${CABVERSTR//./ } )
 
-if [ "${CABVER[0]}" -lt 3 ]; then
-    echo "Cabal version is too old; you need at least cabal-install 3.0"
+# We use 'cabal path', introduced with cabal-install 3.12.
+# Check version ahead of time to avoid a surprising failure later (#27317).
+if [ "${CABVER[0]}" -lt 3 ] || { [ "${CABVER[0]}" -eq 3 ] && [ "${CABVER[1]}" -lt 12 ]; }; then
+    echo "Cabal version is too old; you need at least cabal-install 3.12"
     exit 2
 fi
 
