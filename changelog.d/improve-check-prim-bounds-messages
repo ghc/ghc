@@ -1,0 +1,13 @@
+section: codegen
+synopsis: Improve ``-fcheck-prim-bounds`` error messages
+issues: #26964 #24617
+mrs: !16130
+
+description: {
+  When an array access instrumented by ``-fcheck-prim-bounds`` fails at
+  runtime, the program now reports the failing primop, the offending index and
+  the array size, and exits with a normal non-zero status. Previously it
+  aborted with an "internal error" framed as a GHC bug, even though such
+  failures are almost always caused by incorrect use of unsafe primops in user
+  or library code.
+}

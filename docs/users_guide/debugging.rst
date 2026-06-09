@@ -1167,10 +1167,28 @@ Checking for consistency
     Typically primops operations like ``writeArray#`` exhibit unsafe behavior,
     relying on the user to perform any bounds checking. This flag instructs the
     code generator to instrument such operations with bound checking logic
-    which aborts the program when an out-of-bounds access is detected.
+    which terminates the program when an out-of-bounds access is detected.
+
+    When a check fails, the program prints a message naming the offending
+    primop and the module being compiled when it was generated, together with
+    the offending index and the array size, and exits with a non-zero status,
+    for example::
+
+        myprog: writeArray#: array access out of bounds in module Main:
+            index 5 is not within [0, 3).
+        This is usually caused by incorrect use of unsafe primops in user or library code.
+
+    The module named is the one containing the failing primop, which need not
+    be the module of the enclosing function that called it. The message does
+    not identify the enclosing function. To obtain a backtrace pinpointing the
+    failing call, build with profiling and run with ``+RTS -xc`` (see
+    :ref:`prof-time-options`), or use :ghc-flag:`-finfo-table-map` together
+    with ``+RTS -xc``.
 
     Note that this is only intended to be used as a debugging measure, not as
-    the primary means of catching out-of-bounds accesses.
+    the primary means of catching out-of-bounds accesses. Currently only the
+    native code generator is instrumented; the JavaScript backend is unaffected
+    by this flag.
 
 .. ghc-flag:: -fcmm-thread-sanitizer
     :shortdesc: Enable ThreadSanitizer instrumentation of memory accesses.

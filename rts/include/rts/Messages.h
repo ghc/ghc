@@ -108,5 +108,5 @@ extern RtsMsgFunction rtsSysErrorMsgFn;
 
 /* Used by code generator */
 void rtsBadAlignmentBarf(void) STG_NORETURN;
-void rtsOutOfBoundsAccess(void) STG_NORETURN;
-void rtsMemcpyRangeOverlap(void) STG_NORETURN;
+void rtsOutOfBoundsAccess(StgInt index, StgWord count, StgWord size, const char *op, const char *module) STG_NORETURN;
+void rtsMemcpyRangeOverlap(const char *op, const char *module) STG_NORETURN;

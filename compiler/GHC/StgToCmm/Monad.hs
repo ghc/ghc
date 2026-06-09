@@ -42,6 +42,7 @@ module GHC.StgToCmm.Monad (
         SelfLoopInfo(..),
 
         setTickyCtrLabel, getTickyCtrLabel,
+        withCurrentPrimOpName, getCurrentPrimOpName,
         tickScope, getTickScope,
 
         withUpdFrameOff, getUpdFrameOff,
@@ -304,6 +305,9 @@ data FCodeState =
                                                          --   See Note [Self-recursive tail calls] in GHC.StgToCmm.Expr
               , fcs_ticky         :: !CLabel             -- ^ Destination for ticky counts
               , fcs_tickscope     :: !CmmTickScope       -- ^ Tick scope for new blocks & ticks
+              , fcs_prim_op       :: Maybe FastString    -- ^ Source name of the primop currently being
+                                                         --   compiled, used by -fcheck-prim-bounds error
+                                                         --   messages.
               }
 
 data HeapUsage   -- See Note [Virtual and real heap pointers]
@@ -462,6 +466,7 @@ initFCodeState p =
                , fcs_selfloop      = Nothing
                , fcs_ticky         = mkTopTickyCtrLabel
                , fcs_tickscope     = GlobalScope
+               , fcs_prim_op       = Nothing
                }
 
 getFCodeState :: FCode FCodeState
@@ -519,6 +524,20 @@ setTickyCtrLabel :: CLabel -> FCode a -> FCode a
 setTickyCtrLabel ticky code = do
         fstate <- getFCodeState
         withFCodeState code (fstate {fcs_ticky = ticky})
+
+-- ----------------------------------------------------------------------------
+-- Track the primop currently being compiled
+
+-- | The source name of the primop currently being compiled (e.g.
+-- @"writeArray#"@), if any. Used to produce informative @-fcheck-prim-bounds@
+-- error messages.
+getCurrentPrimOpName :: FCode (Maybe FastString)
+getCurrentPrimOpName = fcs_prim_op <$> getFCodeState
+
+withCurrentPrimOpName :: FastString -> FCode a -> FCode a
+withCurrentPrimOpName name code = do
+        fstate <- getFCodeState
+        withFCodeState code (fstate {fcs_prim_op = Just name})
 
 -- ----------------------------------------------------------------------------
 -- Manage tick scopes

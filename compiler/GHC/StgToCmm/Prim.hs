@@ -25,17 +25,19 @@ import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Foreign
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Utils
+import GHC.StgToCmm.Lit ( newByteStringCLit )
 import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Prof ( costCentreFrom )
 
 import GHC.Types.Basic
+import GHC.Types.Name.Occurrence ( occNameFS )
 import GHC.Types.Literal.Floating
 import GHC.Cmm.BlockId
 import GHC.Cmm.Graph
 import GHC.Stg.Syntax
 import GHC.Cmm
-import GHC.Unit         ( rtsUnit )
+import GHC.Unit         ( rtsUnit, moduleName, moduleNameFS )
 import GHC.Core.Type    ( Type, tyConAppTyCon_maybe )
 import GHC.Core.TyCon
 import GHC.Cmm.CLabel
@@ -94,7 +96,13 @@ cmmPrimOpApp cfg primop cmm_args mres_ty = do
      -- if the result type isn't explicitly given, we directly use the
      -- result type of the primop.
      res_ty = fromMaybe (primOpResultType primop) mres_ty
-  f res_ty
+  -- When -fcheck-prim-bounds is on, record the primop name so that any
+  -- bounds-check failure handler emitted while compiling it can name it in the
+  -- error message. Guarded by the flag so that the common (unchecked) case pays
+  -- nothing: no name thunk, no FCodeState update.
+  if stgToCmmDoBoundsCheck cfg
+    then withCurrentPrimOpName (occNameFS (primOpOcc primop)) (f res_ty)
+    else f res_ty
 
 externalPrimop :: PrimOp -> [CmmExpr] -> PrimopCmmEmit
 externalPrimop primop args = outOfLinePrimop (callExternalPrimop primop args)
@@ -3615,8 +3623,14 @@ emitCheckedMemcpyCall dst src n align = do
     emitMemcpyCall dst src n align
   where
     doCheck platform = do
+        name <- fromMaybe (fsLit "<unknown primop>") <$> getCurrentPrimOpName
+        nameLbl <- newByteStringCLit (bytesFS name)
+        modLbl <- getCurrentModuleCLit
         overlapCheckFailed <- getCode $
-          emitCCallNeverReturns [] (mkLblExpr mkMemcpyRangeOverlapLabel) []
+          emitCCallNeverReturns []
+            (mkLblExpr mkMemcpyRangeOverlapLabel)
+            [ (CmmLit nameLbl, AddrHint)
+            , (CmmLit modLbl,  AddrHint) ]
         emit =<< mkCmmIfThen' rangesOverlap overlapCheckFailed (Just False)
       where
         rangesOverlap = (checkDiff dst src `or` checkDiff src dst) `ne` zero
@@ -3728,6 +3742,32 @@ whenCheckBounds a = do
     False -> pure ()
     True  -> a
 
+-- | The bare name of the module currently being code-generated, as a string
+-- literal, for use in @-fcheck-prim-bounds@ failure diagnostics.
+getCurrentModuleCLit :: FCode CmmLit
+getCurrentModuleCLit = do
+    mod <- getModuleName
+    newByteStringCLit (bytesFS (moduleNameFS (moduleName mod)))
+
+-- | Emit a call to the RTS @rtsOutOfBoundsAccess@ bounds-check failure
+-- handler, passing the offending index, element count, array size, primop name
+-- (see 'withCurrentPrimOpName') and the module being compiled.
+emitBoundsCheckFailed :: CmmExpr  -- ^ accessed index
+                      -> CmmExpr  -- ^ number of accessed elements
+                      -> CmmExpr  -- ^ array size (in elements)
+                      -> FCode ()
+emitBoundsCheckFailed idx count sz = do
+    name <- fromMaybe (fsLit "<unknown primop>") <$> getCurrentPrimOpName
+    nameLbl <- newByteStringCLit (bytesFS name)
+    modLbl <- getCurrentModuleCLit
+    emitCCallNeverReturns []
+      (mkLblExpr mkOutOfBoundsAccessLabel)
+      [ (idx,            NoHint)
+      , (count,          NoHint)
+      , (sz,             NoHint)
+      , (CmmLit nameLbl, AddrHint)
+      , (CmmLit modLbl,  AddrHint) ]
+
 emitBoundsCheck :: CmmExpr  -- ^ accessed index
                 -> CmmExpr  -- ^ array size (in elements)
                 -> FCode ()
@@ -3735,7 +3775,7 @@ emitBoundsCheck idx sz = do
     assertM (stgToCmmDoBoundsCheck <$> getStgToCmmConfig)
     platform <- getPlatform
     boundsCheckFailed <- getCode $
-      emitCCallNeverReturns [] (mkLblExpr mkOutOfBoundsAccessLabel) []
+      emitBoundsCheckFailed idx (mkIntExpr platform 1) sz
     let isOutOfBounds = cmmUGeWord platform idx sz
     emit =<< mkCmmIfThen' isOutOfBounds boundsCheckFailed (Just False)
 
@@ -3754,7 +3794,7 @@ emitRangeBoundsCheck idx len arrSizeExpr = do
     _ <- withSequel (AssignTo [lastSafeIndexReg, rangeTooLargeReg] False) $
       cmmPrimOpApp config WordSubCOp [arrSize, len] Nothing
     boundsCheckFailed <- getCode $
-      emitCCallNeverReturns [] (mkLblExpr mkOutOfBoundsAccessLabel) []
+      emitBoundsCheckFailed idx len arrSize
     let
       rangeTooLarge = CmmReg (CmmLocal rangeTooLargeReg)
       lastSafeIndex = CmmReg (CmmLocal lastSafeIndexReg)

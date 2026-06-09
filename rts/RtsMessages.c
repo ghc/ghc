@@ -352,13 +352,31 @@ rtsBadAlignmentBarf(void)
 }
 
 void
-rtsOutOfBoundsAccess(void)
+rtsOutOfBoundsAccess(StgInt index, StgWord count, StgWord size, const char *op, const char *module)
 {
-    barf("Encountered out of bounds array access.");
+    if (count <= 1) {
+        errorBelch("%s: array access out of bounds in module %s:\n"
+                   "    index %" FMT_Int " is not within [0, %" FMT_Word ").\n"
+                   "This is usually caused by incorrect use of unsafe primops "
+                   "in user or library code.",
+                   op, module, index, size);
+    } else {
+        errorBelch("%s: array access out of bounds in module %s:\n"
+                   "    range of %" FMT_Word " elements starting at index %" FMT_Int
+                   " is not within [0, %" FMT_Word ").\n"
+                   "This is usually caused by incorrect use of unsafe primops "
+                   "in user or library code.",
+                   op, module, count, index, size);
+    }
+    stg_exit(EXIT_FAILURE);
 }
 
 void
-rtsMemcpyRangeOverlap(void)
+rtsMemcpyRangeOverlap(const char *op, const char *module)
 {
-    barf("Encountered overlapping source/destination ranges in a memcpy-using op.");
+    errorBelch("%s: overlapping source and destination ranges in module %s.\n"
+               "This is usually caused by incorrect use of unsafe primops "
+               "in user or library code.",
+               op, module);
+    stg_exit(EXIT_FAILURE);
 }

@@ -88,10 +88,14 @@ import CLOSURE ghc_hs_iface;
 #endif
 
 #if defined(DEBUG)
-#define ASSERT_IN_BOUNDS(ind, sz) \
-    if (ind >= sz) { ccall rtsOutOfBoundsAccess(); }
+// `op` is the source name of the primop being checked (e.g. "casIntArray#").
+// NB: in some callers `ind` is a byte offset rather than an element index, so
+// the index reported here may be in bytes. count is 1 since these checks cover
+// a single access.
+#define ASSERT_IN_BOUNDS(op, ind, sz) \
+    if (ind >= sz) { ccall rtsOutOfBoundsAccess(ind, 1, sz, op, "<RTS>"); }
 #else
-#define ASSERT_IN_BOUNDS(ind, sz)
+#define ASSERT_IN_BOUNDS(op, ind, sz)
 #endif
 
 /*-----------------------------------------------------------------------------
@@ -336,7 +340,7 @@ stg_casIntArrayzh( gcptr arr, W_ ind, W_ old, W_ new )
 {
     W_ p, h;
 
-    ASSERT_IN_BOUNDS(ind + WDS(1) - 1, StgArrBytes_bytes(arr));
+    ASSERT_IN_BOUNDS("casIntArray#", ind + WDS(1) - 1, StgArrBytes_bytes(arr));
     p = arr + SIZEOF_StgArrBytes + WDS(ind);
     (h) = prim %cmpxchgW(p, old, new);
 
@@ -350,7 +354,7 @@ stg_casInt8Arrayzh( gcptr arr, W_ ind, I8 old, I8 new )
     W_ p;
     I8 h;
 
-    ASSERT_IN_BOUNDS(ind, StgArrBytes_bytes(arr));
+    ASSERT_IN_BOUNDS("casInt8Array#", ind, StgArrBytes_bytes(arr));
     p = arr + SIZEOF_StgArrBytes + ind;
     (h) = prim %cmpxchg8(p, old, new);
 
@@ -364,7 +368,7 @@ stg_casInt16Arrayzh( gcptr arr, W_ ind, I16 old, I16 new )
     W_ p;
     I16 h;
 
-    ASSERT_IN_BOUNDS(ind + 1, StgArrBytes_bytes(arr));
+    ASSERT_IN_BOUNDS("casInt16Array#", ind + 1, StgArrBytes_bytes(arr));
     p = arr + SIZEOF_StgArrBytes + ind*2;
     (h) = prim %cmpxchg16(p, old, new);
 
@@ -378,7 +382,7 @@ stg_casInt32Arrayzh( gcptr arr, W_ ind, I32 old, I32 new )
     W_ p;
     I32 h;
 
-    ASSERT_IN_BOUNDS(ind + 3, StgArrBytes_bytes(arr));
+    ASSERT_IN_BOUNDS("casInt32Array#", ind + 3, StgArrBytes_bytes(arr));
     p = arr + SIZEOF_StgArrBytes + ind*4;
     (h) = prim %cmpxchg32(p, old, new);
 
@@ -392,7 +396,7 @@ stg_casInt64Arrayzh( gcptr arr, W_ ind, I64 old, I64 new )
     W_ p;
     I64 h;
 
-    ASSERT_IN_BOUNDS(ind + 7, StgArrBytes_bytes(arr));
+    ASSERT_IN_BOUNDS("casInt64Array#", ind + 7, StgArrBytes_bytes(arr));
     p = arr + SIZEOF_StgArrBytes + ind*8;
     (h) = prim %cmpxchg64(p, old, new);
 
@@ -470,7 +474,7 @@ stg_casArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
     gcptr h;
     W_ p, len;
 
-    ASSERT_IN_BOUNDS(ind, StgMutArrPtrs_ptrs(arr));
+    ASSERT_IN_BOUNDS("casArray#", ind, StgMutArrPtrs_ptrs(arr));
     p = arr + SIZEOF_StgMutArrPtrs + WDS(ind);
     (h) = prim %cmpxchgW(p, old, new);
 
@@ -578,8 +582,8 @@ stg_copySmallArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n)
 
         SET_INFO(dst, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
 
-        ASSERT_IN_BOUNDS(dst_off + n - 1, StgSmallMutArrPtrs_ptrs(dst));
-        ASSERT_IN_BOUNDS(src_off + n - 1, StgSmallMutArrPtrs_ptrs(src));
+        ASSERT_IN_BOUNDS("copySmallArray#", dst_off + n - 1, StgSmallMutArrPtrs_ptrs(dst));
+        ASSERT_IN_BOUNDS("copySmallArray#", src_off + n - 1, StgSmallMutArrPtrs_ptrs(src));
         dst_p = dst + SIZEOF_StgSmallMutArrPtrs + WDS(dst_off);
         src_p = src + SIZEOF_StgSmallMutArrPtrs + WDS(src_off);
         bytes = WDS(n);
@@ -601,8 +605,8 @@ stg_copySmallMutableArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n
 
         SET_INFO(dst, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
 
-        ASSERT_IN_BOUNDS(dst_off + n - 1, StgSmallMutArrPtrs_ptrs(dst));
-        ASSERT_IN_BOUNDS(src_off + n - 1, StgSmallMutArrPtrs_ptrs(src));
+        ASSERT_IN_BOUNDS("copySmallMutableArray#", dst_off + n - 1, StgSmallMutArrPtrs_ptrs(dst));
+        ASSERT_IN_BOUNDS("copySmallMutableArray#", src_off + n - 1, StgSmallMutArrPtrs_ptrs(src));
         dst_p = dst + SIZEOF_StgSmallMutArrPtrs + WDS(dst_off);
         src_p = src + SIZEOF_StgSmallMutArrPtrs + WDS(src_off);
         bytes = WDS(n);
@@ -623,7 +627,7 @@ stg_casSmallArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
     gcptr h;
     W_ p, len;
 
-    ASSERT_IN_BOUNDS(ind, StgSmallMutArrPtrs_ptrs(arr));
+    ASSERT_IN_BOUNDS("casSmallArray#", ind, StgSmallMutArrPtrs_ptrs(arr));
     p = arr + SIZEOF_StgSmallMutArrPtrs + WDS(ind);
     (h) = prim %cmpxchgW(p, old, new);
 

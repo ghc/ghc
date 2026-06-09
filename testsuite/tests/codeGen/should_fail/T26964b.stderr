@@ -1,0 +1,3 @@
+copyMutableByteArray#: array access out of bounds in module Main:
+    range of 4 elements starting at index 6 is not within [0, 8).
+This is usually caused by incorrect use of unsafe primops in user or library code.
