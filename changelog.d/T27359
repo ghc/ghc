@@ -1,0 +1,9 @@
+section: compiler
+issues: #27359
+mrs: !16142
+synopsis:
+  Fix ``Data.Data`` instance of ``HsCtxt`` to avoid a crash
+description:
+  The ``toConstr`` method of the ``Data.Data`` instance of ``HsCtxt`` now
+  uses ``abstractConstr`` instead of ``error``, which avoids it triggering
+  runtime crashes (e.g. when using ``-ddump-tc-ast``).
