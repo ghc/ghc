@@ -4,6 +4,16 @@ def noCapabilityOutputFilter(s):
 
 test('ipeMap', [extra_files(['ipe_lib.c', 'ipe_lib.h']), c_src, omit_ghci], compile_and_run, ['ipe_lib.c'])
 
+# Return frames whose Cmm block is dominated by inlined library ticks (e.g. the
+# (>>)/(>>=) of a user do-block at -O) should still be attributed to the user's
+# module. See Note [Prefer current-module source ticks for return frames] in
+# GHC.Driver.GenerateCgIPEStub.
+test('T27408',
+     [ omit_ghci          # cloneMyStack# is not available in ghci
+     , js_broken(22261)   # cloneMyStack# not yet implemented in the JS backend
+     ],
+     compile_and_run, ['-O1 -finfo-table-map -g3'])
+
 # Manually create IPE entries and dump them to event log (stderr).
 test('ipeEventLog',
      [ c_src,
