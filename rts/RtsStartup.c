@@ -192,9 +192,9 @@ static void initBuiltinGcRoots(void)
     getStablePtr((StgPtr)stackOverflow_closure);
     getStablePtr((StgPtr)heapOverflow_closure);
     getStablePtr((StgPtr)unpackCString_closure);
-    getStablePtr((StgPtr)blockedIndefinitelyOnMVar_closure);
+    getStablePtr((StgPtr)blockedIndefinitelyOnMVarError_closure);
     getStablePtr((StgPtr)nonTerminationError_closure);
-    getStablePtr((StgPtr)blockedIndefinitelyOnSTM_closure);
+    getStablePtr((StgPtr)blockedIndefinitelyOnSTMError_closure);
     getStablePtr((StgPtr)allocationLimitExceeded_closure);
     getStablePtr((StgPtr)cannotCompactFunction_closure);
     getStablePtr((StgPtr)cannotCompactPinned_closure);
