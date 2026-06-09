@@ -85,17 +85,6 @@ all files; you cannot, for example, invoke
 ``ghc -c -O1 Foo.hs -O2 Bar.hs`` to apply different optimisation levels
 to the files ``Foo.hs`` and ``Bar.hs``.
 
-In addition to passing arguments via the command-line, arguments can be passed
-via GNU-style response files. For instance,
-
-.. code-block:: bash
-
-    $ cat response-file
-    -O1
-    Hello.hs
-    -o Hello
-    $ ghc @response-file
-
 .. note::
 
     .. index::
@@ -118,9 +107,24 @@ via GNU-style response files. For instance,
         ``-fspecialise`` will not be enabled, since the ``-fno-specialise``
         overrides the ``-fspecialise`` implied by ``-O1``.
 
+
+Command-line arguments in response files
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In addition to passing arguments via the command-line, arguments can be passed
+via GNU-style response files. For instance,
+
+.. code-block:: bash
+
+    $ cat response-file
+    -O1
+    Hello.hs
+    -o Hello
+    $ ghc @response-file
+
 .. _source-file-options:
 
-Command line options in source files
+Command-line options in source files
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. index::

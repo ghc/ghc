@@ -304,7 +304,7 @@ instance H.Builder Builder where
             case builder of
                 Ar Pack stg -> do
                     useTempFile <- arSupportsAtFile stg
-                    if useTempFile then runAr                path buildArgs buildInputs buildOptions
+                    if useTempFile then runAr output         path buildArgs buildInputs buildOptions
                                    else runArWithoutTempFile path buildArgs buildInputs buildOptions
 
                 Ar Unpack _ -> cmd' [Cwd output] [path] buildArgs buildOptions
@@ -343,7 +343,7 @@ instance H.Builder Builder where
                     Exit _ <- cmd' [path] (buildArgs ++ [input]) buildOptions
                     return ()
 
-                Haddock BuildPackage -> runHaddock path buildArgs buildInputs
+                Haddock BuildPackage -> runHaddock output path buildArgs buildInputs
 
                 Ghc _ _ ->
                   -- Use a response file for ghc invocations to avoid issues with command line
@@ -351,9 +351,11 @@ instance H.Builder Builder where
                   -- NB: we can't put the buildArgs in a response file, because some flags require
                   -- empty arguments (such as the -dep-suffix flag), but that isn't supported
                   -- yet due to #26560.
-                  withResponseFileOnWindows
-                    (\buildInputs' -> cmd [path] buildArgs buildInputs' buildOptions)
+                  withResponseFileIfLongCmd
+                    output
+                    (toCmdArgument [path] <> toCmdArgument buildArgs)
                     buildInputs
+                    (toCmdArgument buildOptions)
 
                 HsCpp    -> captureStdout
 
@@ -389,13 +391,16 @@ instance H.Builder Builder where
 
 -- | Invoke @haddock@ given a path to it and a list of arguments. On Windows,
 -- the input file arguments are passed as a response file.
-runHaddock :: FilePath    -- ^ path to @haddock@
+runHaddock :: FilePath -- ^ base name to use for response file
+      -> FilePath    -- ^ path to @haddock@
       -> [String]
       -> [FilePath]  -- ^ input file paths
       -> Action ()
-runHaddock haddockPath flagArgs fileInputs = withResponseFileOnWindows
-  (cmd [haddockPath] flagArgs)
+runHaddock outputFilePath haddockPath flagArgs fileInputs = withResponseFileIfLongCmd
+  outputFilePath
+  (toCmdArgument [haddockPath] <> toCmdArgument flagArgs)
   fileInputs
+  (CmdArgument [])
 
 -- TODO: Some builders are required only on certain platforms. For example,
 -- 'Objdump' is only required on OpenBSD and AIX. Add support for platform

@@ -35,14 +35,16 @@ instance NFData   ArMode
 -- to be archived is passed via a temporary response file. Passing arguments
 -- via a response file is not supported by some versions of @ar@, in which
 -- case you should use 'runArWithoutTempFile' instead.
-runAr :: FilePath    -- ^ path to @ar@
+runAr :: FilePath    -- ^ base name to use for response files
+      -> FilePath    -- ^ path to @ar@
       -> [String]    -- ^ other arguments
       -> [FilePath]  -- ^ input file paths
       -> [CmdOption] -- ^ Additional options
       -> Action ()
-runAr arPath flagArgs fileArgs buildOptions = withResponseFile $ \tmp -> do
-    writeFile' tmp $ unwords fileArgs
-    cmd [arPath] flagArgs ('@' : tmp) buildOptions
+runAr outputFilePath arPath flagArgs fileArgs buildOptions = do
+    rspFile <- responseFilePath outputFilePath
+    writeFile' rspFile $ unwords fileArgs
+    cmd [arPath] flagArgs ('@' : rspFile) buildOptions
 
 -- | Invoke @ar@ given a path to it and a list of arguments. Note that @ar@
 -- will be called multiple times if the list of files to be archived is too
