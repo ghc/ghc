@@ -25,7 +25,7 @@ typedef struct {
     StgClosure *cannotCompactFunction_closure;  // GHC.Internal.IO.Exception.cannotCompactFunction_closure
     StgClosure *cannotCompactPinned_closure;  // GHC.Internal.IO.Exception.cannotCompactPinned_closure
     StgClosure *cannotCompactMutable_closure;  // GHC.Internal.IO.Exception.cannotCompactMutable_closure
-    StgClosure *nonTermination_closure;  // GHC.Internal.Control.Exception.Base.nonTermination_closure
+    StgClosure *nonTerminationError_closure;  // GHC.Internal.Control.Exception.Base.nonTerminationError_closure
     StgClosure *nestedAtomically_closure;  // GHC.Internal.Control.Exception.Base.nestedAtomically_closure
     StgClosure *noMatchingContinuationPrompt_closure;  // GHC.Internal.Control.Exception.Base.noMatchingContinuationPrompt_closure
     StgClosure *blockedOnBadFD_closure;  // GHC.Internal.Event.Thread.blockedOnBadFD_closure

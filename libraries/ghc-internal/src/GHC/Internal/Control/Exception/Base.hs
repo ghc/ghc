@@ -108,7 +108,9 @@ module GHC.Internal.Control.Exception.Base (
         impossibleError, impossibleConstraintError,
         nonExhaustiveGuardsError, patError, noMethodBindingError,
         typeError,
-        nonTermination, nestedAtomically, noMatchingContinuationPrompt,
+        nonTermination, nonTerminationError,
+        nestedAtomically,
+        noMatchingContinuationPrompt,
   ) where
 
 import           GHC.Internal.Base (
@@ -448,6 +450,9 @@ impossibleConstraintError   s = errorWithoutStackTrace (unpackCStringUtf8# s)
 
 
 -- GHC's RTS calls this
+nonTerminationError :: IO ()
+nonTerminationError = throwIO NonTermination
+
 nonTermination :: SomeException
 nonTermination = toException NonTermination
 

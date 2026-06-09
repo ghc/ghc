@@ -3276,6 +3276,17 @@ findAtomicallyFrameHelper (Capability *cap, StgTSO *tso)
   }
 }
 
+static void throwNontermination(Capability *cap, StgTSO *tso) {
+  StgStack *stack = tso->stackobj;
+  stack->sp -= 3;
+  stack->sp[0] = (W_)&stg_enter_info;
+  stack->sp[1] = (W_)nonTerminationError_closure;
+  stack->sp[2] = (W_)&stg_ap_v_info;
+  tso->why_blocked = NotBlocked;
+  appendToRunQueue(cap,tso);
+}
+
+
 /* -----------------------------------------------------------------------------
    resurrectThreads is called after garbage collection on the list of
    threads found to be garbage.  Each of these threads will be woken
@@ -3313,8 +3324,7 @@ resurrectThreads (StgTSO *threads)
                                   (StgClosure *)blockedIndefinitelyOnMVar_closure);
             break;
         case BlockedOnBlackHole:
-            throwToSingleThreaded(cap, tso,
-                                  (StgClosure *)nonTermination_closure);
+            throwNontermination(cap, tso);
             break;
         case BlockedOnSTM:
             throwToSingleThreaded(cap, tso,

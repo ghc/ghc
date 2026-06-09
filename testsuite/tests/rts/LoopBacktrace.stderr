@@ -3,19 +3,19 @@ LoopBacktrace: Uncaught exception ghc-internal:GHC.Internal.Control.Exception.Ba
 <<loop>>
 
 IPE backtrace:
-    Cmm$rts/StgStartup.cmm. (:)
-    Cmm$rts/Exception.cmm. (:)
-    GHC.Internal.Base.thenIO (libraries/ghc-internal/src/GHC/Internal/Base.hs:2336:1-72)
-    GHC.Internal.IO.Handle.Text. (:)
-    GHC.Internal.Show. (:)
-    Main.x (LoopBacktrace.hs:6:1-9)
-    Cmm$rts/Updates.cmm. (:)
-    GHC.Num.Integer. (:)
-    Cmm$rts/HeapStackCheck.cmm. (:)
-    GHC.Internal.IO.throwIO (libraries/ghc-internal/src/GHC/Internal/IO.hs:285:36)
-    GHC.Internal.Exception.bindIO (libraries/ghc-internal/src/GHC/Internal/Base.hs:2333:1-76)
-    GHC.Internal.Exception.Backtrace.bindIO (libraries/ghc-internal/src/GHC/Internal/Base.hs:2333:1-76)
-    GHC.Internal.Exception.Backtrace.$ (libraries/ghc-internal/src/GHC/Internal/Base.hs:2267:1-9)
+  GHC.Internal.Exception.Backtrace.collectBacktraces' (libraries/ghc-internal/src/GHC/Internal/Exception/Backtrace.hs:(179,1)-(202,25))
+  GHC.Internal.Exception.Backtrace.collectBacktraces (libraries/ghc-internal/src/GHC/Internal/Exception/Backtrace.hs:174:39-56)
+  GHC.Internal.Exception.toExceptionWithBacktrace (libraries/ghc-internal/src/GHC/Internal/Exception.hs:(179,26)-(181,53))
+  GHC.Internal.IO.throwIO (libraries/ghc-internal/src/GHC/Internal/IO.hs:293:36)
+  Cmm$rts/HeapStackCheck.cmm. (:)
+  GHC.Internal.Bignum.Integer.integerAdd (libraries/ghc-internal/src/GHC/Internal/Bignum/Integer.hs:(547,1)-(571,52))
+  Cmm$rts/Updates.cmm. (:)
+  Main.x (LoopBacktrace.hs:6:1-9)
+  GHC.Internal.Show.show (libraries/ghc-internal/src/GHC/Internal/Show.hs:497:10-21)
+  GHC.Internal.IO.Handle.Text.hPutStr' (libraries/ghc-internal/src/GHC/Internal/IO/Handle/Text.hs:667:29-37)
+  GHC.Internal.Base.thenIO (libraries/ghc-internal/src/GHC/Internal/Base.hs:2337:1-72)
+  Cmm$rts/Exception.cmm. (:)
+  Cmm$rts/StgStartup.cmm. (:)
 HasCallStack backtrace:
-  throwIO, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:446:23 in ghc-internal:GHC.Internal.Control.Exception.Base
+  throwIO, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:452:23 in ghc-internal:GHC.Internal.Control.Exception.Base
 

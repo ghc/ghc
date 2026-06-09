@@ -58,7 +58,7 @@ extern StgClosure ZCMain_main_closure;
 #define cannotCompactFunction_closure ghc_hs_iface->cannotCompactFunction_closure
 #define cannotCompactPinned_closure ghc_hs_iface->cannotCompactPinned_closure
 #define cannotCompactMutable_closure ghc_hs_iface->cannotCompactMutable_closure
-#define nonTermination_closure    ghc_hs_iface->nonTermination_closure
+#define nonTerminationError_closure    ghc_hs_iface->nonTerminationError_closure
 #define nestedAtomically_closure  ghc_hs_iface->nestedAtomically_closure
 #define absentSumFieldError_closure ghc_hs_iface->absentSumFieldError_closure
 #define underflowException_closure ghc_hs_iface->underflowException_closure
