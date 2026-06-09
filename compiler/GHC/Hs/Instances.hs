@@ -46,6 +46,7 @@ import GHC.Hs.ImpExp
 import GHC.Parser.Annotation
 import GHC.Types.Name.Reader (WithUserRdr(..))
 import GHC.Types.InlinePragma (ActivationGhc)
+import GHC.Utils.Misc (abstractConstr)
 import GHC.Data.BooleanFormula (BooleanFormula(..))
 import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Decls.Foreign (CType(..), Header(..))
@@ -673,7 +674,7 @@ deriving instance Eq (IE GhcTc)
 instance Data HsCtxt where
   gunfold _ _ _ = error "no gunfold for HsCtxt"
   gfoldl _ k z = k z
-  toConstr = error "no toConstr for HsCtxt"
+  toConstr _ = abstractConstr "HsCtxt"
   dataTypeOf = error "no dataTypeOf for HsCtxt"
 
 deriving instance Data XXExprGhcRn
