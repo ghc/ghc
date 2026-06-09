@@ -3,8 +3,7 @@ module CommandLine (
     lookupBignum,
     cmdBignum, cmdProgressInfo, cmdCompleteSetting,
     cmdDocsArgs, cmdUnitIdHash, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs,
-    cmdPrefix, cmdChangelogVersion, DocArgs(..), defaultDocArgs,
-    cmdKeepResponseFiles
+    cmdPrefix, cmdChangelogVersion, DocArgs(..), defaultDocArgs
     ) where
 
 import Data.Either
@@ -12,7 +11,7 @@ import qualified Data.HashMap.Strict as Map
 import Data.List.Extra
 import Development.Shake hiding (Normal)
 import Flavour (DocTargets, DocTarget(..))
-import Hadrian.Utilities hiding (buildRoot, keepResponseFiles)
+import Hadrian.Utilities hiding (buildRoot)
 import Settings.Parser
 import System.Console.GetOpt
 import System.Environment
@@ -37,7 +36,6 @@ data CommandLineArgs = CommandLineArgs
     , testArgs       :: TestArgs
     , docsArgs       :: DocArgs
     , docTargets     :: DocTargets
-    , keepResponseFiles :: Bool
     , prefix           :: Maybe FilePath
     , changelogVersion :: Maybe String
     , completeStg      :: Maybe String }
@@ -58,7 +56,6 @@ defaultCommandLineArgs = CommandLineArgs
     , testArgs       = defaultTestArgs
     , docsArgs       = defaultDocArgs
     , docTargets     = Set.fromList [minBound..maxBound]
-    , keepResponseFiles    = False
     , prefix           = Nothing
     , changelogVersion = Nothing
     , completeStg      = Nothing }
@@ -140,9 +137,6 @@ readFreeze1, readFreeze2, readSkipDepends :: Either String (CommandLineArgs -> C
 readFreeze1 = Right $ \flags -> flags { freeze1 = True }
 readFreeze2 = Right $ \flags -> flags { freeze1 = True, freeze2 = True }
 readSkipDepends = Right $ \flags -> flags { skipDepends = True }
-
-readKeepResponseFiles :: Either String (CommandLineArgs -> CommandLineArgs)
-readKeepResponseFiles = Right $ \flags -> flags { keepResponseFiles = True }
 
 readUnitIdHash :: Either String (CommandLineArgs -> CommandLineArgs)
 readUnitIdHash = Right $ \flags ->
@@ -302,8 +296,6 @@ optDescrs =
       "Progress info style (None, Brief, Normal or Unicorn)."
     , Option [] ["docs"] (ReqArg readDocsArg "TARGET")
       "Strip down docs targets (none, no-haddocks, no-sphinx[-{html, pdfs, man}]."
-    , Option ['r'] ["keep-response-files"] (NoArg readKeepResponseFiles)
-      "Keep response files created during the build (for debugging)."
     , Option ['k'] ["keep-test-files"] (NoArg readTestKeepFiles)
       "Keep all the files generated when running the testsuite."
     , Option [] ["test-compiler"] (ReqArg readTestCompiler "TEST_COMPILER")
@@ -382,7 +374,6 @@ cmdLineArgsMap = do
 
     return $ insertExtra (progressInfo               args) -- Accessed by Hadrian.Utilities
            $ insertExtra (buildRoot                  args) -- Accessed by Hadrian.Utilities
-           $ insertExtra (KeepResponseFiles $ keepResponseFiles args) -- Accessed by Hadrian.Utilities
            $ insertExtra (testArgs                   args) -- Accessed by Settings.Builders.RunTest
            $ insertExtra (docsArgs                   args) -- Accessed by Rules.Documentation
            $ insertExtra allSettings                       -- Accessed by Settings
@@ -423,9 +414,6 @@ cmdUnitIdHash = unitIdHash <$> cmdLineArgs
 
 cmdBignum :: Action (Maybe String)
 cmdBignum = bignum <$> cmdLineArgs
-
-cmdKeepResponseFiles :: Action Bool
-cmdKeepResponseFiles = keepResponseFiles <$> cmdLineArgs
 
 cmdProgressInfo :: Action ProgressInfo
 cmdProgressInfo = progressInfo <$> cmdLineArgs

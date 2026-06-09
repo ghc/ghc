@@ -1,4 +1,6 @@
+{-# LANGUAGE ImpredicativeTypes #-}
 {-# LANGUAGE TypeFamilies #-}
+
 module Hadrian.Utilities (
     -- * List manipulation
     fromSingleton, replaceEq, minusOrd, intersectOrd, lookupAll, chunksOfSize,
@@ -14,7 +16,7 @@ module Hadrian.Utilities (
 
     -- * Paths
     BuildRoot (..), buildRoot, buildRootRules, isGeneratedSource,
-    KeepResponseFiles (..), keepResponseFiles, withResponseFile, withResponseFileOnWindows,
+    withResponseFileIfLongCmd, responseFilePath,
 
     -- * File system operations
     copyFile, copyFileUntracked, createFileLink, fixFile,
@@ -47,11 +49,10 @@ import Data.Maybe
 import Data.Typeable (TypeRep, typeOf)
 import Development.Shake hiding (Normal)
 import Development.Shake.Classes
+import Development.Shake.Command (CmdArgument (..), IsCmdArgument (toCmdArgument))
 import Development.Shake.FilePath
 import GHC.ResponseFile (escapeArgs)
 import System.Environment (lookupEnv)
-import System.Info.Extra (isWindows)
-import System.IO (hClose, openTempFile)
 import System.IO.Error (isPermissionError)
 
 import qualified Data.ByteString        as BS
@@ -255,13 +256,13 @@ infix 1 %%>
 -- library, they can reach 2MB! Some operating systems do not support command
 -- lines of such length, and this function can be used to obtain a reasonable
 -- approximation of the limit. On Windows, it is theoretically 32768 characters
--- (since Windows 7). In practice we use 31000 to leave some breathing space for
+-- (since Windows 7). In practice we use 30000 to leave some breathing space for
 -- the builder path & name, auxiliary flags, and other overheads. On Mac OS X,
 -- ARG_MAX is 262144, yet when using @xargs@ on OSX this is reduced by over
 -- 20000. Hence, 200000 seems like a sensible limit. On other operating systems
 -- we currently use the 4194304 setting.
 cmdLineLengthLimit :: Int
-cmdLineLengthLimit | IO.isWindows = 31000
+cmdLineLengthLimit | IO.isWindows = 30000
                    | IO.isMac     = 200000
                    | otherwise    = 4194304
 
@@ -321,53 +322,35 @@ buildRootRules = do
 isGeneratedSource :: FilePath -> Action Bool
 isGeneratedSource file = buildRoot <&> (`isPrefixOf` file)
 
-newtype KeepResponseFiles = KeepResponseFiles Bool deriving (Eq, Show)
+-- | Run an command with the given arguments. If the command is too long then the
+-- response file arguments are placed into a response file and escaped with @GHC.ResponseFile.escapeArgs@.
+withResponseFileIfLongCmd ::
+    CmdResult c
+    => FilePath     -- ^ Response base name. The reponse file is placed in @_build/rsp/\<Response base name\>@.
+    -> CmdArgument  -- ^ Command and arguments before the response file arguments.
+    -> [String]     -- ^ Response file aruguments.
+    -> CmdArgument  -- ^ Command arguments after the response file arguments.
+    -> Action c
+withResponseFileIfLongCmd outputFilePath argsPre argsResp argsPost = do
+    let cmdLineLengh = sum
+            [ 1 + length arg -- add one to account for space inbetween arguments
+            | let CmdArgument args = argsPre <> toCmdArgument argsResp <> argsPost
+            , Right arg <- args
+            ]
+    if cmdLineLengh < cmdLineLengthLimit
+        then cmd argsPre argsResp argsPost
+        else do
+            rspFile <- responseFilePath outputFilePath
+            writeFile' rspFile (escapeArgs argsResp)
+            cmd argsPre ['@' : rspFile] argsPost
 
--- | Whether to retain response files after the build action that created them
--- completes. Mainly useful for debugging.
-keepResponseFiles :: Action Bool
-keepResponseFiles = do
-    KeepResponseFiles keep <- userSetting (KeepResponseFiles False)
-    return keep
-
--- | Run an action either with command arguments direcly or by, on Windows,
--- placing those arguments into a response file escaped with @GHC.ResponseFile.escapeArgs@.
---
--- With @--keep-response-files@, the file is left on disk (if used)
-withResponseFileOnWindows ::
-    ([String] -> Action a)  -- ^ Action to perform given arguments (of the form @["\@reponseFilePath"]@ on Windows)
-    -> [String]             -- ^ Command arguments
-    -> Action a
-withResponseFileOnWindows action commandArgs = do
-    if isWindows
-        then withResponseFile $ \tmp -> do
-                writeFile' tmp (escapeArgs commandArgs)
-                action ['@' : tmp]
-        else action commandArgs
-
--- | Run an action with a response file path.
---
--- With @--keep-response-files@, the file is left on disk.
-withResponseFile :: (FilePath -> Action a) -> Action a
-withResponseFile action = do
-    keep <- keepResponseFiles
-    let putVerboseResponseFile tmp = do
-            verbosity <- getVerbosity
-            when (verbosity >= Verbose) $ do
-                tmpContent <- liftIO (readFile tmp)
-                putVerbose (tmp <> " (use hadrian flag --keep-response-files to keep this file):\n" <> tmpContent)
-    if keep
-        then do
-            (tmp, h) <- liftIO $ openTempFile "." "hadrian-rsp"
-            liftIO $ hClose h
-            putInfo $ "Keeping response file: " ++ tmp
-            result <- action tmp
-            putVerboseResponseFile tmp
-            return result
-        else withTempFile $ \tmp -> do
-            result <- action tmp
-            putVerboseResponseFile tmp
-            return result
+-- | Convert a command's output file path to a response file path to be used for that command.
+-- Response files are placed in a dedicated @rps@ directory under the build directory. This avoids
+-- clutering the work tree or interfearing with other build directories.
+responseFilePath :: FilePath -> Action FilePath
+responseFilePath outputFilePath = do
+    buildDir <- buildRoot
+    return $ buildDir </> "rsp" </> outputFilePath
 
 -- | Link a file tracking the link target. Create the target directory if
 -- missing.
