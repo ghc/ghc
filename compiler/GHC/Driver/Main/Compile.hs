@@ -699,7 +699,7 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
             _          ->
               do
               cmms <- {-# SCC "StgToCmm" #-}
-                doCodeGen hsc_env this_mod denv tycons
+                doCodeGen hsc_env this_mod mod_loc denv tycons
                 cost_centre_info
                 stg_binds
 
@@ -956,14 +956,17 @@ This reduces residency towards the end of the CodeGen phase significantly
 (5-10%).
 -}
 
-doCodeGen :: HscEnv -> Module -> InfoTableProvMap -> [TyCon]
+doCodeGen :: HscEnv -> Module
+          -> ModLocation -- ^ location of the module being compiled, used to
+                         -- prefer current-module IPE source locations
+          -> InfoTableProvMap -> [TyCon]
           -> CollectedCCs
           -> [CgStgTopBinding] -- ^ Bindings come already annotated with fvs
           -> IO (CgStream CmmGroupSRTs CmmCgInfos)
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
-doCodeGen hsc_env this_mod denv tycons
+doCodeGen hsc_env this_mod mod_location denv tycons
               cost_centre_info stg_binds_w_fvs = do
     let dflags     = hsc_dflags hsc_env
         logger     = hsc_logger hsc_env
@@ -1032,7 +1035,7 @@ doCodeGen hsc_env this_mod denv tycons
           -- Positions] in GHC.Stg.Debug.
           (ipes', stats') <-
             if (gopt Opt_InfoTableMap dflags) then
-              liftIO $ lookupEstimatedTicks hsc_env ipes stats cmm_srts
+              liftIO $ lookupEstimatedTicks hsc_env mod_location ipes stats cmm_srts
             else
               return (ipes, stats)
 

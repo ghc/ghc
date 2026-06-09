@@ -1,7 +1,9 @@
 module GHC.Driver.GenerateCgIPEStub (generateCgIPEStub, lookupEstimatedTicks) where
 
+import Control.Applicative ((<|>))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (listToMaybe)
 import Data.Semigroup ((<>))
 import GHC.Cmm
 import GHC.Cmm.CLabel (CLabel, mkAsmTempLabel)
@@ -10,6 +12,7 @@ import GHC.Cmm.Dataflow.Block (blockSplit, blockToList)
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Info.Build (emptySRT)
 import GHC.Cmm.Pipeline (cmmPipeline)
+import GHC.Data.FastString (FastString, mkFastString)
 import GHC.Data.Stream (liftIO, liftEff)
 import qualified GHC.Data.Stream as Stream
 import GHC.Driver.Env (hsc_dflags, hsc_logger)
@@ -28,9 +31,10 @@ import GHC.StgToCmm.Utils
 import GHC.StgToCmm.CgUtils (CgStream)
 import GHC.Types.IPE (InfoTableProvMap (provInfoTables), IpeSourceLocation)
 import GHC.Types.Name.Set (NonCaffySet)
+import GHC.Types.SrcLoc (srcSpanFile)
 import GHC.Types.Tickish (GenTickish (SourceNote))
 import GHC.Unit.Types (Module, moduleName)
-import GHC.Unit.Module (moduleNameString)
+import GHC.Unit.Module (moduleNameString, ModLocation, ml_hs_file)
 import qualified GHC.Utils.Logger as Logger
 import GHC.Utils.Outputable (ppr)
 import GHC.Types.Unique.DSM
@@ -186,6 +190,60 @@ Given a `CmmGraph`:
     location.
 
 See `labelsToSourcesSansTNTC` for the implementation of this algorithm.
+
+Note [Prefer current-module source ticks for return frames]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A block may carry several nested `SourceNote`s before its terminating call.
+For example, when `>>`/`>>=` (and their continuations) are inlined into a user
+`do`-block at `-O`, the case continuation of a blocking primop like `takeMVar#`
+is wrapped in notes for both the combinator's definition (e.g.
+`GHC.Internal.Base.thenIO`, `Base.hs`) and the user's call site (the `do`
+statement). Naively taking the *nearest* note attributes the return frame to the
+library combinator, so IPE/`-finfo-table-map` backtraces of a thread blocked in
+such a primop show no user frames at all.
+
+Concretely, when compiling (at -O1)
+
+    -- Main.hs
+    main = do { v <- newEmptyMVar; takeMVar v; putStrLn "world" }
+
+the proc for `main` begins with `main`'s own span and reaches `takeMVar#`
+in a block carrying only the inlined `>>` combinator's ticks, while the next
+tick of `main` itself lands in the *continuation* block:
+
+    cEntry:
+        //tick src<Main.hs:(2,1)-(2,58)>      -- (Tick 2) the enclosing `main` span
+        ... newEmptyMVar# etc. ...
+    cBlk:
+        //tick src<.../Base.hs:2336:37>       -- only library ticks in this block:
+        //tick src<.../Base.hs:2336:67-71>    -- the inlined `>>` (`thenIO`)
+        call stg_takeMVar#(R1) returns to cCont, args: 8, res: 8, upd: 8;
+    cCont:                                    -- the takeMVar continuation body
+        //tick src<.../Base.hs:2336:60-71>
+        //tick src<Main.hs:2:34-43>           -- (Tick 1) the user tick, in a
+                                              -- *sibling* block
+
+A return frame is attributed to the ticks of the block that *ends* in its call
+(see `labelsToSourcesWithTNTC`). So `cCont` is sourced from `cBlk`, which has no
+`Main.hs` tick at all. This is unhelpful to the user.
+
+To fix this we attribute a return frame's source location in the following
+preference order:
+
+  1. the nearest tick in frame's block whose file is that of the module being
+     compiled — the precise user call site. `cBlk` has none.
+  2. failing that, the proc's *enclosing* current-module note (its function's own
+     span, i.e. the outermost user `SourceNote` in the proc) — here
+     `src<Main.hs:(2,1)-(2,58)>`, named `main`. Without this, `cCont` would
+     take the nearest note `Base.hs:2336:67-71` (named `thenIO`) and, due to
+     rule (3) below, attribute it to the module being compiled. This would result
+     in a reference to `Main.thenIO`, a binding which does not exist.
+     does not exist. In the example above, (T2) labels it `Main.main` instead.
+  3. failing that, the nearest note of any module.
+
+This mirrors the same-file preference the DWARF path uses in
+`GHC.Cmm.DebugBlock.bestSrcTick` and that `GHC.Stg.Debug.quickSourcePos` uses for
+closures.
 -}
 
 generateCgIPEStub
@@ -257,11 +315,12 @@ generateCgIPEStub hsc_env this_mod denv (nonCaffySet, moduleLFInfos, infoTablesW
 -- performance suffered considerably as a result (see #23103).
 lookupEstimatedTicks
   :: HscEnv
+  -> ModLocation -- ^ location of the module being compiled, for IPE provenance
   -> Map CmmInfoTable (Maybe IpeSourceLocation)
   -> IPEStats
   -> CmmGroupSRTs
   -> IO (Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats)
-lookupEstimatedTicks hsc_env ipes stats cmm_group_srts =
+lookupEstimatedTicks hsc_env mod_location ipes stats cmm_group_srts =
     -- Pass 2: Create an entry in the IPE map for every info table listed in
     -- this CmmGroupSRTs. If the info table is a stack info table and
     -- -finfo-table-map-with-stack is enabled, look up its estimated source
@@ -276,6 +335,11 @@ lookupEstimatedTicks hsc_env ipes stats cmm_group_srts =
     dflags = hsc_dflags hsc_env
     platform = targetPlatform dflags
 
+    -- Source file of the module being compiled, used to prefer current-module
+    -- source ticks for return frames. See Note [Prefer current-module source
+    -- ticks for return frames].
+    mb_src_file = mkFastString <$> ml_hs_file mod_location
+
     -- Pass 1: Map every label meeting the conditions described in Note
     -- [Stacktraces from Info Table Provenance Entries (IPE based stack
     -- unwinding)] to the estimated source location (also as described in the
@@ -286,9 +350,9 @@ lookupEstimatedTicks hsc_env ipes stats cmm_group_srts =
     labelsToSources :: Map CLabel IpeSourceLocation
     labelsToSources =
       if platformTablesNextToCode platform then
-        foldl' labelsToSourcesWithTNTC Map.empty cmm_group_srts
+        foldl' (labelsToSourcesWithTNTC mb_src_file) Map.empty cmm_group_srts
       else
-        foldl' labelsToSourcesSansTNTC Map.empty cmm_group_srts
+        foldl' (labelsToSourcesSansTNTC mb_src_file) Map.empty cmm_group_srts
 
     collectInfoTables
       :: (Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats)
@@ -331,15 +395,16 @@ lookupEstimatedTicks hsc_env ipes stats cmm_group_srts =
 
 -- | See Note [Stacktraces from Info Table Provenance Entries (IPE based stack unwinding)]
 labelsToSourcesWithTNTC
-  :: Map CLabel IpeSourceLocation
+  :: Maybe FastString -- ^ source file of the module being compiled
+  -> Map CLabel IpeSourceLocation
   -> GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph
   -> Map CLabel IpeSourceLocation
-labelsToSourcesWithTNTC acc (CmmProc _ _ _ cmm_graph) =
+labelsToSourcesWithTNTC mb_src_file acc (CmmProc _ _ _ cmm_graph) =
     foldl' go acc (toBlockList cmm_graph)
   where
     go :: Map CLabel IpeSourceLocation -> CmmBlock -> Map CLabel IpeSourceLocation
     go acc block =
-        case (,) <$> returnFrameLabel <*> lastTickInBlock of
+        case (,) <$> returnFrameLabel <*> bestTickInBlock of
           Just (clabel, src_loc) -> Map.insert clabel src_loc acc
           Nothing -> acc
       where
@@ -351,36 +416,90 @@ labelsToSourcesWithTNTC acc (CmmProc _ _ _ cmm_graph) =
             (CmmCall _ (Just l) _ _ _ _) -> Just $ mkAsmTempLabel l
             _ -> Nothing
 
-        lastTickInBlock = foldr maybeTick Nothing (blockToList middleBlock)
+        -- All SourceNotes in the block, in block order (so the last is the one
+        -- nearest the terminating call). Prefer a note from the module being
+        -- compiled, so that e.g. continuations of inlined library combinators
+        -- (>>, >>=) point at the user's call site rather than the combinator's
+        -- definition. See Note [Prefer current-module source ticks for return frames].
+        -- This mirrors GHC.Cmm.DebugBlock.bestSrcTick.
+        bestTickInBlock = preferThisFile mb_src_file procFallback (blockToList middleBlock)
 
-        maybeTick :: CmmNode O O -> Maybe IpeSourceLocation -> Maybe IpeSourceLocation
-        maybeTick _ s@(Just _) = s
-        maybeTick (CmmTick (SourceNote span name)) Nothing = Just (span, name)
-        maybeTick _ _ = Nothing
-labelsToSourcesWithTNTC acc _ = acc
+    -- Enclosing current-module note for the whole proc (its function's own
+    -- span), used when a return frame's own block has no current-module tick.
+    procFallback = enclosingThisFileTick mb_src_file (toBlockList cmm_graph)
+labelsToSourcesWithTNTC _ acc _ = acc
+
+-- | Pick the 'IpeSourceLocation' to attribute to a return frame from the
+-- source-note-bearing nodes of its block (in block order). In preference order:
+--
+--   1. the nearest (last) 'SourceNote' from the module being compiled;
+--   2. the enclosing current-module note for the proc (@procFallback@), so that
+--      inlined library glue with no current-module tick of its own is still
+--      attributed to the user's enclosing function rather than the library;
+--   3. the nearest 'SourceNote' of any module (the historical behaviour).
+--
+-- See Note [Prefer current-module source ticks for return frames].
+preferThisFile :: Maybe FastString -> Maybe IpeSourceLocation -> [CmmNode O O] -> Maybe IpeSourceLocation
+preferThisFile mb_src_file procFallback nodes =
+    nearest fromThisFile <|> procFallback <|> nearest sourceNotes
+  where
+    sourceNotes = [ (span, name) | CmmTick (SourceNote span name) <- nodes ]
+    fromThisFile = case mb_src_file of
+      Just f  -> filter ((== f) . srcSpanFile . fst) sourceNotes
+      Nothing -> []
+    nearest = listToMaybe . reverse
+
+-- | The outermost 'SourceNote' from the module being compiled across a proc's
+-- blocks (in 'toBlockList' order, so the entry block's note — the function's own
+-- span — comes first). Used as a fallback so inlined cross-module code is still
+-- labelled with the enclosing user function. 'Nothing' when the proc has no
+-- current-module note (e.g. when compiling the library itself).
+enclosingThisFileTick :: Maybe FastString -> [CmmBlock] -> Maybe IpeSourceLocation
+enclosingThisFileTick mb_src_file blocks =
+    listToMaybe
+      [ (span, name)
+      | b <- blocks
+      , let (_, mid, _) = blockSplit b
+      , CmmTick (SourceNote span name) <- blockToList mid
+      , Just (srcSpanFile span) == mb_src_file ]
 
 -- | See Note [Stacktraces from Info Table Provenance Entries (IPE based stack unwinding)]
 labelsToSourcesSansTNTC
-  :: Map CLabel IpeSourceLocation
+  :: Maybe FastString -- ^ source file of the module being compiled
+  -> Map CLabel IpeSourceLocation
   -> GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph
   -> Map CLabel IpeSourceLocation
-labelsToSourcesSansTNTC acc (CmmProc _ _ _ cmm_graph) =
+labelsToSourcesSansTNTC mb_src_file acc (CmmProc _ _ _ cmm_graph) =
     foldl' go acc (toBlockList cmm_graph)
   where
+    -- See 'enclosingThisFileTick'.
+    procFallback = enclosingThisFileTick mb_src_file (toBlockList cmm_graph)
+
     go :: Map CLabel IpeSourceLocation -> CmmBlock -> Map CLabel IpeSourceLocation
-    go acc block = fst $ foldl' collectLabels (acc, Nothing) (blockToList middleBlock)
+    go acc block = fst $ foldl' collectLabels (acc, (Nothing, Nothing)) (blockToList middleBlock)
       where
         (_, middleBlock, _) = blockSplit block
 
+        -- We track the nearest preceding SourceNote from the module being
+        -- compiled and the nearest of any module, and prefer the former (then
+        -- the proc's enclosing current-module note) when attributing a return
+        -- frame. See 'preferThisFile' and
+        -- Note [Prefer current-module source ticks for return frames].
         collectLabels
-          :: (Map CLabel IpeSourceLocation, Maybe IpeSourceLocation)
+          :: (Map CLabel IpeSourceLocation, (Maybe IpeSourceLocation, Maybe IpeSourceLocation))
           -> CmmNode O O
-          -> (Map CLabel IpeSourceLocation, Maybe IpeSourceLocation)
-        collectLabels (!acc, lastTick) b =
-          case (b, lastTick) of
-            (CmmStore _ (CmmLit (CmmLabel l)) _, Just src_loc) ->
-              (Map.insert l src_loc acc, Nothing)
-            (CmmTick (SourceNote span name), _) ->
-              (acc, Just (span, name))
-            _ -> (acc, lastTick)
-labelsToSourcesSansTNTC acc _ = acc
+          -> (Map CLabel IpeSourceLocation, (Maybe IpeSourceLocation, Maybe IpeSourceLocation))
+        collectLabels (!acc, st@(lastThis, lastAny)) b =
+          case b of
+            CmmStore _ (CmmLit (CmmLabel l)) _ ->
+              case lastThis <|> procFallback <|> lastAny of
+                Just src_loc -> (Map.insert l src_loc acc, (Nothing, Nothing))
+                Nothing      -> (acc, st)
+            CmmTick (SourceNote span name) ->
+              let tick = (span, name)
+                  lastThis'
+                    | Just (srcSpanFile span) == mb_src_file = Just tick
+                    | otherwise                              = lastThis
+              in (acc, (lastThis', Just tick))
+            _ -> (acc, st)
+labelsToSourcesSansTNTC _ acc _ = acc
