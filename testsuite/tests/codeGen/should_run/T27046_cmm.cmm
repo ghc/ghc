@@ -1,0 +1,13 @@
+#include "Cmm.h"
+
+// Test for #27046
+test_mul2_clobber (bits64 x, bits64 y)
+{
+    bits64 hi, nd;
+
+    // Deliberately alias the destination 'lo' with the source 'x'
+    // This forces the NCG to use the same virtual register for both.
+    (nd, hi, x) = prim %mul2_64(x, y);
+
+    return (hi);
+}

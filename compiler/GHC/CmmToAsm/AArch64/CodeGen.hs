@@ -1837,11 +1837,19 @@ genCCall target dest_regs arg_regs = do
               let lo = getRegisterReg platform (CmmLocal dst_lo)
                   hi = getRegisterReg platform (CmmLocal dst_hi)
                   nd = getRegisterReg platform (CmmLocal dst_needed)
+
+              -- Generate a fresh virtual register for the low word computation.
+              -- This avoids clobbering reg_a or reg_b in the first MUL instruction,
+              -- which could for example happen if 'lo' and 'reg_a' are the same
+              -- virtual register.
+              tmp_lo <- getNewRegNat II64
+
               return $
                   code_x `appOL`
                   code_y `snocOL`
-                  MUL   (OpReg W64 lo) (OpReg W64 reg_a) (OpReg W64 reg_b) `snocOL`
+                  MUL   (OpReg W64 tmp_lo) (OpReg W64 reg_a) (OpReg W64 reg_b) `snocOL`
                   SMULH (OpReg W64 hi) (OpReg W64 reg_a) (OpReg W64 reg_b) `snocOL`
+                  MOV   (OpReg W64 lo) (OpReg W64 tmp_lo) `snocOL`
                   -- Are all high bits equal to the sign bit of the low word?
                   -- nd = (hi == ASR(lo,width-1)) ? 1 : 0
                   CMP   (OpReg W64 hi) (OpRegShift W64 lo SASR (widthInBits w - 1)) `snocOL`

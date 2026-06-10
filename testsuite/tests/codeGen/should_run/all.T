@@ -260,6 +260,13 @@ test('T26537', js_broken(26558), compile_and_run, ['-O2 -fregs-graph'])
 # AArch64-specific runtime tests
 test('aarch64-ushr-subword-run', [unless(arch('aarch64'), skip)], compile_and_run, ['-O'])
 test('aarch64-subword-ops', [unless(arch('aarch64'), skip)], compile_and_run, ['-O'])
+test('T27046',
+     [ req_cmm
+     , when(arch('i386'), skip) # i386 does not support MO_S_Mul2 W64
+     , when(arch('wasm32'), skip)
+     , js_skip
+     , when(unregisterised(), skip) # pprCallishMachOp_for_C: MO_S_Mul2 W64 not supported
+     ], compile_and_run, ['T27046_cmm.cmm'])
 
 # Check that GHC-generated finalizers run on Darwin. The Apple linker doesn't
 # support --wrap, so we can't intercept hs_spt_remove directly.  Instead we
