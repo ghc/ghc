@@ -50,7 +50,7 @@ initTicker (Time interval, TickProc handle_tick)
 }
 
 void
-startTicker(void)
+unpauseTicker(void)
 {
     BOOL r;
 
@@ -68,7 +68,7 @@ startTicker(void)
 }
 
 void
-stopTicker(void)
+pauseTicker(void)
 {
     if (timer_queue != NULL && timer != NULL) {
         DeleteTimerQueueTimer(timer_queue, timer, NULL);
@@ -79,7 +79,7 @@ stopTicker(void)
 void
 exitTicker (bool wait)
 {
-    stopTicker();
+    pauseTicker();
     if (timer_queue != NULL) {
         DeleteTimerQueueEx(timer_queue, wait ? INVALID_HANDLE_VALUE : NULL);
         timer_queue = NULL;

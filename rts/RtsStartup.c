@@ -415,8 +415,8 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     traceInitEvent(dumpIPEToEventLog);
     initHeapProfiling();
 
-    /* start the virtual timer 'subsystem'. */
-    startTimer();
+    /* start the timer (after initTimer above) */
+    unpauseTimer();
 
 #if defined(RTS_USER_SIGNALS)
     if (RtsFlags.MiscFlags.install_signal_handlers) {
@@ -512,8 +512,6 @@ hs_exit_(bool wait_foreign)
     }
 #endif
 
-    /* stop the ticker */
-    stopTimer();
     /*
      * it is quite important that we wait here as some timer implementations
      * (e.g. pthread) may fire even after we exit, which may segfault as we've

@@ -455,7 +455,7 @@ run_thread:
         prev = setRecentActivity(ACTIVITY_YES);
         if (prev == ACTIVITY_DONE_GC) {
 #if !defined(PROFILING)
-            startTimer();
+            unpauseTimer();
 #endif
         }
         break;
@@ -1936,7 +1936,7 @@ delete_threads_and_gc:
             // it will get re-enabled if we run any threads after the GC.
             setRecentActivity(ACTIVITY_DONE_GC);
 #if !defined(PROFILING)
-            stopTimer();
+            pauseTimer();
 #endif
             break;
         }
@@ -2244,7 +2244,7 @@ forkProcess(HsStablePtr *entry
 
         // start timer after the IOManager is initialized
         // (the idle GC may wake up the IOManager)
-        startTimer();
+        unpauseTimer();
 
         // Install toplevel exception handlers, so interruption
         // signal will be sent to the main thread.
