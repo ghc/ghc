@@ -52,9 +52,14 @@ d7RegNo, ft7RegNo :: RegNo
 d7RegNo = 39
 ft7RegNo = d7RegNo
 
+d28RegNo, ft8RegNo :: RegNo
+d28RegNo = 60
+ft8RegNo = d28RegNo
+
 -- | Last floating point register.
-d31RegNo :: RegNo
+d31RegNo, ft11RegNo :: RegNo
 d31RegNo = 63
+ft11RegNo = d31RegNo
 
 a0RegNo, x10RegNo :: RegNo
 x10RegNo = 10
