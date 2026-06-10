@@ -42,7 +42,6 @@ module GHC.StgToCmm.Monad (
         SelfLoopInfo(..),
 
         setTickyCtrLabel, getTickyCtrLabel,
-        withCurrentPrimOpName, getCurrentPrimOpName,
         tickScope, getTickScope,
 
         withUpdFrameOff, getUpdFrameOff,
@@ -51,7 +50,7 @@ module GHC.StgToCmm.Monad (
         getHpUsage,  setHpUsage, heapHWM,
         setVirtHp, getVirtHp, setRealHp,
 
-        getModuleName,
+        getModuleName, getModuleNameCLit,
 
         -- ideally we wouldn't export these, but some other modules access internal state
         getState, setState, getSelfLoop, withSelfLoop, getStgToCmmConfig,
@@ -74,6 +73,7 @@ import GHC.StgToCmm.Sequel
 import GHC.Cmm.Graph as CmmGraph
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
+import GHC.Cmm.Utils ( mkByteStringCLit )
 import GHC.Runtime.Heap.Layout
 import GHC.Unit
 import GHC.Types.Id
@@ -305,9 +305,6 @@ data FCodeState =
                                                          --   See Note [Self-recursive tail calls] in GHC.StgToCmm.Expr
               , fcs_ticky         :: !CLabel             -- ^ Destination for ticky counts
               , fcs_tickscope     :: !CmmTickScope       -- ^ Tick scope for new blocks & ticks
-              , fcs_prim_op       :: Maybe FastString    -- ^ Source name of the primop currently being
-                                                         --   compiled, used by -fcheck-prim-bounds error
-                                                         --   messages.
               }
 
 data HeapUsage   -- See Note [Virtual and real heap pointers]
@@ -466,7 +463,6 @@ initFCodeState p =
                , fcs_selfloop      = Nothing
                , fcs_ticky         = mkTopTickyCtrLabel
                , fcs_tickscope     = GlobalScope
-               , fcs_prim_op       = Nothing
                }
 
 getFCodeState :: FCode FCodeState
@@ -526,20 +522,6 @@ setTickyCtrLabel ticky code = do
         withFCodeState code (fstate {fcs_ticky = ticky})
 
 -- ----------------------------------------------------------------------------
--- Track the primop currently being compiled
-
--- | The source name of the primop currently being compiled (e.g.
--- @"writeArray#"@), if any. Used to produce informative @-fcheck-prim-bounds@
--- error messages.
-getCurrentPrimOpName :: FCode (Maybe FastString)
-getCurrentPrimOpName = fcs_prim_op <$> getFCodeState
-
-withCurrentPrimOpName :: FastString -> FCode a -> FCode a
-withCurrentPrimOpName name code = do
-        fstate <- getFCodeState
-        withFCodeState code (fstate {fcs_prim_op = Just name})
-
--- ----------------------------------------------------------------------------
 -- Manage tick scopes
 
 -- | The current tick scope. We will assign this to generated blocks.
@@ -579,6 +561,17 @@ getContext = stgToCmmContext <$> getStgToCmmConfig
 
 getModuleName :: FCode Module
 getModuleName = stgToCmmThisModule <$> getStgToCmmConfig
+
+-- | The bare name of the module currently being compiled, as a string
+-- literal, for use in @-fcheck-prim-bounds@ failure diagnostics.
+getModuleNameCLit :: FCode CmmLit
+getModuleNameCLit = do
+    mod <- getModuleName
+    uniq <- newUnique
+    let bytes = bytesFS (moduleNameFS (moduleName mod))
+        (lit, decl) = mkByteStringCLit (mkStringLitLabel uniq) bytes
+    emitDecl decl
+    return lit
 
 
 --------------------------------------------------------

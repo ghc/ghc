@@ -37,7 +37,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.Graph
 import GHC.Stg.Syntax
 import GHC.Cmm
-import GHC.Unit         ( rtsUnit, moduleName, moduleNameFS )
+import GHC.Unit         ( rtsUnit )
 import GHC.Core.Type    ( Type, tyConAppTyCon_maybe )
 import GHC.Core.TyCon
 import GHC.Cmm.CLabel
@@ -96,13 +96,7 @@ cmmPrimOpApp cfg primop cmm_args mres_ty = do
      -- if the result type isn't explicitly given, we directly use the
      -- result type of the primop.
      res_ty = fromMaybe (primOpResultType primop) mres_ty
-  -- When -fcheck-prim-bounds is on, record the primop name so that any
-  -- bounds-check failure handler emitted while compiling it can name it in the
-  -- error message. Guarded by the flag so that the common (unchecked) case pays
-  -- nothing: no name thunk, no FCodeState update.
-  if stgToCmmDoBoundsCheck cfg
-    then withCurrentPrimOpName (occNameFS (primOpOcc primop)) (f res_ty)
-    else f res_ty
+  f res_ty
 
 externalPrimop :: PrimOp -> [CmmExpr] -> PrimopCmmEmit
 externalPrimop primop args = outOfLinePrimop (callExternalPrimop primop args)
@@ -188,27 +182,27 @@ emitPrimOp cfg primop =
 
   CopyArrayOp -> \case
     [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] ->
-      inlinePrimop $ \ [] -> doCopyArrayOp src src_off dst dst_off (fromInteger n)
+      inlinePrimop $ \ [] -> doCopyArrayOp op_name src src_off dst dst_off (fromInteger n)
     [src, src_off, dst, dst_off, n] ->
       outOfLinePrimop $ do
         profile  <- getProfile
         platform <- getPlatform
         whenCheckBounds $ ifNonZero n $ do
-          emitRangeBoundsCheck src_off n (ptrArraySize platform profile src)
-          emitRangeBoundsCheck dst_off n (ptrArraySize platform profile dst)
+          emitRangeBoundsCheck op_name src_off n (ptrArraySize platform profile src)
+          emitRangeBoundsCheck op_name dst_off n (ptrArraySize platform profile dst)
         callExternalPrimop CopyArrayOp [src, src_off, dst, dst_off, n]
     _ -> panic "CopyArrayOp"
 
   CopyMutableArrayOp -> \case
     [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] ->
-      inlinePrimop $ \ [] -> doCopyMutableArrayOp src src_off dst dst_off (fromInteger n)
+      inlinePrimop $ \ [] -> doCopyMutableArrayOp op_name src src_off dst dst_off (fromInteger n)
     [src, src_off, dst, dst_off, n] ->
       outOfLinePrimop $ do
         profile  <- getProfile
         platform <- getPlatform
         whenCheckBounds $ ifNonZero n $ do
-          emitRangeBoundsCheck src_off n (ptrArraySize platform profile src)
-          emitRangeBoundsCheck dst_off n (ptrArraySize platform profile dst)
+          emitRangeBoundsCheck op_name src_off n (ptrArraySize platform profile src)
+          emitRangeBoundsCheck op_name dst_off n (ptrArraySize platform profile dst)
         callExternalPrimop CopyMutableArrayOp [src, src_off, dst, dst_off, n]
     _ -> panic "CopyMutableArrayOp"
 
@@ -249,27 +243,27 @@ emitPrimOp cfg primop =
 
   CopySmallArrayOp -> \case
     [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] ->
-      inlinePrimop $ \ [] -> doCopySmallArrayOp src src_off dst dst_off (fromInteger n)
+      inlinePrimop $ \ [] -> doCopySmallArrayOp op_name src src_off dst dst_off (fromInteger n)
     [src, src_off, dst, dst_off, n] ->
       outOfLinePrimop $ do
         profile  <- getProfile
         platform <- getPlatform
         whenCheckBounds $ ifNonZero n $ do
-          emitRangeBoundsCheck src_off n (smallPtrArraySize platform profile src)
-          emitRangeBoundsCheck dst_off n (smallPtrArraySize platform profile dst)
+          emitRangeBoundsCheck op_name src_off n (smallPtrArraySize platform profile src)
+          emitRangeBoundsCheck op_name dst_off n (smallPtrArraySize platform profile dst)
         callExternalPrimop CopySmallArrayOp [src, src_off, dst, dst_off, n]
     _ -> panic "CopySmallArrayOp"
 
   CopySmallMutableArrayOp -> \case
     [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] ->
-      inlinePrimop $ \ [] -> doCopySmallMutableArrayOp src src_off dst dst_off (fromInteger n)
+      inlinePrimop $ \ [] -> doCopySmallMutableArrayOp op_name src src_off dst dst_off (fromInteger n)
     [src, src_off, dst, dst_off, n] ->
       outOfLinePrimop $ do
         profile  <- getProfile
         platform <- getPlatform
         whenCheckBounds $ ifNonZero n $ do
-          emitRangeBoundsCheck src_off n (smallPtrArraySize platform profile src)
-          emitRangeBoundsCheck dst_off n (smallPtrArraySize platform profile dst)
+          emitRangeBoundsCheck op_name src_off n (smallPtrArraySize platform profile src)
+          emitRangeBoundsCheck op_name dst_off n (smallPtrArraySize platform profile dst)
         callExternalPrimop CopySmallMutableArrayOp [src, src_off, dst, dst_off, n]
     _ -> panic "CopySmallMutableArrayOp"
 
@@ -447,18 +441,18 @@ emitPrimOp cfg primop =
 -- Reading/writing pointer arrays
 
   ReadArrayOp -> \[obj, ix] -> inlinePrimop $ \[res] ->
-    doReadPtrArrayOp res obj ix
+    doReadPtrArrayOp op_name res obj ix
   IndexArrayOp -> \[obj, ix] -> inlinePrimop $ \[res] ->
-    doReadPtrArrayOp res obj ix
+    doReadPtrArrayOp op_name res obj ix
   WriteArrayOp -> \[obj, ix, v] -> inlinePrimop $ \[] ->
-    doWritePtrArrayOp obj ix v
+    doWritePtrArrayOp op_name obj ix v
 
   ReadSmallArrayOp -> \[obj, ix] -> inlinePrimop $ \[res] ->
-    doReadSmallPtrArrayOp res obj ix
+    doReadSmallPtrArrayOp op_name res obj ix
   IndexSmallArrayOp -> \[obj, ix] -> inlinePrimop $ \[res] ->
-    doReadSmallPtrArrayOp res obj ix
+    doReadSmallPtrArrayOp op_name res obj ix
   WriteSmallArrayOp -> \[obj,ix,v] -> inlinePrimop $ \[] ->
-    doWriteSmallPtrArrayOp obj ix v
+    doWriteSmallPtrArrayOp op_name obj ix v
 
 -- Getting the size of pointer arrays
 
@@ -636,134 +630,134 @@ emitPrimOp cfg primop =
 -- IndexXXXArray
 
   IndexByteArrayOp_Char -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   (Just (mo_u_8ToWord platform)) b8 res args
+    doIndexByteArrayOp op_name   (Just (mo_u_8ToWord platform)) b8 res args
   IndexByteArrayOp_WideChar -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   (Just (mo_u_32ToWord platform)) b32 res args
+    doIndexByteArrayOp op_name   (Just (mo_u_32ToWord platform)) b32 res args
   IndexByteArrayOp_Int -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing (bWord platform) res args
+    doIndexByteArrayOp op_name   Nothing (bWord platform) res args
   IndexByteArrayOp_Word -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing (bWord platform) res args
+    doIndexByteArrayOp op_name   Nothing (bWord platform) res args
   IndexByteArrayOp_Addr -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing (bWord platform) res args
+    doIndexByteArrayOp op_name   Nothing (bWord platform) res args
   IndexByteArrayOp_Float -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing f32 res args
+    doIndexByteArrayOp op_name   Nothing f32 res args
   IndexByteArrayOp_Double -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing f64 res args
+    doIndexByteArrayOp op_name   Nothing f64 res args
   IndexByteArrayOp_StablePtr -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing (bWord platform) res args
+    doIndexByteArrayOp op_name   Nothing (bWord platform) res args
   IndexByteArrayOp_Int8 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing b8  res args
+    doIndexByteArrayOp op_name   Nothing b8  res args
   IndexByteArrayOp_Int16 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing b16  res args
+    doIndexByteArrayOp op_name   Nothing b16  res args
   IndexByteArrayOp_Int32 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing b32  res args
+    doIndexByteArrayOp op_name   Nothing b32  res args
   IndexByteArrayOp_Int64 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing b64  res args
+    doIndexByteArrayOp op_name   Nothing b64  res args
   IndexByteArrayOp_Word8 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing b8  res args
+    doIndexByteArrayOp op_name   Nothing b8  res args
   IndexByteArrayOp_Word16 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing b16  res args
+    doIndexByteArrayOp op_name   Nothing b16  res args
   IndexByteArrayOp_Word32 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing b32  res args
+    doIndexByteArrayOp op_name   Nothing b32  res args
   IndexByteArrayOp_Word64 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing b64  res args
+    doIndexByteArrayOp op_name   Nothing b64  res args
 
 -- ReadXXXArray, identical to IndexXXXArray.
 
   ReadByteArrayOp_Char -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   (Just (mo_u_8ToWord platform)) b8 res args
+    doIndexByteArrayOp op_name   (Just (mo_u_8ToWord platform)) b8 res args
   ReadByteArrayOp_WideChar -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   (Just (mo_u_32ToWord platform)) b32 res args
+    doIndexByteArrayOp op_name   (Just (mo_u_32ToWord platform)) b32 res args
   ReadByteArrayOp_Int -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing (bWord platform) res args
+    doIndexByteArrayOp op_name   Nothing (bWord platform) res args
   ReadByteArrayOp_Word -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing (bWord platform) res args
+    doIndexByteArrayOp op_name   Nothing (bWord platform) res args
   ReadByteArrayOp_Addr -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing (bWord platform) res args
+    doIndexByteArrayOp op_name   Nothing (bWord platform) res args
   ReadByteArrayOp_Float -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing f32 res args
+    doIndexByteArrayOp op_name   Nothing f32 res args
   ReadByteArrayOp_Double -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing f64 res args
+    doIndexByteArrayOp op_name   Nothing f64 res args
   ReadByteArrayOp_StablePtr -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing (bWord platform) res args
+    doIndexByteArrayOp op_name   Nothing (bWord platform) res args
   ReadByteArrayOp_Int8 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing b8  res args
+    doIndexByteArrayOp op_name   Nothing b8  res args
   ReadByteArrayOp_Int16 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing b16  res args
+    doIndexByteArrayOp op_name   Nothing b16  res args
   ReadByteArrayOp_Int32 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing b32  res args
+    doIndexByteArrayOp op_name   Nothing b32  res args
   ReadByteArrayOp_Int64 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing b64  res args
+    doIndexByteArrayOp op_name   Nothing b64  res args
   ReadByteArrayOp_Word8 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing b8  res args
+    doIndexByteArrayOp op_name   Nothing b8  res args
   ReadByteArrayOp_Word16 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing b16  res args
+    doIndexByteArrayOp op_name   Nothing b16  res args
   ReadByteArrayOp_Word32 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing b32  res args
+    doIndexByteArrayOp op_name   Nothing b32  res args
   ReadByteArrayOp_Word64 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOp   Nothing b64  res args
+    doIndexByteArrayOp op_name   Nothing b64  res args
 
 -- IndexWord8ArrayAsXXX
 
   IndexByteArrayOp_Word8AsChar -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   (Just (mo_u_8ToWord platform)) b8 b8 res args
+    doIndexByteArrayOpAs op_name   (Just (mo_u_8ToWord platform)) b8 b8 res args
   IndexByteArrayOp_Word8AsWideChar -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   (Just (mo_u_32ToWord platform)) b32 b8 res args
+    doIndexByteArrayOpAs op_name   (Just (mo_u_32ToWord platform)) b32 b8 res args
   IndexByteArrayOp_Word8AsInt -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing (bWord platform) b8 res args
+    doIndexByteArrayOpAs op_name   Nothing (bWord platform) b8 res args
   IndexByteArrayOp_Word8AsWord -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing (bWord platform) b8 res args
+    doIndexByteArrayOpAs op_name   Nothing (bWord platform) b8 res args
   IndexByteArrayOp_Word8AsAddr -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing (bWord platform) b8 res args
+    doIndexByteArrayOpAs op_name   Nothing (bWord platform) b8 res args
   IndexByteArrayOp_Word8AsFloat -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing f32 b8 res args
+    doIndexByteArrayOpAs op_name   Nothing f32 b8 res args
   IndexByteArrayOp_Word8AsDouble -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing f64 b8 res args
+    doIndexByteArrayOpAs op_name   Nothing f64 b8 res args
   IndexByteArrayOp_Word8AsStablePtr -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing (bWord platform) b8 res args
+    doIndexByteArrayOpAs op_name   Nothing (bWord platform) b8 res args
   IndexByteArrayOp_Word8AsInt16 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing b16 b8 res args
+    doIndexByteArrayOpAs op_name   Nothing b16 b8 res args
   IndexByteArrayOp_Word8AsInt32 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing b32 b8 res args
+    doIndexByteArrayOpAs op_name   Nothing b32 b8 res args
   IndexByteArrayOp_Word8AsInt64 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing b64 b8 res args
+    doIndexByteArrayOpAs op_name   Nothing b64 b8 res args
   IndexByteArrayOp_Word8AsWord16 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing b16 b8 res args
+    doIndexByteArrayOpAs op_name   Nothing b16 b8 res args
   IndexByteArrayOp_Word8AsWord32 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing b32 b8 res args
+    doIndexByteArrayOpAs op_name   Nothing b32 b8 res args
   IndexByteArrayOp_Word8AsWord64 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing b64 b8 res args
+    doIndexByteArrayOpAs op_name   Nothing b64 b8 res args
 
 -- ReadInt8ArrayAsXXX, identical to IndexInt8ArrayAsXXX
 
   ReadByteArrayOp_Word8AsChar -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   (Just (mo_u_8ToWord platform)) b8 b8 res args
+    doIndexByteArrayOpAs op_name   (Just (mo_u_8ToWord platform)) b8 b8 res args
   ReadByteArrayOp_Word8AsWideChar -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   (Just (mo_u_32ToWord platform)) b32 b8 res args
+    doIndexByteArrayOpAs op_name   (Just (mo_u_32ToWord platform)) b32 b8 res args
   ReadByteArrayOp_Word8AsInt -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing (bWord platform) b8 res args
+    doIndexByteArrayOpAs op_name   Nothing (bWord platform) b8 res args
   ReadByteArrayOp_Word8AsWord -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing (bWord platform) b8 res args
+    doIndexByteArrayOpAs op_name   Nothing (bWord platform) b8 res args
   ReadByteArrayOp_Word8AsAddr -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing (bWord platform) b8 res args
+    doIndexByteArrayOpAs op_name   Nothing (bWord platform) b8 res args
   ReadByteArrayOp_Word8AsFloat -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing f32 b8 res args
+    doIndexByteArrayOpAs op_name   Nothing f32 b8 res args
   ReadByteArrayOp_Word8AsDouble -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing f64 b8 res args
+    doIndexByteArrayOpAs op_name   Nothing f64 b8 res args
   ReadByteArrayOp_Word8AsStablePtr -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing (bWord platform) b8 res args
+    doIndexByteArrayOpAs op_name   Nothing (bWord platform) b8 res args
   ReadByteArrayOp_Word8AsInt16 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing b16 b8 res args
+    doIndexByteArrayOpAs op_name   Nothing b16 b8 res args
   ReadByteArrayOp_Word8AsInt32 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing b32 b8 res args
+    doIndexByteArrayOpAs op_name   Nothing b32 b8 res args
   ReadByteArrayOp_Word8AsInt64 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing b64 b8 res args
+    doIndexByteArrayOpAs op_name   Nothing b64 b8 res args
   ReadByteArrayOp_Word8AsWord16 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing b16 b8 res args
+    doIndexByteArrayOpAs op_name   Nothing b16 b8 res args
   ReadByteArrayOp_Word8AsWord32 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing b32 b8 res args
+    doIndexByteArrayOpAs op_name   Nothing b32 b8 res args
   ReadByteArrayOp_Word8AsWord64 -> \args -> inlinePrimop $ \res ->
-    doIndexByteArrayOpAs   Nothing b64 b8 res args
+    doIndexByteArrayOpAs op_name   Nothing b64 b8 res args
 
 -- WriteXXXoffAddr
 
@@ -803,94 +797,94 @@ emitPrimOp cfg primop =
 -- WriteXXXArray
 
   WriteByteArrayOp_Char -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp (Just (mo_WordTo8 platform))  b8 res args
+    doWriteByteArrayOp op_name (Just (mo_WordTo8 platform))  b8 res args
   WriteByteArrayOp_WideChar -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp (Just (mo_WordTo32 platform)) b32 res args
+    doWriteByteArrayOp op_name (Just (mo_WordTo32 platform)) b32 res args
   WriteByteArrayOp_Int -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing (bWord platform) res args
+    doWriteByteArrayOp op_name Nothing (bWord platform) res args
   WriteByteArrayOp_Word -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing (bWord platform) res args
+    doWriteByteArrayOp op_name Nothing (bWord platform) res args
   WriteByteArrayOp_Addr -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing (bWord platform) res args
+    doWriteByteArrayOp op_name Nothing (bWord platform) res args
   WriteByteArrayOp_Float -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing f32 res args
+    doWriteByteArrayOp op_name Nothing f32 res args
   WriteByteArrayOp_Double -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing f64 res args
+    doWriteByteArrayOp op_name Nothing f64 res args
   WriteByteArrayOp_StablePtr -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing (bWord platform) res args
+    doWriteByteArrayOp op_name Nothing (bWord platform) res args
   WriteByteArrayOp_Int8 -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp op_name Nothing b8 res args
   WriteByteArrayOp_Int16 -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b16 res args
+    doWriteByteArrayOp op_name Nothing b16 res args
   WriteByteArrayOp_Int32 -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b32 res args
+    doWriteByteArrayOp op_name Nothing b32 res args
   WriteByteArrayOp_Int64 -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b64 res args
+    doWriteByteArrayOp op_name Nothing b64 res args
   WriteByteArrayOp_Word8 -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b8  res args
+    doWriteByteArrayOp op_name Nothing b8  res args
   WriteByteArrayOp_Word16 -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b16 res args
+    doWriteByteArrayOp op_name Nothing b16 res args
   WriteByteArrayOp_Word32 -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b32 res args
+    doWriteByteArrayOp op_name Nothing b32 res args
   WriteByteArrayOp_Word64 -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b64 res args
+    doWriteByteArrayOp op_name Nothing b64 res args
 
 -- WriteInt8ArrayAsXXX
 
   WriteByteArrayOp_Word8AsChar -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp (Just (mo_WordTo8 platform))  b8 res args
+    doWriteByteArrayOp op_name (Just (mo_WordTo8 platform))  b8 res args
   WriteByteArrayOp_Word8AsWideChar -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp (Just (mo_WordTo32 platform)) b8 res args
+    doWriteByteArrayOp op_name (Just (mo_WordTo32 platform)) b8 res args
   WriteByteArrayOp_Word8AsInt -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp op_name Nothing b8 res args
   WriteByteArrayOp_Word8AsWord -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp op_name Nothing b8 res args
   WriteByteArrayOp_Word8AsAddr -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp op_name Nothing b8 res args
   WriteByteArrayOp_Word8AsFloat -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp op_name Nothing b8 res args
   WriteByteArrayOp_Word8AsDouble -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp op_name Nothing b8 res args
   WriteByteArrayOp_Word8AsStablePtr -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp op_name Nothing b8 res args
   WriteByteArrayOp_Word8AsInt16 -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp op_name Nothing b8 res args
   WriteByteArrayOp_Word8AsInt32 -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp op_name Nothing b8 res args
   WriteByteArrayOp_Word8AsInt64 -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp op_name Nothing b8 res args
   WriteByteArrayOp_Word8AsWord16 -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp op_name Nothing b8 res args
   WriteByteArrayOp_Word8AsWord32 -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp op_name Nothing b8 res args
   WriteByteArrayOp_Word8AsWord64 -> \args -> inlinePrimop $ \res ->
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp op_name Nothing b8 res args
 
 -- Copying and setting byte arrays
   CopyByteArrayOp -> \[src,src_off,dst,dst_off,n] -> inlinePrimop $ \[] ->
-    doCopyByteArrayOp src src_off dst dst_off n
+    doCopyByteArrayOp op_name src src_off dst dst_off n
   CopyMutableByteArrayOp -> \[src,src_off,dst,dst_off,n] -> inlinePrimop $ \[] ->
-    doCopyMutableByteArrayOp src src_off dst dst_off n
+    doCopyMutableByteArrayOp op_name src src_off dst dst_off n
   CopyMutableByteArrayNonOverlappingOp -> \[src,src_off,dst,dst_off,n] -> inlinePrimop $ \[] ->
-    doCopyMutableByteArrayNonOverlappingOp src src_off dst dst_off n
+    doCopyMutableByteArrayNonOverlappingOp op_name src src_off dst dst_off n
   CopyByteArrayToAddrOp -> \[src,src_off,dst,n] -> inlinePrimop $ \[] ->
-    doCopyByteArrayToAddrOp src src_off dst n
+    doCopyByteArrayToAddrOp op_name src src_off dst n
   CopyMutableByteArrayToAddrOp -> \[src,src_off,dst,n] -> inlinePrimop $ \[] ->
-    doCopyMutableByteArrayToAddrOp src src_off dst n
+    doCopyMutableByteArrayToAddrOp op_name src src_off dst n
   CopyAddrToByteArrayOp -> \[src,dst,dst_off,n] -> inlinePrimop $ \[] ->
-    doCopyAddrToByteArrayOp src dst dst_off n
+    doCopyAddrToByteArrayOp op_name src dst dst_off n
   CopyAddrToAddrOp -> \[src,dst,n] -> inlinePrimop $ \[] ->
     doCopyAddrToAddrOp src dst n
   CopyAddrToAddrNonOverlappingOp -> \[src,dst,n] -> inlinePrimop $ \[] ->
-    doCopyAddrToAddrNonOverlappingOp src dst n
+    doCopyAddrToAddrNonOverlappingOp op_name src dst n
   SetByteArrayOp -> \[ba,off,len,c] -> inlinePrimop $ \[] ->
-    doSetByteArrayOp ba off len c
+    doSetByteArrayOp op_name ba off len c
   SetAddrRangeOp -> \[dst,len,c] -> inlinePrimop $ \[] ->
     doSetAddrRangeOp dst len c
 
 -- Comparing byte arrays
   CompareByteArraysOp -> \[ba1,ba1_off,ba2,ba2_off,n] -> inlinePrimop $ \[res] ->
-    doCompareByteArraysOp res ba1 ba1_off ba2 ba2_off n
+    doCompareByteArraysOp op_name res ba1 ba1_off ba2 ba2_off n
 
   BSwap16Op -> \[w] -> inlinePrimop $ \[res] ->
     emitBSwapCall res w W16
@@ -1051,21 +1045,21 @@ emitPrimOp cfg primop =
 
   (VecIndexByteArrayOp vcat n w) -> \args -> inlinePrimop $ \res0 -> do
     checkVecCompatibility cfg vcat n w
-    doIndexByteArrayOp Nothing ty res0 args
+    doIndexByteArrayOp op_name Nothing ty res0 args
    where
     ty :: CmmType
     ty = vecCmmType vcat n w
 
   (VecReadByteArrayOp vcat n w) -> \args -> inlinePrimop $ \res0 -> do
     checkVecCompatibility cfg vcat n w
-    doIndexByteArrayOp Nothing ty res0 args
+    doIndexByteArrayOp op_name Nothing ty res0 args
    where
     ty :: CmmType
     ty = vecCmmType vcat n w
 
   (VecWriteByteArrayOp vcat n w) -> \args -> inlinePrimop $ \res0 -> do
     checkVecCompatibility cfg vcat n w
-    doWriteByteArrayOp Nothing ty res0 args
+    doWriteByteArrayOp op_name Nothing ty res0 args
    where
     ty :: CmmType
     ty = vecCmmType vcat n w
@@ -1093,7 +1087,7 @@ emitPrimOp cfg primop =
 
   (VecIndexScalarByteArrayOp vcat n w) -> \args -> inlinePrimop $ \res0 -> do
     checkVecCompatibility cfg vcat n w
-    doIndexByteArrayOpAs Nothing vecty ty res0 args
+    doIndexByteArrayOpAs op_name Nothing vecty ty res0 args
    where
     vecty :: CmmType
     vecty = vecCmmType vcat n w
@@ -1103,7 +1097,7 @@ emitPrimOp cfg primop =
 
   (VecReadScalarByteArrayOp vcat n w) -> \args -> inlinePrimop $ \res0 -> do
     checkVecCompatibility cfg vcat n w
-    doIndexByteArrayOpAs Nothing vecty ty res0 args
+    doIndexByteArrayOpAs op_name Nothing vecty ty res0 args
    where
     vecty :: CmmType
     vecty = vecCmmType vcat n w
@@ -1113,7 +1107,7 @@ emitPrimOp cfg primop =
 
   (VecWriteScalarByteArrayOp vcat n w) -> \args -> inlinePrimop $ \res0 -> do
     checkVecCompatibility cfg vcat n w
-    doWriteByteArrayOp Nothing ty res0 args
+    doWriteByteArrayOp op_name Nothing ty res0 args
    where
     ty :: CmmType
     ty = vecCmmCat vcat w
@@ -1187,31 +1181,31 @@ emitPrimOp cfg primop =
 
 -- Atomic read-modify-write
   FetchAddByteArrayOp_Int -> \[mba, ix, n] -> inlinePrimop $ \[res] ->
-    doAtomicByteArrayRMW res AMO_Add mba ix (bWord platform) n
+    doAtomicByteArrayRMW op_name res AMO_Add mba ix (bWord platform) n
   FetchSubByteArrayOp_Int -> \[mba, ix, n] -> inlinePrimop $ \[res] ->
-    doAtomicByteArrayRMW res AMO_Sub mba ix (bWord platform) n
+    doAtomicByteArrayRMW op_name res AMO_Sub mba ix (bWord platform) n
   FetchAndByteArrayOp_Int -> \[mba, ix, n] -> inlinePrimop $ \[res] ->
-    doAtomicByteArrayRMW res AMO_And mba ix (bWord platform) n
+    doAtomicByteArrayRMW op_name res AMO_And mba ix (bWord platform) n
   FetchNandByteArrayOp_Int -> \[mba, ix, n] -> inlinePrimop $ \[res] ->
-    doAtomicByteArrayRMW res AMO_Nand mba ix (bWord platform) n
+    doAtomicByteArrayRMW op_name res AMO_Nand mba ix (bWord platform) n
   FetchOrByteArrayOp_Int -> \[mba, ix, n] -> inlinePrimop $ \[res] ->
-    doAtomicByteArrayRMW res AMO_Or mba ix (bWord platform) n
+    doAtomicByteArrayRMW op_name res AMO_Or mba ix (bWord platform) n
   FetchXorByteArrayOp_Int -> \[mba, ix, n] -> inlinePrimop $ \[res] ->
-    doAtomicByteArrayRMW res AMO_Xor mba ix (bWord platform) n
+    doAtomicByteArrayRMW op_name res AMO_Xor mba ix (bWord platform) n
   AtomicReadByteArrayOp_Int -> \[mba, ix] -> inlinePrimop $ \[res] ->
-    doAtomicReadByteArray res mba ix (bWord platform)
+    doAtomicReadByteArray op_name res mba ix (bWord platform)
   AtomicWriteByteArrayOp_Int -> \[mba, ix, val] -> inlinePrimop $ \[] ->
-    doAtomicWriteByteArray mba ix (bWord platform) val
+    doAtomicWriteByteArray op_name mba ix (bWord platform) val
   CasByteArrayOp_Int -> \[mba, ix, old, new] -> inlinePrimop $ \[res] ->
-    doCasByteArray res mba ix (bWord platform) old new
+    doCasByteArray op_name res mba ix (bWord platform) old new
   CasByteArrayOp_Int8 -> \[mba, ix, old, new] -> inlinePrimop $ \[res] ->
-    doCasByteArray res mba ix b8 old new
+    doCasByteArray op_name res mba ix b8 old new
   CasByteArrayOp_Int16 -> \[mba, ix, old, new] -> inlinePrimop $ \[res] ->
-    doCasByteArray res mba ix b16 old new
+    doCasByteArray op_name res mba ix b16 old new
   CasByteArrayOp_Int32 -> \[mba, ix, old, new] -> inlinePrimop $ \[res] ->
-    doCasByteArray res mba ix b32 old new
+    doCasByteArray op_name res mba ix b32 old new
   CasByteArrayOp_Int64 -> \[mba, ix, old, new] -> inlinePrimop $ \[res] ->
-    doCasByteArray res mba ix b64 old new
+    doCasByteArray op_name res mba ix b64 old new
 
 -- The rest just translate straightforwardly
 
@@ -1865,6 +1859,10 @@ emitPrimOp cfg primop =
   platform = stgToCmmPlatform cfg
   result_info = getPrimOpResultInfo primop
 
+  -- The source name of the primop, for -fcheck-prim-bounds error messages.
+  -- Lazy: only forced when such a check is emitted.
+  op_name = occNameFS (primOpOcc primop)
+
   opNop :: [CmmExpr] -> PrimopCmmEmit
   opNop args = inlinePrimop $ \[res] -> emitAssign (CmmLocal res) arg
     where [arg] = args
@@ -2463,40 +2461,43 @@ doIndexOffAddrOpAs maybe_post_read_cast rep idx_rep [res] [addr,idx]
 doIndexOffAddrOpAs _ _ _ _ _
    = panic "GHC.StgToCmm.Prim: doIndexOffAddrOpAs"
 
-doIndexByteArrayOp :: Maybe MachOp
+doIndexByteArrayOp :: FastString
+                   -> Maybe MachOp
                    -> CmmType
                    -> [LocalReg]
                    -> [CmmExpr]
                    -> FCode ()
-doIndexByteArrayOp maybe_post_read_cast rep [res] [addr,idx]
+doIndexByteArrayOp op_name maybe_post_read_cast rep [res] [addr,idx]
    = do profile <- getProfile
-        doByteArrayBoundsCheck idx addr rep rep
+        doByteArrayBoundsCheck op_name idx addr rep rep
         mkBasicIndexedRead False NaturallyAligned (arrWordsHdrSize profile) maybe_post_read_cast rep res addr rep idx
-doIndexByteArrayOp _ _ _ _
+doIndexByteArrayOp _ _ _ _ _
    = panic "GHC.StgToCmm.Prim: doIndexByteArrayOp"
 
-doIndexByteArrayOpAs :: Maybe MachOp
+doIndexByteArrayOpAs :: FastString
+                    -> Maybe MachOp
                     -> CmmType
                     -> CmmType
                     -> [LocalReg]
                     -> [CmmExpr]
                     -> FCode ()
-doIndexByteArrayOpAs maybe_post_read_cast rep idx_rep [res] [addr,idx]
+doIndexByteArrayOpAs op_name maybe_post_read_cast rep idx_rep [res] [addr,idx]
    = do profile <- getProfile
-        doByteArrayBoundsCheck idx addr idx_rep rep
+        doByteArrayBoundsCheck op_name idx addr idx_rep rep
         let alignment = alignmentFromTypes rep idx_rep
         mkBasicIndexedRead False alignment (arrWordsHdrSize profile) maybe_post_read_cast rep res addr idx_rep idx
-doIndexByteArrayOpAs _ _ _ _ _
+doIndexByteArrayOpAs _ _ _ _ _ _
    = panic "GHC.StgToCmm.Prim: doIndexByteArrayOpAs"
 
-doReadPtrArrayOp :: LocalReg
+doReadPtrArrayOp :: FastString
+                 -> LocalReg
                  -> CmmExpr
                  -> CmmExpr
                  -> FCode ()
-doReadPtrArrayOp res addr idx
+doReadPtrArrayOp op_name res addr idx
    = do profile <- getProfile
         platform <- getPlatform
-        doPtrArrayBoundsCheck idx addr
+        doPtrArrayBoundsCheck op_name idx addr
         mkBasicIndexedRead True NaturallyAligned (arrPtrsHdrSize profile) Nothing (gcWord platform) res addr (gcWord platform) idx
 
 doWriteOffAddrOp :: Maybe MachOp
@@ -2509,31 +2510,33 @@ doWriteOffAddrOp castOp idx_ty [] [addr,idx, val]
 doWriteOffAddrOp _ _ _ _
    = panic "GHC.StgToCmm.Prim: doWriteOffAddrOp"
 
-doWriteByteArrayOp :: Maybe MachOp
+doWriteByteArrayOp :: FastString
+                   -> Maybe MachOp
                    -> CmmType
                    -> [LocalReg]
                    -> [CmmExpr]
                    -> FCode ()
-doWriteByteArrayOp castOp idx_ty [] [addr,idx, rawVal]
+doWriteByteArrayOp op_name castOp idx_ty [] [addr,idx, rawVal]
    = do profile <- getProfile
         platform <- getPlatform
         let val = maybeCast castOp rawVal
-        doByteArrayBoundsCheck idx addr idx_ty (cmmExprType platform val)
+        doByteArrayBoundsCheck op_name idx addr idx_ty (cmmExprType platform val)
         mkBasicIndexedWrite False (arrWordsHdrSize profile) addr idx_ty idx val
-doWriteByteArrayOp _ _ _ _
+doWriteByteArrayOp _ _ _ _ _
    = panic "GHC.StgToCmm.Prim: doWriteByteArrayOp"
 
-doWritePtrArrayOp :: CmmExpr
+doWritePtrArrayOp :: FastString
+                  -> CmmExpr
                   -> CmmExpr
                   -> CmmExpr
                   -> FCode ()
-doWritePtrArrayOp addr idx val
+doWritePtrArrayOp op_name addr idx val
   = do profile  <- getProfile
        platform <- getPlatform
        let ty = cmmExprType platform val
            hdr_size = arrPtrsHdrSize profile
 
-       doPtrArrayBoundsCheck idx addr
+       doPtrArrayBoundsCheck op_name idx addr
 
        -- Update remembered set for non-moving collector
        whenUpdRemSetEnabled
@@ -2947,15 +2950,16 @@ doNewByteArrayOp res_r n = do
 -- ----------------------------------------------------------------------------
 -- Comparing byte arrays
 
-doCompareByteArraysOp :: LocalReg -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+doCompareByteArraysOp :: FastString
+                     -> LocalReg -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                      -> FCode ()
-doCompareByteArraysOp res ba1 ba1_off ba2 ba2_off n = do
+doCompareByteArraysOp op_name res ba1 ba1_off ba2 ba2_off n = do
     profile <- getProfile
     platform <- getPlatform
 
     whenCheckBounds $ ifNonZero n $ do
-        emitRangeBoundsCheck ba1_off n (byteArraySize platform profile ba1)
-        emitRangeBoundsCheck ba2_off n (byteArraySize platform profile ba2)
+        emitRangeBoundsCheck op_name ba1_off n (byteArraySize platform profile ba1)
+        emitRangeBoundsCheck op_name ba2_off n (byteArraySize platform profile ba2)
 
     ba1_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform ba1 (arrWordsHdrSize profile)) ba1_off
     ba2_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform ba2 (arrWordsHdrSize profile)) ba2_off
@@ -3011,23 +3015,25 @@ doCompareByteArraysOp res ba1 ba1_off ba2 ba2_off n = do
 -- destination 'MutableByteArray#', an offset into the destination
 -- array, and the number of bytes to copy.  Copies the given number of
 -- bytes from the source array to the destination array.
-doCopyByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+doCopyByteArrayOp :: FastString
+                  -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                   -> FCode ()
-doCopyByteArrayOp = emitCopyByteArray copy
+doCopyByteArrayOp op_name = emitCopyByteArray op_name copy
   where
     -- Copy data (we assume the arrays aren't overlapping since
     -- they're of different types)
     copy _src _dst dst_p src_p bytes align =
-        emitCheckedMemcpyCall dst_p src_p bytes align
+        emitCheckedMemcpyCall op_name dst_p src_p bytes align
 
 -- | Takes a source 'MutableByteArray#', an offset in the source
 -- array, a destination 'MutableByteArray#', an offset into the
 -- destination array, and the number of bytes to copy.  Copies the
 -- given number of bytes from the source array to the destination
 -- array.
-doCopyMutableByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+doCopyMutableByteArrayOp :: FastString
+                         -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                          -> FCode ()
-doCopyMutableByteArrayOp = emitCopyByteArray copy
+doCopyMutableByteArrayOp op_name = emitCopyByteArray op_name copy
   where
     -- The only time the memory might overlap is when the two arrays
     -- we were provided are the same array!
@@ -3044,25 +3050,27 @@ doCopyMutableByteArrayOp = emitCopyByteArray copy
 -- destination array, and the number of bytes to copy.  Copies the
 -- given number of bytes from the source array to the destination
 -- array.  Assumes the two ranges are disjoint
-doCopyMutableByteArrayNonOverlappingOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+doCopyMutableByteArrayNonOverlappingOp :: FastString
+                         -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                          -> FCode ()
-doCopyMutableByteArrayNonOverlappingOp = emitCopyByteArray copy
+doCopyMutableByteArrayNonOverlappingOp op_name = emitCopyByteArray op_name copy
   where
     copy _src _dst dst_p src_p bytes align = do
-        emitCheckedMemcpyCall dst_p src_p bytes align
+        emitCheckedMemcpyCall op_name dst_p src_p bytes align
 
 
-emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+emitCopyByteArray :: FastString
+                  -> (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                       -> Alignment -> FCode ())
                   -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                   -> FCode ()
-emitCopyByteArray copy src src_off dst dst_off n = do
+emitCopyByteArray op_name copy src src_off dst dst_off n = do
     profile <- getProfile
     platform <- getPlatform
 
     whenCheckBounds $ ifNonZero n $ do
-        emitRangeBoundsCheck src_off n (byteArraySize platform profile src)
-        emitRangeBoundsCheck dst_off n (byteArraySize platform profile dst)
+        emitRangeBoundsCheck op_name src_off n (byteArraySize platform profile src)
+        emitRangeBoundsCheck op_name dst_off n (byteArraySize platform profile dst)
 
     let byteArrayAlignment = wordAlignment platform
         srcOffAlignment = cmmExprAlignment src_off
@@ -3075,35 +3083,35 @@ emitCopyByteArray copy src src_off dst dst_off n = do
 -- | Takes a source 'ByteArray#', an offset in the source array, a
 -- destination 'Addr#', and the number of bytes to copy.  Copies the given
 -- number of bytes from the source array to the destination memory region.
-doCopyByteArrayToAddrOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
-doCopyByteArrayToAddrOp src src_off dst_p bytes = do
+doCopyByteArrayToAddrOp :: FastString -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+doCopyByteArrayToAddrOp op_name src src_off dst_p bytes = do
     -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
     profile <- getProfile
     platform <- getPlatform
     whenCheckBounds $ ifNonZero bytes $ do
-        emitRangeBoundsCheck src_off bytes (byteArraySize platform profile src)
+        emitRangeBoundsCheck op_name src_off bytes (byteArraySize platform profile src)
     src_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform src (arrWordsHdrSize profile)) src_off
-    emitCheckedMemcpyCall dst_p src_p bytes (mkAlignment 1)
+    emitCheckedMemcpyCall op_name dst_p src_p bytes (mkAlignment 1)
 
 -- | Takes a source 'MutableByteArray#', an offset in the source array, a
 -- destination 'Addr#', and the number of bytes to copy.  Copies the given
 -- number of bytes from the source array to the destination memory region.
-doCopyMutableByteArrayToAddrOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+doCopyMutableByteArrayToAddrOp :: FastString -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                                -> FCode ()
 doCopyMutableByteArrayToAddrOp = doCopyByteArrayToAddrOp
 
 -- | Takes a source 'Addr#', a destination 'MutableByteArray#', an offset into
 -- the destination array, and the number of bytes to copy.  Copies the given
 -- number of bytes from the source memory region to the destination array.
-doCopyAddrToByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
-doCopyAddrToByteArrayOp src_p dst dst_off bytes = do
+doCopyAddrToByteArrayOp :: FastString -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+doCopyAddrToByteArrayOp op_name src_p dst dst_off bytes = do
     -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
     profile <- getProfile
     platform <- getPlatform
     whenCheckBounds $ ifNonZero bytes $ do
-        emitRangeBoundsCheck dst_off bytes (byteArraySize platform profile dst)
+        emitRangeBoundsCheck op_name dst_off bytes (byteArraySize platform profile dst)
     dst_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform dst (arrWordsHdrSize profile)) dst_off
-    emitCheckedMemcpyCall dst_p src_p bytes (mkAlignment 1)
+    emitCheckedMemcpyCall op_name dst_p src_p bytes (mkAlignment 1)
 
 -- | Takes a source 'Addr#', a destination 'Addr#', and the number of
 -- bytes to copy.  Copies the given number of bytes from the source
@@ -3116,10 +3124,10 @@ doCopyAddrToAddrOp src_p dst_p bytes = do
 -- | Takes a source 'Addr#', a destination 'Addr#', and the number of
 -- bytes to copy.  Copies the given number of bytes from the source
 -- memory region to the destination region.  The regions may not overlap.
-doCopyAddrToAddrNonOverlappingOp :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
-doCopyAddrToAddrNonOverlappingOp src_p dst_p bytes = do
+doCopyAddrToAddrNonOverlappingOp :: FastString -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+doCopyAddrToAddrNonOverlappingOp op_name src_p dst_p bytes = do
     -- Use memcpy; the ranges may not overlap
-    emitCheckedMemcpyCall dst_p src_p bytes (mkAlignment 1)
+    emitCheckedMemcpyCall op_name dst_p src_p bytes (mkAlignment 1)
 
 ifNonZero :: CmmExpr -> FCode () -> FCode ()
 ifNonZero e it = do
@@ -3137,14 +3145,14 @@ ifNonZero e it = do
 -- | Takes a 'MutableByteArray#', an offset into the array, a length,
 -- and a byte, and sets each of the selected bytes in the array to the
 -- given byte.
-doSetByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+doSetByteArrayOp :: FastString -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                  -> FCode ()
-doSetByteArrayOp ba off len c = do
+doSetByteArrayOp op_name ba off len c = do
     profile <- getProfile
     platform <- getPlatform
 
     whenCheckBounds $ ifNonZero len $
-      emitRangeBoundsCheck off len (byteArraySize platform profile ba)
+      emitRangeBoundsCheck op_name off len (byteArraySize platform profile ba)
 
     let byteArrayAlignment = wordAlignment platform -- known since BA is allocated on heap
         offsetAlignment = cmmExprAlignment off
@@ -3215,15 +3223,15 @@ assignTempE e = do
 -- destination 'MutableArray#', an offset into the destination array,
 -- and the number of elements to copy.  Copies the given number of
 -- elements from the source array to the destination array.
-doCopyArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> WordOff
+doCopyArrayOp :: FastString -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> WordOff
               -> FCode ()
-doCopyArrayOp = emitCopyArray copy
+doCopyArrayOp op_name = emitCopyArray op_name copy
   where
     -- Copy data (we assume the arrays aren't overlapping since
     -- they're of different types)
     copy _src _dst dst_p src_p bytes =
         do platform <- getPlatform
-           emitCheckedMemcpyCall dst_p src_p (mkIntExpr platform (toTargetInt bytes))
+           emitCheckedMemcpyCall op_name dst_p src_p (mkIntExpr platform (toTargetInt bytes))
                (wordAlignment platform)
 
 
@@ -3231,9 +3239,9 @@ doCopyArrayOp = emitCopyArray copy
 -- destination 'MutableArray#', an offset into the destination array,
 -- and the number of elements to copy.  Copies the given number of
 -- elements from the source array to the destination array.
-doCopyMutableArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> WordOff
+doCopyMutableArrayOp :: FastString -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> WordOff
                      -> FCode ()
-doCopyMutableArrayOp = emitCopyArray copy
+doCopyMutableArrayOp op_name = emitCopyArray op_name copy
   where
     -- The only time the memory might overlap is when the two arrays
     -- we were provided are the same array!
@@ -3247,7 +3255,8 @@ doCopyMutableArrayOp = emitCopyArray copy
              (wordAlignment platform))
         emit =<< mkCmmIfThenElse (cmmEqWord platform src dst) moveCall cpyCall
 
-emitCopyArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
+emitCopyArray :: FastString     -- ^ primop name
+              -> (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
                   -> FCode ())  -- ^ copy function
               -> CmmExpr        -- ^ source array
               -> CmmExpr        -- ^ offset in source array
@@ -3255,7 +3264,7 @@ emitCopyArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
               -> CmmExpr        -- ^ offset in destination array
               -> WordOff        -- ^ number of elements to copy
               -> FCode ()
-emitCopyArray copy src0 src_off dst0 dst_off0 n =
+emitCopyArray op_name copy src0 src_off dst0 dst_off0 n =
     when (n /= 0) $ do
         profile <- getProfile
         platform <- getPlatform
@@ -3266,9 +3275,9 @@ emitCopyArray copy src0 src_off dst0 dst_off0 n =
         dst_off <- assignTempE dst_off0
 
         whenCheckBounds $ do
-          emitRangeBoundsCheck src_off (mkIntExpr platform (toTargetInt n))
+          emitRangeBoundsCheck op_name src_off (mkIntExpr platform (toTargetInt n))
                                        (ptrArraySize platform profile src)
-          emitRangeBoundsCheck dst_off (mkIntExpr platform (toTargetInt n))
+          emitRangeBoundsCheck op_name dst_off (mkIntExpr platform (toTargetInt n))
                                        (ptrArraySize platform profile dst)
 
         -- Nonmoving collector write barrier
@@ -3292,21 +3301,21 @@ emitCopyArray copy src0 src_off dst0 dst_off0 n =
 
         emitSetCards dst_off dst_cards_p n
 
-doCopySmallArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> WordOff
+doCopySmallArrayOp :: FastString -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> WordOff
                    -> FCode ()
-doCopySmallArrayOp = emitCopySmallArray copy
+doCopySmallArrayOp op_name = emitCopySmallArray op_name copy
   where
     -- Copy data (we assume the arrays aren't overlapping since
     -- they're of different types)
     copy _src _dst dst_p src_p bytes =
         do platform <- getPlatform
-           emitCheckedMemcpyCall dst_p src_p (mkIntExpr platform (toTargetInt bytes))
+           emitCheckedMemcpyCall op_name dst_p src_p (mkIntExpr platform (toTargetInt bytes))
                (wordAlignment platform)
 
 
-doCopySmallMutableArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> WordOff
+doCopySmallMutableArrayOp :: FastString -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> WordOff
                           -> FCode ()
-doCopySmallMutableArrayOp = emitCopySmallArray copy
+doCopySmallMutableArrayOp op_name = emitCopySmallArray op_name copy
   where
     -- The only time the memory might overlap is when the two arrays
     -- we were provided are the same array!
@@ -3320,7 +3329,8 @@ doCopySmallMutableArrayOp = emitCopySmallArray copy
              (wordAlignment platform))
         emit =<< mkCmmIfThenElse (cmmEqWord platform src dst) moveCall cpyCall
 
-emitCopySmallArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
+emitCopySmallArray :: FastString     -- ^ primop name
+                   -> (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
                        -> FCode ())  -- ^ copy function
                    -> CmmExpr        -- ^ source array
                    -> CmmExpr        -- ^ offset in source array
@@ -3328,7 +3338,7 @@ emitCopySmallArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
                    -> CmmExpr        -- ^ offset in destination array
                    -> WordOff        -- ^ number of elements to copy
                    -> FCode ()
-emitCopySmallArray copy src0 src_off dst0 dst_off n =
+emitCopySmallArray op_name copy src0 src_off dst0 dst_off n =
     when (n /= 0) $ do
         profile <- getProfile
         platform <- getPlatform
@@ -3338,9 +3348,9 @@ emitCopySmallArray copy src0 src_off dst0 dst_off n =
         dst     <- assignTempE dst0
 
         whenCheckBounds $ do
-          emitRangeBoundsCheck src_off (mkIntExpr platform (toTargetInt n))
+          emitRangeBoundsCheck op_name src_off (mkIntExpr platform (toTargetInt n))
                                        (smallPtrArraySize platform profile src)
-          emitRangeBoundsCheck dst_off (mkIntExpr platform (toTargetInt n))
+          emitRangeBoundsCheck op_name dst_off (mkIntExpr platform (toTargetInt n))
                                        (smallPtrArraySize platform profile dst)
 
         -- Nonmoving collector write barrier
@@ -3461,27 +3471,29 @@ cardCmm platform i =
 ------------------------------------------------------------------------------
 -- SmallArray PrimOp implementations
 
-doReadSmallPtrArrayOp :: LocalReg
+doReadSmallPtrArrayOp :: FastString
+                      -> LocalReg
                       -> CmmExpr
                       -> CmmExpr
                       -> FCode ()
-doReadSmallPtrArrayOp res addr idx = do
+doReadSmallPtrArrayOp op_name res addr idx = do
     profile <- getProfile
     platform <- getPlatform
-    doSmallPtrArrayBoundsCheck idx addr
+    doSmallPtrArrayBoundsCheck op_name idx addr
     mkBasicIndexedRead True NaturallyAligned (smallArrPtrsHdrSize profile) Nothing (gcWord platform) res addr
         (gcWord platform) idx
 
-doWriteSmallPtrArrayOp :: CmmExpr
+doWriteSmallPtrArrayOp :: FastString
+                       -> CmmExpr
                        -> CmmExpr
                        -> CmmExpr
                        -> FCode ()
-doWriteSmallPtrArrayOp addr idx val = do
+doWriteSmallPtrArrayOp op_name addr idx val = do
     profile <- getProfile
     platform <- getPlatform
     let ty = cmmExprType platform val
 
-    doSmallPtrArrayBoundsCheck idx addr
+    doSmallPtrArrayBoundsCheck op_name idx addr
 
     -- Update remembered set for non-moving collector
     tmp <- newTemp ty
@@ -3499,17 +3511,18 @@ doWriteSmallPtrArrayOp addr idx val = do
 -- reg contains that previous value of the element. Implies a full
 -- memory barrier.
 doAtomicByteArrayRMW
-            :: LocalReg      -- ^ Result reg
+            :: FastString    -- ^ Primop name
+            -> LocalReg      -- ^ Result reg
             -> AtomicMachOp  -- ^ Atomic op (e.g. add)
             -> CmmExpr       -- ^ MutableByteArray#
             -> CmmExpr       -- ^ Index
             -> CmmType       -- ^ Type of element by which we are indexing
             -> CmmExpr       -- ^ Op argument (e.g. amount to add)
             -> FCode ()
-doAtomicByteArrayRMW res amop mba idx idx_ty n = do
+doAtomicByteArrayRMW op_name res amop mba idx idx_ty n = do
     profile <- getProfile
     platform <- getPlatform
-    doByteArrayBoundsCheck idx mba idx_ty idx_ty
+    doByteArrayBoundsCheck op_name idx mba idx_ty idx_ty
     let width = typeWidth idx_ty
         addr  = cmmIndexOffExpr platform (arrWordsHdrSize profile)
                 width mba idx
@@ -3530,15 +3543,16 @@ doAtomicAddrRMW res amop addr ty n =
 
 -- | Emit an atomic read to a byte array that acts as a memory barrier.
 doAtomicReadByteArray
-    :: LocalReg  -- ^ Result reg
+    :: FastString  -- ^ Primop name
+    -> LocalReg  -- ^ Result reg
     -> CmmExpr   -- ^ MutableByteArray#
     -> CmmExpr   -- ^ Index
     -> CmmType   -- ^ Type of element by which we are indexing
     -> FCode ()
-doAtomicReadByteArray res mba idx idx_ty = do
+doAtomicReadByteArray op_name res mba idx idx_ty = do
     profile <- getProfile
     platform <- getPlatform
-    doByteArrayBoundsCheck idx mba idx_ty idx_ty
+    doByteArrayBoundsCheck op_name idx mba idx_ty idx_ty
     let width = typeWidth idx_ty
         addr  = cmmIndexOffExpr platform (arrWordsHdrSize profile)
                 width mba idx
@@ -3558,15 +3572,16 @@ doAtomicReadAddr res addr ty =
 
 -- | Emit an atomic write to a byte array that acts as a memory barrier.
 doAtomicWriteByteArray
-    :: CmmExpr   -- ^ MutableByteArray#
+    :: FastString  -- ^ Primop name
+    -> CmmExpr   -- ^ MutableByteArray#
     -> CmmExpr   -- ^ Index
     -> CmmType   -- ^ Type of element by which we are indexing
     -> CmmExpr   -- ^ Value to write
     -> FCode ()
-doAtomicWriteByteArray mba idx idx_ty val = do
+doAtomicWriteByteArray op_name mba idx idx_ty val = do
     profile <- getProfile
     platform <- getPlatform
-    doByteArrayBoundsCheck idx mba idx_ty idx_ty
+    doByteArrayBoundsCheck op_name idx mba idx_ty idx_ty
     let width = typeWidth idx_ty
         addr  = cmmIndexOffExpr platform (arrWordsHdrSize profile)
                 width mba idx
@@ -3585,17 +3600,18 @@ doAtomicWriteAddr addr ty val =
         [ addr, val ]
 
 doCasByteArray
-    :: LocalReg  -- ^ Result reg
+    :: FastString  -- ^ Primop name
+    -> LocalReg  -- ^ Result reg
     -> CmmExpr   -- ^ MutableByteArray#
     -> CmmExpr   -- ^ Index
     -> CmmType   -- ^ Type of element by which we are indexing
     -> CmmExpr   -- ^ Old value
     -> CmmExpr   -- ^ New value
     -> FCode ()
-doCasByteArray res mba idx idx_ty old new = do
+doCasByteArray op_name res mba idx idx_ty old new = do
     profile <- getProfile
     platform <- getPlatform
-    doByteArrayBoundsCheck idx mba idx_ty idx_ty
+    doByteArrayBoundsCheck op_name idx mba idx_ty idx_ty
     let width = typeWidth idx_ty
         addr = cmmIndexOffExpr platform (arrWordsHdrSize profile)
                width mba idx
@@ -3617,15 +3633,14 @@ emitMemcpyCall dst src n align =
 
 -- | Emit a call to @memcpy@, but check for range
 -- overlap when -fcheck-prim-bounds is on.
-emitCheckedMemcpyCall :: CmmExpr -> CmmExpr -> CmmExpr -> Alignment -> FCode ()
-emitCheckedMemcpyCall dst src n align = do
+emitCheckedMemcpyCall :: FastString -> CmmExpr -> CmmExpr -> CmmExpr -> Alignment -> FCode ()
+emitCheckedMemcpyCall op_name dst src n align = do
     whenCheckBounds (getPlatform >>= doCheck)
     emitMemcpyCall dst src n align
   where
     doCheck platform = do
-        name <- fromMaybe (fsLit "<unknown primop>") <$> getCurrentPrimOpName
-        nameLbl <- newByteStringCLit (bytesFS name)
-        modLbl <- getCurrentModuleCLit
+        nameLbl <- newByteStringCLit (bytesFS op_name)
+        modLbl <- getModuleNameCLit
         overlapCheckFailed <- getCode $
           emitCCallNeverReturns []
             (mkLblExpr mkMemcpyRangeOverlapLabel)
@@ -3742,48 +3757,43 @@ whenCheckBounds a = do
     False -> pure ()
     True  -> a
 
--- | The bare name of the module currently being code-generated, as a string
--- literal, for use in @-fcheck-prim-bounds@ failure diagnostics.
-getCurrentModuleCLit :: FCode CmmLit
-getCurrentModuleCLit = do
-    mod <- getModuleName
-    newByteStringCLit (bytesFS (moduleNameFS (moduleName mod)))
-
 -- | Emit a call to the RTS @rtsOutOfBoundsAccess@ bounds-check failure
--- handler, passing the offending index, element count, array size, primop name
--- (see 'withCurrentPrimOpName') and the module being compiled.
-emitBoundsCheckFailed :: CmmExpr  -- ^ accessed index
+-- handler, passing the failing primop, the offending index, element count,
+-- array size, and the module being compiled.
+emitBoundsCheckFailed :: FastString  -- ^ primop name
+                      -> CmmExpr  -- ^ accessed index
                       -> CmmExpr  -- ^ number of accessed elements
                       -> CmmExpr  -- ^ array size (in elements)
                       -> FCode ()
-emitBoundsCheckFailed idx count sz = do
-    name <- fromMaybe (fsLit "<unknown primop>") <$> getCurrentPrimOpName
-    nameLbl <- newByteStringCLit (bytesFS name)
-    modLbl <- getCurrentModuleCLit
+emitBoundsCheckFailed op_name idx count sz = do
+    nameLbl <- newByteStringCLit (bytesFS op_name)
+    modLbl <- getModuleNameCLit
     emitCCallNeverReturns []
       (mkLblExpr mkOutOfBoundsAccessLabel)
-      [ (idx,            NoHint)
+      [ (CmmLit nameLbl, AddrHint)
+      , (idx,            NoHint)
       , (count,          NoHint)
       , (sz,             NoHint)
-      , (CmmLit nameLbl, AddrHint)
       , (CmmLit modLbl,  AddrHint) ]
 
-emitBoundsCheck :: CmmExpr  -- ^ accessed index
+emitBoundsCheck :: FastString  -- ^ primop name
+                -> CmmExpr  -- ^ accessed index
                 -> CmmExpr  -- ^ array size (in elements)
                 -> FCode ()
-emitBoundsCheck idx sz = do
+emitBoundsCheck op_name idx sz = do
     assertM (stgToCmmDoBoundsCheck <$> getStgToCmmConfig)
     platform <- getPlatform
     boundsCheckFailed <- getCode $
-      emitBoundsCheckFailed idx (mkIntExpr platform 1) sz
+      emitBoundsCheckFailed op_name idx (mkIntExpr platform 1) sz
     let isOutOfBounds = cmmUGeWord platform idx sz
     emit =<< mkCmmIfThen' isOutOfBounds boundsCheckFailed (Just False)
 
-emitRangeBoundsCheck :: CmmExpr  -- ^ first accessed index
+emitRangeBoundsCheck :: FastString  -- ^ primop name
+                     -> CmmExpr  -- ^ first accessed index
                      -> CmmExpr  -- ^ number of accessed indices (non-zero)
                      -> CmmExpr  -- ^ array size (in elements)
                      -> FCode ()
-emitRangeBoundsCheck idx len arrSizeExpr = do
+emitRangeBoundsCheck op_name idx len arrSizeExpr = do
     assertM (stgToCmmDoBoundsCheck <$> getStgToCmmConfig)
     config <- getStgToCmmConfig
     platform <- getPlatform
@@ -3794,7 +3804,7 @@ emitRangeBoundsCheck idx len arrSizeExpr = do
     _ <- withSequel (AssignTo [lastSafeIndexReg, rangeTooLargeReg] False) $
       cmmPrimOpApp config WordSubCOp [arrSize, len] Nothing
     boundsCheckFailed <- getCode $
-      emitBoundsCheckFailed idx len arrSize
+      emitBoundsCheckFailed op_name idx len arrSize
     let
       rangeTooLarge = CmmReg (CmmLocal rangeTooLargeReg)
       lastSafeIndex = CmmReg (CmmLocal lastSafeIndexReg)
@@ -3807,30 +3817,33 @@ emitRangeBoundsCheck idx len arrSizeExpr = do
     emit =<< mkCmmIfThen' isOutOfBounds boundsCheckFailed (Just False)
 
 doPtrArrayBoundsCheck
-    :: CmmExpr  -- ^ accessed index (in bytes)
+    :: FastString  -- ^ primop name
+    -> CmmExpr  -- ^ accessed index (in bytes)
     -> CmmExpr  -- ^ pointer to @StgMutArrPtrs@
     -> FCode ()
-doPtrArrayBoundsCheck idx arr = whenCheckBounds $ do
+doPtrArrayBoundsCheck op_name idx arr = whenCheckBounds $ do
     profile <- getProfile
     platform <- getPlatform
-    emitBoundsCheck idx (ptrArraySize platform profile arr)
+    emitBoundsCheck op_name idx (ptrArraySize platform profile arr)
 
 doSmallPtrArrayBoundsCheck
-    :: CmmExpr  -- ^ accessed index (in bytes)
+    :: FastString  -- ^ primop name
+    -> CmmExpr  -- ^ accessed index (in bytes)
     -> CmmExpr  -- ^ pointer to @StgMutArrPtrs@
     -> FCode ()
-doSmallPtrArrayBoundsCheck idx arr = whenCheckBounds $ do
+doSmallPtrArrayBoundsCheck op_name idx arr = whenCheckBounds $ do
     profile <- getProfile
     platform <- getPlatform
-    emitBoundsCheck idx (smallPtrArraySize platform profile arr)
+    emitBoundsCheck op_name idx (smallPtrArraySize platform profile arr)
 
 doByteArrayBoundsCheck
-    :: CmmExpr  -- ^ accessed index (in elements)
+    :: FastString  -- ^ primop name
+    -> CmmExpr  -- ^ accessed index (in elements)
     -> CmmExpr  -- ^ pointer to @StgArrBytes@
     -> CmmType  -- ^ indexing type
     -> CmmType  -- ^ element type
     -> FCode ()
-doByteArrayBoundsCheck idx arr idx_ty elem_ty = whenCheckBounds $ do
+doByteArrayBoundsCheck op_name idx arr idx_ty elem_ty = whenCheckBounds $ do
     profile <- getProfile
     platform <- getPlatform
     let elem_w = typeWidth elem_ty
@@ -3840,8 +3853,8 @@ doByteArrayBoundsCheck idx arr idx_ty elem_ty = whenCheckBounds $ do
         effective_arr_sz =
           cmmUShrWord platform arr_sz (mkIntExpr platform (toTargetInt (widthInLog idx_w)))
     if elem_w == idx_w
-      then emitBoundsCheck idx effective_arr_sz  -- aligned => simpler check
-      else assert (idx_w == W8) (emitRangeBoundsCheck idx elem_sz arr_sz)
+      then emitBoundsCheck op_name idx effective_arr_sz  -- aligned => simpler check
+      else assert (idx_w == W8) (emitRangeBoundsCheck op_name idx elem_sz arr_sz)
 
 -- | Write barrier for @MUT_VAR@ modification.
 emitDirtyMutVar :: CmmExpr -> CmmExpr -> FCode ()

@@ -352,7 +352,7 @@ rtsBadAlignmentBarf(void)
 }
 
 void
-rtsOutOfBoundsAccess(StgInt index, StgWord count, StgWord size, const char *op, const char *module)
+rtsOutOfBoundsAccess(const char *op, StgInt index, StgWord count, StgWord size, const char *module)
 {
     if (count <= 1) {
         errorBelch("%s: array access out of bounds in module %s:\n"

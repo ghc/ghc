@@ -93,7 +93,7 @@ import CLOSURE ghc_hs_iface;
 // the index reported here may be in bytes. count is 1 since these checks cover
 // a single access.
 #define ASSERT_IN_BOUNDS(op, ind, sz) \
-    if (ind >= sz) { ccall rtsOutOfBoundsAccess(ind, 1, sz, op, "<RTS>"); }
+    if (ind >= sz) { ccall rtsOutOfBoundsAccess(op, ind, 1, sz, "<RTS>"); }
 #else
 #define ASSERT_IN_BOUNDS(op, ind, sz)
 #endif
