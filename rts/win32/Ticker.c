@@ -77,11 +77,15 @@ pauseTicker(void)
 }
 
 void
-exitTicker (bool wait)
+exitTicker(void)
 {
     pauseTicker();
     if (timer_queue != NULL) {
-        DeleteTimerQueueEx(timer_queue, wait ? INVALID_HANDLE_VALUE : NULL);
+        // From the docs for DeleteTimerQueueEx:
+        //   If this parameter is INVALID_HANDLE_VALUE, the function waits
+        //   for all callback functions to complete before returning.
+        HANDLE completion = INVALID_HANDLE_VALUE;
+        DeleteTimerQueueEx(timer_queue, completion);
         timer_queue = NULL;
     }
 }

@@ -273,7 +273,7 @@ pauseTicker(void)
 
 /* There may be at most one additional tick fired after a call to this */
 void
-exitTicker (bool wait)
+exitTicker(void)
 {
     ASSERT(!SEQ_CST_LOAD(&exited));
     SEQ_CST_STORE(&exited, true);
@@ -281,17 +281,13 @@ exitTicker (bool wait)
     unpauseTicker();
     sendFdWakeup(interruptfd_w);
 
-    // wait for ticker to terminate if necessary
-    if (wait) {
-        if (pthread_join(thread, NULL)) {
-            sysErrorBelch("Ticker: Failed to join: %s", strerror(errno));
-        }
-        closeFdWakeup(interruptfd_r, interruptfd_w);
-        closeMutex(&mutex);
-        closeCondition(&start_cond);
-    } else {
-        pthread_detach(thread);
+    // wait for ticker to terminate
+    if (pthread_join(thread, NULL)) {
+        sysErrorBelch("Ticker: Failed to join: %s", strerror(errno));
     }
+    closeFdWakeup(interruptfd_r, interruptfd_w);
+    closeMutex(&mutex);
+    closeCondition(&start_cond);
 }
 
 int

@@ -512,12 +512,12 @@ hs_exit_(bool wait_foreign)
     }
 #endif
 
-    /*
-     * it is quite important that we wait here as some timer implementations
-     * (e.g. pthread) may fire even after we exit, which may segfault as we've
-     * already freed the capabilities.
+    /* We rely on the guarantee that exitTimer stops the timer synchronously,
+     * which ensures the timer handler does not get run again after this point.
+     * We are about to start freeing resources used by the timer handler (like
+     * the capabilities, eventlog and profiling data structures).
      */
-    exitTimer(true);
+    exitTimer();
 
     /*
      * Dump the ticky counter definitions

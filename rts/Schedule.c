@@ -2232,8 +2232,8 @@ forkProcess(HsStablePtr *entry
             generations[g].threads = END_TSO_QUEUE;
         }
 
-        // On Unix, all timers are reset in the child, so we need to start
-        // the timer again.
+        // The timer thread is not present in the child process, so we need
+        // to initialise the timer again.
         initTimer();
 
         // TODO: need to trace various other things in the child
