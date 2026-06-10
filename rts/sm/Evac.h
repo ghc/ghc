@@ -25,7 +25,9 @@
 //         registers EAX, EDX, and ECX instead of on the stack. Functions that
 //         take a variable number of arguments will continue to be passed all of
 //         their arguments on the stack.
-#if defined(x86_64_HOST_ARCH) || defined(i386_HOST_ARCH)
+// On x86-64 the attribute has no effect (the first argument is already
+// passed in a register) and GCC 16 warns that it is ignored.
+#if defined(i386_HOST_ARCH)
 #define REGPARM1 __attribute__((regparm(1)))
 #else
 #define REGPARM1
