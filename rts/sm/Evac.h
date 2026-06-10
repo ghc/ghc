@@ -6,7 +6,7 @@
  *
  * Documentation on the architecture of the Garbage Collector can be
  * found in the online commentary:
- * 
+ *
  *   https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/storage/gc
  *
  * ---------------------------------------------------------------------------*/
@@ -25,7 +25,9 @@
 //         registers EAX, EDX, and ECX instead of on the stack. Functions that
 //         take a variable number of arguments will continue to be passed all of
 //         their arguments on the stack.
-#if __GNUC__ >= 2 && (defined(x86_64_HOST_ARCH) || defined(i386_HOST_ARCH))
+// On x86-64 the attribute has no effect (the first argument is already
+// passed in a register) and GCC 16 warns that it is ignored.
+#if defined(i386_HOST_ARCH)
 #define REGPARM1 __attribute__((regparm(1)))
 #else
 #define REGPARM1
