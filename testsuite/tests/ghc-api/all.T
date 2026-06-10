@@ -85,3 +85,8 @@ test('T24386', [extra_run_opts(f'"{config.libdir}"')], compile_and_run, ['-packa
 test('T27273', [extra_run_opts(f'"{config.libdir}"')],
                compile_and_run,
                ['-package ghc'])
+test('RelatedSpansSourceError',
+     [extra_run_opts(f'"{config.libdir}"'),
+      extra_files(['RelatedSpansSourceError_input.hs'])],
+     compile_and_run,
+     ['-package ghc'])

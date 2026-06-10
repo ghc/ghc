@@ -1,6 +1,6 @@
 module GHC.Types.Error where
 
-import GHC.Prelude (Maybe, Bool, IO)
+import GHC.Prelude (Maybe, Bool)
 import GHC.Utils.Outputable (SDoc)
 import GHC.Types.SrcLoc (SrcSpan)
 
@@ -10,7 +10,7 @@ data MessageClass
   | MCInteractive
   | MCDump
   | MCInfo
-  | MCDiagnostic Severity ResolvedDiagnosticReason (Maybe DiagnosticCode)
+  | MCDiagnostic Severity ResolvedDiagnosticReason (Maybe DiagnosticCode) [SrcSpan]
 
 data Severity
   = SevIgnore
@@ -21,4 +21,3 @@ data DiagnosticCode
 data ResolvedDiagnosticReason
 
 mkLocMessageWarningGroups  :: Bool -> MessageClass -> SrcSpan -> SDoc -> SDoc
-getCaretDiagnostic :: MessageClass -> SrcSpan -> IO SDoc

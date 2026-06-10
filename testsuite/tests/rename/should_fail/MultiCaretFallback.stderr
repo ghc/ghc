@@ -1,0 +1,10 @@
+MultiCaretFallback.hs:11:7: error: [GHC-10498]
+    Conflicting definitions for ‘a’
+    At: Phantom.hs:50:7
+   |
+11 |   let a = 1
+   |       ^
+   |
+12 |       a = 2
+   |       ^
+

@@ -47,7 +47,7 @@ import GHC.Types.Id.Info
 import GHC.Types.Name.Reader
 import GHC.Types.Hint
 
-import Control.Arrow ( first )
+import Control.Arrow ( first, second )
 import Control.Monad ( when )
 import qualified Data.List.NonEmpty as NE
 import Data.Traversable   ( for )
@@ -142,7 +142,7 @@ data ExportAccum        -- The type of the accumulating parameter of
      = ExportAccum {
          expacc_exp_occs :: ExportOccMap,
            -- ^ Tracks exported occurrence names
-         expacc_exp_dflts :: NameEnv (ClassDefaults, IE GhcPs),
+         expacc_exp_dflts :: NameEnv (ClassDefaults, LIE GhcPs),
            -- ^ Tracks exported named default declarations
          expacc_mods :: UniqMap ModuleName [Name],
            -- ^ Tracks (re-)exported module names
@@ -186,7 +186,7 @@ accumExports f xs = do
   where f' acc x
           = fromMaybe (acc, Nothing) <$> attemptM (f acc x)
 
-type ExportOccMap = OccEnv (Name, IE GhcPs)
+type ExportOccMap = OccEnv (Name, LIE GhcPs)
         -- Tracks what a particular exported OccName
         --   in an export list refers to, and which item
         --   it came from.  It's illegal to export two distinct things
@@ -414,7 +414,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
             ; traceRn "efa" (ppr mod $$ ppr all_gres)
             ; addUsedGREs ExportDeprecationWarnings all_gres
 
-            ; occs' <- check_occs occs ie new_gres
+            ; occs' <- check_occs occs (L loc ie) new_gres
                           -- This check_occs not only finds conflicts
                           -- between this item and others, but also
                           -- internally within this item.  That is, if
@@ -484,7 +484,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
             ; traceRn "efa" (ppr mod $$ ppr all_gres)
             ; addUsedGREs ExportDeprecationWarnings all_gres
 
-            ; occs' <- check_occs occs ie new_gres
+            ; occs' <- check_occs occs (L loc ie) new_gres
                           -- This check_occs not only finds conflicts
                           -- between this item and others, but also
                           -- internally within this item.  That is, if
@@ -541,7 +541,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                    name = greName gre
 
                checkThLocalNameNoLift (ieLWrappedUserRdrName l name)
-               occs' <- check_occs occs ie [gre]
+               occs' <- check_occs occs (L loc ie) [gre]
                (export_warn_spans', dont_warn_export', warn_txt_rn)
                  <- process_warning export_warn_spans
                                     dont_warn_export
@@ -579,14 +579,14 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                        Just cls_dflts -> do
                          let cls = cd_class cls_dflts
                          case lookupNameEnv exp_dflts (className cls) of
-                           Just (_, ie') -> do
+                           Just (_, lie') -> do
                              addDiagnostic $
-                               TcRnDuplicateNamedDefaultExport (classTyCon cls) ie ie'
+                               TcRnDuplicateNamedDefaultExport (classTyCon cls) (L loc ie) lie'
                              return (Nothing, occs, exp_dflts)
                            Nothing ->
-                            return $ (Nothing, occs, extendNameEnv exp_dflts (className cls) (cls_dflts, ie))
+                            return $ (Nothing, occs, extendNameEnv exp_dflts (className cls) (cls_dflts, L loc ie))
                    _ -> do
-                    occs' <- check_occs occs ie [gre]
+                    occs' <- check_occs occs (L loc ie) [gre]
                     return (Just avail, occs', exp_dflts)
 
                checkThLocalNameNoLift (ieLWrappedUserRdrName l name)
@@ -618,7 +618,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                    all_names = map greName all_gres
 
                checkThLocalNameNoLift (ieLWrappedUserRdrName l name)
-               occs' <- check_occs occs ie all_gres
+               occs' <- check_occs occs (L loc ie) all_gres
                (export_warn_spans', dont_warn_export', warn_txt_rn)
                  <- process_warning export_warn_spans
                                     dont_warn_export
@@ -657,7 +657,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                    all_names = map greName all_gres
 
                checkThLocalNameNoLift (ieLWrappedUserRdrName l name)
-               occs' <- check_occs occs ie all_gres
+               occs' <- check_occs occs (L loc ie) all_gres
                (export_warn_spans', dont_warn_export', warn_txt_rn)
                  <- process_warning export_warn_spans
                                     dont_warn_export
@@ -1044,12 +1044,13 @@ checkPatSynParent parent NoParent nm
 -- | Insert the given 'GlobalRdrElt's into the 'ExportOccMap', checking that
 -- each of the given 'GlobalRdrElt's does not appear multiple times in
 -- the 'ExportOccMap', as per Note [Exporting duplicate declarations].
-check_occs :: ExportOccMap -> IE GhcPs -> [GlobalRdrElt] -> RnM ExportOccMap
-check_occs occs ie gres
+check_occs :: ExportOccMap -> LIE GhcPs -> [GlobalRdrElt] -> RnM ExportOccMap
+check_occs occs lie gres
   -- 'gres' are the entities specified by 'ie'
   = do { drf <- xoptM LangExt.DuplicateRecordFields
        ; foldlM (check drf) occs gres }
   where
+    ie = unLoc lie
 
     -- Check for distinct children exported with the same OccName (an error) or
     -- for duplicate exports of the same child (a warning).
@@ -1067,20 +1068,21 @@ check_occs occs ie gres
             | drf_enabled || not (isFieldOcc child_occ)
             -> return occs'
             | otherwise
-            -> do { let flds = filter (\(_,ie') -> not $ dupFieldExport_ok ie ie')
+            -> do { let flds = filter (\(_,lie') -> not $ dupFieldExport_ok ie (unLoc lie'))
                              $ lookupFieldsOccEnv occs (occNameFS child_occ)
                   ; case flds of { [] -> return occs'; clash1:clashes ->
-               do { addDuplicateFieldExportErr (gre,ie) (clash1 NE.:| clashes)
+               do { addDuplicateFieldExportErr (gre, unLoc lie)
+                          (fmap (second unLoc) (clash1 NE.:| clashes))
                   ; return occs } } }
 
-          Left (child', ie')
+          Left (child', lie')
             | child == child' -- Duplicate export of a single Name: a warning.
-            -> do { warnIf (not (dupExport_ok child ie ie')) (TcRnDuplicateExport gre ie ie')
+            -> do { warnIf (not (dupExport_ok child ie (unLoc lie'))) (TcRnDuplicateExport gre lie lie')
                   ; return occs }
 
             | otherwise       -- Same OccName but different Name: an error.
             ->  do { global_env <- getGlobalRdrEnv
-                   ; addErr (exportClashErr global_env child' child ie' ie)
+                   ; addErr (exportClashErr global_env child' child (unLoc lie') (unLoc lie))
                    ; return occs }
       where
         child = greName gre
@@ -1088,10 +1090,10 @@ check_occs occs ie gres
 
     -- Try to insert a child into the map, returning Left if there is something
     -- already exported with the same OccName.
-    try_insert :: ExportOccMap -> GlobalRdrElt -> Either (Name, IE GhcPs) ExportOccMap
+    try_insert :: ExportOccMap -> GlobalRdrElt -> Either (Name, LIE GhcPs) ExportOccMap
     try_insert occs child
       = case lookupOccEnv occs occ of
-          Nothing -> Right (extendOccEnv occs occ (greName child, ie))
+          Nothing -> Right (extendOccEnv occs occ (greName child, lie))
           Just x  -> Left x
       where
         occ = greOccName child

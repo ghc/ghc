@@ -1,3 +1,5 @@
-
 T23318.hs:1:21: warning: [GHC-47854] [-Wduplicate-exports (in -Wdefault)]
     ‘T’ is exported by ‘T(..)’ and ‘T()’
+    At: T23318.hs:1:16-18
+        T23318.hs:1:21-25
+

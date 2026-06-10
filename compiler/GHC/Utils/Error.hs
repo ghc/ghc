@@ -40,9 +40,6 @@ module GHC.Utils.Error (
         mkDecoratedDiagnostic,
         noHints,
 
-        -- * Utilities
-        getCaretDiagnostic,
-
         -- * Issuing messages during compilation
         putMsg, printInfoForUser, printOutputForUser,
         logInfo, logOutput,
@@ -77,6 +74,7 @@ import GHC.Unit.Module.Warnings
 
 import System.Exit      ( ExitCode(..), exitWith )
 import Data.List        ( sortBy )
+import Data.Maybe       ( mapMaybe )
 import Data.Function
 import Debug.Trace
 import Control.Monad
@@ -287,9 +285,16 @@ pprLocMsgEnvelope opts (MsgEnvelope { errMsgSpan       = s
                                     , errMsgReason     = reason })
   = withErrStyle name_ppr_ctx $
       mkLocMessage
-        (MCDiagnostic sev reason (diagnosticCode e))
+        (MCDiagnostic sev reason (diagnosticCode e) related)
         s
         (formatBulleted $ diagnosticMessage opts e)
+      -- This printer is pure, so it cannot render carets (those read the
+      -- source, see 'GHC.Utils.Logger.decorateDiagnostic'); list all the
+      -- locations textually instead, as the logger does when carets are off.
+      -- See Note [The source span model for diagnostics] in GHC.Types.Error.
+      $+$ pprAtLocations s (mapMaybe srcSpanToRealSrcSpan (s : related))
+  where
+    related = diagnosticRelatedLocations e
 
 sortMsgBag :: Maybe DiagOpts -> Bag (MsgEnvelope e) -> [MsgEnvelope e]
 sortMsgBag mopts = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList

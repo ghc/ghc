@@ -66,7 +66,7 @@ printMessage logger msg_opts opts message
     doc = updSDocContext (\_ -> ctx) (messageWithHints diagnostic)
 
     messageClass :: MessageClass
-    messageClass = MCDiagnostic severity (errMsgReason message) (diagnosticCode diagnostic)
+    messageClass = MCDiagnostic severity (errMsgReason message) (diagnosticCode diagnostic) relatedSpans
 
     style :: PprStyle
     style = mkErrStyle (errMsgContext message)
@@ -79,6 +79,9 @@ printMessage logger msg_opts opts message
 
     diagnostic :: a
     diagnostic = errMsgDiagnostic message
+
+    relatedSpans :: [SrcSpan]
+    relatedSpans = diagnosticRelatedLocations diagnostic
 
     severity :: Severity
     severity = errMsgSeverity message

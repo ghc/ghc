@@ -1607,14 +1607,14 @@ data TcRnMessage where
                  overloadedrecflds/should_fail/DuplicateExports
                  patsyn/should_compile/T11959
   -}
-  TcRnDuplicateExport :: GlobalRdrElt -> IE GhcPs -> IE GhcPs -> TcRnMessage
+  TcRnDuplicateExport :: GlobalRdrElt -> LIE GhcPs -> LIE GhcPs -> TcRnMessage
 
   {-| TcRnDuplicateNamedDefaultExport is a warning (controlled by -Wduplicate-exports)
       that occurs when a named default declaration appears in an export list
       more than once.
 
   -}
-  TcRnDuplicateNamedDefaultExport :: TyCon -> IE GhcPs -> IE GhcPs -> TcRnMessage
+  TcRnDuplicateNamedDefaultExport :: TyCon -> LIE GhcPs -> LIE GhcPs -> TcRnMessage
 
   {-| TcRnExportedParentChildMismatch is an error that occurs when an export is
       bundled with a parent that it does not belong to

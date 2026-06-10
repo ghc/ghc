@@ -84,7 +84,7 @@ import GHC.Prelude
 import GHC.Driver.Flags
 import GHC.Types.Error
   ( MessageClass (..), Severity (..)
-  , mkLocMessageWarningGroups,getCaretDiagnostic )
+  , mkLocMessageWarningGroups, getCaretDiagnostics, pprAtLocations )
 -- import GHC.Types.Error ()
 import GHC.Types.SrcLoc
 
@@ -102,6 +102,7 @@ import System.FilePath  ( takeDirectory, (</>) )
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict (Map)
 import Data.List (stripPrefix)
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Time
 import System.IO
 import Control.Monad
@@ -369,8 +370,8 @@ defaultLogJsonAction logflags msg_class jsdoc =
       MCInteractive                -> putStrSDoc msg
       MCInfo                       -> printErrs msg
       MCFatal                      -> printErrs msg
-      MCDiagnostic SevIgnore _ _   -> pure () -- suppress the message
-      MCDiagnostic _sev _rea _code -> printErrs msg
+      MCDiagnostic SevIgnore _ _ _   -> pure () -- suppress the message
+      MCDiagnostic _sev _rea _code _ -> printErrs msg
   where
     printOut   = defaultLogActionHPrintDoc  logflags False stdout
     printErrs  = defaultLogActionHPrintDoc  logflags False stderr
@@ -380,7 +381,7 @@ defaultLogJsonAction logflags msg_class jsdoc =
 -- See Note [JSON Error Messages]
 -- this is to be removed
 jsonLogActionWithHandle :: Handle {-^ Standard out -} -> LogAction
-jsonLogActionWithHandle _ _ (MCDiagnostic SevIgnore _ _) _ _ = return () -- suppress the message
+jsonLogActionWithHandle _ _ (MCDiagnostic SevIgnore _ _ _) _ _ = return () -- suppress the message
 jsonLogActionWithHandle out logflags msg_class srcSpan msg
   =
     defaultLogActionHPutStrDoc logflags True out
@@ -422,8 +423,9 @@ defaultLogActionWithHandles out err logflags msg_class srcSpan msg
       MCInteractive                -> putStrSDoc msg
       MCInfo                       -> printErrs msg
       MCFatal                      -> printErrs msg
-      MCDiagnostic SevIgnore _ _   -> pure () -- suppress the message
-      MCDiagnostic _sev _rea _code -> decorateDiagnostic logflags msg_class srcSpan msg >>= printErrs
+      MCDiagnostic SevIgnore _ _ _ -> pure () -- suppress the message
+      MCDiagnostic{} ->
+        decorateDiagnostic logflags msg_class srcSpan msg >>= printErrs
     where
       printOut   = defaultLogActionHPrintDoc  logflags False out
       printErrs  = defaultLogActionHPrintDoc  logflags False err
@@ -464,21 +466,43 @@ defaultLogActionWithHandles out err logflags msg_class srcSpan msg
 --
 -- This story is tracked by #24113.
 decorateDiagnostic :: LogFlags -> MessageClass -> SrcSpan -> SDoc -> IO SDoc
-decorateDiagnostic logflags msg_class srcSpan msg = addCaret
+decorateDiagnostic logflags msg_class srcSpan msg = addLocations
     where
       -- Pretty print the warning flag, if any (#10752)
       message :: SDoc
       message = mkLocMessageWarningGroups (log_show_warn_groups logflags) msg_class srcSpan msg
 
-      addCaret :: IO SDoc
-      addCaret = do
-        caretDiagnostic <-
-            if log_show_caret logflags
-            then getCaretDiagnostic msg_class srcSpan
-            else pure empty
+      -- The related locations are carried by the 'MCDiagnostic' message class.
+      relatedSpans :: [SrcSpan]
+      relatedSpans = case msg_class of
+        MCDiagnostic _ _ _ spans -> spans
+        _                        -> []
+
+      -- The primary span is always caret'd, with the related spans drawn as
+      -- additional carets.  Order is the message author's: the primary first,
+      -- then the related spans as given.  'getCaretDiagnostics' preserves that
+      -- order and does not deduplicate, so an author must not repeat the primary
+      -- among the related spans.
+      -- See Note [The source span model for diagnostics] in GHC.Types.Error.
+      sourceSpans :: NonEmpty SrcSpan
+      sourceSpans = srcSpan :| relatedSpans
+
+      addLocations :: IO SDoc
+      addLocations = do
+        -- 'carets' renders the spans whose source we can show; 'missedSpans'
+        -- are the real spans that got no caret (carets disabled, or source we
+        -- can't read such as GHCi input or TH-generated code), kept in the
+        -- message author's order.
+        (carets, missedSpans) <-
+            getCaretDiagnostics (log_show_caret logflags) msg_class sourceSpans
+        -- List the missed spans textually under an "At:" heading so they aren't
+        -- lost; the primary is included when it has no caret, so the list is a
+        -- complete set of locations.
+        -- See Note [The source span model for diagnostics] in GHC.Types.Error.
+        let relatedLocations = pprAtLocations srcSpan missedSpans
         return $ getPprStyle $ \style ->
           withPprStyle (setStyleColoured True style)
-            (message $+$ caretDiagnostic $+$ blankLine)
+            (message $+$ relatedLocations $+$ carets $+$ blankLine)
 
 -- | Like 'defaultLogActionHPutStrDoc' but appends an extra newline.
 defaultLogActionHPrintDoc :: LogFlags -> Bool -> Handle -> SDoc -> IO ()

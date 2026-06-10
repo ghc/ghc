@@ -65,7 +65,8 @@ module GHC.Types.Error
    , mkLocMessage
    , mkLocMessageWarningGroups
    , formatDiagnostic
-   , getCaretDiagnostic
+   , getCaretDiagnostics
+   , pprAtLocations
 
    , jsonDiagnostic
 
@@ -105,11 +106,12 @@ import GHC.Utils.Panic
 
 import GHC.Version (cProjectVersion)
 import Data.Bifunctor
+import Data.Either ( partitionEithers )
 import Data.Foldable
 import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified Data.List.NonEmpty as NE
 import Data.List ( intercalate )
-import Data.Maybe ( maybeToList )
+import Data.Maybe ( mapMaybe, maybeToList )
 import Data.Typeable ( Typeable )
 import Numeric.Natural ( Natural )
 import Text.Printf ( printf )
@@ -233,6 +235,71 @@ defaultDiagnosticOpts :: forall opts . HasDefaultDiagnosticOpts (DiagnosticOpts 
 defaultDiagnosticOpts = defaultOpts @(DiagnosticOpts opts)
 
 
+{- Note [The source span model for diagnostics]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Every diagnostic is associated with source locations on two levels:
+
+  * One /primary/ span: the 'errMsgSpan' of the 'MsgEnvelope'. This is the
+    single location that identifies "where" the diagnostic is reported. It
+    drives the @file:line:col:@ message prefix, the order in which messages are
+    sorted, and the squiggle an editor draws for the diagnostic. The primary
+    span is always rendered with a caret ('^').
+
+  * Zero or more /related/ spans: 'diagnosticRelatedLocations'. These are
+    /additional/ locations that help explain the diagnostic — for a
+    duplicate-binding error, say, the other binding sites. They are rendered as
+    further carets alongside the primary span, and are exposed to tooling (e.g.
+    via -fdiagnostics-as-json, and onwards to HLS/LSP).
+
+This is close to the diagnostic model of the Language Server Protocol (LSP), to
+which GHC's diagnostics are forwarded by HLS. An LSP diagnostic carries a single
+@range@ plus a list of @relatedInformation@ entries, each a location with its
+own message; GHC's 'errMsgSpan' corresponds to the @range@ and
+'diagnosticRelatedLocations' to @relatedInformation@. See the @Diagnostic@ and
+@DiagnosticRelatedInformation@ interfaces under "Basic JSON Structures":
+
+  https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#diagnostic
+
+A couple of points follow from this:
+
+  * Related spans are additional to the primary span, not replacements for it.
+    The spans that receive a caret are @primary :| relatedLocations@ (see
+    'GHC.Driver.Errors.printMessage' and 'defaultLogActionWithHandles').
+
+  * The order in which locations are shown — both as carets and in the @At:@
+    list below — is exactly the order the message author gives them: the primary
+    span first, then 'diagnosticRelatedLocations' as listed. The rendering layer
+    neither reorders nor deduplicates. A diagnostic with more than one related
+    span should therefore order them deterministically itself (e.g. by sorting
+    with 'leftmost_smallest' at construction), since the spans often come from a
+    source whose natural order is not stable across runs, and should not repeat
+    the primary span among the related ones.
+
+  * Not every location can be shown as a caret: carets are optional
+    (@-fno-diagnostics-show-caret@), and some spans have no source to display
+    anyway (e.g. GHCi input or TH-generated code). Any location -- including the
+    primary span -- that does not appear as a caret is instead listed textually
+    under an @At:@ heading ('pprAtLocations'; a list naming only the primary is
+    dropped, since the message header already states it). Each location is shown
+    either as a caret or in the @At:@ list, which is why error messages do not
+    also spell the locations out in their prose. Carets require 'IO' to read the
+    source, so renderers other than 'GHC.Utils.Logger.decorateDiagnostic' — in
+    particular the pure 'GHC.Utils.Error.pprLocMsgEnvelope', used e.g. when
+    'show'ing a 'GHC.Types.SourceError.SourceError' and for deferred type
+    errors — list /all/ the locations under @At:@.
+
+  * The primary span need not be the leftmost or smallest of the locations
+    involved, and need not be a synthetic span combining all of them. When
+    several real locations are in play, it is usually better to pick one as the
+    primary and list the rest as related locations than to report a single
+    combined span, which gives a less precise prefix and a larger caret.
+
+Note that GHC's related locations are currently bare 'SrcSpan's with no per-span
+label, whereas an LSP @relatedInformation@ entry pairs each location with a
+message (as do rustc's span labels). Carrying such a message per related span is
+a natural future extension; see #23414.
+-}
+
 -- | A class identifying a diagnostic.
 -- Dictionary.com defines a diagnostic as:
 --
@@ -277,6 +344,13 @@ class (Outputable (DiagnosticHint a), HasDefaultDiagnosticOpts (DiagnosticOpts a
   -- #18516 tracks our progress toward this goal.
   diagnosticCode    :: a -> Maybe DiagnosticCode
 
+  -- | Additional locations related to this diagnostic.
+  --
+  -- When rendering caret diagnostics, these locations are shown alongside the
+  -- message's primary location. See Note [The source span model for diagnostics].
+  diagnosticRelatedLocations :: a -> [SrcSpan]
+  diagnosticRelatedLocations _ = []
+
 -- | An existential wrapper around an unknown diagnostic.
 data UnknownDiagnostic opts hint where
   UnknownDiagnostic :: (Diagnostic a, Typeable a)
@@ -295,6 +369,7 @@ instance (HasDefaultDiagnosticOpts opts, Outputable hint) => Diagnostic (Unknown
   diagnosticReason       (UnknownDiagnostic _ _ diag) = diagnosticReason diag
   diagnosticHints        (UnknownDiagnostic _ f diag) = map f (diagnosticHints diag)
   diagnosticCode         (UnknownDiagnostic _ _ diag) = diagnosticCode diag
+  diagnosticRelatedLocations (UnknownDiagnostic _ _ diag) = diagnosticRelatedLocations diag
 
 -- A fallback 'DiagnosticOpts' which can be used when there are no options
 -- for a particular diagnostic.
@@ -482,7 +557,7 @@ data MessageClass
     -- ^ Log messages intended for end users.
     -- No file\/line\/column stuff.
 
-  | MCDiagnostic Severity ResolvedDiagnosticReason (Maybe DiagnosticCode)
+  | MCDiagnostic Severity ResolvedDiagnosticReason (Maybe DiagnosticCode) [SrcSpan]
     -- ^ Diagnostics from the compiler. This constructor is very powerful as
     -- it allows the construction of a 'MessageClass' with a completely
     -- arbitrary permutation of 'Severity' and 'DiagnosticReason'. As such,
@@ -496,6 +571,9 @@ data MessageClass
     -- this diagnostic. If you are creating a message not tied to any
     -- error-message type, then use Nothing. In the long run, this really
     -- should always have a 'DiagnosticCode'. See Note [Diagnostic codes].
+    --
+    -- The list of 'SrcSpan's carries additional locations related to the
+    -- diagnostic. The primary location is supplied separately to the 'LogAction'.
 
 {-
 Note [Suppressing Messages]
@@ -555,8 +633,8 @@ instance ToJson MessageClass where
   json MCInteractive = JSString "MCInteractive"
   json MCDump = JSString "MCDump"
   json MCInfo = JSString "MCInfo"
-  json (MCDiagnostic sev reason code) =
-    JSString $ renderWithContext defaultSDocContext (ppr $ text "MCDiagnostic" <+> ppr sev <+> ppr reason <+> ppr code)
+  json (MCDiagnostic sev reason code relatedSpans) =
+    JSString $ renderWithContext defaultSDocContext (ppr $ text "MCDiagnostic" <+> ppr sev <+> ppr reason <+> ppr code <+> ppr relatedSpans)
 
 instance ToJson DiagnosticCode where
   json c = JSInt (fromIntegral (diagnosticCodeNumber c))
@@ -564,7 +642,7 @@ instance ToJson DiagnosticCode where
 {- Note [Diagnostic Message JSON Schema]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The below instance of ToJson must conform to the JSON schema
-specified in docs/users_guide/diagnostics-as-json-schema-1_2.json.
+specified in docs/users_guide/diagnostics-as-json-schema-1_3.json.
 When the schema is altered, please bump the version.
 If the content is altered in a backwards compatible way,
 update the minor version (e.g. 1.3 ~> 1.4).
@@ -577,7 +655,7 @@ https://json-schema.org
 -}
 
 schemaVersion :: String
-schemaVersion = "1.2"
+schemaVersion = "1.3"
 
 -- See Note [Diagnostic Message JSON Schema] before editing!
 jsonDiagnostic :: forall e. Diagnostic e => String -> MsgEnvelope e -> JsonDoc
@@ -585,6 +663,7 @@ jsonDiagnostic rendered m = JSObject $ [
     ("version", JSString schemaVersion),
     ("ghcVersion", JSString $ "ghc-" ++ cProjectVersion),
     ("span", json $ errMsgSpan m),
+    ("relatedSpans", JSArray $ map json (diagnosticRelatedLocations diag)),
     ("severity", json $ errMsgSeverity m),
     ("code", maybe JSNull json (diagnosticCode diag)),
     ("rendered", JSString rendered),
@@ -649,7 +728,7 @@ mkLocMessageWarningGroups
   -> SDoc
 mkLocMessageWarningGroups show_warn_groups msg_class locn msg
   = case msg_class of
-    MCDiagnostic severity reason code -> formatDiagnostic show_warn_groups locn severity reason code msg
+    MCDiagnostic severity reason code _ -> formatDiagnostic show_warn_groups locn severity reason code msg
     _ -> sdocOption sdocColScheme $ \col_scheme ->
       let
           msg_colour = getMessageClassColour msg_class col_scheme
@@ -774,7 +853,7 @@ formatLocMessageWarningGroups locn msg_title code_doc warning_flag_doc msg
                         msg)
 
 getMessageClassColour :: MessageClass -> Col.Scheme -> Col.PprColour
-getMessageClassColour (MCDiagnostic severity _reason _code)   = getSeverityColour severity
+getMessageClassColour (MCDiagnostic severity _reason _code _) = getSeverityColour severity
 getMessageClassColour MCFatal                                 = Col.sFatal
 getMessageClassColour _                                       = const mempty
 
@@ -784,8 +863,50 @@ getSeverityColour severity = case severity of
   SevWarning -> Col.sWarning
   SevIgnore -> const mempty
 
-getCaretDiagnostic :: MessageClass -> SrcSpan -> IO SDoc
-getCaretDiagnostic msg_class (RealSrcSpan span _) =
+-- | List the given spans textually under an @At:@ heading, in the order they
+-- are given in. Returns 'empty' when the list would name only the message's
+-- primary span, since the message header states that span already.
+-- See Note [The source span model for diagnostics].
+pprAtLocations :: SrcSpan       -- ^ The primary span of the message
+               -> [RealSrcSpan] -- ^ The spans to list, in the message author's order
+               -> SDoc
+pprAtLocations primary spans
+  | any (\s -> Just s /= primaryReal) spans
+  = nest 4 (text "At:" <+> vcat (map ppr spans))
+  | otherwise
+  = empty
+  where
+    primaryReal = srcSpanToRealSrcSpan primary
+
+-- | When @show_caret@ is set, render carets for the given spans; otherwise
+-- render nothing. Either way, return the real spans that did /not/ get a caret,
+-- so the caller can report those locations textually. A span is missed when
+-- carets are disabled, or when its source is unavailable (an unhelpful span —
+-- dropped here — or unreadable source such as GHCi input or TH-generated code).
+-- The spans are kept in the order they were given in; see Note [The source span
+-- model for diagnostics].
+getCaretDiagnostics :: Bool -> MessageClass -> NonEmpty SrcSpan -> IO (SDoc, [RealSrcSpan])
+getCaretDiagnostics show_caret msg_class spans
+  | not show_caret = pure (empty, realSpans)
+  | otherwise = do
+      let maxMarginWidth =
+            foldl' (\acc s -> max acc (length (show (srcSpanStartLine s)))) 0 realSpans
+      -- Each span renders to its caret doc, or, if its source can't be read,
+      -- falls through as a missed span.
+      rendered <- traverse
+        (\s -> maybe (Right s) Left <$> getSingleCaretDiagnostic msg_class maxMarginWidth s)
+        realSpans
+      let (docs, missed) = partitionEithers rendered
+      pure (vcat docs, missed)
+  where
+    -- 'spans' is the primary span followed by the related spans, in the message
+    -- author's order. We drop spans with no real location but otherwise keep
+    -- them as given: no sorting, no deduplication (see Note [The source span
+    -- model for diagnostics]).
+    realSpans = mapMaybe srcSpanToRealSrcSpan (NE.toList spans)
+
+getSingleCaretDiagnostic :: MessageClass -> Int -> RealSrcSpan -> IO (Maybe SDoc)
+getSingleCaretDiagnostic msg_class maxMarginWidth span =
   caretDiagnostic <$> getSrcLine (srcSpanFile span) row
   where
     getSrcLine fn i =
@@ -815,8 +936,9 @@ getCaretDiagnostic msg_class (RealSrcSpan span _) =
     rowStr = show row
     multiline = row /= srcSpanEndLine span
 
-    caretDiagnostic Nothing = empty
+    caretDiagnostic Nothing = Nothing
     caretDiagnostic (Just srcLineWithNewline) =
+      Just $
       sdocOption sdocColScheme$ \col_scheme ->
       let sevColour = getMessageClassColour msg_class col_scheme
           marginColour = Col.sMargin col_scheme
@@ -848,9 +970,9 @@ getCaretDiagnostic msg_class (RealSrcSpan span _) =
             | otherwise = srcSpanEndCol span - 1
         width = max 1 (end - start)
 
-        marginWidth = length rowStr
+        marginWidth = maxMarginWidth
         marginSpace = replicate marginWidth ' ' ++ " |"
-        marginRow   = rowStr ++ " |"
+        marginRow   = replicate (marginWidth - length rowStr) ' ' ++ rowStr ++ " |"
 
         (srcLinePre,  srcLineRest) = splitAt start srcLine
         (srcLineSpan, srcLinePost) = splitAt width srcLineRest
@@ -858,7 +980,6 @@ getCaretDiagnostic msg_class (RealSrcSpan span _) =
         caretEllipsis | multiline = "..."
                       | otherwise = ""
         caretLine = replicate start ' ' ++ replicate width '^' ++ caretEllipsis
-getCaretDiagnostic _ _ = pure empty
 --
 -- Queries
 --

@@ -1,5 +1,4 @@
+TH_dupdecl.hs:8:2: error: [GHC-29916] Multiple declarations of ‘x’
+    At: TH_dupdecl.hs:8:2-17
+        TH_dupdecl.hs:10:2-17
 
-TH_dupdecl.hs:10:2: error: [GHC-29916]
-    Multiple declarations of ‘x’
-    Declared at: TH_dupdecl.hs:8:2
-                 TH_dupdecl.hs:10:2

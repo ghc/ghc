@@ -1,4 +1,5 @@
-FieldSelectors.hs:10:1: [GHC-29916]
+FieldSelectors.hs:8:18: error: [GHC-29916]
     Multiple declarations of ‘foo’
-    Declared at: FieldSelectors.hs:8:18
-                 FieldSelectors.hs:10:1
+    At: FieldSelectors.hs:8:18-20
+        FieldSelectors.hs:10:1-3
+

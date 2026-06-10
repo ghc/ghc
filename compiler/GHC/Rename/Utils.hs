@@ -660,9 +660,10 @@ mkNameClashErr gre_env rdr_name gres = TcRnAmbiguousName gre_env rdr_name gres
 
 dupNamesErr :: NE.NonEmpty SrcSpan -> NE.NonEmpty RdrName -> RnM ()
 dupNamesErr locs names
-  = addErrAt big_loc (TcRnBindingNameConflict (NE.head names) locs)
+  = addErrAt (NE.head sorted_locs)
+             (TcRnBindingNameConflict (NE.head names) sorted_locs)
   where
-    big_loc = foldr1 combineSrcSpans locs
+    sorted_locs = NE.sortBy leftmost_smallest locs
 
 badQualBndrErr :: RdrName -> TcRnMessage
 badQualBndrErr rdr_name = TcRnQualifiedBinder rdr_name

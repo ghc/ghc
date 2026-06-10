@@ -146,6 +146,11 @@ instance Diagnostic GhciMessage where
     GhciCommandMessage m -> diagnosticCode m
     GhciUnknownMessage m -> diagnosticCode m
 
+  diagnosticRelatedLocations = \case
+    GhciGhcMessage     m -> diagnosticRelatedLocations m
+    GhciCommandMessage m -> diagnosticRelatedLocations m
+    GhciUnknownMessage m -> diagnosticRelatedLocations m
+
 
 -- | Modifications to hint messages which we want to display in GHCi.
 ghciDiagnosticHints :: GhcMessage -> [GhcHint]

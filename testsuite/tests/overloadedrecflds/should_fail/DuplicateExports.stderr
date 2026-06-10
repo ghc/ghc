@@ -1,3 +1,9 @@
-
 DuplicateExports.hs:6:29: error: [GHC-47854] [-Wduplicate-exports (in -Wdefault), Werror=duplicate-exports]
     ‘foo’ is exported by ‘foo’ and ‘T(foo, bar)’
+  |
+6 | module Export (T(foo, bar), foo, S(bar)) where
+  |                             ^^^
+  |
+6 | module Export (T(foo, bar), foo, S(bar)) where
+  |                ^^^^^^^^^^^
+

@@ -369,7 +369,7 @@ msg msg_class doc = do
     loc    <- getSrcSpanM
     name_ppr_ctx <- getNamePprCtx
     let sty = case msg_class of
-                MCDiagnostic _ _ _ -> err_sty
+                MCDiagnostic _ _ _ _ -> err_sty
                 MCDump             -> dump_sty
                 _                  -> user_sty
         err_sty  = mkErrStyle name_ppr_ctx

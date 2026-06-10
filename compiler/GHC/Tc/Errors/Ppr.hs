@@ -660,16 +660,15 @@ instance Diagnostic TcRnMessage where
        $ formatExportItemError
            (ppr export_item)
            "attempts to export a default class declaration that is not visible here"
-    TcRnDuplicateExport gre ie1 ie2
+    TcRnDuplicateExport gre lie1 lie2
       -> mkSimpleDecorated $
            hsep [ quotes (ppr $ greName gre)
-                , text "is exported by", quotes (ppr ie1)
-                , text "and",            quotes (ppr ie2) ]
-    TcRnDuplicateNamedDefaultExport nm ie1 ie2
-      -> mkSimpleDecorated $
-           hsep [ text "The named default declaration for" <+> quotes (ppr nm)
-                , text "is exported by", quotes (ppr ie1)
-                , text "and",            quotes (ppr ie2) ]
+                , text "is exported by", quotes (ppr lie1)
+                , text "and",            quotes (ppr lie2) ]
+    TcRnDuplicateNamedDefaultExport nm _lie1 _lie2
+       -> mkSimpleDecorated $
+            text "The named default declaration for" <+> quotes (ppr nm)
+              <+> text "is exported multiple times"
     TcRnExportedParentChildMismatch parent_name ty_thing child parent_names
       -> mkSimpleDecorated $
            text "The type constructor" <+> quotes (ppr parent_name)
@@ -1838,15 +1837,9 @@ instance Diagnostic TcRnMessage where
     TcRnUnusedImport decl reason
       -> mkSimpleDecorated $
          pprUnusedImport decl reason
-    TcRnDuplicateDecls name sorted_names
+    TcRnDuplicateDecls name _sorted_names
       -> mkSimpleDecorated $
-         vcat [text "Multiple declarations of" <+>
-               quotes (ppr name),
-                -- NB. print the OccName, not the Name, because the
-                -- latter might not be in scope in the RdrEnv and so will
-                -- be printed qualified.
-               text "Declared at:" <+>
-               vcat (NE.toList $ ppr . nameSrcLoc <$> sorted_names)]
+         text "Multiple declarations of" <+> quotes (ppr name)
     TcRnPackageImportsDisabled
       -> mkSimpleDecorated $
          text "Package-qualified imports are not enabled"
@@ -1916,14 +1909,9 @@ instance Diagnostic TcRnMessage where
 
            ppr_gre gre = pprAmbiguousGreName gre_env gre
 
-    TcRnBindingNameConflict name locs
+    TcRnBindingNameConflict name _locs
       -> mkSimpleDecorated $
-         vcat [text "Conflicting definitions for" <+> quotes (ppr name),
-               locations]
-         where
-           locations =
-             text "Bound at:"
-             <+> vcat (map ppr (sortBy leftmost_smallest (NE.toList locs)))
+         text "Conflicting definitions for" <+> quotes (ppr name)
     TcRnNonCanonicalDefinition reason inst_ty
       -> mkSimpleDecorated $
          pprNonCanonicalDefinition inst_ty reason
@@ -3454,6 +3442,321 @@ instance Diagnostic TcRnMessage where
       -> noHints
 
   diagnosticCode = constructorCode @GHC
+
+  diagnosticRelatedLocations = \case
+    TcRnUnknownMessage m
+      -> diagnosticRelatedLocations m
+    TcRnMessageWithInfo _ (TcRnMessageDetailed _ msg')
+      -> diagnosticRelatedLocations msg'
+    TcRnWithHsDocContext _ msg'
+      -> diagnosticRelatedLocations msg'
+    TcRnBindingNameConflict _ locs
+      -> NE.tail locs
+    TcRnDuplicateDecls _ names
+      -> map nameSrcSpan (NE.tail names)
+    TcRnDuplicateExport _ _lie1 lie2
+      -> [getLocA lie2]
+    TcRnDuplicateNamedDefaultExport _ _lie1 lie2
+      -> [getLocA lie2]
+    -- The remaining constructors have no related locations (yet). They are listed
+    -- explicitly (rather than matched with a wildcard) so that adding a new
+    -- constructor produces an incomplete-patterns warning here, prompting
+    -- whoever adds it to consider whether it has related locations.
+    TcRnInterfaceError{} -> []
+    TcRnSolverReport{} -> []
+    TcRnSolverDepthError{} -> []
+    TcRnRedundantConstraints{} -> []
+    TcRnInaccessibleCode{} -> []
+    TcRnInaccessibleCoAxBranch{} -> []
+    TcRnTypeDoesNotHaveFixedRuntimeRep{} -> []
+    TcRnImplicitLift{} -> []
+    TcRnUnusedPatternBinds{} -> []
+    TcRnUnusedQuantifiedTypeVar{} -> []
+    TcRnDodgyImports{} -> []
+    TcRnDodgyExports{} -> []
+    TcRnMissingImportList{} -> []
+    TcRnUnsafeDueToPlugin{} -> []
+    TcRnModMissingRealSrcSpan{} -> []
+    TcRnIdNotExportedFromModuleSig{} -> []
+    TcRnIdNotExportedFromLocalSig{} -> []
+    TcRnShadowedName{} -> []
+    TcRnInvalidWarningCategory{} -> []
+    TcRnDuplicateWarningDecls{} -> []
+    TcRnSimplifierTooManyIterations{} -> []
+    TcRnIllegalPatSynDecl{} -> []
+    TcRnLinearPatSyn{} -> []
+    TcRnEmptyRecordUpdate{} -> []
+    TcRnIllegalFieldPunning{} -> []
+    TcRnIllegalWildcardsInRecord{} -> []
+    TcRnIllegalWildcardInType{} -> []
+    TcRnIllegalNamedWildcardInTypeArgument{} -> []
+    TcRnIllegalImplicitTyVarInTypeArgument{} -> []
+    TcRnIllegalPunnedVarOccInTypeArgument{} -> []
+    TcRnDuplicateFieldName{} -> []
+    TcRnIllegalViewPattern{} -> []
+    TcRnCharLiteralOutOfRange{} -> []
+    TcRnNegativeNumTypeLiteral{} -> []
+    TcRnIllegalWildcardsInConstructor{} -> []
+    TcRnIgnoringAnnotations{} -> []
+    TcRnAnnotationInSafeHaskell{} -> []
+    TcRnInvalidTypeApplication{} -> []
+    TcRnTagToEnumMissingValArg{} -> []
+    TcRnTagToEnumUnspecifiedResTy{} -> []
+    TcRnTagToEnumResTyNotAnEnum{} -> []
+    TcRnTagToEnumResTyTypeData{} -> []
+    TcRnArrowIfThenElsePredDependsOnResultTy{} -> []
+    TcRnIllegalHsBootOrSigDecl{} -> []
+    TcRnBootMismatch{} -> []
+    TcRnRecursivePatternSynonym{} -> []
+    TcRnPartialTypeSigTyVarMismatch{} -> []
+    TcRnPartialTypeSigBadQuantifier{} -> []
+    TcRnMissingSignature{} -> []
+    TcRnPolymorphicBinderMissingSig{} -> []
+    TcRnOverloadedSig{} -> []
+    TcRnTupleConstraintInst{} -> []
+    TcRnUserTypeError{} -> []
+    TcRnConstraintInKind{} -> []
+    TcRnUnboxedTupleOrSumTypeFuncArg{} -> []
+    TcRnLinearFuncInKind{} -> []
+    TcRnForAllEscapeError{} -> []
+    TcRnVDQInTermType{} -> []
+    TcRnBadQuantPredHead{} -> []
+    TcRnIllegalTupleConstraint{} -> []
+    TcRnNonTypeVarArgInConstraint{} -> []
+    TcRnIllegalImplicitParam{} -> []
+    TcRnIllegalConstraintSynonymOfKind{} -> []
+    TcRnOversaturatedVisibleKindArg{} -> []
+    TcRnForAllRankErr{} -> []
+    TcRnSimplifiableConstraint{} -> []
+    TcRnArityMismatch{} -> []
+    TcRnIllegalInstance{} -> []
+    TcRnMonomorphicBindings{} -> []
+    TcRnOrphanInstance{} -> []
+    TcRnFunDepConflict{} -> []
+    TcRnDupInstanceDecls{} -> []
+    TcRnConflictingFamInstDecls{} -> []
+    TcRnFamInstNotInjective{} -> []
+    TcRnBangOnUnliftedType{} -> []
+    TcRnLazyBangOnUnliftedType{} -> []
+    TcRnMultipleDefaultDeclarations{} -> []
+    TcRnWarnClashingDefaultImports{} -> []
+    TcRnBadDefaultType{} -> []
+    TcRnPatSynBundledWithNonDataCon{} -> []
+    TcRnPatSynBundledWithWrongType{} -> []
+    TcRnDupeModuleExport{} -> []
+    TcRnDupeWildcardExport{} -> []
+    TcRnExportedModNotImported{} -> []
+    TcRnMissingExportList{} -> []
+    TcRnExportHiddenDefault{} -> []
+    TcRnExportedParentChildMismatch{} -> []
+    TcRnExportedSubordinateNotFound{} -> []
+    TcRnConflictingExports{} -> []
+    TcRnDuplicateFieldExport{} -> []
+    TcRnAmbiguousRecordUpdate{} -> []
+    TcRnMissingFields{} -> []
+    TcRnFieldUpdateInvalidType{} -> []
+    TcRnMissingStrictFields{} -> []
+    TcRnAmbiguousFieldInUpdate{} -> []
+    TcRnBadRecordUpdate{} -> []
+    TcRnStaticFormNotClosed{} -> []
+    TcRnUselessTypeable{} -> []
+    TcRnDerivingDefaults{} -> []
+    TcRnNonUnaryTypeclassConstraint{} -> []
+    TcRnPartialTypeSignatures{} -> []
+    TcRnCannotDeriveInstance{} -> []
+    TcRnLazyGADTPattern{} -> []
+    TcRnArrowProcGADTPattern{} -> []
+    TcRnCapturedTermName{} -> []
+    TcRnTypeEqualityOutOfScope{} -> []
+    TcRnTypeEqualityRequiresOperators{} -> []
+    TcRnIllegalTypeOperator{} -> []
+    TcRnIllegalTypeOperatorDecl{} -> []
+    TcRnGADTMonoLocalBinds{} -> []
+    TcRnNotInScope{} -> []
+    TcRnTermNameInType{} -> []
+    TcRnUntickedPromotedThing{} -> []
+    TcRnIllegalBuiltinSyntax{} -> []
+    TcRnWarnDefaulting{} -> []
+    TcRnIncorrectNameSpace{} -> []
+    TcRnForeignImportPrimExtNotSet{} -> []
+    TcRnForeignImportPrimSafeAnn{} -> []
+    TcRnForeignFunctionImportAsValue{} -> []
+    TcRnFunPtrImportWithoutAmpersand{} -> []
+    TcRnIllegalForeignDeclBackend{} -> []
+    TcRnUnsupportedCallConv{} -> []
+    TcRnIllegalForeignType{} -> []
+    TcRnInvalidCIdentifier{} -> []
+    TcRnExpectedValueId{} -> []
+    TcRnRecSelectorEscapedTyVar{} -> []
+    TcRnPatSynNotBidirectional{} -> []
+    TcRnIllegalDerivingItem{} -> []
+    TcRnIllegalDefaultClass{} -> []
+    TcRnIllegalNamedDefault{} -> []
+    TcRnUnexpectedAnnotation{} -> []
+    TcRnIllegalRecordSyntax{} -> []
+    TcRnInvalidVisibleKindArgument{} -> []
+    TcRnTooManyBinders{} -> []
+    TcRnDifferentNamesForTyVar{} -> []
+    TcRnDisconnectedTyVar{} -> []
+    TcRnInvalidReturnKind{} -> []
+    TcRnUnexpectedKindVar{} -> []
+    TcRnIllegalKind{} -> []
+    TcRnClassKindNotConstraint{} -> []
+    TcRnUnpromotableThing{} -> []
+    TcRnUnpromotableLit{} -> []
+    TcRnIllegalTermLevelUse{} -> []
+    TcRnMatchesHaveDiffNumArgs{} -> []
+    TcRnUnexpectedPatSigType{} -> []
+    TcRnDataKindsError{} -> []
+    TcRnCannotBindScopedTyVarInPatSig{} -> []
+    TcRnCannotBindTyVarsInPatBind{} -> []
+    TcRnMultipleInlinePragmas{} -> []
+    TcRnUnexpectedPragmas{} -> []
+    TcRnNonOverloadedSpecialisePragma{} -> []
+    TcRnSpecialiseNotVisible{} -> []
+    TcRnPragmaWarning{} -> []
+    TcRnDifferentExportWarnings{} -> []
+    TcRnIncompleteExportWarnings{} -> []
+    TcRnIllegalHsigDefaultMethods{} -> []
+    TcRnHsigFixityMismatch{} -> []
+    TcRnHsigShapeMismatch{} -> []
+    TcRnHsigMissingModuleExport{} -> []
+    TcRnBadGenericMethod{} -> []
+    TcRnWarningMinimalDefIncomplete{} -> []
+    TcRnIllegalQuasiQuotes{} -> []
+    TcRnTHError{} -> []
+    TcRnDefaultMethodForPragmaLacksBinding{} -> []
+    TcRnIgnoreSpecialisePragmaOnDefMethod{} -> []
+    TcRnBadMethodErr{} -> []
+    TcRnIllegalNewtype{} -> []
+    TcRnIllegalTypeData{} -> []
+    TcRnTypeDataForbids{} -> []
+    TcRnOrPatBindsVariables{} -> []
+    TcRnUnsatisfiedMinimalDef{} -> []
+    TcRnMisplacedInstSig{} -> []
+    TcRnNoRebindableSyntaxRecordDot{} -> []
+    TcRnNoFieldPunsRecordDot{} -> []
+    TcRnIllegalStaticExpression{} -> []
+    TcRnListComprehensionDuplicateBinding{} -> []
+    TcRnEmptyStmtsGroup{} -> []
+    TcRnLastStmtNotExpr{} -> []
+    TcRnUnexpectedStatementInContext{} -> []
+    TcRnIllegalTupleSection{} -> []
+    TcRnIllegalImplicitParameterBindings{} -> []
+    TcRnSectionWithoutParentheses{} -> []
+    TcRnBindingOfExistingName{} -> []
+    TcRnMultipleFixityDecls{} -> []
+    TcRnIllegalPatternSynonymDecl{} -> []
+    TcRnIllegalClassBinding{} -> []
+    TcRnOrphanCompletePragma{} -> []
+    TcRnEmptyCase{} -> []
+    TcRnNonStdGuards{} -> []
+    TcRnDuplicateSigDecl{} -> []
+    TcRnMisplacedSigDecl{} -> []
+    TcRnUnexpectedDefaultSig{} -> []
+    TcRnDuplicateMinimalSig{} -> []
+    TcRnSpecSigShape{} -> []
+    TcRnIllegalInvisTyVarBndr{} -> []
+    TcRnIllegalWildcardTyVarBndr{} -> []
+    TcRnInvalidInvisTyVarBndr{} -> []
+    TcRnInvisBndrWithoutSig{} -> []
+    TcRnUnexpectedStandaloneDerivingDecl{} -> []
+    TcRnUnusedVariableInRuleDecl{} -> []
+    TcRnUnexpectedStandaloneKindSig{} -> []
+    TcRnIllegalRuleLhs{} -> []
+    TcRnRuleLhsEqualities{} -> []
+    TcRnDuplicateRoleAnnot{} -> []
+    TcRnDuplicateKindSig{} -> []
+    TcRnIllegalDerivStrategy{} -> []
+    TcRnIllegalMultipleDerivClauses{} -> []
+    TcRnNoDerivStratSpecified{} -> []
+    TcRnStupidThetaInGadt{} -> []
+    TcRnShadowedTyVarNameInFamResult{} -> []
+    TcRnIncorrectTyVarOnLhsOfInjCond{} -> []
+    TcRnUnknownTyVarsOnRhsOfInjCond{} -> []
+    TcRnLookupInstance{} -> []
+    TcRnBadlyLevelled{} -> []
+    TcRnBadlyLevelledType{} -> []
+    TcRnTyThingUsedWrong{} -> []
+    TcRnCannotDefaultKindVar{} -> []
+    TcRnUninferrableTyVar{} -> []
+    TcRnSkolemEscape{} -> []
+    TcRnPatSynEscapedCoercion{} -> []
+    TcRnPatSynExistentialInResult{} -> []
+    TcRnPatSynArityMismatch{} -> []
+    TcRnPatSynInvalidRhs{} -> []
+    TcRnZonkerMessage{} -> []
+    TcRnTyFamDepsDisabled{} -> []
+    TcRnAbstractClosedTyFamDecl{} -> []
+    TcRnPartialFieldSelector{} -> []
+    TcRnHasFieldResolvedIncomplete{} -> []
+    TcRnBadFieldAnnotation{} -> []
+    TcRnSuperclassCycle{} -> []
+    TcRnDefaultSigMismatch{} -> []
+    TcRnTyFamsDisabled{} -> []
+    TcRnBadTyConTelescope{} -> []
+    TcRnTyFamResultDisabled{} -> []
+    TcRnRoleValidationFailed{} -> []
+    TcRnCommonFieldResultTypeMismatch{} -> []
+    TcRnCommonFieldTypeMismatch{} -> []
+    TcRnClassExtensionDisabled{} -> []
+    TcRnDataConParentTypeMismatch{} -> []
+    TcRnGADTsDisabled{} -> []
+    TcRnExistentialQuantificationDisabled{} -> []
+    TcRnGADTDataContext{} -> []
+    TcRnMultipleConForNewtype{} -> []
+    TcRnKindSignaturesDisabled{} -> []
+    TcRnEmptyDataDeclsDisabled{} -> []
+    TcRnRoleMismatch{} -> []
+    TcRnRoleCountMismatch{} -> []
+    TcRnIllegalRoleAnnotation{} -> []
+    TcRnRoleAnnotationsDisabled{} -> []
+    TcRnIncoherentRoles{} -> []
+    TcRnPrecedenceParsingError{} -> []
+    TcRnSectionPrecedenceError{} -> []
+    TcRnTypeSynonymCycle{} -> []
+    TcRnSelfImport{} -> []
+    TcRnNoExplicitImportList{} -> []
+    TcRnSafeImportsDisabled{} -> []
+    TcRnDeprecatedModule{} -> []
+    TcRnRedundantSourceImport{} -> []
+    TcRnImportLookup{} -> []
+    TcRnUnusedImport{} -> []
+    TcRnPackageImportsDisabled{} -> []
+    TcRnIllegalDataCon{} -> []
+    TcRnNestedForallsContexts{} -> []
+    TcRnRedundantRecordWildcard{} -> []
+    TcRnUnusedRecordWildcard{} -> []
+    TcRnUnusedName{} -> []
+    TcRnQualifiedBinder{} -> []
+    TcRnTypeApplicationsDisabled{} -> []
+    TcRnInvalidRecordField{} -> []
+    TcRnTupleTooLarge{} -> []
+    TcRnCTupleTooLarge{} -> []
+    TcRnIllegalInferredTyVars{} -> []
+    TcRnAmbiguousName{} -> []
+    TcRnNonCanonicalDefinition{} -> []
+    TcRnImplicitImportOfPrelude{} -> []
+    TcRnMissingMain{} -> []
+    TcRnGhciUnliftedBind{} -> []
+    TcRnGhciMonadLookupFail{} -> []
+    TcRnMissingRoleAnnotation{} -> []
+    TcRnPatersonCondFailure{} -> []
+    TcRnImplicitRhsQuantification{} -> []
+    TcRnIllformedTypePattern{} -> []
+    TcRnIllegalTypePattern{} -> []
+    TcRnIllformedTypeArgument{} -> []
+    TcRnIllegalTypeExpr{} -> []
+    TcRnInvalidDefaultedTyVar{} -> []
+    TcRnNamespacedWarningPragmaWithoutFlag{} -> []
+    TcRnIllegalInvisibleTypePattern{} -> []
+    TcRnNamespacedFixitySigWithoutFlag{} -> []
+    TcRnDefaultedExceptionContext{} -> []
+    TcRnOutOfArityTyVar{} -> []
+    TcRnUnexpectedTypeSyntaxInTerms{} -> []
+    TcRnUnrecognisedModifier{} -> []
+    TcRnUnknownModifierKind{} -> []
+    TcRnTooManyMultiplicities{} -> []
 
 pprTcRnBadlyLevelled :: LevelCheckReason -> Set.Set ThLevelIndex -> ThLevelIndex -> Maybe ErrorItem -> DecoratedSDoc
 pprTcRnBadlyLevelled reason bind_lvls use_lvl lift_attempt = mkDecorated $

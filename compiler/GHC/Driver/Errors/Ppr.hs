@@ -89,6 +89,18 @@ instance Diagnostic GhcMessage where
 
   diagnosticCode = constructorCode @GHC
 
+  diagnosticRelatedLocations = \case
+    GhcPsMessage m
+      -> diagnosticRelatedLocations m
+    GhcTcRnMessage m
+      -> diagnosticRelatedLocations m
+    GhcDsMessage m
+      -> diagnosticRelatedLocations m
+    GhcDriverMessage m
+      -> diagnosticRelatedLocations m
+    GhcUnknownMessage m
+      -> diagnosticRelatedLocations m
+
 instance HasDefaultDiagnosticOpts DriverMessageOpts where
   defaultOpts = DriverMessageOpts (defaultDiagnosticOpts @PsMessage) (defaultDiagnosticOpts @IfaceMessage)
 

@@ -1,5 +1,8 @@
+T7164.hs:5:5: error: [GHC-29916] Multiple declarations of ‘derp’
+  |
+5 |     derp :: m a
+  |     ^^^^^^^^^^^
+  |
+8 | derp = 123
+  | ^^^^
 
-T7164.hs:8:1: [GHC-29916]
-    Multiple declarations of ‘derp’
-    Declared at: T7164.hs:5:5
-                 T7164.hs:8:1

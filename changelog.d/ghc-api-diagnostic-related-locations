@@ -1,0 +1,19 @@
+section: ghc-lib
+synopsis: GHC API changes for diagnostic related locations
+issues: #22637
+mrs: !16100
+
+description: {
+In support of related locations in diagnostics:
+
+- The ``Diagnostic`` class gains a method ``diagnosticRelatedLocations ::
+  a -> [SrcSpan]``, with a default implementation returning ``[]``.
+- The ``MCDiagnostic`` constructor of ``MessageClass`` carries an additional
+  ``[SrcSpan]`` field with the related locations.
+- ``getCaretDiagnostic`` is replaced by ``getCaretDiagnostics``, which
+  renders carets for multiple spans and returns the real spans that did not
+  receive one.
+- The ``TcRnDuplicateExport`` and ``TcRnDuplicateNamedDefaultExport``
+  constructors of ``TcRnMessage`` now carry located export items
+  (``LIE GhcPs`` instead of ``IE GhcPs``).
+}
