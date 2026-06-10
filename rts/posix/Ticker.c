@@ -120,7 +120,7 @@ static int poll_no_timeout(fdset *fdset);
 static int poll_with_timeout(fdset *fdset, timeout *t);
 
 
-static Time itimer_interval = DEFAULT_TICK_INTERVAL;
+static Time ticker_interval = DEFAULT_TICK_INTERVAL;
 
 // Atomic variable used by client threads to communicate that they want the
 // ticker thread to pause. This communication is one-way, with no
@@ -132,12 +132,13 @@ static bool pause_request;
 static bool exit_request;
 
 // Used to wait for the ticker thread to terminate after asking it to exit.
-static OSThreadId thread;
+static OSThreadId ticker_thread_id;
 
-// fds for interrupting the ticker
-static int interruptfd_r = -1, interruptfd_w = -1;
+// Fds used with sendFdWakeup to notify the ticker thread that any of the
+// *_request variables above have been set.
+static int notifyfd_r = -1, notifyfd_w = -1;
 
-static void *itimer_thread_func(void *_handle_tick)
+static void *ticker_thread_func(void *_handle_tick)
 {
     TickProc handle_tick = _handle_tick;
 
@@ -149,8 +150,8 @@ static void *itimer_thread_func(void *_handle_tick)
 
     timeout timeout;
     fdset fdset;
-    poll_init_timeout(&timeout, itimer_interval);
-    poll_init_fdset(&fdset, interruptfd_r);
+    poll_init_timeout(&timeout, ticker_interval);
+    poll_init_fdset(&fdset, notifyfd_r);
 
     while (!exit) {
 
@@ -172,7 +173,7 @@ static void *itimer_thread_func(void *_handle_tick)
             // happens-before relation. So if the request variables are set
             // before calling sendFdWakeup, then we should be able to reliably
             // read them here afterwards.
-            collectFdWakeup(interruptfd_r);
+            collectFdWakeup(notifyfd_r);
 
             paused = ACQUIRE_LOAD_ALWAYS(&pause_request);
             exit   = RELAXED_LOAD_ALWAYS(&exit_request);
@@ -195,9 +196,10 @@ static void *itimer_thread_func(void *_handle_tick)
 void
 initTicker (Time interval, TickProc handle_tick)
 {
-    itimer_interval = interval;
-    pause_request = true;
-    exit_request = false;
+    ticker_interval     = interval;
+    pause_request       = true;
+    exit_request        = false;
+
 #if defined(HAVE_SIGNAL_H)
     sigset_t mask, omask;
     int sigret;
@@ -206,7 +208,7 @@ initTicker (Time interval, TickProc handle_tick)
 
     /* Open the interrupt fd synchronously.
      *
-     * We used to do it in itimer_thread_func (i.e. in the timer thread) but it
+     * We used to do it in ticker_thread_func (i.e. in the timer thread) but it
      * meant that some user code could run before it and get confused by the
      * allocation of the timerfd.
      *
@@ -216,11 +218,11 @@ initTicker (Time interval, TickProc handle_tick)
      * descriptor closed by the first call! (see #20618)
      */
 
-    if (interruptfd_r != -1) {
+    if (notifyfd_r != -1) {
         // don't leak the old file descriptors after a fork (#25280)
-        closeFdWakeup(interruptfd_r, interruptfd_w);
+        closeFdWakeup(notifyfd_r, notifyfd_w);
     }
-    newFdWakeup(&interruptfd_r, &interruptfd_w);
+    newFdWakeup(&notifyfd_r, &notifyfd_w);
 
     /*
      * Create the thread with all blockable signals blocked, leaving signal
@@ -232,7 +234,7 @@ initTicker (Time interval, TickProc handle_tick)
     sigfillset(&mask);
     sigret = pthread_sigmask(SIG_SETMASK, &mask, &omask);
 #endif
-    ret = createAttachedOSThread(&thread, "ghc_ticker", itimer_thread_func, (void*)handle_tick);
+    ret = createAttachedOSThread(&ticker_thread_id, "ghc_ticker", ticker_thread_func, (void*)handle_tick);
 #if defined(HAVE_SIGNAL_H)
     if (sigret == 0)
         pthread_sigmask(SIG_SETMASK, &omask, NULL);
@@ -247,7 +249,7 @@ initTicker (Time interval, TickProc handle_tick)
 void unpauseTicker(void)
 {
     RELEASE_STORE_ALWAYS(&pause_request, false);
-    sendFdWakeup(interruptfd_w);
+    sendFdWakeup(notifyfd_w);
 }
 
 /* Asynchronous. Idempotent.
@@ -257,7 +259,7 @@ void unpauseTicker(void)
 void pauseTicker(void)
 {
     RELEASE_STORE_ALWAYS(&pause_request, true);
-    sendFdWakeup(interruptfd_w);
+    sendFdWakeup(notifyfd_w);
 }
 
 /* Synchronous. Not idempotent.
@@ -267,13 +269,13 @@ void exitTicker(void)
 {
     ASSERT(!RELAXED_LOAD_ALWAYS(&exit_request));
     RELEASE_STORE_ALWAYS(&exit_request, true);
-    sendFdWakeup(interruptfd_w);
+    sendFdWakeup(notifyfd_w);
 
-    // wait for ticker to terminate
-    if (pthread_join(thread, NULL)) {
+    // wait for ticker thread to terminate
+    if (pthread_join(ticker_thread_id, NULL)) {
         sysErrorBelch("Ticker: Failed to join: %s", strerror(errno));
     }
-    closeFdWakeup(interruptfd_r, interruptfd_w);
+    closeFdWakeup(notifyfd_r, notifyfd_w);
 }
 
 /* Implementation of the local helpers, to hide the difference between ppoll()
