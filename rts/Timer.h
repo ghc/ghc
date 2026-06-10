@@ -11,7 +11,7 @@
 #include "BeginPrivate.h"
 
 void initTimer(void);
-void exitTimer(bool wait);
+void exitTimer(void);
 
 void pauseTimer(void);
 void unpauseTimer(void);

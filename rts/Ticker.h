@@ -19,7 +19,7 @@ void initTicker(Time interval, TickProc handle_tick);
  * The exitTicker action is *synchronous*. When it returns the caller is
  * guaranteed that the tick action is blocked.
  */
-void exitTicker(bool wait);
+void exitTicker(void);
 
 /* Pause and unpause (resume) the ticker.
  *

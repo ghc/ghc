@@ -176,8 +176,7 @@ handle_tick(int unused STG_UNUSED)
   }
 }
 
-void
-initTimer(void)
+void initTimer(void)
 {
 #if defined(HAVE_PREEMPTION)
     initProfTimer();
@@ -220,12 +219,11 @@ void unpauseTimer(void)
 #endif
 }
 
-void
-exitTimer (bool wait)
+void exitTimer (void)
 {
 #if defined(HAVE_PREEMPTION)
     if (RtsFlags.MiscFlags.tickInterval != 0) {
-        exitTicker(wait);
+        exitTicker();
     }
 #endif
 }
