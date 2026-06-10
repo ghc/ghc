@@ -777,7 +777,16 @@ getRegister' config plat expr =
         MO_SS_Conv from to -> ss_conv from to reg code
         MO_FF_Conv from to -> return $ Any (floatFormat to) (\dst -> code `snocOL` annExpr e (FCVT FloatToFloat (OpReg to dst) (OpReg from reg)))
         MO_WF_Bitcast w    -> return $ Any (floatFormat w)  (\dst -> code `snocOL` MOV (OpReg w dst) (OpReg w reg))
-        MO_FW_Bitcast w    -> return $ Any (intFormat w)    (\dst -> code `snocOL` MOV (OpReg w dst) (OpReg w reg))
+        MO_FW_Bitcast w ->
+          return
+            $ Any
+              (intFormat w)
+              ( \dst ->
+                  code
+                    `snocOL` MOV (OpReg w dst) (OpReg w reg)
+                    -- FMV.X.W sign-extends the value, so truncate the result
+                    `appOL` truncateReg W64 w dst
+              )
 
         -- Conversions
         -- TODO: Duplication with MO_UU_Conv
