@@ -115,23 +115,23 @@ typedef struct { int fd; fd_set selectfds; } fdset; // need to stash fd
 #endif
 static void poll_init_timeout(timeout *tv, Time t);
 static void poll_init_fdset(fdset *fds, int fd); // single fd only
-// poll_with_timeout returns >0 if fd ready, ==0 if timeout, <0 if error
+// poll_*_timeout returns >0 if fd ready, ==0 if timeout, <0 if error
+static int poll_no_timeout(fdset *fdset);
 static int poll_with_timeout(fdset *fdset, timeout *t);
 
 
 static Time itimer_interval = DEFAULT_TICK_INTERVAL;
 
-// Should we be firing ticks?
-// Writers to this must hold the mutex below.
-static bool stopped = false;
+// Atomic variable used by client threads to communicate that they want the
+// ticker thread to pause. This communication is one-way, with no
+// acknowledgement.
+static bool pause_request;
 
-// should the ticker thread exit?
-// This can be set without holding the mutex.
-static bool exited = true;
+// Atomic variable used by other threads to communicate that they want the
+// ticker thread to exit.
+static bool exit_request;
 
-// Signaled when we want to (re)start the timer
-static Condition start_cond;
-static Mutex mutex;
+// Used to wait for the ticker thread to terminate after asking it to exit.
 static OSThreadId thread;
 
 // fds for interrupting the ticker
@@ -141,70 +141,68 @@ static void *itimer_thread_func(void *_handle_tick)
 {
     TickProc handle_tick = _handle_tick;
 
+    // Thread-local view of our state. We compare these with the corresponding
+    // atomic shared variables used to request state changes.
+    bool paused  = true;  // updated from atomic shared var pause_request
+    bool exit    = false; // updated from atomic shared var exit_request
+    // Note that we start paused.
+
     timeout timeout;
     fdset fdset;
     poll_init_timeout(&timeout, itimer_interval);
     poll_init_fdset(&fdset, interruptfd_r);
 
-    // Relaxed is sufficient: If we don't see that exited was set in one iteration we will
-    // see it next time.
-    while (!RELAXED_LOAD_ALWAYS(&exited)) {
+    while (!exit) {
 
-        int nready = poll_with_timeout(&fdset, &timeout);
-        // In either case (ppoll or select), the result nready is the number
-        // of fds that are ready.
-        if (RTS_LIKELY(nready == 0)) {
-            // Timer expired, not interrupted, continue.
-        } else if (nready > 0) {
-            // We only monitor one fd (the interruptfd_r), so we know
-            // it is that fd that is ready without any further checks.
-            collectFdWakeup(interruptfd_r);
-            // No further action needed, continue on to handling the final tick
-            // and then stop.
-
-            // Note that we rely on sendFdWakeup and select/poll to provide the
-            // happens-before relation. So if 'exited' was set before calling
-            // sendFdWakeup, then we should be able to reliably read it after.
-            // And thus reading 'exited' in the while loop guard is ok.
+        int notify;
+        if (paused) {
+            notify = poll_no_timeout(&fdset);
         } else {
+            notify = poll_with_timeout(&fdset, &timeout);
+        }
+
+        if (RTS_LIKELY(notify == 0)) {
+            // The time expired, no state change notification.
+            handle_tick(0);
+
+        } else if (notify > 0) {
+            // State change notification, check the request variables.
+
+            // We rely on sendFdWakeup and select/poll to provide the
+            // happens-before relation. So if the request variables are set
+            // before calling sendFdWakeup, then we should be able to reliably
+            // read them here afterwards.
+            collectFdWakeup(interruptfd_r);
+
+            paused = ACQUIRE_LOAD_ALWAYS(&pause_request);
+            exit   = RELAXED_LOAD_ALWAYS(&exit_request);
+        } else if (errno != EINTR) {
             // While the RTS attempts to mask signals, some foreign libraries
             // that rely on signal delivery may unmask them. Consequently we
             // may see EINTR. See #24610.
-            if (errno != EINTR) {
-                sysErrorBelch("Ticker: poll failed: %s", strerror(errno));
-            }
-        }
-
-        // first try a cheap test
-        if (RELAXED_LOAD_ALWAYS(&stopped)) {
-            OS_ACQUIRE_LOCK(&mutex);
-            // should we really stop?
-            if (stopped) {
-                waitCondition(&start_cond, &mutex);
-            }
-            OS_RELEASE_LOCK(&mutex);
-        } else {
-            handle_tick(0);
+            sysErrorBelch("Ticker: poll failed: %s", strerror(errno));
         }
     }
 
     return NULL;
 }
 
+/* Initialise the ticker on startup or re-initialise the ticker after a fork().
+ * In the fork case, the thread will not be present, but fds are inherited.
+ *
+ * The ticker is started in the paused state. Use unpauseTicker to continue.
+ */
 void
 initTicker (Time interval, TickProc handle_tick)
 {
     itimer_interval = interval;
-    stopped = true;
-    exited = false;
+    pause_request = true;
+    exit_request = false;
 #if defined(HAVE_SIGNAL_H)
     sigset_t mask, omask;
     int sigret;
 #endif
     int ret;
-
-    initCondition(&start_cond);
-    initMutex(&mutex);
 
     /* Open the interrupt fd synchronously.
      *
@@ -248,10 +246,8 @@ initTicker (Time interval, TickProc handle_tick)
 /* Asynchronous. Idempotent. */
 void unpauseTicker(void)
 {
-    OS_ACQUIRE_LOCK(&mutex);
-    RELAXED_STORE(&stopped, false);
-    signalCondition(&start_cond);
-    OS_RELEASE_LOCK(&mutex);
+    RELEASE_STORE_ALWAYS(&pause_request, false);
+    sendFdWakeup(interruptfd_w);
 }
 
 /* Asynchronous. Idempotent.
@@ -260,9 +256,8 @@ void unpauseTicker(void)
  */
 void pauseTicker(void)
 {
-    OS_ACQUIRE_LOCK(&mutex);
-    RELAXED_STORE(&stopped, true);
-    OS_RELEASE_LOCK(&mutex);
+    RELEASE_STORE_ALWAYS(&pause_request, true);
+    sendFdWakeup(interruptfd_w);
 }
 
 /* Synchronous. Not idempotent.
@@ -270,10 +265,8 @@ void pauseTicker(void)
  */
 void exitTicker(void)
 {
-    ASSERT(!SEQ_CST_LOAD(&exited));
-    SEQ_CST_STORE(&exited, true);
-    // ensure that ticker wakes up if stopped
-    unpauseTicker();
+    ASSERT(!RELAXED_LOAD_ALWAYS(&exit_request));
+    RELEASE_STORE_ALWAYS(&exit_request, true);
     sendFdWakeup(interruptfd_w);
 
     // wait for ticker to terminate
@@ -281,8 +274,6 @@ void exitTicker(void)
         sysErrorBelch("Ticker: Failed to join: %s", strerror(errno));
     }
     closeFdWakeup(interruptfd_r, interruptfd_w);
-    closeMutex(&mutex);
-    closeCondition(&start_cond);
 }
 
 /* Implementation of the local helpers, to hide the difference between ppoll()
@@ -299,6 +290,12 @@ static void poll_init_fdset(fdset *fds, int fd)
 {
     fds->pollfds[0].fd = fd;
     fds->pollfds[0].events = POLLIN;
+}
+
+static int poll_no_timeout(fdset *fds)
+{
+    int nfds = 1;
+    return ppoll(fds->pollfds, nfds, NULL, NULL);
 }
 
 static int poll_with_timeout(fdset *fds, timeout *ts)
@@ -327,6 +324,16 @@ static void poll_init_fdset(fdset *fds, int fd)
      */
     fds->fd = fd;
     FD_ZERO(&fds->selectfds);
+}
+
+static int poll_no_timeout(fdset *fds)
+{
+    /* select() modifies the fd_set so we must set it every time, but we rely
+     * on it not touching other bits to avoid having to FD_ZERO it every time
+     */
+    FD_SET(fds->fd, &fds->selectfds);
+    int nfds = fds->fd+1;
+    return select(nfds, &fds->selectfds, NULL, NULL, NULL);
 }
 
 static int poll_with_timeout(fdset *fds, timeout *tv)
