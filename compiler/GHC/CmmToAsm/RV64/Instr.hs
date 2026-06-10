@@ -165,6 +165,7 @@ callerSavedRegisters =
     ++ map regSingle [t3RegNo .. t6RegNo]
     ++ map regSingle [ft0RegNo .. ft7RegNo]
     ++ map regSingle [fa0RegNo .. fa7RegNo]
+    ++ map regSingle [ft8RegNo .. ft11RegNo]
 
 -- | Apply a given mapping to all the register references in this instruction.
 patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
