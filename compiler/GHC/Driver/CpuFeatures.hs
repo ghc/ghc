@@ -32,7 +32,10 @@ data X86CpuFeature
 
 -- | Decode the bitmask returned by 'ghc_detect_x86_cpu_features'.
 --
--- NOTE: Bit positions must match the enum in @compiler/cbits/cpu_features_x86.c@.
+-- NOTE: Bit positions are LLVM\/GCC's @__builtin_cpu_supports@ feature
+-- numbering, i.e. @enum ProcessorFeatures@ vendored in
+-- @compiler/cbits/cpu_features_x86.c@. The C side returns the first 64
+-- feature bits of that numbering.
 decodeX86CpuFeatureMask :: Word64 -> [X86CpuFeature]
 decodeX86CpuFeatureMask mask =
   [ feat
@@ -61,24 +64,27 @@ cachedX86CpuFeatures :: [X86CpuFeature]
 cachedX86CpuFeatures = unsafePerformIO detectX86CpuFeatures
 {-# NOINLINE cachedX86CpuFeatures #-}
 
+-- | See the NOTE on 'decodeX86CpuFeatureMask' for where these bit positions
+-- come from. The constant names on the C side are upstream's: @FEATURE_SSE2@,
+-- @FEATURE_BMI@ (= 'BMI1'), etc.
 cpuFeatureBitLayout :: [(Int, X86CpuFeature)]
 cpuFeatureBitLayout =
-  [ (0,  SSE2)
-  , (1,  SSE3)
-  , (2,  SSSE3)
-  , (3,  SSE4_1)
-  , (4,  SSE4_2)
-  , (5,  AVX)
-  , (6,  AVX2)
-  , (7,  AVX512F)
-  , (8,  AVX512BW)
-  , (9,  AVX512CD)
-  , (10, AVX512DQ)
-  , (11, AVX512VL)
-  , (12, BMI1)
-  , (13, BMI2)
-  , (14, FMA)
-  , (15, GFNI)
+  [ (4,  SSE2)     -- FEATURE_SSE2
+  , (5,  SSE3)     -- FEATURE_SSE3
+  , (6,  SSSE3)    -- FEATURE_SSSE3
+  , (7,  SSE4_1)   -- FEATURE_SSE4_1
+  , (8,  SSE4_2)   -- FEATURE_SSE4_2
+  , (9,  AVX)      -- FEATURE_AVX
+  , (10, AVX2)     -- FEATURE_AVX2
+  , (14, FMA)      -- FEATURE_FMA
+  , (15, AVX512F)  -- FEATURE_AVX512F
+  , (16, BMI1)     -- FEATURE_BMI
+  , (17, BMI2)     -- FEATURE_BMI2
+  , (20, AVX512VL) -- FEATURE_AVX512VL
+  , (21, AVX512BW) -- FEATURE_AVX512BW
+  , (22, AVX512DQ) -- FEATURE_AVX512DQ
+  , (23, AVX512CD) -- FEATURE_AVX512CD
+  , (32, GFNI)     -- FEATURE_GFNI
   ]
 
 #if !defined(javascript_HOST_ARCH)
