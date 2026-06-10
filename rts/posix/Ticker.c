@@ -253,8 +253,8 @@ initTicker (Time interval, TickProc handle_tick)
     }
 }
 
-void
-unpauseTicker(void)
+/* Asynchronous. Idempotent. */
+void unpauseTicker(void)
 {
     OS_ACQUIRE_LOCK(&mutex);
     RELAXED_STORE(&stopped, false);
@@ -262,18 +262,21 @@ unpauseTicker(void)
     OS_RELEASE_LOCK(&mutex);
 }
 
-/* There may be at most one additional tick fired after a call to this */
-void
-pauseTicker(void)
+/* Asynchronous. Idempotent.
+ * There may be at additional ticks fired after a call to this, but it will
+ * usually stop quickly.
+ */
+void pauseTicker(void)
 {
     OS_ACQUIRE_LOCK(&mutex);
     RELAXED_STORE(&stopped, true);
     OS_RELEASE_LOCK(&mutex);
 }
 
-/* There may be at most one additional tick fired after a call to this */
-void
-exitTicker(void)
+/* Synchronous. Not idempotent.
+ * The ticker is guaranteed stopped after this.
+ */
+void exitTicker(void)
 {
     ASSERT(!SEQ_CST_LOAD(&exited));
     SEQ_CST_STORE(&exited, true);
