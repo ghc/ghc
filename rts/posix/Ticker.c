@@ -254,7 +254,7 @@ initTicker (Time interval, TickProc handle_tick)
 }
 
 void
-startTicker(void)
+unpauseTicker(void)
 {
     OS_ACQUIRE_LOCK(&mutex);
     RELAXED_STORE(&stopped, false);
@@ -264,7 +264,7 @@ startTicker(void)
 
 /* There may be at most one additional tick fired after a call to this */
 void
-stopTicker(void)
+pauseTicker(void)
 {
     OS_ACQUIRE_LOCK(&mutex);
     RELAXED_STORE(&stopped, true);
@@ -278,7 +278,7 @@ exitTicker (bool wait)
     ASSERT(!SEQ_CST_LOAD(&exited));
     SEQ_CST_STORE(&exited, true);
     // ensure that ticker wakes up if stopped
-    startTicker();
+    unpauseTicker();
     sendFdWakeup(interruptfd_w);
 
     // wait for ticker to terminate if necessary

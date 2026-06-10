@@ -148,7 +148,7 @@ handle_tick(int unused STG_UNUSED)
                                      RtsFlags.MiscFlags.tickInterval;
 #if defined(THREADED_RTS)
               wakeUpRts();
-              // The scheduler will call stopTimer() when it has done
+              // The scheduler will call pauseTimer() when it has done
               // the GC.
 #endif
           } else {
@@ -160,10 +160,10 @@ handle_tick(int unused STG_UNUSED)
 #if defined(PROFILING)
               if (!(RtsFlags.ProfFlags.doHeapProfile
                     || RtsFlags.CcFlags.doCostCentres)) {
-                  stopTimer();
+                  pauseTimer();
               }
 #else
-              stopTimer();
+              pauseTimer();
 #endif
           }
       } else {
@@ -188,25 +188,33 @@ initTimer(void)
 #endif
 }
 
-void
-startTimer(void)
+/* Deprecated exported functions. Now no-ops.
+ * Historically they were used by the process and unix libraries to disable
+ * the signal-based interval timer, since otherwise the timer signal would
+ * keep going off in the child process and confusing everything. The interval
+ * timer no longer uses signals, so there is no need any more for libraries to
+ * disable the timer. Also, the timer internal API has changed.
+ */
+void stopTimer(void)  { /* no-op */ }
+void startTimer(void) { /* no-op */ }
+
+void pauseTimer(void)
 {
 #if defined(HAVE_PREEMPTION)
     if (SEQ_CST_SUB_ALWAYS(&timer_disabled, 1) == 0) {
         if (RtsFlags.MiscFlags.tickInterval != 0) {
-            startTicker();
+            pauseTicker();
         }
     }
 #endif
 }
 
-void
-stopTimer(void)
+void unpauseTimer(void)
 {
 #if defined(HAVE_PREEMPTION)
     if (SEQ_CST_ADD_ALWAYS(&timer_disabled, 1) == 1) {
         if (RtsFlags.MiscFlags.tickInterval != 0) {
-            stopTicker();
+            unpauseTicker();
         }
     }
 #endif
