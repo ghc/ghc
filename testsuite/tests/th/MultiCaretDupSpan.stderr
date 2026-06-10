@@ -1,0 +1,6 @@
+MultiCaretDupSpan.hs:12:2: error: [GHC-29916]
+    Multiple declarations of ‘x’
+   |
+12 | $(do let d = ValD (VarP (mkName "x")) (NormalB (LitE (IntegerL 1))) []
+   |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^...
+

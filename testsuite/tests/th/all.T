@@ -125,6 +125,7 @@ test('TH_spliceInst', normal, compile, ['-v0'])
 test('TH_exn1', normal, compile_fail, ['-v0'])
 
 test('TH_dupdecl', normal, compile_fail, ['-v0'])
+test('MultiCaretDupSpan', normal, compile_fail, ['-v0 -fdiagnostics-show-caret'])
 test('TH_exn2', normal, compile_fail, ['-v0'])
 
 test('TH_recover', normal, compile_and_run, [''])

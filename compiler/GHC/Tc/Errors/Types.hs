@@ -3983,8 +3983,11 @@ data TcRnMessage where
                         -- ^ The individual declarations, in ascending source
                         -- order. The last one is the primary span of the
                         -- message; 'diagnosticRelatedLocations' returns the
-                        -- earlier ones. See Note [Choosing the primary and
-                        -- related spans] in GHC.Types.Error.
+                        -- earlier ones, omitting any that coincide with the
+                        -- primary span (all occurrences can share one span,
+                        -- e.g. when spliced by a single TH splice). See
+                        -- Note [Choosing the primary and related spans]
+                        -- in GHC.Types.Error.
                      -> TcRnMessage
 
   {-| TcRnPackageImportsDisabled is an error indicating that an import uses
@@ -4136,8 +4139,10 @@ data TcRnMessage where
                              -- ^ The locations of the duplicates, in ascending
                              -- source order. The last one is the primary span
                              -- of the message; 'diagnosticRelatedLocations'
-                             -- returns the earlier ones. See Note [Choosing the
-                             -- primary and related spans] in GHC.Types.Error.
+                             -- returns the earlier ones, omitting any that
+                             -- coincide with the primary span. See
+                             -- Note [Choosing the primary and related spans]
+                             -- in GHC.Types.Error.
                           -> TcRnMessage
 
   {-| TcRnNonCanonicalDefinition is a warning indicating that an instance

@@ -1,4 +1,7 @@
 Main.hs:8:20: error: [GHC-10498]
     • Conflicting definitions for ‘x’
     • In a case alternative
+  |
+8 |              [expr|$x + $x|] -> print x
+  |                    ^^^^^^^^^
 

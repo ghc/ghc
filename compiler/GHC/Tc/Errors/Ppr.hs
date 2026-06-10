@@ -3454,9 +3454,9 @@ instance Diagnostic TcRnMessage where
     -- the earlier occurrences, in ascending source order, are the related
     -- locations. See Note [Choosing the primary and related spans] in GHC.Types.Error.
     TcRnBindingNameConflict _ locs
-      -> NE.init locs
+      -> priorOccurrences locs
     TcRnDuplicateDecls _ names
-      -> map nameSrcSpan (NE.init names)
+      -> priorOccurrences (NE.map nameSrcSpan names)
     TcRnDuplicateExport _ _lie1 lie2
       -> [getLocA lie2]
     TcRnDuplicateNamedDefaultExport _ _lie1 lie2
@@ -3762,6 +3762,23 @@ instance Diagnostic TcRnMessage where
     TcRnWarnDefaulting{} -> []
     TcRnWarningMinimalDefIncomplete{} -> []
     TcRnZonkerMessage{} -> []
+
+-- | The prior occurrences of a duplicated entity, for use as the related
+-- locations of a \"duplicate\" diagnostic. Given all occurrences in ascending
+-- source order with the primary span last, return the earlier ones, omitting
+-- repeated spans and spans that coincide with the primary. Several
+-- occurrences can share a single span -- e.g. duplicate declarations brought
+-- into being by one TH splice -- and repeating the primary span among the
+-- related locations would draw its caret twice and emit it again in the JSON
+-- relatedSpans field.
+-- See Note [Choosing the primary and related spans] in GHC.Types.Error.
+priorOccurrences :: NE.NonEmpty SrcSpan -> [SrcSpan]
+priorOccurrences locs =
+  nubOrdBy (comparing key) (filter ((/= key primary) . key) (NE.init locs))
+  where
+    primary = NE.last locs
+    -- Compare the real locations, ignoring buffer spans.
+    key = srcSpanToRealSrcSpan
 
 pprTcRnBadlyLevelled :: LevelCheckReason -> Set.Set ThLevelIndex -> ThLevelIndex -> Maybe ErrorItem -> DecoratedSDoc
 pprTcRnBadlyLevelled reason bind_lvls use_lvl lift_attempt = mkDecorated $
