@@ -1,4 +1,4 @@
-<interactive>:2:32: error: [GHC-29916]
+<interactive>:2:68: error: [GHC-29916]
     • Multiple declarations of ‘f’
     • In the Template Haskell quotation:
         [d| f = undefined
@@ -6,6 +6,6 @@
               f :: x -> x
             instance Foo Int where
               f = id |]
-    At: <interactive>:2:32
-        <interactive>:2:68-78
+    At: <interactive>:2:68-78
+        <interactive>:2:32
 

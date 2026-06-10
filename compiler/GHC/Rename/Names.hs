@@ -2544,7 +2544,9 @@ importLookupExtensions = do
 
 addDupDeclErr :: NonEmpty GlobalRdrElt -> TcRn ()
 addDupDeclErr gres@(gre :| _)
-  = addErrAt (getSrcSpan (NE.head sorted_names)) $ (TcRnDuplicateDecls (greOccName gre) sorted_names)
+  -- Report the error at the last occurrence; the earlier ones are the related
+  -- locations. See Note [Choosing the primary and related spans] in GHC.Types.Error.
+  = addErrAt (getSrcSpan (NE.last sorted_names)) $ (TcRnDuplicateDecls (greOccName gre) sorted_names)
   where
     sorted_names =
       NE.sortBy (SrcLoc.leftmost_smallest `on` nameSrcSpan)

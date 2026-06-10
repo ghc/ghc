@@ -1,4 +1,4 @@
-mod22.hs:2:11: error: [GHC-29916] Multiple declarations of ‘K’
-    At: mod22.hs:2:11
-        mod22.hs:3:11
+mod22.hs:3:11: error: [GHC-29916] Multiple declarations of ‘K’
+    At: mod22.hs:3:11
+        mod22.hs:2:11
 

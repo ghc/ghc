@@ -1,5 +1,5 @@
 Mod128_A.hs:2:19: warning: [GHC-47854] [-Wduplicate-exports (in -Wdefault)]
     ‘T’ is exported by ‘T(Con)’ and ‘T’
-    At: Mod128_A.hs:2:17
-        Mod128_A.hs:2:19-24
+    At: Mod128_A.hs:2:19-24
+        Mod128_A.hs:2:17
 

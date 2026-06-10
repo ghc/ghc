@@ -1,10 +1,10 @@
 T25901_exp_dup_wc_4.hs:3:41: warning: [GHC-47854] [-Wduplicate-exports (in -Wdefault)]
     ‘MkD1’ is exported by ‘data ..’ and ‘data MkD1’
-    At: T25901_exp_dup_wc_4.hs:3:30-38
-        T25901_exp_dup_wc_4.hs:3:41-47
+    At: T25901_exp_dup_wc_4.hs:3:41-47
+        T25901_exp_dup_wc_4.hs:3:30-38
 
 T25901_exp_dup_wc_4.hs:3:50: warning: [GHC-47854] [-Wduplicate-exports (in -Wdefault)]
     ‘MkD2’ is exported by ‘data MkD2’ and ‘data ..’
-    At: T25901_exp_dup_wc_4.hs:3:41-47
-        T25901_exp_dup_wc_4.hs:3:50-58
+    At: T25901_exp_dup_wc_4.hs:3:50-58
+        T25901_exp_dup_wc_4.hs:3:41-47
 

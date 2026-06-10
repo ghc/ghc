@@ -1,4 +1,4 @@
-mod20.hs:2:18: error: [GHC-29916] Multiple declarations of ‘m’
-    At: mod20.hs:2:18-23
-        mod20.hs:3:18-23
+mod20.hs:3:18: error: [GHC-29916] Multiple declarations of ‘m’
+    At: mod20.hs:3:18-23
+        mod20.hs:2:18-23
 

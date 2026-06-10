@@ -660,7 +660,9 @@ mkNameClashErr gre_env rdr_name gres = TcRnAmbiguousName gre_env rdr_name gres
 
 dupNamesErr :: NE.NonEmpty SrcSpan -> NE.NonEmpty RdrName -> RnM ()
 dupNamesErr locs names
-  = addErrAt (NE.head sorted_locs)
+  -- Report the error at the last occurrence; the earlier ones are the related
+  -- locations. See Note [Choosing the primary and related spans] in GHC.Types.Error.
+  = addErrAt (NE.last sorted_locs)
              (TcRnBindingNameConflict (NE.head names) sorted_locs)
   where
     sorted_locs = NE.sortBy leftmost_smallest locs

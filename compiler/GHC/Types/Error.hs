@@ -252,52 +252,74 @@ Every diagnostic is associated with source locations on two levels:
     via -fdiagnostics-as-json, and onwards to HLS/LSP).
 
 This is close to the diagnostic model of the Language Server Protocol (LSP), to
-which GHC's diagnostics are forwarded by HLS. An LSP diagnostic carries a single
-@range@ plus a list of @relatedInformation@ entries, each a location with its
-own message; GHC's 'errMsgSpan' corresponds to the @range@ and
-'diagnosticRelatedLocations' to @relatedInformation@. See the @Diagnostic@ and
-@DiagnosticRelatedInformation@ interfaces under "Basic JSON Structures":
+which GHC's diagnostics are forwarded by HLS: an LSP diagnostic carries a single
+@range@ ('errMsgSpan') plus a list of @relatedInformation@ entries
+('diagnosticRelatedLocations'), each a location with its own message. See
 
   https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#diagnostic
 
-A couple of points follow from this:
+How the locations are rendered:
 
   * Related spans are additional to the primary span, not replacements for it.
     The spans that receive a caret are @primary :| relatedLocations@ (see
     'GHC.Driver.Errors.printMessage' and 'defaultLogActionWithHandles').
 
-  * The order in which locations are shown — both as carets and in the @At:@
-    list below — is exactly the order the message author gives them: the primary
-    span first, then 'diagnosticRelatedLocations' as listed. The rendering layer
-    neither reorders nor deduplicates. A diagnostic with more than one related
-    span should therefore order them deterministically itself (e.g. by sorting
-    with 'leftmost_smallest' at construction), since the spans often come from a
-    source whose natural order is not stable across runs, and should not repeat
-    the primary span among the related ones.
+  * Locations are shown — both as carets and in the @At:@ list below — in
+    exactly the order the message author gives them: the primary span first,
+    then 'diagnosticRelatedLocations' as listed. The rendering layer neither
+    reorders nor deduplicates.
 
   * Not every location can be shown as a caret: carets are optional
     (@-fno-diagnostics-show-caret@), and some spans have no source to display
-    anyway (e.g. GHCi input or TH-generated code). Any location -- including the
-    primary span -- that does not appear as a caret is instead listed textually
-    under an @At:@ heading ('pprAtLocations'; a list naming only the primary is
-    dropped, since the message header already states it). Each location is shown
-    either as a caret or in the @At:@ list, which is why error messages do not
-    also spell the locations out in their prose. Carets require 'IO' to read the
-    source, so renderers other than 'GHC.Utils.Logger.decorateDiagnostic' — in
-    particular the pure 'GHC.Utils.Error.pprLocMsgEnvelope', used e.g. when
-    'show'ing a 'GHC.Types.SourceError.SourceError' and for deferred type
-    errors — list /all/ the locations under @At:@.
+    anyway (e.g. GHCi input or TH-generated code). Locations that get no caret
+    are instead listed under an @At:@ heading ('pprAtLocations'; dropped when it
+    would name only the primary span, which the header already states).
+    Every location with a real source position thus appears either as a caret
+    or in the @At:@ list — only spans without one ('UnhelpfulSpan') are dropped
+    altogether — so messages need not spell the locations out in their prose.
+    Carets require 'IO' to read the source, so renderers other than
+    'GHC.Utils.Logger.decorateDiagnostic' — in particular the pure
+    'GHC.Utils.Error.pprLocMsgEnvelope', used e.g. when 'show'ing a
+    'GHC.Types.SourceError.SourceError' and for deferred type errors — list
+    /all/ the locations under @At:@.
 
-  * The primary span need not be the leftmost or smallest of the locations
-    involved, and need not be a synthetic span combining all of them. When
-    several real locations are in play, it is usually better to pick one as the
-    primary and list the rest as related locations than to report a single
-    combined span, which gives a less precise prefix and a larger caret.
+How a message author should pick and order the spans is the subject of
+Note [Choosing the primary and related spans].
 
-Note that GHC's related locations are currently bare 'SrcSpan's with no per-span
-label, whereas an LSP @relatedInformation@ entry pairs each location with a
-message (as do rustc's span labels). Carrying such a message per related span is
-a natural future extension; see #23414.
+GHC's related locations are currently bare 'SrcSpan's with no per-span label,
+whereas an LSP @relatedInformation@ entry pairs each location with a message (as
+do rustc's span labels). Carrying such a message per related span is a natural
+future extension; see #23414.
+
+Note [Choosing the primary and related spans]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The rendering layer shows a diagnostic's locations in exactly the order given
+(see Note [The source span model for diagnostics]), so choosing and ordering
+them is the message author's job:
+
+  * Pick one real location as the primary span and list the rest as related
+    locations. The primary span need not be the leftmost or smallest location
+    involved; a synthetic span combining several locations is usually worse,
+    giving a less precise prefix and a larger caret.
+
+  * Order the related spans deterministically (e.g. by sorting with
+    'leftmost_smallest' at construction): they often come from a source whose
+    natural order is not stable across runs. Do not repeat the primary span
+    among them.
+
+  * Convention for "duplicate" diagnostics, which report the same entity
+    occurring at several sites (e.g. 'TcRnDuplicateDecls',
+    'TcRnDuplicateExport'): the primary span is the /last/ occurrence in
+    source order; the earlier occurrences are the related locations, in
+    ascending order. The later occurrence is usually the one just added, and
+    hence the one to act on; clang, rustc and TypeScript likewise point at it
+    ("redefinition of 'x' / note: previous definition is here"). The carets
+    are then /not/ in source order, but read well without labels: first the
+    site to fix, then the prior sites. (Once per-span labels exist (#23414),
+    the renderer could instead display carets in source order, as rustc does —
+    its labels are what make that readable.) Diagnostics whose locations have
+    a different asymmetry (a definition site versus a use site, say) pick
+    their primary span on their own logic.
 -}
 
 -- | A class identifying a diagnostic.
@@ -347,7 +369,8 @@ class (Outputable (DiagnosticHint a), HasDefaultDiagnosticOpts (DiagnosticOpts a
   -- | Additional locations related to this diagnostic.
   --
   -- When rendering caret diagnostics, these locations are shown alongside the
-  -- message's primary location. See Note [The source span model for diagnostics].
+  -- message's primary location. See Note [The source span model for diagnostics]
+  -- and Note [Choosing the primary and related spans].
   diagnosticRelatedLocations :: a -> [SrcSpan]
   diagnosticRelatedLocations _ = []
 

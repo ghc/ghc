@@ -1,6 +1,6 @@
-TyAppPat_NonlinearSinglePat.hs:12:14: error: [GHC-10498]
+TyAppPat_NonlinearSinglePat.hs:12:16: error: [GHC-10498]
     • Conflicting definitions for ‘a’
     • In an equation for ‘foo’
-    At: TyAppPat_NonlinearSinglePat.hs:12:14
-        TyAppPat_NonlinearSinglePat.hs:12:16
+    At: TyAppPat_NonlinearSinglePat.hs:12:16
+        TyAppPat_NonlinearSinglePat.hs:12:14
 

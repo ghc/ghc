@@ -1,4 +1,4 @@
-mod23.hs:3:8: error: [GHC-10498] Conflicting definitions for ‘a’
-    At: mod23.hs:3:8
-        mod23.hs:3:10
+mod23.hs:3:10: error: [GHC-10498] Conflicting definitions for ‘a’
+    At: mod23.hs:3:10
+        mod23.hs:3:8
 

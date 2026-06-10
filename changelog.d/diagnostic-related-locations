@@ -1,0 +1,18 @@
+section: compiler
+synopsis: Diagnostics can carry related source locations
+issues: #22637
+mrs: !16100
+
+description: {
+Diagnostics can now carry *related locations*: additional source spans beyond
+the primary error span, such as the earlier binding sites in a
+duplicate-definition error. Related locations are rendered as additional
+carets (or, where the source cannot be displayed, listed under an ``At:``
+heading), and are exposed to tooling via ``-fdiagnostics-as-json`` in the new
+``relatedSpans`` field; the JSON schema version is bumped to 1.3.
+
+"Duplicate" diagnostics (e.g. multiple declarations of the same name, or
+duplicate exports) now report the *last* occurrence in source order as the
+primary location, with the earlier occurrences as related locations,
+matching the behaviour of other compilers.
+}

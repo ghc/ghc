@@ -1,24 +1,24 @@
-TyAppPat_NonlinearMultiPat.hs:10:15: error: [GHC-10498]
+TyAppPat_NonlinearMultiPat.hs:10:28: error: [GHC-10498]
     • Conflicting definitions for ‘a’
     • In an equation for ‘foo’
-    At: TyAppPat_NonlinearMultiPat.hs:10:15
-        TyAppPat_NonlinearMultiPat.hs:10:28
+    At: TyAppPat_NonlinearMultiPat.hs:10:28
+        TyAppPat_NonlinearMultiPat.hs:10:15
 
-TyAppPat_NonlinearMultiPat.hs:11:12: error: [GHC-10498]
+TyAppPat_NonlinearMultiPat.hs:11:27: error: [GHC-10498]
     • Conflicting definitions for ‘a’
     • In an equation for ‘foo’
-    At: TyAppPat_NonlinearMultiPat.hs:11:12
-        TyAppPat_NonlinearMultiPat.hs:11:27
+    At: TyAppPat_NonlinearMultiPat.hs:11:27
+        TyAppPat_NonlinearMultiPat.hs:11:12
 
-TyAppPat_NonlinearMultiPat.hs:12:15: error: [GHC-10498]
+TyAppPat_NonlinearMultiPat.hs:12:25: error: [GHC-10498]
     • Conflicting definitions for ‘a’
     • In an equation for ‘foo’
-    At: TyAppPat_NonlinearMultiPat.hs:12:15
-        TyAppPat_NonlinearMultiPat.hs:12:25
+    At: TyAppPat_NonlinearMultiPat.hs:12:25
+        TyAppPat_NonlinearMultiPat.hs:12:15
 
-TyAppPat_NonlinearMultiPat.hs:13:12: error: [GHC-10498]
+TyAppPat_NonlinearMultiPat.hs:13:24: error: [GHC-10498]
     • Conflicting definitions for ‘a’
     • In an equation for ‘foo’
-    At: TyAppPat_NonlinearMultiPat.hs:13:12
-        TyAppPat_NonlinearMultiPat.hs:13:24
+    At: TyAppPat_NonlinearMultiPat.hs:13:24
+        TyAppPat_NonlinearMultiPat.hs:13:12
 

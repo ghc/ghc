@@ -1,5 +1,5 @@
-rnfail015.hs:8:9: error: [GHC-29916]
+rnfail015.hs:14:9: error: [GHC-29916]
     Multiple declarations of ‘TokLiteral’
-    At: rnfail015.hs:8:9-18
-        rnfail015.hs:14:9-18
+    At: rnfail015.hs:14:9-18
+        rnfail015.hs:8:9-18
 

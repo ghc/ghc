@@ -1,4 +1,4 @@
-mod38.hs:3:1: error: [GHC-29916] Multiple declarations of ‘C’
-    At: mod38.hs:3:1-12
-        mod38.hs:4:1-22
+mod38.hs:4:1: error: [GHC-29916] Multiple declarations of ‘C’
+    At: mod38.hs:4:1-22
+        mod38.hs:3:1-12
 

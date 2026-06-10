@@ -4,6 +4,6 @@ ExportWarnings6.hs:1:25: warning: [GHC-94721] [-Wincomplete-export-warnings (in 
 
 ExportWarnings6.hs:1:51: warning: [GHC-47854] [-Wduplicate-exports (in -Wdefault)]
     ‘x’ is exported by ‘x’ and ‘{-# WARNING "warn" #-} x’
-    At: ExportWarnings6.hs:1:25-48
-        ExportWarnings6.hs:1:51
+    At: ExportWarnings6.hs:1:51
+        ExportWarnings6.hs:1:25-48
 

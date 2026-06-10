@@ -3979,7 +3979,12 @@ data TcRnMessage where
       TH_dupdecl, rnfail012
   -}
   TcRnDuplicateDecls :: !OccName -- ^ The name of the declarations
-                     -> !(NE.NonEmpty Name) -- ^ The individual declarations
+                     -> !(NE.NonEmpty Name)
+                        -- ^ The individual declarations, in ascending source
+                        -- order. The last one is the primary span of the
+                        -- message; 'diagnosticRelatedLocations' returns the
+                        -- earlier ones. See Note [Choosing the primary and
+                        -- related spans] in GHC.Types.Error.
                      -> TcRnMessage
 
   {-| TcRnPackageImportsDisabled is an error indicating that an import uses
@@ -4128,7 +4133,11 @@ data TcRnMessage where
   -}
   TcRnBindingNameConflict :: !RdrName -- ^ The conflicting name
                           -> !(NE.NonEmpty SrcSpan)
-                             -- ^ The locations of the duplicates
+                             -- ^ The locations of the duplicates, in ascending
+                             -- source order. The last one is the primary span
+                             -- of the message; 'diagnosticRelatedLocations'
+                             -- returns the earlier ones. See Note [Choosing the
+                             -- primary and related spans] in GHC.Types.Error.
                           -> TcRnMessage
 
   {-| TcRnNonCanonicalDefinition is a warning indicating that an instance

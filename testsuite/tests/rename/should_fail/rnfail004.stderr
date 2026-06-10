@@ -1,18 +1,18 @@
-rnfail004.hs:6:5: error: [GHC-10498]
+rnfail004.hs:7:10: error: [GHC-10498]
     Conflicting definitions for ‘a’
-  |
-6 |     a           = []
-  |     ^
   |
 7 |     (b,c,a)     = ([],[],d)
   |          ^
-
-rnfail004.hs:7:6: error: [GHC-10498]
-    Conflicting definitions for ‘b’
   |
-7 |     (b,c,a)     = ([],[],d)
-  |      ^
+6 |     a           = []
+  |     ^
+
+rnfail004.hs:8:8: error: [GHC-10498]
+    Conflicting definitions for ‘b’
   |
 8 |     [d,b,_]     = ([],a,[])
   |        ^
+  |
+7 |     (b,c,a)     = ([],[],d)
+  |      ^
 
