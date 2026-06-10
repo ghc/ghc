@@ -406,6 +406,17 @@ pprReg w r = case r of
       -- no support for widths > W64.
       | otherwise = pprPanic "Unsupported width in register (max is 64)" (ppr w <+> int i)
 
+-- | Pretty print a rounding mode
+--
+-- If the rounding mode is omitted, 'dyn' will be used.
+pprRm :: IsLine doc => RoundingMode -> doc
+pprRm Rne = text "rne"
+pprRm Rtz = text "rtz"
+pprRm Rdn = text "rdn"
+pprRm Rup = text "rup"
+pprRm Rmm = text "rmm"
+pprRm Dyn = text "dyn"
+
 -- | Single precission `Operand` (floating-point)
 isSingleOp :: Operand -> Bool
 isSingleOp (OpReg W32 _) = True
@@ -643,25 +654,26 @@ pprInstr platform instr = case instr of
   LDRU FF64 o1 o2@(OpAddr (AddrRegImm _ _)) -> op2 (text "\tfld") o1 o2
   LDRU f o1 o2 -> pprPanic "Unsupported unsigned load" ((text . show) f <+> pprOp platform o1 <+> pprOp platform o2)
   FENCE r w -> line $ text "\tfence" <+> pprFenceType r <> char ',' <+> pprFenceType w
-  FCVT FloatToFloat o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.d") o1 o2
-  FCVT FloatToFloat o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.d.s") o1 o2
-  FCVT FloatToFloat o1 o2 ->
+  FCVT FloatToFloat o1@(OpReg W32 _) o2@(OpReg W64 _) rm -> op2rm (text "\tfcvt.s.d") o1 o2 rm
+  -- The assembler seems to be unhappy with explicit rounding mode on fcvt.d.s
+  FCVT FloatToFloat o1@(OpReg W64 _) o2@(OpReg W32 _) _rm -> op2 (text "\tfcvt.d.s") o1 o2
+  FCVT FloatToFloat o1 o2 rm ->
     pprPanic "RV64.pprInstr - impossible float to float conversion"
-      $ line (pprOp platform o1 <> text "->" <> pprOp platform o2)
-  FCVT IntToFloat o1@(OpReg W32 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.s.w") o1 o2
-  FCVT IntToFloat o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.l") o1 o2
-  FCVT IntToFloat o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.d.w") o1 o2
-  FCVT IntToFloat o1@(OpReg W64 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.d.l") o1 o2
-  FCVT IntToFloat o1 o2 ->
+      $ line (pprOp platform o1 <> text "->" <> pprOp platform o2 <> text "," <> pprRm rm)
+  FCVT IntToFloat o1@(OpReg W32 _) o2@(OpReg W32 _) rm -> op2rm (text "\tfcvt.s.w") o1 o2 rm
+  FCVT IntToFloat o1@(OpReg W32 _) o2@(OpReg W64 _) rm -> op2rm (text "\tfcvt.s.l") o1 o2 rm
+  FCVT IntToFloat o1@(OpReg W64 _) o2@(OpReg W32 _) rm -> op2rm (text "\tfcvt.d.w") o1 o2 rm
+  FCVT IntToFloat o1@(OpReg W64 _) o2@(OpReg W64 _) rm -> op2rm (text "\tfcvt.d.l") o1 o2 rm
+  FCVT IntToFloat o1 o2 rm ->
     pprPanic "RV64.pprInstr - impossible integer to float conversion"
-      $ line (pprOp platform o1 <> text "->" <> pprOp platform o2)
-  FCVT FloatToInt o1@(OpReg W32 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.w.s") o1 o2
-  FCVT FloatToInt o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.w.d") o1 o2
-  FCVT FloatToInt o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.l.s") o1 o2
-  FCVT FloatToInt o1@(OpReg W64 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.l.d") o1 o2
-  FCVT FloatToInt o1 o2 ->
+      $ line (pprOp platform o1 <> text "->" <> pprOp platform o2 <> text "," <> pprRm rm)
+  FCVT FloatToInt o1@(OpReg W32 _) o2@(OpReg W32 _) rm -> op2rm (text "\tfcvt.w.s") o1 o2 rm
+  FCVT FloatToInt o1@(OpReg W32 _) o2@(OpReg W64 _) rm -> op2rm (text "\tfcvt.w.d") o1 o2 rm
+  FCVT FloatToInt o1@(OpReg W64 _) o2@(OpReg W32 _) rm -> op2rm (text "\tfcvt.l.s") o1 o2 rm
+  FCVT FloatToInt o1@(OpReg W64 _) o2@(OpReg W64 _) rm -> op2rm (text "\tfcvt.l.d") o1 o2 rm
+  FCVT FloatToInt o1 o2 rm ->
     pprPanic "RV64.pprInstr - impossible float to integer conversion"
-      $ line (pprOp platform o1 <> text "->" <> pprOp platform o2)
+      $ line (pprOp platform o1 <> text "->" <> pprOp platform o2 <> text "," <> pprRm rm)
   FABS o1 o2 | isSingleOp o2 -> op2 (text "\tfabs.s") o1 o2
   FABS o1 o2 | isDoubleOp o2 -> op2 (text "\tfabs.d") o1 o2
   FMIN o1 o2 o3 | isSingleOp o1 -> op3 (text "\tfmin.s") o1 o2 o3
@@ -678,6 +690,8 @@ pprInstr platform instr = case instr of
   instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ instrCon instr
   where
     op2 op o1 o2 = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2
+    op2rm op o1 o2 Dyn = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2
+    op2rm op o1 o2 rm = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprRm rm
     op3 op o1 o2 o3 = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
     op4 op o1 o2 o3 o4 = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
     pprFenceType FenceRead = text "r"

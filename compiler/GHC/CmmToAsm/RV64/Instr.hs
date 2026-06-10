@@ -106,7 +106,7 @@ regUsageOfInstr platform instr = case instr of
   LDR _ dst src -> usage (regOp src, regOp dst)
   LDRU _ dst src -> usage (regOp src, regOp dst)
   FENCE _ _ -> usage ([], [])
-  FCVT _variant dst src -> usage (regOp src, regOp dst)
+  FCVT _variant dst src _rm -> usage (regOp src, regOp dst)
   FABS dst src -> usage (regOp src, regOp dst)
   FMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   FMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -206,7 +206,7 @@ patchRegsOfInstr instr env = case instr of
   LDR f o1 o2 -> LDR f (patchOp o1) (patchOp o2)
   LDRU f o1 o2 -> LDRU f (patchOp o1) (patchOp o2)
   FENCE o1 o2 -> FENCE o1 o2
-  FCVT variant o1 o2 -> FCVT variant (patchOp o1) (patchOp o2)
+  FCVT variant o1 o2 rm -> FCVT variant (patchOp o1) (patchOp o2) rm
   FABS o1 o2 -> FABS (patchOp o1) (patchOp o2)
   FMIN o1 o2 o3 -> FMIN (patchOp o1) (patchOp o2) (patchOp o3)
   FMAX o1 o2 o3 -> FMAX (patchOp o1) (patchOp o2) (patchOp o3)
@@ -613,7 +613,7 @@ data Instr
     -- Memory barrier.
     FENCE FenceType FenceType
   | -- | Floating point conversion
-    FCVT FcvtVariant Operand Operand
+    FCVT FcvtVariant Operand Operand RoundingMode
   | -- | Floating point ABSolute value
     FABS Operand Operand
 
@@ -636,6 +636,21 @@ data FenceType = FenceRead | FenceWrite | FenceReadWrite
 
 -- | Variant of a floating point conversion instruction
 data FcvtVariant = FloatToFloat | IntToFloat | FloatToInt
+
+-- | The rounding mode associated with an instruction
+data RoundingMode
+  = -- | Round to nearest, ties to even
+    Rne
+  | -- | Round toward zero
+    Rtz
+  | -- | Round downward (toward negative infinity)
+    Rdn
+  | -- | Round upward (toward positive infinity)
+    Rup
+  | -- | Round to nearest, ties to max magnitude
+    Rmm
+  | -- | Dynamic rounding mode
+    Dyn
 
 instrCon :: Instr -> String
 instrCon i =

@@ -718,7 +718,7 @@ getRegister' config plat expr =
               ( \dst ->
                   code
                     `appOL` code_x
-                    `snocOL` annExpr expr (FCVT IntToFloat (OpReg to dst) (OpReg from reg_x)) -- (Signed ConVerT Float)
+                    `snocOL` annExpr expr (FCVT IntToFloat (OpReg to dst) (OpReg from reg_x) Rne) -- (Signed ConVerT Float)
               )
         MO_SF_Round from to ->
           pure
@@ -726,7 +726,7 @@ getRegister' config plat expr =
               (floatFormat to)
               ( \dst ->
                   code
-                    `snocOL` annExpr expr (FCVT IntToFloat (OpReg to dst) (OpReg from reg)) -- (Signed ConVerT Float)
+                    `snocOL` annExpr expr (FCVT IntToFloat (OpReg to dst) (OpReg from reg) Rne) -- (Signed ConVerT Float)
               )
         -- TODO: Can this case happen?
         MO_FS_Truncate from to
@@ -738,7 +738,7 @@ getRegister' config plat expr =
                       code
                         `snocOL`
                         -- W32 is the smallest width to convert to. Decrease width afterwards.
-                        annExpr expr (FCVT FloatToInt (OpReg W32 dst) (OpReg from reg))
+                        annExpr expr (FCVT FloatToInt (OpReg W32 dst) (OpReg from reg) Rtz)
                         `appOL` signExtendAdjustPrecission W32 to dst dst -- (float convert (-> zero) signed)
                   )
         MO_FS_Truncate from to ->
@@ -747,7 +747,7 @@ getRegister' config plat expr =
               (intFormat to)
               ( \dst ->
                   code
-                    `snocOL` annExpr expr (FCVT FloatToInt (OpReg to dst) (OpReg from reg))
+                    `snocOL` annExpr expr (FCVT FloatToInt (OpReg to dst) (OpReg from reg) Rtz)
                     `appOL` truncateReg from to dst -- (float convert (-> zero) signed)
               )
         MO_UU_Conv from to
@@ -769,7 +769,7 @@ getRegister' config plat expr =
                     `appOL` truncateReg from to dst
               )
         MO_SS_Conv from to -> ss_conv from to reg code
-        MO_FF_Conv from to -> return $ Any (floatFormat to) (\dst -> code `snocOL` annExpr e (FCVT FloatToFloat (OpReg to dst) (OpReg from reg)))
+        MO_FF_Conv from to -> return $ Any (floatFormat to) (\dst -> code `snocOL` annExpr e (FCVT FloatToFloat (OpReg to dst) (OpReg from reg) Rne))
         MO_WF_Bitcast w    -> return $ Any (floatFormat w)  (\dst -> code `snocOL` MOV (OpReg w dst) (OpReg w reg))
         MO_FW_Bitcast w ->
           return
