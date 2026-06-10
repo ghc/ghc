@@ -1,0 +1,5 @@
+T27370.hs:2:8: warning:
+     a located warning from an external tool
+      with a continuation line
+
+an unlocated line from an external tool

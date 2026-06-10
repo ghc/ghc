@@ -1,0 +1,6 @@
+section: compiler
+synopsis: Mark messages from external tools as errors or warnings depending on
+  the tool's exit code. Previously, output printed to stderr by tools was
+  unconditionally reported as errors.
+issues: #27370
+mrs: !16170

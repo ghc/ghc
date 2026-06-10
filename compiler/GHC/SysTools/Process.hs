@@ -26,8 +26,9 @@ import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 import GHC.Utils.CliOption
 
-import GHC.Driver.Errors (reportError)
+import GHC.Driver.Errors (reportDiagnostic)
 
+import GHC.Types.Error ( DiagnosticReason(..) )
 import GHC.Types.SrcLoc ( SrcLoc, mkSrcLoc, mkSrcSpan )
 import GHC.Data.FastString
 
@@ -271,9 +272,10 @@ builderMainLoop logger filter_fn pgm real_args mb_cwd mb_env = withPipe $ \ (rea
           getLocaleEncoding >>= hSetEncoding readEnd
           hSetNewlineMode readEnd nativeNewlineMode
           hSetBuffering readEnd LineBuffering
-          messages <- parseBuildMessages . filter_fn . lines <$> hGetContents readEnd
-          mapM_ processBuildMessage messages
-          waitForProcess hProcess
+          messages <- parseBuildMessages . filter_fn . lines <$> hGetContents' readEnd
+          code <- waitForProcess hProcess
+          mapM_ (processBuildMessage code) messages
+          return code
         hClose hStdIn
         case r of
           Left (SomeException e) -> do
@@ -282,13 +284,16 @@ builderMainLoop logger filter_fn pgm real_args mb_cwd mb_env = withPipe $ \ (rea
           Right s -> do
             return s
   where
-    processBuildMessage :: BuildMessage -> IO ()
-    processBuildMessage msg = do
+    processBuildMessage :: ExitCode -> BuildMessage -> IO ()
+    processBuildMessage code msg = do
       case msg of
         BuildMsg msg -> do
           logInfo logger $ withPprStyle defaultUserStyle msg
         BuildError loc msg -> do
-          reportError logger neverQualify emptyDiagOpts (mkSrcSpan loc loc) msg
+          let reason = case code of
+                ExitSuccess   -> WarningWithoutFlag
+                ExitFailure{} -> ErrorWithoutFlag
+          reportDiagnostic logger neverQualify emptyDiagOpts (mkSrcSpan loc loc) reason msg
 
 parseBuildMessages :: [String] -> [BuildMessage]
 parseBuildMessages str = loop str Nothing
