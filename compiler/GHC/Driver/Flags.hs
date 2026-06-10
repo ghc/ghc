@@ -1135,6 +1135,7 @@ data WarningFlag =
    | Opt_WarnPatternNamespaceSpecifier               -- ^ @since 9.14
    | Opt_WarnUnrecognisedModifiers                   -- ^ @since 10.0
    | Opt_WarnSemaphoreOpenFailure                   -- Since 10.0.1
+   | Opt_WarnDefaultedCallStack                      -- ^ @since 10.2
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -1258,6 +1259,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnPatternNamespaceSpecifier               -> "pattern-namespace-specifier" :| []
   Opt_WarnUnrecognisedModifiers                   -> "unrecognised-modifiers" :| []
   Opt_WarnSemaphoreOpenFailure                   -> "semaphore-open-failure" :| []
+  Opt_WarnDefaultedCallStack                      -> "defaulted-callstack" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options

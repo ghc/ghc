@@ -25,8 +25,6 @@ import GHC.Tc.Solver.Types
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify( uType, mightEqualLater )
 
-import GHC.Hs.Type( HsIPName(..) )
-
 import GHC.Core
 import GHC.Core.Make
 import GHC.Core.Type
@@ -55,7 +53,6 @@ import GHC.Utils.Misc
 import GHC.Unit.Module
 
 import GHC.Data.Bag
-import GHC.Data.FastString
 
 import GHC.Driver.DynFlags
 
@@ -121,8 +118,8 @@ canDictCt ev cls tys
          -- so set the fuel to doNotExpand to avoid repeating expansion
 
   | CtWanted (WantedCt { ctev_rewriters = rws }) <- ev
-  , Just ip_name <- isCallStackPred cls tys
-  , Just fun_fs  <- isPushCallStackOrigin_maybe orig
+  , isJust (isCallStackPred cls tys)
+  , Just fun_fs <- isPushCallStackOrigin_maybe orig
   -- If we're given a CallStack constraint that arose from a function
   -- call, we need to push the current call-site onto the stack instead
   -- of solving it directly from a given.
@@ -132,11 +129,13 @@ canDictCt ev cls tys
     do { -- First we emit a new constraint that will capture the
          -- given CallStack.
 
-         let new_loc = setCtLocOrigin loc (IPOccOrigin (HsIPName $ fastStringToShortText ip_name))
-                            -- We change the origin to IPOccOrigin so
-                            -- this rule does not fire again.
+         let new_loc = setCtLocOrigin loc (PushedCallStackOrigin fun_fs)
+                            -- PushedCallStackOrigin solves like IPOccOrigin, so
+                            -- this rule does not fire again, but retains fun_fs
+                            -- for -Wdefaulted-callstack.
                             -- See Note [Overview of implicit CallStacks]
                             -- in GHC.Tc.Types.Evidence
+                            -- and Note [Warn about defaulted CallStacks]
 
        ; new_ev <- CtWanted <$> newWantedEvVarNC new_loc rws pred
 
@@ -214,6 +213,80 @@ evCallStack pred (EvCsPushCall fs loc tm)
        ; return (mkCoreApps (Var push_cs_id)
                     [mkCoreTup [name_expr, loc_expr], outer_stk]) }
 
+{- Note [Warn about defaulted CallStacks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A call stack only records the chain of calls as long as every function in the
+chain carries a HasCallStack constraint. When a function with a HasCallStack
+constraint is called from a definition that does /not/ have one, the implicit
+CallStack parameter emitted for the call cannot be solved from any enclosing
+Given and is defaulted to the empty call stack (see Note [Overview of implicit
+CallStacks] in GHC.Tc.Types.Evidence, point 4): the stack stops at this call
+site, omitting the caller and everything above it.
+
+This can be just what you want; e.g. perhaps you selectively add some
+HasCallStack constraints to help you isolate the caller of a failing call to
+`head`. But it can also be a source of surprise if you want complete call
+stacks. Hence, `-Wdefaulted-callstack` reports every such defaulting point
+(including a bare use of an implicit parameter of type CallStack that defaults).
+
+Examples:
+
+  bad :: Int
+  bad = error "boom"      -- -Wdefaulted-callstack fires: `bad` has no
+                          -- HasCallStack constraint, so the call stack for the
+                          -- call to `error` is defaulted to the empty stack
+
+  good :: HasCallStack => Int
+  good = error "boom" + x -- no warning: the call extends `good`'s call stack
+    where
+      x = error "splat"   -- no warning either, even though `x` has no
+                          -- HasCallStack constraint of its own: `good`'s
+                          -- HasCallStack brings a `?callStack` Given into scope
+                          -- over the whole of `good`, including its where/let
+                          -- bindings, so this call is solved from that Given
+                          -- (it floats up to it) and extends `good`'s stack
+
+  stk :: CallStack
+  stk = ?stk              -- -Wdefaulted-callstack fires: implicit parameters
+                          -- of type CallStack default too
+
+We emit the warning from `defaultCallStack` (in GHC.Tc.Solver.Default), the one
+and only place a CallStack is solved with the empty stack `EvCsEmpty`.
+Defaulting runs once, at the top level (`simplifyTopWanteds`), after every
+constraint has had the chance to float up and be solved against all enclosing
+Givens, so a constraint that reaches it really is defaulted.
+
+The message renders the defaulted constraint's `CtOrigin` (just like
+`-Wdefaulted-exception-context`): for a function call (plan PUSH, see Note
+[Overview of implicit CallStacks] in GHC.Tc.Types.Evidence, point 2) that origin
+is `PushedCallStackOrigin fun_fs`, naming the called function; for a bare use of
+an implicit parameter of type `CallStack` it is `IPOccOrigin`. Either way the
+`CtLoc` points at the use site.
+
+In cases when a HasCallStack constraint cannot be supplied using a type
+signature (e.g. the body of `main` or a method in an instance of a class whose
+type signature lacks a HasCallStack constraint) the user can silence the warning
+by bringing an empty stack into scope explicitly with
+`GHC.Stack.withEmptyCallStack`:
+
+main :: IO ()
+main = withEmptyCallStack $ do
+  ...
+  error "oops" -- no warning here
+  ...
+
+Caveat (under-reporting within a single definition): identical Wanted CallStack
+constraints are CSE'd by the constraint solver, so several defaulting call sites
+within the /same/ definition collapse to a single warning:
+
+  twoErrors :: Int
+  twoErrors = error "a" + error "b"   -- one -Wdefaulted-callstack warning
+
+We do, however, report defaulting in /every/ top-level definition (see Note
+[When to build an implication] in GHC.Tc.Utils.Unify). This is what counts,
+because it allows the user to take action on all affected bindings at once.
+-}
+
 {- Note [Solving CallStack constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See Note [Overview of implicit CallStacks] in GHc.Tc.Types.Evidence.
@@ -231,7 +304,7 @@ Suppose f :: HasCallStack => blah.  Then
   pushing the call-site info on the stack, and changing the CtOrigin
   to record that has been done.
    Bind:  s1 = pushCallStack <site-info> s2
-   [W] s2 :: IP "callStack" CallStack   -- CtOrigin = IPOccOrigin
+   [W] s2 :: IP "callStack" CallStack   -- CtOrigin = PushedCallStackOrigin f
 
 * Then, and only then, we can solve the constraint from an enclosing
   Given.

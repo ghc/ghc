@@ -587,7 +587,8 @@ implicationNeeded skol_info skol_tvs given
                                      -- we must build an implication
        ; return (gopt Opt_DeferTypeErrors dflags ||
                  gopt Opt_DeferTypedHoles dflags ||
-                 gopt Opt_DeferOutOfScopeVariables dflags) } }
+                 gopt Opt_DeferOutOfScopeVariables dflags ||
+                 wopt Opt_WarnDefaultedCallStack dflags ) } }
 
   | otherwise     -- Non-empty skolems or givens
   = return True   -- Definitely need an implication
@@ -675,6 +676,14 @@ take care:
   and fundeps can yield [W] b1 ~ b2, even though the two functions have
   literally nothing to do with each other.  #14185 is an example.
   Building an implication keeps them separate.
+
+* If -Wdefaulted-callstack is on, we build an implication around each top-level
+  binding so that their implicit CallStack parameters are solved (and hence
+  defaulted) in isolation.  Otherwise each top-level binding's wanteds float
+  into a single pool and end up CSE'd, so only one of them reaches
+  `defaultCallStack` where the warning is generated; the per-binding implication
+  lets us report every top-level definition that defaults its call stack. See
+  also Note [Warn about defaulted CallStacks] in GHC.Tc.Solver.Dict.
 
 Note [Herald for matchExpectedFunTys]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

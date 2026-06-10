@@ -461,7 +461,12 @@ defaultCallStack :: CtDefaultingStrategy
 defaultCallStack ct
   | ClassPred cls tys <- classifyPredType (ctPred ct)
   , isJust (isCallStackPred cls tys)
-  = do { solveCallStack (ctEvidence ct) EvCsEmpty
+  = do { dflags <- getDynFlags
+         -- See Note [Warn about defaulted CallStacks] in GHC.Tc.Solver.Dict.
+       ; when (wopt Opt_WarnDefaultedCallStack dflags) $
+           do { let loc = ctLoc ct
+              ; ctLocWarnTcS loc (TcRnDefaultedCallStack loc) }
+       ; solveCallStack (ctEvidence ct) EvCsEmpty
        ; return emptyWC }
   | otherwise
   = noDefaulting ct

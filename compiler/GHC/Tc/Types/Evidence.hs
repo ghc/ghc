@@ -1137,7 +1137,7 @@ implicit parameter is not important, see (CS5) below) are solved as follows:
    We do /not/ solve this constraint from Givens, or from other
    Wanteds.  Rather, have a built-in mechanism in that solves it thus:
         d := EvCsPushCall "foo" <details of call-site of `foo`> d2
-        [W] d2 :: (?stk :: CallStack)    CtOrigin = IPOccOrigin
+        [W] d2 :: (?stk :: CallStack)    CtOrigin = PushedCallStackOrigin "foo"
 
    That is, `d` is a call-stack that has the `foo` call-site pushed on top of
    `d2`, which can now be solved normally (as in (1) above).  This is done as follows:
@@ -1148,6 +1148,9 @@ implicit parameter is not important, see (CS5) below) are solved as follows:
 
      * solve it normally (plan NORMAL above)
          - IPOccOrigin (discussed above)
+         - PushedCallStackOrigin (the new Wanted emitted by plan PUSH; behaves
+           like IPOccOrigin but retains the function name for
+           -Wdefaulted-callstack, see Note [Warn about defaulted CallStacks])
          - GivenOrigin (see (CS1) below)
 
      * push an item on the stack and emit a new constraint (plan PUSH above)
@@ -1188,6 +1191,10 @@ For example, using the above definition of `undefined`:
 the resulting CallStack will include the call to `undefined` in `head`
 and the call to `error` in `undefined`, but *not* the call to `head`
 in `g`, because `head` did not explicitly request a CallStack.
+
+The `-Wdefaulted-callstack` warning flags exactly these points where the stack
+is defaulted to empty (here, the call to `undefined` in `head`). See
+Note [Warn about defaulted CallStacks] in GHC.Tc.Solver.Dict.
 
 
 Wrinkles
@@ -1240,11 +1247,14 @@ Wrinkles
   call-site onto a given stack (See GHC.HsToCore.Binds.dsEvCallStack)
 
 (CS7) When we emit a new wanted CallStack in plan PUSH we set its origin to
-  `IPOccOrigin ip_name` instead of the original `OccurrenceOf func`
-  (see GHC.Tc.Solver.Dict.tryInertDicts).
+  `PushedCallStackOrigin func` instead of the original `OccurrenceOf func`
+  (see GHC.Tc.Solver.Dict.canDictCt).
 
-  This is a bit shady, but is how we ensure that the new wanted is
-  solved like a regular IP.
+  This is a bit shady, but is how we ensure that the new wanted is solved like
+  a regular IP (isPushCallStackOrigin_maybe returns Nothing for it, as for
+  IPOccOrigin). Unlike IPOccOrigin it retains the called function's name, which
+  -Wdefaulted-callstack uses if the stack is ultimately defaulted to empty.
+  See Note [Warn about defaulted CallStacks] in GHC.Tc.Solver.Dict.
 -}
 
 mkEvScSelectors         -- Assume   class (..., D ty, ...) => C a b

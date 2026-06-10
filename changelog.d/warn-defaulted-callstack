@@ -1,0 +1,12 @@
+section: compiler
+issues: #27077
+mrs: !16174
+synopsis: Add ``-Wdefaulted-callstack``
+description:
+  GHC now supports a new warning, ``-Wdefaulted-callstack``, which warns when an
+  implicit ``CallStack`` parameter is defaulted to the empty stack. In
+  particular, this includes call sites where a function with a ``HasCallStack``
+  constraint is called from a definition that does *not* provide one. At such
+  call sites the call stack is cut off and does not include the enclosing
+  definition's callers, which can be a source of surprise if the user wants
+  complete call stacks.

@@ -4426,6 +4426,17 @@ data TcRnMessage where
   -}
   TcRnDefaultedExceptionContext :: CtLoc -> TcRnMessage
 
+  {-| TcRnDefaultedCallStack is a warning that is triggered when an implicit
+      @CallStack@ constraint is defaulted to the empty call stack because there
+      is no enclosing @HasCallStack@ constraint to solve it from. The 'CtLoc' is
+      the location and origin of the defaulted constraint.
+
+      See Note [Warn about defaulted CallStacks] in GHC.Tc.Solver.Dict.
+
+      Test cases: WarnDefaultedCallStack
+  -}
+  TcRnDefaultedCallStack :: CtLoc -> TcRnMessage
+
   {-| TcRnOutOfArityTyVar is an error raised when the arity of a type synonym
       (as determined by the SAKS and the LHS) is insufficiently high to
       accommodate an implicit binding for a free variable that occurs in the

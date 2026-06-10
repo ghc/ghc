@@ -676,6 +676,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "NonCanonicalMonoid"                            = 50928
   GhcDiagnosticCode "NonCanonicalMonad"                             = 22705
   GhcDiagnosticCode "TcRnDefaultedExceptionContext"                 = 46235
+  GhcDiagnosticCode "TcRnDefaultedCallStack"                        = 39361
   GhcDiagnosticCode "TcRnImplicitImportOfPrelude"                   = 20540
   GhcDiagnosticCode "TcRnMissingMain"                               = 67120
   GhcDiagnosticCode "TcRnGhciUnliftedBind"                          = 17999

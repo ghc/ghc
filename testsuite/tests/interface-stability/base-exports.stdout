@@ -9047,6 +9047,7 @@ module GHC.Stack where
   pushCallStack :: ([GHC.Internal.Types.Char], SrcLoc) -> CallStack -> CallStack
   renderStack :: [GHC.Internal.Base.String] -> GHC.Internal.Base.String
   whoCreated :: forall a. a -> GHC.Internal.Types.IO [GHC.Internal.Base.String]
+  withEmptyCallStack :: forall a. (HasCallStack => a) -> a
   withFrozenCallStack :: forall a. HasCallStack => (HasCallStack => a) -> a
 
 module GHC.Stack.CCS where

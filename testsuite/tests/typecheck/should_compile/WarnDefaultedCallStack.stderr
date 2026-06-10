@@ -1,0 +1,23 @@
+WarnDefaultedCallStack.hs:24:18: warning: [GHC-39361] [-Wdefaulted-callstack]
+    Defaulting to the empty call stack
+      arising from a use of ‘intCs’.
+    Add a ‘HasCallStack’ constraint to the enclosing definition to extend the call stack.
+
+WarnDefaultedCallStack.hs:28:21: warning: [GHC-39361] [-Wdefaulted-callstack]
+    Defaulting to the empty call stack
+      arising from a use of implicit parameter ‘?other’.
+
+WarnDefaultedCallStack.hs:36:23: warning: [GHC-39361] [-Wdefaulted-callstack]
+    Defaulting to the empty call stack
+      arising from a use of ‘intCs’.
+    Add a ‘HasCallStack’ constraint to the enclosing definition to extend the call stack.
+
+WarnDefaultedCallStack.hs:39:25: warning: [GHC-39361] [-Wdefaulted-callstack]
+    Defaulting to the empty call stack
+      arising from a use of ‘topLevelNoWarning’.
+    Add a ‘HasCallStack’ constraint to the enclosing definition to extend the call stack.
+
+WarnDefaultedCallStack.hs:44:3: warning: [GHC-39361] [-Wdefaulted-callstack]
+    Defaulting to the empty call stack
+      arising from a use of ‘intCs’.
+    Add a ‘HasCallStack’ constraint to the enclosing definition to extend the call stack.

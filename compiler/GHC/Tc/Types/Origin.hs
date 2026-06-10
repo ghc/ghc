@@ -412,6 +412,13 @@ data CtOrigin
       CtOrigin                  -- CtOrigin of the original type equality
 
   | IPOccOrigin  HsIPName       -- Occurrence of an implicit parameter
+  | PushedCallStackOrigin FastString
+      -- ^ The Wanted CallStack emitted by plan PUSH (see Note [Overview of
+      -- implicit CallStacks] in GHC.Tc.Types.Evidence) when a call site for the
+      -- named function is pushed onto the call stack. Solved like
+      -- 'IPOccOrigin', but retains the function name so that
+      -- @-Wdefaulted-callstack@ can report which call had its stack defaulted.
+      -- See Note [Warn about defaulted CallStacks] in GHC.Tc.Solver.Dict.
   | OverLabelOrigin FastString  -- Occurrence of an overloaded label
 
   | LiteralOrigin (HsOverLit GhcRn)     -- Occurrence of a literal
@@ -786,6 +793,7 @@ ppr_br (OccurrenceOf name)   = hsep [text "a use of", quotes (ppr name)]
 ppr_br (OccurrenceOfRecSel name) = hsep [text "a use of", quotes (ppr name)]
 ppr_br AppOrigin             = text "an application"
 ppr_br (IPOccOrigin name)    = hsep [text "a use of implicit parameter", quotes (ppr name)]
+ppr_br (PushedCallStackOrigin fs) = hsep [text "a use of", quotes (ftext fs)]
 ppr_br (OverLabelOrigin l)   = hsep [text "the overloaded label"
                                     ,quotes (char '#' <> ppr l)]
 ppr_br (RecordUpdOrigin {})  = text "a record update"
@@ -897,6 +905,7 @@ foldMapCtOrigin f = go
         SpecPragOrigin {} -> f orig
         TypeEqOrigin {}-> f orig
         IPOccOrigin {} -> f orig
+        PushedCallStackOrigin {} -> f orig
         OverLabelOrigin {} -> f orig
         LiteralOrigin {} -> f orig
         QualLiteralOrigin {} -> f orig
@@ -978,6 +987,7 @@ isPushCallStackOrigin_maybe :: CtOrigin -> Maybe FastString
 isPushCallStackOrigin_maybe (GivenOrigin {})   = Nothing
 isPushCallStackOrigin_maybe (GivenSCOrigin {}) = Nothing
 isPushCallStackOrigin_maybe (IPOccOrigin {})   = Nothing
+isPushCallStackOrigin_maybe (PushedCallStackOrigin {}) = Nothing
 isPushCallStackOrigin_maybe (OccurrenceOf fun) = Just (occNameFS (getOccName fun))
 isPushCallStackOrigin_maybe orig               = Just orig_fs
   -- This fall-through case is important to deal with call stacks

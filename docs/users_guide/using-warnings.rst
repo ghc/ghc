@@ -2619,7 +2619,7 @@ of ``-W(no-)*``.
                 implicit parameter is defaulted to
                 :base-ref:`Control.Exception.Context.emptyExceptionContext`.
     :type: dynamic
-    :reverse: -Wnop-defaulted-exception-context
+    :reverse: -Wno-defaulted-exception-context
 
     :since: 9.10.1
 
@@ -2630,6 +2630,42 @@ of ``-W(no-)*``.
     :base-ref:`Control.Exception.Context.emptyExceptionContext` when no other
     evidence is available. As this behavior may result in dropped exception context
     this warning is provided to give notice when defaulting occurs.
+
+.. ghc-flag:: -Wdefaulted-callstack
+    :shortdesc: warn when an implicit :base-ref:`GHC.Stack.CallStack` parameter
+                is defaulted to the empty stack.
+    :type: dynamic
+    :reverse: -Wno-defaulted-callstack
+
+    :since: 10.2.1
+
+    When a function with a :base-ref:`GHC.Stack.HasCallStack` constraint is
+    called from a definition that does *not* provide one, the implicit
+    :base-ref:`GHC.Stack.CallStack` parameter is defaulted to the empty stack,
+    so at such call sites the call stack is cut off and does not include the
+    enclosing definition's callers.
+
+    This might be desirable; e.g. perhaps the user selectively added some
+    :base-ref:`GHC.Stack.HasCallStack` constraints to help isolate the caller of
+    a failing call to ``head``. But it can also be a source of surprise if the
+    user wants complete call stacks. Hence, ``-Wdefaulted-callstack`` (off by
+    default) reports every such defaulting point (including a bare use of an
+    implicit parameter of type :base-ref:`GHC.Stack.CallStack` that defaults).
+
+    In cases when a :base-ref:`GHC.Stack.HasCallStack` constraint cannot be
+    supplied using a type signature (e.g. the body of ``main`` or a method in an
+    instance of a class whose type signature lacks a
+    :base-ref:`GHC.Stack.HasCallStack` constraint), the user can silence the
+    warning by bringing an empty stack into scope explicitly with
+    :base-ref:`GHC.Stack.withEmptyCallStack`:
+
+    .. code-block:: haskell
+
+        main :: IO ()
+        main = withEmptyCallStack $ do
+          ...
+          error "oops" -- no warning here
+          ...
 
 .. ghc-flag:: -Wview-pattern-signatures
     :shortdesc: warn when a view pattern is used with type signature without

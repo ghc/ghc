@@ -31,6 +31,7 @@ module GHC.Stack
      prettyCallStack,
      pushCallStack,
      withFrozenCallStack,
+     withEmptyCallStack,
      -- *  Source locations
      SrcLoc(..),
      prettySrcLoc,

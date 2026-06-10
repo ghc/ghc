@@ -1941,6 +1941,19 @@ instance Diagnostic TcRnMessage where
           = vcat [ text "Future versions of GHC will turn this warning into an error." ]
         proposal
           = vcat [ text "See GHC Proposal #330." ]
+    TcRnDefaultedCallStack ct_loc
+      -> mkSimpleDecorated $ case ctLocOrigin ct_loc of
+           -- Suggestion makes sense only for this particular case.
+           PushedCallStackOrigin{} -> vcat [ header, suggestion ]
+           _ -> header
+      where
+        header, suggestion :: SDoc
+        header
+          = vcat [ text "Defaulting to the empty call stack"
+                 , nest 2 $ pprCtOrigin (ctLocOrigin ct_loc) <> text "." ]
+        suggestion
+          = text "Add a" <+> quotes (text "HasCallStack") <+>
+            text "constraint to the enclosing definition to extend the call stack."
     TcRnImplicitImportOfPrelude
       -> mkSimpleDecorated $
          text "Module" <+> quotes (text "Prelude") <+> text "implicitly imported."
@@ -2671,6 +2684,8 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag Opt_WarnNonCanonicalMonadInstances
     TcRnDefaultedExceptionContext{}
       -> WarningWithFlag Opt_WarnDefaultedExceptionContext
+    TcRnDefaultedCallStack{}
+      -> WarningWithFlag Opt_WarnDefaultedCallStack
     TcRnImplicitImportOfPrelude {}
       -> WarningWithFlag Opt_WarnImplicitPrelude
     TcRnMissingMain {}
@@ -3403,6 +3418,8 @@ instance Diagnostic TcRnMessage where
     TcRnNonCanonicalDefinition reason _
       -> suggestNonCanonicalDefinition reason
     TcRnDefaultedExceptionContext _
+      -> noHints
+    TcRnDefaultedCallStack{}
       -> noHints
     TcRnImplicitImportOfPrelude {}
       -> noHints
