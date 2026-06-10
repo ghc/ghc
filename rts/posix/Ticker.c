@@ -103,6 +103,22 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+
+// Forward declarations of local types and helper functions to hide the
+// difference between ppoll() and select()
+#if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
+typedef struct timespec timeout;  // for ppoll()
+typedef struct { struct pollfd pollfds[1]; } fdset;
+#else
+typedef struct timeval timeout;   // for select()
+typedef struct { int fd; fd_set selectfds; } fdset; // need to stash fd
+#endif
+static void poll_init_timeout(timeout *tv, Time t);
+static void poll_init_fdset(fdset *fds, int fd); // single fd only
+// poll_with_timeout returns >0 if fd ready, ==0 if timeout, <0 if error
+static int poll_with_timeout(fdset *fdset, timeout *t);
+
+
 static Time itimer_interval = DEFAULT_TICK_INTERVAL;
 
 // Should we be firing ticks?
@@ -125,40 +141,16 @@ static void *itimer_thread_func(void *_handle_tick)
 {
     TickProc handle_tick = _handle_tick;
 
-#if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
-    struct pollfd pollfds[1];
-
-    pollfds[0].fd = interruptfd_r;
-    pollfds[0].events = POLLIN;
-
-    struct timespec ts = { .tv_sec  = TimeToSeconds(itimer_interval)
-                         , .tv_nsec = TimeToNS(itimer_interval) % 1000000000
-                         };
-#else
-    fd_set selectfds;
-    FD_ZERO(&selectfds);
-    FD_SET(interruptfd_r, &selectfds);
-
-    struct timeval tv = { .tv_sec  = TimeToSeconds(itimer_interval)
-                                     /* convert remainder time in nanoseconds
-                                        to microseconds, rounding up: */
-                        , .tv_usec = ((TimeToNS(itimer_interval) % 1000000000)
-                                     + 999) / 1000
-                        };
-#endif
+    timeout timeout;
+    fdset fdset;
+    poll_init_timeout(&timeout, itimer_interval);
+    poll_init_fdset(&fdset, interruptfd_r);
 
     // Relaxed is sufficient: If we don't see that exited was set in one iteration we will
     // see it next time.
     while (!RELAXED_LOAD_ALWAYS(&exited)) {
 
-#if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
-        int nfds   = 1;
-        int nready = ppoll(pollfds, nfds, &ts, NULL);
-#else
-        struct timeval tv_tmp = tv; // copy since select may change this value.
-        int nfds   = interruptfd_r+1;
-        int nready = select(nfds, &selectfds, NULL, NULL, &tv_tmp);
-#endif
+        int nready = poll_with_timeout(&fdset, &timeout);
         // In either case (ppoll or select), the result nready is the number
         // of fds that are ready.
         if (RTS_LIKELY(nready == 0)) {
@@ -293,6 +285,63 @@ void exitTicker(void)
     closeCondition(&start_cond);
 }
 
+/* Implementation of the local helpers, to hide the difference between ppoll()
+ * and select().
+ */
+#if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
+static void poll_init_timeout(timeout *tv, Time t)
+{
+    tv->tv_sec  = TimeToSeconds(t);
+    tv->tv_nsec = TimeToNS(t) % 1000000000;
+}
+
+static void poll_init_fdset(fdset *fds, int fd)
+{
+    fds->pollfds[0].fd = fd;
+    fds->pollfds[0].events = POLLIN;
+}
+
+static int poll_with_timeout(fdset *fds, timeout *ts)
+{
+    int nfds = 1;
+    return ppoll(fds->pollfds, nfds, ts, NULL);
+}
+
+#else // select()
+
+static void poll_init_timeout(timeout *tv, Time t)
+{
+    tv->tv_sec  = TimeToSeconds(t);
+    /* convert remainder time in nanoseconds to microseconds, rounding up: */
+    tv->tv_usec = ((TimeToNS(t) % 1000000000) + 999) / 1000;
+}
+
+static void poll_init_fdset(fdset *fds, int fd)
+{
+    /* select() modifies the fd_set: it uses the same fd_set for reporting as
+     * for input. Thus we must rebuild it every time. We can optimise this
+     * rebuilding somewhat however if we rely on select() not modifying the
+     * bits that we didn't ask it to look at. So we can zero the fd_set just
+     * once, and then only reset the single bit for the single fd, before each
+     * call to selct().
+     */
+    fds->fd = fd;
+    FD_ZERO(&fds->selectfds);
+}
+
+static int poll_with_timeout(fdset *fds, timeout *tv)
+{
+    struct timeval tv_tmp = *tv; // copy since select may change this value.
+    /* select() modifies the fd_set so we must set it every time, but we rely
+     * on it not touching other bits to avoid having to FD_ZERO it every time
+     */
+    FD_SET(fds->fd, &fds->selectfds);
+    int nfds = fds->fd+1;
+    return select(nfds, &fds->selectfds, NULL, NULL, &tv_tmp);
+}
+#endif
+
+/* This is obsolete, but is used in the unix package for now */
 int
 rtsTimerSignal(void)
 {
