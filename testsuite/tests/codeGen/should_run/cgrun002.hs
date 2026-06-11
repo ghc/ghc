@@ -1,4 +1,10 @@
-main = print ((f id2) (10 + thirty_two))
+import System.Exit
+import System.IO
+
+main = do
+    print ((f id2) (10 + thirty_two))
+    hPutStrLn stderr "deliberate breakage to test summary output"
+    exitWith (ExitFailure 3)
   where
     f x = g x
       where
