@@ -2435,7 +2435,7 @@ abstractFloats uf_opts top_lvl main_tvs floats body
     to_sccs (Rec prs)
       = depAnal (\(id,_rhs,_fvs) -> [getName id])
                 (\(_id,_rhs,fvs) -> nonDetStrictFoldVarSet ((:) . getName) [] fvs) -- Wrinkle (AB3)
-                [ (id, rhs, exprFreeVars rhs) | (id, rhs) <- prs ]
+                [ (id, rhs, fvs) | (id, rhs) <- prs, let !fvs = exprFreeVars rhs ]
 
     abstract :: GHC.Core.Subst.Subst -> SCC (Id, CoreExpr, VarSet) -> SimplM (GHC.Core.Subst.Subst, OutBind)
     abstract subst (AcyclicSCC (id, rhs, _empty_var_set))
@@ -2450,16 +2450,15 @@ abstractFloats uf_opts top_lvl main_tvs floats body
         tvs_here = choose_tvs (exprSomeFreeVars isTyVar rhs')
 
     abstract subst (CyclicSCC trpls)
-      = do { anns <- mapM mk1 trpls
-           ; let subst' = GHC.Core.Subst.extendSubstList subst
-                            [ (id, poly_app) | (id, _, poly_app, _) <- anns ]
-                 poly_pairs = [ mk_poly2 poly_id tvs_here
+      = do { (subst', poly_prs) <- mapAccumLM mk1 subst trpls
+           ; let poly_pairs = [ mk_poly2 poly_id tvs_here
                                   (GHC.Core.Subst.substExpr subst' rhs)
-                              | (_, poly_id, _, rhs) <- anns ]
+                              | (poly_id, rhs) <- poly_prs ]
            ; return (subst', Rec poly_pairs) }
       where
-        mk1 (id, rhs, _fvs) = do { (poly_id, poly_app) <- mk_poly1 tvs_here id
-                                 ; return (id, poly_id, poly_app, rhs) }
+        mk1 s (id, rhs, _fvs)
+          = do { (poly_id, poly_app) <- mk_poly1 tvs_here id
+               ; return (GHC.Core.Subst.extendIdSubst s id poly_app, (poly_id, rhs)) }
 
         -- tvs_here: see Note [Which type variables to abstract over]
         tvs_here = choose_tvs (mapUnionVarSet get_bind_fvs trpls)
