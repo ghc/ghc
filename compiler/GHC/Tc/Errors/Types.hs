@@ -4131,12 +4131,7 @@ data TcRnMessage where
   TcRnBindingNameConflict :: !RdrName -- ^ The conflicting name
                           -> !(NE.NonEmpty SrcSpan)
                              -- ^ The locations of the duplicates, in ascending
-                             -- source order. The last one is the primary span
-                             -- of the message; 'diagnosticRelatedLocations'
-                             -- returns the earlier ones, omitting any that
-                             -- coincide with the primary span. See
-                             -- Note [Choosing the primary and related spans]
-                             -- in GHC.Types.Error.
+                             -- source order.
                           -> TcRnMessage
 
   {-| TcRnNonCanonicalDefinition is a warning indicating that an instance
