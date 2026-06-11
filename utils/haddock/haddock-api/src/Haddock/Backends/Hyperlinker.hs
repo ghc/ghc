@@ -31,7 +31,8 @@ import Haddock.Backends.Hyperlinker.Utils
 import Haddock.Backends.Xhtml.Utils (renderToBuilder)
 import Haddock.InterfaceFile
 import Haddock.Types
-import Haddock.Utils (Verbosity, out, verbose)
+import Haddock.Utils (Verbosity, out, verbose, mapConcurrentlyWith_)
+import System.Semaphore (AbstractSem)
 import qualified Data.ByteString.Builder as Builder
 
 -- | Generate hyperlinked source for given interfaces.
@@ -51,19 +52,21 @@ ppHyperlinkedSource
   -- ^ Custom CSS file path
   -> Bool
   -- ^ Flag indicating whether to pretty-print HTML
+  -> AbstractSem
+  -- ^ Concurrency semaphore for module renders
   -> M.Map Module SrcPath
   -- ^ Paths to sources
   -> [Interface]
   -- ^ Interfaces for which we create source
   -> IO ()
-ppHyperlinkedSource verbosity isOneShot outdir libdir mstyle pretty srcs' ifaces = do
+ppHyperlinkedSource verbosity isOneShot outdir libdir mstyle pretty concSem srcs' ifaces = do
   createDirectoryIfMissing True srcdir
   unless isOneShot $ do
     let cssFile = fromMaybe (defaultCssFile libdir) mstyle
     copyFile cssFile $ srcdir </> srcCssFile
     copyFile (libdir </> "html" </> highlightScript) $
       srcdir </> highlightScript
-  mapM_ (ppHyperlinkedModuleSource verbosity srcdir pretty srcs) ifaces
+  mapConcurrentlyWith_ concSem (ppHyperlinkedModuleSource verbosity srcdir pretty srcs) ifaces
   where
     srcdir = outdir </> hypSrcDir
     srcs = (srcs', M.mapKeys moduleName srcs')

@@ -29,6 +29,7 @@ module Haddock.Options
   , wikiUrls
   , baseUrl
   , optParCount
+  , optParSemaphore
   , optDumpInterfaceFile
   , optShowInterfaceFile
   , optLaTeXStyle
@@ -48,7 +49,7 @@ module Haddock.Options
 
 import Control.Applicative
 import qualified Data.Char as Char
-import Data.List (dropWhileEnd)
+import Data.List (dropWhileEnd, isPrefixOf)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -122,6 +123,7 @@ data Flag
   | Flag_SinceQualification String
   | Flag_IgnoreLinkSymbol String
   | Flag_ParCount (Maybe Int)
+  | Flag_ParSemaphore FilePath
   | Flag_TraceArgs
   | Flag_OneShot String
   | Flag_NoCompilation
@@ -408,6 +410,11 @@ options backwardsCompat =
       "load modules in parallel"
   , Option
       []
+      ["jsem"]
+      (ReqArg Flag_ParSemaphore "SEM")
+      "use semaphore SEM to limit parallelism"
+  , Option
+      []
       ["trace-args"]
       (NoArg Flag_TraceArgs)
       "print the arguments provided for this invocation to stdout"
@@ -423,7 +430,7 @@ getUsage = do
 
 parseHaddockOpts :: [String] -> IO ([Flag], [String])
 parseHaddockOpts params =
-  case getOpt Permute (options True) params of
+  case getOpt Permute (options True) (normalizeJsemArgs params) of
     (flags, args, []) -> return (flags, args)
     (_, _, errors) -> do
       usage <- getUsage
@@ -497,6 +504,18 @@ optMathjax flags = optLast [str | Flag_Mathjax str <- flags]
 
 optParCount :: [Flag] -> Maybe (Maybe Int)
 optParCount flags = optLast [n | Flag_ParCount n <- flags]
+
+optParSemaphore :: [Flag] -> Maybe FilePath
+optParSemaphore flags = optLast [s | Flag_ParSemaphore s <- flags]
+
+normalizeJsemArgs :: [String] -> [String]
+normalizeJsemArgs = map rewrite
+  where
+    rewrite arg
+      | arg == "-jsem" = "--jsem"
+      | "-jsem=" `isPrefixOf` arg = "--jsem=" ++ drop 6 arg
+      | "-jsem" `isPrefixOf` arg = "--jsem=" ++ drop 5 arg
+      | otherwise = arg
 
 qualification :: [Flag] -> Either String QualOption
 qualification flags =

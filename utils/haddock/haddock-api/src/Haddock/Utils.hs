@@ -54,6 +54,10 @@ module Haddock.Utils
   , replace
   , spanWith
 
+    -- * Concurrency utilities
+  , mapConcurrentlyWith_
+  , newBoundedSem
+
     -- * Logging
   , parseVerbosity
   , Verbosity (..)
@@ -85,6 +89,13 @@ import Documentation.Haddock.Doc (emptyMetaDoc)
 import Haddock.Types
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as LText
+
+import Control.Concurrent (forkFinally)
+import Control.Concurrent.QSem (newQSem, signalQSem, waitQSem)
+import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
+import Control.Exception (throwIO)
+import Control.Monad (void)
+import System.Semaphore (AbstractSem (..))
 
 --------------------------------------------------------------------------------
 
@@ -333,6 +344,43 @@ html_xrefs = unsafePerformIO (readIORef html_xrefs_ref)
 {-# NOINLINE html_xrefs' #-}
 html_xrefs' :: Map ModuleName FilePath
 html_xrefs' = unsafePerformIO (readIORef html_xrefs_ref')
+
+-- * Concurrency utilities
+
+--------------------------------------------------------------------------------
+
+mapConcurrentlyWith_ :: AbstractSem -> (a -> IO ()) -> [a] -> IO ()
+mapConcurrentlyWith_ _ _ [] = return ()
+mapConcurrentlyWith_ concSem f xs = do
+  -- Create MVars to wait for completion and collect results
+  resultMVars <- mapM (const newEmptyMVar) xs
+
+  -- Fork a thread for each element
+  mapM_ (forkThread concSem) (zip xs resultMVars)
+
+  -- Wait for all threads and collect any errors
+  results <- mapM takeMVar resultMVars
+
+  -- Re-throw the first exception if any
+  case [err | Left err <- results] of
+    (err:_) -> throwIO err
+    [] -> return ()
+  where
+    forkThread concSem' (x, resultMVar) = do
+      acquireSem concSem'
+      void $ forkFinally (f x) $ \res -> do
+        releaseSem concSem'
+        putMVar resultMVar res
+
+newBoundedSem :: Int -> IO AbstractSem
+newBoundedSem maxThreads = do
+  sem <- newQSem (max 1 maxThreads)
+  pure
+    AbstractSem
+      { acquireSem = waitQSem sem
+      , releaseSem = signalQSem sem
+      }
+
 
 -----------------------------------------------------------------------------
 

@@ -69,6 +69,7 @@ import Haddock.ModuleTree
 import Haddock.Options (Visibility (..))
 import Haddock.Types
 import Haddock.Utils
+import System.Semaphore (AbstractSem)
 import Haddock.Utils.Json
 import Haddock.Version
 
@@ -115,6 +116,8 @@ ppHtml
   -- ^ How to qualify names
   -> Bool
   -- ^ Output pretty html (newlines and indenting)
+  -> AbstractSem
+  -- ^ Concurrency semaphore for module renders
   -> Bool
   -- ^ Also write Quickjump index
   -> IO ()
@@ -138,6 +141,7 @@ ppHtml
   packageInfo
   qual
   debug
+  concSem
   withQuickjump = do
     let
       visible_ifaces = filter visible ifaces
@@ -192,7 +196,7 @@ ppHtml
         visible_ifaces
         []
 
-    mapM_
+    mapConcurrentlyWith_ concSem
       ( ppHtmlModule
           odir
           doctitle

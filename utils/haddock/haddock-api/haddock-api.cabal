@@ -97,6 +97,7 @@ library
                , filepath
                , ghc-boot
                , mtl
+               , semaphore-compat
                , transformers
                , text
 
