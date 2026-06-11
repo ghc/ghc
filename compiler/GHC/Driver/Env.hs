@@ -13,6 +13,8 @@ module GHC.Driver.Env
    , hsc_HUE
    , hsc_HUG
    , hsc_all_home_unit_ids
+   , hscUnitIndex
+   , hsc_unit_index
    , hscUpdateLoggerFlags
    , hscUpdateHUG
    , hscInsertHPT
@@ -229,6 +231,12 @@ hscEUD = readExternalUnitDatabases . hscEUDC
 
 hscEUDC :: HscEnv -> ExternalUnitDatabaseCache UnitId
 hscEUDC hsc_env = ue_eud (hsc_unit_env hsc_env)
+
+hscUnitIndex :: HscEnv -> IO UnitIndex
+hscUnitIndex hsc_env = readIORef $ ue_unit_index (hsc_unit_env hsc_env)
+
+hsc_unit_index :: HscEnv -> IORef UnitIndex
+hsc_unit_index hsc_env = ue_unit_index (hsc_unit_env hsc_env)
 
 --------------------------------------------------------------------------------
 -- * Queries on Transitive Closure

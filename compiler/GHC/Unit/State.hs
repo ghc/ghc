@@ -435,16 +435,25 @@ type ModuleNameProvidersMap =
 
 data GlobalUnitKey =
   GlobalUnitKey
-    UnitId -- ^ Unit Id of the 'UnitInfo'
-    ST.ShortText
+    !UnitId -- ^ Unit Id of the 'UnitInfo'
+    !ST.ShortText
+
+instance Uniquable GlobalUnitKey where
+  getUnique :: GlobalUnitKey -> Unique
+  getUnique (GlobalUnitKey unitId abiHash) = getUnique unitId -- TODO @fendor: how to incorporate abiHash
+
+globalUnitKeyFromUnitInfo :: UnitInfo -> GlobalUnitKey
+globalUnitKeyFromUnitInfo u = GlobalUnitKey (unitId u) (unitAbiHash u)
+
+type GlobalUnitInfoMap = UniqMap GlobalUnitKey UnitInfo
 
 data UnitIndex = UnitIndex
-  { ui_wireMap :: WiringMap
+  { ui_wireMap :: !WiringMap
   -- ^ TODO @fendor: document global property
-  , ui_unwireMap :: UnwiringMap
+  , ui_unwireMap :: !UnwiringMap
   -- ^ TODO @fendor: document global property
-  , ui_unitInfoMap :: UnitInfoMap
-  -- ^ TODO @fendor: This needs to be Map (UnitId, AbiHash) UnitInfo for absolut correctness
+  , ui_unitInfoMap :: !GlobalUnitInfoMap
+  -- ^ TODO @fendor: This needs to be UniqMap GlobalUnitKey UnitInfo for absolut correctness
   }
 
 initUnitIndex :: UnitIndex
@@ -468,8 +477,10 @@ isWireMapEmpty unit_index =
 addUnitInfoMap :: UnitInfoMap -> UnitIndex -> UnitIndex
 addUnitInfoMap unit_info_map unit_index =
   unit_index
-    { ui_unitInfoMap = unit_info_map `plusUniqMap` ui_unitInfoMap unit_index
+    { ui_unitInfoMap = globalMap `plusUniqMap` ui_unitInfoMap unit_index
     }
+  where
+    globalMap = listToUniqMap . map (\(_, v) -> (globalUnitKeyFromUnitInfo v, v)) $ nonDetUniqMapToList unit_info_map
 
 -- lookupUnitInfoMap :: UnitIndex -> UnitId -> Maybe UnitInfo
 -- lookupUnitInfoMap unit_index unit_id =
@@ -945,28 +956,23 @@ mungeBytecodeLibFields pkg =
          ds -> ds
     }
 
+seqUnitInfo :: UnitInfo -> b -> b
+seqUnitInfo ui b =
+  unitImportDirs ui `seqList`
+  unitIncludeDirs ui `seqList`
+  unitLibraryDirs ui `seqList`
+  unitLibraryBytecodeDirs ui `seqList`
+  unitExtDepFrameworkDirs ui `seq`
+  unitHaddockInterfaces ui `seq`
+  unitHaddockHTMLs ui `seqList`
+  unitLibraryDynDirs ui `seqList`
+  unitLibraryDirsStatic ui `seqList`
+  unitDepends ui `seqList`
+  unitExposedModules ui `seqList`
+  b
+
 evaluateUnitInfo :: UnitInfo -> IO UnitInfo
-evaluateUnitInfo ui = do
-  importDirs <- evaluate $ unitImportDirs ui
-  includeDirs <- evaluate $ unitIncludeDirs ui
-  libraryDirs <- evaluate $ unitLibraryDirs ui
-  libraryBytecodeDirs <- evaluate $ unitLibraryBytecodeDirs ui
-  extDepFrameworkDirs <- evaluate $ unitExtDepFrameworkDirs ui
-  haddockInterfaces <- evaluate $ unitHaddockInterfaces ui
-  haddockHTMLs <- evaluate $ unitHaddockHTMLs ui
-  libraryDynDirs <- evaluate $ unitLibraryDynDirs ui
-  libraryDirsStatic <- evaluate $ unitLibraryDirsStatic ui
-  evaluate ui
-    { unitImportDirs = importDirs
-    , unitIncludeDirs = includeDirs
-    , unitLibraryDirs = libraryDirs
-    , unitLibraryDynDirs = libraryDynDirs
-    , unitLibraryDirsStatic = libraryDirsStatic
-    , unitLibraryBytecodeDirs = libraryBytecodeDirs
-    , unitExtDepFrameworkDirs = extDepFrameworkDirs
-    , unitHaddockInterfaces = haddockInterfaces
-    , unitHaddockHTMLs = haddockHTMLs
-    }
+evaluateUnitInfo ui = evaluate (seqUnitInfo ui ui)
 
 -- -----------------------------------------------------------------------------
 -- Modify our copy of the unit database based on trust flags,
@@ -1274,11 +1280,11 @@ findWiredInUnits logger prec_map pkgs vis_map = do
 
   return wiredInMap
 
-updateWiredInUnits :: WiringMap -> UnitInfoMap -> [UnitInfo] -> [Either UnitInfo UnitInfo]
+updateWiredInUnits :: WiringMap -> GlobalUnitInfoMap -> [UnitInfo] -> [Either UnitInfo UnitInfo]
 updateWiredInUnits wiredInMap knownInfos pkgs =
   map (updateWiredInUnitsInUnitInfo wiredInMap knownInfos) pkgs
 
-updateWiredInUnitsInUnitInfo :: WiringMap -> UnitInfoMap -> UnitInfo -> Either UnitInfo UnitInfo
+updateWiredInUnitsInUnitInfo :: WiringMap -> GlobalUnitInfoMap -> UnitInfo -> Either UnitInfo UnitInfo
 updateWiredInUnitsInUnitInfo wiredInMap knownInfos pkg =
   let
     upd_pkg pkg
@@ -1299,14 +1305,14 @@ updateWiredInUnitsInUnitInfo wiredInMap knownInfos pkg =
                   (unitExposedModules pkg)
         }
   in
-    case lookupUniqMap knownInfos (unitId pkg) of
+    case lookupUniqMap knownInfos (globalUnitKeyFromUnitInfo pkg) of
       Just ui ->
         Right ui
       Nothing ->
         let
           updated_pkg = upd_deps $ upd_pkg pkg
         in
-          Left updated_pkg
+          Left $ seqUnitInfo updated_pkg updated_pkg
 
 -- Helper functions for rewiring Module and Unit.  These
 -- rewrite Units of modules in wired-in packages to the form known to the
@@ -1725,12 +1731,12 @@ mkUnitState logger unit_index cfg = do
                             -- Note: we NEVER expose indefinite packages by
                             -- default, because it's almost assuredly not
                             -- what you want (no mix-in linking has occurred).
-                            if unitIsExposed p && unitIsDefinite (mkUnit p) && mostPreferable p
+                            let !x = fsPackageName p in if unitIsExposed p && unitIsDefinite (mkUnit p) && mostPreferable p
                                then addToUniqMap vm (mkUnit p)
                                                UnitVisibility {
                                                  uv_expose_all = True,
                                                  uv_renamings = [],
-                                                 uv_package_name = First (Just (fsPackageName p)),
+                                                 uv_package_name = First (Just x),
                                                  uv_requirements = emptyUniqMap,
                                                  uv_explicit = Nothing
                                                }

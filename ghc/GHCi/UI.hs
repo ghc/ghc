@@ -857,8 +857,9 @@ installInteractiveHomeUnits dflags = do
     setupHomeUnitFor :: GHC.GhcMonad m => Logger -> DynFlags -> S.Set UnitId -> m HomeUnitEnv
     setupHomeUnitFor logger dflags all_home_units = do
       env <- GHC.getSession
+      let unit_index = hsc_unit_index env
       (unit_state,home_unit,_mconstants) <-
-        liftIO $ initUnits logger dflags (hscEUDC env) all_home_units
+        liftIO $ initUnits logger dflags unit_index (hscEUDC env) all_home_units
       hpt <- liftIO emptyHomePackageTable
       pure (HUG.mkHomeUnitEnv unit_state dflags hpt (Just home_unit))
 

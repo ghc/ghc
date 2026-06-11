@@ -175,6 +175,8 @@ withBkpSession :: UnitId
                -> BkpM a
 withBkpSession cid insts deps session_type do_this = do
     dflags <- getDynFlags
+    env <- getSession
+    unitIndex <- liftIO $ hscUnitIndex env
     let cid_fs = unitFS cid
         is_primary = False
         uid_str = unpackFS (mkInstantiatedUnitHash cid insts)
@@ -194,8 +196,8 @@ withBkpSession cid insts deps session_type do_this = do
                  | otherwise = sub_comp (key_base p)
 
         mk_temp_env hsc_env =
-          hscUpdateFlags (\dflags -> mk_temp_dflags (hsc_units hsc_env) dflags) hsc_env
-        mk_temp_dflags unit_state dflags = dflags
+          hscUpdateFlags (\dflags -> mk_temp_dflags unitIndex (hsc_units hsc_env) dflags) hsc_env
+        mk_temp_dflags unit_index unit_state dflags = dflags
             { backend = case session_type of
                             TcSession -> noBackend
                             _         -> backend dflags
@@ -242,7 +244,7 @@ withBkpSession cid insts deps session_type do_this = do
             , importPaths = []
             -- Synthesize the flags
             , packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
-              let uid = unwireUnit unit_state
+              let uid = unwireUnit unit_index
                         $ renameHoleUnit unit_state (listToUFM insts) uid0
               in ExposePackage
                 (showSDoc dflags
@@ -349,9 +351,9 @@ buildUnit session cid insts lunit = do
               | otherwise
               = [Nothing]
         linkables <- liftIO $ catMaybes <$> concatHpt takeLinkables (hsc_HPT hsc_env)
+        unit_index <- liftIO $ hscUnitIndex hsc_env
         let
             obj_files = concatMap linkableFiles linkables
-            state     = hsc_units hsc_env
 
             compat_fs = unitIdFS cid
             compat_pn = PackageName compat_fs
@@ -377,7 +379,7 @@ buildUnit session cid insts lunit = do
                         -- really used for anything, so we leave it
                         -- blank for now.
                         TcSession -> []
-                        _ -> map (toUnitId . unwireUnit state)
+                        _ -> map (toUnitId . unwireUnit unit_index)
                                 $ deps ++ [ moduleUnit mod
                                           | (_, mod) <- insts
                                           , not (isHoleModule mod) ],
@@ -449,7 +451,7 @@ addUnit u = do
           { packageDBFlags = packageDBFlags dflags0 ++ [PackageDB (PkgDbPath (unitDatabasePath newdb))]
           }
 
-    (unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags1 eud (hsc_all_home_unit_ids hsc_env)
+    (unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags1 (ue_unit_index old_unit_env) eud (hsc_all_home_unit_ids hsc_env)
 
 
     -- update platform constants
@@ -467,6 +469,7 @@ addUnit u = do
           , ue_eps       = ue_eps old_unit_env
           , ue_module_graph = ue_module_graph old_unit_env
           , ue_eud       = ue_eud old_unit_env
+          , ue_unit_index = ue_unit_index old_unit_env
           }
     setSession $ hscSetFlags dflags $ hsc_env { hsc_unit_env = unit_env }
 

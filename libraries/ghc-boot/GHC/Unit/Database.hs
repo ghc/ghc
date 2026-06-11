@@ -746,11 +746,20 @@ mungeUnitInfoPaths top_dir pkgroot pkg =
       , unitHaddockHTMLs        = munge_paths (munge_urls (unitHaddockHTMLs pkg))
       }
    where
-      munge_paths = map munge_path
-      munge_urls  = map munge_url
+      munge_paths = strictMap munge_path
+      munge_urls  = strictMap munge_url
       (munge_path,munge_url) = mkMungePathUrl top_dir pkgroot
 
 -- | Decode an 'OsPath' to 'FilePath', throwing an 'error' if decoding failed.
 -- Prefer 'decodeUtf' and gracious error handling.
 unsafeDecodeUtf :: HasCallStack => OsPath -> FilePath
 unsafeDecodeUtf = OsPath.Internal.so
+
+strictMap :: (a -> b) -> [a] -> [b]
+strictMap _ []     = []
+strictMap f (x:xs) =
+  let
+    !x' = f x
+    !xs' = strictMap f xs
+  in
+    x' : xs'

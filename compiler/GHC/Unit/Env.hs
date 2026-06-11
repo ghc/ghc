@@ -131,6 +131,7 @@ import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
+import Data.IORef
 
 --------------------------------------------------------------------------------
 -- The hard queries
@@ -177,6 +178,8 @@ data UnitEnv = UnitEnv
 
     , ue_eud :: {-# UNPACK #-} !(ExternalUnitDatabaseCache UnitId)
         -- TODO: @fendor Docs
+    , ue_unit_index :: {-# UNPACK #-} !(IORef UnitIndex)
+        -- TODO: @fendor Docs
     }
 
 ueEPS :: UnitEnv -> IO ExternalPackageState
@@ -186,6 +189,7 @@ initUnitEnv :: UnitId -> HomeUnitGraph -> GhcNameVersion -> Platform -> IO UnitE
 initUnitEnv cur_unit hug namever platform = do
   eps <- initExternalUnitCache
   eud <- initExternalUnitDatabaseCache
+  unit_index <- newIORef (initUnitIndex)
   return $ UnitEnv
     { ue_eps             = eps
     , ue_home_unit_graph = hug
@@ -194,6 +198,7 @@ initUnitEnv cur_unit hug namever platform = do
     , ue_platform        = platform
     , ue_namever         = namever
     , ue_eud             = eud
+    , ue_unit_index      = unit_index
     }
 
 updateHug :: (HomeUnitGraph -> HomeUnitGraph) -> UnitEnv -> UnitEnv
