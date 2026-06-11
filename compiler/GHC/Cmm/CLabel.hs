@@ -1444,14 +1444,73 @@ data LabelStyle
    | AsmStyle -- ^ Asm label style (used by NCG backend)
 
 pprAsmLabel :: IsLine doc => Platform -> CLabel -> doc
-pprAsmLabel platform lbl = pprCLabelStyle platform AsmStyle lbl
-{-# SPECIALIZE pprAsmLabel :: Platform -> CLabel -> SDoc #-}
-{-# SPECIALIZE pprAsmLabel :: Platform -> CLabel -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
+pprAsmLabel platform lbl =
+  dualLine (pprAsmLabelSDoc platform lbl) (pprAsmLabelHLine platform lbl)
+{-# INLINE pprAsmLabel #-}
 
 pprCLabel :: IsLine doc => Platform -> CLabel -> doc
-pprCLabel platform lbl = pprCLabelStyle platform CStyle lbl
-{-# SPECIALIZE pprCLabel :: Platform -> CLabel -> SDoc #-}
-{-# SPECIALIZE pprCLabel :: Platform -> CLabel -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
+pprCLabel platform lbl =
+  dualLine (pprCLabelSDoc platform lbl) (pprCLabelHLine platform lbl)
+{-# INLINE pprCLabel #-}
+
+{- Note [Monomorphic CLabel printers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Printing CLabels is part of the hot path of the NCG, so pprAsmLabel must not
+pay for anything that is only needed when printing C-style labels (the C and
+LLVM backends, and Cmm dumps), nor for dictionary passing.
+
+We used to achieve this with a single recursive worker, pprCLabelStyle,
+parameterised over the LabelStyle and over the printer implementation
+(IsLine doc), with SPECIALIZE pragmas for SDoc and HLine. That had two
+problems:
+
+ * The SPECIALIZE rules do not fire at the NCG call sites, which call at
+   type (Line HDoc): the rule matcher does not normalise the Line type
+   family, so the NCG ended up calling the unspecialised, dictionary-passing
+   worker. See #27016.
+
+ * Both label styles shared one body, so any logic added for one style
+   (e.g. unique suppression in dumps, #21310) slowed down the other.
+   SpecConstr cannot split the body per style because it far exceeds
+   -fspec-constr-threshold.
+
+Instead we now generate a dedicated copy of the printer per (style, printer
+implementation) pair, by hand:
+
+ * pprCLabelStyle is non-recursive and INLINE. It recurses through its
+   function arguments: 'recur' prints a nested label in the same style,
+   'recurC' prints a nested label in C style (the IPE_Label case embeds a
+   C-style name fragment even in asm output).
+
+ * Four monomorphic knots (pprAsmLabelSDoc, pprAsmLabelHLine, pprCLabelSDoc,
+   pprCLabelHLine) instantiate it at a known LabelStyle and concrete doc
+   type. Inlining plus case-of-known-constructor prune each copy down to the
+   branches of its own style.
+
+ * The polymorphic entry points pprAsmLabel and pprCLabel select the right
+   copy with dualLine. dualLine is a class method, so the choice is made by
+   instance resolution (which does normalise Line HDoc to HLine) rather than
+   by rule matching, avoiding #27016 entirely. Both alternatives render the
+   same label, so the usual caveat of Note [dualLine and dualDoc] in
+   GHC.Utils.Outputable (divergence between the two printers) does not
+   arise.
+-}
+
+pprAsmLabelSDoc :: Platform -> CLabel -> SDoc
+pprAsmLabelSDoc platform = go
+  where go lbl = pprCLabelStyle go (pprCLabelSDoc platform) platform AsmStyle lbl
+
+pprAsmLabelHLine :: Platform -> CLabel -> HLine
+pprAsmLabelHLine platform = go
+  where go lbl = pprCLabelStyle go (pprCLabelHLine platform) platform AsmStyle lbl
+
+pprCLabelSDoc :: Platform -> CLabel -> SDoc
+pprCLabelSDoc platform = go
+  where go lbl = pprCLabelStyle go go platform CStyle lbl
+
+pprCLabelHLine :: Platform -> CLabel -> HLine
+pprCLabelHLine platform = go
+  where go lbl = pprCLabelStyle go go platform CStyle lbl
 
 instance OutputableP Platform CLabel where
   {-# INLINE pdoc #-} -- see Note [Bangs in CLabel]
@@ -1461,8 +1520,16 @@ instance OutputableP Platform CLabel where
                           _         -> let lbl_doc = (pprCLabel platform lbl)
                                        in pprTraceUserWarning (text "Labels in code should be printed with pprCLabel or pprAsmLabel" <> lbl_doc) lbl_doc
 
-pprCLabelStyle :: forall doc. IsLine doc => Platform -> LabelStyle -> CLabel -> doc
-pprCLabelStyle !platform !sty lbl = -- see Note [Bangs in CLabel]
+-- | Worker for the label printers. Non-recursive and INLINE: recursion goes
+-- through 'recur' (same style) and 'recurC' (C style), so that each
+-- monomorphic instantiation is pruned to a single style.
+-- See Note [Monomorphic CLabel printers].
+pprCLabelStyle :: forall doc. IsLine doc
+               => (CLabel -> doc)  -- ^ print a nested label in the same style
+               -> (CLabel -> doc)  -- ^ print a nested label in C style
+               -> Platform -> LabelStyle -> CLabel -> doc
+{-# INLINE pprCLabelStyle #-}
+pprCLabelStyle recur recurC !platform !sty lbl = -- see Note [Bangs in CLabel]
   let
     !use_leading_underscores = platformLeadingUnderscore platform
 
@@ -1491,18 +1558,20 @@ pprCLabelStyle !platform !sty lbl = -- see Note [Bangs in CLabel]
          -- we print a derived label, so we just print the parent label
          -- recursively. However we don't want to print the temp prefix (e.g.
          -- ".L") twice, so we must explicitely handle these cases.
+         -- (AsmTempDerivedLabel and DynamicLinkerLabel are only created in
+         -- the NCG, so 'recur' is the AsmStyle printer here in practice.)
       -> let skipTempPrefix = \case
                 AsmTempLabel u            -> pprUniqueAlways u
                 AsmTempDerivedLabel l suf -> skipTempPrefix l <> ftext suf
                 LocalBlockLabel u         -> pprUniqueAlways u
-                lbl                       -> pprAsmLabel platform lbl
+                lbl                       -> recur lbl
          in
          asmTempLabelPrefix platform
          <> skipTempPrefix l
          <> ftext suf
 
    DynamicLinkerLabel info lbl
-      -> pprDynamicLinkerAsmLabel platform info (pprAsmLabel platform lbl)
+      -> pprDynamicLinkerAsmLabel platform info (recur lbl)
 
    PicBaseLabel
       -> text "1b"
@@ -1515,7 +1584,7 @@ pprCLabelStyle !platform !sty lbl = -- see Note [Bangs in CLabel]
          optional `_` (underscore) because this is how you mark non-temp symbols
          on some platforms (Darwin)
       -}
-      maybe_underscore $ text "dsp_" <> pprCLabelStyle platform sty lbl <> text "_dsp"
+      maybe_underscore $ text "dsp_" <> recur lbl <> text "_dsp"
 
    StringLitLabel u
       -> maybe_underscore $ pprUniqueAlways u <> text "_str"
@@ -1590,7 +1659,7 @@ pprCLabelStyle !platform !sty lbl = -- see Note [Bangs in CLabel]
 
    CC_Label cc   -> maybe_underscore $ pprCostCentre cc
    CCS_Label ccs -> maybe_underscore $ pprCostCentreStack ccs
-   IPE_Label (InfoProvEnt l _ _ m _) -> maybe_underscore $ (pprCLabel platform l <> text "_" <> pprModule m <> text "_ipe")
+   IPE_Label (InfoProvEnt l _ _ m _) -> maybe_underscore $ (recurC l <> text "_" <> pprModule m <> text "_ipe")
    ModuleLabel mod kind        -> maybe_underscore $ pprModule mod <> text "_" <> pprModuleLabelKind kind
 
    CmmLabel _ _ fs CmmCode     -> maybe_underscore $ ftext fs
@@ -1601,8 +1670,6 @@ pprCLabelStyle !platform !sty lbl = -- see Note [Bangs in CLabel]
    CmmLabel _ _ fs CmmRetInfo  -> maybe_underscore $ ftext fs <> text "_info"
    CmmLabel _ _ fs CmmRet      -> maybe_underscore $ ftext fs <> text "_ret"
    CmmLabel _ _ fs CmmClosure  -> maybe_underscore $ ftext fs <> text "_closure"
-{-# SPECIALIZE pprCLabelStyle :: Platform -> LabelStyle -> CLabel -> SDoc #-}
-{-# SPECIALIZE pprCLabelStyle :: Platform -> LabelStyle -> CLabel -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- Note [Internal proc labels]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
