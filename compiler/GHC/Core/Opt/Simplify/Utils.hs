@@ -2432,12 +2432,10 @@ abstractFloats uf_opts top_lvl main_tvs floats body
     -- for why we need to re-do dependency analysis
     to_sccs :: OutBind -> [SCC (Id, CoreExpr, VarSet)]
     to_sccs (NonRec id e) = [AcyclicSCC (id, e, emptyVarSet)] -- emptyVarSet: abstract doesn't need it
-    to_sccs (Rec prs)     = sccs
-      where
-        (ids,rhss) = unzip prs
-        sccs = depAnal (\(id,_rhs,_fvs) -> [getName id])
-                       (\(_id,_rhs,fvs) -> nonDetStrictFoldVarSet ((:) . getName) [] fvs) -- Wrinkle (AB3)
-                       (zip3 ids rhss (map exprFreeVars rhss))
+    to_sccs (Rec prs)
+      = depAnal (\(id,_rhs,_fvs) -> [getName id])
+                (\(_id,_rhs,fvs) -> nonDetStrictFoldVarSet ((:) . getName) [] fvs) -- Wrinkle (AB3)
+                [ (id, rhs, exprFreeVars rhs) | (id, rhs) <- prs ]
 
     abstract :: GHC.Core.Subst.Subst -> SCC (Id, CoreExpr, VarSet) -> SimplM (GHC.Core.Subst.Subst, OutBind)
     abstract subst (AcyclicSCC (id, rhs, _empty_var_set))
@@ -2452,14 +2450,16 @@ abstractFloats uf_opts top_lvl main_tvs floats body
         tvs_here = choose_tvs (exprSomeFreeVars isTyVar rhs')
 
     abstract subst (CyclicSCC trpls)
-      = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly1 tvs_here) ids
-           ; let subst' = GHC.Core.Subst.extendSubstList subst (ids `zip` poly_apps)
-                 poly_pairs = [ mk_poly2 poly_id tvs_here rhs'
-                              | (poly_id, rhs) <- poly_ids `zip` rhss
-                              , let rhs' = GHC.Core.Subst.substExpr subst' rhs ]
+      = do { anns <- mapM mk1 trpls
+           ; let subst' = GHC.Core.Subst.extendSubstList subst
+                            [ (id, poly_app) | (id, _, poly_app, _) <- anns ]
+                 poly_pairs = [ mk_poly2 poly_id tvs_here
+                                  (GHC.Core.Subst.substExpr subst' rhs)
+                              | (_, poly_id, _, rhs) <- anns ]
            ; return (subst', Rec poly_pairs) }
       where
-        (ids,rhss,_fvss) = unzip3 trpls
+        mk1 (id, rhs, _fvs) = do { (poly_id, poly_app) <- mk_poly1 tvs_here id
+                                 ; return (id, poly_id, poly_app, rhs) }
 
         -- tvs_here: see Note [Which type variables to abstract over]
         tvs_here = choose_tvs (mapUnionVarSet get_bind_fvs trpls)
