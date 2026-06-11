@@ -651,6 +651,10 @@ function test_hadrian() {
   check_msys2_deps _build/stage1/bin/ghc --version
   check_release_build
 
+  # GitLab's log viewer renders ANSI colors, but stdout here is not a tty,
+  # so the driver must be told to emit them.
+  RUNTEST_ARGS="${RUNTEST_ARGS:-} --force-colors"
+
   # Ensure that statically-linked builds are actually static
   if [[ "${BUILD_FLAVOUR}" = *static* ]]; then
     bad_execs=""

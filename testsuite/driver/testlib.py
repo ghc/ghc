@@ -3563,7 +3563,8 @@ def summary(t: TestRun, file: TextIO, color=False) -> None:
         summary_color = Color.GREEN
 
     assert t.start_time is not None
-    file.write(colored(summary_color, 'SUMMARY') + ' for test run started at '
+    summary_header = colored(summary_color, 'SUMMARY') if color else 'SUMMARY'
+    file.write(summary_header + ' for test run started at '
                + t.start_time.strftime("%c %Z") + '\n'
                + str(datetime.datetime.now() - t.start_time).rjust(8)
                + ' spent to go through\n'
@@ -3617,7 +3618,7 @@ def summary(t: TestRun, file: TextIO, color=False) -> None:
 
     if t.unexpected_failures:
         file.write('Output of unexpected failures:\n\n')
-        printTestOutputSummary(file, t.unexpected_failures)
+        printTestOutputSummary(file, t.unexpected_failures, color)
 
     if stopping():
         file.write('WARNING: Testsuite run was terminated early\n')
@@ -3635,26 +3636,34 @@ def printUnexpectedTests(file: TextIO, testInfoss):
 # Per-stream cap on a failing test's output repeated in the final summary.
 MAX_SUMMARY_OUTPUT_LINES = 100
 
-def printTestOutputSummary(file: TextIO, testInfos) -> None:
+def printTestOutputSummary(file: TextIO, testInfos, color: bool=False) -> None:
     # Repeat failing tests' captured output in the summary, so one needn't
     # hunt for it earlier in a possibly very long log; see #16720.
     for result in sorted(testInfos, key=lambda r: (r.testname.lower(), r.way, r.directory)):
-        file.write(colored(Color.RED,
-                           '=====> {}({}) [{}]'.format(result.testname, result.way, result.reason))
-                   + '\n')
+        header = '=====> {}({}) [{}]'.format(result.testname, result.way, result.reason)
+        if color:
+            header = colored(Color.RED, header)
+        file.write(header + '\n')
         for stream_name, contents in [('stdout', result.stdout), ('stderr', result.stderr)]:
             if contents and contents.strip():
+                label = 'Captured {}:'.format(stream_name)
+                if color:
+                    label = colored(Color.CYAN, label)
                 lines = contents.rstrip('\n').split('\n')
                 if len(lines) > MAX_SUMMARY_OUTPUT_LINES:
                     omitted = len(lines) - MAX_SUMMARY_OUTPUT_LINES
                     lines = lines[:MAX_SUMMARY_OUTPUT_LINES] \
                         + ['... ({} more lines omitted, see junit.xml)'.format(omitted)]
-                s = 'Captured {}:\n{}\n'.format(stream_name, '\n'.join(lines))
+                s = label + '\n' + ''.join(l + '\n' for l in lines)
                 # Test output can contain characters that file's encoding
                 # cannot represent; replace rather than crash (cf safe_print).
                 enc = getattr(file, 'encoding', None) or 'utf-8'
                 file.write(s.encode(enc, errors='replace').decode(enc))
         file.write('\n')
+    footer = '<===== end of output of unexpected failures'
+    if color:
+        footer = colored(Color.RED, footer)
+    file.write(footer + '\n\n')
 
 def printTestInfosSummary(file: TextIO, testInfos):
     maxDirLen = max(len(tr.directory) for tr in testInfos)
