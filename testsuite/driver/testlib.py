@@ -2723,7 +2723,19 @@ def normalise_errmsg(s: str) -> str:
     # clang may warn about unused argument when used as assembler
     s = re.sub('.*warning: argument unused during compilation:.*\n', '', s)
     # Emscripten displays cache info and old emcc doesn't support EMCC_LOGGING=0
-    s = re.sub('cache:INFO: .*\n', '', s)
+    s = drop_lines_containing(s, 'cache:INFO:')
+    # Old emcc warns when we export HEAP8 but new one requires it (see #26290)
+    s = s.replace('warning: invalid item in EXPORTED_RUNTIME_METHODS: HEAP8\nwarning: invalid item in EXPORTED_RUNTIME_METHODS: HEAPU8\nemcc: warning: warnings in JS library compilation [-Wjs-compiler]\n','')
+
+    if opsys('darwin'):
+        # on newer versions of MacOS X, the shipped ranlib warns about object files with no symbols,
+        # however, these are completely benign stubs.
+        # See https://gitlab.haskell.org/ghc/ghc/-/issues/27116
+        s = modify_lines(s, lambda l: re.sub(r'.*ranlib:.*has no symbols', '', l))
+        # we also want to remove linker warnings having to do with undefined dynamic_lookup in combination with
+        # making a single weak symbol undefined as this is dependent on other linker flags
+        # See also https://github.com/haskell/process/pull/377
+        s = drop_lines_containing(s, 'ld: warning: -U option is redundant when using -undefined dynamic_lookup')
 
     return s
 
