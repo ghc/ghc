@@ -88,6 +88,61 @@ def get_all_ways() -> Set[WayName]:
 global testopts_ctx_var
 testopts_ctx_var = contextvars.ContextVar('testopts_ctx_var') # type: ignore
 
+# Pipe each test's output into a per-test buffer (set up by runTestAtomically)
+# to avoid interleaving the output of concurrent tests. Writes from contexts
+# with no active buffer pass straight through to the real streams.
+
+output_buffer_ctx_var = contextvars.ContextVar('output_buffer_ctx_var', default=None) # type: contextvars.ContextVar[Optional[io.StringIO]]
+
+class _OutputProxyBuffer:
+    """The .buffer of an _OutputProxy; takes bytes."""
+    def __init__(self, real) -> None:
+        self._real = real
+
+    def write(self, b: bytes) -> None:
+        buf = output_buffer_ctx_var.get()
+        if buf is None:
+            self._real.buffer.write(b)
+        else:
+            buf.write(b.decode('utf-8', errors='backslashreplace'))
+
+    def flush(self) -> None:
+        if output_buffer_ctx_var.get() is None:
+            self._real.buffer.flush()
+
+class _OutputProxy:
+    def __init__(self, real) -> None:
+        self._real = real
+        self.buffer = _OutputProxyBuffer(real)
+
+    @property
+    def encoding(self) -> str:
+        return self._real.encoding
+
+    def write(self, s: str) -> int:
+        buf = output_buffer_ctx_var.get()
+        if buf is None:
+            return self._real.write(s)
+        return buf.write(s)
+
+    def flush(self) -> None:
+        if output_buffer_ctx_var.get() is None:
+            self._real.flush()
+
+    def isatty(self) -> bool:
+        return self._real.isatty()
+
+    def fileno(self) -> int:
+        return self._real.fileno()
+
+def install_output_proxies() -> None:
+    # Both streams feed the same per-task buffer, so a test's stdout and
+    # stderr stay in print order.
+    if not isinstance(sys.stdout, _OutputProxy):
+        sys.stdout = _OutputProxy(sys.stdout)
+    if not isinstance(sys.stderr, _OutputProxy):
+        sys.stderr = _OutputProxy(sys.stderr)
+
 def getTestOpts() -> TestOptions:
     return testopts_ctx_var.get()
 
@@ -1502,9 +1557,25 @@ allTestNames = set([])  # type: Set[TestName]
 
 async def runTest(sem, opts, name: TestName, func, args):
     if sem is None:
-        return await test_common_work(name, opts, func, args)
+        return await runTestAtomically(opts, name, func, args)
     async with sem:
+        return await runTestAtomically(opts, name, func, args)
+
+async def runTestAtomically(opts, name: TestName, func, args):
+    # Buffer this test's output and emit it as one block at the end, so that
+    # concurrent tests' output does not interleave.
+    buf = io.StringIO()
+    token = output_buffer_ctx_var.set(buf)
+    try:
         return await test_common_work(name, opts, func, args)
+    finally:
+        output_buffer_ctx_var.reset(token)
+        s = buf.getvalue()
+        if s:
+            # The event loop is single-threaded and there is no await between
+            # these calls, so the block is written out atomically.
+            sys.stdout.write(s)
+            sys.stdout.flush()
 
 # name  :: String
 # setup :: [TestOpt] -> IO ()

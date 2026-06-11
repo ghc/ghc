@@ -487,6 +487,7 @@ if config.list_broken:
         print('')
 else:
     # Now run all the tests
+    install_output_proxies() # avoid interleaved output from concurrent tests
     try:
         async def run_parallelTests():
             sem = asyncio.Semaphore(config.threads)
