@@ -71,6 +71,7 @@ RTS_RET(stg_restore_cccs_d);
 RTS_RET(stg_restore_cccs_v16);
 RTS_RET(stg_restore_cccs_v32);
 RTS_RET(stg_restore_cccs_v64);
+RTS_RET(stg_restore_cccs_l);
 RTS_RET(stg_restore_cccs_eval);
 RTS_RET(stg_prompt_frame);
 
@@ -359,7 +360,6 @@ RTS_FUN_DECL(stg_gc_unpt_r1);
 RTS_FUN_DECL(stg_gc_unbx_r1);
 RTS_FUN_DECL(stg_gc_f1);
 RTS_FUN_DECL(stg_gc_d1);
-RTS_FUN_DECL(stg_gc_l1);
 RTS_FUN_DECL(stg_gc_pp);
 RTS_FUN_DECL(stg_gc_ppp);
 RTS_FUN_DECL(stg_gc_pppp);

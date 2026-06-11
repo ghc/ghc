@@ -142,12 +142,6 @@ __D5:
 	.globaltype __D6, f64
 __D6:
 
-	.hidden __L1
-	.globl __L1
-	.section .data.__L1,"",@
-	.globaltype __L1, i64
-__L1:
-
 	.hidden __Sp
 	.globl __Sp
 	.section .data.__Sp,"",@

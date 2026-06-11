@@ -386,7 +386,6 @@ wanteds os = concat
           ,fieldOffset Both "StgRegTable" "rZMM4"
           ,fieldOffset Both "StgRegTable" "rZMM5"
           ,fieldOffset Both "StgRegTable" "rZMM6"
-          ,fieldOffset Both "StgRegTable" "rL1"
           ,fieldOffset Both "StgRegTable" "rSp"
           ,fieldOffset Both "StgRegTable" "rSpLim"
           ,fieldOffset Both "StgRegTable" "rHp"
@@ -666,13 +665,11 @@ wanteds os = concat
           ,constantWord Haskell "MAX_Vanilla_REG"      "MAX_VANILLA_REG"
           ,constantWord Haskell "MAX_Float_REG"        "MAX_FLOAT_REG"
           ,constantWord Haskell "MAX_Double_REG"       "MAX_DOUBLE_REG"
-          ,constantWord Haskell "MAX_Long_REG"         "MAX_LONG_REG"
           ,constantWord Haskell "MAX_XMM_REG"          "MAX_XMM_REG"
           ,constantWord Haskell "MAX_Real_Vanilla_REG" "MAX_REAL_VANILLA_REG"
           ,constantWord Haskell "MAX_Real_Float_REG"   "MAX_REAL_FLOAT_REG"
           ,constantWord Haskell "MAX_Real_Double_REG"  "MAX_REAL_DOUBLE_REG"
           ,constantWord Haskell "MAX_Real_XMM_REG"     "MAX_REAL_XMM_REG"
-          ,constantWord Haskell "MAX_Real_Long_REG"    "MAX_REAL_LONG_REG"
 
           -- This tells the native code generator the size of the spill
           -- area it has available.
@@ -1048,7 +1045,7 @@ writeHeader fn rs = atomicWriteFile fn xs
           genapplyData = [(_name, v) | (_, GetWord _name (Snd v)) <- rs, _name `elem` genapplyFields ]
           genapplyFields = [
             "MAX_Real_Vanilla_REG", "MAX_Real_Float_REG", "MAX_Real_Double_REG",
-            "MAX_Real_Long_REG", "MAX_Real_XMM_REG",
+            "MAX_Real_XMM_REG",
             "WORD_SIZE", "TAG_BITS", "BITMAP_BITS_SHIFT"
             ]
           haskellRs = fmap snd $ filter (\r -> fst r `elem` [Haskell,Both]) rs

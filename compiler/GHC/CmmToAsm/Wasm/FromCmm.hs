@@ -181,8 +181,6 @@ globalInfoFromCmmGlobalReg t reg = case reg of
   DoubleReg i
     | i >= 1 && i <= 6 ->
         Just (fromString $ "__D" <> show i, SomeWasmType TagF64)
-  LongReg i
-    | i == 1 -> Just (fromString $ "__L" <> show i, SomeWasmType TagI64)
   Sp -> Just ("__Sp", ty_word)
   SpLim -> Just ("__SpLim", ty_word)
   Hp -> Just ("__Hp", ty_word)
@@ -196,7 +194,6 @@ supportedCmmGlobalRegs =
   [VanillaReg i | i <- [1 .. 10]]
     <> [FloatReg i | i <- [1 .. 6]]
     <> [DoubleReg i | i <- [1 .. 6]]
-    <> [LongReg i | i <- [1 .. 1]]
     <> [Sp, SpLim, Hp, HpLim]
 
 -- | Truncate a subword.

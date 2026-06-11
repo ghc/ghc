@@ -2283,9 +2283,14 @@ run_BCO:
             SpW(-1) = BCO_PTR(o_bco);
             Sp_subW(2);
 #if defined(PROFILING)
+            // The L1 return convention passes the value on the stack, so we
+            // cannot use stg_restore_cccs_d here (it expects the returned
+            // value to be in registers, with Sp pointing at the frame).
+            // stg_restore_cccs_l knows the value is on the stack and slides
+            // it over the frame; see StgMiscClosures.cmm.
             Sp_subW(2);
             SpW(1) = (W_)cap->r.rCCCS;
-            SpW(0) = (W_)&stg_restore_cccs_d_info;
+            SpW(0) = (W_)&stg_restore_cccs_l_info;
 #endif
             NEXT_INSTRUCTION;
         }

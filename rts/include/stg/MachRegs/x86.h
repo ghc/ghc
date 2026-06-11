@@ -56,7 +56,6 @@
 #define MAX_REAL_VANILLA_REG 1  /* always, since it defines the entry conv */
 #define MAX_REAL_FLOAT_REG   0
 #define MAX_REAL_DOUBLE_REG  0
-#define MAX_REAL_LONG_REG    0
 #define MAX_REAL_XMM_REG     4
 #define MAX_REAL_YMM_REG     4
 #define MAX_REAL_ZMM_REG     4
@@ -208,7 +207,6 @@ See Note [Overlapping global registers] for implications.
 #define MAX_REAL_VANILLA_REG 6
 #define MAX_REAL_FLOAT_REG   6
 #define MAX_REAL_DOUBLE_REG  6
-#define MAX_REAL_LONG_REG    0
 #define MAX_REAL_XMM_REG     6
 #define MAX_REAL_YMM_REG     6
 #define MAX_REAL_ZMM_REG     6

@@ -995,8 +995,6 @@ class DyLD {
       });
     }
 
-    this.#regs.__L1 = new WebAssembly.Global({ value: "i64", mutable: true });
-
     for (const k of ["__Sp", "__SpLim", "__Hp", "__HpLim"]) {
       this.#regs[k] = new WebAssembly.Global({ value: "i32", mutable: true });
     }

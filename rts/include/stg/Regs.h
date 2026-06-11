@@ -98,7 +98,6 @@ typedef struct {
   StgWord512      rZMM4;
   StgWord512      rZMM5;
   StgWord512      rZMM6;
-  StgWord64       rL1;
   StgPtr          rSp;
   StgPtr          rSpLim;
   StgPtr          rHp;
@@ -393,12 +392,6 @@ GLOBAL_REG_DECL(StgWord512,ZMM5,REG_ZMM5)
 GLOBAL_REG_DECL(StgWord512,ZMM6,REG_ZMM6)
 #else
 #define ZMM6 (BaseReg->rZMM6)
-#endif
-
-#if defined(REG_L1) && !defined(NO_GLOBAL_REG_DECLS)
-GLOBAL_REG_DECL(StgWord64,L1,REG_L1)
-#else
-#define L1 (BaseReg->rL1)
 #endif
 
 /*

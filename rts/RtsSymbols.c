@@ -465,6 +465,7 @@ extern char **environ;
       SymI_HasProto(stg_restore_cccs_v16_info)  \
       SymI_HasProto(stg_restore_cccs_v32_info)  \
       SymI_HasProto(stg_restore_cccs_v64_info)  \
+      SymI_HasProto(stg_restore_cccs_l_info)    \
       SymI_HasProto(enterFunCCS)                \
       SymI_HasProto(pushCostCentre)             \
       SymI_HasProto(mkCostCentre)               \
@@ -511,7 +512,6 @@ extern char **environ;
       SymI_HasDataProto(stg_gc_unbx_r1)                                     \
       SymI_HasDataProto(stg_gc_f1)                                          \
       SymI_HasDataProto(stg_gc_d1)                                          \
-      SymI_HasDataProto(stg_gc_l1)                                          \
       SymI_HasDataProto(stg_gc_pp)                                          \
       SymI_HasDataProto(stg_gc_ppp)                                         \
       SymI_HasDataProto(stg_gc_pppp)                                        \

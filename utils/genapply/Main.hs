@@ -151,7 +151,6 @@ data TargetInfo = TargetInfo
   { maxRealVanillaReg,
     maxRealFloatReg,
     maxRealDoubleReg,
-    maxRealLongReg,
     maxRealXmmReg,
     wordSize,
     tagBits,
@@ -172,7 +171,6 @@ parseTargetInfo path = do
     maxRealVanillaReg = tups_get "MAX_Real_Vanilla_REG",
     maxRealFloatReg = tups_get "MAX_Real_Float_REG",
     maxRealDoubleReg = tups_get "MAX_Real_Double_REG",
-    maxRealLongReg = tups_get "MAX_Real_Long_REG",
     maxRealXmmReg = tups_get "MAX_Real_XMM_REG",
     wordSize = tups_get "WORD_SIZE",
     tagBits = tag_bits,
@@ -304,7 +302,7 @@ assign targetInfo sp (arg : args) regs doc
 findAvailableReg :: TargetInfo -> ArgRep -> AvailRegs -> Maybe (Reg, AvailRegs)
 findAvailableReg tgt N   = findAvailIntegerReg       N   (2, maxRealVanillaReg tgt) -- don't use R1
 findAvailableReg tgt P   = findAvailIntegerReg       P   (2, maxRealVanillaReg tgt) --     ''
-findAvailableReg tgt L   = findAvailIntegerReg       L   (1, maxRealLongReg tgt)
+findAvailableReg _   L   = const Nothing -- long values are always passed on the stack
 findAvailableReg tgt F   = findAvailFloatOrVectorReg F   (1, maxRealFloatReg tgt)
 findAvailableReg tgt D   = findAvailFloatOrVectorReg D   (1, maxRealDoubleReg tgt)
 findAvailableReg tgt V16 = findAvailFloatOrVectorReg V16 (1, maxRealXmmReg tgt)
@@ -319,7 +317,7 @@ regName rep regNo = regNm ++ show regNo
     regNm = case rep of
       N   -> "R"
       P   -> "R"
-      L   -> "L"
+      L   -> error "regName: long values are never passed in registers"
       F   -> "F"
       D   -> "D"
       V16 -> "XMM"

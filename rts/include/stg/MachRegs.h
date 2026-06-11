@@ -193,14 +193,6 @@
 #  endif
 #endif
 
-#if !defined(MAX_REAL_LONG_REG)
-#  if   defined(REG_L1)
-#  define MAX_REAL_LONG_REG 1
-#  else
-#  define MAX_REAL_LONG_REG 0
-#  endif
-#endif
-
 #if !defined(MAX_REAL_XMM_REG)
 #  if   defined(REG_XMM6)
 #  define MAX_REAL_XMM_REG 6

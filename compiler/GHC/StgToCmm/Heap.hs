@@ -474,7 +474,6 @@ cannedGCEntryPoint platform regs =
         | is_f32 ty -> ret "stg_gc_f1"
         | is_f64 ty -> ret "stg_gc_d1"
         | is_wn ty  -> ret "stg_gc_unbx_r1"
-        | is_w64 ty -> ret "stg_gc_l1"
     [ty1,ty2]
         | is_gc ty1 && is_gc ty2 -> ret "stg_gc_pp"
         | is_gc ty1 && is_wn ty2 -> ret "stg_gc_pi"
@@ -493,7 +492,6 @@ cannedGCEntryPoint platform regs =
     is_gc  ty = isGcPtrType ty
     is_wn  ty = isBitsType ty && typeWidth ty == wordWidth platform
     is_w8  ty = isBitsType ty && typeWidth ty == W8
-    is_w64 ty = isBitsType ty && typeWidth ty == W64
     is_f32 ty = isFloatType ty && typeWidth ty == W32
     is_f64 ty = isFloatType ty && typeWidth ty == W64
 

@@ -103,6 +103,36 @@ INFO_TABLE_RET (stg_restore_cccs_eval, RET_SMALL, W_ info_ptr, W_ cccs)
     jump stg_ap_0_fast(ret);
 }
 
+/*
+ * A variant of stg_restore_cccs for values returned according to the L1
+ * return convention. On 32-bit platforms a 64-bit integer is returned on
+ * the stack (there are no long registers), so unlike stg_restore_cccs_d
+ * we are entered with the returned value sitting on the stack on top of
+ * this frame:
+ *
+ *      value (8 bytes)        <- Sp
+ *      stg_restore_cccs_l_info
+ *      cccs
+ *      <continuation>
+ *
+ * We restore the CCCS, slide the value down over this frame (on 32-bit
+ * platforms the value is exactly the size of the frame, two words) and
+ * return to the continuation underneath.
+ *
+ * This frame is only ever pushed by the bytecode interpreter
+ * (bci_PUSH_ALTS_L), and only on 32-bit platforms.
+ */
+INFO_TABLE_RET (stg_restore_cccs_l, RET_SMALL, W_ info_ptr, W_ cccs)
+    /* explicit stack */
+{
+#if defined(PROFILING)
+    CCCS = Sp(3);
+#endif
+    L_[Sp + WDS(2)] = L_[Sp];
+    Sp_adj(2);
+    jump %ENTRY_CODE(Sp(2)) [];
+}
+
 /* ----------------------------------------------------------------------------
    Support for the bytecode interpreter.
    ------------------------------------------------------------------------- */
@@ -193,13 +223,21 @@ INFO_TABLE_RET( stg_ctoi_D1, RET_BCO )
 }
 
 /*
- * When the returned value is in L1
+ * When the returned value is a 64-bit integer on a 32-bit platform, it
+ * is returned on the stack (there are no long registers; see
+ * GHC.Cmm.CallConv), so on entry Sp points at the value:
+ *
+ *      value (8 bytes)        <- Sp
+ *      stg_ctoi_L1_info
+ *      alts BCO
+ *
+ * All we have to do is push stg_ret_l_info on top, which both keeps the
+ * stack walkable and matches the layout the interpreter expects.
  */
 INFO_TABLE_RET( stg_ctoi_L1, RET_BCO )
     /* explicit stack */
 {
-    Sp_adj(-1) - 8;
-    L_[Sp + WDS(1)] = L1;
+    Sp_adj(-1);
     Sp(0) = stg_ret_l_info;
     jump stg_yield_to_interpreter [];
 }

@@ -72,31 +72,29 @@ assignArgumentsPos profile off conv arg_ty reps = (stk_off, assignments)
                                     | isFloatType ty = float
                                     | otherwise      = int
         where vec = case regs of
-                      AvailRegs vs fs ds ls (s:ss)
+                      AvailRegs vs fs ds (s:ss)
                         | passVectorInReg w profile
                           -> let reg_class = case w of
                                     W128 -> XmmReg
                                     W256 -> YmmReg
                                     W512 -> ZmmReg
                                     _    -> panic "CmmCallConv.assignArgumentsPos: Invalid vector width"
-                              in k (RegisterParam (reg_class s), AvailRegs vs fs ds ls ss)
+                              in k (RegisterParam (reg_class s), AvailRegs vs fs ds ss)
                       _ -> (assts, r:rs)
               float = case (w, regs) of
-                        (W32, AvailRegs vs fs ds ls (s:ss))
-                            | passFloatInXmm          -> k (RegisterParam (FloatReg s), AvailRegs vs fs ds ls ss)
-                        (W32, AvailRegs vs (f:fs) ds ls ss)
-                            | not passFloatInXmm      -> k (RegisterParam f, AvailRegs vs fs ds ls ss)
-                        (W64, AvailRegs vs fs ds ls (s:ss))
-                            | passFloatInXmm          -> k (RegisterParam (DoubleReg s), AvailRegs vs fs ds ls ss)
-                        (W64, AvailRegs vs fs (d:ds) ls ss)
-                            | not passFloatInXmm      -> k (RegisterParam d, AvailRegs vs fs ds ls ss)
+                        (W32, AvailRegs vs fs ds (s:ss))
+                            | passFloatInXmm          -> k (RegisterParam (FloatReg s), AvailRegs vs fs ds ss)
+                        (W32, AvailRegs vs (f:fs) ds ss)
+                            | not passFloatInXmm      -> k (RegisterParam f, AvailRegs vs fs ds ss)
+                        (W64, AvailRegs vs fs ds (s:ss))
+                            | passFloatInXmm          -> k (RegisterParam (DoubleReg s), AvailRegs vs fs ds ss)
+                        (W64, AvailRegs vs fs (d:ds) ss)
+                            | not passFloatInXmm      -> k (RegisterParam d, AvailRegs vs fs ds ss)
                         _ -> (assts, (r:rs))
               int = case (w, regs) of
                       (W128, _) -> panic "W128 unsupported register type"
-                      (_, AvailRegs (v:vs) fs ds ls ss) | widthInBits w <= widthInBits (wordWidth platform)
-                          -> k (RegisterParam v, AvailRegs vs fs ds ls ss)
-                      (_, AvailRegs vs fs ds (l:ls) ss) | widthInBits w > widthInBits (wordWidth platform)
-                          -> k (RegisterParam l, AvailRegs vs fs ds ls ss)
+                      (_, AvailRegs (v:vs) fs ds ss) | widthInBits w <= widthInBits (wordWidth platform)
+                          -> k (RegisterParam v, AvailRegs vs fs ds ss)
                       _   -> (assts, (r:rs))
               k (asst, regs') = assign_regs ((r, asst) : assts) rs regs'
               ty = arg_ty r
@@ -149,14 +147,12 @@ data AvailRegs
        -- ^ Available float registers
     , availDoubleRegs  :: [GlobalReg]
        -- ^ Available double registers
-    , availLongRegs    :: [GlobalReg]
-       -- ^ Available long registers
     , availXMMRegs     :: [Int]
        -- ^ Available vector XMM registers
     }
 
 noAvailRegs :: AvailRegs
-noAvailRegs = AvailRegs [] [] [] [] []
+noAvailRegs = AvailRegs [] [] [] []
 
 -- Vanilla registers can contain pointers, Ints, Chars.
 -- Floats and doubles have separate register supplies.
@@ -170,7 +166,6 @@ getRegsWithoutNode platform =
    { availVanillaRegs = filter (\r -> r /= node) (realVanillaRegs platform)
    , availFloatRegs   = realFloatRegs platform
    , availDoubleRegs  = realDoubleRegs platform
-   , availLongRegs    = realLongRegs platform
    , availXMMRegs     = realXmmRegNos platform }
 
 -- getRegsWithNode uses R1/node even if it isn't a register
@@ -181,26 +176,23 @@ getRegsWithNode platform =
                         else realVanillaRegs platform
    , availFloatRegs   = realFloatRegs platform
    , availDoubleRegs  = realDoubleRegs platform
-   , availLongRegs    = realLongRegs platform
    , availXMMRegs     = realXmmRegNos platform }
 
-allFloatRegs, allDoubleRegs, allLongRegs :: Platform -> [GlobalReg]
+allFloatRegs, allDoubleRegs :: Platform -> [GlobalReg]
 allVanillaRegs :: Platform -> [GlobalReg]
 allXmmRegs :: Platform -> [Int]
 
 allVanillaRegs platform = map VanillaReg $ regList (pc_MAX_Vanilla_REG (platformConstants platform))
 allFloatRegs   platform = map FloatReg   $ regList (pc_MAX_Float_REG   (platformConstants platform))
 allDoubleRegs  platform = map DoubleReg  $ regList (pc_MAX_Double_REG  (platformConstants platform))
-allLongRegs    platform = map LongReg    $ regList (pc_MAX_Long_REG    (platformConstants platform))
 allXmmRegs     platform =                  regList (pc_MAX_XMM_REG     (platformConstants platform))
 
-realFloatRegs, realDoubleRegs, realLongRegs :: Platform -> [GlobalReg]
+realFloatRegs, realDoubleRegs :: Platform -> [GlobalReg]
 realVanillaRegs :: Platform -> [GlobalReg]
 
 realVanillaRegs platform = map VanillaReg $ regList (pc_MAX_Real_Vanilla_REG (platformConstants platform))
 realFloatRegs   platform = map FloatReg   $ regList (pc_MAX_Real_Float_REG   (platformConstants platform))
 realDoubleRegs  platform = map DoubleReg  $ regList (pc_MAX_Real_Double_REG  (platformConstants platform))
-realLongRegs    platform = map LongReg    $ regList (pc_MAX_Real_Long_REG    (platformConstants platform))
 
 realXmmRegNos :: Platform -> [Int]
 realXmmRegNos platform
@@ -218,7 +210,6 @@ allRegs platform =
    { availVanillaRegs = allVanillaRegs platform
    , availFloatRegs   = allFloatRegs   platform
    , availDoubleRegs  = allDoubleRegs  platform
-   , availLongRegs    = allLongRegs    platform
    , availXMMRegs     = allXmmRegs     platform }
 
 nodeOnly :: AvailRegs
@@ -234,7 +225,6 @@ realArgRegsCover :: Platform
                  -> [GlobalReg]
 realArgRegsCover platform argRegs
   =  realVanillaRegs platform
-  ++ realLongRegs    platform
   ++ concat
       (  [ realFloatRegs platform  | wantFP, not (passFloatArgsInXmm platform) ]
            -- TODO: the line above is legacy logic, but removing it breaks

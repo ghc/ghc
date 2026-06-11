@@ -85,7 +85,6 @@
 #define MAX_VANILLA_REG 10
 #define MAX_FLOAT_REG   6
 #define MAX_DOUBLE_REG  6
-#define MAX_LONG_REG    1
 #define MAX_XMM_REG     6
 
 /* -----------------------------------------------------------------------------

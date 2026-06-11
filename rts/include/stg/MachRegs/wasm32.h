@@ -27,8 +27,6 @@
 #define REG_D5             21
 #define REG_D6             22
 
-#define REG_L1             23
-
 #define REG_Sp             24
 #define REG_SpLim          25
 #define REG_Hp             26

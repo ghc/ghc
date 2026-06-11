@@ -197,9 +197,6 @@ data GlobalReg
   | DoubleReg           -- double-precision floating-point registers
         {-# UNPACK #-} !Int     -- its number
 
-  | LongReg             -- long int registers (64-bit, really)
-        {-# UNPACK #-} !Int     -- its number
-
   -- I think we should redesign 'GlobalReg', for example instead of
   -- FloatReg/DoubleReg/XmmReg/YmmReg/ZmmReg we could have a single VecReg
   -- which also stores the type we are storing in it.
@@ -270,7 +267,6 @@ pprGlobalReg gr
         VanillaReg n   -> char 'R' <> int n
         FloatReg   n   -> char 'F' <> int n
         DoubleReg  n   -> char 'D' <> int n
-        LongReg    n   -> char 'L' <> int n
         XmmReg     n   -> text "XMM" <> int n
         YmmReg     n   -> text "YMM" <> int n
         ZmmReg     n   -> text "ZMM" <> int n
@@ -315,7 +311,6 @@ globalRegSpillType platform = \case
    VanillaReg _ -> gcWord platform
    FloatReg   _ -> cmmFloat W32
    DoubleReg  _ -> cmmFloat W64
-   LongReg    _ -> cmmBits  W64
 
    -- TODO: improve the internal model of SIMD/vectorized registers
    -- the right design SHOULD improve handling of float and double code too.
@@ -332,7 +327,6 @@ isArgReg :: GlobalReg -> Bool
 isArgReg (VanillaReg {}) = True
 isArgReg (FloatReg {})   = True
 isArgReg (DoubleReg {})  = True
-isArgReg (LongReg {})    = True
 isArgReg (XmmReg {})     = True
 isArgReg (YmmReg {})     = True
 isArgReg (ZmmReg {})     = True

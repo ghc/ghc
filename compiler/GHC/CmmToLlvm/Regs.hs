@@ -83,7 +83,7 @@ lmGlobalReg platform suf (GlobalRegUse reg ty)
         MachSp         -> wordGlobal $ "MachSp" ++ suf
         _other         -> panic $ "GHC.CmmToLlvm.Reg: GlobalReg (" ++ (show reg)
                                 ++ ") not supported!"
-        -- LongReg, HpLim, CCSS, CurrentTSO, CurrentNusery, HpAlloc
+        -- HpLim, CCSS, CurrentTSO, CurrentNusery, HpAlloc
         -- EagerBlackholeInfo, GCEnter1, GCFun, BaseReg, PicBaseReg
     where
         wordGlobal   name = LMNLocalVar (fsLit name) (llvmWord platform)

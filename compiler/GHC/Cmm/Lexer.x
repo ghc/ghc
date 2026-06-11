@@ -109,7 +109,6 @@ $white_no_nl+           ;
   R@decimal             { global_regN 1 VanillaReg       bWord }
   F@decimal             { global_regN 1 FloatReg  (const $ cmmFloat W32) }
   D@decimal             { global_regN 1 DoubleReg (const $ cmmFloat W64) }
-  L@decimal             { global_regN 1 LongReg   (const $ cmmBits  W64) }
   XMM@decimal           { global_regN 3 XmmReg    (const $ cmmVec 2 (cmmFloat W64)) }
   YMM@decimal           { global_regN 3 YmmReg    (const $ cmmVec 4 (cmmFloat W64)) }
   ZMM@decimal           { global_regN 3 ZmmReg    (const $ cmmVec 8 (cmmFloat W64)) }

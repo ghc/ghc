@@ -670,6 +670,11 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
                 fprintCCS(stderr, (CostCentreStack*)sp[1]);
                 debugBelch("\n" );
                 continue;
+            } else if (c == (StgWord)&stg_restore_cccs_l_info) {
+                debugBelch("stg_restore_cccs_l_info\n" );
+                fprintCCS(stderr, (CostCentreStack*)sp[1]);
+                debugBelch("\n" );
+                continue;
             } else if (c == (StgWord)&stg_restore_cccs_eval_info) {
                 debugBelch("stg_restore_cccs_eval_info\n" );
                 fprintCCS(stderr, (CostCentreStack*)sp[1]);

@@ -36,7 +36,6 @@ import CLOSURE stg_gc_prim_p_ll_info;
 import CLOSURE stg_gc_prim_pp_ll_info;
 import CLOSURE stg_ret_d_info;
 import CLOSURE stg_ret_f_info;
-import CLOSURE stg_ret_l_info;
 import CLOSURE stg_ret_n_info;
 import CLOSURE stg_ret_p_info;
 import CLOSURE stg_stack_save_entries;
@@ -363,14 +362,6 @@ stg_gc_f1 return (F_ f)
 stg_gc_d1 return (D_ d)
 {
     jump stg_gc_noregs (stg_ret_d_info, d) ();
-}
-
-
-/*-- L1 contains an int64 ------------------------------------------------- */
-
-stg_gc_l1 return (L_ l)
-{
-    jump stg_gc_noregs (stg_ret_l_info, l) ();
 }
 
 stg_gc_pp return (P_ arg1, P_ arg2)
