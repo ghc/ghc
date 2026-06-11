@@ -258,30 +258,14 @@ which GHC's diagnostics are forwarded by HLS: an LSP diagnostic carries a single
 
   https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#diagnostic
 
-How the locations are rendered:
+Locations are rendered exactly in the order they are provided.
+Not every location can be shown as a caret:
+  - carets are optional (@-fno-diagnostics-show-caret@)
+  - some spans have no source to display anyway (e.g. GHCi input or TH-generated code)
+  - they require 'IO' to read the source code, so pure code (e.g. 'Show SourceError')
+    doesn't include them.
 
-  * Related spans are additional to the primary span, not replacements for it.
-    The spans that receive a caret are @primary :| relatedLocations@ (see
-    'GHC.Driver.Errors.printMessage' and 'defaultLogActionWithHandles').
-
-  * Locations are shown — both as carets and in the @At:@ list below — in
-    exactly the order the message author gives them: the primary span first,
-    then 'diagnosticRelatedLocations' as listed. The rendering layer neither
-    reorders nor deduplicates.
-
-  * Not every location can be shown as a caret: carets are optional
-    (@-fno-diagnostics-show-caret@), and some spans have no source to display
-    anyway (e.g. GHCi input or TH-generated code). Locations that get no caret
-    are instead listed under an @At:@ heading ('pprAtLocations'; dropped when it
-    would name only the primary span, which the header already states).
-    Every location with a real source position thus appears either as a caret
-    or in the @At:@ list — only spans without one ('UnhelpfulSpan') are dropped
-    altogether — so messages need not spell the locations out in their prose.
-    Carets require 'IO' to read the source, so renderers other than
-    'GHC.Utils.Logger.decorateDiagnostic' — in particular the pure
-    'GHC.Utils.Error.pprLocMsgEnvelope', used e.g. when 'show'ing a
-    'GHC.Types.SourceError.SourceError' and for deferred type errors — list
-    /all/ the locations under @At:@.
+Locations that get no caret are instead listed under an @At:@ heading.
 
 How a message author should pick and order the spans is the subject of
 Note [Choosing the primary and related spans].
@@ -903,11 +887,9 @@ pprAtLocations primary spans
 
 -- | When @show_caret@ is set, render carets for the given spans; otherwise
 -- render nothing. Either way, return the real spans that did /not/ get a caret,
--- so the caller can report those locations textually. A span is missed when
--- carets are disabled, or when its source is unavailable (an unhelpful span —
--- dropped here — or unreadable source such as GHCi input or TH-generated code).
--- The spans are kept in the order they were given in; see Note [The source span
--- model for diagnostics].
+-- so the caller can report those locations textually.
+--
+-- See Note [The source span model for diagnostics].
 getCaretDiagnostics :: Bool -> MessageClass -> NonEmpty SrcSpan -> IO (SDoc, [RealSrcSpan])
 getCaretDiagnostics show_caret msg_class spans
   | not show_caret = pure (empty, realSpans)

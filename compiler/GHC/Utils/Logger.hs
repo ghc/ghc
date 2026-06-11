@@ -479,11 +479,7 @@ decorateDiagnostic logflags msg_class srcSpan msg = addLocations
         _                        -> []
 
       -- The primary span is always caret'd, with the related spans drawn as
-      -- additional carets.  Order is the message author's: the primary first,
-      -- then the related spans as given.  'getCaretDiagnostics' preserves that
-      -- order and does not deduplicate, so an author must not repeat the primary
-      -- among the related spans.
-      -- See Note [The source span model for diagnostics] in GHC.Types.Error.
+      -- additional carets. See Note [The source span model for diagnostics] in GHC.Types.Error.
       sourceSpans :: NonEmpty SrcSpan
       sourceSpans = srcSpan :| relatedSpans
 

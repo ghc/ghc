@@ -3764,13 +3764,8 @@ instance Diagnostic TcRnMessage where
     TcRnZonkerMessage{} -> []
 
 -- | The prior occurrences of a duplicated entity, for use as the related
--- locations of a \"duplicate\" diagnostic. Given all occurrences in ascending
--- source order with the primary span last, return the earlier ones, omitting
--- repeated spans and spans that coincide with the primary. Several
--- occurrences can share a single span -- e.g. duplicate declarations brought
--- into being by one TH splice -- and repeating the primary span among the
--- related locations would draw its caret twice and emit it again in the JSON
--- relatedSpans field.
+-- locations of a \"duplicate\" diagnostic.
+--
 -- See Note [Choosing the primary and related spans] in GHC.Types.Error.
 priorOccurrences :: NE.NonEmpty SrcSpan -> [SrcSpan]
 priorOccurrences locs =

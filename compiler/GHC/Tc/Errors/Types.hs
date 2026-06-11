@@ -3981,13 +3981,7 @@ data TcRnMessage where
   TcRnDuplicateDecls :: !OccName -- ^ The name of the declarations
                      -> !(NE.NonEmpty Name)
                         -- ^ The individual declarations, in ascending source
-                        -- order. The last one is the primary span of the
-                        -- message; 'diagnosticRelatedLocations' returns the
-                        -- earlier ones, omitting any that coincide with the
-                        -- primary span (all occurrences can share one span,
-                        -- e.g. when spliced by a single TH splice). See
-                        -- Note [Choosing the primary and related spans]
-                        -- in GHC.Types.Error.
+                        -- order.
                      -> TcRnMessage
 
   {-| TcRnPackageImportsDisabled is an error indicating that an import uses
