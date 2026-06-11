@@ -94,6 +94,8 @@ parser.add_argument("--ignore-perf-failures", choices=['increases','decreases','
                         help="Do not fail due to out-of-tolerance perf tests")
 parser.add_argument("--only-report-hadrian-deps", type=Path,
                         help="Dry run the testsuite and report all extra hadrian dependencies needed on the given file")
+parser.add_argument("--force-colors", action="store_true",
+                        help="emit ANSI colors even when stdout is not a tty (e.g. for CI logs)")
 
 args = parser.parse_args()
 
@@ -259,7 +261,9 @@ def supports_colors():
     return True
 
 config.supports_colors = supports_colors()
-term_color.enable_color = config.supports_colors
+# config.supports_colors deliberately stays tty-based: it also guards
+# terminal-title updates, which must not end up in a CI log.
+term_color.enable_color = config.supports_colors or args.force_colors
 
 # This has to come after arg parsing as the args can change the compiler
 get_compiler_info()
@@ -587,7 +591,7 @@ else:
         print(Perf.allow_changes_string([(m.change, m.stat) for m in t.metrics]))
         print('-' * 25)
 
-    summary(t, sys.stdout, color=config.supports_colors)
+    summary(t, sys.stdout, color=term_color.enable_color)
 
     # Write perf stats if any exist or if a metrics file is specified.
     stats_metrics = [stat for (_, stat, __) in t.metrics] # type: List[PerfStat]
