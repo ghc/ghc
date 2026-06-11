@@ -63,10 +63,16 @@ elimCommonBlocks :: CmmGraph -> CmmGraph
 elimCommonBlocks g = replaceLabels env $ copyTicks env g
   where
      env = iterate mapEmpty blocks_with_key
-     -- The order of blocks doesn't matter here. While we could use
-     -- revPostorder which drops unreachable blocks this is done in
-     -- ContFlowOpt already which runs before this pass. So we use
-     -- toBlockList since it is faster.
+     -- The order of blocks doesn't matter here. Note that toBlockList
+     -- includes unreachable blocks (ContFlowOpt leaves them in the block
+     -- map, see Note [unreachable blocks] in GHC.Cmm.Pipeline), so we may
+     -- hash and merge dead blocks, and a live block may even be
+     -- substituted by an unreachable duplicate (resurrecting it). That is
+     -- semantically harmless since the blocks are identical, but it means
+     -- this pass both consumes and produces unreachable blocks; passes
+     -- between this one and the final removeUnreachableBlocksProc must
+     -- not let blocks that are unreachable here influence the reachable
+     -- part of the graph (see e.g. callProcPoints in GHC.Cmm.ProcPoint).
      groups = groupByInt hash_block (toBlockList g) :: [[CmmBlock]]
      blocks_with_key = [ [ (successors b, [b]) | b <- bs] | bs <- groups]
 

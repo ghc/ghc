@@ -173,8 +173,16 @@ procPointLattice = DataflowLattice unreached add_to
 -- introduced because they're reachable from multiple proc points.
 --
 -- Extract the set of Continuation BlockIds, see Note [Continuation BlockIds].
+--
+-- We must consider only *reachable* blocks: the common block eliminator
+-- leaves duplicated (hence unreachable) call blocks in the block map
+-- (see Note [unreachable blocks] in GHC.Cmm.Pipeline), and the
+-- continuation of such a dead call may itself be unreachable. Stack
+-- layout only lays out reachable blocks, so a continuation collected
+-- from a dead call would get an info table (attachContInfoTables) but
+-- no stack map, making setInfoTableStackMap panic (#27368).
 callProcPoints      :: CmmGraph -> ProcPointSet
-callProcPoints g = foldlGraphBlocks add (setSingleton (g_entry g)) g
+callProcPoints g = foldl' add (setSingleton (g_entry g)) (revPostorder g)
   where add :: LabelSet -> CmmBlock -> LabelSet
         add set b = case lastNode b of
                       CmmCall {cml_cont = Just k} -> setInsert k set
