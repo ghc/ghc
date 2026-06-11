@@ -36,6 +36,10 @@ static VOID CALLBACK tick_callback(
 // This seems to be the case starting at some point during the
 // Windows 7 lifetime and any newer versions of windows.
 
+// Forward decls
+static void startTicker(void);
+static void stopTicker(bool synchronous);
+
 void
 initTicker (Time interval, TickProc handle_tick)
 {
@@ -52,34 +56,25 @@ initTicker (Time interval, TickProc handle_tick)
 void
 unpauseTicker(void)
 {
-    BOOL r;
-
-    r = CreateTimerQueueTimer(&timer,
-                              timer_queue,
-                              tick_callback,
-                              0,
-                              0,
-                              TimeToMS(tick_interval), // ms
-                              WT_EXECUTEINTIMERTHREAD);
-    if (r == 0) {
-        sysErrorBelch("CreateTimerQueueTimer");
-        stg_exit(EXIT_FAILURE);
-    }
+    startTicker();
 }
 
 void
 pauseTicker(void)
 {
     if (timer_queue != NULL && timer != NULL) {
-        DeleteTimerQueueTimer(timer_queue, timer, NULL);
-        timer = NULL;
+        /* pauseTicker is called from within the handle_tick, so stopping
+         * the ticker here /must/ be asynchronous or we will deadlock! */
+        stopTicker(false /* asynchronous */);
     }
 }
 
 void
 exitTicker(void)
 {
-    pauseTicker();
+    if (timer != NULL) {
+        stopTicker(true /* synchronous */);
+    }
     if (timer_queue != NULL) {
         // From the docs for DeleteTimerQueueEx:
         //   If this parameter is INVALID_HANDLE_VALUE, the function waits
@@ -88,4 +83,30 @@ exitTicker(void)
         DeleteTimerQueueEx(timer_queue, completion);
         timer_queue = NULL;
     }
+}
+
+static void startTicker(void) {
+    ASSERT(timer_queue != NULL && timer == NULL);
+    BOOL r = CreateTimerQueueTimer(&timer,
+                                   timer_queue,
+                                   tick_callback,
+                                   0,
+                                   0,
+                                   TimeToMS(tick_interval), // ms
+                                   WT_EXECUTEINTIMERTHREAD);
+    if (r == 0) {
+        sysErrorBelch("CreateTimerQueueTimer");
+        stg_exit(EXIT_FAILURE);
+    }
+    ASSERT(timer != NULL);
+}
+
+static void stopTicker(bool synchronous) {
+    ASSERT(timer_queue != NULL && timer != NULL);
+    // From the docs for DeleteTimerQueueTimer:
+    // If this parameter is INVALID_HANDLE_VALUE, the function waits for any
+    // running timer callback functions to complete before returning.
+    HANDLE completion = synchronous ? INVALID_HANDLE_VALUE : NULL;
+    DeleteTimerQueueTimer(timer_queue, timer, completion);
+    timer = NULL;
 }
