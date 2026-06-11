@@ -2442,7 +2442,9 @@ async def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: st
             dump_stdout(name)
             dump_stderr(name)
         message = format_bad_exit_code_message(exit_code)
-        return failBecause(message)
+        return failBecause(message,
+                           stderr=read_stderr(name),
+                           stdout=read_stdout(name))
 
     if not (opts.ignore_stderr or await stderr_ok(name, way) or opts.combined_output):
         return failBecause('bad stderr',
@@ -3593,6 +3595,10 @@ def summary(t: TestRun, file: TextIO, color=False) -> None:
         file.write('Framework warnings:\n')
         printTestInfosSummary(file, t.framework_warnings)
 
+    if t.unexpected_failures:
+        file.write('Output of unexpected failures:\n\n')
+        printTestOutputSummary(file, t.unexpected_failures)
+
     if stopping():
         file.write('WARNING: Testsuite run was terminated early\n')
 
@@ -3604,6 +3610,30 @@ def printUnexpectedTests(file: TextIO, testInfoss):
     if unexpected:
         file.write('Unexpected results from:\n')
         file.write('TEST="' + ' '.join(sorted(unexpected)) + '"\n')
+        file.write('\n')
+
+# Per-stream cap on a failing test's output repeated in the final summary.
+MAX_SUMMARY_OUTPUT_LINES = 100
+
+def printTestOutputSummary(file: TextIO, testInfos) -> None:
+    # Repeat failing tests' captured output in the summary, so one needn't
+    # hunt for it earlier in a possibly very long log; see #16720.
+    for result in sorted(testInfos, key=lambda r: (r.testname.lower(), r.way, r.directory)):
+        file.write(colored(Color.RED,
+                           '=====> {}({}) [{}]'.format(result.testname, result.way, result.reason))
+                   + '\n')
+        for stream_name, contents in [('stdout', result.stdout), ('stderr', result.stderr)]:
+            if contents and contents.strip():
+                lines = contents.rstrip('\n').split('\n')
+                if len(lines) > MAX_SUMMARY_OUTPUT_LINES:
+                    omitted = len(lines) - MAX_SUMMARY_OUTPUT_LINES
+                    lines = lines[:MAX_SUMMARY_OUTPUT_LINES] \
+                        + ['... ({} more lines omitted, see junit.xml)'.format(omitted)]
+                s = 'Captured {}:\n{}\n'.format(stream_name, '\n'.join(lines))
+                # Test output can contain characters that file's encoding
+                # cannot represent; replace rather than crash (cf safe_print).
+                enc = getattr(file, 'encoding', None) or 'utf-8'
+                file.write(s.encode(enc, errors='replace').decode(enc))
         file.write('\n')
 
 def printTestInfosSummary(file: TextIO, testInfos):
