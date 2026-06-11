@@ -895,6 +895,34 @@ Formatting dumps
     let expressions. This is helpful when your code does a lot of
     unboxing.
 
+.. ghc-flag:: -dcanonicalize-local-binds
+    :shortdesc: Rename local binders to canonical names in Core dumps.
+    :type: dynamic
+    :since: 10.2.1
+
+    Rename local binders in Core dumps to deterministic canonical names,
+    making the dumps more stable across compiler versions and unrelated
+    program or compiler changes. This helps when diffing Core dumps and
+    when using them as the expected output of golden tests. Only the dump
+    output is affected; compilation results do not change.
+
+    Canonical names consist of a prefix indicating the kind of binder,
+    followed by a letter sequence ``A``, ``B``, …, ``Z``, ``AA``, ``AB``, ….
+    Each kind of binder is numbered independently:
+
+    - ``cj``: join points,
+    - ``cw``: case binders,
+    - ``ct``: type and coercion variables,
+    - ``cb``: all other term binders.
+
+    All sequences restart at ``A`` for each top-level binding, so a change
+    in one top-level binding never renames binders in another. Top-level
+    binders themselves and all other external names are not renamed.
+
+    The renamed binders keep their uniques, so this flag composes with and
+    without :ghc-flag:`-dsuppress-uniques`. It is not implied by
+    :ghc-flag:`-dsuppress-all`.
+
 .. ghc-flag:: -dhex-word-literals
     :shortdesc: Print values of type ``Word#`` in hexadecimal.
     :type: dynamic

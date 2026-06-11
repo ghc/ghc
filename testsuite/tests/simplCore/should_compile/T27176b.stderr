@@ -1,0 +1,10 @@
+
+==================== Desugar (after optimization) ====================
+Result size of Desugar (after optimization)
+  = {terms: 11, types: 7, coercions: 0, joins: 0/1}
+
+f = \ cbA ->
+      let { cbB = \ cbC -> + $fNumInt cbC cbA } in cbB (cbB cbA)
+
+
+

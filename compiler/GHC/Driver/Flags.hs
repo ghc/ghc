@@ -863,6 +863,10 @@ data GeneralFlag
    -- See Note [Stable Core dump order] in GHC.Core.Ppr.
    | Opt_StableCoreDumpOrder
 
+   -- | Rename local binders in Core dumps to deterministic canonical names.
+   -- See Note [Canonicalizing local binders for dumps] in GHC.Core.Canonicalize.
+   | Opt_CanonicalizeLocalBinds
+
    -- Error message suppression
    | Opt_ShowErrorContext
    | Opt_InteractiveErrorHints

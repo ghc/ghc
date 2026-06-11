@@ -44,6 +44,7 @@ initSimplifyOpts dflags extra_vars iterations mode hpt_rule_base = let
   -- This is a particularly ugly construction, but we will get rid of it in !8341.
   opts = SimplifyOpts
     { so_dump_core_sizes = not $ gopt Opt_SuppressCoreSizes dflags
+    , so_canon_dump_binds = gopt Opt_CanonicalizeLocalBinds dflags
     , so_iterations      = iterations
     , so_mode            = mode
     , so_pass_result_cfg = if gopt Opt_DoCoreLinting dflags

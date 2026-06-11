@@ -169,6 +169,9 @@ simplExprGently env expr = do
 -- The values of this datatype are /only/ driven by the demands of that function.
 data SimplifyOpts = SimplifyOpts
   { so_dump_core_sizes :: !Bool
+  , so_canon_dump_binds :: !Bool
+                          -- See Note [Canonicalizing local binders for dumps]
+                          -- in GHC.Core.Canonicalize
   , so_iterations      :: !Int
   , so_mode            :: !SimplMode
 
@@ -207,6 +210,7 @@ simplifyPgm logger unit_env name_ppr_ctx opts
     }
   where
     dump_core_sizes = so_dump_core_sizes opts
+    canon_dump_binds = so_canon_dump_binds opts
     mode            = so_mode opts
     max_iterations  = so_iterations opts
     top_env_cfg     = so_top_env_cfg opts
@@ -316,7 +320,7 @@ simplifyPgm logger unit_env name_ppr_ctx opts
            let { binds2 = {-# SCC "ZapInd" #-} shortOutIndirections binds1 } ;
 
                 -- Dump the result of this iteration
-           dump_end_iteration logger dump_core_sizes name_ppr_ctx iteration_no counts1 binds2 rules1 ;
+           dump_end_iteration logger dump_core_sizes canon_dump_binds name_ppr_ctx iteration_no counts1 binds2 rules1 ;
 
            for_ (so_pass_result_cfg opts) $ \pass_result_cfg ->
              lintPassResult logger pass_result_cfg binds2 ;
@@ -330,10 +334,10 @@ simplifyPgm logger unit_env name_ppr_ctx opts
         totalise = foldr (\c acc -> acc `plusSimplCount` c)
                          (zeroSimplCount $ logHasDumpFlag logger Opt_D_dump_simpl_stats)
 
-dump_end_iteration :: Logger -> Bool -> NamePprCtx -> Int
+dump_end_iteration :: Logger -> Bool -> Bool -> NamePprCtx -> Int
                    -> SimplCount -> CoreProgram -> [CoreRule] -> IO ()
-dump_end_iteration logger dump_core_sizes name_ppr_ctx iteration_no counts binds rules
-  = dumpPassResult logger dump_core_sizes name_ppr_ctx mb_flag hdr pp_counts binds rules
+dump_end_iteration logger dump_core_sizes canon_dump_binds name_ppr_ctx iteration_no counts binds rules
+  = dumpPassResult logger dump_core_sizes canon_dump_binds name_ppr_ctx mb_flag hdr pp_counts binds rules
   where
     mb_flag | logHasDumpFlag logger Opt_D_dump_simpl_iterations = Just Opt_D_dump_simpl_iterations
             | otherwise                                         = Nothing

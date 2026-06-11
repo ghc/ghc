@@ -52,6 +52,7 @@ endPassHscEnvIO hsc_env name_ppr_ctx pass binds rules
 initEndPassConfig :: DynFlags -> [Var] -> NamePprCtx -> CoreToDo -> EndPassConfig
 initEndPassConfig dflags extra_vars name_ppr_ctx pass = EndPassConfig
   { ep_dumpCoreSizes = not (gopt Opt_SuppressCoreSizes dflags)
+  , ep_canonicalizeBinds = gopt Opt_CanonicalizeLocalBinds dflags
   , ep_lintPassResult = if gopt Opt_DoCoreLinting dflags
       then Just $ initLintPassResultConfig dflags extra_vars pass
       else Nothing

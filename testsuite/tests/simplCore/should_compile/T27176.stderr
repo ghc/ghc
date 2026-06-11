@@ -1,0 +1,36 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 53, types: 45, coercions: 0, joins: 1/1}
+
+Rec {
+$wpoly
+  = \ @ctA cbA ->
+      case cbA of {
+        [] -> 0#;
+        : cbB cbC -> case $wpoly cbC of cwB { __DEFAULT -> +# 1# cwB }
+      }
+end Rec }
+
+poly = \ @ctA cbA -> case $wpoly cbA of cwA { __DEFAULT -> I# cwA }
+
+fusionElemMap
+  = \ cbA cbB ->
+      joinrec {
+        cjA cbC
+          = case cbC of {
+              [] -> False;
+              : cbD cbE ->
+                case cbA of { I# cbF ->
+                case cbD of { I# cbG ->
+                case ==# cbF (+# cbG 1#) of {
+                  __DEFAULT -> jump cjA cbE;
+                  1# -> True
+                }
+                }
+                }
+            }; } in
+      jump cjA cbB
+
+
+

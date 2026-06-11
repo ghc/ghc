@@ -1,0 +1,3 @@
+section: compiler
+synopsis: Add ``-dcanonicalize-local-binds``, which renames local binders in Core dumps to deterministic canonical names, stabilizing the dumps for diffing and golden tests.
+issues: #27176

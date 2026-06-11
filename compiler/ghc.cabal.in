@@ -350,6 +350,7 @@ Library
         GHC.Cmm.Type
         GHC.Cmm.Utils
         GHC.Core
+        GHC.Core.Canonicalize
         GHC.Core.Class
         GHC.Core.Coercion
         GHC.Core.Coercion.Axiom

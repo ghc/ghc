@@ -606,3 +606,9 @@ test('T4081', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-a
 test('T27261', [extra_files(['T27261_aux.hs'])], multimod_compile, ['T27261', '-v0 -O'])
 test('T27296', [], makefile_test, ['T27296'])
 test('T27296b', [], makefile_test, ['T27296b'])
+
+# #27176: -dcanonicalize-local-binds gives local binders deterministic names in dumps
+test('T27176', only_ways(['optasm']), compile,
+     ['-ddump-simpl -dsuppress-all -dsuppress-uniques -dsuppress-ticks -dno-typeable-binds -dcanonicalize-local-binds'])
+test('T27176b', only_ways(['normal']), compile,
+     ['-ddump-ds -dsuppress-all -dsuppress-uniques -dno-typeable-binds -dcanonicalize-local-binds'])

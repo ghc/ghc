@@ -42,6 +42,7 @@ import GHC.Unit.Module.ModGuts
 import GHC.Platform
 
 import GHC.Core
+import GHC.Core.Canonicalize ( canonicalizeBindsForDump, canonicalizeRulesForDump )
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Stats ( coreBindsStats )
@@ -275,6 +276,10 @@ data EndPassConfig = EndPassConfig
   -- ^ Whether core bindings should be dumped with the size of what they
   -- are binding (i.e. the size of the RHS of the binding).
 
+  , ep_canonicalizeBinds :: !Bool
+  -- ^ Whether local binders should be renamed to canonical names in dumps.
+  -- See Note [Canonicalizing local binders for dumps] in GHC.Core.Canonicalize.
+
   , ep_lintPassResult :: !(Maybe LintPassResultConfig)
   -- ^ Whether we should lint the result of this pass.
 
@@ -293,7 +298,8 @@ endPassIO :: Logger
           -> IO ()
 -- Used by the IO-is CorePrep too
 endPassIO logger cfg binds rules
-  = do { dumpPassResult logger (ep_dumpCoreSizes cfg) (ep_namePprCtx cfg) mb_flag
+  = do { dumpPassResult logger (ep_dumpCoreSizes cfg) (ep_canonicalizeBinds cfg)
+                        (ep_namePprCtx cfg) mb_flag
                         (renderWithContext defaultSDocContext (ep_prettyPass cfg))
                         (ep_passDetails cfg) binds rules
        ; for_ (ep_lintPassResult cfg) $ \lp_cfg ->
@@ -307,6 +313,7 @@ endPassIO logger cfg binds rules
 
 dumpPassResult :: Logger
                -> Bool                  -- dump core sizes?
+               -> Bool                  -- canonicalize local binders?
                -> NamePprCtx
                -> Maybe DumpFlag        -- Just df => show details in a file whose
                                         --            name is specified by df
@@ -314,7 +321,7 @@ dumpPassResult :: Logger
                -> SDoc                  -- Extra info to appear after header
                -> CoreProgram -> [CoreRule]
                -> IO ()
-dumpPassResult logger dump_core_sizes name_ppr_ctx mb_flag hdr extra_info binds rules
+dumpPassResult logger dump_core_sizes canon_binds name_ppr_ctx mb_flag hdr extra_info binds rules
   = do { forM_ mb_flag $ \flag -> do
            logDumpFile logger (mkDumpStyle name_ppr_ctx) flag hdr FormatCore dump_doc
 
@@ -325,23 +332,32 @@ dumpPassResult logger dump_core_sizes name_ppr_ctx mb_flag hdr extra_info binds 
        }
 
   where
+    -- size_doc is computed on the original bindings: canonicalization is a
+    -- dump-output-only transform.
     size_doc = sep [text "Result size of" <+> text hdr, nest 2 (equals <+> ppr (coreBindsStats binds))]
 
     -- See Note [Stable Core dump order] in GHC.Core.Ppr
-    binds' | sdocStableCoreDumpOrder (log_default_dump_context (logFlags logger))
-                        = sortCoreBindingsForDump binds
-           | otherwise  = binds
+    sorted_binds
+      | sdocStableCoreDumpOrder (log_default_dump_context (logFlags logger))
+                  = sortCoreBindingsForDump binds
+      | otherwise = binds
+
+    -- See Note [Canonicalizing local binders for dumps]
+    -- in GHC.Core.Canonicalize.
+    (dump_binds, dump_rules)
+      | canon_binds = (canonicalizeBindsForDump sorted_binds, canonicalizeRulesForDump rules)
+      | otherwise   = (sorted_binds, rules)
 
     dump_doc  = vcat [ nest 2 extra_info
                      , size_doc
                      , blankLine
                      , if dump_core_sizes
-                        then pprCoreBindingsWithSize binds'
-                        else pprCoreBindings         binds'
+                        then pprCoreBindingsWithSize dump_binds
+                        else pprCoreBindings         dump_binds
                      , ppUnless (null rules) pp_rules ]
     pp_rules = vcat [ blankLine
                     , text "------ Local rules for imported ids --------"
-                    , pprRules rules ]
+                    , pprRules dump_rules ]
 
 {-
 ************************************************************************
