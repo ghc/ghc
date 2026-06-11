@@ -3015,11 +3015,15 @@ def normalise_errmsg(s: str) -> str:
     # Emscripten displays cache info and old emcc doesn't support EMCC_LOGGING=0
     s = drop_lines_containing(s, 'cache:INFO:')
 
-    # on newer versions of MacOS X, the shipped ranlib warns about object files with no symbols,
-    # however, these are completely benign stubs.
-    # See https://gitlab.haskell.org/ghc/ghc/-/issues/27116
     if opsys('darwin'):
+        # on newer versions of MacOS X, the shipped ranlib warns about object files with no symbols,
+        # however, these are completely benign stubs.
+        # See https://gitlab.haskell.org/ghc/ghc/-/issues/27116
         s = modify_lines(s, lambda l: re.sub(r'.*ranlib:.*has no symbols', '', l))
+        # we also want to remove linker warnings having to do with undefined dynamic_lookup in combination with
+        # making a single weak symbol undefined as this is dependent on other linker flags
+        # See also https://github.com/haskell/process/pull/377
+        s = drop_lines_containing(s, 'ld: warning: -U option is redundant when using -undefined dynamic_lookup')
 
     return s
 
