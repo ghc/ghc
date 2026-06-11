@@ -9,6 +9,7 @@ module GHC.Toolchain.Utils
     , oneOf'
     , isSuccess
     , lastLine
+    , findM
     ) where
 
 import Control.Exception
@@ -69,3 +70,10 @@ isSuccess = \case
 
 lastLine :: String -> String
 lastLine = maybe "" snd . unsnoc . lines
+
+findM :: Monad m => (a -> m Bool) -> [a] -> m (Maybe a)
+findM f = \case
+  [] -> return Nothing
+  a:as -> do
+    found <- f a
+    if found then return (Just a) else findM f as

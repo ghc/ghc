@@ -148,12 +148,14 @@ findProgram description userSpec candidates
                 Just prefix -> map (prefix++) candidates
                 Nothing     -> []
           candidates' = prefixedCandidates ++ candidates
-          err =
-            [ "Failed to find " ++ description ++ "."
-            , "Looked for one of " ++ show candidates' ++ " in the system search path."
-            ]
-      path <- oneOf' err (map findExecutableErr candidates')
-      return Program { prgPath = path, prgFlags = fromMaybe [] (poFlags userSpec) }
+      pathMay <- findM doesExecutableExist candidates'
+      case pathMay of
+        Nothing -> throwEs
+          [ "Failed to find " ++ description ++ "."
+          , "Looked for one of " ++ show candidates' ++ " in the system search path."
+          ]
+        Just path ->
+          return Program { prgPath = path, prgFlags = fromMaybe [] (poFlags userSpec) }
 
 -- Note that @configure.ac@ checks these llvm version constants (using @sed@) to
 -- ensure they are the same as the @$LlvmMinVersion@ and @$LlvmMaxVersion@
@@ -222,21 +224,18 @@ maybeFindProgramFromProgOpts :: String -> ProgOpt -> Maybe (M Program)
 maybeFindProgramFromProgOpts description userSpec = case poPath userSpec of
   Nothing -> Nothing
   Just path -> Just $ do
-    let err =
-          [ "Failed to find " ++ description ++ "."
-          , "Looked for user-specified program '" ++ path ++ "' in the system search path."
-          ]
-    path' <- findExecutableErr path <|> throwEs err
-    return Program { prgPath = path', prgFlags = fromMaybe [] (poFlags userSpec) }
+    exists <- doesExecutableExist path
+    unless exists $ throwEs
+      [ "Failed to find " ++ description ++ "."
+      , "Looked for user-specified program '" ++ path ++ "' in the system search path."
+      ]
+    return Program { prgPath = path, prgFlags = fromMaybe [] (poFlags userSpec) }
 
-findExecutableErr :: String -> M FilePath
-findExecutableErr name = do
-    r <- liftIO $ findExecutable name
-    case r of
-      Nothing -> throwE $ name ++ " not found in search path"
-      -- Use the given `prgPath` or candidate name rather than the
-      -- absolute path returned by `findExecutable`.
-      Just _x -> return name
+doesExecutableExist
+  :: String -- ^ executable name
+  -> M Bool
+doesExecutableExist name = isJust <$> liftIO (findExecutable name)
+
 
 -------------------- Compiling utilities --------------------
 
