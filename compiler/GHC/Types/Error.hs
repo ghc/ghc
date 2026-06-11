@@ -282,8 +282,7 @@ The rendering layer shows a diagnostic's locations in exactly the order given
 them is the message author's job:
 
   * Pick one real location as the primary span and list the rest as related
-    locations. The primary span need not be the leftmost or smallest location
-    involved; a synthetic span combining several locations is usually worse,
+    locations. A synthetic span combining several locations is usually worse,
     giving a less precise prefix and a larger caret.
 
   * Order the related spans deterministically (e.g. by sorting with
@@ -291,19 +290,14 @@ them is the message author's job:
     natural order is not stable across runs. Do not repeat the primary span
     among them.
 
-  * Convention for "duplicate" diagnostics, which report the same entity
-    occurring at several sites (e.g. 'TcRnDuplicateDecls',
-    'TcRnDuplicateExport'): the primary span is the /last/ occurrence in
-    source order; the earlier occurrences are the related locations, in
-    ascending order. The later occurrence is usually the one just added, and
-    hence the one to act on; clang, rustc and TypeScript likewise point at it
-    ("redefinition of 'x' / note: previous definition is here"). The carets
-    are then /not/ in source order, but read well without labels: first the
-    site to fix, then the prior sites. (Once per-span labels exist (#23414),
-    the renderer could instead display carets in source order, as rustc does —
-    its labels are what make that readable.) Diagnostics whose locations have
-    a different asymmetry (a definition site versus a use site, say) pick
-    their primary span on their own logic.
+Different diagnostics may want to pick and order the spans in different ways.
+For "duplicate" diagnostics, which report the same entity occurring at several
+sites (e.g. 'TcRnDuplicateDecls', 'TcRnDuplicateExport'), we currently use the
+/last/ occurrence in source order as the primary span, with the earlier
+occurrences as related locations in ascending order: the last occurrence is
+likely the one just added, and hence the most actionable; clang, rustc and
+TypeScript likewise point at it ("redefinition of 'x' / note: previous
+definition is here").
 -}
 
 -- | A class identifying a diagnostic.
