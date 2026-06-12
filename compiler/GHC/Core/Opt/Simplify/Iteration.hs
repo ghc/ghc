@@ -2482,17 +2482,18 @@ simplCast pushes `co` through the value arguments, casting each into the type
 the normalised function expects; the casts land in the sc_cast field of
 ApplyToVal, which contOutArgs must include for the match to be well typed.)
 
-The cast is built compactly as a chain of InstCos over Refl of f's type.  For
-`f :: forall as. blah`, an argument coercion `gt_i :: ti ~N ti'` (the symmetric
-of what normaliseType returns, at role Nominal) instantiates
+The cast is the lifted substitution: for `f :: forall as. blah` we build
 
-    Refl_R (forall as. blah)
+    co = liftCoSubstWith Representational as gs blah
+       :: blah[ts'/as] ~R blah[ts/as]
 
-one position at a time, ultimately giving `co :: blah[ts'/as] ~R blah[ts/as]`.
-Unreduced arguments keep the spine Refl, so when no argument reduces `co` is
-Refl and we return Nothing.  Lint's existing InstCo rule accepts this coercion: it
-permits heterogeneous instantiation as long as the argument coercion is
-Nominal, which it is.  So no new typing rule and no Lint change is required.
+where `gi :: ti' ~N ti` is the symmetric of what normaliseType returns (an
+unreduced argument is mapped to Refl).  Don't be tempted to build the cast
+more compactly as a chain of InstCos over (Refl_R (idType f)): the coercion
+optimiser mis-optimises such Refl-spined InstCo chains, producing a coercion
+whose right-hand kind is wrong (it loses a Sym on the way into the lifting
+context), and the resulting ill-typed casts surface as Core Lint
+trans-coercion mismatches (e.g. in T21689).
 
 Wrinkles:
 
@@ -2528,13 +2529,27 @@ normaliseCallTyArgs :: FamInstEnvs -> OutId -> SimplCont
 -- form of ti and  co :: blah[ts'/as] ~R blah[ts/as]  for  f :: forall as. blah.
 -- Return Nothing if no ti reduces.
 normaliseCallTyArgs fam_envs fun cont
-  = go [] (mkReflCo Representational (idType fun)) False cont
+  = go [] [] False (idType fun) cont
   where
-    -- fun_co :: (forall as. blah)[ts'/as] ~R (forall as. blah)[ts/as],
-    -- built up one type argument at a time.
-    go rev_tys fun_co changed (ApplyToTy { sc_arg_ty = ty, sc_cont = k })
+    go rev_tys prs changed fun_ty (ApplyToTy { sc_arg_ty = ty, sc_cont = k })
+      | Just (tv, body_ty) <- splitForAllTyCoVar_maybe fun_ty
+      = case norm_arg ty of
+          Nothing        -> go (ty  : rev_tys) ((tv, mkNomReflCo ty) : prs)
+                               changed body_ty k
+          Just (ty', co) -> go (ty' : rev_tys) ((tv, co) : prs)
+                               True body_ty k
+    go rev_tys prs changed body_ty k
+      | changed, let (tvs, cos) = unzip (reverse prs)
+      = Just ( Cast (mkTyApps (Var fun) (reverse rev_tys))
+                    (liftCoSubstWith Representational tvs cos body_ty)
+             , k )
+      | otherwise = Nothing
+
+    -- norm_arg ty = Just (ty', co), with co :: ty' ~N ty, if ty has a
+    -- type-family redex; Nothing if it is already in normal form
+    norm_arg ty
       | isFamFreeTy ty   -- Common case: no redex, leave the argument alone
-      = go (ty : rev_tys) (mkInstCo fun_co (mkNomReflCo ty)) changed k
+      = Nothing
       | Reduction arg_co ty' <- normaliseType fam_envs Nominal ty
       , not (eqType ty ty')   -- arg_co :: ty ~N ty'
         -- NB: test eqType, not isReflCo arg_co.  normaliseType can return a
@@ -2542,12 +2557,9 @@ normaliseCallTyArgs fam_envs fun cont
         -- coercion, as turns up around unsafeCoerce# -- relating a type to
         -- itself.  Treating that as a reduction would loop, re-wrapping a fresh
         -- cast on every re-entry until we run out of memory.
-      = go (ty' : rev_tys) (mkInstCo fun_co (mkSymCo arg_co)) True k
+      = Just (ty', mkSymCo arg_co)
       | otherwise
-      = go (ty : rev_tys) (mkInstCo fun_co (mkNomReflCo ty)) changed k
-    go rev_tys fun_co changed k
-      | changed   = Just (Cast (mkTyApps (Var fun) (reverse rev_tys)) fun_co, k)
-      | otherwise = Nothing
+      = Nothing
 
 ---------------------------------------------------------
 --      Dealing with a call site
