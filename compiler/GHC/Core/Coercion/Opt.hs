@@ -4,7 +4,7 @@
 
 module GHC.Core.Coercion.Opt
    ( optCoercion, optTransCo
-   , optCastCoercion
+   , optCastCoercion, optTransCastCo
    , OptCoercionOpts (..)
    )
 where
@@ -177,6 +177,18 @@ optTransCo opts in_scope co1 co2
   = opt_trans in_scope co1 co2
   | otherwise
   = co1 `mkTransCo` co2
+
+optTransCastCo :: HasDebugCallStack => OptCoercionOpts -> InScopeSet
+           -> TypedCastCoercion -> TypedCastCoercion -> TypedCastCoercion
+optTransCastCo opts in_scope co1 co2
+  | optCoercionEnabled opts
+  = case (co1, co2) of
+      (TCC ty (CCoercion co1'), TCC _ (CCoercion co2')) -> TCC ty (CCoercion (opt_trans in_scope co1' co2'))
+      (co1, TCC _ ReflCastCo) -> co1
+      (TCC _ ReflCastCo, co2) -> co2
+      _ -> co1 `mkTransTypedCastCo` co2
+  | otherwise
+  = co1 `mkTransTypedCastCo` co2
 
 -- AMG TODO: not clear if coercionLKind or substTy is better choice here
 optCastCoercion :: OptCoercionOpts -> Subst -> TypedCastCoercion -> TypedCastCoercion

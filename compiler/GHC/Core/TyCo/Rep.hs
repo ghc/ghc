@@ -1058,6 +1058,9 @@ instance Outputable Coercion where
 instance Outputable CastCoercion where
   ppr = pprCastCo
 
+instance Outputable TypedCastCoercion where
+  ppr (TCC ty co) = text "TCC" <> parens (ppr ty <> text "," <+> ppr co)
+
 instance Outputable CoSel where
   ppr (SelTyCon n r) = text "Tc" <> parens (int n <> comma <> pprOneCharRole r)
   ppr SelForAll      = text "All"

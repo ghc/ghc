@@ -205,11 +205,6 @@ in GHC.Tc.Solver.  Yuk.  This is not pretty.
 *                                                                      *
 ********************************************************************* -}
 
-tyCoVarsOfCastCo :: CastCoercion -> TyCoVarSet
-tyCoVarsOfCastCo (CCoercion co)     = coVarsOfCo co
-tyCoVarsOfCastCo (ZCoercion ty cos) = tyCoVarsOfType ty `unionVarSet` dVarSetToVarSet cos
-tyCoVarsOfCastCo ReflCastCo         = emptyVarSet
-
 tyCoVarsOfType :: Type -> TyCoVarSet
 -- The "deep" TyCoVars of the the type
 tyCoVarsOfType ty = runTyCoVars (deepTypeFV ty)
@@ -226,6 +221,9 @@ tyCoVarsOfCo :: Coercion -> TyCoVarSet
 -- The "deep" TyCoVars of the the coercion
 -- See Note [Computing deep free variables]
 tyCoVarsOfCo co = runTyCoVars (deepCoFV co)
+
+tyCoVarsOfCastCo :: CastCoercion -> TyCoVarSet
+tyCoVarsOfCastCo co = runTyCoVars (deepCastCoFV co)
 
 tyCoVarsOfMCo :: MCoercion -> TyCoVarSet
 tyCoVarsOfMCo MRefl    = emptyVarSet
@@ -264,7 +262,8 @@ deepTypeFV  :: Type       -> TyCoFV
 deepTypesFV :: [Type]     -> TyCoFV
 deepCoFV    :: Coercion   -> TyCoFV
 deepCosFV   :: [Coercion] -> TyCoFV
-(deepTypeFV, deepTypesFV, deepCoFV, deepCosFV, _) = foldTyCo deepTcvFolder
+deepCastCoFV :: CastCoercion -> TyCoFV
+(deepTypeFV, deepTypesFV, deepCoFV, deepCosFV, deepCastCoFV) = foldTyCo deepTcvFolder
 
 deepTcvFolder :: TyCoFolder TyCoFV
 -- It's important that we use a one-shot EndoOS, to ensure that all
@@ -908,10 +907,8 @@ anyFreeVarsOfCo check_fv co = DM.getAny (runFVTop (f co))
   where (_, _, f, _, _) = foldTyCo (afvFolder check_fv)
 
 anyFreeVarsOfCastCo :: (TyCoVar -> Bool) -> CastCoercion -> Bool
-anyFreeVarsOfCastCo check_fv (CCoercion co) = anyFreeVarsOfCo check_fv co
-anyFreeVarsOfCastCo check_fv (ZCoercion ty cvs) =
-    anyFreeVarsOfType check_fv ty || anyDVarSet check_fv cvs
-anyFreeVarsOfCastCo _ ReflCastCo = False
+anyFreeVarsOfCastCo check_fv co = DM.getAny (runFVTop (f co))
+  where (_, _, _, _, f) = foldTyCo (afvFolder check_fv)
 
 noFreeVarsOfType :: Type -> Bool
 noFreeVarsOfType ty = not $ DM.getAny (runFVTop (f ty))

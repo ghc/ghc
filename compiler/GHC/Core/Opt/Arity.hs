@@ -2702,7 +2702,6 @@ tryEtaReduce rec_ids bndrs body eval_sd
   where
     incoming_arity = count isId bndrs -- See Note [Eta reduction makes sense], point (2)
 
-    -- AMG TOOD: make this pass TypedCastCoercion so we can call ok_arg more easily?
     go :: [Var]            -- Binders, innermost first, types [a3,a2,a1]
        -> CoreExpr         -- Of type tr
        -> CastCoercion     -- Of type tr ~ ts
@@ -2723,7 +2722,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
       -- Float app ticks: \x -> Tick t (e x) ==> Tick t e
 
     go (b : bs) (App fun arg) co
-      | Just (co', ticks) <- ok_arg b arg co (exprType fun) (exprType (App fun arg))
+      | Just (co', ticks) <- ok_arg b arg (TCC (exprType (App fun arg)) co) (exprType fun)
       = fmap (flip (foldr mkTick) ticks) $ go bs fun co'
             -- Float arg ticks: \x -> e (Tick t x) ==> Tick t e
 
@@ -2795,19 +2794,18 @@ tryEtaReduce rec_ids bndrs body eval_sd
     ---------------
     ok_arg :: Var              -- Of type bndr_t
            -> CoreExpr         -- Of type arg_t
-           -> CastCoercion     -- Of kind (t1~t2)
+           -> TypedCastCoercion-- Of kind (t1~t2)
            -> Type             -- Type (arg_t -> t1) of the function
                                --      to which the argument is supplied
-           -> Type             -- Type t1 of the result (AMG TODO: use TypedCastCoercion or avoid needing to pass this?)
            -> Maybe (CastCoercion  -- Of type (arg_t -> t1 ~  bndr_t -> t2)
                                --   (and similarly for tyvars, coercion args)
                     , [CoreTickish])
     -- See Note [Eta reduction with casted arguments]
-    ok_arg bndr (Type arg_ty) co fun_ty res_ty
+    ok_arg bndr (Type arg_ty) co fun_ty
        | Just tv <- getTyVar_maybe arg_ty
        , bndr == tv  = case splitForAllForAllTyBinder_maybe fun_ty of
            Just (Bndr _ vis, _) -> Just (fco, [])
-             where !fco = mkForAllCastCo Representational tv vis coreTyLamForAllTyFlag res_ty co
+             where !fco = mkForAllCastCo Representational tv vis coreTyLamForAllTyFlag co
                    -- The lambda we are eta-reducing always has visibility
                    -- 'coreTyLamForAllTyFlag' which may or may not match
                    -- the visibility on the inner function (#24014)
@@ -2815,24 +2813,25 @@ tryEtaReduce rec_ids bndrs body eval_sd
                                (text "fun:" <+> ppr bndr
                                 $$ text "arg:" <+> ppr arg_ty
                                 $$ text "fun_ty:" <+> ppr fun_ty)
-    ok_arg bndr (Var v) co fun_ty _
+    ok_arg bndr (Var v) (TCC _ co) fun_ty
        | bndr == v
        , let mult = idMult bndr
        , Just (_af, fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , mult `eqType` fun_mult -- There is no change in multiplicity, otherwise we must abort
        = Just (mkFunResCastCo Representational bndr co, [])
-    ok_arg bndr (Cast e co_arg) co fun_ty _
+    ok_arg bndr (Cast e co_arg) co fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
-       , Just (_, fun_mult, _, res_ty) <- splitFunTy_maybe fun_ty
+       , Just (_, fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , bndr == v
        , fun_mult `eqType` idMult bndr
-       = Just (mkFunCastCoNoFTF Representational fun_mult (castCoercionRKind (exprType e) co_arg) (mkSymCastCo (exprType e) co_arg) res_ty co, ticks)
+       , let co_arg' = TCC (exprType e) co_arg
+       = Just (mkFunCastCoNoFTF Representational fun_mult (mkSymTypedCastCo co_arg') co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here
-    ok_arg bndr (Tick t arg) co fun_ty res_ty
-       | tickishFloatable t, Just (co', ticks) <- ok_arg bndr arg co fun_ty res_ty
+    ok_arg bndr (Tick t arg) co fun_ty
+       | tickishFloatable t, Just (co', ticks) <- ok_arg bndr arg co fun_ty
        = Just (co', t:ticks)
-    ok_arg _ _ _ _ _ = Nothing
+    ok_arg _ _ _ _ = Nothing
 
 
 {- *********************************************************************
@@ -3003,18 +3002,17 @@ pushCoValArg co
     old_arg_ty = funArgTy tyR
 
 pushCoercionIntoLambda
-    :: HasDebugCallStack => InScopeSet -> Var -> CoreExpr -> Type -> CastCoercion -> Maybe (Var, CoreExpr)
+    :: HasDebugCallStack => InScopeSet -> Var -> CoreExpr -> TypedCastCoercion -> Maybe (Var, CoreExpr)
 -- This implements the Push rule from the paper on coercions
 --    (\x. e) |> co
 -- ===>
 --    (\x'. e |> co')
-pushCoercionIntoLambda in_scope x e ty co
+pushCoercionIntoLambda in_scope x e co
     | assert (not (isTyVar x) && not (isCoVar x)) True
-    , let s1s2 = castCoercionLKind ty co
-    , let t1t2 = castCoercionRKind ty co
+    , Pair s1s2 t1t2 <- typedCastCoercionKind co
     , Just (_, _, s1, _)   <- splitFunTy_maybe s1s2
     , Just (_, w1, t1,_t2) <- splitFunTy_maybe t1t2
-    , (co1, co2)  <- decomposeFunCastCo co
+    , (co1, co2)  <- decomposeFunCastCo (tccCastCoercion co)
     , typeHasFixedRuntimeRep t1
       -- We can't push the coercion into the lambda if it would create
       -- a representation-polymorphic binder.

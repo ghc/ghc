@@ -1412,6 +1412,19 @@ simplCoercion env co
     opts  = seOptCoercionOpts env
     subst_only = isEmptyTvSubst subst || reSimplifying env
 
+simplCastCoercion :: SimplEnv -> InTypedCastCoercion -> SimplM OutTypedCastCoercion
+simplCastCoercion env co
+  = seqTypedCastCoercion opt_co `seq` return opt_co
+  where
+    -- See Note [Optimising coercions]
+    -- NB: substCo has a short-cut when both type and coercion substs are empty
+    opt_co | subst_only = substTypedCastCo subst co
+           | otherwise  = optCastCoercion opts subst co
+
+    subst = getTCvSubst env
+    opts  = seOptCoercionOpts env
+    subst_only = isEmptyTvSubst subst || reSimplifying env
+
 {- Note [Optimising coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Some programs have very big coercions and we'd like to avoid repeatedly
@@ -1439,19 +1452,6 @@ re-optimising them:
 
 
 -}
-
-simplCastCoercion :: SimplEnv -> InTypedCastCoercion -> SimplM OutTypedCastCoercion
-simplCastCoercion env co
-  = do { let opt_co | reSimplifying env = substTypedCastCo subst co
-                    | otherwise         = optCastCoercion opts subst co
-             -- If (reSimplifying env) is True we have already simplified
-             -- this coercion once, and we don't want do so again; doing
-             -- so repeatedly risks non-linear behaviour
-             -- See Note [Inline depth] in GHC.Core.Opt.Simplify.Env
-       ; seqCastCoercion (tccCastCoercion opt_co) `seq` return opt_co }
-  where
-    subst = getTCvSubst env
-    opts  = seOptCoercionOpts env
 
 
 -----------------------------------
@@ -1861,7 +1861,7 @@ simplArg :: SimplEnvIS              -- ^ Used only for its InScopeSet
                                     --   continuation passed to 'simplExprC'
          -> OutType                 -- ^ Type of the function applied to this arg
          -> StaticEnv -> CoreExpr   -- ^ Expression with its static envt
-         -> OutCastCoercion         -- Wrap this around the result
+         -> OutCastCoercion         -- ^ Wrap this around the result
          -> SimplM OutExpr
 simplArg _ _ _ (Simplified {}) arg co
   = return $ mkCastCo arg co -- See Note [Avoid repeated simplification]

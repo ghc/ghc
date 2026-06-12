@@ -57,7 +57,6 @@ import GHC.Core.Unify as Unify ( ruleMatchTyKiX )
 import GHC.Core.Type as Type
    ( Type, extendTvSubst, extendCvSubst
    , substTy, getTyVar_maybe )
-import GHC.Core.TyCo.FVs ( anyFreeVarsOfCastCo )
 import GHC.Core.TyCo.Ppr( pprParendType )
 import GHC.Core.Coercion as Coercion
 import GHC.Core.Tidy     ( tidyRules )

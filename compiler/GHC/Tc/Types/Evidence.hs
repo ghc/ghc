@@ -636,20 +636,13 @@ optSubTypeHsWrapper wrap
     not_in v (WpCompose w1 w2)         = not_in v w1 && not_in v w2
     not_in v (WpEvApp (EvExpr e))      = not (v `elemVarSet` exprFreeVars e)
     not_in v (WpEvApp (EvCastExpr e co ty)) = not (v `elemVarSet` exprFreeVars e)
-                                           && not_in_cast_co v co
+                                           && not (anyFreeVarsOfCastCo (== v) co)
                                            && not (anyFreeVarsOfType (== v) ty)
     not_in _ (WpEvApp (EvTypeable {})) = False  -- Giving up; conservative
     not_in _ (WpEvApp (EvFun {}))      = False  -- Giving up; conservative
     not_in _ (WpTyLam {}) = False    -- Give  up; conservative
     not_in _ (WpEvLam {}) = False    -- Ditto
     not_in _ (WpLet {})   = False    -- Ditto
-
-    not_in_cast_co :: TyVar -> CastCoercion -> Bool
-    not_in_cast_co v = \case
-      CCoercion co     -> not (anyFreeVarsOfCo (== v) co)
-      ZCoercion ty cvs -> not (anyFreeVarsOfType (== v) ty)
-                       && not (v `elemDVarSet` cvs)
-      ReflCastCo       -> True
 
     not_in_submult :: TyVar -> SubMultCo -> Bool
     not_in_submult v = \case
