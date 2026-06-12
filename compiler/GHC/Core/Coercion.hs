@@ -2912,7 +2912,7 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
 -}
 
 has_co_hole_ty :: Type -> Monoid.Any
-(has_co_hole_ty, _, _, _)
+(has_co_hole_ty, _, _, _, _)
   = foldTyCo folder
   where
     folder :: TyCoFolder Monoid.Any

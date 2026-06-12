@@ -2124,7 +2124,7 @@ foldQLInstVars :: forall a. Monoid a => (TcTyVar -> a) -> TcType -> a
 foldQLInstVars check_tv ty
   = runFV (do_ty ty) ()
   where
-    (do_ty, _, _, _) = foldTyCo folder
+    (do_ty, _, _, _, _) = foldTyCo folder
 
     folder :: TyCoFolder (FV () a)
     folder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]

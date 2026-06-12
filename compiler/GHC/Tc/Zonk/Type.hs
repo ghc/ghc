@@ -1842,7 +1842,7 @@ zonkShallowCoVarsOfCo co
                Just co -> unZCVSM (go_co (cph_co co)) }         -- Filled: look inside
 
     go_co :: Coercion -> ZonkCoVarSetMonoid
-    (_, _, go_co, _) = foldTyCo folder
+    (_, _, go_co, _, _) = foldTyCo folder
 
     folder :: TyCoFolder ZonkCoVarSetMonoid
     folder = TyCoFolder { tcf_view  = noView

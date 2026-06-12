@@ -2051,13 +2051,13 @@ data TyCoFolder a
 
 {-# INLINE foldTyCo  #-}  -- See Note [Specialising foldType]
 foldTyCo :: Monoid a => TyCoFolder a
-         -> (Type -> a, [Type] -> a, Coercion -> a, [Coercion] -> a)
+         -> (Type -> a, [Type] -> a, Coercion -> a, [Coercion] -> a, CastCoercion -> a)
 foldTyCo (TyCoFolder { tcf_view       = view
                      , tcf_tyvar      = tyvar
                      , tcf_tycobinder = tycobinder
                      , tcf_covar      = covar
                      , tcf_hole       = cohole })
-  = (go_ty, go_tys, go_co, go_cos)
+  = (go_ty, go_tys, go_co, go_cos, go_cast_co)
   where
     go_ty ty | Just ty' <- view ty = go_ty ty'
     go_ty (TyVarTy tv)        = tyvar tv
@@ -2109,6 +2109,17 @@ foldTyCo (TyCoFolder { tcf_view       = view
 
     go_mco MRefl    = mempty
     go_mco (MCo co) = go_co co
+
+    go_cast_co ReflCastCo = mempty
+    go_cast_co (CCoercion co) = go_co co
+    go_cast_co (ZCoercion ty cos) = go_ty ty `mappend` go_covars (dVarSetElems cos)
+
+    -- See Note [Use explicit recursion in foldTyCo]
+    -- AMG TODO: is this still a good plan? The Note talks about go_cvs using
+    -- foldr, but seems to be out of date with the code...
+    go_covars [] = mempty
+    go_covars (cv:cvs) = covar cv `mappend` go_covars cvs
+
 
 -- | A view function that looks through nothing.
 noView :: Type -> Maybe Type

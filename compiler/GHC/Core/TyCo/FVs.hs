@@ -264,7 +264,7 @@ deepTypeFV  :: Type       -> TyCoFV
 deepTypesFV :: [Type]     -> TyCoFV
 deepCoFV    :: Coercion   -> TyCoFV
 deepCosFV   :: [Coercion] -> TyCoFV
-(deepTypeFV, deepTypesFV, deepCoFV, deepCosFV) = foldTyCo deepTcvFolder
+(deepTypeFV, deepTypesFV, deepCoFV, deepCosFV, _) = foldTyCo deepTcvFolder
 
 deepTcvFolder :: TyCoFolder TyCoFV
 -- It's important that we use a one-shot EndoOS, to ensure that all
@@ -324,7 +324,7 @@ shallowTypeFV  :: Type       -> TyCoFV
 shallowTypesFV :: [Type]     -> TyCoFV
 shallowCoFV    :: Coercion   -> TyCoFV
 shallowCosFV   :: [Coercion] -> TyCoFV
-(shallowTypeFV, shallowTypesFV, shallowCoFV, shallowCosFV)
+(shallowTypeFV, shallowTypesFV, shallowCoFV, shallowCosFV, _)
    = foldTyCo shallowTcvFolder
 
 shallowTcvFolder :: TyCoFolder TyCoFV
@@ -387,9 +387,7 @@ tyCoVarsOfCoList :: Coercion -> [TyCoVar]
 tyCoVarsOfCoList ty = dVarSetElems $ tyCoVarsOfCoDSet ty
 
 tyCoVarsOfCastCoercionDSet :: CastCoercion -> DTyCoVarSet
-tyCoVarsOfCastCoercionDSet (CCoercion co) = tyCoVarsOfCoDSet co
-tyCoVarsOfCastCoercionDSet (ZCoercion ty cvs) = tyCoVarsOfTypeDSet ty `unionDVarSet` cvs
-tyCoVarsOfCastCoercionDSet ReflCastCo = emptyDVarSet
+tyCoVarsOfCastCoercionDSet co = runTyCoVarsDSet (deepDetCastCoFV co)
 
 -- | Returns free variables of types, including kind variables as
 -- a deterministically ordered list. For type synonyms it does /not/ expand the
@@ -401,7 +399,8 @@ tyCoVarsOfTypesList tys = dVarSetElems $ tyCoVarsOfTypesDSet tys
 deepDetTypeFV  :: Type   -> DTyCoFV
 deepDetTypesFV :: [Type] -> DTyCoFV
 deepDetCoFV    :: Coercion -> DTyCoFV
-(deepDetTypeFV, deepDetTypesFV, deepDetCoFV, _) = foldTyCo deepDetTcvFolder
+deepDetCastCoFV :: CastCoercion -> DTyCoFV
+(deepDetTypeFV, deepDetTypesFV, deepDetCoFV, _, deepDetCastCoFV) = foldTyCo deepDetTcvFolder
 
 deepDetTcvFolder :: TyCoFolder DTyCoFV
 -- This one returns a /deterministic/ list
@@ -446,15 +445,10 @@ someTyCoVarsOfTypes interesting
 
 shallowSelTypeFV :: Type -> SelectiveDFV
 shallowSelCoFV   :: Coercion -> SelectiveDFV
+shallowSelCastCoFV :: CastCoercion -> SelectiveDFV
 -- Returns shallow free vars
 -- See Note [Shallow and deep free variables]
-(shallowSelTypeFV, _, shallowSelCoFV, _) = foldTyCo selectiveTcvFolder
-
-shallowSelCastCoFV :: CastCoercion -> SelectiveDFV
-shallowSelCastCoFV (CCoercion co)     = shallowSelCoFV co
-shallowSelCastCoFV (ZCoercion ty cos) = shallowSelTypeFV ty <>
-                                          mapUnionFV (shallowSelCoFV . CoVarCo) (dVarSetElems cos) -- AMG TODO better way?
-shallowSelCastCoFV ReflCastCo         = mempty
+(shallowSelTypeFV, _, shallowSelCoFV, _, shallowSelCastCoFV) = foldTyCo selectiveTcvFolder
 
 selectiveTcvFolder :: TyCoFolder SelectiveDFV
 -- This one takes an `InterestingVarFun`, and returns shallow free vars
@@ -529,12 +523,7 @@ deepCoVarTypesFV :: [Type]     -> CoVarFV
 deepCoVarCoFV  :: Coercion   -> CoVarFV
 deepCoVarCosFV :: [Coercion] -> CoVarFV
 deepCoVarCastCoFV :: CastCoercion -> CoVarFV
-(deepCoVarTypeFV, deepCoVarTypesFV, deepCoVarCoFV, deepCoVarCosFV) = foldTyCo deepCoVarFolder
-
-deepCoVarCastCoFV ReflCastCo = mempty
-deepCoVarCastCoFV (CCoercion co) = deepCoVarCoFV co
-deepCoVarCastCoFV (ZCoercion ty cos) = deepCoVarTypeFV ty <>
-                                         mapUnionFV (deepCoVarCoFV . CoVarCo) (dVarSetElems cos) -- AMG TODO better way?
+(deepCoVarTypeFV, deepCoVarTypesFV, deepCoVarCoFV, deepCoVarCosFV, deepCoVarCastCoFV) = foldTyCo deepCoVarFolder
 
 deepCoVarFolder :: TyCoFolder CoVarFV
 deepCoVarFolder = TyCoFolder { tcf_view = noView
@@ -567,16 +556,11 @@ coVarsOfCosDSet cos = runTyCoVarsDSet (det_cos cos)
 coVarsOfCastCoDSet :: CastCoercion -> DCoVarSet
 coVarsOfCastCoDSet co = runTyCoVarsDSet (det_cast_co co)
 
-det_cast_co :: CastCoercion -> DCoVarFV
-det_cast_co ReflCastCo         = mempty
-det_cast_co (CCoercion co)     = det_co co
-det_cast_co (ZCoercion ty cos) = det_ty ty <>
-                                   mapUnionFV (det_co . CoVarCo) (dVarSetElems cos) -- AMG TODO better way?
-
 det_ty  :: Type       -> DCoVarFV
 det_co  :: Coercion   -> DCoVarFV
 det_cos :: [Coercion] -> DCoVarFV
-(det_ty, _, det_co, det_cos) = foldTyCo deepDetCoVarFolder
+det_cast_co :: CastCoercion -> DCoVarFV
+(det_ty, _, det_co, det_cos, det_cast_co) = foldTyCo deepDetCoVarFolder
 
 deepDetCoVarFolder :: TyCoFolder DCoVarFV
 -- Follows deepCoVarFolders, but returns a /deterministic/ set
@@ -913,15 +897,15 @@ afvFolder check_fv = TyCoFolder { tcf_view = noView  -- See Note [Free vars and 
 
 anyFreeVarsOfType :: (TyCoVar -> Bool) -> Type -> Bool
 anyFreeVarsOfType check_fv ty = DM.getAny (runFVTop (f ty))
-  where (f, _, _, _) = foldTyCo (afvFolder check_fv)
+  where (f, _, _, _, _) = foldTyCo (afvFolder check_fv)
 
 anyFreeVarsOfTypes :: (TyCoVar -> Bool) -> [Type] -> Bool
 anyFreeVarsOfTypes check_fv tys = DM.getAny (runFVTop (f tys))
-  where (_, f, _, _) = foldTyCo (afvFolder check_fv)
+  where (_, f, _, _, _) = foldTyCo (afvFolder check_fv)
 
 anyFreeVarsOfCo :: (TyCoVar -> Bool) -> Coercion -> Bool
 anyFreeVarsOfCo check_fv co = DM.getAny (runFVTop (f co))
-  where (_, _, f, _) = foldTyCo (afvFolder check_fv)
+  where (_, _, f, _, _) = foldTyCo (afvFolder check_fv)
 
 anyFreeVarsOfCastCo :: (TyCoVar -> Bool) -> CastCoercion -> Bool
 anyFreeVarsOfCastCo check_fv (CCoercion co) = anyFreeVarsOfCo check_fv co
@@ -931,15 +915,15 @@ anyFreeVarsOfCastCo _ ReflCastCo = False
 
 noFreeVarsOfType :: Type -> Bool
 noFreeVarsOfType ty = not $ DM.getAny (runFVTop (f ty))
-  where (f, _, _, _) = foldTyCo (afvFolder (const True))
+  where (f, _, _, _, _) = foldTyCo (afvFolder (const True))
 
 noFreeVarsOfTypes :: [Type] -> Bool
 noFreeVarsOfTypes tys = not $ DM.getAny (runFVTop (f tys))
-  where (_, f, _, _) = foldTyCo (afvFolder (const True))
+  where (_, f, _, _, _) = foldTyCo (afvFolder (const True))
 
 noFreeVarsOfCo :: Coercion -> Bool
 noFreeVarsOfCo co = not $ DM.getAny (runFVTop (f co))
-  where (_, _, f, _) = foldTyCo (afvFolder (const True))
+  where (_, _, f, _, _) = foldTyCo (afvFolder (const True))
 
 
 {-

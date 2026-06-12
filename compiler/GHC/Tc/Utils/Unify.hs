@@ -3686,7 +3686,7 @@ mkOccFolders lhs_tv = ( getAny . runFVTop . check_ty
                       , getAny . runFVTop . check_co)
   where
     check_ty :: Type -> FV BoundVars Any
-    !(check_ty, _, check_co, _) = foldTyCo occ_folder
+    !(check_ty, _, check_co, _, _) = foldTyCo occ_folder
 
     occ_folder :: TyCoFolder (FV BoundVars Any)
     occ_folder = TyCoFolder { tcf_view  = noView  -- Don't expand synonyms

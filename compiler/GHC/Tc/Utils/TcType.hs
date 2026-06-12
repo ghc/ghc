@@ -1188,7 +1188,7 @@ exactTyCoVarsOfTypes tys = runTyCoVars (exact_tys tys)
 
 exact_ty  :: Type       -> TyCoFV
 exact_tys :: [Type]     -> TyCoFV
-(exact_ty, exact_tys, _, _) = foldTyCo exactTcvFolder
+(exact_ty, exact_tys, _, _, _) = foldTyCo exactTcvFolder
 
 exactTcvFolder :: TyCoFolder TyCoFV
 exactTcvFolder = deepTcvFolder { tcf_view = coreView }
