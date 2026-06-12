@@ -53,8 +53,8 @@ import GHC.Types.Unique
 import GHC.Types.Name     ( Name )
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
-import GHC.Types.Unique.FM( disjointUFM, pluralUFM, pprUFM )
-import GHC.Types.Unique.DFM( disjointUDFM, udfmToUfm, anyUDFM, allUDFM )
+import GHC.Types.Unique.FM( disjointUFM, subUFM, pluralUFM, pprUFM )
+import GHC.Types.Unique.DFM( disjointUDFM, subUDFM, udfmToUfm, anyUDFM, allUDFM )
 import GHC.Utils.Outputable (SDoc)
 
 -- | A non-deterministic Variable Set
@@ -141,7 +141,7 @@ mapUnionVarSet get_set xs = foldr (unionVarSet . get_set) emptyVarSet xs
 -- See comments with type signatures
 intersectsVarSet s1 s2 = not (s1 `disjointVarSet` s2)
 disjointVarSet   s1 s2 = disjointUFM (getUniqSet s1) (getUniqSet s2)
-subVarSet        s1 s2 = isEmptyVarSet (s1 `minusVarSet` s2)
+subVarSet        s1 s2 = subUFM (getUniqSet s1) (getUniqSet s2)
 
 anyVarSet :: (Var -> Bool) -> VarSet -> Bool
 anyVarSet = uniqSetAny
@@ -261,7 +261,7 @@ dVarSetElems :: DVarSet -> [Var]
 dVarSetElems = uniqDSetToList
 
 subDVarSet :: DVarSet -> DVarSet -> Bool
-subDVarSet s1 s2 = isEmptyDVarSet (s1 `minusDVarSet` s2)
+subDVarSet s1 s2 = subUDFM (getUniqDSet s1) (getUniqDSet s2)
 
 unionDVarSet :: DVarSet -> DVarSet -> DVarSet
 unionDVarSet = unionUniqDSets

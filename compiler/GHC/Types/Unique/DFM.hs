@@ -48,7 +48,7 @@ module GHC.Types.Unique.DFM (
         isNullUDFM,
         sizeUDFM,
         intersectUDFM, udfmIntersectUFM,
-        disjointUDFM, disjointUdfmUfm,
+        disjointUDFM, disjointUdfmUfm, subUDFM,
         equalKeysUDFM,
         minusUDFM,
         listToUDFM, listToUDFM_Directly,
@@ -387,6 +387,10 @@ disjointUDFM (UDFM x _i) (UDFM y _j) = M.disjoint x y
 
 disjointUdfmUfm :: UniqDFM key elt -> UniqFM key elt2 -> Bool
 disjointUdfmUfm (UDFM x _i) y = M.disjoint x (ufmToIntMap y)
+
+-- | True if the first map's keys are a subset of the second's.
+subUDFM :: UniqDFM key elt1 -> UniqDFM key elt2 -> Bool
+subUDFM (UDFM x _i) (UDFM y _j) = M.keysAreSubsetOf x y
 
 minusUDFM :: UniqDFM key elt1 -> UniqDFM key elt2 -> UniqDFM key elt1
 minusUDFM (UDFM x i) (UDFM y _j) = UDFM (M.difference x y) i

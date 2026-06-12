@@ -206,6 +206,7 @@ module GHC.Data.Word64Map.Lazy (
     -- * Submap
     , isSubmapOf, isSubmapOfBy
     , isProperSubmapOf, isProperSubmapOfBy
+    , keysAreSubsetOf
 
     -- * Min\/Max
     , lookupMin

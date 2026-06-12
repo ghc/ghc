@@ -235,6 +235,7 @@ module GHC.Data.Word64Map.Internal (
     -- * Submap
     , isSubmapOf, isSubmapOfBy
     , isProperSubmapOf, isProperSubmapOfBy
+    , keysAreSubsetOf
 
     -- * Min\/Max
     , lookupMin
@@ -2440,6 +2441,21 @@ isSubmapOfBy predicate (Tip k x) t     = case lookup k t of
                                          Just y  -> predicate x y
                                          Nothing -> False
 isSubmapOfBy _         Nil _           = True
+
+-- | \(O(n \cdot W)\). Are all of the first map's keys present in the second?
+--
+-- Like @'isSubmapOfBy' (\\_ _ -> True)@ but fully value-agnostic.
+keysAreSubsetOf :: Word64Map a -> Word64Map b -> Bool
+keysAreSubsetOf t1@(Bin p1 m1 l1 r1) (Bin p2 m2 l2 r2)
+  | shorter m1 m2  = False
+  | shorter m2 m1  = match p1 p2 m2 &&
+                       if zero p1 m2
+                       then keysAreSubsetOf t1 l2
+                       else keysAreSubsetOf t1 r2
+  | otherwise      = p1 == p2 && keysAreSubsetOf l1 l2 && keysAreSubsetOf r1 r2
+keysAreSubsetOf (Bin _ _ _ _) _ = False
+keysAreSubsetOf (Tip k _) t     = member k t
+keysAreSubsetOf Nil _           = True
 
 {--------------------------------------------------------------------
   Mapping

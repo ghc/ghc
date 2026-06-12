@@ -66,6 +66,7 @@ module GHC.Types.Unique.FM (
         intersectUFM_C,
         strictIntersectUFM_C,
         disjointUFM,
+        subUFM,
         equalKeysUFM,
         diffUFM,
         nonDetStrictFoldUFM, nonDetFoldUFM, nonDetStrictFoldUFM_DirectlyM,
@@ -429,6 +430,10 @@ strictIntersectUFM_C f (UFM x) (UFM y) = UFM (MS.intersectionWith f x y)
 
 disjointUFM :: UniqFM key elt1 -> UniqFM key elt2 -> Bool
 disjointUFM (UFM x) (UFM y) = M.disjoint x y
+
+-- | True if the first map's keys are a subset of the second's.
+subUFM :: UniqFM key elt1 -> UniqFM key elt2 -> Bool
+subUFM (UFM x) (UFM y) = M.keysAreSubsetOf x y
 
 -- | Fold over a 'UniqFM'.
 --
