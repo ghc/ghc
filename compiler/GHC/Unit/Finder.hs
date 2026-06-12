@@ -231,36 +231,14 @@ findImportedModuleNoHsc fc fopts ue home_module_name_providers_map mb_home_unit 
                           NoPackage (panic "findImportedModule: no home-unit")
 
     home_pkg_import :: (UnitId, FinderOpts) -> IO FindResult
-    home_pkg_import (uid, opts)
-        -- If the module is reexported, then look for it as if it was from the
-        -- perspective of that package which reexports it.
-        | Just real_mod_name
-              <- lookupUniqMap (finder_reexportedModules opts) mod_name
-            = findImportedModuleNoHsc fc opts ue home_module_name_providers_map
-                  (Just $ DefiniteHomeUnit uid Nothing)
-                  real_mod_name
-                  NoPkgQual
-        | elementOfUniqSet mod_name (finder_hiddenModules opts)
-            = return (mkHomeHidden uid)
-        | otherwise
-            = findHomePackageModule fc opts uid mod_name
-
-    any_home_import :: IO FindResult
-    any_home_import = foldr1 orIfNotFound $
-                      home_import :| map home_pkg_import other_fopts
-    -- Do not try to be smart and change this to `foldr orIfNotFound home_import
-    -- (map home_pkg_import other_fopts)`, as that would not be the same.
-    -- `home_import` is first because we need to first look within the current
-    -- unit before looking at the other units in order.
+    home_pkg_import = findHomeUnitDepModule fc ue home_module_name_providers_map mod_name
 
     pkg_import :: IO FindResult
     pkg_import = findExposedPackageModule fc fopts unit_state mod_name mb_pkg
 
     unqual_import :: IO FindResult
-    unqual_import
-        = any_home_import
-          `orIfNotFound`
-          findExposedPackageModule fc fopts unit_state mod_name NoPkgQual
+    unqual_import = findHomeOrRegularPackageModule fc fopts ue
+                        home_module_name_providers_map mb_home_unit mod_name
 
     unit_state :: UnitState
     unit_state = case mb_home_unit_id of
@@ -268,22 +246,44 @@ findImportedModuleNoHsc fc fopts ue home_module_name_providers_map mb_home_unit 
         Just home_unit_id -> HUG.homeUnitEnv_units $
                              ue_findHomeUnitEnv home_unit_id ue
 
-    home_unit_deps :: Set UnitId
-    home_unit_deps = homeUnitDepends unit_state
-
-    ranked_home_unit_deps :: [UnitId]
-    ranked_home_unit_deps = rankedHomeUnitDeps home_module_name_providers_map
-                                               mod_name
-                                               home_unit_deps
-
     other_fopts :: [(UnitId, FinderOpts)]
-    other_fopts
-        = [
-              (uid, opts) |
-                  uid <- ranked_home_unit_deps,
-                  let opts = initFinderOpts $
-                             homeUnitEnv_dflags (ue_findHomeUnitEnv uid ue)
-          ]
+    other_fopts = homeUnitDepsFinderOpts ue home_module_name_providers_map
+                                         unit_state mod_name
+
+-- | Locate a plugin module requested by the user, for a compiler
+-- plugin.  This consults the same set of exposed packages as
+-- 'findImportedModule', unless @-hide-all-plugin-packages@ or
+-- @-plugin-package@ are specified.
+findPluginModuleNoHsc
+  :: FinderCache
+  -> FinderOpts
+  -> UnitEnv
+  -> HomeModuleNameProvidersMap
+  -> Maybe HomeUnit
+  -> ModuleName
+  -> IO FindResult
+findPluginModuleNoHsc fc fopts ue home_module_name_providers_map mb_home_unit@(Just home_unit) mod_name =
+    findHomeModuleAmongDeps fc fopts ue home_module_name_providers_map
+                            mb_home_unit mod_name
+    `orIfNotFound`
+    findExposedPluginPackageModule fc fopts unit_state mod_name
+  where
+    unit_state = HUG.homeUnitEnv_units $
+                 ue_findHomeUnitEnv (homeUnitId home_unit) ue
+findPluginModuleNoHsc fc fopts ue _ Nothing mod_name =
+  findExposedPluginPackageModule fc fopts (ue_homeUnitState ue) mod_name
+
+findPluginModule :: HscEnv -> ModuleName -> IO FindResult
+findPluginModule hsc_env mod_name = do
+  let fc           = hsc_FC hsc_env
+      mb_home_unit = hsc_home_unit_maybe hsc_env
+      home_module_name_providers_map =
+        mgHomeModuleNameProvidersMap (hsc_mod_graph hsc_env)
+  findPluginModuleNoHsc fc (initFinderOpts (hsc_dflags hsc_env))
+    (hsc_unit_env hsc_env) home_module_name_providers_map mb_home_unit mod_name
+
+-- -----------------------------------------------------------------------------
+-- Home Module Finder Helpers
 
 -- | Yields the unit IDs from the given set as a list with those that refer to
 -- providers of the given home module name coming first. This is to prioritize
@@ -323,24 +323,93 @@ rankedHomeUnitDeps home_module_name_providers_map mod_name home_unit_deps
     uncached_deps :: Set UnitId
     uncached_deps = Set.difference home_unit_deps cached_providers
 
--- | Locate a plugin module requested by the user, for a compiler
--- plugin.  This consults the same set of exposed packages as
--- 'findImportedModule', unless @-hide-all-plugin-packages@ or
--- @-plugin-package@ are specified.
-findPluginModuleNoHsc :: FinderCache -> FinderOpts -> UnitState -> Maybe HomeUnit -> ModuleName -> IO FindResult
-findPluginModuleNoHsc fc fopts units (Just home_unit) mod_name =
-  findHomeModule fc fopts home_unit mod_name
-  `orIfNotFound`
-  findExposedPluginPackageModule fc fopts units mod_name
-findPluginModuleNoHsc fc fopts units Nothing mod_name =
-  findExposedPluginPackageModule fc fopts units mod_name
+-- | The 'FinderOpts' of the home units that should be searched, sorted by
+-- priority order specified by 'rankedHomeUnitDeps'.
+homeUnitDepsFinderOpts
+  :: UnitEnv
+  -> HomeModuleNameProvidersMap
+  -> UnitState  -- ^ unit state of the requesting home unit
+  -> ModuleName
+  -> [(UnitId, FinderOpts)]
+homeUnitDepsFinderOpts ue home_module_name_providers_map unit_state mod_name =
+    [ (uid, initFinderOpts (ue_unitFlags uid ue))
+    | uid <- rankedHomeUnitDeps home_module_name_providers_map mod_name
+                                (homeUnitDepends unit_state)
+    ]
 
-findPluginModule :: HscEnv -> ModuleName -> IO FindResult
-findPluginModule hsc_env mod_name = do
-  let fc = hsc_FC hsc_env
-  let units = hsc_units hsc_env
-  let mb_home_unit = hsc_home_unit_maybe hsc_env
-  findPluginModuleNoHsc fc (initFinderOpts (hsc_dflags hsc_env)) units mb_home_unit mod_name
+-- | Search for @mod_name@ in the given home unit.
+findHomeUnitDepModule
+  :: FinderCache
+  -> UnitEnv
+  -> HomeModuleNameProvidersMap
+  -> ModuleName
+  -> (UnitId, FinderOpts)
+  -> IO FindResult
+findHomeUnitDepModule fc ue home_module_name_providers_map mod_name (uid, opts)
+    -- If the module is reexported, then look for it as if it was from the
+    -- perspective of the package which reexports it.
+    | Just real_mod_name
+          <- lookupUniqMap (finder_reexportedModules opts) mod_name
+        = findHomeOrRegularPackageModule fc opts ue home_module_name_providers_map
+              (Just $ DefiniteHomeUnit uid Nothing)
+              real_mod_name
+    | elementOfUniqSet mod_name (finder_hiddenModules opts)
+        = return (mkHomeHidden uid)
+    | otherwise
+        = findHomePackageModule fc opts uid mod_name
+
+-- | Search for @mod_name@ among the home units: first the current home unit,
+-- then the home units it depends on, in priority order, following module
+-- reexports along the way (see 'findHomeUnitDepModule'). Yields the first
+-- successful result.
+findHomeModuleAmongDeps
+  :: FinderCache
+  -> FinderOpts
+  -> UnitEnv
+  -> HomeModuleNameProvidersMap
+  -> Maybe HomeUnit
+  -> ModuleName
+  -> IO FindResult
+findHomeModuleAmongDeps fc fopts ue home_module_name_providers_map mb_home_unit mod_name =
+    foldr1 orIfNotFound (home_import :| map home_pkg_import other_fopts)
+    -- Do not try to be smart and change this to `foldr orIfNotFound home_import
+    -- (map home_pkg_import other_fopts)`, as that would not be the same.
+    -- `home_import` is first because we need to first look within the current
+    -- unit before looking at the other units in order.
+  where
+    home_import = case mb_home_unit of
+        Just home_unit -> findHomeModule fc fopts home_unit mod_name
+        Nothing        -> pure $
+                          NoPackage (panic "findHomeModuleAmongDeps: no home-unit")
+    home_pkg_import = findHomeUnitDepModule fc ue home_module_name_providers_map mod_name
+
+    unit_state = case homeUnitId <$> mb_home_unit of
+        Nothing           -> ue_homeUnitState ue
+        Just home_unit_id -> HUG.homeUnitEnv_units $
+                             ue_findHomeUnitEnv home_unit_id ue
+    other_fopts = homeUnitDepsFinderOpts ue home_module_name_providers_map
+                                         unit_state mod_name
+
+-- | Search the home-unit graph and otherwise the regular exposed package
+-- database.
+findHomeOrRegularPackageModule
+  :: FinderCache
+  -> FinderOpts
+  -> UnitEnv
+  -> HomeModuleNameProvidersMap
+  -> Maybe HomeUnit
+  -> ModuleName
+  -> IO FindResult
+findHomeOrRegularPackageModule fc fopts ue home_module_name_providers_map mb_home_unit mod_name =
+    findHomeModuleAmongDeps fc fopts ue home_module_name_providers_map
+                            mb_home_unit mod_name
+    `orIfNotFound`
+    findExposedPackageModule fc fopts unit_state mod_name NoPkgQual
+  where
+    unit_state = case homeUnitId <$> mb_home_unit of
+        Nothing           -> ue_homeUnitState ue
+        Just home_unit_id -> HUG.homeUnitEnv_units $
+                             ue_findHomeUnitEnv home_unit_id ue
 
 
 -- | A version of findExactModule which takes the exact parts of the HscEnv it needs
