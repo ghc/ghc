@@ -255,6 +255,9 @@ lint-changelog:
     BUILD_FLAVOUR: default
     CHANGELOG_EXPECT_MR: "$CI_MERGE_REQUEST_IID"
   script:
+    # Cancel the job if there is a no-changelog label
+    - |
+      [[ ",${CI_MERGE_REQUEST_LABELS}," == *",no-changelog,"* ]] && exit 0
     # Check that the MR adds at least one changelog entry
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
@@ -273,8 +276,6 @@ lint-changelog:
   dependencies: []
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
-      when: never
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*no-changelog.*/'
       when: never
     - if: $CI_MERGE_REQUEST_ID
     - *drafts-can-fail-lint
