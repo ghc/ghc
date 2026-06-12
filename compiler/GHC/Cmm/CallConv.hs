@@ -55,8 +55,6 @@ assignArgumentsPos profile off conv arg_ty reps = (stk_off, assignments)
                (_,   NativeDirectCall) -> getRegsWithoutNode platform
                ([_], NativeReturn)     -> allRegs platform
                (_,   NativeReturn)     -> getRegsWithNode platform
-               -- GC calling convention *must* put values in registers
-               (_,   GC)               -> allRegs platform
                (_,   Slow)             -> nodeOnly
       -- The calling conventions first assign arguments to registers,
       -- then switch to the stack when we first run out of registers

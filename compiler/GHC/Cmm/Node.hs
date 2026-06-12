@@ -444,9 +444,6 @@ data Convention
        -- values returned, they are mapped to registers or the stack.
   | Slow
        -- ^ Slow entry points: all args pushed on the stack
-  | GC
-       -- ^ Entry to the garbage collector: uses the node reg!
-       -- (TODO: I don't think we need this --SDM)
   deriving( Eq )
 
 data ForeignConvention
@@ -510,7 +507,6 @@ pprConvention (NativeNodeCall   {}) = text "<native-node-call-convention>"
 pprConvention (NativeDirectCall {}) = text "<native-direct-call-convention>"
 pprConvention (NativeReturn {})     = text "<native-ret-convention>"
 pprConvention  Slow                 = text "<slow-convention>"
-pprConvention  GC                   = text "<gc-convention>"
 
 
 foreignTargetHints :: ForeignTarget -> ([ForeignHint], [ForeignHint])

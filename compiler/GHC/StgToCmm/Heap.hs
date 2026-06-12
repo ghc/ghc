@@ -458,7 +458,7 @@ genericGC checkYield code
   = do updfr_sz <- getUpdFrameOff
        lretry <- newBlockId
        emitLabel lretry
-       call <- mkCall generic_gc (GC, GC) [] [] updfr_sz []
+       call <- mkCall generic_gc (NativeReturn, NativeReturn) [] [] updfr_sz []
        heapCheck False checkYield (call <*> mkBranch lretry) code
 
 -- | Predefined ("canned") GC functions
@@ -557,7 +557,7 @@ heapStackCheckGen stk_hwm mb_bytes
   = do updfr_sz <- getUpdFrameOff
        lretry <- newBlockId
        emitLabel lretry
-       call <- mkCall generic_gc (GC, GC) [] [] updfr_sz []
+       call <- mkCall generic_gc (NativeReturn, NativeReturn) [] [] updfr_sz []
        do_checks stk_hwm False mb_bytes (call <*> mkBranch lretry)
 
 -- Note [Single stack check]
