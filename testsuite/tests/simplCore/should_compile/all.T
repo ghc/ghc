@@ -604,3 +604,8 @@ test('T19166', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-
 # #4081: the strict field of T should be unboxed once, outside the loop.
 test('T4081', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-all -dno-typeable-binds'])
 test('T27261', [extra_files(['T27261_aux.hs'])], multimod_compile, ['T27261', '-v0 -O'])
+
+# T27016: the "USPEC pprLabel @HLine" rule should fire even though the call
+# site reads pprLabel @(Line HDoc), an un-reduced type-family application.
+test('T27016', [extra_files(['T27016a.hs', 'T27016b.hs']), grep_errmsg(r'USPEC')],
+     multimod_compile, ['T27016', '-v0 -O -ddump-rule-firings'])

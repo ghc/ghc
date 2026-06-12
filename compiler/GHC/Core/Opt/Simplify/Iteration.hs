@@ -31,7 +31,7 @@ import GHC.Core.Coercion.Opt    ( optCoercion )
 import GHC.Core.Type hiding ( substCo, substTy, substTyVar, extendTvSubst, extendCvSubst )
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.TyCo.Subst( isEmptyTvSubst )
-import GHC.Core.FamInstEnv      ( FamInstEnv, topNormaliseType_maybe )
+import GHC.Core.FamInstEnv      ( FamInstEnv, FamInstEnvs, topNormaliseType_maybe, normaliseType )
 import GHC.Core.DataCon
 import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Core.Unfold
@@ -2402,8 +2402,9 @@ simplOutId env fun cont
     do { rule_base <- getSimplRules
        ; let rules_for_me = getRules rule_base fun
              out_args     = contOutArgs env cont :: [OutExpr]
-       ; mb_match <- if not (null rules_for_me) &&
-                        (isClassOpId fun || activeUnfolding (seMode env) fun)
+             try_rules    = not (null rules_for_me) &&
+                            (isClassOpId fun || activeUnfolding (seMode env) fun)
+       ; mb_match <- if try_rules
                      then tryRules env rules_for_me fun out_args
                      else return Nothing
        ; case mb_match of {
@@ -2416,6 +2417,15 @@ simplOutId env fun cont
                            mkApps rhs rhs_args
            ; Nothing ->
 
+    -- The rules didn't match the call as-written.  Try normalising
+    -- type-family redexes in the type arguments and matching again.
+    -- See Note [Normalise type-family redexes in call type arguments]
+    case if try_rules then normaliseCallTyArgs (seFamEnvs env) fun cont
+                      else Nothing of {
+        Just (call', cont') -> do { checkedTick (CallTyArgNormalised fun)
+                                  ; simplExprF env call' cont' } ;
+        Nothing ->
+
     -- Try inlining
     do { logger <- getLogger
        ; mb_inline <- tryInlining env logger fun cont
@@ -2427,7 +2437,117 @@ simplOutId env fun cont
     -- Neither worked, so just rebuild
     do { let arg_info = mkArgInfo env fun rules_for_me cont
        ; rebuildCall env arg_info cont
-    } } } } }
+    } } } } } }
+
+{- Note [Normalise type-family redexes in call type arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (#27016)
+
+    class IsLine (Line d) => IsDoc d where
+      type Line d
+    instance IsDoc HDoc where
+      type Line HDoc = HLine
+
+    pprLabel :: IsLine d => Int -> d
+    {-# SPECIALISE pprLabel :: Int -> HLine #-}
+
+The SPECIALISE pragma generates a rule keyed on the *normal form* of the type:
+
+    "USPEC pprLabel @HLine"  forall d. pprLabel @HLine d = $spprLabel
+
+But once a caller is specialised to HDoc, the call to pprLabel reads
+
+    pprLabel @(Line HDoc) ($fIsLineHLine |> co)
+
+Rule matching (see match_ty in GHC.Core.Rules) is purely syntactic, and
+`Line HDoc` is an un-reduced type-family application, so it does not match
+`HLine` and the specialisation rule never fires -- even though `Line HDoc` and
+`HLine` are the same type.  (The constraint solver has already supplied the
+right dictionary, $fIsLineHLine; it just arrives behind a cast.  Only the type
+argument blocks the match.)
+
+So, when the rules for `f` fail to match a call
+
+    f @t1 ... @tn
+
+we normalise the type-family redexes in the type arguments, rewriting the call
+to
+
+    (f @t1' ... @tn') |> co
+
+where ti' is the normal form of ti, and `co` casts the result back to the
+original type so the program stays well typed.  The rewritten call re-enters
+simplOutId, where the rule now matches syntactically.  (On the way back in,
+simplCast pushes `co` through the value arguments, casting each into the type
+the normalised function expects; the casts land in the sc_cast field of
+ApplyToVal, which contOutArgs must include for the match to be well typed.)
+
+The cast is built compactly as a chain of InstCos over Refl of f's type.  For
+`f :: forall as. blah`, an argument coercion `gt_i :: ti ~N ti'` (the symmetric
+of what normaliseType returns, at role Nominal) instantiates
+
+    Refl_R (forall as. blah)
+
+one position at a time, ultimately giving `co :: blah[ts'/as] ~R blah[ts/as]`.
+Unreduced arguments keep the spine Refl, so when no argument reduces `co` is
+Refl and we return Nothing.  Lint's existing InstCo rule accepts this coercion: it
+permits heterogeneous instantiation as long as the argument coercion is
+Nominal, which it is.  So no new typing rule and no Lint change is required.
+
+Wrinkles:
+
+* We use `normaliseType` at role Nominal, /not/ topNormaliseType_maybe.  The
+  latter also unwraps newtypes and returns a Representational coercion.  Newtype
+  unwrapping would be wrong here (a newtype and its representation have different
+  instances, so the dictionary in scope would no longer fit), and a
+  Representational argument coercion cannot be used in InstCo.
+
+* We try the rules on the call as-written /first/, and only normalise if they
+  fail.  A handwritten RULE may deliberately be keyed on an un-reduced family
+  application; normalising first would stop it from ever matching.
+
+* We only do this when `f` has rules -- the whole point is to unlock a rule
+  match -- and `isFamFreeTy` skips even the normaliseType call for type
+  arguments that obviously contain no family.
+
+* The normalised call re-enters simplOutId, so the transform must be idempotent
+  or it loops.  We decide an argument "reduced" by `eqType ty ty'`, /not/ by
+  `isReflCo` of the coercion: normaliseType can hand back a non-Refl /identity/
+  coercion (e.g. a GRefl carrying a kind coercion, as arises around
+  unsafeCoerce#) that relates a type to itself, and acting on that would re-wrap
+  a fresh cast on every re-entry until we run out of memory.  `checkedTick` is a
+  backstop: a genuinely non-idempotent family (only possible with
+  UndecidableInstances) aborts the simplifier rather than looping.
+-}
+
+normaliseCallTyArgs :: FamInstEnvs -> OutId -> SimplCont
+                    -> Maybe (OutExpr, SimplCont)
+-- See Note [Normalise type-family redexes in call type arguments]
+-- Given a call  f @t1 .. @tn <cont>, where some ti contains a type-family
+-- redex, return  ( (f @t1' .. @tn') |> co, <cont> ), where ti' is the normal
+-- form of ti and  co :: blah[ts'/as] ~R blah[ts/as]  for  f :: forall as. blah.
+-- Return Nothing if no ti reduces.
+normaliseCallTyArgs fam_envs fun cont
+  = go [] (mkReflCo Representational (idType fun)) False cont
+  where
+    -- fun_co :: (forall as. blah)[ts'/as] ~R (forall as. blah)[ts/as],
+    -- built up one type argument at a time.
+    go rev_tys fun_co changed (ApplyToTy { sc_arg_ty = ty, sc_cont = k })
+      | isFamFreeTy ty   -- Common case: no redex, leave the argument alone
+      = go (ty : rev_tys) (mkInstCo fun_co (mkNomReflCo ty)) changed k
+      | Reduction arg_co ty' <- normaliseType fam_envs Nominal ty
+      , not (eqType ty ty')   -- arg_co :: ty ~N ty'
+        -- NB: test eqType, not isReflCo arg_co.  normaliseType can return a
+        -- non-Refl /identity/ coercion -- e.g. a GRefl carrying a kind
+        -- coercion, as turns up around unsafeCoerce# -- relating a type to
+        -- itself.  Treating that as a reduction would loop, re-wrapping a fresh
+        -- cast on every re-entry until we run out of memory.
+      = go (ty' : rev_tys) (mkInstCo fun_co (mkSymCo arg_co)) True k
+      | otherwise
+      = go (ty : rev_tys) (mkInstCo fun_co (mkNomReflCo ty)) changed k
+    go rev_tys fun_co changed k
+      | changed   = Just (Cast (mkTyApps (Var fun) (reverse rev_tys)) fun_co, k)
+      | otherwise = Nothing
 
 ---------------------------------------------------------
 --      Dealing with a call site
