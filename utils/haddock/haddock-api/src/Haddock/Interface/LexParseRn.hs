@@ -30,10 +30,13 @@ import Data.Functor
 import Data.List (maximumBy, (\\))
 import Data.Ord
 import qualified Data.Set as Set
-import GHC
+import Data.Text (Text)
+import qualified Data.Text as T
+import GHC hiding (Header)
 import GHC.Data.EnumSet as EnumSet
-import GHC.Data.FastString (unpackFS)
+import Haddock.GhcUtils (fastStringToText)
 import GHC.Driver.Session
+import GHC.Hs.DocString (renderHsDocStringText, renderHsDocStringsText)
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Parser.Lexer (ParserOpts)
 import GHC.Parser.PostProcess
@@ -57,7 +60,7 @@ processDocStringsParas
   -> [HsDoc GhcRn]
   -> IfM m (MDoc Name)
 processDocStringsParas parserOpts sDocContext pkg hdss =
-  overDocF (rename sDocContext $ hsDocRenamer hds) $ parseParas parserOpts pkg (renderHsDocStrings $ hsDocString hds)
+  overDocF (rename sDocContext $ hsDocRenamer hds) $ parseParas parserOpts pkg (renderHsDocStringsText $ hsDocString hds)
   where
     hds :: WithHsDocIdentifiers [HsDocString] GhcRn
     hds = WithHsDocIdentifiers (map hsDocString hdss) (concatMap hsDocIdentifiers hdss)
@@ -70,7 +73,7 @@ processDocStringParas
   -> HsDoc GhcRn
   -> IfM m (MDoc Name)
 processDocStringParas parserOpts sDocContext pkg hds =
-  overDocF (rename sDocContext $ hsDocRenamer hds) $ parseParas parserOpts pkg (renderHsDocString $ hsDocString hds)
+  overDocF (rename sDocContext $ hsDocRenamer hds) $ parseParas parserOpts pkg (renderHsDocStringText $ hsDocString hds)
 
 processDocString
   :: MonadIO m
@@ -79,7 +82,7 @@ processDocString
   -> HsDoc GhcRn
   -> IfM m (Doc Name)
 processDocString parserOpts sDocContext hds =
-  rename sDocContext (hsDocRenamer hds) $ parseString parserOpts (renderHsDocString $ hsDocString hds)
+  rename sDocContext (hsDocRenamer hds) $ parseString parserOpts (renderHsDocStringText $ hsDocString hds)
 
 processModuleHeader
   :: MonadIO m
@@ -97,7 +100,7 @@ processModuleHeader mLanguage parserOpts sDocContext pkgName safety mayLang extS
     case mayStr of
       Nothing -> return failure
       Just hsDoc -> do
-        let str = renderHsDocString $ hsDocString hsDoc
+        let str = renderHsDocStringText $ hsDocString hsDoc
             (hmi, doc) = parseModuleHeader parserOpts pkgName str
             renamer = hsDocRenamer hsDoc
         !descr <- case hmi_description hmi of
@@ -112,7 +115,7 @@ processModuleHeader mLanguage parserOpts sDocContext pkgName safety mayLang extS
       flags = EnumSet.toList extSet \\ languageExtensions mayLang
   return
     ( hmi
-        { hmi_safety = Just $ Outputable.renderWithContext sDocContext (Outputable.ppr safety)
+        { hmi_safety = Just $ T.pack $ Outputable.renderWithContext sDocContext (Outputable.ppr safety)
         , hmi_language = mLanguage
         , hmi_extensions = flags
         }
@@ -164,7 +167,7 @@ rename sDocContext renamer = rn
               Value -> valueNsChoices
               Type -> typeNsChoices
               None -> valueNsChoices <||> typeNsChoices
-        case renamer (Outputable.renderWithContext sDocContext (Outputable.ppr x)) choices of
+        case renamer (T.pack $ Outputable.renderWithContext sDocContext (Outputable.ppr x)) choices of
           [] -> case ns of
             Type -> outOfScope sDocContext ns (i $> setRdrNameSpace x tcName)
             _ -> outOfScope sDocContext ns (i $> x)
@@ -217,18 +220,18 @@ outOfScope sDocContext ns x =
 
     warnAndMonospace :: (MonadIO m, Outputable a) => Wrap a -> IfM m (DocH mod id)
     warnAndMonospace a = do
-      let a' = showWrapped (renderWithContext sDocContext . Outputable.ppr) a
+      let a' = showWrapped (T.pack . renderWithContext sDocContext . Outputable.ppr) a
 
       -- If we have already warned for this identifier, don't warn again
       firstWarn <- Set.notMember a' <$> gets ifeOutOfScopeNames
       when firstWarn $ do
         warn $
           "Warning: "
-            ++ prefix
-            ++ "'"
-            ++ a'
-            ++ "' is out of scope.\n"
-            ++ "    If you qualify the identifier, haddock can try to link it anyway."
+            <> T.pack prefix
+            <> "'"
+            <> a'
+            <> "' is out of scope.\n"
+            <> "    If you qualify the identifier, haddock can try to link it anyway."
         modify' (\env -> env{ifeOutOfScopeNames = Set.insert a' (ifeOutOfScopeNames env)})
 
       pure (monospaced a')
@@ -252,13 +255,13 @@ ambiguous sDocContext x names = do
       nameStr = showNsRdrName sDocContext x
       msg =
         "Warning: "
-          ++ nameStr
-          ++ " is ambiguous. It is defined\n"
-          ++ concatMap (\n -> "    * " ++ defnLoc n ++ "\n") names
-          ++ "    You may be able to disambiguate the identifier by qualifying it or\n"
-          ++ "    by specifying the type/value namespace explicitly.\n"
-          ++ "    Defaulting to the one defined "
-          ++ defnLoc dflt
+          <> nameStr
+          <> " is ambiguous. It is defined\n"
+          <> T.concat (map (\n -> "    * " <> T.pack (defnLoc n) <> "\n") names)
+          <> "    You may be able to disambiguate the identifier by qualifying it or\n"
+          <> "    by specifying the type/value namespace explicitly.\n"
+          <> "    Defaulting to the one defined "
+          <> T.pack (defnLoc dflt)
 
   -- TODO: Once we have a syntax for namespace qualification (#667) we may also
   -- want to emit a warning when an identifier is a data constructor for a type
@@ -279,10 +282,10 @@ ambiguous sDocContext x names = do
     defnLoc = Outputable.renderWithContext sDocContext . pprNameDefnLoc
 
 -- | Printable representation of a wrapped and namespaced name
-showNsRdrName :: SDocContext -> Wrap NsRdrName -> String
-showNsRdrName sDocContext = (\p i -> p ++ "'" ++ i ++ "'") <$> prefix <*> ident
+showNsRdrName :: SDocContext -> Wrap NsRdrName -> Text
+showNsRdrName sDocContext = (\p i -> p <> "'" <> i <> "'") <$> prefix <*> ident
   where
-    ident = showWrapped (Outputable.renderWithContext sDocContext . ppr . rdrName)
+    ident = showWrapped (T.pack . Outputable.renderWithContext sDocContext . ppr . rdrName)
     prefix = renderNs . namespace . unwrap
 
 hsDocRenamer :: WithHsDocIdentifiers a GhcRn -> Renamer
@@ -291,4 +294,4 @@ hsDocRenamer hsDoc = \s cands -> nameSetElemsStable $ filterNameSet (nameMatches
     !env = hsDocIds hsDoc
     nameMatches s ok_ns n =
       let occ = occName n
-       in ok_ns (occNameSpace occ) && s == unpackFS (occNameFS occ)
+       in ok_ns (occNameSpace occ) && s == fastStringToText (occNameFS occ)

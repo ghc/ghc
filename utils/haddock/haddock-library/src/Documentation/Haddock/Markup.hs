@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 -- | @since 1.4.5
 module Documentation.Haddock.Markup
   ( markup
@@ -6,6 +7,7 @@ module Documentation.Haddock.Markup
   ) where
 
 import Data.Maybe (fromMaybe)
+import Data.Text (Text)
 
 import Documentation.Haddock.Types
 
@@ -71,13 +73,13 @@ idMarkup =
 -- | Map a 'DocH' into a best estimate of an alternate string. The idea is to
 -- strip away any formatting while preserving as much of the actual text as
 -- possible.
-plainMarkup :: (mod -> String) -> (id -> String) -> DocMarkupH mod id String
+plainMarkup :: (mod -> Text) -> (id -> Text) -> DocMarkupH mod id Text
 plainMarkup plainMod plainIdent =
   Markup
     { markupEmpty = ""
     , markupString = id
     , markupParagraph = id
-    , markupAppend = (++)
+    , markupAppend = (<>)
     , markupIdentifier = plainIdent
     , markupIdentifierUnchecked = plainMod
     , markupModule = \(ModLink m lbl) -> fromMaybe m lbl

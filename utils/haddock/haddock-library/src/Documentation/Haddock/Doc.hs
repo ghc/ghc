@@ -11,6 +11,7 @@ module Documentation.Haddock.Doc
 
 import Control.Applicative ((<|>))
 import Data.Char (isSpace)
+import qualified Data.Text as T
 
 import Documentation.Haddock.Types
 
@@ -54,9 +55,9 @@ docAppend (DocUnorderedList ds1) (DocUnorderedList ds2) = DocUnorderedList (ds1 
 docAppend (DocUnorderedList ds1) (DocAppend (DocUnorderedList ds2) d) = DocAppend (DocUnorderedList (ds1 ++ ds2)) d
 docAppend DocEmpty d = d
 docAppend d DocEmpty = d
-docAppend (DocString s1) (DocString s2) = DocString (s1 ++ s2)
-docAppend (DocAppend d (DocString s1)) (DocString s2) = DocAppend d (DocString (s1 ++ s2))
-docAppend (DocString s1) (DocAppend (DocString s2) d) = DocAppend (DocString (s1 ++ s2)) d
+docAppend (DocString s1) (DocString s2) = DocString (T.append s1 s2)
+docAppend (DocAppend d (DocString s1)) (DocString s2) = DocAppend d (DocString (T.append s1 s2))
+docAppend (DocString s1) (DocAppend (DocString s2) d) = DocAppend (DocString (T.append s1 s2)) d
 docAppend d1 d2 = DocAppend d1 d2
 
 -- again to make parsing easier - we spot a paragraph whose only item
@@ -65,17 +66,17 @@ docParagraph :: DocH mod id -> DocH mod id
 docParagraph (DocMonospaced p) =
   DocCodeBlock (docCodeBlock p)
 docParagraph (DocAppend (DocString s1) (DocMonospaced p))
-  | all isSpace s1 =
+  | T.all isSpace s1 =
       DocCodeBlock (docCodeBlock p)
 docParagraph
   ( DocAppend
       (DocString s1)
       (DocAppend (DocMonospaced p) (DocString s2))
     )
-    | all isSpace s1 && all isSpace s2 =
+    | T.all isSpace s1 && T.all isSpace s2 =
         DocCodeBlock (docCodeBlock p)
 docParagraph (DocAppend (DocMonospaced p) (DocString s2))
-  | all isSpace s2 =
+  | T.all isSpace s2 =
       DocCodeBlock (docCodeBlock p)
 docParagraph p =
   DocParagraph p
@@ -92,7 +93,7 @@ docParagraph p =
 --
 docCodeBlock :: DocH mod id -> DocH mod id
 docCodeBlock (DocString s) =
-  DocString (reverse $ dropWhile (`elem` " \t") $ reverse s)
+  DocString (T.dropWhileEnd (\c -> c == ' ' || c == '\t') s)
 docCodeBlock (DocAppend l r) =
   DocAppend l (docCodeBlock r)
 docCodeBlock d = d

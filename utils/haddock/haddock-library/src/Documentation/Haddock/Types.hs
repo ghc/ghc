@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- |
 -- Module      :  Documentation.Haddock.Types
@@ -18,6 +19,7 @@ import Control.Arrow ((***))
 import Data.Bifoldable
 import Data.Bifunctor
 import Data.Bitraversable
+import Data.Text (Text)
 
 -- | A @\@since@ declaration.
 data MetaSince = MetaSince
@@ -58,23 +60,23 @@ overDocF :: Functor f => (DocH a b -> f (DocH c d)) -> MetaDoc a b -> f (MetaDoc
 overDocF f d = (\x -> d{_doc = x}) <$> f (_doc d)
 
 type Version = [Int]
-type Package = String
+type Package = Text
 
 data Hyperlink id = Hyperlink
-  { hyperlinkUrl :: String
+  { hyperlinkUrl :: Text
   , hyperlinkLabel :: Maybe id
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data ModLink id = ModLink
-  { modLinkName :: String
+  { modLinkName :: Text
   , modLinkLabel :: Maybe id
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Picture = Picture
-  { pictureUri :: String
-  , pictureTitle :: Maybe String
+  { pictureUri :: Text
+  , pictureTitle :: Maybe Text
   }
   deriving (Eq, Show)
 
@@ -86,8 +88,8 @@ data Header id = Header
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Example = Example
-  { exampleExpression :: String
-  , exampleResult :: [String]
+  { exampleExpression :: Text
+  , exampleResult :: [Text]
   }
   deriving (Eq, Show)
 
@@ -112,7 +114,7 @@ data Table id = Table
 data DocH mod id
   = DocEmpty
   | DocAppend (DocH mod id) (DocH mod id)
-  | DocString String
+  | DocString Text
   | DocParagraph (DocH mod id)
   | DocIdentifier id
   | -- | A qualified identifier that couldn't be resolved.
@@ -130,11 +132,11 @@ data DocH mod id
   | DocCodeBlock (DocH mod id)
   | DocHyperlink (Hyperlink (DocH mod id))
   | DocPic Picture
-  | DocMathInline String
-  | DocMathDisplay String
+  | DocMathInline Text
+  | DocMathDisplay Text
   | -- | A (HTML) anchor. It must not contain any spaces.
-    DocAName String
-  | DocProperty String
+    DocAName Text
+  | DocProperty Text
   | DocExamples [Example]
   | DocHeader (Header (DocH mod id))
   | DocTable (Table (DocH mod id))
@@ -215,7 +217,7 @@ instance Bitraversable DocH where
 data Namespace = Value | Type | None deriving (Eq, Ord, Enum, Show)
 
 -- | Render the a namespace into the same format it was initially parsed.
-renderNs :: Namespace -> String
+renderNs :: Namespace -> Text
 renderNs Value = "v"
 renderNs Type = "t"
 renderNs None = ""
@@ -229,7 +231,7 @@ renderNs None = ""
 -- @since 1.4.5
 data DocMarkupH mod id a = Markup
   { markupEmpty :: a
-  , markupString :: String -> a
+  , markupString :: Text -> a
   , markupParagraph :: a -> a
   , markupAppend :: a -> a -> a
   , markupIdentifier :: id -> a
@@ -244,11 +246,11 @@ data DocMarkupH mod id a = Markup
   , markupDefList :: [(a, a)] -> a
   , markupCodeBlock :: a -> a
   , markupHyperlink :: Hyperlink a -> a
-  , markupAName :: String -> a
+  , markupAName :: Text -> a
   , markupPic :: Picture -> a
-  , markupMathInline :: String -> a
-  , markupMathDisplay :: String -> a
-  , markupProperty :: String -> a
+  , markupMathInline :: Text -> a
+  , markupMathDisplay :: Text -> a
+  , markupProperty :: Text -> a
   , markupExample :: [Example] -> a
   , markupHeader :: Header a -> a
   , markupTable :: Table a -> a

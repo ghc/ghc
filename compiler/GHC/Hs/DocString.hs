@@ -16,6 +16,8 @@ module GHC.Hs.DocString
   , docStringChunks
   , renderHsDocString
   , renderHsDocStrings
+  , renderHsDocStringText
+  , renderHsDocStringsText
   , exactPrintHsDocString
   , pprWithDocString
   , printDecorator
@@ -34,6 +36,8 @@ import qualified Data.ByteString as BS
 import Data.Data
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.List (intercalate)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as Text.Encoding
 
 type LHsDocString = Located HsDocString
 
@@ -158,6 +162,9 @@ mkHsDocStringChunkUtf8ByteString = HsDocStringChunk
 unpackHDSC :: HsDocStringChunk -> String
 unpackHDSC (HsDocStringChunk bs) = utf8DecodeByteString bs
 
+unpackHDSCText :: HsDocStringChunk -> T.Text
+unpackHDSCText (HsDocStringChunk bs) = Text.Encoding.decodeUtf8Lenient bs
+
 nullHDSC :: HsDocStringChunk -> Bool
 nullHDSC (HsDocStringChunk bs) = BS.null bs
 
@@ -195,9 +202,13 @@ exactPrintHsDocString (GeneratedDocString x) = case lines (unpackHDSC x) of
 
 -- | Just get the docstring, without any decorators
 renderHsDocString :: HsDocString -> String
-renderHsDocString (MultiLineDocString _ (x :| xs)) = unlines' $ map (unpackHDSC . unLoc) (x:xs)
-renderHsDocString (NestedDocString _ ds) = unpackHDSC $ unLoc ds
-renderHsDocString (GeneratedDocString x) = unpackHDSC x
+renderHsDocString = T.unpack . renderHsDocStringText
+
+-- | Just get the docstring as 'Text', without any decorators.
+renderHsDocStringText :: HsDocString -> T.Text
+renderHsDocStringText (MultiLineDocString _ (x :| xs)) = T.intercalate (T.singleton '\n') $ map (unpackHDSCText . unLoc) (x:xs)
+renderHsDocStringText (NestedDocString _ ds) = unpackHDSCText $ unLoc ds
+renderHsDocStringText (GeneratedDocString x) = unpackHDSCText x
 
 -- | Don't add a newline to a single string
 unlines' :: [String] -> String
@@ -206,4 +217,9 @@ unlines' = intercalate "\n"
 -- | Just get the docstring, without any decorators
 -- Separates docstrings using "\n\n", which is how haddock likes to render them
 renderHsDocStrings :: [HsDocString] -> String
-renderHsDocStrings = intercalate "\n\n" . map renderHsDocString
+renderHsDocStrings = T.unpack . renderHsDocStringsText
+
+-- | Just get the docstrings as 'Text', without any decorators.
+-- Separates docstrings using "\n\n", which is how haddock likes to render them.
+renderHsDocStringsText :: [HsDocString] -> T.Text
+renderHsDocStringsText = T.intercalate (T.cons '\n' (T.singleton '\n')) . map renderHsDocStringText

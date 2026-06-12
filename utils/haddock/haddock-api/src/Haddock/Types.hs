@@ -51,6 +51,9 @@ import Data.Data (Data)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.IO as T
 import GHC
 import GHC.Data.BooleanFormula (BooleanFormula)
 import GHC.Driver.Session (Language)
@@ -63,7 +66,7 @@ import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader (RdrName (..))
 import GHC.Types.SrcLoc (srcSpanToRealSrcSpan)
 import GHC.Types.Var (Specificity)
-import GHC.Utils.Outputable
+import GHC.Utils.Outputable hiding ((<>))
 
 import Documentation.Haddock.Types
 
@@ -220,9 +223,9 @@ deriving newtype instance Monad m => MonadState (IfEnv m) (IfM m)
 data IfEnv m = IfEnv
   { ifeLookupName :: Name -> m (Maybe TyThing)
   -- ^ Lookup names in the environment.
-  , ifeOutOfScopeNames :: !(Set.Set String)
+  , ifeOutOfScopeNames :: !(Set.Set Text)
   -- ^ Names which we have warned about for being out of scope
-  , ifeAmbiguousNames :: !(Set.Set String)
+  , ifeAmbiguousNames :: !(Set.Set Text)
   -- ^ Names which we have warned about for being ambiguous
   }
 
@@ -253,8 +256,8 @@ lookupName name = IfM $ do
   lift (lookup_name name)
 
 -- | Very basic logging function that simply prints to stdout
-warn :: MonadIO m => String -> IfM m ()
-warn msg = liftIO $ putStrLn msg
+warn :: MonadIO m => Text -> IfM m ()
+warn msg = liftIO $ T.putStrLn msg
 
 -----------------------------------------------------------------------------
 
@@ -276,7 +279,7 @@ data ExportItem name
     ExportGroup
       { expItemSectionLevel :: !Int
       -- ^ Section level (1, 2, 3, ...).
-      , expItemSectionId :: !String
+      , expItemSectionId :: !Text
       -- ^ Section id (for hyperlinks).
       , expItemSectionText :: !(Doc (IdP name))
       -- ^ Section heading text.
@@ -328,7 +331,7 @@ data ExportD name = ExportD
 data RnExportD = RnExportD
   { rnExpDExpD :: !(ExportD DocNameI)
   -- ^ The renamed export declaration
-  , rnExpDHoogle :: [String]
+  , rnExpDHoogle :: [Text]
   -- ^ If Hoogle textbase (textual database) output is enabled, the text
   -- output lines for this declaration. If Hoogle output is not enabled, the
   -- list will be empty.
@@ -468,10 +471,10 @@ instance Outputable n => Outputable (Wrap n) where
   ppr (Parenthesized n) = hcat [char '(', ppr n, char ')']
   ppr (Backticked n) = hcat [char '`', ppr n, char '`']
 
-showWrapped :: (a -> String) -> Wrap a -> String
+showWrapped :: (a -> Text) -> Wrap a -> Text
 showWrapped f (Unadorned n) = f n
-showWrapped f (Parenthesized n) = "(" ++ f n ++ ")"
-showWrapped f (Backticked n) = "`" ++ f n ++ "`"
+showWrapped f (Parenthesized n) = "(" <> f n <> ")"
+showWrapped f (Backticked n) = "`" <> f n <> "`"
 
 instance HasOccName DocName where
   occName = occName . getName
@@ -500,7 +503,7 @@ instance Ord SName where
 data SimpleType
   = SimpleType SName [SimpleType]
   | SimpleIntTyLit Integer
-  | SimpleStringTyLit String
+  | SimpleStringTyLit Text
   | SimpleCharTyLit Char
   deriving (Eq, Ord)
 
@@ -638,9 +641,9 @@ instance NFData id => NFData (TableRow id) where
 instance NFData id => NFData (TableCell id) where
   rnf (TableCell i j c) = i `deepseq` j `deepseq` c `deepseq` ()
 
-exampleToString :: Example -> String
+exampleToString :: Example -> Text
 exampleToString (Example expression result) =
-  ">>> " ++ expression ++ "\n" ++ unlines result
+  ">>> " <> expression <> "\n" <> T.unlines result
 
 instance NFData name => NFData (HaddockModInfo name) where
   rnf (HaddockModInfo{..}) =
@@ -659,12 +662,12 @@ instance NFData LangExt.Extension
 
 data HaddockModInfo name = HaddockModInfo
   { hmi_description :: Maybe (Doc name)
-  , hmi_copyright :: Maybe String
-  , hmi_license :: Maybe String
-  , hmi_maintainer :: Maybe String
-  , hmi_stability :: Maybe String
-  , hmi_portability :: Maybe String
-  , hmi_safety :: Maybe String
+  , hmi_copyright :: Maybe Text
+  , hmi_license :: Maybe Text
+  , hmi_maintainer :: Maybe Text
+  , hmi_stability :: Maybe Text
+  , hmi_portability :: Maybe Text
+  , hmi_safety :: Maybe Text
   , hmi_language :: Maybe Language
   , hmi_extensions :: [LangExt.Extension]
   }
@@ -764,7 +767,7 @@ data SinceQual
 -- | Renames an identifier.
 -- The first input is the identifier as it occurred in the comment
 -- The second input is the possible namespaces of the identifier
-type Renamer = String -> (NameSpace -> Bool) -> [Name]
+type Renamer = Text -> (NameSpace -> Bool) -> [Name]
 
 -----------------------------------------------------------------------------
 
@@ -774,18 +777,18 @@ type Renamer = String -> (NameSpace -> Bool) -> [Name]
 
 -- | Haddock's own exception type.
 data HaddockException
-  = HaddockException String
-  | WithContext [String] SomeException
+  = HaddockException Text
+  | WithContext [Text] SomeException
 
 instance Show HaddockException where
-  show (HaddockException str) = str
-  show (WithContext ctxts se) = unlines $ ["While " ++ ctxt ++ ":\n" | ctxt <- reverse ctxts] ++ [show se]
+  show (HaddockException str) = T.unpack str
+  show (WithContext ctxts se) = T.unpack $ T.unlines $ ["While " <> ctxt <> ":\n" | ctxt <- reverse ctxts] ++ [T.pack $ show se]
 
-throwE :: String -> a
+throwE :: Text -> a
 instance Exception HaddockException
 throwE str = throw (HaddockException str)
 
-withExceptionContext :: MonadCatch m => String -> m a -> m a
+withExceptionContext :: MonadCatch m => Text -> m a -> m a
 withExceptionContext ctxt =
   handle
     ( \ex ->

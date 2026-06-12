@@ -19,6 +19,7 @@
 -- @'toRegular' . '_doc' . 'parseParas'@
 module Documentation.Haddock.Parser
   ( parseString
+  , parseText
   , parseParas
   , overIdentifier
   , toRegular
@@ -28,14 +29,16 @@ module Documentation.Haddock.Parser
 import Control.Applicative
 import Control.Arrow (first)
 import Control.Monad
-import Data.Char (chr, isAlpha, isSpace, isUpper)
+import Data.Char (chr, isAlpha, isAlphaNum, isSpace, isUpper)
 import Data.Functor (($>))
-import Data.List (elemIndex, intercalate, intersperse, unfoldr, unsnoc)
+import Data.List (elemIndex, unfoldr, unsnoc)
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Monoid
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as LT
+import qualified Data.Text.Lazy.Builder as TB
 import Text.Parsec (try)
 import qualified Text.Parsec as Parsec
 import Prelude hiding (takeWhile)
@@ -67,7 +70,7 @@ overIdentifier
 overIdentifier f d = g d
   where
     g (DocIdentifier (Identifier ns o x e)) = case f ns x of
-      Nothing -> DocString $ renderNs ns ++ [o] ++ x ++ [e]
+      Nothing -> DocString $ renderNs ns <> T.singleton o <> T.pack x <> T.singleton e
       Just x' -> DocIdentifier x'
     g DocEmpty = DocEmpty
     g (DocAppend x x') = DocAppend (g x) (g x')
@@ -98,6 +101,11 @@ choice' [] = empty
 choice' [p] = p
 choice' (p : ps) = try p <|> choice' ps
 
+manyText :: Parser Char -> Parser Text
+manyText p = LT.toStrict . TB.toLazyText <$> go mempty
+  where
+    go acc = (p >>= \c -> go (acc <> TB.singleton c)) <|> pure acc
+
 parse :: Parser a -> Text -> (ParserState, a)
 parse p = either err id . parseOnly (p <* Parsec.eof)
   where
@@ -107,8 +115,8 @@ parse p = either err id . parseOnly (p <* Parsec.eof)
 -- to the input string.
 parseParas
   :: Maybe Package
-  -> String
-  -- ^ String to parse
+  -> Text
+  -- ^ Text to parse
   -> MetaDoc mod Identifier
 parseParas pkg input = case parseParasState input of
   (state, a) ->
@@ -118,8 +126,8 @@ parseParas pkg input = case parseParasState input of
           , _doc = a
           }
 
-parseParasState :: String -> (ParserState, DocH mod Identifier)
-parseParasState = parse (emptyLines *> p) . T.pack . (++ "\n") . filter (/= '\r')
+parseParasState :: Text -> (ParserState, DocH mod Identifier)
+parseParasState = parse (emptyLines *> p) . (<> "\n") . T.filter (/= '\r')
   where
     p :: Parser (DocH mod Identifier)
     p = docConcat <$> many (paragraph <* emptyLines)
@@ -127,11 +135,11 @@ parseParasState = parse (emptyLines *> p) . T.pack . (++ "\n") . filter (/= '\r'
     emptyLines :: Parser ()
     emptyLines = void $ many (try (skipHorizontalSpace *> "\n"))
 
-parseParagraphs :: String -> Parser (DocH mod Identifier)
+parseParagraphs :: Text -> Parser (DocH mod Identifier)
 parseParagraphs input = case parseParasState input of
   (state, a) -> Parsec.putState state *> pure a
 
--- | Variant of 'parseText' for 'String' instead of 'Text'
+-- | Variant of 'parseText' for 'String' instead of 'Text'.
 parseString :: String -> DocH mod Identifier
 parseString = parseText . T.pack
 
@@ -174,7 +182,7 @@ parseParagraph = snd . parse p
 encodedChar :: Parser (DocH mod a)
 encodedChar = "&#" *> c <* ";"
   where
-    c = DocString . return . chr <$> num
+    c = DocString . T.singleton . chr <$> num
     num = hex <|> decimal
     hex = ("x" <|> "X") *> hexadecimal
 
@@ -189,8 +197,8 @@ specialChar = "_/<@\"&'`#[ "
 -- before capturing their characters.
 string' :: Parser (DocH mod a)
 string' =
-  DocString
-    <$> ((:) <$> rawOrEscChar "" <*> many (rawOrEscChar "(["))
+  DocString <$> (T.cons <$> rawOrEscChar "" <*> manyText (rawOrEscChar "(["))
+
     -- After the first character, stop for @\(@ or @\[@ math starters. (The
     -- first character won't start a valid math string because this parser
     -- should follow math parsers. But this parser is expected to accept at
@@ -216,7 +224,7 @@ string' =
 -- This is done to skip over any special characters belonging to other
 -- elements but which were not deemed meaningful at their positions.
 skipSpecialChar :: Parser (DocH mod a)
-skipSpecialChar = DocString . return <$> Parsec.oneOf specialChar
+skipSpecialChar = DocString . T.singleton <$> Parsec.oneOf specialChar
 
 -- | Emphasis parser.
 --
@@ -256,7 +264,7 @@ takeWhile1_ = mfilter (not . T.null) . takeWhile_
 -- DocAName "Hello world"
 anchor :: Parser (DocH mod a)
 anchor =
-  DocAName . T.unpack
+  DocAName
     <$> ("#" *> takeWhile1_ (\x -> x /= '#' && not (isSpace x)) <* "#")
 
 -- | Monospaced strings.
@@ -276,23 +284,23 @@ moduleName :: Parser (DocH mod a)
 moduleName = DocModule . flip ModLink Nothing <$> ("\"" *> moduleNameString <* "\"")
 
 -- | A module name, optionally with an anchor
-moduleNameString :: Parser String
+moduleNameString :: Parser T.Text
 moduleNameString = modid `maybeFollowedBy` anchor_
   where
-    modid = intercalate "." <$> conid `Parsec.sepBy1` "."
+    modid = T.intercalate "." <$> conid `Parsec.sepBy1` "."
     anchor_ =
-      (++)
-        <$> (Parsec.string "#" <|> Parsec.string "\\#")
-        <*> many (Parsec.satisfy (\c -> c /= '"' && not (isSpace c)))
+      T.append
+        <$> (string "#" <|> string "\\#")
+        <*> takeWhile (\c -> c /= '"' && not (isSpace c))
 
-    maybeFollowedBy pre suf = (\x -> maybe x (x ++)) <$> pre <*> optional suf
-    conid :: Parser String
+    maybeFollowedBy pre suf = (\x -> maybe x (T.append x)) <$> pre <*> optional suf
+    conid :: Parser T.Text
     conid =
-      (:)
+      T.cons
         <$> Parsec.satisfy (\c -> isAlpha c && isUpper c)
-        <*> many conChar
+        <*> takeWhile isConChar
 
-    conChar = Parsec.alphaNum <|> Parsec.char '_'
+    isConChar c = isAlphaNum c || c == '_'
 
 -- | A labeled link to an indentifier, module or url using markdown
 -- syntax.
@@ -334,7 +342,7 @@ picture =
 -- DocMathInline "\\int_{-\\infty}^{\\infty} e^{-x^2/2} = \\sqrt{2\\pi}"
 mathInline :: Parser (DocH mod a)
 mathInline =
-  DocMathInline . T.unpack
+  DocMathInline
     <$> disallowNewline ("\\(" *> takeUntil "\\)")
 
 -- | Display math parser, surrounded by \\[ and \\].
@@ -343,7 +351,7 @@ mathInline =
 -- DocMathDisplay "\\int_{-\\infty}^{\\infty} e^{-x^2/2} = \\sqrt{2\\pi}"
 mathDisplay :: Parser (DocH mod a)
 mathDisplay =
-  DocMathDisplay . T.unpack
+  DocMathDisplay
     <$> ("\\[" *> takeUntil "\\]")
 
 -- | Markdown image parser. As per the commonmark reference recommendation, the
@@ -358,7 +366,7 @@ markdownImage = do
   pure $ DocPic (Picture url (Just text))
   where
     stringMarkup = plainMarkup (const "") renderIdent
-    renderIdent (Identifier ns l c r) = renderNs ns <> [l] <> c <> [r]
+    renderIdent (Identifier ns l c r) = renderNs ns <> T.singleton l <> T.pack c <> T.singleton r
 
 -- | Paragraph parser, called by 'parseParas'.
 paragraph :: Parser (DocH mod Identifier)
@@ -599,8 +607,7 @@ since = do
       ver <- decimal `Parsec.sepBy1` "."
       return (MetaSince pkg ver)
 
-    package = combine <$> (Parsec.many1 (Parsec.letter <|> Parsec.char '_')) `Parsec.endBy1` (Parsec.char '-')
-    combine = concat . intersperse "-"
+    package = T.intercalate "-" <$> some (takeWhile1 (\c -> isAlpha c || c == '_') <* "-")
 
 -- | Headers inside the comment denoted with @=@ signs, up to 6 levels
 -- deep.
@@ -634,7 +641,7 @@ textParagraphThatStartsWithMarkdownLink = docParagraph <$> (docAppend <$> markdo
     whitespace :: Parser (DocH mod a)
     whitespace = DocString <$> (f <$> takeHorizontalSpace <*> optional "\n")
       where
-        f :: Text -> Maybe Text -> String
+        f :: Text -> Maybe Text -> Text
         f xs (fromMaybe "" -> x)
           | T.null (xs <> x) = ""
           | otherwise = " "
@@ -749,7 +756,7 @@ moreContent indent item = first . (:) <$> nonEmptyLine <*> more indent item
 -- The indentation is 4 spaces.
 indentedParagraphs :: Text -> Parser (DocH mod Identifier)
 indentedParagraphs indent =
-  (T.unpack . T.concat <$> dropFrontOfPara indent') >>= parseParagraphs
+  (T.concat <$> dropFrontOfPara indent') >>= parseParagraphs
   where
     indent' = string $ indent <> "    "
 
@@ -800,7 +807,7 @@ takeIndent = do
 -- >> bar
 -- >> baz
 birdtracks :: Parser (DocH mod a)
-birdtracks = DocCodeBlock . DocString . T.unpack . T.intercalate "\n" . stripSpace <$> some line
+birdtracks = DocCodeBlock . DocString . T.intercalate "\n" . stripSpace <$> some line
   where
     line = try (skipHorizontalSpace *> ">" *> takeLine)
 
@@ -836,9 +843,9 @@ examples = DocExamples <$> (many (try (skipHorizontalSpace *> "\n")) *> go Nothi
 
     makeExample :: Text -> Text -> Text -> [Text] -> Example
     makeExample prefix indent expression res =
-      Example (T.unpack (tryStripIndent (T.stripEnd expression))) result
+      Example (tryStripIndent (T.stripEnd expression)) result
       where
-        result = map (T.unpack . substituteBlankLine . tryStripPrefix) res
+        result = map (substituteBlankLine . tryStripPrefix) res
 
         tryStripPrefix xs = fromMaybe xs (T.stripPrefix prefix xs)
         tryStripIndent = liftA2 fromMaybe T.stripStart (T.stripPrefix indent)
@@ -860,7 +867,7 @@ endOfLine = void "\n" <|> Parsec.eof
 -- >>> snd <$> parseOnly property "prop> hello world"
 -- Right (DocProperty "hello world")
 property :: Parser (DocH mod a)
-property = DocProperty . T.unpack . T.strip <$> ("prop>" *> takeWhile1 (/= '\n'))
+property = DocProperty . T.strip <$> ("prop>" *> takeWhile1 (/= '\n'))
 
 -- |
 -- Paragraph level codeblock. Anything between the two delimiting \@ is parsed
@@ -916,20 +923,20 @@ markdownLinkText :: Parser (DocH mod Identifier)
 markdownLinkText = parseParagraph . T.strip <$> ("[" *> takeUntil "]")
 
 -- | The target for a markdown link, enclosed in parenthesis.
-markdownLinkTarget :: Parser String
+markdownLinkTarget :: Parser Text
 markdownLinkTarget = whitespace *> url
   where
     whitespace :: Parser ()
     whitespace = skipHorizontalSpace <* optional ("\n" *> skipHorizontalSpace)
 
-    url :: Parser String
+    url :: Parser Text
     url = rejectWhitespace (decode <$> ("(" *> takeUntil ")"))
 
-    rejectWhitespace :: MonadPlus m => m String -> m String
-    rejectWhitespace = mfilter (all (not . isSpace))
+    rejectWhitespace :: MonadPlus m => m Text -> m Text
+    rejectWhitespace = mfilter (T.all (not . isSpace))
 
-    decode :: Text -> String
-    decode = T.unpack . removeEscapes
+    decode :: Text -> Text
+    decode = removeEscapes
 
 -- | Looks for URL-like things to automatically hyperlink even if they
 -- weren't marked as links.
@@ -940,11 +947,11 @@ autoUrl = mkLink <$> url
 
     mkLink :: Text -> DocH mod a
     mkLink s = case T.unsnoc s of
-      Just (xs, x) | x `elem` (",.!?" :: String) -> DocHyperlink (mkHyperlink xs) `docAppend` DocString [x]
+      Just (xs, x) | x `elem` (",.!?" :: String) -> DocHyperlink (mkHyperlink xs) `docAppend` DocString (T.singleton x)
       _ -> DocHyperlink (mkHyperlink s)
 
     mkHyperlink :: Text -> Hyperlink (DocH mod a)
-    mkHyperlink lnk = Hyperlink (T.unpack lnk) Nothing
+    mkHyperlink lnk = Hyperlink lnk Nothing
 
 -- | Parses identifiers with help of 'parseValid'.
 identifier :: Parser (DocH mod Identifier)

@@ -1,6 +1,9 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Haddock.Backends.Xhtml.Meta where
 
 import Data.ByteString.Builder (hPutBuilder)
+import qualified Data.Text as T
 import System.FilePath ((</>))
 import System.IO (IOMode (WriteMode), withFile)
 
@@ -22,7 +25,7 @@ writeHaddockMeta odir withQuickjump = do
     meta_json =
       object
         ( concat
-            [ ["haddock_version" .= String projectVersion]
+            [ ["haddock_version" .= T.pack projectVersion]
             , ["quickjump_version" .= quickjumpVersion | withQuickjump]
             ]
         )

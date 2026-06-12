@@ -31,7 +31,7 @@ import Control.DeepSeq (force)
 import Control.Monad (unless, when)
 import Data.Bifunctor (bimap)
 import qualified Data.ByteString.Builder as Builder
-import Data.Char (isSpace, toUpper)
+import Data.Char (toUpper)
 import Data.Either (partitionEithers)
 import Data.Foldable (traverse_)
 import Data.List (intersperse, isPrefixOf, sortBy)
@@ -41,6 +41,8 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Ord (comparing)
 import qualified Data.Set as Set hiding (Set)
+import qualified Data.Text as T
+import Data.Text (Text)
 import GHC hiding (LexicalFixity (..), NoLink, moduleInfo)
 import GHC.Types.Name
 import GHC.Unit.State
@@ -52,9 +54,7 @@ import Text.XHtml hiding (name, p, quote, title)
 import qualified Text.XHtml as XHtml
 import Prelude hiding (div)
 import qualified Data.Text.Lazy as LText
-import qualified Data.Text.Encoding as Text
-import qualified Data.Text as Text
-import qualified Data.ByteString.Lazy as LBS
+import qualified Data.Text.Lazy.Encoding as LTextEncoding
 
 import Haddock.Backends.Xhtml.Decl
 import Haddock.Backends.Xhtml.DocMarkup
@@ -108,7 +108,7 @@ ppHtml
   -- ^ The index URL (--use-index)
   -> Bool
   -- ^ Whether to use unicode in output (--use-unicode)
-  -> Maybe String
+  -> Maybe Package
   -- ^ Package name
   -> PackageInfo
   -- ^ Package info
@@ -337,7 +337,7 @@ moduleInfo iface =
   let
     info = ifaceInfo iface
 
-    doOneEntry :: (String, HaddockModInfo GHC.Name -> Maybe String) -> Maybe HtmlTable
+    doOneEntry :: (String, HaddockModInfo GHC.Name -> Maybe Text) -> Maybe HtmlTable
     doOneEntry (fldNm, fld) =
       fld info >>= \a -> return (th << fldNm <-> td << a)
 
@@ -355,9 +355,9 @@ moduleInfo iface =
           ]
         ++ extsForm
       where
-        lg inf = fmap show (hmi_language inf)
+        lg inf = fmap (T.pack . show) (hmi_language inf)
 
-        multilineRow :: String -> [String] -> HtmlTable
+        multilineRow :: String -> [Text] -> HtmlTable
         multilineRow title xs = (th ! [valign "top"]) << title <-> td << (toLines xs)
           where
             toLines = mconcat . intersperse br . map toHtml
@@ -365,7 +365,7 @@ moduleInfo iface =
         copyrightsTable :: Maybe HtmlTable
         copyrightsTable = fmap (multilineRow "Copyright" . split) (hmi_copyright info)
           where
-            split = map (trim . filter (/= ',')) . lines
+            split = map (T.strip . T.filter (/= ',')) . T.lines
 
         extsForm
           | OptShowExtensions `elem` ifaceOptions iface =
@@ -570,10 +570,10 @@ mkNode pkg qual ss p (Node s leaf _pkg srcPkg short ts) =
 --------------------------------------------------------------------------------
 
 data JsonIndexEntry = JsonIndexEntry
-  { jieHtmlFragment :: String
-  , jieName :: String
-  , jieModule :: String
-  , jieLink :: String
+  { jieHtmlFragment :: Text
+  , jieName :: Text
+  , jieModule :: Text
+  , jieLink :: Text
   }
   deriving (Show)
 
@@ -586,10 +586,10 @@ instance ToJSON JsonIndexEntry where
       , jieLink
       } =
       Object
-        [ "display_html" .= String jieHtmlFragment
-        , "name" .= String jieName
-        , "module" .= String jieModule
-        , "link" .= String jieLink
+        [ "display_html" .= jieHtmlFragment
+        , "name" .= jieName
+        , "module" .= jieModule
+        , "link" .= jieLink
         ]
 
 instance FromJSON JsonIndexEntry where
@@ -658,10 +658,10 @@ ppJsonIndex odir maybe_source_url maybe_wiki_url unicode pkg qual_opt ifaces ins
       | Just item_html <- processExport True links_info unicode pkg qual item =
           Just
             JsonIndexEntry
-              { jieHtmlFragment = Text.unpack (Text.decodeUtf8Lenient (LBS.toStrict (Builder.toLazyByteString (showHtmlFragment item_html))))
-              , jieName = unwords (map getOccString names)
-              , jieModule = moduleString mdl
-              , jieLink = LText.unpack $ fromMaybe "" (listToMaybe (map (nameLink mdl) names))
+              { jieHtmlFragment = builderToText (showHtmlFragment item_html)
+              , jieName = T.unwords (map (getOccText . getName) names)
+              , jieModule = moduleText mdl
+              , jieLink = LText.toStrict $ fromMaybe "" (listToMaybe (map (nameLink mdl) names))
               }
       | otherwise = Nothing
       where
@@ -679,6 +679,9 @@ ppJsonIndex odir maybe_source_url maybe_wiki_url unicode pkg qual_opt ifaces ins
     nameLink :: NamedThing name => Module -> name -> LText
     nameLink mdl = moduleNameUrl' (moduleName mdl) . nameOccName . getName
 
+    builderToText :: Builder.Builder -> Text
+    builderToText = LText.toStrict . LTextEncoding.decodeUtf8 . Builder.toLazyByteString
+
     links_info = (maybe_source_url, maybe_wiki_url)
 
     -- update link using relative path to output directory
@@ -689,8 +692,9 @@ ppJsonIndex odir maybe_source_url maybe_wiki_url unicode pkg qual_opt ifaces ins
     fixLink ifaceFile jie =
       jie
         { jieLink =
-            makeRelative odir (takeDirectory ifaceFile)
-              FilePath.</> jieLink jie
+            T.pack $
+              makeRelative odir (takeDirectory ifaceFile)
+                FilePath.</> T.unpack (jieLink jie)
         }
 
 ppHtmlIndex
@@ -1043,7 +1047,7 @@ ppModuleContents pkg qual exports orphan
       | otherwise = (html : secs, rest2)
       where
         html =
-          linkedAnchor (groupId (LText.pack id0))
+          linkedAnchor (groupId (LText.fromStrict id0))
             << docToHtmlNoAnchors (Just id0) pkg qual (mkMeta doc)
             +++ mk_subsections ssecs
         (ssecs, rest1) = process lev rest
@@ -1062,12 +1066,12 @@ numberSectionHeadings = go 1
     go _ [] = []
     go n (ExportGroup lev _ doc : es) =
       case collectAnchors doc of
-        [] -> ExportGroup lev (show n) doc : go (n + 1) es
+        [] -> ExportGroup lev (T.pack (show n)) doc : go (n + 1) es
         (a : _) -> ExportGroup lev a doc : go (n + 1) es
     go n (other : es) =
       other : go n es
 
-    collectAnchors :: DocH (Wrap (ModuleName, OccName)) (Wrap DocName) -> [String]
+    collectAnchors :: DocH (Wrap (ModuleName, OccName)) (Wrap DocName) -> [T.Text]
     collectAnchors (DocAppend a b) = collectAnchors a ++ collectAnchors b
     collectAnchors (DocAName a) = [a]
     collectAnchors _ = []
@@ -1111,7 +1115,7 @@ processExport
     ) =
     processDecl summary $ ppDecl summary links decl pats doc insts fixities subdocs splice unicode pkg qual
 processExport summary _ _ pkg qual (ExportGroup lev id0 doc) =
-  nothingIf summary $ groupHeading lev (LText.pack id0) << docToHtmlNoAnchors (Just id0) pkg qual (mkMeta doc)
+  nothingIf summary $ groupHeading lev (LText.fromStrict id0) << docToHtmlNoAnchors (Just id0) pkg qual (mkMeta doc)
 processExport summary _ _ _ qual (ExportNoDecl y []) =
   processDeclOneLiner summary $ ppDocName qual Prefix True y
 processExport summary _ _ _ qual (ExportNoDecl y subs) =
@@ -1130,11 +1134,6 @@ nothingIf False a = Just a
 processDecl :: Bool -> Html -> Maybe Html
 processDecl True = Just
 processDecl False = Just . divTopDecl
-
-trim :: String -> String
-trim = f . f
-  where
-    f = reverse . dropWhile isSpace
 
 processDeclOneLiner :: Bool -> Html -> Maybe Html
 processDeclOneLiner True = Just

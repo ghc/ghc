@@ -54,6 +54,7 @@ import GHC.Unit.State
 import GHC.Utils.Binary
 import Haddock.Types
 import Text.ParserCombinators.ReadP (readP_to_S)
+import qualified Data.Text as T
 
 import Haddock.Options (Visibility (..))
 
@@ -139,7 +140,7 @@ binaryInterfaceMagic = 0xD0Cface
 --
 binaryInterfaceVersion :: Word16
 #if MIN_VERSION_ghc(9,11,0) && !MIN_VERSION_ghc(10,2,0)
-binaryInterfaceVersion = 46
+binaryInterfaceVersion = 47
 
 binaryInterfaceVersionCompatibility :: [Word16]
 binaryInterfaceVersionCompatibility = [binaryInterfaceVersion]
@@ -627,7 +628,7 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
         return (DocIdentifier ae)
       -- See note [The DocModule story]
       5 -> do
-        af <- get bh
+        af <- T.pack <$> get bh
         return $
           DocModule
             ModLink

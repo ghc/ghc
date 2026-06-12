@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Haddock.Utils.Json.Types
   ( Value (..)
   , typeOf
@@ -7,20 +9,20 @@ module Haddock.Utils.Json.Types
   ) where
 
 import Data.String
-
--- TODO: We may want to replace 'String' with 'Text' or 'ByteString'
+import Data.Text (Text)
+import qualified Data.Text as T
 
 -- | A JSON value represented as a Haskell value.
 data Value
   = Object !Object
   | Array [Value]
-  | String String
+  | String !Text
   | Number !Double
   | Bool !Bool
   | Null
   deriving (Eq, Read, Show)
 
-typeOf :: Value -> String
+typeOf :: Value -> Text
 typeOf v = case v of
   Object _ -> "Object"
   Array _ -> "Array"
@@ -30,7 +32,7 @@ typeOf v = case v of
   Null -> "Null"
 
 -- | A key\/value pair for an 'Object'
-type Pair = (String, Value)
+type Pair = (Text, Value)
 
 -- | A JSON \"object\" (key/value map).
 type Object = [Pair]
@@ -40,4 +42,4 @@ object :: [Pair] -> Value
 object = Object
 
 instance IsString Value where
-  fromString = String
+  fromString = String . T.pack

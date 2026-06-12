@@ -41,10 +41,10 @@ skipHorizontalSpace = Parsec.skipMany (Parsec.satisfy horizontalSpace)
 takeHorizontalSpace :: Parser Text
 takeHorizontalSpace = takeWhile horizontalSpace
 
-makeLabeled :: (String -> Maybe String -> a) -> Text -> a
+makeLabeled :: (Text -> Maybe Text -> a) -> Text -> a
 makeLabeled f input = case T.break isSpace $ removeEscapes $ T.strip input of
-  (uri, "") -> f (T.unpack uri) Nothing
-  (uri, label) -> f (T.unpack uri) (Just . T.unpack $ T.stripStart label)
+  (uri, "") -> f uri Nothing
+  (uri, label) -> f uri (Just $ T.stripStart label)
 
 -- | Remove escapes from given string.
 --

@@ -54,6 +54,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.Text as T
 import Data.Version
 import GHC (Module, moduleUnit)
 import GHC.Data.FastString
@@ -434,7 +435,7 @@ parseHaddockOpts params =
     (flags, args, []) -> return (flags, args)
     (_, _, errors) -> do
       usage <- getUsage
-      throwE (concat errors ++ usage)
+      throwE (T.pack (concat errors ++ usage))
 
 optPackageVersion :: [Flag] -> Maybe Data.Version.Version
 optPackageVersion flags =
@@ -542,7 +543,7 @@ verbosity flags =
   case [str | Flag_Verbosity str <- flags] of
     [] -> Normal
     x : _ -> case parseVerbosity x of
-      Left e -> throwE e
+      Left e -> throwE (T.pack e)
       Right v -> v
 
 -- | Get the ignored symbols from the given flags. These are the symbols for

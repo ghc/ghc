@@ -7,6 +7,7 @@ module Haddock.Doc
   ) where
 
 import Data.Maybe
+import qualified Data.Text as T
 
 import Documentation.Haddock.Doc
 import Haddock.Types
@@ -32,7 +33,7 @@ combineDocumentation (Documentation mDoc mWarning) =
 --
 docCodeBlock :: DocH mod id -> DocH mod id
 docCodeBlock (DocString s) =
-  DocString (reverse $ dropWhile (`elem` (" \t" :: String)) $ reverse s)
+  DocString (T.dropWhileEnd (`elem` (" \t" :: String)) s)
 docCodeBlock (DocAppend l r) =
   DocAppend l (docCodeBlock r)
 docCodeBlock d = d

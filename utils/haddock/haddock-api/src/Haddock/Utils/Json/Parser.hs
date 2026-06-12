@@ -6,12 +6,15 @@ module Haddock.Utils.Json.Parser
 
 import Control.Applicative (Alternative (..))
 import Control.Monad (MonadPlus (..))
-import qualified Data.ByteString.Lazy.Char8 as BSCL
 import Data.Char (isHexDigit)
 import Data.Functor (($>))
 import qualified Data.List as List
-import Numeric
-import Text.Parsec.ByteString.Lazy (Parser)
+import Data.Text (Text)
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Builder as TB
+import qualified Data.Text.Read as TR
+import Numeric (readHex)
+import Text.Parsec.Text (Parser)
 import Text.ParserCombinators.Parsec ((<?>))
 import qualified Text.ParserCombinators.Parsec as Parsec
 import Prelude hiding (null)
@@ -60,13 +63,18 @@ parseArray =
     (tok (Parsec.char ']'))
     (parseValue `Parsec.sepBy` tok (Parsec.char ','))
 
-parseString :: Parser String
+parseString :: Parser Text
 parseString =
-  Parsec.between
-    (tok (Parsec.char '"'))
-    (tok (Parsec.char '"'))
-    (many char)
+  TL.toStrict . TB.toLazyText <$>
+    Parsec.between
+      (tok (Parsec.char '"'))
+      (tok (Parsec.char '"'))
+      (manyCharText mempty)
   where
+    manyCharText acc =
+      (char >>= \c -> manyCharText (acc <> TB.singleton c))
+        <|> pure acc
+
     char =
       (Parsec.char '\\' >> escapedChar)
         <|> Parsec.satisfy (\x -> x /= '"' && x /= '\\')
@@ -115,7 +123,7 @@ parseObject =
     (tok (Parsec.char '}'))
     (field `Parsec.sepBy` tok (Parsec.char ','))
   where
-    field :: Parser (String, Value)
+    field :: Parser (Text, Value)
     field =
       (,)
         <$> parseString
@@ -124,7 +132,7 @@ parseObject =
 
 parseNumber :: Parser Double
 parseNumber = tok $ do
-  s <- BSCL.unpack <$> Parsec.getInput
-  case readSigned readFloat s of
-    [(n, s')] -> Parsec.setInput (BSCL.pack s') $> n
-    _ -> mzero
+  s <- Parsec.getInput
+  case TR.signed TR.double s of
+    Right (n, s') -> Parsec.setInput s' $> n
+    Left _ -> mzero

@@ -31,6 +31,7 @@ import Control.Monad.Writer.Class
 import Data.Foldable (traverse_)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Data.Text as T
 import Data.Traversable (mapM)
 
 import GHC hiding (NoLink, HsTypeGhcPsExt (..))
@@ -266,7 +267,7 @@ renameExportItem item = case item of
               then
                 -- Since Hoogle is line based, we want to avoid breaking long lines.
                 let dflags = dflags0{pprCols = maxBound}
-                 in ppExportD dflags ed
+                 in map T.pack (ppExportD dflags ed)
               else []
 
     decl' <- renameLDecl decl

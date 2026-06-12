@@ -18,6 +18,8 @@ module Haddock.Interface.ParseModuleHeader (parseModuleHeader) where
 import Control.Applicative (Alternative (..))
 import Control.Monad (ap)
 import Data.Char
+import Data.Text (Text)
+import qualified Data.Text as T
 import GHC.Parser.Lexer (ParserOpts)
 
 import Haddock.Parser
@@ -29,19 +31,19 @@ import Haddock.Types
 -- NB.  The headers must be given in the order Module, Description,
 -- Copyright, License, Maintainer, Stability, Portability, except that
 -- any or all may be omitted.
-parseModuleHeader :: ParserOpts -> Maybe Package -> String -> (HaddockModInfo NsRdrName, MDoc NsRdrName)
+parseModuleHeader :: ParserOpts -> Maybe Package -> Text -> (HaddockModInfo NsRdrName, MDoc NsRdrName)
 parseModuleHeader parserOpts pkgName str0 =
   let
-    kvs :: [(String, String)]
-    str1 :: String
+    kvs :: [(Text, Text)]
+    str1 :: Text
 
     (kvs, str1) = maybe ([], str0) id $ runP fields str0
 
     -- trim whitespaces
-    trim :: String -> String
-    trim = dropWhile isSpace . reverse . dropWhile isSpace . reverse
+    trim :: Text -> Text
+    trim = T.strip
 
-    getKey :: String -> Maybe String
+    getKey :: Text -> Maybe Text
     getKey key = fmap trim (lookup key kvs)
 
     descriptionOpt = getKey "Description"
@@ -116,13 +118,13 @@ instance Alternative P where
   empty = P $ \_ -> Nothing
   a <|> b = P $ \s -> unP a s <|> unP b s
 
-runP :: P a -> String -> Maybe a
+runP :: P a -> Text -> Maybe a
 runP p input = fmap snd (unP p input')
   where
     input' =
       concat
-        [ zipWith C [0 ..] l ++ [C (length l) '\n']
-        | l <- lines input
+        [ zipWith C [0 ..] (T.unpack l) ++ [C (T.length l) '\n']
+        | l <- T.lines input
         ]
 
 -------------------------------------------------------------------------------
@@ -134,22 +136,22 @@ curInd = P $ \s -> Just . (,) s $ case s of
   [] -> 0
   C i _ : _ -> i
 
-rest :: P String
-rest = P $ \cs -> Just ([], [c | C _ c <- cs])
+rest :: P Text
+rest = P $ \cs -> Just ([], T.pack [c | C _ c <- cs])
 
-munch :: (Int -> Char -> Bool) -> P String
+munch :: (Int -> Char -> Bool) -> P Text
 munch p = P $ \cs ->
-  let (xs, ys) = takeWhileMaybe p' cs in Just (ys, xs)
+  let (xs, ys) = takeWhileMaybe p' cs in Just (ys, T.pack xs)
   where
     p' (C i c)
       | p i c = Just c
       | otherwise = Nothing
 
-munch1 :: (Int -> Char -> Bool) -> P String
+munch1 :: (Int -> Char -> Bool) -> P Text
 munch1 p = P $ \s -> case s of
   [] -> Nothing
   (c : cs)
-    | Just c' <- p' c -> let (xs, ys) = takeWhileMaybe p' cs in Just (ys, c' : xs)
+    | Just c' <- p' c -> let (xs, ys) = takeWhileMaybe p' cs in Just (ys, T.pack (c' : xs))
     | otherwise -> Nothing
   where
     p' (C i c)
@@ -178,7 +180,7 @@ takeWhileMaybe f = go
 -- Fields
 -------------------------------------------------------------------------------
 
-field :: Int -> P (String, String)
+field :: Int -> P (Text, Text)
 field i = do
   fn <- munch1 $ \_ c -> isAlpha c || c == '-'
   skipSpaces
@@ -187,7 +189,7 @@ field i = do
   val <- munch $ \j c -> isSpace c || j > i
   return (fn, val)
 
-fields :: P ([(String, String)], String)
+fields :: P ([(Text, Text)], Text)
 fields = do
   skipSpaces
   i <- curInd

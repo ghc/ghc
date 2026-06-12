@@ -27,6 +27,7 @@ import Data.List (sort)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Text as T
 import GHC hiding (HsTypeGhcPsExt (..), fromMaybeContext)
 import GHC.Core.Type (Specificity (..))
 import GHC.Data.FastString (unpackFS)
@@ -1472,7 +1473,7 @@ latexMarkup =
   Markup
     { markupParagraph = \p v -> blockElem (p v (text "\\par"))
     , markupEmpty = \_ -> id
-    , markupString = \s v -> inlineElem (text (fixString v s))
+    , markupString = \s v -> inlineElem (text (fixString v (T.unpack s)))
     , markupAppend = \l r v -> l v . r v
     , markupIdentifier = \i v -> inlineElem (markupId v (fmap occName i))
     , markupIdentifierUnchecked = \i v -> inlineElem (markupId v (fmap snd i))
@@ -1482,7 +1483,7 @@ latexMarkup =
             Just lbl -> inlineElem . tt $ lbl v empty
             Nothing ->
               inlineElem
-                ( let (mdl, _ref) = break (== '#') m
+                ( let (mdl, _ref) = break (== '#') (T.unpack m)
                    in (tt (text mdl))
                 )
     , markupWarning = \p v -> p v
@@ -1491,15 +1492,15 @@ latexMarkup =
     , markupMonospaced = \p v -> inlineElem (markupMonospace p v)
     , markupUnorderedList = \p v -> blockElem (itemizedList (map (\p' -> p' v empty) p))
     , markupPic = \p _ -> inlineElem (markupPic p)
-    , markupMathInline = \p _ -> inlineElem (markupMathInline p)
-    , markupMathDisplay = \p _ -> blockElem (markupMathDisplay p)
+    , markupMathInline = \p _ -> inlineElem (markupMathInline (T.unpack p))
+    , markupMathDisplay = \p _ -> blockElem (markupMathDisplay (T.unpack p))
     , markupOrderedList = \p v -> blockElem (enumeratedList (map (\(_, p') -> p' v empty) p))
     , markupDefList = \l v -> blockElem (descriptionList (map (\(a, b) -> (a v empty, b v empty)) l))
     , markupCodeBlock = \p _ -> blockElem (quote (verb (p Verb empty)))
-    , markupHyperlink = \(Hyperlink u l) v -> inlineElem (markupLink u (fmap (\x -> x v empty) l))
+    , markupHyperlink = \(Hyperlink u l) v -> inlineElem (markupLink (T.unpack u) (fmap (\x -> x v empty) l))
     , markupAName = \_ _ -> id -- TODO
-    , markupProperty = \p _ -> blockElem (quote (verb (text p)))
-    , markupExample = \e _ -> blockElem (quote (verb (text $ unlines $ map exampleToString e)))
+    , markupProperty = \p _ -> blockElem (quote (verb (text (T.unpack p))))
+    , markupExample = \e _ -> blockElem (quote (verb (text $ unlines $ map (T.unpack . exampleToString) e)))
     , markupHeader = \(Header l h) p -> blockElem (header l (h p empty))
     , markupTable = \(Table h b) p -> blockElem (table h b p)
     }
@@ -1533,9 +1534,9 @@ latexMarkup =
     markupPic (Picture uri title) = parens (imageText title)
       where
         imageText Nothing = beg
-        imageText (Just t) = beg <> text " " <> text t
+        imageText (Just t) = beg <> text " " <> text (T.unpack t)
 
-        beg = text "image: " <> text uri
+        beg = text "image: " <> text (T.unpack uri)
 
     markupMathInline mathjax = text "\\(" <> text mathjax <> text "\\)"
 
@@ -1543,11 +1544,11 @@ latexMarkup =
 
     markupId v wrappedOcc =
       case v of
-        Verb -> text i
-        Mono -> text "\\haddockid" <> braces (text . latexMonoFilter $ i)
-        Plain -> text "\\haddockid" <> braces (text . latexFilter $ i)
+        Verb -> text (T.unpack i)
+        Mono -> text "\\haddockid" <> braces (text . latexMonoFilter $ T.unpack i)
+        Plain -> text "\\haddockid" <> braces (text . latexFilter $ T.unpack i)
       where
-        i = showWrapped occNameString wrappedOcc
+        i = showWrapped (T.pack . occNameString) wrappedOcc
 
 docToLaTeX :: Doc DocName -> LaTeX
 docToLaTeX doc = markup latexMarkup doc Plain empty
@@ -1568,10 +1569,10 @@ data StringContext
 
 latexStripTrailingWhitespace :: Doc a -> Doc a
 latexStripTrailingWhitespace (DocString s)
-  | null s' = DocEmpty
-  | otherwise = DocString s
+  | T.null s' = DocEmpty
+  | otherwise = DocString s'
   where
-    s' = reverse (dropWhile isSpace (reverse s))
+    s' = T.dropWhileEnd isSpace s
 latexStripTrailingWhitespace (DocAppend l r)
   | DocEmpty <- r' = latexStripTrailingWhitespace l
   | otherwise = DocAppend l r'

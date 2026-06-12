@@ -24,6 +24,7 @@ module Haddock.Backends.Xhtml.DocMarkup
 
 import Data.List (intersperse)
 import Data.Maybe (fromMaybe)
+import qualified Data.Text as T
 import GHC
 import GHC.Types.Name
 import Text.XHtml hiding (name, p, quote)
@@ -55,13 +56,13 @@ parHtmlMarkup qual insertAnchors ppId =
     , markupIdentifier = thecode . ppId insertAnchors
     , markupIdentifierUnchecked = thecode . ppUncheckedLink qual
     , markupModule = \(ModLink m lbl) ->
-        let (mdl, ref) = break (== '#') m
+        let (mdl, ref) = T.break (== '#') m
             -- Accommodate for old style
             -- foo\#bar anchors
-            mdl' = case reverse mdl of
-              '\\' : _ -> init mdl
+            mdl' = case T.unsnoc mdl of
+              Just (rest, '\\') -> rest
               _ -> mdl
-         in ppModuleRef lbl (mkModuleName mdl') (LText.pack ref)
+         in ppModuleRef lbl (mkModuleName (T.unpack mdl')) (LText.fromStrict ref)
     , markupWarning = thediv ! [theclass "warning"]
     , markupEmphasis = emphasize
     , markupBold = strong
@@ -74,16 +75,16 @@ parHtmlMarkup qual insertAnchors ppId =
         if insertAnchors
           then
             anchor
-              ! [href (LText.pack url)]
+              ! [href (LText.fromStrict url)]
               << fromMaybe (toHtml url) mLabel
           else fromMaybe (toHtml url) mLabel
     , markupAName = \aname ->
         if insertAnchors
-          then namedAnchor (LText.pack aname) << ("" :: LText.Text)
+          then namedAnchor (LText.fromStrict aname) << ("" :: LText.Text)
           else noHtml
-    , markupPic = \(Picture uri t) -> image ! ([src (LText.pack uri)] ++ fromMaybe [] (return . title <$> (LText.pack <$> t)))
-    , markupMathInline = \mathjax -> thespan ! [theclass "mathjax"] << toHtml ("\\(" ++ mathjax ++ "\\)")
-    , markupMathDisplay = \mathjax -> thespan ! [theclass "mathjax"] << toHtml ("\\[" ++ mathjax ++ "\\]")
+    , markupPic = \(Picture uri t) -> image ! ([src (LText.fromStrict uri)] ++ fromMaybe [] (return . title <$> (LText.fromStrict <$> t)))
+    , markupMathInline = \mathjax -> thespan ! [theclass "mathjax"] << toHtml ("\\(" <> mathjax <> "\\)")
+    , markupMathDisplay = \mathjax -> thespan ! [theclass "mathjax"] << toHtml ("\\[" <> mathjax <> "\\]")
     , markupProperty = pre . toHtml
     , markupExample = examplesToHtml
     , markupHeader = \(Header l t) -> makeHeader l t
@@ -121,9 +122,9 @@ parHtmlMarkup qual insertAnchors ppId =
 
     exampleToHtml (Example expression result) = htmlExample
       where
-        htmlExample = htmlPrompt +++ htmlExpression +++ toHtml (unlines result)
+        htmlExample = htmlPrompt +++ htmlExpression +++ toHtml (T.unlines result)
         htmlPrompt = (thecode . toHtml $ (">>> " :: LText.Text)) ! [theclass "prompt"]
-        htmlExpression = (strong . thecode . toHtml $ expression ++ "\n") ! [theclass "userinput"]
+        htmlExpression = (strong . thecode . toHtml $ expression <> "\n") ! [theclass "userinput"]
 
     makeOrdList :: HTML a => [(Int, a)] -> Html
     makeOrdList items = olist << map (\(index, a) -> li ! [intAttr "value" index] << a) items
@@ -135,7 +136,7 @@ parHtmlMarkup qual insertAnchors ppId =
 -- we won't need after the fact.
 data Hack a id
   = UntouchedDoc (MetaDoc a id)
-  | CollapsingHeader (Header (DocH a id)) (MetaDoc a id) Int (Maybe String)
+  | CollapsingHeader (Header (DocH a id)) (MetaDoc a id) Int (Maybe T.Text)
   | HackAppend (Hack a id) (Hack a id)
   deriving (Eq)
 
@@ -144,7 +145,7 @@ toHack
   :: Int
   -- ^ Counter for header IDs which serves to assign
   -- unique identifiers within the comment scope
-  -> Maybe String
+  -> Maybe T.Text
   -- ^ It is not enough to have unique identifier within the
   -- scope of the comment: if two different comments have the
   -- same ID for headers, the collapse/expand behaviour will act
@@ -205,7 +206,7 @@ hackMarkup fmt' currPkg h' =
     hackMarkup' fmt h = case h of
       UntouchedDoc d -> (markup fmt $ _doc d, [_meta d])
       CollapsingHeader (Header lvl titl) par n nm ->
-        let id_ = makeAnchorId $ "ch:" <> fromMaybe "noid:" (LText.pack <$> nm) <> LText.pack (show n)
+        let id_ = makeAnchorId $ "ch:" <> maybe "noid:" LText.fromStrict nm <> LText.pack (show n)
             col' = collapseControl id_ "subheading"
             summary = thesummary ! [theclass "hide-when-js-enabled"] << ("Expand" :: LText.Text)
             instTable contents = collapseDetails id_ DetailsClosed (summary +++ contents)
@@ -228,7 +229,7 @@ renderMetaSince fmt currPkg (MetaSince{sincePackage = pkg, sinceVersion = ver}) 
     "Since: " ++ formatPkgMaybe pkg ++ formatVersion ver
   where
     formatVersion v = concat . intersperse "." $ map show v
-    formatPkgMaybe (Just p) | Just p /= currPkg = p ++ "-"
+    formatPkgMaybe (Just p) | Just p /= currPkg = T.unpack p ++ "-"
     formatPkgMaybe _ = ""
 
 -- | Goes through 'hackMarkup' to generate the 'Html' rather than
@@ -237,7 +238,7 @@ renderMetaSince fmt currPkg (MetaSince{sincePackage = pkg, sinceVersion = ver}) 
 markupHacked
   :: DocMarkup (Wrap id) Html
   -> Maybe Package -- this package
-  -> Maybe String
+  -> Maybe T.Text
   -> MDoc id
   -> Html
 markupHacked fmt currPkg n = hackMarkup fmt currPkg . toHack 0 n . flatten
@@ -245,7 +246,7 @@ markupHacked fmt currPkg n = hackMarkup fmt currPkg . toHack 0 n . flatten
 -- If the doc is a single paragraph, don't surround it with <P> (this causes
 -- ugly extra whitespace with some browsers).  FIXME: Does this still apply?
 docToHtml
-  :: Maybe String
+  :: Maybe T.Text
   -- ^ Name of the thing this doc is for. See
   -- comments on 'toHack' for details.
   -> Maybe Package
@@ -260,7 +261,7 @@ docToHtml n pkg qual = markupHacked fmt pkg n . cleanup
 -- | Same as 'docToHtml' but it doesn't insert the 'anchor' element
 -- in links. This is used to generate the Contents box elements.
 docToHtmlNoAnchors
-  :: Maybe String
+  :: Maybe T.Text
   -- ^ See 'toHack'
   -> Maybe Package
   -- ^ Current package
@@ -307,7 +308,7 @@ docSection_
   -> MDoc DocName
   -> Html
 docSection_ n pkg qual =
-  (docElement thediv <<) . docToHtml (getOccString <$> n) pkg qual
+  (docElement thediv <<) . docToHtml (T.pack . getOccString <$> n) pkg qual
 
 cleanup :: MDoc a -> MDoc a
 cleanup = overDoc (markup fmtUnParagraphLists)

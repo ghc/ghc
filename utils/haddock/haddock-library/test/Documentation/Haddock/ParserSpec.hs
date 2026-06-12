@@ -6,6 +6,7 @@ module Documentation.Haddock.ParserSpec (main, spec) where
 
 import Data.Char (isSpace)
 import Data.String
+import qualified Data.Text as T
 import Test.Hspec
 import Test.QuickCheck
 import Prelude hiding ((<>))
@@ -26,10 +27,10 @@ instance IsString (Doc String) where
 instance IsString a => IsString (Maybe a) where
   fromString = Just . fromString
 
-parseParas :: String -> MetaDoc () String
+parseParas :: T.Text -> MetaDoc () String
 parseParas = overDoc Parse.toRegular . Parse.parseParas Nothing
 
-parseString :: String -> Doc String
+parseString :: T.Text -> Doc String
 parseString = Parse.toRegular . Parse.parseString
 
 hyperlink :: String -> Maybe (Doc String) -> Doc String

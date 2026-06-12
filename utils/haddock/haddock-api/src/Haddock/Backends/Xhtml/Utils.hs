@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
 -----------------------------------------------------------------------------
 
 -----------------------------------------------------------------------------
@@ -54,6 +55,8 @@ module Haddock.Backends.Xhtml.Utils
   ) where
 
 import GHC (Name, SrcSpan (..), GeneratedSrcSpanDetails (..), srcSpanStartLine)
+import GHC.Data.FastString (FastString, bytesFS)
+import qualified Data.Text.Encoding as TE
 import GHC.Types.Name (getOccString, isValOcc, nameOccName)
 import GHC.Unit.Module (Module, ModuleName, moduleName, moduleNameString)
 import Text.XHtml hiding (name, p, quote, title)
@@ -61,6 +64,11 @@ import qualified Text.XHtml as XHtml
 import qualified Data.Text.Lazy as LText
 
 import Haddock.Utils
+
+-- | HTML instance for FastString using efficient Text conversion
+instance HTML FastString where
+  toHtml = toHtml . TE.decodeUtf8 . bytesFS
+  {-# INLINE toHtml #-}
 
 -- | Replace placeholder string elements with provided values.
 --

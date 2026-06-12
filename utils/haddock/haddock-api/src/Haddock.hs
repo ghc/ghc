@@ -56,6 +56,8 @@ import qualified GHC.Paths as GhcPaths
 import Paths_haddock_api (getDataDir)
 #endif
 import System.Directory (doesDirectoryExist, getTemporaryDirectory)
+import qualified Data.Text as T
+import qualified Data.Text.IO.Utf8 as T.Utf8
 import Text.ParserCombinators.ReadP (readP_to_S)
 import GHC hiding (verbosity)
 import GHC.Settings.Config
@@ -84,7 +86,7 @@ import Haddock.Version
 import Haddock.InterfaceFile
 import Haddock.Options
 import Haddock.Utils
-import Haddock.GhcUtils (modifySessionDynFlags, setOutputDir)
+import Haddock.GhcUtils (fastStringToText, modifySessionDynFlags, setOutputDir)
 import Haddock.Compat (getProcessID)
 import System.Semaphore (AbstractSem(..), openSemaphore, releaseSemaphoreToken, waitOnSemaphore)
 
@@ -454,7 +456,7 @@ render dflags parserOpts logger unit_state flags sinceQual qual concSem ifaces p
     pkgKey           = fmap moduleUnit pkgMod
     pkgStr           = fmap unitString pkgKey
     pkgNameVer       = modulePackageInfo unit_state flags pkgMod
-    pkgName          = fmap (unpackFS . (\(PackageName n) -> n)) (fst pkgNameVer)
+    pkgName          = fmap (fastStringToText . (\(PackageName n) -> n)) (fst pkgNameVer)
     sincePkg         = case sinceQual of
                          External -> pkgName
                          Always -> Nothing
@@ -693,7 +695,7 @@ withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
 
       (dynflags'', rest, _) <- parseDynamicFlags logger dynflags' (map noLoc flags')
       if not (null rest)
-        then throwE ("Couldn't parse GHC options: " ++ unwords flags')
+        then throwE (T.pack ("Couldn't parse GHC options: " ++ unwords flags'))
         else return dynflags''
 
 unsetPatternMatchWarnings :: DynFlags -> DynFlags
@@ -881,13 +883,11 @@ getPrologue parserOpts flags =
   case [filename | Flag_Prologue filename <- flags ] of
     [] -> return Nothing
     [filename] -> do
-      h <- openFile filename ReadMode
-      hSetEncoding h utf8
-      str <- hGetContents h -- semi-closes the handle
+      str <- T.Utf8.readFile filename
       return . Just $! second (fmap rdrName) $ parseParas parserOpts Nothing str
     _ -> throwE "multiple -p/--prologue options"
 
 
 rightOrThrowE :: Either String b -> IO b
-rightOrThrowE (Left msg) = throwE msg
+rightOrThrowE (Left msg) = throwE (T.pack msg)
 rightOrThrowE (Right x) = pure x
