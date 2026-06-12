@@ -619,10 +619,15 @@ contOutArgs env cont
     go (ApplyToTy { sc_arg_ty = ty, sc_cont = cont })
       = Type ty : go cont
 
-    go (ApplyToVal { sc_arg = arg, sc_env = se, sc_cont = cont })
-      = case se of
-          Simplified {}    -> arg : go cont
-          UnSimplified env -> GHC.Core.Subst.substExpr (getFullSubst in_scope env) arg : go cont
+    go (ApplyToVal { sc_arg = arg, sc_env = se, sc_cast = mco, sc_cont = cont })
+      = (out_arg `mkCastMCo` mco) : go cont
+        -- Don't forget sc_cast: the argument the hole sees is (arg |> mco),
+        -- and omitting the cast would give the rule matcher an argument of
+        -- the wrong type
+      where
+        out_arg = case se of
+          Simplified {}    -> arg
+          UnSimplified env -> GHC.Core.Subst.substExpr (getFullSubst in_scope env) arg
         -- Make sure we apply the static environment `sc_env` as a substitution
         --   to get an OutExpr.  See (BF1) in Note [tryRules: plan (BEFORE)]
         --   in GHC.Core.Opt.Simplify.Iteration

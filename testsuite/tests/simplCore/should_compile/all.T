@@ -609,3 +609,8 @@ test('T4081', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-a
 test('T27261', [extra_files(['T27261_aux.hs'])], multimod_compile, ['T27261', '-v0 -O'])
 test('T27296', [], makefile_test, ['T27296'])
 test('T27296b', [], makefile_test, ['T27296b'])
+
+# T27016: the "USPEC pprLabel @HLine" rule should fire even though the call
+# site reads pprLabel @(Line HDoc), an un-reduced type-family application.
+test('T27016', [extra_files(['T27016a.hs', 'T27016b.hs']), grep_errmsg(r'USPEC')],
+     multimod_compile, ['T27016', '-v0 -O -ddump-rule-firings'])

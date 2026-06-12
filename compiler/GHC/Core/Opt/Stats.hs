@@ -231,6 +231,9 @@ data Tick  -- See Note [Which transformations are innocuous]
 
   | UnfoldingDone               Id
   | RuleFired                   FastString      -- Rule name
+  | CallTyArgNormalised         Id      -- Callee; see Note [Normalise type-family
+                                        -- redexes in call type arguments] in
+                                        -- GHC.Core.Opt.Simplify.Iteration
 
   | LetFloatFromLet
   | EtaExpansion                Id      -- LHS binder
@@ -276,12 +279,14 @@ tickToTag (CaseIdentity _)              = 12
 tickToTag (FillInCaseDefault _)         = 13
 tickToTag SimplifierDone                = 16
 tickToTag (AltMerge _)                  = 17
+tickToTag (CallTyArgNormalised _)       = 18
 
 pprTickType :: Tick -> SDoc
 pprTickType (PreInlineUnconditionally _) = text "PreInlineUnconditionally"
 pprTickType (PostInlineUnconditionally _)= text "PostInlineUnconditionally"
 pprTickType (UnfoldingDone _)            = text "UnfoldingDone"
 pprTickType (RuleFired _)                = text "RuleFired"
+pprTickType (CallTyArgNormalised _)      = text "CallTyArgNormalised"
 pprTickType LetFloatFromLet              = text "LetFloatFromLet"
 pprTickType (EtaExpansion _)             = text "EtaExpansion"
 pprTickType (EtaReduction _)             = text "EtaReduction"
@@ -300,6 +305,7 @@ pprTickCts (PreInlineUnconditionally v) = ppr v
 pprTickCts (PostInlineUnconditionally v)= ppr v
 pprTickCts (UnfoldingDone v)            = ppr v
 pprTickCts (RuleFired v)                = ppr v
+pprTickCts (CallTyArgNormalised v)      = ppr v
 pprTickCts LetFloatFromLet              = Outputable.empty
 pprTickCts (EtaExpansion v)             = ppr v
 pprTickCts (EtaReduction v)             = ppr v
@@ -324,6 +330,7 @@ cmpEqTick (PreInlineUnconditionally a)  (PreInlineUnconditionally b)    = a `com
 cmpEqTick (PostInlineUnconditionally a) (PostInlineUnconditionally b)   = a `compare` b
 cmpEqTick (UnfoldingDone a)             (UnfoldingDone b)               = a `compare` b
 cmpEqTick (RuleFired a)                 (RuleFired b)                   = a `uniqCompareFS` b
+cmpEqTick (CallTyArgNormalised a)       (CallTyArgNormalised b)         = a `compare` b
 cmpEqTick (EtaExpansion a)              (EtaExpansion b)                = a `compare` b
 cmpEqTick (EtaReduction a)              (EtaReduction b)                = a `compare` b
 cmpEqTick (BetaReduction a)             (BetaReduction b)               = a `compare` b
