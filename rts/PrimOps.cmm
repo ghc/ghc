@@ -120,7 +120,6 @@ stg_newByteArrayzh ( W_ n )
     return (p);
 }
 
-
 #define BA_ALIGN 16
 #define BA_MASK  (BA_ALIGN-1)
 

@@ -70,7 +70,6 @@ module GHC.Builtin.Types.Prim(
 
         arrayPrimTyCon, mkArrayPrimTy,
         byteArrayPrimTyCon,     byteArrayPrimTy,
-        -- byteArrayLiftedPrimTyCon,
         smallArrayPrimTyCon, mkSmallArrayPrimTy,
         mutableArrayPrimTyCon, mkMutableArrayPrimTy,
         mutableByteArrayPrimTyCon, mkMutableByteArrayPrimTy,

@@ -64,7 +64,7 @@ import GHC.Platform.Profile (profileIsProfiling)
 --              cgExpr: the main function
 ------------------------------------------------------------------------
 
-cgExpr  :: HasCallStack => CgStgExpr -> FCode ReturnKind
+cgExpr  :: CgStgExpr -> FCode ReturnKind
 
 cgExpr (StgApp fun args)     = cgIdApp fun args
 
