@@ -30,6 +30,8 @@ module GHC.Builtin.Types (
         falseDataCon, falseDataConName, falseDataConId, false_RDR,
         promotedFalseDataCon, promotedTrueDataCon,
 
+        lazyTy, lazyTyCon, {- mkLazyTyConName, -} mkLazyDataCon, mkLazyDataConName,
+
         -- * Ordering
         orderingTyCon,
         ordLTDataCon, ordLTDataConId,
@@ -330,6 +332,7 @@ wiredInTyCons = map (dataConTyCon . snd) boxingDataCons
                 , unliftedRepTyCon
                 , zeroBitRepTyCon
                 , zeroBitTypeTyCon
+                , lazyTyCon
                 ]
 
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
@@ -382,6 +385,10 @@ boolTyConName, falseDataConName, trueDataConName :: Name
 boolTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Bool") boolTyConKey boolTyCon
 falseDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "False") falseDataConKey falseDataCon
 trueDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "True")  trueDataConKey  trueDataCon
+
+lazyTyConName, mkLazyDataConName :: Name
+lazyTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Lazy") lazyTyConKey lazyTyCon
+mkLazyDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "MkLazy") mkLazyDataConKey mkLazyDataCon
 
 listTyConName, nilDataConName, consDataConName :: Name
 listTyConName     = mkWiredInTyConName   UserSyntax    gHC_TYPES (fsLit "List") listTyConKey listTyCon
@@ -2570,6 +2577,19 @@ trueDataCon  = pcDataCon trueDataConName  [] [] boolTyCon
 falseDataConId, trueDataConId :: Id
 falseDataConId = dataConWorkId falseDataCon
 trueDataConId  = dataConWorkId trueDataCon
+
+lazyTy :: Type
+lazyTy = mkTyConTy lazyTyCon
+
+lazyTyCon :: TyCon
+lazyTyCon = pcTyCon lazyTyConName Nothing [alphaTyVarUnliftedRep] [mkLazyDataCon]
+
+mkLazyDataCon :: DataCon
+mkLazyDataCon = pcDataCon mkLazyDataConName [alphaTyVarUnliftedRep] [alphaTyUnliftedRep] lazyTyCon
+
+-- Do we need this?
+-- lazyDataConId :: Id
+-- lazyDataConId = dataConWorkId mkLazyDataCon
 
 orderingTyCon :: TyCon
 orderingTyCon = pcTyCon orderingTyConName Nothing

@@ -800,7 +800,6 @@ extern char **environ;
       SymI_HasDataProto(stg_TVAR_DIRTY_info)                                \
       SymI_HasDataProto(stg_IND_STATIC_info)                                \
       SymI_HasDataProto(stg_ARR_WORDS_info)                                 \
-      SymI_HasDataProto(stg_ARR_WORDS_LIFTED_info)                          \
       SymI_HasDataProto(stg_MUT_ARR_PTRS_DIRTY_info)                        \
       SymI_HasDataProto(stg_MUT_ARR_PTRS_FROZEN_CLEAN_info)                 \
       SymI_HasDataProto(stg_MUT_ARR_PTRS_FROZEN_DIRTY_info)                 \

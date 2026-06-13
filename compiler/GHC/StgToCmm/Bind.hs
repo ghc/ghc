@@ -269,6 +269,7 @@ cgRhs :: Id
                                   -- (see above)
                )
 
+-- TODO: what if con = MkLazy?
 cgRhs id (StgRhsCon cc con mn _ts args _typ)
   = withNewTickyCounterCon id con mn $
     buildDynCon id mn True cc con (assertNonVoidStgArgs args)

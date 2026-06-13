@@ -2008,12 +2008,6 @@ primtype ByteArray#
   allows to mention 'ByteArray#' and 'MutableByteArray#' in FFI type signatures directly.
 }
 
-primtype ByteArrayLifted#
-{
-  Like ByteArray# but lifted
-}
-
-
 primtype MutableByteArray# s
 { A mutable 'ByteAray#'. It can be created in three ways:
 
@@ -4290,16 +4284,6 @@ primop VecSqrtOp "sqrt#" GenPrimOp
    VECTOR -> VECTOR
    { Element-wise square root. }
    with vector = FLOAT_VECTOR_TYPES
-
-primop LiftByteArrayOp "liftByteArray#" GenPrimOp
-   ByteArray# -> ByteArrayLifted#
-   { comment }
-   with effect = CanFail
-
-primop UnliftByteArrayOp "unliftByteArray#" GenPrimOp
-   ByteArrayLifted# -> ByteArray#
-   { comment }
-   with effect = CanFail
 
 primop VecIndexByteArrayOp "indexArray#" GenPrimOp
    ByteArray# -> Int# -> VECTOR

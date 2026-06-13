@@ -42,6 +42,7 @@ import GHC.Core.DataCon
 import GHC.Types.ForeignCall
 import GHC.Types.Id
 import GHC.Builtin.PrimOps
+import GHC.Builtin.Types (lazyTyCon, mkLazyDataCon)
 import GHC.Core.TyCon
 import GHC.Core.Type        ( isUnliftedType )
 import GHC.Types.RepType    ( isZeroBitTy, countConRepArgs, mightBeFunTy )
@@ -63,7 +64,7 @@ import GHC.Platform.Profile (profileIsProfiling)
 --              cgExpr: the main function
 ------------------------------------------------------------------------
 
-cgExpr  :: CgStgExpr -> FCode ReturnKind
+cgExpr  :: HasCallStack => CgStgExpr -> FCode ReturnKind
 
 cgExpr (StgApp fun args)     = cgIdApp fun args
 
@@ -191,6 +192,7 @@ cgLetNoEscapeRhsBody
     -> FCode (CgIdInfo, FCode ())
 cgLetNoEscapeRhsBody local_cc bndr (StgRhsClosure _ cc _upd args body _typ)
   = cgLetNoEscapeClosure bndr local_cc cc (nonVoidIds args) body
+-- TODO: What do we do if con = MkLazy? Do we need to do anything at all?
 cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon cc con mn _ts args _typ)
   = cgLetNoEscapeClosure bndr local_cc cc []
       (StgConApp con mn args (pprPanic "cgLetNoEscapeRhsBody" $
@@ -596,6 +598,22 @@ cgCase scrut bndr _alt_type [GenStgAlt { alt_rhs = rhs}]
   , isUnboxedTupleDataCon dc
   , v == bndr
   = cgExpr scrut
+
+-- TODO: add note
+cgCase scrut bndr (AlgAlt tc) [GenStgAlt (DataAlt dc) [bndr'] rhs]
+  | tc == lazyTyCon
+  , dc == mkLazyDataCon
+  = do { platform <- getPlatform
+       ; let ret_bndr = head (assertNonVoidIds [bndr])
+             alt_reg = idToReg platform ret_bndr
+             arg_bndr = head (assertNonVoidIds [bndr'])
+       ; _ <- withSequel (AssignTo [alt_reg] False) (cgExpr scrut)
+       ; _ <- bindArgsToRegs [ret_bndr] -- TODO: why?
+       -- we directly pass on the scrutinee to the rhs, avoiding actual pattern matching
+       ; emit (mkAssign (CmmLocal (idToReg platform arg_bndr)) (CmmReg (CmmLocal alt_reg)))
+       ; _ <- bindArgToReg arg_bndr
+       ; cgExpr rhs
+       }
 
 cgCase scrut bndr alt_type alts
   = -- the general case
@@ -1020,6 +1038,11 @@ cgConApp con mn stg_args
   = do { arg_exprs <- getNonVoidArgAmodes stg_args
        ; tickyUnboxedTupleReturn (length arg_exprs)
        ; emitReturn arg_exprs }
+
+  | con == mkLazyDataCon, [StgVarArg var] <- stg_args = 
+    do { idInfo <- getCgIdInfo var
+       ; emitReturn [idInfoToAmode idInfo]
+       }
 
   | otherwise   --  Boxed constructors; allocate and return
   = assertPpr (stg_args `lengthIs` countConRepArgs con)

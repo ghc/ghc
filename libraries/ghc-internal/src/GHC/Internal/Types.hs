@@ -197,9 +197,16 @@ module GHC.Internal.Types (
         Sum63#,
         Sum64#,
 
+        Lazy (MkLazy),
+
     ) where
 
 import GHC.Internal.Prim
+
+-- TODO: note about how this is special cased in the translation to C--
+-- it removed when compiling to C-- so that it has no space and indirection overhead.
+type Lazy :: UnliftedType -> Type
+data Lazy a = MkLazy a
 
 infixr 5 :
 
