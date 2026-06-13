@@ -228,7 +228,9 @@ uniqAway' in_scope var
 
 -- | @unsafeGetFreshUnique in_scope@ finds a unique that is not in-scope in the
 -- given 'InScopeSet'. This must be used very carefully since one can very easily
--- introduce non-unique 'Unique's this way. See Note [Local uniques].
+-- introduce non-unique 'Unique's this way. See Note [Local uniques], and
+-- Note [Uniques and UniqFM shape] in GHC.Types.Unique.FM for the 'lookupLT'
+-- trie mechanics it relies on.
 unsafeGetFreshLocalUnique :: InScopeSet -> Unique
 unsafeGetFreshLocalUnique (InScope set)
   | Just (uniq,_) <- Word64Map.lookupLT (getKey maxLocalUnique) (ufmToIntMap $ getUniqSet set)

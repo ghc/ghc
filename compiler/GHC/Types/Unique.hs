@@ -88,6 +88,10 @@ to distinguish uniques constructed by different parts of the compiler.
 To ensure that we assign distinct tags for each purpose, we represent tags in the compiler
 via the UniqueTag ADT.
 
+The high-order tag also shapes any 'UniqFM' keyed by these uniques, clustering
+keys near the trie root; see Note [Uniques and UniqFM shape] in
+GHC.Types.Unique.FM.
+
 The bidirectional mapping from the UniqueTag ADT to the corresponding character is witnessed
 by the uniqueTag and charToUniqueTag functions.
 See Note [Uniques for wired-in prelude things and known tags]

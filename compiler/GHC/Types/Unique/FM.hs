@@ -10,13 +10,12 @@ Basically, the things need to be in class @Uniquable@, and we use the
 
 (A similar thing to @UniqSet@, as opposed to @Set@.)
 
-The interface is based on @FiniteMap@s, but the implementation uses
-@Data.IntMap@, which is both maintained and faster than the past
-implementation (see commit log).
+The implementation is a 'Word64Map' keyed by each element's 'Unique';
+see Note [Uniques and UniqFM shape].
 
-The @UniqFM@ interface maps directly to Data.IntMap, only
-``Data.IntMap.union'' is left-biased and ``plusUFM'' right-biased
-and ``addToUFM\_C'' and ``Data.IntMap.insertWith'' differ in the order
+The @UniqFM@ interface maps directly to Word64Map, only
+``Word64Map.union'' is left-biased and ``plusUFM'' right-biased
+and ``addToUFM\_C'' and ``Word64Map.insertWith'' differ in the order
 of arguments of combining function.
 -}
 
@@ -99,6 +98,55 @@ import Data.Data
 import qualified Data.Semigroup as Semi
 import Data.Functor.Classes (Eq1 (..))
 import Data.Coerce
+
+{- Note [Uniques and UniqFM shape]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A 'UniqFM' is a 'Word64Map' -- a big-endian PATRICIA trie -- keyed by the
+'Word64' underlying each 'Unique'. A 'Unique' splits into a tag in the top 8
+bits (UNIQUE_TAG_BITS), identifying the supply or namespace that minted it, and
+a running number in the low bits; see Note [Uniques and tags] in
+GHC.Types.Unique. Those numbers are allocated sequentially -- from the global
+'genSym' counter, or by 'uniqAway' from a set's largest local unique -- so they
+stay far below the full 'Word64' range. Within a tag the keys are thus dense and
+sequential, not scattered hashes, which keeps the trie shallow and is what makes
+a 'Word64Map' a good fit. And because those numbers only grow, inserts within a
+cluster tend to land above its existing keys -- a near-monotonic pattern that
+big-endian PATRICIA tries service superoptimally, well below the O(log n)
+worst case (see #24137).
+
+A PATRICIA trie branches on the most-significant bit on which its keys disagree,
+so the tag bits are tested first, nearest the root. Uniques are therefore
+partitioned by tag near the root: all keys with a given tag occupy a single
+subtree (the largest one whose prefix already fixes every tag bit), and two
+keys with different tags diverge closer to the root, where the trie switches on
+a tag bit. In other words the high-order tag clusters together the keys minted
+by each part of the compiler.
+
+This clustering would make tag-keyed bulk operations cheap -- collecting the
+distinct tags, filtering to a set of tags, or splitting into per-tag submaps
+could each reuse whole subtrees and touch O(number of distinct tags) nodes
+rather than O(size). That is only potential, though: GHC has no tag-aware bulk
+operations yet.
+
+The flip side is that the tag bits lengthen the path every per-key operation
+walks: a lookup, insert, or delete descends past the tag-distinguishing nodes
+near the root before reaching the number bits. Mixing tags thus adds branch
+levels above each entry -- at most 7, since the tag is 8 bits with its top bit
+clear for every ASCII tag. In-scope sets and 'VarSet's are the heavy case:
+keyed by 'Var' uniques, they gather ~8-11 supply tags (desugarer, simplifier,
+'uniqAway', wired-in, typechecker), spanning most of the tag bits, so a lookup
+descends roughly 3-5 extra levels. A 'NameEnv'/'TypeEnv' is milder: external
+names all share HscTag, so it is one big cluster plus a few wired-in and local
+tags, ~2-4 levels. A map holding a single tag collapses the tag bits into the
+root prefix and is correspondingly shallower, so keeping a map tag-homogeneous
+(or splitting it by tag) speeds up its lookups.
+
+The trie's key order is exploited the other way too, to mint uniques: 'uniqAway'
+derives a fresh unique not in an 'InScopeSet' from the largest key already in
+that set's local-unique region (an O(depth) 'lookupLT') and increments it,
+staying in that dedicated tag region (the 'X' tag), which cannot clash with
+counter-allocated ones. See Note [Local uniques] in GHC.Types.Var.Env.
+-}
 
 -- | A finite map from @uniques@ of one type to
 -- elements in another type.
