@@ -3,6 +3,7 @@
 ## 4.24.0.0 *TBA*
   * Add `Bounded` instances for `Double`, `Float`, `CDouble` and `CFloat`. ([CLC proposal #402](https://github.com/haskell/core-libraries-committee/issues/402))
   * Ensure that `Data.List.elem` and `notElem` can be specialized even when no list fusion happens. ([CLC proposal #412)(https://github.com/haskell/core-libraries-committee/issues/412))
+  * Introduce `Data.Double` and `Data.Float` modules. ([CLC proposal #378](https://github.com/haskell/core-libraries-committee/issues/378))
 
 ## 4.23.0.0 *TBA*
   * Add `System.IO.hGetNewlineMode`. ([CLC proposal #370](https://github.com/haskell/core-libraries-committee/issues/370))

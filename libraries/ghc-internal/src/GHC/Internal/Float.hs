@@ -1812,8 +1812,8 @@ stgWord32ToFloat :: Word32# -> Float#
 stgWord32ToFloat = castWord32ToFloat#
 
 
--- | @'castWord32ToFloat' w@ does a bit-for-bit copy from an integral value
--- to a floating-point value.
+-- | @'castWord32ToFloat' w@ does a bit-for-bit copy from a 'Word32'
+-- to a 'Float', according to the IEEE 754 binary32 format.
 --
 -- @since base-4.11.0.0
 
@@ -1821,8 +1821,8 @@ stgWord32ToFloat = castWord32ToFloat#
 castWord32ToFloat :: Word32 -> Float
 castWord32ToFloat (W32# w#) = F# (castWord32ToFloat# w#)
 
--- | @'castFloatToWord32' f@ does a bit-for-bit copy from a floating-point value
--- to an integral value.
+-- | @'castFloatToWord32' f@ does a bit-for-bit copy from a 'Float'
+-- to a 'Word32', according to the IEEE 754 binary32 format.
 --
 -- @since base-4.11.0.0
 
@@ -1830,8 +1830,8 @@ castWord32ToFloat (W32# w#) = F# (castWord32ToFloat# w#)
 castFloatToWord32 :: Float -> Word32
 castFloatToWord32 (F# f#) = W32# (castFloatToWord32# f#)
 
--- | @'castWord64ToDouble' w@ does a bit-for-bit copy from an integral value
--- to a floating-point value.
+-- | @'castWord64ToDouble' w@ does a bit-for-bit copy from a 'Word64'
+-- to a 'Double', according to the IEEE 754 binary64 format.
 --
 -- @since base-4.11.0.0
 
@@ -1839,8 +1839,8 @@ castFloatToWord32 (F# f#) = W32# (castFloatToWord32# f#)
 castWord64ToDouble :: Word64 -> Double
 castWord64ToDouble (W64# w) = D# (castWord64ToDouble# w)
 
--- | @'castDoubleToWord64' f@ does a bit-for-bit copy from a floating-point value
--- to an integral value.
+-- | @'castDoubleToWord64' f@ does a bit-for-bit copy from a 'Double'
+-- to a 'Word64', according to the IEEE 754 binary64 format.
 --
 -- @since base-4.11.0.0
 

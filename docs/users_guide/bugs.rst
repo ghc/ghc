@@ -551,7 +551,15 @@ undefined or implementation specific in Haskell 98.
     ``Int32``, ``Int64`` and the unsigned ``Word`` variants), see the
     modules ``Data.Int`` and ``Data.Word`` in the library documentation.
 
-Unchecked floating-point arithmetic
+``Float`` and ``Double``
+    .. index::
+       single: Float
+       single: Double
+       single: IEEE 754
+
+    In GHC, ``Float`` and ``Double`` are represented according to the
+    IEEE 754 standard binary32 and binary64 formats, respectively.
+
     Operations on ``Float`` and ``Double`` numbers are *unchecked* for
     overflow, underflow, and other sad occurrences. (note, however, that
     some architectures trap floating-point overflow and

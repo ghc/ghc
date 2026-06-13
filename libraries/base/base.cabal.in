@@ -49,8 +49,10 @@ Library
         , Data.Bounded
         , Data.Char
         , Data.Complex
+        , Data.Double
         , Data.Enum
         , Data.Fixed
+        , Data.Float
         , Data.Foldable1
         , Data.Functor.Classes
         , Data.Functor.Compose
