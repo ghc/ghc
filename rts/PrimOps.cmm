@@ -121,16 +121,20 @@ stg_newByteArrayzh ( W_ n )
     return (p);
 }
 
-stg_unliftByteArrayzh ( P_ p )
+stg_fromLazzyzh ( P_ p )
 {
     (P_ unlifted) = call stg_ap_0_fast(p);
     return (UNTAG(unlifted));
 }
 
-stg_liftByteArrayzh ( P_ p )
+stg_toLazzyzh ( P_ p )
 {
-    SET_INFO(p, stg_ARR_WORDS_LIFTED_info);
-    return (UNTAG(p) + 1);
+    if (GET_INFO(p) == stg_ARR_WORDS_info) {
+        SET_INFO(p, stg_ARR_WORDS_LIFTED_info);
+        return (UNTAG(p) + 1);
+    }
+    // TODO: throw proper error instead of barfing
+    ccall sbarf("toLazy# on non-ByteArray#") never returns;
 }
 
 #define BA_ALIGN 16

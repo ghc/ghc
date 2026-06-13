@@ -767,6 +767,7 @@ ppTyVar "b_levpoly"
   = PrimOpTyVarBinder
   { inferredTyVarBinders = ["levity2TyVarInf"]
   , primOpTyVarBinder    = "levPolyBetaTyVarSpec" }
+ppTyVar "a_unlifted" = nonDepTyVarBinder "alphaTyVarUnliftedSpec"
 ppTyVar var = error $ "Unknown type variable name '" ++ var ++ "'"
 
 ppType :: Ty -> String
@@ -788,7 +789,6 @@ ppType (TyApp (TyCon "Addr#")       []) = "addrPrimTy"
 ppType (TyApp (TyCon "Float#")      []) = "floatPrimTy"
 ppType (TyApp (TyCon "Double#")     []) = "doublePrimTy"
 ppType (TyApp (TyCon "ByteArray#")  []) = "byteArrayPrimTy"
-ppType (TyApp (TyCon "ByteArrayLifted#")  []) = "byteArrayLiftedPrimTy"
 ppType (TyApp (TyCon "RealWorld")   []) = "realWorldTy"
 ppType (TyApp (TyCon "ThreadId#")   []) = "threadIdPrimTy"
 ppType (TyApp (TyCon "ForeignObj#") []) = "foreignObjPrimTy"
@@ -806,6 +806,8 @@ ppType (TyVar "a_reppoly")              = "openAlphaTy"
 ppType (TyVar "b_reppoly")              = "openBetaTy"
 ppType (TyVar "a_levpoly")              = "levPolyAlphaTy"
 ppType (TyVar "b_levpoly")              = "levPolyBetaTy"
+
+ppType (TyVar "a_unlifted") = "alphaTyUnliftedRep"
 
 ppType (TyApp (TyCon "State#") [x])             = "mkStatePrimTy " ++ ppType x
 ppType (TyApp (TyCon "MutVar#") [x,y])          = "mkMutVarPrimTy " ++ ppType x
@@ -828,6 +830,8 @@ ppType (TyApp (TyCon "MVar#") [x,y])     = "mkMVarPrimTy " ++ ppType x
                                            ++ " " ++ ppType y
 ppType (TyApp (TyCon "TVar#") [x,y])     = "mkTVarPrimTy " ++ ppType x
                                            ++ " " ++ ppType y
+
+ppType (TyApp (TyCon "Lazy") [x]) = "mkLazyPrimTy " ++ ppType x
 
 ppType (TyApp (TyCon "PromptTag#") [x])  = "mkPromptTagPrimTy " ++ ppType x
 ppType (TyApp (VecTyCon _ pptc) [])      = pptc

@@ -21,13 +21,13 @@ module GHC.Builtin.Types.Prim(
         alphaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
         alphaTyVarSpec, betaTyVarSpec, gammaTyVarSpec, deltaTyVarSpec,
         alphaTys, alphaTy, betaTy, gammaTy, deltaTy,
-        alphaTyVarsUnliftedRep, alphaTyVarUnliftedRep,
+        alphaTyVarsUnliftedRep, alphaTyVarUnliftedRep, alphaTyVarUnliftedSpec,
         alphaTysUnliftedRep, alphaTyUnliftedRep,
         runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep3TyVar,
         runtimeRep1TyVarInf, runtimeRep2TyVarInf,
         runtimeRep1Ty, runtimeRep2Ty, runtimeRep3Ty,
         levity1TyVar, levity2TyVar,
-        levity1TyVarInf, levity2TyVarInf,byteArrayLiftedPrimTyConName, byteArrayLiftedPrimTy,
+        levity1TyVarInf, levity2TyVarInf,
         levity1Ty, levity2Ty,
 
         alphaConstraintTyVar, alphaConstraintTy,
@@ -70,7 +70,6 @@ module GHC.Builtin.Types.Prim(
 
         arrayPrimTyCon, mkArrayPrimTy,
         byteArrayPrimTyCon,     byteArrayPrimTy,
-        byteArrayLiftedPrimTyCon,
         smallArrayPrimTyCon, mkSmallArrayPrimTy,
         mutableArrayPrimTyCon, mkMutableArrayPrimTy,
         mutableByteArrayPrimTyCon, mkMutableByteArrayPrimTy,
@@ -87,6 +86,8 @@ module GHC.Builtin.Types.Prim(
         threadIdPrimTyCon,              threadIdPrimTy,
         stackSnapshotPrimTyCon,         stackSnapshotPrimTy,
         promptTagPrimTyCon,             mkPromptTagPrimTy,
+
+        lazyPrimTyCon, mkLazyPrimTy,
 
         int8PrimTyCon,          int8PrimTy, int8PrimTyConName,
         word8PrimTyCon,         word8PrimTy, word8PrimTyConName,
@@ -263,7 +264,6 @@ exposedPrimTyCons
   = [ addrPrimTyCon
     , arrayPrimTyCon
     , byteArrayPrimTyCon
-    , byteArrayLiftedPrimTyCon
     , smallArrayPrimTyCon
     , charPrimTyCon
     , doublePrimTyCon
@@ -295,6 +295,7 @@ exposedPrimTyCons
     , word64PrimTyCon
     , stackSnapshotPrimTyCon
     , promptTagPrimTyCon
+    , lazyPrimTyCon
 
     , fUNTyCon
     , tYPETyCon
@@ -307,7 +308,7 @@ charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int3
   wordPrimTyConName, word32PrimTyConName, word8PrimTyConName, word16PrimTyConName, word64PrimTyConName,
   addrPrimTyConName, floatPrimTyConName, doublePrimTyConName,
   statePrimTyConName, proxyPrimTyConName, realWorldTyConName,
-  arrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName, byteArrayLiftedPrimTyConName,
+  arrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName, lazyPrimTyConName,
   mutableArrayPrimTyConName, mutableByteArrayPrimTyConName,
   smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName,
   tVarPrimTyConName, stablePtrPrimTyConName,
@@ -337,7 +338,6 @@ eqPhantPrimTyConName          = mkBuiltInPrimTc (fsLit "~P#") eqPhantPrimTyConKe
 realWorldTyConName            = mkPrimTc (fsLit "RealWorld") realWorldTyConKey realWorldTyCon
 arrayPrimTyConName            = mkPrimTc (fsLit "Array#") arrayPrimTyConKey arrayPrimTyCon
 byteArrayPrimTyConName        = mkPrimTc (fsLit "ByteArray#") byteArrayPrimTyConKey byteArrayPrimTyCon
-byteArrayLiftedPrimTyConName  = mkPrimTc (fsLit "ByteArrayLifted#") byteArrayLiftedPrimTyConKey byteArrayLiftedPrimTyCon
 smallArrayPrimTyConName       = mkPrimTc (fsLit "SmallArray#") smallArrayPrimTyConKey smallArrayPrimTyCon
 mutableArrayPrimTyConName     = mkPrimTc (fsLit "MutableArray#") mutableArrayPrimTyConKey mutableArrayPrimTyCon
 mutableByteArrayPrimTyConName = mkPrimTc (fsLit "MutableByteArray#") mutableByteArrayPrimTyConKey mutableByteArrayPrimTyCon
@@ -353,6 +353,7 @@ bcoPrimTyConName              = mkPrimTc (fsLit "BCO") bcoPrimTyConKey bcoPrimTy
 weakPrimTyConName             = mkPrimTc (fsLit "Weak#") weakPrimTyConKey weakPrimTyCon
 threadIdPrimTyConName         = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
 promptTagPrimTyConName        = mkPrimTc (fsLit "PromptTag#") promptTagPrimTyConKey promptTagPrimTyCon
+lazyPrimTyConName             = mkPrimTc (fsLit "Lazy") lazyPrimTyConKey lazyPrimTyCon
 
 {- *********************************************************************
 *                                                                      *
@@ -480,6 +481,9 @@ alphaTys :: [Type]
 alphaTys = mkTyVarTys alphaTyVars
 alphaTy, betaTy, gammaTy, deltaTy :: Type
 (alphaTy:betaTy:gammaTy:deltaTy:_) = alphaTys
+
+alphaTyVarUnliftedSpec :: TyVarBinder
+(alphaTyVarUnliftedSpec:_) = mkTyVarBinders Specified alphaTyVarsUnliftedRep
 
 alphaTyVarsUnliftedRep :: [TyVar]
 alphaTyVarsUnliftedRep = mkTemplateTyVars $ repeat unliftedTypeKind
@@ -1265,13 +1269,12 @@ equalityTyCon Phantom          = eqPhantPrimTyCon
 ********************************************************************* -}
 
 arrayPrimTyCon, mutableArrayPrimTyCon, mutableByteArrayPrimTyCon,
-    byteArrayPrimTyCon, byteArrayLiftedPrimTyCon,
+    byteArrayPrimTyCon,
     smallArrayPrimTyCon, smallMutableArrayPrimTyCon :: TyCon
 arrayPrimTyCon             = pcPrimTyCon_LevPolyLastArg arrayPrimTyConName        [Representational]          unliftedRepTy
 mutableArrayPrimTyCon      = pcPrimTyCon_LevPolyLastArg mutableArrayPrimTyConName [Nominal, Representational] unliftedRepTy
 mutableByteArrayPrimTyCon  = pcPrimTyCon mutableByteArrayPrimTyConName  [Nominal] unliftedRepTy
 byteArrayPrimTyCon         = pcPrimTyCon0 byteArrayPrimTyConName        unliftedRepTy
-byteArrayLiftedPrimTyCon   = pcPrimTyCon0 byteArrayLiftedPrimTyConName liftedRepTy
 smallArrayPrimTyCon        = pcPrimTyCon_LevPolyLastArg smallArrayPrimTyConName        [Representational]          unliftedRepTy
 smallMutableArrayPrimTyCon = pcPrimTyCon_LevPolyLastArg smallMutableArrayPrimTyConName [Nominal, Representational] unliftedRepTy
 
@@ -1279,8 +1282,6 @@ mkArrayPrimTy :: Type -> Type
 mkArrayPrimTy elt           = TyConApp arrayPrimTyCon [getLevity elt, elt]
 byteArrayPrimTy :: Type
 byteArrayPrimTy             = mkTyConTy byteArrayPrimTyCon
-byteArrayLiftedPrimTy :: Type
-byteArrayLiftedPrimTy             = mkTyConTy byteArrayLiftedPrimTyCon
 mkSmallArrayPrimTy :: Type -> Type
 mkSmallArrayPrimTy elt = TyConApp smallArrayPrimTyCon [getLevity elt, elt]
 mkMutableArrayPrimTy :: Type -> Type -> Type
@@ -1454,6 +1455,20 @@ promptTagPrimTyCon = pcPrimTyCon promptTagPrimTyConName [Representational] unlif
 
 mkPromptTagPrimTy :: Type -> Type
 mkPromptTagPrimTy v = TyConApp promptTagPrimTyCon [v]
+
+{-
+************************************************************************
+*                                                                      *
+   The Lazy type
+*                                                                      *
+************************************************************************
+-}
+
+lazyPrimTyCon :: TyCon
+lazyPrimTyCon = mkPrimTyCon lazyPrimTyConName (mkTemplateAnonTyConBinders [unliftedTypeKind]) liftedTypeKind [Representational]
+
+mkLazyPrimTy :: Type -> Kind
+mkLazyPrimTy t = mkTyConApp lazyPrimTyCon [t]
 
 {-
 ************************************************************************

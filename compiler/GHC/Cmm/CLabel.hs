@@ -62,7 +62,7 @@ module GHC.Cmm.CLabel (
         mkBadAlignmentLabel,
         mkOutOfBoundsAccessLabel,
         mkMemcpyRangeOverlapLabel,
-        mkArrWords_infoLabel,
+        mkArrWords_infoLabel, mkArrWordsLifted_infoLabel,
         mkSRTInfoLabel,
 
         mkTopTickyCtrLabel,

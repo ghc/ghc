@@ -1722,7 +1722,7 @@ hasFieldClassNameKey = mkPreludeClassUnique 50
 -}
 
 addrPrimTyConKey, arrayPrimTyConKey, boolTyConKey,
-    byteArrayPrimTyConKey, byteArrayLiftedPrimTyConKey, charPrimTyConKey, charTyConKey, doublePrimTyConKey,
+    byteArrayPrimTyConKey, charPrimTyConKey, charTyConKey, doublePrimTyConKey,
     doubleTyConKey, floatPrimTyConKey, floatTyConKey, fUNTyConKey,
     intPrimTyConKey, intTyConKey, int8TyConKey, int16TyConKey,
     int8PrimTyConKey, int16PrimTyConKey, int32PrimTyConKey, int32TyConKey,
@@ -1734,13 +1734,12 @@ addrPrimTyConKey, arrayPrimTyConKey, boolTyConKey,
     ratioTyConKey, rationalTyConKey, realWorldTyConKey, stablePtrPrimTyConKey,
     stablePtrTyConKey, eqTyConKey, heqTyConKey,
     smallArrayPrimTyConKey, smallMutableArrayPrimTyConKey,
-    stringTyConKey,
+    stringTyConKey, lazyPrimTyConKey,
     ccArrowTyConKey, ctArrowTyConKey, tcArrowTyConKey :: Unique
 addrPrimTyConKey                        = mkPreludeTyConUnique  1
 arrayPrimTyConKey                       = mkPreludeTyConUnique  3
 boolTyConKey                            = mkPreludeTyConUnique  4
 byteArrayPrimTyConKey                   = mkPreludeTyConUnique  5
-byteArrayLiftedPrimTyConKey             = mkPreludeTyConUnique  45
 stringTyConKey                          = mkPreludeTyConUnique  6
 charPrimTyConKey                        = mkPreludeTyConUnique  7
 charTyConKey                            = mkPreludeTyConUnique  8
@@ -1782,6 +1781,8 @@ heqTyConKey                             = mkPreludeTyConUnique 41
 ctArrowTyConKey                       = mkPreludeTyConUnique 42
 ccArrowTyConKey                       = mkPreludeTyConUnique 43
 tcArrowTyConKey                       = mkPreludeTyConUnique 44
+
+lazyPrimTyConKey                        = mkPreludeTyConUnique 45
 
 statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     mutVarPrimTyConKey, ioTyConKey,
