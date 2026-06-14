@@ -68,15 +68,18 @@
        (Unqual
         {OccName: bar}))
       (MG
-       (FromSource)
+       ((,)
+        (FromSource)
+        (AnnList
+         (Nothing)
+         (ListNone)
+         []
+         (NoEpTok)
+         []))
        (L
         (EpAnn
          (EpaSpan { Test20297.hs:(5,1)-(7,7) })
-         (AnnList
-          (Nothing)
-          (ListNone)
-          []
-          (NoEpTok)
+         (AnnListItem
           [])
          (EpaComments
           []))
@@ -198,15 +201,18 @@
        (Unqual
         {OccName: foo}))
       (MG
-       (FromSource)
+       ((,)
+        (FromSource)
+        (AnnList
+         (Nothing)
+         (ListNone)
+         []
+         (NoEpTok)
+         []))
        (L
         (EpAnn
          (EpaSpan { Test20297.hs:(9,1)-(11,26) })
-         (AnnList
-          (Nothing)
-          (ListNone)
-          []
-          (NoEpTok)
+         (AnnListItem
           [])
          (EpaComments
           []))
@@ -318,15 +324,18 @@
                   (Unqual
                    {OccName: doStuff}))
                  (MG
-                  (FromSource)
+                  ((,)
+                   (FromSource)
+                   (AnnList
+                    (Nothing)
+                    (ListNone)
+                    []
+                    (NoEpTok)
+                    []))
                   (L
                    (EpAnn
                     (EpaSpan { Test20297.hs:11:9-26 })
-                    (AnnList
-                     (Nothing)
-                     (ListNone)
-                     []
-                     (NoEpTok)
+                    (AnnListItem
                      [])
                     (EpaComments
                      []))
@@ -510,15 +519,18 @@
        (Unqual
         {OccName: bar}))
       (MG
-       (FromSource)
+       ((,)
+        (FromSource)
+        (AnnList
+         (Nothing)
+         (ListNone)
+         []
+         (NoEpTok)
+         []))
        (L
         (EpAnn
          (EpaSpan { Test20297.ppr.hs:(3,1)-(5,7) })
-         (AnnList
-          (Nothing)
-          (ListNone)
-          []
-          (NoEpTok)
+         (AnnListItem
           [])
          (EpaComments
           []))
@@ -628,15 +640,18 @@
        (Unqual
         {OccName: foo}))
       (MG
-       (FromSource)
+       ((,)
+        (FromSource)
+        (AnnList
+         (Nothing)
+         (ListNone)
+         []
+         (NoEpTok)
+         []))
        (L
         (EpAnn
          (EpaSpan { Test20297.ppr.hs:(6,1)-(9,24) })
-         (AnnList
-          (Nothing)
-          (ListNone)
-          []
-          (NoEpTok)
+         (AnnListItem
           [])
          (EpaComments
           []))
@@ -742,15 +757,18 @@
                   (Unqual
                    {OccName: doStuff}))
                  (MG
-                  (FromSource)
+                  ((,)
+                   (FromSource)
+                   (AnnList
+                    (Nothing)
+                    (ListNone)
+                    []
+                    (NoEpTok)
+                    []))
                   (L
                    (EpAnn
                     (EpaSpan { Test20297.ppr.hs:9:7-24 })
-                    (AnnList
-                     (Nothing)
-                     (ListNone)
-                     []
-                     (NoEpTok)
+                    (AnnListItem
                      [])
                     (EpaComments
                      []))

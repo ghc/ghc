@@ -1872,11 +1872,7 @@
         (L
          (EpAnn
           (EpaSpan { DumpTypecheckedAst.hs:20:1-23 })
-          (AnnList
-           (Nothing)
-           (ListNone)
-           []
-           (NoEpTok)
+          (AnnListItem
            [])
           (EpaComments
            []))

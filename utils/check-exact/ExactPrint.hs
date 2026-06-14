@@ -3239,24 +3239,21 @@ instance ExactPrint (HsUntypedSplice GhcPs) where
 
 -- ---------------------------------------------------------------------
 
--- TODO:AZ: combine these instances
-instance ExactPrint (MatchGroup GhcPs (LocatedA (HsExpr GhcPs))) where
-  getAnnotationEntry = const NoEntryVal
-  setAnnotationAnchor a _ _ _ = a
-  exact (MG x matches) = do
-    -- TODO:AZ use SortKey, in MG ann.
-    matches' <- markAnnotated matches
-    return (MG x matches')
+instance (Typeable body,
+          Anno (Match GhcPs (LocatedA (body GhcPs))) ~ SrcSpanAnnA,
+          Anno [GenLocated SrcSpanAnnA (Match GhcPs (LocatedA (body GhcPs)))] ~ SrcSpanAnnA,
+          ExactPrint (Match GhcPs (LocatedA (body GhcPs))))
+          => ExactPrint (MatchGroup GhcPs (LocatedA (body GhcPs))) where
+  getAnnotationEntry (MG _ (L l _)) = fromAnn l
+  setAnnotationAnchor (MG (origin,an) (L l matches)) anc ts cs
+    = MG (origin,an) (L (setAnchorEpa l anc ts cs) matches)
 
-instance ExactPrint (MatchGroup GhcPs (LocatedA (HsCmd GhcPs))) where
-  getAnnotationEntry = const NoEntryVal
-  setAnnotationAnchor a _ _ _ = a
-  exact (MG x matches) = do
-    -- TODO:AZ use SortKey, in MG ann.
-    matches' <- if notDodgy matches
-      then markAnnotated matches
-      else return matches
-    return (MG x matches')
+  exact (MG (origin,an) (L l matches)) = do
+    an0 <- markLensFun an lal_rest markEpToken -- 'where', only for PatSynBind
+    (an1,matches') <- markAnnListA' an0 $ \a -> do
+        m' <- markAnnotated matches
+        return (a,m')
+    return (MG (origin, an1) (L l matches'))
 
 -- ---------------------------------------------------------------------
 
@@ -4510,19 +4507,14 @@ instance ExactPrint (SourceText, RuleName) where
 -- applied.
 -- ---------------------------------------------------------------------
 
-instance (ExactPrint (Match GhcPs (LocatedA body)))
-   => ExactPrint (LocatedLW [LocatedA (Match GhcPs (LocatedA body))]) where
-  getAnnotationEntry = entryFromLocatedA
-  setAnnotationAnchor = setAnchorAn
-  exact (L an a) = do
+instance (ExactPrint (Match GhcPs (LocatedA (body GhcPs))))
+   => ExactPrint [LocatedA (Match GhcPs (LocatedA (body GhcPs)))] where
+  getAnnotationEntry _ = NoEntryVal
+  setAnnotationAnchor a _ _ _ = a
+  exact a = do
     debugM $ "LocatedL [LMatch"
-    -- TODO: markAnnList?
-    an0 <- markLensFun' an lal_rest markEpToken
-    an1 <- markLensBracketsO an0 lal_brackets
-    an2 <- markEpAnnAllLT an1 lal_semis
     a' <- mapM markAnnotated a
-    an3 <- markLensBracketsC an2 lal_brackets
-    return (L an3 a')
+    return a'
 
 instance ExactPrint [LocatedA (StmtLR GhcPs GhcPs (LocatedA (HsExpr GhcPs)))] where
   getAnnotationEntry _ = NoEntryVal
