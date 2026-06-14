@@ -549,15 +549,18 @@
            (Unqual
             {OccName: ==}))
           (MG
-           (FromSource)
+           ((,)
+            (FromSource)
+            (AnnList
+             (Nothing)
+             (ListNone)
+             []
+             (NoEpTok)
+             []))
            (L
             (EpAnn
              (EpaSpan { Test24533.hs:16:3-19 })
-             (AnnList
-              (Nothing)
-              (ListNone)
-              []
-              (NoEpTok)
+             (AnnListItem
               [])
              (EpaComments
               []))
@@ -1156,15 +1159,18 @@
            (Unqual
             {OccName: ==}))
           (MG
-           (FromSource)
+           ((,)
+            (FromSource)
+            (AnnList
+             (Nothing)
+             (ListNone)
+             []
+             (NoEpTok)
+             []))
            (L
             (EpAnn
              (EpaSpan { Test24533.ppr.hs:6:3-19 })
-             (AnnList
-              (Nothing)
-              (ListNone)
-              []
-              (NoEpTok)
+             (AnnListItem
               [])
              (EpaComments
               []))

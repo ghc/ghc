@@ -1012,15 +1012,18 @@
        (Unqual
         {OccName: qux}))
       (MG
-       (FromSource)
+       ((,)
+        (FromSource)
+        (AnnList
+         (Nothing)
+         (ListNone)
+         []
+         (NoEpTok)
+         []))
        (L
         (EpAnn
          (EpaSpan { KindSigs.hs:23:1-12 })
-         (AnnList
-          (Nothing)
-          (ListNone)
-          []
-          (NoEpTok)
+         (AnnListItem
           [])
          (EpaComments
           []))
@@ -1744,15 +1747,18 @@
        (Unqual
         {OccName: true}))
       (MG
-       (FromSource)
+       ((,)
+        (FromSource)
+        (AnnList
+         (Nothing)
+         (ListNone)
+         []
+         (NoEpTok)
+         []))
        (L
         (EpAnn
          (EpaSpan { KindSigs.hs:35:1-11 })
-         (AnnList
-          (Nothing)
-          (ListNone)
-          []
-          (NoEpTok)
+         (AnnListItem
           [])
          (EpaComments
           []))

@@ -335,7 +335,7 @@ tcCmdMatchLambda :: CmdEnv
                  -> CmdType
                  -> TcM (HsWrapper, MatchGroup GhcTc (LHsCmd GhcTc))
 tcCmdMatchLambda env ctxt arity
-                 mg@MG { mg_alts = L l matches, mg_ext = origin }
+                 mg@MG { mg_alts = L l matches, mg_ext = (origin, _) }
                  (cmd_stk, res_ty)
   = do { (co, arg_tys, cmd_stk') <- matchExpectedCmdArgs arity cmd_stk
 

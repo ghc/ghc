@@ -483,7 +483,7 @@ cvtDec (TH.PatSynD nm args dir pat)
     cvtDir n (ExplBidir cls) =
       do { ms <- mapM (cvtClause (mkPrefixFunRhs n noAnn)) cls
          ; th_origin <- getOrigin
-         ; wrapParLA (ExplicitBidirectional . mkMatchGroup th_origin) ms }
+         ; wrapParLA (ExplicitBidirectional . mkMatchGroup th_origin noAnn) ms }
 
 cvtDec (TH.PatSynSigD nm ty)
   = do { nm' <- cNameN nm
@@ -1113,17 +1113,17 @@ cvtl e = wrapLA (cvt e)
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
                             ; let pats = map (parenthesizePat appPrec) ps'
                             ; th_origin <- getOrigin
-                            ; wrapParLA (HsLam noAnn LamSingle . mkMatchGroup th_origin)
+                            ; wrapParLA (HsLam noAnn LamSingle . mkMatchGroup th_origin noAnn)
                                         [mkSimpleMatch (LamAlt LamSingle) (noLocA pats) e']}
     cvt (LamCaseE ms)  = do { ms' <- mapM (cvtMatch $ LamAlt LamCase) ms
                             ; th_origin <- getOrigin
-                            ; wrapParLA (HsLam noAnn LamCase . mkMatchGroup th_origin) ms'
+                            ; wrapParLA (HsLam noAnn LamCase . mkMatchGroup th_origin noAnn) ms'
                             }
     cvt (LamCasesE ms)
       | null ms   = failWith CasesExprWithoutAlts
       | otherwise = do { ms' <- mapM (cvtClause $ LamAlt LamCases) ms
                        ; th_origin <- getOrigin
-                       ; wrapParLA (HsLam noAnn LamCases . mkMatchGroup th_origin) ms'
+                       ; wrapParLA (HsLam noAnn LamCases . mkMatchGroup th_origin noAnn) ms'
                        }
     cvt (TupE es)        = cvt_tup es Boxed
     cvt (UnboxedTupE es) = cvt_tup es Unboxed
@@ -1139,7 +1139,7 @@ cvtl e = wrapLA (cvt e)
                             ; e' <- cvtl e; return $ HsLet noAnn  ds' e'}
     cvt (CaseE e ms)   = do { e' <- cvtl e; ms' <- mapM (cvtMatch CaseAlt) ms
                             ; th_origin <- getOrigin
-                            ; wrapParLA (HsCase noAnn e' . mkMatchGroup th_origin) ms' }
+                            ; wrapParLA (HsCase noAnn e' . mkMatchGroup th_origin noAnn) ms' }
     cvt (DoE m ss)     = cvtHsDo (DoExpr (mk_mod <$> m)) ss
     cvt (MDoE m ss)    = cvtHsDo (MDoExpr (mk_mod <$> m)) ss
     cvt (CompE ss)     = cvtHsDo ListComp ss

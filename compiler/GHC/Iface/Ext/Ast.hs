@@ -846,7 +846,7 @@ type AnnoBody p body
   = ( Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                    ~ SrcSpanAnnA
     , Anno [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
-                   ~ SrcSpanAnnLW
+                   ~ SrcSpanAnnA
     , Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                    ~ EpAnn NoEpAnns
     , Anno (StmtLR (GhcPass p) (GhcPass p) (LocatedA (body (GhcPass p)))) ~ SrcSpanAnnA
@@ -907,7 +907,7 @@ instance ( HiePass p
         , toHie alts
         ]
     where origin = case hiePass @p of
-             HieRn -> mg_ext mg
+             HieRn -> fst $ mg_ext mg
              HieTc -> mg_origin $ mg_ext mg
 
 setOrigin :: Origin -> NodeOrigin -> NodeOrigin

@@ -202,25 +202,27 @@ unguardedRHS :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
 unguardedRHS an loc rhs = NE.singleton $ L (noAnnSrcSpan loc) (GRHS an [] rhs)
 
 type AnnoBody p body
-  = ( XMG (GhcPass p) (LocatedA (body (GhcPass p))) ~ Origin
-    , Anno [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))] ~ SrcSpanAnnLW
+  = ( XMG (GhcPass p) (LocatedA (body (GhcPass p))) ~ (Origin, MatchGroupAnn)
+    , Anno [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))] ~ SrcSpanAnnA
     , Anno (Match (GhcPass p) (LocatedA (body (GhcPass p)))) ~ SrcSpanAnnA
     )
 
 mkMatchGroup :: AnnoBody p body
              => Origin
-             -> LocatedLW [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
+             -> MatchGroupAnn
+             -> LocatedA [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
              -> MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))
-mkMatchGroup origin matches = MG { mg_ext = origin
-                                 , mg_alts = matches }
+mkMatchGroup origin ann matches = MG { mg_ext = (origin, ann)
+                                     , mg_alts = matches }
 
 mkLamCaseMatchGroup :: AnnoBody p body
                     => Origin
+                    -> MatchGroupAnn
                     -> HsLamVariant
-                    -> LocatedLW [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
+                    -> LocatedA [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
                     -> MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))
-mkLamCaseMatchGroup origin lam_variant (L l matches)
-  = mkMatchGroup origin (L l $ map fixCtxt matches)
+mkLamCaseMatchGroup origin ann lam_variant (L l matches)
+  = mkMatchGroup origin ann (L l $ map fixCtxt matches)
   where fixCtxt (L a match) = L a match{m_ctxt = LamAlt lam_variant}
 
 mkLocatedList :: (Semigroup a, NoAnn an)
@@ -259,13 +261,14 @@ mkHsAppType e t = addCLocA t_body e (HsAppType noExtField e paren_wct)
 mkHsAppTypes :: LHsExpr GhcRn -> [LHsWcType GhcRn] -> LHsExpr GhcRn
 mkHsAppTypes = foldl' mkHsAppType
 
-mkHsLam :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ Origin)
+mkHsLam :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ (Origin, MatchGroupAnn))
         => LocatedE [LPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
         -> LHsExpr (GhcPass p)
 mkHsLam (L l pats) body = mkHsPar (L (getLoc body) (HsLam noAnn LamSingle matches))
   where
     matches = mkMatchGroup (Generated OtherExpansion SkipPmc)
+                           noAnn
                            (noLocA [mkSimpleMatch (LamAlt LamSingle) (L l pats') body])
     pats' = map (parenthesizePat appPrec) pats
 
@@ -595,7 +598,7 @@ nlHsCase :: LHsExpr GhcPs -> [LMatch GhcPs (LHsExpr GhcPs)]
 nlList   :: [LHsExpr GhcPs] -> LHsExpr GhcPs
 
 nlHsLam match = noLocA $ HsLam noAnn LamSingle
-                  $ mkMatchGroup (Generated OtherExpansion SkipPmc) (noLocA [match])
+                  $ mkMatchGroup (Generated OtherExpansion SkipPmc) noAnn (noLocA [match])
 
 nlHsPar e     = noLocA (gHsPar e)
 
@@ -605,7 +608,7 @@ nlHsIf :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
 nlHsIf cond true false = noLocA (HsIf noAnn cond true false)
 
 nlHsCase expr matches
-  = noLocA (HsCase noAnn expr (mkMatchGroup (Generated OtherExpansion SkipPmc) (noLocA matches)))
+  = noLocA (HsCase noAnn expr (mkMatchGroup (Generated OtherExpansion SkipPmc) noAnn (noLocA matches)))
 nlList exprs          = noLocA (ExplicitList noAnn exprs)
 
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
@@ -837,7 +840,7 @@ mkFunBind :: Origin -> LocatedN RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
 -- ^ Not infix, with place holders for coercion and free vars
 mkFunBind origin fn ms
   = FunBind { fun_id = fn
-            , fun_matches = mkMatchGroup origin (noLocA ms)
+            , fun_matches = mkMatchGroup origin noAnn (noLocA ms)
             , fun_ext = noExtField
             }
 
@@ -845,7 +848,7 @@ mkTopFunBind :: Origin -> LocatedN Name -> [LMatch GhcRn (LHsExpr GhcRn)]
              -> HsBind GhcRn
 -- ^ In Name-land, with empty bind_fvs
 mkTopFunBind origin fn ms = FunBind { fun_id = fn
-                                    , fun_matches = mkMatchGroup origin (noLocA ms)
+                                    , fun_matches = mkMatchGroup origin noAnn (noLocA ms)
                                     , fun_ext  = emptyNameSet -- NB: closed
                                                               --     binding
                                     }

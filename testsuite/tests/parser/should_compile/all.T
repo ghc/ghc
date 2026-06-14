@@ -140,7 +140,7 @@ def only_MG_loc(x):
                     (EpaSpan { <combineSrcSpans: files differ> })
     """
     ls = x.split("\n")
-    mgLocs = (loc.strip() for (mg,loc) in zip(ls,ls[4:])
+    mgLocs = (loc.strip() for (mg,loc) in zip(ls,ls[11:])
                 if mg.strip().startswith("(MG"))
     return '\n'.join(mgLocs)
 test('T15279', normalise_errmsg_fun(only_MG_loc), compile, [''])
