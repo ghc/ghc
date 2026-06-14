@@ -723,9 +723,9 @@ tyConToDataCon (L loc tc)
     occ = rdrNameOcc tc
 
 mkPatSynMatchGroup :: LocatedN RdrName
-                   -> LocatedA (OrdList (LHsDecl GhcPs), AnnList (EpToken "where"))
+                   -> LocatedA (OrdList (LHsDecl GhcPs), EpToken "where", AnnList ())
                    -> P (MatchGroup GhcPs (LHsExpr GhcPs))
-mkPatSynMatchGroup (L loc patsyn_name) (L ld (decls, ann)) =
+mkPatSynMatchGroup (L loc patsyn_name) (L ld (decls, _, ann)) =
     do { matches <- mapM fromDecl (fromOL decls)
        ; when (null matches) (wrongNumberErr (locA loc))
        ; return $ mkMatchGroup FromSource ann (L ld matches) }
@@ -1772,11 +1772,11 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
               -> PV (LocatedA b)
   -- | Disambiguate "case ... of ..."
   mkHsCasePV :: SrcSpan -> LHsExpr GhcPs
-             -> LocatedA ([LMatch GhcPs (LocatedA b)], AnnList (EpToken "where"))
+             -> LocatedA ([LMatch GhcPs (LocatedA b)], AnnList ())
              -> EpAnnHsCase -> PV (LocatedA b)
   -- | Disambiguate "\... -> ..." (lambda), "\case" and "\cases"
   mkHsLamPV :: SrcSpan -> HsLamVariant
-            -> LocatedA ([LMatch GhcPs (LocatedA b)], AnnList (EpToken "where"))
+            -> LocatedA ([LMatch GhcPs (LocatedA b)], AnnList ())
             -> EpAnnLam
             -> PV (LocatedA b)
   -- | Function argument representation
