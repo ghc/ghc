@@ -2326,7 +2326,7 @@ instance ExactPrint (PatSynBind GhcPs GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (PSB{ psb_ext = AnnPSB ap al ae
+  exact (PSB{ psb_ext = AnnPSB ap al ae aw
             , psb_id = psyn, psb_args = details
             , psb_def = pat
             , psb_dir = dir }) = do
@@ -2349,23 +2349,24 @@ instance ExactPrint (PatSynBind GhcPs GhcPs) where
           ac' <- markEpToken ac
           return (psyn', RecCon (ao',ac') vs')
 
-    (al', ae', pat', dir') <-
+    (al', ae', pat', dir', aw') <-
       case dir of
         Unidirectional           -> do
           al' <- mapM markEpUniToken al
           pat' <- markAnnotated pat
-          return (al', ae, pat', dir)
+          return (al', ae, pat', dir, aw)
         ImplicitBidirectional    -> do
           ae' <- mapM markEpToken ae
           pat' <- markAnnotated pat
-          return (al, ae', pat', dir)
+          return (al, ae', pat', dir, aw)
         ExplicitBidirectional mg -> do
           al' <- mapM markEpUniToken al
           pat' <- markAnnotated pat
+          aw' <- mapM markEpToken aw
           mg' <- markAnnotated mg
-          return (al', ae, pat', ExplicitBidirectional mg')
+          return (al', ae, pat', ExplicitBidirectional mg', aw')
 
-    return (PSB{ psb_ext = AnnPSB ap' al' ae'
+    return (PSB{ psb_ext = AnnPSB ap' al' ae' aw'
                , psb_id = psyn', psb_args = details'
                , psb_def = pat'
                , psb_dir = dir' })
@@ -3249,11 +3250,10 @@ instance (Typeable body,
     = MG (origin,an) (L (setAnchorEpa l anc ts cs) matches)
 
   exact (MG (origin,an) (L l matches)) = do
-    an0 <- markLensFun an lal_rest markEpToken -- 'where', only for PatSynBind
-    (an1,matches') <- markAnnListA' an0 $ \a -> do
+    (an0,matches') <- markAnnListA' an $ \a -> do
         m' <- markAnnotated matches
         return (a,m')
-    return (MG (origin, an1) (L l matches'))
+    return (MG (origin, an0) (L l matches'))
 
 -- ---------------------------------------------------------------------
 
