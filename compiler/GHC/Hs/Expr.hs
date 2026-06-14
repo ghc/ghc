@@ -1649,9 +1649,12 @@ instance (OutputableBndrId p) => Outputable (HsCmdTop (GhcPass p)) where
 ************************************************************************
 -}
 
-type instance XMG         GhcPs b = Origin
-type instance XMG         GhcRn b = Origin -- See Note [Generated code and pattern-match checking]
+type instance XMG         GhcPs b = (Origin, MatchGroupAnn)
+type instance XMG         GhcRn b = (Origin, -- See Note [Generated code and pattern-match checking]
+                                     MatchGroupAnn)
 type instance XMG         GhcTc b = MatchGroupTc
+
+type MatchGroupAnn = AnnList (EpToken "where")
 
 data MatchGroupTc
   = MatchGroupTc
@@ -2651,8 +2654,8 @@ type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd 
 type instance Anno (HsCmd (GhcPass p)) = SrcSpanAnnA
 
 type instance Anno (HsCmdTop (GhcPass p)) = EpAnnCO
-type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p))))] = SrcSpanAnnLW
-type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))] = SrcSpanAnnLW
+type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p))))] = SrcSpanAnnA
+type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))] = SrcSpanAnnA
 type instance Anno (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpanAnnA
 type instance Anno (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpanAnnA
 type instance Anno [LocatedA (Pat (GhcPass p))] = EpaLocation

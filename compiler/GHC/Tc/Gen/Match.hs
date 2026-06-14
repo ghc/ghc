@@ -202,8 +202,8 @@ type AnnoBody body
   = ( Outputable (body GhcRn)
     , Anno (Match GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
     , Anno (Match GhcTc (LocatedA (body GhcTc))) ~ SrcSpanAnnA
-    , Anno [LocatedA (Match GhcRn (LocatedA (body GhcRn)))] ~ SrcSpanAnnLW
-    , Anno [LocatedA (Match GhcTc (LocatedA (body GhcTc)))] ~ SrcSpanAnnLW
+    , Anno [LocatedA (Match GhcRn (LocatedA (body GhcRn)))] ~ SrcSpanAnnA
+    , Anno [LocatedA (Match GhcTc (LocatedA (body GhcTc)))] ~ SrcSpanAnnA
     , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ EpAnnCO
     , Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnnCO
     , Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
@@ -220,7 +220,7 @@ tcMatches :: (AnnoBody body, Outputable (body GhcTc))
           -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
 
 tcMatches ctxt tc_body pat_tys exp_ty (MG { mg_alts = L l matches
-                                          , mg_ext = origin })
+                                          , mg_ext = (origin, _) })
   | null matches  -- Deal with case e of {}
     -- Since there are no branches, no one else will fill in exp_ty
     -- when in inference mode, so we must do it ourselves,

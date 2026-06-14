@@ -1352,8 +1352,8 @@ bindRuleTyVars _ _ thing_inside = thing_inside Nothing
 -}
 
 type AnnoBody body
-  = ( Anno [LocatedA (Match GhcRn (LocatedA (body GhcRn)))] ~ SrcSpanAnnLW
-    , Anno [LocatedA (Match GhcPs (LocatedA (body GhcPs)))] ~ SrcSpanAnnLW
+  = ( Anno [LocatedA (Match GhcRn (LocatedA (body GhcRn)))] ~ SrcSpanAnnA
+    , Anno [LocatedA (Match GhcPs (LocatedA (body GhcPs)))] ~ SrcSpanAnnA
     , Anno (Match GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
     , Anno (Match GhcPs (LocatedA (body GhcPs))) ~ SrcSpanAnnA
     , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ EpAnnCO
@@ -1388,11 +1388,11 @@ rnMatchGroup :: (Outputable (body GhcPs), AnnoBody body) => HsMatchContextRn
              -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeNames))
              -> MatchGroup GhcPs (LocatedA (body GhcPs))
              -> RnM (MatchGroup GhcRn (LocatedA (body GhcRn)), FreeNames)
-rnMatchGroup ctxt rnBody (MG { mg_alts = L lm ms, mg_ext = origin })
+rnMatchGroup ctxt rnBody (MG { mg_alts = L lm ms, mg_ext = (origin, mann) })
          -- see Note [Empty MatchGroups]
   = do { when (null ms) $ checkEmptyCase ctxt
        ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
-       ; return (mkMatchGroup origin (L lm new_ms), ms_fvs) }
+       ; return (mkMatchGroup origin mann (L lm new_ms), ms_fvs) }
 
 -- Check the validity of a MatchGroup with an empty list of alternatives.
 --

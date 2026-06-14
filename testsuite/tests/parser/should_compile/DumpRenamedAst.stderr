@@ -28,15 +28,18 @@
              []))
            {Name: DumpRenamedAst.main})
           (MG
-           (FromSource)
+           ((,)
+            (FromSource)
+            (AnnList
+             (Nothing)
+             (ListNone)
+             []
+             (NoEpTok)
+             []))
            (L
             (EpAnn
              (EpaSpan { DumpRenamedAst.hs:35:1-23 })
-             (AnnList
-              (Nothing)
-              (ListNone)
-              []
-              (NoEpTok)
+             (AnnListItem
               [])
              (EpaComments
               []))
