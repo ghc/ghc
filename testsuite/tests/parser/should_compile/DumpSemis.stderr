@@ -271,7 +271,7 @@
          (Nothing)
          (ListNone)
          []
-         (NoEpTok)
+         (())
          []))
        (L
         (EpAnn
@@ -578,7 +578,7 @@
          (Nothing)
          (ListNone)
          []
-         (NoEpTok)
+         (())
          []))
        (L
         (EpAnn
@@ -840,7 +840,7 @@
          (Nothing)
          (ListNone)
          []
-         (NoEpTok)
+         (())
          []))
        (L
         (EpAnn
@@ -1056,7 +1056,7 @@
          (Nothing)
          (ListNone)
          []
-         (NoEpTok)
+         (())
          []))
        (L
         (EpAnn
@@ -1162,7 +1162,7 @@
          (Nothing)
          (ListNone)
          []
-         (NoEpTok)
+         (())
          []))
        (L
         (EpAnn
@@ -1270,7 +1270,7 @@
          (Nothing)
          (ListNone)
          []
-         (NoEpTok)
+         (())
          []))
        (L
         (EpAnn
@@ -1786,7 +1786,7 @@
          (Nothing)
          (ListNone)
          []
-         (NoEpTok)
+         (())
          []))
        (L
         (EpAnn
@@ -1914,7 +1914,7 @@
          (Nothing)
          (ListNone)
          []
-         (NoEpTok)
+         (())
          []))
        (L
         (EpAnn
@@ -2040,7 +2040,7 @@
                          (Nothing)
                          (ListNone)
                          []
-                         (NoEpTok)
+                         (())
                          []))
                        (L
                         (EpAnn
@@ -2153,7 +2153,7 @@
                          (Nothing)
                          (ListNone)
                          []
-                         (NoEpTok)
+                         (())
                          []))
                        (L
                         (EpAnn
@@ -2281,7 +2281,7 @@
          (Nothing)
          (ListNone)
          []
-         (NoEpTok)
+         (())
          []))
        (L
         (EpAnn
@@ -2402,7 +2402,7 @@
                       (EpaSpan { DumpSemis.hs:38:7 }))
                     ,(EpTok
                       (EpaSpan { DumpSemis.hs:38:8 }))]
-                    (NoEpTok)
+                    (())
                     []))
                   (L
                    (EpAnn

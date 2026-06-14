@@ -1654,7 +1654,7 @@ type instance XMG         GhcRn b = (Origin, -- See Note [Generated code and pat
                                      MatchGroupAnn)
 type instance XMG         GhcTc b = MatchGroupTc
 
-type MatchGroupAnn = AnnList (EpToken "where")
+type MatchGroupAnn = AnnList ()
 
 data MatchGroupTc
   = MatchGroupTc

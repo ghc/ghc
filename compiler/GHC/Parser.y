@@ -1760,19 +1760,19 @@ pattern_synonym_decl :: { LHsDecl GhcPs }
          {%      let (name, args) = $2 in
                  amsA' (sLL $1 $> . ValD noExtField $ mkPatSynBind name args $4
                                                     ImplicitBidirectional
-                      (AnnPSB (epTok $1) Nothing (Just (epTok $3)))) }
+                      (AnnPSB (epTok $1) Nothing (Just (epTok $3)) Nothing)) }
 
         | 'pattern' pattern_synonym_lhs '<-' pat_syn_pat
          {%    let (name, args) = $2 in
                amsA' (sLL $1 $> . ValD noExtField $ mkPatSynBind name args $4 Unidirectional
-                       (AnnPSB (epTok $1) (Just (epUniTok $3)) Nothing)) }
+                       (AnnPSB (epTok $1) (Just (epUniTok $3)) Nothing Nothing)) }
 
         | 'pattern' pattern_synonym_lhs '<-' pat_syn_pat where_decls
             {% do { let (name, args) = $2
                   ; mg <- mkPatSynMatchGroup name $5
                   ; amsA' (sLL $1 $> . ValD noExtField $
                            mkPatSynBind name args $4 (ExplicitBidirectional mg)
-                            (AnnPSB (epTok $1) (Just (epUniTok $3)) Nothing))
+                            (AnnPSB (epTok $1) (Just (epUniTok $3)) Nothing (Just (sndOf3 $ unLoc $5)) ))
                    }}
 
 pattern_synonym_lhs :: { (LocatedN RdrName, HsPatSynDetails GhcPs) }
@@ -1789,11 +1789,13 @@ cvars1 :: { [RecordPatSynField GhcPs] }
        | var ',' cvars1               {% do { h <- addTrailingCommaN $1 (gl $2)
                                             ; return ((RecordPatSynField (mkFieldOcc h) h) : $3 )}}
 
-where_decls :: { LocatedA (OrdList (LHsDecl GhcPs), AnnList (EpToken "where")) }
+where_decls :: { LocatedA (OrdList (LHsDecl GhcPs), EpToken "where", AnnList ()) }
         : 'where' '{' decls '}'       {% amsA' (sLL $1 $> (thdOf3 $ unLoc $3,
-                                                AnnList (Just (fstOf3 $ unLoc $3)) (ListBraces (epTok $2) (epTok $4)) (sndOf3 $ unLoc $3) (epTok $1) [])) }
+                                                epTok $1,
+                                                AnnList (Just (fstOf3 $ unLoc $3)) (ListBraces (epTok $2) (epTok $4)) (sndOf3 $ unLoc $3) () [])) }
         | 'where' vocurly decls close {% amsA' (sLL $1 $3 (thdOf3 $ unLoc $3,
-                                                AnnList (Just (fstOf3 $ unLoc $3)) ListNone (sndOf3 $ unLoc $3) (epTok $1) [])) }
+                                                epTok $1,
+                                                AnnList (Just (fstOf3 $ unLoc $3)) ListNone (sndOf3 $ unLoc $3) () [])) }
 
 pattern_synonym_sig :: { LSig GhcPs }
         : 'pattern' con_list '::' sigtype
@@ -3535,7 +3537,7 @@ guardquals1 :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }
 -----------------------------------------------------------------------------
 -- Case alternatives
 
-altslist(PATS) :: { forall b. DisambECP b => PV (LocatedA ([LMatch GhcPs (LocatedA b)], AnnList (EpToken "where"))) }
+altslist(PATS) :: { forall b. DisambECP b => PV (LocatedA ([LMatch GhcPs (LocatedA b)], AnnList ())) }
         : '{'        alts(PATS) '}'    { $2 >>= \ $2 -> amsA'
                                            (sLL $1 $> (reverse (snd $ unLoc $2),
                                            (AnnList (Just $ glR $2) (ListBraces (epTok $1) (epTok $3)) (fst $ unLoc $2) noAnn []))) }

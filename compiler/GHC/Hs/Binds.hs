@@ -146,11 +146,12 @@ data AnnPSB
   = AnnPSB {
       ap_pattern :: EpToken "pattern",
       ap_larrow  :: Maybe (EpUniToken "<-" "←"),
-      ap_equal   :: Maybe (EpToken "=")
+      ap_equal   :: Maybe (EpToken "="),
+      ap_where   :: Maybe (EpToken "where")
     } deriving Data
 
 instance NoAnn AnnPSB where
-  noAnn = AnnPSB noAnn noAnn noAnn
+  noAnn = AnnPSB noAnn noAnn noAnn noAnn
 
 -- ---------------------------------------------------------------------
 
