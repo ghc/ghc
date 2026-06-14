@@ -1,0 +1,11 @@
+section: compiler
+synopsis: Fix a Simplifier panic on open expressions (e.g. in the GHCi debugger)
+issues: #17833 #21118
+mrs: !16187
+description: {
+  ``simplifyExpr`` now seeds the Simplifier's in-scope set with the free
+  variables of the expression being simplified, restoring the invariant that the
+  in-scope set contains all of an expression's free variables. This fixes a panic
+  (a failed ``substTy`` assertion) when an open expression reaches the Simplifier,
+  as can happen for expressions entered in the GHCi debugger.
+}

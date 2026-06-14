@@ -14,6 +14,7 @@ import GHC.Core.Rules
 import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
 import GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
+import GHC.Core.FVs     ( exprFreeVars )
 import GHC.Core.Utils   ( mkTicks, stripTicksTop )
 import GHC.Core.Lint    ( LintPassResultConfig, dumpPassResult, lintPassResult )
 import GHC.Core.Opt.Simplify.Iteration ( simplTopBinds, simplExpr, simplImpRules )
@@ -74,7 +75,10 @@ simplifyExpr logger euc opts expr
         ; let fam_envs = ( eps_fam_inst_env eps
                          , extendFamInstEnvList emptyFamInstEnv $ se_fam_inst opts
                          )
-              simpl_env = mkSimplEnv (se_mode opts) fam_envs
+              -- See Note [Seed the in-scope set for open expressions]
+              simpl_env = setInScopeSet base_env
+                            (getInScope base_env `extendInScopeSetSet` exprFreeVars expr)
+              base_env  = mkSimplEnv (se_mode opts) fam_envs
               top_env_cfg = se_top_env_cfg opts
               read_eps_rules = eps_rule_base <$> eucEPS euc
               read_ruleenv = updExternalPackageRules emptyRuleEnv <$> read_eps_rules
@@ -93,6 +97,49 @@ simplifyExpr logger euc opts expr
 
         ; return expr'
         }
+
+{- Note [Seed the in-scope set for open expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An invariant of the Simplifier is that the in-scope set contains all the free
+variables of the expression being simplified.  Why?  So that the Simplifier
+never invents a "fresh" binder that accidentally captures one of those free
+variables.
+
+'simplifyExpr' establishes that invariant by initialising the in-scope set with
+the free variables of the expression it is given.  For a closed expression this
+adds nothing.
+
+But how can 'simplifyExpr' be handed an /open/ expression in the first place?
+The whole-module pipeline never does so: 'simplifyPgm' only ever simplifies
+closed bindings.  The one caller that can is 'hscCompileCoreExpr' (in
+GHC.Driver.Main.Passes), which compiles a single Core expression, and is itself
+reached from just two places:
+
+  * GHCi, for an expression typed at the prompt, and in particular in the
+    debugger (see below);
+  * Template Haskell, when running a splice (see GHC.Tc.Gen.Splice).
+
+So this is never on the critical path for mainstream compilation.
+
+Here is how the debugger hands us an open expression (test break006).  We are
+stopped at a breakpoint in
+    mymap f (x:xs) = f x : ...
+where the debugger knows that 'x :: Int' but not yet the result type of 'f'.  So
+it invents a RuntimeUnk skolem 'a' and gives 'f :: Int -> a'.  The user then
+types
+    let y = f x
+GHCi type-checks that and, to hand the result back to the interpreter (see
+GHC.Tc.Module.tcGhciStmts), wraps it as
+    returnIO @[Any] [unsafeCoerce# @LiftedRep @LiftedRep @a @Any y]
+in which the skolem 'a' is free.
+
+When the Simplifier instantiates that 'unsafeCoerce#', it builds a substitution
+mapping unsafeCoerce#'s quantified type variables to (LiftedRep, LiftedRep, a,
+Any), whose range therefore mentions 'a'.  The in-scope set of a substitution
+must contain the free variables of its range (see Note [The substitution
+invariant] in GHC.Core.TyCo.Subst).  Without the seeding above that invariant is
+broken, and in a compiler built with assertions substTy's sanity check fails
+(#17833, and its duplicate #21118). -}
 
 simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 -- ^ Simplifies an expression by doing occurrence analysis, then simplification,
