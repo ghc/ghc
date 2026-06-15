@@ -25,7 +25,7 @@ buildGhcInternalImportDef target = do
 
 buildGhcInternalImportLib :: FilePath -> Action ()
 buildGhcInternalImportLib target = do
-    let input = dropExtensions target <.> "def" -- the .def file
+    let input = dropExtension (dropExtension target) <.> "def" -- the .def file
         output = target -- the .dll.a import lib
     need [input]
     runBuilder Dlltool ["-d", input, "-l", output] [input] [output]
