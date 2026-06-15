@@ -1266,7 +1266,8 @@ instance Outputable (HsPragE (GhcPass p)) where
 {- Note [Rebindable syntax and XXExprGhcRn]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We implement rebindable syntax (RS) support by performing an expansion
-in the renamer. We transform GhcPs expressions and patterns affected by
+right before typechecking and after renaming.
+We transform GhcRn expressions and patterns affected by
 RS into the appropriate expanded form, but **annotated with the original
 expression/pattern**.
 
@@ -1299,7 +1300,7 @@ original 'if' expression around too, using the TTG
 XExpr extension point to allow GHC to construct an
 'XXExprGhcRn' value that will keep track of the original
 expression in its first field, and the desugared one in the
-second field. The resulting renamed AST would look like:
+second field. The resulting expanded AST would look like:
 
     L locif (XExpr
       (ExpandedThingRn (HSE
@@ -1359,25 +1360,26 @@ tcl_in_gen_code Bool to False.
 
 ---
 
-An overview of the constructs that are desugared in this way is laid out in
+An overview of the constructs that are expanded in this way is laid out in
 Note [Handling overloaded and rebindable constructs] in GHC.Rename.Expr.
 
 A general recipe to follow this approach for new constructs could go as follows:
 
 - Remove any GhcRn-time SyntaxExpr extensions to the relevant constructor for your
   construct, in HsExpr or related syntax data types.
-- At renaming-time:
+- At renaming-time (GHC.Tc.Gen.Rename.rnExpr) :
     - take your original node of interest (HsIf above)
     - rename its subexpressions/subpatterns (condition and true/false
       branches above)
     - construct the suitable "rebound"-and-renamed result (ifThenElse call
       above), where the 'SrcSpan' attached to any _fabricated node_ (the
       HsVar/HsApp nodes, above) is set to 'generatedSrcSpan'
+- At Expansion time (GHC.Tc.Gen.Expand.tcExpand)
     - take both the original node and that rebound-and-renamed result and wrap
       them into an expansion construct:
-        for expressions, XExpr (ExpandedThingRn <original node> <desugared>)
+        for expressions, XExpr (ExpandedThingRn (HSE { hse_ctxt = <original node> hse_exp = <desugared> }))
         for patterns, XPat (HsPatExpanded <original node> <desugared>)
- - At typechecking-time:
+ - At typechecking-time (GHC.Tc.Gen.tcExpr):
     - remove any logic that was previously dealing with your rebindable
       construct, typically involving [tc]SyntaxOp, SyntaxExpr and friends.
     - the XExpr (ExpandedThingRn ... ...) case in tcExpr already makes sure that we
@@ -1484,10 +1486,9 @@ type instance XXCmd       GhcTc = HsWrap HsCmd
 type CmdSyntaxTable p = [(Name, HsExpr p)]
 -- See Note [CmdSyntaxTable]
 
+-- | Syntax lookup table for rebindable constructs
 data RebindableSyntaxTable = NoRebindable | Rebindable [(OccName, Name)]
--- Stores the names of the operators for rebindable syntax
--- eg. getField, setField etc.
--- GHC.Tc.Expand will use these names to build the expansions
+-- See Note [RebindableSyntaxTable]
 
 isNoRebindable :: RebindableSyntaxTable -> Bool
 isNoRebindable NoRebindable = True
@@ -1528,6 +1529,32 @@ is Less Cool because
     pre-ordained.  (And this flexibility is useful; for example we can
     typecheck do-notation with (>>=) :: m1 a -> (a -> m2 b) -> m2 b.)
 -}
+
+{-
+Note [RebindableSyntaxTable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+During renaming of constructs that support rebindable syntax (eg. HsIf),
+we store the function (eg. ifThenElse) in a rebindable syntax table. Then
+in the the expansion phase, right before typechecking, we use the
+function (eg. ifThenElse) to build the actual expression to be typechecked.
+
+Why do we need to do this?
+The renamer identifies the free variables of the expressions to perform dependency analysis.
+When rebindable sytax is turned on, we want to treat the expression
+
+      HsIf b e1 e2
+
+As if it is
+
+      ifThenElse b e1 e2
+
+Thus the renamer needs to return `ifThenElse` as a free variable.
+
+Rebindable syntax stores this `ifThenElse` name so that it can be
+used to build the correct expanded expression in GHC.Tc.Gen.Expand.tcExpand.
+
+-}
+
 
 data CmdTopTc
   = CmdTopTc

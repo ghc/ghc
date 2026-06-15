@@ -237,9 +237,6 @@ See Note [Handling overloaded and rebindable constructs] in GHC.Rename.Expr
 To disabmiguate desugaring (`HsExpr GhcTc -> Core.Expr`) we use the phrase expansion
 (`HsExpr GhcRn -> HsExpr GhcRn`)
 
-This expansion is done after renaming and before typechecking
-See Part 2. of Note [Doing XXExprGhcRn in the Renamer vs Typechecker] in `GHC.Rename.Expr`
-
 Historical note START
 ---------------------
 In previous versions of GHC, the `do`-notation wasn't expanded before typechecking,

@@ -1,0 +1,10 @@
+section: compiler
+issues: #T27156
+mrs: !15868
+synopsis:
+  Refactor code, to perform expansions related to rebindable sytax in their own pass
+description:
+  Expansions for some constructs (HsIf, Record Dot Syntax, Sections)
+  was done in the renamer while for others it was done in
+  the type checker. This patch moves all the expansions out of the renamer into its own pass.
+  This patch changes the behavior of typed template haskell with rebindable syntax turned on.
