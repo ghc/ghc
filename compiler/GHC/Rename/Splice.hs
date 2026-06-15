@@ -611,6 +611,13 @@ problems, but keeps it on while processing typed TH quotes.
 
 This note and approach originated in #18102.
 
+The MR!15868 (#27156) moved all the expansion/rebindable syntax (RS) mechanism into its own pass,
+done after renaming and right before typechecking.
+Before this patch, only some constructs (if then else, overloaded labels) were
+expanded in the renamer, but some (Do statements and record updates) were done after
+the renamer. This meant that the treatment of rebindable syntax and typed template haskell was
+not uniform across constructs. The MR!15868 makes the treatement of RS uniform for all constructs.
+
 -}
 
 {- Note [Delaying modFinalizers in untyped splices]

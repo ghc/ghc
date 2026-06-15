@@ -49,12 +49,11 @@ Example: Typechecking the do expression. The typechecker looks (somewhat) like t
 
 The `expandDoStmts` replaces the HsDo { x <- e1; return x }
 with something like
-   HSE { hse_ctxt = ExprCtxt e
+   HSE { hse_ctxt = ExprCtxt (HsDo { x <- e1; return x })
        , hse_exp  = e1 >>= \ x -> x }
 and we then typecheck the expression `e1 >>= \ x -> x`
 
 See also Note [Handling overloaded and rebindable constructs]
-     and Note [Doing XXExprGhcRn in the Renamer vs Typechecker]
      and Note [Rebindable syntax and XXExprGhcRn]
 
 The Big Question is how to ensure that error messages mention
