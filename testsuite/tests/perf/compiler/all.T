@@ -807,7 +807,8 @@ test('T22744',
        pre_cmd('$MAKE -s --no-print-directory T22744'),
        extra_files(['genT22744']),
        pre_cmd_timeout_multiplier(5),
-       compile_timeout_multiplier(5)
+       compile_timeout_multiplier(5),
+       only_ways(['normal']),
      ],
      multimod_compile,
      ['T22744', '-v0'])
