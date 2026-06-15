@@ -12,6 +12,7 @@ module GHC.Rename.Unbound
    , mkUnboundNameRdr
    , mkUnboundGRE
    , mkUnboundGRERdr
+   , mkUnboundGREName
    , isUnboundName
    , reportUnboundName
    , unknownNameSuggestions
@@ -23,6 +24,8 @@ module GHC.Rename.Unbound
    , LookingFor(..)
    , unboundName
    , unboundNameX
+   , unboundGRE
+   , unboundGREX
    , unboundTermNameInTypes
    , IsTermInTypes(..)
    , notInScopeErr
@@ -101,13 +104,22 @@ mkUnboundNameRdr :: RdrName -> Name
 mkUnboundNameRdr rdr = mkUnboundName (rdrNameOcc rdr)
 
 mkUnboundGRE :: OccName -> GlobalRdrElt
-mkUnboundGRE occ = mkLocalGRE UnboundGRE NoParent $ mkUnboundName occ
+mkUnboundGRE occ = mkUnboundGREName $ mkUnboundName occ
 
 mkUnboundGRERdr :: RdrName -> GlobalRdrElt
-mkUnboundGRERdr rdr = mkLocalGRE UnboundGRE NoParent $ mkUnboundNameRdr rdr
+mkUnboundGRERdr rdr = mkUnboundGREName $ mkUnboundNameRdr rdr
+
+mkUnboundGREName :: Name -> GlobalRdrElt
+mkUnboundGREName = mkLocalGRE UnboundGRE NoParent
 
 reportUnboundName :: WhatLooking -> RdrName -> RnM Name
 reportUnboundName what_look rdr = unboundName (LF what_look WL_Anywhere) rdr
+
+unboundGRE :: LookingFor -> RdrName -> RnM GlobalRdrElt
+unboundGRE lf rdr = mkUnboundGREName <$> unboundName lf rdr
+
+unboundGREX :: LookingFor -> RdrName -> [GhcHint] -> RnM GlobalRdrElt
+unboundGREX lf rdr hints = mkUnboundGREName <$> unboundNameX lf rdr hints
 
 unboundName :: LookingFor -> RdrName -> RnM Name
 unboundName lf rdr = unboundNameX lf rdr []

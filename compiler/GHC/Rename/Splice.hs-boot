@@ -2,7 +2,7 @@ module GHC.Rename.Splice where
 
 import GHC.Hs
 import GHC.Tc.Utils.Monad
-import GHC.Types.Name (Name)
+import GHC.Types.Name.Reader (WithUserRdr, GlobalRdrElt)
 import GHC.Types.Name.Set
 
 
@@ -15,6 +15,6 @@ rnSpliceDecl :: SpliceDecl GhcPs -> RnM (SpliceDecl GhcRn, FreeVars)
 
 rnTopSpliceDecls :: HsUntypedSplice GhcPs -> RnM ([LHsDecl GhcPs], FreeVars)
 
-checkThLocalTyName :: Name -> RnM ()
+checkThLocalTyName :: GlobalRdrElt -> RnM ()
 
-checkThLocalNameNoLift :: LIdOccP GhcRn -> RnM ()
+checkThLocalNameNoLift :: LocatedN (WithUserRdr GlobalRdrElt) -> RnM ()

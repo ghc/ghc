@@ -453,7 +453,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                let avail = availFromGRE gre
                    name = greName gre
 
-               checkThLocalNameNoLift (ieLWrappedUserRdrName l name)
+               checkThLocalNameNoLift $ ieLWrappedUserRdrName l gre
                occs' <- check_occs occs ie [gre]
                (export_warn_spans', dont_warn_export', warn_txt_rn)
                  <- process_warning export_warn_spans
@@ -502,7 +502,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                     occs' <- check_occs occs ie [gre]
                     return (Just avail, occs', exp_dflts)
 
-               checkThLocalNameNoLift (ieLWrappedUserRdrName l name)
+               checkThLocalNameNoLift (ieLWrappedUserRdrName l gre)
                (export_warn_spans', dont_warn_export', warn_txt_rn)
                  <- process_warning export_warn_spans
                                     dont_warn_export
@@ -530,7 +530,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                    all_gres = par : all_kids
                    all_names = map greName all_gres
 
-               checkThLocalNameNoLift (ieLWrappedUserRdrName l name)
+               checkThLocalNameNoLift (ieLWrappedUserRdrName l par)
                occs' <- check_occs occs ie all_gres
                (export_warn_spans', dont_warn_export', warn_txt_rn)
                  <- process_warning export_warn_spans
@@ -568,7 +568,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                    all_gres = par : all_kids
                    all_names = map greName all_gres
 
-               checkThLocalNameNoLift (ieLWrappedUserRdrName l name)
+               checkThLocalNameNoLift (ieLWrappedUserRdrName l par)
                occs' <- check_occs occs ie all_gres
                (export_warn_spans', dont_warn_export', warn_txt_rn)
                  <- process_warning export_warn_spans
@@ -705,8 +705,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
       = addUsedGREs ExportDeprecationWarnings (pickGREs parent_rdr kid_gres)
 
 
-ieLWrappedUserRdrName :: LIEWrappedName GhcPs -> Name -> LIdOccP GhcRn
-ieLWrappedUserRdrName l n = fmap (\rdr -> WithUserRdr rdr n) $ ieLWrappedName l
+ieLWrappedUserRdrName :: LIEWrappedName GhcPs -> n -> GenLocated SrcSpanAnnN (WithUserRdr n)
+ieLWrappedUserRdrName l n = (\rdr -> WithUserRdr rdr n) <$> ieLWrappedName l
 
 -- | In what namespaces should we go looking for an import/export item
 -- that is out of scope, for suggestions in error messages?
@@ -812,7 +812,7 @@ lookupChildrenExport parent_gre rdr_items = mapAndReportM doOne rdr_items
                  ; return (L l (IEName noExtField (L (l2l l) ub)), gre)}
             FoundChild child@(GRE { gre_name = child_nm, gre_par = par }) ->
               do { checkPatSynParent spec_parent par child_nm
-                 ; checkThLocalNameNoLift (ieLWrappedUserRdrName n child_nm)
+                 ; checkThLocalNameNoLift (ieLWrappedUserRdrName n child)
                  ; return (replaceLWrappedName n child_nm, child)
                  }
             IncorrectParent p c gs -> failWithDcErr (parentGRE_name p) (greName c) gs

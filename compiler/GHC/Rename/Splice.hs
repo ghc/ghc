@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE MultiWayIf #-}
 
 module GHC.Rename.Splice (
         rnTopSpliceDecls,
@@ -41,7 +40,7 @@ import GHC.Unit.Module
 import GHC.Types.SrcLoc
 import GHC.Rename.HsType ( rnLHsType )
 
-import Control.Monad    ( unless, when )
+import Control.Monad    ( unless, when, void )
 
 import {-# SOURCE #-} GHC.Rename.Expr ( rnLExpr )
 
@@ -182,12 +181,13 @@ rnUntypedBracket e br_body
        }
 
 rn_utbracket :: HsQuote GhcPs -> RnM (HsQuote GhcRn, FreeVars)
-rn_utbracket (VarBr _ flg rdr_name)
-  = do { name <- lookupOccRn (if flg then WL_Term else WL_Type) (unLoc rdr_name)
-       ; let res_name = L (l2l (locA rdr_name)) (WithUserRdr (unLoc rdr_name) name)
-       ; if flg then checkThLocalNameNoLift res_name else checkThLocalTyName name
-       ; check_namespace flg name
-       ; return (VarBr noExtField flg (noLocA name), unitFV name) }
+rn_utbracket (VarBr _ is_value_name rdr_name)
+  = do { gre <- lookupOccRnGRE (if is_value_name then WL_Term else WL_Type) (unLoc rdr_name)
+       ; let loc_name = L (l2l (locA rdr_name)) (WithUserRdr (unLoc rdr_name) gre)
+       ; let name = greName gre
+       ; if is_value_name then checkThLocalNameNoLift loc_name else checkThLocalTyName gre
+       ; check_namespace is_value_name $ greName gre
+       ; return (VarBr noExtField is_value_name (fmap (greName . unwrapUserRdr) loc_name), unitFV name) }
 
 rn_utbracket (ExpBr _ e) = do { (e', fvs) <- rnLExpr e
                                 ; return (ExpBr noExtField e', fvs) }
@@ -432,10 +432,11 @@ rnUntypedSplice (HsUntypedSpliceExpr _ expr) flavour
 
 rnUntypedSplice (HsQuasiQuote _ quoter quote) flavour
   = do  { -- Rename the quoter; akin to the HsVar case of rnExpr
-        ; quoter' <- lookupLocatedOccRn WL_TermVariable quoter
+        ; quoter' <- lookupLocatedOccRnGRE WL_TermVariable quoter
         ; let res_name = WithUserRdr (unLoc quoter) <$> quoter'
         ; checkThLocalNameNoLift res_name
-        ; return (HsQuasiQuote (HsQuasiQuoteExt flavour) quoter' quote, unitFV (unLoc quoter')) }
+        ; let loc_name = fmap greName quoter'
+        ; return (HsQuasiQuote (HsQuasiQuoteExt flavour) loc_name quote, unitFV (unLoc loc_name)) }
 
 ---------------------
 rnTypedSplice :: HsTypedSplice GhcPs -- Typed splice expression
@@ -908,14 +909,14 @@ traceSplice (SpliceInfo { spliceDescription = sd, spliceSource = mb_src
       = vcat [ text "--" <+> ppr loc <> colon <+> text "Splicing" <+> text sd
              , gen ]
 
-checkThLocalTyName :: Name -> RnM ()
-checkThLocalTyName name
+checkThLocalTyName :: GlobalRdrElt -> RnM ()
+checkThLocalTyName gre
   | isUnboundName name   -- Do not report two errors for
   = return ()            --   $(not_in_scope args)
 
   | otherwise
   = do  { traceRn "checkThLocalTyName" (ppr name)
-        ; mb_local_use <- getCurrentAndBindLevel name
+        ; mb_local_use <- getCurrentAndBindLevel gre
         ; case mb_local_use of {
              Nothing -> return () ;  -- Not a locally-bound thing
              Just (top_lvl, bind_lvl, use_lvl) ->
@@ -934,25 +935,29 @@ checkThLocalTyName name
                                                  <+> ppr use_lvl)
         ; dflags <- getDynFlags
         ; checkCrossLevelLiftingTy dflags top_lvl bind_lvl use_lvl use_lvl_idx name } } }
+  where name = greName gre
 
 -- | Check whether we are allowed to use a Name in this context (for TH purposes)
 -- In the case of a level incorrect program, attempt to fix it by using
 -- a Lift constraint.
-checkThLocalNameWithLift :: LIdOccP GhcRn -> RnM (HsExpr GhcRn)
+checkThLocalNameWithLift :: LocatedN (WithUserRdr GlobalRdrElt) -> RnM (HsExpr GhcRn)
 checkThLocalNameWithLift = checkThLocalName True
 
 -- | Check whether we are allowed to use a Name in this context (for TH purposes)
 -- In the case of a level incorrect program, do not attempt to fix it by using
 -- a Lift constraint.
-checkThLocalNameNoLift :: LIdOccP GhcRn -> RnM ()
-checkThLocalNameNoLift name = checkThLocalName False name >> return ()
+checkThLocalNameNoLift :: LocatedN (WithUserRdr GlobalRdrElt) -> RnM ()
+checkThLocalNameNoLift = void . checkThLocalName False
 
 -- | Implemenation of the level checks
 -- See Note [Template Haskell levels]
-checkThLocalName :: Bool -> LIdOccP GhcRn -> RnM (HsExpr GhcRn)
-checkThLocalName allow_lifting name_var
+checkThLocalName :: Bool -> LocatedN (WithUserRdr GlobalRdrElt) -> RnM (HsExpr GhcRn)
+checkThLocalName allow_lifting loc_gre
   -- Exact and Orig names are not imported, so presumed available at all levels.
-  | isExact (userRdrName (unLoc name_var)) || isOrig (userRdrName (unLoc name_var))
+  -- whenever the user uses exact names, e.g. say @'mkNameG_v' "" "Foo" "bar"@,
+  -- even though the 'mkNameG_v' here is essentially a quotation, we do not do
+  -- level checks as we assume that the user was trying to bypass the level checks
+  | isExact rdr || isOrig rdr
   = return (HsVar noExtField name_var)
   | isUnboundName name   -- Do not report two errors for
   = return (HsVar noExtField name_var)            --   $(not_in_scope args)
@@ -960,7 +965,7 @@ checkThLocalName allow_lifting name_var
   = return (HsVar noExtField name_var)
   | otherwise
   = do  {
-          mb_local_use <- getCurrentAndBindLevel name
+          mb_local_use <- getCurrentAndBindLevel $ unwrap loc_gre
         ; case mb_local_use of {
              Nothing -> return (HsVar noExtField name_var) ;  -- Not a locally-bound thing
              Just (top_lvl, bind_lvl, use_lvl) ->
@@ -969,13 +974,12 @@ checkThLocalName allow_lifting name_var
         ; let is_local
                   | Just mod <- nameModule_maybe name = mod == cur_mod
                   | otherwise = True
-        ; traceRn "checkThLocalName" (ppr name <+> ppr bind_lvl <+> ppr use_lvl <+> ppr use_lvl)
         ; dflags <- getDynFlags
-        ; env <- getGlobalRdrEnv
-        ; let mgre = lookupGRE_Name env name
-        ; checkCrossLevelLifting dflags (LevelCheckSplice name mgre) top_lvl is_local allow_lifting bind_lvl use_lvl use_lvl_idx name_var } } }
-  where
-    name = getName name_var
+        ; checkCrossLevelLifting dflags (LevelCheckSplice $ unLoc loc_gre) top_lvl is_local allow_lifting bind_lvl use_lvl use_lvl_idx name_var } } }
+  where rdr = userRdrName $ unLoc name_var
+        name_var = fmap greName <$> loc_gre
+        name = unwrap name_var
+        unwrap = unwrapUserRdr . unLoc
 
 --------------------------------------
 checkCrossLevelLifting :: DynFlags
@@ -1005,12 +1009,14 @@ checkCrossLevelLifting dflags reason top_lvl is_local allow_lifting bind_lvl use
   , any (\bind_idx -> use_lvl_idx == incThLevelIndex bind_idx) (Set.toList bind_lvl)
   , allow_lifting
   = do
-       let mgre = case reason of
-                   LevelCheckSplice _ gre -> gre
-                   _ -> Nothing
+       let gre
+             | LevelCheckSplice rdr <- reason
+             = Just $! unwrapUserRdr rdr
+             | otherwise
+             = Nothing
        (splice_name :: Name) <- newLocalBndrRn (noLocA unqualSplice)
        let  pend_splice :: HsImplicitLiftSplice
-            pend_splice = HsImplicitLiftSplice bind_lvl use_lvl_idx mgre name_var
+            pend_splice = HsImplicitLiftSplice bind_lvl use_lvl_idx gre name_var
        -- Warning for implicit lift (#17804)
        addDetailedDiagnostic (TcRnImplicitLift name)
 

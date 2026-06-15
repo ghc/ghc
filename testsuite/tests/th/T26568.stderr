@@ -1,7 +1,8 @@
 T26568.hs:5:3: error: [GHC-28914]
     • Level error:
-      instance for ‘GHC.Internal.Base.Monad GHC.Internal.TH.Syntax.Q’
-      is bound at levels {} but used at level -1
+      instance for ‘GHC.Internal.Base.Monad
+                      GHC.Internal.TH.Syntax.Q’ is used at level -1
+      but it is bound at levels {}
     • In a stmt of a 'do' block: _ <- _
       In the expression:
         do _ <- _

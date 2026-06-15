@@ -2453,8 +2453,8 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig _ resTv))
              bindLocalNames (maybeToList (hsLTyVarName resTv)) $
              -- The return type variable scopes over the injectivity annotation
              -- e.g.   type family F a = (r::*) | r -> a
-             do { injFrom' <- rnLTyVar injFrom
-                ; injTo'   <- mapM rnLTyVar injTo
+             do { injFrom' <- fmap greName <$> rnLTyVar injFrom
+                ; injTo'   <- mapM (fmap (fmap greName) . rnLTyVar) injTo
                 -- Note: srcSpan is unchanged, but typechecker gets
                 -- confused, l2l call makes it happy
                 ; return $ L (l2l srcSpan) (InjectivityAnn x injFrom' injTo') }
@@ -2495,7 +2495,7 @@ rnInjectivityAnn _ _ (L srcSpan (InjectivityAnn x injFrom injTo)) =
    (injDecl', _) <- askNoErrs $ do
      injFrom' <- rnLTyVar injFrom
      injTo'   <- mapM rnLTyVar injTo
-     return $ L srcSpan (InjectivityAnn x injFrom' injTo')
+     return $ L srcSpan (InjectivityAnn x (fmap greName injFrom') (fmap (fmap greName) injTo'))
    return $ injDecl'
 
 {-
