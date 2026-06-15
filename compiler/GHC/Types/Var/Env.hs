@@ -97,6 +97,13 @@ import GHC.Utils.Panic
 import GHC.Data.Maybe
 import GHC.Utils.Outputable
 
+-- THROWAWAY instrumentation for the tag-flip measurement (NOT to land) --
+import Control.Monad ( when )
+import Data.IORef ( IORef, newIORef, atomicModifyIORef' )
+import System.Environment ( lookupEnv )
+import System.IO.Unsafe ( unsafePerformIO )
+-- end THROWAWAY --
+
 {-
 ************************************************************************
 *                                                                      *
@@ -233,13 +240,44 @@ uniqAway' in_scope var
 -- trie mechanics it relies on.
 unsafeGetFreshLocalUnique :: InScopeSet -> Unique
 unsafeGetFreshLocalUnique (InScope set)
-  | Just (uniq,_) <- Word64Map.lookupLT (getKey maxLocalUnique) (ufmToIntMap $ getUniqSet set)
-  , let uniq' = mkLocalUnique uniq
-  , not $ uniq' `ltUnique` minLocalUnique
-  = incrUnique uniq'
+  = dumpInScopeKeys set go
+  where
+    go | Just (uniq,_) <- Word64Map.lookupLT (getKey maxLocalUnique) (ufmToIntMap $ getUniqSet set)
+       , let uniq' = mkLocalUnique uniq
+       , not $ uniq' `ltUnique` minLocalUnique
+       = incrUnique uniq'
 
-  | otherwise
-  = minLocalUnique
+       | otherwise
+       = minLocalUnique
+
+-- THROWAWAY instrumentation for the tag-flip measurement (NOT to land) ------
+-- When GHC_DUMP_INSCOPE names a file, append the raw Word64 keys of each
+-- sufficiently large in-scope set (one set per line, space-separated decimal),
+-- capped at a fixed number of lines. Zero overhead when the env var is unset.
+
+{-# NOINLINE dumpInScopeFile #-}
+dumpInScopeFile :: Maybe FilePath
+dumpInScopeFile = unsafePerformIO (lookupEnv "GHC_DUMP_INSCOPE")
+
+{-# NOINLINE dumpLineCount #-}
+dumpLineCount :: IORef Int
+dumpLineCount = unsafePerformIO (newIORef 0)
+
+{-# NOINLINE dumpInScopeKeys #-}
+dumpInScopeKeys :: VarSet -> a -> a
+dumpInScopeKeys set x =
+  case dumpInScopeFile of
+    Nothing -> x
+    Just fp ->
+      let keys = Word64Map.keys (ufmToIntMap (getUniqSet set))
+      in if length keys < 32
+           then x
+           else unsafePerformIO $ do
+                  n <- atomicModifyIORef' dumpLineCount (\c -> (c + 1, c))
+                  when (n < 200000) $
+                    appendFile fp (unwords (map show keys) ++ "\n")
+                  return x
+-- end THROWAWAY -----------------------------------------------------------
 
 {-
 ************************************************************************
