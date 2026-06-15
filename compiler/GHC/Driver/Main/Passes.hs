@@ -29,6 +29,7 @@ module GHC.Driver.Main.Passes
     , hscSimplify
     , hscSimplify'
     , hscDesugarAndSimplify
+    , hscTidy
 
     ) where
 
