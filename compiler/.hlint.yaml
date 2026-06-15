@@ -3,6 +3,8 @@
 ##########################
 
 - ignore: {}
+- ignore: {name: Use camelCase}
+- ignore: {name: Eta reduce}
 - warn: {name: Unused LANGUAGE pragma}
 - warn: {name: Use fewer LANGUAGE pragmas}
 - warn: {name: Redundant return}
