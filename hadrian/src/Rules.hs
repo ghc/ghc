@@ -118,8 +118,15 @@ packageRules = do
     Rules.SimpleTargets.simplePackageTargets
     Rules.SimpleTargets.completionRule
 
+configCheckRule :: Rules ()
+configCheckRule = do
+    "hadrian/cfg/system.config" %> \cfg -> do
+        putFailure (cfg <> " not found.\nPerhaps you forgot to run:\n\t./boot\n\t./configure" )
+        fail (cfg <> " not found.")
+
 buildRules :: Rules ()
 buildRules = do
+    configCheckRule
     Rules.BinaryDist.bindistRules
     Rules.Generate.copyRules
     Rules.Generate.generateRules
