@@ -40,7 +40,7 @@ module GHC.Types.Name.Reader (
         isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName,
 
         -- ** Preserving user-written qualification
-        WithUserRdr(..), noUserRdr, unLocWithUserRdr, userRdrName,
+        WithUserRdr(..), noUserRdr, unLocWithUserRdr, userRdrName, unwrapUserRdr,
 
         -- * Local mapping of 'RdrName' to 'Name.Name'
         LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv, extendLocalRdrEnvList,
@@ -2196,8 +2196,8 @@ ppr_defn_site imp_spec name
 instance Outputable ImportSpec where
    ppr imp_spec
      = text "imported" <+> qual
-        <+> text "from" <+> quotes (ppr (importSpecModule imp_spec))
         <+> level_ppr
+        <+> text "from" <+> quotes (ppr (importSpecModule imp_spec))
         <+> pprLoc (importSpecLoc imp_spec)
      where
        qual | is_qual (is_decl imp_spec) = text "qualified"
@@ -2206,7 +2206,7 @@ instance Outputable ImportSpec where
        level = thLevelIndexFromImportLevel (is_level (is_decl imp_spec))
        level_ppr
         | level == topLevelIndex = empty
-        | otherwise = text "at" <+> ppr level
+        | otherwise = text "at level" <+> ppr level
 
 
 pprLoc :: SrcSpan -> SDoc
@@ -2247,8 +2247,11 @@ unLocWithUserRdr (L _ (WithUserRdr _ a)) = a
 noUserRdr :: Name -> WithUserRdr Name
 noUserRdr n = WithUserRdr (nameRdrName n) n
 
-userRdrName :: WithUserRdr Name -> RdrName
+userRdrName :: WithUserRdr a -> RdrName
 userRdrName (WithUserRdr rdr _) = rdr
+
+unwrapUserRdr :: WithUserRdr a -> a
+unwrapUserRdr (WithUserRdr _ a) = a
 
 rdrQual_maybe :: RdrName -> Maybe ModuleName
 rdrQual_maybe = \case

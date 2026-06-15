@@ -1188,8 +1188,14 @@ mkImplicitLiftingReporter ctxt
     mkImplicitLiftingError :: ErrorItem -> TcRnMessage
     mkImplicitLiftingError item =
       case errorItemOrigin item of
-        ImplicitLiftOrigin (HsImplicitLiftSplice bound used gre name) ->
-          TcRnBadlyLevelled (LevelCheckSplice (getName name) gre) bound used (Just item) (cec_defer_type_errors ctxt)
+        -- mgre is Nothing IFF LevelCheckReason is LevelCheckInstance
+        ImplicitLiftOrigin (HsImplicitLiftSplice bound used (Just gre) loc_name) ->
+          TcRnBadlyLevelled
+            (LevelCheckSplice $ gre <$ unLoc loc_name)
+            bound
+            used
+            (Just item)
+            (cec_defer_type_errors ctxt)
         _ -> pprPanic "mkImplicitLiftingError" (ppr item)
 
 mkGivenErrorReporter :: Reporter

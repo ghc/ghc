@@ -606,20 +606,21 @@ rnHsTyKi env tv@(HsTyVar _ ip (L loc rdr_name))
          TcRnUnexpectedKindVar rdr_name
            -- Any type variable at the kind level is illegal without the use
            -- of PolyKinds (see #14710)
-       ; name <- rnTyVar env rdr_name
+       ; gre <- rnTyVar env rdr_name
        ; this_mod <- getModule
        ; explicit_level_imports <- xoptM LangExt.ExplicitLevelImports
-       ; let loc_name_with_rdr = L loc $ WithUserRdr rdr_name name
+       ; let loc_gre_with_rdr = L loc $ WithUserRdr rdr_name gre
+             name = greName gre
        ; if  | explicit_level_imports
              -- See Note [Strict level checks with ExplicitLevelImports]
-             -> checkThLocalNameNoLift loc_name_with_rdr
+             -> checkThLocalNameNoLift loc_gre_with_rdr
 
              | nameIsLocalOrFrom this_mod name
-             -> checkThLocalTyName name
+             -> checkThLocalTyName gre
 
              | otherwise -> pure ()
-       ; checkPromotedDataConName env tv Prefix ip name
-       ; return (HsTyVar noAnn ip loc_name_with_rdr, unitFN name) }
+       ; checkPromotedDataConName env tv Prefix ip $ greName gre
+       ; return (HsTyVar noAnn ip $ fmap greName <$> loc_gre_with_rdr, unitFN name) }
 
 rnHsTyKi env ty@(HsOpTy _ ty1 tyop ty2)
   = setSrcSpan (getLocA tyop) $
@@ -826,13 +827,13 @@ throw an error accordingly.
 -}
 
 --------------
-rnTyVar :: RnTyKiEnv -> RdrName -> RnM Name
+rnTyVar :: RnTyKiEnv -> RdrName -> RnM GlobalRdrElt
 rnTyVar env rdr_name
-  = do { name <- lookupTypeOccRn rdr_name
-       ; checkNamedWildCard env name
-       ; return name }
+  = do { gre <- lookupTypeOccRn rdr_name
+       ; checkNamedWildCard env $ greName gre
+       ; return gre }
 
-rnLTyVar :: LocatedN RdrName -> RnM (LocatedN Name)
+rnLTyVar :: LocatedN RdrName -> RnM (LocatedN GlobalRdrElt)
 -- Called externally; does not deal with wildcards
 rnLTyVar (L loc rdr_name)
   = do { tyvar <- lookupTypeOccRn rdr_name
@@ -843,14 +844,15 @@ rnHsTyOp :: RnTyKiEnv -> HsType GhcPs -> LHsType GhcPs
          -> RnM (LHsType GhcRn, FreeNames)
 rnHsTyOp env overall_ty tyop
   | L l (HsTyVar ann prom (L loc op)) <- tyop
-  = do { op' <- rnTyVar env op
+  = do { opgre <- rnTyVar env op
+       ; let opName = greName opgre
        ; unlessXOptM LangExt.TypeOperators $
-           if (op' `hasKey` eqTyConKey) -- See [eqTyCon (~) compatibility fallback] in GHC.Rename.Env
+           if opName `hasKey` eqTyConKey -- See [eqTyCon (~) compatibility fallback] in GHC.Rename.Env
            then addDiagnostic TcRnTypeEqualityRequiresOperators
            else addErr $ TcRnIllegalTypeOperator (ppr overall_ty) op
-       ; checkPromotedDataConName env overall_ty Infix prom op'
-       ; let tyop' = L l (HsTyVar ann prom (L loc (WithUserRdr op op')))
-       ; return (tyop', unitFN op') }
+       ; checkPromotedDataConName env overall_ty Infix prom opName
+       ; let tyop' = L l (HsTyVar ann prom (L loc (WithUserRdr op opName)))
+       ; return (tyop', unitFN opName) }
   | otherwise
   = rnLHsTyKi env tyop
 
