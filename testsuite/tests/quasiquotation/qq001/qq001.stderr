@@ -1,4 +1,5 @@
 qq001.hs:7:16: error: [GHC-28914]
-    • Level error: ‘parse’ is bound at level 0 but used at level -1
+    • Level error:
+      ‘parse’ is used at level -1 but it is bound at level 0
     • In the quasi-quotation: [parse||]
 

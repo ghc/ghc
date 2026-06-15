@@ -2166,32 +2166,22 @@ keepAlive name
 getThLevel :: TcM ThLevel
 getThLevel = do { env <- getLclEnv; return (getLclEnvThLevel env) }
 
-getCurrentAndBindLevel :: Name -> TcRn (Maybe (TopLevelFlag, Set.Set ThLevelIndex, ThLevel))
-getCurrentAndBindLevel name
+getCurrentAndBindLevel :: GlobalRdrElt -> TcRn (Maybe (TopLevelFlag, Set.Set ThLevelIndex, ThLevel))
+getCurrentAndBindLevel gre
   = do { env <- getLclEnv;
-       ; case lookupNameEnv (getLclEnvThBndrs env) name of
-           Nothing                  -> do
-              lvls <- getExternalBindLvl name
-              if Set.empty == lvls
-                -- This case happens when code is generated for identifiers which are not
-                -- in scope.
-                --
-                -- TODO: What happens if someone generates [|| GHC.Magic.dataToTag# ||]
-                then do
-                  return Nothing
-                else return (Just (TopLevel, lvls, getLclEnvThLevel env))
-           Just (top_lvl, bind_lvl) -> return (Just (top_lvl, Set.singleton bind_lvl, getLclEnvThLevel env)) }
+       ; return $ case lookupNameEnv (getLclEnvThBndrs env) $ greName gre  of
+           Nothing
+             | Set.null lvls  -> Nothing
+             -- This case happens when code is generated for identifiers which are not
+             -- in scope.
+             --
+             -- TODO: What happens if someone generates [|| GHC.Magic.dataToTag# ||]
+             | otherwise -> Just (TopLevel, lvls, getLclEnvThLevel env)
+           Just (top_lvl, bind_lvl) -> Just (top_lvl, Set.singleton bind_lvl, getLclEnvThLevel env) }
+  where lvls = getExternalBindLvl gre
 
-getExternalBindLvl :: Name -> TcRn (Set.Set ThLevelIndex)
-getExternalBindLvl name = do
-  env <- getGlobalRdrEnv
-  mod <- getModule
-  case lookupGRE_Name env name of
-    Just gre -> return $ (Set.map thLevelIndexFromImportLevel (greLevels gre))
-    Nothing ->
-      if nameIsLocalOrFrom mod name
-        then return $ Set.singleton topLevelIndex
-        else return Set.empty
+getExternalBindLvl :: GlobalRdrElt -> Set.Set ThLevelIndex
+getExternalBindLvl gre = Set.map thLevelIndexFromImportLevel (greLevels gre)
 
 setThLevel :: ThLevel -> TcM a -> TcRn a
 setThLevel l = updLclEnv (setLclEnvThLevel l)

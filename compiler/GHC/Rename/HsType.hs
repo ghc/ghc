@@ -544,16 +544,17 @@ rnHsTyKi env tv@(HsTyVar _ ip (L loc rdr_name))
          TcRnUnexpectedKindVar rdr_name
            -- Any type variable at the kind level is illegal without the use
            -- of PolyKinds (see #14710)
-       ; name <- rnTyVar env rdr_name
+       ; gre <- rnTyVar env rdr_name
        ; this_mod <- getModule
        ; explicit_level_imports <- xoptM LangExt.ExplicitLevelImports
-       ; let loc_name_with_rdr = L loc $ WithUserRdr rdr_name name
+       ; let loc_gre_with_rdr = L loc $ WithUserRdr rdr_name gre
+             name = greName gre
        ; if  | explicit_level_imports
              -- See Note [Strict level checks with ExplicitLevelImports]
-             -> checkThLocalNameNoLift loc_name_with_rdr
+             -> checkThLocalNameNoLift loc_gre_with_rdr
 
              | nameIsLocalOrFrom this_mod name
-             -> checkThLocalTyName name
+             -> checkThLocalTyName gre
 
              | otherwise -> pure ()
        ; when (isDataConName name && not (isKindName name)) $
@@ -565,7 +566,7 @@ rnHsTyKi env tv@(HsTyVar _ ip (L loc rdr_name))
        ; when (isDataConName name && not (isPromoted ip)) $
          -- NB: a prefix symbolic operator such as (:) is represented as HsTyVar.
             addDiagnostic (TcRnUntickedPromotedThing $ UntickedConstructor Prefix name)
-       ; return (HsTyVar noAnn ip loc_name_with_rdr, unitFV name) }
+       ; return (HsTyVar noAnn ip $ fmap greName <$> loc_gre_with_rdr, unitFV name) }
 
 rnHsTyKi env ty@(HsOpTy _ prom ty1 l_op ty2)
   = setSrcSpan (getLocA l_op) $
@@ -785,13 +786,13 @@ throw an error accordingly.
 -}
 
 --------------
-rnTyVar :: RnTyKiEnv -> RdrName -> RnM Name
+rnTyVar :: RnTyKiEnv -> RdrName -> RnM GlobalRdrElt
 rnTyVar env rdr_name
-  = do { name <- lookupTypeOccRn rdr_name
-       ; checkNamedWildCard env name
-       ; return name }
+  = do { gre <- lookupTypeOccRn rdr_name
+       ; checkNamedWildCard env $ greName gre
+       ; return gre }
 
-rnLTyVar :: LocatedN RdrName -> RnM (LocatedN Name)
+rnLTyVar :: LocatedN RdrName -> RnM (LocatedN GlobalRdrElt)
 -- Called externally; does not deal with wildcards
 rnLTyVar (L loc rdr_name)
   = do { tyvar <- lookupTypeOccRn rdr_name
@@ -801,12 +802,13 @@ rnLTyVar (L loc rdr_name)
 rnHsTyOp :: RnTyKiEnv -> SDoc -> LocatedN RdrName
          -> RnM (LocatedN Name, FreeVars)
 rnHsTyOp env overall_ty (L loc op)
-  = do { op' <- rnTyVar env op
+  = do { opgre <- rnTyVar env op
+       ; let opName = greName opgre
        ; unlessXOptM LangExt.TypeOperators $
-           if (op' `hasKey` eqTyConKey) -- See [eqTyCon (~) compatibility fallback] in GHC.Rename.Env
+           if opName `hasKey` eqTyConKey -- See [eqTyCon (~) compatibility fallback] in GHC.Rename.Env
            then addDiagnostic TcRnTypeEqualityRequiresOperators
            else addErr $ TcRnIllegalTypeOperator overall_ty op
-       ; return (L loc op', unitFV op') }
+       ; return (L loc opName, unitFV opName) }
 
 --------------
 checkWildCard :: RnTyKiEnv

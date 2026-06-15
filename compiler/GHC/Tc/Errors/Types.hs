@@ -6247,7 +6247,7 @@ data WrongThingSort
 
 data LevelCheckReason
   = LevelCheckInstance !InstanceWhat !PredType
-  | LevelCheckSplice !Name !(Maybe GlobalRdrElt)
+  | LevelCheckSplice !(WithUserRdr GlobalRdrElt)
 
 data UninferrableTyVarCtx
   = UninfTyCtx_ClassContext [TcType]

@@ -1,0 +1,9 @@
+section: compiler
+synopsis: Fix the interaction of ExplicitLevelImports with qualified imports
+description:
+  GHC now properly considers module qualification when tracking the levels that an identifier
+  is imported at:
+    - A qualified occurrence must be bound in a corresponding qualified import of the right level.
+    - The level error message now correctly reports the user-written qualification.
+mrs: !16195
+issues: #26616 #27385
