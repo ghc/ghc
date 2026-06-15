@@ -1297,7 +1297,8 @@ wrapSrcSpanTPRnM fn (L loc a) = do
 
 lookupTypeOccTPRnM :: RdrName -> TPRnM Name
 lookupTypeOccTPRnM rdr_name = liftRnFV $ do
-  name <- lookupTypeOccRn rdr_name
+  gre <- lookupTypeOccRn rdr_name
+  let name = greName gre
   pure (name, unitFN name)
 
 rn_lty_pat :: LHsType GhcPs -> TPRnM (LHsType GhcRn)

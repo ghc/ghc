@@ -2254,6 +2254,7 @@ data HsImplicitLiftSplice =
           { implicit_lift_bind_lvl :: S.Set ThLevelIndex
           , implicit_lift_used_lvl :: ThLevelIndex
           , implicit_lift_gre :: Maybe GlobalRdrElt
+            -- ^ Nothing iff 'LevelCheckReason' is 'LevelCheckInstance'
           , implicit_lift_lid :: LIdOccP GhcRn
           }
 

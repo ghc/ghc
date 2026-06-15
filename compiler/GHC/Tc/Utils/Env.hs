@@ -135,7 +135,7 @@ import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Iface.Errors.Types
-import GHC.Rename.Unbound ( unknownNameSuggestions )
+import GHC.Rename.Unbound ( unknownNameSuggestions, mkUnboundGREName )
 import GHC.Tc.Errors.Types.PromotionErr
 import {-# SOURCE #-} GHC.Tc.Errors.Hole (getHoleFitDispConfig)
 
@@ -244,7 +244,7 @@ tcLookupLocatedGlobal name
   = addLocM tcLookupGlobal name
 
 tcLookupGlobal :: Name -> TcM TyThing
--- The Name is almost always an ExternalName, but not always
+-- The Name is almost always an ExternalName, but not always:
 -- In GHCi, we may make command-line bindings (ghci> let x = True)
 -- that bind a GlobalId, but with an InternalName
 tcLookupGlobal name
@@ -252,15 +252,12 @@ tcLookupGlobal name
           env <- getGblEnv
         ; case lookupNameEnv (tcg_type_env env) name of {
                 Just thing -> return thing ;
-                Nothing    ->
-
                 -- Should it have been in the local envt?
                 -- (NB: use semantic mod here, since names never use
                 -- identity module, see Note [Identity versus semantic module].)
-          if nameIsLocalOrFrom (tcg_semantic_mod env) name
-          then notFound name  -- Internal names can happen in GHCi
-          else
-
+                Nothing | nameIsLocalOrFrom (tcg_semantic_mod env) name ->
+                              notFound $ mkUnboundGREName <$> noUserRdr name  -- Internal names can happen in GHCi
+                        | otherwise ->
            -- Try home package table and external package table
     do  { mb_thing <- tcLookupImported_maybe name
         ; case mb_thing of
@@ -1221,10 +1218,10 @@ pprBinders :: [Name] -> SDoc
 pprBinders [bndr] = quotes (ppr bndr)
 pprBinders bndrs  = pprWithCommas ppr bndrs
 
-notFound :: Name -> TcM TyThing
-notFound name
+notFound :: WithUserRdr GlobalRdrElt -> TcM TyThing
+notFound (WithUserRdr rdr gre)
   = do { lcl_env <- getLclEnv
-       ; lvls <- getCurrentAndBindLevel name
+       ; lvls <- getCurrentAndBindLevel gre
        ; if    -- See Note [Out of scope might be a staging error]
            | isUnboundName name -> failM  -- If the name really isn't in scope
                                           -- don't report it again (#11941)
@@ -1234,8 +1231,13 @@ notFound name
                                           -- introducing bugs after a refactoring of that
                                           -- function, we check this completely independently
                                           -- before scrutinizing lvls
-           | Just (_top_lvl_flag, bind_lvls, lvl@Splice {}) <- lvls
-               -> failWithTc (TcRnBadlyLevelled (LevelCheckSplice name Nothing) bind_lvls (thLevelIndex lvl) Nothing ErrorWithoutFlag)
+           | Just (_top_lvl_flag, bind_lvls, lvl@Splice {}) <- lvls -> failWithTc $
+             TcRnBadlyLevelled
+               (LevelCheckSplice (WithUserRdr rdr gre))
+               bind_lvls
+               (thLevelIndex lvl)
+               Nothing
+               ErrorWithoutFlag
            | otherwise  -> pure ()
 
        ; if isTermVarOrFieldNameSpace (nameNameSpace name)
@@ -1260,6 +1262,7 @@ notFound name
                   -- so let's just not print it!  Getting a loop here is
                   -- very unhelpful, because it hides one compiler bug with another
        }
+       where name = greName gre
 
 wrongThingErr :: WrongThingSort -> TcTyThing -> Name -> TcM a
 wrongThingErr expected thing name =
