@@ -7,6 +7,7 @@ module GHC.Driver.Main.Passes
 
     , hscDesugar'
     , hscSimplify
+    , hscTidy
 
     ) where
 
@@ -24,9 +25,11 @@ import GHC.Tc.Utils.Monad
 
 import GHC.Unit
 import GHC.Unit.Module.ModGuts
+import GHC.Unit.Module.ModDetails
 
 import GHC.Types.SrcLoc
 
 hscDesugar' :: ModLocation -> TcGblEnv -> Hsc ModGuts
 hscSimplify :: HscEnv -> [String] -> ModGuts -> IO ModGuts
 hscCompileCoreExpr :: HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [LinkableUsage], PkgsLoaded)
+hscTidy :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)

@@ -31,7 +31,6 @@ module GHC.Driver.Main.Interactive
     , hscParseExpr
     , hscParseType
     , hscCompileCoreExpr
-    , hscTidy
 
     ) where
 
@@ -39,7 +38,7 @@ import GHC.Prelude
 
 import GHC.Driver.Main.Hsc
 import {-# SOURCE #-} GHC.Driver.Main.Passes
-    ( hscDesugar', hscSimplify, hscCompileCoreExpr )
+    ( hscDesugar', hscSimplify, hscTidy, hscCompileCoreExpr )
 
 import {-# SOURCE #-} GHC.Driver.Main.Compile
     ( mkCgInteractiveGuts, generateFreshByteCodeLinkable )
@@ -47,11 +46,9 @@ import {-# SOURCE #-} GHC.Driver.Main.Compile
 import GHC.Driver.Session
 import GHC.Driver.Env
 import GHC.Driver.Errors.Types
-import GHC.Driver.Config.Core.Lint ( endPassHscEnvIO )
 import GHC.Driver.Config.Core.Lint.Interactive ( lintInteractiveExpr )
 import GHC.Driver.Config.Parser   (initParserOpts)
 import GHC.Driver.Config.Diagnostic
-import GHC.Driver.Config.Tidy
 
 import GHC.Runtime.Context
 import GHCi.RemoteTypes
@@ -66,16 +63,12 @@ import GHC.HsToCore
 
 
 import GHC.Iface.Load   ( loadSysInterface )
-import GHC.Iface.Tidy
 
 import GHC.Core
 import GHC.Core.ConLike
-import GHC.Core.Opt.Pipeline.Types      ( CoreToDo (..))
 import GHC.Core.TyCon
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import GHC.Core.Rules
-import GHC.Core.Stats
 
 import GHC.Parser.Errors.Types
 import GHC.Parser
@@ -569,44 +562,4 @@ hscParseThingWithLocation source linenumber parser str = do
                 liftIO $ putDumpFileMaybe logger Opt_D_dump_parsed_ast "Parser AST"
                             FormatHaskell (showAstData NoBlankSrcSpan NoBlankEpAnnotations thing)
                 return thing
-
-hscTidy :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
-hscTidy hsc_env guts = do
-  let logger   = hsc_logger hsc_env
-  let this_mod = mg_module guts
-
-  opts <- initTidyOpts hsc_env
-  (cgguts, details) <- withTiming logger
-    (text "CoreTidy"<+>brackets (ppr this_mod))
-    (const ())
-    $! {-# SCC "CoreTidy" #-} tidyProgram opts guts
-
-  -- post tidy pretty-printing and linting...
-  let tidy_rules     = md_rules details
-  let all_tidy_binds = cg_binds cgguts
-  let name_ppr_ctx   = mkNamePprCtx ptc (hsc_unit_env hsc_env) (mg_rdr_env guts)
-      ptc            = initPromotionTickContext (hsc_dflags hsc_env)
-
-  endPassHscEnvIO hsc_env name_ppr_ctx CoreTidy all_tidy_binds tidy_rules
-
-  -- If the endPass didn't print the rules, but ddump-rules is
-  -- on, print now
-  unless (logHasDumpFlag logger Opt_D_dump_simpl) $
-    putDumpFileMaybe logger Opt_D_dump_rules
-      "Tidy Core rules"
-      FormatText
-      (pprRulesForUser tidy_rules)
-
-  -- Print one-line size info
-  let cs = coreBindsStats all_tidy_binds
-  putDumpFileMaybe logger Opt_D_dump_core_stats "Core Stats"
-    FormatText
-    (text "Tidy size (terms,types,coercions)"
-     <+> ppr (moduleName this_mod) <> colon
-     <+> int (cs_tm cs)
-     <+> int (cs_ty cs)
-     <+> int (cs_co cs))
-
-  pure (cgguts, details)
-
 
