@@ -116,15 +116,18 @@ below the O(log n) worst case (see #24137).
 
 Because the tag occupies the high bits, the trie branches on it near the root:
 all keys sharing a tag occupy one subtree, so the tag clusters together the
-keys minted by each part of the compiler. The flip side is that those
-tag-distinguishing nodes lengthen the path every per-key lookup, insert or
-delete walks before it reaches the number bits. Mixing tags thus adds branch
+keys minted by each part of the compiler. A tag-keyed bulk operation --
+splitting a map by tag, say -- could thus reuse whole subtrees and touch
+O(number of distinct tags) nodes rather than O(size), though GHC has none
+today. The flip side is that those tag-distinguishing nodes lengthen the path
+every per-key lookup, insert or delete walks before it reaches the number
+bits. Mixing tags thus adds branch
 levels above each entry -- at most 7, since the tag is 8 bits with its top bit
 clear for every ASCII tag. In-scope sets and 'VarSet's are the heavy case:
-keyed by 'Var' uniques, they gather ~8-11 supply tags (desugarer, simplifier,
-'uniqAway', wired-in, typechecker), so a lookup descends roughly 3-5 extra
-levels. A 'NameEnv'/'TypeEnv' is milder: external names all share HscTag, so
-it is one big cluster plus a few wired-in and local tags, ~2-4 levels. A map
+keyed by 'Var' uniques, they gather many supply tags (desugarer, simplifier,
+'uniqAway', wired-in, typechecker), so a lookup descends several extra levels.
+A 'NameEnv'/'TypeEnv' is milder: external names all share HscTag, so it is one
+big cluster plus a few wired-in and local tags, only a level or two. A map
 holding a single tag collapses the tag bits into the root prefix and is
 correspondingly shallower, so keeping a map tag-homogeneous (or splitting it
 by tag) speeds up its lookups.
