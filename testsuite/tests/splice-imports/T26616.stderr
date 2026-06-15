@@ -1,0 +1,5 @@
+T26616.hs:8:7: error: [GHC-28914]
+    Level error:
+    ‘Q.isJust’ is used at level 0 but it is bound at level 1
+      • imported qualified at level 1 from ‘Data.Maybe’ at T26616.hs:4:1-39
+

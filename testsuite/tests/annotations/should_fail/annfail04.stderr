@@ -1,5 +1,6 @@
 annfail04.hs:14:12: error: [GHC-28914]
-    • Level error: instance for ‘Thing Int’ is bound at level 0
-      but used at level -1
+    • Level error:
+      instance for ‘Thing Int’ is used at level -1
+      but it is bound at level 0
     • In the annotation: {-# ANN f (thing :: Int) #-}
 

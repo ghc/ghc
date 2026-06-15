@@ -1,4 +1,4 @@
 T16976z.hs:7:20: error: [GHC-28914]
-    • Level error: ‘str’ is bound at level -1 but used at level 0
+    • Level error: ‘str’ is used at level 0 but it is bound at level -1
     • In the Template Haskell quotation: 'str
 

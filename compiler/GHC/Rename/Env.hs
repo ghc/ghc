@@ -12,9 +12,9 @@ module GHC.Rename.Env (
 
         lookupLocatedTopBndrRnN, lookupTopBndrRn,
 
-        lookupLocatedOccRn, lookupLocatedOccRnConstr, lookupLocatedOccRnRecField,
+        lookupLocatedOccRn, lookupLocatedOccRnGRE, lookupLocatedOccRnConstr, lookupLocatedOccRnRecField,
         lookupLocatedOccRnNone,
-        lookupOccRn, lookupOccRn_maybe, lookupSameOccRn_maybe,
+        lookupOccRn, lookupOccRnGRE, lookupOccRn_maybe, lookupSameOccRn_maybe,
         lookupLocalOccRn_maybe, lookupInfoOccRn,
         lookupLocalOccThLvl_maybe, lookupLocalOccRn,
         lookupTypeOccRn,
@@ -992,6 +992,11 @@ lookupLocatedOccRn :: WhatLooking
                    -> TcRn (GenLocated (EpAnn ann) Name)
 lookupLocatedOccRn what = wrapLocMA (lookupOccRn what)
 
+lookupLocatedOccRnGRE :: WhatLooking
+                      -> GenLocated (EpAnn ann) RdrName
+                      -> TcRn (GenLocated (EpAnn ann) GlobalRdrElt)
+lookupLocatedOccRnGRE what = wrapLocMA (lookupOccRnGRE what)
+
 lookupLocatedOccRnConstr :: GenLocated (EpAnn ann) RdrName
                          -> TcRn (GenLocated (EpAnn ann) Name)
 lookupLocatedOccRnConstr = wrapLocMA lookupOccRnConstr
@@ -1019,11 +1024,14 @@ lookupLocalOccThLvl_maybe name
 -- | lookupOccRn looks up an occurrence of a RdrName, and uses its argument to
 -- determine what kind of suggestions should be displayed if it is not in scope
 lookupOccRn :: WhatLooking -> RdrName -> RnM Name
-lookupOccRn which_suggest rdr_name
+lookupOccRn which_suggest = fmap greName . lookupOccRnGRE which_suggest
+
+lookupOccRnGRE :: WhatLooking -> RdrName -> RnM GlobalRdrElt
+lookupOccRnGRE which_suggest rdr_name
   = do { mb_gre <- lookupOccRn_maybe rdr_name
        ; case mb_gre of
-           Just gre  -> return $ greName gre
-           Nothing   -> reportUnboundName which_suggest rdr_name }
+           Just gre  -> return gre
+           Nothing   -> mkUnboundGRERdr rdr_name <$ reportUnboundName which_suggest rdr_name }
 
 -- | Look up an occurrence of a 'RdrName'.
 --
@@ -1087,16 +1095,20 @@ lookupLocalOccRn rdr_name
 
 -- lookupTypeOccRn looks up an optionally promoted RdrName.
 -- Used for looking up type variables.
-lookupTypeOccRn :: RdrName -> RnM Name
+lookupTypeOccRn :: RdrName -> RnM GlobalRdrElt
 -- see Note [Demotion]
 lookupTypeOccRn rdr_name
   = do { mb_gre <- lookupOccRn_maybe rdr_name
        ; case mb_gre of
-             Just gre -> return $ greName gre
-             Nothing   ->
-               if occName rdr_name == occName eqTyCon_RDR -- See Note [eqTyCon (~) compatibility fallback]
-               then eqTyConName <$ addDiagnostic TcRnTypeEqualityOutOfScope
-               else lookup_demoted rdr_name }
+             Just gre -> return gre
+             Nothing
+               | occName rdr_name == occName eqTyCon_RDR -- See Note [eqTyCon (~) compatibility fallback]
+                 -> do { addDiagnostic TcRnTypeEqualityOutOfScope
+                       ; pure $
+                          mkExactGRE eqTyConName $
+                          IAmTyCon $
+                          eqTyConName <$ tyConFlavour eqTyCon }
+               | otherwise -> lookup_demoted rdr_name }
 
 {- Note [eqTyCon (~) compatibility fallback]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1113,7 +1125,7 @@ but emit appropriate warnings.
 -}
 
 -- Used when looking up a term name (varName or dataName) in a type
-lookup_demoted :: RdrName -> RnM Name
+lookup_demoted :: RdrName -> RnM GlobalRdrElt
 lookup_demoted rdr_name
   | Just demoted_rdr <- demoteRdrNameTcCls rdr_name
     -- Maybe it's the name of a *data* constructor
@@ -1121,11 +1133,12 @@ lookup_demoted rdr_name
        ; star_is_type <- xoptM LangExt.StarIsType
        ; let is_star_type = if star_is_type then StarIsType else StarIsNotType
              star_is_type_hints = noStarIsTypeHints is_star_type rdr_name
+             mk_unbound_name_GRE hint = unboundGREX looking_for rdr_name hint
        ; if data_kinds
             then do { mb_demoted_gre <- lookupOccRn_maybe demoted_rdr
                     ; case mb_demoted_gre of
-                        Nothing -> unboundNameX looking_for rdr_name star_is_type_hints
-                        Just demoted_gre -> return $ greName demoted_gre}
+                        Nothing -> mk_unbound_name_GRE star_is_type_hints
+                        Just demoted_gre -> return demoted_gre}
             else do { -- We need to check if a data constructor of this name is
                       -- in scope to give good error messages. However, we do
                       -- not want to give an additional error if the data
@@ -1137,13 +1150,13 @@ lookup_demoted rdr_name
                                      = [SuggestExtension $ SuggestSingleExtension additional LangExt.DataKinds]
                                      | otherwise
                                      = star_is_type_hints
-                    ; unboundNameX looking_for rdr_name suggestion } }
+                    ; mk_unbound_name_GRE suggestion } }
 
   | isQual rdr_name,
     Just demoted_rdr_name <- demoteRdrNameTv rdr_name
     -- Definitely an illegal term variable, as type variables are never exported.
     -- See Note [Demotion of unqualified variables] (W2)
-  = report_qualified_term_in_types rdr_name demoted_rdr_name
+  = mkUnboundGREName <$> report_qualified_term_in_types rdr_name demoted_rdr_name
 
   | isUnqual rdr_name,
     Just demoted_rdr_name <- demoteRdrNameTv rdr_name
@@ -1152,12 +1165,12 @@ lookup_demoted rdr_name
        ; if required_type_arguments
          then do { mb_demoted_gre <- lookupOccRn_maybe demoted_rdr_name
                  ; case mb_demoted_gre of
-                     Nothing -> unboundName (LF WL_Anything WL_Anywhere) rdr_name
-                     Just demoted_gre -> return $ greName demoted_gre }
-         else unboundName looking_for rdr_name }
+                     Nothing -> unboundGRE (LF WL_Anything WL_Anywhere) rdr_name
+                     Just demoted_gre -> return demoted_gre }
+         else unboundGRE looking_for rdr_name }
 
   | otherwise
-  = unboundName looking_for rdr_name
+  = unboundGRE looking_for rdr_name
 
   where
     looking_for = LF WL_Type WL_Anywhere
