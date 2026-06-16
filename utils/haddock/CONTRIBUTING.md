@@ -33,6 +33,14 @@ $ ./hadrian/build -j --flavour=Quick --freeze1 _build/stage1/bin/haddock
 Currently, this cannot be done with hadrian but has to be done with a
 `cabal-install` built from `master`.
 
+First, generate the `.haddock` interface files for GHC's bundled libraries:
+
+```
+$ ./hadrian/build -j docs-haddock
+```
+
+Then run the tests:
+
 ```
 cabal test -w <absolute-path-to-ghc-repo>/_build/stage1/bin/ghc
 ```
