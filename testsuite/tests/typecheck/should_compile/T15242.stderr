@@ -1,5 +1,5 @@
+(HsPar
 (EpaSpan { T15242.hs:6:5-41 })
-
 
 
 
@@ -8,10 +8,8 @@
 
 
 
-
 (HsPar
 (EpaSpan { T15242.hs:6:7-39 })
-
 
 
 
@@ -20,10 +18,8 @@
 
 
 
-
 (HsPar
 (EpaSpan { T15242.hs:6:9-34 })
-
 
 
 
@@ -32,10 +28,8 @@
 
 
 
-
 (HsPar
 (EpaSpan { T15242.hs:6:11-29 })
-
 
 
 
@@ -44,10 +38,8 @@
 
 
 
-
 (HsPar
 (EpaSpan { T15242.hs:6:13-21 })
-
 
 
 
@@ -56,10 +48,8 @@
 
 
 
-
 (HsPar
 (EpaSpan { T15242.hs:5:5-17 })
-
 
 
 
@@ -68,10 +58,8 @@
 
 
 
-
 (HsPar
-[]))
-
+(WpTyApp
 
 
 
@@ -80,10 +68,8 @@
 
 
 
-
 (HsPar
 (EpaSpan { T15242.hs:5:20-32 })
-
 
 
 
@@ -92,11 +78,13 @@
 
 
 
-
 (HsPar
-[]))
-
+(WpTyApp
 
 
 
 (HsPar
+
+
+
+

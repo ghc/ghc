@@ -1168,7 +1168,7 @@ checkTyClHdr is_cls ty
     -- Combine the annotations from the HsParTy and HsStarTy into a
     -- new one for the LocatedN RdrName
     newAnns :: SrcSpanAnnA -> SrcSpanAnnA -> (EpToken "(", EpToken ")") -> SrcSpanAnnN
-    newAnns l@(EpAnn _ (AnnListItem _) csp0) l1@(EpAnn ap (AnnListItem ta) csp) (o,c) =
+    newAnns l@(EpAnn _ _ csp0) l1@(EpAnn ap ta csp) (o,c) =
       let
         lr = combineSrcSpans (locA l1) (locA l)
       in

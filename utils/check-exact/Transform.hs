@@ -685,7 +685,7 @@ anchorFromLocatedA (L (EpAnn anc _ _) _) = epaLocationRealSrcSpan anc
 -- | Get the full span of interest for comments from a LocatedA.
 -- This extends up to the last TrailingAnn
 fullSpanFromLocatedA :: LocatedA a -> RealSrcSpan
-fullSpanFromLocatedA (L (EpAnn anc (AnnListItem tas)  _) _) = rr
+fullSpanFromLocatedA (L (EpAnn anc tas  _) _) = rr
   where
     r = epaLocationRealSrcSpan anc
     trailing_loc ta = case ta_location ta of
@@ -755,8 +755,8 @@ dn :: Int -> EpaLocation
 dn n = EpaDelta noSrcSpan (SameLine n) []
 
 addComma :: SrcSpanAnnA -> SrcSpanAnnA
-addComma (EpAnn anc (AnnListItem as) cs)
-  = EpAnn anc (AnnListItem (AddCommaAnn (EpTok d0):as)) cs
+addComma (EpAnn anc as cs)
+  = EpAnn anc (AddCommaAnn (EpTok d0):as) cs
 
 -- ---------------------------------------------------------------------
 

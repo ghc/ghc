@@ -45,7 +45,7 @@ X(ExprWithTySig) mismatch
   <<< EpUniToken "::" "\8759"
 X(UntypedSplice) mismatch
   >>> HsUntypedSpliceResult (HsExpr (GhcPass 'Renamed))
-  <<< HsUntypedSpliceResult (GenLocated (EpAnn AnnListItem) (HsType (GhcPass 'Renamed)))
+  <<< HsUntypedSpliceResult (GenLocated (EpAnn [TrailingAnn]) (HsType (GhcPass 'Renamed)))
 X(ExplicitList) match = NoExtField
 X(ExplicitTuple) match = NoExtField
 X(Hole) match = HoleKind
@@ -98,24 +98,24 @@ T(Var) mismatch
   >>> GenLocated (EpAnn NameAnn) RdrName -> HsExpr P
   <<< PromotionFlag -> GenLocated (EpAnn NameAnn) RdrName -> HsExpr P
 T(LitE) match = HsLit P -> HsExpr P
-T(Par) match = GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
-T(App) match = GenLocated (EpAnn AnnListItem) (HsExpr P) -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
+T(Par) match = GenLocated (EpAnn [TrailingAnn]) (HsExpr P) -> HsExpr P
+T(App) match = GenLocated (EpAnn [TrailingAnn]) (HsExpr P) -> GenLocated (EpAnn [TrailingAnn]) (HsExpr P) -> HsExpr P
 T(AppTypeE) mismatch
-  >>> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsWildCardBndrs P (GenLocated (EpAnn AnnListItem) (HsExpr P)) -> HsExpr P
-  <<< GenLocated (EpAnn AnnListItem) (HsExpr P) -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
-T(OpApp) match = GenLocated (EpAnn AnnListItem) (HsExpr P) -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
-T(ForAll) match = HsForAllTelescope P -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
-T(Qual) match = GenLocated (EpAnn AnnListItem) (HsContextDetails P (GenLocated (EpAnn AnnListItem) (HsExpr P))) -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
+  >>> GenLocated (EpAnn [TrailingAnn]) (HsExpr P) -> HsWildCardBndrs P (GenLocated (EpAnn [TrailingAnn]) (HsExpr P)) -> HsExpr P
+  <<< GenLocated (EpAnn [TrailingAnn]) (HsExpr P) -> GenLocated (EpAnn [TrailingAnn]) (HsExpr P) -> HsExpr P
+T(OpApp) match = GenLocated (EpAnn [TrailingAnn]) (HsExpr P) -> GenLocated (EpAnn [TrailingAnn]) (HsExpr P) -> GenLocated (EpAnn [TrailingAnn]) (HsExpr P) -> HsExpr P
+T(ForAll) match = HsForAllTelescope P -> GenLocated (EpAnn [TrailingAnn]) (HsExpr P) -> HsExpr P
+T(Qual) match = GenLocated (EpAnn [TrailingAnn]) (HsContextDetails P (GenLocated (EpAnn [TrailingAnn]) (HsExpr P))) -> GenLocated (EpAnn [TrailingAnn]) (HsExpr P) -> HsExpr P
 T(Star) match = HsExpr P
-T(FunArr) match = HsModifiedFunArrOf (GenLocated (EpAnn AnnListItem) (HsExpr P)) P -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
+T(FunArr) match = HsModifiedFunArrOf (GenLocated (EpAnn [TrailingAnn]) (HsExpr P)) P -> GenLocated (EpAnn [TrailingAnn]) (HsExpr P) -> GenLocated (EpAnn [TrailingAnn]) (HsExpr P) -> HsExpr P
 T(ExprWithTySig) mismatch
-  >>> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsWildCardBndrs P (GenLocated (EpAnn AnnListItem) (HsSigType P)) -> HsExpr P
-  <<< GenLocated (EpAnn AnnListItem) (HsExpr P) -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
+  >>> GenLocated (EpAnn [TrailingAnn]) (HsExpr P) -> HsWildCardBndrs P (GenLocated (EpAnn [TrailingAnn]) (HsSigType P)) -> HsExpr P
+  <<< GenLocated (EpAnn [TrailingAnn]) (HsExpr P) -> GenLocated (EpAnn [TrailingAnn]) (HsExpr P) -> HsExpr P
 T(UntypedSplice) match = HsUntypedSplice P -> HsExpr P
 T(ExplicitList) mismatch
-  >>> [GenLocated (EpAnn AnnListItem) (HsExpr P)] -> HsExpr P
-  <<< PromotionFlag -> [GenLocated (EpAnn AnnListItem) (HsExpr P)] -> HsExpr P
+  >>> [GenLocated (EpAnn [TrailingAnn]) (HsExpr P)] -> HsExpr P
+  <<< PromotionFlag -> [GenLocated (EpAnn [TrailingAnn]) (HsExpr P)] -> HsExpr P
 T(ExplicitTuple) mismatch
   >>> [HsTupArg P] -> Boxity -> HsExpr P
-  <<< PromotionFlag -> [GenLocated (EpAnn AnnListItem) (HsExpr P)] -> HsExpr P
+  <<< PromotionFlag -> [GenLocated (EpAnn [TrailingAnn]) (HsExpr P)] -> HsExpr P
 T(Hole) match = HsExpr P

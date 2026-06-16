@@ -34,8 +34,7 @@
    (L
     (EpAnn
      (EpaSpan { T18791.hs:2:8-13 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     {ModuleName: T18791}))
@@ -44,8 +43,7 @@
   [(L
     (EpAnn
      (EpaSpan { T18791.hs:(4,1)-(5,17) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -89,8 +87,7 @@
         [(L
           (EpAnn
            (EpaSpan { T18791.hs:5:3-17 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (ConDeclGADT
@@ -115,8 +112,7 @@
            (L
             (EpAnn
              (EpaSpan { T18791.hs:5:10-17 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsOuterImplicit
@@ -145,8 +141,7 @@
               (L
                (EpAnn
                 (EpaSpan { T18791.hs:5:10-12 })
-                (AnnListItem
-                 [])
+                []
                 (EpaComments
                  []))
                (HsTyVar
@@ -165,8 +160,7 @@
            (L
             (EpAnn
              (EpaSpan { T18791.hs:5:17 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTyVar
