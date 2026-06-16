@@ -45,12 +45,12 @@ endPassHscEnvIO hsc_env name_ppr_ctx pass binds rules
   = do { let dflags  = hsc_dflags hsc_env
        ; endPassIO
            (hsc_logger hsc_env)
-           (initEndPassConfig dflags (interactiveInScope $ hsc_IC hsc_env) name_ppr_ctx pass)
+           (initEndPassConfig dflags (interactiveInScope $ hsc_IC hsc_env) name_ppr_ctx pass False)
            binds rules
        }
 
-initEndPassConfig :: DynFlags -> [Var] -> NamePprCtx -> CoreToDo -> EndPassConfig
-initEndPassConfig dflags extra_vars name_ppr_ctx pass = EndPassConfig
+initEndPassConfig :: DynFlags -> [Var] -> NamePprCtx -> CoreToDo -> Bool -> EndPassConfig
+initEndPassConfig dflags extra_vars name_ppr_ctx pass strictCoercion = EndPassConfig
   { ep_dumpCoreSizes = not (gopt Opt_SuppressCoreSizes dflags)
   , ep_lintPassResult = if gopt Opt_DoCoreLinting dflags
       then Just $ initLintPassResultConfig dflags extra_vars pass
@@ -59,6 +59,7 @@ initEndPassConfig dflags extra_vars name_ppr_ctx pass = EndPassConfig
   , ep_dumpFlag = coreDumpFlag pass
   , ep_prettyPass = ppr pass
   , ep_passDetails = pprPassDetails pass
+  , ep_strictCoercion = strictCoercion
   }
 
 coreDumpFlag :: CoreToDo -> Maybe DumpFlag
@@ -114,7 +115,8 @@ perPassFlags dflags pass
                , lf_check_rubbish_lits         = check_rubbish
                , lf_allow_beta_joins           = allow_beta_joins
                , lf_allow_weak_joins           = allow_weak_joins
-               , lf_allow_dead_occs            = False }
+               , lf_allow_dead_occs            = False
+               , lf_strict_coercion            = check_strict_coercion }
   where
     -- See Note [Checking for global Ids]
     check_globals = case pass of
@@ -161,8 +163,13 @@ perPassFlags dflags pass
                           CoreDoWorkerWrapper -> True
                           _                   -> False
 
+    check_strict_coercion = case pass of
+                                  CorePrep -> True
+                                  _        -> False
+
+
 initLintConfig :: DynFlags -> [Var] -> LintConfig
-initLintConfig dflags vars =LintConfig
+initLintConfig dflags vars = LintConfig
   { l_diagOpts = initDiagOpts dflags
   , l_platform = targetPlatform dflags
   , l_flags    = defaultLintFlags dflags
@@ -180,4 +187,5 @@ defaultLintFlags dflags = LF { lf_check_global_ids = False
                              , lf_allow_weak_joins = False
                              , lf_allow_beta_joins = False
                              , lf_allow_dead_occs  = False
+                             , lf_strict_coercion = False
                              }

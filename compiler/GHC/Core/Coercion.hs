@@ -1500,6 +1500,7 @@ setNominalRole_maybe r co
       | case prov of PhantomProv {}    -> False  -- should always be phantom
                      ProofIrrelProv {} -> True   -- it's always safe
                      PluginProv {}     -> False  -- who knows? This choice is conservative.
+                     StrictProv {}     -> False  -- representational only; a and Strict a are nominally distinct
                      SubMultProv {}    -> True
       = Just $ co { uco_role = Nominal }
     setNominalRole_maybe_helper _ = Nothing

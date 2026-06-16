@@ -41,6 +41,8 @@ import GHC.Tc.Types.Origin
 import GHC.Unit.Module.ModGuts
 import GHC.Platform
 
+import GHC.Builtin.Types (strictDataCon, isStrictTy)
+
 import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
@@ -285,6 +287,10 @@ data EndPassConfig = EndPassConfig
   , ep_prettyPass :: !SDoc
 
   , ep_passDetails :: !SDoc
+
+  , ep_strictCoercion :: Bool
+  -- ^ whether `Strict a` and `a` are considered the same type
+  -- Used at the end of Core Prep, after MkStrict has been elided.
   }
 
 endPassIO :: Logger
@@ -418,6 +424,13 @@ lintCoreBindings :: LintConfig -> CoreProgram -> WarnsAndErrs
 lintCoreBindings cfg binds
   = initL cfg $
     addLoc TopLevelBindings           $
+    do { flags <- getLintFlags
+         -- Bring all CorePrep-floated type-lambda binders into scope for the
+         -- whole pass.  See Note [Floating out of type lambdas] in
+         -- GHC.CoreToStg.Prep.
+       ; let withFloated | lf_strict_coercion flags = addFloatedTyVarsInScope (floatedTyCoVarsBinds binds)
+                         | otherwise                = id
+       ; withFloated $
     do { -- Check that all top-level binders are distinct
          -- We do not allow  [NonRec x=1, NonRec y=x, NonRec x=2]
          -- because of glomming; see Note [Glomming] in GHC.Core.Opt.OccurAnal
@@ -427,7 +440,7 @@ lintCoreBindings cfg binds
        ; checkL (null ext_dups) (dupExtVars ext_dups)
 
          -- Typecheck the bindings
-       ; lintRecBindings TopLevel all_pairs $ return () }
+       ; lintRecBindings TopLevel all_pairs $ return () } }
   where
     all_pairs = flattenBinds binds
      -- Put all the top-level binders in scope at the start
@@ -493,7 +506,13 @@ lintExpr cfg expr
   where
     (_warns, errs) = initL cfg linter
     linter = addLoc TopLevelBindings $
-             lintCoreExpr expr
+             do { flags <- getLintFlags
+                -- An interactively-compiled expression is CorePrep'd, so it may
+                -- carry type-lambda binders floated out of scope.  See Note
+                -- [Floating out of type lambdas] in GHC.CoreToStg.Prep.
+                ; let withFloated | lf_strict_coercion flags = addFloatedTyVarsInScope (floatedTyCoVars expr)
+                                  | otherwise                = id
+                ; withFloated $ lintCoreExpr expr }
 
 {-
 ************************************************************************
@@ -519,7 +538,10 @@ lintRecBindings top_lvl pairs thing_inside
     (bndrs, rhss) = unzip pairs
     lint_pair bndr rhs
       = addLoc (RhsOf bndr) $
-        do { (rhs_ty, ue) <- lintRhs bndr rhs         -- Check the rhs
+        do { (rhs_ty, ue) <- case top_lvl of
+              TopLevel | bndr == dataConWrapId strictDataCon ->
+                noMkStrictCoercion (lintRhs bndr rhs)   -- Check the rhs
+              _ -> lintRhs bndr rhs                     -- Check the rhs
            ; lintLetBind top_lvl Recursive bndr rhs rhs_ty
            ; return ue }
 
@@ -544,10 +566,16 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
 
         -- Check the let-can-float invariant
         -- See Note [Core let-can-float invariant] in GHC.Core
+       ; flags <- getLintFlags
+         -- After CorePrep a Strict box may be let-bound, provided it is in HNF;
+         -- see Note [The Strict type] in GHC.Builtin.Types
+       ; let isNiceStrict = lf_strict_coercion flags
+                            && isStrictTy (idType binder) && exprIsHNF rhs
        ; checkL ( isJoinId binder
                || mightBeLiftedType binder_ty
                || (isNonRec rec_flag && exprOkForSpeculation rhs)
                || isDataConWorkId binder || isDataConWrapId binder -- until #17521 is fixed
+               || isNiceStrict
                || exprIsTickedString rhs)
            (badBndrTyMsg binder (text "unlifted"))
 
@@ -1000,6 +1028,10 @@ lintIdOcc id nargs
                  (text "Non term variable" <+> ppr id)
                  -- See GHC.Core Note [Variable occurrences in Core]
 
+        ; lf <- getLintFlags
+        ; when (lf_strict_coercion lf) $
+          checkL (id /= dataConWorkId strictDataCon)
+                 (text "Use of MkStrict is not allowed after CorePrep:" <+> ppr id)
         ; lintVarOcc id
 
           -- Check for a nested occurrence of the StaticPtr constructor.
@@ -1703,7 +1735,24 @@ lintCoreAlt case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rh
   | isUnaryClassTyCon (dataConTyCon con)     -- (DALT3) in Note [DataAlt restrictions] in GHC.Core
   = zeroUE <$ addErrL (mkUnaryClassDataConAltMsg scrut_ty alt)
   | Just (tycon, tycon_arg_tys) <- splitTyConApp_maybe scrut_ty
-  = addLoc (CaseAlt alt) $  do
+  = do
+    flags <- getLintFlags
+    checkL (not (lf_strict_coercion flags) || con /= strictDataCon) $
+      (  text "Found unexpected MkStrict case alternative"
+      $$ text "case ty:" <+> ppr scrut_ty <+> text "of " <+> ppr case_bndr <+> text "{" <+> ppr alt <+> text "}"
+      )
+    handle_inner flags tycon tycon_arg_tys
+
+  | otherwise   -- Scrut-ty is wrong shape
+  = zeroUE <$ addErrL (mkBadAltMsg scrut_ty alt)
+  where
+    handle_inner flags tycon tycon_arg_tys
+      | lf_strict_coercion flags
+      , tyConUnique tycon == strictTyConKey
+      , [inner_ty] <- tycon_arg_tys
+      -- Strip off Strict when validating alternatives after Prep
+      = lintCoreAlt case_bndr inner_ty _scrut_mult alt_ty alt
+    handle_inner _ tycon tycon_arg_tys = addLoc (CaseAlt alt) $ do
     { checkTypeDataConOcc "pattern" con      -- (DALT2) in Note [DataAlt restrictions] in GHC.Core
     ; lintL (tycon == dataConTyCon con) (mkBadConMsg tycon con)
 
@@ -1725,9 +1774,6 @@ lintCoreAlt case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rh
       ; return $ deleteUE rhs_ue' case_bndr
       }
    }
-
-  | otherwise   -- Scrut-ty is wrong shape
-  = zeroUE <$ addErrL (mkBadAltMsg scrut_ty alt)
 
 {-
 Note [Validating multiplicities in a case]
@@ -2115,8 +2161,19 @@ lintApp msg lint_forall_arg lint_arrow_arg !orig_fun_ty all_args acc
          -- We need the in_scope set to satisfy the invariant in
          -- Note [The substitution invariant] in GHC.Core.TyCo.Subst
          -- Forcing the in scope set eagerly here reduces allocations by up to 4%.
+         ; flags <- getLintFlags
 
-         ; let init_subst = mkEmptySubst in_scope
+               -- After CorePrep floats a type lambda's body, the fun/arg types
+               -- here may mention type variables that are out of scope (and not
+               -- term-lambda binders, e.g. representation variables, so the
+               -- whole-program seed in 'lintCoreBindings' does not cover them).
+               -- Extend the substitution's in-scope set with their free vars so
+               -- its invariant holds.  See Note [Floating out of type lambdas]
+               -- in GHC.CoreToStg.Prep.
+         ; let add_fvs ty s | lf_strict_coercion flags = extendSubstInScopeSet s (tyCoVarsOfType ty)
+                            | otherwise                = s
+
+               init_subst = add_fvs orig_fun_ty (mkEmptySubst in_scope)
 
                go :: Subst -> Type -> acc -> [a] -> LintM (Type, acc)
                      -- The Subst applies (only) to the fun_ty
@@ -2129,7 +2186,7 @@ lintApp msg lint_forall_arg lint_arrow_arg !orig_fun_ty all_args acc
                  = do { arg' <- lint_forall_arg arg
                       ; let tv_kind = substTy subst (varType tv)
                             karg'   = typeKind arg'
-                            subst'  = extendTCvSubst subst tv arg'
+                            subst'  = extendTCvSubst (add_fvs arg' subst) tv arg'
                       ; ensureEqTys karg' tv_kind $
                         lint_app_fail_msg msg orig_fun_ty all_args
                             (hang (text "Forall:" <+> (ppr tv $$ ppr tv_kind))
@@ -2141,7 +2198,7 @@ lintApp msg lint_forall_arg lint_arrow_arg !orig_fun_ty all_args acc
                       ; ensureEqTys (substTy subst exp_arg_ty) arg_ty $
                         lint_app_fail_msg msg orig_fun_ty all_args
                             (hang (text "Fun:" <+> ppr fun_ty)
-                                2 (vcat [ text "exp_arg_ty:" <+> ppr exp_arg_ty
+                                2 (vcat [ text "exp_arg_ty:" <+> ppr (substTy subst exp_arg_ty)
                                         , text "arg:" <+> ppr arg <+> dcolon <+> ppr arg_ty ]))
                       ; go subst res_ty acc' args }
 
@@ -2957,6 +3014,7 @@ data LintFlags
        , lf_allow_weak_joins   :: Bool -- ^ See Note [Linting join points with casts or ticks]
        , lf_allow_beta_joins   :: Bool -- ^ See Note [Join points and beta-redexes]
        , lf_allow_dead_occs    :: Bool -- ^ See Note [Dead occurrences]
+       , lf_strict_coercion    :: Bool
     }
 
 -- See Note [Checking StaticPtrs]
@@ -3315,6 +3373,13 @@ allowDeadOccs :: LintM a -> LintM a
 allowDeadOccs =
   updLintFlags $ \ flags -> flags { lf_allow_dead_occs = True }
 
+noMkStrictCoercion :: LintM a -> LintM a
+-- Switch off lf_strict_coercion
+noMkStrictCoercion thing_inside
+  = LintM $ \ env errs ->
+    let env' = env { le_flags = (le_flags env) { lf_strict_coercion = False } }
+    in unLintM thing_inside env' errs
+
 getLintFlags :: LintM LintFlags
 getLintFlags = LintM $ \ env errs -> fromBoxedLResult (Just (le_flags env), errs)
 
@@ -3413,6 +3478,40 @@ addInScopeTyCoVar tcv thing_inside
                    , le_vars = extendVarEnv in_vars tcv (tcv, level') }
     in unLintM thing_inside env' errs
 
+addFloatedTyVarsInScope :: [Var] -> LintM a -> LintM a
+-- Seed the in-scope set (only; not the occurrence environment) with the given
+-- type-lambda binders.  After CorePrep floats a type lambda's body out
+-- (possibly to top level), a floated binding may mention such a binder out of
+-- scope, even one bound in another binding's RHS.  The post-Prep lint
+-- substitutes through these types, so the binders must be in the substitution's
+-- in-scope set.  See Note [Floating out of type lambdas] in GHC.CoreToStg.Prep.
+addFloatedTyVarsInScope tcvs thing_inside
+  = LintM $ \ env@(LE { le_in_scope = in_scope }) errs ->
+    unLintM thing_inside
+            (env { le_in_scope = in_scope `extendInScopeSetList` tcvs })
+            errs
+
+-- | The type-lambda binders occurring anywhere in some Core, for seeding the
+-- lint's in-scope set; see 'addFloatedTyVarsInScope'.
+floatedTyCoVars :: CoreExpr -> [Var]
+floatedTyCoVars e = collect e []
+  where
+    collect (Lam b body)        acc = collect body (if isTyCoVar b then b:acc else acc)
+    collect (App f a)           acc = collect f (collect a acc)
+    collect (Let bind body)     acc = collect body (collect_bind bind acc)
+    collect (Case scrut _ _ alts) acc = foldr (\(Alt _ _ r) a -> collect r a)
+                                              (collect scrut acc) alts
+    collect (Cast e' _)         acc = collect e' acc
+    collect (Tick _ e')         acc = collect e' acc
+    collect _                   acc = acc
+    collect_bind (NonRec _ r)   acc = collect r acc
+    collect_bind (Rec prs)      acc = foldr (\(_,r) a -> collect r a) acc prs
+
+floatedTyCoVarsBinds :: [CoreBind] -> [Var]
+floatedTyCoVarsBinds binds = concatMap go binds
+  where go (NonRec _ r) = floatedTyCoVars r
+        go (Rec prs)    = concatMap (floatedTyCoVars . snd) prs
+
 getInVarEnv :: LintM (VarEnv (Id, LintLevel))
 getInVarEnv = LintM (\env errs -> fromBoxedLResult (Just (le_vars env), errs))
 
@@ -3467,14 +3566,22 @@ lintVarOcc v_occ
   = return ()
   | otherwise
   = do { in_var_env <- getInVarEnv
+       ; flags <- getLintFlags
        ; case lookupVarEnv in_var_env v_occ of
-           Nothing -> failWithL (text pp_what <+> quotes (ppr v_occ)
+           Nothing
+             -- After CorePrep floats the body of a type lambda, its (erased)
+             -- type-lambda binders may be referenced out of scope.  See Note
+             -- [Floating out of type lambdas] in GHC.CoreToStg.Prep.
+             | lf_strict_coercion flags, isTyVar v_occ
+             -> return ()
+             | otherwise
+             -> failWithL (text pp_what <+> quotes (ppr v_occ)
                                  <+> text "is out of scope")
            Just (v_bndr, bind_level)
              -> do { let bndr_ty = idType v_bndr
                    ; check_bad_global v_bndr
                    ; check_occ_type_match bndr_ty
-                   ; check_occ_type_scope in_var_env bndr_ty bind_level }
+                   ; check_occ_type_scope flags in_var_env bndr_ty bind_level }
     }
   where
     occ_ty :: Type
@@ -3510,10 +3617,10 @@ lintVarOcc v_occ
       = ensureEqTys bndr_ty occ_ty $  -- Compares Types
         mkBndrOccTypeMismatchMsg v_occ bndr_ty occ_ty
 
-    check_occ_type_scope :: VarEnv (Var,LintLevel) -> Type -> LintLevel -> LintM ()
+    check_occ_type_scope :: LintFlags -> VarEnv (Var,LintLevel) -> Type -> LintLevel -> LintM ()
     -- Check that the free vars of the binder's type
     -- are not shadowed at the occurrence site
-    check_occ_type_scope in_var_env bndr_ty bind_level
+    check_occ_type_scope flags in_var_env bndr_ty bind_level
       = checkL (null bad_fvs) $
         mkBndrOccFreeVarMsg v_occ occ_ty bad_fvs
       where
@@ -3522,9 +3629,15 @@ lintVarOcc v_occ
 
         is_bad :: Var -> Bool
         -- True of a variable bound inside bind_level
-        is_bad v = case lookupVarEnv in_var_env v of
-                      Just (_, v_level) -> v_level > bind_level
-                      Nothing -> True
+        -- A floated binding's type may mention a type-lambda binder that is now
+        -- out of scope, or bound deeper than the binding itself; type variables
+        -- are erased, so neither matters.  See Note [Floating out of type
+        -- lambdas] in GHC.CoreToStg.Prep.
+        is_bad v
+          | lf_strict_coercion flags, isTyVar v = False
+          | otherwise = case lookupVarEnv in_var_env v of
+                           Just (_, v_level) -> v_level > bind_level
+                           Nothing           -> True
 
 lookupJoinId :: Id -> LintM (Maybe (JoinArity, JoinOcc))
 -- Look up an Id which should be a join point, valid here
@@ -3701,7 +3814,7 @@ mkCaseAltMsg e ty1 ty2
 mkScrutMsg :: Id -> Type -> Type -> SDoc
 mkScrutMsg var var_ty scrut_ty
   = vcat [text "Result binder in case doesn't match scrutinee:" <+> ppr var,
-          text "Result binder type:" <+> ppr var_ty,--(idType var),
+          text "Result binder type:" <+> ppr var_ty,
           text "Scrutinee type:" <+> ppr scrut_ty]
 
 mkNonDefltMsg, mkNonIncreasingAltsMsg :: CoreExpr -> SDoc

@@ -1570,6 +1570,11 @@ data UnivCoProvenance
       -- ^ From a plugin, which asserts that this coercion is sound.
       --   The string and the variable set are for the use by the plugin.
 
+  | StrictProv -- ^ From erasing a @Strict@ box in CorePrep: @Strict a@ and @a@
+               --   share a runtime representation (a single heap pointer), so
+               --   the cast is representationally sound.  Introduced after
+               --   typechecking, hence never appears in interface files.
+
   | SubMultProv -- ^ A submultiplicity coercion
 
   deriving (Eq, Ord, Data.Data)
@@ -1579,6 +1584,7 @@ instance Outputable UnivCoProvenance where
   ppr PhantomProv          = text "(phantom)"
   ppr (ProofIrrelProv {})  = text "(proof irrel)"
   ppr (PluginProv str)     = parens (text "plugin" <+> brackets (text str))
+  ppr StrictProv           = text "(strict box)"
   ppr SubMultProv          = text "(sub-mult)"
 
 instance NFData UnivCoProvenance where
@@ -1589,6 +1595,7 @@ instance Binary UnivCoProvenance where
   put_ bh ProofIrrelProv = putByte bh 2
   put_ bh (PluginProv a) = putByte bh 3 >> put_ bh a
   put_ bh SubMultProv    = putByte bh 4
+  put_ bh StrictProv     = putByte bh 5
   get bh = do
       tag <- getByte bh
       case tag of
@@ -1597,6 +1604,7 @@ instance Binary UnivCoProvenance where
            3 -> do a <- get bh
                    return $ PluginProv a
            4 -> return SubMultProv
+           5 -> return StrictProv
            _ -> panic ("get UnivCoProvenance " ++ show tag)
 
 

@@ -2726,7 +2726,7 @@ Erasure.  `Strict` has no runtime existence; `MkStrict x` is represented by `x`
 itself. We erase it in CorePrep:
 
   * a producer `MkStrict @a e` becomes `e |> co`, where
-        co :: a ~R# Strict a   = mkUnivCo (PluginProv "Strict") Representational
+        co :: a ~R# Strict a   = mkUnivCo StrictProv Representational
     a heterogeneous representational coercion (the kinds differ: `a` is lifted,
     `Strict a` is unlifted, but both occupy a single heap pointer). If `e` is
     not already a value it is case-bound first, which is what establishes EPT.

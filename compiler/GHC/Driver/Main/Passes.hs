@@ -1557,7 +1557,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
    tidy_expr
 
   {- Lint if necessary -}
-  lintInteractiveExpr (text "hscCompileCoreExpr") hsc_env prepd_expr
+  lintInteractiveExpr (text "hscCompileCoreExpr") hsc_env True prepd_expr
   let this_loc = OsPathModLocation
           { ml_hs_file_ospath   = Nothing,
             ml_hi_file_ospath   = panic "hscCompileCoreExpr':ml_hi_file_ospath",

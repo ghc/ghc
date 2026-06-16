@@ -30,6 +30,6 @@ initCorePrepConfig hsc_env = do
 
 initCorePrepPgmConfig :: DynFlags -> [Var] -> CorePrepPgmConfig
 initCorePrepPgmConfig dflags extra_vars = CorePrepPgmConfig
-  { cpPgm_endPassConfig     = initEndPassConfig dflags extra_vars alwaysQualify CorePrep
+  { cpPgm_endPassConfig     = initEndPassConfig dflags extra_vars alwaysQualify CorePrep True
   , cpPgm_generateDebugInfo = needSourceNotes dflags
   }

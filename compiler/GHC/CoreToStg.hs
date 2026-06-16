@@ -601,7 +601,6 @@ mkStgApp f how_bound core_args stg_args res_ty
     n_val_args = length stg_args  -- StgArgs are all value arguments
     exactly_saturated  = f_arity == n_val_args
 
-
 -- Given Core arguments to an unboxed sum datacon, return the 'PrimRep's
 -- of every alternative. For example, in (#_|#) @LiftedRep @IntRep @Int @Int# 0
 -- the arguments are [Type LiftedRep, Type IntRep, Type Int, Type Int#, 0]

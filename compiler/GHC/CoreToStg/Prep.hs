@@ -37,6 +37,7 @@ import GHC.Core.Subst
 import GHC.Core.Make
 import GHC.Core.Type
 import GHC.Core.Coercion
+import GHC.Core.TyCo.Rep ( UnivCoProvenance(StrictProv) )
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr_Prep )
@@ -818,8 +819,16 @@ cpeBodyF env (Cast expr co)
 cpeBodyF env expr@(Lam {})
    = do { let (bndrs,body) = collectBinders expr
         ; (env', bndrs') <- cpCloneBndrs env bndrs
-        ; body' <- cpeBody env' body
-        ; return (emptyFloats, mkLams bndrs' body') }
+        ; if all isTyVar bndrs'
+            -- A type lambda erases before codegen, so a non-value body makes it
+            -- a thunk.  Let the body's bindings float out past the (erased)
+            -- binders to leave a manifest value instead.  The floated bindings
+            -- may mention the binders out of scope; the post-CorePrep Core Lint
+            -- pass tolerates this.  See Note [Floating out of type lambdas].
+          then do { (floats, body') <- cpeBodyF env' body
+                  ; return (floats, mkLams bndrs' body') }
+          else do { body' <- cpeBody env' body
+                  ; return (emptyFloats, mkLams bndrs' body') } }
 
 cpeBodyF env (Case scrut bndr _ alts@[Alt con [covar] _])
   -- See (U3) in Note [Implementing unsafeCoerce]
@@ -878,6 +887,57 @@ cpeBodyF env (Case scrut bndr _ [Alt (DataAlt dc) [token_out, res] rhs])
       -- in GHC.Core.Opt.Simplify.Iteration) because the scrutinee is not a
       -- variable, and in that case the zapping doesn't happen; see that Note.
   = cpeBodyF (extendCorePrepEnv env token_out token_in') rhs
+
+-- Elide { MkStrict foo -> } pattern matches in cases
+cpeBodyF env (Case scrut bndr _typ [Alt _alt fld_bndrs rhs])
+  | isStrictTy (idType bndr)
+  = do
+    (floats_scrut, scrut) <- cpeBodyF env scrut
+    if exprIsTrivial scrut && isStrictTy (exprType scrut) then
+      doSubst floats_scrut scrut
+    else
+      doFloat floats_scrut scrut
+  where
+    -- Consider:
+    --     case foo1 of foo2 { MkStrict foo3 -> body }
+    -- We can completely drop this case, as `foo1` is already a "Strict"
+    -- and therefore evaluated. We need to rewrite all usages of either
+    -- foo2 or foo3 in the body to foo1, if we elide the case.
+    --
+    -- case foo1 of foo2 { MkStrict foo3 -> body } =>
+    --                                      body[foo3 => foo1, foo2 => foo1]
+    doSubst floats_scrut scrut = do
+      -- foo2 => foo1 (both have type Strict a)
+      let env' = extendCorePrepEnvExpr env bndr scrut
+      -- foo3 => foo1 |> co, casting Strict a back to the field type a
+      let env'' = foldr (\fld_bndr e -> extendCorePrepEnvExpr e fld_bndr
+                                          (mkStrictCast scrut (idType fld_bndr))) env' fld_bndrs
+      (floats_res, res) <- cpeBodyF env'' rhs
+      return (floats_scrut `appFloats` floats_res, res)
+
+    -- Consider:
+    --     case fun foo1 of foo2 { MkStrict foo3 -> body }
+    -- Here we can not elide the case, but we can rewire the match.
+    -- Other passes will eliminate the `Strict` allocation in `fun foo1`,
+    -- so the returned value isn't really boxed. Therefore, matching on `MkStrict` is wrong.
+    -- We need to keep this case, as it binds a value, but we can move its inner binder up.
+    --
+    -- case fun foo1 of foo2 { MkStrict foo3 -> body } =>
+    -- case fun foo1 of foo3 { _DEFAULT      -> body}
+    --
+    -- Note [Keeping MkStrict application in cases]
+    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    -- If we apply this rewriting to `case MkStrict @typ foo1 of foo2 { MkStrict foo3 -> body}`
+    -- we lose the evaluation, which is bad. This needs to be caught before this match!
+    doFloat floats_scrut scrut = do
+      (env, bndr') <- cpCloneBndr env (zapIdOccInfo bndr)
+      -- foo3 => bndr' |> co, casting Strict a back to the field type a
+      let env' = foldr (\fld_bndr e -> extendCorePrepEnvExpr e fld_bndr
+                                         (mkStrictCast (Var bndr') (idType fld_bndr))) env fld_bndrs
+      (floats_rhs, rhs) <- cpeBodyF env' rhs
+      let case_float = mkCaseFloat bndr' scrut
+          floats = snocFloat floats_scrut case_float `appFloats` floats_rhs
+      return (floats, rhs)
 
 cpeBodyF env (Case scrut bndr ty alts)
   = do { (floats, scrut') <- cpeBodyF env scrut
@@ -1117,6 +1177,35 @@ cpeApp top_env expr
             | not (isTyCoArg arg) = True
           has_value_arg (_:rest) = has_value_arg rest
 
+    cpe_app env (Var f) (AIApp (Type typ) : AIApp arg : args)
+      | f == dataConWorkId strictDataCon
+      = do
+          let (terminal, args') = collect_args arg
+          (floats, rhs) <- cpe_app env terminal (args' ++ args)
+          let typ' = cpSubstTy env typ
+          case_bndr <- newVar env typ'
+          -- The MkStrict box is erased here.  Its result keeps type Strict typ
+          -- via a representational cast from the field type, operationally the
+          -- identity, so the Core remains well-typed without MkStrict.
+          if exprIsHNF rhs
+            then if exprIsTrivial rhs
+              then
+                -- A trivial value: use it directly, mirroring the trivial-RHS
+                -- shortening in cpeBind.  Binding it would leave an indirection
+                -- that CoreToStg lowers to an updatable thunk, turning the
+                -- evaluated (EPT) field into a non-EPT thunk and breaking
+                -- consumers that rely on strict fields being evaluated.
+                return (floats, mkStrictCast rhs (mkStrictTy typ'))
+              else do
+                -- A non-trivial value; let-bind it (a constructor closure, still EPT).
+                let (float, case_bndr') = mkNonRecFloat env Lifted case_bndr rhs
+                return (floats `snocFloat` float, mkStrictCast (Var case_bndr') (mkStrictTy typ'))
+            else do
+              -- The argument may be a thunk; case-bind it to evaluate it.
+              let case_bndr' = case_bndr `setIdUnfolding` evaldUnfolding
+                  float      = mkCaseFloat case_bndr' rhs
+              return (floats `snocFloat` float, mkStrictCast (Var case_bndr') (mkStrictTy typ'))
+
     -- See Note [seq# magic]. This is the step for CorePrep
     cpe_app env (Var f) [AIApp (Type ty), AIApp _st_ty@Type{}, AIApp thing, AIApp token]
         | f `hasKey` seqHashKey
@@ -1126,7 +1215,7 @@ cpeApp top_env expr
         -- allocating CaseBound Floats for token and thing as needed
         = do { (floats1, token) <- cpeArg env topDmd token
              ; (floats2, thing) <- cpeBodyF env thing
-             ; case_bndr <- (`setIdUnfolding` evaldUnfolding) <$> newVar env ty
+             ; case_bndr <- (`setIdUnfolding` evaldUnfolding) <$> newVar env (cpSubstTy env ty)
              ; let tup = mkCoreUnboxedTuple [token, Var case_bndr]
              ; let float = mkCaseFloat case_bndr thing
              ; return (floats1 `appFloats` floats2 `snocFloat` float, tup) }
@@ -1158,6 +1247,13 @@ cpeApp top_env expr
                 -- strictness info, e.g. + (error "urk")
                 -- Here, we can't evaluate the arg strictly, because this
                 -- partial application might be seq'd
+
+        -- Beta-reduce a type-lambda redex against its type argument, so its body
+        -- carries the real instantiation rather than being left as a redex.
+    cpe_app env (Lam b body) (AIApp (Type arg_ty) : args)
+      | isTyVar b
+      = let subst' = extendTvSubst (cpe_subst env) b (cpSubstTy env arg_ty)
+        in cpe_app (env { cpe_subst = subst' }) body args
 
         -- We inlined into something that's not a var and has no args.
         -- Bounce it back up to cpeBodyF.
@@ -1526,18 +1622,18 @@ cpeArg :: CorePrepEnv -> Demand
        -> CoreArg -> UniqSM (Floats, CpeArg)
 cpeArg env dmd arg
   = do { (floats1, arg1) <- cpeBodyF env arg     -- arg1 can be a lambda
-       ; let arg_ty = exprType arg1
+       ; let arg_ty = cpSubstTy env (exprType arg)
              lev    = typeLevity arg_ty
              dec    = wantFloatLocal NonRecursive dmd lev floats1 arg1
              (floats2, arg2) = executeFloatDecision dec floats1 arg1
                 -- Else case: arg1 might have lambdas, and we can't
                 --            put them inside a wrapBinds
-
        -- Now ANF-ise any non-trivial argument
        -- NB: "non-trivial" includes string literals;
        -- see Note [ANF-ising literal string arguments]
        ; if exprIsTrivial arg2
-         then return (floats2, arg2)
+         then do
+          return (floats2, arg2)
          else do { v <- (`setIdDemandInfo` dmd) <$> newVar env arg_ty
                        -- See Note [Pin demand info on floats]
                  ; let arity = cpeArgArity env dec floats1 arg2
@@ -2223,6 +2319,7 @@ data FloatInfoArgs
   , fia_is_string :: Bool
   , fia_is_dc_worker :: Bool
   , fia_ok_for_spec :: Bool
+  , fia_is_strict :: Bool
   }
 
 defFloatInfoArgs :: Id -> CoreExpr -> FloatInfoArgs
@@ -2235,12 +2332,14 @@ defFloatInfoArgs bndr rhs
   , fia_is_string = exprIsTickedString rhs
   , fia_is_dc_worker = isJust (isDataConId_maybe bndr) -- mkCaseFloat uses False
   , fia_ok_for_spec = False -- mkNonRecFloat uses exprOkForSpecEval
+  , fia_is_strict = isStrictTy (idType bndr)
   }
 
 decideFloatInfo :: FloatInfoArgs -> (BindInfo, FloatInfo)
 decideFloatInfo FIA{fia_levity=lev, fia_demand=dmd, fia_is_hnf=is_hnf,
                     fia_is_triv=is_triv, fia_is_string=is_string,
-                    fia_is_dc_worker=is_dc_worker, fia_ok_for_spec=ok_for_spec}
+                    fia_is_dc_worker=is_dc_worker, fia_ok_for_spec=ok_for_spec,
+                    fia_is_strict=is_strict}
   | Lifted <- lev, is_hnf, not is_triv = (LetBound, TopLvlFloatable)
       -- is_lifted: We currently don't allow unlifted values at the
       --            top-level or inside letrecs
@@ -2253,6 +2352,7 @@ decideFloatInfo FIA{fia_levity=lev, fia_demand=dmd, fia_is_hnf=is_hnf,
   | is_string             = (CaseBound, TopLvlFloatable)
       -- String literals are unboxed (so must be case-bound) and float to
       -- the top-level
+  | Unlifted <- lev, is_strict, is_hnf, not is_triv = (LetBound, LazyContextFloatable)
   | ok_for_spec           = (CaseBound, case lev of Unlifted -> LazyContextFloatable
                                                     Lifted   -> TopLvlFloatable)
       -- See Note [Speculative evaluation]
@@ -2264,6 +2364,14 @@ decideFloatInfo FIA{fia_levity=lev, fia_demand=dmd, fia_is_hnf=is_hnf,
       -- These will never be floated out of a lazy RHS context
   | Lifted   <- lev       = (LetBound, TopLvlFloatable)
       -- And these float freely but can't be speculated, hence LetBound
+
+-- | A representational cast relating a strict field's value type @a@ and its
+-- boxed representation @Strict a@ (in either direction).  CorePrep erases the
+-- @MkStrict@ box, so this is operationally the identity; the cast only keeps the
+-- Core well-typed.
+mkStrictCast :: CoreExpr -> Type -> CoreExpr
+mkStrictCast e to_ty
+  = mkCast e (mkUnivCo StrictProv [] Representational (exprType e) to_ty)
 
 mkCaseFloat :: Id -> CpeBody -> FloatingBind
 mkCaseFloat bndr scrut
@@ -2317,8 +2425,7 @@ mkNonRecFloat env lev bndr rhs
 -- | Wrap floats around an expression
 wrapBinds :: Floats -> CpeBody -> CpeBody
 wrapBinds floats body
-  = -- pprTraceWith "wrapBinds" (\res -> ppr floats $$ ppr body $$ ppr res) $
-    foldrOL mk_bind body (getFloats floats)
+  = foldrOL mk_bind body (getFloats floats)
   where
     -- See Note [BindInfo and FloatInfo] on whether we pick Case or Let here
     mk_bind f@(Float bind CaseBound _) body
@@ -2692,6 +2799,27 @@ We want to drop the unfolding/rules on every Id:
 
 HOWEVER, we want to preserve evaluated-ness;
 see Note [Preserve evaluatedness] in GHC.Core.Tidy.
+-}
+
+{- Note [Floating out of type lambdas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A strict field of polymorphic type, e.g. a value of type
+@forall pre. WasmInstr w pre (t : pre)@ stored in a @Strict@ field, desugars
+to a type lambda wrapping a constructor application whose own (strict) fields
+are bound by nested @MkStrict@s.  Those inner bindings mention the type-lambda
+variable, so the body is a @let@ rather than a manifest value, and the whole
+thing is realised as a thunk even though its @Strict@ type promises an
+evaluated value.
+
+Type-lambda variables are erased before code generation, so they carry no
+runtime information.  We therefore let the body's bindings float out past the
+binders, leaving the lambda body a manifest value.  The floated bindings still
+mention the binders, which are now out of scope at the float's position.  This is
+sound precisely because the binders are erased; the post-CorePrep Core Lint pass
+tolerates such out-of-scope type variables (see @lf_strict_coercion@ in
+GHC.Core.Lint).  Keeping the real binders, rather than rewriting them, means an
+applied polymorphic value such as an instance dictionary still carries its real
+instantiation.
 -}
 
 ------------------------------------------------------------------------------

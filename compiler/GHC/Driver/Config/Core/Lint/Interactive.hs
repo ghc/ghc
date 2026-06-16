@@ -19,14 +19,17 @@ import GHC.Utils.Outputable as Outputable
 
 lintInteractiveExpr :: SDoc -- ^ The source of the linted expression
                     -> HscEnv
+                    -> Bool
                     -> CoreExpr -> IO ()
-lintInteractiveExpr what hsc_env expr
+lintInteractiveExpr what hsc_env strictCoercion expr
   | not (gopt Opt_DoCoreLinting dflags)
   = return ()
-  | Just err <- lintExpr (initLintConfig dflags $ interactiveInScope $ hsc_IC hsc_env) expr
+  | Just err <- lintExpr lintConfig expr
   = displayLintResults logger what (pprCoreExpr expr) (emptyBag, err)
   | otherwise
   = return ()
   where
     dflags = hsc_dflags hsc_env
     logger = hsc_logger hsc_env
+    lintConfigInit = initLintConfig dflags $ interactiveInScope $ hsc_IC hsc_env
+    lintConfig = lintConfigInit { l_flags = (l_flags lintConfigInit) { lf_strict_coercion = strictCoercion } }

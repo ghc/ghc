@@ -363,7 +363,7 @@ hscParsedStmt hsc_env stmt = runInteractiveHsc hsc_env $ do
 
   -- Desugar it
   ds_expr <- ioMsgMaybe $ hoistDsMessage $ deSugarExpr hsc_env tc_expr
-  liftIO (lintInteractiveExpr (text "desugar expression") hsc_env ds_expr)
+  liftIO (lintInteractiveExpr (text "desugar expression") hsc_env False ds_expr)
   handleWarnings
 
   -- Then code-gen, and link it
