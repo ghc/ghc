@@ -46,8 +46,7 @@
    (L
     (EpAnn
      (EpaSpan { ZeroWidthSemi.hs:1:8-20 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     {ModuleName: ZeroWidthSemi}))
@@ -56,8 +55,7 @@
   [(L
     (EpAnn
      (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       [(L
         (EpaSpan
@@ -91,15 +89,13 @@
        (L
         (EpAnn
          (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         [(L
           (EpAnn
            (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (Match
@@ -147,8 +143,7 @@
                (L
                 (EpAnn
                  (EpaSpan { ZeroWidthSemi.hs:6:5 })
-                 (AnnListItem
-                  [])
+                 []
                  (EpaComments
                   []))
                 (HsOverLit

@@ -47,8 +47,7 @@
    (L
     (EpAnn
      (EpaSpan { DumpParsedAstComments.hs:5:8-28 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     {ModuleName: DumpParsedAstComments}))
@@ -57,8 +56,7 @@
   [(L
     (EpAnn
      (EpaSpan { DumpParsedAstComments.hs:9:1-7 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       [(L
         (EpaSpan
@@ -99,15 +97,13 @@
        (L
         (EpAnn
          (EpaSpan { DumpParsedAstComments.hs:9:1-7 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         [(L
           (EpAnn
            (EpaSpan { DumpParsedAstComments.hs:9:1-7 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (Match
@@ -155,8 +151,7 @@
                (L
                 (EpAnn
                  (EpaSpan { DumpParsedAstComments.hs:9:7 })
-                 (AnnListItem
-                  [])
+                 []
                  (EpaComments
                   []))
                 (HsOverLit
@@ -174,8 +169,7 @@
   ,(L
     (EpAnn
      (EpaSpan { DumpParsedAstComments.hs:(14,1)-(16,3) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       [(L
         (EpaSpan
@@ -223,15 +217,13 @@
        (L
         (EpAnn
          (EpaSpan { DumpParsedAstComments.hs:(14,1)-(16,3) })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         [(L
           (EpAnn
            (EpaSpan { DumpParsedAstComments.hs:(14,1)-(16,3) })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (Match
@@ -279,8 +271,7 @@
                (L
                 (EpAnn
                  (EpaSpan { DumpParsedAstComments.hs:(14,7)-(16,3) })
-                 (AnnListItem
-                  [])
+                 []
                  (EpaComments
                   [(L
                     (EpaSpan
@@ -304,15 +295,13 @@
                  (L
                   (EpAnn
                    (EpaSpan { DumpParsedAstComments.hs:16:3 })
-                   (AnnListItem
-                    [])
+                   []
                    (EpaComments
                     []))
                   [(L
                     (EpAnn
                      (EpaSpan { DumpParsedAstComments.hs:16:3 })
-                     (AnnListItem
-                      [])
+                     []
                      (EpaComments
                       []))
                     (BodyStmt
@@ -320,8 +309,7 @@
                      (L
                       (EpAnn
                        (EpaSpan { DumpParsedAstComments.hs:16:3 })
-                       (AnnListItem
-                        [])
+                       []
                        (EpaComments
                         []))
                       (HsOverLit
@@ -341,8 +329,7 @@
   ,(L
     (EpAnn
      (EpaSpan { DumpParsedAstComments.hs:19:1-23 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       [(L
         (EpaSpan
@@ -376,15 +363,13 @@
        (L
         (EpAnn
          (EpaSpan { DumpParsedAstComments.hs:19:1-23 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         [(L
           (EpAnn
            (EpaSpan { DumpParsedAstComments.hs:19:1-23 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (Match
@@ -432,8 +417,7 @@
                (L
                 (EpAnn
                  (EpaSpan { DumpParsedAstComments.hs:19:8-23 })
-                 (AnnListItem
-                  [])
+                 []
                  (EpaComments
                   []))
                 (HsApp
@@ -441,8 +425,7 @@
                  (L
                   (EpAnn
                    (EpaSpan { DumpParsedAstComments.hs:19:8-15 })
-                   (AnnListItem
-                    [])
+                   []
                    (EpaComments
                     []))
                   (HsVar
@@ -459,8 +442,7 @@
                  (L
                   (EpAnn
                    (EpaSpan { DumpParsedAstComments.hs:19:17-23 })
-                   (AnnListItem
-                    [])
+                   []
                    (EpaComments
                     []))
                   (HsLit

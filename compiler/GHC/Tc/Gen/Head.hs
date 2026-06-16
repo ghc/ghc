@@ -143,7 +143,8 @@ takes apart either an HsApp, HsTypeApp, an infix OpApp, and XExprs returning
 
 -}
 
-type HsExprLoc = EpAnn AnnListItem    -- The location attached to a HsExpr
+-- TODO:AZ this is SrcSpanAnnA
+type HsExprLoc = EpAnn [TrailingAnn]    -- The location attached to a HsExpr
 
 data TcPass = TcpRn     -- Arguments decomposed
             | TcpInst   -- Function instantiated

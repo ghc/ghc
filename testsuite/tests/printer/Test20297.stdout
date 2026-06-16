@@ -40,8 +40,7 @@
    (L
     (EpAnn
      (EpaSpan { Test20297.hs:2:8-16 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     {ModuleName: Test20297}))
@@ -50,8 +49,7 @@
   [(L
     (EpAnn
      (EpaSpan { Test20297.hs:(5,1)-(7,7) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (ValD
@@ -79,15 +77,13 @@
        (L
         (EpAnn
          (EpaSpan { Test20297.hs:(5,1)-(7,7) })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         [(L
           (EpAnn
            (EpaSpan { Test20297.hs:(5,1)-(7,7) })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (Match
@@ -141,8 +137,7 @@
                (L
                 (EpAnn
                  (EpaSpan { Test20297.hs:5:7 })
-                 (AnnListItem
-                  [])
+                 []
                  (EpaComments
                   []))
                 (HsVar
@@ -177,8 +172,7 @@
   ,(L
     (EpAnn
      (EpaSpan { Test20297.hs:(9,1)-(11,26) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       [(L
         (EpaSpan
@@ -212,15 +206,13 @@
        (L
         (EpAnn
          (EpaSpan { Test20297.hs:(9,1)-(11,26) })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         [(L
           (EpAnn
            (EpaSpan { Test20297.hs:(9,1)-(11,26) })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (Match
@@ -268,8 +260,7 @@
                (L
                 (EpAnn
                  (EpaSpan { Test20297.hs:9:7 })
-                 (AnnListItem
-                  [])
+                 []
                  (EpaComments
                   []))
                 (HsVar
@@ -308,8 +299,7 @@
               [(L
                 (EpAnn
                  (EpaSpan { Test20297.hs:11:9-26 })
-                 (AnnListItem
-                  [])
+                 []
                  (EpaComments
                   []))
                 (FunBind
@@ -335,15 +325,13 @@
                   (L
                    (EpAnn
                     (EpaSpan { Test20297.hs:11:9-26 })
-                    (AnnListItem
-                     [])
+                    []
                     (EpaComments
                      []))
                    [(L
                      (EpAnn
                       (EpaSpan { Test20297.hs:11:9-26 })
-                      (AnnListItem
-                       [])
+                      []
                       (EpaComments
                        []))
                      (Match
@@ -391,8 +379,7 @@
                           (L
                            (EpAnn
                             (EpaSpan { Test20297.hs:11:19-26 })
-                            (AnnListItem
-                             [])
+                            []
                             (EpaComments
                              []))
                            (HsDo
@@ -410,15 +397,13 @@
                             (L
                              (EpAnn
                               (EpaSpan { Test20297.hs:11:22-26 })
-                              (AnnListItem
-                               [])
+                              []
                               (EpaComments
                                []))
                              [(L
                                (EpAnn
                                 (EpaSpan { Test20297.hs:11:22-26 })
-                                (AnnListItem
-                                 [])
+                                []
                                 (EpaComments
                                  []))
                                (BodyStmt
@@ -426,8 +411,7 @@
                                 (L
                                  (EpAnn
                                   (EpaSpan { Test20297.hs:11:22-26 })
-                                  (AnnListItem
-                                   [])
+                                  []
                                   (EpaComments
                                    []))
                                  (HsVar
@@ -491,8 +475,7 @@
    (L
     (EpAnn
      (EpaSpan { Test20297.ppr.hs:2:8-16 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     {ModuleName: Test20297}))
@@ -501,8 +484,7 @@
   [(L
     (EpAnn
      (EpaSpan { Test20297.ppr.hs:(3,1)-(5,7) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (ValD
@@ -530,15 +512,13 @@
        (L
         (EpAnn
          (EpaSpan { Test20297.ppr.hs:(3,1)-(5,7) })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         [(L
           (EpAnn
            (EpaSpan { Test20297.ppr.hs:(3,1)-(5,7) })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (Match
@@ -586,8 +566,7 @@
                (L
                 (EpAnn
                  (EpaSpan { Test20297.ppr.hs:4:5 })
-                 (AnnListItem
-                  [])
+                 []
                  (EpaComments
                   []))
                 (HsVar
@@ -622,8 +601,7 @@
   ,(L
     (EpAnn
      (EpaSpan { Test20297.ppr.hs:(6,1)-(9,24) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (ValD
@@ -651,15 +629,13 @@
        (L
         (EpAnn
          (EpaSpan { Test20297.ppr.hs:(6,1)-(9,24) })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         [(L
           (EpAnn
            (EpaSpan { Test20297.ppr.hs:(6,1)-(9,24) })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (Match
@@ -707,8 +683,7 @@
                (L
                 (EpAnn
                  (EpaSpan { Test20297.ppr.hs:7:5 })
-                 (AnnListItem
-                  [])
+                 []
                  (EpaComments
                   []))
                 (HsVar
@@ -741,8 +716,7 @@
               [(L
                 (EpAnn
                  (EpaSpan { Test20297.ppr.hs:9:7-24 })
-                 (AnnListItem
-                  [])
+                 []
                  (EpaComments
                   []))
                 (FunBind
@@ -768,15 +742,13 @@
                   (L
                    (EpAnn
                     (EpaSpan { Test20297.ppr.hs:9:7-24 })
-                    (AnnListItem
-                     [])
+                    []
                     (EpaComments
                      []))
                    [(L
                      (EpAnn
                       (EpaSpan { Test20297.ppr.hs:9:7-24 })
-                      (AnnListItem
-                       [])
+                      []
                       (EpaComments
                        []))
                      (Match
@@ -824,8 +796,7 @@
                           (L
                            (EpAnn
                             (EpaSpan { Test20297.ppr.hs:9:17-24 })
-                            (AnnListItem
-                             [])
+                            []
                             (EpaComments
                              []))
                            (HsDo
@@ -843,15 +814,13 @@
                             (L
                              (EpAnn
                               (EpaSpan { Test20297.ppr.hs:9:20-24 })
-                              (AnnListItem
-                               [])
+                              []
                               (EpaComments
                                []))
                              [(L
                                (EpAnn
                                 (EpaSpan { Test20297.ppr.hs:9:20-24 })
-                                (AnnListItem
-                                 [])
+                                []
                                 (EpaComments
                                  []))
                                (BodyStmt
@@ -859,8 +828,7 @@
                                 (L
                                  (EpAnn
                                   (EpaSpan { Test20297.ppr.hs:9:20-24 })
-                                  (AnnListItem
-                                   [])
+                                  []
                                   (EpaComments
                                    []))
                                  (HsVar

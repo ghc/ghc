@@ -34,7 +34,7 @@ module GHC.Parser.Annotation (
 
   -- ** Annotation data types used in 'GenLocated'
 
-  AnnListItem(..), AnnList(..), AnnListBrackets(..),
+  AnnList(..), AnnListBrackets(..),
   AnnParen(..),
   AnnPragma(..),
   AnnBooleanFormula(..),
@@ -369,11 +369,11 @@ epaLocationRealSrcSpan _ = panic "epaLocationRealSrcSpan"
 -- print annotation elements.  For example
 --
 -- @
--- type SrcSpannAnnA = EpAnn AnnListItem
+-- type SrcSpannAnnA = EpAnn [TrailingAnn]
 -- @
 --
 -- is a commonly used type alias that specializes the 'ann' type parameter to
--- 'AnnListItem'.
+-- '[TrailingAnn]'.
 --
 -- The spacing between the items under the scope of a given EpAnn is
 -- normally derived from the original 'Anchor'.  But if a sub-element
@@ -435,7 +435,12 @@ type LocatedN = GenLocated SrcSpanAnnN
 type LocatedP = GenLocated SrcSpanAnnP
 type LocatedBF = GenLocated SrcSpanAnnBF
 
-type SrcSpanAnnA = EpAnn AnnListItem
+-- | Annotation for items appearing in a list. They can have one or
+-- more trailing punctuations items, such as commas or semicolons.
+type SrcSpanAnnA = EpAnn [TrailingAnn]
+
+-- | Annotation for a RdrName / Name. They can have adornments depending
+-- on the context, such as backticks.
 type SrcSpanAnnN = EpAnn NameAnn
 
 type SrcSpanAnnP = EpAnn AnnPragma
@@ -507,14 +512,6 @@ instance Outputable TrailingAnn where
   ppr (AddVbarAnn tok)    = text "AddVbarAnn"    <+> ppr tok
   ppr (AddDarrowAnn tok)  = text "AddDarrowAnn"  <+> ppr tok
 
--- | Annotation for items appearing in a list. They can have one or
--- more trailing punctuations items, such as commas or semicolons.
-data AnnListItem
-  = AnnListItem {
-      lann_trailing  :: [TrailingAnn]
-      }
-  deriving (Data, Eq)
-
 -- ---------------------------------------------------------------------
 -- Annotations for the context of a list of items
 -- ---------------------------------------------------------------------
@@ -572,6 +569,7 @@ data AnnBooleanFormula
 -- | exact print annotations for a 'RdrName'.  There are many kinds of
 -- adornment that can be attached to a given 'RdrName'. This type
 -- captures them, as detailed on the individual constructors.
+-- Similar to SrcSpanAnnA, they also carry '[TrailingAnn]'.
 data NameAnn
   -- | Used for a name with an adornment, so '`foo`', '(bar)'
   = NameAnn {
@@ -781,12 +779,11 @@ addTrailingAnnToBF t cs n = n { anns = addTrailing (anns n)
 -- | Helper function used in the parser to add a 'TrailingAnn' items
 -- to an existing annotation.
 addTrailingAnnToA :: TrailingAnn -> EpAnnComments
-                  -> EpAnn AnnListItem -> EpAnn AnnListItem
-addTrailingAnnToA t cs n = n { anns = addTrailing (anns n)
-                               , comments = comments n <> cs }
-  where
-    -- See Note [list append in addTrailing*]
-    addTrailing n = n { lann_trailing = lann_trailing n ++ [t] }
+                  -> EpAnn [TrailingAnn] -> EpAnn [TrailingAnn]
+
+addTrailingAnnToA t cs n = n { -- See Note [list append in addTrailing*]
+                               anns = anns n <> [t]
+                             , comments = comments n <> cs }
 
 -- | Helper function used in the parser to add a comma location to an
 -- existing annotation.
@@ -920,7 +917,7 @@ getLocAnn (L l _) = noAnnSrcSpan l
 -- AZ:TODO use widenSpan here too
 addAnnsA :: SrcSpanAnnA -> [TrailingAnn] -> EpAnnComments -> SrcSpanAnnA
 addAnnsA (EpAnn l as1 cs) as2 cs2
-  = EpAnn l (AnnListItem (lann_trailing as1 ++ as2)) (cs <> cs2)
+  = EpAnn l (as1 <> as2) (cs <> cs2)
 
 -- | The annotations need to all come after the anchor.  Make sure
 -- this is the case.
@@ -1095,9 +1092,6 @@ instance Semigroup EpAnnComments where
   EpaCommentsBalanced cs1 as1 <> EpaComments cs2 = EpaCommentsBalanced (cs1 ++ cs2) as1
   EpaCommentsBalanced cs1 as1 <> EpaCommentsBalanced cs2 as2 = EpaCommentsBalanced (cs1 ++ cs2) (as1++as2)
 
-instance Semigroup AnnListItem where
-  (AnnListItem l1) <> (AnnListItem l2) = AnnListItem (l1 <> l2)
-
 instance Semigroup (AnnSortKey tag) where
   NoAnnSortKey <> x = x
   x <> NoAnnSortKey = x
@@ -1142,9 +1136,6 @@ instance (NoAnn ann) => NoAnn (EpAnn ann) where
 
 instance NoAnn NoEpAnns where
   noAnn = NoEpAnns
-
-instance NoAnn AnnListItem where
-  noAnn = AnnListItem []
 
 instance NoAnn AnnBooleanFormula where
   noAnn = AnnBooleanFormula noAnn noAnn []
@@ -1217,9 +1208,6 @@ instance (Outputable e)
 instance Outputable AnnParen where
   ppr (AnnParens       o c) = text "AnnParens" <+> ppr o <+> ppr c
   ppr (AnnParensHash   o c) = text "AnnParensHash" <+> ppr o <+> ppr c
-
-instance Outputable AnnListItem where
-  ppr (AnnListItem ts) = text "AnnListItem" <+> ppr ts
 
 instance Outputable NameAdornment where
   ppr (NameParens     o c) = text "NameParens" <+> ppr o <+> ppr c

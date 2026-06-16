@@ -74,8 +74,7 @@
    (L
     (EpAnn
      (EpaSpan { T20718.hs:3:8-13 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     {ModuleName: T20718}))
@@ -84,8 +83,7 @@
   [(L
     (EpAnn
      (EpaSpan { T20718.hs:8:1-5 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (ValD
@@ -113,15 +111,13 @@
        (L
         (EpAnn
          (EpaSpan { T20718.hs:8:1-5 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         [(L
           (EpAnn
            (EpaSpan { T20718.hs:8:1-5 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (Match
@@ -169,8 +165,7 @@
                (L
                 (EpAnn
                  (EpaSpan { T20718.hs:8:5 })
-                 (AnnListItem
-                  [])
+                 []
                  (EpaComments
                   []))
                 (HsOverLit

@@ -53,8 +53,7 @@
    (L
     (EpAnn
      (EpaSpan { AnnotationNoListTuplePuns.hs:3:8-32 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     {ModuleName: AnnotationNoListTuplePuns}))
@@ -63,8 +62,7 @@
   [(L
     (EpAnn
      (EpaSpan { AnnotationNoListTuplePuns.hs:(5,1)-(9,3) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       [(L
         (EpaSpan
@@ -99,8 +97,7 @@
       (L
        (EpAnn
         (EpaSpan { AnnotationNoListTuplePuns.hs:(7,3)-(9,3) })
-        (AnnListItem
-         [])
+        []
         (EpaComments
          [(L
            (EpaSpan
@@ -121,8 +118,7 @@
   ,(L
     (EpAnn
      (EpaSpan { AnnotationNoListTuplePuns.hs:(12,1)-(17,3) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       [(L
         (EpaSpan
@@ -164,8 +160,7 @@
       (L
        (EpAnn
         (EpaSpan { AnnotationNoListTuplePuns.hs:(14,3)-(17,3) })
-        (AnnListItem
-         [])
+        []
         (EpaComments
          [(L
            (EpaSpan
@@ -185,8 +180,7 @@
         [(L
           (EpAnn
            (EpaSpan { AnnotationNoListTuplePuns.hs:16:5-8 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (HsTyVar
@@ -252,8 +246,7 @@
    (L
     (EpAnn
      (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:3:8-32 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     {ModuleName: AnnotationNoListTuplePuns}))
@@ -262,8 +255,7 @@
   [(L
     (EpAnn
      (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:4:1-11 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -292,8 +284,7 @@
       (L
        (EpAnn
         (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:4:10-11 })
-        (AnnListItem
-         [])
+        []
         (EpaComments
          []))
        (HsExplicitListTy
@@ -308,8 +299,7 @@
   ,(L
     (EpAnn
      (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:5:1-15 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -338,8 +328,7 @@
       (L
        (EpAnn
         (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:5:10-15 })
-        (AnnListItem
-         [])
+        []
         (EpaComments
          []))
        (HsExplicitListTy
@@ -353,8 +342,7 @@
         [(L
           (EpAnn
            (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:5:11-14 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (HsTyVar
