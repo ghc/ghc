@@ -728,9 +728,10 @@ void pollCompletedTimeoutsOrIO(CapIOManager *iomgr)
 }
 
 
-void awaitCompletedTimeoutsOrIO(CapIOManager *iomgr)
+bool awaitCompletedTimeoutsOrIO(CapIOManager *iomgr)
 {
     debugTrace(DEBUG_iomanager, "waiting for completed IO or timeouts");
+    bool completed = true; // wait completed or interrupted?
     switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
         case IO_MANAGER_SELECT:
@@ -756,9 +757,26 @@ void awaitCompletedTimeoutsOrIO(CapIOManager *iomgr)
           break;
 #endif
         default:
-            barf("pollCompletedTimeoutsOrIO not implemented");
+            barf("awaitCompletedTimeoutsOrIO not implemented");
     }
-    ASSERT(!emptyRunQueue(iomgr->cap) || getSchedState() != SCHED_RUNNING);
+    ASSERT(!emptyRunQueue(iomgr->cap) ||
+           getSchedState() != SCHED_RUNNING ||
+           !completed);
+    return completed;
+}
+
+
+/* Interrupt the I/O manager if it is blocked in awaitCompletedTimeoutsOrIO,
+ * causing it to return early and return false.
+ */
+void interruptIOManager(CapIOManager *iomgr)
+{
+    debugTrace(DEBUG_iomanager, "Interrupting the I/O manager...");
+    switch (iomgr_type) {
+
+        default:
+            break;
+    }
 }
 
 
