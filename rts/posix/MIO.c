@@ -30,25 +30,14 @@
 #include <unistd.h>
 
 // Here's the pipe into which we will send our signals
-static int io_manager_wakeup_fd = -1;
 static int timer_manager_control_wr_fd = -1;
 // TODO: Eliminate these globals. Put then into the CapIOManager, but the
 // problem is these are shared across all caps, not per cap.
 
-#define IO_MANAGER_WAKEUP 0xff
 #define IO_MANAGER_DIE    0xfe
-#define IO_MANAGER_SYNC   0xfd
 
 void setTimerManagerControlFd(int fd) {
     RELAXED_STORE(&timer_manager_control_wr_fd, fd);
-}
-
-void
-setIOManagerWakeupFd (int fd)
-{
-    // only called when THREADED_RTS, but unconditionally
-    // compiled here because GHC.Event.Control depends on it.
-    SEQ_CST_STORE(&io_manager_wakeup_fd, fd);
 }
 
 #if defined(THREADED_RTS)
@@ -80,40 +69,6 @@ void timerManagerNotifySignal(int sig, siginfo_t *info)
 }
 #endif
 
-
-/* -----------------------------------------------------------------------------
- * Wake up at least one IO or timer manager HS thread.
- * -------------------------------------------------------------------------- */
-void
-ioManagerWakeup (void)
-{
-    int r;
-    const int wakeup_fd = SEQ_CST_LOAD(&io_manager_wakeup_fd);
-    // Wake up the IO Manager thread by sending a byte down its pipe
-    if (wakeup_fd >= 0) {
-#if defined(HAVE_EVENTFD)
-        StgWord64 n = (StgWord64)IO_MANAGER_WAKEUP;
-        r = write(wakeup_fd, (char *) &n, 8);
-#else
-        StgWord8 byte = (StgWord8)IO_MANAGER_WAKEUP;
-        r = write(wakeup_fd, &byte, 1);
-#endif
-        /* N.B. If the TimerManager is shutting down as we run this
-         * then there is a possibility that our first read of
-         * io_manager_wakeup_fd is non-negative, but before we get to the
-         * write the file is closed. If this occurs, io_manager_wakeup_fd
-         * will be written into with -1 (GHC.Event.Control does this prior
-         * to closing), so checking this allows us to distinguish this case.
-         * To ensure we observe the correct ordering, we declare the
-         * io_manager_wakeup_fd as volatile.
-         * Since this is not an error condition, we do not print the error
-         * message in this case.
-         */
-        if (r == -1 && SEQ_CST_LOAD(&io_manager_wakeup_fd) >= 0) {
-            sysErrorBelch("ioManagerWakeup: write");
-        }
-    }
-}
 
 #if defined(THREADED_RTS)
 void
@@ -157,7 +112,7 @@ ioManagerStart (void)
 {
     // Make sure the IO manager thread is running
     Capability *cap;
-    if (SEQ_CST_LOAD(&timer_manager_control_wr_fd) < 0 || SEQ_CST_LOAD(&io_manager_wakeup_fd) < 0) {
+    if (SEQ_CST_LOAD(&timer_manager_control_wr_fd) < 0) {
         cap = rts_lock();
         ioManagerStartCap(&cap);
         rts_unlock(cap);
