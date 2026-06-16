@@ -35,7 +35,7 @@ import GHC.Cmm.Graph
 import GHC.Cmm.BlockId
 import GHC.Cmm hiding ( succ )
 import GHC.Cmm.Info
-import GHC.Cmm.Utils ( cmmTagMask, mkWordCLit )
+import GHC.Cmm.Utils ( cmmTagMask, mkWordCLit, cmmLoadGCWord )
 import GHC.Platform.Tag ( mAX_PTR_TAG )
 import GHC.Core
 import GHC.Core.DataCon
@@ -1192,20 +1192,30 @@ emitEnter fun = do
   ; updfr_off   <- getUpdFrameOff
   ; align_check <- stgToCmmAlignCheck <$> getStgToCmmConfig
   ; case sequel of
-      -- For a return, we have the option of generating a tag-test or
-      -- not.  If the value is tagged, we can return directly, which
-      -- is quicker than entering the value.  This is a code
-      -- size/speed trade-off: when optimising for speed rather than
-      -- size we could generate the tag test.
-      --
-      -- Right now, we do what the old codegen did, and omit the tag
-      -- test, just generating an enter.
+      -- For a return we test the tag and, if the value is already tagged
+      -- (hence evaluated), return it directly rather than entering it. This
+      -- upholds the invariant that the entry code of a taggable normal form is
+      -- never reached: only an untagged closure is entered. The tag test costs
+      -- a branch on every tail enter, but a tagged value reaching here is the
+      -- common case.
       Return -> do
-        { let entry = entryCode platform
-                $ closureInfoPtr platform align_check
-                $ CmmReg (nodeReg platform)
-        ; emit $ mkJump profile NativeNodeCall entry
-                        [cmmUntag platform fun] updfr_off
+        { fun_tmp <- assignTemp fun
+        ; let funR     = CmmReg (CmmLocal fun_tmp)
+              entry    = entryCode platform
+                       $ closureInfoPtr platform align_check
+                       $ CmmReg (nodeReg platform)
+              ret_addr = entryCode platform
+                       $ cmmLoadGCWord platform (CmmStackSlot Old updfr_off)
+        ; lenter <- newBlockId
+        ; lret   <- newBlockId
+        ; tscope <- getTickScope
+        ; emit $
+            mkCbranch (cmmIsTagged platform funR) lret lenter Nothing <*>
+            outOfLine lenter
+              ( mkJump profile NativeNodeCall entry [cmmUntag platform funR] updfr_off
+              , tscope ) <*>
+            mkLabel lret tscope <*>
+            mkReturn profile ret_addr [funR] updfr_off
         ; return AssignedDirectly
         }
 

@@ -142,7 +142,8 @@ taggedCgInfo cg_info
   = case lf of
       LFCon {} -> True
       LFReEntrant {} -> True
-      LFUnlifted {} -> True
+      LFScalar -> True
+      LFPrim -> True
       LFThunk {} -> False
       LFUnknown {} -> False
       LFLetNoEscape -> panic "Let no escape binding passed to top level con"

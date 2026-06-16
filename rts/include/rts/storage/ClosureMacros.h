@@ -179,6 +179,28 @@ EXTERN_INLINE StgClosure *tagConstr(StgClosure *con)
     return TAG_CLOSURE(stg_min(TAG_MASK, 1 + GET_TAG(con)), con);
 }
 
+// Tag a pointer obtained by resolving a closure symbol (e.g. a value loaded by
+// the runtime linker, or a static pointer table entry): follow indirections to
+// the evaluated value and, if it is a constructor, return it tagged with its
+// constructor tag, so the caller does not enter a taggable normal form. A
+// closure that is not a constructor (a thunk, function, ...) is returned
+// unchanged for the caller to evaluate.
+EXTERN_INLINE StgClosure *tagClosureIfConstr(StgClosure *p);
+EXTERN_INLINE StgClosure *tagClosureIfConstr(StgClosure *p)
+{
+    StgClosure *c = UNTAG_CLOSURE(p);
+    while (1) {
+        StgHalfWord type = get_itbl(c)->type;
+        if (type == IND || type == IND_STATIC) {
+            c = UNTAG_CLOSURE(c->payload[0]); // the indirectee
+        } else if (type >= CONSTR && type <= CONSTR_NOCAF) {
+            return tagConstr(c);
+        } else {
+            return p;
+        }
+    }
+}
+
 /* -----------------------------------------------------------------------------
    Macros for building closures
    -------------------------------------------------------------------------- */

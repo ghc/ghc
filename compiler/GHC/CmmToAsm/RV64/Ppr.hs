@@ -186,7 +186,10 @@ pprDatas config (CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit 
         labelInd (CmmLabel l) = Just l
         labelInd _ = Nothing,
     Just ind' <- labelInd ind,
-    alias `mayRedirectTo` ind' =
+    alias `mayRedirectTo` ind',
+    -- Do not eliminate indirections for hs-boot-exported symbols; see
+    -- ncgLabelMayBeRedirected in GHC.CmmToAsm.Config.
+    ncgLabelMayBeRedirected config alias =
       pprGloblDecl (ncgPlatform config) alias
         $$ line (text ".equiv" <+> pprAsmLabel (ncgPlatform config) alias <> comma <> pprAsmLabel (ncgPlatform config) ind')
 pprDatas config (CmmStaticsRaw lbl dats) =

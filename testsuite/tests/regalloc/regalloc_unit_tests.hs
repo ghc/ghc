@@ -43,6 +43,7 @@ import GHC.Cmm.DebugBlock
 import GHC
 import GHC.Driver.Monad
 import GHC.Driver.Config.Diagnostic
+import GHC.Types.Name.Set (emptyNameSet)
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.DSM
@@ -131,7 +132,7 @@ compileCmmForRegAllocStats
   -> IO [( Maybe [Color.RegAllocStats (Alignment, RawCmmStatics) X86.Instr.Instr]
         , Maybe [Linear.RegAllocStats])]
 compileCmmForRegAllocStats logger home_unit dflags cmmFile ncgImplF us = do
-    let ncgImpl = ncgImplF (initNCGConfig dflags thisMod)
+    let ncgImpl = ncgImplF (initNCGConfig dflags emptyNameSet thisMod)
     let cmm_config = initCmmConfig dflags
 
     -- parse the cmm file and output any warnings or errors

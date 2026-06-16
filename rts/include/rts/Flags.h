@@ -279,6 +279,8 @@ typedef struct _MISC_FLAGS {
                                           tasks in the future, we'd respect it
                                           there as well. */
     bool internalCounters;       /* See Note [Internal Counters Stats] */
+    bool fatalEnterTaggable;          /* Abort when a taggable normal form is
+                                  * entered, rather than warning once. */
     bool linkerAlwaysPic;        /* Assume the object code is always PIC */
     bool linkerOptimistic;       /* Should the runtime linker optimistically continue */
     StgWord linkerMemBase;       /* address to ask the OS for memory

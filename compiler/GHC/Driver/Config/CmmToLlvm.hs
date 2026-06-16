@@ -9,13 +9,14 @@ import GHC.Driver.LlvmConfigCache
 import GHC.Platform
 import GHC.CmmToLlvm.Config
 import GHC.SysTools.Tasks
+import GHC.Types.Name.Set (NameSet)
 
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
 
 -- | Initialize the Llvm code generator configuration from DynFlags
-initLlvmCgConfig :: Logger -> LlvmConfigCache -> DynFlags -> IO LlvmCgConfig
-initLlvmCgConfig logger config_cache dflags = do
+initLlvmCgConfig :: Logger -> LlvmConfigCache -> NameSet -> DynFlags -> IO LlvmCgConfig
+initLlvmCgConfig logger config_cache boot_exports dflags = do
   version <- figureLlvmVersion logger dflags
   llvm_config <- readLlvmConfigCache config_cache
   pure $! LlvmCgConfig {
@@ -31,4 +32,5 @@ initLlvmCgConfig logger config_cache dflags = do
     , llvmCgDoWarn               = wopt Opt_WarnUnsupportedLlvmVersion dflags
     , llvmCgLlvmTarget           = platformMisc_llvmTarget $! platformMisc dflags
     , llvmCgLlvmConfig           = llvm_config
+    , llvmCgBootExports          = boot_exports
     }

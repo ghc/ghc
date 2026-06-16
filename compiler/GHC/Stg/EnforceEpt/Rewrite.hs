@@ -279,7 +279,9 @@ isTagged v
                         -> True
                     LFUnknown {}
                         -> False
-                    LFUnlifted {}
+                    LFScalar
+                        -> True
+                    LFPrim
                         -> True
                     LFLetNoEscape {}
                     -- Shouldn't be possible. I don't think we can export letNoEscapes

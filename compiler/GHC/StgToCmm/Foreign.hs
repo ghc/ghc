@@ -742,14 +742,23 @@ data StgFArgType
   | StgArrayType
   | StgSmallArrayType
   | StgByteArrayType
+  -- | An unlifted boxed primitive that is not one of the array types above
+  -- (Weak#, MVar#, MutVar#, TVar#, StableName#, ...). Its pointer carries the
+  -- single-constructor tag and is passed to C as the whole closure, so the tag
+  -- must be stripped but no header offset is applied.
+  | StgUnliftedBoxedType
 
 -- See Note [Unlifted boxed arguments to foreign calls]
 add_shim :: Profile -> StgFArgType -> CmmExpr -> CmmExpr
 add_shim profile ty expr = case ty of
   StgPlainType      -> expr
-  StgArrayType      -> cmmOffsetB platform expr (arrPtrsHdrSize profile)
-  StgSmallArrayType -> cmmOffsetB platform expr (smallArrPtrsHdrSize profile)
-  StgByteArrayType  -> cmmOffsetB platform expr (arrWordsHdrSize profile)
+  -- These pointers carry the unlifted-boxed-primitive tag; strip it before
+  -- moving past the header. See Note [Pointer tagging of unlifted boxed
+  -- primitives] in GHC.StgToCmm.Prim.
+  StgArrayType      -> cmmOffsetB platform (cmmUntag platform expr) (arrPtrsHdrSize profile)
+  StgSmallArrayType -> cmmOffsetB platform (cmmUntag platform expr) (smallArrPtrsHdrSize profile)
+  StgByteArrayType  -> cmmOffsetB platform (cmmUntag platform expr) (arrWordsHdrSize profile)
+  StgUnliftedBoxedType -> cmmUntag platform expr
   where
     platform = profilePlatform profile
 
@@ -781,10 +790,12 @@ typeToStgFArgType typ
   | tycon == smallMutableArrayPrimTyCon = StgSmallArrayType
   | tycon == byteArrayPrimTyCon = StgByteArrayType
   | tycon == mutableByteArrayPrimTyCon = StgByteArrayType
+  | isUnliftedType ty && isBoxedType ty = StgUnliftedBoxedType
   | otherwise = StgPlainType
   where
   -- Should be a tycon app, since this is a foreign call. We look
   -- through newtypes so the offset does not change if a user replaces
   -- a type in a foreign function signature with a representationally
   -- equivalent newtype.
-  tycon = tyConAppTyCon (unwrapType typ)
+  ty = unwrapType typ
+  tycon = tyConAppTyCon ty

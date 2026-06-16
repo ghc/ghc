@@ -34,8 +34,10 @@ import GHC.Stg.Syntax
 import GHC.StgToCmm (codeGen)
 import GHC.Types.CostCentre (emptyCollectedCCs)
 import GHC.Types.IPE (emptyInfoTableProvMap)
+import GHC.Types.Name.Set (emptyNameSet)
 import GHC.Types.Unique.DSM
 import GHC.Unit.Home
+import GHC.Unit.Module.Env (emptyModuleSet)
 import GHC.Unit.Module.ModGuts
 import GHC.Utils.Error
 import GHC.Utils.Misc (fstOf3)
@@ -73,7 +75,7 @@ cmmOfSummary summ = do
       liftIO $ fmap fst $
       runUDSMT (initDUniqSupply 't' 0) $
       collectAll $
-      codeGen logger tmpfs (initStgToCmmConfig dflags (ms_mod summ)) infotable tycons ccs stg'
+      codeGen logger tmpfs (initStgToCmmConfig dflags emptyNameSet emptyModuleSet (ms_mod summ)) infotable tycons ccs stg'
   return groups
 
 frontend :: DynFlags -> HscEnv -> ModSummary -> IO ModGuts

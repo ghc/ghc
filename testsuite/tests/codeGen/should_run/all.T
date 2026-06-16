@@ -167,6 +167,11 @@ test('T12059',
   compile_and_run, [''])
 test('T12433', normal, compile_and_run, [''])
 test('T12622', normal, multimod_compile_and_run, ['T12622', '-O'])
+# Pointer-tagging ABI: taggable normal-form values must never be entered.  The
+# tag is conveyed across modules via LambdaFormInfo (part of the ABI, hence
+# present even at -O0) and survives hs-boot indirections.  Compiled at -O0,
+# where a dropped tag manifests.
+test('T24136', normal, multimod_compile_and_run, ['T24136', ''])
 test('T12757', normal, compile_and_run, [''])
 test('T12855', normal, compile_and_run, [''])
 test('T9577', [ unless(arch('x86_64') or arch('i386'),skip),

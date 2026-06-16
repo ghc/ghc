@@ -115,7 +115,9 @@ lookupInfo env (StgVarArg var)
               -> TagProper
           LFUnknown {}
               -> TagDunno
-          LFUnlifted {}
+          LFScalar
+              -> TagProper
+          LFPrim
               -> TagProper
           -- Shouldn't be possible. I don't think we can export letNoEscapes
           LFLetNoEscape {} -> panic "LFLetNoEscape exported"

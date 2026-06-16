@@ -27,7 +27,8 @@ import GHC.StgToCmm.Types (CmmCgInfos (..), ModuleLFInfos)
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.CgUtils (CgStream)
 import GHC.Types.IPE (InfoTableProvMap (provInfoTables), IpeSourceLocation)
-import GHC.Types.Name.Set (NonCaffySet)
+import GHC.Types.Name.Set (NonCaffySet, emptyNameSet)
+import GHC.Unit.Module.Env (emptyModuleSet)
 import GHC.Types.Tickish (GenTickish (SourceNote))
 import GHC.Unit.Types (Module, moduleName)
 import GHC.Unit.Module (moduleNameString)
@@ -217,7 +218,7 @@ generateCgIPEStub hsc_env this_mod denv (nonCaffySet, moduleLFInfos, infoTablesW
     -- Yield Cmm for Info Table Provenance Entries (IPEs)
     let denv' = denv {provInfoTables = Map.mapKeys cit_lbl infoTablesWithTickishes}
         (((mIpeStub, dus'), ipeCmmGroup), _) =
-            runC (initStgToCmmConfig dflags this_mod) fstate cgState $
+            runC (initStgToCmmConfig dflags emptyNameSet emptyModuleSet this_mod) fstate cgState $
               getCmm (initInfoTableProv initStats (Map.keys infoTablesWithTickishes) denv' dus)
 
     return ((mIpeStub, ipeCmmGroup), dus')

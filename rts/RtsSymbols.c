@@ -540,6 +540,10 @@ extern char **environ;
       SymI_HasProto(__word_encodeFloat)                                 \
       SymI_HasDataProto(stg_atomicallyzh)                                   \
       SymI_HasProto(barf)                                               \
+      SymI_HasProto(sbarf)                                              \
+      SymI_HasProto(ssbarf)                                             \
+      SymI_HasProto(checkEnteredTaggable)                               \
+      SymI_HasProto(tagClosureIfConstr)                                 \
       SymI_HasProto(startEventLogging)                                  \
       SymI_HasProto(endEventLogging)                                    \
       SymI_HasProto(flushEventLog)                                      \

@@ -1955,7 +1955,18 @@ generatePrimCall d s p target _result_ty args
          go _   pushes [] = return (reverse pushes)
          go !dd pushes ((a, off):cs) = do (push, szb) <- pushAtom dd p a
                                           massert (off == dd + szb)
-                                          go (dd + szb) (push:pushes) cs
+                                          -- An unlifted boxed argument's pointer
+                                          -- is tagged; the primcall callee works
+                                          -- with the raw pointer, so strip the
+                                          -- tag. SWIZZLE with a zero offset
+                                          -- untags the just-pushed word in place.
+                                          -- See Note [Pointer tagging of unlifted
+                                          -- boxed primitives] in GHC.StgToCmm.Prim.
+                                          let aty = stgArgType a
+                                              push' | isUnliftedType aty && isBoxedType aty
+                                                    = push `snocOL` SWIZZLE 0 0
+                                                    | otherwise = push
+                                          go (dd + szb) (push':pushes) cs
      push_args <- go d [] shifted_args_offsets
      let args_bco = primCallBCO platform args_info prim_args_offsets
      return $ mconcat push_args `appOL`

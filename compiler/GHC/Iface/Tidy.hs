@@ -474,6 +474,17 @@ tidyProgram opts (ModGuts { mg_module           = mod
                  , cg_modBreaks     = modBreaks
                  , cg_spt_entries   = spt_entries
                  , cg_hpc_info      = hpc_info
+                 , cg_boot_exports  = boot_exports
+                 -- Modules whose hs-boot interface this module resolves through
+                 -- (transitively), where a regular import has not clobbered the
+                 -- SOURCE one. A value imported via such a boot iface carries no
+                 -- LFInfo, so its reference must go through the boot indirection.
+                 -- dep_boot_mods already encodes the boot-minus-regular set; see
+                 -- Note [Structure of dep_boot_mods] in GHC.Unit.Module.Deps.
+                 , cg_source_imports =
+                     mkModuleSet [ mkModule (RealUnit (Definite uid)) (gwib_mod m)
+                                 | (uid, m) <- S.toList (dep_boot_mods deps)
+                                 , gwib_isBoot m == IsBoot ]
                  }
          , ModDetails { md_types            = tidy_type_env
                       , md_rules            = tidy_rules

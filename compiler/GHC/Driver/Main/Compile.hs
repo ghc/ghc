@@ -112,6 +112,7 @@ import GHC.Types.HpcInfo (HpcInfo (..))
 import GHC.Types.Id
 import GHC.Types.ForeignStubs
 import GHC.Types.Name.Env      ( mkNameEnv )
+import GHC.Types.Name.Set      ( NameSet, emptyNameSet )
 import GHC.Types.Var.Set
 import GHC.Types.Error
 import GHC.Types.CostCentre
@@ -679,7 +680,7 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
                   -- conservative but correct value.
                   lf_infos (StgTopLifted (StgNonRec b _)) = [(idName b, LFUnknown True)]
                   lf_infos (StgTopLifted (StgRec bs))     = map (\(b,_) -> (idName b, LFUnknown True)) bs
-                  lf_infos (StgTopStringLit b _)          = [(idName b, LFUnlifted)]
+                  lf_infos (StgTopStringLit b _)          = [(idName b, LFScalar)]
 
                   cmm_cg_infos  = CmmCgInfos
                     { cgNonCafs = mempty
@@ -699,7 +700,7 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
             _          ->
               do
               cmms <- {-# SCC "StgToCmm" #-}
-                doCodeGen hsc_env this_mod denv tycons
+                doCodeGen hsc_env this_mod (cg_boot_exports cgguts) (cg_source_imports cgguts) denv tycons
                 cost_centre_info
                 stg_binds
 
@@ -720,7 +721,7 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
 
               (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cmm_cg_infos)
                   <- {-# SCC "codeOutput" #-}
-                    codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) this_mod output_filename mod_loc
+                    codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) this_mod (cg_boot_exports cgguts) output_filename mod_loc
                     foreign_stubs foreign_files dependencies (initDUniqSupply 'n' 0) rawcmms1
               return  ( output_filename, stub_c_exists, foreign_fps
                       , Just stg_cg_infos, Just cmm_cg_infos)
@@ -923,7 +924,7 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
                   in NoStubs `appendStubC` ip_init
               | otherwise     = NoStubs
         (_output_filename, (_stub_h_exists, stub_c_exists), _foreign_fps, _caf_infos)
-          <- codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) cmm_mod output_filename no_loc foreign_stubs [] S.empty
+          <- codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) cmm_mod emptyNameSet output_filename no_loc foreign_stubs [] S.empty
              dus1 rawCmms
         return stub_c_exists
   where
@@ -956,14 +957,14 @@ This reduces residency towards the end of the CodeGen phase significantly
 (5-10%).
 -}
 
-doCodeGen :: HscEnv -> Module -> InfoTableProvMap -> [TyCon]
+doCodeGen :: HscEnv -> Module -> NameSet -> ModuleSet -> InfoTableProvMap -> [TyCon]
           -> CollectedCCs
           -> [CgStgTopBinding] -- ^ Bindings come already annotated with fvs
           -> IO (CgStream CmmGroupSRTs CmmCgInfos)
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
-doCodeGen hsc_env this_mod denv tycons
+doCodeGen hsc_env this_mod boot_exports source_imports denv tycons
               cost_centre_info stg_binds_w_fvs = do
     let dflags     = hsc_dflags hsc_env
         logger     = hsc_logger hsc_env
@@ -976,8 +977,8 @@ doCodeGen hsc_env this_mod denv tycons
         (pprGenStgTopBindings stg_ppr_opts stg_binds_w_fvs)
 
     let stg_to_cmm dflags mod a b c d = case stgToCmmHook hooks of
-          Nothing -> StgToCmm.codeGen logger tmpfs (initStgToCmmConfig dflags mod) a b c d
-          Just h  -> (,emptyDetUFM) <$> h          (initStgToCmmConfig dflags mod) a b c d
+          Nothing -> StgToCmm.codeGen logger tmpfs (initStgToCmmConfig dflags boot_exports source_imports mod) a b c d
+          Just h  -> (,emptyDetUFM) <$> h          (initStgToCmmConfig dflags boot_exports source_imports mod) a b c d
 
     let cmm_stream :: CgStream CmmGroup (ModuleLFInfos, DetUniqFM)
         -- See Note [Forcing of stg_binds]

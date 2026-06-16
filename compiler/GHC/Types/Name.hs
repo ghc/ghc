@@ -47,7 +47,7 @@ module GHC.Types.Name (
         mkInternalName, mkClonedInternalName, mkDerivedInternalName,
         mkSystemVarName, mkSysTvName,
         mkFCallName,
-        mkExternalName, mkWiredInName,
+        mkExternalName, mkWiredInName, mkBootIndName,
 
         -- ** Manipulating and deconstructing 'Name's
         nameUnique, setNameUnique,
@@ -535,6 +535,18 @@ mkExternalName :: Unique -> Module -> OccName -> SrcSpan -> Name
 mkExternalName uniq mod occ loc
   = Name { n_uniq = uniq, n_sort = External mod,
            n_occ = occ, n_loc = loc }
+
+-- | The name under which a defining module emits a static indirection for a
+-- value that it also exports through an hs-boot interface. A SOURCE importer,
+-- which sees the value untagged, references this indirection rather than the
+-- value's own closure; entering it resolves to the tagged value. The external
+-- symbol depends only on the module and (derived) occurrence, so the defining
+-- module and importers agree on it. See Note [Boot-exported constructors and
+-- pointer tagging] in "GHC.StgToCmm.DataCon".
+mkBootIndName :: Name -> Name
+mkBootIndName name =
+  mkExternalName (nameUnique name) (nameModule name)
+                 (mkBootIndOcc (nameOccName name)) (nameSrcSpan name)
 
 -- | Create a name which is actually defined by the compiler itself
 mkWiredInName :: Module -> OccName -> Unique -> TyThing -> BuiltInSyntax -> Name

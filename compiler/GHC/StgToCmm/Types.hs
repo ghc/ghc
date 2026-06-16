@@ -191,8 +191,14 @@ data LambdaFormInfo
                         --        because then we know the entry code will do
                         --        For a function, the entry code is the fast entry point
 
-  | LFUnlifted          -- A value of unboxed type;
-                        -- always a value, needs evaluation
+  | LFScalar            -- An unboxed scalar value (Addr#, string literals):
+                        -- a raw value held outside the managed heap.
+
+  | LFPrim              -- A boxed unlifted primitive (ByteArray#, Array#, MVar#, ...):
+                        -- a managed-heap object with no source-level data
+                        -- constructor, tagged as a single-constructor value.
+                        -- See Note [Pointer tagging of unlifted boxed primitives]
+                        -- in GHC.StgToCmm.Prim.
 
   | LFLetNoEscape       -- See LetNoEscape module for precise description
 
@@ -208,8 +214,10 @@ instance Outputable LambdaFormInfo where
       text "LFCon" <> brackets (ppr con)
     ppr (LFUnknown m_func) =
       text "LFUnknown" <> brackets (pprFuncFlag m_func)
-    ppr LFUnlifted =
-      text "LFUnlifted"
+    ppr LFScalar =
+      text "LFScalar"
+    ppr LFPrim =
+      text "LFPrim"
     ppr LFLetNoEscape =
       text "LFLetNoEscape"
 

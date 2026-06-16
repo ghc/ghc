@@ -145,5 +145,15 @@ data CgGuts
                 -- ^ Static pointer table entries for static forms defined in
                 -- the module.
                 -- See Note [Grand plan for static forms] in "GHC.Iface.Tidy.StaticPtrTable"
-        cg_hpc_info :: HpcInfo
+        cg_hpc_info :: HpcInfo,
+
+        cg_boot_exports :: NameSet,
+                -- ^ Names exported by this module's hs-boot file (empty if none).
+                -- For taggable constructors bound to these names code generation
+                -- emits a static indirection (under a derived symbol) that SOURCE
+                -- importers reference and enter safely.
+
+        cg_source_imports :: ModuleSet
+                -- ^ Modules this module imports with @{-# SOURCE #-}@. References
+                -- to their values are emitted via the value's boot indirection.
     }

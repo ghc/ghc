@@ -8,6 +8,8 @@ import GHC.Driver.Config.Parser
 import GHC.Driver.Config.StgToCmm
 import GHC.Driver.DynFlags
 
+import GHC.Types.Name.Set ( emptyNameSet )
+import GHC.Unit.Module.Env ( emptyModuleSet )
 import GHC.Utils.Panic
 
 initPDConfig :: DynFlags -> PDConfig
@@ -20,6 +22,6 @@ initCmmParserConfig :: DynFlags -> CmmParserConfig
 initCmmParserConfig dflags = CmmParserConfig
   { cmmpParserOpts = initParserOpts dflags
   , cmmpPDConfig = initPDConfig dflags
-  , cmmpStgToCmmConfig = initStgToCmmConfig dflags (panic "initCmmParserConfig: no module")
+  , cmmpStgToCmmConfig = initStgToCmmConfig dflags emptyNameSet emptyModuleSet (panic "initCmmParserConfig: no module")
   }
 

@@ -328,6 +328,12 @@
     IND_STATIC:                                         \
    {                                                    \
       x = %acquire StgInd_indirectee(x);                \
+      if (GETTAG(x) != 0) {                             \
+          /* tagged indirectee is an evaluated value:   \
+             return it, don't enter it */               \
+          R1 = x;                                       \
+          ret(x);                                       \
+      }                                                 \
       goto again;                                       \
    }                                                    \
   case                                                  \
@@ -868,7 +874,7 @@
     src_p = src + SIZEOF_StgMutArrPtrs + WDS(offset);          \
     prim %memcpy(dst_p, src_p, n * SIZEOF_W, SIZEOF_W);        \
                                                                \
-    return (dst);
+    return (dst + 1); /* tag the fresh array, see GHC.StgToCmm.Prim */
 
 #define copyArray(src, src_off, dst, dst_off, n)                  \
   W_ dst_elems_p, dst_p, src_p, bytes;                            \
@@ -951,7 +957,7 @@
     src_p = src + SIZEOF_StgSmallMutArrPtrs + WDS(offset);     \
     prim %memcpy(dst_p, src_p, n * SIZEOF_W, SIZEOF_W);        \
                                                                \
-    return (dst);
+    return (dst + 1); /* tag the fresh array, see GHC.StgToCmm.Prim */
 
 
 //

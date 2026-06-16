@@ -40,7 +40,9 @@ import GHC.Types.Basic
 import GHC.Types.Var.Set ( isEmptyDVarSet )
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
+import GHC.Types.Name (mkBootIndName)
 import GHC.Types.Name.Env
+import GHC.Types.Name.Set (elemNameSet)
 
 import GHC.Core.DataCon
 import GHC.Core.TyCon
@@ -56,7 +58,7 @@ import GHC.Utils.TmpFs
 import GHC.Data.Stream
 import GHC.Data.OrdList
 
-import Control.Monad (when,void, forM_)
+import Control.Monad (when,void, forM_, zipWithM_)
 import GHC.Utils.Misc
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
@@ -134,10 +136,11 @@ codeGen logger tmpfs cfg (InfoTableProvMap denv _ _) tycons
                   !name = idName (cg_id info)
                   !lf = cg_lf info
 
+              -- LFInfo is part of the STG-ABI (a reference to an imported value
+              -- must carry its pointer tag), not an inlining pragma, so collect
+              -- it for every binding regardless of -fomit-interface-pragmas.
+              -- (Only LFInfo is conveyed here, never unfoldings.)
               !generatedInfo
-                | stgToCmmOmitIfPragmas cfg
-                = emptyNameEnv
-                | otherwise
                 = mkNameEnv (Prelude.map extractInfo (nonDetEltsUFM cg_id_infos))
 
         ; rn_mapping <- liftIO (readIORef uniqRnRef)
@@ -218,6 +221,7 @@ cgTopBinding logger tmpfs cfg = \case
         let (info, fcode) = cgTopRhs cfg NonRecursive id rhs
         fcode
         addBindC info
+        emitBootInd cfg id info
 
     StgTopLifted (StgRec pairs) -> do
         let (bndrs, rhss) = unzip pairs
@@ -226,6 +230,7 @@ cgTopBinding logger tmpfs cfg = \case
             (infos, fcodes) = unzip r
         addBindsC infos
         sequence_ fcodes
+        zipWithM_ (emitBootInd cfg) bndrs infos
 
     StgTopStringLit id str -> do
         let label = mkBytesLabel (idName id)
@@ -245,6 +250,22 @@ cgTopBinding logger tmpfs cfg = \case
                      return $ mkFileEmbedLit label bFile (BS.length str)
         emitDecl decl
         addBindC (litIdInfo (stgToCmmPlatform cfg) id mkLFStringLit lit)
+
+-- | For a value (a constructor or a thunk/CAF, but not a function) that this
+-- module also exports through its hs-boot interface, emit a static indirection
+-- under a derived symbol. A SOURCE importer references this indirection (it sees
+-- the value untagged) and entering it resolves to the properly tagged value,
+-- while every other client uses the value's own closure with full LFInfo.
+-- See Note [Boot-exported constructors and pointer tagging] in GHC.StgToCmm.DataCon.
+emitBootInd :: StgToCmmConfig -> Id -> CgIdInfo -> FCode ()
+emitBootInd cfg id info
+  | idName id `elemNameSet` stgToCmmBootExports cfg
+  , needsBootInd id
+  , CmmLit payload <- idInfoToAmode info
+  = emitDataCon (mkClosureLabel (mkBootIndName (idName id)) (idCafInfo id))
+                indStaticInfoTable dontCareCCS [payload]
+  | otherwise
+  = return ()
 
 
 cgTopRhs :: StgToCmmConfig -> RecFlag -> Id -> CgStgRhs -> (CgIdInfo, FCode ())
@@ -320,6 +341,11 @@ cgDataCon mn data_con
 
             nonptr_wds   = tot_wds - ptr_wds
 
+            -- A small (taggable) family carries its full constructor identity in
+            -- the pointer tag, so a tag-0 pointer to such a value must never be
+            -- entered; doing so signals a broken tagging invariant.
+            taggable = isSmallFamily platform (tyConFamilySize (dataConTyCon data_con))
+
             dyn_info_tbl =
               mkDataConInfoTable profile data_con mn False ptr_wds nonptr_wds
 
@@ -342,7 +368,17 @@ cgDataCon mn data_con
                ; let node = CmmReg $ nodeReg platform
                ; ldvEnter node
                ; tickyReturnOldCon (length arg_reps)
-               ; void $ emitReturn [cmmOffsetB platform node (fromDynTag (tagForCon platform data_con))]
+               -- A taggable (small-family) normal form should never be entered:
+               -- every reference to it carries the constructor's pointer tag, so
+               -- reaching this entry code is an invariant violation. We report it
+               -- (aborting under +RTS --fatal-enter-taggable, otherwise warning once)
+               -- and then self-return the value tagged with the constructor tag.
+               -- Larger families have no spare tag, so their values are entered
+               -- as normal and the entry returns them tagged with the
+               -- family-saturating tag.
+               ; when taggable $
+                   emitCheckEnteredTaggable (showPprUnsafe data_con)
+               ; void $ emitReturn
+                   [cmmOffsetB platform node (fromDynTag (tagForCon platform data_con))]
                }
-                    -- The case continuation code expects a tagged pointer
         }

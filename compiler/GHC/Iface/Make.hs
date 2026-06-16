@@ -135,11 +135,11 @@ mkPartialIface hsc_env core_prog mod_details mod_summary import_decls
 -- Note [Conveying CAF-info and LFInfo between modules] in GHC.StgToCmm.Types.
 mkFullIface :: HscEnv -> PartialModIface -> Maybe StgCgInfos -> Maybe CmmCgInfos -> ForeignStubs -> [(ForeignSrcLang, FilePath)] -> IO ModIface
 mkFullIface hsc_env partial_iface mb_stg_infos mb_cmm_infos stubs foreign_files = do
-    let decls
-          | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
-          = mi_decls partial_iface
-          | otherwise
-          = updateDecl (mi_decls partial_iface) mb_stg_infos mb_cmm_infos
+    -- LFInfo is a code-generation correctness fact (a reference to an imported
+    -- value must carry the value's pointer tag, which needs its LambdaFormInfo),
+    -- not an inlining pragma.  Attach it regardless of -fomit-interface-pragmas
+    -- so imported value references are tagged at every optimisation level.
+    let decls = updateDecl (mi_decls partial_iface) mb_stg_infos mb_cmm_infos
 
     -- See Note [Foreign stubs and TH bytecode linking]
     mi_simplified_core <- for (mi_simplified_core partial_iface) $ \simpl_core -> do
@@ -203,7 +203,9 @@ updateDecl decls m_stg_infos m_cmm_infos
       | let not_caffy = elemNameSet nm non_cafs
       , let mb_lf_info = lookupNameEnv lf_infos nm
       , let sig = lookupNameEnv tag_sigs nm
-      , warnPprTrace (isNothing mb_lf_info) "updateDecl" (text "Name without LFInfo:" <+> ppr nm) True
+      -- NB: with LFInfo now attached at every optimisation level, a missing
+      -- LFInfo is unremarkable (e.g. at -O0), so we do not trace it here.
+      , warnPprTrace False "updateDecl" (text "Name without LFInfo:" <+> ppr nm) True
         -- Only allocate a new IfaceId if we're going to update the infos
       , isJust mb_lf_info || not_caffy || isJust sig
       = IfaceId nm ty details $

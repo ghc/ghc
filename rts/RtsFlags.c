@@ -272,6 +272,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.MiscFlags.generate_stack_trace    = true;
     RtsFlags.MiscFlags.generate_dump_file      = false;
     RtsFlags.MiscFlags.machineReadable         = false;
+    RtsFlags.MiscFlags.fatalEnterTaggable           = true; /* TEMP: hard-bar verification; revert to false */
     RtsFlags.MiscFlags.disableDelayedOsMemoryReturn = false;
     RtsFlags.MiscFlags.internalCounters        = false;
     RtsFlags.MiscFlags.linkerAlwaysPic         = DEFAULT_LINKER_ALWAYS_PIC;
@@ -988,6 +989,11 @@ error = true;
                                &rts_argv[arg][2])) {
                       OPTION_UNSAFE;
                       RtsFlags.MiscFlags.install_signal_handlers = false;
+                  }
+                  else if (strequal("fatal-enter-taggable",
+                               &rts_argv[arg][2])) {
+                      OPTION_SAFE;
+                      RtsFlags.MiscFlags.fatalEnterTaggable = true;
                   }
                   else if (strequal("install-seh-handlers=yes",
                               &rts_argv[arg][2])) {

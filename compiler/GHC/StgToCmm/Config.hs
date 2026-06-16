@@ -8,6 +8,7 @@ module GHC.StgToCmm.Config
 import GHC.Platform.Profile
 import GHC.Platform
 import GHC.Unit.Module
+import GHC.Types.Name.Set ( NameSet )
 import GHC.Utils.Outputable
 import GHC.Utils.TmpFs
 
@@ -21,6 +22,15 @@ data StgToCmmConfig = StgToCmmConfig
   { stgToCmmProfile       :: !Profile            -- ^ Current profile
   , stgToCmmThisModule    :: Module              -- ^ The module being compiled. This field kept lazy for
                                                  -- Cmm/Parser.y which preloads it with a panic
+  , stgToCmmBootExports   :: NameSet             -- ^ Names this module's hs-boot interface exports. For a
+                                                 -- taggable constructor bound to such a name the module
+                                                 -- emits an extra static indirection (under a derived
+                                                 -- symbol) that SOURCE importers reference and enter
+                                                 -- safely. See Note [Boot-exported constructors and
+                                                 -- pointer tagging] in "GHC.StgToCmm.DataCon".
+  , stgToCmmSourceImports :: ModuleSet           -- ^ Modules this module imports with @{-# SOURCE #-}@.
+                                                 -- A reference to a value in one of these is emitted via
+                                                 -- the value's boot indirection rather than its closure.
   , stgToCmmTmpDir        :: !TempDir            -- ^ Temp Dir for files used in compilation
   , stgToCmmContext       :: !SDocContext        -- ^ Context for StgToCmm phase
   , stgToCmmEmitDebugInfo :: !Bool               -- ^ Whether we wish to output debug information

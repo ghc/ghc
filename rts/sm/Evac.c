@@ -1441,6 +1441,25 @@ selector_loop:
               RELAXED_STORE(&((StgClosure*)p)->payload[0], (StgClosure *)prev_thunk_selector);
               prev_thunk_selector = p;
 
+              // Re-establish the pointer tag for an evaluated constructor: a
+              // selector field can hold an untagged pointer to an already
+              // evaluated value, but the tagging invariant requires every
+              // reference to such a value to carry its tag.  Tag `val` itself so
+              // both *q and the indirectee installed by unchain_thunk_selectors
+              // are tagged.  See Note [Data constructor dynamic tags].
+              if (GET_CLOSURE_TAG(val) == 0) {
+                  StgClosure *cval = UNTAG_CLOSURE(val);
+                  const StgInfoTable *cinfo = ACQUIRE_LOAD(&cval->header.info);
+                  if (IS_FORWARDING_PTR(cinfo)) {
+                      cval  = (StgClosure *) UN_FORWARDING_PTR(cinfo);
+                      cinfo = ACQUIRE_LOAD(&cval->header.info);
+                  }
+                  const StgInfoTable *ci = INFO_PTR_TO_STRUCT(cinfo);
+                  if (ci->type >= CONSTR && ci->type <= CONSTR_NOCAF) {
+                      val = TAG_CLOSURE(stg_min(TAG_MASK, 1 + ci->srt), val);
+                  }
+              }
+
               *q = val;
 
               // update the other selectors in the chain *before*

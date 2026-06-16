@@ -4,14 +4,17 @@ module GHC.CmmToAsm.Config
    , ncgWordWidth
    , ncgSpillPreallocSize
    , platformWordWidth
+   , ncgLabelMayBeRedirected
    )
 where
 
 import GHC.Prelude
 import GHC.Platform
 import GHC.Cmm.Type (Width(..))
+import GHC.Cmm.CLabel (CLabel, hasHaskellName)
 import GHC.CmmToAsm.CFG.Weight
 import GHC.Unit.Module (Module)
+import GHC.Types.Name.Set (NameSet, elemNameSet)
 import GHC.Utils.Outputable
 
 -- | Native code generator configuration
@@ -52,7 +55,24 @@ data NCGConfig = NCGConfig
    , ncgComputeUnwinding      :: !Bool            -- ^ Compute block unwinding tables
    , ncgEnableDeadCodeElimination :: !Bool        -- ^ Whether to enable the dead-code elimination
    , ncgLa664Enabled          :: !Bool            -- ^ la664 is equal to isav1.1
+   , ncgBootExports           :: !NameSet         -- ^ Names exported by this module's hs-boot file.
+                                                  -- Static indirections for these must not be
+                                                  -- eliminated (see ncgLabelMayBeRedirected):
+                                                  -- a SOURCE-importer references them untagged
+                                                  -- (the boot iface carries no LFInfo), so the
+                                                  -- indirection must survive to be enter-safe.
    }
+
+-- | May a static indirection labelled @symbol@ be eliminated by redirecting it
+-- to its indirectee (the @.equiv@ trick, see Note [emit-time elimination of
+-- static indirections] in "GHC.Cmm.CLabel")?  No, if @symbol@ is exported by
+-- this module's hs-boot file: SOURCE importers reference it untagged and must be
+-- able to enter it to obtain the (tagged) indirectee.
+ncgLabelMayBeRedirected :: NCGConfig -> CLabel -> Bool
+ncgLabelMayBeRedirected config symbol =
+  case hasHaskellName symbol of
+    Just nm -> not (nm `elemNameSet` ncgBootExports config)
+    Nothing -> True
 
 -- | Return Word size
 ncgWordWidth :: NCGConfig -> Width

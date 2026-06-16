@@ -10,14 +10,16 @@ import GHC.Driver.DynFlags
 import GHC.Platform
 import GHC.Unit.Types (Module)
 import GHC.CmmToAsm.Config
+import GHC.Types.Name.Set (NameSet)
 import GHC.Utils.Outputable
 import GHC.CmmToAsm.BlockLayout
 
 -- | Initialize the native code generator configuration from the DynFlags
-initNCGConfig :: DynFlags -> Module -> NCGConfig
-initNCGConfig dflags this_mod = NCGConfig
+initNCGConfig :: DynFlags -> NameSet -> Module -> NCGConfig
+initNCGConfig dflags boot_exports this_mod = NCGConfig
    { ncgPlatform              = targetPlatform dflags
    , ncgThisModule            = this_mod
+   , ncgBootExports           = boot_exports
    , ncgAsmContext            = initSDocContext dflags PprCode
    , ncgProcAlignment         = cmmProcAlignment dflags
    , ncgExternalDynamicRefs   = gopt Opt_ExternalDynamicRefs dflags

@@ -76,6 +76,28 @@ ssbarf(const char *fmt, const char *s)
   barf(fmt, s);
 }
 
+// Called from the entry code of a taggable normal form. The pointer-tagging
+// invariant says every pointer to such a closure is tagged, so its entry code
+// is unreachable. With +RTS --fatal-enter-taggable a violation aborts; otherwise it
+// warns once and the entry self-returns the value tagged with its constructor
+// tag, so a violating program degrades rather than crashing.
+void
+checkEnteredTaggable(const char *con)
+{
+  if (RtsFlags.MiscFlags.fatalEnterTaggable) {
+    ssbarf("entered a taggable normal form: %s", con);
+    // ssbarf does not return
+  }
+  static int warned = 0;
+  if (!warned) {
+    warned = 1;
+    debugBelch("warning: entered a taggable normal form: %s\n"
+               "(further occurrences suppressed; rerun with "
+               "+RTS --fatal-enter-taggable to abort)\n",
+               con);
+  }
+}
+
 void
 _assertFail(const char*filename, unsigned int linenum)
 {

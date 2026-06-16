@@ -508,7 +508,8 @@ data IfaceLFInfo
       !Bool -- True <=> might be a function type
   | IfLFCon !Name
   | IfLFUnknown !Bool
-  | IfLFUnlifted
+  | IfLFScalar
+  | IfLFPrim
 
 instance Outputable IfaceLFInfo where
     ppr (IfLFReEntrant arity) =
@@ -522,8 +523,11 @@ instance Outputable IfaceLFInfo where
     ppr (IfLFCon con) =
       text "LFCon" <> brackets (ppr con)
 
-    ppr IfLFUnlifted =
-      text "LFUnlifted"
+    ppr IfLFScalar =
+      text "LFScalar"
+
+    ppr IfLFPrim =
+      text "LFPrim"
 
     ppr (IfLFUnknown fun_flag) =
       text "LFUnknown" <+> ppr fun_flag
@@ -542,8 +546,10 @@ instance Binary IfaceLFInfo where
     put_ bh (IfLFUnknown fun_flag) = do
         putByte bh 3
         put_ bh fun_flag
-    put_ bh IfLFUnlifted =
+    put_ bh IfLFScalar =
         putByte bh 4
+    put_ bh IfLFPrim =
+        putByte bh 5
     get bh = do
         tag <- getByte bh
         case tag of
@@ -551,7 +557,8 @@ instance Binary IfaceLFInfo where
             1 -> IfLFThunk <$> get bh <*> get bh
             2 -> IfLFCon <$> get bh
             3 -> IfLFUnknown <$> get bh
-            4 -> pure IfLFUnlifted
+            4 -> pure IfLFScalar
+            5 -> pure IfLFPrim
             _ -> panic "Invalid byte"
 
 instance NFData IfaceLFInfo where
@@ -560,7 +567,8 @@ instance NFData IfaceLFInfo where
     IfLFThunk updatable mb_fun -> rnf updatable `seq` rnf mb_fun
     IfLFCon con -> rnf con
     IfLFUnknown fun_flag -> rnf fun_flag
-    IfLFUnlifted -> ()
+    IfLFScalar -> ()
+    IfLFPrim -> ()
 
 {-
 Note [Versioning of instances]

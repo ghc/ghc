@@ -47,7 +47,7 @@ import Data.Int
 pprNatCmmDecl :: IsDoc doc => NCGConfig -> NatCmmDecl RawCmmStatics Instr -> doc
 pprNatCmmDecl config (CmmData section dats) =
   pprSectionAlign config section
-  $$ pprDatas (ncgPlatform config) dats
+  $$ pprDatas config dats
 
 pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   let platform = ncgPlatform config in
@@ -150,18 +150,23 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
 
 
 
-pprDatas :: IsDoc doc => Platform -> RawCmmStatics -> doc
+pprDatas :: IsDoc doc => NCGConfig -> RawCmmStatics -> doc
 -- See Note [emit-time elimination of static indirections] in "GHC.Cmm.CLabel".
-pprDatas platform (CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+pprDatas config (CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
         labelInd _ = Nothing
   , Just ind' <- labelInd ind
   , alias `mayRedirectTo` ind'
+  -- Do not eliminate indirections for hs-boot-exported symbols; see
+  -- ncgLabelMayBeRedirected in GHC.CmmToAsm.Config.
+  , ncgLabelMayBeRedirected config alias
   = pprGloblDecl platform alias
     $$ line (text ".equiv" <+> pprAsmLabel platform alias <> comma <> pprAsmLabel platform ind')
-pprDatas platform (CmmStaticsRaw lbl dats) = vcat (pprLabel platform lbl : map (pprData platform) dats)
+  where platform = ncgPlatform config
+pprDatas config (CmmStaticsRaw lbl dats) = vcat (pprLabel platform lbl : map (pprData platform) dats)
+  where platform = ncgPlatform config
 
 pprData :: IsDoc doc => Platform -> CmmStatic -> doc
 pprData platform d = case d of

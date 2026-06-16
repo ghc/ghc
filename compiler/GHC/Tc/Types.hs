@@ -716,8 +716,14 @@ bootExports boot =
   case boot of
     NoSelfBoot -> emptyNameSet
     SelfBoot { sb_mds = mds} ->
-      let exports = md_exports mds
-      in availsToNameSet exports
+      -- All Ids the boot interface exposes, so a SOURCE importer's reference to
+      -- any of them (including implicit ones like instance dfuns and $tc Typeable
+      -- bindings, which are absent from md_exports) finds the boot indirection the
+      -- defining module emits. See Note [Boot-exported constructors and pointer
+      -- tagging] in "GHC.StgToCmm.DataCon".
+      availsToNameSet (md_exports mds)
+        `unionNameSet`
+      mkNameSet (map getName (typeEnvIds (md_types mds)))
 
 
 

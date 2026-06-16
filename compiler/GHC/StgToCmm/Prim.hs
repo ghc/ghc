@@ -36,8 +36,10 @@ import GHC.Cmm.Graph
 import GHC.Stg.Syntax
 import GHC.Cmm
 import GHC.Unit         ( rtsUnit )
-import GHC.Core.Type    ( Type, tyConAppTyCon_maybe )
+import GHC.Core.Type    ( Type, tyConAppTyCon_maybe, isUnliftedType, isBoxedType )
 import GHC.Core.TyCon
+import GHC.Types.RepType ( unwrapType )
+import GHC.StgToCmm.Closure ( NonVoid, nonVoidStgArgs, fromNonVoid )
 import GHC.Cmm.CLabel
 import GHC.Cmm.Info     ( closureInfoPtr )
 import GHC.Cmm.Utils
@@ -79,13 +81,22 @@ cgOpApp (StgFCallOp fcall ty) stg_args res_ty
 
 cgOpApp (StgPrimOp primop) args res_ty = do
     cfg <- getStgToCmmConfig
+    let platform = stgToCmmPlatform cfg
     cmm_args <- getNonVoidArgAmodes args
-    cmmPrimOpApp cfg primop cmm_args (Just res_ty)
+    -- See Note [Pointer tagging of unlifted boxed primitives]
+    let cmm_args' = zipWith (untagPrimArg platform) (nonVoidStgArgs args) cmm_args
+    cmmPrimOpApp cfg primop cmm_args' (Just res_ty)
 
 cgOpApp (StgPrimCallOp primcall) args _res_ty
-  = do  { cmm_args <- getNonVoidArgAmodes args
+  = do  { cfg <- getStgToCmmConfig
+        ; let platform = stgToCmmPlatform cfg
+        ; cmm_args <- getNonVoidArgAmodes args
+        -- A foreign-prim callee dereferences raw pointers; strip the tag from
+        -- unlifted boxed arguments. See Note [Pointer tagging of unlifted boxed
+        -- primitives].
+        ; let cmm_args' = zipWith (untagFFIArg platform) (nonVoidStgArgs args) cmm_args
         ; let fun = CmmLit (CmmLabel (mkPrimCallLabel primcall))
-        ; emitCall (NativeNodeCall, NativeReturn) fun cmm_args }
+        ; emitCall (NativeNodeCall, NativeReturn) fun cmm_args' }
 
 cmmPrimOpApp :: StgToCmmConfig -> PrimOp -> [CmmExpr] -> Maybe Type -> FCode ReturnKind
 cmmPrimOpApp cfg primop cmm_args mres_ty = do
@@ -95,6 +106,89 @@ cmmPrimOpApp cfg primop cmm_args mres_ty = do
      -- result type of the primop.
      res_ty = fromMaybe (primOpResultType primop) mres_ty
   f res_ty
+
+-- | Strip the pointer tag from a primop argument that is an unlifted boxed
+-- primitive (ByteArray#, Array#, MVar#, ...). See
+-- Note [Pointer tagging of unlifted boxed primitives].
+untagPrimArg :: Platform -> NonVoid StgArg -> CmmExpr -> CmmExpr
+untagPrimArg platform nv_arg e
+  | isUnliftedBoxedTy (stgArgType (fromNonVoid nv_arg)) = cmmUntag platform e
+  | otherwise                                           = e
+
+-- | Is this the type of an unlifted boxed /primitive/ (ByteArray#, Array#,
+-- MVar#, ...), whose pointer a producer tags with 1? Restricted to primitive
+-- type constructors: a user-defined unlifted data type is already given its
+-- constructor tag by the ordinary LFCon machinery, so a value of such a type
+-- (e.g. an array element) must not be stripped here.
+isUnliftedBoxedTy :: Type -> Bool
+isUnliftedBoxedTy ty =
+  isUnliftedType ty && isBoxedType ty &&
+  -- Look through newtypes (e.g. the ArrayArray# wrappers, which are newtypes
+  -- over MutableArray#) so a wrapped primitive container is still recognised,
+  -- while a user-defined unlifted @data@ type is not.
+  maybe False isPrimTyCon (tyConAppTyCon_maybe (unwrapType ty))
+
+-- | Strip the tag from an unlifted boxed argument passed across a foreign-prim
+-- (or FFI) boundary, where the callee works with raw pointers. Unlike
+-- 'untagPrimArg' this is deliberately broad: it covers unsafe-coerced
+-- @Any \@UnliftedRep@ arguments too, which are not primitive type constructors.
+untagFFIArg :: Platform -> NonVoid StgArg -> CmmExpr -> CmmExpr
+untagFFIArg platform nv_arg e
+  | isUnliftedType ty && isBoxedType ty = cmmUntag platform e
+  | otherwise                           = e
+  where ty = stgArgType (fromNonVoid nv_arg)
+
+-- | Tag a freshly produced unlifted-boxed-primitive pointer with 1, the
+-- single-constructor tag. See Note [Pointer tagging of unlifted boxed primitives].
+tagPrimPtr :: Platform -> CmmExpr -> CmmExpr
+tagPrimPtr platform e = cmmOffsetB platform e 1
+
+{- Note [Pointer tagging of unlifted boxed primitives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An unlifted boxed primitive (ByteArray#, MutableByteArray#, Array#,
+MutableArray#, SmallArray#, MVar#, MutVar#, TVar#, Weak#, StableName#, Compact#,
+PromptTag#, ThreadId#, ...) is a managed-heap object with a single,
+source-invisible representation. Such an object is given the LambdaFormInfo
+'LFPrim' (see GHC.StgToCmm.Types), and every pointer to it carries the pointer
+tag 1 -- the tag a single-constructor datatype receives -- while the pointer is
+"at rest" in a register, a closure field, or on the stack. A raw unlifted scalar
+(Addr#, a string literal, StablePtr#) is 'LFScalar' and carries no tag.
+
+The tag is established and consumed at well-defined boundaries, so the primop
+implementations, the RTS, and the GC keep working with the untagged
+representation throughout.
+
+Producers
+  The allocating primops tag their freshly built result with 1: the inline
+  implementations here (via 'tagPrimPtr'), the out-of-line ones in
+  rts/PrimOps.cmm and the clone macros in rts/include/Cmm.h (as 'return (p+1)'),
+  and the coercions that hand back the same object (unsafeFreeze#/unsafeThaw#).
+
+Primop arguments
+  'cgOpApp' strips the tag from each argument whose type is a boxed unlifted
+  /primitive/ ('untagPrimArg' / 'isUnliftedBoxedTy', restricted to primitive
+  type constructors and looking through newtypes such as the ArrayArray#
+  wrappers). A value of a user-defined unlifted data type carries its own
+  constructor tag from the LFCon machinery and is read at the matching offset,
+  so its primitive-type-constructor test is False and it keeps its tag.
+
+Foreign and foreign-prim arguments
+  A C ('foreign import ccall') or Cmm ('foreign import prim') callee works with
+  raw pointers and computes its own header offsets, so every unlifted boxed
+  argument is untagged at the call boundary: 'add_shim' for ccalls (in
+  GHC.StgToCmm.Foreign), 'untagFFIArg' for the StgPrimCallOp path, and the
+  SWIZZLE bytecode instruction for the interpreter (rts/Interpreter.c, also used
+  to untag the breakpoint array read out of a BCO). These cover unsafe-coerced
+  @Any \@UnliftedRep@ arguments, so the predicate here admits any unlifted boxed
+  type rather than only the primitive ones.
+
+Stripping the tag from an already-untagged pointer is the identity, so the
+boundaries are correct whether or not a given producer has been taught to tag.
+
+BCO# is the one unlifted boxed type that keeps no 'LFPrim' tag: it is a function
+closure (info table FUN) whose pointer follows the function arity-tagging
+convention, and the interpreter enters it to run it.
+-}
 
 externalPrimop :: PrimOp -> [CmmExpr] -> PrimopCmmEmit
 externalPrimop primop args = outOfLinePrimop (callExternalPrimop primop args)
@@ -322,7 +416,7 @@ emitPrimOp cfg primop =
     emitAssign (CmmLocal res) (cccsExpr platform)
 
   MyThreadIdOp -> \[] -> inlinePrimop $ \[res] ->
-    emitAssign (CmmLocal res) (currentTSOExpr platform)
+    emitAssign (CmmLocal res) (tagPrimPtr platform (currentTSOExpr platform))
 
   ReadMutVarOp -> \[mutv] -> inlinePrimop $ \[res] ->
     emitPrimCall [res] (MO_AtomicRead (wordWidth platform) MemOrderAcquire)
@@ -422,19 +516,19 @@ emitPrimOp cfg primop =
   UnsafeFreezeArrayOp -> \[arg] -> inlinePrimop $ \[res] ->
     emit $ catAGraphs
       [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN_DIRTY_infoLabel)),
-        mkAssign (CmmLocal res) arg ]
+        mkAssign (CmmLocal res) (tagPrimPtr platform arg) ]
   UnsafeFreezeSmallArrayOp -> \[arg] -> inlinePrimop $ \[res] ->
     emit $ catAGraphs
       [ setInfo arg (CmmLit (CmmLabel mkSMAP_FROZEN_DIRTY_infoLabel)),
-        mkAssign (CmmLocal res) arg ]
+        mkAssign (CmmLocal res) (tagPrimPtr platform arg) ]
 
 --  #define unsafeFreezzeByteArrayzh(r,a)       r=(a)
   UnsafeFreezeByteArrayOp -> \[arg] -> inlinePrimop $ \[res] ->
-    emitAssign (CmmLocal res) arg
+    emitAssign (CmmLocal res) (tagPrimPtr platform arg)
 
 --  #define unsafeThawByteArrayzh(r,a)       r=(a)
   UnsafeThawByteArrayOp -> \[arg] -> inlinePrimop $ \[res] ->
-    emitAssign (CmmLocal res) arg
+    emitAssign (CmmLocal res) (tagPrimPtr platform arg)
 
 -- Reading/writing pointer arrays
 
@@ -2934,7 +3028,7 @@ doNewByteArrayOp res_r n = do
                         hdr_size + pc_OFFSET_StgArrBytes_bytes (platformConstants platform))
                      ]
 
-    emit $ mkAssign (CmmLocal res_r) base
+    emit $ mkAssign (CmmLocal res_r) (tagPrimPtr platform base)
 
 -- ----------------------------------------------------------------------------
 -- Comparing byte arrays
@@ -3184,7 +3278,7 @@ doNewArrayOp res_r rep info payload n init = do
         initialization = [ mkStore (mkOff off) init | off <- [0.. n - 1] ]
     emit (catAGraphs initialization)
 
-    emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
+    emit $ mkAssign (CmmLocal res_r) (tagPrimPtr platform (CmmReg arr))
 
 -- ----------------------------------------------------------------------------
 -- Copying pointer arrays
@@ -3388,7 +3482,7 @@ emitCloneArray info_p res_r src src_off n = do
     emitMemcpyCall dst_p src_p (mkIntExpr platform (toTargetInt (wordsToBytes platform n)))
         (wordAlignment platform)
 
-    emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
+    emit $ mkAssign (CmmLocal res_r) (tagPrimPtr platform (CmmReg arr))
 
 -- | Takes an info table label, a register to return the newly
 -- allocated array in, a source array, an offset in the source array,
@@ -3426,7 +3520,7 @@ emitCloneSmallArray info_p res_r src src_off n = do
     emitMemcpyCall dst_p src_p (mkIntExpr platform (toTargetInt (wordsToBytes platform n)))
         (wordAlignment platform)
 
-    emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
+    emit $ mkAssign (CmmLocal res_r) (tagPrimPtr platform (CmmReg arr))
 
 -- | Takes an offset in the destination array, the base address of
 -- the card table, and the number of elements affected (*not* the

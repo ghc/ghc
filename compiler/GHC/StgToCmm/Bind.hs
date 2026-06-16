@@ -105,13 +105,22 @@ cgTopRhsClosure platform rec id ccs upd_flag args body =
   -- hole detection from working in that case.  Test
   -- concurrent/should_run/4030 fails, for instance.
   --
-  gen_code _ closure_label
+  -- We also omit it when the indirectee is a data constructor: the '.equiv'
+  -- would alias this binding's symbol directly onto the constructor, so a
+  -- reference to it (which carries the thunk tag 0) would be an untagged
+  -- pointer to a constructor, breaking the invariant that pointers to
+  -- small-family constructors are tagged. A thunk keeps the binding enterable;
+  -- entering it yields the properly tagged constructor.
+  --
+  gen_code lf_info closure_label
     | StgApp f [] <- body
     , null args
     , isNonRec rec
     = do
          cg_info <- getCgIdInfo f
-         emitDataCon closure_label indStaticInfoTable ccs [unLit (idInfoToAmode cg_info)]
+         if isLFCon (cg_lf cg_info)
+           then gen_thunk lf_info
+           else emitDataCon closure_label indStaticInfoTable ccs [unLit (idInfoToAmode cg_info)]
 
   -- Emit standard stg_unpack_cstring closures for top-level unpackCString# thunks.
   --
@@ -128,7 +137,9 @@ cgTopRhsClosure platform rec id ccs upd_flag args body =
          emitDecl $ CmmData (Section Data closure_label) $
              CmmStatics closure_label info ccs [] [lit]
 
-  gen_code lf_info _closure_label
+  gen_code lf_info _closure_label = gen_thunk lf_info
+
+  gen_thunk lf_info
    = do { profile <- getProfile
         ; let name = idName id
         ; mod_name <- getModuleName

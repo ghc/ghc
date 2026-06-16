@@ -17,12 +17,15 @@ import GHC.Platform.Regs
 import GHC.Utils.Error
 import GHC.Unit.Module
 import GHC.Utils.Outputable
+import GHC.Types.Name.Set ( NameSet )
 
-initStgToCmmConfig :: DynFlags -> Module -> StgToCmmConfig
-initStgToCmmConfig dflags mod = StgToCmmConfig
+initStgToCmmConfig :: DynFlags -> NameSet -> ModuleSet -> Module -> StgToCmmConfig
+initStgToCmmConfig dflags boot_exports source_imports mod = StgToCmmConfig
   -- settings
   { stgToCmmProfile       = profile
   , stgToCmmThisModule    = mod
+  , stgToCmmBootExports   = boot_exports
+  , stgToCmmSourceImports = source_imports
   , stgToCmmTmpDir        = tmpDir          dflags
   , stgToCmmContext       = initSDocContext dflags defaultDumpStyle
   , stgToCmmEmitDebugInfo = debugLevel      dflags > 0

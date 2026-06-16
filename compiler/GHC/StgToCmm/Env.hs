@@ -26,6 +26,7 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Closure
+import GHC.Unit.Module.Env (elemModuleSet)
 
 import GHC.Cmm.CLabel
 
@@ -128,6 +129,7 @@ addBindsC new_bindings = do
 getCgIdInfo :: Id -> FCode CgIdInfo
 getCgIdInfo id
   = do  { platform <- getPlatform
+        ; cfg <- getStgToCmmConfig
         ; local_binds <- getBinds -- Try local bindings first
         ; case lookupVarEnv local_binds id of {
             Just info -> -- pprTrace "getCgIdInfoLocal" (ppr id) $
@@ -136,10 +138,27 @@ getCgIdInfo id
 
                 -- Should be imported; make up a CgIdInfo for it
           let name = idName id
+        ; let lf_info = importedIdLFInfo id
+              -- A value whose defining module this one resolves through its
+              -- hs-boot interface (transitively, and not clobbered by a regular
+              -- import) carries no LFInfo, so it is seen untagged. Reference its
+              -- boot indirection instead; entering that yields the tagged value.
+              -- 'stgToCmmSourceImports' is exactly that boot-minus-regular set
+              -- (from dep_boot_mods), so every module in it has an hs-boot and
+              -- hence the indirection symbol exists.
+              -- Functions keep their own symbol so saturated calls stay direct.
+              -- Data constructor workers are emitted by cgDataCon, not
+              -- cgTopBinding, so no indirection exists for them; reference them
+              -- directly. See Note [Boot-exported constructors and pointer
+              -- tagging] in "GHC.StgToCmm.DataCon".
+              use_boot_ind = needsBootInd id
+                          && not (isDataConWorkId id)
+                          && nameModule name `elemModuleSet` stgToCmmSourceImports cfg
         ; if isExternalName name then
               let ext_lbl
                       | isBoxedType (idType id)
-                      = mkClosureLabel name $ idCafInfo id
+                      = mkClosureLabel (if use_boot_ind then mkBootIndName name else name)
+                                       (idCafInfo id)
                       | isUnliftedType (idType id)
                           -- An unlifted external Id must refer to a top-level
                           -- string literal. See Note [Bytes label] in "GHC.Cmm.CLabel".
@@ -148,7 +167,7 @@ getCgIdInfo id
                       | otherwise
                       = pprPanic "GHC.StgToCmm.Env: label not found" (ppr id <+> dcolon <+> ppr (idType id))
               in return $
-                  litIdInfo platform id (importedIdLFInfo id) (CmmLabel ext_lbl)
+                  litIdInfo platform id lf_info (CmmLabel ext_lbl)
           else
               cgLookupPanic id -- Bug, id is neither in local binds nor is external
         }}}

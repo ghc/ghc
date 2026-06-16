@@ -117,7 +117,8 @@ stg_newByteArrayzh ( W_ n )
     if (p == NULL) (likely: False) {
         jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
-    return (p);
+    // See Note [Pointer tagging of unlifted boxed primitives] in GHC.StgToCmm.Prim
+    return (p + 1);
 }
 
 #define BA_ALIGN 16
@@ -134,7 +135,7 @@ stg_newPinnedByteArrayzh ( W_ n )
     if (p == NULL) (likely: False) {
         jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
-    return (p);
+    return (p + 1);
 }
 
 stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
@@ -148,7 +149,7 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
     if (p == NULL) (likely: False) {
         jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
-    return (p);
+    return (p + 1);
 }
 
 stg_isByteArrayPinnedzh ( gcptr ba )
@@ -273,7 +274,7 @@ stg_resizzeMutableByteArrayzh ( gcptr mba, W_ new_size )
    old_size = StgArrBytes_bytes(mba);
    if (new_size <= old_size) {
       call stg_shrinkMutableByteArrayzh(mba, new_size);
-      return (mba);
+      return (mba + 1);
    }
 
    bd = Bdescr(mba);
@@ -288,12 +289,13 @@ stg_resizzeMutableByteArrayzh ( gcptr mba, W_ new_size )
        new_free <= bdescr_start(bd) + (TO_W_(bdescr_blocks(bd)) * BLOCK_SIZE)) {
       bdescr_free(bd) = new_free;
       StgArrBytes_bytes(mba) = new_size;
-      return (mba);
+      return (mba + 1);
    } else {
+      // stg_newByteArrayzh returns a tagged pointer; untag for direct access.
       (P_ new_mba) = call stg_newByteArrayzh(new_size);
 
       // copy over old content
-      prim %memcpy(BYTE_ARR_CTS(new_mba), BYTE_ARR_CTS(mba),
+      prim %memcpy(BYTE_ARR_CTS(UNTAG(new_mba)), BYTE_ARR_CTS(mba),
                    StgArrBytes_bytes(mba), SIZEOF_W);
 
       return (new_mba);
@@ -411,7 +413,7 @@ stg_newArrayzh ( W_ n /* words */, gcptr init )
         jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
 
-    return (arr);
+    return (arr + 1);
 }
 
 stg_unsafeThawArrayzh ( gcptr arr )
@@ -425,10 +427,10 @@ stg_unsafeThawArrayzh ( gcptr arr )
         SET_INFO(arr,stg_MUT_ARR_PTRS_DIRTY_info);
         // must be done after SET_INFO, because it ASSERTs closure_MUTABLE():
         recordMutable(arr);
-        return (arr);
+        return (arr + 1);
     } else {
         SET_INFO(arr,stg_MUT_ARR_PTRS_DIRTY_info);
-        return (arr);
+        return (arr + 1);
     }
 }
 
@@ -508,7 +510,7 @@ stg_newSmallArrayzh ( W_ n /* words */, gcptr init )
         jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
 
-    return (arr);
+    return (arr + 1);
 }
 
 stg_unsafeThawSmallArrayzh ( gcptr arr )
@@ -518,10 +520,10 @@ stg_unsafeThawSmallArrayzh ( gcptr arr )
         SET_INFO(arr, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
         recordMutable(arr);
         // must be done after SET_INFO, because it ASSERTs closure_MUTABLE()
-        return (arr);
+        return (arr + 1);
     } else {
         SET_INFO(arr, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
-        return (arr);
+        return (arr + 1);
     }
 }
 
@@ -657,7 +659,7 @@ stg_newMutVarzh ( gcptr init )
     SET_HDR(mv,stg_MUT_VAR_DIRTY_info,CCCS);
     StgMutVar_var(mv) = init;
 
-    return (mv);
+    return (mv + 1);
 }
 
 // RRN: To support the "ticketed" approach, we return the NEW rather
@@ -837,7 +839,7 @@ stg_mkWeakzh ( gcptr key,
 
     IF_DEBUG(weak, ccall debugBelch("New weak pointer at %p\n",w));
 
-    return (w);
+    return (w + 1);
 }
 
 stg_mkWeakNoFinalizzerzh ( gcptr key, gcptr value )
@@ -1061,7 +1063,7 @@ stg_forkzh ( gcptr closure )
     // forkIO to force a context-switch.
     %relaxed Capability_context_switch(MyCapability()) = 1 :: CInt;
 
-    return (threadid);
+    return (threadid + 1);
 }
 
 stg_forkOnzh ( W_ cpu, gcptr closure )
@@ -1082,7 +1084,7 @@ again: MAYBE_GC(again);
 
     ccall scheduleThreadOn(MyCapability() "ptr", cpu, threadid "ptr");
 
-    return (threadid);
+    return (threadid + 1);
 }
 
 stg_yieldzh ()
@@ -1541,7 +1543,7 @@ stg_newTVarzh (P_ init)
     StgTVar_first_watch_queue_entry(tv) = stg_END_STM_WATCH_QUEUE_closure;
     StgTVar_num_updates(tv) = 0;
 
-    return (tv);
+    return (tv + 1);
 }
 
 
@@ -1658,7 +1660,7 @@ stg_newMVarzh ()
     StgMVar_head(mvar)  = stg_END_TSO_QUEUE_closure;
     StgMVar_tail(mvar)  = stg_END_TSO_QUEUE_closure;
     StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
-    return (mvar);
+    return (mvar + 1);
 }
 
 
@@ -2064,7 +2066,7 @@ stg_makeStableNamezh ( P_ obj )
         %release snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry) = sn_obj;
     }
 
-    return (sn_obj);
+    return (sn_obj + 1);
 }
 
 /* -----------------------------------------------------------------------------
@@ -2126,6 +2128,10 @@ for:
         goto for;
     }
 
+    // A BCO is a FUN closure (executable code with an arity), not an inert data
+    // box, so its pointer follows the function arity-tagging convention rather
+    // than the single-constructor tag. Leave it untagged; the interpreter
+    // enters it. See Note [Pointer tagging of unlifted boxed primitives].
     return (bco);
 }
 
@@ -2143,12 +2149,24 @@ stg_newConAppObjzh ( W_ datacon_info, P_ literals, P_ ptrs , W_ arity )
     SET_HDR(con_obj, datacon_info, CCS_MAIN);
 
     // Copy the ptrs followed by nonptrs into the constructor payload
-    W_ i, n_ptrs;
+    W_ i, n_ptrs, fld, ftype;
     n_ptrs = StgMutArrPtrs_ptrs(ptrs);
     i = 0;
 loop1:
     if (i < n_ptrs) {
-        StgClosure_payload(con_obj,i) = StgMutArrPtrs_payload(ptrs,i);
+        fld = StgMutArrPtrs_payload(ptrs,i);
+        // A field that points directly to a constructor must carry that
+        // constructor's pointer tag, so the consumer never enters a taggable
+        // normal form. Locally-built fields arrive already tagged or as
+        // thunks; only untagged direct constructor references, such as
+        // references to imported nullary constructors, need tagging here.
+        if (GETTAG(fld) == 0) {
+            ftype = TO_W_(%INFO_TYPE(%GET_STD_INFO(fld)));
+            if (ftype >= CONSTR && ftype <= CONSTR_NOCAF) {
+                (fld) = ccall tagConstr(fld);
+            }
+        }
+        StgClosure_payload(con_obj,i) = fld;
         i = i + 1;
         goto loop1;
     }
@@ -2237,7 +2255,7 @@ for:
         jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
 
-    return (info, dat_arr, ptrArray);
+    return (info, dat_arr + 1, ptrArray + 1);
 }
 
 stg_closureSizzezh (P_ clos)

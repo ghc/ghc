@@ -10,7 +10,7 @@
 module GHC.StgToCmm.Utils (
         emitDataLits, emitRODataLits,
         emitDataCon,
-        emitRtsCall, emitRtsCallWithResult, emitRtsCallGen,
+        emitRtsCall, emitRtsCallWithResult, emitRtsCallGen, emitCheckEnteredTaggable,
         emitBarf,
         assignTemp, newTemp,
 
@@ -188,6 +188,15 @@ emitBarf msg = do
   strLbl <- newStringCLit msg
   emitRtsCallGen [] (mkCmmCodeLabel rtsUnitId (fsLit "sbarf"))
     CmmNeverReturns
+    [(CmmLit strLbl, AddrHint)] False
+
+-- Call from a taggable normal form's entry code (which the pointer-tagging
+-- invariant makes unreachable). It aborts under +RTS --fatal-enter-taggable and
+-- otherwise warns once; the entry then self-returns the tagged value.
+emitCheckEnteredTaggable :: String -> FCode ()
+emitCheckEnteredTaggable con = do
+  strLbl <- newStringCLit con
+  emitRtsCall rtsUnitId (fsLit "checkEnteredTaggable")
     [(CmmLit strLbl, AddrHint)] False
 
 emitRtsCall :: UnitId -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()

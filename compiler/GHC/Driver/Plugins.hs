@@ -411,8 +411,9 @@ loadExternalPlugins ps = do
                         , text "  Library path: " <> text path
                         , text "  Symbol      : " <> text symbol
                         ])
-      Just (Ptr addr) -> case addrToAny# addr of
-        (# a #) -> pure a
+      Just p -> case tagClosurePtr p of
+        Ptr addr -> case addrToAny# addr of
+          (# a #) -> pure a
 
     pure $ ExternalPlugin (PluginWithArgs plugin opts) unit mod_name
 

@@ -772,7 +772,9 @@ interpretBCO (Capability* cap)
             arg4_info_index     = BCO_READ_NEXT_32;
 
             StgPtr* ptrs = (StgPtr*)(&bco->ptrs->payload[0]);
-            StgArrBytes* breakPoints = (StgArrBytes *) BCO_PTR(arg1_brk_array);
+            // The breakpoint array is an unlifted boxed primitive whose pointer
+            // carries a tag; strip it before dereferencing.
+            StgArrBytes* breakPoints = (StgArrBytes *) UNTAG_CLOSURE((StgClosure*)BCO_PTR(arg1_brk_array));
 
             // ACTIVATE the breakpoint by tick index
             ((StgInt*)breakPoints->payload)[arg4_info_index] = 0;
@@ -1938,7 +1940,8 @@ run_BCO:
             // and continue executing
             if (!returning_from_break)
             {
-               breakPoints = (StgArrBytes *) BCO_PTR(arg1_brk_array);
+               // Strip the tag from the unlifted-boxed breakpoint array.
+               breakPoints = (StgArrBytes *) UNTAG_CLOSURE((StgClosure*)BCO_PTR(arg1_brk_array));
 
                StgPtr stack_head = (StgPtr)SpW(0);
 
@@ -2060,7 +2063,7 @@ run_BCO:
                   // (2.2) The `rts_breakpoint_io_action` call
                   Sp_subW(11);
                   SpW(10) = (W_)new_aps;
-                  SpW(9)  = (W_)False_closure;         // True <=> an exception
+                  SpW(9)  = (W_)TAG_CLOSURE(1, (StgClosure *)False_closure); // True <=> an exception
                   SpW(8)  = (W_)&stg_ap_ppv_info;
                   SpW(7)  = (W_)arg4_info_index;
                   SpW(6)  = (W_)&stg_ap_n_info;
@@ -2930,7 +2933,12 @@ run_BCO:
         INSTRUCTION(bci_SWIZZLE): {
             W_ stkoff = BCO_GET_LARGE_ARG;
             StgInt n = BCO_GET_LARGE_ARG;
-            (*(StgInt*)(SafeSpWP(stkoff))) += n;
+            // This adjusts an unlifted boxed array argument to point past its
+            // header for a foreign call. The array pointer carries a tag, so
+            // strip it before offsetting. See Note [Pointer tagging of unlifted
+            // boxed primitives] in GHC.StgToCmm.Prim.
+            StgInt p = (StgInt) UNTAG_CLOSURE((StgClosure*)(*(StgWord*)(SafeSpWP(stkoff))));
+            (*(StgInt*)(SafeSpWP(stkoff))) = p + n;
             NEXT_INSTRUCTION;
         }
 

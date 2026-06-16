@@ -349,7 +349,7 @@ stg_compactNewzh ( W_ size )
     again: MAYBE_GC(again);
 
     ("ptr" str) = ccall compactNew(MyCapability() "ptr", size);
-    return (str);
+    return (str + 1);
 }
 
 stg_compactResizzezh ( P_ str, W_ new_size )

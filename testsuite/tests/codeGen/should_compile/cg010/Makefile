@@ -6,4 +6,4 @@ include $(TOP)/mk/test.mk
 cg010:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O A.hs -fforce-recomp
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O Main.hs -fforce-recomp -ddump-cmm -ddump-to-file
-	grep "A.val_closure+2" Main.dump-cmm
+	grep -o "A.val_closure+2" Main.dump-cmm

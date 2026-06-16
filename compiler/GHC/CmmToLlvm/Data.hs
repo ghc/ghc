@@ -44,14 +44,23 @@ linkage lbl = if externallyVisibleCLabel lbl
 
 -- | Pass a CmmStatic section to an equivalent Llvm code.
 genLlvmData :: (Section, RawCmmStatics) -> LlvmM LlvmData
+genLlvmData stat = do
+  config <- getConfig
+  genLlvmData' config stat
+
+genLlvmData' :: LlvmCgConfig -> (Section, RawCmmStatics) -> LlvmM LlvmData
 -- See Note [emit-time elimination of static indirections] in "GHC.Cmm.CLabel".
-genLlvmData (_, CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+genLlvmData' config (_, CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
         labelInd _ = Nothing
   , Just ind' <- labelInd ind
-  , alias `mayRedirectTo` ind' = do
+  , alias `mayRedirectTo` ind'
+  -- Preserve the indirection for hs-boot-exported symbols; see
+  -- llvmLabelMayBeRedirected and Note [Pointer tagging of unlifted boxed
+  -- primitives] in GHC.StgToCmm.Prim.
+  , llvmLabelMayBeRedirected config alias = do
     label <- strCLabel_llvm alias
     label' <- strCLabel_llvm ind'
     let link     = linkage alias
@@ -69,14 +78,14 @@ genLlvmData (_, CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit i
     pure ([LMGlobal aliasDef $ Just orig], [tyAlias])
 
 -- See Note [Initializers and finalizers in Cmm] in GHC.Cmm.InitFini.
-genLlvmData (sect, statics)
+genLlvmData' _ (sect, statics)
   | Just (initOrFini, clbls) <- isInitOrFiniArray (CmmData sect statics)
   = let var = case initOrFini of
                 IsInitArray -> fsLit "llvm.global_ctors"
                 IsFiniArray -> fsLit "llvm.global_dtors"
     in genGlobalLabelArray var clbls
 
-genLlvmData (sec@(Section t _), CmmStaticsRaw lbl xs) = do
+genLlvmData' _ (sec@(Section t _), CmmStaticsRaw lbl xs) = do
     label <- strCLabel_llvm lbl
     static <- mapM genData xs
     lmsec <- llvmSection sec

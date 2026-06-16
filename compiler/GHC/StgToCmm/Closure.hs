@@ -24,9 +24,10 @@ module GHC.StgToCmm.Closure (
         StandardFormInfo,        -- ...ditto...
         mkLFThunk, mkLFReEntrant, mkConLFInfo, mkSelectorLFInfo,
         mkApLFInfo, importedIdLFInfo, mkLFArgument, mkLFLetNoEscape,
+        needsBootInd,
         mkLFStringLit,
         lfDynTag,
-        isLFThunk, isLFReEntrant, lfUpdatable,
+        isLFThunk, isLFReEntrant, isLFCon, lfUpdatable,
 
         -- * Used by other modules
         CgLoc(..), CallMethod(..),
@@ -197,9 +198,18 @@ addArgReps = map (\arg -> let arg' = fromNonVoid arg
 --                Building LambdaFormInfo
 ------------------------------------------------------
 
+-- | Does a boot-exported Id denote a value (a constructor or thunk) rather than
+-- a function? Such a value is referenced untagged by a SOURCE importer, so the
+-- defining module emits a tagging indirection for it and importers reference
+-- that indirection. The test is on the type, so the defining module and
+-- importers agree even though a boot interface conveys no arity. See Note
+-- [Boot-exported constructors and pointer tagging] in "GHC.StgToCmm.DataCon".
+needsBootInd :: Id -> Bool
+needsBootInd id = not (isFunTy (dropForAlls (idType id)))
+
 mkLFArgument :: Id -> LambdaFormInfo
 mkLFArgument id
-  | isUnliftedType ty      = LFUnlifted
+  | isUnliftedType ty      = if isBoxedType ty then LFPrim else LFScalar
   | mightBeFunTy ty = LFUnknown True
   | otherwise              = LFUnknown False
   where
@@ -313,7 +323,7 @@ correct by construction (the invariant being that if it exists, it is correct):
 
 -------------
 mkLFStringLit :: LambdaFormInfo
-mkLFStringLit = LFUnlifted
+mkLFStringLit = LFScalar
 
 -----------------------------------------------------
 --                Dynamic pointer tagging
@@ -334,6 +344,7 @@ lfDynTag :: Platform -> LambdaFormInfo -> DynTag
 lfDynTag platform lf = case lf of
    LFCon con               -> tagForCon   platform con
    LFReEntrant _ arity _ _ -> tagForArity platform arity
+   LFPrim                  -> toDynTag platform 1
    _other                  -> toDynTag platform 0
 
 
@@ -349,6 +360,10 @@ isLFThunk _ = False
 isLFReEntrant :: LambdaFormInfo -> Bool
 isLFReEntrant (LFReEntrant {}) = True
 isLFReEntrant _                = False
+
+isLFCon :: LambdaFormInfo -> Bool
+isLFCon (LFCon {}) = True
+isLFCon _          = False
 
 -----------------------------------------------------------------------------
 --                Choosing SM reps
@@ -417,7 +432,8 @@ nodeMustPointToIt _ (LFCon _) = True
         -- 27/11/92.
 
 nodeMustPointToIt _ (LFUnknown _)   = True
-nodeMustPointToIt _ LFUnlifted      = False
+nodeMustPointToIt _ LFScalar        = False
+nodeMustPointToIt _ LFPrim          = False
 nodeMustPointToIt _ LFLetNoEscape   = False
 
 {- Note [GC recovery]
@@ -542,7 +558,10 @@ getCallMethod cfg name id (LFReEntrant _ arity _ _) n_args _cg_loc _self_loop_in
   | n_args < arity = SlowCall        -- Not enough args
   | otherwise      = DirectEntry (enterIdLabel (stgToCmmPlatform cfg) name (idCafInfo id)) arity
 
-getCallMethod _ _name _ LFUnlifted n_args _cg_loc _self_loop_info
+getCallMethod _ _name _ LFScalar n_args _cg_loc _self_loop_info
+  = assert (n_args == 0) ReturnIt
+
+getCallMethod _ _name _ LFPrim n_args _cg_loc _self_loop_info
   = assert (n_args == 0) ReturnIt
 
 getCallMethod _ _name _ (LFCon _) n_args _cg_loc _self_loop_info

@@ -1848,6 +1848,11 @@ tcIdInfo ignore_prags toplvl name ty info = do
       -- Always read in compulsory unfoldings
       -- See Note [Always expose compulsory unfoldings] in GHC.Iface.Tidy
     need_prag (HsUnfold _ (IfCoreUnfold src _ _ _)) = isCompulsorySource src
+      -- LFInfo is a codegen correctness fact (pointer tagging of references to
+      -- imported values), not an inlining pragma: read it even under
+      -- -fignore-interface-pragmas.  (CAF-info and tag sigs are intentionally
+      -- not read here; honouring them needs matching importer obligations.)
+    need_prag HsLFInfo{}  = True
     need_prag _ = False
 
     tcPrag :: IdInfo -> IfaceInfoItem -> IfL IdInfo
@@ -1893,8 +1898,11 @@ tcLFInfo lfi = case lfi of
       -- These invariants are checked when generating LFInfos in toIfaceLFInfo.
       return (LFThunk TopLevel True updatable NonStandardThunk mb_fun)
 
-    IfLFUnlifted ->
-      return LFUnlifted
+    IfLFScalar ->
+      return LFScalar
+
+    IfLFPrim ->
+      return LFPrim
 
     IfLFCon con_name ->
       LFCon <$!> tcIfaceDataCon con_name

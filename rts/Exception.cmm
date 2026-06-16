@@ -536,7 +536,7 @@ retry_pop_stack:
             Sp(10) = exception;
             Sp(9) = stg_raise_ret_info;
             Sp(8) = exception;
-            Sp(7) = HsIface_True_closure(W_[ghc_hs_iface]); // True <=> an exception
+            Sp(7) = HsIface_True_closure(W_[ghc_hs_iface]) + 2; // True <=> an exception (tag 2)
             Sp(6) = stg_ap_ppv_info;
             Sp(5) = 0;
             Sp(4) = stg_ap_n_info;

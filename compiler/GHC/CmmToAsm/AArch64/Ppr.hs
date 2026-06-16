@@ -156,6 +156,9 @@ pprDatas config (CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit 
         labelInd _ = Nothing
   , Just ind' <- labelInd ind
   , alias `mayRedirectTo` ind'
+  -- Do not eliminate indirections for hs-boot-exported symbols; see
+  -- ncgLabelMayBeRedirected in GHC.CmmToAsm.Config.
+  , ncgLabelMayBeRedirected config alias
   -- See Note [Split sections on COFF objects]
   , not $ platformOS platform == OSMinGW32 && ncgSplitSections config
   = pprGloblDecl platform alias

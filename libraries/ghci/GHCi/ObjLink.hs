@@ -20,6 +20,7 @@ module GHCi.ObjLink
   , lookupSymbol
   , lookupSymbolInDLL
   , lookupClosure
+  , tagClosurePtr
   , resolveObjs
   , addLibrarySearchPath
   , removeLibrarySearchPath
@@ -300,10 +301,21 @@ isWindowsHost = False
 
 #endif
 
+#if defined(wasm32_HOST_ARCH)
+tagClosurePtr :: Ptr a -> Ptr a
+tagClosurePtr = id
+#else
+-- Tag a constructor closure resolved by the runtime linker, so that a caller
+-- forcing the looked-up value does not enter an untagged taggable normal form.
+foreign import ccall unsafe "tagClosureIfConstr"
+  tagClosurePtr :: Ptr a -> Ptr a
+#endif
+
 lookupClosure :: BS.ShortByteString -> IO (Maybe HValueRef)
 lookupClosure str = do
   m <- lookupSymbol str
   case m of
     Nothing -> return Nothing
-    Just (Ptr addr) -> case addrToAny# addr of
-      (# a #) -> Just <$> mkRemoteRef (HValue a)
+    Just p -> case tagClosurePtr p of
+      Ptr addr -> case addrToAny# addr of
+        (# a #) -> Just <$> mkRemoteRef (HValue a)

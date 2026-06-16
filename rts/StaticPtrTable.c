@@ -82,7 +82,12 @@ StgPtr hs_spt_lookup(StgWord64 key[2]) {
     ACQUIRE_LOCK(&spt_lock);
     const StgStablePtr * entry = lookupHashTable_(spt, (StgWord)key,
         hashFingerprint, compareFingerprint);
-    const StgPtr ret = entry ? deRefStablePtr(*entry) : NULL;
+    // The SPT stores StaticPtr constructors, possibly behind a static
+    // indirection. Hand the caller a pointer tagged with the constructor's tag,
+    // so deRefStaticPtr does not enter an untagged constructor.
+    StgPtr ret = entry
+        ? (StgPtr) tagClosureIfConstr((StgClosure*) deRefStablePtr(*entry))
+        : NULL;
     RELEASE_LOCK(&spt_lock);
     return ret;
   } else

@@ -46,7 +46,7 @@ stg_newPromptTagzh()
   tag = Hp - SIZEOF_StgHeader + WDS(1);
   SET_HDR(tag,stg_PROMPT_TAG_info,CCCS);
 
-  return (tag);
+  return (tag + 1);
 }
 
 #define PROMPT_FRAME_FIELDS(w_,p_,info_ptr,p1,p2,tag) \

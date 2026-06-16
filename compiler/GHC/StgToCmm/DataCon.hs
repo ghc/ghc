@@ -58,6 +58,33 @@ import GHC.Utils.Outputable
 --      Top-level constructors
 ---------------------------------------------------------------
 
+{- Note [Boot-exported constructors and pointer tagging]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A reference to a constructor in normal form carries the constructor's pointer
+tag, so consumers can branch on it without entering the closure. Which tag to
+use is recorded in the binding's LambdaFormInfo and conveyed to other modules
+through the interface file.
+
+An hs-boot interface declares its values abstractly and cannot carry a
+LambdaFormInfo, so a module that imports a value through the boot interface (a
+SOURCE import) learns nothing about its constructor and references it untagged.
+Entering it untagged would land on the constructor's entry code.
+
+The fix keeps the value's own closure exactly as it is (a tagged constructor
+with full LambdaFormInfo, used by all ordinary clients and the indirection
+optimisations) and additionally emits, under a derived symbol
+('mkBootIndName'), a static indirection onto the tagged value. A SOURCE
+importer references this indirection ('GHC.StgToCmm.Env.getCgIdInfo') and
+entering it resolves through stg_IND_STATIC to the tagged value.
+
+The indirection is emitted for every boot-exported value that is not a function
+('emitBootInd' in "GHC.StgToCmm"), since a SOURCE importer cannot tell a
+constructor from a thunk through the abstract boot interface. Functions keep
+their own symbol so saturated calls stay direct. The set of boot-exported names
+is 'stgToCmmBootExports'; the modules a client SOURCE-imports is
+'stgToCmmSourceImports'.
+-}
+
 cgTopRhsCon :: StgToCmmConfig
             -> Id               -- Name of thing bound to this RHS
             -> DataCon          -- Id

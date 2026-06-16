@@ -694,8 +694,10 @@ toIfaceLFInfo nm lfi = case lfi of
       IfLFCon (dataConName dc)
     LFUnknown mb_fun ->
       IfLFUnknown mb_fun
-    LFUnlifted ->
-      IfLFUnlifted
+    LFScalar ->
+      IfLFScalar
+    LFPrim ->
+      IfLFPrim
     LFLetNoEscape ->
       panic "toIfaceLFInfo: LFLetNoEscape"
 
