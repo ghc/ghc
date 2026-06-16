@@ -194,7 +194,7 @@ newWith :: Backend -> IO EventManager
 newWith be = do
   iofds <- fmap (listArray (0, callbackArraySize-1)) $
            replicateM callbackArraySize (newMVar =<< IT.new 8)
-  ctrl <- newControl False
+  ctrl <- newControl
   state <- newIORef Created
   us <- newSource
   _ <- mkWeakIORef state $ do
