@@ -63,6 +63,9 @@ module GHC.Internal.Types (
         Module(..), TrName(..), TyCon(..), TypeLitSort(..),
         KindRep(..), KindBndr,
 
+        -- * Strictness
+        Strict(..),
+
         -- * Unboxed tuples
         Unit#,
         Solo#(..),
@@ -266,6 +269,12 @@ type family MultMul (a :: Multiplicity) (b :: Multiplicity) :: Multiplicity wher
   MultMul x 'One = x
   MultMul 'Many x = 'Many
   MultMul x 'Many = 'Many
+
+
+-- | A first-class witness that the wrapped value is evaluated and properly
+-- tagged. See @Note [The Strict type]@ in "GHC.Builtin.Types".
+data Strict a = MkStrict !a
+
 
 {- *********************************************************************
 *                                                                      *

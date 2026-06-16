@@ -67,6 +67,11 @@ module GHC.Builtin.Types (
         promotedNilDataCon, promotedConsDataCon,
         mkListTy, mkPromotedListTy, extractPromotedList,
 
+        -- * Strict
+        strictTyCon, strictTyConName,
+        strictDataCon, strictDataConName,
+        mkStrictTy, isStrictTy,
+
         -- * Maybe
         maybeTyCon, maybeTyConName,
         nothingDataCon, nothingDataConName, promotedNothingDataCon,
@@ -311,6 +316,7 @@ wiredInTyCons = map (dataConTyCon . snd) boxingDataCons
                 , listTyCon
                 , orderingTyCon
                 , maybeTyCon
+                , strictTyCon
                 , heqTyCon
                 , eqTyCon
                 , coercibleTyCon
@@ -395,6 +401,14 @@ nothingDataConName = mkWiredInDataConName UserSyntax gHC_INTERNAL_MAYBE (fsLit "
                                           nothingDataConKey nothingDataCon
 justDataConName    = mkWiredInDataConName UserSyntax gHC_INTERNAL_MAYBE (fsLit "Just")
                                           justDataConKey justDataCon
+
+strictTyConName :: Name
+strictTyConName    = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Strict")
+                                          strictTyConKey strictTyCon
+strictDataConName :: Name
+strictDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "MkStrict")
+                                          strictDataConKey strictDataCon
+
 
 wordTyConName, wordDataConName, word8DataConName :: Name
 wordTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Word")   wordTyConKey     wordTyCon
@@ -647,6 +661,22 @@ pcRepPolyDataCon n univs conc_tvs tys
       []    -- No theta
       (map linear tys)
 
+
+pcDataConStrict :: Name -> [TyVar] -> [Type] -> TyCon -> DataCon
+pcDataConStrict n univs tys
+  = pcRepPolyDataConStrict n univs noConcreteTyVars tys
+
+pcRepPolyDataConStrict :: Name -> [TyVar] -> ConcreteTyVars
+                 -> [Type] -> TyCon -> DataCon
+pcRepPolyDataConStrict n univs conc_tvs tys
+  = pcDataConWithFixityStrict False n
+      univs
+      []    -- no ex_tvs
+      conc_tvs
+      univs -- the univs are precisely the user-written tyvars
+      []    -- No theta
+      (map linear tys)
+
 pcDataConConstraint :: Name -> [TyVar] -> ThetaType -> TyCon -> DataCon
 -- Used for data constructors whose arguments are all constraints.
 -- Notably constraint tuples, Eq# etc.
@@ -716,6 +746,54 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
                 (map (const no_bang) arg_tys)
                 (map (const HsLazy) arg_tys)
                 (map (const NotMarkedStrict) arg_tys)
+                []      -- No labelled fields
+                tyvars ex_tyvars
+                conc_tyvars
+                (mkTyVarBinders Specified user_tyvars)
+                []      -- No equality spec
+                theta
+                arg_tys (mkTyConApp tycon (mkTyVarTys tyvars))
+                rri
+                tycon
+                (lookupNameEnv_NF tag_map dc_name)
+                []      -- No stupid theta
+                (mkDataConWorkId wrk_name data_con)
+                NoDataConRep    -- Wired-in types are too simple to need wrappers
+
+    no_bang = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
+
+    wrk_name = mkDataConWorkerName data_con wrk_key
+
+    prom_info = mkPrelTyConRepName dc_name
+
+pcDataConWithFixityStrict :: Bool      -- ^ declared infix?
+                    -> Name      -- ^ datacon name
+                    -> [TyVar]   -- ^ univ tyvars
+                    -> [TyCoVar] -- ^ ex tycovars
+                    -> ConcreteTyVars
+                                 -- ^ concrete tyvars
+                    -> [TyCoVar] -- ^ user-written tycovars
+                    -> ThetaType
+                    -> [Scaled Type]    -- ^ args
+                    -> TyCon
+                    -> DataCon
+pcDataConWithFixityStrict infx n = pcDataConWithFixityStrict' infx n
+                                 (dataConWorkerUnique (nameUnique n)) NoPromInfo
+
+pcDataConWithFixityStrict' :: Bool -> Name -> Unique -> PromDataConInfo
+                     -> [TyVar] -> [TyCoVar]
+                     -> ConcreteTyVars
+                     -> [TyCoVar]
+                     -> ThetaType -> [Scaled Type] -> TyCon -> DataCon
+pcDataConWithFixityStrict' declared_infix dc_name wrk_key rri
+                     tyvars ex_tyvars conc_tyvars user_tyvars theta arg_tys tycon
+  = data_con
+  where
+    tag_map = mkTyConTagMap tycon
+    data_con = mkDataCon dc_name declared_infix prom_info
+                (map (const no_bang) arg_tys)
+                (map (const (HsStrict False)) arg_tys)
+                (map (const MarkedStrict) arg_tys)
                 []      -- No labelled fields
                 tyvars ex_tyvars
                 conc_tyvars
@@ -2617,6 +2695,98 @@ consDataCon = pcDataConWithFixity True {- Declared infix -}
 -- Interesting: polymorphic recursion would help here.
 -- We can't use (mkListTy alphaTy) in the defn of consDataCon, else mkListTy
 -- gets the over-specific type (Type -> Type)
+
+{- Note [The Strict type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+`Strict :: Type -> UnliftedType` is a wired-in, single-constructor box
+
+    type Strict :: forall (a :: Type). a -> TYPE (BoxedRep Unlifted)
+    data Strict a = MkStrict !a
+
+A value of type `Strict a` is a first-class witness that the wrapped `a` is
+evaluated and properly tagged (EPT): because `Strict a` is unlifted, anyone
+holding one may read its pointer tag and skip the entry code, exactly as for a
+strict constructor field. `MkStrict` therefore forces its argument.
+
+We use `Strict` for two jobs that previously required ad-hoc `case` seqs:
+
+  * Worker/wrapper marks each strictified worker argument with `Strict`, so the
+    wrapper passes an evaluated value and the worker need not re-force it.
+
+  * Strict constructor fields are presented to the rest of the pipeline as
+    `Strict`-wrapped, so demand and CPR analysis can reason about them
+    uniformly.
+
+`Strict` is transparent to demand and CPR analysis: a product demand `P(d)` on
+`Strict a` is handed straight to the field `a`, and CPR flows likewise. So
+wrapping a value in `Strict` changes its operational guarantee (EPT) without
+hiding its structure from the optimiser.
+
+Erasure.  `Strict` has no runtime existence; `MkStrict x` is represented by `x`
+itself. We erase it in CorePrep:
+
+  * a producer `MkStrict @a e` becomes `e |> co`, where
+        co :: a ~R# Strict a   = mkUnivCo (PluginProv "Strict") Representational
+    a heterogeneous representational coercion (the kinds differ: `a` is lifted,
+    `Strict a` is unlifted, but both occupy a single heap pointer). If `e` is
+    not already a value it is case-bound first, which is what establishes EPT.
+
+  * a consumer `case s of MkStrict x -> body` becomes `body`, with `x` bound to
+    `s |> sym co`.
+
+The cast keeps Core well typed and lintable after the box is gone; see
+`mkStrictCast` in GHC.CoreToStg.Prep and Note [Conveying CAF-info and LFInfo
+between modules].
+
+Relationship to dictionary erasure.  The same "single-field box that costs
+nothing at runtime" problem is solved for type-class dictionaries:
+
+  * Classic single-method classes (Note [Single-method classes] in
+    GHC.Tc.TyCl.Instance) represented a unary class as a newtype and erased the
+    box with a representational newtype coercion `MkC = op |> sym Co:C`. The
+    coercion `Strict` uses is the unlifted analogue of that cast.
+
+  * Modern unary classes (Note [Unary class magic] in GHC.Core.TyCon) instead
+    keep the box as a real one-field data type all through Core and drop it at
+    Core->STG (UCM1), where STG is untyped so no coercion is needed at all. GHC
+    moved to this scheme because the newtype-cast representation caused subtle
+    unsoundness and bogus specialisation; see Note [Representing unary classes
+    with newtypes: bad, bad, bad].
+
+The difference that earns `Strict` its cast is that dictionary erasure is pure
+type-erasure (a dictionary is already a value), whereas `Strict` erasure must
+also *force* the field to make it EPT. That forcing is CorePrep's job; only the
+box removal needs the coercion.
+-}
+
+-- Wired-in type Strict
+
+strictTyCon :: TyCon
+strictTyCon = mkAlgTyCon strictTyConName
+  (mkTyConKind (mkAnonTyConBinders alpha_tyvar) unliftedTypeKind)
+  (mkAnonTyConBinders alpha_tyvar)
+  0
+  unliftedTypeKind
+  [Representational]
+  Nothing
+  []
+  (mkDataTyConRhs [strictDataCon])
+  (VanillaAlgTyCon (mkPrelTyConRepName strictTyConName))
+  False
+
+strictDataCon :: DataCon
+strictDataCon = pcDataConStrict strictDataConName alpha_tyvar [alphaTy] strictTyCon
+
+mkStrictTy :: Type -> Type
+mkStrictTy v = mkTyConApp strictTyCon [v]
+
+isStrictTy :: Type -> Bool
+isStrictTy ty = strict
+  where
+    tcSplitMaybe = splitTyConApp_maybe ty
+    strict = case tcSplitMaybe of
+      Nothing      -> False
+      Just (tc, _) -> tc `hasKey` strictTyConKey
 
 -- Wired-in type Maybe
 

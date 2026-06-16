@@ -56,6 +56,7 @@ module GHC.Core.DataCon (
         isLazyDataConRep,
         isTupleDataCon, isBoxedTupleDataCon, isUnboxedTupleDataCon,
         isUnboxedSumDataCon, isCovertGadtDataCon, isUnaryClassDataCon,
+        isStrictDataCon,
         isVanillaDataCon, isNewDataCon, isTypeDataCon,
         classDataCon, dataConCannotMatch,
         dataConUserTyVarBindersNeedWrapper, checkDataConTyVars,
@@ -1719,6 +1720,9 @@ isUnboxedTupleDataCon (MkData {dcRepTyCon = tc}) = isUnboxedTupleTyCon tc
 
 isUnboxedSumDataCon :: DataCon -> Bool
 isUnboxedSumDataCon (MkData {dcRepTyCon = tc}) = isUnboxedSumTyCon tc
+
+isStrictDataCon :: DataCon -> Bool
+isStrictDataCon (MkData { dcUnique = uq }) = uq == strictDataConKey
 
 -- | Vanilla 'DataCon's are those that are nice boring Haskell 98 constructors
 isVanillaDataCon :: DataCon -> Bool

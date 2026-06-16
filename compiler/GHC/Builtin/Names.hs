@@ -1792,7 +1792,8 @@ statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     funPtrTyConKey, tVarPrimTyConKey, eqPrimTyConKey,
     eqReprPrimTyConKey, eqPhantPrimTyConKey,
     compactPrimTyConKey, stackSnapshotPrimTyConKey,
-    promptTagPrimTyConKey, constPtrTyConKey, jsvalTyConKey :: Unique
+    promptTagPrimTyConKey, strictTyConKey,
+    constPtrTyConKey, jsvalTyConKey :: Unique
 statePrimTyConKey                       = mkPreludeTyConUnique 50
 stableNamePrimTyConKey                  = mkPreludeTyConUnique 51
 stableNameTyConKey                      = mkPreludeTyConUnique 52
@@ -1822,6 +1823,7 @@ tVarPrimTyConKey                        = mkPreludeTyConUnique 79
 compactPrimTyConKey                     = mkPreludeTyConUnique 80
 stackSnapshotPrimTyConKey               = mkPreludeTyConUnique 81
 promptTagPrimTyConKey                   = mkPreludeTyConUnique 82
+strictTyConKey                          = mkPreludeTyConUnique 83
 
 eitherTyConKey :: Unique
 eitherTyConKey                          = mkPreludeTyConUnique 84
@@ -2180,6 +2182,10 @@ integerINDataConKey       = mkPreludeDataConUnique 121
 integerIPDataConKey       = mkPreludeDataConUnique 122
 naturalNSDataConKey       = mkPreludeDataConUnique 123
 naturalNBDataConKey       = mkPreludeDataConUnique 124
+
+-- strict
+strictDataConKey :: Unique
+strictDataConKey     = mkPreludeDataConUnique 125
 
 
 ---------------- Template Haskell -------------------

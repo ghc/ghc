@@ -3436,6 +3436,8 @@ module GHC.Base where
   type role State# nominal
   type State# :: * -> ZeroBitType
   data State# a
+  type Strict :: * -> UnliftedType
+  data Strict a = MkStrict !a
   type String :: *
   type String = [Char]
   type Symbol :: *
@@ -5572,6 +5574,8 @@ module GHC.Exts where
   type role State# nominal
   type State# :: * -> ZeroBitType
   data State# a
+  type Strict :: * -> UnliftedType
+  data Strict a = MkStrict !a
   type Symbol :: *
   data Symbol
   type role TVar# nominal representational
