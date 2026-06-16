@@ -29,6 +29,7 @@ module GHC.Types.RepType
 import GHC.Prelude
 
 import GHC.Types.Basic (Arity, RepArity)
+import GHC.Builtin.Names (strictTyConKey)
 import GHC.Core.DataCon
 import GHC.Core.Coercion
 import GHC.Core.TyCon
@@ -100,6 +101,10 @@ unwrapType ty
     go t | Just t' <- coreView t = go t'
     go (ForAllTy _ t)            = go t
     go (CastTy t _)              = go t
+    -- Look through Strict types
+    go (TyConApp tc [t])
+      | tyConUnique tc == strictTyConKey
+      = go t
     go t                         = t
 
     -- cf. GHC.Core.Coercion.unwrapNewTypeStepper
@@ -248,29 +253,46 @@ ubxSumRepType constrs0
 layoutUbxSum :: HasDebugCallStack
              => SortedSlotTys -- Layout of sum. Does not include tag.
                               -- We assume that they are in increasing order
-             -> [SlotTy]      -- Slot types of things we want to map to locations in the
-                              -- sum layout
+             -> [(SlotTy, Bool)] -- Slot types of things we want to map to locations in
+                                 -- the sum layout.  The Bool says whether a lifted
+                                 -- pointer may occupy an unlifted slot, i.e. it is
+                                 -- already evaluated.
              -> [Int]         -- Where to map 'things' in the sum layout
 layoutUbxSum sum_slots0 arg_slots0 =
     go arg_slots0 IS.empty
   where
-    go :: [SlotTy] -> IS.IntSet -> [Int]
+    go :: [(SlotTy, Bool)] -> IS.IntSet -> [Int]
     go [] _
       = []
     go (arg : args) used
-      = let slot_idx = findSlot arg 0 sum_slots0 used
-         in slot_idx : go args (IS.insert slot_idx used)
+      = let slot_idx
+              | Just slot_idx <- findSlot (fst arg) 0 sum_slots0 used
+              = Just slot_idx
+              -- All pointer slots hold a heap pointer, so an unlifted pointer can
+              -- occupy a lifted slot.  This bridges the gap left by 'unwrapType'
+              -- looking through Strict: the sum layout may have a lifted slot
+              -- where the argument is an (unlifted) Strict box.
+              | PtrUnliftedSlot <- fst arg
+              = findSlot PtrLiftedSlot 0 sum_slots0 used
+              -- An already-evaluated lifted pointer can occupy an unlifted slot.
+              | PtrLiftedSlot <- fst arg, snd arg
+              = findSlot PtrUnliftedSlot 0 sum_slots0 used
+              | otherwise
+              = Nothing
+         in case slot_idx of
+              Just slot_idx -> slot_idx : go args (IS.insert slot_idx used)
+              Nothing -> pprPanic "layoutUbxSum" (  text "Can't find slot for arg" <+> ppr arg
+                                                 $$ text "sum_slots:" <> ppr sum_slots0
+                                                 $$ text "arg_slots:" <> ppr arg_slots0)
 
-    findSlot :: SlotTy -> Int -> SortedSlotTys -> IS.IntSet -> Int
+    findSlot :: SlotTy -> Int -> SortedSlotTys -> IS.IntSet -> Maybe Int
     findSlot arg slot_idx (slot : slots) useds
       | not (IS.member slot_idx useds)
       , Just slot == arg `fitsIn` slot
-      = slot_idx
+      = Just slot_idx
       | otherwise
       = findSlot arg (slot_idx + 1) slots useds
-    findSlot _ _ [] _
-      = pprPanic "findSlot" (text "Can't find slot" $$ text "sum_slots:" <> ppr sum_slots0
-                                                    $$ text "arg_slots:" <> ppr arg_slots0 )
+    findSlot _ _ [] _ = Nothing
 
 --------------------------------------------------------------------------------
 
@@ -730,10 +752,6 @@ mightBeFunTy :: Type -> Bool
 -- In particular, 'isFunTy' returns @False@ for @IO ()@ as well as for all
 -- type family applications.
 mightBeFunTy ty
-  -- GHC (currently) has no unlifted functions, so an unlifted type is
-  -- definitely not a function type.
-  | definitelyUnliftedType ty
-  = False
   | Just tc <- tyConAppTyCon_maybe (unwrap_type ty)
   -- A proper datatype (such as 'Int' or 'Maybe Bool') is definitely not
   -- a function type. (This does not include newtypes nor type families.)

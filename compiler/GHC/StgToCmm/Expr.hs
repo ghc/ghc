@@ -41,9 +41,10 @@ import GHC.Core
 import GHC.Core.DataCon
 import GHC.Types.ForeignCall
 import GHC.Types.Id
+import GHC.Types.Unique ( hasKey )
 import GHC.Builtin.PrimOps
 import GHC.Core.TyCon
-import GHC.Core.Type        ( isUnliftedType )
+import GHC.Core.Type        ( isUnliftedType, splitTyConApp_maybe )
 import GHC.Types.RepType    ( isZeroBitTy, countConRepArgs, mightBeFunTy )
 import GHC.Types.CostCentre ( CostCentreStack, currentCCS )
 import GHC.Types.Tickish
@@ -58,6 +59,8 @@ import Control.Arrow ( first )
 import Data.List     ( partition )
 import GHC.Stg.EnforceEpt.TagSig (isTaggedSig)
 import GHC.Platform.Profile (profileIsProfiling)
+import GHC.Builtin.Names (strictTyConKey, strictDataConKey)
+import GHC.Plugins (varUnique)
 
 ------------------------------------------------------------------------
 --              cgExpr: the main function
@@ -1037,6 +1040,10 @@ cgConApp con mn stg_args
         ; emitReturn [idInfoToAmode idinfo] }
 
 cgIdApp :: Id -> [StgArg] -> FCode ReturnKind
+cgIdApp fun_id _
+  -- MkStrict is erased in CorePrep, so it must never reach the code generator.
+  | varUnique fun_id == strictDataConKey
+  = pprPanic "cgIdApp: MkStrict survived to StgToCmm" (ppr fun_id)
 cgIdApp fun_id args = do
     platform       <- getPlatform
     fun_info       <- getCgIdInfo fun_id
@@ -1051,15 +1058,32 @@ cgIdApp fun_id args = do
     case getCallMethod cfg fun_name fun_id lf_info n_args (cg_loc fun_info) self_loop of
             -- A value in WHNF, so we can just return it.
         ReturnIt
-          | isZeroBitTy (idType fun_id) -> emitReturn []
-          | otherwise                -> emitReturn [fun]
+          | isZeroBitTy (idType fun_id) -> do
+            emitReturn []
+          | otherwise                -> do
+            if strict then
+              assertTag >> emitReturn [fun]
+            else
+              emitReturn [fun]
+          where
+            tcSplitMaybe = splitTyConApp_maybe (idType fun_id)
+            strict = case tcSplitMaybe of
+              Nothing      -> False
+              Just (tc, _) -> tc `hasKey` strictTyConKey
+            assertTag = whenCheckTags $ do
+              mod <- getModuleName
+              emitTagAssertionStrict (showPprUnsafe
+                (text "TagCheck failed on entry in" <+> ppr mod <+> text "- value:" <> ppr fun_id <+> pdoc platform fun))
+                fun
 
         -- A value infered to be in WHNF, so we can just return it.
         -- See (EPT-codegen) in Note [EPT enforcement] in GHC.Stg.EnforceEpt
         InferedReturnIt
-          | isZeroBitTy (idType fun_id) -> trace >> emitReturn []
-          | otherwise                   -> trace >> assertTag >>
-                                                    emitReturn [fun]
+          | isZeroBitTy (idType fun_id) -> do
+            trace >> emitReturn []
+          | otherwise                   ->  do
+            trace >> assertTag >>
+              emitReturn [fun]
             where
               trace = do
                 tickyTagged
@@ -1074,12 +1098,11 @@ cgIdApp fun_id args = do
                       (text "TagCheck failed on entry in" <+> ppr mod <+> text "- value:" <> ppr fun_id <+> pdoc platform fun))
                       fun
 
-        EnterIt -> assertPpr (null args) (ppr fun_id $$ ppr args) $  -- Discarding arguments
+        EnterIt -> assertPpr (null args) (ppr fun_id $$ ppr args) $ do  -- Discarding arguments
                    emitEnter fun
 
         SlowCall -> do      -- A slow function call via the RTS apply routines
                 { tickySlowCall lf_info args
-                ; emitComment $ mkFastString "slowCall"
                 ; slowCall fun args }
 
         -- A direct function call (possibly with some left-over arguments)

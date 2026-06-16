@@ -10,7 +10,8 @@
 
 module GHC.StgToCmm.TagCheck
   ( emitTagAssertion, emitArgTagCheck, checkArg, whenCheckTags,
-    checkArgStatic, checkFunctionArgTags,checkConArgsStatic,checkConArgsDyn) where
+    checkArgStatic, checkFunctionArgTags,checkConArgsStatic,checkConArgsDyn
+  , emitTagAssertionStrict) where
 
 #include "ClosureTypes.h"
 
@@ -71,6 +72,51 @@ whenCheckTags act = do
   check_tags <- stgToCmmDoTagCheck <$> getStgToCmmConfig
   when check_tags act
 
+emitTagAssertionStrict :: String -> CmmExpr -> FCode ()
+emitTagAssertionStrict onWhat fun = do
+  { platform <- getPlatform
+  ; lret <- newBlockId
+  ; lno_tag <- newBlockId
+  ; lbarf <- newBlockId
+  -- Check for presence of any tag.
+  ; emit $ mkCbranch (cmmIsTagged platform fun)
+                     lret lno_tag (Just True)
+  -- If there is no tag check if we are dealing with an untagged object
+  ; emitLabel lno_tag
+  ; needsTaggedPointer fun lbarf lret
+
+  ; emitLabel lbarf
+  ; emitBarf ("Tag eval failed on:" ++ onWhat)
+  ; emitLabel lret
+  }
+
+-- | Jump to the first block if the argument is subject
+--   to tagging requirements. Otherwise jump to the 2nd one.
+needsTaggedPointer :: CmmExpr -> BlockId -> BlockId -> FCode ()
+needsTaggedPointer val fail lpass = do
+  profile <- getProfile
+  align_check <- stgToCmmAlignCheck <$> getStgToCmmConfig
+  let clo_ty_e = cmmGetClosureType profile align_check val
+  -- The ENTER macro doesn't evaluate FUN/PAP/BCO objects. So we
+  -- have to accept them not being tagged. See #21193
+  -- See Note [TagInfo of functions]
+  let targets = mkSwitchTargets
+        False
+        (INVALID_OBJECT, N_CLOSURE_TYPES)
+        (Just lpass)
+        (M.fromList [(THUNK, fail),
+                    (THUNK_1_0, fail),
+                    (THUNK_0_1, fail),
+                    (THUNK_2_0, fail),
+                    (THUNK_1_1, fail),
+                    (THUNK_0_2, fail),
+                    (THUNK_STATIC, fail),
+                    (THUNK_SELECTOR, fail)])
+
+  emit $ mkSwitch clo_ty_e targets
+
+  emit $ mkBranch lpass
+
 -- | Call barf if we failed to predict a tag correctly.
 -- This is immensely useful when debugging issues in tag inference
 -- as it will result in a program abort when we encounter an invalid
@@ -112,15 +158,15 @@ needsArgTag closure fail lpass = do
         False
         (INVALID_OBJECT, N_CLOSURE_TYPES)
         (Just fail)
-        (M.fromList [(PAP,lpass)
-                    ,(BCO,lpass)
-                    ,(FUN,lpass)
-                    ,(FUN_1_0,lpass)
-                    ,(FUN_0_1,lpass)
-                    ,(FUN_2_0,lpass)
-                    ,(FUN_1_1,lpass)
-                    ,(FUN_0_2,lpass)
-                    ,(FUN_STATIC,lpass)
+        (M.fromList [(PAP,lpass)        -- 25
+                    ,(BCO,lpass)        -- 23
+                    ,(FUN,lpass)        -- 8
+                    ,(FUN_1_0,lpass)    -- 9
+                    ,(FUN_0_1,lpass)    -- 10
+                    ,(FUN_2_0,lpass)    -- 11
+                    ,(FUN_1_1,lpass)    -- 12
+                    ,(FUN_0_2,lpass)    -- 13
+                    ,(FUN_STATIC,lpass) -- 14
                     ])
 
   emit $ mkSwitch clo_ty_e targets

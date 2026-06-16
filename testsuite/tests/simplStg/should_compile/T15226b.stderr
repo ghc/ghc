@@ -1,12 +1,23 @@
 
 ==================== Final STG: ====================
-T15226b.Str [InlPrag=CONLIKE] :: forall a. a %1 -> T15226b.Str a
+T15226b.$WStr [InlPrag=INLINE[final] CONLIKE]
+  :: forall a. a %1 -> T15226b.Str a
+[GblId[DataConWrapper],
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=<SL>,
+ Unf=OtherCon []] =
+    {} \r [conrep]
+        case conrep of $WStr_sat { __DEFAULT -> T15226b.Str [$WStr_sat]; };
+
+T15226b.Str [InlPrag=CONLIKE]
+  :: forall {a}. GHC.Internal.Types.Strict a %1 -> T15226b.Str a
 [GblId[DataCon],
  Arity=1,
  Caf=NoCafRefs,
  Str=<SL>,
  Unf=OtherCon []] =
-    {} \r [eta] case eta of eta { __DEFAULT -> T15226b.Str [eta]; };
+    {} \r [eta] T15226b.Str [eta];
 
 T15226b.bar1
   :: forall a.

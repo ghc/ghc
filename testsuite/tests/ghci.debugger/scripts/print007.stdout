@@ -1,6 +1,6 @@
 ()
-s = S2 'a' 'b'
+s = S2 'a' (GHC.Internal.Types.C# 'b')
 ()
-s = S2 'a' 'b'
+s = S2 'a' (GHC.Internal.Types.C# 'b')
 ()
 s = S2 'a' 'b'

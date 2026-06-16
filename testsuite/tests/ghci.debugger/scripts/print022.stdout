@@ -4,5 +4,5 @@ Breakpoint 0 activated at print022.hs:11:7
 Stopped in Main.f, print022.hs:11:7
 _result :: p = _
 x :: p = _
-x = C2 1 (W# 32) (TwoFields 'a' 3)
+x = C2 (I# 1) (W# 32) (TwoFields 'a' 3)
 x :: T2

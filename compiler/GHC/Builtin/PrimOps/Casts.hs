@@ -53,6 +53,10 @@ getCasts from_rep to_rep
   | -- pprTrace "getCasts" (ppr (from_rep,to_rep)) $
     to_rep == from_rep
   = []
+  | from_rep == BoxedRep (Just Lifted) && to_rep == BoxedRep (Just Unlifted)
+  = []
+  | to_rep == BoxedRep (Just Lifted) && from_rep == BoxedRep (Just Unlifted)
+  = []
 
   -- Float <-> Double
   | to_rep == FloatRep =

@@ -416,7 +416,6 @@ import GHC.Builtin.PrimOps.Casts
 import GHC.Platform
 import Data.List (mapAccumL)
 
--- import GHC.Utils.Trace
 --------------------------------------------------------------------------------
 
 -- | A mapping from binders to the Ids they were expanded/renamed to.
@@ -843,7 +842,7 @@ mapSumIdBinders alt_bndr args rhs rho0
       arg_slots = map primRepSlot $ concatMap stgArgRep args
       -- The slots representing the field of the sum we bind.
       id_slots  = map primRepSlot $ fld_reps
-      layout1   = layoutUbxSum arg_slots id_slots
+      layout1   = layoutUbxSum arg_slots (map (\s -> (s, True)) id_slots)
 
       -- See Note [Casting slot arguments]
       -- Most of the code here is just to make sure our binders are of the
@@ -927,7 +926,7 @@ mkUbxSum platform dc ty_args args0 us
   = let
       tag_slot :| sum_slots = ubxSumRepType ty_args
       -- drop tag slot
-      field_slots = (mapMaybe (repSlotTy . stgArgRep) args0)
+      field_slots = mapMaybe argToSlotTy args0
       tag = dataConTag dc
       layout'  = layoutUbxSum sum_slots field_slots
 
@@ -970,7 +969,9 @@ mkUbxSum platform dc ty_args args0 us
         , Just lit' <- castLiteralArg platform (slotPrimRep slot_ty) lit
         = Just (StgLitArg lit', us, id)
       castArg us slot_ty arg
-        -- Cast the argument to the type of the slot if required
+        -- Cast the argument to the type of the slot if required.  A lifted
+        -- pointer in an unlifted slot (or vice versa) needs no conversion, so
+        -- getCasts returns no ops and we fall through to the no-op case below.
         | slotPrimRep slot_ty /= stgArgRepU arg
         , (ops,types) <- unzip $ getCasts (stgArgRepU arg) $ slotPrimRep slot_ty
         , not . null $ ops
@@ -985,12 +986,17 @@ mkUbxSum platform dc ty_args args0 us
 
       tup_args = tag_arg : slot_args
     in
-      -- pprTrace "mkUbxSum" (
-      --   text "ty_args (slots)" <+> ppr ty_args $$
-      --   text "args0" <+> ppr args0 $$
-      --   text "wrapper" <+>
-      --       (ppr $ wrapper $ StgLit $ LitChar '_'))
       (tup_args, wrapper)
+  where
+    -- The Bool says whether a lifted pointer may occupy an unlifted slot; we
+    -- conservatively allow it for any pointer.  Pointer slots are handled
+    -- loosely: this is sound only because 'fitsIn' keeps the lifted and unlifted
+    -- pointer slots separate, so an unlifted argument falls back to a lifted slot
+    -- (see 'layoutUbxSum') rather than the two being merged.
+    argToSlotTy :: StgArg -> Maybe (SlotTy, Bool)
+    argToSlotTy arg = do
+      ty <- repSlotTy (stgArgRep arg)
+      return (ty, True)
 
 
 -- | Return a rubbish value for the given slot type.

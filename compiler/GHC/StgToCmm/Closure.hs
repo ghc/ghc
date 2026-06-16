@@ -95,6 +95,7 @@ import Data.Coerce (coerce)
 import qualified Data.ByteString.Char8 as BS8
 import GHC.StgToCmm.Config
 import GHC.Stg.EnforceEpt.TagSig (isTaggedSig)
+import GHC.Builtin.Types (isStrictTy)
 
 -----------------------------------------------------------------------------
 --                Data types and synonyms
@@ -199,9 +200,9 @@ addArgReps = map (\arg -> let arg' = fromNonVoid arg
 
 mkLFArgument :: Id -> LambdaFormInfo
 mkLFArgument id
-  | isUnliftedType ty      = LFUnlifted
-  | mightBeFunTy ty = LFUnknown True
-  | otherwise              = LFUnknown False
+  | isUnliftedType ty = LFUnlifted
+  | mightBeFunTy ty   = LFUnknown True
+  | otherwise         = LFUnknown False
   where
     ty = idType id
 
@@ -224,7 +225,10 @@ mkLFReEntrant top fvs args arg_descr
 -------------
 mkLFThunk :: Type -> TopLevelFlag -> [Id] -> UpdateFlag -> LambdaFormInfo
 mkLFThunk thunk_ty top fvs upd_flag
-  = assert (not (isUpdatable upd_flag) || not (isUnliftedType thunk_ty)) $
+  = assertPpr (not (isUpdatable upd_flag) || not (isUnliftedType thunk_ty))
+              (ppr thunk_ty <+> ppr top <+> ppr fvs <+> ppr upd_flag) $
+    -- An unlifted binder, including a Strict box, is always evaluated, so it is
+    -- never an updatable thunk.  See Note [The Strict type] in GHC.Builtin.Types.
     LFThunk top (null fvs)
             (isUpdatable upd_flag)
             NonStandardThunk
@@ -542,8 +546,12 @@ getCallMethod cfg name id (LFReEntrant _ arity _ _) n_args _cg_loc _self_loop_in
   | n_args < arity = SlowCall        -- Not enough args
   | otherwise      = DirectEntry (enterIdLabel (stgToCmmPlatform cfg) name (idCafInfo id)) arity
 
-getCallMethod _ _name _ LFUnlifted n_args _cg_loc _self_loop_info
-  = assert (n_args == 0) ReturnIt
+getCallMethod cfg name id LFUnlifted n_args cg_loc self_loop_info
+  -- A value of unlifted type is already evaluated, so we can just return it,
+  -- unless it is also a function (e.g. @Strict (a -> b)@) that is being
+  -- applied, in which case we must call it.
+  | n_args > 0 = getCallMethod cfg name id (LFUnknown True) n_args cg_loc self_loop_info
+  | otherwise  = ReturnIt
 
 getCallMethod _ _name _ (LFCon _) n_args _cg_loc _self_loop_info
   = assert (n_args == 0) ReturnIt
@@ -552,7 +560,6 @@ getCallMethod _ _name _ (LFCon _) n_args _cg_loc _self_loop_info
 
 getCallMethod cfg name id (LFThunk _ _ updatable std_form_info is_fun)
               n_args _cg_loc _self_loop_info
-
   | Just sig <- idTagSig_maybe id
   , isTaggedSig sig -- Infered to be already evaluated by EPT analysis
   , n_args == 0     -- See Note [EPT enforcement]

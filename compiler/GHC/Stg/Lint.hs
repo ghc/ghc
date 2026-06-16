@@ -101,7 +101,7 @@ import GHC.Stg.Syntax
 import GHC.Stg.Utils
 
 import GHC.Core.DataCon
-import GHC.Core             ( AltCon(..) )
+import GHC.Core             ( AltCon(..), isEvaldUnfolding )
 import GHC.Core.Type
 import GHC.Core.Lint        ( lintMessage )
 
@@ -126,6 +126,7 @@ import Control.Monad
 import GHC.Core.Multiplicity (scaledThing)
 import GHC.Settings (Platform)
 import GHC.Core.TyCon (primRepCompatible, primRepsCompatible)
+import GHC.Builtin.Types (isStrictTy)
 
 lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
                    => Platform
@@ -230,8 +231,24 @@ lint_binds_help top_lvl (binder, rhs)
         -- Check binder doesn't have unlifted type or it's a join point
         checkL ( isJoinId binder
               || not (isUnliftedType (idType binder))
+              || isNiceStrict -- A Strict binding must be in HNF; see Note [The Strict type]
               || isDataConWorkId binder || isDataConWrapId binder) -- until #17521 is fixed
           (mkUnliftedTyMsg opts binder rhs)
+        -- See Note [The Strict type] in GHC.Builtin.Types: a binder known to be
+        -- evaluated (an evald unfolding) must not be lowered to an updatable
+        -- indirection, which would turn an EPT value into a non-EPT thunk. An
+        -- evaluated indirection should have been shortened away instead.
+        when (not (isTopLevel top_lvl)) $
+          checkL (not (isEvaldUnfolding (idUnfolding binder)) || not (isUpdatableIndirection rhs))
+            (mkEvaldUpdatableMsg opts binder rhs)
+  where
+    isNiceStrict = isStrictTy (idType binder) && isRhsHNF rhs
+    -- A constructor or a manifest function is in HNF; a thunk (no binders) is not.
+    isRhsHNF (StgRhsCon {})                  = True
+    isRhsHNF (StgRhsClosure _ _ _ bndrs _ _) = not (null bndrs)
+    -- An updatable thunk whose body is just a reference to another variable.
+    isUpdatableIndirection (StgRhsClosure _ _ flag [] (StgApp _ []) _) = isUpdatable flag
+    isUpdatableIndirection _                                           = False
 
 -- | Top-level bindings can't inherit the cost centre stack from their
 -- (static) allocation site.
@@ -564,5 +581,12 @@ mkUnliftedTyMsg :: OutputablePass a => StgPprOpts -> Id -> GenStgRhs a -> SDoc
 mkUnliftedTyMsg opts binder rhs
   = (text "Let(rec) binder" <+> quotes (ppr binder) <+>
      text "has unlifted type" <+> quotes (ppr (idType binder)))
+    $$
+    (text "RHS:" <+> pprStgRhs opts rhs)
+
+mkEvaldUpdatableMsg :: OutputablePass a => StgPprOpts -> Id -> GenStgRhs a -> SDoc
+mkEvaldUpdatableMsg opts binder rhs
+  = (text "Let binder" <+> quotes (ppr binder) <+>
+     text "has an evaluated unfolding but an updatable indirection RHS")
     $$
     (text "RHS:" <+> pprStgRhs opts rhs)
