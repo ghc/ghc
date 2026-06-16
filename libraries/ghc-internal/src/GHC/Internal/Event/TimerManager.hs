@@ -126,7 +126,7 @@ new = newWith =<< newDefaultBackend
 newWith :: Backend -> IO TimerManager
 newWith be = do
   timeouts <- newIORef Q.empty
-  ctrl <- newControl True
+  ctrl <- newControl
   state <- newIORef Created
   us <- newSource
   _ <- mkWeakIORef state $ do
