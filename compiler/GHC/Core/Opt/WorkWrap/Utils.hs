@@ -30,7 +30,7 @@ import GHC.Core.Subst
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.Coercion
-import GHC.Core.Predicate( isDictTy )
+import GHC.Core.Predicate( isDictTy, isPredTy )
 import GHC.Core.Reduction
 import GHC.Core.FamInstEnv
 import GHC.Core.Predicate( isEqualityClass )
@@ -53,7 +53,7 @@ import GHC.Data.FastString
 import GHC.Data.OrdList
 import GHC.Data.List.SetOps
 
-import GHC.Builtin.Types ( tupleDataCon )
+import GHC.Builtin.Types ( tupleDataCon, strictDataCon, strictTyCon, mkStrictTy )
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -66,6 +66,7 @@ import Data.List ( unzip4 )
 import GHC.Types.RepType
 import GHC.Unit.Types
 import GHC.Core.TyCo.Rep
+import GHC.Types.Unique (Unique)
 
 {-
 ************************************************************************
@@ -239,14 +240,19 @@ mkWwBodies opts fun_id ww_arity arg_vars res_ty demands res_cpr
                 = addVoidWorkerArg work_args work_marks
                 | otherwise
                 = (work_args, work_args, work_marks)
+              workerCallArgs = zip work_call_args work_call_str
 
-              call_work work_fn  = mkVarApps (Var work_fn) work_call_args
+        ; vals <- strictTypeAdjustments workerCallArgs work_lam_args <$> getUniqueSupplyM
+        ; let (workerCallArgs, workerLamVars, workerStrictWraps) = unzip3 vals
+
+        ; let
+              call_work work_fn  = mkApps (Var work_fn) workerCallArgs
               call_rhs fn_rhs = mkApps fn_rhs fn_args
                    -- See Note [Join points and beta-redexes] in GHC.Core.Lint
               wrapper_body = mkLams cloned_arg_vars . wrap_fn_cpr . wrap_fn_str . call_work
                    -- See Note [Call-by-value for worker args]
-              work_seq_str_flds = mkStrictFieldSeqs (zip work_lam_args work_call_str)
-              worker_body = mkLams work_lam_args . work_seq_str_flds . work_fn_cpr . call_rhs
+              work_seq_str_flds = foldr (.) id workerStrictWraps
+              worker_body = mkLams workerLamVars . work_seq_str_flds . work_fn_cpr . call_rhs
               worker_args_dmds= [ idDemandInfo v | v <- work_call_args, isId v]
 
         ; if ((useful1 && not only_one_void_argument) || useful2)
@@ -262,6 +268,29 @@ mkWwBodies opts fun_id ww_arity arg_vars res_ty demands res_cpr
         -- f's RHS is now trivial (size 1) we still want the __inline__ to prevent
         -- fw from being inlined into f's RHS
   where
+    -- (Adjusted worker call args, new worker lambda vars, new case wrapping)
+    strictTypeAdjustments :: [(Var, StrictnessMark)] -> [Var] -> UniqSupply -> [(CoreExpr, Var, CoreExpr -> CoreExpr)]
+    strictTypeAdjustments workerCallArgs workLambdaVars uniqSupply
+      = map (\(a, b, c) -> processArg a b c) preparedArgs
+      where
+        freshUniques = uniqsFromSupply uniqSupply
+        preparedArgs = zip3 workerCallArgs workLambdaVars freshUniques
+
+        processArg :: (Var, StrictnessMark) -> Var -> Unique -> (CoreExpr, Var, CoreExpr -> CoreExpr)
+        processArg (argId, MarkedStrict) w uniq
+          | wantCbvForId argId
+          , not (isStrictDmd (idDemandInfo argId))
+          , not (isPredTy (idType argId))   -- Strict wraps Type-kinded args only, not Constraint dictionaries
+          = (newCall, newDummyVar, caseTransform)
+          where
+            newCall = Var (dataConWorkId strictDataCon) `mkTyApps` [idType argId] `mkVarApps` [argId]
+            newDummyVar = snd $ cloneBndr emptySubst uniq (argId `setIdType` strictArgTy)
+            strictArgTy = mkStrictTy (idType argId)
+            caseTransform rhs = Case (Var newDummyVar) newDummyVar (exprType rhs)
+                                [Alt (DataAlt strictDataCon) [w] rhs]
+        -- we leave it
+        processArg (argId, _) w _ = (varToCoreExpr argId, w, nop_fn)
+
     zap_var v | isTyVar v = v
               | otherwise = modifyIdInfo zap_info v
     zap_info info -- See Note [Zap IdInfo on worker args]
@@ -622,9 +651,17 @@ canUnboxArg
   -> Demand      -- ^ How the arg was used
   -> UnboxingDecision (DataConPatContext Demand)
 -- See Note [Which types are unboxed?]
-canUnboxArg fam_envs ty (n :* sd)
+canUnboxArg fam_envs ty dmd@(n :* sd)
   | isAbs n
   = DropAbsent
+
+  -- See Note [Unboxing through Strict]
+  | Just (tc, tc_args, co) <- normSplitTyConApp_maybe fam_envs ty
+  , tc == strictTyCon
+  , [inner_ty] <- tc_args
+  , unboxesOrDrops (canUnboxArg fam_envs inner_ty dmd)
+  = DoUnbox (DataConPatContext { dcpc_dc = strictDataCon, dcpc_tc_args = tc_args
+                               , dcpc_co = co, dcpc_args = [dmd] })
 
   -- From here we are strict and not absent
   | Just (tc, tc_args, co) <- normSplitTyConApp_maybe fam_envs ty
@@ -637,7 +674,25 @@ canUnboxArg fam_envs ty (n :* sd)
 
   | otherwise
   = DontUnbox
+  where
+    unboxesOrDrops DoUnbox{}  = True
+    unboxesOrDrops DropAbsent = True
+    unboxesOrDrops DontUnbox  = False
 
+{- Note [Unboxing through Strict]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+@Strict a@ is transparent to demand analysis: the demand on a @Strict a@
+argument describes the wrapped value of type @a@ directly, with the @MkStrict@
+layer collapsed.  So when unboxing such an argument we look through @MkStrict@
+to @a@ and unbox that with the same demand, matching the analysis.
+
+We peel @MkStrict@ only when the wrapped value is itself unboxed or dropped.  A
+@Strict a@ records that the value is evaluated, which lets the worker treat it
+call-by-value; peeling it down to a bare lifted @a@ argument would discard that
+information.  So if @a@ would not be unboxed, we keep the @Strict@ argument.
+Conversely, an argument found to be used strictly is wrapped in @Strict@ in the
+worker for the same reason.
+-}
 
 -- | Unboxing strategy for constructed results.
 canUnboxResult :: FamInstEnvs -> Type -> Cpr
@@ -1009,12 +1064,14 @@ mkWWstr_one opts arg str_mark =
 
     DontUnbox
       | isStrictDmd arg_dmd || isMarkedStrict str_mark
-      , wwUseForUnlifting opts  -- See Note [WW for calling convention]
       , not (isFunTy arg_ty)
       , not (isUnliftedType arg_ty) -- Already unlifted!
         -- NB: function arguments have a fixed RuntimeRep,
         -- so it's OK to call isUnliftedType here
-      -> return  (usefulSplit, [(arg, MarkedStrict)], nop_fn, varToCoreExpr arg )
+      -> return (
+           wwUseForUnlifting opts, -- See Note [CBV Function Ids: overview]
+           [(arg, MarkedStrict)], nop_fn, varToCoreExpr arg
+         )
 
       | otherwise -> do_nothing
 

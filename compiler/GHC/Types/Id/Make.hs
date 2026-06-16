@@ -58,7 +58,7 @@ import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.Make
 import GHC.Core.FVs     ( mkRuleInfo )
-import GHC.Core.Utils   ( exprType, mkCast, coreAltsType )
+import GHC.Core.Utils   ( exprType, mkCast, coreAltsType, mkDefaultCase )
 import GHC.Core.Unfold.Make
 import GHC.Core.SimpleOpt
 import GHC.Core.TyCon
@@ -94,6 +94,7 @@ import Data.List        ( zipWith4 )
 -- A bit of a shame we must import these here
 import GHC.StgToCmm.Types (LambdaFormInfo(..))
 import GHC.Runtime.Heap.Layout (ArgDescr(ArgUnknown))
+import qualified GHC.Core.TyCo.Subst as Subst
 
 import GHC.Builtin.PrimOps.Ids (primOpId)
 import GHC.Builtin.PrimOps (PrimOp(..))
@@ -920,7 +921,8 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
                         wrapFamInstBody tycon res_ty_args non_wrap_arg_ty $
                         wrap_body
 
-       ; return (DCR { dcr_wrap_id = wrap_id
+       ; return $
+          (DCR { dcr_wrap_id = wrap_id
                      , dcr_boxer   = mk_boxer boxers
                      , dcr_arg_tys = rep_tys }
                 , arg_ibangs, rep_strs) }
@@ -1000,6 +1002,8 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
          && (any isUnpacked (ev_ibangs ++ arg_ibangs)))
                      -- Some unboxing (includes eq_spec)
 
+      || (any isBanged (ev_ibangs ++ arg_ibangs)) -- anything with strict
+
       || isFamInstTyCon tycon -- Cast result
 
       || dataConUserTyVarBindersNeedWrapper data_con
@@ -1046,7 +1050,8 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
     mk_rep_app ((wrap_arg, unboxer) : prs) con_app
       = do { (rep_ids, unbox_fn) <- unboxer wrap_arg
            ; expr <- mk_rep_app prs (mkVarApps con_app rep_ids)
-           ; return (unbox_fn expr) }
+           ; return $ (unbox_fn expr)
+           }
 
 
 dataConWrapperInlinePragma :: InlinePragmaInfo
@@ -1265,8 +1270,10 @@ dataConArgRep
 dataConArgRep _ arg_ty HsLazy
   = ([(arg_ty, NotMarkedStrict)], (unitUnboxer, unitBoxer))
 
-dataConArgRep _ arg_ty (HsStrict _)
-  = ([(arg_ty, MarkedStrict)], (unitUnboxer, unitBoxer)) -- Seqs are inserted in STG
+dataConArgRep _ arg_ty@(Scaled w ty) (HsStrict _)
+  = ([(rep_ty, MarkedStrict)], (toStrictUnboxer, toStrictBoxer arg_ty)) -- Seqs are inserted in STG
+  where
+    rep_ty = Scaled w (mkStrictTy ty)
 
 dataConArgRep platform arg_ty (HsUnpack Nothing)
   = dataConArgUnpack platform arg_ty
@@ -1276,6 +1283,24 @@ dataConArgRep platform (Scaled w _) (HsUnpack (Just co))
   , (rep_tys, wrappers) <- dataConArgUnpack platform (Scaled w co_rep_ty)
   = (rep_tys, wrapCo co co_rep_ty wrappers)
 
+toStrictUnboxer :: Unboxer
+toStrictUnboxer arg_id = do
+  let fin_type = mkStrictTy (idType arg_id)
+  rep_id <- newLocal (mappend (occNameFS $ occName $ idName arg_id) (fsLit "_ubx") ) (Scaled (idMult arg_id) fin_type)
+  let toStrict = Var (dataConWorkId strictDataCon)
+      apply_to_strict = toStrict `mkTyApps` [idType arg_id] `mkVarApps` [arg_id]
+      unbox_case = mkDefaultCase (apply_to_strict) rep_id
+  return ([rep_id], unbox_case)
+
+
+toStrictBoxer :: Scaled Type -> Boxer
+toStrictBoxer scaled_ty@(Scaled w ty) = Boxer $ \subst -> do
+  outer_id' <- newLocal (fsLit "strict_local_var_box") (Subst.substScaledTy subst (Scaled w (mkStrictTy ty)))
+  inner_id' <- newLocal (fsLit "strict_local_var_bx") (Subst.substScaledTy subst scaled_ty)
+  let outer_id = outer_id' `setIdUnfolding` evaldUnfolding
+  let inner_id = inner_id' `setIdUnfolding` evaldUnfolding
+  let box_case = mkSingleAltCase (Var outer_id) outer_id (DataAlt strictDataCon) [inner_id] (Var inner_id)
+  return ([outer_id], box_case)
 
 -------------------------
 wrapCo :: Coercion -> Type -> (Unboxer, Boxer) -> (Unboxer, Boxer)
@@ -1502,12 +1527,13 @@ dataConArgUnpackProduct (Scaled arg_mult _) tc_args con =
             ; let unbox_fn body
                     = mkSingleAltCase (Var arg_id) arg_id
                                (DataAlt con) rep_ids' body
-            ; return (rep_ids, unbox_fn) }
+            ; return $ (rep_ids, unbox_fn) }
        , Boxer $ \ subst ->
          do { rep_ids <- mapM (newLocal (fsLit "bx") . TcType.substScaledTyUnchecked subst) rep_tys
-            ; return (rep_ids, Var (dataConWorkId con)
+            ; let expr = Var (dataConWorkId con)
                                `mkTyApps` (substTysUnchecked subst tc_args)
-                               `mkVarApps` rep_ids ) } ) )
+                               `mkVarApps` rep_ids
+            ; return (rep_ids, expr ) } ) )
 
 dataConArgUnpackSum
   :: Scaled Type
