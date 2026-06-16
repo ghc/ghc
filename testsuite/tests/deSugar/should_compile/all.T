@@ -116,3 +116,7 @@ test('T22719', normal, compile, ['-ddump-simpl -dsuppress-uniques -dno-typeable-
 test('T23550', normal, compile, [''])
 test('T24489', normal, compile, ['-O'])
 test('T25996', normal, compile, [''])
+test('T27383',
+     [collect_compiler_stats('bytes allocated', 10)],
+     compile,
+     ['-Wincomplete-patterns'])
