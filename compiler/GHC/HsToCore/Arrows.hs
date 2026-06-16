@@ -554,7 +554,7 @@ dsCmd ids local_vars stack_ty res_ty
           in_ty = envStackType env_ids stack_ty'
           discrims = map nlHsVar arg_ids
       (discrim_vars, matching_code)
-        <- matchWrapper (ArrowMatchCtxt match_ctxt) (Just discrims) match'
+        <- matchWrapper (ArrowMatchCtxt match_ctxt) (Just (map Var arg_ids)) match'
       core_body <- flip (bind_vars discrim_vars) matching_code <$>
         traverse dsLExpr discrims
 
