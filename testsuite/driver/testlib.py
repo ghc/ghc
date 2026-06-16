@@ -3527,9 +3527,22 @@ def findTFiles(roots: List[str]) -> Iterator[str]:
 # -----------------------------------------------------------------------------
 # Output a test summary to the specified file object
 
-def summary(t: TestRun, file: TextIO, color=False) -> None:
+def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=None) -> None:
 
     file.write('\n')
+
+    if t.unexpected_failures:
+        if len(t.unexpected_failures) > MAX_SUMMARY_OUTPUT_TESTS:
+            # junit.xml only exists when a path was requested (e.g. in CI); don't
+            # point at a file that a local run never wrote.
+            where = 'see {}'.format(junit_path) if junit_path \
+                else 'rerun them individually'
+            file.write('Output of {} unexpected failures omitted (limit {}); {}.\n\n'
+                       .format(len(t.unexpected_failures), MAX_SUMMARY_OUTPUT_TESTS, where))
+        else:
+            file.write('Output of unexpected failures:\n\n')
+            printTestOutputSummary(file, t.unexpected_failures, color, junit_path)
+
     printUnexpectedTests(file,
         [t.unexpected_passes, t.unexpected_failures,
          t.unexpected_stat_failures, t.framework_failures])
@@ -3596,10 +3609,6 @@ def summary(t: TestRun, file: TextIO, color=False) -> None:
         file.write('Framework warnings:\n')
         printTestInfosSummary(file, t.framework_warnings)
 
-    if t.unexpected_failures:
-        file.write('Output of unexpected failures:\n\n')
-        printTestOutputSummary(file, t.unexpected_failures, color)
-
     if stopping():
         file.write('WARNING: Testsuite run was terminated early\n')
 
@@ -3616,9 +3625,15 @@ def printUnexpectedTests(file: TextIO, testInfoss):
 # Per-stream cap on a failing test's output repeated in the final summary.
 MAX_SUMMARY_OUTPUT_LINES = 100
 
-def printTestOutputSummary(file: TextIO, testInfos, color: bool=False) -> None:
+# Above this many unexpected failures, skip repeating output entirely: the
+# dump would drown out the summary.
+MAX_SUMMARY_OUTPUT_TESTS = 20
+
+def printTestOutputSummary(file: TextIO, testInfos, color: bool=False,
+                           junit_path: Optional[Path]=None) -> None:
     # Repeat failing tests' captured output in the summary, so one needn't
     # hunt for it earlier in a possibly very long log; see #16720.
+    where = ', see {}'.format(junit_path) if junit_path else ''
     for result in sorted(testInfos, key=lambda r: (r.testname.lower(), r.way, r.directory)):
         header = '=====> {}({}) [{}]'.format(result.testname, result.way, result.reason)
         if color:
@@ -3633,7 +3648,7 @@ def printTestOutputSummary(file: TextIO, testInfos, color: bool=False) -> None:
                 if len(lines) > MAX_SUMMARY_OUTPUT_LINES:
                     omitted = len(lines) - MAX_SUMMARY_OUTPUT_LINES
                     lines = lines[:MAX_SUMMARY_OUTPUT_LINES] \
-                        + ['... ({} more lines omitted, see junit.xml)'.format(omitted)]
+                        + ['... ({} more lines omitted{})'.format(omitted, where)]
                 s = label + '\n' + ''.join(l + '\n' for l in lines)
                 # Test output can contain characters that file's encoding
                 # cannot represent; replace rather than crash (cf safe_print).
