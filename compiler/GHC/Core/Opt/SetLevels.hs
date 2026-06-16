@@ -86,6 +86,7 @@ module GHC.Core.Opt.SetLevels (
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.DataCon (dataConWorkId)
 import GHC.Core.Opt.Monad ( FloatOutSwitches(..) )
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe, isOneShotBndr )
@@ -1145,6 +1146,10 @@ notWorthFloating e abs_vars
     go (Tick t e) n        = not (tickishIsCode t) && go e n
     go (Cast e _) n        = n==0 || go e n     -- See (NWF3)
     go (Coercion {}) _     = True
+    -- MkStrict x is trivial if x is trivial and in HNF. If that is the case,
+    -- there is nothing to evaluate (isHNF) and duplicating is cheap (isTrivial).
+    go (App (App (Var id) _typ) arg) n
+      | id == dataConWorkId strictDataCon = if exprIsHNF arg then go arg n else False
     go (App e arg) n
        | Type {} <- arg    = go e n    -- Just types, not coercions (NWF2)
        | exprIsTrivial arg = go e (n+1)

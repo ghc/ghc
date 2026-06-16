@@ -2,7 +2,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 1,209, types: 1,139, coercions: 18, joins: 17/29}
+  = {terms: 1,251, types: 1,232, coercions: 18, joins: 17/29}
 
 -- RHS size: {terms: 6, types: 8, coercions: 0, joins: 0/0}
 unArray :: forall a. Array a -> SmallArray# a
@@ -15,45 +15,29 @@ unArray :: forall a. Array a -> SmallArray# a
 unArray = \ (@a) (ds :: Array a) -> case ds of { Array ds1 -> ds1 }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T26615a.$trModule4 :: Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 20 0}]
-T26615a.$trModule4 = "main"#
+$trModule1 :: Addr#
+[GblId, Unf=OtherCon []]
+$trModule1 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T26615a.$trModule3 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T26615a.$trModule3 = GHC.Internal.Types.TrNameS T26615a.$trModule4
+$trModule2 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$trModule2 = GHC.Internal.Types.TrNameS $trModule1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T26615a.$trModule2 :: Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 30 0}]
-T26615a.$trModule2 = "T26615a"#
+$trModule3 :: Addr#
+[GblId, Unf=OtherCon []]
+$trModule3 = "T26615a"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T26615a.$trModule1 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T26615a.$trModule1 = GHC.Internal.Types.TrNameS T26615a.$trModule2
+$trModule4 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$trModule4 = GHC.Internal.Types.TrNameS $trModule3
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T26615a.$trModule :: GHC.Internal.Types.Module
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T26615a.$trModule
-  = GHC.Internal.Types.Module T26615a.$trModule3 T26615a.$trModule1
+T26615a.$trModule [InlPrag=[~]] :: GHC.Internal.Types.Module
+[GblId, Unf=OtherCon []]
+T26615a.$trModule = GHC.Internal.Types.Module $trModule2 $trModule4
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
 $krep :: GHC.Internal.Types.KindRep
@@ -104,33 +88,24 @@ $krep6
       GHC.Internal.Types.$tcSmallArray# $krep5
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tcLeaf2 :: Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 20 0}]
-T26615a.$tcLeaf2 = "Leaf"#
+$tcLeaf1 :: Addr#
+[GblId, Unf=OtherCon []]
+$tcLeaf1 = "Leaf"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tcLeaf1 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T26615a.$tcLeaf1 = GHC.Internal.Types.TrNameS T26615a.$tcLeaf2
+$tcLeaf2 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$tcLeaf2 = GHC.Internal.Types.TrNameS $tcLeaf1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tcLeaf :: GHC.Internal.Types.TyCon
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
+T26615a.$tcLeaf [InlPrag=[~]] :: GHC.Internal.Types.TyCon
+[GblId, Unf=OtherCon []]
 T26615a.$tcLeaf
   = GHC.Internal.Types.TyCon
       13798714324392902582#Word64
       3237499036029031497#Word64
       T26615a.$trModule
-      T26615a.$tcLeaf1
+      $tcLeaf2
       0#
       GHC.Internal.Types.krep$*->*->*
 
@@ -160,374 +135,286 @@ $krep10 :: GHC.Internal.Types.KindRep
 $krep10 = GHC.Internal.Types.KindRepFun $krep2 $krep9
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'L1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+$krep11 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-T26615a.$tc'L1 = GHC.Internal.Types.KindRepFun $krep3 $krep10
+$krep11 = GHC.Internal.Types.KindRepFun $krep3 $krep10
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'L3 :: Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 20 0}]
-T26615a.$tc'L3 = "'L"#
+$tc'L1 :: Addr#
+[GblId, Unf=OtherCon []]
+$tc'L1 = "'L"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'L2 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T26615a.$tc'L2 = GHC.Internal.Types.TrNameS T26615a.$tc'L3
+$tc'L2 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$tc'L2 = GHC.Internal.Types.TrNameS $tc'L1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'L :: GHC.Internal.Types.TyCon
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
+T26615a.$tc'L [InlPrag=[~]] :: GHC.Internal.Types.TyCon
+[GblId, Unf=OtherCon []]
 T26615a.$tc'L
   = GHC.Internal.Types.TyCon
       8570419491837374712#Word64
       2090006989092642392#Word64
       T26615a.$trModule
-      T26615a.$tc'L2
+      $tc'L2
       2#
-      T26615a.$tc'L1
+      $krep11
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tcArray2 :: Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 30 0}]
-T26615a.$tcArray2 = "Array"#
+$tcArray1 :: Addr#
+[GblId, Unf=OtherCon []]
+$tcArray1 = "Array"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tcArray1 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T26615a.$tcArray1 = GHC.Internal.Types.TrNameS T26615a.$tcArray2
+$tcArray2 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$tcArray2 = GHC.Internal.Types.TrNameS $tcArray1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tcArray :: GHC.Internal.Types.TyCon
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
+T26615a.$tcArray [InlPrag=[~]] :: GHC.Internal.Types.TyCon
+[GblId, Unf=OtherCon []]
 T26615a.$tcArray
   = GHC.Internal.Types.TyCon
       10495761415291712389#Word64
       7580086293698619153#Word64
       T26615a.$trModule
-      T26615a.$tcArray1
+      $tcArray2
       0#
       GHC.Internal.Types.krep$*Arr*
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep11 :: GHC.Internal.Types.KindRep
+$krep12 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep11
+$krep12
   = GHC.Internal.Types.KindRepTyConApp T26615a.$tcArray $krep4
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Array1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+$krep13 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-T26615a.$tc'Array1 = GHC.Internal.Types.KindRepFun $krep6 $krep11
+$krep13 = GHC.Internal.Types.KindRepFun $krep6 $krep12
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Array3 :: Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 30 0}]
-T26615a.$tc'Array3 = "'Array"#
+$tc'Array1 :: Addr#
+[GblId, Unf=OtherCon []]
+$tc'Array1 = "'Array"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Array2 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T26615a.$tc'Array2 = GHC.Internal.Types.TrNameS T26615a.$tc'Array3
+$tc'Array2 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$tc'Array2 = GHC.Internal.Types.TrNameS $tc'Array1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Array :: GHC.Internal.Types.TyCon
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
+T26615a.$tc'Array [InlPrag=[~]] :: GHC.Internal.Types.TyCon
+[GblId, Unf=OtherCon []]
 T26615a.$tc'Array
   = GHC.Internal.Types.TyCon
       12424115309881832159#Word64
       15542868641947707803#Word64
       T26615a.$trModule
-      T26615a.$tc'Array2
+      $tc'Array2
       1#
-      T26615a.$tc'Array1
+      $krep13
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
-$krep12 :: [GHC.Internal.Types.KindRep]
+$krep14 :: [GHC.Internal.Types.KindRep]
 [GblId, Unf=OtherCon []]
-$krep12
+$krep14
   = GHC.Internal.Types.:
       @GHC.Internal.Types.KindRep
       $krep9
       (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep13 :: GHC.Internal.Types.KindRep
+$krep15 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep13
-  = GHC.Internal.Types.KindRepTyConApp T26615a.$tcArray $krep12
+$krep15
+  = GHC.Internal.Types.KindRepTyConApp T26615a.$tcArray $krep14
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tcHashMap2 :: Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 30 0}]
-T26615a.$tcHashMap2 = "HashMap"#
+$tcHashMap1 :: Addr#
+[GblId, Unf=OtherCon []]
+$tcHashMap1 = "HashMap"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tcHashMap1 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T26615a.$tcHashMap1
-  = GHC.Internal.Types.TrNameS T26615a.$tcHashMap2
+$tcHashMap2 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$tcHashMap2 = GHC.Internal.Types.TrNameS $tcHashMap1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tcHashMap :: GHC.Internal.Types.TyCon
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
+T26615a.$tcHashMap [InlPrag=[~]] :: GHC.Internal.Types.TyCon
+[GblId, Unf=OtherCon []]
 T26615a.$tcHashMap
   = GHC.Internal.Types.TyCon
       2021755758654901686#Word64
       8209241086311595496#Word64
       T26615a.$trModule
-      T26615a.$tcHashMap1
+      $tcHashMap2
       0#
       GHC.Internal.Types.krep$*->*->*
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Empty1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+$krep16 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-T26615a.$tc'Empty1
+$krep16
   = GHC.Internal.Types.KindRepTyConApp T26615a.$tcHashMap $krep8
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Empty3 :: Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 30 0}]
-T26615a.$tc'Empty3 = "'Empty"#
+$tc'Empty1 :: Addr#
+[GblId, Unf=OtherCon []]
+$tc'Empty1 = "'Empty"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Empty2 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T26615a.$tc'Empty2 = GHC.Internal.Types.TrNameS T26615a.$tc'Empty3
+$tc'Empty2 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$tc'Empty2 = GHC.Internal.Types.TrNameS $tc'Empty1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Empty :: GHC.Internal.Types.TyCon
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
+T26615a.$tc'Empty [InlPrag=[~]] :: GHC.Internal.Types.TyCon
+[GblId, Unf=OtherCon []]
 T26615a.$tc'Empty
   = GHC.Internal.Types.TyCon
       2520556399233147460#Word64
       17224648764450205443#Word64
       T26615a.$trModule
-      T26615a.$tc'Empty2
+      $tc'Empty2
       2#
-      T26615a.$tc'Empty1
+      $krep16
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep14 :: GHC.Internal.Types.KindRep
+$krep17 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep14 = GHC.Internal.Types.KindRepFun $krep9 T26615a.$tc'Empty1
+$krep17 = GHC.Internal.Types.KindRepFun $krep9 $krep16
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Leaf1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+$krep18 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-T26615a.$tc'Leaf1 = GHC.Internal.Types.KindRepFun $krep1 $krep14
+$krep18 = GHC.Internal.Types.KindRepFun $krep1 $krep17
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Leaf3 :: Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 30 0}]
-T26615a.$tc'Leaf3 = "'Leaf"#
+$tc'Leaf1 :: Addr#
+[GblId, Unf=OtherCon []]
+$tc'Leaf1 = "'Leaf"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Leaf2 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T26615a.$tc'Leaf2 = GHC.Internal.Types.TrNameS T26615a.$tc'Leaf3
+$tc'Leaf2 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$tc'Leaf2 = GHC.Internal.Types.TrNameS $tc'Leaf1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Leaf :: GHC.Internal.Types.TyCon
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
+T26615a.$tc'Leaf [InlPrag=[~]] :: GHC.Internal.Types.TyCon
+[GblId, Unf=OtherCon []]
 T26615a.$tc'Leaf
   = GHC.Internal.Types.TyCon
       5773656560257991946#Word64
       17028074687139582545#Word64
       T26615a.$trModule
-      T26615a.$tc'Leaf2
+      $tc'Leaf2
       2#
-      T26615a.$tc'Leaf1
+      $krep18
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep15 :: GHC.Internal.Types.KindRep
+$krep19 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep15 = GHC.Internal.Types.KindRepFun $krep13 T26615a.$tc'Empty1
+$krep19 = GHC.Internal.Types.KindRepFun $krep15 $krep16
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Collision1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+$krep20 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-T26615a.$tc'Collision1
-  = GHC.Internal.Types.KindRepFun $krep1 $krep15
+$krep20 = GHC.Internal.Types.KindRepFun $krep1 $krep19
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Collision3 :: Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 40 0}]
-T26615a.$tc'Collision3 = "'Collision"#
+$tc'Collision1 :: Addr#
+[GblId, Unf=OtherCon []]
+$tc'Collision1 = "'Collision"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Collision2 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T26615a.$tc'Collision2
-  = GHC.Internal.Types.TrNameS T26615a.$tc'Collision3
+$tc'Collision2 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$tc'Collision2 = GHC.Internal.Types.TrNameS $tc'Collision1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Collision :: GHC.Internal.Types.TyCon
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
+T26615a.$tc'Collision [InlPrag=[~]] :: GHC.Internal.Types.TyCon
+[GblId, Unf=OtherCon []]
 T26615a.$tc'Collision
   = GHC.Internal.Types.TyCon
       18175105753528304021#Word64
       13986842878006680511#Word64
       T26615a.$trModule
-      T26615a.$tc'Collision2
+      $tc'Collision2
       2#
-      T26615a.$tc'Collision1
+      $krep20
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
-$krep16 :: [GHC.Internal.Types.KindRep]
+$krep21 :: [GHC.Internal.Types.KindRep]
 [GblId, Unf=OtherCon []]
-$krep16
+$krep21
   = GHC.Internal.Types.:
       @GHC.Internal.Types.KindRep
-      T26615a.$tc'Empty1
+      $krep16
       (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep17 :: GHC.Internal.Types.KindRep
+$krep22 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep17
-  = GHC.Internal.Types.KindRepTyConApp T26615a.$tcArray $krep16
+$krep22
+  = GHC.Internal.Types.KindRepTyConApp T26615a.$tcArray $krep21
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Full1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+$krep23 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-T26615a.$tc'Full1
-  = GHC.Internal.Types.KindRepFun $krep17 T26615a.$tc'Empty1
+$krep23 = GHC.Internal.Types.KindRepFun $krep22 $krep16
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Full3 :: Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 30 0}]
-T26615a.$tc'Full3 = "'Full"#
+$tc'Full1 :: Addr#
+[GblId, Unf=OtherCon []]
+$tc'Full1 = "'Full"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Full2 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T26615a.$tc'Full2 = GHC.Internal.Types.TrNameS T26615a.$tc'Full3
+$tc'Full2 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$tc'Full2 = GHC.Internal.Types.TrNameS $tc'Full1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'Full :: GHC.Internal.Types.TyCon
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
+T26615a.$tc'Full [InlPrag=[~]] :: GHC.Internal.Types.TyCon
+[GblId, Unf=OtherCon []]
 T26615a.$tc'Full
   = GHC.Internal.Types.TyCon
       12008762105994325570#Word64
       13514145886440831186#Word64
       T26615a.$trModule
-      T26615a.$tc'Full2
+      $tc'Full2
       2#
-      T26615a.$tc'Full1
+      $krep23
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'BitmapIndexed1 [InlPrag=[~]]
-  :: GHC.Internal.Types.KindRep
+$krep24 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-T26615a.$tc'BitmapIndexed1
-  = GHC.Internal.Types.KindRepFun $krep1 T26615a.$tc'Full1
+$krep24 = GHC.Internal.Types.KindRepFun $krep1 $krep23
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'BitmapIndexed3 :: Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 50 0}]
-T26615a.$tc'BitmapIndexed3 = "'BitmapIndexed"#
+$tc'BitmapIndexed1 :: Addr#
+[GblId, Unf=OtherCon []]
+$tc'BitmapIndexed1 = "'BitmapIndexed"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'BitmapIndexed2 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T26615a.$tc'BitmapIndexed2
-  = GHC.Internal.Types.TrNameS T26615a.$tc'BitmapIndexed3
+$tc'BitmapIndexed2 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$tc'BitmapIndexed2 = GHC.Internal.Types.TrNameS $tc'BitmapIndexed1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T26615a.$tc'BitmapIndexed :: GHC.Internal.Types.TyCon
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
+T26615a.$tc'BitmapIndexed [InlPrag=[~]] :: GHC.Internal.Types.TyCon
+[GblId, Unf=OtherCon []]
 T26615a.$tc'BitmapIndexed
   = GHC.Internal.Types.TyCon
       15226751910432948177#Word64
       957331387129868915#Word64
       T26615a.$trModule
-      T26615a.$tc'BitmapIndexed2
+      $tc'BitmapIndexed2
       2#
-      T26615a.$tc'BitmapIndexed1
+      $krep24
 
--- RHS size: {terms: 98, types: 109, coercions: 0, joins: 3/4}
+-- RHS size: {terms: 104, types: 117, coercions: 0, joins: 3/4}
 T26615a.$wdisjointCollisions [InlPrag=INLINABLE[2]]
   :: forall k a b.
      Eq k =>
@@ -538,7 +425,7 @@ T26615a.$wdisjointCollisions [InlPrag=INLINABLE[2]]
  Str=<LP(SC(S,C(1,L)),A)><L><1L><L><L>,
  Unf=Unf{Src=StableUser, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [30 0 20 0 0] 406 10
+         Guidance=IF_ARGS [90 0 20 0 0] 386 10
          Tmpl= \ (@k)
                  (@a)
                  (@b)
@@ -574,7 +461,7 @@ T26615a.$wdisjointCollisions [InlPrag=INLINABLE[2]]
                                case ary of wild3 [Occ=Once1] { Array ds [Occ=Once1] ->
                                case indexSmallArray# @Lifted @(Leaf k a) ds i# of
                                { (# ipv1 [Occ=Once1!] #) ->
-                               case ipv1 of { L kA [Occ=Once1] _ [Occ=Dead] ->
+                               case ipv1 of { L strict_local_var_box [Occ=Once1!] _ [Occ=Dead] ->
                                join {
                                  $j [Occ=OnceL1T[0]] :: Bool
                                  [LclId[JoinId(0)(Nothing)]]
@@ -586,7 +473,7 @@ T26615a.$wdisjointCollisions [InlPrag=INLINABLE[2]]
                                   Arity=5,
                                   Str=<L><L><L><L><L>,
                                   Unf=OtherCon []]
-                                 lookupInArrayCont_ _ [Occ=Dead]
+                                 lookupInArrayCont_ ($dEq1 [Occ=Dead] :: Eq k)
                                                     (k1 [Occ=Once1] :: k)
                                                     (ary1 [Occ=Once1!] :: Array (Leaf k b))
                                                     (i1 [Occ=Once1!] :: Int)
@@ -599,8 +486,17 @@ T26615a.$wdisjointCollisions [InlPrag=INLINABLE[2]]
                                        False ->
                                          case indexSmallArray# @Lifted @(Leaf k b) ipv2 ipv3 of
                                          { (# ipv5 [Occ=Once1!] #) ->
-                                         case ipv5 of { L kx [Occ=Once1] _ [Occ=Dead] ->
-                                         case == @k $dEq k2 kx of {
+                                         case ipv5 of
+                                         { L strict_local_var_box1 [Occ=Once1!] _ [Occ=Dead] ->
+                                         case ==
+                                                @k
+                                                $dEq
+                                                k2
+                                                (case strict_local_var_box1 of
+                                                 { MkStrict strict_local_var_bx [Occ=Once1] ->
+                                                 strict_local_var_bx
+                                                 })
+                                         of {
                                            False ->
                                              jump lookupInArrayCont_
                                                $dEq k2 ary2 (GHC.Internal.Types.I# (+# ipv3 1#)) n2;
@@ -616,7 +512,10 @@ T26615a.$wdisjointCollisions [InlPrag=INLINABLE[2]]
                                      }; } in
                                jump lookupInArrayCont_
                                  $dEq
-                                 kA
+                                 (case strict_local_var_box of
+                                  { MkStrict strict_local_var_bx [Occ=Once1] ->
+                                  strict_local_var_bx
+                                  })
                                  aryB
                                  (GHC.Internal.Types.I# 0#)
                                  (GHC.Internal.Types.I# (sizeofSmallArray# @Lifted @(Leaf k b) ww2))
@@ -654,24 +553,24 @@ T26615a.$wdisjointCollisions
             $s$wfoldr_ [InlPrag=[2],
                         Occ=LoopBreaker,
                         Dmd=SC(S,C(1,C(1,C(1,L))))]
-              :: Bool -> Int# -> Int# -> SmallArray# (Leaf k a) -> Bool
+              :: SmallArray# (Leaf k a) -> Int# -> Int# -> Bool -> Bool
             [LclId[JoinId(4)(Nothing)],
              Arity=4,
              Str=<L><L><L><L>,
              Unf=OtherCon []]
-            $s$wfoldr_ (sc :: Bool)
+            $s$wfoldr_ (sc :: SmallArray# (Leaf k a))
                        (sc1 :: Int#)
                        (sc2 :: Int#)
-                       (sc3 :: SmallArray# (Leaf k a))
-              = case >=# sc1 sc2 of {
+                       (sc3 :: Bool)
+              = case >=# sc2 sc1 of {
                   __DEFAULT ->
-                    case indexSmallArray# @Lifted @(Leaf k a) sc3 sc1 of
-                    { (# ipv1 #) ->
-                    case ipv1 of { L kA ds1 ->
+                    case indexSmallArray# @Lifted @(Leaf k a) sc sc2 of { (# ipv1 #) ->
+                    case ipv1 of { L strict_local_var_box ds1 ->
+                    case strict_local_var_box of { MkStrict strict_local_var_bx ->
                     join {
                       $j :: Bool
                       [LclId[JoinId(0)(Nothing)]]
-                      $j = jump $s$wfoldr_ sc (+# sc1 1#) sc2 sc3 } in
+                      $j = jump $s$wfoldr_ sc sc1 (+# sc2 1#) sc3 } in
                     joinrec {
                       $wlookupInArrayCont_ [InlPrag=[2],
                                             Occ=LoopBreaker,
@@ -690,8 +589,16 @@ T26615a.$wdisjointCollisions
                             __DEFAULT ->
                               case indexSmallArray# @Lifted @(Leaf k b) ww3 ww4 of
                               { (# ipv2 #) ->
-                              case ipv2 of { L kx v ->
-                              case == @k $dEq k2 kx of {
+                              case ipv2 of { L strict_local_var_box2 v ->
+                              case ==
+                                     @k
+                                     $dEq
+                                     k2
+                                     (case strict_local_var_box2 of
+                                      { MkStrict strict_local_var_bx1 ->
+                                      strict_local_var_bx1
+                                      })
+                              of {
                                 False -> jump $wlookupInArrayCont_ k2 ww3 (+# ww4 1#) ww5;
                                 True -> GHC.Internal.Types.False
                               }
@@ -700,16 +607,17 @@ T26615a.$wdisjointCollisions
                             1# -> jump $j
                           }
                           }; } in
-                    jump $wlookupInArrayCont_ kA ww2 0# lvl2
+                    jump $wlookupInArrayCont_ strict_local_var_bx ww2 0# lvl2
+                    }
                     }
                     };
-                  1# -> sc
+                  1# -> sc3
                 }; } in
           jump $s$wfoldr_
-            GHC.Internal.Types.True
-            0#
-            (sizeofSmallArray# @Lifted @(Leaf k a) ipv)
             ipv
+            (sizeofSmallArray# @Lifted @(Leaf k a) ipv)
+            0#
+            GHC.Internal.Types.True
       }
       }
 
@@ -725,31 +633,32 @@ lvl1
   = GHC.Internal.Control.Exception.Base.patError @LiftedRep @() lvl
 
 Rec {
--- RHS size: {terms: 133, types: 126, coercions: 0, joins: 1/2}
+-- RHS size: {terms: 139, types: 141, coercions: 0, joins: 1/2}
 T26615a.disjointSubtrees_$s$wdisjointSubtrees [InlPrag=INLINABLE[2],
                                                Occ=LoopBreaker]
-  :: forall b a k.
-     Word#
-     -> SmallArray# (Leaf k a) -> Int# -> Eq k => HashMap k b -> Bool
+  :: forall k a b.
+     Eq k =>
+     Int# -> Word# -> SmallArray# (Leaf k a) -> HashMap k b -> Bool
 [GblId[StrictWorker([~, ~, ~, ~, !])],
  Arity=5,
- Str=<L><L><L><LP(SC(S,C(1,L)),A)><1L>,
+ Str=<LP(SC(S,C(1,L)),A)><L><L><L><1L>,
  Unf=OtherCon []]
 T26615a.disjointSubtrees_$s$wdisjointSubtrees
-  = \ (@b)
+  = \ (@k)
       (@a)
-      (@k)
-      (sc :: Word#)
-      (sc1 :: SmallArray# (Leaf k a))
-      (sc2 :: Int#)
-      (sc3 :: Eq k)
+      (@b)
+      (sc :: Eq k)
+      (sc1 :: Int#)
+      (sc2 :: Word#)
+      (sc3 :: SmallArray# (Leaf k a))
       (_b :: HashMap k b) ->
       case _b of {
         Empty -> GHC.Internal.Types.True;
-        Leaf bx ds ->
-          case ds of { L kB ds1 ->
-          case kB of k0 { __DEFAULT ->
-          case eqWord# bx sc of {
+        Leaf bx strict_local_var_box ->
+          case strict_local_var_box of { MkStrict strict_local_var_bx ->
+          case strict_local_var_bx of { L strict_local_var_box2 ds ->
+          case strict_local_var_box2 of { MkStrict strict_local_var_bx1 ->
+          case eqWord# bx sc2 of {
             __DEFAULT -> GHC.Internal.Types.True;
             1# ->
               joinrec {
@@ -769,8 +678,15 @@ T26615a.disjointSubtrees_$s$wdisjointSubtrees
                     case >=# ww1 ww2 of {
                       __DEFAULT ->
                         case indexSmallArray# @Lifted @(Leaf k a) ww ww1 of { (# ipv #) ->
-                        case ipv of { L kx v ->
-                        case == @k sc3 k2 kx of {
+                        case ipv of { L strict_local_var_box4 v ->
+                        case ==
+                               @k
+                               sc
+                               k2
+                               (case strict_local_var_box4 of { MkStrict strict_local_var_bx2 ->
+                                strict_local_var_bx2
+                                })
+                        of {
                           False -> jump $wlookupInArrayCont_ k2 ww (+# ww1 1#) ww2;
                           True -> GHC.Internal.Types.False
                         }
@@ -780,19 +696,23 @@ T26615a.disjointSubtrees_$s$wdisjointSubtrees
                     }
                     }; } in
               jump $wlookupInArrayCont_
-                k0 sc1 0# (sizeofSmallArray# @Lifted @(Leaf k a) sc1)
+                strict_local_var_bx1
+                sc3
+                0#
+                (sizeofSmallArray# @Lifted @(Leaf k a) sc3)
+          }
           }
           }
           };
         Collision bx bx1 ->
           T26615a.$wdisjointCollisions
-            @k @a @b sc3 sc (T26615a.Array @(Leaf k a) sc1) bx bx1;
+            @k @a @b sc sc2 (T26615a.Array @(Leaf k a) sc3) bx bx1;
         BitmapIndexed bx bx1 ->
           let {
             m :: Word#
             [LclId]
             m = uncheckedShiftL#
-                  1## (word2Int# (and# (uncheckedShiftRL# sc sc2) 31##)) } in
+                  1## (word2Int# (and# (uncheckedShiftRL# sc2 sc1) 31##)) } in
           case and# m bx of {
             __DEFAULT ->
               case indexSmallArray#
@@ -803,7 +723,7 @@ T26615a.disjointSubtrees_$s$wdisjointSubtrees
               of
               { (# ipv #) ->
               T26615a.disjointSubtrees_$s$wdisjointSubtrees
-                @b @a @k sc sc1 (+# sc2 5#) sc3 ipv
+                @k @a @b sc (+# sc1 5#) sc2 sc3 ipv
               };
             0## -> GHC.Internal.Types.True
           };
@@ -812,17 +732,17 @@ T26615a.disjointSubtrees_$s$wdisjointSubtrees
                  @Lifted
                  @(HashMap k b)
                  bx
-                 (word2Int# (and# (uncheckedShiftRL# sc sc2) 31##))
+                 (word2Int# (and# (uncheckedShiftRL# sc2 sc1) 31##))
           of
           { (# ipv #) ->
           T26615a.disjointSubtrees_$s$wdisjointSubtrees
-            @b @a @k sc sc1 (+# sc2 5#) sc3 ipv
+            @k @a @b sc (+# sc1 5#) sc2 sc3 ipv
           }
       }
 end Rec }
 
 Rec {
--- RHS size: {terms: 705, types: 732, coercions: 18, joins: 13/23}
+-- RHS size: {terms: 735, types: 802, coercions: 18, joins: 13/23}
 T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
   :: forall k a b. Eq k => Int# -> HashMap k a -> HashMap k b -> Bool
 [GblId[StrictWorker([~, ~, !])],
@@ -841,7 +761,7 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                  join {
                    fail [Occ=Once3!T[1]] :: (# #) -> Bool
                    [LclId[JoinId(1)(Nothing)], Arity=1, Str=<L>, Unf=OtherCon []]
-                   fail _ [Occ=Dead, OS=OneShot]
+                   fail (ds1 [Occ=Dead, OS=OneShot] :: (# #))
                      = case _b of wild [Occ=Once1] {
                          __DEFAULT ->
                            case GHC.Internal.Control.Exception.Base.patError
@@ -850,9 +770,13 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                   "T26615a.hs:(26,1)-(65,59)|function disjointSubtrees"#
                            of {};
                          Empty -> GHC.Internal.Types.True;
-                         Leaf bx [Occ=Once1] ds2 [Occ=Once1!] ->
-                           case ds2 of { L kB [Occ=Once1] _ [Occ=Dead] ->
-                           case kB of k0 [Occ=Once1] { __DEFAULT ->
+                         Leaf bx [Occ=Once1] strict_local_var_box [Occ=Once1!] ->
+                           case strict_local_var_box of
+                           { MkStrict strict_local_var_bx [Occ=Once1!] ->
+                           case strict_local_var_bx of
+                           { L strict_local_var_box2 [Occ=Once1!] _ [Occ=Dead] ->
+                           case strict_local_var_box2 of
+                           { MkStrict strict_local_var_bx1 [Occ=Once1] ->
                            joinrec {
                              lookupCont_ [Occ=LoopBreakerT[5]]
                                :: Eq k => Word -> k -> Int -> HashMap k a -> Bool
@@ -860,32 +784,44 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                               Arity=5,
                               Str=<L><L><L><L><L>,
                               Unf=OtherCon []]
-                             lookupCont_ _ [Occ=Dead]
-                                         (ds4 [Occ=Once1!] :: Word)
-                                         (ds5 [Occ=Once1] :: k)
-                                         (ds6 [Occ=Once1!] :: Int)
-                                         (ds7 [Occ=Once1!] :: HashMap k a)
-                               = case ds4 of ds8 [Occ=Once4] { W# ipv [Occ=Once2] ->
-                                 case ds5 of ds9 [Occ=Once4] { __DEFAULT ->
-                                 case ds6 of { I# ipv1 ->
-                                 case ds7 of {
+                             lookupCont_ ($dEq1 [Occ=Dead] :: Eq k)
+                                         (ds3 [Occ=Once1!] :: Word)
+                                         (ds4 [Occ=Once1] :: k)
+                                         (ds5 [Occ=Once1!] :: Int)
+                                         (ds6 [Occ=Once1!] :: HashMap k a)
+                               = case ds3 of ds7 [Occ=Once4] { W# ipv [Occ=Once2] ->
+                                 case ds4 of ds8 [Occ=Once4] { __DEFAULT ->
+                                 case ds5 of { I# ipv1 ->
+                                 case ds6 of {
                                    Empty -> GHC.Internal.Types.True;
-                                   Leaf bx1 [Occ=Once1] ds11 [Occ=Once1!] ->
-                                     case ds11 of { L kx [Occ=Once1] _ [Occ=Dead] ->
+                                   Leaf bx1 [Occ=Once1] strict_local_var_box4 [Occ=Once1!] ->
+                                     case strict_local_var_box4 of
+                                     { MkStrict strict_local_var_bx2 [Occ=Once1!] ->
+                                     case strict_local_var_bx2 of
+                                     { L strict_local_var_box6 [Occ=Once1!] _ [Occ=Dead] ->
                                      case GHC.Internal.Classes.eqWord
-                                            ds8 (GHC.Internal.Types.W# bx1)
+                                            ds7 (GHC.Internal.Types.W# bx1)
                                      of {
                                        False -> GHC.Internal.Types.True;
                                        True ->
-                                         case == @k $dEq ds9 kx of {
+                                         case ==
+                                                @k
+                                                $dEq
+                                                ds8
+                                                (case strict_local_var_box6 of
+                                                 { MkStrict strict_local_var_bx3 [Occ=Once1] ->
+                                                 strict_local_var_bx3
+                                                 })
+                                         of {
                                            False -> GHC.Internal.Types.True;
                                            True -> GHC.Internal.Types.False
                                          }
                                      }
+                                     }
                                      };
                                    Collision bx1 [Occ=Once1] bx2 ->
                                      case GHC.Internal.Classes.eqWord
-                                            ds8 (GHC.Internal.Types.W# bx1)
+                                            ds7 (GHC.Internal.Types.W# bx1)
                                      of {
                                        False -> GHC.Internal.Types.True;
                                        True ->
@@ -896,7 +832,7 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                             Arity=5,
                                             Str=<L><L><L><L><L>,
                                             Unf=OtherCon []]
-                                           lookupInArrayCont_ _ [Occ=Dead]
+                                           lookupInArrayCont_ ($dEq2 [Occ=Dead] :: Eq k)
                                                               (k1 [Occ=Once1] :: k)
                                                               (ary [Occ=Once1!] :: Array (Leaf k a))
                                                               (i [Occ=Once1!] :: Int)
@@ -912,8 +848,18 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                                           @Lifted @(Leaf k a) ipv2 ipv3
                                                    of
                                                    { (# ipv5 [Occ=Once1!] #) ->
-                                                   case ipv5 of { L kx [Occ=Once1] _ [Occ=Dead] ->
-                                                   case == @k $dEq k2 kx of {
+                                                   case ipv5 of
+                                                   { L strict_local_var_box4 [Occ=Once1!]
+                                                       _ [Occ=Dead] ->
+                                                   case ==
+                                                          @k
+                                                          $dEq
+                                                          k2
+                                                          (case strict_local_var_box4 of
+                                                           { MkStrict strict_local_var_bx2 [Occ=Once1] ->
+                                                           strict_local_var_bx2
+                                                           })
+                                                   of {
                                                      False ->
                                                        jump lookupInArrayCont_
                                                          $dEq
@@ -933,7 +879,7 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                                }; } in
                                          jump lookupInArrayCont_
                                            $dEq
-                                           ds9
+                                           ds8
                                            (T26615a.Array @(Leaf k a) bx2)
                                            (GHC.Internal.Types.I# 0#)
                                            (GHC.Internal.Types.I#
@@ -960,7 +906,7 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                          of
                                          { (# ipv2 [Occ=Once1] #) ->
                                          jump lookupCont_
-                                           $dEq ds8 ds9 (GHC.Internal.Types.I# (+# ipv1 5#)) ipv2
+                                           $dEq ds7 ds8 (GHC.Internal.Types.I# (+# ipv1 5#)) ipv2
                                          };
                                        True -> GHC.Internal.Types.True
                                      };
@@ -973,14 +919,19 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                      of
                                      { (# ipv2 [Occ=Once1] #) ->
                                      jump lookupCont_
-                                       $dEq ds8 ds9 (GHC.Internal.Types.I# (+# ipv1 5#)) ipv2
+                                       $dEq ds7 ds8 (GHC.Internal.Types.I# (+# ipv1 5#)) ipv2
                                      }
                                  }
                                  }
                                  }
                                  }; } in
                            jump lookupCont_
-                             $dEq (GHC.Internal.Types.W# bx) k0 (GHC.Internal.Types.I# ww) ds
+                             $dEq
+                             (GHC.Internal.Types.W# bx)
+                             strict_local_var_bx1
+                             (GHC.Internal.Types.I# ww)
+                             ds
+                           }
                            }
                            };
                          Collision _ [Occ=Dead] _ [Occ=Dead] ->
@@ -988,11 +939,15 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                        } } in
                  case ds of wild [Occ=Once2] {
                    Empty -> GHC.Internal.Types.True;
-                   Leaf bx [Occ=Once2] ds1 [Occ=Once1!] ->
-                     case ds1 of { L kA [Occ=Once2] _ [Occ=Dead] ->
+                   Leaf bx [Occ=Once2] strict_local_var_box [Occ=Once1!] ->
+                     case strict_local_var_box of
+                     { MkStrict strict_local_var_bx [Occ=Once1!] ->
+                     case strict_local_var_bx of
+                     { L strict_local_var_box2 [Occ=Once2!] _ [Occ=Dead] ->
                      case _b of wild2 [Occ=Once1] {
                        __DEFAULT ->
-                         case kA of k0 [Occ=Once1] { __DEFAULT ->
+                         case strict_local_var_box2 of
+                         { MkStrict strict_local_var_bx1 [Occ=Once1] ->
                          joinrec {
                            lookupCont_ [Occ=LoopBreakerT[5]]
                              :: Eq k => Word -> k -> Int -> HashMap k b -> Bool
@@ -1000,30 +955,42 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                             Arity=5,
                             Str=<L><L><L><L><L>,
                             Unf=OtherCon []]
-                           lookupCont_ _ [Occ=Dead]
-                                       (ds3 [Occ=Once1!] :: Word)
-                                       (ds4 [Occ=Once1] :: k)
-                                       (ds5 [Occ=Once1!] :: Int)
-                                       (ds6 [Occ=Once1!] :: HashMap k b)
-                             = case ds3 of ds7 [Occ=Once4] { W# ipv [Occ=Once2] ->
-                               case ds4 of ds8 [Occ=Once4] { __DEFAULT ->
-                               case ds5 of { I# ipv1 ->
-                               case ds6 of {
+                           lookupCont_ ($dEq1 [Occ=Dead] :: Eq k)
+                                       (ds2 [Occ=Once1!] :: Word)
+                                       (ds3 [Occ=Once1] :: k)
+                                       (ds4 [Occ=Once1!] :: Int)
+                                       (ds5 [Occ=Once1!] :: HashMap k b)
+                             = case ds2 of ds6 [Occ=Once4] { W# ipv [Occ=Once2] ->
+                               case ds3 of ds7 [Occ=Once4] { __DEFAULT ->
+                               case ds4 of { I# ipv1 ->
+                               case ds5 of {
                                  Empty -> GHC.Internal.Types.True;
-                                 Leaf bx1 [Occ=Once1] ds10 [Occ=Once1!] ->
-                                   case ds10 of { L kx [Occ=Once1] _ [Occ=Dead] ->
-                                   case GHC.Internal.Classes.eqWord ds7 (GHC.Internal.Types.W# bx1)
+                                 Leaf bx1 [Occ=Once1] strict_local_var_box4 [Occ=Once1!] ->
+                                   case strict_local_var_box4 of
+                                   { MkStrict strict_local_var_bx2 [Occ=Once1!] ->
+                                   case strict_local_var_bx2 of
+                                   { L strict_local_var_box6 [Occ=Once1!] _ [Occ=Dead] ->
+                                   case GHC.Internal.Classes.eqWord ds6 (GHC.Internal.Types.W# bx1)
                                    of {
                                      False -> GHC.Internal.Types.True;
                                      True ->
-                                       case == @k $dEq ds8 kx of {
+                                       case ==
+                                              @k
+                                              $dEq
+                                              ds7
+                                              (case strict_local_var_box6 of
+                                               { MkStrict strict_local_var_bx3 [Occ=Once1] ->
+                                               strict_local_var_bx3
+                                               })
+                                       of {
                                          False -> GHC.Internal.Types.True;
                                          True -> GHC.Internal.Types.False
                                        }
                                    }
+                                   }
                                    };
                                  Collision bx1 [Occ=Once1] bx2 ->
-                                   case GHC.Internal.Classes.eqWord ds7 (GHC.Internal.Types.W# bx1)
+                                   case GHC.Internal.Classes.eqWord ds6 (GHC.Internal.Types.W# bx1)
                                    of {
                                      False -> GHC.Internal.Types.True;
                                      True ->
@@ -1034,7 +1001,7 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                           Arity=5,
                                           Str=<L><L><L><L><L>,
                                           Unf=OtherCon []]
-                                         lookupInArrayCont_ _ [Occ=Dead]
+                                         lookupInArrayCont_ ($dEq2 [Occ=Dead] :: Eq k)
                                                             (k1 [Occ=Once1] :: k)
                                                             (ary [Occ=Once1!] :: Array (Leaf k b))
                                                             (i [Occ=Once1!] :: Int)
@@ -1049,8 +1016,18 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                                  case indexSmallArray# @Lifted @(Leaf k b) ipv2 ipv3
                                                  of
                                                  { (# ipv5 [Occ=Once1!] #) ->
-                                                 case ipv5 of { L kx [Occ=Once1] _ [Occ=Dead] ->
-                                                 case == @k $dEq k2 kx of {
+                                                 case ipv5 of
+                                                 { L strict_local_var_box4 [Occ=Once1!]
+                                                     _ [Occ=Dead] ->
+                                                 case ==
+                                                        @k
+                                                        $dEq
+                                                        k2
+                                                        (case strict_local_var_box4 of
+                                                         { MkStrict strict_local_var_bx2 [Occ=Once1] ->
+                                                         strict_local_var_bx2
+                                                         })
+                                                 of {
                                                    False ->
                                                      jump lookupInArrayCont_
                                                        $dEq
@@ -1070,7 +1047,7 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                              }; } in
                                        jump lookupInArrayCont_
                                          $dEq
-                                         ds8
+                                         ds7
                                          (T26615a.Array @(Leaf k b) bx2)
                                          (GHC.Internal.Types.I# 0#)
                                          (GHC.Internal.Types.I#
@@ -1096,7 +1073,7 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                        of
                                        { (# ipv2 [Occ=Once1] #) ->
                                        jump lookupCont_
-                                         $dEq ds7 ds8 (GHC.Internal.Types.I# (+# ipv1 5#)) ipv2
+                                         $dEq ds6 ds7 (GHC.Internal.Types.I# (+# ipv1 5#)) ipv2
                                        };
                                      True -> GHC.Internal.Types.True
                                    };
@@ -1109,24 +1086,44 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                    of
                                    { (# ipv2 [Occ=Once1] #) ->
                                    jump lookupCont_
-                                     $dEq ds7 ds8 (GHC.Internal.Types.I# (+# ipv1 5#)) ipv2
+                                     $dEq ds6 ds7 (GHC.Internal.Types.I# (+# ipv1 5#)) ipv2
                                    }
                                }
                                }
                                }
                                }; } in
                          jump lookupCont_
-                           $dEq (GHC.Internal.Types.W# bx) k0 (GHC.Internal.Types.I# ww) wild2
+                           $dEq
+                           (GHC.Internal.Types.W# bx)
+                           strict_local_var_bx1
+                           (GHC.Internal.Types.I# ww)
+                           wild2
                          };
-                       Leaf bx1 [Occ=Once1] ds3 [Occ=Once1!] ->
-                         case ds3 of { L kB [Occ=Once1] _ [Occ=Dead] ->
+                       Leaf bx1 [Occ=Once1] strict_local_var_box3 [Occ=Once1!] ->
+                         case strict_local_var_box3 of
+                         { MkStrict strict_local_var_bx1 [Occ=Once1!] ->
+                         case strict_local_var_bx1 of
+                         { L strict_local_var_box5 [Occ=Once1!] _ [Occ=Dead] ->
                          case GHC.Internal.Classes.neWord
                                 (GHC.Internal.Types.W# bx) (GHC.Internal.Types.W# bx1)
                          of {
-                           False -> /= @k $dEq kA kB;
+                           False ->
+                             /=
+                               @k
+                               $dEq
+                               (case strict_local_var_box2 of
+                                { MkStrict strict_local_var_bx2 [Occ=Once1] ->
+                                strict_local_var_bx2
+                                })
+                               (case strict_local_var_box5 of
+                                { MkStrict strict_local_var_bx2 [Occ=Once1] ->
+                                strict_local_var_bx2
+                                });
                            True -> GHC.Internal.Types.True
                          }
                          }
+                         }
+                     }
                      }
                      };
                    Collision bx [Occ=Once3] bx1 [Occ=Once1] ->
@@ -1324,6 +1321,27 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                }; } in
                          jump go (GHC.Internal.Types.W# (and# 4294967295## bx1));
                        Full bx1 ->
+                         joinrec {
+                           go [Occ=LoopBreakerT[1]] :: Int -> Bool
+                           [LclId[JoinId(1)(Nothing)], Arity=1, Str=<L>, Unf=OtherCon []]
+                           go (i :: Int)
+                             = case GHC.Internal.Classes.ltInt i (GHC.Internal.Types.I# 0#) of {
+                                 False ->
+                                   case i of { I# i# ->
+                                   case indexSmallArray# @Lifted @(HashMap k a) bx i# of
+                                   { (# ipv [Occ=Once1] #) ->
+                                   case indexSmallArray# @Lifted @(HashMap k b) bx1 i# of
+                                   { (# ipv1 [Occ=Once1] #) ->
+                                   case T26615a.$wdisjointSubtrees @k @a @b $dEq (+# ww 5#) ipv ipv1
+                                   of {
+                                     False -> GHC.Internal.Types.False;
+                                     True -> jump go (GHC.Internal.Types.I# (-# i# 1#))
+                                   }
+                                   }
+                                   }
+                                   };
+                                 True -> GHC.Internal.Types.True
+                               }; } in
                          case GHC.Internal.Unsafe.Coerce.unsafeEqualityProof
                                 @(*)
                                 @(SmallArray# (HashMap k a) -> SmallArray# (HashMap k b) -> Int#)
@@ -1345,30 +1363,7 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                          :: SmallArray# (HashMap k b)
                                             ~R# GHC.Internal.Types.ZonkAny 1))
                          of {
-                           __DEFAULT ->
-                             joinrec {
-                               go [Occ=LoopBreakerT[1]] :: Int -> Bool
-                               [LclId[JoinId(1)(Nothing)], Arity=1, Str=<L>, Unf=OtherCon []]
-                               go (i :: Int)
-                                 = case GHC.Internal.Classes.ltInt i (GHC.Internal.Types.I# 0#) of {
-                                     False ->
-                                       case i of { I# i# ->
-                                       case indexSmallArray# @Lifted @(HashMap k a) bx i# of
-                                       { (# ipv [Occ=Once1] #) ->
-                                       case indexSmallArray# @Lifted @(HashMap k b) bx1 i# of
-                                       { (# ipv1 [Occ=Once1] #) ->
-                                       case T26615a.$wdisjointSubtrees
-                                              @k @a @b $dEq (+# ww 5#) ipv ipv1
-                                       of {
-                                         False -> GHC.Internal.Types.False;
-                                         True -> jump go (GHC.Internal.Types.I# (-# i# 1#))
-                                       }
-                                       }
-                                       }
-                                       };
-                                     True -> GHC.Internal.Types.True
-                                   }; } in
-                             jump go (GHC.Internal.Types.I# 31#);
+                           __DEFAULT -> jump go (GHC.Internal.Types.I# 31#);
                            1# -> GHC.Internal.Types.False
                          }
                          }
@@ -1385,31 +1380,39 @@ T26615a.$wdisjointSubtrees
       join {
         fail [Dmd=MC(1,L)] :: (# #) -> Bool
         [LclId[JoinId(1)(Nothing)], Arity=1, Str=<A>, Unf=OtherCon []]
-        fail _ [Occ=Dead, OS=OneShot]
+        fail (ds1 [Occ=Dead, OS=OneShot] :: (# #))
           = case _b of {
               __DEFAULT -> case lvl1 of {};
               Empty -> GHC.Internal.Types.True;
-              Leaf bx ds2 ->
-                case ds2 of { L kB ds3 ->
-                case kB of k0 { __DEFAULT ->
+              Leaf bx strict_local_var_box ->
+                case strict_local_var_box of { MkStrict strict_local_var_bx ->
+                case strict_local_var_bx of { L strict_local_var_box2 ds2 ->
+                case strict_local_var_box2 of { MkStrict strict_local_var_bx1 ->
                 join {
                   exit [Dmd=LC(S,C(1,C(1,C(1,L))))]
-                    :: Word# -> k -> Word# -> Leaf k a -> Bool
-                  [LclId[JoinId(4)(Just [~, ~, ~, !])],
-                   Arity=4,
-                   Str=<L><L><L><1P(L,A)>]
+                    :: Word# -> k -> Word# -> Strict (Leaf k a) -> Bool
+                  [LclId[JoinId(4)(Nothing)], Arity=4, Str=<L><L><L><1P(MP(1L),A)>]
                   exit (ww1 [OS=OneShot] :: Word#)
-                       (ds4 [OS=OneShot] :: k)
+                       (ds3 [OS=OneShot] :: k)
                        (bx1 [OS=OneShot] :: Word#)
-                       (ds5 [OS=OneShot] :: Leaf k a)
-                    = case ds5 of { L kx x ->
+                       (strict_local_var_box4 [OS=OneShot] :: Strict (Leaf k a))
+                    = case strict_local_var_box4 of { MkStrict strict_local_var_bx2 ->
+                      case strict_local_var_bx2 of { L strict_local_var_box6 x ->
                       case eqWord# ww1 bx1 of {
                         __DEFAULT -> GHC.Internal.Types.True;
                         1# ->
-                          case == @k $dEq ds4 kx of {
+                          case ==
+                                 @k
+                                 $dEq
+                                 ds3
+                                 (case strict_local_var_box6 of { MkStrict strict_local_var_bx3 ->
+                                  strict_local_var_bx3
+                                  })
+                          of {
                             False -> GHC.Internal.Types.True;
                             True -> GHC.Internal.Types.False
                           }
+                      }
                       }
                       } } in
                 join {
@@ -1417,7 +1420,7 @@ T26615a.$wdisjointSubtrees
                     :: Word# -> k -> Word# -> SmallArray# (Leaf k a) -> Bool
                   [LclId[JoinId(4)(Nothing)], Arity=4, Str=<L><ML><L><L>]
                   exit1 (ww1 [OS=OneShot] :: Word#)
-                        (ds4 [OS=OneShot] :: k)
+                        (ds3 [OS=OneShot] :: k)
                         (bx1 [OS=OneShot] :: Word#)
                         (bx2 [OS=OneShot] :: SmallArray# (Leaf k a))
                     = case eqWord# ww1 bx1 of {
@@ -1441,8 +1444,16 @@ T26615a.$wdisjointSubtrees
                                   __DEFAULT ->
                                     case indexSmallArray# @Lifted @(Leaf k a) ww2 ww3 of
                                     { (# ipv #) ->
-                                    case ipv of { L kx v ->
-                                    case == @k $dEq k2 kx of {
+                                    case ipv of { L strict_local_var_box4 v ->
+                                    case ==
+                                           @k
+                                           $dEq
+                                           k2
+                                           (case strict_local_var_box4 of
+                                            { MkStrict strict_local_var_bx2 ->
+                                            strict_local_var_bx2
+                                            })
+                                    of {
                                       False -> jump $wlookupInArrayCont_ k2 ww2 (+# ww3 1#) ww4;
                                       True -> GHC.Internal.Types.False
                                     }
@@ -1452,7 +1463,7 @@ T26615a.$wdisjointSubtrees
                                 }
                                 }; } in
                           jump $wlookupInArrayCont_
-                            ds4 bx2 0# (sizeofSmallArray# @Lifted @(Leaf k a) bx2)
+                            ds3 bx2 0# (sizeofSmallArray# @Lifted @(Leaf k a) bx2)
                       } } in
                 joinrec {
                   $wlookupCont_ [InlPrag=[2],
@@ -1464,14 +1475,15 @@ T26615a.$wdisjointSubtrees
                    Str=<L><1L><L><1L>,
                    Unf=OtherCon []]
                   $wlookupCont_ (ww1 :: Word#)
-                                (ds4 :: k)
+                                (ds3 :: k)
                                 (ww2 :: Int#)
-                                (ds5 :: HashMap k a)
-                    = case ds4 of ds6 { __DEFAULT ->
-                      case ds5 of {
+                                (ds4 :: HashMap k a)
+                    = case ds3 of ds5 { __DEFAULT ->
+                      case ds4 of {
                         Empty -> GHC.Internal.Types.True;
-                        Leaf bx1 ds7 -> jump exit ww1 ds6 bx1 ds7;
-                        Collision bx1 bx2 -> jump exit1 ww1 ds6 bx1 bx2;
+                        Leaf bx1 strict_local_var_box4 ->
+                          jump exit ww1 ds5 bx1 strict_local_var_box4;
+                        Collision bx1 bx2 -> jump exit1 ww1 ds5 bx1 bx2;
                         BitmapIndexed bx1 bx2 ->
                           let {
                             m :: Word#
@@ -1487,7 +1499,7 @@ T26615a.$wdisjointSubtrees
                                      (word2Int# (popCnt# (and# bx1 (minusWord# m 1##))))
                               of
                               { (# ipv #) ->
-                              jump $wlookupCont_ ww1 ds6 (+# ww2 5#) ipv
+                              jump $wlookupCont_ ww1 ds5 (+# ww2 5#) ipv
                               };
                             0## -> GHC.Internal.Types.True
                           };
@@ -1499,42 +1511,51 @@ T26615a.$wdisjointSubtrees
                                  (word2Int# (and# (uncheckedShiftRL# ww1 ww2) 31##))
                           of
                           { (# ipv #) ->
-                          jump $wlookupCont_ ww1 ds6 (+# ww2 5#) ipv
+                          jump $wlookupCont_ ww1 ds5 (+# ww2 5#) ipv
                           }
                       }
                       }; } in
-                jump $wlookupCont_ bx k0 ww ds
+                jump $wlookupCont_ bx strict_local_var_bx1 ww ds
+                }
                 }
                 };
               Collision bx bx1 ->
                 T26615a.disjointSubtrees_$s$wdisjointSubtrees
-                  @a @b @k bx bx1 ww $dEq ds
+                  @k @b @a $dEq ww bx bx1 ds
             } } in
       case ds of {
         Empty -> GHC.Internal.Types.True;
-        Leaf bx ds1 ->
-          case ds1 of { L kA ds2 ->
+        Leaf bx strict_local_var_box ->
+          case strict_local_var_box of { MkStrict strict_local_var_bx ->
+          case strict_local_var_bx of { L strict_local_var_box2 ds1 ->
+          case strict_local_var_box2 of { MkStrict strict_local_var_bx1 ->
           case _b of wild2 {
             __DEFAULT ->
-              case kA of k0 { __DEFAULT ->
               join {
                 exit [Dmd=LC(S,C(1,C(1,C(1,L))))]
-                  :: Word# -> k -> Word# -> Leaf k b -> Bool
-                [LclId[JoinId(4)(Just [~, ~, ~, !])],
-                 Arity=4,
-                 Str=<L><L><L><1P(L,A)>]
+                  :: Word# -> k -> Word# -> Strict (Leaf k b) -> Bool
+                [LclId[JoinId(4)(Nothing)], Arity=4, Str=<L><L><L><1P(MP(1L),A)>]
                 exit (ww1 [OS=OneShot] :: Word#)
-                     (ds3 [OS=OneShot] :: k)
+                     (ds2 [OS=OneShot] :: k)
                      (bx1 [OS=OneShot] :: Word#)
-                     (ds4 [OS=OneShot] :: Leaf k b)
-                  = case ds4 of { L kx x ->
+                     (strict_local_var_box4 [OS=OneShot] :: Strict (Leaf k b))
+                  = case strict_local_var_box4 of { MkStrict strict_local_var_bx2 ->
+                    case strict_local_var_bx2 of { L strict_local_var_box6 x ->
                     case eqWord# ww1 bx1 of {
                       __DEFAULT -> GHC.Internal.Types.True;
                       1# ->
-                        case == @k $dEq ds3 kx of {
+                        case ==
+                               @k
+                               $dEq
+                               ds2
+                               (case strict_local_var_box6 of { MkStrict strict_local_var_bx3 ->
+                                strict_local_var_bx3
+                                })
+                        of {
                           False -> GHC.Internal.Types.True;
                           True -> GHC.Internal.Types.False
                         }
+                    }
                     }
                     } } in
               join {
@@ -1542,7 +1563,7 @@ T26615a.$wdisjointSubtrees
                   :: Word# -> k -> Word# -> SmallArray# (Leaf k b) -> Bool
                 [LclId[JoinId(4)(Nothing)], Arity=4, Str=<L><ML><L><L>]
                 exit1 (ww1 [OS=OneShot] :: Word#)
-                      (ds3 [OS=OneShot] :: k)
+                      (ds2 [OS=OneShot] :: k)
                       (bx1 [OS=OneShot] :: Word#)
                       (bx2 [OS=OneShot] :: SmallArray# (Leaf k b))
                   = case eqWord# ww1 bx1 of {
@@ -1566,8 +1587,16 @@ T26615a.$wdisjointSubtrees
                                 __DEFAULT ->
                                   case indexSmallArray# @Lifted @(Leaf k b) ww2 ww3 of
                                   { (# ipv #) ->
-                                  case ipv of { L kx v ->
-                                  case == @k $dEq k2 kx of {
+                                  case ipv of { L strict_local_var_box4 v ->
+                                  case ==
+                                         @k
+                                         $dEq
+                                         k2
+                                         (case strict_local_var_box4 of
+                                          { MkStrict strict_local_var_bx2 ->
+                                          strict_local_var_bx2
+                                          })
+                                  of {
                                     False -> jump $wlookupInArrayCont_ k2 ww2 (+# ww3 1#) ww4;
                                     True -> GHC.Internal.Types.False
                                   }
@@ -1577,7 +1606,7 @@ T26615a.$wdisjointSubtrees
                               }
                               }; } in
                         jump $wlookupInArrayCont_
-                          ds3 bx2 0# (sizeofSmallArray# @Lifted @(Leaf k b) bx2)
+                          ds2 bx2 0# (sizeofSmallArray# @Lifted @(Leaf k b) bx2)
                     } } in
               joinrec {
                 $wlookupCont_ [InlPrag=[2],
@@ -1589,14 +1618,15 @@ T26615a.$wdisjointSubtrees
                  Str=<L><1L><L><1L>,
                  Unf=OtherCon []]
                 $wlookupCont_ (ww1 :: Word#)
-                              (ds3 :: k)
+                              (ds2 :: k)
                               (ww2 :: Int#)
-                              (ds4 :: HashMap k b)
-                  = case ds3 of ds5 { __DEFAULT ->
-                    case ds4 of {
+                              (ds3 :: HashMap k b)
+                  = case ds2 of ds4 { __DEFAULT ->
+                    case ds3 of {
                       Empty -> GHC.Internal.Types.True;
-                      Leaf bx1 ds6 -> jump exit ww1 ds5 bx1 ds6;
-                      Collision bx1 bx2 -> jump exit1 ww1 ds5 bx1 bx2;
+                      Leaf bx1 strict_local_var_box4 ->
+                        jump exit ww1 ds4 bx1 strict_local_var_box4;
+                      Collision bx1 bx2 -> jump exit1 ww1 ds4 bx1 bx2;
                       BitmapIndexed bx1 bx2 ->
                         let {
                           m :: Word#
@@ -1612,7 +1642,7 @@ T26615a.$wdisjointSubtrees
                                    (word2Int# (popCnt# (and# bx1 (minusWord# m 1##))))
                             of
                             { (# ipv #) ->
-                            jump $wlookupCont_ ww1 ds5 (+# ww2 5#) ipv
+                            jump $wlookupCont_ ww1 ds4 (+# ww2 5#) ipv
                             };
                           0## -> GHC.Internal.Types.True
                         };
@@ -1624,19 +1654,29 @@ T26615a.$wdisjointSubtrees
                                (word2Int# (and# (uncheckedShiftRL# ww1 ww2) 31##))
                         of
                         { (# ipv #) ->
-                        jump $wlookupCont_ ww1 ds5 (+# ww2 5#) ipv
+                        jump $wlookupCont_ ww1 ds4 (+# ww2 5#) ipv
                         }
                     }
                     }; } in
-              jump $wlookupCont_ bx k0 ww wild2
-              };
-            Leaf bx1 ds3 ->
-              case ds3 of { L kB ds4 ->
+              jump $wlookupCont_ bx strict_local_var_bx1 ww wild2;
+            Leaf bx1 strict_local_var_box4 ->
+              case strict_local_var_box4 of { MkStrict strict_local_var_bx2 ->
+              case strict_local_var_bx2 of { L strict_local_var_box6 ds2 ->
               case neWord# bx bx1 of {
-                __DEFAULT -> /= @k $dEq kA kB;
+                __DEFAULT ->
+                  /=
+                    @k
+                    $dEq
+                    strict_local_var_bx1
+                    (case strict_local_var_box6 of { MkStrict strict_local_var_bx3 ->
+                     strict_local_var_bx3
+                     });
                 1# -> GHC.Internal.Types.True
               }
               }
+              }
+          }
+          }
           }
           };
         Collision bx bx1 ->
@@ -1661,7 +1701,7 @@ T26615a.$wdisjointSubtrees
                   of
                   { (# ipv #) ->
                   T26615a.disjointSubtrees_$s$wdisjointSubtrees
-                    @b @a @k bx bx1 (+# ww 5#) $dEq ipv
+                    @k @a @b $dEq (+# ww 5#) bx bx1 ipv
                   };
                 0## -> GHC.Internal.Types.True
               };
@@ -1674,7 +1714,7 @@ T26615a.$wdisjointSubtrees
               of
               { (# ipv #) ->
               T26615a.disjointSubtrees_$s$wdisjointSubtrees
-                @b @a @k bx bx1 (+# ww 5#) $dEq ipv
+                @k @a @b $dEq (+# ww 5#) bx bx1 ipv
               }
           };
         BitmapIndexed bx bx1 ->
@@ -1910,88 +1950,72 @@ disjointSubtrees
 
 ------ Local rules for imported ids --------
 "SC:$wdisjointSubtrees1" [1]
-    forall (@a)
+    forall (@k)
            (@b)
-           (@k)
-           (sc :: Word#)
-           (sc1 :: SmallArray# (Leaf k a))
+           (@a)
+           (sc :: Eq k)
+           (sc1 :: Int#)
            (sc2 :: Word#)
            (sc3 :: SmallArray# (Leaf k b))
-           (sc4 :: Int#)
-           (sc5 :: Eq k).
+           (sc4 :: Word#)
+           (sc5 :: SmallArray# (Leaf k a)).
       T26615a.$wdisjointSubtrees @k
                                  @b
                                  @a
-                                 sc5
-                                 sc4
+                                 sc
+                                 sc1
                                  (T26615a.Collision @k @b sc2 sc3)
-                                 (T26615a.Collision @k @a sc sc1)
+                                 (T26615a.Collision @k @a sc4 sc5)
       = T26615a.$wdisjointCollisions
-          @k @b @a sc5 sc2 (T26615a.Array @(Leaf k b) sc3) sc sc1
+          @k @b @a sc sc2 (T26615a.Array @(Leaf k b) sc3) sc4 sc5
 "SC:$wdisjointSubtrees0" [1]
-    forall (@b)
+    forall (@k)
            (@a)
-           (@k)
-           (sc :: Word#)
-           (sc1 :: SmallArray# (Leaf k a))
-           (sc2 :: Int#)
-           (sc3 :: Eq k).
+           (@b)
+           (sc :: Eq k)
+           (sc1 :: Int#)
+           (sc2 :: Word#)
+           (sc3 :: SmallArray# (Leaf k a)).
       T26615a.$wdisjointSubtrees @k
                                  @a
                                  @b
-                                 sc3
-                                 sc2
-                                 (T26615a.Collision @k @a sc sc1)
+                                 sc
+                                 sc1
+                                 (T26615a.Collision @k @a sc2 sc3)
       = T26615a.disjointSubtrees_$s$wdisjointSubtrees
-          @b @a @k sc sc1 sc2 sc3
+          @k @a @b sc sc1 sc2 sc3
 
 
 [2 of 2] Compiling T26615           ( T26615.hs, T26615.o )
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 614, types: 666, coercions: 18, joins: 8/14}
+  = {terms: 647, types: 726, coercions: 18, joins: 8/14}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T26615.$trModule2 :: GHC.Internal.Prim.Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 30 0}]
-T26615.$trModule2 = "T26615"#
+$trModule1 :: GHC.Internal.Prim.Addr#
+[GblId, Unf=OtherCon []]
+$trModule1 = "T26615"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T26615.$trModule1 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T26615.$trModule1 = GHC.Internal.Types.TrNameS T26615.$trModule2
+$trModule2 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$trModule2 = GHC.Internal.Types.TrNameS $trModule1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T26615.$trModule4 :: GHC.Internal.Prim.Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 20 0}]
-T26615.$trModule4 = "main"#
+$trModule3 :: GHC.Internal.Prim.Addr#
+[GblId, Unf=OtherCon []]
+$trModule3 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T26615.$trModule3 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T26615.$trModule3 = GHC.Internal.Types.TrNameS T26615.$trModule4
+$trModule4 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$trModule4 = GHC.Internal.Types.TrNameS $trModule3
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T26615.$trModule :: GHC.Internal.Types.Module
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T26615.$trModule
-  = GHC.Internal.Types.Module T26615.$trModule3 T26615.$trModule1
+T26615.$trModule [InlPrag=[~]] :: GHC.Internal.Types.Module
+[GblId, Unf=OtherCon []]
+T26615.$trModule = GHC.Internal.Types.Module $trModule4 $trModule2
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 lvl :: GHC.Internal.Prim.Addr#
@@ -2006,7 +2030,7 @@ lvl1
       @GHC.Internal.Types.LiftedRep @() lvl
 
 Rec {
--- RHS size: {terms: 37, types: 30, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 40, types: 34, coercions: 0, joins: 0/0}
 $wpoly_lookupInArrayCont_
   :: forall a.
      String
@@ -2031,12 +2055,15 @@ $wpoly_lookupInArrayCont_
                  @GHC.Internal.Types.Lifted @(T26615a.Leaf String a) ww ww1
           of
           { (# ipv5 #) ->
-          case ipv5 of { T26615a.L kx v ->
-          case GHC.Internal.Base.eqString k2 kx of {
+          case ipv5 of { T26615a.L strict_local_var_box4 v ->
+          case strict_local_var_box4 of
+          { GHC.Internal.Types.MkStrict strict_local_var_bx2 ->
+          case GHC.Internal.Base.eqString k2 strict_local_var_bx2 of {
             False ->
               $wpoly_lookupInArrayCont_
                 @a k2 ww (GHC.Internal.Prim.+# ww1 1#) ww2;
             True -> GHC.Internal.Types.False
+          }
           }
           }
           };
@@ -2046,7 +2073,7 @@ $wpoly_lookupInArrayCont_
 end Rec }
 
 Rec {
--- RHS size: {terms: 98, types: 73, coercions: 0, joins: 0/1}
+-- RHS size: {terms: 104, types: 85, coercions: 0, joins: 0/1}
 $wpoly_lookupCont_
   :: forall a.
      GHC.Internal.Prim.Word#
@@ -2058,21 +2085,27 @@ $wpoly_lookupCont_
 $wpoly_lookupCont_
   = \ (@a)
       (ww :: GHC.Internal.Prim.Word#)
-      (ds5 :: String)
+      (ds4 :: String)
       (ww1 :: GHC.Internal.Prim.Int#)
-      (ds7 :: HashMap String a) ->
-      case ds5 of ds9 { __DEFAULT ->
-      case ds7 of {
+      (ds6 :: HashMap String a) ->
+      case ds4 of ds8 { __DEFAULT ->
+      case ds6 of {
         T26615a.Empty -> GHC.Internal.Types.True;
-        T26615a.Leaf bx1 ds11 ->
-          case ds11 of { T26615a.L kx x ->
+        T26615a.Leaf bx1 strict_local_var_box4 ->
+          case strict_local_var_box4 of
+          { GHC.Internal.Types.MkStrict strict_local_var_bx2 ->
+          case strict_local_var_bx2 of { T26615a.L strict_local_var_box6 x ->
+          case strict_local_var_box6 of
+          { GHC.Internal.Types.MkStrict strict_local_var_bx3 ->
           case GHC.Internal.Prim.eqWord# ww bx1 of {
             __DEFAULT -> GHC.Internal.Types.True;
             1# ->
-              case GHC.Internal.Base.eqString ds9 kx of {
+              case GHC.Internal.Base.eqString ds8 strict_local_var_bx3 of {
                 False -> GHC.Internal.Types.True;
                 True -> GHC.Internal.Types.False
               }
+          }
+          }
           }
           };
         T26615a.Collision bx1 bx2 ->
@@ -2081,7 +2114,7 @@ $wpoly_lookupCont_
             1# ->
               $wpoly_lookupInArrayCont_
                 @a
-                ds9
+                ds8
                 bx2
                 0#
                 (GHC.Internal.Prim.sizeofSmallArray#
@@ -2107,7 +2140,7 @@ $wpoly_lookupCont_
                            (GHC.Internal.Prim.and# bx1 (GHC.Internal.Prim.minusWord# m 1##))))
               of
               { (# ipv2 #) ->
-              $wpoly_lookupCont_ @a ww ds9 (GHC.Internal.Prim.+# ww1 5#) ipv2
+              $wpoly_lookupCont_ @a ww ds8 (GHC.Internal.Prim.+# ww1 5#) ipv2
               };
             0## -> GHC.Internal.Types.True
           };
@@ -2121,14 +2154,14 @@ $wpoly_lookupCont_
                        (GHC.Internal.Prim.uncheckedShiftRL# ww ww1) 31##))
           of
           { (# ipv2 #) ->
-          $wpoly_lookupCont_ @a ww ds9 (GHC.Internal.Prim.+# ww1 5#) ipv2
+          $wpoly_lookupCont_ @a ww ds8 (GHC.Internal.Prim.+# ww1 5#) ipv2
           }
       }
       }
 end Rec }
 
 Rec {
--- RHS size: {terms: 448, types: 507, coercions: 18, joins: 8/13}
+-- RHS size: {terms: 472, types: 551, coercions: 18, joins: 8/13}
 T26615.$s$wdisjointSubtrees [InlPrag=[~], Occ=LoopBreaker]
   :: forall a b.
      GHC.Internal.Prim.Int#
@@ -2143,34 +2176,58 @@ T26615.$s$wdisjointSubtrees
       join {
         fail [Dmd=MC(1,L)] :: (# #) -> Bool
         [LclId[JoinId(1)(Nothing)], Arity=1, Str=<A>, Unf=OtherCon []]
-        fail _ [Occ=Dead, OS=OneShot]
+        fail (ds1 [Occ=Dead, OS=OneShot] :: (# #))
           = case _b of wild {
               __DEFAULT -> case lvl1 of {};
               T26615a.Empty -> GHC.Internal.Types.True;
-              T26615a.Leaf bx ds2 ->
-                case ds2 of { T26615a.L kB ds3 ->
-                $wpoly_lookupCont_ @a bx kB ww ds
+              T26615a.Leaf bx strict_local_var_box ->
+                case strict_local_var_box of
+                { GHC.Internal.Types.MkStrict strict_local_var_bx ->
+                case strict_local_var_bx of
+                { T26615a.L strict_local_var_box2 ds2 ->
+                case strict_local_var_box2 of
+                { GHC.Internal.Types.MkStrict strict_local_var_bx1 ->
+                $wpoly_lookupCont_ @a bx strict_local_var_bx1 ww ds
+                }
+                }
                 };
               T26615a.Collision bx bx1 ->
                 T26615.$s$wdisjointSubtrees @b @a ww wild ds
             } } in
       case ds of wild {
         T26615a.Empty -> GHC.Internal.Types.True;
-        T26615a.Leaf bx ds1 ->
-          case ds1 of { T26615a.L kA ds2 ->
+        T26615a.Leaf bx strict_local_var_box ->
+          case strict_local_var_box of
+          { GHC.Internal.Types.MkStrict strict_local_var_bx ->
+          case strict_local_var_bx of
+          { T26615a.L strict_local_var_box2 ds1 ->
+          case strict_local_var_box2 of
+          { GHC.Internal.Types.MkStrict strict_local_var_bx1 ->
           case _b of wild2 {
-            __DEFAULT -> $wpoly_lookupCont_ @b bx kA ww wild2;
-            T26615a.Leaf bx1 ds3 ->
-              case ds3 of { T26615a.L kB ds4 ->
+            __DEFAULT ->
+              $wpoly_lookupCont_ @b bx strict_local_var_bx1 ww wild2;
+            T26615a.Leaf bx1 strict_local_var_box4 ->
+              case strict_local_var_box4 of
+              { GHC.Internal.Types.MkStrict strict_local_var_bx2 ->
+              case strict_local_var_bx2 of
+              { T26615a.L strict_local_var_box6 ds2 ->
+              case strict_local_var_box6 of
+              { GHC.Internal.Types.MkStrict strict_local_var_bx3 ->
               case GHC.Internal.Prim.neWord# bx bx1 of {
                 __DEFAULT ->
-                  case GHC.Internal.Classes.$fEqList_$s$c==1 kA kB of {
+                  case GHC.Internal.Classes.$fEqList_$s$c==1
+                         strict_local_var_bx1 strict_local_var_bx3
+                  of {
                     False -> GHC.Internal.Types.True;
                     True -> GHC.Internal.Types.False
                   };
                 1# -> GHC.Internal.Types.True
               }
               }
+              }
+              }
+          }
+          }
           }
           };
         T26615a.Collision bx bx1 ->
@@ -2190,30 +2247,30 @@ T26615.$s$wdisjointSubtrees
                     $s$wfoldr_ [InlPrag=[2],
                                 Occ=LoopBreaker,
                                 Dmd=SC(S,C(1,C(1,C(1,L))))]
-                      :: Bool
-                         -> GHC.Internal.Prim.Int#
-                         -> GHC.Internal.Prim.Int#
-                         -> GHC.Internal.Prim.SmallArray# (T26615a.Leaf [Char] a)
-                         -> Bool
+                      :: GHC.Internal.Prim.SmallArray# (T26615a.Leaf [Char] a)
+                         -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> Bool -> Bool
                     [LclId[JoinId(4)(Nothing)],
                      Arity=4,
                      Str=<L><L><L><L>,
                      Unf=OtherCon []]
-                    $s$wfoldr_ (sc :: Bool)
+                    $s$wfoldr_ (sc
+                                  :: GHC.Internal.Prim.SmallArray# (T26615a.Leaf [Char] a))
                                (sc1 :: GHC.Internal.Prim.Int#)
                                (sc2 :: GHC.Internal.Prim.Int#)
-                               (sc3 :: GHC.Internal.Prim.SmallArray# (T26615a.Leaf [Char] a))
-                      = case GHC.Internal.Prim.>=# sc1 sc2 of {
+                               (sc3 :: Bool)
+                      = case GHC.Internal.Prim.>=# sc2 sc1 of {
                           __DEFAULT ->
                             case GHC.Internal.Prim.indexSmallArray#
-                                   @GHC.Internal.Types.Lifted @(T26615a.Leaf String a) sc3 sc1
+                                   @GHC.Internal.Types.Lifted @(T26615a.Leaf String a) sc sc2
                             of
                             { (# ipv1 #) ->
-                            case ipv1 of { T26615a.L kA ds2 ->
+                            case ipv1 of { T26615a.L strict_local_var_box ds2 ->
+                            case strict_local_var_box of
+                            { GHC.Internal.Types.MkStrict strict_local_var_bx ->
                             join {
                               $j :: Bool
                               [LclId[JoinId(0)(Nothing)]]
-                              $j = jump $s$wfoldr_ sc (GHC.Internal.Prim.+# sc1 1#) sc2 sc3 } in
+                              $j = jump $s$wfoldr_ sc sc1 (GHC.Internal.Prim.+# sc2 1#) sc3 } in
                             joinrec {
                               $wlookupInArrayCont_ [InlPrag=[2],
                                                     Occ=LoopBreaker,
@@ -2243,29 +2300,33 @@ T26615.$s$wdisjointSubtrees
                                              ww2
                                       of
                                       { (# ipv5 #) ->
-                                      case ipv5 of { T26615a.L kx v ->
-                                      case GHC.Internal.Base.eqString k2 kx of {
+                                      case ipv5 of { T26615a.L strict_local_var_box2 v ->
+                                      case strict_local_var_box2 of
+                                      { GHC.Internal.Types.MkStrict strict_local_var_bx1 ->
+                                      case GHC.Internal.Base.eqString k2 strict_local_var_bx1 of {
                                         False ->
                                           jump $wlookupInArrayCont_
                                             k2 ww1 (GHC.Internal.Prim.+# ww2 1#) ww3;
                                         True -> GHC.Internal.Types.False
                                       }
                                       }
+                                      }
                                       };
                                     1# -> jump $j
                                   }
                                   }; } in
-                            jump $wlookupInArrayCont_ kA bx3 0# lvl2
+                            jump $wlookupInArrayCont_ strict_local_var_bx bx3 0# lvl2
+                            }
                             }
                             };
-                          1# -> sc
+                          1# -> sc3
                         }; } in
                   jump $s$wfoldr_
-                    GHC.Internal.Types.True
-                    0#
+                    bx1
                     (GHC.Internal.Prim.sizeofSmallArray#
                        @GHC.Internal.Types.Lifted @(T26615a.Leaf String a) bx1)
-                    bx1
+                    0#
+                    GHC.Internal.Types.True
               };
             T26615a.BitmapIndexed bx2 bx3 ->
               let {
@@ -2564,7 +2625,7 @@ f = \ (@a)
 
 ------ Local rules for imported ids --------
 "SPEC/T26615 $wdisjointSubtrees @String @_ @_" [2]
-    forall (@a) (@b) ($dEq :: Eq String).
+    forall (@a) (@b) ($dEq [Occ=Dead] :: Eq String).
       T26615a.$wdisjointSubtrees @String @a @b $dEq
       = T26615.$s$wdisjointSubtrees @a @b
 

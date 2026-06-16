@@ -715,6 +715,8 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
              | otherwise                 -> funSize opts top_args fun (length val_args) voids
 
     ------------
+    size_up_alt (Alt (DataAlt con) _bndrs rhs)
+      | isStrictDataCon con = size_up rhs
     size_up_alt (Alt _con _bndrs rhs) = size_up rhs `addSizeN` 10
         -- Don't charge for args, so that wrappers look cheap
         -- (See comments about wrappers with Case)
@@ -858,6 +860,7 @@ conSize dc n_val_args
 
 -- See Note [Unboxed tuple size and result discount]
   | isUnboxedTupleDataCon dc = SizeIs 0 emptyBag 10
+  | isStrictDataCon dc = SizeIs 0 emptyBag 10
 
   | isUnaryClassDataCon dc = sizeZero
 

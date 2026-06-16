@@ -1482,12 +1482,7 @@ simplTick env tickish expr cont
   | Select {} <- cont, Just expr' <- push_tick_inside
   = simplExprF env expr' cont
 
-  -- We don't want to move the tick, but we might still want to allow
-  -- floats to pass through with appropriate wrapping (or not, see
-  -- wrap_floats below)
-  --- | not (tickishCounts tickish) || tickishCanSplit tickish
-  -- = wrap_floats
-
+  -- We don't want to move the tick; keep the floats trapped behind it.
   | otherwise
   = no_floating_past_tick
 

@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 40, types: 25, coercions: 0, joins: 0/1}
+  = {terms: 43, types: 29, coercions: 0, joins: 0/1}
 
 $wfoo
   = \ ww ww1 ->
@@ -18,9 +18,11 @@ $wfoo
 foo
   = \ ds y ->
       case ds of { T ww ->
-      case ww of { I# ww1 ->
-      case y of { I# ww2 ->
-      case $wfoo ww1 ww2 of ww3 { __DEFAULT -> I# ww3 }
+      case ww of { MkStrict ww1 ->
+      case ww1 of { I# ww2 ->
+      case y of { I# ww3 ->
+      case $wfoo ww2 ww3 of ww4 { __DEFAULT -> I# ww4 }
+      }
       }
       }
       }

@@ -3,6 +3,16 @@
 "USPEC showsIArray @UA @_"
     forall (@i) ($dIArray [Occ=Dead] :: IArray UA) ($dShow :: Show i).
       showsIArray @UA @i $dIArray $dShow
-      = showsIArray_$sshowsIArray @i $dShow
+      = \ (a [Occ=Once1!] :: UA i) ->
+          show
+            @i
+            $dShow
+            (case a of { UA strict_local_var_box [Occ=Once1!] ->
+             case strict_local_var_box of
+             { MkStrict strict_local_var_bx [Occ=Once1] ->
+             strict_local_var_bx
+             }
+             })
+
 
 

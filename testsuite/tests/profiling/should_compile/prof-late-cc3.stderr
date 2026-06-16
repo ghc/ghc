@@ -8,14 +8,14 @@ doStuff [InlPrag=INLINE (sat-args=1)]
   :: forall {b}. Show b => b -> IO b
 [GblId, Arity=2, Unf=OtherCon []]
 doStuff
-  = \ (@b_axP) ($dShow_aET :: Show b_axP) (eta_B0 :: b_axP) ->
+  = \ (@b_aIz) ($dShow_aIP :: Show b_aIz) (eta_B0 :: b_aIz) ->
       >>
         @IO
-        GHC.Base.$fMonadIO
+        GHC.Internal.Base.$fMonadIO
         @()
-        @b_axP
-        (print @b_axP $dShow_aET eta_B0)
-        (return @IO GHC.Base.$fMonadIO @b_axP eta_B0)
+        @b_aIz
+        (print @b_aIz $dShow_aIP eta_B0)
+        (return @IO GHC.Internal.Base.$fMonadIO @b_aIz eta_B0)
 
 
 
@@ -26,25 +26,36 @@ Result size of CorePrep
 
 -- RHS size: {terms: 15, types: 14, coercions: 0, joins: 0/2}
 M.doStuff [InlPrag=INLINE (sat-args=1)]
-  :: forall {b}. GHC.Show.Show b => b -> GHC.Types.IO b
+  :: forall {b}.
+     GHC.Internal.Show.Show b =>
+     b -> GHC.Internal.Types.IO b
 [GblId, Arity=2, Unf=OtherCon []]
 M.doStuff
-  = \ (@b_axP)
-      ($dShow_sJs [Occ=OnceL1] :: GHC.Show.Show b_axP)
-      (eta_sJt :: b_axP) ->
-      scctick<doStuff>
+  = \ (@b_aIz)
+      ($dShow_sMs [Occ=OnceL1] :: GHC.Internal.Show.Show b_aIz)
+      (eta_sMt :: b_aIz) ->
+      scctick<doStuffCostCentreScope>
       let {
-        sat_sJv [Occ=Once1] :: GHC.Types.IO b_axP
+        doStuff_sat_sMv [Occ=Once1] :: GHC.Internal.Types.IO b_aIz
         [LclId]
-        sat_sJv
-          = GHC.Base.return
-              @GHC.Types.IO GHC.Base.$fMonadIO @b_axP eta_sJt } in
+        doStuff_sat_sMv
+          = GHC.Internal.Base.return
+              @GHC.Internal.Types.IO
+              GHC.Internal.Base.$fMonadIO
+              @b_aIz
+              eta_sMt } in
       let {
-        sat_sJu [Occ=Once1] :: GHC.Types.IO ()
+        doStuff_sat_sMu [Occ=Once1] :: GHC.Internal.Types.IO ()
         [LclId]
-        sat_sJu = System.IO.print @b_axP $dShow_sJs eta_sJt } in
-      GHC.Base.>>
-        @GHC.Types.IO GHC.Base.$fMonadIO @() @b_axP sat_sJu sat_sJv
+        doStuff_sat_sMu
+          = GHC.Internal.System.IO.print @b_aIz $dShow_sMs eta_sMt } in
+      GHC.Internal.Base.>>
+        @GHC.Internal.Types.IO
+        GHC.Internal.Base.$fMonadIO
+        @()
+        @b_aIz
+        doStuff_sat_sMu
+        doStuff_sat_sMv
 
 
 

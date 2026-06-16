@@ -1,6 +1,6 @@
 
 ==================== Demand signatures ====================
-f: <1!P(L)>
+f: <1!P(MP(1L))>
 
 
 
@@ -10,17 +10,23 @@ f: 1
 
 
 ==================== Demand signatures ====================
-f: <1!P(1L)>
+f: <1!P(MP(1L))>
 
 
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 25, types: 23, coercions: 0, joins: 0/0}
+  = {terms: 26, types: 30, coercions: 0, joins: 0/0}
 
-$WT = \ conrep -> case conrep of conrep { __DEFAULT -> T conrep }
+$WT
+  = \ conrep ->
+      case MkStrict conrep of conrep_ubx { __DEFAULT -> T conrep_ubx }
 
-$wf = \ ww -> case ww of ww1 { __DEFAULT -> (# ww1 #) }
+$wf
+  = \ ww ->
+      (# case ww of { MkStrict strict_local_var_bx ->
+         strict_local_var_bx
+         } #)
 
 f = \ ds ->
       case ds of { T ww -> case $wf ww of { (# ww1 #) -> Box ww1 } }

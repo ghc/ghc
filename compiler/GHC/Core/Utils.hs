@@ -123,6 +123,7 @@ import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL )
 import qualified Data.List.NonEmpty as NE
 import Data.Ord            ( comparing )
 import qualified Data.Set as Set
+import GHC.Builtin.Types (strictDataCon, isStrictTy)
 
 {-
 ************************************************************************
@@ -235,6 +236,17 @@ applyTypeToArgs op_ty args
   = go op_ty args
   where
     go op_ty []                   = op_ty
+
+    -- If we find `(Strict (a -> b)) a` we need to strip off the `Strict`. There is no
+    -- nice place to put it and the type eval shouldn't panic. If we apply this, we
+    -- end up with `b`, which should be fine. It loses the `Strict` information, but
+    -- that only applied to the function anyways.
+    go op_ty args
+      | not (null args)
+      , isStrictTy op_ty
+      = applyTypeToArgs inner args
+      where
+        inner = head $ snd $ splitTyConApp op_ty
     go op_ty (Type ty : args)     = go_ty_args op_ty [ty] args
     go op_ty (Coercion co : args) = go_ty_args op_ty [mkCoercionTy co] args
     go op_ty (_ : args)           | Just (_, _, _, res_ty) <- splitFunTy_maybe op_ty
@@ -1648,6 +1660,10 @@ trivial_expr_fold k_id k_lit k_triv k_not_triv = go
     go (Lit l)    | litIsTrivial l        = k_lit l
     go (Type _)                           = k_triv
     go (Coercion _)                       = k_triv
+    -- MkStrict x is trivial if x is trivial and in HNF. If that is the case,
+    -- there is nothing to evaluate (isHNF) and duplicating is cheap (isTrivial).
+    go (App (App (Var id) _typ) arg)
+      | id == dataConWorkId strictDataCon = if exprIsHNF arg then go arg else k_not_triv
     go (App f arg)
       | not (isRuntimeArg arg)            = go f
       | exprIsUnaryClassFun f             = go arg
@@ -2276,12 +2292,9 @@ app_ok fun_ok primop_ok fun args
               -- Also c.f. the Var case of exprIsHNF
          |  isTerminatingType fun_ty  -- See Note [exprOkForSpeculation and type classes]
          || definitelyUnliftedType fun_ty
-         -> assertPpr (n_val_args == 0) (ppr fun $$ ppr args)
-            True  -- Both terminating types (e.g. Eq a), and unlifted types (e.g. Int#)
-                  -- are non-functions and so will have no value args.  The assert is
-                  -- just to check this.
-                  -- (If we added unlifted function types this would change,
-                  -- and we'd need to actually test n_val_args == 0.)
+         -> n_val_args == 0  -- Both terminating types (e.g. Eq a), and unlifted types
+                             -- that aren't functions (e.g. Int#) are non-functions and
+                             -- so will have no value args.
 
          -- Functions that terminate fast without raising exceptions etc
          -- See (U12) of Note [Implementing unsafeCoerce]

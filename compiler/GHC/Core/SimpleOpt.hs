@@ -1706,36 +1706,28 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
               -> (Either InScopeSet Subst, FloatBind, Id)
     case_bind subst expr expr_ty = (subst', float, bndr)
       where
-        bndr   = setCaseBndrEvald MarkedStrict $
-                 uniqAway (subst_in_scope subst) $
-                 mkWildValBinder ManyTy expr_ty
-        subst' = subst_extend_in_scope subst bndr
-        expr'  = subst_expr subst expr
-        float  = FloatCase expr' bndr DEFAULT []
+        bndr     = setCaseBndrEvald MarkedStrict $
+                   uniqAway (subst_in_scope subst) $
+                   mkWildValBinder ManyTy expr_ty'
+        expr_ty' = case subst of
+            Right s -> substTyUnchecked s expr_ty
+            Left  _ -> expr_ty
+        subst'   = subst_extend_in_scope subst bndr
+        expr'    = subst_expr subst expr
+        float    = FloatCase expr' bndr DEFAULT []
 
     mkFieldSeqFloats :: InScopeSet -> DataCon -> [CoreExpr] -> (InScopeSet, FloatBinds, [CoreExpr])
     -- See Note [Strict fields in Core] for what a field seq is and (SFC2) for
-    -- why we insert them
-    mkFieldSeqFloats in_scope dc args
-      | isLazyDataConRep dc
+    -- why we insert them.  A strict field is a @Strict a@ box, so only the
+    -- @MkStrict@ payload needs a field seq; STG lowering turns it into the seq.
+    mkFieldSeqFloats in_scope dc [typ, arg]
+      | dc == strictDataCon
+      = case case_bind (Left in_scope) arg (exprToType typ) of
+          (Left in_scope', float, bndr) -> (in_scope', unitOL float, [typ, Var bndr])
+          (right, _, _) -> pprPanic "case_bind did not preserve Left" (ppr in_scope $$ ppr arg $$ ppr right)
+
+    mkFieldSeqFloats in_scope _ args
       = (in_scope, nilOL, args)
-      | otherwise
-      = (in_scope', floats', ty_args ++ val_args')
-      where
-        (ty_args, val_args) = splitAtList (dataConUnivAndExTyCoVars dc) args
-        (in_scope', floats', val_args') = foldr do_one (in_scope, nilOL, []) $
-                                          zipEqual str_marks val_args
-        str_marks = dataConRepStrictness dc
-        do_one (str, arg) (in_scope,floats,args)
-          | NotMarkedStrict <- str   = no_seq
-          | exprIsHNF arg            = no_seq
-          | otherwise                = (in_scope', float `consOL` floats, Var bndr:args)
-          where
-            no_seq = (in_scope, floats, arg:args)
-            (in_scope', float, bndr) =
-               case case_bind (Left in_scope) arg (exprType arg) of
-                 (Left in_scope', float, bndr) -> (in_scope', float, bndr)
-                 (right, _, _) -> pprPanic "case_bind did not preserve Left" (ppr in_scope $$ ppr arg $$ ppr right)
 
 -- See Note [exprIsConApp_maybe on literal strings]
 dealWithStringLiteral :: Var -> BS.ByteString -> MCoercion

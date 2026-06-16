@@ -2240,6 +2240,9 @@ wantToUnboxArg env ty str_mark dmd@(n :* _)
          -- and Note [Demand analysis for recursive data constructors]
        -> DontUnbox
 
+       | isStrictDataCon dc
+       -> wantToUnboxArg env (head tc_args) (MarkedStrict) (head dmds)
+
        | otherwise  -- Bad cases dealt with: we want to unbox!
        -> DoUnbox (zip3 (dubiousDataConInstArgTys dc tc_args)
                         (dataConRepStrictness dc)

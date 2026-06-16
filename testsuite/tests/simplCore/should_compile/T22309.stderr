@@ -1,10 +1,20 @@
 
 ==================== Final STG: ====================
-MkW_NB :: NU_B %1 -> WNU_B =
-    \r [eta] case eta of eta { __DEFAULT -> MkW_NB [eta]; };
+$WMkW_NB :: NU_B %1 -> WNU_B =
+    \r [conrep]
+        case conrep of $WMkW_NB_sat {
+        __DEFAULT -> MkW_NB [$WMkW_NB_sat];
+        };
 
-MkW_NA :: NU_A %1 -> WNU_A =
-    \r [eta] case eta of eta { __DEFAULT -> MkW_NA [eta]; };
+MkW_NB :: Strict NU_B %1 -> WNU_B = \r [eta] MkW_NB [eta];
+
+$WMkW_NA :: NU_A %1 -> WNU_A =
+    \r [conrep]
+        case conrep of $WMkW_NA_sat {
+        __DEFAULT -> MkW_NA [$WMkW_NA_sat];
+        };
+
+MkW_NA :: Strict NU_A %1 -> WNU_A = \r [eta] MkW_NA [eta];
 
 $WMkW_F :: UF %1 -> WU_F =
     \r [conrep] case conrep of conrep { Mk_F us -> MkW_F [us]; };

@@ -33,9 +33,11 @@ import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.Seq
 import GHC.Core.TyCon
+import GHC.Core.Opt.Arity ( typeArity )
 import GHC.Core.Opt.WorkWrap.Utils
 
 import GHC.Data.Graph.UnVar -- for UnVarSet
+import GHC.Data.Maybe (isJust)
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -385,18 +387,59 @@ cprTransformDataConWork env con args
   , wkr_arity <= mAX_CPR_SIZE -- See Note [Trimming to mAX_CPR_SIZE]
   , args `lengthIs` wkr_arity
   , ae_rec_dc env con /= DefinitelyRecursive -- See Note [CPR for recursive data constructors]
-  = -- pprTraceWith "cprTransformDataConWork" (\r -> ppr con <+> ppr wkr_arity <+> ppr args <+> ppr r) $
-    CprType 0 (ConCpr (dataConTag con) (strictZipWith extract_nested_cpr args wkr_str_marks))
+  = if isStrictDataCon con then
+      -- Unpack a Strict box when its parts have CPR, or when it wraps a
+      -- function.  Shedding the box lets the worker return the bare function,
+      -- which the arity analysis can then eta-expand; this matters especially
+      -- for recursive workers whose result would otherwise be reboxed at every
+      -- iteration.  See Note [Unboxing Strict boxes around functions]
+      if any (isJust . asConCpr) nested_cpr_parts || wraps_function then
+        nested_cpr
+      else
+        topCprType
+    else
+      nested_cpr
   | otherwise
   = topCprType
   where
     wkr_arity = dataConRepArity con
     wkr_str_marks = dataConRepStrictness con
+    -- typeArity looks through foralls and newtypes, so a newtype over a
+    -- function (e.g. Data.ByteString.Builder.Builder) counts as a function.
+    wraps_function = any ((> 0) . typeArity . exprType . snd) args
     -- See Note [Nested CPR]
+    nested_cpr = CprType 0 (ConCpr (dataConTag con) nested_cpr_parts)
+    nested_cpr_parts = strictZipWith extract_nested_cpr args wkr_str_marks
     extract_nested_cpr (CprType 0 cpr, arg) str
       | MarkedStrict <- str              = cpr
       | Terminates <- exprTerminates arg = cpr
     extract_nested_cpr _ _               = topCpr -- intervening lambda or doesn't terminate
+
+{- Note [Unboxing Strict boxes around functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A strict field of function type is represented by a @Strict@ box around the
+function (see Note [The Strict type] in GHC.Builtin.Types).  When such a field is
+the constructed result of a worker, we give the box a 'ConCpr' so that
+worker/wrapper sheds it: the worker returns the bare function and the wrapper
+reapplies @MkStrict@.
+
+Shedding the box exposes the function's arrows to the arity analysis.  Consider a
+worker
+
+    $wf :: Int# -> Strict Builder
+
+returning @MkStrict <function>@.  Leaving the box on the result hides the arrows,
+so the function is never eta-expanded; and a recursive @$wf@ then unboxes and
+reboxes a @MkStrict@ on every call.  Unboxing the box gives
+
+    $wf :: Int# -> Builder
+
+whose result is a newtype over a function; the arity analysis eta-expands it, and
+a recursive @$wf@ becomes a plain tail call.
+
+We unbox the box whenever the payload is a function ('typeArity' > 0).  A @Strict@
+box around ordinary data is unboxed only when its parts have CPR.
+-}
 
 -- | See Note [Trimming to mAX_CPR_SIZE].
 mAX_CPR_SIZE :: Arity
