@@ -421,7 +421,7 @@ dsExpr (HsPragE _ (HsPragSCC _ cc) expr)
 
 dsExpr (HsCase ctxt discrim matches)
   = do { core_discrim <- dsLExpr discrim
-       ; ([discrim_var], matching_code) <- matchWrapper ctxt (Just [discrim]) matches
+       ; ([discrim_var], matching_code) <- matchWrapper ctxt (Just [core_discrim]) matches
        ; return (bindNonRec discrim_var core_discrim matching_code) }
 
 -- Pepe: The binds are in scope in the body but NOT in the binding group

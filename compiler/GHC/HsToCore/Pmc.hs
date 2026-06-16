@@ -37,7 +37,7 @@ module GHC.HsToCore.Pmc (
         isMatchContextPmChecked, isMatchContextPmChecked_SinglePat,
 
         -- See Note [Long-distance information]
-        addTyCs, addCoreScrutTmCs, addHsScrutTmCs, getLdiNablas,
+        addTyCs, addCoreScrutTmCs, getLdiNablas,
         getNFirstUncovered
     ) where
 
@@ -62,7 +62,6 @@ import GHC.Utils.Panic
 import GHC.Types.Var (EvVar, Var (..))
 import GHC.Types.Id.Info
 import GHC.Tc.Utils.TcType (evVarPred)
-import {-# SOURCE #-} GHC.HsToCore.Expr (dsLExpr)
 import GHC.HsToCore.Monad
 import GHC.Data.Bag
 import GHC.Data.OrdList
@@ -683,12 +682,6 @@ addCoreScrutTmCs (scr:scrs) (x:xs) k
     addPhiCtsNablas nablas (unitBag (PhiCoreCt x scr))
 addCoreScrutTmCs _   _   _ = panic "addCoreScrutTmCs: numbers of scrutinees and match ids differ"
 
--- | 'addCoreScrutTmCs', but desugars the 'LHsExpr's first.
-addHsScrutTmCs :: [LHsExpr GhcTc] -> [Id] -> DsM a -> DsM a
-addHsScrutTmCs scrs vars k = do
-  scr_es <- traverse dsLExpr scrs
-  addCoreScrutTmCs scr_es vars k
-
 {- Note [Long-distance information]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -715,8 +708,8 @@ To achieve similar reasoning in the coverage checker:
   which the call sites put into place with 'GHC.HsToCore.Monad.updPmNablas'.
 
 * Call sites also extend this set with facts from type-constraint dictionaries,
-  case scrutinees, etc. with the exported functions 'addTyCs', 'addCoreScrutTmCs'
-  and 'addHsScrutTmCs'.
+  case scrutinees, etc. with the exported functions 'addTyCs' and
+  'addCoreScrutTmCs'.
 
 
 Note [Recovering from unsatisfiable pattern-matching constraints]
