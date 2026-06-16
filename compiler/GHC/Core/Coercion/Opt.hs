@@ -500,9 +500,34 @@ Example:
 Conclusion: Because of the way this all works, we want to put in the *left-hand*
 coercion in co5's type. (In the code, co5 is called `arg`.)
 So we extend the environment binding cv to arg's left-hand type.
+
+Note [Ambient sym and InstCo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When `opt_co4 env sym rep r (InstCo fun_co arg_co)` reduces by lifting, it binds
+the instantiated variable in the LiftingContext to a coercion derived from
+`arg_co` and then re-optimises the body of `fun_co`. By (LC2) of
+Note [The LiftingContext in optCoercion], that lifting-context entry must /not/
+have the ambient `sym` applied: `sym` belongs to the whole coercion, and the
+body re-optimisation re-applies it (via the `wrapSym` in the Refl/GRefl cases)
+to every occurrence, at whatever local sym-parity that occurrence sits at.
+
+So we must split a copy of `fun_co` optimised /without/ the ambient sym
+(`fun_co_ns`), so that its body is likewise sym-free, and feed an (LC2)-respecting
+sym-free entry, carrying `sym` into the body recursion.
+
+It is tempting to instead split `fun_co'` (optimised /with/ sym pushed in) and
+recurse `NotSwapped`, on the grounds that "sym is already pushed into both".
+That is wrong: `mkSymCo` cannot always push `sym` to the leaves (e.g. it leaves
+`Sym` outside a `FunCo` or `TyConAppCo`). Such a residual `Sym` in the body
+flips the ambient sym back on during re-optimisation, so `wrapSym` then
+double-applies it to the substituted entry — yielding an ill-kinded result such
+as the `Sym ax ; Sym ax` of #27374.
+
+The two syntactic forall cases already do the right thing: they build the entry
+from a `NotSwapped` `arg_co` and recurse carrying `sym`.
 -}
 
--- See Note [Optimising InstCo]
+-- See Note [Optimising InstCo] and Note [Ambient sym and InstCo]
 opt_co4' env sym rep r (InstCo fun_co arg_co)
     -- forall over type...
   | Just (tv, _visL, _visR, k_co, body_co) <- splitForAllCo_ty_maybe fun_co
@@ -526,21 +551,26 @@ opt_co4' env sym rep r (InstCo fun_co arg_co)
   , let h1' = opt_co4 env NotSwapped False Nominal h1
   = opt_co4 (extendLiftingContextCvSubst env cv h1') sym rep r body_co
 
-  -- OK so those cases didn't work.  See if it is a forall /after/ optimization
-  -- If so, do an inefficient one-variable substitution, then re-optimize
+  -- OK so those cases didn't work.  See if it is a forall /after/ optimization.
+  -- We split `fun_co_ns`, which is optimised /without/ the ambient sym, and
+  -- carry `sym` into the body, exactly as in the two syntactic cases above.
+  -- See Note [Ambient sym and InstCo] -- using the sym-pushed fun_co'/arg_co'
+  -- here is wrong (#27374).
 
     -- forall over type...
-  | Just (tv', _visL, _visR, k_co', body_co') <- splitForAllCo_ty_maybe fun_co'
-  , let s2'   = coercionRKind arg_co'
-        tv_co = mk_coherence_right_co Nominal s2' (mkSymCo k_co') arg_co'
+  | Just (tv', _visL, _visR, k_co', body_co') <- splitForAllCo_ty_maybe fun_co_ns
+  , let arg_co_ns = opt_co4 env NotSwapped False Nominal arg_co
+        s2'   = coercionRKind arg_co_ns
+        tv_co = mk_coherence_right_co Nominal s2' (mkSymCo k_co') arg_co_ns
         env'  = extendLiftingContext (zapLiftingContext env) tv' tv_co
-  = opt_co4 env' NotSwapped False r' body_co'
+  = opt_co4 env' sym False r' body_co'
 
     -- See Note [Forall over coercion]
-  | Just (cv', _visL, _visR, _kind_co', body_co') <- splitForAllCo_co_maybe fun_co'
-  , CoercionTy h1' <- coercionLKind arg_co'
-  , let env' = extendLiftingContextCvSubst (zapLiftingContext env) cv' h1'
-  = opt_co4 env' NotSwapped False r' body_co'
+  | Just (cv', _visL, _visR, _kind_co', body_co') <- splitForAllCo_co_maybe fun_co_ns
+  , CoercionTy h1 <- coercionLKind arg_co
+  , let h1' = opt_co4 env NotSwapped False Nominal h1
+        env' = extendLiftingContextCvSubst (zapLiftingContext env) cv' h1'
+  = opt_co4 env' sym False r' body_co'
 
   -- Those cases didn't work either, so rebuild the InstCo
   -- Push Sym into /both/ function /and/ arg_coument
@@ -551,6 +581,9 @@ opt_co4' env sym rep r (InstCo fun_co arg_co)
     -- So no more sym'ing on th results of fun_co' arg_co'
     fun_co' = opt_co4 env sym rep r fun_co
     arg_co' = opt_co4 env sym False Nominal arg_co
+    -- fun_co_ns is fun_co optimised /without/ the ambient sym; the forall cases
+    -- above split it and re-apply `sym` themselves. See Note [Ambient sym and InstCo]
+    fun_co_ns = opt_co4 env NotSwapped rep r fun_co
     r'   = chooseRole rep r
 
 opt_co4' env sym _rep r (KindCo co)

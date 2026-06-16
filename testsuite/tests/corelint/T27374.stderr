@@ -1,4 +1,4 @@
-covar ax (ill-kinded, lint rejects):
+covar ax (was: ill-kinded, lint-rejected):
   in_co: ((,,)
             (Sym (Maybe (Maybe ax)_N)_N)
             (Sym (Maybe ax)_N)
@@ -8,31 +8,16 @@ covar ax (ill-kinded, lint rejects):
                                       (Sym (Maybe (Maybe ax)_N)_N))
                                 (Sym (Maybe ax)_N))
                           (Sym ((,) ax ax)_N)))
-  out_co: ((,,)
-             <Maybe (Maybe a)>_N
-             (Maybe
-                (Sym ax
-                 ; Sym ax))_N
-             <(a, a)>_N)_N
+  out_co: <(Maybe (Maybe a), Maybe a, (a, a))>_N
   in_ty1: (Maybe (Maybe a), Maybe a, (a, a))
   in_ty2: (Maybe (Maybe a), Maybe a, (a, a))
   out_ty1: (Maybe (Maybe a), Maybe a, (a, a))
-  out_ty2: (Maybe (Maybe a), Maybe [a], (a, a))
-  kind preserved: False
+  out_ty2: (Maybe (Maybe a), Maybe a, (a, a))
+  kind preserved: True
   lint in_co: lint: OK
-  lint out_co: <no location info>: warning:
-                   Trans coercion mis-match: Sym ax
-                                             ; Sym ax
-                     a ~ [a]
-                     a ~ [a]
-                   In the coercion ‘((,,)
-                                       <Maybe (Maybe a)>_N
-                                       (Maybe
-                                          (Sym ax
-                                           ; Sym ax))_N
-                                       <(a, a)>_N)_N’
+  lint out_co: lint: OK
 
-univ ax (ill-kinded, lints clean):
+univ ax (was: ill-kinded, lint-clean):
   in_co: ((,,)
             (Sym (Maybe
                     (Maybe Univ(nominal (plugin [T27374])[] :: [a]~# a))_N)_N)
@@ -50,14 +35,11 @@ univ ax (ill-kinded, lints clean):
                           (Sym ((,)
                                   Univ(nominal (plugin [T27374])[] :: [a]~# a)
                                   Univ(nominal (plugin [T27374])[] :: [a]~# a))_N)))
-  out_co: ((,,)
-             <Maybe (Maybe a)>_N
-             (Maybe Univ(nominal (plugin [T27374])[] :: a~# [a]))_N
-             <(a, a)>_N)_N
+  out_co: <(Maybe (Maybe a), Maybe a, (a, a))>_N
   in_ty1: (Maybe (Maybe a), Maybe a, (a, a))
   in_ty2: (Maybe (Maybe a), Maybe a, (a, a))
   out_ty1: (Maybe (Maybe a), Maybe a, (a, a))
-  out_ty2: (Maybe (Maybe a), Maybe [a], (a, a))
-  kind preserved: False
+  out_ty2: (Maybe (Maybe a), Maybe a, (a, a))
+  kind preserved: True
   lint in_co: lint: OK
   lint out_co: lint: OK

@@ -1,25 +1,26 @@
--- Standalone reproducer for #27374: optCoercion drops an ambient Sym on a
+-- Regression test for #27374: optCoercion used to drop an ambient Sym on a
 -- certain shape of (lint-valid) input coercion, namely a TyConAppCo
 -- transitively composed with  Sym (SelCo:Fun(arg) (InstCo-chain over a Refl of
 -- a forall-type)), where the instantiating arguments are Sym of an axiom-like
--- coercion ax :: [n] ~ n.
+-- coercion ax :: [n] ~ n.  See Note [Ambient sym and InstCo] in
+-- GHC.Core.Coercion.Opt for the fix.
 --
 -- We build the coercion by hand, feed it to optCoercion, then (a) check that
 -- the optimiser preserved the coercion's kind and (b) Core-Lint the result.
--- We run this for two choices of ax, which expose the bug differently:
+-- We run this for two choices of ax, which used to expose the bug differently:
 --
 --   * ax = a free coercion variable.  Like a real type-family axiom, a CoVarCo
 --     resists Sym-distribution (the optimiser keeps Sym on the *outside*), so
---     the dropped Sym stays visible as an ill-formed  Sym ax ; Sym ax  trans:
---     the output is ill-kinded *and* Core Lint rejects it.
+--     the dropped Sym used to stay visible as an ill-formed  Sym ax ; Sym ax
+--     trans: the output was ill-kinded *and* Core Lint rejected it.
 --
 --   * ax = a UnivCo.  opt_univ freely flips its types, so the dropped Sym
---     collapses into the coercion: the output is ill-kinded but still lints
+--     collapsed into the coercion: the output was ill-kinded but still linted
 --     clean.  This shows -dcore-lint alone does not catch the bug, which is why
---     optCoercion needs its own kind-preservation assertion (see the issue).
+--     a self-standing kind-preservation check is valuable.
 --
--- Both choices currently violate kind preservation; see the issue for the
--- original, axiom-driven shape this models.
+-- The input is reflexive-but-not-Refl, so a correct optimiser reduces both to
+-- Refl; we assert kind preservation and that both coercions lint.
 
 module Main where
 
@@ -159,9 +160,9 @@ main = do
                          $$ text "lint in_co:"  <+> report lintIn
                          $$ text "lint out_co:" <+> report lintOut)
 
-          (okCoVar, docCoVar) = check "covar ax (ill-kinded, lint rejects):"
+          (okCoVar, docCoVar) = check "covar ax (was: ill-kinded, lint-rejected):"
                                       (mkInCo axCoVar)
-          (okUniv,  docUniv)  = check "univ ax (ill-kinded, lints clean):"
+          (okUniv,  docUniv)  = check "univ ax (was: ill-kinded, lint-clean):"
                                       (mkInCo axUniv)
       putMsg logger (docCoVar $$ blankLine $$ docUniv)
       -- Fail (non-zero exit) if optCoercion did not preserve the kind, or if
