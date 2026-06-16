@@ -365,20 +365,32 @@ bool anyPendingTimeoutsOrIO(CapIOManager *iomgr);
  */
 void pollCompletedTimeoutsOrIO(CapIOManager *iomgr);
 
- /* If there are any completed I/O operations or expired timers, process the
+/* If there are any completed I/O operations or expired timers, process the
  * completions as appropriate. If there are none, wait until I/O or a timer
  * does complete (or we get a signal with a handler) and process the
  * completions as appropriate.
  *
- * Upon return this guarantees that the scheduler run queue is non-empty or
- * that the scheduler is no longer in the running state. Succinctly, the
- * post-condition is (!emptyRunQueue(cap) || getSchedState() != SCHED_RUNNING).
+ * Upon returning true this guarantees that the scheduler run queue is
+ * non-empty or that the scheduler is no longer in the running state.
+ * Succinctly, the post-condition in the return true case is
+ * (!emptyRunQueue(cap) || getSchedState() != SCHED_RUNNING).
+ * A false result means the wait was interrupted by interruptIOManager, and
+ * there is no post-condition in this case.
  *
  * This is only expected to be called if anyPendingTimeoutsOrIO() returns true,
  * i.e. there actually is something to wait for.
  *
  * Called from schedule() both *before* and *after* scheduleDetectDeadlock().
  */
-void awaitCompletedTimeoutsOrIO(CapIOManager *iomgr);
+bool awaitCompletedTimeoutsOrIO(CapIOManager *iomgr);
+
+/* Interrupt the I/O manager if it is blocked in awaitCompletedTimeoutsOrIO,
+ * causing it to return early.
+ *
+ * Its use is inherently concurrent and racy: the interrupt races against any
+ * I/O or timer completion. This does not matter for the intended use case of
+ * returning control to the scheduler.
+ */
+void interruptIOManager(CapIOManager *iomgr);
 
 #include "EndPrivate.h"
