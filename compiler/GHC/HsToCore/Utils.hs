@@ -52,6 +52,7 @@ import GHC.Core
 import GHC.HsToCore.Monad
 
 import GHC.Core.Utils
+import GHC.Core.FVs        ( exprFreeVars, exprsFreeVars )
 import GHC.Core.Make
 import GHC.Types.Id.Make
 import GHC.Types.Id
@@ -65,6 +66,7 @@ import GHC.Core.TyCo.Rep( Scaled(..) )
 import GHC.Builtin.Types
 import GHC.Core.ConLike
 import GHC.Types.Unique.Set
+import GHC.Types.Var.Set   ( elemVarSet, unionVarSet )
 import GHC.Types.Unique.Supply
 import GHC.Unit.Module
 import GHC.Builtin.Names
@@ -380,7 +382,15 @@ mkDataConCase var ty alts@(alt1 :| _)
               -- Upholds the invariant that the binders of a case expression
               -- must be scaled by the case multiplicity. See Note [Case
               -- expression invariants] in CoreSyn.
-            return (Alt (DataAlt con) rep_ids' (mkLets binds body))
+            -- The boxer reconstructs every field's source binder from its
+            -- representation binder (e.g. for a strict field, by destructuring
+            -- @Strict a@).  Reconstructing a field that the body never uses
+            -- just produces dead code for the simplifier to remove later, so we
+            -- drop those binds here.  Their representation binders stay in
+            -- 'rep_ids'' but are already evaluated, so leaving them unused is
+            -- fine.
+            return $
+              (Alt (DataAlt con) rep_ids' (mkLets (usedBoxBinds body binds) body))
 
     mk_default :: MatchResult (Maybe CoreAlt)
     mk_default
@@ -391,6 +401,21 @@ mkDataConCase var ty alts@(alt1 :| _)
     un_mentioned_constructors
         = mkUniqSet data_cons `minusUniqSet` mentioned_constructors
     exhaustive_case = isEmptyUniqSet un_mentioned_constructors
+
+-- | Drop the field-reconstruction binds produced by a 'DataConBoxer' whose
+-- binders are not reachable from the case-alternative body.  This avoids
+-- emitting destructuring (e.g. of @Strict@ strict fields) for fields the body
+-- never uses, which would otherwise only be cleaned up later by the simplifier.
+-- Binds are processed from last to first so that one kept only because a later
+-- kept bind refers to it is retained.
+usedBoxBinds :: CoreExpr -> [CoreBind] -> [CoreBind]
+usedBoxBinds body binds = fst (foldr keep ([], exprFreeVars body) binds)
+  where
+    keep b (kept, needed)
+      | any (`elemVarSet` needed) (bindersOf b)
+      = (b : kept, needed `unionVarSet` exprsFreeVars (rhssOfBind b))
+      | otherwise
+      = (kept, needed)
 
 {-
 ************************************************************************

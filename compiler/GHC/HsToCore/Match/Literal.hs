@@ -222,7 +222,7 @@ dsFractionalLitToRational fl@FL{ fl_signi = signi, fl_exp = exp, fl_exp_base = b
                     (tycon, [i_ty]) -> assert (isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
                                        (head (tyConDataCons tycon), i_ty)
                     x -> pprPanic "dsLit" (ppr x)
-    return $! (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])
+    return $! (mkCoreConWrapApps ratio_data_con [Type integer_ty, num, denom])
   -- Large rationals will be computed at runtime.
   | otherwise
   = do
@@ -241,7 +241,7 @@ dsRational (n :% d) = do
   dcn <- dsLookupDataCon ratioDataConName
   let cn = mkIntegerExpr platform n
   let dn = mkIntegerExpr platform d
-  return $ mkCoreConApps dcn [Type integerTy, cn, dn]
+  return $ mkCoreConWrapApps dcn [Type integerTy, cn, dn]
 
 
 dsOverLit :: HsOverLit GhcTc -> DsM CoreExpr

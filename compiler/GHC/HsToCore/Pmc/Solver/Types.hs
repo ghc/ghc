@@ -714,7 +714,7 @@ coreExprAsPmLit e = case collectArgs e of
     | Just (ty,l) <- bignum_lit_maybe x l
     -> Just (PmLit ty (PmLitInt l))
   (Var x, [_ty, n_arg, d_arg])
-    | Just dc <- isDataConWorkId_maybe x
+    | Just dc <- firstJust (isDataConWorkId_maybe x) (isDataConWrapId_maybe x)
     , dataConName dc == ratioDataConName
     , Just (PmLit _ (PmLitInt n)) <- coreExprAsPmLit n_arg
     , Just (PmLit _ (PmLitInt d)) <- coreExprAsPmLit d_arg
@@ -741,7 +741,7 @@ coreExprAsPmLit e = case collectArgs e of
     | Just exp_base <- is_larg_exp_ratio x
     , [r, exp] <- dropWhile (not . is_ratio) args
     , (Var x, [_ty, n_arg, d_arg]) <- collectArgs r
-    , Just dc <- isDataConWorkId_maybe x
+    , Just dc <- firstJust (isDataConWorkId_maybe x) (isDataConWrapId_maybe x)
     , dataConName dc == ratioDataConName
     , Just (PmLit _ (PmLitInt n)) <- coreExprAsPmLit n_arg
     , Just (PmLit _ (PmLitInt d)) <- coreExprAsPmLit d_arg
@@ -797,7 +797,6 @@ coreExprAsPmLit e = case collectArgs e of
       = Just Base2
       | otherwise
       = Nothing
-
 
     -- See Note [Detecting overloaded literals with -XRebindableSyntax]
     is_rebound_name :: Id -> Name -> Bool
