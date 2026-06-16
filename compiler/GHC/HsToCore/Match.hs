@@ -764,7 +764,7 @@ Call @match@ with all of this information!
 
 matchWrapper
   :: HsMatchContextRn                  -- ^ For shadowing warning messages
-  -> Maybe [LHsExpr GhcTc]             -- ^ Scrutinee(s)
+  -> Maybe [CoreExpr]                  -- ^ Already-desugared scrutinee(s)
                                        -- see Note [matchWrapper scrutinees]
   -> MatchGroup GhcTc (LHsExpr GhcTc)  -- ^ Matches being desugared
   -> DsM ([Id], CoreExpr)              -- ^ Results (usually passed to 'match')
@@ -820,7 +820,7 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
                -- pmc for pattern synonyms
 
             -- See Note [Long-distance information] in GHC.HsToCore.Pmc
-            then addHsScrutTmCs (concat scrs) new_vars $
+            then addCoreScrutTmCs (concat scrs) new_vars $
                  pmcMatches origin (DsMatchContext ctxt locn) new_vars matches
 
             -- When we're not doing PM checks on the match group,

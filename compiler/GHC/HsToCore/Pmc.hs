@@ -39,7 +39,7 @@ module GHC.HsToCore.Pmc (
         isMatchContextPmChecked, isMatchContextPmChecked_SinglePat,
 
         -- See Note [Long-distance information]
-        addTyCs, addCoreScrutTmCs, addHsScrutTmCs, getLdiNablas,
+        addTyCs, addCoreScrutTmCs, getLdiNablas,
         getNFirstUncovered
     ) where
 
@@ -63,7 +63,6 @@ import GHC.Utils.Panic
 import GHC.Types.Var (EvVar, Var (..))
 import GHC.Types.Id.Info
 import GHC.Tc.Utils.TcType (evVarPred)
-import {-# SOURCE #-} GHC.HsToCore.Expr (dsLExpr)
 import GHC.HsToCore.Monad
 import GHC.Data.Bag
 import GHC.Data.OrdList
@@ -542,12 +541,6 @@ addCoreScrutTmCs (scr:scrs) (x:xs) k =
     addPhiCtsNablas nablas (unitBag (PhiCoreCt x scr))
 addCoreScrutTmCs _   _   _ = panic "addCoreScrutTmCs: numbers of scrutinees and match ids differ"
 
--- | 'addCoreScrutTmCs', but desugars the 'LHsExpr's first.
-addHsScrutTmCs :: [LHsExpr GhcTc] -> [Id] -> DsM a -> DsM a
-addHsScrutTmCs scrs vars k = do
-  scr_es <- traverse dsLExpr scrs
-  addCoreScrutTmCs scr_es vars k
-
 {- Note [Long-distance information]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -564,15 +557,18 @@ and the nested case pattern match to see that the inner pattern match is
 exhaustive: @c@ can't be @R@ anymore because it was matched in the first clause
 of @f@.
 
-To achieve similar reasoning in the coverage checker, we keep track of the set
-of values that can reach a particular program point (often loosely referred to
-as "Covered set") in 'GHC.HsToCore.Monad.dsl_nablas'.
-We fill that set with Covered Nablas returned by the exported checking
-functions, which the call sites put into place with
-'GHC.HsToCore.Monad.updPmNablas'.
-Call sites also extend this set with facts from type-constraint dictionaries,
-case scrutinees, etc. with the exported functions 'addTyCs', 'addCoreScrutTmCs'
-and 'addHsScrutTmCs'.
+To achieve similar reasoning in the coverage checker:
+
+* We keep track of the set of values that can reach a particular program point
+  (often loosely refer red to as "Covered set") in 'GHC.HsToCore.Monad.dsl_nablas
+  :: LdiNablas'.
+
+* We fill that set with Covered Nablas returned by the exported checking functions,
+  which the call sites put into place with 'GHC.HsToCore.Monad.updPmNablas'.
+
+* Call sites also extend this set with facts from type-constraint dictionaries,
+  case scrutinees, etc. with the exported functions 'addTyCs' and
+  'addCoreScrutTmCs'.
 
 Note [Recovering from unsatisfiable pattern-matching constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
