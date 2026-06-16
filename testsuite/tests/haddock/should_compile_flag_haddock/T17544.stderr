@@ -34,8 +34,7 @@
    (L
     (EpAnn
      (EpaSpan { T17544.hs:3:8-13 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     {ModuleName: T17544}))
@@ -44,8 +43,7 @@
   [(L
     (EpAnn
      (EpaSpan { T17544.hs:(5,1)-(6,16) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -82,8 +80,7 @@
        [(L
          (EpAnn
           (EpaSpan { T17544.hs:5:10 })
-          (AnnListItem
-           [])
+          []
           (EpaComments
            []))
          (HsTvb
@@ -112,8 +109,7 @@
       [(L
         (EpAnn
          (EpaSpan { T17544.hs:6:3-16 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (ClassOpSig
@@ -136,8 +132,7 @@
          (L
           (EpAnn
            (EpaSpan { T17544.hs:6:9-16 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (HsSig
@@ -147,8 +142,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544.hs:6:9-16 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsFunTy
@@ -164,8 +158,7 @@
              (L
               (EpAnn
                (EpaSpan { T17544.hs:6:9 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -183,8 +176,7 @@
              (L
               (EpAnn
                (EpaSpan { T17544.hs:6:14-16 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsDocTy
@@ -192,8 +184,7 @@
                (L
                 (EpAnn
                  (EpaSpan { T17544.hs:6:14-16 })
-                 (AnnListItem
-                  [])
+                 []
                  (EpaComments
                   []))
                 (HsTyVar
@@ -227,8 +218,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:(9,1)-(10,16) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -265,8 +255,7 @@
        [(L
          (EpAnn
           (EpaSpan { T17544.hs:9:10 })
-          (AnnListItem
-           [])
+          []
           (EpaComments
            []))
          (HsTvb
@@ -295,8 +284,7 @@
       [(L
         (EpAnn
          (EpaSpan { T17544.hs:10:3-16 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (ClassOpSig
@@ -319,8 +307,7 @@
          (L
           (EpAnn
            (EpaSpan { T17544.hs:10:9-16 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (HsSig
@@ -330,8 +317,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544.hs:10:9-16 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsFunTy
@@ -347,8 +333,7 @@
              (L
               (EpAnn
                (EpaSpan { T17544.hs:10:9 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -366,8 +351,7 @@
              (L
               (EpAnn
                (EpaSpan { T17544.hs:10:14-16 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -388,8 +372,7 @@
       [(L
         (EpAnn
          (EpaSpan { T17544.hs:11:3-20 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (DocCommentPrev
@@ -408,8 +391,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:(13,1)-(14,16) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -446,8 +428,7 @@
        [(L
          (EpAnn
           (EpaSpan { T17544.hs:13:10 })
-          (AnnListItem
-           [])
+          []
           (EpaComments
            []))
          (HsTvb
@@ -476,8 +457,7 @@
       [(L
         (EpAnn
          (EpaSpan { T17544.hs:14:3-16 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (ClassOpSig
@@ -500,8 +480,7 @@
          (L
           (EpAnn
            (EpaSpan { T17544.hs:14:9-16 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (HsSig
@@ -511,8 +490,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544.hs:14:9-16 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsFunTy
@@ -528,8 +506,7 @@
              (L
               (EpAnn
                (EpaSpan { T17544.hs:14:9 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -547,8 +524,7 @@
              (L
               (EpAnn
                (EpaSpan { T17544.hs:14:14-16 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -570,8 +546,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:15:1-18 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (DocD
@@ -592,8 +567,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:(17,1)-(20,16) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -630,8 +604,7 @@
        [(L
          (EpAnn
           (EpaSpan { T17544.hs:17:10 })
-          (AnnListItem
-           [])
+          []
           (EpaComments
            []))
          (HsTvb
@@ -660,8 +633,7 @@
       [(L
         (EpAnn
          (EpaSpan { T17544.hs:18:3-16 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (ClassOpSig
@@ -684,8 +656,7 @@
          (L
           (EpAnn
            (EpaSpan { T17544.hs:18:9-16 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (HsSig
@@ -695,8 +666,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544.hs:18:9-16 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsFunTy
@@ -712,8 +682,7 @@
              (L
               (EpAnn
                (EpaSpan { T17544.hs:18:9 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -731,8 +700,7 @@
              (L
               (EpAnn
                (EpaSpan { T17544.hs:18:14-16 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -750,8 +718,7 @@
       ,(L
         (EpAnn
          (EpaSpan { T17544.hs:20:3-16 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (ClassOpSig
@@ -774,8 +741,7 @@
          (L
           (EpAnn
            (EpaSpan { T17544.hs:20:9-16 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (HsSig
@@ -785,8 +751,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544.hs:20:9-16 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsFunTy
@@ -802,8 +767,7 @@
              (L
               (EpAnn
                (EpaSpan { T17544.hs:20:9 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -821,8 +785,7 @@
              (L
               (EpAnn
                (EpaSpan { T17544.hs:20:14-16 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -844,8 +807,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:22:1-30 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -883,8 +845,7 @@
        [(L
          (EpAnn
           (EpaSpan { T17544.hs:22:10 })
-          (AnnListItem
-           [])
+          []
           (EpaComments
            []))
          (HsTvb
@@ -915,8 +876,7 @@
       [(L
         (EpAnn
          (EpaSpan { T17544.hs:22:20-28 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (FamilyDecl
@@ -950,8 +910,7 @@
           [(L
             (EpAnn
              (EpaSpan { T17544.hs:22:28 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTvb
@@ -990,8 +949,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:(23,1)-(25,18) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (InstD
@@ -1013,8 +971,7 @@
        (L
         (EpAnn
          (EpaSpan { T17544.hs:23:10-15 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (HsSig
@@ -1024,8 +981,7 @@
          (L
           (EpAnn
            (EpaSpan { T17544.hs:23:10-15 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (HsAppTy
@@ -1033,8 +989,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544.hs:23:10-11 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTyVar
@@ -1052,8 +1007,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544.hs:23:13-15 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTyVar
@@ -1074,8 +1028,7 @@
        [(L
          (EpAnn
           (EpaSpan { T17544.hs:(24,3)-(25,18) })
-          (AnnListItem
-           [])
+          []
           (EpaComments
            []))
          (DataFamInstDecl
@@ -1100,8 +1053,7 @@
              (L
               (EpAnn
                (EpaSpan { T17544.hs:24:11-13 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -1140,8 +1092,7 @@
              [(L
                (EpAnn
                 (EpaSpan { T17544.hs:25:5-18 })
-                (AnnListItem
-                 [])
+                []
                 (EpaComments
                  []))
                (ConDeclGADT
@@ -1166,8 +1117,7 @@
                 (L
                  (EpAnn
                   (EpaSpan { T17544.hs:25:13-18 })
-                  (AnnListItem
-                   [])
+                  []
                   (EpaComments
                    []))
                  (HsOuterImplicit
@@ -1180,8 +1130,7 @@
                 (L
                  (EpAnn
                   (EpaSpan { T17544.hs:25:13-18 })
-                  (AnnListItem
-                   [])
+                  []
                   (EpaComments
                    []))
                  (HsAppTy
@@ -1189,8 +1138,7 @@
                   (L
                    (EpAnn
                     (EpaSpan { T17544.hs:25:13-14 })
-                    (AnnListItem
-                     [])
+                    []
                     (EpaComments
                      []))
                    (HsTyVar
@@ -1208,8 +1156,7 @@
                   (L
                    (EpAnn
                     (EpaSpan { T17544.hs:25:16-18 })
-                    (AnnListItem
-                     [])
+                    []
                     (EpaComments
                      []))
                    (HsTyVar
@@ -1230,8 +1177,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:28:1-30 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -1269,8 +1215,7 @@
        [(L
          (EpAnn
           (EpaSpan { T17544.hs:28:10 })
-          (AnnListItem
-           [])
+          []
           (EpaComments
            []))
          (HsTvb
@@ -1301,8 +1246,7 @@
       [(L
         (EpAnn
          (EpaSpan { T17544.hs:28:20-28 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (FamilyDecl
@@ -1336,8 +1280,7 @@
           [(L
             (EpAnn
              (EpaSpan { T17544.hs:28:28 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTvb
@@ -1376,8 +1319,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:(29,1)-(31,18) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (InstD
@@ -1399,8 +1341,7 @@
        (L
         (EpAnn
          (EpaSpan { T17544.hs:29:10-15 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (HsSig
@@ -1410,8 +1351,7 @@
          (L
           (EpAnn
            (EpaSpan { T17544.hs:29:10-15 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (HsAppTy
@@ -1419,8 +1359,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544.hs:29:10-11 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTyVar
@@ -1438,8 +1377,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544.hs:29:13-15 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTyVar
@@ -1460,8 +1398,7 @@
        [(L
          (EpAnn
           (EpaSpan { T17544.hs:(30,3)-(31,18) })
-          (AnnListItem
-           [])
+          []
           (EpaComments
            []))
          (DataFamInstDecl
@@ -1486,8 +1423,7 @@
              (L
               (EpAnn
                (EpaSpan { T17544.hs:30:11-13 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -1526,8 +1462,7 @@
              [(L
                (EpAnn
                 (EpaSpan { T17544.hs:31:5-18 })
-                (AnnListItem
-                 [])
+                []
                 (EpaComments
                  []))
                (ConDeclGADT
@@ -1552,8 +1487,7 @@
                 (L
                  (EpAnn
                   (EpaSpan { T17544.hs:31:13-18 })
-                  (AnnListItem
-                   [])
+                  []
                   (EpaComments
                    []))
                  (HsOuterImplicit
@@ -1566,8 +1500,7 @@
                 (L
                  (EpAnn
                   (EpaSpan { T17544.hs:31:13-18 })
-                  (AnnListItem
-                   [])
+                  []
                   (EpaComments
                    []))
                  (HsAppTy
@@ -1575,8 +1508,7 @@
                   (L
                    (EpAnn
                     (EpaSpan { T17544.hs:31:13-14 })
-                    (AnnListItem
-                     [])
+                    []
                     (EpaComments
                      []))
                    (HsTyVar
@@ -1594,8 +1526,7 @@
                   (L
                    (EpAnn
                     (EpaSpan { T17544.hs:31:16-18 })
-                    (AnnListItem
-                     [])
+                    []
                     (EpaComments
                      []))
                    (HsTyVar
@@ -1616,8 +1547,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:34:1-30 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -1655,8 +1585,7 @@
        [(L
          (EpAnn
           (EpaSpan { T17544.hs:34:10 })
-          (AnnListItem
-           [])
+          []
           (EpaComments
            []))
          (HsTvb
@@ -1687,8 +1616,7 @@
       [(L
         (EpAnn
          (EpaSpan { T17544.hs:34:20-28 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (FamilyDecl
@@ -1722,8 +1650,7 @@
           [(L
             (EpAnn
              (EpaSpan { T17544.hs:34:28 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTvb
@@ -1762,8 +1689,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:(35,1)-(37,18) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (InstD
@@ -1785,8 +1711,7 @@
        (L
         (EpAnn
          (EpaSpan { T17544.hs:35:10-15 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (HsSig
@@ -1796,8 +1721,7 @@
          (L
           (EpAnn
            (EpaSpan { T17544.hs:35:10-15 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (HsAppTy
@@ -1805,8 +1729,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544.hs:35:10-11 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTyVar
@@ -1824,8 +1747,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544.hs:35:13-15 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTyVar
@@ -1846,8 +1768,7 @@
        [(L
          (EpAnn
           (EpaSpan { T17544.hs:(36,3)-(37,18) })
-          (AnnListItem
-           [])
+          []
           (EpaComments
            []))
          (DataFamInstDecl
@@ -1872,8 +1793,7 @@
              (L
               (EpAnn
                (EpaSpan { T17544.hs:36:11-13 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -1912,8 +1832,7 @@
              [(L
                (EpAnn
                 (EpaSpan { T17544.hs:37:5-18 })
-                (AnnListItem
-                 [])
+                []
                 (EpaComments
                  []))
                (ConDeclGADT
@@ -1938,8 +1857,7 @@
                 (L
                  (EpAnn
                   (EpaSpan { T17544.hs:37:13-18 })
-                  (AnnListItem
-                   [])
+                  []
                   (EpaComments
                    []))
                  (HsOuterImplicit
@@ -1952,8 +1870,7 @@
                 (L
                  (EpAnn
                   (EpaSpan { T17544.hs:37:13-18 })
-                  (AnnListItem
-                   [])
+                  []
                   (EpaComments
                    []))
                  (HsAppTy
@@ -1961,8 +1878,7 @@
                   (L
                    (EpAnn
                     (EpaSpan { T17544.hs:37:13-14 })
-                    (AnnListItem
-                     [])
+                    []
                     (EpaComments
                      []))
                    (HsTyVar
@@ -1980,8 +1896,7 @@
                   (L
                    (EpAnn
                     (EpaSpan { T17544.hs:37:16-18 })
-                    (AnnListItem
-                     [])
+                    []
                     (EpaComments
                      []))
                    (HsTyVar
@@ -2002,8 +1917,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:40:1-30 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -2041,8 +1955,7 @@
        [(L
          (EpAnn
           (EpaSpan { T17544.hs:40:10 })
-          (AnnListItem
-           [])
+          []
           (EpaComments
            []))
          (HsTvb
@@ -2073,8 +1986,7 @@
       [(L
         (EpAnn
          (EpaSpan { T17544.hs:40:20-28 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (FamilyDecl
@@ -2108,8 +2020,7 @@
           [(L
             (EpAnn
              (EpaSpan { T17544.hs:40:28 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTvb
@@ -2148,8 +2059,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:(41,1)-(43,18) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (InstD
@@ -2171,8 +2081,7 @@
        (L
         (EpAnn
          (EpaSpan { T17544.hs:41:10-15 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (HsSig
@@ -2182,8 +2091,7 @@
          (L
           (EpAnn
            (EpaSpan { T17544.hs:41:10-15 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (HsAppTy
@@ -2191,8 +2099,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544.hs:41:10-11 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTyVar
@@ -2210,8 +2117,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544.hs:41:13-15 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTyVar
@@ -2232,8 +2138,7 @@
        [(L
          (EpAnn
           (EpaSpan { T17544.hs:(42,3)-(43,18) })
-          (AnnListItem
-           [])
+          []
           (EpaComments
            []))
          (DataFamInstDecl
@@ -2258,8 +2163,7 @@
              (L
               (EpAnn
                (EpaSpan { T17544.hs:42:11-13 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -2298,8 +2202,7 @@
              [(L
                (EpAnn
                 (EpaSpan { T17544.hs:43:5-18 })
-                (AnnListItem
-                 [])
+                []
                 (EpaComments
                  []))
                (ConDeclGADT
@@ -2324,8 +2227,7 @@
                 (L
                  (EpAnn
                   (EpaSpan { T17544.hs:43:13-18 })
-                  (AnnListItem
-                   [])
+                  []
                   (EpaComments
                    []))
                  (HsOuterImplicit
@@ -2338,8 +2240,7 @@
                 (L
                  (EpAnn
                   (EpaSpan { T17544.hs:43:13-18 })
-                  (AnnListItem
-                   [])
+                  []
                   (EpaComments
                    []))
                  (HsAppTy
@@ -2347,8 +2248,7 @@
                   (L
                    (EpAnn
                     (EpaSpan { T17544.hs:43:13-14 })
-                    (AnnListItem
-                     [])
+                    []
                     (EpaComments
                      []))
                    (HsTyVar
@@ -2366,8 +2266,7 @@
                   (L
                    (EpAnn
                     (EpaSpan { T17544.hs:43:16-18 })
-                    (AnnListItem
-                     [])
+                    []
                     (EpaComments
                      []))
                    (HsTyVar
@@ -2388,8 +2287,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:46:1-30 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -2427,8 +2325,7 @@
        [(L
          (EpAnn
           (EpaSpan { T17544.hs:46:10 })
-          (AnnListItem
-           [])
+          []
           (EpaComments
            []))
          (HsTvb
@@ -2459,8 +2356,7 @@
       [(L
         (EpAnn
          (EpaSpan { T17544.hs:46:20-28 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (FamilyDecl
@@ -2494,8 +2390,7 @@
           [(L
             (EpAnn
              (EpaSpan { T17544.hs:46:28 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTvb
@@ -2534,8 +2429,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:(47,1)-(49,18) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (InstD
@@ -2557,8 +2451,7 @@
        (L
         (EpAnn
          (EpaSpan { T17544.hs:47:10-15 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (HsSig
@@ -2568,8 +2461,7 @@
          (L
           (EpAnn
            (EpaSpan { T17544.hs:47:10-15 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (HsAppTy
@@ -2577,8 +2469,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544.hs:47:10-11 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTyVar
@@ -2596,8 +2487,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544.hs:47:13-15 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTyVar
@@ -2618,8 +2508,7 @@
        [(L
          (EpAnn
           (EpaSpan { T17544.hs:(48,3)-(49,18) })
-          (AnnListItem
-           [])
+          []
           (EpaComments
            []))
          (DataFamInstDecl
@@ -2644,8 +2533,7 @@
              (L
               (EpAnn
                (EpaSpan { T17544.hs:48:11-13 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -2684,8 +2572,7 @@
              [(L
                (EpAnn
                 (EpaSpan { T17544.hs:49:5-18 })
-                (AnnListItem
-                 [])
+                []
                 (EpaComments
                  []))
                (ConDeclGADT
@@ -2710,8 +2597,7 @@
                 (L
                  (EpAnn
                   (EpaSpan { T17544.hs:49:13-18 })
-                  (AnnListItem
-                   [])
+                  []
                   (EpaComments
                    []))
                  (HsOuterImplicit
@@ -2724,8 +2610,7 @@
                 (L
                  (EpAnn
                   (EpaSpan { T17544.hs:49:13-18 })
-                  (AnnListItem
-                   [])
+                  []
                   (EpaComments
                    []))
                  (HsAppTy
@@ -2733,8 +2618,7 @@
                   (L
                    (EpAnn
                     (EpaSpan { T17544.hs:49:13-14 })
-                    (AnnListItem
-                     [])
+                    []
                     (EpaComments
                      []))
                    (HsTyVar
@@ -2752,8 +2636,7 @@
                   (L
                    (EpAnn
                     (EpaSpan { T17544.hs:49:16-18 })
-                    (AnnListItem
-                     [])
+                    []
                     (EpaComments
                      []))
                    (HsTyVar
@@ -2774,8 +2657,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:52:1-32 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -2813,8 +2695,7 @@
        [(L
          (EpAnn
           (EpaSpan { T17544.hs:52:11 })
-          (AnnListItem
-           [])
+          []
           (EpaComments
            []))
          (HsTvb
@@ -2845,8 +2726,7 @@
       [(L
         (EpAnn
          (EpaSpan { T17544.hs:52:21-30 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (FamilyDecl
@@ -2880,8 +2760,7 @@
           [(L
             (EpAnn
              (EpaSpan { T17544.hs:52:30 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTvb
@@ -2920,8 +2799,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:(53,1)-(55,20) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (InstD
@@ -2943,8 +2821,7 @@
        (L
         (EpAnn
          (EpaSpan { T17544.hs:53:10-16 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (HsSig
@@ -2954,8 +2831,7 @@
          (L
           (EpAnn
            (EpaSpan { T17544.hs:53:10-16 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (HsAppTy
@@ -2963,8 +2839,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544.hs:53:10-12 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTyVar
@@ -2982,8 +2857,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544.hs:53:14-16 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTyVar
@@ -3004,8 +2878,7 @@
        [(L
          (EpAnn
           (EpaSpan { T17544.hs:(54,3)-(55,20) })
-          (AnnListItem
-           [])
+          []
           (EpaComments
            []))
          (DataFamInstDecl
@@ -3030,8 +2903,7 @@
              (L
               (EpAnn
                (EpaSpan { T17544.hs:54:12-14 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -3070,8 +2942,7 @@
              [(L
                (EpAnn
                 (EpaSpan { T17544.hs:55:5-20 })
-                (AnnListItem
-                 [])
+                []
                 (EpaComments
                  []))
                (ConDeclGADT
@@ -3096,8 +2967,7 @@
                 (L
                  (EpAnn
                   (EpaSpan { T17544.hs:55:14-20 })
-                  (AnnListItem
-                   [])
+                  []
                   (EpaComments
                    []))
                  (HsOuterImplicit
@@ -3110,8 +2980,7 @@
                 (L
                  (EpAnn
                   (EpaSpan { T17544.hs:55:14-20 })
-                  (AnnListItem
-                   [])
+                  []
                   (EpaComments
                    []))
                  (HsAppTy
@@ -3119,8 +2988,7 @@
                   (L
                    (EpAnn
                     (EpaSpan { T17544.hs:55:14-16 })
-                    (AnnListItem
-                     [])
+                    []
                     (EpaComments
                      []))
                    (HsTyVar
@@ -3138,8 +3006,7 @@
                   (L
                    (EpAnn
                     (EpaSpan { T17544.hs:55:18-20 })
-                    (AnnListItem
-                     [])
+                    []
                     (EpaComments
                      []))
                    (HsTyVar
@@ -3160,8 +3027,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:56:1-38 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (DocD

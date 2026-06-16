@@ -34,8 +34,7 @@
    (L
     (EpAnn
      (EpaSpan { T24221.hs:1:8-13 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     {ModuleName: T24221}))
@@ -44,8 +43,7 @@
   [(L
     (EpAnn
      (EpaSpan { T24221.hs:(3,1)-(9,15) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -89,10 +87,9 @@
         [(L
           (EpAnn
            (EpaSpan { T24221.hs:5:5-12 })
-           (AnnListItem
-            [(AddVbarAnn
-              (EpTok
-               (EpaSpan { T24221.hs:7:3 })))])
+           [(AddVbarAnn
+             (EpTok
+              (EpaSpan { T24221.hs:7:3 })))]
            (EpaComments
             []))
           (ConDeclH98
@@ -133,8 +130,7 @@
               (L
                (EpAnn
                 (EpaSpan { T24221.hs:5:10-12 })
-                (AnnListItem
-                 [])
+                []
                 (EpaComments
                  []))
                (HsTyVar
@@ -166,10 +162,9 @@
         ,(L
           (EpAnn
            (EpaSpan { T24221.hs:7:5-12 })
-           (AnnListItem
-            [(AddVbarAnn
-              (EpTok
-               (EpaSpan { T24221.hs:9:3 })))])
+           [(AddVbarAnn
+             (EpTok
+              (EpaSpan { T24221.hs:9:3 })))]
            (EpaComments
             []))
           (ConDeclH98
@@ -210,8 +205,7 @@
               (L
                (EpAnn
                 (EpaSpan { T24221.hs:7:10-12 })
-                (AnnListItem
-                 [])
+                []
                 (EpaComments
                  []))
                (HsTyVar
@@ -243,8 +237,7 @@
         ,(L
           (EpAnn
            (EpaSpan { T24221.hs:9:5-15 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (ConDeclH98
@@ -285,8 +278,7 @@
              (L
               (EpAnn
                (EpaSpan { T24221.hs:9:5-7 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -320,8 +312,7 @@
              (L
               (EpAnn
                (EpaSpan { T24221.hs:9:12-15 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -354,8 +345,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T24221.hs:(11,1)-(12,13) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -399,8 +389,7 @@
         [(L
           (EpAnn
            (EpaSpan { T24221.hs:12:3-13 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (ConDeclH98
@@ -441,8 +430,7 @@
              (L
               (EpAnn
                (EpaSpan { T24221.hs:12:3-5 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -476,8 +464,7 @@
              (L
               (EpAnn
                (EpaSpan { T24221.hs:12:10-13 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -510,8 +497,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T24221.hs:(14,1)-(17,6) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -555,8 +541,7 @@
         [(L
           (EpAnn
            (EpaSpan { T24221.hs:(15,3)-(17,6) })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (ConDeclH98
@@ -597,8 +582,7 @@
              (L
               (EpAnn
                (EpaSpan { T24221.hs:15:3-5 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -644,8 +628,7 @@
              (L
               (EpAnn
                (EpaSpan { T24221.hs:17:3-6 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -690,8 +673,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T24221.hs:(19,1)-(25,6) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -735,8 +717,7 @@
         [(L
           (EpAnn
            (EpaSpan { T24221.hs:(21,3)-(25,6) })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (ConDeclH98
@@ -777,8 +758,7 @@
              (L
               (EpAnn
                (EpaSpan { T24221.hs:21:3-5 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -824,8 +804,7 @@
              (L
               (EpAnn
                (EpaSpan { T24221.hs:25:3-6 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTyVar
@@ -870,8 +849,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T24221.hs:(27,1)-(29,22) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -915,8 +893,7 @@
         [(L
           (EpAnn
            (EpaSpan { T24221.hs:(28,3)-(29,22) })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (ConDeclH98
@@ -951,10 +928,9 @@
              [(L
                (EpAnn
                 (EpaSpan { T24221.hs:28:12-20 })
-                (AnnListItem
-                 [(AddCommaAnn
-                   (EpTok
-                    (EpaSpan { T24221.hs:29:10 })))])
+                [(AddCommaAnn
+                  (EpTok
+                   (EpaSpan { T24221.hs:29:10 })))]
                 (EpaComments
                  []))
                (HsConDeclRecField
@@ -962,8 +938,7 @@
                 [(L
                   (EpAnn
                    (EpaSpan { T24221.hs:28:12-13 })
-                   (AnnListItem
-                    [])
+                   []
                    (EpaComments
                     []))
                   (FieldOcc
@@ -997,8 +972,7 @@
                  (L
                   (EpAnn
                    (EpaSpan { T24221.hs:28:18-20 })
-                   (AnnListItem
-                    [])
+                   []
                    (EpaComments
                     []))
                   (HsTyVar
@@ -1029,8 +1003,7 @@
              ,(L
                (EpAnn
                 (EpaSpan { T24221.hs:29:12-20 })
-                (AnnListItem
-                 [])
+                []
                 (EpaComments
                  []))
                (HsConDeclRecField
@@ -1038,8 +1011,7 @@
                 [(L
                   (EpAnn
                    (EpaSpan { T24221.hs:29:12-13 })
-                   (AnnListItem
-                    [])
+                   []
                    (EpaComments
                     []))
                   (FieldOcc
@@ -1073,8 +1045,7 @@
                  (L
                   (EpAnn
                    (EpaSpan { T24221.hs:29:18-20 })
-                   (AnnListItem
-                    [])
+                   []
                    (EpaComments
                     []))
                   (HsTyVar
@@ -1107,8 +1078,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T24221.hs:(31,1)-(34,17) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -1152,8 +1122,7 @@
         [(L
           (EpAnn
            (EpaSpan { T24221.hs:(32,3)-(34,17) })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (ConDeclH98
@@ -1188,10 +1157,9 @@
              [(L
                (EpAnn
                 (EpaSpan { T24221.hs:33:7-15 })
-                (AnnListItem
-                 [(AddCommaAnn
-                   (EpTok
-                    (EpaSpan { T24221.hs:34:5 })))])
+                [(AddCommaAnn
+                  (EpTok
+                   (EpaSpan { T24221.hs:34:5 })))]
                 (EpaComments
                  []))
                (HsConDeclRecField
@@ -1199,8 +1167,7 @@
                 [(L
                   (EpAnn
                    (EpaSpan { T24221.hs:33:7-8 })
-                   (AnnListItem
-                    [])
+                   []
                    (EpaComments
                     []))
                   (FieldOcc
@@ -1234,8 +1201,7 @@
                  (L
                   (EpAnn
                    (EpaSpan { T24221.hs:33:13-15 })
-                   (AnnListItem
-                    [])
+                   []
                    (EpaComments
                     []))
                   (HsTyVar
@@ -1266,8 +1232,7 @@
              ,(L
                (EpAnn
                 (EpaSpan { T24221.hs:34:7-15 })
-                (AnnListItem
-                 [])
+                []
                 (EpaComments
                  []))
                (HsConDeclRecField
@@ -1275,8 +1240,7 @@
                 [(L
                   (EpAnn
                    (EpaSpan { T24221.hs:34:7-8 })
-                   (AnnListItem
-                    [])
+                   []
                    (EpaComments
                     []))
                   (FieldOcc
@@ -1310,8 +1274,7 @@
                  (L
                   (EpAnn
                    (EpaSpan { T24221.hs:34:13-15 })
-                   (AnnListItem
-                    [])
+                   []
                    (EpaComments
                     []))
                   (HsTyVar
@@ -1356,8 +1319,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T24221.hs:(36,1)-(43,3) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -1401,8 +1363,7 @@
         [(L
           (EpAnn
            (EpaSpan { T24221.hs:(38,3)-(43,3) })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (ConDeclH98
@@ -1437,10 +1398,9 @@
              [(L
                (EpAnn
                 (EpaSpan { T24221.hs:40:5-13 })
-                (AnnListItem
-                 [(AddCommaAnn
-                   (EpTok
-                    (EpaSpan { T24221.hs:40:14 })))])
+                [(AddCommaAnn
+                  (EpTok
+                   (EpaSpan { T24221.hs:40:14 })))]
                 (EpaComments
                  []))
                (HsConDeclRecField
@@ -1448,8 +1408,7 @@
                 [(L
                   (EpAnn
                    (EpaSpan { T24221.hs:40:5-6 })
-                   (AnnListItem
-                    [])
+                   []
                    (EpaComments
                     []))
                   (FieldOcc
@@ -1483,8 +1442,7 @@
                  (L
                   (EpAnn
                    (EpaSpan { T24221.hs:40:11-13 })
-                   (AnnListItem
-                    [])
+                   []
                    (EpaComments
                     []))
                   (HsTyVar
@@ -1515,8 +1473,7 @@
              ,(L
                (EpAnn
                 (EpaSpan { T24221.hs:42:5-13 })
-                (AnnListItem
-                 [])
+                []
                 (EpaComments
                  []))
                (HsConDeclRecField
@@ -1524,8 +1481,7 @@
                 [(L
                   (EpAnn
                    (EpaSpan { T24221.hs:42:5-6 })
-                   (AnnListItem
-                    [])
+                   []
                    (EpaComments
                     []))
                   (FieldOcc
@@ -1559,8 +1515,7 @@
                  (L
                   (EpAnn
                    (EpaSpan { T24221.hs:42:11-13 })
-                   (AnnListItem
-                    [])
+                   []
                    (EpaComments
                     []))
                   (HsTyVar

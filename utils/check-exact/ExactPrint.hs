@@ -283,9 +283,9 @@ instance HasTrailing (AnnList a) where
   trailing a = al_trailing a
   setTrailing a ts = a { al_trailing = ts }
 
-instance HasTrailing AnnListItem where
-  trailing a = lann_trailing a
-  setTrailing a ts = a { lann_trailing = ts }
+instance HasTrailing [TrailingAnn] where
+  trailing a = a
+  setTrailing _ ts = ts
 
 instance HasTrailing AnnPragma where
   trailing _ = []

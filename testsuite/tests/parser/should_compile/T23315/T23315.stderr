@@ -30,8 +30,7 @@
    (L
     (EpAnn
      (EpaSpan { T23315.hsig:1:11-16 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     {ModuleName: T23315}))
@@ -40,8 +39,7 @@
   [(L
     (EpAnn
      (EpaSpan { T23315.hsig:2:1-12 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (DocD
@@ -62,8 +60,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T23315.hsig:3:1-7 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (SigD
@@ -90,8 +87,7 @@
        (L
         (EpAnn
          (EpaSpan { T23315.hsig:3:6-7 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (HsSig
@@ -101,8 +97,7 @@
          (L
           (EpAnn
            (EpaSpan { T23315.hsig:3:6-7 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (HsTupleTy
@@ -114,8 +109,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T23315.hsig:4:1-14 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (DocD

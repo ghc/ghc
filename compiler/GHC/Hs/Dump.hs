@@ -401,7 +401,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             -- -------------------------
 
-            srcSpanAnnA :: EpAnn AnnListItem -> SDoc
+            srcSpanAnnA :: EpAnn [TrailingAnn] -> SDoc
             srcSpanAnnA = locatedAnn'' (text "SrcSpanAnnA")
 
             srcSpanAnnP :: EpAnn AnnPragma -> SDoc

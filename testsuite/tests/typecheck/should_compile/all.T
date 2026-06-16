@@ -651,8 +651,7 @@ def onlyHsParLocs(x):
     not compare the entire typechecked AST.
     Located (HsPar GhcTc) are pretty printed with the form
       (EpaSpan { T15242.hs:6:5-41 })
-      (AnnListItem
-       [])
+      []
       (EpaComments
        []))
      (HsPar
@@ -661,7 +660,7 @@ def onlyHsParLocs(x):
     appropriate spacing.
     """
     ls = x.split("\n")
-    filteredLines = (loc.strip() for (loc,hspar) in zip(ls,ls[5:])
+    filteredLines = (loc.strip() for (loc,hspar) in zip(ls,ls[4:])
 		      if hspar.strip().startswith("(HsPar")
 			and not "<no location info>" in loc)
     return '\n'.join(filteredLines)

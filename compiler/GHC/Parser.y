@@ -4833,5 +4833,5 @@ combineHasLocs a b = combineSrcSpans (getHasLoc a) (getHasLoc b)
 
 fromTrailingN :: SrcSpanAnnN -> SrcSpanAnnA
 fromTrailingN (EpAnn anc ann cs)
-    = EpAnn anc (AnnListItem (nann_trailing ann)) cs
+    = EpAnn anc (nann_trailing ann) cs
 }

@@ -34,8 +34,7 @@
    (L
     (EpAnn
      (EpaSpan { T17544_kw.hs:8:3-11 })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     {ModuleName: T17544_kw}))
@@ -43,10 +42,9 @@
    [(L
      (EpAnn
       (EpaSpan { T17544_kw.hs:9:3-9 })
-      (AnnListItem
-       [(AddCommaAnn
-         (EpTok
-          (EpaSpan { T17544_kw.hs:9:10 })))])
+      [(AddCommaAnn
+        (EpTok
+         (EpaSpan { T17544_kw.hs:9:10 })))]
       (EpaComments
        []))
      (IEThingAll
@@ -61,8 +59,7 @@
       (L
        (EpAnn
         (EpaSpan { T17544_kw.hs:9:3-5 })
-        (AnnListItem
-         [])
+        []
         (EpaComments
          []))
        (IEName
@@ -80,10 +77,9 @@
    ,(L
      (EpAnn
       (EpaSpan { T17544_kw.hs:10:3-9 })
-      (AnnListItem
-       [(AddCommaAnn
-         (EpTok
-          (EpaSpan { T17544_kw.hs:10:10 })))])
+      [(AddCommaAnn
+        (EpTok
+         (EpaSpan { T17544_kw.hs:10:10 })))]
       (EpaComments
        []))
      (IEThingAll
@@ -98,8 +94,7 @@
       (L
        (EpAnn
         (EpaSpan { T17544_kw.hs:10:3-5 })
-        (AnnListItem
-         [])
+        []
         (EpaComments
          []))
        (IEName
@@ -117,8 +112,7 @@
    ,(L
      (EpAnn
       (EpaSpan { T17544_kw.hs:11:3-9 })
-      (AnnListItem
-       [])
+      []
       (EpaComments
        []))
      (IEThingAll
@@ -133,8 +127,7 @@
       (L
        (EpAnn
         (EpaSpan { T17544_kw.hs:11:3-5 })
-        (AnnListItem
-         [])
+        []
         (EpaComments
          []))
        (IEName
@@ -153,8 +146,7 @@
   [(L
     (EpAnn
      (EpaSpan { T17544_kw.hs:(13,1)-(14,20) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -198,8 +190,7 @@
         [(L
           (EpAnn
            (EpaSpan { T17544_kw.hs:14:9-20 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (ConDeclGADT
@@ -224,8 +215,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544_kw.hs:14:18-20 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsOuterImplicit
@@ -238,8 +228,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544_kw.hs:14:18-20 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTyVar
@@ -259,8 +248,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544_kw.hs:(16,1)-(17,26) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -303,8 +291,7 @@
         (L
          (EpAnn
           (EpaSpan { T17544_kw.hs:17:9-26 })
-          (AnnListItem
-           [])
+          []
           (EpaComments
            []))
          (ConDeclGADT
@@ -329,8 +316,7 @@
           (L
            (EpAnn
             (EpaSpan { T17544_kw.hs:17:18-26 })
-            (AnnListItem
-             [])
+            []
             (EpaComments
              []))
            (HsOuterImplicit
@@ -359,8 +345,7 @@
              (L
               (EpAnn
                (EpaSpan { T17544_kw.hs:17:18-19 })
-               (AnnListItem
-                [])
+               []
                (EpaComments
                 []))
               (HsTupleTy
@@ -373,8 +358,7 @@
           (L
            (EpAnn
             (EpaSpan { T17544_kw.hs:17:24-26 })
-            (AnnListItem
-             [])
+            []
             (EpaComments
              []))
            (HsTyVar
@@ -394,8 +378,7 @@
   ,(L
     (EpAnn
      (EpaSpan { T17544_kw.hs:(19,1)-(22,18) })
-     (AnnListItem
-      [])
+     []
      (EpaComments
       []))
     (TyClD
@@ -432,8 +415,7 @@
        [(L
          (EpAnn
           (EpaSpan { T17544_kw.hs:19:11 })
-          (AnnListItem
-           [])
+          []
           (EpaComments
            []))
          (HsTvb
@@ -462,8 +444,7 @@
       [(L
         (EpAnn
          (EpaSpan { T17544_kw.hs:22:5-18 })
-         (AnnListItem
-          [])
+         []
          (EpaComments
           []))
         (ClassOpSig
@@ -486,8 +467,7 @@
          (L
           (EpAnn
            (EpaSpan { T17544_kw.hs:22:18 })
-           (AnnListItem
-            [])
+           []
            (EpaComments
             []))
           (HsSig
@@ -497,8 +477,7 @@
            (L
             (EpAnn
              (EpaSpan { T17544_kw.hs:22:18 })
-             (AnnListItem
-              [])
+             []
              (EpaComments
               []))
             (HsTyVar

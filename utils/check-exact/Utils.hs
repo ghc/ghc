@@ -237,7 +237,7 @@ insertCppComments (L l p) cs0 = insertRemainingCppComments (L l p2) remaining
                                            `extM` addCommentsList) p0) cs
     (p2, remaining) = insertTopLevelCppComments p1 toplevel
 
-    addCommentsListItem :: EpAnn AnnListItem -> State [LEpaComment] (EpAnn AnnListItem)
+    addCommentsListItem :: EpAnn [TrailingAnn] -> State [LEpaComment] (EpAnn [TrailingAnn])
     addCommentsListItem = addComments
 
     addCommentsList :: EpAnn (AnnList ()) -> State [LEpaComment] (EpAnn (AnnList ()))
