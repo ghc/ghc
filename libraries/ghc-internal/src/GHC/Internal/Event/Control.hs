@@ -39,7 +39,7 @@ import GHC.Internal.Show (Show)
 import GHC.Internal.Types (Bool(..), Int, IO)
 import GHC.Internal.Word (Word8)
 import GHC.Internal.Foreign.C.Error (throwErrnoIfMinus1_, throwErrno, getErrno)
-import GHC.Internal.Foreign.C.Types (CInt(..), CSize(..))
+import GHC.Internal.Foreign.C.Types (CSize(..))
 import GHC.Internal.Foreign.ForeignPtr (ForeignPtr, mallocForeignPtrBytes, withForeignPtr)
 import GHC.Internal.Foreign.Marshal.Alloc (alloca, allocaBytes)
 import GHC.Internal.Foreign.Marshal.Array (allocaArray)
@@ -51,7 +51,7 @@ import GHC.Internal.System.Posix.Types (Fd)
 
 #if defined(HAVE_EVENTFD)
 import GHC.Internal.Foreign.C.Error (throwErrnoIfMinus1, eBADF)
-import GHC.Internal.Foreign.C.Types (CULLong(..))
+import GHC.Internal.Foreign.C.Types (CInt(..), CULLong(..))
 #else
 import GHC.Internal.Foreign.C.Error (eAGAIN, eWOULDBLOCK, eBADF)
 #endif
@@ -78,7 +78,10 @@ data Control = W {
     , wakeupReadFd   :: {-# UNPACK #-} !Fd
     , wakeupWriteFd  :: {-# UNPACK #-} !Fd
 #endif
-    , didRegisterWakeupFd :: !Bool
+    , didRegisterWakeupFd :: !Bool -- ^ Now redundant. Always False.
+      --TODO: remove ^^ this redundant field.
+      -- Technically, removing this is an API change to base. Sigh.
+
       -- | Have this Control's fds been cleaned up?
     , controlIsDead  :: !(IORef Bool)
     }
@@ -91,8 +94,8 @@ wakeupReadFd = controlEventFd
 
 -- | Create the structure (usually a pipe) used for waking up the IO
 -- manager thread from another thread.
-newControl :: Bool -> IO Control
-newControl shouldRegister = allocaArray 2 $ \fds -> do
+newControl :: IO Control
+newControl = allocaArray 2 $ \fds -> do
   let createPipe = do
         throwErrnoIfMinus1_ "pipe" $ c_pipe fds
         rd <- peekElemOff fds 0
@@ -108,10 +111,8 @@ newControl shouldRegister = allocaArray 2 $ \fds -> do
   ev <- throwErrnoIfMinus1 "eventfd" $ c_eventfd 0 0
   setNonBlockingFD ev True
   setCloseOnExec ev
-  when shouldRegister $ c_setIOManagerWakeupFd ev
 #else
   (wake_rd, wake_wr) <- createPipe
-  when shouldRegister $ c_setIOManagerWakeupFd wake_wr
 #endif
   isDead <- newIORef False
   return W { controlReadFd  = fromIntegral ctrl_rd
@@ -122,25 +123,16 @@ newControl shouldRegister = allocaArray 2 $ \fds -> do
            , wakeupReadFd   = fromIntegral wake_rd
            , wakeupWriteFd  = fromIntegral wake_wr
 #endif
-           , didRegisterWakeupFd = shouldRegister
+           , didRegisterWakeupFd = False
            , controlIsDead  = isDead
            }
 
 -- | Close the control structure used by the IO manager thread.
--- N.B. If this Control is the Control whose wakeup file was registered with
--- the RTS, then *BEFORE* the wakeup file is closed, we must call
--- c_setIOManagerWakeupFd (-1), so that the RTS does not try to use the wakeup
--- file after it has been closed.
---
--- Note, however, that even if we do the above, this function is still racy
--- since we do not synchronize between here and ioManagerWakeup.
--- ioManagerWakeup ignores failures that arise from this case.
 closeControl :: Control -> IO ()
 closeControl w = do
   _ <- atomicSwapIORef (controlIsDead w) True
   _ <- c_close . fromIntegral . controlReadFd $ w
   _ <- c_close . fromIntegral . controlWriteFd $ w
-  when (didRegisterWakeupFd w) $ c_setIOManagerWakeupFd (-1)
 #if defined(HAVE_EVENTFD)
   _ <- c_close . fromIntegral . controlEventFd $ w
 #else
@@ -247,12 +239,4 @@ foreign import ccall unsafe "sys/eventfd.h eventfd"
 
 foreign import ccall unsafe "sys/eventfd.h eventfd_write"
    c_eventfd_write :: CInt -> CULLong -> IO CInt
-#endif
-
-#if defined(wasm32_HOST_ARCH)
-c_setIOManagerWakeupFd :: CInt -> IO ()
-c_setIOManagerWakeupFd _ = return ()
-#else
-foreign import ccall unsafe "setIOManagerWakeupFd"
-   c_setIOManagerWakeupFd :: CInt -> IO ()
 #endif

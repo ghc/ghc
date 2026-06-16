@@ -555,42 +555,6 @@ exitIOManager(bool wait_threads)
     }
 }
 
-/* Wakeup hook: called from the scheduler's wakeUpRts (currently only in
- * threaded mode).
- */
-void wakeupIOManager(void)
-{
-    switch (iomgr_type) {
-
-#if defined(IOMGR_ENABLED_MIO_POSIX)
-        case IO_MANAGER_MIO_POSIX:
-            /* MIO Posix implementation in posix/Signals.c */
-            ioManagerWakeup();
-            break;
-#endif
-#if defined(IOMGR_ENABLED_MIO_WIN32)
-        case IO_MANAGER_MIO_WIN32:
-            /* MIO Windows implementation in win32/ThrIOManager.c
-             * Yes, this is shared with the WinIO (threaded) impl.
-             */
-            ioManagerWakeup();
-            break;
-#endif
-#if defined(IOMGR_ENABLED_WINIO)
-        case IO_MANAGER_WINIO:
-#if defined(THREADED_RTS)
-            /* WinIO threaded implementation in win32/ThrIOManager.c
-             * Yes, this is shared with the MIO win32 impl.
-             */
-            ioManagerWakeup();
-#endif
-            break;
-#endif
-        default:
-            break;
-    }
-}
-
 void markCapabilityIOManager(evac_fn evac, void *user, CapIOManager *iomgr)
 {
     switch (iomgr_type) {

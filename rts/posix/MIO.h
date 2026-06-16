@@ -18,7 +18,6 @@
 
 /* Communicating with the IO manager thread (see GHC.Conc).
  */
-void ioManagerWakeup (void);
 #if defined(THREADED_RTS)
 void ioManagerDie (void);
 void ioManagerStart (void);

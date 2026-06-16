@@ -33,7 +33,6 @@ void     ioManagerFinished  (void);
 
 void     setIOManagerControlFd   (uint32_t cap_no, int fd);
 void     setTimerManagerControlFd(int fd);
-void     setIOManagerWakeupFd   (int fd);
 
 #endif
 

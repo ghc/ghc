@@ -265,7 +265,6 @@ extern char **environ;
 #define RTS_USER_SIGNALS_SYMBOLS        \
    SymI_HasProto(setIOManagerControlFd) \
    SymI_HasProto(setTimerManagerControlFd) \
-   SymI_HasProto(setIOManagerWakeupFd)  \
    SymI_HasProto(blockUserSignals)      \
    SymI_HasProto(unblockUserSignals)
 #else
