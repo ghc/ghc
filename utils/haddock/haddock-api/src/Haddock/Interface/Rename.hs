@@ -609,9 +609,10 @@ renameTyClD d = case d of
     , tcdTyVars = ltyvars
     , tcdFixity = fixity
     , tcdFDs = lfundeps
-    , tcdSigs = lsigs
-    , tcdATs = ats
-    , tcdATDefs = at_defs
+    , tcdCExt = (ClassDeclX
+       { tcdSigs = lsigs
+       , tcdATs = ats
+       , tcdATDefs = at_defs }, _)
     , tcdModifiers = mods
     } -> do
       lcontext' <- traverse renameLContext lcontext
@@ -625,17 +626,18 @@ renameTyClD d = case d of
       -- we don't need the default methods or the already collected doc entities
       return
         ( ClassDecl
-            { tcdCExt = noExtField
-            , tcdCtxt = lcontext'
+            { tcdCtxt = lcontext'
             , tcdLName = lname'
             , tcdTyVars = ltyvars'
             , tcdFixity = fixity
             , tcdFDs = lfundeps'
-            , tcdSigs = lsigs'
-            , tcdMeths = []
-            , tcdATs = ats'
-            , tcdATDefs = at_defs'
-            , tcdDocs = []
+            , tcdDecls = []
+            , tcdCExt = (ClassDeclX
+                 { tcdSigs = lsigs'
+                 , tcdMeths = []
+                 , tcdATs = ats'
+                 , tcdATDefs = at_defs'
+                 , tcdDocs = []}, noExtField)
             , tcdModifiers = mods'
             }
         )

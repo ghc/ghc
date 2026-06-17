@@ -422,11 +422,9 @@ data TyClDecl pass
                 tcdTyVars  :: LHsQTyVars pass,         -- ^ Class type variables
                 tcdFixity  :: LexicalFixity, -- ^ Fixity used in the declaration
                 tcdFDs     :: [LHsFunDep pass],         -- ^ Functional deps
-                tcdSigs    :: [LSig pass],              -- ^ Methods' signatures
-                tcdMeths   :: LHsBinds pass,            -- ^ Default methods
-                tcdATs     :: [LFamilyDecl pass],       -- ^ Associated types;
-                tcdATDefs  :: [LTyFamDefltDecl pass],   -- ^ Associated type defaults
-                tcdDocs    :: [LDocDecl pass]           -- ^ Haddock docs
+                tcdDecls   :: [LHsDecl pass] -- ^ Class declarations. Allow pass-specific representation
+                                             -- only SigD, ValD, TyClD _ FamDecl, InstD _ TyFamInstD,
+                                             -- InstD _ DataFamInstD and DocD
     }
   | XTyClDecl !(XXTyClDecl pass)
 

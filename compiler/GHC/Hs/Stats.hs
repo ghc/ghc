@@ -144,8 +144,9 @@ ppSourceStats short (L _ (HsModule{ hsmodExports = exports, hsmodImports = impor
     class_info decl@(ClassDecl {})
         = (classops, addpr (sum3 (map count_bind methods)))
       where
-        methods = map unLoc $ tcdMeths decl
-        (_, classops, _, _, _) = count_sigs (map unLoc (tcdSigs decl))
+        (methods1, sigs, _ats, _at_defs, _, _docs) = partitionBindsAndSigs (tcdDecls decl)
+        methods = map unLoc methods1
+        (_, classops, _, _, _) = count_sigs (map unLoc sigs)
     class_info _ = (0,0)
 
     inst_info :: InstDecl GhcPs -> (Int, Int, Int, Int, Int)

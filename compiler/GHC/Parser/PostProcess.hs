@@ -35,6 +35,7 @@ module GHC.Parser.PostProcess (
         cvBindGroup,
         cvBindsAndSigsOnly, wrapValBind,
         cvBindsAndSigs,
+        cvClassDecls,
         cvTopDecls,
         placeHolderPunRhs,
 
@@ -212,20 +213,17 @@ mkClassDecl :: SrcSpan
             -> P (LTyClDecl GhcPs)
 
 mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layout annsIn
-  = do { (binds, sigs, ats, at_defs, _, docs) <- cvBindsAndSigs where_cls
+  = do { decls <- cvBindsAndSigs' where_cls
        ; (cls, tparams, fixity, ops, cps, cs) <- checkTyClHdr True tycl_hdr
        ; tyvars <- checkTyVars (text "class") whereDots cls tparams
        ; let anns' = annsIn { acd_openp = ops, acd_closep = cps}
        ; let loc = EpAnn (spanAsAnchor loc') noAnn cs
-       ; return (L loc (ClassDecl { tcdCExt = (anns', layout, NoAnnSortKey)
+       ; return (L loc (ClassDecl { tcdCExt = (anns', layout)
                                   , tcdCtxt = mcxt
                                   , tcdLName = cls, tcdTyVars = tyvars
                                   , tcdFixity = fixity
                                   , tcdFDs = snd (unLoc fds)
-                                  , tcdSigs = mkClassOpSigs sigs
-                                  , tcdMeths = binds
-                                  , tcdATs = ats, tcdATDefs = at_defs
-                                  , tcdDocs = docs
+                                  , tcdDecls = cvClassDecls decls
                                   , tcdModifiers = [] })) }
 
 mkTyData :: SrcSpan
@@ -530,14 +528,8 @@ cvBindsAndSigsOnly :: OrdList (LHsDecl GhcPs)
 -- and in case of class or instance declarations also
 -- associated type declarations. They might also contain Haddock comments.
 cvBindsAndSigsOnly fb = do
-  fb' <- drop_bad_decls (fromOL fb)
-  return (fmap wrapValBind (getMonoBindAll fb'))
-  where
-    drop_bad_decls [] = return []
-    drop_bad_decls (L l (SpliceD _ d) : ds) = do
-      addError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrDeclSpliceNotAtTopLevel d
-      drop_bad_decls ds
-    drop_bad_decls (d:ds) = (d:) <$> drop_bad_decls ds
+  fb' <- cvBindsAndSigs' fb
+  return (fmap wrapValBind fb')
 
 wrapValBind :: LHsDecl (GhcPass p) -> ValBind (GhcPass p) (GhcPass p)
 wrapValBind (L l (ValD _ b)) = VbBind (L l b)
@@ -551,8 +543,8 @@ cvBindsAndSigs :: OrdList (LHsDecl GhcPs)
 -- and in case of class or instance declarations also
 -- associated type declarations. They might also contain Haddock comments.
 cvBindsAndSigs fb = do
-  fb' <- drop_bad_decls (fromOL fb)
-  return (partitionBindsAndSigs (getMonoBindAll fb'))
+  fb' <- cvBindsAndSigs' fb
+  return (partitionBindsAndSigs fb')
   where
     -- cvBindsAndSigs is called in several places in the parser,
     -- and its items can be produced by various productions:
@@ -563,8 +555,17 @@ cvBindsAndSigs fb = do
     --
     -- partitionBindsAndSigs can handle almost all declaration forms produced
     -- by the aforementioned productions, except for SpliceD, which we filter
-    -- out here (in drop_bad_decls).
+    -- out here (in cvBindsAndSigs').
     --
+
+cvBindsAndSigs' :: OrdList (LHsDecl GhcPs) -> P [LHsDecl GhcPs]
+-- Input decls contain just value bindings and signatures
+-- and in case of class or instance declarations also
+-- associated type declarations. They might also contain Haddock comments.
+cvBindsAndSigs' fb = do
+  fb' <- drop_bad_decls (fromOL fb)
+  return (getMonoBindAll fb')
+  where
     -- We're not concerned with every declaration form possible, such as those
     -- produced by the topdecl parser production, because cvBindsAndSigs is not
     -- called on top-level declarations.
@@ -573,6 +574,13 @@ cvBindsAndSigs fb = do
       addError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrDeclSpliceNotAtTopLevel d
       drop_bad_decls ds
     drop_bad_decls (d:ds) = (d:) <$> drop_bad_decls ds
+
+-- | For a class decl, convert 'LSig GhcPs' to a class op
+cvClassDecls :: [LHsDecl GhcPs] -> [LHsDecl GhcPs]
+cvClassDecls ds = map cvt ds
+  where
+    cvt (L l (SigD x sig)) = L l (SigD x (unLoc (mkClassOpSig (L l sig))))
+    cvt decl = decl
 
 -----------------------------------------------------------------------------
 -- Group function bindings into equation groups

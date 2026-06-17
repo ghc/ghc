@@ -195,7 +195,7 @@ ppSig sDocContext names (L _ typ) =
 
 -- note: does not yet output documentation for class methods
 ppClass :: SDocContext -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> [String]
-ppClass sDocContext decl@(ClassDecl{}) subdocs =
+ppClass sDocContext decl@(ClassDecl{ tcdCExt = (decls, ns)}) subdocs =
   (ppDecl ++ ppTyFams) : ppMethods
   where
     ppDecl :: String
@@ -203,14 +203,15 @@ ppClass sDocContext decl@(ClassDecl{}) subdocs =
       out
         sDocContext
         decl
-          { tcdSigs = []
-          , tcdATs = []
-          , tcdATDefs = []
-          , tcdMeths = emptyLHsBinds
+          { tcdCExt = (decls
+             { tcdSigs = []
+             , tcdATs = []
+             , tcdATDefs = []
+             , tcdMeths = emptyLHsBinds }, ns)
           }
 
     ppMethods :: [String]
-    ppMethods = concat . map (ppSig' . unLoc . add_ctxt) $ tcdSigs decl
+    ppMethods = concat . map (ppSig' . unLoc . add_ctxt) $ tcdSigs decls
 
     ppSig' = flip (ppSigWithDoc sDocContext) subdocs
 
@@ -218,12 +219,12 @@ ppClass sDocContext decl@(ClassDecl{}) subdocs =
 
     ppTyFams :: String
     ppTyFams
-      | null $ tcdATs decl = ""
+      | null $ tcdATs decls = ""
       | otherwise =
           (" " ++) . Outputable.renderWithContext sDocContext . whereWrapper $
             concat
-              [ map pprTyFam (tcdATs decl)
-              , map (pprTyFamInstDecl NotTopLevel . unLoc) (tcdATDefs decl)
+              [ map pprTyFam (tcdATs decls)
+              , map (pprTyFamInstDecl NotTopLevel . unLoc) (tcdATDefs decls)
               ]
 
     pprTyFam :: LFamilyDecl GhcRn -> SDoc
