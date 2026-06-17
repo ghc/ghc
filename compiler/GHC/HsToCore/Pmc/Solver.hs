@@ -640,11 +640,11 @@ tyOracle ty_st@(TySt n inert) cts
          -- return the new inert set and increment the sequence number n
        ; return (TySt (n+1) <$> mb_new_inert) }
 
--- | Allocates a fresh 'EvVar' name for 'PredTy's.
+-- | Allocates a fresh 'EvVar' name for 'PredTy's
 nameTyCt :: PredType -> DsM EvVar
 nameTyCt pred_ty = do
   unique <- getUniqueM
-  let occname = mkVarOccFS (fsLit ("pm_"++show unique))
+  let occname = mkVarOccFS $ fsLit "pm"
   return (mkUserLocalOrCoVar occname unique ManyTy pred_ty noSrcSpan)
 
 -----------------------------
