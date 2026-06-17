@@ -34,6 +34,7 @@ instance HasConst a => HasConst10 a where
     constA = constVal
 
 -- this doesn't use the big dictionary most of the time
+{-# NOINLINE printConst #-}
 printConst :: forall a. (Show a, HasConst10 a)
            => a -> Int -> IO ()
 printConst x 5000  = print @a constA >> print (constInt8 x)
