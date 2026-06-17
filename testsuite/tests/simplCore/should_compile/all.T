@@ -530,7 +530,10 @@ test('T24229a', [ grep_errmsg(r'wfoo') ], compile, ['-O2 -ddump-simpl -dno-typea
 test('T24229b', [ grep_errmsg(r'wfoo') ], compile, ['-O2 -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques -dppr-cols=99999'])
 test('T24370', normal, compile, ['-O'])
 test('T24551', normal, compile, ['-O -dcore-lint'])
-test('T24726', normal, compile, ['-dcore-lint -dsuppress-uniques'])
+
+# If optimizations are enabled, the rule just fires and -drule-check will report nothing
+test('T24726', [ omit_ways(opt_ways) ], compile, ['-dcore-lint -dsuppress-uniques'])
+
 test('T24768', normal, compile, ['-O'])
 test('T24770', [ grep_errmsg(r'Dead') ], compile, ['-O'])
 test('T24808', [ grep_errmsg(r'myFunction') ], compile, ['-O -ddump-simpl'])
