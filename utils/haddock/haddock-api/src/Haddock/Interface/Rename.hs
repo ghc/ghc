@@ -604,9 +604,10 @@ renameTyClD d = case d of
     , tcdTyVars = ltyvars
     , tcdFixity = fixity
     , tcdFDs = lfundeps
-    , tcdSigs = lsigs
-    , tcdATs = ats
-    , tcdATDefs = at_defs
+    , tcdDecls = ClassDeclX
+       { tcdSigs = lsigs
+       , tcdATs = ats
+       , tcdATDefs = at_defs }
     , tcdModifiers = mods
     } -> do
       lcontext' <- traverse renameLContext lcontext
@@ -626,11 +627,12 @@ renameTyClD d = case d of
             , tcdTyVars = ltyvars'
             , tcdFixity = fixity
             , tcdFDs = lfundeps'
-            , tcdSigs = lsigs'
-            , tcdMeths = []
-            , tcdATs = ats'
-            , tcdATDefs = at_defs'
-            , tcdDocs = []
+            , tcdDecls = ClassDeclX
+                 { tcdSigs = lsigs'
+                 , tcdMeths = []
+                 , tcdATs = ats'
+                 , tcdATDefs = at_defs'
+                 , tcdDocs = []}
             , tcdModifiers = mods'
             }
         )

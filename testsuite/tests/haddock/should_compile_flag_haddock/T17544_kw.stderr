@@ -447,55 +447,53 @@
          []
          (EpaComments
           []))
-        (ClassOpSig
-         (AnnSig
-          (EpUniTok
-           (EpaSpan { T17544_kw.hs:22:15-16 })
-           (NormalSyntax))
-          (Nothing)
-          (Nothing))
-         (False)
-         [(L
-           (EpAnn
-            (EpaSpan { T17544_kw.hs:22:5-13 })
-            (NameAnnTrailing
-             [])
-            (EpaComments
-             []))
-           (Unqual
-            {OccName: clsmethod}))]
-         (L
-          (EpAnn
-           (EpaSpan { T17544_kw.hs:22:18 })
-           []
-           (EpaComments
-            []))
-          (HsSig
-           (NoExtField)
-           (HsOuterImplicit
-            (NoExtField))
-           (L
+        (SigD
+         (NoExtField)
+         (ClassOpSig
+          (AnnSig
+           (EpUniTok
+            (EpaSpan { T17544_kw.hs:22:15-16 })
+            (NormalSyntax))
+           (Nothing)
+           (Nothing))
+          (False)
+          [(L
             (EpAnn
-             (EpaSpan { T17544_kw.hs:22:18 })
-             []
+             (EpaSpan { T17544_kw.hs:22:5-13 })
+             (NameAnnTrailing
+              [])
              (EpaComments
               []))
-            (HsTyVar
-             (NoEpTok)
-             (NotPromoted)
-             (L
-              (EpAnn
-               (EpaSpan { T17544_kw.hs:22:18 })
-               (NameAnnTrailing
-                [])
-               (EpaComments
-                []))
-              (Unqual
-               {OccName: a}))))))))]
-      []
-      []
-      []
-      [])))]))
+            (Unqual
+             {OccName: clsmethod}))]
+          (L
+           (EpAnn
+            (EpaSpan { T17544_kw.hs:22:18 })
+            []
+            (EpaComments
+             []))
+           (HsSig
+            (NoExtField)
+            (HsOuterImplicit
+             (NoExtField))
+            (L
+             (EpAnn
+              (EpaSpan { T17544_kw.hs:22:18 })
+              []
+              (EpaComments
+               []))
+             (HsTyVar
+              (NoEpTok)
+              (NotPromoted)
+              (L
+               (EpAnn
+                (EpaSpan { T17544_kw.hs:22:18 })
+                (NameAnnTrailing
+                 [])
+                (EpaComments
+                 []))
+               (Unqual
+                {OccName: a})))))))))])))]))
 
 
 T17544_kw.hs:7:3: warning: [GHC-94458] [-Winvalid-haddock]

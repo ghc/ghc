@@ -21,7 +21,7 @@ module GHC.Hs.Decls (
   StandaloneKindSig(..), LStandaloneKindSig, standaloneKindSigName,
 
   -- ** Class or type declarations
-  TyClDecl(..), LTyClDecl, DataDeclRn(..),
+  TyClDecl(..), LTyClDecl, DataDeclRn(..), ClassDeclX(..), LClassDeclX,
   AnnDataDefn(..),
   AnnClassDecl(..),
   AnnSynDecl(..),
@@ -94,7 +94,10 @@ module GHC.Hs.Decls (
   HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups, hsGroupInstDecls,
   hsGroupTopLevelFixitySigs,
 
-  partitionBindsAndSigs,
+  -- * Class decls, across GHC passes
+  partitionBindsAndSigs, flattenBindsAndSigs,
+  classDeclsSplit, classDeclsList,
+  asTcdDecls
     ) where
 
 -- friends:
@@ -124,7 +127,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 
 -- others:
-import GHC.Utils.Misc (count)
+import GHC.Utils.Misc (count, mergeListsBy)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.SrcLoc
@@ -135,7 +138,7 @@ import GHC.Unit.Module.Warnings
 
 import GHC.Data.Maybe
 import Data.Data (Data)
-import Data.List (concatMap)
+import Data.List (concatMap,singleton)
 import Data.Foldable (toList)
 
 {-
@@ -162,6 +165,82 @@ type instance XDocD       (GhcPass _) = NoExtField
 type instance XRoleAnnotD (GhcPass _) = NoExtField
 type instance XXHsDecl    (GhcPass _) = DataConCantHappen
 
+asTcdDecls
+  ::  forall p. (IsPass p , OutputableBndrId p)
+  => [LHsDecl (GhcPass p)]
+  ->  XClassDecls (GhcPass p)
+asTcdDecls decls
+  = case ghcPass @p of
+      GhcPs -> decls
+      GhcRn -> to_struct @p decls
+      GhcTc -> to_struct @p decls
+  where
+    to_struct
+      :: forall p. ( IsPass p
+                   , OutputableBndrId p
+                   , XTyFamInstD (GhcPass p) ~ NoExtField
+                   , XClassDecls (GhcPass p) ~ ClassDeclX (GhcPass p) )
+      => [LHsDecl (GhcPass p)]
+      -> XClassDecls (GhcPass p)
+    to_struct decls =
+      let
+        (methods, sigs, ats, at_defs, _, docs) = partitionBindsAndSigs @p decls
+      in
+        ClassDeclX { tcdSigs = sigs,
+                     tcdMeths = methods,
+                     tcdATs   = ats,
+                     tcdATDefs = at_defs,
+                     tcdDocs = docs}
+
+classDeclsList
+  ::  forall p. IsPass p
+  =>  XClassDecls (GhcPass p)
+  -> [LHsDecl (GhcPass p)]
+classDeclsList decls
+  = case ghcPass @p of
+      GhcPs -> decls
+      GhcRn -> from_struct @p decls
+      GhcTc -> from_struct @p decls
+  where
+    from_struct
+      :: forall p. ( IsPass p
+                   , XTyFamInstD (GhcPass p) ~ NoExtField
+                   , XClassDecls (GhcPass p) ~ ClassDeclX (GhcPass p) )
+      => XClassDecls (GhcPass p)
+      -> [LHsDecl (GhcPass p)]
+
+    from_struct ClassDeclX { tcdSigs = sigs,
+                             tcdMeths = methods,
+                             tcdATs   = ats,
+                             tcdATDefs = at_defs,
+                             tcdDocs = docs}
+      = flattenBindsAndSigs @p (methods, sigs, ats, at_defs, [], docs)
+
+classDeclsSplit
+  ::  forall p. IsPass p
+  =>  XClassDecls (GhcPass p)
+  -> (LHsBinds (GhcPass p), [LSig (GhcPass p)], [LFamilyDecl (GhcPass p)],
+      [LTyFamInstDecl (GhcPass p)], [LDataFamInstDecl (GhcPass p)], [LDocDecl (GhcPass p)])
+classDeclsSplit decls
+  = case ghcPass @p of
+      GhcPs -> partitionBindsAndSigs decls
+      GhcRn -> from_decls decls
+      GhcTc -> from_decls decls
+  where
+    from_decls
+      :: (XClassDecls (GhcPass p) ~ ClassDeclX (GhcPass p))
+      => XClassDecls (GhcPass p)
+      -> (LHsBinds (GhcPass p), [LSig (GhcPass p)], [LFamilyDecl (GhcPass p)],
+          [LTyFamInstDecl (GhcPass p)], [LDataFamInstDecl (GhcPass p)], [LDocDecl (GhcPass p)])
+
+    from_decls ClassDeclX { tcdSigs = sigs,
+                            tcdMeths = methods,
+                            tcdATs   = ats,
+                            tcdATDefs = at_defs,
+                            tcdDocs = docs}
+      = (methods, sigs, ats, at_defs, [], docs)
+
+
 -- | Partition a list of HsDecls into function/pattern bindings, signatures,
 -- type family declarations, type family instances, and documentation comments.
 --
@@ -171,9 +250,10 @@ type instance XXHsDecl    (GhcPass _) = DataConCantHappen
 -- The primary use of this function is to implement
 -- 'GHC.Parser.PostProcess.cvBindsAndSigs'.
 partitionBindsAndSigs
-  :: [LHsDecl GhcPs]
-  -> (LHsBinds GhcPs, [LSig GhcPs], [LFamilyDecl GhcPs],
-      [LTyFamInstDecl GhcPs], [LDataFamInstDecl GhcPs], [LDocDecl GhcPs])
+  :: forall p. (IsPass p, OutputableBndrId p)
+  => [LHsDecl (GhcPass p)]
+  -> (LHsBinds (GhcPass p), [LSig (GhcPass p)], [LFamilyDecl (GhcPass p)],
+      [LTyFamInstDecl (GhcPass p)], [LDataFamInstDecl (GhcPass p)], [LDocDecl (GhcPass p)])
 partitionBindsAndSigs = go
   where
     go [] = ([], [], [], [], [], [])
@@ -193,6 +273,39 @@ partitionBindsAndSigs = go
         DocD _ d
           -> (bs, ss, ts, tfis, dfis, L l d : docs)
         _ -> pprPanic "partitionBindsAndSigs" (ppr decl)
+
+
+-- | The inverse of 'partitionBindsAndSigs' that merges partitioned items back
+-- into a flat list. Elements are put back into the order in which they
+-- appeared in the original program before partitioning, using BufPos to order
+-- them.
+--
+-- Precondition (unchecked): the input lists are already sorted.
+flattenBindsAndSigs
+  :: (XTyFamInstD (GhcPass p) ~ NoExtField)
+  => (LHsBinds (GhcPass p), [LSig (GhcPass p)], [LFamilyDecl (GhcPass p)],
+      [LTyFamInstDecl (GhcPass p)], [LDataFamInstDecl (GhcPass p)], [LDocDecl (GhcPass p)])
+  -> [LHsDecl (GhcPass p)]
+flattenBindsAndSigs (all_bs, all_ss, all_ts, all_tfis, all_dfis, all_docs) =
+  -- 'cmpBufSpan' is safe here with the following assumptions:
+  --
+  -- - 'LHsDecl' produced by 'decl_cls' in Parser.y always have a 'BufSpan'
+  -- - 'partitionBindsAndSigs' does not discard this 'BufSpan'
+  mergeListsBy cmpBufSpanA [
+    mapLL (\b -> ValD noExtField b) all_bs,
+    mapLL (\s -> SigD noExtField s) all_ss,
+    mapLL (\t -> TyClD noExtField (FamDecl noExtField t)) all_ts,
+    mapLL (\tfi -> InstD noExtField (TyFamInstD noExtField tfi)) all_tfis,
+    mapLL (\dfi -> InstD noExtField (DataFamInstD noExtField dfi)) all_dfis,
+    mapLL (\d -> DocD noExtField d) all_docs
+  ]
+
+cmpBufSpanA :: GenLocated (EpAnn a1) a2 -> GenLocated (EpAnn a3) a2 -> Ordering
+cmpBufSpanA (L la a) (L lb b) = cmpBufSpan (L (locA la) a) (L (locA lb) b)
+
+-- Map a function over a list of located items.
+mapLL :: (a -> b) -> [GenLocated l a] -> [GenLocated l b]
+mapLL f = map (fmap f)
 
 -- Okay, I need to reconstruct the document comments, but for now:
 instance Outputable (DocDecl name) where
@@ -220,12 +333,13 @@ emptyGroup = HsGroup { hs_ext = noExtField,
 -- | The fixity signatures for each top-level declaration and class method
 -- in an 'HsGroup'.
 -- See Note [Top-level fixity signatures in an HsGroup]
-hsGroupTopLevelFixitySigs :: HsGroup (GhcPass p) -> [LFixitySig (GhcPass p)]
+hsGroupTopLevelFixitySigs :: forall p. IsPass p => HsGroup (GhcPass p) -> [LFixitySig (GhcPass p)]
 hsGroupTopLevelFixitySigs (HsGroup{ hs_fixds = fixds, hs_tyclds = tyclds }) =
     fixds ++ cls_fixds
   where
     cls_fixds = [ L loc sig
-                | L _ ClassDecl{tcdSigs = sigs} <- tyClGroupTyClDecls tyclds
+                | L _ ClassDecl{tcdDecls = decls} <- tyClGroupTyClDecls tyclds
+                , (_meths, sigs, _typs, _deftyps, _, _docs) <- (singleton . classDeclsSplit @p)  decls
                 , L loc (FixSig _ sig) <- sigs
                 ]
 
@@ -380,6 +494,10 @@ type instance XClassDecl    GhcPs =
 type instance XClassDecl    GhcRn = NameSet -- FVs
 type instance XClassDecl    GhcTc = NameSet -- FVs
 
+type instance XClassDecls GhcPs = [LHsDecl GhcPs]
+type instance XClassDecls GhcRn = ClassDeclX GhcRn
+type instance XClassDecls GhcTc = ClassDeclX GhcTc
+
 type instance XXTyClDecl    (GhcPass _) = DataConCantHappen
 
 type instance XCTyFamInstDecl (GhcPass _) = (EpToken "type", EpToken "instance")
@@ -519,21 +637,40 @@ instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
     ppr (ClassDecl {tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars,
                     tcdFixity = fixity,
                     tcdFDs  = fds,
-                    tcdSigs = sigs, tcdMeths = methods,
-                    tcdATs = ats, tcdATDefs = at_defs, tcdModifiers = mods})
-      | null sigs && null methods && null ats && null at_defs -- No "where" part
-      = top_matter
+                    tcdDecls = decls,
+                    tcdModifiers = mods})
+      = case ghcPass @p of
+          GhcPs -> if null decls -- No "where" part
+                        then top_matter
+                        else vcat [ top_matter <+> text "where"
+                                  , nest 2 $ pprDeclList (map (ppr . unLoc) (decls_no_docs decls)) ]
+          GhcRn -> ppr_decls decls
+          GhcTc -> ppr_decls decls
 
-      | otherwise       -- Laid out
-      = vcat [ top_matter <+> text "where"
-             , nest 2 $ pprDeclList (map (ppr . unLoc) ats ++
-                                     map (pprTyFamDefltDecl . unLoc) at_defs ++
-                                     pprLHsBindsForUser methods sigs) ]
+
       where
         top_matter = pprLHsModifiers mods
                     $$  text "class"
                     <+> pp_vanilla_decl_head lclas tyvars fixity context
                     <+> pprFundeps (map unLoc fds)
+
+        decls_no_docs decls = filter keep decls
+          where
+            keep (L _ DocD{}) = False
+            keep _ = True
+
+        ppr_decls :: ClassDeclX (GhcPass p) -> SDoc
+        ppr_decls ClassDeclX { tcdSigs = sigs,
+                               tcdMeths = methods,
+                               tcdATs   = ats,
+                               tcdATDefs = at_defs }
+            | null sigs && null methods && null ats && null at_defs -- No "where" part
+                = top_matter
+            | otherwise -- Laid out
+                = vcat [ top_matter <+> text "where"
+                       , nest 2 $ pprDeclList (map (ppr . unLoc) ats ++
+                                               map (pprTyFamDefltDecl . unLoc) at_defs ++
+                                               pprLHsBindsForUser methods sigs) ]
 
 instance OutputableBndrId p
        => Outputable (TyClGroup (GhcPass p)) where
@@ -1488,6 +1625,7 @@ roleAnnotDeclName (RoleAnnotDecl _ (L _ name) _) = name
 type instance Anno (HsDecl (GhcPass _)) = SrcSpanAnnA
 type instance Anno (SpliceDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (TyClDecl (GhcPass p)) = SrcSpanAnnA
+type instance Anno (ClassDeclX (GhcPass p)) = SrcSpanAnnA
 type instance Anno (FunDep (GhcPass p)) = SrcSpanAnnA
 type instance Anno (FamilyResultSig (GhcPass p)) = EpAnnCO
 type instance Anno (FamilyDecl (GhcPass p)) = SrcSpanAnnA

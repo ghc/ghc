@@ -294,6 +294,8 @@ type family XDataDecl      x
 type family XClassDecl     x
 type family XXTyClDecl     x
 
+type family XClassDecls    x
+
 -- -------------------------------------
 -- FunDep type families
 type family XCFunDep      x

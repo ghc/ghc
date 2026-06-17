@@ -175,7 +175,8 @@ tyThingToLHsDecl prr t = case t of
                       )
                       $ snd
                       $ classTvsFds cl
-                , tcdSigs =
+                , tcdDecls = ClassDeclX {
+                  tcdSigs =
                     noLocA (MinimalSig (noAnn, NoSourceText) . noLocA $ classMinimalDef cl)
                       : [ noLocA tcdSig
                         | clsOp <- classOpItems cl
@@ -185,7 +186,7 @@ tyThingToLHsDecl prr t = case t of
                 -- class associated-types are a subset of TyCon:
                 , tcdATs = atFamDecls
                 , tcdATDefs = catMaybes atDefFamDecls
-                , tcdDocs = [] -- we don't have any docs at this point
+                , tcdDocs = []} -- we don't have any docs at this point
                 , tcdCExt = emptyNameSet
                 , tcdModifiers = []
                 }

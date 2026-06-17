@@ -462,7 +462,7 @@ isInlineLSig _                    = False
 
 isMinimalLSig :: forall p. UnXRec p => LSig p -> Bool
 isMinimalLSig (unXRec @p -> MinimalSig {}) = True
-isMinimalLSig _                               = False
+isMinimalLSig _                            = False
 
 isSCCFunSig :: forall p. UnXRec p => LSig p -> Bool
 isSCCFunSig (unXRec @p -> SCCFunSig {}) = True

@@ -359,9 +359,9 @@ restrictTo names (L loc decl) = L loc $ case decl of
     | DataDecl { tcdDataDefn = dd } <- d
     -> TyClD x (d {tcdDataDefn = restrictDataDefn names dd})
   TyClD x d
-    | ClassDecl { tcdSigs = sigs, tcdATs = ats } <- d
-    -> TyClD x (d { tcdSigs = restrictDecls names sigs
-                  , tcdATs = restrictATs names ats } )
+    | ClassDecl { tcdDecls = cd@ClassDeclX { tcdSigs = sigs, tcdATs = ats }} <- d
+    -> TyClD x (d { tcdDecls = cd { tcdSigs = restrictDecls names sigs
+                                  , tcdATs = restrictATs names ats }} )
   _ -> decl
 
 restrictDataDefn :: [Name] -> HsDataDefn GhcRn -> HsDataDefn GhcRn
@@ -595,7 +595,7 @@ instance Parent (TyClDecl GhcRn) where
     | DataDecl { tcdDataDefn = dd } <- d
     = map unLoc $
       concatMap (toList . getConNames . unLoc) (dd_cons dd)
-    | ClassDecl{ tcdSigs = sigs, tcdATs = ats } <- d
+    | ClassDecl{ tcdDecls = ClassDeclX { tcdSigs = sigs, tcdATs = ats }} <- d
     = map (unLoc . fdLName . unLoc) ats
       ++ [unLoc n | L _ (TypeSig _ _ ns _) <- sigs, n <- ns]
     | otherwise = []

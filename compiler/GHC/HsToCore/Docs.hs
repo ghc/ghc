@@ -459,13 +459,8 @@ classDecls :: TyClDecl GhcRn  -- Always a ClassDecl
            -> [(LHsDecl GhcRn, [HsDoc GhcRn])]
 classDecls decl
   | ClassDecl { .. } <- decl
-  , let decls = docs ++ defs ++ sigs ++ ats
-        docs  = mkDecls (DocD noExtField) tcdDocs
-        defs  = mkDecls (ValD noExtField) tcdMeths
-        sigs  = mkDecls (SigD noExtField) tcdSigs
-        ats   = mkDecls (TyClD noExtField . FamDecl noExtField) tcdATs
-
-  = filterDecls . collectDocs . sortLocatedA $ decls
+  -- AZ: I suspect sortLocatedA is not needed here
+  = filterDecls . collectDocs . sortLocatedA $ classDeclsList tcdDecls
 
   | otherwise
   = pprPanic "classDecls" (ppr decl)
@@ -567,13 +562,30 @@ filterDecls = filter (isHandled . unXRec @p . fst)
 
 
 -- | Go through all class declarations and filter their sub-declarations
-filterClasses :: forall p doc. (IsPass p) => [(LHsDecl (GhcPass p), doc)] -> [(LHsDecl (GhcPass p), doc)]
+filterClasses
+  :: forall p doc. (IsPass p, XClassDecls (GhcPass p) ~ ClassDeclX (GhcPass p),
+                    OutputableBndrId p)
+  => [(LHsDecl (GhcPass p), doc)] -> [(LHsDecl (GhcPass p), doc)]
 filterClasses = map (first (fmap filterClass))
   where
+    filterClass :: (XClassDecls (GhcPass p) ~ ClassDeclX (GhcPass p),
+                    OutputableBndrId p)
+                =>  HsDecl (GhcPass p) -> HsDecl (GhcPass p)
     filterClass (TyClD x c@(ClassDecl {})) =
-      TyClD x $ c { tcdSigs =
-        filter (liftA2 (||) (isUserSig . unLoc) isMinimalLSig) (tcdSigs c) }
+      TyClD x $ c { tcdDecls = asTcdDecls @p $
+        filter keep (classDeclsList $ tcdDecls c) }
+      where
+        keep ld@(L _ (SigD {})) = isUserSigDecl (unLoc ld) || isMinimalLSigDecl ld
+        keep _                  = True
     filterClass d = d
+
+isMinimalLSigDecl :: LHsDecl (GhcPass p) -> Bool
+isMinimalLSigDecl (L _ (SigD _ MinimalSig {})) = True
+isMinimalLSigDecl _                            = False
+
+isUserSigDecl :: HsDecl p -> Bool
+isUserSigDecl (SigD _ s) = isUserSig s
+isUserSigDecl _          = False
 
 -- | Was this signature given by the user?
 isUserSig :: Sig name -> Bool

@@ -203,14 +203,15 @@ ppClass sDocContext decl@(ClassDecl{}) subdocs =
       out
         sDocContext
         decl
-          { tcdSigs = []
-          , tcdATs = []
-          , tcdATDefs = []
-          , tcdMeths = emptyLHsBinds
+          { tcdDecls = (tcdDecls decl)
+             { tcdSigs = []
+             , tcdATs = []
+             , tcdATDefs = []
+             , tcdMeths = emptyLHsBinds }
           }
 
     ppMethods :: [String]
-    ppMethods = concat . map (ppSig' . unLoc . add_ctxt) $ tcdSigs decl
+    ppMethods = concat . map (ppSig' . unLoc . add_ctxt) $ tcdSigs $ tcdDecls decl
 
     ppSig' = flip (ppSigWithDoc sDocContext) subdocs
 
@@ -218,12 +219,12 @@ ppClass sDocContext decl@(ClassDecl{}) subdocs =
 
     ppTyFams :: String
     ppTyFams
-      | null $ tcdATs decl = ""
+      | null $ tcdATs $ tcdDecls decl = ""
       | otherwise =
           (" " ++) . Outputable.renderWithContext sDocContext . whereWrapper $
             concat
-              [ map pprTyFam (tcdATs decl)
-              , map (pprTyFamInstDecl NotTopLevel . unLoc) (tcdATDefs decl)
+              [ map pprTyFam (tcdATs $ tcdDecls decl)
+              , map (pprTyFamInstDecl NotTopLevel . unLoc) (tcdATDefs $ tcdDecls decl)
               ]
 
     pprTyFam :: LFamilyDecl GhcRn -> SDoc

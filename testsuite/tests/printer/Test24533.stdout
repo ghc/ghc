@@ -405,10 +405,6 @@
                {OccName: Type})))))))])
       (Prefix)
       []
-      []
-      []
-      []
-      []
       [])))
   ,(L
     (EpAnn
@@ -1004,10 +1000,6 @@
               (Unqual
                {OccName: Type})))))))])
       (Prefix)
-      []
-      []
-      []
-      []
       []
       [])))
   ,(L

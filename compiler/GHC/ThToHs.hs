@@ -323,17 +323,16 @@ cvtDec (TypeDataD tc tvs ksig constrs)
 cvtDec (ClassD ctxt cl tvs fds decs)
   = do  { (cxt', tc', tvs') <- cvt_tycl_hdr ctxt cl tvs
         ; fds'  <- mapM cvt_fundep fds
-        ; (binds', sigs', fams', at_defs', adts') <- cvt_ci_decs ClssDecl decs
+        ; decls' <- cvt_ci_decs' ClssDecl decs
+        ; let (adts',_) = partitionWith is_datafam_inst decls'
         ; unless (null adts')
             (failWith $ DefaultDataInstDecl adts')
         ; returnJustLA $ TyClD noExtField $
           ClassDecl { tcdCExt = (noAnn, EpNoLayout, NoAnnSortKey)
                     , tcdCtxt = mkHsContextMaybe cxt', tcdLName = tc', tcdTyVars = tvs'
                     , tcdFixity = Prefix
-                    , tcdFDs = fds', tcdSigs = Hs.mkClassOpSigs sigs'
-                    , tcdMeths = binds'
-                    , tcdATs = fams', tcdATDefs = at_defs'
-                    , tcdDocs = [] -- no docs in TH
+                    , tcdFDs = fds'
+                    , tcdDecls =  cvClassDecls decls'
                     , tcdModifiers = [] }
         }
 
@@ -617,6 +616,25 @@ cvt_ci_decs declDescr decs
         ; for_ (nonEmpty bads) $ \ bad_decls ->
             failWith (IllegalDeclaration declDescr $ IllegalDecls bad_decls)
         ; return (binds', sigs', fams', ats', adts') }
+
+cvt_ci_decs' :: THDeclDescriptor -> [TH.Dec] -> CvtM [LHsDecl GhcPs]
+-- Convert the declarations inside a class or instance decl
+-- ie signatures, bindings, and associated types
+cvt_ci_decs' declDescr decs
+  = do  { decs' <- cvtDecs decs
+        ; let (decs'', bads) = partitionWith is_ci_decl decs'
+        ; for_ (nonEmpty bads) $ \ bad_decls ->
+            failWith (IllegalDeclaration declDescr $ IllegalDecls bad_decls)
+        ; return decs'' }
+
+-- Validate possible class or instance decls. Return 'Left d' if valid, 'Right d' if not
+is_ci_decl :: LHsDecl GhcPs -> Either (LHsDecl GhcPs) (LHsDecl GhcPs)
+is_ci_decl d@(L _ (Hs.InstD _ Hs.TyFamInstD{}))   = Left d
+is_ci_decl d@(L _ (Hs.InstD _ Hs.DataFamInstD{})) = Left d
+is_ci_decl d@(L _ (Hs.SigD{}))                    = Left d
+is_ci_decl d@(L _ (Hs.ValD{}))                    = Left d
+is_ci_decl d@(L _ (Hs.TyClD _ (Hs.FamDecl{})))    = Left d
+is_ci_decl d                                      = Right d
 
 ----------------
 cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr TH.BndrVis]

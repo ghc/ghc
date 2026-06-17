@@ -169,6 +169,10 @@ deriving instance Data (TyClGroup GhcPs)
 deriving instance Data (TyClGroup GhcRn)
 deriving instance Data (TyClGroup GhcTc)
 
+deriving instance Data (ClassDeclX GhcPs)
+deriving instance Data (ClassDeclX GhcRn)
+deriving instance Data (ClassDeclX GhcTc)
+
 -- deriving instance (DataIdLR p p) => Data (FamilyResultSig p)
 deriving instance Data (FamilyResultSig GhcPs)
 deriving instance Data (FamilyResultSig GhcRn)

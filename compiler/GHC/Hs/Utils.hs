@@ -69,7 +69,7 @@ module GHC.Hs.Utils(
 
   -- * Types
   mkHsAppTy, mkHsAppKindTy,
-  hsTypeToHsSigType, hsTypeToHsSigWcType, mkClassOpSigs, mkHsSigEnv,
+  hsTypeToHsSigType, hsTypeToHsSigWcType, mkClassOpSigs, mkClassOpSig, mkHsSigEnv,
   nlHsAppTy, nlHsAppKindTy, nlHsTyVar, nlHsFunTy, nlHsParTy, nlHsTyConApp,
 
   -- * Stmts
@@ -766,14 +766,13 @@ mkClassOpSigs :: [LSig GhcPs] -> [LSig GhcPs]
 -- ^ Convert 'TypeSig' to 'ClassOpSig'.
 -- The former is what is parsed, but the latter is
 -- what we need in class/instance declarations
-mkClassOpSigs sigs
-  = map fiddle sigs
-  where
-    -- This drops modifiers, but they can't be parsed here anyway.
-    fiddle (L loc (TypeSig anns _ nms ty))
-      = L loc (ClassOpSig anns False nms (dropWildCards ty))
-    fiddle sig = sig
+mkClassOpSigs = map mkClassOpSig
 
+mkClassOpSig :: LSig GhcPs -> LSig GhcPs
+mkClassOpSig (L loc (TypeSig anns _ nms ty))
+  -- This drops modifiers, but they can't be parsed here anyway.
+  = L loc (ClassOpSig anns False nms (dropWildCards ty))
+mkClassOpSig sig = sig
 
 -- | Type ascription: (e :: ty)
 nlAscribe :: RdrName -> LHsExpr GhcPs -> LHsExpr GhcPs
@@ -1477,7 +1476,7 @@ tyDeclBinders (TyDeclBinders main ats sigs consWithFields)
   where
     (cons, flds) = lconsWithFieldsBinders consWithFields
 
-hsLTyClDeclBinders :: (IsPass p, OutputableBndrId p)
+hsLTyClDeclBinders :: forall p. (IsPass p, OutputableBndrId p)
                    => LocatedA (TyClDecl (GhcPass p))
                    -> TyDeclBinders p
 -- ^ Returns all the /binding/ names of the decl.  The first one is
@@ -1504,9 +1503,11 @@ hsLTyClDeclBinders (L loc (SynDecl
   , tyDeclConsWithFields = emptyLConsWithFields }
 hsLTyClDeclBinders (L loc (ClassDecl
                                { tcdLName = (L _ cls_name)
-                               , tcdSigs  = sigs
-                               , tcdATs   = ats }))
-  = TyDeclBinders
+                               , tcdDecls  = decls}))
+  = let
+    -- TOOO:AZ optimize this, calc once only somewhere. Perhaps in the extension point?
+    (_binds, sigs, ats, _at_defs, _, _docs) = classDeclsSplit @p decls
+  in TyDeclBinders
   { tyDeclMainBinder = (L loc cls_name, ClassFlavour)
   , tyDeclATs = [ (L fam_loc fam_name, familyInfoTyConFlavour (Just ()) fd_info)
                 | (L fam_loc (FamilyDecl { fdLName = L _ fam_name
@@ -1595,6 +1596,7 @@ hsDataDefnBinders :: (IsPass p, OutputableBndrId p)
 hsDataDefnBinders (HsDataDefn { dd_cons = cons })
   = hsConDeclsBinders (toList cons)
   -- See Note [Binders in family instances]
+
 
 -------------------
 

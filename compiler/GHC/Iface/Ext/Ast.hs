@@ -1631,11 +1631,14 @@ instance ToHie (LocatedA (TyClDecl GhcRn)) where
                 , tcdLName = name
                 , tcdTyVars = vars
                 , tcdFDs = deps
-                , tcdSigs = sigs
-                , tcdMeths = meths
-                , tcdATs = typs
-                , tcdATDefs = deftyps
+                , tcdDecls = decls
                 } ->
+        let
+          (meths, sigs, typs, deftyps, _, _docs) = classDeclsSplit @Renamed decls
+          context_scope = mkScope $ fromMaybe (noLocA (HsContext noAnn [])) context
+          rhs_scope = foldl1' combineScopes $ NE.map mkScope
+            ( getHasLocList deps :| getHasLocList sigs : getHasLocList meths : getHasLocList typs : getHasLocList deftyps : [])
+        in
         [ toHie $ C (Decl ClassDec $ getRealSpanA span) name
         , toHie context
         , toHie $ TS (ResolvedScopes [context_scope, rhs_scope]) vars
@@ -1646,10 +1649,6 @@ instance ToHie (LocatedA (TyClDecl GhcRn)) where
         , concatMapM (locOnly . getLocA) deftyps
         , toHie deftyps
         ]
-        where
-          context_scope = mkScope $ fromMaybe (noLocA (HsContext noAnn [])) context
-          rhs_scope = foldl1' combineScopes $ NE.map mkScope
-            ( getHasLocList deps :| getHasLocList sigs : getHasLocList meths : getHasLocList typs : getHasLocList deftyps : [])
 
 instance ToHie (LocatedA (FamilyDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of

@@ -735,9 +735,9 @@ ppClassDecl
       , tcdLName = lname
       , tcdTyVars = ltyvars
       , tcdFDs = lfds
-      , tcdSigs = lsigs
-      , tcdATs = ats
-      , tcdATDefs = at_defs
+      , tcdDecls = ClassDeclX { tcdSigs = lsigs
+                              , tcdATs = ats
+                              , tcdATDefs = at_defs }
       }
     )
   unicode =

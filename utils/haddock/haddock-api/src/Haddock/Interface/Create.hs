@@ -838,8 +838,8 @@ extractDecl prr dflags sDocContext name decl
           _
           d@ClassDecl
             { tcdLName = L _ clsNm
-            , tcdSigs = clsSigs
-            , tcdATs = clsATs
+            , tcdDecls = ClassDeclX { tcdSigs = clsSigs
+                                    , tcdATs = clsATs }
             } ->
             let
               matchesMethod =

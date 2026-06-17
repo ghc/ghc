@@ -23,7 +23,7 @@ module Language.Haskell.Syntax.Decls (
   StandaloneKindSig(..), LStandaloneKindSig,
 
   -- ** Class or type declarations
-  TyClDecl(..), LTyClDecl,
+  TyClDecl(..), LTyClDecl, ClassDeclX(..), LClassDeclX,
   TyClGroup(..),
   isClassDecl, isDataDecl, isSynDecl,
   isFamilyDecl, isTypeFamilyDecl, isDataFamilyDecl,
@@ -423,13 +423,22 @@ data TyClDecl pass
                 tcdTyVars  :: LHsQTyVars pass,         -- ^ Class type variables
                 tcdFixity  :: LexicalFixity, -- ^ Fixity used in the declaration
                 tcdFDs     :: [LHsFunDep pass],         -- ^ Functional deps
-                tcdSigs    :: [LSig pass],              -- ^ Methods' signatures
-                tcdMeths   :: LHsBinds pass,            -- ^ Default methods
-                tcdATs     :: [LFamilyDecl pass],       -- ^ Associated types;
-                tcdATDefs  :: [LTyFamDefltDecl pass],   -- ^ Associated type defaults
-                tcdDocs    :: [LDocDecl pass]           -- ^ Haddock docs
+                tcdDecls   :: XClassDecls pass          -- ^ Class declarations. Allow pass-specific representation
     }
   | XTyClDecl !(XXTyClDecl pass)
+
+
+-- | Convenience type for the classic 'XClassDecls' where the [LHsDecl pass] are split out.
+data ClassDeclX pass
+  = ClassDeclX { tcdSigs    :: [LSig pass],              -- ^ Methods' signatures
+                 tcdMeths   :: LHsBinds pass,            -- ^ Default methods
+                 tcdATs     :: [LFamilyDecl pass],       -- ^ Associated types;
+                 tcdATDefs  :: [LTyFamDefltDecl pass],   -- ^ Associated type defaults
+                 tcdDocs    :: [LDocDecl pass]           -- ^ Haddock docs
+    }
+
+-- | Located Declaration of a Type or Class
+type LClassDeclX pass = XRec pass (ClassDeclX pass)
 
 data FunDep pass
   = FunDep (XCFunDep pass)

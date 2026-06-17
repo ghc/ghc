@@ -1321,7 +1321,7 @@ generaliseTyClDecl inferred_tc_env (L _ decl)
     tycld_names decl = tcdName decl : at_names decl
 
     at_names :: TyClDecl GhcRn -> [Name]
-    at_names (ClassDecl { tcdATs = ats }) = map (familyDeclName . unLoc) ats
+    at_names (ClassDecl { tcdDecls = ClassDeclX { tcdATs = ats }}) = map (familyDeclName . unLoc) ats
     at_names _ = []  -- Only class decls have associated types
 
     skolemise_tc_tycon :: Name -> ZonkM (TcTyCon, SkolemInfo, ScopedPairs)
@@ -1878,7 +1878,7 @@ mkPromotionErrorEnv decls
           emptyNameEnv decls
 
 mk_prom_err_env :: TyClDecl GhcRn -> TcTypeEnv
-mk_prom_err_env (ClassDecl { tcdLName = L _ nm, tcdATs = ats })
+mk_prom_err_env (ClassDecl { tcdLName = L _ nm, tcdDecls = ClassDeclX { tcdATs = ats }})
   = unitNameEnv nm (APromotionErr ClassPE)
     `plusNameEnv`
     mkNameEnv [ (familyDeclName at, APromotionErr TyConPE)
@@ -1947,7 +1947,7 @@ getInitialKind :: InitialKindStrategy -> TyClDecl GhcRn -> TcM [TcTyCon]
 getInitialKind strategy
     (ClassDecl { tcdLName = L _ name
                , tcdTyVars = ktvs
-               , tcdATs = ats })
+               , tcdDecls = ClassDeclX { tcdATs = ats }})
   = do { cls_tc <- kcDeclHeader strategy name ClassFlavour ktvs $
                 return (TheKind constraintKind)
             -- See Note [Don't process associated types in getInitialKind]
@@ -2177,7 +2177,7 @@ kcTyClDecl (SynDecl { tcdLName = L _ _name, tcdRhs = rhs }) tycon
         -- in inferInitialKinds.
 
 kcTyClDecl (ClassDecl { tcdLName = L _ _name
-                      , tcdCtxt = ctxt, tcdSigs = sigs }) tycon
+                      , tcdCtxt = ctxt, tcdDecls = ClassDeclX { tcdSigs = sigs }}) tycon
   = tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
     do  { _ <- tcHsContext ctxt
         ; mapM_ (wrapLocMA_ kc_sig) sigs }
@@ -3039,11 +3039,12 @@ tcTyClDecl1 _parent roles_info
 tcTyClDecl1 _parent roles_info
             (ClassDecl { tcdLName = L _ class_name
                        , tcdCtxt = hs_ctxt
-                       , tcdMeths = meths
                        , tcdFDs = fundeps
-                       , tcdSigs = sigs
-                       , tcdATs = ats
-                       , tcdATDefs = at_defs })
+                       , tcdDecls = ClassDeclX
+                            { tcdMeths = meths
+                            , tcdSigs = sigs
+                            , tcdATs = ats
+                            , tcdATDefs = at_defs }})
   = assert (isNothing _parent) $
     do { clas <- tcClassDecl1 roles_info class_name hs_ctxt
                               meths fundeps sigs ats at_defs

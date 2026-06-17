@@ -234,7 +234,6 @@ data SinceType = SinceType
 class SinceClass a
 
 
-
 Test.hs:33:9: warning: [GHC-47854] [-Wduplicate-exports (in -Wdefault)]
     ‘p’ is exported by ‘p’ and ‘R(..)’
 
@@ -246,3 +245,4 @@ Test.hs:33:15: warning: [GHC-47854] [-Wduplicate-exports (in -Wdefault)]
 
 Test.hs:39:9: warning: [GHC-47854] [-Wduplicate-exports (in -Wdefault)]
     ‘a’ is exported by ‘a’ and ‘C(a, b)’
+

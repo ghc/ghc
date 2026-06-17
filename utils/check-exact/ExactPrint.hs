@@ -3607,12 +3607,10 @@ instance ExactPrint (TyClDecl GhcPs) where
                     tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars,
                     tcdFixity = fixity,
                     tcdFDs  = fds,
-                    tcdSigs = sigs, tcdMeths = methods,
-                    tcdATs = ats, tcdATDefs = at_defs,
-                    tcdDocs = _docs,
+                    tcdDecls = decls,
                     tcdModifiers = mods})
       -- TODO: add a test that demonstrates tcdDocs
-      | null sigs && null methods && null ats && null at_defs -- No "where" part
+      | null decls -- No "where" part
       = do
           (mods', c', w', vb', fds', lclas', tyvars',context') <- top_matter
           oc' <- markEpToken oc
@@ -3621,9 +3619,7 @@ instance ExactPrint (TyClDecl GhcPs) where
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
                              tcdFDs  = fds',
-                             tcdSigs = sigs, tcdMeths = methods,
-                             tcdATs = ats, tcdATDefs = at_defs,
-                             tcdDocs = _docs,
+                             tcdDecls = decls,
                              tcdModifiers = mods'})
 
       | otherwise       -- Laid out
@@ -3631,26 +3627,13 @@ instance ExactPrint (TyClDecl GhcPs) where
           (mods', c', w', vb', fds', lclas', tyvars',context') <- top_matter
           oc' <- markEpToken oc
           semis' <- mapM markEpToken semis
-          (sortKey', ds) <- withSortKey sortKey
-                               [(ClsSigTag, prepareListAnnotationA sigs),
-                                (ClsMethodTag, prepareListAnnotationA methods),
-                                (ClsAtTag, prepareListAnnotationA ats),
-                                (ClsAtdTag, prepareListAnnotationA at_defs)
-                             -- ++ prepareListAnnotation docs
-                               ]
+          decls' <- mapM markAnnotated decls
           cc' <- markEpToken cc
-          let
-            sigs'    = undynamic ds
-            methods' = undynamic ds
-            ats'     = undynamic ds
-            at_defs' = undynamic ds
-          return (ClassDecl {tcdCExt = (AnnClassDecl c' [] [] vb' w' oc' cc' semis', lo, sortKey'),
+          return (ClassDecl {tcdCExt = (AnnClassDecl c' [] [] vb' w' oc' cc' semis', lo, sortKey),
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
                              tcdFDs  = fds',
-                             tcdSigs = sigs', tcdMeths = methods',
-                             tcdATs = ats', tcdATDefs = at_defs',
-                             tcdDocs = _docs,
+                             tcdDecls = decls',
                              tcdModifiers = mods'})
       where
         top_matter = do

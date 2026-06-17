@@ -793,8 +793,8 @@ ppShortClassDecl
       , tcdLName = lname
       , tcdTyVars = tvs
       , tcdFDs = fds
-      , tcdSigs = sigs
-      , tcdATs = ats
+      , tcdDecls = ClassDeclX { tcdSigs = sigs
+                              , tcdATs = ats }
       }
     )
   loc
@@ -871,9 +871,9 @@ ppClassDecl
           , tcdLName = lname
           , tcdTyVars = ltyvars
           , tcdFDs = lfds
-          , tcdSigs = lsigs
-          , tcdATs = ats
-          , tcdATDefs = atsDefs
+          , tcdDecls = ClassDeclX { tcdSigs = lsigs
+                                  , tcdATs = ats
+                                  , tcdATDefs = atsDefs }
           }
         )
   splice
