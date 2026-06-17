@@ -1,5 +1,13 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.22.1.0 *July 2026*
+  * Shipped with GHC 9.14.2
+  * Evaluate backtraces for "error" exceptions at the moment they are thrown ([CLC proposal #383](https://github.com/haskell/core-libraries-committee/issues/383), [#26751](https://gitlab.haskell.org/ghc/ghc/-/issues/26751))
+  * `throwSTM` now carries a `HasCallStack` constraint and attaches a backtrace to the thrown exception ([CLC proposal #297](https://github.com/haskell/core-libraries-committee/issues/297), [#25365](https://gitlab.haskell.org/ghc/ghc/-/issues/25365))
+  * `catchSTM` now annotates exceptions rethrown from the handler with `WhileHandling` ([CLC proposal #298](https://github.com/haskell/core-libraries-committee/issues/298))
+  * Hide implementation details of `throw` and `throwSTM` from exception stack traces ([CLC proposal #387](https://github.com/haskell/core-libraries-committee/issues/387), [#26808](https://gitlab.haskell.org/ghc/ghc/-/issues/26808))
+  * GHC internals re-exported from `GHC.Num` have been deprecated and will be removed after one major release ([CLC proposal #360](https://github.com/haskell/core-libraries-committee/issues/360))
+
 ## 4.22.0.0 *December 2025*
   * Shipped with GHC 9.14.1
   * The internal `GHC.Weak.Finalize.runFinalizerBatch` function has been deprecated ([CLC proposal #342](https://github.com/haskell/core-libraries-committee/issues/342))

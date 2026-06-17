@@ -1,9 +1,0 @@
-section: compiler
-issues: #27046
-mrs: !16031
-synopsis:
-  Avoid AArch64 register clobbering bug in MUL2
-description:
-  Fixes an issue in which, on AArch64, code generation for the MUL2 operation
-  could clobber one of the input operands when computing the lower bits, which
-  rendered invalid the subsequent computation of the high bits.

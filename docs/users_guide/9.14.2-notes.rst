@@ -3,7 +3,207 @@
 Version 9.14.2
 ==============
 
-- JSON diagnostics produced with (:ghc-flag:`-fdiagnostics-as-json`) now
-  include the `rendered` diagnostics message, in the exact same format as what
-  GHC would have produced without -fdiagnostics-as-json (including ANSI escape
-  sequences).
+The significant changes to the various parts of the compiler are listed in the
+following sections. See the `migration guide
+<https://gitlab.haskell.org/ghc/ghc/-/wikis/migration/9.14>`_ on the GHC Wiki
+for specific guidance on migrating programs to this release.
+
+Compiler
+~~~~~~~~
+
+- :ghc-flag:`-fdiagnostics-as-json` output now includes the rendered diagnostic
+  message, in the same format GHC would produce without the flag (:ghc-ticket:`26173`)
+- Fixed the orientation of ``HsWrapper`` composition (``<.>``) (:ghc-ticket:`26350`)
+- Fixed LLVM linking of Intel BMI intrinsics ``pdep{8,16}`` and ``pext{8,16}`` (:ghc-ticket:`26065`)
+- Improved compiler performance by making ``OccAnal`` stricter, reducing residency and improving compile times
+- Fixed a shadowing bug with implicit parameters (:ghc-ticket:`26451`)
+- Pass the ``+evex512`` attribute to LLVM 18+ when ``-mavx512f`` is set (:ghc-ticket:`26410`)
+- Fixed a bug in the Cmm register-conflict analysis where an assignment's left-hand side register was not accounted for, which could generate incorrect code (:ghc-ticket:`26550`)
+- Fixed a register allocator bug where the format of a spilled register was not updated after reassignment, which could corrupt vector register contents (:ghc-ticket:`26542`)
+- Fixed the order of spill/reload instructions emitted by the AArch64 native code generator (:ghc-ticket:`26537`)
+- Reduced allocations during recompilation checking by using ``OsPath`` when checking file modification times
+- Reduced memory usage of the package database by using ``OsPath`` instead of ``FilePath`` in ``PkgDbRef`` and ``UnitDatabase``
+- Reinstated the Template Haskell level check when reporting out-of-scope identifiers, fixing misleading errors caused by staging errors (:ghc-ticket:`26099`)
+- Fixed a compiler panic when computing reachability to a module graph node that does not exist (:ghc-ticket:`26568`)
+- Fixed an incorrect optimisation that folded multiplication, division, or remainder by an out-of-range power-of-2 literal into a shift (:ghc-ticket:`25664`)
+- Bumped the maximum supported LLVM version to 21
+- Enabled a Cmm comparison-folding optimisation on all architectures, previously restricted to x86/x86-64 (:ghc-ticket:`26664`)
+- Fixed five register allocation bugs relating to register formats, some of which could corrupt vector register contents when spilling and reloading (:ghc-ticket:`26411`, :ghc-ticket:`26526`)
+- Fixed associated type family changes not triggering recompilation in dependent modules (:ghc-ticket:`26183`)
+- Fixed LLVM backend ``pdep``/``pext`` handling for i386 targets (:ghc-ticket:`26450`)
+- Fixed a missing InVar->OutVar lookup in ``SetLevels`` (:ghc-ticket:`26681`)
+- Fixed data family instance type class instance changes not triggering recompilation (:ghc-ticket:`26705`)
+- Improved case merging by floating join points out of ``DEFAULT`` alternatives (:ghc-ticket:`26709`)
+- Fixed scoping errors in the type-class specialiser (:ghc-ticket:`26682`)
+- Fixed split sections on Windows (:ghc-ticket:`26696`, :ghc-ticket:`26494`)
+- Don't re-use stack slots for growing registers (:ghc-ticket:`26668`)
+- Fixed PPC NCG shift right operations at smaller than word sizes (:ghc-ticket:`26519`)
+- Fixed split sections for the LLVM backend (:ghc-ticket:`26770`)
+- Fixed non-determinism in ``TyLitMap`` by using deterministic maps for strings (:ghc-ticket:`26846`)
+- Fixed a subtle bug in ``GHC.Core.Utils.mkTick`` that could generate type-incorrect code (:ghc-ticket:`26772`)
+- Fixed a long-standing interaction between ticks and casts in ``Eliminate Identity Case``
+- Fixed non-determinism in ``WithHsDocIdentifiers`` binary instance by using a stable sort (:ghc-ticket:`26858`)
+- Fixed cast worker/wrapper incorrectly firing on INLINE functions (:ghc-ticket:`26903`)
+- Fixed negative type literals bypassing the renamer check via ``RequiredTypeArguments``, causing the compiler to hang (:ghc-ticket:`26861`)
+- Fixed a bug where ``mergeCaseAlts`` could move a tick in between a join point and its jump, producing invalid Core (:ghc-ticket:`26642`, :ghc-ticket:`26693`, :ghc-ticket:`26929`)
+- Fixed the Haddock documentation for ``GHC.Prim`` (:ghc-ticket:`26954`)
+- Fixed demand analysis giving an absent demand to an argument that was still used by the function's stable unfolding, which could cause a run-time crash (:ghc-ticket:`26416`)
+- Fixed ``capi`` wrappers failing to compile with newer GCC/Clang by collapsing chains of void pointers to a single ``void*`` (:ghc-ticket:`26852`)
+- Fixed an infinite loop in the type checker triggered by deep subsumption (:ghc-ticket:`26823`)
+- Fixed a segfault caused by refining the ``DEFAULT`` alternative for dictionaries of unary typeclasses (:ghc-ticket:`27071`)
+- The driver now recognises ``.dyn_o`` files as object files when passed on the command line, fixing plugins compiled with this suffix (:ghc-ticket:`24486`)
+- Fixed a regression that caused overloaded functions to no longer be specialised as
+  effectively as in previous releases, hurting runtime performance (:ghc-ticket:`26831`)
+- Fixed the ``Data`` instance for ``ModuleName`` to give a non-bottom ``toConstr`` implementation (:ghc-ticket:`27129`)
+- Fixed ``-dsuppress-uniques`` to also suppress the unique of free variables shown in demand signatures (:ghc-ticket:`27106`)
+- Fix "failed to detect OverLit" panic in the pattern-match checker (:ghc-ticket:`25926`, :ghc-ticket:`27124`)
+- Introduce a cache of home module name providers (:ghc-ticket:`27055`)
+- On AArch64, use a logical instead of an arithmetic right shift for the unsigned right shift (``MO_U_Shr``) at 8/16 bit word size (:ghc-ticket:`26979`)
+- Fixed spurious incomplete record selector warnings for bare record field projections such as ``.fld`` (:ghc-ticket:`26686`)
+- Fixed the simplifier firing rules or inlinings that are not active throughout the whole activation range of a RULE or stable unfolding when simplifying its right-hand side (:ghc-ticket:`26323`)
+- Fixed a compiler loop caused by not taking the current simplifier phase into account when computing the phase range used to simplify the right-hand side of a RULE or stable unfolding (:ghc-ticket:`26826`)
+- Fixed a QuickLook instantiation bug that could cause the typechecker to reject programs using the ``($)`` operator that are accepted when using explicit parentheses (:ghc-ticket:`26543`)
+- Fix a token leak in the ``-jsem`` jobserver shutdown path (:ghc-ticket:`27253`)
+- Update to semaphore-compat 2.0.0 (``-jsem`` protocol v2) (:ghc-ticket:`25087`)
+- Fixed a compiler panic when trimming the continuation for bottoming functions (:ghc-ticket:`27261`)
+- Fixed ``mkTick`` to avoid attaching profiling ticks to coercions, preventing a compiler panic (:ghc-ticket:`27121`)
+- Added a deprecation warning for static forms that mention nested let-bound variables, ahead of a breaking change in a future release (:ghc-ticket:`26718`)
+- Avoid AArch64 register clobbering bug in MUL2 (:ghc-ticket:`27046`)
+- Fixed the RISC-V code generator to zero-extend the result of ``castFloatToWord32`` (:ghc-ticket:`27300`)
+- Fixed the RISC-V code generator to treat registers ``d28``-``d31`` (``ft8``-``ft11``) as caller-saved (:ghc-ticket:`27306`)
+- Fixed the RISC-V code generator to set the correct rounding mode when emitting ``truncate`` (:ghc-ticket:`27303`)
+- AArch64 code generation: use ``SXTW`` instead of ``SXTH`` for ``W32`` sign extension (:ghc-ticket:`26978`)
+- Fix incorrect overflow bit for ``MUL2`` on AArch64 for sub-``W64`` operands (:ghc-ticket:`27047`)
+- Eliminate redundant thunks introduced by tag inference (:ghc-ticket:`27005`)
+- Fix exponential-time desugaring of nested ``case`` expressions. The scrutinee is no longer desugared a second time when recording long-distance information for the pattern-match checker (:ghc-ticket:`27383`, :ghc-ticket:`20251`)
+- Under ``ExplicitLevelImports``, imported types are now subject to the same level (staging) checks as values (:ghc-ticket:`26098`)
+- Reference the correct package in error messages when trying to import a reexported module from a hidden package (:ghc-ticket:`27417`)
+- Fix invalid cmm basic block output when proc-point splitting is enabled (wasm/llvm/unregisterised) (:ghc-ticket:`27447`)
+- Fix a CorePrep miscompilation that could project a field out of an absent dictionary, resulting in a segfault (:ghc-ticket:`25924`)
+- Fix two crashes that could happen in a multithreaded setting when profiling (:ghc-ticket:`27123`)
+- Fix `getStgArgFromTrivialArg` panic in CoreToStg (:ghc-ticket:`27182`)
+- Don't drop cost centres around variables of type `IO ()` (:ghc-ticket:`27225`)
+- Another fix for another `getStgArgFromTrivialArg` panic in CoreToStg (:ghc-ticket:`27386`)
+- Make the order of usages deterministic (:ghc-ticket:`26877`)
+- Fix the interaction of ExplicitLevelImports with qualified imports (:ghc-ticket:`26616`, :ghc-ticket:`27385`)
+- Rename ZonkAny to UnusedType and add pretty printing logic for it (:ghc-ticket:`27390`)
+
+GHCi
+~~~~
+
+- Added the ``-fimport-loaded-targets`` flag, which automatically imports all loaded targets into the GHCi session (:ghc-ticket:`26866`)
+- Added support for custom external interpreter commands, allowing GHC API clients to extend the external interpreter with their own message handlers (:ghc-ticket:`26652`)
+- Fix regression to allow loading modules into the GHCi after startup (:ghc-ticket:`27202`)
+- Fixed the GHCi prompt and session home units to use a consistent package database stack, avoiding spurious ambiguous-import errors for home unit dependencies (:ghc-ticket:`27202`)
+
+Template Haskell
+~~~~~~~~~~~~~~~~
+
+- Fixed implicit lifting to use a precise level check (:ghc-ticket:`26088`)
+
+Runtime System
+~~~~~~~~~~~~~~
+
+- Fixed an incorrect cast in ``SIZED_BIN_OP_TY_INT`` in the bytecode interpreter (:ghc-ticket:`26287`)
+- Removed unnecessary Cabal flags
+- Used computed goto for instruction dispatch in the bytecode interpreter, improving interpreter performance (:ghc-ticket:`12953`)
+- Fixed a deadlock with eventlog flush interval and RTS shutdown (:ghc-ticket:`26573`)
+- Handle 16-bit overflow of ELF section header string table (:ghc-ticket:`26603`)
+- Fixed object file format detection in ``loadArchive`` (:ghc-ticket:`26630`)
+- Fixed an ABI mismatch in calls to the variadic ``barf`` function, both in compiler-generated code and hand-written Cmm (:ghc-ticket:`22882`)
+- Reclaimed slop space opportunistically in ``shrinkMutableByteArray#``, reducing heap fragmentation.
+- Use ``INFO_TABLE_CONSTR`` for ``stg_dummy_ret_closure`` (:ghc-ticket:`26745`)
+- Don't use CAS without ``PARALLEL_GC`` on
+- Switch prim to use modern atomic compiler builtins (:ghc-ticket:`26729`)
+- The runtime linker now supports COMMON symbols (:ghc-ticket:`6107`)
+- Fixed a potential crash when decoding stack snapshots, caused by an invalid pointer left in a GC-visible slot (:ghc-ticket:`27009`)
+- Fixed a missing profiling header in the ``origin_thunk`` stack frame info table, which could cause corruption when the frame was copied by the garbage collector (:ghc-ticket:`27007`)
+- Fixed a stack alignment bug on x86 that could cause segfaults or corrupted registers when using AVX/AVX-512 vector code (:ghc-ticket:`26595`, :ghc-ticket:`26822`)
+- Fixed a race condition where a cloned-stack request could be mishandled after its target thread migrated to another capability (:ghc-ticket:`27008`)
+- Fixed a race condition between ``flushEventLog`` and ``startEventLogging``/``endEventLogging`` that could corrupt the eventlog (:ghc-ticket:`27082`)
+- Windows: fixed crashes and memory leaks in the legacy I/O manager's handling of asynchronous I/O results (:ghc-ticket:`26341`)
+- Add rts Message to set/unset TSO flags (:ghc-ticket:`27131`)
+- Fixed several missing i386 relocation types in the RTS's runtime linker (:ghc-ticket:`25260`)
+- Fix several black hole handling bugs that could lead to deadlocks or crashes in multithreaded programs. These could show up as the program hanging or "END_TSO_QUEUE object entered" errors (:ghc-ticket:`26922`, :ghc-ticket:`26936`)
+- Rethrow exceptions in overlapped IO when using the WinIO IO manager (:ghc-ticket:`27283`)
+- Fix "unknown/strange object 24 crash" in compacting GC (:ghc-ticket:`27434`)
+
+Code Generation
+~~~~~~~~~~~~~~~
+
+- PPC NCG: generate the clear-right instruction at architecture width for all ``MachOp`` widths (:ghc-ticket:`24145`)
+- PPC NCG: Use libcall for 64-bit ``cmpxchg`` on 32-bit PowerPC (:ghc-ticket:`23969`)
+- NCG for PPC: add pattern for ``CmmRegOff`` to ``iselExpr64`` (:ghc-ticket:`26828`)
+- AArch64: fixed a register allocation bug where ``MOVK``'s destination register was not marked as both read and written, which could clobber live values (:ghc-ticket:`26980`)
+- Fix module finalizers on multiple platforms (:ghc-ticket:`27072`)
+- Fix miscompiled %load_relaxed primop, add missing %store_relaxed (:ghc-ticket:`27483`)
+- Fix redundant AP thunk codegen when not using -ticky-ap-thunk (:ghc-ticket:`27502`)
+
+Bytecode Compiler
+~~~~~~~~~~~~~~~~~
+
+- Improved bytecode loading performance by caching ``MallocStrings`` requests for repeated breakpoint strings, avoiding redundant remote heap allocation (:ghc-ticket:`26995`)
+- Fixed the ``SLIDE`` bytecode instruction crashing when sliding off the end of a stack chunk (:ghc-ticket:`27001`)
+- Removed the size limit on unboxed tuples supported by the bytecode interpreter on 64-bit platforms (:ghc-ticket:`26946`)
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+- Added ``@since`` annotation to ``System.Info.fullCompilerVersion`` (:ghc-ticket:`26973`)
+
+``ghc-heap`` library
+~~~~~~~~~~~~~~~~~~~~
+
+- Fix invalid srtlen field returned by peekItbl when no tables-next-to-code (:ghc-ticket:`27465`)
+
+``ghc-internal`` library
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Fixed a crash when decoding a captured stack containing a bytecode object with an empty payload bitmap (:ghc-ticket:`26640`)
+
+``ghc-experimental`` library
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Fixed ``GHC.Exception.Backtrace.Experimental`` module
+- Added an optional ``SrcLoc`` to the ``StackAnnotation`` class in ``GHC.Stack.Annotation.Experimental`` (:ghc-ticket:`26806`)
+- Added a cumulative ``gc_sync_elapsed_ns`` counter to ``RTSStats`` (:ghc-ticket:`26944`)
+- Exposed ``decodeStackWithIpe`` and related stack-decoding helpers from ``ghc-experimental`` (:ghc-ticket:`27065`)
+
+``ghc-pkg``
+~~~~~~~~~~~
+
+- Removed ``traceId`` from ``ghc-pkg`` executable
+- Improve performance of `ghc-pkg list` command (:ghc-ticket:`27275`)
+
+Wasm Backend
+~~~~~~~~~~~~
+
+- Fixed handling of ``ByteArray#``/``MutableByteArray#`` arguments in JSFFI imports on the wasm backend
+- Ensure post-linker output is synchronous ESM and fix loading in ServiceWorker (:ghc-ticket:`27257`)
+- Use ``import.meta.main`` for proper distinction of Node.js main modules (:ghc-ticket:`26916`)
+
+Packaging and Build System
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Added ``hpc`` to release script
+- Hadrian now places user-supplied arguments after package arguments, making it easier to override default package arguments in ``UserSettings.hs`` (:ghc-ticket:`25821`)
+- Use a response file to invoke GHC when analysing dependencies
+- Bumped ``haskeline`` submodule to 0.8.4.1
+- Removed a build-system hack that forced ``-fno-PIC`` on RTS objects on i386, restoring compatibility with modern toolchains (:ghc-ticket:`26792`)
+- Added ``ghc-{experimental,internal}.cabal`` to the list of dependencies of the doc target (:ghc-ticket:`26738`)
+- Fixed runtime error during ``users_guide`` build with Sphinx 9.1.0 (:ghc-ticket:`26810`)
+- Bumped ``text`` submodule to 2.1.4
+- Bumped ``transformers`` submodule to 0.6.3.0
+- Bumped ``Cabal`` submodule to 3.16.1.0
+- Bumped ``deepseq`` submodule to 1.5.2.0
+- Bumped ``directory`` submodule to 1.3.10.1.
+- Bumped ``exceptions`` submodule to 0.10.12.
+- The build system now accepts version 2.2 of the ``happy`` parser generator.
+- Hadrian now builds profiled dynamic objects with ``-dynamic-too``, improving build parallelism (:ghc-ticket:`27010`)
+- Fixed the ``--target`` support check in ``configure`` to use the stage0 C compiler instead of ``$CC`` (:ghc-ticket:`26999`)
+- Installed the ``rts/Types.h`` header when using the JavaScript backend, fixing use of ``HsFFI.h`` (:ghc-ticket:`27033`)
+- Removed the package hash from Haddock documentation directory paths, making it easier for downstream packages to link to them (:ghc-ticket:`26635`)
+- bump submodule to v1.6.29.0 (:ghc-ticket:`27144`)
+- Bumped ``process`` submodule to 1.6.30.0
+- Fixed a validate-build failure of the runtime system with GCC 16 (:ghc-ticket:`27366`)
+- Hadrian no longer leaves stale `.conf` files in its package databases when rebuilding in the same build root with different settings (e.g. another flavour, or when hashes change with +hash-unit-ids) (:ghc-ticket:`26661`)

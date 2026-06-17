@@ -1,8 +1,0 @@
-section: compiler
-issues: #27253
-mrs: !15729
-synopsis:
-  Fix a token leak in the ``-jsem`` jobserver shutdown path
-description:
-  A build interrupted by Ctrl-C while a ``-jsem`` token transfer was in
-  flight could leak that token.
