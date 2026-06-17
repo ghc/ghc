@@ -1,8 +1,0 @@
-section: compiler
-issues: #27386
-mrs: !16198
-synopsis:
-  Another fix for another `getStgArgFromTrivialArg` panic in CoreToStg
-description:
-  Avoid another `getStgArgFromTrivialArg` panic in CoreToStg due to a call to
-  `mkTick` in Core Prep which invalidated ANF.

@@ -1,4 +1,0 @@
-section: compiler
-synopsis: Reference the correct package in error messages when trying to import a reexported module from a hidden package.
-issues: #27417
-mrs: !16229

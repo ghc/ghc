@@ -1,8 +1,0 @@
-section: compiler
-synopsis: Eliminate redundant thunks introduced by tag inference.
-description: {
-  Tag inference is now more precise in tracking function results, eliminating
-  redundant thunks for certain functions that return an unboxed tuple.
-}
-issues: #27005
-mrs: !15688
