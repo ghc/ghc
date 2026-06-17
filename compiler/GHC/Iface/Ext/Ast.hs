@@ -1631,10 +1631,11 @@ instance ToHie (LocatedA (TyClDecl GhcRn)) where
                 , tcdLName = name
                 , tcdTyVars = vars
                 , tcdFDs = deps
-                , tcdSigs = sigs
-                , tcdMeths = meths
-                , tcdATs = typs
-                , tcdATDefs = deftyps
+                , tcdCExt = (ClassDeclX {
+                   tcdSigs = sigs
+                 , tcdMeths = meths
+                 , tcdATs = typs
+                 , tcdATDefs = deftyps }, _)
                 } ->
         [ toHie $ C (Decl ClassDec $ getRealSpanA span) name
         , toHie context

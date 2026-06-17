@@ -469,8 +469,9 @@ repTyClD (L loc (DataDecl { tcdLName = tc
 
 repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
                              tcdTyVars = tvs, tcdFDs = fds,
-                             tcdSigs = sigs, tcdMeths = meth_binds,
-                             tcdATs = ats, tcdATDefs = atds }))
+                             tcdCExt = (ClassDeclX
+                               { tcdSigs = sigs, tcdMeths = meth_binds,
+                                 tcdATs = ats, tcdATDefs = atds }, _)}))
   = do { cls1 <- lookupLOcc cls         -- See Note [Binders and occurrences]
        ; dec  <- addQTyVarBinds FreshNamesOnly tvs $ \bndrs ->
            do { cxt1   <- repLContext cxt

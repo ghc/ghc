@@ -69,7 +69,7 @@ module GHC.Hs.Utils(
 
   -- * Types
   mkHsAppTy, mkHsAppKindTy,
-  hsTypeToHsSigType, hsTypeToHsSigWcType, mkClassOpSigs, mkHsSigEnv,
+  hsTypeToHsSigType, hsTypeToHsSigWcType, mkClassOpSigs, mkClassOpSig, mkHsSigEnv,
   nlHsAppTy, nlHsAppKindTy, nlHsTyVar, nlHsFunTy, nlHsParTy, nlHsTyConApp,
 
   -- * Stmts
@@ -112,6 +112,7 @@ import GHC.Hs.Expr
 import GHC.Hs.Pat
 import GHC.Hs.Type
 import GHC.Hs.Lit
+import GHC.Hs.Instances ()
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Text
 import GHC.Hs.Extension
@@ -767,14 +768,13 @@ mkClassOpSigs :: [LSig GhcPs] -> [LSig GhcPs]
 -- ^ Convert 'TypeSig' to 'ClassOpSig'.
 -- The former is what is parsed, but the latter is
 -- what we need in class/instance declarations
-mkClassOpSigs sigs
-  = map fiddle sigs
-  where
-    -- This drops modifiers, but they can't be parsed here anyway.
-    fiddle (L loc (TypeSig anns _ nms ty))
-      = L loc (ClassOpSig anns False nms (dropWildCards ty))
-    fiddle sig = sig
+mkClassOpSigs = map mkClassOpSig
 
+mkClassOpSig :: LSig GhcPs -> LSig GhcPs
+mkClassOpSig (L loc (TypeSig anns _ nms ty))
+  -- This drops modifiers, but they can't be parsed here anyway.
+  = L loc (ClassOpSig anns False nms (dropWildCards ty))
+mkClassOpSig sig = sig
 
 -- | Type ascription: (e :: ty)
 nlAscribe :: RdrName -> LHsExpr GhcPs -> LHsExpr GhcPs
@@ -1478,7 +1478,7 @@ tyDeclBinders (TyDeclBinders main ats sigs consWithFields)
   where
     (cons, flds) = lconsWithFieldsBinders consWithFields
 
-hsLTyClDeclBinders :: (IsPass p, OutputableBndrId p)
+hsLTyClDeclBinders :: forall p. (IsPass p, OutputableBndrId p)
                    => LocatedA (TyClDecl (GhcPass p))
                    -> TyDeclBinders p
 -- ^ Returns all the /binding/ names of the decl.  The first one is
@@ -1504,10 +1504,12 @@ hsLTyClDeclBinders (L loc (SynDecl
   , tyDeclATs = [], tyDeclOpSigs = []
   , tyDeclConsWithFields = emptyLConsWithFields }
 hsLTyClDeclBinders (L loc (ClassDecl
-                               { tcdLName = (L _ cls_name)
-                               , tcdSigs  = sigs
-                               , tcdATs   = ats }))
-  = TyDeclBinders
+                               { tcdCExt = ext
+                               , tcdLName = (L _ cls_name)
+                               , tcdDecls  = decls}))
+  = let
+    (_binds, sigs, ats, _at_defs, _, _docs) = classDeclsSplit @p (decls, ext)
+  in TyDeclBinders
   { tyDeclMainBinder = (L loc cls_name, ClassFlavour)
   , tyDeclATs = [ (L fam_loc fam_name, familyInfoTyConFlavour (Just ()) fd_info)
                 | (L fam_loc (FamilyDecl { fdLName = L _ fam_name
@@ -1525,6 +1527,30 @@ hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = (L _ name)
   , tyDeclConsWithFields = hsDataDefnBinders defn }
   where
     flav = newOrDataToFlavour $ dataDefnConsNewOrData $ dd_cons defn
+
+classDeclsSplit
+  ::  forall p. IsPass p
+  => ([LHsDecl (GhcPass p)], XClassDecl (GhcPass p))
+  -> (LHsBinds (GhcPass p), [LSig (GhcPass p)], [LFamilyDecl (GhcPass p)],
+      [LTyFamInstDecl (GhcPass p)], [LDataFamInstDecl (GhcPass p)], [LDocDecl (GhcPass p)])
+classDeclsSplit (decls, ext)
+  = case ghcPass @p of
+      GhcPs -> partitionBindsAndSigs decls
+      GhcRn -> from_decls ext
+      GhcTc -> from_decls ext
+  where
+    from_decls
+      :: (XClassDecl (GhcPass p) ~ (ClassDeclX (GhcPass p), NameSet))
+      =>  (ClassDeclX (GhcPass p), NameSet)
+      -> (LHsBinds (GhcPass p), [LSig (GhcPass p)], [LFamilyDecl (GhcPass p)],
+          [LTyFamInstDecl (GhcPass p)], [LDataFamInstDecl (GhcPass p)], [LDocDecl (GhcPass p)])
+
+    from_decls (ClassDeclX { tcdSigs = sigs,
+                            tcdMeths = methods,
+                            tcdATs   = ats,
+                            tcdATDefs = at_defs,
+                            tcdDocs = docs}, _)
+      = (methods, sigs, ats, at_defs, [], docs)
 
 familyInfoTyConFlavour
   :: Maybe tc    -- ^ Just cls <=> this is an associated family of class cls

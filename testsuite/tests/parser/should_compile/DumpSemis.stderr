@@ -1296,7 +1296,7 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (AnnClassDecl
         (EpTok
          (EpaSpan { DumpSemis.hs:28:1-5 }))
@@ -1309,8 +1309,7 @@
         (NoEpTok)
         [])
        (EpVirtualBraces
-        (3))
-       (NoAnnSortKey))
+        (3)))
       []
       (Nothing)
       (L
@@ -1381,89 +1380,87 @@
          []
          (EpaComments
           []))
-        (ClassOpSig
-         (AnnSig
-          (EpUniTok
-           (EpaSpan { DumpSemis.hs:29:9-10 })
-           (NormalSyntax))
-          (Nothing)
-          (Nothing))
-         (False)
-         [(L
-           (EpAnn
-            (EpaSpan { DumpSemis.hs:29:3-7 })
-            (NameAnnTrailing
-             [])
-            (EpaComments
-             []))
-           (Unqual
-            {OccName: proof}))]
-         (L
-          (EpAnn
-           (EpaSpan { DumpSemis.hs:29:12-23 })
-           []
-           (EpaComments
-            []))
-          (HsSig
-           (NoExtField)
-           (HsOuterImplicit
-            (NoExtField))
-           (L
+        (SigD
+         (NoExtField)
+         (ClassOpSig
+          (AnnSig
+           (EpUniTok
+            (EpaSpan { DumpSemis.hs:29:9-10 })
+            (NormalSyntax))
+           (Nothing)
+           (Nothing))
+          (False)
+          [(L
             (EpAnn
-             (EpaSpan { DumpSemis.hs:29:12-23 })
-             []
+             (EpaSpan { DumpSemis.hs:29:3-7 })
+             (NameAnnTrailing
+              [])
              (EpaComments
               []))
-            (HsFunTy
-             (NoExtField)
-             (HsModifiedFunArr
-              (NoExtField)
+            (Unqual
+             {OccName: proof}))]
+          (L
+           (EpAnn
+            (EpaSpan { DumpSemis.hs:29:12-23 })
+            []
+            (EpaComments
+             []))
+           (HsSig
+            (NoExtField)
+            (HsOuterImplicit
+             (NoExtField))
+            (L
+             (EpAnn
+              (EpaSpan { DumpSemis.hs:29:12-23 })
               []
-              (HsStandardArr
-               (EpArrow
-                (EpUniTok
-                 (EpaSpan { DumpSemis.hs:29:18-19 })
-                 (NormalSyntax)))))
-             (L
-              (EpAnn
-               (EpaSpan { DumpSemis.hs:29:12-16 })
+              (EpaComments
+               []))
+             (HsFunTy
+              (NoExtField)
+              (HsModifiedFunArr
+               (NoExtField)
                []
-               (EpaComments
-                []))
-              (HsTyVar
-               (NoEpTok)
-               (NotPromoted)
-               (L
-                (EpAnn
-                 (EpaSpan { DumpSemis.hs:29:12-16 })
-                 (NameAnnTrailing
-                  [])
-                 (EpaComments
-                  []))
-                (Unqual
-                 {OccName: trans}))))
-             (L
-              (EpAnn
-               (EpaSpan { DumpSemis.hs:29:21-23 })
-               []
-               (EpaComments
-                []))
-              (HsTyVar
-               (NoEpTok)
-               (NotPromoted)
-               (L
-                (EpAnn
-                 (EpaSpan { DumpSemis.hs:29:21-23 })
-                 (NameAnnTrailing
-                  [])
-                 (EpaComments
-                  []))
-                (Unqual
-                 {OccName: Int}))))))))))]
-      []
-      []
-      []
-      [])))
+               (HsStandardArr
+                (EpArrow
+                 (EpUniTok
+                  (EpaSpan { DumpSemis.hs:29:18-19 })
+                  (NormalSyntax)))))
+              (L
+               (EpAnn
+                (EpaSpan { DumpSemis.hs:29:12-16 })
+                []
+                (EpaComments
+                 []))
+               (HsTyVar
+                (NoEpTok)
+                (NotPromoted)
+                (L
+                 (EpAnn
+                  (EpaSpan { DumpSemis.hs:29:12-16 })
+                  (NameAnnTrailing
+                   [])
+                  (EpaComments
+                   []))
+                 (Unqual
+                  {OccName: trans}))))
+              (L
+               (EpAnn
+                (EpaSpan { DumpSemis.hs:29:21-23 })
+                []
+                (EpaComments
+                 []))
+               (HsTyVar
+                (NoEpTok)
+                (NotPromoted)
+                (L
+                 (EpAnn
+                  (EpaSpan { DumpSemis.hs:29:21-23 })
+                  (NameAnnTrailing
+                   [])
+                  (EpaComments
+                   []))
+                 (Unqual
+                  {OccName: Int})))))))))))])))
   ,(L
     (EpAnn
      (EpaSpan { DumpSemis.hs:31:1-30 })

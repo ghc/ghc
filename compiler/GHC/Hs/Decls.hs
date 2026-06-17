@@ -21,7 +21,7 @@ module GHC.Hs.Decls (
   StandaloneKindSig(..), LStandaloneKindSig, standaloneKindSigName,
 
   -- ** Class or type declarations
-  TyClDecl(..), LTyClDecl, DataDeclRn(..),
+  TyClDecl(..), LTyClDecl, DataDeclRn(..), ClassDeclX(..),
   AnnDataDefn(..),
   AnnClassDecl(..),
   AnnSynDecl(..),
@@ -136,7 +136,7 @@ import GHC.Unit.Module.Warnings
 
 import GHC.Data.Maybe
 import Data.Data (Data)
-import Data.List (concatMap)
+import Data.List (concatMap,singleton)
 import Data.Foldable (toList)
 
 {-
@@ -221,12 +221,13 @@ emptyGroup = HsGroup { hs_ext = noExtField,
 -- | The fixity signatures for each top-level declaration and class method
 -- in an 'HsGroup'.
 -- See Note [Top-level fixity signatures in an HsGroup]
-hsGroupTopLevelFixitySigs :: HsGroup (GhcPass p) -> [LFixitySig (GhcPass p)]
+hsGroupTopLevelFixitySigs :: HsGroup GhcPs -> [LFixitySig GhcPs]
 hsGroupTopLevelFixitySigs (HsGroup{ hs_fixds = fixds, hs_tyclds = tyclds }) =
     fixds ++ cls_fixds
   where
     cls_fixds = [ L loc sig
-                | L _ ClassDecl{tcdSigs = sigs} <- tyClGroupTyClDecls tyclds
+                | L _ ClassDecl{tcdDecls = decls} <- tyClGroupTyClDecls tyclds
+                , (_meths, sigs, _typs, _deftyps, _, _docs) <- (singleton . partitionBindsAndSigs)  decls
                 , L loc (FixSig _ sig) <- sigs
                 ]
 
@@ -373,13 +374,53 @@ data DataDeclRn = DataDeclRn
              , tcdFVs      :: NameSet }
   deriving Data
 
-type instance XClassDecl    GhcPs =
-  ( AnnClassDecl
-  , EpLayout              -- See Note [Class EpLayout]
-  , AnnSortKey DeclTag )  -- TODO:AZ:tidy up AnnSortKey
+type instance XClassDecl    GhcPs = (AnnClassDecl, EpLayout) -- See Note [Class EpLayout]
+type instance XClassDecl    GhcRn = (ClassDeclX GhcRn, NameSet) -- FVs
+type instance XClassDecl    GhcTc = (ClassDeclX GhcTc, NameSet) -- FVs
 
-type instance XClassDecl    GhcRn = NameSet -- FVs
-type instance XClassDecl    GhcTc = NameSet -- FVs
+-- | Convenience type for 'XClassDecls' where the [LHsDecl pass] are
+-- | split out. In GHC this is used from the renamer onward.
+-- | See Note [Pass-sensitive decls for ClassDecls]
+data ClassDeclX pass
+  = ClassDeclX { tcdSigs    :: [LSig pass],              -- ^ Methods' signatures
+                 tcdMeths   :: LHsBinds pass,            -- ^ Default methods
+                 tcdATs     :: [LFamilyDecl pass],       -- ^ Associated types;
+                 tcdATDefs  :: [LTyFamDefltDecl pass],   -- ^ Associated type defaults
+                 tcdDocs    :: [LDocDecl pass]           -- ^ Haddock docs
+    }
+
+
+{- Note [Pass-sensitive decls for ClassDecls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When this AST is used in GHC, the 'pass' parameter is used to
+represent the current compiler pass, running through the parser,
+renamer and typechecker.
+
+The parser phase is intended to capture the source code as it is
+written, and in GHC this includes locations of every item via exact
+print annotations.
+
+A ClassDecl is a container for a number of different kinds of
+declarations: method signatures, methods, associated types, associated
+type defaults or haddock documents. There is no requirement for any
+specific ordering for these.
+
+For the parsed AST, it is useful to capture these decls in the order
+written. From the renamer onwards, they should be grouped by the kind
+of declaration.
+
+The usefulness of the direct representation arises from the the parser
+AST being used in multiple roles, including by tools such as
+formatters, linters, refactorers which need to manipulate the source
+code. These tools can be simpler, and hence less error prone if parsed
+AST s in close alignment with the source as written.
+
+We enable this by using XClassDecls pass in the TTG extension field
+tcdCExt for GhcRn and GhcTc.
+
+This gives us a linear, as-written decls occurrence for GhcPs, and a
+grouped representation from the renamer onwards.
+-}
 
 type instance XXTyClDecl    (GhcPass _) = DataConCantHappen
 
@@ -517,24 +558,41 @@ instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
       = pprLHsModifiers mods
         $$ pp_data_defn (pp_vanilla_decl_head ltycon tyvars fixity) defn
 
-    ppr (ClassDecl {tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars,
+    ppr (ClassDecl {tcdCExt = ext,
+                    tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars,
                     tcdFixity = fixity,
                     tcdFDs  = fds,
-                    tcdSigs = sigs, tcdMeths = methods,
-                    tcdATs = ats, tcdATDefs = at_defs, tcdModifiers = mods})
-      | null sigs && null methods && null ats && null at_defs -- No "where" part
-      = top_matter
+                    tcdDecls = decls,
+                    tcdModifiers = mods})
+      = case ghcPass @p of
+          GhcPs -> if null decls -- No "where" part
+                        then top_matter
+                        else vcat [ top_matter <+> text "where"
+                                  , nest 2 $ pprDeclList (map (ppr . unLoc) decls) ]
+          GhcRn -> ppr_decls (fst ext)
+          GhcTc -> ppr_decls (fst ext)
 
-      | otherwise       -- Laid out
-      = vcat [ top_matter <+> text "where"
-             , nest 2 $ pprDeclList (map (ppr . unLoc) ats ++
-                                     map (pprTyFamDefltDecl . unLoc) at_defs ++
-                                     pprLHsBindsForUser methods sigs) ]
+
       where
         top_matter = pprLHsModifiers mods
                     $$  text "class"
                     <+> pp_vanilla_decl_head lclas tyvars fixity context
                     <+> pprFundeps (map unLoc fds)
+
+        ppr_decls :: ClassDeclX (GhcPass p) -> SDoc
+        ppr_decls ClassDeclX { tcdSigs = sigs,
+                               tcdMeths = methods,
+                               tcdATs   = ats,
+                               tcdATDefs = at_defs,
+                               tcdDocs = docs}
+            | null sigs && null methods && null ats && null at_defs -- No "where" part
+                = top_matter
+            | otherwise -- Laid out
+                = vcat [ top_matter <+> text "where"
+                       , nest 2 $ pprDeclList (map (ppr . unLoc) ats ++
+                                               map (pprTyFamDefltDecl . unLoc) at_defs ++
+                                               map (ppr . unLoc) docs ++
+                                               pprLHsBindsForUser methods sigs) ]
 
 instance OutputableBndrId p
        => Outputable (TyClGroup (GhcPass p)) where
@@ -1490,6 +1548,7 @@ roleAnnotDeclName (RoleAnnotDecl _ (L _ name) _) = name
 type instance Anno (HsDecl (GhcPass _)) = SrcSpanAnnA
 type instance Anno (SpliceDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (TyClDecl (GhcPass p)) = SrcSpanAnnA
+type instance Anno (ClassDeclX (GhcPass p)) = SrcSpanAnnA
 type instance Anno (FunDep (GhcPass p)) = SrcSpanAnnA
 type instance Anno (FamilyResultSig (GhcPass p)) = EpAnnCO
 type instance Anno (FamilyDecl (GhcPass p)) = SrcSpanAnnA

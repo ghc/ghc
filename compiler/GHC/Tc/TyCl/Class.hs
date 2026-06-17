@@ -190,8 +190,9 @@ tcClassSigs clas sigs def_methods
 tcClassDecl2 :: LTyClDecl GhcRn          -- The class declaration
              -> TcM (LHsBinds GhcTc)
 
-tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
-                                tcdMeths = default_binds}))
+tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name,
+                             tcdCExt =
+                               (ClassDeclX { tcdSigs = sigs, tcdMeths = default_binds }, _)}))
   = recoverM (return emptyLHsBinds) $
     setSrcSpan (getLocA class_name) $
     do  { clas <- tcLookupLocatedClass (la2la class_name)

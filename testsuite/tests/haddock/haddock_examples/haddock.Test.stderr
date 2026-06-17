@@ -106,8 +106,10 @@ newtype N7 a b
   = -- | The 'N7' constructor
     N7 {n7 :: a b}
 class (D a) => C a where
+  <document comment>
   a :: IO a
   b :: [a]
+  <document comment>
   c :: a
 <document comment>
 class D a where
@@ -234,7 +236,6 @@ data SinceType = SinceType
 class SinceClass a
 
 
-
 Test.hs:33:9: warning: [GHC-47854] [-Wduplicate-exports (in -Wdefault)]
     ‘p’ is exported by ‘p’ and ‘R(..)’
 
@@ -246,3 +247,4 @@ Test.hs:33:15: warning: [GHC-47854] [-Wduplicate-exports (in -Wdefault)]
 
 Test.hs:39:9: warning: [GHC-47854] [-Wduplicate-exports (in -Wdefault)]
     ‘a’ is exported by ‘a’ and ‘C(a, b)’
+

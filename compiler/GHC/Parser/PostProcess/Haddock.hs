@@ -61,7 +61,7 @@ import {-# SOURCE #-} GHC.Parser (parseIdentifier)
 import GHC.Parser.Lexer
 import GHC.Parser.HaddockLex
 import GHC.Parser.Errors.Types
-import GHC.Utils.Misc (mergeListsBy, filterOut, (<&&>))
+import GHC.Utils.Misc ( filterOut, (<&&>))
 import qualified GHC.Data.Strict as Strict
 
 {- Note [Adding Haddock comments to the syntax tree]
@@ -498,24 +498,18 @@ instance HasHaddock (HsDecl GhcPs) where
   --      -- ^ Comment on the second method
   --
   addHaddock (TyClD _ decl)
-    | ClassDecl { tcdCExt = (x, layout, NoAnnSortKey),
+    | ClassDecl { tcdCExt = (x, layout),
                   tcdCtxt, tcdLName, tcdTyVars, tcdFixity, tcdFDs,
-                  tcdSigs, tcdMeths, tcdATs, tcdATDefs, tcdModifiers } <- decl
+                  tcdDecls, tcdModifiers } <- decl
     = do
         registerHdkA tcdLName
         registerEpTokenHdkA (acd_where x)
-        where_cls' <-
-          addHaddockInterleaveItems layout (mkDocHsDecl layout) $
-          flattenBindsAndSigs (tcdMeths, tcdSigs, tcdATs, tcdATDefs, [], [])
+        tcdDecls' <- addHaddockInterleaveItems layout (mkDocHsDecl layout) tcdDecls
         pure $
-          let (tcdMeths', tcdSigs', tcdATs', tcdATDefs', _, tcdDocs) = partitionBindsAndSigs where_cls'
-              decl' = ClassDecl { tcdCExt = (x, layout, NoAnnSortKey)
+          let decl' = ClassDecl { tcdCExt = (x, layout)
                                 , tcdCtxt, tcdLName, tcdTyVars, tcdFixity, tcdFDs
-                                , tcdSigs = tcdSigs'
-                                , tcdMeths = tcdMeths'
-                                , tcdATs = tcdATs'
-                                , tcdATDefs = tcdATDefs'
-                                , tcdDocs, tcdModifiers }
+                                , tcdDecls = tcdDecls'
+                                , tcdModifiers }
           in TyClD noExtField decl'
 
   -- Data family instances:
@@ -1461,42 +1455,11 @@ getForAllTeleLoc tele =
 getLHsTyVarBndrsLoc :: [LHsTyVarBndr flag GhcPs] -> SrcSpan
 getLHsTyVarBndrsLoc bndrs = foldr combineSrcSpans noSrcSpan $ map getLocA bndrs
 
--- | The inverse of 'partitionBindsAndSigs' that merges partitioned items back
--- into a flat list. Elements are put back into the order in which they
--- appeared in the original program before partitioning, using BufPos to order
--- them.
---
--- Precondition (unchecked): the input lists are already sorted.
-flattenBindsAndSigs
-  :: (LHsBinds GhcPs, [LSig GhcPs], [LFamilyDecl GhcPs],
-      [LTyFamInstDecl GhcPs], [LDataFamInstDecl GhcPs], [LDocDecl GhcPs])
-  -> [LHsDecl GhcPs]
-flattenBindsAndSigs (all_bs, all_ss, all_ts, all_tfis, all_dfis, all_docs) =
-  -- 'cmpBufSpan' is safe here with the following assumptions:
-  --
-  -- - 'LHsDecl' produced by 'decl_cls' in Parser.y always have a 'BufSpan'
-  -- - 'partitionBindsAndSigs' does not discard this 'BufSpan'
-  mergeListsBy cmpBufSpanA [
-    mapLL (\b -> ValD noExtField b) all_bs,
-    mapLL (\s -> SigD noExtField s) all_ss,
-    mapLL (\t -> TyClD noExtField (FamDecl noExtField t)) all_ts,
-    mapLL (\tfi -> InstD noExtField (TyFamInstD noExtField tfi)) all_tfis,
-    mapLL (\dfi -> InstD noExtField (DataFamInstD noExtField dfi)) all_dfis,
-    mapLL (\d -> DocD noExtField d) all_docs
-  ]
-
-cmpBufSpanA :: GenLocated (EpAnn a1) a2 -> GenLocated (EpAnn a3) a2 -> Ordering
-cmpBufSpanA (L la a) (L lb b) = cmpBufSpan (L (locA la) a) (L (locA lb) b)
-
 {- *********************************************************************
 *                                                                      *
 *                   General purpose utilities                          *
 *                                                                      *
 ********************************************************************* -}
-
--- Map a function over a list of located items.
-mapLL :: (a -> b) -> [GenLocated l a] -> [GenLocated l b]
-mapLL f = map (fmap f)
 
 {- Note [Old solution: Haddock in the grammar]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

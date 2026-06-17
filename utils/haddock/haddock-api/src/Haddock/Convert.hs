@@ -177,18 +177,19 @@ tyThingToLHsDecl prr t = case t of
                       )
                       $ snd
                       $ classTvsFds cl
-                , tcdSigs =
-                    noLocA (MinimalSig (noAnn, NoSourceText) . noLocA $ classMinimalDef cl)
-                      : [ noLocA tcdSig
-                        | clsOp <- classOpItems cl
-                        , tcdSig <- synifyTcIdSig (mkVarSet vs) clsOp
-                        ]
-                , tcdMeths = [] -- ignore default method definitions, they don't affect signature
-                -- class associated-types are a subset of TyCon:
-                , tcdATs = atFamDecls
-                , tcdATDefs = catMaybes atDefFamDecls
-                , tcdDocs = [] -- we don't have any docs at this point
-                , tcdCExt = emptyNameSet
+                , tcdDecls = []
+                , tcdCExt = (ClassDeclX {
+                    tcdSigs =
+                      noLocA (MinimalSig (noAnn, NoSourceText) . noLocA $ classMinimalDef cl)
+                        : [ noLocA tcdSig
+                          | clsOp <- classOpItems cl
+                          , tcdSig <- synifyTcIdSig (mkVarSet vs) clsOp
+                          ]
+                  , tcdMeths = [] -- ignore default method definitions, they don't affect signature
+                  -- class associated-types are a subset of TyCon:
+                  , tcdATs = atFamDecls
+                  , tcdATDefs = catMaybes atDefFamDecls
+                  , tcdDocs = []}, emptyNameSet) -- we don't have any docs at this point
                 , tcdModifiers = []
                 }
     | otherwise ->

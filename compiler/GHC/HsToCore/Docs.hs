@@ -458,7 +458,7 @@ isValD _ = False
 classDecls :: TyClDecl GhcRn  -- Always a ClassDecl
            -> [(LHsDecl GhcRn, [HsDoc GhcRn])]
 classDecls decl
-  | ClassDecl { .. } <- decl
+  | ClassDecl { tcdCExt = (ClassDeclX { .. }, _) } <- decl
   , let decls = docs ++ defs ++ sigs ++ ats
         docs  = mkDecls (DocD noExtField) tcdDocs
         defs  = mkDecls (ValD noExtField) tcdMeths
@@ -552,8 +552,8 @@ collectDocs = go [] Nothing
     finished decl docs rest = (decl, reverse docs) : rest
 
 -- | Filter out declarations that we don't handle in Haddock
-filterDecls :: forall p doc. UnXRec p => [(LHsDecl p, doc)] -> [(LHsDecl p, doc)]
-filterDecls = filter (isHandled . unXRec @p . fst)
+filterDecls :: [(LHsDecl GhcRn, doc)] -> [(LHsDecl GhcRn, doc)]
+filterDecls = filter (isHandled . unLoc . fst)
   where
     isHandled (ForD _ (ForeignImport {})) = True
     isHandled (TyClD {})  = True
@@ -567,12 +567,13 @@ filterDecls = filter (isHandled . unXRec @p . fst)
 
 
 -- | Go through all class declarations and filter their sub-declarations
-filterClasses :: forall p doc. (IsPass p) => [(LHsDecl (GhcPass p), doc)] -> [(LHsDecl (GhcPass p), doc)]
+filterClasses :: [(LHsDecl GhcRn, doc)] -> [(LHsDecl GhcRn, doc)]
 filterClasses = map (first (fmap filterClass))
   where
-    filterClass (TyClD x c@(ClassDecl {})) =
-      TyClD x $ c { tcdSigs =
-        filter (liftA2 (||) (isUserSig . unLoc) isMinimalLSig) (tcdSigs c) }
+    filterClass :: HsDecl GhcRn -> HsDecl GhcRn
+    filterClass (TyClD x c@(ClassDecl { tcdCExt = (cd, ns) })) =
+      TyClD x $ c { tcdCExt = (cd { tcdSigs =
+        filter (liftA2 (||) (isUserSig . unLoc) isMinimalLSig) (tcdSigs cd) }, ns)}
     filterClass d = d
 
 -- | Was this signature given by the user?

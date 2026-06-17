@@ -1926,10 +1926,11 @@ rnTyClDecl (DataDecl
 
 rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                         tcdTyVars = tyvars, tcdFixity = fixity,
-                        tcdFDs = fds, tcdSigs = sigs,
-                        tcdMeths = mbinds, tcdATs = ats, tcdATDefs = at_defs,
-                        tcdDocs = docs, tcdModifiers = modifiers})
-  = do  { lcls' <- lookupLocatedTopBndrRnN WL_TyCon lcls
+                        tcdFDs = fds,
+                        tcdDecls = decls,
+                        tcdModifiers = modifiers})
+  = do  { let (mbinds, sigs, ats, at_defs, _, docs) = partitionBindsAndSigs decls
+        ; lcls' <- lookupLocatedTopBndrRnN WL_TyCon lcls
         ; let cls' = unLoc lcls'
               kvs = []  -- No scoped kind vars except those in
                         -- kind signatures on the tyvars
@@ -1981,9 +1982,14 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
         ; docs' <- traverse rnLDocDecl docs
         ; return (ClassDecl { tcdCtxt = context', tcdLName = lcls',
                               tcdTyVars = tyvars', tcdFixity = fixity,
-                              tcdFDs = fds', tcdSigs = sigs',
-                              tcdMeths = mbinds', tcdATs = ats', tcdATDefs = at_defs',
-                              tcdDocs = docs', tcdCExt = all_fvs, tcdModifiers = modifiers' },
+                              tcdFDs = fds',
+                              tcdDecls = [], -- See Note [Pass-sensitive decls for ClassDecls]
+                              tcdCExt = (ClassDeclX { tcdSigs   = sigs',
+                                                      tcdMeths  = mbinds',
+                                                      tcdATs    = ats',
+                                                      tcdATDefs = at_defs',
+                                                      tcdDocs   = docs'},
+                              all_fvs), tcdModifiers = modifiers' },
                   all_fvs ) }
   where
     cls_doc  = ClassDeclCtx lcls

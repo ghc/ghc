@@ -591,32 +591,12 @@ orderedDecls sortKey declGroup  =
 
 hsDeclsClassDecl :: TyClDecl GhcPs -> [LHsDecl GhcPs]
 hsDeclsClassDecl dec = case dec of
-  ClassDecl { tcdCExt = (_an2, _layout, sortKey),
-              tcdSigs = sigs,tcdMeths = methods,
-              tcdATs = ats, tcdATDefs = at_defs
-            } -> map snd decls
-    where
-      srs :: EpAnn a -> RealSrcSpan
-      srs a = realSrcSpan $ locA a
-      decls
-          = orderedDecls sortKey $ Map.fromList
-              [(ClsSigTag,    map (\(L l s) -> (srs l, L l (SigD noExtField s))) sigs),
-               (ClsMethodTag, map (\(L l s) -> (srs l, L l (ValD noExtField s))) methods),
-               (ClsAtTag,     map (\(L l s) -> (srs l, L l (TyClD noExtField $ FamDecl noExtField s))) ats),
-               (ClsAtdTag,    map (\(L l s) -> (srs l, L l (InstD noExtField $ TyFamInstD noExtField s))) at_defs)
-              ]
+  ClassDecl { tcdDecls = decls} -> decls
   _ -> error $ "hsDeclsClassDecl:dec=" ++ showAst dec
 
 replaceDeclsClassDecl :: TyClDecl GhcPs -> [LHsDecl GhcPs] -> TyClDecl GhcPs
 replaceDeclsClassDecl decl decls = case decl of
-  ClassDecl { tcdCExt = (an2, layout, _) } -> decl'
-    where
-      (tags, methods', sigs', ats', at_defs', _, _docs) = partitionWithSortKey decls
-      decl' = decl { tcdCExt = (an2, layout, AnnSortKey tags),
-                     tcdSigs = sigs',tcdMeths = methods',
-                     tcdATs = ats', tcdATDefs = at_defs'
-                   }
-
+  ClassDecl {} -> decl { tcdDecls = decls }
   _ -> error $ "replaceDeclsClassDecl:decl=" ++ showAst decl
 
 partitionWithSortKey

@@ -289,7 +289,7 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (AnnClassDecl
         (EpTok
          (EpaSpan { T20452.hs:8:1-5 }))
@@ -303,8 +303,7 @@
         [])
        (EpExplicitBraces
         (EpTok (EpaSpan { T20452.hs:8:84 }))
-        (EpTok (EpaSpan { T20452.hs:8:85 })))
-       (NoAnnSortKey))
+        (EpTok (EpaSpan { T20452.hs:8:85 }))))
       []
       (Nothing)
       (L
@@ -504,10 +503,6 @@
                     {OccName: String}))))])))))))])
       (Prefix)
       []
-      []
-      []
-      []
-      []
       [])))
   ,(L
     (EpAnn
@@ -518,7 +513,7 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (AnnClassDecl
         (EpTok
          (EpaSpan { T20452.hs:9:1-5 }))
@@ -532,8 +527,7 @@
         [])
        (EpExplicitBraces
         (EpTok (EpaSpan { T20452.hs:9:84 }))
-        (EpTok (EpaSpan { T20452.hs:9:85 })))
-       (NoAnnSortKey))
+        (EpTok (EpaSpan { T20452.hs:9:85 }))))
       []
       (Nothing)
       (L
@@ -738,10 +732,6 @@
                    (Unqual
                     {OccName: String}))))])))))))])
       (Prefix)
-      []
-      []
-      []
-      []
       []
       [])))]))
 
