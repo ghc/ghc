@@ -22,3 +22,4 @@ test('T19894', [test_opts, extra_files(['T19894'])], multimod_compile, ['Main', 
 test('T20938', [test_opts], compile, ['-O -prof'])
 test('T27121', [test_opts, extra_files(['T27121_aux.hs'])], multimod_compile, ['T27121', '-v0 -O -prof -fprof-auto'])
 test('T27182', [test_opts], compile, ['-O -prof -fprof-late'])
+test('T27386', [test_opts], compile, ['-O -prof -fprof-auto -finfo-table-map'])
