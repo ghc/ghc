@@ -3547,21 +3547,22 @@ def findTFiles(roots: List[str]) -> Iterator[str]:
 # -----------------------------------------------------------------------------
 # Output a test summary to the specified file object
 
-def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=None) -> None:
+def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=None,
+            tempdir: str='') -> None:
 
     file.write('\n')
 
+    too_many_failures = len(t.unexpected_failures) > MAX_SUMMARY_OUTPUT_TESTS
+
     if t.unexpected_failures:
-        if len(t.unexpected_failures) > MAX_SUMMARY_OUTPUT_TESTS:
-            # junit.xml only exists when a path was requested (e.g. in CI); don't
-            # point at a file that a local run never wrote.
-            where = 'see {}'.format(junit_path) if junit_path \
-                else 'rerun them individually'
-            file.write('Output of {} unexpected failures omitted (limit {}); {}.\n\n'
-                       .format(len(t.unexpected_failures), MAX_SUMMARY_OUTPUT_TESTS, where))
-        else:
+        if not too_many_failures:
             file.write('Output of unexpected failures:\n\n')
-            printTestOutputSummary(file, t.unexpected_failures, color, junit_path)
+            printTestOutputSummary(file, t.unexpected_failures, color, junit_path, tempdir)
+        else:
+            where = '; see {}'.format(junit_path) if junit_path else ''
+            file.write('Unexpected failures (output omitted, more than {}{}):\n'
+                       .format(MAX_SUMMARY_OUTPUT_TESTS, where))
+            printTestInfosSummary(file, t.unexpected_failures)
 
     printUnexpectedTests(file,
         [t.unexpected_passes, t.unexpected_failures,
@@ -3613,10 +3614,6 @@ def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=No
         file.write('Unexpected passes:\n')
         printTestInfosSummary(file, t.unexpected_passes)
 
-    if t.unexpected_failures:
-        file.write('Unexpected failures:\n')
-        printTestInfosSummary(file, t.unexpected_failures)
-
     if t.unexpected_stat_failures:
         file.write('Unexpected stat failures:\n')
         printTestInfosSummary(file, t.unexpected_stat_failures)
@@ -3650,12 +3647,14 @@ MAX_SUMMARY_OUTPUT_LINES = 100
 MAX_SUMMARY_OUTPUT_TESTS = 20
 
 def printTestOutputSummary(file: TextIO, testInfos, color: bool=False,
-                           junit_path: Optional[Path]=None) -> None:
+                           junit_path: Optional[Path]=None, tempdir: str='') -> None:
     # Repeat failing tests' captured output in the summary, so one needn't
     # hunt for it earlier in a possibly very long log; see #16720.
     where = ', see {}'.format(junit_path) if junit_path else ''
     for result in sorted(testInfos, key=lambda r: (r.testname.lower(), r.way, r.directory)):
-        header = '=====> {}({}) [{}]'.format(result.testname, result.way, result.reason)
+        # Strip the long temp-run-dir prefix; see Note [Running tests in /tmp].
+        directory = os.path.relpath(result.directory, tempdir) if tempdir else result.directory
+        header = '=====> {}({}) ({}) [{}]'.format(result.testname, result.way, directory, result.reason)
         if color:
             header = colored(Color.RED, header)
         file.write(header + '\n')
@@ -3674,7 +3673,6 @@ def printTestOutputSummary(file: TextIO, testInfos, color: bool=False,
                 # cannot represent; replace rather than crash (cf safe_print).
                 enc = getattr(file, 'encoding', None) or 'utf-8'
                 file.write(s.encode(enc, errors='replace').decode(enc))
-        file.write('\n')
     footer = '<===== end of output of unexpected failures'
     if color:
         footer = colored(Color.RED, footer)
