@@ -441,7 +441,7 @@ function cleanup_submodules() {
     # is not valid. Avoid failing in this case with the following insanity.
     git submodule sync || git submodule deinit --force --all
     git submodule update --init
-    git submodule foreach git clean -xdf
+    git submodule --quiet foreach git clean -xdfq
   else
     info "Not cleaning submodules, not in a git repo"
   fi;
@@ -934,8 +934,8 @@ function clean() {
   # uploaded. Keep in sync with `jobArtifacts` in
   # `.gitlab/generate-ci/gen_ci.hs`!
   if [[ "${CI_DISPOSABLE_ENVIRONMENT:-}" != true ]]; then
-    git submodule foreach --recursive git clean -xdf
-    git clean -xdf \
+    git submodule --quiet foreach --recursive git clean -xdfq
+    git clean -xdfq \
       --exclude=ci_timings.txt \
       --exclude=ghc-*.tar.xz \
       --exclude=junit.xml \
