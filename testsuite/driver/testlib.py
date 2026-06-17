@@ -1497,6 +1497,14 @@ def _newTestDir(name: TestName, opts: TestOptions, tempdir, dir):
     opts.testdir_raw = Path(os.path.join(tempdir, testdir, name + testdir_suffix))
     opts.compiler_always_flags = config.compiler_always_flags
 
+def _result_directory(opts: TestOptions) -> str:
+    # The test's source directory, relative to the GHC source root, so it reads
+    # the same regardless of which directory `make` was invoked from.
+    try:
+        return os.path.relpath(opts.srcdir, config.top.parent)
+    except Exception:
+        return ''
+
 # -----------------------------------------------------------------------------
 # Actually doing tests
 
@@ -1821,7 +1829,7 @@ async def do_test(name: TestName,
     if opts.expect not in ['pass', 'fail', 'missing-lib']:
         framework_fail(name, way, 'bad expected ' + opts.expect)
 
-    directory = str_removeprefix(str_removeprefix(str(opts.testdir), './'), '.\\')
+    directory = _result_directory(opts)
 
     if way in opts.fragile_ways:
         if_verbose(1, '*** fragile test %s resulted in %s' % (full_name, 'pass' if result.passed else 'fail'))
@@ -1872,7 +1880,7 @@ def framework_fail(name: Optional[TestName], way: Optional[WayName], reason: str
     # so we need to take care not to blow up with the wrong way
     # and report the actual reason for the failure.
     try:
-      directory = str_removeprefix(str_removeprefix(str(opts.testdir), './'), '.\\')
+      directory = _result_directory(opts)
     except:
       directory = ''
     full_name = '%s(%s)' % (name, way)
@@ -1885,7 +1893,7 @@ def framework_fail(name: Optional[TestName], way: Optional[WayName], reason: str
 
 def framework_warn(name: TestName, way: WayName, reason: str) -> None:
     opts = getTestOpts()
-    directory = str_removeprefix(str_removeprefix(str(opts.testdir), './'), '.\\')
+    directory = _result_directory(opts)
     full_name = name + '(' + way + ')'
     if_verbose(1, '*** framework warning for %s %s ' % (full_name, reason))
     t.framework_warnings.append(TestResult(directory, name, reason, way))
@@ -3547,8 +3555,7 @@ def findTFiles(roots: List[str]) -> Iterator[str]:
 # -----------------------------------------------------------------------------
 # Output a test summary to the specified file object
 
-def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=None,
-            tempdir: str='') -> None:
+def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=None) -> None:
 
     file.write('\n')
 
@@ -3557,7 +3564,7 @@ def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=No
     if t.unexpected_failures:
         if not too_many_failures:
             file.write('Output of unexpected failures:\n\n')
-            printTestOutputSummary(file, t.unexpected_failures, color, junit_path, tempdir)
+            printTestOutputSummary(file, t.unexpected_failures, color, junit_path)
         else:
             where = '; see {}'.format(junit_path) if junit_path else ''
             file.write('Unexpected failures (output omitted, more than {}{}):\n'
@@ -3647,7 +3654,7 @@ MAX_SUMMARY_OUTPUT_LINES = 100
 MAX_SUMMARY_OUTPUT_TESTS = 20
 
 def printTestOutputSummary(file: TextIO, testInfos, color: bool=False,
-                           junit_path: Optional[Path]=None, tempdir: str='') -> None:
+                           junit_path: Optional[Path]=None) -> None:
     # Repeat failing tests' captured output in the summary, so one needn't
     # hunt for it earlier in a possibly very long log; see #16720.
     where = ', see {}'.format(junit_path) if junit_path else ''
@@ -3658,10 +3665,8 @@ def printTestOutputSummary(file: TextIO, testInfos, color: bool=False,
         key = (result.testname, result.directory, result.reason, result.stdout, result.stderr)
         groups.setdefault(key, (result, []))[1].append(result.way)
     for result, ways in groups.values():
-        # Strip the long temp-run-dir prefix; see Note [Running tests in /tmp].
-        directory = os.path.relpath(result.directory, tempdir) if tempdir else result.directory
         header = '=====> {}({}) ({}) [{}]'.format(
-            result.testname, ', '.join(ways), directory, result.reason)
+            result.testname, ', '.join(ways), result.directory + os.sep, result.reason)
         if color:
             header = colored(Color.RED, header)
         file.write(header + '\n')
@@ -3686,12 +3691,9 @@ def printTestOutputSummary(file: TextIO, testInfos, color: bool=False,
     file.write(footer + '\n\n')
 
 def printTestInfosSummary(file: TextIO, testInfos):
-    maxDirLen = max(len(tr.directory) for tr in testInfos)
     for result in sorted(testInfos, key=lambda r: (r.testname.lower(), r.way, r.directory)):
-        directory = result.directory.ljust(maxDirLen)
-        file.write('   {directory}  {r.testname} [{r.reason}] ({r.way})\n'.format(
-            r = result,
-            directory = directory))
+        path = os.path.join(result.directory, result.testname)
+        file.write('   {path} [{r.reason}] ({r.way})\n'.format(r=result, path=path))
     file.write('\n')
 
 def modify_lines(s: str, f: Callable[[str], str]) -> str:
