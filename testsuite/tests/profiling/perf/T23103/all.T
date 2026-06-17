@@ -9,7 +9,8 @@ test(
                 '../../../../../utils/check-exact/Utils.hs',
             ]
         ),
-        js_skip
+        js_skip,
+        omit_ways(llvm_ways), # -finfo-table-map does not work with -fllvm (#26435)
     ],
     multimod_compile,
     ['ExactPrint.hs', '-package ghc -O -finfo-table-map']

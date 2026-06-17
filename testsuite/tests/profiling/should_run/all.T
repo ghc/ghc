@@ -28,12 +28,14 @@ def normalise_InfoProv_ipName(str):
 
 test('staticcallstack001',
      [ omit_ways(ghci_ways + ['ghci-ext-prof']), # produces a different stack
+       omit_ways(llvm_ways), # -finfo-table-map does not work with -fllvm (#26435)
        normalise_fun(normalise_InfoProv_ipName)
      ], compile_and_run,
      ['-O0 -g3 -fdistinct-constructor-tables -finfo-table-map'])
 
 test('staticcallstack002',
      [ omit_ways(ghci_ways + ['ghci-ext-prof']), # produces a different stack
+       omit_ways(llvm_ways), # -finfo-table-map does not work with -fllvm (#26435)
        normalise_fun(normalise_InfoProv_ipName)
      ], compile_and_run,
      ['-O0 -g3 -fdistinct-constructor-tables -finfo-table-map'])
