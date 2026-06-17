@@ -14,7 +14,7 @@ test('LinkableUsage01'
       , when(arch('wasm32'), skip)
       ]
     , multimod_compile
-    , ['LinkableUsage01', '-package-db bytecode.package.conf -package-id testpkg-1.2.3.4-XXX -no-link -fbyte-code -fprefer-byte-code ' + config.ghc_th_way_flags])
+    , ['LinkableUsage01', '-package-db bytecode.package.conf -package-id testpkg-1.2.3.4-XXX -no-link -fbyte-code -fprefer-byte-code -fno-unoptimized-core-for-interpreter ' + config.ghc_th_way_flags])
 
 # Performance test for bytecode `Linkable`s.
 test('LinkableUsage02'
@@ -25,7 +25,7 @@ test('LinkableUsage02'
       , req_th
       ]
     , multimod_compile
-    , ['LinkableUsage02', '-no-link -fbyte-code -fwrite-byte-code -fprefer-byte-code'])
+    , ['LinkableUsage02', '-no-link -fbyte-code -fwrite-byte-code -fprefer-byte-code -fno-unoptimized-core-for-interpreter'])
 
 test('linkable-space'
     , [ extra_files(['genLinkables.sh', 'BCOTemplate.hs'])
