@@ -1,8 +1,0 @@
-section: compiler
-synopsis: Make the order of usages deterministic
-issues: #26877
-mrs: !15484
-description: {
-    The order in which usages appear in interface files is now
-    deterministic.
-}

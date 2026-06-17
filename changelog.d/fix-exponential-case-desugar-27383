@@ -1,6 +1,0 @@
-section: compiler
-synopsis: Fix exponential-time desugaring of nested ``case`` expressions.
-  The scrutinee is no longer desugared a second time when recording
-  long-distance information for the pattern-match checker.
-issues: #27383 #20251
-mrs: !16203

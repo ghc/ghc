@@ -1,4 +1,0 @@
-section: ghc-heap
-synopsis: Fix invalid srtlen field returned by peekItbl when no tables-next-to-code
-issues: #27465
-mrs: !16289

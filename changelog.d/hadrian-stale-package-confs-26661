@@ -1,6 +1,0 @@
-section: packaging
-synopsis: Hadrian no longer leaves stale `.conf` files in its package databases
-  when rebuilding in the same build root with different settings (e.g. another
-  flavour, or when hashes change with +hash-unit-ids).
-issues: #26661
-mrs: !15186
