@@ -367,7 +367,7 @@ initBlock id block_live
                           Nothing ->
                             setFreeRegsR    (frInitFreeRegs platform)
                           Just live ->
-                            setFreeRegsR $ foldl' (flip $ frAllocateReg platform) (frInitFreeRegs platform)
+                            setFreeRegsR $ foldl' (flip frAllocateReg) (frInitFreeRegs platform)
                                                   (nonDetEltsUniqSet $ takeRealRegs $ getRegs live)
                             -- See Note [Unique Determinism and code generation]
                         setAssigR       emptyRegMap
@@ -638,20 +638,19 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
 
 releaseRegs :: FR freeRegs => [Reg] -> RegM freeRegs ()
 releaseRegs regs = do
-  platform <- getPlatform
   assig <- getAssigR
   free <- getFreeRegsR
 
   let loop assig !free [] = do setAssigR assig; setFreeRegsR free; return ()
-      loop assig !free (RegReal rr : rs) = loop assig (frReleaseReg platform rr free) rs
+      loop assig !free (RegReal rr : rs) = loop assig (frReleaseReg rr free) rs
       loop assig !free (r:rs) =
          case lookupUFM assig r of
          Just (Loc (InBoth real _) _) ->
            loop (delFromUFM assig r)
-                (frReleaseReg platform real free) rs
+                (frReleaseReg real free) rs
          Just (Loc (InReg real) _) ->
            loop (delFromUFM assig r)
-                (frReleaseReg platform real free) rs
+                (frReleaseReg real free) rs
          _ ->
            loop (delFromUFM assig r) free rs
   loop assig free regs
@@ -716,7 +715,7 @@ saveClobberedTemps clobbered dying
 
             freeRegs <- getFreeRegsR
             let regclass = targetClassOfRealReg platform reg
-                freeRegs_thisClass = frGetFreeRegs platform regclass freeRegs
+                freeRegs_thisClass = frGetFreeRegs regclass freeRegs
 
             case filter (`notElem` clobbered) freeRegs_thisClass of
 
@@ -724,7 +723,7 @@ saveClobberedTemps clobbered dying
               -- clobbered by this instruction; use it to save the
               -- clobbered value.
               (my_reg : _) -> do
-                  setFreeRegsR (frAllocateReg platform my_reg freeRegs)
+                  setFreeRegsR (frAllocateReg my_reg freeRegs)
 
                   let new_assign = addToUFM_Directly assig temp (Loc (InReg my_reg) fmt)
                   let instr = mkRegRegMoveInstr config fmt
@@ -763,13 +762,13 @@ clobberRegs clobbered
                  Unified   ->   Unified.allRegClasses
                  Separate  ->  Separate.allRegClasses
                  NoVectors -> NoVectors.allRegClasses
-            allFreeRegs = foldMap (\ rc -> frGetFreeRegs platform rc freeregs) allRegClasses
+            allFreeRegs = foldMap (\ rc -> frGetFreeRegs rc freeregs) allRegClasses
 
         let extra_clobbered = [ r | r <- clobbered, r `elem` allFreeRegs ]
 
-        setFreeRegsR $! foldl' (flip $ frAllocateReg platform) freeregs extra_clobbered
+        setFreeRegsR $! foldl' (flip frAllocateReg) freeregs extra_clobbered
 
-        -- setFreeRegsR $! foldl' (flip $ frAllocateReg platform) freeregs clobbered
+        -- setFreeRegsR $! foldl' (flip frAllocateReg) freeregs clobbered
 
         assig           <- getAssigR
         setAssigR $! clobber assig (nonDetUFMToList assig)
@@ -896,7 +895,7 @@ allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr vrF
  = do   platform <- getPlatform
         freeRegs <- getFreeRegsR
         let regclass = classOfVirtualReg (platformArch platform) vr
-            freeRegs_thisClass = frGetFreeRegs platform regclass freeRegs :: [RealReg]
+            freeRegs_thisClass = frGetFreeRegs regclass freeRegs :: [RealReg]
 
         -- Can we put the variable into a register it already was?
         pref_reg <- findPrefRealReg vr
@@ -915,7 +914,7 @@ allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr vrF
 
                 setAssigR $ toRegMap
                           $ (addToUFM assig vr $! newLocation spill_loc $ RealRegUsage final_reg vrFmt)
-                setFreeRegsR $  frAllocateReg platform final_reg freeRegs
+                setFreeRegsR $  frAllocateReg final_reg freeRegs
 
                 allocateRegsAndSpill reading keep spills' (final_reg : alloc) rs
 

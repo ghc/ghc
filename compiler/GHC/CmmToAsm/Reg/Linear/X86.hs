@@ -25,17 +25,17 @@ initFreeRegs :: Platform -> FreeRegs
 initFreeRegs platform
         = foldl' (flip releaseReg) noFreeRegs (allocatableRegs platform)
 
-getFreeRegs :: Platform -> RegClass -> FreeRegs -> [RealReg] -- lazily
-getFreeRegs platform cls (FreeRegs f) =
+getFreeRegs :: RegClass -> FreeRegs -> [RealReg] -- lazily
+getFreeRegs cls (FreeRegs f) =
   case cls of
     RcInteger ->
       [ RealRegSingle i
-      | i <- intregnos platform
+      | i <- intregnos PW4
       , testBit f i
       ]
     RcFloatOrVector ->
       [ RealRegSingle i
-      | i <- xmmregnos platform
+      | i <- xmmregnos PW4
       , testBit f i
       ]
 

@@ -41,9 +41,11 @@ regColors platform = listToUFM (normalRegColors platform)
 
 normalRegColors :: Platform -> [(RealReg,String)]
 normalRegColors platform =
-    zip (map realRegSingle [0..lastint platform]) colors
-        ++ zip (map realRegSingle [firstxmm..lastxmm platform]) greys
+    zip (map realRegSingle [0..lastint wordSize]) colors
+        ++ zip (map realRegSingle [firstxmm..lastxmm wordSize]) greys
   where
+    wordSize = platformWordSize platform
+
     -- 16 colors - enough for amd64 gp regs
     colors = ["#800000","#ff0000","#808000","#ffff00","#008000"
              ,"#00ff00","#008080","#00ffff","#000080","#0000ff"

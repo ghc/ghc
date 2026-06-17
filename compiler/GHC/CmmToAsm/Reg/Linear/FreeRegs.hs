@@ -43,49 +43,51 @@ import qualified GHC.CmmToAsm.RV64.Instr    as RV64.Instr
 import qualified GHC.CmmToAsm.LA64.Instr    as LA64.Instr
 
 class Show freeRegs => FR freeRegs where
-    frAllocateReg :: Platform -> RealReg -> freeRegs -> freeRegs
-    frGetFreeRegs :: Platform -> RegClass -> freeRegs -> [RealReg]
+    frAllocateReg :: RealReg -> freeRegs -> freeRegs
+    frGetFreeRegs :: RegClass -> freeRegs -> [RealReg]
+    -- | The initial allocatable set is platform-dependent. See Note
+    -- [Aarch64 Register x18 at Darwin and Windows].
     frInitFreeRegs :: Platform -> freeRegs
-    frReleaseReg :: Platform -> RealReg -> freeRegs -> freeRegs
+    frReleaseReg :: RealReg -> freeRegs -> freeRegs
 
 instance FR X86.FreeRegs where
-    frAllocateReg  = \_ -> X86.allocateReg
+    frAllocateReg  = X86.allocateReg
     frGetFreeRegs  = X86.getFreeRegs
     frInitFreeRegs = X86.initFreeRegs
-    frReleaseReg   = \_ -> X86.releaseReg
+    frReleaseReg   = X86.releaseReg
 
 instance FR X86_64.FreeRegs where
-    frAllocateReg  = \_ -> X86_64.allocateReg
+    frAllocateReg  = X86_64.allocateReg
     frGetFreeRegs  = X86_64.getFreeRegs
     frInitFreeRegs = X86_64.initFreeRegs
-    frReleaseReg   = \_ -> X86_64.releaseReg
+    frReleaseReg   = X86_64.releaseReg
 
 instance FR PPC.FreeRegs where
-    frAllocateReg  = \_ -> PPC.allocateReg
-    frGetFreeRegs  = \_ -> PPC.getFreeRegs
+    frAllocateReg  = PPC.allocateReg
+    frGetFreeRegs  = PPC.getFreeRegs
     frInitFreeRegs = PPC.initFreeRegs
-    frReleaseReg   = \_ -> PPC.releaseReg
+    frReleaseReg   = PPC.releaseReg
 
 instance FR AArch64.FreeRegs where
-    frAllocateReg = \_ -> AArch64.allocateReg
-    frGetFreeRegs = \_ -> AArch64.getFreeRegs
+    frAllocateReg = AArch64.allocateReg
+    frGetFreeRegs = AArch64.getFreeRegs
     frInitFreeRegs = AArch64.initFreeRegs
-    frReleaseReg = \_ -> AArch64.releaseReg
+    frReleaseReg = AArch64.releaseReg
 
 instance FR RV64.FreeRegs where
-    frAllocateReg = const RV64.allocateReg
-    frGetFreeRegs = const RV64.getFreeRegs
+    frAllocateReg = RV64.allocateReg
+    frGetFreeRegs = RV64.getFreeRegs
     frInitFreeRegs = RV64.initFreeRegs
-    frReleaseReg = const RV64.releaseReg
+    frReleaseReg = RV64.releaseReg
 
 instance FR LA64.FreeRegs where
-    frAllocateReg = \_ -> LA64.allocateReg
-    frGetFreeRegs = \_ -> LA64.getFreeRegs
+    frAllocateReg = LA64.allocateReg
+    frGetFreeRegs = LA64.getFreeRegs
     frInitFreeRegs = LA64.initFreeRegs
-    frReleaseReg = \_ -> LA64.releaseReg
+    frReleaseReg = LA64.releaseReg
 
 allFreeRegs :: FR freeRegs => Platform -> freeRegs -> [RealReg]
-allFreeRegs plat fr = foldMap (\rcls -> frGetFreeRegs plat rcls fr) allRegClasses
+allFreeRegs plat fr = foldMap (\rcls -> frGetFreeRegs rcls fr) allRegClasses
   where
     allRegClasses =
       case registerArch (platformArch plat) of
