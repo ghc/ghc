@@ -68,7 +68,6 @@ module Transform
         , addModuleCommentOrigDeltas
 
         -- ** Managing lists, pure functions
-        , captureOrderBinds
         , captureLineSpacing
         , captureMatchLineSpacing
         , captureTypeSigSpacing
@@ -92,6 +91,7 @@ import Control.Monad.RWS
 import qualified Control.Monad.Fail as Fail
 
 import GHC  hiding (parseModule, parsedSource)
+import GHC.Parser.PostProcess ( wrapValBind )
 import GHC.Data.FastString
 import GHC.Types.SrcLoc
 
@@ -507,7 +507,7 @@ pushTrailingComments w cs lb@(HsValBinds an _) = (True, HsValBinds an' vb)
       (L la d:ds) -> (an, L (addCommentsToEpAnn la cs) d:ds)
     vb = case replaceDeclsValbinds w lb (reverse decls') of
       (HsValBinds _ vb') -> vb'
-      _ -> ValBinds NoAnnSortKey [] []
+      _ -> ValBinds noExtField []
 
 
 balanceCommentsListA :: [LocatedA a] -> [LocatedA a]
@@ -1084,18 +1084,11 @@ replaceDeclsValbinds w b@(HsValBinds a _) new
     = let
         oldSpan = spanHsLocaLBinds b
         an = oldWhereAnnotation a w (realSrcSpan oldSpan)
-        decs = concatMap decl2Bind new
-        sigs = concatMap decl2Sig new
-        sortKey = captureOrderBinds new
-      in (HsValBinds an (ValBinds sortKey decs sigs))
+      in (HsValBinds an (ValBinds noExtField (map wrapValBind new)))
 replaceDeclsValbinds _ (HsIPBinds {}) _new    = error "undefined replaceDecls HsIPBinds"
 replaceDeclsValbinds w (EmptyLocalBinds _) new
-    = let
-        an = newWhereAnnotation w
-        decs = concatMap decl2Bind new
-        sigs = concatMap decl2Sig  new
-        sortKey = captureOrderBinds new
-      in (HsValBinds an (ValBinds sortKey decs sigs))
+    = let an = newWhereAnnotation w
+      in (HsValBinds an (ValBinds noExtField (map wrapValBind new)))
 
 oldWhereAnnotation :: EpAnn (AnnList (EpToken "where"))
   -> WithWhere -> RealSrcSpan -> (EpAnn (AnnList (EpToken "where")))

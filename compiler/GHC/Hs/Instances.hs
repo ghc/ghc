@@ -73,6 +73,11 @@ deriving instance Data (HsValBindsLR GhcPs GhcRn)
 deriving instance Data (HsValBindsLR GhcRn GhcRn)
 deriving instance Data (HsValBindsLR GhcTc GhcTc)
 
+deriving instance Data (ValBind GhcPs GhcPs)
+deriving instance Data (ValBind GhcPs GhcRn)
+deriving instance Data (ValBind GhcRn GhcRn)
+deriving instance Data (ValBind GhcTc GhcTc)
+
 -- deriving instance (DataIdLR pL pL) => Data (NHsValBindsLR pL)
 deriving instance Data (HsValBindGroups 'Parsed)
 deriving instance Data (HsValBindGroups 'Renamed)

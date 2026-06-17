@@ -41,7 +41,7 @@ module GHC.Parser.Annotation (
   NameAnn(..), NameAdornment(..),
   NoEpAnns(..),
 
-  AnnSortKey(..), DeclTag(..), BindTag(..),
+  AnnSortKey(..), DeclTag(..),
 
   -- ** Trailing annotations in lists
   TrailingAnn(..), ta_location,
@@ -652,13 +652,6 @@ data AnnSortKey tag
   | AnnSortKey [tag]
   deriving (Data, Eq)
 
--- | Used to track of interleaving of binds and signatures for ValBind
-data BindTag
-  -- See Note [AnnSortKey] below
-  = BindTag
-  | SigDTag
-  deriving (Eq,Data,Ord,Show)
-
 -- | Used to track interleaving of class methods, class signatures,
 -- associated types and associate type defaults in `ClassDecl` and
 -- `ClsInstDecl`.
@@ -1178,9 +1171,6 @@ instance Outputable EpAnnComments where
 
 instance (NamedThing (Located a)) => NamedThing (LocatedAn an a) where
   getName (L l a) = getName (L (locA l) a)
-
-instance Outputable BindTag where
-  ppr tag = text $ show tag
 
 instance Outputable DeclTag where
   ppr tag = text $ show tag

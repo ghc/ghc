@@ -1462,13 +1462,11 @@ instance HiePass p => ToHie (RScoped (HsLocalBinds (GhcPass p))) where
         ]
 
 scopeHsLocaLBinds :: forall p. IsPass p => HsLocalBinds (GhcPass p) -> Scope
-scopeHsLocaLBinds (HsValBinds _ (ValBinds _ bs sigs))
-  = foldr combineScopes NoScope (bsScope ++ sigsScope)
+scopeHsLocaLBinds (HsValBinds _ (ValBinds _ bs))
+  = foldr combineScopes NoScope bsScope
   where
     bsScope :: [Scope]
-    bsScope = map (mkScope . getLoc) bs
-    sigsScope :: [Scope]
-    sigsScope = map (mkScope . getLocA) sigs
+    bsScope = map (mkScope . getHasLoc) bs
 scopeHsLocaLBinds (HsValBinds _ (XValBindsLR (HsVBG grps sigs)))
   = foldr combineScopes NoScope (bsScope ++ sigsScope)
   where
@@ -1491,7 +1489,9 @@ instance HiePass p => ToHie (RScoped (LocatedA (IPBind (GhcPass p)))) where
 
 instance HiePass p => ToHie (RScoped (HsValBindsLR (GhcPass p) (GhcPass p))) where
   toHie (RS sc v) = concatM $ case v of
-    ValBinds _ binds sigs ->
+    ValBinds _ binds_and_sigs ->
+      let (binds, sigs) = val_binds_and_sigs binds_and_sigs
+      in
       [ toHie $ fmap (BC RegularBind sc) binds
       , toHie $ fmap (SC (SI BindSig Nothing)) sigs
       ]

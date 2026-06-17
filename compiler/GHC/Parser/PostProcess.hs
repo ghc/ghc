@@ -33,6 +33,7 @@ module GHC.Parser.PostProcess (
         addModifiersToDecl,
 
         cvBindGroup,
+        cvBindsAndSigsOnly, wrapValBind,
         cvBindsAndSigs,
         cvTopDecls,
         placeHolderPunRhs,
@@ -521,10 +522,28 @@ cvTopDecls decls = getMonoBindAll (fromOL decls)
 -- Declaration list may only contain value bindings and signatures.
 cvBindGroup :: OrdList (LHsDecl GhcPs) -> P (HsValBinds GhcPs)
 cvBindGroup binding
-  = do { (mbs, sigs, fam_ds, tfam_insts
-         , dfam_insts, _) <- cvBindsAndSigs binding
-       ; massert (null fam_ds && null tfam_insts && null dfam_insts)
-       ; return $ ValBinds NoAnnSortKey mbs sigs }
+  = do { binds <- cvBindsAndSigsOnly binding
+       ; return $ ValBinds noExtField binds }
+
+cvBindsAndSigsOnly :: OrdList (LHsDecl GhcPs)
+  -> P [ValBind GhcPs GhcPs]
+-- Input decls contain just value bindings and signatures
+-- and in case of class or instance declarations also
+-- associated type declarations. They might also contain Haddock comments.
+cvBindsAndSigsOnly fb = do
+  fb' <- drop_bad_decls (fromOL fb)
+  return (fmap wrapValBind (getMonoBindAll fb'))
+  where
+    drop_bad_decls [] = return []
+    drop_bad_decls (L l (SpliceD _ d) : ds) = do
+      addError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrDeclSpliceNotAtTopLevel d
+      drop_bad_decls ds
+    drop_bad_decls (d:ds) = (d:) <$> drop_bad_decls ds
+
+wrapValBind :: LHsDecl (GhcPass p) -> ValBind (GhcPass p) (GhcPass p)
+wrapValBind (L l (ValD _ b)) = VbBind (L l b)
+wrapValBind (L l (SigD _ s)) = VbSig (L l s)
+wrapValBind _ = panic "wrapValBind: got unexpected decl"
 
 cvBindsAndSigs :: OrdList (LHsDecl GhcPs)
   -> P (LHsBinds GhcPs, [LSig GhcPs], [LFamilyDecl GhcPs]
