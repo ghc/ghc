@@ -2079,7 +2079,11 @@ eta_expand in_scope one_shots orig_expr
           (expr', args) = collectArgs expr
           (ticks, expr'') = stripTicksTop tickishFloatable expr'
           sexpr = mkApps expr'' args
-          retick expr = foldr mkTick expr ticks
+          retick expr = foldr mkTickCpe expr ticks
+            -- Defensive programming: use 'mkTickCpe' instead of 'mkTick',
+            -- as this code can be called by Core Prep.
+            --
+            -- See Note [mkTick breaks ANF] in GHC.CoreToStg.Prep
 
 {- *********************************************************************
 *                                                                      *
