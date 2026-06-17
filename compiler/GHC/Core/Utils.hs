@@ -331,26 +331,26 @@ mkTickCpe = mk_tick True
 -- | Internal function used to define both 'mkTick' and 'mkTickCpe'
 -- without duplication.
 mk_tick :: Bool -> CoreTickish -> CoreExpr -> CoreExpr
-mk_tick preserve_anf t orig_expr = mkTick' orig_expr
+mk_tick preserve_anf t orig_expr = mk_tick_t orig_expr
  where
   -- Some ticks (cost-centres) can be split in two, with the
   -- non-counting part having laxer placement properties.
   -- See Note [Scoping ticks and counting ticks] in GHC.Types.Tickish.
   can_split = tickishCanSplit t
 
-  -- mkTick' handles floating of tick `t` *into* the expression.
-  mkTick' :: CoreExpr -> CoreExpr
-  mkTick' expr
+  -- mk_tick_t handles floating of tick `t` *into* the expression.
+  mk_tick_t :: CoreExpr -> CoreExpr
+  mk_tick_t expr
     -- Deal with ticking a expression headed by one or more ticks.
     | Just (ts, e) <- tickedExpr_maybe expr
-    = tickTickedExpr t ts e
-  mkTick' expr = case expr of
+    = tickTickedExpr preserve_anf t ts e
+  mk_tick_t expr = case expr of
 
     Lam x e
       -- Always float through type lambdas. Even for non-type lambdas,
       -- floating is allowed for all but the most strict placement rule.
       | not (isRuntimeVar x) || tickishPlace t /= PlaceRuntime
-      -> Lam x $ mkTick' e
+      -> Lam x $ mk_tick_t e
 
       -- Push SCCs into lambdas.
       -- See (PSCC2) in Note [Pushing SCCs inwards].
@@ -361,7 +361,7 @@ mk_tick preserve_anf t orig_expr = mkTick' orig_expr
       -- All ticks float inwards through non-runtime arguments, as per
       -- Note [Tickish placement] in GHC.Types.Tickish.
       | not (isRuntimeArg arg)
-      -> App (mkTick' f) arg
+      -> App (mk_tick_t f) arg
 
       -- Push SCCs into saturated constructor applications.
       -- See (PSCC3) in Note [Pushing SCCs inwards].
@@ -381,13 +381,13 @@ mk_tick preserve_anf t orig_expr = mkTick' orig_expr
     e@(Lit {}) | tickishIsCode t -> e
 
     -- All ticks can be floated through casts, as per Note [Tickish placement].
-    Cast e co   -> mkCast (mkTick' e) co
+    Cast e co   -> mkCast (mk_tick_t e) co
 
     -- Treat 'unsafeCoerce' as if it was a cast: float all ticks inwards.
     -- See Note [Push ticks into unsafeCoerce]
     Case scrut bndr ty alts@[Alt ac abs _rhs]
       | Just rhs <- isUnsafeEqualityCase scrut bndr alts
-      -> Case scrut bndr ty [Alt ac abs (mkTick' rhs)]
+      -> Case scrut bndr ty [Alt ac abs (mk_tick_t rhs)]
 
     Var x
        -- Don't drop any ticks around anything that might be a function,
@@ -413,11 +413,12 @@ mk_tick preserve_anf t orig_expr = mkTick' orig_expr
 
 -- | Apply a tick to an expression headed by ticks.
 tickTickedExpr
-  :: CoreTickish             -- ^ tick to add
+  :: Bool                    -- ^ preserve ANF?
+  -> CoreTickish             -- ^ tick to add
   -> NE.NonEmpty CoreTickish -- ^ existing stack of ticks
   -> CoreExpr                -- ^ inner core expression
   -> CoreExpr
-tickTickedExpr t1 t2s e
+tickTickedExpr preserve_anf t1 t2s e
 
   -- Case 1: common up 't1' with a tick in the stack.
   --
@@ -432,7 +433,7 @@ tickTickedExpr t1 t2s e
   -- it has tighter placement properties than all the ticks in the stack.
   -- Push it inwards to expose cancellation opportunities.
   | all (tickishCommutable t1) t2s
-  = apply_ticks t2s $ mkTick t1 e
+  = apply_ticks t2s $ mk_tick preserve_anf t1 e
 
   -- Fallback: keep the new tick on the outside.
   | otherwise
