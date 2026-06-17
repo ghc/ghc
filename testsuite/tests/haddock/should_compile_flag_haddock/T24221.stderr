@@ -921,8 +921,7 @@
             (L
              (EpAnn
               (EpaSpan { T24221.hs:(28,12)-(29,20) })
-              (AnnListItem
-               [])
+              []
               (EpaComments
                []))
              [(L
@@ -1150,8 +1149,7 @@
             (L
              (EpAnn
               (EpaSpan { T24221.hs:(33,7)-(34,15) })
-              (AnnListItem
-               [])
+              []
               (EpaComments
                []))
              [(L
@@ -1391,8 +1389,7 @@
             (L
              (EpAnn
               (EpaSpan { T24221.hs:(40,5)-(42,13) })
-              (AnnListItem
-               [])
+              []
               (EpaComments
                []))
              [(L

@@ -11,9 +11,12 @@
 
 import Data.Data
 import Data.List (intercalate)
+-- import Language.Haskell.Syntax.Binds
 import GHC hiding (moduleName)
 import GHC.Driver.Ppr
 import GHC.Hs.Dump
+import GHC.Parser.PostProcess ( wrapValBind )
+import GHC.Types.Error
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader
 import GHC.Utils.Error
@@ -56,7 +59,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl1.hs" (Just changeAddDecl1)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl2.hs" (Just changeAddDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl3.hs" (Just changeAddDecl3)
- -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls.hs" (Just changeLocalDecls)
+ "../../testsuite/tests/ghc-api/exactprint/LocalDecls.hs" (Just changeLocalDecls)
  -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls2.hs" (Just changeLocalDecls2)
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn3a.hs" (Just changeWhereIn3a)
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn3b.hs" (Just changeWhereIn3b)
@@ -447,15 +450,15 @@ changeLetIn1 _libdir parsed
     replace :: HsExpr GhcPs -> HsExpr GhcPs
     replace (HsLet (tkLet, _) localDecls expr)
       =
-         let (HsValBinds x (ValBinds xv decls sigs)) = localDecls
-             [l2,_l1] = map wrapDecl decls
-             decls' = concatMap decl2Bind [l2]
+         let (HsValBinds x (ValBinds xv bs)) = localDecls
+             [l2,_l1] = bs
+             decls' = [l2]
              (L _ e) = expr
              a = EpAnn (EpaDelta noSrcSpan (SameLine 1) []) noAnn emptyComments
              expr' = L a e
              tkIn' = EpTok (EpaDelta noSrcSpan (DifferentLine 1 0) [])
          in (HsLet (tkLet, tkIn')
-                (HsValBinds x (ValBinds xv decls' sigs)) expr')
+                (HsValBinds x (ValBinds xv decls')) expr')
 
     replace x = x
 
@@ -508,27 +511,24 @@ changeAddDecl3 libdir top = do
 -- | Add a local declaration with signature to LocalDecl
 changeLocalDecls :: Changer
 changeLocalDecls libdir (L l p) = do
-  Right s@(L ls (SigD _ sig))  <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
-  Right d@(L ld (ValD _ decl)) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
+  Right (L ls (SigD _ sig))  <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
+  Right (L ld (ValD _ decl)) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
   let decl' = setEntryDP (L ld decl) (DifferentLine 1 0)
   let  sig' = setEntryDP (L ls sig)  (SameLine 0)
   let (p',_,_w) = runTransform doAddLocal
       doAddLocal = everywhereM (mkM replaceLocalBinds) p
       replaceLocalBinds :: LMatch GhcPs (LHsExpr GhcPs)
                         -> Transform (LMatch GhcPs (LHsExpr GhcPs))
-      replaceLocalBinds (L lm (Match an mln pats (GRHSs _ rhs (HsValBinds van (ValBinds _ binds sigs))))) = do
-        let oldDecls = sortLocatedA $ map wrapDecl binds ++ map wrapSig sigs
-        let decls = s:d:oldDecls
+      replaceLocalBinds (L lm (Match an mln pats (GRHSs _ rhs (HsValBinds van (ValBinds _ bs))))) = do
+        let (oldDecls) = map unWrapValBind bs
+        -- let decls = s:d:oldDecls
         let oldDecls' = captureLineSpacing oldDecls
-        let oldBinds     = concatMap decl2Bind oldDecls'
-            (os:oldSigs) = concatMap decl2Sig  oldDecls'
-            os' = setEntryDP os (DifferentLine 2 0)
-        let sortKey = captureOrderBinds decls
+        let (VbSig o:oldBinds)  = map wrapValBind oldDecls'
+            o' = setEntryDP o (DifferentLine 2 0)
         let (EpAnn anc (AnnList (Just _) a b c dd) cs) = van
         let van' = (EpAnn anc (AnnList (Just (EpaDelta noSrcSpan (DifferentLine 1 4) [])) a b c dd) cs)
         let binds' = (HsValBinds van'
-                          (ValBinds sortKey (decl':oldBinds)
-                                          (sig':os':oldSigs)))
+                          (ValBinds noExtField (VbSig sig':VbBind decl':VbSig o':oldBinds)))
         return (L lm (Match an mln pats (GRHSs emptyComments rhs binds')))
                    `debug` ("oldDecls=" ++ showAst oldDecls)
       replaceLocalBinds x = return x
@@ -540,8 +540,8 @@ changeLocalDecls libdir (L l p) = do
 -- prior local decl. So it adds a "where" annotation.
 changeLocalDecls2 :: Changer
 changeLocalDecls2 libdir (L l p) = do
-  Right d@(L ld (ValD _ decl)) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
-  Right s@(L ls (SigD _ sig))  <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
+  Right (L ld (ValD _ decl)) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
+  Right (L ls (SigD _ sig))  <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
   let decl' = setEntryDP (L ld decl) (DifferentLine 1 0)
   let  sig' = setEntryDP (L ls  sig) (SameLine 2)
   let (p',_,_w) = runTransform doAddLocal
@@ -557,10 +557,8 @@ changeLocalDecls2 libdir (L l p) = do
                                  (EpTok (EpaDelta noSrcSpan (SameLine 0) []))
                                  [])
                         emptyComments
-        let decls = [s,d]
-        let sortKey = captureOrderBinds decls
-        let binds = (HsValBinds an (ValBinds sortKey [decl']
-                                    [sig']))
+        let decls = [VbSig sig', VbBind decl']
+        let binds = (HsValBinds an (ValBinds noExtField decls))
         return (L lm (Match ma mln pats (GRHSs emptyComments rhs binds)))
       replaceLocalBinds x = return x
   return (L l p')

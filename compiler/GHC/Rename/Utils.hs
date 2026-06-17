@@ -35,7 +35,9 @@ module GHC.Rename.Utils (
         addNameClashErrRn, mkNameClashErr,
 
         checkInferredVars,
-        noNestedForallsContextsErr, addNoNestedForallsContextsErr
+        noNestedForallsContextsErr, addNoNestedForallsContextsErr,
+
+        makeRnValBinds
 )
 
 where
@@ -868,3 +870,10 @@ mkExpandedTc
   -> LHsExpr GhcTc           -- ^ expanded typechecked expression
   -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcTc'
 mkExpandedTc o e = XExpr (ExpandedThingTc (HSE o e))
+
+-- TODO:AZ move this to the right place
+makeRnValBinds :: XValBinds idL idR
+               -> [XRec idL (HsBindLR idL idR)]
+               -> [XRec idR (Sig idR)]
+               -> HsValBindsLR idL idR
+makeRnValBinds x binds sigs = ValBinds x (map VbBind binds ++ map VbSig sigs)

@@ -32,7 +32,8 @@ import GHC.Rename.Utils ( mapFvRn, bindLocalNames
                         , checkDupRdrNames, bindLocalNamesFV
                         , warnUnusedTypePatterns
                         , noNestedForallsContextsErr
-                        , addNoNestedForallsContextsErr, checkInferredVars )
+                        , addNoNestedForallsContextsErr, checkInferredVars
+                        , makeRnValBinds)
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr, WhereLooking(WL_Global) )
 import GHC.Rename.Names
 
@@ -148,12 +149,12 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
 
    -- We need to throw an error on such value bindings when in a boot file.
    is_boot <- tcIsHsBootOrSig ;
-   new_lhs <- if is_boot
+   (binds', sigs') <- if is_boot
     then rnTopBindsLHSBoot local_fix_env val_decls
     else rnTopBindsLHS     local_fix_env val_decls ;
 
    -- Bind the LHSes (and their fixities) in the global rdr environment
-   let { id_bndrs = collectHsIdBinders CollNoDictBinders new_lhs } ;
+   let { id_bndrs = collectHsIdBinders' CollNoDictBinders binds' } ;
                     -- Excludes pattern-synonym binders
                     -- They are already in scope
    traceRn "rnSrcDecls" (ppr id_bndrs) ;
@@ -178,6 +179,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- (F) Rename Value declarations right-hand sides
    traceRn "Start rnmono" empty ;
    let { val_bndr_set = mkNameSet id_bndrs `unionNameSet` mkNameSet pat_syn_bndrs } ;
+   let { new_lhs = makeRnValBinds noExtField binds' sigs' } ;
    (rn_val_decls@(XValBindsLR (HsVBG _ sigs')), bind_dus) <- if is_boot
     -- For an hs-boot, use tc_bndrs (which collects how we're renamed
     -- signatures), since val_bndr_set is empty (there are no x = ...
@@ -2714,7 +2716,7 @@ extendPatSynEnv dup_fields_ok has_sel val_decls local_fix_env thing = do {
   where
 
     new_ps :: HsValBinds GhcPs -> TcM [(ConLikeName, ConInfo)]
-    new_ps (ValBinds _ binds _) = foldrM new_ps' [] binds
+    new_ps (ValBinds _ binds) = foldrM new_ps' [] (val_binds binds)
     new_ps _ = panic "new_ps"
 
     new_ps' :: LHsBindLR GhcPs GhcPs
@@ -2912,9 +2914,9 @@ add_kisig d (tycls@(TyClGroup { group_kisigs = kisigs }) : rest)
   = tycls { group_kisigs = d : kisigs } : rest
 
 add_bind :: LHsBind a -> HsValBinds a -> HsValBinds a
-add_bind b (ValBinds x bs sigs) = ValBinds x (bs ++ [b]) sigs
+add_bind b (ValBinds x bs) = ValBinds x (bs ++ [VbBind b])
 add_bind _ (XValBindsLR {})     = panic "GHC.Rename.Module.add_bind"
 
 add_sig :: LSig (GhcPass a) -> HsValBinds (GhcPass a) -> HsValBinds (GhcPass a)
-add_sig s (ValBinds x bs sigs) = ValBinds x bs (s:sigs)
+add_sig s (ValBinds x bs) = ValBinds x (VbSig s:bs)
 add_sig _ (XValBindsLR {})     = panic "GHC.Rename.Module.add_sig"

@@ -32,6 +32,7 @@ import GHC.Types.SourceText (StringLiteral)
 
 import Data.Bool
 import Data.Maybe
+import Data.List
 
 {-
 ************************************************************************
@@ -97,7 +98,7 @@ data HsValBindsLR idL idR
     -- Recursive by default
     ValBinds
         (XValBinds idL idR)
-        (LHsBindsLR idL idR) [LSig idR]
+        [ValBind idL idR]
 
     -- | Value Bindings Out
     --
@@ -105,6 +106,10 @@ data HsValBindsLR idL idR
     -- later bindings in the list may depend on earlier ones.
   | XValBindsLR
       !(XXValBindsLR idL idR)
+
+data ValBind idL idR
+  = VbBind (LHsBindLR idL idR)
+  | VbSig (LSig idR)
 
 -- ---------------------------------------------------------------------
 
@@ -243,6 +248,27 @@ data PatSynBind idL idR
           psb_dir  :: HsPatSynDir idR          -- ^ Directionality
      }
    | XPatSynBind !(XXPatSynBind idL idR)
+
+
+val_binds :: [ValBind idL idR] -> [LHsBindLR idL idR]
+val_binds binds = concatMap get_bind binds
+  where
+    get_bind (VbBind b) = [b]
+    get_bind (VbSig _) = []
+
+val_sigs :: [ValBind idL idR] -> [LSig idR]
+val_sigs binds = concatMap get_bind binds
+  where
+    get_bind (VbBind _) = []
+    get_bind (VbSig s) = [s]
+
+val_binds_and_sigs :: [ValBind idL idR] -> ([LHsBindLR idL idR], [LSig idR])
+val_binds_and_sigs binds = go binds [] []
+  where
+    go [] bs ss = (reverse bs, reverse ss)
+    go ((VbBind b):ds) bs ss = go ds (b:bs) ss
+    go ((VbSig  s):ds) bs ss = go ds bs (s:ss)
+
 
 {-
 ************************************************************************

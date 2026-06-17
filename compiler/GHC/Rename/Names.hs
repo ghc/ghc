@@ -820,11 +820,11 @@ getLocalNonValBinders fixity_env
         ; is_boot <- tcIsHsBootOrSig
         ; let val_bndrs
                 | is_boot = case binds of
-                      ValBinds _ _val_binds val_sigs ->
+                      ValBinds _ val_binds ->
                           -- In a hs-boot file, the value binders come from the
                           --  *signatures*, and there should be no foreign binders
                           [ L (l2l decl_loc) (unLoc n)
-                          | L decl_loc (TypeSig _ _ ns _) <- val_sigs, n <- ns]
+                          | L decl_loc (TypeSig _ _ ns _) <- (val_sigs val_binds), n <- ns]
                       _ -> panic "Non-ValBinds in hs-boot group"
                 | otherwise = for_hs_bndrs
         ; val_gres <- mapM new_simple val_bndrs

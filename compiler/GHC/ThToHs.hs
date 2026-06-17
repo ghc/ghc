@@ -1051,16 +1051,20 @@ cvtLocalDecs declDescr ds
       ([], []) -> return (EmptyLocalBinds noExtField)
       ([], _) -> do
         ds' <- cvtDecs ds
-        let (binds, prob_sigs) = partitionWith is_bind ds'
-        let (sigs, bads) = partitionWith is_sig prob_sigs
+        let (binds, bads) = partitionWith is_valbind ds'
         for_ (nonEmpty bads) $ \ bad_decls ->
           failWith (IllegalDeclaration declDescr $ IllegalDecls bad_decls)
-        return (HsValBinds noAnn (ValBinds NoAnnSortKey binds sigs))
+        return (HsValBinds noAnn (ValBinds noExtField binds))
       (ip_binds, []) -> do
         binds <- mapM (uncurry cvtImplicitParamBind) ip_binds
         return (HsIPBinds noAnn (IPBinds noExtField binds))
       ((_:_), (_:_)) ->
         failWith ImplicitParamsWithOtherBinds
+
+is_valbind :: LHsDecl (GhcPass p) -> Either (ValBind (GhcPass p) (GhcPass p)) (LHsDecl (GhcPass p))
+is_valbind (L l (Hs.ValD _ b)) = Left (VbBind (L l b))
+is_valbind (L l (Hs.SigD _ s)) = Left (VbSig (L l s))
+is_valbind d = Right d
 
 cvtClause :: HsMatchContextPs -> TH.Clause -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
 cvtClause ctxt (Clause ps body wheres)

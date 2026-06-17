@@ -2525,14 +2525,17 @@ instance ExactPrint (HsValBindsLR GhcPs GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (ValBinds sortKey binds sigs) = do
-    decls <- setLayoutBoth $ mapM markAnnotated $ hsDeclsValBinds (ValBinds sortKey binds sigs)
-    let
-      binds' = concatMap decl2Bind decls
-      sigs'  = concatMap decl2Sig decls
-      sortKey' = captureOrderBinds decls
-    return (ValBinds sortKey' binds' sigs')
+  exact (ValBinds sortKey bs) = do
+    bs' <- mapM markAnnotated bs
+    return (ValBinds sortKey bs')
   exact (XValBindsLR _) = panic "XValBindsLR"
+
+instance ExactPrint (ValBind GhcPs GhcPs) where
+  getAnnotationEntry _ = NoEntryVal
+  setAnnotationAnchor a _ _ _ = a
+
+  exact (VbBind b) = VbBind <$> markAnnotated b
+  exact (VbSig  s) = VbSig  <$> markAnnotated s
 
 undynamic :: Typeable a => [Dynamic] -> [a]
 undynamic ds = mapMaybe fromDynamic ds

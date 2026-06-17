@@ -337,8 +337,8 @@ hsScopedTvBinders binds
   = concatMap get_scoped_tvs sigs
   where
     sigs = case binds of
-             ValBinds           _ _ sigs -> sigs
-             XValBindsLR (HsVBG _ sigs)  -> sigs
+             ValBinds           _ bs    -> val_sigs bs
+             XValBindsLR (HsVBG _ sigs) -> sigs
 
 get_scoped_tvs :: LSig GhcRn -> [Name]
 get_scoped_tvs (L _ signature)
@@ -2003,7 +2003,7 @@ rep_val_binds (XValBindsLR (HsVBG binds sigs))
  = do { core1 <- rep_binds (concatMap snd binds)
       ; core2 <- rep_sigs sigs
       ; return (core1 ++ core2) }
-rep_val_binds (ValBinds _ _ _)
+rep_val_binds (ValBinds _ _)
  = panic "rep_val_binds: ValBinds"
 
 rep_binds :: LHsBinds GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]

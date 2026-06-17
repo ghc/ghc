@@ -205,6 +205,7 @@ type family XXHsLocalBindsLR x x'
 -- HsValBindsLR type families
 type family XValBinds    x x'
 type family XXValBindsLR x x'
+type family XXValBinds   x x'
 
 -- HsBindLR type families
 type family XFunBind    x x'

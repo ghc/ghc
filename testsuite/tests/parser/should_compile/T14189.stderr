@@ -168,8 +168,7 @@
               (L
                (EpAnn
                 (EpaSpan { T14189.hs:6:33-40 })
-                (AnnListItem
-                 [])
+                []
                 (EpaComments
                  []))
                [(L

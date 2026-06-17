@@ -194,21 +194,18 @@ it expects the global environment to contain bindings for the binders
 -- so we have a different entry point than for local bindings
 rnTopBindsLHS :: MiniFixityEnv
               -> HsValBinds GhcPs
-              -> RnM (HsValBindsLR GhcRn GhcPs)
+              -> RnM ([LHsBindLR GhcRn GhcPs], [LSig GhcPs])
 rnTopBindsLHS fix_env binds
   = rnValBindsLHS (topRecNameMaker fix_env) binds
 
 -- Ensure that a hs-boot file has no top-level bindings.
 rnTopBindsLHSBoot :: MiniFixityEnv
                   -> HsValBinds GhcPs
-                  -> RnM (HsValBindsLR GhcRn GhcPs)
+                  -> RnM ([LHsBindLR GhcRn GhcPs], [LSig GhcPs])
 rnTopBindsLHSBoot fix_env binds
-  = do  { topBinds <- rnTopBindsLHS fix_env binds
-        ; case topBinds of
-            ValBinds x mbinds sigs ->
-              do  { rejectBootDecls HsBoot BootBindsPs mbinds
-                  ; pure (ValBinds x [] sigs) }
-            _ -> pprPanic "rnTopBindsLHSBoot" (ppr topBinds) }
+  = do  { (mbinds, sigs) <- rnTopBindsLHS fix_env binds
+        ; rejectBootDecls HsBoot BootBindsPs mbinds
+        ; pure ([], sigs) }
 
 rejectBootDecls :: HsBootOrSig
                 -> (NonEmpty (LocatedA decl) -> BadBootDecls)
@@ -224,8 +221,8 @@ rnTopBindsBoot :: NameSet -> HsValBindsLR GhcRn GhcPs
                -> RnM (HsValBinds GhcRn, DefUses)
 -- A hs-boot file has no bindings.
 -- Return a single HsBindGroup with empty binds and renamed signatures
-rnTopBindsBoot bound_names (ValBinds _ _ sigs)
-  = do  { (sigs', fvs) <- renameSigs (HsBootCtxt bound_names) sigs
+rnTopBindsBoot bound_names (ValBinds _ val_binds)
+  = do  { (sigs', fvs) <- renameSigs (HsBootCtxt bound_names) (val_sigs val_binds)
         ; return (XValBindsLR (HsVBG [] sigs'), usesOnly fvs) }
 rnTopBindsBoot _ b = pprPanic "rnTopBindsBoot" (ppr b)
 
@@ -277,9 +274,9 @@ rnIPBind (IPBind _ n expr) = do
 -- Does duplicate/shadow check
 rnLocalValBindsLHS :: MiniFixityEnv
                    -> HsValBinds GhcPs
-                   -> RnM ([Name], HsValBindsLR GhcRn GhcPs)
+                   -> RnM ([Name], ([LHsBindLR GhcRn GhcPs], [LSig GhcPs]))
 rnLocalValBindsLHS fix_env binds
-  = do { binds' <- rnValBindsLHS (localRecNameMaker fix_env) binds
+  = do { (binds',sigs) <- rnValBindsLHS (localRecNameMaker fix_env) binds
 
          -- Check for duplicates and shadowing
          -- Must do this *after* renaming the patterns
@@ -299,26 +296,27 @@ rnLocalValBindsLHS fix_env binds
          --   import A(f)
          --   g = let f = ... in f
          -- should.
-       ; let bound_names = collectHsValBinders CollNoDictBinders binds'
+       ; let bound_names = collectHsValBinders' CollNoDictBinders binds'
              -- There should be only Ids, but if there are any bogus
              -- pattern synonyms, we'll collect them anyway, so that
              -- we don't generate subsequent out-of-scope messages
        ; envs <- getRdrEnvs
        ; checkDupAndShadowedNames envs bound_names
 
-       ; return (bound_names, binds') }
+       ; return (bound_names, (binds', sigs)) }
 
 -- renames the left-hand sides
 -- generic version used both at the top level and for local binds
 -- does some error checking, but not what gets done elsewhere at the top level
 rnValBindsLHS :: NameMaker
               -> HsValBinds GhcPs
-              -> RnM (HsValBindsLR GhcRn GhcPs)
-rnValBindsLHS topP (ValBinds x mbinds sigs)
-  = do { mbinds' <- mapM (wrapLocMA (rnBindLHS topP doc)) mbinds
-       ; return $ ValBinds x mbinds' sigs }
+              -> RnM ([LHsBindLR GhcRn GhcPs], [LSig GhcPs])
+rnValBindsLHS topP (ValBinds _ vbinds)
+  = do { let (mbinds, sigs) = val_binds_and_sigs vbinds
+       ; mbinds' <- mapM (wrapLocMA (rnBindLHS topP doc)) mbinds
+       ; return  (mbinds', sigs) }
   where
-    bndrs = collectHsBindsBinders CollNoDictBinders mbinds
+    bndrs = collectHsBindsBinders CollNoDictBinders (val_binds vbinds)
     doc   = text "In the binding group for:" <+> pprWithCommas ppr bndrs
 
 rnValBindsLHS _ b = pprPanic "rnValBindsLHSFromDoc" (ppr b)
@@ -331,8 +329,9 @@ rnValBindsRHS :: HsSigCtxt
               -> HsValBindsLR GhcRn GhcPs
               -> RnM (HsValBinds GhcRn, DefUses)
 
-rnValBindsRHS ctxt (ValBinds _ mbinds sigs)
-  = do { (sigs', sig_fvs) <- renameSigs ctxt sigs
+rnValBindsRHS ctxt (ValBinds _ vbinds)
+  = do { let (mbinds, sigs) = val_binds_and_sigs vbinds
+       ; (sigs', sig_fvs) <- renameSigs ctxt sigs
 
        -- Update the TcGblEnv with renamed COMPLETE pragmas from the current
        -- module, for pattern irrefutability checking in do notation.
@@ -382,20 +381,22 @@ rnLocalValBindsAndThen
   :: HsValBinds GhcPs
   -> (HsValBinds GhcRn -> FreeNames -> RnM (result, FreeNames))
   -> RnM (result, FreeNames)
-rnLocalValBindsAndThen binds@(ValBinds _ _ sigs) thing_inside
- = do   {     -- (A) Create the local fixity environment
-          new_fixities <- makeMiniFixityEnv [ L loc sig
+rnLocalValBindsAndThen binds@(ValBinds _ vbinds) thing_inside
+ = do   { let sigs = val_sigs vbinds
+             -- (A) Create the local fixity environment
+        ; new_fixities <- makeMiniFixityEnv [ L loc sig
                                             | L loc (FixSig _ sig) <- sigs]
 
               -- (B) Rename the LHSes
-        ; (bound_names, new_lhs) <- rnLocalValBindsLHS new_fixities binds
+        ; (bound_names, (binds',sigs')) <- rnLocalValBindsLHS new_fixities binds
 
               --     ...and bring them (and their fixities) into scope
         ; bindLocalNamesFV bound_names              $
           addLocalFixities new_fixities bound_names $ do
 
         {      -- (C) Do the RHS and thing inside
-          (binds', dus) <- rnLocalValBindsRHS (mkNameSet bound_names) new_lhs
+          let new_lhs :: HsValBindsLR GhcRn GhcPs = ValBinds noExtField (map VbBind binds' ++ map VbSig sigs')
+        ; (binds', dus) <- rnLocalValBindsRHS (mkNameSet bound_names) new_lhs
         ; (result, result_fvs) <- thing_inside binds' (allUses dus)
 
                 -- Report unused bindings based on the (accurate)
