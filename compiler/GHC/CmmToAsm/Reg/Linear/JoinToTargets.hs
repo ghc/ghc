@@ -15,7 +15,6 @@ import GHC.CmmToAsm.Reg.Linear.Base
 import GHC.CmmToAsm.Reg.Linear.FreeRegs
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Instr
-import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Types
 
 import GHC.Platform.Reg
@@ -132,12 +131,9 @@ joinToTargets_first block_live new_blocks block_id instr dest dests
         block_assig src_assig
         to_free
 
- = do   config <- getConfig
-        let platform = ncgPlatform config
-
-        -- free up the regs that are not live on entry to this block.
+ = do   -- free up the regs that are not live on entry to this block.
         freeregs        <- getFreeRegsR
-        let freeregs' = foldl' (flip $ frReleaseReg platform) freeregs to_free
+        let freeregs' = foldl' (flip frReleaseReg) freeregs to_free
 
         -- remember the current assignment on entry to this block.
         setBlockAssigR (updateBlockAssignment dest (freeregs', src_assig) block_assig)
