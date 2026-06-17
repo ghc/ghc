@@ -63,7 +63,9 @@ test('stack_big_ret',
      [
         extra_files(['TestUtils.hs']),
         ignore_stdout,
-        ignore_stderr
+        ignore_stderr,
+        # Stack layout may change with optimizations
+        omit_ways(opt_ways),
      ],
      compile_and_run,
      [''])
