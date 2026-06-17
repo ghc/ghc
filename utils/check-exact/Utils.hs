@@ -65,15 +65,6 @@ warn c _ = c
 
 -- ---------------------------------------------------------------------
 
-captureOrderBinds :: [LHsDecl GhcPs] -> AnnSortKey BindTag
-captureOrderBinds ls = AnnSortKey $ map go ls
-  where
-    go (L _ (ValD _ _))       = BindTag
-    go (L _ (SigD _ _))       = SigDTag
-    go d      = error $ "captureOrderBinds:" ++ showGhc d
-
--- ---------------------------------------------------------------------
-
 notDocDecl :: LHsDecl GhcPs -> Bool
 notDocDecl (L _ DocD{}) = False
 notDocDecl _ = True
@@ -655,44 +646,26 @@ partitionWithSortKey = go
 
 -- ---------------------------------------------------------------------
 
-orderedDeclsBinds
-  :: AnnSortKey BindTag
-  -> [LHsDecl GhcPs] -> [LHsDecl GhcPs]
-  -> [LHsDecl GhcPs]
-orderedDeclsBinds sortKey binds sigs =
-  case sortKey of
-    NoAnnSortKey ->
-      sortBy (\a b -> compare (realSrcSpan $ getLocA a)
-                              (realSrcSpan $ getLocA b)) (binds ++ sigs)
-    AnnSortKey keys ->
-      let
-        go [] _ _                      = []
-        go (BindTag:ks) (b:bs) ss = b : go ks bs ss
-        go (SigDTag:ks) bs (s:ss) = s : go ks bs ss
-        go (_:ks) bs ss           =     go ks bs ss
-      in
-        go keys binds sigs
-
 hsDeclsLocalBinds :: HsLocalBinds GhcPs -> [LHsDecl GhcPs]
 hsDeclsLocalBinds lb = case lb of
-    HsValBinds _ (ValBinds sortKey bs sigs) ->
-      let
-        bds = map wrapDecl bs
-        sds = map wrapSig sigs
-      in
-        orderedDeclsBinds sortKey bds sds
+    HsValBinds _ (ValBinds _ bs) -> map unWrapValBind bs
     HsValBinds _ (XValBindsLR _) -> error $ "hsDecls.XValBindsLR not valid"
     HsIPBinds {}       -> []
     EmptyLocalBinds {} -> []
 
 hsDeclsValBinds :: (HsValBindsLR GhcPs GhcPs) -> [LHsDecl GhcPs]
-hsDeclsValBinds (ValBinds sortKey bs sigs) =
-      let
-        bds = map wrapDecl bs
-        sds = map wrapSig sigs
-      in
-        orderedDeclsBinds sortKey bds sds
+hsDeclsValBinds (ValBinds _ bs) = map unWrapValBind bs
 hsDeclsValBinds XValBindsLR{} = error "hsDeclsValBinds"
+
+unWrapValBind :: ValBind (GhcPass p) (GhcPass p) -> LHsDecl (GhcPass p)
+unWrapValBind (VbBind (L l b)) = L l (ValD noExtField b)
+unWrapValBind (VbSig  (L l s)) = L l (SigD noExtField s)
+
+sig2Decl :: LSig (GhcPass p) -> LHsDecl (GhcPass p)
+sig2Decl (L l s) = L l (SigD noExtField s)
+
+bind2Decl :: LHsBind (GhcPass p) -> LHsDecl (GhcPass p)
+bind2Decl (L l b) = L l (ValD noExtField b)
 
 -- ---------------------------------------------------------------------
 

@@ -1438,7 +1438,7 @@ instance CollectFldBinders (HsLocalBinds GhcTc) where
   collectFldBinds HsIPBinds{} = emptyVarEnv
   collectFldBinds EmptyLocalBinds{} = emptyVarEnv
 instance CollectFldBinders (HsValBinds GhcTc) where
-  collectFldBinds (ValBinds _ bnds _) = collectFldBinds bnds
+  collectFldBinds (ValBinds _ bnds) = collectFldBinds (val_binds bnds)
   collectFldBinds (XValBindsLR (HsVBG grps _))
      = collectFldBinds (hsValBindGroupsBinds @'Typechecked grps)
 instance CollectFldBinders (HsBind GhcTc) where

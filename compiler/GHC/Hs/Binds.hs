@@ -78,7 +78,7 @@ type instance XEmptyLocalBinds (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XXHsLocalBindsLR (GhcPass pL) (GhcPass pR) = DataConCantHappen
 
 -- ---------------------------------------------------------------------
-type instance XValBinds    (GhcPass pL) (GhcPass pR) = AnnSortKey BindTag
+type instance XValBinds    (GhcPass pL) (GhcPass pR) = NoExtField
 
 type instance XXValBindsLR (GhcPass pL) _ = HsValBindGroups pL
 
@@ -153,6 +153,10 @@ data AnnPSB
 
 instance NoAnn AnnPSB where
   noAnn = AnnPSB noAnn noAnn noAnn noAnn
+
+instance HasLoc (ValBind (GhcPass p) (GhcPass p)) where
+  getHasLoc (VbBind b) = getHasLoc b
+  getHasLoc (VbSig  s) = getHasLoc s
 
 -- ---------------------------------------------------------------------
 
@@ -442,8 +446,8 @@ instance (OutputableBndrId pl, OutputableBndrId pr)
 
 instance (OutputableBndrId pl, OutputableBndrId pr)
         => Outputable (HsValBindsLR (GhcPass pl) (GhcPass pr)) where
-  ppr (ValBinds _ binds sigs)
-   = pprDeclList (pprLHsBindsForUser binds sigs)
+  ppr (ValBinds _ binds)
+   = pprDeclList (pprLHsBindsForUser' binds)
 
   ppr (XValBindsLR (HsVBG bs sigs))
     = getPprDebug $ \case
@@ -487,6 +491,21 @@ pprLHsBindsForUser binds sigs
 
     sort_by_loc decls = sortBy (SrcLoc.leftmost_smallest `on` fst) decls
 
+pprLHsBindsForUser' :: (OutputableBndrId idL, OutputableBndrId idR)
+     => [ValBind (GhcPass idL) (GhcPass idR)] -> [SDoc]
+--  pprLHsBindsForUser is different to pprLHsBinds because
+--  a) No braces: 'let' and 'where' include a list of HsBindGroups
+--     and we don't want several groups of bindings each
+--     with braces around
+--  b) Sort by location before printing
+--  c) Include signatures
+pprLHsBindsForUser' binds
+  = map ppr_bind binds
+  where
+    ppr_bind (VbBind b) = ppr b
+    ppr_bind (VbSig s) = ppr s
+
+
 pprDeclList :: [SDoc] -> SDoc   -- Braces with a space
 -- Print a bunch of declarations
 -- One could choose  { d1; d2; ... }, using 'sep'
@@ -507,11 +526,11 @@ eqEmptyLocalBinds (EmptyLocalBinds _) = True
 eqEmptyLocalBinds _                   = False
 
 isEmptyValBinds :: HsValBindsLR (GhcPass a) (GhcPass b) -> Bool
-isEmptyValBinds (ValBinds _ ds sigs)  = isEmptyLHsBinds ds && null sigs
+isEmptyValBinds (ValBinds _ binds)  = null binds
 isEmptyValBinds (XValBindsLR (HsVBG ds sigs)) = null ds && null sigs
 
 emptyValBindsIn :: HsValBindsLR (GhcPass a) (GhcPass b)
-emptyValBindsIn  = ValBinds NoAnnSortKey [] []
+emptyValBindsIn  = ValBinds noExtField []
 emptyValBindsRn :: HsValBindsLR GhcRn GhcRn
 emptyValBindsRn  = XValBindsLR (HsVBG [] [])
 
@@ -532,8 +551,8 @@ hsValBindGroupsBinds binds
 ------------
 plusHsValBinds :: HsValBinds (GhcPass a) -> HsValBinds (GhcPass a)
                -> HsValBinds(GhcPass a)
-plusHsValBinds (ValBinds _ ds1 sigs1) (ValBinds _ ds2 sigs2)
-  = ValBinds NoAnnSortKey (ds1 ++ ds2) (sigs1 ++ sigs2)
+plusHsValBinds (ValBinds _ ds1) (ValBinds _ ds2)
+  = ValBinds noExtField (ds1 ++ ds2)
 plusHsValBinds (XValBindsLR (HsVBG ds1 ss1)) (XValBindsLR (HsVBG ds2 ss2))
   = XValBindsLR (HsVBG (ds1++ds2) (ss1++ss2))
 plusHsValBinds _ _

@@ -1633,7 +1633,7 @@ runStmt input step = do
       let
         la  = L (noAnnSrcSpan loc)
         la' = L (noAnnSrcSpan loc)
-      in la (LetStmt noAnn (HsValBinds noAnn (ValBinds NoAnnSortKey [la' bind] [])))
+      in la (LetStmt noAnn (HsValBinds noAnn (ValBinds noExtField [VbBind $ la' bind])))
 
     setDumpFilePrefix :: GHC.GhcMonad m => InteractiveContext -> m () -- #17500
     setDumpFilePrefix ic = do

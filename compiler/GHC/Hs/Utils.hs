@@ -84,8 +84,8 @@ module GHC.Hs.Utils(
   -- * Collecting binders
   isUnliftedHsBind, isUnliftedHsBinds, isBangedHsBind,
 
-  collectLocalBinders, collectHsValBinders, collectHsBindListBinders,
-  collectHsIdBinders,
+  collectLocalBinders, collectHsValBinders, collectHsValBinders', collectHsBindListBinders,
+  collectHsIdBinders, collectHsIdBinders',
   collectHsBindsBinders, collectHsBindBinders, collectMethodBinders,
 
   collectPatBinders, collectPatsBinders,
@@ -885,8 +885,11 @@ spanHsLocaLBinds (EmptyLocalBinds _)
   = noSrcSpan
 spanHsLocaLBinds (HsIPBinds _ (IPBinds _ bs))
   = get_bind_spans bs []
-spanHsLocaLBinds (HsValBinds _ (ValBinds _ bs sigs))
-  = get_bind_spans bs sigs
+spanHsLocaLBinds (HsValBinds _ (ValBinds _ binds))
+  = get_bind_spans bs ss
+    where
+      bs :: [LHsBindLR (GhcPass p) (GhcPass p)]
+      (bs,ss) = val_binds_and_sigs binds
 spanHsLocaLBinds (HsValBinds _ (XValBindsLR (HsVBG bs ss)))
   = get_bind_spans (hsValBindGroupsBinds @p bs) ss
 
@@ -1085,11 +1088,24 @@ collectHsIdBinders :: (IsPass idL, CollectPass (GhcPass idL))
 -- ^ Collect 'Id' binders only, or 'Id's + pattern synonyms, respectively
 collectHsIdBinders flag = collect_hs_val_binders True flag
 
+collectHsIdBinders' :: (IsPass idL, CollectPass (GhcPass idL))
+                   => CollectFlag (GhcPass idL)
+                   -> [LHsBindLR (GhcPass idL) idR]
+                   -> [IdP (GhcPass idL)]
+-- ^ Collect 'Id' binders only, or 'Id's + pattern synonyms, respectively
+collectHsIdBinders' flag = collect_hs_val_binders' True flag
+
 collectHsValBinders :: (IsPass idL, CollectPass (GhcPass idL))
                     => CollectFlag (GhcPass idL)
                     -> HsValBindsLR (GhcPass idL) idR
                     -> [IdP (GhcPass idL)]
 collectHsValBinders flag = collect_hs_val_binders False flag
+
+collectHsValBinders' :: (IsPass idL, CollectPass (GhcPass idL))
+                    => CollectFlag (GhcPass idL)
+                    -> [LHsBindLR (GhcPass idL) idR]
+                    -> [IdP (GhcPass idL)]
+collectHsValBinders' flag = collect_hs_val_binders' False flag
 
 collectHsBindBinders :: CollectPass p
                      => CollectFlag p
@@ -1117,8 +1133,16 @@ collect_hs_val_binders :: forall idL idR. (IsPass idL, CollectPass (GhcPass idL)
                        -> HsValBindsLR (GhcPass idL) idR
                        -> [IdP (GhcPass idL)]
 collect_hs_val_binders ps flag = \case
-    ValBinds _ binds _         -> collect_binds ps flag binds []
+    ValBinds _ binds           -> collect_binds ps flag (val_binds binds) []
     XValBindsLR (HsVBG grps _) -> collect_binds ps flag (hsValBindGroupsBinds @idL grps) []
+
+collect_hs_val_binders' :: forall idL idR. (IsPass idL, CollectPass (GhcPass idL))
+                       => Bool
+                       -> CollectFlag (GhcPass idL)
+                       -> [LHsBindLR (GhcPass idL) idR]
+                       -> [IdP (GhcPass idL)]
+collect_hs_val_binders' ps flag binds = collect_binds ps flag binds []
+
 
 collect_binds :: forall p idR. CollectPass p
               => Bool
@@ -1528,7 +1552,7 @@ hsForeignDeclsBinders foreign_decls
 hsPatSynSelectors :: IsPass p => HsValBinds (GhcPass p) -> [FieldOcc (GhcPass p)]
 -- ^ Collects record pattern-synonym selectors only; the pattern synonym
 -- names are collected by 'collectHsValBinders'.
-hsPatSynSelectors (ValBinds _ _ _) = panic "hsPatSynSelectors"
+hsPatSynSelectors (ValBinds _ _) = panic "hsPatSynSelectors"
 hsPatSynSelectors (XValBindsLR (HsVBG grps _))
   = foldr addPatSynSelector [] $ hsValBindGroupsBinds grps
 
@@ -1814,8 +1838,8 @@ hsValBindsImplicits :: HsValBindsLR GhcRn (GhcPass idR)
                     -> [(SrcSpan, [ImplicitFieldBinders])]
 hsValBindsImplicits (XValBindsLR (HsVBG grps _))
   = lhsBindsImplicits (hsValBindGroupsBinds grps)
-hsValBindsImplicits (ValBinds _ binds _)
-  = lhsBindsImplicits binds
+hsValBindsImplicits (ValBinds _ binds)
+  = lhsBindsImplicits (val_binds binds)
 
 lhsBindsImplicits :: LHsBindsLR GhcRn idR -> [(SrcSpan, [ImplicitFieldBinders])]
 lhsBindsImplicits = concatMap (lhs_bind . unLoc)

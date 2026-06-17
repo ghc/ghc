@@ -1546,10 +1546,10 @@ rnRecStmtsAndThen ctxt rnBody s cont
 collectRecStmtsFixities :: [LStmtLR GhcPs GhcPs body] -> [LFixitySig GhcPs]
 collectRecStmtsFixities l =
     foldr (\ s -> \acc -> case s of
-            (L _ (LetStmt _ (HsValBinds _ (ValBinds _ _ sigs)))) ->
+            (L _ (LetStmt _ (HsValBinds _ (ValBinds _ bs)))) ->
               foldr (\ sig -> \ acc -> case sig of
                                          (L loc (FixSig _ s)) -> (L loc s) : acc
-                                         _ -> acc) acc sigs
+                                         _ -> acc) acc (val_sigs bs)
             _ -> acc) [] l
 
 -- left-hand sides
@@ -1578,8 +1578,8 @@ rn_rec_stmt_lhs _ (L _ (LetStmt _ binds@(HsIPBinds {})))
 
 
 rn_rec_stmt_lhs fix_env (L loc (LetStmt _ (HsValBinds x binds)))
-    = do (_bound_names, binds') <- rnLocalValBindsLHS fix_env binds
-         return [(L loc (LetStmt noAnn (HsValBinds x binds')),
+    = do (_bound_names, (bs',sigs')) <- rnLocalValBindsLHS fix_env binds
+         return [(L loc (LetStmt noAnn (HsValBinds x (makeRnValBinds noExtField bs' sigs'))),
                  -- Warning: this is bogus; see function invariant
                  emptyFNs
                  )]
