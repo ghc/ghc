@@ -3631,10 +3631,17 @@ def printTestOutputSummary(file: TextIO, testInfos, color: bool=False,
     # Repeat failing tests' captured output in the summary, so one needn't
     # hunt for it earlier in a possibly very long log; see #16720.
     where = ', see {}'.format(junit_path) if junit_path else ''
-    for result in sorted(testInfos, key=lambda r: (r.testname.lower(), r.way, r.directory)):
+    # Tests that fail identically in several ways (e.g. normal and g1) share one
+    # output block, with the ways collected in the header.
+    groups = collections.OrderedDict() # type: ignore
+    for result in sorted(testInfos, key=lambda r: (r.testname.lower(), r.directory, r.way)):
+        key = (result.testname, result.directory, result.reason, result.stdout, result.stderr)
+        groups.setdefault(key, (result, []))[1].append(result.way)
+    for result, ways in groups.values():
         # Strip the long temp-run-dir prefix; see Note [Running tests in /tmp].
         directory = os.path.relpath(result.directory, tempdir) if tempdir else result.directory
-        header = '=====> {}({}) ({}) [{}]'.format(result.testname, result.way, directory, result.reason)
+        header = '=====> {}({}) ({}) [{}]'.format(
+            result.testname, ', '.join(ways), directory, result.reason)
         if color:
             header = colored(Color.RED, header)
         file.write(header + '\n')
