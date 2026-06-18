@@ -38,6 +38,9 @@ awaitCompletedTimeoutsOrIOWin32(Capability *cap, bool wait)
     workerWaitingForRequests = true;
     if (is_io_mng_native_p())
       awaitAsyncRequests(wait);
+      /* FIXME: no support yet for interrupting in WinIO I/O manager
+       * See issue #27403
+       */
     else
       interrupt = !awaitRequests(wait);
     workerWaitingForRequests = false;

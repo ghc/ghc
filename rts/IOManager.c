@@ -796,6 +796,14 @@ void interruptIOManager(CapIOManager *iomgr)
             break;
 #endif
 
+#if defined(IOMGR_ENABLED_WINIO)
+        case IO_MANAGER_WINIO:
+            /* FIXME: no support yet for interrupting in WinIO I/O manager
+             * See issue #27403
+             */
+            break;
+#endif
+
         default:
             break;
     }
