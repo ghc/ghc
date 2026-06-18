@@ -448,3 +448,13 @@ test('SpecTyFamRun', [ grep_errmsg(r'foo')
                     , collect_stats('bytes allocated', 5)],
      multimod_compile_and_run,
      ['SpecTyFamRun', '-O2'])
+
+# A strict field of function type (a ByteString Builder) must stay fused: the
+# worker must not return a `Strict Builder` box that gets reboxed every iteration.
+# See Note [Unboxing Strict boxes around functions] in GHC.Core.Opt.CprAnal
+test('StrictBuilderFusion',
+     [collect_stats('bytes allocated', 5),
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O'])

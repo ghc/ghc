@@ -289,3 +289,7 @@ test('T27072w', [req_c, js_skip, when(opsys('darwin'), skip)],
 # AArch64-specific runtime tests
 test('aarch64-ushr-subword-run', [unless(arch('aarch64'), skip)], compile_and_run, ['-O'])
 test('aarch64-subword-ops', [unless(arch('aarch64'), skip)], compile_and_run, ['-O'])
+
+# Strict / strict-field machinery, with runtime tag-inference checks
+test('StrictBox', normal, compile_and_run,
+     ['-O -dtag-inference-checks -fmax-simplifier-iterations=20'])
