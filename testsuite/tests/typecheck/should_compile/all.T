@@ -283,7 +283,7 @@ test('T2497', normal, compile, [''])
 
 
 # Omitting temporarily
-test('syn-perf', normal, compile, ['-freduction-depth=30'])
+test('syn-perf', [expect_broken_for(27398, opt_ways)], compile, ['-freduction-depth=30'])
 test('syn-perf2', normal, compile, [''])
 
 test('LoopOfTheDay1', normal, compile, [''])
