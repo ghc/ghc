@@ -668,6 +668,8 @@ test('T22859',
       when(arch('wasm32'), skip)],
      compile_and_run, ['-with-rtsopts -A8K'])
 
+test('T27123', [when(have_profiling(), extra_ways(['prof']))], compile_and_run, ['-O -package ghc'])
+
 test('T27434',
      extra_ways(['compacting_gc']),
      compile_and_run, [''])
