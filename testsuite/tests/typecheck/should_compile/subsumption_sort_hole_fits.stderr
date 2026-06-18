@@ -5,10 +5,10 @@ subsumption_sort_hole_fits.hs:2:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdef
     • Relevant bindings include
         f :: [String] (bound at subsumption_sort_hole_fits.hs:2:1)
       Valid hole fits include
-        lines :: String -> [String]
+        words :: String -> [String]
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Data.OldList’))
-        words :: String -> [String]
+        lines :: String -> [String]
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Data.OldList’))
         repeat :: forall a. a -> [a]

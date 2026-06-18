@@ -37,7 +37,6 @@ import GHC.Unit
 import GHC.Unit.Module.ModIface
 import GHC.Types.Name
 import GHC.Platform.Profile
-import GHC.Types.Unique.FM
 import GHC.Utils.Panic
 import GHC.Utils.Binary as Binary
 import GHC.Data.FastMutInt
@@ -61,7 +60,8 @@ import System.IO.Unsafe
 import Data.Typeable (Typeable)
 import qualified GHC.Data.Strict as Strict
 import Data.Function ((&))
-
+import GHC.Types.Name.Env
+import Data.Maybe
 
 -- ---------------------------------------------------------------------------
 -- Reading and writing binary interface files
@@ -618,25 +618,27 @@ initNameReaderTable cache = do
       }
 
 data BinSymbolTable = BinSymbolTable {
-        bin_symtab_next :: !FastMutInt, -- The next index to use
-        bin_symtab_map  :: !(IORef (UniqFM Name (Int,Name)))
-                                -- indexed by Name
+        bin_symtab_next :: !FastMutInt,
+                        -- ^ The next index to use
+        bin_symtab_map  :: !(IORef (NameEnv Int, ModuleEnv [(Int,Name)]))
+                        -- ^ Deduplication indexed by Name
+                        -- ; Group table data by module for serialization
   }
 
 initNameWriterTable :: IO (WriterTable, BinaryWriter Name)
 initNameWriterTable = do
   symtab_next <- newFastMutInt 0
-  symtab_map <- newIORef emptyUFM
+  symtab_map <- newIORef (emptyNameEnv, emptyModuleEnv)
   let bin_symtab =
         BinSymbolTable
           { bin_symtab_next = symtab_next
-          , bin_symtab_map = symtab_map
+          , bin_symtab_map  = symtab_map
           }
 
   let put_symtab bh = do
         name_count <- readFastMutInt symtab_next
-        symtab_map <- readIORef symtab_map
-        putSymbolTable bh name_count symtab_map
+        (_, symtab_tbl) <- readIORef symtab_map
+        putSymbolTable bh name_count symtab_tbl
         pure name_count
 
   return
@@ -647,40 +649,53 @@ initNameWriterTable = do
     )
 
 
-putSymbolTable :: WriteBinHandle -> Int -> UniqFM Name (Int,Name) -> IO ()
+{- |
+The symbol table payload will look like:
+
+  <total name count>
+  $modules.size
+  for (mod, names) in $modules:
+    $mod
+    $names.size
+    for table_ix, occ in $names
+      $table_ix
+      $occ
+-}
+putSymbolTable :: WriteBinHandle -> Int -> ModuleEnv [(Int, Name)] -> IO ()
 putSymbolTable bh name_count symtab = do
     put_ bh name_count
-    let names = elems (array (0,name_count-1) (nonDetEltsUFM symtab))
-      -- It's OK to use nonDetEltsUFM here because the elements have
-      -- indices that array uses to create order
-    mapM_ (\n -> serialiseName bh n symtab) names
+    put_ bh (sizeModuleEnv symtab)
+    forM_ (moduleEnvToList symtab) $ \(mod,names) -> do
+      put_ bh mod
+      put_ bh (length names)
+      forM_ names $ \(table_ix, name) -> do
+        let occ = assertPpr (isExternalName name) (ppr name) (nameOccName name)
+        put_ bh table_ix
+        put_ bh occ
 
-
+-- | Decode the symbol table -- layout set by 'putSymbolTable'.
 getSymbolTable :: ReadBinHandle -> NameCache -> IO (SymbolTable Name)
 getSymbolTable bh name_cache = do
     sz <- get bh :: IO Int
     -- create an array of Names for the symbols and add them to the NameCache
     updateNameCache' name_cache $ \cache0 -> do
-        mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int Name)
-        cache <- foldGet' (fromIntegral sz) bh cache0 $ \i (uid, mod_name, occ) cache -> do
-          let mod = mkModule uid mod_name
-          case lookupOrigNameCache cache mod occ of
-            Just name -> do
-              writeArray mut_arr (fromIntegral i) name
-              return cache
-            Nothing   -> do
-              uniq <- takeUniqFromNameCache name_cache
-              let name      = mkExternalName uniq mod occ noSrcSpan
-                  new_cache = extendOrigNameCache cache mod occ name
-              writeArray mut_arr (fromIntegral i) name
-              return new_cache
-        arr <- unsafeFreeze mut_arr
-        return (cache, arr)
-
-serialiseName :: WriteBinHandle -> Name -> UniqFM key (Int,Name) -> IO ()
-serialiseName bh name _ = do
-    let mod = assertPpr (isExternalName name) (ppr name) (nameModule name)
-    put_ bh (moduleUnit mod, moduleName mod, nameOccName name)
+      mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int Name)
+      mods_sz <- get bh :: IO Int
+      cache <-
+        foldGet' (fromIntegral mods_sz) bh cache0 $ \_mod_ix (mod,mod_nms_sz) cache1 -> do
+          foldGet' (fromIntegral (mod_nms_sz::Int)) bh cache1 $ \_mod_nms_ix (table_ix, occ) cache2 -> do
+            case lookupOrigNameCache cache2 mod occ of
+              Just name -> do
+                writeArray mut_arr table_ix name
+                return cache2
+              Nothing   -> do
+                uniq <- takeUniqFromNameCache name_cache
+                let name   = mkExternalName uniq mod occ noSrcSpan
+                    cache3 = extendOrigNameCache cache2 mod occ name
+                writeArray mut_arr table_ix name
+                return cache3
+      arr <- unsafeFreeze mut_arr
+      return (cache, arr)
 
 
 -- Note [Symbol table representation of names]
@@ -714,16 +729,26 @@ putName BinSymbolTable{
              .|. (fromIntegral u :: Word32))
 
   | otherwise
-  = do symtab_map <- readIORef symtab_map_ref
-       case lookupUFM symtab_map name of
-         Just (off,_) -> put_ bh (fromIntegral off :: Word32)
+  = do (symtab_map,symtab_tbl) <- readIORef symtab_map_ref
+       case lookupNameEnv symtab_map name of
+         Just off -> put_ bh (fromIntegral off :: Word32)
          Nothing -> do
-            off <- readFastMutInt symtab_next
-            -- massert (off < 2^(30 :: Int))
-            writeFastMutInt symtab_next (off+1)
-            writeIORef symtab_map_ref
-                $! addToUFM symtab_map name (off,name)
-            put_ bh (fromIntegral off :: Word32)
+          off <- freshIndex
+          let mod = nameModule name
+          let mod_nms = fromMaybe [] (lookupModuleEnv symtab_tbl mod)
+
+          let !symtab_map' = extendNameEnv symtab_map name off
+          let !symtab_tbl' = extendModuleEnv symtab_tbl mod ((off,name):mod_nms)
+          writeIORef symtab_map_ref $! ( symtab_map',  symtab_tbl' )
+
+          put_ bh (fromIntegral off :: Word32)
+  where
+    freshIndex :: IO Int
+    freshIndex = do
+      off <- readFastMutInt symtab_next
+      -- massert (off < 2^(30 :: Int))
+      writeFastMutInt symtab_next (off+1)
+      return off
 
 -- See Note [Symbol table representation of names]
 getSymtabName :: SymbolTable Name
