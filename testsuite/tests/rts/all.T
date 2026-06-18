@@ -697,6 +697,8 @@ test('ClosureTable',
 
 test('resizeMutableByteArrayInPlace', [req_cmm, extra_ways(['optasm', 'sanity']), only_ways(['optasm', 'sanity'])], compile_and_run, [''])
 
+test('T27123', [when(have_profiling(), extra_ways(['prof']))], compile_and_run, ['-O'])
+
 test('T27434',
      extra_ways(['compacting_gc']),
      compile_and_run, [''])
