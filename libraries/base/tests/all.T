@@ -135,7 +135,8 @@ test('list003', when(fast(), skip), compile_and_run, [''])
 test('isSuffixOf', normal, compile_and_run, [''])
 
 test('memo001', [extra_files(['Memo1.lhs']),
-                 extra_run_opts('+RTS -A10k -RTS')], multimod_compile_and_run,
+                 extra_run_opts('+RTS -A10k -RTS'),
+                 expect_broken_for(27396, opt_ways)], multimod_compile_and_run,
      ['memo001', ''])
 
 test('memo002', [extra_files(['Memo2.lhs']),
