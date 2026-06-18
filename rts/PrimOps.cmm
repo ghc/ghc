@@ -121,12 +121,6 @@ stg_newByteArrayzh ( W_ n )
     return (p);
 }
 
-stg_fromLazzyzh ( P_ p )
-{
-    (P_ unlifted) = call stg_ap_0_fast(p);
-    return (UNTAG(unlifted));
-}
-
 stg_toLazzyzh ( P_ p )
 {
     if (GET_INFO(p) == stg_ARR_WORDS_info) {

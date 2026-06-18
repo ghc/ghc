@@ -4291,12 +4291,12 @@ primop VecSqrtOp "sqrt#" GenPrimOp
    { Element-wise square root. }
    with vector = FLOAT_VECTOR_TYPES
 
-primop LazyOp "toLazy#" GenPrimOp
+primop ToLazyOp "toLazy#" GenPrimOp
    a_unlifted -> Lazy a_unlifted
    { comment }
    with effect = CanFail
 
-primop UnlazyOp "fromLazy#" GenPrimOp
+primop FromLazyOp "fromLazy#" GenPrimOp
    Lazy a_unlifted -> a_unlifted
    { comment }
    with effect = CanFail

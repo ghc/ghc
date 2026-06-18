@@ -22,7 +22,7 @@ module GHC.Builtin.PrimOps (
 
         PrimOpEffect(..), primOpEffect,
 
-        getPrimOpResultInfo,  isComparisonPrimOp, PrimOpResultInfo(..),
+        getPrimOpResultKind, isComparisonPrimOp,
 
         PrimCall(..)
     ) where
@@ -872,30 +872,12 @@ primOpSig op
         Compare   _occ ty                    -> ([],     [ty,ty], intPrimTy)
         GenPrimOp _occ tyvars arg_tys res_ty -> (tyvars, arg_tys, res_ty   )
 
-data PrimOpResultInfo
-  = ReturnsVoid
-  | ReturnsPrim     PrimRep
-  | ReturnsTuple
-
--- Some PrimOps need not return a manifest primitive or algebraic value
--- (i.e. they might return a polymorphic value).  These PrimOps *must*
--- be out of line, or the code generator won't work.
-
-getPrimOpResultInfo :: PrimOp -> PrimOpResultInfo
-getPrimOpResultInfo op
-  = case (primOpInfo op) of
-      Compare _ _                         -> ReturnsPrim IntRep
-      GenPrimOp _ _ _ ty | isPrimTyCon tc -> case tyConPrimRep tc of
-                                               [] -> ReturnsVoid
-                                               [rep] -> ReturnsPrim rep
-                                               _ -> pprPanic "getPrimOpResultInfo" (ppr op)
-                         | isUnboxedTupleTyCon tc -> ReturnsTuple
-                         | otherwise      -> pprPanic "getPrimOpResultInfo" (ppr op)
-                         where
-                           tc = tyConAppTyCon ty
-                        -- All primops return a tycon-app result
-                        -- The tycon can be an unboxed tuple or sum, though,
-                        -- which gives rise to a ReturnAlg
+-- Will crash for primops with representation or levity polymorphic result types
+getPrimOpResultKind:: PrimOp -> Kind
+getPrimOpResultKind op
+  = case primOpInfo op of
+      Compare _ _ -> typeKind intPrimTy
+      GenPrimOp _ _ _ ty -> typeKind ty
 
 {-
 We do not currently make use of whether primops are commutable.

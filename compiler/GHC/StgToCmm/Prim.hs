@@ -31,6 +31,7 @@ import GHC.StgToCmm.Prof ( costCentreFrom )
 
 import GHC.Types.Basic
 import GHC.Types.Literal.Floating
+import GHC.Types.RepType (kindPrimRep_maybe)
 import GHC.Cmm.BlockId
 import GHC.Cmm.Graph
 import GHC.Stg.Syntax
@@ -858,9 +859,11 @@ emitPrimOp cfg primop =
   WriteByteArrayOp_Word8AsWord64 -> \args -> inlinePrimop $ \res ->
     doWriteByteArrayOp Nothing b8 res args
 
-  -- TODO: make these inline
-  LazyOp -> \args -> externalPrimop primop args
-  UnlazyOp -> \args -> externalPrimop primop args
+  ToLazyOp -> \args -> externalPrimop primop args
+  FromLazyOp -> \[addr] -> inlinePrimop $ \[res] -> do
+    platform <- getPlatform
+    _ <- withSequel (AssignTo [res] False) (emitEnter addr)
+    emitAssign (CmmLocal res) (cmmUntag platform (CmmReg (CmmLocal res)))
 
 -- Copying and setting byte arrays
   CopyByteArrayOp -> \[src,src_off,dst,dst_off,n] -> inlinePrimop $ \[] ->
@@ -1859,7 +1862,6 @@ emitPrimOp cfg primop =
  where
   profile  = stgToCmmProfile  cfg
   platform = stgToCmmPlatform cfg
-  result_info = getPrimOpResultInfo primop
 
   opNop :: [CmmExpr] -> PrimopCmmEmit
   opNop args = inlinePrimop $ \[res] -> emitAssign (CmmLocal res) arg
@@ -1913,15 +1915,10 @@ emitPrimOp cfg primop =
   inlinePrimopWithReturnType f = PrimopCmmEmit
     { primopCmmInline = True
     , primopCmmCode = \res_ty -> do
-        regs <- case result_info of
-          ReturnsVoid -> pure []
-          ReturnsPrim rep
-            -> do reg <- newTemp (primRepCmmType platform rep)
-                  pure [reg]
-
-          ReturnsTuple
-            -> do (regs, _hints) <- newUnboxedTupleRegs res_ty
-                  pure regs
+        regs <-
+          case kindPrimRep_maybe (getPrimOpResultKind primop) of
+            Nothing -> panic "Primop result kind has no runtime representation!"
+            Just reps -> mapM (newTemp . primRepCmmType platform) reps
         f res_ty regs
         emitReturn (map (CmmReg . CmmLocal) regs)
     }
