@@ -535,4 +535,5 @@ import GHC.Types hiding (
   Sum62#,
   Sum63#,
   Sum64#,
+  UnusedType,
   )
