@@ -6978,6 +6978,8 @@ module GHC.Types where
   type UnliftedRep = BoxedRep Unlifted
   type UnliftedType :: *
   type UnliftedType = TYPE UnliftedRep
+  type UnusedType :: forall k0. Symbol -> k0
+  type family UnusedType k1 where
   type VecCount :: *
   data VecCount = Vec2 | Vec4 | Vec8 | Vec16 | Vec32 | Vec64
   type VecElem :: *
