@@ -9,7 +9,7 @@ module GHC.Unit.Module.Env
    , alterModuleEnv
    , partitionModuleEnv
    , moduleEnvKeys, moduleEnvElts, moduleEnvToList
-   , unitModuleEnv, isEmptyModuleEnv
+   , unitModuleEnv, isEmptyModuleEnv, sizeModuleEnv
    , extendModuleEnvWith, filterModuleEnv, mapMaybeModuleEnv
 
      -- * ModuleName mappings
@@ -175,6 +175,9 @@ unitModuleEnv m x = ModuleEnv (Map.singleton (NDModule m) x)
 
 isEmptyModuleEnv :: ModuleEnv a -> Bool
 isEmptyModuleEnv (ModuleEnv e) = Map.null e
+
+sizeModuleEnv :: ModuleEnv a -> Int
+sizeModuleEnv (ModuleEnv e) = Map.size e
 
 -- | A set of 'Module's
 type ModuleSet = Set NDModule

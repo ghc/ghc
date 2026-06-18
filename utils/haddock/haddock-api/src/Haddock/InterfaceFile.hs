@@ -40,6 +40,7 @@ import Data.Coerce (coerce)
 import Data.Function ((&))
 import Data.IORef
 import Data.Map (Map)
+import Data.Maybe (fromMaybe)
 import Data.Version
 import Data.Word
 import GHC hiding (NoLink)
@@ -50,7 +51,9 @@ import GHC.Iface.Type (IfaceType, putIfaceType)
 import GHC.Types.Name.Cache
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
+import GHC.Types.Name.Env
 import GHC.Unit.State
+import GHC.Unit.Module.Env
 import GHC.Utils.Binary
 import Haddock.Types
 import Text.ParserCombinators.ReadP (readP_to_S)
@@ -171,7 +174,7 @@ writeInterfaceFile filename iface = do
 
   -- Make some intial state
   symtab_next <- newFastMutInt 0
-  symtab_map <- newIORef emptyUFM
+  symtab_map <- newIORef (emptyNameEnv, emptyModuleEnv)
   let bin_symtab =
         BinSymbolTable
           { bin_symtab_next = symtab_next
@@ -211,8 +214,8 @@ writeInterfaceFile filename iface = do
 
   -- write the symbol table itself
   symtab_next' <- readFastMutInt symtab_next
-  symtab_map' <- readIORef symtab_map
-  putSymbolTable bh symtab_next' symtab_map'
+  (_, symtab_tbl') <- readIORef symtab_map
+  putSymbolTable bh symtab_next' symtab_tbl'
 
   -- write the dictionary pointer at the fornt of the file
   dict_p <- tellBinWriter bh
@@ -269,20 +272,30 @@ putName
   bh
   name =
     do
-      symtab_map <- readIORef symtab_map_ref
-      case lookupUFM symtab_map name of
-        Just (off, _) -> put_ bh (fromIntegral off :: Word32)
+      (symtab_map, symtab_tbl) <- readIORef symtab_map_ref
+      case lookupNameEnv symtab_map name of
+        Just off -> put_ bh (fromIntegral off :: Word32)
         Nothing -> do
-          off <- readFastMutInt symtab_next
-          writeFastMutInt symtab_next (off + 1)
-          writeIORef symtab_map_ref $!
-            addToUFM symtab_map name (off, name)
+          off <- freshIndex
+          let mod' = nameModule name
+          let mod_nms = fromMaybe [] (lookupModuleEnv symtab_tbl mod')
+
+          let !symtab_map' = extendNameEnv symtab_map name off
+          let !symtab_tbl' = extendModuleEnv symtab_tbl mod' ((off, name):mod_nms)
+          writeIORef symtab_map_ref $! (symtab_map', symtab_tbl')
           put_ bh (fromIntegral off :: Word32)
+  where
+    freshIndex :: IO Int
+    freshIndex = do
+      off <- readFastMutInt symtab_next
+      writeFastMutInt symtab_next (off + 1)
+      return off
 
 data BinSymbolTable = BinSymbolTable
   { bin_symtab_next :: !FastMutInt -- The next index to use
-  , bin_symtab_map :: !(IORef (UniqFM Name (Int, Name)))
-  -- indexed by Name
+  , bin_symtab_map :: !(IORef (NameEnv Int, ModuleEnv [(Int, Name)]))
+  -- ^ Deduplication indexed by Name
+  -- ; Group table data by module for serialization
   }
 
 putFastString :: BinDictionary -> WriteBinHandle -> FastString -> IO ()

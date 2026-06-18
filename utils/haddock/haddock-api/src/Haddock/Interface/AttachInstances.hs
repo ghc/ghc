@@ -251,10 +251,12 @@ attachToExportItem cls_index fam_index index expInfo getInstDoc getFixity getIns
             }
         where
           fixities :: [(Name, Fixity)]
-          !fixities = force . Map.toList $ List.foldl' f Map.empty all_names
+          -- Use DNameEnv to guarantee a deterministic output regardless of the
+          -- uniques assigned to each_name e.g. off of the interface file.
+          !fixities = force . eltsDNameEnv $ List.foldl' f emptyDNameEnv all_names
 
-          f :: Map.Map Name Fixity -> Name -> Map.Map Name Fixity
-          f !fs n = Map.alter (<|> getFixity n) n fs
+          f :: DNameEnv (Name, Fixity) -> Name -> DNameEnv (Name, Fixity)
+          f !fs n = alterDNameEnv (<|> ((,) n <$> getFixity n)) fs n
 
           patsyn_names :: [Name]
           patsyn_names = concatMap (getMainDeclBinder emptyOccEnv . fst) patsyns
