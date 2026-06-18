@@ -210,6 +210,7 @@ getTables name_cache bh = do
     ud <- unsafeInterleaveIO (readIORef bhRef)
 
     fsReaderTable <- initFastStringReaderTable
+    moduleReaderTable <- initModuleReaderTable
     nameReaderTable <- initNameReaderTable name_cache
     ifaceTypeReaderTable <- initReadIfaceTypeTable ud
 
@@ -229,6 +230,7 @@ getTables name_cache bh = do
       --
       -- See Note [Order of deduplication tables during iface binary serialisation] for details.
       [ decodeReaderTable fsReaderTable
+      , decodeReaderTable moduleReaderTable
       , decodeReaderTable nameReaderTable
       , decodeReaderTable ifaceTypeReaderTable
       ]
@@ -279,11 +281,13 @@ putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface =
 -- This segment should be read using `getWithUserData`.
 putWithUserData :: Binary a => TraceBinIFace -> CompressionIFace -> WriteBinHandle -> a -> IO ()
 putWithUserData traceBinIface compressionLevel bh payload = do
-  (name_count, fs_count, ifacetype_count, _b) <- putWithTables compressionLevel bh (\bh' -> put bh' payload)
+  (mod_count, name_count, fs_count, ifacetype_count, _b) <- putWithTables compressionLevel bh (\bh' -> put bh' payload)
 
   case traceBinIface of
     QuietBinIFace         -> return ()
     TraceBinIFace printer -> do
+       printer (text "writeBinIface:" <+> int mod_count
+                                      <+> text "Modules")
        printer (text "writeBinIface:" <+> int name_count
                                       <+> text "Names")
        printer (text "writeBinIface:" <+> int fs_count
@@ -296,20 +300,23 @@ putWithUserData traceBinIface compressionLevel bh payload = do
 -- 1. setup the given BinHandle with Name/FastString/IfaceType table handling
 -- 2. write the following
 --    - FastString table pointer
+--    - Module table pointer
 --    - Name table pointer
 --    - IfaceType table pointer
 --    - payload
 --    - IfaceType table
 --    - Name table
+--    - Module table
 --    - FastString table
 --
--- It returns (number of names, number of FastStrings, number of IfaceTypes, payload write result)
+-- It returns (number of modules, number of names, number of FastStrings, number of IfaceTypes, payload write result)
 --
 -- See Note [Order of deduplication tables during iface binary serialisation]
-putWithTables :: CompressionIFace -> WriteBinHandle -> (WriteBinHandle -> IO b) -> IO (Int, Int, Int, b)
+putWithTables :: CompressionIFace -> WriteBinHandle -> (WriteBinHandle -> IO b) -> IO (Int, Int, Int, Int, b)
 putWithTables compressionLevel bh' put_payload = do
   -- Initialise deduplicating tables.
   (fast_wt, fsWriter) <- initFastStringWriterTable
+  (mod_wt, modWriter) <- initModuleWriterTable
   (name_wt, nameWriter) <- initNameWriterTable
   (ifaceType_wt, ifaceTypeWriter) <- initWriteIfaceType compressionLevel
 
@@ -320,6 +327,7 @@ putWithTables compressionLevel bh' put_payload = do
   -- avoid overwriting existing writers of other types in bh'.
   let bh =
         addWriterToUserData fsWriter
+          $ addWriterToUserData modWriter
           $ addWriterToUserData nameWriter
           -- We sometimes serialise binding and non-binding names differently, but
           -- not during 'ModIface' serialisation. Here, we serialise both to the same
@@ -330,14 +338,14 @@ putWithTables compressionLevel bh' put_payload = do
             (mkWriter $ \bh name -> putEntry nameWriter bh $ getBindingName name)
           $ addWriterToUserData ifaceTypeWriter bh'
 
-  ([fs_count, name_count, ifacetype_count] , r) <-
+  ([fs_count, mod_count, name_count, ifacetype_count] , r) <-
     -- The order of these entries matters!
     --
     -- See Note [Order of deduplication tables during iface binary serialisation] for details.
-    putAllTables bh [fast_wt, name_wt, ifaceType_wt] $ do
+    putAllTables bh [fast_wt, mod_wt, name_wt, ifaceType_wt] $ do
       put_payload bh
 
-  return (name_count, fs_count, ifacetype_count, r)
+  return (mod_count, name_count, fs_count, ifacetype_count, r)
 
 -- | Write all deduplication tables to disk after serialising the
 -- main payload.
@@ -570,8 +578,12 @@ that the deduplication table for 'IfaceType' exists when forced.
 -}
 
 -- -----------------------------------------------------------------------------
--- The symbol table
---
+-- * The deduplication symbol tables
+-- -----------------------------------------------------------------------------
+
+-- -----------------------------------------------------------------------------
+-- ** IfaceType table
+-- -----------------------------------------------------------------------------
 
 initReadIfaceTypeTable :: ReaderUserData -> IO (ReaderTable IfaceType)
 initReadIfaceTypeTable ud = do
@@ -608,6 +620,9 @@ initWriteIfaceType compressionLevel = do
 
     literalIfaceTypeSerialiser = putIfaceType
 
+-- -----------------------------------------------------------------------------
+-- ** Name table
+-- -----------------------------------------------------------------------------
 
 initNameReaderTable :: NameCache -> IO (ReaderTable Name)
 initNameReaderTable cache = do
@@ -662,8 +677,7 @@ getSymbolTable bh name_cache = do
     -- create an array of Names for the symbols and add them to the NameCache
     updateNameCache' name_cache $ \cache0 -> do
         mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int Name)
-        cache <- foldGet' (fromIntegral sz) bh cache0 $ \i (uid, mod_name, occ) cache -> do
-          let mod = mkModule uid mod_name
+        cache <- foldGet' (fromIntegral sz) bh cache0 $ \i (mod{-Binary Module uses dedup table!-}, occ) cache -> do
           case lookupOrigNameCache cache mod occ of
             Just name -> do
               writeArray mut_arr (fromIntegral i) name
@@ -680,7 +694,7 @@ getSymbolTable bh name_cache = do
 serialiseName :: WriteBinHandle -> Name -> UniqFM key (Int,Name) -> IO ()
 serialiseName bh name _ = do
     let mod = assertPpr (isExternalName name) (ppr name) (nameModule name)
-    put_ bh (moduleUnit mod, moduleName mod, nameOccName name)
+    put_ bh (mod{-Binary Module uses dedup table!-}, nameOccName name)
 
 
 -- Note [Symbol table representation of names]
@@ -745,3 +759,40 @@ getSymtabName symtab bh = do
                       Just n  -> n
 
       _ -> pprPanic "getSymtabName:unknown name tag" (ppr i)
+
+-- -----------------------------------------------------------------------------
+-- ** Module table
+-- -----------------------------------------------------------------------------
+
+initModuleReaderTable :: IO (ReaderTable Module)
+initModuleReaderTable = do
+  pure $
+    ReaderTable
+      { getTable = getGenericSymbolTable (lazyGet' deserializeModule)
+      , mkReaderFromTable = \tbl -> mkReader (getGenericSymtab tbl)
+      }
+
+initModuleWriterTable :: IO (WriterTable, BinaryWriter Module)
+initModuleWriterTable = do
+  sym_tab <- initGenericSymbolTable @(Map Module)
+  pure
+    ( WriterTable
+        { putTable = putGenericSymbolTable sym_tab (lazyPut' serializeModule)
+        }
+    , mkWriter $ putGenericSymTab sym_tab
+    )
+
+-- | Serialize a module directly.
+-- INTERNAL! Always prefer the `Binary Module` instance which uses a
+-- deduplication table.
+serializeModule :: WriteBinHandle -> Module -> IO ()
+serializeModule bh (Module p n) = put_ bh p >> put_ bh n
+
+-- | Deserialize a module directly.
+-- INTERNAL! Always prefer the `Binary Module` instance which uses a
+-- deduplication table.
+deserializeModule :: ReadBinHandle -> IO Module
+deserializeModule bh =
+  -- Module has strict fields, so use $! in order not to allocate a thunk
+  do p <- get bh; n <- get bh; return $! Module p n
+

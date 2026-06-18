@@ -136,10 +136,13 @@ mkModule = Module
 instance Uniquable Module where
   getUnique (Module p n) = getUnique (unitFS p `appendFS` moduleNameFS n)
 
-instance Binary a => Binary (GenModule a) where
-  put_ bh (Module p n) = put_ bh p >> put_ bh n
-  -- Module has strict fields, so use $! in order not to allocate a thunk
-  get bh = do p <- get bh; n <- get bh; return $! Module p n
+instance Binary Module where
+  put_ bh mod =
+    case findUserDataWriter Proxy bh of
+      tbl -> putEntry tbl bh mod
+  get bh =
+    case findUserDataReader Proxy bh of
+      tbl -> getEntry tbl bh
 
 instance NFData (GenModule a) where
   rnf (Module unit name) = unit `seq` name `seq` ()
