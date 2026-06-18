@@ -639,3 +639,5 @@ test('T25280', [unless(opsys('linux'),skip),req_process,js_skip], compile_and_ru
 test('T25560', [req_c_rts, ignore_stderr], compile_and_run, [''])
 
 test('TestProddableBlockSet', [req_c_rts], multimod_compile_and_run, ['TestProddableBlockSet.c', '-no-hs-main'])
+
+test('T27123', [when(have_profiling(), extra_ways(['prof']))], compile_and_run, ['-O -package ghc'])

@@ -99,12 +99,14 @@ again:
     W_  info;
     P_ untaggedfun;
     W_ arity;
+    W_ closure_type;
     // We must obey the correct heap object observation pattern in
     // Note [Heap memory barriers] in SMP.h.
     untaggedfun = UNTAG(fun);
     info = %INFO_PTR(untaggedfun);
+    closure_type = TO_W_( %INFO_TYPE(%STD_INFO(info)) );
     switch [INVALID_OBJECT .. N_CLOSURE_TYPES]
-        (TO_W_( %INFO_TYPE(%STD_INFO(info)) )) {
+        (closure_type) {
         case
             IND,
             IND_STATIC:
@@ -212,10 +214,17 @@ again:
             // We can't use the value of 'info' any more, because if
             // STK_CHK_GEN() did a GC then the closure we're looking
             // at may have changed, e.g. a THUNK_SELECTOR may have
-            // been evaluated by the GC.  So we reload the info
-            // pointer now.
+            // been evaluated by the GC.
+            // We always reload the info pointer now. And if
+            // the closure type changed we need to take a different case
+            // alt altogether so we retry from the start in that case.
+
             untaggedfun = UNTAG(fun);
             info = %INFO_PTR(untaggedfun);
+            if(closure_type != TO_W_( %INFO_TYPE(%STD_INFO(info)) ) )
+            {
+              goto again;
+            }
 
             jump %ENTRY_CODE(info)
                 (stg_restore_cccs_eval_info, CCCS)
