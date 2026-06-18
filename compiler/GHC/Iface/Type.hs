@@ -7,7 +7,7 @@ This module defines interface types and binders
 -}
 
 
-{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE MultiWayIf, OverloadedRecordDot #-}
 module GHC.Iface.Type (
         IfExtName,
         IfLclName(..), mkIfLclName, ifLclNameFS,
@@ -1740,6 +1740,7 @@ pprTyTcApp ctxt_prec tc tys =
     sdocOption sdocPrintExplicitKinds $ \print_kinds ->
     sdocOption sdocPrintTypeAbbreviations $ \print_type_abbreviations ->
     getPprDebug $ \debug ->
+    getPprStyle $ \style ->
 
     if | ifaceTyConName tc `hasKey` ipClassKey
        , IA_Arg (IfaceLitTy (IfaceStrTyLit n))
@@ -1791,6 +1792,14 @@ pprTyTcApp ctxt_prec tc tys =
        | Just doc <- ppr_equality ctxt_prec tc (appArgsIfaceTypes tys)
        -> doc
 
+       -- See Note [The types Any and UnusedType], specifically (Any6) and (Any7)
+       | ifaceTyConName tc `hasKey` unusedTypeTyConKey
+       , ((arg_k, _) : (IfaceLitTy (IfaceStrTyLit arg_nm), _) : args_usr)
+         <- appArgsIfaceTypesForAllTyFlags tys
+         -- if arg_k is a kind with more than 0 arguments, then _ might not be [] here
+       , userStyle style
+       -> ppr_iface_unused_ty_tycon ctxt_prec arg_k arg_nm args_usr
+
        | otherwise
        -> ppr_iface_tc_app ppr_app_arg ctxt_prec tc $
           appArgsIfaceTypesForAllTyFlags $ stripInvisArgs (PrintExplicitKinds print_kinds) tys
@@ -1801,6 +1810,23 @@ ppr_kind_type :: PprPrec -> SDoc
 ppr_kind_type ctxt_prec = sdocOption sdocStarIsType $ \case
    False -> pprPrefixOcc liftedTypeKindTyConName
    True  -> maybeParen ctxt_prec starPrec starLit
+
+-- | user-style printer that pretty-prints an 'UnusedType @k "foo_3" to foo_3.
+-- If -fprint-explicit-kinds or -fprint-explicit-runtime-reps are set, instead
+-- prints them to (foo3 :: k).
+-- See Note [The types Any and UnusedType], specifically (Any6) and (Any7) for why this is useful.
+ppr_iface_unused_ty_tycon :: PprPrec -> IfaceType -> LexicalFastString -> [(IfaceType, ForAllTyFlag)] -> SDoc
+ppr_iface_unused_ty_tycon ctxt_prec arg_k arg_nm args_usr
+  = sdocOption sdocPrintExplicitKinds       $ \print_kinds ->
+    sdocOption sdocPrintExplicitRuntimeReps $ \print_reps  ->
+      if print_kinds || print_reps
+      then prettyMeta $ \nm ->
+             maybeParen sig_prec sigPrec $ nm <+> text "::" <+> pprIfaceType arg_k
+      else prettyMeta id
+  where sig_prec = if null args_usr then ctxt_prec else appPrec
+        prettyMeta add_ty
+          = pprIfacePrefixApp ctxt_prec (add_ty $ ppr arg_nm)
+          $ map (ppr_app_arg appPrec) args_usr
 
 -- | Pretty-print a type-level equality.
 -- Returns (Just doc) if the argument is a /saturated/ application
@@ -2190,7 +2216,8 @@ instance Binary IfaceTyConSort where
          0 -> return IfaceNormalTyCon
          1 -> IfaceTupleTyCon <$> get bh <*> get bh
          2 -> IfaceSumTyCon <$> get bh
-         _ -> return IfaceEqualityTyCon
+         3 -> return IfaceEqualityTyCon
+         _ -> panic "get IfaceTyConSort"
 
 instance Binary IfaceTyConInfo where
    put_ bh (IfaceTyConInfo i s) = put_ bh i >> put_ bh s

@@ -35,6 +35,7 @@ module GHC.Internal.Types (
         SPEC(..),
         Symbol,
         Any,
+        UnusedType,
 
         -- * Type equality
         type (~), type (~~), Coercible,
@@ -283,48 +284,53 @@ data Symbol
 *                                                                      *
 ********************************************************************* -}
 
--- | The type constructor @Any :: forall k. k@ is a type to which you can unsafely coerce any type, and back.
+-- | The type constructor @Any :: forall k. k@ allows creating an arbitrary type
+-- of the given kind.
 --
--- For @unsafeCoerce@ this means for all lifted types @t@ that
--- @unsafeCoerce (unsafeCoerce x :: Any) :: t@ is equivalent to @x@ and safe.
+-- It can be used to create a placeholder type when you only have a kind in hand.
 --
--- The same is true for *all* types when using
--- @
---   unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
---                   (a :: TYPE r1) (b :: TYPE r2).
---                   a -> b
--- @
--- but /only/ if you instantiate @r1@ and @r2@ to the /same/ runtime representation.
--- For example using @(unsafeCoerce# :: forall (a :: TYPE IntRep) (b :: TYPE IntRep). a -> b) x@
--- is fine, but @(unsafeCoerce# :: forall (a :: TYPE IntRep) (b :: TYPE FloatRep). a -> b)@
--- will likely cause seg-faults or worse.
--- For this resason, users should always prefer unsafeCoerce over unsafeCoerce# when possible.
+-- You can use 'unsafeCoerce#' to unsafely coerce a value from @ty :: k@ to @Any \@k@
+-- and back. As per the documentation of 'unsafeCoerce#', this is only sound if both
+-- sides have the __exact same__runtime representation. Some examples:
 --
--- Here are some more examples:
 -- @
---    bad_a1 :: Any @(TYPE 'IntRep)
---    bad_a1 = unsafeCoerce# True
+--    unsafeCoerce# True :: (Any :: Type)                -- OK
+--    unsafeCoerce# (1# :: Int#) :: (Any :: TYPE IntRep) -- OK
+--    unsafeCoerce# True :: (Any :: Type IntRep)         -- INVALID
+--    unsafeCoerce  True :: (Any :: UnliftedType)        -- INVALID
+--    unsafeCoerce  (ba :: ByteArray#) :: (Any :: Type)  -- INVALID
+-- @
 --
---    bad_a2 :: Any @(TYPE ('BoxedRep 'UnliftedRep))
---    bad_a2 = unsafeCoerce# True
--- @
--- Here @bad_a1@ is bad because we started with @True :: (Bool :: Type)@, represented by a boxed heap pointer,
--- and coerced it to @a1 :: Any @(TYPE 'IntRep)@, whose representation is a non-pointer integer.
--- That's why we had to use `unsafeCoerce#`; it is really unsafe because it can change representations.
--- Similarly @bad_a2@ is bad because although both @True@ and @bad_a2@ are represented by a heap pointer,
--- @True@ is lifted but @bad_a2@ is not; bugs here may be rather subtle.
+-- To avoid accidentally unsafe-coercing between different representations,
+-- it is recommended to:
+--  - use explicit type annotations or type applications at every use-site
+--    of 'unsafeCoerce#'
+--  - use representation-monomorphic variants such as 'unsafeCoerce' or
+--    'unsafeCoerceUnlifted'.
 --
--- If you must use unsafeCoerce# to cast to `Any`, type annotations are recommended
--- to make sure that @Any@ has the correct kind. As casting between different runtimereps is
--- unsound. For example to cast a @ByteArray#@ to @Any@ you might use:
--- @
---    unsafeCoerce# b :: (Any :: TYPE ('BoxedRep 'Unlifted))
--- @
+-- In particular, this also implies it is safe to round-trip unsafe-coercion via 'Any',
+-- as long as the kinds line up e.g. @unsafeCoerce (unsafeCoerce (val :: a) :: 'Any') :: a@
+-- is safe in that way.
 type family Any :: k where { }
--- See Note [Any types] in GHC.Builtin.Types. Also, for a bit of history on Any see
+-- See Note [The types Any and UnusedType] in GHC.Builtin.Types. Also, for a bit of history on Any see
 -- #10886. Note that this must be a *closed* type family: we need to ensure
 -- that this can't reduce to a `data` type for the results discussed in
--- Note [Any types].
+-- Note [The types Any and UnusedType].
+--
+
+-- | @UnusedType \@k "foo"@ denotes an arbitrary type of kind
+-- @k@ and is pretty-printed as @foo@ .
+--
+-- This type is used internally by GHC to fill in otherwise
+-- unconstrained type variables, such as @a@ in @length \@a []@.
+-- It is exported purely for documentation purposes.
+--
+-- You shouldn't ever see this type in the compiler's output if
+-- you don't specifically ask for it, for instance when viewing
+-- core, since the compiler will try hard to output a given
+-- @'UnusedType' "m_0"@ simply as @m_0@.
+type family UnusedType :: Symbol -> k where { }
+-- See Note [The types Any and UnusedType] in GHC.Builtin.Types.
 
 {- *********************************************************************
 *                                                                      *
