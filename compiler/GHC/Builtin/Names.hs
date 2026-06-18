@@ -1997,8 +1997,8 @@ unsatisfiableClassNameKey = mkPreludeTyConUnique 170
 anyTyConKey :: Unique
 anyTyConKey = mkPreludeTyConUnique 171
 
-zonkAnyTyConKey :: Unique
-zonkAnyTyConKey = mkPreludeTyConUnique 172
+unusedTypeTyConKey :: Unique
+unusedTypeTyConKey = mkPreludeTyConUnique 172
 
 -- Custom user type-errors
 errorMessageTypeErrorFamKey :: Unique

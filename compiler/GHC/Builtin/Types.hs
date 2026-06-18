@@ -93,7 +93,7 @@ module GHC.Builtin.Types (
         cTupleSelId, cTupleSelIdName,
 
         -- * Any
-        anyTyCon, anyTy, anyTypeOfKind, zonkAnyTyCon,
+        anyTyCon, anyTy, anyTypeOfKind, unusedTypeTyCon,
 
         -- * Recovery TyCon
         makeRecoveryTyCon,
@@ -298,7 +298,7 @@ wiredInTyCons :: [TyCon]
 
 wiredInTyCons = map (dataConTyCon . snd) boxingDataCons
              ++ [ anyTyCon
-                , zonkAnyTyCon
+                , unusedTypeTyCon
                 , boolTyCon
                 , charTyCon
                 , stringTyCon
@@ -408,58 +408,89 @@ doubleDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "D#")     
 -- Any
 
 {-
-Note [Any types]
-~~~~~~~~~~~~~~~~
-The type constructors `Any` and `ZonkAny` are closed type families declared thus:
+Note [The types Any and UnusedType]
+~~~~~~~~~~~~~~~~ ~~~~~~~~~~~~~~~~~~
+The type constructors `Any` and `UnusedType` are closed type families declared as:
 
-    type family Any     :: forall k.        k where { }
-    type family ZonkAny :: forall k. Nat -> k where { }
+    type family Any        :: forall k.           k where { }
+    type family UnusedType :: forall k. Symbol -> k where { }
 
 They are used when we want a type of a particular kind, but we don't really care
-what that type is.  The leading example is this: `ZonkAny` is used to instantiate
-un-constrained type variables after type checking. For example, consider the
-term (length [] :: Int), where
+what that type is. The leading example that is relevant for GHC itself is this:
 
-  length :: forall a. [a] -> Int
-  []     :: forall a. [a]
+    `UnusedType` is used to instantiate unconstrained type variables after type
+    checking. For example, consider the term (length [] :: Int), where
 
-We must type-apply `length` and `[]`, but to what type? It doesn't matter!
-The typechecker will end up with
+      length :: forall a. [a] -> Int
+      []     :: forall a. [a]
 
-  length @alpha ([] @alpha)
+    We must type-apply `length` and `[]`, but to what type? It doesn't matter!
+    The typechecker will end up with
 
-where `alpha` is an un-constrained unification variable.  The "zonking" process zaps
-that unconstrained `alpha` to an arbitrary type (ZonkAny @Type 3), where the `3` is
-arbitrary (see wrinkle (Any5) below).  This is done in `GHC.Tc.Zonk.Type.commitFlexi`.
-So we end up with
+      length @alpha ([] @alpha)
 
-  length @(ZonkAny @Type 3) ([] @(ZonkAny @Type 3))
+    where `alpha` is an unconstrained unification variable.  The "zonking" process
+    zaps that unconstrained `alpha` to an arbitrary type (UnusedType @Type "a_3"),
+    where the `3` is arbitrary (see wrinkle (Any3) below) and "a" is the name string
+    of the meta variable. This is done in `GHC.Tc.Zonk.Type.commitFlexi`.
+    So we end up with
 
-`Any` and `ZonkAny` differ only in the presence of the `Nat` argument; see
-wrinkle (Any4).
+      length @(UnusedType @Type "a_3") ([] @(UnusedType @Type "a_3"))
 
-Wrinkles:
+`Any` and `UnusedType` differ only in the presence of the `Symbol` argument; see (Any6).
 
-(Any1) `Any` and `ZonkAny` are kind polymorphic since in some program we may
-   need to use `ZonkAny` to fill in a type variable of some kind other than *
-   (see #959 for examples).
-
-(Any2) They are /closed/ type families, with no instances.  For example, suppose that
+(Any1) They are /closed/ type families, with no instances.  For example, suppose that
    with  alpha :: '(k1, k2)  we add a given coercion
              g :: alpha ~ (Fst alpha, Snd alpha)
-   and we zonked alpha = ZonkAny @(k1,k2) n.  Then, if `ZonkAny` was a /data/ type,
-   we'd get inconsistency because we'd have a Given equality with `ZonkAny` on one
+   and we zonked alpha = UnusedType @(k1,k2) n.  Then, if `UnusedType` was a /data/ type,
+   we'd get inconsistency because we'd have a Given equality with `UnusedType` on one
    side and '(,) on the other. See also #9097 and #9636.
 
-   See #25244 for a suggestion that we instead use an /open/ type family for which
-   you cannot provide instances.  Probably the difference is not very important.
+   They are not /data/ types, and that's important for the code generator,
+   because the code gen may enter a data value.
 
-(Any3) They do not claim to be /data/ types, and that's important for
-   the code generator, because the code gen may /enter/ a data value
-   but never enters a function value.
+   A closed type family with no equations behaves differently than an open type
+   family with no equations due to Note [Insoluble fundeps] IFD0 in
+   GHC.Tc.Solver.FunDeps, so it was argued in #25244 that perhaps 'Any' should
+   rather be an open type family for which new equations cannot be written.
 
-(Any4) `ZonkAny` takes a `Nat` argument so that we can readily make up /distinct/
-   types (#24817).  Consider
+(Any2) `Any` and `UnusedType` are kind polymorphic since in some programs we may
+   need to use `UnusedType` to fill in a type variable of some kind other than Type
+   e.g. TYPE r for some r, or types of the form _ -> Type.
+
+(Any3) `Any` and `UnusedType` are wired-in so we can easily refer to them where we
+    don't have a name environment.
+
+(Any4) User facing aspects of the types Any and UnusedType:
+
+   `Any` is defined in ghc-internal:GHC.Internal.Types, and exported. `Any`
+    is available to users because it is a useful type in userspace and is thus
+    re-exported from base:GHC.Exts.
+
+    `UnusedType` is exported mainly for documentation in case a user stumbles over
+    it in debug output of GHC.
+
+    The key property of 'Any' is that it is safe to coerce a type to 'Any' as long
+    as the representation is unchanged. That is, it is OK to use 'unsafeCoerce#' to
+    go from 'ty :: TYPE r' to 'Any :: TYPE r' and back.
+    This can be useful when e.g. implementing dependent maps or similar typed
+    container types, storing values of type `Any`.
+
+(Any5) Warnings about unused bindings of type `Any` and `UnusedType` are suppressed,
+    following the same rationale of supressing warning about the unit type.
+
+    For example, consider (#25895):
+
+      do { forever (return ()); blah }
+
+    where forever :: forall a b. IO a -> IO b
+    Nothing constrains `b`, so it will be instantiated with `Any` or `UnusedType`.
+    But we certainly don't want to complain about a discarded do-binding.
+
+(Any6) Wrinkle - Pattern match checking.
+
+   The first reason why `UnusedType` takes a `Symbol` argument is that
+   we can readily make up /distinct/ types (#24817) for the Pmc.  Consider
 
      data SBool a where { STrue :: SBool True; SFalse :: SBool False }
 
@@ -473,53 +504,33 @@ Wrinkles:
    Now, what are `alpha` and `beta`? If we zonk both of them to the same type
    `Any @Type`, the pattern-match checker will (wrongly) report that the first
    branch is inaccessible.  So we zonk them to two /different/ types:
-       alpha :=  ZonkAny @Type 4   and   beta :=  ZonkAny @Type k 5
+       alpha :=  UnusedType @Type "a_4"  and   beta :=  UnusedType @Type k "b_5"
    (The actual numbers are arbitrary; they just need to differ.)
 
    The unique-name generation comes from field `tcg_zany_n` of `TcGblEnv`; and
-   `GHC.Tc.Zonk.Type.commitFlexi` calls `GHC.Tc.Utils.Monad.newZonkAnyType` to
+   `GHC.Tc.Zonk.Type.commitFlexi` calls `GHC.Tc.Utils.Monad.newUnusedTypeType` to
    make up a fresh type.
 
    If this example seems unconvincing (e.g. in this case foo must be bottom)
    see #24817 for larger but more compelling examples.
 
-(Any5) `Any` and `ZonkAny` are wired-in so we can easily refer to it where we
-    don't have a name environment (e.g. see Rules.matchRule for one example)
+(Any7) Wrinkle - Error reporting.
 
-(Any6) `Any` is defined in library module ghc-prim:GHC.Types, and exported so that
-    it is available to users.  For this reason it's treated like any other
-    wired-in type:
-      - has a fixed unique, anyTyConKey,
-      - lives in the global name cache
-    Currently `ZonkAny` is not available to users; but it could easily be.
+   There's a second reason why `UnusedType` takes a `Symbol` argument, which is that
+   we use it to neatly display zonked unfilled metavariables without leaking
+   implementation details of code generation.
 
-(Any7) Properties of `Any`:
-  * When `Any` is instantiated at a lifted type it is inhabited by at least one value,
-    namely bottom.
+   `UnusedType` is handled specially in the pretty-printer to avoid confusing
+   compiler output. For example, `UnusedType "foo_3" :: Type` is displayed as `foo_3`.
 
-  * You can safely coerce any /lifted/ type to `Any` and back with `unsafeCoerce`.
+   That special handling is implemented in GHC.Iface.Type.pprTyTcApp and more
+   specifically ppr_iface_unused_ty_tycon.
 
-  * You can safely coerce any /unlifted/ type to `Any` and back with `unsafeCoerceUnlifted`.
+   See testcase T27390 for an example of the pretty-printing in action.
 
-  * You can coerce /any/ type to `Any` and back with `unsafeCoerce#`, but it's only safe when
-    the kinds of both the type and `Any` match.
-
-  * For lifted/unlifted types `unsafeCoerce[Unlifted]` should be preferred over
-    `unsafeCoerce#` as they prevent accidentally coercing between types with kinds
-    that don't match.
-
-    See examples in ghc-prim:GHC.Types
-
-(Any8) Warning about unused bindings of type `Any` and `ZonkAny` are suppressed,
-    following the same rationale of supressing warning about the unit type.
-
-    For example, consider (#25895):
-
-     do { forever (return ()); blah }
-
-    where forever :: forall a b. IO a -> IO b
-    Nothing constrains `b`, so it will be instantiates with `Any` or `ZonkAny`.
-    But we certainly don't want to complain about a discarded do-binding.
+   Historical note: in the past, `UnusedType` was called `ZonkAny` (or `Any` before that).
+   We renamed it to `UnusedType` and added this special treatment in the pretty-printer to avoid
+   confusing mentions of zonking.
 
 The Any tycon used to be quite magic, but we have since been able to
 implement it merely with an empty kind polymorphic type family. See #10886 for a
@@ -532,7 +543,7 @@ anyTyConName =
     mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Any") anyTyConKey anyTyCon
 
 anyTyCon :: TyCon
--- See Note [Any types]
+-- See Note [The types Any and UnusedType]
 anyTyCon = mkFamilyTyCon anyTyConName binders res_kind Nothing
                          (ClosedSynFamilyTyCon Nothing)
                          Nothing
@@ -547,23 +558,23 @@ anyTy = mkTyConTy anyTyCon
 anyTypeOfKind :: Kind -> Type
 anyTypeOfKind kind = mkTyConApp anyTyCon [kind]
 
-zonkAnyTyConName :: Name
-zonkAnyTyConName =
-    mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "ZonkAny") zonkAnyTyConKey zonkAnyTyCon
+unusedTypeTyConName :: Name
+unusedTypeTyConName =
+    mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "UnusedType") unusedTypeTyConKey unusedTypeTyCon
 
-zonkAnyTyCon :: TyCon
--- ZonkAnyTyCon :: forall k. Nat -> k
--- See Note [Any types]
-zonkAnyTyCon = mkFamilyTyCon zonkAnyTyConName
-                         [ mkNamedTyConBinder Specified kv
-                         , mkAnonTyConBinder nat_kv ]
-                         (mkTyVarTy kv)
+unusedTypeTyCon :: TyCon
+-- unusedTypeTyCon :: forall k. Symbol -> k
+-- See Note [The types Any and UnusedType]
+unusedTypeTyCon = mkFamilyTyCon unusedTypeTyConName bndrs res_kind
                          Nothing
                          (ClosedSynFamilyTyCon Nothing)
                          Nothing
                          NotInjective
   where
-    [kv,nat_kv] = mkTemplateKindVars [liftedTypeKind, naturalTy]
+    [kv,sym_kv] = mkTemplateKindVars [liftedTypeKind, typeSymbolKind]
+    bndrs = [ mkNamedTyConBinder Specified kv
+            , mkAnonTyConBinder sym_kv ]
+    res_kind = mkTyVarTy kv
 
 -- | Make a fake, recovery 'TyCon' from an existing one.
 -- Used when recovering from errors in type declarations

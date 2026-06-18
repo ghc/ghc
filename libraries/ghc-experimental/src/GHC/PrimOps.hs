@@ -29,5 +29,5 @@ module GHC.PrimOps
         module GHC.Internal.Exts,
        ) where
 
-import GHC.Internal.Exts
+import GHC.Internal.Exts hiding (UnusedType)
 

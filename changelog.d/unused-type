@@ -1,0 +1,12 @@
+section: compiler
+synopsis: Rename ZonkAny to UnusedType and add pretty printing logic for it.
+issues: #27390
+mrs: !16212
+
+description: {
+  After unification, GHC fills in unconstrained type variables such as ``alpha`` in
+  ``(length :: [alpha] -> Int) ([] :: List alpha) :: Int`` with a fixed type. 
+  This type was, confusingly to the user, called ``ZonkAny``. 
+  This type is now renamed ``UnusedType``, with special pretty-printing logic to make
+  it display like an ordinary metavariable.
+}

@@ -254,6 +254,7 @@ import GHC.Types hiding (
   Type, -- Exported from "Data.Kind"
   -- GHC's internal representation of 'TyCon's, for 'Typeable'
   Module, TrName, TyCon, TypeLitSort, KindRep, KindBndr,
+  UnusedType,
   Unit#,
   Solo#(..),
   Tuple0#,
