@@ -7,7 +7,7 @@ This module defines interface types and binders
 -}
 
 
-{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE MultiWayIf, OverloadedRecordDot #-}
 {-# LANGUAGE LambdaCase #-}
 module GHC.Iface.Type (
         IfExtName,
@@ -1664,6 +1664,7 @@ pprTyTcApp ctxt_prec tc tys =
     sdocOption sdocPrintExplicitKinds $ \print_kinds ->
     sdocOption sdocPrintTypeAbbreviations $ \print_type_abbreviations ->
     getPprDebug $ \debug ->
+    getPprStyle $ \style ->
 
     if | ifaceTyConName tc `hasKey` ipClassKey
        , IA_Arg (IfaceLitTy (IfaceStrTyLit n))
@@ -1715,6 +1716,12 @@ pprTyTcApp ctxt_prec tc tys =
        | Just doc <- ppr_equality ctxt_prec tc (appArgsIfaceTypes tys)
        -> doc
 
+       | ifaceTyConName tc `hasKey` unusedTypeTyConKey
+       , (arg_k : IfaceLitTy (IfaceNumTyLit arg_n) : IfaceLitTy (IfaceStrTyLit arg_nm) : _) <- appArgsIfaceTypes tys
+         -- if arg_k is a kind with more than 0 arguments, then _ might not be [] here
+       , userStyle style
+       -> ppr_iface_unused_ty_tycon ctxt_prec arg_k arg_n arg_nm
+
        | otherwise
        -> ppr_iface_tc_app ppr_app_arg ctxt_prec tc $
           appArgsIfaceTypesForAllTyFlags $ stripInvisArgs (PrintExplicitKinds print_kinds) tys
@@ -1726,6 +1733,15 @@ ppr_kind_type ctxt_prec = sdocOption sdocStarIsType $ \case
    False -> pprPrefixOcc liftedTypeKindTyConName
    True  -> maybeParen ctxt_prec starPrec $
               unicodeSyntax (char '★') (char '*')
+
+ppr_iface_unused_ty_tycon :: PprPrec -> IfaceType -> Integer -> LexicalFastString -> SDoc
+ppr_iface_unused_ty_tycon ctxt_prec arg_k arg_n arg_nm
+  = sdocOption sdocPrintExplicitKinds       $ \print_kinds ->
+    sdocOption sdocPrintExplicitRuntimeReps $ \print_reps  ->
+      if print_kinds || print_reps
+      then maybeParen ctxt_prec sigPrec $ prettyMeta <+> text "::" <+> pprIfaceType arg_k
+      else prettyMeta
+  where prettyMeta = ppr arg_nm <> ppr arg_n
 
 -- | Pretty-print a type-level equality.
 -- Returns (Just doc) if the argument is a /saturated/ application
@@ -2113,7 +2129,8 @@ instance Binary IfaceTyConSort where
          0 -> return IfaceNormalTyCon
          1 -> IfaceTupleTyCon <$> get bh <*> get bh
          2 -> IfaceSumTyCon <$> get bh
-         _ -> return IfaceEqualityTyCon
+         3 -> return IfaceEqualityTyCon
+         _ -> panic "get IfaceTyConSort"
 
 instance Binary IfaceTyConInfo where
    put_ bh (IfaceTyConInfo i s) = put_ bh i >> put_ bh s

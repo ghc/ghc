@@ -88,7 +88,7 @@ module GHC.Tc.Utils.TcType (
   isSigmaTy, isRhoTy, isRhoExpTy, isOverloadedTy,
   isFloatingPrimTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isNaturalTy,
-  isBoolTy, isUnitTy, isCharTy,
+  isBoolTy, isUnitTy, isAnyTy, isUnusedTypeTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy,
   isPredTy, isTyVarClassPred,
   checkValidClsArgs, hasTyVarHead,
@@ -2005,7 +2005,7 @@ isFloatTy, isDoubleTy,
     isFloatPrimTy, isDoublePrimTy,
     isIntegerTy, isNaturalTy,
     isIntTy, isWordTy, isBoolTy,
-    isUnitTy, isCharTy :: Type -> Bool
+    isUnitTy, isAnyTy, isUnusedTypeTy, isCharTy :: Type -> Bool
 isFloatTy      = is_tc floatTyConKey
 isDoubleTy     = is_tc doubleTyConKey
 isFloatPrimTy  = is_tc floatPrimTyConKey
@@ -2016,6 +2016,8 @@ isIntTy        = is_tc intTyConKey
 isWordTy       = is_tc wordTyConKey
 isBoolTy       = is_tc boolTyConKey
 isUnitTy       = is_tc unitTyConKey
+isAnyTy        = is_tc anyTyConKey
+isUnusedTypeTy = is_tc unusedTypeTyConKey
 isCharTy       = is_tc charTyConKey
 
 -- | Check whether the type is of the form @Any :: k@,

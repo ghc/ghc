@@ -569,7 +569,7 @@ data TcGblEnv
           -- ^ Allows us to choose unique DFun names.
 
         tcg_zany_n :: TcRef Integer,
-          -- ^ A source of unique identities for ZonkAny instances
+          -- ^ A source of unique identities for UnusedType instances
           -- See Note [Any types] in GHC.Builtin.Types, wrinkle (Any4)
 
         tcg_merged :: [(Module, Fingerprint)],

@@ -142,7 +142,7 @@ module GHC.Tc.Utils.Monad(
   getCCIndexM, getCCIndexTcM,
 
   -- * Zonking
-  liftZonkM, newZonkAnyType,
+  liftZonkM, newUnusedType,
 
   -- * Complete matches
   localAndImportedCompleteMatches, getCompleteMatchesTcM,
@@ -156,7 +156,7 @@ import GHC.Prelude
 
 
 import GHC.Builtin.Names
-import GHC.Builtin.Types( zonkAnyTyCon )
+import GHC.Builtin.Types( unusedTypeTyCon )
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types     -- Re-export all
@@ -180,7 +180,7 @@ import GHC.Core.UsageEnv
 import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import GHC.Core.Type( mkNumLitTy )
+import GHC.Core.Type( mkNumLitTy, mkStrLitTy )
 
 import GHC.Driver.Env
 import GHC.Driver.Session
@@ -1792,17 +1792,17 @@ chooseUniqueOccTc fn =
      ; writeTcRef dfun_n_var (extendOccSet set occ)
      ; return occ }
 
-newZonkAnyType :: Kind -> TcM Type
--- Return a type (ZonkAny @k n), where n is fresh
--- Recall  ZonkAny :: forall k. Natural -> k
+newUnusedType :: Name -> Kind -> TcM Type
+-- Return a type (UnusedType @k n sym), where n is fresh
+-- Recall  UnusedType :: forall k. Natural -> Symbol -> k
 -- See Note [Any types] in GHC.Builtin.Types, wrinkle (Any4)
-newZonkAnyType kind
+newUnusedType name kind
   = do { env <- getGblEnv
        ; let zany_n_var = tcg_zany_n env
        ; i <- readTcRef zany_n_var
        ; let !i2 = i+1
        ; writeTcRef zany_n_var i2
-       ; return (mkTyConApp zonkAnyTyCon [kind, mkNumLitTy i]) }
+       ; return (mkTyConApp unusedTypeTyCon [kind, mkNumLitTy i, mkStrLitTy $ getOccFS name ]) }
 
 getConstraintVar :: TcM (TcRef WantedConstraints)
 getConstraintVar = do { env <- getLclEnv; return (tcl_lie env) }
