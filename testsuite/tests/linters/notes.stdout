@@ -1,4 +1,5 @@
 Broken note references (target note not found!):
+ref    compiler/GHC/Builtin/Types.hs:453:35:     Note [Insoluble fundeps]
 ref    compiler/GHC/Core/Coercion/Axiom.hs:488:2:     Note [RoughMap and rm_empty]
 ref    compiler/GHC/Core/Opt/OccurAnal.hs:1150:7:     Note [Loop breaking]
 ref    compiler/GHC/Core/Opt/SetLevels.hs:1688:30:     Note [Top level scope]
