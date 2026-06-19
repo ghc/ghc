@@ -1319,7 +1319,8 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
       pure (Breakpoint noExtField (BreakpointId (this_mod env) i) ids)
 
     SourceNotes | RealSrcSpan pos' _ <- pos ->
-      return $ SourceNote pos' $ LexicalFastString cc_name
+      return $ SourceNote pos' (LexicalFastString cc_name)
+                          (moduleName (this_mod env))
 
     _otherwise -> panic "mkTickish: bad source span!"
 

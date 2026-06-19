@@ -1274,6 +1274,6 @@ cgTick tick
        ; case tick of
            ProfNote   cc t p -> emitSetCCC cc t p
            HpcTick    m n    -> emit (mkTickBox platform m n)
-           SourceNote s n    -> emitTick $ SourceNote s n
+           SourceNote s n m  -> emitTick $ SourceNote s n m
            Breakpoint {}     -> return () -- ignore
        }

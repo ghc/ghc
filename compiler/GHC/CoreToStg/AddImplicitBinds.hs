@@ -10,7 +10,7 @@ import GHC.Prelude
 
 import GHC.CoreToStg.Prep( CorePrepPgmConfig(..) )
 
-import GHC.Unit( ModLocation(..), ml_hs_file )
+import GHC.Unit( ModLocation(..), ml_hs_file, moduleName )
 
 import GHC.Core
 import GHC.Core.DataCon( DataCon, dataConWorkId, dataConWrapId )
@@ -140,9 +140,10 @@ tick_it generate_debug_info mod_loc name
   | Just file <- ml_hs_file mod_loc       = tick (span1 file)
   | otherwise                             = tick (span1 "???")
   where
-    tick span  = Tick $ SourceNote span $
-                 LexicalFastString $ mkFastString $
-                 renderWithContext defaultSDocContext $ ppr name
+    tick span  = Tick $ SourceNote span
+                 (LexicalFastString $ mkFastString $
+                  renderWithContext defaultSDocContext $ ppr name)
+                 (moduleName (nameModule name))
     span1 file = realSrcLocSpan $ mkRealSrcLoc (mkFastString file) 1 1
 
 

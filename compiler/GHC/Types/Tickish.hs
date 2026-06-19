@@ -147,6 +147,11 @@ data GenTickish pass =
     { sourceSpan :: RealSrcSpan -- ^ Source covered
     , sourceName :: LexicalFastString  -- ^ Name for source location
                                        --   (uses same names as CCs)
+    , sourceModule :: ModuleName -- ^ Module the covered source belongs to.
+                                 --   Recorded when the note is created (the
+                                 --   module being compiled) and preserved
+                                 --   through inlining, so it identifies the
+                                 --   *originating* module of inlined code.
     }
 
 deriving instance Eq (GenTickish 'TickishPassCore)
@@ -603,11 +608,11 @@ combineTickish_maybe
                       , profNoteCount = cnt1 || cnt2
                       , profNoteScope = scope1 || scope2
                       }
-combineTickish_maybe t1@(SourceNote sp1 n1) t2@(SourceNote sp2 n2)
-  | n1 == n2
+combineTickish_maybe t1@(SourceNote sp1 n1 m1) t2@(SourceNote sp2 n2 m2)
+  | n1 == n2, m1 == m2
   , sp1 `containsSpan` sp2
   = Just t1
-  | n1 == n2
+  | n1 == n2, m1 == m2
   , sp2 `containsSpan` sp1
   = Just t2
   -- NB: it would be possible to use 'combineRealSrcSpans' instead,
@@ -645,8 +650,8 @@ tickishCommutable t1 t2
 -- making the second tick redundant.
 tickishContains :: Eq (GenTickish pass)
                 => GenTickish pass -> GenTickish pass -> Bool
-tickishContains (SourceNote sp1 n1) (SourceNote sp2 n2)
-  = containsSpan sp1 sp2 && n1 == n2
+tickishContains (SourceNote sp1 n1 m1) (SourceNote sp2 n2 m2)
+  = containsSpan sp1 sp2 && n1 == n2 && m1 == m2
     -- compare the String last
 tickishContains t1 t2
   = t1 == t2

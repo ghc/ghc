@@ -704,7 +704,7 @@ data IfaceExpr
 data IfaceTickish
   = IfaceHpcTick    Module Int               -- from HpcTick x
   | IfaceSCC        CostCentre Bool Bool     -- from ProfNote
-  | IfaceSource  RealSrcSpan FastString      -- from SourceNote
+  | IfaceSource  RealSrcSpan FastString ModuleName -- from SourceNote
   | IfaceBreakpoint BreakpointId [IfaceExpr] -- from Breakpoint
 
 data IfaceAlt = IfaceAlt IfaceConAlt [IfLclName] IfaceExpr
@@ -1852,7 +1852,7 @@ pprIfaceTickish (IfaceHpcTick m ix)
   = braces (text "tick" <+> ppr m <+> ppr ix)
 pprIfaceTickish (IfaceSCC cc tick scope)
   = braces (pprCostCentreCore cc <+> ppr tick <+> ppr scope)
-pprIfaceTickish (IfaceSource src _names)
+pprIfaceTickish (IfaceSource src _names _mod)
   = braces (pprUserRealSpan True src)
 pprIfaceTickish (IfaceBreakpoint (BreakpointId m ix) fvs)
   = braces (text "break" <+> ppr m <+> ppr ix <+> ppr fvs)
@@ -2946,7 +2946,7 @@ instance Binary IfaceTickish where
         put_ bh cc
         put_ bh tick
         put_ bh push
-    put_ bh (IfaceSource src name) = do
+    put_ bh (IfaceSource src name modl) = do
         putByte bh 2
         put_ bh (srcSpanFile src)
         put_ bh (srcSpanStartLine src)
@@ -2954,6 +2954,7 @@ instance Binary IfaceTickish where
         put_ bh (srcSpanEndLine src)
         put_ bh (srcSpanEndCol src)
         put_ bh name
+        put_ bh modl
     put_ bh (IfaceBreakpoint (BreakpointId m ix) fvs) = do
         putByte bh 3
         put_ bh m
@@ -2978,7 +2979,8 @@ instance Binary IfaceTickish where
                     let start = mkRealSrcLoc file sl sc
                         end = mkRealSrcLoc file el ec
                     name <- get bh
-                    return (IfaceSource (mkRealSrcSpan start end) name)
+                    modl <- get bh
+                    return (IfaceSource (mkRealSrcSpan start end) name modl)
             3 -> do m <- get bh
                     ix <- get bh
                     fvs <- get bh
@@ -3241,7 +3243,7 @@ instance NFData IfaceTickish where
   rnf = \case
     IfaceHpcTick m i -> rnf m `seq` rnf i
     IfaceSCC cc b1 b2 -> rnf cc `seq` rnf b1 `seq` rnf b2
-    IfaceSource src str -> rnf src `seq` rnf str
+    IfaceSource src str modl -> rnf src `seq` rnf str `seq` rnf modl
     IfaceBreakpoint i fvs -> rnf i `seq` rnf fvs
 
 instance NFData IfaceConAlt where

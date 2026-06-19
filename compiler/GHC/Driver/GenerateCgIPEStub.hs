@@ -227,19 +227,30 @@ A return frame is attributed to the ticks of the block that *ends* in its call
 (see `labelsToSourcesWithTNTC`). So `cCont` is sourced from `cBlk`, which has no
 `Main.hs` tick at all. This is unhelpful to the user.
 
+It is worth being precise about how the chosen tick is rendered, since it is the
+crux. The IPE entry for a return frame is built (in `convertInfoProvMap`,
+GHC.StgToCmm.Utils) as `InfoProvEnt _ _ _ this_mod (Just (span, name))` and a
+backtrace prints it as `<module>.<name> (<file>:<span>)`. The `<module>` is always
+`this_mod`, the module being compiled: it is shared by every IPE entry in the
+module and is *not* taken from the tick — a `SourceNote` carries no module, only a
+name and a `RealSrcSpan` (hence a file). Only `<name>` and `<file>:<span>` come
+from the chosen tick. So sourcing `cCont` from the inlined `>>` tick
+`Base.hs:2336:67-71` (name `thenIO`) yields `this_mod` + `thenIO` + `Base.hs` =
+`Main.thenIO (Base.hs:2336:67-71)`: the module says `Main` but the name and file
+are `Base`'s `thenIO`, and `Main.thenIO` is a binding that does not exist.
+
 To fix this we attribute a return frame's source location in the following
 preference order:
 
-  1. the nearest tick in frame's block whose file is that of the module being
+  1. the nearest tick in the frame's block whose file is that of the module being
      compiled — the precise user call site. `cBlk` has none.
   2. failing that, the proc's *enclosing* current-module note (its function's own
-     span, i.e. the outermost user `SourceNote` in the proc) — here
-     `src<Main.hs:(2,1)-(2,58)>`, named `main`. Without this, `cCont` would
-     take the nearest note `Base.hs:2336:67-71` (named `thenIO`) and, due to
-     rule (3) below, attribute it to the module being compiled. This would result
-     in a reference to `Main.thenIO`, a binding which does not exist.
-     does not exist. In the example above, (T2) labels it `Main.main` instead.
-  3. failing that, the nearest note of any module.
+     span, i.e. the outermost user `SourceNote` in the proc) — here (Tick 2),
+     `src<Main.hs:(2,1)-(2,58)>`, named `main`. Its name and file are consistent
+     with the always-`this_mod` module, so `cCont` is labelled `Main.main` rather
+     than the bogus `Main.thenIO`.
+  3. failing that, the nearest note of any module (the historical behaviour),
+     which is what library-only code (compiled in the library module) gets.
 
 This mirrors the same-file preference the DWARF path uses in
 `GHC.Cmm.DebugBlock.bestSrcTick` and that `GHC.Stg.Debug.quickSourcePos` uses for
@@ -443,7 +454,7 @@ preferThisFile :: Maybe FastString -> Maybe IpeSourceLocation -> [CmmNode O O] -
 preferThisFile mb_src_file procFallback nodes =
     nearest fromThisFile <|> procFallback <|> nearest sourceNotes
   where
-    sourceNotes = [ (span, name) | CmmTick (SourceNote span name) <- nodes ]
+    sourceNotes = [ (span, name) | CmmTick (SourceNote span name _) <- nodes ]
     fromThisFile = case mb_src_file of
       Just f  -> filter ((== f) . srcSpanFile . fst) sourceNotes
       Nothing -> []
@@ -460,7 +471,7 @@ enclosingThisFileTick mb_src_file blocks =
       [ (span, name)
       | b <- blocks
       , let (_, mid, _) = blockSplit b
-      , CmmTick (SourceNote span name) <- blockToList mid
+      , CmmTick (SourceNote span name _) <- blockToList mid
       , Just (srcSpanFile span) == mb_src_file ]
 
 -- | See Note [Stacktraces from Info Table Provenance Entries (IPE based stack unwinding)]
@@ -495,7 +506,7 @@ labelsToSourcesSansTNTC mb_src_file acc (CmmProc _ _ _ cmm_graph) =
               case lastThis <|> procFallback <|> lastAny of
                 Just src_loc -> (Map.insert l src_loc acc, (Nothing, Nothing))
                 Nothing      -> (acc, st)
-            CmmTick (SourceNote span name) ->
+            CmmTick (SourceNote span name _) ->
               let tick = (span, name)
                   lastThis'
                     | Just (srcSpanFile span) == mb_src_file = Just tick

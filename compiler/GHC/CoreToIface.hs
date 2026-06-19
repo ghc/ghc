@@ -581,8 +581,8 @@ toIfaceOneShot id | isId id
 toIfaceTickish :: CoreTickish -> IfaceTickish
 toIfaceTickish (ProfNote cc tick push) = IfaceSCC cc tick push
 toIfaceTickish (HpcTick modl ix)       = IfaceHpcTick modl ix
-toIfaceTickish (SourceNote src (LexicalFastString names)) =
-  IfaceSource src names
+toIfaceTickish (SourceNote src (LexicalFastString names) modl) =
+  IfaceSource src names modl
 toIfaceTickish (Breakpoint _ ix fv) =
   IfaceBreakpoint ix (toIfaceVar <$> fv)
 

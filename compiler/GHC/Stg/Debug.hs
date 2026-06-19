@@ -117,7 +117,7 @@ collectExpr = go
 
     go (StgTick tick e) = do
        let k = case tick of
-                SourceNote ss fp -> withSpan (ss, fp)
+                SourceNote ss fp _ -> withSpan (ss, fp)
                 _ -> id
        e' <- k (go e)
        return (StgTick tick e')
@@ -135,7 +135,7 @@ collectAlt alt = do e' <- collectExpr $ alt_rhs alt
 -- propagated downwards by 'withSpan'. It's "quick" because it works only using immediate context rather
 -- than looking at the parent context like 'withSpan'
 quickSourcePos :: FastString -> StgExpr -> Maybe SpanWithLabel
-quickSourcePos cur_mod (StgTick (SourceNote ss m) e)
+quickSourcePos cur_mod (StgTick (SourceNote ss m _) e)
   | srcSpanFile ss == cur_mod = Just (SpanWithLabel ss m)
   | otherwise = quickSourcePos cur_mod e
 quickSourcePos _ _ = Nothing
@@ -196,8 +196,8 @@ selectTick :: [StgTickish] -> Maybe (RealSrcSpan, LexicalFastString)
 selectTick = foldl' go Nothing
   where
     go :: Maybe (RealSrcSpan, LexicalFastString) -> StgTickish -> Maybe (RealSrcSpan, LexicalFastString)
-    go _   (SourceNote rss d) = Just (rss, d)
-    go acc _                  = acc
+    go _   (SourceNote rss d _) = Just (rss, d)
+    go acc _                    = acc
 
 -- | Descide whether a distinct info table should be made for a usage of a data
 -- constructor. We only want to do this if -fdistinct-constructor-tables was

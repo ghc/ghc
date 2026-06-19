@@ -129,7 +129,7 @@ basicBlockCodeGen block = do
     genLocInstrs = do
       dbg <- getDebugBlock (entryLabel block)
       case dblSourceTick =<< dbg of
-        Just (SourceNote span name) ->
+        Just (SourceNote span name _) ->
           do
             fileId <- getFileId (srcSpanFile span)
             let line = srcSpanStartLine span; col = srcSpanStartCol span

@@ -670,7 +670,7 @@ coreToStgTick :: Type -- type of the ticked expression
               -> CoreTickish
               -> StgTickish
 coreToStgTick _ty (HpcTick m i)           = HpcTick m i
-coreToStgTick _ty (SourceNote span nm)    = SourceNote span nm
+coreToStgTick _ty (SourceNote span nm m)  = SourceNote span nm m
 coreToStgTick _ty (ProfNote cc cnt scope) = ProfNote cc cnt scope
 coreToStgTick !ty (Breakpoint _ bid fvs)  = Breakpoint ty bid fvs
 

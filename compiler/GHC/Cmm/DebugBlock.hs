@@ -153,7 +153,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
       -- (if we generated one, we probably want debug information to
       -- refer to it).
       bestSrcTick = minimumBy (comparing rangeRating)
-      rangeRating (span, _)
+      rangeRating (span, _, _)
         | srcSpanFile span == thisFile = 1
         | otherwise                    = 2 :: Int
       thisFile = maybe nilFS mkFastString $ ml_hs_file modLoc
@@ -162,7 +162,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
       -- scopes. Note that if there are multiple blocks in the (exact)
       -- same scope we elect one as the "branch" node and add the rest
       -- as children.
-      blocksForScope :: Maybe (RealSrcSpan, LexicalFastString) -> (CmmTickScope, NonEmpty BlockContext) -> DebugBlock
+      blocksForScope :: Maybe (RealSrcSpan, LexicalFastString, ModuleName) -> (CmmTickScope, NonEmpty BlockContext) -> DebugBlock
       blocksForScope cstick (scope, bctx:|bctxs) = mkBlock True bctx
         where nested = fromMaybe [] $ Map.lookup scope scopeMap
               childs = map (mkBlock False) bctxs ++
@@ -177,7 +177,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
                              , dblParent       = Nothing
                              , dblTicks        = ticks
                              , dblPosition     = Nothing -- see cmmDebugLink
-                             , dblSourceTick   = uncurry SourceNote <$> stick
+                             , dblSourceTick   = (\(s, n, m) -> SourceNote s n m) <$> stick
                              , dblBlocks       = blocks
                              , dblUnwind       = []
                              }
@@ -191,7 +191,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
 
               -- A source tick scopes over all nested blocks. However
               -- their source ticks might take priority.
-              isSourceTick (SourceNote span a) = Just (span, a)
+              isSourceTick (SourceNote span a m) = Just (span, a, m)
               isSourceTick _ = Nothing
               -- Collect ticks from all blocks inside the tick scope.
               -- We attempt to filter out duplicates while we're at it.

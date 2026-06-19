@@ -163,7 +163,7 @@ overloadedCallsCC =
     trackSourceNote :: CoreTickish -> LateCCM OverloadedCallsCCState a -> LateCCM OverloadedCallsCCState a
     trackSourceNote tick act =
       case tick of
-        SourceNote rss _ -> do
+        SourceNote rss _ _ -> do
           -- Prefer source notes from the current file
           in_current_file <-
             maybe False ((== EQ) . lexicalCompareFS (srcSpanFile rss)) <$>

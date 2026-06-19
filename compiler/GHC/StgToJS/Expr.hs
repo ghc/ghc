@@ -125,7 +125,7 @@ genExpr ctx stg = case stg of
     setSCCstats <- ifProfilingM $ setCC cc count scope
     (stats, result) <- genExpr ctx e
     return (setSCCstats <> stats, result)
-  StgTick (SourceNote span _sname) e
+  StgTick (SourceNote span _sname _) e
     -> genExpr (ctxSetSrcSpan span ctx) e
   StgTick _m e
     -> genExpr ctx e

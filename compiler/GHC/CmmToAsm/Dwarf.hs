@@ -210,7 +210,7 @@ blockToDwarf config blk
       | otherwise                 = Nothing   -- block was optimized out
 
 tickToDwarf :: CmmTickish -> [DwarfInfo]
-tickToDwarf  (SourceNote ss _) = [DwarfSrcNote ss]
+tickToDwarf  (SourceNote ss _ _) = [DwarfSrcNote ss]
 tickToDwarf _ = []
 
 -- | Generates the data for the debug frame section, which encodes the
