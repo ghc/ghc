@@ -1,0 +1,5 @@
+section: compiler
+synopsis: Fix a CorePrep miscompilation that could project a field out of an absent dictionary, resulting in a segfault.
+issues: #25924
+mrs: !16219
+description: We no longer speculatively evaluate bindings that we have already discovered are absent.
