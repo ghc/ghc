@@ -1960,6 +1960,21 @@ It is also similar to Note [Do not strictify a DFun's parameter dictionaries],
 where marking recursive DFuns (of undecidable *instances*) strict in dictionary
 *parameters* leads to quite the same change in termination as above.
 
+Another Nasty Wrinkle: do not speculate absent bindings
+
+Speculative evaluation is in conflict with absent fillers (see Note [Absent
+fillers] in GHC.Core.Opt.WorkWrap.Utils).
+
+When an argument is found to be absent, worker/wrapper drops it and binds an
+absent filler in its place. This is supposed to be OK because the filler is
+absent (i.e. not evaluated by the program).
+
+But speculation can force it anyway! See #25924 for how this goes wrong.
+
+So in 'decideFloatInfo' we decline to speculate a binding whose demand is
+absent. An absent value is by definition never needed, so we lose nothing by not
+speculating it.
+
 Note [BindInfo and FloatInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The `BindInfo` of a `Float` describes whether it will be case-bound or
@@ -2204,12 +2219,16 @@ mkNonRecFloat env is_unlifted bndr rhs
       | exprIsTickedString rhs   = (CaseBound, TopLvlFloatable)
           -- String literals are unboxed (so must be case-bound) and float to
           -- the top-level
-      | is_unlifted, ok_for_spec = (CaseBound, LazyContextFloatable)
-      | is_lifted,   ok_for_spec = (CaseBound, TopLvlFloatable)
+      | is_unlifted, ok_for_spec, not (isAbsDmd dmd) = (CaseBound, LazyContextFloatable)
+      | is_lifted,   ok_for_spec, not (isAbsDmd dmd) = (CaseBound, TopLvlFloatable)
           -- See Note [Speculative evaluation]
           -- Ok-for-spec-eval things will be case-bound, lifted or not.
           -- But when it's lifted we are ok with floating it to top-level
           -- (where it is actually bound lazily).
+          --
+          -- Don't speculate an absent binding. See #25924 and
+          -- "Another Nasty Wrinkle" in Note [Speculative evaluation].
+
       | is_unlifted || is_strict = (CaseBound, StrictContextFloatable)
           -- These will never be floated out of a lazy RHS context
       | otherwise                = assertPpr is_lifted (ppr rhs) $

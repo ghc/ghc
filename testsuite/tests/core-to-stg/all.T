@@ -7,3 +7,4 @@ test('T14895', normal, compile, ['-O -ddump-stg-final -dno-typeable-binds -dsupp
 test('T24124', normal, compile, ['-O -ddump-stg-final -dno-typeable-binds -dsuppress-uniques'])
 test('T24334', normal, compile_and_run, ['-O'])
 test('T24463', normal, compile, ['-O'])
+test('T25924a', [ignore_stderr], compile_and_run, ['-O'])
