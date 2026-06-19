@@ -14,7 +14,7 @@ generation.
 -}
 
 module GHC.Stg.Syntax (
-        StgKind(getStgKind), typeStgKind, stgKindPrimRep, stgKindPrimRep1, 
+        StgKind(getStgKind), typeStgKind, stgKindPrimRep, stgKindPrimRep1,
         stgKindPrimRepU, isUnboxedTupleStgKind, isLiftedTypeStgKind,
 
         StgFArgType(..),
@@ -81,12 +81,12 @@ import GHC.Types.CostCentre ( CostCentreStack )
 import GHC.Core     ( AltCon )
 import GHC.Core.DataCon
 import GHC.Core.TyCon    ( PrimRep(..), PrimOrVoidRep(..), TyCon )
-import GHC.Core.Type     
-    ( Type, 
-      tyConAppTyCon, 
-      typeKind, 
-      isUnboxedTupleKind, 
-      kindRep_maybe, 
+import GHC.Core.Type
+    ( Type,
+      tyConAppTyCon,
+      typeKind,
+      isUnboxedTupleKind,
+      kindRep_maybe,
       isLiftedRuntimeRep )
 import GHC.Core.Ppr( {- instances -} )
 
@@ -95,11 +95,11 @@ import GHC.Types.Id
 import GHC.Types.Tickish     ( StgTickish )
 import GHC.Types.Var.Set
 import GHC.Types.Literal     ( Literal, literalType )
-import GHC.Types.RepType 
-    ( typePrimRep, 
-      typePrimRep1, 
-      typePrimRepU, 
-      typePrimRep_maybe, 
+import GHC.Types.RepType
+    ( typePrimRep,
+      typePrimRep1,
+      typePrimRepU,
+      typePrimRep_maybe,
       kindPrimRep,
       kindPrimRep1,
       kindPrimRep_maybe,
@@ -169,7 +169,7 @@ There are two reasons for wanting a coarser type system:
     another language might not be compatible with GHC's type system. In such a
     case the kind system is often still compatible because it is so much coarser.
     Examples of such projects are:
-    
+
     - agda2stg: https://github.com/noughtmare/agda2stg
     - external-stg-interpreter: https://github.com/grin-compiler/ghc-whole-program-compiler-project/tree/master/external-stg-interpreter
 
@@ -189,7 +189,7 @@ There are two reasons for wanting a coarser type system:
                   Left _ -> r        <------------- NB
                   Right _ -> error "urk"
 
-    See Note [Case 2: CSEing case binders] for the full details of this 
+    See Note [Case 2: CSEing case binders] for the full details of this
     optimization.
 
     This is not type-safe in Core, but it is kind-safe in STG. So, using
@@ -200,6 +200,23 @@ Note that the kinds do not always accurately reflect the final runtime
 representation. For example, on the JS backend the kind 'TYPE Int64Rep'
 might eventually be rewritten to 'TYPE (TupleRep [Int32Rep,Int32Rep])'
 because there is no 64 bit integer type in JS.
+
+Consequences:
+
+* STG Lint checks for kind-correctness, not type-correctness.
+
+  - In an appplication, check that that kind of the argument matches the kind expected by the function
+  - In a let-binding check that the kind of the binder matches the kind of the RHS.
+  - etc
+
+  (It would be good to check these claims are true of STG Lint!)
+
+* In practice, each Id still contains its Type; but only the Kind of that type is used in STG onwards.
+  Some places still use DataCon which also still contains a reference to its type.
+
+* We define a newtype StgKind to distinguish it from Type which Kind is otherwise equal to.
+
+* What else?
 -}
 
 {-
