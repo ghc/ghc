@@ -689,3 +689,9 @@ test('ClosureTable',
 test('resizeMutableByteArrayInPlace', [req_cmm, extra_ways(['optasm', 'sanity']), only_ways(['optasm', 'sanity'])], compile_and_run, [''])
 
 test('LoopBacktrace', [exit_code(1)], compile_and_run, [''])
+
+deadlock_backtrace_norm = grep_errmsg(r'(Uncaught exception|Main\.)')
+test('MVarDeadlockBacktrace', [exit_code(1), only_ways(['normal']), deadlock_backtrace_norm],
+     compile_and_run, ['-O'])
+test('STMDeadlockBacktrace', [exit_code(1), only_ways(['normal']), deadlock_backtrace_norm],
+     compile_and_run, ['-O'])
