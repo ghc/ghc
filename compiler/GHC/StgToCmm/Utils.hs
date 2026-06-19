@@ -50,6 +50,7 @@ module GHC.StgToCmm.Utils (
 import GHC.Prelude hiding ( head, init, last, tail )
 
 import GHC.Platform
+import GHC.Stg.Syntax
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Lit (mkSimpleLit, newStringCLit)
@@ -65,7 +66,6 @@ import GHC.StgToCmm.CgUtils
 
 import GHC.Types.ForeignCall
 import GHC.Types.Id.Info
-import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Runtime.Heap.Layout
 import GHC.Unit
@@ -76,7 +76,6 @@ import GHC.Types.Unique
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.RepType
 import GHC.Types.CostCentre
 import GHC.Types.IPE
 
@@ -320,22 +319,20 @@ assignTemp e = do { platform <- getPlatform
                   ; emitAssign (CmmLocal reg) e
                   ; return reg }
 
-newUnboxedTupleRegs :: HasDebugCallStack => Kind -> FCode ([LocalReg], [ForeignHint])
+newUnboxedTupleRegs :: HasDebugCallStack => StgKind -> FCode ([LocalReg], [ForeignHint])
 -- Choose suitable local regs to use for the components
 -- of an unboxed tuple that we are about to return to
 -- the Sequel.  If the Sequel is a join point, using the
 -- regs it wants will save later assignments.
 newUnboxedTupleRegs res_kind
-  = assert (isUnboxedTupleKind res_kind) $
-    case kindPrimRep_maybe res_kind of
-      Just reps ->
-        do  { platform <- getPlatform
-            ; sequel <- getSequel
-            ; regs <- case sequel of
-                AssignTo regs _ -> regs <$ massert (regs `equalLength` reps)
-                _ -> mapM (newTemp . primRepCmmType platform) reps
-            ; return (regs, map primRepForeignHint reps) }
-      Nothing -> pprPanic "newUnboxedTupleRegs applied to non-unboxed-tuple kind" (ppr res_kind)
+  = assert (isUnboxedTupleStgKind res_kind) $
+    let reps = stgKindPrimRep res_kind
+    in do  { platform <- getPlatform
+           ; sequel <- getSequel
+           ; regs <- case sequel of
+               AssignTo regs _ -> regs <$ massert (regs `equalLength` reps)
+               _ -> mapM (newTemp . primRepCmmType platform) reps
+           ; return (regs, map primRepForeignHint reps) }
 
 -------------------------------------------------------------------------
 --      emitMultiAssign

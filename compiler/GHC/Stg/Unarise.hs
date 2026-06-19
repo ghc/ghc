@@ -889,7 +889,7 @@ castArgRename ops in_arg rhs =
     ((op,ty,uq):rest_ops) ->
       let out_id' = mkCastVar uq ty -- out_name `setIdUnique` uq `setIdType` ty
           sub_cast = castArgRename rest_ops (StgVarArg out_id')
-      in mkCast in_arg op out_id' (MkStgKind (typeKind ty)) $ sub_cast rhs
+      in mkCast in_arg op out_id' (typeStgKind ty) $ sub_cast rhs
 
 -- Construct a case binder used when casting sums, of a given type and unique.
 mkCastVar :: Unique -> Type -> Id
@@ -899,7 +899,7 @@ mkCast :: StgArg -> PrimOp -> OutId -> StgKind -> StgExpr -> StgExpr
 mkCast arg_in cast_op out_id out_kind in_rhs =
   let scrut = StgOpApp (StgPrimOp cast_op) [arg_in]
       alt = GenStgAlt { alt_con = DEFAULT, alt_bndrs = [], alt_rhs = in_rhs}
-      alt_ty = PrimAlt (kindPrimRep1 (getStgKind out_kind))
+      alt_ty = PrimAlt (stgKindPrimRep1 out_kind)
   in (StgCase scrut out_id alt_ty [alt])
 
 -- | Build a unboxed sum term from arguments of an alternative.

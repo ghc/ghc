@@ -50,7 +50,7 @@ bcPrepRHS con@StgRhsCon{} = pure con
 bcPrepExpr :: StgExpr -> BcPrepM StgExpr
 -- explicitly match all constructors so we get a warning if we miss any
 bcPrepExpr (StgTick bp@(Breakpoint tick_ty _ _) rhs)
-  | isLiftedTypeKind tick_kind = do
+  | isLiftedTypeStgKind tick_kind = do
       id <- newId tick_ty
       rhs' <- bcPrepExpr rhs
       let expr' = StgTick bp rhs'
@@ -59,7 +59,7 @@ bcPrepExpr (StgTick bp@(Breakpoint tick_ty _ _) rhs)
                                             ReEntrant
                                             []
                                             expr'
-                                            (MkStgKind tick_kind)
+                                            tick_kind
                              )
           letExp = StgLet noExtFieldSilent bnd (StgApp id [])
       pure letExp
@@ -72,10 +72,10 @@ bcPrepExpr (StgTick bp@(Breakpoint tick_ty _ _) rhs)
                                             ReEntrant
                                             [voidArgId]
                                             expr'
-                                            (MkStgKind tick_kind)
+                                            tick_kind
                              )
       pure $ StgLet noExtFieldSilent bnd (StgApp id [StgVarArg realWorldPrimId])
-  where tick_kind = typeKind tick_ty
+  where tick_kind = typeStgKind tick_ty
 bcPrepExpr (StgTick tick rhs) =
   StgTick tick <$> bcPrepExpr rhs
 bcPrepExpr (StgLet xlet bnds expr) =

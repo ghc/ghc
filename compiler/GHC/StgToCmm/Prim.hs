@@ -36,7 +36,6 @@ import GHC.Cmm.Graph
 import GHC.Stg.Syntax
 import GHC.Cmm
 import GHC.Unit         ( rtsUnit )
-import GHC.Core.Type    ( typeKind )
 import GHC.Core.TyCon ( isEnumerationTyCon )
 import GHC.Cmm.CLabel
 import GHC.Cmm.Info     ( closureInfoPtr )
@@ -105,7 +104,7 @@ cgOpApp (StgTagToEnumOp tyc) args = do
 cmmPrimOpApp :: StgToCmmConfig -> PrimOp -> [CmmExpr] -> FCode ReturnKind
 cmmPrimOpApp cfg primop cmm_args =
   let PrimopCmmEmit _inline f = emitPrimOp cfg primop cmm_args
-  in f (MkStgKind (typeKind (primOpResultType primop)))
+  in f (typeStgKind (primOpResultType primop))
 
 externalPrimop :: PrimOp -> [CmmExpr] -> PrimopCmmEmit
 externalPrimop primop args = outOfLinePrimop (callExternalPrimop primop args)
@@ -1919,7 +1918,7 @@ emitPrimOp cfg primop =
                   pure [reg]
 
           ReturnsTuple
-            -> do (regs, _hints) <- newUnboxedTupleRegs (getStgKind res_kind)
+            -> do (regs, _hints) <- newUnboxedTupleRegs res_kind
                   pure regs
         f res_kind regs
         emitReturn (map (CmmReg . CmmLocal) regs)

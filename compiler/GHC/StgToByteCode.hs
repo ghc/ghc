@@ -645,12 +645,6 @@ schemeE d s p (StgCase scrut _ _ []) = schemeE d s p scrut
 schemeE d s p (StgCase scrut bndr _ alts)
    = doCase d s p scrut bndr alts
 
-stgKindPrimRepU :: StgKind -> PrimOrVoidRep
-stgKindPrimRepU (MkStgKind kind) = case kindPrimRep_maybe kind of
-  Just [] -> VoidRep
-  Just [r] -> NVRep r
-  r -> pprPanic "stgKindPrimRepU" (ppr r)
-
 {-
    Ticked Expressions
    ------------------

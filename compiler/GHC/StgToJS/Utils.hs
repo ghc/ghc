@@ -205,9 +205,7 @@ typeJSRep :: HasDebugCallStack => Type -> [JSRep]
 typeJSRep t = map primRepToJSRep (typePrimRep t)
 
 stgKindJSRep :: HasDebugCallStack => StgKind -> [JSRep]
-stgKindJSRep (MkStgKind k) = case kindPrimRep_maybe k of
-  Just rs -> map primRepToJSRep rs
-  Nothing -> pprPanic "kindJSRep" (ppr k)
+stgKindJSRep = map primRepToJSRep . stgKindPrimRep
 
 -- only use if you know it's not an unboxed tuple
 unaryTypeJSRep :: HasDebugCallStack => UnaryType -> JSRep

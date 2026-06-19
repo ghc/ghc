@@ -14,7 +14,8 @@ generation.
 -}
 
 module GHC.Stg.Syntax (
-        StgKind(..),
+        StgKind(getStgKind), typeStgKind, stgKindPrimRep, stgKindPrimRep1, 
+        stgKindPrimRepU, isUnboxedTupleStgKind, isLiftedTypeStgKind,
 
         StgFArgType(..),
         collectStgFArgTypes,
@@ -80,7 +81,13 @@ import GHC.Types.CostCentre ( CostCentreStack )
 import GHC.Core     ( AltCon )
 import GHC.Core.DataCon
 import GHC.Core.TyCon    ( PrimRep(..), PrimOrVoidRep(..), TyCon )
-import GHC.Core.Type     ( Type, tyConAppTyCon )
+import GHC.Core.Type     
+    ( Type, 
+      tyConAppTyCon, 
+      typeKind, 
+      isUnboxedTupleKind, 
+      kindRep_maybe, 
+      isLiftedRuntimeRep )
 import GHC.Core.Ppr( {- instances -} )
 
 import GHC.Types.ForeignCall ( ForeignCall )
@@ -88,10 +95,19 @@ import GHC.Types.Id
 import GHC.Types.Tickish     ( StgTickish )
 import GHC.Types.Var.Set
 import GHC.Types.Literal     ( Literal, literalType )
-import GHC.Types.RepType ( typePrimRep, typePrimRep1, typePrimRepU, typePrimRep_maybe, unwrapType )
+import GHC.Types.RepType 
+    ( typePrimRep, 
+      typePrimRep1, 
+      typePrimRepU, 
+      typePrimRep_maybe, 
+      kindPrimRep,
+      kindPrimRep1,
+      kindPrimRep_maybe,
+      unwrapType )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
+import GHC.Utils.Panic ( pprPanic )
 
 import GHC.Builtin.PrimOps ( PrimOp, PrimCall )
 
@@ -112,27 +128,54 @@ import GHC.Builtin.Types.Prim
 -- Kind is otherwise equal to.
 -- See Note [Kinds in STG]
 newtype StgKind = MkStgKind { getStgKind :: Kind }
+-- getStgKind is only used to do some silly pretty printing in the JS backend.
+
+typeStgKind :: Type -> StgKind
+typeStgKind = MkStgKind . typeKind
+
+stgKindPrimRep1 :: StgKind -> PrimRep
+stgKindPrimRep1 = kindPrimRep1 . getStgKind
+
+stgKindPrimRepU :: StgKind -> PrimOrVoidRep
+stgKindPrimRepU (MkStgKind kind) = case kindPrimRep_maybe kind of
+  Just [] -> VoidRep
+  Just [r] -> NVRep r
+  r -> pprPanic "stgKindPrimRepU" (ppr r)
+
+stgKindPrimRep :: StgKind -> [PrimRep]
+stgKindPrimRep = kindPrimRep . getStgKind
+
+isUnboxedTupleStgKind :: StgKind -> Bool
+isUnboxedTupleStgKind = isUnboxedTupleKind . getStgKind
+
+isLiftedTypeStgKind :: StgKind -> Bool
+isLiftedTypeStgKind (MkStgKind kind)
+  = case kindRep_maybe kind of
+      Just rep -> isLiftedRuntimeRep rep
+      Nothing  -> False
 
 {-
 Note [Kinds in STG]
 ~~~~~~~~~~~~~~~~~~~
-
-Whereas Core is type-annotated, STG is kind-annotated.
+Whereas Core is well-typed, STG is well-kinded.
 
 Just as many different values may have a single type, so many different
 types may have a single kind. So kinds are a "coarser approximation" to the
 values being manipulated; and that is what we want in STG.
 
-There are two reasons for this:
+There are two reasons for wanting a coarser type system:
 
 (1) It is easier for third party projects to compile to STG. The type system of
     another language might not be compatible with GHC's type system. In such a
     case the kind system is often still compatible because it is so much coarser.
-    Example projects are Jaro Reinders' agda2stg and Csaba Hruska's external-stg.
+    Examples of such projects are:
+    
+    - agda2stg: https://github.com/noughtmare/agda2stg
+    - external-stg-interpreter: https://github.com/grin-compiler/ghc-whole-program-compiler-project/tree/master/external-stg-interpreter
 
 (2) It allows for more aggressive optimizations. In STG we may do
-    type-incorrect things that are kind-correct. For example consider
-    the following function:
+    type-incorrect things that are still kind-correct. For example
+    consider the following function:
 
       f :: Either a b -> Either a c
       f = \x -> case x of r
@@ -146,10 +189,12 @@ There are two reasons for this:
                   Left _ -> r        <------------- NB
                   Right _ -> error "urk"
 
+    See Note [Case 2: CSEing case binders] for the full details of this 
+    optimization.
+
     This is not type-safe in Core, but it is kind-safe in STG. So, using
     the coarser notion of kinds in STG allows us to do more aggressive
-    optimizations. Note, however, that we do not implement any such
-    optimizations yet.
+    optimizations.
 
 Note that the kinds do not always accurately reflect the final runtime
 representation. For example, on the JS backend the kind 'TYPE Int64Rep'
@@ -813,7 +858,6 @@ to move these around together, notably in StgOpApp and COpStmt.
 
 Note [tagToEnum# in STG]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-
 STG is untyped, but 'tagToEnum#' needs type information, so we make it a special
 STG operation which stores the type constructor information alongside it.
 
@@ -833,7 +877,6 @@ To preserve this information we desugar the 'tagToEnum#' primop into a special
 'StgTagToEnumOp' which has an extra field to store the type constructor
 information. This desugaring happens when converting Core to STG, which is the
 last moment that we still have access to the type information.
-
 -}
 
 data StgOp

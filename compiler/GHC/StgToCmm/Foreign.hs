@@ -72,7 +72,7 @@ cgForeignCall :: ForeignCall            -- the op
 cgForeignCall (CCall (CCallSpec target cconv safety)) arg_tys stg_args res_kind
   = do  { cmm_args <- getFCallArgs stg_args arg_tys
         -- ; traceM $ show cmm_args
-        ; (res_regs, res_hints) <- newUnboxedTupleRegs (getStgKind res_kind)
+        ; (res_regs, res_hints) <- newUnboxedTupleRegs res_kind
         ; let ((call_args, arg_hints), cmm_target)
                 = case target of
                     StaticTarget _ _ ForeignValue ->

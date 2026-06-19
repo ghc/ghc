@@ -447,7 +447,7 @@ coreToStgExpr expr@(Lam {})
              fun_ty  = mkLamTypes val_bndrs body_ty
                        -- This type is a bit ill-formed but it doesn't matter
              rhs = StgRhsClosure noExtFieldSilent currentCCS
-                                 ReEntrant val_bndrs body' (MkStgKind (typeKind body_ty))
+                                 ReEntrant val_bndrs body' (typeStgKind body_ty)
              tmp_fun = mkSysLocal (fsLit "pap") uniq ManyTy fun_ty
        ; return (StgLet noExtFieldSilent (StgNonRec tmp_fun rhs) $
                  StgApp tmp_fun []) }
@@ -607,7 +607,7 @@ mkStgApp f how_bound core_args stg_args res_ty
     f_arity    = stgArity f how_bound
     n_val_args = length stg_args  -- StgArgs are all value arguments
     exactly_saturated  = f_arity == n_val_args
-    res_kind = MkStgKind (typeKind res_ty)
+    res_kind = typeStgKind res_ty
 
 
 -- Given Core arguments to an unboxed sum datacon, return the 'PrimRep's
@@ -751,7 +751,7 @@ coreToMkStgRhs bndr expr = do
     let mk_rhs = MkStgRhs
           { rhs_args = bndrs
           , rhs_expr = body'
-          , rhs_kind = MkStgKind (typeKind (exprType body))
+          , rhs_kind = typeStgKind (exprType body)
           , rhs_is_join = isJoinId bndr
           }
     pure mk_rhs
