@@ -1,0 +1,2 @@
+MVarDeadlockBacktrace: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.BlockedIndefinitelyOnMVar:
+  Main.main (MVarDeadlockBacktrace.hs:16:3-36)
