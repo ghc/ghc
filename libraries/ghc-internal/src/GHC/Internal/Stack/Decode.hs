@@ -192,6 +192,16 @@ foreign import prim "getInfoTableAddrszh" getInfoTableAddrs# :: StackSnapshot# -
 
 foreign import prim "getStackInfoTableAddrzh" getStackInfoTableAddr# :: StackSnapshot# -> Addr#
 
+foreign import prim "getOrigThunkInfoPtrzh" getOrigThunkInfoPtr# :: StackSnapshot# -> Word# -> Addr#
+
+-- | @'Just' itbl@ if the frame at the given offset is an
+-- @stg_orig_thunk_info_frame@ (where @itbl@ is the recorded original thunk
+-- info table), otherwise 'Nothing'.
+origThunkInfoFrame :: StackSnapshot# -> WordOffset -> Maybe (Ptr StgInfoTable)
+origThunkInfoFrame stackSnapshot# index =
+  let p = Ptr (getOrigThunkInfoPtr# stackSnapshot# (wordOffsetToWord# index))
+  in if p == nullPtr then Nothing else Just p
+
 -- | Get the 'StgInfoTable' of the stack frame.
 -- Additionally, provides 'InfoProv' for the 'StgInfoTable' if there is any.
 getInfoTableOnStack :: StackSnapshot# -> WordOffset -> IO (StgInfoTable, Maybe InfoProv)
@@ -380,6 +390,15 @@ unpackStackFrameTo (StackSnapshot stackSnapshot#, index) unpackUnderflowFrame fi
                 bco = bco',
                 bcoArgs = bcoArgs'
               }
+        RET_SMALL
+          | Just orig_itbl <- origThunkInfoFrame stackSnapshot# index -> do
+            orig_info_prov <- lookupIPE (castPtr orig_itbl)
+            finaliseStackFrame
+              OrigThunkInfo
+                { info_tbl = info,
+                  orig_info_tbl = orig_itbl
+                }
+              orig_info_prov
         RET_SMALL ->
           let payload' = decodeSmallBitmap getSmallBitmap# stackSnapshot# index offsetStgClosurePayload
           in
