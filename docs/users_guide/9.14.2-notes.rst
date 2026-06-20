@@ -1,0 +1,9 @@
+.. _release-9-14-2:
+
+Version 9.14.2
+==============
+
+- JSON diagnostics produced with (:ghc-flag:`-fdiagnostics-as-json`) now
+  include the `rendered` diagnostics message, in the exact same format as what
+  GHC would have produced without -fdiagnostics-as-json (including ANSI escape
+  sequences).
