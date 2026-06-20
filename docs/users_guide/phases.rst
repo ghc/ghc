@@ -603,7 +603,7 @@ Options affecting a Haskell pre-processor
     appropriate and useful. The ``-F`` option lets you run a
     pre-processor as part of the overall GHC compilation pipeline, which
     has the advantage over running a Haskell pre-processor separately in
-    that it works in interpreted mode and you can continue to take reap
+    that it works in interpreted mode and you can continue to reap
     the benefits of GHC's recompilation checker.
 
     The pre-processor is run just before the Haskell compiler proper
@@ -621,6 +621,10 @@ Options affecting a Haskell pre-processor
     Additional arguments to the pre-processor can be passed in using the
     :ghc-flag:`-optF ⟨option⟩` option. These are fed to ⟨cmd⟩ on the command
     line after the three standard input and output arguments.
+
+    GHC sets the environment variable `GHC_VERSION` to the current GHC version
+    when invoking a pre-processor.  The pre-processor can use this to emit
+    backward-compatible code.
 
     An example of a pre-processor is to convert your source files to the
     input encoding that GHC expects, i.e. create a script ``convert.sh``

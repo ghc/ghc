@@ -1,0 +1,7 @@
+section: compiler
+synopsis:
+  Set the environment variable `GHC_VERSION` to the current GHC version when
+  invoking custom pre-processors, so that pre-processors can emit
+  backward-compatible code.
+issues: #25952
+mrs: !16224
