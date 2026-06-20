@@ -45,6 +45,7 @@ import GHC.ForeignSrcLang
 
 import GHC.CmmToLlvm.Version (LlvmVersion, llvmVersionStr, supportedLlvmVersionUpperBound, parseLlvmVersion, supportedLlvmVersionLowerBound)
 
+import GHC.Version
 import GHC.Settings
 
 import GHC.SysTools.Process
@@ -63,6 +64,7 @@ import Data.List (tails, isPrefixOf)
 import Data.Maybe (fromMaybe)
 import System.IO
 import System.Process
+import System.Environment
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types (GhcMessage(..), DriverMessage (DriverNoConfiguredLLVMToolchain))
@@ -217,7 +219,8 @@ runPp :: Logger -> DynFlags -> [Option] -> IO ()
 runPp logger dflags args = traceSystoolCommand logger "pp" $ do
   let prog = pgm_F dflags
       opts = map Option (getOpts dflags opt_F)
-  runSomething logger "Haskell pre-processor" prog (args ++ opts)
+  env <- (("GHC_VERSION", cProjectVersion) :) <$> getEnvironment
+  runSomethingFiltered logger id "Haskell pre-processor" prog (args ++ opts) Nothing (Just env)
 
 data CcConfig = CcConfig
   { ccProg :: String
