@@ -110,6 +110,7 @@ data Flag
     = FlagHaddockPath FilePath
     | FlagHaddockOptions String
     | FlagGhcPath FilePath
+    | FlagGhcPkgPath FilePath
     | FlagDiffTool FilePath
     | FlagNoDiff
     | FlagAccept
@@ -122,6 +123,9 @@ flagsHaddockPath flags = mlast [ path | FlagHaddockPath path <- flags ]
 
 flagsGhcPath :: [Flag] -> Maybe FilePath
 flagsGhcPath flags = mlast [ path | FlagGhcPath path <- flags ]
+
+flagsGhcPkgPath :: [Flag] -> Maybe FilePath
+flagsGhcPkgPath flags = mlast [ path | FlagGhcPkgPath path <- flags ]
 
 flagsHaddockOptions :: [Flag] -> [String]
 flagsHaddockOptions flags = concat
@@ -140,6 +144,8 @@ options =
         "additional options to run Haddock with"
     , Option [] ["ghc-path"] (ReqArg FlagGhcPath "FILE")
         "path ghc executable"
+    , Option [] ["ghc-pkg-path"] (ReqArg FlagGhcPkgPath "FILE")
+        "path to ghc-pkg executable"
     , Option [] ["diff-tool"] (ReqArg FlagDiffTool "PATH")
         "diff tool to use when printing failed cases"
     , Option ['a'] ["accept"] (NoArg FlagAccept)
@@ -217,7 +223,7 @@ loadConfig ccfg dcfg flags files = do
         , pure ["--optghc=-w"]
         , pure ["--optghc=-hide-all-packages"]
         , pure $ flagsHaddockOptions flags
-        , baseDependencies cfgGhcPath
+        , baseDependencies cfgGhcPath (flagsGhcPkgPath flags)
         ]
 
     cfgDiffTool <- if FlagNoDiff `elem` flags
@@ -248,14 +254,14 @@ printVersions env haddockPath = do
     void $ waitForSuccess "Failed to run `haddock --ghc-version`" stderr handleGhc
 
 
-baseDependencies :: FilePath -> IO [String]
-baseDependencies ghcPath = do
+baseDependencies :: FilePath -> Maybe FilePath -> IO [String]
+baseDependencies ghcPath ghcPkgPath = do
     -- The 'getInstalledPackages' crashes if used when "GHC_PACKAGE_PATH" is
     -- set to some value. I am not sure why is that happening and what are the
     -- consequences of unsetting it - but looks like it works (for now).
     unsetEnv "GHC_PACKAGE_PATH"
 
-    (comp, _, cfg) <- configure normal (Just ghcPath) Nothing
+    (comp, _, cfg) <- configure normal (Just ghcPath) ghcPkgPath
         defaultProgramDb
     pkgIndex <- getInstalledPackages normal comp Nothing [GlobalPackageDB] cfg
     let

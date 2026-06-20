@@ -1,7 +1,8 @@
 accept = 'ACCEPT=--accept' if config.accept else 'ACCEPT=""'
 
+# Threaded.hs uses forkOS in a TH splice; GHCJS RTS doesn't support forkOS
 test('haddockHtmlTest',
-     [ignore_stdout, ignore_stderr, req_haddock],
+     [ignore_stdout, ignore_stderr, req_haddock, js_skip],
      makefile_test,
      ['htmlTest ' + accept])
 
