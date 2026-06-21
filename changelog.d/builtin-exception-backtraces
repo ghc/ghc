@@ -1,10 +1,10 @@
 section: rts
-synopsis: Non-termination exceptions now have backtrace annotations
+synopsis: Non-termination and deadlock exceptions now have backtrace annotations
 issues: #21878
 mrs: !16158
 description: {
-  The `NonTermination` exception (manifesting in printed exception output as
-  `<<loop>>`) now include `Backtrace` `ExceptionAnnotations`, like exceptions
-  thrown from user-written Haskell.
+  The `BlockedOnMVar`, `BlockedOnSTM`, and `NonTermination` exceptions
+  (the latter being the infamous `<<loop>>` error) now include `Backtrace`
+  `ExceptionAnnotations`, like exceptions thrown from user-written Haskell.
 }
 

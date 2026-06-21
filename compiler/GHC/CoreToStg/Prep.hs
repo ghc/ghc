@@ -918,10 +918,14 @@ mkTick will push the SCC into the constructor application, resulting in:
 
   \ (eta :: Char -> Bool) -> BindP (p :: Int) (scc<oneM> eta)
 
+i.e. the SCC ends up on the argument `eta`, which is no longer a valid `arg`.
+
 To avoid this problem (at least until 'mkTick' is more thoroughly reworked to
 avoid this infelicity, see #27141), we define a variant of 'mkTick', called
 'mkTickCpe', which does not push ticks into constructor applications (this is
-the only optimisation done by 'mkTick' that can break ANF).
+the only optimisation done by 'mkTick' that can break ANF). This is the concrete
+meaning of the 'preserve_anf' flag threaded through 'GHC.Core.Utils.mk_tick':
+when set, 'mk_tick' will not push a tick onto an application's arguments (PSCC3).
 
 We prefer using a small variant of 'mkTick' rather than using the 'Tick'
 constructor, as the latter can slightly degrade profiling reports by failing to

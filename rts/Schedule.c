@@ -3276,17 +3276,6 @@ findAtomicallyFrameHelper (Capability *cap, StgTSO *tso)
   }
 }
 
-static void throwNontermination(Capability *cap, StgTSO *tso) {
-  StgStack *stack = tso->stackobj;
-  stack->sp -= 3;
-  stack->sp[0] = (W_)&stg_enter_info;
-  stack->sp[1] = (W_)nonTerminationError_closure;
-  stack->sp[2] = (W_)&stg_ap_v_info;
-  tso->why_blocked = NotBlocked;
-  appendToRunQueue(cap,tso);
-}
-
-
 /* -----------------------------------------------------------------------------
    resurrectThreads is called after garbage collection on the list of
    threads found to be garbage.  Each of these threads will be woken
@@ -3320,15 +3309,16 @@ resurrectThreads (StgTSO *threads)
         case BlockedOnMVar:
         case BlockedOnMVarRead:
             /* Called by GC - sched_mutex lock is currently held. */
-            throwToSingleThreaded(cap, tso,
-                                  (StgClosure *)blockedIndefinitelyOnMVar_closure);
+            scheduleRaiseViaIO(cap, tso,
+                               (StgClosure *)blockedIndefinitelyOnMVarError_closure);
             break;
         case BlockedOnBlackHole:
-            throwNontermination(cap, tso);
+            scheduleRaiseViaIO(cap, tso,
+                               (StgClosure *)nonTerminationError_closure);
             break;
         case BlockedOnSTM:
-            throwToSingleThreaded(cap, tso,
-                                  (StgClosure *)blockedIndefinitelyOnSTM_closure);
+            scheduleRaiseViaIO(cap, tso,
+                               (StgClosure *)blockedIndefinitelyOnSTMError_closure);
             break;
         case NotBlocked:
             /* This might happen if the thread was blocked on a black hole

@@ -38,6 +38,10 @@ void suspendComputation (Capability *cap,
                          StgTSO *tso,
                          StgUpdateFrame *stop_here);
 
+void scheduleRaiseViaIO (Capability *cap,
+                         StgTSO *tso,
+                         StgClosure *io_action);
+
 MessageThrowTo *throwTo (Capability *cap,      // the Capability we hold
                          StgTSO *source,
                          StgTSO *target,

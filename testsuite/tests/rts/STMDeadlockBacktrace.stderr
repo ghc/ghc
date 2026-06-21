@@ -1,0 +1,2 @@
+STMDeadlockBacktrace: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.BlockedIndefinitelyOnSTM:
+  Main.main (STMDeadlockBacktrace.hs:16:3-32)

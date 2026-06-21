@@ -1,0 +1,7 @@
+section: ghc-heap
+issues: #24812
+mrs: !16228
+synopsis:
+  Introduce a `OrigThunkInfo` frame type in `StackFrame`, exposing frames
+  produced by `-forig-thunk-info`.
+

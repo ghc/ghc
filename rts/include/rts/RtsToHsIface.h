@@ -20,8 +20,8 @@ typedef struct {
     StgClosure *stackOverflow_closure;  // GHC.Internal.IO.Exception.stackOverflow_closure
     StgClosure *heapOverflow_closure;  // GHC.Internal.IO.Exception.heapOverflow_closure
     StgClosure *allocationLimitExceeded_closure;  // GHC.Internal.IO.Exception.allocationLimitExceeded_closure
-    StgClosure *blockedIndefinitelyOnMVar_closure;  // GHC.Internal.IO.Exception.blockedIndefinitelyOnMVar_closure
-    StgClosure *blockedIndefinitelyOnSTM_closure;  // GHC.Internal.IO.Exception.blockedIndefinitelyOnSTM_closure
+    StgClosure *blockedIndefinitelyOnMVarError_closure;  // GHC.Internal.IO.Exception.blockedIndefinitelyOnMVarError_closure
+    StgClosure *blockedIndefinitelyOnSTMError_closure;  // GHC.Internal.IO.Exception.blockedIndefinitelyOnSTMError_closure
     StgClosure *cannotCompactFunction_closure;  // GHC.Internal.IO.Exception.cannotCompactFunction_closure
     StgClosure *cannotCompactPinned_closure;  // GHC.Internal.IO.Exception.cannotCompactPinned_closure
     StgClosure *cannotCompactMutable_closure;  // GHC.Internal.IO.Exception.cannotCompactMutable_closure

@@ -568,6 +568,17 @@ data GenStackFrame b =
       , stack_payload       :: ![GenStackField b]
       }
 
+  -- | An @stg_orig_thunk_info_frame@ pushed by @-forig-thunk-info@. It records
+  -- the original info table of the thunk being updated (in 'orig_info_tbl'),
+  -- which is otherwise lost when the thunk is blackholed.
+  -- See @Note [Original thunk info table frames]@ in "GHC.StgToCmm.Bind".
+  | OrigThunkInfo
+      { info_tbl            :: !StgInfoTable
+        -- ^ the frame's own (RTS) info table
+      , orig_info_tbl       :: !(Ptr StgInfoTable)
+        -- ^ the original info table of the thunk being updated
+      }
+
   | RetFun
       { info_tbl            :: !StgInfoTable
       , retFunSize          :: !Word

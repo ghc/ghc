@@ -3,6 +3,10 @@
 
 #include "Cmm.h"
 
+#if !defined(UnregisterisedCompiler)
+import CLOSURE stg_orig_thunk_info_frame_info;
+#endif
+
 // StgStack_marking was not available in the Stage0 compiler at the time of
 // writing. Because, it has been added to derivedConstants when Stack.cmm was
 // developed.
@@ -166,6 +170,18 @@ getStackInfoTableAddrzh(P_ stack) {
   P_ info;
   info = %GET_STD_INFO(UNTAG(stack));
   return (info);
+}
+
+// (StgInfoTable*) getOrigThunkInfoPtrzh(StgStack* stack, StgWord offsetWords)
+getOrigThunkInfoPtrzh(P_ stack, W_ offsetWords) {
+  P_ p;
+  p = StgStack_sp(stack) + WDS(offsetWords);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
+  if (%INFO_PTR(UNTAG(p)) == stg_orig_thunk_info_frame_info) {
+    return (StgOrigThunkInfoFrame_info_ptr(UNTAG(p)));
+  } else {
+    return (NULL);
+  }
 }
 
 // (StgClosure*) getStackClosurezh(StgStack* stack, StgWord offsetWords)
