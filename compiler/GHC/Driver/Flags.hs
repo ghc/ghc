@@ -865,6 +865,7 @@ data GeneralFlag
 
    -- Error message suppression
    | Opt_ShowErrorContext
+   | Opt_InteractiveErrorHints
 
    -- Object code determinism
    | Opt_ObjectDeterminism

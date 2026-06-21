@@ -1571,6 +1571,7 @@ initSDocContext dflags style = SDC
   , sdocLineLength                  = pprCols dflags
   , sdocCanUseUnicode               = useUnicode dflags
   , sdocPrintErrIndexLinks          = overrideWith (canUseErrorLinks dflags) (useErrorLinks dflags)
+  , sdocInteractiveErrorHints       = gopt Opt_InteractiveErrorHints dflags
   , sdocHexWordLiterals             = gopt Opt_HexWordLiterals dflags
   , sdocPprDebug                    = dopt Opt_D_ppr_debug dflags
   , sdocPrintUnicodeSyntax          = gopt Opt_PrintUnicodeSyntax dflags

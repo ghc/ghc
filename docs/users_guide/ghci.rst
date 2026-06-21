@@ -2114,6 +2114,27 @@ mostly obvious.
     If disabled, only the target given last on the command line interface will be
     added to interactive context of the GHCi session.
 
+.. ghc-flag:: -finteractive-error-hints
+    :shortdesc: Print GHCi specific error hints.
+    :type: dynamic
+    :reverse: -fno-interactive-error-hints
+    :category:
+
+    :default: on
+    :since: 10.2.1
+
+    By default, GHCi extends error hints with GHCi specific instructions.
+
+    Example:
+
+    .. code-block:: none
+
+        Perhaps you intended to use the ‘BlockArguments’ extension
+        You may enable this language extension in GHCi with:
+          :set -XBlockArguments
+
+    This can be disabled with `-fno-interactive-error-hints`.
+
 Packages
 ~~~~~~~~
 

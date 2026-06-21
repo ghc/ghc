@@ -23,8 +23,6 @@ import GHC.Driver.Errors.Types
 import GHC.Iface.Errors.Ppr
 import GHC.Iface.Errors.Types
 
-import qualified GHC.LanguageExtensions as LangExt
-
 import GHC.Tc.Errors.Ppr
 import GHC.Tc.Errors.Types
 
@@ -137,7 +135,7 @@ instance Diagnostic GhciMessage where
     GhciUnknownMessage m -> diagnosticReason m
 
   diagnosticHints = \case
-    GhciGhcMessage     m -> map GhciGhcHint     (ghciDiagnosticHints m)
+    GhciGhcMessage     m -> map GhciGhcHint (diagnosticHints m)
     GhciCommandMessage m -> map GhciCommandHint (diagnosticHints m)
     GhciUnknownMessage m -> diagnosticHints m
 
@@ -145,40 +143,6 @@ instance Diagnostic GhciMessage where
     GhciGhcMessage     m -> diagnosticCode m
     GhciCommandMessage m -> diagnosticCode m
     GhciUnknownMessage m -> diagnosticCode m
-
-
--- | Modifications to hint messages which we want to display in GHCi.
-ghciDiagnosticHints :: GhcMessage -> [GhcHint]
-ghciDiagnosticHints msg = map modifyHintForGHCi (diagnosticHints msg)
-  where
-    modifyHintForGHCi :: GhcHint -> GhcHint
-    modifyHintForGHCi = \case
-      SuggestExtension extHint -> SuggestExtension $ modifyExtHintForGHCi extHint
-      hint -> hint
-    modifyExtHintForGHCi :: LanguageExtensionHint -> LanguageExtensionHint
-    modifyExtHintForGHCi = \case
-      SuggestSingleExtension    doc ext  -> SuggestSingleExtension    (suggestSetExt [ext] doc False) ext
-      SuggestExtensionInOrderTo doc ext  -> SuggestExtensionInOrderTo (suggestSetExt [ext] doc False) ext
-      SuggestAnyExtension       doc exts -> SuggestAnyExtension       (suggestSetExt exts  doc True ) exts
-      SuggestExtensions         doc exts -> SuggestExtensions         (suggestSetExt exts  doc False) exts
-    -- Suggest enabling extension with :set -X<ext>
-    -- SuggestAnyExtension will be on multiple lines so the user can select which to enable without editing
-    suggestSetExt :: [LangExt.Extension] -> SDoc -> Bool -> SDoc
-    suggestSetExt exts doc enable_any = doc $$ hang header 2 exts_cmds
-      where
-        header = text "You may enable" <+> which <+> text "language extension" <> plural exts <+> text "in GHCi with:"
-        which
-          | [ _ext ] <- exts
-          = text "this"
-          | otherwise
-          = if enable_any
-            then text "these"
-            else text "all of these"
-        exts_cmds
-          | enable_any
-          = vcat $ map (\ext -> text ":set -X" <> ppr ext) exts
-          | otherwise
-          = text ":set" <> hcat (map (\ext -> text " -X" <> ppr ext) exts)
 
 -- | Modifications to error messages which we want to display in GHCi
 ghciDiagnosticMessage :: GhcMessageOpts -> GhcMessage -> DecoratedSDoc

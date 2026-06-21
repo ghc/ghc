@@ -199,6 +199,7 @@ main' postLoadMode units dflags0 args flagWarnings = do
                | DoRun         <- postLoadMode = def_ghci_flags
                | otherwise                     = dflags1
         where def_ghci_flags = dflags1 `gopt_set` Opt_ImplicitImportQualified
+                                       `gopt_set` Opt_InteractiveErrorHints
                                        `gopt_set` Opt_IgnoreOptimChanges
                                        `gopt_set` Opt_IgnoreHpcChanges
                                        -- Setting this by default has the nice effect that

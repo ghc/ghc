@@ -2666,6 +2666,7 @@ fFlagsDeps = [
                (addWarn "-compact-unwind is only implemented by the darwin platform. Ignoring.")
         return dflags)),
   flagSpec "show-error-context"               Opt_ShowErrorContext,
+  flagSpec "interactive-error-hints"          Opt_InteractiveErrorHints,
   flagSpec "cmm-thread-sanitizer"             Opt_CmmThreadSanitizer,
   flagSpec "split-sections"                   Opt_SplitSections,
   flagSpec "break-points"                     Opt_InsertBreakpoints,

@@ -12,6 +12,7 @@ other dynamic, non-language, flag settings:
   -fimplicit-import-qualified
   -fshow-warning-groups
   -fprefer-byte-code
+  -finteractive-error-hints
   -fbreak-points
 warning settings:
   -Wpattern-namespace-specifier

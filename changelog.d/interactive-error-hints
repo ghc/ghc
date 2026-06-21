@@ -1,0 +1,6 @@
+section: compiler
+synopsis:
+  Add flags `-finteractive-error-hints` / `-fno-interactive-error-hints` that
+  control whether GHCi specific error hints are printed.
+issues: #27409
+mrs: !16225

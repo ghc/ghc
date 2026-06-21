@@ -14,6 +14,7 @@ other dynamic, non-language, flag settings:
   -fno-unoptimized-core-for-interpreter
   -fshow-warning-groups
   -fprefer-byte-code
+  -finteractive-error-hints
   -fbreak-points
 warning settings:
   -Wpattern-namespace-specifier
@@ -33,6 +34,7 @@ other dynamic, non-language, flag settings:
   -fno-unoptimized-core-for-interpreter
   -fshow-warning-groups
   -fprefer-byte-code
+  -finteractive-error-hints
   -fbreak-points
 warning settings:
   -Wpattern-namespace-specifier
@@ -50,6 +52,7 @@ other dynamic, non-language, flag settings:
   -fno-unoptimized-core-for-interpreter
   -fshow-warning-groups
   -fprefer-byte-code
+  -finteractive-error-hints
   -fbreak-points
 warning settings:
   -Wpattern-namespace-specifier
@@ -67,6 +70,7 @@ other dynamic, non-language, flag settings:
   -fno-unoptimized-core-for-interpreter
   -fshow-warning-groups
   -fprefer-byte-code
+  -finteractive-error-hints
   -fbreak-points
 warning settings:
   -Wpattern-namespace-specifier
@@ -84,6 +88,7 @@ other dynamic, non-language, flag settings:
   -fno-unoptimized-core-for-interpreter
   -fshow-warning-groups
   -fprefer-byte-code
+  -finteractive-error-hints
   -fbreak-points
 warning settings:
   -Wpattern-namespace-specifier

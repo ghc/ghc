@@ -43,19 +43,44 @@ instance Outputable GhcHint where
       -> case extHint of
           SuggestSingleExtension extraUserInfo ext ->
             ("Perhaps you intended to use" <+> extension_with_implied ext)
-            $$ extraUserInfo
+            $$ interactiveErrorHints [ext] extraUserInfo False
           SuggestAnyExtension extraUserInfo exts ->
             (enable "any" <+> unquotedListWith "or" (map implied exts))
-            $$ extraUserInfo
+            $$ interactiveErrorHints exts extraUserInfo True
           SuggestExtensions extraUserInfo exts ->
             (enable "all" <+> unquotedListWith "and" (map implied exts))
-            $$ extraUserInfo
+            $$ interactiveErrorHints exts extraUserInfo False
           SuggestExtensionInOrderTo extraUserInfo ext ->
             ("Use" <+> extension_with_implied ext)
-            $$ extraUserInfo
+            $$ interactiveErrorHints [ext] extraUserInfo False
       where extension_with_implied ext = "the" <+> quotes (ppr ext) <+> "extension" <+> pprImpliedExtensions ext
             implied ext = quotes (ppr ext) <+> pprImpliedExtensions ext
             enable any_or_all = "Enable" <+> any_or_all <+> "of the following extensions" <> colon
+
+            interactiveErrorHints :: [LangExt.Extension] -> SDoc -> Bool -> SDoc
+            interactiveErrorHints exts doc enable_any = sdocOption sdocInteractiveErrorHints $ \ case
+              True -> suggestSetExt exts doc enable_any
+              False -> doc
+
+            -- Suggest enabling extension with :set -X<ext>
+            -- SuggestAnyExtension will be on multiple lines so the user can select which to enable without editing
+            suggestSetExt :: [LangExt.Extension] -> SDoc -> Bool -> SDoc
+            suggestSetExt exts doc enable_any = doc $$ hang header 2 exts_cmds
+              where
+                header = text "You may enable" <+> which <+> text "language extension" <> plural exts <+> text "in GHCi with:"
+                which
+                  | [ _ext ] <- exts
+                  = text "this"
+                  | otherwise
+                  = if enable_any
+                    then text "these"
+                    else text "all of these"
+                exts_cmds
+                  | enable_any
+                  = vcat $ map (\ext -> text ":set -X" <> ppr ext) exts
+                  | otherwise
+                  = text ":set" <> hcat (map (\ext -> text " -X" <> ppr ext) exts)
+
     SuggestCorrectPragmaName suggestions
       -> text "Perhaps you meant" <+> quotedListWithOr (map text suggestions)
     SuggestMissingDo
