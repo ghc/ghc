@@ -85,7 +85,6 @@ module Control.Exception.Base
      patError,
      noMethodBindingError,
      typeError,
-     nonTermination,
      nestedAtomically,
      noMatchingContinuationPrompt
      ) where

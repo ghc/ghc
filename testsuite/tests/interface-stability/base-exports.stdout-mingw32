@@ -412,7 +412,6 @@ module Control.Exception.Base where
   noMatchingContinuationPrompt :: SomeException
   noMethodBindingError :: forall (q :: GHC.Internal.Types.RuntimeRep) (a :: TYPE q). GHC.Internal.Prim.Addr# -> a
   nonExhaustiveGuardsError :: forall (q :: GHC.Internal.Types.RuntimeRep) (a :: TYPE q). GHC.Internal.Prim.Addr# -> a
-  nonTermination :: SomeException
   onException :: forall a b. GHC.Internal.Types.IO a -> GHC.Internal.Types.IO b -> GHC.Internal.Types.IO a
   patError :: forall (q :: GHC.Internal.Types.RuntimeRep) (a :: TYPE q). GHC.Internal.Prim.Addr# -> a
   recConError :: forall (q :: GHC.Internal.Types.RuntimeRep) (a :: TYPE q). GHC.Internal.Prim.Addr# -> a
