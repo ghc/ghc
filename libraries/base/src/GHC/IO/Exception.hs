@@ -19,8 +19,8 @@
 --
 
 module GHC.IO.Exception (
-  BlockedIndefinitelyOnMVar(..), blockedIndefinitelyOnMVar,
-  BlockedIndefinitelyOnSTM(..), blockedIndefinitelyOnSTM,
+  BlockedIndefinitelyOnMVar(..),
+  BlockedIndefinitelyOnSTM(..),
   Deadlock(..),
   AllocationLimitExceeded(..), allocationLimitExceeded,
   AssertionFailed(..),

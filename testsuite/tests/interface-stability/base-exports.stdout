@@ -7816,8 +7816,6 @@ module GHC.IO.Exception where
   assertError :: forall a. (?callStack::GHC.Internal.Stack.Types.CallStack) => GHC.Internal.Types.Bool -> a -> a
   asyncExceptionFromException :: forall e. GHC.Internal.Exception.Type.Exception e => GHC.Internal.Exception.Type.SomeException -> GHC.Internal.Maybe.Maybe e
   asyncExceptionToException :: forall e. GHC.Internal.Exception.Type.Exception e => e -> GHC.Internal.Exception.Type.SomeException
-  blockedIndefinitelyOnMVar :: GHC.Internal.Exception.Type.SomeException
-  blockedIndefinitelyOnSTM :: GHC.Internal.Exception.Type.SomeException
   cannotCompactFunction :: GHC.Internal.Exception.Type.SomeException
   cannotCompactMutable :: GHC.Internal.Exception.Type.SomeException
   cannotCompactPinned :: GHC.Internal.Exception.Type.SomeException

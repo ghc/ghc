@@ -24,12 +24,8 @@
 -----------------------------------------------------------------------------
 
 module GHC.Internal.IO.Exception (
-  BlockedIndefinitelyOnMVar(..),
-  blockedIndefinitelyOnMVar,
-  blockedIndefinitelyOnMVarError,
-  BlockedIndefinitelyOnSTM(..),
-  blockedIndefinitelyOnSTM,
-  blockedIndefinitelyOnSTMError,
+  BlockedIndefinitelyOnMVar(..), blockedIndefinitelyOnMVarError,
+  BlockedIndefinitelyOnSTM(..), blockedIndefinitelyOnSTMError,
   Deadlock(..),
   AllocationLimitExceeded(..), allocationLimitExceeded,
   AssertionFailed(..),
@@ -91,9 +87,6 @@ instance Show BlockedIndefinitelyOnMVar where
 blockedIndefinitelyOnMVarError :: IO () -- for the RTS
 blockedIndefinitelyOnMVarError = throwIO BlockedIndefinitelyOnMVar
 
-blockedIndefinitelyOnMVar :: SomeException -- for the RTS
-blockedIndefinitelyOnMVar = toException BlockedIndefinitelyOnMVar
-
 -----
 
 -- |The thread is waiting to retry an STM transaction, but there are no
@@ -109,9 +102,6 @@ instance Show BlockedIndefinitelyOnSTM where
 
 blockedIndefinitelyOnSTMError :: IO () -- for the RTS
 blockedIndefinitelyOnSTMError = throwIO BlockedIndefinitelyOnSTM
-
-blockedIndefinitelyOnSTM :: SomeException -- for the RTS
-blockedIndefinitelyOnSTM = toException BlockedIndefinitelyOnSTM
 
 -----
 
