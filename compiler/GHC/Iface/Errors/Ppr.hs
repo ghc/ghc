@@ -261,13 +261,13 @@ cantFindErrorX pkg_hidden_hint may_show_locations mod_or_interface (CantFindInst
                 .ppr.mkUnit) res ++
       if f then [text "a package flag"] else []
       )
-    pkg_hidden :: (Unit, Maybe UnitInfo) -> SDoc
-    pkg_hidden (uid, uif) =
+    pkg_hidden :: UnitInfo -> SDoc
+    pkg_hidden unit =
         text "It is a member of the hidden package"
-        <+> quotes (ppr uid)
+        <+> quotes (ppr $ unitId unit)
         --FIXME: we don't really want to show the unit id here we should
         -- show the source package id or installed package id if it's ambiguous
-        <> dot $$ maybe empty pkg_hidden_hint uif
+        <> dot $$ pkg_hidden_hint unit
 
 
     mod_hidden pkg =
