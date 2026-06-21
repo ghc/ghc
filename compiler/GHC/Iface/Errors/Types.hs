@@ -73,7 +73,7 @@ data CantFindInstalledReason
   | NotAModule
   | CouldntFindInFiles [FilePath]
   | GenericMissing
-      [(Unit, Maybe UnitInfo)] [Unit]
+      [UnitInfo] [Unit]
       [UnusableUnit] [FilePath]
   | MultiplePackages [(Module, ModuleOrigin)]
   deriving Generic

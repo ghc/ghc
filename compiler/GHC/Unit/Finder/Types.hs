@@ -70,7 +70,7 @@ data FindResult
       , fr_mods_hidden :: [Unit]           -- ^ Module is in these units,
                                            --   but the *module* is hidden
 
-      , fr_pkgs_hidden :: [Unit]           -- ^ Module is in these units,
+      , fr_pkgs_hidden :: [UnitInfo]       -- ^ Module is in these units,
                                            --   but the *unit* is hidden
 
         -- | Module is in these units, but it is unusable
