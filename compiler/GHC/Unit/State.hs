@@ -1907,7 +1907,7 @@ data LookupResult =
     -- | No modules found, but there were some hidden ones with
     -- an exact name match.  First is due to package hidden, second
     -- is due to module being hidden
-  | LookupHidden [(Module, ModuleOrigin)] [(Module, ModuleOrigin)]
+  | LookupHidden [UnitInfo] [(Module, ModuleOrigin)]
     -- | No modules found, but there were some unusable ones with
     -- an exact name match
   | LookupUnusable [(Module, ModuleOrigin)]
@@ -1956,8 +1956,8 @@ lookupModuleWithSuggestions' :: UnitState
                             -> ModuleName
                             -> PkgQual
                             -> LookupResult
-lookupModuleWithSuggestions' pkgs mod_map m mb_pn
-  = case lookupUniqMap mod_map m of
+lookupModuleWithSuggestions' pkgs mod_map name mb_pn
+  = case lookupUniqMap mod_map name of
         Nothing -> LookupNotFound suggestions
         Just xs ->
           case foldl' classify ([],[],[], []) (sortOn fst $ nonDetUniqMapToList xs) of
@@ -1976,14 +1976,21 @@ lookupModuleWithSuggestions' pkgs mod_map m mb_pn
             -> (hidden_pkg, x:hidden_mod, unusable, exposed)
           ModUnusable _
             -> (hidden_pkg, hidden_mod, x:unusable, exposed)
-          _ | originEmpty origin
+          ModOrigin { fromOrigUnit = origAvailableUnderSameName, fromHiddenReexport }
+            | originEmpty origin
             -> (hidden_pkg,   hidden_mod, unusable, exposed)
             | originVisible origin
             -> (hidden_pkg, hidden_mod, unusable, x:exposed)
             | otherwise
-            -> (x:hidden_pkg, hidden_mod, unusable, exposed)
+            -> (reexports ++ maybe id (:) origUnit hidden_pkg, hidden_mod, unusable, exposed)
+            where
+              reexports :: [UnitInfo]
+              reexports = sortOn unitId fromHiddenReexport
 
-    unit_lookup p = lookupUnit pkgs p `orElse` pprPanic "lookupModuleWithSuggestions" (ppr p <+> ppr m)
+              origUnit :: Maybe UnitInfo
+              origUnit = origAvailableUnderSameName >> lookupUnit pkgs (moduleUnit m)
+
+    unit_lookup p = lookupUnit pkgs p `orElse` pprPanic "lookupModuleWithSuggestions" (ppr p <+> ppr name)
     mod_unit = unit_lookup . moduleUnit
 
     -- Filters out origins which are not associated with the given package
@@ -2013,7 +2020,7 @@ lookupModuleWithSuggestions' pkgs mod_map m mb_pn
                 , fromPackageFlag     = False -- always excluded
                 }
 
-    suggestions = fuzzyLookup (moduleNameString m) all_mods
+    suggestions = fuzzyLookup (moduleNameString name) all_mods
 
     all_mods :: [(String, ModuleSuggestion)]     -- All modules
     all_mods = sortBy (comparing fst) $

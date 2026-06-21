@@ -225,11 +225,13 @@ ghciDiagnosticMessage ghc_opts msg =
           Just (pprWithUnitState us $ cantFindErrorX pkg_hidden_hint may_show_locations module_or_interface cfi)
         _ -> Nothing
       where
-
+        may_show_locations :: [String] -> SDoc
         may_show_locations = mayShowLocations ":set -v" (ifaceShowTriedFiles opts)
 
+        pkg_hidden_hint :: UnitInfo -> SDoc
         pkg_hidden_hint = pkgHiddenHint hidden_msg (ifaceBuildingCabalPackage opts)
           where
+            hidden_msg :: UnitInfo -> SDoc
             hidden_msg pkg =
               text "You can run" <+>
               quotes (text ":set -package " <> ppr (unitPackageName pkg)) <+>

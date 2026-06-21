@@ -131,7 +131,7 @@ cantFindErr unit_env profile mod_name find_result
 
                 | otherwise
                 -> GenericMissing
-                    (map ((\uid -> (uid, lookupUnit (ue_homeUnitState unit_env) uid))) pkg_hiddens)
+                    pkg_hiddens
                     mod_hiddens unusables files
             _ -> panic "cantFindErr"
 
