@@ -416,9 +416,9 @@ findLookupResult fc fopts r = case r of
                                          , fr_suggestions = []})
      LookupMultiple rs ->
        return (FoundMultiple rs)
-     LookupHidden pkg_hiddens mod_hiddens ->
+     LookupHidden fr_pkgs_hidden mod_hiddens ->
        return (NotFound{ fr_paths = [], fr_pkg = Nothing
-                       , fr_pkgs_hidden = map (moduleUnit.fst) pkg_hiddens
+                       , fr_pkgs_hidden
                        , fr_mods_hidden = map (moduleUnit.fst) mod_hiddens
                        , fr_unusables = []
                        , fr_suggestions = [] })
