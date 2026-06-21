@@ -343,7 +343,7 @@ mk_tick preserve_anf t orig_expr = mkTick' orig_expr
   mkTick' expr
     -- Deal with ticking a expression headed by one or more ticks.
     | Just (ts, e) <- tickedExpr_maybe expr
-    = tickTickedExpr t ts e
+    = tickTickedExpr preserve_anf t ts e
   mkTick' expr = case expr of
 
     Lam x e
@@ -413,11 +413,13 @@ mk_tick preserve_anf t orig_expr = mkTick' orig_expr
 
 -- | Apply a tick to an expression headed by ticks.
 tickTickedExpr
-  :: CoreTickish             -- ^ tick to add
+  :: Bool                    -- ^ preserve ANF? (See 'mkTickCpe' and
+                             --   Note [mkTick breaks ANF] in GHC.CoreToStg.Prep)
+  -> CoreTickish             -- ^ tick to add
   -> NE.NonEmpty CoreTickish -- ^ existing stack of ticks
   -> CoreExpr                -- ^ inner core expression
   -> CoreExpr
-tickTickedExpr t1 t2s e
+tickTickedExpr preserve_anf t1 t2s e
 
   -- Case 1: common up 't1' with a tick in the stack.
   --
@@ -431,8 +433,24 @@ tickTickedExpr t1 t2s e
   -- Case 2: 't1' can be commuted past all the ticks in the stack, e.g. because
   -- it has tighter placement properties than all the ticks in the stack.
   -- Push it inwards to expose cancellation opportunities.
+  --
+  -- We must thread 'preserve_anf' through here.  Otherwise we may turn the
+  -- argument
+  --
+  --     scc<f> (src<l> (Just x))
+  --
+  -- into the ill-formed argument
+  --
+  --     src<l> (Just (scc<f> x))   -- SCC on an argument: not a CpeArg!
+  --
+  -- whereas with preserve_anf we keep the SCC outside the application,
+  -- respecting ANF:
+  --
+  --     src<l> (scc<f> (Just breakpoint))
+  --
+  -- See Note [mkTick breaks ANF] in GHC.CoreToStg.Prep and #27415.
   | all (tickishCommutable t1) t2s
-  = apply_ticks t2s $ mkTick t1 e
+  = apply_ticks t2s $ mk_tick preserve_anf t1 e
 
   -- Fallback: keep the new tick on the outside.
   | otherwise
@@ -455,7 +473,7 @@ tickTickedExpr t1 t2s e
 
 {- Note [Pushing SCCs inwards]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Amongst all ticks, SCCs have the laxest placement properties (PlaceCostCentre,
+Amongst all ticks, SCCs have the most lax placement properties (PlaceCostCentre,
 as described in Note [Tickish placement] GHC.Types.Tickish):
 
   (PSCC1) SCCs around non-function variables can be eliminated.
