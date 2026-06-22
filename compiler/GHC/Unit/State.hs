@@ -38,6 +38,7 @@ module GHC.Unit.State (
         LookupResult(..),
         ModuleSuggestion(..),
         ModuleOrigin(..),
+        AvailableFromOriginalUnit(..),
         UnusableUnit(..),
         UnusableUnitReason(..),
         pprReason,
@@ -178,11 +179,7 @@ data ModuleOrigin =
 
     -- | Module is public, and could have come from some places.
   | ModOrigin {
-        -- | @Just False@ means that this module is in
-        -- someone's @exported-modules@ list, but that package is hidden;
-        -- @Just True@ means that it is available; @Nothing@ means neither
-        -- applies.
-        fromOrigUnit :: Maybe Bool
+        fromOrigUnit :: AvailableFromOriginalUnit
         -- | Is the module available from a reexport of an exposed package?
         -- There could be multiple.
       , fromExposedReexport :: [UnitInfo]
@@ -192,6 +189,15 @@ data ModuleOrigin =
         -- more information.
       , fromPackageFlag :: Bool
       }
+
+data AvailableFromOriginalUnit =
+    -- | the canonical module name is different from the requested name
+    Renamed
+    -- | the module is in someone's @exposed-modules@ list, but that package is hidden
+  | AvailableFromHiddenPackage
+    -- | the module is available from the original unit under the requested name
+  | AvailableFromExposedPackage
+  deriving (Eq, Show)
 
 -- | A unusable unit module origin
 data UnusableUnit = UnusableUnit
@@ -205,9 +211,9 @@ instance Outputable ModuleOrigin where
     ppr (ModUnusable _) = text "unusable module"
     ppr (ModOrigin e res rhs f) = sep (punctuate comma (
         (case e of
-            Nothing -> []
-            Just False -> [text "hidden package"]
-            Just True -> [text "exposed package"]) ++
+            Renamed -> []
+            AvailableFromHiddenPackage -> [text "hidden package"]
+            AvailableFromExposedPackage -> [text "exposed package"]) ++
         (if null res
             then []
             else [text "reexport by" <+>
@@ -222,34 +228,36 @@ instance Outputable ModuleOrigin where
 -- | Smart constructor for a module which is in @exposed-modules@.  Takes
 -- as an argument whether or not the defining package is exposed.
 fromExposedModules :: Bool -> ModuleOrigin
-fromExposedModules e = ModOrigin (Just e) [] [] False
+fromExposedModules True = ModOrigin AvailableFromExposedPackage [] [] False
+fromExposedModules False = ModOrigin AvailableFromHiddenPackage [] [] False
 
 -- | Smart constructor for a module which is in @reexported-modules@.  Takes
 -- as an argument whether or not the reexporting package is exposed, and
 -- also its 'UnitInfo'.
 fromReexportedModules :: Bool -> UnitInfo -> ModuleOrigin
-fromReexportedModules True pkg = ModOrigin Nothing [pkg] [] False
-fromReexportedModules False pkg = ModOrigin Nothing [] [pkg] False
+fromReexportedModules True pkg = ModOrigin Renamed [pkg] [] False
+fromReexportedModules False pkg = ModOrigin Renamed [] [pkg] False
 
 -- | Smart constructor for a module which was bound by a package flag.
 fromFlag :: ModuleOrigin
-fromFlag = ModOrigin Nothing [] [] True
+fromFlag = ModOrigin Renamed [] [] True
 
 instance Semigroup ModuleOrigin where
     x@(ModOrigin e res rhs f) <> y@(ModOrigin e' res' rhs' f') =
         ModOrigin (g e e') (res ++ res') (rhs ++ rhs') (f || f')
-      where g (Just b) (Just b')
-                | b == b'   = Just b
-                | otherwise = pprPanic "ModOrigin: package both exposed/hidden" $
+      where
+            g AvailableFromHiddenPackage AvailableFromHiddenPackage = AvailableFromHiddenPackage
+            g AvailableFromExposedPackage AvailableFromExposedPackage = AvailableFromExposedPackage
+            g Renamed x = x
+            g x Renamed = x
+            g _ _ = pprPanic "ModOrigin: package both exposed/hidden" $
                     text "x: " <> ppr x $$ text "y: " <> ppr y
-            g Nothing x = x
-            g x Nothing = x
 
     x <> y = pprPanic "ModOrigin: module origin mismatch" $
                  text "x: " <> ppr x $$ text "y: " <> ppr y
 
 instance Monoid ModuleOrigin where
-    mempty = ModOrigin Nothing [] [] False
+    mempty = ModOrigin Renamed [] [] False
     mappend = (Semigroup.<>)
 
 -- | Is the name from the import actually visible? (i.e. does it cause
@@ -257,12 +265,12 @@ instance Monoid ModuleOrigin where
 originVisible :: ModuleOrigin -> Bool
 originVisible ModHidden = False
 originVisible (ModUnusable _) = False
-originVisible (ModOrigin b res _ f) = b == Just True || not (null res) || f
+originVisible (ModOrigin b res _ f) = b == AvailableFromExposedPackage || not (null res) || f
 
 -- | Are there actually no providers for this module?  This will never occur
 -- except when we're filtering based on package imports.
 originEmpty :: ModuleOrigin -> Bool
-originEmpty (ModOrigin Nothing [] [] False) = True
+originEmpty (ModOrigin Renamed [] [] False) = True
 originEmpty _ = False
 
 -- | 'UniqFM' map from 'Unit' to a 'UnitVisibility'.
@@ -586,7 +594,7 @@ resolvePackageImport unit_st mn pn = do
     to_uid (mod, ModOrigin mo re_exps _ _) =
       case mo of
         -- Available directly, but also potentially from re-exports
-        Just True ->  (toUnitId (moduleUnit mod)) : map unitId re_exps
+        AvailableFromExposedPackage ->  (toUnitId (moduleUnit mod)) : map unitId re_exps
         -- Just available from these re-exports
         _ -> map unitId re_exps
     to_uid _ = []
@@ -1932,8 +1940,7 @@ lookupModulePackage pkgs mn mfs =
         case origin of
           ModOrigin {fromOrigUnit, fromExposedReexport} ->
             case fromOrigUnit of
-              -- Just True means, the import is available from its original location
-              Just True ->
+              AvailableFromExposedPackage ->
                 pure [orig_unit]
               -- Otherwise, it must be available from a reexport
               _ -> pure fromExposedReexport
@@ -1974,19 +1981,21 @@ lookupModuleWithSuggestions' pkgs mod_map name mb_pn
             -> (hidden_pkg, x:hidden_mod, unusable, exposed)
           ModUnusable _
             -> (hidden_pkg, hidden_mod, x:unusable, exposed)
-          ModOrigin { fromOrigUnit = origAvailableUnderSameName, fromHiddenReexport }
+          ModOrigin { fromOrigUnit, fromHiddenReexport }
             | originEmpty origin
             -> (hidden_pkg,   hidden_mod, unusable, exposed)
             | originVisible origin
             -> (hidden_pkg, hidden_mod, unusable, x:exposed)
             | otherwise
-            -> (reexports ++ maybe id (:) origUnit hidden_pkg, hidden_mod, unusable, exposed)
+            -> (reexports ++ maybe id (:) hiddenOrigUnit hidden_pkg, hidden_mod, unusable, exposed)
             where
               reexports :: [UnitInfo]
               reexports = sortOn unitId fromHiddenReexport
 
-              origUnit :: Maybe UnitInfo
-              origUnit = origAvailableUnderSameName >> lookupUnit pkgs (moduleUnit m)
+              hiddenOrigUnit :: Maybe UnitInfo
+              hiddenOrigUnit = case fromOrigUnit of
+                AvailableFromHiddenPackage -> lookupUnit pkgs (moduleUnit m)
+                _ -> Nothing
 
     unit_lookup p = lookupUnit pkgs p `orElse` pprPanic "lookupModuleWithSuggestions" (ppr p <+> ppr name)
     mod_unit = unit_lookup . moduleUnit
@@ -2012,7 +2021,7 @@ lookupModuleWithSuggestions' pkgs mod_map name mb_pn
           ModOrigin { fromOrigUnit = e, fromExposedReexport = res,
                       fromHiddenReexport = rhs }
             -> ModOrigin
-                { fromOrigUnit        = if match_pkg pkg then e else Nothing
+                { fromOrigUnit        = if match_pkg pkg then e else Renamed
                 , fromExposedReexport = filter match_pkg res
                 , fromHiddenReexport  = filter match_pkg rhs
                 , fromPackageFlag     = False -- always excluded

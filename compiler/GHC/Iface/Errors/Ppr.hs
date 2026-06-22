@@ -205,7 +205,7 @@ cantFindErrorX pkg_hidden_hint may_show_locations mod_or_interface (CantFindInst
                   provenance (ModOrigin{ fromOrigUnit = e,
                                          fromExposedReexport = res,
                                          fromPackageFlag = f })
-                    | Just True <- e
+                    | AvailableFromExposedPackage <- e
                        = parens (text "from" <+> ppr (moduleUnit mod))
                     | f && moduleName mod == m
                        = parens (text "from" <+> ppr (moduleUnit mod))
@@ -221,7 +221,7 @@ cantFindErrorX pkg_hidden_hint may_show_locations mod_or_interface (CantFindInst
                   provenance (ModUnusable _) = empty
                   provenance (ModOrigin{ fromOrigUnit = e,
                                          fromHiddenReexport = rhs })
-                    | Just False <- e
+                    | AvailableFromHiddenPackage <- e
                        = parens (text "needs flag -package-id"
                           <+> ppr (moduleUnit mod))
                     | (pkg:_) <- rhs
@@ -240,7 +240,7 @@ cantFindErrorX pkg_hidden_hint may_show_locations mod_or_interface (CantFindInst
       -> vcat (map pprMod mods)
       where
         unambiguousPackages = foldl' unambiguousPackage (Just []) mods
-        unambiguousPackage (Just xs) (m, ModOrigin (Just _) _ _ _)
+        unambiguousPackage (Just xs) (m, ModOrigin ((/= Renamed) -> True) _ _ _)
             = Just (moduleUnit m : xs)
         unambiguousPackage _ _ = Nothing
     GenericMissing pkg_hiddens mod_hiddens unusables files ->
@@ -254,7 +254,7 @@ cantFindErrorX pkg_hidden_hint may_show_locations mod_or_interface (CantFindInst
     pprOrigin _ ModHidden = panic "cantFindErr: bound by mod hidden"
     pprOrigin _ (ModUnusable _) = panic "cantFindErr: bound by mod unusable"
     pprOrigin m (ModOrigin e res _ f) = sep $ punctuate comma (
-      if e == Just True
+      if e == AvailableFromExposedPackage
           then [text "package" <+> ppr (moduleUnit m)]
           else [] ++
       map ((text "a reexport in package" <+>)

@@ -85,7 +85,7 @@ attachInstances expInfo ifaces instIfaceMap isOneShot = do
                   }
               ) <-
               nonDetUniqMapToList mod_map
-          , fromOrig == Just True || not (null reExp)
+          , fromOrig == AvailableFromExposedPackage || not (null reExp)
           ]
       mods_to_load = moduleSetElts mods
       -- We need to ensure orphans in modules outside of this package are included.
