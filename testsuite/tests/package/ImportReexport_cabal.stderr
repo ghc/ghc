@@ -1,0 +1,16 @@
+ImportReexport_cabal.hs:2:1: error: [GHC-87110]
+    Could not load module ‘GHC.Types’.
+    It is a member of the hidden package ‘ghc-prim-0.14.0’.
+    Perhaps you need to add ‘ghc-prim’ to the build-depends in your .cabal file.
+    Use -v to see a list of the files searched for.
+
+ImportReexport_cabal.hs:3:1: error: [GHC-87110]
+    Could not load module ‘GHC.Platform.ArchOS’.
+    It is a member of the hidden package ‘ghc-10.1’.
+    Perhaps you need to add ‘ghc’ to the build-depends in your .cabal file.
+    It is a member of the hidden package ‘ghc-boot-10.1’.
+    Perhaps you need to add ‘ghc-boot’ to the build-depends in your .cabal file.
+    It is a member of the hidden package ‘ghc-platform-0.1.0.0’.
+    Perhaps you need to add ‘ghc-platform’ to the build-depends in your .cabal file.
+    Use -v to see a list of the files searched for.
+

@@ -13,11 +13,6 @@ module GHC.Iface.Errors.Ppr
   , missingInterfaceErrorReason
   , missingInterfaceErrorDiagnostic
   , readInterfaceErrorDiagnostic
-
-  , lookingForHerald
-  , cantFindErrorX
-  , mayShowLocations
-  , pkgHiddenHint
   )
   where
 
@@ -124,38 +119,14 @@ data FindOrLoad  = Find | Load
 
 data AmbiguousOrMissing = AoM_Ambiguous | AoM_Missing
 
-cantFindError :: IfaceMessageOpts
-  -> FindingModuleOrInterface
-  -> CantFindInstalled
-  -> SDoc
-cantFindError opts =
-  cantFindErrorX
-    (pkgHiddenHint (const empty) (ifaceBuildingCabalPackage opts))
-    (mayShowLocations "-v" (ifaceShowTriedFiles opts))
+data ErrorMode = NormalMode | InteractiveMode | BuildingCabalPackage
 
+cantFindError :: IfaceMessageOpts -> FindingModuleOrInterface -> CantFindInstalled -> SDoc
+cantFindError opts mod_or_interface cantFindInstalled =
+  sdocOption sdocInteractiveErrorHints $ cantFindErrorWith opts mod_or_interface cantFindInstalled
 
-pkgHiddenHint :: (UnitInfo -> SDoc) -> BuildingCabalPackage
-              -> UnitInfo -> SDoc
-pkgHiddenHint _hint YesBuildingCabalPackage pkg
- = text "Perhaps you need to add" <+>
-   quotes (ppr (unitPackageName pkg)) <+>
-   text "to the build-depends in your .cabal file."
-pkgHiddenHint hint _not_cabal pkg
- = hint pkg
-
-mayShowLocations :: String -> Bool -> [FilePath] -> SDoc
-mayShowLocations option verbose files
-    | null files = empty
-    | not verbose =
-          text "Use" <+> text option <+>
-              text "to see a list of the files searched for."
-    | otherwise =
-          hang (text "Locations searched:") 2 $ vcat (map text files)
-
--- | General version of cantFindError which has some holes which allow GHC/GHCi to display slightly different
--- error messages.
-cantFindErrorX :: (UnitInfo -> SDoc) -> ([FilePath] -> SDoc) -> FindingModuleOrInterface -> CantFindInstalled -> SDoc
-cantFindErrorX pkg_hidden_hint may_show_locations mod_or_interface (CantFindInstalled mod_name cfir) =
+cantFindErrorWith :: IfaceMessageOpts -> FindingModuleOrInterface -> CantFindInstalled -> Bool -> SDoc
+cantFindErrorWith opts mod_or_interface (CantFindInstalled mod_name cfir) interactiveErrorHints =
   let ambig = isAmbiguousInstalledReason cfir
       find_or_load = isLoadOrFindReason cfir
       ppr_what = prettyCantFindWhat find_or_load mod_or_interface ambig
@@ -279,6 +250,40 @@ cantFindErrorX pkg_hidden_hint may_show_locations mod_or_interface (CantFindInst
       <+> quotes (ppr unit)
       $$ pprReason (text "which is") reason
 
+    mode :: ErrorMode
+    mode
+      | interactiveErrorHints = InteractiveMode
+      | otherwise = case ifaceBuildingCabalPackage opts of
+          NoBuildingCabalPackage -> NormalMode
+          YesBuildingCabalPackage -> BuildingCabalPackage
+
+    pkg_hidden_hint :: UnitInfo -> SDoc
+    pkg_hidden_hint pkg = case mode of
+      NormalMode ->
+        empty
+      InteractiveMode ->
+        text "You can run" <+>
+        quotes (text ":set -package " <> ppr (unitPackageName pkg)) <+>
+        text "to expose it." $$
+        text "(Note: this unloads all the modules in the current scope.)"
+      BuildingCabalPackage ->
+        text "Perhaps you need to add" <+>
+        quotes (ppr (unitPackageName pkg)) <+>
+        text "to the build-depends in your .cabal file."
+
+    may_show_locations :: [FilePath] -> SDoc
+    may_show_locations files
+      | null files =
+          empty
+      | ifaceShowTriedFiles opts =
+          hang (text "Locations searched:") 2 $ vcat (map text files)
+      | otherwise =
+          text "Use" <+> text option <+> text "to see a list of the files searched for."
+      where
+        option :: String
+        option = case mode of
+          InteractiveMode -> ":set -v"
+          _ -> "-v"
 
 interfaceErrorDiagnostic :: IfaceMessageOpts -> IfaceMessage -> SDoc
 interfaceErrorDiagnostic opts = \ case

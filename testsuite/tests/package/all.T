@@ -13,11 +13,15 @@ test('package04',  normal, compile,      [incr_containers])
 test('package05',  normal, compile,      [incr_ghc + inc_ghc])
 test('package06',  normal, compile,      [incr_ghc])
 test('package06e', normalise_version('ghc'), compile_fail, [incr_ghc])
-test('ImportReexport', normalise_version('ghc'), compile_fail, ['-hide-all-packages -XNoImplicitPrelude'])
 test('package07e', normalise_version('ghc'), compile_fail, [incr_ghc + inc_ghc + hide_ghc])
 test('package08e', normalise_version('ghc'), compile_fail, [incr_ghc + hide_ghc])
 test('package09e', normal, compile_fail, ['-package "containers (Data.Map as M, Data.Set as M)"'])
 test('package10',  normal, compile,      ['-hide-all-packages -package "ghc (GHC.Types.Unique.FM as Prelude)" '])
+
+import_reexport_args = '-hide-all-packages -XNoImplicitPrelude '
+test('ImportReexport', normal, compile_fail, [import_reexport_args])
+test('ImportReexport_cabal', normal, compile_fail, [import_reexport_args + '-fbuilding-cabal-package'])
+test('ImportReexport_ghci', normal, compile_fail, [import_reexport_args + '-finteractive-error-hints'])
 
 test('T4806', normalise_version('containers'), compile_fail, ['-ignore-package containers'])
 test('T4806a', normalise_version('deepseq', 'containers', 'template-haskell'), compile_fail, ['-ignore-package deepseq'])
