@@ -48,6 +48,7 @@ module GHC.Driver.Main
     , Messager, batchMsg, batchMultiMsg
     , HscBackendAction (..), HscRecompStatus (..)
     , initModDetails
+    , compileWholeCoreBindings
     , initWholeCoreBindings
     , loadIfaceByteCode
     , loadIfaceByteCodeLazy
