@@ -447,17 +447,17 @@ addFamInsts :: [FamInst] -> TcM (TcGblEnv, ThBindEnv)
 --        (b) the type envt with stuff from data type decls
 addFamInsts fam_insts
   = tcExtendLocalFamInstEnv fam_insts $
-    tcExtendGlobalEnv axioms          $
+    tcExtendGlobalEnv axioms $
     do { traceTc "addFamInsts" (pprFamInsts fam_insts)
        ; (gbl_env, th_bndrs) <- addTyConsToGblEnv data_rep_tycons
-                    -- Does not add its axiom; that comes
-                    -- from adding the 'axioms' above
+                    -- NB: this does not add the data family instance axioms;
+                    -- those are added separately above.
        ; return (gbl_env, th_bndrs)
        }
   where
     axioms = map (ACoAxiom . toBranchedAxiom . famInstAxiom) fam_insts
     data_rep_tycons = famInstsRepTyCons fam_insts
-      -- The representation tycons for 'data instances' declarations
+      -- The representation tycons for data family instance declarations.
 
 {-
 Note [Deriving inside TH brackets]
@@ -533,7 +533,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty
                                                  , ai_tyvars = visible_skol_tvs
                                                  , ai_inst_env = mini_env }
                     ; df_stuff  <- mapAndRecoverM (tcDataFamInstDecl mb_info tv_skol_env) adts
-                    ; tf_insts1 <- mapAndRecoverM (tcTyFamInstDecl mb_info)   ats
+                    ; tf_insts1 <- mapAndRecoverM (tcTyFamInstDecl mb_info) ats
 
                       -- Check for missing associated types and build them
                       -- from their defaults (if available)
@@ -812,8 +812,11 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
                   tcConDecls (DDataInstance orig_res_ty) rec_rep_tc tc_ty_binders tc_res_kind
                       hs_cons
 
+              -- Generate fresh names for the representation TyCon and CoAxiom
+              -- of the data family instance.
               ; rep_tc_name <- newFamInstTyConName lfam_name pats
               ; axiom_name  <- newFamInstAxiomName lfam_name [pats]
+
               ; tc_rhs <- case data_cons of
                      DataTypeCons type_data data_cons -> return $
                         mkLevPolyDataTyConRhs

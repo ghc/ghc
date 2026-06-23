@@ -831,7 +831,7 @@ Wrinkles
      If we insert (F @Constraint tys) into a FamInstEnv, and look
      up (F @Type tys'), we /must/ ensure that the (C @Constraint tys)
      appears among the unifiables when we do the lookupRM' in
-     GHC.Core.FamInstEnv.lookup_fam_inst_env'.  So for the RoughMap we
+     GHC.Core.FamInstEnv.lookup_fam_inst_env.  So for the RoughMap we
      simply pretend that they are the same type constructor.  If we
      don't, we'll treat them as fully apart, which is unsound.
 

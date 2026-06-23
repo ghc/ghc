@@ -445,12 +445,11 @@ familyInstances envs tc
   = familyNameInstances envs (tyConName tc)
 
 familyNameInstances :: (FamInstEnv, FamInstEnv) -> Name -> [FamInst]
-familyNameInstances (pkg_fie, home_fie) fam
+familyNameInstances (pkg_fie, home_fie) fam_nm
   = get home_fie ++ get pkg_fie
   where
     get :: FamInstEnv -> [FamInst]
-    get (FamIE _ env) = lookupRM [RML_KnownTc fam] env
-
+    get (FamIE _ env) = lookupRM [RML_KnownTc fam_nm] env
 
 -- | Makes no particular effort to detect conflicts.
 unionFamInstEnv :: FamInstEnv -> FamInstEnv -> FamInstEnv
@@ -834,7 +833,8 @@ lookupFamInstEnvByTyCon :: FamInstEnvs -> TyCon -> [FamInst]
 lookupFamInstEnvByTyCon (pkg_ie, home_ie) fam_tc
   = get pkg_ie ++ get home_ie
   where
-    get (FamIE _ rm) = lookupRM [RML_KnownTc (tyConName fam_tc)] rm
+    fam_nm = tyConName fam_tc
+    get (FamIE _ rm) = lookupRM [RML_KnownTc fam_nm] rm
 
 lookupFamInstEnv
     :: FamInstEnvs
@@ -1019,26 +1019,24 @@ data FamInstLookupMode a where
   WantConflicts :: FamInst -> FamInstLookupMode FamInst
   WantMatches  :: FamInstLookupMode FamInstMatch
 
-lookup_fam_inst_env'          -- The worker, local to this module
-    :: forall a . FamInstLookupMode a
-    -> FamInstEnv
-    -> TyCon -> [Type]        -- What we are looking for
-    -> [a]
-lookup_fam_inst_env' lookup_mode (FamIE _ ie) fam match_tys
-  | isOpenFamilyTyCon fam
-  , let xs = rm_fun (lookupRM' rough_tmpl ie)   -- The common case
-    -- Avoid doing any of the allocation below if there are no instances to look at.
-  , not $ null xs
-  = mapMaybe' check_fun xs
-  | otherwise = []
-  where
-    rough_tmpl :: [RoughMatchLookupTc]
-    rough_tmpl = RML_KnownTc (tyConName fam) : map typeToRoughMatchLookupTc match_tys
+lookup_fam_inst_env           -- The worker, local to this module
+    :: forall a
+    .  FamInstLookupMode a
+    -> FamInstEnvs
+    -> TyCon -> [Type] -- What we are looking for
+    -> [a]             -- Successful matches
 
-    rm_fun :: (Bag FamInst, [FamInst]) -> [FamInst]
-    (rm_fun, check_fun) = case lookup_mode of
-                            WantConflicts fam_inst -> (snd, unify_fun fam_inst)
-                            WantMatches -> (bagToList . fst, match_fun)
+-- Precondition: the tycon is saturated (or over-saturated)
+
+lookup_fam_inst_env lookup_mode envs fam match_tys
+  = mapMaybe' check_fun $
+    famInstEnvCandidates lookup_mode envs fam match_tys
+  where
+    check_fun :: FamInst -> Maybe a
+    check_fun =
+      case lookup_mode of
+        WantConflicts fam_inst -> unify_fun fam_inst
+        WantMatches            -> match_fun
 
     -- Function used for finding unifiers
     unify_fun orig_fam_inst item@(FamInst { fi_axiom = old_axiom, fi_tys = tpl_tys, fi_tvs = tpl_tvs })
@@ -1084,21 +1082,25 @@ lookup_fam_inst_env' lookup_mode (FamIE _ ie) fam match_tys
     pre_rough_split_tys
       = (pre_match_tys1, pre_match_tys2)
 
-lookup_fam_inst_env           -- The worker, local to this module
-    :: FamInstLookupMode a
-    -> FamInstEnvs
-    -> TyCon -> [Type]        -- What we are looking for
-    -> [a]         -- Successful matches
+-- | All candidate 'FamInst's for a type or data family application,
+-- roughly filtered using 'RoughMap'.
+--
+-- See Note [FamInstEnv].
+famInstEnvCandidates
+  :: FamInstLookupMode a -> FamInstEnvs -> TyCon -> [Type] -> [FamInst]
+famInstEnvCandidates mode (pkg_ie, home_ie) fam match_tys
+  | not (isOpenFamilyTyCon fam) = []
+  | otherwise
+  = from home_ie ++ from pkg_ie
+  where
+    fam_nm = tyConName fam
+    rough_tmpl = RML_KnownTc fam_nm : map typeToRoughMatchLookupTc match_tys
+    pick = case mode of WantMatches      -> bagToList . fst
+                        WantConflicts {} -> snd
+    from (FamIE _ ie) = pick (lookupRM' rough_tmpl ie)
 
--- Precondition: the tycon is saturated (or over-saturated)
-
-lookup_fam_inst_env match_fun (pkg_ie, home_ie) fam tys
-  =  lookup_fam_inst_env' match_fun home_ie fam tys
-  ++ lookup_fam_inst_env' match_fun pkg_ie  fam tys
-
-{-
-Note [Over-saturated matches]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Over-saturated matches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's ok to look up an over-saturated type constructor.  E.g.
      type family F a :: * -> *
      type instance F (a,b) = Either (a->b)

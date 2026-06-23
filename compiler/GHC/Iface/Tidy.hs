@@ -204,8 +204,8 @@ mkBootModDetailsTc logger
                 | id <- typeEnvIds type_env
                 , keep_it id ]
 
-    final_tcs  = filterOut isWiredIn tcs
-                 -- See Note [Drop wired-in things]
+    final_tcs       = filterOut isWiredIn tcs
+                      -- See Note [Drop wired-in things]
     type_env'  = typeEnvFromEntities final_ids final_tcs pat_syns fam_insts
     insts'     = mkFinalClsInsts type_env' $ mkInstEnv insts
 
@@ -551,8 +551,15 @@ trimId do_trim id
 
 {- Note [Drop wired-in things]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We never put wired-in TyCons or Ids in an interface file.
-They are wired-in, so the compiler knows about them already.
+We never put wired-in TyThings (Id, TyCon, DataCon, CoAxiom) in interface files.
+They are wired-in, so the compiler knows about them fully. Putting a TyThing
+into its appropriate environment (e.g. into the TypeEnv or FamInstEnv) would
+be useless bloat: we always look up wired-in things directly, not by looking up
+in any environment.
+
+NB: DataCons need no separate treatment, as they are not standalone entities but
+implicit children of their parent TyCon (see implicitTyConThings). Dropping
+wired-in TyCons automatically drops their associated DataCons.
 
 Note [Don't attempt to trim data types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
