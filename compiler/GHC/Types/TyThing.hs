@@ -216,7 +216,7 @@ implicitTyConThings tc
 implicitCoTyCon :: TyCon -> [TyThing]
 implicitCoTyCon tc
   | Just co <- newTyConCo_maybe tc = [ACoAxiom $ toBranchedAxiom co]
-  | Just ax <- isClosedFamilyTyCon_maybe tc
+  | Just ax <- closedFamilyTyConCoAxiom_maybe tc
                                    = [ACoAxiom ax]
   | otherwise                      = []
 

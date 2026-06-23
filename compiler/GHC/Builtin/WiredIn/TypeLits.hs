@@ -5,7 +5,7 @@ module GHC.Builtin.WiredIn.TypeLits
 
   , typeNatTyCons
   , typeNatCoAxiomRules
-  , BuiltInSynFamily(..)
+  , BuiltinClosedTyFam(..)
 
     -- If you define a new built-in type family, make sure to export its TyCon
     -- from here as well.
@@ -33,7 +33,7 @@ import GHC.Core.Type
 import GHC.Core.Unify      ( tcMatchTys )
 import GHC.Data.Pair
 import GHC.Core.TyCon    ( TyCon, FamTyConFlav(..), mkFamilyTyCon, tyConArity
-                         , Injectivity(..), isBuiltInSynFamTyCon_maybe
+                         , Injectivity(..), builtInClosedTyFamTyCon_maybe
                          , mkTyConKind )
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Compare   ( tcEqType )
@@ -153,26 +153,26 @@ These functions aren't exported, so the effect is very local.
 --     Key utility functions
 -------------------------------------------------------------------------------
 
-tryInteractTopFam :: BuiltInSynFamily -> TyCon -> [Type] -> Type
+tryInteractTopFam :: BuiltinClosedTyFam -> TyCon -> [Type] -> Type
                   -> [(CoAxiomRule, TypeEqn)]
 -- The returned CoAxiomRule is always unary
 tryInteractTopFam fam fam_tc tys r
-  = [(bifinj_axr bif, eqn_out) | bif  <- sfInteract fam
+  = [(bifinj_axr bif, eqn_out) | bif  <- bctfInteract fam
                                , Just eqn_out <- [bifinj_proves bif eqn_in] ]
   where
     eqn_in :: TypeEqn
     eqn_in = Pair (mkTyConApp fam_tc tys) r
 
-tryInteractInertFam :: BuiltInSynFamily -> TyCon
+tryInteractInertFam :: BuiltinClosedTyFam -> TyCon
                     -> [Type] -> [Type] -- F tys1 ~ F tys2
                     -> [(CoAxiomRule, TypeEqn)]
 tryInteractInertFam builtin_fam fam_tc tys1 tys2
-  = [(bifinj_axr bif, eqn_out) | bif <- sfInteract builtin_fam
+  = [(bifinj_axr bif, eqn_out) | bif <- bctfInteract builtin_fam
                                , Just eqn_out <- [bifinj_proves bif eqn_in] ]
   where
     eqn_in = Pair (mkTyConApp fam_tc tys1) (mkTyConApp fam_tc tys2)
 
-tryMatchFam :: BuiltInSynFamily -> [Type]
+tryMatchFam :: BuiltinClosedTyFam -> [Type]
             -> Maybe (CoAxiomRule, [Type], Type)
 -- Does this reduce on the given arguments?
 -- If it does, returns (CoAxiomRule, types to instantiate the rule at, rhs type)
@@ -181,7 +181,7 @@ tryMatchFam :: BuiltInSynFamily -> [Type]
 tryMatchFam builtin_fam arg_tys
   = listToMaybe $   -- Pick first rule to match
     [ (bifrw_axr rw_ax, inst_tys, res_ty)
-    | rw_ax <- sfMatchFam builtin_fam
+    | rw_ax <- bctfMatchFam builtin_fam
     , Just (inst_tys,res_ty) <- [bifrw_match rw_ax arg_tys] ]
 
 -------------------------------------------------------------------------------
@@ -392,9 +392,9 @@ typeNatCoAxiomRules :: UniqFM FastString CoAxiomRule
 typeNatCoAxiomRules
   = listToUFM $
     [ pr | tc <- typeNatTyCons
-         , Just ops <- [isBuiltInSynFamTyCon_maybe tc]
-         , pr <- [ (bifinj_name bif, bifinj_axr bif) | bif <- sfInteract ops ]
-              ++ [ (bifrw_name bif,  bifrw_axr bif)  | bif <- sfMatchFam ops ] ]
+         , Just ops <- [builtInClosedTyFamTyCon_maybe tc]
+         , pr <- [ (bifinj_name bif, bifinj_axr bif) | bif <- bctfInteract ops ]
+              ++ [ (bifrw_name bif,  bifrw_axr bif)  | bif <- bctfMatchFam ops ] ]
 
 -------------------------------------------------------------------------------
 --                   Addition (+)
@@ -402,9 +402,9 @@ typeNatCoAxiomRules
 
 typeNatAddTyCon :: TyCon
 typeNatAddTyCon = mkTypeNatFunTyCon2 name
-  BuiltInSynFamily
-    { sfMatchFam  = axAddRewrites
-    , sfInteract  = axAddInjectivity
+  BuiltinClosedTyFam
+    { bctfMatchFam = axAddRewrites
+    , bctfInteract = axAddInjectivity
     }
   where
     name = mkWiredInTyConName UserSyntax gHC_INTERNAL_TYPENATS (fsLit "+")
@@ -455,9 +455,9 @@ axAddInjectivity
 
 typeNatSubTyCon :: TyCon
 typeNatSubTyCon = mkTypeNatFunTyCon2 name
-  BuiltInSynFamily
-    { sfMatchFam = axSubRewrites
-    , sfInteract = axSubInjectivity
+  BuiltinClosedTyFam
+    { bctfMatchFam = axSubRewrites
+    , bctfInteract = axSubInjectivity
     }
   where
   name = mkWiredInTyConName UserSyntax gHC_INTERNAL_TYPENATS (fsLit "-")
@@ -521,8 +521,8 @@ something more general.
 
 typeNatMulTyCon :: TyCon
 typeNatMulTyCon = mkTypeNatFunTyCon2 name
-  BuiltInSynFamily { sfMatchFam = axMulRewrites
-                   , sfInteract = axMulInjectivity  }
+  BuiltinClosedTyFam { bctfMatchFam = axMulRewrites
+                     , bctfInteract = axMulInjectivity  }
   where
     name = mkWiredInTyConName UserSyntax gHC_INTERNAL_TYPENATS (fsLit "*")
               typeNatMulTyFamNameKey typeNatMulTyCon
@@ -569,16 +569,16 @@ axMulInjectivity
 
 typeNatDivTyCon :: TyCon
 typeNatDivTyCon = mkTypeNatFunTyCon2 name
-  BuiltInSynFamily { sfMatchFam = axDivRewrites
-                   , sfInteract = [] }
+  BuiltinClosedTyFam { bctfMatchFam = axDivRewrites
+                     , bctfInteract = [] }
   where
   name = mkWiredInTyConName UserSyntax gHC_INTERNAL_TYPENATS (fsLit "Div")
             typeNatDivTyFamNameKey typeNatDivTyCon
 
 typeNatModTyCon :: TyCon
 typeNatModTyCon = mkTypeNatFunTyCon2 name
-  BuiltInSynFamily { sfMatchFam = axModRewrites
-                   , sfInteract = [] }
+  BuiltinClosedTyFam { bctfMatchFam = axModRewrites
+                     , bctfInteract = [] }
   where
   name = mkWiredInTyConName UserSyntax gHC_INTERNAL_TYPENATS (fsLit "Mod")
             typeNatModTyFamNameKey typeNatModTyCon
@@ -605,8 +605,8 @@ axModRewrites
 
 typeNatExpTyCon :: TyCon  -- Exponentiation
 typeNatExpTyCon = mkTypeNatFunTyCon2 name
-  BuiltInSynFamily { sfMatchFam = axExpRewrites
-                   , sfInteract = axExpInjectivity }
+  BuiltinClosedTyFam { bctfMatchFam = axExpRewrites
+                     , bctfInteract = axExpInjectivity }
   where
   name = mkWiredInTyConName UserSyntax gHC_INTERNAL_TYPENATS (fsLit "^")
                 typeNatExpTyFamNameKey typeNatExpTyCon
@@ -647,8 +647,8 @@ axExpInjectivity
 
 typeNatLogTyCon :: TyCon
 typeNatLogTyCon = mkTypeNatFunTyCon1 name
-  BuiltInSynFamily { sfMatchFam = axLogRewrites
-                   , sfInteract = [] }
+  BuiltinClosedTyFam { bctfMatchFam = axLogRewrites
+                     , bctfInteract = [] }
   where
   name = mkWiredInTyConName UserSyntax gHC_INTERNAL_TYPENATS (fsLit "Log2")
             typeNatLogTyFamNameKey typeNatLogTyCon
@@ -670,15 +670,15 @@ typeNatCmpTyCon
       bndrs 0
       orderingKind
       Nothing
-      (BuiltInSynFamTyCon ops)
+      (ClosedTypeFamilyTyCon $ CTF_BuiltIn ops)
       Nothing
       NotInjective
 
   where
     name = mkWiredInTyConName UserSyntax gHC_INTERNAL_TYPENATS_INTERNAL (fsLit "CmpNat")
                   typeNatCmpTyFamNameKey typeNatCmpTyCon
-    ops = BuiltInSynFamily { sfMatchFam = axCmpNatRewrites
-                           , sfInteract = axCmpNatInjectivity }
+    ops = BuiltinClosedTyFam { bctfMatchFam = axCmpNatRewrites
+                             , bctfInteract = axCmpNatInjectivity }
     bndrs = mkTemplateAnonTyConBinders [ naturalTy, naturalTy ]
 
 axCmpNatRewrites :: [BuiltInFamRewrite]
@@ -705,15 +705,15 @@ typeSymbolCmpTyCon =
     bndrs 0
     orderingKind
     Nothing
-    (BuiltInSynFamTyCon ops)
+    (ClosedTypeFamilyTyCon $ CTF_BuiltIn ops)
     Nothing
     NotInjective
 
   where
   name = mkWiredInTyConName UserSyntax gHC_INTERNAL_TYPELITS_INTERNAL (fsLit "CmpSymbol")
                 typeSymbolCmpTyFamNameKey typeSymbolCmpTyCon
-  ops = BuiltInSynFamily { sfMatchFam = axSymbolCmpRewrites
-                         , sfInteract = axSymbolCmpInjectivity }
+  ops = BuiltinClosedTyFam { bctfMatchFam = axSymbolCmpRewrites
+                           , bctfInteract = axSymbolCmpInjectivity }
   bndrs = mkTemplateAnonTyConBinders [typeSymbolKind, typeSymbolKind]
 
 ss,ts :: TyVar  -- Of kind Symbol
@@ -739,8 +739,8 @@ axSymbolCmpInjectivity
 
 typeSymbolAppendTyCon :: TyCon
 typeSymbolAppendTyCon = mkTypeSymbolFunTyCon2 name
-  BuiltInSynFamily { sfMatchFam = axAppendRewrites
-                   , sfInteract = axAppendInjectivity }
+  BuiltinClosedTyFam { bctfMatchFam = axAppendRewrites
+                     , bctfInteract = axAppendInjectivity }
   where
   name = mkWiredInTyConName UserSyntax gHC_INTERNAL_TYPELITS (fsLit "AppendSymbol")
                 typeSymbolAppendFamNameKey typeSymbolAppendTyCon
@@ -790,14 +790,14 @@ typeConsSymbolTyCon =
     bndrs 0
     typeSymbolKind
     Nothing
-    (BuiltInSynFamTyCon ops)
+    (ClosedTypeFamilyTyCon $ CTF_BuiltIn ops)
     Nothing
     (Injective [True, True])
   where
   name = mkWiredInTyConName UserSyntax gHC_INTERNAL_TYPELITS (fsLit "ConsSymbol")
                   typeConsSymbolTyFamNameKey typeConsSymbolTyCon
-  ops = BuiltInSynFamily  { sfMatchFam = axConsRewrites
-                          , sfInteract = axConsInjectivity }
+  ops = BuiltinClosedTyFam { bctfMatchFam = axConsRewrites
+                           , bctfInteract = axConsInjectivity }
   bndrs = mkTemplateAnonTyConBinders [ charTy, typeSymbolKind ]
 
 axConsRewrites :: [BuiltInFamRewrite]
@@ -834,14 +834,14 @@ typeUnconsSymbolTyCon =
     bndrs 0
     res_kind
     Nothing
-    (BuiltInSynFamTyCon ops)
+    (ClosedTypeFamilyTyCon $ CTF_BuiltIn ops)
     Nothing
     (Injective [True])
   where
   name = mkWiredInTyConName UserSyntax gHC_INTERNAL_TYPELITS (fsLit "UnconsSymbol")
                   typeUnconsSymbolTyFamNameKey typeUnconsSymbolTyCon
-  ops = BuiltInSynFamily { sfMatchFam = axUnconsRewrites
-                         , sfInteract = axUnconsInjectivity }
+  ops = BuiltinClosedTyFam { bctfMatchFam = axUnconsRewrites
+                           , bctfInteract = axUnconsInjectivity }
   bndrs = mkTemplateAnonTyConBinders [ typeSymbolKind ]
   res_kind = mkMaybeTy charSymbolPairKind
 
@@ -888,14 +888,14 @@ typeCharToNatTyCon =
     bndrs 0
     naturalTy
     Nothing
-    (BuiltInSynFamTyCon ops)
+    (ClosedTypeFamilyTyCon $ CTF_BuiltIn ops)
     Nothing
     (Injective [True])
   where
   name = mkWiredInTyConName UserSyntax gHC_INTERNAL_TYPELITS (fsLit "CharToNat")
                   typeCharToNatTyFamNameKey typeCharToNatTyCon
-  ops = BuiltInSynFamily { sfMatchFam = axCharToNatRewrites
-                         , sfInteract = axCharToNatInjectivity }
+  ops = BuiltinClosedTyFam { bctfMatchFam = axCharToNatRewrites
+                           , bctfInteract = axCharToNatInjectivity }
   bndrs = mkTemplateAnonTyConBinders [ charTy ]
 
 axCharToNatRewrites :: [BuiltInFamRewrite]
@@ -921,14 +921,14 @@ typeNatToCharTyCon =
     bndrs 0
     charTy
     Nothing
-    (BuiltInSynFamTyCon ops)
+    (ClosedTypeFamilyTyCon $ CTF_BuiltIn ops)
     Nothing
     (Injective [True])
   where
   name = mkWiredInTyConName UserSyntax gHC_INTERNAL_TYPELITS (fsLit "NatToChar")
                   typeNatToCharTyFamNameKey typeNatToCharTyCon
-  ops = BuiltInSynFamily { sfMatchFam = axNatToCharRewrites
-                         , sfInteract = axNatToCharInjectivity }
+  ops = BuiltinClosedTyFam { bctfMatchFam = axNatToCharRewrites
+                           , bctfInteract = axNatToCharInjectivity }
   bndrs = mkTemplateAnonTyConBinders [ naturalTy ]
 
 axNatToCharRewrites :: [BuiltInFamRewrite]
@@ -955,14 +955,14 @@ typeCharCmpTyCon =
     bndrs 0
     orderingKind
     Nothing
-    (BuiltInSynFamTyCon ops)
+    (ClosedTypeFamilyTyCon $ CTF_BuiltIn ops)
     Nothing
     NotInjective
   where
   name = mkWiredInTyConName UserSyntax gHC_INTERNAL_TYPELITS_INTERNAL (fsLit "CmpChar")
                   typeCharCmpTyFamNameKey typeCharCmpTyCon
-  ops = BuiltInSynFamily { sfMatchFam = axCharCmpRewrites
-                         , sfInteract = axCharCmpInjectivity }
+  ops = BuiltinClosedTyFam { bctfMatchFam = axCharCmpRewrites
+                           , bctfInteract = axCharCmpInjectivity }
   bndrs = mkTemplateAnonTyConBinders [ charTy, charTy ]
 
 sc :: TyVar  -- Of kind Char
@@ -1061,39 +1061,39 @@ isOrderingLitTy tc =
          | otherwise                -> Nothing
 
 -- Make a unary built-in constructor of kind: Nat -> Nat
-mkTypeNatFunTyCon1 :: Name -> BuiltInSynFamily -> TyCon
+mkTypeNatFunTyCon1 :: Name -> BuiltinClosedTyFam -> TyCon
 mkTypeNatFunTyCon1 op tcb =
   mkFamilyTyCon op (mkTyConKind bndrs naturalTy)
     bndrs 0
     naturalTy
     Nothing
-    (BuiltInSynFamTyCon tcb)
+    (ClosedTypeFamilyTyCon $ CTF_BuiltIn tcb)
     Nothing
     NotInjective
   where
     bndrs = mkTemplateAnonTyConBinders [ naturalTy ]
 
 -- Make a binary built-in constructor of kind: Nat -> Nat -> Nat
-mkTypeNatFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
+mkTypeNatFunTyCon2 :: Name -> BuiltinClosedTyFam -> TyCon
 mkTypeNatFunTyCon2 op tcb =
   mkFamilyTyCon op (mkTyConKind bndrs naturalTy)
     bndrs 0
     naturalTy
     Nothing
-    (BuiltInSynFamTyCon tcb)
+    (ClosedTypeFamilyTyCon $ CTF_BuiltIn tcb)
     Nothing
     NotInjective
   where
     bndrs = mkTemplateAnonTyConBinders [ naturalTy, naturalTy ]
 
 -- Make a binary built-in constructor of kind: Symbol -> Symbol -> Symbol
-mkTypeSymbolFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
+mkTypeSymbolFunTyCon2 :: Name -> BuiltinClosedTyFam -> TyCon
 mkTypeSymbolFunTyCon2 op tcb =
   mkFamilyTyCon op (mkTyConKind bndrs typeSymbolKind)
     bndrs 0
     typeSymbolKind
     Nothing
-    (BuiltInSynFamTyCon tcb)
+    (ClosedTypeFamilyTyCon $ CTF_BuiltIn tcb)
     Nothing
     NotInjective
   where

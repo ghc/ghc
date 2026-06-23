@@ -3413,7 +3413,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
   ; inj' <- tcInjectivity tc_bndrs inj
   ; checkResultSigFlag tc_name sig  -- check after injectivity for better errors
   ; let tycon = mkFamilyTyCon tc_name kind tc_bndrs 0 res_kind
-                               (resultVariableName sig) OpenSynFamilyTyCon
+                               (resultVariableName sig) OpenTypeFamilyTyCon
                                parent inj'
   ; return (tycon, []) }
 
@@ -3437,7 +3437,8 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
            Nothing   ->
               let tc = mkFamilyTyCon tc_name kind tc_bndrs 0 res_kind
                                      (resultVariableName sig)
-                                     AbstractClosedSynFamilyTyCon parent
+                                     (ClosedTypeFamilyTyCon CTF_Abstract)
+                                     parent
                                      inj'
               in return (tc, [])
            Just eqns -> do {
@@ -3464,7 +3465,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
               | otherwise = Just (mkBranchedCoAxiom co_ax_name fam_tc branches)
 
              fam_tc = mkFamilyTyCon tc_name kind tc_bndrs 0 res_kind (resultVariableName sig)
-                      (ClosedSynFamilyTyCon mb_co_ax) parent inj'
+                      (ClosedTypeFamilyTyCon $ CTF mb_co_ax) parent inj'
 
          -- We check for instance validity later, when doing validity
          -- checking for the tycon. Exception: checking equations
@@ -4996,16 +4997,17 @@ checkValidTyCon tc
 
             | Just fam_flav <- famTyConFlav_maybe tc
               -> case fam_flav of
-               { ClosedSynFamilyTyCon (Just ax)
-                   -> addErrCtxt (ClosedFamEqnCtxt tc) $
-                      checkValidCoAxiom ax
-               ; ClosedSynFamilyTyCon Nothing   -> return ()
-               ; AbstractClosedSynFamilyTyCon ->
-                 do { hsBoot <- tcIsHsBootOrSig
-                    ; checkTc hsBoot $ TcRnAbstractClosedTyFamDecl }
-               ; DataFamilyTyCon {}           -> return ()
-               ; OpenSynFamilyTyCon           -> return ()
-               ; BuiltInSynFamTyCon _         -> return () }
+               { ClosedTypeFamilyTyCon ctf ->
+                 case ctf of
+                   { CTF (Just ax) ->
+                       addErrCtxt (ClosedFamEqnCtxt tc) $ checkValidCoAxiom ax
+                   ; CTF Nothing -> return ()
+                   ; CTF_Abstract ->
+                     do { hsBoot <- tcIsHsBootOrSig
+                        ; checkTc hsBoot $ TcRnAbstractClosedTyFamDecl }
+                   ; CTF_BuiltIn {} -> return () }
+               ; DataFamilyTyCon {}  -> return ()
+               ; OpenTypeFamilyTyCon -> return () }
 
              | otherwise -> do
                { -- Check the context on the data decl
@@ -5281,7 +5283,7 @@ checkValidDataCon dflags existential_ok tc con
                , text "Datacon rep type:" <+> ppr (dataConRepType con)
                , text "Datacon wrapper type:" <+> ppr (dataConWrapperType con)
                , text "Rep typcon binders:" <+> ppr (tyConBinders (dataConTyCon con))
-               , case tyConFamInst_maybe (dataConTyCon con) of
+               , case tyConDataFamInst_maybe (dataConTyCon con) of
                    Nothing -> text "not family"
                    Just (f, _) -> ppr (tyConBinders f) ]
     }

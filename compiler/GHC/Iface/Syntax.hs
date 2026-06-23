@@ -8,7 +8,8 @@
 module GHC.Iface.Syntax (
         module GHC.Iface.Type,
 
-        IfaceDecl(..), IfaceFamTyConFlav(..), IfaceClassOp(..), IfaceAT(..),
+        IfaceDecl(..), IfaceFamTyConFlav(..), IfaceClosedTyFamTyCon(..),
+        IfaceClassOp(..), IfaceAT(..),
         IfaceConDecl(..), IfaceConDecls(..), IfaceEqSpec,
         IfaceExpr(..), IfaceAlt(..), IfaceLetBndr(..), IfaceBinding,
         IfaceBindingX(..), IfaceMaybeRhs(..), IfaceConAlt(..),
@@ -299,14 +300,22 @@ data IfaceTyConParent
        IfaceAppArgs  -- Arguments of the family TyCon
 
 data IfaceFamTyConFlav
-  = IfaceDataFamilyTyCon                      -- Data family
-  | IfaceOpenSynFamilyTyCon
-  | IfaceClosedSynFamilyTyCon (Maybe (IfExtName, [IfaceAxBranch]))
+  -- | Data family
+  = IfaceDataFamilyTyCon
+
+  -- | Open type family
+  | IfaceOpenTypeFamilyTyCon
+
+  -- | Closed type family
+  | IfaceClosedTypeFamilyTyCon IfaceClosedTyFamTyCon
+
+data IfaceClosedTyFamTyCon
+  = IfaceClosedTyFamTyCon (Maybe (IfExtName, [IfaceAxBranch]))
     -- ^ Name of associated axiom and branches for pretty printing purposes,
     -- or 'Nothing' for an empty closed family without an axiom
     -- See Note [Pretty printing via Iface syntax] in "GHC.Types.TyThing.Ppr"
-  | IfaceAbstractClosedSynFamilyTyCon
-  | IfaceBuiltInSynFamTyCon -- for pretty printing purposes only
+  | IfaceAbstractClosedTyFamTyCon
+  | IfaceBuiltInClosedTyFamTyCon
 
 data IfaceClassOp
   = IfaceClassOp IfaceTopBndr
@@ -1382,8 +1391,10 @@ pprIfaceDecl ss decl@(IfaceFamily { ifName = tycon
 
     decl_head = pprIfaceDeclHead decl suppress_bndr_sig [] ss tycon binders
 
-    pp_where (IfaceClosedSynFamilyTyCon {}) = text "where"
-    pp_where _                              = empty
+    pp_where (IfaceClosedTypeFamilyTyCon (IfaceClosedTyFamTyCon {}))
+      = text "where"
+    pp_where _
+      = empty
 
     pp_inj Nothing    _   = empty
     pp_inj (Just res) inj
@@ -1397,16 +1408,18 @@ pprIfaceDecl ss decl@(IfaceFamily { ifName = tycon
 
     pp_rhs IfaceDataFamilyTyCon
       = ppShowIface ss (text "data")
-    pp_rhs IfaceOpenSynFamilyTyCon
+    pp_rhs IfaceOpenTypeFamilyTyCon
       = ppShowIface ss (text "open")
-    pp_rhs IfaceAbstractClosedSynFamilyTyCon
-      = ppShowIface ss (text "closed, abstract")
-    pp_rhs (IfaceClosedSynFamilyTyCon {})
-      = empty  -- see pp_branches
-    pp_rhs IfaceBuiltInSynFamTyCon
-      = ppShowIface ss (text "built-in")
+    pp_rhs (IfaceClosedTypeFamilyTyCon ctf)
+      = case ctf of
+          IfaceAbstractClosedTyFamTyCon ->
+            ppShowIface ss (text "closed, abstract")
+          IfaceClosedTyFamTyCon {} ->
+            empty -- see pp_branches
+          IfaceBuiltInClosedTyFamTyCon ->
+            ppShowIface ss (text "built-in")
 
-    pp_branches (IfaceClosedSynFamilyTyCon (Just (ax, brs)))
+    pp_branches (IfaceClosedTypeFamilyTyCon (IfaceClosedTyFamTyCon (Just (ax, brs))))
       = vcat (unzipWith (pprAxBranch
                      (pprPrefixIfDeclBndr
                        (ss_how_much ss)
@@ -2008,13 +2021,15 @@ freeNamesIfIdDetails IfDFunId            = emptyNameSet
 
 -- All other changes are handled via the version info on the tycon
 freeNamesIfFamFlav :: IfaceFamTyConFlav -> NameSet
-freeNamesIfFamFlav IfaceOpenSynFamilyTyCon             = emptyNameSet
+freeNamesIfFamFlav IfaceOpenTypeFamilyTyCon            = emptyNameSet
 freeNamesIfFamFlav IfaceDataFamilyTyCon                = emptyNameSet
-freeNamesIfFamFlav (IfaceClosedSynFamilyTyCon (Just (ax, br)))
-  = unitNameSet ax &&& fnList freeNamesIfAxBranch br
-freeNamesIfFamFlav (IfaceClosedSynFamilyTyCon Nothing) = emptyNameSet
-freeNamesIfFamFlav IfaceAbstractClosedSynFamilyTyCon   = emptyNameSet
-freeNamesIfFamFlav IfaceBuiltInSynFamTyCon             = emptyNameSet
+freeNamesIfFamFlav (IfaceClosedTypeFamilyTyCon ctf) =
+  case ctf of
+    IfaceClosedTyFamTyCon (Just (ax, br)) ->
+      unitNameSet ax &&& fnList freeNamesIfAxBranch br
+    IfaceClosedTyFamTyCon Nothing -> emptyNameSet
+    IfaceBuiltInClosedTyFamTyCon -> emptyNameSet
+    IfaceAbstractClosedTyFamTyCon -> emptyNameSet
 
 freeNamesIfContext :: IfaceContext -> NameSet
 freeNamesIfContext = fnList freeNamesIfType
@@ -2503,20 +2518,22 @@ represent a small proportion of all declarations.
 -}
 
 instance Binary IfaceFamTyConFlav where
-    put_ bh IfaceDataFamilyTyCon              = putByte bh 0
-    put_ bh IfaceOpenSynFamilyTyCon           = putByte bh 1
-    put_ bh (IfaceClosedSynFamilyTyCon mb)    = putByte bh 2 >> put_ bh mb
-    put_ bh IfaceAbstractClosedSynFamilyTyCon = putByte bh 3
-    put_ _ IfaceBuiltInSynFamTyCon
-        = pprPanic "Cannot serialize IfaceBuiltInSynFamTyCon, used for pretty-printing only" Outputable.empty
+    put_ bh IfaceDataFamilyTyCon             = putByte bh 0
+    put_ bh IfaceOpenTypeFamilyTyCon         = putByte bh 1
+    put_ bh (IfaceClosedTypeFamilyTyCon ctf) =
+      case ctf of
+        IfaceClosedTyFamTyCon mb      -> putByte bh 2 >> put_ bh mb
+        IfaceAbstractClosedTyFamTyCon -> putByte bh 3
+        IfaceBuiltInClosedTyFamTyCon  ->
+          pprPanic "Cannot serialize IfaceBuiltInClosedTyFamTyCon (pretty-printing only)" Outputable.empty
 
     get bh = do { h <- getByte bh
                 ; case h of
                     0 -> return IfaceDataFamilyTyCon
-                    1 -> return IfaceOpenSynFamilyTyCon
+                    1 -> return IfaceOpenTypeFamilyTyCon
                     2 -> do { mb <- get bh
-                            ; return (IfaceClosedSynFamilyTyCon mb) }
-                    3 -> return IfaceAbstractClosedSynFamilyTyCon
+                            ; return (IfaceClosedTypeFamilyTyCon $ IfaceClosedTyFamTyCon mb) }
+                    3 -> return $ IfaceClosedTypeFamilyTyCon IfaceAbstractClosedTyFamTyCon
                     _ -> pprPanic "Binary.get(IfaceFamTyConFlav): Invalid tag"
                                   (ppr (fromIntegral h :: Int)) }
 
@@ -3243,10 +3260,14 @@ instance NFData IfaceLetBndr where
 instance NFData IfaceFamTyConFlav where
   rnf = \case
     IfaceDataFamilyTyCon -> ()
-    IfaceOpenSynFamilyTyCon -> ()
-    IfaceClosedSynFamilyTyCon f1 -> rnf f1
-    IfaceAbstractClosedSynFamilyTyCon -> ()
-    IfaceBuiltInSynFamTyCon -> ()
+    IfaceOpenTypeFamilyTyCon -> ()
+    IfaceClosedTypeFamilyTyCon f1 -> rnf f1
+
+instance NFData IfaceClosedTyFamTyCon where
+  rnf = \case
+    IfaceClosedTyFamTyCon ax -> rnf ax
+    IfaceAbstractClosedTyFamTyCon -> ()
+    IfaceBuiltInClosedTyFamTyCon -> ()
 
 instance NFData IfaceTickish where
   rnf = \case

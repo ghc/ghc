@@ -1447,7 +1447,7 @@ gen_Data_binds loc (DerivInstTys{dit_rep_tc = rep_tc})
         -- even though rep_tc has kind * -> * -> * -> *
         -- Hence looking for the kind of fam_tc not rep_tc
         -- See #4896
-    tycon_kind = case tyConFamInst_maybe rep_tc of
+    tycon_kind = case tyConDataFamInst_maybe rep_tc of
                     Just (fam_tc, _) -> tyConKind fam_tc
                     Nothing          -> tyConKind rep_tc
     gcast_binds | tycon_kind `tcEqKind` kind1 = mk_gcast dataCast1_RDR gcast1_RDR
@@ -2137,7 +2137,7 @@ mkParentType :: TyCon -> Type
 -- Turn the representation tycon of a family into
 -- a use of its family constructor
 mkParentType tc
-  = case tyConFamInst_maybe tc of
+  = case tyConDataFamInst_maybe tc of
        Nothing  -> mkTyConApp tc (mkTyVarTys (tyConTyVars tc))
        Just (fam_tc,tys) -> mkTyConApp fam_tc tys
 

@@ -25,7 +25,8 @@ module GHC.Core.Coercion.Axiom (
        CoAxiomRule(..), BuiltInFamRewrite(..), BuiltInFamInjectivity(..), TypeEqn,
        coAxiomRuleArgRoles, coAxiomRuleRole,
        coAxiomRuleBranch_maybe, isNewtypeAxiomRule_maybe,
-       BuiltInSynFamily(..), trivialBuiltInFamily
+       ClosedTyFam(..), BuiltinClosedTyFam(..),
+       trivialBuiltInClosedTyFam
        ) where
 
 import GHC.Prelude
@@ -642,17 +643,27 @@ instance Outputable CoAxiomRule where
 *                                                                      *
 ********************************************************************* -}
 
-
 -- | A more explicit representation for `t1 ~ t2`.
 type TypeEqn = Pair Type
 
--- Type checking of built-in families
-data BuiltInSynFamily = BuiltInSynFamily
-  { sfMatchFam :: [BuiltInFamRewrite]
-  , sfInteract :: [BuiltInFamInjectivity]
+-- | Equations (and interaction rules) for a closed type family.
+data ClosedTyFam
+  -- | The equations for a standard (not built-in) closed type family, e.g.
+  -- @type family F x where { F Int = Bool }@.
+  = CTF (Maybe (CoAxiom Branched)) -- ^ 'Nothing' <=> the type family has no equations
+  -- | The equations and interaction rules for a built-in closed type family.
+  | CTF_BuiltIn BuiltinClosedTyFam
+  -- | A closed type family declared in an hs-boot file, with a declaration
+  -- of the form @type family F a where ..@ (the @..@ is source syntax, not an elision).
+  | CTF_Abstract
+
+-- | The equations and interaction rules of a built-in closed type family.
+data BuiltinClosedTyFam = BuiltinClosedTyFam
+  { bctfMatchFam :: [BuiltInFamRewrite]
+  , bctfInteract :: [BuiltInFamInjectivity]
     -- If given these type arguments and RHS, returns the equalities that
     -- are guaranteed to hold.  That is, if
-    --     (ar, Pair s1 s2)  is an element of  (sfInteract tys ty)
+    --     (ar, Pair s1 s2)  is an element of  (bctfInteract tys ty)
     -- then  AxiomRule ar [co :: F tys ~ ty]  ::  s1~s2
   }
 
@@ -696,6 +707,11 @@ data BuiltInFamRewrite  -- Argument roles and result role are always Nominal
        --      * bifrw_proves (map (return @Pair) inst_tys) = Just (return @Pair res_ty)
 
 
--- Provides default implementations that do nothing.
-trivialBuiltInFamily :: BuiltInSynFamily
-trivialBuiltInFamily = BuiltInSynFamily { sfMatchFam = [], sfInteract = [] }
+-- | An empty built-in closed type family (no equations, no interaction rules).
+trivialBuiltInClosedTyFam :: BuiltinClosedTyFam
+trivialBuiltInClosedTyFam =
+  BuiltinClosedTyFam
+    { bctfMatchFam = []
+    , bctfInteract = []
+    }
+

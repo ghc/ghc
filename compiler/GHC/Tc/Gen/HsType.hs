@@ -2173,7 +2173,7 @@ tcTyVar name         -- Could be a tyvar, a tycon, or a datacon
              -> return (mkTyConTy tc, tyConKind tc)
 
            AGlobal (AConLike (RealDataCon dc))
-             -> do { when (isFamInstTyCon (dataConTyCon dc)) $
+             -> do { when (isDataFamInstTyCon (dataConTyCon dc)) $
                        -- see #15245
                        promotionErr name FamDataConPE
                    ; let (_, _, _, theta, _, _) = dataConFullSig dc

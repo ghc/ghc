@@ -700,10 +700,17 @@ rnIfaceClassBody
         }
 
 rnIfaceFamTyConFlav :: Rename IfaceFamTyConFlav
-rnIfaceFamTyConFlav (IfaceClosedSynFamilyTyCon (Just (n, axs)))
-    = IfaceClosedSynFamilyTyCon . Just <$> ((,) <$> rnIfaceNeverExported n
-                                                <*> mapM rnIfaceAxBranch axs)
-rnIfaceFamTyConFlav flav = pure flav
+rnIfaceFamTyConFlav (IfaceClosedTypeFamilyTyCon ctf)
+  = IfaceClosedTypeFamilyTyCon <$>
+      case ctf of
+        IfaceAbstractClosedTyFamTyCon -> pure IfaceAbstractClosedTyFamTyCon
+        IfaceBuiltInClosedTyFamTyCon -> pure IfaceBuiltInClosedTyFamTyCon
+        IfaceClosedTyFamTyCon mb_ax -> IfaceClosedTyFamTyCon <$> traverse rn_coax mb_ax
+  where
+    rn_coax (n, axs) = ((,) <$> rnIfaceNeverExported n
+                            <*> mapM rnIfaceAxBranch axs)
+rnIfaceFamTyConFlav IfaceOpenTypeFamilyTyCon = pure IfaceOpenTypeFamilyTyCon
+rnIfaceFamTyConFlav IfaceDataFamilyTyCon = pure IfaceDataFamilyTyCon
 
 rnIfaceAT :: Rename IfaceAT
 rnIfaceAT (IfaceAT decl mb_ty)

@@ -192,19 +192,23 @@ tyConToIfaceDecl env tycon
     if_syn_type ty = tidyToIfaceType tc_env1 ty
     if_res_var     = getOccFS `fmap` tyConFamilyResVar_maybe tycon
 
-    parent = case tyConFamInstSig_maybe tycon of
+    parent = case tyConDataFamInstSig_maybe tycon of
                Just (tc, ty, ax) -> IfDataInstance (coAxiomName ax)
                                                    (toIfaceTyCon tc)
                                                    (tidyToIfaceTcArgs tc_env1 tc ty)
                Nothing           -> IfNoParent
 
-    to_if_fam_flav OpenSynFamilyTyCon             = IfaceOpenSynFamilyTyCon
-    to_if_fam_flav AbstractClosedSynFamilyTyCon   = IfaceAbstractClosedSynFamilyTyCon
-    to_if_fam_flav (DataFamilyTyCon {})           = IfaceDataFamilyTyCon
-    to_if_fam_flav (BuiltInSynFamTyCon {})        = IfaceBuiltInSynFamTyCon
-    to_if_fam_flav (ClosedSynFamilyTyCon Nothing) = IfaceClosedSynFamilyTyCon Nothing
-    to_if_fam_flav (ClosedSynFamilyTyCon (Just ax))
-      = IfaceClosedSynFamilyTyCon (Just (axn, ibr))
+    to_if_fam_flav :: FamTyConFlav -> IfaceFamTyConFlav
+    to_if_fam_flav OpenTypeFamilyTyCon         = IfaceOpenTypeFamilyTyCon
+    to_if_fam_flav (DataFamilyTyCon {})        = IfaceDataFamilyTyCon
+    to_if_fam_flav (ClosedTypeFamilyTyCon ctf) = IfaceClosedTypeFamilyTyCon (to_if_ctf ctf)
+
+    to_if_ctf :: ClosedTyFam -> IfaceClosedTyFamTyCon
+    to_if_ctf CTF_Abstract     = IfaceAbstractClosedTyFamTyCon
+    to_if_ctf (CTF_BuiltIn {}) = IfaceBuiltInClosedTyFamTyCon
+    to_if_ctf (CTF Nothing)    = IfaceClosedTyFamTyCon Nothing
+    to_if_ctf (CTF (Just ax))
+      = IfaceClosedTyFamTyCon (Just (axn, ibr))
       where defs = fromBranches $ coAxiomBranches ax
             lhss = map coAxBranchLHS defs
             ibr  = map (coAxBranchToIfaceBranch tycon lhss) defs

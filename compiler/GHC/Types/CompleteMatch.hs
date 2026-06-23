@@ -63,6 +63,6 @@ completeMatchAppliesAtType ty cm = all @Maybe ty_matches (getUnique <$> cmResult
       | otherwise
       = False
     fam_tc `is_family_ty_con_of` repr_tc =
-      case fst <$> tyConFamInst_maybe repr_tc of
+      case fst <$> tyConDataFamInst_maybe repr_tc of
         Just tc -> tc `hasKey` fam_tc
         Nothing -> False

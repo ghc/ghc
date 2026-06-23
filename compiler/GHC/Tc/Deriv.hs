@@ -552,7 +552,7 @@ deriveClause rep_tc scoped_tvs mb_lderiv_strat (L loc deriv_preds) err_ctxt
         return (snd <$> earlyDerivSpecs)
   where
     tvs = tyConTyVars rep_tc
-    (tc, tys) = case tyConFamInstSig_maybe rep_tc of
+    (tc, tys) = case tyConDataFamInstSig_maybe rep_tc of
                         -- data family:
                   Just (fam_tc, pats, _) -> (fam_tc, pats)
       -- NB: deriveTyData wants the *user-specified*
@@ -966,7 +966,7 @@ deriveTyData tc tc_args mb_deriv_strat deriv_tvs cls cls_tys cls_arg_kind
 You might wonder if we could use (tyConArity tc) at this point, rather
 than (length tc_args).  But for data families the two can differ!  The
 tc and tc_args passed into 'deriveTyData' come from 'deriveClause' which
-in turn gets them from 'tyConFamInstSig_maybe' which in turn gets them
+in turn gets them from 'tyConDataFamInstSig_maybe' which in turn gets them
 from DataFamInstTyCon:
 
 | DataFamInstTyCon          -- See Note [Data type families]

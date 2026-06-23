@@ -452,7 +452,7 @@ todoForTyCons mod mod_id tycons = do
             , tc''   <- tc' : promoted
               -- Don't make bindings for data-family instance tycons.
               -- Do, however, make them for their promoted datacon (see #13915).
-            , not $ isFamInstTyCon tc''
+            , not $ isDataFamInstTyCon tc''
             , Just rep_name <- pure $ tyConRepName_maybe tc''
             , tyConIsTypeable tc''
             ]

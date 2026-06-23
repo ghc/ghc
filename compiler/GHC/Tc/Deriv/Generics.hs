@@ -182,7 +182,7 @@ canDoGenerics dit@(DerivInstTys{dit_rep_tc = tc})
   where
     -- The tc can be a representation tycon. When we want to display it to the
     -- user (in an error message) we should print its parent
-    tc_name = case tyConFamInst_maybe tc of
+    tc_name = case tyConDataFamInst_maybe tc of
         Just (ptc, _) -> ptc
         _             -> tc
 
@@ -629,7 +629,7 @@ tc_mkRepTy gk get_fixity dit@(DerivInstTys{ dit_rep_tc = tycon
               {ata_rec0 = mkRec0, ata_par1 = mkPar1,
                ata_rec1 = mkRec1, ata_comp = mkComp comp k})
 
-        tyConName_user = case tyConFamInst_maybe tycon of
+        tyConName_user = case tyConDataFamInst_maybe tycon of
                            Just (ptycon, _) -> tyConName ptycon
                            Nothing          -> tyConName tycon
 

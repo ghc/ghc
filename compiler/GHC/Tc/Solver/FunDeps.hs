@@ -575,7 +575,7 @@ tryEqFunDeps work_item@(EqCt { eq_lhs = work_lhs
 tryFamEqFunDeps :: TcSMode -> [EqCt] -> TyCon -> [TcType] -> EqCt -> SolverStage ()
 tryFamEqFunDeps mode eqs_for_me fam_tc work_args
                 work_item@(EqCt { eq_ev = ev, eq_rhs = work_rhs })
-  | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
+  | Just ops <- builtInClosedTyFamTyCon_maybe fam_tc
   = if isGiven ev
     then tryGivenBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_item
     else do { -- Note [Do local fundeps before top-level instances]
@@ -611,14 +611,14 @@ mkTopFamEqFDs fam_tc work_args work_item
   = -- Open, injective type families
     simpleStage (mkTopOpenFamEqFDs fam_tc inj_flags work_args work_item)
 
-  | Just ax <- isClosedFamilyTyCon_maybe fam_tc
-  = -- Closed type families
-    mkTopClosedFamEqFDs ax work_args work_item
+  -- Non built-in closed type families
+  -- (Built-in closed type families were dealt with in 'tryFamEqFunDeps'.)
+  | Just ax <- closedFamilyTyConCoAxiom_maybe fam_tc
+  = mkTopClosedFamEqFDs ax work_args work_item
 
   | otherwise
-  = -- Data families, abstract families,
-    -- open families that are not injective,
-    -- closed type families with no equations (isClosedFamilyTyCon_maybe returns Nothing)
+  = -- Anything else: data families, open type families that are not injective,
+    -- closed type families with no equations or that are abstract.
     return []
 
 tryFDEqns :: Bool -> TyCon -> [TcType] -> EqCt -> [FunDepEqns] -> SolverStage ()
@@ -769,7 +769,7 @@ trim_qtvs subst (tv:tvs)
 --  Built-in type families
 -----------------------------------------
 
-tryGivenBuiltinFamEqFDs :: [EqCt] -> TyCon -> BuiltInSynFamily
+tryGivenBuiltinFamEqFDs :: [EqCt] -> TyCon -> BuiltinClosedTyFam
                         -> [TcType] -> EqCt -> SolverStage ()
 -- TyCon is definitely a built-in type family
 -- Built-in type families are special becase we can generate
@@ -830,12 +830,12 @@ tryGivenBuiltinFamEqFDs eqs_for_me fam_tc ops work_args
 
     do_one _ = return ()
 
-mkTopBuiltinFamEqFDs :: TyCon -> BuiltInSynFamily -> [TcType] -> Xi -> SolverStage [FunDepEqns]
+mkTopBuiltinFamEqFDs :: TyCon -> BuiltinClosedTyFam -> [TcType] -> Xi -> SolverStage [FunDepEqns]
 mkTopBuiltinFamEqFDs fam_tc ops work_args work_rhs
   = return [FDEqns { fd_qtvs = []
                    , fd_eqs = map snd $ tryInteractTopFam ops fam_tc work_args work_rhs }]
 
-mkLocalBuiltinFamEqFDs :: [EqCt] -> TyCon -> BuiltInSynFamily
+mkLocalBuiltinFamEqFDs :: [EqCt] -> TyCon -> BuiltinClosedTyFam
                        -> [TcType] -> Xi -> SolverStage [FunDepEqns]
 mkLocalBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_rhs
   = do { let do_one :: EqCt -> [FunDepEqns]

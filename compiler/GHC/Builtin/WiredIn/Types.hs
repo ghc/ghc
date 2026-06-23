@@ -557,7 +557,7 @@ anyTyConName =
 anyTyCon :: TyCon
 -- See Note [The types Any and UnusedType]
 anyTyCon = mkFamilyTyCon anyTyConName kind binders 0 res_kind Nothing
-                         (ClosedSynFamilyTyCon Nothing)
+                         (ClosedTypeFamilyTyCon $ CTF Nothing)
                          Nothing
                          NotInjective
   where
@@ -580,7 +580,7 @@ unusedTypeTyCon :: TyCon
 -- See Note [The types Any and UnusedType]
 unusedTypeTyCon = mkFamilyTyCon unusedTypeTyConName kind bndrs 0 res_kind
                          Nothing
-                         (ClosedSynFamilyTyCon Nothing)
+                         (ClosedTypeFamilyTyCon $ CTF Nothing)
                          Nothing
                          NotInjective
   where
@@ -1884,7 +1884,7 @@ multMulTyConName =
 
 multMulTyCon :: TyCon
 multMulTyCon = mkFamilyTyCon multMulTyConName kind binders 0 multiplicityTy Nothing
-                         (BuiltInSynFamTyCon trivialBuiltInFamily)
+                         (ClosedTypeFamilyTyCon $ CTF_BuiltIn trivialBuiltInClosedTyFam)
                          Nothing
                          NotInjective
   where

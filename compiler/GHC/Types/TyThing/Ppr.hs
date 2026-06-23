@@ -95,7 +95,7 @@ Consequences:
 
 - In a few places we have info that is used only for pretty-printing,
   and is totally ignored when turning Iface syntax back into Core
-  (in GHC.IfaceToCore). For example, IfaceClosedSynFamilyTyCon
+  (in GHC.IfaceToCore). For example, IfaceClosedTyFamTyCon
   stores a [IfaceAxBranch] that is used only for pretty-printing.
 
 - See Note [Free TyVars and CoVars in IfaceType] in GHC.Iface.Type

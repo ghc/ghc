@@ -370,7 +370,7 @@ pprWithTYPE ty = updSDocContext (\ctx -> ctx { sdocPrintExplicitRuntimeReps = Tr
 -- In that case we want to print @T [a]@, where @T@ is the family 'TyCon'
 pprSourceTyCon :: TyCon -> SDoc
 pprSourceTyCon tycon
-  | Just (fam_tc, tys) <- tyConFamInst_maybe tycon
+  | Just (fam_tc, tys) <- tyConDataFamInst_maybe tycon
   = ppr $ fam_tc `TyConApp` tys        -- can't be FunTyCon
   | otherwise
   = ppr tycon

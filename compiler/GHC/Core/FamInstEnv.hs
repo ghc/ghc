@@ -333,7 +333,7 @@ mkImportedFamInst fam mb_tcs axiom orphan
          -- Maybe we should store it in the IfaceFamInst?
      flavor = case splitTyConApp_maybe rhs of
                 Just (tc, _)
-                  | Just ax' <- tyConFamilyCoercion_maybe tc
+                  | Just ax' <- tyConDataFamCoercion_maybe tc
                   , ax' == axiom
                   -> DataFamilyInst tc
                 _ -> SynFamilyInst
@@ -1172,6 +1172,7 @@ reduceTyFamApp_maybe envs role tc tys
   | Phantom <- role
   = Nothing
 
+  -- Open type families & data families
   | case role of
       Representational -> isOpenFamilyTyCon     tc
       _                -> isOpenTypeFamilyTyCon tc
@@ -1187,15 +1188,18 @@ reduceTyFamApp_maybe envs role tc tys
   = let co = mkUnbranchedAxInstCo role ax inst_tys inst_cos
     in Just $ coercionRedn co
 
-  | Just ax <- isClosedFamilyTyCon_maybe tc
-  , Just (ind, inst_tys, inst_cos) <- chooseBranch ax tys
-  = let co = mkAxInstCo role (BranchedAxiom ax ind) inst_tys inst_cos
-    in Just $ coercionRedn co
-
-  | Just builtin_fam  <- isBuiltInSynFamTyCon_maybe tc
-  , Just (rewrite,ts,ty) <- tryMatchFam builtin_fam tys
-  = let co = mkAxiomCo rewrite (map mkNomReflCo ts)
-    in Just $ mkReduction co ty
+  -- Closed type families
+  | Just ctf <- closedTypeFamily_maybe tc
+  = case ctf of
+      CTF (Just ax)
+        | Just (ind, inst_tys, inst_cos) <- chooseBranch ax tys
+        -> let co = mkAxInstCo role (BranchedAxiom ax ind) inst_tys inst_cos
+           in Just $ coercionRedn co
+      CTF_BuiltIn builtin_fam
+        | Just (rewrite,ts,ty) <- tryMatchFam builtin_fam tys
+        -> let co = mkAxiomCo rewrite (map mkNomReflCo ts)
+           in Just $ mkReduction co ty
+      _ -> Nothing
 
   | otherwise
   = Nothing

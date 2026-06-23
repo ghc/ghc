@@ -274,7 +274,7 @@ typecheckWholeCoreBindings type_var WholeCoreBindings {wcb_bindings, wcb_module}
 isAbstractIfaceDecl :: IfaceDecl -> Bool
 isAbstractIfaceDecl IfaceData{ ifCons = IfAbstractTyCon {} } = True
 isAbstractIfaceDecl IfaceClass{ ifBody = IfAbstractClass } = True
-isAbstractIfaceDecl IfaceFamily{ ifFamFlav = IfaceAbstractClosedSynFamilyTyCon } = True
+isAbstractIfaceDecl IfaceFamily{ ifFamFlav = IfaceClosedTypeFamilyTyCon IfaceAbstractClosedTyFamTyCon } = True
 isAbstractIfaceDecl _ = False
 
 ifMaybeRoles :: IfaceDecl -> Maybe [Role]
@@ -790,15 +790,16 @@ tc_iface_decl parent _ (IfaceFamily {ifName = tc_name,
      tc_fam_flav tc_name IfaceDataFamilyTyCon
        = do { tc_rep_name <- newTyConRepName tc_name
             ; return (DataFamilyTyCon tc_rep_name) }
-     tc_fam_flav _ IfaceOpenSynFamilyTyCon= return OpenSynFamilyTyCon
-     tc_fam_flav _ (IfaceClosedSynFamilyTyCon mb_ax_name_branches)
-       = do { ax <- traverse (tcIfaceBranchedAxiom . fst) mb_ax_name_branches
-            ; return (ClosedSynFamilyTyCon ax) }
-     tc_fam_flav _ IfaceAbstractClosedSynFamilyTyCon
-         = return AbstractClosedSynFamilyTyCon
-     tc_fam_flav _ IfaceBuiltInSynFamTyCon
-         = pprPanic "tc_iface_decl"
-                    (text "IfaceBuiltInSynFamTyCon in interface file")
+     tc_fam_flav _ IfaceOpenTypeFamilyTyCon = return OpenTypeFamilyTyCon
+     tc_fam_flav _ (IfaceClosedTypeFamilyTyCon ctf) = ClosedTypeFamilyTyCon <$>
+       case ctf of
+        IfaceClosedTyFamTyCon mb_ax_name_branches ->
+         do { ax <- traverse (tcIfaceBranchedAxiom . fst) mb_ax_name_branches
+            ; return (CTF ax) }
+        IfaceAbstractClosedTyFamTyCon -> return CTF_Abstract
+        IfaceBuiltInClosedTyFamTyCon ->
+          pprPanic "tc_iface_decl" $
+            text "IfaceBuiltInClosedTyFamTyCon in interface file"
 
 tc_iface_decl _parent _ignore_prags
             (IfaceClass {ifName = tc_name,

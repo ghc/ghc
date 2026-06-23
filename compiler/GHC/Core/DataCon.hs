@@ -1233,7 +1233,7 @@ dataConTyCon = dcRepTyCon
 -- type constructor.
 dataConOrigTyCon :: DataCon -> TyCon
 dataConOrigTyCon dc
-  | Just (tc, _) <- tyConFamInst_maybe (dcRepTyCon dc) = tc
+  | Just (tc, _) <- tyConDataFamInst_maybe (dcRepTyCon dc) = tc
   | otherwise                                          = dcRepTyCon dc
 
 -- | The representation type of the data constructor, i.e. the sort
@@ -1800,7 +1800,7 @@ dataConResRepTyArgs :: DataCon -> [Type]
 -- This is almost the same as (subst eq_spec univ_tvs); but not quite,
 --   because eq_spec omits constraint-kinded equalities
 dataConResRepTyArgs dc@(MkData { dcRepTyCon = rep_tc, dcOrigResTy = orig_res_ty })
-  | Just (fam_tc, fam_args) <- tyConFamInst_maybe rep_tc
+  | Just (fam_tc, fam_args) <- tyConDataFamInst_maybe rep_tc
   = -- fvs(fam_args) = tyConTyVars rep_tc
     -- These tyvars are the domain of subst
     -- Fvs(range(subst)) = tvars of the datacon

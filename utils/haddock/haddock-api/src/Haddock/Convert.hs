@@ -243,7 +243,7 @@ synifyAxiom ax@(CoAxiom{co_ax_tc = tc})
         InstD noExtField $
           TyFamInstD noExtField $
             TyFamInstDecl{tfid_xtn = noAnn, tfid_eqn = synifyAxBranch tc branch}
-  | Just ax' <- isClosedFamilyTyCon_maybe tc
+  | Just ax' <- closedFamilyTyConCoAxiom_maybe tc
   , getUnique ax' == getUnique ax -- without the getUniques, type error
     =
       synifyTyCon ShowRuntimeRep (Just ax) tc >>= return . TyClD noExtField
@@ -305,22 +305,21 @@ synifyTyCon prr _coax tc
 synifyTyCon _prr _coax tc
   | Just flav <- famTyConFlav_maybe tc =
       case flav of
-        -- Type families
-        OpenSynFamilyTyCon -> mkFamDecl OpenTypeFamily
-        ClosedSynFamilyTyCon mb
-          | Just (CoAxiom{co_ax_branches = branches}) <- mb ->
-              mkFamDecl $
-                ClosedTypeFamily $
-                  Just $
-                    map (noLocA . synifyAxBranch tc) (fromBranches branches)
-          | otherwise ->
-              mkFamDecl $ ClosedTypeFamily $ Just []
-        BuiltInSynFamTyCon{} ->
-          mkFamDecl $ ClosedTypeFamily $ Just []
-        AbstractClosedSynFamilyTyCon{} ->
-          mkFamDecl $ ClosedTypeFamily Nothing
         DataFamilyTyCon{} ->
           mkFamDecl DataFamily
+        OpenTypeFamilyTyCon -> mkFamDecl OpenTypeFamily
+        ClosedTypeFamilyTyCon ctf ->
+          case ctf of
+            CTF mb
+              | Just (CoAxiom{co_ax_branches = branches}) <- mb
+              -> mkFamDecl $
+                   ClosedTypeFamily $
+                     Just $
+                       map (noLocA . synifyAxBranch tc) (fromBranches branches)
+              | otherwise
+              -> mkFamDecl $ ClosedTypeFamily $ Just []
+            CTF_BuiltIn {} -> mkFamDecl $ ClosedTypeFamily $ Just []
+            CTF_Abstract -> mkFamDecl $ ClosedTypeFamily Nothing
   where
     resultVar = tyConFamilyResVar_maybe tc
     mkFamDecl i =

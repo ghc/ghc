@@ -402,7 +402,7 @@ recSelParentCons (RecSelPatSyn ps) = [PatSynCon ps]
 instance Outputable RecSelParent where
   ppr p = case p of
     RecSelData tc
-      | Just (parent_tc, tys) <- tyConFamInst_maybe tc
+      | Just (parent_tc, tys) <- tyConDataFamInst_maybe tc
       -> ppr (mkTyConApp parent_tc tys)
       | otherwise
       -> ppr tc

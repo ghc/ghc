@@ -44,7 +44,7 @@ module GHC.Core.TyCon(
         -- ** Predicates on TyCons
         isAlgTyCon, isVanillaAlgTyCon, isClassTyCon,
         isUnaryClassTyCon, isUnaryClassTyCon_maybe, isTerminatingTyCon,
-        isFamInstTyCon,
+        isDataFamInstTyCon,
         isPrimTyCon,
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon,
         isUnboxedSumTyCon, isPromotedTupleTyCon,
@@ -62,9 +62,11 @@ module GHC.Core.TyCon(
         isNewTyCon, isAbstractTyCon,
         isFamilyTyCon, isOpenFamilyTyCon, famTyConHasInjectivity,
         isTypeFamilyTyCon, isDataFamilyTyCon,
-        isOpenTypeFamilyTyCon, isClosedFamilyTyCon_maybe,
+        isOpenTypeFamilyTyCon,
+        closedTypeFamily_maybe,
+        builtInClosedTyFamTyCon_maybe,
+        closedFamilyTyConCoAxiom_maybe,
         tyConInjectivityInfo,
-        isBuiltInSynFamTyCon_maybe,
         isGadtSyntaxTyCon, isInjectiveTyCon, isGenerativeTyCon,
         isTyConAssoc, tyConAssoc_maybe, tyConFlavourAssoc_maybe,
         isImplicitTyCon,
@@ -90,7 +92,7 @@ module GHC.Core.TyCon(
         tyConRoles,
         tyConFlavour,
         tyConTuple_maybe, tyConClass_maybe, tyConATs,
-        tyConFamInst_maybe, tyConFamInstSig_maybe, tyConFamilyCoercion_maybe,
+        tyConDataFamInst_maybe, tyConDataFamInstSig_maybe, tyConDataFamCoercion_maybe,
         tyConFamilyResVar_maybe,
         synTyConDefn_maybe, synTyConRhs_maybe,
         famTyConFlav_maybe,
@@ -219,14 +221,14 @@ Note [Type synonym families]
 * Translation of type family decl:
         type family F a :: Type
   translates to
-    a FamilyTyCon 'F', whose FamTyConFlav is OpenSynFamilyTyCon
+    a FamilyTyCon 'F', whose FamTyConFlav is OpenTypeFamilyTyCon
 
         type family G a :: Type where
           G Int = Bool
           G Bool = Char
           G a = ()
   translates to
-    a FamilyTyCon 'G', whose FamTyConFlav is ClosedSynFamilyTyCon, with the
+    a FamilyTyCon 'G', whose FamTyConFlav is ClosedTypeFamilyTyCon, with the
     appropriate CoAxiom representing the equations
 
 We also support injective type families -- see Note [Injective type families]
@@ -1307,8 +1309,7 @@ data Injectivity
 
 -- | Information pertaining to the expansion of a type synonym (@type@)
 data FamTyConFlav
-  = -- | Represents an open type family without a fixed right hand
-    -- side.  Additional instances can appear at any time.
+  = -- | A data family 'TyCon'.
     --
     -- These are introduced by either a top level declaration:
     --
@@ -1318,31 +1319,26 @@ data FamTyConFlav
     --
     -- > class C a b where
     -- >   data T b :: Type
+    --
+    -- NB: data family /instance/ 'TyCon's are __not__ family 'TyCon's.
      DataFamilyTyCon
        TyConRepName
 
-     -- | An open type synonym family  e.g. @type family F x y :: Type -> Type@
-   | OpenSynFamilyTyCon
+   -- | An open type family 'TyCon' e.g. @type family F x y :: Type -> Type@ or
+   -- an associated type family for a class.
+   | OpenTypeFamilyTyCon
 
-   -- | A closed type synonym family  e.g.
-   -- @type family F x where { F Int = Bool }@
-   | ClosedSynFamilyTyCon (Maybe (CoAxiom Branched))
-     -- See Note [Closed type families]
-
-   -- | A closed type synonym family declared in an hs-boot file with
-   -- type family F a where ..
-   | AbstractClosedSynFamilyTyCon
-
-   -- | Built-in type family used by the TypeNats solver
-   | BuiltInSynFamTyCon BuiltInSynFamily
+   -- | A closed type family 'TyCon'. See Note [Closed type families].
+   | ClosedTypeFamilyTyCon ClosedTyFam -- ^ the equations for this closed type family
 
 instance Outputable FamTyConFlav where
     ppr (DataFamilyTyCon n) = text "data family" <+> ppr n
-    ppr OpenSynFamilyTyCon = text "open type family"
-    ppr (ClosedSynFamilyTyCon Nothing) = text "closed type family"
-    ppr (ClosedSynFamilyTyCon (Just coax)) = text "closed type family" <+> ppr coax
-    ppr AbstractClosedSynFamilyTyCon = text "abstract closed type family"
-    ppr (BuiltInSynFamTyCon _) = text "built-in type family"
+    ppr OpenTypeFamilyTyCon = text "open type family"
+    ppr (ClosedTypeFamilyTyCon ctf) =
+      case ctf of
+        CTF mb_coax    -> text "closed type family" <+> maybe empty ppr mb_coax
+        CTF_Abstract   -> text "abstract closed type family"
+        CTF_BuiltIn {} -> text "built-in closed type family"
 
 {- Note [Closed type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1353,7 +1349,7 @@ instance Outputable FamTyConFlav where
   is defined.
 
 A non-empty closed type family has a single axiom with multiple
-branches, stored in the 'ClosedSynFamilyTyCon' constructor.  A closed
+branches, stored in the 'ClosedTypeFamilyTyCon' constructor.  A closed
 type family with no equations does not have an axiom, because there is
 nothing for the axiom to prove!
 
@@ -2336,7 +2332,7 @@ isInjectiveTyCon (TyCon { tyConDetails = details }) role
        | Nominal <- role                                = True
        | Representational <- role                       = go_alg_rep rhs
 
-    go (FamilyTyCon { famTcFlav = DataFamilyTyCon _ })
+    go (FamilyTyCon { famTcFlav = DataFamilyTyCon {}})
        | Nominal <- role                                = True
     go (FamilyTyCon { famTcInj = Injective inj })
        | Nominal <- role                                = and inj
@@ -2369,8 +2365,8 @@ isGenerativeTyCon :: TyCon -> Role -> Bool
 isGenerativeTyCon tc@(TyCon { tyConDetails = details }) role
    = go role details
    where
-    go Nominal (FamilyTyCon { famTcFlav = DataFamilyTyCon _ }) = True
-    go _       (FamilyTyCon {})                                = False
+    go Nominal (FamilyTyCon { famTcFlav = DataFamilyTyCon {} }) = True
+    go _       (FamilyTyCon {})                                 = False
 
     -- In all other cases, injectivity implies generativity
     go r _ = isInjectiveTyCon tc r
@@ -2508,9 +2504,9 @@ isOpenFamilyTyCon :: TyCon -> Bool
 isOpenFamilyTyCon (TyCon { tyConDetails = details })
   | FamilyTyCon {famTcFlav = flav } <- details
               = case flav of
-                  OpenSynFamilyTyCon -> True
-                  DataFamilyTyCon {} -> True
-                  _                  -> False
+                  OpenTypeFamilyTyCon      -> True
+                  DataFamilyTyCon {}       -> True
+                  ClosedTypeFamilyTyCon {} -> False
   | otherwise = False
 
 -- | Is this a type family 'TyCon' (whether open or closed)?
@@ -2528,34 +2524,67 @@ isDataFamilyTyCon (TyCon { tyConDetails = details })
 -- | Is this an open type family TyCon?
 isOpenTypeFamilyTyCon :: TyCon -> Bool
 isOpenTypeFamilyTyCon (TyCon { tyConDetails = details })
-  | FamilyTyCon {famTcFlav = OpenSynFamilyTyCon } <- details = True
-  | otherwise                                                = False
+  | FamilyTyCon {famTcFlav = OpenTypeFamilyTyCon } <- details = True
+  | otherwise                                                 = False
 
--- | Is this a /non-empty/ closed type family?
---   Returns 'Nothing' for closed type family with no equations, as well
---      as for open families, data famlilies, abstract families
-isClosedFamilyTyCon_maybe :: TyCon -> Maybe (CoAxiom Branched)
-isClosedFamilyTyCon_maybe (TyCon { tyConDetails = details })
-  | FamilyTyCon {famTcFlav = ClosedSynFamilyTyCon mb} <- details = mb
-  | otherwise                                                    = Nothing
+-- | Is this the 'TyCon' of a closed type family?
+closedTypeFamily_maybe :: TyCon -> Maybe ClosedTyFam
+closedTypeFamily_maybe (TyCon { tyConDetails = details })
+  | FamilyTyCon {famTcFlav = ClosedTypeFamilyTyCon ctf} <- details
+  = Just ctf
+  | otherwise
+  = Nothing
 
-isBuiltInSynFamTyCon_maybe :: TyCon -> Maybe BuiltInSynFamily
-isBuiltInSynFamTyCon_maybe (TyCon { tyConDetails = details })
-  | FamilyTyCon {famTcFlav = BuiltInSynFamTyCon ops} <- details = Just ops
-  | otherwise                                                   = Nothing
+-- | Retrieve the coercion axiom for a closed type family.
+--
+-- Returns 'Nothing' for:
+--
+--  - any 'TyCon' that is not a closed type family 'TyCon', including open
+--    type families, data families and abstract closed type families
+--  - closed type families with no equations
+--  - built-in closed type families
+--
+-- Only use this function if you are /sure/ you do not need to handle built-in
+-- closed type families.
+closedFamilyTyConCoAxiom_maybe :: TyCon -> Maybe (CoAxiom Branched)
+closedFamilyTyConCoAxiom_maybe tc
+  | Just (CTF mb_coax) <- closedTypeFamily_maybe tc
+  = mb_coax
+  | otherwise
+  = Nothing
 
+builtInClosedTyFamTyCon_maybe :: TyCon -> Maybe BuiltinClosedTyFam
+builtInClosedTyFamTyCon_maybe tc
+  | Just (CTF_BuiltIn builtin_fam) <- closedTypeFamily_maybe tc
+  = Just builtin_fam
+  | otherwise
+  = Nothing
+
+-- | Does this family 'TyCon' have injectivity information?
+--
+-- That is, can knowing something about the result tell us something
+-- (not necessarily everything) about the arguments?
 famTyConHasInjectivity :: TyCon -> Bool
--- True if knowing something about the result may tell us
--- something (not necessarily everything) about the arguments
 famTyConHasInjectivity (TyCon { tyConDetails = details })
   | FamilyTyCon { famTcFlav = flav, famTcInj = inj } <- details
-  = case (flav, inj) of
-       (ClosedSynFamilyTyCon (Just {}), _) -> True
-       (BuiltInSynFamTyCon {},          _) -> True
-       (_, Injective {})                   -> True
-       _                                   -> False
+  = flav_inj flav || is_inj inj
   | otherwise
   = False
+  where
+    is_inj :: Injectivity -> Bool
+    is_inj (Injective {}) = True
+    is_inj _ = False
+
+    flav_inj :: FamTyConFlav -> Bool
+    flav_inj flav =
+      case flav of
+        ClosedTypeFamilyTyCon ctf ->
+          case ctf of
+            CTF (Just {}) -> True
+            CTF_BuiltIn {} -> True
+            _ -> False
+        _ -> False
+
 
 -- | Extract type variable naming the result of injective type family
 tyConFamilyResVar_maybe :: TyCon -> Maybe Name
@@ -3019,8 +3048,8 @@ synTyConRhs_maybe (TyCon { tyConDetails = details })
   | SynonymTyCon {synTcRhs = rhs} <- details  = Just rhs
   | otherwise                                 = Nothing
 
--- | Extract the flavour of a type family (with all the extra information that
--- it carries)
+-- | Extract the flavour of a type or data family 'TyCon',
+-- with all the extra information that it carries.
 famTyConFlav_maybe :: TyCon -> Maybe FamTyConFlav
 famTyConFlav_maybe (TyCon { tyConDetails = details })
   | FamilyTyCon {famTcFlav = flav} <- details = Just flav
@@ -3073,28 +3102,28 @@ tyConATs (TyCon { tyConDetails = details })
 
 ----------------------------------------------------------------------------
 -- | Is this 'TyCon' that for a data family instance?
-isFamInstTyCon :: TyCon -> Bool
-isFamInstTyCon (TyCon { tyConDetails = details })
+isDataFamInstTyCon :: TyCon -> Bool
+isDataFamInstTyCon (TyCon { tyConDetails = details })
   | AlgTyCon {algTcFlavour = DataFamInstTyCon {} } <- details = True
   | otherwise                                                 = False
 
-tyConFamInstSig_maybe :: TyCon -> Maybe (TyCon, [Type], CoAxiom Unbranched)
-tyConFamInstSig_maybe (TyCon { tyConDetails = details })
+tyConDataFamInstSig_maybe :: TyCon -> Maybe (TyCon, [Type], CoAxiom Unbranched)
+tyConDataFamInstSig_maybe (TyCon { tyConDetails = details })
   | AlgTyCon {algTcFlavour = DataFamInstTyCon ax f ts } <- details = Just (f, ts, ax)
   | otherwise                                                      = Nothing
 
 -- | If this 'TyCon' is that of a data family instance, return the family in question
 -- and the instance types. Otherwise, return @Nothing@
-tyConFamInst_maybe :: TyCon -> Maybe (TyCon, [Type])
-tyConFamInst_maybe (TyCon { tyConDetails = details })
+tyConDataFamInst_maybe :: TyCon -> Maybe (TyCon, [Type])
+tyConDataFamInst_maybe (TyCon { tyConDetails = details })
   | AlgTyCon {algTcFlavour = DataFamInstTyCon _ f ts } <- details = Just (f, ts)
   | otherwise                                                     = Nothing
 
 -- | If this 'TyCon' is that of a data family instance, return a 'TyCon' which
 -- represents a coercion identifying the representation type with the type
 -- instance family.  Otherwise, return @Nothing@
-tyConFamilyCoercion_maybe :: TyCon -> Maybe (CoAxiom Unbranched)
-tyConFamilyCoercion_maybe (TyCon { tyConDetails = details })
+tyConDataFamCoercion_maybe :: TyCon -> Maybe (CoAxiom Unbranched)
+tyConDataFamCoercion_maybe (TyCon { tyConDetails = details })
   | AlgTyCon {algTcFlavour = DataFamInstTyCon ax _ _ } <- details = Just ax
   | otherwise                                                     = Nothing
 
@@ -3171,11 +3200,9 @@ tyConFlavour (TyCon { tyConDetails = details })
 
   | FamilyTyCon { famTcFlav = flav, famTcParent = parent } <- details
   = case flav of
-      DataFamilyTyCon{}            -> OpenFamilyFlavour (IAmData DataType) parent
-      OpenSynFamilyTyCon           -> OpenFamilyFlavour IAmType parent
-      ClosedSynFamilyTyCon{}       -> ClosedTypeFamilyFlavour
-      AbstractClosedSynFamilyTyCon -> ClosedTypeFamilyFlavour
-      BuiltInSynFamTyCon{}         -> ClosedTypeFamilyFlavour
+      DataFamilyTyCon{}       -> OpenFamilyFlavour (IAmData DataType) parent
+      OpenTypeFamilyTyCon     -> OpenFamilyFlavour IAmType parent
+      ClosedTypeFamilyTyCon{} -> ClosedTypeFamilyFlavour
 
   | SynonymTyCon {} <- details                  = TypeSynonymFlavour
   | PrimTyCon {} <- details                     = BuiltInTypeFlavour

@@ -1102,7 +1102,7 @@ error.  Hence, the smart wrapper function boxySplitTyConAppWithFamily calls
 boxySplitTyConApp with the family tycon Map instead, which gives us the family
 type list {(Int, c), w}.  To get the correct split for :R123Map, we need to
 unify the family type list {(Int, c), w} with the instance types {(a, b), v}
-(provided by tyConFamInst_maybe together with the family tycon).  This
+(provided by tyConDataFamInst_maybe together with the family tycon).  This
 unification yields the substitution [a -> Int, b -> c, v -> w], which gives us
 the split arguments for the representation tycon :R123Map as {Int, c, w}
 
@@ -1483,7 +1483,7 @@ matchExpectedConTy :: PatEnv
 --
 -- Returns a wrapper : pat_ty ~~> T ty1 ... tyn
 matchExpectedConTy (PE { pe_orig = orig }) data_tc exp_pat_ty
-  | Just (fam_tc, fam_args, co_tc) <- tyConFamInstSig_maybe data_tc
+  | Just (fam_tc, fam_args, co_tc) <- tyConDataFamInstSig_maybe data_tc
          -- Comments refer to Note [Matching constructor patterns]
          -- co_tc :: forall a. T [a] ~ T7 a
   = do { pat_ty <- expTypeToType (scaledThing exp_pat_ty)

@@ -2238,7 +2238,7 @@ mkFamilyTyConApp :: TyCon -> [Type] -> Type
 --
 -- > mkFamilyTyConApp :RTL Int  =  T (Maybe Int)
 mkFamilyTyConApp tc tys
-  | Just (fam_tc, fam_tys) <- tyConFamInst_maybe tc
+  | Just (fam_tc, fam_tys) <- tyConDataFamInst_maybe tc
   , let tvs = tyConTyVars tc
         fam_subst = assertPpr (tvs `equalLength` tys) (ppr tc <+> ppr tys) $
                     zipTvSubst tvs tys

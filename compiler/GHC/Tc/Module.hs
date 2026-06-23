@@ -1428,22 +1428,17 @@ eqFD env (as1,bs1) (as2,bs2) =
 
 -- | Check compatibility of two type family flavours.
 compatFamFlav :: FamTyConFlav -> FamTyConFlav -> BootErrsM BootTyConMismatch
-compatFamFlav OpenSynFamilyTyCon   OpenSynFamilyTyCon
-  = checkSuccess
-compatFamFlav (DataFamilyTyCon {}) (DataFamilyTyCon {})
-  = checkSuccess
-compatFamFlav AbstractClosedSynFamilyTyCon AbstractClosedSynFamilyTyCon
-  = checkSuccess -- This case only happens for hsig merging.
-compatFamFlav AbstractClosedSynFamilyTyCon (ClosedSynFamilyTyCon {})
-  = checkSuccess
-compatFamFlav (ClosedSynFamilyTyCon {}) AbstractClosedSynFamilyTyCon
-  = checkSuccess
-compatFamFlav (ClosedSynFamilyTyCon ax1) (ClosedSynFamilyTyCon ax2)
-  = eqClosedFamilyAx ax1 ax2
-compatFamFlav (BuiltInSynFamTyCon {}) (BuiltInSynFamTyCon {})
-  = checkSuccess
-compatFamFlav flav1 flav2
-  = bootErr $ TyConFlavourMismatch flav1 flav2
+compatFamFlav (DataFamilyTyCon {}) (DataFamilyTyCon {}) = checkSuccess
+compatFamFlav OpenTypeFamilyTyCon OpenTypeFamilyTyCon = checkSuccess
+compatFamFlav flav1@(ClosedTypeFamilyTyCon ctf1) flav2@(ClosedTypeFamilyTyCon ctf2) =
+  case (ctf1, ctf2) of
+    (CTF_Abstract, CTF_Abstract) -> checkSuccess -- This case only happens for hsig merging
+    (CTF {}, CTF_Abstract) -> checkSuccess
+    (CTF_Abstract, CTF {}) -> checkSuccess
+    (CTF ax1, CTF ax2) -> eqClosedFamilyAx ax1 ax2
+    (CTF_BuiltIn {}, CTF_BuiltIn {}) -> checkSuccess
+    _ -> bootErr $ TyConFlavourMismatch flav1 flav2
+compatFamFlav flav1 flav2 = bootErr $ TyConFlavourMismatch flav1 flav2
 
 -- | Check that two 'AlgTyConRhs's are compatible.
 compatAlgRhs :: AlgTyConRhs -> AlgTyConRhs -> BootErrsM BootDataMismatch

@@ -137,9 +137,9 @@ the wrapper.  For example, consider the declarations
 The tycon to which the datacon MapPair belongs gets a unique internal
 name of the form :R123Map, and we call it the representation tycon.
 In contrast, Map is the family tycon (accessible via
-tyConFamInst_maybe). A coercion allows you to move between
+tyConDataFamInst_maybe). A coercion allows you to move between
 representation and family type.  It is accessible from :R123Map via
-tyConFamilyCoercion_maybe and has kind
+tyConDataFamCoercion_maybe and has kind
 
   Co123Map a b v :: {Map (a, b) v ~ :R123Map a b v}
 
@@ -887,7 +887,7 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
          && (any isUnpacked (ev_ibangs ++ arg_ibangs)))
                      -- Some unboxing (includes eq_spec)
 
-      || isFamInstTyCon tycon -- Cast result
+      || isDataFamInstTyCon tycon -- Cast result
 
       || dataConUserTyVarBindersNeedWrapper data_con
                      -- If the data type was written with GADT syntax and
@@ -1806,7 +1806,7 @@ wrapNewTypeBody tycon args result_expr
 -- See Note [Wrappers for data instance tycons]
 wrapFamInstBody :: TyCon -> [Type] -> Maybe (Scaled Type) -> CoreExpr -> CoreExpr
 wrapFamInstBody tycon args mb_fun_arg body
-  | Just co_con <- tyConFamilyCoercion_maybe tycon
+  | Just co_con <- tyConDataFamCoercion_maybe tycon
   = mkCast body (mkSymCo $ mkFun (mkUnbranchedAxInstCo Representational co_con args []))
   | otherwise
   = body
