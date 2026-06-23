@@ -859,6 +859,10 @@ data GeneralFlag
    | Opt_SuppressTimestamps -- ^ Suppress timestamps in dumps
    | Opt_SuppressCoreSizes  -- ^ Suppress per binding Core size stats in dumps
 
+   -- | Reorder top-level bindings in Core dumps into a stable, diffable order.
+   -- See Note [Stable Core dump order] in GHC.Core.Ppr.
+   | Opt_StableCoreDumpOrder
+
    -- Error message suppression
    | Opt_ShowErrorContext
 

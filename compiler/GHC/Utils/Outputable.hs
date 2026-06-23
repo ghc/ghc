@@ -422,6 +422,7 @@ data SDocContext = SDC
   , sdocSuppressModulePrefixes      :: !Bool
   , sdocSuppressStgExts             :: !Bool
   , sdocSuppressStgReps             :: !Bool
+  , sdocStableCoreDumpOrder         :: !Bool
   , sdocErrorSpans                  :: !Bool
   , sdocStarIsType                  :: !Bool
   , sdocLinearTypes                 :: !Bool
@@ -490,6 +491,7 @@ defaultSDocContext = SDC
   , sdocSuppressModulePrefixes      = False
   , sdocSuppressStgExts             = False
   , sdocSuppressStgReps             = True
+  , sdocStableCoreDumpOrder         = False
   , sdocErrorSpans                  = False
   , sdocStarIsType                  = False
   , sdocLinearTypes                 = False

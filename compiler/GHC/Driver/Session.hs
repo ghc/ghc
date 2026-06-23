@@ -2468,6 +2468,7 @@ dFlagsDeps = [
   flagSpec "ppr-case-as-let"            Opt_PprCaseAsLet,
   depFlagSpec' "ppr-ticks"              Opt_PprShowTicks
      (\turn_on -> useInstead "-d" "suppress-ticks" (not turn_on)),
+  flagSpec "stable-core-dump-order"     Opt_StableCoreDumpOrder,
   flagSpec "suppress-ticks"             Opt_SuppressTicks,
   depFlagSpec' "suppress-stg-free-vars" Opt_SuppressStgExts
      (useInstead "-d" "suppress-stg-exts"),

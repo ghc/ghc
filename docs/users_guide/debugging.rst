@@ -959,6 +959,32 @@ parts that you are not interested in.
     has shown you where to look, you can try again without
     :ghc-flag:`-dsuppress-uniques`
 
+.. ghc-flag:: -dstable-core-dump-order
+    :shortdesc: Reorder top-level bindings in Core dumps into a stable,
+        diffable order
+    :type: dynamic
+    :reverse: -dno-stable-core-dump-order
+    :category: verbosity
+
+    :since: 10.2.1
+
+    Normally the order of top-level bindings in a Core dump (such as the
+    output of :ghc-flag:`-ddump-simpl`) reflects the compiler's internal
+    processing order, which depends on ``Unique`` values. Those uniques can
+    shift whenever an unrelated upstream module changes, so the bindings get
+    re-ordered and a textual ``diff`` of two dumps fails to line up the real
+    changes.
+
+    This flag is opt-in and reorders the top-level bindings of Core dumps that
+    go through the pass-result printer (e.g. :ghc-flag:`-ddump-simpl`,
+    :ghc-flag:`-ddump-prep`, :ghc-flag:`-ddump-ds`,
+    :ghc-flag:`-ddump-simpl-iterations`) into a stable, source-location-driven
+    order that does not depend on uniques.
+
+    It is intended to be combined with :ghc-flag:`-dsuppress-uniques` when
+    diffing two dumps, but because the ordering does not depend on uniques the
+    output is also more diffable without it.
+
 .. ghc-flag:: -dsuppress-idinfo
     :shortdesc: Suppress extended information about identifiers where they
         are bound

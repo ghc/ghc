@@ -327,12 +327,17 @@ dumpPassResult logger dump_core_sizes name_ppr_ctx mb_flag hdr extra_info binds 
   where
     size_doc = sep [text "Result size of" <+> text hdr, nest 2 (equals <+> ppr (coreBindsStats binds))]
 
+    -- See Note [Stable Core dump order] in GHC.Core.Ppr
+    binds' | sdocStableCoreDumpOrder (log_default_dump_context (logFlags logger))
+                        = sortCoreBindingsForDump binds
+           | otherwise  = binds
+
     dump_doc  = vcat [ nest 2 extra_info
                      , size_doc
                      , blankLine
                      , if dump_core_sizes
-                        then pprCoreBindingsWithSize binds
-                        else pprCoreBindings         binds
+                        then pprCoreBindingsWithSize binds'
+                        else pprCoreBindings         binds'
                      , ppUnless (null rules) pp_rules ]
     pp_rules = vcat [ blankLine
                     , text "------ Local rules for imported ids --------"

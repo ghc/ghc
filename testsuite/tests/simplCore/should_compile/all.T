@@ -604,3 +604,5 @@ test('T19166', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-
 # #4081: the strict field of T should be unboxed once, outside the loop.
 test('T4081', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-all -dno-typeable-binds'])
 test('T27261', [extra_files(['T27261_aux.hs'])], multimod_compile, ['T27261', '-v0 -O'])
+test('T27296', [], makefile_test, ['T27296'])
+test('T27296b', [], makefile_test, ['T27296b'])

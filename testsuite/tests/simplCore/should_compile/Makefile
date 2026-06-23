@@ -298,3 +298,31 @@ T17901:
 	$(RM) -f T17901.o T17901.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques T17901.hs | grep 'wombat'
         # All three functions should get their case alternatives combined
+
+# Check -dstable-core-dump-order on a small Data.Map-style module. The
+# sed allow-list prints, deduplicated, the top-level binders we care about in
+# dump order. It inspects names only, so it is insensitive to unrelated
+# Core-format churn.
+#
+# The allow-list covers one binder of each interesting category, so the test
+# exercises the clustering of generated binders next to their origin:
+#   * derived instances ($fEqKey/$fOrdKey/$fOrdKey_$ccompare),
+#   * a call-site specialisation (findI_$slookupG, from lookupG's SPECIALISE), and
+#   * a recursive worker ($wrotate).
+T27296:
+	$(RM) -f T27296.o T27296.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques \
+	    -dsuppress-idinfo -dsuppress-module-prefixes -dno-typeable-binds \
+	    -dstable-core-dump-order T27296.hs 2> /dev/null \
+	    | sed -nE 's/^(\$$fEqKey|\$$fOrdKey|\$$fOrdKey_\$$ccompare|size|findI_\$$slookupG|lookupG|member|findI|\$$wrotate|rotate|insertG|insertManyI|insertTwoI|weight|balance|ratios|fromAscI)( .*)?$$/\1/p' \
+	    | uniq
+
+# See T27296b.hs for what this pins and why. The six floated "lvl" constants
+# are scrambled in source order; grep them out and the dump coming out
+# 1000..6000 confirms the stable, value-ordered float ordering.
+T27296b:
+	$(RM) -f T27296b.o T27296b.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-float-out -dsuppress-uniques \
+	    -dsuppress-idinfo -dsuppress-module-prefixes -dno-typeable-binds \
+	    -dstable-core-dump-order T27296b.hs 2> /dev/null \
+	    | grep '^lvl = I#'

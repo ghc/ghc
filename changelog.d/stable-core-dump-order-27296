@@ -1,0 +1,4 @@
+section: compiler
+synopsis: Add :ghc-flag:`-dstable-core-dump-order`, a debugging flag that prints top-level Core bindings in a stable, source-location-based order that does not depend on uniques, making intermediate-compiler dumps (e.g. with :ghc-flag:`-ddump-simpl` or :ghc-flag:`-dverbose-core2core`) easier to diff. This affects only the compiler's intermediate output; it does not change generated code.
+issues: #27296
+mrs: !16143

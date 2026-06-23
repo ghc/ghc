@@ -1595,6 +1595,7 @@ initSDocContext dflags style = SDC
   , sdocSuppressModulePrefixes      = gopt Opt_SuppressModulePrefixes dflags
   , sdocSuppressStgExts             = gopt Opt_SuppressStgExts dflags
   , sdocSuppressStgReps             = gopt Opt_SuppressStgReps dflags
+  , sdocStableCoreDumpOrder         = gopt Opt_StableCoreDumpOrder dflags
   , sdocErrorSpans                  = gopt Opt_ErrorSpans dflags
   , sdocStarIsType                  = xopt LangExt.StarIsType dflags
   , sdocLinearTypes                 = xopt LangExt.LinearTypes dflags
