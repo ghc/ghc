@@ -94,46 +94,25 @@ testopts_ctx_var = contextvars.ContextVar('testopts_ctx_var') # type: ignore
 
 output_buffer_ctx_var = contextvars.ContextVar('output_buffer_ctx_var', default=None) # type: contextvars.ContextVar[Optional[io.StringIO]]
 
-class _OutputProxyBuffer:
-    """The .buffer of an _OutputProxy; takes bytes."""
-    def __init__(self, real) -> None:
-        self._real = real
-
-    def write(self, b: bytes) -> None:
-        buf = output_buffer_ctx_var.get()
-        if buf is None:
-            self._real.buffer.write(b)
-        else:
-            buf.write(b.decode('utf-8', errors='backslashreplace'))
-
-    def flush(self) -> None:
-        if output_buffer_ctx_var.get() is None:
-            self._real.buffer.flush()
-
 class _OutputProxy:
     def __init__(self, real) -> None:
         self._real = real
-        self.buffer = _OutputProxyBuffer(real)
+
+    @property
+    def _handle(self):
+        return output_buffer_ctx_var.get() or self._real
 
     @property
     def encoding(self) -> str:
+        # Always the real stream's: a StringIO buffer reports encoding None,
+        # which safe_print's str.encode would choke on.
         return self._real.encoding
 
     def write(self, s: str) -> int:
-        buf = output_buffer_ctx_var.get()
-        if buf is None:
-            return self._real.write(s)
-        return buf.write(s)
+        return self._handle.write(s)
 
     def flush(self) -> None:
-        if output_buffer_ctx_var.get() is None:
-            self._real.flush()
-
-    def isatty(self) -> bool:
-        return self._real.isatty()
-
-    def fileno(self) -> int:
-        return self._real.fileno()
+        return self._handle.flush()
 
 def install_output_proxies() -> None:
     # Both streams feed the same per-task buffer, so a test's stdout and
@@ -3379,9 +3358,9 @@ async def runCmd(cmd: str,
             stdin_file.close()
         if config.verbose >= 1 and print_output:
             if stdout_buffer:
-                sys.stdout.buffer.write(stdout_buffer)
+                sys.stdout.write(stdout_buffer.decode(sys.stdout.encoding, errors='replace'))
             if stderr_buffer:
-                sys.stderr.buffer.write(stderr_buffer)
+                sys.stderr.write(stderr_buffer.decode(sys.stderr.encoding, errors='replace'))
 
         if stdout is not None:
             if isinstance(stdout, Path):
