@@ -1,4 +1,4 @@
-LazyFieldsDisabled.hs:3:10: error: [GHC-81601]
+LazyFieldsDisabledStrictData.hs:8:10: error: [GHC-81601]
     • Lazy field annotations (~) are disabled
         on the first argument of ‘A’
     • In the definition of data constructor ‘A’

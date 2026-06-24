@@ -967,4 +967,5 @@ test('T26805a', normal, compile, [''])
 test('T24464', normal, compile, [''])
 test('ExpansionQLIm', normal, compile, [''])
 test('T23135', normal, compile, [''])
+test('LazyFieldAnnotations', normal, compile, [''])
 

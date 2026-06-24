@@ -1,0 +1,14 @@
+section: language
+synopsis: Add the `LazyFieldAnnotations` extension
+issues: #24455
+mrs: !16246
+
+description: {
+    The new :extension:`LazyFieldAnnotations` extension permits the prefix
+    ``~`` lazy field annotation on data and GADT constructor fields without
+    enabling :extension:`StrictData`. :extension:`StrictData` (and therefore
+    :extension:`Strict`) now implies :extension:`LazyFieldAnnotations` and
+    continues to control the default strictness of unannotated fields.
+
+    See `GHC Proposal #752 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0752-lazy-field-annotations.rst>`_.
+}

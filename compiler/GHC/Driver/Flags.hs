@@ -283,6 +283,7 @@ extensionName = \case
   LangExt.ExplicitLevelImports -> "ExplicitLevelImports"
   LangExt.ImplicitStagePersistence -> "ImplicitStagePersistence"
   LangExt.QualifiedStrings -> "QualifiedStrings"
+  LangExt.LazyFieldAnnotations -> "LazyFieldAnnotations"
 
 -- | Is this extension known by any other names? For example
 -- -XGeneralizedNewtypeDeriving is accepted
@@ -357,6 +358,7 @@ impliedXFlags
 
     , (LangExt.TemplateHaskell, On LangExt.TemplateHaskellQuotes)
     , (LangExt.Strict, On LangExt.StrictData)
+    , (LangExt.StrictData, On LangExt.LazyFieldAnnotations)
 
     -- Historically only UnboxedTuples was required for unboxed sums to work.
     -- To avoid breaking code, we make UnboxedTuples imply UnboxedSums.
