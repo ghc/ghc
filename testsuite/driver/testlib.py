@@ -2944,6 +2944,12 @@ def normalise_whitespace(s: str) -> str:
 
 callSite_re = re.compile(r', called at (.+):[\d]+:[\d]+ in [<>\w\-\.]+:')
 
+# A line:column location pointing inside 'libraries' (e.g. ghc-internal).
+inLibrariesLoc_re = re.compile(
+    r'(libraries[\\/]\S+?)'
+    r':(?:\d+:\d+(?:-\d+)?|\(\d+,\d+\)-\(\d+,\d+\))' # line:col span
+)
+
 def normalise_callstacks(s: str) -> str:
     opts = getTestOpts()
     def repl(matches):
@@ -2952,6 +2958,12 @@ def normalise_callstacks(s: str) -> str:
         return ', called at {0}:<line>:<column> in <package-id>:'.format(location)
     # Ignore line number differences in call stacks (#10834).
     s = re.sub(callSite_re, repl, s)
+    # Ignore differences in line numbers pointing into internal libraries,
+    # as those line numbers are not stable (e.g. adding a comment somewhere
+    # in ghc-internal) (#27387).
+    s = re.sub(inLibrariesLoc_re,
+               lambda m: '{0}:<line>:<column>'.format(normalise_slashes_(m.group(1))),
+               s)
     # Ignore the change in how we identify implicit call-stacks
     s = s.replace('from ImplicitParams', 'from HasCallStack')
     if not opts.keep_prof_callstacks:
