@@ -155,6 +155,45 @@ Note the following points:
   for more discussion and examples.
 
 
+.. _lazy-field-annotations:
+
+Lazy field annotations
+----------------------
+
+.. extension:: LazyFieldAnnotations
+    :shortdesc: Allow the prefix ``~`` lazy field annotation on constructor fields.
+
+    :since: 10.2.1
+
+    Allow the prefix ``~`` lazy field annotation on data and GADT constructor
+    fields.
+
+``LazyFieldAnnotations`` allows a prefix ``~`` lazy annotation in every
+constructor-field position where a prefix ``!`` strict annotation is accepted:
+Haskell-98 prefix and record fields, and GADT argument types and record
+fields. ::
+
+  {-# LANGUAGE LazyFieldAnnotations #-}
+
+  data A = A ~Int Bool
+  data B = B { b1 :: ~Int, b2 :: !Bool }
+
+  data C where
+    C1 :: ~Int -> C
+    C2 :: { c1 :: ~Int, c2 :: !Bool } -> C
+
+A field annotated with ``~`` is lazy: it is not forced when the constructor is
+built, but held as a thunk — the same behaviour as an unannotated field under
+:extension:`NoStrictData`.
+
+The ``~`` annotation must be written in prefix form::
+
+   data T = MkT ~Int   -- valid
+   data T = MkT ~ Int  -- invalid
+
+See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
+for the precise rules.
+
 .. _strict-data:
 
 Strict-by-default data types
@@ -162,6 +201,8 @@ Strict-by-default data types
 
 .. extension:: StrictData
     :shortdesc: Treat datatype fields as strict by default.
+
+    :implies: :extension:`LazyFieldAnnotations`
 
     :since: 8.0.1
 
@@ -183,13 +224,8 @@ we interpret it as if they had written ::
 
 The extension only affects definitions in this module.
 
-The ``~`` annotation must be written in prefix form::
-
-   data T = MkT ~Int   -- valid
-   data T = MkT ~ Int  -- invalid
-
-See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
-for the precise rules.
+The ``~`` lazy field annotation is provided by :extension:`LazyFieldAnnotations`
+(which ``StrictData`` implies); see :ref:`lazy-field-annotations`.
 
 .. _strict:
 

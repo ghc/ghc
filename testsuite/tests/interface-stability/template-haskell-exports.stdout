@@ -269,6 +269,7 @@ module Language.Haskell.TH where
     | ExplicitLevelImports
     | ImplicitStagePersistence
     | QualifiedStrings
+    | LazyFieldAnnotations
   type FamilyResultSig :: *
   data FamilyResultSig = NoSig | KindSig Kind | TyVarSig (TyVarBndr ())
   type FamilyResultSigQ :: *
@@ -880,6 +881,7 @@ module Language.Haskell.TH.LanguageExtensions where
     | ExplicitLevelImports
     | ImplicitStagePersistence
     | QualifiedStrings
+    | LazyFieldAnnotations
 
 module Language.Haskell.TH.Lib where
   -- Safety: Safe
@@ -1625,6 +1627,7 @@ module Language.Haskell.TH.Syntax where
     | ExplicitLevelImports
     | ImplicitStagePersistence
     | QualifiedStrings
+    | LazyFieldAnnotations
   type FamilyResultSig :: *
   data FamilyResultSig = NoSig | KindSig Kind | TyVarSig (TyVarBndr ())
   type FieldExp :: *

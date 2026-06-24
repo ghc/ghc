@@ -76,3 +76,5 @@ test('T19680A', normal, compile_and_run, [''])
 test('T20024', exit_code(1), compile_and_run, [''])
 
 test('Or5', exit_code(1), compile_and_run, [''])
+
+test('LazyFieldAnnotationsSemantics', normal, compile_and_run, [''])
