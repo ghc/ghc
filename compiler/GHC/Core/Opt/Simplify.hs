@@ -12,7 +12,7 @@ import GHC.Driver.Flags
 import GHC.Core
 import GHC.Core.Rules
 import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
-import GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
+import GHC.Core.Opt.OccurAnal ( OccurAnalOpts(..), occurAnalysePgm, occurAnalyseExpr )
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
 import GHC.Core.FVs     ( exprFreeVars )
 import GHC.Core.Utils   ( mkTicks, stripTicksTop )
@@ -252,8 +252,14 @@ simplifyPgm logger unit_env name_ppr_ctx opts
       = do {
                 -- Occurrence analysis
            let { tagged_binds = {-# SCC "OccAnal" #-}
-                     occurAnalysePgm this_mod active_unf active_rule
-                                     local_rules binds
+                     occurAnalysePgm
+                       this_mod
+                       OccurAnalOpts
+                         { oa_active_unf = active_unf
+                         , oa_active_rule = active_rule
+                         , oa_lcl_imp_rules = local_rules
+                         }
+                       binds
                } ;
            Logger.putDumpFileMaybe logger Opt_D_dump_occur_anal "Occurrence analysis"
                      FormatCore

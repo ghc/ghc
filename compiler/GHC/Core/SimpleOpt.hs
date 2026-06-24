@@ -28,7 +28,7 @@ import GHC.Core.FVs
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Make
-import GHC.Core.Opt.OccurAnal( occurAnalyseExpr, occurAnalysePgm, zapLambdaBndrs )
+import GHC.Core.Opt.OccurAnal( OccurAnalOpts(..), occurAnalyseExpr, occurAnalysePgm, zapLambdaBndrs )
 import GHC.Core.DataCon
 import GHC.Core.Coercion.Opt ( optCoercion, optTransCo, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
@@ -282,10 +282,14 @@ simpleOptPgm :: SimpleOpts
 simpleOptPgm opts this_mod binds rules =
     (reverse binds', rules', occ_anald_binds)
   where
-    occ_anald_binds  = occurAnalysePgm this_mod
-                          (\_ -> True)  {- All unfoldings active -}
-                          (\_ -> False) {- No rules active -}
-                          rules binds
+    occ_anald_binds  = occurAnalysePgm
+                         this_mod
+                         OccurAnalOpts
+                           { oa_active_unf = \_ -> True  {- All unfoldings active -}
+                           , oa_active_rule = \_ -> False {- No rules active -}
+                           , oa_lcl_imp_rules = rules
+                           }
+                         binds
 
     (final_env, binds') = foldl' do_one (emptyEnv opts, []) occ_anald_binds
     final_subst = soe_subst final_env

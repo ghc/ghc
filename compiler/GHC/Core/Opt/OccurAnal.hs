@@ -26,6 +26,7 @@ core expression with (hopefully) improved usage information.
 -}
 
 module GHC.Core.Opt.OccurAnal (
+    OccurAnalOpts(..),
     occurAnalysePgm,
     occurAnalyseExpr, occurAnalyseBndrsAndExpr,
     occurAnalyseExpr_Prep,
@@ -103,12 +104,18 @@ occurAnalyseExpr_Prep expr = expr'
   where
     WUD _ expr' = occAnal (initOccEnv { occ_allow_weak_joins = True }) expr
 
+-- | Options for occurrence analysis of a program
+data OccurAnalOpts = OccurAnalOpts
+  { oa_active_unf     :: Id -> Bool              -- ^ Active unfoldings
+  , oa_active_rule    :: ActivationGhc -> Bool   -- ^ Active rules
+  , oa_lcl_imp_rules  :: [CoreRule]              -- ^ Local rules for imported Ids
+  }
+
 occurAnalysePgm :: Module         -- Used only in debug output
-                -> (Id -> Bool)         -- Active unfoldings
-                -> (ActivationGhc -> Bool) -- Active rules
-                -> [CoreRule]           -- Local rules for imported Ids
-                -> CoreProgram -> CoreProgram
-occurAnalysePgm this_mod active_unf active_rule imp_rules binds
+                -> OccurAnalOpts
+                -> CoreProgram
+                -> CoreProgram
+occurAnalysePgm this_mod opts binds
   | isEmptyDetails final_usage
   = occ_anald_binds
 
@@ -116,8 +123,8 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
   = warnPprTrace True "Glomming in" (hang (ppr this_mod <> colon) 2 (ppr final_usage))
     occ_anald_glommed_binds
   where
-    init_env = initOccEnv { occ_rule_act = active_rule
-                          , occ_unf_act  = active_unf }
+    init_env = initOccEnv { occ_rule_act = oa_active_rule opts
+                          , occ_unf_act  = oa_active_unf opts}
 
     WUD final_usage occ_anald_binds = go binds init_env
     WUD _ occ_anald_glommed_binds = occAnalRecBind init_env TopLevel
@@ -133,7 +140,7 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
           -- a binding that was actually needed (albeit before its
           -- definition site).  #17724 threw this up.
 
-    initial_uds = addManyOccs emptyDetails (rulesFreeVars imp_rules)
+    initial_uds = addManyOccs emptyDetails (rulesFreeVars $ oa_lcl_imp_rules opts)
     -- The RULES declarations keep things alive!
 
     -- imp_rule_edges maps a top-level local binder 'f' to the
@@ -148,7 +155,7 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
                            [ mapVarEnv (const [(act,rhs_fvs)]) $ getUniqSet $
                              exprsFreeIds args `delVarSetList` bndrs
                            | Rule { ru_act = act, ru_bndrs = bndrs
-                                   , ru_args = args, ru_rhs = rhs } <- imp_rules
+                                   , ru_args = args, ru_rhs = rhs } <- oa_lcl_imp_rules opts
                                    -- Not BuiltinRules; see Note [Plugin rules]
                            , let rhs_fvs = exprFreeIds rhs `delVarSetList` bndrs ]
 
