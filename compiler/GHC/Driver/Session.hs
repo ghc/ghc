@@ -3856,8 +3856,8 @@ makeDynFlagsConsistent dflags
    && os == OSMinGW32
    && arch == ArchAArch64
     = case backendCodeOutput (backend dflags) of
-        LlvmCodeOutput -> pgmError "-fllvm is incompatible with enabled TablesNextToCode at Windows Aarch64"
-        NcgCodeOutput -> pgmError "-fasm is incompatible with enabled TablesNextToCode at Windows Aarch64"
+        Just LlvmCodeOutput -> pgmError "-fllvm is incompatible with enabled TablesNextToCode at Windows Aarch64"
+        Just NcgCodeOutput -> pgmError "-fasm is incompatible with enabled TablesNextToCode at Windows Aarch64"
         _ -> (dflags, mempty, mempty)
 
   -- When we do ghci, force using dyn ways if the target RTS linker

@@ -4,7 +4,6 @@
 \section{Code output phase}
 -}
 
-
 module GHC.Driver.CodeOutput
    ( codeOutput
    , outputForeignStubs
@@ -50,7 +49,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Logger
 import GHC.Utils.Exception ( bracket )
 import GHC.Utils.Ppr (Mode(..))
-import GHC.Utils.Panic.Plain ( pgmError )
+import GHC.Utils.Panic.Plain ( panic, pgmError )
 
 import GHC.Unit
 import GHC.Unit.Finder      ( mkStubPaths )
@@ -63,7 +62,6 @@ import GHC.Types.Unique.Supply ( UniqueTag(..) )
 import System.IO
 import Data.Set (Set)
 import qualified Data.Set as Set
-import GHC.Plugins (panic)
 
 {-
 ************************************************************************
@@ -125,11 +123,12 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
 
         ; let dus1 = newTagDUniqSupply CodeGenTag dus0
         ; (stubs, a) <- case backendCodeOutput (backend dflags) of
-                 NcgCodeOutput  -> outputAsm logger dflags this_mod location filenm dus1
-                                             final_stream
-                 ViaCCodeOutput -> outputC logger dflags filenm dus1 final_stream pkg_deps
-                 LlvmCodeOutput -> outputLlvm logger llvm_config dflags filenm dus1 final_stream
-                 JSCodeOutput   -> outputJS logger llvm_config dflags filenm final_stream
+             Just NcgCodeOutput  -> outputAsm logger dflags this_mod location filenm dus1
+                                              final_stream
+             Just ViaCCodeOutput -> outputC logger dflags filenm dus1 final_stream pkg_deps
+             Just LlvmCodeOutput -> outputLlvm logger llvm_config dflags filenm dus1 final_stream
+             Just JSCodeOutput   -> outputJS logger llvm_config dflags filenm final_stream
+             Nothing             -> panic $ "backendCodeOutput: " ++ show (backend dflags) ++ " doesn't support code output"
         ; stubs_exist <- outputForeignStubs logger tmpfs dflags unit_state this_mod location stubs
         ; return (filenm, stubs_exist, foreign_fps, a)
         }

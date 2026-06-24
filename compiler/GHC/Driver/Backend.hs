@@ -118,7 +118,6 @@ import GHC.Driver.Phases
 
 
 import GHC.Utils.Error
-import GHC.Utils.Panic
 
 import GHC.Driver.Pipeline.Monad
 import GHC.Platform
@@ -369,7 +368,8 @@ data PrimitiveImplementation
 -- We expect one function per back end—or more precisely, one function
 -- for each back end that writes code to a file.  (The interpreter
 -- does not write to files; its output lives only in memory.)
-
+--
+-- See Note [Backend Defunctionalization]
 data DefunctionalizedCodeOutput
   = NcgCodeOutput
   | ViaCCodeOutput
@@ -779,20 +779,33 @@ backendCDefs (Named NoBackend)   = NoCDefs
 -- > -> Set UnitId -- ^ dependencies
 -- > -> Stream IO RawCmmGroup a -- results from `StgToCmm`
 -- > -> IO a
-backendCodeOutput :: Backend -> DefunctionalizedCodeOutput
-backendCodeOutput (Named NCG)         = NcgCodeOutput
-backendCodeOutput (Named LLVM)        = LlvmCodeOutput
-backendCodeOutput (Named ViaC)        = ViaCCodeOutput
-backendCodeOutput (Named JavaScript)  = JSCodeOutput
-backendCodeOutput (Named Bytecode) = panic "backendCodeOutput: bytecodeBackend"
-backendCodeOutput (Named NoBackend)   = panic "backendCodeOutput: noBackend"
+--
+-- See Note [Backend Defunctionalization]
+--
+-- === __WARNING__
+--
+-- Do NOT use 'backendCodeOutput' (or other functions in this module) as a
+-- proxy for the 'Backend', which is __abstract by design__.
+--
+-- If you need to determine some property of the backend, do NOT match on
+-- 'DefunctionalizedCodeOutput'; Instead, write a new property predicate in
+-- this module. This makes it easier to add new backends because essentially
+-- all backend properties depended upon throughout the compiler are all found
+-- here.
+backendCodeOutput :: Backend -> Maybe DefunctionalizedCodeOutput
+backendCodeOutput (Named NCG)         = Just NcgCodeOutput
+backendCodeOutput (Named LLVM)        = Just LlvmCodeOutput
+backendCodeOutput (Named ViaC)        = Just ViaCCodeOutput
+backendCodeOutput (Named JavaScript)  = Just JSCodeOutput
+backendCodeOutput (Named Bytecode)    = Nothing
+backendCodeOutput (Named NoBackend)   = Nothing
 
 backendUseJSLinker :: Backend -> Bool
 backendUseJSLinker (Named NCG)         = False
 backendUseJSLinker (Named LLVM)        = False
 backendUseJSLinker (Named ViaC)        = False
 backendUseJSLinker (Named JavaScript)  = True
-backendUseJSLinker (Named Bytecode) = False
+backendUseJSLinker (Named Bytecode)    = False
 backendUseJSLinker (Named NoBackend)   = False
 
 -- | This (defunctionalized) function tells the compiler

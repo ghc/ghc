@@ -743,7 +743,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
   let home_unit = hsc_home_unit hsc_env
 
   case backendCodeOutput (backend dflags) of
-    JSCodeOutput -> do
+    Just JSCodeOutput -> do
       empty_stub <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "js"
       let src = ppr (mkHomeModule home_unit mod_name) <+> text "= 0;"
       writeFile empty_stub (showSDoc dflags (pprCode src))
@@ -752,7 +752,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
       _ <- runPipeline (hsc_hooks hsc_env) pipeline
       pure ()
 
-    _ -> do
+    Just _ -> do
       empty_stub <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "c"
       let src = text "int" <+> ppr (mkHomeModule home_unit mod_name) <+> text "= 0;"
       writeFile empty_stub (showSDoc dflags (pprCode src))
@@ -760,6 +760,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
           pipeline = viaCPipeline HCc pipe_env hsc_env (Just location) empty_stub
       _ <- runPipeline (hsc_hooks hsc_env) pipeline
       pure ()
+    Nothing -> panic $ "backendCodeOutput: " ++ show (backend dflags) ++ " doesn't support code output"
 
 
 
