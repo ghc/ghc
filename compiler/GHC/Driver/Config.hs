@@ -27,6 +27,7 @@ initSimpleOpts dflags = SimpleOpts
    , so_co_opts = initOptCoercionOpts dflags
    , so_eta_red = gopt Opt_DoEtaReduction dflags
    , so_inline  = const True
+   , so_can_drop = const True
    }
 
 -- | Instruct the interpreter evaluation to break...

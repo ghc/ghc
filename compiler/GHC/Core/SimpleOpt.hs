@@ -208,6 +208,8 @@ data SimpleOpts = SimpleOpts
                                     --   used-once things
                                     --
                                     --   See Note [Controlling inlining in the simple optimiser]
+   , so_can_drop :: !(Var -> Bool)  -- ^ True <=> can drop the given binding if it is dead
+                                    -- See 'oa_can_drop' in 'OccurAnalOpts'.
    }
 
 -- | Default options for the Simple optimiser.
@@ -217,6 +219,7 @@ defaultSimpleOpts = SimpleOpts
    , so_co_opts = OptCoercionOpts { optCoercionEnabled = False }
    , so_eta_red = False
    , so_inline  = const True
+   , so_can_drop = const True
    }
 
 simpleOptExpr :: HasDebugCallStack => SimpleOpts -> CoreExpr -> CoreExpr
@@ -288,6 +291,7 @@ simpleOptPgm opts this_mod binds rules =
                            { oa_active_unf = \_ -> True  {- All unfoldings active -}
                            , oa_active_rule = \_ -> False {- No rules active -}
                            , oa_lcl_imp_rules = rules
+                           , oa_can_drop = so_can_drop opts
                            }
                          binds
 

@@ -109,6 +109,9 @@ data OccurAnalOpts = OccurAnalOpts
   { oa_active_unf     :: Id -> Bool              -- ^ Active unfoldings
   , oa_active_rule    :: ActivationGhc -> Bool   -- ^ Active rules
   , oa_lcl_imp_rules  :: [CoreRule]              -- ^ Local rules for imported Ids
+  , oa_can_drop       :: Id -> Bool
+      -- ^ Can we drop this Id if it is dead?
+      -- See Note [Controlling elimination of dead bindings in occurrence analysis].
   }
 
 occurAnalysePgm :: Module         -- Used only in debug output
@@ -124,7 +127,9 @@ occurAnalysePgm this_mod opts binds
     occ_anald_glommed_binds
   where
     init_env = initOccEnv { occ_rule_act = oa_active_rule opts
-                          , occ_unf_act  = oa_active_unf opts}
+                          , occ_unf_act  = oa_active_unf opts
+                          , occ_can_drop = oa_can_drop opts
+                          }
 
     WUD final_usage occ_anald_binds = go binds init_env
     WUD _ occ_anald_glommed_binds = occAnalRecBind init_env TopLevel
@@ -1040,6 +1045,28 @@ Note [Occurrences in stable unfoldings and RULES]: occurrences in an unfolding
 or RULE are treated as ManyOcc anyway.
 
 But NB that tail-call info is preserved so that we don't thereby lose join points.
+
+Note [Controlling elimination of dead bindings in occurrence analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sometimes, plugins might want to retain dead bindings. This is needed when
+a binding is only consumed by a plugin, and it is otherwise unused in the
+program.
+
+For instance, Liquid Haskell might be the sole consumer of a binding that is
+providing a proof. Or it might provide a lemma that is needed to check other
+parts of the program. Or it might provide a value that is only referred from a
+refinement type, but not from the Haskell code itself.
+
+The plugin could avoid running the occurrence analyser, but that would also
+disable other effects, such as the split of the program in strongly connected
+components. For this reason the occurrence analyser can be configured to retain
+some bindings even if they are dead. This is done by setting the `oa_can_drop`
+field of `OccAnalOpts` to a function that returns `False` for the bindings that
+should be retained.
+
+See https://gitlab.haskell.org/ghc/ghc/-/issues/27240 for more discussion on
+this topic.
 -}
 
 ------------------------------------------------------------------
@@ -1085,7 +1112,7 @@ occAnalBind !env lvl ire (NonRec bndr rhs) thing_inside combine
         !(WUD body_uds (occ, body)) = occAnalNonRecBody env_body bndr' $ \env ->
                                       thing_inside (addJoinPoint env bndr' rhs_uds)
     in
-    if isDeadOcc occ     -- Drop dead code; see Note [Dead code]
+    if isDeadOcc occ && occ_can_drop env bndr  -- Drop dead code; see Note [Dead code]
     then WUD body_uds body
     else WUD (combineJoinPointUDs env rhs_uds body_uds)    -- Note `orUDs`
              (combine [NonRec (fst (tagNonRecBinder lvl occ bndr')) rhs']
@@ -1095,7 +1122,7 @@ occAnalBind !env lvl ire (NonRec bndr rhs) thing_inside combine
   -- Analyse the body and /then/ the RHS
   | let env_body = addLocalLet env lvl bndr
   , WUD body_uds (occ,body) <- occAnalNonRecBody env_body bndr thing_inside
-  = if isDeadOcc occ   -- Drop dead code; see Note [Dead code]
+  = if isDeadOcc occ && occ_can_drop env bndr  -- Drop dead code; see Note [Dead code]
     then WUD body_uds body
     else let
         -- Get the join info from the *new* decision; NB: bndr is not already a JoinId
@@ -1232,10 +1259,10 @@ occAnalRec :: OccEnv -> TopLevelFlag
            -> WithUsageDetails [CoreBind]
 
 -- The NonRec case is just like a Let (NonRec ...) above
-occAnalRec !_ lvl
+occAnalRec !env lvl
            (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = wtuds }))
            (WUD body_uds binds)
-  | isDeadOcc occ  -- Check for dead code: see Note [Dead code]
+  | isDeadOcc occ && occ_can_drop env bndr  -- Check for dead code: see Note [Dead code]
   = WUD body_uds binds
   | otherwise
   = let (bndr', mb_join) = tagNonRecBinder lvl occ bndr
@@ -3019,6 +3046,10 @@ data OccEnv
            , occ_nested_lets :: IdSet    -- Non-top-level, non-rec-bound lets
                 -- I tried making this field strict, but doing so increased
                 -- compile-time allocation very slightly: 0.1% on average
+
+           , occ_can_drop :: Id -> Bool
+                -- ^ Can we drop this Id if it is dead?
+                -- See 'oa_can_drop' in 'OccurAnalOpts'.
            }
 
 type JoinPointInfo = IdEnv OccInfoEnv
@@ -3073,7 +3104,9 @@ initOccEnv
            , occ_join_points = emptyVarEnv
            , occ_bs_env = emptyVarEnv
            , occ_bs_rng = emptyVarSet
-           , occ_nested_lets = emptyVarSet }
+           , occ_nested_lets = emptyVarSet
+           , occ_can_drop = \_ -> True
+           }
 
 noBinderSwaps :: OccEnv -> Bool
 noBinderSwaps (OccEnv { occ_bs_env = bs_env }) = isEmptyVarEnv bs_env

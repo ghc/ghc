@@ -1,0 +1,15 @@
+section: ghc-lib
+synopsis: Add ``oa_can_drop`` option to the occurrence analyser which selects
+          bindings to preserve.
+
+issues: #27240
+mrs: !16253
+
+description: {
+  The ``oa_can_drop`` option of the occurrence analyser indicates whether a
+  binding is ok to drop. The option is also exposed in the simple optimiser as
+  ``so_can_drop``.
+
+  In addition, the function ``occurAnalysePgm`` earned a record parameter of
+  type ``OccurAnalOpts`` which aggregates former parameters of the function.
+}

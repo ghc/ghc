@@ -258,6 +258,7 @@ simplifyPgm logger unit_env name_ppr_ctx opts
                          { oa_active_unf = active_unf
                          , oa_active_rule = active_rule
                          , oa_lcl_imp_rules = local_rules
+                         , oa_can_drop = const True
                          }
                        binds
                } ;
