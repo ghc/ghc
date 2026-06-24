@@ -6,6 +6,7 @@
 
 
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -44,7 +45,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad
 import GHC.Tc.TyCl.Build( TcMethInfo )
 
-import GHC.Core.Type     ( extendTvSubstWithClone, piResultTys )
+import GHC.Core.Type     ( extendTvSubstWithClone, piResultTys, pattern UnmatchableTy )
 import GHC.Core.Predicate
 import GHC.Core.Multiplicity
 import GHC.Core.Class
@@ -293,7 +294,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
 
              ctxt = FunSigCtxt sel_name warn_redundant
 
-       ; let local_dm_id = mkLocalId local_dm_name ManyTy local_dm_ty
+       ; let local_dm_id = mkLocalId local_dm_name UnmatchableTy ManyTy local_dm_ty
              local_dm_sig = CSig { sig_bndr = local_dm_id
                                  , sig_ctxt = ctxt
                                  , sig_loc  = getLocA hs_ty }

@@ -146,7 +146,7 @@ newUnique = state $
 newId :: Type -> BcPrepM Id
 newId ty = do
     uniq <- newUnique
-    return $ mkSysLocal prepFS uniq ManyTy ty
+    return $ mkSysLocal prepFS uniq UnmatchableTy ManyTy ty
 
 prepFS :: FastString
 prepFS = fsLit "bcprep"

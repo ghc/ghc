@@ -349,17 +349,19 @@ mkAppRedn (Reduction co1 ty1) (Reduction co2 ty2)
 -- Combines 'mkFunCo' and 'mkFunTy'.
 mkFunRedn :: Role
           -> FunTyFlag
+          -> ReductionN -- ^ matchability reduction
           -> ReductionN -- ^ multiplicity reduction
           -> Reduction  -- ^ argument reduction
           -> Reduction  -- ^ result reduction
           -> Reduction
 mkFunRedn r af
+  (Reduction m_co m_ty)
   (Reduction w_co w_ty)
   (Reduction arg_co arg_ty)
   (Reduction res_co res_ty)
     = mkReduction
-        (mkFunCo r af w_co arg_co res_co)
-        (mkFunTy   af w_ty arg_ty res_ty)
+        (mkFunCo r af m_co w_co arg_co res_co)
+        (mkFunTy   af m_ty w_ty arg_ty res_ty)
 {-# INLINE mkFunRedn #-}
 
 -- | Create a 'Reduction' associated to a Π type,

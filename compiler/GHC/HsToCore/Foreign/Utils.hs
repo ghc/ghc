@@ -41,7 +41,7 @@ getPrimTyOf ty
   -- with a single primitive-typed argument (see TcType.legalFEArgTyCon).
   | otherwise =
   case splitDataProductType_maybe rep_ty of
-     Just (_, _, data_con, [Scaled _ prim_ty]) ->
+     Just (_, _, data_con, [Scaled _ _ prim_ty]) ->
         assert (dataConSourceArity data_con == 1) $
         assertPpr (isUnliftedType prim_ty) (ppr prim_ty)
           -- NB: it's OK to call isUnliftedType here, as we don't allow

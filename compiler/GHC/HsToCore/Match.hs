@@ -78,6 +78,7 @@ import Control.Monad ( zipWithM, unless )
 import Data.List.NonEmpty (NonEmpty(..), nonEmpty)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
+import GHC.Core.TyCo.Rep (scaledMa)
 
 {-
 ************************************************************************
@@ -277,7 +278,7 @@ matchCoercion :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE -> DsM (Mat
 matchCoercion (var :| vars) ty eqns@(eqn1 :| _)
   = do  { let XPat (CoPat co pat _) = firstPat eqn1
         ; let pat_ty' = hsPatType pat
-        ; var' <- newUniqueId var (idMult var) pat_ty'
+        ; var' <- newUniqueId var (idMa var) (idMult var) pat_ty'
         ; match_result <- match (var':vars) ty $ NE.toList $
             decomposeFirstPat getCoPat <$> eqns
         ; dsHsWrapper co $ \core_wrap -> do
@@ -293,7 +294,7 @@ matchView (var :| vars) ty eqns@(eqn1 :| _)
          let TcViewPat viewExpr pat = firstPat eqn1
          -- do the rest of the compilation
         ; let pat_ty' = hsPatType pat
-        ; var' <- newUniqueId var (idMult var) pat_ty'
+        ; var' <- newUniqueId var (idMa var) (idMult var) pat_ty'
         ; match_result <- match (var':vars) ty $ NE.toList $
             decomposeFirstPat getViewPat <$> eqns
          -- compile the view expressions
@@ -799,7 +800,7 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
                            []    -> newSysLocalsDs arg_tys
                            (m:_) ->
                             selectMatchVars (zipWithEqual
-                                              (\a b -> (scaledMult a, unLoc b))
+                                              (\a b -> (scaledMa a, scaledMult a, unLoc b))
                                                 arg_tys
                                                 (hsLMatchPats m))
 
@@ -951,8 +952,8 @@ matchSinglePat (Var var) ctx pat _ ty match_result
   | not (isExternalName (idName var))
   = matchSinglePatVar var Nothing ctx pat ty match_result
 
-matchSinglePat scrut hs_ctx pat mult ty match_result
-  = do { var           <- selectSimpleMatchVarL mult pat
+matchSinglePat scrut hs_ctx pat  mult ty match_result
+  = do { var           <- selectSimpleMatchVarL UnmatchableTy mult pat
        ; match_result' <- matchSinglePatVar var (Just scrut) hs_ctx pat ty match_result
        ; return $ bindNonRec var scrut <$> match_result'
        }
@@ -1219,8 +1220,8 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     syn_exp _              _              = False
 
     ---------
-    tup_arg (Present _ e1)           (Present _ e2)         = lexp e1 e2
-    tup_arg (Missing (Scaled _ t1)) (Missing (Scaled _ t2)) = eqType t1 t2
+    tup_arg (Present _ e1)            (Present _ e2)            = lexp e1 e2
+    tup_arg (Missing (Scaled _ _ t1)) (Missing (Scaled _ _ t2)) = eqType t1 t2
     tup_arg _ _ = False
 
     ---------
@@ -1233,7 +1234,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     --        equating different ways of writing a coercion)
     wrap WpHole WpHole = True
     wrap (WpCompose w1 w2) (WpCompose w1' w2') = wrap w1 w1' && wrap w2 w2'
-    wrap (WpFun m1 w1 w2 _ _) (WpFun m2 w1' w2' _ _) = sub_mult m1 m2 && wrap w1 w1' && wrap w2 w2'
+    wrap (WpFun ma1 m1 w1 w2 _ _) (WpFun ma2 m2 w1' w2' _ _) = ma1 `eqCoercion` ma2 && sub_mult m1 m2 && wrap w1 w1' && wrap w2 w2'
     wrap (WpCast co)       (WpCast co')        = co `eqCoercion` co'
     wrap (WpEvApp et1)     (WpEvApp et2)       = et1 `ev_term` et2
     wrap (WpTyApp t)       (WpTyApp t')        = eqType t t'

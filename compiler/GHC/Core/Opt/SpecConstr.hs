@@ -1995,7 +1995,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
               spec_join_arity | isJoinId fn = JoinPoint (length spec_call_args)
                               | otherwise   = NotJoinPoint
               spec_id    = setCbvCandidate $
-                           mkLocalId spec_name ManyTy spec_id_ty
+                           mkLocalId spec_name UnmatchableTy ManyTy spec_id_ty
                              -- See Note [Transfer strictness]
                              `setIdDmdSig`     spec_sig
                              `setIdCprSig`     topCprSig
@@ -2052,7 +2052,7 @@ generaliseDictPats qvars pats
        , let pat_ty = exprType pat
        , typeDeterminesValue pat_ty
        , exprFreeVars pat `disjointVarSet` qvar_set
-       = do { id <- mkSysLocalOrCoVarM (fsLit "dict") ManyTy pat_ty
+       = do { id <- mkSysLocalOrCoVarM (fsLit "dict") UnmatchableTy ManyTy pat_ty
             ; return (id:extra_qvs, Var id) }
        | otherwise
        = return (extra_qvs, pat)
@@ -2842,7 +2842,7 @@ argToPat1 _env _in_scope _val_env arg _arg_occ arg_str
 -- | wildCardPats are always boring
 wildCardPat :: Type -> StrictnessMark -> UniqSM (Bool, CoreArg, [Id])
 wildCardPat ty str
-  = do { id <- mkSysLocalOrCoVarM (fsLit "sc") ManyTy ty
+  = do { id <- mkSysLocalOrCoVarM (fsLit "sc") UnmatchableTy ManyTy ty
        -- ; pprTraceM "wildCardPat" (ppr id' <+> ppr (idUnfolding id'))
        ; return (False, varToCoreExpr id, if isMarkedStrict str then [id] else []) }
 

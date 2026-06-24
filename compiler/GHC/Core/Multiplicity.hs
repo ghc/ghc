@@ -346,7 +346,7 @@ mkMultMul _      ManyTy = ManyTy
 mkMultMul p q = mkTyConApp multMulTyCon [p, q]
 
 scaleScaled :: Mult -> Scaled a -> Scaled a
-scaleScaled m' (Scaled m t) = Scaled (m' `mkMultMul` m) t
+scaleScaled m' (Scaled ma m t) = Scaled ma (m' `mkMultMul` m) t
 
 -- See Note [Joining usages]
 -- | @mkMultSup w1 w2@ returns a multiplicity such that @mkMultSup w1

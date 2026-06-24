@@ -6027,7 +6027,7 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
           (t1_2', t2_2') = go t1_2 t2_2
        in (mkAppTy t1_1' t1_2', mkAppTy t2_1' t2_2')
 
-    go ty1@(FunTy _ w1 t1_1 t1_2) ty2@(FunTy _ w2 t2_1 t2_2) | w1 `eqType` w2 =
+    go ty1@(FunTy _ m1 w1 t1_1 t1_2) ty2@(FunTy _ m2 w2 t2_1 t2_2) | m1 `eqType` m2, w1 `eqType` w2 =
       let (t1_1', t2_1') = go t1_1 t2_1
           (t1_2', t2_2') = go t1_2 t2_2
        in ( ty1 { ft_arg = t1_1', ft_res = t1_2' }
@@ -6732,7 +6732,7 @@ pprSynAbstractDataError = \case
            Just $ text "Invalid type family" <+> quotes (ppr tc) <> dot
       ty@(ForAllTy {})
         -> Just $ text "Invalid polymorphic type" <> colon <+> ppr ty <> dot
-      ty@(FunTy af _ _ _)
+      ty@(FunTy af _ _ _ _)
         | not (af == FTF_T_T)
         -> Just $ text "Invalid qualified type" <> colon <+> ppr ty <> dot
       _ -> Nothing

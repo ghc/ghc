@@ -37,6 +37,7 @@ import GHC.Utils.Panic
 import Control.Monad(liftM)
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
+import GHC.Core.TyCo.Rep (scaledMa)
 
 {-
 We are confronted with the first column of patterns in a set of
@@ -250,7 +251,7 @@ selectConMatchVars arg_tys con
       PrefixCon _ ps   -> selectMatchVars (zipMults arg_tys ps)
       InfixCon _ p1 p2 -> selectMatchVars (zipMults arg_tys [p1, p2])
   where
-    zipMults = zipWithEqual (\a b -> (scaledMult a, unLoc b))
+    zipMults = zipWithEqual (\a b -> (scaledMa a, scaledMult a, unLoc b))
 
 conArgPats :: [Scaled Type]-- Instantiated argument types
                           -- Used only to fill in the types of WildPats, which

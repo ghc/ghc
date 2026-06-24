@@ -606,7 +606,7 @@ dsMcBindStmt :: LPat GhcTc
              -> [ExprLStmt GhcTc]
              -> DsM CoreExpr
 dsMcBindStmt pat rhs' bind_op fail_op res1_ty stmts
-  = do  { var   <- selectSimpleMatchVarL ManyTy pat
+  = do  { var   <- selectSimpleMatchVarL UnmatchableTy ManyTy pat
         ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt (DoExpr Nothing))) pat
                       res1_ty (MR_Infallible $ dsMcStmts stmts)
             -- NB: dsMcStmts needs to happen inside matchSinglePatVar, and not

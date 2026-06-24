@@ -2711,7 +2711,7 @@ fiddleCCall id
 newVar :: CorePrepEnv ->  Type -> UniqSM Id
 newVar env ty
  -- See Note [Binder context]
- = seqType ty `seq` mkSysLocalOrCoVarM (fsLit occ) ManyTy ty
+ = seqType ty `seq` mkSysLocalOrCoVarM (fsLit occ) UnmatchableTy ManyTy ty
    where occ = intercalate "_" (map occNameString $ cpe_context env) ++ "_sat"
 
 {- Note [Binder context]
@@ -2827,28 +2827,28 @@ cpeBigNatLit env i = assert (i >= 0) $ do
   --   * A call to `newByteArray#` with the appropriate size
   --   * A call to `copyAddrToByteArray#` to initialize the `ByteArray#`
   --   * A call to `unsafeFreezeByteArray#` to make the types match
-  litAddrId <- mkSysLocalM (fsLit "bigNatGuts") ManyTy addrPrimTy
+  litAddrId <- mkSysLocalM (fsLit "bigNatGuts") UnmatchableTy ManyTy addrPrimTy
   -- returned from newByteArray#:
   deadNewByteArrayTupleId
-    <- fmap (`setIdOccInfo` IAmDead) . mkSysLocalM (fsLit "tup") ManyTy $
+    <- fmap (`setIdOccInfo` IAmDead) . mkSysLocalM (fsLit "tup") UnmatchableTy ManyTy $
          mkTupleTy Unboxed [ realWorldStatePrimTy
                            , realWorldMutableByteArrayPrimTy
                            ]
   stateTokenFromNewByteArrayId
-    <- mkSysLocalM (fsLit "token") ManyTy realWorldStatePrimTy
+    <- mkSysLocalM (fsLit "token") UnmatchableTy ManyTy realWorldStatePrimTy
   mutableByteArrayId
-    <- mkSysLocalM (fsLit "mba") ManyTy realWorldMutableByteArrayPrimTy
+    <- mkSysLocalM (fsLit "mba") UnmatchableTy ManyTy realWorldMutableByteArrayPrimTy
   -- returned from copyAddrToByteArray#:
   stateTokenFromCopyId
-    <- mkSysLocalM (fsLit "token") ManyTy realWorldStatePrimTy
+    <- mkSysLocalM (fsLit "token") UnmatchableTy ManyTy realWorldStatePrimTy
   -- returned from unsafeFreezeByteArray#:
   deadFreezeTupleId
-    <- fmap (`setIdOccInfo` IAmDead) . mkSysLocalM (fsLit "tup") ManyTy $
+    <- fmap (`setIdOccInfo` IAmDead) . mkSysLocalM (fsLit "tup") UnmatchableTy ManyTy $
          mkTupleTy Unboxed [realWorldStatePrimTy, byteArrayPrimTy]
   stateTokenFromFreezeId
     <- (`setIdOccInfo` IAmDead) <$>
-         mkSysLocalM (fsLit "token") ManyTy realWorldStatePrimTy
-  byteArrayId <- mkSysLocalM (fsLit "ba") ManyTy byteArrayPrimTy
+         mkSysLocalM (fsLit "token") UnmatchableTy ManyTy realWorldStatePrimTy
+  byteArrayId <- mkSysLocalM (fsLit "ba") UnmatchableTy ManyTy byteArrayPrimTy
 
   let
     litAddrRhs = Lit (LitString words)

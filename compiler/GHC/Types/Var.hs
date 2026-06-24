@@ -44,7 +44,7 @@ module GHC.Types.Var (
 
         -- ** Taking 'Var's apart
         varName, varUnique, varType,
-        varMultMaybe, idMult,
+        varMultMaybe, idMult, idMa,
 
         -- ** Modifying 'Var's
         setVarName, setVarUnique, setVarType,
@@ -54,7 +54,7 @@ module GHC.Types.Var (
         mkGlobalVar, mkLocalVar, mkExportedLocalVar, mkCoVar,
         idInfo, idDetails,
         lazySetIdInfo, setIdDetails, globaliseId,
-        setIdExported, setIdNotExported, setIdMult,
+        setIdExported, setIdNotExported, setIdMult, setIdMa,
         updateIdTypeButNotMult,
         updateIdTypeAndMult, updateIdTypeAndMultM,
 
@@ -114,12 +114,12 @@ module GHC.Types.Var (
 
 import GHC.Prelude
 
-import {-# SOURCE #-}   GHC.Core.TyCo.Rep( Type, Kind, Mult, Scaled, scaledThing )
+import {-# SOURCE #-}   GHC.Core.TyCo.Rep( Type, Kind, Mult, Scaled, scaledThing, Matchability )
 import {-# SOURCE #-}   GHC.Core.TyCo.Ppr( pprKind )
 import {-# SOURCE #-}   GHC.Tc.Utils.TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTvUnk )
 import {-# SOURCE #-}   GHC.Types.Id.Info( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                            vanillaIdInfo, pprIdDetails )
-import {-# SOURCE #-}   GHC.Builtin.Types ( manyDataConTy )
+import {-# SOURCE #-}   GHC.Builtin.Types ( unmatchableDataConTy, manyDataConTy )
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Unique ( Uniquable, Unique, getKey, getUnique
                         , nonDetCmpUnique )
@@ -277,6 +277,7 @@ data Var
         varName    :: !Name,
         realUnique :: {-# UNPACK #-} !Unique,
         varType    :: Type,
+        varMa      :: Matchability,
         varMult    :: Mult,             -- See Note [Multiplicity of let binders]
         idScope    :: IdScope,
         id_details :: IdDetails,        -- Stable, doesn't change
@@ -422,6 +423,10 @@ varMultMaybe _ = Nothing
 idMult :: HasDebugCallStack => Id -> Mult
 idMult (Id { varMult = mult }) = mult
 idMult non_id                  = pprPanic "idMult" (ppr non_id)
+
+idMa :: HasDebugCallStack => Id -> Matchability
+idMa (Id { varMa = ma }) = ma
+idMa non_id = pprPanic "idMa" (ppr non_id)
 
 setVarUnique :: Var -> Unique -> Var
 setVarUnique var uniq
@@ -1081,28 +1086,29 @@ idDetails other                         = pprPanic "idDetails" (ppr other)
 -- Ids, because "GHC.Types.Id" uses 'mkGlobalId' etc with different types
 mkGlobalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalVar details name ty info
-  = mk_id name manyDataConTy ty GlobalId details info
+  = mk_id name unmatchableDataConTy manyDataConTy ty GlobalId details info
   -- There is no support for linear global variables yet. They would require
   -- being checked at link-time, which can be useful, but is not a priority.
 
-mkLocalVar :: IdDetails -> Name -> Mult -> Type -> IdInfo -> Id
-mkLocalVar details name w ty info
-  = mk_id name w ty (LocalId NotExported) details  info
+mkLocalVar :: IdDetails -> Name -> Matchability -> Mult -> Type -> IdInfo -> Id
+mkLocalVar details name m w ty info
+  = mk_id name m w ty (LocalId NotExported) details  info
 
 mkCoVar :: Name -> Type -> CoVar
 -- Coercion variables have no IdInfo
-mkCoVar name ty = mk_id name manyDataConTy ty (LocalId NotExported) coVarDetails vanillaIdInfo
+mkCoVar name ty = mk_id name unmatchableDataConTy manyDataConTy ty (LocalId NotExported) coVarDetails vanillaIdInfo
 
 -- | Exported 'Var's will not be removed as dead code
 mkExportedLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkExportedLocalVar details name ty info
-  = mk_id name manyDataConTy ty (LocalId Exported) details info
+  = mk_id name unmatchableDataConTy manyDataConTy ty (LocalId Exported) details info
   -- There is no support for exporting linear variables. See also [mkGlobalVar]
 
-mk_id :: Name -> Mult -> Type -> IdScope -> IdDetails -> IdInfo -> Id
-mk_id name !w ty scope details info
+mk_id :: Name -> Matchability -> Mult -> Type -> IdScope -> IdDetails -> IdInfo -> Id
+mk_id name !m !w ty scope details info
   = Id { varName    = name,
          realUnique = nameUnique name,
+         varMa      = m,
          varMult    = w,
          varType    = ty,
          idScope    = scope,
@@ -1158,6 +1164,10 @@ updateIdTypeAndMultM _ other = pprPanic "updateIdTypeAndMultM" (ppr other)
 setIdMult :: Id -> Mult -> Id
 setIdMult id !r | isId id = id { varMult = r }
                 | otherwise = pprPanic "setIdMult" (ppr id <+> ppr r)
+
+setIdMa :: Id -> Matchability -> Id
+setIdMa id !r | isId id = id { varMa = r }
+              | otherwise = pprPanic "setIdMa" (ppr id <+> ppr r)
 
 {-
 ************************************************************************

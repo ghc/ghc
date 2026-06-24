@@ -880,7 +880,8 @@ subst_co subst co
       where
         !(subst', tcv') = substVarBndrUnchecked subst tcv
                           -- Unchecked because used from substTyUnchecked
-    go (FunCo r afl afr w co1 co2)   = ((mkFunCo2 r afl afr $! go w) $! go co1) $! go co2
+    go (FunCo r afl afr m w co1 co2)
+      = (((mkFunCo2 r afl afr $! go m) $! go w) $! go co1) $! go co2
     go (CoVarCo cv)          = substCoVar subst cv
     go (UnivCo { uco_prov = p, uco_role = r
                , uco_lty = t1, uco_rty = t2, uco_deps = deps })

@@ -1737,7 +1737,7 @@ unify_ty _ _ _ _ = surelyApart
 unify_tc_app :: UMEnv -> TyCon -> [Type] -> [Type] -> UM ()
 -- Mainly just unifies the argument types;
 -- but with a special case for fUNTyCon
-unify_tc_app env tc tys1 tys2
+unify_tc_app env tc tys1 tys2 -- TODO: update wrt matchability
   | tc == fUNTyCon
   , IgnoreMultiplicities <- um_arr_mult env
   , (_mult1 : no_mult_tys1) <- tys1
@@ -1999,7 +1999,7 @@ uOccursCheck (UMState { um_tv_env = tv_env, um_fam_env = fam_env }) bvs lhs ty
                         = go bvs (tyVarKind tv)
     go bvs (AppTy ty1 ty2)           = go bvs ty1 || go bvs ty2
     go _   (LitTy {})                = False
-    go bvs (FunTy _ w arg res)       = go bvs w || go bvs arg || go bvs res
+    go bvs (FunTy _ m w arg res)     = go bvs m || go bvs w || go bvs arg || go bvs res
     go bvs (TyConApp tc tys)         = go_tc bvs tc tys
 
     go bvs (ForAllTy (Bndr tv _) ty)
@@ -2503,8 +2503,8 @@ pushRefl co =
   case (isReflCo_maybe co) of
     Just (AppTy ty1 ty2, Nominal)
       -> Just (AppCo (mkReflCo Nominal ty1) (mkNomReflCo ty2))
-    Just (FunTy af w ty1 ty2, r)
-      ->  Just (FunCo r af af (mkReflCo r w) (mkReflCo r ty1) (mkReflCo r ty2))
+    Just (FunTy af m w ty1 ty2, r)
+      ->  Just (FunCo r af af (mkReflCo r m) (mkReflCo r w) (mkReflCo r ty1) (mkReflCo r ty2))
     Just (TyConApp tc tys, r)
       -> Just (TyConAppCo r tc (zipWith mkReflCo (tyConRoleListX r tc) tys))
     Just (ForAllTy (Bndr tv vis) ty, r)

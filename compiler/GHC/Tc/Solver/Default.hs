@@ -314,12 +314,12 @@ unsatisfiableEvExpr (unsat_ev, given_msg) wtd_ty
          -- for a description of what evidence term we are constructing here.
 
        ; let -- (##) -=> wtd_ty
-             fun_ty = mkFunTy visArgConstraintLike ManyTy unboxedUnitTy wtd_ty
+             fun_ty = mkFunTy visArgConstraintLike UnmatchableTy ManyTy unboxedUnitTy wtd_ty
              mkDictBox = case boxingDataCon fun_ty of
                BI_Box { bi_data_con = mkDictBox } -> mkDictBox
                _ -> pprPanic "unsatisfiableEvExpr: no DictBox!" (ppr wtd_ty)
              dictBox = dataConTyCon mkDictBox
-       ; ev_bndr <- mkSysLocalM (fsLit "ct") ManyTy fun_ty
+       ; ev_bndr <- mkSysLocalM (fsLit "ct") UnmatchableTy ManyTy fun_ty
              -- Dict ((##) -=> wtd_ty)
        ; let scrut_ty = mkTyConApp dictBox [fun_ty]
              -- unsatisfiable @{LiftedRep} @given_msg @(Dict ((##) -=> wtd_ty)) unsat_ev

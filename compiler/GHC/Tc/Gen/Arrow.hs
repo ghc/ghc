@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeFamilies   #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -33,6 +34,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
 import GHC.Core.Multiplicity
 import GHC.Core.Coercion
+import GHC.Core.Type (pattern UnmatchableTy)
 import GHC.Types.Arity ( Arity )
 import GHC.Types.Id( mkLocalId )
 import GHC.Tc.Utils.Instantiate
@@ -417,7 +419,7 @@ tcArrDoStmt env ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_n
                             , recS_rec_ids = rec_names }) res_ty thing_inside
   = do  { let tup_names = rec_names ++ filterOut (`elem` rec_names) later_names
         ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
-        ; let tup_ids = zipWith (\n p -> mkLocalId n ManyTy p) tup_names tup_elt_tys
+        ; let tup_ids = zipWith (\n p -> mkLocalId n UnmatchableTy ManyTy p) tup_names tup_elt_tys
                         -- Many because it's a recursive definition
         ; tcExtendIdEnv tup_ids $ do
         { (stmts', tup_rets)

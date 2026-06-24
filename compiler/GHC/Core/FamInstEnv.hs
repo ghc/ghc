@@ -1468,12 +1468,13 @@ normalise_type ty
            ; return $ mkReflRedn r ty }
     go (AppTy ty1 ty2) = go_app_tys ty1 [ty2]
 
-    go (FunTy { ft_af = vis, ft_mult = w, ft_arg = ty1, ft_res = ty2 })
+    go (FunTy { ft_af = vis, ft_ma = m, ft_mult = w, ft_arg = ty1, ft_res = ty2 })
       = do { arg_redn <- go ty1
            ; res_redn <- go ty2
+           ; m_redn <- withRole Nominal $ go m
            ; w_redn <- withRole Nominal $ go w
            ; r <- getRole
-           ; return $ mkFunRedn r vis w_redn arg_redn res_redn }
+           ; return $ mkFunRedn r vis m_redn w_redn arg_redn res_redn }
     go (ForAllTy (Bndr tcvar vis) ty)
       = do { (lc', tv', k_redn) <- normalise_var_bndr tcvar
            ; redn <- withLC lc' $ normalise_type ty

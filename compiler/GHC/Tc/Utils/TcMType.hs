@@ -29,7 +29,7 @@ module GHC.Tc.Utils.TcMType (
   newAnonMetaTyVar, newConcreteTyVar, mkConcreteInfo,
   cloneMetaTyVar, cloneMetaTyVarWithInfo,
   newCycleBreakerTyVar,
-  newMultiplicityVar,
+  newMultiplicityVar, newMatchabilityVar,
 
   readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
   newTauTvDetailsAtLevel, newMetaDetails, newMetaTyVarName,
@@ -189,7 +189,7 @@ newEvVars theta = mapM newEvVar theta
 newEvVar :: TcPredType -> TcRnIf gbl lcl EvVar
 -- Creates new *rigid* variables for predicates
 newEvVar ty = do { name <- newSysName (predTypeOccName ty)
-                 ; return (mkLocalIdOrCoVar name ManyTy ty) }
+                 ; return (mkLocalIdOrCoVar name UnmatchableTy ManyTy ty) }
 
 -- | Create a new Wanted constraint with the given 'CtLoc'.
 newWantedWithLoc :: CtLoc -> PredType -> TcM CtEvidence
@@ -315,7 +315,7 @@ emitNewExprHole occ ty
 newDict :: Class -> [TcType] -> TcM DictId
 newDict cls tys
   = do { name <- newSysName (mkDictOcc (getOccName cls))
-       ; return (mkLocalId name ManyTy (mkClassPred cls tys)) }
+       ; return (mkLocalId name UnmatchableTy ManyTy (mkClassPred cls tys)) }
 
 predTypeOccName :: PredType -> OccName
 predTypeOccName ty = case classifyPredType ty of
@@ -447,9 +447,9 @@ readExpType_maybe (Infer (IR { ir_ref = ref})) = liftIO $ readIORef ref
 
 -- | Same as readExpType, but for Scaled ExpTypes
 readScaledExpType :: MonadIO m => Scaled ExpType -> m (Scaled Type)
-readScaledExpType (Scaled m exp_ty)
+readScaledExpType (Scaled ma m exp_ty)
   = do { ty <- readExpType exp_ty
-       ; return (Scaled m ty) }
+       ; return (Scaled ma m ty) }
 {-# INLINEABLE readScaledExpType  #-}
 
 -- | Extract a type out of an ExpType. Otherwise, panics.
@@ -462,9 +462,9 @@ readExpType exp_ty
 {-# INLINEABLE readExpType  #-}
 
 scaledExpTypeToType :: Scaled ExpType -> TcM (Scaled TcType)
-scaledExpTypeToType (Scaled m exp_ty)
+scaledExpTypeToType (Scaled ma m exp_ty)
   = do { ty <- expTypeToType exp_ty
-       ; return (Scaled m ty) }
+       ; return (Scaled ma m ty) }
 
 -- | Extracts the expected type if there is one, or generates a new
 -- TauTv if there isn't.
@@ -929,6 +929,8 @@ coercion variables, except for the special case of the promoted Eq#. But,
 that can't ever appear in user code, so we're safe!
 -}
 
+newMatchabilityVar :: TcM TcType
+newMatchabilityVar = newFlexiTyVarTy matchabilityTy
 
 newMultiplicityVar :: TcM TcType
 newMultiplicityVar = newFlexiTyVarTy multiplicityTy
@@ -1424,7 +1426,7 @@ collect_cand_qtvs orig_ty is_dep cur_lvl bound dvs ty
     -- Uses accumulating-parameter style
     go dv (AppTy t1 t2)       = foldlM go dv [t1, t2]
     go dv (TyConApp tc tys)   = go_tc_args dv (tyConBinders tc) tys
-    go dv (FunTy _ w arg res) = foldlM go dv [arg, w, res]
+    go dv (FunTy _ m w arg res) = foldlM go dv [arg, m, w, res]
     go dv (LitTy {})          = return dv
     go dv (CastTy ty co)      = do { dv1 <- go dv ty
                                    ; collect_cand_qtvs_co orig_ty cur_lvl bound dv1 co }
@@ -1520,7 +1522,7 @@ collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
                                           ; go_mco dv1 mco }
     go_co dv (TyConAppCo _ _ cos)    = foldlM go_co dv cos
     go_co dv (AppCo co1 co2)         = foldlM go_co dv [co1, co2]
-    go_co dv (FunCo _ _ _ w co1 co2) = foldlM go_co dv [w, co1, co2]
+    go_co dv (FunCo _ _ _ m w co1 co2) = foldlM go_co dv [m, w, co1, co2]
     go_co dv (AxiomCo _ cos)         = foldlM go_co dv cos
     go_co dv (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = deps })
                                      = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv t1

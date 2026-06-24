@@ -67,7 +67,7 @@ mkNewTyConRhs tycon_name tycon con
     fixed_rep = isFixedRuntimeRepKind $ tyConResKind tycon
     rhs_ty
       -- Only try if the newtype is actually valid (see "otherwise" below).
-      | [Scaled _ arg_ty] <- dataConRepArgTys con
+      | [Scaled _ _ arg_ty] <- dataConRepArgTys con
       , null $ dataConExTyCoVars con
       = substTyWith (dataConUnivTyVars con)
                          (mkTyVarTys tvs) arg_ty

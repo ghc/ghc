@@ -134,7 +134,7 @@ toIfaceIdBndr :: Id -> IfaceIdBndr
 toIfaceIdBndr = toIfaceIdBndrX emptyVarSet
 
 toIfaceIdBndrX :: VarSet -> CoVar -> IfaceIdBndr
-toIfaceIdBndrX fr covar = ( toIfaceType (idMult covar)
+toIfaceIdBndrX fr covar = ( toIfaceType (idMa covar), toIfaceType (idMult covar)
                           , mkIfLclName (occNameFS (getOccName covar))
                           , toIfaceTypeX fr (varType covar)
                           )
@@ -190,8 +190,8 @@ toIfaceTypeX fr ty@(AppTy {})  =
 toIfaceTypeX _  (LitTy n)      = IfaceLitTy (toIfaceTyLit n)
 toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllBndrX fr b)
                                                (toIfaceTypeX (fr `delVarSet` binderVar b) t)
-toIfaceTypeX fr (FunTy { ft_arg = t1, ft_mult = w, ft_res = t2, ft_af = af })
-  = IfaceFunTy af (toIfaceTypeX fr w) (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
+toIfaceTypeX fr (FunTy { ft_arg = t1, ft_ma = m, ft_mult = w, ft_res = t2, ft_af = af })
+  = IfaceFunTy af (toIfaceTypeX fr m) (toIfaceTypeX fr w) (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
 toIfaceTypeX fr (CastTy ty co)  = IfaceCastTy (toIfaceTypeX fr ty) (toIfaceCoercionX fr co)
 toIfaceTypeX fr (CoercionTy co) = IfaceCoercionTy (toIfaceCoercionX fr co)
 
@@ -306,8 +306,8 @@ toIfaceCoercionX fr co
       =  assertPpr (isNothing (tyConAppFunCo_maybe r tc cos)) (ppr co) $
          IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
 
-    go (FunCo { fco_role = r, fco_mult = w, fco_arg = co1, fco_res = co2 })
-      = IfaceFunCo r (go w) (go co1) (go co2)
+    go (FunCo { fco_role = r, fco_ma = m, fco_mult = w, fco_arg = co1, fco_res = co2 })
+      = IfaceFunCo r (go m) (go w) (go co1) (go co2)
 
     go (ForAllCo tv visL visR k co)
       = IfaceForAllCo (toIfaceBndr tv)

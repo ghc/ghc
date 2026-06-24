@@ -41,6 +41,7 @@ module GHC.Builtin.Types.Prim(
         levPolyAlphaTy, levPolyBetaTy,
 
         multiplicityTyVar1, multiplicityTyVar2,
+        matchabilityTyVar1, matchabilityTyVar2,
 
         -- Kind constructors...
         tYPETyCon, tYPETyConName, tYPEKind,
@@ -126,7 +127,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
   , int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy
   , word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy
   , doubleElemRepDataConTy
-  , multiplicityTy
+  , multiplicityTy, matchabilityTy
   , constraintKind )
 
 import {-# SOURCE #-} GHC.Types.TyThing( mkATyCon )
@@ -554,6 +555,9 @@ multiplicityTyVar1, multiplicityTyVar2  :: TyVar
 (multiplicityTyVar1 : multiplicityTyVar2 : _)
    = drop 13 (mkTemplateTyVars (repeat multiplicityTy))  -- selects 'n', 'm'
 
+matchabilityTyVar1, matchabilityTyVar2  :: TyVar
+(matchabilityTyVar1 : matchabilityTyVar2 : _)
+   = drop 14 (mkTemplateTyVars (repeat matchabilityTy))  -- selects 'm', 'o'
 
 {-
 ************************************************************************
@@ -635,7 +639,8 @@ tcArrowTyConName = mkBuiltInPrimTc (fsLit "-=>") tcArrowTyConKey tcArrowTyCon
 -- | The @FUN@ type constructor.
 --
 -- @
--- FUN :: forall (m :: Multiplicity) ->
+-- FUN :: forall (ma :: Matchability) ->
+--        forall (m :: Multiplicity) ->
 --        forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
 --        TYPE rep1 -> TYPE rep2 -> Type
 -- @
@@ -649,12 +654,13 @@ fUNTyCon :: TyCon
 fUNTyCon = mkPrimTyCon fUNTyConName tc_bndrs liftedTypeKind tc_roles
   where
     -- See also unrestrictedFunTyCon
-    tc_bndrs = [ mkNamedTyConBinder Required multiplicityTyVar1
+    tc_bndrs = [ mkNamedTyConBinder Required matchabilityTyVar1
+               , mkNamedTyConBinder Required multiplicityTyVar1
                , mkNamedTyConBinder Inferred runtimeRep1TyVar
                , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
                ++ mkTemplateAnonTyConBinders [ mk_TYPE_app runtimeRep1Ty
                                              , mk_TYPE_app runtimeRep2Ty ]
-    tc_roles = [Nominal, Nominal, Nominal, Representational, Representational]
+    tc_roles = [Nominal, Nominal, Nominal, Nominal, Representational, Representational]
 
 -- (=>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
 --         CONSTRAINT rep1 -> TYPE rep2 -> Type

@@ -1397,7 +1397,7 @@ findTypeShape fam_envs ty
        -- to look deep into such products -- see #18034
   where
     go rec_tc ty
-       | Just (_, _, _, res) <- splitFunTy_maybe ty
+       | Just (_, _, _, _, res) <- splitFunTy_maybe ty
        = TsFun (go rec_tc res)
 
        | Just (tc, tc_args)  <- splitTyConApp_maybe ty
@@ -1583,7 +1583,7 @@ mkWWcpr_entry opts body_ty body_cpr
 mk_res_bndr :: Type -> UniqSM Id
 mk_res_bndr body_ty = do
   -- See Note [Linear types and CPR]
-  bndr <- mkSysLocalOrCoVarM ww_prefix cprCaseBndrMult body_ty
+  bndr <- mkSysLocalOrCoVarM ww_prefix UnmatchableTy cprCaseBndrMult body_ty
   -- See Note [Record evaluated-ness in worker/wrapper]
   pure (setCaseBndrEvald MarkedStrict bndr)
 
@@ -1685,7 +1685,7 @@ move_transit_vars vars
     ubx_tup_app = mkCoreUnboxedTuple (map varToCoreExpr vars)
     tup_con     = tupleDataCon Unboxed (length vars)
     -- See also Note [Linear types and CPR]
-    case_bndr   = mkWildValBinder cprCaseBndrMult (exprType ubx_tup_app)
+    case_bndr   = mkWildValBinder UnmatchableTy cprCaseBndrMult (exprType ubx_tup_app)
 
 
 {- Note [Worker/wrapper for CPR]
@@ -1806,7 +1806,7 @@ mkUnpackCase scrut co mult boxing_con unpk_args body
                     (DataAlt boxing_con) unpk_args body
   where
     casted_scrut = scrut `mkCast` co
-    bndr = mkWildValBinder mult (exprType casted_scrut)
+    bndr = mkWildValBinder UnmatchableTy mult (exprType casted_scrut)
 
 -- | The multiplicity of a case binder unboxing a constructed result.
 -- See Note [Linear types and CPR]

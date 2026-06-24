@@ -461,7 +461,7 @@ it easier to read debugging output.
 -}
 
 -- Make a new Id with the same print name, but different type, and new unique
-newUniqueId :: Id -> Mult -> Type -> DsM Id
+newUniqueId :: Id -> Matchability -> Mult -> Type -> DsM Id
 newUniqueId id = mkSysLocalOrCoVarM (occNameFS (nameOccName (idName id)))
 
 newStaticId :: Type -> DsM Id
@@ -478,18 +478,18 @@ duplicateLocalDs old_local
 
 newPredVarDs :: PredType -> DsM Var
 newPredVarDs
- = mkSysLocalOrCoVarM (fsLit "ds") ManyTy  -- like newSysLocalDs, but we allow covars
+ = mkSysLocalOrCoVarM (fsLit "ds") UnmatchableTy ManyTy  -- like newSysLocalDs, but we allow covars
 
 newSysLocalMDs, newFailLocalMDs :: Type -> DsM Id
 -- Implicitly have ManyTy multiplicity, hence the "M"
-newSysLocalMDs  = mkSysLocalM (fsLit "ds")    ManyTy
-newFailLocalMDs = mkSysLocalM (fsLit "fail") ManyTy
+newSysLocalMDs  = mkSysLocalM (fsLit "ds")   UnmatchableTy ManyTy
+newFailLocalMDs = mkSysLocalM (fsLit "fail") UnmatchableTy ManyTy
 
 newSysLocalsMDs :: [Type] -> DsM [Id]
 newSysLocalsMDs = mapM newSysLocalMDs
 
 newSysLocalDs :: Scaled Type -> DsM Id
-newSysLocalDs (Scaled w t) = mkSysLocalM (fsLit "ds") w t
+newSysLocalDs (Scaled m w t) = mkSysLocalM (fsLit "ds") m w t
 
 newSysLocalsDs :: [Scaled Type] -> DsM [Id]
 newSysLocalsDs = mapM newSysLocalDs

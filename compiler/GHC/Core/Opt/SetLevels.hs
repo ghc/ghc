@@ -94,7 +94,7 @@ import GHC.Core.Subst
 import GHC.Core.TyCo.Subst( lookupTyVar )
 import GHC.Core.TyCo.FVs
 import GHC.Core.Make    ( sortQuantVars )
-import GHC.Core.Type    ( Type, mightBeUnliftedType, typeHasFixedRuntimeRep )
+import GHC.Core.Type    ( Type, mightBeUnliftedType, typeHasFixedRuntimeRep, pattern UnmatchableTy )
 import GHC.Core.Multiplicity     ( pattern ManyTy )
 
 import GHC.Types.Id
@@ -1872,7 +1872,7 @@ newPolyBndrs dest_lvl
 
     mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $ -- Note [transferPolyIdInfo] in GHC.Types.Id
                              transfer_join_info bndr $
-                             mkSysLocal str uniq (idMult bndr) poly_ty
+                             mkSysLocal str uniq (idMa bndr) (idMult bndr) poly_ty
                            where
                              str     = fsLit "poly_" `appendFS` occNameFS (getOccName bndr)
                              poly_ty = mkLamTypes abs_vars (substTyUnchecked subst (idType bndr))
@@ -1900,7 +1900,7 @@ newLvlVar lvld_rhs join_arity_maybe
     de_tagged_rhs = deTagExpr lvld_rhs
     rhs_ty        = exprType de_tagged_rhs
 
-    mk_id uniq rhs_ty = mkSysLocal (mkFastString "lvl") uniq ManyTy rhs_ty
+    mk_id uniq rhs_ty = mkSysLocal (mkFastString "lvl") uniq UnmatchableTy ManyTy rhs_ty
 
 -- | Clone the binders bound by a single-alternative case.
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])

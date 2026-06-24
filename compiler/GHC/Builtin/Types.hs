@@ -156,6 +156,11 @@ module GHC.Builtin.Types (
 
         unrestrictedFunTyCon, unrestrictedFunTyConName,
 
+        -- * Matchability and friends
+        matchabilityTyConName, unmatchableDataConName, matchableDataConName, matchabilityTy,
+        matchabilityTyCon, unmatchableDataCon, matchableDataCon, unmatchableDataConTy, matchableDataConTy,
+        unmatchableDataConTyCon, matchableDataConTyCon,
+
         -- * Bignum
         integerTy, integerTyCon, integerTyConName,
         integerISDataCon, integerISDataConName,
@@ -324,6 +329,7 @@ wiredInTyCons = map (dataConTyCon . snd) boxingDataCons
                 , unliftedTypeKindTyCon
                 , unrestrictedFunTyCon
                 , multiplicityTyCon
+                , matchabilityTyCon
                 , naturalTyCon
                 , integerTyCon
                 , liftedRepTyCon
@@ -1881,6 +1887,39 @@ multMulTyCon = mkFamilyTyCon multMulTyConName kind binders 0 multiplicityTy Noth
   where
     binders = mkTemplateAnonTyConBinders [multiplicityTy, multiplicityTy]
     kind = mkTyConKind binders multiplicityTy
+
+{- *********************************************************************
+*                                                                      *
+                Matchability
+*                                                                      *
+********************************************************************* -}
+
+matchabilityTyConName :: Name
+matchabilityTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Multiplicity")
+                          matchabilityTyConKey matchabilityTyCon
+
+unmatchableDataConName, matchableDataConName :: Name
+unmatchableDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "One") unmatchableDataConKey unmatchableDataCon
+matchableDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Many") matchableDataConKey matchableDataCon
+
+matchabilityTy :: Type
+matchabilityTy = mkTyConTy matchabilityTyCon
+
+matchabilityTyCon :: TyCon
+matchabilityTyCon = pcTyCon matchabilityTyConName Nothing []
+                            [unmatchableDataCon, matchableDataCon]
+
+unmatchableDataCon, matchableDataCon :: DataCon
+unmatchableDataCon = pcDataCon unmatchableDataConName [] [] matchabilityTyCon
+matchableDataCon = pcDataCon matchableDataConName [] [] matchabilityTyCon
+
+unmatchableDataConTy, matchableDataConTy :: Type
+unmatchableDataConTy = mkTyConTy unmatchableDataConTyCon
+matchableDataConTy = mkTyConTy matchableDataConTyCon
+
+unmatchableDataConTyCon, matchableDataConTyCon :: TyCon
+unmatchableDataConTyCon = promoteDataCon unmatchableDataCon
+matchableDataConTyCon = promoteDataCon matchableDataCon
 
 ------------------------
 -- type (->) :: forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep).

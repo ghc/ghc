@@ -441,8 +441,8 @@ matchWithDict [cls_ty, mty]
     -- `class C a_1 ... a_n where op :: meth_ty`
   , Just (cls, dict_dc) <- isUnaryClassTyCon_maybe dict_tc
   , [inst_meth_ty] <- dataConInstArgTys dict_dc dict_args
-  = do { sv <- mkSysLocalM (fsLit "withDict_s") ManyTy mty
-       ; k  <- mkSysLocalM (fsLit "withDict_k") ManyTy (mkInvisFunTy cls_ty openAlphaTy)
+  = do { sv <- mkSysLocalM (fsLit "withDict_s") UnmatchableTy ManyTy mty
+       ; k  <- mkSysLocalM (fsLit "withDict_k") UnmatchableTy ManyTy (mkInvisFunTy cls_ty openAlphaTy)
        ; wd_cls <- tcLookupClass withDictClassName
 
        -- Given ev_expr : mty ~N# inst_meth_ty, construct the method of
@@ -651,6 +651,7 @@ matchDataToTag dataToTagClass [levity, dty] = do
             methodRep = Var whichOp `App` Type levity `App` Type repTy
             methodCo = mkFunCo Representational
                                FTF_T_T
+                               (mkNomReflCo UnmatchableTy)
                                (mkNomReflCo ManyTy)
                                (mkSymCo repCo)
                                (mkReflCo Representational intPrimTy)
@@ -951,9 +952,9 @@ matchTypeable clas [k,t]  -- clas = Typeable
   | isForAllTy k = return NoInstance
 
   -- Functions; but only with a visible argment
-  | Just (af,mult,arg,ret) <- splitFunTy_maybe t
+  | Just (af,ma,mult,arg,ret) <- splitFunTy_maybe t
   = if isVisibleFunArg af
-    then doFunTy clas t mult arg ret
+    then doFunTy clas t ma mult arg ret
     else return NoInstance
       -- 'else' case: qualified types like (Num a => blah) are not typeable
       -- see Note [No Typeable for polytypes or qualified types]
@@ -970,16 +971,16 @@ matchTypeable clas [k,t]  -- clas = Typeable
 matchTypeable _ _ = return NoInstance
 
 -- | Representation for a type @ty@ of the form @arg -> ret@.
-doFunTy :: Class -> Type -> Mult -> Type -> Type -> TcM ClsInstResult
-doFunTy clas ty mult arg_ty ret_ty
+doFunTy :: Class -> Type -> Matchability -> Mult -> Type -> Type -> TcM ClsInstResult
+doFunTy clas ty ma mult arg_ty ret_ty
   = return $ OneInst { cir_new_theta   = preds
                      , cir_mk_ev       = mk_ev
                      , cir_canonical   = EvCanonical
                      , cir_what        = BuiltinInstance }
   where
-    preds = map (mk_typeable_pred clas) [mult, arg_ty, ret_ty]
-    mk_ev [mult_ev, arg_ev, ret_ev]
-       = evTypeable ty $ EvTypeableTrFun (EvExpr mult_ev) (EvExpr arg_ev) (EvExpr ret_ev)
+    preds = map (mk_typeable_pred clas) [ma, mult, arg_ty, ret_ty]
+    mk_ev [ma_ev, mult_ev, arg_ev, ret_ev]
+       = evTypeable ty $ EvTypeableTrFun (EvExpr ma_ev) (EvExpr mult_ev) (EvExpr arg_ev) (EvExpr ret_ev)
     mk_ev _ = panic "GHC.Tc.Instance.Class.doFunTy"
 
 

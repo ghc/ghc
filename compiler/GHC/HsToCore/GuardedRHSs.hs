@@ -1,4 +1,4 @@
-
+{-# LANGUAGE PatternSynonyms #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -23,7 +23,7 @@ import GHC.Core.Utils (bindNonRec)
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
 import GHC.HsToCore.Types
-import GHC.Core.Type ( Type )
+import GHC.Core.Type ( Type, pattern UnmatchableTy )
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -134,7 +134,7 @@ matchGuards (LetStmt _ binds : stmts) ctx rhs rhs_ty = do
 
 matchGuards (BindStmt _ pat bind_rhs : stmts) ctx rhs rhs_ty = do
     let upat = unLoc pat
-    match_var <- selectMatchVar ManyTy upat
+    match_var <- selectMatchVar UnmatchableTy ManyTy upat
        -- We only allow unrestricted patterns in guards, hence the `Many`
        -- above. It isn't clear what linear patterns would mean, maybe we will
        -- figure it out in the future.

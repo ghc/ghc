@@ -640,8 +640,9 @@ almost_devoid_co_var_of_type (LitTy {}) _ = True
 almost_devoid_co_var_of_type (AppTy fun arg) cv
   = almost_devoid_co_var_of_type fun cv
   && almost_devoid_co_var_of_type arg cv
-almost_devoid_co_var_of_type (FunTy _ w arg res) cv
-  = almost_devoid_co_var_of_type w cv
+almost_devoid_co_var_of_type (FunTy _ m w arg res) cv
+  = almost_devoid_co_var_of_type m cv
+  && almost_devoid_co_var_of_type w cv
   && almost_devoid_co_var_of_type arg cv
   && almost_devoid_co_var_of_type res cv
 almost_devoid_co_var_of_type (ForAllTy (Bndr v _) ty) cv
@@ -681,7 +682,7 @@ visVarsOfType orig_ty = Pair invis_vars vis_vars
     go (TyVarTy tv)      = Pair (tyCoVarsOfType $ tyVarKind tv) (unitVarSet tv)
     go (AppTy t1 t2)     = go t1 `mappend` go t2
     go (TyConApp tc tys) = go_tc tc tys
-    go (FunTy _ w t1 t2) = go w `mappend` go t1 `mappend` go t2
+    go (FunTy _ m w t1 t2) = go m `mappend` go w `mappend` go t1 `mappend` go t2
     go (ForAllTy (Bndr tv _) ty)
       = ((`delVarSet` tv) <$> go ty) `mappend`
         (invisible (tyCoVarsOfType $ varType tv))
@@ -715,7 +716,7 @@ isInjectiveInType tv ty
     go ty | Just ty' <- rewriterView ty = go ty'
     go (TyVarTy tv')                    = tv' == tv
     go (AppTy f a)                      = go f || go a
-    go (FunTy _ w ty1 ty2)              = go w || go ty1 || go ty2
+    go (FunTy _ m w ty1 ty2)            = go m || go w || go ty1 || go ty2
     go (TyConApp tc tys)                = go_tc tc tys
     go (ForAllTy (Bndr tv' _) ty)       = go (tyVarKind tv')
                                           || (tv /= tv' && go ty)
@@ -779,7 +780,7 @@ inj_vars_of_type look_under_tfs = go
     go ty | Just ty' <- rewriterView ty = go ty'
     go (TyVarTy v)                      = deepUnitFV go v
     go (AppTy f a)                      = go f `mappend` go a
-    go (FunTy _ w ty1 ty2)              = go w `mappend` go ty1 `mappend` go ty2
+    go (FunTy _ m w ty1 ty2)            = go m `mappend` go w `mappend` go ty1 `mappend` go ty2
     go (TyConApp tc tys)                = go_tc tc tys
     go (ForAllTy (Bndr tv _) ty)        = go (tyVarKind tv) `mappend`
                                           addBndrFV tv (go ty)
@@ -825,7 +826,7 @@ invisibleVarsOfType = go
                            = go ty'
     go (TyVarTy v)         = go (tyVarKind v)
     go (AppTy f a)         = go f `unionVarSet` go a
-    go (FunTy _ w ty1 ty2) = go ty1 `unionVarSet` go w `unionVarSet` go ty2
+    go (FunTy _ m w ty1 ty2) = go ty1 `unionVarSet` go m `unionVarSet` go w `unionVarSet` go ty2
                              -- As per #23764, order is: arg, mult, res.
     go (TyConApp tc tys)   = tyCoVarsOfTypes invisibles `unionVarSet`
                              invisibleVarsOfTypes visibles
@@ -921,7 +922,7 @@ tyConsOfType ty
      go (LitTy {})                  = emptyUniqSet
      go (TyConApp tc tys)           = go_tc tc `unionUniqSets` tyConsOfTypes tys
      go (AppTy a b)                 = go a `unionUniqSets` go b
-     go (FunTy af w a b)            = go w `unionUniqSets`
+     go (FunTy af m w a b)          = go m `unionUniqSets` go w `unionUniqSets`
                                       go a `unionUniqSets` go b
                                       `unionUniqSets` go_tc (funTyFlagTyCon af)
      go (ForAllTy (Bndr tv _) ty)   = go ty `unionUniqSets` go (varType tv)
@@ -1060,11 +1061,12 @@ occCheckExpand vs_to_avoid ty
     go cxt (AppTy ty1 ty2) = do { ty1' <- go cxt ty1
                                 ; ty2' <- go cxt ty2
                                 ; return (AppTy ty1' ty2') }
-    go cxt ty@(FunTy _ w ty1 ty2)
-       = do { w'   <- go cxt w
+    go cxt ty@(FunTy _ m w ty1 ty2)
+       = do { m'   <- go cxt m
+            ; w'   <- go cxt w
             ; ty1' <- go cxt ty1
             ; ty2' <- go cxt ty2
-            ; return (ty { ft_mult = w', ft_arg = ty1', ft_res = ty2' }) }
+            ; return (ty { ft_ma = m', ft_mult = w', ft_arg = ty1', ft_res = ty2' }) }
     go cxt@(as, env) (ForAllTy (Bndr tv vis) body_ty)
        = do { ki' <- go cxt (varType tv)
             ; let tv'  = setVarType tv ki'

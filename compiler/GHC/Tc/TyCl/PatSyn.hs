@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -36,7 +37,7 @@ import GHC.Tc.Types.ErrCtxt( UserTypeCtxt(..) )
 import GHC.Tc.TyCl.Build
 
 import GHC.Core.Multiplicity
-import GHC.Core.Type ( typeKind, isManyTy, mkTYPEapp, definitelyLiftedType )
+import GHC.Core.Type ( typeKind, isManyTy, mkTYPEapp, definitelyLiftedType, pattern UnmatchableTy )
 import GHC.Core.TyCo.Subst( extendTvSubstWithClone )
 import GHC.Core.Predicate
 import GHC.Core.TyCo.Tidy
@@ -817,9 +818,9 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
              fail_ty  = mkVisFunTyMany unboxedUnitTy res_ty
 
        ; matcher_name <- newImplicitBinder ps_name mkMatcherOcc
-       ; scrutinee    <- newSysLocalId (fsLit "scrut") ManyTy pat_ty
-       ; cont         <- newSysLocalId (fsLit "cont")  ManyTy cont_ty
-       ; fail         <- newSysLocalId (fsLit "fail")  ManyTy fail_ty
+       ; scrutinee    <- newSysLocalId (fsLit "scrut") UnmatchableTy ManyTy pat_ty
+       ; cont         <- newSysLocalId (fsLit "cont")  UnmatchableTy ManyTy cont_ty
+       ; fail         <- newSysLocalId (fsLit "fail")  UnmatchableTy ManyTy fail_ty
 
        ; is_strict    <- xoptM LangExt.Strict
        ; comps        <- getCompleteMatchesTcM

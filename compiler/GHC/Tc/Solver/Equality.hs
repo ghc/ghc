@@ -166,12 +166,13 @@ zonkEqTypes ev eq_rel ty1 ty2
     -- so we may run into an unzonked type variable while trying to compute the
     -- RuntimeReps of the argument and result types. This can be observed in
     -- testcase tc269.
-    go (FunTy af1 w1 arg1 res1) (FunTy af2 w2 arg2 res2)
+    go (FunTy af1 m1 w1 arg1 res1) (FunTy af2 m2 w2 arg2 res2)
       | af1 == af2
+      , eqType m1 m2
       , eqType w1 w2
       = do { res_a <- go arg1 arg2
            ; res_b <- go res1 res2
-           ; return $ combine_rev (FunTy af1 w1) res_b res_a }
+           ; return $ combine_rev (FunTy af1 m1 w1) res_b res_a }
 
     go ty1@(FunTy {}) ty2 = bale_out ty1 ty2
     go ty1 ty2@(FunTy {}) = bale_out ty1 ty2
@@ -530,10 +531,10 @@ can_eq_nc _rewritten _rdr_env _envs ev eq_rel
 -- Decompose FunTy: (s -> t) and (c => t)
 -- NB: don't decompose (Int -> blah) ~ (Show a => blah)
 can_eq_nc _ces _rdr_env _envs ev eq_rel
-           ty1@(FunTy { ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _ps_ty1
-           ty2@(FunTy { ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _ps_ty2
+           ty1@(FunTy { ft_ma = ama1, ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _ps_ty1
+           ty2@(FunTy { ft_ma = ama2, ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _ps_ty2
   | af1 == af2  -- See Note [Decomposing FunTy]
-  = canDecomposableFunTy ev eq_rel af1 (ty1,am1,ty1a,ty1b) (ty2,am2,ty2a,ty2b)
+  = canDecomposableFunTy ev eq_rel af1 (ty1,ama1,am1,ty1a,ty1b) (ty2,ama2,am2,ty2a,ty2b)
 
 -- (EQNC4) TyCon
 -- Decompose type constructor applications
@@ -1687,10 +1688,10 @@ canDecomposableTyConAppOK ev eq_rel tc (ty1,tys1) (ty2,tys2)
       in adjustCtLocTyConBinder mb_bndr mb_role_expln loc
 
 canDecomposableFunTy :: CtEvidence -> EqRel -> FunTyFlag
-                     -> (Type,Type,Type,Type)   -- (fun_ty,multiplicity,arg,res)
-                     -> (Type,Type,Type,Type)   -- (fun_ty,multiplicity,arg,res)
+                     -> (Type,Type,Type,Type,Type)   -- (fun_ty,matchability,multiplicity,arg,res)
+                     -> (Type,Type,Type,Type,Type)   -- (fun_ty,matchability,multiplicity,arg,res)
                      -> TcS (StopOrContinue a)
-canDecomposableFunTy ev eq_rel af f1@(ty1,m1,a1,r1) f2@(ty2,m2,a2,r2)
+canDecomposableFunTy ev eq_rel af f1@(ty1,ma1,m1,a1,r1) f2@(ty2,ma2,m2,a2,r2)
   = do { traceTcS "canDecomposableFunTy"
                   (ppr ev $$ ppr eq_rel $$ ppr f1 $$ ppr f2)
        ; case ev of
@@ -1698,13 +1699,16 @@ canDecomposableFunTy ev eq_rel af f1@(ty1,m1,a1,r1) f2@(ty2,m2,a2,r2)
              -> do { co_plus_holes <- wrapUnifierAndEmit ev Nominal $ \ uenv ->
                         do { let mult_env = uenv `updUEnvLoc` toInvisibleLoc InvisibleMultiplicity
                                                  `setUEnvRole` funRole role SelMult
+                                 ma_env = uenv `updUEnvLoc` toInvisibleLoc InvisibleMatchability
+                                               `setUEnvRole` funRole role SelMa
+                           ; ma <- uType ma_env ma1 ma2
                            ; mult <- uType mult_env m1 m2
                              -- TODO: it would be good to set an environment for
                              -- RuntimeRep mismatches, but it's difficult to do so because
                              -- we don't explicit call uType on the RuntimeReps here.
                            ; arg  <- uType (uenv `setUEnvRole` funRole role SelArg) a1 a2
                            ; res  <- uType (uenv `setUEnvRole` funRole role SelRes) r1 r2
-                           ; return (mkNakedFunCo role af mult arg res) }
+                           ; return (mkNakedFunCo role af ma mult arg res) }
                    ; setWantedEq dest co_plus_holes }
 
            CtGiven (GivenCt { ctev_evar = evar })
@@ -1715,7 +1719,7 @@ canDecomposableFunTy ev eq_rel af f1@(ty1,m1,a1,r1) f2@(ty2,m2,a2,r2)
                    --           See the call to canonicaliseEquality in solveEquality.
              -> emitNewGivens loc
                        [ (funRole role fs, mkSelCo (SelFun fs) ev_co)
-                       | fs <- [SelMult, SelArg, SelRes] ]
+                       | fs <- [SelMa, SelMult, SelArg, SelRes] ]
 
     ; stopWith ev "Decomposed TyConApp" }
 

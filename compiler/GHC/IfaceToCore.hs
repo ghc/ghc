@@ -1194,7 +1194,7 @@ tcIfaceDataCons tycon_name tycon if_cons
                 -- the argument types was recursively defined.
                 -- See also Note [Tying the knot]
                 ; arg_tys <- forkM (mk_doc dc_name <+> text "arg_tys")
-                           $ mapM (\(w, ty) -> mkScaled <$> tcIfaceType w <*> tcIfaceType ty) args
+                           $ mapM (\(IfArgTy m w ty) -> mkScaled <$> tcIfaceType m <*> tcIfaceType w <*> tcIfaceType ty) args
                 ; stricts <- mapM tc_strict if_stricts
                         -- The IfBang field can mention
                         -- the type itself; hence inside forkM
@@ -1516,7 +1516,8 @@ tcIfaceType = go
     go (IfaceTyVar n)            = TyVarTy <$> tcIfaceTyVar n
     go (IfaceFreeTyVar n)        = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
     go (IfaceLitTy l)            = LitTy <$> tcIfaceTyLit l
-    go (IfaceFunTy flag w t1 t2) = FunTy flag <$> tcIfaceType w <*> go t1 <*> go t2
+    go (IfaceFunTy flag m w t1 t2) 
+      = FunTy flag <$> tcIfaceType m <*> tcIfaceType w <*> go t1 <*> go t2
     go (IfaceTupleTy s i tks)    = tcIfaceTupleTy s i tks
     go (IfaceAppTy t ts)
       = do { t'  <- go t
@@ -1589,7 +1590,7 @@ tcIfaceCo = go
 
     go (IfaceReflCo t)           = Refl <$> tcIfaceType t
     go (IfaceGReflCo r t mco)    = GRefl r <$> tcIfaceType t <*> go_mco mco
-    go (IfaceFunCo r w c1 c2)    = mkFunCoNoFTF r <$> go w <*> go c1 <*> go c2
+    go (IfaceFunCo r m w c1 c2)    = mkFunCoNoFTF r <$> go m <*> go w <*> go c1 <*> go c2
     go (IfaceTyConAppCo r tc cs) = TyConAppCo r <$> tcIfaceTyCon tc <*> mapM go cs
     go (IfaceAppCo c1 c2)        = AppCo <$> go c1 <*> go c2
     go (IfaceForAllCo tcv visL visR k co)
@@ -1694,7 +1695,7 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     let
         scrut_ty   = exprType scrut'
         case_mult  = ManyTy
-        case_bndr' = mkLocalIdOrCoVar case_bndr_name case_mult scrut_ty
+        case_bndr' = mkLocalIdOrCoVar case_bndr_name UnmatchableTy case_mult scrut_ty
      -- "OrCoVar" since a coercion can be a scrutinee with -fdefer-type-errors
      -- (e.g. see test T15695). Ticket #17291 covers fixing this problem.
         tc_app     = splitTyConApp scrut_ty
@@ -1713,7 +1714,7 @@ tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
         ; ty'     <- tcIfaceType ty
         ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
                               NotTopLevel name ty' info
-        ; let id = mkLocalIdWithInfo name ManyTy ty' id_info
+        ; let id = mkLocalIdWithInfo name UnmatchableTy ManyTy ty' id_info
                      `asJoinId_maybe` ji
         ; rhs' <- tcIfaceExpr rhs
         ; body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)
@@ -1729,7 +1730,7 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
    tc_rec_bndr (IfLetBndr fs ty _ ji)
      = do { name <- newIfaceName (mkVarOccFS (ifLclNameFS fs))
           ; ty'  <- tcIfaceType ty
-          ; return (mkLocalId name ManyTy ty' `asJoinId_maybe` ji) }
+          ; return (mkLocalId name UnmatchableTy ManyTy ty' `asJoinId_maybe` ji) }
    tc_pair (IfLetBndr _ _ info _, rhs) id
      = do { rhs' <- tcIfaceExpr rhs
           ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
@@ -2202,11 +2203,12 @@ tcIfaceImplicit n = do
 -}
 
 bindIfaceId :: IfaceIdBndr -> (Id -> IfL a) -> IfL a
-bindIfaceId (w, fs, ty) thing_inside
+bindIfaceId (m, w, fs, ty) thing_inside
   = do  { name <- newIfaceName (mkVarOccFS (ifLclNameFS fs))
         ; ty' <- tcIfaceType ty
+        ; m' <- tcIfaceType m
         ; w' <- tcIfaceType w
-        ; let id = mkLocalIdOrCoVar name w' ty'
+        ; let id = mkLocalIdOrCoVar name m' w' ty'
           -- We should not have "OrCoVar" here, this is a bug (#17545)
         ; extendIfaceIdEnv [id] (thing_inside id) }
 

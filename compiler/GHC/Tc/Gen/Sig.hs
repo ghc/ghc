@@ -223,7 +223,7 @@ tcUserTypeSig loc hs_sig_ty mb_name
   = do { sigma_ty <- tcHsSigWcType ctxt_no_rrc hs_sig_ty
        ; traceTc "tcuser" (ppr sigma_ty)
        ; return $ TcCompleteSig $
-         CSig { sig_bndr  = mkLocalId name ManyTy sigma_ty
+         CSig { sig_bndr  = mkLocalId name UnmatchableTy ManyTy sigma_ty
                                    -- We use `Many' as the multiplicity here,
                                    -- as if this identifier corresponds to
                                    -- anything, it is a top-level
@@ -459,7 +459,7 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
        --   - the return type becomes the scrutinee type (see test RepPolyPatSynRes).
        ; let (arg_tys, res_ty) = tcSplitFunTys body_ty
        ; mapM_
-           (\(Scaled _ arg_ty) -> checkTypeHasFixedRuntimeRep FixedRuntimeRepPatSynSigArg arg_ty)
+           (\(Scaled _ _ arg_ty) -> checkTypeHasFixedRuntimeRep FixedRuntimeRepPatSynSigArg arg_ty)
            arg_tys
        ; checkTypeHasFixedRuntimeRep FixedRuntimeRepPatSynSigRes res_ty
 
@@ -1331,7 +1331,7 @@ tcRuleBndrs skol_info (RuleBndrs { rb_tyvs = mb_tv_bndrs, rb_tmvs = tm_bndrs })
       = do { res <- thing_inside; return ([], res) }
     go_tms (L _ (RuleBndr _ (L _ name)) : rule_bndrs) thing_inside
       = do  { ty <- newOpenFlexiTyVarTy
-            ; let bndr_id = mkLocalId name ManyTy ty
+            ; let bndr_id = mkLocalId name UnmatchableTy ManyTy ty
             ; (bndrs, res) <- tcExtendIdEnv [bndr_id] $
                               go_tms rule_bndrs thing_inside
             ; return (bndr_id : bndrs, res) }
@@ -1343,7 +1343,7 @@ tcRuleBndrs skol_info (RuleBndrs { rb_tyvs = mb_tv_bndrs, rb_tmvs = tm_bndrs })
       --  If there's an explicit forall, the renamer would have already reported an
       --   error for each out-of-scope type variable used
       = do  { (_ , tv_prs, id_ty) <- tcRuleBndrSig name skol_info rn_ty
-            ; let bndr_id  = mkLocalId name ManyTy id_ty
+            ; let bndr_id  = mkLocalId name UnmatchableTy ManyTy id_ty
                      -- See Note [Typechecking pattern signature binders] in GHC.Tc.Gen.HsType
 
                      -- The type variables scope over subsequent bindings; yuk

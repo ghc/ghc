@@ -26,7 +26,7 @@ import GHC.Types.Var       ( Var, isId, mkLocalVar )
 import GHC.Types.Name      ( mkSystemVarName )
 import GHC.Types.Id        ( Id, mkSysLocalOrCoVarM )
 import GHC.Types.Id.Info   ( IdDetails(..), vanillaIdInfo, setArityInfo )
-import GHC.Core.Type       ( Type, Mult )
+import GHC.Core.Type       ( Type, Mult, Matchability, pattern UnmatchableTy )
 import GHC.Core.Opt.Stats
 import GHC.Core.Rules
 import GHC.Core.Utils      ( mkLamTypes )
@@ -201,8 +201,8 @@ liftIOWithEnv m = SM (\st_env sc -> do
 gets :: (SimplTopEnv -> a) -> SimplM a
 gets f = liftIOWithEnv (return . f)
 
-newId :: FastString -> Mult -> Type -> SimplM Id
-newId fs w ty = mkSysLocalOrCoVarM fs w ty
+newId :: FastString -> Matchability -> Mult -> Type -> SimplM Id
+newId fs m w ty = mkSysLocalOrCoVarM fs m w ty
 
 -- | Make a join id with given type and arity but without call-by-value annotations.
 newJoinId :: [Var] -> Type -> SimplM Id
@@ -216,7 +216,7 @@ newJoinId bndrs body_ty
              details    = JoinId join_arity Nothing
              id_info    = vanillaIdInfo `setArityInfo` arity
 
-       ; return (mkLocalVar details name ManyTy join_id_ty id_info) }
+       ; return (mkLocalVar details name UnmatchableTy ManyTy join_id_ty id_info) }
 
 {-
 ************************************************************************

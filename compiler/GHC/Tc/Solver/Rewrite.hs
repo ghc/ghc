@@ -31,7 +31,6 @@ import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Exts (oneShot)
 import Control.Monad
-import Control.Applicative (liftA3)
 import GHC.Builtin.Types (tYPETyCon)
 import Data.List ( find )
 import GHC.Data.List.Infinite (Infinite)
@@ -509,7 +508,7 @@ rewrite_one (TyConApp tc tys)
               -- See Note [Do not rewrite newtypes]
   = rewrite_ty_con_app tc tys
 
-rewrite_one (FunTy { ft_af = vis, ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
+rewrite_one (FunTy { ft_af = vis, ft_ma = ma, ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
   = do { arg_redn <- rewrite_one ty1
        ; res_redn <- rewrite_one ty2
 
@@ -519,10 +518,11 @@ rewrite_one (FunTy { ft_af = vis, ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
        ; let arg_rep = getRuntimeRep (reductionReducedType arg_redn)
              res_rep = getRuntimeRep (reductionReducedType res_redn)
 
-       ; (w_redn, arg_rep_redn, res_rep_redn) <- setEqRel NomEq $
-           liftA3 (,,) (rewrite_one mult)
-                       (rewrite_one arg_rep)
-                       (rewrite_one res_rep)
+       ; (m_redn, w_redn, arg_rep_redn, res_rep_redn) <- setEqRel NomEq $
+           (,,,) <$> rewrite_one ma
+                 <*> rewrite_one mult
+                 <*> rewrite_one arg_rep
+                 <*> rewrite_one res_rep
        ; role <- getRole
 
        ; let arg_rep_co = reductionCoercion arg_rep_redn
@@ -540,7 +540,7 @@ rewrite_one (FunTy { ft_af = vis, ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
           -- be done if we used TyConApp instead of FunTy. These rewritten
           -- representations are seen only in casts of the arg and res, below.
           -- Forgetting this caused #19677.
-       ; return $ mkFunRedn role vis w_redn casted_arg_redn casted_res_redn }
+       ; return $ mkFunRedn role vis m_redn w_redn casted_arg_redn casted_res_redn }
 
 rewrite_one ty@(ForAllTy {})
 -- TODO (RAE): This is inadequate, as it doesn't rewrite the kind of
@@ -1087,10 +1087,10 @@ split_pi_tys' ty = split ty ty
                                        -- terrible reboxing, as noted in #19102.
                                        !(bs, ty, _) = split res res
                                    in  (Named b : bs, ty, True)
-  split _       (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
+  split _       (FunTy { ft_af = af, ft_ma = m, ft_mult = w, ft_arg = arg, ft_res = res })
                                  = let -- See #19102
                                        !(bs, ty, named) = split res res
-                                   in  (Anon (mkScaled w arg) af : bs, ty, named)
+                                   in  (Anon (mkScaled m w arg) af : bs, ty, named)
 
   split orig_ty ty | Just ty' <- coreView ty = split orig_ty ty'
   split orig_ty _                = ([], orig_ty, False)

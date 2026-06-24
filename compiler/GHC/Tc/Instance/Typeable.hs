@@ -608,7 +608,8 @@ kindIsTypeable ty
   | isLiftedTypeKind ty             = True
 kindIsTypeable (TyVarTy _)          = True
 kindIsTypeable (AppTy a b)          = kindIsTypeable a && kindIsTypeable b
-kindIsTypeable (FunTy _ w a b)      = kindIsTypeable w &&
+kindIsTypeable (FunTy _ m w a b)    = kindIsTypeable m &&
+                                      kindIsTypeable w &&
                                       kindIsTypeable a &&
                                       kindIsTypeable b
 kindIsTypeable (TyConApp tc args)   = tyConIsTypeable tc
@@ -711,7 +712,7 @@ getKindRep stuff@(Stuff {..}) in_scope = go
       | otherwise
       = do -- See Note [NOINLINE on generated Typeable bindings]
            rep_bndr <- (`setInlinePragma` neverInlinePragma)
-                   <$> newSysLocalId (fsLit "$krep") ManyTy (mkTyConTy kindRepTyCon)
+                   <$> newSysLocalId (fsLit "$krep") UnmatchableTy ManyTy (mkTyConTy kindRepTyCon)
 
            -- do we need to tie a knot here?
            flip runStateT env $ unKindRepM $ do
@@ -779,7 +780,7 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep_shortcut
     new_kind_rep (ForAllTy (Bndr var _) ty)
       = pprPanic "mkTyConKindRepBinds(ForAllTy)" (ppr var $$ ppr ty)
 
-    new_kind_rep (FunTy _ _ t1 t2)
+    new_kind_rep (FunTy _ _ _ t1 t2)
       = do rep1 <- getKindRep stuff in_scope t1
            rep2 <- getKindRep stuff in_scope t2
            return $ nlHsDataCon kindRepFunDataCon

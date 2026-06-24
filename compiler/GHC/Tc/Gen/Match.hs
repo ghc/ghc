@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeFamilies     #-}
 {-# LANGUAGE MonadComprehensions  #-}
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 {-# OPTIONS_GHC -Wno-partial-type-signatures   #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -60,6 +61,7 @@ import GHC.Core.UsageEnv
 import GHC.Core.TyCon
 -- Create chunkified tuple types for monad comprehensions
 import GHC.Core.Make
+import GHC.Core.Type (pattern UnmatchableTy)
 
 import GHC.Hs
 
@@ -176,8 +178,8 @@ tcCaseMatches :: (AnnoBody body, Outputable (body GhcTc))
                 -- Translated alternatives
                 -- wrapper goes from MatchGroup's ty to expected ty
 
-tcCaseMatches ctxt tc_body (Scaled scrut_mult scrut_ty) matches res_ty
-  = tcMatches ctxt tc_body [ExpFunPatTy (Scaled scrut_mult (mkCheckExpType scrut_ty))] res_ty matches
+tcCaseMatches ctxt tc_body (Scaled scrut_ma scrut_mult scrut_ty) matches res_ty
+  = tcMatches ctxt tc_body [ExpFunPatTy (Scaled scrut_ma scrut_mult (mkCheckExpType scrut_ty))] res_ty matches
 
 -- @tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a @PatMonoBind@.
 tcGRHSsPat :: Mult -> GRHSs GhcRn (LHsExpr GhcRn) -> ExpRhoType
@@ -677,7 +679,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
              -- typically something like [(Int,Bool,Int)]
              -- We don't know what tuple_ty is yet, so we use a variable
        ; let mk_n_bndr :: Name -> TcId -> TcId
-             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name ManyTy (n_app (idType bndr_id))
+             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name UnmatchableTy ManyTy (n_app (idType bndr_id))
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
@@ -729,7 +731,7 @@ tcMcStmt ctxt (BindStmt xbsrn pat rhs) res_ty thing_inside
                           [SynRho, SynFun SynAny SynRho] res_ty $
                \ [rhs_ty, pat_ty, new_res_ty] [rhs_mult, fun_mult, pat_mult] ->
                do { rhs' <- tcScalingUsage rhs_mult $ tcCheckMonoExprNC rhs rhs_ty
-                  ; (pat', thing) <- tcScalingUsage fun_mult $ tcCheckPat (StmtCtxt ctxt) pat (Scaled pat_mult pat_ty) $
+                  ; (pat', thing) <- tcScalingUsage fun_mult $ tcCheckPat (StmtCtxt ctxt) pat (Scaled UnmatchableTy pat_mult pat_ty) $
                                      thing_inside (mkCheckExpType new_res_ty)
                   ; return (rhs_ty, rhs', pat_mult, pat', thing, new_res_ty) }
 
@@ -870,7 +872,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
 
        --------------- Building the bindersMap ----------------
        ; let mk_n_bndr :: Name -> TcId -> TcId
-             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name ManyTy (n_app (idType bndr_id))
+             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name UnmatchableTy ManyTy (n_app (idType bndr_id))
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
@@ -1000,7 +1002,7 @@ tcDoStmt ctxt (BindStmt xbsrn pat rhs) res_ty thing_inside
             <- tcSyntaxOp DoStmtOrigin (xbsrn_bindOp xbsrn) [SynRho, SynFun SynAny SynRho] res_ty $
                 \ [rhs_ty, pat_ty, new_res_ty] [rhs_mult,fun_mult,pat_mult] ->
                 do { rhs' <-tcScalingUsage rhs_mult $ tcCheckMonoExprNC rhs rhs_ty
-                   ; (pat', thing) <- tcScalingUsage fun_mult $ tcCheckPat (StmtCtxt ctxt) pat (Scaled pat_mult pat_ty) $
+                   ; (pat', thing) <- tcScalingUsage fun_mult $ tcCheckPat (StmtCtxt ctxt) pat (Scaled UnmatchableTy pat_mult pat_ty) $
                                       thing_inside (mkCheckExpType new_res_ty)
                    ; return (rhs_ty, rhs', pat_mult, pat', new_res_ty, thing) }
 
@@ -1035,7 +1037,7 @@ tcDoStmt ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_names
          res_ty thing_inside
   = do  { let tup_names = rec_names ++ filterOut (`elem` rec_names) later_names
         ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
-        ; let tup_ids = zipWith (\n t -> mkLocalId n ManyTy t) tup_names tup_elt_tys
+        ; let tup_ids = zipWith (\n t -> mkLocalId n UnmatchableTy ManyTy t) tup_names tup_elt_tys
                 -- Many because it's a recursive definition
               tup_ty  = mkBigCoreTupTy tup_elt_tys
 

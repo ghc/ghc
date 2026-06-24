@@ -819,7 +819,7 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env
 
 check_type (ve@ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                           , ve_rank = rank })
-           ty@(FunTy _ mult arg_ty res_ty)
+           ty@(FunTy _ ma mult arg_ty res_ty)
   = do  { failIfTcM (not (linearityAllowed ctxt) && not (isManyTy mult))
                      (env, TcRnLinearFuncInKind (tidyType env ty))
         ; check_type (ve{ve_rank = arg_rank}) arg_ty
@@ -1698,7 +1698,8 @@ dropCasts :: Type -> Type
 -- To consider: drop only HoleCo casts
 dropCasts (CastTy ty _)       = dropCasts ty
 dropCasts (AppTy t1 t2)       = mkAppTy (dropCasts t1) (dropCasts t2)
-dropCasts ty@(FunTy _ w t1 t2)  = ty { ft_mult = dropCasts w, ft_arg = dropCasts t1, ft_res = dropCasts t2 }
+dropCasts ty@(FunTy _ m w t1 t2)
+  = ty { ft_ma = dropCasts m, ft_mult = dropCasts w, ft_arg = dropCasts t1, ft_res = dropCasts t2 }
 dropCasts (TyConApp tc tys)   = mkTyConApp tc (map dropCasts tys)
 dropCasts (ForAllTy b ty)     = ForAllTy (dropCastsB b) (dropCasts ty)
 dropCasts ty                  = ty  -- LitTy, TyVarTy, CoercionTy

@@ -1708,7 +1708,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
       where
         bndr   = setCaseBndrEvald MarkedStrict $
                  uniqAway (subst_in_scope subst) $
-                 mkWildValBinder ManyTy expr_ty
+                 mkWildValBinder UnmatchableTy ManyTy expr_ty
         subst' = subst_extend_in_scope subst bndr
         expr'  = subst_expr subst expr
         float  = FloatCase expr' bndr DEFAULT []

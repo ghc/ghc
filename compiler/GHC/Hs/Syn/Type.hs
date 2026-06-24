@@ -187,7 +187,7 @@ conLikeType (PatSynCon patsyn) = case patSynBuilder patsyn of
 
 hsTupArgType :: HsTupArg GhcTc -> Type
 hsTupArgType (Present _ e)           = lhsExprType e
-hsTupArgType (Missing (Scaled _ ty)) = ty
+hsTupArgType (Missing (Scaled _ _ ty)) = ty
 
 -- | The result type of a @SyntaxExpr GhcTc@ for a unary function,
 -- including the result 'HsWrapper'.
@@ -215,11 +215,12 @@ hsWrapperType wrap ty = prTypeType $ go wrap (ty,[])
     go WpHole              = id
     go (WpSubType w)       = go w
     go (w1 `WpCompose` w2) = go w1 . go w2
-    go (WpFun mult_co _ w2 exp_arg _) = liftPRType $ \t ->
+    go (WpFun ma_co mult_co _ w2 exp_arg _) = liftPRType $ \t ->
       let act_res = funResultTy t
           exp_res = hsWrapperType w2 act_res
+          ma = coercionLKind ma_co
           mult = subMultCoRKind mult_co
-      in mkFunctionType mult exp_arg exp_res
+      in mkFunctionType ma mult exp_arg exp_res
     go (WpCast co)        = liftPRType $ \_ -> coercionRKind co
     go (WpEvLam v)        = liftPRType $ mkInvisFunTy (idType v)
     go (WpEvApp _)        = liftPRType $ funResultTy

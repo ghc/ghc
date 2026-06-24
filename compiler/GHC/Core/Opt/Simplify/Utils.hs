@@ -562,7 +562,7 @@ contHoleScaling (Select { sc_bndr = id, sc_cont = k })
 contHoleScaling (StrictArg { sc_fun_ty = fun_ty, sc_cont = k })
   = w `mkMultMul` contHoleScaling k
   where
-    (w, _, _) = splitFunTy fun_ty
+    (_, w, _, _) = splitFunTy fun_ty
 contHoleScaling (ApplyToTy { sc_cont = k }) = contHoleScaling k
 contHoleScaling (ApplyToVal { sc_cont = k }) = contHoleScaling k
 contHoleScaling (TickIt _ k) = contHoleScaling k
@@ -697,7 +697,7 @@ mkBottomCont cont = go cont
          = stop_cont
          | otherwise
          = Select { sc_alts = []
-                  , sc_bndr = mkWildValBinder OneTy hole_ty
+                  , sc_bndr = mkWildValBinder UnmatchableTy OneTy hole_ty
                   , sc_env  = Simplified OkDup
                   , sc_cont = stop_cont }
          where
@@ -771,7 +771,7 @@ mkArgInfo env fun rules_for_fun cont
       | Just (_, fun_ty') <- splitForAllTyCoVar_maybe fun_ty
       = add_type_strictness fun_ty' dmds     -- Look through foralls
 
-      | Just (_, _, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
+      | Just (_, _, _, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
       , dmd : rest_dmds <- dmds
       , let dmd'
              | definitelyUnliftedType arg_ty
@@ -2493,7 +2493,7 @@ abstractFloats uf_opts top_lvl main_tvs floats body
            ; let  poly_name = setNameUnique (idName var) uniq      -- Keep same name
                   poly_ty   = mkInfForAllTys tvs_here (idType var) -- But new type of course
                   poly_id   = transferPolyIdInfo var tvs_here $ -- Note [transferPolyIdInfo] in GHC.Types.Id
-                              mkLocalId poly_name (idMult var) poly_ty
+                              mkLocalId poly_name (idMa var) (idMult var) poly_ty
            ; return (poly_id, mkTyApps (Var poly_id) (mkTyVarTys tvs_here)) }
                 -- In the olden days, it was crucial to copy the occInfo of the original var,
                 -- because we were looking at occurrence-analysed but as yet unsimplified code!
@@ -2951,7 +2951,7 @@ mkCase2 mode scrut bndr alts_ty alts
       _                 -> True
   , sm_case_folding mode
   , Just (scrut', tx_con, mk_orig) <- caseRules (smPlatform mode) scrut
-  = do { bndr' <- newId (fsLit "lwild") ManyTy (exprType scrut')
+  = do { bndr' <- newId (fsLit "lwild") UnmatchableTy ManyTy (exprType scrut')
 
        ; alts' <- mapMaybeM (tx_alt tx_con mk_orig bndr') alts
                   -- mapMaybeM: discard unreachable alternatives

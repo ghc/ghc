@@ -71,6 +71,7 @@ import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.Coercion     ( isCoVar, mkRepReflCo, mkForAllVisCos )
 import GHC.Core.DataCon      ( DataCon, dataConWorkId, dataConWrapId )
 import GHC.Core.Multiplicity
+import GHC.Core.TyCo.Rep (Matchability)
 
 import GHC.Builtin.Types
 import GHC.Builtin.Names
@@ -187,8 +188,8 @@ rely on Lint to discover any mis-constructed terms.
 -- easy to get into difficulties with shadowing.  That's why it is used so little.
 --
 -- See Note [WildCard binders] in "GHC.Core.Opt.Simplify.Env"
-mkWildValBinder :: Mult -> Type -> Id
-mkWildValBinder w ty = mkLocalIdOrCoVar wildCardName w ty
+mkWildValBinder :: Matchability -> Mult -> Type -> Id
+mkWildValBinder m w ty = mkLocalIdOrCoVar wildCardName m w ty
   -- "OrCoVar" since a coercion can be a scrutinee with -fdefer-type-errors
   -- (e.g. see test T15695). Ticket #17291 covers fixing this problem.
 
@@ -199,8 +200,8 @@ mkWildCase :: CoreExpr -- ^ scrutinee
            -> Type -- ^ res_ty
            -> [CoreAlt] -- ^ alts
            -> CoreExpr
-mkWildCase scrut (Scaled w scrut_ty) res_ty alts
-  = Case scrut (mkWildValBinder w scrut_ty) res_ty alts
+mkWildCase scrut (Scaled m w scrut_ty) res_ty alts
+  = Case scrut (mkWildValBinder m w scrut_ty) res_ty alts
 
 mkIfThenElse :: CoreExpr -- ^ guard
              -> CoreExpr -- ^ then
@@ -218,7 +219,7 @@ castBottomExpr :: CoreExpr -> Type -> CoreExpr
 -- See Note [Empty case alternatives] in GHC.Core
 castBottomExpr e res_ty
   | e_ty `eqType` res_ty = e
-  | otherwise            = Case e (mkWildValBinder OneTy e_ty) res_ty []
+  | otherwise            = Case e (mkWildValBinder UnmatchableTy OneTy e_ty) res_ty []
   where
     e_ty = exprType e
 
@@ -539,7 +540,7 @@ unwrapBox us var body
       BI_Box { bi_data_con = box_con, bi_boxed_type = box_ty }
          -> (us', var', body')
          where
-           var'  = mkSysLocal (fsLit "uc") uniq ManyTy box_ty
+           var'  = mkSysLocal (fsLit "uc") uniq UnmatchableTy ManyTy box_ty
            body' = Case (Var var') var' (exprType body)
                         [Alt (DataAlt box_con) [var] body]
   where
@@ -720,7 +721,7 @@ mkBigTupleCase vars body scrut
     new_var us ty = (us', id)
        where
          (uniq, us') = takeUniqFromSupply us
-         id = mkSysLocal (fsLit "ds") uniq ManyTy ty
+         id = mkSysLocal (fsLit "ds") uniq UnmatchableTy ManyTy ty
 
 -- | As 'mkBigTupleCase', but for a tuple that is small enough to be guaranteed
 -- not to need nesting.
@@ -787,7 +788,7 @@ mkBuildExpr elt_ty mk_build_inside = do
     n_tyvar <- newTyVar alphaTyVar
     let n_ty = mkTyVarTy n_tyvar
         c_ty = mkVisFunTysMany [elt_ty, n_ty] n_ty
-    [c, n] <- sequence [mkSysLocalM (fsLit "c") ManyTy c_ty, mkSysLocalM (fsLit "n") ManyTy n_ty]
+    [c, n] <- sequence [mkSysLocalM (fsLit "c") UnmatchableTy ManyTy c_ty, mkSysLocalM (fsLit "n") UnmatchableTy ManyTy n_ty]
 
     build_inside <- mk_build_inside (c, c_ty) (n, n_ty)
 
@@ -1235,7 +1236,7 @@ aBSENT_CONSTRAINT_ERROR_ID -- See Note [aBSENT_ERROR_ID]
  where
    -- absentConstraintError :: forall (a :: Constraint). Addr# -> a
    absent_ty = mkSpecForAllTys [alphaConstraintTyVar] $
-               mkFunTy visArgConstraintLike ManyTy
+               mkFunTy visArgConstraintLike UnmatchableTy ManyTy
                        addrPrimTy (mkTyVarTy alphaConstraintTyVar)
 
 
@@ -1273,7 +1274,7 @@ mkRuntimeErrorTy :: TypeOrConstraint -> Type
 -- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a
 --   See Note [Error and friends have an "open-tyvar" forall]
 mkRuntimeErrorTy torc = mkSpecForAllTys [runtimeRep1TyVar, tyvar] $
-                        mkFunctionType ManyTy addrPrimTy (mkTyVarTy tyvar)
+                        mkFunctionType UnmatchableTy ManyTy addrPrimTy (mkTyVarTy tyvar)
   where
     tyvar:|_ = expectNonEmpty $ mkTemplateTyVars [kind]
     kind = case torc of

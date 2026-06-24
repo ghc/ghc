@@ -9,7 +9,7 @@ module GHC.Iface.Syntax (
         module GHC.Iface.Type,
 
         IfaceDecl(..), IfaceFamTyConFlav(..), IfaceClassOp(..), IfaceAT(..),
-        IfaceConDecl(..), IfaceConDecls(..), IfaceEqSpec,
+        IfaceConDecl(..), IfaceConDecls(..), IfaceEqSpec, IfaceArgTy(..),
         IfaceExpr(..), IfaceAlt(..), IfaceLetBndr(..), IfaceBinding,
         IfaceBindingX(..), IfaceMaybeRhs(..), IfaceConAlt(..),
         IfaceIdInfo, IfaceIdDetails(..), IfaceUnfolding(..), IfGuidance(..),
@@ -334,6 +334,12 @@ data IfaceConDecls
 -- (there is some redundancy here, because a field label may occur
 -- in multiple IfaceConDecls and represent the same field label)
 
+data IfaceArgTy 
+  = IfArgTy { 
+      ifArgMa :: IfaceMa,
+      ifArgMult :: IfaceMult,
+      ifArgType :: IfaceType }
+
 data IfaceConDecl
   = IfCon {
         ifConName    :: IfaceTopBndr,                -- Constructor name
@@ -354,7 +360,7 @@ data IfaceConDecl
           -- See Note [DataCon user type variable binders] in GHC.Core.DataCon
         ifConEqSpec  :: IfaceEqSpec,        -- Equality constraints
         ifConCtxt    :: IfaceContext,       -- Non-stupid context
-        ifConArgTys  :: [(IfaceMult, IfaceType)],-- Arg types
+        ifConArgTys  :: [IfaceArgTy],-- Arg types
         ifConFields  :: [FieldLabel],  -- ...ditto... (field labels)
         ifConStricts :: [IfaceBang],
           -- Empty (meaning all lazy),
@@ -1139,7 +1145,7 @@ iface_decl_mentioned_vars (IfaceData { ifCons = condecls, ifGadtSyntax = gadt })
   -- Get visible occurrences in each constructor in each alternative
   | otherwise = Set.unions (map mentioned_con_vars cons)
   where
-    mentioned_con_vars = Set.unions . map (visibleTypeVarOccurencies . snd) . ifConArgTys
+    mentioned_con_vars = Set.unions . map (visibleTypeVarOccurencies . ifArgType) . ifConArgTys
     cons = visibleIfConDecls condecls
 
 iface_decl_mentioned_vars (IfaceClass { ifFDs = fds, ifBody = IfAbstractClass })
@@ -1429,7 +1435,7 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
                               , ppWhen insert_empty_ctxt $ parens empty <+> darrow
                               , ex_msg
                               , pprIfaceContextArr prov_ctxt
-                              , pprIfaceType $ foldr (IfaceFunTy visArgTypeLike many_ty)
+                              , pprIfaceType $ foldr (IfaceFunTy visArgTypeLike unmatchable_ty many_ty)
                                                      pat_ty arg_tys ])
         pat_body = braces $ sep $ punctuate comma $ map ppr pat_fldlbls
         univ_msg = pprUserIfaceForAll $ tyVarSpecToBinders univ_bndrs
@@ -1566,7 +1572,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
 
     how_much = ss_how_much ss
     tys_w_strs :: [(IfaceBang, IfaceType)]
-    tys_w_strs = zip stricts (map snd arg_tys)
+    tys_w_strs = zip stricts (map ifArgType arg_tys)
     pp_prefix_con = pprPrefixIfDeclBndr how_much (occName name)
 
     -- If we're pretty-printing a H98-style declaration with existential
@@ -1583,7 +1589,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
         -- because we don't have a Name for the tycon, only an OccName
     pp_tau | null fields
            = case pp_args ++ [pp_gadt_res_ty] of
-                (t:ts) -> fsep (t : zipWithEqual (\(w,_) d -> ppr_arr w <+> d)
+                (t:ts) -> fsep (t : zipWithEqual (\(IfArgTy m w _) d -> ppr_arr m w <+> d)
                                                  arg_tys ts)
                 []     -> panic "pp_con_taus"
            | otherwise
@@ -1591,9 +1597,10 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
 
     -- Constructors are linear by default, but we don't want to show
     -- linear arrows when -XLinearTypes is disabled
-    ppr_arr w = sdocOption sdocLinearTypes $ \linearTypes ->
+    -- TODO: show matchability when UnsaturatedTypeFamilies is enabled
+    ppr_arr m w = sdocOption sdocLinearTypes $ \linearTypes ->
                 if linearTypes
-                then pprTypeArrow visArgTypeLike w
+                then pprTypeArrow visArgTypeLike m w
                 else arrow
 
     ppr_bang IfNoBang = whenPprDebug $ char '_'
@@ -2041,8 +2048,9 @@ freeNamesIfConDecl (IfCon { ifConUnivTvs = univ_tvs
     fnList freeNamesIfBndr ex_tvs &&&
     fnList freeNamesIfVarBndr user_tvs &&&
     freeNamesIfContext ctxt &&&
-    fnList freeNamesIfType (map fst arg_tys) &&& -- these are multiplicities, represented as types
-    fnList freeNamesIfType (map snd arg_tys) &&&
+    fnList freeNamesIfType (map ifArgMa arg_tys) &&&
+    fnList freeNamesIfType (map ifArgMult arg_tys) &&& -- these are multiplicities, represented as types
+    fnList freeNamesIfType (map ifArgType arg_tys) &&&
     mkNameSet (map flSelector flds) &&&
     fnList freeNamesIfType (map snd eq_spec) &&& -- equality constraints
     fnList freeNamesIfBang bangs
@@ -2066,7 +2074,8 @@ freeNamesIfType (IfaceTyConApp tc ts) = freeNamesIfTc tc &&& freeNamesIfAppArgs 
 freeNamesIfType (IfaceTupleTy _ _ ts) = freeNamesIfAppArgs ts
 freeNamesIfType (IfaceLitTy _)        = emptyNameSet
 freeNamesIfType (IfaceForAllTy tv t)  = freeNamesIfVarBndr tv &&& freeNamesIfType t
-freeNamesIfType (IfaceFunTy _ w s t)  = freeNamesIfType s &&& freeNamesIfType t &&& freeNamesIfType w
+freeNamesIfType (IfaceFunTy _ m w s t)
+  = freeNamesIfType s &&& freeNamesIfType t &&& freeNamesIfType m &&& freeNamesIfType w
 freeNamesIfType (IfaceCastTy t c)     = freeNamesIfType t &&& freeNamesIfCoercion c
 freeNamesIfType (IfaceCoercionTy c)   = freeNamesIfCoercion c
 
@@ -2078,8 +2087,8 @@ freeNamesIfCoercion :: IfaceCoercion -> NameSet
 freeNamesIfCoercion (IfaceReflCo t) = freeNamesIfType t
 freeNamesIfCoercion (IfaceGReflCo _ t mco)
   = freeNamesIfType t &&& freeNamesIfMCoercion mco
-freeNamesIfCoercion (IfaceFunCo _ c_mult c1 c2)
-  = freeNamesIfCoercion c_mult &&& freeNamesIfCoercion c1 &&& freeNamesIfCoercion c2
+freeNamesIfCoercion (IfaceFunCo _ c_ma c_mult c1 c2)
+  = freeNamesIfCoercion c_ma &&& freeNamesIfCoercion c_mult &&& freeNamesIfCoercion c1 &&& freeNamesIfCoercion c2
 freeNamesIfCoercion (IfaceTyConAppCo _ tc cos)
   = freeNamesIfTc tc &&& fnList freeNamesIfCoercion cos
 freeNamesIfCoercion (IfaceAppCo c1 c2)
@@ -2138,7 +2147,7 @@ freeNamesIfTvBndr (_fs,k) = freeNamesIfKind k
     -- kinds can have Names inside, because of promotion
 
 freeNamesIfIdBndr :: IfaceIdBndr -> NameSet
-freeNamesIfIdBndr (_, _fs,k) = freeNamesIfKind k
+freeNamesIfIdBndr (_, _, _fs,k) = freeNamesIfKind k
 
 freeNamesIfIdInfo :: IfaceIdInfo -> NameSet
 freeNamesIfIdInfo = fnList freeNamesItem
@@ -2562,6 +2571,17 @@ instance Binary IfaceConDecls where
             2 -> liftM (IfDataTyCon True) (get bh)
             3 -> liftM IfNewTyCon (get bh)
             _ -> error "Binary(IfaceConDecls).get: Invalid IfaceConDecls"
+
+instance Binary IfaceArgTy where
+  put_ bh (IfArgTy a1 a2 a3) = do
+    put_ bh a1
+    put_ bh a2
+    put_ bh a3
+  get bh = do
+    a1 <- get bh
+    a2 <- get bh
+    a3 <- get bh
+    return (IfArgTy a1 a2 a3)
 
 instance Binary IfaceConDecl where
     put_ bh (IfCon a1 a2 a3 a12 a4 a5 a6 a7 a8 a9 a10 a11) = do
@@ -3147,6 +3167,9 @@ instance NFData IfaceConDecls where
     IfAbstractTyCon -> ()
     IfDataTyCon _ f1 -> rnf f1
     IfNewTyCon f1 -> rnf f1
+
+instance NFData IfaceArgTy where
+  rnf (IfArgTy a1 a2 a3) = rnf a1 `seq` rnf a2 `seq` rnf a3
 
 instance NFData IfaceConDecl where
   rnf (IfCon f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12) =

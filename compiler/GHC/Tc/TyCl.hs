@@ -1543,11 +1543,11 @@ generaliseTcTyConKind inferred_tvs sorted_spec_tvs req_bndrs0 ki0 =
       = ty
     mk_req_foralls (Bndr tv vis:bndrs) ty =
       case ty of
-        FunTy af w arg res ->
+        FunTy af m w arg res ->
           case vis of
             NamedTCB ftf ->
               mkForAllTy (Bndr tv ftf) $ mk_req_foralls bndrs res
-            _ -> mkFunTy af w arg $ mk_req_foralls bndrs res
+            _ -> mkFunTy af m w arg $ mk_req_foralls bndrs res
         ForAllTy bndr' ty' ->
           mkForAllTy bndr' $ mk_req_foralls bndrs ty'
         _ ->
@@ -4408,7 +4408,7 @@ tcConArg exp_kind isPrefixConGADT (CDF (_, src) unp str w bty _)
         ; arg_ty <- tcCheckLHsTypeInContext bty exp_kind
         ; w' <- tcDataConMult isPrefixConGADT w
         ; traceTc "tcConArg 2" (ppr bty)
-        ; return (Scaled w' arg_ty, HsSrcBang src unp str) }
+        ; return (Scaled UnmatchableTy w' arg_ty, HsSrcBang src unp str) }
 
 tcRecHsConDeclRecFields :: ConArgKind
                    -> LocatedA [LHsConDeclRecField GhcRn]
@@ -5275,7 +5275,7 @@ checkNewDataCon con
           -- Fail here if the newtype is invalid: subsequent code in
           -- checkValidDataCon can fall over if it comes across an invalid newtype.
      do { case arg_tys of
-            [Scaled arg_mult _] ->
+            [Scaled arg_ma arg_mult _] ->
               unless (ok_mult arg_mult) $
               addErrTc $
               TcRnIllegalNewtype con IsNonLinear
@@ -5865,7 +5865,7 @@ checkValidRoles tc
       =  check_ty_roles env role    ty1
       >> check_ty_roles env Nominal ty2
 
-    check_ty_roles env role (FunTy _ w ty1 ty2)
+    check_ty_roles env role (FunTy _ m w ty1 ty2)
       =  check_ty_roles env Nominal w
       >> check_ty_roles env role ty1
       >> check_ty_roles env role ty2

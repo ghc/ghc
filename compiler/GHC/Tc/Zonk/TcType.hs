@@ -215,8 +215,8 @@ See for example test T5631, which regresses without this change.
 -}
 
 zonkScaledTcType :: Scaled TcType -> ZonkM (Scaled TcType)
-zonkScaledTcType (Scaled m ty)
-  = Scaled <$> zonkTcType m <*> zonkTcType ty
+zonkScaledTcType (Scaled ma m ty)
+  = Scaled <$> zonkTcType ma <*> zonkTcType m <*> zonkTcType ty
 
 -- For unbound, mutable tyvars, zonkType uses the function given to it
 -- For tyvars bound at a for-all, zonkType zonks them to an immutable

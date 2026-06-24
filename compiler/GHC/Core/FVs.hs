@@ -420,7 +420,7 @@ orphNamesOfType (TyConApp tycon tys) = func
                        arg:_ | tycon == fUNTyCon -> orph_names_of_fun_ty_con arg
                        _ -> emptyNameSet
 
-orphNamesOfType (FunTy af w arg res) =  func
+orphNamesOfType (FunTy af m w arg res) =  func
                                        `unionNameSet` unitNameSet fun_tc
                                        `unionNameSet` orphNamesOfType w
                                        `unionNameSet` orphNamesOfType arg

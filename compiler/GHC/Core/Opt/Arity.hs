@@ -205,7 +205,7 @@ typeOneShots ty
         then idOneShotInfo tcv : go rec_nts ty'
         else go rec_nts ty'
 
-      | Just (_,_,arg,res) <- splitFunTy_maybe ty
+      | Just (_,_,_,arg,res) <- splitFunTy_maybe ty
       = typeOneShot arg : go rec_nts res
 
       | Just (tc,tys) <- splitTyConApp_maybe ty
@@ -2323,12 +2323,12 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
        = (in_scope, EI (tcv' : bs) (mkEtaForAllMCo (Bndr tcv' vis) ty' mco))
 
        ----------- Function types  (t1 -> t2)
-       | Just (_af, mult, arg_ty, res_ty) <- splitFunTy_maybe ty
+       | Just (_af, ma, mult, arg_ty, res_ty) <- splitFunTy_maybe ty
        , typeHasFixedRuntimeRep arg_ty
           -- See Note [Representation polymorphism invariants] in GHC.Core
           -- See also test case typecheck/should_run/EtaExpandLevPoly
 
-       , (subst', eta_id) <- freshEtaId n subst (Scaled mult arg_ty)
+       , (subst', eta_id) <- freshEtaId n subst (Scaled ma mult arg_ty)
           -- Avoid free vars of the original expression
 
        , let eta_id' = eta_id `setIdOneShotInfo` one_shot
@@ -2819,15 +2819,15 @@ tryEtaReduce rec_ids bndrs body eval_sd
     ok_arg bndr (Var v) co fun_ty
        | bndr == v
        , let mult = idMult bndr
-       , Just (_af, fun_mult, _, _) <- splitFunTy_maybe fun_ty
+       , Just (_af, _, fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , mult `eqType` fun_mult -- There is no change in multiplicity, otherwise we must abort
        = Just (mkFunResCo Representational bndr co, [])
     ok_arg bndr (Cast e co_arg) co fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
-       , Just (_, fun_mult, _, _) <- splitFunTy_maybe fun_ty
+       , Just (_, fun_ma, fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , bndr == v
        , fun_mult `eqType` idMult bndr
-       = Just (mkFunCoNoFTF Representational (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
+       = Just (mkFunCoNoFTF Representational (maToCo fun_ma) (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here
     ok_arg bndr (Tick t arg) co fun_ty
@@ -2994,7 +2994,7 @@ pushCoercionIntoLambda in_scope x e co
     | assert (not (isTyVar x) && not (isCoVar x)) True
     , Pair s1s2 t1t2 <- coercionKind co
     , Just {}              <- splitFunTy_maybe s1s2
-    , Just (_, w1, t1,_t2) <- splitFunTy_maybe t1t2
+    , Just (_, m1, w1, t1,_t2) <- splitFunTy_maybe t1t2
     , (_, co1, co2)  <- decomposeFunCo co
     , typeHasFixedRuntimeRep t1
       -- We can't push the coercion into the lambda if it would create
@@ -3216,8 +3216,8 @@ etaBodyForJoinPoint need_args body
       = go (n-1) res_ty subst' (tv' : rev_bs) (e `App` varToCoreExpr tv')
         -- The varToCoreExpr is important: `tv` might be a coercion variable
 
-      | Just (_, mult, arg_ty, res_ty) <- splitFunTy_maybe ty
-      , let (subst', b) = freshEtaId n subst (Scaled mult arg_ty)
+      | Just (_, ma, mult, arg_ty, res_ty) <- splitFunTy_maybe ty
+      , let (subst', b) = freshEtaId n subst (Scaled ma mult arg_ty)
       = go (n-1) res_ty subst' (b : rev_bs) (e `App` varToCoreExpr b)
         -- The varToCoreExpr is important: `b` might be a coercion variable
 
@@ -3248,9 +3248,9 @@ freshEtaId :: Int -> Subst -> Scaled Type -> (Subst, Id)
 freshEtaId n subst ty
       = (subst', eta_id')
       where
-        Scaled mult' ty' = Type.substScaledTyUnchecked subst ty
+        (Scaled ma' mult' ty') = Type.substScaledTyUnchecked subst ty
         eta_id' = uniqAway (substInScopeSet subst) $
-                  mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) mult' ty'
+                  mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) ma' mult' ty'
                   -- "OrCoVar" since this can be used to eta-expand
                   -- coercion abstractions
         subst'  = extendSubstInScope subst eta_id'

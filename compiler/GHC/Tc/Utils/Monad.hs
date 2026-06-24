@@ -197,7 +197,7 @@ import GHC.Core.Coercion ( isReflCo )
 import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import GHC.Core.Type( mkNumLitTy )
+import GHC.Core.Type( mkNumLitTy, Matchability )
 import GHC.Core.TyCo.Rep( CoercionHole(..) )
 import GHC.Core.TyCo.FVs( coVarsOfCo )
 import GHC.Core.TyCon ( TyCon )
@@ -1023,15 +1023,15 @@ newSysName occ
   = do { uniq <- newUnique
        ; return (mkSystemName uniq occ) }
 
-newSysLocalId :: FastString -> Mult -> TcType -> TcRnIf gbl lcl TcId
-newSysLocalId fs w ty
+newSysLocalId :: FastString -> Matchability -> Mult -> TcType -> TcRnIf gbl lcl TcId
+newSysLocalId fs m w ty
   = do  { u <- newUnique
-        ; return (mkSysLocal fs u w ty) }
+        ; return (mkSysLocal fs u m w ty) }
 
 newSysLocalIds :: FastString -> [Scaled TcType] -> TcRnIf gbl lcl [TcId]
 newSysLocalIds fs tys
   = do  { us <- getUniquesM
-        ; let mkId' n (Scaled w t) = mkSysLocal fs n w t
+        ; let mkId' n (Scaled m w t) = mkSysLocal fs n m w t
         ; return (zipWith mkId' us tys) }
 
 instance MonadUnique (IOEnv (Env gbl lcl)) where

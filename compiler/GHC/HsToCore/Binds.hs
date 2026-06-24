@@ -1024,7 +1024,7 @@ dsSpec_help poly_nm poly_id poly_rhs spec_inl orig_bndrs ds_call
              spec_info  = vanillaIdInfo
                           `setInlinePragInfo` specFunInlinePrag poly_id id_inl spec_inl
                           `setUnfoldingInfo`  spec_unf
-             spec_id    = mkLocalVar (idDetails poly_id) spec_name ManyTy spec_ty spec_info
+             spec_id    = mkLocalVar (idDetails poly_id) spec_name UnmatchableTy ManyTy spec_ty spec_info
                           -- Specialised binding is toplevel, hence Many.
 
              -- The RULE looks like
@@ -1328,7 +1328,7 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
                 -- extra_dicts: see Note [Free dictionaries on rule LHS]
 -- ToDo: extra_dicts is needed. E.g. the SPECIALISE rules for `ap` in GHC.Base
                 extra_dicts
-                  = [ mkLocalIdOrCoVar (localiseName (idName d)) ManyTy (idType d)
+                  = [ mkLocalIdOrCoVar (localiseName (idName d)) UnmatchableTy ManyTy (idType d)
                     | d <- exprsSomeFreeVarsList is_extra args ]
 
                 is_extra v
@@ -1617,8 +1617,8 @@ ds_hs_wrapper hs_wrap
     go (WpCompose c1 c2) k = go c1 $ \w1 ->
                              go c2 $ \w2 ->
                              k (w1 . w2)
-    go (WpFun w_co c1 c2 t _) k = -- See Note [Desugaring WpFun]
-                              do { x <- newSysLocalDs (mkScaled (subMultCoRKind w_co) t)
+    go (WpFun m_co w_co c1 c2 t _) k = -- See Note [Desugaring WpFun]
+                              do { x <- newSysLocalDs (mkScaled (coercionRKind m_co) (subMultCoRKind w_co) t)
                                  ; go c1 $ \w1 ->
                                    go c2 $ \w2 ->
                                    let app f a = mkCoreApp f a
@@ -1796,18 +1796,19 @@ ds_ev_typeable ty (EvTypeableTyApp ev1 ev2)
        ; mkTrAppChecked <- dsLookupGlobalId mkTrAppCheckedName
                     -- mkTrAppChecked :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
                     --                   TypeRep a -> TypeRep b -> TypeRep (a b)
-       ; let (_, k1, k2) = splitFunTy (typeKind t1)  -- drop the multiplicity,
-                                                     -- since it's a kind
+       ; let (_, _, k1, k2) = splitFunTy (typeKind t1)  -- drop the multiplicity,
+                                                        -- since it's a kind
        ; let expr =  mkApps (mkTyApps (Var mkTrAppChecked) [ k1, k2, t1, t2 ])
                             [ e1, e2 ]
        -- ; pprRuntimeTrace "Trace mkTrAppChecked" (ppr expr) expr
        ; return expr
        }
 
-ds_ev_typeable ty (EvTypeableTrFun evm ev1 ev2)
-  | Just (_af,m,t1,t2) <- splitFunTy_maybe ty
+ds_ev_typeable ty (EvTypeableTrFun evma evm ev1 ev2)
+  | Just (_af,ma,m,t1,t2) <- splitFunTy_maybe ty
   = do { e1 <- getRep ev1 t1
        ; e2 <- getRep ev2 t2
+       ; ema <- getRep evma ma
        ; em <- getRep evm m
        ; mkTrFun <- dsLookupGlobalId mkTrFunName
                     -- mkTrFun :: forall (m :: Multiplicity) r1 r2 (a :: TYPE r1) (b :: TYPE r2).
@@ -1815,7 +1816,7 @@ ds_ev_typeable ty (EvTypeableTrFun evm ev1 ev2)
        ; let r1 = getRuntimeRep t1
              r2 = getRuntimeRep t2
        ; return $ mkApps (mkTyApps (Var mkTrFun) [m, r1, r2, t1, t2])
-                         [ em, e1, e2 ]
+                         [ ema, em, e1, e2 ]
        }
 
 ds_ev_typeable ty (EvTypeableTyLit ev)

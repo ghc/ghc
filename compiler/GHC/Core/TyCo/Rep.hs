@@ -66,7 +66,10 @@ module GHC.Core.TyCo.Rep (
         typeSize, typesSize, coercionSize,
 
         -- * Multiplicities
-        Scaled(..), scaledMult, scaledThing, mapScaledType, Mult
+        Scaled(..), scaledMult, scaledMa, scaledThing, mapScaledType, Mult,
+
+        -- * Matchability
+        Matchability,
     ) where
 
 import GHC.Prelude
@@ -175,6 +178,7 @@ data Type
                                  --      ft_arg and ft_res
                                  -- Note [FunTyFlag] in GHC.Types.Var
 
+     , ft_ma   :: Matchability   -- Matchability
      , ft_mult :: Mult           -- Multiplicity; always Many for (=>) and (==>)
      , ft_arg  :: Type           -- Argument type
      , ft_res  :: Type }         -- Result type
@@ -688,32 +692,33 @@ mkNakedFunTy :: FunTyFlag -> Kind -> Kind -> Kind
 -- See Note [Naked FunTy] in GHC.Builtin.Types
 -- Always Many multiplicity; kinds have no linearity
 mkNakedFunTy af arg res
- =  FunTy { ft_af   = af, ft_mult = manyDataConTy
+ =  FunTy { ft_af   = af, ft_ma = unmatchableDataConTy, ft_mult = manyDataConTy
           , ft_arg  = arg, ft_res  = res }
 
-mkFunTy :: HasDebugCallStack => FunTyFlag -> Mult -> Type -> Type -> Type
-mkFunTy af mult arg res
+mkFunTy :: HasDebugCallStack => FunTyFlag -> Matchability -> Mult -> Type -> Type -> Type
+mkFunTy af ma mult arg res
   = assertPpr (af == chooseFunTyFlag arg res) (vcat
       [ text "af" <+> ppr af
       , text "chooseAAF" <+> ppr (chooseFunTyFlag arg res)
       , text "arg" <+> ppr arg <+> dcolon <+> ppr (typeKind arg)
       , text "res" <+> ppr res <+> dcolon <+> ppr (typeKind res) ]) $
     FunTy { ft_af   = af
+          , ft_ma   = ma
           , ft_mult = mult
           , ft_arg  = arg
           , ft_res  = res }
 
 mkInvisFunTy :: HasDebugCallStack => Type -> Type -> Type
 mkInvisFunTy arg res
-  = mkFunTy (invisArg (typeTypeOrConstraint res)) manyDataConTy arg res
+  = mkFunTy (invisArg (typeTypeOrConstraint res)) unmatchableDataConTy manyDataConTy arg res
 
 mkInvisFunTys :: HasDebugCallStack => [Type] -> Type -> Type
 mkInvisFunTys args res
-  = foldr (mkFunTy af manyDataConTy) res args
+  = foldr (mkFunTy af unmatchableDataConTy manyDataConTy) res args
   where
     af = invisArg (typeTypeOrConstraint res)
 
-mkVisFunTy :: HasDebugCallStack => Mult -> Type -> Type -> Type
+mkVisFunTy :: HasDebugCallStack => Matchability -> Mult -> Type -> Type -> Type
 -- Always TypeLike, user-specified multiplicity.
 mkVisFunTy = mkFunTy visArgTypeLike
 
@@ -721,7 +726,7 @@ mkVisFunTy = mkFunTy visArgTypeLike
 -- | Special, common, case: Arrow type with mult Many
 mkVisFunTyMany :: HasDebugCallStack => Type -> Type -> Type
 -- Always TypeLike, multiplicity Many
-mkVisFunTyMany = mkVisFunTy manyDataConTy
+mkVisFunTyMany = mkVisFunTy unmatchableDataConTy manyDataConTy
 
 mkVisFunTysMany :: [Type] -> Type -> Type
 -- Always TypeLike, multiplicity Many
@@ -729,7 +734,7 @@ mkVisFunTysMany tys ty = foldr mkVisFunTyMany ty tys
 
 ---------------
 mkScaledFunTy :: HasDebugCallStack => FunTyFlag -> Scaled Type -> Type -> Type
-mkScaledFunTy af (Scaled mult arg) res = mkFunTy af mult arg res
+mkScaledFunTy af (Scaled ma mult arg) res = mkFunTy af ma mult arg res
 
 mkScaledFunTys :: HasDebugCallStack => [Scaled Type] -> Type -> Type
 -- All visible args
@@ -778,12 +783,12 @@ mkPiTys tbs ty = foldr mkPiTy ty tbs
 mkNakedTyConTy :: TyCon -> Type
 mkNakedTyConTy tycon = TyConApp tycon []
 
-tcMkVisFunTy :: Mult -> Type -> Type -> Type
+tcMkVisFunTy :: Matchability -> Mult -> Type -> Type -> Type
 -- Always TypeLike result, user-specified multiplicity.
 -- Does not have the assert-checking in mkFunTy: used by the typechecker
 -- to avoid looking at the result kind, which may not be zonked
-tcMkVisFunTy mult arg res
-  = FunTy { ft_af = visArgTypeLike, ft_mult = mult
+tcMkVisFunTy ma mult arg res
+  = FunTy { ft_af = visArgTypeLike, ft_ma = ma, ft_mult = mult
           , ft_arg = arg, ft_res = res }
 
 tcMkInvisFunTy :: TypeOrConstraint -> Type -> Type -> Type
@@ -791,7 +796,7 @@ tcMkInvisFunTy :: TypeOrConstraint -> Type -> Type -> Type
 -- Does not have the assert-checking in mkFunTy: used by the typechecker
 -- to avoid looking at the result kind, which may not be zonked
 tcMkInvisFunTy res_torc arg res
-  = FunTy { ft_af = invisArg res_torc, ft_mult = manyDataConTy
+  = FunTy { ft_af = invisArg res_torc, ft_ma = unmatchableDataConTy, ft_mult = manyDataConTy
           , ft_arg = arg, ft_res = res }
 
 tcMkScaledFunTys :: [Scaled Type] -> Type -> Type
@@ -801,7 +806,7 @@ tcMkScaledFunTys :: [Scaled Type] -> Type -> Type
 tcMkScaledFunTys tys ty = foldr tcMkScaledFunTy ty tys
 
 tcMkScaledFunTy :: Scaled Type -> Type -> Type
-tcMkScaledFunTy (Scaled mult arg) res = tcMkVisFunTy mult arg res
+tcMkScaledFunTy (Scaled ma mult arg) res = tcMkVisFunTy ma mult arg res
 
 {-
 %************************************************************************
@@ -895,6 +900,7 @@ data Coercion
         { fco_role         :: Role
         , fco_afl          :: FunTyFlag   -- Arrow for coercionLKind
         , fco_afr          :: FunTyFlag   -- Arrow for coercionRKind
+        , fco_ma           :: CoercionN
         , fco_mult         :: CoercionN
         , fco_arg, fco_res :: Coercion }
        -- (if the role "e" is Phantom, the first coercion is, too)
@@ -969,7 +975,8 @@ data CoSel  -- See Note [SelCo]
   deriving( Eq, Data.Data, Ord )
 
 data FunSel  -- See Note [SelCo]
-  = SelMult  -- Multiplicity
+  = SelMa    -- Matchability
+  | SelMult  -- Multiplicity
   | SelArg   -- Argument of function
   | SelRes   -- Result of function
   deriving( Eq, Data.Data, Ord )
@@ -988,11 +995,13 @@ pprOneCharRole Representational = char 'R'
 pprOneCharRole Phantom          = char 'P'
 
 instance Outputable FunSel where
+  ppr SelMa   = text "ma"
   ppr SelMult = text "mult"
   ppr SelArg  = text "arg"
   ppr SelRes  = text "res"
 
 instance NFData FunSel where
+  rnf SelMa   = ()
   rnf SelMult = ()
   rnf SelArg  = ()
   rnf SelRes  = ()
@@ -1003,6 +1012,7 @@ instance Binary CoSel where
    put_ bh (SelFun SelMult) = putByte bh 2
    put_ bh (SelFun SelArg)  = putByte bh 3
    put_ bh (SelFun SelRes)  = putByte bh 4
+   put_ bh (SelFun SelMa)   = putByte bh 5
 
    get bh = do { h <- getByte bh
                ; case h of
@@ -1010,7 +1020,8 @@ instance Binary CoSel where
                    1 -> return SelForAll
                    2 -> return (SelFun SelMult)
                    3 -> return (SelFun SelArg)
-                   _ -> return (SelFun SelRes) }
+                   4 -> return (SelFun SelRes)
+                   _ -> return (SelFun SelMa) }
 
 instance NFData CoSel where
   rnf (SelTyCon n r) = rnf n `seq` rnf r `seq` ()
@@ -1979,7 +1990,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_ty (LitTy {})          = mempty
     go_ty (CastTy ty co)      = go_ty ty `mappend` go_co co
     go_ty (CoercionTy co)     = go_co co
-    go_ty (FunTy _ w arg res) = go_ty arg `mappend` go_ty w `mappend` go_ty res
+    go_ty (FunTy _ m w arg res) = go_ty arg `mappend` go_ty m `mappend` go_ty w `mappend` go_ty res
                                 -- As per #23764, ordering is [arg, w, res]
 
     go_ty (TyConApp _ tys)  = go_tys tys
@@ -2053,7 +2064,7 @@ typeSize :: Type -> Int
 typeSize (LitTy {})                 = 1
 typeSize (TyVarTy {})               = 1
 typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
-typeSize (FunTy _ _ t1 t2)          = typeSize t1 + typeSize t2
+typeSize (FunTy _ _ _ t1 t2)        = typeSize t1 + typeSize t2
 typeSize (ForAllTy (Bndr tv _) t)   = typeSize (varType tv) + typeSize t
 typeSize (TyConApp _ ts)            = 1 + typesSize ts
 typeSize (CastTy ty co)             = typeSize ty + coercionSize co
@@ -2069,8 +2080,8 @@ coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)        = coercionSize co + coercionSize arg
 coercionSize (ForAllCo { fco_kind = h, fco_body = co })
                                    = 1 + coercionSize co + mCoercionSize h
-coercionSize (FunCo _ _ _ w c1 c2) = 1 + coercionSize c1 + coercionSize c2
-                                                         + coercionSize w
+coercionSize (FunCo _ _ _ m w c1 c2) 
+  = 1 + coercionSize c1 + coercionSize c2 + coercionSize m + coercionSize w
 coercionSize (CoVarCo _)         = 1
 coercionSize (HoleCo _)          = 1
 coercionSize (AxiomCo _ cs)      = 1 + sum (map coercionSize cs)
@@ -2101,8 +2112,8 @@ GHC.Core.Multiplicity above this module.
 
 -}
 
--- | A shorthand for data with an attached 'Mult' element (the multiplicity).
-data Scaled a = Scaled !Mult a
+-- | A shorthand for data with an attached 'Matchability' and 'Mult' element (the matchability and multiplicity).
+data Scaled a = Scaled !Matchability !Mult a
   deriving (Data.Data)
   -- You might think that this would be a natural candidate for
   -- Functor, Traversable but Krzysztof says (!3674) "it was too easy
@@ -2111,22 +2122,25 @@ data Scaled a = Scaled !Mult a
   -- multiplicities and causing bugs".  So we don't.
   --
   -- Being strict in a is worse for performance, so we are only strict on the
-  -- Mult part of scaled.
+  -- Matchability and Mult part of scaled.
 
 
 instance (Outputable a) => Outputable (Scaled a) where
-   ppr (Scaled _cnt t) = ppr t
+   ppr (Scaled _m _cnt t) = ppr t
      -- Do not print the multiplicity here because it tends to be too verbose
 
 scaledMult :: Scaled a -> Mult
-scaledMult (Scaled m _) = m
+scaledMult (Scaled _ m _) = m
+
+scaledMa :: Scaled a -> Matchability
+scaledMa (Scaled ma _ _) = ma
 
 scaledThing :: Scaled a -> a
-scaledThing (Scaled _ t) = t
+scaledThing (Scaled _ _ t) = t
 
--- | Apply a function to both the Mult and the Type in a 'Scaled Type'
+-- | Apply a function to the matchability, multiplicity, and the type in a 'Scaled Type'
 mapScaledType :: (Type -> Type) -> Scaled Type -> Scaled Type
-mapScaledType f (Scaled m t) = Scaled (f m) (f t)
+mapScaledType f (Scaled ma m t) = Scaled (f ma) (f m) (f t)
 
 {- |
 Mult is a type alias for Type.
@@ -2144,3 +2158,5 @@ So that Mult feels a bit more structured, we provide pattern synonyms and smart
 constructors for these.
 -}
 type Mult = Type
+
+type Matchability = Type

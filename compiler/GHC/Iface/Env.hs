@@ -221,7 +221,7 @@ lookupIfaceTyVar (occ, _)
         ; return (lookupFsEnv (if_tv_env lcl) (ifLclNameFS occ)) }
 
 lookupIfaceVar :: IfaceBndr -> IfL (Maybe TyCoVar)
-lookupIfaceVar (IfaceIdBndr (_, occ, _))
+lookupIfaceVar (IfaceIdBndr (_, _, occ, _))
   = do  { lcl <- getLclEnv
         ; return (lookupFsEnv (if_id_env lcl) (ifLclNameFS occ)) }
 lookupIfaceVar (IfaceTvBndr (occ, _))

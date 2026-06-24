@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, PatternSynonyms #-}
 
 -- | Hides away distracting bookkeeping while lambda lifting into a 'LiftM'
 -- monad.
@@ -40,6 +40,7 @@ import GHC.Utils.Panic
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Core.Multiplicity
+import GHC.Core.Type ( pattern UnmatchableTy )
 
 import Control.Arrow ( second )
 import Control.Monad.Trans.Class
@@ -278,7 +279,7 @@ withLiftedBndr abs_ids bndr inner = do
         -- See Note [transferPolyIdInfo] in GHC.Types.Id. We need to do this at least
         -- for arity information.
             transferPolyIdInfo bndr (dVarSetElems abs_ids)
-        <$> mkSysLocalM str ManyTy ty
+        <$> mkSysLocalM str UnmatchableTy ManyTy ty
   LiftM $ RWS.local
     (\e -> e
       { e_subst = extendSubst bndr bndr' $ extendInScope bndr' $ e_subst e

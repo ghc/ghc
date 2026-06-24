@@ -48,7 +48,7 @@ import GHC.Core.Class
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core
-import GHC.Core.Type( pattern ManyTy, mkFunTy )
+import GHC.Core.Type( pattern ManyTy, mkFunTy, pattern UnmatchableTy)
 import GHC.Core.Make
 import GHC.Core.Utils
 
@@ -122,7 +122,7 @@ mkMetaWrappers q@(QuoteWrapper quote_var_raw m_var) = do
           -- the expected type
           tyvars = dataConUserTyVarBinders (classDataCon cls)
           expected_ty = mkForAllTys tyvars $
-                        mkFunTy invisArgConstraintLike ManyTy
+                        mkFunTy invisArgConstraintLike UnmatchableTy ManyTy
                                 (mkClassPred cls (mkTyVarTys (binderVars tyvars)))
                                 (mkClassPred monad_cls (mkTyVarTys (binderVars tyvars)))
 
@@ -2274,7 +2274,7 @@ mkGenSyms :: [Name] -> MetaM [GenSymBind]
 --
 -- Nevertheless, it's monadic because we have to generate nameTy
 mkGenSyms ns = do { var_ty <- lookupType nameTyConName
-                  ; return [ (nm, mkLocalId (localiseName nm) ManyTy var_ty)
+                  ; return [ (nm, mkLocalId (localiseName nm) UnmatchableTy ManyTy var_ty)
                            | nm <- ns] }
 
 

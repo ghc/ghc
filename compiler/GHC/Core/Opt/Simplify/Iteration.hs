@@ -626,7 +626,7 @@ tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
                                                    -- See Note [OPAQUE pragma]
   = do  { uniq <- getUniqueM
         ; let work_name = mkSystemVarName uniq occ_fs
-              work_id   = mkLocalIdWithInfo work_name ManyTy work_ty work_info
+              work_id   = mkLocalIdWithInfo work_name UnmatchableTy ManyTy work_ty work_info
               is_strict = isStrictId bndr
 
         ; (rhs_floats, work_rhs) <- prepareBinding env top_lvl is_rec is_strict
@@ -863,7 +863,7 @@ makeTrivial env top_lvl dmd occ_fs expr
   = do  { (floats, expr1) <- prepareRhs env top_lvl occ_fs expr
         ; uniq <- getUniqueM
         ; let name = mkSystemVarName uniq occ_fs
-              var  = mkLocalIdWithInfo name ManyTy expr_ty id_info
+              var  = mkLocalIdWithInfo name UnmatchableTy ManyTy expr_ty id_info
 
         -- Now something very like completeBind,
         -- but without the postInlineUnconditionally part
@@ -2379,10 +2379,10 @@ simplOutId env fun cont
                             -- Important: do not try to eta-expand this lambda
                             -- See Note [No eta-expansion in runRW#]
 
-           _ -> do { s' <- newId (fsLit "s") ManyTy realWorldStatePrimTy
-                   ; let (m,_,_) = splitFunTy fun_ty
+           _ -> do { s' <- newId (fsLit "s") UnmatchableTy ManyTy realWorldStatePrimTy
+                   ; let (m,w,_,_) = splitFunTy fun_ty
                          env'  = arg_env `addNewInScopeIds` [s']
-                         hole_ty = mkVisFunTy m realWorldStatePrimTy new_runrw_res_ty
+                         hole_ty = mkVisFunTy m w realWorldStatePrimTy new_runrw_res_ty
                    ; cont' <- pushCastMCo env' arg_mco $
                               ApplyToVal { sc_arg = Var s', sc_cast = MRefl
                                          , sc_env = Simplified OkDup
@@ -3541,7 +3541,7 @@ improveSeq :: (FamInstEnv, FamInstEnv)
 improveSeq fam_envs (saf,env) scrut case_bndr case_bndr1 [Alt DEFAULT _ _]
   | SAF_In <- saf  -- improveSeq extends the substitution; not allowed for SAF_Out
   , Just (Reduction co ty2) <- topNormaliseType_maybe fam_envs (idType case_bndr1)
-  = do { case_bndr2 <- newId (fsLit "nt") ManyTy ty2
+  = do { case_bndr2 <- newId (fsLit "nt") UnmatchableTy ManyTy ty2
         ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co) NotJoinPoint
               env2 = extendIdSubst env case_bndr rhs
         ; return (env2, scrut `Cast` co, case_bndr2) }
@@ -4180,8 +4180,8 @@ mkDupableContWithDmds env _
     --   K[ f a b <> ]   -->   join j x = K[ f a b x ]
     --                         j <>
     do { let rhs_ty       = contResultType cont
-             (m,arg_ty,_) = splitFunTy fun_ty
-       ; arg_bndr <- newId (fsLit "arg") m arg_ty
+             (m,w,arg_ty,_) = splitFunTy fun_ty
+       ; arg_bndr <- newId (fsLit "arg") m w arg_ty
        ; let env' = env `addNewInScopeIds` [arg_bndr]
        ; (floats, join_rhs) <- rebuildCall env' (addValArgTo fun (Var arg_bndr) fun_ty) cont
        ; mkDupableStrictBind env' arg_bndr (wrapFloats floats join_rhs) rhs_ty }

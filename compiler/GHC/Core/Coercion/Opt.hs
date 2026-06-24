@@ -374,12 +374,13 @@ opt_co4' env sym rep r (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = vis
     !(env', tv', k_co') = optForAllCoBndr env sym tv k_co
     !(visL', visR') = swapSym sym (visL, visR)
 
-opt_co4' env sym rep r (FunCo _r afl afr cow co1 co2)
+opt_co4' env sym rep r (FunCo _r afl afr com cow co1 co2)
   = assert (r == _r) $
-    mkFunCo2 r' afl' afr' cow' co1' co2'
+    mkFunCo2 r' afl' afr' com' cow' co1' co2'
   where
     co1' = opt_co4 env sym rep r co1
     co2' = opt_co4 env sym rep r co2
+    com' = opt_co1 env sym com
     cow' = opt_co1 env sym cow
     !r' | rep       = Representational
         | otherwise = r
@@ -826,12 +827,13 @@ opt_trans_rule is in_co1@(TyConAppCo r1 tc1 cos1) in_co2@(TyConAppCo r2 tc2 cos2
     fireTransRule "PushTyConApp" in_co1 in_co2 $
     mkTyConAppCo r1 tc1 (opt_transList is cos1 cos2)
 
-opt_trans_rule is in_co1@(FunCo r1 afl1 afr1 w1 co1a co1b)
-                  in_co2@(FunCo r2 afl2 afr2 w2 co2a co2b)
+opt_trans_rule is in_co1@(FunCo r1 afl1 afr1 m1 w1 co1a co1b)
+                  in_co2@(FunCo r2 afl2 afr2 m2 w2 co2a co2b)
   = assert (r1 == r2)     $     -- Just like the TyConAppCo/TyConAppCo case
     assert (afr1 == afl2) $
     fireTransRule "PushFun" in_co1 in_co2 $
-    mkFunCo2 r1 afl1 afr2 (opt_trans is w1 w2)
+    mkFunCo2 r1 afl1 afr2 (opt_trans is m1 m2)
+                          (opt_trans is w1 w2)
                           (opt_trans is co1a co2a)
                           (opt_trans is co1b co2b)
 

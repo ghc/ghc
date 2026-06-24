@@ -256,7 +256,7 @@ dsUnliftedBind (PatBind { pat_lhs = pat, pat_rhs = grhss
     do { match_nablas <- pmcGRHSs PatBindGuards grhss
        ; rhs          <- dsGuarded grhss (patBindGRHSType ext) match_nablas
        ; let eqn = EqnMatch { eqn_pat = pat, eqn_rest = EqnDone (cantFailMatchResult body) }
-       ; var    <- selectMatchVar ManyTy (unLoc pat)
+       ; var    <- selectMatchVar UnmatchableTy ManyTy (unLoc pat)
                     -- `var` will end up in a let binder, so the multiplicity
                     -- doesn't matter.
        ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body)
@@ -810,7 +810,7 @@ ds_app_var (L loc fun_id) hs_args core_args
   , let case_bndr = case arg1 of
             Var v1 | isInternalName (idName v1)
                   -> v1        -- Note [Desugaring seq], points (2) and (3)
-            _     -> mkWildValBinder ManyTy ty1
+            _     -> mkWildValBinder UnmatchableTy ManyTy ty1
   = return (Case arg1 case_bndr ty2 [Alt DEFAULT [] arg2]
             `mkCoreApps` rest_args)
 
@@ -871,7 +871,7 @@ ds_app_rec_sel sel_id fun_id core_args
            -- applied to all its type arguments
            -- See (IRS3) of Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
            [] | Just (val_arg_ty, _) <- splitVisibleFunTy_maybe fun_ty
-              -> do { dummy <- newSysLocalDs (Scaled ManyTy val_arg_ty)
+              -> do { dummy <- newSysLocalDs (Scaled UnmatchableTy ManyTy val_arg_ty)
                     ; pmcRecSel sel_id (Var dummy) }
 
            -- Not even applied to all its type args
@@ -1133,7 +1133,7 @@ dsDo ctx stmts res_ty
       -- SG: As far as I can tell, this code path is only triggered when ApplicativeDo fails, e.g.
       --   do blah <- action1; action2 (blah * 2)
       -- It is reached when compiling GHC.Parser.PostProcess.Haddock.addHaddockToModule
-      = do  { var   <- selectSimpleMatchVarL (xbstc_boundResultMult xbs) pat
+      = do  { var   <- selectSimpleMatchVarL UnmatchableTy (xbstc_boundResultMult xbs) pat
             ; rhs'  <- dsLExpr rhs
             ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) pat
                                  (xbstc_boundResultType xbs) (MR_Infallible $ goL stmts)
@@ -1200,7 +1200,7 @@ dsDo ctx stmts res_ty
 
            ; let match_args (pat, fail_op) (vs,body)
                    = putSrcSpanDs (getLocA pat) $
-                     do { var   <- selectSimpleMatchVarL ManyTy pat
+                     do { var   <- selectSimpleMatchVarL UnmatchableTy ManyTy pat
                         ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) pat
                                    body_ty (cantFailMatchResult body)
                         ; match_code <- dsHandleMonadicFailure ctx pat body_ty match fail_op

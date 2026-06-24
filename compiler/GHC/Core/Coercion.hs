@@ -117,7 +117,7 @@ module GHC.Core.Coercion (
         -- * Other
         promoteCoercion, buildCoercion,
 
-        multToCo, mkRuntimeRepCo,
+        maToCo, multToCo, mkRuntimeRepCo,
 
         hasCoercionHole,
         setCoHoleType
@@ -501,8 +501,8 @@ decomposePiCos orig_co (Pair orig_k1 orig_k2) orig_args
         in
         go (arg_co : acc_arg_cos) (subst1', t1) res_co (subst2', t2) tys
 
-      | Just (af1, _w1, _s1, t1) <- splitFunTy_maybe k1
-      , Just (af2, _w1, _s2, t2) <- splitFunTy_maybe k2
+      | Just (af1, _m1, _w1, _s1, t1) <- splitFunTy_maybe k1
+      , Just (af2, _m2, _w2, _s2, t2) <- splitFunTy_maybe k2
       , af1 == af2  -- Same sort of arrow
         -- know     co :: (s1 -> t1) ~ (s2 -> t2)
         --    function :: s1 -> t1
@@ -535,6 +535,9 @@ getCoVar_maybe _            = Nothing
 
 multToCo :: Mult -> Coercion
 multToCo r = mkNomReflCo r
+
+maToCo :: Matchability -> Coercion
+maToCo m = mkNomReflCo m
 
 -- first result has role equal to input; third result is Nominal
 splitAppCo_maybe :: Coercion -> Maybe (Coercion, Coercion)
@@ -817,10 +820,10 @@ mkTyConAppCo r tc cos
 
   | otherwise = TyConAppCo r tc cos
 
-mkFunCoNoFTF :: HasDebugCallStack => Role -> CoercionN -> Coercion -> Coercion -> Coercion
+mkFunCoNoFTF :: HasDebugCallStack => Role -> CoercionN -> CoercionN -> Coercion -> Coercion -> Coercion
 -- This version of mkFunCo takes no FunTyFlags; it works them out
-mkFunCoNoFTF r w arg_co res_co
-  = mkFunCo2 r afl afr w arg_co res_co
+mkFunCoNoFTF r m w arg_co res_co
+  = mkFunCo2 r afl afr m w arg_co res_co
   where
     afl = chooseFunTyFlag argl_ty resl_ty
     afr = chooseFunTyFlag argr_ty resr_ty
@@ -832,24 +835,25 @@ mkFunCoNoFTF r w arg_co res_co
 -- or @(a => x) ~ (b => y)@, depending on the kind of @a@/@b@.
 -- This (most common) version takes a single FunTyFlag, which is used
 --   for both fco_afl and ftf_afr of the FunCo
-mkFunCo :: Role -> FunTyFlag -> CoercionN -> Coercion -> Coercion -> Coercion
-mkFunCo r af w arg_co res_co
-  = mkFunCo2 r af af w arg_co res_co
+mkFunCo :: Role -> FunTyFlag -> CoercionN -> CoercionN -> Coercion -> Coercion -> Coercion
+mkFunCo r af m w arg_co res_co
+  = mkFunCo2 r af af m w arg_co res_co
 
-mkNakedFunCo :: Role -> FunTyFlag -> CoercionN -> Coercion -> Coercion -> Coercion
+mkNakedFunCo :: Role -> FunTyFlag -> CoercionN -> CoercionN -> Coercion -> Coercion -> Coercion
 -- This version of mkFunCo does not check FunCo invariants (checkFunCo)
 -- It's a historical vestige; See Note [No assertion check on mkFunCo]
 mkNakedFunCo = mkFunCo
 
 mkFunCo2 :: Role -> FunTyFlag -> FunTyFlag
-         -> CoercionN -> Coercion -> Coercion -> Coercion
+         -> CoercionN -> CoercionN -> Coercion -> Coercion -> Coercion
 -- This is the smart constructor for FunCo; it checks invariants
-mkFunCo2 r afl afr w arg_co res_co
+mkFunCo2 r afl afr m w arg_co res_co
   -- See Note [No assertion check on mkFunCo]
   | Just (ty1, _) <- isReflCo_maybe arg_co
   , Just (ty2, _) <- isReflCo_maybe res_co
+  , Just (m, _)   <- isReflCo_maybe m
   , Just (w, _)   <- isReflCo_maybe w
-  = mkReflCo r (mkFunTy afl w ty1 ty2)  -- See Note [Refl invariant]
+  = mkReflCo r (mkFunTy afl m w ty1 ty2)  -- See Note [Refl invariant]
 
   | otherwise
   = FunCo { fco_role = r, fco_afl = afl, fco_afr = afr
@@ -1220,8 +1224,8 @@ mkSelCo_maybe cs co
       -- If co :: (forall a1:t1 ~ t2. t1) ~ (forall a2:t3 ~ t4. t2)
       -- then (nth SelForAll co :: (t1 ~ t2) ~N (t3 ~ t4))
 
-    go (SelFun fs) (FunCo _ _ _ w arg res)
-      = Just (getNthFun fs w arg res)
+    go (SelFun fs) (FunCo _ _ _ m w arg res)
+      = Just (getNthFun fs m w arg res)
 
     go (SelTyCon i r) (TyConAppCo r0 tc arg_cos)
       = assertPpr (r == tyConRole r0 tc i)
@@ -1292,18 +1296,20 @@ mkSelCoResRole (SelFun fs)     r = funRole r fs
 
 -- | Extract the nth field of a FunCo
 getNthFun :: FunSel
+          -> a    -- ^ matchability
           -> a    -- ^ multiplicity
           -> a    -- ^ argument
           -> a    -- ^ result
           -> a    -- ^ One of the above three
-getNthFun SelMult mult _   _   = mult
-getNthFun SelArg _     arg _   = arg
-getNthFun SelRes _     _   res = res
+getNthFun SelMa   ma _    _   _   = ma
+getNthFun SelMult _  mult _   _   = mult
+getNthFun SelArg  _  _    arg _   = arg
+getNthFun SelRes  _  _    _   res = res
 
 selectFromType :: HasDebugCallStack => CoSel -> Type -> Type
 selectFromType (SelFun fs) ty
-  | Just (_af, mult, arg, res) <- splitFunTy_maybe ty
-  = getNthFun fs mult arg res
+  | Just (_af, ma, mult, arg, res) <- splitFunTy_maybe ty
+  = getNthFun fs ma mult arg res
 
 selectFromType (SelTyCon n _) ty
   | Just args <- tyConAppArgs_maybe ty
@@ -1767,9 +1773,10 @@ mkFunResCo :: Role -> Id -> Coercion -> Coercion
 --   mkFunResCo r m arg res_co :: (arg -> res1) ~r (arg -> res2)
 -- Reflexive in the multiplicity argument
 mkFunResCo role id res_co
-  = mkFunCoNoFTF role mult arg_co res_co
+  = mkFunCoNoFTF role ma mult arg_co res_co
   where
     arg_co = mkReflCo role (varType id)
+    ma     = undefined
     mult   = multToCo (idMult id)
 
 -- mkCoCast (c :: s1 ~?r t1) (g :: (s1 ~?r t1) ~#R (s2 ~?r t2)) :: s2 ~?r t2
@@ -2189,7 +2196,7 @@ ty_co_subst !lc role ty
                               liftCoSubstTyVar lc r tv
     go r (AppTy ty1 ty2)    = mkAppCo (go r ty1) (go Nominal ty2)
     go r (TyConApp tc tys)  = mkTyConAppCo r tc (zipWith go (tyConRoleListX r tc) tys)
-    go r (FunTy af w t1 t2) = mkFunCo r af (go Nominal w) (go r t1) (go r t2)
+    go r (FunTy af m w t1 t2) = mkFunCo r af (go Nominal m) (go Nominal w) (go r t1) (go r t2)
     go r t@(ForAllTy (Bndr v vis) ty)
        = let (lc', v', k_co) = liftCoSubstVarBndr lc v
              body_co = ty_co_subst lc' r ty
@@ -2453,8 +2460,8 @@ seqCo (AxiomCo _ cs)        = seqCos cs
 seqCo (ForAllCo tv visL visR k co)
   = seqType (varType tv) `seq` rnf visL `seq` rnf visR `seq`
     seqMCo k `seq` seqCo co
-seqCo (FunCo r af1 af2 w co1 co2)
-  = r `seq` af1 `seq` af2 `seq` seqCo w `seq` seqCo co1 `seq` seqCo co2
+seqCo (FunCo r af1 af2 m w co1 co2)
+  = r `seq` af1 `seq` af2 `seq` seqCo m `seq` seqCo w `seq` seqCo co1 `seq` seqCo co2
 seqCo (UnivCo { uco_prov = p, uco_role = r
               , uco_lty = t1, uco_rty = t2, uco_deps = deps })
   = p `seq` r `seq` seqType t1 `seq` seqType t2 `seq` seqCos deps
@@ -2738,10 +2745,10 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
                   ; _           -> False      }) $
         mkNomReflCo ty1
 
-    go (FunTy { ft_af = af1, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
-       (FunTy { ft_af = af2, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
+    go (FunTy { ft_af = af1, ft_ma = m1, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
+       (FunTy { ft_af = af2, ft_ma = m2, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
       = assert (af1 == af2) $
-        mkFunCo Nominal af1 (go w1 w2) (go arg1 arg2) (go res1 res2)
+        mkFunCo Nominal af1 (go m1 m2) (go w1 w2) (go arg1 arg2) (go res1 res2)
 
     go (TyConApp tc1 args1) (TyConApp tc2 args2)
       = assertPpr (tc1 == tc2) (vcat [ ppr tc1 <+> ppr tc2

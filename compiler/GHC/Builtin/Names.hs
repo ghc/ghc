@@ -1932,6 +1932,10 @@ staticPtrInfoTyConKey = mkPreludeTyConUnique 190
 callStackTyConKey :: Unique
 callStackTyConKey = mkPreludeTyConUnique 191
 
+-- Matchability
+matchabilityTyConKey :: Unique
+matchabilityTyConKey = mkPreludeTyConUnique 192
+
 -- Typeables
 someTypeRepTyConKey, someTypeRepDataConKey :: Unique
 someTypeRepTyConKey   = mkPreludeTyConUnique 193
@@ -2180,6 +2184,10 @@ integerINDataConKey       = mkPreludeDataConUnique 121
 integerIPDataConKey       = mkPreludeDataConUnique 122
 naturalNSDataConKey       = mkPreludeDataConUnique 123
 naturalNBDataConKey       = mkPreludeDataConUnique 124
+
+unmatchableDataConKey, matchableDataConKey :: Unique
+unmatchableDataConKey = mkPreludeDataConUnique 125
+matchableDataConKey = mkPreludeDataConUnique 126
 
 
 ---------------- Template Haskell -------------------

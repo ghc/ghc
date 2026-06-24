@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE TypeFamilies, PatternSynonyms #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -55,7 +55,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Core.Class   ( Class )
 import GHC.Core.Coercion( mkSymCo )
-import GHC.Core.Type (mkStrLitTy, mkCastTy)
+import GHC.Core.Type (mkStrLitTy, mkCastTy, pattern UnmatchableTy)
 import GHC.Core.TyCo.Ppr( pprTyVars )
 import GHC.Core.TyCo.Tidy( tidyOpenTypeX )
 
@@ -508,7 +508,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc closed bind_list
 recoveryCode :: [Name] -> TcSigFun -> TcM (LHsBinds GhcTc, [Scaled Id])
 recoveryCode binder_names sig_fn
   = do  { traceTc "tcBindsWithSigs: error recovery" (ppr binder_names)
-        ; let poly_ids = map (Scaled ManyTy) $ map mk_dummy binder_names
+        ; let poly_ids = map (Scaled UnmatchableTy ManyTy) $ map mk_dummy binder_names
         ; return ([], poly_ids) }
   where
     mk_dummy name
@@ -516,7 +516,7 @@ recoveryCode binder_names sig_fn
       , Just poly_id <- completeSigPolyId_maybe sig
       = poly_id
       | otherwise
-      = mkLocalId name ManyTy forall_a_a
+      = mkLocalId name UnmatchableTy ManyTy forall_a_a
 
 forall_a_a :: TcType
 -- At one point I had (forall r (a :: TYPE r). a), but of course
@@ -549,7 +549,7 @@ tcPolyNoGen rec_tc prag_fn tc_sig_fn bind_list
   where
     tc_mono_info (MBI { mbi_poly_name = name, mbi_mono_id = mono_id, mbi_mono_mult = mult })
       = do { _specs <- tcSpecPrags mono_id (lookupPragEnv prag_fn name)
-           ; return $ Scaled mult mono_id }
+           ; return $ Scaled UnmatchableTy mult mono_id }
            -- NB: tcPrags generates error messages for
            --     specialisation pragmas for non-overloaded sigs
            -- Indeed that is why we call it here!
@@ -585,7 +585,7 @@ tcPolyCheck prag_fn
        ; (wrap_gen, (wrap_res, matches'))
              <- tcSkolemiseCompleteSig sig $ \invis_pat_tys rho_ty ->
 
-                let mono_id = mkLocalId mono_name (idMult poly_id) rho_ty in
+                let mono_id = mkLocalId mono_name (idMa poly_id) (idMult poly_id) rho_ty in
                 tcExtendBinderStack [TcIdBndr mono_id NotTopLevel] $
                 -- Why mono_id in the BinderStack?
                 -- See Note [Relevant bindings and the binder stack]
@@ -600,7 +600,7 @@ tcPolyCheck prag_fn
        -- We re-use mono-name, but we could equally well use a fresh one
 
        ; let prag_sigs = lookupPragEnv prag_fn name
-             poly_id2  = mkLocalId mono_name (idMult poly_id) (idType poly_id)
+             poly_id2  = mkLocalId mono_name (idMa poly_id) (idMult poly_id) (idType poly_id)
        ; spec_prags <- tcSpecPrags    poly_id prag_sigs
        ; poly_id    <- addInlinePrags poly_id prag_sigs
 
@@ -624,7 +624,7 @@ tcPolyCheck prag_fn
                                  , abs_binds    = [L bind_loc bind']
                                  , abs_sig      = True }
 
-       ; return ([abs_bind], [Scaled mult poly_id]) }
+       ; return ([abs_bind], [Scaled UnmatchableTy mult poly_id]) }
 
 tcPolyCheck _prag_fn sig bind
   = pprPanic "tcPolyCheck" (ppr sig $$ ppr bind)
@@ -757,7 +757,7 @@ tcPolyInfer top_lvl rec_tc prag_fn tc_sig_fn bind_list
        ; emitConstraints residual
 
        ; loc <- getSrcSpanM
-       ; let scaled_poly_ids = [ Scaled p (abe_poly export) | Scaled p export <- scaled_exports]
+       ; let scaled_poly_ids = [ Scaled m p (abe_poly export) | Scaled m p export <- scaled_exports]
              poly_ids = map scaledThing scaled_poly_ids
              abs_bind = L (noAnnSrcSpan loc) $ XHsBindsLR $
                         AbsBinds { abs_tvs = qtvs
@@ -931,7 +931,7 @@ mkExport prag_fn residual insoluble qtvs theta
 
         ; localSigWarn poly_id mb_sig
 
-        ; return (Scaled mono_mult $
+        ; return (Scaled UnmatchableTy mono_mult $
                   ABE { abe_wrap = wrap
                         -- abe_wrap :: (forall qtvs. theta => mono_ty) ~ idType poly_id
                       , abe_poly  = poly_id
@@ -987,7 +987,7 @@ mkInferredPolyId residual insoluble qtvs inferred_theta poly_name mb_sig_inst mo
          -- (#14000) we may report an ambiguity error for a rather
          -- bogus type.
 
-       ; return (mkLocalId poly_name ManyTy inferred_poly_ty) }
+       ; return (mkLocalId poly_name UnmatchableTy ManyTy inferred_poly_ty) }
 
 
 chooseInferredQuantifiers :: WantedConstraints  -- residual constraints
@@ -1336,7 +1336,7 @@ tcMonoBinds is_rec sig_fn no_gen
                              tcGRHSsPat mult grhss exp_ty
 
        ; let exp_pat_ty :: Scaled ExpSigmaTypeFRR
-             exp_pat_ty = Scaled mult (mkCheckExpType pat_ty)
+             exp_pat_ty = Scaled UnmatchableTy mult (mkCheckExpType pat_ty)
        ; (_, (pat', mbis)) <- tcCollectingUsage $
                          tcLetPat (const Nothing) no_gen pat exp_pat_ty $ do
                            tcEmitBindingUsage bottomUE
@@ -1524,7 +1524,7 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mods = mods }
         ; ((pat', nosig_mbis), pat_ty)
             <- addErrCtxt (PatMonoBindsCtxt pat grhss) $
                runInferSigmaFRR FRRPatBind $ \ exp_ty ->
-               tcLetPat inst_sig_fun no_gen pat (Scaled mult exp_ty) $
+               tcLetPat inst_sig_fun no_gen pat (Scaled UnmatchableTy mult exp_ty) $
                  -- The above inferred type get an unrestricted multiplicity. It may be
                  -- worth it to try and find a finer-grained multiplicity here
                  -- if examples warrant it.

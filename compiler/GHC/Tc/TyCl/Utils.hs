@@ -98,7 +98,7 @@ synonymTyConsOfType ty
      go (LitTy _)         = emptyNameEnv
      go (TyVarTy _)       = emptyNameEnv
      go (AppTy a b)       = go a `plusNameEnv` go b
-     go (FunTy _ w a b)   = go w `plusNameEnv` go a `plusNameEnv` go b
+     go (FunTy _ m w a b) = go m `plusNameEnv` go w `plusNameEnv` go a `plusNameEnv` go b
      go (ForAllTy _ ty)   = go ty
      go (CastTy ty co)    = go ty `plusNameEnv` go_co co
      go (CoercionTy co)   = go_co co
@@ -596,7 +596,7 @@ irType = go
                                           lcls' = extendVarSet lcls tv
                                     ; markNominal lcls (tyVarKind tv)
                                     ; go lcls' ty }
-    go lcls (FunTy _ w arg res)  = markNominal lcls w >> go lcls arg >> go lcls res
+    go lcls (FunTy _ m w arg res) = markNominal lcls m >> markNominal lcls w >> go lcls arg >> go lcls res
     go _    (LitTy {})         = return ()
       -- See Note [Coercions in role inference]
     go lcls (CastTy ty _)      = go lcls ty
@@ -634,7 +634,8 @@ markNominal lcls ty = mapM_ (updateRole Nominal) $
                                   = get_ty_vars t'
     get_ty_vars (TyVarTy tv)      = unitVarSet tv
     get_ty_vars (AppTy t1 t2)     = get_ty_vars t1 `unionVarSet` get_ty_vars t2
-    get_ty_vars (FunTy _ w t1 t2) = get_ty_vars w `unionVarSet` get_ty_vars t1
+    get_ty_vars (FunTy _ m w t1 t2) 
+      = get_ty_vars m `unionVarSet` get_ty_vars w `unionVarSet` get_ty_vars t1
                                                   `unionVarSet` get_ty_vars t2
     get_ty_vars (TyConApp _ tys)  = mapUnionVarSet get_ty_vars tys
     get_ty_vars (ForAllTy (Bndr v _) ty) = get_ty_vars (varType v) `unionVarSet`

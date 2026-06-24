@@ -495,7 +495,7 @@ mkDictSelId name clas
     pred_ty = mkClassPred clas (mkTyVarTys (binderVars tyvars))
     res_ty  = scaledThing (getNth arg_tys val_index)
     sel_ty  = mkForAllTys tyvars $
-              mkFunctionType ManyTy pred_ty res_ty
+              mkFunctionType UnmatchableTy ManyTy pred_ty res_ty
              -- See Note [Type classes and linear types]
 
     terminating = isTerminatingType res_ty || definitelyUnliftedType res_ty
@@ -1200,8 +1200,8 @@ case of a newtype constructor, we simply hardcode its dcr_bangs field to
 newLocal :: FastString   -- ^ a string which will form part of the 'Var'\'s name
          -> Scaled Type  -- ^ the type of the 'Var'
          -> UniqSM Var
-newLocal name_stem (Scaled w ty) =
-    mkSysLocalOrCoVarM name_stem w ty
+newLocal name_stem (Scaled m w ty) =
+    mkSysLocalOrCoVarM name_stem m w ty
          -- We should not have "OrCoVar" here, this is a bug (#17545)
 
 
@@ -1271,9 +1271,9 @@ dataConArgRep _ arg_ty (HsStrict _)
 dataConArgRep platform arg_ty (HsUnpack Nothing)
   = dataConArgUnpack platform arg_ty
 
-dataConArgRep platform (Scaled w _) (HsUnpack (Just co))
+dataConArgRep platform (Scaled m w _) (HsUnpack (Just co))
   | let co_rep_ty = coercionRKind co
-  , (rep_tys, wrappers) <- dataConArgUnpack platform (Scaled w co_rep_ty)
+  , (rep_tys, wrappers) <- dataConArgUnpack platform (Scaled m w co_rep_ty)
   = (rep_tys, wrapCo co co_rep_ty wrappers)
 
 
@@ -1282,7 +1282,7 @@ wrapCo :: Coercion -> Type -> (Unboxer, Boxer) -> (Unboxer, Boxer)
 wrapCo co rep_ty (unbox_rep, box_rep)  -- co :: arg_ty ~ rep_ty
   = (unboxer, boxer)
   where
-    unboxer arg_id = do { rep_id <- newLocal (fsLit "cowrap_unbx") (Scaled (idMult arg_id) rep_ty)
+    unboxer arg_id = do { rep_id <- newLocal (fsLit "cowrap_unbx") (Scaled (idMa arg_id) (idMult arg_id) rep_ty)
                         ; (rep_ids, rep_fn) <- unbox_rep rep_id
                         ; let co_bind = NonRec rep_id (Var arg_id `Cast` co)
                         ; return (rep_ids, Let co_bind . rep_fn) }
@@ -1402,7 +1402,7 @@ dataConArgUnpack
    -> Scaled Type
    ->  ( [(Scaled Type, StrictnessMark)]   -- Rep types
        , (Unboxer, Boxer) )
-dataConArgUnpack platform scaledTy@(Scaled _ arg_ty)
+dataConArgUnpack platform scaledTy@(Scaled _ _ arg_ty)
   | Just (tc, tc_args) <- splitTyConApp_maybe arg_ty
   = assert (not (isNewTyCon tc)) $
     case tyConDataCons tc of
@@ -1436,7 +1436,7 @@ dataConArgUnpackEnum
   -> [DataCon]
   -> ( [(Scaled Type, StrictnessMark)]   -- Rep types
       , (Unboxer, Boxer) )
-dataConArgUnpackEnum platform (Scaled arg_mult ty) _tc_args cons =
+dataConArgUnpackEnum platform (Scaled arg_ma arg_mult ty) _tc_args cons =
   ( [ (scaled_enum_ty, MarkedStrict) ] -- See Note [UNPACK for enum types]
   , ( unboxer, boxer ) )
   where
@@ -1449,7 +1449,7 @@ dataConArgUnpackEnum platform (Scaled arg_mult ty) _tc_args cons =
        | enum_sum_arity < 256   = (word8PrimTy, conv WordToWord8Op, conv Word8ToWordOp)
        | enum_sum_arity < 65536 = (word16PrimTy, conv WordToWord16Op, conv Word16ToWordOp)
        | otherwise              = (wordPrimTy, id, id)
-    scaled_enum_ty = Scaled arg_mult enum_ty
+    scaled_enum_ty = Scaled arg_ma arg_mult enum_ty
 
     datatotag_op
        | isSmallFamily platform enum_sum_arity = DataToTagSmallOp
@@ -1490,7 +1490,7 @@ dataConArgUnpackProduct
   -> DataCon
   -> ( [(Scaled Type, StrictnessMark)]   -- Rep types
      , (Unboxer, Boxer) )
-dataConArgUnpackProduct (Scaled arg_mult _) tc_args con =
+dataConArgUnpackProduct (Scaled _ arg_mult _) tc_args con =
   assert (null (dataConExTyCoVars con)) $
     -- Note [Unpacking GADTs and existentials]
   let rep_tys = map (scaleScaled arg_mult) $ dataConInstArgTys con tc_args
@@ -1515,7 +1515,7 @@ dataConArgUnpackSum
   -> [DataCon]
   -> ( [(Scaled Type, StrictnessMark)]   -- Rep types
      , (Unboxer, Boxer) )
-dataConArgUnpackSum (Scaled arg_mult arg_ty) tc_args cons =
+dataConArgUnpackSum (Scaled arg_ma arg_mult arg_ty) tc_args cons =
   ( [ (sum_ty, MarkedStrict) ] -- The idea: Unpacked variant will
                                -- be one field only, and the type of the
                                -- field will be an unboxed sum.
@@ -1525,8 +1525,8 @@ dataConArgUnpackSum (Scaled arg_mult arg_ty) tc_args cons =
     src_tys = map (\con -> map scaledThing $ dataConInstArgTys con tc_args) cons
     sum_alt_tys = map mkUbxSumAltTy src_tys
     sum_ty_unscaled = mkSumTy sum_alt_tys
-    sum_ty = Scaled arg_mult sum_ty_unscaled
-    newLocal' fs = newLocal fs . Scaled arg_mult
+    sum_ty = Scaled arg_ma arg_mult sum_ty_unscaled
+    newLocal' fs = newLocal fs . Scaled arg_ma arg_mult
 
     -- See Note [UNPACK for sum types]
     unboxer :: Unboxer
@@ -1620,7 +1620,7 @@ shouldUnpackArgTy platform bang_opts prag fam_envs arg_ty
              -- We'd get a black hole if we used dataConImplBangs
 
          ok_arg :: NameSet -> (Scaled Type, HsSrcBang) -> Bool
-         ok_arg dcs (Scaled _ ty, HsSrcBang _ unpack_prag str_prag)
+         ok_arg dcs (Scaled _ _ ty, HsSrcBang _ unpack_prag str_prag)
            | strict_field str_prag
            , Just data_cons <- unpackable_type_datacons (topNormaliseType fam_envs ty)
            , should_unpack_conservative unpack_prag data_cons  -- Wrinkle (W3)
@@ -1943,11 +1943,11 @@ wrapFamInstBody tycon args mb_fun_arg body
     mkFun =
       case mb_fun_arg of
         Nothing -> id
-        Just (Scaled m ty) ->
+        Just (Scaled ma m ty) ->
           let af = case typeTypeOrConstraint ty of
                      TypeLike -> FTF_T_T
                      ConstraintLike -> FTF_C_T
-          in mkFunCo Representational af (mkNomReflCo m) (mkRepReflCo ty)
+          in mkFunCo Representational af (mkNomReflCo ma) (mkNomReflCo m) (mkRepReflCo ty)
 
 {-
 ************************************************************************
@@ -2144,7 +2144,7 @@ noinlineConstraintId = pcMiscPrelId noinlineConstraintIdName ty info
   where
     info = noCafIdInfo
     ty   = mkSpecForAllTys [alphaConstraintTyVar] $
-           mkFunTy visArgConstraintLike ManyTy alphaTy alphaConstraintTy
+           mkFunTy visArgConstraintLike UnmatchableTy ManyTy alphaTy alphaConstraintTy
 
 ------------------------------------------------
 nospecId :: Id -- See Note [nospecId magic]
@@ -2207,7 +2207,7 @@ leftSectionId = pcRepPolyId leftSectionName ty concs info
     ty  = mkInfForAllTys  [runtimeRep1TyVar,runtimeRep2TyVar, multiplicityTyVar1] $
           mkSpecForAllTys [openAlphaTyVar,  openBetaTyVar]    $
           exprType body
-    [f,x] = mkTemplateLocals [mkVisFunTy mult openAlphaTy openBetaTy, openAlphaTy]
+    [f,x] = mkTemplateLocals [mkVisFunTy UnmatchableTy mult openAlphaTy openBetaTy, openAlphaTy]
 
     mult = mkTyVarTy multiplicityTyVar1 :: Mult
     xmult = setIdMult x mult
@@ -2222,8 +2222,8 @@ leftSectionId = pcRepPolyId leftSectionName ty concs info
 
 -- See Note [Left and right sections] in GHC.Rename.Expr
 -- See Note [Wired-in Ids for rebindable syntax]
---   rightSection :: forall r1 r2 r3 n1 n2 (a::TYPE r1) (b::TYPE r2) (c::TYPE r3).
---                   (a %n1 -> b %n2-> c) -> b %n2-> a %n1-> c
+--   rightSection :: forall r1 r2 r3 m1 m2 n1 n2 (a::TYPE r1) (b::TYPE r2) (c::TYPE r3).
+--                   (a %m1 %n1 -> b %m2 %n2 -> c) -> b %m2 %n2 -> a %m1 %n1 -> c
 --   rightSection f y x = f x y
 -- Again, multiplicity polymorphism is important
 rightSectionId :: Id
@@ -2236,11 +2236,13 @@ rightSectionId = pcRepPolyId rightSectionName ty concs info
                           , multiplicityTyVar1, multiplicityTyVar2 ] $
           mkSpecForAllTys [openAlphaTyVar,  openBetaTyVar,   openGammaTyVar ]  $
           exprType body
+    ma1   = mkTyVarTy matchabilityTyVar1
+    ma2   = mkTyVarTy matchabilityTyVar2
     mult1 = mkTyVarTy multiplicityTyVar1
     mult2 = mkTyVarTy multiplicityTyVar2
 
-    [f,x,y] = mkTemplateLocals [ mkScaledFunTys [ Scaled mult1 openAlphaTy
-                                                , Scaled mult2 openBetaTy ] openGammaTy
+    [f,x,y] = mkTemplateLocals [ mkScaledFunTys [ Scaled ma1 mult1 openAlphaTy
+                                                , Scaled ma2 mult2 openBetaTy ] openGammaTy
                                , openAlphaTy, openBetaTy ]
     xmult = setIdMult x mult1
     ymult = setIdMult y mult2
@@ -2627,7 +2629,7 @@ unboxedUnitExpr :: CoreExpr
 unboxedUnitExpr = Var (dataConWorkId unboxedUnitDataCon)
 
 voidArgId :: Id       -- Local lambda-bound :: Void#
-voidArgId = mkSysLocal (fsLit "void") voidArgIdKey ManyTy unboxedUnitTy
+voidArgId = mkSysLocal (fsLit "void") voidArgIdKey UnmatchableTy ManyTy unboxedUnitTy
 
 coercionTokenId :: Id         -- :: () ~# ()
 coercionTokenId -- See Note [Coercion tokens] in "GHC.CoreToStg"

@@ -406,9 +406,10 @@ inline_generic_eq_type_x syn_flag mult_flag mb_env
     -- kind variable, which causes things to blow up.
     -- See Note [Equality on FunTys] in GHC.Core.TyCo.Rep: we must check
     -- kinds here
-      (FunTy _ w1 arg1 res1, FunTy _ w2 arg2 res2)
+      (FunTy _ m1 w1 arg1 res1, FunTy _ m2 w2 arg2 res2)
         ->   fullEq go arg1 arg2
           && fullEq go res1 res2
+          && go m1 m2
           && (case mult_flag of
                   RespectMultiplicities -> go w1 w2
                   IgnoreMultiplicities  -> True)
@@ -722,11 +723,11 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
       | Just (s1, t1) <- splitAppTyNoView_maybe ty1
       = go env s1 s2 `thenCmpTy` go env t1 t2
 
-    go env (FunTy _ w1 s1 t1) (FunTy _ w2 s2 t2)
+    go env (FunTy _ m1 w1 s1 t1) (FunTy _ m2 w2 s2 t2)
         -- NB: nonDepCmpTypeX does the kind check requested by
         -- Note [Equality on FunTys] in GHC.Core.TyCo.Rep
       = liftOrdering (nonDetCmpTypeX env s1 s2 S.<> nonDetCmpTypeX env t1 t2)
-          `thenCmpTy` go env w1 w2
+          `thenCmpTy` go env m1 m2 `thenCmpTy` go env w1 w2
         -- Comparing multiplicities last because the test is usually true
 
     go env (TyConApp tc1 tys1) (TyConApp tc2 tys2)
@@ -790,6 +791,7 @@ data InvisibleBit
   = InvisibleKind
   | InvisibleRuntimeRep
   | InvisibleMultiplicity
+  | InvisibleMatchability
   deriving stock (Eq, Ord, Show)
 instance Outputable InvisibleBit where
   ppr thing = text (show thing)
@@ -912,8 +914,9 @@ mayLookIdentical orig_ty1 orig_ty2
     go _ _ (ForAllTy b@(Bndr tv _) _) _ | isDefaultableBndr b = discard_defaultable_tyvar tv
     go _ _ _ (ForAllTy b@(Bndr tv _) _) | isDefaultableBndr b = discard_defaultable_tyvar tv
 
-    go env _top (FunTy _ w1 arg1 res1) (FunTy _ w2 arg2 res2)
-      = do { _mult_ok <- tell_on_mismatch InvisibleMultiplicity $ go env False w1 w2
+    go env _top (FunTy _ m1 w1 arg1 res1) (FunTy _ m2 w2 arg2 res2)
+      = do { _ma_ok   <- tell_on_mismatch InvisibleMatchability $ go env False m1 m2 
+           ; _mult_ok <- tell_on_mismatch InvisibleMultiplicity $ go env False w1 w2
            ; _reps_ok <- tell_on_mismatch InvisibleRuntimeRep $
                (&&) <$> go env False (typeKind arg1) (typeKind arg2)
                     <*> go env False (typeKind res1) (typeKind res2)

@@ -19,6 +19,7 @@ data Scaled a
 scaledThing :: Scaled a -> a
 
 type Mult = Type
+type Matchability = Type
 
 type PredType = Type
 type RuntimeRepType = Type

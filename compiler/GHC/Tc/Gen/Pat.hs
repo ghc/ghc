@@ -229,8 +229,8 @@ tcCheckPat_O :: HsMatchContextRn
              -> LPat GhcRn -> Scaled TcSigmaTypeFRR
              -> TcM a                 -- Checker for body
              -> TcM (LPat GhcTc, a)
-tcCheckPat_O ctxt orig pat (Scaled pat_mult pat_ty) thing_inside
-  = tc_lpat (Scaled pat_mult (mkCheckExpType pat_ty)) penv pat thing_inside
+tcCheckPat_O ctxt orig pat (Scaled pat_ma pat_mult pat_ty) thing_inside
+  = tc_lpat (Scaled pat_ma pat_mult (mkCheckExpType pat_ty)) penv pat thing_inside
   where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = orig }
 
@@ -348,7 +348,7 @@ tcPatBndr _ bndr_name pat_ty
   = do { let pat_mult = scaledMult pat_ty
        ; pat_ty <- expTypeToType (scaledThing pat_ty)
        ; traceTc "tcPatBndr(not let)" (ppr bndr_name $$ ppr pat_ty)
-       ; return (idHsWrapper, mkLocalIdOrCoVar bndr_name pat_mult pat_ty) }
+       ; return (idHsWrapper, mkLocalIdOrCoVar bndr_name UnmatchableTy pat_mult pat_ty) }
                -- We should not have "OrCoVar" here, this is a bug (#17545)
                -- Whether or not there is a sig is irrelevant,
                -- as this is local
@@ -366,9 +366,9 @@ newLetBndr :: LetBndrSpec -> Name -> Mult -> TcType -> TcM TcId
 --    and we use the original name directly
 newLetBndr LetLclBndr name w ty
   = do { mono_name <- cloneLocalName name
-       ; return (mkLocalId mono_name w ty) }
+       ; return (mkLocalId mono_name UnmatchableTy w ty) }
 newLetBndr (LetGblBndr prags) name w ty
-  = addInlinePrags (mkLocalId name w ty) (lookupPragEnv prags name)
+  = addInlinePrags (mkLocalId name UnmatchableTy w ty) (lookupPragEnv prags name)
 
 -- | A version of 'tcSubTypePat' specialised to 'GenSigCtxt'.
 --
@@ -612,12 +612,13 @@ tc_pat  :: Scaled ExpSigmaTypeFRR
         -> Checker (Pat GhcRn) (Pat GhcTc)
         -- ^ Translated pattern
 
-tc_pat scaled_exp_pat_ty@(Scaled w_pat exp_pat_ty) penv ps_pat thing_inside =
+tc_pat scaled_exp_pat_ty@(Scaled m_pat w_pat exp_pat_ty) penv ps_pat thing_inside =
 
   case ps_pat of
 
     VarPat x (L l name) -> do
       { (wrap, id) <- tcPatBndr penv name scaled_exp_pat_ty
+      ; -- TODO: check m_pat?
       ; res <- tcCheckUsage name w_pat $
                tcExtendIdEnv1 name id thing_inside
       ; pat_ty <- readExpType exp_pat_ty
@@ -669,7 +670,7 @@ tc_pat scaled_exp_pat_ty@(Scaled w_pat exp_pat_ty) penv ps_pat thing_inside =
       { checkManyPattern OtherPatternReason (noLocA ps_pat) scaled_exp_pat_ty
       ; (wrap, bndr_id) <- setSrcSpanA nm_loc (tcPatBndr penv name scaled_exp_pat_ty)
       ; (pat', res) <- tcExtendIdEnv1 name bndr_id $
-                       tc_lpat (Scaled w_pat (mkCheckExpType $ idType bndr_id))
+                       tc_lpat (Scaled m_pat w_pat (mkCheckExpType $ idType bndr_id))
                                penv pat thing_inside
           -- NB: if we do inference on:
           --          \ (y@(x::forall a. a->a)) = e
@@ -702,7 +703,7 @@ tc_pat scaled_exp_pat_ty@(Scaled w_pat exp_pat_ty) penv ps_pat thing_inside =
         -- 'view_expr' must be a function; expose its argument/result types
         -- using 'matchActualFunTy'.
       ; let herald = ExpectedFunTyViewPat $ unLoc view_expr
-      ; (view_expr_co1, Scaled _mult view_arg_ty, view_res_ty)
+      ; (view_expr_co1, Scaled _ma _mult view_arg_ty, view_res_ty)
           <- matchActualFunTy herald (Just . HsExprRnThing $ unLoc view_expr)
                (1, view_expr_rho) view_expr_rho
              -- See Note [View patterns and polymorphism]
@@ -714,12 +715,12 @@ tc_pat scaled_exp_pat_ty@(Scaled w_pat exp_pat_ty) penv ps_pat thing_inside =
           -- view_expr_wrap2 :: pat_ty ~~> view_arg_ty
 
         -- The inner pattern must have type 'view_res_ty'.
-      ; (inner_pat', res) <- tc_lpat (Scaled w_pat (mkCheckExpType view_res_ty)) penv inner_pat thing_inside
+      ; (inner_pat', res) <- tc_lpat (Scaled UnmatchableTy w_pat (mkCheckExpType view_res_ty)) penv inner_pat thing_inside
 
       ; pat_ty <- readExpType exp_pat_ty
       ; let view_expr_wrap2' =
               mkWpFun view_expr_wrap2 idHsWrapper
-                (EqMultCo $ mkNomReflCo w_pat, pat_ty) view_res_ty
+                (mkNomReflCo UnmatchableTy, EqMultCo $ mkNomReflCo w_pat, pat_ty) view_res_ty
             -- view_expr_wrap2' ::  (view_arg_ty -> view_res_ty)
             --                  ~~> (pat_ty -> view_res_ty)
             -- This satisfies WpFun-FRR-INVARIANT:
@@ -771,7 +772,7 @@ Another example is #26331.
               -- from an outer scope to mention one of these tyvars in its kind.
       ; (pat', res) <- tcExtendNameTyVarEnv wcs      $
                        tcExtendNameTyVarEnv tv_binds $
-                       tc_lpat (Scaled w_pat $ mkCheckExpType inner_ty) penv pat thing_inside
+                       tc_lpat (Scaled UnmatchableTy w_pat $ mkCheckExpType inner_ty) penv pat thing_inside
       ; pat_ty <- readExpType exp_pat_ty
       ; return (mkHsWrapPat wrap (SigPat inner_ty pat' sig_ty) pat_ty, res) }
 
@@ -782,7 +783,7 @@ Another example is #26331.
   -- See Note [Desugaring overloaded list patterns].
     ListPat _ pats -> do
       { (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy penv exp_pat_ty
-      ; (pats', res) <- tcMultiple (tc_lpat (Scaled w_pat $ mkCheckExpType elt_ty))
+      ; (pats', res) <- tcMultiple (tc_lpat (Scaled UnmatchableTy w_pat $ mkCheckExpType elt_ty))
                                    penv pats thing_inside
       ; pat_ty <- readExpType exp_pat_ty
       ; return (mkHsWrapPat coi
@@ -799,7 +800,7 @@ Another example is #26331.
                    -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
       ; let con_arg_tys = case boxity of Unboxed -> drop arity arg_tys
                                          Boxed   -> arg_tys
-      ; (pats', res) <- tc_lpats (map (Scaled w_pat . mkCheckExpType) con_arg_tys)
+      ; (pats', res) <- tc_lpats (map (Scaled UnmatchableTy w_pat . mkCheckExpType) con_arg_tys)
                                  penv pats thing_inside
 
       ; dflags <- getDynFlags
@@ -826,7 +827,7 @@ Another example is #26331.
       ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc) penv exp_pat_ty
       ; -- Drop levity vars, we don't care about them here
         let con_arg_tys = drop arity arg_tys
-      ; (pat', res) <- tc_lpat (Scaled w_pat $ mkCheckExpType (con_arg_tys `getNth` (alt - 1)))
+      ; (pat', res) <- tc_lpat (Scaled UnmatchableTy w_pat $ mkCheckExpType (con_arg_tys `getNth` (alt - 1)))
                                penv pat thing_inside
       ; pat_ty <- readExpType exp_pat_ty
       ; return (mkHsWrapPat coi (SumPat con_arg_tys pat' alt arity) pat_ty
@@ -1327,7 +1328,7 @@ tcPatSynPat (L con_span con_name) pat_syn pat_ty penv arg_pats thing_inside
           -- 'tcDataConPat'.)
         ; let
             bad_arg_tys :: [(Int, Scaled Type)]
-            bad_arg_tys = filter (\ (_, Scaled _ arg_ty) -> not (typeHasFixedRuntimeRep arg_ty))
+            bad_arg_tys = filter (\ (_, Scaled _ _ arg_ty) -> not (typeHasFixedRuntimeRep arg_ty))
                         $ zip [0..] arg_tys'
         ; massertPpr (null bad_arg_tys) $
             vcat [ text "tcPatSynPat: pattern arguments do not have a fixed RuntimeRep"
@@ -1794,8 +1795,8 @@ tcConTyArg tenv penv (rn_ty, con_tv) thing_inside
        ; return ((), result) }
 
 tcConArg :: Checker (LPat GhcRn, Scaled TcSigmaType) (LPat GhcTc)
-tcConArg penv (arg_pat, Scaled arg_mult arg_ty)
-  = tc_lpat (Scaled arg_mult (mkCheckExpType arg_ty)) penv arg_pat
+tcConArg penv (arg_pat, Scaled arg_ma arg_mult arg_ty)
+  = tc_lpat (Scaled arg_ma arg_mult (mkCheckExpType arg_ty)) penv arg_pat
 
 addDataConStupidTheta :: DataCon -> [TcType] -> TcM ()
 -- Instantiate the "stupid theta" of the data con, and throw

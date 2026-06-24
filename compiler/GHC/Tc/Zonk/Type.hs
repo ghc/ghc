@@ -526,8 +526,8 @@ zonkTcTypeToType :: TcType -> TcM Type
 zonkTcTypeToType ty = initZonkEnv DefaultFlexi $ zonkTcTypeToTypeX ty
 
 zonkScaledTcTypeToTypeX :: Scaled TcType -> ZonkTcM (Scaled TcType)
-zonkScaledTcTypeToTypeX (Scaled m ty) = Scaled <$> zonkTcTypeToTypeX m
-                                               <*> zonkTcTypeToTypeX ty
+zonkScaledTcTypeToTypeX (Scaled ma m ty) 
+  = Scaled <$> zonkTcTypeToTypeX ma <*> zonkTcTypeToTypeX m <*> zonkTcTypeToTypeX ty
 
 zonkTcTypeToTypeX   :: TcType   -> ZonkTcM Type
 zonkTcTypesToTypesX :: [TcType] -> ZonkTcM [Type]
@@ -588,8 +588,8 @@ zonkIdBndrX v
 
 zonkIdBndr :: TcId -> ZonkTcM Id
 zonkIdBndr v
-  = do { Scaled w' ty' <- zonkScaledTcTypeToTypeX (idScaledType v)
-       ; return $ setIdMult (setIdType v ty') w' }
+  = do { Scaled m' w' ty' <- zonkScaledTcTypeToTypeX (idScaledType v)
+       ; return $ setIdMa (setIdMult (setIdType v ty') w') m' }
 
 zonkIdBndrs :: [TcId] -> ZonkTcM [Id]
 zonkIdBndrs ids = mapM zonkIdBndr ids
@@ -1232,8 +1232,9 @@ zonkCoFn (WpSubType w)     = do { w' <- zonkCoFn w
 zonkCoFn (WpCompose c1 c2) = do { c1' <- zonkCoFn c1
                                 ; c2' <- zonkCoFn c2
                                 ; return (WpCompose c1' c2') }
-zonkCoFn (WpFun w arg res t1 t2) =
-  do { w' <- noBinders $
+zonkCoFn (WpFun m w arg res t1 t2) =
+  do { m' <- noBinders $ zonkCoToCo m
+     ; w' <- noBinders $
                case w of
                  EqMultCo co -> EqMultCo <$> zonkCoToCo co
                  OneSubMult w -> OneSubMult <$> zonkTcTypeToTypeX w
@@ -1241,7 +1242,7 @@ zonkCoFn (WpFun w arg res t1 t2) =
      ; res' <- zonkCoFn res
      ; t1' <- noBinders $ zonkTcTypeToTypeX t1
      ; t2' <- noBinders $ zonkTcTypeToTypeX t2
-     ; return (WpFun w' arg' res' t1' t2') }
+     ; return (WpFun m' w' arg' res' t1' t2') }
 zonkCoFn (WpCast co)   = WpCast  <$> noBinders (zonkCoToCo co)
 zonkCoFn (WpEvLam ev)  = WpEvLam <$> zonkEvBndrX ev
 zonkCoFn (WpEvApp arg) = WpEvApp <$> noBinders (zonkEvTerm arg)
@@ -1894,11 +1895,12 @@ zonkEvTypeable (EvTypeableTyApp t1 t2)
   = do { t1' <- zonkEvTerm t1
        ; t2' <- zonkEvTerm t2
        ; return (EvTypeableTyApp t1' t2') }
-zonkEvTypeable (EvTypeableTrFun tm t1 t2)
-  = do { tm' <- zonkEvTerm tm
+zonkEvTypeable (EvTypeableTrFun tma tm t1 t2)
+  = do { tma' <- zonkEvTerm tma
+       ; tm' <- zonkEvTerm tm
        ; t1' <- zonkEvTerm t1
        ; t2' <- zonkEvTerm t2
-       ; return (EvTypeableTrFun tm' t1' t2') }
+       ; return (EvTypeableTrFun tma' tm' t1' t2') }
 zonkEvTypeable (EvTypeableTyLit t1)
   = do { t1' <- zonkEvTerm t1
        ; return (EvTypeableTyLit t1') }

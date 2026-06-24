@@ -120,7 +120,7 @@ countFunRepArgs :: Arity -> Type -> RepArity
 countFunRepArgs 0 _
   = 0
 countFunRepArgs n ty
-  | FunTy _ _ arg res <- unwrapType ty
+  | FunTy _ _ _ arg res <- unwrapType ty
   = (length (typePrimRep arg) `max` 1)
     + countFunRepArgs (n - 1) res
     -- If typePrimRep returns [] that means a void arg,
@@ -135,7 +135,7 @@ countConRepArgs dc = go (dataConRepArity dc) (dataConRepType dc)
     go 0 _
       = 0
     go n ty
-      | FunTy _ _ arg res <- unwrapType ty
+      | FunTy _ _ _ arg res <- unwrapType ty
       = length (typePrimRep arg) + go (n - 1) res
       | otherwise
       = pprPanic "countConRepArgs: arity greater than type can handle" (ppr (n, ty, typePrimRep ty))

@@ -275,7 +275,8 @@ data HsWrapper
   --
   -- Use 'mkWpFun' to construct such a wrapper.
   | WpFun
-     { mult_co  :: SubMultCo
+     { ma_co    :: TcCoercionN
+     , mult_co  :: SubMultCo
      , arg_wrap :: HsWrapper
      , res_wrap :: HsWrapper
      , arg_type :: TcTypeFRR
@@ -367,25 +368,29 @@ subMultCoRKind (OneSubMult w) = w
 -- | Like 'mkFunCo2' except that it allows for sub-multiplicity instead of
 -- a multiplicity coercion.
 mkSubMultFunCo :: FunTyFlag -> FunTyFlag
+               -> TcCoercionN -- ^ act_ma   ~~> exp_ma
                -> SubMultCo   -- ^ act_mult ~~> exp_mult
                -> TcCoercionR -- ^ act_arg  ~~> exp_arg
                -> TcCoercionR -- ^ act_res  ~~> exp_res
                -> TcCoercionR
-mkSubMultFunCo act_af exp_af (EqMultCo w_co) arg_co res_co =
+mkSubMultFunCo act_af exp_af m_co (EqMultCo w_co) arg_co res_co =
   mkFunCo2 Representational act_af exp_af
+    m_co
     w_co
     arg_co
     res_co
-mkSubMultFunCo act_af exp_af (OneSubMult w2) arg_co res_co =
+mkSubMultFunCo act_af exp_af m_co (OneSubMult w2) arg_co res_co =
   mkUnivCo SubMultProv [] Representational
-    (mkFunTy act_af OneTy act_arg act_res)
-    (mkFunTy exp_af w2    act_arg act_res)
+    (mkFunTy act_af m OneTy act_arg act_res)
+    (mkFunTy exp_af m w2    act_arg act_res)
     `mkTransCo`
   mkFunCo2 Representational act_af exp_af
+    m_co
     (mkNomReflCo w2)
     arg_co
     res_co
   where
+    m = coercionLKind m_co
     act_arg = coercionLKind arg_co
     act_res = coercionLKind res_co
 
@@ -395,13 +400,13 @@ mkSubMultFunCo act_af exp_af (OneSubMult w2) arg_co res_co =
 --
 -- PRECONDITION: same as Note [WpFun-FRR-INVARIANT]
 mkWpFun :: HsWrapper -> HsWrapper
-        -> (SubMultCo, TcTypeFRR) -- ^ the "from" type of the first wrapper
+        -> (TcCoercionN, SubMultCo, TcTypeFRR) -- ^ the "from" type of the first wrapper
         -> TcType           -- ^ Either "from" type or "to" type of the second wrapper
                             --   (used only when the second wrapper is the identity)
         -> HsWrapper
 -- Unfortunately, we can't check PRECONDITION with an assertion here, because of
 -- [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
-mkWpFun w1 w2 (wp_mult, t1) t2
+mkWpFun w1 w2 (wp_ma, wp_mult, t1) t2
   = case (w1,w2) of
       (WpHole,     WpHole)
         -> mkWpCastR (mk_wp_fun_co (mkRepReflCo t1) (mkRepReflCo t2))
@@ -412,11 +417,11 @@ mkWpFun w1 w2 (wp_mult, t1) t2
       (WpCast co1, WpCast co2)
         -> WpCast    (mk_wp_fun_co (mkSymCo co1)    co2)
       (_,          _)
-        -> WpFun { mult_co = wp_mult
+        -> WpFun { ma_co = wp_ma, mult_co = wp_mult
                  , arg_wrap = w1, res_wrap = w2
                  , arg_type = t1, res_type = t2 }
   where
-    mk_wp_fun_co = mkSubMultFunCo FTF_T_T FTF_T_T wp_mult
+    mk_wp_fun_co = mkSubMultFunCo FTF_T_T FTF_T_T wp_ma wp_mult
       -- FTF_T_T: WpFun is always (->)
 
 mkWpSubType :: HsWrapper -> HsWrapper
@@ -435,7 +440,8 @@ mkWpEta orig_fun_ty xs wrap = go orig_fun_ty xs
     go _      []       = wrap
     go fun_ty (id:ids) =
       WpFun
-        { mult_co  = EqMultCo $ mkNomReflCo (idMult id)
+        { ma_co    = mkNomReflCo (idMa id)
+        , mult_co  = EqMultCo $ mkNomReflCo (idMult id)
         , arg_wrap = idHsWrapper
         , res_wrap = go res_ty ids
         , arg_type = idType id
@@ -565,8 +571,8 @@ optSubTypeHsWrapper wrap
     opt1 (WpLet binds)          ws = pushWpLet binds ws
     opt1 w@(WpTyApp {})         ws = w : ws
     opt1 w@(WpEvApp {})         ws = w : ws
-    opt1 (WpFun mult_co arg_wrap res_wrap arg_ty res_ty) ws
-      = opt_fun mult_co arg_wrap res_wrap arg_ty res_ty ws
+    opt1 (WpFun ma_co mult_co arg_wrap res_wrap arg_ty res_ty) ws
+      = opt_fun ma_co mult_co arg_wrap res_wrap arg_ty res_ty ws
 
     -----------------
     -- (WpTyLam a <.> WpTyApp a <.> w) = w
@@ -603,6 +609,7 @@ optSubTypeHsWrapper wrap
       = opt_co fun_co (opt_ev_lam ev ws)
       where
         fun_co = mkFunCo Representational FTF_C_T
+                        (mkNomReflCo UnmatchableTy)
                         (mkNomReflCo ManyTy)
                         (mkRepReflCo (idType ev))
                         co
@@ -617,8 +624,8 @@ optSubTypeHsWrapper wrap
                  | otherwise        = WpCast co : ws
 
     ------------------
-    opt_fun mult_co arg_wrap res_wrap ty1 ty2 ws
-      = case mkWpFun (opt arg_wrap) (opt res_wrap) (mult_co, ty1) ty2 of
+    opt_fun ma_co mult_co arg_wrap res_wrap ty1 ty2 ws
+      = case mkWpFun (opt arg_wrap) (opt res_wrap) (ma_co, mult_co, ty1) ty2 of
           WpHole    -> ws
           WpCast co -> opt_co co ws
           w         -> w : ws
@@ -630,7 +637,8 @@ optSubTypeHsWrapper wrap
     not_in _  WpHole                   = True
     not_in v (WpCast co)               = not (anyFreeVarsOfCo (== v) co)
     not_in v (WpTyApp ty)              = not (anyFreeVarsOfType (== v) ty)
-    not_in v (WpFun w_co w1 w2 _ _)    = not_in_submult v w_co && not_in v w1 && not_in v w2
+    not_in v (WpFun m_co w_co w1 w2 _ _)
+      = not (anyFreeVarsOfCo (== v) m_co) && not_in_submult v w_co && not_in v w1 && not_in v w2
     not_in v (WpSubType w)             = not_in v w
     not_in v (WpCompose w1 w2)         = not_in v w1 && not_in v w2
     not_in v (WpEvApp (EvExpr e))      = not (v `elemVarSet` exprFreeVars e)
@@ -998,8 +1006,8 @@ data EvTypeable
     -- ^ Dictionary for @Typeable (s t)@,
     -- given a dictionaries for @s@ and @t@.
 
-  | EvTypeableTrFun EvTerm EvTerm EvTerm
-    -- ^ Dictionary for @Typeable (s % w -> t)@,
+  | EvTypeableTrFun EvTerm EvTerm EvTerm EvTerm
+    -- ^ Dictionary for @Typeable (s %m %w -> t)@,
     -- given a dictionaries for @w@, @s@, and @t@.
 
   | EvTypeableTyLit EvTerm
@@ -1339,7 +1347,7 @@ evFVsOfTypeable ev =
   case ev of
     EvTypeableTyCon _ e      -> mapUnionFV evTermFVs e
     EvTypeableTyApp e1 e2    -> evTermFVss [e1,e2]
-    EvTypeableTrFun em e1 e2 -> evTermFVss [em,e1,e2]
+    EvTypeableTrFun em ew e1 e2 -> evTermFVss [em,ew,e1,e2]
     EvTypeableTyLit e        -> evTermFVs e
 
 {- Note [Free vars of EvFun]
@@ -1384,8 +1392,8 @@ pprHsWrapper wrap pp_thing_inside
     help it WpHole             = it
     help it (WpCompose w1 w2)  = help (help it w2) w1
     help it (WpSubType w)      = no_parens $ text "subtype" <> braces (help it w False)
-    help it (WpFun w arg_wrap res_wrap t1 _t2)
-      = add_parens $ text "\\(x" <> dcolon <> brackets (ppr $ subMultCoRKind w) <> ppr t1 <> text ")." <+>
+    help it (WpFun m w arg_wrap res_wrap t1 _t2)
+      = add_parens $ text "\\(x" <> dcolon <> brackets (ppr $ coercionLKind m) <> brackets (ppr $ subMultCoRKind w) <> ppr t1 <> text ")." <+>
                      help (\_ -> it True <+> help (\_ -> text "x") arg_wrap True) res_wrap False
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (text "|>"
                                               <+> pprParendCo co)]
@@ -1443,9 +1451,9 @@ instance Outputable EvTypeable where
   ppr (EvTypeableTyCon ts _)     = text "TyCon" <+> ppr ts
   ppr (EvTypeableTyApp t1 t2)    = parens (ppr t1 <+> ppr t2)
   ppr (EvTypeableTyLit t1)       = text "TyLit" <> ppr t1
-  ppr (EvTypeableTrFun tm t1 t2) = parens (ppr t1 <+> arr <+> ppr t2)
+  ppr (EvTypeableTrFun tm tw t1 t2) = parens (ppr t1 <+> arr <+> ppr t2)
     where
-      arr = pprArrowWithModifiers [ppr tm] visArgTypeLike Many
+      arr = pprArrowWithModifiers [ppr tm, ppr tw] visArgTypeLike Many
 
 ----------------------------------------------------------------------
 -- A datatype used to pass information when desugaring quotations

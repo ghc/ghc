@@ -467,7 +467,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
     do { (tup_args1, arg_tys) <- tcInferTupArgs boxity tup_args
 
        ; let expr'       = ExplicitTuple x tup_args1 boxity
-             missing_tys = [Scaled mult ty | (Missing (Scaled mult _), ty) <- zip tup_args1 arg_tys]
+             missing_tys = [Scaled ma mult ty | (Missing (Scaled ma mult _), ty) <- zip tup_args1 arg_tys]
 
              -- See Note [Typechecking data constructors] in GHC.Tc.Gen.Head
              -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
@@ -519,7 +519,8 @@ tcExpr (HsCase ctxt scrut matches) res_ty
            --
            -- But now, in the GADT world, we need to typecheck the scrutinee
            -- first, to get type info that may be refined in the case alternatives
-          mult <- newFlexiTyVarTy multiplicityTy
+        ; ma <- newFlexiTyVarTy matchabilityTy
+        ; mult <- newFlexiTyVarTy multiplicityTy
 
           -- Typecheck the scrutinee.  We use tcInferRho but tcInferSigma
           -- would also be possible (tcCaseMatches accepts sigma-types)
@@ -528,7 +529,7 @@ tcExpr (HsCase ctxt scrut matches) res_ty
           --     case (\v -> v) of {..}
           -- This design choice is discussed in #17790
         ; (scrut', scrut_ty) <- tcScalingUsage mult $ tcInferRhoFRR FRRCase scrut
-        ; matches' <- tcCaseMatches ctxt tcBody (Scaled mult scrut_ty) matches res_ty
+        ; matches' <- tcCaseMatches ctxt tcBody (Scaled ma mult scrut_ty) matches res_ty
         ; return (HsCase ctxt scrut' matches') }
 
 tcExpr (HsIf x pred b1 b2) res_ty
@@ -873,9 +874,10 @@ tcInferTupArgs boxity args
  where
   tc_infer_tup_arg :: Int -> HsTupArg GhcRn -> TcM (HsTupArg GhcTc, TcSigmaTypeFRR)
   tc_infer_tup_arg i (Missing {})
-    = do { mult <- newFlexiTyVarTy multiplicityTy
+    = do { ma <- newFlexiTyVarTy matchabilityTy
+         ; mult <- newFlexiTyVarTy multiplicityTy
          ; arg_ty <- new_arg_ty i
-         ; return (Missing (Scaled mult arg_ty), arg_ty) }
+         ; return (Missing (Scaled ma mult arg_ty), arg_ty) }
   tc_infer_tup_arg i (Present x lexpr@(L l expr))
     = do { (expr', arg_ty) <- case boxity of
              Unboxed -> runInferRhoFRR (FRRUnboxedTuple i) (tcPolyExpr expr)
@@ -993,7 +995,7 @@ tcSynArgE orig op sigma_ty syn_ty thing_inside
                           ; return (result, arg_tc_ty, res_tc_ty, arg_mult) }}
 
            ; let fun_wrap = mkWpFun (arg_wrapper2 <.> arg_wrapper1) res_wrapper
-                              (EqMultCo $ mkNomReflCo op_mult, arg_ty) res_ty
+                              (mkNomReflCo UnmatchableTy, EqMultCo $ mkNomReflCo op_mult, arg_ty) res_ty
                -- NB: arg_ty comes from matchExpectedFunTys, so it has a
                -- fixed RuntimeRep, as needed to call mkWpFun.
            ; return (result, match_wrapper <.> fun_wrap) }
@@ -1404,7 +1406,7 @@ expandRecordUpd record_expr@(L lspan _) possible_parents rbnds res_ty
        -- e.g. (x', e1), (y', e2), ...
        ; let mk_upd_id :: Name -> LHsFieldBind GhcTc fld (LHsExpr GhcRn) -> TcM (Name, (TcId, LHsExpr GhcRn))
              mk_upd_id fld_nm (L _ rbind)
-               = do { let Scaled _ arg_ty = lookupNameEnv_NF arg_ty_env fld_nm
+               = do { let Scaled _ _ arg_ty = lookupNameEnv_NF arg_ty_env fld_nm
                           nm_occ = rdrNameOcc . nameRdrName $ fld_nm
                           actual_arg_ty = substTy subst arg_ty
                           rhs = hfbRHS rbind
@@ -1415,7 +1417,7 @@ expandRecordUpd record_expr@(L lspan _) possible_parents rbnds res_ty
                       -- (As we will typecheck the let-bindings later, we can drop this coercion here.)
                       -- See RepPolyRecordUpdate test.
                     ; nm <- newNameAt nm_occ generatedSrcSpan
-                    ; let id = mkLocalId nm ManyTy actual_arg_ty
+                    ; let id = mkLocalId nm UnmatchableTy ManyTy actual_arg_ty
                       -- NB: create fresh names to avoid any accidental shadowing
                       -- occurring in the RHS expressions when creating the let bindings:
                       --
@@ -1707,14 +1709,14 @@ tcRecordField :: ConLike -> Assoc Name (Scaled Type)
               -> LFieldOcc GhcRn -> LHsExpr GhcRn
               -> TcM (Maybe (LFieldOcc GhcTc, LHsExpr GhcTc))
 tcRecordField con_like flds_w_tys (L loc (FieldOcc rdr (L l sel_name))) rhs
-  | Just (Scaled field_mult field_ty) <- assocMaybe flds_w_tys sel_name
+  | Just (Scaled field_ma field_mult field_ty) <- assocMaybe flds_w_tys sel_name
       = addErrCtxt (FieldCtxt field_lbl)$
         do { rhs' <- tcScalingUsage field_mult $ tcCheckPolyExprNC rhs field_ty
            ; hasFixedRuntimeRep_syntactic (FRRRecordCon rdr (unLoc rhs'))
                 field_ty
            ; let field_id = mkUserLocal (nameOccName sel_name)
                                         (nameUnique sel_name)
-                                        field_mult field_ty (locA loc)
+                                        field_ma field_mult field_ty (locA loc)
                 -- Yuk: the field_id has the *unique* of the selector Id
                 --          (so we can find it easily)
                 --      but is a LocalId with the appropriate type of the RHS

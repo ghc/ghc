@@ -235,8 +235,8 @@ tyConToIfaceDecl env tycon
                     ifConEqSpec  = map (to_eq_spec . eqSpecPair) eq_spec,
                     ifConCtxt    = tidyToIfaceContext con_env3 theta,
                     ifConArgTys  =
-                      map (\(Scaled w t) -> (tidyToIfaceType con_env3 w
-                                          , (tidyToIfaceType con_env3 t))) arg_tys,
+                      map (\(Scaled m w t) -> IfArgTy (tidyToIfaceType con_env3 m) (tidyToIfaceType con_env3 w)
+                                          (tidyToIfaceType con_env3 t)) arg_tys,
                     ifConFields  = dataConFieldLabels data_con,
                     ifConStricts = map (toIfaceBang con_env1)
                                        (dataConImplBangs data_con),

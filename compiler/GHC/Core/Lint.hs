@@ -938,14 +938,14 @@ lintCoreExpr e@(App _ _)
     -- N.B. we may have an over-saturated application of the form:
     --   runRW (\s -> \x -> ...) y
   , ty_arg1 : ty_arg2 : cont_arg : rest <- args
-  = do { let lint_rw_cont :: CoreArg -> Mult -> UsageEnv -> LintM (Type, UsageEnv)
-             lint_rw_cont expr@(Lam _ _) mult fun_ue
+  = do { let lint_rw_cont :: CoreArg -> Matchability -> Mult -> UsageEnv -> LintM (Type, UsageEnv)
+             lint_rw_cont expr@(Lam _ _) ma mult fun_ue
                 = do { (arg_ty, arg_ue) <- lintJoinLams 1 (Just fun) expr
                      ; let app_ue = addUE fun_ue (scaleUE mult arg_ue)
                      ; return (arg_ty, app_ue) }
 
-             lint_rw_cont expr mult ue
-                = lintValArg expr mult ue
+             lint_rw_cont expr ma mult ue
+                = lintValArg expr ma mult ue
              -- TODO: Look through ticks?
 
        ; runrw_pr <- lintApp (text "runRW# expression")
@@ -1444,8 +1444,8 @@ lintTyArg (Type arg_ty)
 lintTyArg arg
   = failWithL (hang (text "Expected type argument but found") 2 (ppr arg))
 
-lintValArg  :: CoreExpr -> Mult -> UsageEnv -> LintM (Type, UsageEnv)
-lintValArg arg mult fun_ue
+lintValArg  :: CoreExpr -> Matchability -> Mult -> UsageEnv -> LintM (Type, UsageEnv)
+lintValArg arg ma mult fun_ue
   = do { (arg_ty, arg_ue) <- markAllJoinsBad $ lintCoreExpr arg
            -- See Note [Representation polymorphism invariants] in GHC.Core
 
@@ -1530,7 +1530,7 @@ lintTyApp fun_ty arg_ty
 lintValApp :: CoreExpr -> Type -> Type -> UsageEnv -> UsageEnv
            -> LintM (Type, UsageEnv)
 lintValApp arg fun_ty arg_ty fun_ue arg_ue
-  | Just (_, w, arg_ty', res_ty') <- splitFunTy_maybe fun_ty
+  | Just (_, m, w, arg_ty', res_ty') <- splitFunTy_maybe fun_ty
   = do { ensureEqTys arg_ty' arg_ty (mkAppMsg arg_ty' arg_ty arg)
        ; let app_ue =  addUE fun_ue (scaleUE w arg_ue)
        ; return (res_ty', app_ue) }
@@ -1948,11 +1948,12 @@ lintType ty@(TyConApp tc tys)
 
 -- arrows can related *unlifted* kinds, so this has to be separate from
 -- a dependent forall.
-lintType ty@(FunTy af tw t1 t2)
+lintType ty@(FunTy af tm tw t1 t2)
   = do { lintType t1
        ; lintType t2
+       ; lintType tm
        ; lintType tw
-       ; lintArrow (text "type or kind" <+> quotes (ppr ty)) af t1 t2 tw }
+       ; lintArrow (text "type or kind" <+> quotes (ppr ty)) af t1 t2 tm tw }
 
 lintType ty@(ForAllTy {})
   = go [] ty
@@ -2038,16 +2039,18 @@ checkValueType kind doc
            text "when checking" <+> doc)
 
 -----------------
-lintArrow :: SDoc -> FunTyFlag -> Type -> Type -> Type -> LintM ()
+lintArrow :: SDoc -> FunTyFlag -> Type -> Type -> Type -> Type -> LintM ()
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintArrow what af t1 t2 tw  -- Eg lintArrow "type or kind `blah'" k1 k2 kw
-                            -- or lintArrow "coercion `blah'" k1 k2 kw
+lintArrow what af t1 t2 tm tw  -- Eg lintArrow "type or kind `blah'" k1 k2 km kw
+                               -- or lintArrow "coercion `blah'" k1 k2 km kw
   = do { let k1 = typeKind t1
              k2 = typeKind t2
+             km = typeKind tm
              kw = typeKind tw
        ; unless (isTYPEorCONSTRAINT k1) (report (text "argument")     t1 k1)
        ; unless (isTYPEorCONSTRAINT k2) (report (text "result")       t2 k2)
+       ; unless (isMatchabilityTy km)   (report (text "matchability") tm km)
        ; unless (isMultiplicityTy kw)   (report (text "multiplicity") tw kw)
 
        ; let real_af = chooseFunTyFlag t1 t2
@@ -2080,8 +2083,8 @@ lint_co_app co = lint_tyco_app (text "coercion" <+> quotes (ppr co))
 lint_tyco_app :: SDoc -> Kind -> [Type] -> LintM ()
 lint_tyco_app msg fun_kind arg_tys
     -- See Note [Avoiding compiler perf traps when constructing error messages.]
-  = do { _ <- lintApp msg (\ty     -> do { lintType ty; return ty })
-                          (\ty _ _ -> do { lintType ty; return (typeKind ty,()) })
+  = do { _ <- lintApp msg (\ty -> do { lintType ty; return ty })
+                          (\ty _ _ _ -> do { lintType ty; return (typeKind ty,()) })
                           fun_kind arg_tys ()
        ; return () }
 
@@ -2089,7 +2092,7 @@ lint_tyco_app msg fun_kind arg_tys
 lintApp :: forall a acc. Outputable a =>
              SDoc
           -> (a -> LintM Type)                        -- Lint the thing and return its value
-          -> (a -> Mult -> acc -> LintM (Kind, acc))  -- Lint the thing and return its type
+          -> (a -> Matchability -> Mult -> acc -> LintM (Kind, acc))  -- Lint the thing and return its type
           -> Type
           -> [a]                          -- The arguments
           -> acc                          -- Used (only) for UsageEnv in /term/ applications
@@ -2136,8 +2139,8 @@ lintApp msg lint_forall_arg lint_arrow_arg !orig_fun_ty all_args acc
                                 2 (ppr arg' <+> dcolon <+> ppr karg'))
                       ; go subst' body_ty acc args }
 
-               go subst fun_ty@(FunTy _ mult exp_arg_ty res_ty) acc (arg:args)
-                 = do { (arg_ty, acc') <- lint_arrow_arg arg (substTy subst mult) acc
+               go subst fun_ty@(FunTy _ ma mult exp_arg_ty res_ty) acc (arg:args)
+                 = do { (arg_ty, acc') <- lint_arrow_arg arg (substTy subst ma) (substTy subst mult) acc
                       ; ensureEqTys (substTy subst exp_arg_ty) arg_ty $
                         lint_app_fail_msg msg orig_fun_ty all_args
                             (hang (text "Fun:" <+> ppr fun_ty)
@@ -2426,15 +2429,17 @@ lintCoercion co@(ForAllCo {})
 
 
 lintCoercion (FunCo { fco_role = r, fco_afl = afl, fco_afr = afr
-                    , fco_mult = cow, fco_arg = co1, fco_res = co2 })
+                    , fco_ma = com, fco_mult = cow, fco_arg = co1, fco_res = co2 })
   = do { lintCoercion co1
        ; lintCoercion co2
+       ; lintCoercion com
        ; lintCoercion cow
        ; let Pair lt1 rt1 = coercionKind co1
              Pair lt2 rt2 = coercionKind co2
+             Pair ltm rtm = coercionKind com
              Pair ltw rtw = coercionKind cow
-       ; lintArrow (bad_co_msg "arrowl") afl lt1 lt2 ltw
-       ; lintArrow (bad_co_msg "arrowr") afr rt1 rt2 rtw
+       ; lintArrow (bad_co_msg "arrowl") afl lt1 lt2 ltm ltw
+       ; lintArrow (bad_co_msg "arrowr") afr rt1 rt2 rtm rtw
        ; lintRole co1 r (coercionRole co1)
        ; lintRole co2 r (coercionRole co2)
        ; let expected_mult_role = case r of

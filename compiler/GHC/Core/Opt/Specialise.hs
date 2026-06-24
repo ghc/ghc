@@ -3648,7 +3648,7 @@ newSpecIdSM old_name new_ty details info
         ; let new_occ  = mkSpecOcc (nameOccName old_name)
               new_name = mkInternalName uniq new_occ  (getSrcSpan old_name)
         ; return (assert (not (isCoVarType new_ty)) $
-                  mkLocalVar details new_name ManyTy new_ty info) }
+                  mkLocalVar details new_name UnmatchableTy ManyTy new_ty info) }
 
 {-
                 Old (but interesting) stuff about unboxed bindings

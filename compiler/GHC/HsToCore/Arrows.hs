@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -36,7 +37,7 @@ import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Make
 import GHC.HsToCore.Binds (dsHsWrapper)
-
+import GHC.Core.Type (pattern UnmatchableTy)
 
 import GHC.Types.Id
 import GHC.Core.ConLike
@@ -293,7 +294,7 @@ dsProcExpr pat (L _ (HsCmdTop (CmdTopTc { ctt_res_ty = cmd_ty, ctt_table = ids }
     let env_stk_ty = mkCorePairTy env_ty unitTy
     let env_stk_expr = mkCorePairExpr (mkBigCoreVarTup env_ids) mkCoreUnitExpr
     fail_expr <- mkFailExpr (ArrowMatchCtxt ProcExpr) env_stk_ty
-    var <- selectSimpleMatchVarL ManyTy pat
+    var <- selectSimpleMatchVarL UnmatchableTy ManyTy pat
     match_code <- matchSimply (Var var) (ArrowMatchCtxt ProcExpr) ManyTy pat env_stk_expr fail_expr
     let pat_ty = hsLPatType pat
     let proc_code = do_premap meth_ids pat_ty env_stk_ty cmd_ty
@@ -816,7 +817,7 @@ dsCases ids local_vars stack_id stack_ty res_ty
     Nothing -> ([], void_ty,) . do_arr ids void_ty res_ty <$>
       dsExpr (HsLam noAnn LamCase
         (MG { mg_alts = noLocA []
-            , mg_ext = MatchGroupTc [Scaled ManyTy void_ty] res_ty (Generated OtherExpansion SkipPmc)
+            , mg_ext = MatchGroupTc [Scaled UnmatchableTy ManyTy void_ty] res_ty (Generated OtherExpansion SkipPmc)
             }))
 
       -- Replace the commands in the case with these tagged tuples,
@@ -967,7 +968,7 @@ dsCmdStmt ids local_vars out_ids (BindStmt _ pat cmd) env_ids = do
     body_expr <- coreCaseTuple env_id env_ids2 (mkBigCoreVarTup out_ids)
 
     fail_expr <- mkFailExpr (StmtCtxt (HsDoStmt (DoExpr Nothing))) out_ty
-    pat_id    <- selectSimpleMatchVarL ManyTy pat
+    pat_id    <- selectSimpleMatchVarL UnmatchableTy ManyTy pat
     match_code
       <- matchSimply (Var pat_id) (StmtCtxt (HsDoStmt (DoExpr Nothing))) ManyTy pat body_expr fail_expr
     pair_id   <- newSysLocalMDs after_c_ty

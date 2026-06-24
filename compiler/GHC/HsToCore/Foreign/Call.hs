@@ -348,7 +348,7 @@ resultWrapper result_ty
                             -- a recursive one might fall through here, I think
   , Just data_con <- tyConSingleDataCon_maybe tycon  -- One constructor
   , null (dataConExTyCoVars data_con)                -- no existentials
-  , [Scaled _ unwrapped_res_ty] <- dataConInstOrigArgTys data_con tycon_arg_tys  -- One argument
+  , [Scaled _ _ unwrapped_res_ty] <- dataConInstOrigArgTys data_con tycon_arg_tys  -- One argument
   = do { (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
        ; let marshal_con e  = Var (dataConWrapId data_con)
                               `mkTyApps` tycon_arg_tys

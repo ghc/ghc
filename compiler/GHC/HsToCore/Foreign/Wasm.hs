@@ -136,7 +136,7 @@ dsWasmJSDynamicExport sync fn_id co unitId = do
   sp_tycon <- dsLookupTyCon stablePtrTyConName
   let ty = coercionLKind co
       (tv_bndrs, fun_ty) = tcSplitForAllTyVarBinders ty
-      ([Scaled ManyTy arg_ty], io_jsval_ty) = tcSplitFunTys fun_ty
+      ([Scaled UnmatchableTy ManyTy arg_ty], io_jsval_ty) = tcSplitFunTys fun_ty
       sp_ty = mkTyConApp sp_tycon [arg_ty]
   sp_id <- newSysLocalMDs sp_ty
   work_export_name <- unpackFS <$> uniqueCFunName

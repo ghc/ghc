@@ -857,8 +857,8 @@ rnIfaceBndr (IfaceIdBndr id_bndr) = IfaceIdBndr <$> rnIfaceIdBndr id_bndr
 rnIfaceBndr (IfaceTvBndr tv_bndr) = IfaceTvBndr <$> rnIfaceTvBndr tv_bndr
 
 rnIfaceIdBndr :: Rename IfaceIdBndr
-rnIfaceIdBndr (w, fs, ty) =
-  (,,) <$> rnIfaceType w <*> pure fs <*> rnIfaceType ty
+rnIfaceIdBndr (m, w, fs, ty) =
+  (,,,) <$> rnIfaceType m <*> rnIfaceType w <*> pure fs <*> rnIfaceType ty
 
 rnIfaceTvBndr :: Rename IfaceTvBndr
 rnIfaceTvBndr (fs, kind) = (,) fs <$> rnIfaceType kind
@@ -888,7 +888,7 @@ rnIfaceMCo (IfaceMCo co) = IfaceMCo <$> rnIfaceCo co
 rnIfaceCo :: Rename IfaceCoercion
 rnIfaceCo (IfaceReflCo ty)              = IfaceReflCo <$> rnIfaceType ty
 rnIfaceCo (IfaceGReflCo role ty mco)    = IfaceGReflCo role <$> rnIfaceType ty <*> rnIfaceMCo mco
-rnIfaceCo (IfaceFunCo role w co1 co2)   = IfaceFunCo role <$> rnIfaceCo w <*> rnIfaceCo co1 <*> rnIfaceCo co2
+rnIfaceCo (IfaceFunCo role m w co1 co2) = IfaceFunCo role <$> rnIfaceCo m <*> rnIfaceCo w <*> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceTyConAppCo role tc cos) = IfaceTyConAppCo role <$> rnIfaceTyCon tc <*> mapM rnIfaceCo cos
 rnIfaceCo (IfaceAppCo co1 co2)          = IfaceAppCo <$> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceFreeCoVar c)            = pure (IfaceFreeCoVar c)
@@ -929,8 +929,8 @@ rnIfaceType (IfaceTyVar   n)   = pure (IfaceTyVar n)
 rnIfaceType (IfaceAppTy t1 t2)
     = IfaceAppTy <$> rnIfaceType t1 <*> rnIfaceAppArgs t2
 rnIfaceType (IfaceLitTy l)         = return (IfaceLitTy l)
-rnIfaceType (IfaceFunTy af w t1 t2)
-    = IfaceFunTy af <$> rnIfaceType w <*> rnIfaceType t1 <*> rnIfaceType t2
+rnIfaceType (IfaceFunTy af m w t1 t2)
+    = IfaceFunTy af <$> rnIfaceType m <*> rnIfaceType w <*> rnIfaceType t1 <*> rnIfaceType t2
 rnIfaceType (IfaceTupleTy s i tks)
     = IfaceTupleTy s i <$> rnIfaceAppArgs tks
 rnIfaceType (IfaceTyConApp tc tks)
@@ -942,8 +942,8 @@ rnIfaceType (IfaceCoercionTy co)
 rnIfaceType (IfaceCastTy ty co)
     = IfaceCastTy <$> rnIfaceType ty <*> rnIfaceCo co
 
-rnIfaceScaledType :: Rename (IfaceMult, IfaceType)
-rnIfaceScaledType (m, t) = (,) <$> rnIfaceType m <*> rnIfaceType t
+rnIfaceScaledType :: Rename IfaceArgTy
+rnIfaceScaledType (IfArgTy ma m t) = IfArgTy <$> rnIfaceType ma <*> rnIfaceType m <*> rnIfaceType t
 
 rnIfaceForAllBndr :: Rename (VarBndr IfaceBndr flag)
 rnIfaceForAllBndr (Bndr tv vis) = Bndr <$> rnIfaceBndr tv <*> pure vis

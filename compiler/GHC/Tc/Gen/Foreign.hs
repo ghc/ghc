@@ -265,7 +265,7 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
              -- for overloaded functions, but doesn't seem worth it
              (arg_tys, res_ty) = splitFunTys (dropForAlls norm_sig_ty)
 
-             id = mkLocalId nm ManyTy sig_ty
+             id = mkLocalId nm UnmatchableTy ManyTy sig_ty
                  -- Use a LocalId to obey the invariant that locally-defined
                  -- things are LocalIds.  However, it does not need zonking,
                  -- (so GHC.Tc.Zonk.Type.zonkForeignExports ignores it).
@@ -308,7 +308,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport src (L lc cconv) safety mh CWrapper)
     checkCg (Right idecl) backendValidityOfCImport
     cconv' <- checkCConv (Right idecl) cconv
     case arg_tys of
-        [Scaled arg1_mult arg1_ty] -> do
+        [Scaled arg1_ma arg1_mult arg1_ty] -> do
                         checkNoLinearFFI arg1_mult
                         checkForeignArgs isFFIExternalTy arg1_tys
                         checkForeignRes nonIOok  checkSafe isFFIExportResultTy res1_ty
@@ -326,7 +326,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport src (L lc cconv) (L ls safety) mh
       case arg_tys of           -- The first arg must be Ptr or FunPtr
         []                ->
           addErrTc (TcRnIllegalForeignType Nothing AtLeastOneArgExpected)
-        (Scaled arg1_mult arg1_ty:arg_tys) -> do
+        (Scaled arg1_ma arg1_mult arg1_ty:arg_tys) -> do
           dflags <- getDynFlags
           let curried_res_ty = mkScaledFunTys arg_tys res_ty
           checkNoLinearFFI arg1_mult
@@ -482,7 +482,7 @@ tcCheckFEType sig_ty edecl@(CExport src (L l (CExportStatic str cconv))) = do
 
 ------------ Checking argument types for foreign import ----------------------
 checkForeignArgs :: (Type -> Validity' IllegalForeignTypeReason) -> [Scaled Type] -> TcM ()
-checkForeignArgs _pred [(Scaled mult ty)]
+checkForeignArgs _pred [(Scaled ma mult ty)]
   -- If there is a single argument allow:
   --    foo :: (# #) -> T
   | isUnboxedTupleType ty
@@ -499,8 +499,8 @@ checkForeignArgs _pred [(Scaled mult ty)]
   -- = check (validIfUnliftedFFITypes dflags) (TypeCannotBeMarshaled (Just Arg)) >> checkNoLinearFFI mult
 checkForeignArgs pred tys = mapM_ go tys
   where
-    go (Scaled mult ty) = checkNoLinearFFI mult >>
-                          check (pred ty) (TcRnIllegalForeignType (Just Arg))
+    go (Scaled ma mult ty) = checkNoLinearFFI mult >>
+                             check (pred ty) (TcRnIllegalForeignType (Just Arg))
 
 checkNoLinearFFI :: Mult -> TcM ()  -- No linear types in FFI (#18472)
 checkNoLinearFFI ManyTy = return ()

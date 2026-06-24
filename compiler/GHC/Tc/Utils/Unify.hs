@@ -176,14 +176,15 @@ matchActualFunTy herald mb_thing err_info fun_ty
        -> TcM (TcCoercion, Scaled TcSigmaTypeFRR, TcSigmaType)
     go ty | Just ty' <- coreView ty = go ty'
 
-    go (FunTy { ft_af = af, ft_mult = w, ft_arg = arg_ty, ft_res = res_ty })
+    go (FunTy { ft_af = af, ft_ma = m, ft_mult = w, ft_arg = arg_ty, ft_res = res_ty })
       = assert (isVisibleFunArg af) $
       do { (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy herald 1) arg_ty
          ; let fun_co = mkFunCo Nominal af
+                          (mkNomReflCo m)
                           (mkReflCo Nominal w)
                           arg_co
                           (mkReflCo Nominal res_ty)
-         ; return (fun_co, Scaled w arg_ty, res_ty) }
+         ; return (fun_co, Scaled m w arg_ty, res_ty) }
 
     go ty@(TyVarTy tv)
       | isMetaTyVar tv
@@ -272,10 +273,10 @@ matchActualFunTys herald ct_orig n_val_args_wanted top_ty
     go 0 fun_ty = return (idHsWrapper, [], fun_ty)
 
     go n fun_ty
-      = do { (co1, scaled_arg1_ty_frr@(Scaled arg1_mult arg1_ty_frr), res_ty1) <-
+      = do { (co1, scaled_arg1_ty_frr@(Scaled arg1_ma arg1_mult arg1_ty_frr), res_ty1) <-
                 matchActualFunTy herald Nothing (n_val_args_wanted, top_ty) fun_ty
            ; (wrap_res, arg_tys, res_ty) <- go (n-1) res_ty1
-           ; let wrap_fun2 = mkWpFun idHsWrapper wrap_res (EqMultCo $ mkNomReflCo arg1_mult, arg1_ty_frr) res_ty
+           ; let wrap_fun2 = mkWpFun idHsWrapper wrap_res (mkNomReflCo arg1_ma, EqMultCo $ mkNomReflCo arg1_mult, arg1_ty_frr) res_ty
               -- This call to mkWpFun satisfies WpFun-FRR-INVARIANT:
               -- 'arg1_ty_frr' comes from matchActualFunTy, so is FRR.
            ; return (wrap_fun2 <.> mkWpCastN co1, scaled_arg1_ty_frr:arg_tys, res_ty) }
@@ -813,7 +814,7 @@ matchExpectedFunTys herald _ctxt arity (Infer inf_res) thing_inside
   = do { arg_tys <- mapM (new_infer_arg_ty herald) [1 .. arity]
        ; res_ty  <- newInferExpType (ir_inst inf_res)
        ; result  <- thing_inside (map ExpFunPatTy arg_tys) res_ty
-       ; arg_tys <- mapM (\(Scaled m t) -> Scaled m <$> readExpType t) arg_tys
+       ; arg_tys <- mapM (\(Scaled ma m t) -> Scaled ma m <$> readExpType t) arg_tys
        ; res_ty  <- readExpType res_ty
          -- Remarks:
          --  1. use tcMkScaledFunTys rather than mkScaledFunTys, as we might
@@ -871,12 +872,12 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
 
     ----------------------------
     -- Function types
-    check n_req rev_pat_tys (FunTy { ft_af = af, ft_mult = mult
+    check n_req rev_pat_tys (FunTy { ft_af = af, ft_ma = ma, ft_mult = mult
                                    , ft_arg = arg_ty, ft_res = res_ty })
       = assert (isVisibleFunArg af) $
         do { let arg_pos = arity - n_req + 1   -- 1 for the first argument etc
            ; (arg_co, arg_ty_frr) <- hasFixedRuntimeRep (FRRExpectedFunTy herald arg_pos) arg_ty
-           ; let scaled_arg_ty_frr = Scaled mult arg_ty_frr
+           ; let scaled_arg_ty_frr = Scaled ma mult arg_ty_frr
            ; (res_wrap, result) <- check (n_req - 1)
                                          (mkCheckExpFunPatTy scaled_arg_ty_frr : rev_pat_tys)
                                          res_ty
@@ -884,11 +885,11 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
             -- arg_co :: arg_ty ~ arg_ty_frr
             -- res_wrap :: act_res_ty ~~> res_ty
            ; let fun_wrap1 -- :: (arg_ty_frr -> act_res_ty) ~~> (arg_ty_frr -> res_ty)
-                   = mkWpFun idHsWrapper res_wrap (EqMultCo $ mkNomReflCo mult, arg_ty_frr) res_ty
+                   = mkWpFun idHsWrapper res_wrap (mkNomReflCo ma, EqMultCo $ mkNomReflCo mult, arg_ty_frr) res_ty
                        -- Satisfies WpFun-FRR-INVARIANT because arg_sty_frr is FRR
 
                  fun_wrap2 -- :: (arg_ty_frr -> res_ty) ~~> (arg_ty -> res_ty)
-                   = mkWpCastN (mkFunCo Nominal af (mkNomReflCo mult) (mkSymCo arg_co) (mkNomReflCo res_ty))
+                   = mkWpCastN (mkFunCo Nominal af (mkNomReflCo ma) (mkNomReflCo mult) (mkSymCo arg_co) (mkNomReflCo res_ty))
 
                  fun_wrap -- :: (arg_ty_frr -> act_res_ty) ~~> (arg_ty -> res_ty)
                    = fun_wrap2 <.> fun_wrap1
@@ -949,15 +950,17 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
 
 new_infer_arg_ty :: ExpectedFunTyCtxt -> Int -> TcM (Scaled ExpRhoTypeFRR)
 new_infer_arg_ty herald arg_pos -- position for error messages only
-  = do { mult     <- newFlexiTyVarTy multiplicityTy
+  = do { ma       <- newFlexiTyVarTy matchabilityTy
+       ; mult     <- newFlexiTyVarTy multiplicityTy
        ; inf_hole <- newInferExpTypeFRR IIF_DeepRho (FRRExpectedFunTy herald arg_pos)
-       ; return (mkScaled mult inf_hole) }
+       ; return (mkScaled ma mult inf_hole) }
 
 new_check_arg_ty :: ExpectedFunTyCtxt -> Int -> TcM (Scaled TcType)
 new_check_arg_ty herald arg_pos -- Position for error messages only, 1 for first arg
-  = do { mult   <- newFlexiTyVarTy multiplicityTy
+  = do { ma     <- newFlexiTyVarTy matchabilityTy
+       ; mult   <- newFlexiTyVarTy multiplicityTy
        ; arg_ty <- newOpenFlexiFRRTyVarTy (FRRExpectedFunTy herald arg_pos)
-       ; return (mkScaled mult arg_ty) }
+       ; return (mkScaled ma mult arg_ty) }
 
 mkFunTysMsg :: ExpectedFunTyCtxt
             -> (VisArity, TcType)
@@ -2193,35 +2196,37 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
            ; return (body_wrap <.> in_wrap) }
 
     -- Main case: FunTy vs FunTy. go_fun does the work.
-    go1 (FunTy { ft_af = af1, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res })
-        (FunTy { ft_af = af2, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res })
+    go1 (FunTy { ft_af = af1, ft_ma = act_ma, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res })
+        (FunTy { ft_af = af2, ft_ma = exp_ma, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res })
       | isVisibleFunArg af1
       , isVisibleFunArg af2
-      = go_fun af1 act_mult act_arg act_res
-               af2 exp_mult exp_arg exp_res
+      = go_fun af1 act_ma act_mult act_arg act_res
+               af2 exp_ma exp_mult exp_arg exp_res
 
     -- See Note [FunTy vs non-FunTy case in tc_sub_type_deep]
-    go1 (FunTy { ft_af = af1, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res }) ty_e
+    go1 (FunTy { ft_af = af1, ft_ma = act_ma, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res }) ty_e
       | isVisibleFunArg af1
-      = do { exp_mult <- newMultiplicityVar
+      = do { exp_ma   <- newMatchabilityVar
+           ; exp_mult <- newMultiplicityVar
            ; exp_arg  <- newOpenFlexiTyVarTy -- NB: no FRR check needed; we might not need to eta-expand
            ; exp_res  <- newOpenFlexiTyVarTy
-           ; let exp_funTy = FunTy { ft_af = af1, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res }
+           ; let exp_funTy = FunTy { ft_af = af1, ft_ma = exp_ma, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res }
              -- Recur before unifying; see Wrinkle [Avoiding a loop in tc_sub_type_deep]
-           ; fun_wrap <- go_fun af1 act_mult act_arg act_res af1 exp_mult exp_arg exp_res
+           ; fun_wrap <- go_fun af1 act_ma act_mult act_arg act_res af1 exp_ma exp_mult exp_arg exp_res
            ; unify_wrap <- just_unify exp_funTy ty_e
            ; return $ unify_wrap <.> fun_wrap
              -- unify_wrap :: exp_funTy ~~> ty_e
              -- fun_wrap :: ty_a ~~> exp_funTy
            }
-    go1 ty_a (FunTy { ft_af = af2, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res })
+    go1 ty_a (FunTy { ft_af = af2, ft_ma = exp_ma, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res })
       | isVisibleFunArg af2
-      = do { act_mult <- newMultiplicityVar
+      = do { act_ma   <- newMatchabilityVar
+           ; act_mult <- newMultiplicityVar
            ; act_arg  <- newOpenFlexiTyVarTy -- NB: no FRR check needed; we might not need to eta-expand
            ; act_res  <- newOpenFlexiTyVarTy
-           ; let act_funTy = FunTy { ft_af = af2, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res }
+           ; let act_funTy = FunTy { ft_af = af2, ft_ma = act_ma, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res }
              -- Recur before unifying; see Wrinkle [Avoiding a loop in tc_sub_type_deep]
-           ; fun_wrap <- go_fun af2 act_mult act_arg act_res af2 exp_mult exp_arg exp_res
+           ; fun_wrap <- go_fun af2 act_ma act_mult act_arg act_res af2 exp_ma exp_mult exp_arg exp_res
            ; unify_wrap <- just_unify ty_a act_funTy
            ; return $ fun_wrap <.> unify_wrap
              -- unify_wrap :: ty_a ~~> act_funTy
@@ -2235,14 +2240,16 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
                               ; return (mkWpCastN cow) }
 
     -- FunTy/FunTy case: this is where we insert any necessary eta-expansions.
-    go_fun :: FunTyFlag -> Mult -> TcType -> TcType -- actual FunTy
-           -> FunTyFlag -> Mult -> TcType -> TcType -- expected FunTy
+    go_fun :: FunTyFlag -> Matchability -> Mult -> TcType -> TcType -- actual FunTy
+           -> FunTyFlag -> Matchability -> Mult -> TcType -> TcType -- expected FunTy
            -> TcM HsWrapper
-    go_fun act_af act_mult act_arg act_res exp_af exp_mult exp_arg exp_res
+    go_fun act_af act_ma act_mult act_arg act_res exp_af exp_ma exp_mult exp_arg exp_res
       -- See Note [FunTy vs FunTy case in tc_sub_type_deep]
       = do { arg_wrap  <- tc_sub_type_ds (tc_fun, Argument pos) (recurInArgumentDSFlag ds_depth) unify given_orig GenSigCtxt exp_arg act_arg
                           -- GenSigCtxt: See Note [Setting the argument context]
            ; res_wrap  <- tc_sub_type_deep (tc_fun, Result pos) ds_depth unify inst_orig ctxt act_res exp_res
+
+           ; wp_ma <- unify act_ma exp_ma
 
              -- Treat 'a %1 -> b' like it was 'forall m. a %m -> b',
              -- i.e. (after instantiating) 'a %m[tau] -> b'.
@@ -2256,9 +2263,10 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
 
            ; fun_wrap <- mkWpFun_FRR
                fun_pos
+               wp_ma
                wp_mult
-               act_af act_mult act_arg act_res
-               exp_af exp_mult exp_arg exp_res
+               act_af act_ma act_mult act_arg act_res
+               exp_af exp_ma exp_mult exp_arg exp_res
                arg_wrap res_wrap
 
            ; traceTc "tc_sub_type_deep go_fun" $
@@ -2307,19 +2315,20 @@ recurInArgumentDSFlag = \case
 --     See Note [Desugaring WpFun] in GHC.HsToCore.Binds.
 mkWpFun_FRR
   :: (Maybe (HsExpr GhcTc), Position p)
+  -> TcCoercionN -- ^ act_ma ~# exp_ma
   -> SubMultCo -- ^ act_mult ~# exp_mult
-  -> FunTyFlag -> Mult -> TcType -> Type --   actual FunTy
-  -> FunTyFlag -> Mult -> TcType -> Type -- expected FunTy
+  -> FunTyFlag -> Matchability -> Mult -> TcType -> Type --   actual FunTy
+  -> FunTyFlag -> Matchability -> Mult -> TcType -> Type -- expected FunTy
   -> HsWrapper -- ^ exp_arg ~~> act_arg
   -> HsWrapper -- ^ act_res ~~> exp_res
   -> TcM HsWrapper -- ^ (act_arg->act_res) ~~> (exp_arg->exp_res)
-mkWpFun_FRR (mb_tc_fun, pos) sub_mult act_af act_mult act_arg act_res exp_af exp_mult exp_arg exp_res arg_wrap res_wrap
+mkWpFun_FRR (mb_tc_fun, pos) co_ma sub_mult act_af act_ma act_mult act_arg act_res exp_af exp_ma exp_mult exp_arg exp_res arg_wrap res_wrap
   | Just arg_co <- getWpCo_maybe arg_wrap act_arg   -- arg_co :: exp_arg ~R# act_arg
   , Just res_co <- getWpCo_maybe res_wrap act_res   -- res_co :: act_res ~R# exp_res
   = -- The argument and result wrappers are both hole or cast;
     -- so we can make do with a FunCo
     -- See Note [Representation-polymorphism checking during subtyping]
-    do { let the_co = mkSubMultFunCo act_af exp_af sub_mult (mkSymCo arg_co) res_co
+    do { let the_co = mkSubMultFunCo act_af exp_af co_ma sub_mult (mkSymCo arg_co) res_co
        ; traceTc "mkWpFun_FRR: cast" $
            vcat [ text "act_mult:" <+> ppr act_mult
                 , text "exp_mult:" <+> ppr exp_mult
@@ -2341,11 +2350,13 @@ mkWpFun_FRR (mb_tc_fun, pos) sub_mult act_af act_mult act_arg act_res exp_af exp
        ; let
             exp_arg_fun_co =  -- (exp_arg_frr -> exp_res) ~ (exp_arg -> exp_res)
               mkFunCo Nominal exp_af
+                 (mkNomReflCo exp_ma)
                  (mkNomReflCo exp_mult)
                  (mkSymCo exp_arg_co)
                  (mkNomReflCo exp_res)
             act_arg_fun_co =  -- (act_arg -> act_res) ~ (act_arg_frr -> act_res)
               mkFunCo Nominal act_af
+                 (mkNomReflCo act_ma)
                  (mkReflCo Nominal act_mult)
                  act_arg_co
                  (mkNomReflCo act_res)
@@ -2353,18 +2364,21 @@ mkWpFun_FRR (mb_tc_fun, pos) sub_mult act_af act_mult act_arg act_res exp_af exp
               mkWpCastN (mkSymCo exp_arg_co) <.> arg_wrap <.> mkWpCastN act_arg_co
 
        ; traceTc "mkWpFun_FRR: WpFun" $
-           vcat [ text "act_mult:" <+> ppr act_mult
+           vcat [ text "act_ma:" <+> ppr act_ma
+                , text "exp_ma:" <+> ppr exp_ma
+                , text "sub_ma:" <+> ppr co_ma
+                , text "act_mult:" <+> ppr act_mult
                 , text "exp_mult:" <+> ppr exp_mult
                 , text "sub_mult:" <+> ppr sub_mult
                 , text "arg_wrap_frr:" <+> ppr arg_wrap_frr
                 , text "res_wrap:" <+> ppr res_wrap
-                , text "wp_fun:" <+> ppr (mkWpFun arg_wrap_frr res_wrap (sub_mult, exp_arg_frr) exp_res)
+                , text "wp_fun:" <+> ppr (mkWpFun arg_wrap_frr res_wrap (co_ma, sub_mult, exp_arg_frr) exp_res)
                 ]
 
        ; return $   -- Whole thing :: (act_arg->act_res) ~~> (exp_arg->exp_ress)
             mkWpCastN exp_arg_fun_co   -- (exp_ar_frr->exp_res) ~~> (exp_arg->exp_res)
               <.>
-            mkWpFun arg_wrap_frr res_wrap (sub_mult, exp_arg_frr) exp_res
+            mkWpFun arg_wrap_frr res_wrap (co_ma, sub_mult, exp_arg_frr) exp_res
               <.>                       -- (act_arg_frr->act_res) ~~> (exp_arg_frr->exp_res)
             mkWpCastN act_arg_fun_co    -- (act_arg->act_res) ~~> (act_arg_frr->act_res)
        }
@@ -2445,9 +2459,9 @@ deeplyInstantiate orig ty
            ; return (idHsWrapper, ty') }
 
     oneToMeta :: Scaled TcType -> TcM (Scaled TcType)
-    oneToMeta (Scaled OneTy ty)
+    oneToMeta (Scaled ma OneTy ty)
       = do { mu <- newMultiplicityVar
-           ; return $ Scaled mu ty }
+           ; return $ Scaled ma mu ty }
     oneToMeta ty = return ty
 
 
@@ -2460,7 +2474,7 @@ tcDeepSplitSigmaTy_maybe ty
   where
   -- As per Note [Multiplicity in deep subsumption],
   -- we treat (a %1 -> b) as if it were forall m. a %m -> b.
-  go ty | Just (arg_ty@(Scaled OneTy _), res_ty) <- tcSplitFunTy_maybe ty
+  go ty | Just (arg_ty@(Scaled _ OneTy _), res_ty) <- tcSplitFunTy_maybe ty
         = case go res_ty of
             Nothing ->
               Just ([arg_ty], [], [], res_ty)
@@ -2512,7 +2526,7 @@ isDeepRhoTy ty
   | not (isRhoTy ty)
   -- Foralls or (=>) at top
   = False
-  | Just (Scaled m _, res) <- tcSplitFunTy_maybe ty
+  | Just (Scaled _ m _, res) <- tcSplitFunTy_maybe ty
   = case m of
       OneTy -> False -- (%1 ->) at top
       _ -> isDeepRhoTy res
@@ -2879,14 +2893,15 @@ uType env@(UE { u_role = role }) orig_ty1 orig_ty2
       | Just ty2' <- coreView ty2 = go ty1  ty2'
 
     -- Functions (t1 -> t2) just check the two parts
-    go (FunTy { ft_af = af1, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
-       (FunTy { ft_af = af2, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
+    go (FunTy { ft_af = af1, ft_ma = m1, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
+       (FunTy { ft_af = af2, ft_ma = m2, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
       | isVisibleFunArg af1  -- Do not attempt (c => t); just defer
       , af1 == af2           -- Important!  See #21530
-      = do { co_w <- uType (env { u_role = funRole role SelMult }) w1   w2
+      = do { co_m <- uType (env { u_role = funRole role SelMa }) m1 m2
+           ; co_w <- uType (env { u_role = funRole role SelMult }) w1   w2
            ; co_l <- uType (env { u_role = funRole role SelArg })  arg1 arg2
            ; co_r <- uType (env { u_role = funRole role SelRes })  res1 res2
-           ; return $ mkNakedFunCo role af1 co_w co_l co_r }
+           ; return $ mkNakedFunCo role af1 co_m co_w co_l co_r }
 
         -- Always defer if a type synonym family (type function)
         -- is involved.  (Data families behave rigidly.)
@@ -3551,10 +3566,10 @@ matchExpectedFunKind hs_ty n k = go n k
                 Indirect fun_kind -> go n fun_kind
                 Flexi ->             defer n k }
 
-    go n (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
+    go n (FunTy { ft_af = af, ft_ma = m, ft_mult = w, ft_arg = arg, ft_res = res })
       | isVisibleFunArg af
       = do { co <- go (n-1) res
-           ; return (mkNakedFunCo Nominal af (mkNomReflCo w) (mkNomReflCo arg) co) }
+           ; return (mkNakedFunCo Nominal af (mkNomReflCo m) (mkNomReflCo w) (mkNomReflCo arg) co) }
 
     go n other
      = defer n other
@@ -4283,14 +4298,15 @@ check_ty_eq_rhs flags ty
         -- Nor can we expand synonyms; see Note [Occurrence checking: look inside kinds]
         --                             in GHC.Core.FVs
 
-      FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r}
+      FunTy {ft_af = af, ft_ma = m, ft_mult = w, ft_arg = a, ft_res = r}
        | isInvisibleFunArg af  -- e.g.  Num a => blah
        -> return $ PuFail impredicativeProblem -- Not allowed (TyEq:F)
        | otherwise
-       -> do { w_res <- check_ty_eq_rhs flags w
+       -> do { m_res <- check_ty_eq_rhs flags m
+             ; w_res <- check_ty_eq_rhs flags w
              ; a_res <- check_ty_eq_rhs flags a
              ; r_res <- check_ty_eq_rhs flags r
-             ; return (mkFunRedn Nominal af <$> w_res <*> a_res <*> r_res) }
+             ; return (mkFunRedn Nominal af <$> m_res <*> w_res <*> a_res <*> r_res) }
 
       AppTy fun arg -> do { fun_res <- check_ty_eq_rhs flags fun
                           ; arg_res <- check_ty_eq_rhs flags arg

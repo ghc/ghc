@@ -99,9 +99,9 @@ otherwise, make one up. The multiplicity argument is chosen as the multiplicity
 of the variable if it is made up.
 -}
 
-selectSimpleMatchVarL :: Mult -> LPat GhcTc -> DsM Id
+selectSimpleMatchVarL :: Matchability -> Mult -> LPat GhcTc -> DsM Id
 -- Postcondition: the returned Id has an Internal Name
-selectSimpleMatchVarL w pat = selectMatchVar w (unLoc pat)
+selectSimpleMatchVarL m w pat = selectMatchVar m w (unLoc pat)
 
 -- (selectMatchVars ps tys) chooses variables of type tys
 -- to use for matching ps against.  If the pattern is a variable,
@@ -119,16 +119,16 @@ selectSimpleMatchVarL w pat = selectMatchVar w (unLoc pat)
 --    Then we must not choose (x::Int) as the matching variable!
 -- And nowadays we won't, because the (x::Int) will be wrapped in a CoPat
 
-selectMatchVars :: [(Mult, Pat GhcTc)] -> DsM [Id]
+selectMatchVars :: [(Matchability, Mult, Pat GhcTc)] -> DsM [Id]
 -- Postcondition: the returned Ids have Internal Names
-selectMatchVars ps = mapM (uncurry selectMatchVar) ps
+selectMatchVars ps = mapM (\(m,w,x) -> selectMatchVar m w x) ps
 
-selectMatchVar :: Mult -> Pat GhcTc -> DsM Id
+selectMatchVar :: Matchability -> Mult -> Pat GhcTc -> DsM Id
 -- Postcondition: the returned Id has an Internal Name
-selectMatchVar w (BangPat _ pat)    = selectMatchVar w (unLoc pat)
-selectMatchVar w (LazyPat _ pat)    = selectMatchVar w (unLoc pat)
-selectMatchVar w (ParPat _  pat)    = selectMatchVar w (unLoc pat)
-selectMatchVar _w (VarPat _ var)    = return (localiseId (unLoc var))
+selectMatchVar m w (BangPat _ pat)    = selectMatchVar m w (unLoc pat)
+selectMatchVar m w (LazyPat _ pat)    = selectMatchVar m w (unLoc pat)
+selectMatchVar m w (ParPat _  pat)    = selectMatchVar m w (unLoc pat)
+selectMatchVar _m _w (VarPat _ var)    = return (localiseId (unLoc var))
                                   -- Note [Localise pattern binders]
                                   --
                                   -- Remark: when the pattern is a variable (or
@@ -136,8 +136,8 @@ selectMatchVar _w (VarPat _ var)    = return (localiseId (unLoc var))
                                   -- multiplicity stored within the variable
                                   -- itself. It's easier to pull it from the
                                   -- variable, so we ignore the multiplicity.
-selectMatchVar _w (AsPat _ var _) = assert (isManyTy _w ) (return (localiseId (unLoc var)))
-selectMatchVar w other_pat        = newSysLocalDs (Scaled w (hsPatType other_pat))
+selectMatchVar _m _w (AsPat _ var _) = assert (isManyTy _w ) (return (localiseId (unLoc var)))
+selectMatchVar m w other_pat        = newSysLocalDs (Scaled m w (hsPatType other_pat))
 
 {- Note [Localise pattern binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
