@@ -99,6 +99,7 @@ module GHC.Driver.Backend
    , backendPostHscPipeline
    , backendNormalSuccessorPhase
    , backendName
+   , backendSupportsInfoTableMap
    , backendValidityOfCImport
    , backendValidityOfCExport
 
@@ -679,6 +680,16 @@ backendSupportsBreakpoints = \case
   Named JavaScript  -> False
   Named Bytecode -> True
   Named NoBackend   -> False
+
+-- | If this flag is unset, then the driver ignores the flag @-finfo-table-map@,
+-- since the backend doesn't support generating the info table map.
+backendSupportsInfoTableMap :: Backend -> Bool
+backendSupportsInfoTableMap (Named NCG)        = True
+backendSupportsInfoTableMap (Named LLVM)       = False
+backendSupportsInfoTableMap (Named ViaC)       = True
+backendSupportsInfoTableMap (Named JavaScript) = False
+backendSupportsInfoTableMap (Named Bytecode)   = False
+backendSupportsInfoTableMap (Named NoBackend)  = True -- We are not generating code, so we ignore it any way
 
 -- | If this flag is set, then the driver forces the
 -- optimization level to 0, issuing a warning message if

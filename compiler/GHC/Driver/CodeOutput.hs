@@ -63,6 +63,7 @@ import GHC.Types.Unique.Supply ( UniqueTag(..) )
 import System.IO
 import Data.Set (Set)
 import qualified Data.Set as Set
+import GHC.Plugins (panic)
 
 {-
 ************************************************************************
