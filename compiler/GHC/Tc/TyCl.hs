@@ -5186,7 +5186,7 @@ checkValidDataCon dflags existential_ok tc con
         ; let check_bang :: Type -> HsSrcBang -> HsImplBang -> Int -> TcM ()
               check_bang orig_arg_ty bang rep_bang n
                | HsSrcBang _  _ SrcLazy <- bang
-               , not (bang_opt_strict_data bang_opts)
+               , not (xopt LangExt.LazyFieldAnnotations dflags)
                = addErrTc (bad_bang n LazyFieldsDisabled)
 
                -- Warn about UNPACK without "!"

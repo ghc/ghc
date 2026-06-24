@@ -6355,7 +6355,7 @@ data PatSynInvalidRhsReason
 
 data BadFieldAnnotationReason where
   {-| A lazy data type field annotation (~) was used without enabling the
-    extension StrictData.
+    extension LazyFieldAnnotations.
 
     Test cases:
     LazyFieldsDisabled

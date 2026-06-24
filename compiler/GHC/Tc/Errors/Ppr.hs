@@ -3231,7 +3231,7 @@ instance Diagnostic TcRnMessage where
     TcRnHasFieldResolvedIncomplete{}
       -> noHints
     TcRnBadFieldAnnotation _ _ LazyFieldsDisabled
-      -> [suggestExtension LangExt.StrictData]
+      -> [suggestExtension LangExt.LazyFieldAnnotations]
     TcRnBadFieldAnnotation{}
       -> noHints
     TcRnSuperclassCycle{}
