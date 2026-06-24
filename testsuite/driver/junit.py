@@ -14,12 +14,13 @@ def junit(t: TestRun) -> ET.ElementTree:
                                              + len(t.unexpected_stat_failures)
                                              + len(t.unexpected_passes)),
                               errors = str(len(t.framework_failures)),
+                              skipped = str(len(t.fragile_failures)),
                               timestamp = datetime.now().isoformat())
 
-    for res_type, group in [('stat failure', t.unexpected_stat_failures),
-                            ('unexpected failure', t.unexpected_failures),
-                            ('unexpected pass', t.unexpected_passes),
-                            ('fragile failure', t.fragile_failures)]:
+    for kind, res_type, group in [('failure', 'stat failure', t.unexpected_stat_failures),
+                                  ('failure', 'unexpected failure', t.unexpected_failures),
+                                  ('failure', 'unexpected pass', t.unexpected_passes),
+                                  ('skipped', 'fragile failure', t.fragile_failures)]:
         for tr in group:
             testcase = ET.SubElement(testsuite, 'testcase',
                                      classname = tr.way,
@@ -30,7 +31,7 @@ def junit(t: TestRun) -> ET.ElementTree:
             if tr.stderr:
                 message += ['', 'stderr:', '==========', tr.stderr]
 
-            result = ET.SubElement(testcase, 'failure',
+            result = ET.SubElement(testcase, kind,
                                    type = res_type,
                                    message = tr.reason)
             result.text = '\n'.join(message)
