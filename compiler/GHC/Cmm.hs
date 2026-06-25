@@ -269,6 +269,7 @@ data SectionType
   | FiniArray           -- .fini_array on ELF, .dtor on Windows
   | CString
   | IPE
+  | Directive           -- .drectve on Windows
   deriving (Show)
 
 data SectionProtection
@@ -289,6 +290,7 @@ sectionProtection t = case t of
     Data                    -> ReadWriteSection
     UninitialisedData       -> ReadWriteSection
     IPE                     -> ReadWriteSection
+    Directive               -> ReadOnlySection
 
 {-
 Note [Relocatable Read-Only Data]
@@ -548,3 +550,4 @@ pprSectionType s = doubleQuotes $ case s of
   FiniArray               -> text "finiarray"
   CString                 -> text "cstring"
   IPE                     -> text "ipe"
+  Directive               -> text "drectve"

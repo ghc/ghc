@@ -243,6 +243,7 @@ pprGNUSectionHeader config t suffix =
         | OSMinGW32 <- platformOS platform
                     -> text ".rdata"
         | otherwise -> text ".ipe"
+      Directive -> text ".drectve"
     flags
       -- See
       -- https://github.com/llvm/llvm-project/blob/llvmorg-21.1.8/lld/COFF/Chunks.cpp#L54
@@ -339,8 +340,9 @@ pprDarwinSectionHeader t = case t of
   RelocatableReadOnlyData -> text ".const_data"
   UninitialisedData       -> text ".data"
   InitArray               -> text ".section\t__DATA,__mod_init_func,mod_init_funcs"
-  FiniArray               -> panic "pprDarwinSectionHeader: fini not supported"
   CString                 -> text ".section\t__TEXT,__cstring,cstring_literals"
   IPE                     -> text ".const"
+  FiniArray               -> panic "pprDarwinSectionHeader: fini not supported"
+  Directive               -> panic "pprDarwinSectionHeader: drectve not supported"
 {-# SPECIALIZE pprDarwinSectionHeader :: SectionType -> SDoc #-}
 {-# SPECIALIZE pprDarwinSectionHeader :: SectionType -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
