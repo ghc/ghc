@@ -62,7 +62,7 @@ import GHC.Types.Unique.DSM
 import GHC.Data.Bag
 import GHC.Utils.Monad.State.Strict
 
-import Data.List (mapAccumL, sortOn)
+import Data.List (sortOn)
 import Data.Maybe
 import Data.IntSet              (IntSet)
 import GHC.Utils.Misc
@@ -897,36 +897,33 @@ livenessSCCs platform blockmap done (AcyclicSCC block : sccs)
 livenessSCCs platform blockmap done
         (CyclicSCC blocks : sccs) =
         livenessSCCs platform blockmap' (CyclicSCC blocks':done) sccs
- where      (blockmap', blocks')
-                = iterateUntilUnchanged linearLiveness equalBlockMaps
-                                      blockmap blocks
+ where      (blockmap', blocks') = fixpoint blockmap
 
-            iterateUntilUnchanged
-                :: (a -> b -> (a,c)) -> (a -> a -> Bool)
-                -> a -> b
-                -> (a,c)
-
-            iterateUntilUnchanged f eq aa b = go aa
-              where
-                go a = if eq a a' then ac else go a'
-                  where
-                    ac@(a', _) = f a b
+            -- Iterate the liveness pass over the SCC until the block map reaches
+            -- a fixed point. Only the SCC's own blocks can change between
+            -- iterations (livenessBlock only inserts the block it processes, and
+            -- earlier SCCs are already finalised).
+            fixpoint bm
+              | changed   = fixpoint bm'
+              | otherwise = (bm', blocks'')
+              where (changed, bm', blocks'') = linearLiveness bm blocks
 
             linearLiveness
                 :: Instruction instr
                 => BlockMap Regs -> [LiveBasicBlock instr]
-                -> (BlockMap Regs, [LiveBasicBlock instr])
-
-            linearLiveness = mapAccumL (livenessBlock platform)
-
-                -- probably the least efficient way to compare two
-                -- BlockMaps for equality.
-            equalBlockMaps :: BlockMap Regs -> BlockMap Regs -> Bool
-            equalBlockMaps a b
-                = a' == b'
-              where a' = mapToList a
-                    b' = mapToList b
-                    -- See Note [Unique Determinism and code generation]
+                -> (Bool, BlockMap Regs, [LiveBasicBlock instr])
+            linearLiveness bm0 blks = go False bm0 blks
+              where
+                go !changed bm [] = (changed, bm, [])
+                go !changed bm (block : blks') =
+                  case livenessBlock platform bm block of
+                    (bm', block') ->
+                      let bid       = blockId block
+                          !changed' = changed
+                                   || mapLookup bid bm /= mapLookup bid bm'
+                      in case go changed' bm' blks' of
+                           (changed'', bm'', blks'') ->
+                             (changed'', bm'', block' : blks'')
 
 
 
