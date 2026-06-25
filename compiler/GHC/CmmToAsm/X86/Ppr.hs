@@ -133,6 +133,9 @@ pprNatCmmDecl config proc@(CmmProc top_info entry_lbl _ (ListGraph blocks)) =
 
       -- ELF .size directive (size of the entry code function)
     , pprSizeDecl platform proc_lbl
+
+    , -- Explicite export on windows (see Note [TODO])
+      pprExport config proc_lbl False
     ]
 {-# SPECIALIZE pprNatCmmDecl :: NCGConfig -> NatCmmDecl (Alignment, RawCmmStatics) Instr -> SDoc #-}
 {-# SPECIALIZE pprNatCmmDecl :: NCGConfig -> NatCmmDecl (Alignment, RawCmmStatics) Instr -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
@@ -206,11 +209,17 @@ pprDatas config (_, CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticL
   , not $ platformOS platform == OSMinGW32 && ncgSplitSections config
   = pprGloblDecl (ncgPlatform config) alias
     $$ line (text ".equiv" <+> pprAsmLabel (ncgPlatform config) alias <> comma <> pprAsmLabel (ncgPlatform config) ind')
+    $$ pprExport config lbl True
     where
       platform = ncgPlatform config
 
 pprDatas config (align, (CmmStaticsRaw lbl dats))
- = vcat (pprAlign platform align : pprLabel platform lbl : map (pprData config) dats)
+ = vcat $
+    [ pprAlign platform align
+    , pprLabel platform lbl
+    ]
+    ++ (map (pprData config) dats)
+    ++ [pprExport config lbl True]
    where
       platform = ncgPlatform config
 
@@ -288,6 +297,28 @@ pprLabelType' platform lbl =
     -}
     functionOkInfoTable = platformTablesNextToCode platform &&
       isInfoTableLabel lbl && not (isCmmInfoTableLabel lbl) && not (isConInfoTableLabel lbl)
+
+
+-- See Note [TODO]
+pprExport :: IsDoc doc => NCGConfig -> CLabel -> Bool -> doc
+pprExport config lbl isCmmData =
+  if platformOS platform == OSMinGW32
+     && platformTablesNextToCode platform
+     && externallyVisibleCLabel lbl
+     && ncgExternalDynamicRefs config
+     then let
+        asData = isCmmData || isInfoTableLabel lbl
+        in
+          pprSectionAlign config (Section Directive lbl) $$
+          line (text ".ascii" <> doubleQuotes (
+              text " -export:"
+              <> pprAsmLabel platform lbl
+              <> if asData then text ",data" else empty
+            ))
+     else empty
+  where
+    platform = ncgPlatform config
+
 
 
 pprTypeDecl :: IsDoc doc => Platform -> CLabel -> doc
