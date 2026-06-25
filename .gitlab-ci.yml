@@ -1307,7 +1307,8 @@ ghcup-metadata-nightly-push:
     - git config user.name "GHC GitLab CI"
     - git remote add gitlab_origin https://oauth2:$PROJECT_PUSH_TOKEN@gitlab.haskell.org/ghc/ghcup-metadata.git
     - git add .
-    - git commit -m "Update metadata"
+    # a metadata nightly run may result in no changes. We reflect that in the commit message.
+    - git diff --cached --quiet && git commit --allow-empty -m "Updated metadata - no changes" || git commit -m "Update metadata"
     - git push gitlab_origin HEAD:updates
   rules:
     # Only run the update on scheduled nightly pipelines, ie once a day
