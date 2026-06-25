@@ -62,6 +62,51 @@ int64_t fun32(int32_t a0, uint32_t a1, int32_t a2, int32_t a3, int32_t a4,
          s1;
 }
 
+int32_t shrink32(int64_t a0) {
+  printf("shrink32:\n");
+  printf("a0: %#llx %lld\n", a0, a0);
+
+  fflush(stdout);
+
+  return a0;
+}
+
+int16_t shrink16(int64_t a0) {
+  printf("shrink16:\n");
+  printf("a0: %#llx %lld\n", a0, a0);
+
+  fflush(stdout);
+
+  return a0;
+}
+
+int8_t shrink8(int64_t a0) {
+  printf("shrink8:\n");
+  printf("a0: %#llx %lld\n", a0, a0);
+
+  fflush(stdout);
+
+  return a0;
+}
+
+int16_t shrink32_16(int32_t a0) {
+  printf("shrink32_16:\n");
+  printf("a0: %#x %d\n", a0, a0);
+
+  fflush(stdout);
+
+  return a0;
+}
+
+int8_t shrink32_8(int32_t a0) {
+  printf("shrink32_8:\n");
+  printf("a0: %#x %d\n", a0, a0);
+
+  fflush(stdout);
+
+  return a0;
+}
+
 float funFloat(float a0, float a1, float a2, float a3, float a4, float a5,
              float a6, float a7, float s0, float s1) {
   printf("funFloat:\n");
