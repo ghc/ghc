@@ -18,12 +18,22 @@ struct StgClosure_;
 struct StgThunk_;
 struct Capability_;
 
+#if IN_STG_CODE
+
+EFF_(updateRemembSetPushClosure_);
+
+EFF_(updateRemembSetPushThunk_);
+
+#else
+
 /* This is called by the code generator */
 extern
 void updateRemembSetPushClosure_(StgRegTable *reg, struct StgClosure_ *p);
 
 extern
 void updateRemembSetPushThunk_(StgRegTable *reg, struct StgThunk_ *p);
+
+#endif
 
 // Forward declaration for unregisterised backend.
 EF_(stg_copyArray_barrier);
