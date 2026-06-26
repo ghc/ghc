@@ -19,9 +19,8 @@ test('testmblockalloc',
 # See bug #101, test requires +RTS -c (or equivalently +RTS -M<something>)
 # only GHCi triggers the bug, but we run the test all ways for completeness.
 test('bug1010',
-     # Non-moving GC doesn't support -c
-     omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc']),
-     compile_and_run, ['+RTS -c -RTS'])
+     extra_ways(['compacting_gc']),
+     compile_and_run, [''])
 
 def normalise_address(str):
     return re.sub('Access violation in generated code when reading [0]+',
@@ -122,10 +121,8 @@ test('outofmem2',
 
 test('T2047',
      [ignore_stdout,
-      extra_run_opts('+RTS -c -RTS'),
       when(opsys('freebsd'), fragile(25751)),
-      # Non-moving collector doesn't support -c
-      omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity', 'nonmoving_thr_ghc'])],
+      extra_ways(['compacting_gc'])],
      compile_and_run, ['-package containers'])
 
 # Blackhole-detection test.
@@ -449,14 +446,11 @@ test('T13832', [exit_code(1), req_ghc_with_threaded_rts], compile_and_run, ['-th
 test('T13894', js_skip, compile_and_run, [''])
 # this test fails with the profasm way on some machines but not others,
 # so we just skip it.
-test('T14497', [omit_ways(['profasm']), multi_cpu_race], compile_and_run, ['-O'])
-# The issue in the above test also happened with compaction enabled.
-test('T14497-compact',
-               [ extra_files(['T14497.hs'])
-               , only_ways(['normal'])
+test('T14497', [ omit_ways(['profasm'])
+               , extra_ways(['compacting_gc'])
                , multi_cpu_race
-               , extra_run_opts('+RTS -c -RTS')
-               ] , compile_and_run, ['-O'])
+               ]
+               , compile_and_run, ['-O'])
 test('T14695', [js_broken(22359), ignore_stderr], makefile_test, ['T14695'])
 test('T14702', [ ignore_stdout
                , when(unregisterised(), skip)
@@ -546,7 +540,7 @@ test('RestartEventLogging',
      compile_and_run, ['RestartEventLogging_c.c'])
 
 test('T17088',
-     [only_ways(['normal']), extra_run_opts('+RTS -c -A256k -RTS')],
+     [extra_ways(['compacting_gc']), extra_run_opts('+RTS -A256k -RTS')],
      compile_and_run, ['-rtsopts -O2'])
 
 test('T15427', js_broken(22374), compile_and_run, [''])
