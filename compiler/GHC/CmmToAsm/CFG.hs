@@ -885,17 +885,11 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
       in  map (\n -> (n, loopCount n)) $ nodes :: [(BlockId, Int)]
 
     mkDomMap :: Tree BlockId -> LabelMap LabelSet
-    mkDomMap root = mapFromList $ go setEmpty root
+    mkDomMap (Node _root children) = foldl' (go setEmpty) mapEmpty children
       where
-        go :: LabelSet -> Tree BlockId -> [(Label,LabelSet)]
-        go parents (Node lbl [])
-          =  [(lbl, parents)]
-        go parents (Node _ leaves)
-          = let nodes = map rootLabel leaves
-                entries = map (\x -> (x,parents)) nodes
-            in  entries ++ concatMap
-                            (\n -> go (setInsert (rootLabel n) parents) n)
-                            leaves
+        go :: LabelSet -> LabelMap LabelSet -> Tree BlockId -> LabelMap LabelSet
+        go doms acc (Node lbl kids)
+          = foldl' (go (setInsert lbl doms)) (mapInsert lbl doms acc) kids
 
 -- We make the CFG a Hoopl Graph, so we can reuse revPostOrder.
 newtype BlockNode (e :: Extensibility) (x :: Extensibility) = BN (BlockId,[BlockId])

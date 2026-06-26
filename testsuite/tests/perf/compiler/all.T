@@ -857,3 +857,16 @@ test ('T26989',
       multimod_compile,
       ['T26989', '-v0 -O'])
 
+# A single Cmm procedure with thousands of basic blocks (diamonds plus periodic
+# backedges), stressing the control-flow handling of the NCG and Wasm backends.
+test('ManyBasicBlocks',
+     [ only_ways(['optasm']),
+       unless(have_ncg(), skip),
+       cmm_src,
+       collect_compiler_stats('bytes allocated', 2),
+       pre_cmd('./genManyBasicBlocks'),
+       extra_files(['genManyBasicBlocks']),
+     ],
+     compile,
+     ['-O2 -v0'])
+
