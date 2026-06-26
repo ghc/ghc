@@ -35,6 +35,8 @@ import Data.Either
 import Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.Set as Set
+import GHC.Toolchain.Target
+import Hadrian.Oracles.TextFile (queryTargetTarget)
 import Oracles.Flag
 import Packages
 import Flavour.Type
@@ -158,6 +160,15 @@ werror =
           , arg "-optc-Wno-error=unknown-pragmas"
             -- rejected inlinings are highly dependent upon toolchain and way
           , arg "-optc-Wno-error=inline"
+            -- when building unregisterised, gcc 15+ complains "error:
+            -- function called through a non-compatible type" with
+            -- -Werror (#27404). no corresponding -Wno-foo for it so
+            -- -Wno-error is needed.
+            --
+            -- TODO: get rid of EFF_ altogether (#14647) and make sure
+            -- unregisterised backend emits clean C without needing
+            -- these hacks.
+          , queryTargetTarget tgtUnregisterised ? arg "-optc-Wno-error"
           ]
       -- N.B. We currently don't build the boot libraries' C sources with -Werror
       -- as this tends to be a portability nightmare.
