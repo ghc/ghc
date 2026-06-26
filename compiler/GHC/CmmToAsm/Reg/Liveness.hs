@@ -909,6 +909,8 @@ livenessSCCs platform blockmap done
               | otherwise = (bm', blocks'')
               where (changed, bm', blocks'') = linearLiveness bm blocks
 
+            -- Like @mapAccumL (livenessBlock platform)@, but also reports whether
+            -- any of the SCC's blocks changed.
             linearLiveness
                 :: Instruction instr
                 => BlockMap Regs -> [LiveBasicBlock instr]
@@ -925,7 +927,6 @@ livenessSCCs platform blockmap done
                       in case go changed' bm' blks' of
                            (changed'', bm'', blks'') ->
                              (changed'', bm'', block' : blks'')
-
 
 
 -- | Annotate a basic block with register liveness information.
