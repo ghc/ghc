@@ -941,17 +941,18 @@ livenessBlock platform blockmap (BasicBlock block_id instrs)
  = let
         (regsLiveOnEntry, instrs1)
             = livenessBack platform noRegs blockmap [] (reverse instrs)
-        -- Fuse the insert with the lookup of the old entry, so the fixpoint
-        -- loop in livenessSCCs can tell whether this block changed for free,
-        -- without a separate map traversal.
-        (oldEntry, blockmap') = mapInsertLookup block_id regsLiveOnEntry blockmap
-        changed         = oldEntry /= Just regsLiveOnEntry
 
         instrs2         = livenessForward platform regsLiveOnEntry instrs1
 
         output          = BasicBlock block_id instrs2
 
-   in   (changed, blockmap', output)
+   -- Fuse the insert with the lookup of the old entry, so the fixpoint loop in
+   -- livenessSCCs can tell whether this block changed for free, without a
+   -- separate map traversal. A single 'case' lets the pair from mapInsertLookup
+   -- cancel away rather than being allocated.
+   in   case mapInsertLookup block_id regsLiveOnEntry blockmap of
+          (oldEntry, blockmap') ->
+            (oldEntry /= Just regsLiveOnEntry, blockmap', output)
 
 -- | Calculate liveness going forwards,
 --   filling in when regs are born
