@@ -1573,7 +1573,7 @@ instance ExactPrint (LocatedP (WarningTxt GhcPs)) where
     c' <- markEpToken c
     return (L (EpAnn l (AnnPragma o' c' (os',cs') l1 l2 t m) css) (DeprecatedTxt src ws'))
 
-instance Typeable p => ExactPrint (InWarningCategory (GhcPass p)) where
+instance ExactPrint (InWarningCategory GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
@@ -1958,7 +1958,7 @@ exactNsSpec (DataNamespaceSpecifier data_) = do
 
 -- ---------------------------------------------------------------------
 
-instance Typeable p => ExactPrint (StringLiteral (GhcPass p)) where
+instance ExactPrint (StringLiteral GhcPs) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 

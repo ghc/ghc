@@ -28,6 +28,6 @@ toIfaceWarningTxt (DeprecatedTxt src strs) = IfDeprecatedTxt src (map (toIfaceSt
 toIfaceStringLiteralWithNames :: WithHsDocIdentifiers (StringLiteral GhcRn) GhcRn -> (IfaceStringLiteral, [IfExtName])
 toIfaceStringLiteralWithNames (WithHsDocIdentifiers src names) = (toIfaceStringLiteral src, map unLoc names)
 
-toIfaceStringLiteral :: StringLiteral (GhcPass p) -> IfaceStringLiteral
+toIfaceStringLiteral :: StringLiteral GhcRn -> IfaceStringLiteral
 toIfaceStringLiteral sLit =
   IfStringLiteral (stringLitSourceText sLit) (sl_fs sLit)
