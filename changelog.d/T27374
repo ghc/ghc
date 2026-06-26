@@ -1,0 +1,9 @@
+section: compiler
+issues: #27374
+mrs: !16207
+synopsis:
+  Fix optimisation of InstCo coercions
+description:
+  Fixes a bug in which the coercion optimiser would incorrectly optimise certain
+  InstCo coercions, incorrectly changing their kinds.
+

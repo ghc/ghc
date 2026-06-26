@@ -534,24 +534,44 @@ opt_co4' env sym rep r (InstCo fun_co arg_co)
   , let s2'   = coercionRKind arg_co'
         tv_co = mk_coherence_right_co Nominal s2' (mkSymCo k_co') arg_co'
         env'  = extendLiftingContext (zapLiftingContext env) tv' tv_co
-  = opt_co4 env' NotSwapped False r' body_co'
+  = opt_co4 env' sym False r' body_co'
 
     -- See Note [Forall over coercion]
   | Just (cv', _visL, _visR, _kind_co', body_co') <- splitForAllCo_co_maybe fun_co'
   , CoercionTy h1' <- coercionLKind arg_co'
   , let env' = extendLiftingContextCvSubst (zapLiftingContext env) cv' h1'
-  = opt_co4 env' NotSwapped False r' body_co'
+  = opt_co4 env' sym False r' body_co'
 
   -- Those cases didn't work either, so rebuild the InstCo
-  -- Push Sym into /both/ function /and/ arg_coument
-  | otherwise = InstCo fun_co' arg_co'
+  | otherwise = InstCo sym_fun_co' sym_arg_co'
 
   where
-    -- fun_co' arg_co' are both optimised, /and/ we have pushed `sym` into both
-    -- So no more sym'ing on th results of fun_co' arg_co'
-    fun_co' = opt_co4 env sym rep r fun_co
-    arg_co' = opt_co4 env sym False Nominal arg_co
     r'   = chooseRole rep r
+
+    -- Optimised versions of fun_co & arg_co. NB: we have /not/ pushed in `sym`,
+    -- in order to respect (LC2) in Note [The LiftingContext in optCoercion].
+    fun_co'     = opt_co4 env NotSwapped rep   r       fun_co
+    arg_co'     = opt_co4 env NotSwapped False Nominal arg_co
+
+    -- Like fun_co'/arg_co', except we /have/ pushed in `sym`.
+    --
+    -- Unfortunately, this can require optimising the input coercion twice,
+    -- risking exponential behaviour.
+    --
+    --  - We mitigate this by re-using fun_co'/arg_co' if we don't need to sym.
+    --  - To fully rule out exponential behaviour, we could imagine adding an
+    --    argument to opt_co4' that indicates whether the input coercion is
+    --    already optimised.
+    sym_fun_co'
+      | isSwapped sym
+      = opt_co4 env sym rep r fun_co
+      | otherwise
+      = fun_co' -- Avoids recomputing the optimised fun_co
+    sym_arg_co'
+      | isSwapped sym
+      = opt_co4 env sym False Nominal arg_co
+      | otherwise
+      = arg_co' -- Avoids recomputing the optimised arg_co
 
 opt_co4' env sym _rep r (KindCo co)
   = assert (r == Nominal) $
