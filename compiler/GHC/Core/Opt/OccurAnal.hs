@@ -1048,25 +1048,25 @@ But NB that tail-call info is preserved so that we don't thereby lose join point
 
 Note [Controlling elimination of dead bindings in occurrence analysis]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Sometimes, plugins might want to retain dead bindings. This is needed when
-a binding is only consumed by a plugin, and it is otherwise unused in the
-program.
+Sometimes, plugins might want to retain dead bindings.
 
 For instance, Liquid Haskell might be the sole consumer of a binding that is
 providing a proof. Or it might provide a lemma that is needed to check other
 parts of the program. Or it might provide a value that is only referred from a
 refinement type, but not from the Haskell code itself.
 
-The plugin could avoid running the occurrence analyser, but that would also
-disable other effects, such as the split of the program in strongly connected
-components. For this reason the occurrence analyser can be configured to retain
+For this reason, the occurrence analyser can be configured to retain
 some bindings even if they are dead. This is done by setting the `oa_can_drop`
 field of `OccAnalOpts` to a function that returns `False` for the bindings that
-should be retained.
+should be retained. All calls to the occurrence analyser from within GHC itself
+use `const True` for this predicate; only calls from plugins might return
+`False` in some cases.
 
-See https://gitlab.haskell.org/ghc/ghc/-/issues/27240 for more discussion on
-this topic.
+Alternatively, the plugin could avoid running the occurrence analyser, but that
+would also disable other effects, such as the split of the program in strongly
+connected components.
+
+See #27240 for more details.
 -}
 
 ------------------------------------------------------------------
