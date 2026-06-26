@@ -671,7 +671,7 @@ fromIfaceWarningTxt = \case
 fromIfaceStringLiteralWithNames :: (IfaceStringLiteral, [IfExtName]) -> WithHsDocIdentifiers (StringLiteral GhcRn) GhcRn
 fromIfaceStringLiteralWithNames (str, names) = WithHsDocIdentifiers (fromIfaceStringLiteral str) (map noLoc names)
 
-fromIfaceStringLiteral :: IfaceStringLiteral -> StringLiteral (GhcPass p)
+fromIfaceStringLiteral :: IfaceStringLiteral -> StringLiteral GhcRn
 fromIfaceStringLiteral (IfStringLiteral st fs) = StringLiteral st fs
 
 
