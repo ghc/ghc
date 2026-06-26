@@ -1,5 +1,4 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UnboxedTuples #-}
 
 -----------------------------------------------------------------------------
 --
@@ -898,10 +897,12 @@ livenessSCCs platform blockmap done (AcyclicSCC block : sccs)
 livenessSCCs platform blockmap done
         (CyclicSCC blocks : sccs) =
         livenessSCCs platform blockmap' (CyclicSCC blocks':done) sccs
- where      -- Iterate the liveness pass over the SCC until the block map
-            -- reaches a fixed point; see Note [Liveness fixpoint convergence test].
-            (blockmap', blocks') = fixpoint blockmap
+ where      (blockmap', blocks') = fixpoint blockmap
 
+            -- Iterate the liveness pass over the SCC until the block map reaches
+            -- a fixed point. Only the SCC's own blocks can change between
+            -- iterations (livenessBlock only inserts the block it processes, and
+            -- earlier SCCs are already finalised).
             fixpoint bm
               | changed   = fixpoint bm'
               | otherwise = (bm', blocks'')
@@ -911,58 +912,19 @@ livenessSCCs platform blockmap done
                 :: Instruction instr
                 => BlockMap Regs -> [LiveBasicBlock instr]
                 -> (Bool, BlockMap Regs, [LiveBasicBlock instr])
-            linearLiveness bm0 blks =
-              case mapAccumL' step (# False, bm0 #) blks of
-                (# (# changed, bm' #), blks' #) -> (changed, bm', blks')
+            linearLiveness bm0 blks = go False bm0 blks
               where
-                step (# changed, bm #) block =
+                go !changed bm [] = (changed, bm, [])
+                go !changed bm (block : blks') =
                   case livenessBlock platform bm block of
                     (bm', block') ->
                       let bid       = blockId block
                           !changed' = changed
                                    || mapLookup bid bm /= mapLookup bid bm'
-                      in (# (# changed', bm' #), block' #)
+                      in case go changed' bm' blks' of
+                           (changed'', bm'', blks'') ->
+                             (changed'', bm'', block' : blks'')
 
-
-{- Note [Liveness fixpoint convergence test]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A cyclic SCC is processed by running the liveness pass over its blocks
-repeatedly until the block map stops changing. We must detect that fixed
-point cheaply: only the SCC's *own* blocks can change between iterations
-(livenessBlock only inserts the block it processes, and earlier SCCs are
-already finalised), so it suffices to check, per block, whether its own
-entry moved this pass -- there is no need to compare the whole accumulated
-block map (which would make each iteration O(all-blocks-so-far)).
-
-linearLiveness does this in a single traversal: 'mapAccumL'' threads the
-block map and a 'changed' flag through the SCC's blocks, and the step
-function OR's in 'mapLookup bid bm /= mapLookup bid bm'' for the block it
-just rewrote.
-
-The flag and the map are threaded together in one *unboxed-tuple*
-accumulator so that neither is boxed per block. A reusable mapAccumL'
-cannot achieve this: threading two values forces them into a single boxed
-accumulator (a strict pair still costs one heap cell per iteration), and a
-representation-polymorphic accumulator that could be an unboxed tuple is
-rejected by GHC's representation-polymorphism restriction. Hence mapAccumL'
-is local here and monomorphic in its accumulator.
--}
-
--- | 'Data.List.mapAccumL' specialised to a @(# Bool, BlockMap Regs #)@
--- accumulator threaded in an unboxed tuple, so the loop allocates nothing per
--- element. See Note [Liveness fixpoint convergence test].
-mapAccumL'
-    :: ((# Bool, BlockMap Regs #) -> a -> (# (# Bool, BlockMap Regs #), b #))
-    -> (# Bool, BlockMap Regs #) -> [a]
-    -> (# (# Bool, BlockMap Regs #), [b] #)
-{-# INLINE mapAccumL' #-}
-mapAccumL' f = go
-  where
-    go acc []       = (# acc, [] #)
-    go acc (x : xs) =
-      case f acc x of
-        (# acc', y #) -> case go acc' xs of
-          (# acc'', ys #) -> (# acc'', y : ys #)
 
 
 -- | Annotate a basic block with register liveness information.
