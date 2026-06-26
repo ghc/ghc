@@ -667,3 +667,7 @@ test('T22859',
       # Allocation behaviour differs with the wasm backend so we get different output
       when(arch('wasm32'), skip)],
      compile_and_run, ['-with-rtsopts -A8K'])
+
+test('T27434',
+     extra_ways(['compacting_gc']),
+     compile_and_run, [''])

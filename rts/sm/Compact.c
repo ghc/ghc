@@ -622,6 +622,10 @@ update_fwd_large( bdescr *bd )
         thread_PAP((StgPAP *)p);
         continue;
 
+    case AP:
+        thread_AP((StgAP *)p);
+        continue;
+
     case TREC_CHUNK:
     {
         StgTRecChunk *tc = (StgTRecChunk *)p;
