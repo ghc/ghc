@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -ddump-rule-firings -ddump-simpl
-                -dsuppress-coercions -dsuppress-uniques #-}
+                -dsuppress-coercions -dsuppress-uniques
+                -dcanonicalize-local-binds -dstable-core-dump-order #-}
 {-# LANGUAGE Arrows #-}
 
 module T18013 where

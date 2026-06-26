@@ -142,45 +142,50 @@ T18013.$wmapMaybeRule [InlPrag=NOINLINE]
  Str=<1L><1C(L,C(1,C(1,P(L,1L))))>,
  Unf=OtherCon []]
 T18013.$wmapMaybeRule
-  = \ (@a) (@b) (@s) (ww :: s) (ww1 :: s -> a -> IO (Result s b)) ->
-      case ww of ww2 { __DEFAULT ->
-      case ww1 of wild { __DEFAULT ->
+  = \ (@ctA)
+      (@ctB)
+      (@ctC)
+      (cbA :: ctC)
+      (cbB :: ctC -> ctA -> IO (Result ctC ctB)) ->
+      case cbA of cwA { __DEFAULT ->
+      case cbB of cwB { __DEFAULT ->
       T18013a.Rule
         @IO
-        @(Maybe a)
-        @(Maybe b)
-        @s
-        ww2
-        ((\ (s2 :: s)
-            (a1 :: Maybe a)
-            (s1 :: GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld) ->
-            case a1 of {
+        @(Maybe ctA)
+        @(Maybe ctB)
+        @ctC
+        cwA
+        ((\ (cbC :: ctC)
+            (cbD :: Maybe ctA)
+            (cbE :: GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld) ->
+            case cbD of {
               Nothing ->
-                (# s1,
+                (# cbE,
                    T18013a.Result
-                     @s @(Maybe b) ww2 (GHC.Internal.Maybe.Nothing @b) #);
-              Just x ->
-                case ((wild s2 x)
-                      `cast` <Co:4> :: IO (Result s b)
+                     @ctC @(Maybe ctB) cwA (GHC.Internal.Maybe.Nothing @ctB) #);
+              Just cbF ->
+                case ((cwB cbC cbF)
+                      `cast` <Co:4> :: IO (Result ctC ctB)
                                        ~R# (GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
                                             -> (# GHC.Internal.Prim.State#
                                                     GHC.Internal.Prim.RealWorld,
-                                                  Result s b #)))
-                       s1
+                                                  Result ctC ctB #)))
+                       cbE
                 of
-                { (# ipv, ipv1 #) ->
-                case ipv1 of { Result t2 c1 ->
-                (# ipv,
-                   T18013a.Result @s @(Maybe b) t2 (GHC.Internal.Maybe.Just @b c1) #)
+                { (# cbG, cbH #) ->
+                case cbH of { Result cbI cbJ ->
+                (# cbG,
+                   T18013a.Result
+                     @ctC @(Maybe ctB) cbI (GHC.Internal.Maybe.Just @ctB cbJ) #)
                 }
                 }
             })
-         `cast` <Co:13> :: (s
-                            -> Maybe a
+         `cast` <Co:13> :: (ctC
+                            -> Maybe ctA
                             -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
                             -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
-                                  Result s (Maybe b) #))
-                           ~R# (s -> Maybe a -> IO (Result s (Maybe b))))
+                                  Result ctC (Maybe ctB) #))
+                           ~R# (ctC -> Maybe ctA -> IO (Result ctC (Maybe ctB))))
       }
       }
 
@@ -193,14 +198,14 @@ mapMaybeRule [InlPrag=NOINLINE[final]]
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@a) (@b) (f [Occ=Once1!] :: Rule IO a b) ->
-                 case f of { Rule @s ww [Occ=Once1] ww1 [Occ=Once1] ->
-                 T18013.$wmapMaybeRule @a @b @s ww ww1
+         Tmpl= \ (@ctD) (@ctE) (cbD [Occ=Once1!] :: Rule IO ctD ctE) ->
+                 case cbD of { Rule @ctF cbE [Occ=Once1] cbF [Occ=Once1] ->
+                 T18013.$wmapMaybeRule @ctD @ctE @ctF cbE cbF
                  }}]
 mapMaybeRule
-  = \ (@a) (@b) (f :: Rule IO a b) ->
-      case f of { Rule @s ww ww1 ->
-      T18013.$wmapMaybeRule @a @b @s ww ww1
+  = \ (@ctA) (@ctB) (cbA :: Rule IO ctA ctB) ->
+      case cbA of { Rule @ctC cbB cbC ->
+      T18013.$wmapMaybeRule @ctA @ctB @ctC cbB cbC
       }
 
 
