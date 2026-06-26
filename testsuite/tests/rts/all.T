@@ -687,3 +687,7 @@ test('ClosureTable',
      ['-debug -O0 ClosureTable_c.c -I{top}/../rts -I{top}/../rts/include'])
 
 test('resizeMutableByteArrayInPlace', [req_cmm, extra_ways(['optasm', 'sanity']), only_ways(['optasm', 'sanity'])], compile_and_run, [''])
+
+test('T27434',
+     extra_ways(['compacting_gc']),
+     compile_and_run, [''])
