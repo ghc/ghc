@@ -617,7 +617,11 @@ extern StgWord      CCS_SYSTEM[];
 //    'GHC.StgToCmm.Prof'
 // as opposed to real prototype declared in
 //    'rts/include/rts/prof/CCS.h'
+#if IN_STG_CODE
+EFF_(enterFunCCS);
+#else
 void enterFunCCS (void *reg, void *ccsfn);
+#endif
 void * pushCostCentre (void *ccs, void *cc);
 
 // Capability.c
