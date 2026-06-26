@@ -1,0 +1,11 @@
+section: rts
+synopsis: Fix "unknown/strange object 24 crash" in compacting GC
+issues: #27434
+mrs: !16261
+
+description {
+Fix a crash in the compacting garbage collector when collecting large
+function-application thunks. Affected programs crashed with an internal error
+of the form "update_fwd_large: unknown/strange object 24" when run with the
+compacting GC (``+RTS -c``).
+}
