@@ -40,6 +40,7 @@ testLocalBindingsDesugaring = do
           , "f :: ()"
           , "f = ()"
           , "  where"
+          , "    w = ()"
           , "    z = ()"
           ]
 
