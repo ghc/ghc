@@ -290,9 +290,9 @@ simpleOptPgm opts this_mod binds rules =
                          OccurAnalOpts
                            { oa_active_unf = \_ -> True  {- All unfoldings active -}
                            , oa_active_rule = \_ -> False {- No rules active -}
-                           , oa_lcl_imp_rules = rules
                            , oa_can_drop = so_can_drop opts
                            }
+                         rules
                          binds
 
     (final_env, binds') = foldl' do_one (emptyEnv opts, []) occ_anald_binds

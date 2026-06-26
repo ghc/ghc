@@ -108,7 +108,6 @@ occurAnalyseExpr_Prep expr = expr'
 data OccurAnalOpts = OccurAnalOpts
   { oa_active_unf     :: Id -> Bool              -- ^ Active unfoldings
   , oa_active_rule    :: ActivationGhc -> Bool   -- ^ Active rules
-  , oa_lcl_imp_rules  :: [CoreRule]              -- ^ Local rules for imported Ids
   , oa_can_drop       :: Id -> Bool
       -- ^ Can we drop this Id if it is dead?
       -- See Note [Controlling elimination of dead bindings in occurrence analysis].
@@ -116,9 +115,10 @@ data OccurAnalOpts = OccurAnalOpts
 
 occurAnalysePgm :: Module         -- Used only in debug output
                 -> OccurAnalOpts
+                -> [CoreRule]     -- Local rules for imported Ids
                 -> CoreProgram
                 -> CoreProgram
-occurAnalysePgm this_mod opts binds
+occurAnalysePgm this_mod opts imp_rules binds
   | isEmptyDetails final_usage
   = occ_anald_binds
 
@@ -126,10 +126,7 @@ occurAnalysePgm this_mod opts binds
   = warnPprTrace True "Glomming in" (hang (ppr this_mod <> colon) 2 (ppr final_usage))
     occ_anald_glommed_binds
   where
-    init_env = initOccEnv { occ_rule_act = oa_active_rule opts
-                          , occ_unf_act  = oa_active_unf opts
-                          , occ_can_drop = oa_can_drop opts
-                          }
+    init_env = initOccEnv { occ_opts = opts }
 
     WUD final_usage occ_anald_binds = go binds init_env
     WUD _ occ_anald_glommed_binds = occAnalRecBind init_env TopLevel
@@ -145,7 +142,7 @@ occurAnalysePgm this_mod opts binds
           -- a binding that was actually needed (albeit before its
           -- definition site).  #17724 threw this up.
 
-    initial_uds = addManyOccs emptyDetails (rulesFreeVars $ oa_lcl_imp_rules opts)
+    initial_uds = addManyOccs emptyDetails (rulesFreeVars imp_rules)
     -- The RULES declarations keep things alive!
 
     -- imp_rule_edges maps a top-level local binder 'f' to the
@@ -160,7 +157,7 @@ occurAnalysePgm this_mod opts binds
                            [ mapVarEnv (const [(act,rhs_fvs)]) $ getUniqSet $
                              exprsFreeIds args `delVarSetList` bndrs
                            | Rule { ru_act = act, ru_bndrs = bndrs
-                                   , ru_args = args, ru_rhs = rhs } <- oa_lcl_imp_rules opts
+                                   , ru_args = args, ru_rhs = rhs } <- imp_rules
                                    -- Not BuiltinRules; see Note [Plugin rules]
                            , let rhs_fvs = exprFreeIds rhs `delVarSetList` bndrs ]
 
@@ -1112,7 +1109,7 @@ occAnalBind !env lvl ire (NonRec bndr rhs) thing_inside combine
         !(WUD body_uds (occ, body)) = occAnalNonRecBody env_body bndr' $ \env ->
                                       thing_inside (addJoinPoint env bndr' rhs_uds)
     in
-    if isDeadOcc occ && occ_can_drop env bndr  -- Drop dead code; see Note [Dead code]
+    if isDeadOcc occ && oa_can_drop (occ_opts env) bndr  -- Drop dead code; see Note [Dead code]
     then WUD body_uds body
     else WUD (combineJoinPointUDs env rhs_uds body_uds)    -- Note `orUDs`
              (combine [NonRec (fst (tagNonRecBinder lvl occ bndr')) rhs']
@@ -1122,7 +1119,7 @@ occAnalBind !env lvl ire (NonRec bndr rhs) thing_inside combine
   -- Analyse the body and /then/ the RHS
   | let env_body = addLocalLet env lvl bndr
   , WUD body_uds (occ,body) <- occAnalNonRecBody env_body bndr thing_inside
-  = if isDeadOcc occ && occ_can_drop env bndr  -- Drop dead code; see Note [Dead code]
+  = if isDeadOcc occ && oa_can_drop (occ_opts env) bndr  -- Drop dead code; see Note [Dead code]
     then WUD body_uds body
     else let
         -- Get the join info from the *new* decision; NB: bndr is not already a JoinId
@@ -1262,7 +1259,7 @@ occAnalRec :: OccEnv -> TopLevelFlag
 occAnalRec !env lvl
            (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = wtuds }))
            (WUD body_uds binds)
-  | isDeadOcc occ && occ_can_drop env bndr  -- Check for dead code: see Note [Dead code]
+  | isDeadOcc occ && oa_can_drop (occ_opts env) bndr  -- Check for dead code: see Note [Dead code]
   = WUD body_uds binds
   | otherwise
   = let (bndr', mb_join) = tagNonRecBinder lvl occ bndr
@@ -1497,8 +1494,8 @@ However, tagZero can only be inlined in phase 1 and later, while
 the RULE is only active *before* phase 1.  So there's no problem.
 
 To make this work, we look for the RHS free vars only for
-*active* rules. That's the reason for the occ_rule_act field
-of the OccEnv.
+*active* rules. That's the reason for the oa_active_rule field
+of occ_opts in OccEnv.
 
 Note [loopBreakNodes]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -1888,7 +1885,7 @@ makeNode !env imp_rule_edges bndr_set (bndr, rhs)
       -- of Note [Join arity prediction based on joinRhsArity]
 
     --------- IMP-RULES --------
-    is_active     = occ_rule_act env :: ActivationGhc -> Bool
+    is_active     = oa_active_rule (occ_opts env) :: ActivationGhc -> Bool
     imp_rule_info = lookupImpRules imp_rule_edges bndr
     imp_rule_uds  = impRulesScopeUsage imp_rule_info
     imp_rule_fvs  = impRulesActiveFvs is_active bndr_set imp_rule_info
@@ -1997,8 +1994,8 @@ nodeScore !env new_bndr lb_deps
   | old_bndr `elemVarSet` lb_deps  -- Self-recursive things are great loop breakers
   = (0, 0, True)                   -- See Note [Self-recursion and loop breakers]
 
-  | not (occ_unf_act env old_bndr) -- A binder whose inlining is inactive (e.g. has
-  = (0, 0, True)                   -- a NOINLINE pragma) makes a great loop breaker
+  | not (oa_active_unf (occ_opts env) old_bndr) -- A binder whose inlining is inactive (e.g. has
+  = (0, 0, True)                                -- a NOINLINE pragma) makes a great loop breaker
 
   | exprIsTrivial rhs
   = mk_score 10  -- Practically certain to be inlined
@@ -3019,8 +3016,7 @@ scrutinised y).
 data OccEnv
   = OccEnv { occ_encl       :: !OccEncl      -- Enclosing context information
            , occ_one_shots  :: !OneShots     -- See Note [OneShots]
-           , occ_unf_act    :: Id -> Bool    -- Which Id unfoldings are active
-           , occ_rule_act   :: ActivationGhc -> Bool  -- Which rules are active
+           , occ_opts       :: !OccurAnalOpts
              -- See Note [Finding rule RHS free vars]
 
            , occ_allow_weak_joins :: !Bool
@@ -3046,10 +3042,6 @@ data OccEnv
            , occ_nested_lets :: IdSet    -- Non-top-level, non-rec-bound lets
                 -- I tried making this field strict, but doing so increased
                 -- compile-time allocation very slightly: 0.1% on average
-
-           , occ_can_drop :: Id -> Bool
-                -- ^ Can we drop this Id if it is dead?
-                -- See 'oa_can_drop' in 'OccurAnalOpts'.
            }
 
 type JoinPointInfo = IdEnv OccInfoEnv
@@ -3093,19 +3085,18 @@ initOccEnv :: OccEnv
 initOccEnv
   = OccEnv { occ_encl      = OccVanilla
            , occ_one_shots = []
-
-                 -- To be conservative, we say that all
-                 -- inlines and rules are active
-           , occ_unf_act   = \_ -> True
-           , occ_rule_act  = \_ -> True
-
            , occ_allow_weak_joins = False
-
            , occ_join_points = emptyVarEnv
            , occ_bs_env = emptyVarEnv
            , occ_bs_rng = emptyVarSet
            , occ_nested_lets = emptyVarSet
-           , occ_can_drop = \_ -> True
+             -- To be conservative, we say that all
+             -- inlines and rules are active
+           , occ_opts = OccurAnalOpts
+              { oa_active_rule  = \_ -> True
+              , oa_active_unf  = \_ -> True
+              , oa_can_drop = \_ -> True
+              }
            }
 
 noBinderSwaps :: OccEnv -> Bool
