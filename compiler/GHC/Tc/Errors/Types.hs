@@ -78,6 +78,7 @@ module GHC.Tc.Errors.Types (
   , CoercibleMsg(..)
   , NoBuiltinInstanceMsg(..)
   , HasFieldMsg(..)
+  , WithDictMsg(..)
   , TooFancyField(..)
   , PotentialInstances(..)
   , UnsupportedCallConvention(..)
@@ -5994,15 +5995,28 @@ data CoercibleMsg
   -- known instance.
   | StuckDataFamApps TyCon (NE.NonEmpty [Type])
 
+-- | Explains why GHCwasn't able to provide a built-in 'WithDict' instance
+-- for the given type.
+data WithDictMsg
+  -- todo superclass
+  -- | The given type is not a class constraint.
+  = NotClassConstraint Type
+  -- | The class we want to construct a dict from is not unary.
+  -- e.g. @HasField "fld" Int fld@. --todo
+  | NotUnaryClass Type
+  -- | The class arguments' types mismatch somehow.
+  | ArgumentTypeMismatch DataCon [Type]
+
 -- | Explains why GHC wasn't able to provide a built-in instance for
 -- a particular class.
 data NoBuiltinInstanceMsg
   = NoBuiltinHasFieldMsg HasFieldMsg
+  -- NoBuiltinWithDictMsg  -- see Note [withDict]
+  | NoBuiltinWithDictMsg WithDictMsg
 
   -- Other useful constructors might be:
   -- NoBuiltinTypeableMsg  -- explains polykinded Typeable restrictions
   -- NoBuiltinDataToTagMsg -- see conditions in Note [DataToTag overview]
-  -- NoBuiltinWithDictMsg  -- see Note [withDict]
 
 -- | Explains why GHC wasn't able to provide a built-in 'HasField' instance
 -- for the given types.

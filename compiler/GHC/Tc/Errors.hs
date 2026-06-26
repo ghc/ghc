@@ -12,7 +12,7 @@ module GHC.Tc.Errors(
 
 import GHC.Prelude
 
-import GHC.Builtin.Names (hasFieldClassName)
+import GHC.Builtin.Names (hasFieldClassName, withDictClassName)
 
 import GHC.Driver.Env (hsc_units)
 import GHC.Driver.DynFlags
@@ -59,7 +59,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core.PatSyn (PatSyn)
 import GHC.Core.Predicate
 import GHC.Core.Type
-import GHC.Core.Class (className)
+import GHC.Core.Class (className, Class)
 import GHC.Core.ConLike (isExistentialRecordField, ConLike (..))
 import GHC.Core.Coercion
 import GHC.Core.DataCon
@@ -2553,8 +2553,24 @@ getNoBuiltinInstMsg item =
   do { rdr_env <- getGlobalRdrEnv
      ; fam_envs <- tcGetFamInstEnvs
      ; mbNoHasFieldMsg <- hasFieldInfo_maybe rdr_env fam_envs item
-     ; return $ fmap NoBuiltinHasFieldMsg mbNoHasFieldMsg
+     ; mbNoWithDictMsg <- withDictInfo_maybe item
+     ; return $ (firstJust (fmap NoBuiltinHasFieldMsg mbNoHasFieldMsg) (fmap NoBuiltinWithDictMsg mbNoWithDictMsg))
      }
+
+withDictInfo_maybe :: ErrorItem -> TcM (Maybe WithDictMsg)
+withDictInfo_maybe item
+  | Just (cls_ty, _) <- withDict_maybe (errorItemPred item)
+  = case tcSplitTyConApp_maybe cls_ty of
+      Nothing -> return $ Just $ NotClassConstraint cls_ty
+      Just (dict_tc, dict_args) -> do
+        case isUnaryClassTyCon_maybe dict_tc of
+          Nothing -> return $ Just $ NotUnaryClass cls_ty
+          Just (_, dict_dc) ->
+            case dataConInstArgTys dict_dc dict_args of
+              [inst_meth_ty] -> return Nothing
+              _ -> return $ Just $ ArgumentTypeMismatch dict_dc dict_args
+
+  | otherwise = return Nothing
 
 {- Note [Error messages for unsolved HasField constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2759,6 +2775,16 @@ hasField_maybe pred =
       , [ _k, _rec_rep, _fld_rep, x_ty, rec_ty, fld_ty ] <- tys
       -> Just (x_ty, rec_ty, fld_ty)
     _ -> Nothing
+
+withDict_maybe :: PredType -> Maybe (Type, Type)
+withDict_maybe pred =
+  case classifyPredType pred of
+    ClassPred cls tys
+      | className cls == withDictClassName
+      , [cls_ty, ty] <- tys
+      -> Just (cls_ty, ty)
+    _ -> Nothing
+
   -- NB: we deliberately don't handle rebound 'HasField' (with -XRebindableSyntax),
   -- as GHC only has built-in instances for the built-in 'HasField' class.
 

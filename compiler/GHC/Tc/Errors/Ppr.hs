@@ -5161,6 +5161,13 @@ pprCoercibleMsg (OutOfScopeNewtypeConstructor dc import_suggs) =
 pprNoBuiltinInstanceMsg :: NoBuiltinInstanceMsg -> SDoc
 pprNoBuiltinInstanceMsg = \case
   NoBuiltinHasFieldMsg msg -> pprHasFieldMsg msg
+  NoBuiltinWithDictMsg msg -> pprWithDictMsg msg
+
+pprWithDictMsg :: WithDictMsg -> SDoc
+pprWithDictMsg = \case
+  NotClassConstraint ty -> text "NB:" <+> quotes (ppr ty) <+> "NotClassConstraint"
+  NotUnaryClass ty -> text "NB:" <+> quotes (ppr ty) <+> "NotUnaryClass"
+  ArgumentTypeMismatch dcon tys -> text "NB:" <+> quotes (ppr tys) <+> "ArgumentTypeMismatch"
 
 pprHasFieldMsg :: HasFieldMsg -> SDoc
 pprHasFieldMsg = \case
@@ -5477,6 +5484,13 @@ tcSolverReportMsgHints ctxt = \case
 noBuiltinInstanceHints :: NoBuiltinInstanceMsg -> [GhcHint]
 noBuiltinInstanceHints = \case
   NoBuiltinHasFieldMsg noHasFieldMsg -> hasFieldMsgHints noHasFieldMsg
+  NoBuiltinWithDictMsg noWithDictMsg -> withDictMsgHints noWithDictMsg
+
+withDictMsgHints :: WithDictMsg -> [GhcHint]
+withDictMsgHints = \case
+  NotClassConstraint {} -> noHints
+  NotUnaryClass {} -> noHints
+  ArgumentTypeMismatch {} -> noHints
 
 hasFieldMsgHints :: HasFieldMsg -> [GhcHint]
 hasFieldMsgHints = \case
