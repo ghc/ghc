@@ -879,7 +879,7 @@ computeLiveness platform sccs
                                         , ppr sccs'])
 
 livenessSCCs
-       :: Instruction instr
+       :: forall instr. Instruction instr
        => Platform
        -> BlockMap Regs
        -> [SCC (LiveBasicBlock instr)]          -- accum
@@ -897,14 +897,15 @@ livenessSCCs platform blockmap done (AcyclicSCC block : sccs)
 livenessSCCs platform blockmap done
         (CyclicSCC blocks : sccs) =
         livenessSCCs platform blockmap' (CyclicSCC blocks':done) sccs
- where      (blockmap', blocks') = fixpoint blockmap
+ where      (blockmap', blocks') = iterateUntilUnchanged blockmap
 
             -- Iterate the liveness pass over the SCC until the block map reaches
             -- a fixed point. Only the SCC's own blocks can change between
             -- iterations (livenessBlock only inserts the block it processes, and
             -- earlier SCCs are already finalised).
-            fixpoint bm
-              | changed   = fixpoint bm'
+            iterateUntilUnchanged :: BlockMap Regs -> (BlockMap Regs, [LiveBasicBlock instr])
+            iterateUntilUnchanged bm
+              | changed   = iterateUntilUnchanged bm'
               | otherwise = (bm', blocks'')
               where (changed, bm', blocks'') = linearLiveness bm blocks
 
