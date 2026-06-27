@@ -891,7 +891,7 @@ livenessSCCs _ blockmap done []
         = (done, blockmap)
 
 livenessSCCs platform blockmap done (AcyclicSCC block : sccs)
- = let  (_, blockmap', block')  = livenessBlock platform blockmap block
+ = let  (blockmap', block')     = livenessBlock platform blockmap block
    in   livenessSCCs platform blockmap' (AcyclicSCC block' : done) sccs
 
 livenessSCCs platform blockmap done
@@ -909,9 +909,8 @@ livenessSCCs platform blockmap done
               | otherwise = (bm', blocks'')
               where (changed, bm', blocks'') = linearLiveness bm blocks
 
-            -- Like @mapAccumL (livenessBlock platform)@, but also OR's together
-            -- the per-block changed flags reported by livenessBlock, so the
-            -- caller can detect the fixed point without comparing block maps.
+            -- Like @mapAccumL (livenessBlock platform)@, but also reports whether
+            -- any of the SCC's blocks changed.
             linearLiveness
                 :: Instruction instr
                 => BlockMap Regs -> [LiveBasicBlock instr]
@@ -921,8 +920,10 @@ livenessSCCs platform blockmap done
                 go !changed bm [] = (changed, bm, [])
                 go !changed bm (block : blks') =
                   case livenessBlock platform bm block of
-                    (blockChanged, bm', block') ->
-                      let !changed' = changed || blockChanged
+                    (bm', block') ->
+                      let bid       = blockId block
+                          !changed' = changed
+                                   || mapLookup bid bm /= mapLookup bid bm'
                       in case go changed' bm' blks' of
                            (changed'', bm'', blks'') ->
                              (changed'', bm'', block' : blks'')
@@ -935,23 +936,19 @@ livenessBlock
         => Platform
         -> BlockMap Regs
         -> LiveBasicBlock instr
-        -> (Bool, BlockMap Regs, LiveBasicBlock instr)
+        -> (BlockMap Regs, LiveBasicBlock instr)
 
 livenessBlock platform blockmap (BasicBlock block_id instrs)
  = let
         (regsLiveOnEntry, instrs1)
             = livenessBack platform noRegs blockmap [] (reverse instrs)
-        -- Fuse the insert with the lookup of the old entry, so the fixpoint
-        -- loop in livenessSCCs can tell whether this block changed for free,
-        -- without a separate map traversal.
-        (oldEntry, blockmap') = mapInsertLookup block_id regsLiveOnEntry blockmap
-        changed         = oldEntry /= Just regsLiveOnEntry
+        blockmap'       = mapInsert block_id regsLiveOnEntry blockmap
 
         instrs2         = livenessForward platform regsLiveOnEntry instrs1
 
         output          = BasicBlock block_id instrs2
 
-   in   (changed, blockmap', output)
+   in   ( blockmap', output)
 
 -- | Calculate liveness going forwards,
 --   filling in when regs are born
