@@ -203,7 +203,6 @@ mapInsert (Label k) v (LM m) = LM (M.insert k v m)
 -- | Insert a value, also returning the value previously bound to the key (if
 -- any). Fuses the insert and lookup into a single traversal of the map.
 mapInsertLookup :: Label -> v -> LabelMap v -> (Maybe v, LabelMap v)
-{-# INLINE mapInsertLookup #-}
 mapInsertLookup (Label k) v (LM m) =
   case M.insertLookupWithKey (\_ new _ -> new) k v m of
     (old, m') -> (old, LM m')
