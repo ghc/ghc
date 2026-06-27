@@ -160,6 +160,7 @@ data BuildConfig
                 , withZstd       :: Bool
                 , crossTarget    :: Maybe String
                 , crossStage     :: Maybe Int
+                , platformKeyOverride :: Maybe String
                 , crossEmulator  :: CrossEmulator
                 , configureWrapper :: Maybe String
                 , fullyStatic    :: Bool
@@ -229,6 +230,7 @@ vanilla = BuildConfig
   , withZstd = False
   , crossTarget = Nothing
   , crossStage  = Nothing
+  , platformKeyOverride = Nothing
   , crossEmulator = NoEmulator
   , configureWrapper = Nothing
   , fullyStatic = False
@@ -273,15 +275,29 @@ static = vanilla { fullyStatic = True }
 staticNativeInt :: BuildConfig
 staticNativeInt = static { bignumBackend = Native }
 
-crossConfig :: String       -- ^ target triple
+stage2CrossConfig :: String       -- ^ target triple
             -> CrossEmulator -- ^ emulator for testing
             -> Maybe String -- ^ Configure wrapper
             -> BuildConfig
-crossConfig triple emulator configure_wrapper =
+stage2CrossConfig triple emulator configure_wrapper =
     vanilla { crossTarget = Just triple
             , crossStage  = Just 2
             , crossEmulator = emulator
             , configureWrapper = configure_wrapper
+            }
+
+-- | cross-compiled compilers (build /= host/target)
+stage3CrossConfig :: String       -- ^ target triple
+            -> String        -- ^ GHCup platform key for the host (e.g. "riscv64-linux")
+            -> CrossEmulator -- ^ emulator for testing
+            -> Maybe String -- ^ Configure wrapper
+            -> BuildConfig
+stage3CrossConfig triple hostKey emulator configure_wrapper =
+    vanilla { crossTarget        = Just triple
+            , crossStage         = Just 3
+            , platformKeyOverride = Just hostKey
+            , crossEmulator      = emulator
+            , configureWrapper   = configure_wrapper
             }
 
 llvm :: BuildConfig
@@ -368,6 +384,7 @@ testEnv arch opsys bc =
     , ["zstd"  | withZstd bc ]
     , ["no_tntc"  | not (tablesNextToCode bc) ]
     , ["cross_"++triple  | Just triple <- pure $ crossTarget bc ]
+    , ["stage" ++ show stage | Just stage <- pure (crossStage bc), Just triple <- pure (crossTarget bc), "riscv" `isInfixOf` triple ]
     , [flavourString (mkJobFlavour bc)]
     ]
 
@@ -806,6 +823,7 @@ data Job
         , jobCache :: Cache
         , jobRules :: OnOffRules
         , jobPlatform  :: (Arch, Opsys)
+        , jobHostPlatformKey :: String
         }
 
 instance Show Job where
@@ -836,6 +854,8 @@ job :: Arch -> Opsys -> BuildConfig -> NamedJob Job
 job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
   where
     jobPlatform = (arch, opsys)
+
+    jobHostPlatformKey = fromMaybe (mkPlatform arch opsys) (platformKeyOverride buildConfig)
 
     jobRules = emptyRules jobName
 
@@ -1285,13 +1305,16 @@ alpine_aarch64 = [
 cross_jobs :: [JobGroup Job]
 cross_jobs = [
     -- x86 -> aarch64
-    validateBuilds Amd64 (Linux Debian13) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
+    validateBuilds Amd64 (Linux Debian13) (stage2CrossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
 
-    -- x86_64 -> riscv
-  , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian13Riscv) (crossConfig "riscv64-linux-gnu" (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing))
+    -- x86_64 (build/host) -> riscv (target)
+  , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian13Riscv) (stage2CrossConfig "riscv64-linux-gnu" (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing))
+
+    -- x86_64 (build) -> riscv (host/target)
+  , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian13Riscv) (stage3CrossConfig "riscv64-linux-gnu" "riscv64-linux" (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing))
 
     -- x86_64 -> loongarch64
-  , addValidateRule LoongArch64 (validateBuilds Amd64 (Linux Ubuntu2404LoongArch64) (crossConfig "loongarch64-linux-gnu" (Emulator "qemu-loongarch64 -L /usr/loongarch64-linux-gnu") Nothing))
+  , addValidateRule LoongArch64 (validateBuilds Amd64 (Linux Ubuntu2404LoongArch64) (stage2CrossConfig "loongarch64-linux-gnu" (Emulator "qemu-loongarch64 -L /usr/loongarch64-linux-gnu") Nothing))
 
     -- Javascript
   , addValidateRule JSBackend (validateBuilds Amd64 (Linux Debian11Js) javascriptConfig)
@@ -1312,7 +1335,7 @@ cross_jobs = [
         (validateBuilds AArch64 (Linux Debian12Wine) (winAarch64Config {llvmBootstrap = True}))
   ]
   where
-    javascriptConfig = (crossConfig "javascript-unknown-ghcjs" (NoEmulatorNeeded TimeoutIncrease) (Just "emconfigure"))
+    javascriptConfig = (stage2CrossConfig "javascript-unknown-ghcjs" (NoEmulatorNeeded TimeoutIncrease) (Just "emconfigure"))
                          { bignumBackend = Native }
 
     makeWinArmJobs = modifyJobs
@@ -1351,7 +1374,7 @@ cross_jobs = [
             llvm_prefix = "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-"
             cflags = "-fuse-ld=" ++ llvm_prefix ++ "ld --rtlib=compiler-rt"
 
-    winAarch64Config = (crossConfig "aarch64-unknown-mingw32" (Emulator "/opt/wine-arm64ec-msys2-deb12/bin/wine") Nothing)
+    winAarch64Config = (stage2CrossConfig "aarch64-unknown-mingw32" (Emulator "/opt/wine-arm64ec-msys2-deb12/bin/wine") Nothing)
                          { bignumBackend = Native }
 
     make_wasm_jobs cfg =
@@ -1364,7 +1387,7 @@ cross_jobs = [
         $ addValidateRule WasmBackend $ validateBuilds Amd64 (Linux AlpineWasm) cfg
 
     wasm_build_config =
-      (crossConfig "wasm32-wasi" (NoEmulatorNeeded NoTimeoutIncrease) Nothing)
+      (stage2CrossConfig "wasm32-wasi" (NoEmulatorNeeded NoTimeoutIncrease) Nothing)
         { hostFullyStatic = True
         , buildFlavour    = Release -- TODO: This needs to be validate but wasm backend doesn't pass yet
         , textWithSIMDUTF = True
@@ -1435,7 +1458,7 @@ platform_mapping = Map.map go combined_result
 
     process sel =
       Map.fromListWith combine
-      [ (uncurry mkPlatform (jobPlatform (jobInfo j)), j)
+      [ (jobHostPlatformKey (jobInfo j), j)
       | (sel -> Just j) <- job_groups
       ]
 

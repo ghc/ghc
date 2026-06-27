@@ -1034,7 +1034,12 @@ esac
 if [ -n "${CROSS_TARGET:-}" ]; then
   info "Cross-compiling for $CROSS_TARGET..."
   target_triple="$CROSS_TARGET"
-  cross_prefix="$target_triple-"
+  # Stage3 native GHC runs on the target itself, so no cross prefix.
+  if [ "${CROSS_STAGE:-2}" = "3" ]; then
+    cross_prefix=""
+  else
+    cross_prefix="$target_triple-"
+  fi
 else
   cross_prefix=""
 fi
