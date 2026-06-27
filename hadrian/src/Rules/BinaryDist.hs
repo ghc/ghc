@@ -110,12 +110,12 @@ other, the install script:
 
 data Relocatable = Relocatable | NotRelocatable
 
-installTo :: Relocatable -> String -> Action ()
-installTo relocatable prefix = do
+installTo :: Relocatable -> FilePath -> String -> Action ()
+installTo relocatable dirSuffix prefix = do
     root <- buildRoot
     version        <- setting ProjectVersion
     targetPlatform <- setting TargetPlatformFull
-    let ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
+    let ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform <> dirSuffix
         bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
     runBuilder (Configure bindistFilesDir) ["--prefix="++prefix] [] []
     let env = case relocatable of
@@ -124,8 +124,8 @@ installTo relocatable prefix = do
     runBuilderWithCmdOptions env (Make bindistFilesDir) ["install"] [] []
 
 
-buildBinDistDir :: FilePath -> BindistConfig -> Action ()
-buildBinDistDir root conf@BindistConfig{..} = do
+buildBinDistDir :: FilePath -> FilePath -> BindistConfig -> Action ()
+buildBinDistDir dirSuffix root conf@BindistConfig{..} = do
 
     verbosity <- getVerbosity
     -- We 'need' all binaries and libraries
@@ -155,7 +155,7 @@ buildBinDistDir root conf@BindistConfig{..} = do
     distDir        <- Context.distDir (vanillaContext library_stage rts)
 
     let ghcBuildDir      = root -/- stageString library_stage
-        bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
+        bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty <> dirSuffix
         ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
         rtsIncludeDir    = distDir -/- "include"
 
@@ -228,7 +228,7 @@ buildBinDistDir root conf@BindistConfig{..} = do
     let bindistSettings = bindistFilesDir -/- "lib" -/- "settings"
         bindistContext = vanillaContext library_stage compiler
     bindistSettingsContent <- interpretInContext bindistContext $
-        generateSettings bindistSettings False "package.conf.d"
+        generateSettings bindistSettings False "package.conf.d" executable_stage
     writeFile' bindistSettings bindistSettingsContent
 
     copyDirectory rtsIncludeDir         bindistFilesDir
@@ -240,10 +240,16 @@ buildBinDistDir root conf@BindistConfig{..} = do
     --
     -- N.B. the ghc-pkg executable may be prefixed with a target triple
     -- (c.f. #20267).
-
-    -- Not going to work for cross
-    ghcPkgName <- programName (vanillaContext Stage1 ghcPkg)
-    cmd_ (bindistFilesDir -/- "bin" -/- ghcPkgName) ["recache", "--package-db", bindistFilesDir -/- "lib" -/- "package.conf.d" ]
+    --
+    -- For target bindists the executable_stage binaries run on the target, not
+    -- the build host, so we fall back to the prior stage's ghc-pkg.
+    canRunGhcPkg <- not <$> crossStage (predStage executable_stage)
+    if canRunGhcPkg then do
+      ghcPkgName <- programName (vanillaContext executable_stage ghcPkg)
+      cmd_ (bindistFilesDir -/- "bin" -/- ghcPkgName) ["recache", "--package-db", bindistFilesDir -/- "lib" -/- "package.conf.d" ]
+    else do
+      ghcPkgPath <- builderPath $ GhcPkg Recache library_stage
+      cmd_ ghcPkgPath ["recache", "--package-db", bindistFilesDir -/- "lib" -/- "package.conf.d" ]
 
 
     need ["docs"]
@@ -318,45 +324,45 @@ buildBinDistDir root conf@BindistConfig{..} = do
 bindistRules :: Rules ()
 bindistRules = do
     root <- buildRootRules
-    phony "reloc-binary-dist-dir" $ do
-        need ["binary-dist-dir"]
+    forM_ ["", "-stage3"] $ \suffix -> do
+      phony ("reloc-binary-dist-dir" ++ suffix) $ do
+        need ["binary-dist-dir" ++ suffix]
         cwd <- liftIO IO.getCurrentDirectory
         version        <- setting ProjectVersion
         targetPlatform <- setting TargetPlatformFull
-        let ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
-        let prefix = cwd -/- root -/- "reloc-bindist" -/- ghcVersionPretty
-        installTo Relocatable prefix
+        let prefix = cwd -/- root -/- "reloc-bindist" -/- ("ghc-" ++ version ++ "-" ++ targetPlatform ++ suffix)
+        installTo Relocatable suffix prefix
 
-    phony "install" $ do
-        need ["binary-dist-dir"]
+      phony ("install" ++ suffix) $ do
+        need ["binary-dist-dir" ++ suffix]
         let prefixErr = "You must specify a path with --prefix when using the"
-                     ++ " 'install' rule"
+                     ++ " 'install" ++ suffix ++ "' rule"
         installPrefix <- fromMaybe (error prefixErr) <$> cmdPrefix
-        installTo NotRelocatable installPrefix
+        installTo NotRelocatable suffix installPrefix
 
     phony "binary-dist-dir" $ do
       cfg <- implicitBindistConfig
-      buildBinDistDir root cfg
+      buildBinDistDir "" root cfg
 
-    phony "binary-dist-dir-cross" $ buildBinDistDir root crossBindist
-    -- MP: Not working yet
-    -- phony "binary-dist-dir-stage3" $ buildBinDistDir root targetBindist
+    phony "binary-dist-dir-cross" $ buildBinDistDir "" root crossBindist
+
+    phony "binary-dist-dir-stage3" $ buildBinDistDir "-stage3" root targetBindist
 
     let buildBinDist compressor = do
           win_host <- isWinHost
           win_target <- isWinTarget Stage2
           when (win_target && win_host) (error "normal binary-dist does not work for windows targets, use `reloc-binary-dist-*` target instead.")
-          buildBinDistX "binary-dist-dir" "bindist" compressor
-        buildBinDistReloc = buildBinDistX "reloc-binary-dist-dir" "reloc-bindist"
+          buildBinDistX "binary-dist-dir" "bindist" "" compressor
+        buildBinDistReloc = buildBinDistX "reloc-binary-dist-dir" "reloc-bindist" ""
 
-        buildBinDistX :: String -> FilePath -> Compressor -> Action ()
-        buildBinDistX target bindist_folder compressor = do
+        buildBinDistX :: String -> FilePath -> FilePath -> Compressor -> Action ()
+        buildBinDistX target bindist_folder dirSuffix compressor = do
             need [target]
 
             version        <- setting ProjectVersion
             targetPlatform <- setting TargetPlatformFull
 
-            let ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
+            let ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform <> dirSuffix
 
             -- Finally, we create the archive <root>/bindist/ghc-X.Y.Z-platform.tar.xz
             tarPath <- builderPath (Tar Create)
@@ -371,14 +377,35 @@ bindistRules = do
       phony (name <> "-dist-bzip2") $ mk_bindist Bzip2
       phony (name <> "-dist-xz") $ mk_bindist Xz
 
-    phony "binary-dist-cross" $ buildBinDistX "binary-dist-dir-cross" "bindist" Xz
-    phony "binary-dist-stage3" $ buildBinDistX "binary-dist-dir-stage3" "bindist" Xz
+    phony "binary-dist-cross" $ buildBinDistX "binary-dist-dir-cross" "bindist" "" Xz
+    phony "binary-dist-stage3" $ buildBinDistX "binary-dist-dir-stage3" "bindist" "-stage3" Xz
 
     -- Prepare binary distribution configure script
     -- (generated under <ghc root>/distrib/configure by 'autoreconf')
-    root -/- "bindist" -/- "ghc-*" -/- "configure" %> \configurePath -> do
-        need ["distrib" -/- "configure.ac"]
+    priority 2 $ root -/- "bindist" -/- "*ghc-*-stage3" -/- "configure" %> generateConfigure Stage2
+    root -/- "bindist" -/- "*ghc-*" -/- "configure" %> generateConfigure Stage1
+
+    -- Generate the Makefile that enables the "make install" part
+    root -/- "bindist" -/- "*ghc-*" -/- "Makefile" %> \makefilePath -> do
+        top <- topDirectory
+        copyFile (top -/- "hadrian" -/- "bindist" -/- "Makefile") makefilePath
+
+    -- Copy various configure-related files needed for a working
+    -- './configure [...] && make install' workflow
+    -- (see the list of files needed in the 'binary-dist' rule above, before
+    -- creating the archive).
+    forM_ bindistInstallFiles $ \file ->
+        root -/- "bindist" -/- "*ghc-*" -/- file %> \dest -> do
+            copyFile (fixup file) dest
+
+  where
+    fixup f | f `elem` ["INSTALL", "README"] = "distrib" -/- f
+            | otherwise                      = f
+    generateConfigure stage configurePath = do
+        let acFile = stageString stage -/- "distrib" -/- "configure.ac"
+        need [acFile]
         ghcRoot <- topDirectory
+        copyFile (ghcRoot -/- acFile) (ghcRoot -/- "distrib" -/- "configure.ac")
         copyFile (ghcRoot -/- "aclocal.m4") (ghcRoot -/- "distrib" -/- "aclocal.m4")
         copyDirectory (ghcRoot -/- "m4") (ghcRoot -/- "distrib")
 
@@ -401,29 +428,11 @@ bindistRules = do
 
         buildWithCmdOptions env $
             target (vanillaContext Stage1 ghc) (Autoreconf $ ghcRoot -/- "distrib") [] []
-        -- We clean after ourselves, moving the configure script we generated in
-        -- our bindist dir
+        removeFile (ghcRoot -/- acFile)
+        removeFile (ghcRoot -/- "distrib" -/- "configure.ac")
         removeFile (ghcRoot -/- "distrib" -/- "aclocal.m4")
         removeDirectory (ghcRoot -/- "distrib" -/- "m4")
-
         moveFile (ghcRoot -/- "distrib" -/- "configure") configurePath
-
-    -- Generate the Makefile that enables the "make install" part
-    root -/- "bindist" -/- "ghc-*" -/- "Makefile" %> \makefilePath -> do
-        top <- topDirectory
-        copyFile (top -/- "hadrian" -/- "bindist" -/- "Makefile") makefilePath
-
-    -- Copy various configure-related files needed for a working
-    -- './configure [...] && make install' workflow
-    -- (see the list of files needed in the 'binary-dist' rule above, before
-    -- creating the archive).
-    forM_ bindistInstallFiles $ \file ->
-        root -/- "bindist" -/- "ghc-*" -/- file %> \dest -> do
-            copyFile (fixup file) dest
-
-  where
-    fixup f | f `elem` ["INSTALL", "README"] = "distrib" -/- f
-            | otherwise                      = f
 
 data Compressor = Gzip | Bzip2 | Xz
                 deriving (Eq, Ord, Show)
@@ -499,7 +508,7 @@ pkgToWrappers stage pkg = do
         -- These are the packages which we want to expose to the user and hence
         -- there are wrappers installed in the bindist.
       | pkg `elem` [hpcBin, haddock, hp2ps, hsc2hs, ghc, ghcPkg]
-                      -> (:[]) <$> (programName =<< programContext Stage1 pkg)
+                      -> (:[]) <$> (programName =<< programContext stage pkg)
       | otherwise     -> pure []
 
 wrapper :: Stage -> FilePath -> Action String

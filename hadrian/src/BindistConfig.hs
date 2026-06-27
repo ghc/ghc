@@ -3,6 +3,7 @@ module BindistConfig where
 import Stage
 import Oracles.Flag
 import Expression
+import UserSettings (finalStage)
 
 data BindistConfig = BindistConfig { library_stage :: Stage -- ^ The stage compiler which builds the libraries
                                    , executable_stage :: Stage -- ^ The stage compiler which builds the executables
@@ -32,7 +33,9 @@ implicitBindistConfig = do
   -- libraries built for the host, but the distributed compiler would produce files for
   -- the target.
   cross <- flag CrossCompiling
-  return $ if cross then crossBindist else normalBindist
+  if not cross
+    then return normalBindist
+    else return $ if finalStage == Stage3 then targetBindist else crossBindist
 
 -- | Are we building things in this stage for the final target?
 buildingForTarget ::  Stage -> Action Bool
