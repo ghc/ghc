@@ -1,0 +1,44 @@
+
+==================== Common sub-expression ====================
+Result size of Common sub-expression
+  = {terms: 27, types: 22, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 14, types: 6, coercions: 0, joins: 0/0}
+$sspec :: Int -> Int -> Int
+[LclId,
+ Arity=2,
+ Str=<S!P(L)><S!P(L)>,
+ Cpr=1,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (cbA [Occ=Once1!, Dmd=S!P(L)] :: Int)
+                 (cbB [Occ=Once1!, Dmd=S!P(L)] :: Int) ->
+                 case cbA of { I# cbC ->
+                 case cbB of { I# cbD [Occ=Once1] -> I# (+# (*# cbC cbD) cbC) }
+                 }}]
+$sspec
+  = \ (cbA [Dmd=S!P(L)] :: Int) (cbB [Dmd=S!P(L)] :: Int) ->
+      case cbA of cwA [Dmd=A] { I# cbC ->
+      case cbB of cwB [Dmd=A] { I# cbD -> I# (+# (*# cbC cbD) cbC) }
+      }
+
+-- RHS size: {terms: 11, types: 7, coercions: 0, joins: 0/0}
+spec :: forall a. Num a => a -> a -> a
+[LclIdX,
+ Arity=3,
+ Str=<SP(SC(1,C(1,L)),A,LC(1,C(1,L)),A,A,A,A)><L><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [180 0 0] 80 0},
+ RULES: "USPEC spec @Int"
+            forall (cbA [Occ=Dead] :: Num Int). spec @Int cbA = $sspec]
+spec
+  = \ (@ctA)
+      (cbA [Dmd=SP(SC(1,C(1,L)),A,LC(1,C(1,L)),A,A,A,A)] :: Num ctA)
+      (cbB :: ctA)
+      (cbC :: ctA) ->
+      + @ctA cbA (* @ctA cbA cbB cbC) cbB
+
+
+

@@ -612,3 +612,8 @@ test('T27176', only_ways(['optasm']), compile,
      ['-ddump-simpl -dsuppress-all -dsuppress-uniques -dsuppress-ticks -dno-typeable-binds -dcanonicalize-local-binds'])
 test('T27176b', only_ways(['normal']), compile,
      ['-ddump-ds -dsuppress-all -dsuppress-uniques -dno-typeable-binds -dcanonicalize-local-binds'])
+# T27176c: a SPECIALISE rule attached to a binder's IdInfo has its binders
+# canonicalized in their own fresh scope.  Dump CSE (pre-Tidy) rather than the
+# simpl output, as Tidy detaches local rules into a separate section; cf. T7785.
+test('T27176c', only_ways(['optasm']), compile,
+     ['-O -ddump-cse -dsuppress-uniques -dsuppress-coercions -dsuppress-module-prefixes -dno-typeable-binds -dcanonicalize-local-binds'])
