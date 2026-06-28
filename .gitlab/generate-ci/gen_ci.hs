@@ -1311,7 +1311,9 @@ cross_jobs = [
   , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian13Riscv) (stage2CrossConfig "riscv64-linux-gnu" (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing))
 
     -- x86_64 (build) -> riscv (host/target)
-  , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian13Riscv) (stage3CrossConfig "riscv64-linux-gnu" "riscv64-linux" (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing))
+    -- Skip testing in ci.sh by setting CROSS_EMULATOR=NOT_SET
+    -- (we're creating target binaries which won't run on the build arch)
+  , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian13Riscv) (stage3CrossConfig "riscv64-linux-gnu" "riscv64-linux" NoEmulator Nothing))
 
     -- x86_64 -> loongarch64
   , addValidateRule LoongArch64 (validateBuilds Amd64 (Linux Ubuntu2404LoongArch64) (stage2CrossConfig "loongarch64-linux-gnu" (Emulator "qemu-loongarch64 -L /usr/loongarch64-linux-gnu") Nothing))

@@ -2819,11 +2819,11 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-stage3-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
-      "CROSS_EMULATOR": "qemu-riscv64 -L /usr/riscv64-linux-gnu",
+      "CROSS_EMULATOR": "NOT_SET",
       "CROSS_STAGE": "3",
       "CROSS_TARGET": "riscv64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "-e config.timeout=900",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-stage3-validate",
       "XZ_OPT": "-9"
     }
@@ -6799,11 +6799,11 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-stage3-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
-      "CROSS_EMULATOR": "qemu-riscv64 -L /usr/riscv64-linux-gnu",
+      "CROSS_EMULATOR": "NOT_SET",
       "CROSS_STAGE": "3",
       "CROSS_TARGET": "riscv64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "-e config.timeout=900",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-stage3-validate"
     }
   },
