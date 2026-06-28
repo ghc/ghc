@@ -198,9 +198,9 @@ mapMaybeRule [InlPrag=NOINLINE[final]]
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@ctD) (@ctE) (cbD [Occ=Once1!] :: Rule IO ctD ctE) ->
-                 case cbD of { Rule @ctF cbE [Occ=Once1] cbF [Occ=Once1] ->
-                 T18013.$wmapMaybeRule @ctD @ctE @ctF cbE cbF
+         Tmpl= \ (@ctA) (@ctB) (cbA [Occ=Once1!] :: Rule IO ctA ctB) ->
+                 case cbA of { Rule @ctC cbB [Occ=Once1] cbC [Occ=Once1] ->
+                 T18013.$wmapMaybeRule @ctA @ctB @ctC cbB cbC
                  }}]
 mapMaybeRule
   = \ (@ctA) (@ctB) (cbA :: Rule IO ctA ctB) ->

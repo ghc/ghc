@@ -65,13 +65,19 @@ The scheme:
   whole Rec group), so a change in one top-level binding never renames
   binders in another.
 
-* Within one binding (a top-level pair or a nested let), names are
-  allocated visible-first: the binder itself and its RHS before the
-  unfolding template and attached RULES, even though IdInfo prints *above*
-  the RHS.  Under -dsuppress-all the IdInfo is invisible, and allocating it
-  first would let an unfolding-only change renumber the visible RHS.  The
-  cosmetic cost when IdInfo is shown is that the `Unf=` block contains
-  higher-numbered names than the RHS below it.
+* An unfolding template and each attached rule are numbered as their own
+  fresh scope (counters reset, via withFreshCounters in canonIdInfo), because
+  their binders are independent of the surrounding code: a binder in an
+  unfolding template or a rule never *is* an RHS binder.  So a change in the
+  visible RHS can never renumber them, and an unfolding reads as a mirror of
+  the RHS it came from (both start at A).  Attached rules are thereby numbered
+  exactly like the standalone rules of canonicalizeRulesForDump.
+
+  The cost is that canonical names are no longer unique across one top-level
+  binding: under -dsuppress-uniques a name like `cbA` can recur, once per
+  scope (the RHS, each unfolding, each rule).  Within any single scope names
+  are still distinct, and these scopes are read independently, so this does
+  not introduce real ambiguity.
 
 * Each renamed binder keeps its Unique, its OccName namespace, its
   IdDetails (join points keep printing as `join`/`jump`) and its IdInfo
@@ -118,6 +124,21 @@ startCounters = CC 0 0 0 0
 
 type CanonM = State CanonCounters
 
+-- | Run an action with the counters reset to their start, restoring the
+-- caller's counters afterwards.  Used for binder scopes that are independent
+-- of the surrounding code -- an unfolding template and each attached rule --
+-- so that churn in a visible RHS can never renumber them.  Restoring (rather
+-- than only resetting) matters for nested lets: after a let binder's IdInfo
+-- the enclosing let-body must keep numbering on from the RHS, not from the
+-- reset scope.  See Note [Canonicalizing local binders for dumps].
+withFreshCounters :: CanonM a -> CanonM a
+withFreshCounters act = do
+  saved <- get
+  put startCounters
+  r <- act
+  put saved
+  return r
+
 -- | The substitution for occurrences of renamed binders.  Passed as a plain
 -- argument (not in 'CanonM'): the counters must thread across sibling
 -- branches, the substitution must not escape the binder's scope.
@@ -155,10 +176,11 @@ canonicalizeBindsForDump :: CoreProgram -> CoreProgram
 canonicalizeBindsForDump binds = map canonTopBind binds
 
 -- | Canonicalize the rules in the standalone \"local rules for imported
--- ids\" list of a dump.  Each rule gets a fresh set of counters.
+-- ids\" list of a dump.  Each rule is its own fresh scope, exactly as when it
+-- prints attached to its binder (see 'canonIdInfo').
 canonicalizeRulesForDump :: [CoreRule] -> [CoreRule]
 canonicalizeRulesForDump rules
-  = map (\r -> evalState (canonRule emptyVarEnv r) startCounters) rules
+  = evalState (mapM (withFreshCounters . canonRule emptyVarEnv) rules) startCounters
 
 -- All counters restart per top-level bind.  Top-level binder Names are
 -- kept; only their IdInfo is rewritten, after the (visible) RHSs.
@@ -214,8 +236,9 @@ canonAlt env (Alt con bs rhs) = do
 
 canonBind :: CanonEnv -> CoreBind -> CanonM (CanonEnv, CoreBind)
 canonBind env (NonRec b rhs) = do
-  -- Binder first (it prints first), then the RHS, then the IdInfo
-  -- (visible-first; see Note [Canonicalizing local binders for dumps]).
+  -- Binder first (it prints first), then the RHS; the IdInfo is numbered in
+  -- its own fresh scope (canonIdInfo), so its position here doesn't affect
+  -- the RHS numbering.  See Note [Canonicalizing local binders for dumps].
   -- This handles type-lets too: see Note [Substituting type-lets]
   -- in GHC.Core.Lint.SubstTypeLets.
   (env', b1) <- canonBndr env (letBndrRole b) b
@@ -290,9 +313,12 @@ canonBndrs env vs = mapAccumLM (\e v -> canonBndr e (nonLetBndrRole v) v) env vs
 canonIdInfo :: CanonEnv -> Var -> CanonM Var
 canonIdInfo env v
   | isId v = do
-      unf' <- canonUnfolding env (realIdUnfolding v)
+      -- The unfolding template and each rule are independent binder scopes,
+      -- numbered fresh so a change in the visible RHS can't renumber them.
+      -- See Note [Canonicalizing local binders for dumps].
+      unf' <- withFreshCounters (canonUnfolding env (realIdUnfolding v))
       let RuleInfo rules fvs = idSpecialisation v
-      rules' <- mapM (canonRule env) rules
+      rules' <- mapM (withFreshCounters . canonRule env) rules
       return (v `setIdUnfolding` unf'
                 `setIdSpecialisation` RuleInfo rules' fvs)
   | otherwise = return v
