@@ -1,0 +1,24 @@
+#include "Cmm.h"
+
+t27447_repro (W_ x) {
+  I64 ty;
+  W_ old;
+
+again:
+  ty = I64[x];
+  switch [0 .. 2] (ty) {
+    case 0: {
+      return (I64[x + 16]);
+    }
+    case 1: {
+      old = x;
+      x = %acquire W_[x + 8];
+      I64[old] = 0;
+      goto again;
+    }
+    case 2: {
+      STK_CHK_GEN();
+      goto again;
+    }
+  }
+}

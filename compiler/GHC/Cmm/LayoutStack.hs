@@ -407,6 +407,8 @@ procMiddle stackmaps node sm
         where loc = getStackLoc area off stackmaps
      CmmAssign (CmmLocal r) _other
        -> sm { sm_regs = delFromUFM (sm_regs sm) r }
+     CmmUnsafeForeignCall _ results _
+       -> sm { sm_regs = delListFromUFM (sm_regs sm) results }
      _other
        -> sm
 

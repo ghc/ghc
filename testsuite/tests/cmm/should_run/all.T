@@ -33,7 +33,7 @@ test('T22871',
 
 test('JumpTableNoStackDealloc',
      [    extra_run_opts('"' + config.libdir + '"')
-     ,    req_cmm 
+     ,    req_cmm
      ,    when(arch('wasm32'), skip) # wasm32 doesn't support the printf() calls
      ,    when(arch('i386'), skip) # i386 doesn't support `MO_U_Rem W64` (`_c1::I64 % 10 :: W64`)
      ],
@@ -52,3 +52,11 @@ test('T25601',
      [req_cmm],
      multi_compile_and_run,
      ['T25601', [('T25601a.cmm', '')], ''])
+
+test('T27447',
+     [ req_cmm
+     , extra_ways(['optasm'])
+     , when(have_llvm(), extra_ways(['optasm', 'optllvm']))
+     ],
+     multi_compile_and_run,
+     ['T27447', [('T27447_cmm.cmm', '')], ''])
