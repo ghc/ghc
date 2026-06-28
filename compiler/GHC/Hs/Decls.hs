@@ -643,7 +643,7 @@ instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
           GhcPs -> if null decls -- No "where" part
                         then top_matter
                         else vcat [ top_matter <+> text "where"
-                                  , nest 2 $ pprDeclList (map (ppr . unLoc) (decls_no_docs decls)) ]
+                                  , nest 2 $ pprDeclList (map (ppr . unLoc) decls) ]
           GhcRn -> ppr_decls decls
           GhcTc -> ppr_decls decls
 
@@ -654,22 +654,19 @@ instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
                     <+> pp_vanilla_decl_head lclas tyvars fixity context
                     <+> pprFundeps (map unLoc fds)
 
-        decls_no_docs decls = filter keep decls
-          where
-            keep (L _ DocD{}) = False
-            keep _ = True
-
         ppr_decls :: ClassDeclX (GhcPass p) -> SDoc
         ppr_decls ClassDeclX { tcdSigs = sigs,
                                tcdMeths = methods,
                                tcdATs   = ats,
-                               tcdATDefs = at_defs }
+                               tcdATDefs = at_defs,
+                               tcdDocs = docs}
             | null sigs && null methods && null ats && null at_defs -- No "where" part
                 = top_matter
             | otherwise -- Laid out
                 = vcat [ top_matter <+> text "where"
                        , nest 2 $ pprDeclList (map (ppr . unLoc) ats ++
                                                map (pprTyFamDefltDecl . unLoc) at_defs ++
+                                               map (ppr . unLoc) docs ++
                                                pprLHsBindsForUser methods sigs) ]
 
 instance OutputableBndrId p

@@ -106,8 +106,10 @@ newtype N7 a b
   = -- | The 'N7' constructor
     N7 {n7 :: a b}
 class (D a) => C a where
+  <document comment>
   a :: IO a
   b :: [a]
+  <document comment>
   c :: a
 <document comment>
 class D a where
