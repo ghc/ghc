@@ -30,7 +30,7 @@ cachegrind Ir profile because a cons is Ir-cheap. Always look at both numbers.
 | **Generated Core** of the compiler | `~/ghc/head0/_build/stage1/compiler/build/compiler/<Module/Path>.dump-simpl` |
 | Suite-wide cachegrind Ir ranking | `cg-out/aggregate.md` (which functions are hot suite-wide, SCALES vs startup) |
 | Late-CCS caller profiles (all 82 tests) | `prof-out/<TEST>.prof` (JSON cost-centre stack tree) |
-| Ticky entry+alloc profiles | `ticky-out/<TEST>.ticky` (only a few exist; regenerate as needed) |
+| Ticky entry+alloc profiles | `ticky-out/<TEST>.ticky` (all 82 tests) |
 | Per-test command table | `cg_batch.py` `TESTS` (drives every runner) |
 
 `-fprof-late` inserts cost centres *after* optimisation, so attribution is on the
@@ -51,9 +51,10 @@ alloc stay exact** and match ticky to the digit.
 2. **Get the two definition-site numbers (entries & alloc).** Ticky, keyed to the
    real definition site even through thunks:
    ```
-   python3 ticky_run.py <TEST>                       # if ticky-out/<TEST>.ticky absent
    python3 ticky_top.py xyz --file <TEST>            # entries + Alloc + Alloc'd
+   python3 ticky_top.py --alloc --file <TEST>        # what this test allocates most
    ```
+   (`ticky-out/` is complete; `python3 ticky_run.py <TEST> --force` to regenerate.)
    High entries + 0 alloc ⇒ pure walk ⇒ (B) only. High alloc ⇒ ask *what structure
    is being built* (list, env, map) and whether it must be.
 
