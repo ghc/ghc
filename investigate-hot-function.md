@@ -99,7 +99,16 @@ alloc stay exact** and match ticky to the digit.
 
 ## What "performance opportunities" to look for
 
-Map the findings onto one of these recurring patterns (each seen in this suite):
+The patterns below are the ones that have actually recurred in this suite — a
+**checklist of priors, not a closed taxonomy.** Use them to recognise the common
+cases fast, but stay open-minded: the goal is the cheapest correct way to meet the
+caller's real requirement, and the biggest wins are often *structural* and specific
+to this function — they won't have a name on this list. Let the data (entries, alloc,
+Core, caller stacks) lead; if what you find doesn't fit any pattern here, that's a
+finding, not a dead end — describe the mechanism in its own terms and propose the fix.
+If it's a clean new pattern, say so so it can be added.
+
+Common patterns (each seen in this suite):
 
 - **List/map materialisation** — a deterministic fold that builds and orders an
   element list (`Word64Map.elems1` ← `RoughMap.lookupRM'`, 11.2 GB). Lever: stream /
