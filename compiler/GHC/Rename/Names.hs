@@ -895,7 +895,7 @@ getLocalNonValBinders fixity_env
       = new_di dup_fields_ok has_sel Nothing d
     new_assoc dup_fields_ok has_sel
       (L _ (ClsInstD _ (ClsInstDecl { cid_poly_ty = inst_ty
-                                    , cid_datafam_insts = adts })))
+                                    , cid_decls = decls })))
       = do -- First, attempt to grab the name of the class from the instance.
            -- This step could fail if the instance is not headed by a class,
            -- such as in the following examples:
@@ -919,7 +919,7 @@ getLocalNonValBinders fixity_env
                -> pure []
              Just cls_gre
                -> let cls_nm = greName cls_gre
-                  in concatMapM (new_di dup_fields_ok has_sel (Just cls_nm) . unLoc) adts
+                  in concatMapM (new_di dup_fields_ok has_sel (Just cls_nm) . unLoc) (asCidDatafamInsts decls)
 
     new_di :: DuplicateRecordFields -> FieldSelectors
            -> Maybe Name -- class name

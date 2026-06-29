@@ -1296,7 +1296,7 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (AnnClassDecl
         (EpTok
          (EpaSpan { DumpSemis.hs:28:1-5 }))
@@ -1309,8 +1309,7 @@
         (NoEpTok)
         [])
        (EpVirtualBraces
-        (3))
-       (NoAnnSortKey))
+        (3)))
       []
       (Nothing)
       (L

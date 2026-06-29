@@ -355,6 +355,8 @@ type family XXTyFamInstDecl x
 type family XCClsInstDecl      x
 type family XXClsInstDecl      x
 
+type family XClsInstDecls      x
+
 -- -------------------------------------
 -- InstDecl type families
 type family XClsInstD      x

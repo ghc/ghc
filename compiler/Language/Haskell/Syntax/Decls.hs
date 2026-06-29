@@ -36,7 +36,7 @@ module Language.Haskell.Syntax.Decls (
   TyFamDefltDecl, LTyFamDefltDecl,
   DataFamInstDecl(..), LDataFamInstDecl,
   FamEqn(..), TyFamInstEqn, LTyFamInstEqn, HsFamEqnPats,
-  LClsInstDecl, ClsInstDecl(..),
+  LClsInstDecl, ClsInstDecl(..), ClsInstDeclX(..),
 
   -- ** Standalone deriving declarations
   DerivDecl(..), LDerivDecl,
@@ -1271,13 +1271,19 @@ data ClsInstDecl pass
       , cid_poly_ty :: LHsSigType pass      -- Context => Class Instance-type
                                             -- Using a polytype means that the renamer conveniently
                                             -- figures out the quantified type variables for us.
-      , cid_binds         :: LHsBinds pass       -- Class methods
-      , cid_sigs          :: [LSig pass]         -- User-supplied pragmatic info
-      , cid_tyfam_insts   :: [LTyFamInstDecl pass]   -- Type family instances
-      , cid_datafam_insts :: [LDataFamInstDecl pass] -- Data family instances
+      , cid_decls   :: XClsInstDecls pass   -- ^ Class instance declarations. Allow pass-specific representation
       , cid_overlap_mode  :: Maybe (XRec pass (OverlapMode pass))
       }
   | XClsInstDecl !(XXClsInstDecl pass)
+
+-- | Convenience type for the classic 'XClassDecls' where the [LHsDecl pass] are split out.
+data ClsInstDeclX pass
+  = ClsInstDeclX
+      { cid_binds         :: LHsBinds pass           -- Class methods
+      , cid_sigs          :: [LSig pass]             -- User-supplied pragmatic info
+      , cid_tyfam_insts   :: [LTyFamInstDecl pass]   -- Type family instances
+      , cid_datafam_insts :: [LDataFamInstDecl pass] -- Data family instances
+      }
 
 ----------------- Instances of all kinds -------------
 

@@ -384,7 +384,7 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (AnnClassDecl
         (EpTok
          (EpaSpan { T17544_kw.hs:19:1-5 }))
@@ -397,8 +397,7 @@
         (NoEpTok)
         [])
        (EpVirtualBraces
-        (5))
-       (NoAnnSortKey))
+        (5)))
       []
       (Nothing)
       (L

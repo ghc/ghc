@@ -989,6 +989,7 @@ type instance XCHsDataDefn DocNameI = NoExtField
 type instance XCFamilyDecl DocNameI = NoExtField
 type instance XClassDecl DocNameI = NoExtField
 type instance XClassDecls DocNameI = ClassDeclX DocNameI
+type instance XClsInstDecls DocNameI = ClsInstDeclX DocNameI
 type instance XDataDecl DocNameI = NoExtField
 type instance XSynDecl DocNameI = NoExtField
 type instance XFamDecl DocNameI = NoExtField

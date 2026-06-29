@@ -16,7 +16,6 @@ import GHC hiding (moduleName)
 import GHC.Driver.Ppr
 import GHC.Hs.Dump
 import GHC.Parser.PostProcess ( wrapValBind )
-import GHC.Types.Error
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader
 import GHC.Utils.Error

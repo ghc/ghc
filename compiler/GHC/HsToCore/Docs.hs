@@ -371,10 +371,10 @@ subordinates env instMap decl = case decl of
     data_fams = do
       DataFamInstDecl { dfid_eqn =
         FamEqn { feqn_tycon = L l _
-               , feqn_rhs   = defn }} <- unLoc <$> cid_datafam_insts d
+               , feqn_rhs   = defn }} <- unLoc <$>  asCidDatafamInsts (cid_decls d)
       [ (n, [], IM.empty) | Just n <- [lookupSrcSpan (locA l) instMap] ] ++ dataSubs defn
     ty_fams = do
-      TyFamInstDecl { tfid_eqn = FamEqn { feqn_tycon = L l _ } } <- unLoc <$> cid_tyfam_insts d
+      TyFamInstDecl { tfid_eqn = FamEqn { feqn_tycon = L l _ } } <- unLoc <$> asCidTyfamInsts @Renamed (cid_decls d)
       [ (n, [], IM.empty) | Just n <- [lookupSrcSpan (locA l) instMap] ]
     in data_fams ++ ty_fams
 

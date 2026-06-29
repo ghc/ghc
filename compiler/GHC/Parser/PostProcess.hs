@@ -213,7 +213,7 @@ mkClassDecl :: SrcSpan
             -> P (LTyClDecl GhcPs)
 
 mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layout annsIn
-  = do { decls <- cvBindsAndSigs' where_cls
+  = do { decls <- cvBindsAndSigs where_cls
        ; (cls, tparams, fixity, ops, cps, cs) <- checkTyClHdr True tycl_hdr
        ; tyvars <- checkTyVars (text "class") whereDots cls tparams
        ; let anns' = annsIn { acd_openp = ops, acd_closep = cps}
@@ -528,7 +528,7 @@ cvBindsAndSigsOnly :: OrdList (LHsDecl GhcPs)
 -- and in case of class or instance declarations also
 -- associated type declarations. They might also contain Haddock comments.
 cvBindsAndSigsOnly fb = do
-  fb' <- cvBindsAndSigs' fb
+  fb' <- cvBindsAndSigs fb
   return (fmap wrapValBind fb')
 
 -- TODO:AZ add this to the re-exports of the GHC module
@@ -537,33 +537,11 @@ wrapValBind (L l (ValD _ b)) = VbBind (L l b)
 wrapValBind (L l (SigD _ s)) = VbSig (L l s)
 wrapValBind _ = panic "wrapValBind: got unexpected decl"
 
-cvBindsAndSigs :: OrdList (LHsDecl GhcPs)
-  -> P (LHsBinds GhcPs, [LSig GhcPs], [LFamilyDecl GhcPs]
-          , [LTyFamInstDecl GhcPs], [LDataFamInstDecl GhcPs], [LDocDecl GhcPs])
+cvBindsAndSigs :: OrdList (LHsDecl GhcPs) -> P [LHsDecl GhcPs]
 -- Input decls contain just value bindings and signatures
 -- and in case of class or instance declarations also
 -- associated type declarations. They might also contain Haddock comments.
 cvBindsAndSigs fb = do
-  fb' <- cvBindsAndSigs' fb
-  return (partitionBindsAndSigs fb')
-  where
-    -- cvBindsAndSigs is called in several places in the parser,
-    -- and its items can be produced by various productions:
-    --
-    --    * decl       (when parsing a where clause or a let-expression)
-    --    * decl_inst  (when parsing an instance declaration)
-    --    * decl_cls   (when parsing a class declaration)
-    --
-    -- partitionBindsAndSigs can handle almost all declaration forms produced
-    -- by the aforementioned productions, except for SpliceD, which we filter
-    -- out here (in cvBindsAndSigs').
-    --
-
-cvBindsAndSigs' :: OrdList (LHsDecl GhcPs) -> P [LHsDecl GhcPs]
--- Input decls contain just value bindings and signatures
--- and in case of class or instance declarations also
--- associated type declarations. They might also contain Haddock comments.
-cvBindsAndSigs' fb = do
   fb' <- drop_bad_decls (fromOL fb)
   return (getMonoBindAll fb')
   where

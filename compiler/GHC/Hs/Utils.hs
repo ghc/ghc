@@ -1573,8 +1573,8 @@ hsLInstDeclBinders :: (IsPass p, OutputableBndrId p)
                    -> ([(LocatedA (IdP (GhcPass p)))], [LFieldOcc (GhcPass p)])
 hsLInstDeclBinders (L _ (ClsInstD
                              { cid_inst = ClsInstDecl
-                                          { cid_datafam_insts = dfis }}))
-  = foldMap (lconsWithFieldsBinders . hsDataFamInstBinders . unLoc) dfis
+                                          { cid_decls = decls }}))
+  = foldMap (lconsWithFieldsBinders . hsDataFamInstBinders . unLoc) (asCidDatafamInsts decls)
 hsLInstDeclBinders (L _ (DataFamInstD { dfid_inst = fi }))
   = lconsWithFieldsBinders $ hsDataFamInstBinders fi
 hsLInstDeclBinders (L _ (TyFamInstD {})) = mempty

@@ -595,13 +595,13 @@ checkCanonicalInstances cls poly_ty mbinds = do
       addDiagnostic (TcRnNonCanonicalDefinition reason poly_ty)
 
 rnClsInstDecl :: ClsInstDecl GhcPs -> RnM (ClsInstDecl GhcRn, FreeNames)
-rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
-                           , cid_poly_ty = inst_ty, cid_binds = mbinds
-                           , cid_sigs = uprags, cid_tyfam_insts = ats
+rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _)
+                           , cid_poly_ty = inst_ty
+                           , cid_decls = decls
                            , cid_overlap_mode = omode
-                           , cid_datafam_insts = adts
                            , cid_modifiers = modifiers })
-  = do { rec { let ctxt = ClassInstanceCtx head_ty'
+  = do { rec { let (mbinds, uprags, _, ats, adts, _) = partitionBindsAndSigs decls
+             ; let ctxt = ClassInstanceCtx head_ty'
              ; checkInferredVars ctxt inst_ty
              ; (inst_ty', inst_fvs) <- rnHsSigType ctxt TypeLevel inst_ty
              ; let (ktv_names, _, head_ty') = splitLHsInstDeclTy inst_ty'
@@ -680,10 +680,13 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
                                 `plusFN` mods_fvs
        ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
        ; return (ClsInstDecl { cid_ext = inst_warn_rn
-                             , cid_poly_ty = inst_ty', cid_binds = mbinds'
-                             , cid_sigs = uprags', cid_tyfam_insts = ats'
+                             , cid_poly_ty = inst_ty'
+                             , cid_decls = ClsInstDeclX
+                                            { cid_binds = mbinds'
+                                            , cid_sigs = uprags'
+                                            , cid_tyfam_insts = ats'
+                                            , cid_datafam_insts = adts'}
                              , cid_overlap_mode = omode'
-                             , cid_datafam_insts = adts'
                              , cid_modifiers = modifiers' },
                  all_fvs) }
              -- We return the renamed associated data type declarations so

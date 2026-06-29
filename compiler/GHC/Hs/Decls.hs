@@ -97,7 +97,12 @@ module GHC.Hs.Decls (
   -- * Class decls, across GHC passes
   partitionBindsAndSigs, flattenBindsAndSigs,
   classDeclsSplit, classDeclsList,
-  asTcdDecls
+  asTcdDecls,
+
+  -- * Class instance decls, across GHC passes
+  clsInstDeclsStruct,
+  asCidDatafamInsts,
+  asCidTyfamInsts
     ) where
 
 -- friends:
@@ -248,7 +253,7 @@ classDeclsSplit decls
 -- groups.
 --
 -- The primary use of this function is to implement
--- 'GHC.Parser.PostProcess.cvBindsAndSigs'.
+-- 'GHC.Parser.PostProcess.cvBindsAndSigs.
 partitionBindsAndSigs
   :: forall p. (IsPass p, OutputableBndrId p)
   => [LHsDecl (GhcPass p)]
@@ -306,6 +311,54 @@ cmpBufSpanA (L la a) (L lb b) = cmpBufSpan (L (locA la) a) (L (locA lb) b)
 -- Map a function over a list of located items.
 mapLL :: (a -> b) -> [GenLocated l a] -> [GenLocated l b]
 mapLL f = map (fmap f)
+
+-- ---------------------------------------------------------------------
+
+clsInstDeclsStruct
+  ::  forall p. IsPass p
+  =>  XClsInstDecls (GhcPass p)
+  -> ClsInstDeclX (GhcPass p)
+clsInstDeclsStruct decls
+  = case ghcPass @p of
+      GhcPs -> from_decls decls
+      GhcRn -> decls
+      GhcTc -> decls
+  where
+    from_decls :: [LHsDecl GhcPs] -> ClsInstDeclX GhcPs
+    from_decls decls = ClsInstDeclX { cid_binds = binds
+                                    , cid_sigs          = sigs
+                                    , cid_tyfam_insts   = tinst_ds
+                                    , cid_datafam_insts = dinst_ds }
+      where
+      (binds, sigs, _, tinst_ds, dinst_ds, _docs) = partitionBindsAndSigs decls
+
+asCidDatafamInsts :: forall p . (IsPass p)
+                  => XClsInstDecls (GhcPass p) -> [LDataFamInstDecl (GhcPass p)]
+asCidDatafamInsts  decls
+  = case ghcPass @p of
+      GhcPs -> concatMap get decls
+      GhcRn -> cid_datafam_insts decls
+      GhcTc -> cid_datafam_insts decls
+  where
+    get :: LHsDecl GhcPs -> [LDataFamInstDecl GhcPs]
+    get (L l (InstD _ (DataFamInstD { dfid_inst = d}))) = [L l d]
+    get _ = []
+
+
+asCidTyfamInsts :: forall p . (IsPass p)
+                => XClsInstDecls (GhcPass p) -> [LTyFamInstDecl (GhcPass p)]
+asCidTyfamInsts  decls
+  = case ghcPass @p of
+      GhcPs -> concatMap get decls
+      GhcRn -> cid_tyfam_insts decls
+      GhcTc -> cid_tyfam_insts decls
+  where
+    get :: LHsDecl GhcPs -> [LTyFamInstDecl GhcPs]
+    get (L l (InstD _ (TyFamInstD { tfid_inst = d}))) = [L l d]
+    get _ = []
+
+
+-- ---------------------------------------------------------------------
 
 -- Okay, I need to reconstruct the document comments, but for now:
 instance Outputable (DocDecl name) where
@@ -643,8 +696,6 @@ instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
                                   , nest 2 $ pprDeclList (map (ppr . unLoc) decls) ]
           GhcRn -> ppr_decls decls
           GhcTc -> ppr_decls decls
-
-
       where
         top_matter = pprLHsModifiers mods
                     $$  text "class"
@@ -1067,8 +1118,7 @@ type instance XCClsInstDecl    GhcPs = ( Maybe (LWarningTxt GhcPs)
                                              -- The warning of the deprecated instance
                                              -- See Note [Implementation of deprecated instances]
                                              -- in GHC.Tc.Solver.Dict
-                                       , AnnClsInstDecl
-                                       , AnnSortKey DeclTag) -- For sorting the additional annotations
+                                       , AnnClsInstDecl)
                                         -- TODO:AZ:tidy up
 type instance XCClsInstDecl    GhcRn = Maybe (LWarningTxt GhcRn)
                                            -- The warning of the deprecated instance
@@ -1077,6 +1127,10 @@ type instance XCClsInstDecl    GhcRn = Maybe (LWarningTxt GhcRn)
 type instance XCClsInstDecl    GhcTc = NoExtField
 
 type instance XXClsInstDecl    (GhcPass _) = DataConCantHappen
+
+type instance XClsInstDecls GhcPs = [LHsDecl GhcPs]
+type instance XClsInstDecls GhcRn = ClsInstDeclX GhcRn
+type instance XClsInstDecls GhcTc = ClsInstDeclX GhcTc
 
 ----------------- Instances of all kinds -------------
 
@@ -1109,7 +1163,7 @@ cidDeprecation = fmap unLoc . decl_deprecation (ghcPass @p)
   where
     decl_deprecation :: GhcPass p  -> ClsInstDecl (GhcPass p)
                      -> Maybe (LocatedP (WarningTxt (GhcPass p)))
-    decl_deprecation GhcPs (ClsInstDecl{ cid_ext = (depr, _, _) } )
+    decl_deprecation GhcPs (ClsInstDecl{ cid_ext = (depr, _) } )
       = depr
     decl_deprecation GhcRn (ClsInstDecl{ cid_ext = depr })
       = depr
@@ -1178,24 +1232,38 @@ pprHsFamInstLHS thing bndrs typats fixity mb_ctxt
 
 instance OutputableBndrId p
        => Outputable (ClsInstDecl (GhcPass p)) where
-    ppr (cid@ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = binds
-                         , cid_sigs = sigs, cid_tyfam_insts = ats
+    ppr (cid@ClsInstDecl { cid_poly_ty = inst_ty
+                         , cid_decls = decls
                          , cid_overlap_mode = mbOverlap
-                         , cid_datafam_insts = adts, cid_modifiers = mods })
-      | null sigs, null ats, null adts, null binds  -- No "where" part
-      = top_matter
-
-      | otherwise       -- Laid out
-      = vcat [ top_matter <+> text "where"
-             , nest 2 $ pprDeclList $
-               map (pprTyFamInstDecl NotTopLevel . unLoc)   ats ++
-               map (pprDataFamInstDecl NotTopLevel . unLoc) adts ++
-               pprLHsBindsForUser binds sigs ]
+                         , cid_modifiers = mods })
+      = case ghcPass @p of
+          GhcPs -> ppr_decls decls_struct
+          GhcRn -> ppr_decls decls
+          GhcTc -> ppr_decls decls
       where
+        decls_struct = clsInstDeclsStruct @p decls
+
         top_matter = pprLHsModifiers mods
                   $$ text "instance" <+> maybe empty ppr (cidDeprecation cid)
                                      <+> ppOverlapPragma mbOverlap
                                      <+> ppr inst_ty
+
+        ppr_decls :: ClsInstDeclX (GhcPass p) -> SDoc
+        ppr_decls ClsInstDeclX
+                    { cid_binds         = binds
+                    , cid_sigs          = sigs
+                    , cid_tyfam_insts   = ats
+                    , cid_datafam_insts = adts
+                    }
+          | null sigs, null ats, null adts, null binds  -- No "where" part
+          = top_matter
+
+          | otherwise       -- Laid out
+          = vcat [ top_matter <+> text "where"
+                 , nest 2 $ pprDeclList $
+                   map (pprTyFamInstDecl NotTopLevel . unLoc)   ats ++
+                   map (pprDataFamInstDecl NotTopLevel . unLoc) adts ++
+                   pprLHsBindsForUser binds sigs ]
 
 ppDerivStrategy :: OutputableBndrId p
                 => Maybe (LDerivStrategy (GhcPass p)) -> SDoc
@@ -1226,13 +1294,17 @@ instance (OutputableBndrId p) => Outputable (InstDecl (GhcPass p)) where
 
 -- Extract the declarations of associated data types from an instance
 
-instDeclDataFamInsts :: [LInstDecl (GhcPass p)] -> [DataFamInstDecl (GhcPass p)]
+instDeclDataFamInsts :: forall p. (IsPass p,
+                                   XClsInstDecls (GhcPass p) ~ ClsInstDeclX (GhcPass p))
+                     => [LInstDecl (GhcPass p)] -> [DataFamInstDecl (GhcPass p)]
 instDeclDataFamInsts inst_decls
   = concatMap do_one inst_decls
   where
-    do_one :: LInstDecl (GhcPass p) -> [DataFamInstDecl (GhcPass p)]
-    do_one (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = fam_insts } }))
-      = map unLoc fam_insts
+    do_one :: forall p. (IsPass p,
+                         XClsInstDecls (GhcPass p) ~ ClsInstDeclX (GhcPass p))
+           => LInstDecl (GhcPass p) -> [DataFamInstDecl (GhcPass p)]
+    do_one (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_decls = decls } }))
+      = map unLoc (asCidDatafamInsts @p decls)
     do_one (L _ (DataFamInstD { dfid_inst = fam_inst }))      = [fam_inst]
     do_one (L _ (TyFamInstD {}))                              = []
 

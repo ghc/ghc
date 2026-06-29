@@ -1429,16 +1429,14 @@ expModifiers1 :: { forall b. DisambECP b => PV (Located [LHsModifierOf (LocatedA
 
 inst_decl :: { LInstDecl GhcPs }
         : 'instance' maybe_warning_pragma overlap_pragma inst_type where_inst
-       {% do { (binds, sigs, _, ats, adts, _) <- cvBindsAndSigs (snd $ unLoc $5)
+       {% do { decls <- cvBindsAndSigs (snd $ unLoc $5)
              ; let (twhere, (openc, closec, semis)) = fst $ unLoc $5
              ; let anns = AnnClsInstDecl (epTok $1) twhere openc semis closec
              ; let cid = ClsInstDecl
-                                  { cid_ext = ($2, anns, NoAnnSortKey)
-                                  , cid_poly_ty = $4, cid_binds = binds
-                                  , cid_sigs = mkClassOpSigs sigs
-                                  , cid_tyfam_insts = ats
+                                  { cid_ext = ($2, anns)
+                                  , cid_poly_ty = $4
+                                  , cid_decls = cvClassDecls decls
                                   , cid_overlap_mode = $3
-                                  , cid_datafam_insts = adts
                                   , cid_modifiers = [] }
              ; amsA' (L (comb3 $1 $4 $5)
                              (ClsInstD { cid_d_ext = noExtField, cid_inst = cid }))
