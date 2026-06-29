@@ -21,6 +21,7 @@ initNCGConfig dflags this_mod = NCGConfig
    , ncgAsmContext            = initSDocContext dflags PprCode
    , ncgProcAlignment         = cmmProcAlignment dflags
    , ncgExternalDynamicRefs   = gopt Opt_ExternalDynamicRefs dflags
+   , ncgDynLib                = ghcLink dflags == LinkDynLib || dynamicNow dflags
    , ncgPIC                   = positionIndependent dflags
    , ncgInlineThresholdMemcpy = fromIntegral $ maxInlineMemcpyInsns dflags
    , ncgInlineThresholdMemset = fromIntegral $ maxInlineMemsetInsns dflags

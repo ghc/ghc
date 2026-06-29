@@ -1632,17 +1632,47 @@ atanhDouble  (D# x) = D# (atanhDouble# x)
 powerDouble :: Double -> Double -> Double
 powerDouble  (D# x) (D# y) = D# (x **## y)
 
-foreign import ccall unsafe "isFloatNaN" isFloatNaN :: Float -> Int
-foreign import ccall unsafe "isFloatInfinite" isFloatInfinite :: Float -> Int
-foreign import ccall unsafe "isFloatDenormalized" isFloatDenormalized :: Float -> Int
-foreign import ccall unsafe "isFloatNegativeZero" isFloatNegativeZero :: Float -> Int
-foreign import ccall unsafe "isFloatFinite" isFloatFinite :: Float -> Int
+{-# NOINLINE isFloatInfinite #-}
+isFloatInfinite :: Float -> Int
+isFloatInfinite x = cIsFloatInfinite x
+foreign import ccall unsafe "isFloatInfinite" cIsFloatInfinite :: Float -> Int
+{-# NOINLINE isFloatNaN #-}
+isFloatNaN :: Float -> Int
+isFloatNaN = _isFloatNaN
+foreign import ccall unsafe "isFloatNaN" _isFloatNaN :: Float -> Int
+{-# NOINLINE isFloatDenormalized #-}
+isFloatDenormalized :: Float -> Int
+isFloatDenormalized = _isFloatDenormalized
+foreign import ccall unsafe "isFloatDenormalized" _isFloatDenormalized :: Float -> Int
+{-# NOINLINE isFloatNegativeZero #-}
+isFloatNegativeZero :: Float -> Int
+isFloatNegativeZero = _isFloatNegativeZero
+foreign import ccall unsafe "isFloatNegativeZero" _isFloatNegativeZero :: Float -> Int
+{-# NOINLINE isFloatFinite #-}
+isFloatFinite :: Float -> Int
+isFloatFinite = _isFloatFinite
+foreign import ccall unsafe "isFloatFinite" _isFloatFinite :: Float -> Int
 
-foreign import ccall unsafe "isDoubleNaN" isDoubleNaN :: Double -> Int
-foreign import ccall unsafe "isDoubleInfinite" isDoubleInfinite :: Double -> Int
-foreign import ccall unsafe "isDoubleDenormalized" isDoubleDenormalized :: Double -> Int
-foreign import ccall unsafe "isDoubleNegativeZero" isDoubleNegativeZero :: Double -> Int
-foreign import ccall unsafe "isDoubleFinite" isDoubleFinite :: Double -> Int
+{-# NOINLINE isDoubleInfinite #-}
+isDoubleInfinite :: Double -> Int
+isDoubleInfinite x = cIsDoubleInfinite x
+foreign import ccall unsafe "isDoubleInfinite" cIsDoubleInfinite :: Double -> Int
+{-# NOINLINE isDoubleNaN #-}
+isDoubleNaN :: Double -> Int
+isDoubleNaN = _isDoubleNaN
+foreign import ccall unsafe "isDoubleNaN" _isDoubleNaN :: Double -> Int
+{-# NOINLINE isDoubleDenormalized #-}
+isDoubleDenormalized :: Double -> Int
+isDoubleDenormalized = _isDoubleDenormalized
+foreign import ccall unsafe "isDoubleDenormalized" _isDoubleDenormalized :: Double -> Int
+{-# NOINLINE isDoubleNegativeZero #-}
+isDoubleNegativeZero :: Double -> Int
+isDoubleNegativeZero = _isDoubleNegativeZero
+foreign import ccall unsafe "isDoubleNegativeZero" _isDoubleNegativeZero :: Double -> Int
+{-# NOINLINE isDoubleFinite #-}
+isDoubleFinite :: Double -> Int
+isDoubleFinite = _isDoubleFinite
+foreign import ccall unsafe "isDoubleFinite" _isDoubleFinite :: Double -> Int
 
 ------------------------------------------------------------------------
 -- Coercion rules

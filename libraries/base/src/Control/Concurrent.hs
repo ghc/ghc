@@ -132,6 +132,12 @@ import Control.Concurrent.Chan
 import Control.Concurrent.QSem
 import Control.Concurrent.QSemN
 
+
+-- Needed for windows dynamic builds
+-- TODO we may need to disable inlining of ccalls by default
+{-# NOINLINE waitFd #-}
+
+
 {- $conc_intro
 
 The concurrency extension for Haskell is described in the paper

@@ -357,5 +357,8 @@ float2Integer (F# x) =
 foreign import ccall unsafe "rintDouble"
     c_rintDouble :: Double -> Double
 
+{-# NOINLINE c_rintFloat #-}
+c_rintFloat :: Float -> Float
+c_rintFloat = _c_rintFloat
 foreign import ccall unsafe "rintFloat"
-    c_rintFloat :: Float -> Float
+    _c_rintFloat :: Float -> Float

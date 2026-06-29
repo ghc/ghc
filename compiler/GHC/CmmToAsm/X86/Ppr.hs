@@ -305,6 +305,7 @@ pprExport config lbl isCmmData =
   if platformOS platform == OSMinGW32
      && platformTablesNextToCode platform
      && externallyVisibleCLabel lbl
+     && (ncgExternalDynamicRefs config || ncgDynLib config)
      then let
         asData = isCmmData || isInfoTableLabel lbl
         in

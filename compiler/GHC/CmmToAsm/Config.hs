@@ -21,6 +21,7 @@ data NCGConfig = NCGConfig
    , ncgThisModule            :: !Module          -- ^ The name of the module we are currently compiling
    , ncgProcAlignment         :: !(Maybe Int)     -- ^ Mandatory proc alignment
    , ncgExternalDynamicRefs   :: !Bool            -- ^ Generate code to link against dynamic libraries
+   , ncgDynLib                :: !Bool            -- ^ Generate code for a shared dynamic library
    , ncgPIC                   :: !Bool            -- ^ Enable Position-Independent Code
    , ncgInlineThresholdMemcpy :: !Word            -- ^ If inlining `memcpy` produces less than this threshold (in pseudo-instruction unit), do it
    , ncgInlineThresholdMemset :: !Word            -- ^ Ditto for `memset`
