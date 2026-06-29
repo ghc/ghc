@@ -73,8 +73,11 @@ alloc stay exact** and match ticky to the digit.
    `~/ghc/head0/.../compiler/build/compiler/` and read the worker (`$w…`). Look for:
    boxing of an `Int#`/`Word#`, a `foldr (:) []` that materialises a list, a
    re-`cons`ing `map` (`strictMap`), a missing `reallyUnsafePtrEquality#` short
-   circuit, an accumulator that isn't strict. If the body is a tight unboxed
-   traversal with a fast path already present, declare (A) done and move to (B).
+   circuit, an accumulator that isn't strict. Also check the *call site*: is this
+   small function passed polymorphically into a higher-order combinator (e.g. a
+   comparator into `actualSort`) rather than inlined/specialized into it? — see the
+   "small functions in fixed combinations" pattern below. If the body is a tight
+   unboxed traversal with a fast path already present, declare (A) done and move to (B).
 
 4. **Caller attribution for axis (B)** — the late-CCS profile, which pierces laziness
    (the *logical* source caller, not the `stg_ap_*` thunk that forced it):
@@ -111,6 +114,23 @@ Map the findings onto one of these recurring patterns (each seen in this suite):
   compares) — the win is upstream, in the caller that triggers the fanout.
 - **Price of determinism** — `$fFoldableUniqDFM2` is a `sortBy` for deterministic
   UniqDFM folds. Lever: does this fold need to be deterministic/ordered here?
+- **Small functions in fixed combinations — specialize the combination.** When a tiny
+  hot function always appears in the *same pipeline*, check whether it is passed/called
+  *polymorphically through a runtime argument* rather than inlined into its partner.
+  Tell-tale in the Core: a higher-order callee applied to a function value (and in
+  ticky/profile the inner function shows up as its own millions of entries via
+  `stg_ap_*`). E.g. `eltsUDFM` compiles to `map taggedFst (actualSort
+  ($fFoldableUniqDFM2) (elems1 m))` — `actualSort` takes the comparator as an argument,
+  so all 200M compares are indirect calls on a boxed path instead of inlined unboxed
+  `Int#` compares. Lever: a monomorphic/specialized variant of the combinator (or a
+  static-argument-transform lifting the function out of the recursion) turns the
+  indirect calls into direct, often unboxed, ones. This is a **constant-factor (A)**
+  win (it does not change the call count), but it is cheap and pays off precisely for
+  the small functions that recur in fixed combinations across the suite. Note what
+  fusion can and cannot do here: a `sortBy`/`foldl'`-style barrier in the middle of the
+  pipeline blocks fusion of the intermediate list, and fusion never reduces a
+  comparison/iteration *count* — so reach for specialization, not fusion, when the cost
+  is CPU in a fixed combination rather than intermediate allocation.
 - **Cross-cutting allocators** — `strictMap`, the iface Alex lexer (`$walexGetByte`).
   Broad, no single caller; flag as systemic rather than point-fixable.
 
