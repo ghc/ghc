@@ -603,13 +603,13 @@ checkCanonicalInstances cls poly_ty mbinds = do
       addDiagnostic (TcRnNonCanonicalDefinition reason poly_ty)
 
 rnClsInstDecl :: ClsInstDecl GhcPs -> RnM (ClsInstDecl GhcRn, FreeNames)
-rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
-                           , cid_poly_ty = inst_ty, cid_binds = mbinds
-                           , cid_sigs = uprags, cid_tyfam_insts = ats
+rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _)
+                           , cid_poly_ty = inst_ty
+                           , cid_decls = decls
                            , cid_overlap_mode = omode
-                           , cid_datafam_insts = adts
                            , cid_modifiers = modifiers })
-  = do { rec { let ctxt = ClassInstanceCtx head_ty'
+  = do { rec { let (mbinds, uprags, _, ats, adts, _) = partitionBindsAndSigs decls
+             ; let ctxt = ClassInstanceCtx head_ty'
              ; checkInferredVars ctxt inst_ty
              ; (inst_ty', inst_fvs) <- rnHsSigType ctxt TypeLevel inst_ty
              ; let (ktv_names, _, head_ty') = splitLHsInstDeclTy inst_ty'
@@ -687,11 +687,14 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
                                 `plusFN` inst_fvs
                                 `plusFN` mods_fvs
        ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
-       ; return (ClsInstDecl { cid_ext = inst_warn_rn
-                             , cid_poly_ty = inst_ty', cid_binds = mbinds'
-                             , cid_sigs = uprags', cid_tyfam_insts = ats'
+       ; return (ClsInstDecl { cid_poly_ty = inst_ty'
+                             , cid_decls = [] -- See Note [Pass-sensitive decls for ClassDecls/ClsInstDecls]
+                             , cid_ext = (inst_warn_rn, ClsInstDeclX
+                                            { cid_binds = mbinds'
+                                            , cid_sigs = uprags'
+                                            , cid_tyfam_insts = ats'
+                                            , cid_datafam_insts = adts'})
                              , cid_overlap_mode = omode'
-                             , cid_datafam_insts = adts'
                              , cid_modifiers = modifiers' },
                  all_fvs) }
              -- We return the renamed associated data type declarations so
@@ -1983,7 +1986,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
         ; return (ClassDecl { tcdCtxt = context', tcdLName = lcls',
                               tcdTyVars = tyvars', tcdFixity = fixity,
                               tcdFDs = fds',
-                              tcdDecls = [], -- See Note [Pass-sensitive decls for ClassDecls]
+                              tcdDecls = [], -- See Note [Pass-sensitive decls for ClassDecls/ClsInstDecls]
                               tcdCExt = (ClassDeclX { tcdSigs   = sigs',
                                                       tcdMeths  = mbinds',
                                                       tcdATs    = ats',

@@ -978,7 +978,7 @@ type instance XXFamilyResultSig DocNameI = DataConCantHappen
 type instance XCFamEqn DocNameI _ = NoExtField
 type instance XXFamEqn DocNameI _ = DataConCantHappen
 
-type instance XCClsInstDecl DocNameI = NoExtField
+type instance XCClsInstDecl DocNameI = ClsInstDeclX DocNameI
 type instance XCDerivDecl DocNameI = NoExtField
 type instance XStockStrategy DocNameI = NoExtField
 type instance XAnyClassStrategy DocNameI = NoExtField

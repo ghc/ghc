@@ -921,7 +921,7 @@ extractDecl prr dflags sDocContext name decl
               if isDataConName name
                 then fmap (SigD noExtField) <$> extractPatternSyn name n tys (toList $ dd_cons defn)
                 else fmap (SigD noExtField) <$> extractRecSel name n tys (toList $ dd_cons defn)
-        InstD _ (ClsInstD _ ClsInstDecl{cid_datafam_insts = insts})
+        InstD _ (ClsInstD _ ClsInstDecl{ cid_ext = (_, ClsInstDeclX { cid_datafam_insts = insts})})
           | isDataConName name ->
               let matches =
                     [ d' | L _ d'@(DataFamInstDecl (FamEqn{feqn_rhs = dd})) <- insts, name `elem` map unLoc (concatMap (toList . getConNames . unLoc) (dd_cons dd))

@@ -819,8 +819,8 @@ tcAddDataFamConPlaceholders inst_decls thing_inside
     get_cons :: LInstDecl GhcRn -> [Name]
     get_cons (L _ (TyFamInstD {}))                     = []
     get_cons (L _ (DataFamInstD { dfid_inst = fid }))  = get_fi_cons fid
-    get_cons (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = fids } }))
-      = concatMap (get_fi_cons . unLoc) fids
+    get_cons (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_ext = (_, decls) } }))
+      = concatMap (get_fi_cons . unLoc) (cid_datafam_insts decls)
 
     get_fi_cons :: DataFamInstDecl GhcRn -> [Name]
     get_fi_cons (DataFamInstDecl { dfid_eqn =

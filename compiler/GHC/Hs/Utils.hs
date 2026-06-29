@@ -1594,13 +1594,12 @@ getPatSynBinds binds
           , L _ (PatSynBind _ psb) <- lbinds ]
 
 -------------------
-hsLInstDeclBinders :: (IsPass p, OutputableBndrId p)
-                   => LInstDecl (GhcPass p)
-                   -> ([(LocatedA (IdP (GhcPass p)))], [LFieldOcc (GhcPass p)])
+hsLInstDeclBinders :: LInstDecl GhcRn
+                   -> ([(LocatedA (IdP GhcRn))], [LFieldOcc GhcRn])
 hsLInstDeclBinders (L _ (ClsInstD
                              { cid_inst = ClsInstDecl
-                                          { cid_datafam_insts = dfis }}))
-  = foldMap (lconsWithFieldsBinders . hsDataFamInstBinders . unLoc) dfis
+                                          { cid_ext = (_, decls) }}))
+  = foldMap (lconsWithFieldsBinders . hsDataFamInstBinders . unLoc) (cid_datafam_insts decls)
 hsLInstDeclBinders (L _ (DataFamInstD { dfid_inst = fi }))
   = lconsWithFieldsBinders $ hsDataFamInstBinders fi
 hsLInstDeclBinders (L _ (TyFamInstD {})) = mempty

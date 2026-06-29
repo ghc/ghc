@@ -243,6 +243,10 @@ deriving instance Data (ClsInstDecl GhcPs)
 deriving instance Data (ClsInstDecl GhcRn)
 deriving instance Data (ClsInstDecl GhcTc)
 
+deriving instance Data (ClsInstDeclX GhcPs)
+deriving instance Data (ClsInstDeclX GhcRn)
+deriving instance Data (ClsInstDeclX GhcTc)
+
 -- deriving instance (DataIdLR p p) => Data (InstDecl p)
 deriving instance Data (InstDecl GhcPs)
 deriving instance Data (InstDecl GhcRn)

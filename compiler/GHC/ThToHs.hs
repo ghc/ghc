@@ -324,7 +324,7 @@ cvtDec (TypeDataD tc tvs ksig constrs)
 cvtDec (ClassD ctxt cl tvs fds decs)
   = do  { (cxt', tc', tvs') <- cvt_tycl_hdr ctxt cl tvs
         ; fds'  <- mapM cvt_fundep fds
-        ; decls' <- cvt_ci_decs' ClssDecl decs
+        ; decls' <- cvt_ci_decs ClssDecl decs
         ; let (adts',_) = partitionWith is_datafam_inst decls'
         ; unless (null adts')
             (failWith $ DefaultDataInstDecl adts')
@@ -338,7 +338,9 @@ cvtDec (ClassD ctxt cl tvs fds decs)
         }
 
 cvtDec (InstanceD o ctxt ty decs)
-  = do  { (binds', sigs', fams', ats', adts') <- cvt_ci_decs InstanceDecl decs
+  -- = do  { (binds', sigs', fams', ats', adts') <- cvt_ci_decs InstanceDecl decs
+  = do  { decs' <- cvt_ci_decs InstanceDecl decs
+        ; let (fams', decls') = partitionWith is_fam_decl decs'
         ; for_ (nonEmpty fams') $ \ bad_fams ->
             failWith (IllegalDeclaration InstanceDecl $ IllegalFamDecls bad_fams)
         ; ctxt' <- cvtContext funPrec ctxt
@@ -346,10 +348,8 @@ cvtDec (InstanceD o ctxt ty decs)
         ; let inst_ty' = L loc $ mkHsImplicitSigType $
                          mkHsQualTy ctxt loc ctxt' $ L loc ty'
         ; returnJustLA $ InstD noExtField $ ClsInstD noExtField $
-          ClsInstDecl { cid_ext = (Nothing, noAnn, NoAnnSortKey), cid_poly_ty = inst_ty'
-                      , cid_binds = binds'
-                      , cid_sigs = Hs.mkClassOpSigs sigs'
-                      , cid_tyfam_insts = ats', cid_datafam_insts = adts'
+          ClsInstDecl { cid_ext = (Nothing, noAnn), cid_poly_ty = inst_ty'
+                      , cid_decls = cvClassDecls decls'
                       , cid_overlap_mode
                                    = fmap (L (l2l loc) . overlap) o
                       , cid_modifiers = []
@@ -599,29 +599,10 @@ cvtTySynEqn (TySynEqn mb_bndrs lhs rhs)
         }
 
 ----------------
-cvt_ci_decs :: THDeclDescriptor -> [TH.Dec]
-            -> CvtM (LHsBinds GhcPs,
-                     [LSig GhcPs],
-                     [LFamilyDecl GhcPs],
-                     [LTyFamInstDecl GhcPs],
-                     [LDataFamInstDecl GhcPs])
+cvt_ci_decs :: THDeclDescriptor -> [TH.Dec] -> CvtM [LHsDecl GhcPs]
 -- Convert the declarations inside a class or instance decl
 -- ie signatures, bindings, and associated types
 cvt_ci_decs declDescr decs
-  = do  { decs' <- cvtDecs decs
-        ; let (ats', bind_sig_decs') = partitionWith is_tyfam_inst decs'
-        ; let (adts', no_ats')       = partitionWith is_datafam_inst bind_sig_decs'
-        ; let (sigs', prob_binds')   = partitionWith is_sig no_ats'
-        ; let (binds', prob_fams')   = partitionWith is_bind prob_binds'
-        ; let (fams', bads)          = partitionWith is_fam_decl prob_fams'
-        ; for_ (nonEmpty bads) $ \ bad_decls ->
-            failWith (IllegalDeclaration declDescr $ IllegalDecls bad_decls)
-        ; return (binds', sigs', fams', ats', adts') }
-
-cvt_ci_decs' :: THDeclDescriptor -> [TH.Dec] -> CvtM [LHsDecl GhcPs]
--- Convert the declarations inside a class or instance decl
--- ie signatures, bindings, and associated types
-cvt_ci_decs' declDescr decs
   = do  { decs' <- cvtDecs decs
         ; let (decs'', bads) = partitionWith is_ci_decl decs'
         ; for_ (nonEmpty bads) $ \ bad_decls ->
@@ -690,26 +671,12 @@ is_fam_decl :: LHsDecl GhcPs -> Either (LFamilyDecl GhcPs) (LHsDecl GhcPs)
 is_fam_decl (L loc (TyClD _ (FamDecl { tcdFam = d }))) = Left (L loc d)
 is_fam_decl decl = Right decl
 
-is_tyfam_inst :: LHsDecl GhcPs -> Either (LTyFamInstDecl GhcPs) (LHsDecl GhcPs)
-is_tyfam_inst (L loc (Hs.InstD _ (TyFamInstD { tfid_inst = d })))
-  = Left (L loc d)
-is_tyfam_inst decl
-  = Right decl
-
 is_datafam_inst :: LHsDecl GhcPs
                 -> Either (LDataFamInstDecl GhcPs) (LHsDecl GhcPs)
 is_datafam_inst (L loc (Hs.InstD  _ (DataFamInstD { dfid_inst = d })))
   = Left (L loc d)
 is_datafam_inst decl
   = Right decl
-
-is_sig :: LHsDecl GhcPs -> Either (LSig GhcPs) (LHsDecl GhcPs)
-is_sig (L loc (Hs.SigD _ sig)) = Left (L loc sig)
-is_sig decl                    = Right decl
-
-is_bind :: LHsDecl GhcPs -> Either (LHsBind GhcPs) (LHsDecl GhcPs)
-is_bind (L loc (Hs.ValD _ bind)) = Left (L loc bind)
-is_bind decl                     = Right decl
 
 is_ip_bind :: TH.Dec -> Either (String, TH.Exp) TH.Dec
 is_ip_bind (TH.ImplicitParamBindD n e) = Left (n, e)

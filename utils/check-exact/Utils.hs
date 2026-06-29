@@ -38,7 +38,6 @@ import GHC.Parser.Lexer (allocateComments)
 
 import Data.Data hiding ( Fixity )
 import Data.List (sortBy, partition, unsnoc)
-import qualified Data.Map.Strict as Map
 
 import Debug.Trace
 import Types
@@ -565,30 +564,6 @@ name2String = showPprUnsafe
 
 -- ---------------------------------------------------------------------
 
-type DeclsByTag a = Map.Map DeclTag [(RealSrcSpan, a)]
-
-orderedDecls
-  :: AnnSortKey DeclTag
-  -> DeclsByTag a
-  -> [(RealSrcSpan, a)]
-orderedDecls sortKey declGroup  =
-  case sortKey of
-    NoAnnSortKey ->
-      sortBy (\a b -> compare (fst a) (fst b)) (concat $ Map.elems declGroup)
-    AnnSortKey keys ->
-      let
-        go :: [DeclTag] -> DeclsByTag a -> [(RealSrcSpan, a)]
-        go [] _                      = []
-        go (tag:ks) dbt = d : go ks dbt'
-          where
-            dbt' = Map.adjust (\ds -> drop 1 ds) tag dbt
-            d = case Map.lookup tag dbt of
-              Just (d':_) -> d'
-              _           -> error $ "orderedDecls: could not look up "
-                                       ++ show tag ++ " in " ++ show (Map.keys dbt)
-      in
-        go keys declGroup
-
 hsDeclsClassDecl :: TyClDecl GhcPs -> [LHsDecl GhcPs]
 hsDeclsClassDecl dec = case dec of
   ClassDecl { tcdDecls = decls} -> decls
@@ -598,31 +573,6 @@ replaceDeclsClassDecl :: TyClDecl GhcPs -> [LHsDecl GhcPs] -> TyClDecl GhcPs
 replaceDeclsClassDecl decl decls = case decl of
   ClassDecl {} -> decl { tcdDecls = decls }
   _ -> error $ "replaceDeclsClassDecl:decl=" ++ showAst decl
-
-partitionWithSortKey
-  :: [LHsDecl GhcPs]
-  -> ([DeclTag], LHsBinds GhcPs, [LSig GhcPs], [LFamilyDecl GhcPs],
-      [LTyFamInstDecl GhcPs], [LDataFamInstDecl GhcPs], [LDocDecl GhcPs])
-partitionWithSortKey = go
-  where
-    go [] = ([], [], [], [], [], [], [])
-    go ((L l decl) : ds) =
-      let (tags, bs, ss, ts, tfis, dfis, docs) = go ds in
-      case decl of
-        ValD _ b
-          -> (ClsMethodTag:tags, L l b : bs, ss, ts, tfis, dfis, docs)
-        SigD _ s
-          -> (ClsSigTag:tags, bs, L l s : ss, ts, tfis, dfis, docs)
-        TyClD _ (FamDecl _ t)
-          -> (ClsAtTag:tags, bs, ss, L l t : ts, tfis, dfis, docs)
-        InstD _ (TyFamInstD { tfid_inst = tfi })
-          -> (ClsAtdTag:tags, bs, ss, ts, L l tfi : tfis, dfis, docs)
-        InstD _ (DataFamInstD { dfid_inst = dfi })
-          -> (tags, bs, ss, ts, tfis, L l dfi : dfis, docs)
-        DocD _ d
-          -> (tags, bs, ss, ts, tfis, dfis, L l d : docs)
-        _ -> error $ "partitionBindsAndSigs" ++ (showAst decl)
-
 
 -- ---------------------------------------------------------------------
 

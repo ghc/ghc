@@ -942,8 +942,9 @@ renameClsInstD
   ( ClsInstDecl
       { cid_overlap_mode = omode
       , cid_poly_ty = ltype
-      , cid_tyfam_insts = lATs
-      , cid_datafam_insts = lADTs
+      , cid_ext = (_, ClsInstDeclX
+         { cid_tyfam_insts = lATs
+         , cid_datafam_insts = lADTs })
       , cid_modifiers = mods
       }
     ) = do
@@ -953,13 +954,14 @@ renameClsInstD
     mods' <- renameModifiers mods
     return
       ( ClsInstDecl
-          { cid_ext = noExtField
-          , cid_overlap_mode = fmap convertOverlapMode <$> omode
+          { cid_overlap_mode = fmap convertOverlapMode <$> omode
           , cid_poly_ty = ltype'
-          , cid_binds = []
-          , cid_sigs = []
-          , cid_tyfam_insts = lATs'
-          , cid_datafam_insts = lADTs'
+          , cid_decls = []
+          , cid_ext = ClsInstDeclX
+            { cid_binds = []
+            , cid_sigs = []
+            , cid_tyfam_insts = lATs'
+            , cid_datafam_insts = lADTs' }
           , cid_modifiers = mods'
           }
       )
