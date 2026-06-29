@@ -11,8 +11,19 @@ before proposing anything:
 
 - **(A) make the body cheaper** — boxing, a missing fast path, a lazy accumulator,
   redundant re-allocation. Checked by *reading the generated Core*.
-- **(B) call it less** — the function is already optimal but invoked enormously, or
-  invoked on more/bigger data than necessary. Checked by *caller attribution*.
+- **(B) fix the callers** — the function is already optimal but its callers use it
+  wastefully. This is usually the bigger lever, and it has three depths, from
+  shallowest to deepest:
+  1. *Call it fewer times* — memoise, hoist out of a loop, deduplicate.
+  2. *Call it on smaller/cheaper data* — the caller passes more, or bigger, than the
+     result actually depends on.
+  3. **Question the requirement** — walk the (transitive) hot callers and ask what
+     each one *actually needs* from the call. Often the caller over-asks: it forces a
+     whole structure when a shallow check suffices, materialises and orders a list it
+     only folds over, or compares full types when a cheap predicate would do. If the
+     caller's real need can be met another way, the hot function isn't called less —
+     it isn't called at all. (This is where the largest wins in this suite live, e.g.
+     `RoughMap.lookupRM'` materialising a full element list it only filters.)
 
 A third, cross-cutting axis falls out of the data: **entries vs. allocation are
 decoupled**. The highest-*entry* functions (`seqType`, `eq_type_*`, `coVarsOfType`)
@@ -74,6 +85,14 @@ alloc stay exact** and match ticky to the digit.
    ```
    This names *who* drives the entries/alloc and how concentrated it is (one caller
    at 99 % vs. broad fan-out across many). That concentration decides the fix.
+
+   Then **don't stop at the immediate caller — interrogate it.** Climb the hot callers
+   (rerun `prof_callers.py` on the dominant caller itself, and read its source) and for
+   each ask: *what does this caller actually need from `xyz`?* Does it consume the whole
+   result or one field; the ordered list or just a fold/membership test; a deep
+   comparison or a shallow one? Where the caller over-asks, the fix lives there, not in
+   `xyz` — the deepest (B) win is replacing the call with one that matches the real
+   requirement (or removing it).
 
 ## What "performance opportunities" to look for
 
