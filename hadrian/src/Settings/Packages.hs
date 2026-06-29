@@ -322,6 +322,7 @@ rtsPackageArgs = package rts ? do
           , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
           , notM targetSupportsSMP           ? arg "-optc-DNOSMP"
           , isWinHost                        ? arg "-optl-Wl,--disable-runtime-pseudo-reloc"
+                                            <> arg "-optl-Wl,--export-all-symbols"
 
             -- See Note [AutoApply.cmm for vectors] in genapply/Main.hs
             --
