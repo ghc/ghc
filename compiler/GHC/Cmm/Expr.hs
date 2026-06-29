@@ -443,6 +443,11 @@ pprExpr platform e
         CmmLit lit -> pprLit platform lit
         _other     -> pprExpr1 platform e
 
+-- `exp` usually, but (expr[width]) with -dppr-debug
+withDebugWidth :: Width -> SDoc -> SDoc
+withDebugWidth w exp =
+  ifPprDebug (parens (exp <> brackets (ppr w))) exp
+
 -- Here's the precedence table from GHC.Cmm.Parser:
 -- %nonassoc '>=' '>' '<=' '<' '!=' '=='
 -- %left '|'
@@ -465,15 +470,17 @@ pprExpr1 platform e = pprExpr7 platform e
 
 infixMachOp1, infixMachOp7, infixMachOp8 :: MachOp -> Maybe SDoc
 
-infixMachOp1 (MO_Eq     _) = Just (text "==")
-infixMachOp1 (MO_Ne     _) = Just (text "!=")
-infixMachOp1 (MO_Shl    _) = Just (text "<<")
-infixMachOp1 (MO_U_Shr  _) = Just (text ">>")
-infixMachOp1 (MO_U_Ge   _) = Just (text ">=")
-infixMachOp1 (MO_U_Le   _) = Just (text "<=")
-infixMachOp1 (MO_U_Gt   _) = Just (char '>')
-infixMachOp1 (MO_U_Lt   _) = Just (char '<')
-infixMachOp1 _             = Nothing
+infixMachOp1 mop = case mop of
+    (MO_Eq     w) -> Just $ withDebugWidth w (text "==")
+    (MO_Ne     w) -> Just $ withDebugWidth w (text "!=")
+    (MO_Shl    w) -> Just $ withDebugWidth w (text "<<")
+    (MO_U_Shr  w) -> Just $ withDebugWidth w (text ">>")
+    (MO_U_Ge   w) -> Just $ withDebugWidth w (text ">=")
+    (MO_U_Le   w) -> Just $ withDebugWidth w (text "<=")
+    (MO_U_Gt   w) -> Just $ withDebugWidth w (char '>')
+    (MO_U_Lt   w) -> Just $ withDebugWidth w (char '<')
+    _             -> Nothing
+    where
 
 -- %left '-' '+'
 pprExpr7 platform (CmmMachOp (MO_Add rep1) [x, CmmLit (CmmInt i rep2)]) | i < 0
@@ -483,8 +490,8 @@ pprExpr7 platform (CmmMachOp op [x,y])
    = pprExpr7 platform x <+> doc <+> pprExpr8 platform y
 pprExpr7 platform e = pprExpr8 platform e
 
-infixMachOp7 (MO_Add _)  = Just (char '+')
-infixMachOp7 (MO_Sub _)  = Just (char '-')
+infixMachOp7 (MO_Add w)  = Just $ withDebugWidth w (char '+')
+infixMachOp7 (MO_Sub w)  = Just $ withDebugWidth w (char '-')
 infixMachOp7 _           = Nothing
 
 -- %left '/' '*' '%'
@@ -493,9 +500,9 @@ pprExpr8 platform (CmmMachOp op [x,y])
    = pprExpr8 platform x <+> doc <+> pprExpr9 platform y
 pprExpr8 platform e = pprExpr9 platform e
 
-infixMachOp8 (MO_U_Quot _) = Just (char '/')
-infixMachOp8 (MO_Mul _)    = Just (char '*')
-infixMachOp8 (MO_U_Rem _)  = Just (char '%')
+infixMachOp8 (MO_U_Quot w) = Just $ withDebugWidth w (char '/')
+infixMachOp8 (MO_Mul w)    = Just $ withDebugWidth w (char '*')
+infixMachOp8 (MO_U_Rem w)  = Just $ withDebugWidth w (char '%')
 infixMachOp8 _             = Nothing
 
 pprExpr9 :: Platform -> CmmExpr -> SDoc
