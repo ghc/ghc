@@ -6,11 +6,11 @@
      {offset
        _lbl_:
            __locVar_::I64 = R1;
-           if (__locVar_::I64 > 0) goto _lbl_; else goto _lbl_;
+           if (__locVar_::I64 (>[W64]) 0) goto _lbl_; else goto _lbl_;
        _lbl_:
            goto _lbl_;
        _lbl_:
-           __locVar_::I64 = __locVar_::I64 - 1;
+           __locVar_::I64 = __locVar_::I64 (-[W64]) 1;
            R1 = __locVar_::I64;
            call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
        _lbl_:
@@ -20,7 +20,7 @@
            call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
        // unreachable blocks:
          _lbl_:
-             __locVar_::I64 = __locVar_::I64 + 42;
+             __locVar_::I64 = __locVar_::I64 (+[W64]) 42;
              R1 = __locVar_::I64;
              call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
      }
