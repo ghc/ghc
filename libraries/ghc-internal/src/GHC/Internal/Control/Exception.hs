@@ -115,11 +115,12 @@ module GHC.Internal.Control.Exception (
         ExceptionContext(..),
         annotateIO,
         WhileHandling(..),
+        ThrownFrom(..),
 
   ) where
 
 import GHC.Internal.Control.Exception.Base
-import GHC.Internal.Exception.Type (ExceptionWithContext(..), whileHandling)
+import GHC.Internal.Exception.Type (ExceptionWithContext(..), whileHandling, ThrownFrom(..))
 
 import GHC.Internal.Base (Functor(..), foldr, return, ($), (.))
 import GHC.Internal.IO (IO, interruptible)

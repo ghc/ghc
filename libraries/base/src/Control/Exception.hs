@@ -40,6 +40,7 @@ module Control.Exception
      NoBacktrace(..),
      ExceptionWithContext(..),
      WhileHandling(..),
+     ThrownFrom(..),
 
      -- * Concrete exception types
      IOException,

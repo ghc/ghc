@@ -105,6 +105,8 @@ import GHC.Internal.Int
 import GHC.Internal.IO
 import GHC.Internal.IO.Exception
 import GHC.Internal.Exception
+import GHC.Internal.Exception.Type (ThrownFrom(..))
+import {-# SOURCE #-} GHC.Internal.Exception.Backtrace (collectBacktraces)
 import GHC.Internal.IORef
 import GHC.Internal.Magic ( lazy )
 import GHC.Internal.Maybe ( Maybe(..) )
@@ -478,8 +480,16 @@ target, the exception will be thrown even if the thread is currently
 inside 'mask' or 'uninterruptibleMask'.
   -}
 throwTo :: Exception e => ThreadId -> e -> IO ()
-throwTo (ThreadId tid) ex = IO $ \ s ->
-   case (killThread# tid (toException ex) s) of s1 -> (# s1, () #)
+throwTo tid ex
+  | backtraceDesired ex = do
+    bts <- collectBacktraces
+    throwTo_ tid $ addExceptionContext (ThrownFrom bts) (toException ex)
+  | otherwise =
+    throwTo_ tid $ toException ex
+
+throwTo_ :: Exception e => ThreadId -> e -> IO ()
+throwTo_ (ThreadId tid) ex = IO $ \ s ->
+   case (killThread# tid ex s) of s1 -> (# s1, () #)
 
 -- | Returns the 'ThreadId' of the calling thread (GHC only).
 myThreadId :: IO ThreadId

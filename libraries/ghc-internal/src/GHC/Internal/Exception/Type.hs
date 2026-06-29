@@ -43,6 +43,8 @@ module GHC.Internal.Exception.Type
          -- * Exception propagation
        , WhileHandling(..)
        , whileHandling
+         -- * Asynchronous exception provenance
+       , ThrownFrom(..)
          -- * Arithmetic exceptions
        , ArithException(..)
        , divZeroException, overflowException, ratioZeroDenomException
@@ -59,6 +61,7 @@ import GHC.Internal.Base (String, Void, fmap, return, ($), (.), (++))
 import GHC.Internal.Show
 import GHC.Internal.Types (Bool(..))
 import GHC.Internal.Exception.Context
+import {-# SOURCE #-} GHC.Internal.Exception.Backtrace
 
 {- |
 A constraint used to propagate 'ExceptionContext's.
@@ -297,6 +300,19 @@ instance Exception a => Exception (ExceptionWithContext a) where
         return (ExceptionWithContext (someExceptionContext se) e)
     backtraceDesired (ExceptionWithContext _ e) = backtraceDesired e
     displayException = displayException . toException
+
+-- | 'ThrownBy' records the site from which an asynchronous exception was thrown (e.g. the call-site of @throwTo@).
+--
+-- @since 4.23.0.0
+newtype ThrownFrom = ThrownFrom Backtraces
+
+instance ExceptionAnnotation ThrownFrom where
+  displayExceptionAnnotation (ThrownFrom e) =
+    "Thrown asynchronously by " ++ case lines $ displayExceptionAnnotation e of
+      [] -> ""
+      (l1:ls) ->
+        unlines $ l1:[if null l then "  |" else "  | " ++ l | l <- ls]
+
 
 -- |Arithmetic exceptions.
 data ArithException

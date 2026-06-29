@@ -1,0 +1,7 @@
+section: base
+synopsis: Introduce `ThrownFrom` `ExceptionAnnotation`
+issues: #27453
+mrs: !16273
+description: {
+  Introduce new ``ExceptionAnnotation``, ``Control.Exception.ThrownFrom``, to record a backtrace of the site from which an asynchronous exception was thrown. ``Control.Exception.throwTo`` now attaches such an annotation when throwing exceptions for which ``backtraceDesired=True``. :ref:`CLC Proposal #430 <https://github.com/haskell/core-libraries-committee/issues/430>`).
+}

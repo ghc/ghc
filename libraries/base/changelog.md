@@ -35,6 +35,7 @@
   * Change `hIsReadable` and `hIsWritable` such that they always throw a respective exception when encountering a closed or semi-closed handle, not just in the case of a file handle. ([CLC proposal #371](github.com/haskell/core-libraries-committee/issues/371))
   * Annotate `onException` continuation with `WhileHandling`. ([CLC Proposal #397](https://github.com/haskell/core-libraries-committee/issues/397))
   * Improve error message for `Data.Char.chr`. ([CLC Proposal #384](https://github.com/haskell/core-libraries-committee/issues/384))
+  * Introduce new `ExceptionAnnotation`, `Control.Exception.ThrownFrom`, to record a backtrace of the site from which an asynchronous exception was thrown. `Control.Exception.throwTo` now attaches such an annotation when throwing exceptions for which `backtraceDesired=True`. ([CLC Proposal #430](https://github.com/haskell/core-libraries-committee/issues/430)).
 
 ## 4.22.0.0 *TBA*
   * Shipped with GHC 9.14.1
