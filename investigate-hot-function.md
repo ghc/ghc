@@ -131,6 +131,38 @@ Map the findings onto one of these recurring patterns (each seen in this suite):
   pipeline blocks fusion of the intermediate list, and fusion never reduces a
   comparison/iteration *count* — so reach for specialization, not fusion, when the cost
   is CPU in a fixed combination rather than intermediate allocation.
+- **Laziness leak / missing strictness** — thunks build up in an accumulator or a
+  lazy field (`foldl` where `foldl'` is meant, a lazy pair/state threaded through a
+  loop, a non-strict record field). Tell-tale: ticky shows large `Alloc'd` in
+  `THUNK`/`sat_s…` closures, or far more closures allocated than the producer's entry
+  count. Lever: strict accumulator (`foldl'`, bang), `!`-fields + `{-# UNPACK #-}`,
+  force intermediate state. (Conversely a space leak from *over*-sharing — a big thunk
+  retained — shows as live-heap growth, not alloc.)
+- **Boxing / worker–wrapper / CPR** — a hot function returns or threads a boxed
+  `Int`/`Word`/tuple, reboxes at a join point, or a strict field isn't unpacked.
+  Tell-tale in Core: an `I#`/`W64#` built then immediately `case`d; a `$w` worker that
+  still allocates a box; a boxed result the caller unboxes. Lever: let worker/wrapper +
+  CPR fire — strict fields, `{-# UNPACK #-}`, monomorphise, avoid polymorphism that
+  forces boxing.
+- **Dictionary passing / un-specialized overloading** — an overloaded function
+  (`Ord`/`Eq`/`Foldable`/`Outputable`…) called at a fixed type in a hot loop but not
+  specialized, so class methods are indirect dictionary calls. Tell-tale in Core:
+  `$dOrd`/`$fEq…` dictionary arguments threaded through the loop; class methods reached
+  via `stg_ap`. Lever: `{-# SPECIALIZE #-}` / `{-# INLINABLE #-}` at the definition,
+  `-fexpose-all-unfoldings` so cross-module specialization can fire. (Distinct from
+  passing a *known function* above; this is about class dictionaries.)
+- **Wrong structure / quadratic blow-up** — a list where a set/map is needed
+  (`elem`/`nub`/`lookup` inside a loop → O(n²)), repeated `++`/`concat`, or
+  **lookup-then-insert** done as two traversals (`member` then `insert`). Tell-tale:
+  entry counts that grow *super-linearly* with input size across tests (cross-check the
+  `SCALES` flag and per-test totals in `cg-out/aggregate.md`); a `lookup` and `insert`
+  on the same map co-resident. Lever: the right structure (`Set`/`IntMap`), a single
+  pass (`insertWith`/`alterF`), difference lists / accumulators for append.
+- **Redundant recomputation (no sharing)** — the same non-trivial value (a free-var
+  set, a kind, a `tcView`/`coreView` result) recomputed at each use instead of being
+  `let`-bound or cached in the structure. Tell-tale: a pure function with high entries
+  whose argument is structurally identical across those calls. Lever: hoist/`let`-bind,
+  compute once and thread, or memoise in the data type.
 - **Cross-cutting allocators** — `strictMap`, the iface Alex lexer (`$walexGetByte`).
   Broad, no single caller; flag as systemic rather than point-fixable.
 
