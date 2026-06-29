@@ -469,9 +469,9 @@ repTyClD (L loc (DataDecl { tcdLName = tc
 
 repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
                              tcdTyVars = tvs, tcdFDs = fds,
-                             tcdCExt = (ClassDeclX
-                               { tcdSigs = sigs, tcdMeths = meth_binds,
-                                 tcdATs = ats, tcdATDefs = atds }, _)}))
+                             tcdCExt = (HsNestedGroup
+                               { ng_sigs = sigs, ng_meths = meth_binds,
+                                 ng_ats = ats, ng_tyfam_insts = atds }, _)}))
   = do { cls1 <- lookupLOcc cls         -- See Note [Binders and occurrences]
        ; dec  <- addQTyVarBinds FreshNamesOnly tvs $ \bndrs ->
            do { cxt1   <- repLContext cxt
@@ -630,9 +630,11 @@ repInstD (L loc (ClsInstD { cid_inst = cls_decl }))
        ; return (locA loc, dec) }
 
 repClsInstD :: ClsInstDecl GhcRn -> MetaM (Core (M TH.Dec))
-repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
-                         , cid_sigs = sigs, cid_tyfam_insts = ats
-                         , cid_datafam_insts = adts
+repClsInstD (ClsInstDecl { cid_poly_ty = ty
+                         , cid_ext = (_, HsNestedGroup
+                             { ng_meths = binds
+                             , ng_sigs = sigs, ng_tyfam_insts = ats
+                             , ng_datafam_insts = adts })
                          , cid_overlap_mode = overlap
                          })
   = addSimpleTyVarBinds FreshNamesOnly tvs $

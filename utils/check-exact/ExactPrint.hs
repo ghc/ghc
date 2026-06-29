@@ -75,10 +75,9 @@ import Data.Dynamic
 import Data.Foldable
 import Data.Functor.Const
 import Data.Typeable
-import Data.List ( partition, sort, sortBy )
+import Data.List ( partition, sort )
 import qualified Data.List.NonEmpty as NE
-import qualified Data.Map.Strict as Map
-import Data.Maybe ( isJust, mapMaybe )
+import Data.Maybe ( isJust )
 import Data.Void
 
 import Utils
@@ -2207,33 +2206,21 @@ instance ExactPrint (ClsInstDecl GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (ClsInstDecl { cid_ext = (mbWarn, AnnClsInstDecl i w oc semis cc, sortKey)
-                     , cid_poly_ty = inst_ty, cid_binds = binds
-                     , cid_sigs = sigs, cid_tyfam_insts = ats
+  exact (ClsInstDecl { cid_ext = (mbWarn, AnnClsInstDecl i w oc semis cc)
+                     , cid_poly_ty = inst_ty
+                     , cid_decls = decls
                      , cid_overlap_mode = mbOverlap
-                     , cid_datafam_insts = adts
                      , cid_modifiers = mods })
       = do
           (mbWarn', i', w', mbOverlap', inst_ty', mods') <- top_matter
           oc' <- markEpToken oc
           semis' <- mapM markEpToken semis
-          (sortKey', ds) <- withSortKey sortKey
-                               [(ClsAtTag, prepareListAnnotationA ats),
-                                (ClsAtdTag, prepareListAnnotationF adts),
-                                (ClsMethodTag, prepareListAnnotationA binds),
-                                (ClsSigTag, prepareListAnnotationA sigs)
-                               ]
+          decls' <- mapM markAnnotated decls
           cc' <- markEpToken cc
-          let
-            ats'   = undynamic ds
-            adts'  = undynamic ds
-            binds' = undynamic ds
-            sigs'  = undynamic ds
-          return (ClsInstDecl { cid_ext = (mbWarn', AnnClsInstDecl i' w' oc' semis' cc', sortKey')
-                              , cid_poly_ty = inst_ty', cid_binds = binds'
-                              , cid_sigs = sigs', cid_tyfam_insts = ats'
+          return (ClsInstDecl { cid_ext = (mbWarn', AnnClsInstDecl i' w' oc' semis' cc')
+                              , cid_poly_ty = inst_ty'
+                              , cid_decls = decls'
                               , cid_overlap_mode = mbOverlap'
-                              , cid_datafam_insts = adts'
                               , cid_modifiers = mods' })
       where
         top_matter = do
@@ -2535,9 +2522,6 @@ instance ExactPrint (ValBind GhcPs GhcPs) where
   exact (VbBind b) = VbBind <$> markAnnotated b
   exact (VbSig  s) = VbSig  <$> markAnnotated s
 
-undynamic :: Typeable a => [Dynamic] -> [a]
-undynamic ds = mapMaybe fromDynamic ds
-
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (HsIPBinds GhcPs) where
@@ -2568,44 +2552,6 @@ instance ExactPrint HsIPName where
   setAnnotationAnchor a _ _ _ = a
 
   exact i@(HsIPName fs) = printStringAdvanceA ("?" ++ (unpackHText fs)) >> return i
-
--- ---------------------------------------------------------------------
--- Managing lists which have been separated, e.g. Sigs and Binds
-
-prepareListAnnotationF :: (Monad m, Monoid w) =>
-  [LDataFamInstDecl GhcPs] -> [(RealSrcSpan,EP w m Dynamic)]
-prepareListAnnotationF ls = map (\b -> (realSrcSpan $ getLocA b, go b)) ls
-  where
-    go (L l a) = do
-      (L l' d') <- markAnnotated (L l a)
-      return (toDyn (L l' d'))
-
-prepareListAnnotationA :: (Monad m, Monoid w, ExactPrint (LocatedAn an a))
-  => [LocatedAn an a] -> [(RealSrcSpan,EP w m Dynamic)]
-prepareListAnnotationA ls = map (\b -> (realSrcSpan $ getLocA b,go b)) ls
-  where
-    go b = do
-      b' <- markAnnotated b
-      return (toDyn b')
-
-withSortKey :: (Monad m, Monoid w)
-  => AnnSortKey DeclTag -> [(DeclTag, [(RealSrcSpan, EP w m Dynamic)])]
-  -> EP w m (AnnSortKey DeclTag, [Dynamic])
-withSortKey annSortKey xs = do
-  debugM $ "withSortKey:annSortKey=" ++ showAst annSortKey
-  let (sk, ordered) = case annSortKey of
-                  NoAnnSortKey -> (annSortKey', map snd os)
-                    where
-                      doOne (tag, ds) = map (\d -> (tag, d)) ds
-                      xsExpanded = concatMap doOne xs
-                      os = sortBy orderByFst $ xsExpanded
-                      annSortKey' = AnnSortKey (map fst os)
-                  AnnSortKey _keys -> (annSortKey, orderedDecls annSortKey (Map.fromList xs))
-  ordered' <- mapM snd ordered
-  return (sk, ordered')
-
-orderByFst :: Ord a => (t, (a,b1)) -> (t, (a, b2)) -> Ordering
-orderByFst (_,(a,_)) (_,(b,_)) = compare a b
 
 -- ---------------------------------------------------------------------
 

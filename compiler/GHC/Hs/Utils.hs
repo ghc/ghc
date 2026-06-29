@@ -1508,7 +1508,11 @@ hsLTyClDeclBinders (L loc (ClassDecl
                                , tcdLName = (L _ cls_name)
                                , tcdDecls  = decls}))
   = let
-    (_binds, sigs, ats, _at_defs, _, _docs) = classDeclsSplit @p (decls, ext)
+    HsNestedGroup { ng_sigs = sigs, ng_ats = ats } :: HsNestedGroup (GhcPass p)
+        = case ghcPass @p of
+            GhcPs -> partitionBindsAndSigs decls
+            GhcRn -> fst ext
+            GhcTc -> fst ext
   in TyDeclBinders
   { tyDeclMainBinder = (L loc cls_name, ClassFlavour)
   , tyDeclATs = [ (L fam_loc fam_name, familyInfoTyConFlavour (Just ()) fd_info)
@@ -1527,30 +1531,6 @@ hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = (L _ name)
   , tyDeclConsWithFields = hsDataDefnBinders defn }
   where
     flav = newOrDataToFlavour $ dataDefnConsNewOrData $ dd_cons defn
-
-classDeclsSplit
-  ::  forall p. IsPass p
-  => ([LHsDecl (GhcPass p)], XClassDecl (GhcPass p))
-  -> (LHsBinds (GhcPass p), [LSig (GhcPass p)], [LFamilyDecl (GhcPass p)],
-      [LTyFamInstDecl (GhcPass p)], [LDataFamInstDecl (GhcPass p)], [LDocDecl (GhcPass p)])
-classDeclsSplit (decls, ext)
-  = case ghcPass @p of
-      GhcPs -> partitionBindsAndSigs decls
-      GhcRn -> from_decls ext
-      GhcTc -> from_decls ext
-  where
-    from_decls
-      :: (XClassDecl (GhcPass p) ~ (ClassDeclX (GhcPass p), NameSet))
-      =>  (ClassDeclX (GhcPass p), NameSet)
-      -> (LHsBinds (GhcPass p), [LSig (GhcPass p)], [LFamilyDecl (GhcPass p)],
-          [LTyFamInstDecl (GhcPass p)], [LDataFamInstDecl (GhcPass p)], [LDocDecl (GhcPass p)])
-
-    from_decls (ClassDeclX { tcdSigs = sigs,
-                            tcdMeths = methods,
-                            tcdATs   = ats,
-                            tcdATDefs = at_defs,
-                            tcdDocs = docs}, _)
-      = (methods, sigs, ats, at_defs, [], docs)
 
 familyInfoTyConFlavour
   :: Maybe tc    -- ^ Just cls <=> this is an associated family of class cls
@@ -1594,13 +1574,12 @@ getPatSynBinds binds
           , L _ (PatSynBind _ psb) <- lbinds ]
 
 -------------------
-hsLInstDeclBinders :: (IsPass p, OutputableBndrId p)
-                   => LInstDecl (GhcPass p)
-                   -> ([(LocatedA (IdP (GhcPass p)))], [LFieldOcc (GhcPass p)])
+hsLInstDeclBinders :: LInstDecl GhcRn
+                   -> ([(LocatedA (IdP GhcRn))], [LFieldOcc GhcRn])
 hsLInstDeclBinders (L _ (ClsInstD
                              { cid_inst = ClsInstDecl
-                                          { cid_datafam_insts = dfis }}))
-  = foldMap (lconsWithFieldsBinders . hsDataFamInstBinders . unLoc) dfis
+                                          { cid_ext = (_, decls) }}))
+  = foldMap (lconsWithFieldsBinders . hsDataFamInstBinders . unLoc) (ng_datafam_insts decls)
 hsLInstDeclBinders (L _ (DataFamInstD { dfid_inst = fi }))
   = lconsWithFieldsBinders $ hsDataFamInstBinders fi
 hsLInstDeclBinders (L _ (TyFamInstD {})) = mempty

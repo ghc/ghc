@@ -144,7 +144,7 @@ ppSourceStats short (L _ (HsModule{ hsmodExports = exports, hsmodImports = impor
     class_info decl@(ClassDecl {})
         = (classops, addpr (sum3 (map count_bind methods)))
       where
-        (methods1, sigs, _ats, _at_defs, _, _docs) = partitionBindsAndSigs (tcdDecls decl)
+        HsNestedGroup { ng_meths = methods1, ng_sigs = sigs } = partitionBindsAndSigs (tcdDecls decl)
         methods = map unLoc methods1
         (_, classops, _, _, _) = count_sigs (map unLoc sigs)
     class_info _ = (0,0)
@@ -152,16 +152,15 @@ ppSourceStats short (L _ (HsModule{ hsmodExports = exports, hsmodImports = impor
     inst_info :: InstDecl GhcPs -> (Int, Int, Int, Int, Int)
     inst_info (TyFamInstD {}) = (0,0,0,1,0)
     inst_info (DataFamInstD {}) = (0,0,0,0,1)
-    inst_info (ClsInstD { cid_inst = ClsInstDecl {cid_binds = inst_meths
-                                                 , cid_sigs = inst_sigs
-                                                 , cid_tyfam_insts = ats
-                                                 , cid_datafam_insts = adts } })
+    inst_info (ClsInstD { cid_inst = ClsInstDecl { cid_decls = decls } })
         = case count_sigs (map unLoc inst_sigs) of
             (_,_,ss,is,_) ->
                   (addpr (sum3 (map count_bind methods)),
                    ss, is, length ats, length adts)
       where
         methods = map unLoc inst_meths
+        HsNestedGroup { ng_meths = inst_meths, ng_sigs = inst_sigs
+                      , ng_ats = ats, ng_tyfam_insts = adts} = partitionBindsAndSigs decls
 
     -- TODO: use Sum monoid
     addpr :: (Int,Int,Int) -> Int

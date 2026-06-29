@@ -178,18 +178,19 @@ tyThingToLHsDecl prr t = case t of
                       $ snd
                       $ classTvsFds cl
                 , tcdDecls = []
-                , tcdCExt = (ClassDeclX {
-                    tcdSigs =
+                , tcdCExt = (HsNestedGroup {
+                    ng_sigs =
                       noLocA (MinimalSig (noAnn, NoSourceText) . noLocA $ classMinimalDef cl)
                         : [ noLocA tcdSig
                           | clsOp <- classOpItems cl
                           , tcdSig <- synifyTcIdSig (mkVarSet vs) clsOp
                           ]
-                  , tcdMeths = [] -- ignore default method definitions, they don't affect signature
+                  , ng_meths = [] -- ignore default method definitions, they don't affect signature
                   -- class associated-types are a subset of TyCon:
-                  , tcdATs = atFamDecls
-                  , tcdATDefs = catMaybes atDefFamDecls
-                  , tcdDocs = []}, emptyNameSet) -- we don't have any docs at this point
+                  , ng_ats = atFamDecls
+                  , ng_tyfam_insts = catMaybes atDefFamDecls
+                  , ng_docs = []
+                  , ng_datafam_insts = []}, emptyNameSet) -- we don't have any docs at this point
                 , tcdModifiers = []
                 }
     | otherwise ->

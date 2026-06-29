@@ -609,10 +609,10 @@ renameTyClD d = case d of
     , tcdTyVars = ltyvars
     , tcdFixity = fixity
     , tcdFDs = lfundeps
-    , tcdCExt = (ClassDeclX
-       { tcdSigs = lsigs
-       , tcdATs = ats
-       , tcdATDefs = at_defs }, _)
+    , tcdCExt = (HsNestedGroup
+       { ng_sigs = lsigs
+       , ng_ats = ats
+       , ng_tyfam_insts = at_defs }, _)
     , tcdModifiers = mods
     } -> do
       lcontext' <- traverse renameLContext lcontext
@@ -632,12 +632,13 @@ renameTyClD d = case d of
             , tcdFixity = fixity
             , tcdFDs = lfundeps'
             , tcdDecls = []
-            , tcdCExt = (ClassDeclX
-                 { tcdSigs = lsigs'
-                 , tcdMeths = []
-                 , tcdATs = ats'
-                 , tcdATDefs = at_defs'
-                 , tcdDocs = []}, noExtField)
+            , tcdCExt = (HsNestedGroup
+                 { ng_sigs = lsigs'
+                 , ng_meths = []
+                 , ng_ats = ats'
+                 , ng_tyfam_insts = at_defs'
+                 , ng_docs = []
+                 , ng_datafam_insts = []}, noExtField)
             , tcdModifiers = mods'
             }
         )
@@ -942,8 +943,9 @@ renameClsInstD
   ( ClsInstDecl
       { cid_overlap_mode = omode
       , cid_poly_ty = ltype
-      , cid_tyfam_insts = lATs
-      , cid_datafam_insts = lADTs
+      , cid_ext = (_, HsNestedGroup
+         { ng_tyfam_insts = lATs
+         , ng_datafam_insts = lADTs })
       , cid_modifiers = mods
       }
     ) = do
@@ -953,13 +955,16 @@ renameClsInstD
     mods' <- renameModifiers mods
     return
       ( ClsInstDecl
-          { cid_ext = noExtField
-          , cid_overlap_mode = fmap convertOverlapMode <$> omode
+          { cid_overlap_mode = fmap convertOverlapMode <$> omode
           , cid_poly_ty = ltype'
-          , cid_binds = []
-          , cid_sigs = []
-          , cid_tyfam_insts = lATs'
-          , cid_datafam_insts = lADTs'
+          , cid_decls = []
+          , cid_ext = HsNestedGroup
+            { ng_meths = []
+            , ng_sigs = []
+            , ng_tyfam_insts = lATs'
+            , ng_datafam_insts = lADTs'
+            , ng_ats = []
+            , ng_docs = []}
           , cid_modifiers = mods'
           }
       )

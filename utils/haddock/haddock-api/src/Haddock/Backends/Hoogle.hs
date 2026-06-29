@@ -204,14 +204,14 @@ ppClass sDocContext decl@(ClassDecl{ tcdCExt = (decls, ns)}) subdocs =
         sDocContext
         decl
           { tcdCExt = (decls
-             { tcdSigs = []
-             , tcdATs = []
-             , tcdATDefs = []
-             , tcdMeths = emptyLHsBinds }, ns)
+             { ng_sigs = []
+             , ng_ats = []
+             , ng_tyfam_insts = []
+             , ng_meths = emptyLHsBinds }, ns)
           }
 
     ppMethods :: [String]
-    ppMethods = concat . map (ppSig' . unLoc . add_ctxt) $ tcdSigs decls
+    ppMethods = concat . map (ppSig' . unLoc . add_ctxt) $ ng_sigs decls
 
     ppSig' = flip (ppSigWithDoc sDocContext) subdocs
 
@@ -219,12 +219,12 @@ ppClass sDocContext decl@(ClassDecl{ tcdCExt = (decls, ns)}) subdocs =
 
     ppTyFams :: String
     ppTyFams
-      | null $ tcdATs decls = ""
+      | null $ ng_ats decls = ""
       | otherwise =
           (" " ++) . Outputable.renderWithContext sDocContext . whereWrapper $
             concat
-              [ map pprTyFam (tcdATs decls)
-              , map (pprTyFamInstDecl NotTopLevel . unLoc) (tcdATDefs decls)
+              [ map pprTyFam (ng_ats decls)
+              , map (pprTyFamInstDecl NotTopLevel . unLoc) (ng_tyfam_insts decls)
               ]
 
     pprTyFam :: LFamilyDecl GhcRn -> SDoc

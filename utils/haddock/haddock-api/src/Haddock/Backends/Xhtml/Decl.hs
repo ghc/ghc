@@ -793,8 +793,8 @@ ppShortClassDecl
       , tcdLName = lname
       , tcdTyVars = tvs
       , tcdFDs = fds
-      , tcdCExt = (ClassDeclX { tcdSigs = sigs
-                              , tcdATs = ats }, _)
+      , tcdCExt = (HsNestedGroup { ng_sigs = sigs
+                                 , ng_ats = ats }, _)
       }
     )
   loc
@@ -871,9 +871,9 @@ ppClassDecl
           , tcdLName = lname
           , tcdTyVars = ltyvars
           , tcdFDs = lfds
-          , tcdCExt = (ClassDeclX { tcdSigs = lsigs
-                                  , tcdATs = ats
-                                  , tcdATDefs = atsDefs }, _)
+          , tcdCExt = (HsNestedGroup { ng_sigs = lsigs
+                                     , ng_ats = ats
+                                     , ng_tyfam_insts = atsDefs }, _)
           }
         )
   splice
