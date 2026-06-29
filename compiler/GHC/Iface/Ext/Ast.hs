@@ -1631,11 +1631,11 @@ instance ToHie (LocatedA (TyClDecl GhcRn)) where
                 , tcdLName = name
                 , tcdTyVars = vars
                 , tcdFDs = deps
-                , tcdCExt = (ClassDeclX {
-                   tcdSigs = sigs
-                 , tcdMeths = meths
-                 , tcdATs = typs
-                 , tcdATDefs = deftyps }, _)
+                , tcdCExt = (HsNestedGroup {
+                   ng_sigs = sigs
+                 , ng_meths = meths
+                 , ng_ats = typs
+                 , ng_tyfam_insts = deftyps }, _)
                 } ->
         [ toHie $ C (Decl ClassDec $ getRealSpanA span) name
         , toHie context
@@ -2148,14 +2148,14 @@ instance ToHie (LocatedA (InstDecl GhcRn)) where
         ]
 
 instance ToHie (LocatedA (ClsInstDecl GhcRn)) where
-  toHie (L span decl) = concatM
+  toHie (L span decl@ClsInstDecl { cid_ext = (_, decls)}) = concatM
     [ toHie $ TS (ResolvedScopes [mkScope span]) $ cid_poly_ty decl
-    , toHie $ fmap (BC InstanceBind ModuleScope) $ cid_binds decl
-    , toHie $ map (SC $ SI InstSig $ getRealSpanA span) $ cid_sigs decl
-    , concatMapM (locOnly . getLocA) $ cid_tyfam_insts decl
-    , toHie $ cid_tyfam_insts decl
-    , concatMapM (locOnly . getLocA) $ cid_datafam_insts decl
-    , toHie $ cid_datafam_insts decl
+    , toHie $ fmap (BC InstanceBind ModuleScope) $ ng_meths decls
+    , toHie $ map (SC $ SI InstSig $ getRealSpanA span) $ ng_sigs decls
+    , concatMapM (locOnly . getLocA) $ ng_tyfam_insts decls
+    , toHie $ ng_tyfam_insts decls
+    , concatMapM (locOnly . getLocA) $ ng_datafam_insts decls
+    , toHie $ ng_datafam_insts decls
     , toHie $ cid_overlap_mode decl
     ]
 

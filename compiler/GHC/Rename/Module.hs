@@ -603,13 +603,15 @@ checkCanonicalInstances cls poly_ty mbinds = do
       addDiagnostic (TcRnNonCanonicalDefinition reason poly_ty)
 
 rnClsInstDecl :: ClsInstDecl GhcPs -> RnM (ClsInstDecl GhcRn, FreeNames)
-rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
-                           , cid_poly_ty = inst_ty, cid_binds = mbinds
-                           , cid_sigs = uprags, cid_tyfam_insts = ats
+rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _)
+                           , cid_poly_ty = inst_ty
+                           , cid_decls = decls
                            , cid_overlap_mode = omode
-                           , cid_datafam_insts = adts
                            , cid_modifiers = modifiers })
-  = do { rec { let ctxt = ClassInstanceCtx head_ty'
+  = do { rec { let HsNestedGroup { ng_meths = mbinds, ng_sigs = uprags
+                                 , ng_tyfam_insts = ats
+                                 , ng_datafam_insts = adts} = partitionBindsAndSigs decls
+             ; let ctxt = ClassInstanceCtx head_ty'
              ; checkInferredVars ctxt inst_ty
              ; (inst_ty', inst_fvs) <- rnHsSigType ctxt TypeLevel inst_ty
              ; let (ktv_names, _, head_ty') = splitLHsInstDeclTy inst_ty'
@@ -687,11 +689,17 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
                                 `plusFN` inst_fvs
                                 `plusFN` mods_fvs
        ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
-       ; return (ClsInstDecl { cid_ext = inst_warn_rn
-                             , cid_poly_ty = inst_ty', cid_binds = mbinds'
-                             , cid_sigs = uprags', cid_tyfam_insts = ats'
+       ; return (ClsInstDecl { cid_poly_ty = inst_ty'
+                             , cid_decls = [] -- See Note [Pass-sensitive decls for ClassDecls/ClsInstDecls]
+                             , cid_ext = (inst_warn_rn, HsNestedGroup
+                                            { ng_meths = mbinds'
+                                            , ng_sigs = uprags'
+                                            , ng_tyfam_insts = ats'
+                                            , ng_datafam_insts = adts'
+                                            -- Next two not used for ClsInstDecl
+                                            , ng_ats = []
+                                            , ng_docs = []})
                              , cid_overlap_mode = omode'
-                             , cid_datafam_insts = adts'
                              , cid_modifiers = modifiers' },
                  all_fvs) }
              -- We return the renamed associated data type declarations so
@@ -1929,7 +1937,8 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                         tcdFDs = fds,
                         tcdDecls = decls,
                         tcdModifiers = modifiers})
-  = do  { let (mbinds, sigs, ats, at_defs, _, docs) = partitionBindsAndSigs decls
+  = do  { let HsNestedGroup { ng_meths = mbinds, ng_sigs = sigs, ng_ats = ats
+                            , ng_tyfam_insts = at_defs, ng_docs = docs} = partitionBindsAndSigs decls
         ; lcls' <- lookupLocatedTopBndrRnN WL_TyCon lcls
         ; let cls' = unLoc lcls'
               kvs = []  -- No scoped kind vars except those in
@@ -1983,12 +1992,14 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
         ; return (ClassDecl { tcdCtxt = context', tcdLName = lcls',
                               tcdTyVars = tyvars', tcdFixity = fixity,
                               tcdFDs = fds',
-                              tcdDecls = [], -- See Note [Pass-sensitive decls for ClassDecls]
-                              tcdCExt = (ClassDeclX { tcdSigs   = sigs',
-                                                      tcdMeths  = mbinds',
-                                                      tcdATs    = ats',
-                                                      tcdATDefs = at_defs',
-                                                      tcdDocs   = docs'},
+                              tcdDecls = [], -- See Note [Pass-sensitive decls for ClassDecls/ClsInstDecls]
+                              tcdCExt = (HsNestedGroup { ng_sigs          = sigs',
+                                                         ng_meths         = mbinds',
+                                                         ng_ats           = ats',
+                                                         ng_tyfam_insts   = at_defs',
+                                                         ng_docs          = docs',
+                                                         ng_datafam_insts = [] -- Not used in a ClassDecl
+                                                         },
                               all_fvs), tcdModifiers = modifiers' },
                   all_fvs ) }
   where

@@ -371,10 +371,10 @@ subordinates env instMap decl = case decl of
     data_fams = do
       DataFamInstDecl { dfid_eqn =
         FamEqn { feqn_tycon = L l _
-               , feqn_rhs   = defn }} <- unLoc <$> cid_datafam_insts d
+               , feqn_rhs   = defn }} <- unLoc <$> ng_datafam_insts (snd $ cid_ext d)
       [ (n, [], IM.empty) | Just n <- [lookupSrcSpan (locA l) instMap] ] ++ dataSubs defn
     ty_fams = do
-      TyFamInstDecl { tfid_eqn = FamEqn { feqn_tycon = L l _ } } <- unLoc <$> cid_tyfam_insts d
+      TyFamInstDecl { tfid_eqn = FamEqn { feqn_tycon = L l _ } } <- unLoc <$> ng_tyfam_insts (snd $ cid_ext d)
       [ (n, [], IM.empty) | Just n <- [lookupSrcSpan (locA l) instMap] ]
     in data_fams ++ ty_fams
 
@@ -458,12 +458,12 @@ isValD _ = False
 classDecls :: TyClDecl GhcRn  -- Always a ClassDecl
            -> [(LHsDecl GhcRn, [HsDoc GhcRn])]
 classDecls decl
-  | ClassDecl { tcdCExt = (ClassDeclX { .. }, _) } <- decl
+  | ClassDecl { tcdCExt = (HsNestedGroup { .. }, _) } <- decl
   , let decls = docs ++ defs ++ sigs ++ ats
-        docs  = mkDecls (DocD noExtField) tcdDocs
-        defs  = mkDecls (ValD noExtField) tcdMeths
-        sigs  = mkDecls (SigD noExtField) tcdSigs
-        ats   = mkDecls (TyClD noExtField . FamDecl noExtField) tcdATs
+        docs  = mkDecls (DocD noExtField) ng_docs
+        defs  = mkDecls (ValD noExtField) ng_meths
+        sigs  = mkDecls (SigD noExtField) ng_sigs
+        ats   = mkDecls (TyClD noExtField . FamDecl noExtField) ng_ats
 
   = filterDecls . collectDocs . sortLocatedA $ decls
 
@@ -572,8 +572,8 @@ filterClasses = map (first (fmap filterClass))
   where
     filterClass :: HsDecl GhcRn -> HsDecl GhcRn
     filterClass (TyClD x c@(ClassDecl { tcdCExt = (cd, ns) })) =
-      TyClD x $ c { tcdCExt = (cd { tcdSigs =
-        filter (liftA2 (||) (isUserSig . unLoc) isMinimalLSig) (tcdSigs cd) }, ns)}
+      TyClD x $ c { tcdCExt = (cd { ng_sigs =
+        filter (liftA2 (||) (isUserSig . unLoc) isMinimalLSig) (ng_sigs cd) }, ns)}
     filterClass d = d
 
 -- | Was this signature given by the user?

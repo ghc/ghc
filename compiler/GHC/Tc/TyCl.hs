@@ -1321,7 +1321,7 @@ generaliseTyClDecl inferred_tc_env (L _ decl)
     tycld_names decl = tcdName decl : at_names decl
 
     at_names :: TyClDecl GhcRn -> [Name]
-    at_names (ClassDecl { tcdCExt = (ClassDeclX { tcdATs = ats }, _)}) = map (familyDeclName . unLoc) ats
+    at_names (ClassDecl { tcdCExt = (HsNestedGroup { ng_ats = ats }, _)}) = map (familyDeclName . unLoc) ats
     at_names _ = []  -- Only class decls have associated types
 
     skolemise_tc_tycon :: Name -> ZonkM (TcTyCon, SkolemInfo, ScopedPairs)
@@ -1878,7 +1878,7 @@ mkPromotionErrorEnv decls
           emptyNameEnv decls
 
 mk_prom_err_env :: TyClDecl GhcRn -> TcTypeEnv
-mk_prom_err_env (ClassDecl { tcdLName = L _ nm, tcdCExt = (ClassDeclX { tcdATs = ats }, _)})
+mk_prom_err_env (ClassDecl { tcdLName = L _ nm, tcdCExt = (HsNestedGroup { ng_ats = ats }, _)})
   = unitNameEnv nm (APromotionErr ClassPE)
     `plusNameEnv`
     mkNameEnv [ (familyDeclName at, APromotionErr TyConPE)
@@ -1947,7 +1947,7 @@ getInitialKind :: InitialKindStrategy -> TyClDecl GhcRn -> TcM [TcTyCon]
 getInitialKind strategy
     (ClassDecl { tcdLName = L _ name
                , tcdTyVars = ktvs
-               , tcdCExt = (ClassDeclX { tcdATs = ats }, _)})
+               , tcdCExt = (HsNestedGroup { ng_ats = ats }, _)})
   = do { cls_tc <- kcDeclHeader strategy name ClassFlavour ktvs $
                 return (TheKind constraintKind)
             -- See Note [Don't process associated types in getInitialKind]
@@ -2177,7 +2177,7 @@ kcTyClDecl (SynDecl { tcdLName = L _ _name, tcdRhs = rhs }) tycon
         -- in inferInitialKinds.
 
 kcTyClDecl (ClassDecl { tcdLName = L _ _name
-                      , tcdCtxt = ctxt, tcdCExt = (ClassDeclX { tcdSigs = sigs }, _)}) tycon
+                      , tcdCtxt = ctxt, tcdCExt = (HsNestedGroup { ng_sigs = sigs }, _)}) tycon
   = tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
     do  { _ <- tcHsContext ctxt
         ; mapM_ (wrapLocMA_ kc_sig) sigs }
@@ -3040,11 +3040,11 @@ tcTyClDecl1 _parent roles_info
             (ClassDecl { tcdLName = L _ class_name
                        , tcdCtxt = hs_ctxt
                        , tcdFDs = fundeps
-                       , tcdCExt = (ClassDeclX
-                            { tcdMeths = meths
-                            , tcdSigs = sigs
-                            , tcdATs = ats
-                            , tcdATDefs = at_defs }, _)})
+                       , tcdCExt = (HsNestedGroup
+                            { ng_meths = meths
+                            , ng_sigs = sigs
+                            , ng_ats = ats
+                            , ng_tyfam_insts = at_defs }, _)})
   = assert (isNothing _parent) $
     do { clas <- tcClassDecl1 roles_info class_name hs_ctxt
                               meths fundeps sigs ats at_defs

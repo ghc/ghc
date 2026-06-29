@@ -498,11 +498,13 @@ tcLocalInstDecl (L loc (ClsInstD { cid_inst = decl }))
 tcClsInstDecl :: LClsInstDecl GhcRn
               -> TcM ([InstInfo GhcRn], [FamInst], [DerivInfo])
 -- The returned DerivInfos are for any associated data families
-tcClsInstDecl (L loc (ClsInstDecl { cid_ext = lwarn
-                                  , cid_poly_ty = hs_ty, cid_binds = binds
-                                  , cid_sigs = uprags, cid_tyfam_insts = ats
+tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty
+                                  , cid_ext = (lwarn,  HsNestedGroup
+                                       { ng_meths = binds
+                                       , ng_sigs = uprags, ng_tyfam_insts = ats
+                                       , ng_datafam_insts = adts })
                                   , cid_overlap_mode = overlap_mode
-                                  , cid_datafam_insts = adts }))
+                                  }))
   = setSrcSpanA loc                   $
     addErrCtxt (instDeclCtxt1 hs_ty)  $
     do  { dfun_ty <- tcHsClsInstType (InstDeclCtxt False) hs_ty

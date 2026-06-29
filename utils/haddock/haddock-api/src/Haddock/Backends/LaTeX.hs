@@ -735,9 +735,9 @@ ppClassDecl
       , tcdLName = lname
       , tcdTyVars = ltyvars
       , tcdFDs = lfds
-      , tcdCExt = (ClassDeclX { tcdSigs = lsigs
-                              , tcdATs = ats
-                              , tcdATDefs = at_defs }, _)
+      , tcdCExt = (HsNestedGroup { ng_sigs = lsigs
+                                 , ng_ats = ats
+                                 , ng_tyfam_insts = at_defs }, _)
       }
     )
   unicode =

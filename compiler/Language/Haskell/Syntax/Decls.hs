@@ -422,7 +422,7 @@ data TyClDecl pass
                 tcdTyVars  :: LHsQTyVars pass,         -- ^ Class type variables
                 tcdFixity  :: LexicalFixity, -- ^ Fixity used in the declaration
                 tcdFDs     :: [LHsFunDep pass],         -- ^ Functional deps
-                tcdDecls   :: [LHsDecl pass] -- ^ Class declarations. Allow pass-specific representation
+                tcdDecls   :: [LHsDecl pass] -- ^ Class declarations.
                                              -- only SigD, ValD, TyClD _ FamDecl, InstD _ TyFamInstD,
                                              -- InstD _ DataFamInstD and DocD
     }
@@ -1259,10 +1259,8 @@ data ClsInstDecl pass
       , cid_poly_ty :: LHsSigType pass      -- Context => Class Instance-type
                                             -- Using a polytype means that the renamer conveniently
                                             -- figures out the quantified type variables for us.
-      , cid_binds         :: LHsBinds pass       -- Class methods
-      , cid_sigs          :: [LSig pass]         -- User-supplied pragmatic info
-      , cid_tyfam_insts   :: [LTyFamInstDecl pass]   -- Type family instances
-      , cid_datafam_insts :: [LDataFamInstDecl pass] -- Data family instances
+      , cid_decls   :: [LHsDecl pass]       -- ^ Class instance declarations.
+                                            -- only SigD, ValD, InstD _ TyFamInstD or InstD _ DataFamInstD
       , cid_overlap_mode  :: Maybe (XRec pass (OverlapMode pass))
       }
   | XClsInstDecl !(XXClsInstDecl pass)
