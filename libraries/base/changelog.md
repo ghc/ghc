@@ -33,6 +33,7 @@
   * Evaluate backtraces for "error" exceptions at the moment they are thrown. ([CLC proposal #383](https://github.com/haskell/core-libraries-committee/issues/383))
   * Hide implementation details when throwing exceptions in throw and throwSTM. ([CLC proposal #387](https://github.com/haskell/core-libraries-committee/issues/387))
   * Change `hIsReadable` and `hIsWritable` such that they always throw a respective exception when encountering a closed or semi-closed handle, not just in the case of a file handle. ([CLC proposal #371](github.com/haskell/core-libraries-committee/issues/371))
+  * The implementation of `toException` in `SomeException`'s `Exception` instance no longer drops exception context, in keeping with the behavior originally proposed in [CLC Proposal #200](https://github.com/haskell/core-libraries-committee/issues/200).
   * Annotate `onException` continuation with `WhileHandling`. ([CLC Proposal #397](https://github.com/haskell/core-libraries-committee/issues/397))
   * Improve error message for `Data.Char.chr`. ([CLC Proposal #384](https://github.com/haskell/core-libraries-committee/issues/384))
 

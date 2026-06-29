@@ -1,0 +1,8 @@
+section: base
+issues: #27455
+mrs: 
+synopsis:
+  Don't drop `ExceptionContext` in `SomeException(toException)`
+description:
+  Previously the implementation of ``Exception(toException)`` given to `SomeException` would inappropriately drop the carried `ExceptionContext`. Now ``toException = id``, faithfully implementing the semantics proposed in :ref:`CLC Proposal #200 <https://github.com/haskell/core-libraries-committee/issues/200>`.
+
