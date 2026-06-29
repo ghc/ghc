@@ -498,7 +498,7 @@ instance HasHaddock (HsDecl GhcPs) where
   --      -- ^ Comment on the second method
   --
   addHaddock (TyClD _ decl)
-    | ClassDecl { tcdCExt = (x, layout, NoAnnSortKey),
+    | ClassDecl { tcdCExt = (x, layout),
                   tcdCtxt, tcdLName, tcdTyVars, tcdFixity, tcdFDs,
                   tcdDecls, tcdModifiers } <- decl
     = do
@@ -506,7 +506,7 @@ instance HasHaddock (HsDecl GhcPs) where
         registerEpTokenHdkA (acd_where x)
         tcdDecls' <- addHaddockInterleaveItems layout (mkDocHsDecl layout) tcdDecls
         pure $
-          let decl' = ClassDecl { tcdCExt = (x, layout, NoAnnSortKey)
+          let decl' = ClassDecl { tcdCExt = (x, layout)
                                 , tcdCtxt, tcdLName, tcdTyVars, tcdFixity, tcdFDs
                                 , tcdDecls = tcdDecls'
                                 , tcdModifiers }

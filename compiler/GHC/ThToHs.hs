@@ -328,7 +328,7 @@ cvtDec (ClassD ctxt cl tvs fds decs)
         ; unless (null adts')
             (failWith $ DefaultDataInstDecl adts')
         ; returnJustLA $ TyClD noExtField $
-          ClassDecl { tcdCExt = (noAnn, EpNoLayout, NoAnnSortKey)
+          ClassDecl { tcdCExt = (noAnn, EpNoLayout)
                     , tcdCtxt = mkHsContextMaybe cxt', tcdLName = tc', tcdTyVars = tvs'
                     , tcdFixity = Prefix
                     , tcdFDs = fds'

@@ -486,10 +486,7 @@ data DataDeclRn = DataDeclRn
              , tcdFVs      :: NameSet }
   deriving Data
 
-type instance XClassDecl    GhcPs =
-  ( AnnClassDecl
-  , EpLayout              -- See Note [Class EpLayout]
-  , AnnSortKey DeclTag )  -- TODO:AZ:tidy up AnnSortKey
+type instance XClassDecl    GhcPs = (AnnClassDecl, EpLayout) -- See Note [Class EpLayout]
 
 type instance XClassDecl    GhcRn = NameSet -- FVs
 type instance XClassDecl    GhcTc = NameSet -- FVs

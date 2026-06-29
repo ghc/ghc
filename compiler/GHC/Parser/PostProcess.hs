@@ -218,7 +218,7 @@ mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layout annsIn
        ; tyvars <- checkTyVars (text "class") whereDots cls tparams
        ; let anns' = annsIn { acd_openp = ops, acd_closep = cps}
        ; let loc = EpAnn (spanAsAnchor loc') noAnn cs
-       ; return (L loc (ClassDecl { tcdCExt = (anns', layout, NoAnnSortKey)
+       ; return (L loc (ClassDecl { tcdCExt = (anns', layout)
                                   , tcdCtxt = mcxt
                                   , tcdLName = cls, tcdTyVars = tyvars
                                   , tcdFixity = fixity
@@ -528,14 +528,8 @@ cvBindsAndSigsOnly :: OrdList (LHsDecl GhcPs)
 -- and in case of class or instance declarations also
 -- associated type declarations. They might also contain Haddock comments.
 cvBindsAndSigsOnly fb = do
-  fb' <- drop_bad_decls (fromOL fb)
-  return (fmap wrapValBind (getMonoBindAll fb'))
-  where
-    drop_bad_decls [] = return []
-    drop_bad_decls (L l (SpliceD _ d) : ds) = do
-      addError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrDeclSpliceNotAtTopLevel d
-      drop_bad_decls ds
-    drop_bad_decls (d:ds) = (d:) <$> drop_bad_decls ds
+  fb' <- cvBindsAndSigs' fb
+  return (fmap wrapValBind fb')
 
 -- TODO:AZ add this to the re-exports of the GHC module
 wrapValBind :: LHsDecl (GhcPass p) -> ValBind (GhcPass p) (GhcPass p)
@@ -562,7 +556,7 @@ cvBindsAndSigs fb = do
     --
     -- partitionBindsAndSigs can handle almost all declaration forms produced
     -- by the aforementioned productions, except for SpliceD, which we filter
-    -- out here (in drop_bad_decls).
+    -- out here (in cvBindsAndSigs').
     --
 
 cvBindsAndSigs' :: OrdList (LHsDecl GhcPs) -> P [LHsDecl GhcPs]
