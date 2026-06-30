@@ -36,6 +36,7 @@ module GHC.Linker.Loader
    , initLinkDepsOpts
    , getGccSearchDirectory
    , mkDynLoadLib
+   , linkablesDefault
    )
 where
 
@@ -253,10 +254,10 @@ loadDependencies
   -> IO (LoaderState, SuccessFlag, [LinkableUsage], PkgsLoaded) -- ^ returns the set of linkables required
 -- When called, the loader state must have been initialized (see `initLoaderState`)
 loadDependencies interp hsc_env pls span needed_mods = do
-   let opts = initLinkDepsOpts hsc_env
+   linkables <- hsc_linkables hsc_env hsc_env pls
 
    -- Find what packages and linkables are required
-   deps <- getLinkDeps opts interp pls span needed_mods
+   deps <- linkablesGet linkables span needed_mods
 
    let this_pkgs_needed = ldNeededUnits deps
 
@@ -650,6 +651,18 @@ findWholeCoreBindings hsc_env mod = do
       EPS {eps_iface_bytecode} <- hscEPS hsc_env
       sequence (lookupModuleEnv eps_iface_bytecode mod)
 
+
+linkablesDefault ::
+  HscEnv ->
+  LoaderState ->
+  IO Linkables
+linkablesDefault hsc_env pls =
+  pure Linkables {
+    linkablesResolve = resolveLinkDeps opts pls,
+    linkablesSelect = selectLinkDeps opts (hscInterp hsc_env)
+  }
+  where
+    opts = initLinkDepsOpts hsc_env
 
 findBytecodeLinkableMaybe :: HscEnv -> ModLocation -> IO (Maybe Linkable)
 findBytecodeLinkableMaybe hsc_env locn = do

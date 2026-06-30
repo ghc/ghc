@@ -1,6 +1,8 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE GADTs #-}
 
 -----------------------------------------------------------------------------
 --
@@ -78,6 +80,9 @@ module GHC.Linker.Types
    , mkLinkableUsage
 
    , ModuleByteCode(..)
+   , LinkDeps (..)
+   , Linkables (..)
+   , linkablesGet
    )
 where
 
@@ -95,6 +100,7 @@ import GHC.Stack.CCS
 import GHC.Types.Name.Env      ( NameEnv, emptyNameEnv, extendNameEnvList, lookupNameEnv )
 import GHC.Types.Name          ( Name )
 import GHC.Types.SptEntry
+import GHC.Types.SrcLoc (SrcSpan)
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.DFM
 import GHC.Unit.Module.Deps (LinkablePartUsage (..), linkablePartUsageObjectPaths)
@@ -693,3 +699,23 @@ instance Outputable LibrarySpec where
   ppr (DLLPath f) = text "DLLPath" <+> text f
   ppr (Framework s) = text "Framework" <+> text s
   ppr (BytecodeLibrary f) = text "BytecodeLibrary" <+> text f
+
+data LinkDeps = LinkDeps
+  { ldNeededLinkables :: [Linkable]
+  , ldAllLinkables    :: [LinkableUsage]
+  , ldUnits           :: [UnitId]
+  , ldNeededUnits     :: UniqDSet UnitId
+  }
+
+-- | Customizable procedure for determining the linkables required by a set of
+-- modules, split into a resolution phase and a selection phase with an
+-- intermediate representation that is opaque to consumers.
+data Linkables where
+  Linkables :: {
+    linkablesResolve :: SrcSpan -> [Module] -> IO a,
+    linkablesSelect :: SrcSpan -> a -> IO LinkDeps
+  } -> Linkables
+
+linkablesGet :: Linkables -> SrcSpan -> [Module] -> IO LinkDeps
+linkablesGet Linkables {..} span mods =
+  linkablesSelect span =<< linkablesResolve span mods
