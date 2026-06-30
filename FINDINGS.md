@@ -147,6 +147,21 @@ deliverable.
   reshape chain optimisation): [[opt-trans-rule-identity-eqtype-deep-walk]] in
   `~/ghc/todos`.
 
+### Zonk type/coercion mapper  (`Tc.Zonk.Type` `mapTyCoX`)
+
+- **`$wgo_tys` (suite #13, 1.14 %) is resolved**: it is the `[Type]` arm of
+  `mapTyCoX` (the zonker's map). Driver **T9872b_defer** (67 % of entries), where
+  `$wgo_tys` is the **#1 allocator in the whole test**: 22.3M entries / **417.6 MB**.
+  The decisive ratio: across ~45M visited type/coercion nodes the mapper does only
+  **273** tyvar substitutions and **6** coercion-hole fills — so essentially the
+  entire alloc is the zonker **re-allocating `TyConApp` arg-lists/nodes structurally
+  identical to their inputs**. Caller chain `go_tys ← go_ty(TyConApp) ← go_co`, i.e.
+  driven by zonking the huge coercions in deferred-error evidence. Body already
+  optimal (A done); lever is a `reallyUnsafePtrEquality#` identity short-circuit in
+  the shared mapper — an **allocation** win (GC/bytes-allocated), Ir-neutral, and it
+  also covers `Tc.Zonk.TcType`'s zonker. Investigation + lever:
+  [[zonk-maptyco-identity-rebuild-ptr-eq]] in `~/ghc/todos`.
+
 ### Interface load/write  (MultiLayerModules)
 
 - Dominated by `utf8CompareByteArray#` (17.6 %), `Lexer.Interface.$walexGetByte`
@@ -165,6 +180,7 @@ deliverable.
 | `Word64Map.$winsert` (#6) | ManyConstructors |
 | `coVarsOfType(s)` | T16577 |
 | `Core.Map.Type` / de Bruijn eq | T9872b |
+| `Tc.Zonk.Type.$wgo_tys`/`go_ty` (zonk mapper) | **T9872b_defer** (67 % of `go_tys` entries) |
 | iface (utf8/alex/ULEB, GenUnit==) | MultiLayerModules |
 
 ## Ticky phase — source-level entry counts + an allocation axis
