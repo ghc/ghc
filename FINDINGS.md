@@ -146,6 +146,18 @@ deliverable.
   Investigation + (B) levers (guard the optional check / share endpoint types /
   reshape chain optimisation): [[opt-trans-rule-identity-eqtype-deep-walk]] in
   `~/ghc/todos`.
+- **`castCoercionKind_go` (suite #15, 1.06 %) is the *construction half* of that
+  same Identity rule** — not an independent opportunity. The mangled name hides two
+  coercion-kind walkers: `castCoercionKind_go` = `coercionLKind`, `castCoercionKind_go1`
+  = `coercionRKind` (the two inlined `coercion_lr_kind` copies). They **freshly
+  materialise** the `ty1`/`ty2` that the rule's `eqType` then compares, so the
+  earlier "no allocation" note undercounts the rule. **Driver is T13386** (95 %
+  `$wopt_trans_rule`), and it *inverts* T8095: building `coercionLKind co1` = 27.1 M
+  node-ops vs. the `eqType` walk's 1.0 M (shallow reject, reflexive 0.45 % of calls)
+  — we build a deep type ~27x larger than the comparison needs, then reject it after
+  ~4 nodes. So the rule's true cost = construction (#15) **+** comparison (#2); a
+  comparison-only fix misses T13386. Folded into
+  [[opt-trans-rule-identity-eqtype-deep-walk]] (construction-half section).
 
 ### Zonk type/coercion mapper  (`Tc.Zonk.Type` `mapTyCoX`)
 
