@@ -276,7 +276,7 @@ import GHC.Data.FastString
 import GHC.Utils.TmpFs
 import GHC.Utils.Fingerprint
 import GHC.Utils.Outputable
-import GHC.Utils.Error (emptyDiagOpts, logInfo)
+import GHC.Utils.Error (emptyDiagOpts, logInfo, Validity'(..))
 import GHC.Settings
 import GHC.CmmToAsm.CFG.Weight
 import GHC.Core.Opt.CallerCC
@@ -3855,8 +3855,8 @@ makeDynFlagsConsistent dflags
    && os == OSMinGW32
    && arch == ArchAArch64
     = case backendCodeOutput (backend dflags) of
-        LlvmCodeOutput -> pgmError "-fllvm is incompatible with enabled TablesNextToCode at Windows Aarch64"
-        NcgCodeOutput -> pgmError "-fasm is incompatible with enabled TablesNextToCode at Windows Aarch64"
+        Just LlvmCodeOutput -> pgmError "-fllvm is incompatible with enabled TablesNextToCode at Windows Aarch64"
+        Just NcgCodeOutput -> pgmError "-fasm is incompatible with enabled TablesNextToCode at Windows Aarch64"
         _ -> (dflags, mempty, mempty)
 
   -- When we do ghci, force using dyn ways if the target RTS linker
@@ -3902,9 +3902,8 @@ makeDynFlagsConsistent dflags
         in dflags_c
 
  | gopt Opt_InfoTableMap dflags
- , LlvmCodeOutput <- backendCodeOutput (backend dflags)
-    = loop (gopt_unset dflags Opt_InfoTableMap)
-           "-finfo-table-map is incompatible with -fllvm and is disabled (See #26435)"
+ , NotValid msg <- backendInfoTableMapValidity (backend dflags)
+    = loop (gopt_unset dflags Opt_InfoTableMap) msg
 
  | otherwise = (dflags, mempty, mempty)
     where loc = mkGeneralSrcSpan (fsLit "when making flags consistent")
