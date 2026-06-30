@@ -19,12 +19,13 @@ import GHC.Core.SimpleOpt( defaultSimpleOpts, simpleOptExprWith, exprIsConApp_ma
 import GHC.Core.Predicate
 import GHC.Core.Class( classMethods )
 import GHC.Core.Coercion( Coercion )
-import GHC.Core.DataCon (dataConTyCon)
+import GHC.Core.DataCon (dataConTyCon, StrictnessMark(NotMarkedStrict))
 
 import qualified GHC.Core.Subst as Core
 import GHC.Core.Unfold.Make
 import GHC.Core
-import GHC.Core.Make      ( mkLitRubbish, wrapFloats )
+import GHC.Core.Make      ( wrapFloats )
+import GHC.Core.Opt.WorkWrap.Utils ( mkAbsentFiller )
 import GHC.Core.Unify     ( tcMatchTy )
 import GHC.Core.Rules
 import GHC.Core.Subst (substTickish)
@@ -1669,7 +1670,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                                         | otherwise    = UnspecArg
 
            ; (useful, subst', rule_bndrs, rule_lhs_args, spec_bndrs, dx_binds, spec_args)
-                 <- specHeader subst rhs_bndrs all_call_args
+                 <- specHeader this_mod subst rhs_bndrs all_call_args
            ; let env' = env { se_subst = subst' }
 
            -- Check for (a) usefulness and (b) not already covered
@@ -2573,7 +2574,8 @@ isSpecDict _             = False
 --    , [T1, T2, c, i, dEqT1, dShow1]
 --    )
 specHeader
-     :: Core.Subst  -- This substitution applies to the [InBndr]
+     :: Module      -- The module being compiled, for mkAbsentFiller
+     -> Core.Subst  -- This substitution applies to the [InBndr]
      -> [InBndr]    -- Binders from the original function `f`
      -> [SpecArg]   -- From the CallInfo
      -> SpecM ( Bool     -- True <=> some useful specialisation happened
@@ -2598,13 +2600,13 @@ specHeader
 
 -- If we run out of binders, stop immediately
 -- See Note [Specialisation Must Preserve Sharing]
-specHeader subst [] _  = pure (False, subst, [], [], [], [], [])
-specHeader subst _  [] = pure (False, subst, [], [], [], [], [])
+specHeader _ subst [] _  = pure (False, subst, [], [], [], [], [])
+specHeader _ subst _  [] = pure (False, subst, [], [], [], [], [])
 
 -- We want to specialise on type 'T1', and so we must construct a substitution
 -- 'a->T1', as well as a LHS argument for the resulting RULE and unfolding
 -- details.
-specHeader subst (bndr:bndrs) (SpecType ty : args)
+specHeader mod subst (bndr:bndrs) (SpecType ty : args)
   = do { -- Find free_tvs, the type variables to add to the binders for the rule
          -- Namely those deeply free in `ty` that aren't in scope
          -- See (MP2) in Note [Specialising polymorphic dictionaries]
@@ -2617,7 +2619,7 @@ specHeader subst (bndr:bndrs) (SpecType ty : args)
 
        ; let subst2 = Core.extendTvSubst subst1 bndr ty
        ; (useful, subst3, rule_bs, rule_args, spec_bs, dx, spec_args)
-             <- specHeader subst2 bndrs args
+             <- specHeader mod subst2 bndrs args
        ; pure ( useful, subst3
               , free_tvs ++ rule_bs,     Type ty : rule_args
               , free_tvs ++ spec_bs, dx, Type ty : spec_args ) }
@@ -2626,29 +2628,34 @@ specHeader subst (bndr:bndrs) (SpecType ty : args)
 -- a substitution on it (in case the type refers to 'a'). Additionally, we need
 -- to produce a binder, LHS argument and RHS argument for the resulting rule,
 -- /and/ a binder for the specialised body.
-specHeader subst (bndr:bndrs) (UnspecType : args)
+specHeader mod subst (bndr:bndrs) (UnspecType : args)
   = do { let (subst1, bndr') = Core.substBndr subst bndr
        ; (useful, subst2, rule_bs, rule_es, spec_bs, dx, spec_args)
-             <- specHeader subst1 bndrs args
+             <- specHeader mod subst1 bndrs args
        ; let ty_e' = Type (mkTyVarTy bndr')
        ; pure ( useful, subst2
               , bndr' : rule_bs,     ty_e' : rule_es
               , bndr' : spec_bs, dx, ty_e' : spec_args ) }
 
-specHeader subst (bndr:bndrs) (_ : args)
+specHeader mod subst (bndr:bndrs) (_ : args)
   | isDeadBinder bndr
   , let (subst1, bndr') = Core.substBndr subst (zapIdOccInfo bndr)
-  , Just rubbish_lit <- mkLitRubbish (idType bndr')
+  , Just filler <- mkAbsentFiller mod bndr' NotMarkedStrict
+      -- NB: mkAbsentFiller returns Nothing for a terminating type (e.g. a
+      -- dictionary), so this guard fails and we fall through, keeping the
+      -- argument instead of dropping it.
+      -- See Note [Don't make fillers for terminating types]
+      -- in GHC.Core.Opt.WorkWrap.Utils
   = -- See Note [Drop dead args from specialisations]
-    do { (useful, subst2, rule_bs, rule_es, spec_bs, dx, spec_args) <- specHeader subst1 bndrs args
+    do { (useful, subst2, rule_bs, rule_es, spec_bs, dx, spec_args) <- specHeader mod subst1 bndrs args
        ; pure ( useful, subst2
               , bndr' : rule_bs, Var bndr'   : rule_es
-              , spec_bs,     dx, rubbish_lit : spec_args ) }
+              , spec_bs,     dx, filler : spec_args ) }
 
 -- Next we want to specialise the 'Eq a' dict away. We need to construct
 -- a wildcard binder to match the dictionary (See Note [Specialising Calls] for
 -- the nitty-gritty), as a LHS rule and unfolding details.
-specHeader subst (bndr:bndrs) (SpecDict dict_arg : args)
+specHeader mod subst (bndr:bndrs) (SpecDict dict_arg : args)
   = do { -- Make up a fresh binder to use in the RULE
          -- It might turn into a dict binding (via bindAuxiliaryDict) which we
          -- then float, so we use cloneIdBndr to get a completely fresh binder
@@ -2659,7 +2666,7 @@ specHeader subst (bndr:bndrs) (SpecDict dict_arg : args)
          -- Extend the substitution to map bndr :-> dict_arg, for use in the RHS
        ; let (subst2, dx_bind, spec_dict) = bindAuxiliaryDict subst1 bndr bndr' dict_arg
 
-       ; (_, subst3, rule_bs, rule_es, spec_bs, dx, spec_args) <- specHeader subst2 bndrs args
+       ; (_, subst3, rule_bs, rule_es, spec_bs, dx, spec_args) <- specHeader mod subst2 bndrs args
 
        ; let dx' = case dx_bind of { Nothing -> dx; Just d -> d : dx }
        ; pure ( True, subst3      -- Ha!  A useful specialisation!
@@ -2674,10 +2681,10 @@ specHeader subst (bndr:bndrs) (SpecDict dict_arg : args)
 -- why 'i' doesn't appear in our RULE above. But we have no guarantee that
 -- there aren't 'UnspecArg's which come /before/ all of the dictionaries, so
 -- this case must be here.
-specHeader subst (bndr:bndrs) (UnspecArg : args)
+specHeader mod subst (bndr:bndrs) (UnspecArg : args)
   = do { let (subst1, bndr') = Core.substBndr subst (zapIdOccInfo bndr)
                  -- zapIdOccInfo: see Note [Zap occ info in rule binders]
-       ; (useful, subst2, rule_bs, rule_es, spec_bs, dx, spec_args) <- specHeader subst1 bndrs args
+       ; (useful, subst2, rule_bs, rule_es, spec_bs, dx, spec_args) <- specHeader mod subst1 bndrs args
 
        ; let dummy_arg = varToCoreExpr bndr'
                -- dummy_arg is usually just (Var bndr),
