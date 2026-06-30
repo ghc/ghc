@@ -116,6 +116,13 @@ deliverable.
   from `$weqDeBruijnType` + 20.7 % from `splitAppTyNoView_maybe` → the cost is
   **de Bruijn type-key equality in the solver's TrieMaps**. `rewriteType2`
   (16.29 %) entered 10.8 % via `TyCon_con`. Cleanly symbolised.
+- **`rewriteType2` = `rewrite_one`** (the central rewriter loop) is itself a
+  T9872b driver: 8 top-level `rewrite` calls (← `can_eq_nc`) explode into 1.98 M
+  node-rewrites via the fam-app FINISH-1 re-walk. Body already optimal (one-shot
+  monad, famapp-cache); levers are a cheap per-tyvar rebuild short-circuit (A) and
+  the hard "don't re-walk already-normal sub-structure" (B). Investigation +
+  levers: [[rewriteType2-rewrite-one-tyvar-rebuild-and-famapp-rewalk]] in
+  `~/ghc/todos`.
 - `eq_type_expand_ignore` (suite #2) is *not* top in any of the five tests
   profiled — driven by other type-comparison-heavy tests (candidates: T9872c,
   T8095, T13719). One more callgrind run would localise it.
