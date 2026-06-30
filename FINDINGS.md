@@ -234,7 +234,14 @@ lot". Ticky separates them, and they point at *different* functions:
   deterministic `UniqDFM` fold materialises its element list (`foldr (:) []`) *and*
   sorts it by insertion tag. This single list-materialisation is the largest cost
   source in the whole investigation — invisible to Ir (cons is Ir-cheap), enormous
-  in bytes. Lever (B): avoid materialising/ordering these solver-map folds.
+  in bytes. The driver is **`RoughMap.lookupRM'`'s *unifier* enumeration** (99.9 %,
+  via `matchInstEnv`/`tcExtendLocalInstEnv1` solving variable-headed `Show a` goals):
+  `foldDNameEnv`=`foldUDFM`=`sortBy . M.elems` sorts+materialises all 10,000 `Show`
+  instances just to answer the zero/non-zero unifier question, defeating the laziness
+  `Note [Matches vs Unifiers]` relies on. Lever (B): non-deterministic unifier fold
+  (order matters only for error messages). Mechanism, caller chain, lever, and the
+  order-independence caveat written up in
+  [[roughmap-lookuprm-elems-materialization]] in `~/ghc/todos`.
 - **T8095 = the `eq_type_expand_ignore` driver** (187.1M entries, **0 B**), entered
   via `eqTypeIgnoringMultiplicity` only 251k times → ~745 recursive node-compares
   per top-level type comparison. Pure volume; body already has the
