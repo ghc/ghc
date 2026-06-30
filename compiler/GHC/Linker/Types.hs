@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -----------------------------------------------------------------------------
 --
@@ -45,6 +46,9 @@ module GHC.Linker.Types
    , linkableFilterByteCode
    , linkableFilterNative
    , partitionLinkables
+   , LinkDeps (..)
+   , Linkables (..)
+   , linkablesGet
    )
 where
 
@@ -57,6 +61,7 @@ import GHCi.Message            ( LoadedDLL )
 import GHC.Types.Name.Env      ( NameEnv, emptyNameEnv, extendNameEnvList, filterNameEnv )
 import GHC.Types.Name          ( Name )
 import GHC.Types.SptEntry
+import GHC.Types.SrcLoc (SrcSpan)
 
 import GHC.Utils.Outputable
 
@@ -477,3 +482,21 @@ instance Outputable LibrarySpec where
   ppr (DLL s) = text "DLL" <+> text s
   ppr (DLLPath f) = text "DLLPath" <+> text f
   ppr (Framework s) = text "Framework" <+> text s
+
+data LinkDeps =
+  LinkDeps {
+    ldNeededLinkables :: [Linkable],
+    ldAllLinkables :: [Linkable],
+    ldNeededUnits :: [UnitId],
+    ldAllUnits :: UniqDSet UnitId
+  }
+
+data Linkables where
+  Linkables :: {
+    linkablesResolve :: SrcSpan -> [Module] -> IO a,
+    linkablesSelect :: SrcSpan -> a -> IO LinkDeps
+  } -> Linkables
+
+linkablesGet :: Linkables -> SrcSpan -> [Module] -> IO LinkDeps
+linkablesGet Linkables {..} span mods =
+  linkablesSelect span =<< linkablesResolve span mods
