@@ -1003,6 +1003,14 @@ data type. Here are the moving parts:
 
    This is sad, though: see #18983.
 
+   INVARIANT 3: we never make a rubbish literal of a terminating type
+   (isTerminatingType), such as a class dictionary. GHC relies on a value of
+   a terminating type never being bottom, and so may speculatively evaluate
+   a dictionary or select a superclass from it. Either would crash on a
+   rubbish literal (#24934, #25924).
+   See Note [Don't make fillers for terminating types]
+   in GHC.Core.Opt.WorkWrap.Utils.
+
 3. STG: The type app in `RUBBISH[IntRep] @Int# :: Int#` is erased and we get
    the (untyped) 'StgLit' `RUBBISH[IntRep] :: Int#` in STG.
 
