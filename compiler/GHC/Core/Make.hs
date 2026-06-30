@@ -226,13 +226,16 @@ mkLitRubbish :: Type -> Maybe CoreExpr
 -- Fail (returning Nothing) if
 --    * the RuntimeRep of the Type is not monomorphic;
 --    * the type is (a ~# b), the type of coercion
--- See INVARIANT 1 and 2 of item (2) in Note [Rubbish literals]
+--    * the type is terminating (isTerminatingType), e.g. a dictionary
+-- See INVARIANT 1, 2 and 3 of item (2) in Note [Rubbish literals]
 -- in GHC.Types.Literal
 mkLitRubbish ty
   | not (noFreeVarsOfType rep)
   = Nothing   -- Satisfy INVARIANT 1
   | isEqPred ty
   = Nothing   -- Satisfy INVARIANT 2
+  | isTerminatingType ty
+  = Nothing   -- Satisfy INVARIANT 3
   | otherwise
   = Just (Lit (LitRubbish torc rep) `mkTyApps` [ty])
   where

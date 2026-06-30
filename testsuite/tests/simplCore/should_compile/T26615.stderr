@@ -2,7 +2,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 1,209, types: 1,155, coercions: 18, joins: 17/29}
+  = {terms: 1,229, types: 1,163, coercions: 18, joins: 17/29}
 
 -- RHS size: {terms: 6, types: 8, coercions: 0, joins: 0/0}
 unArray :: forall a. Array a -> SmallArray# a
@@ -414,7 +414,7 @@ T26615a.$tc'BitmapIndexed
       2#
       $krep24
 
--- RHS size: {terms: 98, types: 109, coercions: 0, joins: 3/4}
+-- RHS size: {terms: 101, types: 113, coercions: 0, joins: 3/4}
 T26615a.$wdisjointCollisions [InlPrag=INLINABLE[2]]
   :: forall k a b.
      Eq k =>
@@ -561,13 +561,14 @@ T26615a.$wdisjointCollisions
                     joinrec {
                       $wlookupInArrayCont_ [InlPrag=[2],
                                             Occ=LoopBreaker,
-                                            Dmd=SC(S,C(1,C(1,C(1,L))))]
-                        :: k -> SmallArray# (Leaf k b) -> Int# -> Int# -> Bool
-                      [LclId[JoinId(4)(Just [!])],
-                       Arity=4,
-                       Str=<1L><L><L><L>,
+                                            Dmd=SC(S,C(1,C(1,C(1,C(1,L)))))]
+                        :: Eq k => k -> SmallArray# (Leaf k b) -> Int# -> Int# -> Bool
+                      [LclId[JoinId(5)(Just [~, !])],
+                       Arity=5,
+                       Str=<A><1L><L><L><L>,
                        Unf=OtherCon []]
-                      $wlookupInArrayCont_ (k1 :: k)
+                      $wlookupInArrayCont_ ($dEq1 [Occ=Dead] :: Eq k)
+                                           (k1 :: k)
                                            (ww3 :: SmallArray# (Leaf k b))
                                            (ww4 :: Int#)
                                            (ww5 :: Int#)
@@ -578,7 +579,7 @@ T26615a.$wdisjointCollisions
                               { (# ipv2 #) ->
                               case ipv2 of { L kx v ->
                               case == @k $dEq k2 kx of {
-                                False -> jump $wlookupInArrayCont_ k2 ww3 (+# ww4 1#) ww5;
+                                False -> jump $wlookupInArrayCont_ $dEq k2 ww3 (+# ww4 1#) ww5;
                                 True -> GHC.Internal.Types.False
                               }
                               }
@@ -586,7 +587,7 @@ T26615a.$wdisjointCollisions
                             1# -> jump $j
                           }
                           }; } in
-                    jump $wlookupInArrayCont_ kA ww2 0# lvl2
+                    jump $wlookupInArrayCont_ $dEq kA ww2 0# lvl2
                     }
                     };
                   1# -> sc3
@@ -611,7 +612,7 @@ lvl1
   = GHC.Internal.Control.Exception.Base.patError @LiftedRep @() lvl
 
 Rec {
--- RHS size: {terms: 133, types: 126, coercions: 0, joins: 1/2}
+-- RHS size: {terms: 136, types: 130, coercions: 0, joins: 1/2}
 T26615a.disjointSubtrees_$s$wdisjointSubtrees [InlPrag=INLINABLE[2],
                                                Occ=LoopBreaker]
   :: forall k a b.
@@ -641,13 +642,14 @@ T26615a.disjointSubtrees_$s$wdisjointSubtrees
               joinrec {
                 $wlookupInArrayCont_ [InlPrag=[2],
                                       Occ=LoopBreaker,
-                                      Dmd=SC(S,C(1,C(1,C(1,L))))]
-                  :: k -> SmallArray# (Leaf k a) -> Int# -> Int# -> Bool
-                [LclId[JoinId(4)(Just [!])],
-                 Arity=4,
-                 Str=<1L><L><L><L>,
+                                      Dmd=SC(S,C(1,C(1,C(1,C(1,L)))))]
+                  :: Eq k => k -> SmallArray# (Leaf k a) -> Int# -> Int# -> Bool
+                [LclId[JoinId(5)(Just [~, !])],
+                 Arity=5,
+                 Str=<A><1L><L><L><L>,
                  Unf=OtherCon []]
-                $wlookupInArrayCont_ (k1 :: k)
+                $wlookupInArrayCont_ ($dEq [Occ=Dead] :: Eq k)
+                                     (k1 :: k)
                                      (ww :: SmallArray# (Leaf k a))
                                      (ww1 :: Int#)
                                      (ww2 :: Int#)
@@ -657,7 +659,7 @@ T26615a.disjointSubtrees_$s$wdisjointSubtrees
                         case indexSmallArray# @Lifted @(Leaf k a) ww ww1 of { (# ipv #) ->
                         case ipv of { L kx v ->
                         case == @k sc k2 kx of {
-                          False -> jump $wlookupInArrayCont_ k2 ww (+# ww1 1#) ww2;
+                          False -> jump $wlookupInArrayCont_ sc k2 ww (+# ww1 1#) ww2;
                           True -> GHC.Internal.Types.False
                         }
                         }
@@ -666,7 +668,7 @@ T26615a.disjointSubtrees_$s$wdisjointSubtrees
                     }
                     }; } in
               jump $wlookupInArrayCont_
-                k0 sc3 0# (sizeofSmallArray# @Lifted @(Leaf k a) sc3)
+                sc k0 sc3 0# (sizeofSmallArray# @Lifted @(Leaf k a) sc3)
           }
           }
           };
@@ -708,7 +710,7 @@ T26615a.disjointSubtrees_$s$wdisjointSubtrees
 end Rec }
 
 Rec {
--- RHS size: {terms: 705, types: 748, coercions: 18, joins: 13/23}
+-- RHS size: {terms: 719, types: 748, coercions: 18, joins: 13/23}
 T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
   :: forall k a b. Eq k => Int# -> HashMap k a -> HashMap k b -> Bool
 [GblId[StrictWorker([~, ~, !])],
@@ -1065,23 +1067,23 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                     @(*)
                                     @(SmallArray# (HashMap k a)
                                       -> SmallArray# (HashMap k b) -> Int#)
-                                    @(GHC.Internal.Types.UnusedType 0 "a"
-                                      -> GHC.Internal.Types.UnusedType 1 "b" -> Int#)
+                                    @(GHC.Internal.Types.UnusedType "a_0"
+                                      -> GHC.Internal.Types.UnusedType "b_1" -> Int#)
                              of
                              { GHC.Internal.Unsafe.Coerce.UnsafeRefl v2 ->
                              case reallyUnsafePtrEquality#
                                     @Lifted
                                     @Lifted
-                                    @(GHC.Internal.Types.UnusedType 0 "a")
-                                    @(GHC.Internal.Types.UnusedType 1 "b")
+                                    @(GHC.Internal.Types.UnusedType "a_0")
+                                    @(GHC.Internal.Types.UnusedType "b_1")
                                     (bx1
                                      `cast` (SelCo:Fun(arg) (Sub (Sym v2))
                                              :: SmallArray# (HashMap k a)
-                                                ~R# GHC.Internal.Types.UnusedType 0 "a"))
+                                                ~R# GHC.Internal.Types.UnusedType "a_0"))
                                     (bx3
                                      `cast` (SelCo:Fun(arg) (SelCo:Fun(res) (Sub (Sym v2)))
                                              :: SmallArray# (HashMap k b)
-                                                ~R# GHC.Internal.Types.UnusedType 1 "b"))
+                                                ~R# GHC.Internal.Types.UnusedType "b_1"))
                              of {
                                __DEFAULT ->
                                  joinrec {
@@ -1234,23 +1236,23 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                          case GHC.Internal.Unsafe.Coerce.unsafeEqualityProof
                                 @(*)
                                 @(SmallArray# (HashMap k a) -> SmallArray# (HashMap k b) -> Int#)
-                                @(GHC.Internal.Types.UnusedType 0 "a"
-                                  -> GHC.Internal.Types.UnusedType 1 "b" -> Int#)
+                                @(GHC.Internal.Types.UnusedType "a_0"
+                                  -> GHC.Internal.Types.UnusedType "b_1" -> Int#)
                          of
                          { GHC.Internal.Unsafe.Coerce.UnsafeRefl v2 ->
                          case reallyUnsafePtrEquality#
                                 @Lifted
                                 @Lifted
-                                @(GHC.Internal.Types.UnusedType 0 "a")
-                                @(GHC.Internal.Types.UnusedType 1 "b")
+                                @(GHC.Internal.Types.UnusedType "a_0")
+                                @(GHC.Internal.Types.UnusedType "b_1")
                                 (bx
                                  `cast` (SelCo:Fun(arg) (Sub (Sym v2))
                                          :: SmallArray# (HashMap k a)
-                                            ~R# GHC.Internal.Types.UnusedType 0 "a"))
+                                            ~R# GHC.Internal.Types.UnusedType "a_0"))
                                 (bx1
                                  `cast` (SelCo:Fun(arg) (SelCo:Fun(res) (Sub (Sym v2)))
                                          :: SmallArray# (HashMap k b)
-                                            ~R# GHC.Internal.Types.UnusedType 1 "b"))
+                                            ~R# GHC.Internal.Types.UnusedType "b_1"))
                          of {
                            __DEFAULT -> jump go (GHC.Internal.Types.I# 31#);
                            1# -> GHC.Internal.Types.False
@@ -1310,13 +1312,14 @@ T26615a.$wdisjointSubtrees
                           joinrec {
                             $wlookupInArrayCont_ [InlPrag=[2],
                                                   Occ=LoopBreaker,
-                                                  Dmd=SC(S,C(1,C(1,C(1,L))))]
-                              :: k -> SmallArray# (Leaf k a) -> Int# -> Int# -> Bool
-                            [LclId[JoinId(4)(Just [!])],
-                             Arity=4,
-                             Str=<1L><L><L><L>,
+                                                  Dmd=SC(S,C(1,C(1,C(1,C(1,L)))))]
+                              :: Eq k => k -> SmallArray# (Leaf k a) -> Int# -> Int# -> Bool
+                            [LclId[JoinId(5)(Just [~, !])],
+                             Arity=5,
+                             Str=<A><1L><L><L><L>,
                              Unf=OtherCon []]
-                            $wlookupInArrayCont_ (k1 :: k)
+                            $wlookupInArrayCont_ ($dEq1 [Occ=Dead] :: Eq k)
+                                                 (k1 :: k)
                                                  (ww2 :: SmallArray# (Leaf k a))
                                                  (ww3 :: Int#)
                                                  (ww4 :: Int#)
@@ -1327,7 +1330,8 @@ T26615a.$wdisjointSubtrees
                                     { (# ipv #) ->
                                     case ipv of { L kx v ->
                                     case == @k $dEq k2 kx of {
-                                      False -> jump $wlookupInArrayCont_ k2 ww2 (+# ww3 1#) ww4;
+                                      False ->
+                                        jump $wlookupInArrayCont_ $dEq k2 ww2 (+# ww3 1#) ww4;
                                       True -> GHC.Internal.Types.False
                                     }
                                     }
@@ -1336,18 +1340,19 @@ T26615a.$wdisjointSubtrees
                                 }
                                 }; } in
                           jump $wlookupInArrayCont_
-                            ds4 bx2 0# (sizeofSmallArray# @Lifted @(Leaf k a) bx2)
+                            $dEq ds4 bx2 0# (sizeofSmallArray# @Lifted @(Leaf k a) bx2)
                       } } in
                 joinrec {
                   $wlookupCont_ [InlPrag=[2],
                                  Occ=LoopBreaker,
-                                 Dmd=SC(S,C(1,C(1,C(1,L))))]
-                    :: Word# -> k -> Int# -> HashMap k a -> Bool
-                  [LclId[JoinId(4)(Just [~, !, ~, !])],
-                   Arity=4,
-                   Str=<L><1L><L><1L>,
+                                 Dmd=SC(S,C(1,C(1,C(1,C(1,L)))))]
+                    :: Eq k => Word# -> k -> Int# -> HashMap k a -> Bool
+                  [LclId[JoinId(5)(Just [~, ~, !, ~, !])],
+                   Arity=5,
+                   Str=<A><L><1L><L><1L>,
                    Unf=OtherCon []]
-                  $wlookupCont_ (ww1 :: Word#)
+                  $wlookupCont_ ($dEq1 [Occ=Dead] :: Eq k)
+                                (ww1 :: Word#)
                                 (ds4 :: k)
                                 (ww2 :: Int#)
                                 (ds5 :: HashMap k a)
@@ -1371,7 +1376,7 @@ T26615a.$wdisjointSubtrees
                                      (word2Int# (popCnt# (and# bx1 (minusWord# m 1##))))
                               of
                               { (# ipv #) ->
-                              jump $wlookupCont_ ww1 ds6 (+# ww2 5#) ipv
+                              jump $wlookupCont_ $dEq ww1 ds6 (+# ww2 5#) ipv
                               };
                             0## -> GHC.Internal.Types.True
                           };
@@ -1383,11 +1388,11 @@ T26615a.$wdisjointSubtrees
                                  (word2Int# (and# (uncheckedShiftRL# ww1 ww2) 31##))
                           of
                           { (# ipv #) ->
-                          jump $wlookupCont_ ww1 ds6 (+# ww2 5#) ipv
+                          jump $wlookupCont_ $dEq ww1 ds6 (+# ww2 5#) ipv
                           }
                       }
                       }; } in
-                jump $wlookupCont_ bx k0 ww ds
+                jump $wlookupCont_ $dEq bx k0 ww ds
                 }
                 };
               Collision bx bx1 ->
@@ -1435,13 +1440,14 @@ T26615a.$wdisjointSubtrees
                         joinrec {
                           $wlookupInArrayCont_ [InlPrag=[2],
                                                 Occ=LoopBreaker,
-                                                Dmd=SC(S,C(1,C(1,C(1,L))))]
-                            :: k -> SmallArray# (Leaf k b) -> Int# -> Int# -> Bool
-                          [LclId[JoinId(4)(Just [!])],
-                           Arity=4,
-                           Str=<1L><L><L><L>,
+                                                Dmd=SC(S,C(1,C(1,C(1,C(1,L)))))]
+                            :: Eq k => k -> SmallArray# (Leaf k b) -> Int# -> Int# -> Bool
+                          [LclId[JoinId(5)(Just [~, !])],
+                           Arity=5,
+                           Str=<A><1L><L><L><L>,
                            Unf=OtherCon []]
-                          $wlookupInArrayCont_ (k1 :: k)
+                          $wlookupInArrayCont_ ($dEq1 [Occ=Dead] :: Eq k)
+                                               (k1 :: k)
                                                (ww2 :: SmallArray# (Leaf k b))
                                                (ww3 :: Int#)
                                                (ww4 :: Int#)
@@ -1452,7 +1458,7 @@ T26615a.$wdisjointSubtrees
                                   { (# ipv #) ->
                                   case ipv of { L kx v ->
                                   case == @k $dEq k2 kx of {
-                                    False -> jump $wlookupInArrayCont_ k2 ww2 (+# ww3 1#) ww4;
+                                    False -> jump $wlookupInArrayCont_ $dEq k2 ww2 (+# ww3 1#) ww4;
                                     True -> GHC.Internal.Types.False
                                   }
                                   }
@@ -1461,18 +1467,19 @@ T26615a.$wdisjointSubtrees
                               }
                               }; } in
                         jump $wlookupInArrayCont_
-                          ds3 bx2 0# (sizeofSmallArray# @Lifted @(Leaf k b) bx2)
+                          $dEq ds3 bx2 0# (sizeofSmallArray# @Lifted @(Leaf k b) bx2)
                     } } in
               joinrec {
                 $wlookupCont_ [InlPrag=[2],
                                Occ=LoopBreaker,
-                               Dmd=SC(S,C(1,C(1,C(1,L))))]
-                  :: Word# -> k -> Int# -> HashMap k b -> Bool
-                [LclId[JoinId(4)(Just [~, !, ~, !])],
-                 Arity=4,
-                 Str=<L><1L><L><1L>,
+                               Dmd=SC(S,C(1,C(1,C(1,C(1,L)))))]
+                  :: Eq k => Word# -> k -> Int# -> HashMap k b -> Bool
+                [LclId[JoinId(5)(Just [~, ~, !, ~, !])],
+                 Arity=5,
+                 Str=<A><L><1L><L><1L>,
                  Unf=OtherCon []]
-                $wlookupCont_ (ww1 :: Word#)
+                $wlookupCont_ ($dEq1 [Occ=Dead] :: Eq k)
+                              (ww1 :: Word#)
                               (ds3 :: k)
                               (ww2 :: Int#)
                               (ds4 :: HashMap k b)
@@ -1496,7 +1503,7 @@ T26615a.$wdisjointSubtrees
                                    (word2Int# (popCnt# (and# bx1 (minusWord# m 1##))))
                             of
                             { (# ipv #) ->
-                            jump $wlookupCont_ ww1 ds5 (+# ww2 5#) ipv
+                            jump $wlookupCont_ $dEq ww1 ds5 (+# ww2 5#) ipv
                             };
                           0## -> GHC.Internal.Types.True
                         };
@@ -1508,11 +1515,11 @@ T26615a.$wdisjointSubtrees
                                (word2Int# (and# (uncheckedShiftRL# ww1 ww2) 31##))
                         of
                         { (# ipv #) ->
-                        jump $wlookupCont_ ww1 ds5 (+# ww2 5#) ipv
+                        jump $wlookupCont_ $dEq ww1 ds5 (+# ww2 5#) ipv
                         }
                     }
                     }; } in
-              jump $wlookupCont_ bx k0 ww wild2
+              jump $wlookupCont_ $dEq bx k0 ww wild2
               };
             Leaf bx1 ds3 ->
               case ds3 of { L kB ds4 ->
@@ -1570,23 +1577,23 @@ T26615a.$wdisjointSubtrees
                   case GHC.Internal.Unsafe.Coerce.unsafeEqualityProof
                          @(*)
                          @(SmallArray# (HashMap k a) -> SmallArray# (HashMap k b) -> Int#)
-                         @(GHC.Internal.Types.UnusedType 0 "a"
-                           -> GHC.Internal.Types.UnusedType 1 "b" -> Int#)
+                         @(GHC.Internal.Types.UnusedType "a_0"
+                           -> GHC.Internal.Types.UnusedType "b_1" -> Int#)
                   of
                   { GHC.Internal.Unsafe.Coerce.UnsafeRefl v2 ->
                   case reallyUnsafePtrEquality#
                          @Lifted
                          @Lifted
-                         @(GHC.Internal.Types.UnusedType 0 "a")
-                         @(GHC.Internal.Types.UnusedType 1 "b")
+                         @(GHC.Internal.Types.UnusedType "a_0")
+                         @(GHC.Internal.Types.UnusedType "b_1")
                          (bx1
                           `cast` (SelCo:Fun(arg) (Sub (Sym v2))
                                   :: SmallArray# (HashMap k a)
-                                     ~R# GHC.Internal.Types.UnusedType 0 "a"))
+                                     ~R# GHC.Internal.Types.UnusedType "a_0"))
                          (bx3
                           `cast` (SelCo:Fun(arg) (SelCo:Fun(res) (Sub (Sym v2)))
                                   :: SmallArray# (HashMap k b)
-                                     ~R# GHC.Internal.Types.UnusedType 1 "b"))
+                                     ~R# GHC.Internal.Types.UnusedType "b_1"))
                   of {
                     __DEFAULT ->
                       let {
@@ -1715,23 +1722,23 @@ T26615a.$wdisjointSubtrees
               case GHC.Internal.Unsafe.Coerce.unsafeEqualityProof
                      @(*)
                      @(SmallArray# (HashMap k a) -> SmallArray# (HashMap k b) -> Int#)
-                     @(GHC.Internal.Types.UnusedType 0 "a"
-                       -> GHC.Internal.Types.UnusedType 1 "b" -> Int#)
+                     @(GHC.Internal.Types.UnusedType "a_0"
+                       -> GHC.Internal.Types.UnusedType "b_1" -> Int#)
               of
               { GHC.Internal.Unsafe.Coerce.UnsafeRefl v2 ->
               case reallyUnsafePtrEquality#
                      @Lifted
                      @Lifted
-                     @(GHC.Internal.Types.UnusedType 0 "a")
-                     @(GHC.Internal.Types.UnusedType 1 "b")
+                     @(GHC.Internal.Types.UnusedType "a_0")
+                     @(GHC.Internal.Types.UnusedType "b_1")
                      (bx
                       `cast` (SelCo:Fun(arg) (Sub (Sym v2))
                               :: SmallArray# (HashMap k a)
-                                 ~R# GHC.Internal.Types.UnusedType 0 "a"))
+                                 ~R# GHC.Internal.Types.UnusedType "a_0"))
                      (bx1
                       `cast` (SelCo:Fun(arg) (SelCo:Fun(res) (Sub (Sym v2)))
                               :: SmallArray# (HashMap k b)
-                                 ~R# GHC.Internal.Types.UnusedType 1 "b"))
+                                 ~R# GHC.Internal.Types.UnusedType "b_1"))
               of {
                 __DEFAULT ->
                   let {
@@ -1838,7 +1845,7 @@ disjointSubtrees
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 614, types: 682, coercions: 18, joins: 8/14}
+  = {terms: 622, types: 674, coercions: 18, joins: 8/14}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $trModule1 :: GHC.Internal.Prim.Addr#
@@ -1878,20 +1885,22 @@ lvl1
       @GHC.Internal.Types.LiftedRep @() lvl
 
 Rec {
--- RHS size: {terms: 37, types: 30, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 39, types: 32, coercions: 0, joins: 0/0}
 $wpoly_lookupInArrayCont_
   :: forall a.
+     Eq String =>
      String
      -> GHC.Internal.Prim.SmallArray# (T26615a.Leaf String a)
      -> GHC.Internal.Prim.Int#
      -> GHC.Internal.Prim.Int#
      -> Bool
-[GblId[StrictWorker([!])],
- Arity=4,
- Str=<1L><L><L><L>,
+[GblId[StrictWorker([~, !])],
+ Arity=5,
+ Str=<A><1L><L><L><L>,
  Unf=OtherCon []]
 $wpoly_lookupInArrayCont_
   = \ (@a)
+      ($dEq2 [Occ=Dead] :: Eq String)
       (k1 :: String)
       (ww :: GHC.Internal.Prim.SmallArray# (T26615a.Leaf String a))
       (ww1 :: GHC.Internal.Prim.Int#)
@@ -1907,7 +1916,12 @@ $wpoly_lookupInArrayCont_
           case GHC.Internal.Base.eqString k2 kx of {
             False ->
               $wpoly_lookupInArrayCont_
-                @a k2 ww (GHC.Internal.Prim.+# ww1 1#) ww2;
+                @a
+                GHC.Internal.Classes.$fEqList_$s$fEqList1
+                k2
+                ww
+                (GHC.Internal.Prim.+# ww1 1#)
+                ww2;
             True -> GHC.Internal.Types.False
           }
           }
@@ -1918,17 +1932,19 @@ $wpoly_lookupInArrayCont_
 end Rec }
 
 Rec {
--- RHS size: {terms: 98, types: 73, coercions: 0, joins: 0/1}
+-- RHS size: {terms: 102, types: 75, coercions: 0, joins: 0/1}
 $wpoly_lookupCont_
   :: forall a.
+     Eq String =>
      GHC.Internal.Prim.Word#
      -> String -> GHC.Internal.Prim.Int# -> HashMap String a -> Bool
-[GblId[StrictWorker([~, !, ~, !])],
- Arity=4,
- Str=<L><1L><L><1L>,
+[GblId[StrictWorker([~, ~, !, ~, !])],
+ Arity=5,
+ Str=<A><L><1L><L><1L>,
  Unf=OtherCon []]
 $wpoly_lookupCont_
   = \ (@a)
+      ($dEq1 [Occ=Dead] :: Eq String)
       (ww :: GHC.Internal.Prim.Word#)
       (ds5 :: String)
       (ww1 :: GHC.Internal.Prim.Int#)
@@ -1953,6 +1969,7 @@ $wpoly_lookupCont_
             1# ->
               $wpoly_lookupInArrayCont_
                 @a
+                GHC.Internal.Classes.$fEqList_$s$fEqList1
                 ds9
                 bx2
                 0#
@@ -1979,7 +1996,13 @@ $wpoly_lookupCont_
                            (GHC.Internal.Prim.and# bx1 (GHC.Internal.Prim.minusWord# m 1##))))
               of
               { (# ipv2 #) ->
-              $wpoly_lookupCont_ @a ww ds9 (GHC.Internal.Prim.+# ww1 5#) ipv2
+              $wpoly_lookupCont_
+                @a
+                GHC.Internal.Classes.$fEqList_$s$fEqList1
+                ww
+                ds9
+                (GHC.Internal.Prim.+# ww1 5#)
+                ipv2
               };
             0## -> GHC.Internal.Types.True
           };
@@ -1993,14 +2016,20 @@ $wpoly_lookupCont_
                        (GHC.Internal.Prim.uncheckedShiftRL# ww ww1) 31##))
           of
           { (# ipv2 #) ->
-          $wpoly_lookupCont_ @a ww ds9 (GHC.Internal.Prim.+# ww1 5#) ipv2
+          $wpoly_lookupCont_
+            @a
+            GHC.Internal.Classes.$fEqList_$s$fEqList1
+            ww
+            ds9
+            (GHC.Internal.Prim.+# ww1 5#)
+            ipv2
           }
       }
       }
 end Rec }
 
 Rec {
--- RHS size: {terms: 448, types: 523, coercions: 18, joins: 8/13}
+-- RHS size: {terms: 450, types: 507, coercions: 18, joins: 8/13}
 T26615.$s$wdisjointSubtrees [InlPrag=[~], Occ=LoopBreaker]
   :: forall a b.
      GHC.Internal.Prim.Int#
@@ -2021,7 +2050,8 @@ T26615.$s$wdisjointSubtrees
               T26615a.Empty -> GHC.Internal.Types.True;
               T26615a.Leaf bx ds2 ->
                 case ds2 of { T26615a.L kB ds3 ->
-                $wpoly_lookupCont_ @a bx kB ww ds
+                $wpoly_lookupCont_
+                  @a GHC.Internal.Classes.$fEqList_$s$fEqList1 bx kB ww ds
                 };
               T26615a.Collision bx bx1 ->
                 T26615.$s$wdisjointSubtrees @b @a ww wild ds
@@ -2031,7 +2061,9 @@ T26615.$s$wdisjointSubtrees
         T26615a.Leaf bx ds1 ->
           case ds1 of { T26615a.L kA ds2 ->
           case _b of wild2 {
-            __DEFAULT -> $wpoly_lookupCont_ @b bx kA ww wild2;
+            __DEFAULT ->
+              $wpoly_lookupCont_
+                @b GHC.Internal.Classes.$fEqList_$s$fEqList1 bx kA ww wild2;
             T26615a.Leaf bx1 ds3 ->
               case ds3 of { T26615a.L kB ds4 ->
               case GHC.Internal.Prim.neWord# bx bx1 of {
@@ -2085,9 +2117,9 @@ T26615.$s$wdisjointSubtrees
                               [LclId[JoinId(0)(Nothing)]]
                               $j = jump $s$wfoldr_ sc sc1 (GHC.Internal.Prim.+# sc2 1#) sc3 } in
                             joinrec {
-                              $wlookupInArrayCont_ [InlPrag=[2],
-                                                    Occ=LoopBreaker,
-                                                    Dmd=SC(S,C(1,C(1,C(1,L))))]
+                              $w$slookupInArrayCont_ [InlPrag=[2],
+                                                      Occ=LoopBreaker,
+                                                      Dmd=SC(S,C(1,C(1,C(1,L))))]
                                 :: String
                                    -> GHC.Internal.Prim.SmallArray# (T26615a.Leaf String b)
                                    -> GHC.Internal.Prim.Int#
@@ -2097,12 +2129,12 @@ T26615.$s$wdisjointSubtrees
                                Arity=4,
                                Str=<1L><L><L><L>,
                                Unf=OtherCon []]
-                              $wlookupInArrayCont_ (k1 :: String)
-                                                   (ww1
-                                                      :: GHC.Internal.Prim.SmallArray#
-                                                           (T26615a.Leaf String b))
-                                                   (ww2 :: GHC.Internal.Prim.Int#)
-                                                   (ww3 :: GHC.Internal.Prim.Int#)
+                              $w$slookupInArrayCont_ (k1 :: String)
+                                                     (ww1
+                                                        :: GHC.Internal.Prim.SmallArray#
+                                                             (T26615a.Leaf String b))
+                                                     (ww2 :: GHC.Internal.Prim.Int#)
+                                                     (ww3 :: GHC.Internal.Prim.Int#)
                                 = case k1 of k2 { __DEFAULT ->
                                   case GHC.Internal.Prim.>=# ww2 ww3 of {
                                     __DEFAULT ->
@@ -2116,7 +2148,7 @@ T26615.$s$wdisjointSubtrees
                                       case ipv5 of { T26615a.L kx v ->
                                       case GHC.Internal.Base.eqString k2 kx of {
                                         False ->
-                                          jump $wlookupInArrayCont_
+                                          jump $w$slookupInArrayCont_
                                             k2 ww1 (GHC.Internal.Prim.+# ww2 1#) ww3;
                                         True -> GHC.Internal.Types.False
                                       }
@@ -2125,7 +2157,7 @@ T26615.$s$wdisjointSubtrees
                                     1# -> jump $j
                                   }
                                   }; } in
-                            jump $wlookupInArrayCont_ kA bx3 0# lvl2
+                            jump $w$slookupInArrayCont_ kA bx3 0# lvl2
                             }
                             };
                           1# -> sc3
@@ -2187,23 +2219,23 @@ T26615.$s$wdisjointSubtrees
                          @(GHC.Internal.Prim.SmallArray# (HashMap String a)
                            -> GHC.Internal.Prim.SmallArray# (HashMap String b)
                            -> GHC.Internal.Prim.Int#)
-                         @(GHC.Internal.Types.UnusedType 0 "a"
-                           -> GHC.Internal.Types.UnusedType 1 "b" -> GHC.Internal.Prim.Int#)
+                         @(GHC.Internal.Types.UnusedType "a_0"
+                           -> GHC.Internal.Types.UnusedType "b_1" -> GHC.Internal.Prim.Int#)
                   of
                   { GHC.Internal.Unsafe.Coerce.UnsafeRefl v2 ->
                   case GHC.Internal.Prim.reallyUnsafePtrEquality#
                          @GHC.Internal.Types.Lifted
                          @GHC.Internal.Types.Lifted
-                         @(GHC.Internal.Types.UnusedType 0 "a")
-                         @(GHC.Internal.Types.UnusedType 1 "b")
+                         @(GHC.Internal.Types.UnusedType "a_0")
+                         @(GHC.Internal.Types.UnusedType "b_1")
                          (bx1
                           `cast` (SelCo:Fun(arg) (Sub (Sym v2))
                                   :: GHC.Internal.Prim.SmallArray# (HashMap String a)
-                                     ~R# GHC.Internal.Types.UnusedType 0 "a"))
+                                     ~R# GHC.Internal.Types.UnusedType "a_0"))
                          (bx3
                           `cast` (SelCo:Fun(arg) (SelCo:Fun(res) (Sub (Sym v2)))
                                   :: GHC.Internal.Prim.SmallArray# (HashMap String b)
-                                     ~R# GHC.Internal.Types.UnusedType 1 "b"))
+                                     ~R# GHC.Internal.Types.UnusedType "b_1"))
                   of {
                     __DEFAULT ->
                       joinrec {
@@ -2365,23 +2397,23 @@ T26615.$s$wdisjointSubtrees
                      @(GHC.Internal.Prim.SmallArray# (HashMap String a)
                        -> GHC.Internal.Prim.SmallArray# (HashMap String b)
                        -> GHC.Internal.Prim.Int#)
-                     @(GHC.Internal.Types.UnusedType 0 "a"
-                       -> GHC.Internal.Types.UnusedType 1 "b" -> GHC.Internal.Prim.Int#)
+                     @(GHC.Internal.Types.UnusedType "a_0"
+                       -> GHC.Internal.Types.UnusedType "b_1" -> GHC.Internal.Prim.Int#)
               of
               { GHC.Internal.Unsafe.Coerce.UnsafeRefl v2 ->
               case GHC.Internal.Prim.reallyUnsafePtrEquality#
                      @GHC.Internal.Types.Lifted
                      @GHC.Internal.Types.Lifted
-                     @(GHC.Internal.Types.UnusedType 0 "a")
-                     @(GHC.Internal.Types.UnusedType 1 "b")
+                     @(GHC.Internal.Types.UnusedType "a_0")
+                     @(GHC.Internal.Types.UnusedType "b_1")
                      (bx
                       `cast` (SelCo:Fun(arg) (Sub (Sym v2))
                               :: GHC.Internal.Prim.SmallArray# (HashMap String a)
-                                 ~R# GHC.Internal.Types.UnusedType 0 "a"))
+                                 ~R# GHC.Internal.Types.UnusedType "a_0"))
                      (bx1
                       `cast` (SelCo:Fun(arg) (SelCo:Fun(res) (Sub (Sym v2)))
                               :: GHC.Internal.Prim.SmallArray# (HashMap String b)
-                                 ~R# GHC.Internal.Types.UnusedType 1 "b"))
+                                 ~R# GHC.Internal.Types.UnusedType "b_1"))
               of {
                 __DEFAULT ->
                   joinrec {
