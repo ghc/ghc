@@ -30,7 +30,6 @@ import GHC.Core.Subst
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.Coercion
-import GHC.Core.Predicate( isDictTy )
 import GHC.Core.Reduction
 import GHC.Core.FamInstEnv
 import GHC.Core.Predicate( isEqualityClass )
@@ -1031,7 +1030,7 @@ mkWWstr_one opts arg str_mark =
     _ | isTyVar arg -> do_nothing
 
     DropAbsent
-      | Just absent_filler <- mkAbsentFiller opts arg str_mark
+      | Just absent_filler <- mkAbsentFiller (wo_module opts) arg str_mark
          -- Absent case.  Drop the argument from the worker.
          -- We can't always handle absence for arbitrary
          -- unlifted types, so we need to choose just the cases we can
@@ -1102,14 +1101,20 @@ unbox_one_arg opts arg_var
 --
 -- If @mkAbsentFiller _ id == Just e@, then @e@ is an absent filler with the
 -- same type as @id@. Otherwise, no suitable filler could be found.
-mkAbsentFiller :: WwOpts -> Id -> StrictnessMark -> Maybe CoreExpr
-mkAbsentFiller opts arg str
+mkAbsentFiller :: Module -> Id -> StrictnessMark -> Maybe CoreExpr
+mkAbsentFiller mod arg str
+  -- We never make a filler for a terminating type: it might be speculatively
+  -- evaluated or have a field projected out of it.
+  -- See (AF4) in Note [Absent fillers], and
+  -- Note [Don't make fillers for terminating types].
+  | isTerminatingType arg_ty
+  = Nothing
+
   -- The lifted case: bind 'absentError'. See (AF1) in Note [Absent fillers]
   -- We want to use this case if possible, because we get a nice runtime panic message
   -- if we are wrong (like we were in #11126).  Otherwise we fall through to the
   -- less-desirable mkLitRubbish case.
   | mightBeLiftedType arg_ty
-  , not (isDictTy arg_ty)                 -- See (AF4) in Note [Absent fillers]
   , not (isStrictDmd (idDemandInfo arg))  -- See (AF2)
   , not (isMarkedStrict str)              --    in Note [Absent fillers]
   = Just (mkAbsentErrorApp arg_ty msg)
@@ -1136,7 +1141,7 @@ mkAbsentFiller opts arg str
               -- will have different lengths and hence different costs for
               -- the inliner leading to different inlining.
               -- See also Note [Unique Determinism] in GHC.Types.Unique
-    file_msg = text "In module" <+> quotes (ppr $ wo_module opts)
+    file_msg = text "In module" <+> quotes (ppr mod)
 
 {- Note [Worker/wrapper for Strictness and Absence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1329,27 +1334,8 @@ Needless to say, there are some wrinkles:
      have to be representation monomorphic. But in the future, we might allow
      levity polymorphism, e.g. a polymorphic levity variable in 'BoxedRep'.
 
-(AF4) Consider (#24934)
-         f :: (a~b) => blah {-# INLINE f #-}
-         f d x = case eq_sel d of co -> body
-     In #24934 it turned out that `co` was unused; and we discarded the
-     entire case-scrutinisation via the `exprOkToDiscard` test in
-     `GHC.Core.Opt.Simplify.Iteration.rebuildCase`.  So now `d` is absent.
-     But in the /unfolding/ for some reason we did not discard the `case`;
-     so when we inline `f` we end up evaluating that `d` argument.  So we had
-     better not replace it with an error thunk!
-
-     The root of it is this: `exprOkToDiscard` assumes that a dictionary is
-     non-bottom (Note [exprOkForSpeculation and type classes]); but then we replace
-     the (a~b) dictionary with an error thunk, breaking the invariant that every
-     dictionary is non-bottom.  (If -XDictsStrict is on, the invariant is even
-     more important.)
-
-     Simple solution: never use an error thunk for a dictionary; instead fall
-     through to mkRubbishLit.  (The only downside is that we lose the compiler
-     debugging advantages of (AF1).)
-
-     This is quite delicate.
+(AF4) We never make an absent filler for a terminating type.
+      See Note [Don't make fillers for terminating types].
 
 While (AF1) and (AF2) are simply an optimisation in terms of compiler debugging
 experience, (AF3) should be irrelevant in most programs, if not all.
@@ -1370,6 +1356,47 @@ fragile
        ...f (MkT a (absentError Int# "blah"))...
    because `MkT` is strict in its Int# argument, so we get an absentError
    exception when we shouldn't.  Very annoying!
+
+Note [Don't make fillers for terminating types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We never make an absent filler, error thunk or rubbish literal, for a terminating
+type (isTerminatingType): a non-unary class dictionary, a boxed equality, or a
+constraint tuple.
+
+GHC relies on a dictionary value never being bottom (see
+Note [NON-BOTTOM-DICTS invariant] in GHC.Core).  GHC uses "speculation" to
+evaluated guaranteed-non-bottom values: see Note [Speculative evaluation] in
+GHC.CoreToStg.Prep. This speculative evaluation is fundamentally incompatible
+with replacing a dictionary with an absent filler.  Attempts to to do so gave
+rise to a succession of bugs including:
+
+  * #24934: we evaluated an absent dictionary
+  * #25924: we selected a superclass from an absent dictionary
+
+A terminating type is exactly what speculation will force: see
+Note [exprOkForSpeculation and type classes] in GHC.Core.Utils. So we refuse to
+make a filler for precisely those types.
+
+So the safe thing is to make no filler at all for a terminating type. Then there
+is no bogus dictionary to evaluate or project from.  Specifically
+
+  * `mkAbsentFiller` returns `Nothing` for a terminating type, so worker/wrapper
+    keeps the real argument.
+
+  * `Specialise.specHeader` calls `mkAbsentFiller` too, so it likewise keeps the
+    dead dictionary argument rather than dropping it for a filler.
+
+Prior failed approaches
+
+We used to paper over this. !13233 replaced the error thunk for an absent
+dictionary with a rubbish literal, so that it could at least be evaluated
+without complaint. But #25924 showed that this is not enough, because we do not
+only evaluate the absent dictionary, we also select a superclass from it.
+
+We could instead teach speculation to leave absent bindings alone, and we do
+that too (see Note [Speculative evaluation] in GHC.CoreToStg.Prep). But that is
+not a guarantee. After optimisation a binding that holds an absent filler may no
+longer be marked absent, so we cannot rely on the demand to protect us.
 
 Note [Unboxing through unboxed tuples]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
