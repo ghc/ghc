@@ -1143,10 +1143,10 @@ ghc-wasm-meta-unreg:
     UPSTREAM_GHC_JOB_NAME: x86_64-linux-alpine3_23-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf
 
 ############################################################
-# Building `base` with GHC 9.14
+# Building `base` with released GHC versions
 ############################################################
 
-base-build-with-ghc-914:
+base-build-with-released-ghcs:
   stage: testing
   needs:
     - job: x86_64-linux-deb13-validate
@@ -1161,15 +1161,20 @@ base-build-with-ghc-914:
     - x86_64-linux
   script:
     - |
-      ghc_version=9.14.1
-      url=https://downloads.haskell.org/~ghc/${ghc_version}/ghc-${ghc_version}-x86_64-deb12-linux.tar.xz
-      curl "$url" >ghc-${ghc_version}.tar.xz
-      tar -xJf ghc-${ghc_version}.tar.xz
-      cd ghc-${ghc_version}-x86_64-unknown-linux
-      ./configure --prefix "$PWD/../ghc"
-      make install
-      cd -
-      cabal build --with-compiler ghc/bin/ghc --allow-boot-library-installs -O0
+      ghc_versions=9.14.1
+      for ghc_version in ${ghc_versions}
+      do
+        url=https://downloads.haskell.org/~ghc/${ghc_version}/ghc-${ghc_version}-x86_64-deb12-linux.tar.xz
+        curl "$url" >ghc-${ghc_version}.tar.xz
+        tar -xJf ghc-${ghc_version}.tar.xz
+        cd ghc-${ghc_version}-x86_64-unknown-linux
+        ./configure --prefix "$PWD/../ghc-${ghc_version}-installed"
+        make install
+        cd -
+        cabal build --with-compiler ghc-${ghc_version}-installed/bin/ghc \
+                    --allow-boot-library-installs \
+                    -O0
+      done
   rules:
     - *full-ci
 
