@@ -11,6 +11,9 @@ module GHC.Linker.Deps
   ( LinkDepsOpts (..)
   , LinkDeps (..)
   , getLinkDeps
+  , Linkables (..)
+  , resolveLinkDeps
+  , selectLinkDeps
   )
 where
 
@@ -62,13 +65,6 @@ data LinkDepsOpts = LinkDepsOpts
   , ldGetDependencies :: !([Module] -> IO ([Module], UniqDSet UnitId))
   }
 
-data LinkDeps = LinkDeps
-  { ldNeededLinkables :: [Linkable]
-  , ldAllLinkables    :: [LinkableUsage]
-  , ldUnits           :: [UnitId]
-  , ldNeededUnits     :: UniqDSet UnitId
-  }
-
 -- | Find all the packages and linkables that a set of modules depends on
 --
 -- Return the module and package dependencies for the needed modules.
@@ -84,22 +80,20 @@ getLinkDeps
   -> [Module]     -- If you need these
   -> IO LinkDeps  -- ... then link these first
 getLinkDeps opts interp pls span mods = do
-      -- The interpreter and dynamic linker can only handle object code built
-      -- the "normal" way, i.e. no non-std ways like profiling or ticky-ticky.
-      -- So here we check the build tag: if we're building a non-standard way
-      -- then we need to find & link object files built the "normal" way.
-      maybe_normal_osuf <- checkNonStdWay opts interp span
+  linkables <- resolveLinkDeps opts pls span mods
+  selectLinkDeps opts interp span linkables
 
-      get_link_deps opts pls maybe_normal_osuf span mods
-
-get_link_deps
+-- | Compute the transitive dependencies of the given modules and split them
+-- into those that are already loaded and those that need to be linked.
+--
+-- Returns @(loaded linkables, needed modules, needed units, all units)@.
+resolveLinkDeps
   :: LinkDepsOpts
   -> LoaderState
-  -> Maybe FilePath  -- replace object suffixes?
   -> SrcSpan
   -> [Module]
-  -> IO LinkDeps
-get_link_deps opts pls maybe_normal_osuf span mods = do
+  -> IO ([LinkableUsage], [Module], [UnitId], UniqDSet UnitId)
+resolveLinkDeps opts pls _span mods = do
 
       -- Three step process:
 
@@ -120,6 +114,33 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                  Just linkable -> Right linkable
                  Nothing -> Left mod
 
+      pure (links_got, mods_needed, pkgs_needed, pkgs_s)
+  where
+    relevant_mods = filterOut isInteractiveModule mods
+
+-- | Find the linkables for the modules that need to be loaded, as determined
+-- by 'resolveLinkDeps'.
+selectLinkDeps
+  :: LinkDepsOpts
+  -> Interp
+  -> SrcSpan      -- for error messages
+  -> ([LinkableUsage], [Module], [UnitId], UniqDSet UnitId)
+  -> IO LinkDeps  -- ... then link these first
+selectLinkDeps opts interp span linkables = do
+      -- The interpreter and dynamic linker can only handle object code built
+      -- the "normal" way, i.e. no non-std ways like profiling or ticky-ticky.
+      -- So here we check the build tag: if we're building a non-standard way
+      -- then we need to find & link object files built the "normal" way.
+      maybe_normal_osuf <- checkNonStdWay opts interp span
+      select_link_deps opts maybe_normal_osuf span linkables
+
+select_link_deps
+  :: LinkDepsOpts
+  -> Maybe FilePath  -- replace object suffixes?
+  -> SrcSpan
+  -> ([LinkableUsage], [Module], [UnitId], UniqDSet UnitId)
+  -> IO LinkDeps
+select_link_deps opts maybe_normal_osuf span (links_got, mods_needed, pkgs_needed, pkgs_s) = do
         -- 3.  For each dependent module, find its linkable
         --     This will either be in the HPT or (in the case of one-shot
         --     compilation) we may need to use maybe_getFileLinkable
@@ -139,7 +160,6 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
       return link_deps
   where
     unit_env = ldUnitEnv opts
-    relevant_mods = filterOut isInteractiveModule mods
 
     no_obj :: Outputable a => a -> IO b
     no_obj mod = dieWith opts span $
