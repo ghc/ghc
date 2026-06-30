@@ -1171,9 +1171,11 @@ base-build-with-released-ghcs:
         ./configure --prefix "$PWD/../ghc-${ghc_version}-installed"
         make install
         cd -
+        cd libraries/base
         cabal build --with-compiler ghc-${ghc_version}-installed/bin/ghc \
                     --allow-boot-library-installs \
                     -O0
+        cd -
       done
   rules:
     - *full-ci
