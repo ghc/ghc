@@ -12,6 +12,8 @@ module GHC.Linker.Deps
   ( LinkDepsOpts (..)
   , LinkDeps (..)
   , getLinkDeps
+  , Linkables (..)
+  , linkablesGet
   )
 where
 
@@ -46,7 +48,6 @@ import GHC.Iface.Errors.Ppr
 
 import GHC.Utils.Misc
 import GHC.Unit.Home
-import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Data.Maybe
 
 import Control.Applicative
@@ -61,10 +62,8 @@ import System.FilePath
 import System.Directory
 import GHC.Utils.Logger (Logger)
 import Control.Monad ((<$!>))
-import GHC.Driver.Env
-import {-# SOURCE #-} GHC.Driver.Main
-import Data.Time.Clock
 import GHC.Unit.Home.Graph
+import GHC.Driver.Env.Types (Linkables (..), LinkDeps (..))
 
 
 data LinkDepsOpts = LinkDepsOpts
@@ -86,12 +85,9 @@ data LinkDepsOpts = LinkDepsOpts
   , ldLogger :: !Logger
   }
 
-data LinkDeps = LinkDeps
-  { ldNeededLinkables :: [Linkable]
-  , ldAllLinkables    :: [Linkable]
-  , ldNeededUnits     :: [UnitId]
-  , ldAllUnits        :: UniqDSet UnitId
-  }
+linkablesGet :: Linkables -> SrcSpan -> [Module] -> IO LinkDeps
+linkablesGet Linkables {..} span mods =
+  linkablesSelect =<< linkablesResolve span mods
 
 -- | Find all the packages and linkables that a set of modules depends on
 --
