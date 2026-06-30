@@ -550,7 +550,7 @@ tryWW ww_opts is_rec fn_id rhs
   -- See Note [Drop absent bindings]
   | isAbsDmd (demandInfo fn_info)
   , not (isJoinId fn_id)
-  , Just filler <- mkAbsentFiller ww_opts fn_id NotMarkedStrict
+  , Just filler <- mkAbsentFiller (wo_module ww_opts) fn_id NotMarkedStrict
   = return [(new_fn_id, filler)]
 
   -- See Note [Don't w/w INLINE things]
