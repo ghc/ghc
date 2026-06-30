@@ -385,6 +385,14 @@ test('ListTuplePunsPpr', normal, ghci_script, ['ListTuplePunsPpr.script'])
 test('ListTuplePunsPprNoAbbrevTuple', [limit_stdout_lines(14)], ghci_script, ['ListTuplePunsPprNoAbbrevTuple.script'])
 test('T24459', normal, ghci_script, ['T24459.script'])
 test('T24632', normal, ghci_script, ['T24632.script'])
+# bytecode backend doesn't support '-finfo-table-map' (#27039)
+test('bytecodeIPE',
+     [ extra_hc_opts('-finfo-table-map')
+     , extra_files(['bytecodeIPE.hs'])
+     , req_rts_linker
+     , when(arch('wasm32') or arch('javascript'), skip)
+     ],
+     ghci_script, ['bytecodeIPE.script'])
 
 # Test package renaming in GHCi session
 test('GhciPackageRename',
