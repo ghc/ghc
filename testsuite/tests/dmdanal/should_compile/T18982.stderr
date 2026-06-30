@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 295, types: 206, coercions: 4, joins: 0/0}
+Result size of Tidy Core = {terms: 297, types: 214, coercions: 4, joins: 0/0}
 
 -- RHS size: {terms: 8, types: 9, coercions: 1, joins: 0/0}
 T18982.$WExGADT :: forall e. (e ~ Int) => e %1 -> Int %1 -> ExGADT Int
@@ -194,13 +194,13 @@ T18982.$tc'ExGADT2 = GHC.Types.TrNameS T18982.$tc'ExGADT3
 T18982.$tc'ExGADT :: GHC.Types.TyCon
 T18982.$tc'ExGADT = GHC.Types.TyCon 8468257409157161049#Word64 5503123603717080600#Word64 T18982.$trModule T18982.$tc'ExGADT2 1# T18982.$tc'ExGADT1
 
--- RHS size: {terms: 11, types: 10, coercions: 0, joins: 0/0}
-T18982.$wi :: forall a e. (a GHC.Prim.~# Int) => e -> GHC.Prim.Int# -> GHC.Prim.Int#
-T18982.$wi = \ (@a) (@e) (ww :: a GHC.Prim.~# Int) (ww1 :: e) (ww2 :: GHC.Prim.Int#) -> case ww1 of { __DEFAULT -> GHC.Prim.+# ww2 1# }
+-- RHS size: {terms: 12, types: 14, coercions: 0, joins: 0/0}
+T18982.$wi :: forall a e. (a GHC.Prim.~# Int, e ~ Int) => e -> GHC.Prim.Int# -> GHC.Prim.Int#
+T18982.$wi = \ (@a) (@e) (ww :: a GHC.Prim.~# Int) _ (ww2 :: e) (ww3 :: GHC.Prim.Int#) -> case ww2 of { __DEFAULT -> GHC.Prim.+# ww3 1# }
 
--- RHS size: {terms: 15, types: 22, coercions: 1, joins: 0/0}
+-- RHS size: {terms: 16, types: 22, coercions: 1, joins: 0/0}
 i :: forall a. ExGADT a -> Int
-i = \ (@a) (ds :: ExGADT a) -> case ds of { ExGADT @e ww ww1 ww2 ww3 -> case ww3 of { GHC.Types.I# ww4 -> case T18982.$wi @a @e @~(ww :: a GHC.Prim.~# Int) ww2 ww4 of ww5 { __DEFAULT -> GHC.Types.I# ww5 } } }
+i = \ (@a) (ds :: ExGADT a) -> case ds of { ExGADT @e ww ww1 ww2 ww3 -> case ww3 of { GHC.Types.I# ww4 -> case T18982.$wi @a @e @~(ww :: a GHC.Prim.~# Int) ww1 ww2 ww4 of ww5 { __DEFAULT -> GHC.Types.I# ww5 } } }
 
 -- RHS size: {terms: 6, types: 7, coercions: 0, joins: 0/0}
 T18982.$wh :: forall a. (a GHC.Prim.~# Int) => GHC.Prim.Int# -> GHC.Prim.Int#

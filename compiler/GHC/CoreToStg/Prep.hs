@@ -1960,20 +1960,19 @@ It is also similar to Note [Do not strictify a DFun's parameter dictionaries],
 where marking recursive DFuns (of undecidable *instances*) strict in dictionary
 *parameters* leads to quite the same change in termination as above.
 
-Another Nasty Wrinkle: do not speculate absent bindings
+Belt and braces: do not speculate absent bindings
 
-Speculative evaluation is in conflict with absent fillers (see Note [Absent
-fillers] in GHC.Core.Opt.WorkWrap.Utils).
+In 'decideFloatInfo' we decline to speculate a binding whose demand is absent.
+There is no point in speculating an absent binding, since its value is
+(presumably) not needed.
 
-When an argument is found to be absent, worker/wrapper drops it and binds an
-absent filler in its place. This is supposed to be OK because the filler is
-absent (i.e. not evaluated by the program).
-
-But speculation can force it anyway! See #25924 for how this goes wrong.
-
-So in 'decideFloatInfo' we decline to speculate a binding whose demand is
-absent. An absent value is by definition never needed, so we lose nothing by not
-speculating it.
+This used to matter more. Worker/wrapper would bind an absent dictionary to a
+rubbish literal filler, and speculation could force a superclass selection out
+of that rubbish literal, causing a segfault (#25924). Nowadays we never make a
+filler for a dictionary in the first place, so this can no longer happen and
+the guard is merely belt and braces.
+See Note [Don't make fillers for terminating types]
+in GHC.Core.Opt.WorkWrap.Utils.
 
 Note [BindInfo and FloatInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2227,7 +2226,7 @@ mkNonRecFloat env is_unlifted bndr rhs
           -- (where it is actually bound lazily).
           --
           -- Don't speculate an absent binding. See #25924 and
-          -- "Another Nasty Wrinkle" in Note [Speculative evaluation].
+          -- "Belt and braces" in Note [Speculative evaluation].
 
       | is_unlifted || is_strict = (CaseBound, StrictContextFloatable)
           -- These will never be floated out of a lazy RHS context

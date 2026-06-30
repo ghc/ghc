@@ -20,11 +20,13 @@ import GHC.Core.Multiplicity
 import GHC.Core.SimpleOpt( defaultSimpleOpts, simpleOptExprWith )
 import GHC.Core.Predicate
 import GHC.Core.Coercion( Coercion )
+import GHC.Core.DataCon ( StrictnessMark (..) )
 import GHC.Core.Opt.Monad
+
 import qualified GHC.Core.Subst as Core
 import GHC.Core.Unfold.Make
 import GHC.Core
-import GHC.Core.Make      ( mkLitRubbish )
+import GHC.Core.Opt.WorkWrap.Utils ( mkAbsentFiller )
 import GHC.Core.Unify     ( tcMatchTy )
 import GHC.Core.Rules
 import GHC.Core.Utils     ( exprIsTrivial, exprIsTopLevelBindable
@@ -1711,7 +1713,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
 
            ; ( useful, rhs_env2, leftover_bndrs
              , rule_bndrs, rule_lhs_args
-             , spec_bndrs1, dx_binds, spec_args) <- specHeader env rhs_bndrs all_call_args
+             , spec_bndrs1, dx_binds, spec_args) <- specHeader this_mod env rhs_bndrs all_call_args
 
 --           ; pprTrace "spec_call" (vcat
 --                [ text "fun:       "  <+> ppr fn
@@ -2562,7 +2564,8 @@ isSpecDict _             = False
 --    , [T1, T2, c, i, dEqT1, dShow1]
 --    )
 specHeader
-     :: SpecEnv
+     :: Module      -- The module being compiled, for mkAbsentFiller
+     -> SpecEnv
      -> [InBndr]    -- The binders from the original function 'f'
      -> [SpecArg]   -- From the CallInfo
      -> SpecM ( Bool     -- True <=> some useful specialisation happened
@@ -2588,7 +2591,7 @@ specHeader
 -- We want to specialise on type 'T1', and so we must construct a substitution
 -- 'a->T1', as well as a LHS argument for the resulting RULE and unfolding
 -- details.
-specHeader env (bndr : bndrs) (SpecType ty : args)
+specHeader mod env (bndr : bndrs) (SpecType ty : args)
   = do { -- Find qvars, the type variables to add to the binders for the rule
          -- Namely those free in `ty` that aren't in scope
          -- See (MP2) in Note [Specialising polymorphic dictionaries]
@@ -2600,7 +2603,7 @@ specHeader env (bndr : bndrs) (SpecType ty : args)
              ty'            = substTy env1 ty
              env2           = extendTvSubst env1 bndr ty'
        ; (useful, env3, leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
-            <- specHeader env2 bndrs args
+            <- specHeader mod env2 bndrs args
        ; pure ( useful
               , env3
               , leftover_bndrs
@@ -2616,10 +2619,10 @@ specHeader env (bndr : bndrs) (SpecType ty : args)
 -- a substitution on it (in case the type refers to 'a'). Additionally, we need
 -- to produce a binder, LHS argument and RHS argument for the resulting rule,
 -- /and/ a binder for the specialised body.
-specHeader env (bndr : bndrs) (UnspecType : args)
+specHeader mod env (bndr : bndrs) (UnspecType : args)
   = do { let (env', bndr') = substBndr env bndr
        ; (useful, env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
-            <- specHeader env' bndrs args
+            <- specHeader mod env' bndrs args
        ; pure ( useful
               , env''
               , leftover_bndrs
@@ -2630,18 +2633,17 @@ specHeader env (bndr : bndrs) (UnspecType : args)
               , varToCoreExpr bndr' : spec_args
               )
        }
-
 -- Next we want to specialise the 'Eq a' dict away. We need to construct
 -- a wildcard binder to match the dictionary (See Note [Specialising Calls] for
 -- the nitty-gritty), as a LHS rule and unfolding details.
-specHeader env (bndr : bndrs) (SpecDict d : args)
+specHeader mod env (bndr : bndrs) (SpecDict d : args)
   | not (isDeadBinder bndr)
   , allVarSet (`elemInScopeSet` in_scope) (exprFreeVars d)
     -- See Note [Weird special case for SpecDict]
   = do { (env1, bndr') <- newDictBndr env bndr -- See Note [Zap occ info in rule binders]
        ; let (env2, dx_bind, spec_dict) = bindAuxiliaryDict env1 bndr bndr' d
        ; (_, env3, leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
-             <- specHeader env2 bndrs args
+             <- specHeader mod env2 bndrs args
        ; pure ( True      -- Ha!  A useful specialisation!
               , env3
               , leftover_bndrs
@@ -2666,21 +2668,24 @@ specHeader env (bndr : bndrs) (SpecDict d : args)
 -- why 'i' doesn't appear in our RULE above. But we have no guarantee that
 -- there aren't 'UnspecArg's which come /before/ all of the dictionaries, so
 -- this case must be here.
-specHeader env (bndr : bndrs) (_ : args)
+specHeader mod env (bndr : bndrs) (_ : args)
     -- The "_" can be UnSpecArg, or SpecDict where the bndr is dead
   = do { -- see Note [Zap occ info in rule binders]
          let (env', bndr') = substBndr env (zapIdOccInfo bndr)
        ; (useful, env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
-             <- specHeader env' bndrs args
+             <- specHeader mod env' bndrs args
 
-       ; let bndr_ty = idType bndr'
-
-             -- See Note [Drop dead args from specialisations]
+       ; let -- See Note [Drop dead args from specialisations]
              -- C.f. GHC.Core.Opt.WorkWrap.Utils.mk_absent_let
              (mb_spec_bndr, spec_arg)
                 | isDeadBinder bndr
-                , Just lit_expr <- mkLitRubbish bndr_ty
-                = (Nothing, lit_expr)
+                , Just filler <- mkAbsentFiller mod bndr' NotMarkedStrict
+                     -- NB: mkAbsentFiller returns Nothing for a terminating type (e.g. a
+                     -- dictionary), so this guard fails and we fall through, keeping the
+                     -- argument instead of dropping it.
+                     -- See Note [Don't make fillers for terminating types]
+                     -- in GHC.Core.Opt.WorkWrap.Utils
+                = (Nothing, filler)
                 | otherwise
                 = (Just bndr', varToCoreExpr bndr')
 
@@ -2699,12 +2704,12 @@ specHeader env (bndr : bndrs) (_ : args)
 
 -- If we run out of binders, stop immediately
 -- See Note [Specialisation Must Preserve Sharing]
-specHeader env [] _ = pure (False, env, [], [], [], [], [], [])
+specHeader _ env [] _ = pure (False, env, [], [], [], [], [], [])
 
 -- Return all remaining binders from the original function. These have the
 -- invariant that they should all correspond to unspecialised arguments, so
 -- it's safe to stop processing at this point.
-specHeader env bndrs []
+specHeader _ env bndrs []
   = pure (False, env', bndrs', [], [], [], [], [])
   where
     (env', bndrs') = substBndrs env bndrs
