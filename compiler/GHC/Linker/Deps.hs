@@ -12,6 +12,11 @@ module GHC.Linker.Deps
   ( LinkDepsOpts (..)
   , LinkDeps (..)
   , getLinkDeps
+  , Linkables (..)
+  , LinkDep (..)
+  , LinkModule (..)
+  , resolveLinkDeps
+  , selectLinkDeps
   )
 where
 
@@ -42,16 +47,13 @@ import GHC.Unit.Module.Graph
 import GHC.Unit.Home.ModInfo
 
 import GHC.Iface.Errors.Types
-import GHC.Iface.Errors.Ppr
 
 import GHC.Utils.Misc
 import GHC.Unit.Home
-import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Data.Maybe
 
 import Control.Applicative
 import Control.Monad.IO.Class (MonadIO (liftIO))
-import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
 
 import Data.Foldable (traverse_)
 import qualified Data.Set as Set
@@ -60,10 +62,6 @@ import Data.List (isSuffixOf)
 import System.FilePath
 import System.Directory
 import GHC.Utils.Logger (Logger)
-import Control.Monad ((<$!>))
-import GHC.Driver.Env
-import {-# SOURCE #-} GHC.Driver.Main
-import Data.Time.Clock
 import GHC.Unit.Home.Graph
 
 
@@ -86,13 +84,6 @@ data LinkDepsOpts = LinkDepsOpts
   , ldLogger :: !Logger
   }
 
-data LinkDeps = LinkDeps
-  { ldNeededLinkables :: [Linkable]
-  , ldAllLinkables    :: [Linkable]
-  , ldNeededUnits     :: [UnitId]
-  , ldAllUnits        :: UniqDSet UnitId
-  }
-
 -- | Find all the packages and linkables that a set of modules depends on
 --
 -- Return the module and package dependencies for the needed modules.
@@ -108,14 +99,8 @@ getLinkDeps
   -> [Module]     -- If you need these
   -> IO LinkDeps  -- ... then link these first
 getLinkDeps opts interp pls span mods = do
-      -- The interpreter and dynamic linker can only handle object code built
-      -- the "normal" way, i.e. no non-std ways like profiling or ticky-ticky.
-      -- So here we check the build tag: if we're building a non-standard way
-      -- then we need to find & link object files built the "normal" way.
-      maybe_normal_osuf <- checkNonStdWay opts interp span
-
-      withTiming (ldLogger opts) (text "getLinkDeps" <+> brackets (ppr span)) (const ()) $
-        get_link_deps opts pls maybe_normal_osuf span mods
+  linkables <- resolveLinkDeps opts pls span mods
+  selectLinkDeps opts interp span linkables
 
 -- | Determine which parts of a module and its dependencies should be linked
 -- when resolving external dependencies.
@@ -180,48 +165,31 @@ instance Outputable LinkModule where
     LinkObjectModule mod _ -> ppr mod
     LinkByteCodeModule mod _ -> ppr mod <+> brackets (text "BC")
 
--- | Compute the linkables for the given module set's dependencies.
---
--- Home modules in make mode are treated separately in a preprocessing step,
--- then all the remaining external deps are processed for both modes.
--- If bytecode is available, transitive external deps are included, otherwise
--- the module's library is linked and processing stops.
---
--- The results are split into sets of needed/loaded modules/packages.
-get_link_deps
-  :: LinkDepsOpts
-  -> LoaderState
-  -> Maybe FilePath  -- replace object suffixes?
-  -> SrcSpan
-  -> [Module]
-  -> IO LinkDeps
-get_link_deps opts pls maybe_normal_osuf span mods = do
-  (link_deps_home, module_deps_external) <- separate_home_deps
-  link_deps_external <- external_deps opts module_deps_external
-  let (loaded_modules, needed_modules, ldAllUnits, ldNeededUnits) =
-        classify_deps pls link_deps_home link_deps_external
-  ldNeededLinkables <- mapM module_linkable needed_modules
-  pure LinkDeps {
-    ldNeededLinkables,
-    ldAllLinkables = loaded_modules ++ ldNeededLinkables,
-    ldNeededUnits,
-    ldAllUnits
-  }
+resolveLinkDeps ::
+  LinkDepsOpts ->
+  LoaderState ->
+  SrcSpan ->
+  [Module] ->
+  IO ([Linkable], [LinkModule], UniqDSet UnitId, [UnitId])
+resolveLinkDeps opts pls span mods =
+  withTiming (ldLogger opts) (text "getLinkDeps" <+> brackets (ppr span)) (const ()) $ do
+    (link_deps_home, module_deps_external) <- separate_home_deps
+    link_deps_external <- external_deps opts module_deps_external
+    pure (classify_deps pls link_deps_home link_deps_external)
   where
     mod_graph = ldModuleGraph opts
     unit_env  = ldUnitEnv     opts
     noninteractive = filterOut isInteractiveModule mods
 
-    -- Preprocess the dependencies in make mode to remove all home modules,
-    -- since the transitive dependency closure is already cached for those in
-    -- the HUG (see MultiLayerModulesTH_* tests for the performance impact).
+    -- Preprocess the dependencies to remove all home modules, since the
+    -- transitive dependency closure is already cached for those in the HUG
+    -- (see MultiLayerModulesTH_* tests for the performance impact).
     --
-    -- Returns the remaining, external, dependencies on the right, which is the
-    -- entire set for oneshot mode.
-    separate_home_deps =
-      if ldOneShotMode opts
-      then pure ([], LinkExternal LinkAllDeps <$!> noninteractive)
-      else make_deps
+    -- Returns the remaining, external, dependencies on the right.
+    -- This function only supports make mode; oneshot mode (in which the
+    -- entire dependency set would be treated as external) is not used by
+    -- this worker and is not supported here.
+    separate_home_deps = make_deps
 
     make_deps = do
       (dep_ext, mmods) <- unzip <$> mapM get_mod_info all_home_mods
@@ -264,6 +232,22 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
           pure (LinkExternal (LinkOnlyPackages iface) (mi_module iface), hmi)
         Nothing -> throwProgramError opts $
           text "getLinkDeps: Home module not loaded" <+> ppr (gwib_mod gwib) <+> ppr uid
+
+select_link_deps
+  :: LinkDepsOpts
+  -> Maybe FilePath  -- replace object suffixes?
+  -> SrcSpan
+  -> ([Linkable], [LinkModule], UniqDSet UnitId, [UnitId])
+  -> IO LinkDeps
+select_link_deps opts maybe_normal_osuf span (loaded_modules, needed_modules, ldAllUnits, ldNeededUnits) = do
+  ldNeededLinkables <- mapM module_linkable needed_modules
+  pure LinkDeps {
+    ldNeededLinkables,
+    ldAllLinkables = loaded_modules ++ ldNeededLinkables,
+    ldNeededUnits,
+    ldAllUnits
+  }
+  where
 
     no_obj :: Outputable a => a -> IO b
     no_obj mod = dieWith opts span $
@@ -321,6 +305,20 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
       CoreBindings WholeCoreBindings {wcb_module} ->
         pprPanic "Unhydrated core bindings" (ppr wcb_module)
 
+selectLinkDeps
+  :: LinkDepsOpts
+  -> Interp
+  -> SrcSpan      -- for error messages
+  -> ([Linkable], [LinkModule], UniqDSet UnitId, [UnitId])
+  -> IO LinkDeps  -- ... then link these first
+selectLinkDeps opts interp span linkables = do
+      -- The interpreter and dynamic linker can only handle object code built
+      -- the "normal" way, i.e. no non-std ways like profiling or ticky-ticky.
+      -- So here we check the build tag: if we're building a non-standard way
+      -- then we need to find & link object files built the "normal" way.
+      maybe_normal_osuf <- checkNonStdWay opts interp span
+      select_link_deps opts maybe_normal_osuf span linkables
+
 data LinkDep =
   LinkModules !(UniqDFM ModuleName LinkModule)
   |
@@ -330,11 +328,6 @@ instance Outputable LinkDep where
   ppr = \case
     LinkModules mods -> text "modules:" <+> ppr (eltsUDFM mods)
     LinkLibrary uid -> text "library:" <+> ppr uid
-
-data OneshotError =
-  NoInterface !MissingInterfaceError
-  |
-  LinkBootModule !Module
 
 -- | Compute the transitive dependency closure of the given modules.
 --
@@ -346,21 +339,13 @@ external_deps ::
   [LinkExternal] ->
   IO [LinkDep]
 external_deps opts mods =
-  runExceptT (external_deps_loop opts mods emptyUDFM) >>= \case
-    Right a -> pure (eltsUDFM a)
-    Left err -> throwProgramError opts (message err)
-  where
-    message = \case
-      NoInterface err ->
-        missingInterfaceErrorDiagnostic (ldMsgOpts opts) err
-      LinkBootModule mod ->
-        link_boot_mod_error mod
+  eltsUDFM <$> external_deps_loop opts mods emptyUDFM
 
 external_deps_loop ::
   LinkDepsOpts ->
   [LinkExternal] ->
   UniqDFM UnitId LinkDep ->
-  ExceptT OneshotError IO (UniqDFM UnitId LinkDep)
+  IO (UniqDFM UnitId LinkDep)
 external_deps_loop _ [] acc =
   pure acc
 external_deps_loop opts (job@LinkExternal {le_module = mod, ..} : mods) acc = do
@@ -386,8 +371,7 @@ external_deps_loop opts (job@LinkExternal {le_module = mod, ..} : mods) acc = do
     -- link an object file (which happens for home unit modules, since those
     -- have no libraries).
     process_module = \case
-      LinkAllDeps | is_home || package_bc -> try_iface
-                  | otherwise -> add_library
+      LinkAllDeps -> add_library
 
     -- @LinkOnlyPackages@ is used for make mode home modules, so all imports
     -- that are not external are already processed otherwise.
@@ -407,44 +391,8 @@ external_deps_loop opts (job@LinkExternal {le_module = mod, ..} : mods) acc = do
       | otherwise
       = False
 
-    -- Load the iface and attempt to get bytecode from Core bindings.
-    try_iface =
-      liftIO (ldLoadIface opts load_reason mod) >>= \case
-        Failed err -> throwE (NoInterface err)
-        Succeeded (iface, loc) -> do
-          mb_load_bc <- liftIO (ldLoadByteCode opts (mi_module iface))
-          with_iface iface loc mb_load_bc
-
-    -- Decide how to link this module.
-    -- If bytecode or an object file is available, use those in that order.
-    -- Otherwise fall back to linking a library.
-    with_iface iface loc mb_load_bc
-      | IsBoot <- mi_boot iface
-      = throwE (LinkBootModule mod)
-
-      | ldUseByteCode opts
-      , is_home || package_bc
-      , Just load_bc <- mb_load_bc
-      = add_module iface (LinkByteCodeModule mod load_bc) "bytecode"
-
-      | is_home
-      = add_module iface (LinkObjectModule mod loc) "object"
-
-      | otherwise
-      = add_library
-
     add_library =
       pure (addToUDFM acc mod_unit_id (LinkLibrary mod_unit_id), [], Just "library")
-
-    add_module iface lmod action =
-      with_deps with_mod iface True action
-      where
-        with_mod = alterUDFM (add_package_module lmod) acc mod_unit_id
-
-    add_package_module lmod = \case
-      Just (LinkLibrary u) -> Just (LinkLibrary u)
-      Just (LinkModules old) -> Just (LinkModules (addToUDFM old mod_name lmod))
-      Nothing -> Just (LinkModules (unitUDFM mod_name lmod))
 
     with_deps acc iface local action =
       pure (addListToUDFM acc link, new_local ++ new_package, Just action)
@@ -458,26 +406,17 @@ external_deps_loop opts (job@LinkExternal {le_module = mod, ..} : mods) acc = do
         | (_, GWIB m _) <- Set.toList (dep_direct_mods (mi_deps iface))
       ]
 
-    -- If bytecode linking of external dependencies is enabled, add them to the
-    -- jobs passed to the next iteration of 'external_deps_loop'.
-    -- Otherwise, link all package deps as libraries.
-    package_deps iface
-      | package_bc
-      = ([], [LinkExternal LinkAllDeps usg_mod | UsagePackageModule {usg_mod} <- mi_usages iface])
-      | otherwise
-      = ([(u, LinkLibrary u) | u <- Set.toList (dep_direct_pkgs (mi_deps iface))], [])
+    -- External package dependencies are always linked as libraries; this
+    -- worker does not support traversing external package modules for
+    -- bytecode ("-fpackage-db-byte-code").
+    package_deps iface =
+      ([(u, LinkLibrary u) | u <- Set.toList (dep_direct_pkgs (mi_deps iface))], [])
 
-    load_reason =
-      text "need to link module" <+> ppr mod <+>
-      text "due to use of Template Haskell"
-
-    package_bc = ldPkgByteCode opts
-
-    -- In multiple home unit mode, this only considers modules from the same
-    -- unit as the splice's module to be eligible for linking bytecode when
-    -- @-fpackage-db-byte-code@ is off.
-    -- For make mode, this is irrelevant, since any bytecode from the HUG is
-    -- obtained directly, not going through 'external_deps'.
+    -- Considers only modules from the same unit as the splice's module to be
+    -- eligible for linking bytecode.
+    -- For make mode, this is irrelevant for home modules in general, since any
+    -- bytecode from the HUG is obtained directly, not going through
+    -- 'external_deps'.
     is_home
       | Just home <- ue_homeUnit (ldUnitEnv opts)
       = homeUnitAsUnit home == mod_unit
@@ -488,11 +427,6 @@ external_deps_loop opts (job@LinkExternal {le_module = mod, ..} : mods) acc = do
     mod_name = moduleName mod
     mod_unit_id = moduleUnitId mod
     mod_unit = moduleUnit mod
-
-link_boot_mod_error :: Module -> SDoc
-link_boot_mod_error mod =
-  text "module" <+> ppr mod <+>
-  text "cannot be linked; it is only available as a boot module"
 
 -- | Split link dependencies into the sets of modules and packages that have
 -- been linked previously and those that need to be linked now by checking for

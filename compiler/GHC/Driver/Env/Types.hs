@@ -29,6 +29,7 @@ import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State
 import Data.IORef
 import GHC.Driver.Env.KnotVars
+import GHC.Linker.Types (LoaderState, Linkables)
 
 -- | The Hsc monad: Passing an environment and diagnostic state
 newtype Hsc a = Hsc (HscEnv -> Messages GhcMessage -> IO (a, Messages GhcMessage))
@@ -43,7 +44,6 @@ instance ContainsDynFlags HscEnv where
 
 instance HasLogger Hsc where
     getLogger = Hsc $ \e w -> return (hsc_logger e, w)
-
 
 -- | HscEnv is like 'GHC.Driver.Monad.Session', except that some of the fields are immutable.
 -- An HscEnv is used to compile a single module from plain Haskell source
@@ -86,6 +86,8 @@ data HscEnv
         , hsc_interp :: Maybe Interp
                 -- ^ target code interpreter (if any) to use for TH and GHCi.
                 -- See Note [Target code interpreter]
+
+        , hsc_linkables :: HscEnv -> LoaderState -> IO Linkables
 
         , hsc_plugins :: !Plugins
                 -- ^ Plugins
