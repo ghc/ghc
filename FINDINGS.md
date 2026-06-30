@@ -133,9 +133,19 @@ deliverable.
   sites — `uVarOrFam` is the #3 suite allocator at 158 MB) plus a (B) re-match
   hypothesis shared with the rewriter:
   [[unify-matcher-um-monad-pair-and-uvarorfam-boxing]] in `~/ghc/todos`.
-- `eq_type_expand_ignore` (suite #2) is *not* top in any of the five tests
-  profiled — driven by other type-comparison-heavy tests (candidates: T9872c,
-  T8095, T13719). One more callgrind run would localise it.
+- **`eq_type_expand_ignore` (suite #2, 6.81 %) is resolved**: driver **T8095**
+  (98.7 % of entries — the deep type-family reduction), a 0-alloc structural walk
+  with the `reallyUnsafePtrEquality#` fast path already present (A done). Late-CCS
+  pins **100 %** of callers on a single source line: the *last-resort* Identity
+  rule of `opt_trans_rule` (`Opt.hs:979`, `RedTypeDirRefl`), which runs a full
+  `eqType (coercionLKind co1) (coercionRKind co2)` at every transitivity
+  composition. 251 k checks → 187 M node compares (745× fanout, deep common
+  prefix), and it returns `False` in ≥96 % of calls (mkReflCo entered only 10 k×),
+  so it's ~O(n·depth) wasted re-walking of near-identical endpoint types. (The
+  `assertPpr` at `Opt.hs:779` is compiled out in perf builds — not the culprit.)
+  Investigation + (B) levers (guard the optional check / share endpoint types /
+  reshape chain optimisation): [[opt-trans-rule-identity-eqtype-deep-walk]] in
+  `~/ghc/todos`.
 
 ### Interface load/write  (MultiLayerModules)
 
