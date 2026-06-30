@@ -123,6 +123,16 @@ deliverable.
   the hard "don't re-walk already-normal sub-structure" (B). Investigation +
   levers: [[rewriteType2-rewrite-one-tyvar-rebuild-and-famapp-rewalk]] in
   `~/ghc/todos`.
+- **`ruleMatchTyKiX3` (0.59 %, `SCALES`) is the shared type matcher**, not RULE
+  matching — it is `unify_ty`/`tc_unify_tys` specialized into `ruleMatchTyKiX`.
+  Driver **T9872b**: 897,764 entries, ~86 MB suite-wide alloc (it is *not* a
+  0-alloc walk — it allocates `UM`-monad plumbing). Caller chain
+  `← tc_unify_tys ← $wtc_match_tys`/`reduceTyFamApp_maybe ← rewriteType2`, i.e.
+  type-family rewriting again. Two (A) levers (the dead `()` in the
+  `(UMState,())` result pair; the `CanEqLHS`/`UMEnv` boxing at `uVarOrFam` call
+  sites — `uVarOrFam` is the #3 suite allocator at 158 MB) plus a (B) re-match
+  hypothesis shared with the rewriter:
+  [[unify-matcher-um-monad-pair-and-uvarorfam-boxing]] in `~/ghc/todos`.
 - `eq_type_expand_ignore` (suite #2) is *not* top in any of the five tests
   profiled — driven by other type-comparison-heavy tests (candidates: T9872c,
   T8095, T13719). One more callgrind run would localise it.
