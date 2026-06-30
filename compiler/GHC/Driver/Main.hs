@@ -305,7 +305,6 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.DSM
 import GHC.Cmm.Config (CmmConfig)
-import Data.Bifunctor
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Home.PackageTable
 
@@ -342,6 +341,7 @@ newHscEnvWithHUG top_dir top_dynflags cur_unit home_unit_graph = do
                   , hsc_FC             = fc_var
                   , hsc_type_env_vars  = emptyKnotVars
                   , hsc_interp         = Nothing
+                  , hsc_linkables      = linkablesDefault
                   , hsc_unit_env       = unit_env
                   , hsc_plugins        = emptyPlugins
                   , hsc_hooks          = emptyHooks
@@ -2880,10 +2880,10 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
 
   -- Take lock for the actual work.
   (dep_linkables, dep_units) <- modifyLoaderState interp $ \pls -> do
-    let link_opts = initLinkDepsOpts hsc_env
 
     -- Find what packages and linkables are required
-    deps <- getLinkDeps link_opts interp pls srcspan needed_mods
+    linkables <- hsc_linkables hsc_env hsc_env pls
+    deps <- linkablesGet linkables srcspan needed_mods
     -- We update the LinkerState even if the JS interpreter maintains its linker
     -- state independently to load new objects here.
 
