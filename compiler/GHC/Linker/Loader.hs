@@ -32,6 +32,7 @@ module GHC.Linker.Loader
    , rmDupLinkables
    , modifyLoaderState
    , initLinkDepsOpts
+   , linkablesDefault
    )
 where
 
@@ -97,7 +98,6 @@ import Control.Monad
 import qualified Data.Set as Set
 import Data.Char (isSpace)
 import Data.Functor ((<&>))
-import qualified Data.Foldable as Foldable
 import Data.IORef
 import Data.List (intercalate, isPrefixOf, nub, partition)
 import Data.Maybe
@@ -115,7 +115,7 @@ import System.Win32.Info (getSystemDirectory)
 #endif
 
 import GHC.Utils.Exception
-import GHC.Unit.Home.Graph (lookupHug, unitEnv_foldWithKey)
+import GHC.Unit.Home.Graph (unitEnv_foldWithKey)
 
 -- Note [Linkers and loaders]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -231,10 +231,10 @@ loadDependencies
   -> IO (LoaderState, SuccessFlag, [Linkable], PkgsLoaded) -- ^ returns the set of linkables required
 -- When called, the loader state must have been initialized (see `initLoaderState`)
 loadDependencies interp hsc_env pls span needed_mods = do
-   let opts = initLinkDepsOpts hsc_env
+   linkables <- hsc_linkables hsc_env hsc_env pls
 
    -- Find what packages and linkables are required
-   deps <- getLinkDeps opts interp pls span needed_mods
+   deps <- linkablesGet linkables span needed_mods
 
    let this_pkgs_needed = ldAllUnits deps
 
@@ -683,6 +683,15 @@ initLinkDepsOpts hsc_env = opts
       EPS {eps_iface_bytecode} <- hscEPS hsc_env
       pure (lookupModuleEnv eps_iface_bytecode mod)
 
+linkablesDefault ::
+  HscEnv ->
+  LoaderState ->
+  IO Linkables
+linkablesDefault hsc_env pls =
+  pure Linkables {
+    linkablesResolve = getLinkDeps (initLinkDepsOpts hsc_env) (hscInterp hsc_env) pls,
+    linkablesSelect = pure
+  }
 
 
 {- **********************************************************************
