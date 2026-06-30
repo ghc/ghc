@@ -102,6 +102,13 @@ deliverable.
   functions being `tidyType`, `$wzonkTyVarOcc` → forcing/tidying/FV-scanning whole
   types during **zonk + tidy**. Source-level attribution here needs the profiled
   build (laziness).
+- **`coVarsOfType(s)` (~6.5 %) is resolved**: the late-CCS profile pins 99 % of
+  `coVarsOfType1`'s external entries on `$woccAnal` — i.e. `occAnal (Type ty)`
+  (`OccurAnal:2583`) computing free CoVars of *every* `Type` argument for CoVar
+  deadness. The walk is 0-alloc and the result is ~always ∅ (T16577's types are
+  coercion-free), so it's a pure wasted deep traversal redone each occanal pass.
+  Investigation + (B) levers (short-circuit/memoise coercion-free types):
+  [[occanal-covarsoftype-coercion-free-walk]] in `~/ghc/todos`.
 
 ### Type-keyed maps & equality  (Core.Map.Type, eq_type)
 
