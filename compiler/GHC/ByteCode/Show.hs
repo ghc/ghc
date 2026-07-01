@@ -174,7 +174,7 @@ pprLiteral :: Module -> BCONPtr -> SDoc
 pprLiteral currentModule literal = case literal of
     BCONPtrWord word
         -> text "word" <+>
-           pprFixedSizeNatural word
+           ppr word
     BCONPtrLbl label
         -> text "label" <+>
            ppr label
@@ -421,9 +421,9 @@ pprVariable :: Maybe (IfaceIdBndr, Word) -> SDoc
 pprVariable = maybe (text "<unknown>") (uncurry pprKnownVariable)
 
 pprKnownVariable :: IfaceIdBndr -> Word -> SDoc
-pprKnownVariable binder offset = pprVariableBinder binder   <+>
-                                 text "@"                   <+>
-                                 pprFixedSizeNatural offset
+pprKnownVariable binder offset = pprVariableBinder binder <+>
+                                 text "@"                 <+>
+                                 ppr offset
 -- That the second argument is an offset is apparent from the use of the
 -- identifier @offset@ in the implementation of
 -- 'GHC.StgToByteCode.dehydrateCgBreakInfo'.
