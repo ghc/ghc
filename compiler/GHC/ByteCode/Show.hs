@@ -91,12 +91,16 @@ showByteCode logger env path = do
 -- | […]
 pprOnDiskModuleByteCode :: OnDiskModuleByteCode -> SDoc
 pprOnDiskModuleByteCode OnDiskModuleByteCode {..}
-    = entry (text "module" <+> ppr odgbc_module) $
-      vcat [
+    = vcat [
+               pprModuleIdent                   $ odgbc_module,
                pprOnDiskModuleByteCodeHash      $ odgbc_hash,
                pprCompiledByteCode odgbc_module $ odgbc_compiled_byte_code,
                pprObjectFileContents            $ odgbc_foreign
            ]
+
+-- | […]
+pprModuleIdent :: Module -> SDoc
+pprModuleIdent = entry (text "name:") . ppr
 
 -- | […]
 pprOnDiskModuleByteCodeHash :: Fingerprint -> SDoc
