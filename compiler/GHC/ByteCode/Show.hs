@@ -251,8 +251,6 @@ pprDataConstructorInfoTable dataConstrName ConInfoTable {..}
                pprTablePositioning    $ conItblTablesNextToCode,
                pprPointerWordCount    $ conItblPtrs,
                pprNonPointerWordCount $ conItblNPtrs,
-               pprConstructorTag      $ conItblConTag,
-               pprPointerTag          $ conItblPtrTag,
                pprDescription         $ conItblDescr
            ]
 
@@ -267,14 +265,6 @@ pprPointerWordCount = entry (text "number of words for pointers:") . ppr
 -- | […]
 pprNonPointerWordCount :: Int -> SDoc
 pprNonPointerWordCount = entry (text "number of words for non-pointers:") . ppr
-
--- | […]
-pprConstructorTag :: Int -> SDoc
-pprConstructorTag = entry (text "constructor tag:") . ppr
-
--- | […]
-pprPointerTag :: Int -> SDoc
-pprPointerTag = entry (text "pointer tag:") . ppr
 
 -- | […]
 pprDescription :: ByteString -> SDoc
