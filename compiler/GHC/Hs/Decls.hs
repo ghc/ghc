@@ -1180,20 +1180,25 @@ ppDerivStrategy mb =
     Nothing       -> empty
     Just (L _ ds) -> ppr ds
 
-ppOverlapPragma :: Maybe (LocatedP (OverlapMode (GhcPass p))) -> SDoc
+ppOverlapPragma :: forall p. IsPass p => Maybe (LocatedA (OverlapMode (GhcPass p))) -> SDoc
 ppOverlapPragma mb =
   case mb of
     Nothing           -> empty
-    Just (L _ (NoOverlap s))    -> maybe_stext s "{-# NO_OVERLAP #-}"
-    Just (L _ (Overlappable s)) -> maybe_stext s "{-# OVERLAPPABLE #-}"
-    Just (L _ (Overlapping s))  -> maybe_stext s "{-# OVERLAPPING #-}"
-    Just (L _ (Overlaps s))     -> maybe_stext s "{-# OVERLAPS #-}"
-    Just (L _ (Incoherent s))   -> maybe_stext s "{-# INCOHERENT #-}"
-    Just (L _ (NonCanonical s)) -> maybe_stext s "{-# INCOHERENT #-}" -- No surface syntax for NONCANONICAL yet
+    Just (L _ (NoOverlap s))    -> maybe_stext (stext s) "{-# NO_OVERLAP #-}"
+    Just (L _ (Overlappable s)) -> maybe_stext (stext s) "{-# OVERLAPPABLE #-}"
+    Just (L _ (Overlapping s))  -> maybe_stext (stext s) "{-# OVERLAPPING #-}"
+    Just (L _ (Overlaps s))     -> maybe_stext (stext s) "{-# OVERLAPS #-}"
+    Just (L _ (Incoherent s))   -> maybe_stext (stext s) "{-# INCOHERENT #-}"
+    Just (L _ (NonCanonical s)) -> maybe_stext (stext s) "{-# INCOHERENT #-}" -- No surface syntax for NONCANONICAL yet
   where
     maybe_stext NoSourceText     alt = text alt
     maybe_stext (SourceText src) _   = ftext src <+> text "#-}"
 
+    stext :: XOverlapMode (GhcPass p) -> SourceText
+    stext s = case (ghcPass @p, s) of
+                (GhcPs, (s,_)) -> s
+                (GhcRn, (s,_)) -> s
+                (GhcTc, s) -> s
 
 instance (OutputableBndrId p) => Outputable (InstDecl (GhcPass p)) where
     ppr (ClsInstD     { cid_inst  = decl }) = ppr decl
@@ -1616,7 +1621,7 @@ type instance Anno (ClsInstDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (InstDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (DocDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (DerivDecl (GhcPass p)) = SrcSpanAnnA
-type instance Anno (OverlapMode (GhcPass p)) = SrcSpanAnnP
+type instance Anno (OverlapMode (GhcPass p)) = SrcSpanAnnA
 type instance Anno (DerivStrategy (GhcPass p)) = EpAnnCO
 type instance Anno (DefaultDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (ForeignDecl (GhcPass p)) = SrcSpanAnnA

@@ -2246,40 +2246,40 @@ instance ExactPrint (TyFamInstDecl GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance Typeable p => ExactPrint (LocatedP (OverlapMode (GhcPass p))) where
-  getAnnotationEntry = entryFromLocatedA
-  setAnnotationAnchor = setAnchorAn
+instance ExactPrint (OverlapMode GhcPs) where
+  getAnnotationEntry _ = NoEntryVal
+  setAnnotationAnchor a _ _ _ = a
 
   -- NOTE: NoOverlap is only used in the typechecker
-  exact (L (EpAnn l (AnnPragma o c s l1 l2 t m) cs) (NoOverlap src)) = do
+  exact (NoOverlap (src, AnnPragma o c s l1 l2 t m)) = do
     o' <- markAnnOpen'' o src "{-# NO_OVERLAP"
     c' <- markEpToken c
-    return (L (EpAnn l (AnnPragma o' c' s l1 l2 t m) cs) (NoOverlap src))
+    return (NoOverlap (src, AnnPragma o' c' s l1 l2 t m))
 
-  exact (L (EpAnn l (AnnPragma o c s l1 l2 t m) cs) (Overlappable src)) = do
+  exact (Overlappable (src, AnnPragma o c s l1 l2 t m)) = do
     o' <- markAnnOpen'' o src "{-# OVERLAPPABLE"
     c' <- markEpToken c
-    return (L (EpAnn l (AnnPragma o' c' s l1 l2 t m) cs) (Overlappable src))
+    return (Overlappable (src, AnnPragma o' c' s l1 l2 t m))
 
-  exact (L (EpAnn l (AnnPragma o c s l1 l2 t m) cs) (Overlapping src)) = do
+  exact (Overlapping (src, AnnPragma o c s l1 l2 t m)) = do
     o' <- markAnnOpen'' o src "{-# OVERLAPPING"
     c' <- markEpToken c
-    return (L (EpAnn l (AnnPragma o' c' s l1 l2 t m) cs) (Overlapping src))
+    return (Overlapping (src, AnnPragma o' c' s l1 l2 t m))
 
-  exact (L (EpAnn l (AnnPragma o c s l1 l2 t m) cs) (Overlaps src)) = do
+  exact (Overlaps (src, AnnPragma o c s l1 l2 t m)) = do
     o' <- markAnnOpen'' o src "{-# OVERLAPS"
     c' <- markEpToken c
-    return (L (EpAnn l (AnnPragma o' c' s l1 l2 t m) cs) (Overlaps src))
+    return (Overlaps (src, AnnPragma o' c' s l1 l2 t m))
 
-  exact (L (EpAnn l (AnnPragma o c s l1 l2 t m) cs) (Incoherent src)) = do
+  exact (Incoherent (src, AnnPragma o c s l1 l2 t m)) = do
     o' <- markAnnOpen'' o src "{-# INCOHERENT"
     c' <- markEpToken c
-    return (L (EpAnn l (AnnPragma o' c' s l1 l2 t m) cs) (Incoherent src))
+    return (Incoherent (src, AnnPragma o' c' s l1 l2 t m))
 
-  exact (L (EpAnn l (AnnPragma o c s l1 l2 t m) cs) (NonCanonical src)) = do
+  exact (NonCanonical (src, AnnPragma o c s l1 l2 t m)) = do
     o' <- markAnnOpen'' o src "{-# INCOHERENT"
     c' <- markEpToken c
-    return (L (EpAnn l (AnnPragma o' c' s l1 l2 t m) cs) (Incoherent src))
+    return (Incoherent (src, AnnPragma o' c' s l1 l2 t m))
 
 -- ---------------------------------------------------------------------
 

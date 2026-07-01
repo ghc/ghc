@@ -11,7 +11,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | Handles @deriving@ clauses on @data@ declarations.
-module GHC.Tc.Deriv ( tcDeriving, DerivInfo(..) ) where
+module GHC.Tc.Deriv ( tcDeriving, DerivInfo(..), tcOverlapMode ) where
 
 import GHC.Prelude
 
@@ -776,12 +776,12 @@ deriveStandalone (L loc (DerivDecl (warn, _) deriv_ty mb_lderiv_strat overlap_mo
 
 tcOverlapMode :: OverlapMode GhcRn -> OverlapMode GhcTc
 tcOverlapMode = \case
-  NoOverlap    s -> NoOverlap    s
-  Overlappable s -> Overlappable s
-  Overlapping  s -> Overlapping  s
-  Overlaps     s -> Overlaps     s
-  Incoherent   s -> Incoherent   s
-  NonCanonical s -> NonCanonical s
+  NoOverlap    s -> NoOverlap    (fst s)
+  Overlappable s -> Overlappable (fst s)
+  Overlapping  s -> Overlapping  (fst s)
+  Overlaps     s -> Overlaps     (fst s)
+  Incoherent   s -> Incoherent   (fst s)
+  NonCanonical s -> NonCanonical (fst s)
 
 -- Typecheck the type in a standalone deriving declaration.
 --

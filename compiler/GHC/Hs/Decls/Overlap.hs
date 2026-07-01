@@ -26,6 +26,8 @@ import GHC.Prelude
 
 import GHC.Hs.Extension
 
+import GHC.Parser.Annotation ( AnnPragma )
+
 import Language.Haskell.Syntax.Decls.Overlap
 import Language.Haskell.Syntax.Extension
 
@@ -65,7 +67,9 @@ instance NFData OverlapFlag where
 instance Outputable OverlapFlag where
     ppr flag = ppr (overlapMode flag) <+> pprSafeOverlap (isSafeOverlap flag)
 
-type instance XOverlapMode  (GhcPass _) = SourceText
+type instance XOverlapMode  GhcPs = (SourceText, AnnPragma)
+type instance XOverlapMode  GhcRn = (SourceText, AnnPragma)
+type instance XOverlapMode  GhcTc = SourceText
 
 type instance XXOverlapMode (GhcPass _) = DataConCantHappen
 

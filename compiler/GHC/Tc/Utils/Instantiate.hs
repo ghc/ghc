@@ -912,7 +912,7 @@ hasFixedRuntimeRepRes std_nm user_expr ty = mapM_ do_check mb_arity
 ************************************************************************
 -}
 
-getOverlapFlag :: Maybe (OverlapMode (GhcPass p)) -- User pragma if any
+getOverlapFlag :: Maybe (OverlapMode GhcTc) -- User pragma if any
                -> TcM OverlapFlag
 -- Construct the OverlapFlag from the global module flags,
 -- but if the overlap_mode argument is (Just m),
@@ -936,9 +936,9 @@ getOverlapFlag overlap_mode_prag
 
               overlap_mode
                 | Just m <- overlap_mode_prag = m
-                | incoherent_ok               = Incoherent NoSourceText
-                | overlap_ok                  = Overlaps   NoSourceText
-                | otherwise                   = NoOverlap  NoSourceText
+                | incoherent_ok               = Incoherent noAnn
+                | overlap_ok                  = Overlaps   noAnn
+                | otherwise                   = NoOverlap  noAnn
 
               -- final_overlap_mode: the `-fspecialise-incoherents` flag controls the
               -- meaning of the `Incoherent` overlap mode: as either an Incoherent overlap
@@ -964,7 +964,7 @@ tcGetInsts :: TcM [ClsInst]
 -- Gets the local class instances.
 tcGetInsts = fmap tcg_insts getGblEnv
 
-newClsInst :: Maybe (OverlapMode (GhcPass p))   -- User pragma
+newClsInst :: Maybe (OverlapMode GhcTc)   -- User pragma
            -> Name -> [TyVar] -> ThetaType
            -> Class -> [Type] -> Maybe (WarningTxt GhcRn) -> TcM ClsInst
 newClsInst overlap_mode dfun_name tvs theta clas tys warn

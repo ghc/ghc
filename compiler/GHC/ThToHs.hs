@@ -338,7 +338,6 @@ cvtDec (ClassD ctxt cl tvs fds decs)
         }
 
 cvtDec (InstanceD o ctxt ty decs)
-  -- = do  { (binds', sigs', fams', ats', adts') <- cvt_ci_decs InstanceDecl decs
   = do  { decs' <- cvt_ci_decs InstanceDecl decs
         ; let (fams', decls') = partitionWith is_fam_decl decs'
         ; for_ (nonEmpty fams') $ \ bad_fams ->
@@ -357,10 +356,10 @@ cvtDec (InstanceD o ctxt ty decs)
   where
   overlap pragma =
     case pragma of
-      TH.Overlaps      -> Hs.Overlaps     (SourceText $ fsLit "{-# OVERLAPS")
-      TH.Overlappable  -> Hs.Overlappable (SourceText $ fsLit "{-# OVERLAPPABLE")
-      TH.Overlapping   -> Hs.Overlapping  (SourceText $ fsLit "{-# OVERLAPPING")
-      TH.Incoherent    -> Hs.Incoherent   (SourceText $ fsLit "{-# INCOHERENT")
+      TH.Overlaps      -> Hs.Overlaps     (SourceText $ fsLit "{-# OVERLAPS", noAnn)
+      TH.Overlappable  -> Hs.Overlappable (SourceText $ fsLit "{-# OVERLAPPABLE", noAnn)
+      TH.Overlapping   -> Hs.Overlapping  (SourceText $ fsLit "{-# OVERLAPPING", noAnn)
+      TH.Incoherent    -> Hs.Incoherent   (SourceText $ fsLit "{-# INCOHERENT", noAnn)
 
 
 
