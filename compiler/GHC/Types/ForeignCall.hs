@@ -109,6 +109,7 @@ import Data.Data (Data)
 import Data.Functor ((<&>))
 
 import Control.DeepSeq (NFData(..))
+import GHC.Parser.Annotation (AnnPragma, noAnn)
 
 {-
 ************************************************************************
@@ -213,11 +214,11 @@ instance Outputable CCallSpec where
 
 defaultCType :: String -> CType (GhcPass p)
 defaultCType =
-  CType (CTypeGhc NoSourceText NoSourceText) Nothing . packHText
+  CType (CTypeGhc NoSourceText NoSourceText noAnn) Nothing . packHText
 
-mkCType :: SourceText -> SourceText -> Maybe (Header (GhcPass p)) -> HText -> CType (GhcPass p)
-mkCType x y m =
-  CType (CTypeGhc x y) m
+mkCType :: SourceText -> SourceText -> AnnPragma -> Maybe (Header (GhcPass p)) -> HText -> CType (GhcPass p)
+mkCType x y ann m =
+  CType (CTypeGhc x y ann) m
 
 typeCheckCType :: CType GhcRn -> CType GhcTc
 typeCheckCType (CType x y z) = CType x (typeCheckHeader <$> y) z
@@ -302,6 +303,7 @@ data StaticTargetGhc = StaticTargetGhc
 data CTypeGhc = CTypeGhc
   { cTypeSourceText :: SourceText
   , cTypeOtherText  :: SourceText
+  , cTypeAnn        :: AnnPragma
   }
   deriving (Data, Eq)
 
@@ -349,6 +351,7 @@ instance Binary CTypeGhc where
       return $ CTypeGhc
         { cTypeSourceText = str1
         , cTypeOtherText  = str2
+        , cTypeAnn        = noAnn
         }
 
 instance NFData StaticTargetGhc where
