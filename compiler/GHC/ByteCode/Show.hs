@@ -254,8 +254,7 @@ pprDataConstructorInfoTable dataConstrName ConInfoTable {..}
       vcat [
                pprTablePositioning    $ conItblTablesNextToCode,
                pprPointerWordCount    $ conItblPtrs,
-               pprNonPointerWordCount $ conItblNPtrs,
-               pprDescription         $ conItblDescr
+               pprNonPointerWordCount $ conItblNPtrs
            ]
 
 -- | […]
@@ -269,12 +268,6 @@ pprPointerWordCount = entry (text "number of words for pointers:") . ppr
 -- | […]
 pprNonPointerWordCount :: Int -> SDoc
 pprNonPointerWordCount = entry (text "number of words for non-pointers:") . ppr
-
--- | […]
-pprDescription :: ByteString -> SDoc
-pprDescription = entry (text "description:") .
-                 text                        .
-                 utf8DecodeByteString
 
 -- | […]
 pprTopLevelStrings :: [(Name, ByteString)] -> SDoc
