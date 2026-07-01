@@ -8,6 +8,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 #include <stddef.h>
 #include "rts/OSThreads.h"
 
@@ -160,12 +164,12 @@ typedef struct generation_ {
     StgWeak *    old_weak_ptr_list;
 } generation;
 
-extern generation * generations;
-extern generation * g0;
-extern generation * oldest_gen;
+extern RTS_EXPORT generation * generations;
+extern RTS_EXPORT generation * g0;
+extern RTS_EXPORT generation * oldest_gen;
 
 typedef void(*ListBlocksCb)(void *user, bdescr *);
-void listAllBlocks(ListBlocksCb cb, void *user);
+RTS_EXPORT void listAllBlocks(ListBlocksCb cb, void *user);
 
 /* -----------------------------------------------------------------------------
    Generic allocation
@@ -175,9 +179,9 @@ void listAllBlocks(ListBlocksCb cb, void *user);
         Note [allocate failure]
    -------------------------------------------------------------------------- */
 
-StgPtr  allocate          ( Capability *cap, W_ n );
-StgPtr  allocateMightFail ( Capability *cap, W_ n );
-StgPtr  allocatePinned    ( Capability *cap, W_ n, W_ alignment, W_ align_off);
+RTS_EXPORT StgPtr  allocate          ( Capability *cap, W_ n );
+RTS_EXPORT StgPtr  allocateMightFail ( Capability *cap, W_ n );
+RTS_EXPORT StgPtr  allocatePinned    ( Capability *cap, W_ n, W_ alignment, W_ align_off);
 
 /* Note [allocate and allocateMightFail]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -274,39 +278,39 @@ StgPtr  allocatePinned    ( Capability *cap, W_ n, W_ alignment, W_ align_off);
 typedef void* AdjustorWritable;
 typedef void* AdjustorExecutable;
 
-void flushExec(W_ len, AdjustorExecutable exec_addr);
+RTS_EXPORT void flushExec(W_ len, AdjustorExecutable exec_addr);
 
 // Used by GC checks in external .cmm code:
-extern W_ large_alloc_lim;
+extern RTS_EXPORT W_ large_alloc_lim;
 
 // Should triggering an allocation limit kill the thread
 // and should we run a user-defined hook when it is triggered.
-void setAllocLimitKill(bool, bool);
+RTS_EXPORT void setAllocLimitKill(bool, bool);
 
 /* -----------------------------------------------------------------------------
    Performing Garbage Collection
    -------------------------------------------------------------------------- */
 
-void performGC(void);
-void performMajorGC(void);
-void performBlockingMajorGC(void);
+RTS_EXPORT void performGC(void);
+RTS_EXPORT void performMajorGC(void);
+RTS_EXPORT void performBlockingMajorGC(void);
 
 /* -----------------------------------------------------------------------------
    The CAF table - used to let us revert CAFs in GHCi
    -------------------------------------------------------------------------- */
 
-StgInd *newCAF         (StgRegTable *reg, StgIndStatic *caf);
-StgInd *newRetainedCAF (StgRegTable *reg, StgIndStatic *caf);
-StgInd *newGCdCAF      (StgRegTable *reg, StgIndStatic *caf);
-void revertCAFs (void);
+RTS_EXPORT StgInd *newCAF         (StgRegTable *reg, StgIndStatic *caf);
+RTS_EXPORT StgInd *newRetainedCAF (StgRegTable *reg, StgIndStatic *caf);
+RTS_EXPORT StgInd *newGCdCAF      (StgRegTable *reg, StgIndStatic *caf);
+RTS_EXPORT void revertCAFs (void);
 
 // Request that all CAFs are retained indefinitely.
 // (preferably use RtsConfig.keep_cafs instead)
-void setKeepCAFs (void);
+RTS_EXPORT void setKeepCAFs (void);
 
 // Let the runtime know that all the CAFs in high mem are not
 // to be retained. Useful in conjunction with loadNativeObj
-void setHighMemDynamic (void);
+RTS_EXPORT void setHighMemDynamic (void);
 
 /* -----------------------------------------------------------------------------
    This is the write barrier for MUT_VARs, a.k.a. IORefs.  A
@@ -315,11 +319,11 @@ void setHighMemDynamic (void);
    and is put on the mutable list.
    -------------------------------------------------------------------------- */
 
-void dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mv, StgClosure *old);
+RTS_EXPORT void dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mv, StgClosure *old);
 
 /* set to disable CAF garbage collection in GHCi. */
 /* (needed when dynamic libraries are used). */
-extern bool keepCAFs;
+extern RTS_EXPORT bool keepCAFs;
 
 #include "rts/Flags.h"
 

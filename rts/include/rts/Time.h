@@ -11,6 +11,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 // For most time values in the RTS we use a fixed resolution of nanoseconds,
 // normalising the time we get from platform-dependent APIs to this
 // resolution.
@@ -42,4 +46,4 @@ INLINE_HEADER Time fsecondsToTime (double t)
     return (Time)(t * TIME_RESOLUTION);
 }
 
-Time getProcessElapsedTime (void);
+RTS_EXPORT Time getProcessElapsedTime (void);

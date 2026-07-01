@@ -8,6 +8,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 // for FILE
 #include <stdio.h>
 
@@ -83,15 +87,15 @@ struct LibdwSession_;
 typedef struct LibdwSession_ LibdwSession;
 
 /* Free a backtrace */
-void backtraceFree(Backtrace *bt);
+RTS_EXPORT void backtraceFree(Backtrace *bt);
 
 /* Request a backtrace of the current stack state.
  * May return NULL if a backtrace can't be acquired. */
-Backtrace *libdwGetBacktrace(LibdwSession *session);
+RTS_EXPORT Backtrace *libdwGetBacktrace(LibdwSession *session);
 
 /* Lookup Location information for the given address.
  * Returns 0 if successful, 1 if address could not be found. */
-int libdwLookupLocation(LibdwSession *session, Location *loc, StgPtr pc);
+RTS_EXPORT int libdwLookupLocation(LibdwSession *session, Location *loc, StgPtr pc);
 
 /* Pretty-print a backtrace to the given FILE */
-void libdwPrintBacktrace(LibdwSession *session, FILE *file, Backtrace *bt);
+RTS_EXPORT void libdwPrintBacktrace(LibdwSession *session, FILE *file, Backtrace *bt);

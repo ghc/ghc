@@ -11,7 +11,11 @@
 
 #pragma once
 
-StgDouble __int_encodeDouble (I_ j, I_ e);
-StgFloat  __int_encodeFloat (I_ j, I_ e);
-StgDouble __word_encodeDouble (W_ j, I_ e);
-StgFloat  __word_encodeFloat (W_ j, I_ e);
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
+RTS_EXPORT StgDouble __int_encodeDouble (I_ j, I_ e);
+RTS_EXPORT StgFloat  __int_encodeFloat (I_ j, I_ e);
+RTS_EXPORT StgDouble __word_encodeDouble (W_ j, I_ e);
+RTS_EXPORT StgFloat  __word_encodeFloat (W_ j, I_ e);

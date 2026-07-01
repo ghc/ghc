@@ -13,9 +13,13 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 /* Creating and destroying an adjustor thunk */
-void* createAdjustor (StgStablePtr hptr,
+RTS_EXPORT void* createAdjustor (StgStablePtr hptr,
                       StgFunPtr wptr,
                       char *typeString);
 
-void freeHaskellFunctionPtr (void* ptr);
+RTS_EXPORT void freeHaskellFunctionPtr (void* ptr);

@@ -13,6 +13,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 /* Used by runProcess() in the process package
  */
 
@@ -24,11 +28,11 @@
  * when emptying the queue by running the handlers.
  *
  */
-void blockUserSignals(void);
+RTS_EXPORT void blockUserSignals(void);
 
 /*
  * Function: unblockUserSignals()
  *
  * The inverse of blockUserSignals(); re-enable the deliver of console events.
  */
-void unblockUserSignals(void);
+RTS_EXPORT void unblockUserSignals(void);

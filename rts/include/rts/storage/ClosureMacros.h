@@ -8,6 +8,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 /* -----------------------------------------------------------------------------
    Info tables are slammed up against the entry code, and the label
    for the info table is at the *end* of the table itself.  This
@@ -158,9 +162,9 @@ EXTERN_INLINE StgHalfWord GET_TAG(const StgClosure *con)
 */
 #if !defined(RTS_FLAGS_DOING_PROFILING)
 #define RTS_FLAGS_DOING_PROFILING 1
-bool doingLDVProfiling(void);
-bool doingRetainerProfiling(void);
-bool doingErasProfiling(void);
+RTS_EXPORT bool doingLDVProfiling(void);
+RTS_EXPORT bool doingRetainerProfiling(void);
+RTS_EXPORT bool doingErasProfiling(void);
 #endif
 
 /*
@@ -437,7 +441,7 @@ EXTERN_INLINE StgWord compact_nfdata_full_sizeW ( StgCompactNFData *str )
  *
  * (Also for 'closure_sizeW' below)
  */
-uint32_t
+RTS_EXPORT uint32_t
 closure_sizeW_ (const StgClosure *p, const StgInfoTable *info);
 
 // The definitive way to find the size, in words, of a heap-allocated closure
@@ -565,7 +569,7 @@ EXTERN_INLINE StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 #endif
 
 #if defined(PROFILING)
-void LDV_recordDead (const StgClosure *c, uint32_t size);
+RTS_EXPORT void LDV_recordDead (const StgClosure *c, uint32_t size);
 RTS_PRIVATE bool isInherentlyUsed ( StgHalfWord closure_type );
 #endif
 
@@ -625,7 +629,7 @@ zeroSlop (StgClosure *p,
 
 // N.B. the stg_* variants of the utilities below are only for calling from
 // Cmm. The INLINE_HEADER functions should be used when in C.
-void stg_overwritingClosure (StgClosure *p);
+RTS_EXPORT void stg_overwritingClosure (StgClosure *p);
 INLINE_HEADER void overwritingClosure (StgClosure *p)
 {
     W_ size = closure_sizeW(p);
@@ -641,7 +645,7 @@ INLINE_HEADER void overwritingClosure (StgClosure *p)
 // closure.  The offset is expressed in words relative to 'p' and shall
 // be less than or equal to closure_sizeW(p), and usually at least as
 // large as the respective thunk header.
-void stg_overwritingMutableClosureOfs (StgClosure *p, uint32_t offset);
+RTS_EXPORT void stg_overwritingMutableClosureOfs (StgClosure *p, uint32_t offset);
 INLINE_HEADER void overwritingMutableClosureOfs (StgClosure *p, uint32_t offset)
 {
     // Since overwritingClosureOfs is only ever called by:
@@ -659,7 +663,7 @@ INLINE_HEADER void overwritingMutableClosureOfs (StgClosure *p, uint32_t offset)
 }
 
 // Version of 'overwritingClosure' which takes closure size as argument.
-void stg_overwritingClosureSize (StgClosure *p, uint32_t size /* in words */);
+RTS_EXPORT void stg_overwritingClosureSize (StgClosure *p, uint32_t size /* in words */);
 INLINE_HEADER void overwritingClosureSize (StgClosure *p, uint32_t size)
 {
     // This function is only called from stg_AP_STACK so we can assume it's not

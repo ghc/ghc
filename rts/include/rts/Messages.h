@@ -16,6 +16,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 #include <stdarg.h>
 
 /* -----------------------------------------------------------------------------
@@ -30,23 +34,23 @@
  * barf() invokes (*fatalInternalErrorFn)().  This function is not
  * expected to return.
  */
-void barf(const char *s, ...)
+RTS_EXPORT void barf(const char *s, ...)
    STG_NORETURN
    STG_PRINTF_ATTR(1, 2);
 
-void vbarf(const char *s, va_list ap)
+RTS_EXPORT void vbarf(const char *s, va_list ap)
    STG_NORETURN;
 
 /* Non-variadic wrapper around barf(), used by the code generator. */
-void sbarf(const char *s)
+RTS_EXPORT void sbarf(const char *s)
    STG_NORETURN;
 
 /* Non-variadic wrapper around barf() for a format string and one pointer. */
-void pbarf(const char *fmt, void *p)
+RTS_EXPORT void pbarf(const char *fmt, void *p)
    STG_NORETURN;
 
 /* Non-variadic wrapper around barf() for a format string and one string. */
-void ssbarf(const char *fmt, const char *s)
+RTS_EXPORT void ssbarf(const char *fmt, const char *s)
    STG_NORETURN;
 
 // declared in Rts.h:
@@ -59,10 +63,10 @@ void ssbarf(const char *fmt, const char *s)
  *
  * errorBelch() invokes (*errorMsgFn)().
  */
-void errorBelch(const char *s, ...)
+RTS_EXPORT void errorBelch(const char *s, ...)
    STG_PRINTF_ATTR(1, 2);
 
-void verrorBelch(const char *s, va_list ap);
+RTS_EXPORT void verrorBelch(const char *s, va_list ap);
 
 /*
  * An error condition which is caused by and/or can be corrected by
@@ -73,10 +77,10 @@ void verrorBelch(const char *s, va_list ap);
  *
  * sysErrorBelch() invokes (*sysErrorMsgFn)().
  */
-void sysErrorBelch(const char *s, ...)
+RTS_EXPORT void sysErrorBelch(const char *s, ...)
    STG_PRINTF_ATTR(1, 2);
 
-void vsysErrorBelch(const char *s, va_list ap);
+RTS_EXPORT void vsysErrorBelch(const char *s, va_list ap);
 
 /*
  * A debugging message.  Debugging messages are generated either as a
@@ -85,28 +89,28 @@ void vsysErrorBelch(const char *s, va_list ap);
  *
  * debugBelch() invokes (*debugMsgFn)().
  */
-void debugBelch(const char *s, ...)
+RTS_EXPORT void debugBelch(const char *s, ...)
    STG_PRINTF_ATTR(1, 2);
 
-int vdebugBelch(const char *s, va_list ap);
+RTS_EXPORT int vdebugBelch(const char *s, va_list ap);
 
 /* Hooks for redirecting message generation: */
 
 typedef void RtsMsgFunction(const char *, va_list);
 typedef int RtsMsgFunctionRetLen(const char *, va_list);
 
-extern RtsMsgFunction *fatalInternalErrorFn;
-extern RtsMsgFunctionRetLen *debugMsgFn;
-extern RtsMsgFunction *errorMsgFn;
+extern RTS_EXPORT RtsMsgFunction *fatalInternalErrorFn;
+extern RTS_EXPORT RtsMsgFunctionRetLen *debugMsgFn;
+extern RTS_EXPORT RtsMsgFunction *errorMsgFn;
 
 /* Default stdio implementation of the message hooks: */
 
-extern RtsMsgFunction rtsFatalInternalErrorFn;
-extern RtsMsgFunctionRetLen rtsDebugMsgFn;
-extern RtsMsgFunction rtsErrorMsgFn;
-extern RtsMsgFunction rtsSysErrorMsgFn;
+extern RTS_EXPORT RtsMsgFunction rtsFatalInternalErrorFn;
+extern RTS_EXPORT RtsMsgFunctionRetLen rtsDebugMsgFn;
+extern RTS_EXPORT RtsMsgFunction rtsErrorMsgFn;
+extern RTS_EXPORT RtsMsgFunction rtsSysErrorMsgFn;
 
 /* Used by code generator */
-void rtsBadAlignmentBarf(void) STG_NORETURN;
-void rtsOutOfBoundsAccess(void) STG_NORETURN;
-void rtsMemcpyRangeOverlap(void) STG_NORETURN;
+RTS_EXPORT void rtsBadAlignmentBarf(void) STG_NORETURN;
+RTS_EXPORT void rtsOutOfBoundsAccess(void) STG_NORETURN;
+RTS_EXPORT void rtsMemcpyRangeOverlap(void) STG_NORETURN;

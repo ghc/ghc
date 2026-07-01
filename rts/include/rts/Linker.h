@@ -13,6 +13,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 #if defined(mingw32_HOST_OS)
 typedef wchar_t pathchar;
 #define PATH_FMT "ls"
@@ -22,7 +26,7 @@ typedef char    pathchar;
 #endif
 
 /* Initialize the object linker. Equivalent to initLinker_(1). */
-void initLinker (void);
+RTS_EXPORT void initLinker (void);
 
 /* Initialize the object linker.
  * The retain_cafs argument is:
@@ -39,13 +43,13 @@ void initLinker (void);
  *               frees these StablePtrs, which will allow the CAFs to
  *               be GC'd and the code to be removed.
  */
-void initLinker_ (int retain_cafs);
+RTS_EXPORT void initLinker_ (int retain_cafs);
 
 /* insert a code symbol in the hash table */
-HsInt insertSymbol(pathchar* obj_name, char* key, void* data);
+RTS_EXPORT HsInt insertSymbol(pathchar* obj_name, char* key, void* data);
 
 /* lookup a symbol in the hash table */
-void *lookupSymbol( char *lbl );
+RTS_EXPORT void *lookupSymbol( char *lbl );
 
 /* See Linker.c Note [runtime-linker-phases] */
 typedef enum {
@@ -60,58 +64,58 @@ typedef enum {
 } OStatus;
 
 /* check object load status */
-OStatus getObjectLoadStatus( pathchar *path );
+RTS_EXPORT OStatus getObjectLoadStatus( pathchar *path );
 
 /* delete an object from the pool */
-HsInt unloadObj( pathchar *path );
+RTS_EXPORT HsInt unloadObj( pathchar *path );
 
 /* purge an object's symbols from the symbol table, but don't unload it */
-HsInt purgeObj( pathchar *path );
+RTS_EXPORT HsInt purgeObj( pathchar *path );
 
 /* add an obj (populate the global symbol table, but don't resolve yet) */
-HsInt loadObj( pathchar *path );
+RTS_EXPORT HsInt loadObj( pathchar *path );
 
 /* add an arch (populate the global symbol table, but don't resolve yet) */
-HsInt loadArchive( pathchar *path );
+RTS_EXPORT HsInt loadArchive( pathchar *path );
 
 /* resolve all the currently unlinked objects in memory */
-HsInt resolveObjs( void );
+RTS_EXPORT HsInt resolveObjs( void );
 
 /* Load an .so using the system linker.
    Returns a handle that can be passed to dlsym() or NULL on error.
 
    In the case of error, stores the error message in errmsg. The caller
    is responsible for freeing it. */
-void *loadNativeObj( pathchar *path, char **errmsg );
+RTS_EXPORT void *loadNativeObj( pathchar *path, char **errmsg );
 
 /* Mark the .so loaded with the system linker for unloading.
    The RTS will unload it when all the references to the .so disappear from
    the heap.
    Takes the handle returned from loadNativeObj() as an argument. */
-HsInt unloadNativeObj( void *handle );
+RTS_EXPORT HsInt unloadNativeObj( void *handle );
 
-void *lookupSymbolInNativeObj(void *handle, const char *symbol_name);
+RTS_EXPORT void *lookupSymbolInNativeObj(void *handle, const char *symbol_name);
 
 /* load a dynamic library */
-const char *addDLL(pathchar* dll_name);
+RTS_EXPORT const char *addDLL(pathchar* dll_name);
 
 /* add a path to the library search path */
-HsPtr addLibrarySearchPath(pathchar* dll_path);
+RTS_EXPORT HsPtr addLibrarySearchPath(pathchar* dll_path);
 
 /* removes a directory from the search path,
    path must have been added using addLibrarySearchPath */
-HsBool removeLibrarySearchPath(HsPtr dll_path_index);
+RTS_EXPORT HsBool removeLibrarySearchPath(HsPtr dll_path_index);
 
 /* give a warning about missing Windows patches that would make
    the linker work better */
-void warnMissingKBLibraryPaths( void );
+RTS_EXPORT void warnMissingKBLibraryPaths( void );
 
 /* -----------------------------------------------------------------------------
 * Searches the system directories to determine if there is a system DLL that
 * satisfies the given name. This prevent GHCi from linking against a static
 * library if a DLL is available.
 */
-pathchar* findSystemLibrary(pathchar* dll_name);
+RTS_EXPORT pathchar* findSystemLibrary(pathchar* dll_name);
 
 /* called by the initialization code for a module, not a user API */
-StgStablePtr foreignExportStablePtr (StgPtr p);
+RTS_EXPORT StgStablePtr foreignExportStablePtr (StgPtr p);

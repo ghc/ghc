@@ -11,17 +11,21 @@
 
 #pragma once
 
-extern W_ peak_mblocks_allocated;
-extern W_ mblocks_allocated;
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
 
-extern void initMBlocks(void);
-extern void * getMBlock(void);
-extern void * getMBlocks(uint32_t n);
-extern void * getMBlockOnNode(uint32_t node);
-extern void * getMBlocksOnNode(uint32_t node, uint32_t n);
-extern void freeMBlocks(void *addr, uint32_t n);
-extern void releaseFreeMemory(void);
-extern void freeAllMBlocks(void);
+extern RTS_EXPORT W_ peak_mblocks_allocated;
+extern RTS_EXPORT W_ mblocks_allocated;
 
-extern void *getFirstMBlock(void **state);
-extern void *getNextMBlock(void **state, void *mblock);
+extern RTS_EXPORT void initMBlocks(void);
+extern RTS_EXPORT void * getMBlock(void);
+extern RTS_EXPORT void * getMBlocks(uint32_t n);
+extern RTS_EXPORT void * getMBlockOnNode(uint32_t node);
+extern RTS_EXPORT void * getMBlocksOnNode(uint32_t node, uint32_t n);
+extern RTS_EXPORT void freeMBlocks(void *addr, uint32_t n);
+extern RTS_EXPORT void releaseFreeMemory(void);
+extern RTS_EXPORT void freeAllMBlocks(void);
+
+extern RTS_EXPORT void *getFirstMBlock(void **state);
+extern RTS_EXPORT void *getNextMBlock(void **state, void *mblock);

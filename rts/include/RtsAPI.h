@@ -49,7 +49,7 @@ typedef struct PauseToken_ PauseToken;
  * From a PauseToken, get a Capability token used when allocating objects and
  * threads in the RTS.
  */
-Capability *pauseTokenCapability(PauseToken *pauseToken);
+RTS_EXPORT Capability *pauseTokenCapability(PauseToken *pauseToken);
 
 /*
  * The public view of a Capability: we can be sure it starts with
@@ -127,7 +127,7 @@ typedef struct {
 // Clients should start with defaultRtsConfig and then customise it.
 // Bah, I really wanted this to be a const struct value, but it seems
 // you can't do that in C (it generates code).
-extern const RtsConfig defaultRtsConfig;
+extern RTS_EXPORT const RtsConfig defaultRtsConfig;
 
 /* -----------------------------------------------------------------------------
    Statistics
@@ -282,27 +282,27 @@ typedef struct _RTSStats {
   Time nonmoving_gc_max_elapsed_ns;
 } RTSStats;
 
-void getRTSStats (RTSStats *s);
-int getRTSStatsEnabled (void);
+RTS_EXPORT void getRTSStats (RTSStats *s);
+RTS_EXPORT int getRTSStatsEnabled (void);
 
 // Returns the total number of bytes allocated since the start of the program.
 // TODO: can we remove this?
-uint64_t getAllocations (void);
+RTS_EXPORT uint64_t getAllocations (void);
 
 /* ----------------------------------------------------------------------------
    Starting up and shutting down the Haskell RTS.
    ------------------------------------------------------------------------- */
 
 /* DEPRECATED, use hs_init() or hs_init_ghc() instead  */
-extern void startupHaskell         ( int argc, char *argv[],
+extern RTS_EXPORT void startupHaskell         ( int argc, char *argv[],
                                      void (*init_root)(void) );
 
 /* DEPRECATED, use hs_exit() instead  */
-extern void shutdownHaskell        ( void );
+extern RTS_EXPORT void shutdownHaskell        ( void );
 
 /* Like hs_init(), but allows rtsopts. For more complicated usage,
  * use hs_init_ghc. */
-extern void hs_init_with_rtsopts (int *argc, char **argv[]);
+extern RTS_EXPORT void hs_init_with_rtsopts (int *argc, char **argv[]);
 
 /*
  * GHC-specific version of hs_init() that allows specifying whether
@@ -310,25 +310,25 @@ extern void hs_init_with_rtsopts (int *argc, char **argv[]);
  * options are allowed), and allows passing an option string that is
  * to be interpreted by the RTS only, not passed to the program.
  */
-extern void hs_init_ghc (int *argc, char **argv[],   // program arguments
+extern RTS_EXPORT void hs_init_ghc (int *argc, char **argv[],   // program arguments
                          RtsConfig rts_config);      // RTS configuration
 
-extern void shutdownHaskellAndExit (int exitCode, int fastExit)
+extern RTS_EXPORT void shutdownHaskellAndExit (int exitCode, int fastExit)
     STG_NORETURN;
 
 #if !defined(mingw32_HOST_OS)
-extern void shutdownHaskellAndSignal (int sig, int fastExit)
+extern RTS_EXPORT void shutdownHaskellAndSignal (int sig, int fastExit)
     STG_NORETURN;
 #endif
 
-extern void getProgArgv            ( int *argc, char **argv[] );
-extern void setProgArgv            ( int argc, char *argv[] );
-extern void getFullProgArgv        ( int *argc, char **argv[] );
-extern void setFullProgArgv        ( int argc, char *argv[] );
-extern void freeFullProgArgv       ( void ) ;
+extern RTS_EXPORT void getProgArgv            ( int *argc, char **argv[] );
+extern RTS_EXPORT void setProgArgv            ( int argc, char *argv[] );
+extern RTS_EXPORT void getFullProgArgv        ( int *argc, char **argv[] );
+extern RTS_EXPORT void setFullProgArgv        ( int argc, char *argv[] );
+extern RTS_EXPORT void freeFullProgArgv       ( void ) ;
 
 /* exit() override */
-extern void (*exitFn)(int);
+extern RTS_EXPORT void (*exitFn)(int);
 
 /* Note [Locking and Pausing the RTS]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -397,11 +397,11 @@ This has the following consequences:
 
 // Acquires a token which may be used to create new objects and evaluate them.
 // See Note [Locking and Pausing the RTS] for correct usage.
-Capability *rts_lock (void);
+RTS_EXPORT Capability *rts_lock (void);
 
 // releases the token acquired with rts_lock().
 // See Note [Locking and Pausing the RTS] for correct usage.
-void rts_unlock (Capability *token);
+RTS_EXPORT void rts_unlock (Capability *token);
 
 // If you are in a context where you know you have a current capability but
 // do not know what it is, then use this to get it. Basically this only
@@ -410,7 +410,7 @@ void rts_unlock (Capability *token);
 //
 // WARNING: There is *no* guarantee this returns anything sensible (eg NULL)
 // when there is no current capability.
-Capability *rts_unsafeGetMyCapability (void);
+RTS_EXPORT Capability *rts_unsafeGetMyCapability (void);
 
 /* ----------------------------------------------------------------------------
    Which cpu should the OS thread and Haskell thread run on?
@@ -437,58 +437,58 @@ Capability *rts_unsafeGetMyCapability (void);
 // If affinity is non-zero, the current thread will be bound to
 // specific CPUs according to the prevailing affinity policy for the
 // specified capability, set by either +RTS -qa or +RTS --numa.
-void rts_setInCallCapability (int preferred_capability, int affinity);
+RTS_EXPORT void rts_setInCallCapability (int preferred_capability, int affinity);
 
 // Specify the CPU Node that the current OS thread should run on when it calls
 // into Haskell. The argument can be either a node number or capability number.
 // The actual node will be calculated as the supplied value modulo the number
 // of numa nodes.
-void rts_pinThreadToNumaNode (int node);
+RTS_EXPORT void rts_pinThreadToNumaNode (int node);
 
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
    ------------------------------------------------------------------------- */
-HaskellObj   rts_mkChar       ( Capability *, HsChar   c );
-HaskellObj   rts_mkInt        ( Capability *, HsInt    i );
-HaskellObj   rts_mkInt8       ( Capability *, HsInt8   i );
-HaskellObj   rts_mkInt16      ( Capability *, HsInt16  i );
-HaskellObj   rts_mkInt32      ( Capability *, HsInt32  i );
-HaskellObj   rts_mkInt64      ( Capability *, HsInt64  i );
-HaskellObj   rts_mkWord       ( Capability *, HsWord   w );
-HaskellObj   rts_mkWord8      ( Capability *, HsWord8  w );
-HaskellObj   rts_mkWord16     ( Capability *, HsWord16 w );
-HaskellObj   rts_mkWord32     ( Capability *, HsWord32 w );
-HaskellObj   rts_mkWord64     ( Capability *, HsWord64 w );
-HaskellObj   rts_mkPtr        ( Capability *, HsPtr    a );
-HaskellObj   rts_mkFunPtr     ( Capability *, HsFunPtr a );
-HaskellObj   rts_mkFloat      ( Capability *, HsFloat  f );
-HaskellObj   rts_mkDouble     ( Capability *, HsDouble f );
-HaskellObj   rts_mkStablePtr  ( Capability *, HsStablePtr s );
-HaskellObj   rts_mkBool       ( Capability *, HsBool   b );
-HaskellObj   rts_mkString     ( Capability *, char    *s );
+RTS_EXPORT HaskellObj   rts_mkChar       ( Capability *, HsChar   c );
+RTS_EXPORT HaskellObj   rts_mkInt        ( Capability *, HsInt    i );
+RTS_EXPORT HaskellObj   rts_mkInt8       ( Capability *, HsInt8   i );
+RTS_EXPORT HaskellObj   rts_mkInt16      ( Capability *, HsInt16  i );
+RTS_EXPORT HaskellObj   rts_mkInt32      ( Capability *, HsInt32  i );
+RTS_EXPORT HaskellObj   rts_mkInt64      ( Capability *, HsInt64  i );
+RTS_EXPORT HaskellObj   rts_mkWord       ( Capability *, HsWord   w );
+RTS_EXPORT HaskellObj   rts_mkWord8      ( Capability *, HsWord8  w );
+RTS_EXPORT HaskellObj   rts_mkWord16     ( Capability *, HsWord16 w );
+RTS_EXPORT HaskellObj   rts_mkWord32     ( Capability *, HsWord32 w );
+RTS_EXPORT HaskellObj   rts_mkWord64     ( Capability *, HsWord64 w );
+RTS_EXPORT HaskellObj   rts_mkPtr        ( Capability *, HsPtr    a );
+RTS_EXPORT HaskellObj   rts_mkFunPtr     ( Capability *, HsFunPtr a );
+RTS_EXPORT HaskellObj   rts_mkFloat      ( Capability *, HsFloat  f );
+RTS_EXPORT HaskellObj   rts_mkDouble     ( Capability *, HsDouble f );
+RTS_EXPORT HaskellObj   rts_mkStablePtr  ( Capability *, HsStablePtr s );
+RTS_EXPORT HaskellObj   rts_mkBool       ( Capability *, HsBool   b );
+RTS_EXPORT HaskellObj   rts_mkString     ( Capability *, char    *s );
 
-HaskellObj   rts_apply        ( Capability *, HaskellObj, HaskellObj );
+RTS_EXPORT HaskellObj   rts_apply        ( Capability *, HaskellObj, HaskellObj );
 
 /* ----------------------------------------------------------------------------
    Deconstructing Haskell objects
    ------------------------------------------------------------------------- */
-HsChar       rts_getChar      ( HaskellObj );
-HsInt        rts_getInt       ( HaskellObj );
-HsInt8       rts_getInt8      ( HaskellObj );
-HsInt16      rts_getInt16     ( HaskellObj );
-HsInt32      rts_getInt32     ( HaskellObj );
-HsInt64      rts_getInt64     ( HaskellObj );
-HsWord       rts_getWord      ( HaskellObj );
-HsWord8      rts_getWord8     ( HaskellObj );
-HsWord16     rts_getWord16    ( HaskellObj );
-HsWord32     rts_getWord32    ( HaskellObj );
-HsWord64     rts_getWord64    ( HaskellObj );
-HsPtr        rts_getPtr       ( HaskellObj );
-HsFunPtr     rts_getFunPtr    ( HaskellObj );
-HsFloat      rts_getFloat     ( HaskellObj );
-HsDouble     rts_getDouble    ( HaskellObj );
-HsStablePtr  rts_getStablePtr ( HaskellObj );
-HsBool       rts_getBool      ( HaskellObj );
+RTS_EXPORT HsChar       rts_getChar      ( HaskellObj );
+RTS_EXPORT HsInt        rts_getInt       ( HaskellObj );
+RTS_EXPORT HsInt8       rts_getInt8      ( HaskellObj );
+RTS_EXPORT HsInt16      rts_getInt16     ( HaskellObj );
+RTS_EXPORT HsInt32      rts_getInt32     ( HaskellObj );
+RTS_EXPORT HsInt64      rts_getInt64     ( HaskellObj );
+RTS_EXPORT HsWord       rts_getWord      ( HaskellObj );
+RTS_EXPORT HsWord8      rts_getWord8     ( HaskellObj );
+RTS_EXPORT HsWord16     rts_getWord16    ( HaskellObj );
+RTS_EXPORT HsWord32     rts_getWord32    ( HaskellObj );
+RTS_EXPORT HsWord64     rts_getWord64    ( HaskellObj );
+RTS_EXPORT HsPtr        rts_getPtr       ( HaskellObj );
+RTS_EXPORT HsFunPtr     rts_getFunPtr    ( HaskellObj );
+RTS_EXPORT HsFloat      rts_getFloat     ( HaskellObj );
+RTS_EXPORT HsDouble     rts_getDouble    ( HaskellObj );
+RTS_EXPORT HsStablePtr  rts_getStablePtr ( HaskellObj );
+RTS_EXPORT HsBool       rts_getBool      ( HaskellObj );
 
 /* ----------------------------------------------------------------------------
    Evaluating Haskell expressions
@@ -505,65 +505,65 @@ HsBool       rts_getBool      ( HaskellObj );
    result in a type error.
    ------------------------------------------------------------------------- */
 
-void rts_eval (/* inout */ Capability **,
+RTS_EXPORT void rts_eval (/* inout */ Capability **,
                /* in    */ HaskellObj p,
                /* out */   HaskellObj *ret);
 
-void rts_eval_ (/* inout */ Capability **,
+RTS_EXPORT void rts_eval_ (/* inout */ Capability **,
                 /* in    */ HaskellObj p,
                 /* in    */ unsigned int stack_size,
                 /* out   */ HaskellObj *ret);
 
-void rts_evalIO (/* inout */ Capability **,
+RTS_EXPORT void rts_evalIO (/* inout */ Capability **,
                  /* in    */ HaskellObj p,
                  /* out */   HaskellObj *ret);
 
-void rts_evalStableIOMain (/* inout */ Capability **,
+RTS_EXPORT void rts_evalStableIOMain (/* inout */ Capability **,
                            /* in    */ HsStablePtr s,
                            /* out */   HsStablePtr *ret);
 
-void rts_evalStableIO (/* inout */ Capability **,
+RTS_EXPORT void rts_evalStableIO (/* inout */ Capability **,
                        /* in    */ HsStablePtr s,
                        /* out */   HsStablePtr *ret);
 
-void rts_evalLazyIO (/* inout */ Capability **,
+RTS_EXPORT void rts_evalLazyIO (/* inout */ Capability **,
                      /* in    */ HaskellObj p,
                      /* out */   HaskellObj *ret);
 
-void rts_evalLazyIO_ (/* inout */ Capability **,
+RTS_EXPORT void rts_evalLazyIO_ (/* inout */ Capability **,
                       /* in    */ HaskellObj p,
                       /* in    */ unsigned int stack_size,
                       /* out   */ HaskellObj *ret);
 
-void rts_inCall (/* inout */ Capability **,
+RTS_EXPORT void rts_inCall (/* inout */ Capability **,
                  /* in    */ HaskellObj p,
                  /* out */   HaskellObj *ret);
 
-void rts_checkSchedStatus (char* site, Capability *);
+RTS_EXPORT void rts_checkSchedStatus (char* site, Capability *);
 
-SchedulerStatus rts_getSchedStatus (Capability *cap);
+RTS_EXPORT SchedulerStatus rts_getSchedStatus (Capability *cap);
 
 // Halt execution of all Haskell threads.
 // See Note [Locking and Pausing the RTS] for correct usage.
-PauseToken *rts_pause (void);
+RTS_EXPORT PauseToken *rts_pause (void);
 
 // Counterpart of rts_pause: Continue from a pause.
 // See Note [Locking and Pausing the RTS] for correct usage.
 // [in] pauseToken: the token returned by rts_pause.
-void rts_resume (PauseToken *pauseToken);
+RTS_EXPORT void rts_resume (PauseToken *pauseToken);
 
 // Returns true if the rts is paused. See rts_pause() and rts_resume().
-bool rts_isPaused(void);
+RTS_EXPORT bool rts_isPaused(void);
 
 // List all live threads. The RTS must be paused and this must be called on the
 // same thread that called rts_pause().
 typedef void (*ListThreadsCb)(void *user, StgTSO *);
-void rts_listThreads(ListThreadsCb cb, void *user);
+RTS_EXPORT void rts_listThreads(ListThreadsCb cb, void *user);
 
 // List all non-thread GC roots. The RTS must be paused and this must be called
 // on the same thread that called rts_pause().
 typedef void (*ListRootsCb)(void *user, StgClosure *);
-void rts_listMiscRoots(ListRootsCb cb, void *user);
+RTS_EXPORT void rts_listMiscRoots(ListRootsCb cb, void *user);
 
 /*
  * The RTS allocates some thread-local data when you make a call into
@@ -576,7 +576,7 @@ void rts_listMiscRoots(ListRootsCb cb, void *user);
  * but the next one will cause allocation of the thread-local memory
  * again.
  */
-void rts_done (void);
+RTS_EXPORT void rts_done (void);
 
 /* --------------------------------------------------------------------------
    Wrapper closures
@@ -633,7 +633,7 @@ void rts_done (void);
 // Because it only makes sense to do the zeroing once before
 // snapshotting the memory, but there's no point to pay for the
 // zeroing overhead at the new module's run-time.
-void rts_clearMemory(void);
+RTS_EXPORT void rts_clearMemory(void);
 
 #if defined(__cplusplus)
 }

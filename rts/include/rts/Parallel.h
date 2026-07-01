@@ -13,4 +13,8 @@
 
 #pragma once
 
-StgInt newSpark (StgRegTable *reg, StgClosure *p);
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
+RTS_EXPORT StgInt newSpark (StgRegTable *reg, StgClosure *p);

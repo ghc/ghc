@@ -8,12 +8,16 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 /* Claim a session from the pool */
-LibdwSession *libdwPoolTake(void);
+RTS_EXPORT LibdwSession *libdwPoolTake(void);
 
 /* Return a session to the pool */
-void libdwPoolRelease(LibdwSession *sess);
+RTS_EXPORT void libdwPoolRelease(LibdwSession *sess);
 
 /* Free any sessions in the pool forcing a reload of any loaded debug
  * information */
-void libdwPoolClear(void);
+RTS_EXPORT void libdwPoolClear(void);

@@ -13,6 +13,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 /** Inserts an entry in the Static Pointer Table.
  *
  * The key is a fingerprint computed from the static pointer and the spe_closure
@@ -25,7 +29,7 @@
  * compiler/deSugar/StaticPtrTable.sptInitCode
  *
  * */
-void hs_spt_insert (StgWord64 key[2],void* spe_closure);
+RTS_EXPORT void hs_spt_insert (StgWord64 key[2],void* spe_closure);
 
 /** Inserts an entry for a StgTablePtr in the Static Pointer Table.
  *
@@ -33,7 +37,7 @@ void hs_spt_insert (StgWord64 key[2],void* spe_closure);
  * SPT entries for bytecode objects.
  *
  * */
-void hs_spt_insert_stableptr(StgWord64 key[2], StgStablePtr *entry);
+RTS_EXPORT void hs_spt_insert_stableptr(StgWord64 key[2], StgStablePtr *entry);
 
 /** Removes an entry from the Static Pointer Table.
  *
@@ -41,4 +45,4 @@ void hs_spt_insert_stableptr(StgWord64 key[2], StgStablePtr *entry);
  * compiler/deSugar/StaticPtrTable.sptInitCode
  *
  * */
-void hs_spt_remove (StgWord64 key[2]);
+RTS_EXPORT void hs_spt_remove (StgWord64 key[2]);

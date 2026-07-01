@@ -168,6 +168,14 @@
 
 #define STG_NORETURN GNU_ATTRIBUTE(__noreturn__)
 
+// Export annotation for RTS public symbols. On Windows, explicitly marks
+// symbols for DLL export. On ELF platforms symbols are exported by default.
+#if defined(mingw32_HOST_OS)
+# define RTS_EXPORT __attribute__((dllexport))
+#else
+# define RTS_EXPORT
+#endif
+
 #define STG_MALLOC GNUC3_ATTRIBUTE(__malloc__)
 
 /* Instead of relying on GCC version checks to expand attributes,

@@ -13,6 +13,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -361,16 +365,16 @@ typedef struct _RTS_FLAGS {
 } RTS_FLAGS;
 
 #if defined(COMPILING_RTS_MAIN)
-extern RTS_FLAGS RtsFlags;
+extern RTS_EXPORT RTS_FLAGS RtsFlags;
 #elif IN_STG_CODE
 /* Note [RtsFlags is a pointer in STG code]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * When compiling with IN_STG_CODE the RtsFlags symbol is defined as a pointer.
  * This is necessary because the C code generator can't generate '&label'.
  */
-extern RTS_FLAGS RtsFlags[];
+extern RTS_EXPORT RTS_FLAGS RtsFlags[];
 #else
-extern RTS_FLAGS RtsFlags;
+extern RTS_EXPORT RTS_FLAGS RtsFlags;
 #endif
 
 /*
@@ -397,5 +401,5 @@ extern RTS_FLAGS RtsFlags;
 extern int     prog_argc;
 extern char  **prog_argv;
 */
-extern int      rts_argc;  /* ditto */
-extern char   **rts_argv;
+extern RTS_EXPORT int      rts_argc;  /* ditto */
+extern RTS_EXPORT char   **rts_argv;

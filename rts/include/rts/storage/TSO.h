@@ -8,6 +8,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 #include "rts/storage/Closures.h"
 
 /*
@@ -290,11 +294,11 @@ INLINE_HEADER StgPtr tso_SpLim (StgTSO* tso)
    functions
    -------------------------------------------------------------------------- */
 
-void dirty_TSO  (Capability *cap, StgTSO *tso);
-void setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target);
-void setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target);
+RTS_EXPORT void dirty_TSO  (Capability *cap, StgTSO *tso);
+RTS_EXPORT void setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target);
+RTS_EXPORT void setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target);
 
-void dirty_STACK (Capability *cap, StgStack *stack);
+RTS_EXPORT void dirty_STACK (Capability *cap, StgStack *stack);
 
 /* -----------------------------------------------------------------------------
    Invariants:

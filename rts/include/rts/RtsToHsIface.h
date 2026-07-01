@@ -8,6 +8,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 typedef struct {
     StgClosure *processRemoteCompletion_closure;  // GHC.Internal.Event.Windows.processRemoteCompletion_closure
     StgClosure *runIO_closure;  // GHC.Internal.TopHandler.runIO_closure
@@ -67,4 +71,4 @@ typedef struct {
 #endif
 } HsIface;
 
-extern HsIface *ghc_hs_iface;
+extern RTS_EXPORT HsIface *ghc_hs_iface;

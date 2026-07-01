@@ -14,6 +14,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 #if defined(HAVE_PTHREAD_H) && !defined(mingw32_HOST_OS)
 
 #if defined(CMINUSMINUS)
@@ -180,43 +184,43 @@ typedef void* OSThreadId;
 //
 // General thread operations
 //
-extern OSThreadId osThreadId      ( void );
-extern void shutdownThread        ( void )   STG_NORETURN;
-extern void yieldThread           ( void );
+extern RTS_EXPORT OSThreadId osThreadId      ( void );
+extern RTS_EXPORT void shutdownThread        ( void )   STG_NORETURN;
+extern RTS_EXPORT void yieldThread           ( void );
 
 typedef void* OSThreadProcAttr OSThreadProc(void *);
 
-extern int  createOSThread        ( OSThreadId* tid, const char *name,
+extern RTS_EXPORT int  createOSThread        ( OSThreadId* tid, const char *name,
                                     OSThreadProc *startProc, void *param);
 #if !defined(mingw32_HOST_OS)
-extern int  createAttachedOSThread( OSThreadId *tid, const char *name,
+extern RTS_EXPORT int  createAttachedOSThread( OSThreadId *tid, const char *name,
                                     OSThreadProc *startProc, void *param);
 #endif
-extern bool osThreadIsAlive       ( OSThreadId id );
-extern void interruptOSThread     ( OSThreadId id );
-extern void joinOSThread          ( OSThreadId id );
+extern RTS_EXPORT bool osThreadIsAlive       ( OSThreadId id );
+extern RTS_EXPORT void interruptOSThread     ( OSThreadId id );
+extern RTS_EXPORT void joinOSThread          ( OSThreadId id );
 
 //
 // Condition Variables
 //
-extern void initCondition         ( Condition* pCond );
-extern void closeCondition        ( Condition* pCond );
-extern void broadcastCondition    ( Condition* pCond );
-extern void signalCondition       ( Condition* pCond );
-extern void waitCondition         ( Condition* pCond, Mutex* pMut );
+extern RTS_EXPORT void initCondition         ( Condition* pCond );
+extern RTS_EXPORT void closeCondition        ( Condition* pCond );
+extern RTS_EXPORT void broadcastCondition    ( Condition* pCond );
+extern RTS_EXPORT void signalCondition       ( Condition* pCond );
+extern RTS_EXPORT void waitCondition         ( Condition* pCond, Mutex* pMut );
 // Returns false on timeout, true otherwise.
-extern bool timedWaitCondition    ( Condition* pCond, Mutex* pMut, Time timeout);
+extern RTS_EXPORT bool timedWaitCondition    ( Condition* pCond, Mutex* pMut, Time timeout);
 
 //
 // Mutexes
 //
-extern void initMutex             ( Mutex* pMut );
-extern void closeMutex            ( Mutex* pMut );
+extern RTS_EXPORT void initMutex             ( Mutex* pMut );
+extern RTS_EXPORT void closeMutex            ( Mutex* pMut );
 
 // Processors and affinity
-void setThreadAffinity (uint32_t n, uint32_t m);
-void setThreadNode (uint32_t node);
-void releaseThreadNode (void);
+RTS_EXPORT void setThreadAffinity (uint32_t n, uint32_t m);
+RTS_EXPORT void setThreadNode (uint32_t node);
+RTS_EXPORT void releaseThreadNode (void);
 #endif // !CMINUSMINUS
 
 #if defined(THREADED_RTS)
@@ -240,17 +244,17 @@ void releaseThreadNode (void);
 // Support for forkOS (defined regardless of THREADED_RTS, but does
 // nothing when !THREADED_RTS).
 //
-int forkOS_createThread ( HsStablePtr entry );
+RTS_EXPORT int forkOS_createThread ( HsStablePtr entry );
 
 //
 // Free any global resources created in OSThreads.
 //
-void freeThreadingResources(void);
+RTS_EXPORT void freeThreadingResources(void);
 
 //
 // Returns the number of processor cores in the machine
 //
-uint32_t getNumberOfProcessors (void);
+RTS_EXPORT uint32_t getNumberOfProcessors (void);
 
 //
 // Support for getting at the kernel thread Id for tracing/profiling.
@@ -272,6 +276,6 @@ uint32_t getNumberOfProcessors (void);
 typedef StgWord64 KernelThreadId;
 
 // Get the current kernel thread id
-KernelThreadId kernelThreadId (void);
+RTS_EXPORT KernelThreadId kernelThreadId (void);
 
 #endif /* CMINUSMINUS */

@@ -13,6 +13,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 struct _ObjectCode;
 
 /* N.B. See Note [Tracking foreign exports] in
@@ -34,5 +38,5 @@ struct ForeignExportsList {
     StgPtr exports[];
 };
 
-void registerForeignExports(struct ForeignExportsList *exports);
+RTS_EXPORT void registerForeignExports(struct ForeignExportsList *exports);
 

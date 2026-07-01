@@ -13,16 +13,20 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 // Forward declaration for Stg.h
 struct StgClosure_;
 struct StgThunk_;
 struct Capability_;
 
 /* This is called by the code generator */
-extern
+extern RTS_EXPORT
 void updateRemembSetPushClosure_(StgRegTable *reg, struct StgClosure_ *p);
 
-extern
+extern RTS_EXPORT
 void updateRemembSetPushThunk_(StgRegTable *reg, struct StgThunk_ *p);
 
 // Forward declaration for unregisterised backend.
@@ -31,7 +35,7 @@ EF_(stg_copyArray_barrier);
 // Note that RTS code should not condition on this directly by rather
 // use the IF_NONMOVING_WRITE_BARRIER_ENABLED macro to ensure that
 // the barrier is eliminated in the non-threaded RTS.
-extern StgWord nonmoving_write_barrier_enabled;
+extern RTS_EXPORT StgWord nonmoving_write_barrier_enabled;
 
 // A similar macro is defined in rts/include/Cmm.h for C-- code.
 #if defined(THREADED_RTS)

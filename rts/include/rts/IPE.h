@@ -13,6 +13,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 typedef struct InfoProv_ {
     uint64_t   info_prov_id;
     const char *table_name;
@@ -116,19 +120,19 @@ typedef struct IpeBufferListNode_ {
     StringIdx module_name;
 } IpeBufferListNode;
 
-void registerInfoProvList(IpeBufferListNode *node);
+RTS_EXPORT void registerInfoProvList(IpeBufferListNode *node);
 
 // We leave it in old format to keep compatibility with existing https://github.com/haskell/ghc-events
 // See: https://github.com/haskell/ghc-events/commit/cce6a35677f5f99b44c21d86febd295b909ef1ce
 // The format depends on tooling. At the moment of commit all tooling expects a stringified unsigned int.
 // I.e. 10 -> "10". No padding zeroes. No prefixes.
-void formatClosureDescIpe(const InfoProvEnt *ipe_buf, char *str_buf);
+RTS_EXPORT void formatClosureDescIpe(const InfoProvEnt *ipe_buf, char *str_buf);
 
 // Returns true on success, initializes `out`.
-bool lookupIPE(const StgInfoTable *info, InfoProvEnt *out);
+RTS_EXPORT bool lookupIPE(const StgInfoTable *info, InfoProvEnt *out);
 
-uint64_t lookupIPEId(const StgInfoTable *info);
+RTS_EXPORT uint64_t lookupIPEId(const StgInfoTable *info);
 
 #if defined(DEBUG)
-void printIPE(const StgInfoTable *info);
+RTS_EXPORT void printIPE(const StgInfoTable *info);
 #endif

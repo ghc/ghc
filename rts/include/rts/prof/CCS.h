@@ -13,6 +13,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 /* -----------------------------------------------------------------------------
  * Data Structures
  * ---------------------------------------------------------------------------*/
@@ -80,8 +84,8 @@ typedef struct CostCentreStack_ {
  * See the module GHC.Profiling.
  * ---------------------------------------------------------------------------*/
 
-void stopProfTimer      ( void );
-void startProfTimer     ( void );
+RTS_EXPORT void stopProfTimer      ( void );
+RTS_EXPORT void startProfTimer     ( void );
 
 /* -----------------------------------------------------------------------------
  * The rest is PROFILING only...
@@ -144,41 +148,41 @@ extern StgWord CCS_DONT_CARE[];  // CCS attached to static constructors
 
 #else
 
-extern CostCentre      CC_MAIN[];
-extern CostCentreStack CCS_MAIN[];      // Top CCS
+extern RTS_EXPORT CostCentre      CC_MAIN[];
+extern RTS_EXPORT CostCentreStack CCS_MAIN[];      // Top CCS
 
-extern CostCentre      CC_SYSTEM[];
-extern CostCentreStack CCS_SYSTEM[];    // RTS costs
+extern RTS_EXPORT CostCentre      CC_SYSTEM[];
+extern RTS_EXPORT CostCentreStack CCS_SYSTEM[];    // RTS costs
 
-extern CostCentre      CC_GC[];
-extern CostCentreStack CCS_GC[];         // Garbage collector costs
+extern RTS_EXPORT CostCentre      CC_GC[];
+extern RTS_EXPORT CostCentreStack CCS_GC[];         // Garbage collector costs
 
-extern CostCentre      CC_OVERHEAD[];
-extern CostCentreStack CCS_OVERHEAD[];   // Profiling overhead
+extern RTS_EXPORT CostCentre      CC_OVERHEAD[];
+extern RTS_EXPORT CostCentreStack CCS_OVERHEAD[];   // Profiling overhead
 
-extern CostCentre      CC_DONT_CARE[];
-extern CostCentreStack CCS_DONT_CARE[];  // shouldn't ever get set
+extern RTS_EXPORT CostCentre      CC_DONT_CARE[];
+extern RTS_EXPORT CostCentreStack CCS_DONT_CARE[];  // shouldn't ever get set
 
-extern CostCentre      CC_PINNED[];
-extern CostCentreStack CCS_PINNED[];     // pinned memory
+extern RTS_EXPORT CostCentre      CC_PINNED[];
+extern RTS_EXPORT CostCentreStack CCS_PINNED[];     // pinned memory
 
-extern CostCentre      CC_IDLE[];
-extern CostCentreStack CCS_IDLE[];       // capability is idle
+extern RTS_EXPORT CostCentre      CC_IDLE[];
+extern RTS_EXPORT CostCentreStack CCS_IDLE[];       // capability is idle
 
 #endif /* IN_STG_CODE */
 
-extern unsigned int RTS_VAR(era);
-extern StgWord RTS_VAR(user_era);
+extern RTS_EXPORT unsigned int RTS_VAR(era);
+extern RTS_EXPORT StgWord RTS_VAR(user_era);
 
 /* -----------------------------------------------------------------------------
  * Functions
  * ---------------------------------------------------------------------------*/
 
-CostCentreStack * pushCostCentre (CostCentreStack *, CostCentre *);
-void              enterFunCCS    (StgRegTable *reg, CostCentreStack *);
-CostCentre *mkCostCentre (char *label, char *module, char *srcloc);
+RTS_EXPORT CostCentreStack * pushCostCentre (CostCentreStack *, CostCentre *);
+RTS_EXPORT void              enterFunCCS    (StgRegTable *reg, CostCentreStack *);
+RTS_EXPORT CostCentre *mkCostCentre (char *label, char *module, char *srcloc);
 
-extern CostCentre * RTS_VAR(CC_LIST);               // registered CC list
+extern RTS_EXPORT CostCentre * RTS_VAR(CC_LIST);               // registered CC list
 
 /* -----------------------------------------------------------------------------
  * Declaring Cost Centres & Cost Centre Stacks.

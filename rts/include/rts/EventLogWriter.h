@@ -16,6 +16,10 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 /*
  *  Abstraction for writing eventlog data.
  */
@@ -41,12 +45,12 @@ typedef struct {
  * An EventLogWriter which writes eventlogs to
  * a file `program.eventlog`.
  */
-extern const EventLogWriter FileEventLogWriter;
+extern RTS_EXPORT const EventLogWriter FileEventLogWriter;
 
 /*
  * An EventLogWriter which does nothing.
  */
-extern const EventLogWriter NullEventLogWriter;
+extern RTS_EXPORT const EventLogWriter NullEventLogWriter;
 
 enum EventLogStatus {
   /* The runtime system wasn't compiled with eventlog support. */
@@ -60,21 +64,21 @@ enum EventLogStatus {
 /*
  * Query whether the current runtime system supports eventlogging.
  */
-enum EventLogStatus eventLogStatus(void);
+RTS_EXPORT enum EventLogStatus eventLogStatus(void);
 
 /*
  * Initialize event logging using the given EventLogWriter.
  * Returns true on success or false if an EventLogWriter is already configured
  * or eventlogging isn't supported by the runtime.
  */
-bool startEventLogging(const EventLogWriter *writer);
+RTS_EXPORT bool startEventLogging(const EventLogWriter *writer);
 
 /*
  * Stop event logging and destroy the current EventLogWriter.
  */
-void endEventLogging(void);
+RTS_EXPORT void endEventLogging(void);
 
 /*
  * Flush the eventlog. cap can be NULL if one is not held.
  */
-void flushEventLog(Capability **cap);
+RTS_EXPORT void flushEventLog(Capability **cap);

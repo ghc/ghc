@@ -13,8 +13,12 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 ATTR_ALWAYS_INLINE EXTERN_INLINE StgPtr deRefStablePtr (StgStablePtr stable_ptr);
-StgStablePtr getStablePtr  (StgPtr p);
+RTS_EXPORT StgStablePtr getStablePtr  (StgPtr p);
 
 /* -----------------------------------------------------------------------------
    PRIVATE from here.
@@ -26,7 +30,7 @@ typedef struct {
                          // otherwise.
 } spEntry;
 
-extern spEntry *stable_ptr_table;
+extern RTS_EXPORT spEntry *stable_ptr_table;
 
 ATTR_ALWAYS_INLINE EXTERN_INLINE
 StgPtr deRefStablePtr(StgStablePtr sp)

@@ -13,9 +13,13 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 #if defined(arm_HOST_ARCH) && defined(arm_HOST_ARCH_PRE_ARMv6)
-void arm_atomic_spin_lock(void);
-void arm_atomic_spin_unlock(void);
+RTS_EXPORT void arm_atomic_spin_lock(void);
+RTS_EXPORT void arm_atomic_spin_unlock(void);
 #endif
 
 // Unconditionally atomic operations

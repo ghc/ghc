@@ -8,9 +8,13 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 #if defined(THREADED_RTS)
 // needed for HEAP_ALLOCED below
-extern SpinLock gc_alloc_block_sync;
+extern RTS_EXPORT SpinLock gc_alloc_block_sync;
 #endif
 
 #define ACQUIRE_ALLOC_BLOCK_SPIN_LOCK() ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync)
@@ -60,14 +64,14 @@ struct mblock_address_range {
     W_ begin, end;
     W_ padding[6];  // ensure nothing else inhabits this cache line
 } ATTRIBUTE_ALIGNED(CACHELINE_SIZE);
-extern struct mblock_address_range mblock_address_space;
+extern RTS_EXPORT struct mblock_address_range mblock_address_space;
 
 # define HEAP_ALLOCED(p)        ((W_)(p) >= mblock_address_space.begin && \
                                  (W_)(p) < (mblock_address_space.end))
 # define HEAP_ALLOCED_GC(p)     HEAP_ALLOCED(p)
 
 #elif SIZEOF_VOID_P == 4
-extern StgWord8 mblock_map[];
+extern RTS_EXPORT StgWord8 mblock_map[];
 
 # define MBLOCK_MAP_SIZE        (1 << (32 - MBLOCK_SHIFT))
 # define MBLOCK_MAP_ENTRY(p)    ((StgWord)(p) >> MBLOCK_SHIFT)
@@ -153,7 +157,7 @@ typedef StgWord8  MBlockMapLine;
 #define MBC_SHIFT      (48 - MBLOCK_SHIFT - MBC_LINE_BITS - MBC_TAG_BITS)
 #define MBC_ENTRIES    (1<<MBC_SHIFT)
 
-extern MbcCacheLine mblock_cache[];
+extern RTS_EXPORT MbcCacheLine mblock_cache[];
 
 #define MBC_LINE(p) ((StgWord)p >> (MBLOCK_SHIFT + MBC_LINE_BITS))
 
@@ -164,9 +168,9 @@ typedef struct {
     MBlockMapLine lines[MBLOCK_MAP_ENTRIES];
 } MBlockMap;
 
-extern W_ mpc_misses;
+extern RTS_EXPORT W_ mpc_misses;
 
-StgBool HEAP_ALLOCED_miss(StgWord mblock, const void *p);
+RTS_EXPORT StgBool HEAP_ALLOCED_miss(StgWord mblock, const void *p);
 
 INLINE_HEADER
 StgBool HEAP_ALLOCED(const void *p)

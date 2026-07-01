@@ -13,6 +13,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 /* These should probably be automatically generated in order to
    keep them consistent with the macros that use them (which are
    defined in Cmm.h) */
@@ -40,7 +44,7 @@ extern W_ top_ct[];
 #define EXTERN
 #else
 #define INIT(ializer)
-#define EXTERN extern
+#define EXTERN extern RTS_EXPORT
 #endif
 
 EXTERN StgInt ENT_VIA_NODE_ctr INIT(0);

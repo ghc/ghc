@@ -8,6 +8,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 /* ----------------------------------------------------------------------------
    Relative pointers
 
@@ -70,7 +74,7 @@ typedef struct {
 #define isUNPOINTED(flags) ((flags) &_UPT)
 #define hasSRT(flags)      ((flags) &_SRT)
 
-extern const StgWord16 closure_flags[];
+extern RTS_EXPORT const StgWord16 closure_flags[];
 
 #define closureFlags(c)         (closure_flags[get_itbl \
                                     (UNTAG_CONST_CLOSURE(c))->type])
@@ -276,7 +280,7 @@ typedef struct {
 } StgFunInfoTable;
 
 // canned bitmap for each arg type, indexed by constants in FunTypes.h
-extern const StgWord stg_arg_bitmaps[];
+extern RTS_EXPORT const StgWord stg_arg_bitmaps[];
 
 /* -----------------------------------------------------------------------------
    Return info tables

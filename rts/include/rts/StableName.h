@@ -13,6 +13,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 /* -----------------------------------------------------------------------------
    PRIVATE from here.
    -------------------------------------------------------------------------- */
@@ -29,4 +33,4 @@ typedef struct {
                          // free
 } snEntry;
 
-extern snEntry *stable_name_table;
+extern RTS_EXPORT snEntry *stable_name_table;

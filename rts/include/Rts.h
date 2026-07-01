@@ -100,10 +100,10 @@ extern "C" {
               (aka --enable-asserts-all-ways) was enabled at ./configure time.
    -------------------------------------------------------------------------- */
 
-void _assertFail(const char *filename, unsigned int linenum)
+RTS_EXPORT void _assertFail(const char *filename, unsigned int linenum)
    STG_NORETURN;
 
-void _warnFail(const char *filename, unsigned int linenum);
+RTS_EXPORT void _warnFail(const char *filename, unsigned int linenum);
 
 #define CHECK(predicate)                        \
         if (RTS_LIKELY(predicate))              \
@@ -266,18 +266,18 @@ void _warnFail(const char *filename, unsigned int linenum);
 #include "rts/LibdwPool.h"
 
 /* Misc stuff without a home */
-extern char **prog_argv; /* so we can get at these from Haskell */
-extern int    prog_argc;
-extern char  *prog_name;
+extern RTS_EXPORT char **prog_argv; /* so we can get at these from Haskell */
+extern RTS_EXPORT int    prog_argc;
+extern RTS_EXPORT char  *prog_name;
 
-void reportStackOverflow(StgTSO* tso);
-void reportHeapOverflow(void);
-void exitHeapOverflow(void) STG_NORETURN;;
+RTS_EXPORT void reportStackOverflow(StgTSO* tso);
+RTS_EXPORT void reportHeapOverflow(void);
+RTS_EXPORT void exitHeapOverflow(void) STG_NORETURN;;
 
-void stg_exit(int n) STG_NORETURN;
+RTS_EXPORT void stg_exit(int n) STG_NORETURN;
 
 #if !defined(mingw32_HOST_OS)
-int stg_sig_install (int, int, void *);
+RTS_EXPORT int stg_sig_install (int, int, void *);
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -285,19 +285,19 @@ int stg_sig_install (int, int, void *);
    -------------------------------------------------------------------------- */
 
 // Returns non-zero if the RTS is a profiling version
-int rts_isProfiled(void);
+RTS_EXPORT int rts_isProfiled(void);
 
 // Returns non-zero if the RTS is a dynamically-linked version
-int rts_isDynamic(void);
+RTS_EXPORT int rts_isDynamic(void);
 
 // Returns non-zero if the RTS is a threaded version
-int rts_isThreaded(void);
+RTS_EXPORT int rts_isThreaded(void);
 
 // Returns non-zero if the RTS is a debugged version
-int rts_isDebugged(void);
+RTS_EXPORT int rts_isDebugged(void);
 
 // Returns non-zero if the RTS is a tracing version (event log)
-int rts_isTracing(void);
+RTS_EXPORT int rts_isTracing(void);
 
 /* -----------------------------------------------------------------------------
    RTS Exit codes
@@ -316,11 +316,11 @@ int rts_isTracing(void);
 
 #if defined(DEBUG)
 #define TICK_VAR(arity) \
-  extern StgInt SLOW_CALLS_##arity; \
-  extern StgInt RIGHT_ARITY_##arity; \
-  extern StgInt TAGGED_PTR_##arity;
+  extern RTS_EXPORT StgInt SLOW_CALLS_##arity; \
+  extern RTS_EXPORT StgInt RIGHT_ARITY_##arity; \
+  extern RTS_EXPORT StgInt TAGGED_PTR_##arity;
 
-extern StgInt TOTAL_CALLS;
+extern RTS_EXPORT StgInt TOTAL_CALLS;
 
 TICK_VAR(1)
 TICK_VAR(2)

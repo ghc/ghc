@@ -13,6 +13,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 // Simple linked list of modules
 typedef struct _HpcModuleInfo {
   char *modName;                // name of module
@@ -23,12 +27,12 @@ typedef struct _HpcModuleInfo {
   struct _HpcModuleInfo *next;
 } HpcModuleInfo;
 
-void hs_hpc_module (char *modName,
+RTS_EXPORT void hs_hpc_module (char *modName,
                     StgWord32 modCount,
                     StgWord32 modHashNo,
                     StgWord64 *tixArr);
 
-HpcModuleInfo * hs_hpc_rootModule (void);
+RTS_EXPORT HpcModuleInfo * hs_hpc_rootModule (void);
 
-void startupHpc(void);
-void exitHpc(void);
+RTS_EXPORT void startupHpc(void);
+RTS_EXPORT void exitHpc(void);

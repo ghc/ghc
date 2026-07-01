@@ -13,15 +13,19 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 /* -----------------------------------------------------------------------------
  * Fine-grained control over heap census profiling which can be called from
  * Haskell to restrict the profile to portion(s) of the execution.
  * See the module GHC.Profiling.
  * ---------------------------------------------------------------------------*/
 
-void requestHeapCensus ( void );
-void startHeapProfTimer ( void );
-void stopHeapProfTimer ( void );
-void setUserEra ( StgWord w );
-StgWord getUserEra ( void );
-StgWord incrementUserEra ( StgWord w );
+RTS_EXPORT void requestHeapCensus ( void );
+RTS_EXPORT void startHeapProfTimer ( void );
+RTS_EXPORT void stopHeapProfTimer ( void );
+RTS_EXPORT void setUserEra ( StgWord w );
+RTS_EXPORT StgWord getUserEra ( void );
+RTS_EXPORT StgWord incrementUserEra ( StgWord w );

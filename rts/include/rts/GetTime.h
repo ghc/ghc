@@ -13,4 +13,8 @@
 
 #pragma once
 
-StgWord64 getMonotonicNSec (void);
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
+RTS_EXPORT StgWord64 getMonotonicNSec (void);

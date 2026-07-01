@@ -13,6 +13,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 /* -----------------------------------------------------------------------------
    The StgEntCounter type - needed regardless of TICKY_TICKY
    -------------------------------------------------------------------------- */
@@ -33,4 +37,4 @@ typedef struct _StgEntCounter {
     struct _StgEntCounter *link;/* link to chain them all together */
 } StgEntCounter;
 
-void requestTickyCounterSamples(void);
+RTS_EXPORT void requestTickyCounterSamples(void);

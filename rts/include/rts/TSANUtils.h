@@ -65,6 +65,10 @@
  * Users guide: https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual
  */
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 #if defined(__SANITIZE_THREAD__)
 #define TSAN_ENABLED
 #elif defined(__has_feature)
@@ -82,9 +86,9 @@
     AnnotateHappensAfter(__FILE__, __LINE__, (void*)(addr))
 #define TSAN_ANNOTATE_BENIGN_RACE_SIZED(addr,size,desc)                 \
     AnnotateBenignRaceSized(__FILE__, __LINE__, (void*)(addr), size, desc)
-void AnnotateHappensBefore(const char* f, int l, void* addr);
-void AnnotateHappensAfter(const char* f, int l, void* addr);
-void AnnotateBenignRaceSized(const char *file,
+RTS_EXPORT void AnnotateHappensBefore(const char* f, int l, void* addr);
+RTS_EXPORT void AnnotateHappensAfter(const char* f, int l, void* addr);
+RTS_EXPORT void AnnotateBenignRaceSized(const char *file,
                              int line,
                              const volatile void *mem,
                              long size,

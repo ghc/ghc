@@ -13,6 +13,10 @@
 
 #pragma once
 
-void startTimer (void);
-void stopTimer  (void);
-int rtsTimerSignal (void); // Deprecated: see issue #27073
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
+RTS_EXPORT void startTimer (void);
+RTS_EXPORT void stopTimer  (void);
+RTS_EXPORT int rtsTimerSignal (void); // Deprecated: see issue #27073

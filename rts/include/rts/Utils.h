@@ -12,5 +12,9 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 /* Alternate to raise(3) for threaded rts, for BSD-based OSes */
-int genericRaise(int sig);
+RTS_EXPORT int genericRaise(int sig);

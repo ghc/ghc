@@ -21,6 +21,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 #if defined(THREADED_RTS)
 
 typedef struct SpinLock_
@@ -39,7 +43,7 @@ typedef struct SpinLock_
 #define IF_PROF_SPIN(x)
 #endif
 
-void acquire_spin_lock_slow_path(SpinLock * p);
+RTS_EXPORT void acquire_spin_lock_slow_path(SpinLock * p);
 
 // acquire spin lock
 INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)

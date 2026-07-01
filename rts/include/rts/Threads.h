@@ -14,6 +14,10 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 #if defined(HAVE_SYS_TYPES_H)
 #include <sys/types.h>
 #endif
@@ -23,72 +27,72 @@
 //
 // Creating threads
 //
-StgTSO *createThread (Capability *cap, W_ stack_size);
+RTS_EXPORT StgTSO *createThread (Capability *cap, W_ stack_size);
 
 // precondition:
 //   (*cap)->running_task != NULL
 //   (*cap)->running_task must be a bound task (e.g. newBoundTask() has been
 //                        called on that thread).
-void scheduleWaitThread (/* in    */ StgTSO *tso,
+RTS_EXPORT void scheduleWaitThread (/* in    */ StgTSO *tso,
                          /* out   */ HaskellObj* ret,
                          /* inout */ Capability **cap);
 
-StgTSO *createGenThread       (Capability *cap, W_ stack_size,
+RTS_EXPORT StgTSO *createGenThread       (Capability *cap, W_ stack_size,
                                StgClosure *closure);
-StgTSO *createIOThread        (Capability *cap, W_ stack_size,
+RTS_EXPORT StgTSO *createIOThread        (Capability *cap, W_ stack_size,
                                StgClosure *closure);
-StgTSO *createStrictIOThread  (Capability *cap, W_ stack_size,
+RTS_EXPORT StgTSO *createStrictIOThread  (Capability *cap, W_ stack_size,
                                StgClosure *closure);
 
 // Suspending/resuming threads around foreign calls
-void *        suspendThread (StgRegTable *, bool interruptible);
-StgRegTable * resumeThread  (void *);
+RTS_EXPORT void *        suspendThread (StgRegTable *, bool interruptible);
+RTS_EXPORT StgRegTable * resumeThread  (void *);
 
 //
 // Thread operations from Threads.c
 //
-bool        eq_thread                        (StgPtr tso1, StgPtr tso2);
-int         cmp_thread                       (StgPtr tso1, StgPtr tso2);
-StgThreadID rts_getThreadId                  (StgPtr tso);
-void        rts_enableThreadAllocationLimit  (StgPtr tso);
-void        rts_disableThreadAllocationLimit (StgPtr tso);
+RTS_EXPORT bool        eq_thread                        (StgPtr tso1, StgPtr tso2);
+RTS_EXPORT int         cmp_thread                       (StgPtr tso1, StgPtr tso2);
+RTS_EXPORT StgThreadID rts_getThreadId                  (StgPtr tso);
+RTS_EXPORT void        rts_enableThreadAllocationLimit  (StgPtr tso);
+RTS_EXPORT void        rts_disableThreadAllocationLimit (StgPtr tso);
 
 // Forward declarations, defined in Closures.h
 struct _StgMutArrPtrs;
-struct _StgMutArrPtrs *listThreads               (Capability *cap);
+RTS_EXPORT struct _StgMutArrPtrs *listThreads               (Capability *cap);
 
 #if !defined(mingw32_HOST_OS)
-pid_t  forkProcess     (HsStablePtr *entry);
+RTS_EXPORT pid_t  forkProcess     (HsStablePtr *entry);
 #else
-pid_t  forkProcess     (HsStablePtr *entry)
+RTS_EXPORT pid_t  forkProcess     (HsStablePtr *entry)
     STG_NORETURN;
 #endif
 
-HsBool rtsSupportsBoundThreads (void);
+RTS_EXPORT HsBool rtsSupportsBoundThreads (void);
 
 // The number of Capabilities.
 // TODO: Ideally we would only provide getNumCapabilities
 // but this is used in compiler/cbits/genSym.c
-extern uint32_t n_capabilities;
+extern RTS_EXPORT uint32_t n_capabilities;
 
 INLINE_HEADER unsigned int getNumCapabilities(void)
 { return RELAXED_LOAD(&n_capabilities); }
 
 // The number of Capabilities that are not disabled
-extern uint32_t enabled_capabilities;
+extern RTS_EXPORT uint32_t enabled_capabilities;
 
 // The maximum number of Capabilities supported by the RTS.
 // See Note [Capabilities array sizing] in rts/Capability.c.
-extern uint32_t max_n_capabilities;
+extern RTS_EXPORT uint32_t max_n_capabilities;
 
 #if !IN_STG_CODE
-extern Capability MainCapability;
+extern RTS_EXPORT Capability MainCapability;
 #endif
 
 //
 // Change the number of capabilities (only supports increasing the
 // current value at the moment).
 //
-extern void setNumCapabilities (uint32_t new_);
+extern RTS_EXPORT void setNumCapabilities (uint32_t new_);
 
-bool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value);
+RTS_EXPORT bool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value);

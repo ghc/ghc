@@ -13,5 +13,9 @@
 
 #pragma once
 
-void registerCcList(CostCentre **cc_list);
-void registerCcsList(CostCentreStack **cc_list);
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
+RTS_EXPORT void registerCcList(CostCentre **cc_list);
+RTS_EXPORT void registerCcsList(CostCentreStack **cc_list);

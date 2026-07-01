@@ -16,8 +16,12 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 #define mkStoreAccessorPrototype(name)                                  \
-    StgStablePtr                                                        \
+    RTS_EXPORT StgStablePtr                                             \
     getOrSet##name(StgStablePtr ptr);
 
 mkStoreAccessorPrototype(GHCConcSignalSignalHandlerStore)
@@ -32,5 +36,5 @@ mkStoreAccessorPrototype(LibHSghcFastStringTable)
 mkStoreAccessorPrototype(LibHSghcGlobalHasPprDebug)
 mkStoreAccessorPrototype(LibHSghcGlobalHasNoDebugOutput)
 mkStoreAccessorPrototype(LibHSghcGlobalHasNoStateHack)
-extern HsWord64 ghc_unique_counter64;
-extern HsInt ghc_unique_inc;
+extern RTS_EXPORT HsWord64 ghc_unique_counter64;
+extern RTS_EXPORT HsInt ghc_unique_inc;

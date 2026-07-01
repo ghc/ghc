@@ -19,6 +19,12 @@
 
 #pragma once
 
+// RTS_EXPORT is defined in Stg.h; provide a fallback for headers analysed in
+// isolation (e.g. by clangd).
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 #if IN_STG_CODE
 #  define RTS_RET_INFO(i)   extern const W_(i)[]
 #  define RTS_FUN_INFO(i)   extern const W_(i)[]
@@ -27,12 +33,12 @@
 #  define RTS_CLOSURE(i)    extern W_(i)[]
 #  define RTS_FUN_DECL(f)   extern StgFunPtr f(void)
 #else
-#  define RTS_RET_INFO(i)   extern const StgRetInfoTable i
-#  define RTS_FUN_INFO(i)   extern const StgFunInfoTable i
-#  define RTS_THUNK_INFO(i) extern const StgThunkInfoTable i
-#  define RTS_INFO(i)       extern const StgInfoTable i
-#  define RTS_CLOSURE(i)    extern StgClosure i
-#  define RTS_FUN_DECL(f)   extern StgFunPtr f(void)
+#  define RTS_RET_INFO(i)   extern RTS_EXPORT const StgRetInfoTable i
+#  define RTS_FUN_INFO(i)   extern RTS_EXPORT const StgFunInfoTable i
+#  define RTS_THUNK_INFO(i) extern RTS_EXPORT const StgThunkInfoTable i
+#  define RTS_INFO(i)       extern RTS_EXPORT const StgInfoTable i
+#  define RTS_CLOSURE(i)    extern RTS_EXPORT StgClosure i
+#  define RTS_FUN_DECL(f)   extern RTS_EXPORT StgFunPtr f(void)
 #endif
 
 #if defined(TABLES_NEXT_TO_CODE)
@@ -217,8 +223,8 @@ RTS_ENTRY(stg_NO_FINALIZER);
 extern StgWordArray stg_CHARLIKE_closure;
 extern StgWordArray stg_INTLIKE_closure;
 #else
-extern StgIntCharlikeClosure stg_CHARLIKE_closure[MAX_CHARLIKE - MIN_CHARLIKE + 1];
-extern StgIntCharlikeClosure stg_INTLIKE_closure[MAX_INTLIKE - MIN_INTLIKE + 1];
+extern RTS_EXPORT StgIntCharlikeClosure stg_CHARLIKE_closure[MAX_CHARLIKE - MIN_CHARLIKE + 1];
+extern RTS_EXPORT StgIntCharlikeClosure stg_INTLIKE_closure[MAX_INTLIKE - MIN_INTLIKE + 1];
 #endif
 
 /* StgStartup */

@@ -8,15 +8,19 @@
 
 #pragma once
 
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
 #include "rts/storage/Closures.h"
 
 /* Returns NULL on allocation failure */
-StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure);
+RTS_EXPORT StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure);
 
-void heap_view_closure_ptrs_in_pap_payload(StgClosure *ptrs[], StgWord *nptrs
+RTS_EXPORT void heap_view_closure_ptrs_in_pap_payload(StgClosure *ptrs[], StgWord *nptrs
                         , StgClosure *fun, StgClosure **payload, StgWord size);
 
-StgWord heap_view_closureSize(StgClosure *closure);
+RTS_EXPORT StgWord heap_view_closureSize(StgClosure *closure);
 
 /*
  * Collect the pointers of a closure into the given array. The given array should be
@@ -29,4 +33,4 @@ StgWord heap_view_closureSize(StgClosure *closure);
  *   StgWord collect_pointers(StgClosure *closure, StgWord size, StgClosure *ptrs[size]);
  * but we cannot write this and retain C++ compatibility.
  */
-StgWord collect_pointers(StgClosure *closure, StgClosure *ptrs[]);
+RTS_EXPORT StgWord collect_pointers(StgClosure *closure, StgClosure *ptrs[]);

@@ -13,5 +13,9 @@
 
 #pragma once
 
-void* __hscore_get_saved_termios(int fd);
-void  __hscore_set_saved_termios(int fd, void* ts);
+#ifndef RTS_EXPORT
+# define RTS_EXPORT
+#endif
+
+RTS_EXPORT void* __hscore_get_saved_termios(int fd);
+RTS_EXPORT void  __hscore_set_saved_termios(int fd, void* ts);
