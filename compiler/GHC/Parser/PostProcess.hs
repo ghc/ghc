@@ -229,7 +229,7 @@ mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layout annsIn
 mkTyData :: SrcSpan
          -> Bool
          -> NewOrData
-         -> Maybe (LocatedP (CType GhcPs))
+         -> Maybe (LocatedA (CType GhcPs))
          -> Located (Maybe (LHsContext GhcPs), LHsType GhcPs)
          -> Maybe (LHsKind GhcPs)
          -> [LConDecl GhcPs]
@@ -251,7 +251,7 @@ mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
                                    tcdDataDefn = defn,
                                    tcdModifiers = [] })) }
 
-mkDataDefn :: Maybe (LocatedP (CType GhcPs))
+mkDataDefn :: Maybe (LocatedA (CType GhcPs))
            -> Maybe (LHsContext GhcPs)
            -> Maybe (LHsKind GhcPs)
            -> DataDefnCons (LConDecl GhcPs)
@@ -326,7 +326,7 @@ mkTyFamInstEqn loc bndrs lhs rhs annEq
 
 mkDataFamInst :: SrcSpan
               -> NewOrData
-              -> Maybe (LocatedP (CType GhcPs))
+              -> Maybe (LocatedA (CType GhcPs))
               -> (Maybe ( LHsContext GhcPs), HsOuterFamEqnTyVarBndrs GhcPs
                         , LHsType GhcPs)
               -> Maybe (LHsKind GhcPs)

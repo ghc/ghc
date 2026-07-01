@@ -4401,13 +4401,14 @@ instance ExactPrint t => ExactPrint (HsModifierOf t GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance Typeable p => ExactPrint (LocatedP (CType (GhcPass p))) where
-  getAnnotationEntry = entryFromLocatedA
-  setAnnotationAnchor = setAnchorAn
+instance Typeable p => ExactPrint (CType (GhcPass p)) where
+  getAnnotationEntry _ = NoEntryVal
+  setAnnotationAnchor a _ _ _ = a
 
-  exact (L (EpAnn l (AnnPragma o c s l1 l2 t m) cs) (CType ext mh ct)) = do
+  exact (CType ext mh ct) = do
     let stp  = cTypeSourceText ext
         stct = cTypeOtherText  ext
+        AnnPragma o c s l1 l2 t m = cTypeAnn ext
     o' <- markAnnOpen'' o stp "{-# CTYPE"
     l1' <- case mh of
              Nothing -> return l1
@@ -4415,7 +4416,7 @@ instance Typeable p => ExactPrint (LocatedP (CType (GhcPass p))) where
                printStringAtAA l1 (toSourceTextWithSuffix srcH "" "")
     l2' <- printStringAtAA l2 (toSourceTextWithSuffix stct (unpackHText ct) "")
     c' <- markEpToken c
-    return (L (EpAnn l (AnnPragma o' c' s l1' l2' t m) cs) (CType ext mh ct))
+    return (CType (ext { cTypeAnn = AnnPragma o' c' s l1' l2' t m }) mh ct)
 
 -- ---------------------------------------------------------------------
 
