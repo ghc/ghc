@@ -285,10 +285,10 @@ pprTopLevelStrings = entry (text "top-level strings:") .
 -- | […]
 pprTopLevelString :: Name -> ByteString -> SDoc
 pprTopLevelString stringName encodedString
-    = entry (text "string" <+> ppr stringName <> text ":") $
-      text                                                 $
-      show                                                 $
-      utf8DecodeByteString                                 $
+    = entry (ppr stringName <> text ":") $
+      text                               $
+      show                               $
+      utf8DecodeByteString               $
       encodedString
 
 -- | […]
