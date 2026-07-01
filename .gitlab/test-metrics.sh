@@ -7,12 +7,30 @@ REF="perf"
 
 run() {
   echo "$@"
-  $@
+  "$@"
 }
 
 fail() {
   echo "ERROR: $*" >&2
   exit 1
+}
+
+run_retrying() {
+  local max_wait=300
+  local delay=1
+  local cmd="$*"
+  echo "running '$cmd' retrying"
+
+  until eval "run $cmd"; do
+    if (( delay >= max_wait )); then
+        fail "'$cmd' finally failed after $delay surpassed $max_wait seconds wait time"
+    fi
+
+    echo "'$cmd' failed - retrying in ${delay} seconds" >&2
+    sleep "$delay"
+
+    delay=$(( delay * 2 ))
+  done
 }
 
 function pull() {
@@ -24,7 +42,7 @@ function pull() {
   git remote add perf-notes "$NOTES_ORIGIN" || true
   git config fetch.recurseSubmodules false
   git config remote.perf-notes.partialclonefilter tree:0
-  run git fetch --force perf-notes "$ref:$ref"
+  run_retrying git fetch --force perf-notes "$ref:$ref"
   echo "perf notes ref $ref is $(git rev-parse $ref)"
 }
 
