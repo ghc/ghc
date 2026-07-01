@@ -15,7 +15,7 @@ import Data.Function (($), id, (.))
 import Data.Tuple (fst, snd, uncurry)
 import Data.Bool (Bool, otherwise, not, (&&))
 import Data.Int (Int)
-import Data.Word (Word, Word16)
+import Data.Word (Word)
 import Data.Maybe (Maybe, maybe)
 import Data.Either (Either, either)
 import Data.List (length, (++), map, zipWith, take, drop, replicate)
@@ -24,12 +24,10 @@ import Data.ByteString (ByteString, unpack)
 import Data.ByteString.Short (ShortByteString)
 import Data.IntMap (IntMap)
 import Data.IntMap qualified as IntMap (toList)
-import Data.Array.IArray (IArray, bounds, indices, elems)
-import Data.Array.Unboxed (UArray)
+import Data.Array (bounds, indices, elems)
 import Numeric (showHex)
 import Text.Show (show)
 import System.IO (IO, FilePath)
-import Foreign.Storable (Storable)
 import GHC.Data.Strict qualified as Strict (Maybe, maybe)
 import GHC.Data.FastString (unpackFS)
 import GHC.Data.FlatBag (FlatBag, elemsFlatBag)
@@ -78,7 +76,6 @@ import GHC.ByteCode.Breakpoints
 import GHC.ByteCode.Binary (OnDiskModuleByteCode (..))
 import GHC.ByteCode.Serialize (readOnDiskModuleByteCode)
 import GHC.Driver.Env.Types (HscEnv)
-import GHCi.ResolvedBCO (BCOByteArray, fromBCOByteArray)
 import GHCi.FFI (FFIType)
 import GHCi.Message (ConInfoTable (..))
 
@@ -132,8 +129,6 @@ pprByteCodeObject currentModule byteCodeObject = case byteCodeObject of
         -> entry (text "ordinary object" <+> ppr unlinkedBCOName <> text ":") $
            vcat [
                     pprArity                  $ unlinkedBCOArity,
-                    pprInstructions           $ unlinkedBCOInstrs,
-                    pprBitmap                 $ unlinkedBCOBitmap,
                     pprLiterals currentModule $ unlinkedBCOLits,
                     pprPointers currentModule $ unlinkedBCOPtrs
                 ]
@@ -154,14 +149,6 @@ pprByteCodeObject currentModule byteCodeObject = case byteCodeObject of
 -- | […]
 pprArity :: Int -> SDoc
 pprArity = entry (text "arity:") . ppr
-
--- | […]
-pprInstructions :: BCOByteArray Word16 -> SDoc
-pprInstructions = entry (text "instructions:") . pprBCOByteArray
-
--- | […]
-pprBitmap :: BCOByteArray Word -> SDoc
-pprBitmap = entry (text "bitmap:") . pprBCOByteArray
 
 -- | […]
 pprDataConstructorName :: Name -> SDoc
@@ -529,11 +516,6 @@ pprObjectFileContent ix = entry (text "file" <+> ppr ix <> text ":") .
 -- | […]
 pprByteString :: ByteString -> SDoc
 pprByteString = pprFixedSizeNaturalList . unpack
-
--- | […]
-pprBCOByteArray :: (Integral a, FiniteBits a, Storable a, IArray UArray a) =>
-                   BCOByteArray a -> SDoc
-pprBCOByteArray = pprFixedSizeNaturalList . elems . fromBCOByteArray
 
 -- | […]
 pprFixedSizeNaturalList :: (Integral a, FiniteBits a) => [a] -> SDoc
