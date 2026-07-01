@@ -444,13 +444,13 @@ downsweepFromRootNodes hsc_env old_summaries maybe_base_graph excl_mods allow_du
              dup_roots = filterOut isSingleton $ map rights (M.elems root_map)
 
 
-calcDeps :: ModSummary -> [(UnitId, ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName))]
+calcDeps :: ModSummary -> [(ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName))]
 calcDeps ms =
   -- Add a dependency on the HsBoot file if it exists
   -- This gets passed to the loopImports function which just ignores it if it
   -- can't be found.
-  [(ms_unitid ms, NormalLevel, NoPkgQual, GWIB (noLoc $ ms_mod_name ms) IsBoot) | NotBoot <- [isBootSummary ms] ] ++
-  [(ms_unitid ms, lvl, b, c) | (lvl, b, c) <- msDeps ms ]
+  [(NormalLevel, NoPkgQual, GWIB (noLoc $ ms_mod_name ms) IsBoot) | NotBoot <- [isBootSummary ms] ] ++
+  [(lvl, b, c) | (lvl, b, c) <- msDeps ms ]
 
 
 type DownsweepM a = ReaderT DownsweepEnv IO a
@@ -489,16 +489,16 @@ loopSummaries (ms:next) (done, summarised)
   = loopSummaries next (done, summarised)
   -- Didn't work out what the imports mean yet, now do that.
   | otherwise = do
-     (final_deps, done', summarised') <- loopImports (calcDeps ms) done summarised
+     (final_deps, done', summarised') <- loopImports (ms_unitid ms) (calcDeps ms) done summarised
      -- This has the effect of finding a .hs file if we are looking at the .hs-boot file.
-     (_, done'', summarised'') <- loopImports (maybeToList hs_file_for_boot) done' summarised'
+     (_, done'', summarised'') <- loopImports (ms_unitid ms) (maybeToList hs_file_for_boot) done' summarised'
      loopSummaries next (M.insert k (ModuleNode final_deps (ModuleNodeCompile ms)) done'', summarised'')
   where
     k = NodeKey_Module (msKey ms)
 
     hs_file_for_boot
       | HsBootFile <- ms_hsc_src ms
-      = Just $ ((ms_unitid ms), NormalLevel, NoPkgQual, (GWIB (noLoc $ ms_mod_name ms) NotBoot))
+      = Just (NormalLevel, NoPkgQual, (GWIB (noLoc $ ms_mod_name ms) NotBoot))
       | otherwise
       = Nothing
 
@@ -603,30 +603,33 @@ downsweepSummarise home_unit is_boot wanted_mod mb_pkg maybe_buf = do
     DownsweepUseFixed -> liftIO $ summariseModuleInterface hsc_env home_unit is_boot wanted_mod mb_pkg excl_mods
 
 
--- This loops over each import in each summary. It is mutually recursive with loopSummaries if we discover
--- a new module by doing this.
-loopImports :: [(UnitId, ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName))]
-                -- Work list: process these modules
-     -> M.Map NodeKey ModuleGraphNode
-     -> DownsweepCache
-                -- Visited set; the range is a list because
-                -- the roots can have the same module names
-                -- if allow_dup_roots is True
-     -> DownsweepM ([ModuleNodeEdge],
-          M.Map NodeKey ModuleGraphNode, DownsweepCache)
-                -- The result is the completed NodeMap
-loopImports [] done summarised = return ([], done, summarised)
-loopImports ((home_uid, imp, mb_pkg, gwib) : ss) done summarised
+-- This loops over each import in each summary. It is mutually recursive with
+-- loopSummaries if we discover a new module by doing this.
+loopImports
+  :: UnitId
+      -- ^ UnitId of home unit of summary whose imports are being processed
+  -> [(ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName))]
+      -- ^ Work list: process these modules
+  -> M.Map NodeKey ModuleGraphNode
+  -> DownsweepCache
+      -- ^ Visited set; the range is a list because
+      -- the roots can have the same module names
+      -- if allow_dup_roots is True
+  -> DownsweepM ([ModuleNodeEdge],
+       M.Map NodeKey ModuleGraphNode, DownsweepCache)
+      -- ^ The result is the completed NodeMap
+loopImports _ [] done summarised = return ([], done, summarised)
+loopImports home_uid ((imp, mb_pkg, gwib) : ss) done summarised
   | Just summs <- M.lookup cache_key summarised
   = case summs of
       [Right ms] -> do
         let nk = mkModuleEdge imp (NodeKey_Module (mnKey ms))
-        (rest, summarised', done') <- loopImports ss done summarised
+        (rest, summarised', done') <- loopImportsNext done summarised
         return (nk: rest, summarised', done')
       [Left _err] ->
-        loopImports ss done summarised
+        loopImportsNext done summarised
       _errs ->  do
-        loopImports ss done summarised
+        loopImportsNext done summarised
   | otherwise
   = do
        hsc_env <- asks downsweep_hsc_env
@@ -635,26 +638,27 @@ loopImports ((home_uid, imp, mb_pkg, gwib) : ss) done summarised
                                is_boot wanted_mod mb_pkg
                                Nothing
        case mb_s of
-           NotThere -> loopImports ss done summarised
+           NotThere -> loopImportsNext done summarised
            External uid -> do
             -- Pass an updated hsc_env to loopUnit, as each unit might
             -- have a different visible package database.
             let hsc_env' = hscSetActiveHomeUnit home_unit hsc_env
             let done' = loopUnit hsc_env' done [uid]
-            (other_deps, done'', summarised') <- loopImports ss done' summarised
+            (other_deps, done'', summarised') <- loopImportsNext done' summarised
             return (mkModuleEdge imp (NodeKey_ExternalUnit uid) : other_deps, done'', summarised')
            FoundInstantiation iud -> do
-            (other_deps, done', summarised') <- loopImports ss done summarised
+            (other_deps, done', summarised') <- loopImportsNext done summarised
             return (mkModuleEdge imp (NodeKey_Unit iud) : other_deps, done', summarised')
-           FoundHomeWithError (_uid, e) ->  loopImports ss done (Map.insert cache_key [(Left e)] summarised)
+           FoundHomeWithError (_uid, e) ->  loopImportsNext done (Map.insert cache_key [(Left e)] summarised)
            FoundHome s -> do
              (done', summarised') <-
                loopModuleNodeInfo s (done, Map.insert cache_key [Right s] summarised)
-             (other_deps, final_done, final_summarised) <- loopImports ss done' summarised'
+             (other_deps, final_done, final_summarised) <- loopImportsNext done' summarised'
 
              -- MP: This assumes that we can only instantiate non home units, which is probably fair enough for now.
              return (mkModuleEdge imp (NodeKey_Module (mnKey s)) : other_deps, final_done, final_summarised)
   where
+    loopImportsNext = loopImports home_uid ss
     cache_key = (home_uid, mb_pkg, unLoc <$> gwib)
     GWIB { gwib_mod = L loc mod, gwib_isBoot = is_boot } = gwib
     wanted_mod = L loc mod
