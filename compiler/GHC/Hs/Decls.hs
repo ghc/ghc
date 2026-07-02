@@ -1043,7 +1043,7 @@ cidDeprecation :: forall p. IsPass p
 cidDeprecation = fmap unLoc . decl_deprecation (ghcPass @p)
   where
     decl_deprecation :: GhcPass p  -> ClsInstDecl (GhcPass p)
-                     -> Maybe (LocatedP (WarningTxt (GhcPass p)))
+                     -> Maybe (LocatedA (WarningTxt (GhcPass p)))
     decl_deprecation GhcPs (ClsInstDecl{ cid_ext = (depr, _) } )
       = depr
     decl_deprecation GhcRn (ClsInstDecl{ cid_ext = (depr, _) })
@@ -1242,7 +1242,7 @@ derivDeprecation :: forall p. IsPass p
 derivDeprecation = fmap unLoc . decl_deprecation (ghcPass @p)
   where
     decl_deprecation :: GhcPass p  -> DerivDecl (GhcPass p)
-                     -> Maybe (LocatedP (WarningTxt (GhcPass p)))
+                     -> Maybe (LocatedA (WarningTxt (GhcPass p)))
     decl_deprecation GhcPs (DerivDecl{ deriv_ext = (depr, _) })
       = depr
     decl_deprecation GhcRn (DerivDecl{ deriv_ext = (depr, _) })
