@@ -6,7 +6,6 @@
 module GHC.ByteCode.Show (showByteCode) where
 
 import Prelude ((+), (-), Integral, div)
-import Control.Applicative ((<$>), (<*>))
 import Control.Arrow ((>>>))
 import Control.Exception (assert)
 import Data.Eq ((==))
@@ -18,7 +17,7 @@ import Data.Int (Int)
 import Data.Word (Word)
 import Data.Maybe (Maybe, maybe)
 import Data.Either (Either, either)
-import Data.List (length, (++), map, zipWith, take, drop, replicate)
+import Data.List (length, (++), map, zipWith, zipWith5, take, drop, replicate)
 import Data.String (String)
 import Data.ByteString (ByteString, unpack)
 import Data.ByteString.Short (ShortByteString)
@@ -296,15 +295,15 @@ pprBreakpointsData currentModule InternalModBreaks {..}
 -- | […]
 pprBreakpointsInSource :: Module -> ModBreaks -> SDoc
 pprBreakpointsInSource currentModule ModBreaks {..}
-    = entry (text "breakpoints in source:")                 $
-      assert (modBreaks_module == currentModule)            $
-      assert boundsAreIdentical                             $
-      vcatOrNone                                            $
-      pprBreakpointInSource <$> indices modBreaks_locs_ <*>
-                                elems modBreaks_locs_   <*>
-                                elems modBreaks_decls   <*>
-                                elems modBreaks_vars    <*>
-                                elems modBreaks_ccs
+    = entry (text "breakpoints in source:")                    $
+      assert (modBreaks_module == currentModule)               $
+      assert boundsAreIdentical                                $
+      vcatOrNone                                               $
+      zipWith5 pprBreakpointInSource (indices modBreaks_locs_)
+                                     (elems modBreaks_locs_)
+                                     (elems modBreaks_decls)
+                                     (elems modBreaks_vars)
+                                     (elems modBreaks_ccs)
     where
 
     boundsAreIdentical :: Bool
