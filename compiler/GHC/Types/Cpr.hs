@@ -5,6 +5,8 @@
 -- | Types for the Constructed Product Result lattice.
 -- "GHC.Core.Opt.CprAnal" and "GHC.Core.Opt.WorkWrap.Utils"
 -- are its primary customers via 'GHC.Types.Id.idCprSig'.
+--
+-- See Note [Constructed Product Result] in "GHC.Core.Opt.CprAnal".
 module GHC.Types.Cpr (
     Cpr (ConCpr), topCpr, botCpr, flatConCpr, asConCpr,
     CprType (..), topCprType, botCprType, flatConCprType,
@@ -29,8 +31,15 @@ import GHC.Utils.Panic
 
 data Cpr
   = BotCpr
+  -- ^ The expression dead-ends on every code path (diverges or throws an
+  -- imprecise exception), so any CPR can be assumed for it.
+  --
+  -- Does not always coincide with demand analysis's 'botDiv'; see
+  -- Note [Bottom CPR iff Dead-Ending Divergence] in "GHC.Types.Demand".
   | ConCpr_ !ConTag ![Cpr]
-  -- ^ The number of field Cprs equals 'dataConRepArity'.
+  -- ^ Returns a constructor application with the given tag; the field 'Cpr's
+  -- support Note [Nested CPR] in "GHC.Core.Opt.CprAnal".
+  -- The number of field Cprs equals 'dataConRepArity'.
   -- If all of them are top, better use 'FlatConCpr', as ensured by the pattern
   -- synonym 'ConCpr'.
   | FlatConCpr !ConTag
@@ -52,6 +61,9 @@ viewConTag (ConCpr t _)   = Just t
 viewConTag _              = Nothing
 {-# INLINE viewConTag #-}
 
+-- | Least upper bound, e.g. for merging case alternatives: the result has the
+-- CPR property only if both operands construct the same constructor.
+-- 'BotCpr' is the identity.
 lubCpr :: Cpr -> Cpr -> Cpr
 lubCpr BotCpr      cpr     = cpr
 lubCpr cpr         BotCpr  = cpr
@@ -81,6 +93,7 @@ trimCpr :: Cpr -> Cpr
 trimCpr BotCpr = botCpr
 trimCpr _      = topCpr
 
+-- See Note [Worker/wrapper for CPR] in "GHC.Core.Opt.WorkWrap.Utils".
 asConCpr :: Cpr -> Maybe (ConTag, [Cpr])
 asConCpr (ConCpr t cs)  = Just (t, cs)
 asConCpr (FlatConCpr t) = Just (t, [])
@@ -173,7 +186,8 @@ newtype CprSig = CprSig { getCprSig :: CprType }
 -- "GHC.Types.Demand"
 mkCprSigForArity :: Arity -> CprType -> CprSig
 mkCprSigForArity arty ty@(CprType n _)
-  | arty /= n = topCprSig -- Trim on arity mismatch
+  | arty /= n = topCprSig -- See Note [Arity trimming for CPR signatures]
+                          -- in GHC.Core.Opt.CprAnal
   | otherwise = CprSig ty
 
 topCprSig :: CprSig
