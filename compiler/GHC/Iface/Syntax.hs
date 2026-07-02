@@ -83,7 +83,7 @@ import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisForAllTyFlag )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Builtin.Types ( constraintKindTyConName )
 import GHC.Stg.EnforceEpt.TagSig
-import GHC.Parser.Annotation (noLocA)
+import GHC.Parser.Annotation (noLocA, noAnn)
 import GHC.Hs.Extension ( GhcPass, GhcRn, GhcTc )
 import GHC.Hs.Decls.Overlap ( OverlapFlag )
 import GHC.Hs.Doc ( WithHsDocIdentifiers(..) )
@@ -666,8 +666,8 @@ fromIfaceWarnings = \case
 
 fromIfaceWarningTxt :: IfaceWarningTxt -> WarningTxt GhcRn
 fromIfaceWarningTxt = \case
-    IfWarningTxt src mb_cat strs -> WarningTxt src (noLocA . fromWarningCategory <$> mb_cat) (noLocA <$> map fromIfaceStringLiteralWithNames strs)
-    IfDeprecatedTxt src strs -> DeprecatedTxt src (noLocA <$> map fromIfaceStringLiteralWithNames strs)
+    IfWarningTxt src mb_cat strs -> WarningTxt (src, noAnn) (noLocA . fromWarningCategory <$> mb_cat) (noLocA <$> map fromIfaceStringLiteralWithNames strs)
+    IfDeprecatedTxt src strs -> DeprecatedTxt (src, noAnn) (noLocA <$> map fromIfaceStringLiteralWithNames strs)
 
 fromIfaceStringLiteralWithNames :: (IfaceStringLiteral, [IfExtName]) -> WithHsDocIdentifiers (StringLiteral GhcRn) GhcRn
 fromIfaceStringLiteralWithNames (str, names) = WithHsDocIdentifiers (fromIfaceStringLiteral str) (map noLocA names)

@@ -22,12 +22,11 @@ toIfaceWarnings (WarnSome vs ds) = IfWarnSome vs' ds'
     ds' = [(occ, toIfaceWarningTxt txt) | (occ, txt) <- ds]
 
 toIfaceWarningTxt :: WarningTxt GhcRn -> IfaceWarningTxt
-toIfaceWarningTxt (WarningTxt src mb_cat strs) = IfWarningTxt src (unLoc . iwc_wc . unLoc <$> mb_cat) (map (toIfaceStringLiteralWithNames . unLoc) strs)
-toIfaceWarningTxt (DeprecatedTxt src strs) = IfDeprecatedTxt src (map (toIfaceStringLiteralWithNames . unLoc) strs)
+toIfaceWarningTxt (WarningTxt (src, _) mb_cat strs) = IfWarningTxt src (unLoc . iwc_wc . unLoc <$> mb_cat) (map (toIfaceStringLiteralWithNames . unLoc) strs)
+toIfaceWarningTxt (DeprecatedTxt (src, _) strs) = IfDeprecatedTxt src (map (toIfaceStringLiteralWithNames . unLoc) strs)
 
 toIfaceStringLiteralWithNames :: WithHsDocIdentifiers (StringLiteral GhcRn) GhcRn -> (IfaceStringLiteral, [IfExtName])
 toIfaceStringLiteralWithNames (WithHsDocIdentifiers src names) = (toIfaceStringLiteral src, map unLoc names)
 
 toIfaceStringLiteral :: StringLiteral GhcRn -> IfaceStringLiteral
-toIfaceStringLiteral sLit =
-  IfStringLiteral (stringLitSourceText sLit) (sl_fs sLit)
+toIfaceStringLiteral sLit = IfStringLiteral (stringLitSourceText sLit) (sl_fs sLit)

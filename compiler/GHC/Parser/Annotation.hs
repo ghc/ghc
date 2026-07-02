@@ -27,9 +27,9 @@ module GHC.Parser.Annotation (
   EpAnnCO,
 
   -- ** Annotations in 'GenLocated'
-  LocatedA, LocatedN, LocatedAn, LocatedP,
+  LocatedA, LocatedN, LocatedAn,
   LocatedE, LocatedBF,
-  SrcSpanAnnA, SrcSpanAnnP, SrcSpanAnnN,
+  SrcSpanAnnA, SrcSpanAnnN,
   SrcSpanAnnBF,
 
   -- ** Annotation data types used in 'GenLocated'
@@ -430,7 +430,6 @@ emptyComments = EpaComments []
 type LocatedA = GenLocated SrcSpanAnnA
 type LocatedN = GenLocated SrcSpanAnnN
 
-type LocatedP = GenLocated SrcSpanAnnP
 type LocatedBF = GenLocated SrcSpanAnnBF
 
 -- | Annotation for items appearing in a list. They can have one or
@@ -441,7 +440,6 @@ type SrcSpanAnnA = EpAnn [TrailingAnn]
 -- on the context, such as backticks.
 type SrcSpanAnnN = EpAnn NameAnn
 
-type SrcSpanAnnP = EpAnn AnnPragma
 type SrcSpanAnnBF = EpAnn AnnBooleanFormula
 
 type LocatedE = GenLocated EpaLocation

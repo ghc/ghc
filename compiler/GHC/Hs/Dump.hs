@@ -99,7 +99,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` bagName `extQ` bagRdrName `extQ` bagVar `extQ` nameSet
               `ext2Q` located
               `extQ` srcSpanAnnA
-              `extQ` srcSpanAnnP
               `extQ` srcSpanAnnN
               `extQ` srcSpanAnnBF
 
@@ -408,9 +407,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             srcSpanAnnA :: EpAnn [TrailingAnn] -> SDoc
             srcSpanAnnA = locatedAnn'' (text "SrcSpanAnnA")
-
-            srcSpanAnnP :: EpAnn AnnPragma -> SDoc
-            srcSpanAnnP = locatedAnn'' (text "SrcSpanAnnP")
 
             srcSpanAnnN :: EpAnn NameAnn -> SDoc
             srcSpanAnnN = locatedAnn'' (text "SrcSpanAnnN")

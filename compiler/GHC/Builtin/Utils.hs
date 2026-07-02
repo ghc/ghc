@@ -301,7 +301,7 @@ ghcPrimWarns = WarnSome
   []
   where
     mk_txt msg =
-      DeprecatedTxt NoSourceText [noLocA $ WithHsDocIdentifiers (StringLiteral NoSourceText (fastStringToShortText msg)) []]
+      DeprecatedTxt (NoSourceText, noAnn) [noLocA $ WithHsDocIdentifiers (StringLiteral NoSourceText (fastStringToShortText msg)) []]
     mk_decl_dep (occ, msg) = (occ, mk_txt msg)
 
 ghcPrimFixities :: [(OccName,Fixity)]
