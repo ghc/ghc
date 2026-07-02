@@ -47,7 +47,7 @@ peekItbl a0 = do
   ptrs'   <- (#peek struct StgInfoTable_, layout.payload.ptrs) ptr
   nptrs'  <- (#peek struct StgInfoTable_, layout.payload.nptrs) ptr
   tipe'   <- (#peek struct StgInfoTable_, type) ptr
-  srtlen' <- (#peek struct StgInfoTable_, srt) a0
+  srtlen' <- (#peek struct StgInfoTable_, srt) ptr
   return StgInfoTable
     { entry  = entry'
     , ptrs   = ptrs'

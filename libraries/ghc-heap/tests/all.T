@@ -103,3 +103,8 @@ test('stack_misc_closures',
          ]
       , '-debug' # Debug RTS to use checkSTACK() (Sanity.c)
       ])
+
+test('T27465',
+     [ when(have_profiling(), extra_ways(['prof']))
+     ],
+     compile_and_run, [''])
