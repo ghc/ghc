@@ -351,11 +351,12 @@ nonDetStrictFoldUDFM k z (UDFM m _i) = foldl' k' z m
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Deterministic iteration orders elements by insertion tag, and any such
 -- ordering must inspect every element's tag before it can emit the first
--- element. So even the head of the result costs a full O(n) traversal of the
--- map -- the iteration is not incremental, and laziness in the result list (see
--- Note [Placement sort in eltsUDFM]) saves allocation for undemanded
--- elements, not that up-front traversal. #27459 shows this cost biting in
--- consumers that demanded only the head.
+-- element. So even the head of the result costs a full traversal of the map
+-- plus the allocation of an O(n)-sized array -- or, on the fallback path,
+-- O(n log n) cons cells (see Note [Placement sort in eltsUDFM]). Laziness in
+-- the result list only avoids allocating for elements that are never
+-- demanded; it does not make the iteration incremental. #27459 shows this
+-- cost biting in consumers that demanded only the head.
 --
 -- So: to test for emptiness, use isNullUDFM rather than null on eltsUDFM;
 -- for order-oblivious queries, prefer short-circuiting anyUDFM/allUDFM; and
