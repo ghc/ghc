@@ -252,14 +252,9 @@ pprDataConstructorInfoTable :: Name -> ConInfoTable -> SDoc
 pprDataConstructorInfoTable dataConstrName ConInfoTable {..}
     = entry (text "info table of" <+> ppr dataConstrName <> text ":") $
       vcat [
-               pprTablePositioning    $ conItblTablesNextToCode,
                pprPointerWordCount    $ conItblPtrs,
                pprNonPointerWordCount $ conItblNPtrs
            ]
-
--- | […]
-pprTablePositioning :: Bool -> SDoc
-pprTablePositioning = entry (text "tables next to code:") . noOrYes
 
 -- | […]
 pprPointerWordCount :: Int -> SDoc
