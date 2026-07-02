@@ -1555,26 +1555,26 @@ instance ExactPrint ModuleName where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (LocatedP (WarningTxt GhcPs)) where
-  getAnnotationEntry = entryFromLocatedA
-  setAnnotationAnchor = setAnchorAn
+instance ExactPrint (WarningTxt GhcPs) where
+  getAnnotationEntry _ = NoEntryVal
+  setAnnotationAnchor a _ _ _ = a
 
-  exact (L (EpAnn l (AnnPragma o c (os,cs) l1 l2 t m) css) (WarningTxt src mb_cat ws)) = do
+  exact (WarningTxt (src, AnnPragma o c (os,cs) l1 l2 t m) mb_cat ws) = do
     o' <- markAnnOpen'' o src "{-# WARNING"
     mb_cat' <- markAnnotated mb_cat
     os' <- markEpToken os
     ws' <- mapM markAnnotated ws
     cs' <- markEpToken cs
     c' <- markEpToken c
-    return (L (EpAnn l (AnnPragma o' c' (os',cs') l1 l2 t m) css) (WarningTxt src mb_cat' ws'))
+    return (WarningTxt (src, AnnPragma o' c' (os',cs') l1 l2 t m) mb_cat' ws')
 
-  exact (L (EpAnn l (AnnPragma o c (os,cs) l1 l2 t m) css) (DeprecatedTxt src ws)) = do
+  exact (DeprecatedTxt (src, AnnPragma o c (os,cs) l1 l2 t m) ws) = do
     o' <- markAnnOpen'' o src "{-# DEPRECATED"
     os' <- markEpToken os
     ws' <- mapM markAnnotated ws
     cs' <- markEpToken cs
     c' <- markEpToken c
-    return (L (EpAnn l (AnnPragma o' c' (os',cs') l1 l2 t m) css) (DeprecatedTxt src ws'))
+    return (DeprecatedTxt (src, AnnPragma o' c' (os',cs') l1 l2 t m) ws')
 
 instance ExactPrint (InWarningCategory GhcPs) where
   getAnnotationEntry _ = NoEntryVal

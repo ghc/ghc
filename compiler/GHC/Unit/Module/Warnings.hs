@@ -158,8 +158,8 @@ warningTxtSame w1 w2
 instance Outputable (InWarningCategory (GhcPass pass)) where
   ppr (InWarningCategory _ wt) = text "in" <+> doubleQuotes (ppr wt)
 
-type instance XDeprecatedTxt       (GhcPass _) = SourceText
-type instance XWarningTxt          (GhcPass _) = SourceText
+type instance XDeprecatedTxt       (GhcPass _) = (SourceText, AnnPragma)
+type instance XWarningTxt          (GhcPass _) = (SourceText, AnnPragma)
 type instance XXWarningTxt         (GhcPass _) = DataConCantHappen
 type instance XInWarningCategory   (GhcPass _) = (EpToken "in", SourceText)
 type instance XXInWarningCategory  (GhcPass _) = DataConCantHappen
@@ -167,7 +167,7 @@ type instance XXInWarningCategory  (GhcPass _) = DataConCantHappen
 type instance Anno (WithHsDocIdentifiers (StringLiteral pass) pass) = SrcSpanAnnA
 type instance Anno (InWarningCategory (GhcPass pass)) = EpaLocation
 type instance Anno (WarningCategory) = EpaLocation
-type instance Anno (WarningTxt (GhcPass pass)) = SrcSpanAnnP
+type instance Anno (WarningTxt (GhcPass pass)) = SrcSpanAnnA
 
 deriving stock instance Eq (WarningTxt GhcPs)
 deriving stock instance Eq (WarningTxt GhcRn)
@@ -190,15 +190,15 @@ deriving instance Outputable WarningCategory
 instance Outputable (WarningTxt (GhcPass pass)) where
     ppr (WarningTxt lsrc mcat ws)
       = case lsrc of
-            NoSourceText   -> pp_ws ws
-            SourceText src -> ftext src <+> ctg_doc <+> pp_ws ws <+> text "#-}"
+            (NoSourceText, _)   -> pp_ws ws
+            (SourceText src, _) -> ftext src <+> ctg_doc <+> pp_ws ws <+> text "#-}"
         where
           ctg_doc = maybe empty (\ctg -> ppr ctg) mcat
 
     ppr (DeprecatedTxt lsrc ds)
       = case lsrc of
-          NoSourceText   -> pp_ws ds
-          SourceText src -> ftext src <+> pp_ws ds <+> text "#-}"
+          (NoSourceText, _)   -> pp_ws ds
+          (SourceText src, _) -> ftext src <+> pp_ws ds <+> text "#-}"
 
 pp_ws :: [LocatedA (WithHsDocIdentifiers (StringLiteral (GhcPass p)) (GhcPass p))] -> SDoc
 pp_ws [l] = ppr $ unLoc l

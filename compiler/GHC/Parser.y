@@ -2077,11 +2077,13 @@ to varid (used for rule_vars), 'checkRuleTyVarBndrNames' must be updated.
 
 maybe_warning_pragma :: { Maybe (LWarningTxt GhcPs) }
         : '{-# DEPRECATED' strings '#-}'
-                            {% fmap Just $ amsr (sLL $1 $> $ DeprecatedTxt (getDEPRECATED_PRAGs $1) (snd $ unLoc $2))
-                                (AnnPragma (glR $1) (epTok $3) (fst $ unLoc $2) noAnn noAnn noAnn noAnn) }
+                            {% fmap Just $ amsA' (sLL $1 $> $
+                                DeprecatedTxt (getDEPRECATED_PRAGs $1, AnnPragma (glR $1) (epTok $3) (fst $ unLoc $2) noAnn noAnn noAnn noAnn)
+                                              (snd $ unLoc $2))}
         | '{-# WARNING' warning_category strings '#-}'
-                            {% fmap Just $ amsr (sLL $1 $> $ WarningTxt (getWARNING_PRAGs $1) $2 (snd $ unLoc $3))
-                                (AnnPragma (glR $1) (epTok $4) (fst $ unLoc $3) noAnn noAnn noAnn noAnn)}
+                            {% fmap Just $ amsA' (sLL $1 $> $
+                                WarningTxt (getWARNING_PRAGs $1, AnnPragma (glR $1) (epTok $4) (fst $ unLoc $3) noAnn noAnn noAnn noAnn)
+                                           $2 (snd $ unLoc $3))}
         |  {- empty -}      { Nothing }
 
 warning_category :: { Maybe (LocatedE (InWarningCategory GhcPs)) }
@@ -2110,7 +2112,7 @@ warning :: { OrdList (LWarnDecl GhcPs) }
         : warning_category namespace_spec namelist strings
                 {% fmap unitOL $ amsA' (L (comb4 $1 $2 $3 $4)
                      (Warning (fst $ unLoc $4) (unLoc $2) (unLoc $3)
-                              (WarningTxt NoSourceText $1 (snd $ unLoc $4)))) }
+                              (WarningTxt (NoSourceText, noAnn) $1 (snd $ unLoc $4)))) }
 
 namespace_spec :: { Located (NamespaceSpecifier GhcPs) }
   : 'type'      { sL1 $1 $ TypeNamespaceSpecifier (epTok $1) }
@@ -2138,7 +2140,7 @@ deprecations :: { OrdList (LWarnDecl GhcPs) }
 deprecation :: { OrdList (LWarnDecl GhcPs) }
         : namespace_spec namelist strings
              {% fmap unitOL $ amsA' (sL (comb3 $1 $2 $>) $ (Warning (fst $ unLoc $3) (unLoc $1) (unLoc $2)
-                                          (DeprecatedTxt NoSourceText $ snd $ unLoc $3))) }
+                                          (DeprecatedTxt (NoSourceText, noAnn) $ snd $ unLoc $3))) }
 
 strings :: { Located ((EpToken "[", EpToken "]"), [LocatedA (WithHsDocIdentifiers (StringLiteral GhcPs) GhcPs)]) }
     : STRING             { sL1 $1 (noAnn,[stringLiteralToHsDocWst (L (gl $1) (getStringLiteral $1))]) }
