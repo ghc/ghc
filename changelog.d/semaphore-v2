@@ -2,7 +2,7 @@ section: compiler
 issues: #25087
 mrs: !15729
 synopsis:
-  Update to semaphore-compat 2.0.0 (``-jsem`` protocol v2)
+  Update to semaphore-compat 2.0.1 (``-jsem`` protocol v2)
 description:
   On Linux and other POSIX platforms, GHC's ``-jsem`` jobserver client
   now speaks v2 of the semaphore-compat protocol, which uses Unix
