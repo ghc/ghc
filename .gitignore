@@ -64,6 +64,8 @@ _*
 .hadrian_ghci_multi/
 .hie-bios
 hadrian/bootstrap/jq-bin
+/hadrian/cfg/system.config.host
+/hadrian/cfg/system.config.target
 
 # -----------------------------------------------------------------------------
 # Ignore any overlapped darcs repos and back up files
