@@ -1002,21 +1002,22 @@ doublePrimTyCon = pcPrimTyCon0 doublePrimTyConName doubleRepDataConTy
 
 Note [The equality types story]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-GHC sports a veritable menagerie of equality types:
+GHC sports a veritable menagerie of equality types.
+All of them have kind (CONSTRAINT r) for some RuntimeRep r.
 
-         Type or  Lifted?  Hetero?  Role      Built in         Defining module
-         class?    L/U                        TyCon
------------------------------------------------------------------------------------------
-~#         T        U      hetero   nominal   eqPrimTyCon      GHC.Prim
-~~         C        L      hetero   nominal   heqTyCon         GHC.Types
-~          C        L      homo     nominal   eqTyCon          GHC.Types
-:~:        T        L      homo     nominal   (not built-in)   Data.Type.Equality
-:~~:       T        L      hetero   nominal   (not built-in)   Data.Type.Equality
+          Lifted?  Hetero?  Role      Built in         Defining module
+           L/U                        TyCon
+---------------------------------------------------------------------------------
+~#          U      hetero   nominal   eqPrimTyCon      GHC.Prim
+~~          L      hetero   nominal   heqTyCon         GHC.Types
+~           L      homo     nominal   eqTyCon          GHC.Types
+:~:         L      homo     nominal   (not built-in)   Data.Type.Equality
+:~~:        L      hetero   nominal   (not built-in)   Data.Type.Equality
 
-~R#        T        U      hetero   repr      eqReprPrimTy     GHC.Prim
-Coercible  C        L      homo     repr      coercibleTyCon   GHC.Types
-Coercion   T        L      homo     repr      (not built-in)   Data.Type.Coercion
-~P#        T        U      hetero   phantom   eqPhantPrimTyCon GHC.Prim
+~R#         U      hetero   repr      eqReprPrimTy     GHC.Prim
+Coercible   L      homo     repr      coercibleTyCon   GHC.Types
+Coercion    L      homo     repr      (not built-in)   Data.Type.Coercion
+~P#         U      hetero   phantom   eqPhantPrimTyCon GHC.Prim
 
 Recall that "hetero" means the equality can related types of different
 kinds. Knowing that (t1 ~# t2) or (t1 ~R# t2) or even that (t1 ~P# t2)
@@ -1030,7 +1031,7 @@ error messages, and (~R#) is rendered as Coercible.
 Let's take these one at a time:
 
     --------------------------
-    (~#) :: forall k1 k2. k1 -> k2 -> TYPE (TupleRep '[])
+    (~#) :: forall k1 k2. k1 -> k2 -> CONSTRAINT (TupleRep '[])
     --------------------------
 This is The Type Of Equality in GHC. It classifies nominal coercions.
 This type is used in the solver for recording equality constraints.
@@ -1054,8 +1055,6 @@ This is (almost) an ordinary class, defined as if by
 Here's what's unusual about it:
 
  * We can't actually declare it that way because we don't have syntax for ~#.
-   And ~# isn't a constraint, so even if we could write it, it wouldn't kind
-   check.
 
  * Users cannot write instances of it.
 
@@ -1112,7 +1111,7 @@ They are not defined within GHC at all.
 
 
     --------------------------
-    (~R#) :: forall k1 k2. k1 -> k2 -> TYPE (TupleRep '[])
+    (~R#) :: forall k1 k2. k1 -> k2 -> CONSTRAINT (TupleRep '[])
     --------------------------
 The is the representational analogue of ~#. This is the type of representational
 equalities that the solver works on. All wanted constraints of this type are
@@ -1147,7 +1146,7 @@ within GHC at all.
 
 
     --------------------------
-    (~P#) :: forall k1 k2. k1 -> k2 -> TYPE (TupleRep '[])
+    (~P#) :: forall k1 k2. k1 -> k2 -> CONSTRAINT (TupleRep '[])
     --------------------------
 This is the phantom analogue of ~# and it is barely used at all.
 (The solver has no idea about this one.) Here is the motivation:
