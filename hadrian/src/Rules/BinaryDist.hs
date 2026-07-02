@@ -124,11 +124,8 @@ installTo relocatable prefix = do
     runBuilderWithCmdOptions env (Make bindistFilesDir) ["install"] [] []
 
 
-buildBinDistDir :: FilePath -> BindistConfig -> Action ()
-buildBinDistDir root conf@BindistConfig{..} = do
-
-    verbosity <- getVerbosity
-    -- We 'need' all binaries and libraries
+bindistPackageTargets :: BindistConfig -> Action ([(Package, FilePath)], [(Package, FilePath)])
+bindistPackageTargets conf@BindistConfig{..} = do
     lib_pkgs <- stagePackages library_stage
     (lib_targets, _) <- partitionEithers <$> mapM (pkgTarget conf) lib_pkgs
 
@@ -137,6 +134,14 @@ buildBinDistDir root conf@BindistConfig{..} = do
     let excluded_packages = [ genapply ]
         bin_pkgs = filter (`notElem` excluded_packages) bin_pkgs_all
     (_, bin_targets) <- partitionEithers <$> mapM (pkgTarget conf) bin_pkgs
+    return (lib_targets, bin_targets)
+
+buildBinDistDir :: FilePath -> BindistConfig -> Action ()
+buildBinDistDir root conf@BindistConfig{..} = do
+
+    verbosity <- getVerbosity
+    -- We 'need' all binaries and libraries
+    (lib_targets, bin_targets) <- bindistPackageTargets conf
 
     when (verbosity >= Verbose) $ do
       let libNames = map (pkgName . fst) lib_targets
