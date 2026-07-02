@@ -1175,7 +1175,7 @@ base-build-with-released-ghcs:
         make install
         cd -
         cd libraries/base
-        cabal build --with-compiler ghc-${ghc_version}-installed/bin/ghc \
+        cabal build --with-compiler ../../ghc-${ghc_version}-installed/bin/ghc \
                     --allow-boot-library-installs \
                     -O0
         cd -
