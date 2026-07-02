@@ -1162,6 +1162,9 @@ base-build-with-released-ghcs:
   script:
     - |
       ghc_versions=9.14.1
+      sed -E -e 's/^( *ghc-internal) *== .*(,|$)/\1\2/' \
+        < libraries/base/base.cabal.in \
+        > libraries/base/base.cabal
       for ghc_version in ${ghc_versions}
       do
         url=https://downloads.haskell.org/~ghc/${ghc_version}/ghc-${ghc_version}-x86_64-deb12-linux.tar.xz
