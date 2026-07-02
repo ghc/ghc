@@ -1,18 +1,7 @@
 {-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples, GeneralizedNewtypeDeriving, DerivingStrategies #-}
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
--- gross hack: we maneuvered ourselves into a position where we can't boot GHC with a LLVM based GHC anymore.
--- LLVM based GHC's fail to compile memcmp ffi calls.  These end up as memcmp$def in the llvm ir, however we
--- don't have any prototypes and subsequently the llvm toolchain chokes on them.  Since 7fdcce6d, we use
--- ShortText for the package database.  This however introduces this very module; which through inlining ends
--- up bringing memcmp_ByteArray from bytestring:Data.ByteString.Short.Internal into scope, which results in
--- the memcmp call we choke on.
---
--- The solution thusly is to force late binding via the linker instead of inlining when comping with the
--- bootstrap compiler.  This will produce a slower (slightly less optimised) stage1 compiler only.
---
--- See issue 18857. hsyl20 deserves credit for coming up with the idea for the solution.
--- |
--- An Unicode string for internal GHC use. Meant to replace String
+
+-- | An Unicode string for internal GHC use. Meant to replace String
 -- in places where being a lazy linked is not very useful and a more
 -- memory efficient data structure is desirable.
 
