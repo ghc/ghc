@@ -1640,7 +1640,7 @@ Here,
   co3 = UnivCo ProofIrrelProv Nominal (CoercionTy co1) (CoercionTy co2) [co5]
   where
     co5 :: (a1 ~# Bool) ~# (a2 ~# Bool)
-    co5 = TyConAppCo Nominal (~#) [<Consraint#>, <Constraint#>, co4, <Bool>]
+    co5 = TyConAppCo Nominal (~#) [<Constraint#>, <Constraint#>, co4, <Bool>]
 
 
 Note [The importance of tracking UnivCo dependencies]
