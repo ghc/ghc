@@ -99,7 +99,8 @@ import qualified GHC.Data.Word64Set as W
 --
 -- There is an implementation cost: each element is given a serial number
 -- as it is added, and `udfmToList` orders its result by this serial number
--- (see Note [Placement sort in eltsUDFM]). So you should only use `UniqDFM`
+-- (see Note [Placement sort in eltsUDFM] and
+-- Note [Cost of deterministic iteration]). So you should only use `UniqDFM`
 -- if you need the deterministic property.
 --
 -- `foldUDFM` also preserves determinism.
@@ -159,11 +160,15 @@ data UniqDFM key ele =
                                 -- time. See Note [Overflow on plusUDFM]
   deriving (Data, Functor)
 
--- | Deterministic. See Note [Placement sort in eltsUDFM] for the cost.
+-- | Deterministic.
+--
+-- See Note [Cost of deterministic iteration].
 instance Foldable (UniqDFM key) where
   foldr = foldUDFM
 
--- | Deterministic. See Note [Placement sort in eltsUDFM] for the cost.
+-- | Deterministic.
+--
+-- See Note [Cost of deterministic iteration].
 instance Traversable (UniqDFM key) where
   traverse f = fmap listToUDFM_Directly
              . traverse (\(u,a) -> (u,) <$> f a)
@@ -316,14 +321,18 @@ elemUDFM :: Uniquable key => key -> UniqDFM key elt -> Bool
 elemUDFM k (UDFM m _i) = M.member (getKey $ getUnique k) m
 
 -- | Performs a deterministic fold over the UniqDFM.
+--
 -- It's O(n) in the common case, with an O(n log n) fallback
--- (see Note [Placement sort in eltsUDFM]).
+-- (see Note [Placement sort in eltsUDFM]), and pays that in full even if
+-- only a prefix is demanded (see Note [Cost of deterministic iteration]).
 foldUDFM :: (elt -> a -> a) -> a -> UniqDFM key elt -> a
 {-# INLINE foldUDFM #-}
 -- This INLINE prevents a regression in !10568
 foldUDFM k z m = foldr k z (eltsUDFM m)
 
--- | Like 'foldUDFM' but the function also receives a key
+-- | Like 'foldUDFM' but the function also receives a key.
+--
+-- See Note [Cost of deterministic iteration].
 foldWithKeyUDFM :: (Unique -> elt -> a -> a) -> a -> UniqDFM key elt -> a
 {-# INLINE foldWithKeyUDFM #-}
 -- This INLINE was copied from foldUDFM
@@ -338,6 +347,24 @@ nonDetStrictFoldUDFM k z (UDFM m _i) = foldl' k' z m
   where
     k' acc (TaggedVal v _) = k v acc
 
+-- Note [Cost of deterministic iteration]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Deterministic iteration orders elements by insertion tag, and any such
+-- ordering must inspect every element's tag before it can emit the first
+-- element. So even the head of the result costs a full O(n) traversal of the
+-- map -- the iteration is not incremental, and laziness in the result list (see
+-- Note [Placement sort in eltsUDFM]) saves allocation for undemanded
+-- elements, not that up-front traversal. #27459 shows this cost biting in
+-- consumers that demanded only the head.
+--
+-- So: to test for emptiness, use isNullUDFM rather than null on eltsUDFM;
+-- for order-oblivious queries, prefer short-circuiting anyUDFM/allUDFM; and
+-- if you don't need the deterministic order at all, use the nonDet functions
+-- (with a justification).
+
+-- | Deterministic, in order of insertion.
+--
+-- See Note [Cost of deterministic iteration].
 eltsUDFM :: UniqDFM key elt -> [elt]
 {-# INLINE eltsUDFM #-}
 -- The INLINE makes it a good producer (from the map)
@@ -359,7 +386,8 @@ sort_it m = sortBy (compare `on` taggedSnd) (M.elems m)
 -- its tag, freeze, and read out in index order. That's O(i) work (which
 -- subsumes the O(n) fill, since distinct tags force n <= i), no comparisons,
 -- and the readout is lazy, so consumers that demand only a prefix pay almost
--- nothing beyond the fill.
+-- nothing beyond the fill (but the fill itself is unavoidable; see
+-- Note [Cost of deterministic iteration]).
 --
 -- Holes: slots whose tag never occurs keep the initial sentinel, a TaggedVal
 -- with tag -1. Real tags are non-negative, so the readout skips on tag < 0;
@@ -378,7 +406,9 @@ usePlacement :: Int -> Int -> Bool
 usePlacement n i = i <= 4 * n
 
 -- | Order a list of 'TaggedVal's by tag, by placing each at array index =
--- its tag. The tags must be distinct and in @[0, i)@.
+-- its tag.
+--
+-- The tags must be distinct and in @[0, i)@.
 -- See Note [Placement sort in eltsUDFM].
 placementSort :: forall r. Int -> [TaggedVal r] -> [r]
 placementSort i tvs = runST (ST (\s0 ->
@@ -420,8 +450,10 @@ udfmRestrictKeysSet (UDFM val_set i) set =
   in UDFM (M.restrictKeys val_set key_set) i
 
 -- | Converts `UniqDFM` to a list, with elements in deterministic order.
+--
 -- It's O(n) in the common case, with an O(n log n) fallback
--- (see Note [Placement sort in eltsUDFM]).
+-- (see Note [Placement sort in eltsUDFM]), and pays that in full even if
+-- only a prefix is demanded (see Note [Cost of deterministic iteration]).
 udfmToList :: UniqDFM key elt -> [(Unique, elt)]
 udfmToList (UDFM m i)
   | n <= 1           = [ (mkUniqueGrimily k, taggedFst v) | (k, v) <- M.toList m ]
