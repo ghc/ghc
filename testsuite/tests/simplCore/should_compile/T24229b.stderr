@@ -15,8 +15,8 @@ foo
   = \ @a ds ds1 ->
       case ds of { I# ww ->
       case ww of ds2 {
-        __DEFAULT -> case ds1 `cast` <Co:4> :: ... of { (x, y) -> case foo_$s$wfoo (-# ds2 1#) y x of { (# ww1 #) -> Just ww1 } };
-        0# -> Just (ds1 `cast` <Co:4> :: ...)
+        __DEFAULT -> case ds1 `cast` <Co:4> of { (x, y) -> case foo_$s$wfoo (-# ds2 1#) y x of { (# ww1 #) -> Just ww1 } };
+        0# -> Just (ds1 `cast` <Co:4>)
       }
       }
 

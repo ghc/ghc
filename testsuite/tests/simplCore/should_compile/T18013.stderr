@@ -161,11 +161,11 @@ T18013.$wmapMaybeRule
                      @s @(Maybe b) ww2 (GHC.Internal.Maybe.Nothing @b) #);
               Just x ->
                 case ((wild s2 x)
-                      `cast` <Co:4> :: IO (Result s b)
-                                       ~R# (GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
-                                            -> (# GHC.Internal.Prim.State#
-                                                    GHC.Internal.Prim.RealWorld,
-                                                  Result s b #)))
+                      `cast` (<Co:4>
+                              :: IO (Result s b)
+                                 ~R# (GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+                                      -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
+                                            Result s b #))))
                        s1
                 of
                 { (# ipv, ipv1 #) ->
@@ -175,12 +175,13 @@ T18013.$wmapMaybeRule
                 }
                 }
             })
-         `cast` <Co:13> :: (s
-                            -> Maybe a
-                            -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
-                            -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
-                                  Result s (Maybe b) #))
-                           ~R# (s -> Maybe a -> IO (Result s (Maybe b))))
+         `cast` (<Co:13>
+                 :: (s
+                     -> Maybe a
+                     -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+                     -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
+                           Result s (Maybe b) #))
+                    ~R# (s -> Maybe a -> IO (Result s (Maybe b)))))
       }
       }
 

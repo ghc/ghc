@@ -5,7 +5,7 @@ Result size of Tidy Core
 
 testFun
   = \ @x v ->
-      case v `cast` <Co:2> :: ... of {
+      case v `cast` <Co:2> of {
         __DEFAULT -> 47#;
         C0 ipv -> -3#;
         C2 -> 13#;

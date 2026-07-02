@@ -132,8 +132,14 @@ tidyToIfaceTypeX env ty = toIfaceTypeX (mkVarSet free_tcvs) (tidyType env' ty)
 
 ------------
 pprCo, pprParendCo :: Coercion -> SDoc
-pprCo       co = getPprStyle $ \ sty -> pprIfaceCoercion (tidyToIfaceCoSty co sty)
-pprParendCo co = getPprStyle $ \ sty -> pprParendIfaceCoercion (tidyToIfaceCoSty co sty)
+-- Print a coercion without its type
+-- Honour -dsuppress-coercions
+pprCo       co = sdocOption sdocSuppressCoercions $ \case
+                 True  -> angleBrackets (text "Co:" <> int (coercionSize co))
+                 False -> getPprStyle $ \ sty -> pprIfaceCoercion (tidyToIfaceCoSty co sty)
+pprParendCo co = sdocOption sdocSuppressCoercions $ \case
+                 True  -> angleBrackets (text "Co:" <> int (coercionSize co))
+                 False -> getPprStyle $ \ sty -> pprParendIfaceCoercion (tidyToIfaceCoSty co sty)
 
 tidyToIfaceCoSty :: Coercion -> PprStyle -> IfaceCoercion
 tidyToIfaceCoSty co sty
