@@ -89,4 +89,6 @@ ghcWarningsArgs = do
                                       , "-Wno-deprecations" -- https://gitlab.haskell.org/ghc/ghc/-/issues/24240
                                       , "-Wno-deriving-typeable"
                                       ]
-        , package xhtml        ? pure [ "-Wno-unused-imports" ] ] ]
+        , package xhtml        ? pure [ "-Wno-unused-imports" ]
+        , package semaphoreCompat ? pure [ "-Wno-unused-imports" ]
+        ] ]
