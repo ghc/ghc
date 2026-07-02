@@ -1,5 +1,4 @@
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS_GHC -Wno-orphans #-} -- Outputable FieldLabelString
 
 {-
 %
@@ -48,7 +47,6 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Types.Name
 
-import GHC.Types.Unique (Uniquable(..))
 import GHC.Utils.Outputable
 import GHC.Utils.Binary
 import GHC.Data.FastString
@@ -88,12 +86,6 @@ instance Outputable FieldLabel where
     ppr fl = ppr (flLabel fl) <> whenPprDebug (braces (ppr (flSelector fl))
                                                 <> ppr (flHasDuplicateRecordFields fl)
                                                 <> ppr (flHasFieldSelector fl))
-
-instance Outputable FieldLabelString where
-  ppr (FieldLabelString l) = ppr l
-
-instance Uniquable FieldLabelString where
-  getUnique (FieldLabelString fs) = getUnique (mkFastStringShortText fs)
 
 -- | Flag to indicate whether the DuplicateRecordFields extension is enabled.
 data DuplicateRecordFields

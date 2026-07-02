@@ -115,12 +115,17 @@ import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
 import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Binds.InlinePragma
 import Language.Haskell.Syntax.Decls.Overlap ( OverlapMode(..) )
+import Language.Haskell.Syntax.Doc
+import Language.Haskell.Syntax.ImpExp ( NamespaceSpecifier(..) )
 import Language.Haskell.Syntax.Module.Name ( ModuleName(..) )
+import Language.Haskell.Syntax.Specificity
 import Language.Haskell.Syntax.Text
+import Language.Haskell.Syntax.Type ( PromotionFlag(..) )
 
 import GHC.Prelude.Basic
 
 import GHC.Utils.BufHandle (BufHandle, bPutChar, bPutStr, bPutFS, bPutFZS)
+import GHC.Utils.Encoding ( utf8DecodeByteString )
 import GHC.Data.FastString
 import qualified GHC.Utils.Ppr as Pretty
 import qualified GHC.Utils.Ppr.Colour as Col
@@ -1108,6 +1113,28 @@ instance Outputable Extension where
 instance Outputable ModuleName where
   ppr = pprModuleName
 
+instance Outputable FieldLabelString where
+  ppr (FieldLabelString l) = ppr l
+
+instance Outputable ForAllTyFlag where
+  ppr Required  = text "[req]"
+  ppr Specified = text "[spec]"
+  ppr Inferred  = text "[infrd]"
+
+instance Outputable HsDocStringDecorator where
+  ppr HsDocStringNext        = text "|"
+  ppr HsDocStringPrevious    = text "^"
+  ppr (HsDocStringNamed n)   = char '$' <> text n
+  ppr (HsDocStringGroup n)   = text (replicate n '*')
+
+instance Outputable HsDocStringChunk where
+  ppr (HsDocStringChunk bs) = text (utf8DecodeByteString bs)
+
+-- | For compatibility with the existing @-ddump-parsed@ output, we only show
+-- the docstring.
+instance Outputable a => Outputable (WithHsDocIdentifiers a pass) where
+  ppr (WithHsDocIdentifiers s _ids) = ppr s
+
 instance Outputable OsPath where
   ppr p = text $ either show id (decodeUtf p)
 
@@ -2039,6 +2066,35 @@ instance Outputable TopLevelFlag where
   ppr TopLevel    = text "<TopLevel>"
   ppr NotTopLevel = text "<NotTopLevel>"
 
+instance Outputable LexicalFixity where
+  ppr Prefix = text "Prefix"
+  ppr Infix  = text "Infix"
+
+instance Outputable FixityDirection where
+  ppr InfixL = text "infixl"
+  ppr InfixR = text "infixr"
+  ppr InfixN = text "infix"
+
+instance Outputable Fixity where
+  ppr (Fixity prec dir) = hcat [ppr dir, space, int prec]
+
+instance Outputable SrcStrictness where
+    ppr SrcLazy     = char '~'
+    ppr SrcStrict   = char '!'
+    ppr NoSrcStrict = empty
+
+instance Outputable SrcUnpackedness where
+    ppr SrcUnpack   = text "{-# UNPACK #-}"
+    ppr SrcNoUnpack = text "{-# NOUNPACK #-}"
+    ppr NoSrcUnpack = empty
+
+instance Outputable PromotionFlag where
+  ppr NotPromoted = text "NotPromoted"
+  ppr IsPromoted  = text "IsPromoted"
+
+instance Outputable Role where
+  ppr = ftext . strFromRole
+
 instance Outputable (OverlapMode p) where
   ppr (NoOverlap    _) = empty
   ppr (Overlappable _) = text "[overlappable]"
@@ -2047,3 +2103,9 @@ instance Outputable (OverlapMode p) where
   ppr (Incoherent   _) = text "[incoherent]"
   ppr (NonCanonical _) = text "[noncanonical]"
   ppr (XOverlapMode _) = text "[user TTG extension]"
+
+instance Outputable (NamespaceSpecifier p) where
+  ppr NoNamespaceSpecifier{}   = empty
+  ppr TypeNamespaceSpecifier{} = text "type"
+  ppr DataNamespaceSpecifier{} = text "data"
+  ppr (XNamespaceSpecifier _)  = text "[user TTG extension]"

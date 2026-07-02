@@ -74,7 +74,7 @@ import Control.DeepSeq
 import Data.Data        hiding (TyCon, Fixity, Infix)
 import Data.Maybe
 import Data.Eq
-import Prelude (Enum, Show)
+import Prelude (Enum, Show, seq)
 
 {-
 ************************************************************************
@@ -211,6 +211,12 @@ data CCallTarget pass
   | DynamicTarget (XDynamicTarget pass)
   | XCCallTarget !(XXCCallTarget pass)
 
+instance (NFData (XStaticTarget pass), NFData (XDynamicTarget pass), NFData (XXCCallTarget pass))
+      => NFData (CCallTarget pass) where
+  rnf (StaticTarget x a b) = rnf a `seq` rnf b `seq` rnf x
+  rnf (DynamicTarget x) = rnf x
+  rnf (XCCallTarget x) = rnf x
+
 data CExportSpec
   -- | foreign export ccall foo :: ty
   = CExportStatic
@@ -228,12 +234,21 @@ data CType pass
       HText
   | XCType !(XXCType pass)
 
+instance (NFData (XCType pass), NFData (Header pass), NFData (XXCType pass))
+      => NFData (CType pass) where
+  rnf (CType ext mh fs) = rnf ext `seq` rnf mh `seq` rnf fs
+  rnf (XCType x) = rnf x
+
 -- | The filename for a C header file
 data Header pass
   = Header
       (XHeader pass)
       HText
   | XHeader !(XXHeader pass)
+
+instance (NFData (XHeader pass), NFData (XXHeader pass)) => NFData (Header pass) where
+  rnf (Header s h) = rnf s `seq` rnf h
+  rnf (XHeader x) = rnf x
 
 data Safety
   = PlaySafe          -- ^ Might invoke Haskell GC, or do a call back, or

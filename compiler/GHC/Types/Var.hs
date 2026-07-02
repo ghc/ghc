@@ -129,7 +129,6 @@ import GHC.Utils.Binary
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import GHC.Hs.Specificity ()
 import Language.Haskell.Syntax.Specificity
 import Control.DeepSeq
 

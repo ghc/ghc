@@ -9,16 +9,8 @@
 -}
 
 {-# OPTIONS_GHC -Wno-orphans #-}
-{-
-Suppression of warnings are required for instances:
-  - Binary Activation
-  - Binary CompilerPhase
-  - Binary InlinePragma
-  - Binary InlineSaturation
-  - Binary XActivation
-  - Binary XInlinePragmaGhc
-  - Outputable CompilerPhase
--}
+-- Required for TTG type-family definitions,
+-- There are no orphan type-class instances
 
 module GHC.Types.InlinePragma
   ( -- * Inline Pragma Encoding
@@ -494,10 +486,6 @@ no harm.
     always returns 'False' when its second argument is 'NeverActive'.
 -}
 
-{- TODO: These orphan instance should be moved to the GHC.Utils.{Binary,Outputable}
-modules once TTG has progressed and the Language.Haskell.Syntax.Types module
-no longer depends on importing GHC.Hs.Doc.
--}
 instance Binary XInlinePragmaGhc where
     put_ bh (XInlinePragmaGhc s a) = do
             put_ bh s
@@ -507,26 +495,6 @@ instance Binary XInlinePragmaGhc where
            s <- get bh
            a <- get bh
            return (XInlinePragmaGhc s a)
-
-instance forall p. IsPass p => Binary (InlinePragma (GhcPass p)) where
-    put_ bh (InlinePragma s a b c) = do
-            put_ bh a
-            put_ bh b
-            put_ bh c
-            case ghcPass @p of
-              GhcPs -> put_ bh s
-              GhcRn -> put_ bh s
-              GhcTc -> put_ bh s
-
-    get bh = do
-           a <- get bh
-           b <- get bh
-           c <- get bh
-           s <- case ghcPass @p of
-                  GhcPs -> get bh
-                  GhcRn -> get bh
-                  GhcTc -> get bh
-           return (InlinePragma s a b c)
 
 instance Binary InlineSaturation where
     put_ bh AnySaturation = putByte bh 0
@@ -620,5 +588,24 @@ pprInline' emptyInline (InlinePragma
         AnySaturation -> empty
         AppliedToAtLeast ar -> parens (text "sat-args=" <> int ar)
 
+{- TODO: This orphan instance should be moved to GHC.Utils.Outputable once that
+module can import 'GhcPass' without causing an import cycle.
+@
+┌──────▶ GHC.Utils.Outputable
+│               │
+│               │ Needs to access GhcPass for instance:
+│               │ Outputable (InlinePragma (GhcPass p))
+│               ▼
+│       GHC.Hs.Extension.Pass
+│               │
+│               │ For GenLocated, SrcSpan, unLoc
+│               ▼
+│       GHC.Types.SrcLoc
+│               │
+│               │ for Outputable, SDoc,
+│               │ pprFastFilePath, ppr combinators
+└───────────────┘
+@
+-}
 instance forall p. IsPass p => Outputable (InlinePragma (GhcPass p)) where
   ppr = pprInline

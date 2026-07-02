@@ -9,6 +9,7 @@ module Language.Haskell.Syntax.Extension where
 -- This module captures the type families to precisely identify the extension
 -- points for GHC.Hs syntax
 
+import Control.DeepSeq
 import Data.Type.Equality (type (~))
 
 import Data.Data hiding ( Fixity )
@@ -16,6 +17,7 @@ import Data.Kind (Type)
 
 import Data.Eq
 import Data.Ord
+import Text.Show
 
 {-
 Note [Trees That Grow]
@@ -62,6 +64,9 @@ See also Note [IsPass] and Note [NoGhcTc] in GHC.Hs.Extension.
 data NoExtField = NoExtField
   deriving (Data,Eq,Ord)
 
+instance NFData NoExtField where
+  rnf NoExtField = ()
+
 -- | Used when constructing a term with an unused extension point.
 noExtField :: NoExtField
 noExtField = NoExtField
@@ -95,7 +100,10 @@ can only do that if the extension field was strict (#18764).
 See also [DataConCantHappen and strict fields].
 -}
 data DataConCantHappen
-  deriving (Data,Eq,Ord)
+  deriving (Data,Eq,Ord,Show)
+
+instance NFData DataConCantHappen where
+  rnf = dataConCantHappen
 
 -- | Eliminate a 'DataConCantHappen'. See Note [Constructor cannot occur].
 dataConCantHappen :: DataConCantHappen -> a

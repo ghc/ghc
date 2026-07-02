@@ -1,4 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+                                      -- in module Language.Haskell.Syntax.Extension
 module Language.Haskell.Syntax.ImpExp ( module Language.Haskell.Syntax.ImpExp, IsBootInterface(..) ) where
 
 import Language.Haskell.Syntax.Doc (LHsDoc)
@@ -6,9 +8,9 @@ import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Module.Name
 import Language.Haskell.Syntax.ImpExp.IsBoot ( IsBootInterface(..) )
 
-import Data.Eq (Eq)
+import Data.Eq (Eq(..))
 import Data.Data (Data)
-import Data.Bool (Bool)
+import Data.Bool (Bool(..))
 import Data.Maybe (Maybe)
 import Data.String (String)
 import Data.Int (Int)

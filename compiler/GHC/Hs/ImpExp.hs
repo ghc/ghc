@@ -447,8 +447,3 @@ coveredByNamespaceSpecifier DataNamespaceSpecifier{} = isValNameSpace
 filterByNamespaceSpecifierGREs :: NamespaceSpecifier (GhcPass p) -> [GlobalRdrElt] -> [GlobalRdrElt]
 filterByNamespaceSpecifierGREs NoNamespaceSpecifier{} = id
 filterByNamespaceSpecifierGREs ns_spec = filterByNamespaceGREs (coveredByNamespaceSpecifier ns_spec)
-
-instance Outputable (NamespaceSpecifier (GhcPass p)) where
-  ppr NoNamespaceSpecifier{} = empty
-  ppr TypeNamespaceSpecifier{} = text "type"
-  ppr DataNamespaceSpecifier{} = text "data"

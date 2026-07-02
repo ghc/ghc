@@ -65,6 +65,18 @@ data HsDocString pass
   | XHsDocString
       !(XXHsDocString pass)
 
+instance
+  ( NFData (XMultiLineDocString pass)
+  , NFData (XNestedDocString pass)
+  , NFData (XGeneratedDocString pass)
+  , NFData (XXHsDocString pass)
+  , NFData (LHsDocStringChunk pass)
+  ) => NFData (HsDocString pass) where
+  rnf (MultiLineDocString x a b) = rnf x `seq` rnf a `seq` rnf b
+  rnf (NestedDocString x a b) = rnf x `seq` rnf a `seq` rnf b
+  rnf (GeneratedDocString x a) = rnf x `seq` rnf a
+  rnf (XHsDocString x) = rnf x
+
 mkGeneratedHsDocString :: XGeneratedDocString p -> HsDocStringChunk -> HsDocString p
 mkGeneratedHsDocString x = GeneratedDocString x
 
@@ -110,3 +122,6 @@ data WithHsDocIdentifiers a pass = WithHsDocIdentifiers
   { hsDocString      :: !a
   , hsDocIdentifiers :: ![LIdP pass]
   }
+
+instance (UnXRec pass, NFData (IdP pass), NFData a) => NFData (WithHsDocIdentifiers a pass) where
+  rnf (WithHsDocIdentifiers d i) = rnf d `seq` rnf (map (unXRec @pass) i)

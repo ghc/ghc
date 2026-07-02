@@ -63,16 +63,6 @@ type instance Anno (WithHsDocIdentifiers (HsDocString (GhcPass pass)) (GhcPass p
 deriving instance (Data pass, Data (LIdP pass), Data a) => Data (WithHsDocIdentifiers a pass)
 deriving instance (Eq (LIdP pass), Eq a) => Eq (WithHsDocIdentifiers a pass)
 
-instance (UnXRec pass, NFData (IdP pass), NFData a) => NFData (WithHsDocIdentifiers a pass) where
-  rnf (WithHsDocIdentifiers d i) = rnf d `seq` rnf (map (unXRec @pass) i)
-
--- | For compatibility with the existing @-ddump-parsed' output, we only show
--- the docstring.
---
--- Use 'pprHsDoc' to show `HsDoc`'s internals.
-instance Outputable a => Outputable (WithHsDocIdentifiers a pass) where
-  ppr (WithHsDocIdentifiers s _ids) = ppr s
-
 instance Binary a => Binary (WithHsDocIdentifiers a GhcRn) where
   put_ bh (WithHsDocIdentifiers s ids) = do
       put_ bh s

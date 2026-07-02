@@ -14,6 +14,7 @@ module Language.Haskell.Syntax.Specificity (
 
 import Prelude
 
+import Control.DeepSeq (NFData(..))
 import Data.Data
 
 -- | ForAllTyFlag
@@ -27,6 +28,10 @@ data ForAllTyFlag = Invisible !Specificity
   deriving (Eq, Ord, Data)
   -- (<) on ForAllTyFlag means "is less visible than"
 
+instance NFData ForAllTyFlag where
+  rnf (Invisible spec) = rnf spec
+  rnf Required = ()
+
 -- | Whether an 'Invisible' argument may appear in source Haskell.
 data Specificity = InferredSpec
                    -- ^ the argument may not appear in source Haskell, it is
@@ -35,6 +40,10 @@ data Specificity = InferredSpec
                    -- ^ the argument may appear in source Haskell, but isn't
                    -- required.
   deriving (Eq, Ord, Data)
+
+instance NFData Specificity where
+  rnf SpecifiedSpec = ()
+  rnf InferredSpec = ()
 
 pattern Inferred, Specified :: ForAllTyFlag
 pattern Inferred  = Invisible InferredSpec

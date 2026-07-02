@@ -137,7 +137,6 @@ import GHC.Hs           -- Lots of it
 import GHC.Core.TyCon          ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
 import GHC.Core.DataCon        ( DataCon, dataConTyCon, dataConName )
 import GHC.Core.ConLike        ( ConLike(..) )
-import GHC.Core.Coercion.Axiom ( fsFromRole )
 import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.Basic
@@ -425,7 +424,7 @@ mkRoleAnnotDecl loc tycon roles anns
   where
     role_data_type = dataTypeOf (undefined :: Role)
     all_roles = map fromConstr $ dataTypeConstrs role_data_type
-    possible_roles = [(fsFromRole role, role) | role <- all_roles]
+    possible_roles = [(strFromRole role, role) | role <- all_roles]
 
     parse_role (L loc_role Nothing) = return $ L (noAnnSrcSpan loc_role) Nothing
     parse_role (L loc_role (Just role))
