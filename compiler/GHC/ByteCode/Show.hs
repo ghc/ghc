@@ -8,16 +8,29 @@ module GHC.ByteCode.Show (showByteCode) where
 import Prelude ((+), (-), Integral, div)
 import Control.Arrow ((>>>))
 import Control.Exception (assert)
-import Data.Eq ((==))
+import Data.Eq (Eq, (==))
+import Data.Ord ((<=))
 import Data.Bits (FiniteBits, finiteBitSize)
 import Data.Function (($), id, (.))
 import Data.Tuple (fst, snd, uncurry)
 import Data.Bool (Bool, otherwise, not, (&&))
 import Data.Int (Int)
 import Data.Word (Word)
-import Data.Maybe (Maybe, maybe)
+import Data.Maybe (Maybe (Nothing, Just), maybe)
 import Data.Either (Either, either)
-import Data.List (length, (++), map, zipWith, zipWith5, take, drop, replicate)
+import Data.List
+       (
+           length,
+           (++),
+           repeat,
+           map,
+           zipWith,
+           zipWith5,
+           and,
+           take,
+           drop,
+           replicate
+       )
 import Data.String (String)
 import Data.ByteString (ByteString, unpack)
 import Data.ByteString.Short (ShortByteString)
@@ -44,6 +57,7 @@ import GHC.Utils.Outputable
        (
            defaultDumpStyle,
            SDoc,
+           empty,
            text,
            (<>),
            (<+>),
@@ -297,33 +311,75 @@ pprBreakpointsInSource :: Module -> ModBreaks -> SDoc
 pprBreakpointsInSource currentModule ModBreaks {..}
     = entry (text "breakpoints in source:")                    $
       assert (modBreaks_module == currentModule)               $
-      assert boundsAreIdentical                                $
+      assert boundsAreConsistent                               $
       vcatOrNone                                               $
       zipWith5 pprBreakpointInSource (indices modBreaks_locs_)
                                      (elems modBreaks_locs_)
                                      (elems modBreaks_decls)
                                      (elems modBreaks_vars)
-                                     (elems modBreaks_ccs)
+                                     potentialCostCenterInfos
     where
 
-    boundsAreIdentical :: Bool
-    boundsAreIdentical = bounds modBreaks_locs_ == bounds modBreaks_decls &&
-                         bounds modBreaks_locs_ == bounds modBreaks_vars  &&
-                         bounds modBreaks_locs_ == bounds modBreaks_ccs
+    costCenterInfoIsPresent :: Bool
+    costCenterInfoIsPresent = fst (bounds modBreaks_ccs) <=
+                              snd (bounds modBreaks_ccs)
+
+    boundsAreConsistent :: Bool
+    boundsAreConsistent
+        = allAreEqual $
+          [
+              bounds modBreaks_locs_,
+              bounds modBreaks_decls,
+              bounds modBreaks_vars
+          ] ++ if costCenterInfoIsPresent then [bounds modBreaks_ccs] else []
+        where
+
+        allAreEqual :: Eq a => [a] -> Bool
+        allAreEqual list = and $ zipWith (==) list (drop 1 list)
+
+    potentialCostCenterInfos :: [Maybe (ShortByteString, ShortByteString)]
+    potentialCostCenterInfos
+        | costCenterInfoIsPresent = map Just (elems modBreaks_ccs)
+        | otherwise               = repeat Nothing
 
 -- | […]
 pprBreakpointInSource :: BreakTickIndex
                       -> BinSrcSpan
                       -> [String]
                       -> [OccName]
-                      -> (ShortByteString, ShortByteString)
+                      -> Maybe (ShortByteString, ShortByteString)
                       -> SDoc
-pprBreakpointInSource ix srcSpan declarationPath freeVars costCenterInfo
+pprBreakpointInSource ix
+                      srcSpan
+                      declarationPath
+                      freeVars
+                      potentialCostCenterInfo
     = entry (text "breakpoint" <+> ppr ix <> text ":") $
       vcat [
-               pprSrcSpan            $ srcSpan,
-               pprDeclarationPath    $ declarationPath,
-               pprFreeVariables      $ freeVars,
+               pprSrcSpan                 $ srcSpan,
+               pprDeclarationPath         $ declarationPath,
+               pprFreeVariables           $ freeVars,
+               pprPotentialCostCenterInfo $ potentialCostCenterInfo
+           ]
+
+-- | […]
+pprSrcSpan :: BinSrcSpan -> SDoc
+pprSrcSpan = entry (text "source span:") . ppr . unBinSrcSpan
+
+-- | […]
+pprDeclarationPath :: [String] -> SDoc
+pprDeclarationPath = entry (text "declaration path:") . vcat . map text
+
+-- | […]
+pprFreeVariables :: [OccName] -> SDoc
+pprFreeVariables = entry (text "free variables:") . hsep . map ppr
+
+-- | […]
+pprPotentialCostCenterInfo :: Maybe (ShortByteString, ShortByteString) -> SDoc
+pprPotentialCostCenterInfo Nothing
+    = empty
+pprPotentialCostCenterInfo (Just costCenterInfo)
+    = vcat [
                pprCostCenterPath     $ costCenterPath,
                pprCostCenterLocation $ costCenterLocation
            ]
@@ -337,18 +393,6 @@ pprBreakpointInSource ix srcSpan declarationPath freeVars costCenterInfo
 
     -- The structure of the cost center information is apparent from the
     -- implementation of 'GHC.HsToCore.Breakpoints.mkModBreaks'.
-
--- | […]
-pprSrcSpan :: BinSrcSpan -> SDoc
-pprSrcSpan = entry (text "source span:") . ppr . unBinSrcSpan
-
--- | […]
-pprDeclarationPath :: [String] -> SDoc
-pprDeclarationPath = entry (text "declaration path:") . vcat . map text
-
--- | […]
-pprFreeVariables :: [OccName] -> SDoc
-pprFreeVariables = entry (text "free variables:") . hsep . map ppr
 
 -- | […]
 pprCostCenterPath :: String -> SDoc
