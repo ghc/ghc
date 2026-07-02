@@ -179,7 +179,7 @@ pprLiteral currentModule literal = case literal of
         -> text "label" <+>
            ppr label
     BCONPtrItbl infoTableName
-        -> text "info table" <+>
+        -> text "info table of" <+>
            ppr infoTableName
     BCONPtrAddr addrName
         -> text "address" <+>
