@@ -96,4 +96,5 @@ ghcWarningsArgs = do
                                       ]
         , package xhtml        ? pure [ "-Wno-unused-imports" ]
         , package containers   ? pure [ "-Wno-unused-imports" ]
+        , package semaphoreCompat ? pure [ "-Wno-unused-imports" ]
         ] ]
