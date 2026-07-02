@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wno-orphans     #-} -- Outputable
-
 -- (c) The University of Glasgow 2012
 
 -- | Module for coercion axioms, used to represent type family instances
@@ -22,7 +20,7 @@ module GHC.Core.Coercion.Axiom (
        coAxBranchLHS, coAxBranchRHS, coAxBranchSpan, coAxBranchIncomps,
        placeHolderIncomps,
 
-       Role(..), fsFromRole,
+       Role(..),
 
        CoAxiomRule(..), BuiltInFamRewrite(..), BuiltInFamInjectivity(..), TypeEqn,
        coAxiomRuleArgRoles, coAxiomRuleRole,
@@ -43,7 +41,6 @@ import GHC.Types.Name
 import GHC.Types.Unique
 import GHC.Types.Var
 import GHC.Utils.Misc
-import GHC.Utils.Binary
 import GHC.Utils.Panic
 import GHC.Data.Pair
 import GHC.Types.Basic
@@ -52,7 +49,6 @@ import GHC.Types.SrcLoc
 import qualified Data.Data as Data
 import Data.Array
 import Data.List ( mapAccumL )
-import Control.DeepSeq
 
 {-
 Note [Coercion axiom branches]
@@ -520,44 +516,6 @@ instance Outputable CoAxBranch where
                            , nest 2 (text "=" <+> ppr rhs)
                            , ppUnless (null incomps) $
                              text "incomps:" <+> vcat (map ppr incomps) ])
-
-{-
-************************************************************************
-*                                                                      *
-                    Roles
-*                                                                      *
-************************************************************************
-
-Roles are defined here to avoid circular dependencies.
--}
-
--- These names are slurped into the parser code. Changing these strings
--- will change the **surface syntax** that GHC accepts! If you want to
--- change only the pretty-printing, do some replumbing. See
--- mkRoleAnnotDecl in GHC.Parser.PostProcess
-fsFromRole :: Role -> FastString
-fsFromRole Nominal          = fsLit "nominal"
-fsFromRole Representational = fsLit "representational"
-fsFromRole Phantom          = fsLit "phantom"
-
-instance Outputable Role where
-  ppr = ftext . fsFromRole
-
-instance Binary Role where
-  put_ bh Nominal          = putByte bh 1
-  put_ bh Representational = putByte bh 2
-  put_ bh Phantom          = putByte bh 3
-
-  get bh = do tag <- getByte bh
-              case tag of 1 -> return Nominal
-                          2 -> return Representational
-                          3 -> return Phantom
-                          _ -> panic ("get Role " ++ show tag)
-
-instance NFData Role where
-  rnf Nominal = ()
-  rnf Representational = ()
-  rnf Phantom = ()
 
 {-
 ************************************************************************

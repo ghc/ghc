@@ -566,7 +566,6 @@ Library
         GHC.Hs.Instances
         GHC.Hs.Lit
         GHC.Hs.Pat
-        GHC.Hs.Specificity
         GHC.Hs.Stats
         GHC.HsToCore
         GHC.HsToCore.Arrows

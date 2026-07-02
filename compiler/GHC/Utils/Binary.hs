@@ -1,5 +1,8 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE DerivingVia #-}
 
@@ -119,8 +122,13 @@ import GHC.Prelude
 
 import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Binds.InlinePragma
+import Language.Haskell.Syntax.Decls.Overlap
+import Language.Haskell.Syntax.Doc
+import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Module.Name (ModuleName(..))
 import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
+import Language.Haskell.Syntax.Specificity
+import Language.Haskell.Syntax.Type (PromotionFlag(..))
 
 import {-# SOURCE #-} GHC.Types.Name (Name)
 import GHC.Data.ShortText (ShortText)
@@ -164,7 +172,7 @@ import qualified Data.Map.Strict as Map
 import Data.Proxy
 import Data.Set                 ( Set )
 import qualified Data.Set as Set
-import Data.Time
+import Data.Time hiding ( Nominal )
 import Data.List (unfoldr)
 import System.IO as IO
 import System.IO.Error          ( mkIOError, eofErrorType )
@@ -1926,6 +1934,85 @@ instance Binary ModuleName where
   put_ bh (ModuleName fs) = put_ bh fs
   get bh = do fs <- get bh; return (ModuleName fs)
 
+instance Binary Specificity where
+  put_ bh SpecifiedSpec = putByte bh 0
+  put_ bh InferredSpec  = putByte bh 1
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return SpecifiedSpec
+      _ -> return InferredSpec
+
+instance Binary ForAllTyFlag where
+  put_ bh Required  = putByte bh 0
+  put_ bh Specified = putByte bh 1
+  put_ bh Inferred  = putByte bh 2
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return Required
+      1 -> return Specified
+      _ -> return Inferred
+
+instance Binary HsDocStringDecorator where
+  put_ bh x = case x of
+    HsDocStringNext -> putByte bh 0
+    HsDocStringPrevious -> putByte bh 1
+    HsDocStringNamed n -> putByte bh 2 >> put_ bh n
+    HsDocStringGroup n -> putByte bh 3 >> put_ bh n
+
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> pure HsDocStringNext
+      1 -> pure HsDocStringPrevious
+      2 -> HsDocStringNamed <$> get bh
+      3 -> HsDocStringGroup <$> get bh
+      t -> fail $ "HsDocStringDecorator: invalid tag " ++ show t
+
+instance Binary HsDocStringChunk where
+  put_ bh (HsDocStringChunk bs) = put_ bh bs
+  get bh = HsDocStringChunk <$> get bh
+
+instance ( Binary (XInlinePragma p)
+         , Binary (Activation p)
+         , XXInlinePragma p ~ DataConCantHappen
+         ) => Binary (InlinePragma p) where
+  put_ bh (InlinePragma s a b c) = do
+    put_ bh a
+    put_ bh b
+    put_ bh c
+    put_ bh s
+
+  get bh = do
+    a <- get bh
+    b <- get bh
+    c <- get bh
+    s <- get bh
+    return (InlinePragma s a b c)
+
+instance ( Binary (XOverlapMode p)
+         , XXOverlapMode p ~ DataConCantHappen
+         ) => Binary (OverlapMode p) where
+  put_ bh (NoOverlap    s) = putByte bh 0 >> put_ bh s
+  put_ bh (Overlaps     s) = putByte bh 1 >> put_ bh s
+  put_ bh (Incoherent   s) = putByte bh 2 >> put_ bh s
+  put_ bh (Overlapping  s) = putByte bh 3 >> put_ bh s
+  put_ bh (Overlappable s) = putByte bh 4 >> put_ bh s
+  put_ bh (NonCanonical s) = putByte bh 5 >> put_ bh s
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> get bh >>= \s -> return $ NoOverlap    s
+      1 -> get bh >>= \s -> return $ Overlaps     s
+      2 -> get bh >>= \s -> return $ Incoherent   s
+      3 -> get bh >>= \s -> return $ Overlapping  s
+      4 -> get bh >>= \s -> return $ Overlappable s
+      _ -> get bh >>= \s -> return $ NonCanonical s
+
 newtype BinLocated a = BinLocated { unBinLocated :: Located a }
 
 instance Binary a => Binary (BinLocated a) where
@@ -2088,6 +2175,26 @@ instance Binary Boxity where -- implemented via isBoxed-isomorphism to Bool
     b <- get bh
     pure $ if b then Boxed else Unboxed
 
+instance Binary Fixity where
+  put_ bh (Fixity aa ab) = do
+    put_ bh aa
+    put_ bh ab
+  get bh = do
+    aa <- get bh
+    ab <- get bh
+    return (Fixity aa ab)
+
+instance Binary FixityDirection where
+  put_ bh InfixL = putByte bh 0
+  put_ bh InfixR = putByte bh 1
+  put_ bh InfixN = putByte bh 2
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return InfixL
+      1 -> return InfixR
+      _ -> return InfixN
+
 instance Binary ConInfoTable where
   get bh = Binary.decode <$> get bh
 
@@ -2150,3 +2257,49 @@ instance Binary RuleMatchInfo where
       h <- getByte bh
       if h == 1 then pure ConLike
                 else pure FunLike
+
+instance Binary Role where
+  put_ bh Nominal          = putByte bh 1
+  put_ bh Representational = putByte bh 2
+  put_ bh Phantom          = putByte bh 3
+
+  get bh = do tag <- getByte bh
+              case tag of 1 -> return Nominal
+                          2 -> return Representational
+                          3 -> return Phantom
+                          _ -> panic ("get Role " ++ show tag)
+
+instance Binary SrcStrictness where
+    put_ bh SrcLazy     = putByte bh 0
+    put_ bh SrcStrict   = putByte bh 1
+    put_ bh NoSrcStrict = putByte bh 2
+
+    get bh =
+      do h <- getByte bh
+         case h of
+           0 -> return SrcLazy
+           1 -> return SrcStrict
+           _ -> return NoSrcStrict
+
+instance Binary SrcUnpackedness where
+    put_ bh SrcNoUnpack = putByte bh 0
+    put_ bh SrcUnpack   = putByte bh 1
+    put_ bh NoSrcUnpack = putByte bh 2
+
+    get bh =
+      do h <- getByte bh
+         case h of
+           0 -> return SrcNoUnpack
+           1 -> return SrcUnpack
+           _ -> return NoSrcUnpack
+
+instance Binary PromotionFlag where
+   put_ bh NotPromoted = putByte bh 0
+   put_ bh IsPromoted  = putByte bh 1
+
+   get bh = do
+       n <- getByte bh
+       case n of
+         0 -> return NotPromoted
+         1 -> return IsPromoted
+         _ -> fail "Binary(IsPromoted): fail)"

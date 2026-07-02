@@ -319,13 +319,6 @@ type instance XXHeader (GhcPass p) = DataConCantHappen
 
 deriving instance Eq (Header (GhcPass p))
 
-instance NFData (CType (GhcPass p)) where
-    rnf (CType ext mh fs) =
-      rnf ext `seq` rnf mh `seq` rnf fs
-
-instance NFData (Header (GhcPass p)) where
-    rnf (Header s h) =
-      rnf s `seq` rnf h
 
 instance NFData CCallStaticTargetUnit where
     rnf = \case
@@ -387,14 +380,6 @@ instance forall p. IsPass p => Eq (CCallTarget (GhcPass p)) where
           GhcRn -> x1 == x2
           GhcTc -> x1 == x2
         _ -> False
-
-instance forall p. IsPass p => NFData (CCallTarget (GhcPass p)) where
-    rnf = \case
-      DynamicTarget NoExtField -> ()
-      StaticTarget x a b -> rnf a `seq` rnf b `seq` case ghcPass @p of
-        GhcPs -> rnf x
-        GhcRn -> rnf x
-        GhcTc -> rnf x
 
 instance forall p. IsPass p => Binary (CCallTarget (GhcPass p)) where
     put_ bh = \case

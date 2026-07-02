@@ -14,14 +14,6 @@ types that
 \end{itemize}
 -}
 
-{-# OPTIONS_GHC -Wno-orphans #-}
-{-
-Above flag is necessary for these instances:
-  * Binary Boxity
-  * Binary PromotionFlag
-  * Outputable Boxity
-  * Outputable PromotionFlag
--}
 {-# LANGUAGE DerivingVia #-}
 
 module GHC.Types.Basic (
@@ -376,27 +368,6 @@ unSwap :: SwapFlag -> (a->a->b) -> a -> a -> b
 unSwap NotSwapped f a b = f a b
 unSwap IsSwapped  f a b = f b a
 
-
-{- *********************************************************************
-*                                                                      *
-           Promotion flag
-*                                                                      *
-********************************************************************* -}
-
-instance Outputable PromotionFlag where
-  ppr NotPromoted = text "NotPromoted"
-  ppr IsPromoted  = text "IsPromoted"
-
-instance Binary PromotionFlag where
-   put_ bh NotPromoted = putByte bh 0
-   put_ bh IsPromoted  = putByte bh 1
-
-   get bh = do
-       n <- getByte bh
-       case n of
-         0 -> return NotPromoted
-         1 -> return IsPromoted
-         _ -> fail "Binary(IsPromoted): fail)"
 
 {-
 ************************************************************************

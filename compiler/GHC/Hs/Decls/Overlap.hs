@@ -1,12 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- XOverlapMode, XXOverlapMode
-
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-{- Necessary for the following instances:
-  * (type class):  Binary OverlapMode
-  * (type class):  NFData OverlapMode
--}
+{-# OPTIONS_GHC -fno-warn-orphans #-} -- XOverlapMode, XXOverlapMode
 
 {- |
 Data-types describing the overlap annotations for instances as well as
@@ -73,34 +68,6 @@ instance Outputable OverlapFlag where
 type instance XOverlapMode  (GhcPass _) = SourceText
 
 type instance XXOverlapMode (GhcPass _) = DataConCantHappen
-
-instance NFData (OverlapMode (GhcPass p)) where
-    rnf = \case
-        NoOverlap    s -> rnf s
-        Overlappable s -> rnf s
-        Overlapping  s -> rnf s
-        Overlaps     s -> rnf s
-        Incoherent   s -> rnf s
-        NonCanonical s -> rnf s
-
-instance Binary (OverlapMode (GhcPass p)) where
-    put_ bh = \case
-        NoOverlap    s -> putByte bh 0 >> put_ bh s
-        Overlaps     s -> putByte bh 1 >> put_ bh s
-        Incoherent   s -> putByte bh 2 >> put_ bh s
-        Overlapping  s -> putByte bh 3 >> put_ bh s
-        Overlappable s -> putByte bh 4 >> put_ bh s
-        NonCanonical s -> putByte bh 5 >> put_ bh s
-
-    get bh = do
-        h <- getByte bh
-        case h of
-            0 -> get bh >>= \s -> return $ NoOverlap    s
-            1 -> get bh >>= \s -> return $ Overlaps     s
-            2 -> get bh >>= \s -> return $ Incoherent   s
-            3 -> get bh >>= \s -> return $ Overlapping  s
-            4 -> get bh >>= \s -> return $ Overlappable s
-            _ -> get bh >>= \s -> return $ NonCanonical s
 
 pprSafeOverlap :: Bool -> SDoc
 pprSafeOverlap True  = text "[safe]"

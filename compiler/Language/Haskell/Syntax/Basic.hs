@@ -8,6 +8,7 @@ import Data.Data (Data)
 import Data.Eq
 import Data.Ord
 import Data.Bool
+import Data.String (IsString(..))
 import Prelude
 
 {-
@@ -93,6 +94,20 @@ Field Labels
 data Role = Nominal | Representational | Phantom
   deriving (Eq, Ord, Data)
 
+instance NFData Role where
+  rnf Nominal = ()
+  rnf Representational = ()
+  rnf Phantom = ()
+
+-- These names are slurped into the parser code. Changing these strings
+-- will change the **surface syntax** that GHC accepts! If you want to
+-- change only the pretty-printing, do some replumbing. See
+-- mkRoleAnnotDecl in GHC.Parser.PostProcess
+strFromRole :: IsString s => Role -> s
+strFromRole Nominal          = fromString "nominal"
+strFromRole Representational = fromString "representational"
+strFromRole Phantom          = fromString "phantom"
+
 {-
 ************************************************************************
 *                                                                      *
@@ -109,6 +124,11 @@ data SrcStrictness = SrcLazy -- ^ Lazy, ie '~'
                    | NoSrcStrict -- ^ no strictness annotation
      deriving (Eq, Data)
 
+instance NFData SrcStrictness where
+  rnf SrcLazy = ()
+  rnf SrcStrict = ()
+  rnf NoSrcStrict = ()
+
 -- | Source Unpackedness
 --
 -- What unpackedness the user requested
@@ -116,6 +136,11 @@ data SrcUnpackedness = SrcUnpack -- ^ {-# UNPACK #-} specified
                      | SrcNoUnpack -- ^ {-# NOUNPACK #-} specified
                      | NoSrcUnpack -- ^ no unpack pragma
      deriving (Eq, Data)
+
+instance NFData SrcUnpackedness where
+  rnf SrcNoUnpack = ()
+  rnf SrcUnpack = ()
+  rnf NoSrcUnpack = ()
 
 {-
 ************************************************************************

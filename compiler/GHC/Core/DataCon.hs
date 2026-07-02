@@ -5,8 +5,6 @@
 \section[DataCon]{@DataCon@: Data Constructors}
 -}
 
-{-# OPTIONS_GHC -Wno-orphans #-} -- Outputable, Binary
-
 module GHC.Core.DataCon (
         -- * Main data types
         DataCon, DataConRep(..),
@@ -109,7 +107,6 @@ import qualified Data.ByteString.Lazy    as LBS
 import qualified Data.Data as Data
 import Data.Char
 import Data.List( find )
-import Control.DeepSeq
 
 {-
 Note [Data constructor representation]
@@ -1030,16 +1027,6 @@ instance Outputable HsImplBang where
     ppr (HsUnpack (Just co))    = text "Unpacked" <> parens (ppr co)
     ppr (HsStrict b)            = text "StrictNotUnpacked" <> parens (ppr b)
 
-instance Outputable SrcStrictness where
-    ppr SrcLazy     = char '~'
-    ppr SrcStrict   = char '!'
-    ppr NoSrcStrict = empty
-
-instance Outputable SrcUnpackedness where
-    ppr SrcUnpack   = text "{-# UNPACK #-}"
-    ppr SrcNoUnpack = text "{-# NOUNPACK #-}"
-    ppr NoSrcUnpack = empty
-
 instance Outputable StrictnessMark where
     ppr MarkedStrict    = text "!"
     ppr NotMarkedStrict = empty
@@ -1053,40 +1040,6 @@ instance Binary StrictnessMark where
            0 -> return NotMarkedStrict
            1 -> return MarkedStrict
            _ -> panic "Invalid binary format"
-
-instance Binary SrcStrictness where
-    put_ bh SrcLazy     = putByte bh 0
-    put_ bh SrcStrict   = putByte bh 1
-    put_ bh NoSrcStrict = putByte bh 2
-
-    get bh =
-      do h <- getByte bh
-         case h of
-           0 -> return SrcLazy
-           1 -> return SrcStrict
-           _ -> return NoSrcStrict
-
-instance Binary SrcUnpackedness where
-    put_ bh SrcNoUnpack = putByte bh 0
-    put_ bh SrcUnpack   = putByte bh 1
-    put_ bh NoSrcUnpack = putByte bh 2
-
-    get bh =
-      do h <- getByte bh
-         case h of
-           0 -> return SrcNoUnpack
-           1 -> return SrcUnpack
-           _ -> return NoSrcUnpack
-
-instance NFData SrcStrictness where
-  rnf SrcLazy = ()
-  rnf SrcStrict = ()
-  rnf NoSrcStrict = ()
-
-instance NFData SrcUnpackedness where
-  rnf SrcNoUnpack = ()
-  rnf SrcUnpack = ()
-  rnf NoSrcUnpack = ()
 
 -- | Compare strictness annotations
 eqHsBang :: HsImplBang -> HsImplBang -> Bool

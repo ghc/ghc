@@ -68,7 +68,8 @@ import GHC.Exts (indexCharOffAddr#, Char(..), Int(..))
 import GHC.Word         ( Word64 )
 import Data.Char        ( chr, ord, isPrint )
 
-import Language.Haskell.Syntax.Module.Name
+import Language.Haskell.Syntax.Basic ( FieldLabelString(..) )
+import Language.Haskell.Syntax.Module.Name ( ModuleName(..) )
 
 {-
 ************************************************************************
@@ -419,6 +420,8 @@ instance Uniquable Word64 where
 instance Uniquable ModuleName where
   getUnique (ModuleName nm) = getUnique nm
 
+instance Uniquable FieldLabelString where
+  getUnique (FieldLabelString fs) = getUnique (mkFastStringShortText fs)
 
 {-
 ************************************************************************

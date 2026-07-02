@@ -5,6 +5,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
+-- Binary HsDocString
+-- Outputable HsDocString
 
 module GHC.Hs.DocString
   ( LHsDocString
@@ -44,7 +46,6 @@ import GHC.Hs.Extension.Pass (GhcPass, GhcPs, GhcRn, GhcTc)
 import Language.Haskell.Syntax.Doc
 import Language.Haskell.Syntax.Extension
 
-import Control.DeepSeq
 import Data.Data
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.List (intercalate)
@@ -82,11 +83,6 @@ instance (Show (LHsDocStringChunk pass), XXHsDocString pass ~ DataConCantHappen)
 instance Outputable (HsDocString (GhcPass p)) where
   ppr = text . renderHsDocString
 
-instance NFData (HsDocString (GhcPass p)) where
-  rnf (MultiLineDocString _ a b) = rnf a `seq` rnf b
-  rnf (NestedDocString _ a b) = rnf a `seq` rnf b
-  rnf (GeneratedDocString _ a) = rnf a
-
 -- | Annotate a pretty printed thing with its doc.
 -- The docstring comes after if it is 'HsDocStringPrevious'.
 -- Otherwise it comes before.
@@ -120,36 +116,11 @@ instance Binary (HsDocString (GhcPass p)) where
       2 -> GeneratedDocString noExtField <$> get bh
       t -> fail $ "HsDocString: invalid tag " ++ show t
 
-instance Outputable HsDocStringDecorator where
-  ppr = text . printDecorator
-
 printDecorator :: HsDocStringDecorator -> String
 printDecorator HsDocStringNext = "|"
 printDecorator HsDocStringPrevious = "^"
 printDecorator (HsDocStringNamed n) = '$':n
 printDecorator (HsDocStringGroup n) = replicate n '*'
-
-instance Binary HsDocStringDecorator where
-  put_ bh x = case x of
-    HsDocStringNext -> putByte bh 0
-    HsDocStringPrevious -> putByte bh 1
-    HsDocStringNamed n -> putByte bh 2 >> put_ bh n
-    HsDocStringGroup n -> putByte bh 3 >> put_ bh n
-  get bh = do
-    tag <- getByte bh
-    case tag of
-      0 -> pure HsDocStringNext
-      1 -> pure HsDocStringPrevious
-      2 -> HsDocStringNamed <$> get bh
-      3 -> HsDocStringGroup <$> get bh
-      t -> fail $ "HsDocStringDecorator: invalid tag " ++ show t
-
-instance Binary HsDocStringChunk where
-  put_ bh (HsDocStringChunk bs) = put_ bh bs
-  get bh = HsDocStringChunk <$> get bh
-
-instance Outputable HsDocStringChunk where
-  ppr = text . unpackHDSC
 
 mkGeneratedHsDocStringGhc :: String -> HsDocString (GhcPass p)
 mkGeneratedHsDocStringGhc = mkGeneratedHsDocString noExtField . mkHsDocStringChunk
