@@ -292,14 +292,14 @@ noParens :: SDoc -> SDoc
 noParens pp = pp
 
 pprOptCo :: Coercion -> SDoc
--- Print a coercion optionally; i.e. honouring -dsuppress-coercions
-pprOptCo co = sdocOption sdocSuppressCoercions $ \case
-              True  -> angleBrackets (text "Co:" <> int (coercionSize co)) <+> dcolon <+> co_type
-              False -> parens $ sep [ppr co, dcolon <+> co_type]
-    where
-      co_type = sdocOption sdocSuppressCoercionTypes $ \case
-          True  -> ellipsis
-          False -> ppr (coercionType co)
+-- Print a coercion with its type (unless suppressed by -dsuppress-coercion-types)
+-- Honour -dsuppress-coercions
+-- Placed here because it needs GHC.Core.Coercion.coercionType
+pprOptCo co = sdocOption sdocSuppressCoercionTypes $ \case
+               True  -> pprParendCo co
+               False -> parens (sep [pprCo co, dcolon <+> pp_co_type])
+  where
+    pp_co_type = ppr (coercionType co)
 
 ppr_id_occ :: (SDoc -> SDoc) -> Id -> SDoc
 ppr_id_occ add_par id

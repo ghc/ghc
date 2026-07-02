@@ -11,7 +11,7 @@ lvl = foo d
 
 bar1 = \ x eta -> case lvl of { W# ipv -> (# eta, () #) }
 
-bar = bar1 `cast` <Co:6> :: ...
+bar = bar1 `cast` <Co:6>
 
 
 
