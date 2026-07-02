@@ -14,6 +14,9 @@ See Note [Unique Determinism] in GHC.Types.Unique for explanation why @Unique@ o
 is not deterministic.
 -}
 
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE UnboxedTuples #-}
+
 {-# OPTIONS_GHC -Wall #-}
 
 module GHC.Types.Unique.DFM (
@@ -79,6 +82,9 @@ import Data.Functor.Classes (Eq1 (..))
 import Data.List (sortBy)
 import Data.Function (on)
 import GHC.Types.Unique.FM (UniqFM, nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM)
+import GHC.Data.SmallArray
+import GHC.Exts (State#)
+import GHC.ST (ST(..), runST)
 import Unsafe.Coerce
 import qualified GHC.Data.Word64Set as W
 
@@ -92,9 +98,9 @@ import qualified GHC.Data.Word64Set as W
 -- order then `udfmToList` returns them in deterministic order.
 --
 -- There is an implementation cost: each element is given a serial number
--- as it is added, and `udfmToList` sorts its result by this serial
--- number. So you should only use `UniqDFM` if you need the deterministic
--- property.
+-- as it is added, and `udfmToList` orders its result by this serial number
+-- (see Note [Placement sort in eltsUDFM]). So you should only use `UniqDFM`
+-- if you need the deterministic property.
 --
 -- `foldUDFM` also preserves determinism.
 --
@@ -153,11 +159,11 @@ data UniqDFM key ele =
                                 -- time. See Note [Overflow on plusUDFM]
   deriving (Data, Functor)
 
--- | Deterministic, in O(n log n).
+-- | Deterministic. See Note [Placement sort in eltsUDFM] for the cost.
 instance Foldable (UniqDFM key) where
   foldr = foldUDFM
 
--- | Deterministic, in O(n log n).
+-- | Deterministic. See Note [Placement sort in eltsUDFM] for the cost.
 instance Traversable (UniqDFM key) where
   traverse f = fmap listToUDFM_Directly
              . traverse (\(u,a) -> (u,) <$> f a)
@@ -310,7 +316,8 @@ elemUDFM :: Uniquable key => key -> UniqDFM key elt -> Bool
 elemUDFM k (UDFM m _i) = M.member (getKey $ getUnique k) m
 
 -- | Performs a deterministic fold over the UniqDFM.
--- It's O(n log n) while the corresponding function on `UniqFM` is O(n).
+-- It's O(n) in the common case, with an O(n log n) fallback
+-- (see Note [Placement sort in eltsUDFM]).
 foldUDFM :: (elt -> a -> a) -> a -> UniqDFM key elt -> a
 {-# INLINE foldUDFM #-}
 -- This INLINE prevents a regression in !10568
@@ -334,10 +341,67 @@ nonDetStrictFoldUDFM k z (UDFM m _i) = foldl' k' z m
 eltsUDFM :: UniqDFM key elt -> [elt]
 {-# INLINE eltsUDFM #-}
 -- The INLINE makes it a good producer (from the map)
-eltsUDFM (UDFM m _i) = map taggedFst (sort_it m)
+eltsUDFM (UDFM m i)
+  | n <= 1            = map taggedFst (M.elems m)  -- no sorting needed
+  | usePlacement n i  = placementSort i (M.elems m)
+  | otherwise         = map taggedFst (sort_it m)
+  where n = M.size m
 
 sort_it :: M.Word64Map (TaggedVal elt) -> [TaggedVal elt]
 sort_it m = sortBy (compare `on` taggedSnd) (M.elems m)
+
+-- Note [Placement sort in eltsUDFM]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Deterministic iteration must order elements by insertion tag. Instead of a
+-- comparison sort -- the list mergesort behind sortBy allocates ~n*log n cons
+-- cells -- we exploit the invariant that in (UDFM m i) all tags are distinct
+-- Ints in [0, i): allocate an array of size i, write each element at index =
+-- its tag, freeze, and read out in index order. That's O(i) work (which
+-- subsumes the O(n) fill, since distinct tags force n <= i), no comparisons,
+-- and the readout is lazy, so consumers that demand only a prefix pay almost
+-- nothing beyond the fill.
+--
+-- Holes: slots whose tag never occurs keep the initial sentinel, a TaggedVal
+-- with tag -1. Real tags are non-negative, so the readout skips on tag < 0;
+-- the sentinel's value field is never touched (it is unsafeCoerced ()).
+--
+-- The array loses when i is much larger than n: i never shrinks (overwrites
+-- keep bumping it, delete/filter shrink n but not i). We compute n = M.size m
+-- (O(n), cheap next to either sort) and fall back to the mergesort when
+-- i > 4 * n. Maps built by plain insertion -- the common case -- have i == n.
+-- The guard also caps the fast path's O(i) at O(n).
+--
+-- Determinism is unaffected: the tags are distinct, so they fully determine
+-- the order; the previous sort never relied on stability.
+
+usePlacement :: Int -> Int -> Bool
+usePlacement n i = i <= 4 * n
+
+-- | Order a list of 'TaggedVal's by tag, by placing each at array index =
+-- its tag. The tags must be distinct and in @[0, i)@.
+-- See Note [Placement sort in eltsUDFM].
+placementSort :: forall r. Int -> [TaggedVal r] -> [r]
+placementSort i tvs = runST (ST (\s0 ->
+  case newSmallArray i hole s0 of
+    (# s1, marr #) -> case fill marr tvs s1 of
+      s2 -> case unsafeFreezeSmallArray marr s2 of
+        (# s3, arr #) -> (# s3, readout arr 0 #)))
+  where
+    hole :: TaggedVal r
+    hole = TaggedVal (unsafeCoerce ()) (-1)
+
+    fill :: SmallMutableArray s (TaggedVal r) -> [TaggedVal r] -> State# s -> State# s
+    fill _    []          s = s
+    fill marr (tv : tvs') s =
+      case writeSmallArray marr (taggedSnd tv) tv s of
+        s' -> fill marr tvs' s'
+
+    readout :: SmallArray (TaggedVal r) -> Int -> [r]
+    readout arr j
+      | j >= i    = []
+      | t < 0     = readout arr (j + 1)
+      | otherwise = v : readout arr (j + 1)
+      where TaggedVal v t = indexSmallArray arr j
 
 filterUDFM :: (elt -> Bool) -> UniqDFM key elt -> UniqDFM key elt
 filterUDFM p (UDFM m i) = UDFM (M.filter (\(TaggedVal v _) -> p v) m) i
@@ -356,11 +420,21 @@ udfmRestrictKeysSet (UDFM val_set i) set =
   in UDFM (M.restrictKeys val_set key_set) i
 
 -- | Converts `UniqDFM` to a list, with elements in deterministic order.
--- It's O(n log n) while the corresponding function on `UniqFM` is O(n).
+-- It's O(n) in the common case, with an O(n log n) fallback
+-- (see Note [Placement sort in eltsUDFM]).
 udfmToList :: UniqDFM key elt -> [(Unique, elt)]
-udfmToList (UDFM m _i) =
-  [ (mkUniqueGrimily k, taggedFst v)
-  | (k, v) <- sortBy (compare `on` (taggedSnd . snd)) $ M.toList m ]
+udfmToList (UDFM m i)
+  | n <= 1           = [ (mkUniqueGrimily k, taggedFst v) | (k, v) <- M.toList m ]
+    -- Unlike eltsUDFM, this allocates a fresh TaggedVal + pair per element
+    -- before the sort. If it ever matters, a parallel Word64 array of
+    -- keys filled in the same pass would avoid the eager boxes.
+  | usePlacement n i = placementSort i
+      (M.foldrWithKey (\k tv rest ->
+         TaggedVal (mkUniqueGrimily k, taggedFst tv) (taggedSnd tv) : rest) [] m)
+  | otherwise =
+      [ (mkUniqueGrimily k, taggedFst v)
+      | (k, v) <- sortBy (compare `on` (taggedSnd . snd)) $ M.toList m ]
+  where n = M.size m
 
 -- Determines whether two 'UniqDFM's contain the same keys.
 equalKeysUDFM :: UniqDFM key a -> UniqDFM key b -> Bool
