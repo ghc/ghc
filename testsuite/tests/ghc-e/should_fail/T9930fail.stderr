@@ -3,8 +3,14 @@ ghc: Uncaught exception ghc-9.13-inplace:GHC.Utils.Panic.GhcException:
 default output name would overwrite the input file; must specify -o explicitly
 Usage: For basic information, try the `--help' option.
 
-While handling default output name would overwrite the input file; must specify -o explicitly
+While handling ghc-9.13-inplace:GHC.Utils.Panic.GhcException:
+  |
+  | default output name would overwrite the input file; must specify -o explicitly
   | Usage: For basic information, try the `--help' option.
+  |
+  | HasCallStack backtrace:
+  |   throw, called at compiler/GHC/Utils/Panic.hs:1:1 in <package-id>:GHC.Utils.Panic
+  |   throwGhcException, called at compiler/GHC/Driver/Make.hs:1:1 in <package-id>:GHC.Driver.Make
 
 HasCallStack backtrace:
   throwIO, called at libraries/exceptions/src/Control/Monad/Catch.hs:1:1 in <package-id>:Control.Monad.Catch

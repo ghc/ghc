@@ -1,4 +1,4 @@
-"cgrun025"
+"cgrun025.exe"
 ["cgrun025.hs"]
 GOT PATH
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -27,11 +27,16 @@ main = do
     trace "hello, trace" $
       catch (getEnv "__WURBLE__" >> return ()) (\ (e :: SomeException) -> error "hello, error")
 hello, trace
-cgrun025: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+cgrun025.exe: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 hello, error
 
-While handling __WURBLE__: getEnv: does not exist (no environment variable)
+While handling ghc-internal:GHC.Internal.IO.Exception.IOException:
+  |
+  | __WURBLE__: getEnv: does not exist (no environment variable)
+  |
+  | HasCallStack backtrace:
+  |   ioException, called at libraries\ghc-internal\src\GHC\Internal\System\Environment.hs:204:26 in ghc-internal:GHC.Internal.System.Environment
 
 HasCallStack backtrace:
   error, called at cgrun025.hs:25:75 in main:Main

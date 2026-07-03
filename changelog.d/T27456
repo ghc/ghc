@@ -1,0 +1,8 @@
+section: base
+issues: #27456
+mrs: !16275
+synopsis:
+  Show `ExceptionContext` in `displayExceptionAnnotation` implementation of `WhileHandling`
+description:
+  In the past ``displayException`` (in terms of which ``WhileHandling``\'s ``displayExceptionAnnotation` is implemented) was changed to hide ``ExceptionContext``. This regressed the behavior of ``displayExceptionAnnotation`` from that which was originally specified. Restore the intended behavior of showing the ``ExceptionContext`` of the carried exception.
+
