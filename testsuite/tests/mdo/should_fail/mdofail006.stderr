@@ -1,9 +1,11 @@
-mdofail006: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.FixIOException:
+mdofail006.exe: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.FixIOException:
 
 cyclic evaluation in fixIO
 
-While handling thread blocked indefinitely in an MVar operation
+While handling ghc-internal:GHC.Internal.IO.Exception.BlockedIndefinitelyOnMVar:
+  |
+  | thread blocked indefinitely in an MVar operation
 
 HasCallStack backtrace:
-  throwIO, called at libraries/ghc-internal/src/GHC/Internal/Control/Monad/Fix.hs:167:37 in ghc-internal:GHC.Internal.Control.Monad.Fix
+  throwIO, called at libraries\ghc-internal\src\GHC\Internal\Control\Monad\Fix.hs:169:37 in ghc-internal:GHC.Internal.Control.Monad.Fix
 
