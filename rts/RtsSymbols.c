@@ -6,6 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "RtsPublic.h"
 #include "ghcplatform.h"
 #include "Rts.h"
 #include "RtsUtils.h"
@@ -544,7 +545,6 @@ extern char **environ;
       SymI_HasProto(barf)                                               \
       SymI_HasProto(startEventLogging)                                  \
       SymI_HasProto(endEventLogging)                                    \
-      SymI_HasProto(flushEventLog)                                      \
       SymI_HasProto(flushEventLog)                                      \
       SymI_HasProto(getTraceFlag)                                       \
       SymI_HasProto(setTraceFlag)                                       \

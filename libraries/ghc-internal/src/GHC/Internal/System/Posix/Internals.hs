@@ -742,8 +742,12 @@ foreign import capi unsafe "HsBase.h _unlink"
 foreign import capi unsafe "HsBase.h _utime"
    c_utime :: CString -> Ptr CUtimbuf -> IO CInt
 
+
+{-# NOINLINE c_getpid #-}
+c_getpid :: IO CPid
+c_getpid = _c_getpid
 foreign import capi unsafe "HsBase.h _getpid"
-   c_getpid :: IO CPid
+   _c_getpid :: IO CPid
 #else
 -- We use CAPI as on some OSs (eg. Linux) this is wrapped by a macro
 -- which redirects to the 64-bit-off_t versions when large file
@@ -828,8 +832,11 @@ foreign import capi unsafe "HsBase.h utime"
 c_getpid :: IO CPid
 c_getpid = pure 1
 #else
+{-# NOINLINE c_getpid #-}
+c_getpid :: IO CPid
+c_getpid = _c_getpid
 foreign import ccall unsafe "HsBase.h getpid"
-   c_getpid :: IO CPid
+   _c_getpid :: IO CPid
 #endif
 #endif
 
@@ -919,7 +926,10 @@ foreign import ccall unsafe "HsBase.h __hscore_o_wronly" o_WRONLY :: CInt
 foreign import ccall unsafe "HsBase.h __hscore_o_rdwr"   o_RDWR   :: CInt
 foreign import ccall unsafe "HsBase.h __hscore_o_append" o_APPEND :: CInt
 foreign import ccall unsafe "HsBase.h __hscore_o_creat"  o_CREAT  :: CInt
-foreign import ccall unsafe "HsBase.h __hscore_o_excl"   o_EXCL   :: CInt
+{-# NOINLINE o_EXCL #-}
+o_EXCL :: CInt
+o_EXCL = _o_EXCL
+foreign import ccall unsafe "HsBase.h __hscore_o_excl"   _o_EXCL   :: CInt
 foreign import ccall unsafe "HsBase.h __hscore_o_trunc"  o_TRUNC  :: CInt
 
 -- non-POSIX flags.

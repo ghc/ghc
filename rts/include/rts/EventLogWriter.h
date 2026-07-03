@@ -77,7 +77,7 @@ void endEventLogging(void);
 /*
  * Flush the eventlog. cap can be NULL if one is not held.
  */
-void flushEventLog(Capability **cap);
+RTS_PUBLIC void flushEventLog(Capability **cap);
 
 /*
  * An enumeration for the runtime trace flags.

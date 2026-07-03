@@ -138,6 +138,7 @@ LPWSTR base_getErrorMessage(DWORD err)
     return what;
 }
 
+__attribute__((dllexport))
 int get_unique_file_info_hwnd(HANDLE h, HsWord64 *dev, HsWord64 *ino)
 {
     BY_HANDLE_FILE_INFORMATION info;
@@ -167,6 +168,7 @@ BOOL file_exists(LPCTSTR path)
 }
 
 /* If true then caller needs to free tempFileName.  */
+__attribute__((dllexport))
 bool __createUUIDTempFileErrNo (wchar_t* pathName, wchar_t* prefix,
                                 wchar_t* suffix, wchar_t** tempFileName)
 {

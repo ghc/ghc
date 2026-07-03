@@ -10,17 +10,17 @@
 typedef struct _Arena Arena;
 
 // Start a new arena
-Arena * newArena   ( void );
+RTS_PUBLIC Arena * newArena   ( void );
 
 // Allocate memory in an arena
-void  * arenaAlloc ( Arena *, size_t );
+RTS_PUBLIC void  * arenaAlloc ( Arena *, size_t );
 
 // Free an entire arena
-void arenaFree  ( Arena * );
+RTS_PUBLIC void arenaFree  ( Arena * );
 
 // For internal use only:
 RTS_PRIVATE unsigned long arenaBlocks( void );
 
 #if defined(DEBUG)
-void checkPtrInArena( StgPtr p, Arena *arena );
+RTS_PUBLIC void checkPtrInArena( StgPtr p, Arena *arena );
 #endif

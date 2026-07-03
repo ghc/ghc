@@ -137,6 +137,7 @@ import Control.Concurrent.Chan
 import Control.Concurrent.QSem
 import Control.Concurrent.QSemN
 
+
 {- $conc_intro
 
 The concurrency extension for Haskell is described in the paper
@@ -370,6 +371,9 @@ withThread label io = do
     Right a -> return a
     Left e  -> throwIO (e :: IOException)
 
+-- Needed for windows dynamic builds
+-- TODO we may need to disable inlining of ccalls by default
+{-# NOINLINE waitFd #-}
 waitFd :: Fd -> Bool -> IO ()
 waitFd fd write = do
    throwErrnoIfMinus1_ "fdReady" $

@@ -14,16 +14,12 @@
 #include <stdbool.h>
 #include <windows.h>
 
-extern void registerIOCPHandle (HANDLE port);
-extern void registerAlertableWait (bool has_timeout, DWORD mssec);
-extern OVERLAPPED_ENTRY* getOverlappedEntries (uint32_t *num);
-extern void completeSynchronousRequest (void);
-
-#include "BeginPrivate.h"
+RTS_PUBLIC extern void registerIOCPHandle (HANDLE port);
+RTS_PUBLIC extern void registerAlertableWait (bool has_timeout, DWORD mssec);
+RTS_PUBLIC extern OVERLAPPED_ENTRY* getOverlappedEntries (uint32_t *num);
+RTS_PUBLIC extern void completeSynchronousRequest (void);
 
 extern bool startupAsyncWinIO(void);
 extern void shutdownAsyncWinIO(bool wait_threads);
 extern void awaitAsyncRequests(bool wait);
 extern bool queueIOThread(void);
-
-#include "EndPrivate.h"

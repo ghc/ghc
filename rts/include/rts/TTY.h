@@ -13,5 +13,5 @@
 
 #pragma once
 
-void* __hscore_get_saved_termios(int fd);
-void  __hscore_set_saved_termios(int fd, void* ts);
+RTS_PUBLIC void* __hscore_get_saved_termios(int fd);
+RTS_PUBLIC void  __hscore_set_saved_termios(int fd, void* ts);

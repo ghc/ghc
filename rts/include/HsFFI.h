@@ -21,6 +21,7 @@ extern "C" {
 
 /* get types from GHC's runtime system */
 #include "ghcconfig.h"
+#include "RtsPublic.h"
 #include "rts/Types.h"
 #include "stg/Types.h"
 
@@ -98,14 +99,14 @@ typedef void*                   HsStablePtr;
 #define HS_DOUBLE_MAX_EXP       DBL_MAX_EXP
 #define HS_DOUBLE_MAX_10_EXP    DBL_MAX_10_EXP
 
-extern void hs_init     (int *argc, char **argv[]);
-extern void hs_exit     (void);
-extern void hs_exit_nowait(void);
-extern void hs_set_argv (int argc, char *argv[]);
-extern void hs_thread_done (void);
+extern RTS_PUBLIC void hs_init     (int *argc, char **argv[]);
+extern RTS_PUBLIC void hs_exit     (void);
+extern RTS_PUBLIC void hs_exit_nowait(void);
+extern RTS_PUBLIC void hs_set_argv (int argc, char *argv[]);
+extern RTS_PUBLIC void hs_thread_done (void);
 extern void hs_restoreConsoleCP (void);
 
-extern void hs_perform_gc (void);
+extern RTS_PUBLIC void hs_perform_gc (void);
 
 /* Lock the stable pointer table. The table must be unlocked
  * again before calling any Haskell functions, even if those
@@ -115,31 +116,31 @@ extern void hs_perform_gc (void);
  * or any stable pointer-related FFI functions other than
  * hs_free_stable_ptr_unsafe while the table is locked.
  */
-extern void hs_lock_stable_ptr_table (void);
+extern RTS_PUBLIC void hs_lock_stable_ptr_table (void);
 
 /* A deprecated synonym. */
-extern void hs_lock_stable_tables (void);
+extern RTS_PUBLIC void hs_lock_stable_tables (void);
 
 /* Unlock the stable pointer table. */
-extern void hs_unlock_stable_ptr_table (void);
+extern RTS_PUBLIC void hs_unlock_stable_ptr_table (void);
 
 /* A deprecated synonym. */
-extern void hs_unlock_stable_tables (void);
+extern RTS_PUBLIC void hs_unlock_stable_tables (void);
 
 /* Free a stable pointer assuming that the stable pointer
  * table is already locked.
  */
-extern void hs_free_stable_ptr_unsafe (HsStablePtr sp);
+extern RTS_PUBLIC void hs_free_stable_ptr_unsafe (HsStablePtr sp);
 
-extern void hs_free_stable_ptr (HsStablePtr sp);
-extern void hs_free_fun_ptr    (HsFunPtr fp);
+extern RTS_PUBLIC void hs_free_stable_ptr (HsStablePtr sp);
+extern RTS_PUBLIC void hs_free_fun_ptr    (HsFunPtr fp);
 
-extern StgPtr hs_spt_lookup(StgWord64 key[2]);
-extern int hs_spt_keys(StgPtr keys[], int szKeys);
-extern int hs_spt_key_count (void);
+extern RTS_PUBLIC StgPtr hs_spt_lookup(StgWord64 key[2]);
+extern RTS_PUBLIC int hs_spt_keys(StgPtr keys[], int szKeys);
+extern RTS_PUBLIC int hs_spt_key_count (void);
 
-extern void hs_try_putmvar (int capability, HsStablePtr sp);
-extern void hs_try_putmvar_with_value (int capability, HsStablePtr sp, StgClosure *value);
+extern RTS_PUBLIC void hs_try_putmvar (int capability, HsStablePtr sp);
+extern RTS_PUBLIC void hs_try_putmvar_with_value (int capability, HsStablePtr sp, StgClosure *value);
 
 /* -------------------------------------------------------------------------- */
 

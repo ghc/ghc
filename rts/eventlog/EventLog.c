@@ -6,6 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "RtsPublic.h"
 #include "rts/PosixSource.h"
 #include "Rts.h"
 
@@ -1625,7 +1626,7 @@ void flushAllCapsEventsBufs_(void)
     flushEventLogWriter();
 }
 
-void flushEventLog(Capability **cap USED_IF_THREADS)
+RTS_PUBLIC void flushEventLog(Capability **cap USED_IF_THREADS)
 {
   ACQUIRE_LOCK(&state_change_mutex);
   flushEventLog_(cap);
@@ -1679,6 +1680,6 @@ bool startEventLogging(const EventLogWriter *writer STG_UNUSED) {
 
 void endEventLogging(void) {}
 
-void flushEventLog(Capability **cap STG_UNUSED) {}
+RTS_PUBLIC void flushEventLog(Capability **cap STG_UNUSED) {}
 
 #endif /* TRACING */

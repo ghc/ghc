@@ -19,9 +19,9 @@
  * See the module GHC.Profiling.
  * ---------------------------------------------------------------------------*/
 
-void requestHeapCensus ( void );
-void startHeapProfTimer ( void );
-void stopHeapProfTimer ( void );
-void setUserEra ( StgWord w );
-StgWord getUserEra ( void );
-StgWord incrementUserEra ( StgWord w );
+RTS_PUBLIC void requestHeapCensus ( void );
+RTS_PUBLIC void startHeapProfTimer ( void );
+RTS_PUBLIC void stopHeapProfTimer ( void );
+RTS_PUBLIC void setUserEra ( StgWord w );
+RTS_PUBLIC StgWord getUserEra ( void );
+RTS_PUBLIC StgWord incrementUserEra ( StgWord w );

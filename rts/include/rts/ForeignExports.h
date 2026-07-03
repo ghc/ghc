@@ -34,5 +34,5 @@ struct ForeignExportsList {
     StgPtr exports[];
 };
 
-void registerForeignExports(struct ForeignExportsList *exports);
+RTS_PUBLIC void registerForeignExports(struct ForeignExportsList *exports);
 

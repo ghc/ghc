@@ -8,6 +8,7 @@
 
 #include "Rts.h"
 
+__attribute__((dllexport))
 void init_ghc_hs_iface(void);
 
 // Forward declarations

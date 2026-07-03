@@ -23,12 +23,12 @@ typedef struct _HpcModuleInfo {
   struct _HpcModuleInfo *next;
 } HpcModuleInfo;
 
-void hs_hpc_module (char *modName,
+RTS_PUBLIC void hs_hpc_module (char *modName,
                     StgWord32 modCount,
                     StgWord32 modHashNo,
                     StgWord64 *tixArr);
 
-HpcModuleInfo * hs_hpc_rootModule (void);
+RTS_PUBLIC HpcModuleInfo * hs_hpc_rootModule (void);
 
 void startupHpc(void);
 void exitHpc(void);

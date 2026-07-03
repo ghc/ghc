@@ -107,6 +107,14 @@ import GHC.Internal.IO.Exception
 import GHC.Internal.IO.Handle.Types
 import GHC.Internal.Num
 
+
+
+-- Needed for windows dynamic builds
+-- TODO we may need to disable inlining of ccalls by default
+{-# NOINLINE getErrno #-}
+
+
+
 -- "errno" type
 -- ------------
 

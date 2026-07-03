@@ -41,54 +41,54 @@ StgTSO *createStrictIOThread  (Capability *cap, W_ stack_size,
                                StgClosure *closure);
 
 // Suspending/resuming threads around foreign calls
-void *        suspendThread (StgRegTable *, bool interruptible);
-StgRegTable * resumeThread  (void *);
+RTS_PUBLIC void *        suspendThread (StgRegTable *, bool interruptible);
+RTS_PUBLIC StgRegTable * resumeThread  (void *);
 
 //
 // Thread operations from Threads.c
 //
-bool        eq_thread                        (StgPtr tso1, StgPtr tso2);
-int         cmp_thread                       (StgPtr tso1, StgPtr tso2);
-StgThreadID rts_getThreadId                  (StgPtr tso);
-void        rts_enableThreadAllocationLimit  (StgPtr tso);
-void        rts_disableThreadAllocationLimit (StgPtr tso);
+RTS_PUBLIC bool        eq_thread                        (StgPtr tso1, StgPtr tso2);
+RTS_PUBLIC int         cmp_thread                       (StgPtr tso1, StgPtr tso2);
+RTS_PUBLIC StgThreadID rts_getThreadId                  (StgPtr tso);
+RTS_PUBLIC void        rts_enableThreadAllocationLimit  (StgPtr tso);
+RTS_PUBLIC void        rts_disableThreadAllocationLimit (StgPtr tso);
 
 // Forward declarations, defined in Closures.h
 struct _StgMutArrPtrs;
 struct _StgMutArrPtrs *listThreads               (Capability *cap);
 
 #if !defined(mingw32_HOST_OS)
-pid_t  forkProcess     (HsStablePtr *entry);
+RTS_PUBLIC pid_t  forkProcess     (HsStablePtr *entry);
 #else
-pid_t  forkProcess     (HsStablePtr *entry)
+RTS_PUBLIC pid_t  forkProcess     (HsStablePtr *entry)
     STG_NORETURN;
 #endif
 
-HsBool rtsSupportsBoundThreads (void);
+RTS_PUBLIC HsBool rtsSupportsBoundThreads (void);
 
 // The number of Capabilities.
 // TODO: Ideally we would only provide getNumCapabilities
 // but this is used in compiler/cbits/genSym.c
-extern uint32_t n_capabilities;
+extern RTS_PUBLIC uint32_t n_capabilities;
 
 INLINE_HEADER unsigned int getNumCapabilities(void)
 { return RELAXED_LOAD(&n_capabilities); }
 
 // The number of Capabilities that are not disabled
-extern uint32_t enabled_capabilities;
+extern RTS_PUBLIC uint32_t enabled_capabilities;
 
 // The maximum number of Capabilities supported by the RTS.
 // See Note [Capabilities array sizing] in rts/Capability.c.
-extern uint32_t max_n_capabilities;
+extern RTS_PUBLIC uint32_t max_n_capabilities;
 
 #if !IN_STG_CODE
-extern Capability MainCapability;
+extern RTS_PUBLIC Capability MainCapability;
 #endif
 
 //
 // Change the number of capabilities (only supports increasing the
 // current value at the moment).
 //
-extern void setNumCapabilities (uint32_t new_);
+extern RTS_PUBLIC void setNumCapabilities (uint32_t new_);
 
-bool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value);
+RTS_PUBLIC bool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value);
