@@ -1,8 +1,13 @@
-T26759: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+T26759.exe: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 cleanup failure
 
-While handling outer failure
+While handling ghc-internal:GHC.Internal.Exception.ErrorCall:
+  |
+  | outer failure
+  |
+  | HasCallStack backtrace:
+  |   throwIO, called at T26759.hs:6:21 in main:Main
 
 HasCallStack backtrace:
   throwIO, called at T26759.hs:7:22 in main:Main
