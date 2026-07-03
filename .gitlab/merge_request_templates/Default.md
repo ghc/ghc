@@ -27,6 +27,7 @@ https://gitlab.haskell.org/ghc/ghc/-/wikis/Contributing-a-Patch
 - [ ] If this MR has the potential to break user programs, the ~"user-facing" label was applied to 
       test against head.hackage.
 - [ ] All commits are either individually buildable or squashed.
+- [ ] After all approvals and before landing: all fixup commits are squashed with their originating commits.
 - [ ] Commit messages describe *what they do*, referring to tickets using `#NNNNN` syntax.
 - [ ] Source comments describing the change were added. For larger changes [notes][notes] and 
       cross-references from the relevant places were added (as applicable).
