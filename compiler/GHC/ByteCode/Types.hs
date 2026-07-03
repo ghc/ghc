@@ -42,7 +42,7 @@ import GHC.Types.Name.Env
 import GHC.Utils.Outputable
 import GHC.Builtin.PrimOps
 import GHC.Types.SptEntry
-import GHC.HsToCore.Breakpoints
+import GHC.HsToCore.Breakpoints.Types
 import GHC.ByteCode.Breakpoints
 import GHCi.Message
 import GHCi.RemoteTypes
@@ -305,4 +305,3 @@ instance Outputable UnlinkedBCO where
       = sep [text "BCO", ppr nm, text "with",
              ppr (sizeFlatBag lits), text "lits",
              ppr (sizeFlatBag ptrs), text "ptrs" ]
-

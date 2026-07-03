@@ -13,3 +13,7 @@ TopEnvIface:
 	# Second compilation starts from interface files, but still can print "a"
 	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) TopEnvIface -v1 -e "a" -e ":q" -fwrite-if-simplified-core -fwrite-interface
 
+T27287:
+	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) T27287.hs -v1 -fno-hide-source-paths -e ":q" -fwrite-if-simplified-core -fwrite-interface
+	# Second compilation starts from interface files, but still can print "a"
+	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) T27287.hs -v1 -fno-hide-source-paths -e ":break T27287 5" -e ":q" -fwrite-if-simplified-core -fwrite-interface

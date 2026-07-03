@@ -105,6 +105,7 @@ GHC.Hs.Pat
 GHC.Hs.Specificity
 GHC.Hs.Type
 GHC.Hs.Utils
+GHC.HsToCore.Breakpoints.Types
 GHC.Iface.Errors.Types
 GHC.Iface.Ext.Fields
 GHC.Iface.Flags

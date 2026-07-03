@@ -1919,6 +1919,7 @@ instance Binary UnhelpfulSpanReason where
       _ -> UnhelpfulOther <$> get bh
 
 newtype BinSrcSpan = BinSrcSpan { unBinSrcSpan :: SrcSpan }
+  deriving newtype NFData
 
 -- See Note [Source Location Wrappers]
 instance Binary BinSrcSpan where

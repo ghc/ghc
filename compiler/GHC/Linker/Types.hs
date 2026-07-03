@@ -47,6 +47,7 @@ module GHC.Linker.Types
    , linkableFilterByteCode
    , linkableFilterNative
    , partitionLinkables
+   , linkableAllBCOs
    )
 where
 
@@ -351,6 +352,17 @@ linkableIsNativeCodeOnly l = all isNativeCode (NE.toList (linkableParts l))
 -- This excludes the LazyBCOs and the CoreBindings parts
 linkableBCOs :: Linkable -> [CompiledByteCode]
 linkableBCOs l = [ cbc | BCOs cbc <- NE.toList (linkableParts l) ]
+
+linkableAllBCOs :: Linkable -> [CompiledByteCode]
+linkableAllBCOs l = mapMaybe bcos $ NE.toList (linkableParts l)
+  where
+    -- Note: explicit match on all constructors to trigger warning when new ones are introduced.
+    bcos (BCOs bco) = Just bco
+    bcos (LazyBCOs bco _fs) = Just bco -- TODO: _fs ?
+    bcos DotA{} = Nothing
+    bcos DotDLL{} = Nothing
+    bcos CoreBindings{} = Nothing
+    bcos DotO{} = Nothing
 
 -- | List the native linkable parts (.o/.so/.dll) of a linkable
 linkableNativeParts :: Linkable -> [LinkablePart]

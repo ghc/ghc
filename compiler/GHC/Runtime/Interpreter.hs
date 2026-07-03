@@ -737,7 +737,7 @@ getModBreaks :: HomeModInfo -> Maybe InternalModBreaks
 getModBreaks hmi
   | Just linkable <- homeModInfoByteCode hmi,
     -- The linkable may have 'DotO's as well; only consider BCOs. See #20570.
-    [cbc] <- linkableBCOs linkable
+    [cbc] <- linkableAllBCOs linkable
   = bc_breaks cbc
   | otherwise
   = Nothing -- probably object code

@@ -109,6 +109,7 @@ GHC.Hs.Pat
 GHC.Hs.Specificity
 GHC.Hs.Type
 GHC.Hs.Utils
+GHC.HsToCore.Breakpoints.Types
 GHC.HsToCore.Errors.Types
 GHC.HsToCore.Pmc.Solver.Types
 GHC.Iface.Errors.Types
