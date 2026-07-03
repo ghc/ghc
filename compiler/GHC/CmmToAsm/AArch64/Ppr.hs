@@ -569,12 +569,8 @@ pprInstr platform instr = case instr of
   -- NOTE: GHC may do whacky things where it only load the lower part of an
   --       address. Not observing the correct size when loading will lead
   --       inevitably to crashes.
-  STR _f o1@(OpReg W8 (RegReal (RealRegSingle i))) o2 | i < 32 ->
-    op2 (text "\tstrb") o1 o2
-  STR _f o1@(OpReg W16 (RegReal (RealRegSingle i))) o2 | i < 32 ->
-    op2 (text "\tstrh") o1 o2
-  STR _f o1 o2 -> op2 (text "\tstr") o1 o2
-  STLR _f o1 o2 -> op2 (text "\tstlr") o1 o2
+  STR f o1 o2 ->  op2 (subword_suffix f $ text "\tstr") o1 o2
+  STLR f o1 o2 -> op2 (subword_suffix f $ text "\tstlr") o1 o2
 
   LDR _f o1 (OpImm (ImmIndex lbl' off)) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
     let (adrp', ldr') = op_adrp_reloc_dynamic $ pprAsmLabel platform lbl in
@@ -622,12 +618,8 @@ pprInstr platform instr = case instr of
     op_adrp o1 adrp' $$
     op_add o1 ldr'
 
-  LDR _f o1@(OpReg W8 (RegReal (RealRegSingle i))) o2 | i < 32 ->
-    op2 (text "\tldrb") o1 o2
-  LDR _f o1@(OpReg W16 (RegReal (RealRegSingle i))) o2 | i < 32 ->
-    op2 (text "\tldrh") o1 o2
-  LDR _f o1 o2 -> op2 (text "\tldr") o1 o2
-  LDAR _f o1 o2 -> op2 (text "\tldar") o1 o2
+  LDR f o1 o2 -> op2 (subword_suffix f $ text "\tldr") o1 o2
+  LDAR f o1 o2 -> op2 (subword_suffix f $ text "\tldar") o1 o2
 
   -- 8. Synchronization Instructions -------------------------------------------
   DMBISH DmbLoadStore -> line $ text "\tdmb ish"
@@ -697,6 +689,12 @@ pprInstr platform instr = case instr of
 
        check_off off = if off >= 0 && off <= 4095 then char '#' <> int off else
          pgmError $ "GHC.CmmToAsm.AArch64.Ppr.check_off : " ++ show off ++ " is out of 12 bit"
+
+       -- Some instructions encode subword ops via b/h suffix on the instruction.
+       -- We handle this here relying on the format rather than the operands.
+       subword_suffix II8  t = t <> char 'b'
+       subword_suffix II16 t = t <> char 'h'
+       subword_suffix _    t = t
 
 pprBcond :: IsLine doc => Cond -> doc
 pprBcond c = text "b." <> pprCond c
