@@ -1,0 +1,11 @@
+section: compiler
+issues: #27430
+mrs: !16255
+synopsis:
+  AArch64 code generation: Fix handling of subword return values at FFI boundary.
+description:
+  When calling C functions returning subword values, sometimes those values high
+  bit would incorrectly influence certain operations.
+
+  We now zero the high bits consistently to avoid this.
+
