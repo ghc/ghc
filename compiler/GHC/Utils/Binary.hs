@@ -1964,6 +1964,7 @@ instance Binary UnhelpfulSpanReason where
       _ -> UnhelpfulOther <$> get bh
 
 newtype BinSrcSpan = BinSrcSpan { unBinSrcSpan :: SrcSpan }
+  deriving newtype NFData
 
 instance Binary GeneratedSrcSpanDetails where
   put_ bh (OrigSpan ss) = do

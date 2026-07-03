@@ -706,7 +706,7 @@ hsc_typecheck tc_rn_opts mod_summary mb_rdr_module = do
                     Nothing -> hscParse' mod_summary
             tc_result0 <- tcRnModule' mod_summary tc_rn_opts' hpm
             if hsc_src == HsigFile
-                then do (iface, _) <- liftIO $ hscSimpleIface hsc_env Nothing tc_result0 mod_summary
+                then do (iface, _) <- liftIO $ hscSimpleIface hsc_env Nothing Nothing tc_result0 mod_summary
                         ioMsgMaybe $ hoistTcRnMessage $
                             tcRnMergeSignatures hsc_env hpm tc_result0 iface
                 else return tc_result0
@@ -1065,9 +1065,10 @@ initModDetails hsc_env iface =
 -- | Assemble 'WholeCoreBindings' if the interface contains Core bindings.
 iface_core_bindings :: ModIface -> ModLocation -> Maybe WholeCoreBindings
 iface_core_bindings iface wcb_mod_location =
-  mi_simplified_core <&> \(IfaceSimplifiedCore bindings foreign') ->
+  mi_simplified_core <&> \(IfaceSimplifiedCore bindings mbreaks foreign') ->
     WholeCoreBindings {
       wcb_bindings = bindings,
+      wcb_modBreaks = mbreaks,
       wcb_module = mi_module,
       wcb_mod_location,
       wcb_foreign = foreign'
@@ -1211,11 +1212,11 @@ compileWholeCoreBindings hsc_env type_env wcb = do
     gen_bytecode core_binds stubs foreign_files = do
       let cgi_guts = CgInteractiveGuts wcb_module core_binds
                       (typeEnvTyCons type_env) stubs foreign_files
-                      Nothing []
+                      wcb_modBreaks []
       trace_if logger (text "Generating ByteCode for" <+> ppr wcb_module)
       mkModuleByteCode hsc_env wcb_module wcb_mod_location cgi_guts
 
-    WholeCoreBindings {wcb_module, wcb_mod_location, wcb_foreign} = wcb
+    WholeCoreBindings {wcb_module, wcb_mod_location, wcb_foreign, wcb_modBreaks} = wcb
 
     logger = hsc_logger hsc_env
 
@@ -1351,7 +1352,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
               liftIO $ hscTidy hsc_env simplified_guts
 
           (iface, _details) <- liftIO $
-            hscSimpleIface hsc_env (Just $ cg_binds cg_guts) tc_result summary
+            hscSimpleIface hsc_env (Just $ cg_binds cg_guts) (cg_modBreaks cg_guts) tc_result summary
 
           liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_hash (ms_location summary)
 
@@ -1366,7 +1367,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
       -- and generate a simple interface.
       _ -> do
         (iface, _details) <- liftIO $
-          hscSimpleIface hsc_env Nothing tc_result summary
+          hscSimpleIface hsc_env Nothing Nothing tc_result summary
 
         liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_hash (ms_location summary)
 
@@ -1967,17 +1968,19 @@ hscSimplify' plugins ds_result = do
 -- generates interface files. See Note [simpleTidyPgm - mkBootModDetailsTc]
 hscSimpleIface :: HscEnv
                -> Maybe CoreProgram
+               -> Maybe ModBreaks
                -> TcGblEnv
                -> ModSummary
                -> IO (ModIface, ModDetails)
-hscSimpleIface hsc_env mb_core_program tc_result summary
-    = runHsc hsc_env $ hscSimpleIface' mb_core_program tc_result summary
+hscSimpleIface hsc_env mb_core_program mb_modBreaks tc_result summary
+    = runHsc hsc_env $ hscSimpleIface' mb_core_program mb_modBreaks tc_result summary
 
 hscSimpleIface' :: Maybe CoreProgram
+                -> Maybe ModBreaks
                 -> TcGblEnv
                 -> ModSummary
                 -> Hsc (ModIface, ModDetails)
-hscSimpleIface' mb_core_program tc_result summary = do
+hscSimpleIface' mb_core_program mb_modBreaks tc_result summary = do
     hsc_env   <- getHscEnv
     logger    <- getLogger
     details   <- liftIO $ mkBootModDetailsTc logger tc_result
@@ -1985,7 +1988,7 @@ hscSimpleIface' mb_core_program tc_result summary = do
     new_iface
         <- {-# SCC "MkFinalIface" #-}
            liftIO $
-               mkIfaceTc hsc_env safe_mode details summary mb_core_program tc_result
+               mkIfaceTc hsc_env safe_mode details summary mb_core_program mb_modBreaks tc_result
     -- And the answer is ...
     liftIO $ dumpIfaceStats hsc_env
     return (new_iface, details)
