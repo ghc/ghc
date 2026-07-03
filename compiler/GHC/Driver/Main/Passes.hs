@@ -424,7 +424,7 @@ hsc_typecheck tc_rn_opts mod_summary mb_rdr_module = do
                     Nothing -> hscParse' mod_summary
             tc_result0 <- tcRnModule' mod_summary tc_rn_opts' hpm
             if hsc_src == HsigFile
-                then do (iface, _) <- liftIO $ hscSimpleIface hsc_env Nothing tc_result0 mod_summary
+                then do (iface, _) <- liftIO $ hscSimpleIface hsc_env Nothing Nothing tc_result0 mod_summary
                         ioMsgMaybe $ hoistTcRnMessage $
                             tcRnMergeSignatures hsc_env hpm tc_result0 iface
                 else return tc_result0
@@ -895,7 +895,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
               liftIO $ hscTidy hsc_env simplified_guts
 
           (iface, _details) <- liftIO $
-            hscSimpleIface hsc_env (Just $ cg_binds cg_guts) tc_result summary
+            hscSimpleIface hsc_env (Just $ cg_binds cg_guts) (cg_modBreaks cg_guts) tc_result summary
 
           liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_hash (ms_location summary)
 
@@ -910,7 +910,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
       -- and generate a simple interface.
       _ -> do
         (iface, _details) <- liftIO $
-          hscSimpleIface hsc_env Nothing tc_result summary
+          hscSimpleIface hsc_env Nothing Nothing tc_result summary
 
         liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_hash (ms_location summary)
 
@@ -1715,4 +1715,3 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
                     mkForeignRef href (freeReallyRemoteRef inst href)
 
   return (castForeignRef binding_fref, dep_linkables, this_pkgs_loaded)
-

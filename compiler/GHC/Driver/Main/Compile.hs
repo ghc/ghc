@@ -331,11 +331,11 @@ compileWholeCoreBindings hsc_env type_env wcb = do
     gen_bytecode core_binds stubs foreign_files = do
       let cgi_guts = CgInteractiveGuts wcb_module core_binds
                       (typeEnvTyCons type_env) stubs foreign_files
-                      Nothing [] NoHpcInfo
+                      wcb_modBreaks [] NoHpcInfo
       trace_if logger (text "Generating ByteCode for" <+> ppr wcb_module)
       mkModuleByteCode hsc_env wcb_module wcb_mod_location cgi_guts
 
-    WholeCoreBindings {wcb_module, wcb_mod_location, wcb_foreign} = wcb
+    WholeCoreBindings {wcb_module, wcb_mod_location, wcb_foreign, wcb_modBreaks} = wcb
 
     logger = hsc_logger hsc_env
 

@@ -46,7 +46,7 @@ import GHC.Utils.Binary
 import GHC.Utils.Outputable
 import GHC.Builtin.PrimOps
 import GHC.Types.SptEntry
-import GHC.HsToCore.Breakpoints
+import GHC.HsToCore.Breakpoints.Types
 import GHC.ByteCode.Breakpoints
 import GHCi.Message
 import GHCi.RemoteTypes
@@ -376,4 +376,3 @@ instance Binary FFIInfo where
   get bh = FFIInfo <$> get bh <*> get bh
 
   put_ bh FFIInfo {..} = put_ bh ffiInfoArgs *> put_ bh ffiInfoRet
-

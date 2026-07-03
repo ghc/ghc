@@ -61,6 +61,8 @@ import GHC.Iface.Load   ( ifaceStats )
 import GHC.Iface.Make
 import GHC.Iface.Tidy
 
+import GHC.HsToCore.Breakpoints.Types (ModBreaks)
+
 import GHC.Core
 
 import GHC.Parser.Errors.Types
@@ -191,9 +193,10 @@ initModDetails hsc_env iface =
 -- | Assemble 'WholeCoreBindings' if the interface contains Core bindings.
 iface_core_bindings :: ModIface -> ModLocation -> Maybe WholeCoreBindings
 iface_core_bindings iface wcb_mod_location =
-  mi_simplified_core <&> \(IfaceSimplifiedCore bindings foreign') ->
+  mi_simplified_core <&> \(IfaceSimplifiedCore bindings mbreaks foreign') ->
     WholeCoreBindings {
       wcb_bindings = bindings,
+      wcb_modBreaks = mbreaks,
       wcb_module = mi_module,
       wcb_mod_location,
       wcb_foreign = foreign'
@@ -311,17 +314,19 @@ genModDetails hsc_env old_iface
 -- generates interface files. See Note [hscSimpleIface - mkBootModDetailsTc]
 hscSimpleIface :: HscEnv
                -> Maybe CoreProgram
+               -> Maybe ModBreaks
                -> TcGblEnv
                -> ModSummary
                -> IO (ModIface, ModDetails)
-hscSimpleIface hsc_env mb_core_program tc_result summary
-    = runHsc hsc_env $ hscSimpleIface' mb_core_program tc_result summary
+hscSimpleIface hsc_env mb_core_program mb_modBreaks tc_result summary
+    = runHsc hsc_env $ hscSimpleIface' mb_core_program mb_modBreaks tc_result summary
 
 hscSimpleIface' :: Maybe CoreProgram
+                -> Maybe ModBreaks
                 -> TcGblEnv
                 -> ModSummary
                 -> Hsc (ModIface, ModDetails)
-hscSimpleIface' mb_core_program tc_result summary = do
+hscSimpleIface' mb_core_program mb_modBreaks tc_result summary = do
     hsc_env   <- getHscEnv
     logger    <- getLogger
     details   <- liftIO $ mkBootModDetailsTc logger tc_result
@@ -329,7 +334,7 @@ hscSimpleIface' mb_core_program tc_result summary = do
     new_iface
         <- {-# SCC "MkFinalIface" #-}
            liftIO $
-               mkIfaceTc hsc_env safe_mode details summary mb_core_program tc_result
+               mkIfaceTc hsc_env safe_mode details summary mb_core_program mb_modBreaks tc_result
     -- And the answer is ...
     liftIO $ dumpIfaceStats hsc_env
     return (new_iface, details)

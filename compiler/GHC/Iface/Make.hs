@@ -34,6 +34,7 @@ import GHC.Iface.Syntax
 import GHC.Iface.Recomp
 import GHC.Iface.Load
 import GHC.Iface.Ext.Fields
+import GHC.HsToCore.Breakpoints.Types (ModBreaks)
 
 import GHC.CoreToIface
 
@@ -121,11 +122,12 @@ mkPartialIface hsc_env core_prog mod_details mod_summary import_decls
          , mg_safe_haskell = safe_mode
          , mg_trust_pkg    = self_trust
          , mg_docs         = docs
+         , mg_modBreaks    = modBreaks
          }
   = do
       self_recomp <- traverse (mkSelfRecomp hsc_env this_mod (ms_hs_hash mod_summary)) usages
       return $ mkIface_ hsc_env this_mod core_prog hsc_src deps rdr_env import_decls fix_env warns self_trust
-                safe_mode self_recomp docs mod_details
+                safe_mode self_recomp docs mod_details modBreaks
 
 -- | Fully instantiate an interface. Adds fingerprints and potentially code
 -- generator produced information.
@@ -227,9 +229,10 @@ mkIfaceTc :: HscEnv
           -> ModDetails         -- gotten from mkBootModDetails, probably
           -> ModSummary
           -> Maybe CoreProgram
+          -> Maybe ModBreaks
           -> TcGblEnv           -- Usages, deprecations, etc
           -> IO ModIface
-mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program
+mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program mb_modBreaks
   tc_result@TcGblEnv{ tcg_mod = this_mod,
                       tcg_src = hsc_src,
                       tcg_imports = imports,
@@ -257,6 +260,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program
                    (imp_trust_own_pkg imports) safe_mode self_recomp
                    docs
                    mod_details
+                   mb_modBreaks
 
           mkFullIface hsc_env partial_iface Nothing Nothing NoStubs []
 
@@ -303,6 +307,7 @@ mkIface_ :: HscEnv -> Module -> CoreProgram -> HscSource
          -> Maybe IfaceSelfRecomp
          -> Maybe Docs
          -> ModDetails
+         -> Maybe ModBreaks
          -> PartialModIface
 mkIface_ hsc_env
          this_mod core_prog hsc_src deps rdr_env import_decls fix_env src_warns
@@ -320,7 +325,7 @@ mkIface_ hsc_env
 --      only at the TypeEnv.  The previous Tidy phase has
 --      put exactly the info into the TypeEnv that we want
 --      to expose in the interface
-
+        modBreaks
   = do
     let home_unit    = hsc_home_unit hsc_env
         semantic_mod = homeModuleNameInstantiation home_unit (moduleName this_mod)
@@ -328,7 +333,7 @@ mkIface_ hsc_env
 
         simplified_core =
           if gopt Opt_WriteIfSimplifiedCore dflags
-          then Just (IfaceSimplifiedCore [ toIfaceTopBind b | b <- core_prog ] emptyIfaceForeign)
+          then Just (IfaceSimplifiedCore [ toIfaceTopBind b | b <- core_prog ] modBreaks emptyIfaceForeign)
           else Nothing
         decls  = [ tyThingToIfaceDecl entity
                  | entity <- entities,

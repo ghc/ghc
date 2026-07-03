@@ -8,6 +8,7 @@ import GHC.Cmm.CLabel
 import GHC.Driver.DynFlags (DynFlags (targetPlatform), initSDocContext)
 import GHC.ForeignSrcLang (ForeignSrcLang (..))
 import GHC.Iface.Syntax
+import GHC.HsToCore.Breakpoints.Types (ModBreaks)
 import GHC.Prelude
 import GHC.Types.ForeignStubs
 import GHC.Unit.Module.Location
@@ -122,6 +123,7 @@ the object files.
 
 data WholeCoreBindings = WholeCoreBindings
             { wcb_bindings :: [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo] -- ^ serialised tidied core bindings.
+            , wcb_modBreaks :: Maybe ModBreaks -- ^ if @wcb_bindings@ contains breakpoints, this field provides the metadata required by the bytecode debugger.
             , wcb_module   :: Module  -- ^ The module which the bindings are for
             , wcb_mod_location :: ModLocation -- ^ The location where the sources reside.
               -- | Stubs for foreign declarations and files added via
