@@ -295,3 +295,5 @@ test('aarch64-sxtw-run',
        when(unregisterised(), skip)],
      multi_compile_and_run,
      ['aarch64-sxtw-run', [('aarch64-sxtw-cmm.cmm', '')], '-O'])
+
+test('T27430', [req_c], compile_and_run, ['T27430_c.c'])
