@@ -4,3 +4,8 @@ foo
 
 HasCallStack backtrace:
   error, called at ghc-e005.hs:12:10 in main:Main
+
+
+HasCallStack backtrace:
+  throwIO, called at ghc\GHCi\UI.hs:1655:31 in ghc-bin-10.1.20260629-inplace:GHCi.UI
+
