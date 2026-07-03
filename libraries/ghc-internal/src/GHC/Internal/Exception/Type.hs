@@ -84,7 +84,7 @@ data WhileHandling = WhileHandling SomeException deriving Show
 
 instance ExceptionAnnotation WhileHandling where
   displayExceptionAnnotation (WhileHandling e) =
-    "While handling " ++ case lines $ displayException e of
+    "While handling " ++ case lines $ displayExceptionWithInfo e of
       [] -> ""
       (l1:ls) ->
         -- Indent lines forward.

@@ -1,10 +1,12 @@
-<interactive>: Uncaught exception ghc-9.13-inplace:GHC.Utils.Panic.GhcException:
+<interactive>: Uncaught exception ghc-10.1-inplace:GHC.Utils.Panic.GhcException:
 
 IO error:  "Abcde" does not exist
 
-While handling IO error:  "Abcde" does not exist
+While handling ghc-10.1-inplace:GHC.Utils.Panic.GhcException:
+  |
+  | IO error:  "Abcde" does not exist
 
 HasCallStack backtrace:
-  throwIO, called at compiler/GHC/Utils/Error.hs:512:19 in ghc-9.13-inplace:GHC.Utils.Error
+  throwIO, called at compiler\GHC\Utils\Error.hs:499:19 in ghc-10.1-inplace:GHC.Utils.Error
 
 1
