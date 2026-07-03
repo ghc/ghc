@@ -113,7 +113,7 @@ lintCmmExpr expr =
   do platform <- getPlatform
      return (cmmExprType platform expr)
 
--- We require every address to refer to be word-width since we don't support 32
+-- We require every address value to be word-sized since we don't support 32
 -- bit pointers on 64bit platforms.
 lintAddrTy :: CmmExpr -> CmmType -> CmmLint ()
 lintAddrTy e addr_ty = do
