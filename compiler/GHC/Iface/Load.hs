@@ -62,6 +62,8 @@ import GHC.Iface.Rename
 import GHC.Iface.Env
 import GHC.Iface.Errors as Iface_Errors
 
+import GHC.HsToCore.Breakpoints.Types (modBreaks_locs)
+
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 
@@ -112,6 +114,7 @@ import GHC.Unit.Env
 import GHC.Data.Maybe
 
 import Control.Monad
+import qualified Data.Foldable as Foldable
 import Data.Map ( toList )
 import System.FilePath
 import System.Directory
@@ -1159,9 +1162,11 @@ pprModIface unit_state iface
         , vcat [ppr ver $$ nest 2 (ppr decl) | (ver,decl) <- mi_decls iface]
         , case mi_simplified_core iface of
             Nothing -> empty
-            Just (IfaceSimplifiedCore eds fs) ->
+            Just (IfaceSimplifiedCore eds mbs fs) ->
               vcat [ text "extra decls:"
                            $$ nest 2 (vcat ([ppr bs | bs <- eds]))
+                   , text "mod breaks:"
+                           $$ nest 2 (ppr $ Foldable.toList . modBreaks_locs <$> mbs)
                    , text "foreign stubs:"
                            $$ nest 2 (ppr fs)
                    ]

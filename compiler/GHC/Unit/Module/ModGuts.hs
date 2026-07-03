@@ -7,7 +7,7 @@ where
 
 import GHC.Prelude
 
-import GHC.HsToCore.Breakpoints
+import GHC.HsToCore.Breakpoints.Types
 import GHC.ForeignSrcLang
 
 import GHC.Hs

@@ -8,6 +8,7 @@ test('ghcirun002', just_ghci, compile_and_run, [''])
 test('ghcirun003', just_ghci, compile_and_run, [''])
 test('T2589',      just_ghci, compile_and_run, [''])
 test('T2881',      just_ghci, compile_and_run, [''])
+test('T27287', [just_ghci, combined_output], makefile_test, [])
 
 test('T3171',
      [when(opsys('mingw32'),skip),

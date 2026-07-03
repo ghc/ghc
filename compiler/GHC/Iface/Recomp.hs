@@ -1208,7 +1208,7 @@ addFingerprints hsc_env iface0 = do
 
       sorted_extra_decls :: Maybe IfaceSimplifiedCore
       sorted_extra_decls = mi_simplified_core iface0 <&> \simpl_core ->
-         IfaceSimplifiedCore (sortOn binding_key (mi_sc_extra_decls simpl_core)) (mi_sc_foreign simpl_core)
+         IfaceSimplifiedCore (sortOn binding_key (mi_sc_extra_decls simpl_core)) (mi_sc_modBreaks simpl_core) (mi_sc_foreign simpl_core)
 
   -- The interface hash depends on:
   --   - the ABI hash, plus

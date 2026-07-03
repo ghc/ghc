@@ -15,7 +15,7 @@
 -- See Note [ModBreaks vs InternalModBreaks] and Note [Breakpoint identifiers]
 module GHC.HsToCore.Breakpoints
   ( -- * ModBreaks
-    mkModBreaks, ModBreaks(..)
+    mkModBreaks, ModBreaks(..), modBreaks_locs
 
     -- ** Re-exports BreakpointId
   , BreakpointId(..), BreakTickIndex
@@ -25,46 +25,12 @@ import GHC.Prelude
 import Data.Array
 
 import GHC.HsToCore.Ticks (Tick (..))
+import GHC.HsToCore.Breakpoints.Types
 import GHC.Data.SizedSeq
-import GHC.Types.SrcLoc (SrcSpan)
-import GHC.Types.Name (OccName)
-import GHC.Types.Tickish (BreakTickIndex, BreakpointId(..))
 import GHC.Unit.Module (Module)
 import GHC.Utils.Outputable
 import Data.List (intersperse)
-
---------------------------------------------------------------------------------
--- ModBreaks
---------------------------------------------------------------------------------
-
--- | All the information about the source-relevant breakpoints for a module
---
--- This information is constructed once during desugaring (with `mkModBreaks`)
--- from breakpoint ticks and fixed/unchanged from there on forward. It could be
--- exported as an abstract datatype because it should never be updated after
--- construction, only queried.
---
--- The arrays can be indexed using the int in the corresponding 'BreakpointId'
--- (i.e. the 'BreakpointId' whose 'Module' matches the 'Module' corresponding
--- to these 'ModBreaks') with the accessors 'modBreaks_locs', 'modBreaks_vars',
--- and 'modBreaks_decls'.
-data ModBreaks
-   = ModBreaks
-   { modBreaks_locs   :: !(Array BreakTickIndex SrcSpan)
-        -- ^ An array giving the source span of each breakpoint.
-   , modBreaks_vars   :: !(Array BreakTickIndex [OccName])
-        -- ^ An array giving the names of the free variables at each breakpoint.
-   , modBreaks_decls  :: !(Array BreakTickIndex [String])
-        -- ^ An array giving the names of the declarations enclosing each breakpoint.
-        -- See Note [Field modBreaks_decls]
-   , modBreaks_ccs    :: !(Array BreakTickIndex (String, String))
-        -- ^ Array pointing to cost centre info for each breakpoint;
-        -- actual 'CostCentre' allocation is done at link-time.
-   , modBreaks_module :: !Module
-        -- ^ The module to which this ModBreaks is associated.
-        -- We also cache this here for internal sanity checks.
-   }
-
+import GHC.Utils.Binary (BinSrcSpan(BinSrcSpan))
 -- | Initialize memory for breakpoint data that is shared between the bytecode
 -- generator and the interpreter.
 --
@@ -91,7 +57,7 @@ mkModBreaks interpreterProfiled modl extendedMixEntries
                 ]
           | otherwise = listArray (0, -1) []
      in ModBreaks
-      { modBreaks_locs   = locsTicks
+      { modBreaks_locs_  = fmap BinSrcSpan locsTicks
       , modBreaks_vars   = varsTicks
       , modBreaks_decls  = declsTicks
       , modBreaks_ccs    = ccs

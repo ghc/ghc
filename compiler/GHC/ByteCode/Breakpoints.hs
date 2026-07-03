@@ -40,7 +40,7 @@ import Control.DeepSeq
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IM
 
-import GHC.HsToCore.Breakpoints
+import GHC.HsToCore.Breakpoints.Types
 import GHC.Iface.Syntax
 
 import GHC.Unit.Module (Module)

@@ -127,6 +127,8 @@ import GHC.Iface.Flags
 import GHC.Iface.Ext.Fields
 import GHC.Iface.Recomp.Types
 
+import GHC.HsToCore.Breakpoints.Types
+
 import GHC.Unit
 import GHC.Unit.Module.Deps
 import GHC.Unit.Module.Warnings
@@ -425,6 +427,8 @@ data IfaceSimplifiedCore = IfaceSimplifiedCore {
   -- ^ Extra variable definitions which are **NOT** exposed but when
   -- combined with mi_decls allows us to restart code generation.
   -- See Note [Interface Files with Core Definitions] and Note [Interface File with Core: Sharing RHSs]
+  , mi_sc_modBreaks :: Maybe ModBreaks
+  -- ^ If breakpoints are present in @mi_sc_extra_decls@ this field provides this field provides the metadata required by the bytecode debugger.
   , mi_sc_foreign :: IfaceForeign
   -- ^ Foreign stubs and files to supplement 'mi_extra_decls_'.
   -- See Note [Foreign stubs and TH bytecode linking]
@@ -754,14 +758,16 @@ instance Binary IfaceAbiHashes where
                    }
 
 instance Binary IfaceSimplifiedCore where
-  put_ bh (IfaceSimplifiedCore eds fs) = do
+  put_ bh (IfaceSimplifiedCore eds mbs fs) = do
     put_ bh eds
+    put_ bh mbs
     put_ bh fs
 
   get bh = do
     eds <- get bh
+    mbs <- get bh
     fs <- get bh
-    return (IfaceSimplifiedCore eds fs)
+    return (IfaceSimplifiedCore eds mbs fs)
 
 emptyPartialModIface :: Module -> PartialModIface
 emptyPartialModIface mod
@@ -870,7 +876,7 @@ instance NFData IfaceModInfo where
 
 
 instance NFData IfaceSimplifiedCore where
-  rnf (IfaceSimplifiedCore eds fs) = rnf eds `seq` rnf fs
+  rnf (IfaceSimplifiedCore eds mbs fs) = rnf eds `seq` rnf mbs `seq` rnf fs
 
 instance NFData IfaceAbiHashes where
   rnf (IfaceAbiHashes a1 a2 a3 a4 a5 a6)
