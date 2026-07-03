@@ -645,7 +645,7 @@ releaseCapability_ (Capability* cap,
 }
 
 void
-releaseCapability (Capability* cap USED_IF_THREADS)
+releaseCapability (Capability* cap)
 {
     ACQUIRE_LOCK(&cap->lock);
     releaseCapability_(cap, false);
@@ -653,7 +653,7 @@ releaseCapability (Capability* cap USED_IF_THREADS)
 }
 
 void
-releaseAndWakeupCapability (Capability* cap USED_IF_THREADS)
+releaseAndWakeupCapability (Capability* cap)
 {
     ACQUIRE_LOCK(&cap->lock);
     releaseCapability_(cap, true);
@@ -661,7 +661,7 @@ releaseAndWakeupCapability (Capability* cap USED_IF_THREADS)
 }
 
 static void
-enqueueWorker (Capability* cap USED_IF_THREADS)
+enqueueWorker (Capability* cap)
 {
     Task *task;
 
