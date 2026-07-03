@@ -144,8 +144,8 @@ data MachOp
 
   -- Conversions.  Some of these will be NOPs.
   -- Floating-point conversions use the signed variant.
-  | MO_SF_Round    Width Width  -- Signed int -> Float
-  | MO_FS_Truncate Width Width  -- Float -> Signed int
+  | MO_SF_Round    Width Width  -- Signed int -> Float, but only W32/W64 inputs
+  | MO_FS_Truncate Width Width  -- Float -> Signed int, only W32/W64 on the int side.
   | MO_SS_Conv Width Width      -- Signed int -> Signed int
   | MO_UU_Conv Width Width      -- unsigned int -> unsigned int
   | MO_XX_Conv Width Width      -- int -> int; puts no requirements on the
