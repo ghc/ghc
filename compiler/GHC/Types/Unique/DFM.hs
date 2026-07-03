@@ -375,10 +375,9 @@ nonDetStrictFoldUDFM k z (UDFM m _i) = foldl' k' z m
 -- See Note [Sorting a UDFM] and Note [Cost of deterministic iteration].
 eltsUDFM :: UniqDFM key elt -> [elt]
 eltsUDFM (UDFM m i)
-  | n <= 1            = map taggedFst (M.elems m)
-  | usePlacement n i  = placementSort i (M.elems m)
-  | otherwise         = map taggedFst (sort_it m)
-  where n = M.size m
+  | M.compareSize m 1 /= GT = map taggedFst (M.elems m)
+  | usePlacement m i        = placementSort i (M.elems m)
+  | otherwise               = map taggedFst (sort_it m)
 
 sort_it :: M.Word64Map (TaggedVal elt) -> [TaggedVal elt]
 sort_it m = sortBy (compare `on` taggedSnd) (M.elems m)
@@ -400,14 +399,17 @@ sort_it m = sortBy (compare `on` taggedSnd) (M.elems m)
 -- with tag -1. Real tags are non-negative, so the readout skips on tag < 0;
 -- the sentinel's value field is never touched (it is unsafeCoerced ()).
 --
--- This sorting method loses when i is much larger than n: i never shrinks
--- (overwrites keep bumping it, delete/filter shrink n but not i). We compute
--- n = M.size m (O(n), cheap next to either sort) and fall back to the
--- mergesort when i > 4 * n. Maps built by plain insertion -- the common
--- case -- have i == n. The guard also caps the fast path's O(i) at O(n).
+-- This sorting method loses when i is much larger than n = M.size m: i never
+-- shrinks (overwrites keep bumping it, delete/filter shrink n but not i). We
+-- fall back to the mergesort when i > 4 * n, checking this with M.compareSize,
+-- which stops traversing the map as soon as the outcome is decided (so the
+-- guard costs O(min(n, i)), not a full O(n) size computation). Maps built by
+-- plain insertion -- the common case -- have i == n. The guard also caps the
+-- fast path's O(i) at O(n).
 
-usePlacement :: Int -> Int -> Bool
-usePlacement n i = i <= 4 * n
+-- | @i <= 4 * size m@, computed without a full 'M.size' traversal.
+usePlacement :: M.Word64Map a -> Int -> Bool
+usePlacement m i = M.compareSize m ((i + 3) `div` 4) /= LT
 
 -- | Order a list of 'TaggedVal's by tag, by placing each at array index =
 -- its tag.
@@ -462,18 +464,18 @@ udfmRestrictKeysSet (UDFM val_set i) set =
 -- See Note [Cost of deterministic iteration].
 udfmToList :: UniqDFM key elt -> [(Unique, elt)]
 udfmToList (UDFM m i)
-  | n <= 1           = [ (mkUniqueGrimily k, taggedFst v) | (k, v) <- M.toList m ]
+  | M.compareSize m 1 /= GT =
+      [ (mkUniqueGrimily k, taggedFst v) | (k, v) <- M.toList m ]
 
   -- Unlike eltsUDFM, this allocates a fresh TaggedVal + pair per element
   -- before the sort. If it ever matters, a parallel Word64 array of
   -- keys filled in the same pass would avoid the eager boxes.
-  | usePlacement n i = placementSort i
+  | usePlacement m i = placementSort i
       (M.foldrWithKey (\k tv rest ->
          TaggedVal (mkUniqueGrimily k, taggedFst tv) (taggedSnd tv) : rest) [] m)
   | otherwise =
       [ (mkUniqueGrimily k, taggedFst v)
       | (k, v) <- sortBy (compare `on` (taggedSnd . snd)) $ M.toList m ]
-  where n = M.size m
 
 -- Determines whether two 'UniqDFM's contain the same keys.
 equalKeysUDFM :: UniqDFM key a -> UniqDFM key b -> Bool
