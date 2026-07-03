@@ -1,5 +1,4 @@
 {-# LANGUAGE MagicHash #-}
-{-# OPTIONS_GHC -dno-typeable-binds -ddump-to-file -dsuppress-ticks -dsuppress-timestamps -ddump-stg-from-core -ddump-stg-final -ddump-cmm -ddump-cmm-raw -ddump-asm #-}
 
 import GHC.Exts
 import Data.Bits
