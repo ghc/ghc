@@ -376,7 +376,7 @@ nonDetStrictFoldUDFM k z (UDFM m _i) = foldl' k' z m
 eltsUDFM :: UniqDFM key elt -> [elt]
 eltsUDFM (UDFM m i)
   | M.compareSize m 1 /= GT = map taggedFst (M.elems m)
-  | usePlacement m i        = placementSort i (M.elems m)
+  | usePlacement m i        = placementSort i (\_ tv -> tv) m
   | otherwise               = map taggedFst (sort_it m)
 
 sort_it :: M.Word64Map (TaggedVal elt) -> [TaggedVal elt]
@@ -411,26 +411,30 @@ sort_it m = sortBy (compare `on` taggedSnd) (M.elems m)
 usePlacement :: M.Word64Map a -> Int -> Bool
 usePlacement m i = M.compareSize m ((i + 3) `div` 4) /= LT
 
--- | Order a list of 'TaggedVal's by tag, by placing each at array index =
--- its tag.
+-- | Order the map's elements by tag, by placing @mk key elt@ at array index =
+-- the tag of @elt@.
 --
--- The tags must be distinct and in @[0, i)@.
+-- The tags must be distinct and in @[0, i)@; @mk@ must preserve the tag.
 -- See Note [Sorting a UDFM].
-placementSort :: forall r. Int -> [TaggedVal r] -> [r]
-placementSort i tvs = runST (ST (\s0 ->
+placementSort :: forall e r. Int
+              -> (M.Key -> TaggedVal e -> TaggedVal r)
+              -> M.Word64Map (TaggedVal e)
+              -> [r]
+{-# INLINE placementSort #-}  -- specializes mk into the fill loop
+placementSort i mk m = runST (ST (\s0 ->
   case newSmallArray i hole s0 of
-    (# s1, marr #) -> case fill marr tvs s1 of
-      s2 -> case unsafeFreezeSmallArray marr s2 of
+    (# s1, marr #) -> case fill marr s1 of
+      (# s2, () #) -> case unsafeFreezeSmallArray marr s2 of
         (# s3, arr #) -> (# s3, readout arr 0 #)))
   where
     hole :: TaggedVal r
     hole = TaggedVal (unsafeCoerce ()) (-1)
 
-    fill :: SmallMutableArray s (TaggedVal r) -> [TaggedVal r] -> State# s -> State# s
-    fill _    []          s = s
-    fill marr (tv : tvs') s =
-      case writeSmallArray marr (taggedSnd tv) tv s of
-        s' -> fill marr tvs' s'
+    fill :: SmallMutableArray s (TaggedVal r) -> State# s -> (# State# s, () #)
+    fill marr s = case M.traverseWithKey_ write m of ST st -> st s
+      where
+        write k tv = ST (\s' ->
+          (# writeSmallArray marr (taggedSnd tv) (mk k tv) s', () #))
 
     readout :: SmallArray (TaggedVal r) -> Int -> [r]
     readout arr j
@@ -468,11 +472,9 @@ udfmToList (UDFM m i)
       [ (mkUniqueGrimily k, taggedFst v) | (k, v) <- M.toList m ]
 
   -- Unlike eltsUDFM, this allocates a fresh TaggedVal + pair per element
-  -- before the sort. If it ever matters, a parallel Word64 array of
-  -- keys filled in the same pass would avoid the eager boxes.
+  -- (they make up the result).
   | usePlacement m i = placementSort i
-      (M.foldrWithKey (\k tv rest ->
-         TaggedVal (mkUniqueGrimily k, taggedFst tv) (taggedSnd tv) : rest) [] m)
+      (\k tv -> TaggedVal (mkUniqueGrimily k, taggedFst tv) (taggedSnd tv)) m
   | otherwise =
       [ (mkUniqueGrimily k, taggedFst v)
       | (k, v) <- sortBy (compare `on` (taggedSnd . snd)) $ M.toList m ]

@@ -149,6 +149,7 @@ module GHC.Data.Word64Map.Lazy (
     , WM.map
     , mapWithKey
     , traverseWithKey
+    , traverseWithKey_
     , traverseMaybeWithKey
     , mapAccum
     , mapAccumWithKey

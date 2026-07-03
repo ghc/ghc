@@ -166,6 +166,7 @@ module GHC.Data.Word64Map.Strict (
     , map
     , mapWithKey
     , traverseWithKey
+    , traverseWithKey_
     , traverseMaybeWithKey
     , mapAccum
     , mapAccumWithKey
