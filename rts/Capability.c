@@ -523,20 +523,28 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
 #endif
 
 /* ----------------------------------------------------------------------------
- * releaseCapability
+ * releaseCapability_
  *
  * This serves two purposes:
  *
- * 1. The current Task (cap->running_task) releases the Capability.
- *    The Capability is marked free, and if there is any work to do, an
- *    appropriate Task is woken up.
+ * 1. The current Task (cap->running_task) releases ownership of the Capability.
+ *    If there is any work to do, the Capability is given to an appropriate
+ *    Task, or otherwise the Capability is marked as unowned.
  *
  * 2. There is no current task (cap->task == NULL), and thus the Capability
  *    is idle, and we want to wake up an idle Task to animate the Capability.
  *    In this case set always_wakeup. See also prodCapability.
  *
- * The caller must hold cap->lock and will still hold it after
- * releaseCapability returns.
+ * Setting the always_wakeup parameter (almost) ensures that the capability is
+ * not left idle: even if there is no known work to do, the capability will be
+ * given to a worker task. There are two exceptions to this:
+ *  1. if there is a pending sync then the capability is left idle, but in
+ *     anticipation of whichever task initiated the sync picking it up shortly.
+ *  2. if the scheduler is shutting down and there are no threads on the run
+ *     queue and there are no spare workers then the capability is left idle.
+ *     It is not entirely clear if this corner case is intentional.
+ *
+ * The caller must hold cap->lock and will still hold it after the call returns.
  *
  * N.B. May need to take all_tasks_mutex, if it needs to start a new task.
  *
@@ -561,6 +569,7 @@ releaseCapability_ (Capability* cap,
     }
     ASSERT_LOCK_HELD(&cap->lock);
 
+    // Remove the current Task owning the Capability (if any, see purpose 2).
     RELAXED_STORE(&cap->running_task, NULL);
 
     // Check to see whether a worker thread can be given
@@ -580,6 +589,10 @@ releaseCapability_ (Capability* cap,
     // be currently in waitForCapability() waiting for this
     // capability, in which case simply setting it as free would not
     // wake up the waiting task.
+    //
+    // FIXME: this pending_sync approach is a poor design, hard to understand
+    // and subject to various unnecessary delays. See issues #27460 and #27473.
+    //
     PendingSync *sync = SEQ_CST_LOAD(&pending_sync);
     if (sync && (sync->type != SYNC_GC_PAR || sync->idle[cap->no])) {
         debugTrace(DEBUG_sched, "sync pending, freeing capability %d", cap->no);
