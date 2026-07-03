@@ -48,14 +48,16 @@ typedef union {
   StgAsyncIOOp *aiop;
   StgTimeoutQueue *timeout;
 #if defined(mingw32_HOST_OS)
+    // Only used by the Legacy Win32 I/O manager: the async request id for the
+    // operation.
   StgWord async_reqID;
 #endif
 #if !defined(THREADED_RTS)
   StgWord target;
-    // Only for the non-threaded RTS: the target time for a thread
-    // blocked in threadDelay, in units of 1ms.  This is a
-    // compromise: we don't want to take up much space in the TSO.  If
-    // you want better resolution for threadDelay, use -threaded.
+    // Only for the legacy select I/O manager: the target time for a thread
+    // blocked in threadDelay, in units of 1ms.  This is a compromise: we don't
+    // want to take up much space in the TSO.  If you want better resolution
+    // for threadDelay, use *literally any* other I/O manager.
 #endif
 } StgTSOBlockInfo;
 
