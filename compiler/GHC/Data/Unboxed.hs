@@ -13,10 +13,11 @@
 
 module GHC.Data.Unboxed (
   MaybeUB(JustUB, NothingUB),
-  fmapMaybeUB, fromMaybeUB, apMaybeUB, maybeUB
+  fmapMaybeUB, fromMaybeUB, apMaybeUB, maybeUB,
+  MaybeUB2(JustUB2, NothingUB2), boxMaybeUB2
   ) where
 
-import GHC.Prelude hiding (Maybe(..), Either(..))
+import GHC.Prelude hiding (Either(..))
 
 -- | Like Maybe, but using unboxed sums.
 --
@@ -54,3 +55,20 @@ fmapMaybeUB f (JustUB x) = JustUB $ f x
 maybeUB :: b -> (a -> b) -> MaybeUB a -> b
 maybeUB _def f (JustUB x) = f x
 maybeUB def _f NothingUB = def
+
+-- | Like @Maybe (a, b)@, but with the @Maybe@ and the pair unboxed;
+-- the fields stay lifted. The caveats on 'MaybeUB' apply here too.
+newtype MaybeUB2 a b = MaybeUB2 (# (# #) | (# a, b #) #)
+
+pattern JustUB2 :: a -> b -> MaybeUB2 a b
+pattern JustUB2 x y = MaybeUB2 (# | (# x, y #) #)
+
+pattern NothingUB2 :: MaybeUB2 a b
+pattern NothingUB2 = MaybeUB2 (# (# #) | #)
+
+{-# COMPLETE NothingUB2, JustUB2 #-}
+
+boxMaybeUB2 :: MaybeUB2 a b -> Maybe (a, b)
+boxMaybeUB2 (JustUB2 x y) = Just (x, y)
+boxMaybeUB2 NothingUB2    = Nothing
+{-# INLINE boxMaybeUB2 #-}

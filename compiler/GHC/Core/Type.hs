@@ -268,6 +268,7 @@ import GHC.Utils.Panic
 import GHC.Data.FastString
 
 import GHC.Data.Maybe   ( orElse, isJust )
+import GHC.Data.Unboxed ( MaybeUB2(JustUB2, NothingUB2), boxMaybeUB2 )
 import GHC.List (build)
 
 -- $type_classification
@@ -1287,15 +1288,23 @@ funTyConAppTy_maybe :: FunTyFlag -> Type -> Type -> Type
 -- ^ Given the components of a FunTy
 -- figure out the corresponding TyConApp.
 funTyConAppTy_maybe af mult arg res
+  = boxMaybeUB2 (funTyConAppTy_maybeUB af mult arg res)
+{-# INLINE funTyConAppTy_maybe #-}
+
+funTyConAppTy_maybeUB :: FunTyFlag -> Type -> Type -> Type
+                      -> MaybeUB2 TyCon [Type]
+-- Worker for 'funTyConAppTy_maybe';
+-- see Note [Unboxed Maybe workers for hot splitters]
+funTyConAppTy_maybeUB af mult arg res
   | Just arg_rep <- getRuntimeRep_maybe arg
   , Just res_rep <- getRuntimeRep_maybe res
   -- If you're changing the lines below, you'll probably want to adapt the
   -- `fUNTyCon` case of GHC.Core.Unify.unify_ty correspondingly.
   , let args | isFUNArg af = [mult, arg_rep, res_rep, arg, res]
              | otherwise   = [      arg_rep, res_rep, arg, res]
-  = Just $ (funTyFlagTyCon af, args)
+  = JustUB2 (funTyFlagTyCon af) args
   | otherwise
-  = Nothing
+  = NothingUB2
 
 tyConAppFunTy_maybe :: HasDebugCallStack => TyCon -> [Type] -> Maybe Type
 -- ^ Return Just if this TyConApp should be represented as a FunTy
@@ -1579,19 +1588,65 @@ tyConAppArgs ty = tyConAppArgs_maybe ty `orElse` pprPanic "tyConAppArgs" (ppr ty
 splitTyConApp :: Type -> (TyCon, [Type])
 splitTyConApp ty = splitTyConApp_maybe ty `orElse` pprPanic "splitTyConApp" (ppr ty)
 
+{- Note [Unboxed Maybe workers for hot splitters]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Functions like splitTyConApp_maybe and sORTKind_maybe are called at
+enormous volume, and nearly every caller immediately scrutinises the
+result.  A boxed result means allocating a Just plus a pair on every
+successful call, only for the caller to tear both apart.  CPR
+worker/wrapper cannot remove this: it unboxes a multi-constructor
+result only when a single constructor is returned on all paths (see
+Note [Which types are unboxed?] in GHC.Core.Opt.WorkWrap.Utils), and a
+function with both Just and Nothing return paths gets TopCpr, because
+lubCpr in GHC.Types.Cpr collapses differing constructor tags.
+
+So we do the worker/wrapper split by hand: the out-of-line worker
+(e.g. splitTyConApp_maybeUB) returns an unboxed 'MaybeUB2', and a tiny
+INLINE wrapper reboxes to Maybe.  At scrutinising call sites the
+wrapper inlines and case-of-case eliminates the boxes entirely;
+callers that store the result rebox and are no worse off.
+
+The worker must actually stay out of line: a worker small enough to
+inline dissolves into the wrapper's stable unfolding, and the "wrapper"
+then duplicates the whole function at every call site.  Recursive
+workers (sORTKind_maybeUB) are safe; small non-recursive ones need
+NOINLINE (splitTyConApp_maybeUB).
+
+The wrappers' unfoldings must survive into interface files, or every
+caller silently falls back to the boxed path; likewise the pattern
+synonym matchers of GHC.Data.Unboxed (see the header of that module
+regarding -fomit-interface-pragmas).
+-}
+
 -- | Attempts to tease a type apart into a type constructor and the application
 -- of a number of arguments to that constructor
 splitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
-splitTyConApp_maybe ty = splitTyConAppNoView_maybe (coreFullView ty)
+splitTyConApp_maybe ty = boxMaybeUB2 (splitTyConApp_maybeUB ty)
+{-# INLINE splitTyConApp_maybe #-}
+
+splitTyConApp_maybeUB :: HasDebugCallStack => Type -> MaybeUB2 TyCon [Type]
+-- Worker for 'splitTyConApp_maybe';
+-- see Note [Unboxed Maybe workers for hot splitters]
+splitTyConApp_maybeUB ty = splitTyConAppNoView_maybeUB (coreFullView ty)
+{-# NOINLINE splitTyConApp_maybeUB #-}
+  -- NOINLINE: otherwise this tiny definition dissolves into the INLINE
+  -- wrapper's stable unfolding, turning the wrapper into a full copy of
+  -- the splitter that is duplicated at every call site.
 
 splitTyConAppNoView_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 -- Same as splitTyConApp_maybe but without looking through synonyms
-splitTyConAppNoView_maybe ty
+splitTyConAppNoView_maybe ty = boxMaybeUB2 (splitTyConAppNoView_maybeUB ty)
+{-# INLINE splitTyConAppNoView_maybe #-}
+
+splitTyConAppNoView_maybeUB :: HasDebugCallStack => Type -> MaybeUB2 TyCon [Type]
+-- Worker for 'splitTyConAppNoView_maybe';
+-- see Note [Unboxed Maybe workers for hot splitters]
+splitTyConAppNoView_maybeUB ty
   = case ty of
       FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res}
-                      -> funTyConAppTy_maybe af w arg res
-      TyConApp tc tys -> Just (tc, tys)
-      _               -> Nothing
+                      -> funTyConAppTy_maybeUB af w arg res
+      TyConApp tc tys -> JustUB2 tc tys
+      _               -> NothingUB2
 
 -- | tcSplitTyConApp_maybe splits a type constructor application into
 -- its type constructor and applied types.
@@ -2690,26 +2745,33 @@ typeKind ty@(ForAllTy {})
 sORTKind_maybe :: Kind -> Maybe (TypeOrConstraint, Type)
 -- Sees if the argument is of form (TYPE rep) or (CONSTRAINT rep)
 -- and if so returns which, and the runtime rep
+sORTKind_maybe ki = boxMaybeUB2 (sORTKind_maybeUB ki)
+{-# INLINE sORTKind_maybe #-}
+
+sORTKind_maybeUB :: Kind -> MaybeUB2 TypeOrConstraint Type
+-- Worker for 'sORTKind_maybe';
+-- see Note [Unboxed Maybe workers for hot splitters]
 --
 -- This is a "hot" function.  Do not call splitTyConApp_maybe here,
 -- to avoid the faff with FunTy
-sORTKind_maybe (TyConApp tc tys)
-  -- First, short-cuts for Type and Constraint that do no allocation
-  | tc_uniq == liftedTypeKindTyConKey = assert( null tys ) $ Just (TypeLike,       liftedRepTy)
-  | tc_uniq == constraintKindTyConKey = assert( null tys ) $ Just (ConstraintLike, liftedRepTy)
+sORTKind_maybeUB (TyConApp tc tys)
+  -- First, short-cuts for Type and Constraint
+  -- (assert has a lifted result type, hence the `seq`s)
+  | tc_uniq == liftedTypeKindTyConKey = assert (null tys) () `seq` JustUB2 TypeLike       liftedRepTy
+  | tc_uniq == constraintKindTyConKey = assert (null tys) () `seq` JustUB2 ConstraintLike liftedRepTy
   | tc_uniq == tYPETyConKey           = get_rep TypeLike
   | tc_uniq == cONSTRAINTTyConKey     = get_rep ConstraintLike
-  | Just ty' <- expandSynTyConApp_maybe tc tys = sORTKind_maybe ty'
+  | Just ty' <- expandSynTyConApp_maybe tc tys = sORTKind_maybeUB ty'
   where
     !tc_uniq = tyConUnique tc
-     -- This bang on tc_uniq is important.  It means that sORTKind_maybe starts
+     -- This bang on tc_uniq is important.  It means that sORTKind_maybeUB starts
      -- by evaluating tc_uniq, and then ends up with a single case with a 4-way branch
 
     get_rep torc = case tys of
-                     (rep:_reps) -> assert (null _reps) $ Just (torc, rep)
-                     []          -> Nothing
+                     (rep:_reps) -> assert (null _reps) () `seq` JustUB2 torc rep
+                     []          -> NothingUB2
 
-sORTKind_maybe _ = Nothing
+sORTKind_maybeUB _ = NothingUB2
 
 typeTypeOrConstraint :: HasDebugCallStack => Type -> TypeOrConstraint
 -- Precondition: expects a type that classifies values.
