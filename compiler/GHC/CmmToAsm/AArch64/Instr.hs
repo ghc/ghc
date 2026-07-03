@@ -771,7 +771,8 @@ data Instr
     | MOVZ Operand Operand
     | MVN Operand Operand -- rd = ~rn
     | ORR Format Operand Operand Operand -- rd = rn | op2
-    -- Load and stores.
+    -- Load and stores, we support subwords by picking the subword variant
+    -- based on the format.
     -- TODO STR/LDR might want to change to STP/LDP with XZR for the second register.
     | STR Format Operand Operand -- str Xn, address-mode // Xn -> *addr
     | STLR Format Operand Operand -- stlr Xn, address-mode // Xn -> *addr
