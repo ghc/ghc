@@ -97,9 +97,9 @@ import qualified GHC.Data.Word64Set as W
 -- If the client of the map performs operations on the map in deterministic
 -- order then `udfmToList` returns them in deterministic order.
 --
--- There is an implementation cost: each element is given a serial number
+-- There is an implementation cost: each element is given an insertion tag
 -- as it is added, and functions like `udfmToList` or `eltsUDFM` order their
--- results by this serial number (see
+-- results by this tag (see
 -- Note [Cost of deterministic iteration]). So you should only use `UniqDFM`
 -- if you need the deterministic property.
 --
@@ -114,7 +114,7 @@ import qualified GHC.Data.Word64Set as W
 --
 --
 -- There's more than one way to implement this. The implementation here tags
--- every value with the insertion time that can later be used to sort the
+-- every value with its insertion tag that can later be used to sort the
 -- values when asked to convert to a list.
 --
 -- An alternative would be to have
@@ -133,11 +133,11 @@ import qualified GHC.Data.Word64Set as W
 --
 -- may also be worth considering. Compare Dhall.Map in the dhall package.
 
--- | A type of values tagged with insertion time
+-- | A type of values carrying an insertion tag
 data TaggedVal val =
   TaggedVal
     !val
-    {-# UNPACK #-} !Int -- ^ insertion time
+    {-# UNPACK #-} !Int -- ^ insertion tag
   deriving stock (Data, Functor, Foldable, Traversable)
 
 taggedFst :: TaggedVal val -> val
@@ -159,12 +159,24 @@ instance Eq val => Eq (TaggedVal val) where
 data UniqDFM key ele =
   UDFM
     !(M.Word64Map (TaggedVal ele)) -- A map where keys are Unique's values and
-                                -- values are tagged with insertion time.
-                                -- The invariant is that all the tags will
-                                -- be distinct within a single map
+                                -- values carry an insertion tag.
     {-# UNPACK #-} !Int         -- Upper bound on the values' insertion
-                                -- time. See Note [Overflow on plusUDFM]
+                                -- tags. See Note [Overflow on plusUDFM]
+  -- See Note [UDFM invariants]
   deriving (Data, Functor)
+
+{- Note [UDFM invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+In a map (UDFM m ub):
+
+ (a) The insertion tags of the elements of m are distinct.
+ (b) Every tag lies in [0, ub).
+
+Consequently ub >= size m.
+
+The tags determine the order of deterministic iteration (eltsUDFM,
+udfmToList); see Note [Sorting a UDFM].
+-}
 
 -- | Deterministic.
 --
@@ -266,8 +278,8 @@ plusUDFM_CK f udfml@(UDFM _ i) udfmr@(UDFM _ j)
 -- Note [Overflow on plusUDFM]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- There are multiple ways of implementing plusUDFM.
--- The main problem that needs to be solved is overlap on times of
--- insertion between different keys in two maps.
+-- The main problem that needs to be solved is overlap on insertion
+-- tags between different keys in two maps.
 -- Consider:
 --
 -- A = fromList [(a, (x, 1))]
@@ -355,80 +367,98 @@ nonDetStrictFoldUDFM k z (UDFM m _i) = foldl' k' z m
   where
     k' acc (TaggedVal v _) = k v acc
 
--- Note [Cost of deterministic iteration]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Deterministic iteration orders elements by insertion tag, and any such
--- ordering must inspect every element's tag before it can emit the first
--- element. So even the head of the result costs a full traversal of the map
--- plus -- on the main path -- the allocation of an O(n)-sized array (see
--- Note [Sorting a UDFM]). Laziness in the result list only avoids allocating
--- for elements that are never demanded; it does not make the iteration
--- incremental. #27459 shows this cost biting in consumers that demanded only
--- the head.
---
--- So: to test for emptiness, use isNullUDFM rather than null on eltsUDFM;
--- for order-oblivious queries, prefer short-circuiting anyUDFM/allUDFM; and
--- if you don't need the deterministic order at all, use the nonDet functions.
+{- Note [Cost of deterministic iteration]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Deterministic iteration -- eltsUDFM, udfmToList, and everything built on
+them, such as foldUDFM and UniqDFM's Foldable instance -- orders elements
+by insertion tag, and any such ordering must inspect every element's tag
+before it can emit the first element. So even the head of the result costs
+a full traversal of the map plus -- on the main path -- the allocation of
+an O(n)-sized array (see Note [Sorting a UDFM]). Laziness in the result
+list only avoids allocating for elements that are never demanded; it does
+not make the iteration incremental. #27459 shows this cost biting in
+consumers that demanded only the head.
+
+So: to test for emptiness, use isNullUDFM rather than null on eltsUDFM;
+for order-oblivious queries, prefer short-circuiting anyUDFM/allUDFM; and
+if you don't need the deterministic order at all, use the nonDet functions.
+-}
 
 -- | Deterministic, in order of insertion.
 --
 -- See Note [Sorting a UDFM] and Note [Cost of deterministic iteration].
 eltsUDFM :: UniqDFM key elt -> [elt]
-eltsUDFM (UDFM m i)
+eltsUDFM (UDFM m ub)
   | M.compareSize m 1 /= GT = map taggedFst (M.elems m)
-  | usePlacement m i        = placementSort i (\_ tv -> tv) m
+  | usePlacement m ub       = placementSort ub (\_ tv -> tv) m
   | otherwise               = map taggedFst (sort_it m)
 
 sort_it :: M.Word64Map (TaggedVal elt) -> [TaggedVal elt]
 sort_it m = sortBy (compare `on` taggedSnd) (M.elems m)
 
 
--- Note [Sorting a UDFM]
--- ~~~~~~~~~~~~~~~~~~~~~
--- Deterministic iteration must order elements by insertion tag. Instead of a
--- comparison sort -- the list mergesort behind sortBy allocates ~n*log n cons
--- cells -- we exploit the invariant that in (UDFM m i) all tags are distinct
--- Ints in [0, i): allocate an array of size i, write each element at
--- @index = tag@, freeze, and read out in index order. That's O(i) work (which
--- subsumes the O(n) fill, since distinct tags force n <= i), no comparisons,
--- and the readout is lazy, so consumers that demand only a prefix pay almost
--- nothing beyond the fill (but the fill itself is unavoidable; see
--- Note [Cost of deterministic iteration]).
---
--- Holes: slots whose tag never occurs keep the initial sentinel, a TaggedVal
--- with tag -1. Real tags are non-negative, so the readout skips on tag < 0;
--- the sentinel's value field is never touched (it is unsafeCoerced ()).
---
--- This sorting method loses when i is much larger than n = M.size m: i never
--- shrinks (overwrites keep bumping it, delete/filter shrink n but not i). We
--- fall back to the mergesort when i > 4 * n, checking this with M.compareSize,
--- which stops traversing the map as soon as the outcome is decided (so the
--- guard costs O(min(n, i)), not a full O(n) size computation). Maps built by
--- plain insertion -- the common case -- have i == n. The guard also caps the
--- fast path's O(i) at O(n).
+{- Note [Sorting a UDFM]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Deterministic iteration must order elements by insertion tag. A comparison
+sort is needlessly expensive: the list mergesort behind sortBy allocates
+~n*log n cons cells, and in #27459 those allocations made up a large share
+of the compiler's total allocation on the InstanceMatching perf tests.
 
--- | @i <= 4 * size m@, computed without a full 'M.size' traversal.
+Instead we exploit the UDFM invariants (all tags in (UDFM m ub) are distinct
+Ints in [0, ub); see Note [UDFM invariants]): allocate an array of size ub,
+write each element at
+@index = tag@, freeze, and read out in index order. The fill is O(n) work,
+where n = size m; the readout is O(ub); and since ub >= n, the whole sort is
+O(ub) -- with no comparisons. The readout is lazy, so consumers that demand
+only a prefix pay almost nothing beyond the fill (but the fill itself is
+unavoidable; see Note [Cost of deterministic iteration]).
+
+Holes: slots whose tag never occurs keep the initial sentinel, a TaggedVal
+with tag -1. Real tags are non-negative, so the readout skips on tag < 0.
+The sentinel's value field is never read, but something must fill it: not a
+panic thunk -- TaggedVal's strict value field would force it as soon as the
+readout inspects a hole's tag -- so we borrow the value of an arbitrary map
+element. (Safe: the callers' guards send maps of size < 2 down a different
+path, so the map is never empty here.)
+
+This sorting method loses when ub is much larger than n = M.size m: ub never
+shrinks (overwrites keep bumping it, delete/filter shrink n but not ub). We
+fall back to the mergesort when ub > 4 * n; the decision about which sort to
+use is made by usePlacement. It checks the threshold with M.compareSize,
+which stops traversing the map as soon as the outcome is decided (so the
+guard costs O(min(n, ub)), not a full O(n) size computation). Maps built by
+plain insertion -- the common case -- have ub == n. The guard also caps the
+fast path's O(ub) at O(n).
+-}
+
+-- | @ub <= 4 * size m@, computed without a full 'M.size' traversal.
 usePlacement :: M.Word64Map a -> Int -> Bool
-usePlacement m i = M.compareSize m ((i + 3) `div` 4) /= LT
+usePlacement m ub = M.compareSize m ceil_ub_div_4 /= LT
+  where
+    ceil_ub_div_4 = (ub + 3) `div` 4  -- ceil(ub/4): ub <= 4*n iff n >= ceil(ub/4)
 
 -- | Order the map's elements by tag, by placing @mk key elt@ at array index =
 -- the tag of @elt@.
 --
--- The tags must be distinct and in @[0, i)@; @mk@ must preserve the tag.
--- See Note [Sorting a UDFM].
+-- The map must be non-empty, its tags distinct and in @[0, ub)@; @mk@ must
+-- preserve the tag. See Note [Sorting a UDFM].
 placementSort :: forall e r. Int
               -> (M.Key -> TaggedVal e -> TaggedVal r)
               -> M.Word64Map (TaggedVal e)
               -> [r]
 {-# INLINE placementSort #-}  -- specializes mk into the fill loop
-placementSort i mk m = runST (ST (\s0 ->
-  case newSmallArray i hole s0 of
+placementSort ub mk m = runST (ST (\s0 ->
+  case newSmallArray ub hole s0 of
     (# s1, marr #) -> case fill marr s1 of
       (# s2, () #) -> case unsafeFreezeSmallArray marr s2 of
         (# s3, arr #) -> (# s3, readout arr 0 #)))
   where
+    -- The tag -1 marks unfilled slots; the value field is never read, but
+    -- it is strict, so it needs a real value of type r -- borrow one from
+    -- the map. See Note [Sorting a UDFM].
     hole :: TaggedVal r
-    hole = TaggedVal (unsafeCoerce ()) (-1)
+    hole = case M.findMin m of
+      (k, tv) -> TaggedVal (taggedFst (mk k tv)) (-1)
 
     fill :: SmallMutableArray s (TaggedVal r) -> State# s -> (# State# s, () #)
     fill marr s = case M.traverseWithKey_ write m of ST st -> st s
@@ -438,7 +468,7 @@ placementSort i mk m = runST (ST (\s0 ->
 
     readout :: SmallArray (TaggedVal r) -> Int -> [r]
     readout arr j
-      | j >= i    = []
+      | j >= ub   = []
       | t < 0     = readout arr (j + 1)
       | otherwise = v : readout arr (j + 1)
       where TaggedVal v t = indexSmallArray arr j
@@ -467,13 +497,13 @@ udfmRestrictKeysSet (UDFM val_set i) set =
 -- as this already incurs most of the cost of returning the full list.
 -- See Note [Cost of deterministic iteration].
 udfmToList :: UniqDFM key elt -> [(Unique, elt)]
-udfmToList (UDFM m i)
+udfmToList (UDFM m ub)
   | M.compareSize m 1 /= GT =
       [ (mkUniqueGrimily k, taggedFst v) | (k, v) <- M.toList m ]
 
   -- Unlike eltsUDFM, this allocates a fresh TaggedVal + pair per element
   -- (they make up the result).
-  | usePlacement m i = placementSort i
+  | usePlacement m ub = placementSort ub
       (\k tv -> TaggedVal (mkUniqueGrimily k, taggedFst tv) (taggedSnd tv)) m
   | otherwise =
       [ (mkUniqueGrimily k, taggedFst v)

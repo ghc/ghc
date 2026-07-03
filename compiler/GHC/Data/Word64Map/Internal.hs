@@ -2528,7 +2528,6 @@ traverseWithKey f = go
 traverseWithKey_ :: Applicative t => (Key -> a -> t ()) -> Word64Map a -> t ()
 traverseWithKey_ f = go
   where
-    -- No sign-bit fixup (cf. traverseWithKey): a Word64 mask is never negative.
     go Nil = pure ()
     go (Tip k v) = f k v
     go (Bin _ _ l r) = go l *> go r
