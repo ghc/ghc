@@ -91,3 +91,4 @@ test('T24496'
       ]
     , compile_and_run, ['-O'])
 test('T6026', normal, compile_and_run, [''])
+test('T27299', normal, compile_and_run, [''])

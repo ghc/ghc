@@ -1,16 +1,18 @@
 #include "Rts.h"
 
-StgWord16
-hs_bswap16(StgWord16 x)
+StgWord
+hs_bswap16(StgWord x)
 {
-  return ((x >> 8) | (x << 8));
+  x = (StgWord16)x;
+  return (StgWord16)((x >> 8) | (x << 8));
 }
 
-StgWord32
-hs_bswap32(StgWord32 x)
+StgWord
+hs_bswap32(StgWord x)
 {
-  return ((x >> 24) | ((x >> 8) & 0xff00) |
-          (x << 24) | ((x & 0xff00) << 8));
+  x = (StgWord32)x;
+  return (StgWord32)((x >> 24) | ((x >> 8) & 0xff00) |
+                     (x << 24) | ((x & 0xff00) << 8));
 }
 
 StgWord64
