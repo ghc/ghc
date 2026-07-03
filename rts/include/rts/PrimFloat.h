@@ -11,7 +11,7 @@
 
 #pragma once
 
-StgDouble __int_encodeDouble (I_ j, I_ e);
-StgFloat  __int_encodeFloat (I_ j, I_ e);
-StgDouble __word_encodeDouble (W_ j, I_ e);
-StgFloat  __word_encodeFloat (W_ j, I_ e);
+RTS_PUBLIC StgDouble __int_encodeDouble (I_ j, I_ e);
+RTS_PUBLIC StgFloat  __int_encodeFloat (I_ j, I_ e);
+RTS_PUBLIC StgDouble __word_encodeDouble (W_ j, I_ e);
+RTS_PUBLIC StgFloat  __word_encodeFloat (W_ j, I_ e);

@@ -116,7 +116,7 @@ typedef struct IpeBufferListNode_ {
     StringIdx module_name;
 } IpeBufferListNode;
 
-void registerInfoProvList(IpeBufferListNode *node);
+RTS_PUBLIC void registerInfoProvList(IpeBufferListNode *node);
 
 // We leave it in old format to keep compatibility with existing https://github.com/haskell/ghc-events
 // See: https://github.com/haskell/ghc-events/commit/cce6a35677f5f99b44c21d86febd295b909ef1ce
@@ -125,7 +125,7 @@ void registerInfoProvList(IpeBufferListNode *node);
 void formatClosureDescIpe(const InfoProvEnt *ipe_buf, char *str_buf);
 
 // Returns true on success, initializes `out`.
-bool lookupIPE(const StgInfoTable *info, InfoProvEnt *out);
+RTS_PUBLIC bool lookupIPE(const StgInfoTable *info, InfoProvEnt *out);
 
 uint64_t lookupIPEId(const StgInfoTable *info);
 

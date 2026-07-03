@@ -80,8 +80,8 @@ typedef struct CostCentreStack_ {
  * See the module GHC.Profiling.
  * ---------------------------------------------------------------------------*/
 
-void stopProfTimer      ( void );
-void startProfTimer     ( void );
+RTS_PUBLIC void stopProfTimer      ( void );
+RTS_PUBLIC void startProfTimer     ( void );
 
 /* -----------------------------------------------------------------------------
  * The rest is PROFILING only...
@@ -140,7 +140,7 @@ extern StgWord CC_OVERHEAD[];
 extern StgWord CCS_OVERHEAD[];   // Profiling overhead
 
 extern StgWord CC_DONT_CARE[];
-extern StgWord CCS_DONT_CARE[];  // CCS attached to static constructors
+extern RTS_PUBLIC StgWord CCS_DONT_CARE[];  // CCS attached to static constructors
 
 #else
 
@@ -157,7 +157,7 @@ extern CostCentre      CC_OVERHEAD[];
 extern CostCentreStack CCS_OVERHEAD[];   // Profiling overhead
 
 extern CostCentre      CC_DONT_CARE[];
-extern CostCentreStack CCS_DONT_CARE[];  // shouldn't ever get set
+extern RTS_PUBLIC CostCentreStack CCS_DONT_CARE[];  // shouldn't ever get set
 
 extern CostCentre      CC_PINNED[];
 extern CostCentreStack CCS_PINNED[];     // pinned memory
@@ -167,18 +167,18 @@ extern CostCentreStack CCS_IDLE[];       // capability is idle
 
 #endif /* IN_STG_CODE */
 
-extern unsigned int RTS_VAR(era);
-extern StgWord RTS_VAR(user_era);
+extern RTS_PUBLIC unsigned int RTS_VAR(era);
+extern RTS_PUBLIC StgWord RTS_VAR(user_era);
 
 /* -----------------------------------------------------------------------------
  * Functions
  * ---------------------------------------------------------------------------*/
 
-CostCentreStack * pushCostCentre (CostCentreStack *, CostCentre *);
-void              enterFunCCS    (StgRegTable *reg, CostCentreStack *);
-CostCentre *mkCostCentre (char *label, char *module, char *srcloc);
+RTS_PUBLIC CostCentreStack * pushCostCentre (CostCentreStack *, CostCentre *);
+RTS_PUBLIC void              enterFunCCS    (StgRegTable *reg, CostCentreStack *);
+RTS_PUBLIC CostCentre *mkCostCentre (char *label, char *module, char *srcloc);
 
-extern CostCentre * RTS_VAR(CC_LIST);               // registered CC list
+extern RTS_PUBLIC CostCentre * RTS_VAR(CC_LIST);               // registered CC list
 
 /* -----------------------------------------------------------------------------
  * Declaring Cost Centres & Cost Centre Stacks.

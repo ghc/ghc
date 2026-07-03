@@ -91,6 +91,7 @@ static StgStablePtr getOrSetKey(StoreKey key, StgStablePtr ptr)
 }
 
 #define mkStoreAccessor(name) \
+    RTS_PUBLIC \
     StgStablePtr \
     getOrSet##name(StgStablePtr ptr) \
     { return getOrSetKey(name, ptr); }

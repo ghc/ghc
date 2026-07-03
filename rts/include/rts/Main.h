@@ -12,7 +12,10 @@
  * The entry point for Haskell programs that use a Haskell main function
  * -------------------------------------------------------------------------- */
 
-int hs_main (int argc, char *argv[],     // program args
-             StgClosure *main_closure,   // closure for Main.main
-             RtsConfig rts_config)       // RTS configuration
+#include "RtsPublic.h"
+
+RTS_PUBLIC int hs_main (
+            int argc, char *argv[],     // program args
+            StgClosure *main_closure,   // closure for Main.main
+            RtsConfig rts_config)       // RTS configuration
    STG_NORETURN;

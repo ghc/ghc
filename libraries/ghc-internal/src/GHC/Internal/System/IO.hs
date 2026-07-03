@@ -738,7 +738,10 @@ openTempFile' loc tmp_dir template binary mode
 foreign import ccall "getTempFileNameErrorNo" c_getTempFileNameErrorNo
   :: CWString -> CWString -> CWString -> CUInt -> Ptr CWchar -> IO Bool
 
-foreign import ccall "__createUUIDTempFileErrNo" c_createUUIDTempFileErrNo
+{-# NOINLINE c_createUUIDTempFileErrNo #-}
+c_createUUIDTempFileErrNo :: CWString -> CWString -> CWString -> Ptr CWString -> IO Bool
+c_createUUIDTempFileErrNo = _c_createUUIDTempFileErrNo
+foreign import ccall "__createUUIDTempFileErrNo" _c_createUUIDTempFileErrNo
   :: CWString -> CWString -> CWString -> Ptr CWString -> IO Bool
 
 pathSeparator :: String -> Bool

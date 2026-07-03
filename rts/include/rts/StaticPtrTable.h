@@ -25,7 +25,7 @@
  * compiler/deSugar/StaticPtrTable.sptInitCode
  *
  * */
-void hs_spt_insert (StgWord64 key[2],void* spe_closure);
+RTS_PUBLIC void hs_spt_insert (StgWord64 key[2],void* spe_closure);
 
 /** Inserts an entry for a StgTablePtr in the Static Pointer Table.
  *
@@ -33,7 +33,7 @@ void hs_spt_insert (StgWord64 key[2],void* spe_closure);
  * SPT entries for bytecode objects.
  *
  * */
-void hs_spt_insert_stableptr(StgWord64 key[2], StgStablePtr *entry);
+RTS_PUBLIC void hs_spt_insert_stableptr(StgWord64 key[2], StgStablePtr *entry);
 
 /** Removes an entry from the Static Pointer Table.
  *
@@ -41,4 +41,4 @@ void hs_spt_insert_stableptr(StgWord64 key[2], StgStablePtr *entry);
  * compiler/deSugar/StaticPtrTable.sptInitCode
  *
  * */
-void hs_spt_remove (StgWord64 key[2]);
+RTS_PUBLIC void hs_spt_remove (StgWord64 key[2]);

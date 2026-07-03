@@ -384,11 +384,17 @@ foreign import ccall safe "__set_console_echo"
 foreign import ccall safe "__get_console_echo"
     c_get_console_echo :: HANDLE -> IO BOOL
 
+{-# NOINLINE c_close_handle #-}
+c_close_handle :: HANDLE -> IO Bool
+c_close_handle = _c_close_handle
 foreign import ccall safe "__close_handle"
-    c_close_handle :: HANDLE -> IO Bool
+    _c_close_handle :: HANDLE -> IO Bool
 
+{-# NOINLINE c_handle_type #-}
+c_handle_type :: HANDLE -> IO Int
+c_handle_type = _c_handle_type
 foreign import ccall safe "__handle_type"
-    c_handle_type :: HANDLE -> IO Int
+    _c_handle_type :: HANDLE -> IO Int
 
 foreign import ccall safe "__set_file_pointer"
   c_set_file_pointer :: HANDLE -> CLong -> DWORD -> Ptr CLong -> IO BOOL
@@ -990,8 +996,11 @@ handleToMode hwnd = do
        | hasFlag (#{const GENERIC_WRITE})                           -> return WriteMode
        | otherwise -> error "unknown access mask in handleToMode."
 
+{-# NOINLINE c_get_handle_access_mask #-}
+c_get_handle_access_mask :: HANDLE -> IO DWORD
+c_get_handle_access_mask = _c_get_handle_access_mask
 foreign import ccall unsafe "__get_handle_access_mask"
-  c_get_handle_access_mask :: HANDLE -> IO DWORD
+  _c_get_handle_access_mask :: HANDLE -> IO DWORD
 
 release :: RawHandle a => a -> IO ()
 release h = if isLockable h
@@ -1011,11 +1020,15 @@ foreign import ccall unsafe "unlockFile"
 
 -- | Returns -1 on error. Otherwise writes two values representing
 -- the file into the given ptrs.
+{-# NOINLINE c_getUniqueFileInfo #-}
+c_getUniqueFileInfo :: HANDLE -> Ptr Word64 -> Ptr Word64 -> IO ()
+c_getUniqueFileInfo = _c_getUniqueFileInfo
 foreign import ccall unsafe "get_unique_file_info_hwnd"
-  c_getUniqueFileInfo :: HANDLE -> Ptr Word64 -> Ptr Word64 -> IO ()
+  _c_getUniqueFileInfo :: HANDLE -> Ptr Word64 -> Ptr Word64 -> IO ()
 
 -- | getUniqueFileInfo assumes the C call to getUniqueFileInfo
 -- succeeds.
+{-# NOINLINE getUniqueFileInfo #-}
 getUniqueFileInfo :: RawHandle a => a -> IO (Word64, Word64)
 getUniqueFileInfo handle = do
   with 0 $ \devptr -> do

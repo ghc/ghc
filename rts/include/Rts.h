@@ -32,6 +32,8 @@ extern "C" {
 /* For _Static_assert */
 #include <assert.h>
 
+#include "RtsPublic.h"
+
 #if !defined(IN_STG_CODE)
 #define IN_STG_CODE 0
 #endif
@@ -100,7 +102,7 @@ extern "C" {
               (aka --enable-asserts-all-ways) was enabled at ./configure time.
    -------------------------------------------------------------------------- */
 
-void _assertFail(const char *filename, unsigned int linenum)
+RTS_PUBLIC void _assertFail(const char *filename, unsigned int linenum)
    STG_NORETURN;
 
 void _warnFail(const char *filename, unsigned int linenum);
@@ -266,18 +268,18 @@ void _warnFail(const char *filename, unsigned int linenum);
 #include "rts/LibdwPool.h"
 
 /* Misc stuff without a home */
-extern char **prog_argv; /* so we can get at these from Haskell */
-extern int    prog_argc;
+extern RTS_PUBLIC char **prog_argv; /* so we can get at these from Haskell */
+extern RTS_PUBLIC int    prog_argc;
 extern char  *prog_name;
 
-void reportStackOverflow(StgTSO* tso);
-void reportHeapOverflow(void);
+RTS_PUBLIC void reportStackOverflow(StgTSO* tso);
+RTS_PUBLIC void reportHeapOverflow(void);
 void exitHeapOverflow(void) STG_NORETURN;;
 
-void stg_exit(int n) STG_NORETURN;
+RTS_PUBLIC void stg_exit(int n) STG_NORETURN;
 
 #if !defined(mingw32_HOST_OS)
-int stg_sig_install (int, int, void *);
+RTS_PUBLIC int stg_sig_install (int, int, void *);
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -285,19 +287,19 @@ int stg_sig_install (int, int, void *);
    -------------------------------------------------------------------------- */
 
 // Returns non-zero if the RTS is a profiling version
-int rts_isProfiled(void);
+RTS_PUBLIC int rts_isProfiled(void);
 
 // Returns non-zero if the RTS is a dynamically-linked version
-int rts_isDynamic(void);
+RTS_PUBLIC int rts_isDynamic(void);
 
 // Returns non-zero if the RTS is a threaded version
-int rts_isThreaded(void);
+RTS_PUBLIC int rts_isThreaded(void);
 
 // Returns non-zero if the RTS is a debugged version
-int rts_isDebugged(void);
+RTS_PUBLIC int rts_isDebugged(void);
 
 // Returns non-zero if the RTS is a tracing version (event log)
-int rts_isTracing(void);
+RTS_PUBLIC int rts_isTracing(void);
 
 /* -----------------------------------------------------------------------------
    RTS Exit codes
@@ -367,3 +369,4 @@ TICK_VAR(2)
 #if defined(__cplusplus)
 }
 #endif
+

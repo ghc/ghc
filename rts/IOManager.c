@@ -105,7 +105,7 @@ IOManagerType iomgr_type;
  * in the base library to tell us which style of I/O manager we are using: one
  * that uses the Windows native API HANDLEs, or one that uses Posix style fds.
  */
-bool rts_IOManagerIsWin32Native = false;
+RTS_PUBLIC bool rts_IOManagerIsWin32Native = false;
 #endif
 
 enum IOManagerAvailability

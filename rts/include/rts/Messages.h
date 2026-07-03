@@ -30,7 +30,7 @@
  * barf() invokes (*fatalInternalErrorFn)().  This function is not
  * expected to return.
  */
-void barf(const char *s, ...)
+RTS_PUBLIC void barf(const char *s, ...)
    STG_NORETURN
    STG_PRINTF_ATTR(1, 2);
 
@@ -59,7 +59,7 @@ void ssbarf(const char *fmt, const char *s)
  *
  * errorBelch() invokes (*errorMsgFn)().
  */
-void errorBelch(const char *s, ...)
+RTS_PUBLIC void errorBelch(const char *s, ...)
    STG_PRINTF_ATTR(1, 2);
 
 void verrorBelch(const char *s, va_list ap);
@@ -73,7 +73,7 @@ void verrorBelch(const char *s, va_list ap);
  *
  * sysErrorBelch() invokes (*sysErrorMsgFn)().
  */
-void sysErrorBelch(const char *s, ...)
+RTS_PUBLIC void sysErrorBelch(const char *s, ...)
    STG_PRINTF_ATTR(1, 2);
 
 void vsysErrorBelch(const char *s, va_list ap);
@@ -85,7 +85,7 @@ void vsysErrorBelch(const char *s, va_list ap);
  *
  * debugBelch() invokes (*debugMsgFn)().
  */
-void debugBelch(const char *s, ...)
+RTS_PUBLIC void debugBelch(const char *s, ...)
    STG_PRINTF_ATTR(1, 2);
 
 int vdebugBelch(const char *s, va_list ap);
@@ -107,6 +107,6 @@ extern RtsMsgFunction rtsErrorMsgFn;
 extern RtsMsgFunction rtsSysErrorMsgFn;
 
 /* Used by code generator */
-void rtsBadAlignmentBarf(void) STG_NORETURN;
-void rtsOutOfBoundsAccess(void) STG_NORETURN;
-void rtsMemcpyRangeOverlap(void) STG_NORETURN;
+RTS_PUBLIC void rtsBadAlignmentBarf(void) STG_NORETURN;
+RTS_PUBLIC void rtsOutOfBoundsAccess(void) STG_NORETURN;
+RTS_PUBLIC void rtsMemcpyRangeOverlap(void) STG_NORETURN;

@@ -33,4 +33,4 @@ typedef struct _StgEntCounter {
     struct _StgEntCounter *link;/* link to chain them all together */
 } StgEntCounter;
 
-void requestTickyCounterSamples(void);
+RTS_PUBLIC void requestTickyCounterSamples(void);

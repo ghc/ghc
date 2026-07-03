@@ -622,8 +622,11 @@ foreign import ccall unsafe "integer_gmp_mpn_xor_n"
                  -> IO ()
 
 -- mp_bitcnt_t mpn_popcount (const mp_limb_t *s1p, mp_size_t n)
+{-# NOINLINE c_mpn_popcount #-}
+c_mpn_popcount :: ByteArray# -> GmpSize# -> Word#
+c_mpn_popcount a b = _c_mpn_popcount a b
 foreign import ccall unsafe "gmp.h __gmpn_popcount"
-  c_mpn_popcount :: ByteArray# -> GmpSize# -> Word#
+  _c_mpn_popcount :: ByteArray# -> GmpSize# -> Word#
 
 -- double integer_gmp_mpn_get_d (const mp_limb_t sp[], const mp_size_t sn)
 foreign import ccall unsafe "integer_gmp_mpn_get_d"

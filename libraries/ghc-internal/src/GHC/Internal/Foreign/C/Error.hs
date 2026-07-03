@@ -109,6 +109,14 @@ import GHC.Internal.Num
 import GHC.Internal.Base ( String, otherwise, return, ($) )
 import GHC.Internal.Types ( Bool(..) )
 
+
+
+-- Needed for windows dynamic builds
+-- TODO we may need to disable inlining of ccalls by default
+{-# NOINLINE getErrno #-}
+
+
+
 -- "errno" type
 -- ------------
 

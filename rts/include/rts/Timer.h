@@ -13,6 +13,6 @@
 
 #pragma once
 
-void startTimer (void);
-void stopTimer  (void);
-int rtsTimerSignal (void); // Deprecated: see issue #27073
+RTS_PUBLIC void startTimer (void);
+RTS_PUBLIC void stopTimer  (void);
+RTS_PUBLIC int rtsTimerSignal (void); // Deprecated: see issue #27073

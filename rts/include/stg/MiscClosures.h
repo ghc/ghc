@@ -20,19 +20,19 @@
 #pragma once
 
 #if IN_STG_CODE
-#  define RTS_RET_INFO(i)   extern const W_(i)[]
-#  define RTS_FUN_INFO(i)   extern const W_(i)[]
-#  define RTS_THUNK_INFO(i) extern const W_(i)[]
-#  define RTS_INFO(i)       extern const W_(i)[]
-#  define RTS_CLOSURE(i)    extern W_(i)[]
-#  define RTS_FUN_DECL(f)   extern StgFunPtr f(void)
+#  define RTS_RET_INFO(i)   extern RTS_PUBLIC const W_(i)[]
+#  define RTS_FUN_INFO(i)   extern RTS_PUBLIC const W_(i)[]
+#  define RTS_THUNK_INFO(i) extern RTS_PUBLIC const W_(i)[]
+#  define RTS_INFO(i)       extern RTS_PUBLIC const W_(i)[]
+#  define RTS_CLOSURE(i)    extern RTS_PUBLIC W_(i)[]
+#  define RTS_FUN_DECL(f)   extern RTS_PUBLIC StgFunPtr f(void)
 #else
-#  define RTS_RET_INFO(i)   extern const StgRetInfoTable i
-#  define RTS_FUN_INFO(i)   extern const StgFunInfoTable i
-#  define RTS_THUNK_INFO(i) extern const StgThunkInfoTable i
-#  define RTS_INFO(i)       extern const StgInfoTable i
-#  define RTS_CLOSURE(i)    extern StgClosure i
-#  define RTS_FUN_DECL(f)   extern StgFunPtr f(void)
+#  define RTS_RET_INFO(i)   extern RTS_PUBLIC const StgRetInfoTable i
+#  define RTS_FUN_INFO(i)   extern RTS_PUBLIC const StgFunInfoTable i
+#  define RTS_THUNK_INFO(i) extern RTS_PUBLIC const StgThunkInfoTable i
+#  define RTS_INFO(i)       extern RTS_PUBLIC const StgInfoTable i
+#  define RTS_CLOSURE(i)    extern RTS_PUBLIC StgClosure i
+#  define RTS_FUN_DECL(f)   extern RTS_PUBLIC StgFunPtr f(void)
 #endif
 
 #if defined(TABLES_NEXT_TO_CODE)
@@ -214,11 +214,11 @@ RTS_CLOSURE(stg_NO_TREC_closure);
 RTS_ENTRY(stg_NO_FINALIZER);
 
 #if IN_STG_CODE
-extern StgWordArray stg_CHARLIKE_closure;
-extern StgWordArray stg_INTLIKE_closure;
+extern RTS_PUBLIC StgWordArray stg_CHARLIKE_closure;
+extern RTS_PUBLIC StgWordArray stg_INTLIKE_closure;
 #else
-extern StgIntCharlikeClosure stg_CHARLIKE_closure[MAX_CHARLIKE - MIN_CHARLIKE + 1];
-extern StgIntCharlikeClosure stg_INTLIKE_closure[MAX_INTLIKE - MIN_INTLIKE + 1];
+extern RTS_PUBLIC StgIntCharlikeClosure stg_CHARLIKE_closure[MAX_CHARLIKE - MIN_CHARLIKE + 1];
+extern RTS_PUBLIC StgIntCharlikeClosure stg_INTLIKE_closure[MAX_INTLIKE - MIN_INTLIKE + 1];
 #endif
 
 /* StgStartup */
@@ -567,42 +567,37 @@ RTS_FUN_DECL(stg_annotateStackzh);
 
 #if IN_STG_CODE && !IN_STGCRUN
 
-// Interpreter.c
-extern StgWord rts_stop_next_breakpoint[];
-extern StgWord rts_stop_on_exception[];
-extern StgWord rts_breakpoint_io_action[];
-
 // Schedule.c
-extern StgWord RTS_VAR(blocked_queue_hd), RTS_VAR(blocked_queue_tl);
-extern StgWord RTS_VAR(sleeping_queue);
-extern StgWord RTS_VAR(sched_mutex);
+extern RTS_PUBLIC StgWord RTS_VAR(blocked_queue_hd), RTS_VAR(blocked_queue_tl);
+extern RTS_PUBLIC StgWord RTS_VAR(sleeping_queue);
+extern RTS_PUBLIC StgWord RTS_VAR(sched_mutex);
 
 // Apply.cmm
 // canned bitmap for each arg type
-extern const StgWord stg_arg_bitmaps[];
-extern const StgWord stg_ap_stack_entries[];
-extern const StgWord stg_stack_save_entries[];
+extern RTS_PUBLIC const StgWord stg_arg_bitmaps[];
+extern RTS_PUBLIC const StgWord stg_ap_stack_entries[];
+extern RTS_PUBLIC const StgWord stg_stack_save_entries[];
 
 // Storage.c
-extern unsigned int RTS_VAR(g0);
-extern unsigned int RTS_VAR(large_alloc_lim);
-extern StgWord RTS_VAR(atomic_modify_mutvar_mutex);
+extern RTS_PUBLIC unsigned int RTS_VAR(g0);
+extern RTS_PUBLIC unsigned int RTS_VAR(large_alloc_lim);
+extern RTS_PUBLIC StgWord RTS_VAR(atomic_modify_mutvar_mutex);
 
 // RtsFlags
-extern StgWord RTS_VAR(RtsFlags); // bogus type
+extern RTS_PUBLIC StgWord RTS_VAR(RtsFlags); // bogus type
 
 // StablePtr.c
-extern StgWord RTS_VAR(stable_ptr_table);
+extern RTS_PUBLIC StgWord RTS_VAR(stable_ptr_table);
 
 // StableName.c
-extern StgWord RTS_VAR(stable_name_table);
+extern RTS_PUBLIC StgWord RTS_VAR(stable_name_table);
 
 // Profiling.c
-extern unsigned int RTS_VAR(era);
-extern StgWord RTS_VAR(user_era);
-extern unsigned int RTS_VAR(entering_PAP);
-extern StgWord      CCS_OVERHEAD[];
-extern StgWord      CCS_SYSTEM[];
+extern RTS_PUBLIC unsigned int RTS_VAR(era);
+extern RTS_PUBLIC StgWord RTS_VAR(user_era);
+extern RTS_PUBLIC unsigned int RTS_VAR(entering_PAP);
+extern RTS_PUBLIC StgWord      CCS_OVERHEAD[];
+extern RTS_PUBLIC StgWord      CCS_SYSTEM[];
 
 // Calls to these rts functions are generated directly
 // by codegen (see GHC.StgToCmm.Prof)
@@ -614,11 +609,11 @@ extern StgWord      CCS_SYSTEM[];
 //    'GHC.StgToCmm.Prof'
 // as opposed to real prototype declared in
 //    'rts/include/rts/prof/CCS.h'
-void enterFunCCS (void *reg, void *ccsfn);
-void * pushCostCentre (void *ccs, void *cc);
+RTS_PUBLIC void enterFunCCS (void *reg, void *ccsfn);
+RTS_PUBLIC void * pushCostCentre (void *ccs, void *cc);
 
 // Capability.c
-extern unsigned int n_capabilities;
+extern RTS_PUBLIC unsigned int n_capabilities;
 
 /* -----------------------------------------------------------------------------
    Nonmoving GC write barrier

@@ -437,7 +437,7 @@ EXTERN_INLINE StgWord compact_nfdata_full_sizeW ( StgCompactNFData *str )
  *
  * (Also for 'closure_sizeW' below)
  */
-uint32_t
+RTS_PUBLIC uint32_t
 closure_sizeW_ (const StgClosure *p, const StgInfoTable *info);
 
 // The definitive way to find the size, in words, of a heap-allocated closure

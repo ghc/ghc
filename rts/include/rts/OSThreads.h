@@ -240,7 +240,7 @@ void releaseThreadNode (void);
 // Support for forkOS (defined regardless of THREADED_RTS, but does
 // nothing when !THREADED_RTS).
 //
-int forkOS_createThread ( HsStablePtr entry );
+RTS_PUBLIC int forkOS_createThread ( HsStablePtr entry );
 
 //
 // Free any global resources created in OSThreads.
@@ -250,7 +250,7 @@ void freeThreadingResources(void);
 //
 // Returns the number of processor cores in the machine
 //
-uint32_t getNumberOfProcessors (void);
+RTS_PUBLIC uint32_t getNumberOfProcessors (void);
 
 //
 // Support for getting at the kernel thread Id for tracing/profiling.

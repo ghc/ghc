@@ -20,18 +20,18 @@ struct Capability_;
 
 /* This is called by the code generator */
 extern
-void updateRemembSetPushClosure_(StgRegTable *reg, struct StgClosure_ *p);
+RTS_PUBLIC void updateRemembSetPushClosure_(StgRegTable *reg, struct StgClosure_ *p);
 
 extern
-void updateRemembSetPushThunk_(StgRegTable *reg, struct StgThunk_ *p);
+RTS_PUBLIC void updateRemembSetPushThunk_(StgRegTable *reg, struct StgThunk_ *p);
 
 // Forward declaration for unregisterised backend.
-EF_(stg_copyArray_barrier);
+RTS_PUBLIC EF_(stg_copyArray_barrier);
 
 // Note that RTS code should not condition on this directly by rather
 // use the IF_NONMOVING_WRITE_BARRIER_ENABLED macro to ensure that
 // the barrier is eliminated in the non-threaded RTS.
-extern StgWord nonmoving_write_barrier_enabled;
+extern RTS_PUBLIC StgWord nonmoving_write_barrier_enabled;
 
 // A similar macro is defined in rts/include/Cmm.h for C-- code.
 #if defined(THREADED_RTS)

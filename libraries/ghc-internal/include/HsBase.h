@@ -133,8 +133,8 @@
 
 #if defined(_WIN32)
 /* in Win32Utils.c */
-extern void maperrno (void);
-extern int maperrno_func(DWORD dwErrorCode);
+__attribute__((dllexport)) extern void maperrno (void);
+__attribute__((dllexport)) extern int maperrno_func(DWORD dwErrorCode);
 extern HsWord64 getMonotonicUSec(void);
 #endif
 

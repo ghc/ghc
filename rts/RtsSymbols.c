@@ -6,6 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "RtsPublic.h"
 #include "ghcplatform.h"
 #include "Rts.h"
 #include "RtsSymbols.h"

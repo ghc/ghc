@@ -150,6 +150,7 @@ compute_WaitForSingleObject_timeout(bool infinite, Time remaining)
  *   1 => Input ready, 0 => not ready, -1 => error
  * On error, sets `errno`.
  */
+__attribute__((dllexport))
 int
 fdReady(int fd, bool write, int64_t msecs, bool isSock)
 {

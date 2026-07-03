@@ -361,16 +361,16 @@ typedef struct _RTS_FLAGS {
 } RTS_FLAGS;
 
 #if defined(COMPILING_RTS_MAIN)
-extern RTS_FLAGS RtsFlags;
+extern RTS_PUBLIC RTS_FLAGS RtsFlags;
 #elif IN_STG_CODE
 /* Note [RtsFlags is a pointer in STG code]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * When compiling with IN_STG_CODE the RtsFlags symbol is defined as a pointer.
  * This is necessary because the C code generator can't generate '&label'.
  */
-extern RTS_FLAGS RtsFlags[];
+extern RTS_PUBLIC RTS_FLAGS RtsFlags[];
 #else
-extern RTS_FLAGS RtsFlags;
+extern RTS_PUBLIC RTS_FLAGS RtsFlags;
 #endif
 
 /*

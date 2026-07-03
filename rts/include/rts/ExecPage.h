@@ -9,10 +9,10 @@ typedef struct {
 } ExecPage;
 
 /* Allocate a writable page. */
-ExecPage *allocateExecPage(void);
+RTS_PUBLIC ExecPage *allocateExecPage(void);
 
 /* Make a page previously allocated by allocateExecPage. */
-void freezeExecPage(ExecPage *page);
+RTS_PUBLIC void freezeExecPage(ExecPage *page);
 
 /* Free a page previously allocated by allocateExecPage. */
-void freeExecPage(ExecPage *page);
+RTS_PUBLIC void freeExecPage(ExecPage *page);

@@ -17,156 +17,156 @@
 #pragma once
 
 /* rts/prim/atomic.c */
-StgWord hs_atomic_add8(StgWord x, StgWord val);
-StgWord hs_atomic_add16(StgWord x, StgWord val);
-StgWord hs_atomic_add32(StgWord x, StgWord val);
-StgWord64 hs_atomic_add64(StgWord x, StgWord64 val);
-StgWord hs_atomic_sub8(StgWord x, StgWord val);
-StgWord hs_atomic_sub16(StgWord x, StgWord val);
-StgWord hs_atomic_sub32(StgWord x, StgWord val);
-StgWord64 hs_atomic_sub64(StgWord x, StgWord64 val);
-StgWord hs_atomic_and8(StgWord x, StgWord val);
-StgWord hs_atomic_and16(StgWord x, StgWord val);
-StgWord hs_atomic_and32(StgWord x, StgWord val);
-StgWord64 hs_atomic_and64(StgWord x, StgWord64 val);
-StgWord hs_atomic_nand8(StgWord x, StgWord val);
-StgWord hs_atomic_nand16(StgWord x, StgWord val);
-StgWord hs_atomic_nand32(StgWord x, StgWord val);
-StgWord64 hs_atomic_nand64(StgWord x, StgWord64 val);
-StgWord hs_atomic_or8(StgWord x, StgWord val);
-StgWord hs_atomic_or16(StgWord x, StgWord val);
-StgWord hs_atomic_or32(StgWord x, StgWord val);
-StgWord64 hs_atomic_or64(StgWord x, StgWord64 val);
-StgWord hs_atomic_xor8(StgWord x, StgWord val);
-StgWord hs_atomic_xor16(StgWord x, StgWord val);
-StgWord hs_atomic_xor32(StgWord x, StgWord val);
-StgWord64 hs_atomic_xor64(StgWord x, StgWord64 val);
-StgWord hs_cmpxchg8(StgWord x, StgWord old, StgWord new_);
-StgWord hs_cmpxchg16(StgWord x, StgWord old, StgWord new_);
-StgWord hs_cmpxchg32(StgWord x, StgWord old, StgWord new_);
-StgWord64 hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new_);
-StgWord hs_atomicread8(StgWord x);
-StgWord hs_atomicread16(StgWord x);
-StgWord hs_atomicread32(StgWord x);
-StgWord64 hs_atomicread64(StgWord x);
-void hs_atomicwrite8(StgWord x, StgWord val);
-void hs_atomicwrite16(StgWord x, StgWord val);
-void hs_atomicwrite32(StgWord x, StgWord val);
-void hs_atomicwrite64(StgWord x, StgWord64 val);
-StgWord hs_xchg8(StgWord x, StgWord val);
-StgWord hs_xchg16(StgWord x, StgWord val);
-StgWord hs_xchg32(StgWord x, StgWord val);
-StgWord64 hs_xchg64(StgWord x, StgWord64 val);
+RTS_PUBLIC StgWord hs_atomic_add8(StgWord x, StgWord val);
+RTS_PUBLIC StgWord hs_atomic_add16(StgWord x, StgWord val);
+RTS_PUBLIC StgWord hs_atomic_add32(StgWord x, StgWord val);
+RTS_PUBLIC StgWord64 hs_atomic_add64(StgWord x, StgWord64 val);
+RTS_PUBLIC StgWord hs_atomic_sub8(StgWord x, StgWord val);
+RTS_PUBLIC StgWord hs_atomic_sub16(StgWord x, StgWord val);
+RTS_PUBLIC StgWord hs_atomic_sub32(StgWord x, StgWord val);
+RTS_PUBLIC StgWord64 hs_atomic_sub64(StgWord x, StgWord64 val);
+RTS_PUBLIC StgWord hs_atomic_and8(StgWord x, StgWord val);
+RTS_PUBLIC StgWord hs_atomic_and16(StgWord x, StgWord val);
+RTS_PUBLIC StgWord hs_atomic_and32(StgWord x, StgWord val);
+RTS_PUBLIC StgWord64 hs_atomic_and64(StgWord x, StgWord64 val);
+RTS_PUBLIC StgWord hs_atomic_nand8(StgWord x, StgWord val);
+RTS_PUBLIC StgWord hs_atomic_nand16(StgWord x, StgWord val);
+RTS_PUBLIC StgWord hs_atomic_nand32(StgWord x, StgWord val);
+RTS_PUBLIC StgWord64 hs_atomic_nand64(StgWord x, StgWord64 val);
+RTS_PUBLIC StgWord hs_atomic_or8(StgWord x, StgWord val);
+RTS_PUBLIC StgWord hs_atomic_or16(StgWord x, StgWord val);
+RTS_PUBLIC StgWord hs_atomic_or32(StgWord x, StgWord val);
+RTS_PUBLIC StgWord64 hs_atomic_or64(StgWord x, StgWord64 val);
+RTS_PUBLIC StgWord hs_atomic_xor8(StgWord x, StgWord val);
+RTS_PUBLIC StgWord hs_atomic_xor16(StgWord x, StgWord val);
+RTS_PUBLIC StgWord hs_atomic_xor32(StgWord x, StgWord val);
+RTS_PUBLIC StgWord64 hs_atomic_xor64(StgWord x, StgWord64 val);
+RTS_PUBLIC StgWord hs_cmpxchg8(StgWord x, StgWord old, StgWord new_);
+RTS_PUBLIC StgWord hs_cmpxchg16(StgWord x, StgWord old, StgWord new_);
+RTS_PUBLIC StgWord hs_cmpxchg32(StgWord x, StgWord old, StgWord new_);
+RTS_PUBLIC StgWord64 hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new_);
+RTS_PUBLIC StgWord hs_atomicread8(StgWord x);
+RTS_PUBLIC StgWord hs_atomicread16(StgWord x);
+RTS_PUBLIC StgWord hs_atomicread32(StgWord x);
+RTS_PUBLIC StgWord64 hs_atomicread64(StgWord x);
+RTS_PUBLIC void hs_atomicwrite8(StgWord x, StgWord val);
+RTS_PUBLIC void hs_atomicwrite16(StgWord x, StgWord val);
+RTS_PUBLIC void hs_atomicwrite32(StgWord x, StgWord val);
+RTS_PUBLIC void hs_atomicwrite64(StgWord x, StgWord64 val);
+RTS_PUBLIC StgWord hs_xchg8(StgWord x, StgWord val);
+RTS_PUBLIC StgWord hs_xchg16(StgWord x, StgWord val);
+RTS_PUBLIC StgWord hs_xchg32(StgWord x, StgWord val);
+RTS_PUBLIC StgWord64 hs_xchg64(StgWord x, StgWord64 val);
 
 /* rts/prim/bswap.c */
-StgWord16 hs_bswap16(StgWord16 x);
-StgWord32 hs_bswap32(StgWord32 x);
-StgWord64 hs_bswap64(StgWord64 x);
+RTS_PUBLIC StgWord16 hs_bswap16(StgWord16 x);
+RTS_PUBLIC StgWord32 hs_bswap32(StgWord32 x);
+RTS_PUBLIC StgWord64 hs_bswap64(StgWord64 x);
 
 /* rts/prim/bitrev.c
 This was done as part of issue #16164.
 See Note [Bit reversal primop] for more details about the implementation.*/
-StgWord hs_bitrev8(StgWord x);
-StgWord16 hs_bitrev16(StgWord16 x);
-StgWord32 hs_bitrev32(StgWord32 x);
-StgWord64 hs_bitrev64(StgWord64 x);
+RTS_PUBLIC StgWord hs_bitrev8(StgWord x);
+RTS_PUBLIC StgWord16 hs_bitrev16(StgWord16 x);
+RTS_PUBLIC StgWord32 hs_bitrev32(StgWord32 x);
+RTS_PUBLIC StgWord64 hs_bitrev64(StgWord64 x);
 
 /* rts/prim/longlong.c */
 #if WORD_SIZE_IN_BITS < 64
-StgInt hs_eq64 (StgWord64 a, StgWord64 b);
-StgInt hs_ne64 (StgWord64 a, StgWord64 b);
-StgInt hs_gtWord64 (StgWord64 a, StgWord64 b);
-StgInt hs_geWord64 (StgWord64 a, StgWord64 b);
-StgInt hs_ltWord64 (StgWord64 a, StgWord64 b);
-StgInt hs_leWord64 (StgWord64 a, StgWord64 b);
-StgInt hs_gtInt64 (StgInt64 a, StgInt64 b);
-StgInt hs_geInt64 (StgInt64 a, StgInt64 b);
-StgInt hs_ltInt64 (StgInt64 a, StgInt64 b);
-StgInt hs_leInt64 (StgInt64 a, StgInt64 b);
-StgInt64 hs_neg64       (StgInt64 a);
-StgWord64 hs_add64      (StgWord64 a, StgWord64 b);
-StgWord64 hs_sub64      (StgWord64 a, StgWord64 b);
-StgWord64 hs_mul64      (StgWord64 a, StgWord64 b);
-StgWord64 hs_remWord64  (StgWord64 a, StgWord64 b);
-StgWord64 hs_quotWord64 (StgWord64 a, StgWord64 b);
-StgInt64 hs_remInt64    (StgInt64 a, StgInt64 b);
-StgInt64 hs_quotInt64   (StgInt64 a, StgInt64 b);
-StgWord64 hs_and64      (StgWord64 a, StgWord64 b);
-StgWord64 hs_or64       (StgWord64 a, StgWord64 b);
-StgWord64 hs_xor64      (StgWord64 a, StgWord64 b);
-StgWord64 hs_not64      (StgWord64 a);
-StgWord64 hs_uncheckedShiftL64   (StgWord64 a, StgInt b);
-StgWord64 hs_uncheckedShiftRL64  (StgWord64 a, StgInt b);
-StgInt64  hs_uncheckedIShiftRA64 (StgInt64 a,  StgInt b);
-StgInt64  hs_intToInt64    (StgInt    i);
-StgInt    hs_int64ToInt    (StgInt64  i);
-StgWord64 hs_wordToWord64  (StgWord   w);
-StgWord   hs_word64ToWord  (StgWord64 w);
+RTS_PUBLIC StgInt hs_eq64 (StgWord64 a, StgWord64 b);
+RTS_PUBLIC StgInt hs_ne64 (StgWord64 a, StgWord64 b);
+RTS_PUBLIC StgInt hs_gtWord64 (StgWord64 a, StgWord64 b);
+RTS_PUBLIC StgInt hs_geWord64 (StgWord64 a, StgWord64 b);
+RTS_PUBLIC StgInt hs_ltWord64 (StgWord64 a, StgWord64 b);
+RTS_PUBLIC StgInt hs_leWord64 (StgWord64 a, StgWord64 b);
+RTS_PUBLIC StgInt hs_gtInt64 (StgInt64 a, StgInt64 b);
+RTS_PUBLIC StgInt hs_geInt64 (StgInt64 a, StgInt64 b);
+RTS_PUBLIC StgInt hs_ltInt64 (StgInt64 a, StgInt64 b);
+RTS_PUBLIC StgInt hs_leInt64 (StgInt64 a, StgInt64 b);
+RTS_PUBLIC StgInt64 hs_neg64       (StgInt64 a);
+RTS_PUBLIC StgWord64 hs_add64      (StgWord64 a, StgWord64 b);
+RTS_PUBLIC StgWord64 hs_sub64      (StgWord64 a, StgWord64 b);
+RTS_PUBLIC StgWord64 hs_mul64      (StgWord64 a, StgWord64 b);
+RTS_PUBLIC StgWord64 hs_remWord64  (StgWord64 a, StgWord64 b);
+RTS_PUBLIC StgWord64 hs_quotWord64 (StgWord64 a, StgWord64 b);
+RTS_PUBLIC StgInt64 hs_remInt64    (StgInt64 a, StgInt64 b);
+RTS_PUBLIC StgInt64 hs_quotInt64   (StgInt64 a, StgInt64 b);
+RTS_PUBLIC StgWord64 hs_and64      (StgWord64 a, StgWord64 b);
+RTS_PUBLIC StgWord64 hs_or64       (StgWord64 a, StgWord64 b);
+RTS_PUBLIC StgWord64 hs_xor64      (StgWord64 a, StgWord64 b);
+RTS_PUBLIC StgWord64 hs_not64      (StgWord64 a);
+RTS_PUBLIC StgWord64 hs_uncheckedShiftL64   (StgWord64 a, StgInt b);
+RTS_PUBLIC StgWord64 hs_uncheckedShiftRL64  (StgWord64 a, StgInt b);
+RTS_PUBLIC StgInt64  hs_uncheckedIShiftRA64 (StgInt64 a,  StgInt b);
+RTS_PUBLIC StgInt64  hs_intToInt64    (StgInt    i);
+RTS_PUBLIC StgInt    hs_int64ToInt    (StgInt64  i);
+RTS_PUBLIC StgWord64 hs_wordToWord64  (StgWord   w);
+RTS_PUBLIC StgWord   hs_word64ToWord  (StgWord64 w);
 #endif
 
 /* rts/prim/pdep.c */
-StgWord64 hs_pdep64(StgWord64 src, StgWord64 mask);
-StgWord hs_pdep32(StgWord src, StgWord mask);
-StgWord hs_pdep16(StgWord src, StgWord mask);
-StgWord hs_pdep8(StgWord src, StgWord mask);
+RTS_PUBLIC StgWord64 hs_pdep64(StgWord64 src, StgWord64 mask);
+RTS_PUBLIC StgWord hs_pdep32(StgWord src, StgWord mask);
+RTS_PUBLIC StgWord hs_pdep16(StgWord src, StgWord mask);
+RTS_PUBLIC StgWord hs_pdep8(StgWord src, StgWord mask);
 
 /* rts/prim/pext.c */
-StgWord64 hs_pext64(StgWord64 src, StgWord64 mask);
-StgWord hs_pext32(StgWord src, StgWord mask);
-StgWord hs_pext16(StgWord src, StgWord mask);
-StgWord hs_pext8(StgWord src, StgWord mask);
+RTS_PUBLIC StgWord64 hs_pext64(StgWord64 src, StgWord64 mask);
+RTS_PUBLIC StgWord hs_pext32(StgWord src, StgWord mask);
+RTS_PUBLIC StgWord hs_pext16(StgWord src, StgWord mask);
+RTS_PUBLIC StgWord hs_pext8(StgWord src, StgWord mask);
 
 /* rts/prim/popcnt.c */
-StgWord hs_popcnt8(StgWord x);
-StgWord hs_popcnt16(StgWord x);
-StgWord hs_popcnt32(StgWord x);
-StgWord hs_popcnt64(StgWord64 x);
-StgWord hs_popcnt(StgWord x);
+RTS_PUBLIC StgWord hs_popcnt8(StgWord x);
+RTS_PUBLIC StgWord hs_popcnt16(StgWord x);
+RTS_PUBLIC StgWord hs_popcnt32(StgWord x);
+RTS_PUBLIC StgWord hs_popcnt64(StgWord64 x);
+RTS_PUBLIC StgWord hs_popcnt(StgWord x);
 
 /* rts/prim/word2float.c */
-StgFloat hs_word2float32(StgWord x);
-StgDouble hs_word2float64(StgWord x);
+RTS_PUBLIC StgFloat hs_word2float32(StgWord x);
+RTS_PUBLIC StgDouble hs_word2float64(StgWord x);
 
 /* rts/prim/clz.c */
-StgWord hs_clz8(StgWord x);
-StgWord hs_clz16(StgWord x);
-StgWord hs_clz32(StgWord x);
-StgWord hs_clz64(StgWord64 x);
+RTS_PUBLIC StgWord hs_clz8(StgWord x);
+RTS_PUBLIC StgWord hs_clz16(StgWord x);
+RTS_PUBLIC StgWord hs_clz32(StgWord x);
+RTS_PUBLIC StgWord hs_clz64(StgWord64 x);
 
 /* rts/prim/ctz.c */
-StgWord hs_ctz8(StgWord x);
-StgWord hs_ctz16(StgWord x);
-StgWord hs_ctz32(StgWord x);
-StgWord hs_ctz64(StgWord64 x);
+RTS_PUBLIC StgWord hs_ctz8(StgWord x);
+RTS_PUBLIC StgWord hs_ctz16(StgWord x);
+RTS_PUBLIC StgWord hs_ctz32(StgWord x);
+RTS_PUBLIC StgWord hs_ctz64(StgWord64 x);
 
 /* rts/prim/mulIntMayOflo.c */
-W_ hs_mulIntMayOflo(W_ a, W_ b);
+RTS_PUBLIC W_ hs_mulIntMayOflo(W_ a, W_ b);
 
 
 /* rts/prim/int64x2minmax and rts/prim/vectorQuotRem */
 #if defined(__SSE2__) || defined(__aarch64__)
 typedef char v128 __attribute__((vector_size(16)));
-v128 hs_minInt64X2(v128, v128);
-v128 hs_maxInt64X2(v128, v128);
-v128 hs_minWord64X2(v128, v128);
-v128 hs_maxWord64X2(v128, v128);
+RTS_PUBLIC v128 hs_minInt64X2(v128, v128);
+RTS_PUBLIC v128 hs_maxInt64X2(v128, v128);
+RTS_PUBLIC v128 hs_minWord64X2(v128, v128);
+RTS_PUBLIC v128 hs_maxWord64X2(v128, v128);
 
-v128 hs_quotInt8X16(v128, v128);
-v128 hs_quotInt16X8(v128, v128);
-v128 hs_quotInt32X4(v128, v128);
-v128 hs_quotInt64X2(v128, v128);
-v128 hs_quotWord8X16(v128, v128);
-v128 hs_quotWord16X8(v128, v128);
-v128 hs_quotWord32X4(v128, v128);
-v128 hs_quotWord64X2(v128, v128);
-v128 hs_remInt8X16(v128, v128);
-v128 hs_remInt16X8(v128, v128);
-v128 hs_remInt32X4(v128, v128);
-v128 hs_remInt64X2(v128, v128);
-v128 hs_remWord8X16(v128, v128);
-v128 hs_remWord16X8(v128, v128);
-v128 hs_remWord32X4(v128, v128);
-v128 hs_remWord64X2(v128, v128);
+RTS_PUBLIC v128 hs_quotInt8X16(v128, v128);
+RTS_PUBLIC v128 hs_quotInt16X8(v128, v128);
+RTS_PUBLIC v128 hs_quotInt32X4(v128, v128);
+RTS_PUBLIC v128 hs_quotInt64X2(v128, v128);
+RTS_PUBLIC v128 hs_quotWord8X16(v128, v128);
+RTS_PUBLIC v128 hs_quotWord16X8(v128, v128);
+RTS_PUBLIC v128 hs_quotWord32X4(v128, v128);
+RTS_PUBLIC v128 hs_quotWord64X2(v128, v128);
+RTS_PUBLIC v128 hs_remInt8X16(v128, v128);
+RTS_PUBLIC v128 hs_remInt16X8(v128, v128);
+RTS_PUBLIC v128 hs_remInt32X4(v128, v128);
+RTS_PUBLIC v128 hs_remInt64X2(v128, v128);
+RTS_PUBLIC v128 hs_remWord8X16(v128, v128);
+RTS_PUBLIC v128 hs_remWord16X8(v128, v128);
+RTS_PUBLIC v128 hs_remWord32X4(v128, v128);
+RTS_PUBLIC v128 hs_remWord64X2(v128, v128);
 #endif
 
 /* bitcasts, instead of creating a new C file we static inline these here. We

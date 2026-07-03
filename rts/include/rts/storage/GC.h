@@ -11,6 +11,8 @@
 #include <stddef.h>
 #include "rts/OSThreads.h"
 
+#include "RtsPublic.h"
+
 /* -----------------------------------------------------------------------------
  * Generational GC
  *
@@ -161,7 +163,7 @@ typedef struct generation_ {
 } generation;
 
 extern generation * generations;
-extern generation * g0;
+extern RTS_PUBLIC generation * g0;
 extern generation * oldest_gen;
 
 typedef void(*ListBlocksCb)(void *user, bdescr *);
@@ -175,7 +177,7 @@ void listAllBlocks(ListBlocksCb cb, void *user);
         Note [allocate failure]
    -------------------------------------------------------------------------- */
 
-StgPtr  allocate          ( Capability *cap, W_ n );
+RTS_PUBLIC StgPtr  allocate          ( Capability *cap, W_ n );
 StgPtr  allocateMightFail ( Capability *cap, W_ n );
 StgPtr  allocatePinned    ( Capability *cap, W_ n, W_ alignment, W_ align_off);
 
@@ -277,32 +279,32 @@ typedef void* AdjustorExecutable;
 void flushExec(W_ len, AdjustorExecutable exec_addr);
 
 // Used by GC checks in external .cmm code:
-extern W_ large_alloc_lim;
+extern RTS_PUBLIC W_ large_alloc_lim;
 
 // Should triggering an allocation limit kill the thread
 // and should we run a user-defined hook when it is triggered.
-void setAllocLimitKill(bool, bool);
+RTS_PUBLIC void setAllocLimitKill(bool, bool);
 
 /* -----------------------------------------------------------------------------
    Performing Garbage Collection
    -------------------------------------------------------------------------- */
 
-void performGC(void);
-void performMajorGC(void);
-void performBlockingMajorGC(void);
+RTS_PUBLIC void performGC(void);
+RTS_PUBLIC void performMajorGC(void);
+RTS_PUBLIC void performBlockingMajorGC(void);
 
 /* -----------------------------------------------------------------------------
    The CAF table - used to let us revert CAFs in GHCi
    -------------------------------------------------------------------------- */
 
-StgInd *newCAF         (StgRegTable *reg, StgIndStatic *caf);
-StgInd *newRetainedCAF (StgRegTable *reg, StgIndStatic *caf);
-StgInd *newGCdCAF      (StgRegTable *reg, StgIndStatic *caf);
-void revertCAFs (void);
+RTS_PUBLIC StgInd *newCAF         (StgRegTable *reg, StgIndStatic *caf);
+RTS_PUBLIC StgInd *newRetainedCAF (StgRegTable *reg, StgIndStatic *caf);
+RTS_PUBLIC StgInd *newGCdCAF      (StgRegTable *reg, StgIndStatic *caf);
+RTS_PUBLIC void revertCAFs (void);
 
 // Request that all CAFs are retained indefinitely.
 // (preferably use RtsConfig.keep_cafs instead)
-void setKeepCAFs (void);
+RTS_PUBLIC void setKeepCAFs (void);
 
 // Let the runtime know that all the CAFs in high mem are not
 // to be retained. Useful in conjunction with loadNativeObj
@@ -315,11 +317,11 @@ void setHighMemDynamic (void);
    and is put on the mutable list.
    -------------------------------------------------------------------------- */
 
-void dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mv, StgClosure *old);
+RTS_PUBLIC void dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mv, StgClosure *old);
 
 /* set to disable CAF garbage collection in GHCi. */
 /* (needed when dynamic libraries are used). */
-extern bool keepCAFs;
+extern RTS_PUBLIC bool keepCAFs;
 
 #include "rts/Flags.h"
 

@@ -212,13 +212,19 @@ failUnlessSuccessOr val fn_name act = do
 -- by @GetLastError@.
 
 -- | Map the last system error to an errno value, and assign it to @errno@.
+{-# NOINLINE c_maperrno #-}
+c_maperrno :: IO ()
+c_maperrno = _c_maperrno
 foreign import ccall unsafe "maperrno"             -- in Win32Utils.c
-   c_maperrno :: IO ()
+   _c_maperrno :: IO ()
 
 -- | Pure function variant of 'c_maperrno' that does not call @GetLastError@
 -- or modify @errno@.
+{-# NOINLINE c_maperrno_func #-}
+c_maperrno_func :: ErrCode -> Errno
+c_maperrno_func = _c_maperrno_func
 foreign import ccall unsafe "maperrno_func"        -- in Win32Utils.c
-   c_maperrno_func :: ErrCode -> Errno
+   _c_maperrno_func :: ErrCode -> Errno
 
 foreign import ccall unsafe "base_getErrorMessage" -- in Win32Utils.c
     c_getErrorMessage :: DWORD -> IO LPWSTR

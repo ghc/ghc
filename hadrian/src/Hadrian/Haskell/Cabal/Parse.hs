@@ -224,7 +224,7 @@ copyPackage context@Context {..} = do
 
 shakeVerbosityToCabalFlag :: Verbosity -> String
 shakeVerbosityToCabalFlag = \case
-    Diagnostic -> "-v2"
+    Diagnostic -> "-v3"
     Verbose -> "-v1"
     -- Normal levels should not produce output to stdout
     Silent -> "-v0"
