@@ -6591,20 +6591,25 @@ genPopCnt bid width dst src = do
 
     True -> do
       code_src <- getAnyReg src
-      src_r <- getNewRegNat format
+      src_r <- getNewRegNat (max II32 format)
       let dst_r = getRegisterReg platform  (CmmLocal dst)
+          -- POPCNT has no r/m8 form, and the 16-bit form would require
+          -- zero-extending the result. So for widths below 32 bits we
+          -- zero-extend the argument and use 32-bit POPCNT; writing a
+          -- 32-bit destination implicitly zero-extends to 64 bits.
+          narrow
+            -- Skip the zero-extension when the argument is visibly
+            -- already zero-extended at least to 'width'.
+            | CmmMachOp (MO_UU_Conv from _) [_] <- src, from <= width
+            = nilOL
+            | otherwise
+            = unitOL (MOVZxL format (OpReg src_r) (OpReg src_r))
       return $ code_src src_r `appOL`
-          (if width == W8 then
-               -- The POPCNT instruction doesn't take a r/m8
-               unitOL (MOVZxL II8 (OpReg src_r) (OpReg src_r)) `appOL`
-               unitOL (POPCNT II16 (OpReg src_r) dst_r)
-           else
-               unitOL (POPCNT format (OpReg src_r) dst_r)) `appOL`
           (if width == W8 || width == W16 then
-               -- We used a 16-bit destination register above,
-               -- so zero-extend
-               unitOL (MOVZxL II16 (OpReg dst_r) (OpReg dst_r))
-           else nilOL)
+               narrow `appOL`
+               unitOL (POPCNT II32 (OpReg src_r) dst_r)
+           else
+               unitOL (POPCNT format (OpReg src_r) dst_r))
 
     False ->
       -- generate C call to hs_popcntN in ghc-prim
