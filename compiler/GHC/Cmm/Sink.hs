@@ -719,7 +719,10 @@ conflicts platform assig@(r, rhs, addr) node
   = True
 
   -- (c) foreign calls clobber heap: see Note [Foreign calls clobber heap]
-  | CmmUnsafeForeignCall{} <- node, memConflicts addr AnyMem      = True
+  | CmmUnsafeForeignCall target _ _ <- node
+  , foreignTargetClobbersMemory target
+  , memConflicts addr AnyMem
+  = True
 
   -- (d) native calls clobber any memory
   | CmmCall{} <- node, memConflicts addr AnyMem                   = True
@@ -731,6 +734,12 @@ conflicts platform assig@(r, rhs, addr) node
   = True
 
   | otherwise = False
+
+-- | May this foreign-call target write to memory, or otherwise act as a
+-- memory barrier?  See Note [Foreign calls clobber heap].
+foreignTargetClobbersMemory :: ForeignTarget -> Bool
+foreignTargetClobbersMemory (PrimTarget op)    = callishMachOpClobbersMemory op
+foreignTargetClobbersMemory (ForeignTarget {}) = True
 
 {- Note [Inlining foldRegsDefd]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -874,6 +883,21 @@ data AbsMem
 -- `suspendThread` releases the capability used by the thread, hence we mustn't
 -- float accesses to heap, stack or virtual global registers stored in the
 -- capability (e.g. with unregisterised build, see #19237).
+--
+-- Conversely, a few CallishMachOps neither write memory nor imply a
+-- barrier, and needn't block sinking ('callishMachOpClobbersMemory' in
+-- GHC.Cmm.MachOp classifies them):
+--
+--  * MO_Touch is a pure liveness marker: no backend emits any code for it.
+--    Sinking a load past a touch# cannot run afoul of the known touch#
+--    reordering hazard (#18040): that bug is about a read being delayed
+--    past a GC safe point at the *Core* level, whereas sinking is
+--    intra-block and calls that could contain a safe point still block
+--    sinking (via this rule and (C3)(d)). Register conflicts (C1)/(C2)
+--    independently prevent moving an assignment of the touched register
+--    across the touch.
+--
+--  * MO_Prefetch_Data reads memory but writes nothing.
 
 
 bothMems :: AbsMem -> AbsMem -> AbsMem

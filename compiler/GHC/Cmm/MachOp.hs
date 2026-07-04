@@ -18,6 +18,7 @@ module GHC.Cmm.MachOp
 
     -- CallishMachOp
     , CallishMachOp(..), callishMachOpHints
+    , callishMachOpClobbersMemory
     , pprCallishMachOp
     , machOpMemcpyishAlign
     , callishMachOpArgTys
@@ -866,6 +867,18 @@ callishMachOpHints op = case op of
   MO_ResumeThread  -> ([AddrHint], [AddrHint])
   _                -> ([],[])
   -- empty lists indicate NoHint
+
+-- | May this operation write to memory, or otherwise act as a memory
+-- barrier?  When in doubt, answer 'True'.
+--
+-- Used by the sinking pass to decide whether a memory read may be moved
+-- past a call of this operation; see Note [Foreign calls clobber heap]
+-- in GHC.Cmm.Sink.
+callishMachOpClobbersMemory :: CallishMachOp -> Bool
+callishMachOpClobbersMemory op = case op of
+  MO_Touch          -> False  -- pure liveness marker, no instructions
+  MO_Prefetch_Data _ -> False -- reads memory, writes nothing
+  _                 -> True
 
 -- | The alignment of a 'memcpy'-ish operation.
 machOpMemcpyishAlign :: CallishMachOp -> Maybe Int
