@@ -23,6 +23,8 @@ test('avx512-int64-minmax', [unless(arch('x86_64'), skip),
                              when(unregisterised(), skip)], compile_grep_asm, ['hs', True, '-mavx512vl'])
 test('avx512-word64-minmax', [unless(arch('x86_64'), skip),
                               when(unregisterised(), skip)], compile_grep_asm, ['hs', True, '-mavx512vl'])
+test('T25233', [unless(arch('x86_64'), skip),
+                when(unregisterised(), skip)], compile_grep_asm, ['hs', True, '-O'])
 is_aarch64_codegen = [
     unless(arch('aarch64'), skip),
     when(unregisterised(), skip),

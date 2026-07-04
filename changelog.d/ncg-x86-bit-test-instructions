@@ -1,0 +1,20 @@
+section: compiler
+synopsis: The x86 native code generator now uses the bit-test instructions
+  ``btr``/``bts``/``btc`` to clear, set or complement a single bit
+description:
+  Cmm patterns such as ``x & ~(1 << i)``, ``x | (1 << i)`` and
+  ``x ^ (1 << i)`` now compile to a single ``btr``/``bts``/``btc``
+  instruction instead of a mov/shl/not/and-style sequence, matching what C
+  compilers produce. The same applies to the literal masks that constant
+  folding produces from these patterns when ``i`` is constant, in the cases
+  where the mask doesn't fit in an imm32 operand.
+
+  For a variable bit index this applies only when the shift is unchecked,
+  as with ``uncheckedShiftL#`` or ``Data.Bits.unsafeShiftL``. The
+  bounds-checked ``shiftL`` — used, for example, by the default
+  implementations of ``clearBit``, ``setBit`` and ``complementBit`` —
+  wraps the shift in a bounds mask that this optimisation does not see
+  through. With a literal index, the bounds mask is constant-folded away,
+  so the checked operations benefit too.
+mrs: !16311
+issues: #25233
