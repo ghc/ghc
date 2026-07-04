@@ -1518,7 +1518,7 @@ checkFunBind :: SrcSpan
              -> AnnFunRhs
              -> LocatedN RdrName
              -> LexicalFixity
-             -> LocatedE [LocatedA (PatBuilder GhcPs)]
+             -> LocatedA [LocatedA (PatBuilder GhcPs)]
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> P (HsBind GhcPs)
 checkFunBind locF ann_fun (L lf fun) is_infix (L lp pats) (L _ grhss)
@@ -3214,7 +3214,7 @@ mkImport cconv safety (L loc sLit, v, ty) (timport, td) =
 -- the string "foo" is ambiguous: either a header or a C identifier.  The
 -- C identifier case comes first in the alternatives below, so we pick
 -- that one.
-parseCImport :: LocatedE CCallConv -> LocatedE Safety -> HText -> String
+parseCImport :: LocatedA CCallConv -> LocatedA Safety -> HText -> String
              -> Located SourceText
              -> Maybe (ForeignImport GhcPs)
 parseCImport cconv safety nm str sourceText =

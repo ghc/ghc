@@ -555,7 +555,11 @@
                   []
                   []))
                 (L
-                 (EpaSpan { Test24533.hs:16:3-12 })
+                 (EpAnn
+                  (EpaSpan { Test24533.hs:16:3-12 })
+                  []
+                  (EpaComments
+                   []))
                  [(L
                    (EpAnn
                     (EpaSpan { Test24533.hs:16:3-5 })
@@ -1124,7 +1128,11 @@
                   []
                   []))
                 (L
-                 (EpaSpan { Test24533.ppr.hs:6:3-12 })
+                 (EpAnn
+                  (EpaSpan { Test24533.ppr.hs:6:3-12 })
+                  []
+                  (EpaComments
+                   []))
                  [(L
                    (EpAnn
                     (EpaSpan { Test24533.ppr.hs:6:3-5 })

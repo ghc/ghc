@@ -125,7 +125,11 @@
              []
              []))
            (L
-            (EpaSpan { <no location info> })
+            (EpAnn
+             (EpaSpan { <no location info> })
+             []
+             (EpaComments
+              []))
             [])
            (GRHSs
             (EpaComments
@@ -245,7 +249,11 @@
              []
              []))
            (L
-            (EpaSpan { <no location info> })
+            (EpAnn
+             (EpaSpan { <no location info> })
+             []
+             (EpaComments
+              []))
             [])
            (GRHSs
             (EpaComments
@@ -391,7 +399,11 @@
              []
              []))
            (L
-            (EpaSpan { <no location info> })
+            (EpAnn
+             (EpaSpan { <no location info> })
+             []
+             (EpaComments
+              []))
             [])
            (GRHSs
             (EpaComments

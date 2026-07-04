@@ -165,8 +165,8 @@ type instance XInWarningCategory   (GhcPass _) = (EpToken "in", SourceText)
 type instance XXInWarningCategory  (GhcPass _) = DataConCantHappen
 
 type instance Anno (WithHsDocIdentifiers (StringLiteral pass) pass) = SrcSpanAnnA
-type instance Anno (InWarningCategory (GhcPass pass)) = EpaLocation
-type instance Anno (WarningCategory) = EpaLocation
+type instance Anno (InWarningCategory (GhcPass pass)) = SrcSpanAnnA
+type instance Anno (WarningCategory) = SrcSpanAnnA
 type instance Anno (WarningTxt (GhcPass pass)) = SrcSpanAnnA
 
 deriving stock instance Eq (WarningTxt GhcPs)

@@ -2212,15 +2212,15 @@ instance ToHie (LocatedA (ForeignDecl GhcRn)) where
 
 instance ToHie (ForeignImport GhcRn) where
   toHie (CImport (L c _) (L a _) (L b _) _ _) = concatM $
-    [ locOnlyE a
-    , locOnlyE b
-    , locOnlyE c
+    [ locOnlyE (entry a)
+    , locOnlyE (entry b)
+    , locOnlyE (entry c)
     ]
 
 instance ToHie (ForeignExport GhcRn) where
   toHie (CExport (L b _) (L a _)) = concatM $
-    [ locOnlyE a
-    , locOnlyE b
+    [ locOnlyE (entry a)
+    , locOnlyE (entry b)
     ]
 
 instance ToHie (LocatedA (WarnDecls GhcRn)) where
