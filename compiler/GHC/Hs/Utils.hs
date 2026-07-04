@@ -179,7 +179,7 @@ mkSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                   Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ EpAnn NoEpAnns)
               => HsMatchContext (LIdP (NoGhcTc (GhcPass p)))
-              -> LocatedE [LPat (GhcPass p)] -> LocatedA (body (GhcPass p))
+              -> LocatedA [LPat (GhcPass p)] -> LocatedA (body (GhcPass p))
               -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
 mkSimpleMatch ctxt (L l pats) rhs
   = L loc $
@@ -264,7 +264,7 @@ mkHsAppTypes :: LHsExpr GhcRn -> [LHsWcType GhcRn] -> LHsExpr GhcRn
 mkHsAppTypes = foldl' mkHsAppType
 
 mkHsLam :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ (Origin, MatchGroupAnn))
-        => LocatedE [LPat (GhcPass p)]
+        => LocatedA [LPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
         -> LHsExpr (GhcPass p)
 mkHsLam (L l pats) body = mkHsPar (L (getLoc body) (HsLam noAnn LamSingle matches))
@@ -904,7 +904,7 @@ get_bind_spans binds sigs
 ------------
 -- | Convenience function using 'mkFunBind'.
 -- This is for generated bindings only, do not use for user-written code.
-mkSimpleGeneratedFunBind :: SrcSpan -> RdrName -> LocatedE [LPat GhcPs]
+mkSimpleGeneratedFunBind :: SrcSpan -> RdrName -> LocatedA [LPat GhcPs]
                          -> LHsExpr GhcPs -> LHsBind GhcPs
 mkSimpleGeneratedFunBind loc fun pats expr
   = L (noAnnSrcSpan loc) $ mkFunBind (Generated OtherExpansion SkipPmc) (L (noAnnSrcSpan loc) fun)
@@ -923,7 +923,7 @@ mkPrefixFunRhs n an = FunRhs { mc_fun        = n
 ------------
 mkMatch :: forall p. IsPass p
         => HsMatchContext (LIdP (NoGhcTc (GhcPass p)))
-        -> LocatedE [LPat (GhcPass p)]
+        -> LocatedA [LPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
         -> HsLocalBinds (GhcPass p)
         -> LMatch (GhcPass p) (LHsExpr (GhcPass p))

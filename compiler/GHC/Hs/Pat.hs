@@ -353,7 +353,7 @@ hsRecFieldId = hsRecFieldSel
 ************************************************************************
 -}
 
-instance (Outputable arg, Outputable (XRec p (HsRecField p arg)), XRec p RecFieldsDotDot ~ LocatedE RecFieldsDotDot)
+instance (Outputable arg, Outputable (XRec p (HsRecField p arg)), XRec p RecFieldsDotDot ~ LocatedA RecFieldsDotDot)
       => Outputable (HsRecFields p arg) where
   ppr (HsRecFields { rec_flds = flds, rec_dotdot = Nothing })
         = braces (fsep (punctuate comma (map ppr flds)))
@@ -1178,4 +1178,4 @@ type instance Anno (Pat (GhcPass p)) = SrcSpanAnnA
 type instance Anno (HsOverLit (GhcPass p)) = EpAnnCO
 type instance Anno ConLike = SrcSpanAnnN
 type instance Anno (HsFieldBind lhs rhs) = SrcSpanAnnA
-type instance Anno RecFieldsDotDot = EpaLocation
+type instance Anno RecFieldsDotDot = SrcSpanAnnA

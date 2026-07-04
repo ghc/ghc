@@ -998,7 +998,11 @@
              []
              []))
            (L
-            (EpaSpan { KindSigs.hs:23:5-7 })
+            (EpAnn
+             (EpaSpan { KindSigs.hs:23:5-7 })
+             []
+             (EpaComments
+              []))
             [(L
               (EpAnn
                (EpaSpan { KindSigs.hs:23:5 })
@@ -1694,7 +1698,11 @@
              []
              []))
            (L
-            (EpaSpan { <no location info> })
+            (EpAnn
+             (EpaSpan { <no location info> })
+             []
+             (EpaComments
+              []))
             [])
            (GRHSs
             (EpaComments

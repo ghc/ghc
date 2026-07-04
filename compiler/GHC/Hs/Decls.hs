@@ -1354,10 +1354,10 @@ type instance XForeignExport   GhcTc = Coercion
 
 type instance XXForeignDecl    (GhcPass _) = DataConCantHappen
 
-type instance XCImport (GhcPass _) = LocatedE SourceText -- original source text for the C entity
+type instance XCImport (GhcPass _) = LocatedA SourceText -- original source text for the C entity
 type instance XXForeignImport  (GhcPass _) = DataConCantHappen
 
-type instance XCExport (GhcPass _) = LocatedE SourceText -- original source text for the C entity
+type instance XCExport (GhcPass _) = LocatedA SourceText -- original source text for the C entity
 type instance XXForeignExport  (GhcPass _) = DataConCantHappen
 
 
@@ -1610,6 +1610,6 @@ type instance Anno (WarnDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (AnnDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (RoleAnnotDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (Maybe Role) = EpAnnCO
-type instance Anno CCallConv   = EpaLocation
-type instance Anno Safety      = EpaLocation
-type instance Anno CExportSpec = EpaLocation
+type instance Anno CCallConv   = SrcSpanAnnA
+type instance Anno Safety      = SrcSpanAnnA
+type instance Anno CExportSpec = SrcSpanAnnA

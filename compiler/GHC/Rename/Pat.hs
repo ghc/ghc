@@ -859,7 +859,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                  , hfbRHS = arg'
                  , hfbPun = pun } }
 
-    rn_dotdot :: Maybe (LocatedE RecFieldsDotDot)     -- See Note [DotDot fields] in GHC.Hs.Pat
+    rn_dotdot :: Maybe (LocatedA RecFieldsDotDot)     -- See Note [DotDot fields] in GHC.Hs.Pat
               -> Maybe (WithUserRdr Name)
                   -- The constructor (Nothing for an out of scope constructor)
               -> [LHsRecField GhcRn (LocatedA arg)] -- Explicit fields
