@@ -751,9 +751,13 @@ printStringAtAAC capture (EpaDelta ss d cs) s = do
 
 -- ---------------------------------------------------------------------
 
-markExternalSourceTextE :: (Monad m, Monoid w) => EpaLocation -> SourceText -> String -> EP w m EpaLocation
-markExternalSourceTextE l NoSourceText txt   = printStringAtAA l txt
-markExternalSourceTextE l (SourceText txt) _ = printStringAtAA l (unpackFS txt)
+markExternalSourceTextA :: (Monad m, Monoid w) => EpAnn a -> SourceText -> String -> EP w m (EpAnn a)
+markExternalSourceTextA ann src txt = do
+  l' <- mark_source_text ann src txt
+  return (ann { entry = l'})
+  where
+    mark_source_text l NoSourceText txt'   = printStringAtAA (entry l) txt'
+    mark_source_text l (SourceText txt') _ = printStringAtAA (entry l) (unpackFS txt')
 
 -- ---------------------------------------------------------------------
 
@@ -1869,11 +1873,11 @@ instance ExactPrint (ForeignImport GhcPs) where
   setAnnotationAnchor a _ _ _ = a
   exact (CImport (L ls src) cconv safety@(L l _) mh imp) = do
     cconv' <- markAnnotated cconv
-    safety' <- if notDodgyE l
+    safety' <- if notDodgyE (entry l)
         then markAnnotated safety
         else return safety
-    ls' <- if notDodgyE ls
-        then markExternalSourceTextE ls src ""
+    ls' <- if notDodgyE (entry ls)
+        then markExternalSourceTextA ls src ""
         else return ls
     return (CImport (L ls' src) cconv' safety' mh imp)
 
@@ -1885,8 +1889,8 @@ instance ExactPrint (ForeignExport GhcPs) where
   exact (CExport (L ls src) spec) = do
     debugM $ "CExport starting"
     spec' <- markAnnotated spec
-    ls' <- if notDodgyE ls
-        then markExternalSourceTextE ls src ""
+    ls' <- if notDodgyE (entry ls)
+        then markExternalSourceTextA ls src ""
         else return ls
     return (CExport (L ls' src) spec')
 

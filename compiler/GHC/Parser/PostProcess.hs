@@ -3214,7 +3214,7 @@ mkImport cconv safety (L loc sLit, v, ty) (timport, td) =
 -- the string "foo" is ambiguous: either a header or a C identifier.  The
 -- C identifier case comes first in the alternatives below, so we pick
 -- that one.
-parseCImport :: LocatedE CCallConv -> LocatedE Safety -> HText -> String
+parseCImport :: LocatedA CCallConv -> LocatedA Safety -> HText -> String
              -> Located SourceText
              -> Maybe (ForeignImport GhcPs)
 parseCImport cconv safety nm str sourceText =
