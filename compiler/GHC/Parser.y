@@ -2086,7 +2086,7 @@ maybe_warning_pragma :: { Maybe (LWarningTxt GhcPs) }
                                            $2 (snd $ unLoc $3))}
         |  {- empty -}      { Nothing }
 
-warning_category :: { Maybe (LocatedE (InWarningCategory GhcPs)) }
+warning_category :: { Maybe (LocatedA (InWarningCategory GhcPs)) }
         : 'in' STRING                  { Just (reLoc $ sLL $1 $> $ InWarningCategory (epTok $1, getSTRINGs $2)
                                                                     (reLoc $ sL1 $2 $ mkWarningCategory (getSTRING $2))) }
         | {- empty -}                  { Nothing }
