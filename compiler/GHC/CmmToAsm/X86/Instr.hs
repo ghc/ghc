@@ -193,6 +193,11 @@ data Instr
         | SHLD        Format Operand{-amount-} Operand Operand
 
         | BT          Format Imm Operand
+        -- Bit test-and-reset/set/complement; the bit offset must be an
+        -- immediate or a register (not memory).
+        | BTR         Format Operand{-bit offset-} Operand
+        | BTS         Format Operand{-bit offset-} Operand
+        | BTC         Format Operand{-bit offset-} Operand
         | NOP
 
 
@@ -496,6 +501,9 @@ regUsageOfInstr platform instr
     SHLD   fmt imm dst1 dst2 -> usageRMM fmt imm dst1 dst2
     SHRD   fmt imm dst1 dst2 -> usageRMM fmt imm dst1 dst2
     BT     fmt _   src    -> mkRUR (use_R fmt src [])
+    BTR    fmt off dst    -> usageRM fmt off dst
+    BTS    fmt off dst    -> usageRM fmt off dst
+    BTC    fmt off dst    -> usageRM fmt off dst
 
     PUSH   fmt op         -> mkRUR (use_R fmt op [])
     POP    fmt op         -> mkRU [] (def_W fmt op)
@@ -830,6 +838,9 @@ patchRegsOfInstr platform instr env
     SHLD fmt imm dst1 dst2 -> patch2 (SHLD fmt imm) dst1 dst2
     SHRD fmt imm dst1 dst2 -> patch2 (SHRD fmt imm) dst1 dst2
     BT   fmt imm src     -> patch1 (BT  fmt imm) src
+    BTR  fmt off dst     -> patch2 (BTR fmt) off dst
+    BTS  fmt off dst     -> patch2 (BTS fmt) off dst
+    BTC  fmt off dst     -> patch2 (BTC fmt) off dst
     TEST fmt src dst     -> patch2 (TEST fmt) src dst
     CMP  fmt src dst     -> patch2 (CMP  fmt) src dst
     PUSH fmt op          -> patch1 (PUSH fmt) op

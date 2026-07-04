@@ -1442,6 +1442,28 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
                                     (PUNPCKLQDQ fmt (OpReg dst) dst)
                                     )
 
+-- Use the bit-test instructions btr/bts/btc for clearing, setting and
+-- complementing a single, variable bit: e.g. x .&. complement (1 `shiftL` i)
+-- is btr. See Note [Bit-test instructions].
+getRegister' _ is32Bit (CmmMachOp (MO_And w) [x, CmmMachOp (MO_Not w') [y]])
+  | w == w', Just i <- isSingleBit w y, bitTestOpWidthOK is32Bit w
+  = genBitTestCode (intFormat w) BTR x i
+getRegister' _ is32Bit (CmmMachOp (MO_And w) [CmmMachOp (MO_Not w') [y], x])
+  | w == w', Just i <- isSingleBit w y, bitTestOpWidthOK is32Bit w
+  = genBitTestCode (intFormat w) BTR x i
+getRegister' _ is32Bit (CmmMachOp (MO_Or w) [x, y])
+  | Just i <- isSingleBit w y, bitTestOpWidthOK is32Bit w
+  = genBitTestCode (intFormat w) BTS x i
+getRegister' _ is32Bit (CmmMachOp (MO_Or w) [y, x])
+  | Just i <- isSingleBit w y, bitTestOpWidthOK is32Bit w
+  = genBitTestCode (intFormat w) BTS x i
+getRegister' _ is32Bit (CmmMachOp (MO_Xor w) [x, y])
+  | Just i <- isSingleBit w y, bitTestOpWidthOK is32Bit w
+  = genBitTestCode (intFormat w) BTC x i
+getRegister' _ is32Bit (CmmMachOp (MO_Xor w) [y, x])
+  | Just i <- isSingleBit w y, bitTestOpWidthOK is32Bit w
+  = genBitTestCode (intFormat w) BTC x i
+
 getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
   sse4_1 <- sse4_1Enabled
   sse4_2 <- sse4_2Enabled
@@ -5881,6 +5903,68 @@ genTrivialCode rep instr a b = do
                 b_code `appOL`
                 a_code dst `snocOL`
                 instr b_op dst
+  return (Any rep code)
+
+{- Note [Bit-test instructions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+x86 has dedicated instructions for clearing (btr), setting (bts) and
+complementing (btc) a single bit whose index is given in a register.  We use
+them for Cmm patterns such as
+
+  x & ~(1 << i)     ==>     btr i, x       (#25233)
+
+replacing a mov/shl/not/and sequence with a single instruction.  The
+shift-count register operand of shl is masked modulo the operand width, and
+the bit-offset register operand of btr/bts/btc is masked the same way, so
+the replacement is faithful even for out-of-range i (where the Cmm shift is
+in any case undefined).
+
+The bit-offset operand of these instructions must be an immediate or a
+register.  We only use them when the bit index is a non-literal expression:
+when i is a literal, constant folding has already turned the mask into a
+literal, and an ordinary and/or/xor with an immediate is at least as good.
+
+We restrict the pattern to W32 and native-width W64: the instructions do not
+exist at width 8, and sub-word Cmm operations at W8/W16 are rare enough that
+they are not worth the extra care.
+-}
+
+-- | Match @1 << i@ with a non-literal @i@, returning @i@.
+-- See Note [Bit-test instructions].
+isSingleBit :: Width -> CmmExpr -> Maybe CmmExpr
+isSingleBit w (CmmMachOp (MO_Shl w') [CmmLit (CmmInt 1 _), i])
+  | w == w', not (isLit i) = Just i
+  where
+    isLit (CmmLit {}) = True
+    isLit _           = False
+isSingleBit _ _ = Nothing
+
+bitTestOpWidthOK :: Bool -> Width -> Bool
+bitTestOpWidthOK is32Bit w = w == W32 || (w == W64 && not is32Bit)
+
+-- | Generate code for @dst := x@ followed by a bit-test instruction
+-- (btr/bts/btc) with bit offset @i@.  Analogous to 'genTrivialCode', but the
+-- offset operand must be a register, not memory.
+-- See Note [Bit-test instructions].
+genBitTestCode :: Format -> (Format -> Operand -> Operand -> Instr)
+               -> CmmExpr -> CmmExpr -> NatM Register
+genBitTestCode rep instr x i = do
+  (i_reg, i_code) <- getNonClobberedReg i
+  x_code <- getAnyReg x
+  tmp <- getNewRegNat rep
+  let
+     -- As in genTrivialCode, 'i' must stay alive across the computation of
+     -- 'x' into dst, so save it in a temporary if dst holds 'i'.
+     code dst
+        | dst == i_reg =
+                i_code `appOL`
+                unitOL (MOV rep (OpReg i_reg) (OpReg tmp)) `appOL`
+                x_code dst `snocOL`
+                instr rep (OpReg tmp) (OpReg dst)
+        | otherwise =
+                i_code `appOL`
+                x_code dst `snocOL`
+                instr rep (OpReg i_reg) (OpReg dst)
   return (Any rep code)
 
 regClashesWithOp :: Reg -> Operand -> Bool
