@@ -367,6 +367,12 @@ test('T15226a',
     compile_and_run,
     ['-O'])
 
+test('T25181',
+    [collect_stats('bytes allocated',5),
+     only_ways(['normal'])],
+    compile_and_run,
+    ['-O'])
+
 test('T15263',
     [collect_stats('bytes allocated', 4),
      only_ways(['normal'])],

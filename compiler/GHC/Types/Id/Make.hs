@@ -2516,6 +2516,43 @@ Things to note
   example in #24334 (immortalised as test T24334) for why it should be done in
   CorePrep.
 
+(SEQ5)
+  T25181 shows that we additionally want to unbox through seq# when its
+  argument is a manifest value:
+
+      case seq# (f x, y) s of (# s', p #) ->
+      case p of (a, b) -> rhs
+
+  Evaluating a manifest value (a literal, lambda, or constructor application;
+  see exprIsManifestValue in GHC.Core.Opt.Simplify.Iteration) is a no-op, so
+  here seq# guarantees nothing beyond ordinary data dependencies; the only
+  remaining cost is the allocation of the value itself, which we want the
+  Simplifier to eliminate where possible. Hence three cooperating
+  transformations in GHC.Core.Opt.Simplify.Iteration:
+
+  * rebuildCase (0) ANF-ises the seq# argument when the result is scrutinised
+    immediately: `let sat = f x in case seq# (sat, y) s of ...`. Without this
+    the unfolding below would be a con-app with non-trivial fields, which is
+    not *expandable*, so exprIsConApp_maybe would refuse to expand it and
+    case-of-known-constructor would never fire.
+
+  * simplAlt gives `p` an unfolding `(sat, y)`, so that
+    case-of-known-constructor rewrites `case p of (a, b) -> rhs` to
+    `let a = sat; b = y in rhs`, typically making `p` dead.
+
+  * rebuildCase (2c) then discards the seq# when its result is dead:
+      case seq# <manifest-value> s of (# s', _ #) -> rhs[s']  ==>  rhs[s]
+
+  Soundness: unlike the late, unsound seqRule of #24334, all transformations
+  demand a *manifest* value, not a variable that is merely known to be
+  evaluated (hence exprIsManifestValue, not exprIsHNF). Discarding
+  `seq# x s` for an evaluated variable `x` would lose the syntactic
+  dependency of the continuation on `x`, allowing lazy computations to float
+  past x's binding site and thereby evaluate too early; see the `pseq`
+  example in #24334. A manifest value, by contrast, converges unconditionally
+  and depends on nothing except its own (pure, discardable) field
+  expressions, so no ordering constraint is lost.
+
 Implementing seq#.  The compiler has magic for `seq#` in
 
 - GHC.CoreToStg.Prep.cpeRhsE: Implement (SEQ4).

@@ -3219,6 +3219,35 @@ rebuildCase, reallyRebuildCase
    -> SimplM (SimplFloats, OutExpr)
 
 --------------------------------------------------
+--      0. ANF-ise a manifest-value seq# argument
+--------------------------------------------------
+
+rebuildCase (saf,env) scrut case_bndr alts@[Alt _ [_token, res] rhs] cont
+  -- ANF-ise `case seq# (Con e1 .. en) s of (# s', r #) -> case r of ...`
+  -- to `let a1 = e1 .. in case seq# (Con a1 .. an) s of ...`, so that
+  -- simplAlt can give `r` an *expandable* unfolding `Con a1 .. an` and
+  -- case-of-known-constructor can see through the seq#.
+  -- Guarded on `r` being scrutinised immediately, which guarantees that the
+  -- unfolding pays off; otherwise the let-floats would just be inlined back
+  -- on the next iteration. See (SEQ5) in Note [seq# magic] in GHC.Types.Id.Make
+  | (Var f, [ty_a, ty_s, arg, tok]) <- collectArgs scrut
+  , f `hasKey` seqHashKey
+  , scrutinises_res rhs
+  , exprIsManifestValue arg
+  , (_, con_args) <- collectArgs arg
+  , any (\a -> isValArg a && not (exprIsTrivial a)) con_args
+  = do { (anf_floats, arg') <- prepareRhs env NotTopLevel (fsLit "sat") arg
+       ; let floats = emptyFloats env `addLetFloats` anf_floats
+             env'   = env `setInScopeFromF` floats
+             scrut' = Var f `mkApps` [ty_a, ty_s, arg', tok]
+       ; (floats2, expr') <- rebuildCase (saf,env') scrut' case_bndr alts cont
+       ; return (floats `addFloats` floats2, expr') }
+  where
+    scrutinises_res (Case (Var v) _ _ _) = v == res
+    scrutinises_res (Tick _ e)           = scrutinises_res e
+    scrutinises_res _                    = False
+
+--------------------------------------------------
 --      1. Eliminate the case if there's a known constructor
 --------------------------------------------------
 
@@ -3292,7 +3321,21 @@ rebuildCase (saf,env) scrut case_bndr alts@[Alt _ bndrs rhs] cont
        ; (floats2, expr') <- simplExprF env' rhs cont
        ; return (floats1 `addFloats` floats2, expr') }
 
-  -- 2c. Try the seq rules if
+  -- 2c. Discard a seq# on a manifest value if its result is dead:
+  --       case seq# <manifest-value> s of (# s', _ #) -> rhs ==> rhs[s/s']
+  --     See (SEQ5) in Note [seq# magic] in GHC.Types.Id.Make
+  | [token_out, res] <- bndrs
+  , isDeadBinder res, isDeadBinder case_bndr
+  , (Var f, [_ty1, _ty2, arg, Var token_in]) <- collectArgs scrut
+  , f `hasKey` seqHashKey
+  , exprIsManifestValue arg
+  , exprOkToDiscard arg
+  = do { tick (CaseElim case_bndr)
+       ; (floats1, env')  <- simplAuxBind (saf,env) token_out (Var token_in)
+       ; (floats2, expr') <- simplExprF env' rhs cont
+       ; return (floats1 `addFloats` floats2, expr') }
+
+  -- 2d. Try the seq rules if
   --     a) it binds only the case binder
   --     b) a rule for seq applies
   -- See Note [User-defined RULES for seq] in GHC.Types.Id.Make
@@ -3316,6 +3359,24 @@ rebuildCase (saf,env) scrut case_bndr alts cont
 
   | otherwise
   = reallyRebuildCase (saf,env) scrut case_bndr alts cont
+
+exprIsManifestValue :: OutExpr -> Bool
+-- True of expressions that are values no matter what the context:
+-- literals, lambdas, and (saturated or partial) constructor applications.
+-- Unlike exprIsHNF, never true for a variable that is merely *known* to be
+-- evaluated: for the seq#-discarding transformations that use this
+-- predicate, such a variable carries a dependency on its binding site that
+-- must not be lost. See (SEQ5) in Note [seq# magic] in GHC.Types.Id.Make.
+exprIsManifestValue e = go e
+  where
+    go (Cast e _) = go e
+    go (Tick t e) = not (tickishCounts t) && go e
+    go (Lit _)    = True
+    go (Lam b e)  = isRuntimeVar b || go e
+    go (Var f)    = isDataConWorkId f
+    go e@(App {}) | (Var f, _) <- collectArgs e
+                  = isDataConWorkId f && exprIsHNF e
+    go _          = False
 
 doCaseToLet :: OutExpr          -- Scrutinee
             -> InId             -- Case binder
@@ -3590,7 +3651,21 @@ simplAlt (saf,env) scrut' _ case_bndr' bndr_swap' cont' (Alt (DataAlt con) vs rh
               con_app = mkConApp2 con inst_tys' vs'
               env''   = addAltUnfoldings env' case_bndr' bndr_swap' con_app
 
-        ; rhs' <- simplAltExprC (saf,env'') rhs cont'
+              -- If the scrutinee is (seq# <manifest-value> s), record that
+              -- value as the unfolding of the result binder, so that
+              -- case-of-known-constructor can see through the seq#.
+              -- See (SEQ5) in Note [seq# magic] in GHC.Types.Id.Make
+              env_seq | Just scr <- scrut'
+                      , isUnboxedTupleDataCon con
+                      , [_token, res] <- vs'
+                      , (Var f, [_ty1, _ty2, arg, _]) <- collectArgs scr
+                      , f `hasKey` seqHashKey
+                      , exprIsManifestValue arg
+                      = addBinderUnfolding env'' res $
+                        mkSimpleUnfolding (seUnfoldingOpts env) arg
+                      | otherwise = env''
+
+        ; rhs' <- simplAltExprC (saf,env_seq) rhs cont'
         ; return (Alt (DataAlt con) vs' rhs') }
 
 {- Note [Adding evaluatedness info to pattern-bound variables]
