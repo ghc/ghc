@@ -72,7 +72,6 @@
          (Nothing)
          (ListNone)
          []
-         (())
          []))
        (L
         (EpAnn
@@ -157,18 +156,19 @@
                    {OccName: x}))))))
              [])
             (HsValBinds
-             (EpAnn
-              (EpaSpan { <no location info> })
-              (AnnList
-               (Just
-                (EpaSpan { Test20297.hs:7:3-7 }))
-               (ListNone)
-               []
-               (EpTok
-                (EpaSpan { Test20297.hs:7:3-7 }))
-               [])
-              (EpaComments
-               []))
+             ((,)
+              (EpAnn
+               (EpaSpan { <no location info> })
+               (AnnList
+                (Just
+                 (EpaSpan { Test20297.hs:7:3-7 }))
+                (ListNone)
+                []
+                [])
+               (EpaComments
+                []))
+              (EpTok
+               (EpaSpan { Test20297.hs:7:3-7 })))
              (ValBinds
               (NoExtField)
               [])))))])))))
@@ -204,7 +204,6 @@
          (Nothing)
          (ListNone)
          []
-         (())
          []))
        (L
         (EpAnn
@@ -283,24 +282,25 @@
                    {OccName: x}))))))
              [])
             (HsValBinds
-             (EpAnn
-              (EpaSpan { Test20297.hs:(10,3)-(11,26) })
-              (AnnList
-               (Just
-                (EpaSpan { Test20297.hs:11:9-26 }))
-               (ListNone)
-               []
-               (EpTok
-                (EpaSpan { Test20297.hs:10:3-7 }))
-               [])
-              (EpaComments
-               [(L
-                 (EpaSpan
-                  { Test20297.hs:10:9-19 })
-                 (EpaComment
-                  (EpaLineComment
-                   "-- comment2")
-                  { Test20297.hs:10:3-7 }))]))
+             ((,)
+              (EpAnn
+               (EpaSpan { Test20297.hs:(10,3)-(11,26) })
+               (AnnList
+                (Just
+                 (EpaSpan { Test20297.hs:11:9-26 }))
+                (ListNone)
+                []
+                [])
+               (EpaComments
+                [(L
+                  (EpaSpan
+                   { Test20297.hs:10:9-19 })
+                  (EpaComment
+                   (EpaLineComment
+                    "-- comment2")
+                   { Test20297.hs:10:3-7 }))]))
+              (EpTok
+               (EpaSpan { Test20297.hs:10:3-7 })))
              (ValBinds
               (NoExtField)
               [(VbBind
@@ -328,7 +328,6 @@
                      (Nothing)
                      (ListNone)
                      []
-                     (())
                      []))
                    (L
                     (EpAnn
@@ -395,15 +394,16 @@
                              (EpaComments
                               []))
                             (HsDo
-                             (AnnList
-                              (Just
-                               (EpaSpan { Test20297.hs:11:22-26 }))
-                              (ListBraces
-                               (NoEpTok)
-                               (NoEpTok))
-                              []
-                              (EpaSpan { Test20297.hs:11:19-20 })
-                              [])
+                             ((,)
+                              (AnnList
+                               (Just
+                                (EpaSpan { Test20297.hs:11:22-26 }))
+                               (ListBraces
+                                (NoEpTok)
+                                (NoEpTok))
+                               []
+                               [])
+                              (EpaSpan { Test20297.hs:11:19-20 }))
                              (DoExpr
                               (Nothing))
                              (L
@@ -518,7 +518,6 @@
          (Nothing)
          (ListNone)
          []
-         (())
          []))
        (L
         (EpAnn
@@ -597,18 +596,19 @@
                    {OccName: x}))))))
              [])
             (HsValBinds
-             (EpAnn
-              (EpaSpan { <no location info> })
-              (AnnList
-               (Just
-                (EpaSpan { Test20297.ppr.hs:5:3-7 }))
-               (ListNone)
-               []
-               (EpTok
-                (EpaSpan { Test20297.ppr.hs:5:3-7 }))
-               [])
-              (EpaComments
-               []))
+             ((,)
+              (EpAnn
+               (EpaSpan { <no location info> })
+               (AnnList
+                (Just
+                 (EpaSpan { Test20297.ppr.hs:5:3-7 }))
+                (ListNone)
+                []
+                [])
+               (EpaComments
+                []))
+              (EpTok
+               (EpaSpan { Test20297.ppr.hs:5:3-7 })))
              (ValBinds
               (NoExtField)
               [])))))])))))
@@ -638,7 +638,6 @@
          (Nothing)
          (ListNone)
          []
-         (())
          []))
        (L
         (EpAnn
@@ -717,18 +716,19 @@
                    {OccName: x}))))))
              [])
             (HsValBinds
-             (EpAnn
-              (EpaSpan { Test20297.ppr.hs:(8,3)-(9,24) })
-              (AnnList
-               (Just
-                (EpaSpan { Test20297.ppr.hs:9:7-24 }))
-               (ListNone)
-               []
-               (EpTok
-                (EpaSpan { Test20297.ppr.hs:8:3-7 }))
-               [])
-              (EpaComments
-               []))
+             ((,)
+              (EpAnn
+               (EpaSpan { Test20297.ppr.hs:(8,3)-(9,24) })
+               (AnnList
+                (Just
+                 (EpaSpan { Test20297.ppr.hs:9:7-24 }))
+                (ListNone)
+                []
+                [])
+               (EpaComments
+                []))
+              (EpTok
+               (EpaSpan { Test20297.ppr.hs:8:3-7 })))
              (ValBinds
               (NoExtField)
               [(VbBind
@@ -756,7 +756,6 @@
                      (Nothing)
                      (ListNone)
                      []
-                     (())
                      []))
                    (L
                     (EpAnn
@@ -823,15 +822,16 @@
                              (EpaComments
                               []))
                             (HsDo
-                             (AnnList
-                              (Just
-                               (EpaSpan { Test20297.ppr.hs:9:20-24 }))
-                              (ListBraces
-                               (NoEpTok)
-                               (NoEpTok))
-                              []
-                              (EpaSpan { Test20297.ppr.hs:9:17-18 })
-                              [])
+                             ((,)
+                              (AnnList
+                               (Just
+                                (EpaSpan { Test20297.ppr.hs:9:20-24 }))
+                               (ListBraces
+                                (NoEpTok)
+                                (NoEpTok))
+                               []
+                               [])
+                              (EpaSpan { Test20297.ppr.hs:9:17-18 }))
                              (DoExpr
                               (Nothing))
                              (L
