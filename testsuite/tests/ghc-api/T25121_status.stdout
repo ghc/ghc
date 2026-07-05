@@ -15,7 +15,7 @@ X(FunArr) match = NoExtField
 X(ExprWithTySig) match = EpUniToken "::" "\8759"
 X(UntypedSplice) match = NoExtField
 X(ExplicitList) mismatch
-  >>> AnnList ()
+  >>> AnnList
   <<< ((EpToken "'"),(EpToken "["),(EpToken "]"))
 X(ExplicitTuple) mismatch
   >>> AnnParen

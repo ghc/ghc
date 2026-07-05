@@ -289,11 +289,11 @@ type instance XLet           GhcPs = (EpToken "let", EpToken "in")
 type instance XLet           GhcRn = NoExtField
 type instance XLet           GhcTc = NoExtField
 
-type instance XDo            GhcPs = AnnList EpaLocation
+type instance XDo            GhcPs = (AnnList, EpaLocation)
 type instance XDo            GhcRn = NoExtField
 type instance XDo            GhcTc = Type
 
-type instance XExplicitList  GhcPs = AnnList ()
+type instance XExplicitList  GhcPs = AnnList
 type instance XExplicitList  GhcRn = NoExtField
 type instance XExplicitList  GhcTc = Type
 -- GhcPs: ExplicitList includes all source-level
@@ -1437,7 +1437,7 @@ type instance XCmdArrApp  GhcPs = (IsUnicodeSyntax, EpaLocation)
 type instance XCmdArrApp  GhcRn = NoExtField
 type instance XCmdArrApp  GhcTc = Type
 
-type instance XCmdArrForm GhcPs = AnnList ()
+type instance XCmdArrForm GhcPs = AnnList
 -- | fixity (filled in by the renamer), for forms that were converted from
 -- OpApp's by the renamer
 type instance XCmdArrForm GhcRn = Maybe Fixity
@@ -1464,7 +1464,7 @@ type instance XCmdLet     GhcPs = (EpToken "let", EpToken "in")
 type instance XCmdLet     GhcRn = NoExtField
 type instance XCmdLet     GhcTc = NoExtField
 
-type instance XCmdDo      GhcPs = AnnList EpaLocation
+type instance XCmdDo      GhcPs = (AnnList, EpaLocation)
 type instance XCmdDo      GhcRn = NoExtField
 type instance XCmdDo      GhcTc = Type
 
@@ -1657,7 +1657,7 @@ type instance XMG         GhcRn b = (Origin, -- See Note [Generated code and pat
                                      MatchGroupAnn)
 type instance XMG         GhcTc b = MatchGroupTc
 
-type MatchGroupAnn = AnnList ()
+type MatchGroupAnn = AnnList
 
 data MatchGroupTc
   = MatchGroupTc
@@ -1891,7 +1891,7 @@ type instance XTransStmt       (GhcPass _) GhcPs b = AnnTransStmt
 type instance XTransStmt       (GhcPass _) GhcRn b = NoExtField
 type instance XTransStmt       (GhcPass _) GhcTc b = Type
 
-type instance XRecStmt         (GhcPass _) GhcPs b = (AnnList (), EpToken "rec")
+type instance XRecStmt         (GhcPass _) GhcPs b = (AnnList, EpToken "rec")
 type instance XRecStmt         (GhcPass _) GhcRn b = NoExtField
 type instance XRecStmt         (GhcPass _) GhcTc b = RecStmtTc
 

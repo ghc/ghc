@@ -260,7 +260,6 @@
          (Nothing)
          (ListNone)
          []
-         (())
          []))
        (L
         (EpAnn
@@ -327,15 +326,16 @@
                  (EpaComments
                   []))
                 (HsDo
-                 (AnnList
-                  (Just
-                   (EpaSpan { DumpSemis.hs:(11,3)-(12,3) }))
-                  (ListBraces
-                   (NoEpTok)
-                   (NoEpTok))
-                  []
-                  (EpaSpan { DumpSemis.hs:10:7-8 })
-                  [])
+                 ((,)
+                  (AnnList
+                   (Just
+                    (EpaSpan { DumpSemis.hs:(11,3)-(12,3) }))
+                   (ListBraces
+                    (NoEpTok)
+                    (NoEpTok))
+                   []
+                   [])
+                  (EpaSpan { DumpSemis.hs:10:7-8 }))
                  (DoExpr
                   (Nothing))
                  (L
@@ -359,22 +359,23 @@
                        (EpaComments
                         []))
                       (HsDo
-                       (AnnList
-                        (Just
-                         (EpaSpan { DumpSemis.hs:11:6-15 }))
-                        (ListBraces
-                         (EpTok (EpaSpan { DumpSemis.hs:11:6 }))
-                         (EpTok (EpaSpan { DumpSemis.hs:11:15 })))
-                        [(EpTok
-                          (EpaSpan { DumpSemis.hs:11:8 }))
-                        ,(EpTok
-                          (EpaSpan { DumpSemis.hs:11:9 }))
-                        ,(EpTok
-                          (EpaSpan { DumpSemis.hs:11:10 }))
-                        ,(EpTok
-                          (EpaSpan { DumpSemis.hs:11:11 }))]
-                        (EpaSpan { DumpSemis.hs:11:3-4 })
-                        [])
+                       ((,)
+                        (AnnList
+                         (Just
+                          (EpaSpan { DumpSemis.hs:11:6-15 }))
+                         (ListBraces
+                          (EpTok (EpaSpan { DumpSemis.hs:11:6 }))
+                          (EpTok (EpaSpan { DumpSemis.hs:11:15 })))
+                         [(EpTok
+                           (EpaSpan { DumpSemis.hs:11:8 }))
+                         ,(EpTok
+                           (EpaSpan { DumpSemis.hs:11:9 }))
+                         ,(EpTok
+                           (EpaSpan { DumpSemis.hs:11:10 }))
+                         ,(EpTok
+                           (EpaSpan { DumpSemis.hs:11:11 }))]
+                         [])
+                        (EpaSpan { DumpSemis.hs:11:3-4 }))
                        (DoExpr
                         (Nothing))
                        (L
@@ -554,7 +555,6 @@
          (Nothing)
          (ListNone)
          []
-         (())
          []))
        (L
         (EpAnn
@@ -621,18 +621,19 @@
                  (EpaComments
                   []))
                 (HsDo
-                 (AnnList
-                  (Just
-                   (EpaSpan { DumpSemis.hs:(16,3)-(19,3) }))
-                  (ListBraces
-                   (EpTok (EpaSpan { DumpSemis.hs:16:3 }))
-                   (EpTok (EpaSpan { DumpSemis.hs:19:3 })))
-                  [(EpTok
-                    (EpaSpan { DumpSemis.hs:16:5 }))
-                  ,(EpTok
-                    (EpaSpan { DumpSemis.hs:16:8 }))]
-                  (EpaSpan { DumpSemis.hs:15:7-8 })
-                  [])
+                 ((,)
+                  (AnnList
+                   (Just
+                    (EpaSpan { DumpSemis.hs:(16,3)-(19,3) }))
+                   (ListBraces
+                    (EpTok (EpaSpan { DumpSemis.hs:16:3 }))
+                    (EpTok (EpaSpan { DumpSemis.hs:19:3 })))
+                   [(EpTok
+                     (EpaSpan { DumpSemis.hs:16:5 }))
+                   ,(EpTok
+                     (EpaSpan { DumpSemis.hs:16:8 }))]
+                   [])
+                  (EpaSpan { DumpSemis.hs:15:7-8 }))
                  (DoExpr
                   (Nothing))
                  (L
@@ -806,7 +807,6 @@
          (Nothing)
          (ListNone)
          []
-         (())
          []))
        (L
         (EpAnn
@@ -873,18 +873,19 @@
                  (EpaComments
                   []))
                 (HsDo
-                 (AnnList
-                  (Just
-                   (EpaSpan { DumpSemis.hs:22:10-30 }))
-                  (ListBraces
-                   (EpTok (EpaSpan { DumpSemis.hs:22:10 }))
-                   (EpTok (EpaSpan { DumpSemis.hs:22:30 })))
-                  [(EpTok
-                    (EpaSpan { DumpSemis.hs:22:12 }))
-                  ,(EpTok
-                    (EpaSpan { DumpSemis.hs:22:13 }))]
-                  (EpaSpan { DumpSemis.hs:22:7-8 })
-                  [])
+                 ((,)
+                  (AnnList
+                   (Just
+                    (EpaSpan { DumpSemis.hs:22:10-30 }))
+                   (ListBraces
+                    (EpTok (EpaSpan { DumpSemis.hs:22:10 }))
+                    (EpTok (EpaSpan { DumpSemis.hs:22:30 })))
+                   [(EpTok
+                     (EpaSpan { DumpSemis.hs:22:12 }))
+                   ,(EpTok
+                     (EpaSpan { DumpSemis.hs:22:13 }))]
+                   [])
+                  (EpaSpan { DumpSemis.hs:22:7-8 }))
                  (DoExpr
                   (Nothing))
                  (L
@@ -1015,7 +1016,6 @@
          (Nothing)
          (ListNone)
          []
-         (())
          []))
        (L
         (EpAnn
@@ -1121,7 +1121,6 @@
          (Nothing)
          (ListNone)
          []
-         (())
          []))
        (L
         (EpAnn
@@ -1229,7 +1228,6 @@
          (Nothing)
          (ListNone)
          []
-         (())
          []))
        (L
         (EpAnn
@@ -1721,7 +1719,6 @@
          (Nothing)
          (ListNone)
          []
-         (())
          []))
        (L
         (EpAnn
@@ -1848,7 +1845,6 @@
          (Nothing)
          (ListNone)
          []
-         (())
          []))
        (L
         (EpAnn
@@ -1940,7 +1936,6 @@
                        (EpaSpan { DumpSemis.hs:34:17 }))
                      ,(EpTok
                        (EpaSpan { DumpSemis.hs:34:18 }))]
-                     (())
                      [])
                     (EpaComments
                      []))
@@ -1977,7 +1972,6 @@
                           (Nothing)
                           (ListNone)
                           []
-                          (())
                           []))
                         (L
                          (EpAnn
@@ -2091,7 +2085,6 @@
                           (Nothing)
                           (ListNone)
                           []
-                          (())
                           []))
                         (L
                          (EpAnn
@@ -2217,7 +2210,6 @@
          (Nothing)
          (ListNone)
          []
-         (())
          []))
        (L
         (EpAnn
@@ -2337,7 +2329,6 @@
                       (EpaSpan { DumpSemis.hs:38:7 }))
                     ,(EpTok
                       (EpaSpan { DumpSemis.hs:38:8 }))]
-                    (())
                     []))
                   (L
                    (EpAnn

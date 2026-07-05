@@ -515,12 +515,11 @@ instance Outputable TrailingAnn where
 -- keywords such as 'where'.
 
 -- AZ: goal: only used when there is layout, so vertical alignment matters
-data AnnList a
+data AnnList
   = AnnList {
       al_anchor    :: !(Maybe EpaLocation), -- ^ start point of a list having layout
       al_brackets  :: !AnnListBrackets,
       al_semis     :: [EpToken ";"], -- decls
-      al_rest      :: !a,
       al_trailing  :: ![TrailingAnn] -- ^ items appearing after the
                                      -- list, such as '=>' for a
                                      -- context
@@ -641,7 +640,7 @@ data AnnPragma
 -- | Helper function used in the parser to add a 'TrailingAnn' items
 -- to an existing annotation.
 addTrailingAnnToL :: TrailingAnn -> EpAnnComments
-                  -> EpAnn (AnnList a) -> EpAnn (AnnList a)
+                  -> EpAnn AnnList -> EpAnn AnnList
 addTrailingAnnToL t cs n = n { anns = addTrailing (anns n)
                                , comments = comments n <> cs }
   where
@@ -1012,8 +1011,8 @@ instance NoAnn NoEpAnns where
 instance NoAnn AnnBooleanFormula where
   noAnn = AnnBooleanFormula noAnn noAnn []
 
-instance NoAnn a => NoAnn (AnnList a) where
-  noAnn = AnnList Nothing ListNone noAnn noAnn []
+instance NoAnn AnnList where
+  noAnn = AnnList Nothing ListNone noAnn []
 
 instance NoAnn NameAnn where
   noAnn = NameAnnTrailing []
@@ -1094,9 +1093,9 @@ instance Outputable NameAnn where
   ppr (NameAnnTrailing t)
     = text "NameAnnTrailing" <+> ppr t
 
-instance (Outputable a) => Outputable (AnnList a) where
-  ppr (AnnList anc p s a t)
-    = text "AnnList" <+> ppr anc <+> ppr p <+> ppr s <+> ppr a <+> ppr t
+instance Outputable AnnList where
+  ppr (AnnList anc p s t)
+    = text "AnnList" <+> ppr anc <+> ppr p <+> ppr s <+> ppr t
 
 instance Outputable AnnListBrackets where
   ppr (ListParens o c) = text "ListParens" <+> ppr o <+> ppr c

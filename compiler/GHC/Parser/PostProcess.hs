@@ -437,7 +437,7 @@ mkRoleAnnotDecl loc tycon roles anns
 
 mkMDo :: (EpToken "{", [EpToken ";"], EpToken "}") -> HsDoFlavour -> LocatedA [ExprLStmt GhcPs] -> EpaLocation -> EpaLocation -> HsExpr GhcPs
 mkMDo (ob, semis, cb) ctxt stmts tok loc
-  = mkHsDoAnns ctxt stmts (AnnList (Just loc) (ListBraces ob cb) semis tok [])
+  = mkHsDoAnns ctxt stmts (AnnList (Just loc) (ListBraces ob cb) semis [], tok)
 
 -- | Converts a list of 'LHsTyVarBndr's annotated with their 'Specificity' to
 -- binders without annotations. Only accepts specified variables, and errors if
@@ -463,8 +463,8 @@ annBinds w cs (HsValBinds an bs)  = (HsValBinds (add_where w (fst an) cs) bs, No
 annBinds w cs (HsIPBinds an bs)   = (HsIPBinds (add_where w (fst an) cs) bs, Nothing)
 annBinds _ cs  (EmptyLocalBinds x) = (EmptyLocalBinds x, Just cs)
 
-add_where :: EpToken "where" -> EpAnn (AnnList ()) -> EpAnnComments
-          -> (EpAnn (AnnList ()), EpToken "where")
+add_where :: EpToken "where" -> EpAnn AnnList -> EpAnnComments
+          -> (EpAnn AnnList, EpToken "where")
 add_where w@(EpTok (EpaSpan (RealSrcSpan rs _))) (EpAnn a al cs) cs2
   | valid_anchor a
   = (EpAnn (widenAnchorT a w) al (cs Semi.<> cs2), w)
@@ -728,7 +728,7 @@ tyConToDataCon (L loc tc)
     occ = rdrNameOcc tc
 
 mkPatSynMatchGroup :: LocatedN RdrName
-                   -> LocatedA (OrdList (LHsDecl GhcPs), EpToken "where", AnnList ())
+                   -> LocatedA (OrdList (LHsDecl GhcPs), EpToken "where", AnnList)
                    -> P (MatchGroup GhcPs (LHsExpr GhcPs))
 mkPatSynMatchGroup (L loc patsyn_name) (L ld (decls, _, ann)) =
     do { matches <- mapM fromDecl (fromOL decls)
@@ -1777,11 +1777,11 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
               -> PV (LocatedA b)
   -- | Disambiguate "case ... of ..."
   mkHsCasePV :: SrcSpan -> LHsExpr GhcPs
-             -> LocatedA ([LMatch GhcPs (LocatedA b)], AnnList ())
+             -> LocatedA ([LMatch GhcPs (LocatedA b)], AnnList)
              -> EpAnnHsCase -> PV (LocatedA b)
   -- | Disambiguate "\... -> ..." (lambda), "\case" and "\cases"
   mkHsLamPV :: SrcSpan -> HsLamVariant
-            -> LocatedA ([LMatch GhcPs (LocatedA b)], AnnList ())
+            -> LocatedA ([LMatch GhcPs (LocatedA b)], AnnList)
             -> EpAnnLam
             -> PV (LocatedA b)
   -- | Function argument representation
@@ -1827,7 +1827,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsTySigPV
     :: SrcSpanAnnA -> LocatedA b -> LHsType GhcPs -> TokDcolon -> PV (LocatedA b)
   -- | Disambiguate "[a,b,c]" (list syntax)
-  mkHsExplicitListPV :: SrcSpan -> [LocatedA b] -> AnnList () -> PV (LocatedA b)
+  mkHsExplicitListPV :: SrcSpan -> [LocatedA b] -> AnnList -> PV (LocatedA b)
   -- | Disambiguate "$(...)" and "[quasi|...|]" (TH splices)
   mkHsSplicePV :: Located (HsUntypedSplice GhcPs) -> PV (LocatedA b)
   -- | Disambiguate "f { a = b, ... }" syntax (record construction and record updates)
@@ -1961,7 +1961,7 @@ instance DisambECP (HsCmd GhcPs) where
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (mkHsCmdIf c a b anns)
   mkHsDoPV l (ob,semis,cb) Nothing stmts tok_loc anc = do
     !cs <- getCommentsFor l
-    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsCmdDo (AnnList (Just anc) (ListBraces ob cb) semis tok_loc []) stmts)
+    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsCmdDo (AnnList (Just anc) (ListBraces ob cb) semis [], tok_loc) stmts)
   mkHsDoPV l _ (Just m) _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l $ PsErrQualifiedDoInCmd m
   mkHsParPV l lpar c rpar = do
     !cs <- getCommentsFor l
@@ -2060,7 +2060,7 @@ instance DisambECP (HsExpr GhcPs) where
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (mkHsIf c a b anns)
   mkHsDoPV l (ob,semis,cb) mod stmts loc_tok anc = do
     !cs <- getCommentsFor l
-    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsDo (AnnList (Just anc) (ListBraces ob cb) semis loc_tok []) (DoExpr mod) stmts)
+    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsDo (AnnList (Just anc) (ListBraces ob cb) semis [], loc_tok) (DoExpr mod) stmts)
   mkHsParPV l lpar e rpar = do
     !cs <- getCommentsFor l
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsPar (lpar, rpar) e)

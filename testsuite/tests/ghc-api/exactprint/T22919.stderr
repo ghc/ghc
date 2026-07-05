@@ -72,7 +72,6 @@
          (Nothing)
          (ListNone)
          []
-         (())
          []))
        (L
         (EpAnn

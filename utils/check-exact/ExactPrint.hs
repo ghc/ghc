@@ -231,7 +231,7 @@ setAnchorAn :: (HasTrailing an)
 setAnchorAn (L (EpAnn _ an _) a) anc ts cs = (L (EpAnn anc (setTrailing an ts) cs) a)
      -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
 
-setAnchorEpaL :: EpAnn (AnnList l) -> EpaLocation -> [TrailingAnn] -> EpAnnComments -> EpAnn (AnnList l)
+setAnchorEpaL :: EpAnn AnnList -> EpaLocation -> [TrailingAnn] -> EpAnnComments -> EpAnn AnnList
 setAnchorEpaL (EpAnn _ an _) anc ts cs = EpAnn anc (setTrailing (an {al_anchor = Nothing}) ts) cs
 
 -- ---------------------------------------------------------------------
@@ -280,7 +280,7 @@ instance HasTrailing EpAnnSumPat where
   trailing _ = []
   setTrailing a _ = a
 
-instance HasTrailing (AnnList a) where
+instance HasTrailing AnnList where
   trailing a = al_trailing a
   setTrailing a ts = a { al_trailing = ts }
 
@@ -980,23 +980,18 @@ limportDeclAnnPackage k annImp = fmap (\new -> annImp { importDeclAnnPackage = n
 --       al_anchor    :: Maybe Anchor, -- ^ start point of a list having layout
 --       al_brackets  :: !AnnListBrackets,
 --       al_semis     :: [EpToken ";"], -- decls
---       al_rest      :: !a,
 --       al_trailing  :: [TrailingAnn] -- ^ items appearing after the
 --                                     -- list, such as '=>' for a
 --                                     -- context
 --       } deriving (Data,Eq)
 
-lal_brackets :: Lens (AnnList l) AnnListBrackets
+lal_brackets :: Lens AnnList AnnListBrackets
 lal_brackets k parent = fmap (\new -> parent { al_brackets = new })
                            (k (al_brackets parent))
 
-lal_semis :: Lens (AnnList l) [EpToken ";"]
+lal_semis :: Lens AnnList [EpToken ";"]
 lal_semis k parent = fmap (\new -> parent { al_semis = new })
                            (k (al_semis parent))
-
-lal_rest :: Lens (AnnList l) l
-lal_rest k parent = fmap (\new -> parent { al_rest = new })
-                           (k (al_rest parent))
 
 -- -------------------------------------
 
@@ -1285,23 +1280,23 @@ markKwT (AddDarrowAnn tok)  = AddDarrowAnn  <$> markEpUniToken tok
 -- ---------------------------------------------------------------------
 
 markAnnList :: (Monad m, Monoid w)
-  => EpAnn (AnnList l) -> EP w m a -> EP w m (EpAnn (AnnList l), a)
+  => EpAnn AnnList -> EP w m a -> EP w m (EpAnn AnnList, a)
 markAnnList ann action = do
   markAnnListA ann $ \a -> do
     r <- action
     return (a,r)
 
 markAnnList' :: (Monad m, Monoid w)
-  => AnnList l -> EP w m a -> EP w m (AnnList l, a)
+  => AnnList -> EP w m a -> EP w m (AnnList, a)
 markAnnList' ann action = do
   markAnnListA' ann $ \a -> do
     r <- action
     return (a,r)
 
 markAnnListA :: (Monad m, Monoid w)
-  => EpAnn (AnnList l)
-  -> (EpAnn (AnnList l) -> EP w m (EpAnn (AnnList l), a))
-  -> EP w m (EpAnn (AnnList l), a)
+  => EpAnn AnnList
+  -> (EpAnn AnnList -> EP w m (EpAnn AnnList, a))
+  -> EP w m (EpAnn AnnList, a)
 markAnnListA an action = do
   an0 <- markLensBracketsO an lal_brackets
   an1 <- markEpAnnAllLT an0 lal_semis
@@ -1310,9 +1305,9 @@ markAnnListA an action = do
   return (an3, r)
 
 markAnnListA' :: (Monad m, Monoid w)
-  => AnnList l
-  -> (AnnList l -> EP w m (AnnList l, a))
-  -> EP w m (AnnList l , a)
+  => AnnList
+  -> (AnnList -> EP w m (AnnList, a))
+  -> EP w m (AnnList, a)
 markAnnListA' an action = do
   an0 <- markLensBracketsO' an lal_brackets
   an1 <- markEpAnnAllLT' an0 lal_semis
@@ -2929,10 +2924,10 @@ instance ExactPrint (HsExpr GhcPs) where
       e' <- markAnnotated e
       return (HsLet (tkLet',tkIn') binds' e')
 
-  exact (HsDo an do_or_list_comp stmts) = do
+  exact (HsDo (an,l) do_or_list_comp stmts) = do
     debugM $ "HsDo"
-    (an',stmts') <- exactDo an do_or_list_comp stmts
-    return (HsDo an' do_or_list_comp stmts')
+    (an',l',stmts') <- exactDo (an,l) do_or_list_comp stmts
+    return (HsDo (an',l') do_or_list_comp stmts')
 
   exact (ExplicitList an es) = do
     debugM $ "ExplicitList start"
@@ -3104,33 +3099,35 @@ instance ExactPrint (HsExpr GhcPs) where
 -- ---------------------------------------------------------------------
 
 exactDo :: (Monad m, Monoid w, ExactPrint (LocatedAn an a))
-        => AnnList EpaLocation -> HsDoFlavour -> LocatedAn an a
-        -> EP w m (AnnList EpaLocation, LocatedAn an a)
-exactDo an (DoExpr m)    stmts = exactMdo an m "do" >>=
-                                 \an0 -> markMaybeDodgyStmts an0 stmts
-exactDo an GhciStmtCtxt  stmts = markLensFun an lal_rest (\l -> printStringAtAA l "do") >>=
-                                 \an0 -> markMaybeDodgyStmts an0 stmts
-exactDo an (MDoExpr m)   stmts = exactMdo an m  "mdo" >>=
-                                 \an0 -> markMaybeDodgyStmts an0 stmts
-exactDo an ListComp      stmts = markMaybeDodgyStmts an stmts
-exactDo an MonadComp     stmts = markMaybeDodgyStmts an stmts
+        => (AnnList, EpaLocation) -> HsDoFlavour -> LocatedAn an a
+        -> EP w m (AnnList, EpaLocation, LocatedAn an a)
+exactDo (an,l) (DoExpr m)    stmts = exactMdo l m "do" >>=
+                                   \l0 -> markMaybeDodgyStmts (an,l0) stmts
+exactDo (an,l) GhciStmtCtxt  stmts = printStringAtAA l "do" >>=
+                                   \l0 -> markMaybeDodgyStmts (an,l0) stmts
+exactDo (an,l) (MDoExpr m)   stmts = exactMdo l m  "mdo" >>=
+                                   \l0 -> markMaybeDodgyStmts (an,l0) stmts
+exactDo (an,l) ListComp      stmts = markMaybeDodgyStmts (an,l) stmts
+exactDo (an,l) MonadComp     stmts = markMaybeDodgyStmts (an,l) stmts
 
 exactMdo :: (Monad m, Monoid w)
-  => AnnList EpaLocation -> Maybe ModuleName -> String -> EP w m (AnnList EpaLocation)
-exactMdo an Nothing            kw = markLensFun an lal_rest (\l -> printStringAtAA l kw)
-exactMdo an (Just module_name) kw = markLensFun an lal_rest (\l -> printStringAtAA l n)
+  => EpaLocation -> Maybe ModuleName -> String -> EP w m EpaLocation
+-- exactMdo an Nothing            kw = markLensFun an lal_rest (\l -> printStringAtAA l kw)
+exactMdo l Nothing            kw = printStringAtAA l kw
+exactMdo l (Just module_name) kw = printStringAtAA l n
     where
       n = (moduleNameString module_name) ++ "." ++ kw
 
 markMaybeDodgyStmts :: (Monad m, Monoid w, ExactPrint (LocatedAn an a))
-  => AnnList l -> LocatedAn an a -> EP w m (AnnList l, LocatedAn an a)
-markMaybeDodgyStmts an stmts =
+  => (AnnList, EpaLocation) -> LocatedAn an a -> EP w m (AnnList, EpaLocation, LocatedAn an a)
+markMaybeDodgyStmts (an,l) stmts =
   if notDodgy stmts
     then do
-      markAnnListA' an $ \a -> do
+      (an0,stmts') <- markAnnListA' an $ \a -> do
          r <- markAnnotatedWithLayout stmts
          return (a, r)
-    else return (an, stmts)
+      return (an0, l, stmts')
+    else return (an, l, stmts)
 
 notDodgy :: GenLocated (EpAnn ann) a -> Bool
 notDodgy (L (EpAnn anc _ _) _) = notDodgyE anc
@@ -3410,13 +3407,13 @@ instance ExactPrint (HsCmd GhcPs) where
       e' <- markAnnotated e
       return (HsCmdLet (tkLet', tkIn') binds' e')
 
-  exact (HsCmdDo an (L l es)) = do
+  exact (HsCmdDo (an0,loc) (L l es)) = do
     debugM $ "HsCmdDo"
-    an0 <- markLensFun an lal_rest (\ll -> printStringAtAA ll "do")
+    loc' <- printStringAtAA loc "do"
     (an1,es') <- markAnnList' an0 $ do
       ee <- mapM markAnnotated es
       return ee
-    return (HsCmdDo an1 (L l es'))
+    return (HsCmdDo (an1,loc') (L l es'))
 
 -- ---------------------------------------------------------------------
 

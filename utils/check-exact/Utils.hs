@@ -230,7 +230,7 @@ insertCppComments (L l p) cs0 = insertRemainingCppComments (L l p2) remaining
     addCommentsListItem :: EpAnn [TrailingAnn] -> State [LEpaComment] (EpAnn [TrailingAnn])
     addCommentsListItem = addComments
 
-    addCommentsList :: EpAnn (AnnList ()) -> State [LEpaComment] (EpAnn (AnnList ()))
+    addCommentsList :: EpAnn AnnList -> State [LEpaComment] (EpAnn AnnList)
     addCommentsList = addComments
 
     addCommentsGrhs :: EpAnn GrhsAnn -> State [LEpaComment] (EpAnn GrhsAnn)

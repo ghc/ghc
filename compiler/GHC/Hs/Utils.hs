@@ -326,11 +326,11 @@ mkHsIntegral   :: IntegralLit   GhcPs -> HsOverLit GhcPs
 mkHsFractional :: FractionalLit GhcPs -> HsOverLit GhcPs
 mkHsIsString   :: SourceText -> HText -> HsOverLit GhcPs
 mkHsDo         :: HsDoFlavour -> LocatedA [ExprLStmt GhcPs] -> HsExpr GhcPs
-mkHsDoAnns     :: HsDoFlavour -> LocatedA [ExprLStmt GhcPs] -> AnnList EpaLocation -> HsExpr GhcPs
+mkHsDoAnns     :: HsDoFlavour -> LocatedA [ExprLStmt GhcPs] -> (AnnList, EpaLocation) -> HsExpr GhcPs
 mkHsComp       :: HsDoFlavour -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                -> HsExpr GhcPs
 mkHsCompAnns   :: HsDoFlavour -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
-               -> AnnList EpaLocation
+               -> (AnnList, EpaLocation)
                -> HsExpr GhcPs
 
 mkNPat      :: LocatedAn NoEpAnns (HsOverLit GhcPs) -> Maybe (SyntaxExpr GhcPs) -> EpToken "-"
@@ -368,7 +368,7 @@ mkRecStmt :: forall (idL :: Pass) bodyR.
                              (Anno (StmtLR (GhcPass idL) GhcPs bodyR))
                              (StmtLR (GhcPass idL) GhcPs bodyR)]
                         ~ SrcSpanAnnA)
-                 => (AnnList (), EpToken "rec")
+                 => (AnnList, EpToken "rec")
                  -> LocatedA [LStmtLR (GhcPass idL) GhcPs bodyR]
                  -> StmtLR (GhcPass idL) GhcPs bodyR
 mkRecStmt anns stmts  = (emptyRecStmt' anns :: StmtLR (GhcPass idL) GhcPs bodyR)
