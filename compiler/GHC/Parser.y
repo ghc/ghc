@@ -4723,9 +4723,9 @@ commentsPA la@(L l a) = do
   !cs <- getPriorCommentsFor (getLocA la)
   return (L (addCommentsToEpAnn l cs) a)
 
-hsDoAnn :: EpToken "rec" -> (EpToken "{", [EpToken ";"], EpToken "}") -> LocatedAn t b -> AnnList (EpToken "rec")
+hsDoAnn :: EpToken "rec" -> (EpToken "{", [EpToken ";"], EpToken "}") -> LocatedAn t b -> (AnnList (), EpToken "rec")
 hsDoAnn rec (ob, semis, cb) (L ll _)
-  = AnnList (Just $ spanAsAnchor (locA ll)) (ListBraces ob cb) semis rec []
+  = (AnnList (Just $ spanAsAnchor (locA ll)) (ListBraces ob cb) semis () [], rec)
 
 listAsAnchorM :: [LocatedAn t a] -> Maybe EpaLocation
 listAsAnchorM [] = Nothing

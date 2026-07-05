@@ -3463,11 +3463,11 @@ instance (
     (an', by', using') <- exactTransStmt an by using form
     return (TransStmt an' form stmts' b using' by' c d e)
 
-  exact (RecStmt an stmts a b c d e) = do
+  exact (RecStmt (an,r) stmts a b c d e) = do
     debugM $ "RecStmt"
-    an0 <- markLensFun an lal_rest markEpToken
-    (an1, stmts') <- markAnnList' an0 (markAnnotated stmts)
-    return (RecStmt an1 stmts' a b c d e)
+    r' <- markEpToken r
+    (an1, stmts') <- markAnnList' an (markAnnotated stmts)
+    return (RecStmt (an1,r') stmts' a b c d e)
 
 -- ---------------------------------------------------------------------
 

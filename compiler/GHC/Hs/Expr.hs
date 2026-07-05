@@ -1891,7 +1891,7 @@ type instance XTransStmt       (GhcPass _) GhcPs b = AnnTransStmt
 type instance XTransStmt       (GhcPass _) GhcRn b = NoExtField
 type instance XTransStmt       (GhcPass _) GhcTc b = Type
 
-type instance XRecStmt         (GhcPass _) GhcPs b = AnnList (EpToken "rec")
+type instance XRecStmt         (GhcPass _) GhcPs b = (AnnList (), EpToken "rec")
 type instance XRecStmt         (GhcPass _) GhcRn b = NoExtField
 type instance XRecStmt         (GhcPass _) GhcTc b = RecStmtTc
 
