@@ -368,7 +368,7 @@ mkRecStmt :: forall (idL :: Pass) bodyR.
                              (Anno (StmtLR (GhcPass idL) GhcPs bodyR))
                              (StmtLR (GhcPass idL) GhcPs bodyR)]
                         ~ SrcSpanAnnA)
-                 => AnnList (EpToken "rec")
+                 => (AnnList (), EpToken "rec")
                  -> LocatedA [LStmtLR (GhcPass idL) GhcPs bodyR]
                  -> StmtLR (GhcPass idL) GhcPs bodyR
 mkRecStmt anns stmts  = (emptyRecStmt' anns :: StmtLR (GhcPass idL) GhcPs bodyR)
