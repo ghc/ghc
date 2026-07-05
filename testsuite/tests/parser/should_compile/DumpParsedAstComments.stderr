@@ -90,7 +90,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (Nothing)
+         (AnnListNoLayout)
          (ListNone)
          []))
        (L
@@ -213,7 +213,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (Nothing)
+         (AnnListNoLayout)
          (ListNone)
          []))
        (L
@@ -291,7 +291,7 @@
                  ((,)
                   (Right
                    (AnnList
-                    (Just
+                    (AnnListLayout
                      (EpaSpan { DumpParsedAstComments.hs:16:3 }))
                     (ListNone)
                     []))
@@ -361,7 +361,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (Nothing)
+         (AnnListNoLayout)
          (ListNone)
          []))
        (L
