@@ -92,7 +92,6 @@
          (Nothing)
          (ListNone)
          []
-         (())
          []))
        (L
         (EpAnn
@@ -216,7 +215,6 @@
          (Nothing)
          (ListNone)
          []
-         (())
          []))
        (L
         (EpAnn
@@ -289,15 +287,16 @@
                       "-- normal comment")
                      { DumpParsedAstComments.hs:14:7-8 }))]))
                 (HsDo
-                 (AnnList
-                  (Just
-                   (EpaSpan { DumpParsedAstComments.hs:16:3 }))
-                  (ListBraces
-                   (NoEpTok)
-                   (NoEpTok))
-                  []
-                  (EpaSpan { DumpParsedAstComments.hs:14:7-8 })
-                  [])
+                 ((,)
+                  (AnnList
+                   (Just
+                    (EpaSpan { DumpParsedAstComments.hs:16:3 }))
+                   (ListBraces
+                    (NoEpTok)
+                    (NoEpTok))
+                   []
+                   [])
+                  (EpaSpan { DumpParsedAstComments.hs:14:7-8 }))
                  (DoExpr
                   (Nothing))
                  (L
@@ -366,7 +365,6 @@
          (Nothing)
          (ListNone)
          []
-         (())
          []))
        (L
         (EpAnn

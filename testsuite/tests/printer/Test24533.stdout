@@ -522,7 +522,6 @@
               (Nothing)
               (ListNone)
               []
-              (())
               []))
             (L
              (EpAnn
@@ -1095,7 +1094,6 @@
               (Nothing)
               (ListNone)
               []
-              (())
               []))
             (L
              (EpAnn

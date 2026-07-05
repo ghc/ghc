@@ -67,10 +67,8 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` string `extQ` fastString `extQ` srcSpan `extQ` realSrcSpan
               `extQ` annotationModule
               `extQ` annotationGrhsAnn
+              `extQ` annotationAnnListEpAnn
               `extQ` annotationAnnList
-              `extQ` annotationAnnListUnit
-              `extQ` annotationAnnListCommas
-              `extQ` annotationAnnListEpaLocation
               `extQ` annotationNoEpAnns
               `extQ` annotationExprBracket
               `extQ` annotationTypedBracket
@@ -371,21 +369,12 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
             annotationGrhsAnn :: EpAnn GrhsAnn -> SDoc
             annotationGrhsAnn = annotation' (text "EpAnn GrhsAnn")
 
-            annotationAnnList :: EpAnn (AnnList ()) -> SDoc
-            annotationAnnList = annotation' (text "EpAnn (AnnList ())")
+            annotationAnnListEpAnn :: EpAnn AnnList -> SDoc
+            annotationAnnListEpAnn = annotation' (text "EpAnn AnnList")
 
-            annotationAnnListCommas :: EpAnn (AnnList [EpToken ","]) -> SDoc
-            annotationAnnListCommas = annotation' (text "EpAnn (AnnList [EpToken \",\"])")
-
-            annotationAnnListUnit :: AnnList () -> SDoc
-            annotationAnnListUnit anns = case ba of
+            annotationAnnList :: AnnList -> SDoc
+            annotationAnnList anns = case ba of
              BlankEpAnnotations -> parens (text "blanked:" <+> text "AnnList ()")
-             NoBlankEpAnnotations -> parens $ text (showConstr (toConstr anns))
-                                               $$ vcat (gmapQ showAstData' anns)
-
-            annotationAnnListEpaLocation :: AnnList EpaLocation -> SDoc
-            annotationAnnListEpaLocation anns = case ba of
-             BlankEpAnnotations -> parens (text "blanked:" <+> text "AnnList EpaLocation")
              NoBlankEpAnnotations -> parens $ text (showConstr (toConstr anns))
                                                $$ vcat (gmapQ showAstData' anns)
 
