@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 module GHC.Cmm.LayoutStack (
-       cmmLayoutStack, setInfoTableStackMap
+       cmmLayoutStack, setInfoTableStackMap, StackMap, stackMapLivenessKey
   ) where
 
 import GHC.Prelude hiding ((<*>))
@@ -35,7 +35,7 @@ import GHC.Utils.Panic
 import qualified Data.Set as Set
 import Control.Monad.Fix
 import Data.Array as Array
-import Data.List (nub)
+import Data.List (nub, sort)
 import Data.List.NonEmpty ( NonEmpty (..) )
 
 {- Note [Stack Layout]
@@ -1045,6 +1045,21 @@ stackMapToLiveness platform StackMap{..} =
                    | (r,off) <- nonDetEltsUFM sm_regs
                    , isGcPtrType (localRegType r) ]
                    -- See Note [Unique Determinism and code generation]
+
+-- | The part of a 'StackMap' that determines the info table emitted for a
+-- return point: frame extent plus pointer liveness (equal keys give equal
+-- 'stackMapToLiveness' results, but computed without the array so it is
+-- total on non-return-point stack maps too). Return points with equal keys
+-- can share a single info table, so the second CBE run may merge their
+-- blocks; see Note [Second pass of CBE] in GHC.Cmm.Pipeline.
+stackMapLivenessKey :: Platform -> StackMap -> (ByteOff, ByteOff, ByteOff, [ByteOff])
+stackMapLivenessKey platform StackMap{..}
+  = (sm_sp, sm_args, sm_ret_off, ptr_words)
+  where
+    ptr_words = sort [ toWords platform off
+                     | (r, off) <- nonDetEltsUFM sm_regs
+                     , isGcPtrType (localRegType r) ]
+                     -- See Note [Unique Determinism and code generation]
 
 -- -----------------------------------------------------------------------------
 -- Pass 2

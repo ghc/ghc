@@ -1,5 +1,6 @@
 module GHC.Cmm.CommonBlockElim
   ( elimCommonBlocks
+  , elimCommonBlocksWith
   )
 where
 
@@ -60,9 +61,17 @@ import qualified Data.List.NonEmpty as NE
 
 -- TODO: Use optimization fuel
 elimCommonBlocks :: CmmGraph -> CmmGraph
-elimCommonBlocks g = replaceLabels env $ copyTicks env g
+elimCommonBlocks = elimCommonBlocksWith (\_ _ -> True)
+
+-- | Like 'elimCommonBlocks', but only merges two blocks when the given
+-- predicate holds of their labels. Used by the second CBE run (after stack
+-- layout) to restrict merging to return points with interchangeable stack
+-- maps; see Note [Second pass of CBE] in GHC.Cmm.Pipeline.
+elimCommonBlocksWith :: (Label -> Label -> Bool) -> CmmGraph -> CmmGraph
+elimCommonBlocksWith ok_to_merge g =
+    replaceLabels env $ copyTicks env g
   where
-     env = iterate mapEmpty blocks_with_key
+     env = iterate ok_to_merge mapEmpty blocks_with_key
      -- The order of blocks doesn't matter here. While we could use
      -- revPostorder which drops unreachable blocks this is done in
      -- ContFlowOpt already which runs before this pass. So we use
@@ -77,10 +86,10 @@ type Key = [Label]
 type Subst = LabelMap BlockId
 
 -- The outer list groups by hash. We retain this grouping throughout.
-iterate :: Subst -> [[(Key, DistinctBlocks)]] -> Subst
-iterate subst blocks
+iterate :: (Label -> Label -> Bool) -> Subst -> [[(Key, DistinctBlocks)]] -> Subst
+iterate ok_to_merge subst blocks
     | mapNull new_substs = subst
-    | otherwise = iterate subst' updated_blocks
+    | otherwise = iterate ok_to_merge subst' updated_blocks
   where
     grouped_blocks :: [[(Key, NonEmpty DistinctBlocks)]]
     grouped_blocks = map groupByLabel blocks
@@ -90,30 +99,33 @@ iterate subst blocks
       where
         go !new_subst1 (k,dbs) = (new_subst1 `mapUnion` new_subst2, (k,db))
           where
-            (new_subst2, db) = mergeBlockList subst dbs
+            (new_subst2, db) = mergeBlockList ok_to_merge subst dbs
 
     subst' = subst `mapUnion` new_substs
     updated_blocks = map (map (first (map (lookupBid subst')))) merged_blocks
 
 -- Combine two lists of blocks.
 -- While they are internally distinct they can still share common blocks.
-mergeBlocks :: Subst -> DistinctBlocks -> DistinctBlocks -> (Subst, DistinctBlocks)
-mergeBlocks subst existing new = go new
+mergeBlocks :: (Label -> Label -> Bool)
+            -> Subst -> DistinctBlocks -> DistinctBlocks -> (Subst, DistinctBlocks)
+mergeBlocks ok_to_merge subst existing new = go new
   where
     go [] = (mapEmpty, existing)
-    go (b:bs) = case List.find (eqBlockBodyWith (eqBid subst) b) existing of
+    go (b:bs) = case List.find (\b' -> ok_to_merge (entryLabel b) (entryLabel b')
+                                       && eqBlockBodyWith (eqBid subst) b b') existing of
         -- This block is a duplicate. Drop it, and add it to the substitution
         Just b' -> first (mapInsert (entryLabel b) (entryLabel b')) $ go bs
         -- This block is not a duplicate, keep it.
         Nothing -> second (b:) $ go bs
 
-mergeBlockList :: Subst -> NonEmpty DistinctBlocks -> (Subst, DistinctBlocks)
-mergeBlockList subst (b:|bs) = go mapEmpty b bs
+mergeBlockList :: (Label -> Label -> Bool)
+               -> Subst -> NonEmpty DistinctBlocks -> (Subst, DistinctBlocks)
+mergeBlockList ok_to_merge subst (b:|bs) = go mapEmpty b bs
   where
     go !new_subst1 b [] = (new_subst1, b)
     go !new_subst1 b1 (b2:bs) = go new_subst b bs
       where
-        (new_subst2, b) =  mergeBlocks subst b1 b2
+        (new_subst2, b) =  mergeBlocks ok_to_merge subst b1 b2
         new_subst = new_subst1 `mapUnion` new_subst2
 
 

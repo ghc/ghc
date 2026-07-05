@@ -141,6 +141,22 @@ cpsTop logger platform cfg dus proc =
            condPass (cmmOptSink cfg) (cmmSink platform) g
                     Opt_D_dump_cmm_sink "Sink assignments"
 
+      ----------- Second common-block elimination ------------------------------
+      -- See Note [Second pass of CBE]
+      (g, call_pps) <-
+        if cmmOptElimCommonBlks cfg && cmmOptSink cfg && not splitting_proc_points
+          then do
+            let stackmap_key lbl = stackMapLivenessKey platform
+                                     <$> mapLookup lbl stackmaps
+                ok_to_merge l1 l2 = stackmap_key l1 == stackmap_key l2
+            g <- return $ {-# SCC "elimCommonBlocks2" #-}
+                 elimCommonBlocksWith ok_to_merge g
+            dump Opt_D_dump_cmm_cbe "Post common block elimination (2)" g
+            -- The pass may merge return points, so the call proc-point set
+            -- must be recomputed for the passes below.
+            return (g, callProcPoints g)
+          else return (g, call_pps)
+
       ------------- CAF analysis ----------------------------------------------
       let cafEnv = {-# SCC "cafAnal" #-} cafAnal platform call_pps l g
       dumpWith logger Opt_D_dump_cmm_caf "CAFEnv" FormatText (pdoc platform cafEnv)
@@ -321,6 +337,46 @@ cpsTop logger platform cfg dus proc =
 -- But since we don't see any benefits from running sinking before stack
 -- layout, this situation probably doesn't arise too often in practice.
 --
+
+{- Note [Second pass of CBE]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~
+The first CBE run happens before stack layout, where semantically identical
+blocks often differ syntactically: locals get fresh uniques per copy (e.g. the
+duplicated case alternatives of #20681), and CBE's block equality requires
+local registers to match exactly.  That requirement is essential at that
+stage, because locals are live across blocks, so alpha-renaming one block at
+a time is unsound (#14754).
+
+After stack layout and sinking, most of those locals are gone: values live
+across calls travel via stack slots, and the sinking pass inlines the
+remaining single-use temporaries.  Blocks that differed only in uniques
+frequently become literally identical, so we run CBE once more.  This is
+mostly a code-size optimisation, but duplicated return points also each get
+their own info table, so it saves static data too.
+
+Wrinkles:
+
+* Return points now carry stack maps (used to populate info tables in
+  setInfoTableStackMap).  Two identical blocks may in principle sit on frames
+  with different pointer liveness, and after merging only the surviving
+  label's info table remains.  So we only merge blocks whose stack maps agree
+  on everything the info table records: stackMapLivenessKey in
+  GHC.Cmm.LayoutStack.
+
+* Merging can drop return-point labels, so the call proc-point set is
+  recomputed before CAF analysis and attachContInfoTables.
+
+* We don't run the pass when splitting proc points (unregisterised or
+  non-TNTC backends): merging blocks reachable from different proc points
+  breaks splitAtProcPoints' invariant that each block is reachable from
+  exactly one proc point (#14989).
+
+Historical note: a second CBE pass first landed as d5c4d46a62 and was
+reverted (#14989) because it patched up the proc-point sets by label
+substitution, which cannot express one block becoming reachable from two
+proc points; restricting the pass to the non-splitting path avoids the
+problem entirely.
+-}
 
 {- Note [inconsistent-pic-reg]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
