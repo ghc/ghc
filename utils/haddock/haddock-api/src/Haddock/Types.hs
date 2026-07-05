@@ -1039,6 +1039,12 @@ type instance XCTyFamInstDecl DocNameI = NoExtField
 type instance XHsContext DocNameI = NoExtField
 type instance XXHsContextDetails DocNameI = DataConCantHappen
 
+type instance XBFVar           DocNameI = NoExtField
+type instance XBFAnd           DocNameI = NoExtField
+type instance XBFOr            DocNameI = NoExtField
+type instance XBFParens        DocNameI = NoExtField
+type instance XXBooleanFormula DocNameI = DataConCantHappen
+
 -----------------------------------------------------------------------------
 
 -- * NFData instances for GHC types

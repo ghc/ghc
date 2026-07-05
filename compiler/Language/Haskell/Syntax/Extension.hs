@@ -841,6 +841,14 @@ type family XXIntegralLit x
 type family XStringLit  x
 type family XXStringLit x
 
+-- =====================================================================
+-- BooleanFormula type families
+
+type family XBFVar           p
+type family XBFAnd           p
+type family XBFOr            p
+type family XBFParens        p
+type family XXBooleanFormula p
 
 -- =====================================================================
 -- Misc

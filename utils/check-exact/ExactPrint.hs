@@ -2726,18 +2726,18 @@ instance ExactPrint (BF.BooleanFormula GhcPs) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (BF.Var x)  = do
+  exact (BF.Var e x)  = do
     x' <- markAnnotated x
-    return (BF.Var x')
-  exact (BF.Or ls)  = do
+    return (BF.Var e x')
+  exact (BF.Or e ls)  = do
     ls' <- mapM markAnnotated ls
-    return (BF.Or ls')
-  exact (BF.And ls) = do
+    return (BF.Or e ls')
+  exact (BF.And e ls) = do
     ls' <- mapM markAnnotated ls
-    return (BF.And ls')
-  exact (BF.Parens x)  = do
+    return (BF.And e ls')
+  exact (BF.Parens e x)  = do
     x' <- markAnnotated x
-    return (BF.Parens x')
+    return (BF.Parens e x')
 
 -- ---------------------------------------------------------------------
 

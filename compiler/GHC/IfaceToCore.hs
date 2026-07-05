@@ -887,10 +887,10 @@ tc_iface_decl _parent ignore_prags
           return (ATI tc mb_def)
 
    tc_boolean_formula :: IfaceBooleanFormula -> IfL (BooleanFormula GhcRn)
-   tc_boolean_formula (IfAnd ibfs  ) = BF.And    . map noLocA <$> traverse tc_boolean_formula ibfs
-   tc_boolean_formula (IfOr ibfs   ) = BF.Or     . map noLocA <$> traverse tc_boolean_formula ibfs
-   tc_boolean_formula (IfParens ibf) = BF.Parens .     noLocA <$>          tc_boolean_formula ibf
-   tc_boolean_formula (IfVar nm    ) = BF.Var    .     noLocA <$> (lookupIfaceTop . mkVarOccFS . ifLclNameFS $ nm)
+   tc_boolean_formula (IfAnd ibfs  ) = BF.And    NoExtField . map noLocA <$> traverse tc_boolean_formula ibfs
+   tc_boolean_formula (IfOr ibfs   ) = BF.Or     NoExtField . map noLocA <$> traverse tc_boolean_formula ibfs
+   tc_boolean_formula (IfParens ibf) = BF.Parens NoExtField .     noLocA <$>          tc_boolean_formula ibf
+   tc_boolean_formula (IfVar nm    ) = BF.Var    NoExtField .     noLocA <$> (lookupIfaceTop . mkVarOccFS . ifLclNameFS $ nm)
 
    mk_sc_doc pred = text "Superclass" <+> ppr pred
    mk_at_doc tc = text "Associated type" <+> ppr tc

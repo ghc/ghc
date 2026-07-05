@@ -542,10 +542,11 @@ toIfGuidance src guidance
 toIfaceBooleanFormula :: BF.BooleanFormula GhcRn -> IfaceBooleanFormula
 toIfaceBooleanFormula = go
   where
-    go (BF.Var nm   ) = IfVar    $ mkIfLclName . getOccFS . unLoc $  nm
-    go (BF.And bfs  ) = IfAnd    $ map (go . unLoc) bfs
-    go (BF.Or bfs   ) = IfOr     $ map (go . unLoc) bfs
-    go (BF.Parens bf) = IfParens $     (go . unLoc) bf
+    go (BF.Var _ nm   ) = IfVar    $ mkIfLclName . getOccFS . unLoc $  nm
+    go (BF.And _ bfs  ) = IfAnd    $ map (go . unLoc) bfs
+    go (BF.Or _ bfs   ) = IfOr     $ map (go . unLoc) bfs
+    go (BF.Parens _ bf) = IfParens $     (go . unLoc) bf
+    go (BF.XBooleanFormula _) = panic "toIfaceBooleanFormula"
 
 {-
 ************************************************************************

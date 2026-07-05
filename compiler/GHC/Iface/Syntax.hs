@@ -99,6 +99,7 @@ import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
                        zipWithEqual )
 
 import Language.Haskell.Syntax.BooleanFormula(BooleanFormula(..))
+import Language.Haskell.Syntax.Extension (noExtField)
 import Language.Haskell.Syntax.Text
 
 import Control.Monad
@@ -1319,10 +1320,10 @@ pprIfaceDecl ss decl@(IfaceClass { ifName  = clas
 
       fromIfaceBooleanFormula :: IfaceBooleanFormula -> BooleanFormula GhcRn
       -- `mkUnboundName` here is fine because the Name generated is only used for pretty printing and nothing else.
-      fromIfaceBooleanFormula (IfVar nm   ) = Var    $ noLocA . mkUnboundName . mkVarOccFS . ifLclNameFS $ nm
-      fromIfaceBooleanFormula (IfAnd bfs  ) = And    $ map (noLocA . fromIfaceBooleanFormula) bfs
-      fromIfaceBooleanFormula (IfOr bfs   ) = Or     $ map (noLocA . fromIfaceBooleanFormula) bfs
-      fromIfaceBooleanFormula (IfParens bf) = Parens $     (noLocA . fromIfaceBooleanFormula) bf
+      fromIfaceBooleanFormula (IfVar nm   ) = Var    noExtField $ noLocA . mkUnboundName . mkVarOccFS . ifLclNameFS $ nm
+      fromIfaceBooleanFormula (IfAnd bfs  ) = And    noExtField $ map (noLocA . fromIfaceBooleanFormula) bfs
+      fromIfaceBooleanFormula (IfOr bfs   ) = Or     noExtField $ map (noLocA . fromIfaceBooleanFormula) bfs
+      fromIfaceBooleanFormula (IfParens bf) = Parens noExtField $     (noLocA . fromIfaceBooleanFormula) bf
 
 
       -- See Note [Suppressing binder signatures] in GHC.Iface.Type

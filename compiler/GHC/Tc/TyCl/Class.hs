@@ -345,7 +345,7 @@ tcClassMinimalDef _clas sigs op_info
   where
     -- By default require all methods without a default implementation
     defMindef :: ClassMinimalDef
-    defMindef = mkAnd [ noLocA (mkVar (noLocA name))
+    defMindef = mkAnd [ noLocA (mkVar NoExtField (noLocA name))
                       | (name, _, Nothing) <- op_info ]
 
 instantiateMethod :: Class -> TcId -> [TcType] -> TcType

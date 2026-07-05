@@ -857,10 +857,10 @@ bfTraverse  :: Applicative f
             -> f (BooleanFormula DocNameI)
 bfTraverse f = go
   where
-    go (Var    a  ) = Var    <$> f a
-    go (And    bfs) = And    <$> traverse @[] (traverse go) bfs
-    go (Or     bfs) = Or     <$> traverse @[] (traverse go) bfs
-    go (Parens bf ) = Parens <$> traverse go bf
+    go (Var    x a  ) = Var    x <$> f a
+    go (And    x bfs) = And    x <$> traverse @[] (traverse go) bfs
+    go (Or     x bfs) = Or     x <$> traverse @[] (traverse go) bfs
+    go (Parens x bf ) = Parens x <$> traverse go bf
 
 renameForD :: ForeignDecl GhcRn -> RnM (ForeignDecl DocNameI)
 renameForD (ForeignImport _ modifiers lname ltype x) = do
