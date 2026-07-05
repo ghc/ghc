@@ -1046,7 +1046,7 @@ newWhereAnnotation ww = (an, w)
     WithWhere -> EpTok (EpaDelta noSrcSpan (SameLine 0) [])
     WithoutWhere -> noEpTok
   an = EpAnn anc
-              (AnnList (Just anc2) ListNone [])
+              (AnnList (AnnListLayout anc2) ListNone [])
               emptyComments
 
 -- ---------------------------------------------------------------------
