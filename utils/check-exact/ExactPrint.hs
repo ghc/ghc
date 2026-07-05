@@ -727,6 +727,11 @@ printStringAtMLocL an l s = do
 printStringAdvanceA :: (Monad m, Monoid w) => String -> EP w m ()
 printStringAdvanceA str = printStringAtAA (EpaDelta noSrcSpan (SameLine 0) []) str >> return ()
 
+printStringAtA :: (Monad m, Monoid w) => EpAnn a -> String -> EP w m (EpAnn a)
+printStringAtA ann s = do
+  l' <- printStringAtAA (entry ann) s
+  return ann { entry = l' }
+
 printStringAtAA :: (Monad m, Monoid w) => EpaLocation -> String -> EP w m EpaLocation
 printStringAtAA el str = printStringAtAAC CaptureComments el str
 
@@ -3220,7 +3225,7 @@ instance (ExactPrint body) => ExactPrint (HsRecFields GhcPs body) where
     mdot' <- case mdot of
       Nothing -> return Nothing
       Just (L ss d) -> do
-        ss' <- printStringAtAA ss ".."
+        ss' <- printStringAtA ss ".."
         return $ Just (L ss' d)
       -- Note: mdot contains the SrcSpan where the ".." appears, if present
     cc' <- markEpToken cc
