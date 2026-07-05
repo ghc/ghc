@@ -2471,17 +2471,17 @@ instance ExactPrint (GRHSs GhcPs (LocatedA (HsCmd GhcPs))) where
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (HsLocalBinds GhcPs) where
-  getAnnotationEntry (HsValBinds an _) = fromAnn an
+  getAnnotationEntry (HsValBinds (an,_) _) = fromAnn an
   getAnnotationEntry (HsIPBinds{}) = NoEntryVal
   getAnnotationEntry (EmptyLocalBinds{}) = NoEntryVal
 
-  setAnnotationAnchor (HsValBinds an a) anc ts cs = HsValBinds (setAnchorEpaL an anc ts cs) a
+  setAnnotationAnchor (HsValBinds (an,w) a) anc ts cs = HsValBinds (setAnchorEpaL an anc ts cs, w) a
   setAnnotationAnchor a _ _ _ = a
 
-  exact (HsValBinds an valbinds) = do
-    an0 <- markLensFun' an lal_rest markEpToken -- 'where'
+  exact (HsValBinds (an0, w) valbinds) = do
+    w' <- markEpToken w -- 'where'
 
-    case al_anchor $ anns an of
+    case al_anchor $ anns an0 of
       Just anc -> do
         when (not $ isEmptyValBinds valbinds) $ setExtraDP (Just anc)
       _ -> return ()
@@ -2494,14 +2494,14 @@ instance ExactPrint (HsLocalBinds GhcPs) where
              Just (ss,dp) -> do
                  setExtraDPReturn Nothing
                  return $ an1 { anns = (anns an1) { al_anchor = Just (EpaDelta ss dp []) }}
-    return (HsValBinds an2 valbinds')
+    return (HsValBinds (an2, w') valbinds')
 
-  exact (HsIPBinds an bs) = do
+  exact (HsIPBinds (an,w) bs) = do
+    w' <- markEpToken w
     (an2,bs') <- markAnnListA an $ \an0 -> do
-                           an1 <- markLensFun' an0 lal_rest markEpToken
                            bs' <- markAnnotated bs
-                           return (an1, bs')
-    return (HsIPBinds an2 bs')
+                           return (an0, bs')
+    return (HsIPBinds (an2,w') bs')
   exact b@(EmptyLocalBinds _) = return b
 
 

@@ -68,7 +68,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` annotationModule
               `extQ` annotationGrhsAnn
               `extQ` annotationAnnList
-              `extQ` annotationEpAnnListWhere
               `extQ` annotationAnnListUnit
               `extQ` annotationAnnListCommas
               `extQ` annotationAnnListEpaLocation
@@ -374,9 +373,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             annotationAnnList :: EpAnn (AnnList ()) -> SDoc
             annotationAnnList = annotation' (text "EpAnn (AnnList ())")
-
-            annotationEpAnnListWhere :: EpAnn (AnnList (EpToken "where")) -> SDoc
-            annotationEpAnnListWhere = annotation' (text "EpAnn (AnnList (EpToken \"where\"))")
 
             annotationAnnListCommas :: EpAnn (AnnList [EpToken ","]) -> SDoc
             annotationAnnListCommas = annotation' (text "EpAnn (AnnList [EpToken \",\"])")

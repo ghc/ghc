@@ -1921,28 +1921,30 @@
                   (EpTok
                    (EpaSpan { DumpSemis.hs:34:32-33 })))
                  (HsValBinds
-                  (EpAnn
-                   (EpaSpan { DumpSemis.hs:34:13-31 })
-                   (AnnList
-                    (Just
-                     (EpaSpan { DumpSemis.hs:34:18-30 }))
-                    (ListBraces
-                     (EpTok (EpaSpan { DumpSemis.hs:34:13 }))
-                     (EpTok (EpaSpan { DumpSemis.hs:34:31 })))
-                    [(EpTok
-                      (EpaSpan { DumpSemis.hs:34:14 }))
-                    ,(EpTok
-                      (EpaSpan { DumpSemis.hs:34:15 }))
-                    ,(EpTok
-                      (EpaSpan { DumpSemis.hs:34:16 }))
-                    ,(EpTok
-                      (EpaSpan { DumpSemis.hs:34:17 }))
-                    ,(EpTok
-                      (EpaSpan { DumpSemis.hs:34:18 }))]
-                    (NoEpTok)
-                    [])
-                   (EpaComments
-                    []))
+                  ((,)
+                   (EpAnn
+                    (EpaSpan { DumpSemis.hs:34:13-31 })
+                    (AnnList
+                     (Just
+                      (EpaSpan { DumpSemis.hs:34:18-30 }))
+                     (ListBraces
+                      (EpTok (EpaSpan { DumpSemis.hs:34:13 }))
+                      (EpTok (EpaSpan { DumpSemis.hs:34:31 })))
+                     [(EpTok
+                       (EpaSpan { DumpSemis.hs:34:14 }))
+                     ,(EpTok
+                       (EpaSpan { DumpSemis.hs:34:15 }))
+                     ,(EpTok
+                       (EpaSpan { DumpSemis.hs:34:16 }))
+                     ,(EpTok
+                       (EpaSpan { DumpSemis.hs:34:17 }))
+                     ,(EpTok
+                       (EpaSpan { DumpSemis.hs:34:18 }))]
+                     (())
+                     [])
+                    (EpaComments
+                     []))
+                   (NoEpTok))
                   (ValBinds
                    (NoExtField)
                    [(VbBind

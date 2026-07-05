@@ -499,7 +499,7 @@ balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds)))
 pushTrailingComments :: WithWhere -> EpAnnComments -> HsLocalBinds GhcPs -> (Bool, HsLocalBinds GhcPs)
 pushTrailingComments _ _cs b@EmptyLocalBinds{} = (False, b)
 pushTrailingComments _ _cs (HsIPBinds _ _) = error "TODO: pushTrailingComments:HsIPBinds"
-pushTrailingComments w cs lb@(HsValBinds an _) = (True, HsValBinds an' vb)
+pushTrailingComments w cs lb@(HsValBinds (an,wt) _) = (True, HsValBinds (an',wt) vb)
   where
     decls = hsDeclsLocalBinds lb
     (an', decls') = case reverse decls of
@@ -1090,9 +1090,9 @@ replaceDeclsValbinds w (EmptyLocalBinds _) new
     = let an = newWhereAnnotation w
       in (HsValBinds an (ValBinds noExtField (map wrapValBind new)))
 
-oldWhereAnnotation :: EpAnn (AnnList (EpToken "where"))
-  -> WithWhere -> RealSrcSpan -> (EpAnn (AnnList (EpToken "where")))
-oldWhereAnnotation (EpAnn anc an cs) ww _oldSpan = an'
+oldWhereAnnotation :: (EpAnn (AnnList ()), EpToken "where")
+  -> WithWhere -> RealSrcSpan -> (EpAnn (AnnList ()), EpToken "where")
+oldWhereAnnotation (EpAnn anc an cs, _w) ww _oldSpan = an'
   -- TODO: when we set DP (0,0) for the HsValBinds EpEpaLocation,
   -- change the AnnList anchor to have the correct DP too
   where
@@ -1104,12 +1104,12 @@ oldWhereAnnotation (EpAnn anc an cs) ww _oldSpan = an'
           case ww of
             WithWhere -> (anc, ancl)
             WithoutWhere -> (anc, ancl)
-    an' = EpAnn anc'
-                (AnnList ancl' p s w t)
-                cs
+    an' = (EpAnn anc'
+                 (AnnList ancl' p s () t)
+                 cs, w)
 
-newWhereAnnotation :: WithWhere -> (EpAnn (AnnList (EpToken "where")))
-newWhereAnnotation ww = an
+newWhereAnnotation :: WithWhere -> (EpAnn (AnnList ()), EpToken "where")
+newWhereAnnotation ww = (an, w)
   where
   anc  = EpaDelta noSrcSpan (DifferentLine 1 2) []
   anc2 = EpaDelta noSrcSpan (DifferentLine 1 4) []
@@ -1117,7 +1117,7 @@ newWhereAnnotation ww = an
     WithWhere -> EpTok (EpaDelta noSrcSpan (SameLine 0) [])
     WithoutWhere -> NoEpTok
   an = EpAnn anc
-              (AnnList (Just anc2) ListNone [] w [])
+              (AnnList (Just anc2) ListNone [] () [])
               emptyComments
 
 -- ---------------------------------------------------------------------
