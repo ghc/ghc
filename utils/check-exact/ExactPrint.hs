@@ -232,7 +232,7 @@ setAnchorAn (L (EpAnn _ an _) a) anc ts cs = (L (EpAnn anc (setTrailing an ts) c
      -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
 
 setAnchorEpaL :: EpAnn AnnList -> EpaLocation -> [TrailingAnn] -> EpAnnComments -> EpAnn AnnList
-setAnchorEpaL (EpAnn _ an _) anc ts cs = EpAnn anc (setTrailing (an {al_anchor = Nothing}) ts) cs
+setAnchorEpaL (EpAnn _ an _) anc ts cs = EpAnn anc (setTrailing (an {al_layout = AnnListNoLayout}) ts) cs
 
 -- ---------------------------------------------------------------------
 
@@ -2459,8 +2459,8 @@ instance ExactPrint (HsLocalBinds GhcPs) where
   exact (HsValBinds (an0, w) valbinds) = do
     w' <- markEpToken w -- 'where'
 
-    case al_anchor $ anns an0 of
-      Just anc -> do
+    case al_layout $ anns an0 of
+      AnnListLayout anc -> do
         when (not $ isEmptyValBinds valbinds) $ setExtraDP (Just anc)
       _ -> return ()
 
@@ -2471,7 +2471,7 @@ instance ExactPrint (HsLocalBinds GhcPs) where
              Nothing -> return an1
              Just (ss,dp) -> do
                  setExtraDPReturn Nothing
-                 return $ an1 { anns = (anns an1) { al_anchor = Just (EpaDelta ss dp []) }}
+                 return $ an1 { anns = (anns an1) { al_layout = AnnListLayout (EpaDelta ss dp []) }}
     return (HsValBinds (an2, w') valbinds')
 
   exact (HsIPBinds (an,w) bs) = do

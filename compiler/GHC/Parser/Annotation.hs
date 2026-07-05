@@ -31,10 +31,6 @@ module GHC.Parser.Annotation (
   SrcSpanAnnA, SrcSpanAnnN,
 
   -- ** Annotation data types used in 'GenLocated'
-
-  AnnList(..), AnnListBrackets(..),
-  AnnParen(..),
-  AnnCType(..),AnnWarningTxt(..),AnnOverlap(..),AnnAnnDecl(..),AnnPragSCC(..),
   NameAnn(..), NameAdornment(..),
   NoEpAnns(..),
 
@@ -42,6 +38,12 @@ module GHC.Parser.Annotation (
   TrailingAnn(..), ta_location,
   addTrailingAnnToA, addTrailingCommaToN,
   noTrailingN,
+
+  -- ** Annotation data types used in TTG extension points
+
+  AnnList(..), AnnListBrackets(..), AnnListLayout(..),
+  AnnParen(..),
+  AnnCType(..),AnnWarningTxt(..),AnnOverlap(..),AnnAnnDecl(..),AnnPragSCC(..),
 
   -- ** Utilities for converting between different 'GenLocated' when
   -- ** we do not care about the annotations.
@@ -513,7 +515,7 @@ instance Outputable TrailingAnn where
 -- AZ: goal: only used when there is layout, so vertical alignment matters
 data AnnList
   = AnnList {
-      al_anchor    :: !(Maybe EpaLocation), -- ^ start point of a list having layout
+      al_layout    :: !AnnListLayout,
       al_brackets  :: !AnnListBrackets,
       al_semis     :: [EpToken ";"] -- decls
       } deriving (Data,Eq)
@@ -522,6 +524,18 @@ data AnnListBrackets
   = ListBraces (EpToken "{") (EpToken "}")
   | ListNone
   deriving (Data,Eq)
+
+-- | How the extent of a list was delimited in the source.
+data AnnListLayout
+  = AnnListBraces   -- ^ Explicit @{ ; }@ written by the user. The tokens
+                    --   live in 'al_brackets' and 'al_semis'.
+  | AnnListLayout !EpaLocation
+                    -- ^ The lexer opened an implicit layout context.
+                    --   The 'EpaLocation' is the @vocurly@ token (or, for
+                    --   MultiWayIf, the leading @|@), whose start column is
+                    --   the layout column chosen by 'new_layout_context'.
+  | AnnListNoLayout -- ^ Neither: a bracketed or compiler-generated list.
+  deriving (Data, Eq)
 
 -- ---------------------------------------------------------------------
 -- Annotations for parenthesised elements, such as tuples, lists
@@ -993,7 +1007,10 @@ instance NoAnn NoEpAnns where
   noAnn = NoEpAnns
 
 instance NoAnn AnnList where
-  noAnn = AnnList Nothing ListNone noAnn
+  noAnn = AnnList noAnn ListNone noAnn
+
+instance NoAnn AnnListLayout where
+  noAnn = AnnListNoLayout
 
 instance NoAnn NameAnn where
   noAnn = NameAnnTrailing []
@@ -1093,6 +1110,11 @@ instance Outputable AnnList where
 instance Outputable AnnListBrackets where
   ppr (ListBraces o c) = text "ListBraces" <+> ppr o <+> ppr c
   ppr ListNone         = text "ListNone"
+
+instance Outputable AnnListLayout where
+  ppr AnnListBraces     = text "AnnListBraces"
+  ppr (AnnListLayout l) = text "AnnListLayout" <+> ppr l
+  ppr AnnListNoLayout   = text "AnnListNoLayout"
 
 instance Outputable AnnCType where
   ppr (AnnCType o c l ca)

@@ -466,7 +466,7 @@ add_where w@(EpTok (EpaSpan (RealSrcSpan rs _))) (EpAnn a al cs) cs2
   = (EpAnn (widenAnchorT a w) al (cs Semi.<> cs2), w)
   | otherwise
   = (EpAnn (patch_anchor rs a)
-           (al { al_anchor = (fmap (patch_anchor rs) (al_anchor al))})
+           (al { al_layout = patch_layout rs (al_layout al)})
            (cs Semi.<> cs2), w)
 add_where _ _ _ = panic "add_where"
  -- EpaDelta should only be used for transformations
@@ -483,6 +483,12 @@ patch_anchor r1 (EpaSpan (RealSrcSpan r0 mb)) = EpaSpan (RealSrcSpan r mb)
   where
     r = if srcSpanStartLine r0 < 0 then r1 else r0
 patch_anchor _ (EpaSpan ss) = EpaSpan ss
+
+-- If the decl list for where binds is empty, the anchor ends up
+-- invalid. In this case, use the parent one
+patch_layout :: RealSrcSpan -> AnnListLayout -> AnnListLayout
+patch_layout r (AnnListLayout l) = AnnListLayout (patch_anchor r l)
+patch_layout _ lo = lo
 
 -- | The anchor for a stmtlist is based on either the location or
 -- the first semicolon annotion.
