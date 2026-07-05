@@ -2506,6 +2506,7 @@ fFlagsDeps = [
   flagSpec "cmm-static-pred"                  Opt_CmmStaticPred,
   flagSpec "cse"                              Opt_CSE,
   flagSpec "stg-cse"                          Opt_StgCSE,
+  flagSpec "stg-identity-updates"             Opt_StgIdentityUpdates,
   flagSpec "stg-lift-lams"                    Opt_StgLiftLams,
   flagSpec "cpr-anal"                         Opt_CprAnal,
   flagSpec "defer-diagnostics"                Opt_DeferDiagnostics,

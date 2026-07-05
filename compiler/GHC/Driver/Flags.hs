@@ -643,6 +643,7 @@ data GeneralFlag
    | Opt_StaticArgumentTransformation
    | Opt_CSE
    | Opt_StgCSE
+   | Opt_StgIdentityUpdates
    | Opt_StgLiftLams
    | Opt_LiberateCase
    | Opt_SpecConstr
@@ -919,6 +920,7 @@ optimisationFlags = EnumSet.fromList
    , Opt_PolymorphicSpecialisation
    , Opt_CSE
    , Opt_StgCSE
+   , Opt_StgIdentityUpdates
    , Opt_StgLiftLams
    , Opt_LiberateCase
    , Opt_SpecConstr

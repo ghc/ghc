@@ -41,6 +41,7 @@ getStgToDo for_bytecode dflags =
     -- Important that unarisation comes first
     -- See Note [StgCse after unarisation] in GHC.Stg.CSE
     , optional Opt_StgCSE StgCSE
+    , optional Opt_StgIdentityUpdates StgIdentityUpdate
     , optional Opt_StgLiftLams $ StgLiftLams $ initStgLiftConfig dflags
     , runWhen for_bytecode StgBcPrep
     , optional Opt_StgStats StgStats

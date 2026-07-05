@@ -1316,6 +1316,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_CmmStaticPred)
     , ([1,2],   Opt_CSE)
     , ([1,2],   Opt_StgCSE)
+    , ([1,2],   Opt_StgIdentityUpdates)
     , ([2],     Opt_StgLiftLams)
     , ([1,2],   Opt_CmmControlFlow)
 

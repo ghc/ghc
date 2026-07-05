@@ -435,6 +435,20 @@ as such you shouldn't need to set any of them explicitly. A flag
     intermediate language, where it is able to common up some subexpressions
     that differ in their types, but not their representation.
 
+.. ghc-flag:: -fstg-identity-updates
+    :shortdesc: Avoid allocation for record updates that turn out to be
+        identities at runtime. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-stg-identity-updates
+    :category:
+
+    :default: off but enabled by :ghc-flag:`-O`.
+
+    When a record update replaces a single field with a nullary constructor,
+    e.g. ``r { f = Nothing }``, emit a cheap pointer comparison and reuse the
+    old record when the field already contains that constructor, instead of
+    unconditionally allocating an updated copy.
+
 .. ghc-flag:: -fspec-eval
     :shortdesc: Enables speculative evaluation.
     :type: dynamic

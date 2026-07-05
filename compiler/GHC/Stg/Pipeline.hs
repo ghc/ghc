@@ -26,6 +26,7 @@ import GHC.Stg.FVs      ( depSortWithAnnotStgPgm )
 import GHC.Stg.Unarise  ( unarise )
 import GHC.Stg.BcPrep   ( bcPrep )
 import GHC.Stg.CSE      ( stgCse )
+import GHC.Stg.IdentityUpdate ( stgIdentityUpdates )
 import GHC.Stg.Lift     ( StgLiftConfig, stgLiftLams )
 import GHC.Unit.Module ( Module )
 
@@ -129,6 +130,11 @@ stg2stg logger extra_vars opts this_mod binds
             let binds' = {-# SCC "StgCse" #-} stgCse binds
             end_pass "StgCse" binds'
 
+          StgIdentityUpdate -> do
+            us <- getUniqueSupplyM
+            let binds' = {-# SCC "StgIdentityUpdate" #-} stgIdentityUpdates us binds
+            end_pass "StgIdentityUpdate" binds'
+
           StgLiftLams cfg -> do
             us <- getUniqueSupplyM
             --
@@ -166,6 +172,9 @@ stg2stg logger extra_vars opts this_mod binds
 data StgToDo
   = StgCSE
   -- ^ Common subexpression elimination
+  | StgIdentityUpdate
+  -- ^ Reuse scrutinees for identity record updates
+  -- See Note [Identity record updates] in GHC.Stg.IdentityUpdate
   | StgLiftLams StgLiftConfig
   -- ^ Lambda lifting closure variables, trading stack/register allocation for
   -- heap allocation

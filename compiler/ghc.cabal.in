@@ -736,6 +736,7 @@ Library
         GHC.Settings.IO
         GHC.Stg.BcPrep
         GHC.Stg.CSE
+        GHC.Stg.IdentityUpdate
         GHC.Stg.Debug
         GHC.Stg.EnforceEpt
         GHC.Stg.EnforceEpt.Rewrite
