@@ -70,7 +70,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (Nothing)
+         (AnnListNoLayout)
          (ListNone)
          []))
        (L
@@ -161,7 +161,7 @@
               (EpAnn
                (EpaSpan { <no location info> })
                (AnnList
-                (Just
+                (AnnListLayout
                  (EpaSpan { Test20297.hs:7:3-7 }))
                 (ListNone)
                 [])
@@ -201,7 +201,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (Nothing)
+         (AnnListNoLayout)
          (ListNone)
          []))
        (L
@@ -286,7 +286,7 @@
               (EpAnn
                (EpaSpan { Test20297.hs:(10,3)-(11,26) })
                (AnnList
-                (Just
+                (AnnListLayout
                  (EpaSpan { Test20297.hs:11:9-26 }))
                 (ListNone)
                 [])
@@ -324,7 +324,7 @@
                    ((,)
                     (FromSource)
                     (AnnList
-                     (Nothing)
+                     (AnnListNoLayout)
                      (ListNone)
                      []))
                    (L
@@ -396,7 +396,7 @@
                              ((,)
                               (Right
                                (AnnList
-                                (Just
+                                (AnnListLayout
                                  (EpaSpan { Test20297.hs:11:22-26 }))
                                 (ListNone)
                                 []))
@@ -513,7 +513,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (Nothing)
+         (AnnListNoLayout)
          (ListNone)
          []))
        (L
@@ -598,7 +598,7 @@
               (EpAnn
                (EpaSpan { <no location info> })
                (AnnList
-                (Just
+                (AnnListLayout
                  (EpaSpan { Test20297.ppr.hs:5:3-7 }))
                 (ListNone)
                 [])
@@ -632,7 +632,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (Nothing)
+         (AnnListNoLayout)
          (ListNone)
          []))
        (L
@@ -717,7 +717,7 @@
               (EpAnn
                (EpaSpan { Test20297.ppr.hs:(8,3)-(9,24) })
                (AnnList
-                (Just
+                (AnnListLayout
                  (EpaSpan { Test20297.ppr.hs:9:7-24 }))
                 (ListNone)
                 [])
@@ -749,7 +749,7 @@
                    ((,)
                     (FromSource)
                     (AnnList
-                     (Nothing)
+                     (AnnListNoLayout)
                      (ListNone)
                      []))
                    (L
@@ -821,7 +821,7 @@
                              ((,)
                               (Right
                                (AnnList
-                                (Just
+                                (AnnListLayout
                                  (EpaSpan { Test20297.ppr.hs:9:20-24 }))
                                 (ListNone)
                                 []))

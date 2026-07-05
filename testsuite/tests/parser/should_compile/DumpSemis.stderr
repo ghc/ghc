@@ -261,7 +261,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (Nothing)
+         (AnnListNoLayout)
          (ListNone)
          []))
        (L
@@ -333,7 +333,7 @@
                  ((,)
                   (Right
                    (AnnList
-                    (Just
+                    (AnnListLayout
                      (EpaSpan { DumpSemis.hs:(11,3)-(12,3) }))
                     (ListNone)
                     []))
@@ -364,7 +364,7 @@
                        ((,)
                         (Right
                          (AnnList
-                          (Just
+                          (AnnListLayout
                            (EpaSpan { DumpSemis.hs:11:8-13 }))
                           (ListBraces
                            (EpTok (EpaSpan { DumpSemis.hs:11:6 }))
@@ -555,7 +555,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (Nothing)
+         (AnnListNoLayout)
          (ListNone)
          []))
        (L
@@ -627,7 +627,7 @@
                  ((,)
                   (Right
                    (AnnList
-                    (Just
+                    (AnnListLayout
                      (EpaSpan { DumpSemis.hs:(16,5)-(18,5) }))
                     (ListBraces
                      (EpTok (EpaSpan { DumpSemis.hs:16:3 }))
@@ -808,7 +808,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (Nothing)
+         (AnnListNoLayout)
          (ListNone)
          []))
        (L
@@ -880,7 +880,7 @@
                  ((,)
                   (Right
                    (AnnList
-                    (Just
+                    (AnnListLayout
                      (EpaSpan { DumpSemis.hs:22:12-28 }))
                     (ListBraces
                      (EpTok (EpaSpan { DumpSemis.hs:22:10 }))
@@ -1017,7 +1017,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (Nothing)
+         (AnnListNoLayout)
          (ListNone)
          []))
        (L
@@ -1122,7 +1122,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (Nothing)
+         (AnnListNoLayout)
          (ListNone)
          []))
        (L
@@ -1229,7 +1229,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (Nothing)
+         (AnnListNoLayout)
          (ListNone)
          []))
        (L
@@ -1731,7 +1731,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (Nothing)
+         (AnnListNoLayout)
          (ListNone)
          []))
        (L
@@ -1857,7 +1857,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (Nothing)
+         (AnnListNoLayout)
          (ListNone)
          []))
        (L
@@ -1936,7 +1936,7 @@
                    (EpAnn
                     (EpaSpan { DumpSemis.hs:34:13-31 })
                     (AnnList
-                     (Just
+                     (AnnListLayout
                       (EpaSpan { DumpSemis.hs:34:18-30 }))
                      (ListBraces
                       (EpTok (EpaSpan { DumpSemis.hs:34:13 }))
@@ -1984,7 +1984,7 @@
                         ((,)
                          (FromSource)
                          (AnnList
-                          (Nothing)
+                          (AnnListNoLayout)
                           (ListNone)
                           []))
                         (L
@@ -2097,7 +2097,7 @@
                         ((,)
                          (FromSource)
                          (AnnList
-                          (Nothing)
+                          (AnnListNoLayout)
                           (ListNone)
                           []))
                         (L
@@ -2222,7 +2222,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (Nothing)
+         (AnnListNoLayout)
          (ListNone)
          []))
        (L
@@ -2333,7 +2333,7 @@
                   ((,)
                    (FromSource)
                    (AnnList
-                    (Just
+                    (AnnListLayout
                      (EpaSpan { DumpSemis.hs:(38,6)-(43,13) }))
                     (ListBraces
                      (EpTok (EpaSpan { DumpSemis.hs:38:4 }))
