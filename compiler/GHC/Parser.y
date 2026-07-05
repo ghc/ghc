@@ -1946,13 +1946,13 @@ binds   ::  { Located (HsLocalBinds GhcPs) }
         : decllist          {% do { let { (AnnList anc p s _ t, decls) = unLoc $1 }
                                   ; val_binds <- cvBindGroup (unLoc $ decls)
                                   ; !cs <- getCommentsFor (gl $1)
-                                  ; return (sL1 $1 $ HsValBinds (EpAnn (glR $1) (AnnList anc p s noAnn t) cs) val_binds)} }
+                                  ; return (sL1 $1 $ HsValBinds (EpAnn (glR $1) (AnnList anc p s noAnn t) cs, NoEpTok) val_binds)} }
 
         | '{'            dbinds '}'     {% acs (comb3 $1 $2 $3) (\loc cs -> (L loc
-                                             $ HsIPBinds (EpAnn (spanAsAnchor (comb3 $1 $2 $3)) (AnnList (Just$ glR $2) (ListBraces (epTok $1) (epTok $3)) [] noAnn []) cs) (IPBinds noExtField (reverse $ unLoc $2)))) }
+                                             $ HsIPBinds (EpAnn (spanAsAnchor (comb3 $1 $2 $3)) (AnnList (Just$ glR $2) (ListBraces (epTok $1) (epTok $3)) [] noAnn []) cs, NoEpTok) (IPBinds noExtField (reverse $ unLoc $2)))) }
 
         |     vocurly    dbinds close   {% acs (gl $2) (\loc cs -> (L loc
-                                             $ HsIPBinds (EpAnn (glR $1) (AnnList (Just $ glR $2) ListNone [] noAnn []) cs) (IPBinds noExtField (reverse $ unLoc $2)))) }
+                                             $ HsIPBinds (EpAnn (glR $1) (AnnList (Just $ glR $2) ListNone [] noAnn []) cs, NoEpTok) (IPBinds noExtField (reverse $ unLoc $2)))) }
 
 
 wherebinds :: { Maybe (Located (HsLocalBinds GhcPs, Maybe EpAnnComments )) }

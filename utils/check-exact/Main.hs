@@ -518,7 +518,7 @@ changeLocalDecls libdir (L l p) = do
       doAddLocal = everywhereM (mkM replaceLocalBinds) p
       replaceLocalBinds :: LMatch GhcPs (LHsExpr GhcPs)
                         -> Transform (LMatch GhcPs (LHsExpr GhcPs))
-      replaceLocalBinds (L lm (Match an mln pats (GRHSs _ rhs (HsValBinds van (ValBinds _ bs))))) = do
+      replaceLocalBinds (L lm (Match an mln pats (GRHSs _ rhs (HsValBinds (van,w) (ValBinds _ bs))))) = do
         let (oldDecls) = map unWrapValBind bs
         -- let decls = s:d:oldDecls
         let oldDecls' = captureLineSpacing oldDecls
@@ -526,7 +526,7 @@ changeLocalDecls libdir (L l p) = do
             o' = setEntryDP o (DifferentLine 2 0)
         let (EpAnn anc (AnnList (Just _) a b c dd) cs) = van
         let van' = (EpAnn anc (AnnList (Just (EpaDelta noSrcSpan (DifferentLine 1 4) [])) a b c dd) cs)
-        let binds' = (HsValBinds van'
+        let binds' = (HsValBinds (van',w)
                           (ValBinds noExtField (VbSig sig':VbBind decl':VbSig o':oldBinds)))
         return (L lm (Match an mln pats (GRHSs emptyComments rhs binds')))
                    `debug` ("oldDecls=" ++ showAst oldDecls)
@@ -550,12 +550,12 @@ changeLocalDecls2 libdir (L l p) = do
       replaceLocalBinds (L lm (Match ma mln pats (GRHSs _ rhs EmptyLocalBinds{}))) = do
         let anc = (EpaDelta noSrcSpan (DifferentLine 1 2) [])
         let anc2 = (EpaDelta noSrcSpan (DifferentLine 1 4) [])
-        let an = EpAnn anc
+        let an = (EpAnn anc
                         (AnnList (Just anc2) ListNone
                                  []
-                                 (EpTok (EpaDelta noSrcSpan (SameLine 0) []))
+                                 ()
                                  [])
-                        emptyComments
+                        emptyComments, EpTok (EpaDelta noSrcSpan (SameLine 0) []))
         let decls = [VbSig sig', VbBind decl']
         let binds = (HsValBinds an (ValBinds noExtField decls))
         return (L lm (Match ma mln pats (GRHSs emptyComments rhs binds)))

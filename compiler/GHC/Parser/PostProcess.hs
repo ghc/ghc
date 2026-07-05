@@ -459,19 +459,19 @@ fromSpecTyVarBndr (L loc (HsTvb xtv flag idp k)) = do
 -- | Add the annotation for a 'where' keyword to existing @HsLocalBinds@
 annBinds :: EpToken "where" -> EpAnnComments -> HsLocalBinds GhcPs
   -> (HsLocalBinds GhcPs, Maybe EpAnnComments)
-annBinds w cs (HsValBinds an bs)  = (HsValBinds (add_where w an cs) bs, Nothing)
-annBinds w cs (HsIPBinds an bs)   = (HsIPBinds (add_where w an cs) bs, Nothing)
+annBinds w cs (HsValBinds an bs)  = (HsValBinds (add_where w (fst an) cs) bs, Nothing)
+annBinds w cs (HsIPBinds an bs)   = (HsIPBinds (add_where w (fst an) cs) bs, Nothing)
 annBinds _ cs  (EmptyLocalBinds x) = (EmptyLocalBinds x, Just cs)
 
-add_where :: EpToken "where" -> EpAnn (AnnList (EpToken "where")) -> EpAnnComments -> EpAnn (AnnList (EpToken "where"))
+add_where :: EpToken "where" -> EpAnn (AnnList ()) -> EpAnnComments
+          -> (EpAnn (AnnList ()), EpToken "where")
 add_where w@(EpTok (EpaSpan (RealSrcSpan rs _))) (EpAnn a al cs) cs2
   | valid_anchor a
-  = EpAnn (widenAnchorT a w) (al { al_rest = w}) (cs Semi.<> cs2)
+  = (EpAnn (widenAnchorT a w) al (cs Semi.<> cs2), w)
   | otherwise
-  = EpAnn (patch_anchor rs a)
-          (al { al_anchor = (fmap (patch_anchor rs) (al_anchor al))
-              , al_rest = w})
-          (cs Semi.<> cs2)
+  = (EpAnn (patch_anchor rs a)
+           (al { al_anchor = (fmap (patch_anchor rs) (al_anchor al))})
+           (cs Semi.<> cs2), w)
 add_where _ _ _ = panic "add_where"
  -- EpaDelta should only be used for transformations
 
