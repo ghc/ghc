@@ -293,7 +293,11 @@
              []
              []))
            (L
-            (EpaSpan { <no location info> })
+            (EpAnn
+             (EpaSpan { <no location info> })
+             []
+             (EpaComments
+              []))
             [])
            (GRHSs
             (EpaComments
@@ -583,7 +587,11 @@
              []
              []))
            (L
-            (EpaSpan { <no location info> })
+            (EpAnn
+             (EpaSpan { <no location info> })
+             []
+             (EpaComments
+              []))
             [])
            (GRHSs
             (EpaComments
@@ -831,7 +839,11 @@
              []
              []))
            (L
-            (EpaSpan { <no location info> })
+            (EpAnn
+             (EpaSpan { <no location info> })
+             []
+             (EpaComments
+              []))
             [])
            (GRHSs
             (EpaComments
@@ -1036,7 +1048,11 @@
              []
              []))
            (L
-            (EpaSpan { <no location info> })
+            (EpAnn
+             (EpaSpan { <no location info> })
+             []
+             (EpaComments
+              []))
             [])
            (GRHSs
             (EpaComments
@@ -1138,7 +1154,11 @@
              []
              []))
            (L
-            (EpaSpan { <no location info> })
+            (EpAnn
+             (EpaSpan { <no location info> })
+             []
+             (EpaComments
+              []))
             [])
            (GRHSs
             (EpaComments
@@ -1242,7 +1262,11 @@
              []
              []))
            (L
-            (EpaSpan { <no location info> })
+            (EpAnn
+             (EpaSpan { <no location info> })
+             []
+             (EpaComments
+              []))
             [])
            (GRHSs
             (EpaComments
@@ -1730,7 +1754,11 @@
              []
              []))
            (L
-            (EpaSpan { DumpSemis.hs:32:3 })
+            (EpAnn
+             (EpaSpan { DumpSemis.hs:32:3 })
+             []
+             (EpaComments
+              []))
             [(L
               (EpAnn
                (EpaSpan { DumpSemis.hs:32:3 })
@@ -1853,7 +1881,11 @@
              []
              []))
            (L
-            (EpaSpan { <no location info> })
+            (EpAnn
+             (EpaSpan { <no location info> })
+             []
+             (EpaComments
+              []))
             [])
            (GRHSs
             (EpaComments
@@ -1976,7 +2008,11 @@
                               []
                               []))
                             (L
-                             (EpaSpan { <no location info> })
+                             (EpAnn
+                              (EpaSpan { <no location info> })
+                              []
+                              (EpaComments
+                               []))
                              [])
                             (GRHSs
                              (EpaComments
@@ -2086,7 +2122,11 @@
                               []
                               []))
                             (L
-                             (EpaSpan { <no location info> })
+                             (EpAnn
+                              (EpaSpan { <no location info> })
+                              []
+                              (EpaComments
+                               []))
                              [])
                             (GRHSs
                              (EpaComments
@@ -2208,7 +2248,11 @@
              []
              []))
            (L
-            (EpaSpan { DumpSemis.hs:36:5 })
+            (EpAnn
+             (EpaSpan { DumpSemis.hs:36:5 })
+             []
+             (EpaComments
+              []))
             [(L
               (EpAnn
                (EpaSpan { DumpSemis.hs:36:5 })
@@ -2311,7 +2355,11 @@
                       (NoExtField)
                       (CaseAlt)
                       (L
-                       (EpaSpan { DumpSemis.hs:39:6 })
+                       (EpAnn
+                        (EpaSpan { DumpSemis.hs:39:6 })
+                        []
+                        (EpaComments
+                         []))
                        [(L
                          (EpAnn
                           (EpaSpan { DumpSemis.hs:39:6 })
@@ -2383,7 +2431,11 @@
                       (NoExtField)
                       (CaseAlt)
                       (L
-                       (EpaSpan { DumpSemis.hs:40:6 })
+                       (EpAnn
+                        (EpaSpan { DumpSemis.hs:40:6 })
+                        []
+                        (EpaComments
+                         []))
                        [(L
                          (EpAnn
                           (EpaSpan { DumpSemis.hs:40:6 })
@@ -2458,7 +2510,11 @@
                       (NoExtField)
                       (CaseAlt)
                       (L
-                       (EpaSpan { DumpSemis.hs:41:6 })
+                       (EpAnn
+                        (EpaSpan { DumpSemis.hs:41:6 })
+                        []
+                        (EpaComments
+                         []))
                        [(L
                          (EpAnn
                           (EpaSpan { DumpSemis.hs:41:6 })
@@ -2536,7 +2592,11 @@
                       (NoExtField)
                       (CaseAlt)
                       (L
-                       (EpaSpan { DumpSemis.hs:42:6 })
+                       (EpAnn
+                        (EpaSpan { DumpSemis.hs:42:6 })
+                        []
+                        (EpaComments
+                         []))
                        [(L
                          (EpAnn
                           (EpaSpan { DumpSemis.hs:42:6 })

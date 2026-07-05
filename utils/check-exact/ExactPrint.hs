@@ -1428,15 +1428,6 @@ instance (ExactPrint a) => ExactPrint (Located a) where
 
   exact (L l a) = L l <$> markAnnotated a
 
-instance (ExactPrint a) => ExactPrint (LocatedE a) where
-  getAnnotationEntry (L l _) = Entry l [] emptyComments NoFlushComments CanUpdateAnchorOnly
-  setAnnotationAnchor (L _ a) anc _ts _cs = L anc a
-
-  exact (L la a) = do
-    debugM $ "LocatedE a:la loc=" ++ show (ss2range $ locA la)
-    a' <- markAnnotated a
-    return (L la a')
-
 instance (ExactPrint a) => ExactPrint (LocatedA a) where
   getAnnotationEntry = entryFromLocatedA
   setAnnotationAnchor la anc ts cs = setAnchorAn la anc ts cs

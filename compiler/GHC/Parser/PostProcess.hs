@@ -1518,7 +1518,7 @@ checkFunBind :: SrcSpan
              -> AnnFunRhs
              -> LocatedN RdrName
              -> LexicalFixity
-             -> LocatedE [LocatedA (PatBuilder GhcPs)]
+             -> LocatedA [LocatedA (PatBuilder GhcPs)]
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> P (HsBind GhcPs)
 checkFunBind locF ann_fun (L lf fun) is_infix (L lp pats) (L _ grhss)

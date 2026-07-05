@@ -28,7 +28,7 @@ module GHC.Parser.Annotation (
 
   -- ** Annotations in 'GenLocated'
   LocatedA, LocatedN, LocatedAn,
-  LocatedE, LocatedBF,
+  LocatedBF,
   SrcSpanAnnA, SrcSpanAnnN,
   SrcSpanAnnBF,
 
@@ -442,8 +442,6 @@ type SrcSpanAnnN = EpAnn NameAnn
 
 type SrcSpanAnnBF = EpAnn AnnBooleanFormula
 
-type LocatedE = GenLocated EpaLocation
-
 -- | General representation of a 'GenLocated' type carrying a
 -- parameterised annotation type.
 type LocatedAn an = GenLocated (EpAnn an)
@@ -815,8 +813,8 @@ widenSpanT :: SrcSpan -> EpToken tok -> SrcSpan
 widenSpanT l (EpTok loc) = widenSpanL l [loc]
 widenSpanT l NoEpTok = l
 
-listLocation :: [LocatedAn an a] -> EpaLocation
-listLocation as = EpaSpan (go noSrcSpan as)
+listLocation :: [LocatedAn an a] -> SrcSpanAnnA
+listLocation as = EpAnn (EpaSpan (go noSrcSpan as)) noAnn emptyComments
   where
     combine l r = combineSrcSpans l r
 

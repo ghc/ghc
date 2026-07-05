@@ -2661,7 +2661,7 @@ type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p))))
 type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))] = SrcSpanAnnA
 type instance Anno (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpanAnnA
 type instance Anno (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpanAnnA
-type instance Anno [LocatedA (Pat (GhcPass p))] = EpaLocation
+type instance Anno [LocatedA (Pat (GhcPass p))] = SrcSpanAnnA
 type instance Anno (GRHS (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = EpAnnCO
 type instance Anno (GRHS (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = EpAnnCO
 type instance Anno (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr)))) = SrcSpanAnnA
