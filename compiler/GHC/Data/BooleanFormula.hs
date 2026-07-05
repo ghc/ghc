@@ -27,7 +27,7 @@ import GHC.Types.SrcLoc (unLoc)
 import GHC.Utils.Outputable
 import GHC.Parser.Annotation ( SrcSpanAnnBF )
 import GHC.Hs.Extension (GhcPass (..), OutputableBndrId)
-import Language.Haskell.Syntax.Extension (Anno, LIdP, IdP)
+import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.BooleanFormula
 
 
@@ -36,6 +36,17 @@ import Language.Haskell.Syntax.BooleanFormula
 ----------------------------------------------------------------------
 
 type instance Anno (BooleanFormula (GhcPass p)) = SrcSpanAnnBF
+
+type instance XBFVar           (GhcPass _) = NoExtField
+type instance XBFAnd           (GhcPass _) = NoExtField
+type instance XBFOr            (GhcPass _) = NoExtField
+type instance XBFParens        (GhcPass _) = NoExtField
+type instance XXBooleanFormula (GhcPass _) = DataConCantHappen
+
+instance BooleanFormulaDefault (GhcPass p) where
+  bfAnnAnd = noExtField
+  bfAnnOr = noExtField
+
 
 -- if we had Functor/Traversable (LbooleanFormula p) we could use that
 -- as a constraint and we wouldn't need to specialize to just GhcPass p,
@@ -49,10 +60,10 @@ bfMap :: (LIdP (GhcPass p) -> LIdP (GhcPass p'))
       -> BooleanFormula (GhcPass p) -> BooleanFormula (GhcPass p')
 bfMap f = go
   where
-    go (Var    a  ) = Var     $ f a
-    go (And    bfs) = And     $ map (fmap go) bfs
-    go (Or     bfs) = Or      $ map (fmap go) bfs
-    go (Parens bf ) = Parens  $ fmap go bf
+    go (Var    x a  ) = Var    x $ f a
+    go (And    x bfs) = And    x $ map (fmap go) bfs
+    go (Or     x bfs) = Or     x $ map (fmap go) bfs
+    go (Parens x bf ) = Parens x $ fmap go bf
 
 bfTraverse  :: Applicative f
             => (LIdP (GhcPass p) -> f (LIdP (GhcPass p')))
@@ -60,10 +71,10 @@ bfTraverse  :: Applicative f
             -> f (BooleanFormula (GhcPass p'))
 bfTraverse f = go
   where
-    go (Var    a  ) = Var    <$> f a
-    go (And    bfs) = And    <$> traverse @[] (traverse go) bfs
-    go (Or     bfs) = Or     <$> traverse @[] (traverse go) bfs
-    go (Parens bf ) = Parens <$> traverse go bf
+    go (Var    x a  ) = Var    x <$> f a
+    go (And    x bfs) = And    x <$> traverse @[] (traverse go) bfs
+    go (Or     x bfs) = Or     x <$> traverse @[] (traverse go) bfs
+    go (Parens x bf ) = Parens x <$> traverse go bf
 
 
 
@@ -106,18 +117,18 @@ We don't show a ridiculous error message like
 ----------------------------------------------------------------------
 
 isFalse :: BooleanFormula (GhcPass p) -> Bool
-isFalse (Or []) = True
+isFalse (Or _ []) = True
 isFalse _ = False
 
 isTrue :: BooleanFormula (GhcPass p) -> Bool
-isTrue (And []) = True
+isTrue (And _ []) = True
 isTrue _ = False
 
 eval :: (LIdP (GhcPass p) -> Bool) -> BooleanFormula (GhcPass p) -> Bool
-eval f (Var x)  = f x
-eval f (And xs) = all (eval f . unLoc) xs
-eval f (Or xs)  = any (eval f . unLoc) xs
-eval f (Parens x) = eval f (unLoc x)
+eval f (Var _ x)    = f x
+eval f (And _ xs)   = all (eval f . unLoc) xs
+eval f (Or  _ xs)   = any (eval f . unLoc) xs
+eval f (Parens _ x) = eval f (unLoc x)
 
 -- Simplify a boolean formula.
 -- The argument function should give the truth of the atoms, or Nothing if undecided.
@@ -125,12 +136,12 @@ simplify :: forall p. Eq (LIdP (GhcPass p))
           => (LIdP (GhcPass p) ->  Maybe Bool)
           -> BooleanFormula (GhcPass p)
           -> BooleanFormula (GhcPass p)
-simplify f (Var a) = case f a of
-  Nothing -> Var a
+simplify f (Var x a) = case f a of
+  Nothing -> Var x a
   Just b  -> mkBool b
-simplify f (And xs) = mkAnd (map (fmap (simplify f)) xs)
-simplify f (Or xs)  = mkOr  (map (fmap (simplify f)) xs)
-simplify f (Parens x) = simplify f (unLoc x)
+simplify f (And _ xs) = mkAnd (map (fmap (simplify f)) xs)
+simplify f (Or _ xs)  = mkOr  (map (fmap (simplify f)) xs)
+simplify f (Parens _ x) = simplify f (unLoc x)
 
 -- Test if a boolean formula is satisfied when the given values are assigned to the atoms
 -- if it is, returns Nothing
@@ -152,11 +163,11 @@ isUnsatisfied f bf
 
 -- If the boolean formula holds, does that mean that the given atom is always true?
 impliesAtom :: Eq (IdP (GhcPass p)) => BooleanFormula (GhcPass p) -> LIdP (GhcPass p) -> Bool
-Var x  `impliesAtom` y = (unLoc x) == (unLoc y)
-And xs `impliesAtom` y = any (\x -> unLoc x `impliesAtom` y) xs
-           -- we have all of xs, so one of them implying y is enough
-Or  xs `impliesAtom` y = all (\x -> unLoc x `impliesAtom` y) xs
-Parens x `impliesAtom` y = unLoc x `impliesAtom` y
+Var _ x  `impliesAtom` y = (unLoc x) == (unLoc y)
+And _ xs `impliesAtom` y = any (\x -> unLoc x `impliesAtom` y) xs
+             -- we have all of xs, so one of them implying y is enough
+Or _ xs `impliesAtom` y = all (\x -> unLoc x `impliesAtom` y) xs
+Parens _ x `impliesAtom` y = unLoc x `impliesAtom` y
 
 implies :: (Uniquable (IdP (GhcPass p))) => BooleanFormula (GhcPass p) -> BooleanFormula (GhcPass p) -> Bool
 implies e1 e2 = go (Clause emptyUniqSet [e1]) (Clause emptyUniqSet [e2])
@@ -164,18 +175,18 @@ implies e1 e2 = go (Clause emptyUniqSet [e1]) (Clause emptyUniqSet [e2])
     go :: Uniquable (IdP (GhcPass p)) => Clause (GhcPass p) -> Clause (GhcPass p) -> Bool
     go l@Clause{ clauseExprs = hyp:hyps } r =
         case hyp of
-            Var x | memberClauseAtoms (unLoc x) r -> True
-                  | otherwise -> go (extendClauseAtoms l (unLoc x)) { clauseExprs = hyps } r
-            Parens hyp' -> go l { clauseExprs = unLoc hyp':hyps }     r
-            And hyps'  -> go l { clauseExprs = map unLoc hyps' ++ hyps } r
-            Or hyps'   -> all (\hyp' -> go l { clauseExprs = unLoc hyp':hyps } r) hyps'
+            Var _ x | memberClauseAtoms (unLoc x) r -> True
+                    | otherwise -> go (extendClauseAtoms l (unLoc x)) { clauseExprs = hyps } r
+            Parens _ hyp' -> go l { clauseExprs = unLoc hyp':hyps }     r
+            And _ hyps'  -> go l { clauseExprs = map unLoc hyps' ++ hyps } r
+            Or _ hyps'   -> all (\hyp' -> go l { clauseExprs = unLoc hyp':hyps } r) hyps'
     go l r@Clause{ clauseExprs = con:cons } =
         case con of
-            Var x | memberClauseAtoms (unLoc x) l -> True
-                  | otherwise -> go l (extendClauseAtoms r (unLoc x)) { clauseExprs = cons }
-            Parens con' -> go l r { clauseExprs = unLoc con':cons }
-            And cons'   -> all (\con' -> go l r { clauseExprs = unLoc con':cons }) cons'
-            Or cons'    -> go l r { clauseExprs = map unLoc cons' ++ cons }
+            Var _ x | memberClauseAtoms (unLoc x) l -> True
+                    | otherwise -> go l (extendClauseAtoms r (unLoc x)) { clauseExprs = cons }
+            Parens _ con' -> go l r { clauseExprs = unLoc con':cons }
+            And _ cons'   -> all (\con' -> go l r { clauseExprs = unLoc con':cons }) cons'
+            Or _ cons'    -> go l r { clauseExprs = map unLoc cons' ++ cons }
     go _ _ = False
 
 -- A small sequent calculus proof engine.
@@ -201,12 +212,12 @@ pprBooleanFormula'  :: (Rational -> LIdP (GhcPass p) -> SDoc)
                     -> Rational -> BooleanFormula (GhcPass p) -> SDoc
 pprBooleanFormula' pprVar pprAnd pprOr = go
   where
-  go p (Var x)  = pprVar p x
-  go p (And []) = cparen (p > 0) empty
-  go p (And xs) = pprAnd p (map (go 3 . unLoc) xs)
-  go _ (Or  []) = keyword $ text "FALSE"
-  go p (Or  xs) = pprOr p (map (go 2 . unLoc) xs)
-  go p (Parens x) = go p (unLoc x)
+  go p (Var _ x)  = pprVar p x
+  go p (And _ []) = cparen (p > 0) empty
+  go p (And _ xs) = pprAnd p (map (go 3 . unLoc) xs)
+  go _ (Or  _ []) = keyword $ text "FALSE"
+  go p (Or  _ xs) = pprOr p (map (go 2 . unLoc) xs)
+  go p (Parens _ x) = go p (unLoc x)
 
 -- Pretty print in source syntax, "a | b | c,d,e"
 pprBooleanFormula :: (Rational -> LIdP (GhcPass p) -> SDoc)
@@ -233,8 +244,9 @@ instance OutputableBndrId p => Outputable (BooleanFormula (GhcPass p)) where
 pprBooleanFormulaNormal :: OutputableBndrId p => BooleanFormula (GhcPass p) -> SDoc
 pprBooleanFormulaNormal = go
   where
-    go (Var x)    = pprPrefixOcc (unLoc x)
-    go (And xs)   = fsep $ punctuate comma (map (go . unLoc) xs)
-    go (Or [])    = keyword $ text "FALSE"
-    go (Or xs)    = fsep $ intersperse vbar (map (go . unLoc) xs)
-    go (Parens x) = parens (go $ unLoc x)
+    go (Var _ x)    = pprPrefixOcc (unLoc x)
+    go (And _ xs)   = fsep $ punctuate comma (map (go . unLoc) xs)
+    go (Or _ [])    = keyword $ text "FALSE"
+    go (Or _ xs)    = fsep $ intersperse vbar (map (go . unLoc) xs)
+    go (Parens _ x) = parens (go $ unLoc x)
+    go (XBooleanFormula _) = text "XBooleanFormula"

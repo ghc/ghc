@@ -41,6 +41,7 @@ import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
 import GHC.Utils.Outputable
+import GHC.Data.BooleanFormula () -- for BooleanFormulaDefault instance
 import Language.Haskell.Syntax.BooleanFormula ( BooleanFormula, mkTrue )
 
 import qualified Data.Data as Data

@@ -3819,11 +3819,11 @@ name_boolformula :: { LBooleanFormula GhcPs }
         : name_boolformula_and      { $1 }
         | name_boolformula_and '|' name_boolformula
                            {% do { h <- addTrailingVbarBF $1 (epTok $2)
-                                 ; return (sLLa $1 $> (Or [h,$3])) } }
+                                 ; return (sLLa $1 $> (Or noExtField [h,$3])) } }
 
 name_boolformula_and :: { LBooleanFormula GhcPs }
         : name_boolformula_and_list
-                  { sLLa (head $1) (last $1) (And (toList $1)) }
+                  { sLLa (head $1) (last $1) (And noExtField (toList $1)) }
 
 name_boolformula_and_list :: { NonEmpty (LBooleanFormula GhcPs) }
         : name_boolformula_atom                               { NE.singleton $1 }
@@ -3832,9 +3832,9 @@ name_boolformula_and_list :: { NonEmpty (LBooleanFormula GhcPs) }
                   ; return (h NE.<| $3) } }
 
 name_boolformula_atom :: { LBooleanFormula GhcPs }
-        : '(' name_boolformula ')'  {% amsr (sLL $1 $> (Parens $2))
+        : '(' name_boolformula ')'  {% amsr (sLL $1 $> (Parens noExtField $2))
                                             (AnnBooleanFormula (epTok $1) (epTok $3) [])  }
-        | name_var                  { sL1a $1 (Var $1) }
+        | name_var                  { sL1a $1 (Var noExtField $1) }
 
 namelist :: { Located [LocatedN RdrName] }
 namelist : name_var              { sL1 $1 [$1] }
