@@ -71,7 +71,11 @@ elimCommonBlocksWith :: (Label -> Label -> Bool) -> CmmGraph -> CmmGraph
 elimCommonBlocksWith ok_to_merge g =
     replaceLabels env $ copyTicks env g
   where
-     env = iterate ok_to_merge mapEmpty blocks_with_key
+     -- The entry block must never be eliminated: its label is the
+     -- procedure's externally visible symbol.  (It may still absorb
+     -- duplicates as the surviving block.)
+     ok_to_merge' l1 l2 = l1 /= g_entry g && ok_to_merge l1 l2
+     env = iterate ok_to_merge' mapEmpty blocks_with_key
      -- The order of blocks doesn't matter here. While we could use
      -- revPostorder which drops unreachable blocks this is done in
      -- ContFlowOpt already which runs before this pass. So we use

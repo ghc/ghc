@@ -366,6 +366,12 @@ Wrinkles:
 * Merging can drop return-point labels, so the call proc-point set is
   recomputed before CAF analysis and attachContInfoTables.
 
+* The graph's entry block must never be the eliminated side of a merge: its
+  label is the procedure's externally visible symbol.  Post-layout blocks are
+  bare enough that this genuinely happens (observed on nofib's real/veritas,
+  producing undefined symbol references at link time).
+  elimCommonBlocksWith enforces this for every CBE run.
+
 * We don't run the pass when splitting proc points (unregisterised or
   non-TNTC backends): merging blocks reachable from different proc points
   breaks splitAtProcPoints' invariant that each block is reachable from
