@@ -3818,7 +3818,7 @@ name_boolformula_opt :: { LBooleanFormula GhcPs }
 name_boolformula :: { LBooleanFormula GhcPs }
         : name_boolformula_and      { $1 }
         | name_boolformula_and '|' name_boolformula
-                           {% do { h <- addTrailingVbarBF $1 (epTok $2)
+                           {% do { h <- addTrailingVbarA $1 (epTok $2)
                                  ; return (sLLa $1 $> (Or noExtField [h,$3])) } }
 
 name_boolformula_and :: { LBooleanFormula GhcPs }
@@ -3828,12 +3828,11 @@ name_boolformula_and :: { LBooleanFormula GhcPs }
 name_boolformula_and_list :: { NonEmpty (LBooleanFormula GhcPs) }
         : name_boolformula_atom                               { NE.singleton $1 }
         | name_boolformula_atom ',' name_boolformula_and_list
-            {% do { h <- addTrailingCommaBF $1 (epTok $2)
+            {% do { h <- addTrailingCommaA $1 (epTok $2)
                   ; return (h NE.<| $3) } }
 
 name_boolformula_atom :: { LBooleanFormula GhcPs }
-        : '(' name_boolformula ')'  {% amsr (sLL $1 $> (Parens noExtField $2))
-                                            (AnnBooleanFormula (epTok $1) (epTok $3) [])  }
+        : '(' name_boolformula ')'  {% amsA' (sLL $1 $> (Parens (epTok $1, epTok $3) $2)) }
         | name_var                  { sL1a $1 (Var noExtField $1) }
 
 namelist :: { Located [LocatedN RdrName] }
@@ -4788,20 +4787,6 @@ addTrailingAnnA (L anns a) tok ta = do
     anns' = if isZeroWidthSpan (getHasLoc tok)
               then anns
               else addTrailingAnnToA (ta tok) cs anns
-  return (L anns' a)
-
--- -------------------------------------
-
-addTrailingVbarBF :: MonadP m => LocatedBF a -> EpToken "|" -> m (LocatedBF a)
-addTrailingVbarBF  la tok = addTrailingAnnBF la (AddVbarAnn tok)
-
-addTrailingCommaBF :: MonadP m => LocatedBF a -> EpToken "," -> m (LocatedBF a)
-addTrailingCommaBF  la tok = addTrailingAnnBF la (AddCommaAnn tok)
-
-addTrailingAnnBF :: MonadP m => LocatedBF a -> TrailingAnn -> m (LocatedBF a)
-addTrailingAnnBF (L anns a) ta = do
-  !cs <- getCommentsFor (locA anns)
-  let anns' = addTrailingAnnToBF ta cs anns
   return (L anns' a)
 
 -- -------------------------------------

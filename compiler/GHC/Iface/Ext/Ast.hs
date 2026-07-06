@@ -2080,7 +2080,7 @@ instance ToHie PendingRnSplice where
   toHie (PendingRnSplice _ e) = toHie e
 
 instance (HiePass p, Data (IdGhcP p))
-  => ToHie (GenLocated SrcSpanAnnBF (BooleanFormula (GhcPass p))) where
+  => ToHie (GenLocated SrcSpanAnnA (BooleanFormula (GhcPass p))) where
     toHie (L span form) =  concatM $ makeNode form (locA span) : case form of
       Var _ a ->
         [ toHie $ C Use a

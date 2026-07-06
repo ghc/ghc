@@ -97,7 +97,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `ext2Q` located
               `extQ` srcSpanAnnA
               `extQ` srcSpanAnnN
-              `extQ` srcSpanAnnBF
 
       where generic :: Data a => a -> SDoc
             generic t = parens $ text (showConstr (toConstr t))
@@ -395,10 +394,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             srcSpanAnnN :: EpAnn NameAnn -> SDoc
             srcSpanAnnN = locatedAnn'' (text "SrcSpanAnnN")
-
-            srcSpanAnnBF :: EpAnn AnnBooleanFormula -> SDoc
-            srcSpanAnnBF = locatedAnn'' (text "SrcSpanAnnBF")
-
 
             locatedAnn'' :: forall a. (Typeable a, Data a)
               => SDoc -> EpAnn a -> SDoc

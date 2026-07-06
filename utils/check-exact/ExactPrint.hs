@@ -357,10 +357,6 @@ instance HasTrailing (EpToken "{", EpToken "}") where
   trailing _ = []
   setTrailing a _ = a
 
-instance HasTrailing (AnnBooleanFormula) where
-  trailing bf = abf_trailing bf
-  setTrailing a ts = a { abf_trailing = ts }
-
 -- ---------------------------------------------------------------------
 
 fromAnn' :: (HasEntry a) => a -> Entry
@@ -2735,9 +2731,11 @@ instance ExactPrint (BF.BooleanFormula GhcPs) where
   exact (BF.And e ls) = do
     ls' <- mapM markAnnotated ls
     return (BF.And e ls')
-  exact (BF.Parens e x)  = do
+  exact (BF.Parens (o,c) x)  = do
+    o' <- markEpToken o
     x' <- markAnnotated x
-    return (BF.Parens e x')
+    c' <- markEpToken c
+    return (BF.Parens (o',c') x')
 
 -- ---------------------------------------------------------------------
 
@@ -4477,17 +4475,6 @@ instance ExactPrint [LocatedA (StmtLR GhcPs GhcPs (LocatedA (HsCmd GhcPs)))] whe
       _ -> do
         stmts' <- markAnnotated stmts
         return stmts'
-
-instance ExactPrint (LocatedBF (BF.BooleanFormula GhcPs)) where
-  getAnnotationEntry = entryFromLocatedA
-  setAnnotationAnchor = setAnchorAn
-  exact (L an bf) = do
-    debugM $ "LocatedCB [LBooleanFormula"
-    let (AnnBooleanFormula op cp ta) = anns an
-    op' <- markEpToken op
-    bf' <- markAnnotated bf
-    cp' <- markEpToken cp
-    return (L (an {anns = AnnBooleanFormula op' cp' ta}) bf')
 
 instance ExactPrint [Located HsDocStringChunk] where
   getAnnotationEntry _ = NoEntryVal

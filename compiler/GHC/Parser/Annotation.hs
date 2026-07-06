@@ -28,23 +28,19 @@ module GHC.Parser.Annotation (
 
   -- ** Annotations in 'GenLocated'
   LocatedA, LocatedN, LocatedAn,
-  LocatedBF,
   SrcSpanAnnA, SrcSpanAnnN,
-  SrcSpanAnnBF,
 
   -- ** Annotation data types used in 'GenLocated'
 
   AnnList(..), AnnListBrackets(..),
   AnnParen(..),
   AnnPragma(..),
-  AnnBooleanFormula(..),
   NameAnn(..), NameAdornment(..),
   NoEpAnns(..),
 
   -- ** Trailing annotations in lists
   TrailingAnn(..), ta_location,
   addTrailingAnnToA, addTrailingAnnToL, addTrailingCommaToN,
-  addTrailingAnnToBF,
   noTrailingN,
 
   -- ** Utilities for converting between different 'GenLocated' when
@@ -430,8 +426,6 @@ emptyComments = EpaComments []
 type LocatedA = GenLocated SrcSpanAnnA
 type LocatedN = GenLocated SrcSpanAnnN
 
-type LocatedBF = GenLocated SrcSpanAnnBF
-
 -- | Annotation for items appearing in a list. They can have one or
 -- more trailing punctuations items, such as commas or semicolons.
 type SrcSpanAnnA = EpAnn [TrailingAnn]
@@ -439,8 +433,6 @@ type SrcSpanAnnA = EpAnn [TrailingAnn]
 -- | Annotation for a RdrName / Name. They can have adornments depending
 -- on the context, such as backticks.
 type SrcSpanAnnN = EpAnn NameAnn
-
-type SrcSpanAnnBF = EpAnn AnnBooleanFormula
 
 -- | General representation of a 'GenLocated' type carrying a
 -- parameterised annotation type.
@@ -545,17 +537,6 @@ data AnnParen
   deriving Data
 
 -- ---------------------------------------------------------------------
--- | Exact print annotation for the 'BooleanFormula' data type.
-
-data AnnBooleanFormula
-  = AnnBooleanFormula {
-      abf_open      :: (EpToken "("), -- ^ opening parenthesis.
-      abf_close     :: (EpToken ")"), -- ^ closing parenthesis.
-      abf_trailing  :: ![TrailingAnn] -- ^ items appearing after the
-                                      -- item, such as '|', ','
-      } deriving (Data,Eq)
-
--- ---------------------------------------------------------------------
 -- Annotations for names
 -- ---------------------------------------------------------------------
 
@@ -646,14 +627,6 @@ addTrailingAnnToL t cs n = n { anns = addTrailing (anns n)
   where
     -- See Note [list append in addTrailing*]
     addTrailing n = n { al_trailing = al_trailing n ++ [t]}
-
-addTrailingAnnToBF :: TrailingAnn -> EpAnnComments
-                  -> EpAnn AnnBooleanFormula -> EpAnn AnnBooleanFormula
-addTrailingAnnToBF t cs n = n { anns = addTrailing (anns n)
-                              , comments = comments n <> cs }
-  where
-    -- See Note [list append in addTrailing*]
-    addTrailing n = n { abf_trailing = abf_trailing n ++ [t]}
 
 -- | Helper function used in the parser to add a 'TrailingAnn' items
 -- to an existing annotation.
@@ -1007,9 +980,6 @@ instance (NoAnn ann) => NoAnn (EpAnn ann) where
 
 instance NoAnn NoEpAnns where
   noAnn = NoEpAnns
-
-instance NoAnn AnnBooleanFormula where
-  noAnn = AnnBooleanFormula noAnn noAnn []
 
 instance NoAnn AnnList where
   noAnn = AnnList Nothing ListNone noAnn []

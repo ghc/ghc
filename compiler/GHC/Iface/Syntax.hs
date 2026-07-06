@@ -1323,7 +1323,7 @@ pprIfaceDecl ss decl@(IfaceClass { ifName  = clas
       fromIfaceBooleanFormula (IfVar nm   ) = Var    noExtField $ noLocA . mkUnboundName . mkVarOccFS . ifLclNameFS $ nm
       fromIfaceBooleanFormula (IfAnd bfs  ) = And    noExtField $ map (noLocA . fromIfaceBooleanFormula) bfs
       fromIfaceBooleanFormula (IfOr bfs   ) = Or     noExtField $ map (noLocA . fromIfaceBooleanFormula) bfs
-      fromIfaceBooleanFormula (IfParens bf) = Parens noExtField $     (noLocA . fromIfaceBooleanFormula) bf
+      fromIfaceBooleanFormula (IfParens bf) = Parens noAnn      $     (noLocA . fromIfaceBooleanFormula) bf
 
 
       -- See Note [Suppressing binder signatures] in GHC.Iface.Type
