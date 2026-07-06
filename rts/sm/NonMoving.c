@@ -597,6 +597,8 @@ static void nonmovingExitConcurrentWorker(void);
 void nonmovingPushFreeSegment(struct NonmovingSegment *seg)
 {
     SET_SEGMENT_STATE(seg, FREE);
+    __asan_poison_memory_region(seg->bitmap,
+        (uintptr_t)seg + NONMOVING_SEGMENT_SIZE - (uintptr_t)seg->bitmap);
     while (true) {
         struct NonmovingSegment *old = nonmovingHeap.free;
         seg->link = old;

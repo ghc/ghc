@@ -118,6 +118,8 @@ static void nonmovingClearBitmap(struct NonmovingSegment *seg)
 static void nonmovingInitSegment(struct NonmovingSegment *seg, uint16_t allocator_idx)
 {
     bdescr *bd = Bdescr((P_) seg);
+    __asan_unpoison_memory_region(seg->bitmap,
+        (uintptr_t)seg + NONMOVING_SEGMENT_SIZE - (uintptr_t)seg->bitmap);
     seg->link = NULL;
     seg->todo_link = NULL;
     seg->next_free = 0;
@@ -126,6 +128,8 @@ static void nonmovingInitSegment(struct NonmovingSegment *seg, uint16_t allocato
     bd->nonmoving_segment.next_free_snap = 0;
     bd->u.scan = nonmovingSegmentGetBlock(seg, 0);
     nonmovingClearBitmap(seg);
+    __asan_poison_memory_region(bd->u.scan,
+        (uintptr_t)seg + NONMOVING_SEGMENT_SIZE - (uintptr_t)bd->u.scan);
 }
 
 /* Initialize a new capability. Must hold SM_LOCK. */
@@ -229,6 +233,7 @@ static void *nonmovingAllocate_(enum AllocLockMode mode, Capability *cap, StgWor
     unsigned int block_count = nonmovingSegmentBlockCount(current);
     void *ret = nonmovingSegmentGetBlock_(current, block_size, block_count, current->next_free);
     ASSERT(GET_CLOSURE_TAG(ret) == 0); // check alignment
+    __asan_unpoison_memory_region(ret, block_size);
 
     // Advance the current segment's next_free or allocate a new segment if full
     bool full = advance_next_free(current, block_count);

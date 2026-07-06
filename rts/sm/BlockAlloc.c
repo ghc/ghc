@@ -241,6 +241,9 @@ tail_of (bdescr *bd)
 STATIC_INLINE void
 initGroup(bdescr *head)
 {
+  __asan_unpoison_memory_region(head,
+      stg_min((W_)head->blocks, (W_)BLOCKS_PER_MBLOCK) * sizeof(bdescr));
+
   head->free   = head->start;
   head->link   = NULL;
 
@@ -310,6 +313,7 @@ setup_tail (bdescr *bd)
     bdescr *tail;
     tail = tail_of(bd);
     if (tail != bd) {
+        __asan_unpoison_memory_region(tail, sizeof(bdescr));
         tail->blocks = 0;
         tail->free = 0;
         tail->link = bd;
@@ -327,6 +331,7 @@ split_free_block (bdescr *bd, uint32_t node, W_ n, uint32_t ln /* log_2_ceil(n) 
     ASSERT(bd->blocks > n);
     dbl_link_remove(bd, &free_list[node][ln]);
     fg = bd + bd->blocks - n; // take n blocks off the end
+    __asan_unpoison_memory_region(fg, sizeof(bdescr));
     fg->blocks = n;
     bd->blocks -= n;
     setup_tail(bd);
@@ -476,6 +481,7 @@ alloc_mega_group (uint32_t node, StgWord mblocks)
         bd = alloc_mega_group_from_free_list(&deferred_free_mblock_list[node], n, &best);
         if(bd)
         {
+            __asan_unpoison_memory_region(MBLOCK_ROUND_DOWN(bd), FIRST_BLOCK_OFF);
             __asan_unpoison_memory_region(bd->start, (W_)bd->blocks * BLOCK_SIZE);
             return bd;
         }
@@ -493,6 +499,7 @@ alloc_mega_group (uint32_t node, StgWord mblocks)
 
     if (bd)
     {
+        __asan_unpoison_memory_region(MBLOCK_ROUND_DOWN(bd), FIRST_BLOCK_OFF);
         __asan_unpoison_memory_region(bd->start, (W_)bd->blocks * BLOCK_SIZE);
         return bd;
     }
@@ -887,6 +894,9 @@ free_mega_group (bdescr *mg)
     }
 
     __asan_poison_memory_region(mg->start, (W_)mg->blocks * BLOCK_SIZE);
+    // Only the head bdescr of a free mega group carries meaning; poison the
+    // rest of the first mblock's descriptor area.
+    __asan_poison_memory_region(mg + 1, ((W_)BLOCKS_PER_MBLOCK - 1) * sizeof(bdescr));
 }
 
 static void
@@ -935,6 +945,7 @@ free_deferred_mega_groups (uint32_t node)
         coalesce_mblocks(mg);
 
         __asan_poison_memory_region(mg->start, (W_)mg->blocks * BLOCK_SIZE);
+        __asan_poison_memory_region(mg + 1, ((W_)BLOCKS_PER_MBLOCK - 1) * sizeof(bdescr));
 
         // initialize search for next round
         prev = mg;
@@ -988,7 +999,9 @@ freeGroup(bdescr *p)
   RELAXED_STORE(&p->gen, NULL);
   RELAXED_STORE(&p->gen_no, 0);
   /* fill the block group with garbage if sanity checking is on */
-  IF_DEBUG(zero_on_gc, memset(p->start, 0xaa, (W_)p->blocks * BLOCK_SIZE));
+  IF_DEBUG(zero_on_gc,
+           __asan_unpoison_memory_region(p->start, (W_)p->blocks * BLOCK_SIZE);
+           memset(p->start, 0xaa, (W_)p->blocks * BLOCK_SIZE));
 
   if (p->blocks == 0) barf("freeGroup: block size is zero");
 
@@ -1060,6 +1073,11 @@ freeGroup(bdescr *p)
   free_list_insert(node,p);
 
   __asan_poison_memory_region(p->start, (W_)p->blocks * BLOCK_SIZE);
+  // Only the head and tail bdescrs of a free group carry meaning; poison the
+  // interior ones to catch stale Bdescr() lookups through dangling pointers.
+  if (p->blocks > 2) {
+      __asan_poison_memory_region(p + 1, ((W_)p->blocks - 2) * sizeof(bdescr));
+  }
 
   IF_DEBUG(sanity, checkFreeListSanity());
 }
@@ -1432,6 +1450,7 @@ reportUnmarkedBlocks (void)
     debugBelch("Unreachable blocks:\n");
     for (mblock = getFirstMBlock(&state); mblock != NULL;
          mblock = getNextMBlock(&state, mblock)) {
+        __asan_unpoison_memory_region(mblock, FIRST_BLOCK_OFF);
         for (bd = FIRST_BDESCR(mblock); bd <= LAST_BDESCR(mblock); ) {
             if (!(bd->flags & BF_KNOWN) && bd->free != (P_)-1) {
                 debugBelch("  %p\n",bd);

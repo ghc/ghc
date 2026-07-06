@@ -33,6 +33,7 @@ nonmovingSweepSegment(struct NonmovingSegment *seg)
 {
     ASSERT_SEGMENT_STATE(seg, FILLED_SWEEPING);
     const nonmoving_block_idx blk_cnt = nonmovingSegmentBlockCount(seg);
+    const uint16_t blk_size = nonmovingSegmentBlockSize(seg);
     bool found_free = false;
     bool found_live = false;
 
@@ -42,6 +43,8 @@ nonmovingSweepSegment(struct NonmovingSegment *seg)
             found_live = true;
         } else {
             seg->bitmap[i] = 0;
+            __asan_poison_memory_region(
+                nonmovingSegmentGetBlock_(seg, blk_size, blk_cnt, i), blk_size);
             if (!found_free) {
                 // This is the first free block we've found; set next_free,
                 // next_free_snap, and the scan pointer.
@@ -57,6 +60,8 @@ nonmovingSweepSegment(struct NonmovingSegment *seg)
             for (; i < nonmovingSegmentBlockCount(seg); ++i) {
                 if (seg->bitmap[i] != nonmovingMarkEpoch) {
                     seg->bitmap[i] = 0;
+                    __asan_poison_memory_region(
+                        nonmovingSegmentGetBlock_(seg, blk_size, blk_cnt, i), blk_size);
                 }
             }
             return SEGMENT_PARTIAL;
@@ -113,7 +118,9 @@ void
 nonmovingClearSegment(struct NonmovingSegment* seg)
 {
     size_t end = ((size_t)seg) + NONMOVING_SEGMENT_SIZE;
+    __asan_unpoison_memory_region(&seg->bitmap, end - (size_t)&seg->bitmap);
     memset(&seg->bitmap, 0, end - (size_t)&seg->bitmap);
+    __asan_poison_memory_region(&seg->bitmap, end - (size_t)&seg->bitmap);
 }
 
 void
@@ -124,7 +131,18 @@ nonmovingClearSegmentFreeBlocks(struct NonmovingSegment* seg)
         // N.B. nonmovingSweepSegment helpfully clears the bitmap entries of
         // dead blocks
         if (nonmovingGetMark(seg, p_idx) == 0) {
-            memset(nonmovingSegmentGetBlock(seg, p_idx), 0, block_size);
+            void *blk = nonmovingSegmentGetBlock(seg, p_idx);
+            if (p_idx >= seg->next_free) {
+                // Free block: it is poisoned, so unpoison for the memset and
+                // re-poison afterwards. Unmarked blocks below next_free were
+                // allocated since the last sweep and are live; leave those
+                // unpoisoned.
+                __asan_unpoison_memory_region(blk, block_size);
+                memset(blk, 0, block_size);
+                __asan_poison_memory_region(blk, block_size);
+            } else {
+                memset(blk, 0, block_size);
+            }
         }
     }
 }
