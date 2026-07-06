@@ -43,7 +43,7 @@ import GHC.Driver.Main.Hsc
       iface_core_bindings,
       handleWarningsThrowErrors,
       ioMsgMaybe,
-      hscSimpleIface )
+      hscSimpleIface, hscSimpleIface' )
 
 import GHC.Driver.Plugins
 import GHC.Driver.Session
@@ -185,6 +185,10 @@ import Data.Time
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import GHC.Iface.Env ( trace_if )
 import GHC.Types.Unique.DSet ( uniqDSetToList )
+import GHC.Driver.Config.HsToCore.Ticks (breakpointsAllowed)
+import Control.Monad.Trans.Reader (local)
+import Control.Applicative ((<|>))
+import Debug.Trace
 
 
 -- -----------------------------------------------------------------------------
@@ -872,11 +876,12 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
           (cg_guts, details) <-
               liftIO $ hscTidy hsc_env simplified_guts
 
+          guts_with_bp <- coreWithBreakPointsIfRequested summary tc_result
           !partial_iface <- liftIO $
                 {-# SCC "GHC.Driver.Main.mkPartialIface" #-}
                 -- This `force` saves 2M residency in test T10370
                 -- See Note [Avoiding space leaks in toIface*] for details.
-                fmap force (mkPartialIface hsc_env (cg_binds cg_guts) details summary (tcg_import_decls tc_result) simplified_guts)
+                fmap force (mkPartialIface hsc_env (maybe (cg_binds cg_guts) cg_binds guts_with_bp) details summary (tcg_import_decls tc_result) simplified_guts)
 
           return HscRecomp { hscs_guts = cg_guts,
                              hscs_mod_location = ms_location summary,
@@ -894,8 +899,9 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
           (cg_guts, _) <-
               liftIO $ hscTidy hsc_env simplified_guts
 
+          guts_with_bp <- coreWithBreakPointsIfRequested summary tc_result
           (iface, _details) <- liftIO $
-            hscSimpleIface hsc_env (Just $ cg_binds cg_guts) tc_result summary
+            hscSimpleIface hsc_env (fmap cg_binds $ guts_with_bp <|> Just cg_guts) tc_result summary
 
           liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_hash (ms_location summary)
 
@@ -919,6 +925,29 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
         if ms_mod summary == gHC_PRIM
           then return $ HscUpdate (getGhcPrimIface (hsc_hooks hsc_env))
           else return $ HscUpdate iface
+
+coreWithBreakPointsIfRequested :: ModSummary -> TcGblEnv -> Hsc (Maybe CgGuts)
+coreWithBreakPointsIfRequested summary tc_result = do
+  hsc <- getHscEnv
+  let dflags = hsc_dflags hsc
+  if gopt Opt_InsertBreakpoints dflags && not (breakpointsAllowed dflags)
+    then do
+      let new_hsc = hscSetFlags (dflags { backend = bytecodeBackend }) hsc
+      desugared_guts <- if
+        | ms_mod summary == gHC_PRIM
+        -> liftIO $ hscDesugar new_hsc summary (tc_result { tcg_binds = [] })
+
+        | otherwise
+        -> liftIO $ hscDesugar new_hsc summary tc_result
+
+      plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
+      simplified_guts <- hscSimplify' plugins desugared_guts
+      (cg_guts, _) <-
+          liftIO $ hscTidy new_hsc simplified_guts
+
+      pure $ Just cg_guts
+
+    else pure Nothing
 
 {- Note [Stop TcM plugins after desugaring]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
