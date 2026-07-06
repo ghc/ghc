@@ -25,7 +25,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc (unLoc)
 import GHC.Utils.Outputable
-import GHC.Parser.Annotation ( SrcSpanAnnBF )
+import GHC.Parser.Annotation ( SrcSpanAnnA, EpToken(..) )
 import GHC.Hs.Extension (GhcPass (..), OutputableBndrId)
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.BooleanFormula
@@ -35,12 +35,12 @@ import Language.Haskell.Syntax.BooleanFormula
 -- Boolean formula type and smart constructors
 ----------------------------------------------------------------------
 
-type instance Anno (BooleanFormula (GhcPass p)) = SrcSpanAnnBF
+type instance Anno (BooleanFormula (GhcPass p)) = SrcSpanAnnA
 
 type instance XBFVar           (GhcPass _) = NoExtField
 type instance XBFAnd           (GhcPass _) = NoExtField
 type instance XBFOr            (GhcPass _) = NoExtField
-type instance XBFParens        (GhcPass _) = NoExtField
+type instance XBFParens        (GhcPass _) = (EpToken "(", EpToken ")")
 type instance XXBooleanFormula (GhcPass _) = DataConCantHappen
 
 instance BooleanFormulaDefault (GhcPass p) where

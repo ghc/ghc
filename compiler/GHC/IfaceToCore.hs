@@ -126,7 +126,7 @@ import GHC.Types.Tickish
 import GHC.Types.TyThing
 import GHC.Types.Error
 
-import GHC.Parser.Annotation (noLocA)
+import GHC.Parser.Annotation (noLocA, noAnn)
 
 import GHC.Fingerprint
 
@@ -889,7 +889,7 @@ tc_iface_decl _parent ignore_prags
    tc_boolean_formula :: IfaceBooleanFormula -> IfL (BooleanFormula GhcRn)
    tc_boolean_formula (IfAnd ibfs  ) = BF.And    NoExtField . map noLocA <$> traverse tc_boolean_formula ibfs
    tc_boolean_formula (IfOr ibfs   ) = BF.Or     NoExtField . map noLocA <$> traverse tc_boolean_formula ibfs
-   tc_boolean_formula (IfParens ibf) = BF.Parens NoExtField .     noLocA <$>          tc_boolean_formula ibf
+   tc_boolean_formula (IfParens ibf) = BF.Parens noAnn      .     noLocA <$>          tc_boolean_formula ibf
    tc_boolean_formula (IfVar nm    ) = BF.Var    NoExtField .     noLocA <$> (lookupIfaceTop . mkVarOccFS . ifLclNameFS $ nm)
 
    mk_sc_doc pred = text "Superclass" <+> ppr pred
