@@ -1,9 +1,6 @@
 # FP_CHECK_PTHREAD_LIB
 # ----------------------------------
 # Check whether -lpthread is needed for pthread.
-#
-# Sets variables:
-#   - UseLibpthread: [YES|NO]
 AC_DEFUN([FP_CHECK_PTHREAD_LIB],
 [
   dnl Some platforms (e.g. Android's Bionic) have pthreads support available

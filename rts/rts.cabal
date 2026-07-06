@@ -64,9 +64,6 @@ flag tables-next-to-code
 flag smp
   default: True
   manual: True
-flag find-ptr
-  default: False
-  manual: True
 -- Some cabal flags used to control the flavours we want to produce
 -- for libHSrts in hadrian. By default, we just produce vanilla and
 -- threaded. The flags "compose": if you enable debug and profiling,

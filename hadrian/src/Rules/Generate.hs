@@ -440,7 +440,7 @@ bindistRules = do
     , interpolateSetting "ProjectVersion" ProjectVersion
     , interpolateVar "EnableDistroToolchain" $ interp (staged (lookupStageBuildConfig "settings-use-distro-mingw"))
     , interpolateVar "TablesNextToCode" $ yesNo <$> getTarget tgtTablesNextToCode
-    , interpolateVar "TargetHasLibm" $ yesNo <$> interp (staged (buildFlag TargetHasLibm))
+    , interpolateVar "TargetHasLibm" $ yesNo <$> getTarget tgtHasLibm
     , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
     , interpolateVar "BuildPlatform"  $ interp $ queryBuild targetPlatformTriple
     , interpolateVar "HostPlatform"   $ interp $ queryHost targetPlatformTriple

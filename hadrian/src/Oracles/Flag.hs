@@ -33,13 +33,9 @@ data BuildFlag = CcLlvmBackend
           | UseLibnuma
           | UseLibzstd
           | StaticLibzstd
-          | UseLibm
           | UseLibrt
-          | UseLibdl
           | UseLibbfd
-          | UseLibpthread
           | NeedLibatomic
-          | TargetHasLibm
 
 parseFlagResult :: String -> String -> Bool
 parseFlagResult key value =
@@ -70,13 +66,9 @@ buildFlag f st =
             UseLibnuma           -> "use-lib-numa"
             UseLibzstd           -> "use-lib-zstd"
             StaticLibzstd        -> "static-lib-zstd"
-            UseLibm              -> "use-lib-m"
             UseLibrt             -> "use-lib-rt"
-            UseLibdl             -> "use-lib-dl"
             UseLibbfd            -> "use-lib-bfd"
-            UseLibpthread        -> "use-lib-pthread"
             NeedLibatomic        -> "need-libatomic"
-            TargetHasLibm        -> "use-lib-m"
     in parseFlagResult key <$> (lookupStageBuildConfig key st)
 
 -- | Get a configuration setting.

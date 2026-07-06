@@ -894,10 +894,7 @@ dnl    Keep that check as early as possible.
 dnl    as we need to know whether we need libm
 dnl    for math functions or not
 dnl    (see https://gitlab.haskell.org/ghc/ghc/issues/3730)
-AC_CHECK_LIB(m, atan, UseLibm=YES, UseLibm=NO)
-AC_SUBST([UseLibm])
-TargetHasLibm=$UseLibm
-AC_SUBST(TargetHasLibm)
+AC_CHECK_LIB(m, atan, TargetHasLibm=YES, TargetHasLibm=NO)
 
 FP_BFD_FLAG
 AC_SUBST([UseLibbfd])
@@ -911,10 +908,6 @@ AC_SUBST(UseSystemLibFFI)
 AC_SUBST(FFILibDir)
 AC_SUBST(FFIIncludeDir)
 
-dnl ** check whether we need -ldl to get dlopen()
-AC_CHECK_LIB([dl], [dlopen], UseLibdl=YES, UseLibdl=NO)
-AC_SUBST([UseLibdl])
-
 dnl ** check for leading underscores in symbol names
 FP_LEADING_UNDERSCORE
 AC_SUBST([LeadingUnderscore], [`echo $fptools_cv_leading_underscore | sed 'y/yesno/YESNO/'`])
@@ -922,9 +915,6 @@ AC_SUBST([LeadingUnderscore], [`echo $fptools_cv_leading_underscore | sed 'y/yes
 dnl ** check for librt
 AC_CHECK_LIB([rt], [clock_gettime], UseLibrt=YES, UseLibrt=NO)
 AC_SUBST([UseLibrt])
-
-FP_CHECK_PTHREAD_LIB
-AC_SUBST([UseLibpthread])
 
 GHC_ADJUSTORS_METHOD([Target])
 AC_SUBST([UseLibffiForAdjustors])

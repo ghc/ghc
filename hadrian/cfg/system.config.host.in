@@ -58,10 +58,7 @@ libzstd-lib-dir       =
 use-lib-zstd      = NO
 static-lib-zstd   = NO
 use-lib-numa      = NO
-use-lib-m         = YES
 use-lib-rt        = YES
-use-lib-dl        = YES
 use-lib-bfd       = NO
-use-lib-pthread   = NO
 need-libatomic    = NO
 

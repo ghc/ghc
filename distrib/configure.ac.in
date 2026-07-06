@@ -32,7 +32,6 @@ bootstrap_target=@TargetPlatform@
 bootstrap_llvm_target=@LlvmTarget@
 
 TargetHasLibm=@TargetHasLibm@
-AC_SUBST(TargetHasLibm)
 
 UseLibffiForAdjustors=@UseLibffiForAdjustors@
 AC_SUBST(UseLibffiForAdjustors)

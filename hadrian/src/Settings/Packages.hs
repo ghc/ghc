@@ -92,7 +92,6 @@ packageArgs = do
             --    target code, otherwise enable for stage2 since that runs on
             --    the target and can use target's own ghci object linker
             [ andM [expr (ghcWithInterpreter stage), orM [expr (notM cross), stage2]] `cabalFlag` "internal-interpreter"
-            , orM [ notM cross, haveCurses ]  `cabalFlag` "terminfo"
             , arg "-build-tool-depends"
             , staged (buildFlag UseLibzstd) `cabalFlag` "with-libzstd"
             -- ROMES: While the boot compiler is not updated wrt -this-unit-id
@@ -125,10 +124,6 @@ packageArgs = do
                   (compilerStageOption ghcThreaded `cabalFlag` "threaded")
             ]
           ]
-
-        -------------------------------- ghcPkg --------------------------------
-        , package ghcPkg ?
-          builder (Cabal Flags) ? orM [ notM cross, haveCurses ] `cabalFlag` "terminfo"
 
         -------------------------------- ghcBoot ------------------------------
         , package ghcBoot ?
@@ -408,12 +403,9 @@ rtsPackageArgs = package rts ? do
           , any (wayUnit Debug) rtsWays       `cabalFlag` "debug"
           , any (wayUnit Dynamic) rtsWays     `cabalFlag` "dynamic"
           , any (wayUnit Threaded) rtsWays    `cabalFlag` "threaded"
-          , buildFlag UseLibm stage           `cabalFlag` "libm"
           , buildFlag UseLibrt stage          `cabalFlag` "librt"
-          , buildFlag UseLibdl stage          `cabalFlag` "libdl"
           , useSystemFfi                      `cabalFlag` "use-system-libffi"
           , targetUseLibffiForAdjustors stage `cabalFlag` "libffi-adjustors"
-          , buildFlag UseLibpthread stage     `cabalFlag` "need-pthread"
           , buildFlag UseLibbfd stage         `cabalFlag` "libbfd"
           , buildFlag NeedLibatomic stage     `cabalFlag` "need-atomic"
           , useLibdw stage                    `cabalFlag` "libdw"
@@ -423,7 +415,6 @@ rtsPackageArgs = package rts ? do
           , queryTargetTarget stage tgtSymbolsHaveLeadingUnderscore `cabalFlag` "leading-underscore"
           , ghcUnreg                          `cabalFlag` "unregisterised"
           , ghcEnableTNC                      `cabalFlag` "tables-next-to-code"
-          , Debug `wayUnit` way               `cabalFlag` "find-ptr"
           ]
         , builder (Cabal Setup) ? mconcat
               [ useLibdw stage ? cabalExtraDirs (fromMaybe "" libdwIncludeDir) (fromMaybe "" libdwLibraryDir)
