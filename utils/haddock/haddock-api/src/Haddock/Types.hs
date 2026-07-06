@@ -834,7 +834,7 @@ type instance Anno (HsDecl DocNameI) = SrcSpanAnnA
 type instance Anno (FamilyResultSig DocNameI) = EpAnn NoEpAnns
 type instance Anno (HsOuterTyVarBndrs Specificity DocNameI) = SrcSpanAnnA
 type instance Anno (HsSigType DocNameI) = SrcSpanAnnA
-type instance Anno (BooleanFormula DocNameI) = SrcSpanAnnBF
+type instance Anno (BooleanFormula DocNameI) = SrcSpanAnnA
 type instance Anno (OverlapMode DocNameI) = SrcSpanAnnA
 type instance Anno (CType DocNameI) = SrcSpanAnnA
 type instance Anno (Header DocNameI) = SrcSpanAnnA
@@ -1041,7 +1041,7 @@ type instance XXHsContextDetails DocNameI = DataConCantHappen
 type instance XBFVar           DocNameI = NoExtField
 type instance XBFAnd           DocNameI = NoExtField
 type instance XBFOr            DocNameI = NoExtField
-type instance XBFParens        DocNameI = NoExtField
+type instance XBFParens        DocNameI = (EpToken "(", EpToken ")")
 type instance XXBooleanFormula DocNameI = DataConCantHappen
 
 -----------------------------------------------------------------------------
