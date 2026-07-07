@@ -53,7 +53,8 @@ void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
          * We have running_task == NULL, hence we must use always_wakeup. This
          * is ok since the inbox is now non-empty, so we wake a task anyway.
          */
-        releaseCapability_(to_cap, true /*always_wakeup*/);
+        releaseCapability_(to_cap, true  /*always_wakeup*/,
+                                   false /*wakeup_worker*/);
     } else {
         interruptCapability(to_cap);
     }

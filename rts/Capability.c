@@ -580,6 +580,10 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
  *     queue and there are no spare workers then the capability is left idle.
  *     It is not entirely clear if this corner case is intentional.
  *
+ * Setting the wakeup_worker parameter prioritises waking a worker task over
+ * returning tasks or bound tasks. It makes sense to use it in combination
+ * with always_wakeup.
+ *
  * The caller must hold cap->lock and will still hold it after the call returns.
  *
  * N.B. May need to take all_tasks_mutex, if it needs to start a new task.
@@ -589,7 +593,8 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
 #if defined(THREADED_RTS)
 void
 releaseCapability_ (Capability* cap,
-                    bool always_wakeup)
+                    bool always_wakeup,
+                    bool wakeup_worker)
 {
     {
         Task *task = cap->running_task;
@@ -608,6 +613,38 @@ releaseCapability_ (Capability* cap,
     // Remove the current Task owning the Capability (if any, see purpose 2).
     RELAXED_STORE(&cap->running_task, NULL);
 
+    // We now look for a task to give the capability to, or otherwise we leave
+    // the capability free.
+    //
+    // We take one of these guarded actions, in priority order:
+    //
+    // 1. If there's a pending synchronisation of all capabilities (e.g. GC),
+    //    then give the capability to the task performing the sync.
+    // 2. If there's a task returning (e.g. from safe FFI) on this capability,
+    //    then give the capability to the first such task.
+    // 3. If the next runnable thread on this capability is a bound thread,
+    //    then give the capability to the corresponding bound task.
+    // 4. If there are no spare worker tasks for this capability,
+    //    then start one and give the capability to the new task.
+    // 5. If there is some work to do on this capability (e.g. runnable thread),
+    //    then give the capability to a worker task.
+    // 6. Otherwise leave the capability free/idle.
+    //
+    // There are two modifiers to this priority list:
+    //
+    // * Setting always_wakeup modifies the case 5 predicate to be always true.
+    //   This has the effect of giving the cap to a worker task, rather than
+    //   leaving the cap idle, even if there is no obvious work to do.
+    //
+    // * Setting wakeup_worker skips cases 2 & 3. This prioritises waking a
+    //   worker over returning tasks or bound tasks. It is also usually used in
+    //   combination with always_wakeup.
+
+
+    // Guarded action 1:
+    // If there's a pending synchronisation of all capabilities (e.g. GC),
+    // then give the capability to the task performing the sync.
+    //
     // If there is a pending sync, then we will be in one of two cases:
     //
     // 1. the task that requested the pending sync has put itself onto the
@@ -652,17 +689,22 @@ releaseCapability_ (Capability* cap,
         return;
     }
 
-    // Check to see whether a worker thread can be given
-    // the go-ahead to return the result of an external call..
-    if (cap->n_returning_tasks != 0) {
+    // Skip guarded actions 2 & 3 if wakeup_worker. See the list of actions and
+    // modifiers above.
+
+    // Guarded action 2:
+    // If there's a task returning (e.g. from safe FFI) on this capability,
+    // then give the capability to the first such task.
+    if (!wakeup_worker && cap->n_returning_tasks != 0) {
         giveCapabilityToTask(cap,cap->returning_tasks_hd);
         // The Task pops itself from the queue (see waitForCapability())
         return;
     }
 
-    // If the next thread on the run queue is a bound thread,
-    // give this Capability to the appropriate Task.
-    if (!emptyRunQueue(cap) && peekRunQueue(cap)->bound) {
+    // Guarded action 3:
+    // If the next runnable thread on this capability is a bound thread,
+    // then give the capability to the bound thread's corresponding task.
+    if (!wakeup_worker && !emptyRunQueue(cap) && peekRunQueue(cap)->bound) {
         // Make sure we're not about to try to wake ourselves up
         // ASSERT(task != cap->run_queue_hd->bound);
         // assertion is false: in schedule() we force a yield after
@@ -673,11 +715,13 @@ releaseCapability_ (Capability* cap,
         return;
     }
 
+    // Guarded action 4:
+    // If there are no spare worker tasks for this capability,
+    // then start one and give the capability to the new task.
     if (!cap->spare_workers) {
-        // Create a worker thread if we don't have one.  If the system
-        // is interrupted, we only create a worker task if there
-        // are threads that need to be completed.  If the system is
-        // shutting down, we never create a new worker.
+        // If the system is interrupted, we only create a worker task if there
+        // are threads that need to be completed.  If the system is shutting
+        // down, we never create a new worker.
         if (getSchedState() < SCHED_SHUTTING_DOWN || !emptyRunQueue(cap)) {
             debugTrace(DEBUG_sched,
                        "starting new worker on capability %d", cap->no);
@@ -686,8 +730,9 @@ releaseCapability_ (Capability* cap,
         }
     }
 
-    // If we have an unbound thread on the run queue, or if there's
-    // anything else to do, give the Capability to a worker thread.
+    // Guarded action 5:
+    // If there is some work to do on this capability (e.g. runnable thread),
+    // then give the capability to a worker task.
     if (always_wakeup ||
         !emptyRunQueue(cap) || !emptyInbox(cap) ||
         (!cap->disabled && !emptySparkPoolCap(cap)) || globalWorkToDo()) {
@@ -698,6 +743,8 @@ releaseCapability_ (Capability* cap,
         }
     }
 
+    // Guarded action 6:
+    // Otherwise leave the capability free/idle.
 #if defined(PROFILING)
     cap->r.rCCCS = CCS_IDLE;
 #endif
@@ -709,7 +756,8 @@ void
 releaseCapability (Capability* cap)
 {
     ACQUIRE_LOCK(&cap->lock);
-    releaseCapability_(cap, false);
+    releaseCapability_(cap, false /*always_wakeup*/,
+                            false /*wakeup_worker*/);
     RELEASE_LOCK(&cap->lock);
 }
 
@@ -717,7 +765,8 @@ void
 releaseAndWakeupCapability (Capability* cap)
 {
     ACQUIRE_LOCK(&cap->lock);
-    releaseCapability_(cap, true);
+    releaseCapability_(cap, true  /*always_wakeup*/,
+                            false /*wakeup_worker*/);
     RELEASE_LOCK(&cap->lock);
 }
 
@@ -743,7 +792,8 @@ enqueueWorker (Capability* cap)
     {
         debugTrace(DEBUG_sched, "%d spare workers already, exiting",
                    cap->n_spare_workers);
-        releaseCapability_(cap,false);
+        releaseCapability_(cap, false /*always_wakeup*/,
+                                false /*wakeup_worker*/);
         // hold the lock until after workerTaskStop; c.f. scheduleWorker()
         workerTaskStop(task);
         RELEASE_LOCK(&cap->lock);
@@ -1039,18 +1089,20 @@ static void waitForCapability_ (Capability **pCap, Task *task,
  * when either we know that the Capability should be given to another Task, or
  * there is nothing to do right now.  One of the following is true:
  *
- *    - The current Task is a worker, and there's a bound thread at the head of
- *      the run queue (or vice versa)
- *
- *    - The run queue is empty.  We'll be woken up again when there's work to
- *      do.
- *
  *    - Another Task is trying to do parallel GC (pending_sync == SYNC_GC_PAR).
  *      We should become a GC worker for a while.
  *
  *    - Another Task is trying to acquire all the Capabilities (pending_sync !=
  *      SYNC_GC_PAR), either to do a sequential GC, forkProcess, or
  *      setNumCapabilities.  We should give up the Capability temporarily.
+ *
+ *    - There is a Task returning from a safe FFI call.
+ *
+ *    - The current Task is a worker, and there's a bound thread at the head of
+ *      the run queue (or vice versa)
+ *
+ *    - There is no work to do (empty run queue, inbox etc).  We'll be woken up
+ *      again when there's work to do.
  *
  * When yieldCapability returns *pCap will have been updated to the new
  * capability held by the caller.
@@ -1119,7 +1171,8 @@ yieldCapability
         enqueueWorker(cap);
     }
 
-    releaseCapability_(cap, false);
+    releaseCapability_(cap, false /*always_wakeup*/,
+                            false /*wakeup_worker*/);
 
     if (isWorker(task) || isBoundTask(task)) {
         RELEASE_LOCK(&cap->lock);
@@ -1394,7 +1447,8 @@ prodCapability (Capability *cap)
 {
     ACQUIRE_LOCK(&cap->lock);
     if (!cap->running_task) {
-        releaseCapability_(cap,true);
+        releaseCapability_(cap, true  /*always_wakeup*/,
+                                false /*wakeup_worker*/);
     }
     RELEASE_LOCK(&cap->lock);
 }
@@ -1515,7 +1569,9 @@ shutdownCapability (Capability *cap USED_IF_THREADS,
         if (!emptyRunQueue(cap) || cap->spare_workers) {
             debugTrace(DEBUG_sched,
                        "runnable threads or workers still alive, yielding");
-            releaseCapability_(cap,false); // this will wake up a worker
+            // This will wake up a worker anyway, without forcing it.
+            releaseCapability_(cap, false /*always_wakeup*/,
+                                    false /*wakeup_worker*/);
             RELEASE_LOCK(&cap->lock);
             yieldThread();
             continue;
