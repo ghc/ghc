@@ -1291,7 +1291,7 @@ void acquireAllCapabilities(Capability *cap, Task *task)
         tmpcap = getCapability(i);
         if (tmpcap != cap) {
             task->cap = tmpcap;
-            waitForCapability(task);
+            waitForCapability_(task, true /*high_priority*/);
 
             // Note that waitForCapability only waits for the capability
             // the task is associated with. There's no task migration here.
