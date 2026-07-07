@@ -83,7 +83,7 @@ import Data.List (sortBy)
 import Data.Function (on)
 import GHC.Types.Unique.FM (UniqFM, nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM)
 import GHC.Data.SmallArray
-import GHC.Exts (State#)
+import GHC.Exts (State#, build)
 import GHC.ST (ST(..), runST)
 import Unsafe.Coerce
 import qualified GHC.Data.Word64Set as W
@@ -388,10 +388,17 @@ if you don't need the deterministic order at all, use the nonDet functions.
 --
 -- See Note [Sorting a UDFM] and Note [Cost of deterministic iteration].
 eltsUDFM :: UniqDFM key elt -> [elt]
+{-# INLINE eltsUDFM #-}  -- so the small case is a good producer
 eltsUDFM (UDFM m ub)
-  | M.compareSize m 1 /= GT = map taggedFst (M.elems m)
-  | usePlacement m ub       = placementSort ub (\_ tv -> tv) m
-  | otherwise               = map taggedFst (sort_it m)
+  -- n <= 1: any order is trivially tag order, so read straight off the map
+  | M.compareSize m 1 /= GT = build (\c n -> M.foldr (c . taggedFst) n m)
+  | otherwise               = elts_nonempty m ub
+
+-- Precondition: m is non-empty
+elts_nonempty :: M.Word64Map (TaggedVal elt) -> Int -> [elt]
+elts_nonempty m ub
+  | usePlacement m ub = placementSort ub (\_ tv -> tv) m
+  | otherwise         = map taggedFst (sort_it m)
 
 sort_it :: M.Word64Map (TaggedVal elt) -> [TaggedVal elt]
 sort_it m = sortBy (compare `on` taggedSnd) (M.elems m)
@@ -497,11 +504,18 @@ udfmRestrictKeysSet (UDFM val_set i) set =
 -- as this already incurs most of the cost of returning the full list.
 -- See Note [Cost of deterministic iteration].
 udfmToList :: UniqDFM key elt -> [(Unique, elt)]
+{-# INLINE udfmToList #-}  -- so the small case is a good producer
 udfmToList (UDFM m ub)
+  -- n <= 1: any order is trivially tag order, so read straight off the map
   | M.compareSize m 1 /= GT =
-      [ (mkUniqueGrimily k, taggedFst v) | (k, v) <- M.toList m ]
+      build (\c n ->
+        M.foldrWithKey (\k tv r -> c (mkUniqueGrimily k, taggedFst tv) r) n m)
+  | otherwise = to_list_nonempty m ub
 
-  -- Unlike eltsUDFM, this allocates a fresh TaggedVal + pair per element
+-- Precondition: m is non-empty
+to_list_nonempty :: M.Word64Map (TaggedVal elt) -> Int -> [(Unique, elt)]
+to_list_nonempty m ub
+  -- Unlike elts_nonempty, this allocates a fresh TaggedVal + pair per element
   -- (they make up the result).
   | usePlacement m ub = placementSort ub
       (\k tv -> TaggedVal (mkUniqueGrimily k, taggedFst tv) (taggedSnd tv)) m
