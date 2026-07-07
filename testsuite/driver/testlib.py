@@ -1828,7 +1828,8 @@ async def do_test(name: TestName,
         if result.passed:
             t.fragile_passes.append(TestResult(directory, name, 'fragile', way))
         else:
-            t.fragile_failures.append(TestResult(directory, name, 'fragile', way,
+            reason = '%s (fragile)' % result.reason if result.reason else 'fragile'
+            t.fragile_failures.append(TestResult(directory, name, reason, way,
                                                  stdout=result.stdout,
                                                  stderr=result.stderr))
     elif result.passed:
