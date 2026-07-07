@@ -616,22 +616,47 @@ releaseCapability_ (Capability* cap,
         return;
     }
 
-    // If there is a pending sync, then we should just leave the Capability
-    // free.  The thread trying to sync will be about to call
-    // waitForCapability().
+    // If there is a pending sync, then we will be in one of two cases:
     //
-    // Note: this is *after* we check for a returning task above,
-    // because the task attempting to acquire all the capabilities may
-    // be currently in waitForCapability() waiting for this
-    // capability, in which case simply setting it as free would not
-    // wake up the waiting task.
+    // 1. the task that requested the pending sync has put itself onto the
+    //    returning_tasks list; or
+    // 2. the task that requested the pending sync has not yet put itself onto
+    //    the returning_tasks list. This is unlikely but possible depending on
+    //    how the race is resolved.
+    //
+    // The cap->lock is used by both waitForCapability and releaseCapability_
+    // to ensure we are definitely in one of the two cases above, and not some
+    // hideous mish-mash.
+    //
+    // In the first case we can give the capability to that task. It is highly
+    // likely that the task has prepended itself to the returning task queue,
+    // so we can give the capability to the task at the head of the returning
+    // task queue. It is not a correctness issue however if another returning
+    // task gets run first (indeed this was the historical behaviour).
+    //
+    // Note that there can be false positives for this case: if any other
+    // returning task is queued on the returning tasks list. We will still
+    // incur delays if this occurs, scheduling those returning tasks. It is
+    // likely however that the task performing the sync gets to waiting before
+    // the task running the capability responds to the interrupt signal.
+    //
+    // In the second case we leave the capability free since the task trying to
+    // sync will be about to call waitForCapability().
     //
     // FIXME: this pending_sync approach is a poor design, hard to understand
     // and subject to various unnecessary delays. See issues #27460 and #27473.
     //
     PendingSync *sync = SEQ_CST_LOAD(&pending_sync);
     if (sync && (sync->type != SYNC_GC_PAR || sync->idle[cap->no])) {
-        debugTrace(DEBUG_sched, "sync pending, freeing capability %d", cap->no);
+        if (cap->n_returning_tasks != 0) {
+            // The task doing the sync should have used waitForCapability_
+            // using high_priority, so it should be at the head of the queue:
+            debugTrace(DEBUG_sched, "sync pending, passing capability %d", cap->no);
+            giveCapabilityToTask(cap,cap->returning_tasks_hd);
+            // The Task pops itself from the queue (see waitForCapability())
+        } else {
+            debugTrace(DEBUG_sched, "sync pending, freeing capability %d", cap->no);
+        }
         return;
     }
 
