@@ -1831,7 +1831,8 @@ async def do_test(name: TestName,
             reason = '%s (fragile)' % result.reason if result.reason else 'fragile'
             t.fragile_failures.append(TestResult(directory, name, reason, way,
                                                  stdout=result.stdout,
-                                                 stderr=result.stderr))
+                                                 stderr=result.stderr,
+                                                 diff=result.diff))
     elif result.passed:
         if _expect_pass(way):
             t.expected_passes.append(TestResult(directory, name, "", way))
@@ -1850,7 +1851,8 @@ async def do_test(name: TestName,
                 if_verbose(1, '*** unexpected failure for %s' % full_name)
                 tr = TestResult(directory, name, reason, way,
                                 stdout=result.stdout,
-                                stderr=result.stderr)
+                                stderr=result.stderr,
+                                diff=result.diff)
                 t.unexpected_failures.append(tr)
         else:
             t.n_expected_failures += 1
@@ -2022,19 +2024,16 @@ async def do_compile(name: TestName,
 
     expected_stderr_file = find_expected_file(name, 'stderr', way)
     actual_stderr_file = add_suffix(name, 'comp.stderr')
-    diff_file_name = in_testdir(add_suffix(name, 'comp.diff'))
-
-    if compare_stderr and not await compare_outputs(way, 'stderr',
+    if compare_stderr:
+        stderr_match = await compare_outputs(way, 'stderr',
                            join_normalisers(getTestOpts().extra_errmsg_normaliser,
                                             normalise_errmsg),
                            expected_stderr_file, actual_stderr_file,
-                           diff_file=diff_file_name,
                            whitespace_normaliser=getattr(getTestOpts(),
                                                          "whitespace_normaliser",
-                                                         normalise_whitespace)):
-        stderr = diff_file_name.read_text()
-        diff_file_name.unlink()
-        return failBecause('stderr mismatch', stderr=stderr)
+                                                         normalise_whitespace))
+        if not stderr_match:
+            return failBecause('stderr mismatch', diff=stderr_match.diff)
 
     opts = getTestOpts()
     if isGenericStatsTest():
@@ -2064,10 +2063,11 @@ async def compile_cmp_asm(name: TestName,
     expected_asm_file = find_expected_file(name, 'asm', way)
     actual_asm_file = add_suffix(name, 's')
 
-    if not await compare_outputs(way, 'asm',
+    asm_match = await compare_outputs(way, 'asm',
                            join_normalisers(normalise_errmsg, normalise_asm),
-                           expected_asm_file, actual_asm_file):
-        return failBecause('asm mismatch')
+                           expected_asm_file, actual_asm_file)
+    if not asm_match:
+        return failBecause('asm mismatch', diff=asm_match.diff)
 
     # no problems found, this test passed
     return passed()
@@ -2148,19 +2148,15 @@ async def compile_and_run__(name: TestName,
         if compile_stderr:
             expected_stderr_file = find_expected_file(name, 'ghc.stderr', way)
             actual_stderr_file = add_suffix(name, 'comp.stderr')
-            diff_file_name = in_testdir(add_suffix(name, 'comp.diff'))
-
-            if not await compare_outputs(way, 'stderr',
+            ghc_stderr_match = await compare_outputs(way, 'stderr',
                            join_normalisers(getTestOpts().extra_errmsg_normaliser,
                                             normalise_errmsg),
                            expected_stderr_file, actual_stderr_file,
-                           diff_file=diff_file_name,
                            whitespace_normaliser=getattr(getTestOpts(),
                                                          "whitespace_normaliser",
-                                                         normalise_whitespace)):
-             stderr = diff_file_name.read_text()
-             diff_file_name.unlink()
-             return failBecause('ghc.stderr mismatch', stderr=stderr)
+                                                         normalise_whitespace))
+            if not ghc_stderr_match:
+                return failBecause('ghc.stderr mismatch', diff=ghc_stderr_match.diff)
 
         opts = getTestOpts()
         extension = exe_extension() if not opts.ignore_extension else ""
@@ -2449,14 +2445,18 @@ async def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: st
         message = format_bad_exit_code_message(exit_code)
         return failBecause(message)
 
-    if not (opts.ignore_stderr or await stderr_ok(name, way) or opts.combined_output):
+    stderr_match = CompareOutput(True) if (opts.ignore_stderr or opts.combined_output) else await stderr_ok(name, way)
+    if not stderr_match:
         return failBecause('bad stderr',
                            stderr=read_stderr(name),
-                           stdout=read_stdout(name))
-    if not (opts.ignore_stdout or await stdout_ok(name, way)):
+                           stdout=read_stdout(name),
+                           diff=stderr_match.diff)
+    stdout_match = CompareOutput(True) if opts.ignore_stdout else await stdout_ok(name, way)
+    if not stdout_match:
         return failBecause('bad stdout',
                            stderr=read_stderr(name),
-                           stdout=read_stdout(name))
+                           stdout=read_stdout(name),
+                           diff=stdout_match.diff)
 
     check_hp = '-hT' in my_rts_flags and opts.check_hp
     check_prof = '-p' in my_rts_flags
@@ -2464,8 +2464,10 @@ async def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: st
     # exit_code > 127 probably indicates a crash, so don't try to run hp2ps.
     if check_hp and (exit_code <= 127 or exit_code == 251) and not await check_hp_ok(name):
         return failBecause('bad heap profile')
-    if check_prof and not await check_prof_ok(name, way):
-        return failBecause('bad profile')
+    if check_prof:
+        prof_match = await check_prof_ok(name, way)
+        if not prof_match:
+            return failBecause('bad profile', diff=prof_match.diff)
 
     # Check the results of stats tests
     if isGenericStatsTest():
@@ -2559,20 +2561,23 @@ async def interpreter_run(name: TestName,
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    if not (opts.ignore_stderr or await stderr_ok(name, way)):
+    stderr_match = CompareOutput(True) if opts.ignore_stderr else await stderr_ok(name, way)
+    if not stderr_match:
         if _expect_pass(way):
             dump_stderr_for('comp', name)
         return failBecause('bad stderr',
                            stderr=read_stderr(name),
-                           stdout=read_stdout(name))
-    elif not (opts.ignore_stdout or await stdout_ok(name, way)):
+                           stdout=read_stdout(name),
+                           diff=stderr_match.diff)
+    stdout_match = CompareOutput(True) if opts.ignore_stdout else await stdout_ok(name, way)
+    if not stdout_match:
         if _expect_pass(way):
             dump_stderr_for('comp', name)
         return failBecause('bad stdout',
                            stderr=read_stderr(name),
-                           stdout=read_stdout(name))
-    else:
-        return passed()
+                           stdout=read_stdout(name),
+                           diff=stdout_match.diff)
+    return passed()
 
 def split_file(in_fn: Path, delimiter: str, out1_fn: Path, out2_fn: Path):
     # See Note [Universal newlines].
@@ -2603,7 +2608,15 @@ def get_compiler_flags() -> List[str]:
 
     return flags
 
-async def stdout_ok(name: TestName, way: WayName) -> bool:
+class CompareOutput:
+    __slots__ = 'ok', 'diff'
+    def __init__(self, ok: bool, diff: Optional[str]=None) -> None:
+        self.ok = ok
+        self.diff = diff
+    def __bool__(self) -> bool:
+        return self.ok
+
+async def stdout_ok(name: TestName, way: WayName) -> CompareOutput:
    actual_stdout_file = add_suffix(name, 'run.stdout')
    expected_stdout_file = find_expected_file(name, 'stdout', way)
 
@@ -2612,7 +2625,7 @@ async def stdout_ok(name: TestName, way: WayName) -> bool:
    check_stdout = getTestOpts().check_stdout
    if check_stdout is not None:
       actual_stdout_path = in_testdir(actual_stdout_file)
-      return check_stdout(actual_stdout_path, extra_norm)
+      return CompareOutput(check_stdout(actual_stdout_path, extra_norm))
 
    return await compare_outputs(way, 'stdout', extra_norm,
                           expected_stdout_file, actual_stdout_file)
@@ -2624,13 +2637,21 @@ def read_stdout( name: TestName ) -> str:
     else:
         return ''
 
+def read_diff( diff_file: Path ) -> Optional[str]:
+    if diff_file.exists():
+        diff = diff_file.read_text()
+        diff_file.unlink()
+        return diff or None
+    else:
+        return None
+
 def dump_stdout( name: TestName ) -> None:
     s = read_stdout(name).strip()
     if s:
         print("Stdout (", name, "):")
         safe_print(s)
 
-async def stderr_ok(name: TestName, way: WayName) -> bool:
+async def stderr_ok(name: TestName, way: WayName) -> CompareOutput:
    actual_stderr_file = add_suffix(name, 'run.stderr')
    expected_stderr_file = find_expected_file(name, 'stderr', way)
 
@@ -2736,48 +2757,48 @@ async def check_hp_ok(name: TestName) -> bool:
         print("hp2ps error when processing heap profile for " + name)
         return False
 
-async def check_prof_ok(name: TestName, way: WayName) -> bool:
+async def check_prof_ok(name: TestName, way: WayName) -> CompareOutput:
     expected_prof_file = find_expected_file(name, 'prof.sample', way)
     expected_prof_path = in_testdir(expected_prof_file)
 
     # Check actual prof file only if we have an expected prof file to
     # compare it with.
     if not expected_prof_path.exists():
-        return True
+        return CompareOutput(True)
 
     actual_prof_file = add_suffix(name, 'prof')
     actual_prof_path = in_testdir(actual_prof_file)
 
     if not actual_prof_path.exists():
         print("%s does not exist" % actual_prof_path)
-        return(False)
+        return CompareOutput(False)
 
     if actual_prof_path.stat().st_size == 0:
         print("%s is empty" % actual_prof_path)
-        return(False)
+        return CompareOutput(False)
 
     return await compare_outputs(way, 'prof', normalise_prof,
                             expected_prof_file, actual_prof_file,
                             whitespace_normaliser=normalise_whitespace)
 
 # Compare expected output to actual output, and optionally accept the
-# new output. Returns true if output matched or was accepted, false
-# otherwise. See Note [Output comparison] for the meaning of the
-# normaliser and whitespace_normaliser parameters.
+# new output. Returns a truthy CompareOutput if output matched or was
+# accepted, a falsy one (with the diff) otherwise. See Note [Output
+# comparison] for the meaning of the normaliser and whitespace_normaliser
+# parameters.
 async def compare_outputs(
         way: WayName,
         kind: str,
         normaliser: OutputNormalizer,
         expected_file: Path,
         actual_file: Path,
-        diff_file: Optional[Path]=None,
-        whitespace_normaliser: OutputNormalizer=lambda x:x) -> bool:
+        whitespace_normaliser: OutputNormalizer=lambda x:x) -> CompareOutput:
 
     # Respect ignore_stdout and ignore_stderr options
     if kind == 'stderr' and getTestOpts().ignore_stderr:
-        return True
+        return CompareOutput(True)
     if kind == 'stdout' and getTestOpts().ignore_stdout:
-        return True
+        return CompareOutput(True)
 
     expected_path = in_srcdir(expected_file)
     actual_path = in_testdir(actual_file)
@@ -2797,7 +2818,7 @@ async def compare_outputs(
 
     # See Note [Output comparison].
     if whitespace_normaliser(expected_str) == whitespace_normaliser(actual_str):
-        return True
+        return CompareOutput(True)
     else:
         if config.verbose >= 1 and _expect_pass(way):
             print('Actual ' + kind + ' output differs from expected:')
@@ -2809,6 +2830,7 @@ async def compare_outputs(
         actual_normalised_path = add_suffix(actual_path, 'normalised')
         write_file(actual_normalised_path, actual_str)
 
+        diff_file = add_suffix(actual_path, 'diff')
         if config.verbose >= 1 and _expect_pass(way):
             # See Note [Output comparison].
             r = await runCmd('diff -uw "{0}" "{1}"'.format(null2unix_null(expected_normalised_path),
@@ -2823,13 +2845,14 @@ async def compare_outputs(
                                                            actual_normalised_path),
                            stdout=diff_file,
                            print_output=True)
-        elif diff_file: diff_file.open('ab').close() # Make sure the file exists still as
-                                                     # we will try to read it later
+        else:
+            diff_file.open('ab').close() # Make sure the file exists still as
+                                         # we will try to read it later
 
         if config.accept and (getTestOpts().expect == 'fail' or
                               way in getTestOpts().expect_fail_for):
             if_verbose(1, 'Test is expected to fail. Not accepting new output.')
-            return False
+            return CompareOutput(False, read_diff(diff_file))
         elif config.accept and actual_raw:
             if config.accept_platform:
                 if_verbose(1, 'Accepting new output for platform "'
@@ -2843,11 +2866,11 @@ async def compare_outputs(
                 if_verbose(1, 'Accepting new output.')
 
             write_file(expected_path, actual_raw)
-            return True
+            return CompareOutput(True)
         elif config.accept:
             if_verbose(1, 'No output. Deleting "{0}".'.format(expected_path))
             expected_path.unlink()
-            return True
+            return CompareOutput(True)
         else:
             if config.unexpected_output_dir is not None:
                 ghc_root = expected_path.relative_to(config.top.parent)
@@ -2855,7 +2878,7 @@ async def compare_outputs(
                 out.parent.mkdir(exist_ok=True, parents=True)
                 write_file(out, actual_raw)
 
-            return False
+            return CompareOutput(False, read_diff(diff_file))
 
 # Checks that each line from pattern_file is present in actual_file as
 # a substring or regex pattern depending on is_substring.
