@@ -391,6 +391,21 @@ INLINE_HEADER void contextSwitchCapability(Capability *cap, bool immediately);
 void interruptAllCapabilities(void);
 INLINE_HEADER void interruptCapability(Capability *cap);
 
+#if defined(THREADED_RTS)
+void stopAllCapabilities (Capability **pCap, Task *task);
+void stopAllCapabilitiesWith (Capability **pCap, Task *task, SyncType sync_type);
+void acquireAllCapabilities(Capability *cap, Task *task);
+void releaseAllCapabilities(uint32_t n, Capability *keep_cap, Task *task);
+
+// Used by scheduler for GC. Other use cases should prefer stopAllCapabilities.
+bool requestSync (Capability **pcap,
+                  Task *task,
+                  PendingSync *new_sync,
+                  SyncType *prev_sync_type);
+void resetSync (void);
+INLINE_HEADER bool anyPendingSync(void);
+#endif
+
 // Free all capabilities
 void freeCapabilities (void);
 
@@ -516,6 +531,10 @@ INLINE_HEADER bool emptyInbox(Capability *cap)
             RELAXED_LOAD(&cap->putMVars) == NULL);
 }
 
+INLINE_HEADER bool anyPendingSync(void)
+{
+    return RELAXED_LOAD(&pending_sync);
+}
 #endif
 
 #include "EndPrivate.h"
