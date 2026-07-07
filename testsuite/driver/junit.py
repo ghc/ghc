@@ -26,6 +26,8 @@ def junit(t: TestRun) -> ET.ElementTree:
                                      classname = tr.way,
                                      name = '%s(%s)' % (tr.testname, tr.way))
             message = [] # type: List[str]
+            if tr.diff:
+                message += ['diff:', '==========', tr.diff]
             if tr.stdout:
                 message += ['', 'stdout:', '==========', tr.stdout]
             if tr.stderr:

@@ -291,20 +291,22 @@ class TestResult:
     framework_failures, framework_warnings, unexpected_passes,
     unexpected_failures, unexpected_stat_failures lists of TestRun.
     """
-    __slots__ = 'directory', 'testname', 'reason', 'way', 'stdout', 'stderr'
+    __slots__ = 'directory', 'testname', 'reason', 'way', 'stdout', 'stderr', 'diff'
     def __init__(self,
                  directory: str,
                  testname: TestName,
                  reason: str,
                  way: WayName,
                  stdout: Optional[str]=None,
-                 stderr: Optional[str]=None) -> None:
+                 stderr: Optional[str]=None,
+                 diff: Optional[str]=None) -> None:
         self.directory = directory
         self.testname = testname
         self.reason = reason
         self.way = way
         self.stdout = stdout
         self.stderr = stderr
+        self.diff = diff
 
 # A performance metric measured in this test run.
 PerfMetric = NamedTuple('PerfMetric',
