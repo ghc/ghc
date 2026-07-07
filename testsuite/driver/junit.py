@@ -30,6 +30,8 @@ def junit(t: TestRun) -> ET.ElementTree:
                 message += ['', 'stdout:', '==========', tr.stdout]
             if tr.stderr:
                 message += ['', 'stderr:', '==========', tr.stderr]
+            if not message:
+                message = [tr.reason]
 
             result = ET.SubElement(testcase, kind,
                                    type = res_type,
