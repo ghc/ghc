@@ -1134,37 +1134,62 @@ yieldCapability
     // We must now release the capability and wait to be woken up again.
     task->wakeup = false;
 
+    // What happens next is a bit complicated. It has the following outline:
+    //
+    //  1. take the cap->lock
+    //  2. "various stuff part A", pre-releaseCapability_ holding cap->lock
+    //  3. release the capability
+    //  4. "various stuff part B", post-releaseCapability_ holding cap->lock
+    //  5. release the cap->lock
+    //  6. "various stuff part C", post release cap->lock
+    //
+    // Much of the "various stuff" is also conditional, which complicates
+    // matters further. To try and maintain clarity we use the following
+    // variables in the conditions for the in-between steps.
+    //
     bool terminate_worker = false;
+    bool task_is_worker   = isWorker(task);
+    bool task_is_bound    = isBoundTask(task);
 
+    // Step 1: take the cap->lock
     ACQUIRE_LOCK(&cap->lock);
 
-    // If this is a worker thread, try to put it on the spare_workers queue
-    // or if it is surplus then we will terminate it.
-    if (isWorker(task)) {
+    // Step 2: "various stuff part A", pre-releaseCapability_ holding cap->lock
+    if (task_is_worker) {
+        // If this is a worker thread, try to put it on the spare_workers
+        // queue or if it is surplus then we will terminate it.
         terminate_worker = !tryEnqueueWorker(cap);
     }
 
+    // Step 3: release the capability
     releaseCapability_(cap, false /*always_wakeup*/,
                             false /*wakeup_worker*/);
 
+    // Step 4: "various stuff part B", post-releaseCapability_ holding cap->lock
     if (terminate_worker) {
         // hold the lock until after workerTaskStop; c.f. scheduleWorker()
         workerTaskStop(task);
-        RELEASE_LOCK(&cap->lock);
-        shutdownThread();
-    } else if (isWorker(task) || isBoundTask(task)) {
-        RELEASE_LOCK(&cap->lock);
-        cap = waitForWorkerCapability(task);
-    } else {
+    } else if (!task_is_worker && !task_is_bound) {
         // Not a worker Task, or a bound Task.  The only way we can be woken up
         // again is to put ourselves on the returning_tasks queue, so that's
-        // what we do.  We still hold cap->lock at this point
-        // The Task waiting for this Capability does not have it
-        // yet, so we can be sure to be woken up later. (see #10545)
+        // what we do.  We still hold cap->lock at this point. The Task waiting
+        // for this Capability does not have it yet, so we can be sure to be
+        // woken up later. (see #10545)
         appendToReturningTaskQueue(cap,task);
-        RELEASE_LOCK(&cap->lock);
+    }
+
+    // Step 5: release the cap->lock
+    RELEASE_LOCK(&cap->lock);
+
+    // Step 6. "various stuff part C", post release cap->lock
+    if (terminate_worker) {
+        shutdownThread();
+    } else if (task_is_worker || task_is_bound) {
+        cap = waitForWorkerCapability(task);
+    } else {
         cap = waitForReturnCapability(task);
     }
+    // End of step 6.
 
     debugTrace(DEBUG_sched, "resuming capability %d", cap->no);
     ASSERT(cap->running_task == task);
