@@ -778,37 +778,6 @@ static void releaseCapability__ (Capability* cap,
     RELAXED_STORE(&last_free_capability[cap->node], cap);
     debugTrace(DEBUG_sched, "freeing capability %d", cap->no);
 }
-
-static void
-enqueueWorker (Capability* cap)
-{
-    Task *task;
-
-    task = cap->running_task;
-
-    // If the Task is stopped, we shouldn't be yielding, we should
-    // be just exiting.
-    ASSERT(!task->stopped);
-    ASSERT(task->worker);
-
-    if (cap->n_spare_workers < MAX_SPARE_WORKERS)
-    {
-        task->next = cap->spare_workers;
-        cap->spare_workers = task;
-        cap->n_spare_workers++;
-    }
-    else
-    {
-        debugTrace(DEBUG_sched, "%d spare workers already, exiting",
-                   cap->n_spare_workers);
-        releaseCapability_(cap);
-        // hold the lock until after workerTaskStop; c.f. scheduleWorker()
-        workerTaskStop(task);
-        RELEASE_LOCK(&cap->lock);
-        shutdownThread();
-    }
-}
-
 #endif
 
 /*
@@ -1126,6 +1095,7 @@ static void waitForCapability_ (Task *task,
  * ------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
+static void enqueueWorker (Capability* cap);
 
 /* See Note [GC livelock] in Schedule.c for why we have gcAllowed
    and return the bool */
@@ -1215,6 +1185,34 @@ yieldCapability
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
     return false;
+}
+
+static void enqueueWorker (Capability* cap)
+{
+    Task *task = cap->running_task;
+
+    // If the Task is stopped, we shouldn't be yielding, we should
+    // be just exiting.
+    ASSERT(!task->stopped);
+    ASSERT(task->worker);
+
+    if (cap->n_spare_workers < MAX_SPARE_WORKERS)
+    {
+        task->next = cap->spare_workers;
+        cap->spare_workers = task;
+        cap->n_spare_workers++;
+    }
+    else
+    {
+        debugTrace(DEBUG_sched, "%d spare workers already, exiting",
+                   cap->n_spare_workers);
+        releaseCapability_(cap, false /*always_wakeup*/,
+                                false /*wakeup_worker*/);
+        // hold the lock until after workerTaskStop; c.f. scheduleWorker()
+        workerTaskStop(task);
+        RELEASE_LOCK(&cap->lock);
+        shutdownThread();
+    }
 }
 
 #endif /* THREADED_RTS */
