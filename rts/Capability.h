@@ -283,36 +283,6 @@ INLINE_HEADER Capability *getCapability(uint32_t i)
     return RELAXED_LOAD(&capabilities[i]);
 }
 
-//
-// Types of global synchronisation
-//
-typedef enum {
-    SYNC_OTHER,
-    SYNC_GC_SEQ,
-    SYNC_GC_PAR,
-    SYNC_FLUSH_UPD_REM_SET,
-    SYNC_FLUSH_EVENT_LOG
-} SyncType;
-
-//
-// Details about a global synchronisation
-//
-typedef struct {
-    SyncType type;              // The kind of synchronisation
-    bool *idle;                 // Array of size n_capabilities. idle[i] is true
-                                // if capability i will be idle during this GC
-                                // cycle. Only available when doing GC (when
-                                // type is SYNC_GC_*).
-    Task *task;                 // The Task performing the sync
-} PendingSync;
-
-//
-// Indicates that the RTS wants to synchronise all the Capabilities
-// for some reason.  All Capabilities should stop and return to the
-// scheduler.
-//
-extern PendingSync * volatile pending_sync;
-
 // Acquires a capability at a return point.  If *cap is non-NULL, then
 // this is taken as a preference for the Capability we wish to
 // acquire.
@@ -392,10 +362,33 @@ void interruptAllCapabilities(void);
 INLINE_HEADER void interruptCapability(Capability *cap);
 
 #if defined(THREADED_RTS)
+//
+// Types of global synchronisation
+//
+typedef enum {
+    SYNC_OTHER,
+    SYNC_GC_SEQ,
+    SYNC_GC_PAR,
+    SYNC_FLUSH_UPD_REM_SET,
+    SYNC_FLUSH_EVENT_LOG
+} SyncType;
+
 void stopAllCapabilities (Capability **pCap, Task *task);
 void stopAllCapabilitiesWith (Capability **pCap, Task *task, SyncType sync_type);
 void acquireAllCapabilities(Capability *cap, Task *task);
 void releaseAllCapabilities(uint32_t n, Capability *keep_cap, Task *task);
+
+//
+// Details about a global synchronisation
+//
+typedef struct {
+    SyncType type;              // The kind of synchronisation
+    bool *idle;                 // Array of size n_capabilities. idle[i] is true
+                                // if capability i will be idle during this GC
+                                // cycle. Only available when doing GC (when
+                                // type is SYNC_GC_*).
+    Task *task;                 // The Task performing the sync
+} PendingSync;
 
 // Used by scheduler for GC. Other use cases should prefer stopAllCapabilities.
 bool requestSync (Capability **pcap,
@@ -403,7 +396,13 @@ bool requestSync (Capability **pcap,
                   PendingSync *new_sync,
                   SyncType *prev_sync_type);
 void resetSync (void);
+
+// Is there a current pending sync? This is true after a successful requestSync
+// and before the sync completes.
 INLINE_HEADER bool anyPendingSync(void);
+
+// Private, use anyPendingSync() accessor.
+extern PendingSync *pending_sync;
 #endif
 
 // Free all capabilities

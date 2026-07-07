@@ -58,11 +58,14 @@ Capability **capabilities;
 // locking, so we don't do that.
 static Capability *last_free_capability[MAX_NUMA_NODES];
 
+#if defined(THREADED_RTS)
 /*
  * Indicates that the RTS wants to synchronise all the Capabilities
  * for some reason.  All Capabilities should yieldCapability().
+ *
+ * This is an atomic variable, all accesses must use appropriate atomics.
  */
-PendingSync * volatile pending_sync = 0;
+PendingSync *pending_sync = NULL;
 
 /*
  * sync_finished_cond allows threads which do not own any capability (e.g. the
@@ -71,7 +74,6 @@ PendingSync * volatile pending_sync = 0;
  * block on sync_finished_cond, which will be signalled when the sync is
  * finished (by releaseAllCapabilities).
  */
-#if defined(THREADED_RTS)
 static Condition sync_finished_cond;
 static Mutex sync_finished_mutex;
 #endif
