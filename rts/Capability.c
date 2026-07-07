@@ -218,7 +218,7 @@ anySparks (void)
 
 #if defined(THREADED_RTS)
 STATIC_INLINE void
-newReturningTask (Capability *cap, Task *task)
+appendToReturningTaskQueue (Capability *cap, Task *task)
 {
     ASSERT_LOCK_HELD(&cap->lock);
     ASSERT(task->next == NULL);
@@ -237,7 +237,7 @@ newReturningTask (Capability *cap, Task *task)
 }
 
 STATIC_INLINE Task *
-popReturningTask (Capability *cap)
+popReturningTaskQueue (Capability *cap)
 {
     ASSERT_LOCK_HELD(&cap->lock);
     Task *task;
@@ -841,7 +841,7 @@ static Capability * waitForReturnCapability (Task *task)
                 continue;
             }
             RELAXED_STORE(&cap->running_task, task);
-            popReturningTask(cap);
+            popReturningTaskQueue(cap);
             RELEASE_LOCK(&cap->lock);
             break;
         }
@@ -952,7 +952,7 @@ void waitForCapability (Capability **pCap, Task *task)
         RELAXED_STORE(&cap->running_task, task);
         RELEASE_LOCK(&cap->lock);
     } else {
-        newReturningTask(cap,task);
+        appendToReturningTaskQueue(cap,task);
         RELEASE_LOCK(&cap->lock);
         cap = waitForReturnCapability(task);
     }
@@ -1067,7 +1067,7 @@ yieldCapability
         // what we do.  We still hold cap->lock at this point
         // The Task waiting for this Capability does not have it
         // yet, so we can be sure to be woken up later. (see #10545)
-        newReturningTask(cap,task);
+        appendToReturningTaskQueue(cap,task);
         RELEASE_LOCK(&cap->lock);
         cap = waitForReturnCapability(task);
     }
