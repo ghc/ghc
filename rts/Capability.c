@@ -1079,7 +1079,7 @@ static void waitForCapability_ (Capability **pCap, Task *task,
  * ------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
-static void enqueueWorker (Capability* cap);
+static bool tryEnqueueWorker (Capability* cap);
 
 /* See Note [GC livelock] in Schedule.c for why we have gcAllowed
    and return the bool */
@@ -1134,17 +1134,25 @@ yieldCapability
     // We must now release the capability and wait to be woken up again.
     task->wakeup = false;
 
+    bool terminate_worker = false;
+
     ACQUIRE_LOCK(&cap->lock);
 
-    // If this is a worker thread, put it on the spare_workers queue
+    // If this is a worker thread, try to put it on the spare_workers queue
+    // or if it is surplus then we will terminate it.
     if (isWorker(task)) {
-        enqueueWorker(cap);
+        terminate_worker = !tryEnqueueWorker(cap);
     }
 
     releaseCapability_(cap, false /*always_wakeup*/,
                             false /*wakeup_worker*/);
 
-    if (isWorker(task) || isBoundTask(task)) {
+    if (terminate_worker) {
+        // hold the lock until after workerTaskStop; c.f. scheduleWorker()
+        workerTaskStop(task);
+        RELEASE_LOCK(&cap->lock);
+        shutdownThread();
+    } else if (isWorker(task) || isBoundTask(task)) {
         RELEASE_LOCK(&cap->lock);
         cap = waitForWorkerCapability(task);
     } else {
@@ -1172,7 +1180,9 @@ yieldCapability
     return false;
 }
 
-static void enqueueWorker (Capability* cap)
+// Returns true if it could enqueue, and false if the worker is surplus to
+// requirements and should be terminated.
+static bool tryEnqueueWorker (Capability* cap)
 {
     Task *task = cap->running_task;
 
@@ -1180,23 +1190,20 @@ static void enqueueWorker (Capability* cap)
     // be just exiting.
     ASSERT(!task->stopped);
     ASSERT(task->worker);
+    ASSERT_LOCK_HELD(&cap->lock);
 
     if (cap->n_spare_workers < MAX_SPARE_WORKERS)
     {
         task->next = cap->spare_workers;
         cap->spare_workers = task;
         cap->n_spare_workers++;
+        return true;
     }
     else
     {
         debugTrace(DEBUG_sched, "%d spare workers already, exiting",
                    cap->n_spare_workers);
-        releaseCapability_(cap, false /*always_wakeup*/,
-                                false /*wakeup_worker*/);
-        // hold the lock until after workerTaskStop; c.f. scheduleWorker()
-        workerTaskStop(task);
-        RELEASE_LOCK(&cap->lock);
-        shutdownThread();
+        return false;
     }
 }
 
