@@ -941,15 +941,22 @@ static Capability * find_capability_for_task(const Task * task)
  *
  * ------------------------------------------------------------------------- */
 
+#if !defined(THREADED_RTS)
 void waitForCapability (Capability **pCap, Task *task)
 {
-#if !defined(THREADED_RTS)
 
     MainCapability.running_task = task;
     task->cap = &MainCapability;
     *pCap = &MainCapability;
+}
 
 #else
+
+static void waitForCapability_ (Capability **pCap, Task *task,
+                                bool high_priority);
+
+void waitForCapability (Capability **pCap, Task *task)
+{
     Capability *cap = *pCap;
 
     if (cap == NULL) {
@@ -957,9 +964,19 @@ void waitForCapability (Capability **pCap, Task *task)
 
         // record the Capability as the one this Task is now associated with.
         task->cap = cap;
-    } else {
-        ASSERT(task->cap == cap);
+
+        // We've updated the cap, and we pass pCap below.
+        *pCap = cap;
     }
+
+    waitForCapability_(pCap, task, false /*high_priority*/);
+}
+
+static void waitForCapability_ (Capability **pCap, Task *task,
+                                bool high_priority)
+{
+    Capability *cap = *pCap;
+    ASSERT(task->cap == cap);
 
     debugTrace(DEBUG_sched, "returning; I want capability %d", cap->no);
 
@@ -969,7 +986,11 @@ void waitForCapability (Capability **pCap, Task *task)
         RELAXED_STORE(&cap->running_task, task);
         RELEASE_LOCK(&cap->lock);
     } else {
-        appendToReturningTaskQueue(cap,task);
+        if (high_priority) {
+            prependToReturningTaskQueue(cap,task);
+        } else {
+            appendToReturningTaskQueue(cap,task);
+        }
         RELEASE_LOCK(&cap->lock);
         cap = waitForReturnCapability(task);
     }
@@ -983,8 +1004,8 @@ void waitForCapability (Capability **pCap, Task *task)
     debugTrace(DEBUG_sched, "resuming capability %d", cap->no);
 
     *pCap = cap;
-#endif
 }
+#endif
 
 /* ----------------------------------------------------------------------------
  * yieldCapability
