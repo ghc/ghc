@@ -608,14 +608,6 @@ releaseCapability_ (Capability* cap,
     // Remove the current Task owning the Capability (if any, see purpose 2).
     RELAXED_STORE(&cap->running_task, NULL);
 
-    // Check to see whether a worker thread can be given
-    // the go-ahead to return the result of an external call..
-    if (cap->n_returning_tasks != 0) {
-        giveCapabilityToTask(cap,cap->returning_tasks_hd);
-        // The Task pops itself from the queue (see waitForCapability())
-        return;
-    }
-
     // If there is a pending sync, then we will be in one of two cases:
     //
     // 1. the task that requested the pending sync has put itself onto the
@@ -657,6 +649,14 @@ releaseCapability_ (Capability* cap,
         } else {
             debugTrace(DEBUG_sched, "sync pending, freeing capability %d", cap->no);
         }
+        return;
+    }
+
+    // Check to see whether a worker thread can be given
+    // the go-ahead to return the result of an external call..
+    if (cap->n_returning_tasks != 0) {
+        giveCapabilityToTask(cap,cap->returning_tasks_hd);
+        // The Task pops itself from the queue (see waitForCapability())
         return;
     }
 
