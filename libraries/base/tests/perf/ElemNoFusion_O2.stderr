@@ -15,7 +15,7 @@ noFusionElemSort
                         case y2 of { I# y3 ->
                         case ==# x2 y3 of {
                           __DEFAULT -> jump go1 ys1;
-                          1# -> True
+                          0# -> Oops
                         }
                         }
                     }; } in
