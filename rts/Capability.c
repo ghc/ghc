@@ -1288,7 +1288,7 @@ void acquireAllCapabilities(Capability *cap, Task *task)
             // all the Capabilities, but even so it's a slightly
             // unsavoury invariant.
             task->cap = tmpcap;
-            waitForCapability(&tmpcap, task);
+            waitForCapability_(&tmpcap, task, true /*high_priority*/);
             if (tmpcap->no != i) {
                 barf("acquireAllCapabilities: got the wrong capability");
             }
