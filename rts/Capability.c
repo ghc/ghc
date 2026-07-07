@@ -960,6 +960,9 @@ void waitForCapability (Task *task)
 
 #else
 
+static void waitForCapability_ (Task *task,
+                                bool high_priority);
+
 Capability *waitForSomeCapability (Task *task)
 {
     Capability *cap = task->cap;
@@ -970,12 +973,18 @@ Capability *waitForSomeCapability (Task *task)
         task->cap = cap;
     }
 
-    waitForCapability(task);
+    waitForCapability_(task, false /*high_priority*/);
 
     return task->cap;
 }
 
 void waitForCapability (Task *task)
+{
+    waitForCapability_(task, false /*high_priority*/);
+}
+
+static void waitForCapability_ (Task *task,
+                                bool high_priority)
 {
     Capability *cap = task->cap;
     ASSERT(task->cap);
@@ -988,7 +997,11 @@ void waitForCapability (Task *task)
         RELAXED_STORE(&cap->running_task, task);
         RELEASE_LOCK(&cap->lock);
     } else {
-        appendToReturningTaskQueue(cap,task);
+        if (high_priority) {
+            prependToReturningTaskQueue(cap,task);
+        } else {
+            appendToReturningTaskQueue(cap,task);
+        }
         RELEASE_LOCK(&cap->lock);
         cap = waitForReturnCapability(task);
     }
