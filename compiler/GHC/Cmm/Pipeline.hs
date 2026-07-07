@@ -33,6 +33,15 @@ import GHC.Platform
 import Control.Monad
 import GHC.Utils.Monad (mapAccumLM)
 
+import System.Environment (lookupEnv)
+import System.IO.Unsafe (unsafePerformIO)
+
+-- TEMPORARY measurement hack, not for committing: GHC_CBE2=0 disables the
+-- second CBE pass, giving a same-binary A/B for size/perf comparisons.
+{-# NOINLINE cbe2Enabled #-}
+cbe2Enabled :: Bool
+cbe2Enabled = unsafePerformIO (lookupEnv "GHC_CBE2") /= Just "0"
+
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
 -----------------------------------------------------------------------------
@@ -144,7 +153,7 @@ cpsTop logger platform cfg dus proc =
       ----------- Second common-block elimination ------------------------------
       -- See Note [Second pass of CBE]
       (g, call_pps) <-
-        if cmmOptElimCommonBlks cfg && cmmOptSink cfg && not splitting_proc_points
+        if cbe2Enabled && cmmOptElimCommonBlks cfg && cmmOptSink cfg && not splitting_proc_points
           then do
             let stackmap_key lbl = stackMapLivenessKey platform
                                      <$> mapLookup lbl stackmaps
