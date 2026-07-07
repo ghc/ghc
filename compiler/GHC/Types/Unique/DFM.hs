@@ -504,12 +504,13 @@ udfmRestrictKeysSet (UDFM val_set i) set =
 -- as this already incurs most of the cost of returning the full list.
 -- See Note [Cost of deterministic iteration].
 udfmToList :: UniqDFM key elt -> [(Unique, elt)]
-{-# INLINE udfmToList #-}  -- so the small case is a good producer
+-- NB: no INLINE, unlike eltsUDFM. udfmToList's one hot consumer is
+-- traverseUSDFM in the pattern-match checker, which doesn't fuse. Inlining
+-- the size dispatch into it regresses T17836.
 udfmToList (UDFM m ub)
   -- n <= 1: any order is trivially tag order, so read straight off the map
   | M.compareSize m 1 /= GT =
-      build (\c n ->
-        M.foldrWithKey (\k tv r -> c (mkUniqueGrimily k, taggedFst tv) r) n m)
+      M.foldrWithKey (\k tv r -> (mkUniqueGrimily k, taggedFst tv) : r) [] m
   | otherwise = to_list_nonempty m ub
 
 -- Precondition: m is non-empty
