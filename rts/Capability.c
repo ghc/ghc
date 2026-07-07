@@ -236,6 +236,23 @@ appendToReturningTaskQueue (Capability *cap, Task *task)
     ASSERT_RETURNING_TASKS(cap,task);
 }
 
+STATIC_INLINE void
+prependToReturningTaskQueue (Capability *cap, Task *task)
+{
+    ASSERT_LOCK_HELD(&cap->lock);
+    ASSERT(task->next == NULL);
+    task->next = cap->returning_tasks_hd;
+    cap->returning_tasks_hd = task;
+    if (cap->returning_tasks_tl == NULL) {
+        cap->returning_tasks_tl = task;
+    }
+
+    // See Note [Data race in shouldYieldCapability] in Schedule.c.
+    RELAXED_ADD(&cap->n_returning_tasks, 1);
+
+    ASSERT_RETURNING_TASKS(cap,task);
+}
+
 STATIC_INLINE Task *
 popReturningTaskQueue (Capability *cap)
 {
