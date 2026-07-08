@@ -12,7 +12,3 @@ index-state: 2026-03-10T17:36:36Z
 -- and the Cabal takes nearly twice as long to build with -O1. See #16817.
 package Cabal
   optimization: False
-
--- Build static linked, vanilla libraries to reduce build time.
-shared: False
-executable-dynamic: False
