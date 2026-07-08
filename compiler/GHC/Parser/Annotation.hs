@@ -40,8 +40,8 @@ module GHC.Parser.Annotation (
 
   -- ** Trailing annotations in lists
   TrailingAnn(..), ta_location,
-  addTrailingAnnToA, addTrailingAnnToL, addTrailingCommaToN,
-  noTrailingN,
+  addTrailingAnnToA,
+  addTrailingCommaToN, noTrailingN,
 
   -- ** Utilities for converting between different 'GenLocated' when
   -- ** we do not care about the annotations.
@@ -617,16 +617,6 @@ data AnnPragma
       } deriving (Data,Eq)
 
 -- ---------------------------------------------------------------------
-
--- | Helper function used in the parser to add a 'TrailingAnn' items
--- to an existing annotation.
-addTrailingAnnToL :: TrailingAnn -> EpAnnComments
-                  -> EpAnn AnnList -> EpAnn AnnList
-addTrailingAnnToL t cs n = n { anns = addTrailing (anns n)
-                               , comments = comments n <> cs }
-  where
-    -- See Note [list append in addTrailing*]
-    addTrailing n = n { al_trailing = al_trailing n ++ [t]}
 
 -- | Helper function used in the parser to add a 'TrailingAnn' items
 -- to an existing annotation.
