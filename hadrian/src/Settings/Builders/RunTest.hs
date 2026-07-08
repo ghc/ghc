@@ -27,7 +27,10 @@ import GHC.Toolchain.Target
 -- | Extra flags to send to the Haskell compiler to run tests.
 runTestGhcFlags :: Stage -> Action String
 runTestGhcFlags stage = do
-    unregisterised <- queryTargetTarget stage tgtUnregisterised
+    -- The test compiler built in 'stage' generates code for the platform of
+    -- the next stage (cf. 'inTreeCompilerArgs'), so query that platform's
+    -- properties. See #27479.
+    unregisterised <- queryTargetTarget (succStage stage) tgtUnregisterised
 
     let ifMinGhcVer ver opt = do v <- ghcCanonVersion
                                  if ver <= v then pure opt

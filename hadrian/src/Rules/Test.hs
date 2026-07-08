@@ -233,9 +233,15 @@ testEnv stg = do
 
     top             <- topDirectory
     pythonPath      <- builderPath Python
+    -- The test compiler is built in stage 'stg' and hence runs on the
+    -- platform of that stage, but the code it generates is for the platform
+    -- of the *next* stage (cf. 'crossStage'). TEST_CC compiles C code that
+    -- gets linked into test programs, so it must be the C compiler for the
+    -- platform the test compiler targets, not the one it runs on. See #27479.
     -- MP: TODO wrong, should use the ccPath and ccFlags from the bindist we are testing.
-    ccPath          <- queryTargetTarget stg (Toolchain.prgPath . Toolchain.ccProgram . Toolchain.tgtCCompiler)
-    ccFlags         <- queryTargetTarget stg (unwords . Toolchain.prgFlags . Toolchain.ccProgram . Toolchain.tgtCCompiler)
+    let ccStage = succStage stg
+    ccPath          <- queryTargetTarget ccStage (Toolchain.prgPath . Toolchain.ccProgram . Toolchain.tgtCCompiler)
+    ccFlags         <- queryTargetTarget ccStage (unwords . Toolchain.prgFlags . Toolchain.ccProgram . Toolchain.tgtCCompiler)
     ghcFlags        <- runTestGhcFlags stg
     let ghciFlags = ghcFlags ++ unwords
           [ "--interactive", "-v0", "-ignore-dot-ghci"
