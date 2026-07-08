@@ -653,7 +653,11 @@ def check_stats_change(actual: PerfStat,
         error = str(change) + ' from ' + baseline.perfStat.test_env + \
                 ' baseline @ %s' % baseline.commit
         print(actual.metric, error + ':')
-        result = failBecause('stat ' + error, tag='stat')
+        dev = 100.0 if expected_val == 0 else round(((float(actual.value) * 100) / int(expected_val)) - 100, 1)
+        change_line = (f'{actual.metric} {change.value} from {baseline.perfStat.test_env} '
+                       f'baseline @ {baseline.commit[:7]}: {expected_val} -> {actual.value} '
+                       f'({dev:+g}%, allowed {acceptance_window.describe()})')
+        result = failBecause('stat ' + change_line, tag='stat')
 
     if not change_allowed or force_print:
         length = max(len(str(x)) for x in [expected_val, lowerBound, upperBound, actual.value])
