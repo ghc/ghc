@@ -40,8 +40,8 @@ module GHC.Parser.Annotation (
 
   -- ** Trailing annotations in lists
   TrailingAnn(..), ta_location,
-  addTrailingAnnToA, addTrailingCommaToN,
-  noTrailingN,
+  addTrailingAnnToA,
+  addTrailingCommaToN, noTrailingN,
 
   -- ** Utilities for converting between different 'GenLocated' when
   -- ** we do not care about the annotations.
