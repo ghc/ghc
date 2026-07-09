@@ -28,6 +28,7 @@ import GHC.Unit.Module.Stage
 import GHC.Data.Graph.Directed.Reachability
 import GHC.Utils.Trace
 import GHC.Unit.Module.Graph
+import Data.IORef (newIORef)
 
 main :: IO ()
 main = do
@@ -75,5 +76,6 @@ main = do
         getModSummaryFromTarget :: FilePath -> Ghc ModSummary
         getModSummaryFromTarget file = do
           hsc_env <- getSession
-          Right ms <- liftIO $ summariseFile hsc_env (DefiniteHomeUnit mainUnitId Nothing) mempty file Nothing Nothing
+          summ_cache <- liftIO $ newIORef mempty
+          Right ms <- liftIO $ summariseFile hsc_env (DefiniteHomeUnit mainUnitId Nothing) summ_cache file Nothing Nothing
           return ms
