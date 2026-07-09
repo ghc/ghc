@@ -16,6 +16,7 @@ import GHC.Types.SourceFile
 import System.Environment
 import Control.Monad (void, when)
 import Data.Maybe (fromJust)
+import Data.IORef (newIORef)
 import Control.Exception (ExceptionWithContext(..), SomeException)
 import Control.Monad.Catch (handle, throwM)
 import Control.Exception.Context
@@ -67,7 +68,9 @@ main = do
           keyC = msKey msC
 
       let mkGraph s = do
-            ([], nodes) <- downsweepFromRootNodes hsc_env mempty Nothing [] True DownsweepUseFixed s []
+            summ_cache <- newIORef mempty
+            imps_cache <- newIORef mempty
+            ([], nodes) <- downsweepFromRootNodes hsc_env summ_cache imps_cache Nothing [] True DownsweepUseFixed s []
             return $ mkModuleGraph nodes
 
       graph <- liftIO $ mkGraph [ModuleNodeCompile msC]
@@ -98,5 +101,6 @@ main = do
         getModSummaryFromTarget :: FilePath -> Ghc ModSummary
         getModSummaryFromTarget file = do
           hsc_env <- getSession
-          Right ms <- liftIO $ summariseFile hsc_env (DefiniteHomeUnit mainUnitId Nothing) mempty file Nothing Nothing
+          summ_cache <- liftIO $ newIORef mempty
+          Right ms <- liftIO $ summariseFile hsc_env (DefiniteHomeUnit mainUnitId Nothing) summ_cache file Nothing Nothing
           return ms
