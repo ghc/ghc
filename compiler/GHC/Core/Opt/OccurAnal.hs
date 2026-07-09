@@ -2324,7 +2324,7 @@ occ_anal_lam_tail env expr@(Lam {})
                   -- one-shot info might be better than what we can infer, e.g.
                   -- due to explicit use of the magic 'oneShot' function.
                   -- See Note [oneShot magic]
-            env' = env { occ_encl = OccVanilla, occ_one_shots = env_one_shots' }
+            env' = env { occ_encl = OccInteresting, occ_one_shots = env_one_shots' }
          in go env' (bndr':rev_bndrs) body
 
     go env rev_bndrs body
@@ -2679,7 +2679,7 @@ occAnal env (Case scrut bndr ty alts)
       WUD alts_usage (tagged_bndr, alts')
          = addInScopeOne env bndr $ \env ->
            let alt_env = addBndrSwap scrut' bndr $
-                         setTailCtxt env  -- Kill off OccRhs
+                         setTailCtxt env  -- Kill off OccRhs and OccInteresting
                WUD alts_usage alts' = do_alts alt_env alts
                !tagged_bndr = tagLamBinder alts_usage bndr
                -- See Note [Strictness in the occurrence analyser]
@@ -2724,7 +2724,7 @@ occAnalArgs env fun args one_shots
 
     -- Make bottoming functions interesting
     -- See Note [Bottoming function calls]
-    encl | Var f <- fun, isDeadEndSig (idDmdSig f) = OccScrut
+    encl | Var f <- fun, isDeadEndSig (idDmdSig f) = OccInteresting
          | otherwise                               = OccVanilla
 
     go uds fun [] _ = WUD (markAllNonTail uds) fun
@@ -2752,12 +2752,12 @@ Consider
    let x = (a,b) in
    case p of
       A -> ...(error x)..
-      B -> ...(ertor x)...
+      B -> ...(error x)...
 
 postInlineUnconditionally may duplicate x's binding, but sometimes it
 does so only if the use site IsInteresting.  Pushing allocation into error
 branches is good, so we try to make bottoming calls look interesting, by
-setting occ_encl = OccScrut for such calls.
+setting occ_encl = OccInteresting for such calls.
 
 The slightly-artificial test T21128 is a good example.  It's probably
 not a huge deal.
@@ -2787,8 +2787,8 @@ occAnalApp !env (Var fun_id, [], ticks)
     !(fun', fun_id')  = lookupBndrSwap env fun_id
     !fun_uds = mkOneOcc env fun_id' int_cxt 0
     !int_cxt = case occ_encl env of
-                   OccScrut -> IsInteresting
-                   _other   -> NotInteresting
+                   OccInteresting -> IsInteresting
+                   _other         -> NotInteresting
 
 occAnalApp env (Var fun, args, ticks)
   -- Account for join arity of runRW# continuation
@@ -2837,7 +2837,7 @@ occAnalApp env (Var fun_id, args, ticks)
     !n_val_args = valArgCount args
     !n_args     = length args
     !int_cxt    = case occ_encl env of
-                   OccScrut -> IsInteresting
+                   OccInteresting -> IsInteresting
                    _other   | n_val_args > 0 -> IsInteresting
                             | otherwise      -> NotInteresting
 
@@ -2877,7 +2877,7 @@ addAppCtxt env@(OccEnv { occ_one_shots = ctxt }) args
   = env { occ_one_shots = replicate n_val_args OneShotLam ++ ctxt
         , occ_encl      = OccVanilla }
           -- OccVanilla: the function part of the application
-          -- is no longer on OccRhs or OccScrut
+          -- is no longer on OccRhs or OccInteresting
   | otherwise
   = env
   where
@@ -3061,21 +3061,21 @@ OccEncl is used to control whether to inline into constructor arguments.
 
   The OccRhs just tells occAnalApp to mark occurrences in constructor args
 
-* OccScrut: consider (case x of ...).  Here we want to give `x` OneOcc
-  with "interesting context" field int_cxt = True.  The OccScrut tells
+* OccInteresting: consider (case x of ...).  Here we want to give `x` OneOcc
+  with "interesting context" field int_cxt = True.  The OccInteresting tells
   occAnalApp (which deals with lone variables too) when to set this field
   to True.
 -}
 
 data OccEncl -- See Note [OccEncl]
   = OccRhs         -- RHS of let(rec), albeit perhaps inside a type lambda
-  | OccScrut       -- Scrutintee of a case
+  | OccInteresting       -- Scrutintee of a case
   | OccVanilla     -- Everything else
 
 instance Outputable OccEncl where
-  ppr OccRhs     = text "occRhs"
-  ppr OccScrut   = text "occScrut"
-  ppr OccVanilla = text "occVanilla"
+  ppr OccRhs         = text "occRhs"
+  ppr OccInteresting = text "occInterest"
+  ppr OccVanilla     = text "occVanilla"
 
 -- See Note [OneShots]
 type OneShots = [OneShotInfo]
@@ -3103,9 +3103,13 @@ noBinderSwaps (OccEnv { occ_bs_env = bs_env }) = isEmptyVarEnv bs_env
 
 setScrutCtxt :: OccEnv -> [CoreAlt] -> OccEnv
 setScrutCtxt !env alts
-  = setNonTailCtxt encl env
+  = setNonTailCtxt OccVanilla env
+
+{-    Historical code: we used to say OccInteresting for case-scrutinees
+                       but we no longer do so.   We can simplify a `case`
+                       without actually inlining the scrutinee.
   where
-    encl | interesting_alts = OccScrut
+    encl | interesting_alts = OccInteresting
          | otherwise        = OccVanilla
 
     interesting_alts = case alts of
@@ -3115,6 +3119,7 @@ setScrutCtxt !env alts
      -- 'interesting_alts' is True if the case has at least one
      -- non-default alternative.  That in turn influences
      -- pre/postInlineUnconditionally.  Grep for "occ_int_cxt"!
+-}
 
 -- | Mark occurrences under a cast/non-soft-scope tick as non-tail-called,
 -- except if 'occ_allow_weak_joins = True'.

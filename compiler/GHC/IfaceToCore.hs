@@ -1956,10 +1956,12 @@ rehydrating. Specifically, the following fields are moved to the
 
 * 'uf_is_conlike'
 * 'uf_is_value'
+* 'uf_is_value'
 * 'uf_is_work_free'
 * 'uf_expandable'
+* 'uf_is_vlam'
 
-These four bits make the interface files only one byte larger per
+These five bits make the interface files only one byte larger per
 unfolding; on the other hand, this does save calls to 'exprIsValue',
 'exprIsExpandable' etc for every imported Id.
 

@@ -1853,7 +1853,7 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
 
   where
     work_ok NotInsideLam _              = True
-    work_ok IsInsideLam  IsInteresting  = isCheapUnfolding unfolding
+    work_ok IsInsideLam  IsInteresting  = isValueLamUnfolding unfolding
     work_ok IsInsideLam  NotInteresting = False
       -- NotInsideLam: outside a lambda, we want to be reasonably aggressive
       -- about inlining into multiple branches of case

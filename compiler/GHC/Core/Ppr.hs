@@ -774,12 +774,14 @@ instance Outputable Unfolding where
 
 instance Outputable UnfoldingCache where
     ppr (UnfoldingCache { uf_is_value = hnf, uf_is_conlike = conlike
-                        , uf_is_work_free = wf, uf_expandable = exp })
+                        , uf_is_work_free = wf, uf_expandable = exp
+                        , uf_is_vlam = vl })
         = fsep $ punctuate comma
           [ text "Value="      <> ppr hnf
           , text "ConLike="    <> ppr conlike
           , text "WorkFree="   <> ppr wf
-          , text "Expandable=" <> ppr exp ]
+          , text "Expandable=" <> ppr exp
+          , text "Val-lambda=" <> ppr vl ]
 
 {-
 -----------------------------------------------------
