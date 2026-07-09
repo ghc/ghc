@@ -24,6 +24,7 @@ import Control.Monad.Catch (handle, throwM)
 import Control.Exception.Context
 import GHC.Driver.MakeFile
 import GHC.Utils.Outputable
+import Data.IORef (newIORef)
 -- | Convert a ModuleNodeCompile to a ModuleNodeFixed
 convertToFixed :: ModuleNodeInfo -> ModuleNodeInfo
 convertToFixed (ModuleNodeCompile ms) =
@@ -151,5 +152,6 @@ main = do
         getModSummaryFromTarget :: FilePath -> Ghc ModSummary
         getModSummaryFromTarget file = do
           hsc_env <- getSession
-          Right ms <- liftIO $ summariseFile hsc_env (DefiniteHomeUnit mainUnitId Nothing) mempty file Nothing Nothing
+          summ_cache <- liftIO $ newIORef mempty
+          Right ms <- liftIO $ summariseFile hsc_env (DefiniteHomeUnit mainUnitId Nothing) summ_cache file Nothing Nothing
           return ms
