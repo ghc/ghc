@@ -10165,6 +10165,7 @@ module System.Environment where
   getEnv :: GHC.Internal.Base.String -> GHC.Internal.Types.IO GHC.Internal.Base.String
   getEnvironment :: GHC.Internal.Types.IO [(GHC.Internal.Base.String, GHC.Internal.Base.String)]
   getExecutablePath :: GHC.Internal.Types.IO GHC.Internal.IO.FilePath
+  getFullArgs :: GHC.Internal.Types.IO [GHC.Internal.Base.String]
   getProgName :: GHC.Internal.Types.IO GHC.Internal.Base.String
   lookupEnv :: GHC.Internal.Base.String -> GHC.Internal.Types.IO (GHC.Internal.Maybe.Maybe GHC.Internal.Base.String)
   setEnv :: GHC.Internal.Base.String -> GHC.Internal.Base.String -> GHC.Internal.Types.IO ()
