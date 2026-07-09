@@ -1,0 +1,7 @@
+"-- Successfully load modules if file target is not imported"
+:! cp Main2.hs src/Main.hs
+:load src/Main.hs src/Bar.hs
+main
+:! cp Main1.hs src/Main.hs
+"-- Crash on reload as we import a file target that has the wrong module name"
+:reload

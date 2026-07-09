@@ -1,0 +1,5 @@
+src/Bar.hs:1:8: error: [GHC-28623]
+    File name does not match module name:
+    Saw     : ‘Foo’
+    Expected: ‘Bar’
+
