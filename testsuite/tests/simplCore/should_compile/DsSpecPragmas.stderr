@@ -47,7 +47,11 @@
            ($dEq :: Eq b)
            ($dMonad [Occ=Dead] :: Monad (ST s)).
       f4 @b @(ST s) $dEq $dMonad
-      = $fApplicativeST_$cpure @s @b
+      = (\ (eta [Occ=Once1] :: b)
+           (eta1 [Occ=Once1, OS=OneShot] :: State# s) ->
+           (# eta1, eta #))
+        `cast` (Sym (<b>_R ->_R N:ST <s>_N <b>_R)
+                :: Coercible (b -> STRep s b) (b -> ST s b))
 "USPEC f4_qc @Int @_ @_"
     forall (@(r :: (* -> *) -> * -> *))
            (@(n :: * -> *))
