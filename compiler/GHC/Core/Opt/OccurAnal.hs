@@ -37,7 +37,7 @@ import GHC.Prelude hiding ( head, init, last, tail )
 
 import GHC.Core
 import GHC.Core.FVs
-import GHC.Core.Utils   ( exprIsTrivial, isDefaultAlt, isExpandableApp,
+import GHC.Core.Utils   ( exprIsTrivial, isExpandableApp,
                           mkCastMCo, mkTicks, BinderSwapDecision(..), scrutOkForBinderSwap )
 import GHC.Core.Opt.Arity   ( joinRhsArity, isOneShotBndr )
 import GHC.Core.Coercion
@@ -3102,7 +3102,7 @@ noBinderSwaps :: OccEnv -> Bool
 noBinderSwaps (OccEnv { occ_bs_env = bs_env }) = isEmptyVarEnv bs_env
 
 setScrutCtxt :: OccEnv -> [CoreAlt] -> OccEnv
-setScrutCtxt !env alts
+setScrutCtxt !env _alts
   = setNonTailCtxt OccVanilla env
 
 {-    Historical code: we used to say OccInteresting for case-scrutinees
