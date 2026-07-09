@@ -222,6 +222,19 @@ copyPackage context@Context {..} = do
         C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
             [ "copy", "--builddir", ctxPath, "--target-package-db", pkgDbPath, v ]
 
+    -- TODO This is windows only
+    -- TODO Future versions of cabal should do this for us in the above "copy" command
+    -- Copy missing .dll.a files
+    dir <- Context.buildPath context
+    files <- getDirectoryFiles "." [ dir -/- "*.dll.a" ]
+    libDir <- distDynDir context
+    forM_ files $ \file -> do
+        let fileCopy = libDir </> takeFileName file
+        copyFileUntracked file fileCopy
+        produces [fileCopy]
+
+
+
 shakeVerbosityToCabalFlag :: Verbosity -> String
 shakeVerbosityToCabalFlag = \case
     Diagnostic -> "-v3"

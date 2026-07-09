@@ -2058,8 +2058,8 @@ checkHSLib _verbosity dirs lib = do
                    "lib" ++ lib ++ "_p" ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".so",
                    "lib" ++ lib ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dylib",
                    "lib" ++ lib ++ "_p" ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dylib",
-                   lib ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dll",
-                   lib ++ "_p" ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dll",
+                   lib ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dll.a",
+                   lib ++ "_p" ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dll.a",
                    lib ++ ".bytecodelib"
                   ]
   b <- liftIO $ doesFileExistOnPath filenames dirs
