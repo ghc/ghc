@@ -2,6 +2,7 @@
 
 // This is not a test of atomic semantics,
 // just checking that GHC can parse %fetch_fooXX
+// and %load/%store with explicit ordering
 
 cmm_foo64 (P_ p)
 {
@@ -19,6 +20,10 @@ cmm_foo64 (P_ p)
   (x) = prim %fetch_xor64(q, 33 :: I64);
   (x) = prim %fetch_nand64(q, 127 :: I64);
   (x) = prim %load_seqcst64(q);
+  prim %store_relaxed64(q, x);
+  (x) = prim %load_relaxed64(q);
+  prim %store_release64(q, x);
+  (x) = prim %load_acquire64(q);
   return (x);
 }
 
@@ -38,6 +43,10 @@ cmm_foo32 (P_ p)
   (x) = prim %fetch_xor32(q, 33 :: I32);
   (x) = prim %fetch_nand32(q, 127 :: I32);
   (x) = prim %load_seqcst32(q);
+  prim %store_relaxed32(q, x);
+  (x) = prim %load_relaxed32(q);
+  prim %store_release32(q, x);
+  (x) = prim %load_acquire32(q);
   return (x);
 }
 
@@ -57,6 +66,10 @@ cmm_foo16 (P_ p)
   (x) = prim %fetch_xor16(q, 33 :: I16);
   (x) = prim %fetch_nand16(q, 127 :: I16);
   (x) = prim %load_seqcst16(q);
+  prim %store_relaxed16(q, x);
+  (x) = prim %load_relaxed16(q);
+  prim %store_release16(q, x);
+  (x) = prim %load_acquire16(q);
   return (x);
 }
 
@@ -76,5 +89,9 @@ cmm_foo8 (P_ p)
   (x) = prim %fetch_xor8(q, 33 :: I8);
   (x) = prim %fetch_nand8(q, 127 :: I8);
   (x) = prim %load_seqcst8(q);
+  prim %store_relaxed8(q, x);
+  (x) = prim %load_relaxed8(q);
+  prim %store_release8(q, x);
+  (x) = prim %load_acquire8(q);
   return (x);
 }
