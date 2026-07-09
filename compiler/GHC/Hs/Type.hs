@@ -898,12 +898,11 @@ splitLHsGadtTy (L _ sig_ty)
   | (outer_bndrs, sigma_ty) <- split_outer_bndrs sig_ty
   , (inner_bndrs, phi_ty)   <- split_inner_bndrs sigma_ty
   , (mb_ctxt, rho_ty)       <- splitLHsQualTy_KP phi_ty
-  = case rho_ty of
-      L _ (HsFunTy _ _ (L _ (XHsType HsRecTy{})) _) | not (null inner_bndrs)
+  = if is_gadt_rec_ty rho_ty && not (null inner_bndrs)
         -- Bad! Record GADTs are not allowed to have inner_bndrs,
         -- undo the split to get a proper error message later
-        -> (outer_bndrs, [], Nothing, sigma_ty)
-      _ -> (outer_bndrs, inner_bndrs, mb_ctxt, rho_ty)
+      then (outer_bndrs, [], Nothing, sigma_ty)
+      else (outer_bndrs, inner_bndrs, mb_ctxt, rho_ty)
   where
     split_outer_bndrs :: HsSigType GhcPs -> (HsOuterSigTyVarBndrs GhcPs, LHsType GhcPs)
     split_outer_bndrs (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty}) =
@@ -914,7 +913,16 @@ splitLHsGadtTy (L _ sig_ty)
                                       , hst_body = body })
       = let ~(teles, t) = split_inner_bndrs body
         in (tele:teles, t)
+    split_inner_bndrs t@(L _ (HsParTy _ ty))
+      | not (is_gadt_rec_ty ty)
+      = split_inner_bndrs ty
+      | otherwise
+      = ([], t)
     split_inner_bndrs t = ([], t)
+
+    -- type of form {fld :: ty, ...} -> ResTy
+    is_gadt_rec_ty (L _ (HsFunTy _ _ (L _ (XHsType HsRecTy{})) _)) = True
+    is_gadt_rec_ty _ = False
 
 -- | Decompose a type of the form @forall <tvs>. body@ into its constituent
 -- parts. Only splits type variable binders that

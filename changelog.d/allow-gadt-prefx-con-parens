@@ -1,0 +1,16 @@
+section: language
+synopsis: Allow parentheses in prefix GADT constructor declarations, as specified
+  by GHC Proposal #402 "Stable GADT constructor syntax".
+issues: #27423
+mrs: !16321
+
+description: {
+  Parenthesized types are now accepted in prefix GADT constructor declarations,
+  even when they contain explicit ``forall`` quantifiers. For example:
+
+    data T where
+      MkT :: (forall a. a -> b -> T)
+
+  This is equivalent to ``MkT :: forall {b}. (forall a. a -> b -> T)``, so the
+  forall-or-nothing rule continues to be respected.
+}

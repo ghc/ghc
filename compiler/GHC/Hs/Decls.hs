@@ -910,12 +910,27 @@ pprConDecl (ConDeclGADT { con_names = cons
                         , con_res_ty = res_ty, con_modifiers = mods, con_doc = doc })
   = pprMaybeWithDoc doc $ pprLHsModifiers mods <+> ppr_con_names (toList cons) <+> dcolon
     <+> (sep [pprHsOuterSigTyVarBndrs outer_bndrs
+                <+> inner_bndrs_lguard
                 <+> hsep (map pprHsForAllTelescope inner_bndrs)
                 <+> pprLHsContext mcxt,
-              sep (ppr_args args ++ [ppr res_ty]) ])
+              sep (ppr_args args ++ [ppr res_ty]),
+              inner_bndrs_rguard ])
   where
     ppr_args (PrefixConGADT _ args) = map (pprHsConDeclFieldWith (\arr tyDoc -> tyDoc <+> pprHsModifiedFunArr arr)) args
     ppr_args (RecConGADT _ fields) = [pprHsConDeclRecFields (unLoc fields) <+> arrow]
+
+    -- We may have inner binders without outer ones, for example:
+    --   data D a where MkD :: forall. forall a. D a
+    -- and
+    --   data D a where MkD :: (forall a. D a)
+    -- These cases have different outer_bndrs: explicit or implicit.
+    -- We want to add an empty `forall.` or wrap type into parentheses
+    -- to highlight the fact that binds in the question are indeed inner.
+    (inner_bndrs_lguard, inner_bndrs_rguard)
+      | null inner_bndrs = (empty, empty)
+      | HsOuterImplicit{} <- outer_bndrs = (lparen, rparen)
+      | HsOuterExplicit{hso_bndrs=[]} <- outer_bndrs = (text "forall" <+> text ".", empty)
+      | otherwise = (empty, empty)
 
 ppr_con_names :: (OutputableBndr a) => [GenLocated l a] -> SDoc
 ppr_con_names = pprWithCommas (pprPrefixOcc . unLoc)

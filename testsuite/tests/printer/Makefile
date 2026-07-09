@@ -932,3 +932,8 @@ PprModifiers:
 PprQualifiedStrings:
 	$(CHECK_PPR)   $(LIBDIR) PprQualifiedStrings.hs
 	$(CHECK_EXACT) $(LIBDIR) PprQualifiedStrings.hs
+
+.PHONY: T27423c
+T27423c:
+	$(CHECK_PPR)   $(LIBDIR) T27423c.hs
+	$(CHECK_EXACT) $(LIBDIR) T27423c.hs
