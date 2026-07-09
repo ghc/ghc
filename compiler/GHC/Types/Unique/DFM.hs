@@ -347,8 +347,21 @@ elemUDFM k (UDFM m _i) = M.member (getKey $ getUnique k) m
 -- See Note [Cost of deterministic iteration].
 foldUDFM :: (elt -> a -> a) -> a -> UniqDFM key elt -> a
 {-# INLINE foldUDFM #-}
--- This INLINE prevents a regression in !10568
-foldUDFM k z m = foldr k z (eltsUDFM m)
+-- The INLINE prevents a regression in !10568 and, together with the placement
+-- sort's build form, lets the non-empty path fold directly over the sorted
+-- readout with no intermediate list. See Note [Sorting a UDFM].
+foldUDFM k z (UDFM m ub)
+  -- n <= 1: any order is trivially tag order, so fold straight over the map
+  | M.compareSize m 1 /= GT = M.foldr (k . taggedFst) z m
+  | otherwise               = fold_elts_nonempty k z m ub
+
+-- Precondition: m is non-empty. Out of line (like elts_nonempty) so foldUDFM's
+-- consumers don't inline the sort machinery; but placementSort's build fuses
+-- with the foldr here, so the placement path folds without building a list.
+fold_elts_nonempty :: (elt -> a -> a) -> a -> M.Word64Map (TaggedVal elt) -> Int -> a
+fold_elts_nonempty k z m ub
+  | usePlacement m ub = foldr k z (placementSort ub (\_ tv -> tv) m)
+  | otherwise         = foldr k z (map taggedFst (sort_it m))
 
 -- | Like 'foldUDFM' but the function also receives a key.
 --
@@ -420,6 +433,13 @@ O(ub) -- with no comparisons. The readout is lazy, so consumers that demand
 only a prefix pay almost nothing beyond the fill (but the fill itself is
 unavoidable; see Note [Cost of deterministic iteration]).
 
+placementSort emits the readout as a 'build', so foldr/build fusion applies.
+An eltsUDFM consumer materialises the list (build reduces to cons/nil); a
+foldUDFM consumer instead has its combiner threaded straight into the readout,
+folding the sorted elements with no intermediate list. foldUDFM is INLINE and
+dispatches through the out-of-line fold_elts_nonempty, where the fusion happens
+once -- so the fold is list-free without inlining the sort into every consumer.
+
 Holes: slots whose tag never occurs keep the initial sentinel, a TaggedVal
 with tag -1. Real tags are non-negative, so the readout skips on tag < 0.
 The sentinel's value field is never read, but something must fill it: not a
@@ -453,12 +473,10 @@ placementSort :: forall e r. Int
               -> (M.Key -> TaggedVal e -> TaggedVal r)
               -> M.Word64Map (TaggedVal e)
               -> [r]
-{-# INLINE placementSort #-}  -- specializes mk into the fill loop
-placementSort ub mk m = runST (ST (\s0 ->
-  case newSmallArray ub hole s0 of
-    (# s1, marr #) -> case fill marr s1 of
-      (# s2, () #) -> case unsafeFreezeSmallArray marr s2 of
-        (# s3, arr #) -> (# s3, readout arr 0 #)))
+{-# INLINE placementSort #-}  -- specializes mk into the fill loop; makes the
+                              -- readout a good producer that fuses with a
+                              -- consuming fold. See Note [Sorting a UDFM].
+placementSort ub mk m = build gen
   where
     -- The tag -1 marks unfilled slots; the value field is never read, but
     -- it is strict, so it needs a real value of type r -- borrow one from
@@ -473,12 +491,22 @@ placementSort ub mk m = runST (ST (\s0 ->
         write k tv = ST (\s' ->
           (# writeSmallArray marr (taggedSnd tv) (mk k tv) s', () #))
 
-    readout :: SmallArray (TaggedVal r) -> Int -> [r]
-    readout arr j
-      | j >= ub   = []
-      | t < 0     = readout arr (j + 1)
-      | otherwise = v : readout arr (j + 1)
-      where TaggedVal v t = indexSmallArray arr j
+    -- Written as a build so that foldr/build fusion lets a consuming fold
+    -- (foldUDFM) apply its combiner during readout, with no cons cells.
+    -- Unfused (eltsUDFM), build reduces to cons/nil and yields the list.
+    gen :: forall b. (r -> b -> b) -> b -> b
+    gen cons nil = runST (ST (\s0 ->
+      case newSmallArray ub hole s0 of
+        (# s1, marr #) -> case fill marr s1 of
+          (# s2, () #) -> case unsafeFreezeSmallArray marr s2 of
+            (# s3, arr #) -> (# s3, readout arr 0 #)))
+      where
+        readout :: SmallArray (TaggedVal r) -> Int -> b
+        readout arr j
+          | j >= ub   = nil
+          | t < 0     = readout arr (j + 1)
+          | otherwise = cons v (readout arr (j + 1))
+          where TaggedVal v t = indexSmallArray arr j
 
 filterUDFM :: (elt -> Bool) -> UniqDFM key elt -> UniqDFM key elt
 filterUDFM p (UDFM m i) = UDFM (M.filter (\(TaggedVal v _) -> p v) m) i
