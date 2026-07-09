@@ -15,6 +15,7 @@
 module System.Environment
     (
       getArgs,
+      getFullArgs,
       getProgName,
       executablePath,
       getExecutablePath,
@@ -27,4 +28,5 @@ module System.Environment
       getEnvironment,
   ) where
 
+import GHC.Internal.Environment (getFullArgs)
 import GHC.Internal.System.Environment
