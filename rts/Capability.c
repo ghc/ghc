@@ -413,7 +413,7 @@ void initCapabilities (void)
         max_n_capabilities = RtsFlags.ParFlags.nCapabilities;
     }
 
-    capabilities = stgMallocBytes(sizeof(Capability) * max_n_capabilities, "initCapabilities");
+    capabilities = stgMallocBytes(sizeof(Capability *) * max_n_capabilities, "initCapabilities");
 
     n_capabilities = 0;
     moreCapabilities(0, RtsFlags.ParFlags.nCapabilities);
@@ -422,7 +422,7 @@ void initCapabilities (void)
 #else /* !THREADED_RTS */
 
     n_capabilities = 1;
-    capabilities = stgMallocBytes(sizeof(Capability), "initCapabilities");
+    capabilities = stgMallocBytes(sizeof(Capability *), "initCapabilities");
     capabilities[0] = &MainCapability;
 
     initCapability(&MainCapability, 0);
