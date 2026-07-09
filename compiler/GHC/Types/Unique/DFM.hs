@@ -441,12 +441,21 @@ dispatches through the out-of-line fold_elts_nonempty, where the fusion happens
 once -- so the fold is list-free without inlining the sort into every consumer.
 
 Holes: slots whose tag never occurs keep the initial sentinel, a TaggedVal
-with tag -1. Real tags are non-negative, so the readout skips on tag < 0.
-The sentinel's value field is never read, but something must fill it: not a
-panic thunk -- TaggedVal's strict value field would force it as soon as the
-readout inspects a hole's tag -- so we borrow the value of an arbitrary map
-element. (Safe: the callers' guards send maps of size < 2 down a different
-path, so the map is never empty here.)
+with tag -1. Real tags are non-negative, so the readout skips on tag < 0 and
+never reads the sentinel's value field. But that field is strict, so the
+sentinel still needs a value in WHNF: a panic thunk is out (it would be forced
+-- and crash -- the moment the readout inspects a hole's tag). We use
+@unsafeCoerce ()@: () is a static, already-evaluated nullary constructor, so
+the sentinel is one shared top-level value -- no per-call allocation, and it
+retains nothing.
+
+The unsafeCoerce is safe here because r is always a lifted, boxed (pointer)
+type -- it comes from the map's elements -- so a pointer to () has the right
+representation. The GC only ever traces that pointer (() is a valid closure);
+the value is never evaluated or used as an r, since the readout takes values
+only from filled slots. Borrowing a real element instead would also type-check
+but costs a per-call thunk that retains the whole source map until the holes
+are read.
 
 This sorting method loses when ub is much larger than n = M.size m: ub never
 shrinks (overwrites keep bumping it, delete/filter shrink n but not ub). We
@@ -478,12 +487,10 @@ placementSort :: forall e r. Int
                               -- consuming fold. See Note [Sorting a UDFM].
 placementSort ub mk m = build gen
   where
-    -- The tag -1 marks unfilled slots; the value field is never read, but
-    -- it is strict, so it needs a real value of type r -- borrow one from
-    -- the map. See Note [Sorting a UDFM].
+    -- The tag -1 marks unfilled slots; the value field is never read, but it
+    -- is strict, so it needs a WHNF value of type r. See Note [Sorting a UDFM].
     hole :: TaggedVal r
-    hole = case M.findMin m of
-      (k, tv) -> TaggedVal (taggedFst (mk k tv)) (-1)
+    hole = TaggedVal (unsafeCoerce ()) (-1)
 
     fill :: SmallMutableArray s (TaggedVal r) -> State# s -> (# State# s, () #)
     fill marr s = case M.traverseWithKey_ write m of ST st -> st s
