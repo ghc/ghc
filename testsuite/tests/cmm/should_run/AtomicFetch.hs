@@ -6,6 +6,7 @@
 
 -- This is not a test of atomic semantics,
 -- just checking that GHC can parse %fetch_fooXX
+-- and %load/%store with explicit ordering
 
 import GHC.Exts
 import GHC.Int

@@ -1210,9 +1210,10 @@ callishMachOps platform = listToUFM $
     , allWidths "pext" MO_Pext
     , allWidths "cmpxchg" MO_Cmpxchg
     , allWidths "xchg" MO_Xchg
-    , allWidths "load_relaxed" (\w -> MO_AtomicRead w MemOrderAcquire)
+    , allWidths "load_relaxed" (\w -> MO_AtomicRead w MemOrderRelaxed)
     , allWidths "load_acquire" (\w -> MO_AtomicRead w MemOrderAcquire)
     , allWidths "load_seqcst" (\w -> MO_AtomicRead w MemOrderSeqCst)
+    , allWidths "store_relaxed" (\w -> MO_AtomicWrite w MemOrderRelaxed)
     , allWidths "store_release" (\w -> MO_AtomicWrite w MemOrderRelease)
     , allWidths "store_seqcst" (\w -> MO_AtomicWrite w MemOrderSeqCst)
     , allWidths "fetch_add" (\w -> MO_AtomicRMW w AMO_Add)
