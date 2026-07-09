@@ -67,7 +67,7 @@ module GHC.Core (
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
         isStableUnfolding, isStableUserUnfolding, isStableSystemUnfolding,
         isInlineUnfolding, isBootUnfolding, isBetterUnfoldingThan,
-        hasCoreUnfolding, hasSomeUnfolding, 
+        hasCoreUnfolding, hasSomeUnfolding,
         canUnfold, neverUnfoldGuidance, isStableSource,
 
         -- * Annotated expression data types
