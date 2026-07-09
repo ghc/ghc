@@ -63,11 +63,11 @@ module GHC.Core (
         -- ** Predicates and deconstruction on 'Unfolding'
         expandUnfolding_maybe, expandUnfolding_always,
         maybeUnfoldingTemplate, otherCons,
-        isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
+        isValueUnfolding, isEvaldUnfolding, isCheapUnfolding, isValueLamUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
         isStableUnfolding, isStableUserUnfolding, isStableSystemUnfolding,
         isInlineUnfolding, isBootUnfolding, isBetterUnfoldingThan,
-        hasCoreUnfolding, hasSomeUnfolding,
+        hasCoreUnfolding, hasSomeUnfolding, 
         canUnfold, neverUnfoldGuidance, isStableSource,
 
         -- * Annotated expression data types
@@ -1781,15 +1781,16 @@ data Unfolding
 -- See Note [UnfoldingCache]
 data UnfoldingCache
   = UnfoldingCache {
-        uf_is_value   :: !Bool,         -- exprIsHNF template (cached); it is ok to discard
-                                        --      a `seq` on this variable
-        uf_is_conlike :: !Bool,         -- True <=> applicn of constructor or CONLIKE function
-                                        --      Cached version of exprIsConLike
-        uf_is_work_free :: !Bool,       -- True <=> doesn't waste (much) work to expand
-                                        --          inside an inlining
-                                        --      Cached version of exprIsCheap
-        uf_expandable :: !Bool          -- True <=> can expand in RULE matching
-                                        --      Cached version of exprIsExpandable
+        uf_is_value   :: !Bool,   -- Cached version of exprIsHNF
+                                  --    True <=> it is ok to discard a `seq` on this variable
+        uf_is_conlike :: !Bool,   -- Cached version of exprIsConLike
+                                  --    True <=> applicn of constructor or CONLIKE function
+        uf_is_work_free :: !Bool, -- Cached version of exprIsCheap
+                                  --    True <=> doesn't waste (much) work to expand
+                                  --             inside an inlining
+        uf_expandable :: !Bool,   -- Cached version of exprIsExpandable
+                                  --    True <=> can expand in RULE matching
+        uf_is_vlam :: !Bool       -- Cached version of (manifestArity > 0); is it a value lambda
     }
   deriving (Eq)
 
@@ -1959,6 +1960,10 @@ isConLikeUnfolding _                                    = False
 isCheapUnfolding :: Unfolding -> Bool
 isCheapUnfolding (CoreUnfolding { uf_cache = cache }) = uf_is_work_free cache
 isCheapUnfolding _                                    = False
+
+isValueLamUnfolding :: Unfolding -> Bool
+isValueLamUnfolding (CoreUnfolding { uf_cache = cache }) = uf_is_vlam cache
+isValueLamUnfolding _                                    = False
 
 isExpandableUnfolding :: Unfolding -> Bool
 isExpandableUnfolding (CoreUnfolding { uf_cache = cache }) = uf_expandable cache

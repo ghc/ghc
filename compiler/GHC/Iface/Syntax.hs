@@ -2799,23 +2799,25 @@ instance Binary IfGuidance where
 
 putUnfoldingCache :: WriteBinHandle -> IfUnfoldingCache -> IO ()
 putUnfoldingCache bh (UnfoldingCache { uf_is_value = hnf, uf_is_conlike = conlike
-                                     , uf_is_work_free = wf, uf_expandable = exp }) = do
-    let b = zeroBits .<<|. hnf .<<|. conlike .<<|. wf .<<|. exp
-    putByte bh b
+                                     , uf_is_work_free = wf, uf_expandable = exp
+                                     , uf_is_vlam = vl })
+ = do { let b = zeroBits .<<|. hnf .<<|. conlike .<<|. wf .<<|. exp .<<|. vl
+      ; putByte bh b }
 
 getUnfoldingCache :: ReadBinHandle -> IO IfUnfoldingCache
 getUnfoldingCache bh = do
     b <- getByte bh
-    let hnf     = testBit b 3
-        conlike = testBit b 2
-        wf      = testBit b 1
-        exp     = testBit b 0
+    let hnf     = testBit b 4
+        conlike = testBit b 3
+        wf      = testBit b 2
+        exp     = testBit b 1
+        vl      = testBit b 0
     return (UnfoldingCache { uf_is_value = hnf, uf_is_conlike = conlike
-                           , uf_is_work_free = wf, uf_expandable = exp })
+                           , uf_is_work_free = wf, uf_expandable = exp
+                           , uf_is_vlam = vl })
 
 seqUnfoldingCache :: IfUnfoldingCache -> ()
-seqUnfoldingCache (UnfoldingCache hnf conlike wf exp) =
-    rnf hnf `seq` rnf conlike `seq` rnf wf `seq` rnf exp `seq` ()
+seqUnfoldingCache (UnfoldingCache {}) = ()  -- All its fields are strict!
 
 infixl 9 .<<|.
 (.<<|.) :: (Num a, Bits a) => a -> Bool -> a

@@ -371,11 +371,13 @@ mkCoreUnfolding src top_lvl expr precomputed_cache guidance
     is_conlike    = exprIsConLike expr
     is_work_free  = exprIsWorkFree expr
     is_expandable = exprIsExpandable expr
+    is_vlam       = manifestArity expr > 0
 
     recomputed_cache = UnfoldingCache { uf_is_value = is_value
                                       , uf_is_conlike = is_conlike
                                       , uf_is_work_free = is_work_free
-                                      , uf_expandable = is_expandable }
+                                      , uf_expandable = is_expandable
+                                      , uf_is_vlam = is_vlam }
 
     cache = fromMaybe recomputed_cache precomputed_cache
 
