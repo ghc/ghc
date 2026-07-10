@@ -1053,7 +1053,8 @@ scheduleProcessInbox (Capability **pcap USED_IF_THREADS)
 
         while (p != NULL) {
             pnext = p->link;
-            performTryPutMVar(cap, (StgMVar*)deRefStablePtr(p->mvar),
+            performTryPutMVar(cap,
+                              (StgMVar*)UNTAG_CLOSURE((StgClosure*)deRefStablePtr(p->mvar)),
                               Unit_closure);
             freeStablePtr(p->mvar);
             stgFree(p);

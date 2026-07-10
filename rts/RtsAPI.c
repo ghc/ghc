@@ -982,7 +982,9 @@ void hs_try_putmvar_with_value (/* in */ int capability,
 
 #if !defined(THREADED_RTS)
 
-    performTryPutMVar(cap, (StgMVar*)deRefStablePtr(mvar), value);
+    // MVar# pointers carry tag 1; see Note [Pointer tagging of unlifted boxed
+    // primitives] in GHC.StgToCmm.Prim.
+    performTryPutMVar(cap, (StgMVar*)UNTAG_CLOSURE((StgClosure*)deRefStablePtr(mvar)), value);
     freeStablePtr(mvar);
 
 #else
@@ -995,7 +997,8 @@ void hs_try_putmvar_with_value (/* in */ int capability,
         task->cap = cap;
         RELEASE_LOCK(&cap->lock);
 
-        performTryPutMVar(cap, (StgMVar*)deRefStablePtr(mvar), value);
+        performTryPutMVar(cap, (StgMVar*)UNTAG_CLOSURE((StgClosure*)deRefStablePtr(mvar)),
+                          value);
 
         freeStablePtr(mvar);
 

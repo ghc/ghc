@@ -78,7 +78,9 @@ void sendCloneStackMessage(StgTSO *tso, HsStablePtr mvar) {
   MessageCloneStack *msg;
   msg = (MessageCloneStack *)allocate(srcCapability, sizeofW(MessageCloneStack));
   msg->tso = tso;
-  msg->result = (StgMVar*)deRefStablePtr(mvar);
+  // MVar# pointers carry tag 1; see Note [Pointer tagging of unlifted boxed
+  // primitives] in GHC.StgToCmm.Prim.
+  msg->result = (StgMVar*)UNTAG_CLOSURE((StgClosure*)deRefStablePtr(mvar));
   SET_HDR_RELEASE(msg, &stg_MSG_CLONE_STACK_info, CCS_SYSTEM);
 
   sendMessage(srcCapability, tso->cap, (Message *)msg);
