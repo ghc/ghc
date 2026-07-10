@@ -1,0 +1,15 @@
+section: codegen
+synopsis: Pointers to boxed unlifted primitives (``ByteArray#``, ``Array#``,
+  ``MVar#``, ...) are now tagged, and entering a taggable normal form is
+  reported.
+issues: #23173
+mrs: !16259
+
+description: {
+  References to boxed unlifted primitive values such as ``ByteArray#``,
+  ``Array#`` or ``MVar#`` now carry pointer tag 1, like single-constructor
+  data types. Together with this, GHC now enforces the invariant that the
+  entry code of a taggable normal form is unreachable: entering such a
+  closure prints a one-shot warning at runtime, or aborts the program when
+  the new RTS flag ``--fatal-enter-taggable`` is given.
+}

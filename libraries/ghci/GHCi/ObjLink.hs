@@ -302,6 +302,10 @@ isWindowsHost = False
 #endif
 
 #if defined(wasm32_HOST_ARCH)
+-- The wasm dynamic linker resolves symbols out of process, so the RTS
+-- helper below is unavailable; looked-up constructor closures stay
+-- untagged and forcing one triggers the (non-fatal) enter-taggable
+-- warning.
 tagClosurePtr :: Ptr a -> Ptr a
 tagClosurePtr = id
 #else
