@@ -92,8 +92,15 @@ cgOpApp (StgPrimOp primop) args res_ty = do
     cmm_args <- getNonVoidArgAmodes args
     -- See Note [Pointer tagging of unlifted boxed primitives]
     let decl_tys = map scaledThing (fst (splitFunTys (dropForAlls (primOpType primop))))
-        nv_decl_tys = [ dty
-                      | (dty, arg) <- zip decl_tys args
+        -- Unarisation splits a declared unboxed-tuple argument (e.g.
+        -- packFloatX4#'s) into several STG args, breaking positional
+        -- alignment with the declared types. No such primop takes a boxed
+        -- pointer through a tuple, so fall back to not untagging anything.
+        mb_decl_tys
+          | decl_tys `equalLength` args = map Just decl_tys
+          | otherwise                   = map (const Nothing) args
+        nv_decl_tys = [ mb_dty
+                      | (mb_dty, arg) <- zip mb_decl_tys args
                       , not (null (stgArgRep arg)) ]
         cmm_args' = zipWith3 (untagPrimArg platform) nv_decl_tys (nonVoidStgArgs args) cmm_args
         -- The RTS dereferences the key field of a Weak directly (GC key
@@ -145,9 +152,10 @@ cmmPrimOpApp cfg primop cmm_args mres_ty = do
 --    yet (e.g. ThreadId#s in the array filled in by C listThreads).
 --
 -- See Note [Pointer tagging of unlifted boxed primitives].
-untagPrimArg :: Platform -> Type -> NonVoid StgArg -> CmmExpr -> CmmExpr
-untagPrimArg platform decl_ty nv_arg e
-  | Just tc <- tyConAppTyCon_maybe decl_ty
+untagPrimArg :: Platform -> Maybe Type -> NonVoid StgArg -> CmmExpr -> CmmExpr
+untagPrimArg platform mb_decl_ty nv_arg e
+  | Just decl_ty <- mb_decl_ty
+  , Just tc <- tyConAppTyCon_maybe decl_ty
   = if isKnownTag1PrimTyCon tc
       then cmmOffsetB platform e (-1)
       else if isUnliftedBoxedTy (stgArgType (fromNonVoid nv_arg))
