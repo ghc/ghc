@@ -143,7 +143,7 @@ eval:
     case ARR_WORDS: {
 
         (should) = ccall shouldCompact(compact "ptr", p "ptr");
-        if (should == SHOULDCOMPACT_IN_CNF) { P_[pp] = p; return(); }
+        if (should == SHOULDCOMPACT_IN_CNF) { P_[pp] = tag | p; return(); }
         if (should == SHOULDCOMPACT_PINNED) {
             jump stg_raisezh(HsIface_cannotCompactPinned_closure(W_[ghc_hs_iface]));
         }
@@ -154,7 +154,7 @@ eval:
         W_ size;
         size = SIZEOF_StgArrBytes + StgArrBytes_bytes(p);
         ALLOCATE(compact, ROUNDUP_BYTES_TO_WDS(size), p, to, tag);
-        P_[pp] = to;
+        P_[pp] = tag | to;
         prim %memcpy(to, p, size, 1);
         return();
     }
@@ -164,7 +164,7 @@ eval:
         MUT_ARR_PTRS_FROZEN_CLEAN: {
 
         (should) = ccall shouldCompact(compact "ptr", p "ptr");
-        if (should == SHOULDCOMPACT_IN_CNF) { P_[pp] = p; return(); }
+        if (should == SHOULDCOMPACT_IN_CNF) { P_[pp] = tag | p; return(); }
 
         CHECK_HASH();
 
@@ -196,7 +196,7 @@ eval:
         SMALL_MUT_ARR_PTRS_FROZEN_CLEAN: {
 
         (should) = ccall shouldCompact(compact "ptr", p "ptr");
-        if (should == SHOULDCOMPACT_IN_CNF) { P_[pp] = p; return(); }
+        if (should == SHOULDCOMPACT_IN_CNF) { P_[pp] = tag | p; return(); }
 
         CHECK_HASH();
 
@@ -459,5 +459,6 @@ stg_compactFixupPointerszh ( W_ first_block, W_ root )
     // guaranteed to be valid
     // (this is true even if the fixup phase failed)
     gcstr = str;
-    return (gcstr, ok);
+    // Boxed unlifted primitives are tagged with 1.
+    return (gcstr + 1, ok);
 }

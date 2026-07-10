@@ -9,7 +9,8 @@ stg_cloneMyStackzh () {
 
     ("ptr" clonedStack) = ccall cloneStack(MyCapability() "ptr", stgStack "ptr");
 
-    return (clonedStack);
+    // Boxed unlifted primitives are tagged with 1.
+    return (clonedStack + 1);
 }
 
 stg_sendCloneStackMessagezh (gcptr threadId, gcptr mVarStablePtr) {

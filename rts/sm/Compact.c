@@ -122,6 +122,30 @@ get_iptr_tag(StgInfoTable *iptr)
         }
     }
 
+    // Boxed unlifted primitives are tagged with 1 (see Note [Pointer tagging
+    // of unlifted boxed primitives] in GHC.StgToCmm.Prim). unthread() applies
+    // this tag only to fields that were tagged before threading, so a type
+    // listed here never gains a tag it did not have.
+    case ARR_WORDS:
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
+    case MUT_ARR_PTRS_FROZEN_CLEAN:
+    case MUT_ARR_PTRS_FROZEN_DIRTY:
+    case SMALL_MUT_ARR_PTRS_CLEAN:
+    case SMALL_MUT_ARR_PTRS_DIRTY:
+    case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+    case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
+    case MUT_VAR_CLEAN:
+    case MUT_VAR_DIRTY:
+    case MVAR_CLEAN:
+    case MVAR_DIRTY:
+    case TVAR:
+    case WEAK:
+    case PRIM:
+    case MUT_PRIM:
+    case BLOCKING_QUEUE:
+        return 1;
+
     default:
         return 0;
     }
