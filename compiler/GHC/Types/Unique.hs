@@ -133,6 +133,7 @@ data UniqueTag
   = AlphaTyVarTag
   | BcoTag
   | BlockIdTag
+  | BootIndTag
   | BoxedTupleDataTag
   | BoxedTupleTyConTag
   | BoxingTyConTag
@@ -184,6 +185,7 @@ uniqueTag :: UniqueTag -> Char
 uniqueTag AlphaTyVarTag        = '1'
 uniqueTag BcoTag               = 'I'
 uniqueTag BlockIdTag           = 'L'
+uniqueTag BootIndTag           = 'h'
 uniqueTag BoxedTupleDataTag    = '7'
 uniqueTag BoxedTupleTyConTag   = '4'
 uniqueTag BoxingTyConTag       = 'b'
@@ -253,6 +255,7 @@ charToUniqueTag 'D' = DsTag
 charToUniqueTag 'E' = PseudoTag
 charToUniqueTag 'f' = FldNSTag
 charToUniqueTag 'g' = StgPTag
+charToUniqueTag 'h' = BootIndTag
 charToUniqueTag 'H' = VirtualRegTag
 charToUniqueTag 'i' = IfaceTag
 charToUniqueTag 'I' = BcoTag

@@ -47,7 +47,7 @@ module GHC.Types.Name (
         mkInternalName, mkClonedInternalName, mkDerivedInternalName,
         mkSystemVarName, mkSysTvName,
         mkFCallName,
-        mkExternalName, mkWiredInName, mkBootIndName,
+        mkExternalName, mkWiredInName, mkBootIndName, isBootIndName,
 
         -- ** Manipulating and deconstructing 'Name's
         nameUnique, setNameUnique,
@@ -545,8 +545,19 @@ mkExternalName uniq mod occ loc
 -- pointer tagging] in "GHC.StgToCmm.DataCon".
 mkBootIndName :: Name -> Name
 mkBootIndName name =
-  mkExternalName (nameUnique name) (nameModule name)
+  -- Retag the unique rather than reuse it: reusing would make the indirection's
+  -- Name (and hence its CLabels) equal to the original's under Eq (by unique)
+  -- yet distinct under Ord (stableNameCmp, by occ). Retagging stays
+  -- deterministic, so the external symbol is still a pure function of module
+  -- and occurrence.
+  mkExternalName (newTagUnique (nameUnique name) BootIndTag) (nameModule name)
                  (mkBootIndOcc (nameOccName name)) (nameSrcSpan name)
+
+-- | Is this a name made by 'mkBootIndName'? Recognised by its unique's tag,
+-- so it works on names reconstructed from labels as well.
+isBootIndName :: Name -> Bool
+isBootIndName name = case unpkUnique (nameUnique name) of
+  (tag, _) -> tag == BootIndTag
 
 -- | Create a name which is actually defined by the compiler itself
 mkWiredInName :: Module -> OccName -> Unique -> TyThing -> BuiltInSyntax -> Name

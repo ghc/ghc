@@ -14,6 +14,7 @@ import GHC.Cmm.Type (Width(..))
 import GHC.Cmm.CLabel (CLabel, hasHaskellName)
 import GHC.CmmToAsm.CFG.Weight
 import GHC.Unit.Module (Module)
+import GHC.Types.Name (isBootIndName)
 import GHC.Types.Name.Set (NameSet, elemNameSet)
 import GHC.Utils.Outputable
 
@@ -66,12 +67,13 @@ data NCGConfig = NCGConfig
 -- | May a static indirection labelled @symbol@ be eliminated by redirecting it
 -- to its indirectee (the @.equiv@ trick, see Note [emit-time elimination of
 -- static indirections] in "GHC.Cmm.CLabel")?  No, if @symbol@ is exported by
--- this module's hs-boot file: SOURCE importers reference it untagged and must be
+-- this module's hs-boot file, or is itself a boot indirection ('mkBootIndName'
+-- in "GHC.Types.Name"): SOURCE importers reference it untagged and must be
 -- able to enter it to obtain the (tagged) indirectee.
 ncgLabelMayBeRedirected :: NCGConfig -> CLabel -> Bool
 ncgLabelMayBeRedirected config symbol =
   case hasHaskellName symbol of
-    Just nm -> not (nm `elemNameSet` ncgBootExports config)
+    Just nm -> not (isBootIndName nm || nm `elemNameSet` ncgBootExports config)
     Nothing -> True
 
 -- | Return Word size

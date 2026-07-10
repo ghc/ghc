@@ -45,6 +45,8 @@ import GHC.Types.Var.Env
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import Data.Maybe (isNothing)
+
 import GHC.Builtin.Names (getUnique)
 
 
@@ -151,7 +153,12 @@ getCgIdInfo id
               -- cgTopBinding, so no indirection exists for them; reference them
               -- directly. See Note [Boot-exported constructors and pointer
               -- tagging] in "GHC.StgToCmm.DataCon".
+              -- If the Id does carry LFInfo (its real interface got loaded for
+              -- some other reason), reference the value's own closure with its
+              -- proper tag: diverting would combine that tag with the
+              -- indirection's symbol, mistagging an IND_STATIC.
               use_boot_ind = needsBootInd id
+                          && isNothing (idLFInfo_maybe id)
                           && not (isDataConWorkId id)
                           && nameModule name `elemModuleSet` stgToCmmSourceImports cfg
         ; if isExternalName name then

@@ -12,6 +12,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Cmm.CLabel (CLabel, hasHaskellName)
+import GHC.Types.Name (isBootIndName)
 import GHC.Types.Name.Set (NameSet, elemNameSet)
 import GHC.Utils.Outputable
 import GHC.Settings.Utils
@@ -40,13 +41,14 @@ data LlvmCgConfig = LlvmCgConfig
 -- | May a static indirection labelled @symbol@ be eliminated by redirecting it
 -- to its indirectee (the alias trick, see Note [emit-time elimination of static
 -- indirections] in "GHC.Cmm.CLabel")?  No, if @symbol@ is exported by this
--- module's hs-boot file: SOURCE importers reference it untagged and must be able
+-- module's hs-boot file, or is itself a boot indirection ('mkBootIndName' in
+-- "GHC.Types.Name"): SOURCE importers reference it untagged and must be able
 -- to enter it to obtain the (tagged) indirectee. Mirrors 'ncgLabelMayBeRedirected'
 -- in "GHC.CmmToAsm.Config".
 llvmLabelMayBeRedirected :: LlvmCgConfig -> CLabel -> Bool
 llvmLabelMayBeRedirected config symbol =
   case hasHaskellName symbol of
-    Just nm -> not (nm `elemNameSet` llvmCgBootExports config)
+    Just nm -> not (isBootIndName nm || nm `elemNameSet` llvmCgBootExports config)
     Nothing -> True
 
 data LlvmTarget = LlvmTarget
