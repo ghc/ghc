@@ -96,7 +96,16 @@ cgOpApp (StgPrimOp primop) args res_ty = do
                       | (dty, arg) <- zip decl_tys args
                       , not (null (stgArgRep arg)) ]
         cmm_args' = zipWith3 (untagPrimArg platform) nv_decl_tys (nonVoidStgArgs args) cmm_args
-    cmmPrimOpApp cfg primop cmm_args' (Just res_ty)
+        -- The RTS dereferences the key field of a Weak directly (GC key
+        -- liveness in MarkWeak.c, asserts in TopHandler.c), so unlike other
+        -- value positions the key must be stored untagged.
+        cmm_args'' = case primop of
+          MkWeakOp            -> untag_first cmm_args'
+          MkWeakNoFinalizerOp -> untag_first cmm_args'
+          _                   -> cmm_args'
+        untag_first (k:rest) = cmmUntag platform k : rest
+        untag_first []       = []
+    cmmPrimOpApp cfg primop cmm_args'' (Just res_ty)
 
 cgOpApp (StgPrimCallOp primcall) args _res_ty
   = do  { cfg <- getStgToCmmConfig
