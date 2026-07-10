@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module GHC.Toolchain.Monad
     ( Env(..)
@@ -21,6 +22,10 @@ module GHC.Toolchain.Monad
     , logDebug
     , checking
     , withLogContext
+
+      -- * Errors
+    , Error (..)
+    , formatError
     ) where
 
 import Prelude hiding (readFile, writeFile, appendFile)
@@ -62,6 +67,9 @@ data Error = Error { errorMessage :: String
                    , errorLogContexts :: [String]
                    }
     deriving (Show)
+
+formatError :: Error -> String
+formatError Error {errorMessage, errorLogContexts} = unlines $ errorMessage : errorLogContexts
 
 throwE :: String -> M a
 throwE msg = throwEs [msg]

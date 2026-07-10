@@ -1,5 +1,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module GHC.Toolchain.Tools.Cc
     ( Cc(..)
@@ -23,6 +24,7 @@ import GHC.Platform.ArchOS
 import GHC.Toolchain.Prelude
 import GHC.Toolchain.Utils
 import GHC.Toolchain.Program
+import System.Exit (ExitCode(..))
 
 newtype Cc = Cc { ccProgram :: Program
                 }
@@ -109,11 +111,12 @@ checkCcSupportsExtraViaCFlags cc = checking "whether cc supports extra via-c fla
                                   , "-fwrapv", "-fno-builtin"
                                   , "-Werror", "-x", "c"
                                   , "-o", test_o, test_c]
-  when (not (isSuccess code)
-        || "unrecognized" `isInfixOf` out
-        || "unrecognized" `isInfixOf` err
-        ) $
-    throwE "Your C compiler must support the -fwrapv and -fno-builtin flags"
+
+  if | ExitSuccess <- code
+     , not $ "unrecognized" `isInfixOf` out
+     , not $ "unrecognized" `isInfixOf` err
+     -> pure ()
+     | otherwise -> throwE "Your C compiler must support the -fwrapv and -fno-builtin flags"
 
 -- | Preprocess the given program.
 preprocess

@@ -1,6 +1,8 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Main where
 
@@ -11,7 +13,7 @@ import System.Exit
 import System.Console.GetOpt
 import System.Environment
 import System.FilePath ((</>))
-import qualified System.IO (readFile, writeFile)
+import qualified System.IO (writeFile, readFile')
 
 import GHC.Platform.ArchOS
 
@@ -33,6 +35,10 @@ import GHC.Toolchain.Tools.MergeObjs
 import GHC.Toolchain.Tools.Readelf
 import GHC.Toolchain.NormaliseTriple (normaliseTriple)
 import Text.Read (readMaybe)
+import System.IO (hPutStrLn, stderr)
+import Control.Exception (try, IOException, catch, displayException)
+import GHC.Stack (HasCallStack)
+import Data.Foldable (traverse_)
 
 data Opts = Opts
     { optTriple    :: Maybe String
@@ -72,6 +78,8 @@ data Opts = Opts
     , optTablesNextToCode :: Maybe Bool
     , optUseLibFFIForAdjustors :: Maybe Bool
     , optLdOverride :: Maybe Bool
+      -- ^ whether or not to not use ld in $PATH and instead search for a
+      --   linker that GHC deems "better"
     , optVerbosity :: Int
     , optKeepTemp  :: Bool
     }
@@ -200,7 +208,7 @@ options =
     [ enableDisable "unregisterised" "unregisterised backend" _optUnregisterised
     , enableDisable "tables-next-to-code" "info-tables-next-to-code optimisation" _optTablesNextToCode
     , enableDisable "libffi-adjustors" "the use of libffi for adjustors, even on platforms which have support for more efficient, native adjustor implementations." _optUseLibFFIForAdjustors
-    , enableDisable "ld-override" "override gcc's default linker" _optLdOvveride
+    , enableDisable "ld-override" "search for a more efficient linker than your default linker" _optLdOvveride
     , enableDisable "locally-executable" "the use of a target prefix which will be added to all tool names when searching for toolchain components" _optLocallyExecutable
     , enableDisable "dwarf-unwind" "Enable DWARF unwinding support in the runtime system via elfutils' libdw" _optDwarfUnwind
     ] ++
@@ -280,12 +288,11 @@ options =
         "The output path for the generated target toolchain configuration"
 
 formatOpts :: [OptDescr (FormatOpts -> FormatOpts)]
-formatOpts = [
-    (Option ['o'] ["output"] (ReqArg (set _formatOptOutput) "OUTPUT")
+formatOpts =
+    [ (Option ['o'] ["output"] (ReqArg (set _formatOptOutput) "OUTPUT")
         "The output path for the formatted target toolchain configuration")
     , (Option ['i'] ["input"] (ReqArg (set _formatOptInput) "INPUT")
-        "The target file to format")
-    ]
+        "The target file to format") ]
 
 validateOpts :: Opts -> [String]
 validateOpts opts = mconcat
@@ -297,30 +304,38 @@ main :: IO ()
 main = do
     argv <- getArgs
     case argv of
-      ("format": args) -> doFormat args
+      ("format" : args) -> doFormat args
       _ -> doConfigure argv
 
 -- The format mode is very useful for normalising paths and newlines on windows.
-doFormat :: [String] -> IO ()
+doFormat :: HasCallStack => [String] -> IO ()
 doFormat args = do
   let (opts0, _nonopts, errs) = getOpt RequireOrder formatOpts args
   case errs of
     [] -> do
       let opts = foldr (.) id opts0 emptyFormatOpts
-      tgtFile <- System.IO.readFile (view _formatOptInput opts)
-      case readMaybe @Target tgtFile of
-        Nothing -> error $ "Failed to read a valid Target value from " ++ view _formatOptInput opts ++ ":\n" ++ tgtFile
-        Just tgt -> do
+      tgtFile <- try @IOException $ System.IO.readFile' (view _formatOptInput opts)
+      case tgtFile of
+        Right (readMaybe @Target -> Just tgt) -> do
           let file = formatOptOutput opts
           System.IO.writeFile file (show tgt)
+            `catch` \(e :: IOException) -> do
+              hPutStrLn stderr $ "Failed to write the formatted Target file to" ++ file ++ ". Writing caused the following IOException:\n"
+                ++ displayException e
+        Right contents -> do
+          hPutStrLn stderr $ "Failed to read a valid Target value from " ++ view _formatOptInput opts ++ "invalid file was:\n" ++ contents
+          exitWith (ExitFailure 1)
+        Left reason -> do
+          hPutStrLn stderr $ "Failed to read a valid Target value from " ++ view _formatOptInput opts ++ ", because an IOException occured:\n" ++ displayException reason
+          exitWith (ExitFailure 1)
     _ -> do
-      mapM_ putStrLn errs
-      putStrLn $ usageInfo "ghc-toolchain" formatOpts
+      mapM_ (hPutStrLn stderr) errs
+      hPutStrLn stderr $ usageInfo "ghc-toolchain" formatOpts
       exitWith (ExitFailure 1)
 
 
 
-doConfigure :: [String] -> IO ()
+doConfigure :: HasCallStack => [String] -> IO ()
 doConfigure args = do
     let (opts0, _nonopts, parseErrs) = getOpt RequireOrder options args
     let opts = foldr (.) id opts0 emptyOpts
@@ -329,18 +344,22 @@ doConfigure args = do
           let env = Env { verbosity = optVerbosity opts
                         , targetPrefix = case optTargetPrefix opts of
                                            Just prefix -> Just prefix
+                                           -- TODO: why is this `fromMaybe (error _)`? that seems wrong (ah okay, because that would already mean that `errs` is not null; seems bad that we have this here though)
                                            Nothing -> Just $ fromMaybe (error "undefined triple") (optTriple opts) ++ "-"
                         , keepTemp = optKeepTemp opts
                         , canLocallyExecute = fromMaybe True (optLocallyExecutable opts)
                         , logContexts = []
                         }
           r <- runM env (run opts)
+            `catch` \(e :: IOException) -> pure $ Left [Error {errorLogContexts = [], errorMessage = displayException e}]
           case r of
-            Left err -> print err >> exitWith (ExitFailure 2)
+            Left errs -> do
+              traverse_ (hPutStrLn stderr . formatError) errs
+              exitWith (ExitFailure 1)
             Right () -> return ()
       errs -> do
-        mapM_ putStrLn errs
-        putStrLn $ usageInfo "ghc-toolchain" options
+        mapM_ (hPutStrLn stderr) errs
+        hPutStrLn stderr $ usageInfo "ghc-toolchain" options
         exitWith (ExitFailure 1)
 
 run :: Opts -> M ()
@@ -449,15 +468,15 @@ mkTarget opts = do
       cc0 <- findBasicCc (optCc opts)
       parseTriple cc0 normalised_triple
 
-    cc0 <- findCc archOs tgtLlvmTarget (optCc opts)
+    cc <- findCc archOs tgtLlvmTarget (optCc opts)
     cxx <- findCxx archOs tgtLlvmTarget (optCxx opts)
-    cpp <- findCpp (optCpp opts) cc0
-    hsCpp <- findHsCpp (optHsCpp opts) cc0
+    cpp <- findCpp (optCpp opts) cc
+    hsCpp <- findHsCpp (optHsCpp opts) cc
     -- TODO: same case as ranlib below
     -- TODO: we need it really only for javascript target (maybe wasm target as well)
-    jsCpp <- Just <$> findJsCpp (optJsCpp opts) cc0
-    cmmCpp <- findCmmCpp (optCmmCpp opts) cc0
-    cc <- addPlatformDepCcFlags archOs cc0
+    jsCpp <- Just <$> findJsCpp (optJsCpp opts) cc
+    cmmCpp <- findCmmCpp (optCmmCpp opts) cc
+    ccWithPlatformFlags <- addPlatformDepCcFlags archOs cc
     readelf <- optional $ findReadelf (optReadelf opts)
     -- TODO: We could have
     -- ranlib <- if arNeedsRanlib ar
@@ -466,11 +485,21 @@ mkTarget opts = do
     -- but in order to match the configure output, for now we do
     ranlib <- findRanlib (optRanlib opts)
     ar <- findAr tgtVendor (optAr opts)
-    ccLink <- findCcLink tgtLlvmTarget (optLd opts) (optCcLink opts) (ldOverrideWhitelist archOs && fromMaybe True (optLdOverride opts)) archOs cc readelf ar ranlib
-
+    ccLink <- findCcLink
+      tgtLlvmTarget
+      (optLd opts)
+      (optCcLink opts)
+      (ldOverrideWhitelist archOs
+        -- ld-override is enabled by default
+        && fromMaybe True (optLdOverride opts))
+      archOs
+      ccWithPlatformFlags
+      readelf
+      ar
+      ranlib
 
     nm <- findNm (optNm opts)
-    mergeObjs <- optional $ findMergeObjs (optMergeObjs opts) cc ccLink nm
+    mergeObjs <- optional $ findMergeObjs (optMergeObjs opts) ccWithPlatformFlags ccLink nm
 
     when (isNothing mergeObjs && not (arSupportsDashL ar)) $
       throwE "Neither a object-merging tool (e.g. ld -r) nor an ar that supports -L is available"
@@ -494,15 +523,15 @@ mkTarget opts = do
           _ -> return (Nothing, Nothing)
 
     -- various other properties of the platform
-    tgtWordSize <- checkWordSize cc
-    tgtEndianness <- checkEndianness cc
-    tgtSymbolsHaveLeadingUnderscore <- checkLeadingUnderscore cc nm
-    tgtSupportsSubsectionsViaSymbols <- checkSubsectionsViaSymbols archOs cc
-    tgtSupportsIdentDirective <- checkIdentDirective cc
-    tgtSupportsGnuNonexecStack <- checkGnuNonexecStack archOs cc
-    tgtHasLibm <- checkTargetHasLibm cc
+    tgtWordSize <- checkWordSize ccWithPlatformFlags
+    tgtEndianness <- checkEndianness ccWithPlatformFlags
+    tgtSymbolsHaveLeadingUnderscore <- checkLeadingUnderscore ccWithPlatformFlags nm
+    tgtSupportsSubsectionsViaSymbols <- checkSubsectionsViaSymbols archOs ccWithPlatformFlags
+    tgtSupportsIdentDirective <- checkIdentDirective ccWithPlatformFlags
+    tgtSupportsGnuNonexecStack <- checkGnuNonexecStack archOs ccWithPlatformFlags
+    tgtHasLibm <- checkTargetHasLibm ccWithPlatformFlags
     tgtRTSWithLibdw <- case optDwarfUnwind opts of
-      Just True -> checkTargetHasLibdw cc (optLibdwIncludes opts) (optLibdwLibraries opts)
+      Just True -> checkTargetHasLibdw ccWithPlatformFlags (optLibdwIncludes opts) (optLibdwLibraries opts)
       _         -> pure Nothing
 
     -- code generator configuration
@@ -515,14 +544,14 @@ mkTarget opts = do
         let prog = "int main(int argc, char** argv) { return 0; }"
             via_c_args = ["-fwrapv", "-fno-builtin"]
         forM_ via_c_args $ \arg -> checking ("support of "++arg) $ withTempDir $ \dir -> do
-            let cc' = over (_ccProgram % _prgFlags) (++ [arg]) cc
+            let cc' = over (_ccProgram % _prgFlags) (++ [arg]) ccWithPlatformFlags
             compileC cc' (dir </> "test.o") prog
             return ()
 
     let t = Target { tgtArchOs = archOs
                    , tgtVendor
                    , tgtLocallyExecutable = fromMaybe True (optLocallyExecutable opts)
-                   , tgtCCompiler = cc
+                   , tgtCCompiler = ccWithPlatformFlags
                    , tgtCxxCompiler = cxx
                    , tgtCPreprocessor = cpp
                    , tgtHsCPreprocessor = hsCpp

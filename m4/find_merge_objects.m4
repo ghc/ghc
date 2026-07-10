@@ -22,7 +22,6 @@ AC_DEFUN([CHECK_MERGE_OBJECTS],[
 ])
 
 AC_DEFUN([FIND_MERGE_OBJECTS],[
-    AC_REQUIRE([FIND_LD])
 
     if test -z ${MergeObjsCmd+x}; then
         AC_MSG_NOTICE([Setting cmd])

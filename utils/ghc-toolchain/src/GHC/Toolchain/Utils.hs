@@ -7,19 +7,18 @@ module GHC.Toolchain.Utils
     , withTempDir
     , oneOf
     , oneOf'
-    , isSuccess
     , lastLine
     , findM
     ) where
 
-import Control.Exception
+import Control.Applicative (asum)
+import Control.Exception ( throwIO, bracket, try )
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.List (unsnoc)
 import System.Directory
 import System.FilePath
 import System.IO.Error
-import System.Exit
 
 import GHC.Toolchain.Prelude
 
@@ -61,12 +60,7 @@ oneOf err = oneOf' [err]
 -- | Like 'oneOf' but takes a multi-line error message if none of the checks
 -- succeed.
 oneOf' :: [String] -> [M b] -> M b
-oneOf' err = foldr (<|>) (throwEs err)
-
-isSuccess :: ExitCode -> Bool
-isSuccess = \case
-  ExitSuccess -> True
-  ExitFailure _ -> False
+oneOf' err as = asum $ as <> [throwEs err]
 
 lastLine :: String -> String
 lastLine = maybe "" snd . unsnoc . lines
