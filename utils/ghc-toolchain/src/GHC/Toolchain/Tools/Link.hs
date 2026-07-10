@@ -1,7 +1,8 @@
-{-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module GHC.Toolchain.Tools.Link ( CcLink(..), findCcLink ) where
 
@@ -18,6 +19,8 @@ import GHC.Toolchain.Tools.Cc
 import GHC.Toolchain.Tools.Ar
 import GHC.Toolchain.Tools.Ranlib
 import GHC.Toolchain.Tools.Readelf
+import System.Exit (ExitCode(..))
+import Control.Applicative
 
 -- | Configuration on how the C compiler can be used to link
 data CcLink = CcLink { ccLinkProgram :: Program
@@ -47,61 +50,97 @@ instance Show CcLink where
 _ccLinkProgram :: Lens CcLink Program
 _ccLinkProgram = Lens ccLinkProgram (\x o -> o{ccLinkProgram=x})
 
-findCcLink :: String -- ^ The llvm target to use if CcLink supports --target
-           -> ProgOpt
-           -> ProgOpt
-           -> Bool   -- ^ Whether we should search for a more efficient linker
-           -> ArchOS -> Cc -> Maybe Readelf -> Ar -> Ranlib -> M CcLink
-findCcLink target ld progOpt ldOverride archOs cc readelf ar ranlib = checking "for C compiler for linking command" $ do
+-- | tries to add flags to the c compiler to run as a linker
+findCcLink :: String  -- ^ The llvm target to use if CcLink supports --target
+           -> ProgOpt -- ^ The contents of $LD
+           -> ProgOpt -- ^ The c compiler intended for invoking the linker
+           -> Bool    -- ^ Whether GHC should disregard ld and search for a linker it considers better
+           -> ArchOS
+           -> Cc      -- ^ the c compiler used for compiling c programs, used as a fallback
+           -> Maybe Readelf -> Ar -> Ranlib -> M CcLink
+findCcLink target ld progOpt userLdOverride archOs cc readelf ar ranlib = checking "for C compiler for linking command" $ do
   -- Use the specified linker or try using the C compiler
   rawCcLink <- findProgram "C compiler for linking" progOpt [] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
-  -- See #23857 for why we check to see if LD is set here
-  -- TLDR: If the user explicitly sets LD then in ./configure
-  -- we don't perform a linker search (and set -fuse-ld), so
-  -- we do the same here for consistency.
-  ccLinkProgram <- case (poPath ld, poFlags progOpt) of
-                     (_, Just _) ->
-                         -- If the user specified linker flags don't second-guess them
-                         pure rawCcLink
-                     (Just {}, _) ->
-                         pure rawCcLink
-                     _ -> do
-                         -- If not then try to find decent linker flags
-                         findLinkFlags ldOverride cc rawCcLink <|> pure rawCcLink
-  ccLinkProgram <- linkSupportsTarget archOs cc target ccLinkProgram
-  ccLinkSupportsNoPie         <- checkSupportsNoPie  cc ccLinkProgram
-  ccLinkSupportsCompactUnwind <- checkSupportsCompactUnwind archOs cc ccLinkProgram
-  ccLinkSupportsFilelist      <- checkSupportsFilelist cc ccLinkProgram
-  ccLinkSupportsSingleModule  <- checkSupportsSingleModule archOs cc ccLinkProgram
-  ccLinkIsGnu                 <- checkLinkIsGnu archOs ccLinkProgram
-  checkBfdCopyBug archOs cc readelf ccLinkProgram
-  ccLinkProgram <- addPlatformDepLinkFlags archOs cc ccLinkProgram
-  ccLinkSupportsVerbatimNamespace <- linkSupportsVerbatimNamespace cc ar ranlib ccLinkProgram
-  let ccLink = CcLink {ccLinkProgram, ccLinkSupportsNoPie,
-                       ccLinkSupportsCompactUnwind, ccLinkSupportsFilelist,
-                       ccLinkSupportsSingleModule, ccLinkIsGnu, ccLinkSupportsVerbatimNamespace}
-  ccLink <- linkRequiresNoFixupChains archOs cc ccLink
-  ccLink <- linkRequiresNoWarnDuplicateLibraries archOs cc ccLink
-  return ccLink
+  ccLinkProgram <- if
+    -- A cc with linker was already specified, don't doubt the user's proficiency,
+    -- autonomy and right to segmentation faults
+    | Just _ <- progOpt.poFlags -> pure rawCcLink
+    -- we get a $LD; now figure out how to pass it to the $CC
+    | Just ldPathOrFlavour <- ld.poPath
+    -- even though $LD=ld doesn't really mean anything to C compilers,
+    -- we are lenient and just act as if $LD wasn't set and enable-ld-override
+    -- is off
+    , ldPathOrFlavour /= "ld" -> do
+        flip oneOf'
 
+          [ do
+            -- first check if the c compiler supports --ld-path, which goes best with $LD
+            ldPath <- findProgram (ldPathOrFlavour <> " linker") emptyProgOpt $  tryLdPrefix [ldPathOrFlavour]
+            -- findProgram takes a userSpec but in our case this is emptyProgOpt, so we just
+            -- extract the path that it found and ignore the (empty) arguments
+            checkLink rawCcLink [ fLdPath ldPath.prgPath ]
+          , -- second, check if the c compiler instead understands -fuse-ld (linker "flavour");
+            -- do not try to expand the path first since absolute paths are not valid linker flavours
+            checkLink rawCcLink [ fUseLd ldPathOrFlavour] ]
 
--- | Try to convince @cc@ to use a more efficient linker than @bfd.ld@
-findLinkFlags :: Bool -> Cc -> Program -> M Program
-findLinkFlags enableOverride cc ccLink
-  | enableOverride && doLinkerSearch =
-    oneOf "this can't happen"
-        [ -- Annoyingly, gcc silently falls back to vanilla ld (typically bfd
-          -- ld) if @-fuse-ld@ is given with a non-existent linker.
-          -- Consequently, we must first check that the desired ld
-          -- executable exists before trying cc.
-          do _ <- findProgram (linker ++ " linker") emptyProgOpt ["ld."++linker]
-             prog <$ checkLinkWorks cc prog
-        | linker <- ["lld", "bfd"]
-        , let prog = over _prgFlags (++["-fuse-ld="++linker]) ccLink
-        ]
-        <|> (ccLink <$ checkLinkWorks cc ccLink)
-  | otherwise =
-    return ccLink
+          -- $LD was set but we couldn't figure out how to pass it to $CC. This is a hard failure,
+          -- we report it.
+          [ ldPathOrFlavour <> " is an invalid linker."
+          , "$LD can be either of an executable name that is in $PATH *or* a"
+            <> " path to an executable."
+          , "If your C compiler only supports the '-fuse-ld' flag, $LD can"
+            <> " only be one of the linker flavours supported by it."
+          , "Mind that if your C compiler supports '--ld-path', 'configure'"
+            <> " will always prefer using an absolute path to your linker as"
+            <> " that is less error-prone." ]
+
+    -- $LD is not set or $LD=ld (see above)
+    -- Try to convince @cc@ to use a more efficient linker than @bfd.ld@
+    | let ldOverride
+            | Just "ld" <- ld.poPath = False
+            | otherwise = userLdOverride
+    , ldOverride ->
+       asum
+         [ -- Annoyingly, gcc silently falls back to vanilla ld
+           -- if @-fuse-ld@ is given passed a non-existent linker.
+           -- Consequently, we must first check that the desired ld
+           -- executable exists before trying cc.
+           do linkerPath <- findProgram (linker ++ " linker") emptyProgOpt [ linker ]
+              checkLink rawCcLink [ fLdPath linkerPath.prgPath]
+                <|> checkLink rawCcLink [ fUseLd linker]
+         | linker <- tryLdPrefix ["lld", "bfd"]
+         ]
+       -- fall back to raw ld
+       <|> checkLink rawCcLink []
+
+    -- we can't help the user
+    | otherwise -> checkLink rawCcLink []
+
+  targetedCcLink                  <- linkSupportsTarget archOs cc target ccLinkProgram
+  ccLinkSupportsNoPie             <- checkSupportsNoPie  cc targetedCcLink
+  ccLinkSupportsCompactUnwind     <- checkSupportsCompactUnwind archOs cc targetedCcLink
+  ccLinkSupportsFilelist          <- checkSupportsFilelist cc targetedCcLink
+  ccLinkSupportsSingleModule      <- checkSupportsSingleModule archOs cc targetedCcLink
+  ccLinkIsGnu                     <- checkLinkIsGnu archOs targetedCcLink
+  checkedCcLink                   <- addPlatformDepLinkFlags archOs cc targetedCcLink
+  ccLinkSupportsVerbatimNamespace <- linkSupportsVerbatimNamespace cc ar ranlib checkedCcLink
+
+  checkBfdCopyBug archOs cc readelf targetedCcLink
+
+  let finalCcLink = CcLink
+                    { ccLinkProgram = checkedCcLink, ccLinkSupportsNoPie
+                    , ccLinkSupportsCompactUnwind, ccLinkSupportsFilelist
+                    , ccLinkSupportsSingleModule, ccLinkIsGnu, ccLinkSupportsVerbatimNamespace }
+
+  linkRequiresNoFixupChains archOs cc finalCcLink
+    >>= linkRequiresNoWarnDuplicateLibraries archOs cc
+  where
+    checkLink ccLink extraFlags =
+      let prog = over _prgFlags (extraFlags <>) ccLink
+       in prog <$ checkLinkWorks cc prog
+    tryLdPrefix progs =  [id, ("ld." <>)] <*> progs
+    fUseLd flavour = "-fuse-ld=" <> flavour
+    fLdPath path = "--ld-path=" <> path
 
 -- | Test whether the linker supports the verbatim '-l:libfoo.a' syntax, allowing
 -- us better control over partial static linking.
@@ -150,20 +189,6 @@ linkSupportsTarget archOs cc target link =
     checking "whether cc linker supports --target" $
     supportsTarget archOs (Lens id const) (checkLinkWorks cc) target link
 
--- | Should we attempt to find a more efficient linker on this platform?
---
--- N.B. On Darwin it is quite important that we use the system linker
--- unchanged as it is very easy to run into broken setups (e.g. unholy mixtures
--- of Homebrew and the Apple toolchain).
---
--- See #21712.
-doLinkerSearch :: Bool
-#if defined(linux_HOST_OS)
-doLinkerSearch = True
-#else
-doLinkerSearch = False
-#endif
-
 -- | See Note [No PIE when linking] in GHC.Driver.Session
 checkSupportsNoPie :: Cc -> Program -> M Bool
 checkSupportsNoPie cc ccLink = checking "whether the cc linker supports -no-pie" $
@@ -174,7 +199,11 @@ checkSupportsNoPie cc ccLink = checking "whether the cc linker supports -no-pie"
     -- Check output as some GCC versions only warn and don't respect -Werror
     -- when passed an unrecognized flag.
     (code, out, err) <- readProgram ccLink ["-no-pie", "-Werror", test_o, "-o", test]
-    return (isSuccess code && not ("unrecognized" `isInfixOf` out) && not ("unrecognized" `isInfixOf` err))
+    return if
+      | ExitSuccess <- code
+      , not ("unrecognized" `isInfixOf` out)
+      , not ("unrecognized" `isInfixOf` err) -> True
+      | otherwise -> False
 
 -- ROMES:TODO: This check is wrong here and in configure because with ld.gold parses "-n" "o_compact_unwind"
 -- TODO:
@@ -191,7 +220,8 @@ checkSupportsCompactUnwind archOs cc ccLink
         compileC cc test_o "int foo() { return 0; }"
 
         exitCode <- runProgram ccLink ["-r", "-Wl,-no_compact_unwind", "-o", test2_o, test_o]
-        return $ isSuccess exitCode
+        return if | ExitSuccess <- exitCode -> True
+                  | otherwise -> False
   | otherwise = return False
 
 checkSupportsFilelist :: Cc -> Program -> M Bool
@@ -210,7 +240,8 @@ checkSupportsFilelist cc ccLink = checking "whether the cc linker understands -f
 
     exitCode <- runProgram ccLink ["-r", "-Wl,-filelist", test_ofiles, "-o", test_o]
 
-    return (isSuccess exitCode)
+    return if | ExitSuccess <- exitCode -> True
+              | otherwise -> False
 
 -- | Check that the (darwin) linker supports @-single_module@.
 --

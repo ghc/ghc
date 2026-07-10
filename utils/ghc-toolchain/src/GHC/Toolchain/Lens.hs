@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 -- | A very simple Lens implementation
 module GHC.Toolchain.Lens
     ( Lens(..)
@@ -9,8 +10,12 @@ module GHC.Toolchain.Lens
 
 import Prelude ((.), ($), (++))
 import Data.Function ((&))
+import GHC.Records
 
 data Lens a b = Lens { view :: (a -> b), set :: (b -> a -> a) }
+
+instance HasField "over" (Lens a b) ((b -> b) -> a -> a) where
+  getField = over
 
 (%) :: Lens a b -> Lens b c -> Lens a c
 a % b = Lens { view = view b . view a
