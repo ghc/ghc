@@ -68,7 +68,6 @@ import GHC.Types.TyThing
 import GHC.Types.CompleteMatch
 import GHC.Types.Name.Cache
 
-import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
 import GHC.Utils.Binary
@@ -139,7 +138,12 @@ mkFullIface hsc_env partial_iface mb_stg_infos mb_cmm_infos stubs foreign_files 
     -- value must carry the value's pointer tag, which needs its LambdaFormInfo),
     -- not an inlining pragma.  Attach it regardless of -fomit-interface-pragmas
     -- so imported value references are tagged at every optimisation level.
-    let decls = updateDecl (mi_decls partial_iface) mb_stg_infos mb_cmm_infos
+    -- (At -O0 the code generator only conveys the correctness-relevant
+    -- LFInfos; see generatedInfo in GHC.StgToCmm.)  CAF-info and tag sigs
+    -- remain ordinary pragmas, omitted under -fomit-interface-pragmas.
+    let omit_prags = gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
+        mb_stg_infos' = if omit_prags then Nothing else mb_stg_infos
+        decls = updateDecl (mi_decls partial_iface) mb_stg_infos' omit_prags mb_cmm_infos
 
     -- See Note [Foreign stubs and TH bytecode linking]
     mi_simplified_core <- for (mi_simplified_core partial_iface) $ \simpl_core -> do
@@ -189,13 +193,15 @@ shareIface nc compressionLevel  mi = do
 initBinMemSize :: Int
 initBinMemSize = 1024 * 1024 -- 1 MB
 
-updateDecl :: [IfaceDecl] -> Maybe StgCgInfos -> Maybe CmmCgInfos -> [IfaceDecl]
-updateDecl decls Nothing Nothing = decls
-updateDecl decls m_stg_infos m_cmm_infos
+updateDecl :: [IfaceDecl] -> Maybe StgCgInfos -> Bool -> Maybe CmmCgInfos -> [IfaceDecl]
+updateDecl decls Nothing _ Nothing = decls
+updateDecl decls m_stg_infos omit_prags m_cmm_infos
   = map update_decl decls
   where
     (non_cafs,lf_infos) = maybe (mempty, mempty)
-                                (\cmm_info -> (ncs_nameSet (cgNonCafs cmm_info), cgLFInfos cmm_info))
+                                (\cmm_info -> ( if omit_prags then mempty
+                                                else ncs_nameSet (cgNonCafs cmm_info)
+                                              , cgLFInfos cmm_info ))
                                 m_cmm_infos
     tag_sigs = fromMaybe mempty m_stg_infos
 
@@ -203,9 +209,8 @@ updateDecl decls m_stg_infos m_cmm_infos
       | let not_caffy = elemNameSet nm non_cafs
       , let mb_lf_info = lookupNameEnv lf_infos nm
       , let sig = lookupNameEnv tag_sigs nm
-      -- NB: with LFInfo now attached at every optimisation level, a missing
-      -- LFInfo is unremarkable (e.g. at -O0), so we do not trace it here.
-      , warnPprTrace False "updateDecl" (text "Name without LFInfo:" <+> ppr nm) True
+        -- A missing LFInfo is unremarkable: at -O0 only the
+        -- correctness-relevant LFInfos are conveyed (see GHC.StgToCmm).
         -- Only allocate a new IfaceId if we're going to update the infos
       , isJust mb_lf_info || not_caffy || isJust sig
       = IfaceId nm ty details $

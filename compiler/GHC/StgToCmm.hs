@@ -21,7 +21,7 @@ import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Config
 import GHC.StgToCmm.Ticky
-import GHC.StgToCmm.Types (ModuleLFInfos)
+import GHC.StgToCmm.Types (ModuleLFInfos, LambdaFormInfo(..))
 import GHC.StgToCmm.CgUtils (CgStream)
 
 import GHC.Cmm
@@ -137,11 +137,21 @@ codeGen logger tmpfs cfg (InfoTableProvMap denv _ _) tycons
                   !lf = cg_lf info
 
               -- LFInfo is part of the STG-ABI (a reference to an imported value
-              -- must carry its pointer tag), not an inlining pragma, so collect
-              -- it for every binding regardless of -fomit-interface-pragmas.
-              -- (Only LFInfo is conveyed here, never unfoldings.)
+              -- must carry its pointer tag), not an inlining pragma, so even
+              -- under -fomit-interface-pragmas we must convey the LFInfos that
+              -- pointer-tagging correctness depends on: values without entry
+              -- code that may be entered (LFCon under the tag-test in
+              -- emitEnter; LFScalar/LFPrim never). Functions and thunks are
+              -- safely enterable, so their LFInfo remains a mere optimisation
+              -- and is omitted at -O0 to keep interfaces small.
+              keep_lf_info lf = case lf of
+                LFCon{}  -> True
+                LFScalar -> True
+                LFPrim   -> True
+                _        -> not (stgToCmmOmitIfPragmas cfg)
               !generatedInfo
-                = mkNameEnv (Prelude.map extractInfo (nonDetEltsUFM cg_id_infos))
+                = mkNameEnv [ i | i@(_, lf) <- Prelude.map extractInfo (nonDetEltsUFM cg_id_infos)
+                                , keep_lf_info lf ]
 
         ; rn_mapping <- liftIO (readIORef uniqRnRef)
         ; liftIO $ debugTraceMsg logger 3 (text "DetRnM mapping:" <+> ppr rn_mapping)
