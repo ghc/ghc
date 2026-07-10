@@ -1,0 +1,10 @@
+section: compiler
+synopsis: Unpack strict enumeration fields by default with -O
+description:
+  The new flag ``-funbox-strict-enums``, enabled by default at ``-O`` and
+  higher, unpacks strict constructor fields whose type is an enumeration
+  (all constructors nullary), such as ``Bool``. Such a field is stored as
+  its constructor tag in a ``Word8#``, ``Word16#`` or ``Word#`` instead of
+  a pointer, making the constructor smaller. This builds on the branchless
+  enumeration unpacking introduced for ``{-# UNPACK #-}`` (#26970).
+issues: #605 #26970

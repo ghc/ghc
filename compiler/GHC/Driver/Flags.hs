@@ -656,6 +656,7 @@ data GeneralFlag
    | Opt_CaseFolding                    -- ^ Constant folding through case-expressions
    | Opt_UnboxStrictFields
    | Opt_UnboxSmallStrictFields
+   | Opt_UnboxStrictEnums
    | Opt_DictsCheap
    | Opt_EnableRewriteRules             -- ^ Apply rewrite rules during simplification
    | Opt_EnableThSpliceWarnings         -- ^ Enable warnings for TH splices
@@ -930,6 +931,7 @@ optimisationFlags = EnumSet.fromList
    , Opt_CaseFolding
    , Opt_UnboxStrictFields
    , Opt_UnboxSmallStrictFields
+   , Opt_UnboxStrictEnums
    , Opt_DictsCheap
    , Opt_EnableRewriteRules
    , Opt_RegsGraph

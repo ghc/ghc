@@ -15,5 +15,6 @@ initBangOpts dflags = BangOpts
       -- we use -fomit-interface-pragmas as the indication
   , bang_opt_unbox_strict  = gopt Opt_UnboxStrictFields dflags
   , bang_opt_unbox_small   = gopt Opt_UnboxSmallStrictFields dflags
+  , bang_opt_unbox_enums   = gopt Opt_UnboxStrictEnums dflags
   }
 

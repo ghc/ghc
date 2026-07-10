@@ -1719,6 +1719,36 @@ as such you shouldn't need to set any of them explicitly. A flag
     declarations in the same module. To work around the issue, the use of
     explicit ``UNPACK`` pragmas is advised.
 
+.. ghc-flag:: -funbox-strict-enums
+    :shortdesc: Flatten strict constructor fields of enumeration types.
+        Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-unbox-strict-enums
+    :category:
+
+    :default: off but enabled by :ghc-flag:`-O`.
+
+    .. index::
+       single: strict constructor fields
+       single: constructor fields, strict
+
+    This option causes all constructor fields which are marked strict
+    (i.e. ``!``) and whose type is an enumeration (a data type where all
+    constructors are nullary) to be unpacked. Such a field is represented
+    by its constructor tag in a single ``Word8#``, ``Word16#`` or ``Word#``
+    (depending on the number of constructors), rather than by a pointer.
+    For example, the field in ::
+
+        data T = T !Bool
+
+    is represented by a ``Word8#``. It is equivalent to adding an
+    ``UNPACK`` pragma (see :ref:`unpack-pragma`) to every strict
+    constructor field of an enumeration type.
+
+    Like :ghc-flag:`-funbox-small-strict-fields`, this should rarely make
+    things worse. Unpacking can be disabled for certain constructor fields
+    using the ``NOUNPACK`` pragma (see :ref:`nounpack-pragma`).
+
 .. ghc-flag:: -funbox-strict-fields
     :shortdesc: Flatten strict constructor fields
     :type: dynamic

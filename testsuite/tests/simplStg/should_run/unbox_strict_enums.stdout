@@ -1,0 +1,4 @@
+Auto True Red False Purple True Green False Yellow
+Auto False Blue True Yellow False Red True Purple
+auto as small as explicit UNPACK: True
+NOUNPACK larger than auto:        True

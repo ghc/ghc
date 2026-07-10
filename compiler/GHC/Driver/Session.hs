@@ -2631,6 +2631,7 @@ fFlagsDeps = [
   flagSpec "write-if-self-recomp-flags"       Opt_WriteSelfRecompFlags,
   flagSpec "write-ide-info"                   Opt_WriteHie,
   flagSpec "unbox-small-strict-fields"        Opt_UnboxSmallStrictFields,
+  flagSpec "unbox-strict-enums"               Opt_UnboxStrictEnums,
   flagSpec "unbox-strict-fields"              Opt_UnboxStrictFields,
   flagSpec "unoptimized-core-for-interpreter" Opt_UnoptimizedCoreForInterpreter,
   flagSpec "version-macros"                   Opt_VersionMacros,

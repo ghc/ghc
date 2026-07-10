@@ -842,6 +842,7 @@ data BangOpts = BangOpts
   , bang_opt_unbox_disable :: !Bool -- ^ Disable automatic field unboxing (e.g. if we aren't optimising)
   , bang_opt_unbox_strict  :: !Bool -- ^ Unbox strict fields
   , bang_opt_unbox_small   :: !Bool -- ^ Unbox small strict fields
+  , bang_opt_unbox_enums   :: !Bool -- ^ Unbox strict enumeration fields
   }
 
 mkDataConRep :: Platform
@@ -1664,8 +1665,10 @@ shouldUnpackArgTy platform bang_opts prag fam_envs arg_ty
         SrcUnpack   -> True  -- {-# UNPACK #-}
         NoSrcUnpack -- No explicit unpack pragma, so use heuristics
           | is_sum data_cons
-          -> False -- Don't unpack sum types automatically, but they can
-                   -- be unpacked with an explicit source UNPACK.
+          -> bang_opt_unbox_enums bang_opts && is_enum data_cons
+             -- Sum types are unpacked automatically only if they are
+             -- enumerations (see Note [UNPACK for enum types]); other sums
+             -- need an explicit source UNPACK.
           | otherwise   -- Wrinkle (W4) of Note [Recursive unboxing]
           -> bang_opt_unbox_strict bang_opts
              || (bang_opt_unbox_small bang_opts
@@ -1683,10 +1686,15 @@ shouldUnpackArgTy platform bang_opts prag fam_envs arg_ty
           in rep_size <= 8
 
     is_sum :: [DataCon] -> Bool
-    -- We never unpack sum types automatically
+    -- We never unpack sum types automatically, except enumerations
     -- (Product types, we do. Empty types are weeded out by unpackable_type_datacons.)
     is_sum (_:_:_) = True
     is_sum _       = False
+
+    is_enum :: [DataCon] -> Bool
+    -- True <=> all constructors are nullary, so the field unpacks to a
+    -- single narrow tag; see Note [UNPACK for enum types]
+    is_enum = all (null . dataConOrigArgTys)
 
 
 
