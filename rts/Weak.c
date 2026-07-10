@@ -173,7 +173,9 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
                            rts_apply(cap,
                                (StgClosure *)runFinalizerBatch_closure,
                                rts_mkInt(cap,n)),
-                           (StgClosure *)arr)
+                           // Array# references carry tag 1; see Note [Pointer
+                           // tagging of unlifted boxed primitives] in GHC.StgToCmm.Prim
+                           TAG_CLOSURE(1, (StgClosure *)arr))
         );
 
     scheduleThread(cap,t);
