@@ -965,7 +965,10 @@ loop:
   case WEAK:
   case PRIM:
   case MUT_PRIM:
-      copy(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen_no);
+      // Preserve the reference's pointer tag: boxed unlifted primitives
+      // (MutVar#, MVar#, TVar#, Weak#, StableName#, ...) carry tag 1.
+      // See Note [Pointer tagging of unlifted boxed primitives] in GHC.StgToCmm.Prim.
+      copy_tag(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen_no,tag);
       return;
 
   case BCO:
@@ -1009,24 +1012,26 @@ loop:
       return;
 
   case ARR_WORDS:
-      // just copy the block
-      copy(p,info,q,arr_words_sizeW((StgArrBytes *)q),gen_no);
+      // just copy the block, preserving the reference's pointer tag
+      // (ByteArray# references carry tag 1; see Note [Pointer tagging of
+      // unlifted boxed primitives] in GHC.StgToCmm.Prim)
+      copy_tag(p,info,q,arr_words_sizeW((StgArrBytes *)q),gen_no,tag);
       return;
 
   case MUT_ARR_PTRS_CLEAN:
   case MUT_ARR_PTRS_DIRTY:
   case MUT_ARR_PTRS_FROZEN_CLEAN:
   case MUT_ARR_PTRS_FROZEN_DIRTY:
-      // just copy the block
-      copy(p,info,q,mut_arr_ptrs_sizeW((StgMutArrPtrs *)q),gen_no);
+      // just copy the block, preserving the reference's pointer tag
+      copy_tag(p,info,q,mut_arr_ptrs_sizeW((StgMutArrPtrs *)q),gen_no,tag);
       return;
 
   case SMALL_MUT_ARR_PTRS_CLEAN:
   case SMALL_MUT_ARR_PTRS_DIRTY:
   case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
   case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
-      // just copy the block
-      copy(p,info,q,small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs *)q),gen_no);
+      // just copy the block, preserving the reference's pointer tag
+      copy_tag(p,info,q,small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs *)q),gen_no,tag);
       return;
 
   case TSO:

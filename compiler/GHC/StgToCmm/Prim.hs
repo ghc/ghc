@@ -36,8 +36,15 @@ import GHC.Cmm.Graph
 import GHC.Stg.Syntax
 import GHC.Cmm
 import GHC.Unit         ( rtsUnit )
-import GHC.Core.Type    ( Type, tyConAppTyCon_maybe, isUnliftedType, isBoxedType )
+import GHC.Core.Type    ( Type, tyConAppTyCon_maybe, isUnliftedType, isBoxedType
+                        , splitFunTys, dropForAlls )
 import GHC.Core.TyCon
+import GHC.Builtin.Types.Prim ( arrayPrimTyCon, mutableArrayPrimTyCon
+                              , smallArrayPrimTyCon, smallMutableArrayPrimTyCon
+                              , byteArrayPrimTyCon, mutableByteArrayPrimTyCon
+                              , mutVarPrimTyCon, mVarPrimTyCon, tVarPrimTyCon
+                              , weakPrimTyCon, stableNamePrimTyCon, promptTagPrimTyCon )
+import GHC.Core.TyCo.Rep ( scaledThing )
 import GHC.Types.RepType ( unwrapType )
 import GHC.StgToCmm.Closure ( NonVoid, nonVoidStgArgs, fromNonVoid )
 import GHC.Cmm.CLabel
@@ -84,7 +91,11 @@ cgOpApp (StgPrimOp primop) args res_ty = do
     let platform = stgToCmmPlatform cfg
     cmm_args <- getNonVoidArgAmodes args
     -- See Note [Pointer tagging of unlifted boxed primitives]
-    let cmm_args' = zipWith (untagPrimArg platform) (nonVoidStgArgs args) cmm_args
+    let decl_tys = map scaledThing (fst (splitFunTys (dropForAlls (primOpType primop))))
+        nv_decl_tys = [ dty
+                      | (dty, arg) <- zip decl_tys args
+                      , not (null (stgArgRep arg)) ]
+        cmm_args' = zipWith3 (untagPrimArg platform) nv_decl_tys (nonVoidStgArgs args) cmm_args
     cmmPrimOpApp cfg primop cmm_args' (Just res_ty)
 
 cgOpApp (StgPrimCallOp primcall) args _res_ty
@@ -108,12 +119,48 @@ cmmPrimOpApp cfg primop cmm_args mres_ty = do
   f res_ty
 
 -- | Strip the pointer tag from a primop argument that is an unlifted boxed
--- primitive (ByteArray#, Array#, MVar#, ...). See
--- Note [Pointer tagging of unlifted boxed primitives].
-untagPrimArg :: Platform -> NonVoid StgArg -> CmmExpr -> CmmExpr
-untagPrimArg platform nv_arg e
-  | isUnliftedBoxedTy (stgArgType (fromNonVoid nv_arg)) = cmmUntag platform e
-  | otherwise                                           = e
+-- primitive (ByteArray#, Array#, MVar#, ...). Which arguments to strip, and
+-- how, is decided by the primop's /declared/ argument type:
+--
+--  * A declared array container (Array#, MutableByteArray#, ...) is a pointer
+--    the primop dereferences. Its tag is statically known to be 1, so untag by
+--    subtracting 1; this folds into the header/index offset of the subsequent
+--    access, making the untag free on most architectures. This is only sound
+--    because every producer of an array pointer tags it.
+--
+--  * A declared type-variable position (e.g. the element argument of
+--    writeArray#) is stored, not dereferenced: keep its tag, whatever it is.
+--
+--  * Any other declared unlifted boxed primitive (MVar#, ThreadId#, ...) is
+--    untagged with a mask, which tolerates the few producers that do not tag
+--    yet (e.g. ThreadId#s in the array filled in by C listThreads).
+--
+-- See Note [Pointer tagging of unlifted boxed primitives].
+untagPrimArg :: Platform -> Type -> NonVoid StgArg -> CmmExpr -> CmmExpr
+untagPrimArg platform decl_ty nv_arg e
+  | Just tc <- tyConAppTyCon_maybe decl_ty
+  = if isKnownTag1PrimTyCon tc
+      then cmmOffsetB platform e (-1)
+      else if isUnliftedBoxedTy (stgArgType (fromNonVoid nv_arg))
+             then cmmUntag platform e
+             else e
+  | otherwise
+  = e
+
+-- | Unlifted boxed primitives for which /every/ producer establishes the tag
+-- 1, so consumers may untag by subtracting 1. Not included (mask-untagged
+-- instead) because some producer hands out untagged pointers: ThreadId#
+-- (the Array# elements filled in by C listThreads), Compact#
+-- (stg_compactFixupPointerszh), StackSnapshot# (stg_cloneMyStackzh), BCO#
+-- (never tagged with 1 by design).
+isKnownTag1PrimTyCon :: TyCon -> Bool
+isKnownTag1PrimTyCon tc =
+     tc == arrayPrimTyCon      || tc == mutableArrayPrimTyCon
+  || tc == smallArrayPrimTyCon || tc == smallMutableArrayPrimTyCon
+  || tc == byteArrayPrimTyCon  || tc == mutableByteArrayPrimTyCon
+  || tc == mutVarPrimTyCon     || tc == mVarPrimTyCon
+  || tc == tVarPrimTyCon       || tc == weakPrimTyCon
+  || tc == stableNamePrimTyCon || tc == promptTagPrimTyCon
 
 -- | Is this the type of an unlifted boxed /primitive/ (ByteArray#, Array#,
 -- MVar#, ...), whose pointer a producer tags with 1? Restricted to primitive

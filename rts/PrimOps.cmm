@@ -1113,7 +1113,8 @@ stg_listThreadszh ()
     jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
   }
 
-  return (arr);
+  // See Note [Pointer tagging of unlifted boxed primitives] in GHC.StgToCmm.Prim
+  return (arr + 1);
 }
 
 stg_isCurrentThreadBoundzh (/* no args */)
@@ -1130,7 +1131,9 @@ stg_threadLabelzh ( gcptr tso )
     if (r == 0) {
         return (0, 0);
     } else {
-        return (1, r);
+        // The label is a ByteArray#; tag it like every other array producer.
+        // See Note [Pointer tagging of unlifted boxed primitives] in GHC.StgToCmm.Prim
+        return (1, r + 1);
     }
 }
 
