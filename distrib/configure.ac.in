@@ -175,7 +175,11 @@ AC_SUBST([CmmCPPSupportsG0])
 
 dnl ** Which ld to use?
 dnl --------------------------------------------------------------
-FIND_LD([$target],[GccUseLdOpt])
+dnl currently if you pass $LD=foo, merge objs command will be set to $(which foo)
+dnl which is not required by GHC and also wrong.
+BINDIST_DETERMINE_LINKER([$target],[GccUseLdOpt])
+dnl at this point, we should have set LD in all cases, so FIND_MERGE_OBJECTS command can
+dnl go off and do it's thing
 FIND_MERGE_OBJECTS()
 CONF_GCC_LINKER_OPTS_STAGE1="$CONF_GCC_LINKER_OPTS_STAGE1 $GccUseLdOpt"
 CONF_GCC_LINKER_OPTS_STAGE2="$CONF_GCC_LINKER_OPTS_STAGE2 $GccUseLdOpt"
