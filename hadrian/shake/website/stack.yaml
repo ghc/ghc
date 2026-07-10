@@ -1,0 +1,6 @@
+# Run:
+# stack build extra tagsoup markdown
+# stack ghci
+# ghcid --test=":main debug" --reload=parts --reload=../docs
+resolver: lts-3.9
+packages: []

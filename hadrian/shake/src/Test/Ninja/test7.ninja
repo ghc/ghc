@@ -1,0 +1,7 @@
+# #565, check multi-file rules that don't create their contents
+ninja_required_version = 1.5
+build test : phony a b
+rule CUSTOM_COMMAND
+   command = $COMMAND
+build a b : CUSTOM_COMMAND
+  COMMAND = cd

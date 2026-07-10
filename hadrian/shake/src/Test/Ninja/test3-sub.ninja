@@ -1,0 +1,6 @@
+v4 = s1
+v5 = s1
+
+build out3.4: dump
+
+v5 = s2

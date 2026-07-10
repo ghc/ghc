@@ -1,0 +1,7 @@
+The Shake sources in hadrian/shake are vendored from:
+
+    https://github.com/ndmitchell/shake.git
+    commit 02594b855981856ebc97d4b3813976a6f9b760d3
+
+This was upstream master/HEAD on 2026-01-19 and is tagged v0.19.9.
+GHC-specific changes are maintained in the surrounding GHC repository.

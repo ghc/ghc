@@ -54,6 +54,22 @@ time you fire up a build. This is not possible with the Make build system.
   build -j8
   ```
 
+- Fuzzing the build for missing dependencies by shuffling scheduling order
+
+  ``` sh
+  # Make
+  make -j8 --shuffle
+
+  # Hadrian
+  build -j8 --shuffle
+  ```
+
+  Both accept `random` (the default), `reverse`, `none`, or a decimal seed as
+  the shuffle mode. Hadrian reports the random seed so that a run can be
+  replayed with, for example, `build -j8 --shuffle=123456789`. See the
+  [full flag documentation](../README.md#command-line-flags) for advice on
+  reproducible runs.
+
 - Building a stage 1 or 2 GHC executable
 
   ``` sh

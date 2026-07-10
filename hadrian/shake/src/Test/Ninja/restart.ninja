@@ -1,0 +1,8 @@
+
+rule add
+    command = echo build restart.txt: self >> $out
+
+build restart.ninja: add
+
+rule self
+    command = echo $out > $out

@@ -34,8 +34,10 @@ build script (Stack provides a managed MSYS environment), as described in
 [these instructions][windows-build]. If you don't mind installing MSYS yourself
 or already have it, you can use the Cabal-based build script.
 
-* Hadrian is written in Haskell and depends on `shake` (plus a few packages that
-`shake` depends on), `mtl`, `quickcheck`, and GHC core libraries.
+* Hadrian is written in Haskell and depends on the in-tree copy of `shake`
+  (whose [upstream revision](shake-version.txt) is recorded alongside Hadrian),
+  plus a few packages that `shake` depends on, `mtl`, `quickcheck`, and GHC core
+  libraries.
 
 * If you have never built GHC before, start with the
 [preparation guide][ghc-preparation].
@@ -124,6 +126,28 @@ messages by Shake oracles and full command lines for all commands.
 build to check that the build system is well formed. Note that the Lint check
 currently fails under certain circumstances, as discussed in
 [this ticket](https://gitlab.haskell.org/ghc/ghc/issues/15971).
+
+* `--shuffle[=MODE]`: perturb the order in which ready build dependencies are
+  scheduled, which can expose missing dependency declarations. With no mode,
+  or with `--shuffle=random`, Hadrian chooses a fresh random seed and reports
+  it. `--shuffle=SEED` repeats the permutation for a decimal integer seed;
+  `--shuffle=reverse` uses reverse order; and `--shuffle=none` disables
+  shuffling. Shuffling affects scheduling only: a rule still observes its
+  dependency results in their original declared order.
+
+  A parallel build with a fresh build root is a useful fuzzing run:
+
+  ```sh
+  build -j16 --build-root=_build-shuffle --shuffle
+  ```
+
+  If it exposes a failure, clean the build root and repeat with the reported
+  seed and the same build-root path and job count, for example:
+
+  ```sh
+  build --build-root=_build-shuffle clean
+  build -j16 --build-root=_build-shuffle --shuffle=123456789
+  ```
 
 #### Expressions
 

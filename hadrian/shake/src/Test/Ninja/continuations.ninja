@@ -1,0 +1,12 @@
+
+rule $
+    run
+    command $
+    = $
+    touch $
+    $out
+
+build $
+    continuations.txt $
+    : $
+    run

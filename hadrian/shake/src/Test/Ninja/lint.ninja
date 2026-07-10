@@ -1,0 +1,19 @@
+
+rule gen
+    command = echo $out > $out
+
+rule run
+    command = (echo $out : $out.gen > $out.d) && (echo $out > $out)
+    depfile = $out.d
+
+build good: phony good1 good2
+
+build good1: run || good1.gen
+build good1.gen: gen
+
+build good2: run || good2_phony
+build good2_phony: phony good2.gen
+build good2.gen: gen
+
+build bad: run | input
+build bad.gen: gen

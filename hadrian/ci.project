@@ -1,4 +1,5 @@
 packages: ./
+          ./shake/
 
 package hadrian
     ghc-options: -Werror

@@ -1,0 +1,36 @@
+name: ci
+on:
+  push:
+  pull_request:
+  schedule:
+  - cron:  '0 3 * * 6' # 3am Saturday
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        ghc: ['9.12', '9.10', '9.8', '9.6', '9.4', '9.2', '9.0', '8.10', '8.8']
+        include:
+        - os: windows-latest
+        - os: macOS-latest
+
+    steps:
+    - run: git config --global core.autocrlf false
+    - uses: actions/checkout@v4
+    - uses: haskell-actions/setup@v2
+      id: setup-haskell
+      with:
+        ghc-version: ${{ matrix.ghc }}
+    - run: cabal v2-freeze --enable-tests
+    - uses: actions/cache@v4
+      with:
+        path: ${{ steps.setup-haskell.outputs.cabal-store }}
+        key: ${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('cabal.project.freeze') }}
+        restore-keys: ${{ runner.os }}-${{ matrix.ghc }}-
+    - uses: ndmitchell/neil@master
+      with:
+        hlint-arguments: src
+        install-fsatrace: true

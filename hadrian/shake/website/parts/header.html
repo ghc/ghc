@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="chrome=1" />
+        <meta name="viewport" content="width=device-width" />
+        <!-- favicon from https://findicons.com/icon/445768/blue_lego?id=445922 -->
+        <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
+        <title>Shake Build System</title>
+        <link rel="stylesheet" href="index.css" />
+
+<style type="text/css">
+#header {
+    position: fixed;
+    height: 40px;
+    width: 100%;
+
+    -webkit-box-shadow: 0 1px 10px rgba(0,0,0,.1);
+    -moz-box-shadow: 0 1px 10px rgba(0,0,0,.1);
+    box-shadow: 0 1px 10px rgba(0,0,0,.1);
+    background-color: #99bae0;
+    background-image: -moz-linear-gradient(top, #a0bfe3, #8fb3eb);
+    background-image: -webkit-gradient(linear, 0 0, 0 100%, from(#a0bfe3), to(#8fb3eb));
+    background-image: -webkit-linear-gradient(top, #a0bfe3, #8fb3eb);
+    background-image: -o-linear-gradient(top, #a0bfe3, #8fb3eb);
+    background-image: linear-gradient(to bottom, #a0bfe3, #8fb3eb);
+    background-repeat: repeat-x;
+    filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#ffa0bfd3', endColorstr='#ff8fb3cb', GradientType=0);
+    border: 1px solid #6597b8;
+    border-top: 0px;
+}
+
+#header a {
+    color: #000;
+    text-decoration: none;
+    padding: 10px 15px;
+    text-shadow: 0 1px 0 #a0bfd3;
+    display: block;
+    float: left;
+    line-height: 20px;
+}
+
+#header a:hover {
+    color: #444;
+}
+
+#header a.active {
+    background-color: #7da8e3;
+    -webkit-box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.125);
+    -moz-box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.125);
+    box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.125);
+}
+
+#header a#header-root {
+    font-size: 150%;
+}
+
+#content {
+    clear: both;
+    padding-top: 40px;
+}
+
+@media print, screen and (max-width: 600px) {
+    #header a#header-first {clear: both;}
+    #header a {padding: 3px 15px;}
+    #header a#header-root {padding: 10px 15px;}
+    #header {height: 66px; position: static;}
+    #content {padding-top: 0px;}
+    .target {top: 0px;}
+}
+
+.target {
+    position: relative;
+    top: -33px;
+    display: block;
+    visibility: hidden;
+    border: 1px solid purple;
+}
+</style>
+
+    </head>
+    <body>
+
+<div id="header">
+    <a href="https://shakebuild.com" id="header-root">Shake build system</a>
+    <a href="index.html" id="header-first" class="active">Home</a>
+    <a href="why.html">Why Shake</a>
+    <a href="manual.html">Manual</a>
+    <a href="faq.html">FAQ</a>
+</div>
+
+<div id="content">
+    <h2>main</h2><p>Stuff goes here</p>
+    <h2>entry 1</h2><p>Stuff goes here</p>
+    <h2>entry 2</h2><p>Stuff goes here</p>
+    <h2>entry 2</h2><p>Stuff goes here</p>
+    <h2>entry 2</h2><p>Stuff goes here</p>
+    <h2>entry 2</h2><p>Stuff goes here</p>
+    <span id="foo" class="target"></span><h2>Foo</h2><p>Stuff goes here</p>
+    <h2>entry 2</h2><p>Stuff goes here</p>
+    <h2>entry 2</h2><p>Stuff goes here</p>
+    <h2>entry 2</h2><p>Stuff goes here</p>
+    <h2>entry 2</h2><p>Stuff goes here</p>
+    <h2>entry 2</h2><p>Stuff goes here</p>
+    <h2>entry 2</h2><p>Stuff goes here</p>
+    <h2>entry 2</h2><p>Stuff goes here</p>
+    <h2>entry 2</h2><p>Stuff goes here</p>
+</div>
+
+</body>
+</html>

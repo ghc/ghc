@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="utf-8" />
+<title>Shake progress diagnostic</title>
+
+<!-- Libraries -->
+<script src="lib/jquery.js"></script>
+<script src="lib/jquery.flot.js"></script>
+<script src="lib/jquery.flot.stack.js"></script>
+<!-- Progress output -->
+<script src="data/progress-data.js"></script>
+<script src="data/metadata.js"></script>
+<!-- Functions for creating info from progress info -->
+<script src="shake.js"></script>
+<script>
+initProgress();
+</script>
+
+<style type="text/css">
+body {font-family: sans-serif; font-size: 10pt;}
+h1 {font-size: 12pt;}
+.version {color: gray; font-style: italic; clear: both; padding-top: 30px;}
+.shake {
+    text-decoration: none;
+    font-family: monospace;
+    color: black;
+}
+.plot {
+    width: 300px;
+    height: 200px;
+    float: left;
+}
+</style>
+
+</head>
+<body>
+
+<h1>Shake Progress Analysis</h1>
+<p>
+    The red line represents the real performance, with time to completion on the X axis and predicted time on the Y axis. A perfect progress prediction would follow the gray line.
+</p>
+
+<div id="output">Loading...</div>
+
+<p class="version"></p>
+
+</body>
+</html>

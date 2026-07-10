@@ -1,0 +1,22 @@
+# HLint configuration file
+# https://github.com/ndmitchell/hlint
+##########################
+
+- ignore: # Due to CPP
+    name: Unused LANGUAGE pragma
+    within:
+    - Development.Shake.Internal.Progress
+    - Development.Shake.Internal.FileInfo
+
+# Warnings currently triggered by the code
+- ignore: {name: "Use fmap"}
+- ignore: {name: "Reduce duplication"}
+- ignore: {name: "Use uncurry"}
+- ignore: {name: "Use let"}
+- ignore: {name: "Use &&&"}
+- ignore: {name: "Use fromMaybe"}
+- ignore: {name: "Use section"}
+- ignore: {name: "Redundant if"}
+- ignore: {name: "Move brackets to avoid $"}
+- ignore: {name: "Redundant lambda"}
+- ignore: {name: "Use camelCase"}

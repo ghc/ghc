@@ -1,0 +1,512 @@
+cabal-version:      1.18
+build-type:         Simple
+name:               shake
+version:            0.19.9
+license:            BSD3
+license-file:       LICENSE
+category:           Development, Shake
+author:             Neil Mitchell <ndmitchell@gmail.com>
+maintainer:         Neil Mitchell <ndmitchell@gmail.com>
+copyright:          Neil Mitchell 2011-2026
+synopsis:           Build system library, like Make, but more accurate dependencies.
+description:
+    Shake is a Haskell library for writing build systems - designed as a
+    replacement for @make@. See "Development.Shake" for an introduction,
+    including an example. The homepage contains links to a user
+    manual, an academic paper and further information:
+    <https://shakebuild.com>
+    .
+    To use Shake the user writes a Haskell program
+    that imports "Development.Shake", defines some build rules, and calls
+    the 'Development.Shake.shakeArgs' function. Thanks to do notation and infix
+    operators, a simple Shake build system
+    is not too dissimilar from a simple Makefile. However, as build systems
+    get more complex, Shake is able to take advantage of the excellent
+    abstraction facilities offered by Haskell and easily support much larger
+    projects. The Shake library provides all the standard features available in other
+    build systems, including automatic parallelism and minimal rebuilds.
+    Shake also provides more accurate dependency tracking, including seamless
+    support for generated files, and dependencies on system information
+    (e.g. compiler version).
+homepage:           https://shakebuild.com
+bug-reports:        https://github.com/ndmitchell/shake/issues
+tested-with:        GHC==9.12, GHC==9.10, GHC==9.8, GHC==9.6, GHC==9.4, GHC==9.2, GHC==9.0, GHC==8.10, GHC==8.8
+extra-doc-files:
+    CHANGES.txt
+    README.md
+    docs/Manual.md
+    docs/shake-progress.png
+extra-source-files:
+    src/Paths.hs
+    src/Test/C/constants.c
+    src/Test/C/constants.h
+    src/Test/C/main.c
+    src/Test/Ninja/*.ninja
+    src/Test/Ninja/*.output
+    src/Test/Ninja/subdir/*.ninja
+    src/Test/Progress/*.prog
+    src/Test/Tar/list.txt
+    src/Test/Tup/hello.c
+    src/Test/Tup/newmath/root.cfg
+    src/Test/Tup/newmath/square.c
+    src/Test/Tup/newmath/square.h
+    src/Test/Tup/root.cfg
+data-files:
+    docs/manual/build.bat
+    docs/manual/Shakefile.hs
+    docs/manual/build.sh
+    docs/manual/constants.c
+    docs/manual/constants.h
+    docs/manual/main.c
+    html/profile.html
+    html/progress.html
+    html/shake.js
+
+source-repository head
+    type:     git
+    location: https://github.com/ndmitchell/shake.git
+
+flag portable
+    default: False
+    manual: True
+    description: Obtain FileTime using portable functions
+
+flag cloud
+    default: False
+    manual: True
+    description: Enable cloud build features
+
+flag embed-files
+    default: False
+    manual: True
+    description: Embed data files into the shake library
+
+flag threaded
+    default: True
+    manual: True
+    description: Build shake with the threaded RTS
+
+library
+    default-language: Haskell2010
+    hs-source-dirs:   src
+    build-depends:
+        base >= 4.9 && < 5,
+        binary,
+        bytestring,
+        deepseq >= 1.1,
+        directory >= 1.2.7.0,
+        extra >= 1.6.19,
+        filepath >= 1.4,
+        filepattern,
+        hashable >= 1.1.2.3,
+        heaps >= 0.3.6.1,
+        js-dgtable,
+        js-flot,
+        js-jquery,
+        primitive,
+        process >= 1.1,
+        random,
+        time,
+        transformers >= 0.2,
+        unordered-containers >= 0.2.7,
+        utf8-string >= 0.3
+
+    if flag(embed-files)
+        cpp-options: -DFILE_EMBED
+        build-depends:
+            file-embed >= 0.0.11,
+            template-haskell
+
+    if flag(portable)
+        cpp-options: -DPORTABLE
+    else
+        if !os(windows)
+            build-depends: unix >= 2.5.1
+    if !os(windows)
+        build-depends: unix
+
+    if flag(cloud)
+        cpp-options: -DNETWORK
+        build-depends: network, network-uri
+
+    exposed-modules:
+        Development.Shake
+        Development.Shake.Classes
+        Development.Shake.Command
+        Development.Shake.Config
+        Development.Shake.Database
+        Development.Shake.FilePath
+        Development.Shake.Forward
+        Development.Shake.Rule
+        Development.Shake.Util
+
+    other-modules:
+        Development.Ninja.Env
+        Development.Ninja.Lexer
+        Development.Ninja.Parse
+        Development.Ninja.Type
+        Development.Shake.Internal.Args
+        Development.Shake.Internal.CmdOption
+        Development.Shake.Internal.CompactUI
+        Development.Shake.Internal.Core.Action
+        Development.Shake.Internal.Core.Build
+        Development.Shake.Internal.Core.Database
+        Development.Shake.Internal.History.Shared
+        Development.Shake.Internal.History.Symlink
+        Development.Shake.Internal.History.Bloom
+        Development.Shake.Internal.History.Cloud
+        Development.Shake.Internal.History.Network
+        Development.Shake.Internal.History.Server
+        Development.Shake.Internal.History.Serialise
+        Development.Shake.Internal.History.Types
+        Development.Shake.Internal.Core.Monad
+        Development.Shake.Internal.Core.Pool
+        Development.Shake.Internal.Core.Rules
+        Development.Shake.Internal.Core.Run
+        Development.Shake.Internal.Core.Storage
+        Development.Shake.Internal.Core.Types
+        Development.Shake.Internal.Demo
+        Development.Shake.Internal.Derived
+        Development.Shake.Internal.Errors
+        Development.Shake.Internal.FileInfo
+        Development.Shake.Internal.FileName
+        Development.Shake.Internal.FilePattern
+        Development.Shake.Internal.Options
+        Development.Shake.Internal.Paths
+        Development.Shake.Internal.Profile
+        Development.Shake.Internal.Progress
+        Development.Shake.Internal.Resource
+        Development.Shake.Internal.Rules.Default
+        Development.Shake.Internal.Rules.Directory
+        Development.Shake.Internal.Rules.File
+        Development.Shake.Internal.Rules.Files
+        Development.Shake.Internal.Rules.Oracle
+        Development.Shake.Internal.Rules.OrderOnly
+        Development.Shake.Internal.Rules.Rerun
+        Development.Shake.Internal.Value
+        General.Bilist
+        General.Binary
+        General.Chunks
+        General.Cleanup
+        General.Fence
+        General.EscCodes
+        General.Extra
+        General.FileLock
+        General.GetOpt
+        General.Ids
+        General.Intern
+        General.ListBuilder
+        General.Makefile
+        General.Pool
+        General.Process
+        General.Template
+        General.Thread
+        General.Timing
+        General.TypeMap
+        General.Wait
+        Paths_shake
+
+
+executable shake
+    default-language: Haskell2010
+    hs-source-dirs:   src
+    ghc-options: -main-is Run.main -rtsopts
+    if flag(threaded)
+        ghc-options: -threaded "-with-rtsopts=-I0 -qg"
+    main-is: Run.hs
+    build-depends:
+        base == 4.*,
+        binary,
+        bytestring,
+        deepseq >= 1.1,
+        directory,
+        extra >= 1.6.19,
+        filepath,
+        filepattern,
+        hashable >= 1.1.2.3,
+        heaps >= 0.3.6.1,
+        js-dgtable,
+        js-flot,
+        js-jquery,
+        primitive,
+        process >= 1.1,
+        random,
+        time,
+        transformers >= 0.2,
+        unordered-containers >= 0.2.7,
+        utf8-string >= 0.3
+
+    if flag(embed-files)
+        cpp-options: -DFILE_EMBED
+        build-depends:
+            file-embed >= 0.0.11,
+            template-haskell
+
+    if flag(portable)
+        cpp-options: -DPORTABLE
+    else
+        if !os(windows)
+            build-depends: unix >= 2.5.1
+    if !os(windows)
+        build-depends: unix
+
+    if flag(cloud)
+        cpp-options: -DNETWORK
+        build-depends: network, network-uri
+
+    if impl(ghc < 8.0)
+        build-depends: semigroups >= 0.18
+
+    other-modules:
+        Development.Ninja.All
+        Development.Ninja.Env
+        Development.Ninja.Lexer
+        Development.Ninja.Parse
+        Development.Ninja.Type
+        Development.Shake
+        Development.Shake.Classes
+        Development.Shake.Command
+        Development.Shake.Database
+        Development.Shake.FilePath
+        Development.Shake.Internal.Args
+        Development.Shake.Internal.CmdOption
+        Development.Shake.Internal.CompactUI
+        Development.Shake.Internal.Core.Action
+        Development.Shake.Internal.Core.Build
+        Development.Shake.Internal.Core.Database
+        Development.Shake.Internal.History.Shared
+        Development.Shake.Internal.History.Symlink
+        Development.Shake.Internal.History.Bloom
+        Development.Shake.Internal.History.Cloud
+        Development.Shake.Internal.History.Network
+        Development.Shake.Internal.History.Server
+        Development.Shake.Internal.History.Serialise
+        Development.Shake.Internal.History.Types
+        Development.Shake.Internal.Core.Monad
+        Development.Shake.Internal.Core.Pool
+        Development.Shake.Internal.Core.Rules
+        Development.Shake.Internal.Core.Run
+        Development.Shake.Internal.Core.Storage
+        Development.Shake.Internal.Core.Types
+        Development.Shake.Internal.Demo
+        Development.Shake.Internal.Derived
+        Development.Shake.Internal.Errors
+        Development.Shake.Internal.FileInfo
+        Development.Shake.Internal.FileName
+        Development.Shake.Internal.FilePattern
+        Development.Shake.Internal.Options
+        Development.Shake.Internal.Paths
+        Development.Shake.Internal.Profile
+        Development.Shake.Internal.Progress
+        Development.Shake.Internal.Resource
+        Development.Shake.Internal.Rules.Default
+        Development.Shake.Internal.Rules.Directory
+        Development.Shake.Internal.Rules.File
+        Development.Shake.Internal.Rules.Files
+        Development.Shake.Internal.Rules.Oracle
+        Development.Shake.Internal.Rules.OrderOnly
+        Development.Shake.Internal.Rules.Rerun
+        Development.Shake.Internal.Value
+        General.Bilist
+        General.Binary
+        General.Chunks
+        General.Cleanup
+        General.Fence
+        General.EscCodes
+        General.Extra
+        General.FileLock
+        General.GetOpt
+        General.Ids
+        General.Intern
+        General.ListBuilder
+        General.Makefile
+        General.Pool
+        General.Process
+        General.Template
+        General.Thread
+        General.Timing
+        General.TypeMap
+        General.Wait
+        Paths_shake
+
+
+test-suite shake-test
+    default-language: Haskell2010
+    type: exitcode-stdio-1.0
+    main-is: Test.hs
+    hs-source-dirs: src
+    ghc-options: -main-is Test.main -rtsopts -with-rtsopts=-K1K
+    if flag(threaded)
+        ghc-options: -threaded
+
+    build-depends:
+        base == 4.*,
+        binary,
+        bytestring,
+        deepseq >= 1.1,
+        directory,
+        extra >= 1.6.19,
+        filepath,
+        filepattern,
+        hashable >= 1.1.2.3,
+        heaps >= 0.3.6.1,
+        js-dgtable,
+        js-flot,
+        js-jquery,
+        primitive,
+        process >= 1.1,
+        QuickCheck >= 2.0,
+        random,
+        time,
+        transformers >= 0.2,
+        unordered-containers >= 0.2.7,
+        utf8-string >= 0.3
+
+    if flag(embed-files)
+        cpp-options: -DFILE_EMBED
+        build-depends:
+            file-embed >= 0.0.11,
+            template-haskell
+
+    if flag(portable)
+        cpp-options: -DPORTABLE
+    else
+        if !os(windows)
+            build-depends: unix >= 2.5.1
+    if !os(windows)
+        build-depends: unix
+
+    if flag(cloud)
+        cpp-options: -DNETWORK
+        build-depends: network, network-uri
+
+    if impl(ghc < 8.0)
+        build-depends: semigroups >= 0.18
+
+    other-modules:
+        Development.Ninja.All
+        Development.Ninja.Env
+        Development.Ninja.Lexer
+        Development.Ninja.Parse
+        Development.Ninja.Type
+        Development.Shake
+        Development.Shake.Classes
+        Development.Shake.Command
+        Development.Shake.Config
+        Development.Shake.Database
+        Development.Shake.FilePath
+        Development.Shake.Forward
+        Development.Shake.Internal.Args
+        Development.Shake.Internal.CmdOption
+        Development.Shake.Internal.CompactUI
+        Development.Shake.Internal.Core.Action
+        Development.Shake.Internal.Core.Build
+        Development.Shake.Internal.Core.Database
+        Development.Shake.Internal.History.Shared
+        Development.Shake.Internal.History.Symlink
+        Development.Shake.Internal.History.Bloom
+        Development.Shake.Internal.History.Cloud
+        Development.Shake.Internal.History.Network
+        Development.Shake.Internal.History.Server
+        Development.Shake.Internal.History.Serialise
+        Development.Shake.Internal.History.Types
+        Development.Shake.Internal.Core.Monad
+        Development.Shake.Internal.Core.Pool
+        Development.Shake.Internal.Core.Rules
+        Development.Shake.Internal.Core.Run
+        Development.Shake.Internal.Core.Storage
+        Development.Shake.Internal.Core.Types
+        Development.Shake.Internal.Demo
+        Development.Shake.Internal.Derived
+        Development.Shake.Internal.Errors
+        Development.Shake.Internal.FileInfo
+        Development.Shake.Internal.FileName
+        Development.Shake.Internal.FilePattern
+        Development.Shake.Internal.Options
+        Development.Shake.Internal.Paths
+        Development.Shake.Internal.Profile
+        Development.Shake.Internal.Progress
+        Development.Shake.Internal.Resource
+        Development.Shake.Internal.Rules.Default
+        Development.Shake.Internal.Rules.Directory
+        Development.Shake.Internal.Rules.File
+        Development.Shake.Internal.Rules.Files
+        Development.Shake.Internal.Rules.Oracle
+        Development.Shake.Internal.Rules.OrderOnly
+        Development.Shake.Internal.Rules.Rerun
+        Development.Shake.Internal.Value
+        Development.Shake.Rule
+        Development.Shake.Util
+        General.Bilist
+        General.Binary
+        General.Chunks
+        General.Cleanup
+        General.Fence
+        General.EscCodes
+        General.Extra
+        General.FileLock
+        General.GetOpt
+        General.Ids
+        General.Intern
+        General.ListBuilder
+        General.Makefile
+        General.Pool
+        General.Process
+        General.Template
+        General.Thread
+        General.Timing
+        General.TypeMap
+        General.Wait
+        Paths_shake
+        Run
+        Test.Basic
+        Test.Batch
+        Test.Benchmark
+        Test.Builtin
+        Test.BuiltinOverride
+        Test.C
+        Test.Cache
+        Test.Cleanup
+        Test.CloseFileHandles
+        Test.Command
+        Test.Config
+        Test.Database
+        Test.Digest
+        Test.Directory
+        Test.Docs
+        Test.Errors
+        Test.Existence
+        Test.FileLock
+        Test.FilePath
+        Test.FilePattern
+        Test.Files
+        Test.Forward
+        Test.History
+        Test.Journal
+        Test.Lint
+        Test.Live
+        Test.Manual
+        Test.Match
+        Test.Monad
+        Test.Ninja
+        Test.Oracle
+        Test.OrderOnly
+        Test.Parallel
+        Test.Pool
+        Test.Progress
+        Test.Random
+        Test.Rebuild
+        Test.Reschedule
+        Test.Resources
+        Test.Self
+        Test.SelfMake
+        Test.Shuffle
+        Test.Tar
+        Test.Targets
+        Test.Thread
+        Test.Tup
+        Test.Type
+        Test.Unicode
+        Test.Util
+        Test.Verbosity
+        Test.Version

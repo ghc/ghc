@@ -1,0 +1,6 @@
+rule create
+    command = echo 1 > $out
+
+build root: phony || allow_directory.txt directory1
+build allow_directory.txt: create | directory2
+default root

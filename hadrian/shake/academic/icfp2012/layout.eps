@@ -1,0 +1,1196 @@
+%!PS-Adobe-3.0 EPSF-3.0
+%%Creator: graphviz version 2.24.0 (20090616.2323)
+%%Title: shake
+%%Pages: 1
+%%BoundingBox: 36 36 458 728
+%%EndComments
+save
+%%BeginProlog
+/DotDict 200 dict def
+DotDict begin
+
+/setupLatin1 {
+mark
+/EncodingVector 256 array def
+ EncodingVector 0
+
+ISOLatin1Encoding 0 255 getinterval putinterval
+EncodingVector 45 /hyphen put
+
+% Set up ISO Latin 1 character encoding
+/starnetISO {
+        dup dup findfont dup length dict begin
+        { 1 index /FID ne { def }{ pop pop } ifelse
+        } forall
+        /Encoding EncodingVector def
+        currentdict end definefont
+} def
+/Times-Roman starnetISO def
+/Times-Italic starnetISO def
+/Times-Bold starnetISO def
+/Times-BoldItalic starnetISO def
+/Helvetica starnetISO def
+/Helvetica-Oblique starnetISO def
+/Helvetica-Bold starnetISO def
+/Helvetica-BoldOblique starnetISO def
+/Courier starnetISO def
+/Courier-Oblique starnetISO def
+/Courier-Bold starnetISO def
+/Courier-BoldOblique starnetISO def
+cleartomark
+} bind def
+
+%%BeginResource: procset graphviz 0 0
+/coord-font-family /Times-Roman def
+/default-font-family /Times-Roman def
+/coordfont coord-font-family findfont 8 scalefont def
+
+/InvScaleFactor 1.0 def
+/set_scale {
+       dup 1 exch div /InvScaleFactor exch def
+       scale
+} bind def
+
+% styles
+/solid { [] 0 setdash } bind def
+/dashed { [9 InvScaleFactor mul dup ] 0 setdash } bind def
+/dotted { [1 InvScaleFactor mul 6 InvScaleFactor mul] 0 setdash } bind def
+/invis {/fill {newpath} def /stroke {newpath} def /show {pop newpath} def} bind def
+/bold { 2 setlinewidth } bind def
+/filled { } bind def
+/unfilled { } bind def
+/rounded { } bind def
+/diagonals { } bind def
+
+% hooks for setting color 
+/nodecolor { sethsbcolor } bind def
+/edgecolor { sethsbcolor } bind def
+/graphcolor { sethsbcolor } bind def
+/nopcolor {pop pop pop} bind def
+
+/beginpage {	% i j npages
+	/npages exch def
+	/j exch def
+	/i exch def
+	/str 10 string def
+	npages 1 gt {
+		gsave
+			coordfont setfont
+			0 0 moveto
+			(\() show i str cvs show (,) show j str cvs show (\)) show
+		grestore
+	} if
+} bind def
+
+/set_font {
+	findfont exch
+	scalefont setfont
+} def
+
+% draw text fitted to its expected width
+/alignedtext {			% width text
+	/text exch def
+	/width exch def
+	gsave
+		width 0 gt {
+			[] 0 setdash
+			text stringwidth pop width exch sub text length div 0 text ashow
+		} if
+	grestore
+} def
+
+/boxprim {				% xcorner ycorner xsize ysize
+		4 2 roll
+		moveto
+		2 copy
+		exch 0 rlineto
+		0 exch rlineto
+		pop neg 0 rlineto
+		closepath
+} bind def
+
+/ellipse_path {
+	/ry exch def
+	/rx exch def
+	/y exch def
+	/x exch def
+	matrix currentmatrix
+	newpath
+	x y translate
+	rx ry scale
+	0 0 1 0 360 arc
+	setmatrix
+} bind def
+
+/endpage { showpage } bind def
+/showpage { } def
+
+/layercolorseq
+	[	% layer color sequence - darkest to lightest
+		[0 0 0]
+		[.2 .8 .8]
+		[.4 .8 .8]
+		[.6 .8 .8]
+		[.8 .8 .8]
+	]
+def
+
+/layerlen layercolorseq length def
+
+/setlayer {/maxlayer exch def /curlayer exch def
+	layercolorseq curlayer 1 sub layerlen mod get
+	aload pop sethsbcolor
+	/nodecolor {nopcolor} def
+	/edgecolor {nopcolor} def
+	/graphcolor {nopcolor} def
+} bind def
+
+/onlayer { curlayer ne {invis} if } def
+
+/onlayers {
+	/myupper exch def
+	/mylower exch def
+	curlayer mylower lt
+	curlayer myupper gt
+	or
+	{invis} if
+} def
+
+/curlayer 0 def
+
+%%EndResource
+%%EndProlog
+%%BeginSetup
+14 default-font-family set_font
+1 setmiterlimit
+% /arrowlength 10 def
+% /arrowwidth 5 def
+
+% make sure pdfmark is harmless for PS-interpreters other than Distiller
+/pdfmark where {pop} {userdict /pdfmark /cleartomark load put} ifelse
+% make '<<' and '>>' safe on PS Level 1 devices
+/languagelevel where {pop languagelevel}{1} ifelse
+2 lt {
+    userdict (<<) cvn ([) cvn load put
+    userdict (>>) cvn ([) cvn load put
+} if
+
+%%EndSetup
+setupLatin1
+%%Page: 1 1
+%%PageBoundingBox: 36 36 458 728
+%%PageOrientation: Portrait
+0 0 1 beginpage
+gsave
+36 36 422 692 boxprim clip newpath
+1 1 set_scale 0 rotate 40 41 translate
+% Development.Shake
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+211 450 27 18 ellipse_path stroke
+0 0 0 nodecolor
+14 /Times-Roman set_font
+207.5 445.4 moveto 7 (2) alignedtext
+grestore
+% Development.Shake.Core
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+211 234 27 18 ellipse_path stroke
+0 0 0 nodecolor
+14 /Times-Roman set_font
+207.5 229.4 moveto 7 (1) alignedtext
+grestore
+% Development.Shake->Development.Shake.Core
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 186.21 442.77 moveto
+162.17 434.69 125.92 419.57 102 396 curveto
+65.86 360.39 36.01 329.64 65 288 curveto
+77.94 269.42 136.47 252.03 175.38 242.23 curveto
+stroke
+0 0 0 edgecolor
+newpath 176.42 245.58 moveto
+185.29 239.79 lineto
+174.74 238.79 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 176.42 245.58 moveto
+185.29 239.79 lineto
+174.74 238.79 lineto
+closepath stroke
+grestore
+% Development.Shake.Derived
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+156 378 27 18 ellipse_path stroke
+grestore
+% Development.Shake->Development.Shake.Derived
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 198.52 433.66 moveto
+191.49 424.46 182.57 412.78 174.71 402.5 curveto
+stroke
+0 0 0 edgecolor
+newpath 177.28 400.1 moveto
+168.43 394.27 lineto
+171.72 404.34 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 177.28 400.1 moveto
+168.43 394.27 lineto
+171.72 404.34 lineto
+closepath stroke
+grestore
+% Development.Shake.Directory
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+101 306 27 18 ellipse_path stroke
+grestore
+% Development.Shake->Development.Shake.Directory
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 186.61 441.91 moveto
+165.68 433.67 136.37 418.85 120 396 curveto
+107.19 378.12 102.66 353.43 101.22 334.43 curveto
+stroke
+0 0 0 edgecolor
+newpath 104.7 334.07 moveto
+100.69 324.27 lineto
+97.71 334.44 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 104.7 334.07 moveto
+100.69 324.27 lineto
+97.71 334.44 lineto
+closepath stroke
+grestore
+% Development.Shake.File
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+211 306 27 18 ellipse_path stroke
+grestore
+% Development.Shake->Development.Shake.File
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 211 431.76 moveto
+211 407.2 211 363.25 211 334.35 curveto
+stroke
+0 0 0 edgecolor
+newpath 214.5 334.09 moveto
+211 324.09 lineto
+207.5 334.09 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 214.5 334.09 moveto
+211 324.09 lineto
+207.5 334.09 lineto
+closepath stroke
+grestore
+% Development.Shake.Files
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+266 378 27 18 ellipse_path stroke
+grestore
+% Development.Shake->Development.Shake.Files
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 223.48 433.66 moveto
+230.51 424.46 239.43 412.78 247.29 402.5 curveto
+stroke
+0 0 0 edgecolor
+newpath 250.28 404.34 moveto
+253.57 394.27 lineto
+244.72 400.1 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 250.28 404.34 moveto
+253.57 394.27 lineto
+244.72 400.1 lineto
+closepath stroke
+grestore
+% Development.Shake.Oracle
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+321 306 27 18 ellipse_path stroke
+grestore
+% Development.Shake->Development.Shake.Oracle
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 235.39 441.91 moveto
+256.32 433.67 285.63 418.85 302 396 curveto
+314.81 378.12 319.34 353.43 320.78 334.43 curveto
+stroke
+0 0 0 edgecolor
+newpath 324.29 334.44 moveto
+321.31 324.27 lineto
+317.3 334.07 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 324.29 334.44 moveto
+321.31 324.27 lineto
+317.3 334.07 lineto
+closepath stroke
+grestore
+% Development.Shake.Rerun
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+376 378 27 18 ellipse_path stroke
+grestore
+% Development.Shake->Development.Shake.Rerun
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 233.86 440.07 moveto
+258.75 429.25 299.72 411.43 335 396 curveto
+337.99 394.69 341.11 393.33 344.22 391.96 curveto
+stroke
+0 0 0 edgecolor
+newpath 345.7 395.14 moveto
+353.45 387.91 lineto
+342.88 388.73 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 345.7 395.14 moveto
+353.45 387.91 lineto
+342.88 388.73 lineto
+closepath stroke
+grestore
+% Development.Shake.Binary
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+211 18 27 18 ellipse_path stroke
+grestore
+% Development.Shake.Database
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+211 162 27 18 ellipse_path stroke
+0 0 0 nodecolor
+14 /Times-Roman set_font
+207.5 157.4 moveto 7 (1) alignedtext
+grestore
+% Development.Shake.Core->Development.Shake.Database
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 211 215.83 moveto
+211 208.13 211 198.97 211 190.42 curveto
+stroke
+0 0 0 edgecolor
+newpath 214.5 190.41 moveto
+211 180.41 lineto
+207.5 190.41 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 214.5 190.41 moveto
+211 180.41 lineto
+207.5 190.41 lineto
+closepath stroke
+grestore
+% Development.Shake.Locks
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+266 90 27 18 ellipse_path stroke
+grestore
+% Development.Shake.Core->Development.Shake.Locks
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 224.1 217.92 moveto
+231.84 207.64 241.24 193.71 247 180 curveto
+255.33 160.19 260.15 136.33 262.85 118.16 curveto
+stroke
+0 0 0 edgecolor
+newpath 266.33 118.57 moveto
+264.21 108.19 lineto
+259.39 117.63 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 266.33 118.57 moveto
+264.21 108.19 lineto
+259.39 117.63 lineto
+closepath stroke
+grestore
+% Development.Shake.Value
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+156 90 27 18 ellipse_path stroke
+grestore
+% Development.Shake.Core->Development.Shake.Value
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 197.9 217.92 moveto
+190.16 207.64 180.76 193.71 175 180 curveto
+166.67 160.19 161.85 136.33 159.15 118.16 curveto
+stroke
+0 0 0 edgecolor
+newpath 162.61 117.63 moveto
+157.79 108.19 lineto
+155.67 118.57 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 162.61 117.63 moveto
+157.79 108.19 lineto
+155.67 118.57 lineto
+closepath stroke
+grestore
+% Development.Shake.Database->Development.Shake.Binary
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 211 143.76 moveto
+211 119.2 211 75.25 211 46.35 curveto
+stroke
+0 0 0 edgecolor
+newpath 214.5 46.09 moveto
+211 36.09 lineto
+207.5 46.09 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 214.5 46.09 moveto
+211 36.09 lineto
+207.5 46.09 lineto
+closepath stroke
+grestore
+% Development.Shake.Database->Development.Shake.Locks
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 223.48 145.66 moveto
+230.51 136.46 239.43 124.78 247.29 114.5 curveto
+stroke
+0 0 0 edgecolor
+newpath 250.28 116.34 moveto
+253.57 106.27 lineto
+244.72 112.1 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 250.28 116.34 moveto
+253.57 106.27 lineto
+244.72 112.1 lineto
+closepath stroke
+grestore
+% Development.Shake.Database->Development.Shake.Value
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 198.52 145.66 moveto
+191.49 136.46 182.57 124.78 174.71 114.5 curveto
+stroke
+0 0 0 edgecolor
+newpath 177.28 112.1 moveto
+168.43 106.27 lineto
+171.72 116.34 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 177.28 112.1 moveto
+168.43 106.27 lineto
+171.72 116.34 lineto
+closepath stroke
+grestore
+% Development.Shake.Derived->Development.Shake.Core
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 157.79 359.81 moveto
+160.09 341.19 165.03 311.7 175 288 curveto
+179.32 277.72 185.69 267.31 191.87 258.42 curveto
+stroke
+0 0 0 edgecolor
+newpath 194.87 260.24 moveto
+197.9 250.08 lineto
+189.2 256.13 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 194.87 260.24 moveto
+197.9 250.08 lineto
+189.2 256.13 lineto
+closepath stroke
+grestore
+% Development.Shake.Derived->Development.Shake.File
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 168.48 361.66 moveto
+175.51 352.46 184.43 340.78 192.29 330.5 curveto
+stroke
+0 0 0 edgecolor
+newpath 195.28 332.34 moveto
+198.57 322.27 lineto
+189.72 328.1 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 195.28 332.34 moveto
+198.57 322.27 lineto
+189.72 328.1 lineto
+closepath stroke
+grestore
+% Development.Shake.Directory->Development.Shake.Core
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 120.41 293.29 moveto
+137.74 281.95 163.33 265.2 182.9 252.39 curveto
+stroke
+0 0 0 edgecolor
+newpath 184.96 255.23 moveto
+191.41 246.82 lineto
+181.13 249.37 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 184.96 255.23 moveto
+191.41 246.82 lineto
+181.13 249.37 lineto
+closepath stroke
+grestore
+% Development.Shake.File->Development.Shake.Core
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 211 287.83 moveto
+211 280.13 211 270.97 211 262.42 curveto
+stroke
+0 0 0 edgecolor
+newpath 214.5 262.41 moveto
+211 252.41 lineto
+207.5 262.41 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 214.5 262.41 moveto
+211 252.41 lineto
+207.5 262.41 lineto
+closepath stroke
+grestore
+% Development.Shake.Files->Development.Shake.Core
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 264.21 359.81 moveto
+261.91 341.19 256.97 311.7 247 288 curveto
+242.68 277.72 236.31 267.31 230.13 258.42 curveto
+stroke
+0 0 0 edgecolor
+newpath 232.8 256.13 moveto
+224.1 250.08 lineto
+227.13 260.24 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 232.8 256.13 moveto
+224.1 250.08 lineto
+227.13 260.24 lineto
+closepath stroke
+grestore
+% Development.Shake.Files->Development.Shake.File
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 253.52 361.66 moveto
+246.49 352.46 237.57 340.78 229.71 330.5 curveto
+stroke
+0 0 0 edgecolor
+newpath 232.28 328.1 moveto
+223.43 322.27 lineto
+226.72 332.34 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 232.28 328.1 moveto
+223.43 322.27 lineto
+226.72 332.34 lineto
+closepath stroke
+grestore
+% Development.Shake.Oracle->Development.Shake.Core
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 301.59 293.29 moveto
+284.26 281.95 258.67 265.2 239.1 252.39 curveto
+stroke
+0 0 0 edgecolor
+newpath 240.87 249.37 moveto
+230.59 246.82 lineto
+237.04 255.23 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 240.87 249.37 moveto
+230.59 246.82 lineto
+237.04 255.23 lineto
+closepath stroke
+grestore
+% Development.Shake.Rerun->Development.Shake.Core
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 377.03 359.89 moveto
+377.17 339.95 374.33 308.06 357 288 curveto
+329.59 256.25 281.75 243.15 248.33 237.76 curveto
+stroke
+0 0 0 edgecolor
+newpath 248.43 234.24 moveto
+238.03 236.26 lineto
+247.42 241.16 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 248.43 234.24 moveto
+238.03 236.26 lineto
+247.42 241.16 lineto
+closepath stroke
+grestore
+% Development.Shake.TypeHash
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+139 18 27 18 ellipse_path stroke
+grestore
+% Development.Shake.Value->Development.Shake.Binary
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 168.48 73.66 moveto
+175.51 64.46 184.43 52.78 192.29 42.5 curveto
+stroke
+0 0 0 edgecolor
+newpath 195.28 44.34 moveto
+198.57 34.27 lineto
+189.72 40.1 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 195.28 44.34 moveto
+198.57 34.27 lineto
+189.72 40.1 lineto
+closepath stroke
+grestore
+% Development.Shake.Value->Development.Shake.TypeHash
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 151.8 72.2 moveto
+149.92 64.24 147.66 54.67 145.56 45.8 curveto
+stroke
+0 0 0 edgecolor
+newpath 148.92 44.77 moveto
+143.21 35.84 lineto
+142.1 46.38 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 148.92 44.77 moveto
+143.21 35.84 lineto
+142.1 46.38 lineto
+closepath stroke
+grestore
+% Examples.Self.Main
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+27 594 27 18 ellipse_path stroke
+grestore
+% Examples.Self.Main->Development.Shake
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 43.51 579.56 moveto
+64.42 561.44 101.74 529.61 135 504 curveto
+150.72 491.9 168.81 479 183.39 468.85 curveto
+stroke
+0 0 0 edgecolor
+newpath 185.74 471.49 moveto
+191.97 462.92 lineto
+181.75 465.73 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 185.74 471.49 moveto
+191.97 462.92 lineto
+181.75 465.73 lineto
+closepath stroke
+grestore
+% Examples.Util
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+211 522 27 18 ellipse_path stroke
+0 0 0 nodecolor
+14 /Times-Roman set_font
+207.5 517.4 moveto 7 (2) alignedtext
+grestore
+% Examples.Self.Main->Examples.Util
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 48.51 582.74 moveto
+53.24 580.41 58.25 578.05 63 576 curveto
+101.37 559.47 146.63 543.44 176.91 533.2 curveto
+stroke
+0 0 0 edgecolor
+newpath 178.21 536.46 moveto
+186.57 529.96 lineto
+175.98 529.82 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 178.21 536.46 moveto
+186.57 529.96 lineto
+175.98 529.82 lineto
+closepath stroke
+grestore
+% Examples.Tar.Main
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+99 594 27 18 ellipse_path stroke
+grestore
+% Examples.Tar.Main->Development.Shake
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 110.57 577.47 moveto
+123.48 559.22 145.17 529.08 165 504 curveto
+173.04 493.84 182.23 482.91 190.28 473.56 curveto
+stroke
+0 0 0 edgecolor
+newpath 193.1 475.66 moveto
+197 465.81 lineto
+187.81 471.08 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 193.1 475.66 moveto
+197 465.81 lineto
+187.81 471.08 lineto
+closepath stroke
+grestore
+% Examples.Tar.Main->Examples.Util
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 118.51 581.46 moveto
+136.31 570.02 162.81 552.98 182.9 540.07 curveto
+stroke
+0 0 0 edgecolor
+newpath 184.82 542.99 moveto
+191.34 534.64 lineto
+181.03 537.1 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 184.82 542.99 moveto
+191.34 534.64 lineto
+181.03 537.1 lineto
+closepath stroke
+grestore
+% Examples.Test.Basic1
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+171 594 27 18 ellipse_path stroke
+grestore
+% Examples.Test.Basic1->Development.Shake
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 169.01 575.9 moveto
+167.61 557.36 167.17 527.93 175 504 curveto
+178.47 493.4 184.64 482.92 190.9 474.06 curveto
+stroke
+0 0 0 edgecolor
+newpath 193.9 475.89 moveto
+197.1 465.79 lineto
+188.3 471.69 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 193.9 475.89 moveto
+197.1 465.79 lineto
+188.3 471.69 lineto
+closepath stroke
+grestore
+% Examples.Test.Basic1->Examples.Util
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 180.48 576.94 moveto
+185.31 568.24 191.29 557.48 196.67 547.79 curveto
+stroke
+0 0 0 edgecolor
+newpath 199.79 549.38 moveto
+201.59 538.94 lineto
+193.67 545.98 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 199.79 549.38 moveto
+201.59 538.94 lineto
+193.67 545.98 lineto
+closepath stroke
+grestore
+% Examples.Test.Directory
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+243 594 27 18 ellipse_path stroke
+grestore
+% Examples.Test.Directory->Development.Shake
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 247.26 575.97 moveto
+250.83 557.48 254.3 528.1 247 504 curveto
+243.73 493.21 237.52 482.61 231.17 473.7 curveto
+stroke
+0 0 0 edgecolor
+newpath 233.95 471.57 moveto
+225.12 465.72 lineto
+228.37 475.8 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 233.95 471.57 moveto
+225.12 465.72 lineto
+228.37 475.8 lineto
+closepath stroke
+grestore
+% Examples.Test.Directory->Examples.Util
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 235.25 576.57 moveto
+231.52 568.17 226.96 557.91 222.81 548.56 curveto
+stroke
+0 0 0 edgecolor
+newpath 225.93 546.99 moveto
+218.67 539.27 lineto
+219.54 549.83 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 225.93 546.99 moveto
+218.67 539.27 lineto
+219.54 549.83 lineto
+closepath stroke
+grestore
+% Examples.Test.Errors
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+315 594 27 18 ellipse_path stroke
+grestore
+% Examples.Test.Errors->Development.Shake
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 306.58 576.65 moveto
+297.13 557.93 280.8 527.65 263 504 curveto
+254.48 492.68 243.8 481.22 234.34 471.78 curveto
+stroke
+0 0 0 edgecolor
+newpath 236.68 469.18 moveto
+227.07 464.7 lineto
+231.79 474.19 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 236.68 469.18 moveto
+227.07 464.7 lineto
+231.79 474.19 lineto
+closepath stroke
+grestore
+% Examples.Test.Errors->Examples.Util
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 295.92 580.79 moveto
+279.8 569.63 256.5 553.5 238.38 540.95 curveto
+stroke
+0 0 0 edgecolor
+newpath 240.17 537.94 moveto
+229.95 535.12 lineto
+236.18 543.69 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 240.17 537.94 moveto
+229.95 535.12 lineto
+236.18 543.69 lineto
+closepath stroke
+grestore
+% Examples.Test.Files
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+387 594 27 18 ellipse_path stroke
+grestore
+% Examples.Test.Files->Development.Shake
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 371.76 579.03 moveto
+352.77 560.63 319.02 528.81 288 504 curveto
+272.23 491.38 253.71 478.35 238.8 468.25 curveto
+stroke
+0 0 0 edgecolor
+newpath 240.73 465.33 moveto
+230.47 462.66 lineto
+236.83 471.14 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 240.73 465.33 moveto
+230.47 462.66 lineto
+236.83 471.14 lineto
+closepath stroke
+grestore
+% Examples.Test.Files->Examples.Util
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 365.46 582.81 moveto
+360.73 580.47 355.73 578.09 351 576 curveto
+315.19 560.18 273.18 544.33 244.58 533.93 curveto
+stroke
+0 0 0 edgecolor
+newpath 245.66 530.6 moveto
+235.06 530.49 lineto
+243.28 537.18 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 245.66 530.6 moveto
+235.06 530.49 lineto
+243.28 537.18 lineto
+closepath stroke
+grestore
+% Examples.Util->Development.Shake
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 211 503.83 moveto
+211 496.13 211 486.97 211 478.42 curveto
+stroke
+0 0 0 edgecolor
+newpath 214.5 478.41 moveto
+211 468.41 lineto
+207.5 478.41 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 214.5 478.41 moveto
+211 468.41 lineto
+207.5 478.41 lineto
+closepath stroke
+grestore
+% Main
+gsave
+1 setlinewidth
+0 0 0 nodecolor
+207 666 27 18 ellipse_path stroke
+0 0 0 nodecolor
+14 /Times-Roman set_font
+203.5 661.4 moveto 7 (3) alignedtext
+grestore
+% Main->Examples.Self.Main
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 182.74 657.78 moveto
+153.87 647.79 104.36 630.04 63 612 curveto
+61.22 611.22 59.41 610.41 57.58 609.56 curveto
+stroke
+0 0 0 edgecolor
+newpath 59.06 606.39 moveto
+48.53 605.22 lineto
+56.03 612.7 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 59.06 606.39 moveto
+48.53 605.22 lineto
+56.03 612.7 lineto
+closepath stroke
+grestore
+% Main->Examples.Tar.Main
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 187.69 653.13 moveto
+170.64 641.76 145.6 625.07 126.47 612.31 curveto
+stroke
+0 0 0 edgecolor
+newpath 128.4 609.4 moveto
+118.14 606.76 lineto
+124.52 615.22 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 128.4 609.4 moveto
+118.14 606.76 lineto
+124.52 615.22 lineto
+closepath stroke
+grestore
+% Main->Examples.Test.Basic1
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 198.29 648.57 moveto
+194.04 640.08 188.85 629.69 184.13 620.27 curveto
+stroke
+0 0 0 edgecolor
+newpath 187.24 618.65 moveto
+179.63 611.27 lineto
+180.98 621.78 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 187.24 618.65 moveto
+179.63 611.27 lineto
+180.98 621.78 lineto
+closepath stroke
+grestore
+% Main->Examples.Test.Directory
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 215.71 648.57 moveto
+219.96 640.08 225.15 629.69 229.87 620.27 curveto
+stroke
+0 0 0 edgecolor
+newpath 233.02 621.78 moveto
+234.37 611.27 lineto
+226.76 618.65 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 233.02 621.78 moveto
+234.37 611.27 lineto
+226.76 618.65 lineto
+closepath stroke
+grestore
+% Main->Examples.Test.Errors
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 226.31 653.13 moveto
+243.36 641.76 268.4 625.07 287.53 612.31 curveto
+stroke
+0 0 0 edgecolor
+newpath 289.48 615.22 moveto
+295.86 606.76 lineto
+285.6 609.4 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 289.48 615.22 moveto
+295.86 606.76 lineto
+285.6 609.4 lineto
+closepath stroke
+grestore
+% Main->Examples.Test.Files
+gsave
+1 setlinewidth
+0 0 0 edgecolor
+newpath 231.26 657.78 moveto
+260.13 647.79 309.64 630.04 351 612 curveto
+352.78 611.22 354.59 610.41 356.42 609.56 curveto
+stroke
+0 0 0 edgecolor
+newpath 357.97 612.7 moveto
+365.47 605.22 lineto
+354.94 606.39 lineto
+closepath fill
+1 setlinewidth
+solid
+0 0 0 edgecolor
+newpath 357.97 612.7 moveto
+365.47 605.22 lineto
+354.94 606.39 lineto
+closepath stroke
+grestore
+endpage
+showpage
+grestore
+%%PageTrailer
+%%EndPage: 1
+%%Trailer
+end
+restore
+%%EOF

@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you need to cite Shake, this metadata is the paper that introduces Shake."
+repository-code: "https://github.com/ndmitchell/shake"
+title: Shake
+url: "https://shakebuild.com"
+preferred-citation:
+  type: proceedings
+  authors: 
+  - family-names: Mitchell
+    given-names: Neil
+    orcid: "https://orcid.org/0000-0001-5171-9726"
+  doi: "10.1145/2398856.2364538"
+  journal: "ICFP '12: Proceedings of the 17th ACM SIGPLAN International Conference on Functional Programming"
+  month: 9
+  day: 10
+  isbn: 978-1-4503-1054-3
+  publisher: ACM
+  title: "Shake Before Building - Replacing Make with Haskell"
+  year: 2012
+  url: https://ndmitchell.com/downloads/paper-shake_before_building-10_sep_2012.pdf
+  abstract: "Most complex software projects are compiled using a build tool (e.g. make), which runs commands in an order satisfying user-defined dependencies. Unfortunately, most build tools require all dependencies to be specified before the build starts. This restriction makes many dependency patterns difficult to express, especially those involving files generated at build time. We show how to eliminate this restriction, allowing additional dependencies to be specified while building. We have implemented our ideas in the Haskell library Shake, and have used Shake to write a complex build system which compiles millions of lines of code."

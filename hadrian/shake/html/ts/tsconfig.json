@@ -1,0 +1,9 @@
+{
+    "compilerOptions": {
+        "target": "esnext",
+        "outFile": "../shake.js",
+        "newLine": "lf",
+        "jsx": "react",
+        "alwaysStrict": true
+    }
+}

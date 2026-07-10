@@ -1,0 +1,5 @@
+
+rule record
+    command = echo hello > $out
+
+build outputtouch.txt: record

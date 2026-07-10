@@ -1,0 +1,13 @@
+
+vGlobal = version1
+
+rule record
+    # should produce version3 version2
+    command = echo $vGlobal $vBuild > $out
+
+vGlobal = version2
+
+build redefine.txt: record
+    vBuild = $vGlobal
+
+vGlobal = version3

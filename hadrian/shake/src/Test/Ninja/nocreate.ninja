@@ -1,0 +1,5 @@
+
+rule gen
+    command = echo x >> nocreate.log
+
+build nocreate.out: gen nocreate.in

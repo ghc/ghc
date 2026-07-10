@@ -1,0 +1,87 @@
+# dot layout.gviz -Teps -olayout.eps
+
+digraph shake{
+
+"Development.Shake"[label="2"];
+"Development.Shake.Binary"[label=""];
+"Development.Shake.Core"[label="1"];
+"Development.Shake.Database"[label="1"];
+"Development.Shake.Derived"[label=""];
+"Development.Shake.Directory"[label=""];
+"Development.Shake.File"[label=""];
+"Development.Shake.Files"[label=""];
+"Development.Shake.Locks"[label=""];
+"Development.Shake.Oracle"[label=""];
+"Development.Shake.Rerun"[label=""];
+"Development.Shake.TypeHash"[label=""];
+"Development.Shake.Value"[label=""];
+"Examples.Self.Main"[label=""];
+"Examples.Tar.Main"[label=""];
+"Examples.Test.Basic1"[label=""];
+"Examples.Test.Directory"[label=""];
+"Examples.Test.Errors"[label=""];
+"Examples.Test.Files"[label=""];
+"Examples.Util"[label="2"];
+"Main"[label="3"];
+
+"Main" -> "Examples.Tar.Main";
+"Main" -> "Examples.Self.Main";
+"Main" -> "Examples.Test.Basic1";
+"Main" -> "Examples.Test.Directory";
+"Main" -> "Examples.Test.Errors";
+"Main" -> "Examples.Test.Files";
+
+"Examples.Test.Basic1" -> "Development.Shake";
+"Examples.Test.Basic1" -> "Examples.Util";
+
+"Examples.Test.Directory" -> "Development.Shake";
+"Examples.Test.Directory" -> "Examples.Util";
+
+"Examples.Test.Errors" -> "Development.Shake";
+"Examples.Test.Errors" -> "Examples.Util";
+
+"Examples.Test.Files" -> "Development.Shake";
+"Examples.Test.Files" -> "Examples.Util";
+
+"Examples.Tar.Main" -> "Development.Shake";
+"Examples.Tar.Main" -> "Examples.Util";
+
+"Examples.Self.Main" -> "Development.Shake";
+"Examples.Self.Main" -> "Examples.Util";
+
+"Development.Shake.Database" -> "Development.Shake.Binary";
+"Development.Shake.Database" -> "Development.Shake.Locks";
+"Development.Shake.Database" -> "Development.Shake.Value";
+
+"Development.Shake.Derived" -> "Development.Shake.Core";
+"Development.Shake.Derived" -> "Development.Shake.File";
+
+"Development.Shake.Directory" -> "Development.Shake.Core";
+
+"Development.Shake.File" -> "Development.Shake.Core";
+
+"Development.Shake.Files" -> "Development.Shake.Core";
+"Development.Shake.Files" -> "Development.Shake.File";
+
+"Development.Shake.Oracle" -> "Development.Shake.Core";
+
+"Development.Shake.Rerun" -> "Development.Shake.Core";
+
+"Development.Shake.Value" -> "Development.Shake.Binary";
+"Development.Shake.Value" -> "Development.Shake.TypeHash";
+
+"Development.Shake.Core" -> "Development.Shake.Database";
+"Development.Shake.Core" -> "Development.Shake.Locks";
+"Development.Shake.Core" -> "Development.Shake.Value";
+
+"Examples.Util" -> "Development.Shake";
+
+"Development.Shake" -> "Development.Shake.Core";
+"Development.Shake" -> "Development.Shake.Derived";
+"Development.Shake" -> "Development.Shake.Directory";
+"Development.Shake" -> "Development.Shake.File";
+"Development.Shake" -> "Development.Shake.Files";
+"Development.Shake" -> "Development.Shake.Oracle";
+"Development.Shake" -> "Development.Shake.Rerun";
+
+}

@@ -1,4 +1,5 @@
 packages: ./
+          ./shake/
           ../utils/ghc-toolchain/
           ../libraries/ghc-platform/
 

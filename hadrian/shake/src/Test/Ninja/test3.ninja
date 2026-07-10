@@ -1,0 +1,24 @@
+
+
+v1 = g1
+v5 = g1
+
+rule dump
+    command = echo $v1+$v2+$v3+$v4+$v5 > $out
+
+v1 = g2
+
+build out3.1: dump
+    v2 = b1
+
+v1 = g3
+
+subninja test3-sub.ninja
+
+include test3-inc.ninja
+
+build out3.2: dump
+
+v1 = g4
+
+include subdir/1.ninja

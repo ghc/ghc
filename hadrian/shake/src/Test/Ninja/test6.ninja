@@ -1,0 +1,3 @@
+v2 = g1
+include ${v1}-inc.ninja
+subninja ${v1}-sub.ninja

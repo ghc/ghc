@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="utf-8" />
+<title>Shake report</title>
+
+<!-- Profiling output -->
+<script src="data/profile-data.js"></script>
+<script src="data/metadata.js"></script>
+<!-- Libraries -->
+<script src="lib/jquery.js"></script>
+<script src="lib/jquery.flot.js"></script>
+<script src="lib/jquery.flot.stack.js"></script>
+<script src="lib/jquery.dgtable.js"></script>
+<!-- Functions for creating info from Shake builds -->
+<script src="shake.js"></script>
+
+<style type="text/css">
+body {font-family: sans-serif; font-size: 10pt; background-color: #e8e8e8;}
+.data {font-size: 9pt; border-spacing: 0px; border-collapse: collapse;}
+.data td {padding-left: 7px; padding-right: 7px;}
+.header {font-weight: bold; background-color: #eee !important;}
+.header td:hover {background-color: #ccc !important;}
+.header td {border: 1px solid #ccc; cursor: pointer;}
+.data tr:hover {background-color: #ddd !important; color: black !important;}
+* {box-sizing: border-box;}
+html, body, .fill {height: 100%; width:100%;}
+table.fill {border-spacing: 0px;}
+input:focus {border-color: rgb(77, 144, 254) !important; outline-width: 0px !important;}
+.note {margin-left: 10px;}
+.note, .note a {color: gray;}
+a tt {color: #315273;}
+
+.tabstrip a {
+    border-radius: 4px 4px 0px 0px;
+    border: 1px solid gray;
+    padding: 4px 8px;
+    box-sizing: border-box;
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+ }
+.tabstrip .bottom {
+    padding: 4px 8px;
+    border-bottom: 1px solid gray;
+}
+.tabstrip .active {
+    border-top: 4px solid orange;
+    border-bottom: 3px solid white;
+    background-color: white;
+}
+.right { text-align: right; }
+.dropdown {
+    border:1px solid gray;
+    background-color:white;
+    white-space:nowrap;
+    position:absolute;
+    right:10px;
+    padding-right:10px;
+    box-shadow: 3px 3px 5px #ccc;
+    z-index: 100;
+}
+.dropdown a tt {
+    cursor: pointer;
+    color: #1467bb !important;
+}
+.details a {
+    cursor: pointer;
+    color: #1467bb;
+}
+
+/* My overrides */
+/* Make the colors and font size match better */
+.dgtable-row:hover { background-color: #e8e8e8 !important; }
+.dgtable-header-cell:hover { background-color: #ddd !important; }
+.dgtable-header-cell { background-color: #eee !important; }
+.dgtable-cell:last-child, .dgtable-header-cell:last-child { border-right: 1px solid #ccc; }
+
+/* Make the header smaller */
+.dgtable-header-row, .dgtable-header-cell { height: 22px !important; }
+.dgtable-header-cell { padding: 2px 4px !important; }
+.dgtable-header-cell, .dgtable-cell-preview.header { font-size: 9pt !important; }
+
+/* Make the rows smaller */
+.dgtable-row { height: 22px !important; }
+.dgtable-row:first-child { height: 23px !important; }
+.dgtable-cell { padding: 2px 4px !important; height: 22px !important; }
+.dgtable-cell, .dgtable-cell-preview{ font-size: 9pt !important; }
+
+.dgtable-wrapper * {
+    box-sizing: border-box;
+}
+.dgtable-wrapper {
+    border: solid 1px #ccc;
+}
+.dgtable {
+    border-top: solid 1px #ccc;
+    max-width: 100%;
+    background-color: transparent;
+}
+.dgtable-header {
+    max-width: 100%;
+    overflow: hidden;
+    background: #eee;
+}
+.dgtable-header-row {
+    height: 26px;
+}
+.dgtable-header-cell {
+    float: left;
+    padding: 4px;
+    height: 26px;
+    border-left: solid 1px #ccc;
+    background: #ddd;
+    font-size: 13px;
+    line-height: 16px;
+    font-weight: bold;
+    cursor: default;
+    text-align: left;
+}
+.dgtable-header-cell:first-child {
+    border-left: 0;
+}
+.dgtable-header-cell > div {
+    border: 1px dashed transparent;
+    white-space: nowrap;
+    overflow-x: hidden;
+    text-overflow: ellipsis;
+}
+.dgtable-header-cell.drag-over > div {
+    border-color: #666;
+    background: #bbb;
+}
+.dgtable-row {
+    border-top: solid 1px #ccc;
+    height: 28px;
+}
+.dgtable-row:first-child {
+    border-top: 0;
+    height: 29px;
+}
+.dgtable.virtual .dgtable-row {
+    border-top: 0;
+    border-bottom: solid 1px #ccc;
+}
+.dgtable-cell {
+    float: left;
+    padding: 4px 4px 4px;
+    height: 28px;
+    border-left: solid 1px #ccc;
+    font-size: 16px;
+    line-height: 19px;
+}
+.dgtable-cell > div {
+    max-height: 100%;
+    white-space: nowrap;
+    overflow: hidden
+}
+.dgtable-cell:first-child {
+    border-left: 0;
+}
+.dgtable-header-cell.sortable {
+    cursor: pointer;
+}
+.dgtable-header-cell.sorted .sort-arrow {
+    float: right;
+    display: inline-block;
+    width: 15px;
+    height: 6px;
+    margin: 5px 0 0 0;
+    background: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAsAAAAGCAMAAAAi7JTKAAAAIGNIUk0AAHolAACAgwAA+f8AAIDpAAB1MAAA6mAAADqYAAAXb5JfxUYAAAMAUExURQNOov///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH52dxwAAAACdFJOU/8A5bcwSgAAAAlwSFlzAAALEwAACxMBAJqcGAAAAB9JREFUCB0FwQEBAAAAgJD8Px0VoFKgRKEIpRBUEAgMBlQAL3y6umEAAAAASUVORK5CYII=") no-repeat center center;
+}
+
+.dgtable-header-cell.sorted.desc .sort-arrow {
+    background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAsAAAAGCAMAAAAi7JTKAAAAIGNIUk0AAHolAACAgwAA+f8AAIDpAAB1MAAA6mAAADqYAAAXb5JfxUYAAAMAUExURQNOov///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH52dxwAAAACdFJOU/8A5bcwSgAAAAlwSFlzAAALEwAACxMBAJqcGAAAAB9JREFUCB0FwQEBAAAAgJD8Px2BQFBBKIUoFClQKkANBywAL6PcDsUAAAAASUVORK5CYII=");
+}
+
+.dgtable-cell-preview {
+    font-size: 16px;
+    line-height: 19px;
+}
+
+/* Making the cell preview show correct styling when previewing header cells */
+.dgtable-cell-preview.header {
+    font-size: 13px;
+    line-height: 16px;
+    font-weight: bold;
+    text-align: left;
+}
+
+.dgtable-cell-preview.header > div {
+    border: 1px dashed transparent;
+}
+
+.dgtable-cell-preview.header.sortable {
+    cursor: pointer;
+}
+
+.dgtable-cell-preview.header.drag-over > div {
+    border-color: #666;
+    background: #bbb;
+}
+</style>
+
+</head>
+<body style="margin:0px;padding:0px;" onload="profileLoaded(profile)">
+    Loading...
+</body>
+</html>

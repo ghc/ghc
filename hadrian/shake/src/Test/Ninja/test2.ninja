@@ -1,0 +1,8 @@
+
+rule run
+    command = touch $out
+
+build out2.1: run
+build out2.2: run
+
+default out2.2

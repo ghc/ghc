@@ -1,0 +1,12 @@
+body {
+    margin: 0px;
+    padding: 0px;
+    font-size: 14px;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    color: #222;
+    background-color: white;
+}
+
+pre i, code i {
+    color: purple;
+}

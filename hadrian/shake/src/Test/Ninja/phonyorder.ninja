@@ -1,0 +1,13 @@
+
+rule create
+  command = touch $out
+
+rule copy
+  command = cp $from $out
+
+build Foo2: phony || foo.txt
+
+build bar.txt: copy || Foo2
+  from = foo.txt
+
+build foo.txt: create

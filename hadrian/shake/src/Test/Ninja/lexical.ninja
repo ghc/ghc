@@ -1,0 +1,7 @@
+
+rule test.run
+    command = echo ${foo.bar}$foo.bar > $out
+
+build lexical.txt: test.run
+    foo.bar = XFoo_BarX
+    foo = XFooX

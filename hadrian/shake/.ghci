@@ -1,0 +1,59 @@
+:set -ignore-package=hashmap
+:set -Wunused-binds -Wunused-imports -Worphans
+:set -isrc
+:set -package file-embed
+:set -DFILE_EMBED
+:load src/Test.hs src/Paths.hs
+
+:def test \x -> return $ ":main test " ++ x
+:def test_random \x -> return $ ":main random test " ++ x
+
+:def docs_ const $ return $ unlines [":!cabal haddock"]
+:def docs const $ return $ unlines [":docs_",":!start dist\\doc\\html\\shake\\Development-Shake.html"]
+
+:def hlint_ const $ return ":!hlint src --report=hlint.html"
+:def hlint const $ return $ unlines [":hlint_",":!start hlint.html"]
+
+:def travis const $ return ":!ghc -fno-code travis.hs"
+
+:{
+let _ghci_make name flags =
+        ":!" ++
+        "(if not exist .hpc mkdir .hpc) && " ++
+        "(if not exist .hpc\\" ++ name ++ " mkdir .hpc\\" ++ name ++ ") && " ++
+        "ghc " ++ flags ++ " -rtsopts -ignore-package hashmap -package transformers --make -isrc src/Test.hs src/Paths.hs -w -odir .hpc/" ++ name ++ " -hidir .hpc/" ++ name ++ " -o .hpc/" ++ name ++ "/shake.exe -main-is Test.main"
+:}
+
+:{
+:def prof_ \x -> return $ unlines
+        [_ghci_make "prof" "-rtsopts -threaded -prof -auto-all -caf-all"
+        ,":!.hpc\\prof\\shake +RTS -P -RTS " ++ x
+        ,":!profiterole shake.prof"
+        ]
+:}
+:def prof \x -> return $ unlines [":prof_ " ++ x,":!start shake.profiterole.html"]
+
+:{
+:def hpc_ const $ return $ unlines
+        [_ghci_make "hpc" "-fhpc"
+        ,":!del shake.tix"
+        ,":!.hpc\\hpc\\shake clean"
+        ,":!.hpc\\hpc\\shake test"
+        ,":!.hpc\\hpc\\shake random test 1m"
+        ,":!hpc.exe markup shake.tix --destdir=.hpc"
+        ,":!hpc.exe report shake.tix"
+        ,":!del shake.tix"]
+:}
+:def hpc \x -> return $ unlines [":hpc_",":!start .hpc\\hpc_index_fun.html"]
+
+:{
+:def benchmark \x -> return $ unlines
+        [_ghci_make "benchmark" "-O2 -threaded"
+        ,":!ptime .hpc\\benchmark\\shake " ++ x
+        ,"putStrLn \"\""]
+:}
+
+:{
+:def core \x -> return $ unlines
+        [_ghci_make "core" "-O1 -threaded -ddump-simpl" ++ " > core.txt"]
+:}

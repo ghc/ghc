@@ -1,0 +1,3 @@
+(5.215521335601807,Progress {isFailure = Nothing, countSkipped = 5028, countBuilt = 0, countUnknown = 36224, countTodo = 1837, timeSkipped = 274149.05088049243, timeBuilt = 0.0, timeUnknown = 31144.710513075814, timeTodo = (4301.8477063977625,1)})
+(12.997299194335938,Progress {isFailure = Nothing, countSkipped = 12154, countBuilt = 0, countUnknown = 23682, countTodo = 7253, timeSkipped = 274894.82577174786, timeBuilt = 0.0, timeUnknown = 23933.863898285897, timeTodo = (10766.919429932255,1)})
+(18.471847534179688,Progress {isFailure = Nothing, countSkipped = 18273, countBuilt = 27, countUnknown = 13862, countTodo = 10931, timeSkipped = 275406.36595057615, timeBuilt = 1.7951794527471066, timeUnknown = 17710.551982904668, timeTodo = (16478.41014388157,4)})

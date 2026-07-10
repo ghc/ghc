@@ -1,0 +1,17 @@
+[
+  {
+    "directory": "*",
+    "command": "g++ -MMD -MT build\\build.o -MF build\\build.o.d -g -Wall -Wextra -Wno-deprecated -Wno-unused-parameter -fno-rtti -fno-exceptions -pipe -Wno-missing-field-initializers -DNINJA_PYTHON=\"python.exe\" -O2 -DNDEBUG -D_WIN32_WINNT=0x0501 -c src\\build.cc -o build\\build.o",
+    "file": "src\\build.cc"
+  },
+  {
+    "directory": "*",
+    "command": "g++ -MMD -MT build\\build_log.o -MF build\\build_log.o.d -g -Wall -Wextra -Wno-deprecated -Wno-unused-parameter -fno-rtti -fno-exceptions -pipe -Wno-missing-field-initializers -DNINJA_PYTHON=\"python.exe\" -O2 -DNDEBUG -D_WIN32_WINNT=0x0501 -c src\\build_log.cc -o build\\build_log.o",
+    "file": "src\\build_log.cc"
+  },
+  {
+    "directory": "*",
+    "command": "g++ -MMD -MT build\\clean.o -MF build\\clean.o.d -g -Wall -Wextra -Wno-deprecated -Wno-unused-parameter -fno-rtti -fno-exceptions -pipe -Wno-missing-field-initializers -DNINJA_PYTHON=\"python.exe\" -O2 -DNDEBUG -D_WIN32_WINNT=0x0501 -c src\\clean.cc -o build\\clean.o",
+    "file": "src\\clean.cc"
+  }
+]
