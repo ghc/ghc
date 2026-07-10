@@ -3647,7 +3647,8 @@ def printUnexpectedTests(file: TextIO, testInfoss):
                      if not result.testname.endswith('.T'))
     if unexpected:
         file.write('Unexpected results from:\n')
-        file.write('TEST="' + ' '.join(sorted(unexpected)) + '"\n')
+        # Format it so we can just copy-paste it for a hadrian invocation.
+        file.write('--only="' + ' '.join(sorted(unexpected)) + '"\n')
         file.write('\n')
 
 def printTestInfosSummary(file: TextIO, testInfos):
