@@ -98,6 +98,16 @@ checkEnteredTaggable(const char *con)
   }
 }
 
+// Backing for stg_enteredTaggable (StgMiscClosures.cmm), the shared entry
+// code of taggable normal forms: report the violation and hand back the
+// pointer retagged with its constructor tag so the entry can self-return.
+StgClosure *
+enteredTaggableClosure(StgClosure *p)
+{
+  checkEnteredTaggable(GET_CON_DESC(get_con_itbl(p)));
+  return tagConstr(p);
+}
+
 void
 _assertFail(const char*filename, unsigned int linenum)
 {

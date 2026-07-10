@@ -477,6 +477,7 @@ RTS_FUN_DECL(stg_raiseIOzh);
 RTS_FUN_DECL(stg_paniczh);
 RTS_FUN_DECL(stg_keepAlivezh);
 RTS_FUN_DECL(stg_absentErrorzh);
+RTS_FUN_DECL(stg_enteredTaggable);
 
 RTS_FUN_DECL(stg_newPromptTagzh);
 RTS_FUN_DECL(stg_promptzh);

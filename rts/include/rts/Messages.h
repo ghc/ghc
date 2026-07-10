@@ -49,10 +49,14 @@ void pbarf(const char *fmt, void *p)
 void ssbarf(const char *fmt, const char *s)
    STG_NORETURN;
 
-/* Called from a taggable normal form's entry code (which the pointer-tagging
-   invariant makes unreachable). Aborts under +RTS --fatal-enter-taggable, otherwise
-   warns once and lets the entry self-return the tagged value. */
+/* Report that a taggable normal form was entered (its entry code is
+   unreachable under the pointer-tagging invariant). Aborts under +RTS
+   --fatal-enter-taggable, otherwise warns once. */
 void checkEnteredTaggable(const char *con);
+
+/* Backing for stg_enteredTaggable: report the violation and return the
+   closure pointer retagged with its constructor tag. */
+StgClosure *enteredTaggableClosure(StgClosure *p);
 
 // declared in Rts.h:
 // extern void _assertFail(const char *filename, unsigned int linenum)
