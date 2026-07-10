@@ -24,6 +24,8 @@ import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Types (ModuleLFInfos, LambdaFormInfo(..))
 import GHC.StgToCmm.CgUtils (CgStream)
 
+import GHC.Platform.Profile (profileIsProfiling)
+
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
@@ -386,7 +388,11 @@ cgDataCon mn data_con
                -- Larger families have no spare tag, so their values are entered
                -- as normal and the entry returns them tagged with the
                -- family-saturating tag.
-               ; when taggable $
+               -- When profiling, entering tagged constructors is sanctioned:
+               -- LDV profiling relies on it to mark closures as used (ENTER()
+               -- in rts/include/Cmm.h does not shortcut on the tag), so the
+               -- check would fire on every constructor use.
+               ; when (taggable && not (profileIsProfiling profile)) $
                    emitCheckEnteredTaggable (showPprUnsafe data_con)
                ; void $ emitReturn
                    [cmmOffsetB platform node (fromDynTag (tagForCon platform data_con))]
