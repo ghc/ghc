@@ -12,4 +12,10 @@ description: {
   entry code of a taggable normal form is unreachable: entering such a
   closure prints a one-shot warning at runtime, or aborts the program when
   the new RTS flag ``--fatal-enter-taggable`` is given.
+
+  ``foreign import prim`` callees receive unlifted boxed arguments untagged,
+  as before, but must now return unlifted boxed results with their proper
+  pointer tag (1 for primitive objects). Likewise, C code that obtains an
+  unlifted boxed value, e.g. an ``MVar#``, through a ``StablePtr`` must strip
+  the tag before dereferencing the pointer.
 }

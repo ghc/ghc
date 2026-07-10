@@ -246,6 +246,11 @@ Foreign and foreign-prim arguments
   @Any \@UnliftedRep@ arguments, so the predicate here admits any unlifted boxed
   type rather than only the primitive ones.
 
+  In the other direction the callee is a producer: an unlifted boxed value
+  /returned/ by a 'foreign import prim' must carry its proper tag (1 for a
+  primitive object), just like the out-of-line primops in rts/PrimOps.cmm.
+  Compiled code assumes the tag on the result (see e.g. T21305).
+
 Stripping the tag from an already-untagged pointer is the identity, so the
 boundaries are correct whether or not a given producer has been taught to tag.
 
