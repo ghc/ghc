@@ -112,8 +112,11 @@ packageArgs = do
              , compilerStageOption ghcDebugAssertions ? arg "-DDEBUG" ]
 
           , builder (Cabal Flags) ? mconcat
-            [ andM [expr (ghcWithInterpreter stage), orM [expr (notM cross), stage1]] `cabalFlag` "interpreter"
-            , andM [expr (ghcWithInterpreter stage), notM (expr cross)] `cabalFlag` "internal-interpreter"
+            -- In the context of cross-compilation, stage2 runs on the target
+            -- and thus can - if the architecture supports it - provide the
+            -- interpreter natively.
+            [ andM [expr (ghcWithInterpreter stage), orM [expr (notM cross), stage1, stage2]] `cabalFlag` "interpreter"
+            , andM [expr (ghcWithInterpreter stage), orM [expr (notM cross), stage2]] `cabalFlag` "internal-interpreter"
             , ifM stage0
                   -- We build a threaded stage 1 if the bootstrapping compiler
                   -- supports it.
