@@ -74,7 +74,6 @@ import GHC.Prelude
 
 import GHC.Types.Unique ( Uniquable(..), Unique, getKey, mkUniqueGrimily )
 import GHC.Utils.Outputable
-import GHC.Utils.Panic (panic)
 
 import qualified GHC.Data.Word64Map.Strict as MS
 import qualified GHC.Data.Word64Map as M
@@ -136,24 +135,19 @@ import qualified GHC.Data.Word64Set as W
 
 -- | A type of values carrying an insertion tag
 data TaggedVal val =
-    TaggedVal
-      !val
-      {-# UNPACK #-} !Int -- ^ insertion tag
-  | TaggedHole            -- ^ placement-sort gap sentinel; never stored in a map.
-                          --   See Note [Sorting a UDFM].
+  TaggedVal
+    !val
+    {-# UNPACK #-} !Int -- ^ insertion tag
   deriving stock (Data, Functor, Foldable, Traversable)
 
 taggedFst :: TaggedVal val -> val
 taggedFst (TaggedVal v _) = v
-taggedFst TaggedHole      = panic "taggedFst: TaggedHole"
 
 taggedSnd :: TaggedVal val -> Int
 taggedSnd (TaggedVal _ i) = i
-taggedSnd TaggedHole      = panic "taggedSnd: TaggedHole"
 
 instance Eq val => Eq (TaggedVal val) where
   (TaggedVal v1 _) == (TaggedVal v2 _) = v1 == v2
-  _                == _                = panic "TaggedVal (==): TaggedHole"
 
 -- | Type of unique deterministic finite maps
 --
@@ -213,7 +207,7 @@ addToUDFM_Directly :: UniqDFM key elt -> Unique -> elt -> UniqDFM key elt
 addToUDFM_Directly (UDFM m i) u v
   = UDFM (MS.insertWith tf (getKey u) (TaggedVal v i) m) (i + 1)
   where
-    tf new old = TaggedVal (taggedFst new) (taggedSnd old)
+    tf (TaggedVal new_v _) (TaggedVal _ old_i) = TaggedVal new_v old_i
       -- Keep the old tag, but insert the new value
       -- This means that udfmToList typically returns elements
       -- in the order of insertion, rather than the reverse
@@ -230,8 +224,8 @@ addToUDFM_C_Directly
 addToUDFM_C_Directly f (UDFM m i) u v
   = UDFM (MS.insertWith tf (getKey u) (TaggedVal v i) m) (i + 1)
     where
-      tf new old
-         = TaggedVal (f (taggedFst old) (taggedFst new)) (taggedSnd old)
+      tf (TaggedVal new_v _) (TaggedVal old_v old_i)
+         = TaggedVal (f old_v new_v) old_i
           -- Flip the arguments, because M.insertWith uses  (new->old->result)
           --                         but f            needs (old->new->result)
           -- Like addToUDFM_Directly, keep the old tag
@@ -384,10 +378,7 @@ foldWithKeyUDFM k z m = foldr (uncurry k) z (udfmToList m)
 nonDetStrictFoldUDFM :: (elt -> a -> a) -> a -> UniqDFM key elt -> a
 nonDetStrictFoldUDFM k z (UDFM m _i) = foldl' k' z m
   where
-    -- Match eagerly so k receives the already-evaluated element rather
-    -- than a (taggedFst tv) thunk.
     k' acc (TaggedVal v _) = k v acc
-    k' _   TaggedHole      = panic "nonDetStrictFoldUDFM: TaggedHole"
 
 {- Note [Cost of deterministic iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -449,13 +440,22 @@ folding the sorted elements with no intermediate list. foldUDFM is INLINE and
 dispatches through the out-of-line fold_elts_nonempty, where the fusion happens
 once -- so the fold is list-free without inlining the sort into every consumer.
 
-Holes: slots whose tag never occurs keep the initial sentinel, the nullary
-constructor TaggedHole. The readout distinguishes it from a real TaggedVal by
-constructor, so it never touches a filled element's value in a hole slot.
-TaggedHole is static (a nullary constructor is a single shared closure), so
-newSmallArray fills every slot with the same pointer -- no per-call allocation,
-nothing retained. TaggedHole must never be stored in a map; the accessors
-(taggedFst, taggedSnd) panic on it to catch any invariant violation.
+Holes: slots whose tag never occurs keep the initial sentinel, a TaggedVal
+with tag -1. Real tags are non-negative, so the readout skips on tag < 0 and
+never reads the sentinel's value field. But that field is strict, so the
+sentinel still needs a value in WHNF: a panic thunk is out (it would be forced
+-- and crash -- the moment the readout inspects a hole's tag). We use
+@unsafeCoerce ()@: () is a static, already-evaluated nullary constructor, so
+the sentinel is one shared top-level value -- no per-call allocation, and it
+retains nothing.
+
+The unsafeCoerce is safe here because r is always a lifted, boxed (pointer)
+type -- it comes from the map's elements -- so a pointer to () has the right
+representation. The GC only ever traces that pointer (() is a valid closure);
+the value is never evaluated or used as an r, since the readout takes values
+only from filled slots. Borrowing a real element instead would also type-check
+but costs a per-call thunk that retains the whole source map until the holes
+are read.
 
 This sorting method loses when ub is much larger than n = M.size m: ub never
 shrinks (overwrites keep bumping it, delete/filter shrink n but not ub). We
@@ -487,10 +487,10 @@ placementSort :: forall e r. Int
                               -- consuming fold. See Note [Sorting a UDFM].
 placementSort ub mk m = build gen
   where
-    -- Unfilled slots hold the TaggedHole sentinel; the readout skips it.
-    -- See Note [Sorting a UDFM].
+    -- The tag -1 marks unfilled slots; the value field is never read, but it
+    -- is strict, so it needs a WHNF value of type r. See Note [Sorting a UDFM].
     hole :: TaggedVal r
-    hole = TaggedHole
+    hole = TaggedVal (unsafeCoerce ()) (-1)
 
     fill :: SmallMutableArray s (TaggedVal r) -> State# s -> (# State# s, () #)
     fill marr s = case M.traverseWithKey_ write m of ST st -> st s
@@ -511,21 +511,17 @@ placementSort ub mk m = build gen
         readout :: SmallArray (TaggedVal r) -> Int -> b
         readout arr j
           | j >= ub   = nil
-          | otherwise = case indexSmallArray arr j of
-              TaggedHole    -> readout arr (j + 1)
-              TaggedVal v _ -> cons v (readout arr (j + 1))
+          | t < 0     = readout arr (j + 1)
+          | otherwise = cons v (readout arr (j + 1))
+          where TaggedVal v t = indexSmallArray arr j
 
 filterUDFM :: (elt -> Bool) -> UniqDFM key elt -> UniqDFM key elt
-filterUDFM p (UDFM m i) = UDFM (M.filter p' m) i
-  where
-  p' (TaggedVal v _) = p v
-  p' TaggedHole      = panic "filterUDFM: TaggedHole"
+filterUDFM p (UDFM m i) = UDFM (M.filter (\(TaggedVal v _) -> p v) m) i
 
 filterUDFM_Directly :: (Unique -> elt -> Bool) -> UniqDFM key elt -> UniqDFM key elt
 filterUDFM_Directly p (UDFM m i) = UDFM (M.filterWithKey p' m) i
   where
   p' k (TaggedVal v _) = p (mkUniqueGrimily k) v
-  p' _ TaggedHole      = panic "filterUDFM_Directly: TaggedHole"
 
 udfmRestrictKeys :: UniqDFM key elt -> UniqDFM key elt2 -> UniqDFM key elt
 udfmRestrictKeys (UDFM a i) (UDFM b _) = UDFM (M.restrictKeys a (M.keysSet b)) i
@@ -650,7 +646,6 @@ alterUDFM f (UDFM m i) k =
   where
   alterf Nothing = inject $ f Nothing
   alterf (Just (TaggedVal v _)) = inject $ f (Just v)
-  alterf (Just TaggedHole) = panic "alterUDFM: TaggedHole"
   inject Nothing = Nothing
   inject (Just v) = Just $ TaggedVal v i
 
@@ -670,7 +665,6 @@ upsertUDFM f (UDFM m i) k =
   where
     upsertf Nothing = TaggedVal (f Nothing) i
     upsertf (Just (TaggedVal v _)) = TaggedVal (f (Just v)) i
-    upsertf (Just TaggedHole) = panic "upsertUDFM: TaggedHole"
 
 -- | The expression (@'alterUDFM_L' f map k@) alters value @x@ at @k@, or absence
 -- thereof and returns the new element at @k@ if there is any.
@@ -694,7 +688,6 @@ alterUDFM_L f (UDFM m i) k =
   alterf :: Maybe (TaggedVal elt) -> (Maybe (TaggedVal elt))
   alterf Nothing = inject $ f Nothing
   alterf (Just (TaggedVal v _)) = inject $ f (Just v)
-  alterf (Just TaggedHole) = panic "alterUDFM_L: TaggedHole"
   inject Nothing = Nothing
   inject (Just v) = Just $ TaggedVal v i
 
