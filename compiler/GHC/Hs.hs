@@ -98,7 +98,7 @@ data AnnsModule
     } deriving (Data, Eq)
 
 instance NoAnn AnnsModule where
-  noAnn = AnnsModule NoEpTok NoEpTok NoEpTok (NoEpTok, NoEpTok, []) [] [] Nothing
+  noAnn = AnnsModule noEpTok noEpTok noEpTok (noEpTok, noEpTok, []) [] [] Nothing
 
 instance Outputable (HsModule GhcPs) where
     ppr (HsModule { hsmodExt = XModulePs { hsmodHaddockModHeader = mbDoc }

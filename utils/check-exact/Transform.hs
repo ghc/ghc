@@ -206,8 +206,6 @@ captureLineSpacing ds = map (\(_,_,x) -> x) $ go (map to ds)
 -- ---------------------------------------------------------------------
 
 captureTypeSigSpacing :: LHsDecl GhcPs -> LHsDecl GhcPs
-captureTypeSigSpacing (L l (SigD x (TypeSig (AnnSig NoEpUniTok mp md) mods ns (HsWC xw ty))))
-  = (L l (SigD x (TypeSig (AnnSig NoEpUniTok mp md) mods ns (HsWC xw ty))))
 captureTypeSigSpacing (L l (SigD x (TypeSig (AnnSig (EpUniTok dca u) mp md) mods ns (HsWC xw ty))))
   = (L l (SigD x (TypeSig (AnnSig (EpUniTok dca' u) mp md) mods ns (HsWC xw ty'))))
   where
@@ -915,7 +913,6 @@ instance HasDecls (LocatedA (HsExpr GhcPs)) where
                , EpTok (addEpaLocationDelta off lastAnc i)
                , ex''
                , newDecls'')
-          (_,_) -> (tkLet, tkIn, ex, newDecls)
         binds' = replaceDeclsValbinds WithoutWhere binds newDecls'
       in (L ll (HsLet (tkLet', tkIn') binds' ex'))
 
@@ -1099,7 +1096,7 @@ oldWhereAnnotation (EpAnn anc an cs, _w) ww _oldSpan = an'
     (AnnList ancl p s t) = an
     w = case ww of
       WithWhere -> EpTok (EpaDelta noSrcSpan (SameLine 0) [])
-      WithoutWhere -> NoEpTok
+      WithoutWhere -> noEpTok
     (anc', ancl') =
           case ww of
             WithWhere -> (anc, ancl)
@@ -1115,7 +1112,7 @@ newWhereAnnotation ww = (an, w)
   anc2 = EpaDelta noSrcSpan (DifferentLine 1 4) []
   w = case ww of
     WithWhere -> EpTok (EpaDelta noSrcSpan (SameLine 0) [])
-    WithoutWhere -> NoEpTok
+    WithoutWhere -> noEpTok
   an = EpAnn anc
               (AnnList (Just anc2) ListNone [] [])
               emptyComments

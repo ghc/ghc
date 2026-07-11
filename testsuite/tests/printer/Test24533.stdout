@@ -8,14 +8,15 @@
    (EpAnn
     (EpaSpan { Test24533.hs:1:1 })
     (AnnsModule
-     (NoEpTok)
+     (EpTok
+      (EpaSpan { <no location info> }))
      (EpTok
       (EpaSpan { Test24533.hs:2:1-6 }))
      (EpTok
       (EpaSpan { Test24533.hs:2:18-22 }))
      ((,,)
-      (NoEpTok)
-      (NoEpTok)
+      (EpTok (EpaSpan { <no location info> }))
+      (EpTok (EpaSpan { <no location info> }))
       [])
      []
      []
@@ -61,10 +62,11 @@
         (Nothing)
         (AnnClsInstDecl
          (EpTok (EpaSpan { Test24533.hs:4:1-8 }))
-         (NoEpTok)
-         (NoEpTok)
+         (EpTok
+          (EpaSpan { <no location info> }))
+         (EpTok (EpaSpan { <no location info> }))
          []
-         (NoEpTok)))
+         (EpTok (EpaSpan { <no location info> }))))
        []
        (L
         (EpAnn
@@ -120,7 +122,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -138,7 +141,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -164,7 +168,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -182,7 +187,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -208,7 +214,8 @@
                (EpaComments
                 []))
               (HsTyVar
-               (NoEpTok)
+               (EpTok
+                (EpaSpan { <no location info> }))
                (NotPromoted)
                (L
                 (EpAnn
@@ -239,7 +246,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -257,7 +265,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -305,10 +314,12 @@
          (EpaSpan { Test24533.hs:11:1-5 }))
         []
         []
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok)
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> }))
         [])
        (EpNoLayout))
       []
@@ -361,7 +372,8 @@
           (AnnTyVarBndr
            [(EpaSpan { Test24533.hs:11:37 })]
            [(EpaSpan { Test24533.hs:11:99 })]
-           (NoEpTok)
+           (EpTok
+            (EpaSpan { <no location info> }))
            (EpUniTok
             (EpaSpan { Test24533.hs:11:66-67 })
             (NormalSyntax)))
@@ -387,7 +399,8 @@
              (EpaComments
               []))
             (HsTyVar
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              (NotPromoted)
              (L
               (EpAnn
@@ -438,9 +451,9 @@
          (EpTok (EpaSpan { Test24533.hs:14:1-8 }))
          (EpTok
           (EpaSpan { Test24533.hs:14:17-21 }))
-         (NoEpTok)
+         (EpTok (EpaSpan { <no location info> }))
          []
-         (NoEpTok)))
+         (EpTok (EpaSpan { <no location info> }))))
        []
        (L
         (EpAnn
@@ -467,7 +480,8 @@
              (EpaComments
               []))
             (HsTyVar
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              (NotPromoted)
              (L
               (EpAnn
@@ -485,7 +499,8 @@
              (EpaComments
               []))
             (HsTyVar
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              (NotPromoted)
              (L
               (EpAnn
@@ -550,7 +565,8 @@
                  (Infix)
                  (NoSrcStrict)
                  (AnnFunRhs
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   []
                   []))
                 (L
@@ -653,14 +669,15 @@
    (EpAnn
     (EpaSpan { Test24533.ppr.hs:1:1 })
     (AnnsModule
-     (NoEpTok)
+     (EpTok
+      (EpaSpan { <no location info> }))
      (EpTok
       (EpaSpan { Test24533.ppr.hs:2:1-6 }))
      (EpTok
       (EpaSpan { Test24533.ppr.hs:2:18-22 }))
      ((,,)
-      (NoEpTok)
-      (NoEpTok)
+      (EpTok (EpaSpan { <no location info> }))
+      (EpTok (EpaSpan { <no location info> }))
       [])
      []
      []
@@ -706,10 +723,11 @@
         (Nothing)
         (AnnClsInstDecl
          (EpTok (EpaSpan { Test24533.ppr.hs:3:1-8 }))
-         (NoEpTok)
-         (NoEpTok)
+         (EpTok
+          (EpaSpan { <no location info> }))
+         (EpTok (EpaSpan { <no location info> }))
          []
-         (NoEpTok)))
+         (EpTok (EpaSpan { <no location info> }))))
        []
        (L
         (EpAnn
@@ -759,7 +777,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -777,7 +796,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -803,7 +823,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -821,7 +842,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -847,7 +869,8 @@
                (EpaComments
                 []))
               (HsTyVar
-               (NoEpTok)
+               (EpTok
+                (EpaSpan { <no location info> }))
                (NotPromoted)
                (L
                 (EpAnn
@@ -878,7 +901,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -896,7 +920,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -924,10 +949,12 @@
          (EpaSpan { Test24533.ppr.hs:4:1-5 }))
         []
         []
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok)
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> }))
         [])
        (EpNoLayout))
       []
@@ -953,7 +980,8 @@
           (AnnTyVarBndr
            [(EpaSpan { Test24533.ppr.hs:4:11 })]
            [(EpaSpan { Test24533.ppr.hs:4:21 })]
-           (NoEpTok)
+           (EpTok
+            (EpaSpan { <no location info> }))
            (EpUniTok
             (EpaSpan { Test24533.ppr.hs:4:14-15 })
             (NormalSyntax)))
@@ -979,7 +1007,8 @@
              (EpaComments
               []))
             (HsTyVar
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              (NotPromoted)
              (L
               (EpAnn
@@ -1010,9 +1039,9 @@
          (EpTok (EpaSpan { Test24533.ppr.hs:5:1-8 }))
          (EpTok
           (EpaSpan { Test24533.ppr.hs:5:17-21 }))
-         (NoEpTok)
+         (EpTok (EpaSpan { <no location info> }))
          []
-         (NoEpTok)))
+         (EpTok (EpaSpan { <no location info> }))))
        []
        (L
         (EpAnn
@@ -1039,7 +1068,8 @@
              (EpaComments
               []))
             (HsTyVar
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              (NotPromoted)
              (L
               (EpAnn
@@ -1057,7 +1087,8 @@
              (EpaComments
               []))
             (HsTyVar
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              (NotPromoted)
              (L
               (EpAnn
@@ -1122,7 +1153,8 @@
                  (Infix)
                  (NoSrcStrict)
                  (AnnFunRhs
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   []
                   []))
                 (L

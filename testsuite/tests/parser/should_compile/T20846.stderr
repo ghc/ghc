@@ -8,14 +8,15 @@
    (EpAnn
     (EpaSpan { T20846.hs:1:1 })
     (AnnsModule
-     (NoEpTok)
+     (EpTok
+      (EpaSpan { <no location info> }))
      (EpTok
       (EpaSpan { T20846.hs:1:1-6 }))
      (EpTok
       (EpaSpan { T20846.hs:1:15-19 }))
      ((,,)
-      (NoEpTok)
-      (NoEpTok)
+      (EpTok (EpaSpan { <no location info> }))
+      (EpTok (EpaSpan { <no location info> }))
       [])
      []
      []
@@ -128,7 +129,8 @@
             (Prefix)
             (NoSrcStrict)
             (AnnFunRhs
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              []
              []))
            (L

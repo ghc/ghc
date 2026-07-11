@@ -8,14 +8,15 @@
    (EpAnn
     (EpaSpan { DumpParsedAst.hs:1:1 })
     (AnnsModule
-     (NoEpTok)
+     (EpTok
+      (EpaSpan { <no location info> }))
      (EpTok
       (EpaSpan { DumpParsedAst.hs:4:1-6 }))
      (EpTok
       (EpaSpan { DumpParsedAst.hs:4:22-26 }))
      ((,,)
-      (NoEpTok)
-      (NoEpTok)
+      (EpTok (EpaSpan { <no location info> }))
+      (EpTok (EpaSpan { <no location info> }))
       [])
      []
      []
@@ -57,9 +58,10 @@
        (Nothing)
        (Nothing)
        ((,,,)
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok)
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> }))
         []))
       (NoSourceText)
       (False))
@@ -105,15 +107,20 @@
        (AnnDataDefn
         []
         []
-        (NoEpTok)
-        (NoEpTok)
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { DumpParsedAst.hs:7:1-4 }))
-        (NoEpTok)
-        (NoEpUniTok)
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok)
+        (EpTok (EpaSpan { <no location info> }))
+        (EpUniTok
+         (EpaSpan { <no location info> })
+         (NormalSyntax))
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { DumpParsedAst.hs:7:12 })))
        (Nothing)
@@ -131,9 +138,12 @@
             []))
           (ConDeclH98
            (AnnConDeclH98
-            (NoEpUniTok)
-            (NoEpTok)
-            (NoEpUniTok))
+            (EpUniTok (EpaSpan { <no location info> }) NormalSyntax)
+            (EpTok
+             (EpaSpan { <no location info> }))
+            (EpUniTok
+             (EpaSpan { <no location info> })
+             (NormalSyntax)))
            []
            (L
             (EpAnn
@@ -159,9 +169,12 @@
             []))
           (ConDeclH98
            (AnnConDeclH98
-            (NoEpUniTok)
-            (NoEpTok)
-            (NoEpUniTok))
+            (EpUniTok (EpaSpan { <no location info> }) NormalSyntax)
+            (EpTok
+             (EpaSpan { <no location info> }))
+            (EpUniTok
+             (EpaSpan { <no location info> })
+             (NormalSyntax)))
            []
            (L
             (EpAnn
@@ -181,7 +194,8 @@
               ((,)
                ((,,)
                 (EpaDelta { <no location info> } (SameLine 0) [])
-                (NoEpTok)
+                (EpTok
+                 (EpaSpan { <no location info> }))
                 (EpaDelta { <no location info> } (SameLine 0) []))
                (NoSourceText))
               (NoSrcUnpack)
@@ -191,7 +205,9 @@
                []
                (HsStandardArr
                 (EpColon
-                 (NoEpUniTok))))
+                 (EpUniTok
+                  (EpaSpan { <no location info> })
+                  (NormalSyntax)))))
               (L
                (EpAnn
                 (EpaSpan { DumpParsedAst.hs:7:26-30 })
@@ -199,7 +215,8 @@
                 (EpaComments
                  []))
                (HsTyVar
-                (NoEpTok)
+                (EpTok
+                 (EpaSpan { <no location info> }))
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -282,7 +299,8 @@
               (EpaComments
                []))
              (HsTyVar
-              (NoEpTok)
+              (EpTok
+               (EpaSpan { <no location info> }))
               (NotPromoted)
               (L
                (EpAnn
@@ -300,7 +318,8 @@
             (EpaComments
              []))
            (HsTyVar
-            (NoEpTok)
+            (EpTok
+             (EpaSpan { <no location info> }))
             (NotPromoted)
             (L
              (EpAnn
@@ -327,19 +346,23 @@
         []
         (EpTok
          (EpaSpan { DumpParsedAst.hs:10:1-4 }))
-        (NoEpTok)
+        (EpTok
+         (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { DumpParsedAst.hs:10:6-11 }))
         (EpUniTok
          (EpaSpan { DumpParsedAst.hs:10:32-33 })
          (NormalSyntax))
-        (NoEpTok)
-        (NoEpTok)
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { DumpParsedAst.hs:10:41-45 }))
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok))
+        (EpTok (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> })))
        (ClosedTypeFamily
         (Just
          [(L
@@ -392,7 +415,8 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    (NoEpTok)
+                    (EpTok
+                     (EpaSpan { <no location info> }))
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -410,7 +434,8 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    (NoEpTok)
+                    (EpTok
+                     (EpaSpan { <no location info> }))
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -428,7 +453,8 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    (NoEpTok)
+                    (EpTok
+                     (EpaSpan { <no location info> }))
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -455,7 +481,8 @@
                 (EpaComments
                  []))
                (HsTyVar
-                (NoEpTok)
+                (EpTok
+                 (EpaSpan { <no location info> }))
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -491,7 +518,8 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    (NoEpTok)
+                    (EpTok
+                     (EpaSpan { <no location info> }))
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -509,7 +537,8 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    (NoEpTok)
+                    (EpTok
+                     (EpaSpan { <no location info> }))
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -569,7 +598,8 @@
               (EpaComments
                []))
              (HsTyVar
-              (NoEpTok)
+              (EpTok
+               (EpaSpan { <no location info> }))
               (NotPromoted)
               (L
                (EpAnn
@@ -602,7 +632,8 @@
            (AnnTyVarBndr
             [(EpaSpan { DumpParsedAst.hs:10:20 })]
             [(EpaSpan { DumpParsedAst.hs:10:30 })]
-            (NoEpTok)
+            (EpTok
+             (EpaSpan { <no location info> }))
             (EpUniTok
              (EpaSpan { DumpParsedAst.hs:10:24-25 })
              (NormalSyntax)))
@@ -640,7 +671,8 @@
                 (EpaComments
                  []))
                (HsTyVar
-                (NoEpTok)
+                (EpTok
+                 (EpaSpan { <no location info> }))
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -667,7 +699,8 @@
            (EpaComments
             []))
           (HsTyVar
-           (NoEpTok)
+           (EpTok
+            (EpaSpan { <no location info> }))
            (NotPromoted)
            (L
             (EpAnn
@@ -711,8 +744,11 @@
           (AnnTyVarBndr
            []
            []
-           (NoEpTok)
-           (NoEpUniTok))
+           (EpTok
+            (EpaSpan { <no location info> }))
+           (EpUniTok
+            (EpaSpan { <no location info> })
+            (NormalSyntax)))
           (HsBndrRequired
            (NoExtField))
           (HsBndrVar
@@ -738,7 +774,8 @@
           (AnnTyVarBndr
            [(EpaSpan { DumpParsedAst.hs:15:10 })]
            [(EpaSpan { DumpParsedAst.hs:15:17 })]
-           (NoEpTok)
+           (EpTok
+            (EpaSpan { <no location info> }))
            (EpUniTok
             (EpaSpan { DumpParsedAst.hs:15:13-14 })
             (NormalSyntax)))
@@ -764,7 +801,8 @@
              (EpaComments
               []))
             (HsTyVar
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              (NotPromoted)
              (L
               (EpAnn
@@ -780,15 +818,20 @@
        (AnnDataDefn
         []
         []
-        (NoEpTok)
-        (NoEpTok)
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { DumpParsedAst.hs:15:1-4 }))
-        (NoEpTok)
-        (NoEpUniTok)
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok)
+        (EpTok (EpaSpan { <no location info> }))
+        (EpUniTok
+         (EpaSpan { <no location info> })
+         (NormalSyntax))
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { DumpParsedAst.hs:15:19 })))
        (Nothing)
@@ -804,9 +847,12 @@
             []))
           (ConDeclH98
            (AnnConDeclH98
-            (NoEpUniTok)
-            (NoEpTok)
-            (NoEpUniTok))
+            (EpUniTok (EpaSpan { <no location info> }) NormalSyntax)
+            (EpTok
+             (EpaSpan { <no location info> }))
+            (EpUniTok
+             (EpaSpan { <no location info> })
+             (NormalSyntax)))
            []
            (L
             (EpAnn
@@ -826,7 +872,8 @@
               ((,)
                ((,,)
                 (EpaDelta { <no location info> } (SameLine 0) [])
-                (NoEpTok)
+                (EpTok
+                 (EpaSpan { <no location info> }))
                 (EpaDelta { <no location info> } (SameLine 0) []))
                (NoSourceText))
               (NoSrcUnpack)
@@ -836,7 +883,9 @@
                []
                (HsStandardArr
                 (EpColon
-                 (NoEpUniTok))))
+                 (EpUniTok
+                  (EpaSpan { <no location info> })
+                  (NormalSyntax)))))
               (L
                (EpAnn
                 (EpaSpan { DumpParsedAst.hs:15:25-29 })
@@ -862,7 +911,8 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    (NoEpTok)
+                    (EpTok
+                     (EpaSpan { <no location info> }))
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -880,7 +930,8 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    (NoEpTok)
+                    (EpTok
+                     (EpaSpan { <no location info> }))
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -951,7 +1002,8 @@
             (EpaComments
              []))
            (HsTyVar
-            (NoEpTok)
+            (EpTok
+             (EpaSpan { <no location info> }))
             (NotPromoted)
             (L
              (EpAnn
@@ -1011,7 +1063,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -1029,7 +1082,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -1047,7 +1101,8 @@
               (EpaComments
                []))
              (HsTyVar
-              (NoEpTok)
+              (EpTok
+               (EpaSpan { <no location info> }))
               (NotPromoted)
               (L
                (EpAnn
@@ -1074,19 +1129,23 @@
         []
         (EpTok
          (EpaSpan { DumpParsedAst.hs:18:1-4 }))
-        (NoEpTok)
+        (EpTok
+         (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { DumpParsedAst.hs:18:6-11 }))
         (EpUniTok
          (EpaSpan { DumpParsedAst.hs:18:42-43 })
          (NormalSyntax))
-        (NoEpTok)
-        (NoEpTok)
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { DumpParsedAst.hs:18:50-54 }))
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok))
+        (EpTok (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> })))
        (ClosedTypeFamily
         (Just
          [(L
@@ -1122,7 +1181,8 @@
                 (EpaComments
                  []))
                (HsTyVar
-                (NoEpTok)
+                (EpTok
+                 (EpaSpan { <no location info> }))
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -1142,7 +1202,8 @@
                 (EpaComments
                  []))
                (HsTyVar
-                (NoEpTok)
+                (EpTok
+                 (EpaSpan { <no location info> }))
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -1162,7 +1223,8 @@
                 (EpaComments
                  []))
                (HsTyVar
-                (NoEpTok)
+                (EpTok
+                 (EpaSpan { <no location info> }))
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -1206,7 +1268,8 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    (NoEpTok)
+                    (EpTok
+                     (EpaSpan { <no location info> }))
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -1224,7 +1287,8 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    (NoEpTok)
+                    (EpTok
+                     (EpaSpan { <no location info> }))
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -1242,7 +1306,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -1260,7 +1325,8 @@
                 (EpaComments
                  []))
                (HsTyVar
-                (NoEpTok)
+                (EpTok
+                 (EpaSpan { <no location info> }))
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -1293,7 +1359,8 @@
            (AnnTyVarBndr
             [(EpaSpan { DumpParsedAst.hs:18:16 })]
             [(EpaSpan { DumpParsedAst.hs:18:23 })]
-            (NoEpTok)
+            (EpTok
+             (EpaSpan { <no location info> }))
             (EpUniTok
              (EpaSpan { DumpParsedAst.hs:18:19-20 })
              (NormalSyntax)))
@@ -1319,7 +1386,8 @@
               (EpaComments
                []))
              (HsTyVar
-              (NoEpTok)
+              (EpTok
+               (EpaSpan { <no location info> }))
               (NotPromoted)
               (L
                (EpAnn
@@ -1340,7 +1408,8 @@
            (AnnTyVarBndr
             [(EpaSpan { DumpParsedAst.hs:18:25 })]
             [(EpaSpan { DumpParsedAst.hs:18:40 })]
-            (NoEpTok)
+            (EpTok
+             (EpaSpan { <no location info> }))
             (EpUniTok
              (EpaSpan { DumpParsedAst.hs:18:28-29 })
              (NormalSyntax)))
@@ -1382,7 +1451,8 @@
                 (EpaComments
                  []))
                (HsTyVar
-                (NoEpTok)
+                (EpTok
+                 (EpaSpan { <no location info> }))
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -1400,7 +1470,8 @@
                 (EpaComments
                  []))
                (HsTyVar
-                (NoEpTok)
+                (EpTok
+                 (EpaSpan { <no location info> }))
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -1427,7 +1498,8 @@
            (EpaComments
             []))
           (HsTyVar
-           (NoEpTok)
+           (EpTok
+            (EpaSpan { <no location info> }))
            (NotPromoted)
            (L
             (EpAnn
@@ -1453,7 +1525,8 @@
        (AnnFamilyDecl
         []
         []
-        (NoEpTok)
+        (EpTok
+         (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { DumpParsedAst.hs:21:1-4 }))
         (EpTok
@@ -1461,12 +1534,16 @@
         (EpUniTok
          (EpaSpan { DumpParsedAst.hs:21:17-18 })
          (NormalSyntax))
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok))
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> })))
        (DataFamily)
        (TopLevel)
        (L
@@ -1513,7 +1590,8 @@
              (EpaComments
               []))
             (HsTyVar
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              (NotPromoted)
              (L
               (EpAnn
@@ -1547,7 +1625,8 @@
                (EpaComments
                 []))
               (HsTyVar
-               (NoEpTok)
+               (EpTok
+                (EpaSpan { <no location info> }))
                (NotPromoted)
                (L
                 (EpAnn
@@ -1565,7 +1644,8 @@
                (EpaComments
                 []))
               (HsTyVar
-               (NoEpTok)
+               (EpTok
+                (EpaSpan { <no location info> }))
                (NotPromoted)
                (L
                 (EpAnn
@@ -1592,7 +1672,8 @@
         ((,,)
          []
          []
-         (NoEpTok))
+         (EpTok
+          (EpaSpan { <no location info> })))
         (L
          (EpAnn
           (EpaSpan { DumpParsedAst.hs:22:18-20 })
@@ -1633,7 +1714,8 @@
                 (EpaComments
                  []))
                (HsTyVar
-                (NoEpTok)
+                (EpTok
+                 (EpaSpan { <no location info> }))
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -1667,7 +1749,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -1685,7 +1768,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -1701,19 +1785,22 @@
          (AnnDataDefn
           []
           []
-          (NoEpTok)
+          (EpTok
+           (EpaSpan { <no location info> }))
           (EpTok
            (EpaSpan { DumpParsedAst.hs:22:1-7 }))
-          (NoEpTok)
+          (EpTok
+           (EpaSpan { <no location info> }))
           (EpTok (EpaSpan { DumpParsedAst.hs:22:9-16 }))
           (EpUniTok
            (EpaSpan { DumpParsedAst.hs:22:39-40 })
            (NormalSyntax))
           (EpTok
            (EpaSpan { DumpParsedAst.hs:22:62-66 }))
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok))
+          (EpTok (EpaSpan { <no location info> }))
+          (EpTok (EpaSpan { <no location info> }))
+          (EpTok
+           (EpaSpan { <no location info> })))
          (Nothing)
          (Nothing)
          (Just
@@ -1766,7 +1853,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -1784,7 +1872,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -1802,7 +1891,8 @@
               (EpaComments
                []))
              (HsTyVar
-              (NoEpTok)
+              (EpTok
+               (EpaSpan { <no location info> }))
               (NotPromoted)
               (L
                (EpAnn
@@ -1855,7 +1945,8 @@
                ((,)
                 ((,,)
                  (EpaDelta { <no location info> } (SameLine 0) [])
-                 (NoEpTok)
+                 (EpTok
+                  (EpaSpan { <no location info> }))
                  (EpaDelta { <no location info> } (SameLine 0) []))
                 (NoSourceText))
                (NoSrcUnpack)
@@ -1905,8 +1996,11 @@
                        (AnnTyVarBndr
                         []
                         []
-                        (NoEpTok)
-                        (NoEpUniTok))
+                        (EpTok
+                         (EpaSpan { <no location info> }))
+                        (EpUniTok
+                         (EpaSpan { <no location info> })
+                         (NormalSyntax)))
                        (SpecifiedSpec)
                        (HsBndrVar
                         (NoExtField)
@@ -1952,7 +2046,8 @@
                          (EpaComments
                           []))
                         (HsTyVar
-                         (NoEpTok)
+                         (EpTok
+                          (EpaSpan { <no location info> }))
                          (NotPromoted)
                          (L
                           (EpAnn
@@ -1970,7 +2065,8 @@
                          (EpaComments
                           []))
                         (HsTyVar
-                         (NoEpTok)
+                         (EpTok
+                          (EpaSpan { <no location info> }))
                          (NotPromoted)
                          (L
                           (EpAnn
@@ -1996,7 +2092,8 @@
                          (EpaComments
                           []))
                         (HsTyVar
-                         (NoEpTok)
+                         (EpTok
+                          (EpaSpan { <no location info> }))
                          (NotPromoted)
                          (L
                           (EpAnn
@@ -2014,7 +2111,8 @@
                          (EpaComments
                           []))
                         (HsTyVar
-                         (NoEpTok)
+                         (EpTok
+                          (EpaSpan { <no location info> }))
                          (NotPromoted)
                          (L
                           (EpAnn
@@ -2049,7 +2147,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -2067,7 +2166,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -2085,7 +2185,8 @@
                 (EpaComments
                  []))
                (HsTyVar
-                (NoEpTok)
+                (EpTok
+                 (EpaSpan { <no location info> }))
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -2152,7 +2253,8 @@
             (Prefix)
             (NoSrcStrict)
             (AnnFunRhs
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              []
              []))
            (L
