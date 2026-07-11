@@ -109,7 +109,7 @@ undefined :: forall a. GHC.Internal.Stack.Types.HasCallStack => a
 %             ^~~^
 > instance Monoid Test where
 % output:
-undefined :: [Test] -> ShowS
+undefined :: Show Test
 
 % executing: ":uses T16804a.hs  5  6  5  9"
 % file snippet:
@@ -178,7 +178,7 @@ undefined :: forall a. GHC.Internal.Stack.Types.HasCallStack => a
 %          ^~~~~~~~~~^
 >   mempty = A
 % output:
-undefined :: [Test] -> Test
+undefined :: Monoid Test
 
 % executing: ":type-at T16804a.hs  8  3  8  8 undefined"
 % file snippet:
@@ -610,8 +610,8 @@ T16804a.hs:(28,5)-(28,6)
 >   B <> _   = B
 % output:
 T16804a.hs:(28,8)-(28,10)
-T16804a.hs:(28,14)-(28,16)
 T16804a.hs:(28,8)-(28,10)
+T16804a.hs:(28,14)-(28,16)
 
 % executing: ":uses T16804a.hs 28 14 28 16"
 % file snippet:
@@ -621,8 +621,8 @@ T16804a.hs:(28,8)-(28,10)
 >   B <> _   = B
 % output:
 T16804a.hs:(28,8)-(28,10)
-T16804a.hs:(28,14)-(28,16)
 T16804a.hs:(28,8)-(28,10)
+T16804a.hs:(28,14)-(28,16)
 
 % executing: ":uses T16804a.hs 29  3 29  3"
 % file snippet:
@@ -777,8 +777,8 @@ T16804c.hs:(6,1)-(6,1)
 > 
 % output:
 T16804c.hs:(9,12)-(9,14)
-T16804c.hs:(9,33)-(9,35)
 T16804c.hs:(9,12)-(9,14)
+T16804c.hs:(9,33)-(9,35)
 
 % executing: ":uses T16804c.hs 9 31 9 31"
 % file snippet:
@@ -798,8 +798,8 @@ T16804c.hs:(9,31)-(9,31)
 > 
 % output:
 T16804c.hs:(9,12)-(9,14)
-T16804c.hs:(9,33)-(9,35)
 T16804c.hs:(9,12)-(9,14)
+T16804c.hs:(9,33)-(9,35)
 
 % executing: ":uses T16804c.hs 12 13 12 13"
 % file snippet:
@@ -809,8 +809,8 @@ T16804c.hs:(9,12)-(9,14)
 > 
 % output:
 T16804c.hs:(12,13)-(12,13)
-T16804c.hs:(12,32)-(12,32)
 T16804c.hs:(12,13)-(12,13)
+T16804c.hs:(12,32)-(12,32)
 
 % executing: ":uses T16804c.hs 12 32 12 32"
 % file snippet:
@@ -820,8 +820,8 @@ T16804c.hs:(12,13)-(12,13)
 > 
 % output:
 T16804c.hs:(12,13)-(12,13)
-T16804c.hs:(12,32)-(12,32)
 T16804c.hs:(12,13)-(12,13)
+T16804c.hs:(12,32)-(12,32)
 
 % executing: ":uses T16804c.hs 15 13 15 13"
 % file snippet:
@@ -830,8 +830,8 @@ T16804c.hs:(12,13)-(12,13)
 %             ^
 % output:
 T16804c.hs:(15,13)-(15,13)
-T16804c.hs:(15,30)-(15,30)
 T16804c.hs:(15,13)-(15,13)
+T16804c.hs:(15,30)-(15,30)
 
 % executing: ":uses T16804c.hs 15 30 15 30"
 % file snippet:
@@ -840,5 +840,5 @@ T16804c.hs:(15,13)-(15,13)
 %                              ^
 % output:
 T16804c.hs:(15,13)-(15,13)
-T16804c.hs:(15,30)-(15,30)
 T16804c.hs:(15,13)-(15,13)
+T16804c.hs:(15,30)-(15,30)

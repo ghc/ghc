@@ -1,0 +1,10 @@
+section: ghci
+synopsis: Make ``:type-at`` prefer an exact source span match.
+issues: #27412
+mrs: !16332
+
+description: {
+  GHCi's ``:type-at`` command now prefers type information whose source
+  span exactly matches the requested range. This prevents a multi-line
+  selection from incorrectly returning the type of a contained expression.
+}

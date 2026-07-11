@@ -61,6 +61,7 @@ data ModInfo = ModInfo
       -- ^ Generated set of information about all spans in the
       -- module that correspond to some kind of identifier for
       -- which there will be type info and/or location info.
+      -- Sorted by 'leftmost_largest', with enclosing spans before contained spans.
     , modinfoRdrEnv     :: !IfGlobalRdrEnv
       -- ^ What's in scope in the module.
     , modinfoLastUpdate :: !UTCTime
@@ -202,7 +203,7 @@ resolveNameFromModule infos name = do
 -- | Try to resolve the type display from the given span.
 resolveName :: [SpanInfo] -> SpanInfo -> Maybe Var
 resolveName spans' si = listToMaybe $ mapMaybe spaninfoVar $
-                        reverse spans' `spaninfosWithin` si
+                        spans' `spaninfosWithin` si
 
 -- | Try to find the type of the given span.
 findType :: GhcMonad m
@@ -224,7 +225,7 @@ findType infos span0 string = do
     -- | Try to resolve the type display from the given span.
     resolveType :: [SpanInfo] -> SpanInfo -> Maybe Type
     resolveType spans' si = listToMaybe $ mapMaybe spaninfoType $
-                            reverse spans' `spaninfosWithin` si
+                            spans' `spaninfosWithin` si
 
 -- | Guess a module name from a file path.
 guessModule :: GhcMonad m
@@ -333,7 +334,7 @@ processAllTypeCheckedModule :: TypecheckedModule -> [SpanInfo]
 processAllTypeCheckedModule tcm
   = mapMaybe toSpanInfo
   $ sortBy cmpSpan
-  $ catMaybes (bts ++ ets ++ pts)
+  $ catMaybes (ets ++ bts ++ pts)
   where
     bts = map getTypeLHsBind $ listifyAllSpans tcs
     ets = map getTypeLHsExpr $ listifyAllSpans tcs
@@ -384,10 +385,8 @@ processAllTypeCheckedModule tcm
       | (False `mkQ` (const True :: OverLitTc -> Bool)) x = z
       | otherwise = foldl k (f x) (gmapQ (everythingAllSpans k z f) x)
 
-    cmpSpan (_,a,_) (_,b,_)
-      | a `isSubspanOf` b = LT
-      | b `isSubspanOf` a = GT
-      | otherwise         = EQ
+    -- Put enclosing spans first so :type-at prefers exact matches. See (#27412).
+    cmpSpan (_,a,_) (_,b,_) = leftmost_largest a b
 
     -- | Pretty print the types into a 'SpanInfo'.
     toSpanInfo :: (Maybe Id,SrcSpan,Type) -> Maybe SpanInfo

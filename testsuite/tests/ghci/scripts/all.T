@@ -385,6 +385,7 @@ test('ListTuplePunsPpr', normal, ghci_script, ['ListTuplePunsPpr.script'])
 test('ListTuplePunsPprNoAbbrevTuple', [limit_stdout_lines(14)], ghci_script, ['ListTuplePunsPprNoAbbrevTuple.script'])
 test('T24459', normal, ghci_script, ['T24459.script'])
 test('T24632', normal, ghci_script, ['T24632.script'])
+test('T27412', normal, ghci_script, ['T27412.script'])
 # bytecode backend doesn't support '-finfo-table-map' (#27039)
 test('bytecodeIPE',
      [ extra_hc_opts('-finfo-table-map')
