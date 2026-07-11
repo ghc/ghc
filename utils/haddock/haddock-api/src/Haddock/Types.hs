@@ -1133,11 +1133,9 @@ instance NFData DeltaPos where
 
 instance NFData (EpToken tok) where
   rnf (EpTok l) = rnf l
-  rnf NoEpTok = ()
 
 instance NFData (EpUniToken tok toku) where
   rnf (EpUniTok l s) = l `deepseq` s `deepseq` ()
-  rnf NoEpUniTok = ()
 
 instance NFData IsUnicodeSyntax where
   rnf NormalSyntax = ()

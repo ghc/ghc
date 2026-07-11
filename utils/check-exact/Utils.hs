@@ -323,9 +323,7 @@ insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports
     -- Either hc0i or hc0d should have comments. Combine them
     hc0 = hc0i ++ hc0d
 
-    (hc1,hc_cs) = if NoEpTok == (am_where $ anns an3)
-        then (hc0,[])
-        else splitOnWhere After (am_where $ anns an3)  hc0
+    (hc1,hc_cs) = splitOnWhere After (am_where $ anns an3)  hc0
     hc2 = workInComments (comments an3) hc1
     an4 = an3 { anns = (anns an3) {am_cs = hc_cs}, comments = hc2 }
 

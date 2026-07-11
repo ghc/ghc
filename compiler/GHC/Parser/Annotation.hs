@@ -1,9 +1,9 @@
 module GHC.Parser.Annotation (
   -- * Core Exact Print Annotation types
-  EpToken(..), EpUniToken(..),
+  EpToken(..), noEpTok, EpUniToken(..), noEpUniTok,
   getEpTokenSrcSpan,
   getEpTokenBufSpan,
-  getEpTokenLocs, getEpTokenLoc, getEpUniTokenLoc,
+  getEpTokenLoc, getEpUniTokenLoc,
   TokDcolon, TokDarrow, TokRarrow, TokForall, TokStar,
   EpLayout(..),
   EpaComment(..), EpaCommentTok(..),
@@ -212,9 +212,11 @@ data HasE = HasE | NoE
 -- let-expression, we store @EpToken "let"@ and @EpToken "in"@.
 -- The locations of those tokens can be used to faithfully reproduce
 -- (exactprint) the original program text.
-data EpToken (tok :: Symbol)
-  = NoEpTok
-  | EpTok !EpaLocation
+newtype EpToken (tok :: Symbol)
+  = EpTok EpaLocation
+
+noEpTok :: EpToken tok
+noEpTok = EpTok (EpaSpan noSrcSpan)
 
 instance KnownSymbol tok => Outputable (EpToken tok) where
   ppr _ = text (symbolVal (Proxy @tok))
@@ -224,8 +226,10 @@ instance KnownSymbol tok => Outputable (EpToken tok) where
 -- recorded in order to exactprint such tokens, so instead of @EpToken "->"@ we
 -- introduce @EpUniToken "->" "→"@.
 data EpUniToken (tok :: Symbol) (utok :: Symbol)
-  = NoEpUniTok
-  | EpUniTok !EpaLocation !IsUnicodeSyntax
+  = EpUniTok !EpaLocation !IsUnicodeSyntax
+
+noEpUniTok :: EpUniToken tok utok
+noEpUniTok = EpUniTok (EpaSpan noSrcSpan) NormalSyntax
 
 deriving instance Eq (EpToken tok)
 deriving instance Eq (EpUniToken tok utok)
@@ -233,32 +237,22 @@ deriving instance KnownSymbol tok => Data (EpToken tok)
 deriving instance (KnownSymbol tok, KnownSymbol utok) => Data (EpUniToken tok utok)
 
 instance (KnownSymbol tok, KnownSymbol utok) => Outputable (EpUniToken tok utok) where
-  ppr NoEpUniTok                 = text $ symbolVal (Proxy @tok)
   ppr (EpUniTok _ NormalSyntax)  = text $ symbolVal (Proxy @tok)
   ppr (EpUniTok _ UnicodeSyntax) = text $ symbolVal (Proxy @utok)
 
 getEpTokenSrcSpan :: EpToken tok -> SrcSpan
-getEpTokenSrcSpan NoEpTok = noSrcSpan
 getEpTokenSrcSpan (EpTok EpaDelta{}) = noSrcSpan
 getEpTokenSrcSpan (EpTok (EpaSpan span)) = span
 
 getEpTokenBufSpan :: EpToken tok -> Strict.Maybe BufSpan
-getEpTokenBufSpan NoEpTok = Strict.Nothing
 getEpTokenBufSpan (EpTok EpaDelta{}) = Strict.Nothing
+getEpTokenBufSpan (EpTok (EpaSpan ( UnhelpfulSpan _))) = Strict.Nothing
 getEpTokenBufSpan (EpTok (EpaSpan span)) = getBufSpan span
 
-getEpTokenLocs :: [EpToken tok] -> [EpaLocation]
-getEpTokenLocs ls = concatMap go ls
-  where
-    go NoEpTok   = []
-    go (EpTok l) = [l]
-
 getEpTokenLoc :: EpToken tok -> EpaLocation
-getEpTokenLoc NoEpTok   = noAnn
 getEpTokenLoc (EpTok l) = l
 
 getEpUniTokenLoc :: EpUniToken tok toku -> EpaLocation
-getEpUniTokenLoc NoEpUniTok     = noAnn
 getEpUniTokenLoc (EpUniTok l _) = l
 
 -- TODO:AZ: check we have all of the unicode tokens
@@ -735,7 +729,6 @@ instance HasLoc (EpToken tok) where
   getHasLoc = getEpTokenSrcSpan
 
 instance HasLoc (EpUniToken tok utok) where
-  getHasLoc NoEpUniTok = noSrcSpan
   getHasLoc (EpUniTok l _) = getHasLoc l
 
 getHasLocList :: HasLoc a => [a] -> SrcSpan
@@ -773,7 +766,6 @@ widenSpanL s as = foldl combineSrcSpans s (go as)
 
 widenSpanT :: SrcSpan -> EpToken tok -> SrcSpan
 widenSpanT l (EpTok loc) = widenSpanL l [loc]
-widenSpanT l NoEpTok = l
 
 listLocation :: [LocatedAn an a] -> SrcSpanAnnA
 listLocation as = EpAnn (EpaSpan (go noSrcSpan as)) noAnn emptyComments
@@ -984,10 +976,10 @@ instance NoAnn AnnParen where
   noAnn = AnnParens noAnn noAnn
 
 instance NoAnn (EpToken s) where
-  noAnn = NoEpTok
+  noAnn = noEpTok
 
 instance NoAnn (EpUniToken s t) where
-  noAnn = NoEpUniTok
+  noAnn = noEpUniTok
 
 instance NoAnn SourceText where
   noAnn = NoSourceText

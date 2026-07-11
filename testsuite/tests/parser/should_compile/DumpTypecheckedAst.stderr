@@ -1727,7 +1727,8 @@
              (Prefix)
              (NoSrcStrict)
              (AnnFunRhs
-              (NoEpTok)
+              (EpTok
+               (EpaSpan { <no location info> }))
               []
               []))
             (L
@@ -1753,7 +1754,8 @@
                  (GrhsAnn
                   (Nothing)
                   (Left
-                   (NoEpTok)))
+                   (EpTok
+                    (EpaSpan { <no location info> }))))
                  (EpaComments
                   []))
                 []

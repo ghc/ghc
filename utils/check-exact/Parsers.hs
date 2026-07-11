@@ -318,15 +318,15 @@ fixModuleHeaderComments (GHC.L l p) = GHC.L l p'
         css = cs <> GHC.EpaComments move
     moveComments _ dd cs = (dd,cs)
 
-    (ds',an') = rebalance (GHC.hsmodDecls p, GHC.hsmodAnn $ GHC.hsmodExt p)
+    (ds',an') = rebalance (GHC.hsmodAnn $ GHC.hsmodExt p)
     p' = p { GHC.hsmodExt = (GHC.hsmodExt p){ GHC.hsmodAnn = an' },
              GHC.hsmodDecls = ds'
            }
 
 
-    rebalance :: ([GHC.LHsDecl GHC.GhcPs], GHC.EpAnn GHC.AnnsModule)
+    rebalance :: GHC.EpAnn GHC.AnnsModule
               -> ([GHC.LHsDecl GHC.GhcPs], GHC.EpAnn GHC.AnnsModule)
-    rebalance (ds, GHC.EpAnn a an cs) = (ds1, GHC.EpAnn a an cs')
+    rebalance (GHC.EpAnn a an cs) = (ds1, GHC.EpAnn a an cs')
       where
         (ds1,cs') = case GHC.am_where an of
                      GHC.EpTok whereLoc ->
@@ -334,8 +334,6 @@ fixModuleHeaderComments (GHC.L l p) = GHC.L l p'
                                (d:ds0) -> (d':ds0, cs0)
                                    where (d',cs0) = moveComments whereLoc d cs
                                ds0 -> (ds0,cs)
-                     _ -> (ds,cs)
-
 
 
 -- | Internal function. Initializes DynFlags value for parsing.

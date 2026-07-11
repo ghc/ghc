@@ -636,10 +636,7 @@ flushComments !trailing_anns = do
 epTokensToComments :: (Monad m, Monoid w)
   => String -> [EpToken tok] -> EP w m ()
 epTokensToComments kw toks
-  = addComments True (concatMap (\tok ->
-                                   case tok of
-                                     EpTok ss -> [mkKWComment kw (epaToNoCommentsLocation ss)]
-                                     NoEpTok -> []) toks)
+  = addComments True (concatMap (\(EpTok ss) -> [mkKWComment kw (epaToNoCommentsLocation ss)]) toks)
 
 -- ---------------------------------------------------------------------
 
@@ -734,6 +731,7 @@ printStringAtAA el str = printStringAtAAC CaptureComments el str
 printStringAtAAC :: (Monad m, Monoid w)
   => CaptureComments -> EpaLocation -> String -> EP w m EpaLocation
 printStringAtAAC capture (EpaSpan (RealSrcSpan r _)) s = printStringAtRsC capture r s
+printStringAtAAC _capture l@(EpaSpan (UnhelpfulSpan UnhelpfulNoLocationInfo)) _s = return l
 printStringAtAAC _capture (EpaSpan ss) _s = error $ "printStringAtAAC:ss=" ++ show ss
 printStringAtAAC capture (EpaDelta ss d cs) s = do
   mapM_ printOneComment $ concatMap tokComment cs
@@ -810,7 +808,6 @@ markLensBracketsC' a l =
 
 markEpToken :: forall m w tok . (Monad m, Monoid w, KnownSymbol tok)
   => EpToken tok -> EP w m (EpToken tok)
-markEpToken NoEpTok = return NoEpTok
 markEpToken (EpTok aa) = do
   aa' <- printStringAtAA aa (symbolVal (Proxy @tok))
   return (EpTok aa')
@@ -824,7 +821,6 @@ markEpToken1 (h:t) = do
 
 markEpUniToken :: forall m w tok utok . (Monad m, Monoid w, KnownSymbol tok, KnownSymbol utok)
   => EpUniToken tok utok -> EP w m (EpUniToken tok utok)
-markEpUniToken NoEpUniTok = return NoEpUniTok
 markEpUniToken (EpUniTok aa isUnicode)  = do
   aa' <- case isUnicode of
     NormalSyntax  -> printStringAtAA aa (symbolVal (Proxy @tok))
@@ -1525,7 +1521,7 @@ data HsModuleImpDecls
 
 instance ExactPrint HsModuleImpDecls where
   -- Use an UnhelpfulSpan for the anchor, we are only interested in the comments
-  getAnnotationEntry mid = mkEntry (EpaSpan (UnhelpfulSpan UnhelpfulNoLocationInfo)) [] (EpaComments (id_cs mid))
+  getAnnotationEntry mid = mkEntry (EpaSpan noSrcSpan) [] (EpaComments (id_cs mid))
   setAnnotationAnchor mid _anc _ cs = mid { id_cs = priorComments cs ++ getFollowingComments cs }
      `debug` ("HsModuleImpDecls.setAnnotationAnchor:cs=" ++ showAst cs)
   exact (HsModuleImpDecls cs imports decls) = do

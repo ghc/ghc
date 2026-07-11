@@ -8,14 +8,15 @@
    (EpAnn
     (EpaSpan { T15323.hs:1:1 })
     (AnnsModule
-     (NoEpTok)
+     (EpTok
+      (EpaSpan { <no location info> }))
      (EpTok
       (EpaSpan { T15323.hs:3:1-6 }))
      (EpTok
       (EpaSpan { T15323.hs:3:15-19 }))
      ((,,)
-      (NoEpTok)
-      (NoEpTok)
+      (EpTok (EpaSpan { <no location info> }))
+      (EpTok (EpaSpan { <no location info> }))
       [])
      []
      []
@@ -72,8 +73,11 @@
           (AnnTyVarBndr
            []
            []
-           (NoEpTok)
-           (NoEpUniTok))
+           (EpTok
+            (EpaSpan { <no location info> }))
+           (EpUniTok
+            (EpaSpan { <no location info> })
+            (NormalSyntax)))
           (HsBndrRequired
            (NoExtField))
           (HsBndrVar
@@ -94,17 +98,22 @@
        (AnnDataDefn
         []
         []
-        (NoEpTok)
-        (NoEpTok)
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { T15323.hs:5:1-4 }))
-        (NoEpTok)
-        (NoEpUniTok)
+        (EpTok (EpaSpan { <no location info> }))
+        (EpUniTok
+         (EpaSpan { <no location info> })
+         (NormalSyntax))
         (EpTok
          (EpaSpan { T15323.hs:5:21-25 }))
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok))
+        (EpTok (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { <no location info> })))
        (Nothing)
        (Nothing)
        (Nothing)
@@ -160,8 +169,11 @@
                 (AnnTyVarBndr
                  []
                  []
-                 (NoEpTok)
-                 (NoEpUniTok))
+                 (EpTok
+                  (EpaSpan { <no location info> }))
+                 (EpUniTok
+                  (EpaSpan { <no location info> })
+                  (NormalSyntax)))
                 (SpecifiedSpec)
                 (HsBndrVar
                  (NoExtField)
@@ -216,7 +228,8 @@
                      (EpaComments
                       []))
                     (HsTyVar
-                     (NoEpTok)
+                     (EpTok
+                      (EpaSpan { <no location info> }))
                      (NotPromoted)
                      (L
                       (EpAnn
@@ -234,7 +247,8 @@
                      (EpaComments
                       []))
                     (HsTyVar
-                     (NoEpTok)
+                     (EpTok
+                      (EpaSpan { <no location info> }))
                      (NotPromoted)
                      (L
                       (EpAnn
@@ -263,7 +277,8 @@
                (EpaComments
                 []))
               (HsTyVar
-               (NoEpTok)
+               (EpTok
+                (EpaSpan { <no location info> }))
                (NotPromoted)
                (L
                 (EpAnn
@@ -281,7 +296,8 @@
                (EpaComments
                 []))
               (HsTyVar
-               (NoEpTok)
+               (EpTok
+                (EpaSpan { <no location info> }))
                (NotPromoted)
                (L
                 (EpAnn

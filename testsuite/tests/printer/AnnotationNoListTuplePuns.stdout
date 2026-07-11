@@ -8,14 +8,15 @@
    (EpAnn
     (EpaSpan { AnnotationNoListTuplePuns.hs:1:1 })
     (AnnsModule
-     (NoEpTok)
+     (EpTok
+      (EpaSpan { <no location info> }))
      (EpTok
       (EpaSpan { AnnotationNoListTuplePuns.hs:3:1-6 }))
      (EpTok
       (EpaSpan { AnnotationNoListTuplePuns.hs:3:34-38 }))
      ((,,)
-      (NoEpTok)
-      (NoEpTok)
+      (EpTok (EpaSpan { <no location info> }))
+      (EpTok (EpaSpan { <no location info> }))
       [])
      []
      []
@@ -108,7 +109,8 @@
             { AnnotationNoListTuplePuns.hs:7:3 }))]))
        (HsExplicitListTy
         ((,,)
-         (NoEpTok)
+         (EpTok
+          (EpaSpan { <no location info> }))
          (EpTok
           (EpaSpan { AnnotationNoListTuplePuns.hs:7:3 }))
          (EpTok
@@ -171,7 +173,8 @@
             { AnnotationNoListTuplePuns.hs:14:3 }))]))
        (HsExplicitListTy
         ((,,)
-         (NoEpTok)
+         (EpTok
+          (EpaSpan { <no location info> }))
          (EpTok
           (EpaSpan { AnnotationNoListTuplePuns.hs:14:3 }))
          (EpTok
@@ -184,7 +187,8 @@
            (EpaComments
             []))
           (HsTyVar
-           (NoEpTok)
+           (EpTok
+            (EpaSpan { <no location info> }))
            (NotPromoted)
            (L
             (EpAnn
@@ -207,14 +211,15 @@
    (EpAnn
     (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:1:1 })
     (AnnsModule
-     (NoEpTok)
+     (EpTok
+      (EpaSpan { <no location info> }))
      (EpTok
       (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:3:1-6 }))
      (EpTok
       (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:3:34-38 }))
      ((,,)
-      (NoEpTok)
-      (NoEpTok)
+      (EpTok (EpaSpan { <no location info> }))
+      (EpTok (EpaSpan { <no location info> }))
       [])
      []
      []
@@ -289,7 +294,8 @@
          []))
        (HsExplicitListTy
         ((,,)
-         (NoEpTok)
+         (EpTok
+          (EpaSpan { <no location info> }))
          (EpTok
           (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:4:10 }))
          (EpTok
@@ -333,7 +339,8 @@
          []))
        (HsExplicitListTy
         ((,,)
-         (NoEpTok)
+         (EpTok
+          (EpaSpan { <no location info> }))
          (EpTok
           (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:5:10 }))
          (EpTok
@@ -346,7 +353,8 @@
            (EpaComments
             []))
           (HsTyVar
-           (NoEpTok)
+           (EpTok
+            (EpaSpan { <no location info> }))
            (NotPromoted)
            (L
             (EpAnn

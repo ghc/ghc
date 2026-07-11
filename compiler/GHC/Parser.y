@@ -910,7 +910,7 @@ signature :: { Located (HsModule GhcPs) }
        : 'signature' modid maybe_warning_pragma maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
                 acs loc (\loc cs-> (L loc (HsModule (XModulePs
-                                                     (EpAnn (spanAsAnchor loc) (AnnsModule (epTok $1) NoEpTok (epTok $5) (fst $4) (fstOf3 $6) [] Nothing) cs)
+                                                     (EpAnn (spanAsAnchor loc) (AnnsModule (epTok $1) noEpTok (epTok $5) (fst $4) (fstOf3 $6) [] Nothing) cs)
                                                (thdOf3 $6) $3 Nothing)
                                            (Just $2) (snd $4) (fst $ sndOf3 $6)
                                             (snd $ sndOf3 $6)))
@@ -920,7 +920,7 @@ module :: { Located (HsModule GhcPs) }
        : 'module' modid maybe_warning_pragma maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
                 acsFinal (\cs eof -> (L loc (HsModule (XModulePs
-                                                       (EpAnn (spanAsAnchor loc) (AnnsModule NoEpTok (epTok $1) (epTok $5) (fst $4) (fstOf3 $6) [] eof) cs)
+                                                       (EpAnn (spanAsAnchor loc) (AnnsModule noEpTok (epTok $1) (epTok $5) (fst $4) (fstOf3 $6) [] eof) cs)
                                                      (thdOf3 $6) $3 Nothing)
                                              (Just $2) (snd $4) (fst $ sndOf3 $6)
                                                   (snd $ sndOf3 $6))
@@ -928,7 +928,7 @@ module :: { Located (HsModule GhcPs) }
         | body2
                 {% fileSrcSpan >>= \ loc ->
                    acsFinal (\cs eof -> (L loc (HsModule (XModulePs
-                                                         (EpAnn (spanAsAnchor loc) (AnnsModule NoEpTok NoEpTok NoEpTok (NoEpTok, NoEpTok, []) (fstOf3 $1) [] eof) cs)
+                                                         (EpAnn (spanAsAnchor loc) (AnnsModule noEpTok noEpTok noEpTok (noEpTok, noEpTok, []) (fstOf3 $1) [] eof) cs)
                                                         (thdOf3 $1) Nothing Nothing)
                                                      Nothing Nothing
                                                      (fst $ sndOf3 $1) (snd $ sndOf3 $1)))) }
@@ -968,14 +968,14 @@ header  :: { Located (HsModule GhcPs) }
         : 'module' modid maybe_warning_pragma maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs loc (\loc cs -> (L loc (HsModule (XModulePs
-                                                         (EpAnn (spanAsAnchor loc) (AnnsModule NoEpTok (epTok  $1) (epTok $5) (fst $4) [] [] Nothing) cs)
+                                                         (EpAnn (spanAsAnchor loc) (AnnsModule noEpTok (epTok  $1) (epTok $5) (fst $4) [] [] Nothing) cs)
                                                    EpNoLayout $3 Nothing)
                                                (Just $2) (snd $4) $6 []
                           ))) }
         | 'signature' modid maybe_warning_pragma maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs loc (\loc cs -> (L loc (HsModule (XModulePs
-                                                         (EpAnn (spanAsAnchor loc) (AnnsModule NoEpTok (epTok $1) (epTok $5) (fst $4) [] [] Nothing) cs)
+                                                         (EpAnn (spanAsAnchor loc) (AnnsModule noEpTok (epTok $1) (epTok $5) (fst $4) [] [] Nothing) cs)
                                                    EpNoLayout $3 Nothing)
                                                (Just $2) (snd $4) $6 []
                           ))) }
@@ -1004,7 +1004,7 @@ header_top_importdecls :: { [LImportDecl GhcPs] }
 maybeexports :: { (AnnListExportDecl, Maybe [LIE GhcPs]) }
         :  '(' exportlist ')'       { (((epTok $1),(epTok $3), fst $2)
                                       , Just (fromOL $ snd $2)) }
-        |  {- empty -}              { ((NoEpTok, NoEpTok, []), Nothing) }
+        |  {- empty -}              { ((noEpTok, noEpTok, []), Nothing) }
 
 exportlist :: { ([EpToken ","], OrdList (LIE GhcPs)) }
         : exportlist1     { ([], $1) }
@@ -1085,7 +1085,7 @@ qcnames1 :: { [LocatedA ImpExpQcSpec] }     -- A reversed list
 -- or tagged type constructor
 qcname_ext_w_wildcard :: { LocatedA ImpExpQcSpec }
         :  qcname_ext               { $1 }
-        |  '..'                     { sL1a $1 (ImpExpQcWildcard Nothing (epTok $1) NoEpTok)  }
+        |  '..'                     { sL1a $1 (ImpExpQcWildcard Nothing (epTok $1) noEpTok)  }
         |  'type' '..'              {% mkTypeWcImpExp (comb2 $1 $>) (epTok $1) (epTok $2) }
         |  'data' '..'              {% mkDataWcImpExp (comb2 $1 $>) (epTok $1) (epTok $2) }
 
@@ -1364,7 +1364,7 @@ ty_decl :: { LTyClDecl GhcPs }
                   ; mkTyData (comb4 $1 $3 $4 $5) (sndOf3 $ unLoc $1) (thdOf3 $ unLoc $1) $2 $3
                            Nothing (reverse (snd $ unLoc $4))
                                    (fmap reverse $5)
-                           (AnnDataDefn [] [] ttype tnewtype tdata NoEpTok NoEpUniTok NoEpTok NoEpTok NoEpTok tequal)
+                           (AnnDataDefn [] [] ttype tnewtype tdata noEpTok noEpUniTok noEpTok noEpTok noEpTok tequal)
                              }}
                                    -- We need the location on tycl_hdr in case
                                    -- constrs and deriving are both empty
@@ -1379,7 +1379,7 @@ ty_decl :: { LTyClDecl GhcPs }
                   ; mkTyData (comb5 $1 $3 $4 $5 $6) (sndOf3 $ unLoc $1) (thdOf3 $ unLoc $1) $2 $3
                             (snd $ unLoc $4) (snd $ unLoc $5)
                             (fmap reverse $6)
-                            (AnnDataDefn [] [] ttype tnewtype tdata NoEpTok tdcolon twhere oc cc NoEpTok)}}
+                            (AnnDataDefn [] [] ttype tnewtype tdata noEpTok tdcolon twhere oc cc noEpTok)}}
                                    -- We need the location on tycl_hdr in case
                                    -- constrs and deriving are both empty
 
@@ -1457,7 +1457,7 @@ inst_decl :: { LInstDecl GhcPs }
                   ; mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (unLoc $4)
                                       Nothing (reverse (snd  $ unLoc $5))
                                               (fmap reverse $6)
-                            (AnnDataDefn [] [] NoEpTok tnewtype tdata (epTok $2) NoEpUniTok NoEpTok NoEpTok NoEpTok tequal)}}
+                            (AnnDataDefn [] [] noEpTok tnewtype tdata (epTok $2) noEpUniTok noEpTok noEpTok noEpTok tequal)}}
 
           -- GADT instance declaration
         | data_or_newtype 'instance' capi_ctype datafam_inst_hdr opt_kind_sig
@@ -1469,7 +1469,7 @@ inst_decl :: { LInstDecl GhcPs }
                   ; mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3 (unLoc $4)
                                    (snd $ unLoc $5) (snd $ unLoc $6)
                                    (fmap reverse $7)
-                            (AnnDataDefn [] [] NoEpTok tnewtype tdata (epTok $2) dcolon twhere oc cc NoEpTok)}}
+                            (AnnDataDefn [] [] noEpTok tnewtype tdata (epTok $2) dcolon twhere oc cc noEpTok)}}
 
 overlap_pragma :: { Maybe (LocatedA (OverlapMode GhcPs)) }
   : '{-# OVERLAPPABLE'    '#-}' {% fmap Just $ amsA' (sLL $1 $> (Overlappable (getOVERLAPPABLE_PRAGs $1,
@@ -1598,7 +1598,7 @@ at_decl_cls :: { LHsDecl GhcPs }
            -- default type instances, with optional 'instance' keyword
         | 'type' ty_fam_inst_eqn
                 {% liftM mkInstD (mkTyFamInst (comb2 $1 $2) (unLoc $2)
-                          (epTok $1) NoEpTok) }
+                          (epTok $1) noEpTok) }
         | 'type' 'instance' ty_fam_inst_eqn
                 {% liftM mkInstD (mkTyFamInst (comb2 $1 $3) (unLoc $3)
                               (epTok $1) (epTok $2) )}
@@ -1608,7 +1608,7 @@ opt_family   :: { EpToken "family" }
               | 'family'      { (epTok $1) }
 
 opt_instance :: { EpToken "instance" }
-              : {- empty -} { NoEpTok }
+              : {- empty -} { noEpTok }
               | 'instance'  { epTok $1 }
 
 -- Associated type instances
@@ -1628,7 +1628,7 @@ at_decl_inst :: { LInstDecl GhcPs }
                   ; mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (unLoc $4)
                                     Nothing (reverse (snd $ unLoc $5))
                                              (fmap reverse $6)
-                            (AnnDataDefn [] [] NoEpTok tnewtype tdata $2 NoEpUniTok NoEpTok NoEpTok NoEpTok tequal)}}
+                            (AnnDataDefn [] [] noEpTok tnewtype tdata $2 noEpUniTok noEpTok noEpTok noEpTok tequal)}}
 
         -- GADT instance declaration, with optional 'instance' keyword
         | data_or_newtype opt_instance capi_ctype datafam_inst_hdr opt_kind_sig
@@ -1640,22 +1640,22 @@ at_decl_inst :: { LInstDecl GhcPs }
                    ; mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3
                                 (unLoc $4) (snd $ unLoc $5) (snd $ unLoc $6)
                                 (fmap reverse $7)
-                            (AnnDataDefn [] [] NoEpTok tnewtype tdata $2 dcolon twhere oc cc NoEpTok)}}
+                            (AnnDataDefn [] [] noEpTok tnewtype tdata $2 dcolon twhere oc cc noEpTok)}}
 
 type_data_or_newtype :: { Located ((EpToken "data", EpToken "newtype", EpToken "type")
                                    , Bool, NewOrData) }
-        : 'data'        { sL1 $1 ((epTok $1, NoEpTok,  NoEpTok),  False,DataType) }
-        | 'newtype'     { sL1 $1 ((NoEpTok,  epTok $1, NoEpTok),  False,NewType) }
-        | 'type' 'data' { sL1 $1 ((epTok $2, NoEpTok,  epTok $1), True ,DataType) }
+        : 'data'        { sL1 $1 ((epTok $1, noEpTok,  noEpTok),  False,DataType) }
+        | 'newtype'     { sL1 $1 ((noEpTok,  epTok $1, noEpTok),  False,NewType) }
+        | 'type' 'data' { sL1 $1 ((epTok $2, noEpTok,  epTok $1), True ,DataType) }
 
 data_or_newtype :: { Located ((EpToken "data", EpToken "newtype"), NewOrData) }
-        : 'data'        { sL1 $1 ((epTok $1, NoEpTok), DataType) }
-        | 'newtype'     { sL1 $1 ((NoEpTok,  epTok $1),NewType) }
+        : 'data'        { sL1 $1 ((epTok $1, noEpTok), DataType) }
+        | 'newtype'     { sL1 $1 ((noEpTok,  epTok $1),NewType) }
 
 -- Family result/return kind signatures
 
 opt_kind_sig :: { Located (TokDcolon, Maybe (LHsKind GhcPs)) }
-        :               { noLoc     (NoEpUniTok , Nothing) }
+        :               { noLoc     (noEpUniTok , Nothing) }
         | '::' kind     { sLL $1 $> (epUniTok $1, Just $2) }
 
 opt_datafam_kind_sig :: { Located (TokDcolon, LFamilyResultSig GhcPs) }
@@ -1853,7 +1853,7 @@ decllist_cls
         : '{'         decls_cls '}'     { sLL $1 $> ((epTok $1, fst $ unLoc $2, epTok $3)
                                              ,snd $ unLoc $2, epExplicitBraces $1 $3) }
         |     vocurly decls_cls close   { let { L l (anns, decls) = $2 }
-                                           in L l ((NoEpTok, anns, NoEpTok), decls, EpVirtualBraces (getVOCURLY $1)) }
+                                           in L l ((noEpTok, anns, noEpTok), decls, EpVirtualBraces (getVOCURLY $1)) }
 
 -- Class body
 --
@@ -1946,13 +1946,13 @@ binds   ::  { Located (HsLocalBinds GhcPs) }
         : decllist          {% do { let { (AnnList anc p s t, decls) = unLoc $1 }
                                   ; val_binds <- cvBindGroup (unLoc $ decls)
                                   ; !cs <- getCommentsFor (gl $1)
-                                  ; return (sL1 $1 $ HsValBinds (EpAnn (glR $1) (AnnList anc p s t) cs, NoEpTok) val_binds)} }
+                                  ; return (sL1 $1 $ HsValBinds (EpAnn (glR $1) (AnnList anc p s t) cs, noEpTok) val_binds)} }
 
         | '{'            dbinds '}'     {% acs (comb3 $1 $2 $3) (\loc cs -> (L loc
-                                             $ HsIPBinds (EpAnn (spanAsAnchor (comb3 $1 $2 $3)) (AnnList (Just$ glR $2) (ListBraces (epTok $1) (epTok $3)) [] []) cs, NoEpTok) (IPBinds noExtField (reverse $ unLoc $2)))) }
+                                             $ HsIPBinds (EpAnn (spanAsAnchor (comb3 $1 $2 $3)) (AnnList (Just$ glR $2) (ListBraces (epTok $1) (epTok $3)) [] []) cs, noEpTok) (IPBinds noExtField (reverse $ unLoc $2)))) }
 
         |     vocurly    dbinds close   {% acs (gl $2) (\loc cs -> (L loc
-                                             $ HsIPBinds (EpAnn (glR $1) (AnnList (Just $ glR $2) ListNone [] []) cs, NoEpTok) (IPBinds noExtField (reverse $ unLoc $2)))) }
+                                             $ HsIPBinds (EpAnn (glR $1) (AnnList (Just $ glR $2) ListNone [] []) cs, noEpTok) (IPBinds noExtField (reverse $ unLoc $2)))) }
 
 
 wherebinds :: { Maybe (Located (HsLocalBinds GhcPs, Maybe EpAnnComments )) }
@@ -2424,7 +2424,7 @@ atype :: { LHsType GhcPs }
         -- (One means a list type, zero means the list type constructor,
         -- so you have to quote those.)
         | '[' ktype ',' comma_types1 ']'  {% do { h <- addTrailingCommaA $2 (epTok $3)
-                                                ; amsA' (sLL $1 $> $ HsExplicitListTy (NoEpTok,epTok $1,epTok $5) NotPromoted (h:$4)) }}
+                                                ; amsA' (sLL $1 $> $ HsExplicitListTy (noEpTok,epTok $1,epTok $5) NotPromoted (h:$4)) }}
         | INTEGER              { sL1a $1 $ HsTyLit noExtField $! HsNatural noExtField (getINTEGER  $1) }
         | RATIONAL             { sL1a $1 $ HsTyLit noExtField $! HsDouble  noExtField (getRATIONAL $1) }
         | literal              { sL1a $1 $ HsTyLit noExtField $! unLoc $1 }
@@ -2494,7 +2494,7 @@ tyvar_wc :: { Located (HsBndrVar GhcPs) }
         | '_'                           { sL1 $1 (HsBndrWildCard (HoleVar (sL1a $1 unnamedHoleRdrName))) }
 
 fds :: { Located (EpToken "|",[LHsFunDep GhcPs]) }
-        : {- empty -}                   { noLoc (NoEpTok,[]) }
+        : {- empty -}                   { noLoc (noEpTok,[]) }
         | '|' fds1                      { (sLL $1 $> (epTok $1 ,reverse (unLoc $2))) }
 
 fds1 :: { Located [LHsFunDep GhcPs] }
@@ -2561,7 +2561,7 @@ gadt_constrlist :: { Located ((EpToken "where", EpToken "{", EpToken "}")
                                                         , unLoc $3) }
         | 'where' vocurly    gadt_constrs close  {% checkEmptyGADTs $
                                                       L (comb2 $1 $3)
-                                                        ((epTok $1, NoEpTok, NoEpTok)
+                                                        ((epTok $1, noEpTok, noEpTok)
                                                         , unLoc $3) }
         | {- empty -}                            { noLoc (noAnn,[]) }
 
@@ -3316,7 +3316,7 @@ acmd    :: { LHsCmdTop GhcPs }
 
 cvtopbody :: { ((EpToken "{", EpToken "}"),[LHsDecl GhcPs]) }
         :  '{'            cvtopdecls0 '}'      { ((epTok $1 ,epTok $3),$2) }
-        |      vocurly    cvtopdecls0 close    { ((NoEpTok, NoEpTok),$2) }
+        |      vocurly    cvtopdecls0 close    { ((noEpTok, noEpTok),$2) }
 
 cvtopdecls0 :: { [LHsDecl GhcPs] }
         : topdecls_semi         { cvTopDecls $1 }
@@ -3608,7 +3608,7 @@ ifgdpats :: { Located ((EpToken "{", EpToken "}"), NonEmpty (LGRHS GhcPs (LHsExp
          : '{' gdpats '}'                 {% runPV $2 >>= \ $2 ->
                                              return $ sLL $1 $> ((epTok $1,epTok $3),unLoc $2)  }
          |     gdpats close               {% runPV $1 >>= \ $1 ->
-                                             return $ sL1 $1 ((NoEpTok, NoEpTok),unLoc $1) }
+                                             return $ sL1 $1 ((noEpTok, noEpTok),unLoc $1) }
 
 gdpat   :: { forall b. DisambECP b => PV (LGRHS GhcPs (LocatedA b)) }
         : '|' guardquals '->' exp
@@ -3660,7 +3660,7 @@ stmtlist :: { forall b. DisambECP b => PV (LocatedA ((EpToken "{", [EpToken ";"]
         : '{'           stmts '}'       { $2 >>= \ $2 ->
                                           amsA' (sLL $1 $> ((epTok $1, fromOL $ fst $ unLoc $2, epTok $3), sL1 $2 $ reverse $ snd $ unLoc $2))}
         |     vocurly   stmts close     { $2 >>= \ $2 ->
-                                          amsA' (L (stmtsLoc $2) ((NoEpTok, fromOL $ fst $ unLoc $2, NoEpTok), sL1 $2 $ reverse $ snd $ unLoc $2))}
+                                          amsA' (L (stmtsLoc $2) ((noEpTok, fromOL $ fst $ unLoc $2, noEpTok), sL1 $2 $ reverse $ snd $ unLoc $2))}
 
 --      do { ;; s ; s ; ; s ;; }
 -- The last Stmt should be an expression, but that's hard to enforce
@@ -4743,7 +4743,7 @@ epUniTok t@(L !l _) = EpUniTok (EpaSpan l) u
 
 -- |Construct an EpToken from the location of the token, provided the span is not zero width
 mzEpTok :: Located Token -> EpToken tok
-mzEpTok !l = if isZeroWidthSpan (gl l) then NoEpTok else (epTok l)
+mzEpTok !l = if isZeroWidthSpan (gl l) then noEpTok else (epTok l)
 
 epExplicitBraces :: Located Token -> Located Token -> EpLayout
 epExplicitBraces !t1 !t2 = EpExplicitBraces (epTok t1) (epTok t2)

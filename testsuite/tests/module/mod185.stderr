@@ -8,12 +8,15 @@
    (EpAnn
     (EpaSpan { mod185.hs:1:1 })
     (AnnsModule
-     (NoEpTok)
-     (NoEpTok)
-     (NoEpTok)
+     (EpTok
+      (EpaSpan { <no location info> }))
+     (EpTok
+      (EpaSpan { <no location info> }))
+     (EpTok
+      (EpaSpan { <no location info> }))
      ((,,)
-      (NoEpTok)
-      (NoEpTok)
+      (EpTok (EpaSpan { <no location info> }))
+      (EpTok (EpaSpan { <no location info> }))
       [])
      []
      []
@@ -50,9 +53,10 @@
        (Nothing)
        (Nothing)
        ((,,,)
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok)
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> }))
         []))
       (NoSourceText)
       (False))
@@ -124,7 +128,8 @@
             (Prefix)
             (NoSrcStrict)
             (AnnFunRhs
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              []
              []))
            (L
