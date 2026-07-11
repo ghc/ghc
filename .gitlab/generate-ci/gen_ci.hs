@@ -159,7 +159,7 @@ data BuildConfig
                 , withNuma       :: Bool
                 , withZstd       :: Bool
                 , crossTarget    :: Maybe String
-                , crossStage     :: Maybe Int
+                , finalCrossStage :: Maybe FinalCrossStage
                 , crossEmulator  :: CrossEmulator
                 , configureWrapper :: Maybe String
                 , fullyStatic    :: Bool
@@ -229,7 +229,7 @@ vanilla = BuildConfig
   , withNuma = False
   , withZstd = False
   , crossTarget = Nothing
-  , crossStage  = Nothing
+  , finalCrossStage  = Nothing
   , crossEmulator = NoEmulator
   , configureWrapper = Nothing
   , fullyStatic = False
@@ -275,13 +275,26 @@ static = vanilla { fullyStatic = True }
 staticNativeInt :: BuildConfig
 staticNativeInt = static { bignumBackend = Native }
 
+-- | The final stage for which binary distributions should be built
+--
+-- `Stage2` builds a cross-compiler (build == host, host /= target). `Stage3`
+-- implies `Stage2` and additionally builds a cross-compiled compiler (build /=
+-- host, host == target).
+data FinalCrossStage = Stage2 | Stage3
+  deriving (Eq, Ord)
+
+crossStageToInt :: FinalCrossStage -> Int
+crossStageToInt Stage2 = 2
+crossStageToInt Stage3 = 3
+
 crossConfig :: String       -- ^ target triple
             -> CrossEmulator -- ^ emulator for testing
             -> Maybe String -- ^ Configure wrapper
+            -> FinalCrossStage -- ^ final stage to build
             -> BuildConfig
-crossConfig triple emulator configure_wrapper =
+crossConfig triple emulator configure_wrapper crossStage =
     vanilla { crossTarget = Just triple
-            , crossStage  = Just 2
+            , finalCrossStage  = Just crossStage
             , crossEmulator = emulator
             , configureWrapper = configure_wrapper
             }
@@ -348,21 +361,48 @@ opsysName Darwin         = "darwin"
 opsysName FreeBSD14      = "freebsd14"
 opsysName Windows        = "windows"
 
+-- | Remove cross-specific prefix for Stage3 bindist names.
+-- We need to pretend to have built the bindist on the target.
+toStage3TargetOpsys :: Opsys -> Opsys
+toStage3TargetOpsys (Linux Debian13Riscv) = Linux Debian13
+toStage3TargetOpsys (Linux Ubuntu2404LoongArch64) = Linux Ubuntu2404
+toStage3TargetOpsys opsys = opsys
+
 archName :: Arch -> String
 archName Amd64   = "x86_64"
 archName AArch64 = "aarch64"
 archName I386    = "i386"
 
+-- | First component of a cross target triple, used to name stage3
+-- (target-platform) bindists as if they had been built natively on the target.
+targetArchName :: String -> String
+targetArchName = takeWhile (/= '-')
+
 binDistName :: Arch -> Opsys -> BuildConfig -> String
-binDistName arch opsys bc = "ghc-" ++ testEnv arch opsys bc
+binDistName arch = binDistNameWith (archName arch)
+
+binDistNameWith :: String -> Opsys -> BuildConfig -> String
+binDistNameWith archN opsys bc = "ghc-" ++ testEnvWith archN opsys bc
+
+stage3BinDistName :: Opsys -> BuildConfig -> Maybe String
+stage3BinDistName opsys bc
+  | Just Stage3 <- finalCrossStage bc
+  , Just triple <- crossTarget bc
+  = Just $ binDistNameWith (targetArchName triple) (toStage3TargetOpsys opsys)
+                          (bc { crossTarget = Nothing })
+  | otherwise
+  = Nothing
 
 -- | Test env should create a string which changes whenever the 'BuildConfig' changes.
 -- Either the change is reflected by modifying the flavourString or directly (as is
 -- the case for settings which affect environment variables)
 testEnv :: Arch -> Opsys -> BuildConfig -> String
-testEnv arch opsys bc =
+testEnv arch = testEnvWith (archName arch)
+
+testEnvWith :: String -> Opsys -> BuildConfig -> String
+testEnvWith archN opsys bc =
   intercalate "-" $ concat
-    [ [ archName arch
+    [ [ archN
       , opsysName opsys ]
     , ["int_" ++ bignumString (bignumBackend bc) | bignumBackend bc /= Gmp]
     , ["unreg" | unregisterised bc ]
@@ -883,13 +923,14 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
       [ opsysVariables arch opsys
       , "TEST_ENV" =: testEnv arch opsys buildConfig
       , "BIN_DIST_NAME" =: binDistName arch opsys buildConfig
+      , maybe mempty ("BIN_DIST_NAME_STAGE3" =:) (stage3BinDistName opsys buildConfig)
       , "BUILD_FLAVOUR" =: flavourString jobFlavour
       , "BIGNUM_BACKEND" =: bignumString (bignumBackend buildConfig)
       , "CONFIGURE_ARGS" =: configureArgsStr buildConfig
       , "INSTALL_CONFIGURE_ARGS" =: "--enable-strict-ghc-toolchain-check"
       , maybe mempty ("CONFIGURE_WRAPPER" =:) (configureWrapper buildConfig)
       , maybe mempty ("CROSS_TARGET" =:) (crossTarget buildConfig)
-      , maybe mempty (("CROSS_STAGE" =:) . show) (crossStage buildConfig)
+      , maybe mempty (("FINAL_CROSS_STAGE" =:) . show . crossStageToInt) (finalCrossStage buildConfig)
       , case crossEmulator buildConfig of
           NoEmulator
             -- we need an emulator but it isn't set. Won't run the testsuite
@@ -922,6 +963,8 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
     trim :: String -> String
     trim = dropWhileEnd isSpace . dropWhile isSpace
 
+    stage3Artifacts = maybe [] (\n -> [n ++ ".tar.xz"]) (stage3BinDistName opsys buildConfig)
+
     -- Keep in sync with the exclude list in `function clean()` in
     -- `.gitlab/ci.sh`!
     jobArtifacts = Artifacts
@@ -930,6 +973,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
       , artifactPaths = [binDistName arch opsys buildConfig ++ ".tar.xz"
                         ,"junit.xml"
                         ,"unexpected-test-output.tar.gz"]
+                        ++ stage3Artifacts
       , artifactsWhen = ArtifactsAlways
       }
 
@@ -1288,13 +1332,14 @@ alpine_aarch64 = [
 cross_jobs :: [JobGroup Job]
 cross_jobs = [
     -- x86 -> aarch64
-    validateBuilds Amd64 (Linux Debian13) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
+    validateBuilds Amd64 (Linux Debian13) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing Stage2)
 
-    -- x86_64 -> riscv
-  , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian13Riscv) (crossConfig "riscv64-linux-gnu" (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing))
+    -- Stage2: x86_64 (build/host) -> riscv64 (target)
+    -- Stage3: x86_64 (build) -> riscv64 (host/target)
+  , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian13Riscv) (crossConfig "riscv64-linux-gnu" (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing Stage3))
 
     -- x86_64 -> loongarch64
-  , addValidateRule LoongArch64 (validateBuilds Amd64 (Linux Ubuntu2404LoongArch64) (crossConfig "loongarch64-linux-gnu" (Emulator "qemu-loongarch64 -L /usr/loongarch64-linux-gnu") Nothing))
+  , addValidateRule LoongArch64 (validateBuilds Amd64 (Linux Ubuntu2404LoongArch64) (crossConfig "loongarch64-linux-gnu" (Emulator "qemu-loongarch64 -L /usr/loongarch64-linux-gnu") Nothing Stage2))
 
     -- Javascript
   , addValidateRule JSBackend (validateBuilds Amd64 (Linux Debian11Js) javascriptConfig)
@@ -1315,7 +1360,7 @@ cross_jobs = [
         (validateBuilds AArch64 (Linux Debian12Wine) (winAarch64Config {llvmBootstrap = True}))
   ]
   where
-    javascriptConfig = (crossConfig "javascript-unknown-ghcjs" (NoEmulatorNeeded TimeoutIncrease) (Just "emconfigure"))
+    javascriptConfig = (crossConfig "javascript-unknown-ghcjs" (NoEmulatorNeeded TimeoutIncrease) (Just "emconfigure") Stage2)
                          { bignumBackend = Native }
 
     makeWinArmJobs = modifyJobs
@@ -1354,7 +1399,7 @@ cross_jobs = [
             llvm_prefix = "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-"
             cflags = "-fuse-ld=" ++ llvm_prefix ++ "ld --rtlib=compiler-rt"
 
-    winAarch64Config = (crossConfig "aarch64-unknown-mingw32" (Emulator "/opt/wine-arm64ec-msys2-deb12/bin/wine") Nothing)
+    winAarch64Config = (crossConfig "aarch64-unknown-mingw32" (Emulator "/opt/wine-arm64ec-msys2-deb12/bin/wine") Nothing Stage2)
                          { bignumBackend = Native }
 
     make_wasm_jobs cfg =
@@ -1367,7 +1412,7 @@ cross_jobs = [
         $ addValidateRule WasmBackend $ validateBuilds Amd64 (Linux AlpineWasm) cfg
 
     wasm_build_config =
-      (crossConfig "wasm32-wasi" (NoEmulatorNeeded NoTimeoutIncrease) Nothing)
+      (crossConfig "wasm32-wasi" (NoEmulatorNeeded NoTimeoutIncrease) Nothing Stage2)
         { hostFullyStatic = True
         , buildFlavour    = Release -- TODO: This needs to be validate but wasm backend doesn't pass yet
         , textWithSIMDUTF = True

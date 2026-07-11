@@ -62,9 +62,9 @@ Common Modes:
 Environment variables affecting the build:
 
   CROSS_TARGET      Triple of cross-compilation target.
-  CROSS_STAGE       The stage of the cross-compiler to build either
-                      * 2: Build a normal cross-compiler bindist
-                      * 3: Build a target executable bindist (with the stage2 cross-compiler)
+  FINAL_CROSS_STAGE The final stage of the cross-compiler to build either
+                      * 2: Build a cross-compiler bindist
+                      * 3: Build a target executable bindist (implies the cross-compiler bindist of 2)
   VERBOSE           Set to non-empty for verbose build output
   RUNTEST_ARGS      Arguments passed to runtest.py
   TEST_WAYS         Testsuite ways to run
@@ -573,10 +573,18 @@ function build_hadrian() {
     export XZ_OPT="${XZ_OPT:-} -T$cores"
   fi
 
-  case "${CROSS_STAGE:-2}" in
+  case "${FINAL_CROSS_STAGE:-2}" in
     2) BINDIST_TARGET="binary-dist";;
-    3) BINDIST_TARGET="binary-dist-stage3";;
-    *) fail "Unknown CROSS_STAGE, must be 2 or 3";;
+    # Stage2 cross-compiler bindists are (almost) a byproduct of Stage3
+    # cross-compiled bindists. So, we bundle both of them when the Stage3
+    # bindist is built.
+    3)
+      BINDIST_TARGET="binary-dist binary-dist-stage3"
+      if [[ -z "${BIN_DIST_NAME_STAGE3:-}" ]]; then
+        fail "FINAL_CROSS_STAGE=3 requires BIN_DIST_NAME_STAGE3 to be set"
+      fi
+      ;;
+    *) fail "Unknown FINAL_CROSS_STAGE, must be 2 or 3";;
   esac
 
   if [[ -n "${REINSTALL_GHC:-}" ]]; then
@@ -590,6 +598,9 @@ function build_hadrian() {
         *)
           run_hadrian test:all_deps $BINDIST_TARGET
           mv _build/bindist/ghc*.tar.xz "$BIN_DIST_NAME.tar.xz"
+          if [[ "${FINAL_CROSS_STAGE:-2}" == "3" ]]; then
+            mv _build/bindist-stage3/ghc*.tar.xz "$BIN_DIST_NAME_STAGE3.tar.xz"
+          fi
           ;;
     esac
   fi
@@ -700,6 +711,26 @@ function test_hadrian() {
     # ---
     # > main = putStrLn "hello world"
     run diff -w expected actual
+
+    if [[ "${FINAL_CROSS_STAGE:-2}" == "3" ]]; then
+      local stage3_dir
+      stage3_dir="$(echo _build/bindist-stage3/ghc-*/)"
+      local stage3_ghc="$stage3_dir/bin/ghc$exe"
+
+      info "Smoke-testing stage3 compiler..."
+      file "$stage3_ghc"
+      run ${CROSS_EMULATOR} "$stage3_ghc" --info
+
+      run ${CROSS_EMULATOR} "$stage3_ghc" -package ghc "$TOP/.gitlab/hello.hs" -o hello-stage3
+
+      if [[ "${CROSS_TARGET:-no_cross_target}" =~ "mingw" ]]; then
+        ${CROSS_EMULATOR:-} ./hello-stage3.exe > actual-stage3
+      else
+        ${CROSS_EMULATOR:-} ./hello-stage3 > actual-stage3
+      fi
+
+      run diff -w expected actual-stage3
+    fi
   elif [[ -n "${REINSTALL_GHC:-}" ]]; then
     run_hadrian \
       test \
