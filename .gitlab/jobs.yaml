@@ -2748,6 +2748,7 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
+        "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-stage3-validate.tar.xz",
         "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
@@ -2792,10 +2793,11 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate",
+      "BIN_DIST_NAME_STAGE3": "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-stage3-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CROSS_EMULATOR": "qemu-riscv64 -L /usr/riscv64-linux-gnu",
-      "CROSS_STAGE": "2",
+      "CROSS_STAGE": "3",
       "CROSS_TARGET": "riscv64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "-e config.timeout=900",
@@ -6724,6 +6726,7 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
+        "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-stage3-validate.tar.xz",
         "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
@@ -6768,10 +6771,11 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate",
+      "BIN_DIST_NAME_STAGE3": "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-stage3-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CROSS_EMULATOR": "qemu-riscv64 -L /usr/riscv64-linux-gnu",
-      "CROSS_STAGE": "2",
+      "CROSS_STAGE": "3",
       "CROSS_TARGET": "riscv64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "-e config.timeout=900",
