@@ -342,7 +342,7 @@ mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
        ; defn <- mkDataDefn cType mcxt ksig data_cons maybe_deriv anns'
        ; let loc' = EpAnn (spanAsAnchor loc) noAnn cs
        ; return (L loc' (DataFamInstD noExtField (DataFamInstDecl
-                  (FamEqn { feqn_ext    = ([], [], NoEpTok)
+                  (FamEqn { feqn_ext    = ([], [], noEpTok)
                           , feqn_tycon  = tc
                           , feqn_bndrs  = bndrs
                           , feqn_pats   = tparams
@@ -1141,10 +1141,8 @@ checkTyClHdr is_cls ty
     goL cs (L l ty) acc ops cps fix = go cs l ty acc ops cps fix
 
     -- workaround to define '*' despite StarIsType
-    go cs ll (HsParTy an (L l (HsStarTy tok))) acc ops' cps' fix
+    go cs ll (HsParTy an (L l (HsStarTy (EpUniTok _ isUni)))) acc ops' cps' fix
       = do { addPsMessage (locA l) PsWarnStarBinder
-           ; let isUni = case tok of { NoEpUniTok    -> NormalSyntax
-                                     ; EpUniTok _ iu -> iu }
            ; let name = mkOccNameFS tcClsName (starSym isUni)
            ; let a' = newAnns ll l an
            ; return (L a' (Unqual name), acc, fix
@@ -1514,7 +1512,7 @@ checkValDef loc lhs Nothing grhss
               checkPatBind loc lhs'' grhss mods
 
 mk_ann_funrhs :: [EpToken "("] -> [EpToken ")"] -> AnnFunRhs
-mk_ann_funrhs ops cps = AnnFunRhs NoEpTok ops cps
+mk_ann_funrhs ops cps = AnnFunRhs noEpTok ops cps
 
 checkFunBind :: SrcSpan
              -> AnnFunRhs
@@ -3336,7 +3334,7 @@ mkModuleImpExp ctx warning (top, tcp) (L l specname) subs = do
     ImpExpList xs -> do
       -- `xs` contains no wildcards (checked by mkImpExpSubSpec)
       newName <- nameT
-      return $ IEThingWith (warning, (top,NoEpTok,NoEpTok,tcp))
+      return $ IEThingWith (warning, (top,noEpTok,noEpTok,tcp))
                            (L l newName)
                            NoIEWildcard
                            (wrapped xs)
@@ -3420,7 +3418,7 @@ mkTypeWcImpExp :: SrcSpan
 mkTypeWcImpExp loc tk_ns tk_wc = do
   let ns_kw = ExplicitTypeNamespace tk_ns
   requireExplicitNamespaces ns_kw
-  let ie_spec = ImpExpQcWildcard (Just ns_kw) tk_wc NoEpTok
+  let ie_spec = ImpExpQcWildcard (Just ns_kw) tk_wc noEpTok
   return (L (noAnnSrcSpan loc) ie_spec)
 
 mkDataWcImpExp :: SrcSpan
@@ -3430,7 +3428,7 @@ mkDataWcImpExp :: SrcSpan
 mkDataWcImpExp loc tk_ns tk_wc = do
   let ns_kw = ExplicitDataNamespace tk_ns
   requireExplicitNamespaces ns_kw
-  let ie_spec = ImpExpQcWildcard (Just ns_kw) tk_wc NoEpTok
+  let ie_spec = ImpExpQcWildcard (Just ns_kw) tk_wc noEpTok
   return (L (noAnnSrcSpan loc) ie_spec)
 
 mkIEWholeNamespacePs :: Maybe (LWarningTxt GhcPs)
@@ -3854,7 +3852,7 @@ mkTupleSyntaxTy parOpen args parClose =
       HsExplicitTupleTy annsKeyword NotPromoted args
 
     annParen = AnnParens parOpen parClose
-    annsKeyword = (NoEpTok, annParen)
+    annsKeyword = (noEpTok, annParen)
 
 -- | Decide whether to parse tuple con syntax @(,)@ in a type as a
 -- type or data constructor, based on the extension @ListTuplePuns@.
@@ -3886,7 +3884,7 @@ mkListSyntaxTy0 brkOpen brkClose span =
       HsExplicitListTy annsKeyword NotPromoted []
 
     rdrNameAnn = NameAnnOnly (NameSquare brkOpen brkClose) []
-    annsKeyword = (NoEpTok, brkOpen, brkClose)
+    annsKeyword = (noEpTok, brkOpen, brkClose)
     fullLoc = EpaSpan span
 
 -- | Decide whether to parse list type syntax @[Int]@ in a type as a
@@ -3905,7 +3903,7 @@ mkListSyntaxTy1 brkOpen t brkClose =
     disabled =
       HsExplicitListTy annsKeyword NotPromoted [t]
 
-    annsKeyword = (NoEpTok, brkOpen, brkClose)
+    annsKeyword = (noEpTok, brkOpen, brkClose)
     annParen = (brkOpen, brkClose)
 
 parseError :: HsExpr GhcPs

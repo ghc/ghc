@@ -10,12 +10,13 @@
     (AnnsModule
      (EpTok
       (EpaSpan { T23315.hsig:1:1-9 }))
-     (NoEpTok)
+     (EpTok
+      (EpaSpan { <no location info> }))
      (EpTok
       (EpaSpan { T23315.hsig:1:18-22 }))
      ((,,)
-      (NoEpTok)
-      (NoEpTok)
+      (EpTok (EpaSpan { <no location info> }))
+      (EpTok (EpaSpan { <no location info> }))
       [])
      []
      []

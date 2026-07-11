@@ -8,14 +8,15 @@
    (EpAnn
     (EpaSpan { DumpParsedAstComments.hs:1:1 })
     (AnnsModule
-     (NoEpTok)
+     (EpTok
+      (EpaSpan { <no location info> }))
      (EpTok
       (EpaSpan { DumpParsedAstComments.hs:5:1-6 }))
      (EpTok
       (EpaSpan { DumpParsedAstComments.hs:5:30-34 }))
      ((,,)
-      (NoEpTok)
-      (NoEpTok)
+      (EpTok (EpaSpan { <no location info> }))
+      (EpTok (EpaSpan { <no location info> }))
       [])
      []
      []
@@ -119,7 +120,8 @@
             (Prefix)
             (NoSrcStrict)
             (AnnFunRhs
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              []
              []))
            (L
@@ -241,7 +243,8 @@
             (Prefix)
             (NoSrcStrict)
             (AnnFunRhs
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              []
              []))
            (L
@@ -290,8 +293,8 @@
                    (Just
                     (EpaSpan { DumpParsedAstComments.hs:16:3 }))
                    (ListBraces
-                    (NoEpTok)
-                    (NoEpTok))
+                    (EpTok (EpaSpan { <no location info> }))
+                    (EpTok (EpaSpan { <no location info> })))
                    [])
                   (EpaSpan { DumpParsedAstComments.hs:14:7-8 }))
                  (DoExpr
@@ -389,7 +392,8 @@
             (Prefix)
             (NoSrcStrict)
             (AnnFunRhs
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              []
              []))
            (L
