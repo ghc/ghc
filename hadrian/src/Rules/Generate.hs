@@ -25,7 +25,6 @@ import Utilities
 import GHC.Toolchain as Toolchain hiding (HsCpp(HsCpp))
 import GHC.Platform.ArchOS
 import Settings.Program (ghcWithInterpreter)
-import UserSettings (finalStage)
 
 -- | Track this file to rebuild generated files whenever it changes.
 trackGenerateHs :: Expr ()
@@ -252,35 +251,35 @@ generateRules = do
     (root -/- "ghc-stage2") <~+ ghcWrapper Stage2
     (root -/- "ghc-stage3") <~+ ghcWrapper Stage3
 
-    forM_ allStages $ \stage -> do
-        let prefix = root -/- stageString stage -/- "lib"
-            -- For the finalStage, we generate settings for that stage. For
-            -- others we look at the next stage. Why? Because cross-compilers
-            -- require libs from the successor stage, otherwise they are
-            -- compiled for the host and not the target.
-            stage' = if stage /= finalStage then succStage stage else stage
-            go gen file = generate file (semiEmptyTarget stage') gen
+    forM_ allStages $ \compilerStage -> do
+        let
+            prefix = root -/- stageString compilerStage -/- "lib"
+            go gen file = generate file (semiEmptyTarget compilerStage) gen
         (prefix -/- "settings") %> \out -> do
-            let get_pkg_db stg = packageDbPath (PackageDbLoc stg Final)
-            -- For cross, LibDir points to stage' lib dir, so pkgDb must also
-            -- be relative to stage' lib dir.
-            isCross <- crossStage stage
-            let libStage = case stage of
-                    Stage0 {} -> Stage1
-                    _         -> if isCross then stage' else stage
-            pkgDb <- get_pkg_db libStage
+            libraryStage <- libraryStageFor compilerStage
+            pkgDb <- packageDbPath (PackageDbLoc libraryStage Final)
             -- addTrailingPathSeparator needed: makeRelativeNoSysLink uses
             -- splitPath where "lib" and "lib/" are distinct components.
             let libTopDir = addTrailingPathSeparator $
-                    if isCross
-                      then root -/- stageString stage' -/- "lib"
-                      else prefix
+                    if isStage0 compilerStage
+                      then prefix
+                      else root -/- stageString libraryStage -/- "lib"
                 relPkgDb = makeRelativeNoSysLink libTopDir pkgDb
-            go (generateSettings libStage out True relPkgDb) out
-        (prefix -/- "targets" -/- "default.target") %> \out -> go (show <$> expr (perStageTarget (succStage stage))) out
+            go (generateSettings libraryStage out True relPkgDb) out
+        (prefix -/- "targets" -/- "default.target") %> \out ->
+            go (generateTargetFile compilerStage) out
 
   where
     file <~+ gen = file %> \out -> generate out emptyTarget gen >> makeExecutable out
+
+    generateTargetFile :: Stage -> Expr String
+    generateTargetFile compilerStage = do
+        isCrossStage <- if compilerStage < Stage3
+                          then expr (crossStage compilerStage)
+                          else pure False
+        libraryStage <- expr (libraryStageFor compilerStage)
+        tgt <- expr (perStageTarget libraryStage)
+        pure $ show tgt { tgtLocallyExecutable = not isCrossStage }
 
 -- TODO: Use the Types, Luke! (drop partial function)
 -- We sometimes need to evaluate expressions that do not require knowing all
@@ -413,6 +412,7 @@ templateRules = do
 
 bindistRules :: Rules ()
 bindistRules = do
+  root <- buildRootRules
   templateRule ("mk" -/- "project.mk") $ mconcat
     [ interpolateSetting "ProjectName" ProjectName
     , interpolateSetting "ProjectVersion" ProjectVersion
@@ -424,45 +424,146 @@ bindistRules = do
 
     , interpolateVar "HostOS_CPP" $ fmap cppify $ interp $ queryHost queryOS
 
-    , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
-    , interpolateVar "TargetPlatform_CPP" $ cppify <$> getTarget targetPlatformTriple
-    , interpolateVar "TargetArch_CPP" $ cppify <$> getTarget queryArch
-    , interpolateVar "TargetOS_CPP" $ cppify <$> getTarget queryOS
-    , interpolateVar "LLVMTarget" $ getTarget tgtLlvmTarget
+    -- Stage2 always targets the target (as in build, host, target)
+    -- architecture. Thus, we can use it constant stage here to find
+    -- information about the target architecture.
+    , interpolateVar "TargetPlatform" $ getTarget Stage2 targetPlatformTriple
+    , interpolateVar "TargetPlatform_CPP" $ cppify <$> getTarget Stage2 targetPlatformTriple
+    , interpolateVar "TargetArch_CPP" $ cppify <$> getTarget Stage2 queryArch
+    , interpolateVar "TargetOS_CPP" $ cppify <$> getTarget Stage2 queryOS
+    , interpolateVar "LLVMTarget" $ getTarget Stage2 tgtLlvmTarget
     ]
-  templateRule ("distrib" -/- "configure.ac") $ mconcat
-    [ interpolateSetting "ConfiguredEmsdkVersion" EmsdkVersion
-    , interpolateVar "CrossCompilePrefix" $ do
-        crossCompiling <- interp $ getFlag CrossCompiling
-        tpf <- setting TargetPlatformFull
-        pure $ if crossCompiling then tpf <> "-" else ""
-    , interpolateVar "LeadingUnderscore" $ yesNo <$> getTarget tgtSymbolsHaveLeadingUnderscore
-    , interpolateSetting "LlvmMaxVersion" LlvmMaxVersion
-    , interpolateSetting "LlvmMinVersion" LlvmMinVersion
-    , interpolateVar "LlvmTarget" $ getTarget tgtLlvmTarget
-    , interpolateSetting "ProjectVersion" ProjectVersion
-    , interpolateVar "EnableDistroToolchain" $ interp (staged (lookupStageBuildConfig "settings-use-distro-mingw"))
-    , interpolateVar "TablesNextToCode" $ yesNo <$> getTarget tgtTablesNextToCode
-    , interpolateVar "TargetHasLibm" $ yesNo <$> getTarget tgtHasLibm
-    , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
-    , interpolateVar "BuildPlatform"  $ interp $ queryBuild targetPlatformTriple
-    , interpolateVar "HostPlatform"   $ interp $ queryHost targetPlatformTriple
-    , interpolateVar "TargetWordBigEndian" $ getTarget isBigEndian
-    , interpolateVar "TargetWordSize" $ getTarget wordSize
-    , interpolateVar "Unregisterised" $ yesNo <$> getTarget tgtUnregisterised
-    , interpolateVar "UseLibdw" $ fmap yesNo $ interp $ staged (fmap (isJust . tgtRTSWithLibdw) . perStageTarget)
-    , interpolateVar "UseLibffiForAdjustors" $ yesNo <$> getTarget tgtUseLibffiForAdjustors
-    , interpolateVar "BaseUnitId" $ bindistUnitId base
-    , interpolateVar "GhcUnitId" $ bindistUnitId compiler
-    , interpolateVar "GhcInternalUnitId" $ bindistUnitId ghcInternal
-    , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP Stage2
-    , interpolateVar "TargetPlatformFull" (setting TargetPlatformFull)
-    , interpolateVar "BuildPlatformFull" (setting BuildPlatformFull)
-    , interpolateVar "HostPlatformFull"  (setting HostPlatformFull)
-    ]
+  forM_ [Stage1, Stage2] $ \stage ->
+    let crossStageInterps = Interpolations $ do
+          isCrossStage <- crossStage stage
+          targetPlatform <- setting TargetPlatformFull
+          -- For cross-compiled compilers we need to pretend that they were
+          -- build on the target. For regular compilers we can assume that:
+          -- build == host == target
+          buildPlatform <-
+            if isCrossStage
+              then
+                interp $ queryBuild targetPlatformTriple
+              else getTarget stage targetPlatformTriple
+          hostPlatform <-
+            if isCrossStage
+              then
+                interp $ queryHost targetPlatformTriple
+              else getTarget stage targetPlatformTriple
+          -- The unit ids of the libraries shipped with this bindist. For
+          -- cross compilers these are the target-architecture libraries'
+          -- unit ids (#27919), which the implicit bindist config encodes.
+          baseUnitId <- bindistUnitId base
+          ghcUnitId <- bindistUnitId compiler
+          ghcInternalUnitId <- bindistUnitId ghcInternal
+          buildPlatformFull <- if isCrossStage then setting BuildPlatformFull else setting TargetPlatformFull
+          hostPlatformFull <- if isCrossStage then setting HostPlatformFull else setting TargetPlatformFull
+          pure
+            [ ("CrossCompilePrefix", if isCrossStage then targetPlatform <> "-" else "")
+            , ("TargetPlatformFull", targetPlatform)
+            , ("BuildPlatform", buildPlatform)
+            , ("HostPlatform", hostPlatform)
+            , ("BaseUnitId", baseUnitId)
+            , ("GhcUnitId", ghcUnitId)
+            , ("GhcInternalUnitId", ghcInternalUnitId)
+            , ("BuildPlatformFull", buildPlatformFull)
+            , ("HostPlatformFull", hostPlatformFull)
+            ]
+    in templateRuleFrom
+      ("distrib" -/- "configure.ac" <.> "in")
+      (root -/- stageString stage -/- "distrib" -/- "configure.ac")
+      $ mconcat
+      [ interpolateSetting "ConfiguredEmsdkVersion" EmsdkVersion
+      , interpolateVar "LeadingUnderscore" $ yesNo <$> getLibTarget stage tgtSymbolsHaveLeadingUnderscore
+      , interpolateSetting "LlvmMaxVersion" LlvmMaxVersion
+      , interpolateSetting "LlvmMinVersion" LlvmMinVersion
+      , interpolateVar "LlvmTarget" $ getLibTarget stage tgtLlvmTarget
+      , interpolateSetting "ProjectVersion" ProjectVersion
+      , interpolateVar "EnableDistroToolchain" $ interp (staged (lookupStageBuildConfig "settings-use-distro-mingw"))
+      , interpolateVar "TablesNextToCode" $ yesNo <$> getLibTarget stage tgtTablesNextToCode
+      , interpolateVar "TargetHasLibm" $ yesNo <$> getLibTarget stage tgtHasLibm
+      , interpolateVar "TargetPlatform" $ getLibTarget stage targetPlatformTriple
+      , interpolateVar "TargetWordBigEndian" $ getLibTarget stage isBigEndian
+      , interpolateVar "TargetWordSize" $ getLibTarget stage wordSize
+      , interpolateVar "Unregisterised" $ yesNo <$> getLibTarget stage tgtUnregisterised
+      , interpolateVar "UseLibdw" $ yesNo <$> getLibTarget stage (isJust . tgtRTSWithLibdw)
+      , interpolateVar "UseLibffiForAdjustors" $ yesNo <$> getLibTarget stage tgtUseLibffiForAdjustors
+      , interpolateVar "GhcWithSMP" $ yesNo <$> libStageSupportsSMP stage
+      , crossStageInterps
+      ]
+
+  -- Note [Bindist configure autoconf srcdir]
+  -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  -- We can build binary distributions for several stages. These may need
+  -- different `configure` scripts. To avoid race-conditions on temporary
+  -- autoconf files (including `configure`), we generate those in the stages'
+  -- dedicated build folders (`_build/<stage>`).
+  --
+  -- The generated `configure.ac` lives in `_build/<stage>/distrib`, while the
+  -- m4 macros are one level up in _build/<stage>/m4. This mirrors the
+  -- repository layout, where `distrib/configure.ac.in` refers to the macros
+  -- via AC_CONFIG_MACRO_DIRS([../m4]) (i.e. the repository's top-level `m4/`).
+  -- Keeping the same relative layout means the template needs no change.
+  --
+  -- We deliberately do *not* copy the top-level `aclocal.m4`: its m4_include
+  -- directives are relative to the directory aclocal first ran in. Instead we
+  -- run autoreconf next to the staged `configure.ac` and let aclocal pick the
+  -- macro directory up from its AC_CONFIG_MACRO_DIRS([../m4]), regenerating
+  -- `aclocal.m4` with `../m4/...` includes that resolve from there.
+  --
+  -- The other copied files need to be present for autoconf and/or autoreconf.
+  forM_ [Stage1, Stage2] $ \stage -> do
+    let stageDir   = root -/- stageString stage
+        distribDir = stageDir -/- "distrib"
+
+    forM_ ["config.sub", "config.guess", "install-sh"] $ \f ->
+      distribDir -/- f %> \out -> do
+        top <- topDirectory
+        copyFile (top -/- f) out
+
+    stageDir -/- "m4/*.m4" %> \out -> do
+      top <- topDirectory
+      copyFile (top -/- "m4" -/- takeFileName out) out
+
+    distribDir -/- "configure" %> \_ -> do
+      top    <- topDirectory
+      m4Files <- getDirectoryFiles (top -/- "m4") ["*.m4"]
+      need $ [ distribDir -/- "configure.ac"
+             , distribDir -/- "config.sub"
+             , distribDir -/- "config.guess"
+             , distribDir -/- "install-sh"
+             ]
+           ++ [ stageDir -/- "m4" -/- takeFileName f | f <- m4Files ]
+
+      -- Note [Autoreconf unix paths from ACLOCAL_PATH]
+      -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      -- On Windows, autoreconf fails when the ACLOCAL_PATH env variable
+      -- contains Windows-style paths. MSYS2 auto-converts env vars to
+      -- Windows-style, so we convert ACLOCAL_PATH back to Unix style here.
+      -- This is done both in the boot Python script and here when
+      -- building a bindist.
+      -- See Note [MSYS paths].
+      win_host <- isWinHost
+      aclocalPathMay <- if win_host then getEnv "ACLOCAL_PATH" else pure Nothing
+      let env = [ AddEnv "ACLOCAL_PATH" (windowsToMsysPathList aclocalPath)
+                | Just aclocalPath <- [aclocalPathMay] ]
+
+      buildWithCmdOptions env $
+        target (vanillaContext stage ghc) (Autoreconf distribDir) [] []
   where
     interp = interpretInContext (semiEmptyTarget Stage2)
-    getTarget = interp . queryTarget Stage2
+    getTarget stage = interp . queryTarget stage
+    getLibTarget executableStage f = do
+      libStage <- libraryStageFor executableStage
+      getTarget libStage f
+    -- | 'targetSupportsSMP' lifted to the library stage (see 'getLibTarget').
+    libStageSupportsSMP stage = do
+      libStage <- libraryStageFor stage
+      targetSupportsSMP libStage
+    -- | The unit id of @pkg@ in the stage whose libraries ship with the
+    -- bindist, i.e. the library stage of the implicit bindist config. For
+    -- cross compilers these are the target-architecture unit ids, as
+    -- reported by @ghc --info@ (#27919).
     bindistUnitId pkg = do
       stage <- library_stage <$> implicitBindistConfig
       pkgUnitId stage pkg
@@ -487,6 +588,14 @@ ghcWrapper stage  = do
 
 -- | Generate settings file, optionally including @LibDir@.
 --
+-- Describes the compiler whose stage is the ambient 'Expr' context
+-- (available here as @executableStage@ via 'getStage'). The @libraryStage@
+-- argument is the stage whose lib dir holds the libraries the described
+-- compiler links against — used both for the @base@ unit-id lookup and for
+-- the @LibDir@ entry. It usually equals @executableStage@ but differs when
+-- the compiler links against libraries from a different stage (cross
+-- compilers, or the Stage0 bootstrap compiler using Stage1's libraries).
+--
 -- @rel_pkg_db@: package DB path relative to the lib dir (e.g.
 -- "package.conf.d"). Callers supply the correct relative path. For bindists
 -- the layout is known statically; for in-tree builds callers compute it. For
@@ -496,7 +605,7 @@ ghcWrapper stage  = do
 generateSettings :: Stage -> FilePath -> Bool -> FilePath -> Expr String
 generateSettings libraryStage settingsFile includeLibDir rel_pkg_db = do
     ctx <- getContext
-    stage <- getStage
+    executableStage <- getStage
 
     -- These are the units supplied in the target package database, which can
     -- differ from the host units linked into a cross compiler.
@@ -504,25 +613,18 @@ generateSettings libraryStage settingsFile includeLibDir rel_pkg_db = do
     ghc_unit_id <- expr $ pkgUnitId libraryStage compiler
     ghc_internal_unit_id <- expr $ pkgUnitId libraryStage ghcInternal
 
-    -- For cross compilers, LibDir points to the succeeding stage's lib dir
-    -- (which contains the target architecture's libraries). For non-cross,
-    -- it points to the preceding stage's lib dir as usual.
-    let compilerStage = predStage stage  -- the GHC that builds packages in this stage
-    isCrossLibDir <- expr $ crossStage compilerStage
-    let stage_dir_stage = if isCrossLibDir then stage else compilerStage
-
-    -- addTrailingPathSeparator is needed because makeRelativeNoSysLink uses
-    -- splitPath internally, where "lib" and "lib/" are distinct components.
-    lib_topDir :: FilePath <- expr $ addTrailingPathSeparator <$> stageLibPath stage_dir_stage
+    lib_topDir :: FilePath <- expr $ addTrailingPathSeparator <$> stageLibPath libraryStage
     let rel_lib_topDir = makeRelativeNoSysLink (dropFileName settingsFile) lib_topDir
 
     settings <- traverse sequence $
-          [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit, Context.stage = compilerStage })))
-          , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter compilerStage)
-          -- Hard-coded as Cabal queries these to determine way support and we
-          -- need to always advertise all ways when bootstrapping.
-          -- The settings file is generated at install time when installing a bindist.
-          , ("RTS ways", unwords . map show . Set.toList <$> getRtsWays)
+          [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
+          , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter executableStage)
+          -- Advertise the RTS ways that will actually ship with the compiler
+          -- described by this settings file, i.e. the ways the @libraryStage@
+          -- RTS is built with.
+          -- The settings file is regenerated at install time when installing a bindist.
+          , ("RTS ways", unwords . map show . Set.toList <$>
+              expr (interpretInContext (vanillaContext libraryStage rts) getRtsWays))
           , ("Relative Global Package DB", pure rel_pkg_db)
           , ("base unit-id", pure base_unit_id)
           , ("Project Unit Id", pure ghc_unit_id)

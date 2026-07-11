@@ -7,7 +7,7 @@ module Oracles.Setting (
     -- * Helpers
     ghcCanonVersion, cmdLineLengthLimit, targetSupportsRPaths, topDirectory,
     libsuf, ghcVersionStage, shPath, perStageTarget, crossStage, queryTarget, queryPerStageTargetSpec,
-    isHostStage,
+    isHostStage, libraryStageFor,
 
     -- ** Target platform things
     anyTargetOs, anyTargetArch, anyHostOs,
@@ -262,3 +262,22 @@ crossStage st = do
   st_target <- perStageTarget (succStage st)
   st_host   <- perStageTarget st
   return (targetPlatformTriple st_target /= targetPlatformTriple st_host)
+
+-- | The 'Stage' whose libraries and package database are used by a compiler
+-- built at (or running from) @compilerStage@.
+--
+-- Usually @compilerStage@ itself, but differs in two cases:
+--
+--  * 'Stage0' has no library or package database of its own; it uses 'Stage1'\'s.
+--  * A cross compiler uses the successor stage's libraries (built for the
+--  target, not the host).
+libraryStageFor :: Stage -> Action Stage
+libraryStageFor compilerStage = do
+  isCross <-
+    if compilerStage < Stage3
+      then
+        crossStage compilerStage
+      else return False
+  return $ case compilerStage of
+    Stage0 {} -> Stage1
+    _ -> if isCross then succStage compilerStage else compilerStage
