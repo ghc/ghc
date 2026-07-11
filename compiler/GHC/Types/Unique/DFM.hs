@@ -384,7 +384,10 @@ foldWithKeyUDFM k z m = foldr (uncurry k) z (udfmToList m)
 nonDetStrictFoldUDFM :: (elt -> a -> a) -> a -> UniqDFM key elt -> a
 nonDetStrictFoldUDFM k z (UDFM m _i) = foldl' k' z m
   where
-    k' acc tv = k (taggedFst tv) acc
+    -- Match eagerly so k receives the already-evaluated element rather
+    -- than a (taggedFst tv) thunk.
+    k' acc (TaggedVal v _) = k v acc
+    k' _   TaggedHole      = panic "nonDetStrictFoldUDFM: TaggedHole"
 
 {- Note [Cost of deterministic iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -513,12 +516,16 @@ placementSort ub mk m = build gen
               TaggedVal v _ -> cons v (readout arr (j + 1))
 
 filterUDFM :: (elt -> Bool) -> UniqDFM key elt -> UniqDFM key elt
-filterUDFM p (UDFM m i) = UDFM (M.filter (p . taggedFst) m) i
+filterUDFM p (UDFM m i) = UDFM (M.filter p' m) i
+  where
+  p' (TaggedVal v _) = p v
+  p' TaggedHole      = panic "filterUDFM: TaggedHole"
 
 filterUDFM_Directly :: (Unique -> elt -> Bool) -> UniqDFM key elt -> UniqDFM key elt
 filterUDFM_Directly p (UDFM m i) = UDFM (M.filterWithKey p' m) i
   where
-  p' k tv = p (mkUniqueGrimily k) (taggedFst tv)
+  p' k (TaggedVal v _) = p (mkUniqueGrimily k) v
+  p' _ TaggedHole      = panic "filterUDFM_Directly: TaggedHole"
 
 udfmRestrictKeys :: UniqDFM key elt -> UniqDFM key elt2 -> UniqDFM key elt
 udfmRestrictKeys (UDFM a i) (UDFM b _) = UDFM (M.restrictKeys a (M.keysSet b)) i
@@ -642,7 +649,8 @@ alterUDFM f (UDFM m i) k =
   UDFM (M.alter alterf (getKey $ getUnique k) m) (i + 1)
   where
   alterf Nothing = inject $ f Nothing
-  alterf (Just tv) = inject $ f (Just (taggedFst tv))
+  alterf (Just (TaggedVal v _)) = inject $ f (Just v)
+  alterf (Just TaggedHole) = panic "alterUDFM: TaggedHole"
   inject Nothing = Nothing
   inject (Just v) = Just $ TaggedVal v i
 
@@ -661,7 +669,8 @@ upsertUDFM f (UDFM m i) k =
   UDFM (MS.upsert upsertf (getKey $ getUnique k) m) (i + 1)
   where
     upsertf Nothing = TaggedVal (f Nothing) i
-    upsertf (Just tv) = TaggedVal (f (Just (taggedFst tv))) i
+    upsertf (Just (TaggedVal v _)) = TaggedVal (f (Just v)) i
+    upsertf (Just TaggedHole) = panic "upsertUDFM: TaggedHole"
 
 -- | The expression (@'alterUDFM_L' f map k@) alters value @x@ at @k@, or absence
 -- thereof and returns the new element at @k@ if there is any.
@@ -684,7 +693,8 @@ alterUDFM_L f (UDFM m i) k =
   where
   alterf :: Maybe (TaggedVal elt) -> (Maybe (TaggedVal elt))
   alterf Nothing = inject $ f Nothing
-  alterf (Just tv) = inject $ f (Just (taggedFst tv))
+  alterf (Just (TaggedVal v _)) = inject $ f (Just v)
+  alterf (Just TaggedHole) = panic "alterUDFM_L: TaggedHole"
   inject Nothing = Nothing
   inject (Just v) = Just $ TaggedVal v i
 
