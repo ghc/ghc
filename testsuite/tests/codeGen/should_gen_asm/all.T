@@ -33,3 +33,6 @@ test('aarch64-ushr-subword', is_aarch64_codegen, compile_grep_asm, ['hs', True, 
 test('aarch64-shl-subword', is_aarch64_codegen, compile_grep_asm, ['hs', True, '-O'])
 test('aarch64-sxtw', is_aarch64_codegen, compile_grep_asm, ['cmm', True, ''])
 test('aarch64-sxth-mul2', is_aarch64_codegen, compile_grep_asm, ['cmm', True, ''])
+
+# Scaled-index addressing for tagToEnum# closure-table lookups
+test('enum-closure-tbl-amode', is_amd64_codegen, compile_grep_asm, ['hs', False, ''])

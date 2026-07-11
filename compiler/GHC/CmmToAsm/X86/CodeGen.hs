@@ -3491,6 +3491,28 @@ getAmode e = do
             let off = ImmInt (-(fromInteger i))
             return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
 
+      -- Matches: (y << shift) + lit, e.g. indexing a closure table by an
+      -- enum's tag: use a scaled-index addressing mode with no base register.
+      -- A constant adjustment of the index, ((y ± c) << shift) + lit, is
+      -- folded into the displacement: lit ± (c << shift).
+      -- Must come before the generic (x + lit) case below, which would
+      -- compute the shift in a separate instruction.
+      CmmMachOp (MO_Add _) [CmmMachOp (MO_Shl _) [y0, CmmLit (CmmInt shift _)], CmmLit lit0]
+         | shift == 0 || shift == 1 || shift == 2 || shift == 3
+         , (y, lit) <- case y0 of
+             CmmMachOp (MO_Add _) [y', CmmLit (CmmInt c _)]
+               | let off = c * 2 ^ shift, abs off < 2 ^ (31 :: Int)
+               -> (y', cmmOffsetLit lit0 (fromInteger off))
+             CmmMachOp (MO_Sub _) [y', CmmLit (CmmInt c _)]
+               | let off = negate c * 2 ^ shift, abs off < 2 ^ (31 :: Int)
+               -> (y', cmmOffsetLit lit0 (fromInteger off))
+             _ -> (y0, lit0)
+         , is32BitLit platform lit
+         -> do
+            (y_reg, y_code) <- getSomeReg y
+            let scale = case shift of 0 -> 1; 1 -> 2; 2 -> 4; _ -> 8
+            return (Amode (AddrBaseIndex EABaseNone (EAIndex y_reg scale) (litToImm lit)) y_code)
+
       CmmMachOp (MO_Add _rep) [x, CmmLit lit]
          | is32BitLit platform lit
          -- assert (rep == II32)???
