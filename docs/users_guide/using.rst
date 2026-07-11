@@ -58,9 +58,10 @@ Windows.
 Options overview
 ----------------
 
-GHC's behaviour is controlled by options, which for historical reasons
-are also sometimes referred to as command-line flags or arguments.
-Options can be specified in three ways:
+GHC's behaviour is controlled by options. Options can be specified in four ways:
+(1) directly on the command line; (2) via files (response files); (3) in source
+files, using a pragma; and (4) when using GHCi, from within GHCi.
+
 
 Command-line arguments
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -76,7 +77,8 @@ An invocation of GHC takes the following form:
 
     ghc [argument...]
 
-Command-line arguments are either options or file names.
+Command-line arguments are either options, file names or response file arguments
+(see further below).
 
 Command-line options begin with ``-``. They may *not* be grouped:
 ``-vO`` is different from ``-v -O``. Options need not precede filenames:
@@ -111,16 +113,47 @@ to the files ``Foo.hs`` and ``Bar.hs``.
 Command-line arguments in response files
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In addition to passing arguments via the command-line, arguments can be passed
-via GNU-style response files. For instance,
+GHC's use of response files is similar to that of GCC. A response file argument
+is ``@`` followed immediately by the absolute or relative path identifying the
+response file.
+
+.. note::
+
+    In PowerShell, ``@`` is used to identify a splatting variable. Consequently,
+    GHC response file arguments must be enclosed in quotation marks on the
+    command line to avoid parsing errors.
+
+A response file argument is equivalent to the command-line arguments in the
+response file in the order that they appear in the file. A response file can
+include a response file argument.
+
+In a response file:
+
+* any unescaped whitespace is assumed to separate command-line arguments and is
+  otherwise ignored;
+* a backslash character (``\``) always escapes the following character; and
+* matching pairs of unescaped single quote (``'``) or double quote (``"``)
+  characters escape blocks of characters.
+
+For example,
 
 .. code-block:: bash
 
-    $ cat response-file
+    $ cat response-file1
     -O1
+    @response-file2
+
+    $ cat response-file2
     Hello.hs
     -o Hello
-    $ ghc @response-file
+
+    $ ghc @response-file1
+
+is equivalent to,
+
+.. code-block:: bash
+
+    $ ghc -O1 Hello.hs -o Hello
 
 .. _source-file-options:
 
