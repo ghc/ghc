@@ -8,14 +8,15 @@
    (EpAnn
     (EpaSpan { Test20297.hs:1:1 })
     (AnnsModule
-     (NoEpTok)
+     (EpTok
+      (EpaSpan { <no location info> }))
      (EpTok
       (EpaSpan { Test20297.hs:2:1-6 }))
      (EpTok
       (EpaSpan { Test20297.hs:2:18-22 }))
      ((,,)
-      (NoEpTok)
-      (NoEpTok)
+      (EpTok (EpaSpan { <no location info> }))
+      (EpTok (EpaSpan { <no location info> }))
       [])
      []
      []
@@ -99,7 +100,8 @@
             (Prefix)
             (NoSrcStrict)
             (AnnFunRhs
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              []
              []))
            (L
@@ -229,7 +231,8 @@
             (Prefix)
             (NoSrcStrict)
             (AnnFunRhs
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              []
              []))
            (L
@@ -351,7 +354,8 @@
                         (Prefix)
                         (NoSrcStrict)
                         (AnnFunRhs
-                         (NoEpTok)
+                         (EpTok
+                          (EpaSpan { <no location info> }))
                          []
                          []))
                        (L
@@ -394,8 +398,8 @@
                                (Just
                                 (EpaSpan { Test20297.hs:11:22-26 }))
                                (ListBraces
-                                (NoEpTok)
-                                (NoEpTok))
+                                (EpTok (EpaSpan { <no location info> }))
+                                (EpTok (EpaSpan { <no location info> })))
                                [])
                               (EpaSpan { Test20297.hs:11:19-20 }))
                              (DoExpr
@@ -448,14 +452,15 @@
    (EpAnn
     (EpaSpan { Test20297.ppr.hs:1:1 })
     (AnnsModule
-     (NoEpTok)
+     (EpTok
+      (EpaSpan { <no location info> }))
      (EpTok
       (EpaSpan { Test20297.ppr.hs:2:1-6 }))
      (EpTok
       (EpaSpan { Test20297.ppr.hs:2:18-22 }))
      ((,,)
-      (NoEpTok)
-      (NoEpTok)
+      (EpTok (EpaSpan { <no location info> }))
+      (EpTok (EpaSpan { <no location info> }))
       [])
      []
      []
@@ -539,7 +544,8 @@
             (Prefix)
             (NoSrcStrict)
             (AnnFunRhs
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              []
              []))
            (L
@@ -657,7 +663,8 @@
             (Prefix)
             (NoSrcStrict)
             (AnnFunRhs
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              []
              []))
            (L
@@ -773,7 +780,8 @@
                         (Prefix)
                         (NoSrcStrict)
                         (AnnFunRhs
-                         (NoEpTok)
+                         (EpTok
+                          (EpaSpan { <no location info> }))
                          []
                          []))
                        (L
@@ -816,8 +824,8 @@
                                (Just
                                 (EpaSpan { Test20297.ppr.hs:9:20-24 }))
                                (ListBraces
-                                (NoEpTok)
-                                (NoEpTok))
+                                (EpTok (EpaSpan { <no location info> }))
+                                (EpTok (EpaSpan { <no location info> })))
                                [])
                               (EpaSpan { Test20297.ppr.hs:9:17-18 }))
                              (DoExpr
