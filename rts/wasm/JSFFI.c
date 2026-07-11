@@ -297,7 +297,9 @@ __attribute__((export_name("rts_promiseThrowTo")))
 void rts_promiseThrowTo(HsStablePtr, HsJSVal);
 void rts_promiseThrowTo(HsStablePtr sp, HsJSVal js_err) {
   Capability *cap = &MainCapability;
-  StgWeak *w = (StgWeak *)deRefStablePtr(sp);
+  // Weak# pointers carry tag 1; see Note [Pointer tagging of unlifted boxed
+  // primitives] in GHC.StgToCmm.Prim. (The key field is stored untagged.)
+  StgWeak *w = (StgWeak *)UNTAG_CLOSURE((StgClosure *)deRefStablePtr(sp));
   if (w->header.info == &stg_DEAD_WEAK_info) {
     return;
   }
