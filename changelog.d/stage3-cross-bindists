@@ -1,0 +1,6 @@
+section: packaging
+synopsis: Fully cross-compiled binary distributions
+mrs: !15417
+issues: #26924
+description: Hadrian can now build cross-compiled binary distributions that run
+  native on another target architecture (e.g. AArch64 -> RISC-V).
