@@ -8,14 +8,15 @@
    (EpAnn
     (EpaSpan { T18791.hs:1:1 })
     (AnnsModule
-     (NoEpTok)
+     (EpTok
+      (EpaSpan { <no location info> }))
      (EpTok
       (EpaSpan { T18791.hs:2:1-6 }))
      (EpTok
       (EpaSpan { T18791.hs:2:15-19 }))
      ((,,)
-      (NoEpTok)
-      (NoEpTok)
+      (EpTok (EpaSpan { <no location info> }))
+      (EpTok (EpaSpan { <no location info> }))
       [])
      []
      []
@@ -68,17 +69,22 @@
        (AnnDataDefn
         []
         []
-        (NoEpTok)
-        (NoEpTok)
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { T18791.hs:4:1-4 }))
-        (NoEpTok)
-        (NoEpUniTok)
+        (EpTok (EpaSpan { <no location info> }))
+        (EpUniTok
+         (EpaSpan { <no location info> })
+         (NormalSyntax))
         (EpTok
          (EpaSpan { T18791.hs:4:8-12 }))
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok))
+        (EpTok (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { <no location info> })))
        (Nothing)
        (Nothing)
        (Nothing)
@@ -125,7 +131,8 @@
               ((,)
                ((,,)
                 (EpaDelta { <no location info> } (SameLine 0) [])
-                (NoEpTok)
+                (EpTok
+                 (EpaSpan { <no location info> }))
                 (EpaDelta { <no location info> } (SameLine 0) []))
                (NoSourceText))
               (NoSrcUnpack)
@@ -145,7 +152,8 @@
                 (EpaComments
                  []))
                (HsTyVar
-                (NoEpTok)
+                (EpTok
+                 (EpaSpan { <no location info> }))
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -164,7 +172,8 @@
              (EpaComments
               []))
             (HsTyVar
-             (NoEpTok)
+             (EpTok
+              (EpaSpan { <no location info> }))
              (NotPromoted)
              (L
               (EpAnn

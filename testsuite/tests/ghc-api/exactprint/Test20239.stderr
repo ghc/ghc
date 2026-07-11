@@ -8,14 +8,15 @@
    (EpAnn
     (EpaSpan { Test20239.hs:1:1 })
     (AnnsModule
-     (NoEpTok)
+     (EpTok
+      (EpaSpan { <no location info> }))
      (EpTok
       (EpaSpan { Test20239.hs:1:1-6 }))
      (EpTok
       (EpaSpan { Test20239.hs:1:18-22 }))
      ((,,)
-      (NoEpTok)
-      (NoEpTok)
+      (EpTok (EpaSpan { <no location info> }))
+      (EpTok (EpaSpan { <no location info> }))
       [])
      []
      []
@@ -81,7 +82,8 @@
         ((,,)
          []
          []
-         (NoEpTok))
+         (EpTok
+          (EpaSpan { <no location info> })))
         (L
          (EpAnn
           (EpaSpan { Test20239.hs:5:15-20 })
@@ -102,7 +104,8 @@
             (EpaComments
              []))
            (HsTyVar
-            (NoEpTok)
+            (EpTok
+             (EpaSpan { <no location info> }))
             (NotPromoted)
             (L
              (EpAnn
@@ -118,15 +121,20 @@
          (AnnDataDefn
           []
           []
-          (NoEpTok)
-          (NoEpTok)
+          (EpTok
+           (EpaSpan { <no location info> }))
+          (EpTok
+           (EpaSpan { <no location info> }))
           (EpTok
            (EpaSpan { Test20239.hs:5:1-4 }))
           (EpTok (EpaSpan { Test20239.hs:5:6-13 }))
-          (NoEpUniTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
+          (EpUniTok
+           (EpaSpan { <no location info> })
+           (NormalSyntax))
+          (EpTok
+           (EpaSpan { <no location info> }))
+          (EpTok (EpaSpan { <no location info> }))
+          (EpTok (EpaSpan { <no location info> }))
           (EpTok
            (EpaSpan { Test20239.hs:5:34 })))
          (Nothing)
@@ -144,9 +152,12 @@
               []))
             (ConDeclH98
              (AnnConDeclH98
-              (NoEpUniTok)
-              (NoEpTok)
-              (NoEpUniTok))
+              (EpUniTok (EpaSpan { <no location info> }) NormalSyntax)
+              (EpTok
+               (EpaSpan { <no location info> }))
+              (EpUniTok
+               (EpaSpan { <no location info> })
+               (NormalSyntax)))
              []
              (L
               (EpAnn
@@ -166,7 +177,8 @@
                 ((,)
                  ((,,)
                   (EpaDelta { <no location info> } (SameLine 0) [])
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (EpaDelta { <no location info> } (SameLine 0) []))
                  (NoSourceText))
                 (NoSrcUnpack)
@@ -176,7 +188,9 @@
                  []
                  (HsStandardArr
                   (EpColon
-                   (NoEpUniTok))))
+                   (EpUniTok
+                    (EpaSpan { <no location info> })
+                    (NormalSyntax)))))
                 (L
                  (EpAnn
                   (EpaSpan { Test20239.hs:5:51-55 })
@@ -184,7 +198,8 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -205,9 +220,12 @@
               []))
             (ConDeclH98
              (AnnConDeclH98
-              (NoEpUniTok)
-              (NoEpTok)
-              (NoEpUniTok))
+              (EpUniTok (EpaSpan { <no location info> }) NormalSyntax)
+              (EpTok
+               (EpaSpan { <no location info> }))
+              (EpUniTok
+               (EpaSpan { <no location info> })
+               (NormalSyntax)))
              []
              (L
               (EpAnn
@@ -227,7 +245,8 @@
                 ((,)
                  ((,,)
                   (EpaDelta { <no location info> } (SameLine 0) [])
-                  (NoEpTok)
+                  (EpTok
+                   (EpaSpan { <no location info> }))
                   (EpaDelta { <no location info> } (SameLine 0) []))
                  (NoSourceText))
                 (NoSrcUnpack)
@@ -237,7 +256,9 @@
                  []
                  (HsStandardArr
                   (EpColon
-                   (NoEpUniTok))))
+                   (EpUniTok
+                    (EpaSpan { <no location info> })
+                    (NormalSyntax)))))
                 (L
                  (EpAnn
                   (EpaSpan { Test20239.hs:7:50-86 })
@@ -271,7 +292,8 @@
                       (EpaComments
                        []))
                      (HsTyVar
-                      (NoEpTok)
+                      (EpTok
+                       (EpaSpan { <no location info> }))
                       (NotPromoted)
                       (L
                        (EpAnn
@@ -297,7 +319,8 @@
                         (EpaComments
                          []))
                        (HsTyVar
-                        (NoEpTok)
+                        (EpTok
+                         (EpaSpan { <no location info> }))
                         (NotPromoted)
                         (L
                          (EpAnn
@@ -341,7 +364,8 @@
                               (EpaComments
                                []))
                              (HsTyVar
-                              (NoEpTok)
+                              (EpTok
+                               (EpaSpan { <no location info> }))
                               (NotPromoted)
                               (L
                                (EpAnn
@@ -359,7 +383,8 @@
                               (EpaComments
                                []))
                              (HsTyVar
-                              (NoEpTok)
+                              (EpTok
+                               (EpaSpan { <no location info> }))
                               (NotPromoted)
                               (L
                                (EpAnn

@@ -310,11 +310,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
                                       $ text "blanked:" <+> text "EpToken"
              NoBlankEpAnnotations ->
               parens $ text "EpTok" <+> epaLocation s
-            epToken' NoEpTok = case ba of
-             BlankEpAnnotations -> parens
-                                      $ text "blanked:" <+> text "EpToken"
-             NoBlankEpAnnotations ->
-              parens $ text "NoEpTok"
 
             epUniToken' :: EpUniToken sym1 sym2 -> SDoc
             epUniToken' (EpUniTok s f) = case ba of
@@ -322,12 +317,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
                                       $ text "blanked:" <+> text "EpUniToken"
              NoBlankEpAnnotations ->
               parens $ text "EpUniTok" <+> epaLocation s <+> ppr f
-            epUniToken' NoEpUniTok = case ba of
-             BlankEpAnnotations -> parens
-                                      $ text "blanked:" <+> text "EpUniToken"
-             NoBlankEpAnnotations ->
-              parens $ text "NoEpUniTok"
-
 
             var  :: Var -> SDoc
             var v      = braces $ text "Var:" <+> ppr v
