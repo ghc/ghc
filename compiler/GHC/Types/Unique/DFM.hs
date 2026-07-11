@@ -441,21 +441,37 @@ dispatches through the out-of-line fold_elts_nonempty, where the fusion happens
 once -- so the fold is list-free without inlining the sort into every consumer.
 
 Holes: slots whose tag never occurs keep the initial sentinel, a TaggedVal
-with tag -1. Real tags are non-negative, so the readout skips on tag < 0 and
-never reads the sentinel's value field. But that field is strict, so the
-sentinel still needs a value in WHNF: a panic thunk is out (it would be forced
--- and crash -- the moment the readout inspects a hole's tag). We use
-@unsafeCoerce ()@: () is a static, already-evaluated nullary constructor, so
-the sentinel is one shared top-level value -- no per-call allocation, and it
-retains nothing.
+with tag -1. Real tags are non-negative, so the readout skips slots with
+tag < 0 and takes the value field only from filled slots. That value field
+is strict, so the sentinel must hold something in WHNF even though it is
+never used: we use @unsafeCoerce () :: r@. This is safe because
 
-The unsafeCoerce is safe here because r is always a lifted, boxed (pointer)
-type -- it comes from the map's elements -- so a pointer to () has the right
-representation. The GC only ever traces that pointer (() is a valid closure);
-the value is never evaluated or used as an r, since the readout takes values
-only from filled slots. Borrowing a real element instead would also type-check
-but costs a per-call thunk that retains the whole source map until the holes
-are read.
+  (S1) r is a lifted boxed type (it is the map's element type), so a
+       pointer to the static () closure has the right representation and
+       the GC can trace it; and
+
+  (S2) the coerced value is never entered or otherwise used at type r:
+       the sentinel is the only TaggedVal with a negative tag, and the
+       readout takes values only from slots with tag >= 0.
+
+Since () is a single static closure, newSmallArray fills every slot with
+the same pointer: no per-call allocation, nothing retained.
+
+The sentinel stays local to placementSort: it exists only in the array
+between fill and readout, never in a map, so nothing outside this function
+needs to know about it. Alternative hole representations all cost more:
+
+  * a panic in the value field: forced (the field is strict) as soon as
+    the readout inspects the first hole's tag -- a crash, not a sentinel;
+  * borrowing a real element of the map: type-checks, but is a per-call
+    thunk that retains the whole source map until the holes are dropped;
+  * a dedicated hole constructor in TaggedVal: no coercion, but the
+    sentinel leaks into the type -- every match in this module must cover
+    a constructor that never occurs outside placementSort, and projecting
+    via partial accessors instead allocates a thunk wherever the value is
+    passed to an unknown function (T24471 ghc/alloc +3%);
+  * an extra sum wrapped around the array elements (e.g. Maybe): an
+    allocation per element in the fill.
 
 This sorting method loses when ub is much larger than n = M.size m: ub never
 shrinks (overwrites keep bumping it, delete/filter shrink n but not ub). We
