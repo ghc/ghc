@@ -120,7 +120,8 @@ _darcs/
 /compiler/GHC/CmmToLlvm/Version/Bounds.hs
 /compiler/ghc.cabal
 /compiler/ghc.cabal.old
-/distrib/configure.ac
+/stage1/distrib/configure.ac
+/stage2/distrib/configure.ac
 /distrib/ghc.iss
 /docs/index.html
 /docs/man

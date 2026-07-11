@@ -275,7 +275,7 @@ generateRules = do
                       then root -/- stageString stage' -/- "lib"
                       else prefix
                 relPkgDb = makeRelativeNoSysLink libTopDir pkgDb
-            go (generateSettings out True relPkgDb) out
+            go (generateSettings out True relPkgDb (predStage stage')) out
         (prefix -/- "targets" -/- "default.target") %> \out -> go (show <$> expr (targetStage (succStage stage))) out
 
   where
@@ -360,6 +360,11 @@ templateRule :: FilePath -> Interpolations -> Rules ()
 templateRule outPath =
   templateRuleFrom (outPath <.> "in") outPath
 
+templateRuleForStages :: FilePath -> (Stage -> Interpolations) -> Rules ()
+templateRuleForStages outPath mkInterps =
+  forM_ [Stage1, Stage2] $ \stage ->
+    templateRuleFrom (outPath <.> "in") (stageString stage -/- outPath) (mkInterps stage)
+
 templateRules :: Rules ()
 templateRules = do
   templateRule "compiler/ghc.cabal" $ projectVersion
@@ -427,12 +432,12 @@ bindistRules = do
     , interpolateVar "TargetOS_CPP" $ cppify <$> getTarget queryOS
     , interpolateVar "LLVMTarget" $ getTarget tgtLlvmTarget
     ]
-  templateRule ("distrib" -/- "configure.ac") $ mconcat
+  templateRuleForStages ("distrib" -/- "configure.ac") $ \stage -> mconcat
     [ interpolateSetting "ConfiguredEmsdkVersion" EmsdkVersion
     , interpolateVar "CrossCompilePrefix" $ do
-        crossCompiling <- interp $ getFlag CrossCompiling
-        tpf <- setting TargetPlatformFull
-        pure $ if crossCompiling then tpf <> "-" else ""
+        isCross <- crossStage stage
+        target <- setting TargetPlatformFull
+        pure $ if isCross then target <> "-" else ""
     , interpolateVar "LeadingUnderscore" $ yesNo <$> getTarget tgtSymbolsHaveLeadingUnderscore
     , interpolateSetting "LlvmMaxVersion" LlvmMaxVersion
     , interpolateSetting "LlvmMinVersion" LlvmMinVersion
@@ -442,18 +447,20 @@ bindistRules = do
     , interpolateVar "TablesNextToCode" $ yesNo <$> getTarget tgtTablesNextToCode
     , interpolateVar "TargetHasLibm" $ yesNo <$> interp (staged (buildFlag TargetHasLibm))
     , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
-    , interpolateVar "BuildPlatform"  $ interp $ queryBuild targetPlatformTriple
-    , interpolateVar "HostPlatform"   $ interp $ queryHost targetPlatformTriple
+    , interpolateVar "BuildPlatform"  $ ifM (not <$> crossStage stage) (getTarget targetPlatformTriple) (interp $ queryBuild targetPlatformTriple)
+    , interpolateVar "HostPlatform"   $ ifM (not <$> crossStage stage) (getTarget targetPlatformTriple) (interp $ queryHost targetPlatformTriple)
     , interpolateVar "TargetWordBigEndian" $ getTarget isBigEndian
     , interpolateVar "TargetWordSize" $ getTarget wordSize
     , interpolateVar "Unregisterised" $ yesNo <$> getTarget tgtUnregisterised
     , interpolateVar "UseLibdw" $ fmap yesNo $ interp $ staged (fmap (isJust . tgtRTSWithLibdw) . targetStage)
     , interpolateVar "UseLibffiForAdjustors" $ yesNo <$> getTarget tgtUseLibffiForAdjustors
-    , interpolateVar "BaseUnitId" $ pkgUnitId Stage1 base
+    , interpolateVar "BaseUnitId" $ do
+        isCross <- crossStage stage
+        pkgUnitId (if isCross then succStage stage else stage) base
     , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP Stage2
     , interpolateVar "TargetPlatformFull" (setting TargetPlatformFull)
-    , interpolateVar "BuildPlatformFull" (setting BuildPlatformFull)
-    , interpolateVar "HostPlatformFull"  (setting HostPlatformFull)
+    , interpolateVar "BuildPlatformFull" $ ifM (not <$> crossStage stage) (setting TargetPlatformFull) (setting BuildPlatformFull)
+    , interpolateVar "HostPlatformFull" $ ifM (not <$> crossStage stage) (setting TargetPlatformFull) (setting HostPlatformFull)
     ]
   where
     interp = interpretInContext (semiEmptyTarget Stage2)
@@ -483,23 +490,27 @@ ghcWrapper stage  = do
 -- "package.conf.d"). Callers supply the correct relative path. For bindists
 -- the layout is known statically; for in-tree builds callers compute it. For
 -- bindists, we omit @LibDir@ so it defaults to @topDir@ at runtime.
-generateSettings :: FilePath -> Bool -> FilePath -> Expr String
-generateSettings settingsFile includeLibDir rel_pkg_db = do
+generateSettings :: FilePath -> Bool -> FilePath -> Stage -> Expr String
+generateSettings settingsFile includeLibDir rel_pkg_db compilerStage = do
     ctx <- getContext
     stage <- getStage
 
-    -- The unit-id of the base package which is always linked against (#25382)
+    -- The unit-id of the base package which is always linked against (#25382).
+    -- For stage2 cross compilers the target libraries live in the stage2 lib
+    -- dir, so the base unit-id must come from stage2; for native stage2 the
+    -- libraries live in the stage1 lib dir.
     base_unit_id <- expr $ do
       case stage of
         Stage0 {} -> error "Unable to generate settings for stage0"
         Stage1 -> pkgUnitId Stage1 base
-        Stage2 -> pkgUnitId Stage1 base
+        Stage2 -> do
+            isCross <- crossStage compilerStage
+            pkgUnitId (if isCross then stage else compilerStage) base
         Stage3 -> pkgUnitId Stage2 base
 
     -- For cross compilers, LibDir points to the succeeding stage's lib dir
     -- (which contains the target architecture's libraries). For non-cross,
     -- it points to the preceding stage's lib dir as usual.
-    let compilerStage = predStage stage  -- the GHC that builds packages in this stage
     isCrossLibDir <- expr $ crossStage compilerStage
     let stage_dir_stage = if isCrossLibDir then stage else compilerStage
 
