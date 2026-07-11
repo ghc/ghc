@@ -258,7 +258,9 @@ test('T24893', normal, compile_and_run, ['-O'])
 test('CCallConv', [req_c], compile_and_run, ['CCallConv_c.c'])
 test('T25364', normal, compile_and_run, [''])
 test('T26061', normal, compile_and_run, [''])
-test('T26537', normal, compile_and_run, ['-O2 -fregs-graph'])
+# The graph allocator needs several minutes for this on a non-perf
+# (e.g. quick-flavour) compiler, close to the default timeout.
+test('T26537', compile_timeout_multiplier(3), compile_and_run, ['-O2 -fregs-graph'])
 test('T24016', normal, compile_and_run, ['-O1 -fPIC'])
 test('T27046',
      [ req_cmm
