@@ -494,7 +494,8 @@ bindistRules = do
     distribDir -/- "configure" %> \_ -> do
       top    <- topDirectory
       m4Files <- getDirectoryFiles (top -/- "m4") ["*.m4"]
-      need $ [ distribDir -/- "config.sub"
+      need $ [ distribDir -/- "configure.ac"
+             , distribDir -/- "config.sub"
              , distribDir -/- "config.guess"
              , distribDir -/- "install-sh"
              , distribDir -/- "aclocal.m4"
