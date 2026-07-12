@@ -84,3 +84,4 @@ extern StgClosure ZCMain_main_closure;
 #define FunPtr_con_info           ghc_hs_iface->FunPtr_con_info
 #define StablePtr_static_info     ghc_hs_iface->StablePtr_static_info
 #define StablePtr_con_info        ghc_hs_iface->StablePtr_con_info
+#define Box_con_info              ghc_hs_iface->Box_con_info

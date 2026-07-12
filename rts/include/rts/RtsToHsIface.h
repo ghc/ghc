@@ -60,6 +60,7 @@ typedef struct {
     StgClosure *overflowException_closure;  // GHC.Internal.Exception.Type.overflowException_closure
     const StgInfoTable *unpackCStringzh_info;  // GHC.Internal.CString.unpackCStringzh_info
     const StgInfoTable *unpackCStringUtf8zh_info;  // GHC.Internal.CString.unpackCStringUtf8zh_info
+    const StgInfoTable *Box_con_info;  // GHC.Internal.Heap.Closures.Box_con_info
 #if defined(wasm32_HOST_ARCH)
     StgClosure *raiseJSException_closure;  // GHC.Internal.Wasm.Prim.Imports.raiseJSException_closure
     const StgInfoTable *JSVal_con_info;  // GHC.Internal.Wasm.Prim.Types.JSVal_con_info
