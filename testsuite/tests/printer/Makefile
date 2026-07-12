@@ -932,3 +932,8 @@ PprModifiers:
 PprQualifiedStrings:
 	$(CHECK_PPR)   $(LIBDIR) PprQualifiedStrings.hs
 	$(CHECK_EXACT) $(LIBDIR) PprQualifiedStrings.hs
+
+.PHONY: Haddock1
+Haddock1:
+	# $(CHECK_PPR)   $(LIBDIR) Haddock1.hs
+	$(CHECK_EXACT) $(LIBDIR) Haddock1.hs
