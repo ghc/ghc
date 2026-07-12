@@ -108,7 +108,7 @@ stg_control0zh_ll // explicit stack
   }
 
   W_ apply_mask_frame;
-  apply_mask_frame = StgContinuation_apply_mask_frame(cont);
+  apply_mask_frame = StgContinuation_apply_mask_frame(UNTAG(cont));
 
   // The stack has been updated, so it’s time to apply the input function,
   // passing the captured continuation and a RealWorld token as arguments.
