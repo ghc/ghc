@@ -183,7 +183,8 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Test17519.hs" Nothing
  -- "../../testsuite/tests/printer/InTreeAnnotations1.hs" Nothing
  -- "../../testsuite/tests/printer/Test19798.hs" Nothing
- "../../testsuite/tests/printer/Test10309.hs" Nothing
+ -- "../../testsuite/tests/printer/Test10309.hs" Nothing
+ "../../testsuite/tests/printer/Haddock1.hs" Nothing
 
  -- "../../testsuite/tests/qualifieddo/should_compile/qdocompile001.hs" Nothing
  -- "../../testsuite/tests/typecheck/should_fail/StrictBinds.hs" Nothing
@@ -304,7 +305,7 @@ writeBinFile fpath x = withBinaryFile fpath WriteMode (\h -> hSetEncoding h utf8
 
 testOneFile :: [(String, Changer)] -> FilePath -> String -> Maybe Changer -> IO ()
 testOneFile _ libdir fileName mchanger = do
-       (p,_toks) <- parseOneFile libdir fileName
+       p <- parseOneFile libdir fileName
        let
          origAst = ppAst p
          pped    = exactPrint p
@@ -333,7 +334,7 @@ testOneFile _ libdir fileName mchanger = do
            changedSource  <- readFile newFile
            return (expectedSource == changedSource, expectedSource, changedSource)
 
-       (p',_) <- parseOneFile libdir newFile
+       p' <- parseOneFile libdir newFile
        let newAstStr :: String
            newAstStr = ppAst p'
        writeBinFile newAstFile newAstStr
@@ -364,15 +365,12 @@ testOneFile _ libdir fileName mchanger = do
 ppAst :: Data a => a -> String
 ppAst ast = showSDocUnsafe $ showAstData BlankSrcSpanFile NoBlankEpAnnotations ast
 
-
-parseOneFile :: FilePath -> FilePath -> IO (ParsedSource, [Located Token])
+parseOneFile :: FilePath -> FilePath -> IO ParsedSource
 parseOneFile libdir fileName = do
-  res <- parseModuleEpAnnsWithCpp libdir defaultCppOptions fileName
+  res <- Parsers.parseModule libdir fileName
   case res of
     Left m -> error (internalDebugShowMessages m)
-    Right (injectedComments, _dflags, pmod) -> do
-      let !pmodWithComments = insertCppComments pmod injectedComments
-      return (pmodWithComments, [])
+    Right pmod -> return pmod
 
 -- ---------------------------------------------------------------------
 
@@ -519,8 +517,7 @@ changeLocalDecls libdir (L l p) = do
       replaceLocalBinds :: LMatch GhcPs (LHsExpr GhcPs)
                         -> Transform (LMatch GhcPs (LHsExpr GhcPs))
       replaceLocalBinds (L lm (Match an mln pats (GRHSs _ rhs (HsValBinds (van,w) (ValBinds _ bs))))) = do
-        let (oldDecls) = map unWrapValBind bs
-        -- let decls = s:d:oldDecls
+        let oldDecls = map unWrapValBind bs
         let oldDecls' = captureLineSpacing oldDecls
         let (VbSig o:oldBinds)  = map wrapValBind oldDecls'
             o' = setEntryDP o (DifferentLine 2 0)
