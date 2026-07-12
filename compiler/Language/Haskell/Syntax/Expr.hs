@@ -117,7 +117,7 @@ values (see function @mkRdrRecordUpd@ in 'GHC.Parser.PostProcess').
 type LFieldLabelStrings p = XRec p (FieldLabelStrings p)
 
 newtype FieldLabelStrings p =
-  FieldLabelStrings (NonEmpty (XRec p (DotFieldOcc p)))
+  FieldLabelStrings (NonEmpty (DotFieldOcc p))
 
 -- Field projection updates (e.g. @foo.bar.baz = 1@). See Note
 -- [RecordDotSyntax field updates].
@@ -452,7 +452,7 @@ data HsExpr p
   | HsGetField {
         gf_ext :: XGetField p
       , gf_expr :: LHsExpr p
-      , gf_field :: XRec p (DotFieldOcc p)
+      , gf_field :: DotFieldOcc p
       }
 
   -- | Record field selector. e.g. @(.x)@ or @(.x.y)@

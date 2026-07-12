@@ -2620,7 +2620,7 @@ FieldLabelStrings
 
 instance (UnXRec p, Outputable (XRec p FieldLabelString)) => Outputable (FieldLabelStrings p) where
   ppr (FieldLabelStrings flds) =
-    hcat (punctuate dot (toList $ NE.map (ppr . unXRec @p) flds))
+    hcat (punctuate dot (toList $ NE.map ppr flds))
 
 instance (UnXRec p, Outputable (XRec p FieldLabelString)) => OutputableBndr (FieldLabelStrings p) where
   pprInfixOcc = pprFieldLabelStrings
@@ -2632,7 +2632,7 @@ instance (UnXRec p,  Outputable (XRec p FieldLabelString)) => OutputableBndr (Lo
 
 pprFieldLabelStrings :: forall p. (UnXRec p, Outputable (XRec p FieldLabelString)) => FieldLabelStrings p -> SDoc
 pprFieldLabelStrings (FieldLabelStrings flds) =
-    hcat (punctuate dot (toList $ NE.map (ppr . unXRec @p) flds))
+    hcat (punctuate dot (toList $ NE.map ppr flds))
 
 pprPrefixFastString :: FastString -> SDoc
 pprPrefixFastString fs = pprPrefixOcc (mkVarUnqual fs)
@@ -2676,8 +2676,6 @@ type instance Anno FieldLabelString                = SrcSpanAnnN
 type instance Anno FastString                      = EpAnnCO
 type instance Anno HText                           = EpAnnCO
   -- Used in HsQuasiQuote and perhaps elsewhere
-
-type instance Anno (DotFieldOcc (GhcPass p))       = EpAnnCO
 
 instance (HasAnnotation (Anno a))
    => WrapXRec (GhcPass p) a where

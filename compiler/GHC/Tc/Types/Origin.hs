@@ -627,9 +627,9 @@ exprCtOrigin (HsQual {})         = Shouldn'tHappenOrigin "constraint context"  -
 exprCtOrigin (HsFunArr {})       = Shouldn'tHappenOrigin "function arrow"      -- See Note [Types in terms]
 exprCtOrigin (ExplicitList {})    = ListOrigin
 exprCtOrigin (HsIf {})            = IfThenElseOrigin
-exprCtOrigin (HsProjection _ p)   = RecordFieldProjectionOrigin (FieldLabelStrings $ fmap noLocA p)
+exprCtOrigin (HsProjection _ p)   = RecordFieldProjectionOrigin (FieldLabelStrings p)
 exprCtOrigin (RecordUpd{})        = RecordUpdOrigin
-exprCtOrigin (HsGetField _ _ f)   = GetFieldOrigin (fmap (mkFastStringShortText . field_label) $ dfoLabel (unLoc f))
+exprCtOrigin (HsGetField _ _ f)   = GetFieldOrigin (fmap (mkFastStringShortText . field_label) $ dfoLabel f)
 exprCtOrigin (XExpr (ExpandedThingRn (HSE o _))) = hsCtxtCtOrigin o
 exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel $ L (getLoc $ foLabel f) (foExt f)
 

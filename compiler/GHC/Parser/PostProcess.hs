@@ -3767,7 +3767,7 @@ starSym NormalSyntax  = fsLit "*"
 -----------------------------------------
 -- Bits and pieces for RecordDotSyntax.
 
-mkRdrGetField :: LHsExpr GhcPs -> LocatedAn NoEpAnns (DotFieldOcc GhcPs)
+mkRdrGetField :: LHsExpr GhcPs -> DotFieldOcc GhcPs
   -> HsExpr GhcPs
 mkRdrGetField arg field =
   HsGetField {
@@ -3776,11 +3776,11 @@ mkRdrGetField arg field =
     , gf_field = field
     }
 
-mkRdrProjection :: NonEmpty (LocatedAn NoEpAnns (DotFieldOcc GhcPs)) -> AnnProjection -> HsExpr GhcPs
+mkRdrProjection :: NonEmpty (DotFieldOcc GhcPs) -> AnnProjection -> HsExpr GhcPs
 mkRdrProjection flds anns =
   HsProjection {
       proj_ext = anns
-    , proj_flds = fmap unLoc flds
+    , proj_flds = flds
     }
 
 mkRdrProjUpdate :: SrcSpanAnnA -> Located (NonEmpty (LocatedAn NoEpAnns (DotFieldOcc GhcPs)))

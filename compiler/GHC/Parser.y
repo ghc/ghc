@@ -3283,12 +3283,12 @@ aexp2   :: { ECP }
                                       amsA' (sLL $1 $> $ HsCmdArrForm (AnnList (glRM $1) (ListBanana (epUniTok $1) (epUniTok $4)) [] []) $2 Prefix
                                                            (reverse $3)) }
 
-projection :: { Located (NonEmpty (LocatedAn NoEpAnns (DotFieldOcc GhcPs))) }
+projection :: { Located (NonEmpty (DotFieldOcc GhcPs)) }
 projection
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parsing.Lexer
         : projection TIGHT_INFIX_PROJ field
-                             { sLL $1 $> ((sLLa $2 $> $ DotFieldOcc (AnnFieldLabel (Just $ epTok $2)) $3) `NE.cons` unLoc $1) }
-        | PREFIX_PROJ field  { sLL $1 $> ((sLLa $1 $> $ DotFieldOcc (AnnFieldLabel (Just $ epTok $1)) $2) :| [])}
+                             { sLL $1 $> ((DotFieldOcc (AnnFieldLabel (Just $ epTok $2)) $3) `NE.cons` unLoc $1) }
+        | PREFIX_PROJ field  { sLL $1 $> ((DotFieldOcc (AnnFieldLabel (Just $ epTok $1)) $2) :| [])}
 
 splice_exp :: { LHsExpr GhcPs }
         : splice_untyped { fmap (HsUntypedSplice noExtField) (reLoc $1) }
@@ -3772,11 +3772,11 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
                             fmap Right $ mkHsProjUpdatePV l (L l fields) var isPun Nothing
                         }
 
-fieldToUpdate :: { Located [LocatedAn NoEpAnns (DotFieldOcc GhcPs)] }
+fieldToUpdate :: { Located [DotFieldOcc GhcPs] }
 fieldToUpdate
         -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
-        : fieldToUpdate TIGHT_INFIX_PROJ field   { sLL $1 $> ((sLLa $2 $> (DotFieldOcc (AnnFieldLabel $ Just $ epTok $2) $3)) : unLoc $1) }
-        | field       { sL1 $1 [sL1a $1 (DotFieldOcc (AnnFieldLabel Nothing) $1)] }
+        : fieldToUpdate TIGHT_INFIX_PROJ field   { sLL $1 $> ((DotFieldOcc (AnnFieldLabel $ Just $ epTok $2) $3) : unLoc $1) }
+        | field       { sL1 $1 [DotFieldOcc (AnnFieldLabel Nothing) $1] }
 
 -----------------------------------------------------------------------------
 -- Implicit Parameter Bindings
