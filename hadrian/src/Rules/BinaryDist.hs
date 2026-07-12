@@ -6,7 +6,6 @@ import Context
 import Data.Either
 import qualified Data.Set as Set
 import Expression
-import Hadrian.Oracles.Path (fixUnixPathsOnWindows)
 import Oracles.Flavour
 import Oracles.Setting
 import Packages
@@ -391,40 +390,14 @@ bindistRules = do
     phony "binary-dist-stage3" $ buildBinDistX "binary-dist-dir-stage3" "bindist-stage3" Xz
 
     forM_ [("bindist", Stage1), ("bindist-stage3",Stage2)] $ \(bindistFolderName, stg)-> do
-      -- Prepare binary distribution configure script
-      -- (generated under <ghc root>/distrib/configure by 'autoreconf')
+      -- Copy the per-stage 'configure' (produced by autoreconf in Generate.hs)
+      -- from the build distrib dir into the bindist. Generating it there keeps
+      -- the autoreconf inputs (configure.ac, aclocal.m4, m4/*.m4) next to the
+      -- configure script and lets Shake track their changes correctly.
       root -/- bindistFolderName -/- "ghc-*" -/- "configure" %> \configurePath -> do
-          let acFile = stageString stg -/- "distrib" -/- "configure.ac"
-          need [acFile]
-          ghcRoot <- topDirectory
-          copyFile (ghcRoot -/- "aclocal.m4") (ghcRoot -/- "distrib" -/- "aclocal.m4")
-          copyDirectory (ghcRoot -/- "m4") (ghcRoot -/- "distrib")
-
-          -- Note [Autoreconf unix paths from ACLOCAL_PATH]
-          -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-          -- On Windows, autoreconf fails when the ACLOCAL_PATH env variable contains Windows-
-          -- style paths. This happens because MSYS2 automatically converts env variables to
-          -- Windows-style paths. To fix this, we convert ACLOCAL_PATH back to Unix style.
-          -- This is done both in the boot Python script and here when building a bindist.
-          win_host <- isWinHost
-          env <- if not win_host
-            then pure []
-            else do
-              aclocalPathMay <- getEnv "ACLOCAL_PATH"
-              case aclocalPathMay of
-                Nothing -> pure []
-                Just aclocalPath -> do
-                  unixAclocalPath <- fixUnixPathsOnWindows aclocalPath
-                  pure [AddEnv "ACLOCAL_PATH" unixAclocalPath]
-
-          buildWithCmdOptions env $
-              target (vanillaContext Stage1 ghc) (Autoreconf $ ghcRoot -/- "distrib") [] []
-          -- We clean after ourselves, moving the configure script we generated in
-          -- our bindist dir
-          removeFile (ghcRoot -/- "distrib" -/- "aclocal.m4")
-          removeDirectory (ghcRoot -/- "distrib" -/- "m4")
-
-          moveFile (ghcRoot -/- acFile) configurePath
+          let distribConfigure = root -/- stageString stg -/- "distrib" -/- "configure"
+          need [distribConfigure]
+          copyFile distribConfigure configurePath
 
       -- Generate the Makefile that enables the "make install" part
       root -/- bindistFolderName -/- "ghc-*" -/- "Makefile" %> \makefilePath -> do

@@ -9,6 +9,7 @@ import qualified Data.Set as Set
 import Base
 import qualified Context
 import Expression
+import Hadrian.Oracles.Path (fixUnixPathsOnWindows)
 import Hadrian.Oracles.TextFile (lookupStageBuildConfig)
 import Oracles.Flag hiding (arSupportsAtFile, arSupportsDashL)
 import Oracles.ModuleFiles
@@ -462,6 +463,50 @@ bindistRules = do
     , interpolateVar "BuildPlatformFull" $ ifM (not <$> crossStage stage) (setting TargetPlatformFull) (setting BuildPlatformFull)
     , interpolateVar "HostPlatformFull" $ ifM (not <$> crossStage stage) (setting TargetPlatformFull) (setting HostPlatformFull)
     ]
+
+  -- Stage the autoreconf inputs (aclocal.m4 and the m4/ macro directory) next
+  -- to each per-stage generated configure.ac, then run 'autoreconf' to produce a
+  -- per-stage 'configure' script in the build distrib dir.
+  --
+  -- The 'Autoreconf' builder auto-needs <dir>/configure.ac (Builder.hs); we
+  -- also explicitly need the staged macros so editng them triggers
+  -- re-generation of 'configure'. BinaryDist.hs copies this 'configure' into
+  -- the bindist; it no longer runs autoreconf itself.
+  forM_ [Stage1, Stage2] $ \stage -> do
+    let distribDir = stageString stage -/- "distrib"
+
+    distribDir -/- "aclocal.m4" %> \out -> do
+      top <- topDirectory
+      copyFile (top -/- "aclocal.m4") out
+
+    distribDir -/- "m4/*.m4" %> \out -> do
+      top <- topDirectory
+      copyFile (top -/- "m4" -/- takeFileName out) out
+
+    distribDir -/- "configure" %> \_ -> do
+      top    <- topDirectory
+      m4Files <- getDirectoryFiles (top -/- "m4") ["*.m4"]
+      need $ (distribDir -/- "aclocal.m4")
+           : [ distribDir -/- "m4" -/- takeFileName f | f <- m4Files ]
+
+      -- Note [Autoreconf unix paths from ACLOCAL_PATH]
+      -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      -- On Windows, autoreconf fails when the ACLOCAL_PATH env variable
+      -- contains Windows-style paths. MSYS2 auto-converts env vars to
+      -- Windows-style, so we convert ACLOCAL_PATH back to Unix style here.
+      win_host <- isWinHost
+      env <- if not win_host
+        then pure []
+        else do
+          aclocalPathMay <- getEnv "ACLOCAL_PATH"
+          case aclocalPathMay of
+            Nothing -> pure []
+            Just aclocalPath -> do
+              unixAclocalPath <- fixUnixPathsOnWindows aclocalPath
+              pure [AddEnv "ACLOCAL_PATH" unixAclocalPath]
+
+      buildWithCmdOptions env $
+        target (vanillaContext stage ghc) (Autoreconf distribDir) [] []
   where
     interp = interpretInContext (semiEmptyTarget Stage2)
     getTarget = interp . queryTarget Stage2
