@@ -423,45 +423,64 @@ bindistRules = do
 
     , interpolateVar "HostOS_CPP" $ fmap cppify $ interp $ queryHost queryOS
 
-    , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
-    , interpolateVar "TargetPlatform_CPP" $ cppify <$> getTarget targetPlatformTriple
-    , interpolateVar "TargetArch_CPP" $ cppify <$> getTarget queryArch
-    , interpolateVar "TargetOS_CPP" $ cppify <$> getTarget queryOS
-    , interpolateVar "LLVMTarget" $ getTarget tgtLlvmTarget
+    -- Stage2 always targets the final  architecture. Thus, we can use a
+    -- constant stage here.
+    , interpolateVar "TargetPlatform" $ getTarget Stage2 targetPlatformTriple
+    , interpolateVar "TargetPlatform_CPP" $ cppify <$> getTarget Stage2 targetPlatformTriple
+    , interpolateVar "TargetArch_CPP" $ cppify <$> getTarget Stage2 queryArch
+    , interpolateVar "TargetOS_CPP" $ cppify <$> getTarget Stage2 queryOS
+    , interpolateVar "LLVMTarget" $ getTarget Stage2 tgtLlvmTarget
     ]
   forM_ [Stage1, Stage2] $ \stage ->
-    templateRuleFrom
+    let crossStageInterps = Interpolations $ do
+          isCrossStage <- crossStage stage
+          targetPlatform <- setting TargetPlatformFull
+          -- For cross-compiled compilers we need to pretend that they were
+          -- build on the target. For regular commpilers we can assume that:
+          -- build == host == target
+          buildPlatform <-
+            if isCrossStage
+              then
+                interp $ queryBuild targetPlatformTriple
+              else getTarget stage targetPlatformTriple
+          hostPlatform <-
+            if isCrossStage
+              then
+                interp $ queryHost targetPlatformTriple
+              else getTarget stage targetPlatformTriple
+          baseUnitId <- pkgUnitId (if isCrossStage then succStage stage else stage) base
+          buildPlatformFull <- if isCrossStage then setting BuildPlatformFull else setting TargetPlatformFull
+          hostPlatformFull <- if isCrossStage then setting HostPlatformFull else setting TargetPlatformFull
+          pure
+            [ ("CrossCompilePrefix", if isCrossStage then targetPlatform <> "-" else "")
+            , ("TargetPlatformFull", targetPlatform)
+            , ("BuildPlatform", buildPlatform)
+            , ("HostPlatform", hostPlatform)
+            , ("BaseUnitId", baseUnitId)
+            , ("BuildPlatformFull", buildPlatformFull)
+            , ("HostPlatformFull", hostPlatformFull)
+            ]
+    in templateRuleFrom
       ("distrib" -/- "configure.ac" <.> "in")
       (root -/- stageString stage -/- "distrib" -/- "configure.ac")
       $ mconcat
     [ interpolateSetting "ConfiguredEmsdkVersion" EmsdkVersion
-    , interpolateVar "CrossCompilePrefix" $ do
-        isCross <- crossStage stage
-        target <- setting TargetPlatformFull
-        pure $ if isCross then target <> "-" else ""
-    , interpolateVar "LeadingUnderscore" $ yesNo <$> getTarget tgtSymbolsHaveLeadingUnderscore
+    , interpolateVar "LeadingUnderscore" $ yesNo <$> getTarget stage tgtSymbolsHaveLeadingUnderscore
     , interpolateSetting "LlvmMaxVersion" LlvmMaxVersion
     , interpolateSetting "LlvmMinVersion" LlvmMinVersion
-    , interpolateVar "LlvmTarget" $ getTarget tgtLlvmTarget
+    , interpolateVar "LlvmTarget" $ getTarget stage tgtLlvmTarget
     , interpolateSetting "ProjectVersion" ProjectVersion
     , interpolateVar "EnableDistroToolchain" $ interp (staged (lookupStageBuildConfig "settings-use-distro-mingw"))
-    , interpolateVar "TablesNextToCode" $ yesNo <$> getTarget tgtTablesNextToCode
+    , interpolateVar "TablesNextToCode" $ yesNo <$> getTarget stage tgtTablesNextToCode
     , interpolateVar "TargetHasLibm" $ yesNo <$> interp (staged (buildFlag TargetHasLibm))
-    , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
-    , interpolateVar "BuildPlatform"  $ ifM (not <$> crossStage stage) (getTarget targetPlatformTriple) (interp $ queryBuild targetPlatformTriple)
-    , interpolateVar "HostPlatform"   $ ifM (not <$> crossStage stage) (getTarget targetPlatformTriple) (interp $ queryHost targetPlatformTriple)
-    , interpolateVar "TargetWordBigEndian" $ getTarget isBigEndian
-    , interpolateVar "TargetWordSize" $ getTarget wordSize
-    , interpolateVar "Unregisterised" $ yesNo <$> getTarget tgtUnregisterised
+    , interpolateVar "TargetPlatform" $ getTarget stage targetPlatformTriple
+    , interpolateVar "TargetWordBigEndian" $ getTarget stage isBigEndian
+    , interpolateVar "TargetWordSize" $ getTarget stage wordSize
+    , interpolateVar "Unregisterised" $ yesNo <$> getTarget stage tgtUnregisterised
     , interpolateVar "UseLibdw" $ fmap yesNo $ interp $ staged (fmap (isJust . tgtRTSWithLibdw) . targetStage)
-    , interpolateVar "UseLibffiForAdjustors" $ yesNo <$> getTarget tgtUseLibffiForAdjustors
-    , interpolateVar "BaseUnitId" $ do
-        isCross <- crossStage stage
-        pkgUnitId (if isCross then succStage stage else stage) base
-    , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP Stage2
-    , interpolateVar "TargetPlatformFull" (setting TargetPlatformFull)
-    , interpolateVar "BuildPlatformFull" $ ifM (not <$> crossStage stage) (setting TargetPlatformFull) (setting BuildPlatformFull)
-    , interpolateVar "HostPlatformFull" $ ifM (not <$> crossStage stage) (setting TargetPlatformFull) (setting HostPlatformFull)
+    , interpolateVar "UseLibffiForAdjustors" $ yesNo <$> getTarget stage tgtUseLibffiForAdjustors
+    , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP stage
+    , crossStageInterps
     ]
 
   -- Stage the autoreconf inputs (aclocal.m4 and the m4/ macro directory) next
@@ -522,7 +541,7 @@ bindistRules = do
         target (vanillaContext stage ghc) (Autoreconf distribDir) [] []
   where
     interp = interpretInContext (semiEmptyTarget Stage2)
-    getTarget = interp . queryTarget Stage2
+    getTarget stage = interp . queryTarget stage
 
 -- | Given a 'String' replace characters '.' and '-' by underscores ('_') so that
 -- the resulting 'String' is a valid C preprocessor identifier.

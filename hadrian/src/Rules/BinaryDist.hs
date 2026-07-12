@@ -13,8 +13,6 @@ import Rules.Generate (generateSettings)
 import Settings
 import qualified System.Directory.Extra as IO
 import Settings.Program (programContext)
-import Target
-import Utilities
 import BindistConfig
 
 {-
