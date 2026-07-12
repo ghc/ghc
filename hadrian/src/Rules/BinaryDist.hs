@@ -390,52 +390,54 @@ bindistRules = do
     phony "binary-dist-cross" $ buildBinDistX "binary-dist-dir-cross" "bindist" Xz
     phony "binary-dist-stage3" $ buildBinDistX "binary-dist-dir-stage3" "bindist-stage3" Xz
 
-    -- Prepare binary distribution configure script
-    -- (generated under <ghc root>/distrib/configure by 'autoreconf')
-    root -/- "bindist" -/- "ghc-*" -/- "configure" %> \configurePath -> do
-        need ["distrib" -/- "configure.ac"]
-        ghcRoot <- topDirectory
-        copyFile (ghcRoot -/- "aclocal.m4") (ghcRoot -/- "distrib" -/- "aclocal.m4")
-        copyDirectory (ghcRoot -/- "m4") (ghcRoot -/- "distrib")
+    forM_ [("bindist", Stage1), ("bindist-stage3",Stage2)] $ \(bindistFolderName, stg)-> do
+      -- Prepare binary distribution configure script
+      -- (generated under <ghc root>/distrib/configure by 'autoreconf')
+      root -/- bindistFolderName -/- "ghc-*" -/- "configure" %> \configurePath -> do
+          let acFile = stageString stg -/- "distrib" -/- "configure.ac"
+          need [acFile]
+          ghcRoot <- topDirectory
+          copyFile (ghcRoot -/- "aclocal.m4") (ghcRoot -/- "distrib" -/- "aclocal.m4")
+          copyDirectory (ghcRoot -/- "m4") (ghcRoot -/- "distrib")
 
-        -- Note [Autoreconf unix paths from ACLOCAL_PATH]
-        -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        -- On Windows, autoreconf fails when the ACLOCAL_PATH env variable contains Windows-
-        -- style paths. This happens because MSYS2 automatically converts env variables to
-        -- Windows-style paths. To fix this, we convert ACLOCAL_PATH back to Unix style.
-        -- This is done both in the boot Python script and here when building a bindist.
-        win_host <- isWinHost
-        env <- if not win_host
-          then pure []
-          else do
-            aclocalPathMay <- getEnv "ACLOCAL_PATH"
-            case aclocalPathMay of
-              Nothing -> pure []
-              Just aclocalPath -> do
-                unixAclocalPath <- fixUnixPathsOnWindows aclocalPath
-                pure [AddEnv "ACLOCAL_PATH" unixAclocalPath]
+          -- Note [Autoreconf unix paths from ACLOCAL_PATH]
+          -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+          -- On Windows, autoreconf fails when the ACLOCAL_PATH env variable contains Windows-
+          -- style paths. This happens because MSYS2 automatically converts env variables to
+          -- Windows-style paths. To fix this, we convert ACLOCAL_PATH back to Unix style.
+          -- This is done both in the boot Python script and here when building a bindist.
+          win_host <- isWinHost
+          env <- if not win_host
+            then pure []
+            else do
+              aclocalPathMay <- getEnv "ACLOCAL_PATH"
+              case aclocalPathMay of
+                Nothing -> pure []
+                Just aclocalPath -> do
+                  unixAclocalPath <- fixUnixPathsOnWindows aclocalPath
+                  pure [AddEnv "ACLOCAL_PATH" unixAclocalPath]
 
-        buildWithCmdOptions env $
-            target (vanillaContext Stage1 ghc) (Autoreconf $ ghcRoot -/- "distrib") [] []
-        -- We clean after ourselves, moving the configure script we generated in
-        -- our bindist dir
-        removeFile (ghcRoot -/- "distrib" -/- "aclocal.m4")
-        removeDirectory (ghcRoot -/- "distrib" -/- "m4")
+          buildWithCmdOptions env $
+              target (vanillaContext Stage1 ghc) (Autoreconf $ ghcRoot -/- "distrib") [] []
+          -- We clean after ourselves, moving the configure script we generated in
+          -- our bindist dir
+          removeFile (ghcRoot -/- "distrib" -/- "aclocal.m4")
+          removeDirectory (ghcRoot -/- "distrib" -/- "m4")
 
-        moveFile (ghcRoot -/- "distrib" -/- "configure") configurePath
+          moveFile (ghcRoot -/- acFile) configurePath
 
-    -- Generate the Makefile that enables the "make install" part
-    root -/- "bindist" -/- "ghc-*" -/- "Makefile" %> \makefilePath -> do
-        top <- topDirectory
-        copyFile (top -/- "hadrian" -/- "bindist" -/- "Makefile") makefilePath
+      -- Generate the Makefile that enables the "make install" part
+      root -/- bindistFolderName -/- "ghc-*" -/- "Makefile" %> \makefilePath -> do
+          top <- topDirectory
+          copyFile (top -/- "hadrian" -/- "bindist" -/- "Makefile") makefilePath
 
-    -- Copy various configure-related files needed for a working
-    -- './configure [...] && make install' workflow
-    -- (see the list of files needed in the 'binary-dist' rule above, before
-    -- creating the archive).
-    forM_ bindistInstallFiles $ \file ->
-        root -/- "bindist" -/- "ghc-*" -/- file %> \dest -> do
-            copyFile (fixup file) dest
+      -- Copy various configure-related files needed for a working
+      -- './configure [...] && make install' workflow
+      -- (see the list of files needed in the 'binary-dist' rule above, before
+      -- creating the archive).
+      forM_ bindistInstallFiles $ \file ->
+          root -/- bindistFolderName -/- "ghc-*" -/- file %> \dest -> do
+              copyFile (fixup file) dest
 
   where
     fixup f | f `elem` ["INSTALL", "README"] = "distrib" -/- f
