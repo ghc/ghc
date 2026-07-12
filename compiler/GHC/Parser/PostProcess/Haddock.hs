@@ -265,12 +265,14 @@ instance HasHaddock (Located (HsModule GhcPs)) where
     --    ) where
     --
     -- Only do this when the export list exists.
-    let (_, close_paren, _) = am_exports mod_anns
+    let
+      (open_paren, close_paren, _) = am_exports mod_anns
+      l_exports = combineSrcSpans (getEpTokenSrcSpan open_paren) (getEpTokenSrcSpan close_paren)
     hsmodExports' <- traverse @Maybe
       (\exports ->
-        extendHdkA (getEpTokenSrcSpan close_paren) $ do
+        extendHdkA l_exports $ do
           exports' <- addHaddockInterleaveItems EpNoLayout mkDocIE exports
-          registerEpTokenHdkA close_paren  -- ) position, not end-of-last-item
+          registerEpTokenHdkA close_paren  -- Do not consume comments after the closing parenthesis
           pure exports')
       (hsmodExports mod)
 
