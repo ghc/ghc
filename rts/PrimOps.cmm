@@ -1565,7 +1565,10 @@ stg_readTVarIOzh ( P_ tvar /* :: TVar a */ )
 
 again:
     result = %acquire StgTVar_current_value(tvar);
-    resultinfo = %INFO_PTR(result);
+    // when result is stg_TREC_HEADER_info, it's word aligned so UNTAG
+    // is no-op; if it's a tagged closure we must UNTAG it to avoid an
+    // unaligned memory access
+    resultinfo = %INFO_PTR(UNTAG(result));
     if (resultinfo == stg_TREC_HEADER_info) {
         goto again;
     }
