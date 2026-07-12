@@ -361,11 +361,6 @@ templateRule :: FilePath -> Interpolations -> Rules ()
 templateRule outPath =
   templateRuleFrom (outPath <.> "in") outPath
 
-templateRuleForStages :: FilePath -> (Stage -> Interpolations) -> Rules ()
-templateRuleForStages outPath mkInterps =
-  forM_ [Stage1, Stage2] $ \stage ->
-    templateRuleFrom (outPath <.> "in") (stageString stage -/- outPath) (mkInterps stage)
-
 templateRules :: Rules ()
 templateRules = do
   templateRule "compiler/ghc.cabal" $ projectVersion
@@ -416,6 +411,7 @@ templateRules = do
 
 bindistRules :: Rules ()
 bindistRules = do
+  root <- buildRootRules
   templateRule ("mk" -/- "project.mk") $ mconcat
     [ interpolateSetting "ProjectName" ProjectName
     , interpolateSetting "ProjectVersion" ProjectVersion
@@ -433,7 +429,11 @@ bindistRules = do
     , interpolateVar "TargetOS_CPP" $ cppify <$> getTarget queryOS
     , interpolateVar "LLVMTarget" $ getTarget tgtLlvmTarget
     ]
-  templateRuleForStages ("distrib" -/- "configure.ac") $ \stage -> mconcat
+  forM_ [Stage1, Stage2] $ \stage ->
+    templateRuleFrom
+      ("distrib" -/- "configure.ac" <.> "in")
+      (root -/- stageString stage -/- "distrib" -/- "configure.ac")
+      $ mconcat
     [ interpolateSetting "ConfiguredEmsdkVersion" EmsdkVersion
     , interpolateVar "CrossCompilePrefix" $ do
         isCross <- crossStage stage
@@ -465,19 +465,27 @@ bindistRules = do
     ]
 
   -- Stage the autoreconf inputs (aclocal.m4 and the m4/ macro directory) next
-  -- to each per-stage generated configure.ac, then run 'autoreconf' to produce a
-  -- per-stage 'configure' script in the build distrib dir.
+  -- to each per-stage generated configure.ac under _build, then run
+  -- 'autoreconf' to produce a per-stage 'configure' script there.
   --
   -- The 'Autoreconf' builder auto-needs <dir>/configure.ac (Builder.hs); we
-  -- also explicitly need the staged macros so editng them triggers
-  -- re-generation of 'configure'. BinaryDist.hs copies this 'configure' into
+  -- also explicitly need the staged macros so editing them triggers
+  -- re-generation of 'configure'. BinaryDist.hs copies this configure into
   -- the bindist; it no longer runs autoreconf itself.
   forM_ [Stage1, Stage2] $ \stage -> do
-    let distribDir = stageString stage -/- "distrib"
+    let distribDir = root -/- stageString stage -/- "distrib"
 
     distribDir -/- "aclocal.m4" %> \out -> do
       top <- topDirectory
       copyFile (top -/- "aclocal.m4") out
+
+    -- Autoconf auxiliary files required by autoreconf (config.sub,
+    -- config.guess, install-sh). They live in-tree at the repo root and must
+    -- be staged next to configure.ac for autoreconf to find them.
+    forM_ ["config.sub", "config.guess", "install-sh"] $ \f ->
+      distribDir -/- f %> \out -> do
+        top <- topDirectory
+        copyFile (top -/- f) out
 
     distribDir -/- "m4/*.m4" %> \out -> do
       top <- topDirectory
@@ -486,8 +494,12 @@ bindistRules = do
     distribDir -/- "configure" %> \_ -> do
       top    <- topDirectory
       m4Files <- getDirectoryFiles (top -/- "m4") ["*.m4"]
-      need $ (distribDir -/- "aclocal.m4")
-           : [ distribDir -/- "m4" -/- takeFileName f | f <- m4Files ]
+      need $ [ distribDir -/- "config.sub"
+             , distribDir -/- "config.guess"
+             , distribDir -/- "install-sh"
+             , distribDir -/- "aclocal.m4"
+             ]
+           ++ [ distribDir -/- "m4" -/- takeFileName f | f <- m4Files ]
 
       -- Note [Autoreconf unix paths from ACLOCAL_PATH]
       -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
