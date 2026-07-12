@@ -223,3 +223,4 @@ test('TestLevelImports', [ignore_stderr, req_ppr_deps], makefile_test, ['TestLev
 test('TestNamedDefaults', [ignore_stderr, req_ppr_deps], makefile_test, ['TestNamedDefaults'])
 test('PprModifiers', [ignore_stderr,req_ppr_deps], makefile_test, ['PprModifiers'])
 test('PprQualifiedStrings', [ignore_stderr,req_ppr_deps], makefile_test, ['PprQualifiedStrings'])
+test('Haddock1', [ignore_stderr,req_ppr_deps], makefile_test, ['Haddock1'])

@@ -183,7 +183,8 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Test17519.hs" Nothing
  -- "../../testsuite/tests/printer/InTreeAnnotations1.hs" Nothing
  -- "../../testsuite/tests/printer/Test19798.hs" Nothing
- "../../testsuite/tests/printer/Test10309.hs" Nothing
+ -- "../../testsuite/tests/printer/Test10309.hs" Nothing
+ "../../testsuite/tests/printer/Haddock1.hs" Nothing
 
  -- "../../testsuite/tests/qualifieddo/should_compile/qdocompile001.hs" Nothing
  -- "../../testsuite/tests/typecheck/should_fail/StrictBinds.hs" Nothing
@@ -519,8 +520,7 @@ changeLocalDecls libdir (L l p) = do
       replaceLocalBinds :: LMatch GhcPs (LHsExpr GhcPs)
                         -> Transform (LMatch GhcPs (LHsExpr GhcPs))
       replaceLocalBinds (L lm (Match an mln pats (GRHSs _ rhs (HsValBinds (van,w) (ValBinds _ bs))))) = do
-        let (oldDecls) = map unWrapValBind bs
-        -- let decls = s:d:oldDecls
+        let oldDecls = map unWrapValBind bs
         let oldDecls' = captureLineSpacing oldDecls
         let (VbSig o:oldBinds)  = map wrapValBind oldDecls'
             o' = setEntryDP o (DifferentLine 2 0)
