@@ -70,8 +70,8 @@ Bytecode Compiler
 Packaging and Build System
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- bumped ``process`` submodule to 1.6.29.0
-- bumped ``semaphore-compat`` submodule to 2.0.0
+- bumped ``process`` submodule to 1.6.30.0
+- bumped ``semaphore-compat`` submodule to 2.0.1
 - accept ``happy`` version 2.2
 - hadrian: don't include package hash in haddock library
 - configure: fix check for ``--target`` support in stage0 ``CC`` (:ghc-ticket:`26999`)
