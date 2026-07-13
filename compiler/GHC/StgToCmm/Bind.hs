@@ -280,7 +280,7 @@ cgRhs id (StgRhsClosure fvs cc upd_flag args body _typ)
   = do
     profile <- getProfile
     check_tags <- stgToCmmDoTagCheck <$> getStgToCmmConfig
-    use_std_ap_thunk <- stgToCmmTickyAP <$> getStgToCmmConfig
+    use_std_ap_thunk <- stgToCmmUseStdApThunk <$> getStgToCmmConfig
     mkRhsClosure profile use_std_ap_thunk check_tags id cc (nonVoidIds (dVarSetElems fvs)) upd_flag args body
 
 ------------------------------------------------------------------------

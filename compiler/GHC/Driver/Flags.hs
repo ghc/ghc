@@ -379,6 +379,7 @@ impliedGFlags = [(Opt_DeferTypeErrors, turnOn, Opt_DeferTypedHoles)
                 ,(Opt_ByteCodeAndObjectCode, turnOn, Opt_WriteByteCode)
                 ,(Opt_InfoTableMap, turnOn, Opt_InfoTableMapWithStack)
                 ,(Opt_InfoTableMap, turnOn, Opt_InfoTableMapWithFallback)
+                ,(Opt_InfoTableMap, turnOn, Opt_Ticky_AP)
                 ] ++ validHoleFitsImpliedGFlags
 
 -- | General flags that are switched on/off when other general flags are switched

@@ -1,0 +1,4 @@
+section: codegen
+synopsis: Fix redundant AP thunk codegen when not using -ticky-ap-thunk
+issues: #27502
+mrs: !16340
