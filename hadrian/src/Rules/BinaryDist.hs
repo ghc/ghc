@@ -165,7 +165,7 @@ buildBinDistDir root conf@BindistConfig{..} = do
     distDir        <- Context.distDir (vanillaContext library_stage rts)
 
     let ghcBuildDir      = root -/- stageString library_stage
-        bindistFilesDir  = root -/- bindistFolder -/- ghcVersionPretty
+        bindistFilesDir  = root -/- bindistFolder conf -/- ghcVersionPretty
         ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
         rtsIncludeDir    = distDir -/- "include"
 
@@ -387,7 +387,9 @@ bindistRules = do
     phony "binary-dist-cross" $ buildBinDistX "binary-dist-dir-cross" "bindist" Xz
     phony "binary-dist-stage3" $ buildBinDistX "binary-dist-dir-stage3" "bindist-stage3" Xz
 
-    forM_ [("bindist", Stage1), ("bindist-stage3",Stage2)] $ \(bindistFolderName, stg)-> do
+    forM_ [normalBindist, targetBindist] $ \bindistCfg -> do
+      let bindistFolderName = bindistFolder bindistCfg
+          stg = executable_stage bindistCfg
       -- Copy the per-stage 'configure' (produced by autoreconf in Generate.hs)
       -- from the build distrib dir into the bindist. Generating it there keeps
       -- the autoreconf inputs (configure.ac, aclocal.m4, m4/*.m4) next to the

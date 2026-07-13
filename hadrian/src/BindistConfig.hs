@@ -3,28 +3,31 @@ module BindistConfig where
 import Stage
 import Oracles.Flag
 import Expression
-data BindistConfig = BindistConfig
-    { library_stage :: Stage -- ^ The stage compiler which builds the libraries
-    , executable_stage :: Stage -- ^ The stage compiler which builds the executables
-    , bindistFolder :: FilePath -- ^ Parent folder under build root ("bindist" or "bindist-stage3")
-    }
+data BindistConfig = BindistConfig { library_stage :: Stage -- ^ The stage compiler which builds the libraries
+                                   , executable_stage :: Stage -- ^ The stage compiler which builds the executables
+                                   }
+
 
 -- | A bindist for when the host = target, non cross-compilation setting.
 -- Both the libraries and final executables are built with stage1 compiler.
 normalBindist :: BindistConfig
-normalBindist = BindistConfig { library_stage = Stage1, executable_stage = Stage1, bindistFolder = "bindist" }
+normalBindist = BindistConfig { library_stage = Stage1, executable_stage = Stage1 }
 
 -- | A bindist which contains a cross compiler (when host /= target)
 -- The cross compiler is produced by the stage1 compiler, but then we must compile
 -- all the boot libraries with the cross compiler (hence stage2 for libraries)
 crossBindist :: BindistConfig
-crossBindist = BindistConfig { library_stage = Stage2, executable_stage = Stage1, bindistFolder = "bindist" }
+crossBindist = BindistConfig { library_stage = Stage2, executable_stage = Stage1 }
 
 -- | A bindist which contains executables for the target, which produce code for the
 -- target. These are produced as "Stage3" build products, produced by a stage2 cross compiler.
 targetBindist ::  BindistConfig
-targetBindist = BindistConfig { library_stage = Stage2, executable_stage = Stage2, bindistFolder = "bindist-stage3" }
+targetBindist = BindistConfig { library_stage = Stage2, executable_stage = Stage2 }
 
+-- | Parent folder under build root ("bindist" or "bindist-stage3")
+bindistFolder :: BindistConfig ->  FilePath
+bindistFolder conf | executable_stage conf == Stage2 = "bindist-stage3"
+bindistFolder _conf = "bindist"
 
 -- | The implicit bindist config, if we don't know any better.
 implicitBindistConfig :: Action BindistConfig
