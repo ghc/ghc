@@ -3401,13 +3401,13 @@ instance ExactPrint (HsCmd GhcPs) where
       e' <- markAnnotated e
       return (HsCmdLet (tkLet', tkIn') binds' e')
 
-  exact (HsCmdDo (an0,loc) (L l es)) = do
+  exact (HsCmdDo (an0,loc) es) = do
     debugM $ "HsCmdDo"
     loc' <- printStringAtAA loc "do"
     (an1,es') <- markAnnList' an0 $ do
-      ee <- mapM markAnnotated es
+      ee <- markAnnotated es
       return ee
-    return (HsCmdDo (an1,loc') (L l es'))
+    return (HsCmdDo (an1,loc') es')
 
 -- ---------------------------------------------------------------------
 
@@ -4466,10 +4466,10 @@ instance ExactPrint [LocatedA (StmtLR GhcPs GhcPs (LocatedA (HsCmd GhcPs)))] whe
       Just (initStmts, ls@(L _ (LastStmt _ _body _ _))) -> do
         debugM $ "LocatedL [ExprLStmt: snocView"
         ls' <- markAnnotated ls
-        initStmts' <- markAnnotated initStmts
+        initStmts' <- mapM markAnnotated initStmts
         return (initStmts' ++ [ls'])
       _ -> do
-        stmts' <- markAnnotated stmts
+        stmts' <- mapM markAnnotated stmts
         return stmts'
 
 instance ExactPrint [Located HsDocStringChunk] where
