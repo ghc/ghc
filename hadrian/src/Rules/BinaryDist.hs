@@ -391,41 +391,12 @@ bindistRules = do
     phony "binary-dist-stage3" $ buildBinDistX "binary-dist-dir-stage3" "bindist-stage3" Xz
 
     -- Prepare binary distribution configure script
-    -- (generated in a per-stage temporary distrib directory by 'autoreconf')
-    forM_ [("bindist", Stage1), ("bindist-stage3", Stage2)] $ \(folder, stage) ->
-        root -/- folder -/- "ghc-*" -/- "configure" %> generateConfigure root stage
-
-    -- Generate the Makefile that enables the "make install" part
-    forM_ ["bindist", "bindist-stage3"] $ \folder ->
-        root -/- folder -/- "ghc-*" -/- "Makefile" %> \makefilePath -> do
-            top <- topDirectory
-            copyFile (top -/- "hadrian" -/- "bindist" -/- "Makefile") makefilePath
-
-    -- Copy various configure-related files needed for a working
-    -- './configure [...] && make install' workflow
-    -- (see the list of files needed in the 'binary-dist' rule above, before
-    -- creating the archive).
-    forM_ ["bindist", "bindist-stage3"] $ \folder ->
-        forM_ bindistInstallFiles $ \file ->
-            root -/- folder -/- "ghc-*" -/- file %> \dest -> do
-                copyFile (fixup file) dest
-
-  where
-    fixup f | f `elem` ["INSTALL", "README"] = "distrib" -/- f
-            | otherwise                      = f
-    generateConfigure root stage configurePath = do
-        let acFile = stageString stage -/- "distrib" -/- "configure.ac"
-        need [acFile]
+    -- (generated under <ghc root>/distrib/configure by 'autoreconf')
+    root -/- "bindist" -/- "ghc-*" -/- "configure" %> \configurePath -> do
+        need ["distrib" -/- "configure.ac"]
         ghcRoot <- topDirectory
-        -- Use a per-stage temporary distrib directory so that Stage1 and
-        -- Stage2 configure generation can run concurrently without
-        -- clobbering each other's inputs/outputs.
-        let distribDir = root -/- ("distrib-" ++ stageString stage)
-        removeDirectory distribDir
-        createDirectory distribDir
-        copyFile (ghcRoot -/- acFile) (distribDir -/- "configure.ac")
-        copyFile (ghcRoot -/- "aclocal.m4") (distribDir -/- "aclocal.m4")
-        copyDirectory (ghcRoot -/- "m4") distribDir
+        copyFile (ghcRoot -/- "aclocal.m4") (ghcRoot -/- "distrib" -/- "aclocal.m4")
+        copyDirectory (ghcRoot -/- "m4") (ghcRoot -/- "distrib")
 
         -- Note [Autoreconf unix paths from ACLOCAL_PATH]
         -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -445,9 +416,30 @@ bindistRules = do
                 pure [AddEnv "ACLOCAL_PATH" unixAclocalPath]
 
         buildWithCmdOptions env $
-            target (vanillaContext Stage1 ghc) (Autoreconf distribDir) [] []
-        moveFile (distribDir -/- "configure") configurePath
-        removeDirectory distribDir
+            target (vanillaContext Stage1 ghc) (Autoreconf $ ghcRoot -/- "distrib") [] []
+        -- We clean after ourselves, moving the configure script we generated in
+        -- our bindist dir
+        removeFile (ghcRoot -/- "distrib" -/- "aclocal.m4")
+        removeDirectory (ghcRoot -/- "distrib" -/- "m4")
+
+        moveFile (ghcRoot -/- "distrib" -/- "configure") configurePath
+
+    -- Generate the Makefile that enables the "make install" part
+    root -/- "bindist" -/- "ghc-*" -/- "Makefile" %> \makefilePath -> do
+        top <- topDirectory
+        copyFile (top -/- "hadrian" -/- "bindist" -/- "Makefile") makefilePath
+
+    -- Copy various configure-related files needed for a working
+    -- './configure [...] && make install' workflow
+    -- (see the list of files needed in the 'binary-dist' rule above, before
+    -- creating the archive).
+    forM_ bindistInstallFiles $ \file ->
+        root -/- "bindist" -/- "ghc-*" -/- file %> \dest -> do
+            copyFile (fixup file) dest
+
+  where
+    fixup f | f `elem` ["INSTALL", "README"] = "distrib" -/- f
+            | otherwise                      = f
 
 data Compressor = Gzip | Bzip2 | Xz
                 deriving (Eq, Ord, Show)
