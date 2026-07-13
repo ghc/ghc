@@ -58,6 +58,7 @@ import Language.Haskell.Syntax.Doc
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Module.Name
 
+-- Exact print annotations ignore LHsDoc, so bare SrcSpan is fine
 type instance Anno (WithHsDocIdentifiers (HsDocString (GhcPass pass)) (GhcPass pass)) = SrcSpan
 
 deriving instance (Data pass, Data (LIdP pass), Data a) => Data (WithHsDocIdentifiers a pass)
