@@ -1,5 +1,6 @@
-nix build nixpkgs#jq.bin -o jq
-PATH+=:$PWD/jq-bin/bin
+#!/usr/bin/env bash
+set -xeuo pipefail
+PATH+=:$(nix eval nixpkgs#jq.outPath)/bin
 
 ghcs_nix="https://gitlab.haskell.org/bgamari/ghcs-nix/-/archive/master/ghcs-nix-master.tar.gz"
 
