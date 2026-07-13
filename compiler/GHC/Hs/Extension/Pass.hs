@@ -46,6 +46,7 @@ type instance XRec (GhcPass p) a = XRecGhc a
 -- but pass-independent, source location
 type XRecGhc a = GenLocated (Anno a) a
 
+-- Exact print annotations ignore LHsDoc, so bare SrcSpan is fine
 type instance Anno (HsDocString (GhcPass _))  = SrcSpan
 type instance Anno HsDocStringChunk           = SrcSpan
 
