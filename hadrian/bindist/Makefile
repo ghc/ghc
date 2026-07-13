@@ -97,12 +97,26 @@ lib/targets/default.target : config.mk default.target
 	@echo "Copying the bindist-configured default.target to lib/targets/default.target"
 	cp default.target $@
 
+# sequentially create one layer of subdirectories under DESTDIR, then
+# subsequent install_* jobs can happen concurrently without bsd
+# install race condition. required for make install -j to work on
+# macos/freebsd, see #27499.
+.PHONY: install_dirs
+install_dirs:
+	$(INSTALL_DIR) "$(DESTDIR)$(prefix)"
+	$(INSTALL_DIR) "$(DESTDIR)$(ActualBinsDir)"
+	$(INSTALL_DIR) "$(DESTDIR)$(WrapperBinsDir)"
+	$(INSTALL_DIR) "$(DESTDIR)$(ActualLibsDir)"
+	$(INSTALL_DIR) "$(DESTDIR)$(mandir)"
+	$(INSTALL_DIR) "$(DESTDIR)$(docdir)"
+	$(INSTALL_DIR) "$(DESTDIR)$(datadir)"
+
 # We need to install binaries relative to libraries.
 BINARIES = $(wildcard ./bin/*)
 .PHONY: install_bin_libdir
-install_bin_libdir:
+install_bin_libdir: install_dirs
 	@echo "Copying binaries to $(DESTDIR)$(ActualBinsDir)"
-	$(INSTALL_DIR) "$(DESTDIR)$(ActualBinsDir)"
+
 	for i in $(BINARIES); do \
 		if test -L "$$i"; then \
 			cp -RP "$$i" "$(DESTDIR)$(ActualBinsDir)"; \
@@ -112,15 +126,14 @@ install_bin_libdir:
 	done
 
 .PHONY: install_bin_direct
-install_bin_direct:
+install_bin_direct: install_dirs
 	@echo "Copying binaries to $(DESTDIR)$(WrapperBinsDir)"
-	$(INSTALL_DIR) "$(DESTDIR)$(WrapperBinsDir)"
+
 	$(INSTALL_PROGRAM) ./bin/* "$(DESTDIR)$(WrapperBinsDir)/"
 
 .PHONY: install_lib
-install_lib: lib/settings lib/targets/default.target
+install_lib: install_dirs lib/settings lib/targets/default.target
 	@echo "Copying libraries to $(DESTDIR)$(ActualLibsDir)"
-	$(INSTALL_DIR) "$(DESTDIR)$(ActualLibsDir)"
 
 	@dest="$(DESTDIR)$(ActualLibsDir)"; \
 	cd ./lib; \
@@ -146,9 +159,8 @@ install_lib: lib/settings lib/targets/default.target
 	done; \
 
 .PHONY: install_docs
-install_docs:
+install_docs: install_dirs
 	@echo "Copying docs to $(DESTDIR)$(docdir)"
-	$(INSTALL_DIR) "$(DESTDIR)$(docdir)"
 
 	if [ -d doc ]; then \
 		cd ./doc; $(FIND) . -type f -exec sh -c \
@@ -163,9 +175,9 @@ install_docs:
 	fi
 
 .PHONY: install_data
-install_data:
+install_data: install_dirs
 	@echo "Copying data to $(DESTDIR)share"
-	$(INSTALL_DIR) "$(DESTDIR)$(datadir)"
+
 	if [ -d share ]; then \
 		cd ./share; $(FIND) . -type f -exec sh -c \
 			'$(INSTALL_DIR) "$(DESTDIR)$(datadir)/`dirname $$1`" && \
@@ -177,18 +189,17 @@ MAN_SECTION := 1
 MAN_PAGES := manpage/ghc.1
 
 .PHONY: install_man
-install_man:
+install_man: install_dirs
 	if [ -f $(MAN_PAGES) ]; then \
-		$(INSTALL_DIR) "$(DESTDIR)$(mandir)"; \
 		$(INSTALL_DIR) "$(DESTDIR)$(mandir)/man$(MAN_SECTION)"; \
 		$(INSTALL_MAN) $(INSTALL_OPTS) $(MAN_PAGES) "$(DESTDIR)$(mandir)/man$(MAN_SECTION)"; \
 	fi
 
 export SHELL
 .PHONY: install_wrappers
-install_wrappers: install_bin_libdir install_hsc2hs_wrapper
+install_wrappers: install_dirs install_bin_libdir install_hsc2hs_wrapper
 	@echo "Installing wrapper scripts"
-	$(INSTALL_DIR) "$(DESTDIR)$(WrapperBinsDir)"
+
 	for p in `cd ./wrappers; $(FIND) . ! -type d`; do \
 	    mk/install_script.sh "$$p" "$(DESTDIR)/$(WrapperBinsDir)/$$p" "$(WrapperBinsDir)" "$(ActualBinsDir)" "$(ActualBinsDir)/$$p" "$(ActualLibsDir)" "$(docdir)" "$(includedir)"; \
 	done

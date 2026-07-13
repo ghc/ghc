@@ -1,0 +1,4 @@
+section: packaging
+synopsis: Fix race condition in bindist make install -j on macos/freebsd
+issues: #27499
+mrs: !15707
