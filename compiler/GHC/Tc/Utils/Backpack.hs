@@ -292,28 +292,28 @@ implicitRequirements hsc_env normal_imports
   where
     mhome_unit = hsc_home_unit_maybe hsc_env
 
--- | Like @implicitRequirements'@, but returns either the module name, if it is
--- a free hole, or the instantiated unit the imported module is from, so that
--- that instantiated unit can be processed and via the batch mod graph (rather
--- than a transitive closure done here) all the free holes are still reachable.
+-- | Like @implicitRequirements'@, but returns the instantiated unit the
+-- imported module is from, so that that instantiated unit can be processed and
+-- via the batch mod graph (rather than a transitive closure done here) all the
+-- free holes are still reachable.
 implicitRequirementsShallow
   :: HscEnv
   -> [UnresolvedImport PkgQual]
-  -> IO ([ModuleName], [InstantiatedUnit])
-implicitRequirementsShallow hsc_env normal_imports = go ([], []) normal_imports
+  -> IO [InstantiatedUnit]
+implicitRequirementsShallow hsc_env normal_imports = go [] normal_imports
  where
   mhome_unit = hsc_home_unit_maybe hsc_env
 
   go acc [] = pure acc
-  go (accL, accR) (e:imports) = do
+  go accR (e:imports) = do
     found <- resolveImport hsc_env e
     let acc' = case found of
           Found _ mod | notHomeModuleMaybe mhome_unit mod ->
               case moduleUnit mod of
-                  HoleUnit -> (moduleName mod : accL, accR)
-                  RealUnit _ -> (accL, accR)
-                  VirtUnit u -> (accL, u:accR)
-          _ -> (accL, accR)
+                  HoleUnit -> panic "implicitRequirementsShallow: HoleUnit is unreachable through findImportedModule!"
+                  RealUnit _ -> accR
+                  VirtUnit u -> u:accR
+          _ -> accR
     go acc' imports
 
 -- | Given a 'Unit', make sure it is well typed.  This is because

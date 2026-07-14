@@ -896,7 +896,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env hsc_src modname
 
-    (implicit_sigs, inst_deps) <- liftIO $ implicitRequirementsShallow hsc_env textual_imports
+    inst_deps <- liftIO $ implicitRequirementsShallow hsc_env textual_imports
 
     -- So that Finder can find it, even though it doesn't exist...
     this_mod <- liftIO $ do
@@ -916,8 +916,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
                            -- We have to do something special here:
                            -- due to merging, requirements may end up with
                            -- extra imports
-                           ++ (generatedImport FromBackpackSig . noLoc <$> extra_sig_imports)
-                           ++ (generatedImport FromBackpackSig . noLoc <$> implicit_sigs),
+                           ++ (generatedImport FromBackpackSig . noLoc <$> extra_sig_imports),
             -- This is our hack to get the parse tree to the right spot
             ms_parsed_mod = Just (HsParsedModule {
                     hpm_module = hsmod,
