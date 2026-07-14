@@ -2748,10 +2748,10 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-stage3-validate.tar.xz",
         "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-stage3-validate.tar.xz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -6726,10 +6726,10 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-stage3-validate.tar.xz",
         "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-stage3-validate.tar.xz"
       ],
       "reports": {
         "junit": "junit.xml"
