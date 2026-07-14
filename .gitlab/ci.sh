@@ -575,8 +575,14 @@ function build_hadrian() {
   case "${CROSS_STAGE:-2}" in
     2) BINDIST_TARGET="binary-dist";;
     # Stage2 cross-compiler bindists are (almost) a byproduct of Stage3
-    # cross-compiled bindists. So, we bundle both of them
-    3) BINDIST_TARGET="binary-dist binary-dist-stage3";;
+    # cross-compiled bindists. So, we bundle both of them when the Stage3
+    # bindist is built.
+    3)
+      BINDIST_TARGET="binary-dist binary-dist-stage3"
+      if [[ -z "${BIN_DIST_NAME_STAGE3:-}" ]]; then
+        fail "CROSS_STAGE=3 requires BIN_DIST_NAME_STAGE3 to be set"
+      fi
+      ;;
     *) fail "Unknown CROSS_STAGE, must be 2 or 3";;
   esac
 
@@ -592,9 +598,6 @@ function build_hadrian() {
           run_hadrian test:all_deps $BINDIST_TARGET
           mv _build/bindist/ghc*.tar.xz "$BIN_DIST_NAME.tar.xz"
           if [[ "${CROSS_STAGE:-2}" == "3" ]]; then
-            if [[ -z "${BIN_DIST_NAME_STAGE3:-}" ]]; then
-              fail "CROSS_STAGE=3 requires BIN_DIST_NAME_STAGE3 to be set"
-            fi
             mv _build/bindist-stage3/ghc*.tar.xz "$BIN_DIST_NAME_STAGE3.tar.xz"
           fi
           ;;
@@ -682,11 +685,6 @@ function test_hadrian() {
   # If we have set CROSS_EMULATOR, then can't test using normal testsuite.
   elif [ -n "${CROSS_EMULATOR:-}" ] && [[ "${CROSS_TARGET:-}" != *"wasm"* ]]; then
     local instdir="$TOP/_build/install"
-    # The stage-2 cross bindist has target-triple-prefixed binaries and runs
-    # natively on the host. Override the global cross_prefix (which is empty
-    # for CROSS_STAGE=3 because the stage-3 bindist has unprefixed binaries)
-    # so that we test the stage-2 cross compiler consistently.
-    local cross_prefix="$target_triple-"
     local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
     install_bindist _build/bindist/ghc-*/ "$instdir"
     echo 'main = putStrLn "hello world"' > expected
@@ -935,8 +933,7 @@ function clean() {
   #
   # The exclude list are the artifacts that we do expect to be
   # uploaded. Keep in sync with `jobArtifacts` in
-  # `.gitlab/generate-ci/gen_ci.hs`! The `ghc-*.tar.xz` pattern covers both
-  # stage2/cross and stage3/target bindists.
+  # `.gitlab/generate-ci/gen_ci.hs`!
   if [[ "${CI_DISPOSABLE_ENVIRONMENT:-}" != true ]]; then
     git submodule --quiet foreach --recursive git clean -xdfq
     git clean -xdfq \
@@ -1046,15 +1043,12 @@ case "$(uname)" in
   *) fail "uname $(uname) is not supported" ;;
 esac
 
-cross_prefix=""
 if [ -n "${CROSS_TARGET:-}" ]; then
-  info "Cross-compiling for $CROSS_TARGET... (stage: $CROSS_STAGE)"
+  info "Cross-compiling for $CROSS_TARGET..."
   target_triple="$CROSS_TARGET"
-  # Stage3 native GHC runs on the target itself, so no cross prefix.
-  # CROSS_STAGE is either 2 (host != target) or 3 (host == target)
-  if [ "${CROSS_STAGE:-2}" = "2" ]; then
-    cross_prefix="$target_triple-"
-  fi
+  cross_prefix="$target_triple-"
+else
+  cross_prefix=""
 fi
 
 echo "Branch name ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}"
