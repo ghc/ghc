@@ -1576,7 +1576,6 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
   hie_timestamp <- modificationTimeIfExists (ml_hie_file_ospath nms_location)
   bytecode_timestamp <- modificationTimeIfExists (ml_bytecode_file_ospath nms_location)
   extra_sig_imports <- findExtraSigImports hsc_env nms_hsc_src pi_mod_name
-  (implicit_sigs, _inst_deps) <- implicitRequirementsShallow (hscSetActiveUnitId (moduleUnitId nms_mod) hsc_env) pi_theimps
 
   return $
         ModSummary
@@ -1590,7 +1589,6 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
         , ms_srcimps = pi_srcimps
         , ms_textual_imps =
             ((,,) NormalLevel NoPkgQual . noLoc <$> extra_sig_imports) ++
-            ((,,) NormalLevel NoPkgQual . noLoc <$> implicit_sigs) ++
             pi_theimps
         , ms_hs_hash = nms_src_hash
         , ms_iface_date = hi_timestamp
