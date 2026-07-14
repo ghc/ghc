@@ -706,6 +706,26 @@ function test_hadrian() {
     # ---
     # > main = putStrLn "hello world"
     run diff -w expected actual
+
+    if [[ "${CROSS_STAGE:-2}" == "3" ]]; then
+      local stage3_dir
+      stage3_dir="$(echo _build/bindist-stage3/ghc-*/)"
+      local stage3_ghc="$stage3_dir/bin/ghc$exe"
+
+      info "Smoke-testing stage3 compiler..."
+      file "$stage3_ghc"
+      run ${CROSS_EMULATOR} "$stage3_ghc" --info
+
+      run ${CROSS_EMULATOR} "$stage3_ghc" -package ghc "$TOP/.gitlab/hello.hs" -o hello-stage3
+
+      if [[ "${CROSS_TARGET:-no_cross_target}" =~ "mingw" ]]; then
+        ${CROSS_EMULATOR:-} ./hello-stage3.exe > actual-stage3
+      else
+        ${CROSS_EMULATOR:-} ./hello-stage3 > actual-stage3
+      fi
+
+      run diff -w expected actual-stage3
+    fi
   elif [[ -n "${REINSTALL_GHC:-}" ]]; then
     run_hadrian \
       test \
