@@ -3,10 +3,10 @@ module BindistConfig where
 import Stage
 import Oracles.Flag
 import Expression
+
 data BindistConfig = BindistConfig { library_stage :: Stage -- ^ The stage compiler which builds the libraries
                                    , executable_stage :: Stage -- ^ The stage compiler which builds the executables
                                    }
-
 
 -- | A bindist for when the host = target, non cross-compilation setting.
 -- Both the libraries and final executables are built with stage1 compiler.
