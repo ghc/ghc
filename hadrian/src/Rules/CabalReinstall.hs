@@ -67,14 +67,13 @@ cabalBuildRules = do
 
         let cabal_package_db = cwd -/- root -/- "stage-cabal" -/- "dist-newstyle" -/- "packagedb" -/- "ghc-" ++ version
 
-        executableStage <- executable_stage <$> implicitBindistConfig
         forM_ bin_targets $ \(bin_pkg,_bin_path) -> do
             let pgmName pkg
                   | pkg == ghc    = "ghc"
                   | pkg == hpcBin = "hpc"
                   | otherwise     = pkgName pkg
             let cabal_bin_out = work_dir -/- "cabal-bin" -/- (pgmName bin_pkg)
-            needed_wrappers <- pkgToWrappers executableStage bin_pkg
+            needed_wrappers <- pkgToWrappers Stage2 bin_pkg
             forM_ needed_wrappers $ \wrapper_name -> do
               let wrapper_prefix = unlines
                     ["#!/usr/bin/env sh"
@@ -86,7 +85,7 @@ cabalBuildRules = do
                     ,"export GHC_PACKAGE_PATH="++show cabal_package_db++":"
                     ]
                   output_file = outputDir -/- wrapper_name
-              wrapper_content <- wrapper executableStage wrapper_name
+              wrapper_content <- wrapper Stage2 wrapper_name
               writeFile' output_file (wrapper_prefix ++ wrapper_content)
               makeExecutable output_file
               pure ()
