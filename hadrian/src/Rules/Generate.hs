@@ -483,14 +483,11 @@ bindistRules = do
     , crossStageInterps
     ]
 
-  -- Stage the autoreconf inputs (aclocal.m4 and the m4/ macro directory) next
-  -- to each per-stage generated configure.ac under _build, then run
-  -- 'autoreconf' to produce a per-stage 'configure' script there.
-  --
-  -- The 'Autoreconf' builder auto-needs <dir>/configure.ac (Builder.hs); we
-  -- also explicitly need the staged macros so editing them triggers
-  -- re-generation of 'configure'. BinaryDist.hs copies this configure into
-  -- the bindist; it no longer runs autoreconf itself.
+  -- We can build two kinds of bindists: Regular Stage2 (including
+  -- cross-compilers) and fully cross-compiled Stage3. To avoid
+  -- race-conditions, stale files, etc. build the `configure` scripts as part
+  -- of the stage's _build files. This requires copying several files such that
+  -- they are available to the autoconf run.
   forM_ [Stage1, Stage2] $ \stage -> do
     let distribDir = root -/- stageString stage -/- "distrib"
 
@@ -498,9 +495,6 @@ bindistRules = do
       top <- topDirectory
       copyFile (top -/- "aclocal.m4") out
 
-    -- Autoconf auxiliary files required by autoreconf (config.sub,
-    -- config.guess, install-sh). They live in-tree at the repo root and must
-    -- be staged next to configure.ac for autoreconf to find them.
     forM_ ["config.sub", "config.guess", "install-sh"] $ \f ->
       distribDir -/- f %> \out -> do
         top <- topDirectory
