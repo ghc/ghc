@@ -109,9 +109,6 @@ infixr 8  ^, ^^
 infixl 7  /, `quot`, `rem`, `div`, `mod`
 infixl 7  %
 
-default ()              -- Double isn't available yet,
-                        -- and we shouldn't be using defaults anyway
-
 {- Note [Allow time for type-specialisation rules to fire]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider

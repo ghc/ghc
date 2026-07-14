@@ -32,8 +32,6 @@ import GHC.Internal.Types
 -- (This module uses the empty tuple () and string literals.)
 import GHC.Internal.Tuple ()
 
-default ()
-
 -- | ghc-bignum backend name
 backendName :: [Char]
 backendName = "native"

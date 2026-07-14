@@ -56,8 +56,6 @@ import GHC.Internal.Classes ( Eq( (==) ), (&&) )
 import GHC.Internal.Classes.IP as Rebindable
 import GHC.Internal.Types
 
-default ()
-
 -- $setup
 -- >>> import Prelude
 -- >>> import GHC.Internal.Stack (prettyCallStack, callStack)

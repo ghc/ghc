@@ -29,9 +29,6 @@ module GHC.Internal.Classes.IP( IP(..) ) where
 
 import GHC.Internal.Types
 
-
-default ()              -- Double isn't available yet
-
 -- | The syntax @?x :: a@ is desugared into @IP "x" a@
 -- IP is declared very early, so that libraries can take
 -- advantage of the implicit-call-stack feature

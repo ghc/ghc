@@ -12,8 +12,6 @@ import GHC.Internal.Types as Rebindable
 import GHC.Internal.Magic as Rebindable( dataToTag# ) -- For derived Eq
 import GHC.Internal.Classes
 
-default ()
-
 -------------------------------------------------------------------------------
 -- Maybe type
 -------------------------------------------------------------------------------

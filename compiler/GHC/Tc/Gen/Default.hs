@@ -158,7 +158,7 @@ tcDefaultDecls decls =
       -- but we must still make sure not to error if we fail to look up e.g. the 'Num'
       -- typeclass when typechecking such a default declaration. To do this, we wrap
       -- calls of 'tcLookupClass' in 'tryTc'.
-      (True, [L _ (DefaultDecl _ _ Nothing [])]) -> return []
+--      (True, [L _ (DefaultDecl _ _ Nothing [])]) -> return []
 --        h2010_dflt_clss <- foldMapM (fmap maybeToList . fmap fst . tryTc . tcLookupKnownKeyClass)
 --                           =<< getH2010DefaultKeys
 --        case NE.nonEmpty h2010_dflt_clss of

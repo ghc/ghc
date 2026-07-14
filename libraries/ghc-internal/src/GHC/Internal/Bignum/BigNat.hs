@@ -29,8 +29,6 @@ import GHC.Internal.Bignum.Primitives
 import GHC.Internal.Bignum.WordArray
 import GHC.Internal.Bignum.Backend
 
-default ()
-
 -- | A BigNat
 --
 -- Represented as an array of limbs (Word#) stored in little-endian order (Word#

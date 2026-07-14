@@ -148,8 +148,6 @@ infix  4  ==, /=, <, <=, >=, >
 infixr 3  &&
 infixr 2  ||
 
-default ()              -- Double isn't available yet
-
 {- $matching_overloaded_methods_in_rules
 
 Matching on class methods (e.g. @(==)@) in rewrite rules tends to be a bit

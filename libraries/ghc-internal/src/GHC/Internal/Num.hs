@@ -49,9 +49,6 @@ import GHC.Internal.Prim (
 infixl 7  *
 infixl 6  +, -
 
-default ()              -- Double isn't available yet,
-                        -- and we shouldn't be using defaults anyway
-
 -- | Basic numeric class.
 --
 -- The Haskell Report defines no laws for 'Num'. However, @('+')@ and @('*')@ are

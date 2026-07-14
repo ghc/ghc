@@ -62,8 +62,6 @@ import GHC.Internal.Enum as Rebindable( enumFromTo )  -- For known-key names
 
 infixl 9  !, //
 
-default ()
-
 -- | The type of immutable non-strict (boxed) arrays
 -- with indices in @i@ and elements in @e@.
 data Array i e

@@ -29,8 +29,6 @@ import GHC.Internal.Num  as Rebindable( fromInteger)
 import GHC.Internal.Prim (State#, noDuplicate#)
 import GHC.Internal.Show
 
-default ()
-
 -- The 'ST' monad proper.  By default the monad is strict;
 -- too many people got bitten by space leaks when it was lazy.
 

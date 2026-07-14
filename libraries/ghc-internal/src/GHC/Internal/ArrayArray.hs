@@ -53,8 +53,6 @@ import GHC.Internal.Prim
 import GHC.Internal.Prim.PtrEq ( unsafePtrEquality# )
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce, unsafeCoerceUnlifted )
 
-default ()
-
 {- **********************************************************************
 *                                                                       *
 *                 Arrays of arrays (legacy interface)                    *

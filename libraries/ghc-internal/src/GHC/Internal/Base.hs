@@ -342,8 +342,6 @@ infixr 0  $, $!
 
 infixl 4 <*>, <*, *>, <**>
 
-default ()              -- Double isn't available yet
-
 {-
 Note [Tracking dependencies on primitives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

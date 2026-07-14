@@ -49,8 +49,6 @@ import GHC.Internal.Prim
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
 import GHC.Internal.Types()
 
-default () -- Double and Integer aren't available yet
-
 ------------------------------------------------------------------------
 -- Delay/wait operations
 ------------------------------------------------------------------------

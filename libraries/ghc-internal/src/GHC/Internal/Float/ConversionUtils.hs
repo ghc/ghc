@@ -52,8 +52,6 @@ elim64# = elimZerosInt#
 
 #endif
 
-default ()
-
 {-# INLINE elimZerosInteger #-}
 elimZerosInteger :: Integer -> Int# -> (# Integer, Int# #)
 elimZerosInteger m e = elim64# (TO64 m) e

@@ -20,8 +20,6 @@ import GHC.Internal.Prim
 import GHC.Internal.Magic
 import GHC.Internal.Types
 
-default () -- Double and Integer aren't available yet
-
 {-
 Note [Compiler error functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

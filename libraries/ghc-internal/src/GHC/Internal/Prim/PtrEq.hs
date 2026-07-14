@@ -41,8 +41,6 @@ module GHC.Internal.Prim.PtrEq
 import GHC.Internal.Base -- Also make implicit dependency known to build system
 import GHC.Internal.Prim
 
-default () -- Double and Integer aren't available yet
-
 {- **********************************************************************
 *                                                                       *
 *                        Pointer equality                               *

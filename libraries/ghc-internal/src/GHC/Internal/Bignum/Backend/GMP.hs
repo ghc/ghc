@@ -34,8 +34,6 @@ import {-# SOURCE #-} GHC.Internal.Bignum.Natural
 -- (This module uses the empty tuple () and string literals.)
 import GHC.Internal.Tuple ()
 
-default ()
-
 -- | ghc-bignum backend name
 backendName :: [Char]
 backendName = "gmp"

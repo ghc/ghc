@@ -167,8 +167,6 @@ import GHC.Internal.Bignum.BigNat
 import GHC.Internal.Bignum.Natural
 import qualified GHC.Internal.Bignum.Backend as Backend
 
-default ()
-
 -- | Arbitrary precision integers. In contrast with fixed-size integral types
 -- such as 'Int', the 'Integer' type represents the entire infinite range of
 -- integers.

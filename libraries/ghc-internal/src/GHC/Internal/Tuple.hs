@@ -33,8 +33,6 @@ module GHC.Internal.Tuple (
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
 import GHC.Internal.Types
 
-default () -- Double and Integer aren't available yet
-
 -- | The unit datatype @Unit@ has one non-undefined member, the nullary
 -- constructor @()@.
 --

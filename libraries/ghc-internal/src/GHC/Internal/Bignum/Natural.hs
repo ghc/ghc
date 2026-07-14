@@ -122,8 +122,6 @@ import GHC.Internal.Classes
 import GHC.Internal.Bignum.BigNat
 import GHC.Internal.Bignum.Primitives
 
-default ()
-
 -- | Natural number
 --
 -- Invariant: numbers <= WORD_MAXBOUND use the `NS` constructor
