@@ -284,6 +284,13 @@ def format_path(path):
 # On Windows we need to set $PATH to include the paths to all the DLLs
 # in order for the dynamic library tests to work.
 if windows:
+    # Add mingw to PATH
+    topdir = config.libdir
+    mingw = os.path.abspath(os.path.join(topdir, '../mingw/bin'))
+    mingw = format_path(mingw)
+    ghc_env['PATH'] = os.pathsep.join([ghc_env.get("PATH", ""), mingw])
+
+    # Add ghc packages to PATH
     try:
         pkginfo = getStdout([config.ghc_pkg, 'dump'])
     except FileNotFoundError as err:
@@ -292,24 +299,22 @@ if windows:
         print (err)
         print ("Failed to call ghc-pkg for windows path modification... some tests might fail")
         pkginfo = ""
-    topdir = config.libdir
-    mingw = os.path.abspath(os.path.join(topdir, '../mingw/bin'))
-    mingw = format_path(mingw)
-    ghc_env['PATH'] = os.pathsep.join([ghc_env.get("PATH", ""), mingw])
-    for line in pkginfo.split('\n'):
-        if line.startswith('library-dirs:'):
-            path = line.rstrip()
-            path = str_removeprefix(path, 'library-dirs: ')
-            # Use string.replace instead of re.sub, because re.sub
-            # interprets backslashes in the replacement string as
-            # escape sequences.
-            path = path.replace('$topdir', topdir)
-            if path.startswith('"'):
-                path = re.sub('^"(.*)"$', '\\1', path)
-                path = re.sub('\\\\(.)', '\\1', path)
 
-                path = format_path(path)
-                ghc_env['PATH'] = os.pathsep.join([path, ghc_env.get("PATH", "")])
+    newPaths = set()
+    # Find all the library-dirs and dynamic-library-dirs in the output of ghc-pkg dump
+    # First we find the full string (with whitespace) for each library-dirs and dynamic-library-dirs
+    for path_block in re.findall(r'^(?:library-dirs|dynamic-library-dirs):((?:.*(?:\n )?)*)', pkginfo, re.MULTILINE):
+        # Then we find the individual paths in that string (allowing quoted strings).
+        for path in re.findall(r'("[^"]*"|\S+)', path_block, re.MULTILINE):
+            # Then we unquote if needed
+            if path.startswith('"'):
+                path = re.sub(r'^"(.*)"$', r'\1', path)
+                path = re.sub(r'\\(.)', r'\1', path)
+            path = format_path(path)
+            newPaths.add(path)
+
+    for path in newPaths:
+        ghc_env['PATH'] = os.pathsep.join([path, ghc_env.get("PATH", "")])
 
 testopts_ctx_var.set(TestOptions())
 
