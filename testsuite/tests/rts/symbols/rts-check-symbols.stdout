@@ -1,0 +1,762 @@
+Symbols declared in RtsSymbols.c but not observed in the DSO:
+Declared> StgReturn Code
+Declared> __udivti3 Code
+Declared> __umodti3 Code
+Declared> atomic_dec Code
+Declared> dirty_TVAR Code
+Declared> ffi_call Code
+Declared> ffi_prep_cif Code
+Declared> ffi_type_double Data
+Declared> ffi_type_float Data
+Declared> ffi_type_pointer Data
+Declared> ffi_type_sint16 Data
+Declared> ffi_type_sint32 Data
+Declared> ffi_type_sint64 Data
+Declared> ffi_type_sint8 Data
+Declared> ffi_type_uint16 Data
+Declared> ffi_type_uint32 Data
+Declared> ffi_type_uint64 Data
+Declared> ffi_type_uint8 Data
+Declared> ffi_type_void Data
+Declared> signal_handlers Code
+Declared> updateRemembSetPushThunk Code
+
+Symbols observed in the DSO but not declared in RtsSymbols.c:
+Observed> AP_STACK_sizeW Code
+Observed> AP_sizeW Code
+Observed> BLACKHOLE_sizeW Code
+Observed> Bdescr Code
+Observed> CHARLIKE_CLOSURE Code
+Observed> CONSTR_sizeW Code
+Observed> CONTINUATION_sizeW Code
+Observed> CON_INFO_PTR_TO_STRUCT Code
+Observed> FUN_INFO_PTR_TO_STRUCT Code
+Observed> FileEventLogWriter Data
+Observed> GET_CLOSURE_TAG Code
+Observed> GET_INFO Code
+Observed> GET_TAG Code
+Observed> INFO_PTR_TO_STRUCT Code
+Observed> INTLIKE_CLOSURE Code
+Observed> LOOKS_LIKE_CLOSURE_PTR Code
+Observed> LOOKS_LIKE_INFO_PTR Code
+Observed> LOOKS_LIKE_INFO_PTR_NOT_NULL Code
+Observed> LOOKS_LIKE_PTR Code
+Observed> NullEventLogWriter Data
+Observed> OS_TRY_ACQUIRE_LOCK Code
+Observed> PAP_sizeW Code
+Observed> RET_INFO_PTR_TO_STRUCT Code
+Observed> SET_INFO Code
+Observed> SET_INFO_RELAXED Code
+Observed> SET_INFO_RELEASE Code
+Observed> STATIC_LINK Code
+Observed> TAG_CLOSURE Code
+Observed> THUNK_INFO_PTR_TO_STRUCT Code
+Observed> THUNK_SELECTOR_sizeW Code
+Observed> UNTAG_CLOSURE Code
+Observed> UNTAG_CONST_CLOSURE Code
+Observed> UPD_BH_UPDATABLE_ctr Data
+Observed> __rts_fopen Code
+Observed> _warnFail Code
+Observed> addInitFini Code
+Observed> addProddableBlock Code
+Observed> allocAlignedGroupOnNode Code
+Observed> allocBlock Code
+Observed> allocBlockOnNode Code
+Observed> allocBlockOnNode_lock Code
+Observed> allocBlock_lock Code
+Observed> allocGroup Code
+Observed> allocGroupOnNode Code
+Observed> allocGroupOnNode_lock Code
+Observed> allocGroup_lock Code
+Observed> allocLimitKill Data
+Observed> allocLimitRunHook Data
+Observed> allocMBlockAlignedGroupOnNode Code
+Observed> allocateMightFail Code
+Observed> allocatePinned Code
+Observed> allocated_bytes_at_heapoverflow Data
+Observed> ap_sizeW Code
+Observed> ap_stack_sizeW Code
+Observed> arr_words_sizeW Code
+Observed> arr_words_words Code
+Observed> bco_sizeW Code
+Observed> broadcastCondition Code
+Observed> cas_word8 Code
+Observed> checkProddableBlock Code
+Observed> checkVectorSupport Code
+Observed> clearImportSymbol Code
+Observed> closeCondition Code
+Observed> closeMutex Code
+Observed> closure_sizeW Code
+Observed> collect_pointers Code
+Observed> compact_nfdata_full_sizeW Code
+Observed> complex_ccall_adjustor_template Data
+Observed> containsSpan Code
+Observed> continuation_sizeW Code
+Observed> createAttachedOSThread Code
+Observed> createGenThread Code
+Observed> createIOThread Code
+Observed> createOSThread Code
+Observed> createStrictIOThread Code
+Observed> createThread Code
+Observed> currentWorkerCount Data
+Observed> debugMsgFn Data
+Observed> dequeElements Code
+Observed> dirty_STACK Code
+Observed> dirty_TSO Code
+Observed> discardElements Code
+Observed> era Data
+Observed> errorMsgFn Data
+Observed> eventLogStatus Code
+Observed> eventTypes Data
+Observed> exitFn Data
+Observed> exitHeapOverflow Code
+Observed> exitHpc Code
+Observed> fatalInternalErrorFn Data
+Observed> fillGot Code
+Observed> findSymbol Code
+Observed> findSymbolTable Code
+Observed> flushExec Code
+Observed> formatClosureDescIpe Code
+Observed> freeAllMBlocks Code
+Observed> freeChain Code
+Observed> freeChain_lock Code
+Observed> freeGot Code
+Observed> freeGroup Code
+Observed> freeGroup_lock Code
+Observed> freeInitFiniList Code
+Observed> freeMBlocks Code
+Observed> freeProddableBlocks Code
+Observed> freeThreadingResources Code
+Observed> freeWSDeque Code
+Observed> full_prog_argc Data
+Observed> full_prog_argv Data
+Observed> generations Data
+Observed> getFirstMBlock Code
+Observed> getMBlock Code
+Observed> getMBlockOnNode Code
+Observed> getMBlocks Code
+Observed> getMBlocksOnNode Code
+Observed> getNextMBlock Code
+Observed> getObjectLoadStatus Code
+Observed> get_con_itbl Code
+Observed> get_fun_itbl Code
+Observed> get_itbl Code
+Observed> get_itbl_acquire Code
+Observed> get_ret_itbl Code
+Observed> get_thunk_itbl Code
+Observed> heap_view_closurePtrs Code
+Observed> heap_view_closureSize Code
+Observed> heap_view_closure_ptrs_in_pap_payload Code
+Observed> highMemDynamic Data
+Observed> hs_main Code
+Observed> initAdjustors Code
+Observed> initBlockAllocator Code
+Observed> initCondition Code
+Observed> initGenerationStats Code
+Observed> initMBlocks Code
+Observed> initMutex Code
+Observed> initProddableBlockSet Code
+Observed> interp_shutdown Code
+Observed> interp_startup Code
+Observed> interruptOSThread Code
+Observed> isSymbolImport Code
+Observed> isSymbolWeak Code
+Observed> itbl_to_con_itbl Code
+Observed> itbl_to_fun_itbl Code
+Observed> itbl_to_ret_itbl Code
+Observed> itbl_to_thunk_itbl Code
+Observed> joinOSThread Code
+Observed> kernelThreadId Code
+Observed> listAllBlocks Code
+Observed> listThreads Code
+Observed> looksEmptyWSDeque Code
+Observed> lookupIPEId Code
+Observed> m32_free_page_pool Data
+Observed> m32_free_page_pool_size Data
+Observed> makeGot Code
+Observed> mblock_address_space Data
+Observed> mblocks_allocated Data
+Observed> modules Data
+Observed> mpc_misses Data
+Observed> mutArrPtrsCard Code
+Observed> mutArrPtrsCardTableSize Code
+Observed> mutArrPtrsCards Code
+Observed> mut_arr_ptrs_sizeW Code
+Observed> n_alloc_blocks_by_node Data
+Observed> needGotSlot Code
+Observed> newCAF Code
+Observed> newGCdCAF Code
+Observed> newRetainedCAF Code
+Observed> newWSDeque Code
+Observed> next_nursery Data
+Observed> no_break_on_exception Data
+Observed> nonmovingAllocatorCensus Code
+Observed> nonmovingAllocatorCensusWithWords Code
+Observed> nonmovingPrintAllocatorCensus Code
+Observed> nonmovingSweep Code
+Observed> nonmovingSweepCompactObjects Code
+Observed> nonmovingSweepLargeObjects Code
+Observed> nonmovingSweepMutLists Code
+Observed> nonmovingSweepStableNameTable Code
+Observed> nonmovingTraceAllocatorCensus Code
+Observed> oldest_gen Data
+Observed> osThreadId Code
+Observed> osThreadIsAlive Code
+Observed> pap_sizeW Code
+Observed> pauseTokenCapability Code
+Observed> pbarf Code
+Observed> peak_mblocks_allocated Data
+Observed> poolFlush Code
+Observed> poolFree Code
+Observed> poolGetDesiredSize Code
+Observed> poolGetMaxSize Code
+Observed> poolInit Code
+Observed> poolRelease Code
+Observed> poolSetDesiredSize Code
+Observed> poolSetMaxSize Code
+Observed> poolTake Code
+Observed> poolTryTake Code
+Observed> popWSDeque Code
+Observed> printLoadedObjects Code
+Observed> prog_name Data
+Observed> pushWSDeque Code
+Observed> re_invalid Data
+Observed> re_realso Data
+Observed> releaseFreeMemory Code
+Observed> releaseThreadNode Code
+Observed> reportMemoryMap Code
+Observed> rtsDebugMsgFn Code
+Observed> rtsErrorMsgFn Code
+Observed> rtsFatalInternalErrorFn Code
+Observed> rtsSysErrorMsgFn Code
+Observed> rts_argc Data
+Observed> rts_argv Data
+Observed> rts_argv_size Data
+Observed> rts_done Code
+Observed> rts_evalLazyIO_ Code
+Observed> rts_getSchedStatus Code
+Observed> rts_isPaused Code
+Observed> rts_listMiscRoots Code
+Observed> rts_listThreads Code
+Observed> rts_pause Code
+Observed> rts_pinThreadToNumaNode Code
+Observed> rts_resume Code
+Observed> runFini Code
+Observed> runInit Code
+Observed> sbarf Code
+Observed> scheduleWaitThread Code
+Observed> setHighMemDynamic Code
+Observed> setImportSymbol Code
+Observed> setSymbolInfo Code
+Observed> setTSOLink Code
+Observed> setTSOPrev Code
+Observed> setThreadAffinity Code
+Observed> setThreadNode Code
+Observed> setVectorSupport Code
+Observed> setWeakSymbol Code
+Observed> shndx_table_uninit_label Data
+Observed> shouldCompact Code
+Observed> shutdownThread Code
+Observed> signalCondition Code
+Observed> simple_ccall_adjustor_template Data
+Observed> sizeW_fromITBL Code
+Observed> small_mut_arr_ptrs_sizeW Code
+Observed> ssbarf Code
+Observed> stack_frame_sizeW Code
+Observed> stack_sizeW Code
+Observed> state_change_mutex Data
+Observed> stealWSDeque Code
+Observed> stealWSDeque_ Code
+Observed> stg_AP_NOUPD_info Data
+Observed> stg_AP_STACK_NOUPD_info Data
+Observed> stg_AP_STACK_info Data
+Observed> stg_AP_info Data
+Observed> stg_ASYNCIOOP_info Data
+Observed> stg_ASYNCIO_LIVE0_closure Data
+Observed> stg_ASYNCIO_LIVE0_info Data
+Observed> stg_BCO_info Data
+Observed> stg_CLOSURE_TABLE_NULL_closure Data
+Observed> stg_CLOSURE_TABLE_NULL_info Data
+Observed> stg_COMPACT_NFDATA_CLEAN_info Data
+Observed> stg_COMPACT_NFDATA_DIRTY_info Data
+Observed> stg_CONTINUATION_apply Code
+Observed> stg_CONTINUATION_info Data
+Observed> stg_C_FINALIZER_LIST_info Data
+Observed> stg_DEAD_SLOT_closure Data
+Observed> stg_DEAD_SLOT_info Data
+Observed> stg_DEAD_WEAK_info Data
+Observed> stg_END_STM_CHUNK_LIST_closure Data
+Observed> stg_END_STM_CHUNK_LIST_info Data
+Observed> stg_END_STM_WATCH_QUEUE_closure Data
+Observed> stg_END_STM_WATCH_QUEUE_info Data
+Observed> stg_END_TSO_QUEUE_closure Data
+Observed> stg_END_TSO_QUEUE_info Data
+Observed> stg_GCD_CAF_info Data
+Observed> stg_IND_info Data
+Observed> stg_MSG_BLACKHOLE_info Data
+Observed> stg_MSG_CLONE_STACK_info Data
+Observed> stg_MSG_NULL_info Data
+Observed> stg_MSG_THROWTO_info Data
+Observed> stg_MSG_TRY_WAKEUP_info Data
+Observed> stg_MSG_UPD_TSO_FLAG_info Data
+Observed> stg_MUT_ARR_PTRS_CLEAN_info Data
+Observed> stg_MVAR_TSO_QUEUE_info Data
+Observed> stg_NO_FINALIZER_closure Data
+Observed> stg_NO_FINALIZER_info Data
+Observed> stg_NO_TREC_closure Data
+Observed> stg_NO_TREC_info Data
+Observed> stg_PAP_apply Code
+Observed> stg_PAP_info Data
+Observed> stg_PROMPT_TAG_info Data
+Observed> stg_SMALL_MUT_ARR_PTRS_CLEAN_info Data
+Observed> stg_STABLE_NAME_info Data
+Observed> stg_STACK_info Data
+Observed> stg_TIMEOUT_QUEUE_EMPTY_closure Data
+Observed> stg_TIMEOUT_QUEUE_EMPTY_info Data
+Observed> stg_TIMEOUT_QUEUE_info Data
+Observed> stg_TREC_CHUNK_info Data
+Observed> stg_TREC_HEADER_info Data
+Observed> stg_TSO_info Data
+Observed> stg_TVAR_WATCH_QUEUE_info Data
+Observed> stg_WHITEHOLE_info Data
+Observed> stg_abort Code
+Observed> stg_ann_frame_info Data
+Observed> stg_ap_0_ret_str Data
+Observed> stg_ap_stack_entries Data
+Observed> stg_ap_stk_ Code
+Observed> stg_ap_stk_d Code
+Observed> stg_ap_stk_f Code
+Observed> stg_ap_stk_l Code
+Observed> stg_ap_stk_n Code
+Observed> stg_ap_stk_nn Code
+Observed> stg_ap_stk_nnn Code
+Observed> stg_ap_stk_nnp Code
+Observed> stg_ap_stk_np Code
+Observed> stg_ap_stk_npn Code
+Observed> stg_ap_stk_npp Code
+Observed> stg_ap_stk_p Code
+Observed> stg_ap_stk_pn Code
+Observed> stg_ap_stk_pnn Code
+Observed> stg_ap_stk_pnp Code
+Observed> stg_ap_stk_pp Code
+Observed> stg_ap_stk_ppn Code
+Observed> stg_ap_stk_ppp Code
+Observed> stg_ap_stk_pppp Code
+Observed> stg_ap_stk_ppppp Code
+Observed> stg_ap_stk_pppppp Code
+Observed> stg_ap_stk_ppppppp Code
+Observed> stg_ap_stk_pppppppp Code
+Observed> stg_ap_stk_v16 Code
+Observed> stg_ap_stk_v32 Code
+Observed> stg_ap_stk_v64 Code
+Observed> stg_apply_interp_info Data
+Observed> stg_atomically_frame_info Data
+Observed> stg_atomically_info Data
+Observed> stg_atomically_waiting_frame_info Data
+Observed> stg_block_blackhole Code
+Observed> stg_block_io_int Code
+Observed> stg_block_io_int_info Data
+Observed> stg_block_io_unit Code
+Observed> stg_block_io_unit_info Data
+Observed> stg_block_putmvar_finally Code
+Observed> stg_block_putmvar_info Data
+Observed> stg_block_readmvar_finally Code
+Observed> stg_block_readmvar_info Data
+Observed> stg_block_stmwait Code
+Observed> stg_block_takemvar_finally Code
+Observed> stg_block_takemvar_info Data
+Observed> stg_block_throwto Code
+Observed> stg_block_throwto_finally Code
+Observed> stg_block_throwto_info Data
+Observed> stg_catch_frame_info Data
+Observed> stg_catch_retry_frame_info Data
+Observed> stg_catch_stm_frame_info Data
+Observed> stg_compactAddWorkerzh Code
+Observed> stg_control0zh_ll Code
+Observed> stg_ctoi_D1_info Data
+Observed> stg_ctoi_F1_info Data
+Observed> stg_ctoi_L1_info Data
+Observed> stg_ctoi_R1n_info Data
+Observed> stg_ctoi_R1p_info Data
+Observed> stg_ctoi_V_info Data
+Observed> stg_dead_thread_info Data
+Observed> stg_do_unpack_cstring Code
+Observed> stg_do_unpack_cstring_utf8 Code
+Observed> stg_dummy_ret_closure Data
+Observed> stg_dummy_ret_info Data
+Observed> stg_forceIO_info Data
+Observed> stg_gc_prim Code
+Observed> stg_gc_prim_p_ll Code
+Observed> stg_gc_prim_p_ll_info Data
+Observed> stg_gc_prim_pp_ll Code
+Observed> stg_gc_prim_pp_ll_info Data
+Observed> stg_handleIOSubmitResult Code
+Observed> stg_keepAlive_frame_info Data
+Observed> stg_killMyself Code
+Observed> stg_marked_upd_frame_info Data
+Observed> stg_maskAsyncExceptionszh_ret_info Data
+Observed> stg_maskUninterruptiblezh_ret_info Data
+Observed> stg_noDuplicate_info Data
+Observed> stg_overwritingClosure Code
+Observed> stg_overwritingClosureSize Code
+Observed> stg_prompt_frame_info Data
+Observed> stg_raise_info Data
+Observed> stg_raise_ret_info Data
+Observed> stg_restore_cccs_d_info Data
+Observed> stg_restore_cccs_eval_info Data
+Observed> stg_restore_cccs_v16_info Data
+Observed> stg_restore_cccs_v32_info Data
+Observed> stg_restore_cccs_v64_info Data
+Observed> stg_returnToSched Code
+Observed> stg_returnToSchedButFirst Code
+Observed> stg_returnToSchedNotPaused Code
+Observed> stg_returnToStackTop Code
+Observed> stg_stack_save_entries Data
+Observed> stg_stack_underflow_frame_d_info Data
+Observed> stg_stack_underflow_frame_v16_info Data
+Observed> stg_stack_underflow_frame_v32_info Data
+Observed> stg_stack_underflow_frame_v64_info Data
+Observed> stg_stk_save_ Code
+Observed> stg_stk_save_d Code
+Observed> stg_stk_save_f Code
+Observed> stg_stk_save_l Code
+Observed> stg_stk_save_n Code
+Observed> stg_stk_save_nn Code
+Observed> stg_stk_save_nnn Code
+Observed> stg_stk_save_nnp Code
+Observed> stg_stk_save_np Code
+Observed> stg_stk_save_npn Code
+Observed> stg_stk_save_npp Code
+Observed> stg_stk_save_p Code
+Observed> stg_stk_save_pn Code
+Observed> stg_stk_save_pnn Code
+Observed> stg_stk_save_pnp Code
+Observed> stg_stk_save_pp Code
+Observed> stg_stk_save_ppn Code
+Observed> stg_stk_save_ppp Code
+Observed> stg_stk_save_pppp Code
+Observed> stg_stk_save_ppppp Code
+Observed> stg_stk_save_pppppp Code
+Observed> stg_stk_save_ppppppp Code
+Observed> stg_stk_save_pppppppp Code
+Observed> stg_stk_save_v16 Code
+Observed> stg_stk_save_v32 Code
+Observed> stg_stk_save_v64 Code
+Observed> stg_stop_thread_info Data
+Observed> stg_threadFinished Code
+Observed> stg_unmaskAsyncExceptionszh_ret_info Data
+Observed> stg_writeSlopMarker Code
+Observed> sync_phase_marking_budget Data
+Observed> sysErrorMsgFn Data
+Observed> tagConstr Code
+Observed> thunk_sizeW_fromITBL Code
+Observed> timedWaitCondition Code
+Observed> totalArgumentSize Code
+Observed> total_ticks Data
+Observed> unloadNativeObj Code
+Observed> user_era Data
+Observed> validate_trec_optimistic Code
+Observed> vbarf Code
+Observed> vdebugBelch Code
+Observed> vectorSupportGlobalVar Data
+Observed> verifyGot Code
+Observed> verrorBelch Code
+Observed> vsysErrorBelch Code
+Observed> waitCondition Code
+Observed> warnMissingKBLibraryPaths Code
+Observed> yieldThread Code
+
+Symbols observed in the DSO and declared in RtsSymbols.c but with conflicting type:
+WrongType> ALLOC_BH_adm (declared, observed): (Code, Data)
+WrongType> ALLOC_BH_ctr (declared, observed): (Code, Data)
+WrongType> ALLOC_BH_gds (declared, observed): (Code, Data)
+WrongType> ALLOC_BH_slp (declared, observed): (Code, Data)
+WrongType> ALLOC_CON_adm (declared, observed): (Code, Data)
+WrongType> ALLOC_CON_ctr (declared, observed): (Code, Data)
+WrongType> ALLOC_CON_gds (declared, observed): (Code, Data)
+WrongType> ALLOC_CON_slp (declared, observed): (Code, Data)
+WrongType> ALLOC_FUN_adm (declared, observed): (Code, Data)
+WrongType> ALLOC_FUN_ctr (declared, observed): (Code, Data)
+WrongType> ALLOC_FUN_gds (declared, observed): (Code, Data)
+WrongType> ALLOC_FUN_slp (declared, observed): (Code, Data)
+WrongType> ALLOC_HEAP_ctr (declared, observed): (Code, Data)
+WrongType> ALLOC_HEAP_tot (declared, observed): (Code, Data)
+WrongType> ALLOC_PAP_adm (declared, observed): (Code, Data)
+WrongType> ALLOC_PAP_ctr (declared, observed): (Code, Data)
+WrongType> ALLOC_PAP_gds (declared, observed): (Code, Data)
+WrongType> ALLOC_PAP_slp (declared, observed): (Code, Data)
+WrongType> ALLOC_PRIM_adm (declared, observed): (Code, Data)
+WrongType> ALLOC_PRIM_ctr (declared, observed): (Code, Data)
+WrongType> ALLOC_PRIM_gds (declared, observed): (Code, Data)
+WrongType> ALLOC_PRIM_slp (declared, observed): (Code, Data)
+WrongType> ALLOC_RTS_ctr (declared, observed): (Code, Data)
+WrongType> ALLOC_RTS_tot (declared, observed): (Code, Data)
+WrongType> ALLOC_SE_THK_ctr (declared, observed): (Code, Data)
+WrongType> ALLOC_STACK_ctr (declared, observed): (Code, Data)
+WrongType> ALLOC_STACK_tot (declared, observed): (Code, Data)
+WrongType> ALLOC_THK_adm (declared, observed): (Code, Data)
+WrongType> ALLOC_THK_gds (declared, observed): (Code, Data)
+WrongType> ALLOC_THK_slp (declared, observed): (Code, Data)
+WrongType> ALLOC_TSO_ctr (declared, observed): (Code, Data)
+WrongType> ALLOC_TSO_tot (declared, observed): (Code, Data)
+WrongType> ALLOC_TUP_adm (declared, observed): (Code, Data)
+WrongType> ALLOC_TUP_ctr (declared, observed): (Code, Data)
+WrongType> ALLOC_TUP_gds (declared, observed): (Code, Data)
+WrongType> ALLOC_TUP_slp (declared, observed): (Code, Data)
+WrongType> ALLOC_UP_THK_ctr (declared, observed): (Code, Data)
+WrongType> CATCHF_PUSHED_ctr (declared, observed): (Code, Data)
+WrongType> ENT_AP_STACK_ctr (declared, observed): (Code, Data)
+WrongType> ENT_AP_ctr (declared, observed): (Code, Data)
+WrongType> ENT_BH_ctr (declared, observed): (Code, Data)
+WrongType> ENT_CONTINUATION_ctr (declared, observed): (Code, Data)
+WrongType> ENT_DYN_CON_ctr (declared, observed): (Code, Data)
+WrongType> ENT_DYN_FUN_DIRECT_ctr (declared, observed): (Code, Data)
+WrongType> ENT_DYN_IND_ctr (declared, observed): (Code, Data)
+WrongType> ENT_DYN_THK_MANY_ctr (declared, observed): (Code, Data)
+WrongType> ENT_DYN_THK_SINGLE_ctr (declared, observed): (Code, Data)
+WrongType> ENT_LNE_ctr (declared, observed): (Code, Data)
+WrongType> ENT_PAP_ctr (declared, observed): (Code, Data)
+WrongType> ENT_PERM_IND_ctr (declared, observed): (Code, Data)
+WrongType> ENT_STATIC_CON_ctr (declared, observed): (Code, Data)
+WrongType> ENT_STATIC_FUN_DIRECT_ctr (declared, observed): (Code, Data)
+WrongType> ENT_STATIC_IND_ctr (declared, observed): (Code, Data)
+WrongType> ENT_STATIC_THK_MANY_ctr (declared, observed): (Code, Data)
+WrongType> ENT_STATIC_THK_SINGLE_ctr (declared, observed): (Code, Data)
+WrongType> ENT_VIA_NODE_ctr (declared, observed): (Code, Data)
+WrongType> GC_FAILED_PROMOTION_ctr (declared, observed): (Code, Data)
+WrongType> GC_SEL_ABANDONED_ctr (declared, observed): (Code, Data)
+WrongType> GC_SEL_MAJOR_ctr (declared, observed): (Code, Data)
+WrongType> GC_SEL_MINOR_ctr (declared, observed): (Code, Data)
+WrongType> HEAP_CHK_ctr (declared, observed): (Code, Data)
+WrongType> KNOWN_CALL_EXTRA_ARGS_ctr (declared, observed): (Code, Data)
+WrongType> KNOWN_CALL_TOO_FEW_ARGS_ctr (declared, observed): (Code, Data)
+WrongType> KNOWN_CALL_ctr (declared, observed): (Code, Data)
+WrongType> MULTI_CHUNK_SLOW_CALL_CHUNKS_ctr (declared, observed): (Code, Data)
+WrongType> MULTI_CHUNK_SLOW_CALL_ctr (declared, observed): (Code, Data)
+WrongType> MainCapability (declared, observed): (Code, Data)
+WrongType> RET_NEW_ctr (declared, observed): (Code, Data)
+WrongType> RET_NEW_hst (declared, observed): (Code, Data)
+WrongType> RET_OLD_ctr (declared, observed): (Code, Data)
+WrongType> RET_OLD_hst (declared, observed): (Code, Data)
+WrongType> RET_SEMI_loads_avoided (declared, observed): (Code, Data)
+WrongType> RET_UNBOXED_TUP_ctr (declared, observed): (Code, Data)
+WrongType> RET_UNBOXED_TUP_hst (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_FUN_CORRECT_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_FUN_TOO_FEW_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_FUN_TOO_MANY_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_PAP_CORRECT_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_PAP_TOO_FEW_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_PAP_TOO_MANY_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_UNEVALD_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_fast_d_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_fast_f_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_fast_l_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_fast_n_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_fast_p_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_fast_pp_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_fast_ppp_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_fast_pppp_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_fast_ppppp_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_fast_pppppp_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_fast_pppv_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_fast_ppv_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_fast_pv_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_fast_v16_ctr (declared, observed): (Code, Data)
+WrongType> SLOW_CALL_fast_v_ctr (declared, observed): (Code, Data)
+WrongType> STK_CHK_ctr (declared, observed): (Code, Data)
+WrongType> TAG_TAGGED_miss (declared, observed): (Code, Data)
+WrongType> TAG_TAGGED_pred (declared, observed): (Code, Data)
+WrongType> TAG_UNTAGGED_miss (declared, observed): (Code, Data)
+WrongType> TAG_UNTAGGED_pred (declared, observed): (Code, Data)
+WrongType> UNKNOWN_CALL_ctr (declared, observed): (Code, Data)
+WrongType> UPDF_OMITTED_ctr (declared, observed): (Code, Data)
+WrongType> UPDF_PUSHED_ctr (declared, observed): (Code, Data)
+WrongType> UPDF_RCC_OMITTED_ctr (declared, observed): (Code, Data)
+WrongType> UPDF_RCC_PUSHED_ctr (declared, observed): (Code, Data)
+WrongType> UPD_CAF_BH_SINGLE_ENTRY_ctr (declared, observed): (Code, Data)
+WrongType> UPD_CAF_BH_UPDATABLE_ctr (declared, observed): (Code, Data)
+WrongType> UPD_CON_IN_NEW_ctr (declared, observed): (Code, Data)
+WrongType> UPD_CON_IN_PLACE_ctr (declared, observed): (Code, Data)
+WrongType> UPD_NEW_IND_ctr (declared, observed): (Code, Data)
+WrongType> UPD_NEW_PERM_IND_ctr (declared, observed): (Code, Data)
+WrongType> UPD_OLD_IND_ctr (declared, observed): (Code, Data)
+WrongType> UPD_OLD_PERM_IND_ctr (declared, observed): (Code, Data)
+WrongType> UPD_PAP_IN_NEW_ctr (declared, observed): (Code, Data)
+WrongType> UPD_PAP_IN_PLACE_ctr (declared, observed): (Code, Data)
+WrongType> UPD_SQUEEZED_ctr (declared, observed): (Code, Data)
+WrongType> VERY_SLOW_CALL_ctr (declared, observed): (Code, Data)
+WrongType> __stg_gc_enter_1 (declared, observed): (Data, Code)
+WrongType> __stg_gc_fun (declared, observed): (Data, Code)
+WrongType> closure_flags (declared, observed): (Code, Data)
+WrongType> defaultRtsConfig (declared, observed): (Code, Data)
+WrongType> g0 (declared, observed): (Code, Data)
+WrongType> ghc_unique_counter64 (declared, observed): (Code, Data)
+WrongType> ghc_unique_inc (declared, observed): (Code, Data)
+WrongType> keepCAFs (declared, observed): (Code, Data)
+WrongType> large_alloc_lim (declared, observed): (Code, Data)
+WrongType> prog_argc (declared, observed): (Code, Data)
+WrongType> prog_argv (declared, observed): (Code, Data)
+WrongType> stable_name_table (declared, observed): (Code, Data)
+WrongType> stable_ptr_table (declared, observed): (Code, Data)
+WrongType> stg_CHARLIKE_closure (declared, observed): (Code, Data)
+WrongType> stg_INTLIKE_closure (declared, observed): (Code, Data)
+WrongType> stg_absentErrorzh (declared, observed): (Data, Code)
+WrongType> stg_annotateStackzh (declared, observed): (Data, Code)
+WrongType> stg_ap_0_fast (declared, observed): (Data, Code)
+WrongType> stg_ap_d_fast (declared, observed): (Data, Code)
+WrongType> stg_ap_f_fast (declared, observed): (Data, Code)
+WrongType> stg_ap_l_fast (declared, observed): (Data, Code)
+WrongType> stg_ap_n_fast (declared, observed): (Data, Code)
+WrongType> stg_ap_p_fast (declared, observed): (Data, Code)
+WrongType> stg_ap_pp_fast (declared, observed): (Data, Code)
+WrongType> stg_ap_ppp_fast (declared, observed): (Data, Code)
+WrongType> stg_ap_pppp_fast (declared, observed): (Data, Code)
+WrongType> stg_ap_ppppp_fast (declared, observed): (Data, Code)
+WrongType> stg_ap_pppppp_fast (declared, observed): (Data, Code)
+WrongType> stg_ap_pppv_fast (declared, observed): (Data, Code)
+WrongType> stg_ap_ppv_fast (declared, observed): (Data, Code)
+WrongType> stg_ap_pv_fast (declared, observed): (Data, Code)
+WrongType> stg_ap_v16_fast (declared, observed): (Data, Code)
+WrongType> stg_ap_v32_fast (declared, observed): (Data, Code)
+WrongType> stg_ap_v64_fast (declared, observed): (Data, Code)
+WrongType> stg_ap_v_fast (declared, observed): (Data, Code)
+WrongType> stg_atomicModifyMutVar2zh (declared, observed): (Data, Code)
+WrongType> stg_atomicModifyMutVarzuzh (declared, observed): (Data, Code)
+WrongType> stg_atomicallyzh (declared, observed): (Data, Code)
+WrongType> stg_block_noregs (declared, observed): (Data, Code)
+WrongType> stg_block_putmvar (declared, observed): (Data, Code)
+WrongType> stg_block_readmvar (declared, observed): (Data, Code)
+WrongType> stg_block_takemvar (declared, observed): (Data, Code)
+WrongType> stg_casArrayzh (declared, observed): (Data, Code)
+WrongType> stg_casInt16Arrayzh (declared, observed): (Data, Code)
+WrongType> stg_casInt32Arrayzh (declared, observed): (Data, Code)
+WrongType> stg_casInt64Arrayzh (declared, observed): (Data, Code)
+WrongType> stg_casInt8Arrayzh (declared, observed): (Data, Code)
+WrongType> stg_casIntArrayzh (declared, observed): (Data, Code)
+WrongType> stg_casMutVarzh (declared, observed): (Data, Code)
+WrongType> stg_casSmallArrayzh (declared, observed): (Data, Code)
+WrongType> stg_castDoubleToWord64zh (declared, observed): (Data, Code)
+WrongType> stg_castFloatToWord32zh (declared, observed): (Data, Code)
+WrongType> stg_castWord32ToFloatzh (declared, observed): (Data, Code)
+WrongType> stg_castWord64ToDoublezh (declared, observed): (Data, Code)
+WrongType> stg_catchRetryzh (declared, observed): (Data, Code)
+WrongType> stg_catchSTMzh (declared, observed): (Data, Code)
+WrongType> stg_catchzh (declared, observed): (Data, Code)
+WrongType> stg_clearCCSzh (declared, observed): (Data, Code)
+WrongType> stg_cloneArrayzh (declared, observed): (Data, Code)
+WrongType> stg_cloneMutableArrayzh (declared, observed): (Data, Code)
+WrongType> stg_cloneSmallArrayzh (declared, observed): (Data, Code)
+WrongType> stg_cloneSmallMutableArrayzh (declared, observed): (Data, Code)
+WrongType> stg_closureSizzezh (declared, observed): (Data, Code)
+WrongType> stg_compactAddWithSharingzh (declared, observed): (Data, Code)
+WrongType> stg_compactAddzh (declared, observed): (Data, Code)
+WrongType> stg_compactAllocateBlockzh (declared, observed): (Data, Code)
+WrongType> stg_compactContainsAnyzh (declared, observed): (Data, Code)
+WrongType> stg_compactContainszh (declared, observed): (Data, Code)
+WrongType> stg_compactFixupPointerszh (declared, observed): (Data, Code)
+WrongType> stg_compactGetFirstBlockzh (declared, observed): (Data, Code)
+WrongType> stg_compactGetNextBlockzh (declared, observed): (Data, Code)
+WrongType> stg_compactNewzh (declared, observed): (Data, Code)
+WrongType> stg_compactResizzezh (declared, observed): (Data, Code)
+WrongType> stg_compactSizzezh (declared, observed): (Data, Code)
+WrongType> stg_copyArray_barrier (declared, observed): (Data, Code)
+WrongType> stg_copyArrayzh (declared, observed): (Data, Code)
+WrongType> stg_copyMutableArrayzh (declared, observed): (Data, Code)
+WrongType> stg_copySmallArrayzh (declared, observed): (Data, Code)
+WrongType> stg_copySmallMutableArrayzh (declared, observed): (Data, Code)
+WrongType> stg_deRefStablePtrzh (declared, observed): (Data, Code)
+WrongType> stg_deRefWeakzh (declared, observed): (Data, Code)
+WrongType> stg_decodeDoublezu2Intzh (declared, observed): (Data, Code)
+WrongType> stg_decodeDoublezuInt64zh (declared, observed): (Data, Code)
+WrongType> stg_decodeFloatzuIntzh (declared, observed): (Data, Code)
+WrongType> stg_delayzh (declared, observed): (Data, Code)
+WrongType> stg_exit (declared, observed): (Data, Code)
+WrongType> stg_freezzeArrayzh (declared, observed): (Data, Code)
+WrongType> stg_freezzeSmallArrayzh (declared, observed): (Data, Code)
+WrongType> stg_gc_bpp (declared, observed): (Data, Code)
+WrongType> stg_gc_d1 (declared, observed): (Data, Code)
+WrongType> stg_gc_f1 (declared, observed): (Data, Code)
+WrongType> stg_gc_ii (declared, observed): (Data, Code)
+WrongType> stg_gc_ip (declared, observed): (Data, Code)
+WrongType> stg_gc_l1 (declared, observed): (Data, Code)
+WrongType> stg_gc_noregs (declared, observed): (Data, Code)
+WrongType> stg_gc_pi (declared, observed): (Data, Code)
+WrongType> stg_gc_pp (declared, observed): (Data, Code)
+WrongType> stg_gc_ppp (declared, observed): (Data, Code)
+WrongType> stg_gc_pppp (declared, observed): (Data, Code)
+WrongType> stg_gc_ppppp (declared, observed): (Data, Code)
+WrongType> stg_gc_prim_n (declared, observed): (Data, Code)
+WrongType> stg_gc_prim_p (declared, observed): (Data, Code)
+WrongType> stg_gc_prim_pp (declared, observed): (Data, Code)
+WrongType> stg_gc_unbx_r1 (declared, observed): (Data, Code)
+WrongType> stg_gc_unpt_r1 (declared, observed): (Data, Code)
+WrongType> stg_getApStackValzh (declared, observed): (Data, Code)
+WrongType> stg_getMaskingStatezh (declared, observed): (Data, Code)
+WrongType> stg_getOtherThreadAllocationCounterzh (declared, observed): (Data, Code)
+WrongType> stg_getSparkzh (declared, observed): (Data, Code)
+WrongType> stg_getThreadAllocationCounterzh (declared, observed): (Data, Code)
+WrongType> stg_isByteArrayPinnedzh (declared, observed): (Data, Code)
+WrongType> stg_isByteArrayWeaklyPinnedzh (declared, observed): (Data, Code)
+WrongType> stg_isCurrentThreadBoundzh (declared, observed): (Data, Code)
+WrongType> stg_isEmptyMVarzh (declared, observed): (Data, Code)
+WrongType> stg_isMutableByteArrayPinnedzh (declared, observed): (Data, Code)
+WrongType> stg_isMutableByteArrayWeaklyPinnedzh (declared, observed): (Data, Code)
+WrongType> stg_keepAlivezh (declared, observed): (Data, Code)
+WrongType> stg_killThreadzh (declared, observed): (Data, Code)
+WrongType> stg_labelThreadzh (declared, observed): (Data, Code)
+WrongType> stg_listThreadszh (declared, observed): (Data, Code)
+WrongType> stg_makeStablePtrzh (declared, observed): (Data, Code)
+WrongType> stg_maskAsyncExceptionszh (declared, observed): (Data, Code)
+WrongType> stg_maskUninterruptiblezh (declared, observed): (Data, Code)
+WrongType> stg_mkApUpd0zh (declared, observed): (Data, Code)
+WrongType> stg_newAlignedPinnedByteArrayzh (declared, observed): (Data, Code)
+WrongType> stg_newArrayzh (declared, observed): (Data, Code)
+WrongType> stg_newBCOzh (declared, observed): (Data, Code)
+WrongType> stg_newByteArrayzh (declared, observed): (Data, Code)
+WrongType> stg_newConAppObjzh (declared, observed): (Data, Code)
+WrongType> stg_newMVarzh (declared, observed): (Data, Code)
+WrongType> stg_newMutVarzh (declared, observed): (Data, Code)
+WrongType> stg_newPinnedByteArrayzh (declared, observed): (Data, Code)
+WrongType> stg_newSmallArrayzh (declared, observed): (Data, Code)
+WrongType> stg_newTVarzh (declared, observed): (Data, Code)
+WrongType> stg_noDuplicatezh (declared, observed): (Data, Code)
+WrongType> stg_numSparkszh (declared, observed): (Data, Code)
+WrongType> stg_paniczh (declared, observed): (Data, Code)
+WrongType> stg_putMVarzh (declared, observed): (Data, Code)
+WrongType> stg_raiseDivZZerozh (declared, observed): (Data, Code)
+WrongType> stg_raiseIOzh (declared, observed): (Data, Code)
+WrongType> stg_raiseOverflowzh (declared, observed): (Data, Code)
+WrongType> stg_raiseUnderflowzh (declared, observed): (Data, Code)
+WrongType> stg_raisezh (declared, observed): (Data, Code)
+WrongType> stg_readMVarzh (declared, observed): (Data, Code)
+WrongType> stg_readTVarIOzh (declared, observed): (Data, Code)
+WrongType> stg_readTVarzh (declared, observed): (Data, Code)
+WrongType> stg_resizzeMutableByteArrayzh (declared, observed): (Data, Code)
+WrongType> stg_retryzh (declared, observed): (Data, Code)
+WrongType> stg_setOtherThreadAllocationCounterzh (declared, observed): (Data, Code)
+WrongType> stg_setThreadAllocationCounterzh (declared, observed): (Data, Code)
+WrongType> stg_shrinkMutableByteArrayzh (declared, observed): (Data, Code)
+WrongType> stg_shrinkSmallMutableArrayzh (declared, observed): (Data, Code)
+WrongType> stg_takeMVarzh (declared, observed): (Data, Code)
+WrongType> stg_thawArrayzh (declared, observed): (Data, Code)
+WrongType> stg_thawSmallArrayzh (declared, observed): (Data, Code)
+WrongType> stg_threadLabelzh (declared, observed): (Data, Code)
+WrongType> stg_threadStatuszh (declared, observed): (Data, Code)
+WrongType> stg_traceBinaryEventzh (declared, observed): (Data, Code)
+WrongType> stg_traceEventzh (declared, observed): (Data, Code)
+WrongType> stg_traceMarkerzh (declared, observed): (Data, Code)
+WrongType> stg_tryReadMVarzh (declared, observed): (Data, Code)
+WrongType> stg_tryTakeMVarzh (declared, observed): (Data, Code)
+WrongType> stg_unmaskAsyncExceptionszh (declared, observed): (Data, Code)
+WrongType> stg_unpackClosurezh (declared, observed): (Data, Code)
+WrongType> stg_unsafeThawArrayzh (declared, observed): (Data, Code)
+WrongType> stg_unsafeThawSmallArrayzh (declared, observed): (Data, Code)
+WrongType> stg_waitReadzh (declared, observed): (Data, Code)
+WrongType> stg_waitWritezh (declared, observed): (Data, Code)
+WrongType> stg_whereFromzh (declared, observed): (Data, Code)
+WrongType> stg_writeTVarzh (declared, observed): (Data, Code)
+WrongType> stg_yield_noregs (declared, observed): (Data, Code)
+WrongType> stg_yield_to_interpreter (declared, observed): (Data, Code)
+WrongType> stg_yieldzh (declared, observed): (Data, Code)
+WrongType> ticky_slow_call_unevald (declared, observed): (Code, Data)
