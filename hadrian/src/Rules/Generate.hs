@@ -423,7 +423,7 @@ bindistRules = do
 
     , interpolateVar "HostOS_CPP" $ fmap cppify $ interp $ queryHost queryOS
 
-    -- Stage2 always targets the final  architecture. Thus, we can use a
+    -- Stage2 always targets the final architecture. Thus, we can use a
     -- constant stage here.
     , interpolateVar "TargetPlatform" $ getTarget Stage2 targetPlatformTriple
     , interpolateVar "TargetPlatform_CPP" $ cppify <$> getTarget Stage2 targetPlatformTriple
