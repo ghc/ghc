@@ -962,7 +962,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
       , artifactPaths = [binDistName arch opsys buildConfig ++ ".tar.xz"
                         ,"junit.xml"
                         ,"unexpected-test-output.tar.gz"]
-                        ++ stage3Artifacts  
+                        ++ stage3Artifacts
       , artifactsWhen = ArtifactsAlways
       }
 
