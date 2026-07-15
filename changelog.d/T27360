@@ -1,0 +1,10 @@
+section: compiler
+issues: #27360
+mrs: !16161
+synopsis:
+  Recognise ``considerAccessible`` under ticks (``-g``, ``-finfo-table-map``, ``-fhpc`` etc)
+description:
+  The pattern-match checker now properly recognises ``considerAccessible`` even
+  when it is surrounded by ticks (e.g. debug info ticks with ``-g``, with
+  ``-finfo-table-map``, etc). This ensures it works as advertised, suppressing
+  redundant pattern-match warnings, even when it occurs under a tick.
