@@ -7,7 +7,12 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module GHC.Tc.Instance.Typeable(mkTypeableBinds, tyConIsTypeable) where
+module GHC.Tc.Instance.Typeable (
+  mkTypeableBinds
+  , tyConIsTypeable
+  , kindIsTypeable
+  )
+where
 
 import GHC.Prelude
 import GHC.Platform

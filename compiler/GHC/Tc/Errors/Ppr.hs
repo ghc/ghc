@@ -4314,15 +4314,6 @@ pprTcSolverReportMsg ctxt
       | any isFunTy (filterOutInvisibleTypes (classTyCon clas) tys)
       = text "(maybe you haven't applied a function to enough arguments?)"
 
-      -- Clarify the mysterious "No instance for (Typeable T)
-      | className clas == typeableClassName
-      , [_,ty] <- tys     -- Look for (Typeable (k->*) (T k))
-      , Just (tc,_) <- tcSplitTyConApp_maybe ty
-      , not (isTypeFamilyTyCon tc)
-      = hang (text "GHC can't yet do polykinded")
-           2 (text "Typeable" <+>
-              parens (ppr ty <+> dcolon <+> ppr (typeKind ty)))
-
       | otherwise
       = empty
 
@@ -5200,6 +5191,7 @@ pprCoercibleMsg (OutOfScopeNewtypeConstructor dc import_suggs) =
 pprNoBuiltinInstanceMsg :: NoBuiltinInstanceMsg -> SDoc
 pprNoBuiltinInstanceMsg = \case
   NoBuiltinHasFieldMsg msg -> pprHasFieldMsg msg
+  NoBuiltinTypeableMsg msg -> pprTypeableMsg msg
 
 pprHasFieldMsg :: HasFieldMsg -> SDoc
 pprHasFieldMsg = \case
@@ -5277,6 +5269,28 @@ pprHasFieldPatSynMsg fld pat_syns =
                   SimilarRdrName n _ _ -> occNameString $ rdrNameOcc n
       in
         packHText occ == field_label fld
+
+pprTypeableMsg :: TypeableMsg -> SDoc
+pprTypeableMsg = \case
+    NoTypeableForPolytype ty ->
+      ppr_is ty "a polymorphic type"
+    NoTypeableForQualifiedType ty ->
+      ppr_is ty "a qualified type"
+    NoTypeableForUnboxedSumType ty ->
+      ppr_is ty "an unboxed sum type"
+    NoTypeableForUnreducedTypeFamilyApplication ty ->
+      ppr_is ty "an unreduced type family application"
+    NoTypeableForTyConWithNonTypeableKind ty k ->
+      vcat
+        [ text "NB:" <+> "The kind of" <+> quotes (ppr ty)
+        , nest 2 (quotes (ppr k)) <+> "contains foralls,"
+        , "for which the built-in"
+          <+> quotes (text "Typeable") <+> text "solver cannot produce evidence." ]
+  where
+    ppr_is ty reason =
+      text "NB:" <+> quotes (ppr ty) <+> text "is" <+> text reason
+        $$ "for which the built-in"
+        <+> quotes (text "Typeable") <+> text "solver cannot produce evidence."
 
 pprWhenMatching :: SolverReportErrCtxt -> WhenMatching -> SDoc
 pprWhenMatching ctxt (WhenMatching cty1 cty2 sub_o mb_sub_t_or_k) =
@@ -5516,6 +5530,7 @@ tcSolverReportMsgHints ctxt = \case
 noBuiltinInstanceHints :: NoBuiltinInstanceMsg -> [GhcHint]
 noBuiltinInstanceHints = \case
   NoBuiltinHasFieldMsg noHasFieldMsg -> hasFieldMsgHints noHasFieldMsg
+  NoBuiltinTypeableMsg _             -> noHints
 
 hasFieldMsgHints :: HasFieldMsg -> [GhcHint]
 hasFieldMsgHints = \case
@@ -7998,4 +8013,3 @@ pprHsCtxt = \case
     ppr_stmt (TransStmt { trS_by = by, trS_using = using
                         , trS_form = form }) = pprTransStmt by using form
     ppr_stmt stmt = pprStmt stmt
-

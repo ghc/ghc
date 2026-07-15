@@ -78,6 +78,7 @@ module GHC.Tc.Errors.Types (
   , CoercibleMsg(..)
   , NoBuiltinInstanceMsg(..)
   , HasFieldMsg(..)
+  , TypeableMsg(..)
   , TooFancyField(..)
   , PotentialInstances(..)
   , UnsupportedCallConvention(..)
@@ -6034,9 +6035,9 @@ data CoercibleMsg
 -- a particular class.
 data NoBuiltinInstanceMsg
   = NoBuiltinHasFieldMsg HasFieldMsg
+  | NoBuiltinTypeableMsg TypeableMsg
 
   -- Other useful constructors might be:
-  -- NoBuiltinTypeableMsg  -- explains polykinded Typeable restrictions
   -- NoBuiltinDataToTagMsg -- see conditions in Note [DataToTag overview]
   -- NoBuiltinWithDictMsg  -- see Note [withDict]
 
@@ -6065,6 +6066,20 @@ data HasFieldMsg
 
   -- | Using -XRebindableSyntax and a different 'HasField'.
   | CustomHasField TyCon -- ^ the custom HasField TyCon
+
+-- | Explains why GHC wasn't able to provide a built-in 'Typeable' instance
+-- for the given types.
+data TypeableMsg
+  -- | Polymorphic types are not typeable.
+  = NoTypeableForPolytype Type
+  -- | Qualified types are not typeable.
+  | NoTypeableForQualifiedType Type
+  -- | Unboxed sum types are not typeable.
+  | NoTypeableForUnboxedSumType Type
+  -- | Unreduced Type Family Applications are not typeable.
+  | NoTypeableForUnreducedTypeFamilyApplication Type
+  -- | TyCons whose kind is not typeable are not typeable.
+  | NoTypeableForTyConWithNonTypeableKind Type Kind
 
 -- | Why is a record field "too fancy" for GHC to be able to properly
 -- solve a 'HasField' constraint?

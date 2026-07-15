@@ -12,7 +12,7 @@ module GHC.Tc.Errors(
 
 import GHC.Prelude
 
-import GHC.Builtin.Names (hasFieldClassName)
+import GHC.Builtin.Names (hasFieldClassName, typeableClassName)
 
 import GHC.Driver.Env (hsc_units)
 import GHC.Driver.DynFlags
@@ -21,6 +21,7 @@ import GHC.Driver.Config.Diagnostic
 
 import GHC.Rename.Unbound
 
+import GHC.Tc.Instance.Typeable (kindIsTypeable)
 import GHC.Tc.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Errors.Types
@@ -2565,8 +2566,51 @@ getNoBuiltinInstMsg item =
   do { rdr_env <- getGlobalRdrEnv
      ; fam_envs <- tcGetFamInstEnvs
      ; mbNoHasFieldMsg <- hasFieldInfo_maybe rdr_env fam_envs item
-     ; return $ fmap NoBuiltinHasFieldMsg mbNoHasFieldMsg
+     ; mbNoTypeableMsg <- typeableInfo_maybe item
+     ; return $ case (mbNoHasFieldMsg, mbNoTypeableMsg) of
+         (Just hasFieldMsg, _) -> Just $ NoBuiltinHasFieldMsg hasFieldMsg
+         (_, Just typeableMsg) -> Just $ NoBuiltinTypeableMsg typeableMsg
+         _ -> Nothing
      }
+
+-- | Try to produce an explanatory message for why GHC was not able to use
+-- a built-in instance to solve a 'Typeable' constraint.
+typeableInfo_maybe :: ErrorItem -> TcM (Maybe TypeableMsg)
+typeableInfo_maybe item
+  | Just ty <- typeable_maybe (errorItemPred item)
+    = if -- Polymorphic types like (forall a. a -> a) are not typeable
+         -- see Note [No Typeable for polytypes or qualified types] in GHC.Tc.Instance.Class
+         | isForAllTy ty -> return $ Just $ NoTypeableForPolytype ty
+
+         -- Qualified types like (Num a => blah) are not typeable
+         | Just (af,_mult_,_arg,_ret) <- splitFunTy_maybe ty
+         , not $ isVisibleFunArg af
+         -> return $ Just $ NoTypeableForQualifiedType ty
+
+         -- Unboxed sum types like (# Int, Int #) are not typeable
+         | Just (tc, _tys) <- splitTyConApp_maybe ty
+         ,  isUnboxedSumTyCon tc -> return $ Just $ NoTypeableForUnboxedSumType ty
+
+         -- Unreduced type family applications are not typeable
+         | Just (tc, _tys) <- splitTyConApp_maybe ty
+         , isTypeFamilyTyCon tc -> return $ Just $ NoTypeableForUnreducedTypeFamilyApplication ty
+
+         -- TyCons whose kind is non-typeable, are not typeable
+         | Just (tc, _tys) <- splitTyConApp_maybe ty
+         , not (kindIsTypeable (tyConKind tc))
+         -> return $ Just $ NoTypeableForTyConWithNonTypeableKind ty (tyConKind tc)
+
+         | otherwise -> return Nothing
+  | otherwise = return Nothing
+
+-- | Is this constraint definitely a 'Typeable' constraint?
+typeable_maybe :: PredType -> Maybe Type
+typeable_maybe pred =
+  case classifyPredType pred of
+    ClassPred cls tys
+      | className cls == typeableClassName, [_k, ty] <- tys -> Just ty
+    _ -> Nothing
+
 
 {- Note [Error messages for unsolved HasField constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2781,7 +2825,7 @@ hasFieldInfo_maybe rdr_env fam_inst_envs item
                 -> TcM (Maybe (Either (PatSyn, SimilarName) (TyCon, SimilarName)))
     with_parent n = fmap (bimap (,n) (,n)) <$> get_parent n
 
--- | Is this constraint definitely 'HasField'?
+-- | Is this constraint definitely a 'HasField' constraint?
 hasField_maybe :: PredType -> Maybe (Type, Type, Type)
 hasField_maybe pred =
   case classifyPredType pred of

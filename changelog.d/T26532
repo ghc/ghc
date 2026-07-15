@@ -1,0 +1,8 @@
+section: compiler
+issues: #26532
+mrs: !16351
+synopsis:
+  Add explanations for unsolved Typeable constraints
+description:
+  GHC now provides additional explanations for an unsolved constraint of the
+  form ``Typeable ty``, explain why GHC did not solve ``Typeable`` constraint.
