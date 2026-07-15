@@ -269,15 +269,17 @@ downsweepInteractiveImports hsc_env ic = unsafeInterleaveIO $ do
 
   -- The existing nodes in the module graph. This will be populated when GHCi runs
   -- :load. Any home package modules need to already be in here.
-  let cached_nodes = Map.fromList [ (mkNodeKey n, n) | n <- mg_mss (hsc_mod_graph hsc_env) ]
+  let cached_nodes = Map.fromList [ (mkNodeKey n, NSuccess n) | n <- mg_mss (hsc_mod_graph hsc_env) ]
 
   summ_cache <- newIORef mempty
   imps_cache <- newIORef mempty
   let env = DownsweepEnv hsc_env DownsweepUseFixed{-or UseCompiled?-} summ_cache imps_cache []
   graph <- runDownsweepM env do
     loopFromInteractive cached_nodes interactive_mn imps
-  let interactive_node  = expectJust $ M.lookup key graph
-      all_nodes  = M.elems graph
+  let interactive_node  = case expectJust $ M.lookup key graph of
+        NSuccess r -> r
+        NSkip      -> pprPanic "downsweepInteractiveImports" (text "Skip")
+      all_nodes  = [s | NSuccess s <- M.elems graph ]
   return $ mkModuleGraph (interactive_node : all_nodes)
 
 -- | Create a module graph from a list of installed modules.
@@ -357,7 +359,7 @@ downsweepFromRootNodes hsc_env summ_cache imps_cache maybe_base_graph excl_mods 
         return deps'
      f_cache <- readIORef summ_cache
      let downsweep_errs = lefts (M.elems f_cache)
-         downsweep_nodes = M.elems deps'
+         downsweep_nodes = [ s | NSuccess s <- M.elems deps' ]
 
      return (downsweep_errs, downsweep_nodes)
   where
@@ -379,9 +381,9 @@ downsweepFromRootNodes hsc_env summ_cache imps_cache maybe_base_graph excl_mods 
            [ ((moduleNodeInfoUnitId s, moduleNodeInfoMnwib s), [s])
            | s <- root_nodes ]
 
-    moduleGraphNodeMap :: ModuleGraph -> M.Map NodeKey ModuleGraphNode
+    moduleGraphNodeMap :: ModuleGraph -> M.Map NodeKey (MGRes ModuleGraphNode)
     moduleGraphNodeMap graph
-        = M.fromList [(mkNodeKey node, node) | node <- mgModSummaries' graph]
+        = M.fromList [(mkNodeKey node, NSuccess node) | node <- mgModSummaries' graph]
 
     sec = initSourceErrorContext (hsc_dflags hsc_env)
 
@@ -458,11 +460,11 @@ mkRootMap summaries = Map.fromList
 runDownsweepM :: DownsweepEnv -> DownsweepM a -> IO a
 runDownsweepM env act = runReaderT act env
 
-loopDownsweepNodes  :: M.Map NodeKey ModuleGraphNode -> [DownsweepNode]              -> DownsweepM (M.Map NodeKey ModuleGraphNode)
-loopModuleNodeInfos :: M.Map NodeKey ModuleGraphNode -> [ModuleNodeInfo]             -> DownsweepM (M.Map NodeKey ModuleGraphNode)
-loopUnits           :: M.Map NodeKey ModuleGraphNode -> UnitId -> [UnitId] -> DownsweepM (M.Map NodeKey ModuleGraphNode)
-loopInstantiations  :: M.Map NodeKey ModuleGraphNode -> [(UnitId, InstantiatedUnit)] -> DownsweepM (M.Map NodeKey ModuleGraphNode)
-loopFromInteractive :: M.Map NodeKey ModuleGraphNode -> Module -> [InteractiveImport] -> DownsweepM (M.Map NodeKey ModuleGraphNode)
+loopDownsweepNodes  :: M.Map NodeKey (MGRes ModuleGraphNode) -> [DownsweepNode]               -> DownsweepM (M.Map NodeKey (MGRes ModuleGraphNode))
+loopModuleNodeInfos :: M.Map NodeKey (MGRes ModuleGraphNode) -> [ModuleNodeInfo]              -> DownsweepM (M.Map NodeKey (MGRes ModuleGraphNode))
+loopUnits           :: M.Map NodeKey (MGRes ModuleGraphNode) -> UnitId -> [UnitId]            -> DownsweepM (M.Map NodeKey (MGRes ModuleGraphNode))
+loopInstantiations  :: M.Map NodeKey (MGRes ModuleGraphNode) -> [(UnitId, InstantiatedUnit)]  -> DownsweepM (M.Map NodeKey (MGRes ModuleGraphNode))
+loopFromInteractive :: M.Map NodeKey (MGRes ModuleGraphNode) -> Module -> [InteractiveImport] -> DownsweepM (M.Map NodeKey (MGRes ModuleGraphNode))
 loopDownsweepNodes  base_map nodes = dfsBuild (Just base_map) nodes dsNodeInfoKey dsNodeExpand
 loopModuleNodeInfos base_map       = loopDownsweepNodes base_map . map DSMod
 loopUnits           base_map homud = loopDownsweepNodes base_map . map (DSUnit homud)
@@ -514,7 +516,7 @@ dsNodeInfoKey = \case
   DSInst{instantiated_ud}       -> NodeKey_Unit instantiated_ud
   DSInteractive mod _imps       -> NodeKey_Module $ moduleToMnk mod NotBoot
 
-dsNodeExpand :: DownsweepNode -> DownsweepM (Maybe (ModuleGraphNode, [DownsweepNode]))
+dsNodeExpand :: DownsweepNode -> DownsweepM (MGRes (ModuleGraphNode, [DownsweepNode]))
 dsNodeExpand = \case
   DSMod (ModuleNodeCompile ms)         -> expandModuleSummary ms
   DSMod (ModuleNodeFixed key loc)      -> expandFixedModuleNode key loc
@@ -523,7 +525,7 @@ dsNodeExpand = \case
         , home_context_uid }           -> expandInstantiatedUnit instantiated_ud home_context_uid
   DSInteractive imod iis               -> expandInteractiveImports imod iis
 
-expandModuleSummary :: ModSummary -> DownsweepM (Maybe (ModuleGraphNode, [DownsweepNode]))
+expandModuleSummary :: ModSummary -> DownsweepM (MGRes (ModuleGraphNode, [DownsweepNode]))
 expandModuleSummary ms = do -- Didn't work out what the imports mean yet, now do that.
     hsc_env <- asks downsweep_hsc_env
     let home_uid  = ms_unitid ms
@@ -560,14 +562,14 @@ expandModuleSummary ms = do -- Didn't work out what the imports mean yet, now do
               _           -> pure []
          | otherwise      -> pure []
 
-    return $ Just
+    return $ NSuccess
       ( ModuleNode (catMaybes final_deps) (ModuleNodeCompile ms)
       , boot_todo ++ concat todo
       )
 
 -- | Expand a 'ModuleNodeFixed' node
 -- NB: If you ever reach a Fixed node, everything under that also must be fixed.
-expandFixedModuleNode :: ModNodeKeyWithUid -> ModLocation -> DownsweepM (Maybe (ModuleGraphNode, [DownsweepNode]))
+expandFixedModuleNode :: ModNodeKeyWithUid -> ModLocation -> DownsweepM (MGRes (ModuleGraphNode, [DownsweepNode]))
 expandFixedModuleNode key loc = do
     hsc_env <- asks downsweep_hsc_env
     -- MP: TODO, we should just read the dependency info from the interface rather than either
@@ -586,12 +588,12 @@ expandFixedModuleNode key loc = do
             edges = map mkFixedEdge node_deps
             node = ModuleNode edges (ModuleNodeFixed key loc)
         deps' <- catMaybes <$> mapM (mk_dep hsc_env) (bimap snd snd <$> node_deps)
-        pure $ Just (node, deps')
+        pure $ NSuccess (node, deps')
 
-      -- Ignore any failure, we might try to read a .hi-boot file for
+      -- Skip any failure, we might try to read a .hi-boot file for
       -- example, even if there is not one.
       M.Failed {} ->
-        pure Nothing
+        pure NSkip
   where
     mk_dep hsc_env (Left key) = do
       -- Like expandImports, but we already know exactly which module we are looking for.
@@ -611,22 +613,22 @@ expandFixedModuleNode key loc = do
 
 -- | Expand a unit id under the context of a certain home unit
 expandUnitNode :: UnitId {-^ @node_uid@ -} -> UnitId {-^ Home unit from where @node_uid@ was introduced -}
-               -> DownsweepM (Maybe (ModuleGraphNode, [DownsweepNode]))
+               -> DownsweepM (MGRes (ModuleGraphNode, [DownsweepNode]))
 expandUnitNode node_uid home_context_uid = do
     -- Set active unit so that looking loopUnit finds the correct
     -- -package flags in the unit state.
     hsc_env <- asks downsweep_hsc_env
     let lcl_hsc_env = hscSetActiveUnitId home_context_uid hsc_env
     case unitDepends <$> lookupUnitId (hsc_units lcl_hsc_env) node_uid of
-      Just us -> pure $ Just ((UnitNode us node_uid), map (\u -> DSUnit{node_uid=u, home_context_uid{-inherit-}}) us)
+      Just us -> pure $ NSuccess ((UnitNode us node_uid), map (\u -> DSUnit{node_uid=u, home_context_uid{-inherit-}}) us)
       Nothing -> pprPanic "loopUnit" (text "Malformed package database, missing " <+> ppr node_uid)
 
-expandInstantiatedUnit :: InstantiatedUnit -> UnitId {-^ Home unit -} -> DownsweepM (Maybe (ModuleGraphNode, [DownsweepNode]))
-expandInstantiatedUnit iud home_uid = pure $ Just
+expandInstantiatedUnit :: InstantiatedUnit -> UnitId {-^ Home unit -} -> DownsweepM (MGRes (ModuleGraphNode, [DownsweepNode]))
+expandInstantiatedUnit iud home_uid = pure $ NSuccess
   ( InstantiationNode home_uid iud
   , [DSUnit{node_uid=instUnitInstanceOf iud, home_context_uid=home_uid}] )
 
-expandInteractiveImports :: Module -> [InteractiveImport] -> DownsweepM (Maybe (ModuleGraphNode, [DownsweepNode]))
+expandInteractiveImports :: Module -> [InteractiveImport] -> DownsweepM (MGRes (ModuleGraphNode, [DownsweepNode]))
 expandInteractiveImports imod imps = do
   hsc_env    <- asks downsweep_hsc_env
   imps_cache <- asks downsweep_imports_cache
@@ -674,7 +676,7 @@ expandInteractiveImports imod imps = do
           _ -> return (Nothing, [])
 
   (module_edges, todo) <- unzip <$> mapM mkEdge imps
-  pure $ Just
+  pure $ NSuccess
     ( ModuleNode (catMaybes module_edges) node_type, concat todo )
   where
     -- No sensible value for ModLocation.. if you hit this panic then you probably
@@ -1638,6 +1640,19 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
 
 --------------------------------------------------------------------------------
 
+-- | The result of expanding a node in 'dfsBuild'.
+data MGRes v
+  -- | Computed the node payload successfully
+  = NSuccess v
+  -- | Skip a node! This means this node doesn't produce a payload and we can
+  -- just ignore it if we ever come across it.
+  --
+  -- In practice, this might happen because of an error or maybe from an
+  -- attempt to expand e.g. an hs-boot node just to see if it sticks, but we
+  -- don't distinguish these uses. Skip just means ignore this node and don't
+  -- abort.
+  | NSkip
+
 -- | In a depth-first order, and starting from the given roots, traverse a
 -- graph by iteratively expanding a node into a payload and a list of children
 -- nodes to visit next.
@@ -1653,12 +1668,8 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
 -- node. The result includes the previously visited nodes given in @base_map@,
 -- s.t. @dfsBuild base_map [] _ _ == base_map@.
 --
--- The @expand@ function may return 'Nothing' if it couldn't compute a payload
--- and/or children value for the given node. This makes 'dfsBuild' ignore that
--- node and continue without failure. We do not cache a "negative" result for
--- the 'Nothing', because if another node happens to expand into this one
--- again, it might well work the second time around (e.g. because of the
--- monadic context).
+-- The @expand@ function returns an 'NResult'. See the 'NResult' documentation
+-- for more information about each result type.
 --
 -- Error handling and exiting early can be achieved by selecting a @Monad m@
 -- accordingly, such as @Control.Monad.Except.Except@
@@ -1666,7 +1677,20 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
 -- Example usage: @n@ is instanced to @DownsweepNode@, @k@ is @NodeKey@, and @v@ is @ModuleNodeEdge@.
 --
 -- See also Note [Downsweep Control Flow and Caching]
-dfsBuild :: (Ord k, Monad m) => Maybe (Map.Map k v) -> [n] -> (n -> k) -> (n -> m (Maybe (v,[n]))) -> m (Map.Map k v)
+dfsBuild :: (Ord k, Monad m)
+         => Maybe (Map.Map k (MGRes v))
+         -- ^ Base map, existing results. We won't re-expand any of the nodes
+         -- already present in this map.
+         -> [n]
+         -- ^ The root nodes from where to start traversal
+         -> (n -> k)
+         -- ^ Compute the key which uniquely identifies this node
+         -> (n -> m (MGRes (v,[n])))
+         -- ^ Expand this node into its payload result and into the list of
+         -- children nodes to visit next.
+         -> m (Map.Map k (MGRes v))
+         -- ^ The result accumulates the payload of expanding the root nodes
+         -- and all nodes transitively reachable from those roots.
 dfsBuild base_map roots key expand = go roots (fromMaybe Map.empty base_map)
   where
     go []     visited = pure visited
@@ -1676,10 +1700,12 @@ dfsBuild base_map roots key expand = go roots (fromMaybe Map.empty base_map)
       | otherwise
       = do r <- expand s
            case r of
-             Nothing -> go ss visited -- Skip!
-             Just (v,ns) ->
+             NSkip ->
+               go ss
+                  (Map.insert k NSkip        visited) -- Skip!
+             NSuccess (v,ns) ->
                go (ns ++ ss {- todo: not use ++ here? -})
-                  (Map.insert k v visited)
+                  (Map.insert k (NSuccess v) visited)
       where
         k = key s
 
