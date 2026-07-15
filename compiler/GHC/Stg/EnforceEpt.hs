@@ -12,6 +12,7 @@ import GHC.Core.Type
 import GHC.Types.Id
 import GHC.Types.Id.Info (tagSigInfo)
 import GHC.Types.Name
+import GHC.Types.Var.Env
 import GHC.Stg.Syntax
 import GHC.Types.Basic ( CbvMark (..) )
 import GHC.Types.Demand (isDeadEndAppSig)
@@ -455,10 +456,61 @@ inferTagExpr env (StgLet ext bind body)
     (info, body') = inferTagExpr env' body
 
 inferTagExpr env (StgLetNoEscape ext bind body)
-  = (info, StgLetNoEscape ext bind' body')
+  | all (isJust . lookupJoinArgInfo env . fst) root_joins
+  = (plain_info, StgLetNoEscape ext plain_bind plain_body)
+  | otherwise
+  = go initial_arg_infos
   where
-    (env', bind') = inferTagBind env bind
-    (info, body') = inferTagExpr env' body
+    (plain_body_env, plain_bind) = inferTagBind env bind
+    (plain_info, plain_body) = inferTagExpr plain_body_env body
+
+    joins = root_joins ++ joinsInBind bind ++ joinsInExpr body
+    join_ids = map fst joins
+    initial_arg_infos = [replicate arity TagEPT | (_, arity) <- joins]
+
+    go arg_infos
+      | arg_infos == new_arg_infos
+      = (info, StgLetNoEscape ext bind' body')
+      | otherwise
+      = go new_arg_infos
+      where
+        join_env = extendJoinArgEnv env (zipEqual join_ids arg_infos)
+        (body_env, bind') = inferTagBind join_env bind
+        (info, body') = inferTagExpr body_env body
+        calls = collectJoinCalls (makeTagged join_env) join_ids bind' body'
+        new_arg_infos =
+          [ maybe initial_infos (combineArgs initial_infos) (lookupVarEnv calls join_id)
+          | (join_id, initial_infos) <- zipEqual join_ids initial_arg_infos ]
+
+    combineArgs = zipWithEqual combineAltInfo
+
+    root_joins = joinsOf bind
+
+    joinsOf (StgNonRec bndr rhs) = [joinOf bndr rhs]
+    joinsOf (StgRec pairs) = [joinOf bndr rhs | (bndr, rhs) <- pairs]
+
+    joinOf bndr (StgRhsClosure _ _ _ bndrs _ _)
+      = (getBinderId env bndr, length bndrs)
+    joinOf bndr (StgRhsCon {})
+      = (getBinderId env bndr, idArity (getBinderId env bndr))
+
+    joinsInBind (StgNonRec _ rhs) = joinsInRhs rhs
+    joinsInBind (StgRec pairs) = concatMap (joinsInRhs . snd) pairs
+
+    joinsInRhs (StgRhsClosure _ _ _ _ rhs _) = joinsInExpr rhs
+    joinsInRhs (StgRhsCon {}) = []
+
+    joinsInExpr (StgApp {}) = []
+    joinsInExpr (StgConApp {}) = []
+    joinsInExpr (StgLit {}) = []
+    joinsInExpr (StgTick _ expr) = joinsInExpr expr
+    joinsInExpr (StgOpApp {}) = []
+    joinsInExpr (StgLet _ let_bind expr)
+      = joinsInBind let_bind ++ joinsInExpr expr
+    joinsInExpr (StgLetNoEscape _ let_bind expr)
+      = joinsOf let_bind ++ joinsInBind let_bind ++ joinsInExpr expr
+    joinsInExpr (StgCase scrut _ _ alts)
+      = joinsInExpr scrut ++ concatMap (joinsInExpr . alt_rhs) alts
 
 inferTagExpr in_env (StgCase scrut bndr ty alts)
   -- Unboxed tuples get their info from the expression we scrutinise if any
@@ -511,6 +563,87 @@ inferTagExpr in_env (StgCase scrut bndr ty alts)
       _ -> Nothing
     (scrut_info, scrut') = inferTagExpr in_env scrut
     bndr' = (getBinderId in_env bndr, TagVal TagEPT)
+
+-- See Note [EPT signatures for join point arguments].
+collectJoinCalls
+  :: TagEnv 'InferTaggedBinders
+  -> [Id]
+  -> InferStgBinding
+  -> InferStgExpr
+  -> IdEnv [TagInfo]
+collectJoinCalls in_env join_ids bind body
+  = bind_calls `plusCalls` collectExpr body_env body
+  where
+    join_env = mkVarEnv [(join_id, ()) | join_id <- join_ids]
+    (bind_calls, body_env) = collectBind in_env bind
+
+    collectExpr env (StgApp fun args)
+      | elemVarEnv fun join_env
+      = unitVarEnv fun (map (lookupInfo env) args)
+      | otherwise
+      = emptyVarEnv
+    collectExpr _ (StgConApp {}) = emptyVarEnv
+    collectExpr _ (StgLit {}) = emptyVarEnv
+    collectExpr env (StgTick _ expr) = collectExpr env expr
+    collectExpr _ (StgOpApp {}) = emptyVarEnv
+    collectExpr env (StgLet _ let_bind expr)
+      = let_calls `plusCalls` collectExpr let_env expr
+      where
+        (let_calls, let_env) = collectBind env let_bind
+    collectExpr env (StgLetNoEscape _ let_bind expr)
+      = let_calls `plusCalls` collectExpr let_env expr
+      where
+        (let_calls, let_env) = collectBind env let_bind
+    collectExpr env (StgCase scrut bndr _ alts)
+      = collectExpr env scrut `plusCalls`
+        plusCallList (map (collectAlt (extendSigEnv env [bndr])) alts)
+
+    collectAlt env GenStgAlt{alt_bndrs, alt_rhs}
+      = collectExpr (extendSigEnv env alt_bndrs) alt_rhs
+
+    collectBind env (StgNonRec bndr rhs)
+      = (collectRhs env rhs, extendSigEnv env [bndr])
+    collectBind env (StgRec pairs)
+      = (plusCallList (map (collectRhs rec_env . snd) pairs), rec_env)
+      where
+        rec_env = extendSigEnv env (map fst pairs)
+
+    collectRhs env (StgRhsClosure _ _ _ bndrs rhs _)
+      = collectExpr (extendSigEnv env bndrs) rhs
+    collectRhs _ (StgRhsCon {}) = emptyVarEnv
+
+    plusCalls = plusVarEnv_C (zipWithEqual combineAltInfo)
+    plusCallList = foldr plusCalls emptyVarEnv
+
+{- Note [EPT signatures for join point arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Join points are local, non-escaping functions, and every occurrence is a
+saturated tail call.  Consequently we can infer EPT information for their
+arguments by treating them like SSA block parameters: an argument is EPT when
+the corresponding actual argument is EPT at every jump to the join point.
+
+At each outermost StgLetNoEscape we optimistically start every argument of that
+join group and all nested join groups at TagEPT, infer tags for the binding and
+its body, and collect the argument tags at all calls to those join points.
+Combining those call-site tags gives the next, no more optimistic approximation
+for the join arguments.  Iterating reaches the greatest fixed point, including
+for recursive and mutually recursive joins.  Using the greatest fixed point is
+important for recursive calls such as @jump j x@, where @x@ is itself a
+parameter of @j@: such a back edge preserves EPTness rather than providing an
+independent reason to reject it.
+
+Solving all nested join groups simultaneously is important for compile-time
+performance.  Independently solving a nested join group on every iteration of
+each enclosing group causes exponential re-analysis in deeply nested code.
+Nested StgLetNoEscapes therefore merely use the argument information installed
+by the outer solver.
+
+This is tag inference, not strictness inference.  It does not evaluate an
+argument or change the calling convention.  It merely records that every path
+which enters the join point already supplies an EPT value.  Existing CBV marks
+remain authoritative in inferTagRhs, since the rewriter enforces their EPT
+precondition at call sites.
+-}
 
 -- Compute binder sigs based on the constructors strict fields.
 -- NB: Not used if we have tuple info from the scrutinee.
@@ -642,25 +775,31 @@ inferTagRhs bnd_id in_env (StgRhsClosure ext cc upd bndrs body typ)
     -- Join points are treated like functions. See Note [TagInfo of functions]
     is_fun_or_join = notNull bndrs || isJoinId bnd_id
 
-    out_bndrs
+    out_bndrs = zipWith3 mkArgSig bndrs cbv_marks inferred_arg_infos
+
+    cbv_marks
       | Just marks <- idCbvMarks_maybe bnd_id
-      -- Sometimes an we eta-expand foo with additional arguments after ww, and we also trim
+      -- Sometimes we eta-expand foo with additional arguments after ww, and we also trim
       -- the list of marks to the last strict entry. So we can conservatively
-      -- assume these are not strict
-      = zipWith (mkArgSig) bndrs (marks ++ repeat NotMarkedCbv)
-      | otherwise = map (noSig env') bndrs :: [(Id,TagSig)]
+      -- assume these are not strict.
+      = marks ++ repeat NotMarkedCbv
+      | otherwise
+      = repeat NotMarkedCbv
+
+    inferred_arg_infos =
+      fromMaybe (repeat TagDunno) (lookupJoinArgInfo in_env bnd_id)
 
     env' = extendSigEnv in_env out_bndrs
     (info, body') = inferTagExpr env' body
 
-    mkArgSig :: BinderP p -> CbvMark -> (Id,TagSig)
-    mkArgSig bndp mark =
+    mkArgSig :: BinderP p -> CbvMark -> TagInfo -> (Id,TagSig)
+    mkArgSig bndp mark inferred_info =
       let id = getBinderId in_env bndp
           tag = case mark of
             MarkedCbv -> TagEPT
             _
               | isUnliftedType (idType id) -> TagEPT
-              | otherwise -> TagDunno
+              | otherwise -> inferred_info
       in (id, TagVal tag)
 
 inferTagRhs _ env _rhs@(StgRhsCon cc con cn ticks args typ)
