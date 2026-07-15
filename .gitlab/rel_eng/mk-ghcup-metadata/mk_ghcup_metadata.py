@@ -351,11 +351,6 @@ def main() -> None:
     else:
         with open(args.metadata, 'r') as file:
             ghcup_metadata = yaml.safe_load(file)
-            if  args.version in ghcup_metadata['ghcupDownloads']['GHC']:
-                # if there are days without a commit, then the nightly metadata
-                # is up to date by default, no need to fail, no need to upload anything
-                print("Refusing to override existing version in metadata, exiting")
-                sys.exit()
             setNightlyTags(ghcup_metadata)
             ghcup_metadata['ghcupDownloads']['GHC'][args.version] = new_yaml
             print(yaml.dump(ghcup_metadata))
