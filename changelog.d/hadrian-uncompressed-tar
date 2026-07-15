@@ -1,0 +1,5 @@
+section: packaging
+synopsis: Hadrian can now create an uncompressed tar as the release artifact
+  by building the target binary-dist-tar
+issues: #27510
+mrs: !16349

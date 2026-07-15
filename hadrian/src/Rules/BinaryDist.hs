@@ -366,9 +366,11 @@ bindistRules = do
 
             -- Finally, we create the archive <root>/bindist/ghc-X.Y.Z-platform.tar.xz
             tarProg <- exeSpawnPath =<< builderPath (Tar Create)
-            cmdExe tarProg [Cwd $ root -/- bindist_folder]
-                [ "-c", compressorTarFlag compressor, "-f"
-                , ghcVersionPretty <.> "tar" <.> compressorExtension compressor
+            -- Compressor flags must come before the operands: bsdtar (used on
+            -- darwin) stops option parsing at the first non-option argument.
+            cmdExe tarProg [Cwd $ root -/- bindist_folder] $
+                [ "-c" ] <> compressorTarFlags compressor <>
+                [ "-f" , applyCompressorExtension compressor $ ghcVersionPretty <.> "tar"
                 , ghcVersionPretty ]
 
     forM_ [("binary", buildBinDist), ("reloc-binary", buildBinDistReloc)] $ \(name, mk_bindist) -> do
@@ -376,6 +378,7 @@ bindistRules = do
       phony (name <> "-dist-gzip") $ mk_bindist Gzip
       phony (name <> "-dist-bzip2") $ mk_bindist Bzip2
       phony (name <> "-dist-xz") $ mk_bindist Xz
+      phony (name <> "-dist-tar") $ mk_bindist NoCompressor
 
     phony "binary-dist-cross" $ buildBinDistX "binary-dist-dir-cross" "bindist" Xz
     phony "binary-dist-stage3" $ buildBinDistX "binary-dist-dir-stage3" "bindist" Xz
@@ -426,7 +429,7 @@ bindistRules = do
     fixup f | f `elem` ["INSTALL", "README"] = "distrib" -/- f
             | otherwise                      = f
 
-data Compressor = Gzip | Bzip2 | Xz
+data Compressor = Gzip | Bzip2 | Xz | NoCompressor
                 deriving (Eq, Ord, Show)
 
 
@@ -443,17 +446,19 @@ generateBuildMk BindistConfig{..}  = do
   where
     a =. b = a ++ " = " ++ b
 
--- | Flag to pass to tar to use the given 'Compressor'.
-compressorTarFlag :: Compressor -> String
-compressorTarFlag Gzip  = "--gzip"
-compressorTarFlag Xz    = "--xz"
-compressorTarFlag Bzip2 = "--bzip"
+-- | Flags to pass to @tar@ to use the given 'Compressor'.
+compressorTarFlags :: Compressor -> [String]
+compressorTarFlags Gzip  = ["--gzip"]
+compressorTarFlags Xz    = ["--xz"  ]
+compressorTarFlags Bzip2 = ["--bzip"]
+compressorTarFlags NoCompressor = []
 
--- | File extension to use for archives compressed with the given 'Compressor'.
-compressorExtension :: Compressor -> String
-compressorExtension Gzip  = "gz"
-compressorExtension Xz    = "xz"
-compressorExtension Bzip2 = "bz2"
+-- | File extension to use for archives @p@ compressed with the given 'Compressor'.
+applyCompressorExtension :: Compressor -> String -> String
+applyCompressorExtension Gzip  p        = p <.> "gz"
+applyCompressorExtension Xz    p        = p <.> "xz"
+applyCompressorExtension Bzip2 p        = p <.> "bz2"
+applyCompressorExtension NoCompressor p = p
 
 -- | A list of files that allow us to support a simple
 -- @./configure [...] && make install@ workflow.
