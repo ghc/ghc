@@ -324,6 +324,7 @@ def main() -> None:
     # TODO: We could work out the --version from the project-version CI job.
     parser.add_argument('--version', required=True, type=str, help='Version of the GHC compiler')
     parser.add_argument('--date', required=True, type=str, help='Date of the compiler release')
+    parser.add_argument('output_path', nargs='?', type=Path, help='Path to write the output to, if not set, dump to stdout')
     args = parser.parse_args()
 
     project = gl.projects.get(1, lazy=True)
@@ -352,13 +353,14 @@ def main() -> None:
         with open(args.metadata, 'r') as file:
             ghcup_metadata = yaml.safe_load(file)
             if  args.version in ghcup_metadata['ghcupDownloads']['GHC']:
-                # if there are days without a commit, then the nightly metadata
-                # is up to date by default, no need to fail, no need to upload anything
-                print("Refusing to override existing version in metadata, exiting")
-                sys.exit()
+                eprint("GHCUp nightly run produced the same metadata as last night")
             setNightlyTags(ghcup_metadata)
             ghcup_metadata['ghcupDownloads']['GHC'][args.version] = new_yaml
-            print(yaml.dump(ghcup_metadata))
+            if args.output_path:
+                with open(args.output_path, 'w') as ofile:
+                    yaml.dump(ghcup_metadata, ofile)
+            else:
+                print(yaml.dump(ghcup_metadata))
 
 
 
