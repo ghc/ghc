@@ -12,7 +12,8 @@ import GHC.Prelude
 
 import GHC.HsToCore.Pmc.Types
 import GHC.HsToCore.Pmc.Utils
-import GHC.Core (Expr(Var,App))
+import GHC.Core (CoreExpr, Expr(Var,App))
+import GHC.Core.Utils (stripTicksTopE)
 import GHC.Data.FastString (unpackFS, lengthFS)
 import GHC.Driver.DynFlags
 import GHC.Hs
@@ -472,24 +473,28 @@ desugarLocalBinds _binds = return GdEnd
 -- | Desugar a pattern guard
 --   @pat <- e ==>  let x = e;  <guards for pat <- x>@
 desugarBind :: LPat GhcTc -> LHsExpr GhcTc -> DsM GrdDag
-desugarBind p e = dsLExpr e >>= \case
-  Var y
-    | Nothing <- isDataConId_maybe y
-    -- RHS is a variable, so that will allow us to omit the let
-    -> desugarLPat y p
-  rhs -> do
-    (x, grds) <- desugarLPatV p
-    pure (PmLet x rhs `consGrdDag` grds)
+desugarBind p e =
+  dsLExpr_stripTicks e >>= \case
+    Var y
+      | Nothing <- isDataConId_maybe y
+      -- RHS is a variable, so that will allow us to omit the let
+      -> desugarLPat y p
+    rhs -> do
+      (x, grds) <- desugarLPatV p
+      pure (PmLet x rhs `consGrdDag` grds)
 
 -- | Desugar a boolean guard
 --   @e ==>  let x = e; True <- x@
 desugarBoolGuard :: LHsExpr GhcTc -> DsM GrdDag
 desugarBoolGuard e
-  | isJust (isTrueLHsExpr e) = return GdEnd
+  | isJust (isTrueLHsExpr e) -- NB: looks through ticks
     -- The formal thing to do would be to generate (True <- True)
     -- but it is trivial to solve so instead we give back an empty
     -- GrdDag for efficiency
-  | otherwise = dsLExpr e >>= \case
+  = return GdEnd
+
+  | otherwise
+  = dsLExpr_stripTicks e >>= \case
       Var y
         | Nothing <- isDataConId_maybe y
         -- Omit the let by matching on y
@@ -497,6 +502,19 @@ desugarBoolGuard e
       rhs -> do
         x <- mkPmId boolTy
         pure $ sequencePmGrds [PmLet x rhs, vanillaConGrd x trueDataCon []]
+
+-- | Desugar an expression, stripping off top-level ticks from the resulting
+-- Core expression.
+--
+-- This function is used instead of 'dsLExpr' when we are immediately going to
+-- inspect the Core (as we do in e.g. 'desugarBoolGuard' or 'desugarBind') to
+-- make sure we properly look through intervening ticks (fixing #27360).
+--
+-- It's not needed when all we do is stash the resulting 'CoreExpr' into a
+-- 'GrdDag', as the rest of the machinery (such as 'GHC.HsToCore.Pmc.Solver.addCoreCt')
+-- looks through ticks.
+dsLExpr_stripTicks :: LHsExpr GhcTc -> DsM CoreExpr
+dsLExpr_stripTicks e = stripTicksTopE (const True) <$> dsLExpr e
 
 {- Note [Field match order for RecCon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
