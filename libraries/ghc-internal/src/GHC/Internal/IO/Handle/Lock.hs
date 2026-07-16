@@ -40,14 +40,14 @@ import GHC.Internal.IO.Handle.Lock.NoOp
 -- to interrupt it with asynchronous exceptions and/or for other threads to
 -- continue working, you MUST use threaded version of the runtime system.
 --
--- 2. The implementation uses relies on any of a number of locking
--- facilities, depending upon what the platform supports:
+-- 2. The implementation relies on any of a number of locking
+--   facilities, depending upon what the platform supports:
 --
---   * 'LockFileEx' is used on Windows
---   * On platforms that support it we use the @F_OFD_SETLK@ and @F_OFD_SETLKW@ @fnctl@s.
---   * Otherwise we use @flock@
+--     * 'LockFileEx' is used on Windows
+--     * On platforms that support it we use the @F_OFD_SETLK@ and @F_OFD_SETLKW@ @fnctl@s.
+--     * Otherwise we use @flock@
 --
--- hence all of their caveats also apply here.
+--   All of their caveats also apply here.
 --
 -- 3. On non-Windows platforms that don't support 'flock' (e.g. Solaris) this
 -- function throws 'FileLockingNotImplemented'. We deliberately choose to not
