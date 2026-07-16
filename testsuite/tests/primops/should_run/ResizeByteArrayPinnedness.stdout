@@ -1,0 +1,82 @@
+testing resizeMutableByteArray#
+starts unpinned:
+first array ends unpinned, is a different array
+second array ends unpinned, is a different array
+
+starts pinned:
+first array ends unpinned, is a different array
+second array ends pinned, is the same array
+
+starts aligned (8) & pinned:
+first array ends unpinned, is a different array
+second array ends pinned, is the same array
+
+===========
+testing resizeMutableByteArrayKeepPinnedness#
+starts unpinned:
+first array ends unpinned, is a different array
+second array ends unpinned, is a different array
+
+starts pinned:
+first array ends pinned, is a different array
+second array ends pinned, is a different array
+
+starts aligned (8) & pinned:
+first array ends pinned, is a different array
+second array ends pinned, is a different array
+
+===========
+testing resizeMutableByteArrayPreferUnpinned#
+starts unpinned:
+first array ends unpinned, is a different array
+second array ends unpinned, is a different array
+
+starts pinned:
+first array ends unpinned, is a different array
+second array ends pinned, is the same array
+
+starts aligned (8) & pinned:
+first array ends unpinned, is a different array
+second array ends pinned, is the same array
+
+===========
+testing resizeMutableByteArrayPreferPinned#
+starts unpinned:
+first array ends pinned, is a different array
+second array ends unpinned, is the same array
+
+starts pinned:
+first array ends pinned, is a different array
+second array ends pinned, is a different array
+
+starts aligned (8) & pinned:
+first array ends pinned, is a different array
+second array ends pinned, is a different array
+
+===========
+testing resizeMutableByteArrayPreferAlignedPinned#
+starts unpinned:
+first array ends pinned, is a different array
+second array ends unpinned, is the same array
+
+starts pinned:
+first array ends pinned, is a different array
+second array ends pinned, is a different array
+
+starts aligned (8) & pinned:
+first array ends pinned, is a different array
+second array ends pinned, is a different array
+
+===========
+testing resizeMutableByteArrayMakeAlignedPinned#
+starts unpinned:
+first array ends pinned, is a different array
+second array ends pinned, is a different array
+
+starts pinned:
+first array ends pinned, is a different array
+second array ends pinned, is a different array
+
+starts aligned (8) & pinned:
+first array ends pinned, is a different array
+second array ends pinned, is a different array

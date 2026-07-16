@@ -2578,6 +2578,11 @@ module GHC.Prim where
   remWord8X32# :: Word8X32# -> Word8X32# -> Word8X32#
   remWord8X64# :: Word8X64# -> Word8X64# -> Word8X64#
   resizeMutableByteArray# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, MutableByteArray# d #)
+  resizeMutableByteArrayKeepPinnedness# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, MutableByteArray# d #)
+  resizeMutableByteArrayMakeAlignedPinned# :: forall d. MutableByteArray# d -> Int# -> Int# -> State# d -> (# State# d, MutableByteArray# d #)
+  resizeMutableByteArrayPreferAlignedPinned# :: forall d. MutableByteArray# d -> Int# -> Int# -> State# d -> (# State# d, MutableByteArray# d #)
+  resizeMutableByteArrayPreferPinned# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, MutableByteArray# d #)
+  resizeMutableByteArrayPreferUnpinned# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, MutableByteArray# d #)
   retry# :: forall {l :: GHC.Internal.Types.Levity} (a :: TYPE (GHC.Internal.Types.BoxedRep l)). State# RealWorld -> (# State# RealWorld, a #)
   rightSection :: forall {q :: GHC.Internal.Types.RuntimeRep} {r :: GHC.Internal.Types.RuntimeRep} {s :: GHC.Internal.Types.RuntimeRep} (a :: TYPE q) (b :: TYPE r) (c :: TYPE s). (a -> b -> c) -> b -> a -> c
   seq :: forall {r :: GHC.Internal.Types.RuntimeRep} a (b :: TYPE r). a -> b -> b
@@ -3603,6 +3608,11 @@ module GHC.PrimopWrappers where
   remWord64# :: GHC.Internal.Prim.Word64# -> GHC.Internal.Prim.Word64# -> GHC.Internal.Prim.Word64#
   remWord8# :: GHC.Internal.Prim.Word8# -> GHC.Internal.Prim.Word8# -> GHC.Internal.Prim.Word8#
   resizeMutableByteArray# :: forall s. GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.MutableByteArray# s #)
+  resizeMutableByteArrayKeepPinnedness# :: forall s. GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.MutableByteArray# s #)
+  resizeMutableByteArrayMakeAlignedPinned# :: forall s. GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.MutableByteArray# s #)
+  resizeMutableByteArrayPreferAlignedPinned# :: forall s. GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.MutableByteArray# s #)
+  resizeMutableByteArrayPreferPinned# :: forall s. GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.MutableByteArray# s #)
+  resizeMutableByteArrayPreferUnpinned# :: forall s. GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.MutableByteArray# s #)
   retry# :: forall a_levpoly. GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld, a_levpoly #)
   setAddrRange# :: GHC.Internal.Prim.Addr# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
   setByteArray# :: forall s. GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s

@@ -396,6 +396,12 @@ import GHC.Prim hiding
   , sqrtDoubleX4#
   , sqrtFloatX16#
   , sqrtDoubleX8#
+  -- Don't export mutable byte array primops before stabilisation
+  , resizeMutableByteArrayKeepPinnedness#
+  , resizeMutableByteArrayPreferPinned#
+  , resizeMutableByteArrayPreferAlignedPinned#
+  , resizeMutableByteArrayMakeAlignedPinned#
+  , resizeMutableByteArrayPreferUnpinned#
 #endif
 
 #if __GLASGOW_HASKELL__ >= 1001

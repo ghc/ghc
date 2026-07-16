@@ -680,6 +680,11 @@ genPrim prof bound ty op = case op of
   MutableByteArrayContents_Char     -> \[a,o] [b]        -> pure $ PrimInline $ mconcat [a |= b, o |= zero_]
   ShrinkMutableByteArrayOp_Char     -> \[]    [a,n]      -> pure $ PrimInline $ appS hdShrinkMutableByteArrayStr [a,n]
   ResizeMutableByteArrayOp_Char     -> \[r]   [a,n]      -> pure $ PrimInline $ r |= app hdResizeMutableByteArrayStr [a,n]
+  ResizeMutableByteArrayKeepPinnednessOp_Char            -> genPrim prof bound ty ResizeMutableByteArrayOp_Char
+  ResizeMutableByteArrayPreferUnpinnedOp_Char            -> genPrim prof bound ty ResizeMutableByteArrayOp_Char
+  ResizeMutableByteArrayPreferPinnedOp_Char              -> genPrim prof bound ty ResizeMutableByteArrayOp_Char
+  ResizeMutableByteArrayPreferAlignedPinnedOp_Char       -> \rs (a:n:_align:_) -> genPrim prof bound ty ResizeMutableByteArrayOp_Char rs [a,n]
+  ResizeMutableByteArrayMakeAlignedPinnedOp_Char         -> \rs (a:n:_align:_) -> genPrim prof bound ty ResizeMutableByteArrayOp_Char rs [a,n]
   UnsafeFreezeByteArrayOp           -> \[a]   [b]        -> pure $ PrimInline $ a |= b
   UnsafeThawByteArrayOp             -> \[a]   [b]        -> pure $ PrimInline $ a |= b
   SizeofByteArrayOp                 -> \[r]   [a]        -> pure $ PrimInline $ r |= a .^ len

@@ -693,6 +693,12 @@ extern char **environ;
       SymI_HasDataProto(stg_isMutableByteArrayWeaklyPinnedzh)               \
       SymI_HasDataProto(stg_shrinkMutableByteArrayzh)                       \
       SymI_HasDataProto(stg_resizzeMutableByteArrayzh)                      \
+      SymI_HasDataProto(stg_resizzeMutableByteArrayKeepPinnednesszh)        \
+      SymI_HasDataProto(stg_resizzeMutableByteArrayPreferUnpinnedzh)        \
+      SymI_HasDataProto(stg_resizzeMutableByteArrayPreferPinnedzh)          \
+      SymI_HasDataProto(stg_resizzeMutableByteArrayPreferAlignedPinnedzh)   \
+      SymI_HasDataProto(stg_resizzeMutableByteArrayChoosezh)                \
+      SymI_HasDataProto(stg_resizzeMutableByteArrayMakeAlignedPinnedzh)     \
       SymI_HasDataProto(stg_shrinkSmallMutableArrayzh)                      \
       SymI_HasProto(newSpark)                                           \
       SymI_HasProto(updateRemembSetPushThunk)                             \

@@ -1767,6 +1767,11 @@ emitPrimOp cfg primop =
   ByteArrayIsWeaklyPinnedOp -> alwaysExternal
   ShrinkMutableByteArrayOp_Char -> alwaysExternal
   ResizeMutableByteArrayOp_Char -> alwaysExternal
+  ResizeMutableByteArrayKeepPinnednessOp_Char -> alwaysExternal
+  ResizeMutableByteArrayPreferUnpinnedOp_Char -> alwaysExternal
+  ResizeMutableByteArrayPreferPinnedOp_Char -> alwaysExternal
+  ResizeMutableByteArrayPreferAlignedPinnedOp_Char -> alwaysExternal
+  ResizeMutableByteArrayMakeAlignedPinnedOp_Char -> alwaysExternal
   ShrinkSmallMutableArrayOp_Char -> alwaysExternal
   NewMutVarOp -> alwaysExternal
   AtomicModifyMutVar2Op -> alwaysExternal

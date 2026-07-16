@@ -152,22 +152,18 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
     return (p);
 }
 
+// See Note [Pinned ByteArray# variants]
 stg_isByteArrayPinnedzh ( gcptr ba )
 // ByteArray# s -> Int#
 {
     W_ bd, flags;
     bd = Bdescr(ba);
-    // Pinned byte arrays live in blocks with the BF_PINNED flag set.
-    // We also consider BF_LARGE objects to be immovable. See #13894.
-    // See the comment in Storage.c:allocatePinned.
-    // We also consider BF_COMPACT objects to be immovable. See #14900.
     flags = TO_W_(bdescr_flags(bd));
 
-    // We used to also consider BF_LARGE pinned, but stopped doing so
-    // because it interacted badly with compact regions. See #22255
     return (flags & BF_PINNED != 0);
 }
 
+// See Note [Pinned ByteArray# variants]
 stg_isByteArrayWeaklyPinnedzh ( gcptr ba )
 // ByteArray# s -> Int#
 {
@@ -243,6 +239,35 @@ stg_isMutableByteArrayWeaklyPinnedzh ( gcptr mba )
  * in ClosureMacros.h.
  */
 
+/* Note [Pinned ByteArray# variants]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * We distinguish different kinds of pinning for byte arrays.
+ *
+ * Pinned:
+ *   * Always safe for ffi.
+ *   * Never moves.
+ *   * Can't be compacted.
+ *
+ * Weakly pinned:
+ *   * Safe for FFI *unless* the byte array is moved into a compact region.
+ *   * Can be compacted, which can invalidate Addr# references to the contents.
+ *
+ * Not pinned:
+ *   * Never safe for FFI.
+ *   * Can be compacted.
+ *
+ * Distinguishing three cases rather than just pinned/unpinned was needed to avoid
+ * edge cases with compact regions. See #22255, #14900 and #13894 for the motivation and more details.
+ * 
+ * We determine the status of a byte array via the block it's allocated
+ * in. Checking the blocks BF_LARGE, BF_PINNED, BF_COMPACT flags.
+ * 
+ * Those relate such that:
+ * * Weakly pinned <-> BF_PINNED | BF_COMPACT | BF_LARGE
+ * * Pinned <-> BF_PINNED
+ *
+*/
+
 // shrink size of MutableByteArray in-place
 stg_shrinkMutableByteArrayzh ( gcptr mba, W_ new_size )
 // MutableByteArray# s -> Int# -> State# s -> State# s
@@ -283,17 +308,63 @@ stg_shrinkMutableByteArrayzh ( gcptr mba, W_ new_size )
    return ();
 }
 
+// allocate unpinned if resizing fails
+#define RMB_RESIZED_OR_UNPINNED 0
+// allocate pinned if resizing fails
+#define RMB_RESIZED_OR_PINNED 1
+// allocate same pinnedness if resizing fails
+#define RMB_RESIZED_OR_KEEP_PINNEDNESS 2
+// allocate aligned and pinned if resizing fails
+#define RMB_RESIZED_OR_ALIGNED_PINNED 3
+
 // resize MutableByteArray
 //
 // The returned MutableByteArray is either the original
 // MutableByteArray resized in-place or, if not possible, a newly
-// allocated (unpinned) MutableByteArray (with the original content
+// allocated MutableByteArray (with the original content
 // copied over)
 stg_resizzeMutableByteArrayzh ( gcptr mba, W_ new_size )
-// MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
+// resizeMutableByteArray#
+//  :: MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
+{
+   jump stg_resizzeMutableByteArrayChoosezh(mba, new_size, 0, RMB_RESIZED_OR_UNPINNED);
+}
+stg_resizzeMutableByteArrayPreferUnpinnedzh ( gcptr mba, W_ new_size )
+// resizeMutableByteArrayPreferUnpinned#
+//  :: MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
+{
+   jump stg_resizzeMutableByteArrayChoosezh(mba, new_size, 0, RMB_RESIZED_OR_UNPINNED);
+}
+stg_resizzeMutableByteArrayPreferPinnedzh ( gcptr mba, W_ new_size )
+// resizeMutableByteArrayPreferPinned#
+//  :: MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
+{
+   jump stg_resizzeMutableByteArrayChoosezh(mba, new_size, 0, RMB_RESIZED_OR_PINNED);
+}
+stg_resizzeMutableByteArrayKeepPinnednesszh ( gcptr mba, W_ new_size )
+// resizeMutableByteArrayKeepPinnedness#
+//  :: MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
+{
+   jump stg_resizzeMutableByteArrayChoosezh(mba, new_size, 0, RMB_RESIZED_OR_KEEP_PINNEDNESS);
+}
+stg_resizzeMutableByteArrayPreferAlignedPinnedzh ( gcptr mba, W_ new_size, W_ alignment )
+// resizeMutableByteArrayPreferAlignedPinned#
+//  :: MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
+{
+   jump stg_resizzeMutableByteArrayChoosezh(mba, new_size, alignment, RMB_RESIZED_OR_ALIGNED_PINNED);
+}
+
+// base function to share implementation between the four resize operations:
+// resize or unpin (mode == RMB_RESIZED_OR_UNPINNED)
+// resize or pin (mode == RMB_RESIZED_OR_PINNED)
+// resize with pinnedness (mode == RMB_RESIZED_OR_KEEP_PINNEDNESS)
+// resize or pin with alignment (mode == RMB_RESIZED_OR_ALIGNED_PINNED)
+stg_resizzeMutableByteArrayChoosezh ( gcptr mba, W_ new_size, W_ alignment, W_ mode )
+// MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
 {
    W_ old_size, old_wds, new_wds, new_free;
    W_ bd;
+   P_ new_mba;
 
    ASSERT(new_size `ge` 0);
 
@@ -317,14 +388,78 @@ stg_resizzeMutableByteArrayzh ( gcptr mba, W_ new_size )
       StgArrBytes_bytes(mba) = new_size;
       return (mba);
    } else {
-      (P_ new_mba) = call stg_newByteArrayzh(new_size);
+      // Resizing is not possible, create a new array object according to the mode.
+      switch [RMB_RESIZED_OR_UNPINNED .. RMB_RESIZED_OR_ALIGNED_PINNED] (mode) {
+         case RMB_RESIZED_OR_UNPINNED: {
+            (P_ new_mba_unpinned) = call stg_newByteArrayzh(new_size);
+            new_mba = new_mba_unpinned;
+            goto after;
+         }
+         case RMB_RESIZED_OR_PINNED: {
+            (P_ new_mba_pinned) = call stg_newPinnedByteArrayzh(new_size);
+            new_mba = new_mba_pinned;
+            goto after;
+         }
+         case RMB_RESIZED_OR_KEEP_PINNEDNESS: {
+            (W_ is_pinned) = call stg_isMutableByteArrayPinnedzh(mba);
+            if (is_pinned != 0) {
+               (P_ new_mba_pinned_two) = call stg_newPinnedByteArrayzh(new_size);
+               new_mba = new_mba_pinned_two;
+            } else {
+               (P_ new_mba_unpinned_two) = call stg_newByteArrayzh(new_size);
+               new_mba = new_mba_unpinned_two;
+            }
+            goto after;
+         }
+         case RMB_RESIZED_OR_ALIGNED_PINNED: {
+            (P_ new_mba_aligned_pinned) = call stg_newAlignedPinnedByteArrayzh(new_size, alignment);
+            new_mba = new_mba_aligned_pinned;
+            goto after;
+         }
+         default: {
+            // shouldn't be possible; this function is only called with one of
+            // the four above enumerated values
+            ccall sbarf("stg_resizzeMutableByteArrayChoosezh: bad mode, something went wrong.") never returns;
+         }
+      }
+      after:
 
       // copy over old content
+      // at this point we know that we are making the array bigger, so we copy
+      // over ALL of the old array
       prim %memcpy(BYTE_ARR_CTS(new_mba), BYTE_ARR_CTS(mba),
                    StgArrBytes_bytes(mba), SIZEOF_W);
 
       return (new_mba);
    }
+}
+
+// resizeMutableByteArrayMakeAlignedPinned#
+stg_resizzeMutableByteArrayMakeAlignedPinnedzh ( gcptr mba, W_ new_size, W_ alignment )
+// MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
+{
+   (W_ is_pinned) = call stg_isMutableByteArrayPinnedzh(mba);
+
+   // if the array is already pinned and aligned, we can call in and try and
+   // resize in place
+   if (is_pinned != 0 && ((BYTE_ARR_CTS(mba) % alignment) == 0)) {
+      jump stg_resizzeMutableByteArrayChoosezh(mba, new_size, alignment, RMB_RESIZED_OR_ALIGNED_PINNED);
+   }
+
+   // else we just create an aligned array of the correct size
+   (P_ new_mba) = call stg_newAlignedPinnedByteArrayzh(new_size, alignment);
+
+   // copy over old content
+   // take the minimum of the old size and the new size
+   W_ copy_size;
+   if (new_size < StgArrBytes_bytes(mba)) {
+      copy_size = new_size;
+   } else {
+      copy_size = StgArrBytes_bytes(mba);
+   }
+   prim %memcpy(BYTE_ARR_CTS(new_mba), BYTE_ARR_CTS(mba), copy_size, SIZEOF_W);
+
+   return (new_mba);
 }
 
 // shrink size of SmallMutableArray in-place

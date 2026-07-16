@@ -2033,14 +2033,22 @@ primop  NewByteArrayOp_Char "newByteArray#" GenPrimOp
 
 primop  NewPinnedByteArrayOp_Char "newPinnedByteArray#" GenPrimOp
    Int# -> State# s -> (# State# s, MutableByteArray# s #)
-   {Like 'newByteArray#' but GC guarantees not to move it.}
+   {Like 'newByteArray#' but GC guarantees not to move it.
+   
+    The alignment of the resulting byte array is 16 bytes as per 'newAlignedPinnedByteArray#'.
+   }
    with out_of_line = True
         effect = ReadWriteEffect
 
 primop  NewAlignedPinnedByteArrayOp_Char "newAlignedPinnedByteArray#" GenPrimOp
    Int# -> Int# -> State# s -> (# State# s, MutableByteArray# s #)
    {Like 'newPinnedByteArray#' but allow specifying an arbitrary
-    alignment, which must be a power of two.}
+    alignment, which must be a power of two. Alignment will be the maximum of the
+    system word size or given alignment.
+
+    The first parameter is the size of the new array and the second parameter is
+    the alignment.
+    }
    with out_of_line = True
         effect = ReadWriteEffect
         can_fail_warning = YesWarnCanFail
@@ -2116,6 +2124,73 @@ primop  ResizeMutableByteArrayOp_Char "resizeMutableByteArray#" GenPrimOp
     @since 0.4.0.0}
    with out_of_line = True
         effect = ReadWriteEffect
+
+primop  ResizeMutableByteArrayKeepPinnednessOp_Char "resizeMutableByteArrayKeepPinnedness#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
+   {Like 'resizeMutableByteArray#', but ensures the pinnedness of the output array
+    is the same as the pinnedness of the input array.
+
+    If the input array is pinned, so is the output array, even if a new array
+    was allocated.
+    If the input array is unpinned, so is the output array, even if a new array
+    was allocated.
+
+    @since X.X}
+   with out_of_line = True
+        effect = ReadWriteEffect
+
+primop  ResizeMutableByteArrayPreferUnpinnedOp_Char "resizeMutableByteArrayPreferUnpinned#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
+   {Like 'resizeMutableByteArray#', trying to resize in place (keeping the same
+    pinnedness as the original if it succeeds), but allocating an
+    unpinned 'MutableByteArray#' if that is not possible.
+
+    This is the default behaviour of 'resizeMutableByteArray#'.
+
+    @since X.X}
+   with out_of_line = True
+        effect = ReadWriteEffect
+
+primop  ResizeMutableByteArrayPreferPinnedOp_Char "resizeMutableByteArrayPreferPinned#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
+   {Like 'resizeMutableByteArray#', trying to resize in place (keeping the same
+    pinnedness as the original if it succeeds), but allocating a
+    pinned 'MutableByteArray#' if that is not possible.
+
+    @since X.X}
+   with out_of_line = True
+        effect = ReadWriteEffect
+
+primop  ResizeMutableByteArrayPreferAlignedPinnedOp_Char "resizeMutableByteArrayPreferAlignedPinned#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
+   {Like 'resizeMutableByteArrayPreferPinned#', trying to resize in place (keeping the same
+    pinnedness as the original if it succeeds), but allocating an aligned,
+    pinned 'MutableByteArray#' if that is not possible.
+
+    The first 'Int#' parameter is the size of the new array, and the second 'Int#'
+    parameter is the alignment of the re-allocated array. See 'newAlignedPinnedByteArray#'
+    for restrictions on alignment.
+
+    @since X.X}
+   with out_of_line = True
+        effect = ReadWriteEffect
+        can_fail_warning = YesWarnCanFail
+        -- can fail warning for the "power of two" requirement
+
+primop  ResizeMutableByteArrayMakeAlignedPinnedOp_Char "resizeMutableByteArrayMakeAlignedPinned#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
+   {Like 'resizeMutableByteArrayPreferAlignedPinned#', but if the input array is
+    not aligned and pinned to the given alignment, a new array is always allocated.
+
+    The first 'Int#' parameter is the size of the new array, and the second 'Int#'
+    parameter is the alignment of the re-allocated array. See 'newAlignedPinnedByteArray#'
+    for restrictions on alignment.
+
+    @since X.X}
+   with out_of_line = True
+        effect = ReadWriteEffect
+        can_fail_warning = YesWarnCanFail
+        -- can fail warning for the "power of two" requirement
 
 primop  UnsafeFreezeByteArrayOp "unsafeFreezeByteArray#" GenPrimOp
    MutableByteArray# s -> State# s -> (# State# s, ByteArray# #)

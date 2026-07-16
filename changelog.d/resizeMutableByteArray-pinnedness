@@ -1,0 +1,15 @@
+section: ghc-internal
+synopsis: Add five more primops for resizing byte arrays, relating to their pinnedness.
+description: {
+  Add more primops for resizing mutable byte arrays, giving five options:
+
+  - prefer unpinned when allocating new array (``resizeMutableByteArrayPreferUnpinned#``; the ``resizeMutableByteArray#`` default)
+  - prefer pinned when allocating new array (``resizeMutableByteArrayPreferPinned#``)
+  - prefer aligned and pinned when allocating new array (``resizeMutableByteArrayPreferAlignedPinned#``)
+  - prefer same as input bytearray when allocating new array (``resizeMutableByteArrayKeepPinnedness#``)
+  - ensure the output array is aligned and pinned after operation (``resizeMutableByteArrayMakeAlignedPinned#``)
+
+  They can be found in ``GHC.Prim`` and ``GHC.PrimOps``.
+}
+issues: #27244
+mrs: !16010

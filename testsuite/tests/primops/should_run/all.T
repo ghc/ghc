@@ -34,6 +34,9 @@ test('CmpWord32', normal, compile_and_run, [''])
 
 test('ShrinkSmallMutableArrayA', normal, compile_and_run, [''])
 test('ShrinkSmallMutableArrayB', normal, compile_and_run, [''])
+test('ResizeByteArrayPinnedness', 
+  js_skip, # js does not implement performMinorGc
+  compile_and_run, [''])
 test('T14664', normal, compile_and_run, [''])
 test('CStringLength', normal, compile_and_run, ['-O2'])
 test('NonNativeSwitch', normal, compile_and_run, ['-O2'])

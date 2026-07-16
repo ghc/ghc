@@ -7329,6 +7329,11 @@ module GHC.PrimOps where
   remWord8X32# :: Word8X32# -> Word8X32# -> Word8X32#
   remWord8X64# :: Word8X64# -> Word8X64# -> Word8X64#
   resizeMutableByteArray# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, MutableByteArray# d #)
+  resizeMutableByteArrayKeepPinnedness# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, MutableByteArray# d #)
+  resizeMutableByteArrayMakeAlignedPinned# :: forall d. MutableByteArray# d -> Int# -> Int# -> State# d -> (# State# d, MutableByteArray# d #)
+  resizeMutableByteArrayPreferAlignedPinned# :: forall d. MutableByteArray# d -> Int# -> Int# -> State# d -> (# State# d, MutableByteArray# d #)
+  resizeMutableByteArrayPreferPinned# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, MutableByteArray# d #)
+  resizeMutableByteArrayPreferUnpinned# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, MutableByteArray# d #)
   resizeSmallMutableArray# :: forall s a. SmallMutableArray# s a -> Int# -> a -> State# s -> (# State# s, SmallMutableArray# s a #)
   retry# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)). State# RealWorld -> (# State# RealWorld, a #)
   rightSection :: forall {q :: RuntimeRep} {r :: RuntimeRep} {s :: RuntimeRep} (a :: TYPE q) (b :: TYPE r) (c :: TYPE s). (a -> b -> c) -> b -> a -> c
