@@ -274,10 +274,11 @@ opt_co4, opt_co4' :: LiftingContext -> SwapFlag -> ReprFlag
 -- Precondition:  In every call (opt_co4 lc sym rep role co)
 --                we should have role = coercionRole co
 -- Precondition:  role is not Phantom
--- Postcondition: The resulting coercion is equivalant to
---                     wrapsub (wrapsym (mksub co)
---                 where wrapsym is SymCo if sym=True
---                       wrapsub is SubCo if rep=True
+-- Postcondition: The resulting coercion is equivalent to
+--                     wrapSub (wrapSym (substCo co))
+--                 where substCo applies the LiftingContext substitution
+--                       wrapSym wraps in SymCo when the ambient Sym is IsSwapped
+--                       wrapSub wraps in SubCo when rep=True
 
 -- opt_co4 is there just to support tracing, when debugging
 -- Usually it just goes straight to opt_co4'
@@ -327,7 +328,10 @@ opt_co4' env sym  rep r (GRefl _r ty (MCo kco))
                text "Type:" <+> ppr ty) $
     if isReflKindCo kco || isReflKindCo kco'
     then wrapSym sym ty_co
-    else wrapSym sym $ mk_coherence_right_co r' (coercionRKind ty_co) kco' ty_co
+    else
+      -- Keep 'sym' on the outside instead of trying to push it in, to avoid
+      -- duplicating 'k_co' in 'GRefl r (ty |> kco) (MCo (sym kco))'
+      wrapSym sym $ mk_coherence_right_co r' (coercionRKind ty_co) kco' ty_co
             -- ty :: k1
             -- kco :: k1 ~ k2
             -- Desired result coercion:   ty ~ ty |> co
@@ -548,30 +552,21 @@ opt_co4' env sym rep r (InstCo fun_co arg_co)
   where
     r'   = chooseRole rep r
 
-    -- Optimised versions of fun_co & arg_co. NB: we have /not/ pushed in `sym`,
+    -- Optimised versions of fun_co & arg_co.
+    -- NB: we do /not/ push in `sym` (hence using `NotSwappped`),
     -- in order to respect (LC2) in Note [The LiftingContext in optCoercion].
     fun_co'     = opt_co4 env NotSwapped rep   r       fun_co
     arg_co'     = opt_co4 env NotSwapped False Nominal arg_co
 
     -- Like fun_co'/arg_co', except we /have/ pushed in `sym`.
-    --
-    -- Unfortunately, this can require optimising the input coercion twice,
-    -- risking exponential behaviour.
-    --
-    --  - We mitigate this by re-using fun_co'/arg_co' if we don't need to sym.
-    --  - To fully rule out exponential behaviour, we could imagine adding an
-    --    argument to opt_co4' that indicates whether the input coercion is
-    --    already optimised.
+    -- We use 'mkDeepSymCo' to push in 'sym' without re-optimising.
+    -- See Note [Pushing Sym without re-optimising]
     sym_fun_co'
-      | isSwapped sym
-      = opt_co4 env sym rep r fun_co
-      | otherwise
-      = fun_co' -- Avoids recomputing the optimised fun_co
+      | isSwapped sym = mkDeepSymCo fun_co'
+      | otherwise     = fun_co'
     sym_arg_co'
-      | isSwapped sym
-      = opt_co4 env sym False Nominal arg_co
-      | otherwise
-      = arg_co' -- Avoids recomputing the optimised arg_co
+      | isSwapped sym = mkDeepSymCo arg_co'
+      | otherwise     = arg_co'
 
 opt_co4' env sym _rep r (KindCo co)
   = assert (r == Nominal) $
@@ -594,6 +589,83 @@ chances of floating the Refl upwards; e.g. Maybe c --> Refl (Maybe t)
 We do so here in optCoercion, not in mkCoVarCo; see Note [mkCoVarCo]
 in GHC.Core.Coercion.
 -}
+
+{- Note [Pushing Sym without re-optimising]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To optimise (InstCo fun_co arg_co) we must first optimise fun_co and arg_co
+/without/ the ambient Sym, as required by (LC2) of
+Note [The LiftingContext in optCoercion].
+
+But in the fallback case (when the optimised fun_co is not a ForAllCo), we need
+to push the ambient Sym into both components when rebuilding the InstCo.
+
+  Re-running the optimiser with sym=IsSwapped would optimise each component twice.
+  As the components can themselves contain 'InstCo's, this has the potential to
+  trigger exponential behaviour.
+
+  Simply wrapping 'sym' on the outside would fail to push 'sym' deeply into the
+  coercion, which would be in tension with the rest of the coercion optimiser
+  which relies on 'sym' being pushed into the leaves to expose cancellation
+  opportunities.
+
+To solve this, we define 'mkDeepSymCo': it pushes a Sym into an already
+optimised coercion. This is much simpler than full coercion optimisation, as it
+doesn't need to do coercion lifting nor downgrade roles.
+-}
+
+-- | Push 'Sym' deeply into an already-optimised coercion.
+--
+-- Morally the same as re-optimising the coercion with @sym=IsSwapped@, but
+-- more efficient.
+--
+-- See Note [Pushing Sym without re-optimising]
+mkDeepSymCo :: NormalCo -> NormalCo
+mkDeepSymCo = go
+  where
+    go :: NormalCo -> NormalCo
+    -- Straightforward cases
+    go (SymCo co)                                 = co
+    go co@(UnivCo { uco_lty = t1, uco_rty = t2 }) = co { uco_lty = t2, uco_rty = t1 }
+    go (TyConAppCo r tc cos)                      = TyConAppCo r tc $ map go cos
+    go (AppCo co1 co2)                            = AppCo (go co1) (go co2)
+    go (FunCo r afl afr cow co1 co2)              = FunCo r afr afl (go cow) (go co1) (go co2)
+    go (TransCo co1 co2)                          = TransCo (go co2) (go co1)
+    go (SelCo cs co)                              = SelCo cs $ go co
+    go (LRCo lr co)                               = LRCo lr $ go co
+    go (InstCo fun_co arg_co)                     = InstCo (go fun_co) (go arg_co)
+    go (KindCo co)                                = KindCo $ go co
+    go (SubCo co)                                 = SubCo $ go co
+    go co@(CoVarCo {})                            = SymCo co
+    go co@(Refl {})                               = co
+    go co@(GRefl _ _ MRefl)                       = co
+    go co@(GRefl _ _ (MCo {}))                    = SymCo co
+      -- keep the sym outside, like the GRefl case of opt_co4' does, instead of
+      --   GRefl r (ty |> kco) (MCo (sym kco))
+      -- as that duplicates 'kco'
+    go co@(AxiomCo {})                           =  SymCo co
+      -- Same as in opt_co4': do *not* push sym inside top-level axioms.
+
+    go co@(ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
+                    , fco_kind = k_mco, fco_body = body_co })
+      = case k_mco of
+          MRefl -> ForAllCo tcv visR visL k_mco (go body_co)
+          MCo {} ->
+            -- Pushing 'sym' into the kind coercion would require threading a
+            -- substitution through, as per Note [Optimising ForAllCo].
+            -- This wouldn't be difficult (see commented out code below), but
+            -- for now we prefer to keep 'mkDeepSymCo' as simple as possible.
+            SymCo co
+
+            -- Pushing 'sym' into the kind coercion, threading 'Subst' through:
+            --
+            -- = ForAllCo tcv' visR visL k_mco' (go subst' body_co)
+            -- where
+            --   k_mco' = case k_mco of
+            --              MRefl  -> MRefl
+            --              MCo co -> MCo (go subst co)
+            --   (subst', tcv') = forAllCoBndrSubst IsSwapped tcv k_mco' subst
+
+    go (HoleCo h) = pprPanic "mkDeepSymCo: HoleCo" (ppr h)
 
 -------------
 -- | Optimize a phantom coercion. The input coercion may not necessarily
@@ -1470,6 +1542,9 @@ But if sym=Swapped, things are trickier.  Here is an identity that helps:
       of tv:k1 in bodyco by (tv:k2 |> Sym kco)
   This mirrors what happens in the typing rule for ForAllCo
   See Note [ForAllCo] in GHC.Core.TyCo.Rep
+  NB: doing so inlines 'kco' at all occurrences of tv, duplicating it. This is
+      inconsistent with how we optimise GRefl, where we keep the 'Sym' on the
+      outside to avoid duplicating the kind coercion.
 
 -}
 optForAllCoBndr :: LiftingContext -> SwapFlag
@@ -1484,13 +1559,20 @@ optForAllCoBndr env sym tcv k_mco
                 MRefl -> MRefl
                 MCo co -> MCo (opt_co4 env sym False Nominal co)
 
-    (env', tcv') = updateLCSubst env upd_subst
+    (env', tcv') = updateLCSubst env (forAllCoBndrSubst sym tcv k_mco')
 
-    upd_subst :: Subst -> (Subst, TyCoVar)
-    upd_subst subst
-      | isTyVar tcv = upd_subst_tv subst
-      | otherwise   = upd_subst_cv subst
-
+-- | Substitute a 'ForAllCo' binder, returning the body substitution.
+--
+-- See Note [Optimising ForAllCo].
+forAllCoBndrSubst
+  :: SwapFlag
+  -> TyCoVar     -- ^ the ForAllCo binder
+  -> MCoercionN  -- ^ its kind coercion, with the ambient Sym already pushed into it
+  -> Subst -> (Subst, TyCoVar)
+forAllCoBndrSubst sym tcv k_mco'
+  | isTyVar tcv = upd_subst_tv
+  | otherwise   = upd_subst_cv
+  where
     upd_subst_tv subst
       = case k_mco' of
           MCo k_co' | isSwapped sym -> (subst2, tv2)
