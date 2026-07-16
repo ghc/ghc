@@ -319,7 +319,7 @@ void scavengeTSOIOManager(StgTSO *tso);
 /* Several code paths are almost identical between read and write paths. In
  * such cases we use a shared code path with an enum to say which we're doing.
  */
-typedef enum { IORead, IOWrite } IOReadOrWrite;
+typedef enum { IORead = 0, IOWrite = 1 } IOReadOrWrite;
 
 /* Synchronous operations: I/O and delays. As synchronous operations they
  * necessarily operate on threads. The thread is suspended until the operation

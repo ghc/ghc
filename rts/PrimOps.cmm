@@ -2269,7 +2269,7 @@ stg_waitReadzh ( W_ fd )
 
     (ok) = ccall syncIOWaitReady(Capability_iomgr(MyCapability()) "ptr",
                                  CurrentTSO "ptr",
-                                 /* IORead */ 0::I32, fd);
+                                 /* IORead */ 0::CInt, fd);
     if (ok != 0::CBool) (likely: True) {
         jump stg_block_noregs();
     } else {
@@ -2283,7 +2283,7 @@ stg_waitWritezh ( W_ fd )
 
     (ok) = ccall syncIOWaitReady(Capability_iomgr(MyCapability()) "ptr",
                                  CurrentTSO "ptr",
-                                 /* IOWrite */ 1::I32, fd);
+                                 /* IOWrite */ 1::CInt, fd);
     if (ok != 0::CBool) (likely: True) {
         jump stg_block_noregs();
     } else {
