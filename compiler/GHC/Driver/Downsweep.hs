@@ -5,8 +5,8 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FunctionalDependencies #-}
+
+-- | See Note [The ModuleGraph]
 module GHC.Driver.Downsweep
   ( downsweep
   , downsweepThunk
@@ -116,17 +116,35 @@ import Data.IORef
 import qualified Data.List.NonEmpty as NE
 
 {-
-Note [Downsweep and the ModuleGraph]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [The ModuleGraph]
+~~~~~~~~~~~~~~~~~~~~~~
+The 'ModuleGraph' stores the relationship between all the modules, units, and
+instantiations in the current session, allowing e.g. to answer questions about
+the transitive closure of the imports.
 
-The ModuleGraph stores the relationship between all the modules, units, and
-instantiations in the current session.
+* A /node/ of the `ModuleGraph`, of type `ModuleGraphNode`, corresponds
+  1-1 with a home-package module of source code, N.hs or N.hs-boot.
+  See the haddocks of `ModuleGraphNode`.
 
-When we do downsweep, we build up a new ModuleGraph, starting from the root
-modules. By following all the dependencies we construct a graph which allows
-us to answer questions about the transitive closure of the imports.
+  The `ModuleNodeInfo` field of the `ModuleGraphNode` contains a `ModSummary`
+  that in turn describes where the source file is (its `ModLocation`), when it
+  was read, its contents etc. See Note [Module Types in the ModuleGraph].
 
-The module graph is accessible in the HscEnv.
+  Each node has a distinct `NodeKey` (an instance of Ord); the function
+        mkNodeKey :: ModuleGraphNode -> NodeKey
+  get the `NodeKey` of a node
+
+* An /edge/ of the `ModuleGraph` from N1 to N2 typically corresponds to a
+  direct import of module N2 in module N1: one edge for each import.
+  Imports of modules from non-home-packages are featured in the `ModuleGraph`
+  as `UnitNode`s, or `InstantiationNodes` when backpack is involved.
+
+  Each node contains a list of all its out-edges or, more precisely, of the
+  `NodeKey`s of its direct dependencies.
+
+Because a node in the `ModuleGraph` describes the precise dependencies of the module, each node has its
+own `UnitId`.  Remember, a single module can be compiled against many different versions of a library; but
+once we fix its dependencies we can compile it, and give it a `UnitId`.  See Note [About units] in GHC.Unit.
 
 When is this graph constructed?
 
@@ -143,10 +161,54 @@ When is this graph constructed?
 
 The result is having a uniform graph available for the whole compilation pipeline.
 
-See also Note [Downsweep Control Flow and Caching]
+See Note [Downsweep Control Flow and Caching] for implementation details of
+the algorithm and caching.
+
+Note [Downsweep: building and maintaining the module graph]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The module graph can be built from scratch by starting from a set of /root nodes/
+and exploring their dependencies. This is done by `GHC.Driver.Downsweep.downsweep`.
+
+Another scenario is when we already /have/ a `ModuleGraph` and want to update
+it (e.g. to reflect any file-system changes that have taken place since the
+last invocation of `downsweep`) or augment it by exploring new roots (e.g. for
+incrementally constructing a ModuleGraph using the GHC API; See #27054). So
+`downsweep` takes a `Maybe ModuleGraph` as one of its arguments.
+
+Downsweep iteratively *expands* each so-called 'DownsweepNode' into a list of
+its dependencies, and recursively traverses all reachable nodes in a
+depth-first order using 'dfsBuild'. A 'DownsweepNode' is *expanded* by 'dsNodeExpand':
+
+  dsNodeExpand :: DownsweepNode -> DownsweepM (NodeRes (ModuleGraphNode, [DownsweepNode]))
+
+Most notably:
+
+  - 'DSMod' (Module-based) nodes can be expanded by preprocessing and
+  parsing the module header, then listing the imports (direct and SOURCE imports)
+  (see 'expandModuleSummary' and 'expandFixedModuleNode')
+
+  - 'DSUnit' is expanded by finding the unit dependencies of that unit by id
+  (see 'expandUnitNode').
+
+Besides its dependencies, expanding a 'DownsweepNode' produces a
+'ModuleGraphNode'. The final 'ModuleGraph' is constructed from the list of
+'ModuleGraphNode's accumulated by expanding all reachable 'DownsweepNode's.
+
+A 'ModuleGraphNode' is essentially the resolved version of 'DownsweepNode':
+it records the payload (e.g. a Module) *and* its dependencies, unlike
+'DownsweepNode' which has the just the payload that is used as a seed (and
+potentially some context information, like the current home-unit)
+
+TL;DR: We recursively traverse 'DownsweepNodes' to discover and build the 'ModuleGraph'.
+
+See also Note [Downsweep Control Flow and Caching] for implementation details.
+See Note [The ModuleGraph] for an overview when we do downsweep.
 -}
 
 -----------------------------------------------------------------------------
+-- * Top-level entry to downsweep
+-----------------------------------------------------------------------------
+
 --
 -- | Downsweep (dependency analysis) for --make mode
 --
@@ -158,7 +220,7 @@ See also Note [Downsweep Control Flow and Caching]
 -- cache to avoid recalculating a module summary if the source is
 -- unchanged.
 --
--- Downsweeping can start from scratch for from a given module graph. In the
+-- Downsweeping can start from scratch or from a given module graph. In the
 -- latter case, the given graph is fully included in the resulting graph, even
 -- if parts of it are not reachable from any of the given roots. When an import
 -- is processed, the source of the imported module is not consulted if this
@@ -174,6 +236,8 @@ See also Note [Downsweep Control Flow and Caching]
 --
 -- It will also turn on code generation for any modules that need it by calling
 -- 'enableCodeGenForTH'.
+--
+-- See also Note [The ModuleGraph]
 downsweep :: HscEnv
           -> (GhcMessage -> AnyGhcDiagnostic)
           -> Maybe Messager
@@ -229,6 +293,35 @@ downsweep hsc_env diag_wrapper msg old_summaries maybe_base_graph excl_mods allo
     unitModuleNodes :: [ModuleGraphNode] -> UnitId -> HomeUnitEnv -> [Either (Messages DriverMessage) ModuleGraphNode]
     unitModuleNodes summaries uid hue =
       maybeToList (linkNodes summaries uid hue)
+
+    -- The linking plan for each module. If we need to do linking for a home unit
+    -- then this function returns a graph node which depends on all the modules in the home unit.
+
+    -- At the moment nothing can depend on these LinkNodes.
+    linkNodes :: [ModuleGraphNode] -> UnitId -> HomeUnitEnv -> Maybe (Either (Messages DriverMessage) ModuleGraphNode)
+    linkNodes summaries uid hue =
+      let dflags = homeUnitEnv_dflags hue
+          ofile = outputFile_ dflags
+
+          unit_nodes :: [NodeKey]
+          unit_nodes = map mkNodeKey (filter ((== uid) . mgNodeUnitId) summaries)
+      -- Issue a warning for the confusing case where the user
+      -- said '-o foo' but we're not going to do any linking.
+      -- We attempt linking if either (a) one of the modules is
+      -- called Main, or (b) the user said -no-hs-main, indicating
+      -- that main() is going to come from somewhere else.
+      --
+          no_hs_main = gopt Opt_NoHsMain dflags
+
+          main_sum = any (== NodeKey_Module (ModNodeKeyWithUid (GWIB (mainModuleNameIs dflags) NotBoot) uid)) unit_nodes
+
+          do_linking =  main_sum || no_hs_main || ghcLink dflags == LinkDynLib || ghcLink dflags == LinkStaticLib || ghcLink dflags == LinkBytecodeLib
+
+      in if | isExecutableLink (ghcLink dflags) && isJust ofile && not do_linking ->
+                Just (Left $ singleMessage $ mkPlainErrorMsgEnvelope noSrcSpan (DriverRedirectedNoMain $ mainModuleNameIs dflags))
+            -- This should be an error, not a warning (#10895).
+            | ghcLink dflags /= NoLink, do_linking -> Just (Right (LinkNode unit_nodes uid))
+            | otherwise  -> Nothing
 
 -- | Calculate the module graph starting from a single ModSummary. The result is a
 -- thunk, which when forced will perform the downsweep. This is useful in oneshot
@@ -317,7 +410,35 @@ downsweepInstalledModules hsc_env mods = do
 
     return (mkModuleGraph mg)
 
+-----------------------------------------------------------------------------
+-- * Orchestrator: downsweepFromRootNodes
+-----------------------------------------------------------------------------
 
+type ModSummaryCache = IORef ModSummaryCacheMap
+type ImportsCache    = IORef ImportsCacheMap
+
+-- | A cache from file paths to the already summarised modules. The same file
+-- can be used in multiple units so the map is actually also keyed by which
+-- unit the file was used in.
+--
+-- We want to reuse ModSummaries as far as possible because the most expensive
+-- part of downsweep is reading and parsing the headers.
+--
+-- See Note [Downsweep Control Flow and Caching]
+type ModSummaryCacheMap
+      -- The cache can't be keyed by 'Module' because that isn't sufficient to
+      -- distinguish .hs from .hs-boot files. Use path+unit instead.
+      = ( M.Map (UnitId, OsPath) (Either DriverMessages (ModSummary, SummProvenance)) )
+
+-- | A 'ModSummary's provenance during downsweep: an old previously constructed
+-- ModSummary, that might be potentially outdated, or a freshly constructed one
+-- during this downsweep which is certainly up to date?
+data SummProvenance
+  -- | Constructed during this downsweep: trivially up to date
+  = SummFresh
+  -- | Carried over from a previous run: may be stale, must be hash-checked
+  -- (and considered by -fforce-recomp)
+  | SummOld
 
 -- | Whether downsweep should use compiler or fixed nodes. Compile nodes are used
 -- by --make mode, and fixed nodes by oneshot mode.
@@ -376,23 +497,15 @@ downsweepFromRootNodes hsc_env summ_cache imps_cache maybe_base_graph excl_mods 
            [ ((moduleNodeInfoUnitId s, moduleNodeInfoMnwib s), [s])
            | s <- root_nodes ]
 
-    moduleGraphNodeMap :: ModuleGraph -> M.Map NodeKey (MGRes ModuleGraphNode)
+    moduleGraphNodeMap :: ModuleGraph -> M.Map NodeKey (NodeRes ModuleGraphNode)
     moduleGraphNodeMap graph
         = M.fromList [(mkNodeKey node, NSuccess node) | node <- mgModSummaries' graph]
 
     sec = initSourceErrorContext (hsc_dflags hsc_env)
 
-calcDeps :: ModSummary -> [UnresolvedImport PkgQual]
-calcDeps ms =
-  -- Add a dependency on the HsBoot file if it exists
-  -- This gets passed to the loopImports function which just ignores it if it
-  -- can't be found.
-  [ self_boot | NotBoot <- [isBootSummary ms] ] ++
-  [ e | e <- ms_imps ms ]
-  where
-    self_boot = (generatedImport FromSelfBoot (noLoc (ms_mod_name ms)))
-                  { ui_boot = IsBoot }
-
+--------------------------------------------------------------------------------
+-- ** 'DownsweepM'
+--------------------------------------------------------------------------------
 
 type DownsweepM a = ReaderT DownsweepEnv IO a
 data DownsweepEnv = DownsweepEnv {
@@ -402,29 +515,6 @@ data DownsweepEnv = DownsweepEnv {
     , downsweep_imports_cache :: ImportsCache
     , _downsweep_excl_mods :: [ModuleName]
 }
-
-type ModSummaryCache = IORef ModSummaryCacheMap
-type ImportsCache    = IORef ImportsCacheMap
-
--- | A cache from file paths to the already summarised modules. The same file
--- can be used in multiple units so the map is actually also keyed by which
--- unit the file was used in.
---
--- We want to reuse ModSummaries as far as possible because the most expensive
--- part of downsweep is reading and parsing the headers.
---
--- See Note [Downsweep Control Flow and Caching]
-type ModSummaryCacheMap
-      -- The cache can't be keyed by 'Module' because that isn't sufficient to
-      -- distinguish .hs from .hs-boot files. Use path+unit instead.
-      = ( M.Map (UnitId, OsPath) (Either DriverMessages (ModSummary, SummProvenance)) )
-
-data SummProvenance
-  -- | Constructed during this downsweep: trivially up to date
-  = SummFresh
-  -- | Carried over from a previous run: may be stale, must be hash-checked
-  -- (and considered by -fforce-recomp)
-  | SummOld
 
 mkModSummaryCache :: [(ModSummary, SummProvenance)] -> ModSummaryCacheMap
 mkModSummaryCache summs = foldl' (flip (uncurry addModSummaryCache)) M.empty summs
@@ -458,17 +548,19 @@ mkRootMap summaries = Map.fromList
 runDownsweepM :: DownsweepEnv -> DownsweepM a -> IO a
 runDownsweepM env act = runReaderT act env
 
-loopDownsweepNodes  :: M.Map NodeKey (MGRes ModuleGraphNode) -> [DownsweepNode]               -> DownsweepM (M.Map NodeKey (MGRes ModuleGraphNode))
-loopModuleNodeInfos :: M.Map NodeKey (MGRes ModuleGraphNode) -> [ModuleNodeInfo]              -> DownsweepM (M.Map NodeKey (MGRes ModuleGraphNode))
-loopUnits           :: M.Map NodeKey (MGRes ModuleGraphNode) -> UnitId -> [UnitId]            -> DownsweepM (M.Map NodeKey (MGRes ModuleGraphNode))
-loopInstantiations  :: M.Map NodeKey (MGRes ModuleGraphNode) -> [(UnitId, InstantiatedUnit)]  -> DownsweepM (M.Map NodeKey (MGRes ModuleGraphNode))
-loopFromInteractive :: M.Map NodeKey (MGRes ModuleGraphNode) -> Module -> [InteractiveImport] -> DownsweepM (M.Map NodeKey (MGRes ModuleGraphNode))
+loopDownsweepNodes  :: M.Map NodeKey (NodeRes ModuleGraphNode) -> [DownsweepNode]               -> DownsweepM (M.Map NodeKey (NodeRes ModuleGraphNode))
+loopModuleNodeInfos :: M.Map NodeKey (NodeRes ModuleGraphNode) -> [ModuleNodeInfo]              -> DownsweepM (M.Map NodeKey (NodeRes ModuleGraphNode))
+loopUnits           :: M.Map NodeKey (NodeRes ModuleGraphNode) -> UnitId -> [UnitId]            -> DownsweepM (M.Map NodeKey (NodeRes ModuleGraphNode))
+loopInstantiations  :: M.Map NodeKey (NodeRes ModuleGraphNode) -> [(UnitId, InstantiatedUnit)]  -> DownsweepM (M.Map NodeKey (NodeRes ModuleGraphNode))
+loopFromInteractive :: M.Map NodeKey (NodeRes ModuleGraphNode) -> Module -> [InteractiveImport] -> DownsweepM (M.Map NodeKey (NodeRes ModuleGraphNode))
 loopDownsweepNodes  base_map nodes = dfsBuild (Just base_map) nodes dsNodeInfoKey dsNodeExpand
 loopModuleNodeInfos base_map       = loopDownsweepNodes base_map . map DSMod
 loopUnits           base_map homud = loopDownsweepNodes base_map . map (DSUnit homud)
 loopInstantiations  base_map       = loopDownsweepNodes base_map . map (uncurry DSInst)
 loopFromInteractive base_map m     = loopDownsweepNodes base_map . (:[]) . DSInteractive m
 
+--------------------------------------------------------------------------------
+-- * Expanding 'DownsweepNode's into payload and node dependencies
 --------------------------------------------------------------------------------
 
 -- | A 'DownsweepNode' is the basic block of the downsweep algorithm which
@@ -514,7 +606,7 @@ dsNodeInfoKey = \case
   DSInst{instantiated_ud}       -> NodeKey_Unit instantiated_ud
   DSInteractive mod _imps       -> NodeKey_Module $ moduleToMnk mod NotBoot
 
-dsNodeExpand :: DownsweepNode -> DownsweepM (MGRes (ModuleGraphNode, [DownsweepNode]))
+dsNodeExpand :: DownsweepNode -> DownsweepM (NodeRes (ModuleGraphNode, [DownsweepNode]))
 dsNodeExpand = \case
   DSMod (ModuleNodeCompile ms)         -> expandModuleSummary ms
   DSMod (ModuleNodeFixed key loc)      -> expandFixedModuleNode key loc
@@ -523,12 +615,29 @@ dsNodeExpand = \case
         , home_context_uid }           -> expandInstantiatedUnit instantiated_ud home_context_uid
   DSInteractive imod iis               -> expandInteractiveImports imod iis
 
-expandModuleSummary :: ModSummary -> DownsweepM (MGRes (ModuleGraphNode, [DownsweepNode]))
+expandModuleSummary :: ModSummary -> DownsweepM (NodeRes (ModuleGraphNode, [DownsweepNode]))
 expandModuleSummary ms = do -- Didn't work out what the imports mean yet, now do that.
     hsc_env <- asks downsweep_hsc_env
     let home_uid  = ms_unitid ms
         home_unit = ue_unitHomeUnit home_uid (hsc_unit_env hsc_env)
-    (final_deps, todo) <- fmap unzip $ forM (calcDeps ms) $ \imp -> do
+    (final_deps, todo) <- unzip <$> mapM (expandModImport home_uid home_unit) (calcDeps ms)
+
+    -- This has the effect of finding a .hs file if we are looking at the .hs-boot file.
+    boot_todo <-
+      if | HsBootFile <- ms_hsc_src ms
+         -> do
+            r <- downsweepSummarise home_unit (generatedImport FromSelfBoot (noLoc (ms_mod_name ms))) Nothing
+            case r of
+              FoundHome s -> pure [DSMod s]
+              _           -> pure []
+         | otherwise      -> pure []
+
+    return $ NSuccess
+      ( ModuleNode (catMaybes final_deps) (ModuleNodeCompile ms)
+      , boot_todo ++ concat todo
+      )
+  where
+    expandModImport home_uid home_unit imp = do
       let UnresolvedImport { ui_level = lvl } = imp
       mb_s <- downsweepSummarise home_unit imp Nothing
       case mb_s of
@@ -549,24 +658,20 @@ expandModuleSummary ms = do -- Didn't work out what the imports mean yet, now do
           ( Just $ mkModuleEdge lvl (NodeKey_Module (mnKey s))
           , [DSMod s] )
 
-    -- This has the effect of finding a .hs file if we are looking at the .hs-boot file.
-    boot_todo <-
-      if | HsBootFile <- ms_hsc_src ms
-         -> do
-            r <- downsweepSummarise home_unit (generatedImport FromSelfBoot (noLoc (ms_mod_name ms))) Nothing
-            case r of
-              FoundHome s -> pure [DSMod s]
-              _           -> pure []
-         | otherwise      -> pure []
-
-    return $ NSuccess
-      ( ModuleNode (catMaybes final_deps) (ModuleNodeCompile ms)
-      , boot_todo ++ concat todo
-      )
+    calcDeps :: ModSummary -> [UnresolvedImport PkgQual]
+    calcDeps ms =
+      -- Add a dependency on the HsBoot file if it exists
+      -- This gets passed to the loopImports function which just ignores it if it
+      -- can't be found.
+      [ self_boot | NotBoot <- [isBootSummary ms] ] ++
+      [ e | e <- ms_imps ms ]
+      where
+        self_boot = (generatedImport FromSelfBoot (noLoc (ms_mod_name ms)))
+                      { ui_boot = IsBoot }
 
 -- | Expand a 'ModuleNodeFixed' node
 -- NB: If you ever reach a Fixed node, everything under that also must be fixed.
-expandFixedModuleNode :: ModNodeKeyWithUid -> ModLocation -> DownsweepM (MGRes (ModuleGraphNode, [DownsweepNode]))
+expandFixedModuleNode :: ModNodeKeyWithUid -> ModLocation -> DownsweepM (NodeRes (ModuleGraphNode, [DownsweepNode]))
 expandFixedModuleNode key loc = do
     hsc_env <- asks downsweep_hsc_env
     -- MP: TODO, we should just read the dependency info from the interface rather than either
@@ -600,7 +705,7 @@ expandFixedModuleNode key loc = do
           pure $ Just $ DSMod (ModuleNodeFixed key loc)
         _otherwise ->
           -- If the finder fails, just keep going, there will be another
-          -- error later.
+          -- error later when we try to expand this dependency.
           pure Nothing
     mk_dep _ (Right uid_dep) = do
       -- Set active unit so that looking loopUnit finds the correct
@@ -608,9 +713,22 @@ expandFixedModuleNode key loc = do
       let home_uid = mnkUnitId key
       pure (Just DSUnit{node_uid=uid_dep, home_context_uid=home_uid})
 
+    mkFixedEdge :: Either (ImportLevel, ModNodeKeyWithUid) (ImportLevel, UnitId) -> ModuleNodeEdge
+    mkFixedEdge (Left (lvl, key))  = mkModuleEdge lvl (NodeKey_Module key)
+    mkFixedEdge (Right (lvl, uid)) = mkModuleEdge lvl (NodeKey_ExternalUnit uid)
+
+    ifaceDeps :: Dependencies -> [Either (ImportLevel, ModNodeKeyWithUid) (ImportLevel, UnitId)]
+    ifaceDeps deps =
+      [ Left (tcImportLevel lvl, ModNodeKeyWithUid dep uid)
+      | (lvl, uid, dep) <- Set.toList (dep_direct_mods deps)
+      ] ++
+      [ Right (tcImportLevel lvl, uid)
+      | (lvl, uid) <- Set.toList (dep_direct_pkgs deps)
+      ]
+
 -- | Expand a unit id under the context of a certain home unit
 expandUnitNode :: UnitId {-^ @node_uid@ -} -> UnitId {-^ Home unit from where @node_uid@ was introduced -}
-               -> DownsweepM (MGRes (ModuleGraphNode, [DownsweepNode]))
+               -> DownsweepM (NodeRes (ModuleGraphNode, [DownsweepNode]))
 expandUnitNode node_uid home_context_uid = do
     -- Set active unit so that looking loopUnit finds the correct
     -- -package flags in the unit state.
@@ -620,12 +738,12 @@ expandUnitNode node_uid home_context_uid = do
       Just us -> pure $ NSuccess ((UnitNode us node_uid), map (\u -> DSUnit{node_uid=u, home_context_uid{-inherit-}}) us)
       Nothing -> pprPanic "loopUnit" (text "Malformed package database, missing " <+> ppr node_uid)
 
-expandInstantiatedUnit :: InstantiatedUnit -> UnitId {-^ Home unit -} -> DownsweepM (MGRes (ModuleGraphNode, [DownsweepNode]))
+expandInstantiatedUnit :: InstantiatedUnit -> UnitId {-^ Home unit -} -> DownsweepM (NodeRes (ModuleGraphNode, [DownsweepNode]))
 expandInstantiatedUnit iud home_uid = pure $ NSuccess
   ( InstantiationNode home_uid iud
   , [DSUnit{node_uid=instUnitInstanceOf iud, home_context_uid=home_uid}] )
 
-expandInteractiveImports :: Module -> [InteractiveImport] -> DownsweepM (MGRes (ModuleGraphNode, [DownsweepNode]))
+expandInteractiveImports :: Module -> [InteractiveImport] -> DownsweepM (NodeRes (ModuleGraphNode, [DownsweepNode]))
 expandInteractiveImports imod imps = do
   hsc_env    <- asks downsweep_hsc_env
   imps_cache <- asks downsweep_imports_cache
@@ -681,19 +799,8 @@ expandInteractiveImports imod imps = do
     node_type = ModuleNodeFixed key ml
 
 --------------------------------------------------------------------------------
-
-mkFixedEdge :: Either (ImportLevel, ModNodeKeyWithUid) (ImportLevel, UnitId) -> ModuleNodeEdge
-mkFixedEdge (Left (lvl, key)) = mkModuleEdge lvl (NodeKey_Module key)
-mkFixedEdge (Right (lvl, uid)) = mkModuleEdge lvl (NodeKey_ExternalUnit uid)
-
-ifaceDeps :: Dependencies -> [Either (ImportLevel, ModNodeKeyWithUid) (ImportLevel, UnitId)]
-ifaceDeps deps =
-  [ Left (tcImportLevel lvl, ModNodeKeyWithUid dep uid)
-  | (lvl, uid, dep) <- Set.toList (dep_direct_mods deps)
-  ] ++
-  [ Right (tcImportLevel lvl, uid)
-  | (lvl, uid) <- Set.toList (dep_direct_pkgs deps)
-  ]
+-- * Constructing Module Summaries
+--------------------------------------------------------------------------------
 
 downsweepSummarise :: HomeUnit
                    -> UnresolvedImport PkgQual
@@ -736,35 +843,6 @@ instantiationNodes uid unit_state = map (uid,) iuids_to_check
         , inst <- instUnitInsts indef
         , recur <- (indef :) $ goUnitId $ moduleUnit $ snd inst
         ]
-
--- The linking plan for each module. If we need to do linking for a home unit
--- then this function returns a graph node which depends on all the modules in the home unit.
-
--- At the moment nothing can depend on these LinkNodes.
-linkNodes :: [ModuleGraphNode] -> UnitId -> HomeUnitEnv -> Maybe (Either (Messages DriverMessage) ModuleGraphNode)
-linkNodes summaries uid hue =
-  let dflags = homeUnitEnv_dflags hue
-      ofile = outputFile_ dflags
-
-      unit_nodes :: [NodeKey]
-      unit_nodes = map mkNodeKey (filter ((== uid) . mgNodeUnitId) summaries)
-  -- Issue a warning for the confusing case where the user
-  -- said '-o foo' but we're not going to do any linking.
-  -- We attempt linking if either (a) one of the modules is
-  -- called Main, or (b) the user said -no-hs-main, indicating
-  -- that main() is going to come from somewhere else.
-  --
-      no_hs_main = gopt Opt_NoHsMain dflags
-
-      main_sum = any (== NodeKey_Module (ModNodeKeyWithUid (GWIB (mainModuleNameIs dflags) NotBoot) uid)) unit_nodes
-
-      do_linking =  main_sum || no_hs_main || ghcLink dflags == LinkDynLib || ghcLink dflags == LinkStaticLib || ghcLink dflags == LinkBytecodeLib
-
-  in if | isExecutableLink (ghcLink dflags) && isJust ofile && not do_linking ->
-            Just (Left $ singleMessage $ mkPlainErrorMsgEnvelope noSrcSpan (DriverRedirectedNoMain $ mainModuleNameIs dflags))
-        -- This should be an error, not a warning (#10895).
-        | ghcLink dflags /= NoLink, do_linking -> Just (Right (LinkNode unit_nodes uid))
-        | otherwise  -> Nothing
 
 getRootSummary ::
   [ModuleName] ->
@@ -851,6 +929,10 @@ rootSummariesParallel n_jobs hsc_env diag_wrapper msg get_summary = do
               throwIO e
             a -> pure a
 
+--------------------------------------------------------------------------------
+-- * Check/validate properties and error out
+--------------------------------------------------------------------------------
+
 -- | This function checks then important property that if both p and q are home units
 -- then any dependency of p, which transitively depends on q is also a home unit.
 --
@@ -897,6 +979,10 @@ checkHomeUnitsClosed ue
                     Just depends ->
                       let todo'' = (depends Set.\\ done) `Set.union` todo'
                       in DigraphNode uid uid (Set.toList depends) : go (Set.insert uid done) todo''
+
+--------------------------------------------------------------------------------
+-- * Enable Code Gen for Template Haskell
+--------------------------------------------------------------------------------
 
 -- | Update the every ModSummary that is depended on
 -- by a module that needs template haskell. We enable codegen to
@@ -1216,7 +1302,8 @@ Potential TODOS:
 -}
 
 -----------------------------------------------------------------------------
--- Summarising modules
+-- * Pre-processing and Summarising and modules
+-----------------------------------------------------------------------------
 
 -- We have two types of summarisation:
 --
@@ -1635,9 +1722,11 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
   return PreprocessedImports {..}
 
 --------------------------------------------------------------------------------
+-- * Generic traversal of iteratively-built graph: dfsBuild
+--------------------------------------------------------------------------------
 
 -- | The result of expanding a node in 'dfsBuild'.
-data MGRes v
+data NodeRes v
   -- | Computed the node payload successfully
   = NSuccess v
   -- | Skip a node! This means this node doesn't produce a payload and we can
@@ -1653,8 +1742,8 @@ data MGRes v
 -- graph by iteratively expanding a node into a payload and a list of children
 -- nodes to visit next.
 --
--- A node is NEVER visited/expanded more than once, as long as the the
--- node key @k@, computed from the node @n@, uniquely identifies that node.
+-- A node is NEVER visited/expanded more than once, as long as the node key
+-- @k@, computed from the node @n@, uniquely identifies that node.
 --
 -- The first argument @base_map@ is the starting set of already visited nodes
 -- (these nodes won't be expanded again!).
@@ -1674,17 +1763,17 @@ data MGRes v
 --
 -- See also Note [Downsweep Control Flow and Caching]
 dfsBuild :: (Ord k, Monad m)
-         => Maybe (Map.Map k (MGRes v))
+         => Maybe (Map.Map k (NodeRes v))
          -- ^ Base map, existing results. We won't re-expand any of the nodes
          -- already present in this map.
          -> [n]
          -- ^ The root nodes from where to start traversal
          -> (n -> k)
          -- ^ Compute the key which uniquely identifies this node
-         -> (n -> m (MGRes (v,[n])))
+         -> (n -> m (NodeRes (v,[n])))
          -- ^ Expand this node into its payload result and into the list of
          -- children nodes to visit next.
-         -> m (Map.Map k (MGRes v))
+         -> m (Map.Map k (NodeRes v))
          -- ^ The result accumulates the payload of expanding the root nodes
          -- and all nodes transitively reachable from those roots.
 dfsBuild base_map roots key expand = go roots (fromMaybe Map.empty base_map)
@@ -1700,7 +1789,7 @@ dfsBuild base_map roots key expand = go roots (fromMaybe Map.empty base_map)
                go ss
                   (Map.insert k NSkip        visited) -- Skip!
              NSuccess (v,ns) ->
-               go (ns ++ ss {- todo: not use ++ here? -})
+               go (ns ++ ss)
                   (Map.insert k (NSuccess v) visited)
       where
         k = key s
@@ -1721,12 +1810,33 @@ twice).
    same node of the module graph. Cache is keyed by the final
    `ModuleGraph`s `NodeKey`s.
 
+    For example, suppose
+
+       A imports B and C
+       B imports D
+       C imports D
+
+    Then, starting from A we will expand A and push B and C to the worklist;
+    then, going back to B, we expand B which pushes D to the worklist. After
+    processing D, we go to C, which imports D, but we have already visited that
+    module so we can just use the already-constructed `ModuleGraphNode` for D.
+
 2. For Module A in home-unit u1, each import in the list of imports
    needs to be *found* (call to `findImportedModuleWithIsBoot`): at this
    point, we only have the `ModuleName` of the import, not the `Module`.
    This *finding* is somewhat expensive, so we cache it as well
    (`ImportsCache`). The cache key is the home-unit to which the module
    belongs~[1], the import package qualifier, and the ModuleName.
+
+   Same example, suppose
+
+      A imports B and C
+      B imports D
+      C imports D
+
+   When expanding B, we will findImportedModule "import D".
+   When expanding C, we would findImportedModule "import D", but we can just
+   look it up in the cache
 
    [1] Different home-units will have different package flags, which means
    potentially different `Module` resolution for the same `ModuleName`.
@@ -1740,6 +1850,10 @@ twice).
    Module's UnitId and the Source path; the reason is we need to
    distinguish between `.hs` and `.hs-boot` files, as their summaries
    will differ.
+
+   Note that this covers more than just (1), because we summarise all imports
+   of a single module when expanding it (see 'expandModuleSummary'), before
+   returning from the expansion function.
 
    Note that (2) can't guarantee this alone: Two ModuleName imports in
    separate units can (and likely do) map to the same `Module`.
@@ -1760,5 +1874,6 @@ twice).
 
    See tests T27461a and T27461b.
 
-See also Note [Downsweep and the ModuleGraph]
+See also Note [Downsweep: building and maintaining the module graph] and
+Note [The ModuleGraph].
 -}
