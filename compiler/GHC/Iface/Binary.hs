@@ -32,7 +32,9 @@ module GHC.Iface.Binary (
 
 import GHC.Prelude
 
-import GHC.Builtin   ( knownKeyOccMap, lookupWiredInKnownKeyName )
+import GHC.Builtin   ( knownKeyOccMap, wiredInNamesMap )
+import GHC.Builtin.Uniques( knownUniqueTupleName )
+
 import GHC.Utils.Panic
 import GHC.Utils.Binary as Binary
 import GHC.Utils.Outputable
@@ -41,6 +43,7 @@ import GHC.Types.Name
 import GHC.Types.Unique
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Cache
+import GHC.Types.Unique.FM
 
 import GHC.Unit
 import GHC.Unit.Module.ModIface
@@ -721,25 +724,84 @@ getSymbolTable bh name_cache = do
 {-
 Note [Symbol table representation of names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-An occurrence of a name in an interface file is serialized as a single 32-bit
-word. The format of this word is:
- 00xxxxxx xxxxxxxx xxxxxxxx xxxxxxxx
-  A normal name. x is an index into the symbol table
- 10xxxxxx xxyyyyyy yyyyyyyy yyyyyyyy
-  A wired-in name. x is the Unique's Char, y is the int part. We assume that
-  all wired-in known-key uniques fit in this space. This is asserted by
-  GHC.Builtin.knownKeyNamesOkay.
+For serialisation we divide Names into two classes:
+  * Compact     Names are serialised simply as their unique.
+  * Non-compact Names are entered into the Symbol Table of the interface file,
+                      and serialised as the index into that table
 
-During serialization we check for tuples or wired-in things with 'lookupWiredInKnownKeyName'.
-During deserialization we use 'lookupWiredInKnownKeyName' to get from the
-unique back to its tuple or corresponding Name. We use the same oracle function
-in both directions to make sure it is symmetric.
+In more detail:
+* Compact Names comprise
+  - All WiredIn Names
+  - All Names related to tuples, whether WiredIn or not.  See (ST2) below.
 
-Tuples are a special case of wired-in names that we can construct from the
-unique alone (see 'knownUniqueTupleName'). Tuples aren't included in the
-wired-in names map: see Note [Infinite families of known-key names].
+* The key property of a compact Name is that GHC can compute the Name from
+  its Unique, via `lookupCompactName`:
+    - For most wired-in names, we look up in the `wiredInNameMap`.
+    - For names related to tuples, we use `knownUniqueTupleName`
+  Tuples aren't included in the wired-in names map: see (ST1) below
+
+* Serialisation is done by `putName`:
+  - When we serialise a compact Name,
+    we serialise it as a single 32-bit word:
+      10xxxxxx xxyyyyyy yyyyyyyy yyyyyyyy
+    where xxxx is the tag, and yyyy is the payload.
+    The function `wiredInNamesOkay` checks that the wired-in names all have
+    uniques that fit into the `yyy` field.
+
+  - When we serialise a non-compact name:
+      - We look it up in the (stateful, growing) symbol table
+      - If it not there we add it to the symbol table
+      - We serialise the occurrenc to a single 32-bit word:
+          00xxxxxx xxxxxxxx xxxxxxxx xxxxxxxx
+        where `xxxxx` is an index into the symbol table.
+
+* Deserialision is done by `getName`.  We read a 32-bit word
+  - If the MSB is `10` it must be a compact name, so we use
+    `lookupCompactName` to get from the Unique to the Name.
+  - If the MSB is `00` it must be a non-compact Name,
+    so we look it up in the symbol table.
+
+Wrinkles:
+
+(ST1) There are many, many tuple types and constructors, so we don't put
+  them in the wiredInNameMap. Instead we put them in a distinct part of the
+  Unique namespace, and provide
+     knownUniqueTupleName :: Unique -> Maybe Name
+  to identify such a Unique and map it to the corresponding Name.
+  See Note [Infinite families of known-key names].
+
+(ST2) A wired-in data constructor, like (#,#) has a related, also wired-in
+  (promoted) type constructor; see `mkPromotedDataCon`.  That type constructor
+  in turn contains its `TyConRepName` (e.g. $tc'(#,#)) to support Typeable.
+
+  That `TyConRepName` is built by `mkPrelTyConRepName`, but it is /not/
+  wired-in.  Why not? Because its definition involves fingerprints etc.  (Maybe
+  it could be made wired-in, but it would tricky, and there is no point.)
+
+  Nevertheless, although it is not wired-in, it is /compact/; that is, we can
+  serialise and de-serialise it using the mechanisms above.
+
+  This idea is, however, entirely optional.  You could delete the line in
+  `isCompactName` that tests for `knownUniqueTupleName` and then the
+  TyConRepNames would be serialised as non-compact names, and everything would
+  work. Fewer tests, but Typeable-heavy code might have bigger interface files.
 -}
 
+isCompactName :: Name -> Bool
+-- See Note [Symbol table representation of names]
+isCompactName n
+  | isWiredInName n                              = True   -- This will catch tuples too!
+  | isJust (knownUniqueTupleName (nameUnique n)) = True   -- Optional: see wrinkle (ST2)
+  | otherwise                                    = False
+
+lookupCompactName :: Unique -> Name
+-- See Note [Symbol table representation of names]
+lookupCompactName u
+  | Just n <- knownUniqueTupleName u               = n    -- See wrinkle (ST1)
+  | Just n <- lookupUFM_Directly wiredInNamesMap u = n
+  | otherwise = pprPanic "lookupCompactName" (ppr u $$ char tag $$ ppr ix)
+  where
+     (tag, ix) = unpkUniqueGrimily u
 
 -- See Note [Symbol table representation of names]
 putName :: BinSymbolTable -> WriteBinHandle -> Name -> IO ()
@@ -747,7 +809,7 @@ putName BinSymbolTable{
                bin_symtab_map = symtab_map_ref,
                bin_symtab_next = symtab_next }
         bh name
-  | Just _ <- lookupWiredInKnownKeyName (nameUnique name)
+  | isCompactName name
   , let (c, u) = unpkUniqueGrimily (nameUnique name) -- INVARIANT: (ord c) fits in 8 bits
   = -- assert (u < 2^(22 :: Int))
     put_ bh (0x80000000
@@ -783,16 +845,10 @@ getSymtabName symtab bh = do
     i :: Word32 <- get bh
     case i .&. 0xC0000000 of
       0x00000000 -> return $! symtab ! fromIntegral i
-
-      0x80000000 ->
-        let
+      0x80000000 -> return $! lookupCompactName u
+        where
           tag = chr (fromIntegral ((i .&. 0x3FC00000) `shiftR` 22))
           ix  = fromIntegral i .&. 0x003FFFFF
           u   = mkUniqueGrimilyWithTag tag ix
-        in
-          return $! case lookupWiredInKnownKeyName u of
-                      Nothing -> pprPanic "getSymtabName:unknown known-key unique"
-                                          (ppr i $$ ppr u $$ char tag $$ ppr ix)
-                      Just n  -> n
 
       _ -> pprPanic "getSymtabName:unknown name tag" (ppr i)

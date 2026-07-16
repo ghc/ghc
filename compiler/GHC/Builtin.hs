@@ -27,8 +27,7 @@ module GHC.Builtin (
         knownKeyOccName, knownKeyOccName_maybe,
 
         -- * Known names
-        lookupWiredInKnownKeyName,
-        lookupKnownNameInfo,
+        wiredInNamesMap, lookupKnownNameInfo,
 
         -- * Random other things
         maybeCharLikeCon, maybeIntLikeCon,
@@ -45,7 +44,6 @@ module GHC.Builtin (
 import GHC.Prelude
 
 
-import GHC.Builtin.Uniques
 import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids
 import GHC.Builtin.WiredIn.Types
@@ -75,9 +73,6 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Data.List.SetOps
 import GHC.Data.FastString
 import qualified GHC.Data.List.Infinite as Inf
-
-import Control.Applicative ((<|>))
-
 
 
 {- *********************************************************************
@@ -577,7 +572,7 @@ See also
 wiredInNames :: [Name]
 wiredInNames
   | debugIsOn
-  , Just badNamesDoc <- knownKeyNamesOkay all_names
+  , Just badNamesDoc <- wiredInNamesOkay all_names
   = pprPanic "badAllKnownKeyNames" badNamesDoc
   | otherwise
   = all_names
@@ -625,8 +620,8 @@ wiredInNames
 -- | Check the known-key names list of consistency.
 -- (a) Unique is in-range
 -- (b) Distinct uniques
-knownKeyNamesOkay :: [Name] -> Maybe SDoc
-knownKeyNamesOkay all_names
+wiredInNamesOkay :: [Name] -> Maybe SDoc
+wiredInNamesOkay all_names
   | ns@(_:_) <- filter (not . isValidKnownKeyUnique . getUnique) all_names
   = Just $ text "    Out-of-range known-key uniques: " <>
            brackets (pprWithCommas (ppr . nameOccName) ns)
@@ -649,15 +644,6 @@ knownKeyNamesOkay all_names
                            pprUniqueAlways uniq <>
                            text ": " <>
                            brackets (pprWithCommas (ppr . nameOccName) ns)
-
--- | Given a 'Unique' lookup its associated 'Name' if it corresponds to a
--- wired-in thing.
---
--- See Note [Symbol table representation of names] for when this function is
--- used to reconstruct a wired-in name from its unique
-lookupWiredInKnownKeyName :: Unique -> Maybe Name
-lookupWiredInKnownKeyName u =
-    knownUniqueTupleName u <|> lookupUFM_Directly wiredInNamesMap u
 
 -- | Maps 'Unique's to wired-in known-key names.
 --
