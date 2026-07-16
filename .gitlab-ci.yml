@@ -1043,6 +1043,7 @@ abi-test:
   tags:
     - x86_64-linux
   script:
+    - sudo chown ghc:ghc -R .
     - root=$(pwd)/ghc
     - |
       mkdir tmp
