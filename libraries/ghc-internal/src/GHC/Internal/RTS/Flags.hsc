@@ -184,6 +184,7 @@ data MiscFlags = MiscFlags
 data IoManagerFlag =
        IoManagerFlagAuto
      | IoManagerFlagSelect        -- ^ Unix only, non-threaded RTS only
+     | IoManagerFlagSelectBis     -- ^ Unix only, non-threaded RTS only
      | IoManagerFlagPoll          -- ^ Unix only, non-threaded RTS only
      | IoManagerFlagMIO           -- ^ cross-platform, threaded RTS only
      | IoManagerFlagWinIO         -- ^ Windows only

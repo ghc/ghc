@@ -14,8 +14,9 @@
 #include "Schedule.h"
 #include "Prelude.h"
 
-#include "Timeout.h"
+#include "IOManager.h"
 #include "IOManagerInternals.h"
+#include "Timeout.h"
 #include "TimeoutQueue.h"
 
 #include <limits.h>
@@ -24,7 +25,7 @@
 /* Currently only used by the poll I/O manager, but in future may be used by
    several in-RTS I/O managers.
  */
-#if defined(IOMGR_ENABLED_POLL)
+#if defined(IOMGR_ENABLED_POLL) || defined(IOMGR_ENABLED_SELECTBIS)
 
 bool syncDelayTimeout(CapIOManager *iomgr, StgTSO *tso, HsInt us_delay)
 {
@@ -223,5 +224,58 @@ struct timespec *timeoutInNanoseconds(CapIOManager *iomgr, bool wait,
 }
 #endif
 
-#endif // defined(IOMGR_ENABLED_POLL)
+/* select() expect a timeout in microseconds, using struct timeval * with
+ * special values of NULL for indefinite wait, and 0 for no waiting.
+ */
+#if defined(IOMGR_ENABLED_SELECTBIS)
+struct timeval *timeoutInMicroseconds(CapIOManager *iomgr, bool wait,
+                                      Time now, struct timeval *tv)
+{
+    if (!wait) {
+        /* Don't wait, just poll. */
+        *tv = (struct timeval) { .tv_sec = 0, .tv_usec = 0 };
+        return tv;
+
+    } else if (!isEmptyTimeoutQueue(iomgr->timeout_queue)) {
+        /* SUSv2 allows implementations to have an implementation defined
+         * maximum timeout for select(2). The standard requires
+         * implementations to silently truncate values exceeding this maximum
+         * to the maximum. Unfortunately, OSX and the BSD don't comply with
+         * SUSv2, instead opting to return EINVAL for values exceeding a
+         * timeout of 1e8.
+         *
+         * Select returning an error crashes the runtime in a bad way. To
+         * play it safe we truncate any timeout to 31 days, as SUSv2 requires
+         * any implementations maximum timeout to be larger than this.
+         *
+         * Truncating the timeout is not an issue, because if nothing
+         * interesting happens when the timeout expires, we'll see that the
+         * thread still wants to be blocked longer and simply block on a new
+         * iteration of select(2).
+         */
+        const time_t max_seconds = 2678400; // 31 * 24 * 60 * 60
+
+        Time waketime = findMinWaketimeTimeoutQueue(iomgr->timeout_queue);
+        Time waittime = waketime - now;
+
+        /* Any expired timeouts should have been cleared, so we must be waiting
+         * for a timeout in the future. */
+        ASSERT(waittime > 0);
+
+        tv->tv_sec  = TimeToSeconds(waittime);
+        if (tv->tv_sec < max_seconds) {
+            tv->tv_usec = TimeToUS(waittime) % 1000000;
+        } else {
+            tv->tv_sec  = max_seconds;
+            tv->tv_usec = 0;
+        }
+        return tv;
+
+    } else {
+        return NULL;
+    }
+}
+#endif
+
+#endif // defined(IOMGR_ENABLED_POLL) || defined(IOMGR_ENABLED_SELECTBIS)
 

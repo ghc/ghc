@@ -14,10 +14,17 @@
 
 #include "IOManager.h"
 
-#if defined(IOMGR_ENABLED_POLL)
-#include <poll.h> /* for struct pollfd */
+#if defined(IOMGR_ENABLED_SELECTBIS) || defined(IOMGR_ENABLED_POLL)
 #include "ClosureTable.h"
 #include "TimeoutQueue.h"
+#endif
+
+#if defined(IOMGR_ENABLED_SELECTBIS)
+#include <sys/select.h> /* for fd_set */
+#endif
+
+#if defined(IOMGR_ENABLED_POLL)
+#include <poll.h> /* for struct pollfd */
 #endif
 
 #include "BeginPrivate.h"
@@ -46,17 +53,25 @@ struct _CapIOManager {
     StgTSO *sleeping_queue;
 #endif
 
-#if defined(IOMGR_ENABLED_SELECT) || defined(IOMGR_ENABLED_POLL)
+#if defined(IOMGR_ENABLED_SELECT) \
+ || defined(IOMGR_ENABLED_SELECTBIS) \
+ || defined(IOMGR_ENABLED_POLL)
 #if defined(HAVE_PREEMPTION)
     /* FDs for waking up the I/O manager when it is blocked waiting */
     int interrupt_fd_r, interrupt_fd_w;
 #endif
 #endif
 
-#if defined(IOMGR_ENABLED_POLL)
+#if defined(IOMGR_ENABLED_POLL) || defined(IOMGR_ENABLED_SELECTBIS)
     /* AIOP and timeout collections shared by several I/O manager impls */
     ClosureTable     aiop_table;
     StgTimeoutQueue *timeout_queue;
+#endif
+
+#if defined(IOMGR_ENABLED_SELECTBIS)
+    struct fd_table_entry { int fd; IOReadOrWrite rw; } *fd_table;
+    fd_set *rfds, *wfds;
+    int ncompletions_extra; /* extra completions for synchronous failures */
 #endif
 
 #if defined(IOMGR_ENABLED_POLL)

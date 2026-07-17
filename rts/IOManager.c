@@ -33,6 +33,11 @@
 #include "posix/Signals.h"
 #endif
 
+#if defined(IOMGR_ENABLED_SELECTBIS)
+#include "posix/SelectBis.h"
+#include "posix/Timeout.h"
+#endif
+
 #if defined(IOMGR_ENABLED_POLL)
 #include "posix/Poll.h"
 #include "posix/Timeout.h"
@@ -114,6 +119,14 @@ parseIOManagerFlag(const char *iomgrstr, IO_MANAGER_FLAG *flag)
     if (strcmp("select", iomgrstr) == 0) {
 #if defined(IOMGR_ENABLED_SELECT)
         *flag = IO_MNGR_FLAG_SELECT;
+        return IOManagerAvailable;
+#else
+        return IOManagerUnavailable;
+#endif
+    }
+    else if (strcmp("selectbis", iomgrstr) == 0) {
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        *flag = IO_MNGR_FLAG_SELECTBIS;
         return IOManagerAvailable;
 #else
         return IOManagerUnavailable;
@@ -226,6 +239,8 @@ void selectIOManager(void)
 #else // !defined(THREADED_RTS)
 #if   defined(IOMGR_DEFAULT_NON_THREADED_SELECT)
             iomgr_type = IO_MANAGER_SELECT;
+#elif defined(IOMGR_DEFAULT_NON_THREADED_SELECTBIS)
+            iomgr_type = IO_MANAGER_SELECTBIS;
 #elif defined(IOMGR_DEFAULT_NON_THREADED_POLL)
             iomgr_type = IO_MANAGER_POLL;
 #elif defined(IOMGR_DEFAULT_NON_THREADED_WINIO)
@@ -241,6 +256,12 @@ void selectIOManager(void)
 #if defined(IOMGR_ENABLED_SELECT)
         case IO_MNGR_FLAG_SELECT:
             iomgr_type = IO_MANAGER_SELECT;
+            break;
+#endif
+
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MNGR_FLAG_SELECTBIS:
+            iomgr_type = IO_MANAGER_SELECTBIS;
             break;
 #endif
 
@@ -290,6 +311,10 @@ char * showIOManager(void)
 #if defined(IOMGR_ENABLED_SELECT)
         case IO_MANAGER_SELECT:
             return "select";
+#endif
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
+            return "selectbis";
 #endif
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
@@ -347,6 +372,12 @@ void initCapabilityIOManager(CapIOManager *iomgr)
             break;
 #endif
 
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
+            initCapabilityIOManagerSelectBis(iomgr);
+            break;
+#endif
+
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
             initCapabilityIOManagerPoll(iomgr);
@@ -380,6 +411,12 @@ void freeCapabilityIOManager(CapIOManager *iomgr)
             break;
 #endif
 
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
+            freeCapabilityIOManagerSelectBis(iomgr);
+            break;
+#endif
+
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
             freeCapabilityIOManagerPoll(iomgr);
@@ -399,9 +436,13 @@ void startIOManager(void)
 
     switch (iomgr_type) {
 
-#if defined(IOMGR_ENABLED_SELECT) || defined(IOMGR_ENABLED_POLL)
+#if defined(IOMGR_ENABLED_SELECT) || defined(IOMGR_ENABLED_SELECTBIS) \
+ || defined(IOMGR_ENABLED_POLL)
 #if defined(IOMGR_ENABLED_SELECT)
         case IO_MANAGER_SELECT:
+#endif
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
 #endif
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
@@ -479,6 +520,7 @@ restartIOManager(CapIOManager *iomgr, Capability **pcap)
             break;
 #endif
         /* The IO_MANAGER_SELECT needs no initialisation */
+        /* The IO_MANAGER_SELECTBIS needs no initialisation */
         /* The IO_MANAGER_POLL needs no initialisation */
 
         /* No impl for any of the Windows I/O managers, since no forking. */
@@ -570,8 +612,13 @@ void markCapabilityIOManager(evac_fn evac, void *user, CapIOManager *iomgr)
             break;
 #endif
 
+#if defined(IOMGR_ENABLED_SELECTBIS) || defined(IOMGR_ENABLED_POLL)
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
+#endif
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
+#endif
             markClosureTable(evac, user, &iomgr->aiop_table);
             evac(user, (StgClosure **)(void *)&iomgr->timeout_queue);
             break;
@@ -599,8 +646,13 @@ void scavengeTSOIOManager(StgTSO *tso)
              * both of these are not GC pointers, so there is nothing to do.
              */
 
+#if defined(IOMGR_ENABLED_SELECTBIS) || defined(IOMGR_ENABLED_POLL)
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
+#endif
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
+#endif
             /* BlockedOn{Read,Write} uses block_info.aiop
              * BlockedOnDelay        uses block_info.timeout
              * both of these are heap allocated, so we can do the same in all
@@ -648,6 +700,11 @@ bool anyPendingTimeoutsOrIO(CapIOManager *iomgr)
         case IO_MANAGER_SELECT:
             return (iomgr->blocked_queue_hd != END_TSO_QUEUE)
                 || (iomgr->sleeping_queue   != END_TSO_QUEUE);
+#endif
+
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
+            return anyPendingTimeoutsOrIOSelectBis(iomgr);
 #endif
 
 #if defined(IOMGR_ENABLED_POLL)
@@ -709,6 +766,12 @@ void pollCompletedTimeoutsOrIO(CapIOManager *iomgr)
           break;
 #endif
 
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
+          pollCompletedTimeoutsOrIOSelectBis(iomgr);
+          break;
+#endif
+
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
           pollCompletedTimeoutsOrIOPoll(iomgr);
@@ -740,6 +803,12 @@ bool awaitCompletedTimeoutsOrIO(CapIOManager *iomgr)
 #if defined(IOMGR_ENABLED_SELECT)
         case IO_MANAGER_SELECT:
           completed = awaitCompletedTimeoutsOrIOSelect(iomgr, true);
+          break;
+#endif
+
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
+          completed = awaitCompletedTimeoutsOrIOSelectBis(iomgr);
           break;
 #endif
 
@@ -781,6 +850,12 @@ void interruptIOManager(CapIOManager *iomgr)
 #if defined(IOMGR_ENABLED_SELECT)
         case IO_MANAGER_SELECT:
             interruptIOManagerSelect(iomgr);
+            break;
+#endif
+
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
+            interruptIOManagerSelectBis(iomgr);
             break;
 #endif
 
@@ -831,6 +906,10 @@ bool syncIOWaitReady(CapIOManager *iomgr,
             return true;
         }
 #endif
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
+            return syncIOWaitReadySelectBis(iomgr, tso, rw, fd);
+#endif
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
             ASSERT(tso->why_blocked == NotBlocked);
@@ -852,6 +931,11 @@ void syncIOCancel(CapIOManager *iomgr, StgTSO *tso)
                                     &iomgr->blocked_queue_hd,
                                     &iomgr->blocked_queue_tl,
                                     tso);
+            break;
+#endif
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
+            syncIOCancelSelectBis(iomgr, tso);
             break;
 #endif
 #if defined(IOMGR_ENABLED_POLL)
@@ -895,8 +979,13 @@ bool syncDelay(CapIOManager *iomgr, StgTSO *tso, HsInt us_delay)
             return true;
         }
 #endif
+#if defined(IOMGR_ENABLED_SELECTBIS) || defined(IOMGR_ENABLED_POLL)
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
+#endif
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
+#endif
             return syncDelayTimeout(iomgr, tso, us_delay);
 #endif
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
@@ -931,8 +1020,13 @@ void syncDelayCancel(CapIOManager *iomgr, StgTSO *tso)
             removeThreadFromQueue(iomgr->cap, &iomgr->sleeping_queue, tso);
             break;
 #endif
+#if defined(IOMGR_ENABLED_SELECTBIS) || defined(IOMGR_ENABLED_POLL)
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
+#endif
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
+#endif
             syncDelayCancelTimeout(iomgr, tso);
             break;
 #endif
