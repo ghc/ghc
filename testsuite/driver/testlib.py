@@ -3563,7 +3563,6 @@ def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=No
 
     if t.unexpected_failures:
         if not too_many_failures:
-            file.write('Output of unexpected failures:\n\n')
             printTestOutputSummary(file, t.unexpected_failures, color, junit_path)
         else:
             where = '; see {}'.format(junit_path) if junit_path else ''
@@ -3657,6 +3656,11 @@ def printTestOutputSummary(file: TextIO, testInfos, color: bool=False,
                            junit_path: Optional[Path]=None) -> None:
     # Repeat failing tests' captured output in the summary, so one needn't
     # hunt for it earlier in a possibly very long log; see #16720.
+    header = '=====> Unexpected failures output summary'
+    if color:
+        header = colored(Color.RED, header)
+    file.write(header + '\n\n')
+
     where = ', see {}'.format(junit_path) if junit_path else ''
     # Tests that fail identically in several ways (e.g. normal and g1) share one
     # output block, with the ways collected in the header.
