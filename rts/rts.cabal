@@ -568,6 +568,7 @@ library
                    wasm/JSFFI.c
                    wasm/JSFFIGlobals.c
                    posix/Select.c
+                   posix/SelectBis.c
                    posix/Poll.c
                    posix/Timeout.c
         cmm-sources: wasm/jsval.cmm
@@ -583,6 +584,7 @@ library
                     posix/MIO.c
                     posix/Poll.c
                     posix/Select.c
+                    posix/SelectBis.c
                     posix/Signals.c
                     posix/Timeout.c
                     posix/TTY.c
