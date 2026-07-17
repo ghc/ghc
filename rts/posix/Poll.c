@@ -132,7 +132,7 @@ the aiop_table, but still allows the full_poll_table to have an extra entry.
 /* Forward declarations */
 static bool enlargeTables(CapIOManager *iomgr);
 static void notifyIOCompletion(CapIOManager *iomgr, StgAsyncIOOp *aiop);
-static void ioCancel(CapIOManager *iomgr, StgAsyncIOOp *aiop);
+static void removeFromTables(CapIOManager *iomgr, int i);
 static void reportPollError(int res, nfds_t nfds) STG_NORETURN;
 
 
@@ -222,7 +222,8 @@ void syncIOCancelPoll(CapIOManager *iomgr, StgTSO *tso)
     StgAsyncIOOp *aiop  = tso->block_info.aiop;
     ASSERT(aiop->notify_type == NotifyTSO);
     ASSERT(indexClosureTable(&iomgr->aiop_table, aiop->index) == aiop);
-    ioCancel(iomgr, aiop);
+    removeFromTables(iomgr, aiop->index);
+    aiop->outcome = IOOpOutcomeCancelled;
     setTsoIOOpOutcome(tso, aiop->outcome, aiop->result);
     /* We cannot use the normal notifyIOCompletion here. We are in the context
      * of throwTo, interrupting a thread blocked on IO via an async exception.
@@ -248,24 +249,10 @@ void asyncIOCancelPoll(CapIOManager *iomgr, StgAsyncIOOp *aiop)
      */
     ASSERT(aiop->notify_type != NotifyTSO);
     if (indexClosureTable(&iomgr->aiop_table, aiop->index) == aiop) {
-        ioCancel(iomgr, aiop);
+        removeFromTables(iomgr, aiop->index);
+        aiop->outcome = IOOpOutcomeCancelled;
         notifyIOCompletion(iomgr, aiop);
     }
-}
-
-
-static void ioCancel(CapIOManager *iomgr, StgAsyncIOOp *aiop)
-{
-    int ix = aiop->index;
-    int ix_from; int ix_to;
-    removeCompactClosureTable(iomgr->cap, &iomgr->aiop_table, ix,
-                              &ix_from, &ix_to);
-    if (ix_to != ix_from) {
-        StgAsyncIOOp *aiop_to = indexClosureTable(&iomgr->aiop_table, ix_to);
-        aiop_to->index = ix_to;
-        iomgr->aiop_poll_table[ix_to] = iomgr->aiop_poll_table[ix_from];
-    }
-    aiop->outcome = IOOpOutcomeCancelled;
 }
 
 
@@ -349,6 +336,8 @@ static bool processIOCompletions(CapIOManager *iomgr, int ncompletions)
         if (aiop_poll_table[i].revents) {
             StgAsyncIOOp *aiop = indexClosureTable(&iomgr->aiop_table, i);
 
+            ASSERT(aiop->outcome == IOOpOutcomeInFlight);
+
             /* We do need to handle POLLNVAL, but we do not need to do anything
              * special for POLLERR or POLLHUP. (See man poll for details).
              * The calling thread will typically try to do I/O after waiting
@@ -364,26 +353,14 @@ static bool processIOCompletions(CapIOManager *iomgr, int ncompletions)
                 aiop->result  = 0;
             }
 
-            /* Remove from the completion table, preserving compactness, and
-             * apply the same compacting to the aiop_poll_table.
-             */
-            int ix_from; int ix_to;
-            removeCompactClosureTable(iomgr->cap, &iomgr->aiop_table, i,
-                                      &ix_from, &ix_to);
-            if (ix_to != ix_from) {
-                StgAsyncIOOp *aiop_to;
-                aiop_to = indexClosureTable(&iomgr->aiop_table, ix_to);
-                aiop_to->index = ix_to;
-                aiop_poll_table[ix_to] = aiop_poll_table[ix_from];
-            }
-
+            removeFromTables(iomgr, i);
             notifyIOCompletion(iomgr, aiop);
             n--;
         } else {
-            /* You'd expect incrementing the poll table index to be
-             * unconditional, but we don't increment the index if we did
-             * process the entry, because using removeCompactClosureTable
-             * means we'll move an entry from the end into the same index.
+            /* You'd expect incrementing the table index to be unconditional,
+             * but we don't increment the index if we did process the entry,
+             * because using removeFromTables means we'll move an entry from
+             * the end of the table into the index i.
              */
             i++;
         }
@@ -564,6 +541,7 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
     return !interrupt;
 }
 
+
 static void reportPollError(int res, nfds_t nfds)
 {
     if (errno == EINVAL) {
@@ -617,6 +595,22 @@ static bool enlargeTables(CapIOManager *iomgr)
                              };
     }
     return true;
+}
+
+
+/* Remove from the completion table, preserving compactness, and apply the same
+ * compacting to the aiop_poll_table.
+ */
+static void removeFromTables(CapIOManager *iomgr, int ix)
+{
+    int ix_from; int ix_to;
+    removeCompactClosureTable(iomgr->cap, &iomgr->aiop_table, ix,
+                              &ix_from, &ix_to);
+    if (ix_to != ix_from) {
+        StgAsyncIOOp *aiop_to = indexClosureTable(&iomgr->aiop_table, ix_to);
+        aiop_to->index = ix_to;
+        iomgr->aiop_poll_table[ix_to] = iomgr->aiop_poll_table[ix_from];
+    }
 }
 
 #endif /* IOMGR_ENABLED_POLL */
