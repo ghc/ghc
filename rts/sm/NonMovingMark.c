@@ -2018,8 +2018,10 @@ bool nonmovingTidyWeaks (struct MarkQueue_ *queue)
 
         // See Note [Weak pointer processing and the non-moving GC] in
         // MarkWeak.c
-        bdescr *key_bd = Bdescr((StgPtr) w->key);
-        bool key_in_nonmoving = HEAP_ALLOCED_GC(w->key) && block_get_flags(key_bd) & BF_NONMOVING;
+        bool key_in_nonmoving =
+               HEAP_ALLOCED_GC(w->key) &&
+               block_get_flags(Bdescr((StgPtr) w->key)) & BF_NONMOVING;
+
         if (!key_in_nonmoving || nonmovingIsNowAlive(w->key)) {
             nonmovingMarkLiveWeak(queue, w);
             did_work = true;
