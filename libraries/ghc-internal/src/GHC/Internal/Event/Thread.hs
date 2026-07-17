@@ -188,7 +188,7 @@ threadWait evt fd = mask_ $ do
 
 -- used at least by RTS in 'select()' IO manager backend
 blockedOnBadFD :: SomeException
-blockedOnBadFD = toException $ errnoToIOError "awaitEvent" eBADF Nothing Nothing
+blockedOnBadFD = toException $ errnoToIOError "threadWaitRead/Write" eBADF Nothing Nothing
 
 threadWaitSTM :: Event -> Fd -> IO (STM (), IO ())
 threadWaitSTM evt fd = mask_ $ do
