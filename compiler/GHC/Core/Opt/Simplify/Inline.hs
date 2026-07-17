@@ -44,7 +44,6 @@ import GHC.Types.Unique.FM
 import GHC.Types.Literal
 import GHC.Core.DataCon
 import GHC.Types.Var
-import GHC.Utils.Panic.Plain (assert)
 import GHC.Types.Tickish
 {-
 ************************************************************************
@@ -924,8 +923,13 @@ interestingArg env e =
           ConArg con fn_args
             | isClassTyCon (dataConTyCon con) -> ValueArg
             | otherwise ->
-              assert (null fn_args) $
-              ConArg con arg_summaries
+              -- fn_args can be non-empty if the head of the application is
+              -- a variable whose unfolding is a partially applied constructor
+              -- application (see the first clause of go_var). In that case the
+              -- args from the unfolding come before the args of this
+              -- application, e.g. for `v ys` with `v = (:) x` we get
+              -- ConArg (:) [x_summary, ys_summary].
+              ConArg con (fn_args ++ arg_summaries)
           _ -> fn_summary
 
     go env depth n (Tick _ a)        = go env depth n a
