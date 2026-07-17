@@ -1441,14 +1441,29 @@ limited.
 Currently the available I/O managers are:
 
 ================ ========= ============
- Name            Platforms RTS way
+I/O manager name Platforms RTS way
 ================ ========= ============
 ``select``       Posix     Non-threaded
-``poll``         Posix     Non-threaded
+``selectbis``    Posix     Non-threaded
+``poll``         Posix(*)  Non-threaded
 ``mio``          All       Threaded
 ``win32-legacy`` Windows   Non-threaded
 ``winio``        Windows   Both
 ================ ========= ============
+
+(*) The ``poll`` I/O manager is not available on macOS due to platform
+limitations.
+
+Currently the default I/O manager on each platform is:
+
+========= ============ ===================
+Platform  RTS way      default I/O manager
+========= ============ ===================
+macOS     Non-threaded ``selectbis``
+Posix     Non-threaded ``poll``
+Windows   Non-threaded ``win32-legacy``
+all       Threaded     ``mio``
+========= ============ ===================
 
 .. rts-flag:: --io-manager=(name)
 
@@ -1474,7 +1489,8 @@ This is because it uses a linked list for timers.
 
 This I/O manager is highly portable and its code is very mature: it is the I/O
 manager that has been used by GHC in the single-threaded RTS on Posix platforms
-since time immemorial.
+since time immemorial. It is likely to be retired, once the ``poll`` and
+``selectbis`` I/O managers are mature enough to cover all use cases.
 
 Timer resolution: on 64bit platforms it supports microsecond precision timers
 while on 32bit platforms it only supports millisecond precision. Timer accuracy
@@ -1484,6 +1500,29 @@ Limitation: on most platforms where it is available this I/O manager can only
 support 1024 open files. More specifically it supports file descriptors with
 numerical value up to 1024 but no higher. It will terminate the RTS (and thus
 typically the process) if this limit is exceeded.
+
+The ``selectbis`` I/O manager
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This I/O manager based on the classic Posix ``select()`` API. It supports
+waiting on I/O readiness on non-blocking file descriptors (i.e. not disk files).
+It is implemented within the RTS and is currently available only in the
+non-threaded RTS.
+
+It scales poorly for I/O readiness notification: costing O(n) in the number of
+threads that are waiting on I/O simultaneously. It scales well for timers:
+most timer operations cost O(log n) in the number of simultaneous timers. This
+is because it uses a heap data structure for timers.
+
+Timer resolution: this I/O manager supports microsecond precision timers.
+
+Limitation: on most platforms where it is available this I/O manager can only
+support 1024 open files. More specifically it supports file descriptors with
+numerical value up to 1024 but no higher. It will throw an IO exception if this
+limit is exceeded.
+
+This I/O manager exists primarily to support macOS, due to ``poll()`` not
+working properly on macOS, while ``select()`` does work. It's name reflects
+the fact that it is the second I/O manager to be based on ``select()``.
 
 The ``poll`` I/O manager
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1511,6 +1550,10 @@ simultaneously be waiting on I/O readiness is limited by the prevailing Posix
 limit can be adjusted using OS facilities (e.g. the ``ulimit`` command).
 Exceeding this limit will cause the RTS (and thus typically the process) to
 terminate.
+
+This I/O manager is not available on macOS due to the ``poll()`` API not
+working for all file types on macOS. Specifically the macOS man page for
+``poll`` documents that it does not work for device files.
 
 The ``mio`` I/O manager
 ~~~~~~~~~~~~~~~~~~~~~~~
