@@ -1,0 +1,19 @@
+section: rts
+issues: #27519
+mrs: !16359
+synopsis:
+  New I/O manager based on select()
+description:
+  There is a new I/O manager on Posix systems based on select(). This exists
+  primarily to support macOS, where the poll() API does not work correctly
+  (specifically it is documented not to work for device files). It is the new
+  default I/O manager for the non-threaded RTS for the macOS platform.
+
+  This is intended to allow the legacy select I/O manager to be retired. It is
+  also a stop-gap measure until a kqueue I/O manager is added.
+
+  The new implementation is marginally faster in some cases. It scales better
+  for timers, O(log n) rather than O(m). For threads waiting on I/O it is
+  necessarily still O(n). If used to wait on fds > 1024 it will throw an IO
+  exception rather than terminating the RTS, as was the behaviour of the old
+  select I/O manager.
