@@ -183,7 +183,7 @@ def get_perf_stats(commit: Union[GitRef, GitHash]=GitRef('HEAD'),
                    namespace: NoteNamespace = LocalNamespace
                    ) -> List[PerfStat]:
     try:
-        log = subprocess.check_output(['git', 'notes', '--ref=' + namespace, 'show', commit], stderr=subprocess.STDOUT).decode('utf-8')
+        log = subprocess.check_output(['git', '-c', 'gc.auto=0', 'notes', '--ref=' + namespace, 'show', commit], stderr=subprocess.DEVNULL).decode('utf-8')
     except subprocess.CalledProcessError:
         return []
 
