@@ -12,10 +12,7 @@ data Box a = Box !a
 
 foo :: Bool -> Int -> (Int, Box Int)
 foo b !x = case x of
-  x' -> let -- Keep fun_exit monomorphic so that it can become a join point.
-            -- Without this signature its polymorphic result type prevents contification.
-            fun_exit :: Int -> Int -> (Int, Box Int)
-            fun_exit x_f i = (i, Box x_f)
+  x' -> let fun_exit x_f i = (i, Box x_f)
             {-# NOINLINE fun_exit #-}
         in if b then fun_exit x' 0 else fun_exit x' 1
 {-# NOINLINE foo #-}

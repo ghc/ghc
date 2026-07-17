@@ -54,9 +54,9 @@ combineAltInfo (TagTuple {})   TagEPT          = TagDunno
 combineAltInfo (TagTuple is1)  (TagTuple is2)  = TagTuple (zipWithEqual combineAltInfo is1 is2)
 
 type TagSigEnv = IdEnv TagSig
-type JoinArgEnv = IdEnv [TagInfo]
+type FunArgEnv = IdEnv [TagInfo]
 data TagEnv p = TE { te_env :: TagSigEnv
-                   , te_join_args :: JoinArgEnv
+                   , te_fun_args :: FunArgEnv
                    , te_get :: BinderP p -> Id
                    , te_bytecode :: !Bool
                    }
@@ -73,7 +73,7 @@ getBinderId = te_get
 
 initEnv :: Bool -> TagEnv 'CodeGen
 initEnv for_bytecode = TE { te_env = emptyVarEnv
-             , te_join_args = emptyVarEnv
+             , te_fun_args = emptyVarEnv
              , te_get = \x -> x
              , te_bytecode = for_bytecode }
 
@@ -81,7 +81,7 @@ initEnv for_bytecode = TE { te_env = emptyVarEnv
 -- with no other changes.
 makeTagged :: TagEnv p -> TagEnv 'InferTaggedBinders
 makeTagged env = TE { te_env = te_env env
-                    , te_join_args = te_join_args env
+                    , te_fun_args = te_fun_args env
                     , te_get = fst
                     , te_bytecode = te_bytecode env }
 
@@ -159,9 +159,9 @@ extendSigEnv :: TagEnv p -> [(Id,TagSig)] -> TagEnv p
 extendSigEnv env@(TE { te_env = sig_env }) bndrs
   = env { te_env = extendVarEnvList sig_env bndrs }
 
-lookupJoinArgInfo :: TagEnv p -> Id -> Maybe [TagInfo]
-lookupJoinArgInfo env join_id = lookupVarEnv (te_join_args env) join_id
+lookupFunArgInfo :: TagEnv p -> Id -> Maybe [TagInfo]
+lookupFunArgInfo env fun_id = lookupVarEnv (te_fun_args env) fun_id
 
-extendJoinArgEnv :: TagEnv p -> [(Id, [TagInfo])] -> TagEnv p
-extendJoinArgEnv env@(TE { te_join_args = join_env }) joins
-  = env { te_join_args = extendVarEnvList join_env joins }
+extendFunArgEnv :: TagEnv p -> [(Id, [TagInfo])] -> TagEnv p
+extendFunArgEnv env@(TE { te_fun_args = fun_env }) funs
+  = env { te_fun_args = extendVarEnvList fun_env funs }

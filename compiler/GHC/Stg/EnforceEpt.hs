@@ -452,65 +452,12 @@ inferTagExpr _ (StgOpApp op args ty)
 inferTagExpr env (StgLet ext bind body)
   = (info, StgLet ext bind' body')
   where
-    (env', bind') = inferTagBind env bind
-    (info, body') = inferTagExpr env' body
+    (info, bind', body') = inferTagLet env (localFunsOfBind env False bind) bind body
 
 inferTagExpr env (StgLetNoEscape ext bind body)
-  | all (isJust . lookupJoinArgInfo env . fst) root_joins
-  = (plain_info, StgLetNoEscape ext plain_bind plain_body)
-  | otherwise
-  = go initial_arg_infos
+  = (info, StgLetNoEscape ext bind' body')
   where
-    (plain_body_env, plain_bind) = inferTagBind env bind
-    (plain_info, plain_body) = inferTagExpr plain_body_env body
-
-    joins = root_joins ++ joinsInBind bind ++ joinsInExpr body
-    join_ids = map fst joins
-    initial_arg_infos = [replicate arity TagEPT | (_, arity) <- joins]
-
-    go arg_infos
-      | arg_infos == new_arg_infos
-      = (info, StgLetNoEscape ext bind' body')
-      | otherwise
-      = go new_arg_infos
-      where
-        join_env = extendJoinArgEnv env (zipEqual join_ids arg_infos)
-        (body_env, bind') = inferTagBind join_env bind
-        (info, body') = inferTagExpr body_env body
-        calls = collectJoinCalls (makeTagged join_env) join_ids bind' body'
-        new_arg_infos =
-          [ maybe initial_infos (combineArgs initial_infos) (lookupVarEnv calls join_id)
-          | (join_id, initial_infos) <- zipEqual join_ids initial_arg_infos ]
-
-    combineArgs = zipWithEqual combineAltInfo
-
-    root_joins = joinsOf bind
-
-    joinsOf (StgNonRec bndr rhs) = [joinOf bndr rhs]
-    joinsOf (StgRec pairs) = [joinOf bndr rhs | (bndr, rhs) <- pairs]
-
-    joinOf bndr (StgRhsClosure _ _ _ bndrs _ _)
-      = (getBinderId env bndr, length bndrs)
-    joinOf bndr (StgRhsCon {})
-      = (getBinderId env bndr, idArity (getBinderId env bndr))
-
-    joinsInBind (StgNonRec _ rhs) = joinsInRhs rhs
-    joinsInBind (StgRec pairs) = concatMap (joinsInRhs . snd) pairs
-
-    joinsInRhs (StgRhsClosure _ _ _ _ rhs _) = joinsInExpr rhs
-    joinsInRhs (StgRhsCon {}) = []
-
-    joinsInExpr (StgApp {}) = []
-    joinsInExpr (StgConApp {}) = []
-    joinsInExpr (StgLit {}) = []
-    joinsInExpr (StgTick _ expr) = joinsInExpr expr
-    joinsInExpr (StgOpApp {}) = []
-    joinsInExpr (StgLet _ let_bind expr)
-      = joinsInBind let_bind ++ joinsInExpr expr
-    joinsInExpr (StgLetNoEscape _ let_bind expr)
-      = joinsOf let_bind ++ joinsInBind let_bind ++ joinsInExpr expr
-    joinsInExpr (StgCase scrut _ _ alts)
-      = joinsInExpr scrut ++ concatMap (joinsInExpr . alt_rhs) alts
+    (info, bind', body') = inferTagLet env (localFunsOfBind env True bind) bind body
 
 inferTagExpr in_env (StgCase scrut bndr ty alts)
   -- Unboxed tuples get their info from the expression we scrutinise if any
@@ -564,28 +511,108 @@ inferTagExpr in_env (StgCase scrut bndr ty alts)
     (scrut_info, scrut') = inferTagExpr in_env scrut
     bndr' = (getBinderId in_env bndr, TagVal TagEPT)
 
--- See Note [EPT signatures for join point arguments].
-collectJoinCalls
+localFunsOfBind
+  :: TagEnv p -> Bool -> GenStgBinding p -> [(Id, Int)]
+localFunsOfBind env is_join (StgNonRec bndr rhs)
+  = localFunOf env is_join bndr rhs
+localFunsOfBind env is_join (StgRec pairs)
+  = concatMap (uncurry (localFunOf env is_join)) pairs
+
+localFunOf
+  :: TagEnv p -> Bool -> BinderP p -> GenStgRhs p -> [(Id, Int)]
+localFunOf env is_join bndr (StgRhsClosure _ _ _ bndrs _ _)
+  | is_join || notNull bndrs
+  = [(getBinderId env bndr, length bndrs)]
+localFunOf _ _ _ (StgRhsClosure {}) = []
+localFunOf env is_join bndr (StgRhsCon {})
+  | is_join
+  = [(getBinderId env bndr, idArity (getBinderId env bndr))]
+localFunOf _ _ _ (StgRhsCon {}) = []
+
+-- See Note [EPT signatures for local function arguments].
+inferTagLet
+  :: forall p. (OutputableInferPass p, InferExtEq p)
+  => TagEnv p
+  -> [(Id, Int)]
+  -> GenStgBinding p
+  -> GenStgExpr p
+  -> (TagInfo, InferStgBinding, InferStgExpr)
+inferTagLet env root_funs bind body
+  | null root_funs
+  = (plain_info, plain_bind, plain_body)
+  | all (isJust . lookupFunArgInfo env . fst) root_funs
+  = (plain_info, plain_bind, plain_body)
+  | otherwise
+  = go initial_arg_infos
+  where
+    (plain_body_env, plain_bind) = inferTagBind env bind
+    (plain_info, plain_body) = inferTagExpr plain_body_env body
+
+    funs = root_funs ++ funsInBind bind ++ funsInExpr body
+    fun_ids = map fst funs
+    initial_arg_infos = [replicate arity TagEPT | (_, arity) <- funs]
+
+    go arg_infos
+      | arg_infos == new_arg_infos
+      = (info, bind', body')
+      | otherwise
+      = go new_arg_infos
+      where
+        fun_env = extendFunArgEnv env (zipEqual fun_ids arg_infos)
+        (body_env, bind') = inferTagBind fun_env bind
+        (info, body') = inferTagExpr body_env body
+        calls = collectFunCalls (makeTagged fun_env) funs bind' body'
+        new_arg_infos =
+          [ maybe initial_infos (combineArgs initial_infos) (lookupVarEnv calls fun_id)
+          | (fun_id, initial_infos) <- zipEqual fun_ids initial_arg_infos ]
+
+    combineArgs = zipWithEqual combineAltInfo
+
+    funsInBind (StgNonRec _ rhs) = funsInRhs rhs
+    funsInBind (StgRec pairs) = concatMap (funsInRhs . snd) pairs
+
+    funsInRhs (StgRhsClosure _ _ _ _ rhs _) = funsInExpr rhs
+    funsInRhs (StgRhsCon {}) = []
+
+    funsInExpr (StgApp {}) = []
+    funsInExpr (StgConApp {}) = []
+    funsInExpr (StgLit {}) = []
+    funsInExpr (StgTick _ expr) = funsInExpr expr
+    funsInExpr (StgOpApp {}) = []
+    funsInExpr (StgLet _ let_bind expr)
+      = localFunsOfBind env False let_bind ++ funsInBind let_bind ++ funsInExpr expr
+    funsInExpr (StgLetNoEscape _ let_bind expr)
+      = localFunsOfBind env True let_bind ++ funsInBind let_bind ++ funsInExpr expr
+    funsInExpr (StgCase scrut _ _ alts)
+      = funsInExpr scrut ++ concatMap (funsInExpr . alt_rhs) alts
+
+-- See Note [EPT signatures for local function arguments].
+collectFunCalls
   :: TagEnv 'InferTaggedBinders
-  -> [Id]
+  -> [(Id, Int)]
   -> InferStgBinding
   -> InferStgExpr
   -> IdEnv [TagInfo]
-collectJoinCalls in_env join_ids bind body
+collectFunCalls in_env funs bind body
   = bind_calls `plusCalls` collectExpr body_env body
   where
-    join_env = mkVarEnv [(join_id, ()) | join_id <- join_ids]
+    fun_env = mkVarEnv funs
     (bind_calls, body_env) = collectBind in_env bind
 
     collectExpr env (StgApp fun args)
-      | elemVarEnv fun join_env
-      = unitVarEnv fun (map (lookupInfo env) args)
-      | otherwise
-      = emptyVarEnv
-    collectExpr _ (StgConApp {}) = emptyVarEnv
+      = direct_call `plusCalls` collectArgs args
+      where
+        direct_call
+          | Just arity <- lookupVarEnv fun_env fun
+          = unitVarEnv fun
+              (take arity (map (lookupInfo env) args) ++
+               replicate (arity - length args) TagDunno)
+          | otherwise
+          = emptyVarEnv
+    collectExpr _ (StgConApp _ _ args _) = collectArgs args
     collectExpr _ (StgLit {}) = emptyVarEnv
     collectExpr env (StgTick _ expr) = collectExpr env expr
-    collectExpr _ (StgOpApp {}) = emptyVarEnv
+    collectExpr _ (StgOpApp _ args _) = collectArgs args
     collectExpr env (StgLet _ let_bind expr)
       = let_calls `plusCalls` collectExpr let_env expr
       where
@@ -610,39 +637,57 @@ collectJoinCalls in_env join_ids bind body
 
     collectRhs env (StgRhsClosure _ _ _ bndrs rhs _)
       = collectExpr (extendSigEnv env bndrs) rhs
-    collectRhs _ (StgRhsCon {}) = emptyVarEnv
+    collectRhs _ (StgRhsCon _ _ _ _ args _) = collectArgs args
+
+    collectArgs = plusCallList . map collectArg
+
+    collectArg (StgVarArg var)
+      | Just arity <- lookupVarEnv fun_env var
+      = unitVarEnv var (replicate arity TagDunno)
+    collectArg _ = emptyVarEnv
 
     plusCalls = plusVarEnv_C (zipWithEqual combineAltInfo)
     plusCallList = foldr plusCalls emptyVarEnv
 
-{- Note [EPT signatures for join point arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Join points are local, non-escaping functions, and every occurrence is a
-saturated tail call.  Consequently we can infer EPT information for their
-arguments by treating them like SSA block parameters: an argument is EPT when
-the corresponding actual argument is EPT at every jump to the join point.
+{- Note [EPT signatures for local function arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For local functions we can inspect every use and infer that a parameter is EPT
+when the corresponding actual argument is EPT at every call.  Join points are
+the particularly simple case: they never escape and every occurrence is a
+saturated tail call, so their parameters behave like SSA block parameters.
 
-At each outermost StgLetNoEscape we optimistically start every argument of that
-join group and all nested join groups at TagEPT, infer tags for the binding and
-its body, and collect the argument tags at all calls to those join points.
+Ordinary let-bound functions can escape or be applied to too few arguments.
+We therefore track their parameters independently.  A direct call contributes
+the tag of each supplied argument; an undersaturated call contributes TagDunno
+for the missing suffix.  If the function occurs as a value (for example as an
+argument or constructor field), every parameter becomes TagDunno because a
+later call is outside the analysis.  Arguments beyond the function's arity do
+not describe its parameters and are ignored.  We still inspect every argument
+for escaping occurrences of other tracked functions.
+
+At each outermost local function binding we optimistically start every argument
+of that function group and all nested function and join groups at TagEPT, infer
+tags for the binding and its body, and collect the argument tags at all uses.
 Combining those call-site tags gives the next, no more optimistic approximation
-for the join arguments.  Iterating reaches the greatest fixed point, including
-for recursive and mutually recursive joins.  Using the greatest fixed point is
-important for recursive calls such as @jump j x@, where @x@ is itself a
-parameter of @j@: such a back edge preserves EPTness rather than providing an
-independent reason to reject it.
+for the function arguments.  Iterating reaches the greatest fixed point,
+including for recursive and mutually recursive functions.  Using the greatest
+fixed point is important for recursive calls such as @jump j x@, where @x@ is
+itself a parameter of @j@: such a back edge preserves EPTness rather than
+providing an independent reason to reject it.
 
-Solving all nested join groups simultaneously is important for compile-time
-performance.  Independently solving a nested join group on every iteration of
-each enclosing group causes exponential re-analysis in deeply nested code.
-Nested StgLetNoEscapes therefore merely use the argument information installed
-by the outer solver.
+Solving all nested function and join groups simultaneously is important for
+compile-time performance.  Independently solving a nested group on every
+iteration of each enclosing group causes exponential re-analysis in deeply
+nested code.
+Nested bindings therefore merely use the argument information installed by the
+outer solver.  A dead local function has no call-site evidence against the
+optimistic approximation, which is sound because it cannot be entered.
 
 This is tag inference, not strictness inference.  It does not evaluate an
 argument or change the calling convention.  It merely records that every path
-which enters the join point already supplies an EPT value.  Existing CBV marks
-remain authoritative in inferTagRhs, since the rewriter enforces their EPT
-precondition at call sites.
+which enters the local function already supplies an EPT value.  Existing CBV
+marks remain authoritative in inferTagRhs, since the rewriter enforces their
+EPT precondition at call sites.
 -}
 
 -- Compute binder sigs based on the constructors strict fields.
@@ -787,7 +832,7 @@ inferTagRhs bnd_id in_env (StgRhsClosure ext cc upd bndrs body typ)
       = repeat NotMarkedCbv
 
     inferred_arg_infos =
-      fromMaybe (repeat TagDunno) (lookupJoinArgInfo in_env bnd_id)
+      fromMaybe (repeat TagDunno) (lookupFunArgInfo in_env bnd_id)
 
     env' = extendSigEnv in_env out_bndrs
     (info, body') = inferTagExpr env' body
