@@ -1500,9 +1500,12 @@ def _newTestDir(name: TestName, opts: TestOptions, tempdir, dir):
 def _result_directory(opts: TestOptions) -> str:
     # The test's source directory, relative to the GHC source root, so it reads
     # the same regardless of which directory `make` was invoked from.
+    srcdir = opts.srcdir
+    if srcdir is None:
+        return ''
     try:
-        return os.path.relpath(opts.srcdir, config.top.parent)
-    except Exception:
+        return os.path.relpath(srcdir, config.top.parent)
+    except ValueError:
         return ''
 
 # -----------------------------------------------------------------------------
