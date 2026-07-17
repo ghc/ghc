@@ -46,5 +46,15 @@ struct timespec *timeoutInNanoseconds(CapIOManager *iomgr, bool wait,
                                       Time now, struct timespec *tv);
 #endif
 
+/* As above, but a timeout in microseconds. This is intended to be used with
+ * select() which expect struct timespec *, with special values of NULL for
+ * indefinite wait, and 0 for no waiting.
+ */
+#if defined(IOMGR_ENABLED_SELECTBIS)
+struct timeval *timeoutInMicroseconds(CapIOManager *iomgr, bool wait,
+                                      Time now, struct timeval *tv);
+
+#endif
+
 #include "EndPrivate.h"
 

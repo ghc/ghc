@@ -368,6 +368,15 @@ GHC_IOMANAGER_ENABLE([select], [EnableIOManagerSelect], [IOMGR_BUILD_SELECT],
            [AC_MSG_ERROR([sys/select.h required by select I/O manager])],[])
    fi])
 
+GHC_IOMANAGER_ENABLE([selectbis], [EnableIOManagerSelectBis], [IOMGR_BUILD_SELECTBIS],
+  [if test "$HostOS" = "mingw32"; then
+       EnableIOManagerSelectBis=NO
+   else
+       AC_CHECK_HEADER([sys/select.h],
+           [EnableIOManagerSelectBis=YES],
+           [AC_MSG_ERROR([sys/select.h required by selectbis I/O manager])],[])
+   fi])
+
 GHC_IOMANAGER_ENABLE([poll], [EnableIOManagerPoll], [IOMGR_BUILD_POLL],
   [if test "$HostOS" = "mingw32"; then
        EnableIOManagerPoll=NO
@@ -406,6 +415,7 @@ if test "$HostOS" = "mingw32"; then
   GHC_IOMANAGER_DEFAULT_SELECT([IOManagerThreadedDefault], [mio], [EnableIOManagerMIO])
 else
   GHC_IOMANAGER_DEFAULT_SELECT([IOManagerNonThreadedDefault], [select], [EnableIOManagerSelect])
+  GHC_IOMANAGER_DEFAULT_SELECT([IOManagerNonThreadedDefault], [selectbis], [EnableIOManagerSelectBis])
   GHC_IOMANAGER_DEFAULT_SELECT([IOManagerNonThreadedDefault], [poll], [EnableIOManagerPoll])
   GHC_IOMANAGER_DEFAULT_SELECT([IOManagerThreadedDefault], [mio], [EnableIOManagerMIO])
 fi
@@ -418,6 +428,9 @@ AC_MSG_NOTICE(default I/O manager for the threaded RTS: ${IOManagerThreadedDefau
 dnl Now define CPP vars for the default ones (threaded and non-threaded)
 GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerNonThreadedDefault], [non-threaded],
                                 [select], [IOMGR_DEFAULT_NON_THREADED_SELECT])
+
+GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerNonThreadedDefault], [non-threaded],
+                                [selectbis], [IOMGR_DEFAULT_NON_THREADED_SELECTBIS])
 
 GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerNonThreadedDefault], [non-threaded],
                                 [poll], [IOMGR_DEFAULT_NON_THREADED_POLL])
