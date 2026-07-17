@@ -294,8 +294,7 @@ import System.Semaphore ( getSemaphoreProtocolVersion, semaphoreVersion )
 import Data.IORef
 import Control.Arrow ((&&&))
 import Control.Monad
-import Control.Monad.Trans.State as State
-import Data.Functor.Identity
+import Control.Monad.Trans.State (runStateT)
 
 import Data.Ord
 import Data.Char
@@ -849,26 +848,6 @@ parseDynamicFilePragma :: MonadIO m => Logger -> DynFlags -> [Located String]
                           -- list of warnings.
 parseDynamicFilePragma = parseDynamicFlagsFull flagsDynamic False
 
-newtype CmdLineP s a = CmdLineP (forall m. (Monad m) => StateT s m a)
-  deriving (Functor)
-
-instance Monad (CmdLineP s) where
-    CmdLineP k >>= f = CmdLineP (k >>= \x -> case f x of CmdLineP g -> g)
-    return = pure
-
-instance Applicative (CmdLineP s) where
-    pure x = CmdLineP (pure x)
-    (<*>) = ap
-
-getCmdLineState :: CmdLineP s s
-getCmdLineState = CmdLineP State.get
-
-putCmdLineState :: s -> CmdLineP s ()
-putCmdLineState x = CmdLineP (State.put x)
-
-runCmdLineP :: CmdLineP s a -> s -> (a, s)
-runCmdLineP (CmdLineP k) s0 = runIdentity $ runStateT k s0
-
 -- | A helper to parse a set of flags from a list of command-line arguments, handling
 -- response files.
 processCmdLineP
@@ -879,10 +858,7 @@ processCmdLineP
     -> m (([Located String], [Err], [Warn]), s)
                             -- ^ (leftovers, errors, warnings)
 processCmdLineP activeFlags s0 args =
-    runStateT (processArgs (map (hoistFlag getCmdLineP) activeFlags) args parseResponseFile) s0
-  where
-    getCmdLineP :: CmdLineP s a -> StateT s m a
-    getCmdLineP (CmdLineP k) = k
+    runStateT (processArgs activeFlags args parseResponseFile) s0
 
 -- | Parses the dynamically set flags for GHC. This is the most general form of
 -- the dynamic flag parser that the other methods simply wrap. It allows
