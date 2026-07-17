@@ -11,12 +11,16 @@
 module GHC.Driver.CmdLine
     (
       processArgs, parseResponseFile, OptKind(..), GhcFlagMode(..),
-      Flag(..), defFlag, defGhcFlag, defGhciFlag, defHiddenFlag, hoistFlag,
+      Flag(..), defFlag, defGhcFlag, defGhciFlag, defHiddenFlag,
       errorsToGhcException,
 
       Err(..), Warn, warnsToMessages,
 
-      EwM, runEwM, addErr, addWarn, addFlagWarn, getArg, getCurLoc, liftEwM
+      EwM, runEwM, addErr, addWarn, addFlagWarn, getArg, getCurLoc, liftEwM,
+
+      -- ** State
+      CmdLineP(..), runCmdLineP,
+      getCmdLineState, putCmdLineState,
     ) where
 
 import GHC.Prelude
@@ -39,6 +43,9 @@ import GHC.ResponseFile
 import Control.Exception (IOException, catch)
 import Control.Monad (ap)
 import Control.Monad.IO.Class
+import Control.Monad.Trans.State (StateT)
+import qualified Control.Monad.Trans.State as State
+import Data.Functor.Identity (runIdentity)
 
 --------------------------------------------------------
 --         The Flag and OptKind types
@@ -61,24 +68,6 @@ defGhciFlag name optKind = Flag name optKind OnlyGhci
 
 defHiddenFlag :: String -> OptKind m -> Flag m
 defHiddenFlag name optKind = Flag name optKind HiddenFlag
-
-hoistFlag :: forall m n. (forall a. m a -> n a) -> Flag m -> Flag n
-hoistFlag f (Flag a b c) = Flag a (go b) c
-  where
-      go (NoArg k)  = NoArg (go2 k)
-      go (HasArg k) = HasArg (\s -> go2 (k s))
-      go (SepArg k) = SepArg (\s -> go2 (k s))
-      go (Prefix k) = Prefix (\s -> go2 (k s))
-      go (OptPrefix k) = OptPrefix (\s -> go2 (k s))
-      go (OptIntSuffix k) = OptIntSuffix (\n -> go2 (k n))
-      go (IntSuffix k) = IntSuffix (\n -> go2 (k n))
-      go (Word64Suffix k) = Word64Suffix (\s -> go2 (k s))
-      go (FloatSuffix k) = FloatSuffix (\s -> go2 (k s))
-      go (PassFlag k) = PassFlag (\s -> go2 (k s))
-      go (AnySuffix k) = AnySuffix (\s -> go2 (k s))
-
-      go2 :: EwM m a -> EwM n a
-      go2 (EwM g) = EwM $ \loc es ws -> f (g loc es ws)
 
 -- | GHC flag modes describing when a flag has an effect.
 data GhcFlagMode
@@ -159,6 +148,9 @@ getCurLoc = EwM (\(L loc _) es ws -> return (es, ws, loc))
 liftEwM :: Monad m => m a -> EwM m a
 liftEwM action = EwM (\_ es ws -> do { r <- action; return (es, ws, r) })
 
+hoistEwM :: (forall a. m a -> n a) -> EwM m b -> EwM n b
+hoistEwM f (EwM g) = EwM $ \loc es ws -> f (g loc es ws)
+
 warnsToMessages :: DiagOpts -> [Warn] -> Messages DriverMessage
 warnsToMessages diag_opts = foldr
   (\(L loc w) ws -> addMessage (mkPlainMsgEnvelope diag_opts loc w) ws)
@@ -168,17 +160,41 @@ warnsToMessages diag_opts = foldr
 --         Processing arguments
 --------------------------------------------------------
 
-processArgs :: Monad m
-            => [Flag m]               -- ^ cmdline parser spec
-            -> [Located String]       -- ^ args
-            -> (FilePath -> EwM m [Located String]) -- ^ response file handler
-            -> m ( [Located String],  -- spare args
+newtype CmdLineP s a = CmdLineP (forall m. (Monad m) => StateT s m a)
+  deriving (Functor)
+
+instance Monad (CmdLineP s) where
+    CmdLineP k >>= f = CmdLineP (k >>= \x -> case f x of CmdLineP g -> g)
+    return = pure
+
+instance Applicative (CmdLineP s) where
+    pure x = CmdLineP (pure x)
+    (<*>) = ap
+
+getCmdLineState :: CmdLineP s s
+getCmdLineState = CmdLineP State.get
+
+putCmdLineState :: s -> CmdLineP s ()
+putCmdLineState x = CmdLineP (State.put x)
+
+runCmdLineP :: CmdLineP s a -> s -> (a, s)
+runCmdLineP (CmdLineP k) s0 = runIdentity $ State.runStateT k s0
+
+processArgs :: forall s m. Monad m
+            => [Flag (CmdLineP s)]        -- ^ cmdline parser spec
+            -> [Located String]           -- ^ args
+            -> (FilePath -> EwM (StateT s m) [Located String]) -- ^ response file handler
+            -> StateT s m
+                 ( [Located String],  -- spare args
                    [Err],  -- errors
                    Warns ) -- warnings
 processArgs spec args handleRespFile = do
     (errs, warns, spare) <- runEwM action
     return (spare, bagToList errs, warns)
   where
+    getCmdLineP :: CmdLineP s a -> StateT s m a
+    getCmdLineP (CmdLineP k) = k
+
     action = process args []
 
     -- process :: [Located String] -> [Located String] -> EwM m [Located String]
@@ -198,7 +214,7 @@ processArgs spec args handleRespFile = do
 
                     Right (action,rest) ->
                         let b = process rest spare
-                        in (setArg locArg $ action) >> b
+                        in setArg locArg (hoistEwM getCmdLineP action) >> b
 
             Nothing -> process args (locArg : spare)
 
