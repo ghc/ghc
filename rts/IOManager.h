@@ -53,6 +53,9 @@ extern bool rts_IOManagerIsWin32Native;
 #if defined(IOMGR_BUILD_SELECT) && !defined(THREADED_RTS)
     #define IOMGR_ENABLED_SELECT
 #endif
+#if defined(IOMGR_BUILD_SELECTBIS) && !defined(THREADED_RTS)
+    #define IOMGR_ENABLED_SELECTBIS
+#endif
 #if defined(IOMGR_BUILD_POLL) && !defined(THREADED_RTS)
     #define IOMGR_ENABLED_POLL
 #endif
@@ -95,6 +98,8 @@ extern bool rts_IOManagerIsWin32Native;
 #else // !defined(THREADED_RTS)
 #if   defined(IOMGR_DEFAULT_NON_THREADED_SELECT)
     #define IOMGR_DEFAULT_STR "select"
+#elif defined(IOMGR_DEFAULT_NON_THREADED_SELECTBIS)
+    #define IOMGR_DEFAULT_STR "selectbis"
 #elif defined(IOMGR_DEFAULT_NON_THREADED_POLL)
     #define IOMGR_DEFAULT_STR "poll"
 #elif defined(IOMGR_DEFAULT_NON_THREADED_WINIO)
@@ -114,6 +119,11 @@ extern bool rts_IOManagerIsWin32Native;
     #define IOMGR_ENABLED_STR_SELECT " select"
 #else
     #define IOMGR_ENABLED_STR_SELECT ""
+#endif
+#if defined(IOMGR_ENABLED_SELECTBIS)
+    #define IOMGR_ENABLED_STR_SELECTBIS " selectbis"
+#else
+    #define IOMGR_ENABLED_STR_SELECTBIS ""
 #endif
 #if defined(IOMGR_ENABLED_POLL)
     #define IOMGR_ENABLED_STR_POLL " poll"
@@ -137,6 +147,7 @@ extern bool rts_IOManagerIsWin32Native;
 #endif
 #define IOMGRS_ENABLED_STR \
           IOMGR_ENABLED_STR_SELECT \
+          IOMGR_ENABLED_STR_SELECTBIS \
           IOMGR_ENABLED_STR_POLL \
           IOMGR_ENABLED_STR_MIO \
           IOMGR_ENABLED_STR_WINIO \
@@ -149,6 +160,9 @@ extern bool rts_IOManagerIsWin32Native;
 typedef enum {
 #if defined(IOMGR_ENABLED_SELECT)
     IO_MANAGER_SELECT,
+#endif
+#if defined(IOMGR_ENABLED_SELECTBIS)
+    IO_MANAGER_SELECTBIS,
 #endif
 #if defined(IOMGR_ENABLED_POLL)
     IO_MANAGER_POLL,
