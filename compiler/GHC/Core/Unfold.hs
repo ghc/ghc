@@ -66,7 +66,6 @@ import GHC.Types.Unique.FM
 import GHC.Types.Var.Env
 import GHC.Utils.Panic.Plain (assert)
 import GHC.Data.Graph.UnVar
-import GHC.Utils.Trace (pprTraceDebug)
 
 -- | Unfolding options
 data UnfoldingOpts = UnfoldingOpts
