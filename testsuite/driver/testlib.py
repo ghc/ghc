@@ -3574,10 +3574,6 @@ def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=No
             file.write(colored_if(color, Color.RED, header) + '\n')
             printTestInfosSummary(file, t.unexpected_failures)
 
-    printUnexpectedTests(file,
-        [t.unexpected_passes, t.unexpected_failures,
-         t.unexpected_stat_failures, t.framework_failures], color)
-
     if t.unexpected_passes:
         header = 'Unexpected passes:'
         file.write(colored_if(color, Color.RED, header) + '\n')
@@ -3601,6 +3597,10 @@ def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=No
     if stopping():
         warning = 'WARNING: Testsuite run was terminated early'
         file.write(colored_if(color, Color.YELLOW, warning) + '\n')
+
+    printUnexpectedTests(file,
+        [t.unexpected_passes, t.unexpected_failures,
+         t.unexpected_stat_failures, t.framework_failures], color)
 
     if len(t.unexpected_failures) > 0 or \
         len(t.unexpected_stat_failures) > 0 or \
