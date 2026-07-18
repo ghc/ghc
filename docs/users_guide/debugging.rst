@@ -940,6 +940,15 @@ parts that you are not interested in.
 
     Suppress "ticks" in the pretty-printer output.
 
+.. ghc-flag:: -dsuppress-guidance
+    :shortdesc: Suppress details of unfolding guidance.
+    :type: dynamic
+    :since: 10.2
+
+    Unfolding guidance describes how the structure of an argument impacts inlining
+    behaviour. However it can be quite noisy so we often want to suppress it.
+    :ghc-flag:`-dsuppress-guidance`
+
 .. ghc-flag:: -dsuppress-uniques
     :shortdesc: Suppress the printing of uniques in debug output (easier to use
         ``diff``)
@@ -951,6 +960,7 @@ parts that you are not interested in.
     differences, so you can realistically apply ``diff``. Once ``diff``
     has shown you where to look, you can try again without
     :ghc-flag:`-dsuppress-uniques`
+
 
 .. ghc-flag:: -dstable-core-dump-order
     :shortdesc: Reorder top-level bindings in Core dumps into a stable,
