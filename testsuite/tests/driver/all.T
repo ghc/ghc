@@ -345,3 +345,8 @@ test('T16720TooManyFailures',
 test('T16720SummaryLines',
      [unless(config.test_env == 'aarch64-darwin-validate', skip)],
      compile_and_run, [''])
+
+# Show the failure output summary alongside another kind of unexpected result.
+test('T16720UnexpectedPass',
+     [unless(config.test_env == 'aarch64-darwin-validate', skip), expect_fail],
+     compile, [''])
