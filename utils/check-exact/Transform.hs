@@ -93,7 +93,6 @@ import qualified Control.Monad.Fail as Fail
 import GHC  hiding (parseModule, parsedSource)
 import GHC.Parser.PostProcess ( wrapValBind )
 import GHC.Data.FastString
-import GHC.Types.SrcLoc
 
 import Data.Data
 import Data.List (unsnoc)
@@ -402,6 +401,14 @@ balanceCommentsList' (a:b:ls) = (a':r)
     (a',b') = balanceComments a b
     r = balanceCommentsList' (b':ls)
 
+balanceCommentsListA :: [LocatedA a ] -> [LocatedA a]
+balanceCommentsListA [] = []
+balanceCommentsListA [x] = [x]
+balanceCommentsListA (a:b:ls) = (a':r)
+  where
+    (a',b') = balanceCommentsA a b
+    r = balanceCommentsListA (b':ls)
+
 -- |The GHC parser puts all comments appearing between the end of one AST
 -- item and the beginning of the next as 'annPriorComments' for the second one.
 -- This function takes two adjacent AST items and moves any 'annPriorComments'
@@ -507,15 +514,6 @@ pushTrailingComments w cs lb@(HsValBinds (an,wt) _) = (True, HsValBinds (an',wt)
       (HsValBinds _ vb') -> vb'
       _ -> ValBinds noExtField []
 
-
-balanceCommentsListA :: [LocatedA a] -> [LocatedA a]
-balanceCommentsListA [] = []
-balanceCommentsListA [x] = [x]
-balanceCommentsListA (a:b:ls) = (a':r)
-  where
-    (a',b') = balanceCommentsA a b
-    r = balanceCommentsListA (b':ls)
-
 -- |Prior to moving an AST element, make sure any trailing comments belonging to
 -- it are attached to it, and not the following element. Of necessity this is a
 -- heuristic process, to be tuned later. Possibly a variant should be provided
@@ -591,59 +589,6 @@ priorCommentsDeltas r cs = go r (sortEpaComments cs)
 
 -- ---------------------------------------------------------------------
 
--- | Split comments into ones occurring before the end of the reference
--- span, and those after it.
-splitComments :: RealSrcSpan -> EpAnnComments -> ([LEpaComment], [LEpaComment], [LEpaComment])
-splitComments p cs = (before, middle, after)
-  where
-    cmpe (L (EpaSpan (RealSrcSpan l _)) _) = ss2pos l > ss2posEnd p
-    cmpe (L _ _) = True
-
-    cmpb (L (EpaSpan (RealSrcSpan l _)) _) = ss2pos l > ss2pos p
-    cmpb (L _ _) = True
-
-    (beforeEnd, after) = break cmpe ((priorComments cs) ++ (getFollowingComments cs))
-    (before, middle) = break cmpb beforeEnd
-
-
--- | Split comments into ones occurring before the end of the reference
--- span, and those after it.
-splitCommentsEnd :: RealSrcSpan -> EpAnnComments -> EpAnnComments
-splitCommentsEnd p (EpaComments cs) = cs'
-  where
-    cmp (L (EpaSpan (RealSrcSpan l _)) _) = ss2pos l > ss2posEnd p
-    cmp (L _ _) = True
-    (before, after) = break cmp cs
-    cs' = case after of
-      [] -> EpaComments cs
-      _ -> epaCommentsBalanced before after
-splitCommentsEnd p (EpaCommentsBalanced cs ts) = epaCommentsBalanced cs' ts'
-  where
-    cmp (L (EpaSpan (RealSrcSpan l _)) _) = ss2pos l > ss2posEnd p
-    cmp (L _ _) = True
-    (before, after) = break cmp cs
-    cs' = before
-    ts' = after <> ts
-
--- | Split comments into ones occurring before the start of the reference
--- span, and those after it.
-splitCommentsStart :: RealSrcSpan -> EpAnnComments -> EpAnnComments
-splitCommentsStart p (EpaComments cs) = cs'
-  where
-    cmp (L (EpaSpan (RealSrcSpan l _)) _) = ss2pos l > ss2posEnd p
-    cmp (L _ _) = True
-    (before, after) = break cmp cs
-    cs' = case after of
-      [] -> EpaComments cs
-      _ -> epaCommentsBalanced before after
-splitCommentsStart p (EpaCommentsBalanced cs ts) = epaCommentsBalanced cs' ts'
-  where
-    cmp (L (EpaSpan (RealSrcSpan l _)) _) = ss2pos l > ss2posEnd p
-    cmp (L _ _) = True
-    (before, after) = break cmp cs
-    cs' = before
-    ts' = after <> ts
-
 moveLeadingComments :: (Data t, Data u, NoAnn t, NoAnn u)
   => LocatedAn t a -> EpAnn u -> (LocatedAn t a, EpAnn u)
 moveLeadingComments (L la a) lb = (L la' a, lb')
@@ -679,19 +624,6 @@ addCommentOrigDeltasAnn (EpAnn e a cs) = EpAnn e a (addCommentOrigDeltas cs)
 -- import loop`
 anchorFromLocatedA :: LocatedA a -> RealSrcSpan
 anchorFromLocatedA (L (EpAnn anc _ _) _) = epaLocationRealSrcSpan anc
-
--- | Get the full span of interest for comments from a LocatedA.
--- This extends up to the last TrailingAnn
-fullSpanFromLocatedA :: LocatedA a -> RealSrcSpan
-fullSpanFromLocatedA (L (EpAnn anc tas  _) _) = rr
-  where
-    r = epaLocationRealSrcSpan anc
-    trailing_loc ta = case ta_location ta of
-        EpaSpan (RealSrcSpan s _) -> [s]
-        _ -> []
-    rr = case reverse (concatMap trailing_loc tas) of
-        [] -> r
-        (s:_) -> combineRealSrcSpans r s
 
 -- ---------------------------------------------------------------------
 
