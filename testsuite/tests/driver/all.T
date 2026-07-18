@@ -337,7 +337,11 @@ test('T24120', normal, compile, ['-Wunused-packages -hide-all-packages -package 
 test('T26551', [extra_files(['T26551.hs'])], makefile_test, [])
 test('T26435', [only_ways(['llvm'])], warn_and_run, ['-finfo-table-map'])
 
-# Deliberately fail one fast-CI job to exercise the summary output limit.
+# Deliberately fail fast-CI jobs to exercise the summary output limits.
 test('T16720TooManyFailures',
      [unless(config.test_env == 'aarch64-linux-deb13-validate', skip)],
      compile_fail, [''])
+
+test('T16720SummaryLines',
+     [unless(config.test_env == 'aarch64-darwin-validate', skip)],
+     compile_and_run, [''])
