@@ -3653,7 +3653,8 @@ MAX_SUMMARY_OUTPUT_LINES = 100
 
 # Above this many unexpected failures, skip repeating output entirely: the
 # dump would drown out the summary.
-MAX_SUMMARY_OUTPUT_TESTS = 20
+MAX_SUMMARY_OUTPUT_TESTS = \
+    0 if config.test_env == 'aarch64-linux-deb13-validate' else 20
 
 def printTestOutputSummary(file: TextIO, testInfos, color: bool=False,
                            junit_path: Optional[Path]=None) -> None:
