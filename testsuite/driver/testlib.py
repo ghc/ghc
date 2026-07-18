@@ -3577,6 +3577,25 @@ def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=No
         [t.unexpected_passes, t.unexpected_failures,
          t.unexpected_stat_failures, t.framework_failures])
 
+    if t.unexpected_passes:
+        file.write('Unexpected passes:\n')
+        printTestInfosSummary(file, t.unexpected_passes)
+
+    if t.unexpected_stat_failures:
+        file.write('Unexpected stat failures:\n')
+        printTestInfosSummary(file, t.unexpected_stat_failures)
+
+    if t.framework_failures:
+        file.write('Framework failures:\n')
+        printTestInfosSummary(file, t.framework_failures)
+
+    if t.framework_warnings:
+        file.write('Framework warnings:\n')
+        printTestInfosSummary(file, t.framework_warnings)
+
+    if stopping():
+        file.write('WARNING: Testsuite run was terminated early\n')
+
     if len(t.unexpected_failures) > 0 or \
         len(t.unexpected_stat_failures) > 0 or \
         len(t.unexpected_passes) > 0 or \
@@ -3618,25 +3637,6 @@ def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=No
                + repr(len(t.fragile_failures) + len(t.fragile_passes)).rjust(8)
                + ' fragile tests\n'
                + '\n')
-
-    if t.unexpected_passes:
-        file.write('Unexpected passes:\n')
-        printTestInfosSummary(file, t.unexpected_passes)
-
-    if t.unexpected_stat_failures:
-        file.write('Unexpected stat failures:\n')
-        printTestInfosSummary(file, t.unexpected_stat_failures)
-
-    if t.framework_failures:
-        file.write('Framework failures:\n')
-        printTestInfosSummary(file, t.framework_failures)
-
-    if t.framework_warnings:
-        file.write('Framework warnings:\n')
-        printTestInfosSummary(file, t.framework_warnings)
-
-    if stopping():
-        file.write('WARNING: Testsuite run was terminated early\n')
 
 def printUnexpectedTests(file: TextIO, testInfoss):
     unexpected = set(result.testname
