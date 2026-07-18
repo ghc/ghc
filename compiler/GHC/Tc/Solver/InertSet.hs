@@ -460,7 +460,7 @@ In implementation terms
   - It is only called when applying an instance decl,
     in GHC.Tc.Solver.Dict.tryInstances
 
-  - ClsInst.InstanceWhat says what kind of instance was
+  - GHC.Tc.Instance.Class.InstanceWhat says what kind of instance was
     used to solve the constraint.  In particular
       * LocalInstance identifies quantified constraints
       * BuiltinEqInstance identifies the strange built-in
