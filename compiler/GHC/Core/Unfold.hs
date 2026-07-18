@@ -693,7 +693,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args' expr
         | Just v <- is_top_arg e
         = let
             -- Compute size of alternatives
-            alt_sizes = map (size_up_alt depth (Just v) arg_comps) alts
+            alt_sizes = map (size_up_alt (depth-1) (Just v) arg_comps) alts
 
             -- Apply a discount for a given constructor that brings the size down to just
             -- the size of the alternative.
@@ -747,7 +747,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args' expr
 
 
     size_up !depth arg_comps (Case e _ _ alts) = size_up depth arg_comps e  `addSizeNSD`
-                                foldr (addAltSize . (size_up_alt depth Nothing arg_comps) ) case_size alts
+                                foldr (addAltSize . (size_up_alt (depth-1) Nothing arg_comps) ) case_size alts
       where
           case_size
            | is_inline_scrut e, lengthAtMost alts 1 = sizeN (-10)
