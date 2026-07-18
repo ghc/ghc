@@ -18,3 +18,5 @@ def colored(color: Color, s: str) -> str:
     else:
         return s
 
+def colored_if(enabled: bool, color: Color, s: str) -> str:
+    return colored(color, s) if enabled else s

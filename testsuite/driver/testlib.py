@@ -27,7 +27,7 @@ from testutil import strip_quotes, lndir, link_or_copy_file, passed, \
                      failBecause, testing_metrics, residency_testing_metrics, \
                      stable_perf_counters, \
                      PassFail, badResult, str_warn, str_removeprefix
-from term_color import Color, colored
+from term_color import Color, colored_if
 import testutil
 from cpu_features import have_cpu_feature
 import perf_notes as Perf
@@ -3571,9 +3571,7 @@ def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=No
             where = '; see {}'.format(junit_path) if junit_path else ''
             header = ('Unexpected failures (output omitted, more than {}{}):'
                       .format(MAX_SUMMARY_OUTPUT_TESTS, where))
-            if color:
-                header = colored(Color.RED, header)
-            file.write(header + '\n')
+            file.write(colored_if(color, Color.RED, header) + '\n')
             printTestInfosSummary(file, t.unexpected_failures)
 
     printUnexpectedTests(file,
@@ -3582,37 +3580,27 @@ def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=No
 
     if t.unexpected_passes:
         header = 'Unexpected passes:'
-        if color:
-            header = colored(Color.RED, header)
-        file.write(header + '\n')
+        file.write(colored_if(color, Color.RED, header) + '\n')
         printTestInfosSummary(file, t.unexpected_passes)
 
     if t.unexpected_stat_failures:
         header = 'Unexpected stat failures:'
-        if color:
-            header = colored(Color.RED, header)
-        file.write(header + '\n')
+        file.write(colored_if(color, Color.RED, header) + '\n')
         printTestInfosSummary(file, t.unexpected_stat_failures)
 
     if t.framework_failures:
         header = 'Framework failures:'
-        if color:
-            header = colored(Color.RED, header)
-        file.write(header + '\n')
+        file.write(colored_if(color, Color.RED, header) + '\n')
         printTestInfosSummary(file, t.framework_failures)
 
     if t.framework_warnings:
         header = 'Framework warnings:'
-        if color:
-            header = colored(Color.YELLOW, header)
-        file.write(header + '\n')
+        file.write(colored_if(color, Color.YELLOW, header) + '\n')
         printTestInfosSummary(file, t.framework_warnings)
 
     if stopping():
         warning = 'WARNING: Testsuite run was terminated early'
-        if color:
-            warning = colored(Color.YELLOW, warning)
-        file.write(warning + '\n')
+        file.write(colored_if(color, Color.YELLOW, warning) + '\n')
 
     if len(t.unexpected_failures) > 0 or \
         len(t.unexpected_stat_failures) > 0 or \
@@ -3623,7 +3611,7 @@ def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=No
         summary_color = Color.GREEN
 
     assert t.start_time is not None
-    summary_header = colored(summary_color, 'SUMMARY') if color else 'SUMMARY'
+    summary_header = colored_if(color, summary_color, 'SUMMARY')
     file.write(summary_header + ' for test run started at '
                + t.start_time.strftime("%c %Z") + '\n'
                + str(datetime.datetime.now() - t.start_time).rjust(8)
@@ -3663,9 +3651,7 @@ def printUnexpectedTests(file: TextIO, testInfoss, color=False):
                      if not result.testname.endswith('.T'))
     if unexpected:
         header = 'Unexpected results from:'
-        if color:
-            header = colored(Color.RED, header)
-        file.write(header + '\n')
+        file.write(colored_if(color, Color.RED, header) + '\n')
         file.write('TEST="' + ' '.join(sorted(unexpected)) + '"\n')
         file.write('\n')
 
@@ -3682,9 +3668,7 @@ def printTestOutputSummary(file: TextIO, testInfos, color: bool=False,
     # Repeat failing tests' captured output in the summary, so one needn't
     # hunt for it earlier in a possibly very long log; see #16720.
     header = '=====> Unexpected failures output summary'
-    if color:
-        header = colored(Color.RED, header)
-    file.write(header + '\n\n')
+    file.write(colored_if(color, Color.RED, header) + '\n\n')
 
     where = ', see {}'.format(junit_path) if junit_path else ''
     # Tests that fail identically in several ways (e.g. normal and g1) share one
@@ -3696,28 +3680,23 @@ def printTestOutputSummary(file: TextIO, testInfos, color: bool=False,
     for result, ways in groups.values():
         header = '=====> {}({}) ({}) [{}]'.format(
             result.testname, ', '.join(ways), result.directory + os.sep, result.reason)
-        if color:
-            header = colored(Color.RED, header)
-        file.write(header + '\n')
+        file.write(colored_if(color, Color.RED, header) + '\n')
         for stream_name, contents in [('stdout', result.stdout), ('stderr', result.stderr)]:
             if contents and contents.strip():
                 label = 'Captured {}:'.format(stream_name)
-                if color:
-                    label = colored(Color.CYAN, label)
                 lines = contents.rstrip('\n').split('\n')
                 if len(lines) > MAX_SUMMARY_OUTPUT_LINES:
                     omitted = len(lines) - MAX_SUMMARY_OUTPUT_LINES
                     lines = lines[:MAX_SUMMARY_OUTPUT_LINES] \
                         + ['... ({} more lines omitted{})'.format(omitted, where)]
-                s = label + '\n' + ''.join(l + '\n' for l in lines)
+                s = colored_if(color, Color.CYAN, label) + '\n' \
+                    + ''.join(l + '\n' for l in lines)
                 # Test output can contain characters that file's encoding
                 # cannot represent; replace rather than crash (cf safe_print).
                 enc = getattr(file, 'encoding', None) or 'utf-8'
                 file.write(s.encode(enc, errors='replace').decode(enc))
     footer = '<===== end of unexpected failures output summary'
-    if color:
-        footer = colored(Color.RED, footer)
-    file.write(footer + '\n\n')
+    file.write(colored_if(color, Color.RED, footer) + '\n\n')
 
 def printTestInfosSummary(file: TextIO, testInfos):
     for result in sorted(testInfos, key=lambda r: (r.testname.lower(), r.way, r.directory)):
