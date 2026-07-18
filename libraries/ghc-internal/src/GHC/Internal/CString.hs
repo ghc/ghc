@@ -49,7 +49,7 @@ summarises the moving parts.
 * The library module ghc-internal:GHC.Internal.CString has a bunch of functions that
   work over primitive strings, including GHC.Internal.CString.unpackCString#
 
-* GHC.Core.Op.ConstantFold has some RULES that optimise certain string
+* GHC.Core.Opt.ConstantFold has some RULES that optimise certain string
   operations on literal strings. For example:
 
     + Constant folding the desugared form of ("foo" ++ "bar")
