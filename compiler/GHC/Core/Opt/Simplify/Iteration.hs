@@ -2420,8 +2420,9 @@ simplOutId env fun cont
     -- The rules didn't match the call as-written.  Try normalising
     -- type-family redexes in the type arguments and matching again.
     -- See Note [Normalise type-family redexes in call type arguments]
-    case if try_rules then normaliseCallTyArgs (seFamEnvs env) fun cont
-                      else Nothing of {
+    case if try_rules && not (isClassOpId fun)
+         then normaliseCallTyArgs (seFamEnvs env) fun cont
+         else Nothing of {
         Just (call', cont') -> do { checkedTick (CallTyArgNormalised fun)
                                   ; simplExprF env call' cont' } ;
         Nothing ->
@@ -2505,6 +2506,14 @@ Wrinkles:
 * We try the rules on the call as-written /first/, and only normalise if they
   fail.  A handwritten RULE may deliberately be keyed on an un-reduced family
   application; normalising first would stop it from ever matching.
+
+* We do not normalise calls to class operations.  The built-in rule for a
+  class operation selects the method from its dictionary argument, so
+  normalising the type arguments after that rule fails does not help it to
+  match.  Since class operations are common, this otherwise amounts to a lot
+  of fruitless work: it caused allocation regressions in the `LargeRecord` and
+  `T12227` performance tests.  Consequently, user-written rules for class
+  operations do not get this second chance to match either.
 
 * We only do this when `f` has rules -- the whole point is to unlock a rule
   match -- and `isFamFreeTy` skips even the normaliseType call for type
