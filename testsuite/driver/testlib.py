@@ -3569,32 +3569,50 @@ def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=No
             printTestOutputSummary(file, t.unexpected_failures, color, junit_path)
         else:
             where = '; see {}'.format(junit_path) if junit_path else ''
-            file.write('Unexpected failures (output omitted, more than {}{}):\n'
-                       .format(MAX_SUMMARY_OUTPUT_TESTS, where))
+            header = ('Unexpected failures (output omitted, more than {}{}):'
+                      .format(MAX_SUMMARY_OUTPUT_TESTS, where))
+            if color:
+                header = colored(Color.RED, header)
+            file.write(header + '\n')
             printTestInfosSummary(file, t.unexpected_failures)
 
     printUnexpectedTests(file,
         [t.unexpected_passes, t.unexpected_failures,
-         t.unexpected_stat_failures, t.framework_failures])
+         t.unexpected_stat_failures, t.framework_failures], color)
 
     if t.unexpected_passes:
-        file.write('Unexpected passes:\n')
+        header = 'Unexpected passes:'
+        if color:
+            header = colored(Color.RED, header)
+        file.write(header + '\n')
         printTestInfosSummary(file, t.unexpected_passes)
 
     if t.unexpected_stat_failures:
-        file.write('Unexpected stat failures:\n')
+        header = 'Unexpected stat failures:'
+        if color:
+            header = colored(Color.RED, header)
+        file.write(header + '\n')
         printTestInfosSummary(file, t.unexpected_stat_failures)
 
     if t.framework_failures:
-        file.write('Framework failures:\n')
+        header = 'Framework failures:'
+        if color:
+            header = colored(Color.RED, header)
+        file.write(header + '\n')
         printTestInfosSummary(file, t.framework_failures)
 
     if t.framework_warnings:
-        file.write('Framework warnings:\n')
+        header = 'Framework warnings:'
+        if color:
+            header = colored(Color.YELLOW, header)
+        file.write(header + '\n')
         printTestInfosSummary(file, t.framework_warnings)
 
     if stopping():
-        file.write('WARNING: Testsuite run was terminated early\n')
+        warning = 'WARNING: Testsuite run was terminated early'
+        if color:
+            warning = colored(Color.YELLOW, warning)
+        file.write(warning + '\n')
 
     if len(t.unexpected_failures) > 0 or \
         len(t.unexpected_stat_failures) > 0 or \
@@ -3638,13 +3656,16 @@ def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=No
                + ' fragile tests\n'
                + '\n')
 
-def printUnexpectedTests(file: TextIO, testInfoss):
+def printUnexpectedTests(file: TextIO, testInfoss, color=False):
     unexpected = set(result.testname
                      for testInfos in testInfoss
                      for result in testInfos
                      if not result.testname.endswith('.T'))
     if unexpected:
-        file.write('Unexpected results from:\n')
+        header = 'Unexpected results from:'
+        if color:
+            header = colored(Color.RED, header)
+        file.write(header + '\n')
         file.write('TEST="' + ' '.join(sorted(unexpected)) + '"\n')
         file.write('\n')
 
