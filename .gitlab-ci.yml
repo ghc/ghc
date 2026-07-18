@@ -251,10 +251,14 @@ ghc-linters:
 lint-changelog:
   stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
-  extends: .lint-params
+  extends: .lint
   variables:
-    BUILD_FLAVOUR: default
     CHANGELOG_EXPECT_MR: "$CI_MERGE_REQUEST_IID"
+    GIT_SUBMODULE_STRATEGY: none
+  before_script:
+    - export PATH="/opt/toolchain/bin:$PATH"
+    # workaround for docker permissions
+    - sudo chown ghc:ghc -R .
   script:
     # Cancel the job if there is a no-changelog label
     - |
@@ -271,9 +275,23 @@ lint-changelog:
         exit 1
       fi
     - echo "Found changelog entries:" $added
-    # Build changelog-d and validate all entries (checks required fields, section names, MR number)
-    - .gitlab/ci.sh configure
-    - .gitlab/ci.sh run_hadrian test --test-root-dirs="testsuite/tests/linters" --only=changelog-d
+    # Build changelog-d with the bootstrap compiler and validate all entries
+    # (checks required fields, section names, and the MR number).
+    - |
+      changelog_build_dir="$(mktemp -d)"
+      ghc -Werror \
+        -package base \
+        -package bytestring \
+        -package Cabal-syntax \
+        -package containers \
+        -package directory \
+        -package filepath \
+        -package pretty \
+        -outputdir "$changelog_build_dir" \
+        -o "$changelog_build_dir/changelog-d" \
+        utils/changelog-d/ChangelogD.hs
+      "$changelog_build_dir/changelog-d" \
+        changelog.d/ --validate --expect-mr "$CHANGELOG_EXPECT_MR"
   dependencies: []
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
