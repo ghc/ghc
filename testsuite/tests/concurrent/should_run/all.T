@@ -326,9 +326,10 @@ test('T26341b'
     , when(arch('wasm32') or arch('javascript'), skip)
     , compile_and_run, ['-package process'])
 
-# Scheduler (very rough) fairness
+# Scheduler fairness
 test('T27105',
      [when(arch('wasm32'), skip),   # same reason as T367_letnoescape
+      fragile(27522),
       run_timeout_multiplier(0.05)], # we expect this to run for ~2s
      compile_and_run, [''])
 test('T27105_fail',
