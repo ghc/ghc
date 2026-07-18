@@ -3692,7 +3692,7 @@ def printTestOutputSummary(file: TextIO, testInfos, color: bool=False,
                 # cannot represent; replace rather than crash (cf safe_print).
                 enc = getattr(file, 'encoding', None) or 'utf-8'
                 file.write(s.encode(enc, errors='replace').decode(enc))
-    footer = '<===== end of output of unexpected failures'
+    footer = '<===== end of unexpected failures output summary'
     if color:
         footer = colored(Color.RED, footer)
     file.write(footer + '\n\n')
