@@ -228,7 +228,7 @@ insertCppComments (L l p) cs0 = insertRemainingCppComments (L l p2) remaining
     (p2, remaining) = insertTopLevelCppComments p1 toplevel
 
     addCommentsListItem :: EpAnn [TrailingAnn] -> State [LEpaComment] (EpAnn [TrailingAnn])
-    addCommentsListItem = addComments
+    addCommentsListItem = addCommentsA
 
     addCommentsList :: EpAnn AnnList -> State [LEpaComment] (EpAnn AnnList)
     addCommentsList = addComments
@@ -249,6 +249,20 @@ insertCppComments (L l p) cs0 = insertRemainingCppComments (L l p2) remaining
 
         _ -> return $ EpAnn anc an ocs
 
+    addCommentsA :: EpAnn [TrailingAnn] -> State [LEpaComment] (EpAnn [TrailingAnn])
+    addCommentsA ann@(EpAnn anc an ocs) = do
+      case anc of
+        EpaSpan (RealSrcSpan s _) -> do
+          unAllocated <- get
+          let
+            (rest, these) = GHC.Parser.Lexer.allocateComments (fullSpanFromEpAnnA ann) unAllocated
+            balanced = splitCommentsEnd s (EpaComments these)
+            cs' = sortEpAnnComments (ocs <> balanced)
+          put rest
+          return $ EpAnn anc an cs'
+
+        _ -> return $ EpAnn anc an ocs
+
 workInComments :: EpAnnComments -> [LEpaComment] -> EpAnnComments
 workInComments ocs [] = ocs
 workInComments ocs new = cs'
@@ -264,9 +278,14 @@ workInComments ocs new = cs'
                    = break (\(L ll _) -> (ss2pos $ epaLocationRealSrcSpan ll) > (ss2pos $ epaLocationRealSrcSpan ac) )
                            new
 
+sortEpAnnComments :: EpAnnComments -> EpAnnComments
+sortEpAnnComments (EpaComments cs) = EpaComments (sortEpaComments cs)
+sortEpAnnComments (EpaCommentsBalanced pc fc)
+  = EpaCommentsBalanced (sortEpaComments pc) (sortEpaComments fc)
+
 insertTopLevelCppComments ::  HsModule GhcPs -> [LEpaComment] -> (HsModule GhcPs, [LEpaComment])
 insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports imports decls) cs
-  = (HsModule (XModulePs an4 lo mdeprec mbDoc) mmn mexports' imports' decls', cs3)
+  = (HsModule (XModulePs an4 lo mdeprec mbDoc) mmn mexports imports' decls', cs3)
     -- `debug` ("insertTopLevelCppComments: (cs2,cs3,hc0,hc1,hc_cs)" ++ showAst (cs2,cs3,hc0,hc1,hc_cs))
     -- `debug` ("insertTopLevelCppComments: (cs2,cs3,hc0i,hc0,hc1,hc_cs)" ++ showAst (cs2,cs3,hc0i,hc0,hc1,hc_cs))
   where
@@ -297,24 +316,7 @@ insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports
             cs' = workInComments (comments an1) stay
         _ -> (an1,cs0a)
 
-    (mexports', an3, cs1) =
-      case mexports of
-        Nothing -> (Nothing, an2, cs0b)
-        Just exports -> (Just exports', an3', cse)
-           where
-             (csh', cs0b') = case am_exports $ anns an2 of
-               (tokOP, _tokCP, _tokCommas) ->
-                 case tokOP of
-                   (EpTok (EpaSpan (RealSrcSpan s _))) -> (h, n)
-                     where
-                       (h,n) = break (\(L ll _) -> (ss2pos $ epaLocationRealSrcSpan ll) > (ss2pos s) )
-                                     cs0b
-
-                   _ -> ([], cs0b)
-             hc1' = workInComments (comments an2) csh'
-             an3' = an2 { comments = hc1' }
-             (exports', cse) = allocPreceding exports cs0b'
-    (imports0, cs2) = allocPreceding imports cs1
+    (imports0, cs2) = allocPreceding imports cs0b
     (imports', hc0i) = balanceFirstLocatedAComments imports0
 
     (decls0, cs3) = allocPreceding decls cs2
@@ -323,9 +325,9 @@ insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports
     -- Either hc0i or hc0d should have comments. Combine them
     hc0 = hc0i ++ hc0d
 
-    (hc1,hc_cs) = splitOnWhere After (am_where $ anns an3)  hc0
-    hc2 = workInComments (comments an3) hc1
-    an4 = an3 { anns = (anns an3) {am_cs = hc_cs}, comments = hc2 }
+    (hc1,hc_cs) = splitOnWhere After (am_where $ anns an2)  hc0
+    hc2 = workInComments (comments an2) hc1
+    an4 = an2 { anns = (anns an2) {am_cs = hc_cs}, comments = hc2 }
 
     allocPreceding :: [LocatedA a] -> [LEpaComment] -> ([LocatedA a], [LEpaComment])
     allocPreceding [] cs' = ([], cs')
@@ -345,7 +347,6 @@ annListBracketsLocs (ListBraces o c) = (getEpTokenLoc o,    getEpTokenLoc c)
 annListBracketsLocs (ListSquare o c) = (getEpTokenLoc o,    getEpTokenLoc c)
 annListBracketsLocs (ListBanana o c) = (getEpUniTokenLoc o, getEpUniTokenLoc c)
 annListBracketsLocs ListNone         = (noAnn,              noAnn)
-
 
 data SplitWhere = Before | After
 
@@ -427,6 +428,79 @@ insertRemainingCppComments (L l p) cs = L l p'
                    = if (ss2pos $ epaLocationRealSrcSpan ac) > end_loc'
                        then break (\(L ll _) -> (ss2pos $ epaLocationRealSrcSpan ll) > (ss2pos $ epaLocationRealSrcSpan ac) ) new
                        else (new_before, new_after)
+
+-- ---------------------------------------------------------------------
+
+-- | Get the full span of interest for comments from a LocatedA.
+-- This extends up to the last TrailingAnn
+fullSpanFromLocatedA :: LocatedA a -> RealSrcSpan
+fullSpanFromLocatedA (L ann _) = fullSpanFromEpAnnA ann
+
+-- | Get the full span of interest for comments from a LocatedA.
+-- This extends up to the last TrailingAnn
+fullSpanFromEpAnnA :: EpAnn [TrailingAnn] -> RealSrcSpan
+fullSpanFromEpAnnA (EpAnn anc tas  _) = rr
+  where
+    r = epaLocationRealSrcSpan anc
+    trailing_loc ta = case ta_location ta of
+        EpaSpan (RealSrcSpan s _) -> [s]
+        _ -> []
+    rr = case reverse (concatMap trailing_loc tas) of
+        [] -> r
+        (s:_) -> combineRealSrcSpans r s
+
+-- | Split comments into ones occurring before the end of the reference
+-- span, and those after it.
+splitComments :: RealSrcSpan -> EpAnnComments -> ([LEpaComment], [LEpaComment], [LEpaComment])
+splitComments p cs = (before, middle, after)
+  where
+    cmpe (L (EpaSpan (RealSrcSpan l _)) _) = ss2pos l > ss2posEnd p
+    cmpe (L _ _) = True
+
+    cmpb (L (EpaSpan (RealSrcSpan l _)) _) = ss2pos l > ss2pos p
+    cmpb (L _ _) = True
+
+    (beforeEnd, after) = break cmpe ((priorComments cs) ++ (getFollowingComments cs))
+    (before, middle) = break cmpb beforeEnd
+
+
+-- | Split comments into ones occurring before the end of the reference
+-- span, and those after it.
+splitCommentsEnd :: RealSrcSpan -> EpAnnComments -> EpAnnComments
+splitCommentsEnd p (EpaComments cs) = cs'
+  where
+    cmp (L (EpaSpan (RealSrcSpan l _)) _) = ss2pos l > ss2posEnd p
+    cmp (L _ _) = True
+    (before, after) = break cmp cs
+    cs' = case after of
+      [] -> EpaComments cs
+      _ -> epaCommentsBalanced before after
+splitCommentsEnd p (EpaCommentsBalanced cs ts) = epaCommentsBalanced cs' ts'
+  where
+    cmp (L (EpaSpan (RealSrcSpan l _)) _) = ss2pos l > ss2posEnd p
+    cmp (L _ _) = True
+    (before, after) = break cmp cs
+    cs' = before
+    ts' = after <> ts
+
+-- | Split comments into ones occurring before the start of the reference
+-- span, and those after it.
+splitCommentsStart :: RealSrcSpan -> EpAnnComments -> EpAnnComments
+splitCommentsStart p (EpaComments cs) = cs'
+  where
+    cmp (L (EpaSpan (RealSrcSpan l _)) _) = ss2pos l > ss2posEnd p
+    cmp (L _ _) = True
+    (before, after) = break cmp cs
+    cs' = case after of
+      [] -> EpaComments cs
+      _ -> epaCommentsBalanced before after
+splitCommentsStart p (EpaCommentsBalanced cs ts) = epaCommentsBalanced cs' ts'
+  where
+    cmp (L (EpaSpan (RealSrcSpan l _)) _) = ss2pos l > ss2posEnd p
+    cmp (L _ _) = True
+    (before, after) = break cmp cs
+    cs' = before
+    ts' = after <> ts
 
 -- ---------------------------------------------------------------------
 
