@@ -785,7 +785,7 @@ typeSymbolKind = mkTyConTy typeSymbolKindCon
 Note [How tuples work]
 ~~~~~~~~~~~~~~~~~~~~~~
 * There are three families of tuple TyCons and corresponding
-  DataCons, expressed by the type BasicTypes.TupleSort:
+  DataCons, expressed by the type GHC.Types.Basic.TupleSort:
     data TupleSort = BoxedTuple | UnboxedTuple | ConstraintTuple
 
 * All three families are AlgTyCons, whose AlgTyConRhs is TupleTyCon
@@ -820,7 +820,7 @@ Note [How tuples work]
       stores them in the context field of types like HsQualTy.
 
 * In quite a lot of places things are restricted just to
-  BoxedTuple/UnboxedTuple, and then we used BasicTypes.Boxity to distinguish
+  BoxedTuple/UnboxedTuple, and then we used GHC.Types.Basic.Boxity to distinguish
   E.g. tupleTyCon has a Boxity argument
 
 * When looking up an OccName in the original-name cache
