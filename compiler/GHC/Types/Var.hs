@@ -622,27 +622,27 @@ Note [Types for coercions, predicates, and evidence]
 VarBndr is polymorphic in both var and visibility fields.
 Currently there are nine different uses of 'VarBndr':
 
-* Var.ForAllTyBinder = VarBndr TyCoVar ForAllTyFlag
+* GHC.Types.Var.ForAllTyBinder = VarBndr TyCoVar ForAllTyFlag
   Binder of a forall-type; see ForAllTy in GHC.Core.TyCo.Rep
 
-* Var.TyVarBinder = VarBndr TyVar ForAllTyFlag
+* GHC.Types.Var.TyVarBinder = VarBndr TyVar ForAllTyFlag
   Subset of ForAllTyBinder when we are sure the binder is a TyVar
 
-* Var.InvisTVBinder = VarBndr TyVar Specificity
+* GHC.Types.Var.InvisTVBinder = VarBndr TyVar Specificity
   Specialised form of TyVarBinder, when ForAllTyFlag = Invisible s
   See GHC.Core.Type.splitForAllInvisTVBinders
 
-* Var.ReqTVBinder = VarBndr TyVar ()
+* GHC.Types.Var.ReqTVBinder = VarBndr TyVar ()
   Specialised form of TyVarBinder, when ForAllTyFlag = Required
   See GHC.Core.Type.splitForAllReqTVBinders
   This one is barely used
 
-* TyCon.TyConBinder = VarBndr TyVar TyConBndrVis
+* GHC.Core.TyCon.TyConBinder = VarBndr TyVar TyConBndrVis
   Binders of a TyCon; see TyCon in GHC.Core.TyCon
 
-* IfaceType.IfaceForAllBndr     = VarBndr IfaceBndr ForAllTyFlag
-* IfaceType.IfaceForAllSpecBndr = VarBndr IfaceBndr Specificity
-* IfaceType.IfaceTyConBinder    = VarBndr IfaceBndr TyConBndrVis
+* GHC.Iface.Type.IfaceForAllBndr     = VarBndr IfaceBndr ForAllTyFlag
+* GHC.Iface.Type.IfaceForAllSpecBndr = VarBndr IfaceBndr Specificity
+* GHC.Iface.Type.IfaceTyConBinder    = VarBndr IfaceBndr TyConBndrVis
 -}
 
 data VarBndr var argf = Bndr var argf
