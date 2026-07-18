@@ -62,7 +62,7 @@ looking up source locations for stack info tables in the map generated during th
 
 The rest of this note will document exactly how the first pass generates the map from labels to
 estimated source positions. The algorithms are different depending on whether tables-next-to-code
-is on or off. Both algorithms have in common that we are looking for a `CmmNode.CmmTick`
+is on or off. Both algorithms have in common that we are looking for a `GHC.Cmm.Node.CmmTick`
 (containing a `SourceNote`) that is near what we estimate to be the label of a return stack frame.
 
 With tables-next-to-code
@@ -112,14 +112,14 @@ open or closed on exit (one can fallthrough from them to the next node).
 Please refer to the paper "Hoopl: A Modular, Reusable Library for Dataflow Analysis and Transformation"
 for a detailed explanation.
 
-Here we use the fact, that calls (represented by `CmmNode.CmmCall`) are always closed on exit
+Here we use the fact, that calls (represented by `GHC.Cmm.Node.CmmCall`) are always closed on exit
 (`CmmNode O C`, `O` means open, `C` closed). In other words, they are always at the end of a block.
 
 So, given a `CmmGraph`:
-  - Look at the end of every block: If it is a `CmmNode.CmmCall` returning to some label, lookup
-    the nearest `CmmNode.CmmTick` by traversing the middle part of the block backwards (from end to
+  - Look at the end of every block: If it is a `GHC.Cmm.Node.CmmCall` returning to some label, lookup
+    the nearest `GHC.Cmm.Node.CmmTick` by traversing the middle part of the block backwards (from end to
     beginning).
-  - Take the first `CmmNode.CmmTick` that contains a `Tickish.SourceNote` and map the label we
+  - Take the first `GHC.Cmm.Node.CmmTick` that contains a `Tickish.SourceNote` and map the label we
     found to it's payload as an `IpeSourceLocation`. (There are other `Tickish` constructors like
     `ProfNote` or `HpcTick`, these are ignored.)
 

@@ -82,7 +82,7 @@ Here is a running example:
 
 (SF4) The desugarer replaces a nested expression (static e) with a top-level
   binding for an application of the function 'makeStatic' (defined in module
-  GHC.StaticPtr.Internal of base).  So we get
+  GHC.Internal.StaticPtr.Internal of base).  So we get
 
    s = /\abc. makeStatic location e
    f x = ...(fromStaticPtr s)...

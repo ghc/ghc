@@ -52,20 +52,20 @@ import GHC.Utils.Panic
 GHC has severals types that represent various aspects of data format.
 These include:
 
- * 'CmmType.CmmType': The data classification used throughout the C--
+ * 'GHC.Cmm.Type.CmmType': The data classification used throughout the C--
    pipeline. This is a pair of a CmmCat and a Width.
 
- * 'CmmType.CmmCat': What the bits in a C-- value mean (e.g. a pointer, integer, or floating-point value)
+ * 'GHC.Cmm.Type.CmmCat': What the bits in a C-- value mean (e.g. a pointer, integer, or floating-point value)
 
- * 'CmmType.Width': The width of a C-- value.
+ * 'GHC.Cmm.Type.Width': The width of a C-- value.
 
- * 'CmmType.Length': The width (measured in number of scalars) of a vector value.
+ * 'GHC.Cmm.Type.Length': The width (measured in number of scalars) of a vector value.
 
  * 'Format.Format': The data format representation used by much of the backend.
 
- * 'Format.ScalarFormat': The format of a 'Format.VecFormat'\'s scalar.
+ * 'GHC.CmmToAsm.Format.ScalarFormat': The format of a 'GHC.CmmToAsm.Format.VecFormat'\'s scalar.
 
- * 'RegClass.RegClass': Whether a register is an integer or a floating point/vector register.
+ * 'GHC.Platform.Reg.Class.RegClass': Whether a register is an integer or a floating point/vector register.
 -}
 
 -- It looks very like the old MachRep, but it's now of purely local

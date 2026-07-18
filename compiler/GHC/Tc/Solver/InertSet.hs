@@ -460,7 +460,7 @@ In implementation terms
   - It is only called when applying an instance decl,
     in GHC.Tc.Solver.Dict.tryInstances
 
-  - ClsInst.InstanceWhat says what kind of instance was
+  - GHC.Tc.Instance.Class.InstanceWhat says what kind of instance was
     used to solve the constraint.  In particular
       * LocalInstance identifies quantified constraints
       * BuiltinEqInstance identifies the strange built-in
@@ -800,7 +800,7 @@ The InertCans represents a collection of constraints with the following properti
     eg a wanted cannot rewrite a given)
 
   * CEqCan equalities: see Note [inert_eqs: the inert equalities]
-    Also see documentation in Constraint.Ct for a list of invariants
+    Also see documentation in GHC.Tc.Types.Constraint.Ct for a list of invariants
 
 Note [inert_eqs: the inert equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
