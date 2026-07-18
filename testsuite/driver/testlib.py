@@ -3569,7 +3569,7 @@ def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=No
             printTestOutputSummary(file, t.unexpected_failures, color, junit_path)
         else:
             where = '; see {}'.format(junit_path) if junit_path else ''
-            header = ('Unexpected failures (output omitted, more than {}{}):'
+            header = ('Unexpected failures (more than {}, output omitted{}):'
                       .format(MAX_SUMMARY_OUTPUT_TESTS, where))
             file.write(colored_if(color, Color.RED, header) + '\n')
             printTestInfosSummary(file, t.unexpected_failures)
