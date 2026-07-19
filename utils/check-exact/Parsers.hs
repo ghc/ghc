@@ -46,6 +46,7 @@ module Parsers (
         ) where
 
 import Preprocess
+import Utils
 
 import Data.Functor (void)
 
@@ -270,7 +271,10 @@ postParseTransform
   -> Either a (GHC.ParsedSource)
 postParseTransform parseRes = fmap mkAnns parseRes
   where
-    mkAnns (_cs, _, m) = fixModuleComments m
+    mkAnns (cs, _, m) = fixModuleComments (insertCppComments (noIEDoc m) cs)
+    noIEDoc (GHC.L l m) = case GHC.hsmodExports m of
+                  Nothing -> GHC.L l m
+                  Just exps -> GHC.L l m { GHC.hsmodExports = Just $ filter notIEDoc exps }
 
 fixModuleComments :: GHC.ParsedSource -> GHC.ParsedSource
 fixModuleComments p = fixModuleHeaderComments $ fixModuleTrailingComments p
