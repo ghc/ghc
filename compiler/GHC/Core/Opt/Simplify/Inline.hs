@@ -923,12 +923,11 @@ interestingArg env e =
           ConArg con fn_args
             | isClassTyCon (dataConTyCon con) -> ValueArg
             | otherwise ->
-              -- fn_args can be non-empty if the head of the application is
-              -- a variable whose unfolding is a partially applied constructor
-              -- application (see the first clause of go_var). In that case the
-              -- args from the unfolding come before the args of this
-              -- application, e.g. for `v ys` with `v = (:) x` we get
-              -- ConArg (:) [x_summary, ys_summary].
+              -- fn_args are the arguments already applied inside `fn`
+              -- in case `fn` is a variable representing a partial application.
+              -- For example if we have `v xs` with `v` unfolding into `(: x)`.
+              -- In that case we will get:
+              -- ConArg (:) [x_summary, xs_summary].
               ConArg con (fn_args ++ arg_summaries)
           _ -> fn_summary
 
