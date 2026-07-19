@@ -1299,7 +1299,7 @@ void postHeapProfSampleString(StgWord8 profile_id,
 }
 
 #if defined(PROFILING)
-void postHeapProfCostCentre(StgWord32 ccID,
+void postHeapProfCostCentre(StgInt ccID,
                             const char *label,
                             const char *module,
                             const char *srcloc,
