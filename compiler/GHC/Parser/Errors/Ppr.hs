@@ -113,7 +113,7 @@ instance Diagnostic PsMessage where
                           <> if null prag then empty else text ":" <+> text prag
     PsWarnMisplacedPragma prag
       -> mkSimpleDecorated $ text "Misplaced" <+> pprFileHeaderPragmaType prag <+> text "pragma"
-    PsWarnImportPreQualified
+    PsWarnImportPreQualified _iqp_on
       -> mkSimpleDecorated $
             text "Found" <+> quotes (text "qualified")
              <+> text "in prepositive position"
@@ -603,7 +603,7 @@ instance Diagnostic PsMessage where
     PsWarnStarIsType                              -> WarningWithFlag Opt_WarnStarIsType
     PsWarnUnrecognisedPragma{}                    -> WarningWithFlag Opt_WarnUnrecognisedPragmas
     PsWarnMisplacedPragma{}                       -> WarningWithFlag Opt_WarnMisplacedPragmas
-    PsWarnImportPreQualified                      -> WarningWithFlag Opt_WarnPrepositiveQualifiedModule
+    PsWarnImportPreQualified{}                    -> WarningWithFlag Opt_WarnPrepositiveQualifiedModule
     PsWarnViewPatternSignatures{}                 -> WarningWithFlag Opt_WarnViewPatternSignatures
     PsErrLexer{}                                  -> ErrorWithoutFlag
     PsErrCmmLexer                                 -> ErrorWithoutFlag
@@ -735,8 +735,10 @@ instance Diagnostic PsMessage where
           then noHints
           else [SuggestCorrectPragmaName suggestions]
     PsWarnMisplacedPragma{}                       -> [SuggestPlacePragmaInHeader]
-    PsWarnImportPreQualified                      -> [ SuggestQualifiedAfterModuleName
-                                                     , suggestExtension LangExt.ImportQualifiedPost]
+    PsWarnImportPreQualified iqp_on | iqp_on     -> [ SuggestQualifiedAfterModuleName ]
+                                    | otherwise  -> [ SuggestQualifiedAfterModuleName
+                                                    , suggestExtension LangExt.ImportQualifiedPost
+                                                    ]
     PsWarnViewPatternSignatures{}                 -> [SuggestParenthesizePatternRHS]
     PsErrLexer{}                                  -> noHints
     PsErrCmmLexer                                 -> noHints
