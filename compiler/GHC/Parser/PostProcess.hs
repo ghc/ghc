@@ -1326,7 +1326,7 @@ checkImportDecl mPre mPost preLevel postLevel = do
   -- Warn if 'qualified' found in prepositive position and
   -- 'Opt_WarnPrepositiveQualifiedModule' is enabled.
   whenJust mPre $ \pre ->
-    warnPrepositiveQualifiedModule (tokenSpan pre)
+    warnPrepositiveQualifiedModule (tokenSpan pre) importQualifiedPostEnabled
 
   return (qualSpec, levelSpec)
 
@@ -3498,9 +3498,9 @@ isImpExpQcWildcard _                  = False
 -----------------------------------------------------------------------------
 -- Warnings and failures
 
-warnPrepositiveQualifiedModule :: SrcSpan -> P ()
-warnPrepositiveQualifiedModule span =
-  addPsMessage span PsWarnImportPreQualified
+warnPrepositiveQualifiedModule :: SrcSpan -> Bool -> P ()
+warnPrepositiveQualifiedModule span qualifiedPostEnabled =
+  addPsMessage span $ PsWarnImportPreQualified qualifiedPostEnabled
 
 failNotEnabledImportQualifiedPost :: SrcSpan -> P ()
 failNotEnabledImportQualifiedPost loc =

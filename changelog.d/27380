@@ -1,0 +1,7 @@
+section: compiler
+synopsis: Don't suggest enabling ``ImportQualifiedPost`` when it is already enabled.
+  The :ghc-flag:`-Wprepositive-qualified-module` warning no longer suggests
+  enabling the extension if it is already in effect (as it is by default
+  under GHC2021).
+issues: #27380
+mrs: !16376

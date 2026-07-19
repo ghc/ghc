@@ -133,7 +133,7 @@ data PsMessage
    | PsWarnStarIsType
 
    -- | Pre qualified import with 'WarnPrepositiveQualifiedModule' enabled
-   | PsWarnImportPreQualified
+   | PsWarnImportPreQualified !Bool -- is 'ImportQualifiedPost' enabled?
 
    | PsWarnOperatorWhitespaceExtConflict !OperatorWhitespaceSymbol
 
