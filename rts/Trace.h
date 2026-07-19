@@ -376,7 +376,7 @@ void traceHeapBioProfSampleBegin(StgInt era, StgWord64 time);
 void traceHeapProfSampleEnd(StgInt era);
 void traceHeapProfSampleString(const char *label, StgWord residency);
 #if defined(PROFILING)
-void traceHeapProfCostCentre(StgWord32 ccID,
+void traceHeapProfCostCentre(StgInt ccID,
                              const char *label,
                              const char *module,
                              const char *srcloc,

@@ -44,9 +44,9 @@ static Arena *prof_arena;
  * closure_cats
  */
 
-static unsigned int CC_ID  = 1;
-static unsigned int CCS_ID = 1;
-static unsigned int DUMPED_CC_ID  = 0; // we have dumped all CCs up to this id to the eventlog
+static StgInt CC_ID  = 1;
+static StgInt CCS_ID = 1;
+static StgInt DUMPED_CC_ID  = 0; // we have dumped all CCs up to this id to the eventlog
 
 /* Globals for opening the profiling log file(s)
  */

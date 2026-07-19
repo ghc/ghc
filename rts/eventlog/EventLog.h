@@ -181,7 +181,7 @@ void postHeapProfSampleString(const char *label,
                               StgWord64 residency);
 
 #if defined(PROFILING)
-void postHeapProfCostCentre(StgWord32 ccID,
+void postHeapProfCostCentre(StgInt ccID,
                             const char *label,
                             const char *module,
                             const char *srcloc,
