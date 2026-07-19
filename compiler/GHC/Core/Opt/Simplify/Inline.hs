@@ -946,7 +946,9 @@ interestingArg env e =
                                  env' = env `addNewInScopeBndr` b
 
     go_var depth n v
-      | Just rhs <- maybeUnfoldingTemplate (idUnfolding v)
+      | unf <- (idUnfolding v)
+      , isConLikeUnfolding unf
+      , Just rhs <- maybeUnfoldingTemplate unf
       , Just con_app <- isConApp_maybe rhs
       = con_app
 
