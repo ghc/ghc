@@ -1469,7 +1469,7 @@ instance ExactPrint (HsModule GhcPs) where
              Just exps -> do
                let (op,cp,tcs) = am_exports $ anns an0
                op' <- markEpToken op
-               exps' <- mapM markAnnotated exps
+               exps' <- mapM markAnnotated (filter notIEDoc exps)
                tcs' <- mapM markEpToken tcs
                cp' <- markEpToken cp
                return (Just exps', an0 { anns = (anns an0) { am_exports = (op',cp',tcs')}})
