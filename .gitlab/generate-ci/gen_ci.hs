@@ -808,13 +808,14 @@ data Job
         , jobCache :: Cache
         , jobRules :: OnOffRules
         , jobPlatform  :: (Arch, Opsys)
+        , jobTimeout :: Maybe String
         }
 
 instance Show Job where
   show = B8.unpack . encode
 
 instance ToJSON Job where
-  toJSON Job{..} = object
+  toJSON Job{..} = object $
     [ "stage" A..= jobStage
       -- Convoluted to avoid download artifacts from ghci job
       -- https://docs.gitlab.com/ee/ci/yaml/#needsartifacts
@@ -831,7 +832,7 @@ instance ToJSON Job where
     , "after_script" A..= jobAfterScript
     , "script" A..= jobScript
     , "rules" A..= jobRules
-    ]
+    ] ++ [ "timeout" A..= timeout | timeout <- maybeToList jobTimeout ]
 
 -- | Build a job description from the system description and 'BuildConfig'
 job :: Arch -> Opsys -> BuildConfig -> NamedJob Job
@@ -840,6 +841,10 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
     jobPlatform = (arch, opsys)
 
     jobRules = emptyRules jobName
+
+    jobTimeout
+      | validateNonmovingGc buildConfig = Just "16h"
+      | otherwise = Nothing
 
     jobName = testEnv arch opsys buildConfig
 

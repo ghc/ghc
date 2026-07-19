@@ -2984,6 +2984,7 @@
     "tags": [
       "x86_64-linux"
     ],
+    "timeout": "16h",
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-validate+boot_nonmoving_gc",
@@ -6957,6 +6958,7 @@
     "tags": [
       "x86_64-linux"
     ],
+    "timeout": "16h",
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-validate+boot_nonmoving_gc",
