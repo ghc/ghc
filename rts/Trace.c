@@ -757,7 +757,7 @@ void traceIPE(const InfoProvEnt *ipe)
 }
 
 #if defined(PROFILING)
-void traceHeapProfCostCentre(StgWord32 ccID,
+void traceHeapProfCostCentre(StgInt ccID,
                              const char *label,
                              const char *module,
                              const char *srcloc,
