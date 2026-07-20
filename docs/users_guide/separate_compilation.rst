@@ -613,8 +613,9 @@ Other options related to interface files
     :type: mode
     :category: interface-files
 
-    where ⟨file⟩ is the name of an interface file, dumps the contents of
-    that interface in a human-readable format. See :ref:`modes`.
+    where ⟨file⟩ is the name of an interface file, dumps relevant parts
+    of this file’s contents in a human-readable format. See
+    :ref:`modes`.
 
 .. _hie-options:
 
