@@ -83,7 +83,6 @@ module GHC.Unit.Env
 
     -- ** Queries on the current active home unit
     , ue_homeUnitState
-    , ue_unit_dbs
     , ue_homeUnit
     , ue_unitFlags
 
@@ -113,6 +112,7 @@ import GHC.Prelude
 import qualified Data.Set as Set
 
 import GHC.Unit.External
+import GHC.Unit.External.Database
 import GHC.Unit.State
 import GHC.Unit.Home
 import GHC.Unit.Types
@@ -177,6 +177,9 @@ data UnitEnv = UnitEnv
 
     , ue_namever   :: !GhcNameVersion
         -- ^ GHC name/version (used for dynamic library suffix)
+
+    , ue_eud :: {-# UNPACK #-} !(ExternalUnitDatabaseCache UnitId)
+        -- ^ Global cache of already read package databases
     }
 
 ueEPS :: UnitEnv -> IO ExternalPackageState
@@ -185,6 +188,7 @@ ueEPS = eucEPS . ue_eps
 initUnitEnv :: UnitId -> HomeUnitGraph -> GhcNameVersion -> Platform -> IO UnitEnv
 initUnitEnv cur_unit hug namever platform = do
   eps <- initExternalUnitCache
+  eud <- initExternalUnitDatabaseCache
   return $ UnitEnv
     { ue_eps             = eps
     , ue_home_unit_graph = hug
@@ -192,6 +196,7 @@ initUnitEnv cur_unit hug namever platform = do
     , ue_current_unit    = cur_unit
     , ue_platform        = platform
     , ue_namever         = namever
+    , ue_eud             = eud
     }
 
 updateHug :: (HomeUnitGraph -> HomeUnitGraph) -> UnitEnv -> UnitEnv
@@ -260,9 +265,6 @@ ue_findHomeUnitEnv uid e = case HUG.lookupHugUnitId uid (ue_home_unit_graph e) o
 
 ue_homeUnitState :: HasDebugCallStack => UnitEnv -> UnitState
 ue_homeUnitState = HUG.homeUnitEnv_units . ue_currentHomeUnitEnv
-
-ue_unit_dbs :: UnitEnv ->  Maybe [UnitDatabase UnitId]
-ue_unit_dbs = HUG.homeUnitEnv_unit_dbs . ue_currentHomeUnitEnv
 
 -- -------------------------------------------------------
 -- Query and modify Home Package Table in HomeUnitEnv
