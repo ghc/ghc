@@ -112,7 +112,7 @@ newHscEnv top_dir dflags = do
   where
     home_unit_graph hpt = HUG.unitEnv_singleton
                         (homeUnitId_ dflags)
-                        (HUG.mkHomeUnitEnv emptyUnitState Nothing dflags hpt Nothing)
+                        (HUG.mkHomeUnitEnv emptyUnitState dflags hpt Nothing)
 
 newHscEnvWithHUG :: FilePath -> DynFlags -> UnitId -> HomeUnitGraph -> IO HscEnv
 newHscEnvWithHUG top_dir top_dynflags cur_unit home_unit_graph = do
