@@ -63,28 +63,28 @@ These are the steps to build a bindist:
     - stage2/ for cross-compiled compiler (stage3) bindists
 
 - create symlink (or bash) wrapper from unversioned to versioned executable:
-    <build root/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/xxxx
+    <build root>/<bindist-dir>/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/[<target>-]xxxx
   points to:
-    <build root>/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/xxxx-<VER>
+    <build root>/<bindist-dir>/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/[<target>-]xxxx-<VER>
 
 - copy the lib directories of the compiler we built:
     <build root>/<library-stage-dir>/lib
   to
-    <build root>/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/lib
-  where library-stage-dir is:
+    <build root>/<bindist-dir>/ghc-<X>.<Y>.<Z>-<arch>-<os>/lib
+  where <library-stage-dir> is:
     - stage1/ for regular bindists
     - stage1/ for cross-compiler bindists
     - stage2/ for cross-compiled compiler (stage3) bindists
 
 - copy the generated docs (user guide, haddocks, etc):
-    <build root>/docs/
+    <build root>/doc/
   to
-    <build root>/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/docs/
+    <build root>/<bindist-dir>/ghc-<X>.<Y>.<Z>-<arch>-<os>/doc/
 
 - use autoreconf to generate per-stage `configure` scripts from
   aclocal.m4 and <executable-stage>/distrib/configure.ac, that we move to:
     <build root>/<bindist-dir>/ghc-<X>.<Y>.<Z>-<arch>-<os>/configure
-  where executable-stage is:
+  where <executable-stage> is:
     - stage1 for regular bindists
     - stage1 for cross-compiler bindists
     - stage2 from cross-compiled compiler (stage3) bindists
