@@ -8,7 +8,9 @@
 
 #include "ghcplatform.h"
 #include "Rts.h"
+#include "RtsUtils.h"
 #include "RtsSymbols.h"
+#include "RtsUtils.h"
 #include "LinkerInternals.h"
 #include "PathUtils.h"
 
@@ -480,6 +482,7 @@ extern char **environ;
       RTS_TICKY_SYMBOLS                                                 \
       RTS_PROF_SYMBOLS                                                  \
       RTS_LIBDW_SYMBOLS                                                 \
+      SymI_HasProto(getRtsSymbols)                                          \
       SymI_HasProto(StgReturn)                                          \
       SymI_HasDataProto(ghc_hs_iface)                                       \
       SymI_HasDataProto(stg_gc_noregs)                                      \
@@ -1225,13 +1228,13 @@ RTS_SYMBOLS_PRIM
 /* See Note [Naming Scheme for Symbol Macros] */
 
 #define SymI_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-                    (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE },
+                    (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE, NULL },
 #define SymI_HasDataProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-                    (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA },
+                    (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA, NULL },
 #define SymE_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-            (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE },
+            (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE | SYM_TYPE_EXTERNAL, NULL },
 #define SymE_HasDataProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-            (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA },
+            (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA | SYM_TYPE_EXTERNAL, NULL },
 
 #define SymI_NeedsProto(vvv) SymI_HasProto(vvv)
 #define SymI_NeedsDataProto(vvv) SymI_HasDataProto(vvv)
@@ -1242,44 +1245,38 @@ RTS_SYMBOLS_PRIM
 // another symbol.  See newCAF/newRetainedCAF/newGCdCAF for an example.
 #define SymI_HasProto_redirect(vvv,xxx,strength,ty) \
     { MAYBE_LEADING_UNDERSCORE_STR(#vvv),    \
-      (void*)(&(xxx)), strength, ty },
+      (void*)(&(xxx)), strength, ty, MAYBE_LEADING_UNDERSCORE_STR(#xxx) },
 
+// Allocate and return an array of rts symbols.
+// The final element marks the end of the array and has `.lbl=NULL`.
+// The caller must free the array.
+RtsSymbolVal const * getRtsSymbols(void) {
+      /* The address of data symbols with the dllimport attribute are not
+      * compile-time constants and so cannot be used in constant initialisers.
+      * For this reason, rtsSyms is a local variable within this function
+      * rather than a global constant (as it was historically).
+      */
+      const RtsSymbolVal _rtsSyms[] = {
+            RTS_SYMBOLS
+            RTS_RET_SYMBOLS
+            RTS_POSIX_ONLY_SYMBOLS
+            RTS_MINGW_ONLY_SYMBOLS
+            RTS_DARWIN_ONLY_SYMBOLS
+            RTS_OPENBSD_ONLY_SYMBOLS
+            RTS_LIBGCC_SYMBOLS
+            RTS_ARCH_LIBGCC_SYMBOLS
+            RTS_FINI_ARRAY_SYMBOLS
+            RTS_LIBFFI_SYMBOLS
+            RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
+            RTS_SYMBOLS_PRIM
+            SymI_HasDataProto(nonmoving_write_barrier_enabled)
+            { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE, NULL } /* sentinel */
+      };
 
+      RtsSymbolVal * rtsSyms = stgMallocBytes(sizeof(_rtsSyms), "getRtsSymbols");
+      memcpy(rtsSyms, _rtsSyms, sizeof(_rtsSyms));
 
-/* Initialize (if not already initialized) and return an array of symbols with stuff from the RTS. */
-void initLinkerRtsSyms (StrHashTable *symhash) {
-    /* The address of data symbols with the dllimport attribute are not
-     * compile-time constants and so cannot be used in constant initialisers.
-     * For this reason, rtsSyms is a local variable within this function
-     * rather than a global constant (as it was historically).
-     */
-    const RtsSymbolVal rtsSyms[] = {
-      RTS_SYMBOLS
-      RTS_RET_SYMBOLS
-      RTS_POSIX_ONLY_SYMBOLS
-      RTS_MINGW_ONLY_SYMBOLS
-      RTS_DARWIN_ONLY_SYMBOLS
-      RTS_OPENBSD_ONLY_SYMBOLS
-      RTS_LIBGCC_SYMBOLS
-      RTS_ARCH_LIBGCC_SYMBOLS
-      RTS_FINI_ARRAY_SYMBOLS
-      RTS_LIBFFI_SYMBOLS
-      RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
-      RTS_SYMBOLS_PRIM
-      SymI_HasDataProto(nonmoving_write_barrier_enabled)
-      { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE } /* sentinel */
-    };
-
-    IF_DEBUG(linker, debugBelch("populating linker symbol table with built-in RTS symbols\n"));
-    for (const RtsSymbolVal *sym = rtsSyms; sym->lbl != NULL; sym++) {
-        IF_DEBUG(linker, debugBelch("initLinker: inserting rts symbol %s, %p\n", sym->lbl, sym->addr));
-        if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"),
-                                    symhash, sym->lbl, sym->addr,
-                                    sym->strength, sym->type, 0, NULL)) {
-            barf("ghciInsertSymbolTable failed");
-        }
-    }
-    IF_DEBUG(linker, debugBelch("done with built-in RTS symbols\n"));
+      return rtsSyms;
 }
 
 
@@ -1363,7 +1360,7 @@ void initLinkerRtsSyms (StrHashTable *symhash) {
 //          CODE_SYM(getauxval)
 //          CODE_SYM(posix_spawn_file_actions_init)
 //          ...
-//          { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE } /* sentinel */
+//          { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE, NULL } /* sentinel */
 //      };
 //
 //      RtsSymbolVal* rtsExtraSyms() {
@@ -1376,7 +1373,7 @@ void initLinkerRtsSyms (StrHashTable *symhash) {
 //
 
 static RtsSymbolVal default_extra_syms[] = {
-      { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE } /* sentinel */
+      { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE, NULL } /* sentinel */
 };
 
 /* Default empty extra RTS symbols. See Note[Extra RTS symbols] */

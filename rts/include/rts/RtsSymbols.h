@@ -1,0 +1,47 @@
+/* -----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 2000-2015
+ *
+ * RTS Symbols
+ *
+ * ---------------------------------------------------------------------------*/
+
+#pragma once
+
+#include <stdbool.h>
+typedef void SymbolAddr;
+typedef char SymbolName;
+
+/* What kind of thing a symbol identifies. We need to know this to determine how
+ * to process overflowing relocations. See Note [Processing overflowed relocations].
+ * This is bitfield however only the option SYM_TYPE_DUP_DISCARD can be combined
+ * with the other values. */
+typedef enum _SymType {
+    SYM_TYPE_CODE = 1 << 0, /* the symbol is a function and can be relocated via a jump island */
+    SYM_TYPE_DATA = 1 << 1, /* the symbol is data */
+    SYM_TYPE_INDIRECT_DATA = 1 << 2, /* see Note [_iob_func symbol] */
+    SYM_TYPE_DUP_DISCARD = 1 << 3, /* the symbol is a symbol in a BFD import library
+                                      however if a duplicate is found with a mismatching
+                                      SymType then discard this one.  */
+    SYM_TYPE_HIDDEN = 1 << 4, /* the symbol is hidden and should not be exported */
+    SYM_TYPE_EXTERNAL = 1 << 5, /* the symbol is defined externally to the RTS library. It might be linked
+                                   dynamically. This corresponds to SymE_* in RtsSymbols.c */
+} SymType;
+
+typedef enum _SymStrength {
+    STRENGTH_NORMAL,
+    STRENGTH_WEAK,
+    STRENGTH_STRONG,
+} SymStrength;
+
+typedef struct _RtsSymbolVal {
+    const SymbolName* lbl;
+    SymbolAddr* addr;
+    SymStrength strength;
+    SymType type;
+    // If this is a redirection, then this is the lable of the
+    // target symbol. Otherwise NULL.
+    const SymbolName* lbl_redirect_target;
+} RtsSymbolVal;
+
+RtsSymbolVal const * getRtsSymbols(void);
