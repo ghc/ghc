@@ -40,6 +40,8 @@ module GHC.Unit.Env
     ( UnitEnv (..)
     , initUnitEnv
     , ueEPS -- Not really needed, get directly type families and rule base!
+    , ueEUD
+    , ueUI
     , updateHug
     -- * Unit Env helper functions
     , ue_currentHomeUnitEnv
@@ -110,6 +112,7 @@ import qualified Data.Set as Set
 
 import GHC.Unit.External
 import GHC.Unit.External.Database
+import GHC.Unit.External.Index
 import GHC.Unit.State
 import GHC.Unit.Home
 import GHC.Unit.Types
@@ -175,17 +178,30 @@ data UnitEnv = UnitEnv
     , ue_namever   :: !GhcNameVersion
         -- ^ GHC name/version (used for dynamic library suffix)
 
-    , ue_eud :: {-# UNPACK #-} !(ExternalUnitDatabaseCache UnitId)
-        -- ^ Global cache of already read package databases
+    , ue_uic :: {-# UNPACK #-} !UnitIndexCache
+        -- ^ Global index of already processed external units.
+        -- Shares state over all 'UnitState's in the 'HomeUnitGraph'.
+        --
+        -- Allows sharing of 'UnitInfo's, ensuring each individual 'UnitInfo'
+        -- is retained a constant number of times.
+        --
+        -- See Note [Sharing 'UnitInfo's across the 'UnitEnv'] for details.
     }
 
 ueEPS :: UnitEnv -> IO ExternalPackageState
 ueEPS = eucEPS . ue_eps
 
+ueEUD :: UnitEnv -> IO (ExternalUnitDatabases UnitId)
+ueEUD = readExternalUnitDatabases . ue_uic
+
+ueUI :: UnitEnv -> IO UnitIndex
+ueUI = readUnitIndex . ue_uic
+
+
 initUnitEnv :: UnitId -> HomeUnitGraph -> GhcNameVersion -> Platform -> IO UnitEnv
 initUnitEnv cur_unit hug namever platform = do
   eps <- initExternalUnitCache
-  eud <- initExternalUnitDatabaseCache
+  uic <- initUnitIndexCache
   return $ UnitEnv
     { ue_eps             = eps
     , ue_home_unit_graph = hug
@@ -193,7 +209,7 @@ initUnitEnv cur_unit hug namever platform = do
     , ue_current_unit    = cur_unit
     , ue_platform        = platform
     , ue_namever         = namever
-    , ue_eud             = eud
+    , ue_uic      = uic
     }
 
 updateHug :: (HomeUnitGraph -> HomeUnitGraph) -> UnitEnv -> UnitEnv
