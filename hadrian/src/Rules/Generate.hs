@@ -547,7 +547,7 @@ generateConfigHs = do
     -- See Note [GHC's Unit Id] in GHC.Unit.Types
     --
     -- It's crucial that the unit-id matches the unit-key -- ghc is no longer
-    -- part of the WiringMap, so we don't to go back and forth between the
+    -- part of the WireMap, so we don't to go back and forth between the
     -- unit-id and the unit-key -- we take care that they are the same by using
     -- 'pkgUnitId' on 'compiler' (the ghc-library package) to create the
     -- unit-id in both situations.

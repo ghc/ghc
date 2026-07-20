@@ -1330,7 +1330,7 @@ hscCheckSafe' m l = do
             Sf_Safe | not trust_own_pkg         -> True
             Sf_SafeInferred | not trust_own_pkg -> True
             _ | isHomeModule home_unit mod      -> True
-            _ -> unitIsTrusted $ unsafeLookupUnit unit_state (moduleUnit m)
+            _ -> isUnitTrusted unit_state (moduleUnit m)
 
     lookup' :: Module -> Hsc (Maybe ModIface)
     lookup' m = do
@@ -1352,7 +1352,7 @@ checkPkgTrust pkgs = do
         errors = S.foldr go emptyBag pkgs
         state  = hsc_units hsc_env
         go pkg acc
-            | unitIsTrusted $ unsafeLookupUnitId state pkg
+            | isUnitIdTrusted state pkg
             = acc
             | otherwise
             = (`consBag` acc)

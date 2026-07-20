@@ -968,6 +968,14 @@ Library
         GHC.Unit.Env
         GHC.Unit.External
         GHC.Unit.External.Database
+        GHC.Unit.External.Index
+        GHC.Unit.External.ModuleOrigin
+        GHC.Unit.External.Providers
+        GHC.Unit.External.Query
+        GHC.Unit.External.Substitution
+        GHC.Unit.External.Validate
+        GHC.Unit.External.Visibility
+        GHC.Unit.External.Wired
         GHC.Unit.Finder
         GHC.Unit.Finder.Types
         GHC.Unit.Home

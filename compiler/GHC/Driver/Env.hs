@@ -13,6 +13,7 @@ module GHC.Driver.Env
    , hsc_HUE
    , hsc_HUG
    , hsc_all_home_unit_ids
+   , hscUnitIndex
    , hscUpdateLoggerFlags
    , hscUpdateHUG
    , hscInsertHPT
@@ -25,7 +26,7 @@ module GHC.Driver.Env
    , runInteractiveHsc
    , hscEPS
    , hscEUD
-   , hscEUDC
+   , hscUIC
    , hscInterp
    , prepareAnnotations
    , discardIC
@@ -226,10 +227,13 @@ hscEPS :: HscEnv -> IO ExternalPackageState
 hscEPS hsc_env = readIORef (euc_eps (ue_eps (hsc_unit_env hsc_env)))
 
 hscEUD :: HscEnv -> IO (ExternalUnitDatabases UnitId)
-hscEUD = readExternalUnitDatabases . hscEUDC
+hscEUD = readExternalUnitDatabases . hscUIC
 
-hscEUDC :: HscEnv -> ExternalUnitDatabaseCache UnitId
-hscEUDC hsc_env = ue_eud (hsc_unit_env hsc_env)
+hscUnitIndex :: HscEnv -> IO UnitIndex
+hscUnitIndex hsc_env = ueUI (hsc_unit_env hsc_env)
+
+hscUIC :: HscEnv -> UnitIndexCache
+hscUIC hsc_env = ue_uic (hsc_unit_env hsc_env)
 
 --------------------------------------------------------------------------------
 -- * Queries on Transitive Closure

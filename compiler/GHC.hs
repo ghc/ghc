@@ -671,7 +671,7 @@ setUnitDynFlagsNoCheck uid dflags1 = do
   logger <- getLogger
   hsc_env <- getSession
 
-  (unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags1 (hscEUDC hsc_env) (hsc_all_home_unit_ids hsc_env)
+  (unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags1 (hscUIC hsc_env) (hsc_all_home_unit_ids hsc_env)
   updated_dflags <- liftIO $ updatePlatformConstants dflags1 mconstants
 
   let upd hue =
@@ -760,7 +760,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
               old_hpt = homeUnitEnv_hpt homeUnitEnv
               home_units = HUG.allUnits (ue_home_unit_graph old_unit_env)
 
-          (unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags (ue_eud old_unit_env) home_units
+          (unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags (ue_uic old_unit_env) home_units
 
           updated_dflags <- liftIO $ updatePlatformConstants dflags0 mconstants
           pure HomeUnitEnv
@@ -778,7 +778,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
               , ue_current_unit    = ue_currentUnit old_unit_env
               , ue_module_graph    = ue_module_graph old_unit_env
               , ue_eps             = ue_eps old_unit_env
-              , ue_eud             = ue_eud old_unit_env
+              , ue_uic      = ue_uic old_unit_env
               }
         modifySession $ \h -> hscSetFlags dflags1 h{ hsc_unit_env = unit_env }
     else modifySession (hscSetFlags dflags0)
@@ -836,7 +836,7 @@ setProgramHUG_ invalidate_needed new_hug0 = do
             , ue_current_unit    = ue_currentUnit unit_env0
             , ue_eps             = ue_eps unit_env0
             , ue_module_graph    = ue_module_graph unit_env0
-            , ue_eud             = ue_eud unit_env0
+            , ue_uic      = ue_uic unit_env0
             }
       modifySession $ \h ->
         -- hscSetFlags takes care of updating the logger as well.
@@ -884,7 +884,7 @@ setProgramHUG_ invalidate_needed new_hug0 = do
           old_hpt = homeUnitEnv_hpt homeUnitEnv
           home_units = HUG.allUnits (ue_home_unit_graph unit_env)
 
-      (unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags (ue_eud unit_env) home_units
+      (unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags (ue_uic unit_env) home_units
 
       updated_dflags <- liftIO $ updatePlatformConstants dflags mconstants
       pure HomeUnitEnv

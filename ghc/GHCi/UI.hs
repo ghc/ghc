@@ -855,8 +855,9 @@ installInteractiveHomeUnits dflags = do
     setupHomeUnitFor :: GHC.GhcMonad m => Logger -> DynFlags -> S.Set UnitId -> m HomeUnitEnv
     setupHomeUnitFor logger dflags all_home_units = do
       env <- GHC.getSession
+      let unit_index = hscUIC env
       (unit_state,home_unit,_mconstants) <-
-        liftIO $ initUnits logger dflags (hscEUDC env) all_home_units
+        liftIO $ initUnits logger dflags unit_index all_home_units
       hpt <- liftIO emptyHomePackageTable
       pure (HUG.mkHomeUnitEnv unit_state dflags hpt (Just home_unit))
 
@@ -2918,11 +2919,11 @@ isSafeModule m = do
 
     packageTrusted hsc_env md
         | isHomeModule (hsc_home_unit hsc_env) md = True
-        | otherwise = unitIsTrusted $ unsafeLookupUnit (hsc_units hsc_env) (moduleUnit md)
+        | otherwise = isUnitTrusted (hsc_units hsc_env) (moduleUnit md)
 
     tallyPkgs hsc_env deps | not (packageTrustOn dflags) = (S.empty, S.empty)
                           | otherwise = S.partition part deps
-        where part pkg   = unitIsTrusted $ unsafeLookupUnitId unit_state pkg
+        where part pkg   = isUnitIdTrusted unit_state pkg
               unit_state = hsc_units hsc_env
               dflags     = hsc_dflags hsc_env
 

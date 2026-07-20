@@ -127,8 +127,8 @@ Prefer `env_ut :: Char` and
 -- for fast ordering and equality tests. You should generate these with
 -- the functions from the 'UniqSupply' module
 --
--- These are sometimes also referred to as \"keys\" in comments in GHC.
 newtype Unique = MkUnique Word64
+-- These are sometimes also referred to as \"keys\" in comments in GHC.
 
 data UniqueTag
   = AlphaTyVarTag
