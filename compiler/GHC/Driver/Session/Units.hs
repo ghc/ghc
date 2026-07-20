@@ -129,16 +129,14 @@ initMulti unitArgsFiles lintDynFlagsAndSrcs = do
   let home_units = HUG.allUnits initial_home_graph
 
   home_unit_graph <- forM initial_home_graph $ \homeUnitEnv -> do
-    let cached_unit_dbs = homeUnitEnv_unit_dbs homeUnitEnv
-        hue_flags = homeUnitEnv_dflags homeUnitEnv
+    let hue_flags = homeUnitEnv_dflags homeUnitEnv
         dflags = homeUnitEnv_dflags homeUnitEnv
-    (dbs,unit_state,home_unit,mconstants) <- liftIO $ State.initUnits logger hue_flags cached_unit_dbs home_units
+    (unit_state,home_unit,mconstants) <- liftIO $ State.initUnits logger hue_flags (hscEUDC hsc_env) home_units
 
     updated_dflags <- liftIO $ updatePlatformConstants dflags mconstants
     emptyHpt <- liftIO $ emptyHomePackageTable
     pure $ HomeUnitEnv
       { homeUnitEnv_units = unit_state
-      , homeUnitEnv_unit_dbs = Just dbs
       , homeUnitEnv_dflags = updated_dflags
       , homeUnitEnv_hpt = emptyHpt
       , homeUnitEnv_home_unit = Just home_unit
@@ -239,7 +237,7 @@ createUnitEnvFromFlags unitDflags = do
   unitEnvList <- forM unitDflags $ \dflags -> do
     emptyHpt <- emptyHomePackageTable
     let newInternalUnitEnv =
-          HUG.mkHomeUnitEnv emptyUnitState Nothing dflags emptyHpt Nothing
+          HUG.mkHomeUnitEnv emptyUnitState dflags emptyHpt Nothing
     return (homeUnitId_ dflags, newInternalUnitEnv)
   let activeUnit = fst $ NE.head unitEnvList
   return (HUG.hugFromList (NE.toList unitEnvList), activeUnit)
