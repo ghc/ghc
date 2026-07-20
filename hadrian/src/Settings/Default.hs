@@ -20,7 +20,8 @@ import qualified Hadrian.Builder.Tar
 
 import CommandLine
 import Expression
-import Flavour.Type
+import Flavour
+--import Flavour.Type
 import Oracles.Flag
 import Oracles.Setting
 import Packages
@@ -286,7 +287,7 @@ defaultSourceArgs = SourceArgs
 -- | Default build flavour. Other build flavours are defined in modules
 -- @Settings.Flavours.*@. Users can add new build flavours in "UserSettings".
 defaultFlavour :: Flavour
-defaultFlavour = Flavour
+defaultFlavour = enableHugepages $ Flavour
     { name               = "default"
     , extraArgs          = defaultExtraArgs
     , packages           = defaultPackages
