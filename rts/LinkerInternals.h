@@ -9,7 +9,6 @@
 #pragma once
 
 #include "Rts.h"
-#include "RtsSymbols.h"
 #include "Hash.h"
 #include "linker/M32Alloc.h"
 #include "linker/ProddableBlocks.h"
