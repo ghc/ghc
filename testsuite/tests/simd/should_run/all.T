@@ -16,6 +16,12 @@ setTestOpts(
   , omit_ghci
   ])
 
+# These tests currently leave half of their output buffers uninitialised.  The
+# nonmoving ways expose this and produce very large diffs.
+omit_nonmoving_doublex2 = omit_ways(
+  ['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc',
+   'nonmoving_thr_sanity'])
+
 # The code generator may emit different instructions depending on
 # the architecture options (e.g. SSE2 vs SSE4.1 vs AVX).
 # Ideally, all ISA levels should be tested, but doing so would
@@ -33,7 +39,7 @@ test('word16x8_basic_baseline', [], compile_and_run, [''])
 test('word32x4_basic_baseline', [], compile_and_run, [''])
 test('word64x2_basic_baseline', [], compile_and_run, [''])
 test('floatx4_arith_baseline', [], compile_and_run, [''])
-test('doublex2_arith_baseline', [], compile_and_run, [''])
+test('doublex2_arith_baseline', [omit_nonmoving_doublex2], compile_and_run, [''])
 test('floatx4_shuffle_baseline', [], compile_and_run, [''])
 test('doublex2_shuffle_baseline', [], compile_and_run, [''])
 test('int8x16_arith_baseline', [], compile_and_run, [''])
@@ -126,15 +132,17 @@ test('word16x8_basic', [], compile_and_run, [''])
 test('word32x4_basic', [], compile_and_run, [''])
 test('word64x2_basic', [], compile_and_run, [''])
 test('floatx4_arith', [], compile_and_run, [''])
-test('doublex2_arith', [], compile_and_run, [''])
+test('doublex2_arith', [omit_nonmoving_doublex2], compile_and_run, [''])
 test('floatx4_shuffle', [], compile_and_run, [''])
 test('doublex2_shuffle', [], compile_and_run, [''])
 test('floatx4_fma', [ unless(have_cpu_feature('fma') or arch('aarch64'), skip)
                     , extra_hc_opts('-mfma')
                     ], compile_and_run, [''])
-test('doublex2_fma', [ unless(have_cpu_feature('fma') or arch('aarch64'), skip)
-                     , extra_hc_opts('-mfma')
-                     ], compile_and_run, [''])
+test('doublex2_fma',
+     [ unless(have_cpu_feature('fma') or arch('aarch64'), skip)
+     , extra_hc_opts('-mfma')
+     , omit_nonmoving_doublex2
+     ], compile_and_run, [''])
 test('int8x16_arith', [], compile_and_run, [''])
 test('int16x8_arith', [], compile_and_run, [''])
 test('int32x4_arith', [], compile_and_run, [''])
