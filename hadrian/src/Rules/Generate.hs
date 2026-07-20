@@ -567,7 +567,7 @@ generateSettings settingsFile includeLibDir rel_pkg_db compilerStage = do
     stage <- getStage
 
     -- The unit-id of the base package which is always linked against (#25382).
-    -- For stage2 cross compilers the target libraries live in the stage2 lib
+    -- For stage2 cross compilers the target libraries live in the stage3 lib
     -- dir, so the base unit-id must come from stage2; for native stage2 the
     -- libraries live in the stage1 lib dir.
     base_unit_id <- expr $ do
