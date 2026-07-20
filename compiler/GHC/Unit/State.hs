@@ -11,6 +11,7 @@ module GHC.Unit.State (
         UnitErr (..),
         emptyUnitState,
         initUnits,
+        readOrGetUnitDatabase,
         readUnitDatabases,
         readUnitDatabase,
         getUnitDbRefs,
@@ -118,6 +119,7 @@ import Data.Monoid (First(..))
 import qualified Data.Semigroup as Semigroup
 import qualified Data.Set as Set
 import Control.Applicative
+import GHC.Unit.External.Database
 
 -- ---------------------------------------------------------------------------
 -- The Unit state
@@ -342,7 +344,7 @@ data UnitConfig = UnitConfig
    , unitConfigHideAll        :: !Bool     -- ^ Hide all units by default
    , unitConfigHideAllPlugins :: !Bool     -- ^ Hide all plugins units by default
 
-   , unitConfigDBCache      :: Maybe [UnitDatabase UnitId]
+   , unitConfigDBCache      :: !(ExternalUnitDatabaseCache UnitId)
       -- ^ Cache of databases to use, in the order they were specified on the
       -- command line (later databases shadow earlier ones).
       -- If Nothing, databases will be found using `unitConfigFlagsDB`.
@@ -356,7 +358,7 @@ data UnitConfig = UnitConfig
    , unitConfigHomeUnits    :: Set.Set UnitId
    }
 
-initUnitConfig :: DynFlags -> Maybe [UnitDatabase UnitId] -> Set.Set UnitId -> UnitConfig
+initUnitConfig :: DynFlags -> ExternalUnitDatabaseCache UnitId -> Set.Set UnitId -> UnitConfig
 initUnitConfig dflags cached_dbs home_units =
    let !hu_id             = homeUnitId_ dflags
        !hu_instanceof     = homeUnitInstanceOf_ dflags
@@ -491,15 +493,6 @@ emptyUnitState = UnitState {
     allowVirtualUnits = False
     }
 
--- | Unit database
-data UnitDatabase unit = UnitDatabase
-   { unitDatabasePath  :: OsPath
-   , unitDatabaseUnits :: [GenUnitInfo unit]
-   }
-
-instance Outputable u => Outputable (UnitDatabase u) where
-  ppr (UnitDatabase fp _u) = text "DB:" <+> ppr fp
-
 type UnitInfoMap = UniqMap UnitId UnitInfo
 
 -- | Find the unit we know about with the given unit, if any
@@ -628,12 +621,12 @@ listUnitInfo state = nonDetEltsUniqMap (unitInfoMap state)
 -- 'initUnits' can be called again subsequently after updating the
 -- 'packageFlags' field of the 'DynFlags', and it will update the
 -- 'unitState' in 'DynFlags'.
-initUnits :: Logger -> DynFlags -> Maybe [UnitDatabase UnitId] -> Set.Set UnitId -> IO ([UnitDatabase UnitId], UnitState, HomeUnit, Maybe PlatformConstants)
+initUnits :: Logger -> DynFlags -> ExternalUnitDatabaseCache UnitId -> Set.Set UnitId -> IO (UnitState, HomeUnit, Maybe PlatformConstants)
 initUnits logger dflags cached_dbs home_units = do
 
-  let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
+  let forceUnitInfoMap state = unitInfoMap state `seq` ()
 
-  (unit_state,dbs) <- withTiming logger (text "initializing unit database")
+  unit_state <- withTiming logger (text "initializing unit database")
                    forceUnitInfoMap
                  $ mkUnitState logger (initUnitConfig dflags cached_dbs home_units)
 
@@ -663,7 +656,7 @@ initUnits logger dflags cached_dbs home_units = do
         Nothing   -> return Nothing
         Just info -> lookupPlatformConstants (fmap ST.unpack (unitIncludeDirs info))
 
-  return (dbs,unit_state,home_unit,mconstants)
+  return (unit_state,home_unit,mconstants)
 
 mkHomeUnit
     :: UnitState
@@ -700,7 +693,7 @@ readUnitDatabases :: Logger -> UnitConfig -> IO [UnitDatabase UnitId]
 readUnitDatabases logger cfg = do
   conf_refs <- getUnitDbRefs cfg
   confs     <- liftM catMaybes $ mapM (resolveUnitDatabase cfg) conf_refs
-  mapM (readUnitDatabase logger cfg) confs
+  mapM (readOrGetUnitDatabase logger cfg) confs
 
 
 getUnitDbRefs :: UnitConfig -> IO [PkgDbRef]
@@ -752,6 +745,18 @@ resolveUnitDatabase cfg UserPkgDb = runMaybeT $ do
   if exist then return (OsPath.unsafeEncodeUtf pkgconf) else mzero
 resolveUnitDatabase _ (PkgDbPath name) = return $ Just name
 
+-- | Get the cached 'UnitDatabase' or read the 'UnitDatabase' at the given location.
+readOrGetUnitDatabase :: Logger -> UnitConfig -> OsPath -> IO (UnitDatabase UnitId)
+readOrGetUnitDatabase logger cfg conf_file =
+  readExternalUnitDatabase (unitConfigDBCache cfg) conf_file >>= \ case
+    Nothing -> do
+      new_db <- readUnitDatabase logger cfg conf_file
+      cacheExternalUnitDatabase (unitConfigDBCache cfg) new_db
+      pure new_db
+    Just db ->
+      pure db
+
+-- | Read the 'UnitDatabase' at the given location.
 readUnitDatabase :: Logger -> UnitConfig -> OsPath -> IO (UnitDatabase UnitId)
 readUnitDatabase logger cfg conf_file = do
   isdir <- OsPath.doesDirectoryExist conf_file
@@ -782,7 +787,8 @@ readUnitDatabase logger cfg conf_file = do
       pkg_configs1 = map (mungeUnitInfo top_dir pkgroot . mapUnitInfo (\(UnitKey x) -> UnitId x) . mkUnitKeyInfo)
                          proto_pkg_configs
   --
-  return $ UnitDatabase conf_file' pkg_configs1
+  pkg_configs2 <- traverse evaluateUnitInfo pkg_configs1
+  return $ pkg_configs2 `seqList` UnitDatabase conf_file' pkg_configs2
   where
     readDirStyleUnitInfo :: OsPath -> IO [DbUnitInfo]
     readDirStyleUnitInfo conf_dir = do
@@ -864,6 +870,29 @@ mungeBytecodeLibFields pkg =
       unitLibraryBytecodeDirs = case unitLibraryBytecodeDirs pkg of
          [] -> unitLibraryDirs pkg
          ds -> ds
+    }
+
+evaluateUnitInfo :: UnitInfo -> IO UnitInfo
+evaluateUnitInfo ui = do
+  importDirs <- evaluate $ unitImportDirs ui
+  includeDirs <- evaluate $ unitIncludeDirs ui
+  libraryDirs <- evaluate $ unitLibraryDirs ui
+  libraryBytecodeDirs <- evaluate $ unitLibraryBytecodeDirs ui
+  extDepFrameworkDirs <- evaluate $ unitExtDepFrameworkDirs ui
+  haddockInterfaces <- evaluate $ unitHaddockInterfaces ui
+  haddockHTMLs <- evaluate $ unitHaddockHTMLs ui
+  libraryDynDirs <- evaluate $ unitLibraryDynDirs ui
+  libraryDirsStatic <- evaluate $ unitLibraryDirsStatic ui
+  evaluate ui
+    { unitImportDirs = importDirs
+    , unitIncludeDirs = includeDirs
+    , unitLibraryDirs = libraryDirs
+    , unitLibraryDynDirs = libraryDynDirs
+    , unitLibraryDirsStatic = libraryDirsStatic
+    , unitLibraryBytecodeDirs = libraryBytecodeDirs
+    , unitExtDepFrameworkDirs = extDepFrameworkDirs
+    , unitHaddockInterfaces = haddockInterfaces
+    , unitHaddockHTMLs = haddockHTMLs
     }
 
 -- -----------------------------------------------------------------------------
@@ -1469,7 +1498,7 @@ validateDatabase cfg pkg_map1 =
 mkUnitState
     :: Logger
     -> UnitConfig
-    -> IO (UnitState,[UnitDatabase UnitId])
+    -> IO UnitState
 mkUnitState logger cfg = do
 {-
    Plan.
@@ -1524,10 +1553,7 @@ mkUnitState logger cfg = do
           we build a mapping saying what every in scope module name points to.
 -}
 
-  -- if databases have not been provided, read the database flags
-  raw_dbs <- case unitConfigDBCache cfg of
-               Nothing  -> readUnitDatabases logger cfg
-               Just dbs -> return dbs
+  raw_dbs <- readUnitDatabases logger cfg
 
   -- distrust all units if the flag is set
   let distrust_all db = db { unitDatabaseUnits = distrustAllUnits (unitDatabaseUnits db) }
@@ -1715,7 +1741,7 @@ mkUnitState logger cfg = do
          , requirementContext           = req_ctx
          , allowVirtualUnits            = unitConfigAllowVirtual cfg
          }
-  return (state, raw_dbs)
+  return state
 
 selectHptFlag :: Set.Set UnitId -> PackageFlag -> Bool
 selectHptFlag home_units (ExposePackage _ (UnitIdArg uid) _) | toUnitId uid `Set.member` home_units = True
