@@ -1,0 +1,14 @@
+section: compiler
+synopsis: Use global ``UnitIndex`` to deduplicate ``UnitInfo``s over multiple home units
+issues: #27500 #26423
+mrs: !16115
+
+description: {
+    The ``UnitState`` used to be duplicated for all ``HomeUnitEnv``, not sharing any of the ``UnitInfo``s.
+    This can lead to excessive memory usage with multiple home units and large package databases.
+
+    Our solution to this problem is deduplicating ``UnitInfo``s globally across the whole ``UnitEnv``.
+    We store this information in the ``UnitIndex`` which contains data global to all ``UnitState``s.
+    All processed ``UnitInfo``s and the ``WiredMap`` are stored in there, and in the future, we might
+    move more fields from ``UnitState`` to ``UnitIndex``.
+}

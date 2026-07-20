@@ -578,7 +578,7 @@ had used @-ignore-package@).
 The affected packages are compiled with, e.g., @-this-unit-id base@, so that
 the symbols in the object files have the unversioned unit id in their name.
 
-Make sure you change 'GHC.Unit.State.findWiredInUnits' if you add an entry here.
+Make sure you change 'wiredInUnitIds' if you add an entry here.
 
 -}
 
@@ -655,7 +655,7 @@ be it either hadrian or cabal, knows exactly the unit-id it passed with -this-un
 
 Note that we also ensure the ghc's unit key matches its unit id, both when
 hadrian or cabal is building ghc. This way, we no longer need to add `ghc` to
-the WiringMap, and that's why 'wiredInUnitIds' no longer includes
+the WireMap, and that's why 'wiredInUnitIds' no longer includes
 'thisGhcUnitId'.
 -}
 
