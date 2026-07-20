@@ -40,27 +40,25 @@ Configuration files (e.g. configure script and default.host.target) differ in
 this case and keeping both targets separated also saves us some headache
 dealing with stale files.
 
-From now on, we use the placeholder <bindist-dir> for the directory containing
-the uncompressed bindist, regardless of the stage. While we refer to the
-concrete directory name in case there is a difference between stage2 and stage3
-compilers.
+This table introduces variables to simplify the following step descriptions:
+
+| compiler kind    | <bindist-dir>  | <executable-stage-dir> | <library-stage-dir> |
+|------------------|----------------|------------------------|---------------------|
+| native           | bindist        | stage1/                | stage1/             |
+| cross compiler   | bindist        | stage1/                | stage2/             |
+| cross-compiled   | bindist-stage3 | stage2/                | stage2/             |
 
 These are the steps to build a bindist:
 
-- make sure we have a complete compiler + haddock for the stage to bundle
-  (stage2 for regular compilers, stage2 executables + stage3 libs for
-  cross-compilers, stage3 for cross-compiled compilers)
+- make sure we have a complete compiler + libraries + haddock for the stage(s)
+- to bundle
 
 - copy the specific binaries which should be in the bindist to the
   bin folder and add the version suffix:
     <build root>/<executable-stage-dir>/bin/xxxx
   to
     <build root>/<bindist-dir>/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/[<target>-]xxxx-<VER>
-  where the optional <target>- prefix is the cross triple for cross-compilers and
-  <executable-stage-dir> is:
-    - stage1/ for regular bindists
-    - stage1/ for cross-compiler bindists
-    - stage2/ for cross-compiled compiler (stage3) bindists
+  where the optional <target>- prefix is the cross triple for cross-compilers.
 
 - create symlink (or bash) wrapper from unversioned to versioned executable:
     <build root>/<bindist-dir>/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/[<target>-]xxxx
@@ -71,23 +69,16 @@ These are the steps to build a bindist:
     <build root>/<library-stage-dir>/lib
   to
     <build root>/<bindist-dir>/ghc-<X>.<Y>.<Z>-<arch>-<os>/lib
-  where <library-stage-dir> is:
-    - stage1/ for regular bindists
-    - stage1/ for cross-compiler bindists
-    - stage2/ for cross-compiled compiler (stage3) bindists
 
 - copy the generated docs (user guide, haddocks, etc):
     <build root>/doc/
   to
     <build root>/<bindist-dir>/ghc-<X>.<Y>.<Z>-<arch>-<os>/doc/
 
-- use autoreconf to generate per-stage `configure` scripts from
-  aclocal.m4 and <executable-stage>/distrib/configure.ac, that we move to:
+- use autoreconf to generate a staged `configure` script in
+    <build root>/<executable-stage>/distrib
+  that we move to:
     <build root>/<bindist-dir>/ghc-<X>.<Y>.<Z>-<arch>-<os>/configure
-  where <executable-stage> is:
-    - stage1 for regular bindists
-    - stage1 for cross-compiler bindists
-    - stage2 for cross-compiled compiler (stage3) bindists
 
 - write a (fixed) Makefile capable of supporting 'make install' to:
     <build root>/<bindist-dir>/ghc-<X>.<Y>.<Z>-<arch>-<os>/Makefile
