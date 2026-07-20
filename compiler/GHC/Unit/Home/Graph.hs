@@ -128,16 +128,6 @@ data HomeUnitEnv = HomeUnitEnv
   { homeUnitEnv_units     :: !UnitState
       -- ^ External units
 
-  , homeUnitEnv_unit_dbs :: !(Maybe [UnitDatabase UnitId])
-      -- ^ Stack of unit databases for the target platform.
-      --
-      -- This field is populated with the result of `initUnits`.
-      --
-      -- 'Nothing' means the databases have never been read from disk.
-      --
-      -- Usually we don't reload the databases from disk if they are
-      -- cached, even if the database flags changed!
-
   , homeUnitEnv_dflags :: DynFlags
     -- ^ The dynamic flag settings
   , homeUnitEnv_hpt :: HomePackageTable
@@ -164,10 +154,9 @@ data HomeUnitEnv = HomeUnitEnv
     -- ^ Home-unit
   }
 
-mkHomeUnitEnv :: UnitState -> Maybe [UnitDatabase UnitId] -> DynFlags -> HomePackageTable -> Maybe HomeUnit -> HomeUnitEnv
-mkHomeUnitEnv us dbs dflags hpt home_unit = HomeUnitEnv
+mkHomeUnitEnv :: UnitState -> DynFlags -> HomePackageTable -> Maybe HomeUnit -> HomeUnitEnv
+mkHomeUnitEnv us dflags hpt home_unit = HomeUnitEnv
   { homeUnitEnv_units = us
-  , homeUnitEnv_unit_dbs = dbs
   , homeUnitEnv_dflags = dflags
   , homeUnitEnv_hpt = hpt
   , homeUnitEnv_home_unit = home_unit

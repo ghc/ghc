@@ -24,6 +24,8 @@ module GHC.Driver.Env
    , mkInteractiveHscEnv
    , runInteractiveHsc
    , hscEPS
+   , hscEUD
+   , hscEUDC
    , hscInterp
    , prepareAnnotations
    , discardIC
@@ -55,6 +57,8 @@ import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types (Interp)
 
 import GHC.Unit
+import GHC.Unit.External.Database
+import GHC.Unit.External.Index
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModDetails
@@ -220,6 +224,12 @@ configured via command-line flags (in `GHC.setTopSessionDynFlags`).
 -- | Retrieve the ExternalPackageState cache.
 hscEPS :: HscEnv -> IO ExternalPackageState
 hscEPS hsc_env = readIORef (euc_eps (ue_eps (hsc_unit_env hsc_env)))
+
+hscEUD :: HscEnv -> IO (ExternalUnitDatabases UnitId)
+hscEUD = readExternalUnitDatabases . hscEUDC
+
+hscEUDC :: HscEnv -> ExternalUnitDatabaseCache UnitId
+hscEUDC hsc_env = ue_eud (hsc_unit_env hsc_env)
 
 --------------------------------------------------------------------------------
 -- * Queries on Transitive Closure

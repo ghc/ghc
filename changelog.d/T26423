@@ -1,0 +1,15 @@
+section: compiler
+synopsis: Introduce ``ExternalUnitDatabases`` and ``ExternalUnitDatabaseCache`` to cache unit databases.
+issues: #26423
+mrs: !16115
+
+description: {
+    Cache the ``UnitDatabase`` in memory in ``ExternalUnitDatabases`` to avoid constantly reading
+    the same ``UnitDatabase`` from disk with multiple home units.
+
+    Allows to share the on-disk representation of ``UnitInfo`` across the whole ``UnitEnv``.
+    We cache a mutable version of ``ExternalUnitDatabases`` as ``ExternalUnitDatabaseCache``
+    in ``UnitEnv``.
+    This allows us more easily to change the ``packageDBFlags`` and reading new package databases
+    from disk if required, but cache everything that has been read from disk before.
+}
