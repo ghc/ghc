@@ -232,12 +232,14 @@ static void ghciRemoveSymbolTable(StrHashTable *table, const SymbolName* key,
 static const char *
 symbolTypeString (SymType type)
 {
-    switch (type & ~(SYM_TYPE_DUP_DISCARD | SYM_TYPE_HIDDEN)) {
-        case SYM_TYPE_CODE: return "code";
-        case SYM_TYPE_DATA: return "data";
-        case SYM_TYPE_INDIRECT_DATA: return "indirect-data";
-        default: barf("symbolTypeString: unknown symbol type (%d)", type);
-    }
+    if (type & SYM_TYPE_CODE)
+        return "code";
+    if (type & SYM_TYPE_DATA)
+        return "data";
+    if (type & SYM_TYPE_INDIRECT_DATA)
+        return "indirect-data";
+
+    barf("symbolTypeString: unknown symbol type (%d)", type);
 }
 
 /* -----------------------------------------------------------------------------
@@ -478,7 +480,18 @@ initLinker_ (int retain_cafs)
     symhash = allocStrHashTable();
 
     /* populate the symbol table with stuff from the RTS */
-    initLinkerRtsSyms(symhash);
+    const RtsSymbolVal * rtsSyms = getRtsSymbols();
+    IF_DEBUG(linker, debugBelch("populating linker symbol table with built-in RTS symbols\n"));
+    for (const RtsSymbolVal *sym = rtsSyms; sym->lbl != NULL; sym++) {
+        IF_DEBUG(linker, debugBelch("initLinker: inserting rts symbol %s, %p\n", sym->lbl, sym->addr));
+        if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"),
+                                    symhash, sym->lbl, sym->addr,
+                                    sym->strength, sym->type, 0, NULL)) {
+            barf("ghciInsertSymbolTable failed");
+        }
+    }
+    stgFree((void*)rtsSyms);
+    IF_DEBUG(linker, debugBelch("done with built-in RTS symbols\n"));
 
     /* Add extra symbols. rtsExtraSyms() is a weakly defined symbol in the rts,
      * that can be overrided by linking in an object with a corresponding

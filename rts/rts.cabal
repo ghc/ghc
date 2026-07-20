@@ -306,6 +306,7 @@ library
                         rts/Profiling.h
                         rts/IPE.h
                         rts/PosixSource.h
+                        rts/RtsSymbols.h
                         rts/Signals.h
                         rts/SpinLock.h
                         rts/StableName.h
