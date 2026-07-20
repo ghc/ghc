@@ -51,7 +51,7 @@ This table introduces variables to simplify the following step descriptions:
 These are the steps to build a bindist:
 
 - make sure we have a complete compiler + libraries + haddock for the stage(s)
-- to bundle
+  to bundle
 
 - copy the specific binaries which should be in the bindist to the
   bin folder and add the version suffix:
@@ -89,8 +89,7 @@ These are the steps to build a bindist:
   where <program> is the name of the executable that the bash file will
   help wrapping.
 
-- copy supporting configure/make related files
-  (see @bindistInstallFiles@) to:
+- copy supporting configure/make related files (see @bindistInstallFiles@) to:
     <build root>/<bindist-dir>/ghc-<X>.<Y>.<Z>-<arch>-<os>/<file>
 
 - create a .tar.xz archive of the directory:
