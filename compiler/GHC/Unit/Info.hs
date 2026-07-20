@@ -5,11 +5,15 @@ module GHC.Unit.Info
    ( GenericUnitInfo (..)
    , GenUnitInfo
    , UnitInfo
+   , UnitInfoMap
+   , mkUnitInfoMap
    , UnitKey (..)
    , UnitKeyInfo
    , mkUnitKeyInfo
    , mapUnitInfo
    , mkUnitPprInfo
+   , evaluateUnitInfoLists
+   , seqUnitInfoLists
 
    , mkUnit
 
@@ -53,6 +57,8 @@ import Data.Containers.ListUtils (nubOrd)
 import Data.Version
 import Data.Bifunctor
 import Data.List (isPrefixOf, stripPrefix)
+import GHC.Types.Unique.Map
+import Control.Exception (evaluate)
 
 
 -- | Information about an installed unit
@@ -72,6 +78,10 @@ type UnitKeyInfo = GenUnitInfo UnitKey
 -- | Information about an installed unit (units are identified by their internal
 -- UnitId)
 type UnitInfo    = GenUnitInfo UnitId
+
+-- | Information about multiple installed units (units are identified by their internal
+-- UnitId)
+type UnitInfoMap = UniqMap UnitId UnitInfo
 
 -- | Convert a DbUnitInfo (read from a package database) into `UnitKeyInfo`
 mkUnitKeyInfo :: DbUnitInfo -> UnitKeyInfo
@@ -250,3 +260,44 @@ unitHsLibs namever ways0 p = map (mkDynName . addSuffix . ST.unpack) (unitLibrar
 
         expandTag t | null t = ""
                     | otherwise = '_':t
+
+-- | Create a Map UnitId UnitInfo
+--
+-- For each instantiated unit, we add two map keys:
+--    * the real unit id
+--    * the virtual unit id made from its instantiation
+--
+-- We do the same thing for fully indefinite units (which are "instantiated"
+-- with module holes).
+--
+mkUnitInfoMap :: [UnitInfo] -> UnitInfoMap
+mkUnitInfoMap infos = foldl' add emptyUniqMap infos
+  where
+   mkVirt      p = virtualUnitId (mkInstantiatedUnit (unitInstanceOf p) (unitInstantiations p))
+   add pkg_map p
+      | not (null (unitInstantiations p))
+      = addToUniqMap (addToUniqMap pkg_map (mkVirt p) p)
+                     (unitId p) p
+      | otherwise
+      = addToUniqMap pkg_map (unitId p) p
+
+-- | Evaluate the lists in 'UnitInfo' to avoid retaining references to old 'UnitInfo's.
+evaluateUnitInfoLists :: UnitInfo -> IO UnitInfo
+evaluateUnitInfoLists ui = evaluate (ui `seqUnitInfoLists` ui)
+
+-- | Evaluate the lists in 'UnitInfo' to avoid retaining references to old 'UnitInfo's.
+-- This effectively ensures that all list elements in 'UnitInfo' are fully to whnf.
+seqUnitInfoLists :: UnitInfo -> b -> b
+seqUnitInfoLists ui b =
+  unitImportDirs ui `seqList`
+  unitIncludeDirs ui `seqList`
+  unitLibraryDirs ui `seqList`
+  unitLibraryBytecodeDirs ui `seqList`
+  unitExtDepFrameworkDirs ui `seq`
+  unitHaddockInterfaces ui `seq`
+  unitHaddockHTMLs ui `seqList`
+  unitLibraryDynDirs ui `seqList`
+  unitLibraryDirsStatic ui `seqList`
+  unitDepends ui `seqList`
+  unitExposedModules ui `seqList`
+  b
