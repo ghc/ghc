@@ -191,6 +191,15 @@ GHC.Types.Var
 GHC.Types.Var.Env
 GHC.Types.Var.Set
 GHC.Unit
+GHC.Unit.External.Database
+GHC.Unit.External.Index
+GHC.Unit.External.ModuleOrigin
+GHC.Unit.External.Providers
+GHC.Unit.External.Query
+GHC.Unit.External.Substitution
+GHC.Unit.External.Validate
+GHC.Unit.External.Visibility
+GHC.Unit.External.Wired
 GHC.Unit.Home
 GHC.Unit.Info
 GHC.Unit.Module
