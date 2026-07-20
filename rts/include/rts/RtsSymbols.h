@@ -38,3 +38,4 @@ typedef struct _RtsSymbolVal {
     SymType type;
 } RtsSymbolVal;
 
+RtsSymbolVal const * getRtsSymbols(void);
