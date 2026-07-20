@@ -271,6 +271,7 @@ void _warnFail(const char *filename, unsigned int linenum);
 #include "rts/StaticPtrTable.h"
 #include "rts/Libdw.h"
 #include "rts/LibdwPool.h"
+#include "rts/RtsSymbols.h"
 
 /* Misc stuff without a home */
 extern char **prog_argv; /* so we can get at these from Haskell */
