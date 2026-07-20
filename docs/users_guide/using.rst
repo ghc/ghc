@@ -414,12 +414,11 @@ The available mode flags are:
     exit.
 
 .. ghc-flag:: --show-iface ⟨file⟩
-    :shortdesc: display the contents of an interface file.
+    :shortdesc: display contents of an interface file.
     :type: mode
     :category: modes
 
-    Read the interface in ⟨file⟩ and dump it as text to ``stdout``. For
-    example ``ghc --show-iface M.hi``.
+    Read an interface file and dump relevent parts of it as text to ``stdout``.
 
 .. ghc-flag:: --supported-extensions
               --supported-languages
