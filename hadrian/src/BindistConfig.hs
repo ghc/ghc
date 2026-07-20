@@ -24,7 +24,7 @@ crossBindist = BindistConfig { library_stage = Stage2, executable_stage = Stage1
 targetBindist ::  BindistConfig
 targetBindist = BindistConfig { library_stage = Stage2, executable_stage = Stage2 }
 
--- | Parent folder under build root ("bindist" or "bindist-stage3")
+-- | Folder relative to build root ("bindist" or "bindist-stage3")
 bindistFolder :: BindistConfig ->  FilePath
 bindistFolder conf | executable_stage conf == Stage2 = "bindist-stage3"
 bindistFolder _conf = "bindist"
