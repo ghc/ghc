@@ -48,15 +48,15 @@ compilers.
 These are the steps to build a bindist:
 
 - make sure we have a complete compiler + haddock for the stage to bundle
-  (stage2 for regular compilers, stage2 + stage3 libs for cross-compilers,
-  stage3 for cross-compiled compilers)
+  (stage2 for regular compilers, stage2 executables + stage3 libs for
+  cross-compilers, stage3 for cross-compiled compilers)
 
 - copy the specific binaries which should be in the bindist to the
   bin folder and add the version suffix:
     <build root>/<executable-stage-dir>/bin/xxxx
   to
     <build root>/<bindist-dir>/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/[<target>-]xxxx-<VER>
-  where the optional <target>- prefix is the cross triple for cross~compilers and
+  where the optional <target>- prefix is the cross triple for cross-compilers and
   <executable-stage-dir> is:
     - stage1/ for regular bindists
     - stage1/ for cross-compiler bindists
@@ -87,7 +87,7 @@ These are the steps to build a bindist:
   where <executable-stage> is:
     - stage1 for regular bindists
     - stage1 for cross-compiler bindists
-    - stage2 from cross-compiled compiler (stage3) bindists
+    - stage2 for cross-compiled compiler (stage3) bindists
 
 - write a (fixed) Makefile capable of supporting 'make install' to:
     <build root>/<bindist-dir>/ghc-<X>.<Y>.<Z>-<arch>-<os>/Makefile
