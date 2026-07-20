@@ -8,7 +8,9 @@
 
 #include "ghcplatform.h"
 #include "Rts.h"
+#include "RtsUtils.h"
 #include "RtsSymbols.h"
+#include "RtsUtils.h"
 #include "LinkerInternals.h"
 #include "PathUtils.h"
 
@@ -480,6 +482,7 @@ extern char **environ;
       RTS_TICKY_SYMBOLS                                                 \
       RTS_PROF_SYMBOLS                                                  \
       RTS_LIBDW_SYMBOLS                                                 \
+      SymI_HasProto(getRtsSymbols)                                          \
       SymI_HasProto(StgReturn)                                          \
       SymI_HasDataProto(ghc_hs_iface)                                       \
       SymI_HasDataProto(stg_gc_noregs)                                      \
@@ -1236,42 +1239,46 @@ RTS_SYMBOLS_PRIM
     { MAYBE_LEADING_UNDERSCORE_STR(#vvv),    \
       (void*)(&(xxx)), strength, ty },
 
+static RtsSymbolVal * rtsSyms = NULL;
 
+// Initialize and return a pointer to an array of rts symbols.
+// The final element marks the end of the array and has `.lbl=NULL`.
+RtsSymbolVal const * getRtsSymbols(void) {
+      if (!rtsSyms) {
+            /* The address of data symbols with the dllimport attribute are not
+            * compile-time constants and so cannot be used in constant initialisers.
+            * For this reason, rtsSyms is a local variable within this function
+            * rather than a global constant (as it was historically).
+            */
+            const RtsSymbolVal _rtsSyms[] = {
+                  RTS_SYMBOLS
+                  RTS_RET_SYMBOLS
+                  RTS_POSIX_ONLY_SYMBOLS
+                  RTS_MINGW_ONLY_SYMBOLS
+                  RTS_DARWIN_ONLY_SYMBOLS
+                  RTS_OPENBSD_ONLY_SYMBOLS
+                  RTS_LIBGCC_SYMBOLS
+                  RTS_ARCH_LIBGCC_SYMBOLS
+                  RTS_FINI_ARRAY_SYMBOLS
+                  RTS_LIBFFI_SYMBOLS
+                  RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
+                  RTS_SYMBOLS_PRIM
+                  SymI_HasDataProto(nonmoving_write_barrier_enabled)
+                  { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE } /* sentinel */
+            };
 
-/* Initialize (if not already initialized) and return an array of symbols with stuff from the RTS. */
-void initLinkerRtsSyms (StrHashTable *symhash) {
-    /* The address of data symbols with the dllimport attribute are not
-     * compile-time constants and so cannot be used in constant initialisers.
-     * For this reason, rtsSyms is a local variable within this function
-     * rather than a global constant (as it was historically).
-     */
-    const RtsSymbolVal rtsSyms[] = {
-      RTS_SYMBOLS
-      RTS_RET_SYMBOLS
-      RTS_POSIX_ONLY_SYMBOLS
-      RTS_MINGW_ONLY_SYMBOLS
-      RTS_DARWIN_ONLY_SYMBOLS
-      RTS_OPENBSD_ONLY_SYMBOLS
-      RTS_LIBGCC_SYMBOLS
-      RTS_ARCH_LIBGCC_SYMBOLS
-      RTS_FINI_ARRAY_SYMBOLS
-      RTS_LIBFFI_SYMBOLS
-      RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
-      RTS_SYMBOLS_PRIM
-      SymI_HasDataProto(nonmoving_write_barrier_enabled)
-      { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE } /* sentinel */
-    };
+            uint32_t n = 1;
+            while (_rtsSyms[n].lbl != NULL) {
+                  n++;
+            }
 
-    IF_DEBUG(linker, debugBelch("populating linker symbol table with built-in RTS symbols\n"));
-    for (const RtsSymbolVal *sym = rtsSyms; sym->lbl != NULL; sym++) {
-        IF_DEBUG(linker, debugBelch("initLinker: inserting rts symbol %s, %p\n", sym->lbl, sym->addr));
-        if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"),
-                                    symhash, sym->lbl, sym->addr,
-                                    sym->strength, sym->type, 0, NULL)) {
-            barf("ghciInsertSymbolTable failed");
-        }
-    }
-    IF_DEBUG(linker, debugBelch("done with built-in RTS symbols\n"));
+            rtsSyms = stgMallocBytes(n * sizeof(RtsSymbolVal), "getRtsSymbols");
+            for (uint32_t i = 0; i < n; i++) {
+                  rtsSyms[i] = _rtsSyms[i];
+            }
+      }
+
+      return rtsSyms;
 }
 
 
