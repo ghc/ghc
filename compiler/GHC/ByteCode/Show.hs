@@ -470,7 +470,6 @@ pprActualHPCInfo ByteCodeHpcInfo {..}
                pprTickBoxName $ bchi_tickbox_name,
                pprTickCount   $ bchi_tick_count
            ]
-    where
 
 -- | Constructs textual information about the hash of HPC info.
 pprHPCInfoHash :: Int -> SDoc
