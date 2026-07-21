@@ -18,7 +18,7 @@ CLASS INSTANCES
   instance [incoherent] Representational a
     -- Defined at T8958.hs:11:10
 Dependent modules: []
-Dependent packages: [(normal, base-4.22.0.0)]
+Dependent packages: [(normal, base-4.23.0.0)]
 
 ==================== Typechecker ====================
 T8958.$tcMap [InlPrag=[~]]
@@ -50,10 +50,10 @@ T8958.$tc'C:Nominal [InlPrag=[~]]
       T8958.$trModule (GHC.Internal.Types.TrNameS "'C:Nominal"#) 1# $krep
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepVar 0
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepVar 1
-$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]]
   = GHC.Internal.Types.KindRepFun
       GHC.Internal.Types.krep$* GHC.Internal.Types.krep$Constraint
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]]
   = GHC.Internal.Types.KindRepTyConApp
       GHC.Internal.Tuple.$tcTuple2

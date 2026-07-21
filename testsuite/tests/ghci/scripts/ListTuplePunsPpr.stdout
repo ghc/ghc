@@ -1,13 +1,13 @@
 type Unit :: *
 data Unit = ()
   	-- Defined in ‘GHC.Internal.Tuple’
-instance Monoid Unit -- Defined in ‘GHC.Internal.Base’
-instance Semigroup Unit -- Defined in ‘GHC.Internal.Base’
-instance Bounded Unit -- Defined in ‘GHC.Internal.Enum’
-instance Read Unit -- Defined in ‘GHC.Internal.Read’
-instance Enum Unit -- Defined in ‘GHC.Internal.Enum’
 instance Eq Unit -- Defined in ‘GHC.Internal.Classes’
+instance Monoid Unit -- Defined in ‘GHC.Internal.Base’
 instance Ord Unit -- Defined in ‘GHC.Internal.Classes’
+instance Semigroup Unit -- Defined in ‘GHC.Internal.Base’
+instance Read Unit -- Defined in ‘GHC.Internal.Read’
+instance Bounded Unit -- Defined in ‘GHC.Internal.Enum’
+instance Enum Unit -- Defined in ‘GHC.Internal.Enum’
 instance Show Unit -- Defined in ‘GHC.Internal.Show’
 type Unit# :: GHC.Internal.Types.ZeroBitType
 data Unit# = (##)
@@ -15,23 +15,23 @@ data Unit# = (##)
 type Solo :: * -> *
 data Solo a = MkSolo a
   	-- Defined in ‘GHC.Internal.Tuple’
-instance Traversable Solo
-  -- Defined in ‘GHC.Internal.Data.Traversable’
 instance Applicative Solo -- Defined in ‘GHC.Internal.Base’
-instance Foldable Solo -- Defined in ‘GHC.Internal.Data.Foldable’
+instance Eq a => Eq (Solo a) -- Defined in ‘GHC.Internal.Classes’
 instance Functor Solo -- Defined in ‘GHC.Internal.Base’
 instance Monad Solo -- Defined in ‘GHC.Internal.Base’
+instance Monoid a => Monoid (Solo a)
+  -- Defined in ‘GHC.Internal.Base’
+instance Ord a => Ord (Solo a) -- Defined in ‘GHC.Internal.Classes’
+instance Semigroup a => Semigroup (Solo a)
+  -- Defined in ‘GHC.Internal.Base’
 instance Read a => Read (Solo a) -- Defined in ‘GHC.Internal.Read’
 instance Bounded a => Bounded (Solo a)
   -- Defined in ‘GHC.Internal.Enum’
 instance Enum a => Enum (Solo a) -- Defined in ‘GHC.Internal.Enum’
-instance Ord a => Ord (Solo a) -- Defined in ‘GHC.Internal.Classes’
 instance Show a => Show (Solo a) -- Defined in ‘GHC.Internal.Show’
-instance Eq a => Eq (Solo a) -- Defined in ‘GHC.Internal.Classes’
-instance Monoid a => Monoid (Solo a)
-  -- Defined in ‘GHC.Internal.Base’
-instance Semigroup a => Semigroup (Solo a)
-  -- Defined in ‘GHC.Internal.Base’
+instance Foldable Solo -- Defined in ‘GHC.Internal.Data.Foldable’
+instance Traversable Solo
+  -- Defined in ‘GHC.Internal.Data.Traversable’
 () :: Unit
 (##) :: Unit#
 (   ) :: Unit
@@ -39,29 +39,29 @@ instance Semigroup a => Semigroup (Solo a)
 type Tuple2 :: * -> * -> *
 data Tuple2 a b = (,) a b
   	-- Defined in ‘GHC.Internal.Tuple’
-instance Traversable (Tuple2 a)
-  -- Defined in ‘GHC.Internal.Data.Traversable’
 instance Monoid a => Applicative (Tuple2 a)
   -- Defined in ‘GHC.Internal.Base’
-instance Foldable (Tuple2 a)
-  -- Defined in ‘GHC.Internal.Data.Foldable’
+instance (Eq a, Eq b) => Eq (Tuple2 a b)
+  -- Defined in ‘GHC.Internal.Classes’
 instance Functor (Tuple2 a) -- Defined in ‘GHC.Internal.Base’
 instance Monoid a => Monad (Tuple2 a)
   -- Defined in ‘GHC.Internal.Base’
 instance (Monoid a, Monoid b) => Monoid (Tuple2 a b)
   -- Defined in ‘GHC.Internal.Base’
-instance (Semigroup a, Semigroup b) => Semigroup (Tuple2 a b)
-  -- Defined in ‘GHC.Internal.Base’
-instance (Bounded a, Bounded b) => Bounded (Tuple2 a b)
-  -- Defined in ‘GHC.Internal.Enum’
 instance (Ord a, Ord b) => Ord (Tuple2 a b)
   -- Defined in ‘GHC.Internal.Classes’
+instance (Semigroup a, Semigroup b) => Semigroup (Tuple2 a b)
+  -- Defined in ‘GHC.Internal.Base’
 instance (Read a, Read b) => Read (Tuple2 a b)
   -- Defined in ‘GHC.Internal.Read’
+instance (Bounded a, Bounded b) => Bounded (Tuple2 a b)
+  -- Defined in ‘GHC.Internal.Enum’
 instance (Show a, Show b) => Show (Tuple2 a b)
   -- Defined in ‘GHC.Internal.Show’
-instance (Eq a, Eq b) => Eq (Tuple2 a b)
-  -- Defined in ‘GHC.Internal.Classes’
+instance Foldable (Tuple2 a)
+  -- Defined in ‘GHC.Internal.Data.Foldable’
+instance Traversable (Tuple2 a)
+  -- Defined in ‘GHC.Internal.Data.Traversable’
 type Tuple2# :: *
                 -> *
                 -> TYPE

@@ -4,7 +4,7 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
   class C{2} :: * -> * -> Constraint
 Dependent modules: []
-Dependent packages: [(normal, base-4.22.0.0)]
+Dependent packages: [(normal, base-4.23.0.0)]
 
 ==================== Typechecker ====================
 Bug.$tcC [InlPrag=[~]]
@@ -15,13 +15,6 @@ Bug.$tc'C:C [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       302756782745842909#Word64 14248103394115774781#Word64 Bug.$trModule
       (GHC.Internal.Types.TrNameS "'C:C"#) 2# $krep
-$krep [InlPrag=[~]]
-  = GHC.Internal.Types.KindRepTyConApp
-      Bug.$tcC
-      ((:) @GHC.Internal.Types.KindRep
-         $krep
-         ((:) @GHC.Internal.Types.KindRep
-            $krep [] @GHC.Internal.Types.KindRep))
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepVar 0
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepVar 1
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
@@ -31,6 +24,13 @@ $krep [InlPrag=[~]]
 $krep [InlPrag=[~]]
   = GHC.Internal.Types.KindRepFun
       GHC.Internal.Types.krep$* GHC.Internal.Types.krep$Constraint
+$krep [InlPrag=[~]]
+  = GHC.Internal.Types.KindRepTyConApp
+      Bug.$tcC
+      ((:) @GHC.Internal.Types.KindRep
+         $krep
+         ((:) @GHC.Internal.Types.KindRep
+            $krep [] @GHC.Internal.Types.KindRep))
 Bug.$trModule [InlPrag=[~]]
   = GHC.Internal.Types.Module
       (GHC.Internal.Types.TrNameS "main"#)

@@ -21,7 +21,7 @@ TYPE SIGNATURES
   (>>) :: forall {m :: * -> *} {a} {b}. Monad m => m a -> m b -> m b
   (>>=) ::
     forall {m :: * -> *} {a} {b}. Monad m => m a -> (a -> m b) -> m b
-  (^) :: forall {b} {a}. (Integral b, Num a) => a -> b -> a
+  (^) :: forall {a} {b}. (Num a, Integral b) => a -> b -> a
   (^^) :: forall {a} {b}. (Fractional a, Integral b) => a -> b -> a
   abs :: forall {a}. Num a => a -> a
   acos :: forall {a}. Floating a => a -> a
@@ -236,4 +236,4 @@ TYPE SIGNATURES
     (a -> b -> c -> d) -> [a] -> [b] -> [c] -> [d]
   (||) :: Bool -> Bool -> Bool
 Dependent modules: []
-Dependent packages: [(normal, base-4.21.0.0)]
+Dependent packages: [(normal, base-4.23.0.0)]
