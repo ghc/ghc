@@ -1926,6 +1926,7 @@ static void normaliseRtsOpts (void)
     if (RtsFlags.MiscFlags.tickInterval == 0) {
         RtsFlags.ConcFlags.ctxtSwitchTime  = 0;
         RtsFlags.GcFlags.idleGCDelayTime   = 0;
+        RtsFlags.GcFlags.doIdleGC          = false;
         RtsFlags.ProfFlags.heapProfileInterval = 0;
     }
 
