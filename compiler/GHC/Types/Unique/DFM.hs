@@ -91,6 +91,11 @@ import qualified GHC.Data.Word64Set as W
 -- If the client of the map performs operations on the map in deterministic
 -- order then `udfmToList` returns them in deterministic order.
 --
+-- The order does not depend on how existing entries were
+-- updated. Updating an existing entry keeps it original position in the order
+-- This means `alterUDFM` consistent with `addToUDFM` and `adjustUDFM`,
+-- so that for example `alterUDFM id k = id` and `alterUDFM (fmap f) k = adjustUDFM f k`
+--
 -- There is an implementation cost: each element is given a serial number
 -- as it is added, and `udfmToList` sorts its result by this serial
 -- number. So you should only use `UniqDFM` if you need the deterministic
@@ -109,6 +114,14 @@ import qualified GHC.Data.Word64Set as W
 -- There's more than one way to implement this. The implementation here tags
 -- every value with the insertion time that can later be used to sort the
 -- values when asked to convert to a list.
+--
+-- Updating an existing key keeps the old tag. This keeps the order stable for
+-- maps whose entries are updated many times. The instance environments are
+-- the main example: inserting an instance updates the entry of its class in a
+-- DNameEnv, and when updates moved keys to the end the order of instances shown
+-- by :info depended on the order in which interfaces happened to be loaded
+-- (#27532). Now a class keeps its place once its first instance is added, so
+-- loading further interfaces cannot change the order.
 --
 -- An alternative would be to have
 --
@@ -169,11 +182,13 @@ emptyUDFM = UDFM M.empty 0
 unitUDFM :: Uniquable key => key -> elt -> UniqDFM key elt
 unitUDFM k v = UDFM (M.singleton (getKey $ getUnique k) (TaggedVal v 0)) 1
 
--- The new binding always goes to the right of existing ones
+-- A new key goes to the right of existing ones
+-- Overwriting an existing key keeps its position in the iteration order
 addToUDFM :: Uniquable key => UniqDFM key elt -> key -> elt  -> UniqDFM key elt
 addToUDFM m k v = addToUDFM_Directly m (getUnique k) v
 
--- The new binding always goes to the right of existing ones
+-- A new key goes to the right of existing ones
+-- Overwriting an existing key keeps its position in the iteration order
 addToUDFM_Directly :: UniqDFM key elt -> Unique -> elt -> UniqDFM key elt
 addToUDFM_Directly (UDFM m i) u v
   = UDFM (MS.insertWith tf (getKey u) (TaggedVal v i) m) (i + 1)
@@ -435,7 +450,8 @@ adjustUDFM_Directly f (UDFM m i) k = UDFM (M.adjust (fmap f) (getKey k) m) i
 -- | The expression (@'alterUDFM' f map k@) alters value x at k, or absence
 -- thereof. 'alterUDFM' can be used to insert, delete, or update a value in
 -- UniqDFM. Use addToUDFM, delFromUDFM or adjustUDFM when possible, they are
--- more efficient.
+-- more efficient. Updating an existing key keeps its position in the
+-- deterministic iteration order.
 --
 -- 'alterUDFM' is non-strict in @k@.
 alterUDFM
@@ -447,16 +463,16 @@ alterUDFM
 alterUDFM f (UDFM m i) k =
   UDFM (M.alter alterf (getKey $ getUnique k) m) (i + 1)
   where
-  alterf Nothing = inject $ f Nothing
-  alterf (Just (TaggedVal v _)) = inject $ f (Just v)
-  inject Nothing = Nothing
-  inject (Just v) = Just $ TaggedVal v i
+  alterf Nothing = inject i $ f Nothing
+  alterf (Just (TaggedVal v old_i)) = inject old_i $ f (Just v)
+  inject _ Nothing = Nothing
+  inject tag (Just v) = Just $ TaggedVal v tag
 
 -- | The expression (@'upsertUDFM' f map k@) updates the value at @k@ or inserts
 -- a new value if @k@ is absent.
 --
--- Like 'alterUDFM', updating an existing entry assigns it the current tag, so it
--- becomes the newest element in deterministic iteration order.
+-- Updating an existing entry keeps its original tag, so its position in
+-- deterministic iteration order is unchanged and does not depend on update order.
 upsertUDFM
   :: Uniquable key
   => (Maybe elt -> elt)  -- ^ How to adjust the element
@@ -467,13 +483,14 @@ upsertUDFM f (UDFM m i) k =
   UDFM (MS.upsert upsertf (getKey $ getUnique k) m) (i + 1)
   where
     upsertf Nothing = TaggedVal (f Nothing) i
-    upsertf (Just (TaggedVal v _)) = TaggedVal (f (Just v)) i
+    upsertf (Just (TaggedVal v old_i)) = TaggedVal (f (Just v)) old_i
 
 -- | The expression (@'alterUDFM_L' f map k@) alters value @x@ at @k@, or absence
 -- thereof and returns the new element at @k@ if there is any.
 -- 'alterUDFM_L' can be used to insert, delete, or update a value in
 -- UniqDFM. Use addToUDFM, delFromUDFM or adjustUDFM when possible, they are
--- more efficient.
+-- more efficient. Updating an existing key keeps its position in the
+-- deterministic iteration order.
 --
 -- Note, 'alterUDFM_L' is strict in @k@.
 alterUDFM_L
@@ -489,10 +506,10 @@ alterUDFM_L f (UDFM m i) k =
     (fmap taggedFst mElt, UDFM udfm (i + 1))
   where
   alterf :: Maybe (TaggedVal elt) -> (Maybe (TaggedVal elt))
-  alterf Nothing = inject $ f Nothing
-  alterf (Just (TaggedVal v _)) = inject $ f (Just v)
-  inject Nothing = Nothing
-  inject (Just v) = Just $ TaggedVal v i
+  alterf Nothing = inject i $ f Nothing
+  alterf (Just (TaggedVal v old_i)) = inject old_i $ f (Just v)
+  inject _ Nothing = Nothing
+  inject tag (Just v) = Just $ TaggedVal v tag
 
 -- | Map a function over every value in a UniqDFM
 mapUDFM :: (elt1 -> elt2) -> UniqDFM key elt1 -> UniqDFM key elt2
