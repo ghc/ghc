@@ -943,6 +943,7 @@ parts that you are not interested in.
 .. ghc-flag:: -dsuppress-guidance
     :shortdesc: Suppress details of unfolding guidance.
     :type: dynamic
+
     :since: 10.2
 
     Unfolding guidance describes how the structure of an argument impacts inlining
