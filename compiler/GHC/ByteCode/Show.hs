@@ -110,36 +110,36 @@ pprOnDiskModuleByteCodeHash = entry (text "hash") . ppr
 pprCompiledByteCode :: Module           -- ^ The enclosing module
                     -> CompiledByteCode -- ^ The bytecode
                     -> SDoc             -- ^ The textual information
-pprCompiledByteCode currentModule CompiledByteCode {..}
+pprCompiledByteCode current_module CompiledByteCode {..}
     = vcat [
-               pprByteCodeObjects currentModule $ bc_bcos,
-               pprDataConstructorInfoTables     $ bc_itbls,
-               pprTopLevelStrings               $ bc_strs,
-               pprBreakpoints currentModule     $ bc_breaks,
-               pprStaticPointerTableEntries     $ bc_spt_entries,
-               pprHPCInfo                       $ bc_hpc_info
+               pprByteCodeObjects current_module $ bc_bcos,
+               pprDataConstructorInfoTables      $ bc_itbls,
+               pprTopLevelStrings                $ bc_strs,
+               pprBreakpoints current_module     $ bc_breaks,
+               pprStaticPointerTableEntries      $ bc_spt_entries,
+               pprHPCInfo                        $ bc_hpc_info
            ]
 
 -- | Constructs textual information about bytecode objects.
 pprByteCodeObjects :: Module              -- ^ The enlosing module
                    -> FlatBag UnlinkedBCO -- ^ The bytecode objects
                    -> SDoc                -- ^ The textual information
-pprByteCodeObjects currentModule = entry (text "objects")                .
-                                   vcatOrNone                            .
-                                   map (pprByteCodeObject currentModule) .
-                                   elemsFlatBag
+pprByteCodeObjects current_module = entry (text "objects")                 .
+                                    vcatOrNone                             .
+                                    map (pprByteCodeObject current_module) .
+                                    elemsFlatBag
 
 -- | Constructs textual information about a single bytecode object.
 pprByteCodeObject :: Module      -- ^ The enclosing module
                   -> UnlinkedBCO -- ^ The bytecode object
                   -> SDoc        -- ^ The textual information
-pprByteCodeObject currentModule byteCodeObject = case byteCodeObject of
+pprByteCodeObject current_module byte_code_object = case byte_code_object of
     UnlinkedBCO {..}
         -> entry (text "ordinary object" <+> quotes (ppr unlinkedBCOName)) $
            vcat [
-                    pprArity                  $ unlinkedBCOArity,
-                    pprLiterals currentModule $ unlinkedBCOLits,
-                    pprPointers currentModule $ unlinkedBCOPtrs
+                    pprArity                   $ unlinkedBCOArity,
+                    pprLiterals current_module $ unlinkedBCOLits,
+                    pprPointers current_module $ unlinkedBCOPtrs
                 ]
     UnlinkedStaticCon {..}
         -> entry (
@@ -148,11 +148,15 @@ pprByteCodeObject currentModule byteCodeObject = case byteCodeObject of
                  )
            $
            vcat [
-                    pprDataConstructorName    $ unlinkedStaticConDataConName,
-                    pprLiftedness             $ not unlinkedStaticConIsUnlifted,
-                    pprLiterals currentModule $ unlinkedStaticConLits,
-                    pprPointers currentModule $ unlinkedStaticConPtrs
+                    pprDataConstructorName     $ unlinkedStaticConDataConName,
+                    pprLiftedness              $ isLifted,
+                    pprLiterals current_module $ unlinkedStaticConLits,
+                    pprPointers current_module $ unlinkedStaticConPtrs
                 ]
+        where
+
+        isLifted :: Bool
+        isLifted = not unlinkedStaticConIsUnlifted
 
 -- | Constructs textual information about the arity of an ordinary bytecode
 --   object.
@@ -173,16 +177,16 @@ pprLiftedness = entry (text "lifted") . noOrYes
 pprLiterals :: Module          -- ^ The enclosing module
             -> FlatBag BCONPtr -- ^ The literals
             -> SDoc            -- ^ The textual information
-pprLiterals currentModule = entry (text "literals")        .
-                            vcatOrNone                     .
-                            map (pprLiteral currentModule) .
-                            elemsFlatBag
+pprLiterals current_module = entry (text "literals")         .
+                             vcatOrNone                      .
+                             map (pprLiteral current_module) .
+                             elemsFlatBag
 
 -- | Constructs textual information about a single literal.
 pprLiteral :: Module  -- ^ The enclosing module
            -> BCONPtr -- ^ The literal
            -> SDoc    -- ^ The textual information
-pprLiteral currentModule literal = case literal of
+pprLiteral current_module literal = case literal of
     BCONPtrWord word
         -> text "word" <+>
            ppr word
@@ -195,9 +199,9 @@ pprLiteral currentModule literal = case literal of
     BCONPtrAddr addrName
         -> text "address" <+>
            quotes (ppr addrName)
-    BCONPtrStr encodedString
+    BCONPtrStr encoded_string
         -> text "top-level string" <+>
-           text (show (utf8DecodeByteString encodedString))
+           text (show (utf8DecodeByteString encoded_string))
     BCONPtrFS string
         -> text "top-level string" <+>
            text (show (unpackFS string))
@@ -206,7 +210,7 @@ pprLiteral currentModule literal = case literal of
            quotes (pprFFIInfo ffiInfo)
     BCONPtrCostCentre breakpointID
         -> text "cost center of breakpoint" <+>
-           pprInternalBreakpointID currentModule breakpointID
+           pprInternalBreakpointID current_module breakpointID
 
 -- | Constructs textual information about FFI info.
 pprFFIInfo :: FFIInfo -> SDoc
@@ -216,21 +220,21 @@ pprFFIInfo FFIInfo {..}
 
 -- | Constructs textual information about an FFI type.
 pprFFIType :: FFIType -> SDoc
-pprFFIType ffiType = assert (take 3 ident == "FFI") $ text (drop 3 ident) where
+pprFFIType ffi_type = assert (take 3 ident == "FFI") $ text (drop 3 ident) where
 
     ident :: String
-    ident = show ffiType
+    ident = show ffi_type
 
 -- | Constructs textual information about the ID of a bytecode breakpoint.
 pprInternalBreakpointID
     :: Module               -- ^ The enclosing module
     -> InternalBreakpointId -- ^ The ID of the bytecode breakpoint
     -> SDoc                 -- ^ The textual information
-pprInternalBreakpointID currentModule InternalBreakpointId {..}
-    | ibi_info_mod == currentModule = indexDoc
-    | otherwise                     = indexDoc         <+>
-                                      text "in"        <+>
-                                      ppr ibi_info_mod
+pprInternalBreakpointID current_module InternalBreakpointId {..}
+    | ibi_info_mod == current_module = indexDoc
+    | otherwise                      = indexDoc         <+>
+                                       text "in"        <+>
+                                       ppr ibi_info_mod
     where
 
     indexDoc :: SDoc
@@ -240,22 +244,22 @@ pprInternalBreakpointID currentModule InternalBreakpointId {..}
 pprPointers :: Module         -- ^ The enclosing module
             -> FlatBag BCOPtr -- ^ The pointers
             -> SDoc           -- ^ The textual information
-pprPointers currentModule = entry (text "utilized items")  .
-                            vcatOrNone                     .
-                            map (pprPointer currentModule) .
-                            elemsFlatBag
+pprPointers current_module = entry (text "utilized items")   .
+                             vcatOrNone                      .
+                             map (pprPointer current_module) .
+                             elemsFlatBag
 
 -- | Constructs textual information about a single pointer.
 pprPointer :: Module -- ^ The enclosing module
            -> BCOPtr -- ^ The pointer
            -> SDoc   -- ^ The textual information
-pprPointer currentModule pointer = case pointer of
+pprPointer current_module pointer = case pointer of
     BCOPtrName name
         -> text "item named" <+> quotes (ppr name)
     BCOPtrPrimOp primOp
         -> text "primitive operation" <+> quotes (ppr primOp)
-    BCOPtrBCO byteCodeObject
-        -> pprByteCodeObject currentModule byteCodeObject
+    BCOPtrBCO byte_code_object
+        -> pprByteCodeObject current_module byte_code_object
     BCOPtrBreakArray breakArrayModule
         -> text "break array of module" <+> quotes (ppr breakArrayModule)
 
@@ -290,37 +294,37 @@ pprTopLevelStrings = entry (text "top-level strings") .
 
 -- | Constructs textual information about a single top-level string.
 pprTopLevelString :: Name -> ByteString -> SDoc
-pprTopLevelString stringName encodedString = entry (ppr stringName) $
-                                             text                   $
-                                             show                   $
-                                             utf8DecodeByteString   $
-                                             encodedString
+pprTopLevelString string_name encoded_string = entry (ppr string_name) $
+                                               text                    $
+                                               show                    $
+                                               utf8DecodeByteString    $
+                                               encoded_string
 
 -- | Constructs textual information about breakpoints.
 pprBreakpoints :: Module                  -- ^ The enclosing module
                -> Maybe InternalModBreaks -- ^ The breakpoints
                -> SDoc                    -- ^ The textual information
-pprBreakpoints currentModule
+pprBreakpoints current_module
     = entry (text "breakpoints") .
-      maybe (text "<none>") (pprActualBreakpoints currentModule)
+      maybe (text "<none>") (pprActualBreakpoints current_module)
 
 -- | Constructs textual information about actual breakpoints.
 pprActualBreakpoints :: Module            -- ^ The enclosing module
                      -> InternalModBreaks -- ^ The actual breakpoints
                      -> SDoc              -- ^ The textual information
-pprActualBreakpoints currentModule InternalModBreaks {..}
+pprActualBreakpoints current_module InternalModBreaks {..}
     = vcat [
-               pprSourceBreakpoints currentModule   $ imodBreaks_modBreaks,
-               pprByteCodeBreakpoints currentModule $ imodBreaks_breakInfo
+               pprSourceBreakpoints current_module   $ imodBreaks_modBreaks,
+               pprByteCodeBreakpoints current_module $ imodBreaks_breakInfo
            ]
 
 -- | Constructs textual information about source breakpoints.
 pprSourceBreakpoints :: Module    -- ^ The enclosing module
                      -> ModBreaks -- ^ The source breakpoints
                      -> SDoc      -- ^ The textual information
-pprSourceBreakpoints currentModule ModBreaks {..}
+pprSourceBreakpoints current_module ModBreaks {..}
     = entry (text "source breakpoints")                         $
-      assert (modBreaks_module == currentModule)                $
+      assert (modBreaks_module == current_module)               $
       assert (bounds modBreaks_locs_ == bounds modBreaks_decls) $
       assert (bounds modBreaks_locs_ == bounds modBreaks_vars)  $
       vcatOrNone                                                $
@@ -363,10 +367,10 @@ pprFreeVariables = entry (text "free variables") . vcatOrNone . map ppr
 pprByteCodeBreakpoints :: Module             -- ^ The enclosing module
                        -> IntMap CgBreakInfo -- ^ The bytecode breakpoints
                        -> SDoc               -- ^ The textual information
-pprByteCodeBreakpoints currentModule
-    = entry (text "bytecode breakpoints")                 .
-      vcatOrNone                                          .
-      map (uncurry (pprByteCodeBreakpoint currentModule)) .
+pprByteCodeBreakpoints current_module
+    = entry (text "bytecode breakpoints")                  .
+      vcatOrNone                                           .
+      map (uncurry (pprByteCodeBreakpoint current_module)) .
       IntMap.toList
 
 -- | Constructs textual information about a single bytecode breakpoint.
@@ -374,13 +378,13 @@ pprByteCodeBreakpoint :: Module      -- ^ The enclosing module
                       -> Int         -- ^ The index of the bytecode breakpoint
                       -> CgBreakInfo -- ^ The bytecode breakpoint
                       -> SDoc        -- ^ The textual information
-pprByteCodeBreakpoint currentModule ix CgBreakInfo {..}
+pprByteCodeBreakpoint current_module ix CgBreakInfo {..}
     = entry (text "bytecode breakpoint" <+> ppr ix) $
       vcat [
-               pprType                                        $ cgb_resty,
-               pprTypeVariables                               $ cgb_tyvars,
-               pprVariables                                   $ cgb_vars,
-               pprCorrespondingSourceBreakpoint currentModule $ cgb_tick_id
+               pprType                                         $ cgb_resty,
+               pprTypeVariables                                $ cgb_tyvars,
+               pprVariables                                    $ cgb_vars,
+               pprCorrespondingSourceBreakpoint current_module $ cgb_tick_id
            ]
     -- That the 'cgb_resty' field holds the type of the breakpoint is apparent
     -- from the fact that this field is set by
@@ -426,20 +430,20 @@ pprCorrespondingSourceBreakpoint :: Module
                                     -- ^ A reference to the source breakpoint
                                  -> SDoc
                                     -- ^ The textual information
-pprCorrespondingSourceBreakpoint currentModule
+pprCorrespondingSourceBreakpoint current_module
     = entry (text "corresponding source breakpoint") .
-      pprBreakpointID currentModule                  .
+      pprBreakpointID current_module                 .
       either internalBreakLoc id
 
 -- | Constructs textual information about the ID of a source breakpoint.
 pprBreakpointID :: Module       -- ^ The enclosing module
                 -> BreakpointId -- ^ The ID of the source breakpoint
                 -> SDoc         -- ^ The textual information
-pprBreakpointID currentModule BreakpointId {..}
-    | bi_tick_mod == currentModule = indexDoc
-    | otherwise                    = indexDoc                 <+>
-                                     text "in"                <+>
-                                     quotes (ppr bi_tick_mod)
+pprBreakpointID current_module BreakpointId {..}
+    | bi_tick_mod == current_module = indexDoc
+    | otherwise                     = indexDoc                 <+>
+                                      text "in"                <+>
+                                      quotes (ppr bi_tick_mod)
     where
 
     indexDoc :: SDoc
