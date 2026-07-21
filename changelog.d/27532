@@ -1,0 +1,9 @@
+section: compiler
+synopsis: Make instance ordering in :info output stable
+description:
+  Updating an existing key in a UniqDFM no longer moves it to the end of the
+  iteration order. Previously the order of instances printed by :info depended
+  on the order in which interfaces were loaded, so it could change after
+  unrelated imports and differ between compiler builds.
+mrs: !16385
+issues: #27532

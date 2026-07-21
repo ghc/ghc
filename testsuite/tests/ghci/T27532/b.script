@@ -1,0 +1,3 @@
+import Data.Ratio
+_ <- return $! compare (1 % 2 :: Rational) (2 % 3)
+:info ()
