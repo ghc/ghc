@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Generate modules that each import and use a distinct instance-heavy module,
+# so a parallel :load races many interface loads against each other.
+gen() { f=$1; shift; printf '%s\n' "module ${f%.hs} where" "$@" > "$f"; }
+gen M01.hs "import Data.Ratio" "v :: Rational" "v = 1 % 2" "s = show v"
+gen M02.hs "import Data.Complex" "v :: Complex Double" "v = 1" "s = show v"
+gen M03.hs "import Data.Fixed" "v :: Fixed E2" "v = 1" "s = show v"
+gen M04.hs "import Foreign.C.Types" "v :: CInt" "v = 1" "s = show v" "b :: CInt" "b = maxBound"
+gen M05.hs "import System.Posix.Types" "v :: CPid" "v = 1" "s = show v"
+gen M06.hs "import Data.Version" "s = showVersion (makeVersion [1,2])"
+gen M07.hs "import Control.Exception" "s = show DivideByZero" "t = show StackOverflow"
+gen M08.hs "import Data.Dynamic" "s = show (toDyn ())"
+gen M09.hs "import Type.Reflection" "s = show (typeRep :: TypeRep Bool)"
+gen M10.hs "import Data.List.NonEmpty (NonEmpty(..))" "s = show (1 :| ([2,3] :: [Int]))"
+gen M11.hs "import Data.Ord" "s = show (Down (3 :: Int))" "c = compare (Down 1) (Down (2 :: Int))"
+gen M12.hs "import Data.Functor.Identity" "s = show (Identity (1 :: Int))"
+gen M13.hs "import Data.Functor.Const" "s = show (Const (1 :: Int) :: Const Int Bool)"
+gen M14.hs "import Data.Functor.Compose" "s = show (Compose (Just (Just (1 :: Int))))"
+gen M15.hs "import Data.Functor.Product" "s = show (Pair (Just (1 :: Int)) (Just (2 :: Int)))"
+gen M16.hs "import Data.Functor.Sum" "s = show (InL (Just (1 :: Int)) :: Sum Maybe Maybe Int)"
+gen M17.hs "import Data.Monoid" "s = show (Sum (1 :: Int) <> Sum 2)" "a = show (All True)"
+gen M18.hs "import Data.Semigroup" "s = show (Min (1 :: Int) <> Min 2)"
+gen M19.hs "import Text.Printf" "s = printf \"%d\" (1 :: Int) :: String"
+gen M20.hs "import Numeric.Natural" "s = show (5 :: Natural)" "v :: Natural" "v = 2 + 3"
+gen M21.hs "import Foreign.Ptr" "s = show nullPtr"
+gen M22.hs "import System.IO" "s = show stdout" "e = show stderr"
+gen M23.hs "import Data.IORef" "v :: IO (IORef Int)" "v = newIORef 1"
+gen M24.hs "import Data.Bits" "v = xor (1 :: Int) 2" "s = show v"
+for f in M??.hs; do
+  n=${f#M}; n=${n%.hs}
+  m=$(printf 'M%02d' $((10#$n + 24)))
+  sed "s/module M$n/module $m/" "$f" > "$m.hs"
+done
