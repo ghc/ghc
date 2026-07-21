@@ -759,3 +759,11 @@ test('T27618',
 
 
 test('T28012', normal, compile_and_run, [''])
+
+test('T27526',
+     [req_profiling,
+      only_ways(['profasm', 'profthreaded']),
+      when(wordsize(32), skip),
+      extra_hc_opts('-fno-prof-auto -fprof-late -rtsopts'),
+      extra_run_opts('+RTS -kc2k -kb256 -A64k -AL8k -RTS')],
+     compile_and_run, [''])
