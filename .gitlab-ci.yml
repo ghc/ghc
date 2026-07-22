@@ -134,6 +134,10 @@ workflow:
   stage: tool-lint
   tags:
     - lint
+  before_script:
+    # Allow Git to read from the runner-owned checkout. This is needed
+    # for example by the lint-author job.
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
   rules:
     - *drafts-can-fail-lint
     - when: always
@@ -251,29 +255,16 @@ ghc-linters:
 lint-changelog:
   stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
-  extends: .lint-params
+  extends: .lint
   variables:
-    BUILD_FLAVOUR: default
     CHANGELOG_EXPECT_MR: "$CI_MERGE_REQUEST_IID"
+    GIT_DEPTH: 1
+    GIT_SUBMODULE_STRATEGY: none
+  before_script:
+    - export PATH="/opt/toolchain/bin:$PATH"
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
   script:
-    # Cancel the job if there is a no-changelog label
-    - |
-      [[ ",${CI_MERGE_REQUEST_LABELS}," == *",no-changelog,"* ]] && exit 0
-    # Check that the MR adds at least one changelog entry
-    - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
-    - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
-    - added=$(git diff --name-only --diff-filter=A "$base..$CI_COMMIT_SHA" -- 'changelog.d/' | grep -v '^changelog.d/config$' || true)
-    - |
-      if [ -z "$added" ]; then
-        echo "ERROR: No changelog entry found in changelog.d/"
-        echo "Please add a changelog entry file describing your user-facing changes."
-        echo "If this MR does not need a changelog entry, apply the 'no-changelog' label."
-        exit 1
-      fi
-    - echo "Found changelog entries:" $added
-    # Build changelog-d and validate all entries (checks required fields, section names, MR number)
-    - .gitlab/ci.sh configure
-    - .gitlab/ci.sh run_hadrian test --test-root-dirs="testsuite/tests/linters" --only=changelog-d
+    - .gitlab/ci.sh lint_changelog
   dependencies: []
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
@@ -285,6 +276,9 @@ lint-changelog:
 lint-linters:
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   extends: .lint
+  variables:
+    GIT_DEPTH: 1
+    GIT_SUBMODULE_STRATEGY: none
   script:
     - mypy testsuite/tests/linters/regex-linters/*.py
   dependencies: []
@@ -293,6 +287,9 @@ lint-linters:
 lint-testsuite:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   extends: .lint
+  variables:
+    GIT_DEPTH: 1
+    GIT_SUBMODULE_STRATEGY: none
   script:
     - make -Ctestsuite list_broken TEST_HC=$GHC
   dependencies: []
@@ -301,6 +298,9 @@ lint-testsuite:
 typecheck-testsuite:
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   extends: .lint
+  variables:
+    GIT_DEPTH: 1
+    GIT_SUBMODULE_STRATEGY: none
   script:
     - mypy testsuite/driver/runtests.py
   dependencies: []
@@ -323,14 +323,13 @@ typecheck-testsuite:
     - _build/stageBoot/bin/lint-submodule-refs . $(git rev-list $base..$CI_COMMIT_SHA)
   dependencies: []
 
-# We allow the submodule checker to fail when run on merge requests (to
-# accommodate, e.g., haddock changes not yet upstream) but not on `master` or
-# Marge jobs.
+# Check that commits in an MR were not authored with the identity that CI uses
+# when it needs to create commits itself. This only needs Git history.
 lint-author:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
-  extends: .lint-params
+  extends: .lint
   variables:
-    BUILD_FLAVOUR: default
+    GIT_SUBMODULE_STRATEGY: none
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
