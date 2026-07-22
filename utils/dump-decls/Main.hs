@@ -68,6 +68,7 @@ ignoredModules =
     map mkModuleName $ concat
     [ unstableModules
     , platformDependentModules
+    , internalModules
     ]
   where
     unstableModules =
@@ -80,6 +81,8 @@ ignoredModules =
         , "GHC.Num.Backend"
         , "GHC.Num.Backend.Selected"
         ]
+    internalModules =
+        [ "GHC.Essentials" ]
 
 ignoredOccNames :: [OccName]
 ignoredOccNames =
