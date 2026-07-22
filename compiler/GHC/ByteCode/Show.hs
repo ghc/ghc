@@ -148,9 +148,9 @@ pprByteCodeObject current_module byte_code_object = case byte_code_object of
     UnlinkedBCO {..}
         -> entry (text "ordinary object" <+> quotes (ppr unlinkedBCOName)) $
            vcat [
-                    pprArity                   $ unlinkedBCOArity,
-                    pprLiterals current_module $ unlinkedBCOLits,
-                    pprPointers current_module $ unlinkedBCOPtrs
+                    pprArity                    $ unlinkedBCOArity,
+                    pprLiterals current_module  $ unlinkedBCOLits,
+                    pprUsedItems current_module $ unlinkedBCOPtrs
                 ]
     UnlinkedStaticCon {..}
         -> entry (
@@ -159,10 +159,10 @@ pprByteCodeObject current_module byte_code_object = case byte_code_object of
                  )
            $
            vcat [
-                    pprDataConstructorName     $ unlinkedStaticConDataConName,
-                    pprLiftedness              $ isLifted,
-                    pprLiterals current_module $ unlinkedStaticConLits,
-                    pprPointers current_module $ unlinkedStaticConPtrs
+                    pprDataConstructorName      $ unlinkedStaticConDataConName,
+                    pprLiftedness               $ isLifted,
+                    pprLiterals current_module  $ unlinkedStaticConLits,
+                    pprUsedItems current_module $ unlinkedStaticConPtrs
                 ]
         where
 
@@ -251,22 +251,22 @@ pprInternalBreakpointID current_module InternalBreakpointId {..}
     indexDoc :: SDoc
     indexDoc = ppr ibi_info_index
 
--- | Constructs textual information about pointers.
-pprPointers :: Module         -- ^ The enclosing module
-            -> FlatBag BCOPtr -- ^ The pointers
-            -> SDoc           -- ^ The textual information
-pprPointers current_module = entry (text "utilized items")   .
-                             vcatOrNone                      .
-                             map (pprPointer current_module) .
-                             elemsFlatBag
+-- | Constructs textual information about used items.
+pprUsedItems :: Module         -- ^ The enclosing module
+            -> FlatBag BCOPtr  -- ^ The used items
+            -> SDoc            -- ^ The textual information
+pprUsedItems current_module = entry (text "used items")        .
+                              vcatOrNone                       .
+                              map (pprUsedItem current_module) .
+                              elemsFlatBag
 
--- | Constructs textual information about a single pointer.
-pprPointer :: Module -- ^ The enclosing module
-           -> BCOPtr -- ^ The pointer
-           -> SDoc   -- ^ The textual information
-pprPointer current_module pointer = case pointer of
+-- | Constructs textual information about a single used item.
+pprUsedItem :: Module -- ^ The enclosing module
+            -> BCOPtr -- ^ The used item
+            -> SDoc   -- ^ The textual information
+pprUsedItem current_module usedItem = case usedItem of
     BCOPtrName name
-        -> text "item named" <+> quotes (ppr name)
+        -> text "named item" <+> quotes (ppr name)
     BCOPtrPrimOp primOp
         -> text "primitive operation" <+> quotes (ppr primOp)
     BCOPtrBCO byte_code_object
