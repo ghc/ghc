@@ -414,7 +414,7 @@ tidy1 :: Id                  -- The Id being scrutinised
 tidy1 v g (ParPat _ pat)      = tidy1 v g (unLoc pat)
 tidy1 v g (SigPat _ pat _)    = tidy1 v g (unLoc pat)
 tidy1 _ _ (WildPat ty)        = return (idDsWrapper, WildPat ty)
-tidy1 v g (BangPat _ (L l p)) = tidy_bang_pat v g l p
+tidy1 v g (BangPat o (L l p)) = tidy_bang_pat v g o l p
 tidy1 v g (ModifiedPat _ _ pat) = tidy1 v g (unLoc pat)
 
         -- case v of { x -> mr[] }
@@ -530,30 +530,30 @@ tidy1 _ _ non_interesting_pat
   = return (idDsWrapper, non_interesting_pat)
 
 --------------------
-tidy_bang_pat :: Id -> Bool -> SrcSpanAnnA -> Pat GhcTc
+tidy_bang_pat :: Id -> Bool -> Origin -> SrcSpanAnnA -> Pat GhcTc
               -> DsM (DsWrapper, Pat GhcTc)
 
 -- Discard par/sig under a bang
-tidy_bang_pat v g _ (ParPat _ (L l p))   = tidy_bang_pat v g l p
-tidy_bang_pat v g _ (SigPat _ (L l p) _) = tidy_bang_pat v g l p
+tidy_bang_pat v g o _ (ParPat _ (L l p))   = tidy_bang_pat v g o l p
+tidy_bang_pat v g o _ (SigPat _ (L l p) _) = tidy_bang_pat v g o l p
 
 -- Push the bang-pattern inwards, in the hope that
 -- it may disappear next time
-tidy_bang_pat v g l (AsPat x v' p)
-  = tidy1 v g (AsPat x v' (L l (BangPat noExtField p)))
-tidy_bang_pat v g l (XPat (CoPat w p t))
-  = tidy1 v g (XPat $ CoPat w (BangPat noExtField (L l p)) t)
-tidy_bang_pat v g l (OrPat x (p:|ps)) -- push bang into first pat alt
-  = tidy1 v g (OrPat x (L l (BangPat noExtField p) :| ps))
+tidy_bang_pat v g o l (AsPat x v' p)
+  = tidy1 v g (AsPat x v' (L l (BangPat o p)))
+tidy_bang_pat v g o l (XPat (CoPat w p t))
+  = tidy1 v g (XPat $ CoPat w (BangPat o (L l p)) t)
+tidy_bang_pat v g o l (OrPat x (p:|ps)) -- push bang into first pat alt
+  = tidy1 v g (OrPat x (L l (BangPat o p) :| ps))
 
 -- Discard bang around strict pattern
-tidy_bang_pat v g _ p@(LitPat {})    = tidy1 v g p
-tidy_bang_pat v g _ p@(ListPat {})   = tidy1 v g p
-tidy_bang_pat v g _ p@(TuplePat {})  = tidy1 v g p
-tidy_bang_pat v g _ p@(SumPat {})    = tidy1 v g p
+tidy_bang_pat v g _ _ p@(LitPat {})    = tidy1 v g p
+tidy_bang_pat v g _ _ p@(ListPat {})   = tidy1 v g p
+tidy_bang_pat v g _ _ p@(TuplePat {})  = tidy1 v g p
+tidy_bang_pat v g _ _ p@(SumPat {})    = tidy1 v g p
 
 -- Data/newtype constructors
-tidy_bang_pat v g l p@(ConPat { pat_con = L _ (RealDataCon dc)
+tidy_bang_pat v g o l p@(ConPat { pat_con = L _ (RealDataCon dc)
                               , pat_args = args
                               , pat_con_ext = ConPatTc
                                 { cpt_arg_tys = arg_tys
@@ -562,7 +562,7 @@ tidy_bang_pat v g l p@(ConPat { pat_con = L _ (RealDataCon dc)
   -- Newtypes: push bang inwards (#9844)
   =
     if isNewTyCon (dataConTyCon dc)
-      then tidy1 v g (p { pat_args = push_bang_into_newtype_arg l (scaledThing ty) args })
+      then tidy1 v g (p { pat_args = push_bang_into_newtype_arg l o (scaledThing ty) args })
       else tidy1 v g p  -- Data types: discard the bang
     where
       (ty:_) = dataConInstArgTys dc arg_tys
@@ -582,28 +582,29 @@ tidy_bang_pat v g l p@(ConPat { pat_con = L _ (RealDataCon dc)
 --
 -- NB: SigPatIn, ConPatIn should not happen
 
-tidy_bang_pat _ _ l p = return (idDsWrapper, BangPat noExtField (L l p))
+tidy_bang_pat _ _ o l p = return (idDsWrapper, BangPat o (L l p))
 
 -------------------
 push_bang_into_newtype_arg :: SrcSpanAnnA
+                           -> Origin
                            -> Type -- The type of the argument we are pushing
                                    -- onto
                            -> HsConPatDetails GhcTc -> HsConPatDetails GhcTc
 -- See Note [Bang patterns and newtypes]
 -- We are transforming   !(N p)   into   (N !p)
-push_bang_into_newtype_arg l _ty (PrefixCon x (arg:args))
+push_bang_into_newtype_arg l o _ty (PrefixCon x (arg:args))
   = assert (null args) $
-    PrefixCon x [L l (BangPat noExtField arg)]
-push_bang_into_newtype_arg l _ty (RecCon x rf)
+    PrefixCon x [L l (BangPat o arg)]
+push_bang_into_newtype_arg l o _ty (RecCon x rf)
   | HsRecFields { rec_flds = L lf fld : flds } <- rf
   , HsFieldBind { hfbRHS = arg } <- fld
   = assert (null flds) $
     RecCon x (rf { rec_flds = [L lf (fld { hfbRHS
-                                           = L l (BangPat noExtField arg) })] })
-push_bang_into_newtype_arg l ty (RecCon _ rf) -- If a user writes !(T {})
+                                           = L l (BangPat o arg) })] })
+push_bang_into_newtype_arg l o ty (RecCon _ rf) -- If a user writes !(T {})
   | HsRecFields { rec_flds = [] } <- rf
-  = PrefixCon noExtField [L l (BangPat noExtField (noLocA (WildPat ty)))]
-push_bang_into_newtype_arg _ _ cd
+  = PrefixCon noExtField [L l (BangPat o (noLocA (WildPat ty)))]
+push_bang_into_newtype_arg _ _ _ cd
   = pprPanic "push_bang_into_newtype_arg" (pprConArgs cd)
 
 {-

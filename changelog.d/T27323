@@ -1,0 +1,15 @@
+section: compiler
+synopsis: Don't report compiler-generated bang patterns under -Wredundant-bang-patterns
+description:
+  With ``-XStrict``, GHC inserts bang patterns on binders. When such a bang
+  cannot force anything - for instance on a binder of unlifted type such as
+  ``Int#`` - it was reported by ``-Wredundant-bang-patterns``, even though
+  there is no bang in the source to remove. The warning now only reports
+  bangs the user actually wrote.
+
+  As part of this change, the ``XBangPat GhcTc`` extension field of
+  ``BangPat`` changed from ``NoExtField`` to ``Origin``, recording whether a
+  bang was user-written or compiler-generated. GHC API users constructing or
+  matching typechecked bang patterns may need a one-line adjustment.
+mrs: !16395
+issues: #27323
