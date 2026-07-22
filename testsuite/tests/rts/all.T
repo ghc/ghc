@@ -540,8 +540,11 @@ test('RestartEventLogging',
      compile_and_run, ['RestartEventLogging_c.c'])
 
 test('T17088',
-     [extra_ways(['compacting_gc']), extra_run_opts('+RTS -A256k -RTS')],
-     compile_and_run, ['-rtsopts -O2'])
+     [ only_ways(['compacting_gc'])
+     , extra_ways(['compacting_gc'])
+     , extra_run_opts('+RTS -A128k -RTS')
+     ],
+     compile_and_run, ['-rtsopts -O1'])
 
 test('T15427', js_broken(22374), compile_and_run, [''])
 

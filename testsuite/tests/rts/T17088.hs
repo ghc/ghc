@@ -2,6 +2,9 @@
 {-# LANGUAGE MagicHash     #-}
 {-# LANGUAGE UnboxedTuples #-}
 
+-- Lambda lifting removes the closure shape needed to reproduce #17088.
+{-# OPTIONS_GHC -fno-stg-lift-lams #-}
+
 module Main (main) where
 
 import Data.Word
@@ -27,7 +30,9 @@ instance Show Bytes where
 bytesAllocRet :: Int -> IO Bytes
 bytesAllocRet (I# sz) =
   IO $ \s -> case newAlignedPinnedByteArray# sz 8# s of
-               (# s', mba #) -> (# s', Bytes mba #)
+               (# s', mba #) ->
+                 case writeWord8Array# mba 0# (wordToWord8# 0##) s' of
+                   s'' -> (# s'', Bytes mba #)
 
 ------------------------------------------------------------------------
 
