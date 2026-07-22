@@ -57,6 +57,7 @@ Common Modes:
   save_cache        Preserve the cabal cache
   build_hadrian     Build GHC via the Hadrian build system
   test_hadrian      Test GHC via the Hadrian build system
+  lint_changelog    Check that an MR adds a valid changelog entry
 
 Environment variables affecting the build:
 
@@ -971,6 +972,49 @@ function lint_author(){
   done
 }
 
+function lint_changelog() {
+  # Cancel the job if there is a no-changelog label.
+  if [[ ",${CI_MERGE_REQUEST_LABELS:-}," == *",no-changelog,"* ]]; then
+    exit 0
+  fi
+
+  # Check that the MR adds at least one changelog entry.
+  git fetch --depth=1 \
+    "$CI_MERGE_REQUEST_PROJECT_URL" \
+    "$CI_MERGE_REQUEST_DIFF_BASE_SHA"
+
+  local added
+  added=$(git diff --name-only --diff-filter=A \
+    "$CI_MERGE_REQUEST_DIFF_BASE_SHA..$CI_COMMIT_SHA" -- \
+    'changelog.d/' | grep -v '^changelog.d/config$' || true)
+
+  if [ -z "$added" ]; then
+    error "No changelog entry found in changelog.d/"
+    echo "Please add a changelog entry file describing your user-facing changes."
+    echo "If this MR does not need a changelog entry, apply the 'no-changelog' label."
+    exit 1
+  fi
+  echo "Found changelog entries: $added"
+
+  # Build changelog-d with the bootstrap compiler and validate all entries
+  # (checks required fields, section names, and the MR number).
+  local changelog_build_dir
+  changelog_build_dir="$(mktemp -d)"
+  "$GHC" -Werror \
+    -package base \
+    -package bytestring \
+    -package Cabal-syntax \
+    -package containers \
+    -package directory \
+    -package filepath \
+    -package pretty \
+    -outputdir "$changelog_build_dir" \
+    -o "$changelog_build_dir/changelog-d" \
+    utils/changelog-d/ChangelogD.hs
+  "$changelog_build_dir/changelog-d" \
+    changelog.d/ --validate --expect-mr "$CHANGELOG_EXPECT_MR"
+}
+
 function abi_of(){
   DIR=$(realpath $1)
   mkdir -p "$OUT"
@@ -1085,6 +1129,7 @@ case ${1:-help} in
   perf_test) run_perf_test ;;
   abi_test) abi_test ;;
   cabal_test) cabal_test ;;
+  lint_changelog) lint_changelog ;;
   lint_author) shift; lint_author "$@" ;;
   compare_interfaces_of) shift; compare_interfaces_of "$@" ;;
   clean) clean ;;

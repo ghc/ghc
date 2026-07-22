@@ -89,6 +89,8 @@ checkPrograms =
     , CheckProgram "lint:notes" noteLinterProgPath  noteLinterSourcePath  noteLinterExtra  lintNotes  (const stage0Boot)  id
     , CheckProgram "lint:codes" codeLinterProgPath  codeLinterSourcePath  codeLinterExtra  lintCodes  id id
     , CheckProgram "lint:whitespace"  whitespaceLinterProgPath  whitespaceLinterSourcePath  whitespaceLinterExtra  lintWhitespace  (const stage0Boot)  (filter (/= lintersCommon))
+    -- N.B. The lint:changelog build is replicated by lint_changelog in
+    -- .gitlab/ci.sh. Keep its package dependencies in sync with this target.
     , CheckProgram "lint:changelog"  changelogDProgPath  changelogDSourcePath  changelogDExtra  changelogD  (const stage0Boot)  id
     ]
 
