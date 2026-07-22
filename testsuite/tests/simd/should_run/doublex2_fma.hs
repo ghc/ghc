@@ -33,7 +33,7 @@ arr3 = listArray (0,63) [-59.65425141222654,69.64349283945359,83.9284747794684,1
 
 run :: (DoubleX2# -> DoubleX2# -> DoubleX2# -> DoubleX2#) -> UArray Int Double -> Ptr Double -> UArray Int Double -> IO [Double]
 run f a b c = allocaArray 64 $ \result -> do
-  forM_ [0,4..63] $ \i -> do
+  forM_ [0,2..63] $ \i -> do
     let v = indexAsDoubleX2 a i
     DoubleX2 w <- readAsDoubleX2 b i
     let x = indexAsDoubleX2 c i
@@ -43,7 +43,7 @@ run f a b c = allocaArray 64 $ \result -> do
 
 runN :: (DoubleX2# -> DoubleX2# -> DoubleX2# -> DoubleX2#) -> UArray Int Double -> Ptr Double -> UArray Int Double -> IO [Double]
 runN f a b c = allocaArray 64 $ \result -> do
-  forM_ [0,4..63] $ \i -> do
+  forM_ [0,2..63] $ \i -> do
     let v = indexAsDoubleX2 a i
     DoubleX2 w <- readAsDoubleX2 b i
     let x = indexAsDoubleX2 c i

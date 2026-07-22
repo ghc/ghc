@@ -67,13 +67,13 @@ main :: IO ()
 main = do
     ba <- IO $ \s -> case newAlignedPinnedByteArray# 64# 64# s of (# s', ba #) -> (# s', BA ba #)
 
-    mapM_ (\i -> writeFloatArray ba i (realToFrac i + realToFrac i / 10)) [0..16]
+    mapM_ (\i -> writeFloatArray ba i (realToFrac i + realToFrac i / 10)) [0..15]
     print =<< readFloatX4 ba 0
     print =<< readFloatX4' ba 0
     print =<< readFloatX4 ba 4
     print =<< readFloatX4' ba 1
 
-    mapM_ (\i -> writeDoubleArray ba i (realToFrac i + realToFrac i / 10)) [0..8]
+    mapM_ (\i -> writeDoubleArray ba i (realToFrac i + realToFrac i / 10)) [0..7]
     print =<< readDoubleX2 ba 0
     print =<< readDoubleX2' ba 0
     print =<< readDoubleX2 ba 2
