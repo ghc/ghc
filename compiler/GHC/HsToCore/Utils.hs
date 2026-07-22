@@ -53,6 +53,7 @@ import GHC.HsToCore.Monad
 
 import GHC.Core.Utils
 import GHC.Core.Make
+import GHC.Types.Basic (Origin(Generated), GenReason(OtherExpansion), DoPmc(..))
 import GHC.Types.Id.Make
 import GHC.Types.Id
 import GHC.Types.Literal
@@ -956,6 +957,12 @@ Specifically:
    !pat    => !pat   -- always
    pat     => !pat   -- when -XStrict
    pat     => pat    -- otherwise
+
+The bangs we add here are compiler-generated: we record 'Generated' in the
+'XBangPat GhcTc' extension field, whereas a user-written bang is typechecked
+to 'FromSource' (GHC.Tc.Gen.Pat). The pattern-match checker consults this
+field so that -Wredundant-bang-patterns only reports bangs that the user
+actually wrote (#27323). See Note [Dead bang patterns] in GHC.HsToCore.Pmc.Check.
 -}
 
 
@@ -975,7 +982,7 @@ decideBangHood dflags lpat
            ParPat x p -> L l (ParPat x (go p))
            LazyPat _ lp' -> lp'
            BangPat _ _   -> lp
-           _             -> L l (BangPat noExtField lp)
+           _             -> L l (BangPat (Generated OtherExpansion DoPmc) lp)
 
 isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
 

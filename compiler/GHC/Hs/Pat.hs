@@ -102,7 +102,11 @@ type instance XParPat  GhcTc = NoExtField
 
 type instance XBangPat GhcPs = EpToken "!"
 type instance XBangPat GhcRn = NoExtField
-type instance XBangPat GhcTc = NoExtField
+-- | Was this bang written by the user, or inserted by 'decideBangHood'
+-- because of -XStrict? Consulted by the pattern-match checker, which
+-- only reports user-written bangs under -Wredundant-bang-patterns.
+-- See Note [Dead bang patterns] in GHC.HsToCore.Pmc.Check.
+type instance XBangPat GhcTc = Origin
 
 type instance XListPat GhcPs = AnnList ()
   -- After parsing, ListPat can refer to a built-in Haskell list pattern

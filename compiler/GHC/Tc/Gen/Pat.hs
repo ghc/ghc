@@ -31,6 +31,7 @@ import GHC.Tc.Gen.Sig( TcPragEnv, lookupPragEnv, addInlinePrags )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate
 import GHC.Types.FieldLabel
+import GHC.Types.Basic (Origin (FromSource))
 import GHC.Types.Id
 import GHC.Types.Var
 import GHC.Types.Name
@@ -627,9 +628,9 @@ tc_pat scaled_exp_pat_ty@(Scaled w_pat exp_pat_ty) penv ps_pat thing_inside =
       { (pat', res) <- tc_lpat scaled_exp_pat_ty penv pat thing_inside
       ; return (ParPat x pat', res) }
 
-    BangPat x pat -> do
+    BangPat _ pat -> do
       { (pat', res) <- tc_lpat scaled_exp_pat_ty penv pat thing_inside
-      ; return (BangPat x pat', res) }
+      ; return (BangPat FromSource pat', res) }
 
     OrPat _ pats -> do -- See Note [Implementation of OrPatterns], Typechecker (1)
       { let pats_list   = NE.toList pats

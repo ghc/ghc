@@ -18,6 +18,7 @@ import GHC.Data.FastString (unpackFS, lengthFS, mkFastStringShortText)
 import GHC.Driver.DynFlags
 import GHC.Hs
 import GHC.Tc.Utils.TcMType (shortCutLit)
+import GHC.Types.Basic (isGenerated)
 import GHC.Types.Id
 import GHC.Core.ConLike
 import GHC.Types.Name
@@ -154,11 +155,11 @@ desugarPat x pat = case pat of
   VarPat _ y   -> pure (mkPmLetVar (unLoc y) x)
   ParPat _ p   -> desugarLPat x p
   LazyPat _ _  -> pure GdEnd -- like a wildcard
-  BangPat _ p@(L l p') ->
+  BangPat orig p@(L l p') ->
     -- Add the bang in front of the list, because it will happen before any
     -- nested stuff.
     consGrdDag (PmBang x pm_loc) <$> desugarLPat x p
-      where pm_loc = Just (SrcInfo (L (locA l) (ppr p')))
+      where pm_loc = if isGenerated orig then Nothing else Just (SrcInfo (L (locA l) (ppr p')))
 
   -- (x@pat)   ==>   Desugar pat with x as match var and handle impedance
   --                 mismatch with incoming match var
@@ -649,4 +650,12 @@ user *had* written a bang:
 +    In an equation for ‘idV’: idV !v = ...
 
 So we live with the duplication.
+
+There is one wrinkle (#27323): the bang inserted by 'decideBangHood' is
+compiler-generated, marked 'Generated' in its 'XBangPat GhcTc' field. When
+'desugarPat' sees such a bang, it emits a 'PmBang' without 'SrcInfo', so
+that the checker performs the usual divergence check (giving the
+inaccessible-RHS warning above) but never reports the bang under
+-Wredundant-bang-patterns. See Note [Dead bang patterns] in
+GHC.HsToCore.Pmc.Check.
 -}

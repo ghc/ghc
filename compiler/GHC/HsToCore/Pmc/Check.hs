@@ -128,7 +128,9 @@ checkGrd grd = CA $ \inc -> case grd of
     div <- addPhiCtNablas inc (PhiBotCt x)
     matched <- addPhiCtNablas inc (PhiNotBotCt x)
     -- See Note [Dead bang patterns]
-    -- mb_info = Just info <==> PmBang originates from bang pattern in source
+    -- mb_info = Just info <==> the PmBang originates from a user-written
+    -- bang pattern. Bangs inserted by -XStrict carry no info and are thus
+    -- never reported as redundant (#27323).
     let bangs | Just info <- mb_info = unitOL (div, info)
               | otherwise            = NilOL
     tracePm "check:Bang" (ppr x <+> ppr div)
@@ -266,6 +268,22 @@ where the PmBang appears in 'checkGrd'. If not, then clearly the bang is
 dead. So for a source bang, we add the refined Nabla and the source info to
 the 'RedSet's 'rs_bangs'. When collecting stuff to warn, we test that Nabla for
 inhabitants. If it's empty, we'll warn that it's redundant.
+
+Crucially, we only ever warn about bangs the user wrote. With -XStrict, the
+compiler inserts bangs itself ('decideBangHood' in GHC.HsToCore.Utils), and
+such a bang is often dead. Consider (#27323)
+
+  {-# LANGUAGE MagicHash, Strict #-}
+  idInt# :: Int# -> Int#
+  idInt# x = x
+
+The binder `x` has unlifted type, so the bang that -XStrict inserts on it can
+never force anything. But warning would be deeply confusing: there is no bang
+in the source to delete! Whether a bang was user-written is recorded in the
+'XBangPat GhcTc' extension field ('Origin'); generated bangs desugar to a
+'PmBang' with no 'SrcInfo', so they still take part in divergence checking
+(that matters for the inaccessible-RHS warnings of #21761) but never end up
+in 'rs_bangs'.
 
 Note that we don't want to warn for a dead bang that appears on a redundant
 clause. That is because in that case, we recommend to delete the clause wholly,
