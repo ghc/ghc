@@ -180,7 +180,7 @@ parseModeFlags :: [Located String]
                       [Warn])
 parseModeFlags args = do
   ((leftover, errs1, warns), (mModeFlag, units, errs2, flags')) <-
-        processCmdLineP mode_flags (Nothing, [], [], []) args
+        processCmdLineP mode_flags_trie (Nothing, [], [], []) args
   let mode = case mModeFlag of
              Nothing     -> doMakeMode
              Just (m, _) -> m
@@ -191,9 +191,13 @@ parseModeFlags args = do
 
   return (mode, units, flags' ++ leftover, warns)
 
-type ModeM = CmdLineP (Maybe (Mode, String), [String], [String], [Located String])
+type ModeMS = (Maybe (Mode, String), [String], [String], [Located String])
+type ModeM = CmdLineP ModeMS
   -- mode flags sometimes give rise to new DynFlags (eg. -C, see below)
   -- so we collect the new ones and return them.
+
+mode_flags_trie :: FlagSpecTrie ModeMS
+mode_flags_trie = mkFlagSpecTrie mode_flags
 
 mode_flags :: [Flag ModeM]
 mode_flags =

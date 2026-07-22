@@ -1,0 +1,5 @@
+Group StringTrie
+  Running lookup_after_insert
+    Passed 1000 iterations
+  Running fromList == foldl (flip $ uncurry insert) empty
+    Passed 1000 iterations

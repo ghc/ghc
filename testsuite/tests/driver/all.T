@@ -99,6 +99,8 @@ test('driver200', [extra_files(['A200.hs', 'B200/', 'D200.hs'])], makefile_test,
 
 test('T2566', normalise_fun(normalise_errmsg), makefile_test, [])
 
+test('stringtrie', [mini_quickcheck], compile_and_run, ['-package ghc'])
+
 test('pragma001', normal, compile, [''])
 test('pragma002', normal, compile, [''])
 

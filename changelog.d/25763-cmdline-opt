@@ -1,0 +1,19 @@
+section: compiler
+synopsis: Speed up command line parser with a trie map
+description:
+  Parsing flags is now faster when there are many flags to parse.
+
+  There is a new trie implementation with String keys in ``GHC.Data.StringTrie``.
+
+  Added a new abstract type ``FlagSpecTrie`` to represent tries of flags.
+
+  ``GHC.Driver.Session`` gets ``flagsDynamic`` removed and ``flagsDynamicTrie``
+  added with type ``FlagSpecTrie``. ``processCmdLineP`` and ``parseDynamicFlagsFull``
+  now have a ``FlagSpecTrie`` parameter instead of a list.
+
+  ``GHC.Driver.Session.Mode`` gets a value ``mode_flags_trie`` of type ``FlagSpecTrie``.
+
+  ``GHC.Driver.CmdLine.processArgs`` now gets a ``FlagSpecTrie`` argument instead
+  of a list.
+mrs: !16392
+issues: #25763
