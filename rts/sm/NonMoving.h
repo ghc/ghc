@@ -150,6 +150,7 @@ extern struct NonmovingHeap nonmovingHeap;
 extern memcount nonmoving_segment_live_words;
 
 void nonmovingInit(void);
+void nonmovingInitAfterFork(void);
 void nonmovingExit(void);
 bool nonmovingConcurrentMarkIsRunning(void);
 
