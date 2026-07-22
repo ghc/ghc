@@ -5,6 +5,7 @@
 --   of bytecode files. It is the backbone of the @--show-byte-code@ option.
 module GHC.ByteCode.Show (showByteCode) where
 
+-- Prelude
 import GHC.Prelude
        (
            (+), (-), Integral, div,                  -- Prelude
@@ -23,14 +24,28 @@ import GHC.Prelude
            show,                                     -- Text.Show
            IO, FilePath                              -- System.IO
        )
-import Control.Arrow ((>>>))
-import Data.List (zipWith4)
-import Data.ByteString (ByteString)
-import Data.ByteString.Short (ShortByteString)
-import Data.IntMap (IntMap)
-import Data.IntMap qualified as IntMap (toList)
-import Data.Array (bounds, indices, elems)
-import Numeric (showHex)
+
+-- Bytecode
+import GHC.ByteCode.Types
+       (
+           FFIInfo (..),
+           BCONPtr (..),
+           BCOPtr (..),
+           UnlinkedBCO (..),
+           ByteCodeHpcInfo (..),
+           CompiledByteCode (..)
+       )
+import GHC.ByteCode.Breakpoints
+       (
+           InternalBreakpointId (..),
+           InternalBreakLoc (..),
+           CgBreakInfo (..),
+           InternalModBreaks (..)
+       )
+import GHC.ByteCode.Binary (OnDiskModuleByteCode (..))
+import GHC.ByteCode.Serialize (readOnDiskModuleByteCode)
+
+-- GHC apart from bytecode
 import GHC.Data.Strict qualified as Strict (Maybe, maybe)
 import GHC.Data.FastString (unpackFS)
 import GHC.Data.FlatBag (FlatBag, elemsFlatBag)
@@ -62,27 +77,19 @@ import GHC.Utils.Outputable
 import GHC.Unit.Types (Module)
 import GHC.Iface.Type (IfaceType, IfaceTvBndr, IfaceIdBndr)
 import GHC.HsToCore.Breakpoints (ModBreaks (..))
-import GHC.ByteCode.Types
-       (
-           FFIInfo (..),
-           BCONPtr (..),
-           BCOPtr (..),
-           UnlinkedBCO (..),
-           ByteCodeHpcInfo (..),
-           CompiledByteCode (..)
-       )
-import GHC.ByteCode.Breakpoints
-       (
-           InternalBreakpointId (..),
-           InternalBreakLoc (..),
-           CgBreakInfo (..),
-           InternalModBreaks (..)
-       )
-import GHC.ByteCode.Binary (OnDiskModuleByteCode (..))
-import GHC.ByteCode.Serialize (readOnDiskModuleByteCode)
 import GHC.Driver.Env.Types (HscEnv)
 import GHCi.FFI (FFIType)
 import GHCi.Message (ConInfoTable (..))
+
+-- Basic things
+import Control.Arrow ((>>>))
+import Data.List (zipWith4)
+import Data.ByteString (ByteString)
+import Data.ByteString.Short (ShortByteString)
+import Data.IntMap (IntMap)
+import Data.IntMap qualified as IntMap (toList)
+import Data.Array (bounds, indices, elems)
+import Numeric (showHex)
 
 -- | Outputs textual information about the contents of a bytecode file.
 showByteCode :: Logger -> HscEnv -> FilePath -> IO ()
