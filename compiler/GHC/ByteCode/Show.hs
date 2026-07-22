@@ -5,28 +5,32 @@
 --   of bytecode files. It is the backbone of the @--show-byte-code@ option.
 module GHC.ByteCode.Show (showByteCode) where
 
-import Prelude ((+), (-), Integral, div)
+import GHC.Prelude
+       (
+           (+), (-), Integral, div,                  -- Prelude
+           (==),                                     -- Data.Eq
+           (>=),                                     -- Data.Ord
+           FiniteBits, finiteBitSize,                -- Data.Bits
+           ($), id, (.),                             -- Data.Function
+           fst, uncurry,                             -- Data.Tuple
+           Bool, otherwise, not,                     -- Data.Bool
+           Int,                                      -- Data.Int
+           Word,                                     -- Data.Word
+           Maybe, maybe,                             -- Data.Maybe
+           Either, either,                           -- Data.Either
+           length, (++), map, take, drop, replicate, -- Data.List
+           String,                                   -- Data.String
+           show,                                     -- Text.Show
+           IO, FilePath                              -- System.IO
+       )
 import Control.Arrow ((>>>))
-import Data.Eq ((==))
-import Data.Ord ((>=))
-import Data.Bits (FiniteBits, finiteBitSize)
-import Data.Function (($), id, (.))
-import Data.Tuple (fst, uncurry)
-import Data.Bool (Bool, otherwise, not)
-import Data.Int (Int)
-import Data.Word (Word)
-import Data.Maybe (Maybe, maybe)
-import Data.Either (Either, either)
-import Data.List (length, (++), map, zipWith4, take, drop, replicate)
-import Data.String (String)
+import Data.List (zipWith4)
 import Data.ByteString (ByteString)
 import Data.ByteString.Short (ShortByteString)
 import Data.IntMap (IntMap)
 import Data.IntMap qualified as IntMap (toList)
 import Data.Array (bounds, indices, elems)
 import Numeric (showHex)
-import Text.Show (show)
-import System.IO (IO, FilePath)
 import GHC.Data.Strict qualified as Strict (Maybe, maybe)
 import GHC.Data.FastString (unpackFS)
 import GHC.Data.FlatBag (FlatBag, elemsFlatBag)
