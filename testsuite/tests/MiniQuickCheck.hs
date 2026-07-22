@@ -28,6 +28,7 @@ module MiniQuickCheck
   , propertyCompare
   , propertyAnd
   , propertyTrue
+  , propertyEqWithContext
   , getCheck
 
     -- * QuickCheck test tree
@@ -51,11 +52,15 @@ module MiniQuickCheck
   , nonZero
   , BoundedShiftAmount(..)
   , BoundedBy(..)
+  , BoundedList(..)
+  , BoundedChar(..)
   ) where
 
 -- base
 import Control.Exception
   ( SomeException, displayException, evaluate, try )
+import Control.Monad
+  ( replicateM )
 import Control.Monad.IO.Class
   ( liftIO )
 import Data.Bits
@@ -64,8 +69,6 @@ import Data.Bits
   )
 import Data.Int
   ( Int8, Int16, Int32, Int64 )
-import Data.IORef
-  ( newIORef, atomicModifyIORef' )
 import Data.Kind
   ( Type )
 import Data.List
@@ -84,6 +87,8 @@ import System.Exit
   ( die, exitFailure )
 import Text.Read
   ( readMaybe )
+import System.IO.Unsafe
+  ( unsafePerformIO )
 
 -- transformers
 import Control.Monad.Trans.Reader
@@ -140,6 +145,15 @@ propertyCompare s f a b = PropertyBinaryOp (f a b) s (show a) (show b)
 (===) :: (Show a, Eq a) => a -> a -> PropertyCheck
 (===) = propertyCompare "==" (==)
 infix 4 ===
+
+-- | Prints the given message when the two values are not equal.
+propertyEqWithContext :: (Eq a, Show a) => String -> a -> a -> PropertyCheck
+propertyEqWithContext msg =
+  propertyCompare
+    (intercalate "\n" $
+      "is not the expected" : map ("    " ++) (lines msg ++ ["expected:"])
+    )
+    (==)
 
 -- | Conjunction of two property checks.
 propertyAnd :: PropertyCheck -> PropertyCheck -> PropertyCheck
@@ -424,3 +438,28 @@ instance
     where
       n :: a
       n = fromIntegral $ natVal @n Proxy
+
+type BoundedList :: Nat -> Type -> Type
+newtype BoundedList n a = BoundedList { getBoundedList :: [a] }
+  deriving (Eq, Ord, Show)
+
+instance
+  forall n a
+  . ( KnownNat n, Arbitrary a )
+  => Arbitrary ( BoundedList n a ) where
+  arbitrary = do
+    x <- arbitrary
+    let n = (x :: Word64) `mod` fromIntegral (natVal @n Proxy + 1)
+    BoundedList <$> replicateM (fromIntegral n) arbitrary
+
+instance (Arbitrary a, Arbitrary b) => Arbitrary (a, b) where
+  arbitrary = (,) <$> arbitrary <*> arbitrary
+
+type BoundedChar :: Nat -> Type
+newtype BoundedChar n = BoundedChar { getBoundedChar :: Char }
+  deriving (Eq, Ord, Show)
+
+instance KnownNat n => Arbitrary (BoundedChar n)  where
+  arbitrary = do
+    x <- getBoundedBy @_ @n <$> arbitrary
+    pure $ BoundedChar (['a'..] !! abs x)

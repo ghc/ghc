@@ -1,8 +1,9 @@
+{-# LANGUAGE BangPatterns #-}
 -------------------------------------------------------------------------------
 --
 -- | Command-line parser
 --
--- This is an abstract command-line parser used by DynFlags.
+-- This is a command-line parser used by DynFlags.
 --
 -- (c) The University of Glasgow 2005
 --
@@ -10,17 +11,26 @@
 
 module GHC.Driver.CmdLine
     (
-      processArgs, parseResponseFile, OptKind(..), GhcFlagMode(..),
+      processArgs,
+
+      -- ** Flags
       Flag(..), defFlag, defGhcFlag, defGhciFlag, defHiddenFlag,
-      errorsToGhcException,
+      OptKind(..), GhcFlagMode(..),
+
+      -- ** EwM monad
+      EwM, runEwM, addErr, addWarn, addFlagWarn, getArg, getCurLoc, liftEwM,
 
       Err(..), Warn, warnsToMessages,
 
-      EwM, runEwM, addErr, addWarn, addFlagWarn, getArg, getCurLoc, liftEwM,
+      -- ** FlagSpecTrie
+      FlagSpecTrie, mkFlagSpecTrie, extendFlagSpecTrie,
 
       -- ** State
       CmdLineP(..), runCmdLineP,
       getCmdLineState, putCmdLineState,
+
+      -- ** Utils
+      parseResponseFile, errorsToGhcException
     ) where
 
 import GHC.Prelude
@@ -28,6 +38,7 @@ import GHC.Prelude
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Data.Bag
+import qualified GHC.Data.StringTrie as StringTrie
 import GHC.Types.SrcLoc
 import GHC.Types.Error
 import GHC.Utils.Error
@@ -35,8 +46,7 @@ import GHC.Driver.Errors.Types
 import GHC.Driver.Errors.Ppr () -- instance Diagnostic DriverMessage
 import GHC.Utils.Outputable (text)
 
-import Data.Function
-import Data.List (sortBy, intercalate, stripPrefix)
+import Data.List (intercalate)
 import Data.Word
 
 import GHC.ResponseFile
@@ -180,8 +190,34 @@ putCmdLineState x = CmdLineP (State.put x)
 runCmdLineP :: CmdLineP s a -> s -> (a, s)
 runCmdLineP (CmdLineP k) s0 = runIdentity $ State.runStateT k s0
 
+-- | Flag specifications as a trie map
+--
+-- No two flags with the same 'flagName' are allowed.
+--
+-- See Note [Optimising the processing of command-line arguments]
+-- in GHC.Driver.Session.
+newtype FlagSpecTrie s =
+    -- | The key of each 'Flag' @f@ is @flagName f@.
+    FlagSpecTrie { unFlagSpecTrie :: StringTrie.StringTrie (Flag (CmdLineP s)) }
+
+-- | Construct a 'FlagSpecTrie' from a list of flags.
+--
+-- Precondition: No two flags in the list have the same flag name.
+mkFlagSpecTrie :: [Flag (CmdLineP s)] -> FlagSpecTrie s
+mkFlagSpecTrie flags =
+  FlagSpecTrie $ StringTrie.fromList [ (flagName f, f) | !f <- flags ]
+{-# INLINE mkFlagSpecTrie #-}
+
+-- | Add flags to an existing 'FlagSpecTrie'.
+--
+-- Precondition: No two flags in the trie plus the list have the same flag name.
+extendFlagSpecTrie :: FlagSpecTrie s -> [Flag (CmdLineP s)] -> FlagSpecTrie s
+extendFlagSpecTrie (FlagSpecTrie t) flags =
+  FlagSpecTrie $ foldl' (\acc f -> StringTrie.insert (flagName f) f acc) t flags
+{-# INLINE extendFlagSpecTrie #-}
+
 processArgs :: forall s m. Monad m
-            => [Flag (CmdLineP s)]        -- ^ cmdline parser spec
+            => FlagSpecTrie s             -- ^ cmdline parser spec
             -> [Located String]           -- ^ args
             -> (FilePath -> EwM (StateT s m) [Located String]) -- ^ response file handler
             -> StateT s m
@@ -197,7 +233,7 @@ processArgs spec args handleRespFile = do
 
     action = process args []
 
-    -- process :: [Located String] -> [Located String] -> EwM m [Located String]
+    process :: [Located String] -> [Located String] -> EwM (StateT s m) [Located String]
     process [] spare = return (reverse spare)
 
     process (L _ ('@' : resp_file) : args) spare = do
@@ -205,7 +241,7 @@ processArgs spec args handleRespFile = do
         process (resp_args ++ args) spare
 
     process (locArg@(L _ ('-' : arg)) : args) spare =
-        case findArg spec arg of
+        case findArg (unFlagSpecTrie spec) arg of
             Just (rest, opt_kind) ->
                 case processOneArg opt_kind rest arg args of
                     Left err ->
@@ -262,31 +298,38 @@ processOneArg opt_kind rest arg args
         OptPrefix f       -> Right (f rest_no_eq, args)
         AnySuffix f       -> Right (f dash_arg, args)
 
-findArg :: [Flag m] -> String -> Maybe (String, OptKind m)
-findArg spec arg =
-    case sortBy (compare `on` (length . fst)) -- prefer longest matching flag
-           [ (removeSpaces rest, optKind)
-           | flag <- spec,
-             let optKind  = flagOptKind flag,
-             Just rest <- [stripPrefix (flagName flag) arg],
-             arg_ok optKind rest arg ]
-    of
-        []      -> Nothing
-        (one:_) -> Just one
-
-arg_ok :: OptKind t -> [Char] -> String -> Bool
-arg_ok (NoArg           _)  rest _   = null rest
-arg_ok (HasArg          _)  _    _   = True
-arg_ok (SepArg          _)  rest _   = null rest
-arg_ok (Prefix          _)  _    _   = True -- Missing argument checked for in processOneArg t
-                                            -- to improve error message (#12625)
-arg_ok (OptIntSuffix    _)  _    _   = True
-arg_ok (IntSuffix       _)  _    _   = True
-arg_ok (Word64Suffix    _)  _    _   = True
-arg_ok (FloatSuffix     _)  _    _   = True
-arg_ok (OptPrefix       _)  _    _   = True
-arg_ok (PassFlag        _)  rest _   = null rest
-arg_ok (AnySuffix       _)  _    _   = True
+-- | Find a flag in the trie whose name is a prefix of the given string.
+--
+-- The unmatched suffix of the string is returned along with the 'OptKind'.
+--
+-- A flag is only returned if the suffix is valid for the 'OptKind' of the flag.
+-- For example, a flag with 'NoArg' will only be returned if the suffix is
+-- empty. More concretely, @-Wallx@ will produce an invalid suffix @"x"@ since
+-- @-Wall@ has @OptKind@ 'NoArg'.
+--
+-- If more than one flag name is a prefix of the string, the longest match with
+-- a valid suffix is returned.
+findArg :: StringTrie.StringTrie (Flag m) -> String -> Maybe (String, OptKind m)
+findArg trie arg =
+    case filter (uncurry valid_flag_suffix) $ StringTrie.lookup arg trie of
+        []               -> Nothing
+        (flag, rest) : _ -> Just (removeSpaces rest, flagOptKind flag)
+  where
+    valid_flag_suffix :: Flag m -> String -> Bool
+    valid_flag_suffix flag rest =
+      case flagOptKind flag of
+        NoArg _        -> null rest
+        HasArg _       -> True
+        SepArg _       -> null rest
+        Prefix _       -> True -- Missing argument checked for in processOneArg t
+                               -- to improve error message (#12625)
+        OptIntSuffix _ -> True
+        IntSuffix _    -> True
+        Word64Suffix _ -> True
+        FloatSuffix _  -> True
+        OptPrefix _    -> True
+        PassFlag _     -> null rest
+        AnySuffix _    -> True
 
 -- | Parse an Int
 --

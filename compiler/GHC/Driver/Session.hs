@@ -181,7 +181,8 @@ module GHC.Driver.Session (
         -- ** Available DynFlags
         allNonDeprecatedFlags,
         flagsAll,
-        flagsDynamic,
+        flagsAllTrie,
+        flagsDynamicTrie,
         flagsPackage,
         flagsForCompletion,
 
@@ -389,6 +390,37 @@ import Language.Haskell.Syntax.Text
 --    on the GHC wiki:  https://gitlab.haskell.org/ghc/ghc/wikis/language-pragma-history
 --
 --  See #4437 and #8176.
+
+-- Note [Optimising the processing of command-line arguments]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- For each command line argument we need to search all the possible flag names to
+-- find the correct command-line argument processor (of type `CmdLineP DynFlags`)
+-- to complete parsing of the argument and modify the `DynFlags`.
+--
+-- GHC has a LOT of flags, and occasionally, users give a LOT of command line
+-- arguments. So in some cases it pays to optimize the search for a command-line
+-- argument processor (#25763).
+--
+-- An additional complication is that flag specs need to be looked up with a
+-- string that may contain the flag key as a prefix.
+--
+-- In general, the `=` sign is optional, and anything after the name of the flag,
+-- if it doesn't start with `=`, is considered the argument. E.g.
+-- `-odirsome/path`, or `-pgmFprogram`, or `-package-dbDiff`, or `-optc-DFOO`,
+-- or `-Isome/path`, or `-fpluginLiquidHaskell`, or `-fplugin-optLiquidHaskell:--save`.
+--
+-- To achieve this:
+--
+-- * We build global lookup tables
+--     * GHC.Driver.Session.flagsAllTrie :: FlagSpecTrie DynFlags
+--     * GHC.Driver.Session.flagsDynamicTrie :: FlagSpecTrie DynFlags
+--     * GHC.Driver.Session.Mode.mode_flags_trie :: FlagSpecTrie ModeMS
+--
+--   These are implemented by a trie indexed by Strings, see GHC.Data.StringTrie.
+--
+-- * As we process each command line argument, one by one, we
+--   look up in the `FlagSpecTrie` to find which processor
+--   to use.  See `GHC.Driver.CmdLine.processArgs`.
 
 -- -----------------------------------------------------------------------------
 -- DynFlags
@@ -836,7 +868,7 @@ parseDynamicFlagsCmdLine :: MonadIO m => Logger -> DynFlags -> [Located String]
                          -> m (DynFlags, [Located String], Messages DriverMessage)
                             -- ^ Updated 'DynFlags', left-over arguments, and
                             -- list of warnings.
-parseDynamicFlagsCmdLine = parseDynamicFlagsFull flagsAll True
+parseDynamicFlagsCmdLine = parseDynamicFlagsFull flagsAllTrie True
 
 
 -- | Like 'parseDynamicFlagsCmdLine' but does not allow the package flags
@@ -846,13 +878,13 @@ parseDynamicFilePragma :: MonadIO m => Logger -> DynFlags -> [Located String]
                        -> m (DynFlags, [Located String], Messages DriverMessage)
                           -- ^ Updated 'DynFlags', left-over arguments, and
                           -- list of warnings.
-parseDynamicFilePragma = parseDynamicFlagsFull flagsDynamic False
+parseDynamicFilePragma = parseDynamicFlagsFull flagsDynamicTrie False
 
 -- | A helper to parse a set of flags from a list of command-line arguments, handling
 -- response files.
 processCmdLineP
     :: forall s m. MonadIO m
-    => [Flag (CmdLineP s)]  -- ^ valid flags to match against
+    => FlagSpecTrie s          -- ^ valid flags to match against
     -> s                    -- ^ current state
     -> [Located String]     -- ^ arguments to parse
     -> m (([Located String], [Err], [Warn]), s)
@@ -866,7 +898,7 @@ processCmdLineP activeFlags s0 args =
 -- arguments from the command line or from a file pragma.
 parseDynamicFlagsFull
     :: forall m. MonadIO m
-    => [Flag (CmdLineP DynFlags)]    -- ^ valid flags to match against
+    => FlagSpecTrie DynFlags         -- ^ valid flags to match against
     -> Bool                          -- ^ are the arguments from the command line?
     -> Logger                        -- ^ logger
     -> DynFlags                      -- ^ current dynamic flags
@@ -988,14 +1020,22 @@ allFlagsDeps keepDeprecated = [ '-':flagName flag
 flagsAll :: [Flag (CmdLineP DynFlags)]
 flagsAll = map snd flagsAllDeps
 
+-- | Same as 'flagsAll' but in trie form for fast lookup.
+--
+-- See Note [Optimising the processing of command-line arguments]
+flagsAllTrie :: FlagSpecTrie DynFlags
+flagsAllTrie = extendFlagSpecTrie flagsDynamicTrie $ map snd package_flags_deps
+
 -- All dynamic flags present in GHC with deprecation information.
 flagsAllDeps :: [(Deprecation, Flag (CmdLineP DynFlags))]
 flagsAllDeps =  package_flags_deps ++ dynamic_flags_deps
 
 
 -- All dynamic flags, minus package flags, present in GHC.
-flagsDynamic :: [Flag (CmdLineP DynFlags)]
-flagsDynamic = map snd dynamic_flags_deps
+--
+-- See Note [Optimising the processing of command-line arguments].
+flagsDynamicTrie :: FlagSpecTrie DynFlags
+flagsDynamicTrie = mkFlagSpecTrie $ map snd dynamic_flags_deps
 
 -- ALl package flags present in GHC.
 flagsPackage :: [Flag (CmdLineP DynFlags)]

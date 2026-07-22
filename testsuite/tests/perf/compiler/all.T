@@ -874,6 +874,16 @@ test ('T24984',
       compile,
       ['-O'])
 
+# Performance regression test for the parser of command line arguments
+test(
+    'T25763',
+    [
+        collect_compiler_runtime(5),
+        pre_cmd(f'seq 400000 | sed "s/.*/-XCPP/" > t25763.txt && echo "main = pure ()" > t25763.hs'),
+    ],
+    multimod_compile,
+    ['t25763', '@t25763.txt -c -fno-code'])
+
 test('interpreter_steplocal',
      [ collect_compiler_stats('bytes allocated', 5)
      ],
