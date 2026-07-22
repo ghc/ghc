@@ -754,6 +754,12 @@ void nonmovingInit(void)
     nonmovingMarkInit();
 }
 
+void nonmovingInitAfterFork(void)
+{
+    if (! RtsFlags.GcFlags.useNonmoving) return;
+    nonmovingInitConcurrentWorker();
+}
+
 void nonmovingExit(void)
 {
     if (! RtsFlags.GcFlags.useNonmoving) return;

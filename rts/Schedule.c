@@ -2078,7 +2078,26 @@ forkProcess(HsStablePtr *entry
     waitForCapability(&cap, task);
 
 #if defined(THREADED_RTS)
-    stopAllCapabilities(&cap, task);
+    while (true) {
+        stopAllCapabilities(&cap, task);
+
+        // The nonmoving collector's worker is not copied by fork(). Only
+        // proceed when it is idle, keeping its lock held to prevent another
+        // collection from starting before the fork. We must not wait for an
+        // active mark while holding capabilities since the mark may need to
+        // synchronize with the mutator before it can finish.
+        if (nonmovingBlockConcurrentMark(false)) {
+            break;
+        }
+
+        releaseAllCapabilities(n_capabilities, NULL, task);
+        CHECK(nonmovingBlockConcurrentMark(true));
+        nonmovingUnblockConcurrentMark();
+        cap = NULL;
+        waitForCapability(&cap, task);
+    }
+#else
+    CHECK(nonmovingBlockConcurrentMark(false));
 #endif
 
     // no funny business: hold locks while we fork, otherwise if some
@@ -2115,6 +2134,8 @@ forkProcess(HsStablePtr *entry
     pid = fork();
 
     if (pid) { // parent
+
+        nonmovingUnblockConcurrentMark();
 
         RELEASE_LOCK(&sched_mutex);
         RELEASE_LOCK(&sm_mutex);
@@ -2231,6 +2252,10 @@ forkProcess(HsStablePtr *entry
         for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
             generations[g].threads = END_TSO_QUEUE;
         }
+
+        // The persistent nonmoving collector worker is an OS thread and was
+        // not copied by fork(). Recreate it before running the child action.
+        nonmovingInitAfterFork();
 
         // The timer thread is not present in the child process, so we need
         // to initialise the timer again.

@@ -1,5 +1,6 @@
 import Control.Concurrent
 import Control.Exception
+import System.Exit
 import System.IO
 import System.Posix
 import System.Posix.IO
@@ -19,3 +20,5 @@ main = do
   "registered" <- hGetLine hdl
   signalProcess sigINT pid
   putStrLn =<< hGetLine hdl
+  Just (Exited ExitSuccess) <- getProcessStatus True False pid
+  return ()
