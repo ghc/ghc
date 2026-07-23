@@ -679,7 +679,7 @@ test('T22859',
      [js_skip,
       # This test is vulnerable to changes in allocation behaviour, so we disable it in some ways
       when(arch('wasm32'), skip),
-      omit_ways(llvm_ways)],
+      omit_ways(llvm_ways + ['nonmoving_thr', 'nonmoving_thr_sanity'])],
      compile_and_run, ['-with-rtsopts -A8K'])
 
 # These tests need access to the internal RTS headers.
