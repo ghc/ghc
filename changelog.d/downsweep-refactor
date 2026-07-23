@@ -1,0 +1,9 @@
+section: compiler
+synopsis: Significantly improve the performance of downsweep
+issues: #27461
+mrs: !16330
+description: {
+    Rewrite the downsweep pass to make the control flow clearer and fix the
+    caching strategy. Allocations during downsweep in multi-home-unit-heavy and
+    module-heavy tests are reduced by -30% to -60%
+}

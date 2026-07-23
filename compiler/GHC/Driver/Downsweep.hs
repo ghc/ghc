@@ -117,14 +117,61 @@ import Data.IORef
 import qualified Data.List.NonEmpty as NE
 
 {-
-Note [Downsweep and the ModuleGraph]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [The ModuleGraph]
+~~~~~~~~~~~~~~~~~~~~~~
 The 'ModuleGraph' stores the relationship between all the modules, units, and
 instantiations in the current session, allowing e.g. to answer questions about
 the transitive closure of the imports.
 
-Downsweep is the compiler pass which discovers and builds a new 'ModuleGraph'.
-by following all the (module,unit,...) dependencies, starting from the root modules.
+* A /node/ of the `ModuleGraph`, of type `ModuleGraphNode`, corresponds
+  1-1 with a home-package module of source code, N.hs or N.hs-boot.
+  See the haddocks of `ModuleGraphNode`.
+
+  The `ModuleNodeInfo` field of the `ModuleGraphNode` contains a `ModSummary`
+  that in turn describes where the source file is (its `ModLocation`), when it
+  was read, its contents etc. See Note [Module Types in the ModuleGraph].
+
+  Each node has a distinct `NodeKey` (an instance of Ord); the function
+        mkNodeKey :: ModuleGraphNode -> NodeKey
+  get the `NodeKey` of a node
+
+* An /edge/ of the `ModuleGraph` from N1 to N2 typically corresponds to a
+  direct import of module N2 in module N1: one edge for each import.
+  Imports of modules from non-home-packages are featured in the `ModuleGraph`
+  as `UnitNode`s, or `InstantiationNodes` when backpack is involved.
+
+  Each node contains a list of all its out-edges or, more precisely, of the
+  `NodeKey`s of its direct dependencies.
+
+Because a node in the `ModuleGraph` describes the precise dependencies of the module, each node has its
+own `UnitId`.  Remember, a single module can be compiled against many different versions of a library; but
+once we fix its dependencies we can compile it, and give it a `UnitId`.  See Note [About units] in GHC.Unit.
+
+When is this graph constructed?
+
+1. In `--make` mode, we construct the graph before starting to do any compilation.
+
+2. In `-c` (oneshot) mode, we construct the graph when we have calculated the
+   ModSummary for the module we are compiling. The `ModuleGraph` is stored in a
+   thunk, so it is only constructed when it is needed. This avoids reading
+   the interface files of the whole transitive closure unless they are needed.
+
+3. In some situations (such as loading plugins) we may need to construct the
+   graph without having a ModSummary. In this case we use the `downsweepInstalledModules`
+   function.
+
+The result is having a uniform graph available for the whole compilation pipeline.
+
+Note [Downsweep: building and maintaining the module graph]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The module graph can be built from scratch by starting from a set of /root nodes/
+and exploring their dependencies. This is done by `GHC.Driver.Downsweep.downsweep`.
+
+Another scenario is when we already /have/ a `ModuleGraph` and want to update
+it (e.g. to reflect any file-system changes that have taken place since the
+last invocation of `downsweep`) or augment it by exploring new roots (e.g. for
+incrementally constructing a ModuleGraph using the GHC API; See #27054). So
+`downsweep` takes a `Maybe ModuleGraph` as one of its arguments.
 
 Downsweep iteratively *expands* each so-called 'DownsweepNode' into a list of
 its dependencies, and recursively traverses all reachable nodes in a
@@ -151,21 +198,6 @@ it records the payload (e.g. a Module) *and* its dependencies, unlike
 potentially some context information, like the current home-unit)
 
 TL;DR: We recursively traverse 'DownsweepNodes' to discover and build the 'ModuleGraph'.
-
-When is this graph constructed?
-
-1. In `--make` mode, we construct the graph before starting to do any compilation.
-
-2. In `-c` (oneshot) mode, we construct the graph when we have calculated the
-   ModSummary for the module we are compiling. The `ModuleGraph` is stored in a
-   thunk, so it is only constructed when it is needed. This avoids reading
-   the interface files of the whole transitive closure unless they are needed.
-
-3. In some situations (such as loading plugins) we may need to construct the
-   graph without having a ModSummary. In this case we use the `downsweepInstalledModules`
-   function.
-
-The result is having a uniform graph available for the whole compilation pipeline.
 
 See also Note [Downsweep Control Flow and Caching]
 -}
@@ -1778,12 +1810,33 @@ twice).
    same node of the module graph. Cache is keyed by the final
    `ModuleGraph`s `NodeKey`s.
 
+    For example, suppose
+
+       A imports B and C
+       B imports D
+       C imports D
+
+    Then, starting from A we will expand A and push B and C to the worklist;
+    then, going back to B, we expand B which pushes D to the worklist. After
+    processing D, we go to C, which imports D, but we have already visited that
+    module so we can just use the already-constructed `ModuleGraphNode` for D.
+
 2. For Module A in home-unit u1, each import in the list of imports
    needs to be *found* (call to `findImportedModuleWithIsBoot`): at this
    point, we only have the `ModuleName` of the import, not the `Module`.
    This *finding* is somewhat expensive, so we cache it as well
    (`ImportsCache`). The cache key is the home-unit to which the module
    belongs~[1], the import package qualifier, and the ModuleName.
+
+   Same example, suppose
+
+      A imports B and C
+      B imports D
+      C imports D
+
+   When expanding B, we will findImportedModule "import D".
+   When expanding C, we would findImportedModule "import D", but we can just
+   look it up in the cache
 
    [1] Different home-units will have different package flags, which means
    potentially different `Module` resolution for the same `ModuleName`.
@@ -1797,6 +1850,10 @@ twice).
    Module's UnitId and the Source path; the reason is we need to
    distinguish between `.hs` and `.hs-boot` files, as their summaries
    will differ.
+
+   Note that this covers more than just (1), because we summarise all imports
+   of a single module when expanding it (see 'expandModuleSummary'), before
+   returning from the expansion function.
 
    Note that (2) can't guarantee this alone: Two ModuleName imports in
    separate units can (and likely do) map to the same `Module`.
