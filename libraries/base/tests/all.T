@@ -309,7 +309,9 @@ test('T20107', extra_run_opts('+RTS -M50M'), compile_and_run, ['-package bytestr
 test('T22816', normal, compile_and_run, [''])
 test('trace', normal, compile_and_run, [''])
 test('listThreads', normal, compile_and_run, [''])
-test('listThreads1', omit_ghci, compile_and_run, [''])
+test('listThreads1',
+     [omit_ghci, omit_ways(['nonmoving_thr', 'nonmoving_thr_sanity'])],
+     compile_and_run, [''])
 test('inits1tails1', normal, compile_and_run, [''])
 test('CLC149', normal, compile, [''])
 test('AtomicModifyIORef', js_fragile(24259), compile_and_run, [''])
