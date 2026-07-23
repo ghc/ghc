@@ -23,6 +23,10 @@ variables:
   # Always start with a fresh clone to avoid non-hermetic builds
   GIT_STRATEGY: clone
 
+  # Shallow submodule clones. Overridden by individual jobs that need deeper
+  # submodule history.
+  GIT_SUBMODULE_DEPTH: 1
+
   # Overridden by individual jobs
   CONFIGURE_ARGS: ""
 
@@ -313,6 +317,7 @@ typecheck-testsuite:
   extends: .lint-params
   variables:
     BUILD_FLAVOUR: default
+    GIT_SUBMODULE_DEPTH: 0 # full history
   script:
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh run_hadrian stage0:exe:lint-submodule-refs
