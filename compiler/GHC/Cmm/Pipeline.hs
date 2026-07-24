@@ -8,6 +8,7 @@ import GHC.Prelude
 import GHC.Driver.Flags
 
 import GHC.Cmm
+import GHC.Cmm.CLabel
 import GHC.Cmm.Config
 import GHC.Cmm.ContFlowOpt
 import GHC.Cmm.CommonBlockElim
@@ -80,14 +81,14 @@ cpsTop logger platform cfg dus proc =
       --
       CmmProc h l v g <- {-# SCC "cmmCfgOpts(1)" #-}
            return $ cmmCfgOptsProc splitting_proc_points proc
-      dump Opt_D_dump_cmm_cfg "Post control-flow optimisations (1)" g
+      dump l Opt_D_dump_cmm_cfg "Post control-flow optimisations (1)" g
 
       let !TopInfo {stack_info=StackInfo { arg_space = entry_off
                                          , do_layout = do_layout }} = h
 
       ----------- Eliminate common blocks -------------------------------------
       g <- {-# SCC "elimCommonBlocks" #-}
-           condPass (cmmOptElimCommonBlks cfg) elimCommonBlocks g
+           condPass l (cmmOptElimCommonBlks cfg) elimCommonBlocks g
                          Opt_D_dump_cmm_cbe "Post common block elimination"
 
       -- Any work storing block Labels must be performed _after_
@@ -98,7 +99,7 @@ cpsTop logger platform cfg dus proc =
              then {-# SCC "createSwitchPlans" #-}
                   pure $ runUniqueDSM dus $ cmmImplementSwitchPlans platform g
              else pure (g, dus)
-      dump Opt_D_dump_cmm_switch "Post switch plan" g
+      dump l Opt_D_dump_cmm_switch "Post switch plan" g
 
       ----------- ThreadSanitizer instrumentation -----------------------------
       g <- {-# SCC "annotateTSAN" #-}
@@ -111,7 +112,7 @@ cpsTop logger platform cfg dus proc =
             return $ initUs_ us $
               annotateTSAN platform g
           else return g
-      dump Opt_D_dump_cmm_thread_sanitizer "ThreadSanitizer instrumentation" g
+      dump l Opt_D_dump_cmm_thread_sanitizer "ThreadSanitizer instrumentation" g
 
       ----------- Proc points -------------------------------------------------
       let
@@ -134,11 +135,11 @@ cpsTop logger platform cfg dus proc =
          if do_layout
             then runUniqueDSM dus $ cmmLayoutStack cfg proc_points entry_off g
             else ((g, mapEmpty), dus)
-      dump Opt_D_dump_cmm_sp "Layout Stack" g
+      dump l Opt_D_dump_cmm_sp "Layout Stack" g
 
       ----------- Sink and inline assignments  --------------------------------
       g <- {-# SCC "sink" #-} -- See Note [Sinking after stack layout]
-           condPass (cmmOptSink cfg) (cmmSink platform) g
+           condPass l (cmmOptSink cfg) (cmmSink platform) g
                     Opt_D_dump_cmm_sink "Sink assignments"
 
       ------------- CAF analysis ----------------------------------------------
@@ -182,11 +183,11 @@ cpsTop logger platform cfg dus proc =
         dumps flag name
            = mapM_ (dumpWith logger flag name FormatCMM . pdoc platform)
 
-        condPass do_opt pass g dumpflag dumpname =
+        condPass lbl do_opt pass g dumpflag dumpname =
             if do_opt
                then do
                     g <- return $ pass g
-                    dump dumpflag dumpname g
+                    dump lbl dumpflag dumpname g
                     return g
                else return g
 
@@ -359,10 +360,10 @@ generator later.
 
 -}
 
-dumpGraph :: Logger -> Platform -> Bool -> DumpFlag -> String -> CmmGraph -> IO ()
-dumpGraph logger platform do_linting flag name g = do
+dumpGraph :: Logger -> Platform -> Bool -> CLabel -> DumpFlag -> String -> CmmGraph -> IO ()
+dumpGraph logger platform do_linting lbl flag name g = do
   when do_linting $ do_lint g
-  dumpWith logger flag name FormatCMM (pdoc platform g)
+  dumpWith logger flag name FormatCMM (pdoc platform lbl $$ pdoc platform g)
  where
   do_lint g = case cmmLintGraph platform g of
                  Just err -> do { fatalErrorMsg logger err
