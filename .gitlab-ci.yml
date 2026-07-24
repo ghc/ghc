@@ -266,7 +266,8 @@ lint-changelog:
     GIT_SUBMODULE_STRATEGY: none
   before_script:
     - export PATH="/opt/toolchain/bin:$PATH"
-    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    # workaround for docker permissions
+    - sudo chown ghc:ghc -R .
   script:
     - .gitlab/ci.sh lint_changelog
   dependencies: []
@@ -283,6 +284,9 @@ lint-linters:
   variables:
     GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
+  before_script:
+    # workaround for docker permissions
+    - sudo chown ghc:ghc -R .
   script:
     - mypy testsuite/tests/linters/regex-linters/*.py
   dependencies: []
@@ -294,6 +298,9 @@ lint-testsuite:
   variables:
     GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
+  before_script:
+    # workaround for docker permissions
+    - sudo chown ghc:ghc -R .
   script:
     - make -Ctestsuite list_broken TEST_HC=$GHC
   dependencies: []
@@ -305,6 +312,9 @@ typecheck-testsuite:
   variables:
     GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
+  before_script:
+    # workaround for docker permissions
+    - sudo chown ghc:ghc -R .
   script:
     - mypy testsuite/driver/runtests.py
   dependencies: []
@@ -335,6 +345,9 @@ lint-author:
   extends: .lint
   variables:
     GIT_SUBMODULE_STRATEGY: none
+  before_script:
+    # workaround for docker permissions
+    - sudo chown ghc:ghc -R .
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
