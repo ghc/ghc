@@ -1,0 +1,17 @@
+section: compiler
+issues: #27461
+mrs: !16330
+synopsis:
+    downsweep: make control flow simpler and cache correct
+description: {
+    Extracts the control flow of downsweep into a single
+    function `dfsBuild`, which takes care of iteratively expanding and
+    traversing all nodes of the in-construction module graph necessary to
+    build a full `ModuleGraph`.
+
+    This avoids recomputing expensive operations, such summarising `Module`s into `ModuleSummary`s.
+    We greatly reduce the number of allocations for module graphs with lots of imports, especially
+    when multiple home units are involved.
+}
+
+
