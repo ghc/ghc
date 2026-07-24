@@ -6,7 +6,7 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE ViewPatterns #-}
 
--- | See Note [Downsweep and the ModuleGraph]
+-- | See Note [The ModuleGraph]
 module GHC.Driver.Downsweep
   ( downsweep
   , downsweepThunk
@@ -234,7 +234,7 @@ See also Note [Downsweep Control Flow and Caching]
 -- It will also turn on code generation for any modules that need it by calling
 -- 'enableCodeGenForTH'.
 --
--- See also Note [Downsweep and the ModuleGraph]
+-- See also Note [The ModuleGraph]
 downsweep :: HscEnv
           -> (GhcMessage -> AnyGhcDiagnostic)
           -> Maybe Messager
@@ -1858,5 +1858,5 @@ twice).
    Note that (2) can't guarantee this alone: Two ModuleName imports in
    separate units can (and likely do) map to the same `Module`.
 
-See also Note [Downsweep and the ModuleGraph]
+See also Note [The ModuleGraph]
 -}

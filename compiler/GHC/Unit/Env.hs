@@ -164,7 +164,7 @@ data UnitEnv = UnitEnv
 
     , ue_module_graph    :: ModuleGraph
         -- ^ The module graph of the current session
-        -- See Note [Downsweep and the ModuleGraph] for when this is constructed.
+        -- See Note [The ModuleGraph] for when this is constructed.
 
     , ue_home_unit_graph :: !HomeUnitGraph
         -- See Note [Multiple Home Units]

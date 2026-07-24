@@ -270,7 +270,7 @@ hugSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> UnitId -> Modu
 -- These things are currently stored in the EPS for home packages. (See #25795 for
 -- progress in removing these kind of checks; and making these functions of
 -- `UnitEnv` rather than `HscEnv`)
--- See Note [Downsweep and the ModuleGraph]
+-- See Note [The ModuleGraph]
 hugSomeThingsBelowUs _ _ hsc_env _ _ | isOneShot (ghcMode (hsc_dflags hsc_env)) = return []
 hugSomeThingsBelowUs extract include_hi_boot hsc_env uid mn
   = let hug = hsc_HUG hsc_env
