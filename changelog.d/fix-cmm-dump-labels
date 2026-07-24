@@ -1,0 +1,4 @@
+section: compiler
+synopsis: Fix missing top-level procedure labels in some intermediate Cmm pass dumps.
+issues: #27553
+mrs: !16406
