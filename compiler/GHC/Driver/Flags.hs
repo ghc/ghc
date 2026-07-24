@@ -680,6 +680,8 @@ data GeneralFlag
    | Opt_LlvmFillUndefWithGarbage       -- Testing for undef bugs (hidden flag)
    | Opt_IrrefutableTuples
    | Opt_CmmSink
+   | Opt_CmmSplitProcPoints
+   | Opt_CmmSwitchPlans
    | Opt_CmmStaticPred
    | Opt_CmmElimCommonBlocks
    | Opt_CmmControlFlow
@@ -951,6 +953,8 @@ optimisationFlags = EnumSet.fromList
    , Opt_RegsIterative
    , Opt_IrrefutableTuples
    , Opt_CmmSink
+   , Opt_CmmSplitProcPoints
+   , Opt_CmmSwitchPlans
    , Opt_CmmElimCommonBlocks
    , Opt_AsmShortcutting
    , Opt_InterModuleFarJumps

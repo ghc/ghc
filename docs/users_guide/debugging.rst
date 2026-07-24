@@ -1297,3 +1297,29 @@ Other
     These are printed by the bytecode disassembler, aiding in correlating
     bytecode with STG.
 
+.. ghc-flag:: -fcmm-split-proc-points
+    :shortdesc: Force Cmm proc-point splitting.
+    :type: dynamic
+    :reverse: -fno-cmm-split-proc-points
+    :category:
+
+    :default: off when using the NCG on a platform with
+              tables-next-to-code, otherwise on.
+
+    Force the Cmm pipeline to split proc points, even when the
+    selected backend supports unsplit proc points. Disabling this flag
+    restores the default derived from the backend and platform; it
+    does not disable splitting when the backend requires it.
+
+.. ghc-flag:: -fcmm-switch-plans
+    :shortdesc: Force Cmm switch-plan generation.
+    :type: dynamic
+    :reverse: -fno-cmm-switch-plans
+    :category:
+
+    :default: off when using the LLVM or unregisterised backend, otherwise on.
+
+    Force the Cmm pipeline to do switch plans for Cmm switches, even
+    when the selected backend supports native switches. Disabling this
+    flag restores the default derived from the backend; it does not
+    disable switch plans when the backend requires it.

@@ -21,8 +21,10 @@ initCmmConfig dflags = CmmConfig
   , cmmOptThreadSanitizer  = gopt Opt_CmmThreadSanitizer dflags
   , cmmGenStackUnwindInstr = debugLevel dflags > 0
   , cmmExternalDynamicRefs = gopt Opt_ExternalDynamicRefs dflags
-  , cmmDoCmmSwitchPlans    = not (backendHasNativeSwitch (backend dflags))
-  , cmmSplitProcPoints     = not (backendSupportsUnsplitProcPoints (backend dflags))
+  , cmmDoCmmSwitchPlans    = gopt Opt_CmmSwitchPlans dflags
+                             || not (backendHasNativeSwitch (backend dflags))
+  , cmmSplitProcPoints     = gopt Opt_CmmSplitProcPoints dflags
+                             || not (backendSupportsUnsplitProcPoints (backend dflags))
                              || not (platformTablesNextToCode platform)
   }
   where platform                = targetPlatform dflags

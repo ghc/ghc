@@ -1,0 +1,5 @@
+section: cmm
+synopsis: Add :ghc-flag:`-fcmm-split-proc-points` and
+  :ghc-flag:`-fcmm-switch-plans` to override backend defaults.
+issues: #27552
+mrs: !16409
