@@ -297,3 +297,7 @@ test('aarch64-sxtw-run',
      ['aarch64-sxtw-run', [('aarch64-sxtw-cmm.cmm', '')], '-O'])
 
 test('T27430', [req_c, extra_ways(['optasm'])], compile_and_run, ['T27430_c.c'])
+
+test('T27537', normal, compile_and_run, ['-O'])
+
+test('T27538', normal, compile_and_run, ['-O'])
