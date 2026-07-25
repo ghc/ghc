@@ -99,11 +99,11 @@ lintCmmExpr expr@(CmmMachOp op args) = do
   platform <- getPlatform
   tys <- mapM lintCmmExpr args
   lintShiftOp op (zip args tys)
-  let machop_arg_widths = machOpArgReps platform op
+  let machop_arg_widths_m = machOpArgReps platform op
       arg_tys           = map (cmmExprType platform) args
-  if map typeWidth arg_tys == machop_arg_widths
+  if maybe False (\machop_arg_widths -> map typeWidth arg_tys == machop_arg_widths) machop_arg_widths_m
     then cmmCheckMachOp op args tys
-    else cmmLintMachOpErr expr arg_tys machop_arg_widths
+    else cmmLintMachOpErr expr arg_tys machop_arg_widths_m
 lintCmmExpr (CmmRegOff reg offset)
   = do let rep = typeWidth (cmmRegType reg)
        lintCmmExpr (CmmMachOp (MO_Add rep)
@@ -279,8 +279,16 @@ addLintInfo info thing = CmmLint $ \platform ->
         Left err -> Left (hang info 2 err)
         Right a  -> Right a
 
-cmmLintMachOpErr :: CmmExpr -> [CmmType] -> [Width] -> CmmLint a
-cmmLintMachOpErr expr argsRep opExpectsRep
+cmmLintMachOpErr :: CmmExpr -> [CmmType] -> Maybe [Width] -> CmmLint a
+cmmLintMachOpErr expr argsRep Nothing
+     = do
+       platform <- getPlatform
+       cmmLintErr (text "in MachOp application: " $$
+                   nest 2 (pdoc platform expr) $$
+                      text "op is using unsupported width" $$
+                      (text "arguments provide: " <+> ppr argsRep))
+
+cmmLintMachOpErr expr argsRep (Just opExpectsRep)
      = do
        platform <- getPlatform
        cmmLintErr (text "in MachOp application: " $$
