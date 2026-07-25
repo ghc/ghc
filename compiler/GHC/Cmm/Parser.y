@@ -719,6 +719,8 @@ stmt    :: { CmmParse () }
                 { doCall $2 [] $4 }
         | '(' formals ')' '=' 'call' expr '(' exprs0 ')' ';'
                 { doCall $6 $2 $8 }
+        -- NB: bool_expr most be a *boolean* expression: A comparison machOp or 1/0 word literals.
+        -- We don't allow arbitrary expressions as conditions (See checkCond, #27543).
         | 'if' bool_expr cond_likely 'goto' NAME
                 { do l <- lookupLabel $5; cmmRawIf $2 l $3 }
         | 'if' bool_expr cond_likely '{' body '}' else
