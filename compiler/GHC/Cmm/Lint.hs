@@ -91,8 +91,9 @@ lintCmmBlock labels block
 -- byte/word mismatches.
 
 lintCmmExpr :: CmmExpr -> CmmLint CmmType
-lintCmmExpr (CmmLoad expr rep _alignment) = do
-  _ <- lintCmmExpr expr
+lintCmmExpr e@(CmmLoad expr rep _alignment) = do
+  ty <- lintCmmExpr expr
+  lintAddrTy e ty
   -- Disabled, if we have the inlining phase before the lint phase,
   -- we can have funny offsets due to pointer tagging. -- EZY
   -- when (widthInBytes (typeWidth rep) >= platformWordSizeInBytes platform) $
@@ -102,11 +103,11 @@ lintCmmExpr expr@(CmmMachOp op args) = do
   platform <- getPlatform
   tys <- mapM lintCmmExpr args
   lintShiftOp op (zip args tys)
-  let machop_arg_widths = machOpArgReps platform op
+  let machop_arg_widths_m = machOpArgReps platform op
       arg_tys           = map (cmmExprType platform) args
-  if map typeWidth arg_tys == machop_arg_widths
+  if maybe False (\machop_arg_widths -> map typeWidth arg_tys == machop_arg_widths) machop_arg_widths_m
     then cmmCheckMachOp op args tys
-    else cmmLintMachOpErr expr arg_tys machop_arg_widths
+    else cmmLintMachOpErr expr arg_tys machop_arg_widths_m
 lintCmmExpr (CmmRegOff reg offset)
   = do let rep = typeWidth (cmmRegType reg)
        lintCmmExpr (CmmMachOp (MO_Add rep)
@@ -114,6 +115,15 @@ lintCmmExpr (CmmRegOff reg offset)
 lintCmmExpr expr =
   do platform <- getPlatform
      return (cmmExprType platform expr)
+
+-- We require every address to refer to be word-width since we don't support 32
+-- bit pointers on 64bit platforms.
+lintAddrTy :: CmmExpr -> CmmType -> CmmLint ()
+lintAddrTy e addr_ty = do
+  p <- getPlatform
+  -- We don't support any platforms where wordwidth /= ptrWidth currently.
+  unless (addr_ty `cmmCompatType` bWord p) $ cmmLintErr (text "Non word-width address found in:" <+> pdoc p e)
+
 
 -- | Check for obviously out-of-bounds shift operations
 lintShiftOp :: MachOp -> [(CmmExpr, CmmType)] -> CmmLint ()
@@ -176,10 +186,10 @@ lintCmmMiddle node = case node of
             unless (erep `cmmCompatType` reg_ty) $
               cmmLintAssignErr (CmmAssign reg expr) erep reg_ty
 
-  CmmStore l r _alignment -> do
-            _ <- lintCmmExpr l
-            _ <- lintCmmExpr r
-            return ()
+  CmmStore addr rhs _alignment -> do
+            addr_ty <- lintCmmExpr addr
+            _ <- lintCmmExpr rhs
+            lintAddrTy addr addr_ty
 
   CmmUnsafeForeignCall target _formals actuals -> do
             let lintArg expr = do
@@ -282,8 +292,16 @@ addLintInfo info thing = CmmLint $ \platform ->
         Left err -> Left (hang info 2 err)
         Right a  -> Right a
 
-cmmLintMachOpErr :: CmmExpr -> [CmmType] -> [Width] -> CmmLint a
-cmmLintMachOpErr expr argsRep opExpectsRep
+cmmLintMachOpErr :: CmmExpr -> [CmmType] -> Maybe [Width] -> CmmLint a
+cmmLintMachOpErr expr argsRep Nothing
+     = do
+       platform <- getPlatform
+       cmmLintErr (text "in MachOp application: " $$
+                   nest 2 (pdoc platform expr) $$
+                      text "op is using unsupported width" $$
+                      (text "arguments provide: " <+> ppr argsRep))
+
+cmmLintMachOpErr expr argsRep (Just opExpectsRep)
      = do
        platform <- getPlatform
        cmmLintErr (text "in MachOp application: " $$

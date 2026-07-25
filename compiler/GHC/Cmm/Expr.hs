@@ -435,7 +435,7 @@ pprExpr platform e
         CmmLit lit -> pprLit platform lit
         _other     -> pprExpr1 platform e
 
--- `exp` usually, but (expr[width]) with -dppr-debug
+-- | `op` usually, but `(op[width])` with -dppr-debug
 withDebugWidth :: Width -> SDoc -> SDoc
 withDebugWidth w exp =
   ifPprDebug (parens (exp <> brackets (ppr w))) exp
