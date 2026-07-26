@@ -405,7 +405,7 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
     ppr ie@(IEModuleContents _ mod')
         = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ text "module" <+> ppr mod']
     ppr (IEWholeNamespace _ ns_spec) = ppr ns_spec <+> text ".."
-    ppr (IEGroup _ n _)           = text ("<IEGroup: " ++ show n ++ ">")
+    ppr (IEGroup _ n doc)         = ppr doc
     ppr (IEDoc _ doc)             = ppr doc
     ppr (IEDocNamed _ string)     = text ("<IEDocNamed: " ++ string ++ ">")
 

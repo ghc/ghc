@@ -223,9 +223,12 @@ partitionBindsAndSigs' = go
 
 -- ---------------------------------------------------------------------
 
--- Okay, I need to reconstruct the document comments, but for now:
-instance Outputable (DocDecl name) where
-  ppr _ = text "<document comment>"
+instance Outputable (DocDecl (GhcPass p)) where
+  ppr (DocCommentNext doc) = ppr doc
+  ppr (DocCommentPrev doc) = ppr doc
+  ppr (DocCommentNamed _name doc) = ppr doc
+  ppr (DocGroup _num doc) = ppr doc
+
 
 type instance XCHsGroup (GhcPass _) = NoExtField
 type instance XXHsGroup (GhcPass _) = DataConCantHappen
