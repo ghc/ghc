@@ -121,13 +121,21 @@ instance Outputable (HsModule GhcPs) where
               Nothing -> pp_header (text "where")
               Just es -> vcat [
                            pp_header lparen,
-                           nest 8 (pprWithCommas ppr es),
+                           nest 8 (fsep (map ppr_with_comma es)),
                            nest 4 (text ") where")
                           ],
             pp_nonnull imports,
             pp_nonnull (Basic.toList decls)
           ]
       where
+        ppr_with_comma lie
+          | needs_comma lie = ppr lie <> comma
+          | otherwise = ppr lie
+
+        needs_comma (L _ IEGroup{}) = False
+        needs_comma (L _ IEDoc{}) = False
+        needs_comma _ = True
+
         pp_header rest = case deprec of
            Nothing -> pp_modname <+> rest
            Just d -> vcat [ pp_modname, ppr d, rest ]
