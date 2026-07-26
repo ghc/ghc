@@ -81,7 +81,7 @@ instance (Show (LHsDocStringChunk pass), XXHsDocString pass ~ DataConCantHappen)
       showString "GeneratedDocString " . showsPrec 11 x
 
 instance Outputable (HsDocString (GhcPass p)) where
-  ppr = text . renderHsDocString
+  ppr = text . exactPrintHsDocString
 
 -- | Annotate a pretty printed thing with its doc.
 -- The docstring comes after if it is 'HsDocStringPrevious'.
