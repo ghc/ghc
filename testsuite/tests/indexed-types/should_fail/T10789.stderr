@@ -1,0 +1,7 @@
+T10789.hs:14:7: error: [GHC-83865]
+    • Couldn't match type ‘F Maybe’ with ‘Maybe’
+      Expected: Proxy (F Maybe) -> Proxy Maybe
+        Actual: Proxy Maybe -> Proxy Maybe
+    • In the expression: id
+      In an equation for ‘foo’: foo = id
+
