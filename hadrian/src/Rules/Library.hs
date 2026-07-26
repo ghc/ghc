@@ -140,7 +140,7 @@ buildPackage root fp = do
   -- Write the current time into the file so the file always changes if
   -- we restamp it because a dependency changes.
   time <- liftIO $ getCurrentTime
-  liftIO $ writeFile fp (show time)
+  writeFileAtomic fp (show time)
   ways <- interpretInContext ctx getLibraryWays
   let hasVanilla = elem vanilla ways
       hasDynamic = elem dynamic ways
@@ -148,7 +148,7 @@ buildPackage root fp = do
   when ((hasVanilla && hasDynamic) &&
         support && way == vanilla) $ do
     stamp <- (pkgStampFile (ctx { way = dynamic }))
-    liftIO $ writeFile stamp (show time)
+    writeFileAtomic stamp (show time)
 
 
 

@@ -268,7 +268,7 @@ buildPackageDocumentation = do
         syn  <- pkgSynopsis    (Context.package ctx)
         desc <- pkgDescription (Context.package ctx)
         let prologue = if null desc then syn else desc
-        liftIO $ writeFile file prologue
+        writeFileAtomic file prologue
 
     root -/- htmlRoot -/- "libraries/*/*.haddock" %> \file -> do
         context <- pkgDocContext =<< getPkgDocTarget root file

@@ -94,7 +94,7 @@ registerPackageRules rs stage iplace = do
         -- leads to errors in GHC).
         buildWithResources rs $
             target (Context stage compiler vanilla iplace) (GhcPkg Recache stage) [] []
-        writeFileLines stamp []
+        writeFileLinesAtomic stamp []
 
     -- Special rule for registering system-cxx-std-lib
     root -/- relativePackageDbPath (PackageDbLoc stage iplace) -/- systemCxxStdLibConf %> \file -> do

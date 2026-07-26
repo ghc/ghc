@@ -21,7 +21,7 @@ buildGhcInternalImportDef target = do
     templateIn <- readFile' "rts/win32/libHSghc-internal.def.in"
     let dllName = takeFileName target -<.> "dll"
         templateOut = replace "@GhcInternalDll@" dllName templateIn
-    writeFile' target templateOut
+    writeFileAtomic target templateOut
 
 buildGhcInternalImportLib :: Stage -> FilePath -> Action ()
 buildGhcInternalImportLib stg target = do

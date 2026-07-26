@@ -234,7 +234,7 @@ buildBinDistDir root conf@BindistConfig{..} = do
         bindistContext = vanillaContext library_stage compiler
     bindistSettingsContent <- interpretInContext bindistContext $
         generateSettings bindistSettings False "package.conf.d"
-    writeFile' bindistSettings bindistSettingsContent
+    writeFileAtomic bindistSettings bindistSettingsContent
 
     copyDirectory rtsIncludeDir         bindistFilesDir
     when windowsHost $ createGhcii (bindistFilesDir -/- "bin")
@@ -296,7 +296,7 @@ buildBinDistDir root conf@BindistConfig{..} = do
     need $ map (bindistFilesDir -/-)
               (["configure", "Makefile"] ++ bindistInstallFiles)
     copyFile ("hadrian" -/- "bindist" -/- "config.mk.in") (bindistFilesDir -/- "config.mk.in")
-    generateBuildMk conf >>= writeFile' (bindistFilesDir -/- "build.mk")
+    generateBuildMk conf >>= writeFileAtomic (bindistFilesDir -/- "build.mk")
     copyFile ("hadrian" -/- "cfg" -/- "default.target.in") (bindistFilesDir -/- "default.target.in")
     copyFile ("hadrian" -/- "cfg" -/- "default.host.target.in") (bindistFilesDir -/- "default.host.target.in")
 
@@ -314,7 +314,7 @@ buildBinDistDir root conf@BindistConfig{..} = do
               versioned_wrapper = wrapper_name ++ "-" ++ suffix
               versioned_wrapper_path = bindistFilesDir -/- "wrappers" -/- versioned_wrapper
           -- Write the wrapper to the versioned path
-          writeFile' versioned_wrapper_path wrapper_content
+          writeFileAtomic versioned_wrapper_path wrapper_content
           -- Create a symlink from the non-versioned to the versioned.
           liftIO $ do
             IO.removeFile unversioned_wrapper_path <|> return ()

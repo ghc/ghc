@@ -32,7 +32,7 @@ buildProgramRules rs = do
         top <- topDirectory
         need [ top -/- "configure" ]
         copyDirectory (top -/- "inplace" -/- "mingw") root
-        writeFile' stampPath "OK"
+        writeFileAtomic stampPath "OK"
 
     -- Rules for programs that are actually built by hadrian.
     forM_ allStages $ \stage ->
