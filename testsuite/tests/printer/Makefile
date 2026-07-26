@@ -939,7 +939,7 @@ PprQualifiedStrings:
 
 .PHONY: Haddock1
 Haddock1:
-	# $(CHECK_PPR)   $(LIBDIR) Haddock1.hs
+	$(CHECK_PPR)   $(LIBDIR) Haddock1.hs
 	$(CHECK_EXACT) $(LIBDIR) Haddock1.hs
 
 .PHONY: Layout
