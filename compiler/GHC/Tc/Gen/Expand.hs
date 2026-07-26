@@ -21,7 +21,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Id.Make
 import GHC.Types.SrcLoc
-import GHC.Types.SourceText ( mkIntegralLit , SourceText(..) )
+import GHC.Types.SourceText ( SourceText(..) )
 
 import GHC.Builtin.Names
 
