@@ -353,7 +353,7 @@ templateRuleFrom inPath outPath interps = do
     outPath %> \_ -> do
         s <- readFile' inPath
         result <- runInterpolations interps s
-        writeFile' outPath result
+        writeFileAtomic outPath result
         putSuccess ("| Successfully generated " ++ outPath ++ " from its template")
 
 templateRule :: FilePath -> Interpolations -> Rules ()

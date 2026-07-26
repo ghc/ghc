@@ -63,7 +63,7 @@ multiSetup pkg_s = do
   -- Get the arguments for all the targets
   pargs <- mapM one_args tool_targets
   -- Build any other dependencies (such as generated files)
-  liftIO $ writeOutput (concatMap (\x -> ["-unit", x]) (map ( "@" <>) pargs))
+  writeOutput (concatMap (\x -> ["-unit", x]) (map ( "@" <>) pargs))
 
   where
     resp_file root p = root </> "multi" </> pkgName p
@@ -96,7 +96,7 @@ multiSetup pkg_s = do
           normalisePackageIds (x:xs) = x : normalisePackageIds xs
           normalisePackageIds [] = []
 
-      writeFile' (resp_file root p) (intercalate "\n" (normalise_ghc arg_list
+      writeFileAtomic (resp_file root p) (intercalate "\n" (normalise_ghc arg_list
                                                       ++  modules cd
                                                       ++ concatMap rexp (reexportModules cd)
                                                       ++ ["-outputdir", hidir,
@@ -112,11 +112,12 @@ toolRuleBody fp = do
     Just (_, (p, extra)) -> mkToolTarget extra p
     Nothing -> fail $ "No prefixes matched " ++ show fp ++ " IN\n " ++ show mm
 
-writeOutput :: [String] -> IO ()
+writeOutput :: [String] -> Action ()
 writeOutput args = do
-    liftIO $ lookupEnv "TOOL_OUTPUT" >>= \case
-      Nothing -> putStrLn (intercalate "\n" args)
-      Just out -> writeFile out (intercalate "\n" args)
+    output <- liftIO $ lookupEnv "TOOL_OUTPUT"
+    case output of
+      Nothing -> liftIO $ putStrLn (intercalate "\n" args)
+      Just out -> writeFileAtomic out (intercalate "\n" args)
 
 mkToolTarget :: [String] -> Package -> Action ()
 mkToolTarget es p = do
@@ -138,7 +139,7 @@ mkToolTarget es p = do
     need (gens ++ srcs ++ dep_confs)
 
     arg_list <- interpret fake_target getArgs
-    liftIO $ writeOutput (arg_list ++ es)
+    writeOutput (arg_list ++ es)
 
 -- This list is quite a lot like stage0packages but doesn't include
 -- critically the `exe:ghc` component as that depends on the GHC library
@@ -200,4 +201,3 @@ dirMap = do
       cd <- readContextData c
       ids <- liftIO $ mapM canonicalizePath [pkgPath p </> i | i <- srcDirs cd]
       return $ map (,(p, modules cd ++ otherModules cd)) ids
-

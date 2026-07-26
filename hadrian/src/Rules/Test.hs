@@ -328,7 +328,7 @@ timeoutProgBuilder = do
             let script = unlines
                     [ "#!/bin/sh"
                     , "exec " ++ python ++ " $0.py \"$@\"" ]
-            writeFile' (root -/- timeoutPath) script
+            writeFileAtomic (root -/- timeoutPath) script
             makeExecutable (root -/- timeoutPath)
 
 -- | Build extra programs and libraries required by testsuite

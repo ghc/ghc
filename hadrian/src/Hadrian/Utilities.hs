@@ -21,7 +21,9 @@ module Hadrian.Utilities (
     -- * File system operations
     copyFile, copyFileUntracked, createFileLink, fixFile,
     makeExecutable, moveFile, removeFile, createDirectory, copyDirectory,
-    moveDirectory, removeDirectory, removeFile_, writeFileChangedBS,
+    moveDirectory, removeDirectory, removeFile_,
+    writeFileAtomic, writeFileLinesAtomic,
+    writeFileChangedBS,
 
     -- * Diagnostic info
     Colour (..), ANSIColour (..), putColoured, shouldUseColor,
@@ -48,6 +50,7 @@ import Data.List.Extra
 import Data.Maybe
 import Data.Typeable (TypeRep, typeOf)
 import Development.Shake hiding (Normal)
+import qualified Development.Shake as Shake
 import Development.Shake.Classes
 import Development.Shake.Command (CmdArgument (..), IsCmdArgument (toCmdArgument))
 import Development.Shake.FilePath
@@ -341,7 +344,7 @@ withResponseFileIfLongCmd outputFilePath argsPre argsResp argsPost = do
         then cmd argsPre argsResp argsPost
         else do
             rspFile <- responseFilePath outputFilePath
-            writeFile' rspFile (escapeArgs argsResp)
+            writeFileAtomic rspFile (escapeArgs argsResp)
             cmd argsPre ['@' : rspFile] argsPost
 
 -- | Convert a command's output file path to a response file path to be used for that command.
@@ -400,6 +403,19 @@ copyFileUntracked source target = do
     putProgressInfo =<< renderAction "Copy file (untracked)" source target
     liftIO $ IO.copyFile source target
 
+-- | An atomic version of Shake's 'Shake.writeFile''.
+writeFileAtomic :: FilePath -> String -> Action ()
+writeFileAtomic file contents = do
+    let dir = takeDirectory file
+    liftIO $ IO.createDirectoryIfMissing True dir
+    withTempFileWithin dir $ \temp -> do
+        Shake.writeFile' temp contents
+        liftIO $ IO.renameFile temp file
+
+-- | An atomic version of Shake's 'Shake.writeFileLines'.
+writeFileLinesAtomic :: FilePath -> [String] -> Action ()
+writeFileLinesAtomic file = writeFileAtomic file . unlines
+
 -- | Transform a given file by applying a function to its contents.
 fixFile :: FilePath -> (String -> String) -> Action ()
 fixFile file f = do
@@ -409,7 +425,7 @@ fixFile file f = do
         let new = f old
         IO.evaluate $ rnf new
         return new
-    liftIO $ writeFile file contents
+    writeFileAtomic file contents
 
 -- | Make a given file executable by running the @chmod +x@ command.
 makeExecutable :: FilePath -> Action ()

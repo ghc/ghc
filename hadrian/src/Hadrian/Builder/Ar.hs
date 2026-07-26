@@ -43,7 +43,7 @@ runAr :: FilePath    -- ^ base name to use for response files
       -> Action ()
 runAr outputFilePath arPath flagArgs fileArgs buildOptions = do
     rspFile <- responseFilePath outputFilePath
-    writeFile' rspFile $ unwords fileArgs
+    writeFileAtomic rspFile $ unwords fileArgs
     cmd [arPath] flagArgs ('@' : rspFile) buildOptions
 
 -- | Invoke @ar@ given a path to it and a list of arguments. Note that @ar@

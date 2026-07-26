@@ -42,7 +42,7 @@ nofibRules = do
         unit $ cmd (Cwd "nofib") [makePath] ["clean"]
         unit $ cmd (Cwd "nofib") [makePath] (nofibArgs ++ ["boot"])
         (Exit e, Stdouterr log) <- cmd (Cwd "nofib") [makePath] nofibArgs
-        writeFile' fp log
+        writeFileAtomic fp log
         if e == ExitSuccess
             then putVerbose $ "nofib log available at " ++ fp
             else error $ "nofib failed, full log available at " ++ fp

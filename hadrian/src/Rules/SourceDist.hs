@@ -36,7 +36,7 @@ sourceDistRules = alternatives $ do
       need [mingw_tarballs_stamp]
     mingw_tarballs_stamp %> \stamp -> do
       build (target (vanillaContext Stage1 compiler) (Win32Tarballs DownloadTarballs) [] [])
-      writeFile' stamp "OK"
+      writeFileAtomic stamp "OK"
 
 
 archiveSourceTree :: (FilePath -> Action ()) -> FilePath -> Action ()

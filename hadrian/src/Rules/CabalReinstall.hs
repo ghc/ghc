@@ -38,7 +38,7 @@ cabalBuildRules = do
         withVerbosity Diagnostic $
           buildWithCmdOptions [] $
             target (vanillaContext Stage2 pkg) (Cabal Install Stage2) [] []
-      liftIO $ writeFile outpath "done"
+      writeFileAtomic outpath "done"
 
     phony "build-cabal" $ need [root -/- "stage-cabal" -/- "bin" -/- ".stamp"]
 
@@ -86,8 +86,8 @@ cabalBuildRules = do
                     ]
                   output_file = outputDir -/- wrapper_name
               wrapper_content <- wrapper Stage2 wrapper_name
-              writeFile' output_file (wrapper_prefix ++ wrapper_content)
+              writeFileAtomic output_file (wrapper_prefix ++ wrapper_content)
               makeExecutable output_file
               pure ()
 
-        writeFile' stamp "OK"
+        writeFileAtomic stamp "OK"
