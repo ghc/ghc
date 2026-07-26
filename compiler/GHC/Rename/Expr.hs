@@ -3,6 +3,7 @@
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE ViewPatterns        #-}
+{-# LANGUAGE RecordWildCards     #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -352,9 +353,10 @@ rnExpr (HsOverLit x lit)
                         , fvs ) }
 
 rnExpr (HsQualLit x QualLit{..})
- = do { (funName, fvs) <- lookupNameWithQualifier fromStringName ql_mod
-      ; let lit' = QualLit{ql_ext = L noAnn funName, ..}
-      ; return (HsQualLit x lit', fvs)
+ = do { (fromStringName, fvs) <- lookupNameWithQualifier ql_mod fromStringClassOpOcc
+      ; let ql_val' = case ql_val of
+                        HsQualString st s -> HsQualString st s
+      ; return (HsQualLit x (QualLit (L noAnn fromStringName) ql_mod ql_val'), fvs)
       }
 
 rnExpr (HsApp x fun arg)

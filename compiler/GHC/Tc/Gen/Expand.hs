@@ -8,7 +8,6 @@
 module GHC.Tc.Gen.Expand( tcExpand ) where
 
 import GHC.Prelude hiding (last, init, tail)
-import GHC.Data.FastString
 
 import GHC.Hs
 
@@ -18,12 +17,12 @@ import GHC.Tc.Gen.Do
 import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
 
 import GHC.Types.Name
-import GHC.Types.Name.Reader
-import GHC.Types.Id.Make
 import GHC.Types.SrcLoc
-import GHC.Types.SourceText ( mkIntegralLit , SourceText(..) )
+import GHC.Types.SourceText ( SourceText(..) )
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownOccs
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.WiredIn.Ids
 
 import GHC.Rename.Utils
 
@@ -31,7 +30,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Outputable
 
 import qualified Data.List.NonEmpty as NE ( map, head, (<|) )
-import Data.List.NonEmpty ( NonEmpty(..), init, last, tail )
+import Data.List.NonEmpty ( NonEmpty(..), last, init, tail )
 
 import qualified GHC.LanguageExtensions as LangExt
 
