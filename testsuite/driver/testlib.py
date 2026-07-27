@@ -1499,6 +1499,19 @@ def _newTestDir(name: TestName, opts: TestOptions, tempdir, dir):
     opts.testdir_raw = Path(os.path.join(tempdir, testdir, name + testdir_suffix))
     opts.compiler_always_flags = config.compiler_always_flags
 
+def _result_directory(opts: TestOptions) -> str:
+    # The test's source directory, relative to the GHC source root, so it reads
+    # the same regardless of which directory `make` was invoked from.
+    srcdir = opts.srcdir
+    if srcdir is None:
+        return ''
+    try:
+        return os.path.relpath(srcdir, config.top.parent)
+    except ValueError:
+        # No relative path exists (e.g. different Windows drives); the
+        # absolute path is still more useful than nothing.
+        return str(srcdir)
+
 # -----------------------------------------------------------------------------
 # Actually doing tests
 
@@ -1823,7 +1836,7 @@ async def do_test(name: TestName,
     if opts.expect not in ['pass', 'fail', 'missing-lib']:
         framework_fail(name, way, 'bad expected ' + opts.expect)
 
-    directory = str_removeprefix(str_removeprefix(str(opts.testdir), './'), '.\\')
+    directory = _result_directory(opts)
 
     if way in opts.fragile_ways:
         if_verbose(1, '*** fragile test %s resulted in %s' % (full_name, 'pass' if result.passed else 'fail'))
@@ -1877,7 +1890,7 @@ def framework_fail(name: Optional[TestName], way: Optional[WayName], reason: str
     # so we need to take care not to blow up with the wrong way
     # and report the actual reason for the failure.
     try:
-      directory = str_removeprefix(str_removeprefix(str(opts.testdir), './'), '.\\')
+      directory = _result_directory(opts)
     except:
       directory = ''
     full_name = '%s(%s)' % (name, way)
@@ -1890,7 +1903,7 @@ def framework_fail(name: Optional[TestName], way: Optional[WayName], reason: str
 
 def framework_warn(name: TestName, way: WayName, reason: str) -> None:
     opts = getTestOpts()
-    directory = str_removeprefix(str_removeprefix(str(opts.testdir), './'), '.\\')
+    directory = _result_directory(opts)
     full_name = name + '(' + way + ')'
     if_verbose(1, '*** framework warning for %s %s ' % (full_name, reason))
     t.framework_warnings.append(TestResult(directory, name, reason, way))
@@ -2445,19 +2458,23 @@ async def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: st
             dump_stdout(name)
             dump_stderr(name)
         message = format_bad_exit_code_message(exit_code)
-        return failBecause(message)
+        return failBecause(message,
+                           stderr=read_stderr(name),
+                           stdout=read_stdout(name))
 
     stderr_match = CompareOutput(True) if (opts.ignore_stderr or opts.combined_output) else await stderr_ok(name, way)
     if not stderr_match:
+        # The diff already contains the mismatching stream; see Note [Redundant
+        # output in test results].
         return failBecause('bad stderr',
-                           stderr=read_stderr(name),
+                           stderr=None if stderr_match.diff else read_stderr(name),
                            stdout=read_stdout(name),
                            diff=stderr_match.diff)
     stdout_match = CompareOutput(True) if opts.ignore_stdout else await stdout_ok(name, way)
     if not stdout_match:
         return failBecause('bad stdout',
                            stderr=read_stderr(name),
-                           stdout=read_stdout(name),
+                           stdout=None if stdout_match.diff else read_stdout(name),
                            diff=stdout_match.diff)
 
     check_hp = '-hT' in my_rts_flags and opts.check_hp
@@ -2567,8 +2584,9 @@ async def interpreter_run(name: TestName,
     if not stderr_match:
         if _expect_pass(way):
             dump_stderr_for('comp', name)
+        # See Note [Redundant output in test results].
         return failBecause('bad stderr',
-                           stderr=read_stderr(name),
+                           stderr=None if stderr_match.diff else read_stderr(name),
                            stdout=read_stdout(name),
                            diff=stderr_match.diff)
     stdout_match = CompareOutput(True) if opts.ignore_stdout else await stdout_ok(name, way)
@@ -2577,7 +2595,7 @@ async def interpreter_run(name: TestName,
             dump_stderr_for('comp', name)
         return failBecause('bad stdout',
                            stderr=read_stderr(name),
-                           stdout=read_stdout(name),
+                           stdout=None if stdout_match.diff else read_stdout(name),
                            diff=stdout_match.diff)
     return passed()
 
@@ -3571,9 +3589,47 @@ def findTFiles(roots: List[str]) -> Iterator[str]:
 # -----------------------------------------------------------------------------
 # Output a test summary to the specified file object
 
-def summary(t: TestRun, file: TextIO, color=False) -> None:
+def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=None) -> None:
 
     file.write('\n')
+
+    if t.unexpected_failures:
+        # Count output blocks rather than results: a test failing in many ways
+        # collapses to a single block.
+        groups = groupTestOutput(t.unexpected_failures)
+        if len(groups) <= MAX_SUMMARY_OUTPUT_TESTS:
+            printTestOutputSummary(file, groups, color, junit_path)
+        else:
+            where = '; see {}'.format(junit_path) if junit_path else ''
+            header = ('Unexpected failures (more than {}, output omitted{}):'
+                      .format(MAX_SUMMARY_OUTPUT_TESTS, where))
+            file.write(colored_if(color, Color.RED, header) + '\n')
+            printTestInfosSummary(file, t.unexpected_failures)
+
+    if t.unexpected_passes:
+        header = 'Unexpected passes:'
+        file.write(colored_if(color, Color.RED, header) + '\n')
+        printTestInfosSummary(file, t.unexpected_passes)
+
+    if t.unexpected_stat_failures:
+        header = 'Unexpected stat failures:'
+        file.write(colored_if(color, Color.RED, header) + '\n')
+        printTestInfosSummary(file, t.unexpected_stat_failures)
+
+    if t.framework_failures:
+        header = 'Framework failures:'
+        file.write(colored_if(color, Color.RED, header) + '\n')
+        printTestInfosSummary(file, t.framework_failures)
+
+    if t.framework_warnings:
+        header = 'Framework warnings:'
+        file.write(colored_if(color, Color.YELLOW, header) + '\n')
+        printTestInfosSummary(file, t.framework_warnings)
+
+    if stopping():
+        warning = 'WARNING: Testsuite run was terminated early'
+        file.write(colored_if(color, Color.YELLOW, warning) + '\n')
+
     printUnexpectedTests(file,
         [t.unexpected_passes, t.unexpected_failures,
          t.unexpected_stat_failures, t.framework_failures], color)
@@ -3620,35 +3676,6 @@ def summary(t: TestRun, file: TextIO, color=False) -> None:
                + ' fragile tests\n'
                + '\n')
 
-    if t.unexpected_passes:
-        header = 'Unexpected passes:'
-        file.write(colored_if(color, Color.RED, header) + '\n')
-        printTestInfosSummary(file, t.unexpected_passes)
-
-    if t.unexpected_failures:
-        header = 'Unexpected failures:'
-        file.write(colored_if(color, Color.RED, header) + '\n')
-        printTestInfosSummary(file, t.unexpected_failures)
-
-    if t.unexpected_stat_failures:
-        header = 'Unexpected stat failures:'
-        file.write(colored_if(color, Color.RED, header) + '\n')
-        printTestInfosSummary(file, t.unexpected_stat_failures)
-
-    if t.framework_failures:
-        header = 'Framework failures:'
-        file.write(colored_if(color, Color.RED, header) + '\n')
-        printTestInfosSummary(file, t.framework_failures)
-
-    if t.framework_warnings:
-        header = 'Framework warnings:'
-        file.write(colored_if(color, Color.YELLOW, header) + '\n')
-        printTestInfosSummary(file, t.framework_warnings)
-
-    if stopping():
-        warning = 'WARNING: Testsuite run was terminated early'
-        file.write(colored_if(color, Color.YELLOW, warning) + '\n')
-
 def printUnexpectedTests(file: TextIO, testInfoss, color=False):
     unexpected = set(result.testname
                      for testInfos in testInfoss
@@ -3660,13 +3687,96 @@ def printUnexpectedTests(file: TextIO, testInfoss, color=False):
         file.write('TEST="' + ' '.join(sorted(unexpected)) + '"\n')
         file.write('\n')
 
+# Per-stream cap on a failing test's output repeated in the final summary.
+MAX_SUMMARY_OUTPUT_LINES = 100
+
+# Above this many output blocks, skip repeating output entirely: the dump
+# would drown out the summary.
+MAX_SUMMARY_OUTPUT_TESTS = 20
+
+# Note [Redundant output in test results]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# A failing test result carries up to three pieces of output: `diff`, `stdout`
+# and `stderr`. For an output mismatch these overlap: the diff's `+` lines are
+# the very stream that mismatched, normalised. Reporting both would print the
+# same text twice, so the mismatching stream is dropped at the call sites in
+# favour of the diff, which additionally shows what was expected. The *other*
+# stream is kept: on a stdout mismatch, stderr is independent context.
+#
+# The drop is conditional on there being a diff at all: compare_outputs only
+# runs `diff` when config.verbose >= 1, so under -v0 the stream is the only
+# output there is.
+#
+# Note that, since the drop happens at result construction, it also affects the
+# JUnit report (junit.py).
+
+def strip_diff_header(diff: Optional[str]) -> Optional[str]:
+    # Drop diff(1)'s ---/+++ lines: they name normalised files in the test
+    # directory and carry timestamps, which would also keep otherwise
+    # identical failures from being grouped.
+    if diff is None:
+        return None
+    lines = diff.split('\n')
+    if len(lines) >= 2 and lines[0].startswith('--- ') and lines[1].startswith('+++ '):
+        return '\n'.join(lines[2:])
+    return diff
+
+def sorted_results(testInfos: List[TestResult]) -> List[TestResult]:
+    return sorted(testInfos, key=lambda r: (r.testname.lower(), r.directory, r.way))
+
+# A failure-output block: a representative result, its header-stripped diff,
+# and the ways that share it.
+OutputGroup = Tuple[TestResult, Optional[str], List[WayName]]
+
+# Tests that fail identically in several ways (e.g. normal and g1) share one
+# output block, with the ways collected in the header.
+def groupTestOutput(testInfos: List[TestResult]) -> List[OutputGroup]:
+    # Relies on dicts preserving insertion order.
+    groups = {} # type: Dict[Tuple, OutputGroup]
+    for result in sorted_results(testInfos):
+        diff = strip_diff_header(result.diff)
+        key = (result.testname, result.directory, result.reason,
+               diff, result.stdout, result.stderr)
+        groups.setdefault(key, (result, diff, []))[2].append(result.way)
+    return list(groups.values())
+
+def printTestOutputSummary(file: TextIO,
+                           groups: List[OutputGroup],
+                           color: bool=False,
+                           junit_path: Optional[Path]=None) -> None:
+    # Repeat failing tests' captured output in the summary, so one needn't
+    # hunt for it earlier in a possibly very long log; see #16720.
+    header = '=====> Unexpected failures output summary'
+    file.write(colored_if(color, Color.RED, header) + '\n\n')
+
+    where = ', see {}'.format(junit_path) if junit_path else ''
+    for result, diff, ways in groups:
+        header = '=====> {}({}) ({}) [{}]'.format(
+            result.testname, ', '.join(ways), result.directory + os.sep, result.reason)
+        file.write(colored_if(color, Color.RED, header) + '\n')
+        # See Note [Redundant output in test results] for why these don't overlap.
+        for label, contents in [('Output diff (expected vs actual):', diff),
+                                ('Captured stdout:', result.stdout),
+                                ('Captured stderr:', result.stderr)]:
+            if contents and contents.strip():
+                lines = contents.rstrip('\n').split('\n')
+                if len(lines) > MAX_SUMMARY_OUTPUT_LINES:
+                    omitted = len(lines) - MAX_SUMMARY_OUTPUT_LINES
+                    lines = lines[:MAX_SUMMARY_OUTPUT_LINES] \
+                        + ['... ({} more lines omitted{})'.format(omitted, where)]
+                s = colored_if(color, Color.CYAN, label) + '\n' \
+                    + ''.join(l + '\n' for l in lines)
+                # Test output can contain characters that file's encoding
+                # cannot represent; replace rather than crash (cf safe_print).
+                enc = getattr(file, 'encoding', None) or 'utf-8'
+                file.write(s.encode(enc, errors='replace').decode(enc))
+    footer = '<===== end of unexpected failures output summary'
+    file.write(colored_if(color, Color.RED, footer) + '\n\n')
+
 def printTestInfosSummary(file: TextIO, testInfos):
-    maxDirLen = max(len(tr.directory) for tr in testInfos)
-    for result in sorted(testInfos, key=lambda r: (r.testname.lower(), r.way, r.directory)):
-        directory = result.directory.ljust(maxDirLen)
-        file.write('   {directory}  {r.testname} [{r.reason}] ({r.way})\n'.format(
-            r = result,
-            directory = directory))
+    for result in sorted_results(testInfos):
+        path = os.path.join(result.directory, result.testname)
+        file.write('   {path} [{r.reason}] ({r.way})\n'.format(r=result, path=path))
     file.write('\n')
 
 def modify_lines(s: str, f: Callable[[str], str]) -> str:
