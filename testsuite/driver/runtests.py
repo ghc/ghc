@@ -591,7 +591,7 @@ else:
         print(Perf.allow_changes_string([(m.change, m.stat) for m in t.metrics]))
         print('-' * 25)
 
-    summary(t, sys.stdout, color=term_color.enable_color)
+    summary(t, sys.stdout, color=term_color.enable_color, junit_path=args.junit)
 
     # Write perf stats if any exist or if a metrics file is specified.
     stats_metrics = [stat for (_, stat, __) in t.metrics] # type: List[PerfStat]
