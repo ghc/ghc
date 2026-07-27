@@ -878,9 +878,11 @@ def _collect_stats(name: TestName, opts, metrics, deviation: Optional[int],
     else:
         tag = 'runtime'
 
-    # Compiler performance numbers change when debugging is on, making the results
-    # useless and confusing. Therefore, skip if debugging is on.
-    if config.compiler_debugged and is_compiler_stats_test:
+    # Performance numbers change when debugging is on, making the results
+    # useless and confusing. This applies to runtime numbers too, since
+    # debugged flavours also build the boot libraries without optimisation.
+    # Therefore, skip if debugging is on.
+    if config.compiler_debugged:
         opts.skip = True
 
     # If there are any residency testing metrics then turn on RESIDENCY_OPTS
