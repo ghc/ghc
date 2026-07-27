@@ -92,7 +92,7 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
         -- Because Expr imports Decls via HsBracket
 
 import Language.Haskell.Syntax.Basic
-  (LexicalFixity, Role, TopLevelFlag)
+  (LexicalFixity, Role, TopLevelFlag, HsList(..))
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Decls.Foreign
 import Language.Haskell.Syntax.Binds.InlinePragma (Activation)
@@ -422,9 +422,10 @@ data TyClDecl pass
                 tcdTyVars  :: LHsQTyVars pass,         -- ^ Class type variables
                 tcdFixity  :: LexicalFixity, -- ^ Fixity used in the declaration
                 tcdFDs     :: [LHsFunDep pass],         -- ^ Functional deps
-                tcdDecls   :: XRec pass [LHsDecl pass] -- ^ Class declarations.
-                                             -- only SigD, ValD, TyClD _ FamDecl, InstD _ TyFamInstD,
-                                             -- InstD _ DataFamInstD and DocD
+                tcdDecls   :: XRec pass (HsList pass (LHsDecl pass))
+                                -- ^ Class declarations.
+                                -- only SigD, ValD, TyClD _ FamDecl, InstD _ TyFamInstD,
+                                -- InstD _ DataFamInstD and DocD
     }
   | XTyClDecl !(XXTyClDecl pass)
 
