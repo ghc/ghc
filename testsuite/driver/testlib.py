@@ -27,7 +27,7 @@ from testutil import strip_quotes, lndir, link_or_copy_file, passed, \
                      failBecause, testing_metrics, residency_testing_metrics, \
                      stable_perf_counters, \
                      PassFail, badResult, str_warn, str_removeprefix
-from term_color import Color, colored
+from term_color import Color, colored_if
 import testutil
 from cpu_features import have_cpu_feature
 import perf_notes as Perf
@@ -3574,7 +3574,7 @@ def summary(t: TestRun, file: TextIO, color=False) -> None:
     file.write('\n')
     printUnexpectedTests(file,
         [t.unexpected_passes, t.unexpected_failures,
-         t.unexpected_stat_failures, t.framework_failures])
+         t.unexpected_stat_failures, t.framework_failures], color)
 
     if len(t.unexpected_failures) > 0 or \
         len(t.unexpected_stat_failures) > 0 or \
@@ -3585,7 +3585,8 @@ def summary(t: TestRun, file: TextIO, color=False) -> None:
         summary_color = Color.GREEN
 
     assert t.start_time is not None
-    file.write(colored(summary_color, 'SUMMARY') + ' for test run started at '
+    summary_header = colored_if(color, summary_color, 'SUMMARY')
+    file.write(summary_header + ' for test run started at '
                + t.start_time.strftime("%c %Z") + '\n'
                + str(datetime.datetime.now() - t.start_time).rjust(8)
                + ' spent to go through\n'
@@ -3618,35 +3619,42 @@ def summary(t: TestRun, file: TextIO, color=False) -> None:
                + '\n')
 
     if t.unexpected_passes:
-        file.write('Unexpected passes:\n')
+        header = 'Unexpected passes:'
+        file.write(colored_if(color, Color.RED, header) + '\n')
         printTestInfosSummary(file, t.unexpected_passes)
 
     if t.unexpected_failures:
-        file.write('Unexpected failures:\n')
+        header = 'Unexpected failures:'
+        file.write(colored_if(color, Color.RED, header) + '\n')
         printTestInfosSummary(file, t.unexpected_failures)
 
     if t.unexpected_stat_failures:
-        file.write('Unexpected stat failures:\n')
+        header = 'Unexpected stat failures:'
+        file.write(colored_if(color, Color.RED, header) + '\n')
         printTestInfosSummary(file, t.unexpected_stat_failures)
 
     if t.framework_failures:
-        file.write('Framework failures:\n')
+        header = 'Framework failures:'
+        file.write(colored_if(color, Color.RED, header) + '\n')
         printTestInfosSummary(file, t.framework_failures)
 
     if t.framework_warnings:
-        file.write('Framework warnings:\n')
+        header = 'Framework warnings:'
+        file.write(colored_if(color, Color.YELLOW, header) + '\n')
         printTestInfosSummary(file, t.framework_warnings)
 
     if stopping():
-        file.write('WARNING: Testsuite run was terminated early\n')
+        warning = 'WARNING: Testsuite run was terminated early'
+        file.write(colored_if(color, Color.YELLOW, warning) + '\n')
 
-def printUnexpectedTests(file: TextIO, testInfoss):
+def printUnexpectedTests(file: TextIO, testInfoss, color=False):
     unexpected = set(result.testname
                      for testInfos in testInfoss
                      for result in testInfos
                      if not result.testname.endswith('.T'))
     if unexpected:
-        file.write('Unexpected results from:\n')
+        header = 'Unexpected results from:'
+        file.write(colored_if(color, Color.RED, header) + '\n')
         file.write('TEST="' + ' '.join(sorted(unexpected)) + '"\n')
         file.write('\n')
 

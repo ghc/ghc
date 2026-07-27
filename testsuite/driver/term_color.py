@@ -1,5 +1,6 @@
 from enum import Enum
 
+# Whether to emit color escapes; set in runtests.py.
 enable_color = True
 
 class Color(Enum):
@@ -18,3 +19,7 @@ def colored(color: Color, s: str) -> str:
     else:
         return s
 
+# For renderers that serve several sinks: `enabled` says whether *this* sink
+# takes color (the summary is written both to stdout and to a plain-text file).
+def colored_if(enabled: bool, color: Color, s: str) -> str:
+    return colored(color, s) if enabled else s
