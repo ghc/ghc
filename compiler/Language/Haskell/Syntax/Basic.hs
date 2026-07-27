@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Language.Haskell.Syntax.Basic where
 
@@ -171,3 +172,45 @@ data Fixity = Fixity Int FixityDirection
 
 instance NFData Fixity where
   rnf (Fixity i d) = rnf i `seq` rnf d `seq` ()
+
+{-
+************************************************************************
+*                                                                      *
+Lists
+*                                                                      *
+************************************************************************
+-}
+
+
+-- data DataDecl = DD { ... ; dd_cons :: [LConDecl] ... }
+
+-- Using a list here is bad!  We should use syntax nodes:
+
+-- data DataDecl p = DD { ... ; dd_cons :: HsList p (LConDecl p) ... }
+
+data HsList p a
+  = HsEmpty (XEmpty p)
+  | HsCons (XCons p) a (HsList p a)
+  | -- | TTG Extension point; see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
+    XHsList !(XXHsList p)
+  deriving (Functor, Foldable, Traversable)
+
+type family XEmpty p
+type family XCons p
+type family XXHsList p
+
+-- Now we have a place to put the punctuation!
+-- type instance XCons (GhcPass GhcPs) = TrailingAnn
+
+fromList :: XEmpty p -> [(XCons p,a)] -> HsList p a
+fromList e [] = HsEmpty e
+fromList e ((c,x):xs) = HsCons c x (fromList e xs)
+
+fromList' :: XEmpty p -> XCons p -> [a] -> HsList p a
+fromList' e _ [] = HsEmpty e
+fromList' e c (x:xs) = HsCons c x (fromList' e c xs)
+
+toList :: HsList p a -> [a]
+toList HsEmpty{} = []
+toList (HsCons _ x ls) = x:toList ls
+toList (XHsList _) = []

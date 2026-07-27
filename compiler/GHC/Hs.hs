@@ -36,7 +36,7 @@ module GHC.Hs (
 -- friends:
 import GHC.Prelude
 
-import GHC.Hs.Basic
+import GHC.Hs.Basic hiding (fromList, toList)
 import GHC.Hs.Decls
 import GHC.Hs.Binds
 import GHC.Hs.Expr
