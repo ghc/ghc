@@ -33,7 +33,7 @@ test('ghcilink005',
       unless(doing_ghci, skip),
       req_dynamic_lib_support,
       req_interp,
-      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
+      when(opsys('linux') and not ghc_dynamic(), fragile(20706))],
      makefile_test, ['ghcilink005'])
 
 test('ghcilink006',
