@@ -1932,7 +1932,8 @@
           []
           (EpaComments
            []))
-         [])))]
+         (HsEmpty
+          (NoExtField)))))]
      []
      []
      [])

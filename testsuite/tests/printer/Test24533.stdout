@@ -423,7 +423,8 @@
         []
         (EpaComments
          []))
-       []))))
+       (HsEmpty
+        (NoExtField))))))
   ,(L
     (EpAnn
      (EpaSpan { Test24533.hs:(14,1)-(16,19) })
@@ -1052,7 +1053,8 @@
         []
         (EpaComments
          []))
-       []))))
+       (HsEmpty
+        (NoExtField))))))
   ,(L
     (EpAnn
      (EpaSpan { Test24533.ppr.hs:(5,1)-(6,19) })

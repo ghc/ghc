@@ -1430,7 +1430,9 @@
         []
         (EpaComments
          []))
-       [(L
+       (HsCons
+        (NoExtField)
+        (L
          (EpAnn
           (EpaSpan { DumpSemis.hs:29:3-23 })
           []
@@ -1518,7 +1520,9 @@
                    (EpaComments
                     []))
                   (Unqual
-                   {OccName: Int})))))))))))]))))
+                   {OccName: Int})))))))))))
+        (HsEmpty
+         (NoExtField)))))))
   ,(L
     (EpAnn
      (EpaSpan { DumpSemis.hs:31:1-30 })
