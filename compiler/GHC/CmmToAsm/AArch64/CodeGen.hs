@@ -376,8 +376,10 @@ getRegisterReg platform (CmmGlobal reg@(GlobalRegUse mid _ty))
 -- -----------------------------------------------------------------------------
 -- General things for putting together code sequences
 
--- | The dual to getAnyReg: compute an expression into a register, but
---      we don't mind which one it is.
+-- | Computes the register into some register, but we can't pick which one.
+-- This means the register might be mapped to a global or local variable and
+-- we can only mutate the result reg in place if we know the Cmm expression can't
+-- refer to local or global variables.
 getSomeReg :: CmmExpr -> NatM (Reg, Format, InstrBlock)
 getSomeReg expr = do
   r <- getRegister expr
@@ -1760,7 +1762,7 @@ getRegister' config plat expr
           tmp <- getNewRegNat format
           return $ Any format $ \dst ->
             code_x `appOL` code_y `appOL`
-            if dst == reg_y
+            if dst == reg_y --unlike MO_V_Insert here y/dst can overlap.
             then toOL [ MOV (OpReg W128 tmp) (OpReg W128 reg_x)
                       , INS format (OpVecLane w tmp index) (OpScalarAsVec w reg_y)
                       , MOV (OpReg W128 dst) (OpReg W128 tmp)
@@ -2062,23 +2064,33 @@ genCondJump bid expr = do
                 -- compute both sides.
                 (reg_x, _format_x, code_x) <- getSomeReg x
                 (reg_y, _format_y, code_y) <- getSomeReg y
-                let x' = OpReg w reg_x
-                    y' = OpReg w reg_y
-                return $ case w of
-                  W8  -> code_x `appOL` code_y `appOL` toOL [ UXTB x' x', UXTB y' y', CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
-                  W16 -> code_x `appOL` code_y `appOL` toOL [ UXTH x' x', UXTH y' y', CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
-                  _   -> code_x `appOL` code_y `appOL` toOL [                         CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
+
+                -- If all computations reliably produce zero-extended subword results
+                -- this truncation is redundant. But for now better to be correct than
+                -- fast.
+                (reg_x', trunc_x) <- truncateSubwordReg w reg_x
+                -- TODO: Use CMP on OpRegExt rather than extending explicitly.
+                (reg_y', trunc_y) <- truncateSubwordReg w reg_y
+
+                let x' = OpReg w reg_x'
+                    y' = OpReg w reg_y'
+                return $ concatOL [code_x, trunc_x, code_y, trunc_y,
+                                   toOL [CMP x' y', (annExpr expr (BCOND cmp (TBlock bid)))]]
 
             sbcond w cmp = do
                 -- compute both sides.
                 (reg_x, _format_x, code_x) <- getSomeReg x
                 (reg_y, _format_y, code_y) <- getSomeReg y
-                let x' = OpReg w reg_x
-                    y' = OpReg w reg_y
-                return $ case w of
-                  W8  -> code_x `appOL` code_y `appOL` toOL [ SXTB x' x', SXTB y' y', CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
-                  W16 -> code_x `appOL` code_y `appOL` toOL [ SXTH x' x', SXTH y' y', CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
-                  _   -> code_x `appOL` code_y `appOL` toOL [                         CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
+
+                -- W64 always works, even if we ultimately compare at W32.
+                (reg_x', ext_x) <- signExtendReg w W64 reg_x
+                -- TODO: Use CMP on OpRegExt rather than extending explicitly.
+                (reg_y', ext_y) <- signExtendReg w W64 reg_y
+
+                let x' = OpReg w reg_x'
+                    y' = OpReg w reg_y'
+                return $ concatOL [code_x, ext_x, code_y, ext_y,
+                                   toOL [CMP x' y', (annExpr expr (BCOND cmp (TBlock bid)))]]
 
             fbcond w cmp = do
               -- ensure we get float regs
