@@ -536,7 +536,8 @@
                     {OccName: String}))))])))))))])
       (Prefix)
       []
-      [])))
+      (HsEmpty
+       (NoExtField)))))
   ,(L
     (EpAnn
      (EpaSpan { T20452.hs:9:1-85 })
@@ -776,6 +777,7 @@
                     {OccName: String}))))])))))))])
       (Prefix)
       []
-      [])))]))
+      (HsEmpty
+       (NoExtField)))))]))
 
 

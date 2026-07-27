@@ -1902,7 +1902,8 @@
              (NoExtField))))])
         (Prefix)
         []
-        []))]
+        (HsEmpty
+         (NoExtField))))]
      []
      []
      [])

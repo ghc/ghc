@@ -1497,7 +1497,7 @@ hsLTyClDeclBinders (L loc (ClassDecl
   = let
     HsNestedGroup { ng_sigs = sigs, ng_ats = ats } :: HsNestedGroup (GhcPass p)
         = case ghcPass @p of
-            GhcPs -> partitionBindsAndSigs decls
+            GhcPs -> partitionBindsAndSigs' decls
             GhcRn -> fst ext
             GhcTc -> fst ext
   in TyDeclBinders
