@@ -35,7 +35,7 @@ module GHC.Parser.PostProcess (
         cvBindGroup,
         cvBindsAndSigsOnly, wrapValBind,
         cvBindsAndSigs,
-        cvClassDecls,
+        cvClassDecls, cvClassDecls',
         cvTopDecls,
         placeHolderPunRhs,
 
@@ -134,7 +134,8 @@ module GHC.Parser.PostProcess (
     ) where
 
 import GHC.Prelude
-import GHC.Hs           -- Lots of it
+import qualified GHC.Hs as Hs
+import GHC.Hs               -- Lots of it
 import GHC.Core.TyCon          ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
 import GHC.Core.DataCon        ( DataCon, dataConTyCon, dataConName )
 import GHC.Core.ConLike        ( ConLike(..) )
@@ -213,7 +214,7 @@ mkClassDecl :: SrcSpan
             -> P (LTyClDecl GhcPs)
 
 mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds (L ld where_cls) layout annsIn
-  = do { decls <- cvBindsAndSigs where_cls
+  = do { decls <- cvBindsAndSigs' where_cls
        ; (cls, tparams, fixity, ops, cps, cs) <- checkTyClHdr True tycl_hdr
        ; tyvars <- checkTyVars (text "class") whereDots cls tparams
        ; let anns' = annsIn { acd_openp = ops, acd_closep = cps}
@@ -223,7 +224,7 @@ mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds (L ld where_cls) layout annsIn
                                   , tcdLName = cls, tcdTyVars = tyvars
                                   , tcdFixity = fixity
                                   , tcdFDs = snd (unLoc fds)
-                                  , tcdDecls = L (noAnnSrcSpan ld) $ cvClassDecls decls
+                                  , tcdDecls = L (noAnnSrcSpan ld) $ cvClassDecls' decls
                                   , tcdModifiers = [] })) }
 
 mkTyData :: SrcSpan
@@ -536,9 +537,21 @@ cvBindsAndSigs fb = do
       drop_bad_decls ds
     drop_bad_decls (d:ds) = (d:) <$> drop_bad_decls ds
 
+cvBindsAndSigs' :: OrdList (LHsDecl GhcPs) -> P (HsList GhcPs (LHsDecl GhcPs))
+cvBindsAndSigs' fb = do
+  fb' <- cvBindsAndSigs fb
+  return (Hs.fromList' noExtField noExtField fb')
+
 -- | For a class decl, convert 'LSig GhcPs' to a class op
 cvClassDecls :: [LHsDecl GhcPs] -> [LHsDecl GhcPs]
 cvClassDecls ds = map cvt ds
+  where
+    cvt (L l (SigD x sig)) = L l (SigD x (unLoc (mkClassOpSig (L l sig))))
+    cvt decl = decl
+
+-- | For a class decl, convert 'LSig GhcPs' to a class op
+cvClassDecls' :: HsList GhcPs (LHsDecl GhcPs) -> HsList GhcPs (LHsDecl GhcPs)
+cvClassDecls' ds = fmap cvt ds
   where
     cvt (L l (SigD x sig)) = L l (SigD x (unLoc (mkClassOpSig (L l sig))))
     cvt decl = decl

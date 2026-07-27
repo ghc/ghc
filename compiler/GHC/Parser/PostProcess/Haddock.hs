@@ -44,6 +44,7 @@ module GHC.Parser.PostProcess.Haddock (addHaddockToModule) where
 
 import GHC.Prelude hiding (head, init, last, mod, tail)
 
+import qualified  Language.Haskell.Syntax.Basic as Basic
 import GHC.Hs
 
 import GHC.Types.SrcLoc
@@ -397,6 +398,17 @@ addHaddockInterleaveItems layout get_doc_item = go
             loc_range = mempty { loc_range_col = ColumnFrom (n+1) }
         in hoistHdkA (inLocRange loc_range)
 
+addHaddockInterleaveItems'
+  :: forall a .
+     HasHaddock a
+  => EpLayout
+  -> (PsLocated HdkComment -> Maybe a) -- Get a documentation item
+  -> HsList GhcPs a           -- Unprocessed (non-documentation) items
+  -> HdkA (HsList GhcPs a)      -- Documentation items & processed non-documentation items
+addHaddockInterleaveItems' layout get_doc_item ds = do
+  ds' <- addHaddockInterleaveItems layout get_doc_item (Basic.toList ds)
+  return (Basic.fromList' noExtField noExtField ds')
+
 instance HasHaddock (LocatedA (HsDecl GhcPs)) where
   addHaddock ldecl =
     extendHdkA (getLocA ldecl) $
@@ -507,7 +519,7 @@ instance HasHaddock (HsDecl GhcPs) where
     = do
         registerHdkA tcdLName
         registerEpTokenHdkA (acd_where x)
-        decls' <- addHaddockInterleaveItems layout (mkDocHsDecl layout) decls
+        decls' <- addHaddockInterleaveItems' layout (mkDocHsDecl layout) decls
         pure $
           let decl' = ClassDecl { tcdCExt = (x, layout)
                                 , tcdCtxt, tcdLName, tcdTyVars, tcdFixity, tcdFDs

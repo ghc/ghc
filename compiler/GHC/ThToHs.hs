@@ -70,6 +70,7 @@ import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict
 
 import Language.Haskell.Syntax.Text
+import qualified Language.Haskell.Syntax.Basic as Basic
 
 -------------------------------------------------------------------
 --              The external interface
@@ -324,8 +325,8 @@ cvtDec (TypeDataD tc tvs ksig constrs)
 cvtDec (ClassD ctxt cl tvs fds decs)
   = do  { (cxt', tc', tvs') <- cvt_tycl_hdr ctxt cl tvs
         ; fds'  <- mapM cvt_fundep fds
-        ; decls' <- cvt_ci_decs ClssDecl decs
-        ; let (adts',_) = partitionWith is_datafam_inst decls'
+        ; decls' <- cvt_ci_decs' ClssDecl decs
+        ; let (adts',_) = partitionWith is_datafam_inst (Basic.toList decls')
         ; unless (null adts')
             (failWith $ DefaultDataInstDecl adts')
         ; returnJustLA $ TyClD noExtField $
@@ -333,7 +334,7 @@ cvtDec (ClassD ctxt cl tvs fds decs)
                     , tcdCtxt = mkHsContextMaybe cxt', tcdLName = tc', tcdTyVars = tvs'
                     , tcdFixity = Prefix
                     , tcdFDs = fds'
-                    , tcdDecls = noLocA $ cvClassDecls decls'
+                    , tcdDecls = noLocA $ cvClassDecls' decls'
                     , tcdModifiers = [] }
         }
 
@@ -607,6 +608,13 @@ cvt_ci_decs declDescr decs
         ; for_ (nonEmpty bads) $ \ bad_decls ->
             failWith (IllegalDeclaration declDescr $ IllegalDecls bad_decls)
         ; return decs'' }
+
+cvt_ci_decs' :: THDeclDescriptor -> [TH.Dec] -> CvtM (HsList GhcPs (LHsDecl GhcPs))
+-- Convert the declarations inside a class or instance decl
+-- ie signatures, bindings, and associated types
+cvt_ci_decs' declDescr decs = do
+  decs' <- cvt_ci_decs declDescr decs
+  return (fromList' noExtField noExtField decs')
 
 -- Validate possible class or instance decls. Return 'Left d' if valid, 'Right d' if not
 is_ci_decl :: LHsDecl GhcPs -> Either (LHsDecl GhcPs) (LHsDecl GhcPs)

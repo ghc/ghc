@@ -35,6 +35,7 @@ import GHC.Driver.Ppr
 import GHC.Data.FastString
 import GHC.Base (NonEmpty(..))
 import GHC.Parser.Lexer (allocateComments)
+import qualified Language.Haskell.Syntax.Basic as Basic
 
 import Data.Data hiding ( Fixity )
 import Data.List (sortBy, partition, unsnoc)
@@ -618,11 +619,21 @@ name2String = showPprUnsafe
 
 hsDeclsClassDecl :: TyClDecl GhcPs -> [LHsDecl GhcPs]
 hsDeclsClassDecl dec = case dec of
-  ClassDecl { tcdDecls = L _ decls} -> decls
+  ClassDecl { tcdDecls = L _ decls} -> Basic.toList decls
+  _ -> error $ "hsDeclsClassDecl:dec=" ++ showAst dec
+
+hsDeclsClassDecl' :: TyClDecl GhcPs -> HsList GhcPs (LHsDecl GhcPs)
+hsDeclsClassDecl' dec = case dec of
+  ClassDecl { tcdDecls = L _ decls } -> decls
   _ -> error $ "hsDeclsClassDecl:dec=" ++ showAst dec
 
 replaceDeclsClassDecl :: TyClDecl GhcPs -> [LHsDecl GhcPs] -> TyClDecl GhcPs
 replaceDeclsClassDecl decl decls = case decl of
+  ClassDecl { tcdDecls = L ld _ } -> decl { tcdDecls = L ld $ Basic.fromList' noExtField noExtField decls }
+  _ -> error $ "replaceDeclsClassDecl:decl=" ++ showAst decl
+
+replaceDeclsClassDecl' :: TyClDecl GhcPs -> HsList GhcPs (LHsDecl GhcPs) -> TyClDecl GhcPs
+replaceDeclsClassDecl' decl decls = case decl of
   ClassDecl { tcdDecls = L ld _ } -> decl { tcdDecls = L ld decls }
   _ -> error $ "replaceDeclsClassDecl:decl=" ++ showAst decl
 

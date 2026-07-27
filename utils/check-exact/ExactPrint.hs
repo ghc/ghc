@@ -61,6 +61,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
 
+import qualified Language.Haskell.Syntax.Basic as Basic
 import Language.Haskell.Syntax.Binds.InlinePragma
   (ActivationX(ActiveAfter, ActiveBefore, NeverActive))
 import Language.Haskell.Syntax.Text
@@ -3525,12 +3526,12 @@ instance ExactPrint (TyClDecl GhcPs) where
       | otherwise       -- Laid out
       = do
           (mods', c', w', vb', fds', lclas', tyvars',context') <- top_matter
-          (L ld' (List al' decls')) <- markAnnotated (L ld (List al (filter notDocDecl decls)))
+          (L ld' (List al' decls')) <- markAnnotated (L ld (List al (filter notDocDecl (Basic.toList decls))))
           return (ClassDecl {tcdCExt = (AnnClassDecl c' [] [] vb' w' al', lo),
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
                              tcdFDs  = fds',
-                             tcdDecls = L ld' decls',
+                             tcdDecls = L ld' (Basic.fromList' noExtField noExtField decls'),
                              tcdModifiers = mods'})
       where
         top_matter = do

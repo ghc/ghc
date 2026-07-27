@@ -1941,7 +1941,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                         tcdDecls = L ld decls,
                         tcdModifiers = modifiers})
   = do  { let HsNestedGroup { ng_meths = mbinds, ng_sigs = sigs, ng_ats = ats
-                            , ng_tyfam_insts = at_defs, ng_docs = docs} = partitionBindsAndSigs decls
+                            , ng_tyfam_insts = at_defs, ng_docs = docs} = partitionBindsAndSigs' decls
         ; lcls' <- lookupLocatedTopBndrRnN WL_TyCon lcls
         ; let cls' = unLoc lcls'
               kvs = []  -- No scoped kind vars except those in
@@ -1995,7 +1995,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
         ; return (ClassDecl { tcdCtxt = context', tcdLName = lcls',
                               tcdTyVars = tyvars', tcdFixity = fixity,
                               tcdFDs = fds',
-                              tcdDecls = L ld [], -- See Note [Pass-sensitive decls for ClassDecls/ClsInstDecls]
+                              tcdDecls = L ld (HsEmpty noExtField), -- See Note [Pass-sensitive decls for ClassDecls/ClsInstDecls]
                               tcdCExt = (HsNestedGroup { ng_sigs          = sigs',
                                                          ng_meths         = mbinds',
                                                          ng_ats           = ats',

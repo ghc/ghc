@@ -48,6 +48,7 @@ import GHC.Types.Name.Reader (WithUserRdr(..) )
 import GHC.Types.InlinePragma (ActivationGhc)
 import GHC.Utils.Misc (abstractConstr)
 import GHC.Data.BooleanFormula (BooleanFormula(..))
+import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Decls.Foreign (CType(..), Header(..))
 import Language.Haskell.Syntax.Decls.Overlap (OverlapMode(..))
@@ -752,3 +753,8 @@ deriving instance Data (InlinePragma GhcTc)
 deriving instance Data (OverlapMode GhcPs)
 deriving instance Data (OverlapMode GhcRn)
 deriving instance Data (OverlapMode GhcTc)
+
+-- deriving instance Data (HsList p a)
+deriving instance (Data a) => Data (HsList GhcPs a)
+deriving instance (Data a) => Data (HsList GhcRn a)
+deriving instance (Data a) => Data (HsList GhcTc a)

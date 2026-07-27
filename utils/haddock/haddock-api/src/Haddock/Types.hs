@@ -842,6 +842,7 @@ type instance Anno (HsModifierOf (LocatedA (HsType DocNameI)) DocNameI) = SrcSpa
 type instance Anno (HsContextDetails DocNameI a) = SrcSpanAnnA
 type instance Anno [LocatedA (HsDecl DocNameI)] = SrcSpanAnnA
 type instance Anno (DataDefnCons _) = SrcSpanAnnA
+type instance Anno (HsList DocNameI (LocatedA (HsDecl DocNameI))) = SrcSpanAnnA
 
 type XRecCond a =
   ( XParTy a ~ (EpToken "(", EpToken ")")
@@ -1050,6 +1051,10 @@ type instance XBFAnd           DocNameI = NoExtField
 type instance XBFOr            DocNameI = NoExtField
 type instance XBFParens        DocNameI = (EpToken "(", EpToken ")")
 type instance XXBooleanFormula DocNameI = DataConCantHappen
+
+type instance XEmpty   DocNameI = NoExtField
+type instance XCons    DocNameI = NoExtField
+type instance XXHsList DocNameI = DataConCantHappen
 
 -----------------------------------------------------------------------------
 

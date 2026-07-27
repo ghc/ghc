@@ -94,7 +94,8 @@ module GHC.Hs.Decls (
   HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups, hsGroupInstDecls,
   hsGroupTopLevelFixitySigs,
 
-  partitionBindsAndSigs
+  partitionBindsAndSigs,
+  partitionBindsAndSigs'
     ) where
 
 -- friends:
@@ -118,7 +119,8 @@ import GHC.Hs.Doc
 import GHC.Types.Basic
 import GHC.Core.Coercion
 
-import GHC.Hs.Basic
+import qualified GHC.Hs.Basic as Basic
+import GHC.Hs.Basic hiding (fromList, toList)
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
 import GHC.Types.Name
@@ -191,6 +193,34 @@ partitionBindsAndSigs = go
           -> ng { ng_docs = L l d : ng_docs ng }
         _ -> pprPanic "partitionBindsAndSigs" (ppr decl)
 
+-- | Partition a list of HsDecls into function/pattern bindings, signatures,
+-- type family declarations, type family instances, and documentation comments.
+--
+-- Panics when given a declaration that cannot be put into any of the output
+-- groups.
+partitionBindsAndSigs'
+  :: HsList GhcPs (LHsDecl GhcPs) -> HsNestedGroup GhcPs
+partitionBindsAndSigs' = go
+  where
+    go :: HsList GhcPs (LHsDecl GhcPs) -> HsNestedGroup GhcPs
+    go (HsEmpty _) = HsNestedGroup [] [] [] [] [] []
+    go (HsCons _ (L l decl) ds) =
+      let ng = go ds in
+      case decl of
+        ValD _ b
+          ->  ng { ng_meths = L l b : ng_meths ng }
+        SigD _ s
+          -> ng { ng_sigs = L l s : ng_sigs ng }
+        TyClD _ (FamDecl _ t)
+          ->  ng { ng_ats =  L l t : ng_ats ng }
+        InstD _ (TyFamInstD { tfid_inst = tfi })
+          -> ng { ng_tyfam_insts = L l tfi : ng_tyfam_insts ng }
+        InstD _ (DataFamInstD { dfid_inst = dfi })
+          -> ng { ng_datafam_insts = L l dfi : ng_datafam_insts ng }
+        DocD _ d
+          -> ng { ng_docs = L l d : ng_docs ng }
+        _ -> pprPanic "partitionBindsAndSigs" (ppr decl)
+
 -- ---------------------------------------------------------------------
 
 -- Okay, I need to reconstruct the document comments, but for now:
@@ -225,7 +255,7 @@ hsGroupTopLevelFixitySigs (HsGroup{ hs_fixds = fixds, hs_tyclds = tyclds }) =
   where
     cls_fixds = [ L loc sig
                 | L _ ClassDecl{tcdDecls = L _ decls} <- tyClGroupTyClDecls tyclds
-                , HsNestedGroup { ng_sigs = sigs } <- (singleton . partitionBindsAndSigs) decls
+                , HsNestedGroup { ng_sigs = sigs } <- (singleton . partitionBindsAndSigs') decls
                 , L loc (FixSig _ sig) <- sigs
                 ]
 
@@ -574,7 +604,7 @@ instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
           GhcPs -> if null decls -- No "where" part
                         then top_matter
                         else vcat [ top_matter <+> text "where"
-                                  , nest 2 $ pprDeclList (map (ppr . unLoc) decls) ]
+                                  , nest 2 $ pprDeclList (map (ppr . unLoc) (Basic.toList decls)) ]
           GhcRn -> ppr_decls (fst ext)
           GhcTc -> ppr_decls (fst ext)
       where
@@ -1566,6 +1596,10 @@ instance OutputableBndr (IdP (GhcPass p))
 roleAnnotDeclName :: RoleAnnotDecl (GhcPass p) -> IdP (GhcPass p)
 roleAnnotDeclName (RoleAnnotDecl _ (L _ name) _) = name
 
+type instance XEmpty (GhcPass _) = NoExtField
+type instance XCons  (GhcPass _) = NoExtField
+type instance XXHsList (GhcPass _) = DataConCantHappen
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1578,6 +1612,8 @@ type instance Anno (HsDecl (GhcPass _)) = SrcSpanAnnA
 type instance Anno [LocatedA (HsDecl (GhcPass _))] = SrcSpanAnnA
 type instance Anno [LocatedA (FamEqn pass (LocatedA (HsType pass)))] = SrcSpanAnnA
 type instance Anno (DataDefnCons _) = SrcSpanAnnA
+type instance Anno [LocatedA (HsDecl (GhcPass p))] = SrcSpanAnnA
+type instance Anno (HsList (GhcPass p) (LocatedA (HsDecl (GhcPass p)))) = SrcSpanAnnA
 type instance Anno (SpliceDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (TyClDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (FunDep (GhcPass p)) = SrcSpanAnnA

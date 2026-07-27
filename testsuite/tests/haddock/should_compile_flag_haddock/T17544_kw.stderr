@@ -481,7 +481,9 @@
         []
         (EpaComments
          []))
-       [(L
+       (HsCons
+        (NoExtField)
+        (L
          (EpAnn
           (EpaSpan { T17544_kw.hs:22:5-18 })
           []
@@ -534,7 +536,9 @@
                  (EpaComments
                   []))
                 (Unqual
-                 {OccName: a})))))))))]))))]))
+                 {OccName: a})))))))))
+        (HsEmpty
+         (NoExtField)))))))]))
 
 
 T17544_kw.hs:7:3: warning: [GHC-94458] [-Winvalid-haddock]
