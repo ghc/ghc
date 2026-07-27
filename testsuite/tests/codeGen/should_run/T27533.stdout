@@ -1,0 +1,2 @@
+after 1-byte release-store: 0xffffffffffffff43
+acquire byte load at p+1:   0xff
