@@ -554,7 +554,8 @@
         []
         (EpaComments
          []))
-       []))))
+       (HsEmpty
+        (NoExtField))))))
   ,(L
     (EpAnn
      (EpaSpan { T20452.hs:9:1-85 })
@@ -800,6 +801,7 @@
         []
         (EpaComments
          []))
-       []))))]))
+       (HsEmpty
+        (NoExtField))))))]))
 
 

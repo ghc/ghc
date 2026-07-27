@@ -975,7 +975,8 @@
         []
         (EpaComments
          []))
-       []))))
+       (HsEmpty
+        (NoExtField))))))
   ,(L
     (EpAnn
      (EpaSpan { Test20297.hs:(34,1)-(35,11) })
@@ -1065,7 +1066,9 @@
         []
         (EpaComments
          []))
-       [(L
+       (HsCons
+        (NoExtField)
+        (L
          (EpAnn
           (EpaSpan { Test20297.hs:35:3-11 })
           []
@@ -1118,7 +1121,9 @@
                  (EpaComments
                   []))
                 (Unqual
-                 {OccName: a})))))))))]))))
+                 {OccName: a})))))))))
+        (HsEmpty
+         (NoExtField)))))))
   ,(L
     (EpAnn
      (EpaSpan { Test20297.hs:(38,1)-(39,14) })
@@ -4518,7 +4523,8 @@
         []
         (EpaComments
          []))
-       []))))
+       (HsEmpty
+        (NoExtField))))))
   ,(L
     (EpAnn
      (EpaSpan { Test20297.ppr.hs:(26,1)-(27,11) })
@@ -4595,7 +4601,9 @@
         []
         (EpaComments
          []))
-       [(L
+       (HsCons
+        (NoExtField)
+        (L
          (EpAnn
           (EpaSpan { Test20297.ppr.hs:27:3-11 })
           []
@@ -4648,7 +4656,9 @@
                  (EpaComments
                   []))
                 (Unqual
-                 {OccName: a})))))))))]))))
+                 {OccName: a})))))))))
+        (HsEmpty
+         (NoExtField)))))))
   ,(L
     (EpAnn
      (EpaSpan { Test20297.ppr.hs:(28,1)-(29,14) })
