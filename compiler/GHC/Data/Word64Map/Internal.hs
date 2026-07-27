@@ -170,6 +170,7 @@ module GHC.Data.Word64Map.Internal (
     , map
     , mapWithKey
     , traverseWithKey
+    , traverseWithKey_
     , traverseMaybeWithKey
     , mapAccum
     , mapAccumWithKey
@@ -2519,6 +2520,16 @@ traverseWithKey f = go
       | m < 0     = liftA2 (flip (Bin p m)) (go r) (go l)
       | otherwise = liftA2 (Bin p m) (go l) (go r)
 {-# INLINE traverseWithKey #-}
+
+-- | \(O(n)\). Visit each key\/value pair in ascending key order, discarding
+-- the results.
+traverseWithKey_ :: Applicative t => (Key -> a -> t ()) -> Word64Map a -> t ()
+traverseWithKey_ f = go
+  where
+    go Nil = pure ()
+    go (Tip k v) = f k v
+    go (Bin _ _ l r) = go l *> go r
+{-# INLINE traverseWithKey_ #-}
 
 -- | \(O(n)\). The function @'mapAccum'@ threads an accumulating
 -- argument through the map in ascending order of keys.

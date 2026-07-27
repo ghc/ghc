@@ -168,6 +168,7 @@ module GHC.Data.Word64Map.Strict.Internal (
     , map
     , mapWithKey
     , traverseWithKey
+    , traverseWithKey_
     , traverseMaybeWithKey
     , mapAccum
     , mapAccumWithKey
@@ -330,6 +331,7 @@ import GHC.Data.Word64Map.Internal
   , toAscList
   , toDescList
   , toList
+  , traverseWithKey_
   , union
   , unions
   , withoutKeys
