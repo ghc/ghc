@@ -1073,7 +1073,7 @@ getRegister' config plat expr
             in return $ Any (intFormat to) $ \dst ->
                 code `snocOL`
                 SBFM (OpReg w' dst) (OpReg w' reg) (OpImm (ImmInt 0)) (toImm (min from to)) `appOL`
-                -- At this point an 8- or 16-bit value would be sign-extended
+                -- At this point an 8- or 16-bit value is sign-extended
                 -- to 32-bits. Truncate back down the final width.
                 truncateSubwordRegInplace to dst
 
@@ -2762,6 +2762,7 @@ genCCall target dest_regs arg_regs = do
           | [p_reg, val_reg] <- arg_regs -> do
               (p, _fmt_p, code_p) <- getSomeReg p_reg
               (val, fmt_val, code_val) <- getSomeReg val_reg
+              massert (fmt_val == intFormat w)
               let instr = case ord of
                       MemOrderRelaxed -> STR
                       _               -> STLR
