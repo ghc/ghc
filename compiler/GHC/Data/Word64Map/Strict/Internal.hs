@@ -132,6 +132,7 @@ module GHC.Data.Word64Map.Strict.Internal (
     -- ** Size
     , null
     , size
+    , compareSize
 
     -- * Combine
 
@@ -322,6 +323,7 @@ import GHC.Data.Word64Map.Internal
   , spanAntitone
   , restrictKeys
   , size
+  , compareSize
   , split
   , splitLookup
   , splitRoot
