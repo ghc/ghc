@@ -1045,6 +1045,10 @@ type instance XBFOr            DocNameI = NoExtField
 type instance XBFParens        DocNameI = (EpToken "(", EpToken ")")
 type instance XXBooleanFormula DocNameI = DataConCantHappen
 
+type instance XEmpty   DocNameI = NoExtField
+type instance XCons    DocNameI = NoExtField
+type instance XXHsList DocNameI = DataConCantHappen
+
 -----------------------------------------------------------------------------
 
 -- * NFData instances for GHC types
