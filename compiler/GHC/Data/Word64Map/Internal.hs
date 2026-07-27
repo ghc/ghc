@@ -72,6 +72,7 @@ module GHC.Data.Word64Map.Internal (
     -- * Query
     , null
     , size
+    , compareSize
     , member
     , notMember
     , lookup
@@ -522,12 +523,31 @@ null _   = False
 -- > size empty                                   == 0
 -- > size (singleton 1 'a')                       == 1
 -- > size (fromList([(1,'a'), (2,'c'), (3,'b')])) == 3
+--
+-- See also: 'compareSize'
 size :: Word64Map a -> Int
 size = go 0
   where
     go !acc (Bin _ _ l r) = go (go acc l) r
     go acc (Tip _ _) = 1 + acc
     go acc Nil = acc
+
+-- | \(O(\min(n,c))\). Compare the number of entries in the map to an @Int@.
+--
+-- @compareSize m c@ returns the same result as @compare ('size' m) c@ but is
+-- more efficient when @c@ is smaller than the size of the map.
+compareSize :: Word64Map a -> Int -> Ordering
+compareSize Nil c0 = compare 0 c0
+compareSize _ c0 | c0 <= 0 = GT
+compareSize t c0 = compare 0 (go t (c0 - 1))
+  where
+    go (Bin _ _ _ _) 0 = -1
+    go (Bin _ _ l r) c
+      | c' < 0 = c'
+      | otherwise = go r c'
+      where
+        c' = go l (c - 1)
+    go _ c = c -- Must be Tip (Nil is never a child of Bin)
 
 -- | \(O(\min(n,W))\). Is the key a member of the map?
 --
