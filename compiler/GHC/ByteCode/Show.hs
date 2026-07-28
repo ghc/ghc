@@ -235,9 +235,9 @@ pprInternalBreakpointID current_module InternalBreakpointId {..}
     indexDoc = ppr ibi_info_index
 
 -- | Constructs textual information about used items.
-pprUsedItems :: Module         -- ^ The enclosing module
-            -> FlatBag BCOPtr  -- ^ The used items
-            -> SDoc            -- ^ The textual information
+pprUsedItems :: Module          -- ^ The enclosing module
+             -> FlatBag BCOPtr  -- ^ The used items
+             -> SDoc            -- ^ The textual information
 pprUsedItems current_module = entry (text "used items")        .
                               vcatOrNone                       .
                               map (pprUsedItem current_module) .
