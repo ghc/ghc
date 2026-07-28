@@ -187,20 +187,22 @@ unitUDFM k v = UDFM (M.singleton (getKey $ getUnique k) (TaggedVal v 0)) 1
 addToUDFM :: Uniquable key => UniqDFM key elt -> key -> elt  -> UniqDFM key elt
 addToUDFM m k v = addToUDFM_Directly m (getUnique k) v
 
+alteredUDFM :: Int -> (Maybe (TaggedVal elt), M.Word64Map (TaggedVal elt)) -> UniqDFM key elt
+alteredUDFM i (new, m) = case new of
+  Just (TaggedVal _ tag) | tag == i -> UDFM m (i + 1)
+  _                                 -> UDFM m i
+
 -- A new key goes to the right of existing ones
 -- Overwriting an existing key keeps its position in the iteration order
 addToUDFM_Directly :: UniqDFM key elt -> Unique -> elt -> UniqDFM key elt
 addToUDFM_Directly (UDFM m i) u v
-  = UDFM (MS.insertWith tf (getKey u) (TaggedVal v i) m) (i + 1)
+  = alteredUDFM i (M.alterLookup alterf (getKey u) m)
   where
-    tf (TaggedVal new_v _) (TaggedVal _ old_i) = TaggedVal new_v old_i
+    alterf Nothing = Just $! TaggedVal v i
+    alterf (Just (TaggedVal _ old_i)) = Just $! TaggedVal v old_i
       -- Keep the old tag, but insert the new value
       -- This means that udfmToList typically returns elements
       -- in the order of insertion, rather than the reverse
-
-      -- It is quite critical that the strict insertWith is used as otherwise
-      -- the combination function 'tf' is not forced and both old values are retained
-      -- in the map.
 
 addToUDFM_C_Directly
   :: (elt -> elt -> elt)   -- old -> new -> result
@@ -208,12 +210,10 @@ addToUDFM_C_Directly
   -> Unique -> elt
   -> UniqDFM key elt
 addToUDFM_C_Directly f (UDFM m i) u v
-  = UDFM (MS.insertWith tf (getKey u) (TaggedVal v i) m) (i + 1)
+  = alteredUDFM i (M.alterLookup alterf (getKey u) m)
     where
-      tf (TaggedVal new_v _) (TaggedVal old_v old_i)
-         = TaggedVal (f old_v new_v) old_i
-          -- Flip the arguments, because M.insertWith uses  (new->old->result)
-          --                         but f            needs (old->new->result)
+      alterf Nothing = Just $! TaggedVal v i
+      alterf (Just (TaggedVal old_v old_i)) = Just $! TaggedVal (f old_v v) old_i
           -- Like addToUDFM_Directly, keep the old tag
 
 addToUDFM_C
@@ -453,7 +453,7 @@ adjustUDFM_Directly f (UDFM m i) k = UDFM (M.adjust (fmap f) (getKey k) m) i
 -- more efficient. Updating an existing key keeps its position in the
 -- deterministic iteration order.
 --
--- 'alterUDFM' is non-strict in @k@.
+-- 'alterUDFM' is strict in @k@.
 alterUDFM
   :: Uniquable key
   => (Maybe elt -> Maybe elt)  -- ^ How to adjust the element
@@ -461,12 +461,12 @@ alterUDFM
   -> key                       -- ^ @key@ of the element to adjust
   -> UniqDFM key elt           -- ^ New element at @key@ and modified 'UniqDFM'
 alterUDFM f (UDFM m i) k =
-  UDFM (M.alter alterf (getKey $ getUnique k) m) (i + 1)
+  alteredUDFM i (M.alterLookup alterf (getKey $ getUnique k) m)
   where
   alterf Nothing = inject i $ f Nothing
   alterf (Just (TaggedVal v old_i)) = inject old_i $ f (Just v)
   inject _ Nothing = Nothing
-  inject tag (Just v) = Just $ TaggedVal v tag
+  inject tag (Just v) = Just $! TaggedVal v tag
 
 -- | The expression (@'upsertUDFM' f map k@) updates the value at @k@ or inserts
 -- a new value if @k@ is absent.
@@ -480,10 +480,10 @@ upsertUDFM
   -> key                 -- ^ @key@ of the element to adjust
   -> UniqDFM key elt     -- ^ New element at @key@ and modified 'UniqDFM'
 upsertUDFM f (UDFM m i) k =
-  UDFM (MS.upsert upsertf (getKey $ getUnique k) m) (i + 1)
+  alteredUDFM i (M.alterLookup upsertf (getKey $ getUnique k) m)
   where
-    upsertf Nothing = TaggedVal (f Nothing) i
-    upsertf (Just (TaggedVal v old_i)) = TaggedVal (f (Just v)) old_i
+    upsertf Nothing = Just $! TaggedVal (f Nothing) i
+    upsertf (Just (TaggedVal v old_i)) = Just $! TaggedVal (f (Just v)) old_i
 
 -- | The expression (@'alterUDFM_L' f map k@) alters value @x@ at @k@, or absence
 -- thereof and returns the new element at @k@ if there is any.
@@ -500,16 +500,14 @@ alterUDFM_L
   -> key                           -- ^ @key@ of the element to adjust
   -> (Maybe elt, UniqDFM key elt)  -- ^ New element at @key@ and modified 'UniqDFM'
 alterUDFM_L f (UDFM m i) k =
-  let
-    (mElt, udfm) = M.alterLookup alterf (getKey $ getUnique k) m
-  in
-    (fmap taggedFst mElt, UDFM udfm (i + 1))
+  case M.alterLookup alterf (getKey $ getUnique k) m of
+    res@(mElt, _) -> (fmap taggedFst mElt, alteredUDFM i res)
   where
-  alterf :: Maybe (TaggedVal elt) -> (Maybe (TaggedVal elt))
+  alterf :: Maybe (TaggedVal elt) -> Maybe (TaggedVal elt)
   alterf Nothing = inject i $ f Nothing
   alterf (Just (TaggedVal v old_i)) = inject old_i $ f (Just v)
   inject _ Nothing = Nothing
-  inject tag (Just v) = Just $ TaggedVal v tag
+  inject tag (Just v) = Just $! TaggedVal v tag
 
 -- | Map a function over every value in a UniqDFM
 mapUDFM :: (elt1 -> elt2) -> UniqDFM key elt1 -> UniqDFM key elt2
