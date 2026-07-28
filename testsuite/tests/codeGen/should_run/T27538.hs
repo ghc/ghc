@@ -14,6 +14,7 @@ f x = if isTrue# (x `ltInt8#` intToInt8# 0#)
 
 main :: IO ()
 main = do
+  -- Test for use of byte-width read.
   let !(I# i) = ix
       x = indexInt8OffAddr# "\x80"# i
   putStrLn ("f(0x80) = " ++ show (I# (f x)))
