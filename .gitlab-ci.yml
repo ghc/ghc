@@ -902,7 +902,7 @@ release-hackage-lint:
     UPSTREAM_PIPELINE_ID: "$CI_PIPELINE_ID"
   trigger:
     project: "ghc/test-primops"
-    branch: "upstream-testing"
+    branch: "ad04287165af3d48e037858eaf47558e3857c52d"
     strategy: "depend"
 
 .test-primops-validate-template:
