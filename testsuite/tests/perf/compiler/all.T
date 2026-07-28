@@ -189,6 +189,32 @@ test ('T13386',
       compile,
       ['-v0 -O0'])
 
+# Performance test for lookups in the family application cache
+test('FamAppCachePerf',
+     [ only_ways(['normal'])
+     , collect_compiler_residency(20)
+     , collect_compiler_stats('bytes allocated',2)
+     ],
+     compile,
+     ['-v0 -O0'])
+
+test('T27336',
+     [ only_ways(['normal'])
+     , collect_compiler_residency(20)
+     , collect_compiler_stats('bytes allocated',2)
+     ],
+     compile,
+     ['-v0 -O0'])
+
+# Performance test involving pushing casts around in the simplifier
+test('SimplCastPerf',
+     [ only_ways(['normal'])
+     , collect_compiler_residency(20)
+     , collect_compiler_stats('bytes allocated',2)
+     ],
+     compile,
+     ['-v0 -O'])
+
 #########
 # The following tests are very sensitive
 # to coercion optimisation.
