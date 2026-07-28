@@ -957,7 +957,7 @@ getRegister' config plat expr
               return $ Fixed (intFormat to) trunc_reg (code `appOL` code_trunc)
 
         -- Vector
-        MO_V_Broadcast l w -> return $ Any fmt (\dst -> code `snocOL` DUP fmt (OpReg vw dst) (OpScalarAsVec w reg))
+        MO_V_Broadcast l w -> return $ Any fmt (\dst -> code `snocOL` DUP fmt (OpReg vw dst) (OpReg w reg))
           where fmt = VecFormat l (intScalarFormat w)
                 vw = formatToWidth fmt
         MO_VF_Broadcast l w -> return $ Any fmt (\dst -> code `snocOL` DUP fmt (OpReg vw dst) (OpScalarAsVec w reg))
