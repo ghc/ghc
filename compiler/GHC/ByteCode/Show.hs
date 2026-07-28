@@ -7,23 +7,6 @@ module GHC.ByteCode.Show (showByteCode) where
 
 -- Prelude
 import GHC.Prelude
-       (
-           (+), (-), Integral, div,                  -- Prelude
-           (==),                                     -- Data.Eq
-           (>=),                                     -- Data.Ord
-           FiniteBits, finiteBitSize,                -- Data.Bits
-           ($), id, (.),                             -- Data.Function
-           fst, uncurry,                             -- Data.Tuple
-           Bool, otherwise, not,                     -- Data.Bool
-           Int,                                      -- Data.Int
-           Word,                                     -- Data.Word
-           Maybe, maybe,                             -- Data.Maybe
-           Either, either,                           -- Data.Either
-           length, (++), map, take, drop, replicate, -- Data.List
-           String,                                   -- Data.String
-           show,                                     -- Text.Show
-           IO, FilePath                              -- System.IO
-       )
 
 -- Bytecode
 import GHC.ByteCode.Types
