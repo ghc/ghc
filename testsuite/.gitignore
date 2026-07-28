@@ -72,7 +72,7 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 # NOTE: to edit this section in Vim, add your ignore annotations some where
 # in the list, select the entire section and say ':sort u' to sort it.
 
-/mk/ghc-config
+/ghc-config/ghc-config
 
 /tests/ado/ado001
 /tests/annotations/should_compile/th/build_make
