@@ -151,15 +151,28 @@ instance OutputableP Platform CmmGraph where
 toBlockMap :: CmmGraph -> LabelMap CmmBlock
 toBlockMap (CmmGraph {g_graph=GMany NothingO body NothingO}) = body
 
+-- | Print the blocks reachable from the entry, in reverse postorder.
+--
+-- Under @-dppr-debug@ the unreachable blocks stored in the graph are appended
+-- too. See Note [unreachable blocks] in "GHC.Cmm.Pipeline".
 pprCmmGraph :: Platform -> CmmGraph -> SDoc
 pprCmmGraph platform g
    = text "{" <> text "offset"
-  $$ nest 2 (vcat $ map (pdoc platform) blocks)
+  $$ nest 2 (ppr_blocks blocks $$ unreachable)
   $$ text "}"
-  where blocks = revPostorder g
-    -- revPostorder has the side-effect of discarding unreachable code,
-    -- so pretty-printed Cmm will omit any unreachable blocks.  This can
-    -- sometimes be confusing.
+  where
+    ppr_blocks :: [CmmBlock] -> SDoc
+    ppr_blocks = vcat . map (pdoc platform)
+
+    blocks = revPostorder g
+
+    unreachable = getPprDebug $ \debug ->
+      if not debug || mapNull dead_blocks
+        then empty
+        else text "// unreachable blocks:"
+          $$ nest 2 (ppr_blocks (mapElems dead_blocks))
+
+    dead_blocks = foldl' (\bs b -> mapDelete (entryLabel b) bs) (toBlockMap g) blocks
 
 revPostorder :: CmmGraph -> [CmmBlock]
 revPostorder g = {-# SCC "revPostorder" #-}

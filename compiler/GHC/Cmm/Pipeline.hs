@@ -357,6 +357,7 @@ containing junk code.  These aren't necessarily a problem, but
 removing them is good because it might save time in the native code
 generator later.
 
+To make unreachable blocks visible in -ddump-cmm-* output, add -dppr-debug.
 -}
 
 dumpGraph :: Logger -> Platform -> Bool -> DumpFlag -> String -> CmmGraph -> IO ()
