@@ -214,3 +214,5 @@ test('StackAlignment64'
     , compile_and_run if have_cpu_feature('avx512f') else compile
     , ['StackAlignment64_main.c']
     )
+
+test('T27565', [], compile_and_run, [''])
