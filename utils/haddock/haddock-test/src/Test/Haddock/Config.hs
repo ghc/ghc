@@ -36,6 +36,10 @@ import Test.Haddock.Process
 import Test.Haddock.Utils
 
 
+normalV :: Verbosity
+normalV = mkVerbosity defaultVerbosityHandles normal
+
+
 data TestPackage = TestPackage
     { tpkgName :: String
     , tpkgFiles :: [FilePath]
@@ -191,7 +195,7 @@ loadConfig ccfg dcfg flags files = do
 
     -- Perhaps Haddock knows where you can find GHC?
     queriedGhcPath <- do
-      p <- init <$> rawSystemStdout normal cfgHaddockPath ["--print-ghc-path"]
+      p <- init <$> rawSystemStdout normalV cfgHaddockPath ["--print-ghc-path"]
       exists <- doesFileExist p
       pure $ if exists then Just p else Nothing
 
@@ -255,9 +259,9 @@ baseDependencies ghcPath = do
     -- consequences of unsetting it - but looks like it works (for now).
     unsetEnv "GHC_PACKAGE_PATH"
 
-    (comp, _, cfg) <- configure normal (Just ghcPath) Nothing
+    (_, _, cfg) <- configure normalV (Just ghcPath) Nothing
         defaultProgramDb
-    pkgIndex <- getInstalledPackages normal comp Nothing [GlobalPackageDB] cfg
+    pkgIndex <- getInstalledPackages normalV Nothing [GlobalPackageDB] cfg
     let
       pkgs =
         [ "array"
