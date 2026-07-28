@@ -37,7 +37,7 @@ void
 ocFlushInstructionCache( ObjectCode *oc )
 {
     /* The main object code */
-    ocFlushInstructionCacheFrom(oc->image + oc->misalignment, oc->fileSize);
+    ocFlushInstructionCacheFrom(oc->image, oc->fileSize);
 
     /* Jump Islands */
     ocFlushInstructionCacheFrom(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras);

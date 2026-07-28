@@ -678,7 +678,7 @@ void flushInstructionCacheRISCV64(ObjectCode *oc) {
   // parameters couldn't be checked during development.)
 
   /* The main object code */
-  void *codeBegin = oc->image + oc->misalignment;
+  void *codeBegin = oc->image;
   __builtin___clear_cache(codeBegin, (void*) ((uint64_t*) codeBegin + oc->fileSize));
 
   /* Jump Islands */
