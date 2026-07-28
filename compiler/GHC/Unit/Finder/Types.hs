@@ -19,6 +19,7 @@ import GHC.Unit.Env
 
 import GHC.Data.FastString
 import GHC.Types.Unique.Set
+import GHC.Iface.Errors.Types (HomeOrExternalOrigin)
 
 -- | The 'FinderCache' maps modules to the result of
 -- searching for that module. It records the results of searching for
@@ -56,7 +57,7 @@ data FindResult
         -- ^ The module was found
   | NoPackage Unit
         -- ^ The requested unit was not found
-  | FoundMultiple [(Module, ModuleOrigin)]
+  | FoundMultiple [(Module, HomeOrExternalOrigin)]
         -- ^ _Error_: both in multiple packages
 
         -- | Not found
