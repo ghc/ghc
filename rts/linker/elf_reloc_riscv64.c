@@ -679,7 +679,7 @@ void flushInstructionCacheRISCV64(ObjectCode *oc) {
 
   /* The main object code */
   void *codeBegin = oc->image + oc->misalignment;
-  __builtin___clear_cache(codeBegin, (void*) ((uint64_t*) codeBegin + oc->fileSize));
+  __builtin___clear_cache(codeBegin, (void*) ((uint8_t*) codeBegin + oc->fileSize));
 
   /* Jump Islands */
   __builtin___clear_cache((void *)oc->symbol_extras,
