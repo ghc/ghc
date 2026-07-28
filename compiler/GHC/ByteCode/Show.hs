@@ -222,7 +222,9 @@ pprInternalBreakpointID
   -> SDoc                 -- ^ The textual information
 pprInternalBreakpointID current_module InternalBreakpointId {..}
   | ibi_info_mod == current_module = indexDoc
-  | otherwise                      = indexDoc <+> text "in" <+> ppr ibi_info_mod
+  | otherwise                      = indexDoc                  <+>
+                                     text "in"                 <+>
+                                     quotes (ppr ibi_info_mod)
   where
 
   indexDoc :: SDoc
