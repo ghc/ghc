@@ -1,0 +1,19 @@
+#include "Cmm.h"
+
+// The block "dead" is stored in the graph but no block branches to it, so it
+// only shows up in Cmm dumps under -dppr-debug.
+testUnreachable (W_ x)
+{
+  if (x > 0) {
+    goto live;
+  }
+  return (x);
+
+dead:
+  x = x + 42;
+  return (x);
+
+live:
+  x = x - 1;
+  return (x);
+}

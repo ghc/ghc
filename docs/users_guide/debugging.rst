@@ -564,6 +564,11 @@ C-\- representation
 
 These flags dump various phases of GHC's C-\- pipeline.
 
+Dumps of Cmm graphs print the blocks reachable from the entry, in reverse
+post-order. To also show unreachable blocks, which can linger in the graph,
+add :ghc-flag:`-dppr-debug`. These blocks are then listed under a
+``// unreachable blocks:`` heading.
+
 .. ghc-flag:: -ddump-cmm-verbose-by-proc
     :shortdesc: Show output from main C-\- pipeline passes (grouped by proc)
     :type: dynamic
@@ -573,9 +578,6 @@ These flags dump various phases of GHC's C-\- pipeline.
     file parsing. Not included are passes run by
     the chosen backend. Currently only the NCG backends runs
     additional passes ( :ghc-flag:`-ddump-opt-cmm` ).
-
-    Cmm dumps don't include unreachable blocks since we print
-    blocks in reverse post-order.
 
 .. ghc-flag:: -ddump-cmm-verbose
     :shortdesc: Write output from main C-\- pipeline passes to files
