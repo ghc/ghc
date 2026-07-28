@@ -169,6 +169,10 @@ toolTargets = [ cabalSyntax
               , hsc2hs  -- # executable
               , hpc
               , hpcBin  -- # executable
+              , parsec
+              , text
+              , thLift
+              , thQuasiquoter
               , time
               , semaphoreCompat
               , unlit  -- # executable

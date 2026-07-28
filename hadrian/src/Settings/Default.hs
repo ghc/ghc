@@ -102,9 +102,11 @@ stage0Packages = do
              , hpcBin
              , hsc2hs
              , osString -- new library not yet present for boot compilers
+             , parsec -- depends on text
              , process -- depends on filepath
              , runGhc
              , semaphoreCompat -- depends on
+             , text -- depends on thLift
              , time -- depends on win32
              , thLift -- new library not yet present for boot compilers
              , thQuasiquoter -- new library not yet present for boot compilers
