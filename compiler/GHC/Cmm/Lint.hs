@@ -88,8 +88,9 @@ lintCmmBlock labels block
 -- byte/word mismatches.
 
 lintCmmExpr :: CmmExpr -> CmmLint CmmType
-lintCmmExpr (CmmLoad expr rep _alignment) = do
-  _ <- lintCmmExpr expr
+lintCmmExpr e@(CmmLoad expr rep _alignment) = do
+  ty <- lintCmmExpr expr
+  lintAddrTy e ty
   -- Disabled, if we have the inlining phase before the lint phase,
   -- we can have funny offsets due to pointer tagging. -- EZY
   -- when (widthInBytes (typeWidth rep) >= platformWordSizeInBytes platform) $
@@ -111,6 +112,15 @@ lintCmmExpr (CmmRegOff reg offset)
 lintCmmExpr expr =
   do platform <- getPlatform
      return (cmmExprType platform expr)
+
+-- We require every address to refer to be word-width since we don't support 32
+-- bit pointers on 64bit platforms.
+lintAddrTy :: CmmExpr -> CmmType -> CmmLint ()
+lintAddrTy e addr_ty = do
+  p <- getPlatform
+  -- We don't support any platforms where wordwidth /= ptrWidth currently.
+  unless (addr_ty `cmmCompatType` bWord p) $ cmmLintErr (text "Non word-width address found in:" <+> pdoc p e)
+
 
 -- | Check for obviously out-of-bounds shift operations
 lintShiftOp :: MachOp -> [(CmmExpr, CmmType)] -> CmmLint ()
@@ -173,10 +183,10 @@ lintCmmMiddle node = case node of
             unless (erep `cmmCompatType` reg_ty) $
               cmmLintAssignErr (CmmAssign reg expr) erep reg_ty
 
-  CmmStore l r _alignment -> do
-            _ <- lintCmmExpr l
-            _ <- lintCmmExpr r
-            return ()
+  CmmStore addr rhs _alignment -> do
+            addr_ty <- lintCmmExpr addr
+            _ <- lintCmmExpr rhs
+            lintAddrTy addr addr_ty
 
   CmmUnsafeForeignCall target _formals actuals -> do
             let lintArg expr = do
