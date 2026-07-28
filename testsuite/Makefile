@@ -46,5 +46,6 @@ clean distclean maintainer-clean:
 	$(RM) -f mk/*.o
 	$(RM) -f mk/*.hi
 	$(RM) -f mk/ghcconfig*.mk
-	$(RM) -f mk/ghc-config mk/ghc-config.exe
+	$(RM) -f ghc-config/ghc-config ghc-config/ghc-config.exe
+	$(RM) -f ghc-config/ghc-config.o ghc-config/ghc-config.hi
 	$(RM) -f driver/*.pyc
