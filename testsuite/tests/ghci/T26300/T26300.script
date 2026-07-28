@@ -1,0 +1,3 @@
+"Report two ambiguous imports."
+"The Data.List import is ambiguous with the `base` module."
+"Bar module is defined in two home units, as such needs to be reported as ambiguous."

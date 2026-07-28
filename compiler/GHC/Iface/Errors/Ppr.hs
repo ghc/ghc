@@ -240,7 +240,9 @@ cantFindErrorX pkg_hidden_hint may_show_locations mod_or_interface (CantFindInst
       -> vcat (map pprMod mods)
       where
         unambiguousPackages = foldl' unambiguousPackage (Just []) mods
-        unambiguousPackage (Just xs) (m, ModOrigin (Just _) _ _ _)
+        unambiguousPackage (Just xs) (m, ExternalUnitOrigin (ModOrigin (Just _) _ _ _))
+            = Just (moduleUnit m : xs)
+        unambiguousPackage (Just xs) (m, HomeOrigin{})
             = Just (moduleUnit m : xs)
         unambiguousPackage _ _ = Nothing
     GenericMissing pkg_hiddens mod_hiddens unusables files ->
@@ -251,9 +253,16 @@ cantFindErrorX pkg_hidden_hint may_show_locations mod_or_interface (CantFindInst
   where
     pprMod (m, o) = text "it is bound as" <+> ppr m <+>
                                 text "by" <+> pprOrigin m o
-    pprOrigin _ ModHidden = panic "cantFindErr: bound by mod hidden"
-    pprOrigin _ (ModUnusable _) = panic "cantFindErr: bound by mod unusable"
-    pprOrigin m (ModOrigin e res _ f) = sep $ punctuate comma (
+
+    pprOrigin m HomeOrigin = pprHomeOrigin m
+    pprOrigin m (ExternalUnitOrigin o) = pprExtOrigin m o
+
+    pprHomeOrigin m =
+      text "package" <+> ppr (moduleUnit m)
+
+    pprExtOrigin _ ModHidden = panic "cantFindErr: bound by mod hidden"
+    pprExtOrigin _ (ModUnusable _) = panic "cantFindErr: bound by mod unusable"
+    pprExtOrigin m (ModOrigin e res _ f) = sep $ punctuate comma (
       if e == Just True
           then [text "package" <+> ppr (moduleUnit m)]
           else [] ++

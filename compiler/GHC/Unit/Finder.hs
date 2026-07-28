@@ -78,10 +78,11 @@ import GHC.Types.Unique.Set
 import qualified Data.List as L(sort)
 import Data.List.NonEmpty ( NonEmpty (..) )
 import Data.Set (Set)
-import qualified Data.Set as Set (empty, intersection, difference, null, toList)
+import qualified Data.Set as Set (empty, intersection, difference, null, toList, member)
 import qualified System.Directory as SD
 import qualified System.OsPath as OsPath
 import qualified Data.List.NonEmpty as NE
+import GHC.Iface.Errors.Types
 
 type FileExt = OsString -- Filename extension
 type BaseName = OsPath  -- Basename of file
@@ -247,8 +248,12 @@ findImportedModuleNoHsc fc fopts ue home_module_name_providers_map mb_home_unit 
                              ue_findHomeUnitEnv home_unit_id ue
 
     other_fopts :: [(UnitId, FinderOpts)]
-    other_fopts = homeUnitDepsFinderOpts ue home_module_name_providers_map
+    other_fopts =
+      let
+        (providers, others) = homeUnitDepsFinderOpts ue home_module_name_providers_map
                                          unit_state mod_name
+      in
+        providers ++ others
 
 -- | Locate a plugin module requested by the user, for a compiler
 -- plugin.  This consults the same set of exposed packages as
@@ -263,11 +268,17 @@ findPluginModuleNoHsc
   -> ModuleName
   -> IO FindResult
 findPluginModuleNoHsc fc fopts ue home_module_name_providers_map mb_home_unit@(Just home_unit) mod_name =
-    findHomeModuleAmongDeps fc fopts ue home_module_name_providers_map
-                            mb_home_unit mod_name
+    home_import
     `orIfNotFound`
-    findExposedPluginPackageModule fc fopts unit_state mod_name
+      (findHomeModuleAmongDeps fc ue home_module_name_providers_map
+                              mb_home_unit mod_name
+      `combineFindResult`
+      findExposedPluginPackageModule fc fopts unit_state mod_name
+      )
   where
+    home_import =
+      findHomeModule fc fopts home_unit mod_name
+
     unit_state = HUG.homeUnitEnv_units $
                  ue_findHomeUnitEnv (homeUnitId home_unit) ue
 findPluginModuleNoHsc fc fopts ue _ Nothing mod_name =
@@ -291,9 +302,9 @@ findPluginModule hsc_env mod_name = do
 rankedHomeUnitDeps :: HomeModuleNameProvidersMap
                    -> ModuleName
                    -> Set UnitId
-                   -> [UnitId]
+                   -> ([UnitId], [UnitId])
 rankedHomeUnitDeps _ _ home_unit_deps | Set.null home_unit_deps
-    = []
+    = ([], [])
 -- The special handling of the situation where the dependency set is empty does
 -- not change the result, but it avoids triggering evaluation of the module
 -- graph. This is particularly important in one-shot mode, where the module
@@ -309,7 +320,7 @@ rankedHomeUnitDeps _ _ home_unit_deps | Set.null home_unit_deps
 --     3 | import {-# source #-} A
 --       | ^^^^^^^^^^^^^^^^^^^^^^^
 rankedHomeUnitDeps home_module_name_providers_map mod_name home_unit_deps
-    = Set.toList cached_deps ++ Set.toList uncached_deps
+    = (Set.toList cached_deps, Set.toList uncached_deps)
     where
 
     cached_providers :: Set UnitId
@@ -330,12 +341,19 @@ homeUnitDepsFinderOpts
   -> HomeModuleNameProvidersMap
   -> UnitState  -- ^ unit state of the requesting home unit
   -> ModuleName
-  -> [(UnitId, FinderOpts)]
+  -> ([(UnitId, FinderOpts)], [(UnitId, FinderOpts)])
 homeUnitDepsFinderOpts ue home_module_name_providers_map unit_state mod_name =
-    [ (uid, initFinderOpts (ue_unitFlags uid ue))
-    | uid <- rankedHomeUnitDeps home_module_name_providers_map mod_name
+  let
+    (providers, otherHomeUnits) = rankedHomeUnitDeps home_module_name_providers_map mod_name
                                 (homeUnitDepends unit_state)
-    ]
+  in
+    ( [ (uid, initFinderOpts (ue_unitFlags uid ue))
+      | uid <- providers
+      ]
+    , [ (uid, initFinderOpts (ue_unitFlags uid ue))
+      | uid <- otherHomeUnits
+      ]
+    )
 
 -- | Search for @mod_name@ in the given home unit.
 findHomeUnitDepModule
@@ -364,30 +382,29 @@ findHomeUnitDepModule fc ue home_module_name_providers_map mod_name (uid, opts)
 -- successful result.
 findHomeModuleAmongDeps
   :: FinderCache
-  -> FinderOpts
   -> UnitEnv
   -> HomeModuleNameProvidersMap
   -> Maybe HomeUnit
   -> ModuleName
   -> IO FindResult
-findHomeModuleAmongDeps fc fopts ue home_module_name_providers_map mb_home_unit mod_name =
-    foldr1 orIfNotFound (home_import :| map home_pkg_import other_fopts)
-    -- Do not try to be smart and change this to `foldr orIfNotFound home_import
-    -- (map home_pkg_import other_fopts)`, as that would not be the same.
-    -- `home_import` is first because we need to first look within the current
-    -- unit before looking at the other units in order.
+findHomeModuleAmongDeps fc ue home_module_name_providers_map mb_home_unit mod_name =
+  findInDirectDeps `orIfNotFound` findInOtherDeps
   where
-    home_import = case mb_home_unit of
-        Just home_unit -> findHomeModule fc fopts home_unit mod_name
-        Nothing        -> pure $
-                          NoPackage (panic "findHomeModuleAmongDeps: no home-unit")
+    findInDirectDeps = case provider_fopts of
+      p:ps -> foldr1 combineFindResult (home_pkg_import p :| map home_pkg_import ps)
+      [] -> pure notFound
+
+    findInOtherDeps = case other_fopts of
+      p:ps -> foldr1 orIfNotFound (home_pkg_import p :| map home_pkg_import ps)
+      [] -> pure notFound
+
     home_pkg_import = findHomeUnitDepModule fc ue home_module_name_providers_map mod_name
 
     unit_state = case homeUnitId <$> mb_home_unit of
         Nothing           -> ue_homeUnitState ue
         Just home_unit_id -> HUG.homeUnitEnv_units $
                              ue_findHomeUnitEnv home_unit_id ue
-    other_fopts = homeUnitDepsFinderOpts ue home_module_name_providers_map
+    (provider_fopts, other_fopts) = homeUnitDepsFinderOpts ue home_module_name_providers_map
                                          unit_state mod_name
 
 -- | Search the home-unit graph and otherwise the regular exposed package
@@ -401,10 +418,17 @@ findHomeOrRegularPackageModule
   -> ModuleName
   -> IO FindResult
 findHomeOrRegularPackageModule fc fopts ue home_module_name_providers_map mb_home_unit mod_name =
-    findHomeModuleAmongDeps fc fopts ue home_module_name_providers_map
-                            mb_home_unit mod_name
-    `orIfNotFound`
-    findExposedPackageModule fc fopts unit_state mod_name NoPkgQual
+  case mb_home_unit of
+    Just home_unit ->
+      findHomeModule fc fopts home_unit mod_name
+        `orIfNotFound`
+        (findHomeModuleAmongDeps fc ue home_module_name_providers_map
+                                 mb_home_unit mod_name
+        `combineFindResult`
+        findExposedPackageModule fc fopts unit_state mod_name NoPkgQual
+        )
+    Nothing ->
+      findExposedPackageModule fc fopts unit_state mod_name NoPkgQual
   where
     unit_state = case homeUnitId <$> mb_home_unit of
         Nothing           -> ue_homeUnitState ue
@@ -470,6 +494,40 @@ orIfNotFound this or_this = do
              _other -> return res2
     _other -> return res
 
+combineFindResult :: Monad m => m FindResult -> m FindResult -> m FindResult
+combineFindResult this or_this = do
+  res <- this
+  case res of
+    NotFound { fr_paths = paths1, fr_mods_hidden = mh1
+             , fr_pkgs_hidden = ph1, fr_unusables = u1, fr_suggestions = s1 }
+     -> do res2 <- or_this
+           case res2 of
+             NotFound { fr_paths = paths2, fr_pkg = mb_pkg2, fr_mods_hidden = mh2
+                      , fr_pkgs_hidden = ph2, fr_unusables = u2
+                      , fr_suggestions = s2 }
+              -> return (NotFound { fr_paths = paths1 ++ paths2
+                                  , fr_pkg = mb_pkg2 -- snd arg is the package search
+                                  , fr_mods_hidden = mh1 ++ mh2
+                                  , fr_pkgs_hidden = ph1 ++ ph2
+                                  , fr_unusables = u1 ++ u2
+                                  , fr_suggestions = s1  ++ s2 })
+             _other -> return res2
+    NoPackage{} -> pure res
+    FoundMultiple ms -> do
+      otherRes <- or_this
+      case otherRes of
+        Found _ other_mod -> pure $ FoundMultiple $ ms ++ [(other_mod, HomeOrigin)]
+        NoPackage{} -> pure res
+        FoundMultiple other_ms -> pure $ FoundMultiple $ ms ++ other_ms
+        NotFound{} -> pure res
+    Found _mod_location modl -> do
+      otherRes <- or_this
+      case otherRes of
+        Found _ other_mod -> pure $ FoundMultiple $ [(modl, HomeOrigin), (other_mod, HomeOrigin)]
+        NoPackage{} -> pure res
+        FoundMultiple other_ms -> pure $ FoundMultiple $ [(modl, HomeOrigin)] ++ other_ms
+        NotFound{} -> pure res
+
 -- | Helper function for 'findHomeModule': this function wraps an IO action
 -- which would look up @mod_name@ in the file system (the home package),
 -- and first consults the 'hsc_FC' cache to see if the lookup has already
@@ -483,8 +541,12 @@ homeSearchCache fc home_unit mod_name do_this = do
 
 findExposedPackageModule :: FinderCache -> FinderOpts -> UnitState -> ModuleName -> PkgQual -> IO FindResult
 findExposedPackageModule fc fopts units mod_name mb_pkg =
-  findLookupResult fc fopts
-    $ lookupModuleWithSuggestions units mod_name mb_pkg
+  findLookupResult fc fopts $
+    case lookupModuleWithSuggestions units mod_name mb_pkg of
+      lf@(LookupFound _ (u, _))
+        | unitId u `Set.member` homeUnitDepends units -> LookupNotFound []
+        | otherwise -> lf
+      other -> other
 
 findExposedPluginPackageModule :: FinderCache -> FinderOpts -> UnitState -> ModuleName -> IO FindResult
 findExposedPluginPackageModule fc fopts units mod_name =
@@ -509,7 +571,7 @@ findLookupResult fc fopts r = case r of
                                          , fr_unusables = []
                                          , fr_suggestions = []})
      LookupMultiple rs ->
-       return (FoundMultiple rs)
+       return (FoundMultiple $ map (\ (m, o) -> (m, ExternalUnitOrigin o)) rs)
      LookupHidden fr_pkgs_hidden mod_hiddens ->
        return (NotFound{ fr_paths = [], fr_pkg = Nothing
                        , fr_pkgs_hidden
@@ -587,6 +649,16 @@ mkHomeHidden uid =
            , fr_pkgs_hidden = []
            , fr_unusables = []
            , fr_suggestions = []}
+
+notFound :: FindResult
+notFound =
+  NotFound { fr_paths = []
+           , fr_pkg = Nothing
+           , fr_mods_hidden = []
+           , fr_pkgs_hidden = []
+           , fr_unusables = []
+           , fr_suggestions = []}
+
 
 findHomePackageModule :: FinderCache -> FinderOpts -> UnitId -> ModuleName -> IO FindResult
 findHomePackageModule fc fopts  home_unit mod_name = do

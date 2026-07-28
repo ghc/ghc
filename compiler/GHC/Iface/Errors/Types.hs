@@ -6,6 +6,7 @@ module GHC.Iface.Errors.Types (
   , ReadInterfaceError(..)
   , CantFindInstalled(..)
   , CantFindInstalledReason(..)
+  , HomeOrExternalOrigin(..)
   , FindingModuleOrInterface(..)
 
   , BuildingCabalPackage(..)
@@ -75,8 +76,12 @@ data CantFindInstalledReason
   | GenericMissing
       [UnitInfo] [Unit]
       [UnusableUnit] [FilePath]
-  | MultiplePackages [(Module, ModuleOrigin)]
+  | MultiplePackages [(Module, HomeOrExternalOrigin)]
   deriving Generic
+
+data HomeOrExternalOrigin
+  = HomeOrigin
+  | ExternalUnitOrigin ModuleOrigin
 
 data CantFindInstalled =
   CantFindInstalled ModuleName CantFindInstalledReason
