@@ -82,56 +82,66 @@ import GHC.Types.Unique.FM (UniqFM, nonDetUFMToList, ufmToIntMap, unsafeIntMapTo
 import Unsafe.Coerce
 import qualified GHC.Data.Word64Set as W
 
--- Note [Deterministic UniqFM]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- A @UniqDFM@ is just like @UniqFM@ with the following additional
--- property: the function `udfmToList` returns the elements in some
--- deterministic order not depending on the Unique key for those elements.
---
--- If the client of the map performs operations on the map in deterministic
--- order then `udfmToList` returns them in deterministic order.
---
--- The order does not depend on how existing entries were
--- updated. Updating an existing entry keeps it original position in the order
--- This means `alterUDFM` consistent with `addToUDFM` and `adjustUDFM`,
--- so that for example `alterUDFM id k = id` and `alterUDFM (fmap f) k = adjustUDFM f k`
---
--- There is an implementation cost: each element is given a serial number
--- as it is added, and `udfmToList` sorts its result by this serial
--- number. So you should only use `UniqDFM` if you need the deterministic
--- property.
---
--- `foldUDFM` also preserves determinism.
---
--- Normal @UniqFM@ when you turn it into a list will use
--- Data.IntMap.toList function that returns the elements in the order of
--- the keys. The keys in @UniqFM@ are always @Uniques@, so you end up with
--- with a list ordered by @Uniques@.
--- The order of @Uniques@ is known to be not stable across rebuilds.
--- See Note [Unique Determinism] in GHC.Types.Unique.
---
---
--- There's more than one way to implement this. The implementation here tags
--- every value with the insertion time that can later be used to sort the
--- values when asked to convert to a list.
---
--- Updating an existing key keeps the old tag. This keeps the order stable for
--- maps whose entries are updated many times. The instance environments are
--- the main example: inserting an instance updates the entry of its class in a
--- DNameEnv, and when updates moved keys to the end the order of instances shown
--- by :info depended on the order in which interfaces happened to be loaded
--- (#27532). Now a class keeps its place once its first instance is added, so
--- loading further interfaces cannot change the order.
---
--- An alternative would be to have
---
---   data UniqDFM ele = UDFM (M.IntMap ele) [ele]
---
--- where the list determines the order. This makes deletion tricky as we'd
--- only accumulate elements in that list, but makes merging easier as you
--- can just merge both structures independently.
--- Deletion can probably be done in amortized fashion when the size of the
--- list is twice the size of the set.
+{- Note [Deterministic UniqFM]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When you enumerate the elements of a normal `UniqFM`, using `nonDetUFMToList`, you
+get the elements back in the order of their `Unique` keys.  This can mess up deterministic
+compilation; see Note [Unique Determinism] in GHC.Types.Unique.
+
+This module defines /deterministic/ unique-keyed finite maps, `UniqDFM`, which have
+the following property:
+
+  (UniqDFM property) The function `udfmToList` returns the elements in the order
+  in which they were inserted; that is, in order of their "insertion date".
+
+  In particular, the order of elements does not depend on:
+     * The Unique key for those elements
+     * How existing entries are updated with `alterUDFM`; updating an element does not change
+       its insertion date.
+
+  If an element is completely deleted and then again inserted, the latter insertion counts as its
+  insertion date.
+
+  When we take (m1 `plusUDFM` m2), the insertion dates of elements in the smaller map are
+  adjusted to be after all those in the bigger map.
+
+Updating an existing entry keeps its original position in the order.
+This means `alterUDFM` is consistent with `addToUDFM` and `adjustUDFM`,
+so that for example `alterUDFM id k = id` and `alterUDFM (fmap f) k = adjustUDFM f k`
+
+It also keeps the order stable for
+maps whose entries are updated many times. The instance environments are
+the main example: inserting an instance updates the entry of its class in a
+DNameEnv, and when updates moved keys to the end the order of instances shown
+by :info depended on the order in which interfaces happened to be loaded
+(#27532). Now a class keeps its place once its first instance is added, so
+loading further interfaces cannot change the order.
+
+`foldUDFM` also preserves determinism:
+
+  foldUDFM k z m  =  foldr k z (eltsUDFM m)
+
+Implementation
+~~~~~~~~~~~~~~
+There's more than one way to implement this. The implementation here tags
+every value with the insertion time that can later be used to sort the
+values when asked to convert to a list.
+
+There is an implementation cost: each element is given a serial number
+as it is added, and `udfmToList` sorts its result by this serial
+number. So you should only use `UniqDFM` if you need the deterministic
+property.
+
+An alternative would be to have
+
+  data UniqDFM ele = UDFM (M.IntMap ele) [ele]
+
+where the list determines the order. This makes deletion tricky as we'd
+only accumulate elements in that list, but makes merging easier as you
+can just merge both structures independently.
+Deletion can probably be done in amortized fashion when the size of the
+list is twice the size of the set.
+-}
 
 -- | A type of values tagged with insertion time
 data TaggedVal val =
