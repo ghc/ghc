@@ -836,7 +836,7 @@ summariseRequirement pn mod_name = do
                         hsmodName = Just (L (noAnnSrcSpan loc) (toHsModuleName mod_name)),
                         hsmodExports = Nothing,
                         hsmodImports = [],
-                        hsmodDecls = []
+                        hsmodDecls = HsEmpty noExtField
                     }),
                 hpm_src_files = []
             }),
