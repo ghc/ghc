@@ -1,0 +1,4 @@
+section: cmm
+synopsis: Always run Cmm lint on parsed Cmm when compiling .cmm
+issues: #8372
+mrs: !16426

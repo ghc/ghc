@@ -1113,7 +1113,8 @@ Checking for consistency
     :shortdesc: C-\- pass sanity checking
     :type: dynamic
 
-    Ditto for C-\- level.
+    Ditto for C-\- level. GHC always runs C-\- lint once after parsing
+    an explicit cmm input file, even when this flag is not enabled.
 
 .. ghc-flag:: -dasm-lint
     :shortdesc: ASM pass sanity checking
@@ -1296,4 +1297,3 @@ Other
     containing the STG name of the binding from which the BCO originated.
     These are printed by the bytecode disassembler, aiding in correlating
     bytecode with STG.
-

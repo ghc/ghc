@@ -76,6 +76,7 @@ import GHC.Iface.Load   ( writeIface, flagsToIfCompression )
 import qualified GHC.ByteCode.Serialize as ByteCode
 
 import GHC.Core
+import GHC.Core.Lint
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.TyCon
 import GHC.Core.LateCC
@@ -96,6 +97,7 @@ import GHC.StgToCmm.CgUtils (CgStream)
 
 import GHC.Cmm
 import GHC.Cmm.Info.Build
+import GHC.Cmm.Lint
 import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
 import GHC.Cmm.Parser
@@ -893,6 +895,19 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
     let cmm = removeDeterm dcmm
     liftIO $ do
         putDumpFileMaybe logger Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (pdoc platform cmm)
+
+        -- Hand-written .cmm is error-prone and they take just a small
+        -- fraction of time when compiling ghc or user libraries,
+        -- therefore do a mandatory lint over parsed cmm regardless of
+        -- whether -dcmm-lint is set or not. (#8372)
+        withTimingSilent logger
+          (text "CmmLint" <+> brackets (text filename))
+          (const ()) $
+            case cmmLint platform cmm of
+              Just err -> do
+                lintMessage logger err
+                ghcExit logger 1
+              Nothing -> return ()
 
         -- Compile decls in Cmm files one decl at a time, to avoid re-ordering
         -- them in SRT analysis.
