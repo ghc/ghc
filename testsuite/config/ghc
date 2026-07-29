@@ -197,6 +197,11 @@ debug_ways     = [x[0] for x in config.way_flags.items()
 threaded_ways = [x[0] for x in config.way_flags.items()
                       if '-threaded' in x[1] or 'ghci' == x[0] or 'ghci-opt' == x[0]]
 
+# #27547
+nonmoving_threaded_ways = [name for name, flags in config.way_flags.items()
+                                if '-threaded' in flags
+                                if '-xn' in config.way_rts_flags.get(name, [])]
+
 # Ways which run with multiple capabilities
 concurrent_ways = [name for name, flags in config.way_flags.items()
                         if '-threaded' in flags or 'ghci' == name or 'ghci-opt' == name
