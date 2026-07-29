@@ -36,6 +36,7 @@ module GHC.Hs (
 -- friends:
 import GHC.Prelude
 
+import qualified Language.Haskell.Syntax.Basic as Basic
 import GHC.Hs.Basic hiding (fromList, toList)
 import GHC.Hs.Decls
 import GHC.Hs.Binds
@@ -106,7 +107,7 @@ instance Outputable (HsModule GhcPs) where
                   , hsmodImports = imports
                   , hsmodDecls = decls })
       = pprMaybeWithDoc mbDoc $ pp_nonnull imports
-                             $$ pp_nonnull decls
+                             $$ pp_nonnull (Basic.toList decls)
 
     ppr (HsModule { hsmodExt = XModulePs { hsmodDeprecMessage = deprec
                                          , hsmodHaddockModHeader = mbDoc }
@@ -124,7 +125,7 @@ instance Outputable (HsModule GhcPs) where
                            nest 4 (text ") where")
                           ],
             pp_nonnull imports,
-            pp_nonnull decls
+            pp_nonnull (Basic.toList decls)
           ]
       where
         pp_header rest = case deprec of

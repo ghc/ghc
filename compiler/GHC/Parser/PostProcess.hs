@@ -183,6 +183,7 @@ import Data.Kind       ( Type )
 import Data.List.NonEmpty ( NonEmpty (..) )
 import Language.Haskell.Syntax.Text
 import Language.Haskell.Syntax.Module.Name
+import qualified Language.Haskell.Syntax.Basic as Basic
 
 {- **********************************************************************
 
@@ -505,8 +506,8 @@ stmtsLoc (L l _) = l
 
 
 --  | Groups together bindings for a single function
-cvTopDecls :: OrdList (LHsDecl GhcPs) -> [LHsDecl GhcPs]
-cvTopDecls decls = getMonoBindAll (fromOL decls)
+cvTopDecls :: OrdList (LHsDecl GhcPs) -> HsList GhcPs (LHsDecl GhcPs)
+cvTopDecls decls = Basic.fromList' noExtField noExtField $ getMonoBindAll (fromOL decls)
 
 -- Declaration list may only contain value bindings and signatures.
 cvBindGroup :: AnnList -> OrdList (LHsDecl GhcPs) -> P (HsValBinds GhcPs)
