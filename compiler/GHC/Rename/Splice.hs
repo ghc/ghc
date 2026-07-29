@@ -68,6 +68,7 @@ import qualified GHC.Boot.TH.Monad  as TH (Q)
 
 import qualified GHC.LanguageExtensions as LangExt
 import qualified Data.Set as Set
+import qualified Language.Haskell.Syntax.Basic as Basic
 import Language.Haskell.Syntax.Text
 
 {-
@@ -196,9 +197,8 @@ rn_utbracket (PatBr _ p)
 rn_utbracket (TypBr _ t) = do { (t', fvs) <- rnLHsType TypBrCtx t
                                 ; return (TypBr noExtField t', fvs) }
 
-
 rn_utbracket (DecBrL _ (L _ decls))
-  = do { group <- groupDecls decls
+  = do { group <- groupDecls (Basic.toList decls)
        ; gbl_env  <- getGblEnv
        ; let new_gbl_env = gbl_env { tcg_dus = emptyDUs }
                           -- The emptyDUs is so that we just collect uses for this

@@ -27,6 +27,7 @@ module Language.Haskell.Syntax (
         ModuleName(..), HsModule(..)
 ) where
 
+import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Doc
@@ -80,7 +81,8 @@ data HsModule p
         --
         --  - @Just [...]@: as you would expect...
       hsmodImports :: [LImportDecl p],
-      hsmodDecls :: [LHsDecl p]
+      -- hsmodDecls :: [LHsDecl p]
+      hsmodDecls :: HsList p (LHsDecl p)
         -- ^ Type, class, value, and interface signature decls
    }
   | XModule !(XXModule p)

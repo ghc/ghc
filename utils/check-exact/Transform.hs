@@ -63,7 +63,7 @@ module Transform
 
         -- *** Low level operations used in 'HasDecls'
         , balanceComments
-        , balanceCommentsList
+        , balanceCommentsList, balanceCommentsListHL
         , balanceCommentsListA
         , addModuleCommentOrigDeltas
 
@@ -93,6 +93,7 @@ import qualified Control.Monad.Fail as Fail
 import GHC  hiding (parseModule, parsedSource)
 import GHC.Parser.PostProcess ( wrapValBind )
 import GHC.Data.FastString
+import qualified Language.Haskell.Syntax.Basic as Basic
 
 import Data.Data
 import Data.List (unsnoc)
@@ -392,6 +393,9 @@ pushDeclDP d _dp = d
 -- these DocDecls, which are not printed.
 balanceCommentsList :: [LHsDecl GhcPs] -> [LHsDecl GhcPs]
 balanceCommentsList decls = balanceCommentsList' (filter notDocDecl decls)
+
+balanceCommentsListHL :: HsList GhcPs (LHsDecl GhcPs) -> HsList GhcPs (LHsDecl GhcPs)
+balanceCommentsListHL decls = Basic.fromList' noExtField noExtField $ balanceCommentsList (Basic.toList decls)
 
 balanceCommentsList' :: [LHsDecl GhcPs] -> [LHsDecl GhcPs]
 balanceCommentsList' [] = []
@@ -781,10 +785,10 @@ class (Data t) => HasDecls t where
 -- ---------------------------------------------------------------------
 
 instance HasDecls ParsedSource where
-  hsDecls (L _ (HsModule (XModulePs _ _lo _ _) _mn _exps _imps decls)) = decls
+  hsDecls (L _ (HsModule (XModulePs _ _lo _ _) _mn _exps _imps decls)) = Basic.toList decls
 
   replaceDecls (L l (HsModule (XModulePs a lo deps haddocks) mname exps imps _decls)) decls
-    = (L l (HsModule (XModulePs a lo deps haddocks) mname exps imps decls))
+    = (L l (HsModule (XModulePs a lo deps haddocks) mname exps imps (Basic.fromList' noExtField noExtField decls)))
 
 -- ---------------------------------------------------------------------
 
