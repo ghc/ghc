@@ -113,6 +113,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import qualified GHC.Data.Strict as Strict
 import GHC.Types.Error
 import qualified GHC.Unit.Home.Graph as HUG
+import qualified Language.Haskell.Syntax.Basic as Basic
 
 -- Haskell Libraries
 import System.Console.Haskeline as Haskeline
@@ -1579,7 +1580,7 @@ runStmt input step = do
          liftIO (hscParseModuleWithLocation hsc_env source line input) >>= \case
            HsModule { hsmodDecls = decls, hsmodImports = imports } -> do
              run_imports imports
-             run_decls decls
+             run_decls (Basic.toList decls)
   where
     exec_complete = GHC.ExecComplete (Right []) 0
 

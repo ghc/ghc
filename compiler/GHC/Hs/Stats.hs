@@ -17,6 +17,8 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
+import qualified Language.Haskell.Syntax.Basic as Basic
+
 import Data.Char
 
 -- | Source Statistics
@@ -60,7 +62,7 @@ ppSourceStats short (L _ (HsModule{ hsmodExports = exports, hsmodImports = impor
              ("SpecialisedBinds ", bind_specs)
             ])
   where
-    decls = map unLoc ldecls
+    decls = map unLoc (Basic.toList ldecls)
 
     pp_val (_, 0) = empty
     pp_val (str, n)
