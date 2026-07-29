@@ -27,6 +27,17 @@ try:
                 else:
                     raise e
 
+    def killStragglers(pid):
+        # A test can leave descendants that outlive its main process (e.g. a
+        # deadlocked forkProcess child, #27547). They hold the inherited
+        # stdout/stderr pipes open and would hang the testsuite driver, so
+        # kill the whole process group.
+        try:
+            os.killpg(pid, signal.SIGKILL)
+        except OSError as e:
+            if e.errno != errno.ESRCH:
+                raise e
+
     pid = os.fork()
     if pid == 0:
         # child
@@ -40,6 +51,9 @@ try:
         old = signal.signal(signal.SIGALRM, handler)
         signal.alarm(secs)
         (pid2, res) = os.waitpid(pid, 0)
+        # The handler signals pid, so it must not run once pid is reaped.
+        signal.alarm(0)
+        killStragglers(pid)
         if (os.WIFEXITED(res)):
             sys.exit(os.WEXITSTATUS(res))
         elif os.WIFSIGNALED(res):

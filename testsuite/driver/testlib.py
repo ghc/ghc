@@ -3328,6 +3328,7 @@ async def runCmd(cmd: str,
     stdin_file = stdin.open('rb') if stdin is not None else None
     stdout_buffer = b''
     stderr_buffer = b''
+    hit_backstop = False
 
     hStdErr = asyncio.subprocess.PIPE
     if stderr is asyncio.subprocess.STDOUT:
@@ -3346,7 +3347,21 @@ async def runCmd(cmd: str,
                                                    env=ghc_env
                                                    )
 
-        stdout_buffer, stderr_buffer = await proc.communicate()
+        # The timeout program enforces the timeout on the test itself, but a
+        # test process that escapes it (e.g. by outliving the timeout
+        # program's direct child) can keep the capture pipes open and block
+        # communicate() indefinitely (#27547). The backstop timeout turns
+        # that into a failure of this one test instead of hanging the run.
+        backstop = int(timeout) + 30
+        try:
+            stdout_buffer, stderr_buffer = await asyncio.wait_for(
+                proc.communicate(), backstop)
+        except asyncio.TimeoutError:
+            hit_backstop = True
+            try:
+                proc.kill()
+            except ProcessLookupError:
+                pass
     finally:
         if stdin_file:
             stdin_file.close()
@@ -3365,6 +3380,11 @@ async def runCmd(cmd: str,
         if stderr is not None:
             if isinstance(stderr, Path):
                 stderr.write_bytes(stderr_buffer)
+
+    if hit_backstop:
+        if_verbose(1, 'Backstop timeout fired, some test process is likely '
+                      'holding the output pipes open (#27547): "{0}"\n'.format(cmd))
+        return 99
 
     if proc.returncode == 98:
         # The python timeout program uses 98 to signal that ^C was pressed
