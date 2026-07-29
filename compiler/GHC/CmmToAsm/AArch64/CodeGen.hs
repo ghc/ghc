@@ -1184,14 +1184,14 @@ getRegister' config plat expr
       return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (LSR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
 
     -- 3. Logic &&, ||
-    CmmMachOp (MO_And w) [(CmmReg reg), CmmLit (CmmInt n _)] | isAArch64Bitmask (opRegWidth w') (fromIntegral n) ->
-      return $ Any fmt (\d -> unitOL $ annExpr expr (AND fmt (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
+    CmmMachOp (MO_And w) [(CmmReg reg), CmmLit (CmmInt n _)] | Just op_bitmask <- getBitmaskImm n (opRegWidth w) ->
+      return $ Any fmt (\d -> unitOL $ annExpr expr (AND fmt (OpReg w d) (OpReg w' r') op_bitmask))
       where fmt = intFormat w
             w' = formatToWidth (cmmTypeFormat (cmmRegType reg))
             r' = getRegisterReg plat reg
 
-    CmmMachOp (MO_Or w) [(CmmReg reg), CmmLit (CmmInt n _)] | isAArch64Bitmask (opRegWidth w') (fromIntegral n) ->
-      return $ Any fmt (\d -> unitOL $ annExpr expr (ORR fmt (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
+    CmmMachOp (MO_Or w) [(CmmReg reg), CmmLit (CmmInt n _)] | Just op_bitmask <- getBitmaskImm n (opRegWidth w) ->
+      return $ Any fmt (\d -> unitOL $ annExpr expr (ORR fmt (OpReg w d) (OpReg w' r') op_bitmask))
       where fmt = intFormat w
             w' = formatToWidth (cmmTypeFormat (cmmRegType reg))
             r' = getRegisterReg plat reg
