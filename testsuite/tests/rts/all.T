@@ -437,6 +437,7 @@ test('T13617', [ unless(opsys('mingw32'), skip)],
 # its history.
 test('T12903', [ fragile(21184)
                , js_broken(22374)
+               , omit_ways(nonmoving_threaded_ways) # #27547
                , req_process]
                , compile_and_run, [''])
 
@@ -668,7 +669,9 @@ test('IOManager', [js_skip, when(arch('wasm32'), skip), when(opsys('mingw32'), s
 test('T24142', [req_target_smp], compile_and_run, ['-threaded -with-rtsopts "-N2"'])
 
 test('T25232', [unless(have_profiling(), skip), only_ways(['normal','nonmoving','nonmoving_prof','nonmoving_thr_prof']), extra_ways(['nonmoving', 'nonmoving_prof'] + (['nonmoving_thr_prof'] if have_threaded() else []))], compile_and_run, [''])
-test('T25280', [unless(opsys('linux'),skip),req_process,js_skip], compile_and_run, [''])
+test('T25280', [unless(opsys('linux'),skip),req_process,js_skip,
+                omit_ways(nonmoving_threaded_ways)], # #27547
+               compile_and_run, [''])
 
 # N.B. This will likely issue a warning on stderr but we merely care that the
 # program doesn't crash.

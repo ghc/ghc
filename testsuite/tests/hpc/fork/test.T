@@ -8,6 +8,6 @@ test('hpc_fork',
       # profiling and forkProcess don't go well together. See #16907, #11645,
       # and #8862.
       req_process,
-      omit_ways(prof_ways),
+      omit_ways(prof_ways + nonmoving_threaded_ways), # #27547
       cmd_prefix(hpc_prefix)],
      compile_and_run, ['-fhpc'])
