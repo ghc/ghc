@@ -294,7 +294,7 @@ instance HasHaddock (Located (HsModule GhcPs)) where
     --      -- ^ Comment on C
     --
     let layout = hsmodLayout (hsmodExt mod)
-    hsmodDecls' <- addHaddockInterleaveItems layout (mkDocHsDecl layout) (hsmodDecls mod)
+    hsmodDecls' <- addHaddockInterleaveItems' layout (mkDocHsDecl layout) (hsmodDecls mod)
 
     pure $ L l_mod $
       mod { hsmodExports = hsmodExports'

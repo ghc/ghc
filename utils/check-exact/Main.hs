@@ -20,6 +20,7 @@ import GHC.Parser.PostProcess ( wrapValBind )
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader
 import GHC.Utils.Error
+import qualified Language.Haskell.Syntax.Basic as Basic
 import System.Environment( getArgs )
 import System.Exit
 import System.Directory
@@ -582,10 +583,10 @@ changeLocalDecls2 libdir (L l p) = do
 changeWhereIn3a :: Changer
 changeWhereIn3a _libdir (L l p) = do
   let decls0 = hsmodDecls p
-      decls = balanceCommentsList decls0
+      decls = balanceCommentsList (Basic.toList decls0)
       (_de0:_:de1:_d2:_) = decls
   debugM $ "changeWhereIn3a:de1:" ++ showAst de1
-  let p2 = p { hsmodDecls = decls}
+  let p2 = p { hsmodDecls = Basic.fromList' noExtField noExtField decls}
   return (L l p2)
 
 -- ---------------------------------------------------------------------
@@ -593,14 +594,14 @@ changeWhereIn3a _libdir (L l p) = do
 changeWhereIn3b :: Changer
 changeWhereIn3b _libdir (L l p) = do
   let decls0 = hsmodDecls p
-      decls = balanceCommentsList decls0
+      decls = balanceCommentsList (Basic.toList decls0)
       (de0:tdecls@(_:de1:d2:_)) = decls
       de0' = setEntryDP de0 (DifferentLine 2 0)
       de1' = setEntryDP de1 (DifferentLine 2 0)
       d2' = setEntryDP d2 (DifferentLine 2 0)
       decls' = d2':de1':de0':tdecls
   debugM $ "changeWhereIn3b:de1':" ++ showAst de1'
-  let p2 = p { hsmodDecls = decls'}
+  let p2 = p { hsmodDecls = Basic.fromList' noExtField noExtField decls'}
   return (L l p2)
 
 -- ---------------------------------------------------------------------

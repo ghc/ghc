@@ -274,11 +274,12 @@ sortEpAnnComments (EpaCommentsBalanced pc fc)
   = EpaCommentsBalanced (sortEpaComments pc) (sortEpaComments fc)
 
 insertTopLevelCppComments ::  HsModule GhcPs -> [LEpaComment] -> (HsModule GhcPs, [LEpaComment])
-insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports imports decls) cs
+insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports imports decls_in) cs
   = (HsModule (XModulePs an4 lo mdeprec mbDoc) mmn mexports imports' decls', cs3)
     -- `debug` ("insertTopLevelCppComments: (cs2,cs3,hc0,hc1,hc_cs)" ++ showAst (cs2,cs3,hc0,hc1,hc_cs))
     -- `debug` ("insertTopLevelCppComments: (cs2,cs3,hc0i,hc0,hc1,hc_cs)" ++ showAst (cs2,cs3,hc0i,hc0,hc1,hc_cs))
   where
+    decls = Basic.toList decls_in
     -- Comments at the top level.
     (an0, cs0) =
       case mmn of
@@ -310,7 +311,8 @@ insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports
     (imports', hc0i) = balanceFirstLocatedAComments imports0
 
     (decls0, cs3) = allocPreceding decls cs2
-    (decls', hc0d) = balanceFirstLocatedAComments decls0
+    (decls0', hc0d) = balanceFirstLocatedAComments decls0
+    decls' = Basic.fromList' noExtField noExtField decls0'
 
     -- Either hc0i or hc0d should have comments. Combine them
     hc0 = hc0i ++ hc0d
