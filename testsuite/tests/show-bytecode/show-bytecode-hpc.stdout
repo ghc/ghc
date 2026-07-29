@@ -661,7 +661,7 @@ static-pointer table entries:
   @hash@: static_ptr
   @hash@: static_ptr1
 HPC information:
-  hash: 000000006110204f
+  hash: @hash@
   module name: Example
   tick box name: _hpc_tickboxes_Example_hpc
   number of ticks: 45

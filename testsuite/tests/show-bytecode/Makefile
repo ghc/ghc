@@ -6,7 +6,8 @@ compile   = '$(TEST_HC)' $(TEST_HC_OPTS) -fbyte-code -fwrite-byte-code -no-link
 show      = '$(TEST_HC)' $(TEST_HC_OPTS) --show-byte-code
 normalize = sed -E -e ' \
                 s/_r[[:alnum:]]+/_@name_suffix@/g; \
-                s/[[:xdigit:]]{32}/@hash@/g; \
+                s/^( *hash: )[[:xdigit:]]+/\1@hash@/g; \
+                s/^( *)[[:xdigit:]]+:/\1@hash@:/g; \
                 s/word [[:digit:]]{4}[[:digit:]]*/word @large_word@/ \
             '
 
