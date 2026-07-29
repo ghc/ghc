@@ -690,8 +690,8 @@ pprInstr platform instr = case instr of
        check_off off = if off >= 0 && off <= 4095 then char '#' <> int off else
          pgmError $ "GHC.CmmToAsm.AArch64.Ppr.check_off : " ++ show off ++ " is out of 12 bit"
 
-       -- Some instructions encode with via b/h suffix on the instruction.
-       -- We handle this here relying on the format rather then the operands.
+       -- Some instructions encode subword ops via b/h suffix on the instruction.
+       -- We handle this here relying on the format rather than the operands.
        subword_suffix II8  t = t <> char 'b'
        subword_suffix II16 t = t <> char 'h'
        subword_suffix _    t = t
