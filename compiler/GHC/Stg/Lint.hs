@@ -92,6 +92,7 @@ be ill-typed in Core.  But it must still be well-kinded!
 -}
 
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 module GHC.Stg.Lint ( lintStgTopBindings ) where
 
@@ -123,6 +124,7 @@ import GHC.Unit.Module            ( Module )
 import GHC.Data.Bag         ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
 
 import Control.Monad
+import GHC.Exts            ( oneShot )
 import GHC.Core.Multiplicity (scaledThing)
 import GHC.Settings (Platform)
 import GHC.Core.TyCon (primRepCompatible, primRepsCompatible)
@@ -432,7 +434,7 @@ The Lint monad
 ************************************************************************
 -}
 
-newtype LintM a = LintM
+newtype LintM a = LintM'
     { unLintM :: Module
               -> LintFlags
               -> DiagOpts          -- Diagnostic options
@@ -442,7 +444,32 @@ newtype LintM a = LintM
               -> Bag SDoc        -- Error messages so far
               -> (a, Bag SDoc)   -- Result and error messages (if any)
     }
-    deriving (Functor)
+instance Functor LintM where
+  fmap f (LintM m) =
+    LintM $ \mod lf diag_opts opts loc scope errs ->
+      case m mod lf diag_opts opts loc scope errs of
+        (a, errs') -> (f a, errs')
+
+-- See Note [The one-shot state monad trick] in GHC.Utils.Monad
+{-# COMPLETE LintM #-}
+pattern LintM :: (Module
+              -> LintFlags
+              -> DiagOpts
+              -> StgPprOpts
+              -> [LintLocInfo]
+              -> IdSet
+              -> Bag SDoc
+              -> (a, Bag SDoc))
+              -> LintM a
+pattern LintM m <- LintM' m
+  where
+    LintM m = LintM' $ oneShot (\mod -> oneShot
+                                (\lf -> oneShot
+                                  (\diag_opts -> oneShot
+                                    (\opts -> oneShot
+                                      (\loc -> oneShot
+                                        (\scope -> oneShot
+                                          (\errs -> m mod lf diag_opts opts loc scope errs)))))))
 
 data LintFlags = LintFlags { lf_unarised :: !Bool
                            , lf_platform :: !Platform
