@@ -552,11 +552,11 @@ genMachOp platform mop args
 infixMachOp :: MachOp -> Maybe SDoc
 infixMachOp mop
         = case mop of
-            MO_And    _ -> Just $ char '&'
-            MO_Or     _ -> Just $ char '|'
-            MO_Xor    _ -> Just $ char '^'
-            MO_Not    _ -> Just $ char '~'
-            MO_S_Neg  _ -> Just $ char '-' -- there is no unsigned neg :)
+            MO_And    w -> Just $ withDebugWidth w $ char '&'
+            MO_Or     w -> Just $ withDebugWidth w $ char '|'
+            MO_Xor    w -> Just $ withDebugWidth w $ char '^'
+            MO_Not    w -> Just $ withDebugWidth w $ char '~'
+            MO_S_Neg  w -> Just $ withDebugWidth w $ char '-' -- there is no unsigned neg :)
             _ -> Nothing
 
 -- --------------------------------------------------------------------------
