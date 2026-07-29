@@ -1337,7 +1337,7 @@ data HsTypedSplice id
 data HsQuote p
   = ExpBr  (XExpBr p)   (LHsExpr p)          -- [|  expr  |]
   | PatBr  (XPatBr p)   (LPat p)             -- [p| pat   |]
-  | DecBrL (XDecBrL p)  (XRec p [LHsDecl p]) -- [d| decls |]; result of parser
+  | DecBrL (XDecBrL p)  (XRec p (HsList p (LHsDecl p))) -- [d| decls |]; result of parser
   | DecBrG (XDecBrG p)  (HsGroup p)          -- [d| decls |]; result of renamer
   | TypBr  (XTypBr p)   (LHsType p)          -- [t| type  |]
   | VarBr  (XVarBr p)   Bool (LIdP p)        -- True: 'x, False: ''T
