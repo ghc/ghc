@@ -1686,9 +1686,9 @@ instance ExactPrint (HsModule GhcPs) where
 
     am_decls' <- markTrailing (am_decls $ anns an3)
 
-    mid <- markAnnotated (HsModuleImpDecls (am_cs $ anns an3) imports decls)
+    mid <- markAnnotated (HsModuleImpDecls (am_cs $ anns an3) imports (Basic.toList decls))
     let imports' = id_imps mid
-    let decls' = id_decls mid
+    let decls' = Basic.fromList' noExtField noExtField $ id_decls mid
 
     lo1 <- case lo0 of
         EpExplicitBraces open close -> do
