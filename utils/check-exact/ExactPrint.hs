@@ -65,6 +65,7 @@ import qualified Language.Haskell.Syntax.Basic as Basic
 import Language.Haskell.Syntax.Binds.InlinePragma
   (ActivationX(ActiveAfter, ActiveBefore, NeverActive))
 import Language.Haskell.Syntax.Text
+import qualified Language.Haskell.Syntax.Basic as Basic
 
 import Control.Monad (forM, when, unless)
 import Control.Monad.Identity (Identity(..))
@@ -1454,9 +1455,9 @@ instance ExactPrint (HsModule GhcPs) where
 
     am_decls' <- markTrailing (am_decls $ anns an3)
 
-    mid <- markAnnotated (HsModuleImpDecls (am_cs $ anns an3) imports decls)
+    mid <- markAnnotated (HsModuleImpDecls (am_cs $ anns an3) imports (Basic.toList decls))
     let imports' = id_imps mid
-    let decls' = id_decls mid
+    let decls' = Basic.fromList' noExtField noExtField $ id_decls mid
 
     lo1 <- case lo0 of
         EpExplicitBraces open close -> do

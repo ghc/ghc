@@ -190,6 +190,7 @@ import qualified Data.Map as M
 import Data.Foldable ( for_ )
 import Data.Traversable ( for )
 import Data.IORef( newIORef )
+import qualified Language.Haskell.Syntax.Basic as Basic
 
 {-
 ************************************************************************
@@ -337,7 +338,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                     _ | tcg_mod tcg_env1 == gHC_PRIM -> pure tcg_env1
 
                     HsBootOrSig boot_or_sig ->
-                      do { tcg_env <- tcRnHsBootDecls boot_or_sig local_decls
+                      do { tcg_env <- tcRnHsBootDecls boot_or_sig (Basic.toList local_decls)
                          ; traceRn "rn4a: before exports" empty
                          ; tcg_env <- setGblEnv tcg_env $
                                       rnExports explicit_mod_hdr export_ies
@@ -346,7 +347,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                          }
                     HsSrcFile ->
                       {-# SCC "tcRnSrcDecls" #-}
-                        tcRnSrcDecls explicit_mod_hdr export_ies local_decls
+                        tcRnSrcDecls explicit_mod_hdr export_ies (Basic.toList local_decls)
 
                ; whenM (goptM Opt_DoCoreLinting) $
                  lintGblEnv (hsc_logger hsc_env) (hsc_dflags hsc_env) tcg_env

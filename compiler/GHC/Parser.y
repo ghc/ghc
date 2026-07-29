@@ -97,6 +97,7 @@ import GHC.Builtin.WiredIn.Types
               unrestrictedFunTyCon )
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import qualified Language.Haskell.Syntax.Basic as Basic
 import Language.Haskell.Syntax.Text
 
 import qualified Data.Semigroup as Semi
@@ -942,26 +943,26 @@ implicit_top :: { () }
         : {- empty -}                           {% pushModuleContext }
 
 body    :: { ([TrailingAnn]
-             ,([LImportDecl GhcPs], [LHsDecl GhcPs])
+             ,([LImportDecl GhcPs], HsList GhcPs (LHsDecl GhcPs))
              ,EpLayout) }
         :  '{'            top '}'      { (fst $2, snd $2, epExplicitBraces $1 $3) }
         |      vocurly    top close    { (fst $2, snd $2, EpVirtualBraces (glR $1)) }
 
 body2   :: { ([TrailingAnn]
-             ,([LImportDecl GhcPs], [LHsDecl GhcPs])
+             ,([LImportDecl GhcPs], HsList GhcPs (LHsDecl GhcPs))
              ,EpLayout) }
         :  '{' top '}'                          { (fst $2, snd $2, epExplicitBraces $1 $3) }
         |  missing_module_keyword top close     { ([], snd $2, EpVirtualBraces (EpaDelta noSrcSpan (SameLine 0) [])) }
 
 
 top     :: { ([TrailingAnn]
-             ,([LImportDecl GhcPs], [LHsDecl GhcPs])) }
+             ,([LImportDecl GhcPs], HsList GhcPs (LHsDecl GhcPs))) }
         : semis top1                            { (reverse $1, $2) }
 
-top1    :: { ([LImportDecl GhcPs], [LHsDecl GhcPs]) }
+top1    :: { ([LImportDecl GhcPs], HsList  GhcPs (LHsDecl GhcPs)) }
         : importdecls_semi topdecls_cs_semi        { (reverse $1, cvTopDecls $2) }
         | importdecls_semi topdecls_cs             { (reverse $1, cvTopDecls $2) }
-        | importdecls                              { (reverse $1, []) }
+        | importdecls                              { (reverse $1, HsEmpty noExtField) }
 
 -----------------------------------------------------------------------------
 -- Module declaration & imports only
@@ -972,18 +973,18 @@ header  :: { Located (HsModule GhcPs) }
                    acs loc (\loc cs -> (L loc (HsModule (XModulePs
                                                          (EpAnn (spanAsAnchor loc) (AnnsModule noEpTok (epTok  $1) (epTok $5) (fst $4) [] [] Nothing) cs)
                                                    EpNoLayout $3 Nothing)
-                                               (Just $2) (snd $4) $6 []
+                                               (Just $2) (snd $4) $6 (HsEmpty noExtField)
                           ))) }
         | 'signature' modid maybe_warning_pragma maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs loc (\loc cs -> (L loc (HsModule (XModulePs
                                                          (EpAnn (spanAsAnchor loc) (AnnsModule noEpTok (epTok $1) (epTok $5) (fst $4) [] [] Nothing) cs)
                                                    EpNoLayout $3 Nothing)
-                                               (Just $2) (snd $4) $6 []
+                                               (Just $2) (snd $4) $6 (HsEmpty noExtField)
                           ))) }
         | header_body2
                 {% fileSrcSpan >>= \ loc ->
-                   return (L loc (HsModule (XModulePs noAnn EpNoLayout Nothing Nothing) Nothing Nothing $1 [])) }
+                   return (L loc (HsModule (XModulePs noAnn EpNoLayout Nothing Nothing) Nothing Nothing $1 (HsEmpty noExtField))) }
 
 header_body :: { [LImportDecl GhcPs] }
         :  '{'            header_top            { $2 }
@@ -3313,11 +3314,11 @@ acmd    :: { LHsCmdTop GhcPs }
                                    runPV (checkCmdBlockArguments cmd) >>= \ _ ->
                                    return (sL1a cmd $ HsCmdTop noExtField cmd) }
 
-cvtopbody :: { (AnnList,LocatedA [LHsDecl GhcPs]) }
+cvtopbody :: { (AnnList,LocatedA (HsList GhcPs (LHsDecl GhcPs))) }
         :  '{'            cvtopdecls0 '}'      { (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) [],sLLa $1 $> $2) }
-        |      vocurly    cvtopdecls0 close    { (AnnList (EpVirtualBraces (glR $1)) [],sLLa $1 (listLocation $2) $2) }
+        |      vocurly    cvtopdecls0 close    { (AnnList (EpVirtualBraces (glR $1)) [],sLLa $1 (listLocation (Basic.toList $2)) $2) }
 
-cvtopdecls0 :: { [LHsDecl GhcPs] }
+cvtopdecls0 :: { HsList GhcPs (LHsDecl GhcPs) }
         : topdecls_semi         { cvTopDecls $1 }
         | topdecls              { cvTopDecls $1 }
 
