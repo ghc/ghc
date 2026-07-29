@@ -46,6 +46,7 @@ def job_triple(job_name):
         'release-aarch64-linux-deb12-release': 'aarch64-deb12-linux',
         'release-aarch64-linux-alpine3_22-release+no_split_sections': 'aarch64-alpine3_22-linux',
         'release-aarch64-darwin-release': 'aarch64-apple-darwin',
+        'release-x86_64-freebsd14-release+no_split_sections': 'x86_64-unknown-freebsd14',
 
         'source-tarball': 'src',
         'package-hadrian-bootstrap-sources': 'hadrian-bootstrap-sources',

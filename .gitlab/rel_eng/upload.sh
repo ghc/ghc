@@ -41,7 +41,7 @@ set -Eeuo pipefail
 : ${ver:=$(ls ghc-*.tar.* | sed -ne 's/ghc-\([0-9]\+\.[0-9]\+\.[0-9]\+\(\.[0-9]\+\)\?\).\+/\1/p' | head -n1)}
 if [ -z "$ver" ]; then echo "Failed to infer \$ver"; exit 1; fi
 
-host="gitlab-storage.haskell.org"
+host="gitlab.haskell.org:2222"
 
 usage() {
     echo "Usage: [rel_name=<name>] ver=7.10.3-rc2 $0 <action>"
@@ -206,7 +206,7 @@ function set_symlink() {
     local SYMLINK="$1"
     # Check to make sure that the indicated version actually exists.
     curl "https://downloads.haskell.org/ghc/$ver" > /dev/null || (echo "$ver doesn't exist"; exit 1)
-    echo -e "rm ghc/$SYMLINK\nln -s $ver ghc/$SYMLINK" | sftp ghc@downloads-origin.haskell.org
+    echo -e "rm ghc/$SYMLINK\nln -s $ver ghc/$SYMLINK" | sftp ghc@gitlab.haskell.org:2222
     curl -X PURGE "http://downloads.haskell.org/~ghc/$SYMLINK"
 }
 
