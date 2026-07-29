@@ -114,6 +114,7 @@ import Data.IORef
 import qualified Data.Set as S
 import Data.Set (Set)
 import Data.List.NonEmpty (NonEmpty)
+import qualified Language.Haskell.Syntax.Basic as Basic
 
 
 -- -----------------------------------------------------------------------------
@@ -378,7 +379,7 @@ hscParseModuleWithLocation hsc_env source line_num str = do
 hscParseDeclsWithLocation :: HscEnv -> String -> Int -> String -> IO [LHsDecl GhcPs]
 hscParseDeclsWithLocation hsc_env source line_num str = do
   HsModule { hsmodDecls = decls } <- hscParseModuleWithLocation hsc_env source line_num str
-  return decls
+  return  (Basic.toList decls)
 
 hscParsedDecls :: HscEnv -> [LHsDecl GhcPs] -> IO ([TyThing], InteractiveContext)
 hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
@@ -562,4 +563,3 @@ hscParseThingWithLocation source linenumber parser str = do
                 liftIO $ putDumpFileMaybe logger Opt_D_dump_parsed_ast "Parser AST"
                             FormatHaskell (showAstData NoBlankSrcSpan NoBlankEpAnnotations thing)
                 return thing
-

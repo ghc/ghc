@@ -329,13 +329,13 @@ fixModuleHeaderComments (GHC.L l p) = GHC.L l p'
 
 
     rebalance :: GHC.EpAnn GHC.AnnsModule
-              -> ([GHC.LHsDecl GHC.GhcPs], GHC.EpAnn GHC.AnnsModule)
+              -> (GHC.HsList GHC.GhcPs (GHC.LHsDecl GHC.GhcPs), GHC.EpAnn GHC.AnnsModule)
     rebalance (GHC.EpAnn a an cs) = (ds1, GHC.EpAnn a an cs')
       where
         (ds1,cs') = case GHC.am_where an of
                      GHC.EpTok whereLoc ->
                            case GHC.hsmodDecls p of
-                               (d:ds0) -> (d':ds0, cs0)
+                               (GHC.HsCons x d ds0) -> (GHC.HsCons x d' ds0, cs0)
                                    where (d',cs0) = moveComments whereLoc d cs
                                ds0 -> (ds0,cs)
 
