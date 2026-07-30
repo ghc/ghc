@@ -1,3 +1,4 @@
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -73,6 +74,7 @@ import Data.IntMap (IntMap)
 import Data.IntMap qualified as IntMap (toList)
 import Data.Array (bounds, indices, elems)
 import Numeric (showHex)
+import GHC.Exts (Int (I#), Word (W#), int2Word#)
 
 -- | Outputs textual information about the contents of a bytecode file.
 showByteCode :: Logger -> HscEnv -> FilePath -> IO ()
@@ -466,7 +468,7 @@ pprActualHPCInfo ByteCodeHpcInfo {..}
 
 -- | Constructs textual information about the hash of HPC info.
 pprHPCInfoHash :: Int -> SDoc
-pprHPCInfoHash = entry (text "hash") . pprFixedSizeNatural
+pprHPCInfoHash = entry (text "hash") . pprFixedSizeNatural . intToWord
 
 -- | Constructs textual information about a module name.
 pprModuleName :: ShortByteString -> SDoc
@@ -498,6 +500,10 @@ pprFixedSizeNatural num
 
   unpadded :: String
   unpadded = showHex num ""
+
+-- | Turns an 'Int' value into the 'Word' value with the same representation.
+intToWord :: Int -> Word
+intToWord (I# int#) = W# (int2Word# int#)
 
 -- | Constructs a textual representation of a boolean, interpreting 'True' and
 --   'False' as “yes” and “no”, respectively.
