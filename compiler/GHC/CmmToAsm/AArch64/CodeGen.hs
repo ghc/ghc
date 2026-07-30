@@ -2089,10 +2089,15 @@ genCondJump bid expr = do
                 (reg_x, _format_x, code_x) <- getSomeReg x
                 (reg_y, _format_y, code_y) <- getSomeReg y
 
-                -- W64 always works, even if we ultimately compare at W32.
-                (reg_x', ext_x) <- signExtendReg w W64 reg_x
+                let !needs_extend = w == W8 || w == W16
+                (reg_x', ext_x) <- if needs_extend
+                    -- W64 always works, even if we ultimately compare at W32.
+                    then signExtendReg w W64 reg_x
+                    else pure (reg_x, nilOL)
                 -- TODO: Use CMP on OpRegExt rather than extending explicitly.
-                (reg_y', ext_y) <- signExtendReg w W64 reg_y
+                (reg_y', ext_y) <- if needs_extend
+                    then signExtendReg w W64 reg_y
+                    else pure (reg_y, nilOL)
 
                 let x' = OpReg w reg_x'
                     y' = OpReg w reg_y'
