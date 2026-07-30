@@ -1,0 +1,14 @@
+#include "Cmm.h"
+
+// Release-store one byte at p. Must touch exactly 1 byte.
+store8 (W_ p) {
+    %release I8[p] = 67 :: I8;
+    return (0);
+}
+
+// Acquire-load one byte from p.
+load8 (W_ p) {
+    I8 v;
+    v = %acquire I8[p];
+    return (TO_ZXW_(v));
+}

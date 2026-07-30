@@ -295,3 +295,12 @@ test('aarch64-sxtw-run',
        when(unregisterised(), skip)],
      multi_compile_and_run,
      ['aarch64-sxtw-run', [('aarch64-sxtw-cmm.cmm', '')], '-O'])
+
+test('T27430', [req_c, extra_ways(['optasm'])], compile_and_run, ['T27430_c.c'])
+
+test('T27533', [req_cmm, extra_ways(['optasm'])], multi_compile_and_run,
+               ['T27533', [('T27533_cmm.cmm', '')], '-O'])
+
+test('T27537', normal, compile_and_run, ['-O'])
+
+test('T27538', normal, compile_and_run, ['-O'])
