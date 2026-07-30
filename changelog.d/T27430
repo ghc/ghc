@@ -1,5 +1,5 @@
 section: compiler
-issues: #27430, #27539, #27538, #27537, #27430, #27565, #27533
+issues: #27430, #27539, #27538, #27537, #27550, #27565, #27533
 mrs: !16255
 synopsis:
   A serious of fixes to the ARM64 ncg, mostly related to subwords.
@@ -13,5 +13,5 @@ description:
   Fix zero-extension on function entry if arguments are passed at word-width
   but used at subword-widths.
   Fix broadcast# for non-literal arguments (arm64 only).
-  Fix rare assembler errors caused by overflowing literals.
-
+  Fix rare assembler errors caused by overflowing literals, by properly checking
+  whether a constant is a viable immediate argument.
