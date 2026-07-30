@@ -58,12 +58,13 @@ import GHC.Utils.Outputable
          withPprStyle,
          ppr
        )
-import GHC.Unit.Types (Module)
+import GHC.Unit.Types (Module, moduleName)
 import GHC.Iface.Type (IfaceType, IfaceTvBndr, IfaceIdBndr)
 import GHC.HsToCore.Breakpoints (ModBreaks (..))
 import GHC.Driver.Env.Types (HscEnv)
 import GHCi.FFI (FFIType)
 import GHCi.Message (ConInfoTable (..))
+import Language.Haskell.Syntax.Module.Name (moduleNameString)
 
 -- Basic things
 import Control.Arrow ((>>>))
@@ -113,7 +114,7 @@ pprCompiledByteCode current_module CompiledByteCode {..}
            pprTopLevelStrings                $ bc_strs,
            pprBreakpoints current_module     $ bc_breaks,
            pprStaticPointerTableEntries      $ bc_spt_entries,
-           pprHPCInfo                        $ bc_hpc_info
+           pprHPCInfo current_module         $ bc_hpc_info
          ]
 
 -- | Constructs textual information about bytecode objects.
@@ -452,16 +453,26 @@ pprStaticPointerTableEntry (SptEntry name fingerprint)
   = ppr fingerprint <> text ":" <+> ppr name
 
 -- | Constructs textual information about HPC info.
-pprHPCInfo :: Strict.Maybe ByteCodeHpcInfo -> SDoc
-pprHPCInfo = entry (text "HPC information") .
-             Strict.maybe (text "<none>") pprActualHPCInfo
+pprHPCInfo :: Module                       -- ^ The enclosing module
+           -> Strict.Maybe ByteCodeHpcInfo -- ^ The HPC info
+           -> SDoc                         -- ^ The textual information
+pprHPCInfo current_module
+  = entry (text "HPC information") .
+    Strict.maybe (text "<none>") (pprActualHPCInfo current_module)
 
 -- | Constructs textual information about actual HPC info.
-pprActualHPCInfo :: ByteCodeHpcInfo -> SDoc
-pprActualHPCInfo ByteCodeHpcInfo {..}
-  = vcat [
+pprActualHPCInfo :: Module          -- ^ The enclosing module
+                 -> ByteCodeHpcInfo -- ^ The actual HPC info
+                 -> SDoc            -- ^ The textual information
+pprActualHPCInfo current_module ByteCodeHpcInfo {..}
+  = assert (
+               utf8DecodeShortByteString bchi_module_name
+               ==
+               moduleNameString (moduleName current_module)
+           )
+    $
+    vcat [
            pprHPCInfoHash $ bchi_hash,
-           pprModuleName  $ bchi_module_name,
            pprTickBoxName $ bchi_tickbox_name,
            pprTickCount   $ bchi_tick_count
          ]
@@ -469,12 +480,6 @@ pprActualHPCInfo ByteCodeHpcInfo {..}
 -- | Constructs textual information about the hash of HPC info.
 pprHPCInfoHash :: Int -> SDoc
 pprHPCInfoHash = entry (text "hash") . pprFixedSizeNatural . intToWord
-
--- | Constructs textual information about a module name.
-pprModuleName :: ShortByteString -> SDoc
-pprModuleName = entry (text "module name") .
-                text                       .
-                utf8DecodeShortByteString
 
 -- | Constructs textual information about a tick box name.
 pprTickBoxName :: ShortByteString -> SDoc
