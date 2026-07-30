@@ -1,0 +1,191 @@
+
+==================== Parsed Cmm ====================
+[testUnreachable() { //  [R1]
+         { info_tbls: []
+           stack_info: arg_space: 8
+         }
+     {offset
+       c7: // global
+           _c1::I64 = R1;
+           //tick src<T27368-ppr-debug.cmm:(6,1)-(19,1)>
+           if (_c1::I64 (>[W64]) 0) goto c2; else goto c4;
+       c2: // global
+           //tick src<T27368-ppr-debug.cmm:(7,14)-(9,3)>
+           goto c6;
+       c6: // global
+           //tick src<T27368-ppr-debug.cmm:17:5-12>
+           _c1::I64 = _c1::I64 (-[W64]) 1;
+           R1 = _c1::I64;
+           call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
+       c4: // global
+           goto c3;
+       c3: // global
+           R1 = _c1::I64;
+           call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
+       // unreachable blocks:
+         c5: // global
+             //tick src<T27368-ppr-debug.cmm:13:5-13>
+             _c1::I64 = _c1::I64 (+[W64]) 42;
+             R1 = _c1::I64;
+             call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
+     }
+ }]
+
+
+
+==================== Post control-flow optimisations (1) ====================
+testUnreachable
+{offset
+  c7: // global
+      _c1::I64 = R1;
+      //tick src<T27368-ppr-debug.cmm:(6,1)-(19,1)>
+      if (_c1::I64 (>[W64]) 0) goto c2; else goto c4;
+  c2: // global
+      //tick src<T27368-ppr-debug.cmm:(7,14)-(9,3)>
+      //tick src<T27368-ppr-debug.cmm:17:5-12>
+      _c1::I64 = _c1::I64 (-[W64]) 1;
+      R1 = _c1::I64;
+      call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
+  c4: // global
+      R1 = _c1::I64;
+      call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
+}
+
+
+
+==================== Post switch plan ====================
+testUnreachable
+{offset
+  c7: // global
+      _c1::I64 = R1;
+      //tick src<T27368-ppr-debug.cmm:(6,1)-(19,1)>
+      if (_c1::I64 (>[W64]) 0) goto c2; else goto c4;
+  c2: // global
+      //tick src<T27368-ppr-debug.cmm:(7,14)-(9,3)>
+      //tick src<T27368-ppr-debug.cmm:17:5-12>
+      _c1::I64 = _c1::I64 (-[W64]) 1;
+      R1 = _c1::I64;
+      call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
+  c4: // global
+      R1 = _c1::I64;
+      call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
+}
+
+
+
+==================== ThreadSanitizer instrumentation ====================
+testUnreachable
+{offset
+  c7: // global
+      _c1::I64 = R1;
+      //tick src<T27368-ppr-debug.cmm:(6,1)-(19,1)>
+      if (_c1::I64 (>[W64]) 0) goto c2; else goto c4;
+  c2: // global
+      //tick src<T27368-ppr-debug.cmm:(7,14)-(9,3)>
+      //tick src<T27368-ppr-debug.cmm:17:5-12>
+      _c1::I64 = _c1::I64 (-[W64]) 1;
+      R1 = _c1::I64;
+      call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
+  c4: // global
+      R1 = _c1::I64;
+      call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
+}
+
+
+
+==================== Layout Stack ====================
+testUnreachable
+{offset
+  c7: // global
+      _c1::I64 = R1;
+      //tick src<T27368-ppr-debug.cmm:(6,1)-(19,1)>
+      if (_c1::I64 (>[W64]) 0) goto c2; else goto c4;
+  c2: // global
+      //tick src<T27368-ppr-debug.cmm:(7,14)-(9,3)>
+      //tick src<T27368-ppr-debug.cmm:17:5-12>
+      _c1::I64 = _c1::I64 (-[W64]) 1;
+      R1 = _c1::I64;
+      call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+  c4: // global
+      R1 = _c1::I64;
+      call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+}
+
+
+
+==================== CAFEnv ====================
+[(c2, {}), (c4, {}), (c7, {})]
+
+
+
+==================== after setInfoTableStackMap ====================
+testUnreachable() { //  [R1]
+        { info_tbls: []
+          stack_info: arg_space: 8
+        }
+    {offset
+      c7: // global
+          _c1::I64 = R1;
+          //tick src<T27368-ppr-debug.cmm:(6,1)-(19,1)>
+          if (_c1::I64 (>[W64]) 0) goto c2; else goto c4;
+      c2: // global
+          //tick src<T27368-ppr-debug.cmm:(7,14)-(9,3)>
+          //tick src<T27368-ppr-debug.cmm:17:5-12>
+          _c1::I64 = _c1::I64 (-[W64]) 1;
+          R1 = _c1::I64;
+          call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+      c4: // global
+          R1 = _c1::I64;
+          call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+    }
+}
+
+
+
+==================== Post control-flow optimisations (2) ====================
+testUnreachable() { //  [R1]
+        { info_tbls: []
+          stack_info: arg_space: 8
+        }
+    {offset
+      c7: // global
+          _c1::I64 = R1;
+          //tick src<T27368-ppr-debug.cmm:(6,1)-(19,1)>
+          if (_c1::I64 (>[W64]) 0) goto c2; else goto c4;
+      c2: // global
+          //tick src<T27368-ppr-debug.cmm:(7,14)-(9,3)>
+          //tick src<T27368-ppr-debug.cmm:17:5-12>
+          _c1::I64 = _c1::I64 (-[W64]) 1;
+          R1 = _c1::I64;
+          call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+      c4: // global
+          R1 = _c1::I64;
+          call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+    }
+}
+
+
+
+==================== Post CPS Cmm ====================
+[testUnreachable() { //  [R1]
+         { info_tbls: []
+           stack_info: arg_space: 8
+         }
+     {offset
+       c7: // global
+           _c1::I64 = R1;
+           //tick src<T27368-ppr-debug.cmm:(6,1)-(19,1)>
+           if (_c1::I64 (>[W64]) 0) goto c2; else goto c4;
+       c2: // global
+           //tick src<T27368-ppr-debug.cmm:(7,14)-(9,3)>
+           //tick src<T27368-ppr-debug.cmm:17:5-12>
+           _c1::I64 = _c1::I64 (-[W64]) 1;
+           R1 = _c1::I64;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+       c4: // global
+           R1 = _c1::I64;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+     }
+ }]
+
+
