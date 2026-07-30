@@ -223,14 +223,14 @@ pprInternalBreakpointID
   -> InternalBreakpointId -- ^ The ID of the bytecode breakpoint
   -> SDoc                 -- ^ The textual information
 pprInternalBreakpointID current_module InternalBreakpointId {..}
-  | ibi_info_mod == current_module = indexDoc
-  | otherwise                      = indexDoc                  <+>
+  | ibi_info_mod == current_module = index_doc
+  | otherwise                      = index_doc                 <+>
                                      text "in"                 <+>
                                      quotes (ppr ibi_info_mod)
   where
 
-  indexDoc :: SDoc
-  indexDoc = ppr ibi_info_index
+  index_doc :: SDoc
+  index_doc = ppr ibi_info_index
 
 -- | Constructs textual information about used items.
 pprUsedItems :: Module          -- ^ The enclosing module
@@ -431,14 +431,14 @@ pprBreakpointID :: Module       -- ^ The enclosing module
                 -> BreakpointId -- ^ The ID of the source breakpoint
                 -> SDoc         -- ^ The textual information
 pprBreakpointID current_module BreakpointId {..}
-    | bi_tick_mod == current_module = indexDoc
-    | otherwise                     = indexDoc                 <+>
+    | bi_tick_mod == current_module = index_doc
+    | otherwise                     = index_doc                <+>
                                       text "in"                <+>
                                       quotes (ppr bi_tick_mod)
     where
 
-    indexDoc :: SDoc
-    indexDoc = ppr bi_tick_index
+    index_doc :: SDoc
+    index_doc = ppr bi_tick_index
 
 -- | Constructs textual information about static-pointer table entries.
 pprStaticPointerTableEntries :: [SptEntry] -> SDoc
@@ -492,11 +492,11 @@ pprTickCount = entry (text "number of ticks") . ppr
 pprFixedSizeNatural :: (Integral a, FiniteBits a) => a -> SDoc
 pprFixedSizeNatural num
   = assert (num >= 0) $
-    text $ replicate (digitCount - length unpadded) '0' ++ unpadded
+    text $ replicate (digit_count - length unpadded) '0' ++ unpadded
   where
 
-  digitCount :: Int
-  digitCount = (finiteBitSize num + 3) `div` 4
+  digit_count :: Int
+  digit_count = (finiteBitSize num + 3) `div` 4
 
   unpadded :: String
   unpadded = showHex num ""
