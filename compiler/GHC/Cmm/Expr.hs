@@ -445,8 +445,8 @@ pprExpr platform e
 
 -- `exp` usually, but (expr[width]) with -dppr-debug
 withDebugWidth :: Width -> SDoc -> SDoc
-withDebugWidth w exp =
-  ifPprDebug (parens (exp <> brackets (ppr w))) exp
+withDebugWidth w doc =
+  ifPprDebug (parens (doc <> brackets (ppr w))) doc
 
 -- Here's the precedence table from GHC.Cmm.Parser:
 -- %nonassoc '>=' '>' '<=' '<' '!=' '=='
