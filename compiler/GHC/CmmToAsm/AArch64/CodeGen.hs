@@ -1942,7 +1942,7 @@ truncateSubwordRegInplace w_to r = do
       W32 -> nilOL
       W16 -> trunc UXTH
       W8  -> trunc UXTB
-      _   -> panic "truncateSubwordReg:unexpectedWidth"
+      _   -> panic "truncateSubwordRegInplace:unexpectedWidth"
   where
     trunc instr = do
         unitOL $ instr (OpReg W32 r) (OpReg W32 r)
