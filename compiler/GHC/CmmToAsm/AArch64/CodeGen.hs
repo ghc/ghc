@@ -920,6 +920,21 @@ getRegister' config plat expr
     CmmMachOp (MO_RelaxedRead w) [e] ->
       getRegister (CmmLoad e (cmmBits w) NaturallyAligned)
 
+    -- XX Conversion
+    CmmMachOp (MO_XX_Conv from to) [e] -> do
+      register <- getRegister e
+      if to >= W32 || to > from
+        then case register of
+          -- Reuse computation, casting width.
+          Any _fmt code       -> pure $ Any (intFormat to) code
+          Fixed _fmt reg code -> pure $ Fixed (intFormat to) reg code
+        else case register of
+          Any _fmt code ->
+            pure $ Any (intFormat to) $ \dst -> do
+              code dst `appOL` truncateSubwordRegInplace to dst
+          Fixed _fmt reg code -> do
+              (trunc_reg, trunc_code) <- truncateSubwordReg to reg
+              pure $ Fixed (intFormat to) trunc_reg (code `appOL` trunc_code)
     CmmMachOp op [e] -> do
       (reg, _format, code) <- getSomeReg e
       case op of
@@ -946,22 +961,6 @@ getRegister' config plat expr
           where fmt = floatFormat w
         MO_FW_Bitcast w    -> return $ Any fmt (\dst -> code `snocOL` FMOV fmt (OpReg w dst) (OpReg w reg))
           where fmt = intFormat w
-
-        -- Conversions
-        MO_XX_Conv from to -> do
-          register <- getRegister e -- recomputs the assmebly for e, which is fine today but a bit of a wart.
-          if to >= W32 || to > from
-            then case register of
-              -- Reuse computation, casting width.
-              Any _fmt code       -> pure $ Any (intFormat to) code
-              Fixed _fmt reg code -> pure $ Fixed (intFormat to) reg code
-            else case register of
-              Any _fmt code ->
-                pure $ Any (intFormat to) $ \reg -> do
-                  code reg `appOL` truncateSubwordRegInplace to reg
-              Fixed _fmt reg code -> do
-                  (trunc_reg, trunc_code) <- truncateSubwordReg to reg
-                  pure $ Fixed (intFormat to) trunc_reg (code `appOL` trunc_code)
 
         -- Vector
         MO_V_Broadcast l w -> return $ Any fmt (\dst -> code `snocOL` DUP fmt (OpReg vw dst) (OpReg w reg))
