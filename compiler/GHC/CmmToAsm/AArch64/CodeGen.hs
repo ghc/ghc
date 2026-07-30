@@ -1267,7 +1267,7 @@ getRegister' config plat expr
                   signExt r
                     -- See Note [Signed arithmetic on AArch64] and #27430
                     | w >= W32       = pure (r, nilOL)
-                    | not is_signed  = truncateSubwordReg w' r
+                    | not is_signed  = truncateSubwordReg w r
                     | otherwise      = signExtendReg w w' r
               (reg_x_sx, code_x_sx) <- signExt reg_x
               (reg_y_sx, code_y_sx) <- signExt reg_y
