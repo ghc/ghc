@@ -465,9 +465,9 @@ pprActualHPCInfo :: Module          -- ^ The enclosing module
                  -> SDoc            -- ^ The textual information
 pprActualHPCInfo current_module ByteCodeHpcInfo {..}
   = assert (
-               utf8DecodeShortByteString bchi_module_name
-               ==
-               moduleNameString (moduleName current_module)
+             utf8DecodeShortByteString bchi_module_name
+             ==
+             moduleNameString (moduleName current_module)
            )
     $
     vcat [
