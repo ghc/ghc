@@ -2,7 +2,6 @@
 -- Testing performance of type-checking rewriting plugins.
 -- Test based on T9872b.
 
-{-# OPTIONS_GHC -dcore-lint #-}
 {-# OPTIONS_GHC -freduction-depth=400 #-}
 {-# OPTIONS_GHC -fplugin RewritePerfPlugin #-}
 

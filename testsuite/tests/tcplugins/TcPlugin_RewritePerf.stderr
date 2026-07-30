@@ -1,8 +1,7 @@
 [1 of 4] Compiling RewritePerfDefs  ( RewritePerfDefs.hs, RewritePerfDefs.o )
 [2 of 4] Compiling RewritePerfPlugin ( RewritePerfPlugin.hs, RewritePerfPlugin.o )
 [3 of 4] Compiling Main             ( TcPlugin_RewritePerf.hs, TcPlugin_RewritePerf.o )
-
-TcPlugin_RewritePerf.hs:25:8: error: [GHC-39999]
+TcPlugin_RewritePerf.hs:24:8: error: [GHC-39999]
     • No instance for ‘Show
                          (Proxy
                             [['Cube G B W R B G, 'Cube W G B W R R, 'Cube R W R B G R,
@@ -25,3 +24,4 @@ TcPlugin_RewritePerf.hs:25:8: error: [GHC-39999]
     • In the expression: print (Proxy :: Proxy (Solutions Cubes))
       In an equation for ‘main’:
           main = print (Proxy :: Proxy (Solutions Cubes))
+
