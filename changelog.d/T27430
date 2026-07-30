@@ -1,11 +1,17 @@
 section: compiler
-issues: #27430
+issues: #27430, #27539, #27538, #27537, #27430, #27565, #27533
 mrs: !16255
 synopsis:
-  AArch64 code generation: Fix handling of subword return values at FFI boundary.
+  A serious of fixes to the ARM64 ncg, mostly related to subwords.
 description:
-  When calling C functions returning subword values, sometimes those values high
-  bit would incorrectly influence certain operations.
+  A series of related fixes to the ncg fixing:
 
-  We now zero the high bits consistently to avoid this.
+  Fixed sign-extension for subword values returnd from unsafe ffi calls.
+  Clarify and lint for invalid conversions of int8/int16 -> float/double conversions.
+  Fix incorrect clobbering of local variables when comparing signed subword values.
+  Fix incorrect use of 32bit reads/stores for 8/16bit wide reads/stores.
+  Fix zero-extension on function entry if arguments are passed at word-width
+  but used at subword-widths.
+  Fix broadcast# for non-literal arguments (arm64 only).
+  Fix rare assembler errors caused by overflowing literals.
 
