@@ -11,7 +11,7 @@ main = do
   let script = intercalate " "
                [ "exec python3 2>/dev/null"
                , "-c"
-               , "'import os; os.kill(os.getpid(), 1)'"
+               , "'import os; os.kill(os.getpid(), 9)'" -- SIGKILL
                ]
   (_,_,_,p) <- createProcess (shell script)
   waitForProcess p >>= print
