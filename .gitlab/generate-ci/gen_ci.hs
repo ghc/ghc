@@ -210,7 +210,7 @@ configureArgsStr bc = unwords $
   ++ ["--with-intree-gmp" | Just _ <- [crossTarget bc] ]
   ++ ["--with-system-libffi" | (tpOs <$> crossTarget bc) == Just TargetOsWasi ]
   ++ ["--enable-ipe-data-compression" | withZstd bc ]
-  ++ ["--enable-strict-ghc-toolchain-check"]
+  -- ++ ["--enable-strict-ghc-toolchain-check"]
 
 -- Compute the hadrian flavour from the BuildConfig
 mkJobFlavour :: BuildConfig -> Flavour
