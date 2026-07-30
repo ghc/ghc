@@ -948,19 +948,20 @@ getRegister' config plat expr
           where fmt = intFormat w
 
         -- Conversions
-        MO_XX_Conv from to
-          | to >= W32 || to > from -> do
-              -- We don't care about garbage high bits when upcasting this way.
-              -- And for w >= W32 the invariant doesn't require zeroing.
-              register <- getRegister e -- recomputs the assmebly for e, which is fine today but a bit of a wart.
-              case register of
-                -- Reuse computation, casting width.
-                Any _fmt code -> pure $ Any (intFormat to) code
-                Fixed _fmt reg code -> pure $ Fixed (intFormat to) reg code
-          | otherwise -> do
-              (trunc_reg, code_trunc) <- truncateSubwordReg to reg
-              -- TODO: Use Any here for a tiny perf boost in edge cases.
-              return $ Fixed (intFormat to) trunc_reg (code `appOL` code_trunc)
+        MO_XX_Conv from to -> do
+          register <- getRegister e -- recomputs the assmebly for e, which is fine today but a bit of a wart.
+          if to >= W32 || to > from
+            then case register of
+              -- Reuse computation, casting width.
+              Any _fmt code       -> pure $ Any (intFormat to) code
+              Fixed _fmt reg code -> pure $ Fixed (intFormat to) reg code
+            else case register of
+              Any _fmt code ->
+                pure $ Any (intFormat to) $ \reg -> do
+                  code reg `appOL` truncateSubwordRegInplace to reg
+              Fixed _fmt reg code -> do
+                  (trunc_reg, trunc_code) <- truncateSubwordReg to reg
+                  pure $ Fixed (intFormat to) trunc_reg (code `appOL` trunc_code)
 
         -- Vector
         MO_V_Broadcast l w -> return $ Any fmt (\dst -> code `snocOL` DUP fmt (OpReg vw dst) (OpReg w reg))
