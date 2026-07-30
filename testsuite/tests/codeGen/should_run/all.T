@@ -292,3 +292,12 @@ test('T27072d', [req_c, only_ways(['dyn']), when(not opsys('darwin'), skip),
 # Skipped on Darwin (Apple linker doesn't support --wrap).
 test('T27072w', [req_c, js_skip, when(opsys('darwin'), skip)],
      compile_and_run, ['T27072w_c.c -no-hs-main -optl-Wl,--wrap=hs_spt_remove'])
+
+test('T27430', [req_c, extra_ways(['optasm'])], compile_and_run, ['T27430_c.c'])
+
+test('T27533', [req_cmm, extra_ways(['optasm'])], multi_compile_and_run,
+               ['T27533', [('T27533_cmm.cmm', '')], '-O'])
+
+test('T27537', normal, compile_and_run, ['-O'])
+
+test('T27538', normal, compile_and_run, ['-O'])
