@@ -90,7 +90,7 @@ objects:
                     used items:
                       named item ‘$fIntegralInteger’
                       named item ‘$fNumNatural’
-                      named item ‘^’
+                      named item ‘(^)’
                   object ‘isPrime_sat_@name_suffix@’:
                     arity: 3
                     literals: <none>
@@ -100,12 +100,12 @@ objects:
                     literals: <none>
                     used items:
                       named item ‘$fOrdNatural’
-                      named item ‘<=’
+                      named item ‘(<=)’
                   object ‘isPrime_sat_@name_suffix@’:
                     arity: 3
                     literals: <none>
                     used items: <none>
-                  named item ‘.’
+                  named item ‘(.)’
               named item ‘primes’
               named item ‘takeWhile’
           object ‘isPrime_sat_@name_suffix@’:
@@ -118,7 +118,7 @@ objects:
           named item ‘any’
       named item ‘not’
   static-construction object ‘primes’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
@@ -216,14 +216,14 @@ objects:
       named item ‘positiveFibonaccis2_sat_@name_suffix@’
       named item ‘zipWith’
   static-construction object ‘positiveFibonaccis1_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
       named item ‘positiveFibonaccis_@name_suffix@’
       named item ‘positiveFibonaccis2_@name_suffix@’
   static-construction object ‘fibonaccis’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
@@ -234,7 +234,7 @@ objects:
     literals: <none>
     used items:
       named item ‘$fNumNatural’
-      named item ‘+’
+      named item ‘(+)’
   object ‘positiveFibonaccis_@name_suffix@’:
     arity: 0
     literals: <none>
@@ -309,7 +309,7 @@ objects:
       named item ‘$tcPerfectTree’
       named item ‘$krep15_@name_suffix@’
   static-construction object ‘$krep15_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
@@ -346,7 +346,7 @@ objects:
       named item ‘$tcPerfectTree’
       named item ‘$krep12_@name_suffix@’
   static-construction object ‘$krep12_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
@@ -436,14 +436,14 @@ objects:
       named item ‘$tcBinTree’
       named item ‘$krep6_@name_suffix@’
   static-construction object ‘$krep6_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
       named item ‘$krep1_@name_suffix@’
       named item ‘$krep5_@name_suffix@’
   static-construction object ‘$krep5_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
@@ -473,14 +473,14 @@ objects:
       named item ‘$tcTuple2’
       named item ‘$krep3_@name_suffix@’
   static-construction object ‘$krep3_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
       named item ‘$krep1_@name_suffix@’
       named item ‘$krep2_@name_suffix@’
   static-construction object ‘$krep2_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
@@ -543,7 +543,7 @@ objects:
               object ‘divides_sat_@name_suffix@’:
                 arity: 0
                 literals: <none>
-                used items: named item ‘==’
+                used items: named item ‘(==)’
               named item ‘$p1Ord’
           named item ‘$p2Real’
       named item ‘$p1Integral’

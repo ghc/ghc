@@ -121,7 +121,7 @@ objects:
                         used items:
                           named item ‘$fIntegralInteger’
                           named item ‘$fNumNatural’
-                          named item ‘^’
+                          named item ‘(^)’
                       object ‘v1_@name_suffix@’:
                         arity: 0
                         literals:
@@ -142,7 +142,7 @@ objects:
                         literals: label ‘_hpc_tickboxes_Example_hpc’
                         used items:
                           named item ‘$fOrdNatural’
-                          named item ‘<=’
+                          named item ‘(<=)’
                       object ‘v1_@name_suffix@’:
                         arity: 1
                         literals: label ‘_hpc_tickboxes_Example_hpc’
@@ -151,7 +151,7 @@ objects:
                         arity: 3
                         literals: <none>
                         used items: <none>
-                  named item ‘.’
+                  named item ‘(.)’
               named item ‘takeWhile’
           object ‘isPrime_sat_@name_suffix@’:
             arity: 1
@@ -183,7 +183,7 @@ objects:
     literals:
       label ‘_hpc_tickboxes_Example_hpc’
       label ‘_hpc_tickboxes_Example_hpc’
-      info table of ‘:’
+      info table of ‘(:)’
     used items:
       named item ‘primes2_@name_suffix@’
       named item ‘primes1_@name_suffix@’
@@ -264,7 +264,7 @@ objects:
     literals:
       label ‘_hpc_tickboxes_Example_hpc’
       label ‘_hpc_tickboxes_Example_hpc’
-      info table of ‘:’
+      info table of ‘(:)’
     used items:
       named item ‘positiveFibonaccis2_@name_suffix@’
       named item ‘positiveFibonaccis_@name_suffix@’
@@ -285,14 +285,14 @@ objects:
         literals: label ‘_hpc_tickboxes_Example_hpc’
         used items:
           named item ‘$fNumNatural’
-          named item ‘+’
+          named item ‘(+)’
       named item ‘zipWith’
   object ‘fibonaccis’:
     arity: 0
     literals:
       label ‘_hpc_tickboxes_Example_hpc’
       label ‘_hpc_tickboxes_Example_hpc’
-      info table of ‘:’
+      info table of ‘(:)’
     used items:
       named item ‘fibonaccis2_@name_suffix@’
       named item ‘fibonaccis1_@name_suffix@’
@@ -368,7 +368,7 @@ objects:
       named item ‘$tcPerfectTree’
       named item ‘$krep15_@name_suffix@’
   static-construction object ‘$krep15_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
@@ -405,7 +405,7 @@ objects:
       named item ‘$tcPerfectTree’
       named item ‘$krep12_@name_suffix@’
   static-construction object ‘$krep12_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
@@ -495,14 +495,14 @@ objects:
       named item ‘$tcBinTree’
       named item ‘$krep6_@name_suffix@’
   static-construction object ‘$krep6_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
       named item ‘$krep1_@name_suffix@’
       named item ‘$krep5_@name_suffix@’
   static-construction object ‘$krep5_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
@@ -532,14 +532,14 @@ objects:
       named item ‘$tcTuple2’
       named item ‘$krep3_@name_suffix@’
   static-construction object ‘$krep3_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
       named item ‘$krep1_@name_suffix@’
       named item ‘$krep2_@name_suffix@’
   static-construction object ‘$krep2_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
@@ -614,7 +614,7 @@ objects:
               object ‘divides_sat_@name_suffix@’:
                 arity: 0
                 literals: <none>
-                used items: named item ‘==’
+                used items: named item ‘(==)’
               named item ‘$p1Ord’
           named item ‘$p2Real’
       named item ‘$p1Integral’

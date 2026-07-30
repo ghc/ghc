@@ -69,7 +69,7 @@ objects:
       top-level string "Example"
       top-level string "main"
       cost center of breakpoint 2
-      info table of ‘:’
+      info table of ‘(:)’
     used items:
       break array of module ‘Example’
       object ‘primes_sat_@name_suffix@’:
@@ -152,7 +152,7 @@ objects:
                         used items:
                           named item ‘$fIntegralInteger’
                           named item ‘$fNumNatural’
-                          named item ‘^’
+                          named item ‘(^)’
                       object ‘pap_@name_suffix@’:
                         arity: 3
                         literals: <none>
@@ -170,12 +170,12 @@ objects:
                         literals: <none>
                         used items:
                           named item ‘$fOrdNatural’
-                          named item ‘<=’
+                          named item ‘(<=)’
                       object ‘pap_@name_suffix@’:
                         arity: 3
                         literals: <none>
                         used items: <none>
-                  named item ‘.’
+                  named item ‘(.)’
               named item ‘primes’
               named item ‘takeWhile’
           object ‘isPrime_sat_@name_suffix@’:
@@ -262,7 +262,7 @@ objects:
       top-level string "Example"
       top-level string "main"
       cost center of breakpoint 11
-      info table of ‘:’
+      info table of ‘(:)’
     used items:
       break array of module ‘Example’
       object ‘fibonaccis_sat_@name_suffix@’:
@@ -280,7 +280,7 @@ objects:
       top-level string "Example"
       top-level string "main"
       cost center of breakpoint 13
-      info table of ‘:’
+      info table of ‘(:)’
     used items:
       break array of module ‘Example’
       object ‘positiveFibonaccis_sat_@name_suffix@’:
@@ -296,7 +296,7 @@ objects:
             literals: <none>
             used items:
               named item ‘$fNumNatural’
-              named item ‘+’
+              named item ‘(+)’
           named item ‘positiveFibonaccis_@name_suffix@’
           named item ‘fibonaccis’
           named item ‘zipWith’
@@ -358,7 +358,7 @@ objects:
       named item ‘$tcPerfectTree’
       named item ‘$krep15_@name_suffix@’
   static-construction object ‘$krep15_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
@@ -395,7 +395,7 @@ objects:
       named item ‘$tcPerfectTree’
       named item ‘$krep12_@name_suffix@’
   static-construction object ‘$krep12_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
@@ -485,14 +485,14 @@ objects:
       named item ‘$tcBinTree’
       named item ‘$krep6_@name_suffix@’
   static-construction object ‘$krep6_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
       named item ‘$krep1_@name_suffix@’
       named item ‘$krep5_@name_suffix@’
   static-construction object ‘$krep5_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
@@ -522,14 +522,14 @@ objects:
       named item ‘$tcTuple2’
       named item ‘$krep3_@name_suffix@’
   static-construction object ‘$krep3_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
       named item ‘$krep1_@name_suffix@’
       named item ‘$krep2_@name_suffix@’
   static-construction object ‘$krep2_@name_suffix@’:
-    data constructor: :
+    data constructor: (:)
     lifted: yes
     literals: <none>
     used items:
@@ -605,7 +605,7 @@ objects:
                             used items:
                               break array of module ‘Example’
                               named item ‘mod’
-                          named item ‘==’
+                          named item ‘(==)’
                   named item ‘$p1Ord’
               named item ‘$p2Real’
           named item ‘$p1Real’

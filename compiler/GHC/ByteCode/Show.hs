@@ -35,8 +35,8 @@ import GHC.Data.FastString (unpackFS)
 import GHC.Data.FlatBag (FlatBag, elemsFlatBag)
 import GHC.Fingerprint (Fingerprint)
 import GHC.Types.SrcLoc (noSrcSpan)
-import GHC.Types.Name (Name)
-import GHC.Types.Name.Occurrence (OccName)
+import GHC.Types.Name (Name, nameOccName)
+import GHC.Types.Name.Occurrence (OccName, isSymOcc)
 import GHC.Types.Tickish (BreakTickIndex, BreakpointId (..))
 import GHC.Types.SptEntry (SptEntry (..))
 import GHC.Types.Error (MessageClass (MCDump))
@@ -132,7 +132,7 @@ pprByteCodeObject :: Module      -- ^ The enclosing module
                   -> SDoc        -- ^ The textual information
 pprByteCodeObject current_module byte_code_object = case byte_code_object of
   UnlinkedBCO {..}
-    -> entry (text "object" <+> quotes (ppr unlinkedBCOName)) $
+    -> entry (text "object" <+> quotes (pprName unlinkedBCOName)) $
        vcat [
               pprArity                    $ unlinkedBCOArity,
               pprLiterals current_module  $ unlinkedBCOLits,
@@ -140,8 +140,8 @@ pprByteCodeObject current_module byte_code_object = case byte_code_object of
             ]
   UnlinkedStaticCon {..}
     -> entry (
-               text "static-construction object"  <+>
-               quotes (ppr unlinkedStaticConName)
+               text "static-construction object" <+>
+               quotes (pprName unlinkedStaticConName)
              )
        $
        vcat [
@@ -158,7 +158,7 @@ pprArity = entry (text "arity") . ppr
 -- | Constructs textual information about the data constructor of a
 --   static-construction bytecode object.
 pprDataConstructor :: Name -> SDoc
-pprDataConstructor = entry (text "data constructor") . ppr
+pprDataConstructor = entry (text "data constructor") . pprName
 
 -- | Constructs textual information about the liftedness of a
 --   static-construction bytecode object.
@@ -187,10 +187,10 @@ pprLiteral current_module literal = case literal of
        quotes (ppr label)
   BCONPtrItbl infoTableName
     -> text "info table of" <+>
-       quotes (ppr infoTableName)
+       quotes (pprName infoTableName)
   BCONPtrAddr addrName
     -> text "address" <+>
-       quotes (ppr addrName)
+       quotes (pprName addrName)
   BCONPtrStr encoded_string
     -> text "top-level string" <+>
        text (show (utf8DecodeByteString encoded_string))
@@ -247,7 +247,7 @@ pprUsedItem :: Module -- ^ The enclosing module
             -> SDoc   -- ^ The textual information
 pprUsedItem current_module usedItem = case usedItem of
   BCOPtrName name
-    -> text "named item" <+> quotes (ppr name)
+    -> text "named item" <+> quotes (pprName name)
   BCOPtrPrimOp primOp
     -> text "primitive operation" <+> quotes (ppr primOp)
   BCOPtrBCO byte_code_object
@@ -264,7 +264,7 @@ pprDataConstructorInfoTables = entry (text "data constructor info tables") .
 -- | Constructs textual information about a single data constructor info table.
 pprDataConstructorInfoTable :: Name -> ConInfoTable -> SDoc
 pprDataConstructorInfoTable dataConstrName ConInfoTable {..}
-  = entry (text "info table of" <+> quotes (ppr dataConstrName)) $
+  = entry (text "info table of" <+> quotes (pprName dataConstrName)) $
     vcat [
            pprPointerWordCount    $ conItblPtrs,
            pprNonPointerWordCount $ conItblNPtrs
@@ -286,10 +286,10 @@ pprTopLevelStrings = entry (text "top-level strings") .
 
 -- | Constructs textual information about a single top-level string.
 pprTopLevelString :: Name -> ByteString -> SDoc
-pprTopLevelString string_name encoded_string = entry (ppr string_name) $
-                                               text                    $
-                                               show                    $
-                                               utf8DecodeByteString    $
+pprTopLevelString string_name encoded_string = entry (pprName string_name) $
+                                               text                        $
+                                               show                        $
+                                               utf8DecodeByteString        $
                                                encoded_string
 
 -- | Constructs textual information about breakpoints.
@@ -449,7 +449,7 @@ pprStaticPointerTableEntries = entry (text "static-pointer table entries") .
 -- | Constructs textual information about a single static-pointer table entry.
 pprStaticPointerTableEntry :: SptEntry -> SDoc
 pprStaticPointerTableEntry (SptEntry name fingerprint)
-  = ppr fingerprint <> text ":" <+> ppr name
+  = ppr fingerprint <> text ":" <+> pprName name
 
 -- | Constructs textual information about HPC info.
 pprHPCInfo :: Module                       -- ^ The enclosing module
@@ -487,6 +487,11 @@ pprTickBox = entry (text "tick box") . text . utf8DecodeShortByteString
 -- | Constructs textual information about a number of tick counts.
 pprTickCount :: Int -> SDoc
 pprTickCount = entry (text "number of ticks") . ppr
+
+-- | Constructs the Haskell representation of a name.
+pprName :: Name -> SDoc
+pprName name | isSymOcc (nameOccName name) = text "(" <> ppr name <> text ")"
+             | otherwise                   = ppr name
 
 -- | Constructs a hexadecimal representation of a natural number such that the
 --   number of hexadecimal digits fits the number of bits used to represent the
