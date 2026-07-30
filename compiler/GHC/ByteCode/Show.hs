@@ -132,7 +132,7 @@ pprByteCodeObject :: Module      -- ^ The enclosing module
                   -> SDoc        -- ^ The textual information
 pprByteCodeObject current_module byte_code_object = case byte_code_object of
   UnlinkedBCO {..}
-    -> entry (text "ordinary object" <+> quotes (ppr unlinkedBCOName)) $
+    -> entry (text "object" <+> quotes (ppr unlinkedBCOName)) $
        vcat [
               pprArity                    $ unlinkedBCOArity,
               pprLiterals current_module  $ unlinkedBCOLits,
@@ -151,8 +151,7 @@ pprByteCodeObject current_module byte_code_object = case byte_code_object of
               pprUsedItems current_module $ unlinkedStaticConPtrs
             ]
 
--- | Constructs textual information about the arity of an ordinary bytecode
---   object.
+-- | Constructs textual information about the arity of a bytecode object.
 pprArity :: Int -> SDoc
 pprArity = entry (text "arity") . ppr
 

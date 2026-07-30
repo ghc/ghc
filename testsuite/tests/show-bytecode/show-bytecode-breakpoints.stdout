@@ -2,7 +2,7 @@
 module: Example
 hash: @hash@
 objects:
-  ordinary object ‘primesPtr’:
+  object ‘primesPtr’:
     arity: 0
     literals:
       top-level string "Example"
@@ -30,19 +30,19 @@ objects:
       named item ‘static_ptr1_sat_@name_suffix@’
       named item ‘static_ptr1_sat_@name_suffix@’
       named item ‘static_ptr1_sat_@name_suffix@’
-  ordinary object ‘static_ptr1_sat_@name_suffix@’:
+  object ‘static_ptr1_sat_@name_suffix@’:
     arity: 0
     literals: top-level string "main"
     used items:
-      ordinary object ‘static_ptr1_sat_@name_suffix@’:
+      object ‘static_ptr1_sat_@name_suffix@’:
         arity: 0
         literals: <none>
         used items: named item ‘unpackCString#’
-  ordinary object ‘static_ptr1_sat_@name_suffix@’:
+  object ‘static_ptr1_sat_@name_suffix@’:
     arity: 0
     literals: top-level string "Example"
     used items:
-      ordinary object ‘static_ptr1_sat_@name_suffix@’:
+      object ‘static_ptr1_sat_@name_suffix@’:
         arity: 0
         literals: <none>
         used items: named item ‘unpackCString#’
@@ -63,7 +63,7 @@ objects:
     lifted: yes
     literals: word 20
     used items: <none>
-  ordinary object ‘primes’:
+  object ‘primes’:
     arity: 0
     literals:
       top-level string "Example"
@@ -72,7 +72,7 @@ objects:
       info table of ‘:’
     used items:
       break array of module ‘Example’
-      ordinary object ‘primes_sat_@name_suffix@’:
+      object ‘primes_sat_@name_suffix@’:
         arity: 0
         literals:
           top-level string "Example"
@@ -80,11 +80,11 @@ objects:
           cost center of breakpoint 1
         used items:
           break array of module ‘Example’
-          ordinary object ‘primes_sat_@name_suffix@’:
+          object ‘primes_sat_@name_suffix@’:
             arity: 0
             literals: <none>
             used items:
-              ordinary object ‘primes_sat_@name_suffix@’:
+              object ‘primes_sat_@name_suffix@’:
                 arity: 0
                 literals:
                   word 3
@@ -96,7 +96,7 @@ objects:
               named item ‘enumFrom’
           named item ‘isPrime_@name_suffix@’
           named item ‘filter’
-      ordinary object ‘primes_sat_@name_suffix@’:
+      object ‘primes_sat_@name_suffix@’:
         arity: 0
         literals:
           word 2
@@ -104,7 +104,7 @@ objects:
         used items:
           named item ‘$fNumNatural’
           named item ‘fromInteger’
-  ordinary object ‘isPrime_@name_suffix@’:
+  object ‘isPrime_@name_suffix@’:
     arity: 1
     literals:
       top-level string "Example"
@@ -112,7 +112,7 @@ objects:
       cost center of breakpoint 9
     used items:
       break array of module ‘Example’
-      ordinary object ‘isPrime_sat_@name_suffix@’:
+      object ‘isPrime_sat_@name_suffix@’:
         arity: 1
         literals:
           top-level string "Example"
@@ -120,7 +120,7 @@ objects:
           cost center of breakpoint 8
         used items:
           break array of module ‘Example’
-          ordinary object ‘isPrime_sat_@name_suffix@’:
+          object ‘isPrime_sat_@name_suffix@’:
             arity: 1
             literals:
               top-level string "Example"
@@ -128,7 +128,7 @@ objects:
               cost center of breakpoint 7
             used items:
               break array of module ‘Example’
-              ordinary object ‘isPrime_sat_@name_suffix@’:
+              object ‘isPrime_sat_@name_suffix@’:
                 arity: 1
                 literals:
                   top-level string "Example"
@@ -136,7 +136,7 @@ objects:
                   cost center of breakpoint 6
                 used items:
                   break array of module ‘Example’
-                  ordinary object ‘isPrime_sat_@name_suffix@’:
+                  object ‘isPrime_sat_@name_suffix@’:
                     arity: 0
                     literals:
                       top-level string "Example"
@@ -146,18 +146,18 @@ objects:
                       info table of ‘IS’
                     used items:
                       break array of module ‘Example’
-                      ordinary object ‘v_@name_suffix@’:
+                      object ‘v_@name_suffix@’:
                         arity: 0
                         literals: <none>
                         used items:
                           named item ‘$fIntegralInteger’
                           named item ‘$fNumNatural’
                           named item ‘^’
-                      ordinary object ‘pap_@name_suffix@’:
+                      object ‘pap_@name_suffix@’:
                         arity: 3
                         literals: <none>
                         used items: <none>
-                  ordinary object ‘isPrime_sat_@name_suffix@’:
+                  object ‘isPrime_sat_@name_suffix@’:
                     arity: 1
                     literals:
                       top-level string "Example"
@@ -165,20 +165,20 @@ objects:
                       cost center of breakpoint 4
                     used items:
                       break array of module ‘Example’
-                      ordinary object ‘v_@name_suffix@’:
+                      object ‘v_@name_suffix@’:
                         arity: 0
                         literals: <none>
                         used items:
                           named item ‘$fOrdNatural’
                           named item ‘<=’
-                      ordinary object ‘pap_@name_suffix@’:
+                      object ‘pap_@name_suffix@’:
                         arity: 3
                         literals: <none>
                         used items: <none>
                   named item ‘.’
               named item ‘primes’
               named item ‘takeWhile’
-          ordinary object ‘isPrime_sat_@name_suffix@’:
+          object ‘isPrime_sat_@name_suffix@’:
             arity: 1
             literals:
               top-level string "Example"
@@ -186,7 +186,7 @@ objects:
               cost center of breakpoint 3
             used items:
               break array of module ‘Example’
-              ordinary object ‘pap_@name_suffix@’:
+              object ‘pap_@name_suffix@’:
                 arity: 2
                 literals: <none>
                 used items:
@@ -195,7 +195,7 @@ objects:
           named item ‘$fFoldableList’
           named item ‘any’
       named item ‘not’
-  ordinary object ‘fibonaccisPtr’:
+  object ‘fibonaccisPtr’:
     arity: 0
     literals:
       top-level string "Example"
@@ -223,19 +223,19 @@ objects:
       named item ‘static_ptr_sat_@name_suffix@’
       named item ‘static_ptr_sat_@name_suffix@’
       named item ‘static_ptr_sat_@name_suffix@’
-  ordinary object ‘static_ptr_sat_@name_suffix@’:
+  object ‘static_ptr_sat_@name_suffix@’:
     arity: 0
     literals: top-level string "main"
     used items:
-      ordinary object ‘static_ptr_sat_@name_suffix@’:
+      object ‘static_ptr_sat_@name_suffix@’:
         arity: 0
         literals: <none>
         used items: named item ‘unpackCString#’
-  ordinary object ‘static_ptr_sat_@name_suffix@’:
+  object ‘static_ptr_sat_@name_suffix@’:
     arity: 0
     literals: top-level string "Example"
     used items:
-      ordinary object ‘static_ptr_sat_@name_suffix@’:
+      object ‘static_ptr_sat_@name_suffix@’:
         arity: 0
         literals: <none>
         used items: named item ‘unpackCString#’
@@ -256,7 +256,7 @@ objects:
     lifted: yes
     literals: word 24
     used items: <none>
-  ordinary object ‘fibonaccis’:
+  object ‘fibonaccis’:
     arity: 0
     literals:
       top-level string "Example"
@@ -265,7 +265,7 @@ objects:
       info table of ‘:’
     used items:
       break array of module ‘Example’
-      ordinary object ‘fibonaccis_sat_@name_suffix@’:
+      object ‘fibonaccis_sat_@name_suffix@’:
         arity: 0
         literals:
           word 0
@@ -274,7 +274,7 @@ objects:
           named item ‘$fNumNatural’
           named item ‘fromInteger’
       named item ‘positiveFibonaccis_@name_suffix@’
-  ordinary object ‘positiveFibonaccis_@name_suffix@’:
+  object ‘positiveFibonaccis_@name_suffix@’:
     arity: 0
     literals:
       top-level string "Example"
@@ -283,7 +283,7 @@ objects:
       info table of ‘:’
     used items:
       break array of module ‘Example’
-      ordinary object ‘positiveFibonaccis_sat_@name_suffix@’:
+      object ‘positiveFibonaccis_sat_@name_suffix@’:
         arity: 0
         literals:
           top-level string "Example"
@@ -291,7 +291,7 @@ objects:
           cost center of breakpoint 12
         used items:
           break array of module ‘Example’
-          ordinary object ‘positiveFibonaccis_sat_@name_suffix@’:
+          object ‘positiveFibonaccis_sat_@name_suffix@’:
             arity: 0
             literals: <none>
             used items:
@@ -300,7 +300,7 @@ objects:
           named item ‘positiveFibonaccis_@name_suffix@’
           named item ‘fibonaccis’
           named item ‘zipWith’
-      ordinary object ‘positiveFibonaccis_sat_@name_suffix@’:
+      object ‘positiveFibonaccis_sat_@name_suffix@’:
         arity: 0
         literals:
           word 1
@@ -308,20 +308,20 @@ objects:
         used items:
           named item ‘$fNumNatural’
           named item ‘fromInteger’
-  ordinary object ‘$dTypeable2_@name_suffix@’:
+  object ‘$dTypeable2_@name_suffix@’:
     arity: 0
     literals: <none>
     used items:
       named item ‘$dTypeable_@name_suffix@’
       named item ‘$dTypeable1_@name_suffix@’
       named item ‘mkTrAppChecked’
-  ordinary object ‘$dTypeable1_@name_suffix@’:
+  object ‘$dTypeable1_@name_suffix@’:
     arity: 0
     literals: info table of ‘[]’
     used items:
       named item ‘$tcList’
       named item ‘mkTrCon’
-  ordinary object ‘$dTypeable_@name_suffix@’:
+  object ‘$dTypeable_@name_suffix@’:
     arity: 0
     literals: info table of ‘[]’
     used items:
@@ -562,27 +562,27 @@ objects:
     lifted: yes
     literals: address ‘$trModule1_@name_suffix@’
     used items: <none>
-  ordinary object ‘divides’:
+  object ‘divides’:
     arity: 3
     literals: <none>
     used items:
-      ordinary object ‘$dReal_@name_suffix@’:
+      object ‘$dReal_@name_suffix@’:
         arity: 0
         literals: <none>
         used items:
-          ordinary object ‘$dNum_@name_suffix@’:
+          object ‘$dNum_@name_suffix@’:
             arity: 0
             literals: <none>
             used items:
-              ordinary object ‘$dEq_@name_suffix@’:
+              object ‘$dEq_@name_suffix@’:
                 arity: 0
                 literals: <none>
                 used items:
-                  ordinary object ‘$dEq1_@name_suffix@’:
+                  object ‘$dEq1_@name_suffix@’:
                     arity: 0
                     literals: <none>
                     used items:
-                      ordinary object ‘bcprep_@name_suffix@’:
+                      object ‘bcprep_@name_suffix@’:
                         arity: 5
                         literals:
                           top-level string "Example"
@@ -590,13 +590,13 @@ objects:
                           cost center of breakpoint 15
                         used items:
                           break array of module ‘Example’
-                          ordinary object ‘divides_sat_@name_suffix@’:
+                          object ‘divides_sat_@name_suffix@’:
                             arity: 1
                             literals:
                               word 0
                               info table of ‘IS’
                             used items: named item ‘fromInteger’
-                          ordinary object ‘divides_sat_@name_suffix@’:
+                          object ‘divides_sat_@name_suffix@’:
                             arity: 3
                             literals:
                               top-level string "Example"
@@ -610,19 +610,19 @@ objects:
               named item ‘$p2Real’
           named item ‘$p1Real’
       named item ‘$p1Integral’
-  ordinary object ‘Node’:
+  object ‘Node’:
     arity: 3
     literals: info table of ‘Node’
     used items: <none>
-  ordinary object ‘Leaf’:
+  object ‘Leaf’:
     arity: 1
     literals: info table of ‘Leaf’
     used items: <none>
-  ordinary object ‘Nested’:
+  object ‘Nested’:
     arity: 1
     literals: info table of ‘Nested’
     used items: <none>
-  ordinary object ‘PerfectTree’:
+  object ‘PerfectTree’:
     arity: 1
     literals: info table of ‘PerfectTree’
     used items: <none>

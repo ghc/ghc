@@ -2,7 +2,7 @@
 module: Example
 hash: @hash@
 objects:
-  ordinary object ‘primesPtr’:
+  object ‘primesPtr’:
     arity: 0
     literals:
       label ‘_hpc_tickboxes_Example_hpc’
@@ -28,19 +28,19 @@ objects:
       named item ‘static_ptr1_sat_@name_suffix@’
       named item ‘static_ptr1_sat_@name_suffix@’
       named item ‘static_ptr1_sat_@name_suffix@’
-  ordinary object ‘static_ptr1_sat_@name_suffix@’:
+  object ‘static_ptr1_sat_@name_suffix@’:
     arity: 0
     literals: top-level string "main"
     used items:
-      ordinary object ‘static_ptr1_sat_@name_suffix@’:
+      object ‘static_ptr1_sat_@name_suffix@’:
         arity: 0
         literals: <none>
         used items: named item ‘unpackCString#’
-  ordinary object ‘static_ptr1_sat_@name_suffix@’:
+  object ‘static_ptr1_sat_@name_suffix@’:
     arity: 0
     literals: top-level string "Example"
     used items:
-      ordinary object ‘static_ptr1_sat_@name_suffix@’:
+      object ‘static_ptr1_sat_@name_suffix@’:
         arity: 0
         literals: <none>
         used items: named item ‘unpackCString#’
@@ -61,19 +61,19 @@ objects:
     lifted: yes
     literals: word 20
     used items: <none>
-  ordinary object ‘static_ptr1_sat_@name_suffix@’:
+  object ‘static_ptr1_sat_@name_suffix@’:
     arity: 0
     literals: label ‘_hpc_tickboxes_Example_hpc’
     used items: named item ‘primes’
-  ordinary object ‘primes2_@name_suffix@’:
+  object ‘primes2_@name_suffix@’:
     arity: 0
     literals: label ‘_hpc_tickboxes_Example_hpc’
     used items:
-      ordinary object ‘primes2_sat_@name_suffix@’:
+      object ‘primes2_sat_@name_suffix@’:
         arity: 0
         literals: label ‘_hpc_tickboxes_Example_hpc’
         used items:
-          ordinary object ‘primes2_sat_@name_suffix@’:
+          object ‘primes2_sat_@name_suffix@’:
             arity: 0
             literals:
               label ‘_hpc_tickboxes_Example_hpc’
@@ -84,101 +84,101 @@ objects:
               named item ‘fromInteger’
           named item ‘$fEnumNatural’
           named item ‘enumFrom’
-      ordinary object ‘primes2_sat_@name_suffix@’:
+      object ‘primes2_sat_@name_suffix@’:
         arity: 0
         literals: label ‘_hpc_tickboxes_Example_hpc’
         used items: named item ‘isPrime_@name_suffix@’
       named item ‘filter’
-  ordinary object ‘isPrime_@name_suffix@’:
+  object ‘isPrime_@name_suffix@’:
     arity: 1
     literals:
       label ‘_hpc_tickboxes_Example_hpc’
       label ‘_hpc_tickboxes_Example_hpc’
     used items:
-      ordinary object ‘isPrime_sat_@name_suffix@’:
+      object ‘isPrime_sat_@name_suffix@’:
         arity: 1
         literals: label ‘_hpc_tickboxes_Example_hpc’
         used items:
-          ordinary object ‘isPrime_sat_@name_suffix@’:
+          object ‘isPrime_sat_@name_suffix@’:
             arity: 1
             literals: label ‘_hpc_tickboxes_Example_hpc’
             used items:
-              ordinary object ‘isPrime_sat_@name_suffix@’:
+              object ‘isPrime_sat_@name_suffix@’:
                 arity: 0
                 literals: label ‘_hpc_tickboxes_Example_hpc’
                 used items: named item ‘primes’
-              ordinary object ‘isPrime_sat_@name_suffix@’:
+              object ‘isPrime_sat_@name_suffix@’:
                 arity: 1
                 literals: label ‘_hpc_tickboxes_Example_hpc’
                 used items:
-                  ordinary object ‘isPrime_sat_@name_suffix@’:
+                  object ‘isPrime_sat_@name_suffix@’:
                     arity: 0
                     literals: label ‘_hpc_tickboxes_Example_hpc’
                     used items:
-                      ordinary object ‘v_@name_suffix@’:
+                      object ‘v_@name_suffix@’:
                         arity: 0
                         literals: label ‘_hpc_tickboxes_Example_hpc’
                         used items:
                           named item ‘$fIntegralInteger’
                           named item ‘$fNumNatural’
                           named item ‘^’
-                      ordinary object ‘v1_@name_suffix@’:
+                      object ‘v1_@name_suffix@’:
                         arity: 0
                         literals:
                           label ‘_hpc_tickboxes_Example_hpc’
                           word 2
                           info table of ‘IS’
                         used items: <none>
-                      ordinary object ‘pap_@name_suffix@’:
+                      object ‘pap_@name_suffix@’:
                         arity: 3
                         literals: <none>
                         used items: <none>
-                  ordinary object ‘isPrime_sat_@name_suffix@’:
+                  object ‘isPrime_sat_@name_suffix@’:
                     arity: 1
                     literals: label ‘_hpc_tickboxes_Example_hpc’
                     used items:
-                      ordinary object ‘v_@name_suffix@’:
+                      object ‘v_@name_suffix@’:
                         arity: 0
                         literals: label ‘_hpc_tickboxes_Example_hpc’
                         used items:
                           named item ‘$fOrdNatural’
                           named item ‘<=’
-                      ordinary object ‘v1_@name_suffix@’:
+                      object ‘v1_@name_suffix@’:
                         arity: 1
                         literals: label ‘_hpc_tickboxes_Example_hpc’
                         used items: <none>
-                      ordinary object ‘pap_@name_suffix@’:
+                      object ‘pap_@name_suffix@’:
                         arity: 3
                         literals: <none>
                         used items: <none>
                   named item ‘.’
               named item ‘takeWhile’
-          ordinary object ‘isPrime_sat_@name_suffix@’:
+          object ‘isPrime_sat_@name_suffix@’:
             arity: 1
             literals: label ‘_hpc_tickboxes_Example_hpc’
             used items:
-              ordinary object ‘v_@name_suffix@’:
+              object ‘v_@name_suffix@’:
                 arity: 0
                 literals: label ‘_hpc_tickboxes_Example_hpc’
                 used items:
-                  ordinary object ‘pap_@name_suffix@’:
+                  object ‘pap_@name_suffix@’:
                     arity: 2
                     literals: <none>
                     used items:
                       named item ‘$fIntegralNatural’
                       named item ‘divides’
-              ordinary object ‘v1_@name_suffix@’:
+              object ‘v1_@name_suffix@’:
                 arity: 1
                 literals: label ‘_hpc_tickboxes_Example_hpc’
                 used items: <none>
-              ordinary object ‘pap_@name_suffix@’:
+              object ‘pap_@name_suffix@’:
                 arity: 3
                 literals: <none>
                 used items: <none>
           named item ‘$fFoldableList’
           named item ‘any’
       named item ‘not’
-  ordinary object ‘primes’:
+  object ‘primes’:
     arity: 0
     literals:
       label ‘_hpc_tickboxes_Example_hpc’
@@ -187,7 +187,7 @@ objects:
     used items:
       named item ‘primes2_@name_suffix@’
       named item ‘primes1_@name_suffix@’
-  ordinary object ‘primes1_@name_suffix@’:
+  object ‘primes1_@name_suffix@’:
     arity: 0
     literals:
       label ‘_hpc_tickboxes_Example_hpc’
@@ -196,7 +196,7 @@ objects:
     used items:
       named item ‘$fNumNatural’
       named item ‘fromInteger’
-  ordinary object ‘fibonaccisPtr’:
+  object ‘fibonaccisPtr’:
     arity: 0
     literals:
       label ‘_hpc_tickboxes_Example_hpc’
@@ -222,19 +222,19 @@ objects:
       named item ‘static_ptr_sat_@name_suffix@’
       named item ‘static_ptr_sat_@name_suffix@’
       named item ‘static_ptr_sat_@name_suffix@’
-  ordinary object ‘static_ptr_sat_@name_suffix@’:
+  object ‘static_ptr_sat_@name_suffix@’:
     arity: 0
     literals: top-level string "main"
     used items:
-      ordinary object ‘static_ptr_sat_@name_suffix@’:
+      object ‘static_ptr_sat_@name_suffix@’:
         arity: 0
         literals: <none>
         used items: named item ‘unpackCString#’
-  ordinary object ‘static_ptr_sat_@name_suffix@’:
+  object ‘static_ptr_sat_@name_suffix@’:
     arity: 0
     literals: top-level string "Example"
     used items:
-      ordinary object ‘static_ptr_sat_@name_suffix@’:
+      object ‘static_ptr_sat_@name_suffix@’:
         arity: 0
         literals: <none>
         used items: named item ‘unpackCString#’
@@ -255,11 +255,11 @@ objects:
     lifted: yes
     literals: word 24
     used items: <none>
-  ordinary object ‘static_ptr_sat_@name_suffix@’:
+  object ‘static_ptr_sat_@name_suffix@’:
     arity: 0
     literals: label ‘_hpc_tickboxes_Example_hpc’
     used items: named item ‘fibonaccis’
-  ordinary object ‘positiveFibonaccis1_@name_suffix@’:
+  object ‘positiveFibonaccis1_@name_suffix@’:
     arity: 0
     literals:
       label ‘_hpc_tickboxes_Example_hpc’
@@ -268,26 +268,26 @@ objects:
     used items:
       named item ‘positiveFibonaccis2_@name_suffix@’
       named item ‘positiveFibonaccis_@name_suffix@’
-  ordinary object ‘positiveFibonaccis2_@name_suffix@’:
+  object ‘positiveFibonaccis2_@name_suffix@’:
     arity: 0
     literals: label ‘_hpc_tickboxes_Example_hpc’
     used items:
-      ordinary object ‘positiveFibonaccis2_sat_@name_suffix@’:
+      object ‘positiveFibonaccis2_sat_@name_suffix@’:
         arity: 0
         literals: label ‘_hpc_tickboxes_Example_hpc’
         used items: named item ‘positiveFibonaccis1_@name_suffix@’
-      ordinary object ‘positiveFibonaccis2_sat_@name_suffix@’:
+      object ‘positiveFibonaccis2_sat_@name_suffix@’:
         arity: 0
         literals: label ‘_hpc_tickboxes_Example_hpc’
         used items: named item ‘fibonaccis’
-      ordinary object ‘positiveFibonaccis2_sat_@name_suffix@’:
+      object ‘positiveFibonaccis2_sat_@name_suffix@’:
         arity: 0
         literals: label ‘_hpc_tickboxes_Example_hpc’
         used items:
           named item ‘$fNumNatural’
           named item ‘+’
       named item ‘zipWith’
-  ordinary object ‘fibonaccis’:
+  object ‘fibonaccis’:
     arity: 0
     literals:
       label ‘_hpc_tickboxes_Example_hpc’
@@ -296,11 +296,11 @@ objects:
     used items:
       named item ‘fibonaccis2_@name_suffix@’
       named item ‘fibonaccis1_@name_suffix@’
-  ordinary object ‘fibonaccis2_@name_suffix@’:
+  object ‘fibonaccis2_@name_suffix@’:
     arity: 0
     literals: label ‘_hpc_tickboxes_Example_hpc’
     used items: named item ‘positiveFibonaccis1_@name_suffix@’
-  ordinary object ‘positiveFibonaccis_@name_suffix@’:
+  object ‘positiveFibonaccis_@name_suffix@’:
     arity: 0
     literals:
       label ‘_hpc_tickboxes_Example_hpc’
@@ -309,7 +309,7 @@ objects:
     used items:
       named item ‘$fNumNatural’
       named item ‘fromInteger’
-  ordinary object ‘fibonaccis1_@name_suffix@’:
+  object ‘fibonaccis1_@name_suffix@’:
     arity: 0
     literals:
       label ‘_hpc_tickboxes_Example_hpc’
@@ -318,20 +318,20 @@ objects:
     used items:
       named item ‘$fNumNatural’
       named item ‘fromInteger’
-  ordinary object ‘$dTypeable2_@name_suffix@’:
+  object ‘$dTypeable2_@name_suffix@’:
     arity: 0
     literals: <none>
     used items:
       named item ‘$dTypeable_@name_suffix@’
       named item ‘$dTypeable1_@name_suffix@’
       named item ‘mkTrAppChecked’
-  ordinary object ‘$dTypeable1_@name_suffix@’:
+  object ‘$dTypeable1_@name_suffix@’:
     arity: 0
     literals: info table of ‘[]’
     used items:
       named item ‘$tcList’
       named item ‘mkTrCon’
-  ordinary object ‘$dTypeable_@name_suffix@’:
+  object ‘$dTypeable_@name_suffix@’:
     arity: 0
     literals: info table of ‘[]’
     used items:
@@ -572,65 +572,65 @@ objects:
     lifted: yes
     literals: address ‘$trModule1_@name_suffix@’
     used items: <none>
-  ordinary object ‘divides’:
+  object ‘divides’:
     arity: 3
     literals: <none>
     used items:
-      ordinary object ‘$dReal_@name_suffix@’:
+      object ‘$dReal_@name_suffix@’:
         arity: 0
         literals:
           label ‘_hpc_tickboxes_Example_hpc’
           label ‘_hpc_tickboxes_Example_hpc’
         used items:
-          ordinary object ‘divides_sat_@name_suffix@’:
+          object ‘divides_sat_@name_suffix@’:
             arity: 1
             literals:
               label ‘_hpc_tickboxes_Example_hpc’
               word 0
               info table of ‘IS’
             used items:
-              ordinary object ‘divides_sat_@name_suffix@’:
+              object ‘divides_sat_@name_suffix@’:
                 arity: 0
                 literals: <none>
                 used items: named item ‘fromInteger’
               named item ‘$p1Real’
-          ordinary object ‘divides_sat_@name_suffix@’:
+          object ‘divides_sat_@name_suffix@’:
             arity: 3
             literals: label ‘_hpc_tickboxes_Example_hpc’
             used items:
-              ordinary object ‘divides_sat_@name_suffix@’:
+              object ‘divides_sat_@name_suffix@’:
                 arity: 1
                 literals: label ‘_hpc_tickboxes_Example_hpc’
                 used items: <none>
-              ordinary object ‘divides_sat_@name_suffix@’:
+              object ‘divides_sat_@name_suffix@’:
                 arity: 1
                 literals: label ‘_hpc_tickboxes_Example_hpc’
                 used items: <none>
               named item ‘mod’
-          ordinary object ‘divides_sat_@name_suffix@’:
+          object ‘divides_sat_@name_suffix@’:
             arity: 0
             literals: <none>
             used items:
-              ordinary object ‘divides_sat_@name_suffix@’:
+              object ‘divides_sat_@name_suffix@’:
                 arity: 0
                 literals: <none>
                 used items: named item ‘==’
               named item ‘$p1Ord’
           named item ‘$p2Real’
       named item ‘$p1Integral’
-  ordinary object ‘Node’:
+  object ‘Node’:
     arity: 3
     literals: info table of ‘Node’
     used items: <none>
-  ordinary object ‘Leaf’:
+  object ‘Leaf’:
     arity: 1
     literals: info table of ‘Leaf’
     used items: <none>
-  ordinary object ‘Nested’:
+  object ‘Nested’:
     arity: 1
     literals: info table of ‘Nested’
     used items: <none>
-  ordinary object ‘PerfectTree’:
+  object ‘PerfectTree’:
     arity: 1
     literals: info table of ‘PerfectTree’
     used items: <none>
