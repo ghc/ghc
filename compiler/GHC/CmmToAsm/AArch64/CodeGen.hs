@@ -1266,6 +1266,7 @@ getRegister' config plat expr
               let w' = opRegWidth w
                   signExt r
                     -- See Note [Signed arithmetic on AArch64] and #27430
+                    | w >= W32       = pure (r, nilOL)
                     | not is_signed  = truncateSubwordReg w' r
                     | otherwise      = signExtendReg w w' r
               (reg_x_sx, code_x_sx) <- signExt reg_x
@@ -1908,12 +1909,13 @@ signExtendReg w w' r =
         return (r', unitOL $ instr (OpReg w' r') (OpReg w r))
 
 -- | Truncate/zero extend the subwords high bits and store the
--- result in a new register.
+-- result in a new register. Must be called with w==8 or w==16
 truncateSubwordReg :: Width -> Reg -> NatM (Reg, OrdList Instr)
 truncateSubwordReg w_to r = do
+    massertPpr (w_to == W8 || w_to == W16) (text "truncateSubwordReg:unexpectedWidth")
     case w_to of
-      -- Simply move it unchanged, we use at least 32bits
-      W64 -> trunc W64 MOV -- Ensure W64->W64 is a no-op by using 64bit mov.
+      -- Asserted false, but be defensive for non-debug builds.
+      W64 -> trunc W64 MOV
       W32 -> trunc W32 MOV
 
       -- Actual truncation
@@ -2068,9 +2070,14 @@ genCondJump bid expr = do
                 -- If all computations reliably produce zero-extended subword results
                 -- this truncation is redundant. But for now better to be correct than
                 -- fast.
-                (reg_x', trunc_x) <- truncateSubwordReg w reg_x
+                let !needs_truncate = w == W8 || w == W16
+                (reg_x', trunc_x) <- if needs_truncate
+                    then truncateSubwordReg w reg_x
+                    else pure (reg_x, nilOL)
                 -- TODO: Use CMP on OpRegExt rather than extending explicitly.
-                (reg_y', trunc_y) <- truncateSubwordReg w reg_y
+                (reg_y', trunc_y) <- if needs_truncate
+                    then truncateSubwordReg w reg_y
+                    else pure (reg_y, nilOL)
 
                 let x' = OpReg w reg_x'
                     y' = OpReg w reg_y'
