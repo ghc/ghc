@@ -1,5 +1,5 @@
 [1 of 1] Compiling Example          ( Example.hs, Example.gbc )
-name: Example
+module: Example
 hash: @hash@
 objects:
   ordinary object ‘primesPtr’:
@@ -10,7 +10,7 @@ objects:
       named item ‘$dTypeable2_@name_suffix@’
       named item ‘$fIsStaticStaticPtr’
   static-construction object ‘static_ptr1’:
-    data constructor name: StaticPtr
+    data constructor: StaticPtr
     lifted: yes
     literals:
       word @large_word@
@@ -19,7 +19,7 @@ objects:
       named item ‘static_ptr1_sat_@name_suffix@’
       named item ‘primes’
   static-construction object ‘static_ptr1_sat_@name_suffix@’:
-    data constructor name: StaticPtrInfo
+    data constructor: StaticPtrInfo
     lifted: yes
     literals: <none>
     used items:
@@ -43,19 +43,19 @@ objects:
         literals: <none>
         used items: named item ‘unpackCString#’
   static-construction object ‘static_ptr1_sat_@name_suffix@’:
-    data constructor name: (,)
+    data constructor: (,)
     lifted: yes
     literals: <none>
     used items:
       named item ‘static_ptr1_sat_@name_suffix@’
       named item ‘static_ptr1_sat_@name_suffix@’
   static-construction object ‘static_ptr1_sat_@name_suffix@’:
-    data constructor name: I#
+    data constructor: I#
     lifted: yes
     literals: word 27
     used items: <none>
   static-construction object ‘static_ptr1_sat_@name_suffix@’:
-    data constructor name: I#
+    data constructor: I#
     lifted: yes
     literals: word 20
     used items: <none>
@@ -118,7 +118,7 @@ objects:
           named item ‘any’
       named item ‘not’
   static-construction object ‘primes’:
-    data constructor name: :
+    data constructor: :
     lifted: yes
     literals: <none>
     used items:
@@ -146,7 +146,7 @@ objects:
       named item ‘$fNumNatural’
       named item ‘fromInteger’
   static-construction object ‘primes1_sat_@name_suffix@’:
-    data constructor name: IS
+    data constructor: IS
     lifted: yes
     literals: word 2
     used items: <none>
@@ -158,7 +158,7 @@ objects:
       named item ‘$dTypeable2_@name_suffix@’
       named item ‘$fIsStaticStaticPtr’
   static-construction object ‘static_ptr’:
-    data constructor name: StaticPtr
+    data constructor: StaticPtr
     lifted: yes
     literals:
       word @large_word@
@@ -167,7 +167,7 @@ objects:
       named item ‘static_ptr_sat_@name_suffix@’
       named item ‘fibonaccis’
   static-construction object ‘static_ptr_sat_@name_suffix@’:
-    data constructor name: StaticPtrInfo
+    data constructor: StaticPtrInfo
     lifted: yes
     literals: <none>
     used items:
@@ -191,19 +191,19 @@ objects:
         literals: <none>
         used items: named item ‘unpackCString#’
   static-construction object ‘static_ptr_sat_@name_suffix@’:
-    data constructor name: (,)
+    data constructor: (,)
     lifted: yes
     literals: <none>
     used items:
       named item ‘static_ptr_sat_@name_suffix@’
       named item ‘static_ptr_sat_@name_suffix@’
   static-construction object ‘static_ptr_sat_@name_suffix@’:
-    data constructor name: I#
+    data constructor: I#
     lifted: yes
     literals: word 15
     used items: <none>
   static-construction object ‘static_ptr_sat_@name_suffix@’:
-    data constructor name: I#
+    data constructor: I#
     lifted: yes
     literals: word 24
     used items: <none>
@@ -216,14 +216,14 @@ objects:
       named item ‘positiveFibonaccis2_sat_@name_suffix@’
       named item ‘zipWith’
   static-construction object ‘positiveFibonaccis1_@name_suffix@’:
-    data constructor name: :
+    data constructor: :
     lifted: yes
     literals: <none>
     used items:
       named item ‘positiveFibonaccis_@name_suffix@’
       named item ‘positiveFibonaccis2_@name_suffix@’
   static-construction object ‘fibonaccis’:
-    data constructor name: :
+    data constructor: :
     lifted: yes
     literals: <none>
     used items:
@@ -243,7 +243,7 @@ objects:
       named item ‘$fNumNatural’
       named item ‘fromInteger’
   static-construction object ‘positiveFibonaccis_sat_@name_suffix@’:
-    data constructor name: IS
+    data constructor: IS
     lifted: yes
     literals: word 1
     used items: <none>
@@ -255,7 +255,7 @@ objects:
       named item ‘$fNumNatural’
       named item ‘fromInteger’
   static-construction object ‘fibonaccis1_sat_@name_suffix@’:
-    data constructor name: IS
+    data constructor: IS
     lifted: yes
     literals: word 0
     used items: <none>
@@ -279,7 +279,7 @@ objects:
       named item ‘$tcNatural’
       named item ‘mkTrCon’
   static-construction object ‘$tc'Nested’:
-    data constructor name: TyCon
+    data constructor: TyCon
     lifted: yes
     literals:
       word @large_word@
@@ -290,33 +290,33 @@ objects:
       named item ‘$tc'Nested2_@name_suffix@’
       named item ‘$krep17_@name_suffix@’
   static-construction object ‘$tc'Nested2_@name_suffix@’:
-    data constructor name: TrNameS
+    data constructor: TrNameS
     lifted: yes
     literals: address ‘$tc'Nested1_@name_suffix@’
     used items: <none>
   static-construction object ‘$krep17_@name_suffix@’:
-    data constructor name: KindRepFun
+    data constructor: KindRepFun
     lifted: yes
     literals: <none>
     used items:
       named item ‘$krep16_@name_suffix@’
       named item ‘$krep13_@name_suffix@’
   static-construction object ‘$krep16_@name_suffix@’:
-    data constructor name: KindRepTyConApp
+    data constructor: KindRepTyConApp
     lifted: yes
     literals: <none>
     used items:
       named item ‘$tcPerfectTree’
       named item ‘$krep15_@name_suffix@’
   static-construction object ‘$krep15_@name_suffix@’:
-    data constructor name: :
+    data constructor: :
     lifted: yes
     literals: <none>
     used items:
       named item ‘$krep4_@name_suffix@’
       named item ‘[]’
   static-construction object ‘$tc'PerfectTree’:
-    data constructor name: TyCon
+    data constructor: TyCon
     lifted: yes
     literals:
       word @large_word@
@@ -327,33 +327,33 @@ objects:
       named item ‘$tc'PerfectTree2_@name_suffix@’
       named item ‘$krep14_@name_suffix@’
   static-construction object ‘$tc'PerfectTree2_@name_suffix@’:
-    data constructor name: TrNameS
+    data constructor: TrNameS
     lifted: yes
     literals: address ‘$tc'PerfectTree1_@name_suffix@’
     used items: <none>
   static-construction object ‘$krep14_@name_suffix@’:
-    data constructor name: KindRepFun
+    data constructor: KindRepFun
     lifted: yes
     literals: <none>
     used items:
       named item ‘$krep1_@name_suffix@’
       named item ‘$krep13_@name_suffix@’
   static-construction object ‘$krep13_@name_suffix@’:
-    data constructor name: KindRepTyConApp
+    data constructor: KindRepTyConApp
     lifted: yes
     literals: <none>
     used items:
       named item ‘$tcPerfectTree’
       named item ‘$krep12_@name_suffix@’
   static-construction object ‘$krep12_@name_suffix@’:
-    data constructor name: :
+    data constructor: :
     lifted: yes
     literals: <none>
     used items:
       named item ‘$krep1_@name_suffix@’
       named item ‘[]’
   static-construction object ‘$tcPerfectTree’:
-    data constructor name: TyCon
+    data constructor: TyCon
     lifted: yes
     literals:
       word @large_word@
@@ -364,12 +364,12 @@ objects:
       named item ‘$tcPerfectTree2_@name_suffix@’
       named item ‘krep$*Arr*’
   static-construction object ‘$tcPerfectTree2_@name_suffix@’:
-    data constructor name: TrNameS
+    data constructor: TrNameS
     lifted: yes
     literals: address ‘$tcPerfectTree1_@name_suffix@’
     used items: <none>
   static-construction object ‘$tc'Node’:
-    data constructor name: TyCon
+    data constructor: TyCon
     lifted: yes
     literals:
       word @large_word@
@@ -380,33 +380,33 @@ objects:
       named item ‘$tc'Node2_@name_suffix@’
       named item ‘$krep11_@name_suffix@’
   static-construction object ‘$tc'Node2_@name_suffix@’:
-    data constructor name: TrNameS
+    data constructor: TrNameS
     lifted: yes
     literals: address ‘$tc'Node1_@name_suffix@’
     used items: <none>
   static-construction object ‘$krep11_@name_suffix@’:
-    data constructor name: KindRepFun
+    data constructor: KindRepFun
     lifted: yes
     literals: <none>
     used items:
       named item ‘$krep7_@name_suffix@’
       named item ‘$krep10_@name_suffix@’
   static-construction object ‘$krep10_@name_suffix@’:
-    data constructor name: KindRepFun
+    data constructor: KindRepFun
     lifted: yes
     literals: <none>
     used items:
       named item ‘$krep_@name_suffix@’
       named item ‘$krep9_@name_suffix@’
   static-construction object ‘$krep9_@name_suffix@’:
-    data constructor name: KindRepFun
+    data constructor: KindRepFun
     lifted: yes
     literals: <none>
     used items:
       named item ‘$krep7_@name_suffix@’
       named item ‘$krep7_@name_suffix@’
   static-construction object ‘$tc'Leaf’:
-    data constructor name: TyCon
+    data constructor: TyCon
     lifted: yes
     literals:
       word @large_word@
@@ -417,40 +417,40 @@ objects:
       named item ‘$tc'Leaf2_@name_suffix@’
       named item ‘$krep8_@name_suffix@’
   static-construction object ‘$tc'Leaf2_@name_suffix@’:
-    data constructor name: TrNameS
+    data constructor: TrNameS
     lifted: yes
     literals: address ‘$tc'Leaf1_@name_suffix@’
     used items: <none>
   static-construction object ‘$krep8_@name_suffix@’:
-    data constructor name: KindRepFun
+    data constructor: KindRepFun
     lifted: yes
     literals: <none>
     used items:
       named item ‘$krep1_@name_suffix@’
       named item ‘$krep7_@name_suffix@’
   static-construction object ‘$krep7_@name_suffix@’:
-    data constructor name: KindRepTyConApp
+    data constructor: KindRepTyConApp
     lifted: yes
     literals: <none>
     used items:
       named item ‘$tcBinTree’
       named item ‘$krep6_@name_suffix@’
   static-construction object ‘$krep6_@name_suffix@’:
-    data constructor name: :
+    data constructor: :
     lifted: yes
     literals: <none>
     used items:
       named item ‘$krep1_@name_suffix@’
       named item ‘$krep5_@name_suffix@’
   static-construction object ‘$krep5_@name_suffix@’:
-    data constructor name: :
+    data constructor: :
     lifted: yes
     literals: <none>
     used items:
       named item ‘$krep_@name_suffix@’
       named item ‘[]’
   static-construction object ‘$tcBinTree’:
-    data constructor name: TyCon
+    data constructor: TyCon
     lifted: yes
     literals:
       word @large_word@
@@ -461,55 +461,55 @@ objects:
       named item ‘$tcBinTree2_@name_suffix@’
       named item ‘krep$*->*->*’
   static-construction object ‘$tcBinTree2_@name_suffix@’:
-    data constructor name: TrNameS
+    data constructor: TrNameS
     lifted: yes
     literals: address ‘$tcBinTree1_@name_suffix@’
     used items: <none>
   static-construction object ‘$krep4_@name_suffix@’:
-    data constructor name: KindRepTyConApp
+    data constructor: KindRepTyConApp
     lifted: yes
     literals: <none>
     used items:
       named item ‘$tcTuple2’
       named item ‘$krep3_@name_suffix@’
   static-construction object ‘$krep3_@name_suffix@’:
-    data constructor name: :
+    data constructor: :
     lifted: yes
     literals: <none>
     used items:
       named item ‘$krep1_@name_suffix@’
       named item ‘$krep2_@name_suffix@’
   static-construction object ‘$krep2_@name_suffix@’:
-    data constructor name: :
+    data constructor: :
     lifted: yes
     literals: <none>
     used items:
       named item ‘$krep1_@name_suffix@’
       named item ‘[]’
   static-construction object ‘$krep1_@name_suffix@’:
-    data constructor name: KindRepVar
+    data constructor: KindRepVar
     lifted: yes
     literals: word 0
     used items: <none>
   static-construction object ‘$krep_@name_suffix@’:
-    data constructor name: KindRepVar
+    data constructor: KindRepVar
     lifted: yes
     literals: word 1
     used items: <none>
   static-construction object ‘$trModule’:
-    data constructor name: Module
+    data constructor: Module
     lifted: yes
     literals: <none>
     used items:
       named item ‘$trModule2_@name_suffix@’
       named item ‘$trModule4_@name_suffix@’
   static-construction object ‘$trModule4_@name_suffix@’:
-    data constructor name: TrNameS
+    data constructor: TrNameS
     lifted: yes
     literals: address ‘$trModule3_@name_suffix@’
     used items: <none>
   static-construction object ‘$trModule2_@name_suffix@’:
-    data constructor name: TrNameS
+    data constructor: TrNameS
     lifted: yes
     literals: address ‘$trModule1_@name_suffix@’
     used items: <none>

@@ -90,14 +90,14 @@ showByteCode logger env path = do
 pprOnDiskModuleByteCode :: OnDiskModuleByteCode -> SDoc
 pprOnDiskModuleByteCode OnDiskModuleByteCode {..}
   = vcat [
-           pprModuleIdent                   $ odgbc_module,
+           pprModule                        $ odgbc_module,
            pprOnDiskModuleByteCodeHash      $ odgbc_hash,
            pprCompiledByteCode odgbc_module $ odgbc_compiled_byte_code
          ]
 
--- | Constructs textual information about the name of a module.
-pprModuleIdent :: Module -> SDoc
-pprModuleIdent = entry (text "name") . ppr
+-- | Constructs textual information about a module.
+pprModule :: Module -> SDoc
+pprModule = entry (text "module") . ppr
 
 -- | Constructs textual information about the hash of a module.
 pprOnDiskModuleByteCodeHash :: Fingerprint -> SDoc
@@ -145,7 +145,7 @@ pprByteCodeObject current_module byte_code_object = case byte_code_object of
              )
        $
        vcat [
-              pprDataConstructorName      $ unlinkedStaticConDataConName,
+              pprDataConstructor          $ unlinkedStaticConDataConName,
               pprLiftedness               $ not unlinkedStaticConIsUnlifted,
               pprLiterals current_module  $ unlinkedStaticConLits,
               pprUsedItems current_module $ unlinkedStaticConPtrs
@@ -156,10 +156,10 @@ pprByteCodeObject current_module byte_code_object = case byte_code_object of
 pprArity :: Int -> SDoc
 pprArity = entry (text "arity") . ppr
 
--- | Constructs textual information about the data constructor name of a
+-- | Constructs textual information about the data constructor of a
 --   static-construction bytecode object.
-pprDataConstructorName :: Name -> SDoc
-pprDataConstructorName = entry (text "data constructor name") . ppr
+pprDataConstructor :: Name -> SDoc
+pprDataConstructor = entry (text "data constructor") . ppr
 
 -- | Constructs textual information about the liftedness of a
 --   static-construction bytecode object.
@@ -473,7 +473,7 @@ pprActualHPCInfo current_module ByteCodeHpcInfo {..}
     $
     vcat [
            pprHPCInfoHash $ bchi_hash,
-           pprTickBoxName $ bchi_tickbox_name,
+           pprTickBox     $ bchi_tickbox_name,
            pprTickCount   $ bchi_tick_count
          ]
 
@@ -481,11 +481,9 @@ pprActualHPCInfo current_module ByteCodeHpcInfo {..}
 pprHPCInfoHash :: Int -> SDoc
 pprHPCInfoHash = entry (text "hash") . pprFixedSizeNatural . intToWord
 
--- | Constructs textual information about a tick box name.
-pprTickBoxName :: ShortByteString -> SDoc
-pprTickBoxName = entry (text "tick box name") .
-                 text                         .
-                 utf8DecodeShortByteString
+-- | Constructs textual information about a tick box.
+pprTickBox :: ShortByteString -> SDoc
+pprTickBox = entry (text "tick box") . text . utf8DecodeShortByteString
 
 -- | Constructs textual information about a number of tick counts.
 pprTickCount :: Int -> SDoc
