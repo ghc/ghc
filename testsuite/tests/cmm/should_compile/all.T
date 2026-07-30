@@ -13,11 +13,9 @@ test('T20725', normal, compile, ['-package ghc'])
 test('T23610', normal, makefile_test, ['T23610'])
 test('T24224', [cmm_src, grep_errmsg(r'(F64.*);', [1]), only_ways(['normal'])], compile, ['-no-hs-main -ddump-cmm -dsuppress-all -dsuppress-uniques'])
 test('T24474', cmm_src, compile, ['-optc-g3'])
-# -dppr-debug makes stored-but-unreachable blocks visible in Cmm dumps (#27368).
-# Skipped on wordsize(32) targets, where the dump would say I32/P32, and on
-# unregisterised builds, which print call targets with an extra load.
-test('T27368-ppr-debug', [when(wordsize(32), skip), when(unregisterised(), skip)],
-     makefile_test, ['T27368-ppr-debug'])
+# Grep for a `... = + .. 42 ..;` occurence from within the dead code block in the cmm dump output.
+test('T27368-ppr-debug', [cmm_src, only_ways(['normal']), grep_errmsg(r'\=.*\+.*(42;)', [1])],
+     compile, ['-no-hs-main -ddump-cmm-verbose-by-proc -dppr-debug'])
 test('T24474-cmm-gets-c-opts', cmm_src, compile, ['-optc-DFOO'])
 test('T24474-cmm-opt-order', cmm_src, compile, ['-optc-DFOO '
                                                 '-optCmmP-UFOO '

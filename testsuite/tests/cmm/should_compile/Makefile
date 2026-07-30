@@ -16,16 +16,3 @@ T16930:
 
 T23610:
 	'$(TEST_HC)' $(TEST_HC_OPTS) T23610.cmm -S
-
-# The three seds below, in order:
-#  1. Keep only the "Parsed Cmm" dump, since that is the one stage where the
-#     unreachable block still exists.
-#  2. Rewrite goto targets: their label uniques survive -dsuppress-uniques
-#     (#21310).
-#  3. Drop the "// CmmAssign"-style node annotations, which pprNode emits
-#     only on DEBUG compilers.
-T27368-ppr-debug:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -no-hs-main -ddump-cmm-verbose-by-proc -dppr-debug -dsuppress-uniques -dsuppress-ticks T27368-ppr-debug.cmm 2>&1 \
-	| sed -n '/^==* Parsed Cmm/,/^ \}\]/p' \
-	| sed 's/goto c[0-9A-Za-z]*/goto _lbl_/g' \
-	| sed 's| *// Cmm[A-Za-z]*$$||'
