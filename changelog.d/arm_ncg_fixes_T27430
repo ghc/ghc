@@ -1,5 +1,5 @@
 section: compiler
-issues: #27430, #27539, #27538, #27537, #27550, #27565, #27533
+issues: #27430 #27539 #27538 #27537 #27550 #27565 #27533
 mrs: !16255
 synopsis:
   A serious of fixes to the ARM64 ncg, mostly related to subwords.
