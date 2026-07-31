@@ -358,7 +358,6 @@ downsweepInteractiveImports hsc_env ic = unsafeInterleaveIO $ do
   let imps = ic_imports (hsc_IC hsc_env)
 
       interactive_mn = icInteractiveModule ic
-      key = dsNodeInfoKey (DSInteractive interactive_mn imps)
 
   -- The existing nodes in the module graph. This will be populated when GHCi runs
   -- :load. Any home package modules need to already be in here.
@@ -366,14 +365,11 @@ downsweepInteractiveImports hsc_env ic = unsafeInterleaveIO $ do
 
   summ_cache <- newIORef mempty
   imps_cache <- newIORef mempty
-  let env = DownsweepEnv hsc_env DownsweepUseFixed{-or UseCompiled?-} summ_cache imps_cache []
+  let env = DownsweepEnv hsc_env DownsweepUseFixed{-or DownsweepUseCompile?-} summ_cache imps_cache []
   graph <- runDownsweepM env do
     loopFromInteractive cached_nodes interactive_mn imps
-  let interactive_node  = case expectJust $ M.lookup key graph of
-        NSuccess r -> r
-        NSkip      -> pprPanic "downsweepInteractiveImports" (text "Skip")
-      all_nodes  = [s | NSuccess s <- M.elems graph ]
-  return $ mkModuleGraph (interactive_node : all_nodes)
+  let all_nodes  = [s | NSuccess s <- M.elems graph ]
+  return $ mkModuleGraph all_nodes
 
 -- | Create a module graph from a list of installed modules.
 -- This is used by the loader when we need to load modules but there
