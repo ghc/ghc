@@ -52,7 +52,7 @@ objects:
   static-construction object ‘static_ptr1_sat_@name_suffix@’:
     data constructor: I#
     lifted: yes
-    literals: word 29
+    literals: word 38
     used items: <none>
   static-construction object ‘static_ptr1_sat_@name_suffix@’:
     data constructor: I#
@@ -200,7 +200,7 @@ objects:
   static-construction object ‘static_ptr_sat_@name_suffix@’:
     data constructor: I#
     lifted: yes
-    literals: word 17
+    literals: word 26
     used items: <none>
   static-construction object ‘static_ptr_sat_@name_suffix@’:
     data constructor: I#

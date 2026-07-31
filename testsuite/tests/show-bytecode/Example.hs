@@ -1,5 +1,14 @@
 {-# LANGUAGE StaticPointers #-}
 
+-- | This module uses in particular the following features:
+--
+--     * Local variables defined in `where` clauses
+--     * Integer literals
+--     * Infix operators
+--     * Recursion
+--     * Static pointers
+--     * Algebraic-datatype declarations
+--     * Foreign import declarations
 module Example where
 
 import Numeric.Natural (Natural)
