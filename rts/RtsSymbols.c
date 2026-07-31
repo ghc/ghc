@@ -543,6 +543,7 @@ extern char **environ;
       SymI_HasProto(sbarf)                                              \
       SymI_HasProto(ssbarf)                                             \
       SymI_HasProto(stg_enteredTaggable)                                \
+      SymI_HasProto(checkEnteredTaggable)                               \
       SymI_HasProto(tagClosureIfConstr)                                 \
       SymI_HasProto(startEventLogging)                                  \
       SymI_HasProto(endEventLogging)                                    \
