@@ -599,26 +599,26 @@ mkPragEnv sigs binds
           Nothing -> sig -- See Note [Pattern synonym inline arity]
 
     -- ar_env maps a local to the arity of its definition
-    ar_env :: NameEnv Arity
-    ar_env = foldr lhsBindArity emptyNameEnv binds
+    ar_env :: NameEnv VisArity
+    ar_env = foldr lhsBindVisArity emptyNameEnv binds
 
-addInlinePragArity :: Arity -> LSig GhcRn -> LSig GhcRn
+addInlinePragArity :: VisArity -> LSig GhcRn -> LSig GhcRn
 addInlinePragArity ar (L l (InlineSig x nm inl))  = L l (InlineSig x nm (add_inl_arity ar inl))
 addInlinePragArity ar (L l (SpecSig x nm ty inl)) = L l (SpecSig x nm ty (add_inl_arity ar inl))
 addInlinePragArity ar (L l (SpecSigE n x e inl))  = L l (SpecSigE n x e (add_inl_arity ar inl))
 addInlinePragArity _ sig = sig
 
-add_inl_arity :: Arity -> InlinePragma GhcRn -> InlinePragma GhcRn
+add_inl_arity :: VisArity -> InlinePragma GhcRn -> InlinePragma GhcRn
 add_inl_arity ar prag@(InlinePragma { inl_inline = inl_spec })
   | Inline {} <- inl_spec  -- Add arity only for real INLINE pragmas, not INLINABLE
   = prag `setInlinePragmaSaturation` AppliedToAtLeast ar
   | otherwise
   = prag
 
-lhsBindArity :: LHsBind GhcRn -> NameEnv Arity -> NameEnv Arity
-lhsBindArity (L _ (FunBind { fun_id = id, fun_matches = ms })) env
-  = extendNameEnv env (unLoc id) (matchGroupArity ms)
-lhsBindArity _ env = env        -- PatBind/VarBind
+lhsBindVisArity :: LHsBind GhcRn -> NameEnv Arity -> NameEnv Arity
+lhsBindVisArity (L _ (FunBind { fun_id = id, fun_matches = ms })) env
+  = extendNameEnv env (unLoc id) (matchGroupVisArity ms)
+lhsBindVisArity _ env = env        -- PatBind/VarBind
 
 
 -----------------

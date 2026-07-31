@@ -288,7 +288,7 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id, fun_matches = matches
   -- We don't want to generate code for blacklisted positions
   -- We don't want redundant ticks on simple pattern bindings
   -- We don't want to tick non-exported bindings in TickExportedFunctions
-  let simple = matchGroupArity matches == 0
+  let simple = matchGroupVisArity matches == 0
                   -- A binding is a "simple pattern binding" if it is a
                   -- funbind with zero patterns
       toplev = null decl_path

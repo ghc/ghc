@@ -1687,10 +1687,11 @@ isSingletonMatchGroup matches
   | otherwise
   = False
 
-matchGroupArity :: MatchGroup (GhcPass id) body -> Arity
+matchGroupVisArity :: MatchGroup (GhcPass id) body -> VisArity
 -- This is called before type checking, when mg_arg_tys is not set
-matchGroupArity MG { mg_alts = L _ [] } = 1 -- See Note [Empty mg_alts]
-matchGroupArity MG { mg_alts = L _ (alt1 : _) } = count isVisArgLPat (hsLMatchPats alt1)
+-- Returns the "visible arity" of the MatchGroup i.e. including required type arguments.
+matchGroupVisArity MG { mg_alts = L _ [] } = 1 -- See Note [Empty mg_alts]
+matchGroupVisArity MG { mg_alts = L _ (alt1 : _) } = count isVisArgLPat (hsLMatchPats alt1)
 
 hsLMatchPats :: LMatch (GhcPass id) body -> [LPat (GhcPass id)]
 hsLMatchPats (L _ (Match { m_pats = L _ pats })) = pats

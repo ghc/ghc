@@ -534,6 +534,13 @@ looks like
 Note that we must cast `a` by a cv bound in the same type in order to
 make this work out.
 
+Notice that the corresponding /term/ looks like (Lam a expr):
+  * If `a` is a type variable, that lambda has no runtime significance;
+    it is erased
+  * If `a` is a coercion variable, we pass a (zero-width) runtime argument;
+    it is not erased
+The relevant predicate on the binder is `isRuntimeVar`.
+
 See also https://gitlab.haskell.org/ghc/ghc/-/wikis/dependent-haskell/phase2
 which gives a general road map that covers this space.  Having this feature in
 Core does *not* mean we have it in source Haskell.  See #15710 about that.

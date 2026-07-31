@@ -84,7 +84,14 @@ like Haskell, there is more than one way to count those arguments.
     forall a b. (Num a, Ord b) => a -> b -> a  has arity <= 4
 
 * `VisArity` is the syntactic notion of arity. It is the number of /visible/
-  arguments, i.e. arguments that occur visibly in the source code.
+  arguments, i.e. arguments that occur visibly in the source code.  For example:
+     f1 :: forall a. a -> a
+     f1 x = x
+     f2 :: forall a -> a -> a
+     f2 t x = x
+  Both have Arity 1 because there is one /value/ argument.
+  But f1 has VisArity 1 while f2 has VisArity 2, becuase f2 has a required
+  type argument.
 
   In a function call `f x y z`, we can confidently say that f's vis-arity >= 3,
   simply because we see three arguments [x,y,z]. We write (>=) rather than (==)

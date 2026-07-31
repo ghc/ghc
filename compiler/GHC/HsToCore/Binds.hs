@@ -69,7 +69,7 @@ import GHC.Types.InlinePragma
 import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Types.Var( EvVar, mkLocalVar )
+import GHC.Types.Var( EvVar, mkLocalVar, isRuntimePiTyBinder )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Unique.Set( nonDetEltsUniqSet )
@@ -196,7 +196,7 @@ dsHsBind dflags (VarBind { var_id = var
   = do  { core_expr <- dsLExpr expr
                 -- Dictionary bindings are always VarBinds,
                 -- so we only need do this here
-        ; let core_bind@(id,_) = makeCorePair dflags var False 0 core_expr
+        ; let core_bind@(id,_) = makeCorePair dflags var False core_expr
               force_var = if xopt LangExt.Strict dflags
                           then [id]
                           else []
@@ -211,11 +211,11 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
 
       ; let body' = mkOptTickBox tick body
             rhs   = core_wrap (mkLams args body')
-            core_binds@(id,_) = makeCorePair dflags fun False 0 rhs
+            core_binds@(id,_) = makeCorePair dflags fun False rhs
             force_var
                 -- Bindings are strict when -XStrict is enabled
               | xopt LangExt.Strict dflags
-              , matchGroupArity matches == 0 -- no need to force lambdas
+              , matchGroupVisArity matches == 0 -- no need to force lambdas
               = [id]
               | isBangedHsBind b
               = [id]
@@ -303,7 +303,7 @@ dsAbsBinds dflags tyvars dicts exports
        ; let global_id' = addIdSpecialisations global_id rules
              main_bind  = makeCorePair dflags global_id'
                                        (isDefaultMethod prags)
-                                       (dictArity dicts) rhs
+                                       rhs
 
        ; return (force_vars', fromOL spec_binds ++ [main_bind]) } }
 
@@ -386,7 +386,7 @@ dsAbsBinds dflags tyvars dicts exports
     mk_aux_bind (lcl_id, rhs) = let lcl_w_inline = lookupVarEnv inline_env lcl_id
                                                    `orElse` lcl_id
                                  in
-                                 makeCorePair dflags lcl_w_inline False 0 rhs
+                                 makeCorePair dflags lcl_w_inline False rhs
 
     inline_env :: IdEnv Id -- Maps a monomorphic local Id to one with
                            -- the inline pragma from the source
@@ -437,9 +437,9 @@ dsAbsBinds dflags tyvars dicts exports
 -- the unfolding in the interface file is made in `GHC.Iface.Tidy.addExternal`
 -- using this information.
 ------------------------
-makeCorePair :: DynFlags -> Id -> Bool -> Arity -> CoreExpr
+makeCorePair :: DynFlags -> Id -> Bool -> CoreExpr
              -> (Id, CoreExpr)
-makeCorePair dflags gbl_id is_default_method dict_arity rhs
+makeCorePair dflags gbl_id is_default_method rhs
   | is_default_method    -- Default methods are *always* inlined
                          -- See Note [INLINE and default methods] in GHC.Tc.TyCl.Instance
   = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding' simpl_opts rhs, rhs)
@@ -456,22 +456,43 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
     inline_prag   = idInlinePragma gbl_id
     inlinable_unf = mkInlinableUnfolding simpl_opts StableUserSrc rhs
     inline_pair
-       | AppliedToAtLeast arity <- inlinePragmaSaturation inline_prag
+       | AppliedToAtLeast vis_arity <- inlinePragmaSaturation inline_prag
         -- Add an Unfolding for an INLINE (but not for NOINLINE)
         -- And eta-expand the RHS; see Note [Eta-expanding INLINE things]
-       , let real_arity = dict_arity + arity
-        -- NB: The arity passed to mkInlineUnfoldingWithArity
-        --     must take account of the dictionaries
-       = ( gbl_id `setIdUnfolding` mkInlineUnfoldingWithArity simpl_opts StableUserSrc real_arity rhs
-         , etaExpand real_arity rhs)
+       , let runtime_arity = findSatArity vis_arity (idType gbl_id)
+        -- NB: runtime_arity: the arity passed to mkInlineUnfoldingWithArity
+        --     must take account of dictionaries and required type args
+       = ( gbl_id `setIdUnfolding` mkInlineUnfoldingWithArity simpl_opts StableUserSrc
+                                                              runtime_arity rhs
+         , etaExpand runtime_arity rhs)
 
        | otherwise
        = pprTrace "makeCorePair: arity missing" (ppr gbl_id) $
          (gbl_id `setIdUnfolding` mkInlineUnfoldingNoArity simpl_opts StableUserSrc rhs, rhs)
 
-dictArity :: [Var] -> Arity
--- Don't count coercion variables in arity
-dictArity dicts = count isId dicts
+findSatArity :: VisArity -> Type -> Arity
+-- Given the VisArity, find the value Arity of the function.
+-- This is the number of runtime-value arguments the function must be applied
+-- to before the INLINE pragma fires and inlines the function
+-- We must:
+--    add one for each invisible dictionary arg; and
+--    subtract one for each required type argment
+findSatArity vis_arity ty
+  = go vis_arity pi_bndrs
+  where
+    (pi_bndrs, _) = splitPiTys ty
+
+    go vis_arity (bndr : bndrs)
+      | isInvisiblePiTyBinder bndr = add_bndr bndr (go vis_arity     bndrs)
+      | vis_arity == 0             = 0
+      | otherwise                  = add_bndr bndr (go (vis_arity-1) bndrs)
+    go vis_arity []
+      | vis_arity == 0 = 0
+      | otherwise      = pprPanic "findSatArity" (ppr vis_arity $$ ppr ty)
+
+    add_bndr :: PiTyBinder -> Arity -> Arity
+    add_bndr bndr ar | isRuntimePiTyBinder bndr = ar+1
+                     | otherwise                = ar
 
 {-
 Note [Desugaring AbsBinds]

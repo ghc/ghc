@@ -737,21 +737,21 @@ Call @match@ with all of this information!
 -- There are three possible cases for matchWrapper's scrutinees argument:
 --
 -- 1. Nothing   Used for FunBind, HsLam, HsLamcase, where there is no explicit scrutinee
---              The MatchGroup may have matchGroupArity of 0 or more. Examples:
---                  f p1 q1 = ... -- matchGroupArity 2
+--              The MatchGroup may have matchGroupVisArity of 0 or more. Examples:
+--                  f p1 q1 = ... -- matchGroupVisArity 2
 --                  f p2 q2 = ...
 --
 --                  \cases | g1 -> ... -- matchGroupArity 0
 --                         | g2 -> ...
 --
 -- 2. Just [e]  Used for HsCase, RecordUpd; exactly one scrutinee
---              The MatchGroup has matchGroupArity of exactly 1. Example:
---                  case e of p1 -> e1 -- matchGroupArity 1
+--              The MatchGroup has matchGroupVisArity of exactly 1. Example:
+--                  case e of p1 -> e1 -- matchGroupVisArity 1
 --                            p2 -> e2
 --
 -- 3. Just es   Used for HsCmdLamCase; zero or more scrutinees
 --              The MatchGroup has matchGroupArity of (length es). Example:
---                  \cases p1 q1 -> returnA -< ... -- matchGroupArity 2
+--                  \cases p1 q1 -> returnA -< ... -- matchGroupVisArity 2
 --                         p2 q2 -> ...
 
 matchWrapper

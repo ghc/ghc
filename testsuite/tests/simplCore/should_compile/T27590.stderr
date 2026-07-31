@@ -1,0 +1,2 @@
+wombat [InlPrag=INLINE (sat-args=2)] :: forall a -> a -> Maybe a
+wombat
