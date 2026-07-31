@@ -56,7 +56,7 @@ objects:
   static-construction object ‘static_ptr1_sat_@name_suffix@’:
     data constructor: I#
     lifted: yes
-    literals: word 27
+    literals: word 29
     used items: <none>
   static-construction object ‘static_ptr1_sat_@name_suffix@’:
     data constructor: I#
@@ -249,7 +249,7 @@ objects:
   static-construction object ‘static_ptr_sat_@name_suffix@’:
     data constructor: I#
     lifted: yes
-    literals: word 15
+    literals: word 17
     used items: <none>
   static-construction object ‘static_ptr_sat_@name_suffix@’:
     data constructor: I#
@@ -327,6 +327,21 @@ objects:
     used items:
       named item ‘$tcNatural’
       named item ‘mkTrCon’
+  object ‘cstrlen’:
+    arity: 2
+    literals: <none>
+    used items:
+      object ‘ds1_@name_suffix@’:
+        arity: 0
+        literals:
+          label ‘strlen’
+          word 0
+          foreign function of type ‘Pointer -> UInt64’
+        used items:
+          object ‘wild_@name_suffix@’:
+            arity: 0
+            literals: info table of ‘W64#’
+            used items: <none>
   static-construction object ‘$tc'Nested’:
     data constructor: TyCon
     lifted: yes
@@ -651,89 +666,89 @@ top-level strings:
 breakpoints:
   source breakpoints:
     source breakpoint 0:
-      source span: Example.hs:18:17-25
+      source span: Example.hs:20:17-25
       declaration path: divides
       free variables:
         k
         n
     source breakpoint 1:
-      source span: Example.hs:18:17-30
+      source span: Example.hs:20:17-30
       declaration path: divides
       free variables:
         k
         n
     source breakpoint 2:
-      source span: Example.hs:24:27-37
+      source span: Example.hs:26:27-37
       declaration path:
         primes
         isPrime
       free variables: n
     source breakpoint 3:
-      source span: Example.hs:24:53-56
+      source span: Example.hs:26:53-56
       declaration path:
         primes
         isPrime
       free variables: n
     source breakpoint 4:
-      source span: Example.hs:24:62-64
+      source span: Example.hs:26:62-64
       declaration path:
         primes
         isPrime
       free variables: <none>
     source breakpoint 5:
-      source span: Example.hs:24:52-65
+      source span: Example.hs:26:52-65
       declaration path:
         primes
         isPrime
       free variables: n
     source breakpoint 6:
-      source span: Example.hs:24:41-73
+      source span: Example.hs:26:41-73
       declaration path:
         primes
         isPrime
       free variables: n
     source breakpoint 7:
-      source span: Example.hs:24:22-74
+      source span: Example.hs:26:22-74
       declaration path:
         primes
         isPrime
       free variables: n
     source breakpoint 8:
-      source span: Example.hs:24:17-75
+      source span: Example.hs:26:17-75
       declaration path:
         primes
         isPrime
       free variables: n
     source breakpoint 9:
-      source span: Example.hs:21:14-34
+      source span: Example.hs:23:14-34
       declaration path: primes
       free variables: isPrime
     source breakpoint 10:
-      source span: Example.hs:21:10-34
+      source span: Example.hs:23:10-34
       declaration path: primes
       free variables: isPrime
     source breakpoint 11:
-      source span: Example.hs:27:13-25
+      source span: Example.hs:29:13-25
       declaration path: primesPtr
       free variables: <none>
     source breakpoint 12:
-      source span: Example.hs:12:30-70
+      source span: Example.hs:14:30-70
       declaration path:
         fibonaccis
         positiveFibonaccis
       free variables: positiveFibonaccis
     source breakpoint 13:
-      source span: Example.hs:12:26-70
+      source span: Example.hs:14:26-70
       declaration path:
         fibonaccis
         positiveFibonaccis
       free variables: positiveFibonaccis
     source breakpoint 14:
-      source span: Example.hs:9:14-35
+      source span: Example.hs:11:14-35
       declaration path: fibonaccis
       free variables: positiveFibonaccis
     source breakpoint 15:
-      source span: Example.hs:15:17-33
+      source span: Example.hs:17:17-33
       declaration path: fibonaccisPtr
       free variables: <none>
   bytecode breakpoints:

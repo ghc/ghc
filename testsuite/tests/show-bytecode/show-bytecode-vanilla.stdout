@@ -52,7 +52,7 @@ objects:
   static-construction object ‘static_ptr1_sat_@name_suffix@’:
     data constructor: I#
     lifted: yes
-    literals: word 27
+    literals: word 29
     used items: <none>
   static-construction object ‘static_ptr1_sat_@name_suffix@’:
     data constructor: I#
@@ -200,7 +200,7 @@ objects:
   static-construction object ‘static_ptr_sat_@name_suffix@’:
     data constructor: I#
     lifted: yes
-    literals: word 15
+    literals: word 17
     used items: <none>
   static-construction object ‘static_ptr_sat_@name_suffix@’:
     data constructor: I#
@@ -278,6 +278,21 @@ objects:
     used items:
       named item ‘$tcNatural’
       named item ‘mkTrCon’
+  object ‘cstrlen’:
+    arity: 2
+    literals: <none>
+    used items:
+      object ‘ds1_@name_suffix@’:
+        arity: 0
+        literals:
+          label ‘strlen’
+          word 0
+          foreign function of type ‘Pointer -> UInt64’
+        used items:
+          object ‘wild_@name_suffix@’:
+            arity: 0
+            literals: info table of ‘W64#’
+            used items: <none>
   static-construction object ‘$tc'Nested’:
     data constructor: TyCon
     lifted: yes

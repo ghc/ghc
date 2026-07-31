@@ -4,6 +4,8 @@ module Example where
 
 import Numeric.Natural (Natural)
 import GHC.StaticPtr (StaticPtr)
+import Foreign.C.Types (CChar, CSize (CSize))
+import Foreign.Ptr (Ptr)
 
 fibonaccis :: [Natural]
 fibonaccis = 0 : positiveFibonaccis where
@@ -29,3 +31,6 @@ primesPtr = static primes
 data BinTree a b = Leaf a | Node (BinTree a b) b (BinTree a b)
 
 data PerfectTree a = PerfectTree a | Nested (PerfectTree (a, a))
+
+foreign import ccall "string.h strlen"
+    cstrlen :: Ptr CChar -> IO CSize
