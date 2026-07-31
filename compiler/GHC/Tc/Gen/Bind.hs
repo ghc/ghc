@@ -808,7 +808,7 @@ checkMonomorphismRestriction mbis lbinds
     restricted (VarBind { var_ext = x })                 = dataConCantHappen x
     restricted b@(PatSynBind {}) = pprPanic "isRestrictedGroup/unrestricted" (ppr b)
 
-    restricted_match mg = matchGroupArity mg == 0
+    restricted_match mg = matchGroupVisArity mg == 0
         -- No args => like a pattern binding
         -- Some args => a function binding
 

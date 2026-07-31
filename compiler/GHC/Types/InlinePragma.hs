@@ -104,7 +104,7 @@ import GHC.Prelude
 
 import GHC.Data.FastString
 import GHC.Hs.Extension
-import GHC.Types.Arity (Arity)
+import GHC.Types.Arity (VisArity)
 import GHC.Types.SourceText (SourceText(..))
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
@@ -125,12 +125,13 @@ infixl 1 `setInlinePragmaActivation`,
 -- | The arity /at which to/ inline a function.
 -- This may differ from the function's syntactic arity.
 data InlineSaturation
-    = AppliedToAtLeast !Arity
+    = AppliedToAtLeast !VisArity
       -- ^ Inline only when applied to @n@ explicit
-      -- (non-type, non-dictionary) arguments.
+      -- (required type or value) arguments.
       --
       -- That is, 'AppliedToAtLeast' describes the number of
       --  *source-code* arguments the thing must be applied to.
+
     | AnySaturation
       -- ^ There does not exist an explicit number of arguments
       -- that the inlining process should be applied to.

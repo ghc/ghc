@@ -1,0 +1,10 @@
+section: compiler
+issues: #27589 #27590
+mrs: !16433
+synopsis:
+  Fixes to arity computations
+description:
+  The arity computation for INLINE pragmas now correctly takes into
+  account required type arguments. Separately, the arity computation
+  in ``tcPolyCheck`` now consistently handles dictionary arguments, fixing
+  a short-cut codepath which didn't

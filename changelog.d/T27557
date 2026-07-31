@@ -1,0 +1,8 @@
+section: compiler
+issues: #27577
+mrs: !16433
+synopsis:
+  Fix a Core Lint error involving RequiredTypeArguments
+description:
+  Fixes an issue with a coercion being used for eta expansion storing
+  the wrong visibility information, which caused a Core Lint error.
