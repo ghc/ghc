@@ -108,7 +108,10 @@ void handleCloneStackMessage(Capability *cap, MessageCloneStack *msg){
   // Lift StackSnapshot# to StackSnapshot by applying it's constructor.
   // This is necessary because performTryPutMVar() puts the closure onto the
   // stack for evaluation and stacks can not be evaluated (entered).
-  HaskellObj result = rts_apply(cap, StackSnapshot_constructor_closure, (HaskellObj) newStackClosure);
+  // The constructor argument is a StackSnapshot#, which carries the
+  // boxed-unlifted-primitive pointer tag.
+  HaskellObj result = rts_apply(cap, StackSnapshot_constructor_closure,
+                                TAG_CLOSURE(1, (StgClosure *) newStackClosure));
 
   bool putMVarWasSuccessful = performTryPutMVar(cap, msg->result, result);
 

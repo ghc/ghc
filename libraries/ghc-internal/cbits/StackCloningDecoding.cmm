@@ -9,7 +9,10 @@ stg_cloneMyStackzh () {
 
     ("ptr" clonedStack) = ccall cloneStack(MyCapability() "ptr", stgStack "ptr");
 
-    return (clonedStack);
+    // The StackSnapshot# result carries the boxed-unlifted-primitive pointer
+    // tag; see Note [Pointer tagging of unlifted boxed primitives] in
+    // GHC.StgToCmm.Prim.
+    return (clonedStack + 1);
 }
 
 stg_sendCloneStackMessagezh (gcptr threadId, gcptr mVarStablePtr) {
