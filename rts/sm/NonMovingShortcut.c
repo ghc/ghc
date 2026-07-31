@@ -222,13 +222,22 @@ selectee_changed:
                 chain = p;
                 p = val;
                 goto selector_changed;
-            default:
+            default: {
                 // Found a value, add the current selector to the chain and
                 // update it.
+                // Re-establish the pointer tag for an evaluated constructor,
+                // as in eval_thunk_selector (rts/sm/Evac.c): the indirectees
+                // and the origin field installed by update_selector_chain
+                // carry the constructor tag.
+                const StgInfoTable *val_info = get_itbl(val);
+                if (val_info->type >= CONSTR && val_info->type <= CONSTR_NOCAF) {
+                    val = TAG_CLOSURE(stg_min(TAG_MASK, 1 + val_info->srt), val);
+                }
                 p->payload[0] = chain;
                 chain = p;
                 update_selector_chain(chain, origin, p0, val);
                 return val;
+            }
             }
         }
 
