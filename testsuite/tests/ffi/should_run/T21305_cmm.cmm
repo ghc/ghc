@@ -2,5 +2,7 @@
 
 f(P_ a, P_ b, P_ c) {
   I64[c + SIZEOF_StgArrBytes + 8] = 770000;
-  return (b, a, c);
+  // c is a MutableByteArray#; unlifted boxed results carry tag 1.
+  // See Note [Pointer tagging of unlifted boxed primitives] in GHC.StgToCmm.Prim.
+  return (b, a, c + 1);
 }
