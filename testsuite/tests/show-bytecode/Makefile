@@ -8,7 +8,7 @@ normalize = sed -E -e ' \
                 s/_r[[:alnum:]]+/_@name_suffix@/g; \
                 s/^( *hash: )[[:xdigit:]]+/\1@hash@/g; \
                 s/^( *)[[:xdigit:]]+:/\1@hash@:/g; \
-                s/word [[:digit:]]{4}[[:digit:]]*/word @large_word@/ \
+                s/word [[:digit:]]{2}[[:digit:]]*/word @large_word@/ \
             '
 
 show-bytecode-vanilla:

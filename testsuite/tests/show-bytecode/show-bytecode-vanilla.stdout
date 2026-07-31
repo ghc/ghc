@@ -52,12 +52,12 @@ objects:
   static-construction object ‘static_ptr1_sat_@name_suffix@’:
     data constructor: I#
     lifted: yes
-    literals: word 38
+    literals: word @large_word@
     used items: <none>
   static-construction object ‘static_ptr1_sat_@name_suffix@’:
     data constructor: I#
     lifted: yes
-    literals: word 20
+    literals: word @large_word@
     used items: <none>
   object ‘primes2_@name_suffix@’:
     arity: 0
@@ -200,12 +200,12 @@ objects:
   static-construction object ‘static_ptr_sat_@name_suffix@’:
     data constructor: I#
     lifted: yes
-    literals: word 26
+    literals: word @large_word@
     used items: <none>
   static-construction object ‘static_ptr_sat_@name_suffix@’:
     data constructor: I#
     lifted: yes
-    literals: word 24
+    literals: word @large_word@
     used items: <none>
   object ‘positiveFibonaccis2_@name_suffix@’:
     arity: 0
