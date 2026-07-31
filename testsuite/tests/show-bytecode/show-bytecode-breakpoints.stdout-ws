@@ -1,0 +1,832 @@
+[1 of 1] Compiling Example          ( Example.hs, Example.gbc )
+module: Example
+hash: @hash@
+objects:
+  object ‘primesPtr’:
+    arity: 0
+    literals:
+      top-level string "Example"
+      top-level string "main"
+      cost center of breakpoint 0
+    used items:
+      break array of module ‘Example’
+      named item ‘static_ptr1’
+      named item ‘$dTypeable2_@name_suffix@’
+      named item ‘$fIsStaticStaticPtr’
+  static-construction object ‘static_ptr1’:
+    data constructor: StaticPtr
+    lifted: yes
+    literals:
+      word @large_word@
+    used items:
+      named item ‘static_ptr1_sat_@name_suffix@’
+      named item ‘primes’
+  static-construction object ‘static_ptr1_sat_@name_suffix@’:
+    data constructor: StaticPtrInfo
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘static_ptr1_sat_@name_suffix@’
+  object ‘static_ptr1_sat_@name_suffix@’:
+    arity: 0
+    literals: top-level string "main"
+    used items:
+      object ‘static_ptr1_sat_@name_suffix@’:
+        arity: 0
+        literals: <none>
+        used items: named item ‘unpackCString#’
+  object ‘static_ptr1_sat_@name_suffix@’:
+    arity: 0
+    literals: top-level string "Example"
+    used items:
+      object ‘static_ptr1_sat_@name_suffix@’:
+        arity: 0
+        literals: <none>
+        used items: named item ‘unpackCString#’
+  static-construction object ‘static_ptr1_sat_@name_suffix@’:
+    data constructor: (,)
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘static_ptr1_sat_@name_suffix@’
+  static-construction object ‘static_ptr1_sat_@name_suffix@’:
+    data constructor: I#
+    lifted: yes
+    literals: word @large_word@
+    used items: <none>
+  static-construction object ‘static_ptr1_sat_@name_suffix@’:
+    data constructor: I#
+    lifted: yes
+    literals: word @large_word@
+    used items: <none>
+  object ‘primes’:
+    arity: 0
+    literals:
+      top-level string "Example"
+      top-level string "main"
+      cost center of breakpoint 2
+      info table of ‘(:)’
+    used items:
+      break array of module ‘Example’
+      object ‘primes_sat_@name_suffix@’:
+        arity: 0
+        literals:
+          top-level string "Example"
+          top-level string "main"
+          cost center of breakpoint 1
+        used items:
+          break array of module ‘Example’
+          object ‘primes_sat_@name_suffix@’:
+            arity: 0
+            literals: <none>
+            used items:
+              object ‘primes_sat_@name_suffix@’:
+                arity: 0
+                literals:
+                  word 3
+                  info table of ‘IS’
+                used items:
+                  named item ‘$fNumNatural’
+                  named item ‘fromInteger’
+              named item ‘$fEnumNatural’
+              named item ‘enumFrom’
+          named item ‘isPrime_@name_suffix@’
+          named item ‘filter’
+      object ‘primes_sat_@name_suffix@’:
+        arity: 0
+        literals:
+          word 2
+          info table of ‘IS’
+        used items:
+          named item ‘$fNumNatural’
+          named item ‘fromInteger’
+  object ‘isPrime_@name_suffix@’:
+    arity: 1
+    literals:
+      top-level string "Example"
+      top-level string "main"
+      cost center of breakpoint 9
+    used items:
+      break array of module ‘Example’
+      object ‘isPrime_sat_@name_suffix@’:
+        arity: 1
+        literals:
+          top-level string "Example"
+          top-level string "main"
+          cost center of breakpoint 8
+        used items:
+          break array of module ‘Example’
+          object ‘isPrime_sat_@name_suffix@’:
+            arity: 1
+            literals:
+              top-level string "Example"
+              top-level string "main"
+              cost center of breakpoint 7
+            used items:
+              break array of module ‘Example’
+              object ‘isPrime_sat_@name_suffix@’:
+                arity: 1
+                literals:
+                  top-level string "Example"
+                  top-level string "main"
+                  cost center of breakpoint 6
+                used items:
+                  break array of module ‘Example’
+                  object ‘isPrime_sat_@name_suffix@’:
+                    arity: 0
+                    literals:
+                      top-level string "Example"
+                      top-level string "main"
+                      cost center of breakpoint 5
+                      word 2
+                      info table of ‘IS’
+                    used items:
+                      break array of module ‘Example’
+                      object ‘v_@name_suffix@’:
+                        arity: 0
+                        literals: <none>
+                        used items:
+                          named item ‘$fIntegralInteger’
+                          named item ‘$fNumNatural’
+                          named item ‘(^)’
+                      object ‘pap_@name_suffix@’:
+                        arity: 3
+                        literals: <none>
+                        used items: <none>
+                  object ‘isPrime_sat_@name_suffix@’:
+                    arity: 1
+                    literals:
+                      top-level string "Example"
+                      top-level string "main"
+                      cost center of breakpoint 4
+                    used items:
+                      break array of module ‘Example’
+                      object ‘v_@name_suffix@’:
+                        arity: 0
+                        literals: <none>
+                        used items:
+                          named item ‘$fOrdNatural’
+                          named item ‘(<=)’
+                      object ‘pap_@name_suffix@’:
+                        arity: 3
+                        literals: <none>
+                        used items: <none>
+                  named item ‘(.)’
+              named item ‘primes’
+              named item ‘takeWhile’
+          object ‘isPrime_sat_@name_suffix@’:
+            arity: 1
+            literals:
+              top-level string "Example"
+              top-level string "main"
+              cost center of breakpoint 3
+            used items:
+              break array of module ‘Example’
+              object ‘pap_@name_suffix@’:
+                arity: 2
+                literals: <none>
+                used items:
+                  named item ‘$fIntegralNatural’
+                  named item ‘divides’
+          named item ‘$fFoldableList’
+          named item ‘any’
+      named item ‘not’
+  object ‘fibonaccisPtr’:
+    arity: 0
+    literals:
+      top-level string "Example"
+      top-level string "main"
+      cost center of breakpoint 10
+    used items:
+      break array of module ‘Example’
+      named item ‘static_ptr’
+      named item ‘$dTypeable2_@name_suffix@’
+      named item ‘$fIsStaticStaticPtr’
+  static-construction object ‘static_ptr’:
+    data constructor: StaticPtr
+    lifted: yes
+    literals:
+      word @large_word@
+    used items:
+      named item ‘static_ptr_sat_@name_suffix@’
+      named item ‘fibonaccis’
+  static-construction object ‘static_ptr_sat_@name_suffix@’:
+    data constructor: StaticPtrInfo
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘static_ptr_sat_@name_suffix@’
+  object ‘static_ptr_sat_@name_suffix@’:
+    arity: 0
+    literals: top-level string "main"
+    used items:
+      object ‘static_ptr_sat_@name_suffix@’:
+        arity: 0
+        literals: <none>
+        used items: named item ‘unpackCString#’
+  object ‘static_ptr_sat_@name_suffix@’:
+    arity: 0
+    literals: top-level string "Example"
+    used items:
+      object ‘static_ptr_sat_@name_suffix@’:
+        arity: 0
+        literals: <none>
+        used items: named item ‘unpackCString#’
+  static-construction object ‘static_ptr_sat_@name_suffix@’:
+    data constructor: (,)
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘static_ptr_sat_@name_suffix@’
+  static-construction object ‘static_ptr_sat_@name_suffix@’:
+    data constructor: I#
+    lifted: yes
+    literals: word @large_word@
+    used items: <none>
+  static-construction object ‘static_ptr_sat_@name_suffix@’:
+    data constructor: I#
+    lifted: yes
+    literals: word @large_word@
+    used items: <none>
+  object ‘fibonaccis’:
+    arity: 0
+    literals:
+      top-level string "Example"
+      top-level string "main"
+      cost center of breakpoint 11
+      info table of ‘(:)’
+    used items:
+      break array of module ‘Example’
+      object ‘fibonaccis_sat_@name_suffix@’:
+        arity: 0
+        literals:
+          word 0
+          info table of ‘IS’
+        used items:
+          named item ‘$fNumNatural’
+          named item ‘fromInteger’
+      named item ‘positiveFibonaccis_@name_suffix@’
+  object ‘positiveFibonaccis_@name_suffix@’:
+    arity: 0
+    literals:
+      top-level string "Example"
+      top-level string "main"
+      cost center of breakpoint 13
+      info table of ‘(:)’
+    used items:
+      break array of module ‘Example’
+      object ‘positiveFibonaccis_sat_@name_suffix@’:
+        arity: 0
+        literals:
+          top-level string "Example"
+          top-level string "main"
+          cost center of breakpoint 12
+        used items:
+          break array of module ‘Example’
+          object ‘positiveFibonaccis_sat_@name_suffix@’:
+            arity: 0
+            literals: <none>
+            used items:
+              named item ‘$fNumNatural’
+              named item ‘(+)’
+          named item ‘positiveFibonaccis_@name_suffix@’
+          named item ‘fibonaccis’
+          named item ‘zipWith’
+      object ‘positiveFibonaccis_sat_@name_suffix@’:
+        arity: 0
+        literals:
+          word 1
+          info table of ‘IS’
+        used items:
+          named item ‘$fNumNatural’
+          named item ‘fromInteger’
+  object ‘$dTypeable2_@name_suffix@’:
+    arity: 0
+    literals: <none>
+    used items:
+      named item ‘$dTypeable_@name_suffix@’
+      named item ‘$dTypeable1_@name_suffix@’
+      named item ‘mkTrAppChecked’
+  object ‘$dTypeable1_@name_suffix@’:
+    arity: 0
+    literals: info table of ‘[]’
+    used items:
+      named item ‘$tcList’
+      named item ‘mkTrCon’
+  object ‘$dTypeable_@name_suffix@’:
+    arity: 0
+    literals: info table of ‘[]’
+    used items:
+      named item ‘$tcNatural’
+      named item ‘mkTrCon’
+  object ‘cstrlen’:
+    arity: 2
+    literals: <none>
+    used items:
+      object ‘ds1_@name_suffix@’:
+    used items: named item ‘cstrlen1_@name_suffix@’
+  object ‘cstrlen1_@name_suffix@’:
+    arity: 2
+    literals: <none>
+        arity: 0
+        literals:
+          label ‘strlen’
+          word 0
+          foreign function of type ‘Pointer -> UInt@word_size@’
+        used items:
+          object ‘wild_@name_suffix@’:
+            arity: 0
+            literals: info table of ‘W@word_size@#’
+            used items: <none>
+  static-construction object ‘$tc'Nested’:
+    data constructor: TyCon
+    lifted: yes
+    literals:
+      word @large_word@
+      word 1
+    used items:
+      named item ‘$trModule’
+      named item ‘$tc'Nested2_@name_suffix@’
+      named item ‘$krep17_@name_suffix@’
+  static-construction object ‘$tc'Nested2_@name_suffix@’:
+    data constructor: TrNameS
+    lifted: yes
+    literals: address ‘$tc'Nested1_@name_suffix@’
+    used items: <none>
+  static-construction object ‘$krep17_@name_suffix@’:
+    data constructor: KindRepFun
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$krep16_@name_suffix@’
+      named item ‘$krep13_@name_suffix@’
+  static-construction object ‘$krep16_@name_suffix@’:
+    data constructor: KindRepTyConApp
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$tcPerfectTree’
+      named item ‘$krep15_@name_suffix@’
+  static-construction object ‘$krep15_@name_suffix@’:
+    data constructor: (:)
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$krep4_@name_suffix@’
+      named item ‘[]’
+  static-construction object ‘$tc'PerfectTree’:
+    data constructor: TyCon
+    lifted: yes
+    literals:
+      word @large_word@
+      word 1
+    used items:
+      named item ‘$trModule’
+      named item ‘$tc'PerfectTree2_@name_suffix@’
+      named item ‘$krep14_@name_suffix@’
+  static-construction object ‘$tc'PerfectTree2_@name_suffix@’:
+    data constructor: TrNameS
+    lifted: yes
+    literals: address ‘$tc'PerfectTree1_@name_suffix@’
+    used items: <none>
+  static-construction object ‘$krep14_@name_suffix@’:
+    data constructor: KindRepFun
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$krep1_@name_suffix@’
+      named item ‘$krep13_@name_suffix@’
+  static-construction object ‘$krep13_@name_suffix@’:
+    data constructor: KindRepTyConApp
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$tcPerfectTree’
+      named item ‘$krep12_@name_suffix@’
+  static-construction object ‘$krep12_@name_suffix@’:
+    data constructor: (:)
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$krep1_@name_suffix@’
+      named item ‘[]’
+  static-construction object ‘$tcPerfectTree’:
+    data constructor: TyCon
+    lifted: yes
+    literals:
+      word @large_word@
+      word 0
+    used items:
+      named item ‘$trModule’
+      named item ‘$tcPerfectTree2_@name_suffix@’
+      named item ‘krep$*Arr*’
+  static-construction object ‘$tcPerfectTree2_@name_suffix@’:
+    data constructor: TrNameS
+    lifted: yes
+    literals: address ‘$tcPerfectTree1_@name_suffix@’
+    used items: <none>
+  static-construction object ‘$tc'Node’:
+    data constructor: TyCon
+    lifted: yes
+    literals:
+      word @large_word@
+      word 2
+    used items:
+      named item ‘$trModule’
+      named item ‘$tc'Node2_@name_suffix@’
+      named item ‘$krep11_@name_suffix@’
+  static-construction object ‘$tc'Node2_@name_suffix@’:
+    data constructor: TrNameS
+    lifted: yes
+    literals: address ‘$tc'Node1_@name_suffix@’
+    used items: <none>
+  static-construction object ‘$krep11_@name_suffix@’:
+    data constructor: KindRepFun
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$krep7_@name_suffix@’
+      named item ‘$krep10_@name_suffix@’
+  static-construction object ‘$krep10_@name_suffix@’:
+    data constructor: KindRepFun
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$krep_@name_suffix@’
+      named item ‘$krep9_@name_suffix@’
+  static-construction object ‘$krep9_@name_suffix@’:
+    data constructor: KindRepFun
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$krep7_@name_suffix@’
+  static-construction object ‘$tc'Leaf’:
+    data constructor: TyCon
+    lifted: yes
+    literals:
+      word @large_word@
+      word 2
+    used items:
+      named item ‘$trModule’
+      named item ‘$tc'Leaf2_@name_suffix@’
+      named item ‘$krep8_@name_suffix@’
+  static-construction object ‘$tc'Leaf2_@name_suffix@’:
+    data constructor: TrNameS
+    lifted: yes
+    literals: address ‘$tc'Leaf1_@name_suffix@’
+    used items: <none>
+  static-construction object ‘$krep8_@name_suffix@’:
+    data constructor: KindRepFun
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$krep1_@name_suffix@’
+      named item ‘$krep7_@name_suffix@’
+  static-construction object ‘$krep7_@name_suffix@’:
+    data constructor: KindRepTyConApp
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$tcBinTree’
+      named item ‘$krep6_@name_suffix@’
+  static-construction object ‘$krep6_@name_suffix@’:
+    data constructor: (:)
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$krep1_@name_suffix@’
+      named item ‘$krep5_@name_suffix@’
+  static-construction object ‘$krep5_@name_suffix@’:
+    data constructor: (:)
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$krep_@name_suffix@’
+      named item ‘[]’
+  static-construction object ‘$tcBinTree’:
+    data constructor: TyCon
+    lifted: yes
+    literals:
+      word @large_word@
+      word 0
+    used items:
+      named item ‘$trModule’
+      named item ‘$tcBinTree2_@name_suffix@’
+      named item ‘krep$*->*->*’
+  static-construction object ‘$tcBinTree2_@name_suffix@’:
+    data constructor: TrNameS
+    lifted: yes
+    literals: address ‘$tcBinTree1_@name_suffix@’
+    used items: <none>
+  static-construction object ‘$krep4_@name_suffix@’:
+    data constructor: KindRepTyConApp
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$tcTuple2’
+      named item ‘$krep3_@name_suffix@’
+  static-construction object ‘$krep3_@name_suffix@’:
+    data constructor: (:)
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$krep1_@name_suffix@’
+      named item ‘$krep2_@name_suffix@’
+  static-construction object ‘$krep2_@name_suffix@’:
+    data constructor: (:)
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$krep1_@name_suffix@’
+      named item ‘[]’
+  static-construction object ‘$krep1_@name_suffix@’:
+    data constructor: KindRepVar
+    lifted: yes
+    literals: word 0
+    used items: <none>
+  static-construction object ‘$krep_@name_suffix@’:
+    data constructor: KindRepVar
+    lifted: yes
+    literals: word 1
+    used items: <none>
+  static-construction object ‘$trModule’:
+    data constructor: Module
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$trModule2_@name_suffix@’
+      named item ‘$trModule4_@name_suffix@’
+  static-construction object ‘$trModule4_@name_suffix@’:
+    data constructor: TrNameS
+    lifted: yes
+    literals: address ‘$trModule3_@name_suffix@’
+    used items: <none>
+  static-construction object ‘$trModule2_@name_suffix@’:
+    data constructor: TrNameS
+    lifted: yes
+    literals: address ‘$trModule1_@name_suffix@’
+    used items: <none>
+  object ‘divides’:
+    arity: 3
+    literals: <none>
+    used items:
+      object ‘$dReal_@name_suffix@’:
+        arity: 0
+        literals: <none>
+        used items:
+          object ‘$dNum_@name_suffix@’:
+            arity: 0
+            literals: <none>
+            used items:
+              object ‘$dEq_@name_suffix@’:
+                arity: 0
+                literals: <none>
+                used items:
+                  object ‘$dEq1_@name_suffix@’:
+                    arity: 0
+                    literals: <none>
+                    used items:
+                      object ‘bcprep_@name_suffix@’:
+                        arity: 5
+                        literals:
+                          top-level string "Example"
+                          top-level string "main"
+                          cost center of breakpoint 15
+                        used items:
+                          break array of module ‘Example’
+                          object ‘divides_sat_@name_suffix@’:
+                            arity: 1
+                            literals:
+                              word 0
+                              info table of ‘IS’
+                            used items: named item ‘fromInteger’
+                          object ‘divides_sat_@name_suffix@’:
+                            arity: 3
+                            literals:
+                              top-level string "Example"
+                              top-level string "main"
+                              cost center of breakpoint 14
+                            used items:
+                              break array of module ‘Example’
+                              named item ‘mod’
+                          named item ‘(==)’
+                  named item ‘$p1Ord’
+              named item ‘$p2Real’
+          named item ‘$p1Real’
+      named item ‘$p1Integral’
+  object ‘Node’:
+    arity: 3
+    literals: info table of ‘Node’
+    used items: <none>
+  object ‘Leaf’:
+    arity: 1
+    literals: info table of ‘Leaf’
+    used items: <none>
+  object ‘Nested’:
+    arity: 1
+    literals: info table of ‘Nested’
+    used items: <none>
+  object ‘PerfectTree’:
+    arity: 1
+    literals: info table of ‘PerfectTree’
+    used items: <none>
+data constructor info tables:
+  info table of ‘PerfectTree’:
+    number of words for pointers: 1
+    number of words for non-pointers: 0
+  info table of ‘Nested’:
+    number of words for pointers: 1
+    number of words for non-pointers: 0
+  info table of ‘Leaf’:
+    number of words for pointers: 1
+    number of words for non-pointers: 0
+  info table of ‘Node’:
+    number of words for pointers: 3
+    number of words for non-pointers: 0
+top-level strings:
+  $tc'Nested1_@name_suffix@: "'Nested"
+  $tc'PerfectTree1_@name_suffix@: "'PerfectTree"
+  $tcPerfectTree1_@name_suffix@: "PerfectTree"
+  $tc'Node1_@name_suffix@: "'Node"
+  $tc'Leaf1_@name_suffix@: "'Leaf"
+  $tcBinTree1_@name_suffix@: "BinTree"
+  $trModule3_@name_suffix@: "Example"
+  $trModule1_@name_suffix@: "main"
+breakpoints:
+  source breakpoints:
+    source breakpoint 0:
+      source span: Example.hs:29:17-25
+      declaration path: divides
+      free variables:
+        k
+        n
+    source breakpoint 1:
+      source span: Example.hs:29:17-30
+      declaration path: divides
+      free variables:
+        k
+        n
+    source breakpoint 2:
+      source span: Example.hs:35:27-37
+      declaration path:
+        primes
+        isPrime
+      free variables: n
+    source breakpoint 3:
+      source span: Example.hs:35:53-56
+      declaration path:
+        primes
+        isPrime
+      free variables: n
+    source breakpoint 4:
+      source span: Example.hs:35:62-64
+      declaration path:
+        primes
+        isPrime
+      free variables: <none>
+    source breakpoint 5:
+      source span: Example.hs:35:52-65
+      declaration path:
+        primes
+        isPrime
+      free variables: n
+    source breakpoint 6:
+      source span: Example.hs:35:41-73
+      declaration path:
+        primes
+        isPrime
+      free variables: n
+    source breakpoint 7:
+      source span: Example.hs:35:22-74
+      declaration path:
+        primes
+        isPrime
+      free variables: n
+    source breakpoint 8:
+      source span: Example.hs:35:17-75
+      declaration path:
+        primes
+        isPrime
+      free variables: n
+    source breakpoint 9:
+      source span: Example.hs:32:14-34
+      declaration path: primes
+      free variables: isPrime
+    source breakpoint 10:
+      source span: Example.hs:32:10-34
+      declaration path: primes
+      free variables: isPrime
+    source breakpoint 11:
+      source span: Example.hs:38:13-25
+      declaration path: primesPtr
+      free variables: <none>
+    source breakpoint 12:
+      source span: Example.hs:23:30-70
+      declaration path:
+        fibonaccis
+        positiveFibonaccis
+      free variables: positiveFibonaccis
+    source breakpoint 13:
+      source span: Example.hs:23:26-70
+      declaration path:
+        fibonaccis
+        positiveFibonaccis
+      free variables: positiveFibonaccis
+    source breakpoint 14:
+      source span: Example.hs:20:14-35
+      declaration path: fibonaccis
+      free variables: positiveFibonaccis
+    source breakpoint 15:
+      source span: Example.hs:26:17-33
+      declaration path: fibonaccisPtr
+      free variables: <none>
+  bytecode breakpoints:
+    bytecode breakpoint 0:
+      type: StaticPtr [Natural]
+      type variables: <none>
+      variables: <none>
+      corresponding source breakpoint: 11
+    bytecode breakpoint 1:
+      type: [Natural]
+      type variables: <none>
+      variables: <unknown>
+      corresponding source breakpoint: 9
+    bytecode breakpoint 2:
+      type: [Natural]
+      type variables: <none>
+      variables: <unknown>
+      corresponding source breakpoint: 10
+    bytecode breakpoint 3:
+      type: Natural -> Bool
+      type variables: <none>
+      variables: %'Many n :: Natural
+      corresponding source breakpoint: 2
+    bytecode breakpoint 4:
+      type: Natural -> Bool
+      type variables: <none>
+      variables: %'Many n :: Natural
+      corresponding source breakpoint: 3
+    bytecode breakpoint 5:
+      type: Natural -> Natural
+      type variables: <none>
+      variables: <none>
+      corresponding source breakpoint: 4
+    bytecode breakpoint 6:
+      type: Natural -> Bool
+      type variables: <none>
+      variables: %'Many n :: Natural
+      corresponding source breakpoint: 5
+    bytecode breakpoint 7:
+      type: [Natural]
+      type variables: <none>
+      variables: %'Many n :: Natural
+      corresponding source breakpoint: 6
+    bytecode breakpoint 8:
+      type: Bool
+      type variables: <none>
+      variables: %'Many n :: Natural
+      corresponding source breakpoint: 7
+    bytecode breakpoint 9:
+      type: Bool
+      type variables: <none>
+      variables: %'Many n :: Natural
+      corresponding source breakpoint: 8
+    bytecode breakpoint 10:
+      type: StaticPtr [Natural]
+      type variables: <none>
+      variables: <none>
+      corresponding source breakpoint: 15
+    bytecode breakpoint 11:
+      type: [Natural]
+      type variables: <none>
+      variables: <unknown>
+      corresponding source breakpoint: 14
+    bytecode breakpoint 12:
+      type: [Natural]
+      type variables: <none>
+      variables: <unknown>
+      corresponding source breakpoint: 12
+    bytecode breakpoint 13:
+      type: [Natural]
+      type variables: <none>
+      variables: <unknown>
+      corresponding source breakpoint: 13
+    bytecode breakpoint 14:
+      type: a
+      type variables: a :: *
+      variables:
+        %'Many eta :: a
+        %'Many eta1 :: a
+      corresponding source breakpoint: 0
+    bytecode breakpoint 15:
+      type: Bool
+      type variables: a :: *
+      variables:
+        %'Many eta :: a
+        %'Many eta1 :: a
+      corresponding source breakpoint: 1
+static-pointer table entries:
+  @hash@: static_ptr
+  @hash@: static_ptr1
+HPC information: <none>
+
