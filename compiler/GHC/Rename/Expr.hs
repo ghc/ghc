@@ -46,7 +46,6 @@ import GHC.Driver.DynFlags
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
 import GHC.Builtin.WiredIn.Types ( nilDataConName, oneDataConName )
-import GHC.Builtin.WiredIn.Ids( rightSectionName, leftSectionName )
 
 import GHC.Unit.Module ( isInteractiveModule )
 
@@ -74,7 +73,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import qualified Data.Foldable as Partial (maximum)
 import Data.List (unzip4)
-import Data.List.NonEmpty ( NonEmpty(..), head, init, last, nonEmpty, scanl, tail )
+import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty, scanl, tail )
 import Data.Ord
 import Data.Array
 import GHC.Driver.Env (HscEnv)
