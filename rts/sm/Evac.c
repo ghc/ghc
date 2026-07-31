@@ -328,7 +328,7 @@ copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
  */
 ATTR_ALWAYS_INLINE static inline bool
 copyPart(StgClosure **p, StgClosure *src, uint32_t size_to_reserve,
-         uint32_t size_to_copy, uint32_t gen_no)
+         uint32_t size_to_copy, uint32_t gen_no, StgWord tag)
 {
     StgPtr to, from;
     uint32_t i;
@@ -361,7 +361,7 @@ spin:
         to[i] = from[i];
     }
 
-    RELEASE_STORE(p, (StgClosure *) to);
+    RELEASE_STORE(p, TAG_CLOSURE(tag, (StgClosure *) to));
     RELEASE_STORE(&src->header.info, (const StgInfoTable*)MK_FORWARDING_PTR(to));
 
 #if defined(PROFILING)
@@ -965,11 +965,13 @@ loop:
   case WEAK:
   case PRIM:
   case MUT_PRIM:
-      copy(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen_no);
+      // These boxed unlifted primitives carry the pointer tag 1; preserve it
+      // across evacuation.
+      copy_tag(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen_no,tag);
       return;
 
   case BCO:
-      copy(p,info,q,bco_sizeW((StgBCO *)q),gen_no);
+      copy_tag(p,info,q,bco_sizeW((StgBCO *)q),gen_no,tag);
       return;
 
   case THUNK_SELECTOR:
@@ -1009,28 +1011,28 @@ loop:
       return;
 
   case ARR_WORDS:
-      // just copy the block
-      copy(p,info,q,arr_words_sizeW((StgArrBytes *)q),gen_no);
+      // just copy the block, preserving the pointer tag
+      copy_tag(p,info,q,arr_words_sizeW((StgArrBytes *)q),gen_no,tag);
       return;
 
   case MUT_ARR_PTRS_CLEAN:
   case MUT_ARR_PTRS_DIRTY:
   case MUT_ARR_PTRS_FROZEN_CLEAN:
   case MUT_ARR_PTRS_FROZEN_DIRTY:
-      // just copy the block
-      copy(p,info,q,mut_arr_ptrs_sizeW((StgMutArrPtrs *)q),gen_no);
+      // just copy the block, preserving the pointer tag
+      copy_tag(p,info,q,mut_arr_ptrs_sizeW((StgMutArrPtrs *)q),gen_no,tag);
       return;
 
   case SMALL_MUT_ARR_PTRS_CLEAN:
   case SMALL_MUT_ARR_PTRS_DIRTY:
   case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
   case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
-      // just copy the block
-      copy(p,info,q,small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs *)q),gen_no);
+      // just copy the block, preserving the pointer tag
+      copy_tag(p,info,q,small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs *)q),gen_no,tag);
       return;
 
   case TSO:
-      copy(p,info,q,sizeofW(StgTSO),gen_no);
+      copy_tag(p,info,q,sizeofW(StgTSO),gen_no,tag);
       return;
 
   case STACK:
@@ -1045,7 +1047,7 @@ loop:
           bool mine;
 
           mine = copyPart(p,(StgClosure *)stack, stack_sizeW(stack),
-                          sizeofW(StgStack), gen_no);
+                          sizeofW(StgStack), gen_no, tag);
           if (mine) {
               new_stack = (StgStack *)*p;
               move_STACK(stack, new_stack);
@@ -1059,11 +1061,11 @@ loop:
     }
 
   case TREC_CHUNK:
-      copy(p,info,q,sizeofW(StgTRecChunk),gen_no);
+      copy_tag(p,info,q,sizeofW(StgTRecChunk),gen_no,tag);
       return;
 
   case CONTINUATION:
-      copy(p,info,q,continuation_sizeW((StgContinuation*)q),gen_no);
+      copy_tag(p,info,q,continuation_sizeW((StgContinuation*)q),gen_no,tag);
       return;
 
   default:

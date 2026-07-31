@@ -1053,7 +1053,8 @@ scheduleProcessInbox (Capability **pcap USED_IF_THREADS)
 
         while (p != NULL) {
             pnext = p->link;
-            performTryPutMVar(cap, (StgMVar*)deRefStablePtr(p->mvar),
+            performTryPutMVar(cap,
+                              (StgMVar*)UNTAG_CLOSURE((StgClosure*)deRefStablePtr(p->mvar)),
                               Unit_closure);
             freeStablePtr(p->mvar);
             stgFree(p);
@@ -1135,7 +1136,10 @@ schedulePostRunThread (Capability *cap, StgTSO *t)
         if(allocLimitRunHook)
         {
           // Create a thread to run the allocation limit handler.
-          StgClosure* c = rts_apply(cap, runAllocationLimitHandler_closure, (StgClosure*)t);
+          // The handler receives the offending thread as a ThreadId#, which
+          // carries the boxed-unlifted-primitive pointer tag.
+          StgClosure* c = rts_apply(cap, runAllocationLimitHandler_closure,
+                                    TAG_CLOSURE(1, (StgClosure*)t));
           StgTSO* hookThread = createIOThread(cap, RtsFlags.GcFlags.initialStkSize, c);
           setThreadLabel(cap, hookThread, "allocation limit handler thread");
           // Schedule the handler to be run immediatelly.

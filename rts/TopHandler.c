@@ -19,7 +19,8 @@ void rts_setMainThread(StgWeak *weak) {
 
     // See Note [rts_setMainThread has an unsound type] in
     // libraries/base/GHC/TopHandler.hs.
-    ASSERT(weak->key->header.info == &stg_TSO_info);
+    // The key is a ThreadId#, which carries the boxed-unlifted-primitive tag.
+    ASSERT(UNTAG_CLOSURE(weak->key)->header.info == &stg_TSO_info);
 
     RELEASE_LOCK(&m);
 }
@@ -34,7 +35,7 @@ StgTSO *getTopHandlerThread(void) {
     }
     const StgInfoTable *info = ACQUIRE_LOAD(&weak->header.info);
     if (info == &stg_WEAK_info) {
-        StgClosure *key = ((StgWeak*)weak)->key;
+        StgClosure *key = UNTAG_CLOSURE(((StgWeak*)weak)->key);
 
         // See Note [rts_setMainThread has an unsound type] in
         // libraries/base/GHC/TopHandler.hs.

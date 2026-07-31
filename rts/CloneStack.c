@@ -78,7 +78,9 @@ void sendCloneStackMessage(StgTSO *tso, HsStablePtr mvar) {
   MessageCloneStack *msg;
   msg = (MessageCloneStack *)allocate(srcCapability, sizeofW(MessageCloneStack));
   msg->tso = tso;
-  msg->result = (StgMVar*)deRefStablePtr(mvar);
+  // The stable pointer's referent (an MVar#) carries the boxed-unlifted-
+  // primitive pointer tag; strip it before the RTS dereferences it.
+  msg->result = (StgMVar*)UNTAG_CLOSURE((StgClosure*)deRefStablePtr(mvar));
   SET_HDR_RELEASE(msg, &stg_MSG_CLONE_STACK_info, CCS_SYSTEM);
 
   sendMessage(srcCapability, tso->cap, (Message *)msg);

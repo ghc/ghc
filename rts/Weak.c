@@ -173,7 +173,9 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
                            rts_apply(cap,
                                (StgClosure *)runFinalizerBatch_closure,
                                rts_mkInt(cap,n)),
-                           (StgClosure *)arr)
+                           // runFinalizerBatch indexes this as an Array#, so it
+                           // must carry the boxed-unlifted-primitive pointer tag.
+                           TAG_CLOSURE(1, (StgClosure *)arr))
         );
 
     scheduleThread(cap,t);

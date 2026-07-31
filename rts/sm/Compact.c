@@ -122,6 +122,31 @@ get_iptr_tag(StgInfoTable *iptr)
         }
     }
 
+    case ARR_WORDS:
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
+    case MUT_ARR_PTRS_FROZEN_CLEAN:
+    case MUT_ARR_PTRS_FROZEN_DIRTY:
+    case SMALL_MUT_ARR_PTRS_CLEAN:
+    case SMALL_MUT_ARR_PTRS_DIRTY:
+    case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+    case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
+    case MUT_VAR_CLEAN:
+    case MUT_VAR_DIRTY:
+    case MVAR_CLEAN:
+    case MVAR_DIRTY:
+    case TVAR:
+    case WEAK:
+    case PRIM:
+    case MUT_PRIM:
+    case TSO:
+    case STACK:
+    case TREC_CHUNK:
+    case CONTINUATION:
+        // Boxed unlifted primitives carry the pointer tag 1; restore it (this is
+        // only consulted for references that were tagged before threading).
+        return 1;
+
     default:
         return 0;
     }

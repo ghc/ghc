@@ -934,7 +934,9 @@ StgMutArrPtrs *listThreads(Capability *cap)
             // Ignore them.
             if (i == n_threads)
                 break;
-            arr->payload[i] = (StgClosure *) t;
+            // The array elements are ThreadId#s, which carry the
+            // boxed-unlifted-primitive pointer tag.
+            arr->payload[i] = TAG_CLOSURE(1, (StgClosure *) t);
             i++;
         }
     }

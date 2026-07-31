@@ -982,7 +982,9 @@ void hs_try_putmvar_with_value (/* in */ int capability,
 
 #if !defined(THREADED_RTS)
 
-    performTryPutMVar(cap, (StgMVar*)deRefStablePtr(mvar), value);
+    // The stable pointer's referent (an MVar#) carries the boxed-unlifted-
+    // primitive pointer tag; strip it before the RTS dereferences it.
+    performTryPutMVar(cap, (StgMVar*)UNTAG_CLOSURE((StgClosure*)deRefStablePtr(mvar)), value);
     freeStablePtr(mvar);
 
 #else
@@ -995,7 +997,9 @@ void hs_try_putmvar_with_value (/* in */ int capability,
         task->cap = cap;
         RELEASE_LOCK(&cap->lock);
 
-        performTryPutMVar(cap, (StgMVar*)deRefStablePtr(mvar), value);
+        // The stable pointer's referent (an MVar#) carries the boxed-unlifted-
+        // primitive pointer tag; strip it before the RTS dereferences it.
+        performTryPutMVar(cap, (StgMVar*)UNTAG_CLOSURE((StgClosure*)deRefStablePtr(mvar)), value);
 
         freeStablePtr(mvar);
 
