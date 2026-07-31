@@ -14,7 +14,6 @@ objects:
     lifted: yes
     literals:
       word @large_word@
-      word @large_word@
     used items:
       named item ‘static_ptr1_sat_@name_suffix@’
       named item ‘primes’
@@ -23,8 +22,6 @@ objects:
     lifted: yes
     literals: <none>
     used items:
-      named item ‘static_ptr1_sat_@name_suffix@’
-      named item ‘static_ptr1_sat_@name_suffix@’
       named item ‘static_ptr1_sat_@name_suffix@’
   object ‘static_ptr1_sat_@name_suffix@’:
     arity: 0
@@ -47,7 +44,6 @@ objects:
     lifted: yes
     literals: <none>
     used items:
-      named item ‘static_ptr1_sat_@name_suffix@’
       named item ‘static_ptr1_sat_@name_suffix@’
   static-construction object ‘static_ptr1_sat_@name_suffix@’:
     data constructor: I#
@@ -162,7 +158,6 @@ objects:
     lifted: yes
     literals:
       word @large_word@
-      word @large_word@
     used items:
       named item ‘static_ptr_sat_@name_suffix@’
       named item ‘fibonaccis’
@@ -171,8 +166,6 @@ objects:
     lifted: yes
     literals: <none>
     used items:
-      named item ‘static_ptr_sat_@name_suffix@’
-      named item ‘static_ptr_sat_@name_suffix@’
       named item ‘static_ptr_sat_@name_suffix@’
   object ‘static_ptr_sat_@name_suffix@’:
     arity: 0
@@ -195,7 +188,6 @@ objects:
     lifted: yes
     literals: <none>
     used items:
-      named item ‘static_ptr_sat_@name_suffix@’
       named item ‘static_ptr_sat_@name_suffix@’
   static-construction object ‘static_ptr_sat_@name_suffix@’:
     data constructor: I#
@@ -287,17 +279,16 @@ objects:
         literals:
           label ‘strlen’
           word 0
-          foreign function of type ‘Pointer -> UInt64’
+          foreign function of type ‘Pointer -> UInt@word_size@’
         used items:
           object ‘wild_@name_suffix@’:
             arity: 0
-            literals: info table of ‘W64#’
+            literals: info table of ‘W@word_size@#’
             used items: <none>
   static-construction object ‘$tc'Nested’:
     data constructor: TyCon
     lifted: yes
     literals:
-      word @large_word@
       word @large_word@
       word 1
     used items:
@@ -335,7 +326,6 @@ objects:
     lifted: yes
     literals:
       word @large_word@
-      word @large_word@
       word 1
     used items:
       named item ‘$trModule’
@@ -372,7 +362,6 @@ objects:
     lifted: yes
     literals:
       word @large_word@
-      word @large_word@
       word 0
     used items:
       named item ‘$trModule’
@@ -387,7 +376,6 @@ objects:
     data constructor: TyCon
     lifted: yes
     literals:
-      word @large_word@
       word @large_word@
       word 2
     used items:
@@ -419,12 +407,10 @@ objects:
     literals: <none>
     used items:
       named item ‘$krep7_@name_suffix@’
-      named item ‘$krep7_@name_suffix@’
   static-construction object ‘$tc'Leaf’:
     data constructor: TyCon
     lifted: yes
     literals:
-      word @large_word@
       word @large_word@
       word 2
     used items:
@@ -468,7 +454,6 @@ objects:
     data constructor: TyCon
     lifted: yes
     literals:
-      word @large_word@
       word @large_word@
       word 0
     used items:

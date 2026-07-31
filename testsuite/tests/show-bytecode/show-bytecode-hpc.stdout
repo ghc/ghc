@@ -6,7 +6,6 @@ objects:
     arity: 0
     literals:
       label ‘_hpc_tickboxes_Example_hpc’
-      label ‘_hpc_tickboxes_Example_hpc’
     used items:
       named item ‘static_ptr1’
       named item ‘$dTypeable2_@name_suffix@’
@@ -16,17 +15,13 @@ objects:
     lifted: yes
     literals:
       word @large_word@
-      word @large_word@
     used items:
-      named item ‘static_ptr1_sat_@name_suffix@’
       named item ‘static_ptr1_sat_@name_suffix@’
   static-construction object ‘static_ptr1_sat_@name_suffix@’:
     data constructor: StaticPtrInfo
     lifted: yes
     literals: <none>
     used items:
-      named item ‘static_ptr1_sat_@name_suffix@’
-      named item ‘static_ptr1_sat_@name_suffix@’
       named item ‘static_ptr1_sat_@name_suffix@’
   object ‘static_ptr1_sat_@name_suffix@’:
     arity: 0
@@ -49,7 +44,6 @@ objects:
     lifted: yes
     literals: <none>
     used items:
-      named item ‘static_ptr1_sat_@name_suffix@’
       named item ‘static_ptr1_sat_@name_suffix@’
   static-construction object ‘static_ptr1_sat_@name_suffix@’:
     data constructor: I#
@@ -92,7 +86,6 @@ objects:
   object ‘isPrime_@name_suffix@’:
     arity: 1
     literals:
-      label ‘_hpc_tickboxes_Example_hpc’
       label ‘_hpc_tickboxes_Example_hpc’
     used items:
       object ‘isPrime_sat_@name_suffix@’:
@@ -182,7 +175,6 @@ objects:
     arity: 0
     literals:
       label ‘_hpc_tickboxes_Example_hpc’
-      label ‘_hpc_tickboxes_Example_hpc’
       info table of ‘(:)’
     used items:
       named item ‘primes2_@name_suffix@’
@@ -200,7 +192,6 @@ objects:
     arity: 0
     literals:
       label ‘_hpc_tickboxes_Example_hpc’
-      label ‘_hpc_tickboxes_Example_hpc’
     used items:
       named item ‘static_ptr’
       named item ‘$dTypeable2_@name_suffix@’
@@ -210,17 +201,13 @@ objects:
     lifted: yes
     literals:
       word @large_word@
-      word @large_word@
     used items:
-      named item ‘static_ptr_sat_@name_suffix@’
       named item ‘static_ptr_sat_@name_suffix@’
   static-construction object ‘static_ptr_sat_@name_suffix@’:
     data constructor: StaticPtrInfo
     lifted: yes
     literals: <none>
     used items:
-      named item ‘static_ptr_sat_@name_suffix@’
-      named item ‘static_ptr_sat_@name_suffix@’
       named item ‘static_ptr_sat_@name_suffix@’
   object ‘static_ptr_sat_@name_suffix@’:
     arity: 0
@@ -244,7 +231,6 @@ objects:
     literals: <none>
     used items:
       named item ‘static_ptr_sat_@name_suffix@’
-      named item ‘static_ptr_sat_@name_suffix@’
   static-construction object ‘static_ptr_sat_@name_suffix@’:
     data constructor: I#
     lifted: yes
@@ -262,7 +248,6 @@ objects:
   object ‘positiveFibonaccis1_@name_suffix@’:
     arity: 0
     literals:
-      label ‘_hpc_tickboxes_Example_hpc’
       label ‘_hpc_tickboxes_Example_hpc’
       info table of ‘(:)’
     used items:
@@ -290,7 +275,6 @@ objects:
   object ‘fibonaccis’:
     arity: 0
     literals:
-      label ‘_hpc_tickboxes_Example_hpc’
       label ‘_hpc_tickboxes_Example_hpc’
       info table of ‘(:)’
     used items:
@@ -346,17 +330,16 @@ objects:
         literals:
           label ‘strlen’
           word 0
-          foreign function of type ‘Pointer -> UInt64’
+          foreign function of type ‘Pointer -> UInt@word_size@’
         used items:
           object ‘wild_@name_suffix@’:
             arity: 0
-            literals: info table of ‘W64#’
+            literals: info table of ‘W@word_size@#’
             used items: <none>
   static-construction object ‘$tc'Nested’:
     data constructor: TyCon
     lifted: yes
     literals:
-      word @large_word@
       word @large_word@
       word 1
     used items:
@@ -394,7 +377,6 @@ objects:
     lifted: yes
     literals:
       word @large_word@
-      word @large_word@
       word 1
     used items:
       named item ‘$trModule’
@@ -431,7 +413,6 @@ objects:
     lifted: yes
     literals:
       word @large_word@
-      word @large_word@
       word 0
     used items:
       named item ‘$trModule’
@@ -446,7 +427,6 @@ objects:
     data constructor: TyCon
     lifted: yes
     literals:
-      word @large_word@
       word @large_word@
       word 2
     used items:
@@ -478,12 +458,10 @@ objects:
     literals: <none>
     used items:
       named item ‘$krep7_@name_suffix@’
-      named item ‘$krep7_@name_suffix@’
   static-construction object ‘$tc'Leaf’:
     data constructor: TyCon
     lifted: yes
     literals:
-      word @large_word@
       word @large_word@
       word 2
     used items:
@@ -527,7 +505,6 @@ objects:
     data constructor: TyCon
     lifted: yes
     literals:
-      word @large_word@
       word @large_word@
       word 0
     used items:
@@ -594,7 +571,6 @@ objects:
       object ‘$dReal_@name_suffix@’:
         arity: 0
         literals:
-          label ‘_hpc_tickboxes_Example_hpc’
           label ‘_hpc_tickboxes_Example_hpc’
         used items:
           object ‘divides_sat_@name_suffix@’:
