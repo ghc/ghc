@@ -88,9 +88,9 @@ checkEnteredTaggable(const char *con)
     ssbarf("entered a taggable normal form: %s", con);
     // ssbarf does not return
   }
-  static int warned = 0;
-  if (!warned) {
-    warned = 1;
+  static StgWord warned = 0;
+  if (!RELAXED_LOAD(&warned)) {
+    RELAXED_STORE(&warned, 1);
     debugBelch("warning: entered a taggable normal form: %s\n"
                "(further occurrences suppressed; rerun with "
                "+RTS --fatal-enter-taggable to abort)\n",
