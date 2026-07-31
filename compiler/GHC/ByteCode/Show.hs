@@ -198,7 +198,7 @@ pprLiteral current_module literal = case literal of
     -> text "top-level string" <+>
        text (show (unpackFS string))
   BCONPtrFFIInfo ffiInfo
-    -> text "foreign function" <+>
+    -> text "foreign function of type" <+>
        quotes (pprFFIInfo ffiInfo)
   BCONPtrCostCentre breakpointID
     -> text "cost center of breakpoint" <+>
