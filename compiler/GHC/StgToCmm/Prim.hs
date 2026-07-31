@@ -83,8 +83,19 @@ cgOpApp (StgPrimOp primop) args res_ty = do
     cfg <- getStgToCmmConfig
     let platform = stgToCmmPlatform cfg
     cmm_args <- getNonVoidArgAmodes args
-    -- See Note [Pointer tagging of unlifted boxed primitives]
-    let cmm_args' = zipWith (untagPrimArg platform) (nonVoidStgArgs args) cmm_args
+    -- See Note [Pointer tagging of unlifted boxed primitives].  Untag by the
+    -- primop's DECLARED signature type, so only a container argument is untagged
+    -- while a polymorphic value/element argument keeps its tag.  The declared arg
+    -- types line up with the (unarised) Cmm arguments only when the primop has no
+    -- unboxed-tuple argument; the primops that do (e.g. VecPackOp) take no boxed
+    -- unlifted container, so leaving their arguments untouched is correct.
+    let (_, arg_tys, _, _, _) = primOpSig primop
+        nonVoid_arg_tys = [ ty | (arg, ty) <- zip args arg_tys
+                               , not (null (stgArgRep arg)) ]
+        cmm_args'
+          | length nonVoid_arg_tys == length cmm_args
+          = zipWith (untagPrimArg platform) nonVoid_arg_tys cmm_args
+          | otherwise = cmm_args
     cmmPrimOpApp cfg primop cmm_args' (Just res_ty)
 
 cgOpApp (StgPrimCallOp primcall) args _res_ty
@@ -110,10 +121,10 @@ cmmPrimOpApp cfg primop cmm_args mres_ty = do
 -- | Strip the pointer tag from a primop argument that is an unlifted boxed
 -- primitive (ByteArray#, Array#, MVar#, ...). See
 -- Note [Pointer tagging of unlifted boxed primitives].
-untagPrimArg :: Platform -> NonVoid StgArg -> CmmExpr -> CmmExpr
-untagPrimArg platform nv_arg e
-  | isUnliftedBoxedTy (stgArgType (fromNonVoid nv_arg)) = cmmUntag platform e
-  | otherwise                                           = e
+untagPrimArg :: Platform -> Type -> CmmExpr -> CmmExpr
+untagPrimArg platform arg_ty e
+  | isUnliftedBoxedTy arg_ty = cmmOffsetB platform e (negate 1)
+  | otherwise                = e
 
 -- | Is this the type of an unlifted boxed /primitive/ (ByteArray#, Array#,
 -- MVar#, ...), whose pointer a producer tags with 1? Restricted to primitive
@@ -122,11 +133,13 @@ untagPrimArg platform nv_arg e
 -- (e.g. an array element) must not be stripped here.
 isUnliftedBoxedTy :: Type -> Bool
 isUnliftedBoxedTy ty =
-  isUnliftedType ty && isBoxedType ty &&
-  -- Look through newtypes (e.g. the ArrayArray# wrappers, which are newtypes
-  -- over MutableArray#) so a wrapped primitive container is still recognised,
-  -- while a user-defined unlifted @data@ type is not.
-  maybe False isPrimTyCon (tyConAppTyCon_maybe (unwrapType ty))
+  -- Match the tycon head first: it is total and yields Nothing for a (possibly
+  -- representation-polymorphic) type variable, for which isUnliftedType panics.
+  -- Look through newtypes (e.g. the ArrayArray# wrappers, newtypes over
+  -- MutableArray#) so a wrapped primitive container is still recognised.
+  case tyConAppTyCon_maybe (unwrapType ty) of
+    Just tc -> isPrimTyCon tc && isUnliftedType ty && isBoxedType ty
+    Nothing -> False
 
 -- | Strip the tag from an unlifted boxed argument passed across a foreign-prim
 -- (or FFI) boundary, where the callee works with raw pointers. Unlike
@@ -181,6 +194,11 @@ Foreign and foreign-prim arguments
   to untag the breakpoint array read out of a BCO). These cover unsafe-coerced
   @Any \@UnliftedRep@ arguments, so the predicate here admits any unlifted boxed
   type rather than only the primitive ones.
+
+  In the result direction the callee is a producer: an unlifted boxed value
+  returned by a 'foreign import prim' callee carries tag 1, following the
+  convention of the out-of-line primops in rts/PrimOps.cmm. Callers read the
+  result through that tag (see e.g. T21305).
 
 Stripping the tag from an already-untagged pointer is the identity, so the
 boundaries are correct whether or not a given producer has been taught to tag.
