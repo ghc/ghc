@@ -53,35 +53,34 @@
          }
      {offset
        cqw: // global
-           if ((Sp + -8) < SpLim) (likely: False) goto cqx; else goto cqy;   // CmmCondBranch
+           if ((Sp + -8) < SpLim) (likely: False) goto cqx; else goto cqy;
        cqx: // global
-           R1 = M.foo_closure;   // CmmAssign
-           call (stg_gc_fun)(R2, R1) args: 8, res: 0, upd: 8;   // CmmCall
+           R1 = M.foo_closure;
+           call (stg_gc_fun)(R2, R1) args: 8, res: 0, upd: 8;
        cqy: // global
-           I64[Sp - 8] = cqo;   // CmmStore
-           R1 = R2;   // CmmAssign
-           Sp = Sp - 8;   // CmmAssign
-           if (R1 & 7 != 0) goto cqo; else goto cqp;   // CmmCondBranch
+           I64[Sp - 8] = cqo;
+           R1 = R2;
+           Sp = Sp - 8;
+           if (R1 & 7 != 0) goto cqo; else goto cqp;
        cqp: // global
-           call (I64![R1])(R1) returns to cqo, args: 8, res: 8, upd: 8;   // CmmCall
+           call (I64![R1])(R1) returns to cqo, args: 8, res: 8, upd: 8;
        cqo: // global
-           _cqv::P64 = R1 & 7;   // CmmAssign
-           if (_cqv::P64 != 1) goto n0; else goto cqt;   // CmmCondBranch
+           _cqv::P64 = R1 & 7;
+           if (_cqv::P64 != 1) goto n0; else goto cqt;
        n0: // global
-           if (_cqv::P64 != 2) goto cqs; else goto cqu;   // CmmCondBranch
+           if (_cqv::P64 != 2) goto cqs; else goto cqu;
        cqs: // global
-           // dataToTagSmall#
-           R1 = R1 & 7 - 1;   // CmmAssign
-           Sp = Sp + 8;   // CmmAssign
-           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+           R1 = R1 & 7 - 1;
+           Sp = Sp + 8;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
        cqu: // global
-           R1 = 42;   // CmmAssign
-           Sp = Sp + 8;   // CmmAssign
-           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+           R1 = 42;
+           Sp = Sp + 8;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
        cqt: // global
-           R1 = 2;   // CmmAssign
-           Sp = Sp + 8;   // CmmAssign
-           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+           R1 = 2;
+           Sp = Sp + 8;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
      }
  },
  section ""data" . M.foo_closure" {
@@ -92,27 +91,7 @@
 
 
 ==================== Output Cmm ====================
-[section ""cstring" . cqJ_str" {
-     cqJ_str:
-         I8[] "A"
- },
- section ""cstring" . cqL_str" {
-     cqL_str:
-         I8[] "B"
- },
- section ""cstring" . cqN_str" {
-     cqN_str:
-         I8[] "C"
- },
- section ""cstring" . cqP_str" {
-     cqP_str:
-         I8[] "D"
- },
- section ""cstring" . cqR_str" {
-     cqR_str:
-         I8[] "E"
- },
- section ""relreadonly" . M.E_closure_tbl" {
+[section ""relreadonly" . M.E_closure_tbl" {
      M.E_closure_tbl:
          const M.A_closure+1;
          const M.B_closure+2;
@@ -121,73 +100,63 @@
          const M.E_closure+5;
  },
  M.A_con_entry() { //  []
-         { info_tbls: [(cqK,
+         { info_tbls: [(cqJ,
                         label: M.A_con_info
                         rep: HeapRep 1 nonptrs { Con {tag: 0 descr:"main:M.A"} }
                         srt: Nothing)]
            stack_info: arg_space: 8
          }
      {offset
-       cqK: // global
-           call "ccall" arg hints:  [PtrHint]  result hints:  [] checkEnteredTaggable(cqJ_str);   // CmmUnsafeForeignCall
-           R1 = R1 + 1;   // CmmAssign
-           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+       cqJ: // global
+           call stg_enteredTaggable(R1) args: 8, res: 0, upd: 8;
      }
  },
  M.B_con_entry() { //  []
-         { info_tbls: [(cqM,
+         { info_tbls: [(cqK,
                         label: M.B_con_info
                         rep: HeapRep 1 nonptrs { Con {tag: 1 descr:"main:M.B"} }
                         srt: Nothing)]
            stack_info: arg_space: 8
          }
      {offset
-       cqM: // global
-           call "ccall" arg hints:  [PtrHint]  result hints:  [] checkEnteredTaggable(cqL_str);   // CmmUnsafeForeignCall
-           R1 = R1 + 2;   // CmmAssign
-           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+       cqK: // global
+           call stg_enteredTaggable(R1) args: 8, res: 0, upd: 8;
      }
  },
  M.C_con_entry() { //  []
-         { info_tbls: [(cqO,
+         { info_tbls: [(cqL,
                         label: M.C_con_info
                         rep: HeapRep 1 nonptrs { Con {tag: 2 descr:"main:M.C"} }
                         srt: Nothing)]
            stack_info: arg_space: 8
          }
      {offset
-       cqO: // global
-           call "ccall" arg hints:  [PtrHint]  result hints:  [] checkEnteredTaggable(cqN_str);   // CmmUnsafeForeignCall
-           R1 = R1 + 3;   // CmmAssign
-           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+       cqL: // global
+           call stg_enteredTaggable(R1) args: 8, res: 0, upd: 8;
      }
  },
  M.D_con_entry() { //  []
-         { info_tbls: [(cqQ,
+         { info_tbls: [(cqM,
                         label: M.D_con_info
                         rep: HeapRep 1 nonptrs { Con {tag: 3 descr:"main:M.D"} }
                         srt: Nothing)]
            stack_info: arg_space: 8
          }
      {offset
-       cqQ: // global
-           call "ccall" arg hints:  [PtrHint]  result hints:  [] checkEnteredTaggable(cqP_str);   // CmmUnsafeForeignCall
-           R1 = R1 + 4;   // CmmAssign
-           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+       cqM: // global
+           call stg_enteredTaggable(R1) args: 8, res: 0, upd: 8;
      }
  },
  M.E_con_entry() { //  []
-         { info_tbls: [(cqS,
+         { info_tbls: [(cqN,
                         label: M.E_con_info
                         rep: HeapRep 1 nonptrs { Con {tag: 4 descr:"main:M.E"} }
                         srt: Nothing)]
            stack_info: arg_space: 8
          }
      {offset
-       cqS: // global
-           call "ccall" arg hints:  [PtrHint]  result hints:  [] checkEnteredTaggable(cqR_str);   // CmmUnsafeForeignCall
-           R1 = R1 + 5;   // CmmAssign
-           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+       cqN: // global
+           call stg_enteredTaggable(R1) args: 8, res: 0, upd: 8;
      }
  }]
 
