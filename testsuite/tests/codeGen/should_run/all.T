@@ -172,6 +172,8 @@ test('T12622', normal, multimod_compile_and_run, ['T12622', '-O'])
 # present even at -O0) and survives hs-boot indirections.  Compiled at -O0,
 # where a dropped tag manifests.
 test('T24136', normal, multimod_compile_and_run, ['T24136', ''])
+test('T23173a', extra_run_opts('+RTS --fatal-enter-taggable -RTS'),
+     multimod_compile_and_run, ['T23173a', ''])
 test('T12757', normal, compile_and_run, [''])
 test('T12855', normal, compile_and_run, [''])
 test('T9577', [ unless(arch('x86_64') or arch('i386'),skip),
