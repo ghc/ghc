@@ -10,7 +10,7 @@
 module GHC.StgToCmm.Utils (
         emitDataLits, emitRODataLits,
         emitDataCon,
-        emitRtsCall, emitRtsCallWithResult, emitRtsCallGen, emitCheckEnteredTaggable,
+        emitRtsCall, emitRtsCallWithResult, emitRtsCallGen, emitJumpEnteredTaggable,
         emitBarf,
         assignTemp, newTemp,
 
@@ -193,11 +193,16 @@ emitBarf msg = do
 -- Call from a taggable normal form's entry code (which the pointer-tagging
 -- invariant makes unreachable). It aborts under +RTS --fatal-enter-taggable and
 -- otherwise warns once; the entry then self-returns the tagged value.
-emitCheckEnteredTaggable :: String -> FCode ()
-emitCheckEnteredTaggable con = do
-  strLbl <- newStringCLit con
-  emitRtsCall rtsUnitId (fsLit "checkEnteredTaggable")
-    [(CmmLit strLbl, AddrHint)] False
+-- Tail-jump to the RTS's shared entry code for taggable normal forms
+-- (stg_enteredTaggable in rts/StgMiscClosures.cmm), which reports the
+-- invariant violation and self-returns the value tagged with its
+-- constructor tag (both derived from the info table).
+emitJumpEnteredTaggable :: CmmExpr -> FCode ()
+emitJumpEnteredTaggable node = do
+  profile   <- getProfile
+  updfr_off <- getUpdFrameOff
+  let lbl = mkCmmCodeLabel rtsUnitId (fsLit "stg_enteredTaggable")
+  emit (mkJump profile NativeNodeCall (CmmLit (CmmLabel lbl)) [node] updfr_off)
 
 emitRtsCall :: UnitId -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
 emitRtsCall pkg fun = emitRtsCallGen [] (mkCmmCodeLabel pkg fun) CmmMayReturn

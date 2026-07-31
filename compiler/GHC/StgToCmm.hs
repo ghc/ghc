@@ -382,9 +382,11 @@ cgDataCon mn data_con
                ; tickyReturnOldCon (length arg_reps)
                -- A taggable (small-family) normal form should never be entered:
                -- every reference to it carries the constructor's pointer tag, so
-               -- reaching this entry code is an invariant violation. We report it
-               -- (aborting under +RTS --fatal-enter-taggable, otherwise warning once)
-               -- and then self-return the value tagged with the constructor tag.
+               -- reaching this entry code is an invariant violation. We jump to
+               -- a shared RTS stub that reports it (aborting under +RTS
+               -- --fatal-enter-taggable, otherwise warning once) and self-returns
+               -- the value tagged with the constructor tag; sharing the stub keeps
+               -- the per-constructor entry code to a single tail-jump.
                -- Larger families have no spare tag, so their values are entered
                -- as normal and the entry returns them tagged with the
                -- family-saturating tag.
@@ -392,9 +394,9 @@ cgDataCon mn data_con
                -- LDV profiling relies on it to mark closures as used (ENTER()
                -- in rts/include/Cmm.h does not shortcut on the tag), so the
                -- check would fire on every constructor use.
-               ; when (taggable && not (profileIsProfiling profile)) $
-                   emitCheckEnteredTaggable (showPprUnsafe data_con)
-               ; void $ emitReturn
-                   [cmmOffsetB platform node (fromDynTag (tagForCon platform data_con))]
+               ; if taggable && not (profileIsProfiling profile)
+                   then emitJumpEnteredTaggable node
+                   else void $ emitReturn
+                     [cmmOffsetB platform node (fromDynTag (tagForCon platform data_con))]
                }
         }

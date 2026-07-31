@@ -103,6 +103,19 @@ INFO_TABLE_RET (stg_restore_cccs_eval, RET_SMALL, W_ info_ptr, W_ cccs)
     jump stg_ap_0_fast(ret);
 }
 
+/* Shared entry code for taggable normal forms, which the pointer-tagging
+   invariant makes unreachable: every taggable data constructor's entry code
+   tail-jumps here (see cgDataCon in GHC.StgToCmm) instead of carrying its own
+   report call. Reports the violation (aborting under +RTS
+   --fatal-enter-taggable, otherwise warning once) and self-returns the value
+   tagged with its constructor tag; name and tag come from the info table. */
+stg_enteredTaggable (P_ node)
+{
+    P_ tagged;
+    (tagged) = ccall enteredTaggableClosure(node "ptr");
+    return (tagged);
+}
+
 /* ----------------------------------------------------------------------------
    Support for the bytecode interpreter.
    ------------------------------------------------------------------------- */
