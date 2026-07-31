@@ -254,7 +254,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , mkForAllCo, mkFunCo2, mkAxiomCo, mkUnivCo
    , mkSymCo, mkTransCo, mkSelCo, mkLRCo, mkInstCo
    , mkKindCo, mkSubCo, mkFunCo, funRole
-   , decomposePiCos, coercionKind
+   , decomposePiCos
    , coercionRKind, coercionType
    , isReflexiveCo, seqCo
    , topNormaliseNewType_maybe
@@ -482,80 +482,35 @@ expandTypeSynonyms :: Type -> Type
 --
 -- Keep this synchronized with 'synonymTyConsOfType'
 expandTypeSynonyms ty
-  = go (mkEmptySubst in_scope) ty
+  = expandTypeSynonymsX empty_subst ty
   where
-    in_scope = mkInScopeSet (tyCoVarsOfType ty)
+    empty_subst = mkEmptySubst $ mkInScopeSet (tyCoVarsOfType ty)
 
-    go subst (TyConApp tc tys)
-      | ExpandsSyn tenv rhs tys' <- expandSynTyCon_maybe tc expanded_tys
-      = let subst' = mkTvSubst in_scope (mkVarEnv tenv)
-            -- Make a fresh substitution; rhs has nothing to
-            -- do with anything that has happened so far
-            -- NB: if you make changes here, be sure to build an
-            --     /idempotent/ substitution, even in the nested case
+expandTypeSynonyms :: Subst -> Type -> Type
+expandTypeSynonymsX
+  = case mapTyCoX expandTypeSynonymMapper of
+      (exp_ty, _, _, _) -> \subst ty -> runIdentity (exp_ty subst ty)
+
+expandTypeSynonymMapper :: TyCoMapper Subst Identity
+-- Just like substitution, but treat TyConApp specially
+expandTypeSynonymMapper
+  = substTyCoMapper { tcm_tcapp_ty = tcapp_ty }
+ where
+   tcapp_ty subst ty tc tys'
+      | ExpandsSyn tenv rhs tys'' <- expandSynTyCon_maybe tc tys'
+      = let in_scope    = substInScope subst
+            local_subst = mkTvSubst in_scope (mkVarEnv tenv)
+            -- NB: tys' are already expanded, so this works
+            --     even in the nested case (#11665)
             --        type T a b = a -> b
             --        type S x y = T y x
-            -- (#11665)
-        in  mkAppTys (go subst' rhs) tys'
+        in  mkAppTys (expandTypeSynonymsX local_subst rhs) tys''
+
+      | null tys'   -- Avoid allocation in this very
+      = return ty   -- common case (E.g. Int, LiftedRep etc)
+
       | otherwise
-      = TyConApp tc expanded_tys
-      where
-        expanded_tys = (map (go subst) tys)
-
-    go _     (LitTy l)     = LitTy l
-    go subst (TyVarTy tv)  = substTyVar subst tv
-    go subst (AppTy t1 t2) = mkAppTy (go subst t1) (go subst t2)
-    go subst ty@(FunTy _ mult arg res)
-      = ty { ft_mult = go subst mult, ft_arg = go subst arg, ft_res = go subst res }
-    go subst (ForAllTy (Bndr tv vis) t)
-      = let (subst', tv') = substVarBndrUsing go subst tv in
-        ForAllTy (Bndr tv' vis) (go subst' t)
-    go subst (CastTy ty co)  = mkCastTy (go subst ty) (go_co subst co)
-    go subst (CoercionTy co) = mkCoercionTy (go_co subst co)
-
-    go_mco _     MRefl    = MRefl
-    go_mco subst (MCo co) = MCo (go_co subst co)
-
-    go_co subst (Refl ty)
-      = mkNomReflCo (go subst ty)
-    go_co subst (GRefl r ty mco)
-      = mkGReflCo r (go subst ty) (go_mco subst mco)
-       -- NB: coercions are always expanded upon creation
-    go_co subst (TyConAppCo r tc args)
-      = mkTyConAppCo r tc (map (go_co subst) args)
-    go_co subst (AppCo co arg)
-      = mkAppCo (go_co subst co) (go_co subst arg)
-    go_co subst (ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
-                          , fco_kind = kind_co, fco_body = co })
-      = mkForAllCo tcv' visL visR
-                   (go_mco subst kind_co)
-                   (go_co subst' co)
-      where
-        (subst', tcv') = substVarBndr subst tcv
-    go_co subst (FunCo r afl afr w co1 co2)
-      = mkFunCo2 r afl afr (go_co subst w) (go_co subst co1) (go_co subst co2)
-    go_co subst (CoVarCo cv)
-      = substCoVar subst cv
-    go_co subst (AxiomCo ax cs)
-      = mkAxiomCo ax (map (go_co subst) cs)
-    go_co subst co@(UnivCo { uco_lty = lty, uco_rty = rty })
-      = co { uco_lty = go subst lty, uco_rty = go subst rty }
-    go_co subst (SymCo co)
-      = mkSymCo (go_co subst co)
-    go_co subst (TransCo co1 co2)
-      = mkTransCo (go_co subst co1) (go_co subst co2)
-    go_co subst (SelCo n co)
-      = mkSelCo n (go_co subst co)
-    go_co subst (LRCo lr co)
-      = mkLRCo lr (go_co subst co)
-    go_co subst (InstCo co arg)
-      = mkInstCo (go_co subst co) (go_co subst arg)
-    go_co subst (KindCo co)
-      = mkKindCo (go_co subst co)
-    go_co subst (SubCo co)
-      = mkSubCo (go_co subst co)
-    go_co _ (HoleCo h)
-      = pprPanic "expandTypeSynonyms hit a hole" (ppr h)
+      = mkTyConApp tc tys'
 
 {- Notes on type synonyms
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1023,6 +978,17 @@ getCastedTyVar_maybe ty = case coreFullView ty of
   _                      -> Nothing
 
 
+substTyVarToTyVar :: HasDebugCallStack => Subst -> TyVar -> TyVar
+-- Apply the substitution, expecting the result to be a TyVarTy
+substTyVarToTyVar (Subst _ _ tenv _) tv
+  = assert (isTyVar tv) $
+    case lookupVarEnv tenv tv of
+      Just ty -> case getTyVar_maybe ty of
+                    Just tv -> tv
+                    Nothing -> pprPanic "substTyVarToTyVar" (ppr tv $$ ppr ty)
+      Nothing -> tv
+
+
 {- *********************************************************************
 *                                                                      *
                       AppTy
@@ -1060,7 +1026,7 @@ type checker (e.g. when matching type-function equations).
 mkAppTy :: Type -> Type -> Type
   -- See Note [Respecting definitional equality], invariant (EQ1).
 mkAppTy (CastTy fun_ty co) arg_ty
-  | ([arg_co], res_co) <- decomposePiCos co (coercionKind co) [arg_ty]
+  | ([arg_co], res_co) <- decomposePiCos co [arg_ty]
   = (fun_ty `mkAppTy` (arg_ty `mkCastTy` arg_co)) `mkCastTy` res_co
 
 mkAppTy (TyConApp tc tys) ty2 = mkTyConApp tc (tys ++ [ty2])
@@ -1086,7 +1052,7 @@ mkAppTys (CastTy fun_ty co) arg_tys  -- much more efficient then nested mkAppTy
                                      -- in GHC.Core.TyCo.Rep
   = foldl' AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
   where
-    (arg_cos, res_co) = decomposePiCos co (coercionKind co) arg_tys
+    (arg_cos, res_co) = decomposePiCos co arg_tys
     (args_to_cast, leftovers) = splitAtList arg_cos arg_tys
     casted_arg_tys = zipWith mkCastTy args_to_cast arg_cos
 mkAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)

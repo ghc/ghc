@@ -52,7 +52,9 @@ module GHC.Core.Coercion (
         NormaliseStepper, NormaliseStepResult(..), composeSteppers, unwrapNewTypeStepper,
         topNormaliseNewType_maybe, topNormaliseTypeX,
 
-        decomposeCo, decomposeFunCo, decomposePiCos, getCoVar_maybe,
+        decomposeCo, decomposeFunCo,
+        decomposePiCos, decomposePiCosK,
+        getCoVar_maybe,
         splitAppCo_maybe,
         splitFunCo_maybe,
         splitForAllCo_maybe,
@@ -134,25 +136,29 @@ import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.Tidy
 import GHC.Core.TyCo.Compare
+import GHC.Core.TyCo.Make
 import GHC.Core.Type
 import GHC.Core.Predicate( mkNomEqPred, mkReprEqPred )
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Core.Coercion.Axiom
+
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name hiding ( varName )
 import GHC.Types.Basic
 import GHC.Types.Unique
-import GHC.Data.FastString
-import GHC.Data.Pair
 import GHC.Types.SrcLoc
+import GHC.Types.Unique.FM
+
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim
+
+import GHC.Data.FastString
+import GHC.Data.Pair
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe
-import GHC.Types.Unique.FM
 import GHC.Data.List.Infinite (Infinite (..))
 import qualified GHC.Data.List.Infinite as Inf
 
@@ -315,13 +321,6 @@ coToMCo :: Coercion -> MCoercion
 coToMCo co | isReflCo co = MRefl
            | otherwise   = MCo co
 
-kindCoToMKindCo :: KindCoercion -> KindMCoercion
--- Convert a KindCoercion to a KindMCoercion,
--- coToMCo doesn't eliminate GRefl, but kindCoToMCo can
--- See Note [KindCoercion]
-kindCoToMKindCo co | isReflKindCo co = MRefl
-                   | otherwise       = MCo co
-
 checkReflexiveMCo :: MCoercion -> MCoercion
 checkReflexiveMCo MRefl                       = MRefl
 checkReflexiveMCo (MCo co) | isReflexiveCo co = MRefl
@@ -466,11 +465,17 @@ Notes:
 -}
 
 decomposePiCos :: HasDebugCallStack
-               => CoercionN -> Pair Type  -- Coercion and its kind
+                => CoercionN
                -> [Type]
                -> ([CoercionN], CoercionN)
+decomposePiCos co args = decomposePiCos co (coercionKind co) args
+
+decomposePiCosK :: HasDebugCallStack
+                => CoercionN -> Pair Type  -- Coercion and its kind
+                -> [Type]
+                -> ([CoercionN], CoercionN)
 -- See Note [Pushing a coercion into a pi-type]
-decomposePiCos orig_co (Pair orig_k1 orig_k2) orig_args
+decomposePiCosK orig_co (Pair orig_k1 orig_k2) orig_args
   = go [] (orig_subst,orig_k1) orig_co (orig_subst,orig_k2) orig_args
   where
     orig_subst = mkEmptySubst $ mkInScopeSet $
@@ -655,6 +660,7 @@ isReflCoVar_maybe cv
   | otherwise
   = Nothing
 
+
 -- | Tests whether this is a "kind coercion":
 -- that is, Nominal and between two types of kind @Type@.
 -- See Note [KindCoercion] in GHC.Core.TyCo.Rep
@@ -663,43 +669,6 @@ isKindCo co
   = role == Nominal && isLiftedTypeKind kk1 && isLiftedTypeKind kk2
   where
     (Pair kk1 kk2, role) = coercionKindRole co
-
--- | Tests if this /kind/ coercion is Refl
--- Guaranteed to work very quickly.
--- PRECONDITION: the argument is a KindCoercion
--- So if it sees  (GRefl k (MCo kk)) :: k ~ (k |> kk)
---    then we know that kk must be reflexive.
--- And hence if co = GRefl {} then it is equivalent to Refl,
---    because GRefl N ty MRefl = Refl ty
---    so we return True
--- See Note [KindCoercion] in GHC.Core.TyCo.Rep
-isReflKindCo :: HasDebugCallStack => KindCoercion -> Bool
-isReflKindCo co@(GRefl {}) = assertPpr (isKindCo co) (ppr co) $
-                             True
-isReflKindCo (Refl{})      = True -- Refl ty == GRefl N ty MRefl
-isReflKindCo _             = False
-
--- | Tests if this /kind/ MCoercion is obviously generalized reflexive
--- Guaranteed to work very quickly.
-isReflKindMCo :: KindMCoercion -> Bool
-isReflKindMCo MRefl    = True
-isReflKindMCo (MCo co) = isReflKindCo co
-
--- | Tests if this coercion is obviously reflexive. Guaranteed to work
--- very quickly. Sometimes a coercion can be reflexive, but not obviously
--- so. c.f. 'isReflexiveCo'
-isReflCo :: Coercion -> Bool
-isReflCo (Refl{}) = True
-isReflCo (GRefl _ _ mco) | isReflKindMCo mco = True
-isReflCo _ = False
-
--- | Returns the type coerced if this coercion is reflexive. Guaranteed
--- to work very quickly. Sometimes a coercion can be reflexive, but not
--- obviously so. c.f. 'isReflexiveCo_maybe'
-isReflCo_maybe :: Coercion -> Maybe (Type, Role)
-isReflCo_maybe (Refl ty) = Just (ty, Nominal)
-isReflCo_maybe (GRefl r ty mco) | isReflKindMCo mco = Just (ty, r)
-isReflCo_maybe _ = Nothing
 
 -- | Slowly checks if the coercion is reflexive. Don't call this in a loop,
 -- as it walks over the entire coercion.
@@ -787,19 +756,6 @@ role is bizarre and a caller should have to ask for this behavior explicitly.
 
 -}
 
--- | Make a reflexive coercion
-mkReflCo :: Role -> Type -> Coercion
-mkReflCo Nominal ty = Refl ty
-mkReflCo r       ty = GRefl r ty MRefl
-
--- | Make a representational reflexive coercion
-mkRepReflCo :: Type -> Coercion
-mkRepReflCo ty = GRefl Representational ty MRefl
-
--- | Make a nominal reflexive coercion
-mkNomReflCo :: Type -> Coercion
-mkNomReflCo = Refl
-
 -- | Apply a type constructor to a list of coercions. It is the
 -- caller's responsibility to get the roles correct on argument coercions.
 mkTyConAppCo :: HasDebugCallStack => Role -> TyCon -> [Coercion] -> Coercion
@@ -826,81 +782,6 @@ mkFunCoNoFTF r w arg_co res_co
     afr = chooseFunTyFlag argr_ty resr_ty
     Pair argl_ty argr_ty = coercionKind arg_co
     Pair resl_ty resr_ty = coercionKind res_co
-
--- | Build a function 'Coercion' from two other 'Coercion's. That is,
--- given @co1 :: a ~ b@ and @co2 :: x ~ y@ produce @co :: (a -> x) ~ (b -> y)@
--- or @(a => x) ~ (b => y)@, depending on the kind of @a@/@b@.
--- This (most common) version takes a single FunTyFlag, which is used
---   for both fco_afl and ftf_afr of the FunCo
-mkFunCo :: Role -> FunTyFlag -> CoercionN -> Coercion -> Coercion -> Coercion
-mkFunCo r af w arg_co res_co
-  = mkFunCo2 r af af w arg_co res_co
-
-mkNakedFunCo :: Role -> FunTyFlag -> CoercionN -> Coercion -> Coercion -> Coercion
--- This version of mkFunCo does not check FunCo invariants (checkFunCo)
--- It's a historical vestige; See Note [No assertion check on mkFunCo]
-mkNakedFunCo = mkFunCo
-
-mkFunCo2 :: Role -> FunTyFlag -> FunTyFlag
-         -> CoercionN -> Coercion -> Coercion -> Coercion
--- This is the smart constructor for FunCo; it checks invariants
-mkFunCo2 r afl afr w arg_co res_co
-  -- See Note [No assertion check on mkFunCo]
-  | Just (ty1, _) <- isReflCo_maybe arg_co
-  , Just (ty2, _) <- isReflCo_maybe res_co
-  , Just (w, _)   <- isReflCo_maybe w
-  = mkReflCo r (mkFunTy afl w ty1 ty2)  -- See Note [Refl invariant]
-
-  | otherwise
-  = FunCo { fco_role = r, fco_afl = afl, fco_afr = afr
-          , fco_mult = w, fco_arg = arg_co, fco_res = res_co }
-
-
-{- Note [No assertion check on mkFunCo]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We used to have a checkFunCo assertion on mkFunCo, but during typechecking
-we can (legitimately) have not-full-zonked types or coercion variables, so
-the assertion spuriously fails (test T11480b is a case in point).  Lint
-checks all these things anyway.
-
-We used to get around the problem by calling mkNakedFunCo from within the
-typechecker, which dodged the assertion check.  But then mkAppCo calls
-mkTyConAppCo, which calls tyConAppFunCo_maybe, which calls mkFunCo.
-Duplicating this stack of calls with "naked" versions of each seems too much.
-
--- Commented out: see Note [No assertion check on mkFunCo]
-checkFunCo :: Role -> FunTyFlag -> FunTyFlag
-           -> CoercionN -> Coercion -> Coercion
-           -> Maybe SDoc
--- Checks well-formed-ness for FunCo
--- Used only in assertions and Lint
-{-# NOINLINE checkFunCo #-}
-checkFunCo _r afl afr _w arg_co res_co
-  | not (ok argl_ty && ok argr_ty && ok resl_ty && ok resr_ty)
-  = Just (hang (text "Bad arg or res types") 2 pp_inputs)
-
-  | afl == computed_afl
-  , afr == computed_afr
-  = Nothing
-  | otherwise
-  = Just (vcat [ text "afl (provided,computed):" <+> ppr afl <+> ppr computed_afl
-               , text "afr (provided,computed):" <+> ppr afr <+> ppr computed_afr
-               , pp_inputs ])
-  where
-    computed_afl = chooseFunTyFlag argl_ty resl_ty
-    computed_afr = chooseFunTyFlag argr_ty resr_ty
-    Pair argl_ty argr_ty = coercionKind arg_co
-    Pair resl_ty resr_ty = coercionKind res_co
-
-    pp_inputs = vcat [ pp_ty "argl" argl_ty, pp_ty "argr" argr_ty
-                     , pp_ty "resl" resl_ty, pp_ty "resr" resr_ty
-                     , text "arg_co:" <+> ppr arg_co
-                     , text "res_co:" <+> ppr res_co ]
-
-    ok ty = isTYPEorCONSTRAINT (typeKind ty)
-    pp_ty str ty = text str <> colon <+> hang (ppr ty)
-                                            2 (dcolon <+> ppr (typeKind ty))
--}
 
 -- | Apply a 'Coercion' to another 'Coercion'.
 -- The second coercion must be Nominal, unless the first is Phantom.
@@ -940,62 +821,6 @@ mkAppCos :: Coercion
          -> Coercion
 mkAppCos co1 cos = foldl' mkAppCo co1 cos
 
-
--- | Make a Coercion from a tycovar, a kind coercion, and a body coercion.
-mkForAllCo :: HasDebugCallStack => TyCoVar -> ForAllTyFlag -> ForAllTyFlag
-           -> KindMCoercion -> Coercion -> Coercion
-mkForAllCo v visL visR kind_co co
-  | Just (ty, r) <- isReflCo_maybe co
-  , isReflMCo kind_co
-  , visL `eqForAllVis` visR
-  = mkReflCo r (mkTyCoForAllTy v visL ty)
-
-  | otherwise
-  = mk_forall_co v visL visR kind_co co
-
--- mkForAllVisCos [tv{vis}] constructs a cast
---   forall tv. res  ~R#   forall tv{vis} res`.
--- See Note [Required foralls in Core] in GHC.Core.TyCo.Rep
-mkForAllVisCos :: HasDebugCallStack => [ForAllTyBinder] -> Coercion -> Coercion
-mkForAllVisCos bndrs orig_co = foldr go orig_co bndrs
-  where
-    go (Bndr tv vis) = mkForAllCo tv coreTyLamForAllTyFlag vis MRefl
-
--- | Make a Coercion quantified over a type/coercion variable;
--- the variable has the same kind and visibility in both sides of the coercion
-mkHomoForAllCos :: [ForAllTyBinder] -> Coercion -> Coercion
-mkHomoForAllCos vs orig_co
-  | Just (ty, r) <- isReflCo_maybe orig_co
-  = mkReflCo r (mkTyCoForAllTys vs ty)
-  | otherwise
-  = foldr go orig_co vs
-  where
-    go :: ForAllTyBinder -> Coercion -> Coercion
-    go (Bndr var vis) co = mk_forall_co var vis vis MRefl co
-
-mkHomoForAllCo :: TyVar -> Coercion -> Coercion
--- Specialised for a single TyVar,
---    and visibility of coreTyLamForAllTyFlag
-mkHomoForAllCo tv orig_co
-  | Just (ty, r) <- isReflCo_maybe orig_co
-  = mkReflCo r (mkForAllTy (Bndr tv vis) ty)
-  | otherwise
-  = mk_forall_co tv vis vis MRefl orig_co
-  where
-    vis  = coreTyLamForAllTyFlag
-
--- | `mk_forall_co` just builds a ForAllCo.
--- With debug on, it checks invariants (e.g. he kind of the tycovar should
---   be the left-hand kind of the kind coercion).
--- Callers should have done any isReflCo short-cutting.
-mk_forall_co :: TyCoVar -> ForAllTyFlag -> ForAllTyFlag
-             -> KindMCoercion -> Coercion -> Coercion
-mk_forall_co tcv visL visR kind_co co
-  = assertGoodForAllCo tcv visL visR kind_co co $
-    assertPpr (not (isReflCo co && isReflMCo kind_co && visL == visR)) (ppr co) $
-    ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
-             , fco_kind = kind_co, fco_body = co }
-
 assertGoodForAllCo :: HasDebugCallStack
                    => TyCoVar -> ForAllTyFlag -> ForAllTyFlag
                    -> KindMCoercion -> Coercion -> a -> a
@@ -1025,71 +850,6 @@ assertGoodForAllCo tcv visL visR kind_co co
     pp_kind_co = case kind_co of
                     MRefl -> text "MRefl"
                     MCo co -> ppr co <+> dcolon <+> ppr (coercionKind co)
-
-
-mkNakedForAllCo :: TyVar    -- Never a CoVar
-                -> ForAllTyFlag -> ForAllTyFlag
-                -> CoercionN -> Coercion -> Coercion
--- This version lacks the assertion checks.
--- Used during type checking when the arguments may (legitimately) not be zonked
--- and so the assertions might (bogusly) fail
--- NB: since the coercions are un-zonked, we can't really deal with
---     (FC6) and (FC7) in Note [ForAllCo] in GHC.Core.TyCo.Rep.
---     Fortunately we don't have to: this function is needed only for /type/ variables.
-mkNakedForAllCo tv visL visR kind_co co
-  | assertPpr (isTyVar tv) (ppr tv) True
-  , Just (ty, r) <- isReflCo_maybe co
-  , isReflCo kind_co
-  , visL `eqForAllVis` visR
-  = mkReflCo r (mkForAllTy (Bndr tv visL) ty)
-  | otherwise
-  = ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
-             , fco_kind = MCo kind_co, fco_body = co }
-
-
-mkCoVarCo :: CoVar -> Coercion
--- cv :: s ~# t
--- See Note [mkCoVarCo]
-mkCoVarCo cv = CoVarCo cv
-
-mkCoVarCos :: [CoVar] -> [Coercion]
-mkCoVarCos = map mkCoVarCo
-
-{- Note [mkCoVarCo]
-~~~~~~~~~~~~~~~~~~~
-In the past, mkCoVarCo optimised (c :: t~t) to (Refl t).  That is
-valid (although see Note [Unbound RULE binders] in GHC.Core.Rules), but
-it's a relatively expensive test and perhaps better done in
-optCoercion.  Not a big deal either way.
--}
-
-mkAxInstCo :: Role
-           -> CoAxiomRule   -- Always BranchedAxiom or UnbranchedAxiom
-           -> [Type] -> [Coercion]
-           -> Coercion
--- mkAxInstCo can legitimately be called over-saturated;
--- i.e. with more type arguments than the coercion requires
--- Only called with BranchedAxiom or UnbranchedAxiom
-mkAxInstCo role axr tys cos
-  | arity == n_tys = downgradeRole role ax_role $
-                     AxiomCo axr (rtys `chkAppend` cos)
-  | otherwise      = assert (arity < n_tys) $
-                     downgradeRole role ax_role $
-                     mkAppCos (AxiomCo axr (ax_args `chkAppend` cos))
-                              leftover_args
-  where
-    (ax_role, branch)        = case coAxiomRuleBranch_maybe axr of
-                                  Just (_tc, ax_role, branch) -> (ax_role, branch)
-                                  Nothing -> pprPanic "mkAxInstCo" (ppr axr)
-    n_tys                    = length tys
-    arity                    = length (coAxBranchTyVars branch)
-    arg_roles                = coAxBranchRoles branch
-    rtys                     = zipWith mkReflCo (arg_roles ++ repeat Nominal) tys
-    (ax_args, leftover_args) = splitAt arity rtys
-
--- worker function
-mkAxiomCo :: CoAxiomRule -> [Coercion] -> Coercion
-mkAxiomCo = AxiomCo
 
 -- to be used only with unbranched axioms
 mkUnbranchedAxInstCo :: Role -> CoAxiom Unbranched
@@ -1154,37 +914,6 @@ mkUnivCo prov deps role ty1 ty2
                               , uco_lty = ty1, uco_rty = ty2
                               , uco_deps = deps }
 
--- | Create a symmetric version of the given 'Coercion' that asserts
---   equality between the same types but in the other "direction", so
---   a kind of @t1 ~ t2@ becomes the kind @t2 ~ t1@.
-mkSymCo :: Coercion -> Coercion
-
--- Do a few simple optimizations, mainly to expose the underlying
--- constructors to other 'mk' functions.  E.g.
---   mkInstCo (mkSymCo (ForAllCo ...)) ty
--- We want to push the SymCo inside the ForallCo, so that we can instantiate
--- This can make a big difference.  E.g without coercion optimisation, GHC.Read
--- totally explodes; but when we push Sym inside ForAll, it's fine.
-mkSymCo co | isReflCo co   = co
-mkSymCo (SymCo co)         = co
-mkSymCo (SubCo (SymCo co)) = SubCo co
-mkSymCo co@(ForAllCo { fco_kind = kco, fco_body = body_co })
-  | isReflMCo kco          = co { fco_body = mkSymCo body_co }
-mkSymCo co                 = SymCo co
-
--- | mkTransCo creates a new 'Coercion' by composing the two
---   given 'Coercion's transitively: (co1 ; co2)
-mkTransCo :: HasDebugCallStack => Coercion -> Coercion -> Coercion
-mkTransCo co1 co2
-   | isReflCo co1 = co2
-   | isReflCo co2 = co1
-
-   | GRefl r t1 (MCo kco1) <- co1
-   , GRefl _ _  (MCo kco2) <- co2
-   = GRefl r t1 (MCo $ mkTransCo kco1 kco2)
-
-   | otherwise
-   = TransCo co1 co2
 
 --------------------
 {- Note [mkSelCo precondition]
@@ -1353,24 +1082,6 @@ mkGReflLeftCo r ty co
   | isReflKindCo co = mkReflCo r ty
   | otherwise       = mkSymCo $ mkGReflMCo r ty co
 
--- | Given @ty :: k1@, @co :: k1 ~ k2@, @co2:: ty ~r ty'@,
--- produces @co' :: (ty |> co) ~r ty'
--- It is not only a utility function, but it saves allocation when co
--- is a GRefl coercion.
-mkCoherenceLeftCo :: Role -> Type -> KindCoercion -> Coercion -> Coercion
-mkCoherenceLeftCo r ty co co2
-  | isReflKindCo co = co2
-  | otherwise       = (mkSymCo $ mkGReflMCo r ty co) `mkTransCo` co2
-
--- | Given @ty :: k1@, @co :: k1 ~ k2@, @co2:: ty' ~r ty@,
--- produces @co' :: ty' ~r (ty |> co)
--- It is not only a utility function, but it saves allocation when co
--- is a GRefl coercion.
-mkCoherenceRightCo :: HasDebugCallStack => Role -> Type -> KindCoercion -> Coercion -> Coercion
-mkCoherenceRightCo r ty co co2
-  | isReflKindCo co = co2
-  | otherwise       = co2 `mkTransCo` mkGReflMCo r ty co
-
 -- | Given @co :: (a :: k) ~ (b :: k')@ produce @co' :: k ~ k'@.
 mkKindCo :: Coercion -> Coercion
 mkKindCo co | Just (ty, _) <- isReflCo_maybe co = Refl (typeKind ty)
@@ -1400,48 +1111,6 @@ mkSubCo co@(FunCo { fco_role = Nominal, fco_arg = arg, fco_res = res })
        , fco_res = downgradeRole Representational Nominal res }
 mkSubCo co = assertPpr (coercionRole co == Nominal) (ppr co <+> ppr (coercionRole co)) $
              SubCo co
-
--- | Changes a role, but only a downgrade. See Note [Role twiddling functions]
-downgradeRole_maybe :: Role   -- ^ desired role
-                    -> Role   -- ^ current role
-                    -> Coercion -> Maybe Coercion
--- In (downgradeRole_maybe dr cr co) it's a precondition that
---                                   cr = coercionRole co
-
-downgradeRole_maybe Nominal          Nominal          co = Just co
-downgradeRole_maybe Nominal          _                _  = Nothing
-
-downgradeRole_maybe Representational Nominal          co = Just (mkSubCo co)
-downgradeRole_maybe Representational Representational co = Just co
-downgradeRole_maybe Representational Phantom          _  = Nothing
-
-downgradeRole_maybe Phantom          Phantom          co = Just co
-downgradeRole_maybe Phantom          _                co = Just (toPhantomCo co)
-
--- | Like 'downgradeRole_maybe', but panics if the change isn't a downgrade.
--- See Note [Role twiddling functions]
-downgradeRole :: Role  -- desired role
-              -> Role  -- current role
-              -> Coercion -> Coercion
-downgradeRole r1 r2 co
-  = case downgradeRole_maybe r1 r2 co of
-      Just co' -> co'
-      Nothing  -> pprPanic "downgradeRole" (ppr co)
-
--- | Make a "coercion between coercions".
-mkProofIrrelCo :: Role          -- ^ role of the created coercion, "r"
-               -> KindCoercion  -- ^ :: phi1 ~N phi2
-               -> Coercion      -- ^ g1 :: phi1
-               -> Coercion      -- ^ g2 :: phi2
-               -> Coercion      -- ^ :: g1 ~r g2
-
--- if the two coercion prove the same fact, I just don't care what
--- the individual coercions are.
-mkProofIrrelCo r kco g1 g2
-  | isReflKindCo kco  = mkReflCo r (mkCoercionTy g1)
-         -- kco is a kind coercion, thus @isReflKindCo@ rather than @isReflCo@
-  | otherwise         = mkUnivCo ProofIrrelProv [kco] r
-                                 (mkCoercionTy g1) (mkCoercionTy g2)
 
 {-
 %************************************************************************

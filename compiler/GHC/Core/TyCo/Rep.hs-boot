@@ -26,6 +26,7 @@ type Kind = Type
 type ThetaType = [PredType]
 type CoercionN = Coercion
 type MCoercionN = MCoercion
+type KindMCoercion = MCoercionN
 
 mkForAllTy       :: VarBndr Var ForAllTyFlag -> Type -> Type
 mkNakedTyConTy   :: TyCon -> Type

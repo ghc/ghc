@@ -41,7 +41,7 @@ module GHC.Core.TyCo.Subst
         substVarBndr, substVarBndrs,
         substTyVarBndr, substTyVarBndrs,
         substCoVarBndr, substDCoVarSet,
-        substTyVar, substTyVars, substTyVarToTyVar,
+        substTyVar, substTyVars,
         substTyCoVars,
         substTyCoBndr,
         substVarBndrUsing,
@@ -50,20 +50,15 @@ module GHC.Core.TyCo.Subst
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Core.Type
-   ( mkCastTy, mkAppTy, isCoercionTy, mkTyConApp, getTyVar_maybe )
+
 import {-# SOURCE #-} GHC.Core.Coercion
-   ( mkCoVarCo, mkKindCo, mkSelCo, mkTransCo
-   , mkNomReflCo, mkSubCo, mkSymCo
-   , mkFunCo2, mkForAllCo, mkUnivCo
-   , mkAxiomCo, mkAppCo, mkGReflCo
-   , mkInstCo, mkLRCo, mkTyConAppCo
-   , mkCoercionType
-   , coVarTypesRole )
+   ( mkCoercionType, coVarTypesRole )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
 import {-# SOURCE #-} GHC.Core.Ppr ( ) -- instance Outputable CoreExpr
 import {-# SOURCE #-} GHC.Core ( CoreExpr )
 
+import GHC.Core.TyCo.Make
+import GHC.Core.TyCon( TyCon )
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 
@@ -80,6 +75,7 @@ import GHC.Types.Unique.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import Data.Functor.Identity ( Identity (..) )
 import Data.List (mapAccumL)
 
 {-
@@ -772,6 +768,47 @@ substThetaUnchecked :: Subst -> ThetaType -> ThetaType
 substThetaUnchecked = substTysUnchecked
 
 
+substTyCoMapper :: TyCoMapper Subst Identity
+substTyCoMapper
+  = TyCoMapper { tcm_tyvar      = subst_tv
+               , tcm_covar      = subst_cv
+               , tcm_hole       = subst_ch
+               , tcm_tycobinder = tcv_bndr
+               , tcm_tcapp_ty   = tcapp_ty
+               , tcm_tcapp_co   = tcapp_co
+               }
+ where
+   subst_tv subst tv = return (substTyVar  subst tv)
+   subst_cv subst cv = return (substCoVar  subst cv)
+   subst_ch subst ch = return (substCoHole subst ch)
+
+   tcv_bndr subst tcv _vis k
+     = k subst' tcv'
+     where
+       (subst', tcv') = substVarBndrUnchecked subst tcv
+       -- Sadly unchecked because subst_ty is used from substTyUnchecked
+
+   -- Avoid allocation in this very
+   -- common case (E.g. Int, LiftedRep etc)
+   tcapp_ty :: Subst -> Type -> TyCon -> [Type] -> Identity Type
+   tcapp_ty _ ty tc tys'
+      | null tys'  = return ty
+      | otherwise  = return (mkTyConApp tc tys')
+   tcapp_co :: Subst -> Coercion -> Role -> TyCon -> [Coercion] -> Identity Coercion
+   tcapp_co _ co r tc cos'
+      | null cos'  = return co
+      | otherwise  = return (mkTyConAppCo r tc cos')
+
+subst_ty :: Subst -> Type -> Type
+subst_co :: Subst -> Coercion -> Coercion
+(subst_ty, subst_co)
+  = case mapTyCoX substTyCoMapper of
+      (ms_ty, _, ms_co, _) -> (run ms_ty, run ms_co)
+  where
+    run :: forall a. (Subst -> a -> Identity a) -> Subst -> a -> a
+    run ms subst x = runIdentity (ms subst x)
+
+{-
 subst_ty :: Subst -> Type -> Type
 -- subst_ty is the main workhorse for type substitution
 --
@@ -804,6 +841,7 @@ subst_ty subst ty
     go (LitTy n)         = LitTy $! n
     go (CastTy ty co)    = (mkCastTy $! (go ty)) $! (subst_co subst co)
     go (CoercionTy co)   = CoercionTy $! (subst_co subst co)
+-}
 
 substTyVar :: Subst -> TyVar -> Type
 substTyVar (Subst _ _ tenv _) tv
@@ -811,16 +849,6 @@ substTyVar (Subst _ _ tenv _) tv
     case lookupVarEnv tenv tv of
       Just ty -> ty
       Nothing -> TyVarTy tv
-
-substTyVarToTyVar :: HasDebugCallStack => Subst -> TyVar -> TyVar
--- Apply the substitution, expecting the result to be a TyVarTy
-substTyVarToTyVar (Subst _ _ tenv _) tv
-  = assert (isTyVar tv) $
-    case lookupVarEnv tenv tv of
-      Just ty -> case getTyVar_maybe ty of
-                    Just tv -> tv
-                    Nothing -> pprPanic "substTyVarToTyVar" (ppr tv $$ ppr ty)
-      Nothing -> tv
 
 substTyVars :: Subst -> [TyVar] -> [Type]
 substTyVars subst = map $ substTyVar subst
@@ -855,6 +883,7 @@ substCos subst cos
   | isEmptyTCvSubst subst = cos
   | otherwise = checkValidSubst subst [] cos $ map (subst_co subst) cos
 
+{-
 subst_co :: HasDebugCallStack => Subst -> Coercion -> Coercion
 subst_co subst co
   = go co
@@ -882,6 +911,7 @@ subst_co subst co
                           -- Unchecked because used from substTyUnchecked
     go (FunCo r afl afr w co1 co2)   = ((mkFunCo2 r afl afr $! go w) $! go co1) $! go co2
     go (CoVarCo cv)          = substCoVar subst cv
+    go (HoleCo h)            = substCoHole subst h
     go (UnivCo { uco_prov = p, uco_role = r
                , uco_lty = t1, uco_rty = t2, uco_deps = deps })
                              = ((((mkUnivCo $! p) $! go_cos deps) $! r) $!
@@ -893,19 +923,21 @@ subst_co subst co
     go (InstCo co arg)       = (mkInstCo $! (go co)) $! go arg
     go (KindCo co)           = mkKindCo $! (go co)
     go (SubCo co)            = mkSubCo $! (go co)
-    go (HoleCo h)            = HoleCo $! go_hole h
 
     go_cos cos = let cos' = map go cos
                  in cos' `seqList` cos'
-
-    -- See Note [Substituting in a coercion hole]
-    go_hole h@(CH { ch_co_var = cv }) = h { ch_co_var = updateVarType go_ty cv }
+-}
 
 -- | Perform a substitution within a 'DVarSet' of free variables,
 -- returning the free coercion variables.
 substDCoVarSet :: Subst -> DCoVarSet -> DCoVarSet
 substDCoVarSet subst cvs = coVarsOfCosDSet $ map (substCoVar subst) $
                            dVarSetElems cvs
+
+substCoHole :: Subst -> CoercionHole -> Coercion
+-- See Note [Substituting in a coercion hole]
+substCoHole subst h@(CH { ch_co_var = cv })
+  = HoleCo (h { ch_co_var = updateVarType (subst_ty subst) cv })
 
 substCoVar :: Subst -> CoVar -> Coercion
 substCoVar (Subst _ _ _ cenv) cv

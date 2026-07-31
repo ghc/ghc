@@ -855,7 +855,7 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
       = let co1 = liftCoSubst Nominal lc inner_ki
             co1_kind              = coercionKind co1
             unrewritten_tys       = map reductionOriginalType arg_redns
-            (arg_cos, res_co)     = decomposePiCos co1 co1_kind unrewritten_tys
+            (arg_cos, res_co)     = decomposePiCosK co1 co1_kind unrewritten_tys
             casted_args           = assertPpr (equalLength arg_redns arg_cos)
                                               (ppr arg_redns $$ ppr arg_cos)
                                   $ zipWith3 mkCoherenceRightRedn (Inf.toList roles) arg_redns arg_cos
