@@ -596,11 +596,11 @@ HsInt loadArchive_ (pathchar *path)
             ASSERT(!isGnuIndex);
             DEBUG_LOG("Member might be an object file...loading...\n");
 #if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
-#if defined(RTS_LINKER_USE_MMAP)
+#if RTS_LINKER_USE_MMAP
             image = mmapAnonForLinker(memberSize);
 #else
 #error "Only MMAP based loading supported on Apple platforms"
-#endif // defined(RTS_LINKER_USE_MMAP)
+#endif // RTS_LINKER_USE_MMAP
 
 #else // not darwin
             image = stgMallocBytes(memberSize, "loadArchive(image)");

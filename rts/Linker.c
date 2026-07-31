@@ -1394,7 +1394,7 @@ preloadObjectFile (pathchar *path)
     * the sections. And hence we need to leave r+w+x here for other hosts
     * until all hosts have been made aware of the initial image being r+w only.
     *
-    * See also the misalignment logic for darwin below.
+    * See also the alignment logic for darwin sections.
     */
 #if defined(darwin_HOST_OS) || defined(openbsd_HOST_OS)
    image = mmapForLinker(fileSize, MEM_READ_WRITE, MAP_PRIVATE, fd, 0);
