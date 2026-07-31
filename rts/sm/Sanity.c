@@ -25,6 +25,7 @@
 #include "Sanity.h"
 #include "Schedule.h"
 #include "Apply.h"
+#include "Prelude.h"
 #include "Printer.h"
 #include "Arena.h"
 #include "RetainerProfile.h"
@@ -42,6 +43,7 @@ int   isHeapAlloced       ( StgPtr p);
 static void  checkSmallBitmap    ( StgPtr payload, StgWord bitmap, uint32_t );
 static void  checkLargeBitmap    ( StgPtr payload, StgLargeBitmap*, uint32_t );
 static void  checkClosureShallow ( const StgClosure * );
+static void  checkPtrTag         ( const StgClosure *, bool );
 
 static void  checkCompactObjects (bdescr *bd);
 
@@ -72,6 +74,7 @@ checkSmallBitmap( StgPtr payload, StgWord bitmap, uint32_t size )
     for(i = 0; i < size; i++, bitmap >>= 1 ) {
         if ((bitmap & 1) == 0) {
             checkClosureShallow((StgClosure *)payload[i]);
+            checkPtrTag((StgClosure *)payload[i], false);
         }
     }
 }
@@ -89,8 +92,123 @@ checkLargeBitmap( StgPtr payload, StgLargeBitmap* large_bitmap, uint32_t size )
         for(; i < size && j < BITS_IN(W_); j++, i++, bitmap >>= 1 ) {
             if ((bitmap & 1) == 0) {
                 checkClosureShallow((StgClosure *)payload[i]);
+                checkPtrTag((StgClosure *)payload[i], false);
             }
         }
+    }
+}
+
+/* Note [Sanity-checking pointer tags]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * checkPtrTag asserts the pointer-tagging invariant (#23173) at rest: a
+ * pointer to a constructor carries its constructor tag (see tagConstr in
+ * ClosureMacros.h and get_iptr_tag in sm/Compact.c), and a pointer to a boxed
+ * unlifted primitive (MVar#, MutVar#, the arrays, ...) carries tag 1 (see
+ * Note [Pointer tagging of unlifted boxed primitives] in GHC.StgToCmm.Prim).
+ * The invariant is otherwise enforced only by crashing entry code, which
+ * catches a stripped tag only if the pointer is subsequently entered; this
+ * check catches tag-stripping pointer-rewriting paths (Evac, Compact,
+ * NonMovingShortcut, ...) mechanically on every sanity-checked GC.
+ *
+ * It is called only on user-level fields (stack bitmap slots, PAP/AP
+ * payloads, constructor/fun/thunk payloads, array elements, MutVar/TVar/MVar
+ * values, IND indirectees), because the RTS also holds internal untagged
+ * links. The rules exempt:
+ *
+ *  - static constructors: RTS sentinels (stg_END_TSO_QUEUE_closure, ...) are
+ *    CONSTR_NOCAFs that C code stores untagged, e.g. as an empty MVar's
+ *    value, so only heap-allocated constructors are checked;
+ *
+ *  - large-family constructors (con_tag >= TAG_MASK): tag is capped at
+ *    TAG_MASK, so no exact requirement is asserted;
+ *
+ *  - WEAK, TSO, STACK, BLOCKING_QUEUE, PRIM, MUT_PRIM: user-level references
+ *    (Weak#, ThreadId#, ...) to these are tagged, but legitimate untagged
+ *    RTS-internal links (weak_ptr_list, run queues, tso->_link, STM
+ *    structures) reach the same traversals;
+ *
+ *  - C_FINALIZER_LIST nodes: although their info table is a CONSTR, they
+ *    are RTS-internal. All references to them — StgWeak.cfinalizers and the
+ *    nodes' link fields — are untagged links built by stg_addCFinalizerToWeakzh
+ *    (PrimOps.cmm) and walked raw by runCFinalizers (Weak.c); user code never
+ *    holds a reference to one. (The compacting GC preserves untaggedness:
+ *    unthread re-applies get_iptr_tag only to originally-tagged references.)
+ *
+ *  - fields of ghc-heap's Box (GHC.Internal.Heap.Closures): `data Box = Box
+ *    Any` wraps a pointer word captured verbatim by heap/stack introspection
+ *    (unpackClosure#, ghc-heap's stack decoding), so it carries whatever tag
+ *    the source bits had — possibly none. Box is recognized via
+ *    ghc_hs_iface->Box_con_info, NULL-guarded since sanity checks can run
+ *    before ghc-internal registers the interface;
+ *
+ *  - BLACKHOLE indirectees (no call site on that field): tag 0 there means
+ *    "not yet updated". Plain IND indirectees are checked;
+ *
+ *  - bitmap-walked slots (stack frames, PAP/AP payloads; heap_field =
+ *    false): hand-written Cmm legitimately stores untagged pointers there.
+ *    Codegen untags unlifted boxed primop arguments at the Cmm call
+ *    boundary, and generic RTS frames save those already-untagged arguments
+ *    on the stack (the stg_block_{take,read,put}mvar frames and the
+ *    stg_gc_prim_* heap-check-retry frames in HeapStackCheck.cmm); Cmm code
+ *    also keeps deliberately untagged working pointers live across calls
+ *    (e.g. stg_compactAddWorkerzh's "p"), landing them in return-frame
+ *    slots. Such slots hence get no constructor rule, and the unlifted-
+ *    primitive rule is relaxed to tag 0-or-1 (still catching corrupt tags).
+ *    The strict rules apply to heap fields, where all the tag-stripping GC
+ *    bugs lived.
+ */
+static void
+checkPtrTag( const StgClosure *q, bool heap_field )
+{
+    const StgClosure *p = UNTAG_CONST_CLOSURE(q);
+    const StgInfoTable *raw_info = ACQUIRE_LOAD(&p->header.info);
+    if (IS_FORWARDING_PTR(raw_info)) return;
+    const StgInfoTable *info = INFO_PTR_TO_STRUCT(raw_info);
+
+    switch (info->type) {
+    case CONSTR:
+    case CONSTR_1_0:
+    case CONSTR_0_1:
+    case CONSTR_2_0:
+    case CONSTR_1_1:
+    case CONSTR_0_2:
+    case CONSTR_NOCAF:
+    {
+        // RTS-internal untagged links; see the C_FINALIZER_LIST bullet in
+        // Note [Sanity-checking pointer tags].
+        if (raw_info == &stg_C_FINALIZER_LIST_info) {
+            break;
+        }
+        StgWord con_tag = (StgWord)info->srt + 1;
+        if (heap_field && con_tag <= TAG_MASK && HEAP_ALLOCED((StgPtr)p)) {
+            ASSERT(GET_CLOSURE_TAG(q) == con_tag);
+        }
+        break;
+    }
+
+    case ARR_WORDS:
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
+    case MUT_ARR_PTRS_FROZEN_CLEAN:
+    case MUT_ARR_PTRS_FROZEN_DIRTY:
+    case SMALL_MUT_ARR_PTRS_CLEAN:
+    case SMALL_MUT_ARR_PTRS_DIRTY:
+    case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+    case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
+    case MUT_VAR_CLEAN:
+    case MUT_VAR_DIRTY:
+    case MVAR_CLEAN:
+    case MVAR_DIRTY:
+    case TVAR:
+        if (heap_field) {
+            ASSERT(GET_CLOSURE_TAG(q) == 1);
+        } else {
+            ASSERT(GET_CLOSURE_TAG(q) <= 1);
+        }
+        break;
+
+    default:
+        break;
     }
 }
 
@@ -102,6 +220,8 @@ checkLargeBitmap( StgPtr payload, StgLargeBitmap* large_bitmap, uint32_t size )
 static void
 checkClosureShallow( const StgClosure* p )
 {
+    // No checkPtrTag here: checkCompactObjects calls this on raw
+    // (necessarily untagged) object addresses, not on stored pointers.
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(UNTAG_CONST_CLOSURE(p)));
 }
 
@@ -129,10 +249,12 @@ checkStackFrame( StgPtr c )
     case STOP_FRAME:
     case RET_SMALL:
     case ANN_FRAME:
+    {
         size = BITMAP_SIZE(info->i.layout.bitmap);
         checkSmallBitmap((StgPtr)c + 1,
                          BITMAP_BITS(info->i.layout.bitmap), size);
         return 1 + size;
+    }
 
     case RET_BCO: {
         StgBCO *bco;
@@ -377,6 +499,8 @@ checkClosure( const StgClosure* p )
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->head));
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->tail));
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->value));
+        // head/tail are RTS-internal TSO queue links; only value is user-level
+        checkPtrTag(mvar->value, true);
         return sizeofW(StgMVar);
       }
 
@@ -390,6 +514,7 @@ checkClosure( const StgClosure* p )
         uint32_t i;
         for (i = 0; i < info->layout.payload.ptrs; i++) {
           ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgThunk *)p)->payload[i]));
+          checkPtrTag(((StgThunk *)p)->payload[i], true);
         }
         return thunk_sizeW_fromITBL(info);
       }
@@ -407,14 +532,33 @@ checkClosure( const StgClosure* p )
     case CONSTR_1_1:
     case CONSTR_0_2:
     case CONSTR_2_0:
-    case BLACKHOLE:
-    case PRIM:
-    case MUT_PRIM:
     case MUT_VAR_CLEAN:
     case MUT_VAR_DIRTY:
     case TVAR:
     case THUNK_STATIC:
     case FUN_STATIC:
+        {
+            // ghc-heap's Box holds a raw captured pointer word; see the Box
+            // bullet in Note [Sanity-checking pointer tags].
+            bool box = ghc_hs_iface != NULL
+                && ACQUIRE_LOAD(&p->header.info) == Box_con_info;
+            uint32_t i;
+            for (i = 0; i < info->layout.payload.ptrs; i++) {
+                ASSERT(LOOKS_LIKE_CLOSURE_PTR(p->payload[i]));
+                if (!box) {
+                    checkPtrTag(p->payload[i], true);
+                }
+            }
+            return sizeW_fromITBL(info);
+        }
+
+    // As above, but without checkPtrTag: a BLACKHOLE indirectee legitimately
+    // carries tag 0 ("not yet updated"), and PRIM/MUT_PRIM/COMPACT_NFDATA
+    // payloads are RTS-internal links.
+    // See Note [Sanity-checking pointer tags].
+    case BLACKHOLE:
+    case PRIM:
+    case MUT_PRIM:
     case COMPACT_NFDATA:
         {
             uint32_t i;
@@ -480,6 +624,7 @@ checkClosure( const StgClosure* p )
              */
             StgInd *ind = (StgInd *)p;
             ASSERT(LOOKS_LIKE_CLOSURE_PTR(ind->indirectee));
+            checkPtrTag(ind->indirectee, true);
             return sizeofW(StgInd);
         }
 
@@ -529,6 +674,7 @@ checkClosure( const StgClosure* p )
             uint32_t i;
             for (i = 0; i < a->ptrs; i++) {
                 ASSERT(LOOKS_LIKE_CLOSURE_PTR(a->payload[i]));
+                checkPtrTag(a->payload[i], true);
             }
             return mut_arr_ptrs_sizeW(a);
         }
@@ -541,6 +687,7 @@ checkClosure( const StgClosure* p )
             StgSmallMutArrPtrs *a = (StgSmallMutArrPtrs *)p;
             for (uint32_t i = 0; i < a->ptrs; i++) {
                 ASSERT(LOOKS_LIKE_CLOSURE_PTR(a->payload[i]));
+                checkPtrTag(a->payload[i], true);
             }
             return small_mut_arr_ptrs_sizeW(a);
         }
