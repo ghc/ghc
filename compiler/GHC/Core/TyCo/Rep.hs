@@ -33,7 +33,7 @@ module GHC.Core.TyCo.Rep (
         ForAllTyFlag(..), FunTyFlag(..),
 
         -- * Coercions
-        Coercion(..), CoSel(..), FunSel(..),
+        Coercion(..), CoSel(..), FunSel(..), Role(..),
         UnivCoProvenance(..),
         CoercionHole(..), CoercionPlusHoles(..), coHoleCoVar, setCoHoleCoVar,
         CoercionN, CoercionR, CoercionP, KindCoercion,

@@ -422,6 +422,7 @@ Library
         GHC.CoreToStg.Prep
         GHC.CoreToStg.AddImplicitBinds
         GHC.Core.TyCo.FVs
+        GHC.Core.TyCo.Make
         GHC.Core.TyCo.Compare
         GHC.Core.TyCon
         GHC.Core.TyCon.Env

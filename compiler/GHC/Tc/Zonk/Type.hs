@@ -510,8 +510,8 @@ zonk_tycomapper = TyCoMapper
   , tcm_tycobinder = \ env tcv _vis k -> flip runZonkT env $
                      runZonkBndrT (zonkTyBndrX tcv) $
                      \ tcv' -> ZonkT $ \ env' -> (k env' tcv')
-  , tcm_tycon      = \ tc -> zonkTcTyConToTyCon tc
-  }
+  , tcm_tycon      = \ _ tc tys' -> do { tc' <- zonkTcTyConToTyCon tc
+                                       ; return (mkTyConApp tc' tys') } }
 
 -- Zonk a TyCon by changing a TcTyCon to a regular TyCon
 zonkTcTyConToTyCon :: TcTyCon -> TcM TyCon
