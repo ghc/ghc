@@ -1049,7 +1049,8 @@ loop:
           mine = copyPart(p,(StgClosure *)stack, stack_sizeW(stack),
                           sizeofW(StgStack), gen_no, tag);
           if (mine) {
-              new_stack = (StgStack *)*p;
+              // copyPart stores the forwarded reference with its tag.
+              new_stack = (StgStack *)UNTAG_CLOSURE(*p);
               move_STACK(stack, new_stack);
               for (r = stack->sp, s = new_stack->sp;
                    r < stack->stack + stack->stack_size;) {
