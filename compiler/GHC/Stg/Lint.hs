@@ -434,11 +434,15 @@ The Lint monad
 ************************************************************************
 -}
 
+data LintReaderEnv = LintReaderEnv
+  { le_mod ::  !Module
+  , le_flags :: !LintFlags
+  , le_diag_opts :: !DiagOpts  -- Diagnostic options
+  , le_ppr_opts :: !StgPprOpts  -- Pretty-printing options
+  }
+
 newtype LintM a = LintM'
-    { unLintM :: Module
-              -> LintFlags
-              -> DiagOpts          -- Diagnostic options
-              -> StgPprOpts        -- Pretty-printing options
+    { unLintM :: LintReaderEnv
               -> [LintLocInfo]     -- Locations
               -> IdSet             -- Local vars in scope
               -> Bag SDoc        -- Error messages so far
@@ -446,16 +450,13 @@ newtype LintM a = LintM'
     }
 instance Functor LintM where
   fmap f (LintM m) =
-    LintM $ \mod lf diag_opts opts loc scope errs ->
-      case m mod lf diag_opts opts loc scope errs of
+    LintM $ \env loc scope errs ->
+      case m env loc scope errs of
         (a, errs') -> (f a, errs')
 
 -- See Note [The one-shot state monad trick] in GHC.Utils.Monad
 {-# COMPLETE LintM #-}
-pattern LintM :: (Module
-              -> LintFlags
-              -> DiagOpts
-              -> StgPprOpts
+pattern LintM :: (LintReaderEnv
               -> [LintLocInfo]
               -> IdSet
               -> Bag SDoc
@@ -463,13 +464,10 @@ pattern LintM :: (Module
               -> LintM a
 pattern LintM m <- LintM' m
   where
-    LintM m = LintM' $ oneShot (\mod -> oneShot
-                                (\lf -> oneShot
-                                  (\diag_opts -> oneShot
-                                    (\opts -> oneShot
+    LintM m = LintM' $ oneShot (\env -> oneShot
                                       (\loc -> oneShot
                                         (\scope -> oneShot
-                                          (\errs -> m mod lf diag_opts opts loc scope errs)))))))
+                                          (\errs -> m env loc scope errs))))
 
 data LintFlags = LintFlags { lf_unarised :: !Bool
                            , lf_platform :: !Platform
@@ -500,14 +498,16 @@ pp_binders bs
 
 initL :: Platform -> DiagOpts -> Module -> Bool -> StgPprOpts -> IdSet -> LintM a -> Maybe SDoc
 initL platform diag_opts this_mod unarised opts locals (LintM m) = do
-  let (_, errs) = m this_mod (LintFlags unarised platform) diag_opts opts [] locals emptyBag
+  let !flags = LintFlags unarised platform
+      !env = LintReaderEnv this_mod flags diag_opts opts
+      (_, errs) = m env [] locals emptyBag
   if isEmptyBag errs then
       Nothing
   else
       Just (vcat (punctuate blankLine (bagToList errs)))
 
 instance Applicative LintM where
-      pure a = LintM $ \_mod _lf _df _opts _loc _scope errs -> (a, errs)
+      pure a = LintM $ \_env _loc _scope errs -> (a, errs)
       (<*>) = ap
       (*>)  = thenL_
 
@@ -516,14 +516,14 @@ instance Monad LintM where
     (>>)  = (*>)
 
 thenL :: LintM a -> (a -> LintM b) -> LintM b
-thenL m k = LintM $ \mod lf diag_opts opts loc scope errs
-  -> case unLintM m mod lf diag_opts opts loc scope errs of
-      (r, errs') -> unLintM (k r) mod lf diag_opts opts loc scope errs'
+thenL m k = LintM $ \env loc scope errs
+  -> case unLintM m env loc scope errs of
+      (r, errs') -> unLintM (k r) env loc scope errs'
 
 thenL_ :: LintM a -> LintM b -> LintM b
-thenL_ m k = LintM $ \mod lf diag_opts opts loc scope errs
-  -> case unLintM m mod lf diag_opts opts loc scope errs of
-      (_, errs') -> unLintM k mod lf diag_opts opts loc scope errs'
+thenL_ m k = LintM $ \env loc scope errs
+  -> case unLintM m env loc scope errs of
+      (_, errs') -> unLintM k env loc scope errs'
 
 checkL :: Bool -> SDoc -> LintM ()
 checkL True  _   = return ()
@@ -552,7 +552,8 @@ checkPostUnariseId id
     id_ty = idType id
 
 addErrL :: SDoc -> LintM ()
-addErrL msg = LintM $ \_mod _lf df _opts loc _scope errs -> ((), addErr df errs msg loc)
+addErrL msg = LintM $ \LintReaderEnv{le_diag_opts = df} loc _scope errs
+  -> ((), addErr df errs msg loc)
 
 addErr :: DiagOpts -> Bag SDoc -> SDoc -> [LintLocInfo] -> Bag SDoc
 addErr diag_opts errs_so_far msg locs
@@ -564,23 +565,23 @@ addErr diag_opts errs_so_far msg locs
     mk_msg []      = msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
-addLoc extra_loc m = LintM $ \mod lf diag_opts opts loc scope errs
-   -> unLintM m mod lf diag_opts opts (extra_loc:loc) scope errs
+addLoc extra_loc m = LintM $ \env loc scope errs
+   -> unLintM m env (extra_loc:loc) scope errs
 
 addInScopeVars :: [Id] -> LintM a -> LintM a
-addInScopeVars ids m = LintM $ \mod lf diag_opts opts loc scope errs
+addInScopeVars ids m = LintM $ \env loc scope errs
  -> let
         new_set = mkVarSet ids
-    in unLintM m mod lf diag_opts opts loc (scope `unionVarSet` new_set) errs
+    in unLintM m env loc (scope `unionVarSet` new_set) errs
 
 getLintFlags :: LintM LintFlags
-getLintFlags = LintM $ \_mod lf _df _opts _loc _scope errs -> (lf, errs)
+getLintFlags = LintM $ \LintReaderEnv{le_flags = lf} _loc _scope errs -> (lf, errs)
 
 getStgPprOpts :: LintM StgPprOpts
-getStgPprOpts = LintM $ \_mod _lf _df opts _loc _scope errs -> (opts, errs)
+getStgPprOpts = LintM $ \LintReaderEnv{le_ppr_opts = opts} _loc _scope errs -> (opts, errs)
 
 checkInScope :: Id -> LintM ()
-checkInScope id = LintM $ \mod _lf diag_opts _opts loc scope errs
+checkInScope id = LintM $ \LintReaderEnv{le_mod = mod, le_diag_opts = diag_opts} loc scope errs
  -> if nameIsLocalOrFrom mod (idName id) && not (id `elemVarSet` scope) then
         ((), addErr diag_opts errs (hsep [ppr id, dcolon, ppr (idType id),
                                     text "is out of scope"]) loc)
