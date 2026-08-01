@@ -55,3 +55,5 @@ test('patsyn_where_fail1', normal, compile_fail, [''])
 test('patsyn_where_fail2', normal, compile_fail, [''])
 test('patsyn_where_fail3', normal, compile_fail, [''])
 test('patsyn_where_fail4', normal, compile_fail, [''])
+
+test('T27440d', normal, compile_fail, [''])
