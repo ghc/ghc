@@ -1,0 +1,9 @@
+section: compiler
+issues: #27583
+mrs: !16434
+synopsis:
+  Fix spurious out-of-scope errors from ``type ty`` in a pattern synonym RHS
+description:
+  A required type argument with an explicit namespace specifier (``type ty``)
+  in the right-hand side of an implicitly bidirectional pattern synonym no
+  longer reports variables bound by the pattern as out of scope.
