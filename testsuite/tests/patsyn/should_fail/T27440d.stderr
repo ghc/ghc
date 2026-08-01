@@ -1,0 +1,12 @@
+T27440d.hs:7:22: error: [GHC-25897]
+    • Couldn't match expected type ‘a’ with actual type ‘a1’
+      ‘a1’ is a rigid type variable bound by
+        a pattern with constructor: MkS :: forall a. Show a => a -> S,
+        in a pattern synonym declaration
+        at T27440d.hs:7:15-22
+      ‘a’ is a rigid type variable bound by
+        the signature for pattern synonym ‘P’
+        at T27440d.hs:6:14-29
+    • In the declaration for pattern synonym ‘P’
+    • Relevant bindings include x :: a1 (bound at T27440d.hs:7:22)
+

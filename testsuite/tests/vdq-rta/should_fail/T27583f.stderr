@@ -1,0 +1,24 @@
+T27583f.hs:12:16: error: [GHC-83865]
+    • Couldn't match expected type ‘Int’ with actual type ‘Bool’
+    • In the pattern: MkT Bool n
+      In the declaration for pattern synonym ‘P1’
+
+T27583f.hs:15:16: error: [GHC-83865]
+    • Couldn't match expected type ‘Int’ with actual type ‘Bool’
+    • In the pattern: MkT (type Bool) n
+      In the declaration for pattern synonym ‘P2’
+
+T27583f.hs:18:16: error: [GHC-83865]
+    • Couldn't match type ‘Bool’ with ‘Int’
+      Expected: Maybe Int
+        Actual: Maybe Bool
+    • In the pattern: MkT (Maybe Bool) n
+      In the declaration for pattern synonym ‘P3’
+
+T27583f.hs:21:16: error: [GHC-83865]
+    • Couldn't match type ‘Bool’ with ‘Int’
+      Expected: Maybe Int
+        Actual: Maybe Bool
+    • In the pattern: MkT (type (Maybe Bool)) n
+      In the declaration for pattern synonym ‘P4’
+

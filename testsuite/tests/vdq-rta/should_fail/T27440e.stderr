@@ -1,0 +1,5 @@
+T27440e.hs:8:19: error: [GHC-88754]
+    • Ill-formed type pattern: @a
+    • In the pattern: MkT @a x
+      In the declaration for pattern synonym ‘P’
+
