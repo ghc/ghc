@@ -138,7 +138,7 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
        ; (tclvl, wanted, ((lpat', args), pat_ty))
             <- pushLevelAndCaptureConstraints      $
                tcInferPat FRRPatSynArg PatSyn lpat $
-               mapM tcLookupId arg_names
+               mapM tcLookupPatSynArg arg_names
 
        ; let (ex_tvs, prov_dicts) = tcCollectEx lpat'
 
@@ -473,7 +473,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
            -- location to x's binding site in lpat, namely the 'x' in Just (x,True).
            -- Else the error message location is wherever tcCheckPat finished,
            -- namely the right-hand corner of the pattern
-        do { arg_id <- tcLookupId arg_name
+        do { arg_id <- tcLookupPatSynArg arg_name
            ; wrap <- tcSubTypeSigma (OccurrenceOf (idName arg_id))
                                     GenSigCtxt
                                     (idType arg_id)
@@ -645,6 +645,19 @@ collectPatSynArgInfo details =
     PrefixCon names      -> (map unLoc names, False)
     InfixCon name1 name2 -> (map unLoc [name1, name2], True)
     RecCon names         -> (map (unLoc . recordPatSynPatVar) names, False)
+
+-- | Look up the 'Id' bound by the pattern for a declared argument of a pattern
+-- synonym. With @RequiredTypeArguments@ the argument may turn out to be a type
+-- variable, e.g. @pattern P x = MkT x@ where the argument of @MkT@ is a required
+-- type argument; then we report an illegal term-level use of @x@ (#27586).
+tcLookupPatSynArg :: Name -> TcM Id
+tcLookupPatSynArg arg_name
+  = do { thing <- tcLookup arg_name
+       ; case thing of
+           ATcId { tct_id = id } -> return id
+           AGlobal (AnId id)     -> return id
+           ATyVar {}             -> failIllegalTyVar (noUserRdr arg_name)
+           _                     -> pprPanic "tcLookupPatSynArg" (ppr arg_name) }
 
 wrongNumberOfParmsErr :: Name -> Arity -> Arity -> TcM a
 wrongNumberOfParmsErr name decl_arity missing

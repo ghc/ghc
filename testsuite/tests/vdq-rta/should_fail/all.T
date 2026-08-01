@@ -35,3 +35,6 @@ test('T25127_fail_arity', normal, compile_fail, [''])
 
 test('T27440e', normal, compile_fail, [''])
 test('T27583f', normal, compile_fail, [''])
+test('T27586a', normal, compile_fail, [''])
+test('T27586b', normal, compile_fail, [''])
+test('T27586c', normal, compile_fail, [''])
