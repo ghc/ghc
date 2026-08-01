@@ -1,0 +1,5 @@
+T27586b.hs:8:15: error: [GHC-01928]
+    • Illegal term-level use of the type variable ‘x’
+    • bound at T27586b.hs:8:19
+    • In the declaration for pattern synonym ‘P’
+
