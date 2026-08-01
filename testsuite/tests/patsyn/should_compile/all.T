@@ -87,3 +87,7 @@ test('T23038', normal, compile_fail, [''])
 test('T22328', normal, compile, [''])
 test('T26331', normal, compile, [''])
 test('T26331a', normal, compile, [''])
+
+test('T27440a', normal, compile, [''])
+test('T27440b', normal, compile, [''])
+test('T27440c', normal, compile, [''])

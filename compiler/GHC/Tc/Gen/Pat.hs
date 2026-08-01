@@ -21,6 +21,7 @@ module GHC.Tc.Gen.Pat
    , tcCheckPat, tcCheckPat_O, tcInferPat
    , tcMatchPats
    , addDataConStupidTheta
+   , zipPatsBndrs
    )
 where
 
@@ -1721,7 +1722,7 @@ split_con_ty_args :: LexicalFixity        -- How to wrap value arguments
                          , [(HsTyPat GhcRn, TyVar)]   -- Existentials
                          , HsConPatDetails GhcRn )    -- Value arguments
 split_con_ty_args fixity con_like arg_pats = do
-  (bndr_ty_arg_prs, value_args) <- zip_pats_bndrs arg_pats (conLikeUserTyVarBinders con_like)
+  (bndr_ty_arg_prs, value_args) <- zipPatsBndrs arg_pats (conLikeUserTyVarBinders con_like)
   return $ if null ex_tvs  -- Short cut common case
            then (bndr_ty_arg_prs, [], mk_details fixity value_args)
            else let (ex_prs, univ_prs) = partition is_existential bndr_ty_arg_prs
@@ -1737,24 +1738,75 @@ split_con_ty_args fixity con_like arg_pats = do
       -- InfixCon becomes PrefixCon if there are fewer than 2 value arguments.
       -- Test case: T25127_infix
 
-zip_pats_bndrs :: [LPat GhcRn] -> [TyVarBinder] -> TcM ([(HsTyPat GhcRn, TyVar)], [LPat GhcRn])
-zip_pats_bndrs (L loc pat : pats) (Bndr tv vis : tvbs)
+-- | Line the arguments of a 'ConPat' up against the 'TyVarBinder's of its
+-- 'ConLike', returning the type arguments with the binders they instantiate,
+-- and the remaining value arguments.
+--
+-- See Note [Zipping ConPat arguments with TyVarBinders]
+--
+-- Precondition: 'check_con_pat_arity' has passed for these arguments, so that
+-- we never run out of patterns while a required binder remains.
+zipPatsBndrs :: [LPat GhcRn] -> [TyVarBinder] -> TcM ([(HsTyPat GhcRn, TyVar)], [LPat GhcRn])
+zipPatsBndrs (L loc pat : pats) (Bndr tv vis : tvbs)
   | isVisibleForAllTyFlag vis
   = do { tp <- setSrcSpanA loc $ pat_to_type_pat pat
-       ; (prs, pats') <- zip_pats_bndrs pats tvbs
+       ; (prs, pats') <- zipPatsBndrs pats tvbs
        ; return ((tp, tv) : prs, pats') }
   | InvisPat pat_spec tp <- pat
   , Invisible spec <- vis
   , pat_spec == spec
-  = do { (prs, pats') <- zip_pats_bndrs pats tvbs
+  = do { (prs, pats') <- zipPatsBndrs pats tvbs
        ; return ((tp, tv):prs, pats') }
-zip_pats_bndrs pats (Bndr _ vis : tvbs)
-  -- zip_pats_bndrs [] (Bndr _ Required : tvbs)
+zipPatsBndrs pats (Bndr _ vis : tvbs)
+  -- zipPatsBndrs [] (Bndr _ Required : tvbs)
   --   is ruled out by the arity check in splitConTyArgs,
   --   so we can assume (isInvisibleForAllTyFlag vis)
   = do { massert (isInvisibleForAllTyFlag vis)
-       ; zip_pats_bndrs pats tvbs }
-zip_pats_bndrs pats [] = return ([], pats)
+       ; zipPatsBndrs pats tvbs }
+zipPatsBndrs pats [] = return ([], pats)
+
+{- Note [Zipping ConPat arguments with TyVarBinders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The zipPatsBndrs function allows us to line up the arguments of a constructor
+pattern `MkT p1 p2 ... pn` with the TyVarBinders of MkT's type. Consider
+
+  MkT :: forall a b. forall c d -> a -> T a b c d
+
+Then, in a pattern match `MkT @s (type t) p q`, we have the following
+correspondence:
+
+  * pattern `@s`     with the TyVarBinder `forall a.`
+  * no pattern       with the TyVarBinder `forall b.`
+  * pattern `type t` with the TyVarBinder `forall c ->`
+  * pattern `p`      with the TyVarBinder `forall d ->`
+  * pattern `q`      is the one remaining value argument
+
+Note how `p` and `q` are exactly alike, and only the TyVarBinder can tell us
+that `p` is a required type argument rather than a value argument.
+
+So the call (zipPatsBndrs pats tvbs) with the inputs
+
+  pats  =   [@s, type t, p, q]
+  tvbs  =   [Bndr a Spec, Bndr b Spec, Bndr c Req, Bndr d Req]
+
+produces the following (ty_pats, val_pats) outputs:
+
+  ty_pats  = [(s, a), (t, c), (p, d)]
+  val_pats = [q]   -- remaining value arguments
+
+Note that the ty_pats components are stripped: the type patterns have lost the
+`@` or the `type` herald, and the binders have been reduced to their TyVars.
+
+This is currently used in two ways:
+
+1. In tcDataConPat/tcPatSynPat (via splitConTyArgs) to pass the type arguments
+   onto tcConTyArgs and the value arguments onto tcConValArgs.
+   See Note [Type applications in patterns] for more details.
+
+2. In tcPatToExpr, to discard the type arguments in the RHS of an implicitly
+   bidirectional pattern synonym, keeping only the value arguments.
+   See Note [Discarding types in the builder expression] in GHC.Tc.TyCl.PatSyn.
+-}
 
 tcConTyArgs :: Subst -> PatEnv -> [(HsTyPat GhcRn, TyVar)]
             -> TcM a -> TcM a

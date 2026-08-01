@@ -32,3 +32,6 @@ test('T24159_type_syntax_tc_fail', normal, compile_fail, [''])
 test('T24159_type_syntax_th_fail', normal, ghci_script, ['T24159_type_syntax_th_fail.script'])
 test('T25127_fail_th_quote', normal, compile_fail, [''])
 test('T25127_fail_arity', normal, compile_fail, [''])
+
+test('T27440e', normal, compile_fail, [''])
+test('T27583f', normal, compile_fail, [''])

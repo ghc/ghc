@@ -49,3 +49,5 @@ test('T14552', normal, compile_fail, [''])
 test('T18856', normal, compile_fail, ['-fdiagnostics-show-caret'])
 test('T21479', normal, compile_fail, [''])
 test('T23467', normal, compile_fail, [''])
+
+test('T27440d', normal, compile_fail, [''])
