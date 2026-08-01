@@ -142,7 +142,7 @@ For 1-d, 2-d, and 3-d arrays of Int we have specialised instances to avoid this.
 
 Note [Out-of-bounds error messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The default method for 'index' generates hoplelessIndexError, because
+The default method for 'index' generates 'hopelessIndexError', because
 Ix doesn't have Show as a superclass.  For particular base types we
 can do better, so we override the default method for index.
 
