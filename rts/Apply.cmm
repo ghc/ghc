@@ -54,6 +54,25 @@ import CLOSURE stg_restore_cccs_eval_info;
  * everything being returned is guaranteed evaluated, so it would be a no-op.
  */
 
+/* -----------------------------------------------------------------------------
+   Evaluate a value whose type rules out functions.
+
+   A specialisation of stg_ap_0_fast (below) to closures that are a
+   thunk, a constructor, or an indirection to one: the FUN/PAP/BCO arms
+   of the generic evaluation are unreachable, and an indirection's own
+   entry code performs the following, so evaluation reduces to the tag
+   test and an entry jump. The code generator jumps here to evaluate in
+   tail position; see emitEnter in GHC.StgToCmm.Expr.
+   -------------------------------------------------------------------------- */
+
+stg_enter_data ( P_ x )
+{
+    if (GETTAG(x) != 0) {
+        return (x);
+    }
+    jump %GET_ENTRY(x) (x);
+}
+
 STRING(stg_ap_0_ret_str,"stg_ap_0_ret... ")
 
 stg_ap_0_fast ( P_ fun )

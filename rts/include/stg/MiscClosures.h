@@ -302,6 +302,7 @@ RTS_RET(stg_ap_ppppp);
 RTS_RET(stg_ap_pppppp);
 
 RTS_FUN_DECL(stg_ap_0_fast);
+RTS_FUN_DECL(stg_enter_data);
 RTS_FUN_DECL(stg_ap_v_fast);
 RTS_FUN_DECL(stg_ap_f_fast);
 RTS_FUN_DECL(stg_ap_d_fast);

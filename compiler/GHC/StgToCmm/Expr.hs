@@ -35,7 +35,9 @@ import GHC.Cmm.Graph
 import GHC.Cmm.BlockId
 import GHC.Cmm hiding ( succ )
 import GHC.Cmm.Info
-import GHC.Cmm.Utils ( cmmTagMask, mkWordCLit, cmmLoadGCWord )
+import GHC.Cmm.Utils ( cmmTagMask, mkWordCLit )
+import GHC.Cmm.CLabel ( mkCmmCodeLabel )
+import GHC.Unit ( rtsUnitId )
 import GHC.Platform.Tag ( mAX_PTR_TAG )
 import GHC.Core
 import GHC.Core.DataCon
@@ -1190,32 +1192,17 @@ emitEnter fun = do
   ; adjustHpBackwards
   ; sequel      <- getSequel
   ; updfr_off   <- getUpdFrameOff
-  ; align_check <- stgToCmmAlignCheck <$> getStgToCmmConfig
   ; case sequel of
-      -- For a return we test the tag and, if the value is already tagged
-      -- (hence evaluated), return it directly rather than entering it. This
-      -- upholds the invariant that the entry code of a taggable normal form is
-      -- never reached: only an untagged closure is entered. The tag test costs
-      -- a branch on every tail enter, but a tagged value reaching here is the
-      -- common case.
+      -- For a return we evaluate through stg_enter_data, the specialisation
+      -- of stg_ap_0_fast to values whose type rules out functions
+      -- (getCallMethod selects EnterIt only for those): it returns a tagged
+      -- (hence evaluated) value directly and enters an untagged closure, so
+      -- the entry code of a taggable normal form is never reached and the
+      -- tail enter costs a single jump in the generated code.
       Return -> do
-        { fun_tmp <- assignTemp fun
-        ; let funR     = CmmReg (CmmLocal fun_tmp)
-              entry    = entryCode platform
-                       $ closureInfoPtr platform align_check
-                       $ CmmReg (nodeReg platform)
-              ret_addr = entryCode platform
-                       $ cmmLoadGCWord platform (CmmStackSlot Old updfr_off)
-        ; lenter <- newBlockId
-        ; lret   <- newBlockId
-        ; tscope <- getTickScope
-        ; emit $
-            mkCbranch (cmmIsTagged platform funR) lret lenter Nothing <*>
-            outOfLine lenter
-              ( mkJump profile NativeNodeCall entry [cmmUntag platform funR] updfr_off
-              , tscope ) <*>
-            mkLabel lret tscope <*>
-            mkReturn profile ret_addr [funR] updfr_off
+        { let enter_data = CmmLit (CmmLabel
+                             (mkCmmCodeLabel rtsUnitId (fsLit "stg_enter_data")))
+        ; emit $ mkJump profile NativeNodeCall enter_data [fun] updfr_off
         ; return AssignedDirectly
         }
 
