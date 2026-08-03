@@ -47,6 +47,21 @@ import CLOSURE stg_apply_interp_info;
 import CLOSURE stg_restore_cccs_eval_info;
 #endif
 
+/* Force a lifted closure whose type rules out functions: return it if it is already
+ * tagged, enter it otherwise.  The code generator jumps here to evaluate
+ * lifted data in tail position; see Note [Forcing lifted data] in
+ * GHC.StgToCmm.Expr for why.
+ * NB: Function-typed closures must go through the more general stg_ap_0_fast.
+ */
+
+stg_enter_data ( P_ x )
+{
+    if (GETTAG(x) != 0) {
+        return (x);
+    }
+    jump %GET_ENTRY(x) (x);
+}
+
 /* ----------------------------------------------------------------------------
  * Evaluate a closure and return it.
  *

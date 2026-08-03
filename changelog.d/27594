@@ -1,0 +1,10 @@
+section: codegen
+synopsis: Returning lifted, already evaluated data no longer enters its closure
+issues: #27594
+mrs: !16445
+description:
+  In ``f (Just x) = x``, GHC must evaluate ``x`` before returning it, and used
+  to do so by entering ``x``'s closure unconditionally. It now tests ``x``'s
+  pointer tag first and returns ``x`` directly when it is evaluated already,
+  entering the closure only otherwise. Scrutinising a value, as in
+  ``case x of ...``, has always tested the tag this way.

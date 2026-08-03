@@ -36,6 +36,8 @@ import GHC.Cmm.BlockId
 import GHC.Cmm hiding ( succ )
 import GHC.Cmm.Info
 import GHC.Cmm.Utils ( cmmTagMask, mkWordCLit )
+import GHC.Cmm.CLabel ( mkCmmCodeLabel )
+import GHC.Unit ( rtsUnitId )
 import GHC.Platform.Tag ( mAX_PTR_TAG )
 import GHC.Core
 import GHC.Core.DataCon
@@ -1183,6 +1185,47 @@ cgIdApp fun_id args = do
 --     DynFlags, then passed to StgToCmmConfig for this phase.
 
 
+{- Note [Forcing lifted data]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  f :: Maybe Bool -> Bool
+  f (Just x) = x
+
+After `f` pattern-matches on the `Just` it must then evaluate `x` and
+return it to the caller.  It could do so by unconditionally entering the
+code in x's closure, but we don't want to do so for two reasons:
+
+* If the RHS had been `case x of (a,b) -> blah`, GHC generates an inline test
+  for EPT; for non-tagged pointers, it then pushes a return address and
+  enters it (see the AssignTo case of emitEnter, below).  It would be
+  consistent to do the same for tail calls too.
+
+* Finally, if we adopt the design described in #23173, if x is untagged, its
+  entry code might warn or panic.  In that case we definitely should not to enter
+  it.
+
+Where are these decisions taken?  getCallMethod (GHC.StgToCmm.Closure)
+classifies the application and cgIdApp dispatches on the result.
+Since `Bool` is not a function type and `x` is not statically EPT
+(See Note [EPT enforcement]), we land in the EnterIt case under a Return
+sequel. In that case, emitEnter emits a jump to the RTS stub stg_enter_data
+(rts/Apply.cmm), which tests the tag, returns the pointer if it is set and
+enters the closure otherwise.
+
+Why a stub here, when the AssignTo case inlines it?  There the continuation is
+a known address that the code can directly jump to. If we were creating a stub
+as well, it would become a register-indirect jump that would be difficult to
+predict by the CPU.
+Under Return, the continuation's address is unknown, so inlining the stub has
+no specialisation effect, yet incur more code to generate and place in
+potentially tight loops.
+That costs 2.6% more compiler allocation on eval-heavy T13960 and about 19 bytes
+per site, while nofib stays within +-0.2% runtime either way.
+
+See #27594.
+-}
+
 emitEnter :: CmmExpr -> FCode ReturnKind
 emitEnter fun = do
   { platform <- getPlatform
@@ -1190,22 +1233,14 @@ emitEnter fun = do
   ; adjustHpBackwards
   ; sequel      <- getSequel
   ; updfr_off   <- getUpdFrameOff
-  ; align_check <- stgToCmmAlignCheck <$> getStgToCmmConfig
   ; case sequel of
-      -- For a return, we have the option of generating a tag-test or
-      -- not.  If the value is tagged, we can return directly, which
-      -- is quicker than entering the value.  This is a code
-      -- size/speed trade-off: when optimising for speed rather than
-      -- size we could generate the tag test.
-      --
-      -- Right now, we do what the old codegen did, and omit the tag
-      -- test, just generating an enter.
+      -- For a return we jump to stg_enter_data, which returns an already
+      -- tagged pointer to our caller and enters an untagged one.
+      -- See Note [Forcing lifted data]
       Return -> do
-        { let entry = entryCode platform
-                $ closureInfoPtr platform align_check
-                $ CmmReg (nodeReg platform)
-        ; emit $ mkJump profile NativeNodeCall entry
-                        [cmmUntag platform fun] updfr_off
+        { let enter_data = CmmLit (CmmLabel
+                             (mkCmmCodeLabel rtsUnitId (fsLit "stg_enter_data")))
+        ; emit $ mkJump profile NativeNodeCall enter_data [fun] updfr_off
         ; return AssignedDirectly
         }
 

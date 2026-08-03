@@ -842,6 +842,7 @@ extern char **environ;
       SymI_HasDataProto(stg_ap_ppppp_info)                                  \
       SymI_HasDataProto(stg_ap_pppppp_info)                                 \
       SymI_HasDataProto(stg_ap_0_fast)                                      \
+      SymI_HasDataProto(stg_enter_data)                                     \
       SymI_HasDataProto(stg_ap_v_fast)                                      \
       SymI_HasDataProto(stg_ap_f_fast)                                      \
       SymI_HasDataProto(stg_ap_d_fast)                                      \
