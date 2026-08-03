@@ -14,13 +14,11 @@ module GHC.Types.Arity
 
 import GHC.Prelude
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-\subsection[Arity]{Arity}
+            Arity, RepArity, JoinArity, VisArity
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 -- | The number of value arguments that can be applied to a value before it does
 -- "real work". So:

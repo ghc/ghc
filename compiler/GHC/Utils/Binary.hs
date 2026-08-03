@@ -130,17 +130,20 @@ import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
 import Language.Haskell.Syntax.Specificity
 import Language.Haskell.Syntax.Type (PromotionFlag(..))
 
+import GHC.Types.Unique.FM
+import GHC.Types.Basic
+import GHC.Types.SrcLoc
+import GHC.Types.Unique
 import {-# SOURCE #-} GHC.Types.Name (Name)
+
+import GHC.Utils.Exception
+import GHC.Utils.Panic.Plain
+import GHC.Data.FastMutInt
+import GHC.Utils.Fingerprint
+
 import GHC.Data.ShortText (ShortText)
 import GHC.Data.FastString
 import GHC.Data.TrieMap
-import GHC.Utils.Exception
-import GHC.Utils.Panic.Plain
-import GHC.Types.Unique.FM
-import GHC.Data.FastMutInt
-import GHC.Utils.Fingerprint
-import GHC.Types.SrcLoc
-import GHC.Types.Unique
 import GHC.Data.SmallArray
 import qualified GHC.Data.Strict as Strict
 import GHC.Utils.Outputable( JoinPointHood(..) )
@@ -184,7 +187,7 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import GHC.ByteOrder
 import GHC.ForeignPtr           ( unsafeWithForeignPtr )
-import GHC.Exts
+import GHC.Exts hiding( Levity(..) )
 import GHC.IO
 import GHC.Word
 
@@ -2303,3 +2306,91 @@ instance Binary PromotionFlag where
          0 -> return NotPromoted
          1 -> return IsPromoted
          _ -> fail "Binary(IsPromoted): fail)"
+
+---------------------------------------------------------------
+-- Some instances from GHC.Types.Basic
+---------------------------------------------------------------
+
+instance Binary LeftOrRight where
+   put_ bh CLeft  = putByte bh 0
+   put_ bh CRight = putByte bh 1
+
+   get bh = do { h <- getByte bh
+               ; case h of
+                   0 -> return CLeft
+                   _ -> return CRight }
+
+instance Binary FunctionOrData where
+    put_ bh IsFunction = putByte bh 0
+    put_ bh IsData     = putByte bh 1
+    get bh = do
+        h <- getByte bh
+        case h of
+          0 -> return IsFunction
+          1 -> return IsData
+          _ -> panic "Binary FunctionOrData"
+
+instance Binary CbvMark where
+    put_ bh NotMarkedCbv = putByte bh 0
+    put_ bh MarkedCbv    = putByte bh 1
+    get bh =
+      do h <- getByte bh
+         case h of
+           0 -> return NotMarkedCbv
+           1 -> return MarkedCbv
+           _ -> panic "Invalid binary format"
+
+instance Binary RecFlag where
+    put_ bh Recursive =
+            putByte bh 0
+    put_ bh NonRecursive =
+            putByte bh 1
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> return Recursive
+              _ -> return NonRecursive
+
+instance Binary TupleSort where
+    put_ bh BoxedTuple      = putByte bh 0
+    put_ bh UnboxedTuple    = putByte bh 1
+    put_ bh ConstraintTuple = putByte bh 2
+    get bh = do
+      h <- getByte bh
+      case h of
+        0 -> return BoxedTuple
+        1 -> return UnboxedTuple
+        _ -> return ConstraintTuple
+
+instance Binary UnfoldingSource where
+    put_ bh CompulsorySrc   = putByte bh 0
+    put_ bh StableUserSrc   = putByte bh 1
+    put_ bh StableSystemSrc = putByte bh 2
+    put_ bh VanillaSrc      = putByte bh 3
+    get bh = do
+        h <- getByte bh
+        case h of
+            0 -> return CompulsorySrc
+            1 -> return StableUserSrc
+            2 -> return StableSystemSrc
+            _ -> return VanillaSrc
+
+instance Binary Levity where
+  put_ bh = \case
+    Lifted   -> putByte bh 0
+    Unlifted -> putByte bh 1
+  get bh = getByte bh >>= \case
+    0 -> pure Lifted
+    _ -> pure Unlifted
+
+instance Binary TypeOrConstraint where
+  put_ bh = \case
+    TypeLike -> putByte bh 0
+    ConstraintLike -> putByte bh 1
+  get bh = getByte bh >>= \case
+    0 -> pure TypeLike
+    1 -> pure ConstraintLike
+    _ -> panic "TypeOrConstraint.get: invalid value"
+
+deriving via (EnumBinary ImportLevel) instance Binary ImportLevel
+

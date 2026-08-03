@@ -46,11 +46,13 @@ module GHC.Types.Name.Env (
 
 import GHC.Prelude
 
-import GHC.Data.Graph.Directed
+import GHC.Types.Basic( SeqResult )
 import GHC.Types.Name
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Map
+
+import GHC.Data.Graph.Directed
 import GHC.Data.Maybe
 
 {-
@@ -134,7 +136,7 @@ mapMaybeNameEnv    :: (a -> Maybe b) -> NameEnv a -> NameEnv b
 anyNameEnv         :: (elt -> Bool) -> NameEnv elt -> Bool
 mapNameEnv         :: (elt1 -> elt2) -> NameEnv elt1 -> NameEnv elt2
 disjointNameEnv    :: NameEnv a -> NameEnv a -> Bool
-seqEltsNameEnv     :: (elt -> ()) -> NameEnv elt -> ()
+seqEltsNameEnv     :: (elt -> SeqResult) -> NameEnv elt -> SeqResult
 
 nonDetNameEnvElts x         = nonDetEltsUFM x
 emptyNameEnv          = emptyUFM

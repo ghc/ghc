@@ -89,16 +89,20 @@ module GHC.Types.Unique.FM (
 
 import GHC.Prelude
 
+import GHC.Types.Basic( SeqResult )
 import GHC.Types.Unique ( Uniquable(..), Unique, getKey, mkUniqueGrimily )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
+
 import qualified GHC.Data.Word64Map as M
 import qualified GHC.Data.Word64Map.Strict as MS
 import qualified GHC.Data.Word64Set as S
-import Data.Data
 import qualified Data.Semigroup as Semi
+
+import Data.Data
 import Data.Functor.Classes (Eq1 (..))
 import Data.Coerce
+import qualified Data.Monoid as M
 
 -- | A finite map from @uniques@ of one type to
 -- elements in another type.
@@ -505,8 +509,8 @@ anyUFM p (UFM m) = M.foldr ((||) . p) False m
 allUFM :: (elt -> Bool) -> UniqFM key elt -> Bool
 allUFM p (UFM m) = M.foldr ((&&) . p) True m
 
-seqEltsUFM :: (elt -> ()) -> UniqFM key elt -> ()
-seqEltsUFM seqElt = nonDetFoldUFM (\v rest -> seqElt v `seq` rest) ()
+seqEltsUFM :: (elt -> SeqResult) -> UniqFM key elt -> SeqResult
+seqEltsUFM seqElt = nonDetFoldUFM (\v rest -> seqElt v M.<> rest) mempty
 
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce

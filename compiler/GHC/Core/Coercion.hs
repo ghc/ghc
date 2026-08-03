@@ -44,6 +44,8 @@ module GHC.Core.Coercion (
         downgradeRole,
         mkGReflRightCo, mkGReflLeftCo, mkCoherenceLeftCo, mkCoherenceRightCo,
         mkKindCo, forAllCoKindCo,
+        mkGReflLeftMCo, mkGReflRightMCo,
+        mkCoherenceRightMCo,
         castCoercionKind, castCoercionKind1, castCoercionKind2,
 
         -- ** Decomposition
@@ -64,11 +66,11 @@ module GHC.Core.Coercion (
         tyConRoleListX, tyConRoleListRepresentational, funRole,
         pickLR,
 
-        isReflKindCo,isReflKindMCo,
+        isKindCo, isReflKindCo,isReflKindMCo,
         isReflCo, isReflCo_maybe,
         isReflexiveMCo, isReflexiveCo, isReflexiveCo_maybe,
-        isReflCoVar_maybe, mkGReflLeftMCo, mkGReflRightMCo,
-        mkCoherenceRightMCo,
+        isReflCoVar_maybe, assertGoodForAllCo,
+
 
         coToMCo, kindCoToMKindCo,
         mkTransMCo, mkTransMCoL, mkTransMCoR, mkCastTyMCo, mkSymMCo,
@@ -152,7 +154,6 @@ import GHC.Types.Unique
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
 
-import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim
 
 import GHC.Data.FastString
@@ -171,7 +172,6 @@ import Data.Function ( on )
 import Data.Char( isDigit )
 import qualified Data.Monoid as Monoid
 import Data.List.NonEmpty ( NonEmpty (..) )
-import Control.DeepSeq
 
 {-
 %************************************************************************
@@ -314,63 +314,10 @@ tidyCoAxBndrsForUser init_env tcvs
 *                                                                      *
 ********************************************************************* -}
 
-coToMCo :: Coercion -> MCoercion
--- Convert a coercion to a MCoercion,
--- It's not clear whether or not isReflexiveCo would be better here
---    See #19815 for a bit of data and discussion on this point
-coToMCo co | isReflCo co = MRefl
-           | otherwise   = MCo co
-
 checkReflexiveMCo :: MCoercion -> MCoercion
 checkReflexiveMCo MRefl                       = MRefl
 checkReflexiveMCo (MCo co) | isReflexiveCo co = MRefl
                            | otherwise        = MCo co
-
--- | Make a generalized reflexive coercion
-mkGReflCo :: Role -> Type -> MCoercionN -> Coercion
-mkGReflCo r ty mco
-  | isReflKindMCo mco = if r == Nominal then Refl ty
-                                        else GRefl r ty MRefl
-  | otherwise
-  = -- I'd like to have this assert, but sadly it's not true during type
-    -- inference because the types are not fully zonked
-    -- assertPpr (case mco of
-    --              MCo co -> typeKind ty `eqType` coercionLKind co
-    --              MRefl  -> True)
-    --          (vcat [ text "ty" <+> ppr ty <+> dcolon <+> ppr (typeKind ty)
-    --                , case mco of
-    --                     MCo co -> text "co" <+> ppr co
-    --                                  <+> dcolon <+> ppr (coercionKind co)
-    --                     MRefl  -> text "MRefl"
-    --                , callStackDoc ]) $
-    GRefl r ty mco
-
-mkGReflMCo :: HasDebugCallStack => Role -> Type -> CoercionN -> Coercion
-mkGReflMCo r ty co = mkGReflCo r ty (MCo co)
-
--- | Compose two MCoercions via transitivity
-mkTransMCo :: MCoercion -> MCoercion -> MCoercion
-mkTransMCo MRefl     co2       = co2
-mkTransMCo co1       MRefl     = co1
-mkTransMCo (MCo co1) (MCo co2) = MCo (mkTransCo co1 co2)
-
-mkTransMCoL :: MCoercion -> Coercion -> MCoercion
-mkTransMCoL MRefl     co2 = coToMCo co2
-mkTransMCoL (MCo co1) co2 = MCo (mkTransCo co1 co2)
-
-mkTransMCoR :: Coercion -> MCoercion -> MCoercion
-mkTransMCoR co1 MRefl     = coToMCo co1
-mkTransMCoR co1 (MCo co2) = MCo (mkTransCo co1 co2)
-
--- | Get the reverse of an 'MCoercion'
-mkSymMCo :: MCoercion -> MCoercion
-mkSymMCo MRefl    = MRefl
-mkSymMCo (MCo co) = MCo (mkSymCo co)
-
--- | Cast a type by an 'MCoercion'
-mkCastTyMCo :: Type -> MCoercion -> Type
-mkCastTyMCo ty MRefl    = ty
-mkCastTyMCo ty (MCo co) = ty `mkCastTy` co
 
 mkPiMCos :: [Var] -> MCoercion -> MCoercion
 mkPiMCos _ MRefl = MRefl
@@ -380,22 +327,6 @@ mkFunResMCo :: Id -> MCoercionR -> MCoercionR
 mkFunResMCo _      MRefl    = MRefl
 mkFunResMCo arg_id (MCo co) = MCo (mkFunResCo Representational arg_id co)
 
-mkGReflLeftMCo :: Role -> Type -> MCoercionN -> Coercion
-mkGReflLeftMCo r ty MRefl    = mkReflCo r ty
-mkGReflLeftMCo r ty (MCo co) = mkGReflLeftCo r ty co
-
-mkGReflRightMCo :: Role -> Type -> MCoercionN -> Coercion
-mkGReflRightMCo r ty MRefl    = mkReflCo r ty
-mkGReflRightMCo r ty (MCo co) = mkGReflRightCo r ty co
-
--- | Like 'mkCoherenceRightCo', but with an 'MCoercion'
-mkCoherenceRightMCo :: Role -> Type -> MCoercionN -> Coercion -> Coercion
-mkCoherenceRightMCo _ _  MRefl    co2 = co2
-mkCoherenceRightMCo r ty (MCo co) co2 = mkCoherenceRightCo r ty co co2
-
-isReflMCo :: MCoercion -> Bool
-isReflMCo MRefl = True
-isReflMCo _     = False
 
 {-
 %************************************************************************
@@ -468,7 +399,7 @@ decomposePiCos :: HasDebugCallStack
                 => CoercionN
                -> [Type]
                -> ([CoercionN], CoercionN)
-decomposePiCos co args = decomposePiCos co (coercionKind co) args
+decomposePiCos co args = decomposePiCosK co (coercionKind co) args
 
 decomposePiCosK :: HasDebugCallStack
                 => CoercionN -> Pair Type  -- Coercion and its kind
@@ -628,16 +559,6 @@ coVarRole cv
   = eqTyConRole (case tyConAppTyCon_maybe (varType cv) of
                    Just tc0 -> tc0
                    Nothing  -> pprPanic "coVarRole: not tyconapp" (ppr cv))
-
-eqTyConRole :: TyCon -> Role
--- Given (~#) or (~R#) return the Nominal or Representational respectively
-eqTyConRole tc
-  | tc `hasKey` eqPrimTyConKey
-  = Nominal
-  | tc `hasKey` eqReprPrimTyConKey
-  = Representational
-  | otherwise
-  = pprPanic "eqTyConRole: unknown tycon" (ppr tc)
 
 -- | Given a coercion `co :: (t1 :: TYPE r1) ~ (t2 :: TYPE r2)`
 -- produce a coercion `rep_co :: r1 ~ r2`
@@ -851,12 +772,6 @@ assertGoodForAllCo tcv visL visR kind_co co
                     MRefl -> text "MRefl"
                     MCo co -> ppr co <+> dcolon <+> ppr (coercionKind co)
 
--- to be used only with unbranched axioms
-mkUnbranchedAxInstCo :: Role -> CoAxiom Unbranched
-                     -> [Type] -> [Coercion] -> Coercion
-mkUnbranchedAxInstCo role ax tys cos
-  = mkAxInstCo role (UnbranchedAxiom ax) tys cos
-
 mkAxInstRHS :: CoAxiom br -> BranchIndex -> [Type] -> [Coercion] -> Type
 -- Instantiate the axiom with specified types,
 -- returning the instantiated RHS
@@ -898,23 +813,6 @@ mkUnbranchedAxInstLHS :: CoAxiom Unbranched -> [Type] -> [Coercion] -> Type
 mkUnbranchedAxInstLHS ax = mkAxInstLHS ax 0
 
 -- | Make a coercion from a coercion hole
-mkHoleCo :: CoercionHole -> Coercion
-mkHoleCo h = HoleCo h
-
--- | Make a universal coercion between two arbitrary types.
-mkUnivCo :: UnivCoProvenance
-         -> [Coercion] -- ^ Coercions on which this depends
-         -> Role       -- ^ role of the built coercion, "r"
-         -> Type       -- ^ t1 :: k1
-         -> Type       -- ^ t2 :: k2
-         -> Coercion   -- ^ :: t1 ~r t2
-mkUnivCo prov deps role ty1 ty2
-  | ty1 `eqType` ty2 = mkReflCo role ty1
-  | otherwise        = UnivCo { uco_prov = prov, uco_role = role
-                              , uco_lty = ty1, uco_rty = ty2
-                              , uco_deps = deps }
-
-
 --------------------
 {- Note [mkSelCo precondition]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1068,49 +966,6 @@ mkInstCo co_fun co_arg
     substCo subst body_co
 mkInstCo co arg = InstCo co arg
 
--- | Given @ty :: k1@, @co :: k1 ~ k2@,
--- produces @co' :: ty ~r (ty |> co)@
-mkGReflRightCo :: Role -> Type -> KindCoercion -> Coercion
-mkGReflRightCo r ty co
-  | isReflKindCo co = mkReflCo r ty  -- Homo (tested) AND nominal (I promise) => Refl
-  | otherwise       = mkGReflMCo r ty co
-
--- | Given @r@, @ty :: k1@, and @co :: k1 ~N k2@,
--- produces @co' :: (ty |> co) ~r ty@
-mkGReflLeftCo :: Role -> Type -> KindCoercion -> Coercion
-mkGReflLeftCo r ty co
-  | isReflKindCo co = mkReflCo r ty
-  | otherwise       = mkSymCo $ mkGReflMCo r ty co
-
--- | Given @co :: (a :: k) ~ (b :: k')@ produce @co' :: k ~ k'@.
-mkKindCo :: Coercion -> Coercion
-mkKindCo co | Just (ty, _) <- isReflCo_maybe co = Refl (typeKind ty)
-mkKindCo (GRefl _ _ (MCo co)) = co
-mkKindCo co
-  | Pair ty1 ty2 <- coercionKind co
-       -- Generally, calling coercionKind during coercion creation is a bad idea,
-       -- as it can lead to exponential behavior. But, we don't have nested mkKindCos,
-       -- so it's OK here.
-  , let tk1 = typeKind ty1
-        tk2 = typeKind ty2
-  , tk1 `eqType` tk2
-  = Refl tk1
-  | otherwise
-  = KindCo co
-
-mkSubCo :: HasDebugCallStack => Coercion -> Coercion
--- Input coercion is Nominal, result is Representational
--- see also Note [Role twiddling functions]
-mkSubCo (Refl ty) = GRefl Representational ty MRefl
-mkSubCo (GRefl Nominal ty co) = GRefl Representational ty co
-mkSubCo (TyConAppCo Nominal tc cos)
-  = TyConAppCo Representational tc (applyRoles tc cos)
-mkSubCo co@(FunCo { fco_role = Nominal, fco_arg = arg, fco_res = res })
-  = co { fco_role = Representational
-       , fco_arg = downgradeRole Representational Nominal arg
-       , fco_res = downgradeRole Representational Nominal res }
-mkSubCo co = assertPpr (coercionRole co == Nominal) (ppr co <+> ppr (coercionRole co)) $
-             SubCo co
 
 {-
 %************************************************************************
@@ -1173,67 +1028,6 @@ setNominalRole_maybe r co
       = Just $ co { uco_role = Nominal }
     setNominalRole_maybe_helper _ = Nothing
 
--- | Make a phantom coercion between two types. The coercion passed
--- in must be a nominal coercion between the kinds of the
--- types.
-mkPhantomCo :: Coercion -> Type -> Type -> Coercion
-mkPhantomCo h t1 t2
-  = mkUnivCo PhantomProv [h] Phantom t1 t2
-
--- takes any coercion and turns it into a Phantom coercion
-toPhantomCo :: Coercion -> Coercion
-toPhantomCo co
-  = mkPhantomCo (mkKindCo co) ty1 ty2
-  where Pair ty1 ty2 = coercionKind co
-
--- Convert args to a TyConAppCo Nominal to the same TyConAppCo Representational
-applyRoles :: TyCon -> [Coercion] -> [Coercion]
-applyRoles = zipWith (`downgradeRole` Nominal) . tyConRoleListRepresentational
-
--- The Role parameter is the Role of the TyConAppCo
--- defined here because this is intimately concerned with the implementation
--- of TyConAppCo
--- Always returns an infinite list (with a infinite tail of Nominal)
-tyConRolesX :: Role -> TyCon -> Infinite Role
-tyConRolesX Representational tc = tyConRolesRepresentational tc
-tyConRolesX role             _  = Inf.repeat role
-
-tyConRoleListX :: Role -> TyCon -> [Role]
-tyConRoleListX role = Inf.toList . tyConRolesX role
-
--- Returns the roles of the parameters of a tycon, with an infinite tail
--- of Nominal
-tyConRolesRepresentational :: TyCon -> Infinite Role
-tyConRolesRepresentational tc = tyConRoles tc Inf.++ Inf.repeat Nominal
-
--- Returns the roles of the parameters of a tycon, with an infinite tail
--- of Nominal
-tyConRoleListRepresentational :: TyCon -> [Role]
-tyConRoleListRepresentational = Inf.toList . tyConRolesRepresentational
-
-tyConRole :: Role -> TyCon -> Int -> Role
-tyConRole Nominal          _  _ = Nominal
-tyConRole Phantom          _  _ = Phantom
-tyConRole Representational tc n = tyConRolesRepresentational tc Inf.!! n
-
-funRole :: Role -> FunSel -> Role
-funRole Nominal          _  = Nominal
-funRole Phantom          _  = Phantom
-funRole Representational fs = funRoleRepresentational fs
-
-funRoleRepresentational :: FunSel -> Role
-funRoleRepresentational SelMult = Nominal
-funRoleRepresentational SelArg  = Representational
-funRoleRepresentational SelRes  = Representational
-
-ltRole :: Role -> Role -> Bool
--- Is one role "less" than another?
---     Nominal < Representational < Phantom
-ltRole Phantom          _       = False
-ltRole Representational Phantom = True
-ltRole Representational _       = False
-ltRole Nominal          Nominal = False
-ltRole Nominal          _       = True
 
 -------------------------------
 
@@ -1482,7 +1276,7 @@ has to do in its full generality.  See #18413.
 {-
 %************************************************************************
 %*                                                                      *
-            Newtypes
+            Newtypes and type normalisation
 %*                                                                      *
 %************************************************************************
 -}
@@ -1498,14 +1292,6 @@ instNewTyCon_maybe tc tys
   = Just (applyTysX tvs ty tys, mkUnbranchedAxInstCo Representational co_tc tys [])
   | otherwise
   = Nothing
-
-{-
-************************************************************************
-*                                                                      *
-         Type normalisation
-*                                                                      *
-************************************************************************
--}
 
 -- | A function to check if we can reduce a type by one step. Used
 -- with 'topNormaliseTypeX'.
@@ -2092,45 +1878,6 @@ lcLookupCoVar (LC subst _) cv = lookupCoVar subst cv
 lcInScopeSet :: LiftingContext -> InScopeSet
 lcInScopeSet (LC subst _) = substInScopeSet subst
 
-{-
-%************************************************************************
-%*                                                                      *
-            Sequencing on coercions
-%*                                                                      *
-%************************************************************************
--}
-
-seqMCo :: MCoercion -> ()
-seqMCo MRefl    = ()
-seqMCo (MCo co) = seqCo co
-
-seqCo :: Coercion -> ()
-seqCo (Refl ty)             = seqType ty
-seqCo (GRefl r ty mco)      = r `seq` seqType ty `seq` seqMCo mco
-seqCo (TyConAppCo r tc cos) = r `seq` tc `seq` seqCos cos
-seqCo (AppCo co1 co2)       = seqCo co1 `seq` seqCo co2
-seqCo (CoVarCo cv)          = cv `seq` ()
-seqCo (HoleCo h)            = coHoleCoVar h `seq` ()
-seqCo (SymCo co)            = seqCo co
-seqCo (TransCo co1 co2)     = seqCo co1 `seq` seqCo co2
-seqCo (SelCo n co)          = n `seq` seqCo co
-seqCo (LRCo lr co)          = lr `seq` seqCo co
-seqCo (InstCo co arg)       = seqCo co `seq` seqCo arg
-seqCo (KindCo co)           = seqCo co
-seqCo (SubCo co)            = seqCo co
-seqCo (AxiomCo _ cs)        = seqCos cs
-seqCo (ForAllCo tv visL visR k co)
-  = seqType (varType tv) `seq` rnf visL `seq` rnf visR `seq`
-    seqMCo k `seq` seqCo co
-seqCo (FunCo r af1 af2 w co1 co2)
-  = r `seq` af1 `seq` af2 `seq` seqCo w `seq` seqCo co1 `seq` seqCo co2
-seqCo (UnivCo { uco_prov = p, uco_role = r
-              , uco_lty = t1, uco_rty = t2, uco_deps = deps })
-  = p `seq` r `seq` seqType t1 `seq` seqType t2 `seq` seqCos deps
-
-seqCos :: [Coercion] -> ()
-seqCos []       = ()
-seqCos (co:cos) = seqCo co `seq` seqCos cos
 
 {-
 %************************************************************************
@@ -2495,6 +2242,7 @@ has_co_hole_ty :: Type -> Monoid.Any
                         , tcf_tyvar = const (Monoid.Any False)
                         , tcf_covar = const (Monoid.Any False)
                         , tcf_hole  = const (Monoid.Any True)
+                        , tcf_lit   = const (Monoid.Any False)
                         , tcf_tycobinder = \ _ x -> x
                         }
 

@@ -650,7 +650,8 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
                         b `seq`
                         c `seqList`
                         d `seqList`
-                        (seqEltsUFM (seqTagSig) tag_env))
+                        seqEltsUFM seqTagSig tag_env `seq`
+                        ())
                    (myCoreToStg logger dflags (interactiveInScope (hsc_IC hsc_env)) False this_mod mod_loc prepd_binds)
 
         let (stg_binds,_stg_deps) = unzip stg_binds_with_deps

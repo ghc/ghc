@@ -11,6 +11,8 @@ module GHC.Core.TyCo.Subst
   (
         -- * Substitutions
         Subst(..), TvSubstEnv, CvSubstEnv, IdSubstEnv,
+        substTyCoMapper,
+
         emptyIdSubstEnv, emptyTvSubstEnv, emptyCvSubstEnv, composeTCvSubst,
         emptySubst, mkEmptySubst, isEmptyTvSubst, isEmptyTCvSubst, isEmptySubst,
         mkSubst, mkTCvSubst, mkTvSubst, mkCvSubst, mkIdSubst,
@@ -51,11 +53,11 @@ module GHC.Core.TyCo.Subst
 import GHC.Prelude
 
 
-import {-# SOURCE #-} GHC.Core.Coercion
-   ( mkCoercionType, coVarTypesRole )
+import {-# SOURCE #-} GHC.Core.Coercion ( mkCoercionType, coVarTypesRole )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
 import {-# SOURCE #-} GHC.Core.Ppr ( ) -- instance Outputable CoreExpr
 import {-# SOURCE #-} GHC.Core ( CoreExpr )
+import {-# SOURCE #-} GHC.Core.Type( isCoercionTy )
 
 import GHC.Core.TyCo.Make
 import GHC.Core.TyCon( TyCon )
@@ -65,13 +67,13 @@ import GHC.Core.TyCo.FVs
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-
-import GHC.Utils.Constants (debugIsOn)
-import GHC.Utils.Misc
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
+
+import GHC.Utils.Constants (debugIsOn)
+import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 

@@ -504,23 +504,23 @@ zonkCoHole hole@(CH { ch_ref = ref, ch_co_var = cv })
 
 zonk_tycomapper :: TyCoMapper ZonkEnv TcM
 zonk_tycomapper = TyCoMapper
-  { tcm_tyvar      = \ env tv -> runZonkT (zonkTyVarOcc tv) env
-  , tcm_covar      = \ env cv -> runZonkT (zonkCoVarOcc cv) env
-  , tcm_hole       = \ env co -> runZonkT (zonkCoHole   co) env
-  , tcm_tycobinder = \ env tcv _vis k -> flip runZonkT env $
-                     runZonkBndrT (zonkTyBndrX tcv) $
-                     \ tcv' -> ZonkT $ \ env' -> (k env' tcv')
-  , tcm_tycon      = \ _ tc tys' -> do { tc' <- zonkTcTyConToTyCon tc
-                                       ; return (mkTyConApp tc' tys') } }
-
--- Zonk a TyCon by changing a TcTyCon to a regular TyCon
-zonkTcTyConToTyCon :: TcTyCon -> TcM TyCon
-zonkTcTyConToTyCon tc
-  | isTcTyCon tc = do { thing <- tcLookupGlobalOnly (getName tc)
-                      ; case thing of
-                          ATyCon real_tc -> return real_tc
-                          _              -> pprPanic "zonkTcTyCon" (ppr tc $$ ppr thing) }
-  | otherwise    = return tc -- it's already zonked
+    { tcm_tyvar      = \ env tv -> runZonkT (zonkTyVarOcc tv) env
+    , tcm_covar      = \ env cv -> runZonkT (zonkCoVarOcc cv) env
+    , tcm_hole       = \ env co -> runZonkT (zonkCoHole   co) env
+    , tcm_tycobinder = \ env tcv _vis k -> flip runZonkT env $
+                       runZonkBndrT (zonkTyBndrX tcv) $
+                       \ tcv' -> ZonkT $ \ env' -> (k env' tcv')
+    , tcm_tcapp_ty   = \_env ty      tc tys -> zonk_tcapp mkTyConApp          ty tc tys
+    , tcm_tcapp_co   = \_env co role tc cos -> zonk_tcapp (mkTyConAppCo role) co tc cos }
+  where
+    zonk_tcapp mk tyco tc tycos'
+      | isTcTyCon tc
+      = do { thing <- tcLookupGlobalOnly (getName tc)
+           ; case thing of
+                ATyCon real_tc -> return (mk real_tc tycos')
+                _              -> pprPanic "zonkTcTyCon" (ppr tc $$ ppr thing) }
+      | null tycos' = return tyco
+      | otherwise   = return (mk tc tycos')
 
 -- | Confused by zonking? See Note [What is zonking?] in "GHC.Tc.Zonk.Type".
 zonkTcTypeToType :: TcType -> TcM Type

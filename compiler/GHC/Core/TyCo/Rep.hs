@@ -99,6 +99,8 @@ import GHC.Utils.Binary
 import qualified Data.Data as Data hiding ( TyCon )
 import Data.Coerce
 import Data.IORef ( IORef )   -- for CoercionHole
+
+import qualified Data.Monoid as M
 import Control.DeepSeq
 
 {- **********************************************************************
@@ -1953,20 +1955,27 @@ data TyCoFolder a
   = TyCoFolder
       { tcf_view  :: Type -> Maybe Type   -- Optional "view" function
                                           -- E.g. expand synonyms
+
+      , tcf_lit   :: forall b. b -> a     -- Used for type literals, visibility, provenance
+                                          -- Usually returns a no-op, but can be `seq`
+                                          -- We could have per-type cases if we need to
+
       , tcf_tyvar :: TyVar -> a    -- Does not automatically recur
       , tcf_covar :: CoVar -> a    -- into kinds of variables
-      , tcf_hole  :: CoercionHole -> a
-          -- ^ What to do with coercion holes.
-          -- See Note [Coercion holes] in "GHC.Core.TyCo.Rep".
+
+      , tcf_hole  :: CoercionHole -> a   -- ^ What to do with coercion holes.
+                                         -- See Note [Coercion holes]
 
       , tcf_tycobinder :: TyCoVar -> a -> a
-          -- ^ The returned env is used in the extended scope
+          -- ^ The CPS style allows us to extend an environment
+          --   See the free-var finders in GHC.Core.TyCo.FVs
       }
 
 {-# INLINE foldTyCo  #-}  -- See Note [Specialising foldType]
 foldTyCo :: Monoid a => TyCoFolder a
          -> (Type -> a, [Type] -> a, Coercion -> a, [Coercion] -> a)
 foldTyCo (TyCoFolder { tcf_view       = view
+                     , tcf_lit        = lit
                      , tcf_tyvar      = tyvar
                      , tcf_tycobinder = tycobinder
                      , tcf_covar      = covar
@@ -1975,51 +1984,52 @@ foldTyCo (TyCoFolder { tcf_view       = view
   where
     go_ty ty | Just ty' <- view ty = go_ty ty'
     go_ty (TyVarTy tv)        = tyvar tv
-    go_ty (AppTy t1 t2)       = go_ty t1 `mappend` go_ty t2
-    go_ty (LitTy {})          = mempty
-    go_ty (CastTy ty co)      = go_ty ty `mappend` go_co co
+    go_ty (LitTy l)           = lit l
+    go_ty (AppTy t1 t2)       = go_ty t1 M.<> go_ty t2
+    go_ty (CastTy ty co)      = go_ty ty M.<> go_co co
     go_ty (CoercionTy co)     = go_co co
-    go_ty (FunTy _ w arg res) = go_ty arg `mappend` go_ty w `mappend` go_ty res
+    go_ty (FunTy _ w arg res) = go_ty arg M.<> go_ty w M.<> go_ty res
                                 -- As per #23764, ordering is [arg, w, res]
 
     go_ty (TyConApp _ tys)  = go_tys tys
     go_ty (ForAllTy (Bndr tv _) inner)
-      = go_ty (varType tv) `mappend` tycobinder tv (go_ty inner)
+      = go_ty (varType tv) M.<> tycobinder tv (go_ty inner)
 
     -- See Note [Use explicit recursion in foldTyCo]
     go_tys []     = mempty
-    go_tys (t:ts) = go_ty t `mappend` go_tys ts
+    go_tys (t:ts) = go_ty t M.<> go_tys ts
 
     -- See Note [Use explicit recursion in foldTyCo]
     go_cos []     = mempty
-    go_cos (c:cs) = go_co c `mappend` go_cos cs
+    go_cos (c:cs) = go_co c M.<> go_cos cs
 
     go_co (Refl ty)                = go_ty ty
     go_co (GRefl _ ty MRefl)       = go_ty ty
-    go_co (GRefl _ ty (MCo co))    = go_ty ty `mappend` go_co co
+    go_co (GRefl _ ty (MCo co))    = go_ty ty M.<> go_co co
     go_co (TyConAppCo _ _ args)    = go_cos args
-    go_co (AppCo c1 c2)            = go_co c1 `mappend` go_co c2
+    go_co (AppCo c1 c2)            = go_co c1 M.<> go_co c2
     go_co (CoVarCo cv)             = covar cv
     go_co (AxiomCo _ cos)          = go_cos cos
     go_co (HoleCo hole)            = cohole hole
-    go_co (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = deps })
-                                   = go_ty t1
-                                     `mappend` go_ty t2
-                                     `mappend` go_cos deps
     go_co (SymCo co)               = go_co co
-    go_co (TransCo c1 c2)          = go_co c1 `mappend` go_co c2
+    go_co (TransCo c1 c2)          = go_co c1 M.<> go_co c2
     go_co (SelCo _ co)             = go_co co
     go_co (LRCo _ co)              = go_co co
-    go_co (InstCo co arg)          = go_co co `mappend` go_co arg
+    go_co (InstCo co arg)          = go_co co M.<> go_co arg
     go_co (KindCo co)              = go_co co
     go_co (SubCo co)               = go_co co
 
-    go_co (FunCo { fco_mult = cw, fco_arg = c1, fco_res = c2 })
-       = go_co cw `mappend` go_co c1 `mappend` go_co c2
+    go_co (UnivCo { uco_prov = prov, uco_lty = t1, uco_rty = t2, uco_deps = deps })
+       = lit prov M.<> go_ty t1 M.<> go_ty t2 M.<> go_cos deps
+    go_co (FunCo { fco_role = role, fco_afl = afl, fco_afr = afr
+                 , fco_mult = cw, fco_arg = c1, fco_res = c2 })
+       = lit role M.<> lit afl M.<> lit afr M.<> go_co cw M.<> go_co c1 M.<> go_co c2
 
-    go_co (ForAllCo { fco_tcv = tcv, fco_kind = kind_co, fco_body = co })
-      = go_mco kind_co `mappend` go_ty (varType tcv)
-                       `mappend` tycobinder tcv (go_co co)
+    go_co (ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
+                    , fco_kind = kind_co, fco_body = co })
+      = lit visL M.<> lit visR
+        M.<> go_mco kind_co M.<> go_ty (varType tcv)
+        M.<> tycobinder tcv (go_co co)
 
     go_mco MRefl    = mempty
     go_mco (MCo co) = go_co co

@@ -2129,8 +2129,11 @@ foldQLInstVars check_tv ty
     folder :: TyCoFolder (FV () a)
     folder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                                              -- in GHC.Core.TyCo.FVs
-                        , tcf_tyvar = do_tv, tcf_covar = mempty
-                        , tcf_hole = do_hole, tcf_tycobinder = do_bndr }
+                        , tcf_lit        = mempty
+                        , tcf_tyvar      = do_tv
+                        , tcf_covar      = mempty
+                        , tcf_hole       = do_hole
+                        , tcf_tycobinder = do_bndr }
 
     do_bndr _ = id
 

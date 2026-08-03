@@ -130,7 +130,8 @@ import {-# SOURCE #-} GHC.Builtin.Types
   , constraintKind )
 
 import {-# SOURCE #-} GHC.Types.TyThing( mkATyCon )
-import {-# SOURCE #-} GHC.Core.Type ( mkTyConApp, getLevity )
+import {-# SOURCE #-} GHC.Core.Type( getLevity )
+import {-# SOURCE #-} GHC.Core.TyCo.Make( mkTyConApp )
 
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep -- Doesn't need special access, but this is easier to avoid
