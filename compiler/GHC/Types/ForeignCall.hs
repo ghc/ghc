@@ -109,7 +109,7 @@ import Data.Data (Data)
 import Data.Functor ((<&>))
 
 import Control.DeepSeq (NFData(..))
-import GHC.Parser.Annotation (AnnPragma, noAnn)
+import GHC.Parser.Annotation (AnnCType, noAnn)
 
 {-
 ************************************************************************
@@ -216,7 +216,7 @@ defaultCType :: String -> CType (GhcPass p)
 defaultCType =
   CType (CTypeGhc NoSourceText NoSourceText noAnn) Nothing . packHText
 
-mkCType :: SourceText -> SourceText -> AnnPragma -> Maybe (Header (GhcPass p)) -> HText -> CType (GhcPass p)
+mkCType :: SourceText -> SourceText -> AnnCType -> Maybe (Header (GhcPass p)) -> HText -> CType (GhcPass p)
 mkCType x y ann m =
   CType (CTypeGhc x y ann) m
 
@@ -303,7 +303,7 @@ data StaticTargetGhc = StaticTargetGhc
 data CTypeGhc = CTypeGhc
   { cTypeSourceText :: SourceText
   , cTypeOtherText  :: SourceText
-  , cTypeAnn        :: AnnPragma
+  , cTypeAnn        :: AnnCType
   }
   deriving (Data, Eq)
 

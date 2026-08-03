@@ -612,7 +612,7 @@ instance NoAnn AnnFunRhs where
 
 -- ---------------------------------------------------------------------
 
-type instance XSCC           (GhcPass _) = (AnnPragma, SourceText)
+type instance XSCC           (GhcPass _) = (AnnPragSCC, SourceText)
 type instance XXPragE        (GhcPass _) = DataConCantHappen
 
 type instance XCDotFieldOcc (GhcPass _) = AnnFieldLabel

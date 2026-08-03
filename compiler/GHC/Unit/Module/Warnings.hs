@@ -158,8 +158,8 @@ warningTxtSame w1 w2
 instance Outputable (InWarningCategory (GhcPass pass)) where
   ppr (InWarningCategory _ wt) = text "in" <+> doubleQuotes (ppr wt)
 
-type instance XDeprecatedTxt       (GhcPass _) = (SourceText, AnnPragma)
-type instance XWarningTxt          (GhcPass _) = (SourceText, AnnPragma)
+type instance XDeprecatedTxt       (GhcPass _) = (SourceText, AnnWarningTxt)
+type instance XWarningTxt          (GhcPass _) = (SourceText, AnnWarningTxt)
 type instance XXWarningTxt         (GhcPass _) = DataConCantHappen
 type instance XInWarningCategory   (GhcPass _) = (EpToken "in", SourceText)
 type instance XXInWarningCategory  (GhcPass _) = DataConCantHappen

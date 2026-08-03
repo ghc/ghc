@@ -36,7 +36,7 @@ module GHC.Parser.Annotation (
 
   AnnList(..), AnnListBrackets(..),
   AnnParen(..),
-  AnnPragma(..),
+  AnnCType(..),AnnWarningTxt(..),AnnOverlap(..),AnnAnnDecl(..),AnnPragSCC(..),
   AnnBooleanFormula(..),
   NameAnn(..), NameAdornment(..),
   NoEpAnns(..),
@@ -627,15 +627,40 @@ data NameAdornment
 
 -- | exact print annotation used for capturing the locations of
 -- annotations in pragmas.
-data AnnPragma
-  = AnnPragma {
-      apr_open      :: EpaLocation,
-      apr_close     :: EpToken "#-}",
-      apr_squares   :: (EpToken "[", EpToken "]"),
-      apr_loc1      :: EpaLocation,
-      apr_loc2      :: EpaLocation,
-      apr_type      :: EpToken "type",
-      apr_module    :: EpToken "module"
+data AnnCType
+  = AnnCType {
+      ac_open      :: EpaLocation,
+      ac_close     :: EpToken "#-}",
+      ac_loc1      :: EpaLocation,
+      ac_loc2      :: EpaLocation
+      } deriving (Data,Eq)
+
+data AnnWarningTxt
+  = AnnWarningTxt {
+      awt_open      :: EpaLocation,
+      awt_close     :: EpToken "#-}",
+      awt_squares   :: (EpToken "[", EpToken "]")
+      } deriving (Data,Eq)
+
+data AnnOverlap
+  = AnnOverlap {
+      ao_open      :: EpaLocation,
+      ao_close     :: EpToken "#-}"
+      } deriving (Data,Eq)
+
+data AnnAnnDecl
+  = AnnAnnDecl {
+      ad_open      :: EpaLocation,
+      ad_close     :: EpToken "#-}",
+      ad_type      :: EpToken "type",
+      ad_module    :: EpToken "module"
+      } deriving (Data,Eq)
+
+data AnnPragSCC
+  = AnnPragSCC {
+      aps_open      :: EpaLocation,
+      aps_close     :: EpToken "#-}",
+      aps_loc1      :: EpaLocation
       } deriving (Data,Eq)
 
 -- ---------------------------------------------------------------------
@@ -1020,8 +1045,20 @@ instance NoAnn a => NoAnn (AnnList a) where
 instance NoAnn NameAnn where
   noAnn = NameAnnTrailing []
 
-instance NoAnn AnnPragma where
-  noAnn = AnnPragma noAnn noAnn noAnn noAnn noAnn noAnn noAnn
+instance NoAnn AnnCType where
+  noAnn = AnnCType noAnn noAnn noAnn noAnn
+
+instance NoAnn AnnWarningTxt where
+  noAnn = AnnWarningTxt noAnn noAnn noAnn
+
+instance NoAnn AnnOverlap where
+  noAnn = AnnOverlap noAnn noAnn
+
+instance NoAnn AnnAnnDecl where
+  noAnn = AnnAnnDecl noAnn noAnn noAnn noAnn
+
+instance NoAnn AnnPragSCC where
+  noAnn = AnnPragSCC noAnn noAnn noAnn
 
 instance NoAnn AnnParen where
   noAnn = AnnParens noAnn noAnn
@@ -1107,7 +1144,23 @@ instance Outputable AnnListBrackets where
   ppr (ListBanana o c) = text "ListBanana" <+> ppr o <+> ppr c
   ppr ListNone         = text "ListNone"
 
-instance Outputable AnnPragma where
-  ppr (AnnPragma o c s l ca t m)
-    = text "AnnPragma" <+> ppr o <+> ppr c <+> ppr s <+> ppr l
-                       <+> ppr ca <+> ppr ca <+> ppr t <+> ppr m
+instance Outputable AnnCType where
+  ppr (AnnCType o c l ca)
+    = text "AnnCType" <+> ppr o <+> ppr c <+> ppr l
+                       <+> ppr ca <+> ppr ca
+
+instance Outputable AnnWarningTxt where
+  ppr (AnnWarningTxt o c s)
+    = text "AnnWarningTxt" <+> ppr o <+> ppr c <+> ppr s
+
+instance Outputable AnnOverlap where
+  ppr (AnnOverlap o c)
+    = text "AnnOverlap" <+> ppr o <+> ppr c
+
+instance Outputable AnnAnnDecl where
+  ppr (AnnAnnDecl o c t m)
+    = text "AnnAnnDecl" <+> ppr o <+> ppr c <+> ppr t <+> ppr m
+
+instance Outputable AnnPragSCC where
+  ppr (AnnPragSCC o c l)
+    = text "AnnPragSCC" <+> ppr o <+> ppr c <+> ppr l
