@@ -14,7 +14,7 @@ stabilize    = sed -E -e ' \
                '
 universalize = sed -E -e ' \
                    s/UInt[[:digit:]]+/UInt@word_size@/; \
-                   s/W[[:digit:]]+#/W@word_size@#/ \
+                   s/W[[:digit:]]+\#/W@word_size@\#/ \
                ' | \
                uniq
 normalize    = $(stabilize) | $(universalize)
