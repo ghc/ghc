@@ -45,4 +45,4 @@ writeByteArray# :: MutableByteArray# RealWorld
 writeByteArray# _   _   []          s = s
 writeByteArray# mba off (I64# i:is) s =
   case writeInt64Array# mba off i s of
-    s' -> writeByteArray# mba (off +# 8#) is s'
+    s' -> writeByteArray# mba (off +# 1#) is s'
