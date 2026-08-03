@@ -288,10 +288,6 @@ instance HasTrailing [TrailingAnn] where
   trailing a = a
   setTrailing _ ts = ts
 
-instance HasTrailing AnnPragma where
-  trailing _ = []
-  setTrailing a _ = a
-
 instance HasTrailing AnnParen where
   trailing _ = []
   setTrailing a _ = a
@@ -1559,22 +1555,22 @@ instance ExactPrint (WarningTxt GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (WarningTxt (src, AnnPragma o c (os,cs) l1 l2 t m) mb_cat ws) = do
+  exact (WarningTxt (src, AnnWarningTxt o c (os,cs)) mb_cat ws) = do
     o' <- markAnnOpen'' o src "{-# WARNING"
     mb_cat' <- markAnnotated mb_cat
     os' <- markEpToken os
     ws' <- mapM markAnnotated ws
     cs' <- markEpToken cs
     c' <- markEpToken c
-    return (WarningTxt (src, AnnPragma o' c' (os',cs') l1 l2 t m) mb_cat' ws')
+    return (WarningTxt (src, AnnWarningTxt o' c' (os',cs')) mb_cat' ws')
 
-  exact (DeprecatedTxt (src, AnnPragma o c (os,cs) l1 l2 t m) ws) = do
+  exact (DeprecatedTxt (src, AnnWarningTxt o c (os,cs)) ws) = do
     o' <- markAnnOpen'' o src "{-# DEPRECATED"
     os' <- markEpToken os
     ws' <- mapM markAnnotated ws
     cs' <- markEpToken cs
     c' <- markEpToken c
-    return (DeprecatedTxt (src, AnnPragma o' c' (os',cs') l1 l2 t m) ws')
+    return (DeprecatedTxt (src, AnnWarningTxt o' c' (os',cs')) ws')
 
 instance ExactPrint (InWarningCategory GhcPs) where
   getAnnotationEntry _ = NoEntryVal
@@ -2251,35 +2247,35 @@ instance ExactPrint (OverlapMode GhcPs) where
   setAnnotationAnchor a _ _ _ = a
 
   -- NOTE: NoOverlap is only used in the typechecker
-  exact (NoOverlap (src, AnnPragma o c s l1 l2 t m)) = do
+  exact (NoOverlap (src, AnnOverlap o c)) = do
     o' <- markAnnOpen'' o src "{-# NO_OVERLAP"
     c' <- markEpToken c
-    return (NoOverlap (src, AnnPragma o' c' s l1 l2 t m))
+    return (NoOverlap (src, AnnOverlap o' c'))
 
-  exact (Overlappable (src, AnnPragma o c s l1 l2 t m)) = do
+  exact (Overlappable (src, AnnOverlap o c)) = do
     o' <- markAnnOpen'' o src "{-# OVERLAPPABLE"
     c' <- markEpToken c
-    return (Overlappable (src, AnnPragma o' c' s l1 l2 t m))
+    return (Overlappable (src, AnnOverlap o' c'))
 
-  exact (Overlapping (src, AnnPragma o c s l1 l2 t m)) = do
+  exact (Overlapping (src, AnnOverlap o c)) = do
     o' <- markAnnOpen'' o src "{-# OVERLAPPING"
     c' <- markEpToken c
-    return (Overlapping (src, AnnPragma o' c' s l1 l2 t m))
+    return (Overlapping (src, AnnOverlap o' c'))
 
-  exact (Overlaps (src, AnnPragma o c s l1 l2 t m)) = do
+  exact (Overlaps (src, AnnOverlap o c)) = do
     o' <- markAnnOpen'' o src "{-# OVERLAPS"
     c' <- markEpToken c
-    return (Overlaps (src, AnnPragma o' c' s l1 l2 t m))
+    return (Overlaps (src, AnnOverlap o' c'))
 
-  exact (Incoherent (src, AnnPragma o c s l1 l2 t m)) = do
+  exact (Incoherent (src, AnnOverlap o c)) = do
     o' <- markAnnOpen'' o src "{-# INCOHERENT"
     c' <- markEpToken c
-    return (Incoherent (src, AnnPragma o' c' s l1 l2 t m))
+    return (Incoherent (src, AnnOverlap o' c'))
 
-  exact (NonCanonical (src, AnnPragma o c s l1 l2 t m)) = do
+  exact (NonCanonical (src, AnnOverlap o c)) = do
     o' <- markAnnOpen'' o src "{-# INCOHERENT"
     c' <- markEpToken c
-    return (Incoherent (src, AnnPragma o' c' s l1 l2 t m))
+    return (Incoherent (src, AnnOverlap o' c'))
 
 -- ---------------------------------------------------------------------
 
@@ -2706,7 +2702,7 @@ instance ExactPrint (AnnDecl GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (HsAnnotation (AnnPragma o c s l1 l2 t m, src) prov e) = do
+  exact (HsAnnotation (AnnAnnDecl o c t m, src) prov e) = do
     o' <- markAnnOpen'' o src "{-# ANN"
     (t', m', prov') <-
       case prov of
@@ -2723,7 +2719,7 @@ instance ExactPrint (AnnDecl GhcPs) where
 
     e' <- markAnnotated e
     c' <- markEpToken c
-    return (HsAnnotation (AnnPragma o' c' s l1 l2 t' m',src) prov' e')
+    return (HsAnnotation (AnnAnnDecl o' c' t' m',src) prov' e')
 
 -- ---------------------------------------------------------------------
 
@@ -3146,11 +3142,11 @@ instance ExactPrint (HsPragE GhcPs) where
   getAnnotationEntry HsPragSCC{}  = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (HsPragSCC (AnnPragma o c s l1 l2 t m,st) sl) = do
+  exact (HsPragSCC (AnnPragSCC o c l1,st) sl) = do
     o' <- markAnnOpen'' o st  "{-# SCC"
     l1' <- printStringAtAA l1 (sourceTextToString (stringLitSourceText sl) (unpackHText $ sl_fs sl))
     c' <- markEpToken c
-    return (HsPragSCC (AnnPragma o' c' s l1' l2 t m,st) sl)
+    return (HsPragSCC (AnnPragSCC o' c' l1',st) sl)
 
 instance ExactPrint (HsTypedSplice GhcPs) where
   getAnnotationEntry _ = NoEntryVal
@@ -4408,7 +4404,7 @@ instance Typeable p => ExactPrint (CType (GhcPass p)) where
   exact (CType ext mh ct) = do
     let stp  = cTypeSourceText ext
         stct = cTypeOtherText  ext
-        AnnPragma o c s l1 l2 t m = cTypeAnn ext
+        AnnCType o c l1 l2 = cTypeAnn ext
     o' <- markAnnOpen'' o stp "{-# CTYPE"
     l1' <- case mh of
              Nothing -> return l1
@@ -4416,7 +4412,7 @@ instance Typeable p => ExactPrint (CType (GhcPass p)) where
                printStringAtAA l1 (toSourceTextWithSuffix srcH "" "")
     l2' <- printStringAtAA l2 (toSourceTextWithSuffix stct (unpackHText ct) "")
     c' <- markEpToken c
-    return (CType (ext { cTypeAnn = AnnPragma o' c' s l1' l2' t m }) mh ct)
+    return (CType (ext { cTypeAnn = AnnCType o' c' l1' l2' }) mh ct)
 
 -- ---------------------------------------------------------------------
 

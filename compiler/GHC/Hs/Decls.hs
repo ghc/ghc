@@ -1528,7 +1528,7 @@ instance OutputableBndrId p
 ************************************************************************
 -}
 
-type instance XHsAnnotation (GhcPass _) = (AnnPragma, SourceText)
+type instance XHsAnnotation (GhcPass _) = (AnnAnnDecl, SourceText)
 type instance XXAnnDecl     (GhcPass _) = DataConCantHappen
 
 instance (OutputableBndrId p) => Outputable (AnnDecl (GhcPass p)) where
