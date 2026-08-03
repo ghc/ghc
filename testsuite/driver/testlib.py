@@ -2635,13 +2635,13 @@ async def stdout_ok(name: TestName, way: WayName) -> CompareOutput:
 def read_stdout( name: TestName ) -> str:
     path = in_testdir(name, 'run.stdout')
     if path.exists():
-        return path.read_text(encoding='UTF-8')
+        return path.read_text(encoding='UTF-8', errors='replace')
     else:
         return ''
 
 def read_diff( diff_file: Path ) -> Optional[str]:
     if diff_file.exists():
-        diff = diff_file.read_text()
+        diff = diff_file.read_text(encoding='UTF-8', errors='replace')
         diff_file.unlink()
         return diff or None
     else:
@@ -2665,14 +2665,14 @@ async def stderr_ok(name: TestName, way: WayName) -> CompareOutput:
 def read_comp_stderr( name: TestName ) -> str:
     path = in_testdir(name, 'comp.stderr')
     if path.exists():
-        return path.read_text(encoding='UTF-8')
+        return path.read_text(encoding='UTF-8', errors='replace')
     else:
         return ''
 
 def read_stderr_for( phase: str, name: TestName ) -> str:
     path = in_testdir(name, phase + '.stderr')
     if path.exists():
-        return path.read_text(encoding='UTF-8')
+        return path.read_text(encoding='UTF-8', errors='replace')
     else:
         return ''
 
