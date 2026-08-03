@@ -1555,7 +1555,23 @@ summariseModuleWithSource home_unit summ_cache_ref is_boot maybe_buf hsc_env loc
     -- hi file, object file, when is_boot says so
     let src_fn = expectJust (ml_hs_file location)
     summ_cache <- readIORef summ_cache_ref
-    case ml_hs_file_ospath location >>= \p -> M.lookup (moduleUnitId mod, p) summ_cache of
+    -- Reject the cache result if the module name doesn't match the inferred
+    -- module name based on the file name.
+    -- This happens if we `summariseFile` for a root file target (which has a different module name)
+    -- and then we try to import it.
+    --
+    -- Fall through to `new_summary` if this happens to reject this module.
+    let cached = do
+          p   <- ml_hs_file_ospath location
+          res <- M.lookup (moduleUnitId mod, p) summ_cache
+          case res of
+            Right (ms, _) | msKey ms /= moduleToMnk mod is_boot ->
+              -- Module name doesn't match the file path name.
+              -- We fall through to @new_summary@, where this will be
+              -- discovered and the correct error message will be thrown.
+              Nothing
+            _ -> Just res
+    case cached of
       Just (Right (chd_summary, SummFresh)) ->
         -- Fresh! just return it
         pure $ FoundHome (ModuleNodeCompile chd_summary)
@@ -1857,6 +1873,15 @@ twice).
 
    Note that (2) can't guarantee this alone: Two ModuleName imports in
    separate units can (and likely do) map to the same `Module`.
+
+   Note:
+   There is a special case where the module name doesn't have to match the file name.
+   For example, the `Main` module is sometimes not defined in a file
+   named `Main.hs`. We still want to compile such file targets, but reject the module
+   if it is used as a module target.
+   Thus, we accept this difference while `summariseFile`, but reject if we encounter expand
+   this module node during `summariseModuleWithSource`.
+   See tests T27461a and T27461b.
 
 See also Note [Downsweep: building and maintaining the module graph] and
 Note [The ModuleGraph].
