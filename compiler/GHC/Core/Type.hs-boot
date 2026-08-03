@@ -13,9 +13,7 @@ rewriterView     :: Type -> Maybe Type
 chooseFunTyFlag  :: HasDebugCallStack => Type -> Type -> FunTyFlag
 typeKind         :: HasDebugCallStack => Type -> Type
 isCoercionTy     :: Type -> Bool
-mkAppTy          :: Type -> Type -> Type
 mkCastTy         :: Type -> Coercion -> Type
-mkTyConApp       :: TyCon -> [Type] -> Type
 getLevity        :: HasDebugCallStack => Type -> Type
 getTyVar_maybe   :: Type -> Maybe TyVar
 isLiftedTypeKind :: Type -> Bool

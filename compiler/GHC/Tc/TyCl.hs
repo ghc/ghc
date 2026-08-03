@@ -1392,11 +1392,19 @@ swizzleTcTyConBndrs tc_infos
                                , tcm_covar = swizzle_cv
                                , tcm_hole  = swizzle_hole
                                , tcm_tycobinder = swizzle_bndr
-                               , tcm_tycon      = swizzle_tycon }
+                               , tcm_tcapp_ty   = swizzle_tcapp_ty
+                               , tcm_tcapp_co   = swizzle_tcapp_co }
     swizzle_hole  _ hole = pprPanic "swizzle_hole" (ppr hole)
        -- These types are pre-zonked
-    swizzle_tycon tc = pprPanic "swizzle_tc" (ppr tc)
-       -- TcTyCons can't appear in kinds (yet)
+
+    swizzle_tcapp_ty _ ty      tc tys' = swizzle_tcapp mkTyConApp          ty tc tys'
+    swizzle_tcapp_co _ co role tc cos' = swizzle_tcapp (mkTyConAppCo role) co tc cos'
+
+    swizzle_tcapp mk tyco tc tycos'
+      | isTcTyCon tc = pprPanic "swizzle_tc" (ppr tc) -- TcTyCons can't appear in kinds (yet)
+      | null tycos'  = return tyco
+      | otherwise    = return (mk tc tycos')
+
     swizzle_tv _ tv = return (mkTyVarTy (swizzle_var tv))
     swizzle_cv _ cv = return (mkCoVarCo (swizzle_var cv))
 

@@ -230,28 +230,33 @@ zonkCo      :: Coercion -> ZonkM Coercion
     zonkTcTypeMapper = TyCoMapper
       { tcm_tyvar = const zonkTcTyVar
       , tcm_covar = const (\cv -> mkCoVarCo <$> zonkTyCoVarKind cv)
-      , tcm_hole  = const zonk_hole
+      , tcm_hole       = zonk_hole
       , tcm_tycobinder = \ _env tcv _vis k -> zonkTyCoVarKind tcv >>= k ()
-      , tcm_tycon      = zonk_tc_app }
-      where
-        zonk_hole :: CoercionHole -> ZonkM Coercion
-        zonk_hole hole@(CH { ch_ref = ref, ch_co_var = cv })
-          = do { contents <- readTcRef ref
-               ; case contents of
-                   Just (CPH { cph_co = co })
-                           -> do { co' <- zonkCo co
-                                     ; checkCoercionHole cv co' }
-                   Nothing -> do { cv' <- zonkCoVar cv
-                                 ; return $ HoleCo (hole { ch_co_var = cv' }) } }
+      , tcm_tcapp_ty   = zonk_tcapp_ty
+      , tcm_tcapp_co   = zonk_tcapp_co }
 
-        zonk_tc_app ty tc tys'
-           | isMonoTcTyCon tc -- A non-poly TcTyCon may have unification variables
-                              -- in its kind that need zonking, but poly ones cannot
-           = do { tck' <- zonkTcType (tyConKind tc)
-                                   ; let tc' = setTcTyConKind tc tck'
-                                   ; return (mkTyConApp tc' tys') }
-           | null tys' = ty
-           | otherwise = mkTyConApp tc tys'
+    zonk_hole :: () -> CoercionHole -> ZonkM Coercion
+    zonk_hole _ hole@(CH { ch_ref = ref, ch_co_var = cv })
+      = do { contents <- readTcRef ref
+           ; case contents of
+               Just (CPH { cph_co = co })
+                       -> do { co' <- zonkCo co
+                                 ; checkCoercionHole cv co' }
+               Nothing -> do { cv' <- zonkCoVar cv
+                             ; return $ HoleCo (hole { ch_co_var = cv' }) } }
+
+    zonk_tcapp_ty _ ty      tc tys' = zonk_tcapp mkTyConApp          ty tc tys'
+    zonk_tcapp_co _ co role tc cos' = zonk_tcapp (mkTyConAppCo role) co tc cos'
+
+    zonk_tcapp :: forall r. (TyCon -> [r] -> r) -> r -> TyCon -> [r] -> ZonkM r
+    zonk_tcapp mk tyco tc tycos'
+       | isMonoTcTyCon tc -- A non-poly TcTyCon may have unification variables
+                          -- in its kind that need zonking, but poly ones cannot
+       = do { tck' <- zonkTcType (tyConKind tc)
+            ; let tc' = setTcTyConKind tc tck'
+            ; return (mk tc' tycos') }
+       | null tycos' = return tyco
+       | otherwise   = return (mk tc tycos')
 
 zonkTcTyVar :: TcTyVar -> ZonkM TcType
 -- Simply look through all Flexis

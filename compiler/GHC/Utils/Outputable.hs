@@ -1324,7 +1324,8 @@ data BindingSite
     | LetBind     -- ^ The x in   (let x = rhs in e)
     deriving Eq
 
-data JoinPointHood
+data JoinPointHood  -- Defined here because it is used in
+                    -- the type of bndrIsJoin_maybe
   = JoinPoint {-# UNPACK #-} !Int   -- The JoinArity (but an Int here because
   | NotJoinPoint                    -- synonym JoinArity is defined in Types.Basic)
   deriving( Eq )

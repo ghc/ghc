@@ -11,8 +11,10 @@ where
 
 import GHC.Prelude
 
+import GHC.Types.Basic( SeqResult )
 import GHC.Types.Var
 import GHC.Types.Name.Env( NameEnv )
+
 import GHC.Utils.Outputable
 import GHC.Utils.Binary
 import GHC.Utils.Panic.Plain
@@ -123,12 +125,12 @@ isTaggedInfo TagEPT       = True
 isTaggedInfo TagBottoming = True
 isTaggedInfo _            = False
 
-seqTagSig :: TagSig -> ()
+seqTagSig :: TagSig -> SeqResult
 seqTagSig (TagVal ti) = seqTagInfo ti
 seqTagSig (TagFun ti) = seqTagInfo ti
 
-seqTagInfo :: TagInfo -> ()
-seqTagInfo TagBottoming   = ()
-seqTagInfo TagDunno       = ()
-seqTagInfo TagEPT         = ()
-seqTagInfo (TagTuple tis) = foldl' (\_unit info -> seqTagInfo info) () tis
+seqTagInfo :: TagInfo -> SeqResult
+seqTagInfo TagBottoming   = mempty
+seqTagInfo TagDunno       = mempty
+seqTagInfo TagEPT         = mempty
+seqTagInfo (TagTuple tis) = foldl' (\_unit info -> seqTagInfo info) mempty tis

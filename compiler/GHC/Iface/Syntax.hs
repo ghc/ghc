@@ -3184,7 +3184,7 @@ instance NFData IfaceIdDetails where
 instance NFData IfaceInfoItem where
   rnf = \case
     HsArity a -> rnf a
-    HsDmdSig str -> seqDmdSig str
+    HsDmdSig str -> seqDmdSig str `seq` ()
     HsInline (InlinePragma a b c d) -> rnf a `seq` rnf b `seq` rnf c `seq` rnf d `seq` ()
     HsUnfold b unf -> rnf b `seq` rnf unf
     HsNoCafRefs -> ()

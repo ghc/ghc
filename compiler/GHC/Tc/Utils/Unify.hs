@@ -3700,7 +3700,7 @@ mkOccFolders lhs_tv = ( getAny . runFVTop . check_ty
     occ_folder :: TyCoFolder (FV BoundVars Any)
     occ_folder = TyCoFolder { tcf_view  = noView  -- Don't expand synonyms
                             , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                            , tcf_hole  = do_hole
+                            , tcf_lit = mempty, tcf_hole  = do_hole
                             , tcf_tycobinder = addBndrFV }
 
     do_tcv v = (MkFV $ \ bvs ->
