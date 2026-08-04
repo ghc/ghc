@@ -310,6 +310,8 @@ test('hs_try_putmvar003',
 # Check forkIO exception determinism under optimization
 test('T13330', normal, compile_and_run, ['-O'])
 
+test('T16761', normal, compile_and_run, [''])
+
 test('T26341', normal, compile_and_run, [''])
 
 # Test EINTR for async I/O interrupted by an exception (#26341)
