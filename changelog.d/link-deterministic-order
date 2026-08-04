@@ -1,0 +1,5 @@
+section: compiler
+synopsis: -fobject-determinism sorts the list of object files to be linked for reproducible builds
+issues: #27612
+mrs: !16457
+
