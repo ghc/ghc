@@ -605,19 +605,9 @@ void checkHeapChain (bdescr *bd)
                 ASSERT( size >= MIN_PAYLOAD_SIZE + sizeofW(StgHeader) );
                 p += size;
 
-                /* skip slop; loop because an array may have been shrunk
-                   multiple times.  See Note [slop on the heap] in Storage.c
-                   and Note [shrink-array slop marker] in PrimOps.cmm. */
-                while (p < bd->free) {
-                    if (!*p) {
-                        p++;
-                    } else if (*p == (StgWord)(-1)) {
-                        StgWord skip = *(p + 1);
-                        p += 2 + skip;
-                    } else {
-                        break;
-                    }
-                }
+                /* See Note [Skipping slop when scanning the heap]
+                   in ClosureMacros.h */
+                p = skipSlop(p, bd->free);
             }
         }
     }

@@ -223,9 +223,8 @@ stg_isMutableByteArrayWeaklyPinnedzh ( gcptr mba )
 /* Note [shrink-array slop marker]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * When shrinkSmallMutableArray# or shrinkMutableByteArray# creates n words of
- * slop at address `slop_start`, we write an O(1) marker so that the heap
- * census (heapCensus in ProfHeap.c) and the sanity checker (checkHeapChain in
- * Sanity.c) can skip over the slop without reading stale heap pointers.
+ * slop at address `slop_start`, we write an O(1) marker so that linear heap
+ * scans can skip over the slop without reading stale heap pointers.
  *
  * The marker scheme (let n = number of slop words):
  *
@@ -239,8 +238,8 @@ stg_isMutableByteArrayWeaklyPinnedzh ( gcptr mba )
  *
  * An array may be shrunk multiple times, leaving consecutive slop regions.
  * Traversal code must therefore loop over all slop regions before advancing
- * to the next live closure.  See the while-loops in heapCensusBlock (ProfHeap.c)
- * and checkHeapChain (Sanity.c).
+ * to the next live closure.  See Note [Skipping slop when scanning the heap]
+ * in ClosureMacros.h.
  */
 
 // shrink size of MutableByteArray in-place

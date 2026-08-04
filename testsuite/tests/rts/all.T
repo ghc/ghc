@@ -710,3 +710,13 @@ test('T19048',
      , extra_run_opts('+RTS -hT -i0 -RTS')
      ],
      compile_and_run, ['-O -rtsopts'])
+
+test('T27585',
+     [ omit_ghci
+     , no_check_hp
+     , js_skip
+     , when(have_profiling(), extra_ways(['prof_hb']))
+     , only_ways(['prof_hb'])
+     , extra_run_opts('+RTS -i0 -RTS')
+     ],
+     compile_and_run, ['-O -rtsopts'])

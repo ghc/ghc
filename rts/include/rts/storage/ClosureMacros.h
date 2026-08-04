@@ -634,6 +634,44 @@ INLINE_HEADER void writeSlopMarker(StgWord *slop, StgWord n)
     }
 }
 
+// Note [Skipping slop when scanning the heap]
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Every linear scan of the heap (heap census, LDV census, sanity checker,
+// findPtr) has to step over slop between closures.  Slop comes in two forms:
+//
+//  1. Zero words: alignment padding for large/pinned objects, zeroed
+//     explicitly (see MEMSET_SLOP_W in allocatePinned).
+//
+//  2. Slop markers: written by writeSlopMarker whenever a closure is
+//     overwritten by a smaller one.  See Note [shrink-array slop marker]
+//     in PrimOps.cmm for the encoding.
+//
+// A closure can be shrunk repeatedly, leaving consecutive slop regions, so we
+// must loop until reaching a word that can't be slop.  Info pointers are never
+// 0 or (StgWord)(-1), so such a word starts the next closure.
+//
+// All scanners must use skipSlop: if any one of them keeps its own copy of
+// this loop it will go out of sync with the encoding (#27585).
+INLINE_HEADER StgPtr skipSlop(StgPtr p, StgPtr end)
+{
+    while (p < end) {
+        if (!*p) {
+            // single-word slop region, or alignment padding
+            p++;
+        } else if (*p == (StgWord)(-1)) {
+            // Multi-word slop region: sentinel, count, then that many words.
+            // writeSlopMarker only writes the sentinel for n >= 2, so the count
+            // word is always within the region.  We assert rather than bail out
+            // so that a corrupt heap is reported instead of silently skipped.
+            ASSERT(p + 1 < end);
+            p += 2 + *(p + 1);
+        } else {
+            break;
+        }
+    }
+    return p;
+}
+
 INLINE_HEADER void
 markImmutableSlop (StgClosure *p,
           uint32_t offset,    /*< offset to start marking at, in words */

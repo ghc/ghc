@@ -177,8 +177,8 @@ processHeapForDead( bdescr *bd )
         p = bd->start;
         while (p < bd->free) {
             p += processHeapClosureForDead((StgClosure *)p);
-            while (p < bd->free && !*p)   // skip slop
-                p++;
+            // See Note [Skipping slop when scanning the heap] in ClosureMacros.h
+            p = skipSlop(p, bd->free);
         }
         ASSERT(p == bd->free);
         bd = bd->link;

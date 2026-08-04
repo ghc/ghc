@@ -1035,9 +1035,10 @@ accountAllocation(Capability *cap, W_ n)
  *   leave slop behind depending on the size of the closure being
  *   overwritten. See Note [marking slop when overwriting immutable closures].
  *
- * To allow the heap profiler and sanity checker to linearly scan over heap
- * blocks, slop must be identifiable without reading stale heap pointers.
- * See Note [skipping slop in the heap profiler]
+ * To allow the heap profiler, the LDV profiler and the sanity checker to
+ * linearly scan over heap blocks, slop must be identifiable without reading
+ * stale heap pointers.
+ * See Note [Skipping slop when scanning the heap] in ClosureMacros.h
  *
  * Shrunk-array slop has a further, concurrent reader: the non-moving GC mark
  * thread scans SmallMutArrPtrs payloads while the mutator may be shrinking
@@ -1207,7 +1208,7 @@ allocateMightFail (Capability *cap, W_ n)
  * When profiling we zero the space used for alignment. This allows us to
  * traverse pinned blocks in the heap profiler.
  *
- * See Note [skipping slop in the heap profiler]
+ * See Note [Skipping slop when scanning the heap] in ClosureMacros.h
  */
 #define MEMSET_SLOP_W(p, val, len_w) memset(p, val, (len_w) * sizeof(W_))
 
