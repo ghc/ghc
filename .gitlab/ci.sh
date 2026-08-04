@@ -614,7 +614,7 @@ function make_install_destdir() {
   fi
   info "merging file tree from $destdir to $instdir"
   cp -a "$destdir/$instdir"/* "$instdir"/
-  "$instdir"/bin/${cross_prefix}ghc-pkg recache
+  "$instdir/bin/${cross_prefix}ghc-pkg" recache
 }
 
 # install the binary distribution in directory $1 to $2.
@@ -631,7 +631,7 @@ function install_bindist() {
   case "$(uname)" in
     MSYS_*|MINGW*)
       mkdir -p "$instdir"
-      cp -a * "$instdir"
+      cp -a ./* "$instdir"
       ;;
     *)
       read -r -a args <<< "${INSTALL_CONFIGURE_ARGS:-}"
