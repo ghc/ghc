@@ -53,7 +53,7 @@ module GHC.Core.TyCo.Subst
 import GHC.Prelude
 
 
-import {-# SOURCE #-} GHC.Core.Coercion ( mkCoercionType, coVarTypesRole )
+import {-# SOURCE #-} GHC.Core.Coercion ( mkCoercionType, coVarTypesRole, mkTyConAppCo )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
 import {-# SOURCE #-} GHC.Core.Ppr ( ) -- instance Outputable CoreExpr
 import {-# SOURCE #-} GHC.Core ( CoreExpr )
@@ -76,8 +76,8 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.StrictIdentity
 
-import Data.Functor.Identity ( Identity (..) )
 import Data.List (mapAccumL)
 
 {-
@@ -769,8 +769,9 @@ substTheta = substTys
 substThetaUnchecked :: Subst -> ThetaType -> ThetaType
 substThetaUnchecked = substTysUnchecked
 
-
-substTyCoMapper :: TyCoMapper Subst Identity
+substTyCoMapper :: TyCoMapper Subst StrictIdentity
+-- Use StrictIdentity, so that the entire mapping
+-- operation is strict, building no thunks
 substTyCoMapper
   = TyCoMapper { tcm_tyvar      = subst_tv
                , tcm_covar      = subst_cv
@@ -787,16 +788,16 @@ substTyCoMapper
    tcv_bndr subst tcv _vis k
      = k subst' tcv'
      where
-       (subst', tcv') = substVarBndrUnchecked subst tcv
+       !(subst', tcv') = substVarBndrUnchecked subst tcv
        -- Sadly unchecked because subst_ty is used from substTyUnchecked
 
    -- Avoid allocation in this very
    -- common case (E.g. Int, LiftedRep etc)
-   tcapp_ty :: Subst -> Type -> TyCon -> [Type] -> Identity Type
+   tcapp_ty :: Subst -> Type -> TyCon -> [Type] -> StrictIdentity Type
    tcapp_ty _ ty tc tys'
       | null tys'  = return ty
       | otherwise  = return (mkTyConApp tc tys')
-   tcapp_co :: Subst -> Coercion -> Role -> TyCon -> [Coercion] -> Identity Coercion
+   tcapp_co :: Subst -> Coercion -> Role -> TyCon -> [Coercion] -> StrictIdentity Coercion
    tcapp_co _ co r tc cos'
       | null cos'  = return co
       | otherwise  = return (mkTyConAppCo r tc cos')
@@ -807,43 +808,8 @@ subst_co :: Subst -> Coercion -> Coercion
   = case mapTyCoX substTyCoMapper of
       (ms_ty, _, ms_co, _) -> (run ms_ty, run ms_co)
   where
-    run :: forall a. (Subst -> a -> Identity a) -> Subst -> a -> a
-    run ms subst x = runIdentity (ms subst x)
-
-{-
-subst_ty :: Subst -> Type -> Type
--- subst_ty is the main workhorse for type substitution
---
--- Note that the in_scope set is poked only if we hit a forall
--- so it may often never be fully computed
-subst_ty subst ty
-   = go ty
-  where
-    go (TyVarTy tv)      = substTyVar subst tv
-    go (AppTy fun arg)   = (mkAppTy $! (go fun)) $! (go arg)
-                -- The mkAppTy smart constructor is important
-                -- we might be replacing (a Int), represented with App
-                -- by [Int], represented with TyConApp
-    go ty@(TyConApp tc []) = tc `seq` ty  -- avoid allocation in this common case
-    go (TyConApp tc tys) = (mkTyConApp $! tc) $! strictMap go tys
-                               -- NB: mkTyConApp, not TyConApp.
-                               -- mkTyConApp has optimizations.
-                               -- See Note [Using synonyms to compress types]
-                               -- in GHC.Core.Type
-    go ty@(FunTy { ft_mult = mult, ft_arg = arg, ft_res = res })
-      = let !mult' = go mult
-            !arg' = go arg
-            !res' = go res
-        in ty { ft_mult = mult', ft_arg = arg', ft_res = res' }
-    go (ForAllTy (Bndr tv vis) ty)
-      = (ForAllTy $! ((Bndr $! tv') vis)) $! (subst_ty subst' ty)
-      where
-        !(subst',tv') = substVarBndrUnchecked subst tv
-                        -- Unchecked because subst_ty is used from substTyUnchecked
-    go (LitTy n)         = LitTy $! n
-    go (CastTy ty co)    = (mkCastTy $! (go ty)) $! (subst_co subst co)
-    go (CoercionTy co)   = CoercionTy $! (subst_co subst co)
--}
+    run :: forall a. (Subst -> a -> StrictIdentity a) -> Subst -> a -> a
+    run ms subst x = runStrictIdentity (ms subst x)
 
 substTyVar :: Subst -> TyVar -> Type
 substTyVar (Subst _ _ tenv _) tv
@@ -884,51 +850,6 @@ substCos :: HasDebugCallStack => Subst -> [Coercion] -> [Coercion]
 substCos subst cos
   | isEmptyTCvSubst subst = cos
   | otherwise = checkValidSubst subst [] cos $ map (subst_co subst) cos
-
-{-
-subst_co :: HasDebugCallStack => Subst -> Coercion -> Coercion
-subst_co subst co
-  = go co
-  where
-    go_ty :: Type -> Type
-    go_ty = subst_ty subst
-
-    go_mco :: MCoercion -> MCoercion
-    go_mco MRefl    = MRefl
-    go_mco (MCo co) = MCo (go co)
-
-    go :: Coercion -> Coercion
-    go (Refl ty)             = mkNomReflCo $! (go_ty ty)
-    go (GRefl r ty mco)      = (mkGReflCo r $! (go_ty ty)) $! (go_mco mco)
-    go (TyConAppCo r tc args)= mkTyConAppCo r tc $! go_cos args
-    go (AxiomCo con cos)     = mkAxiomCo con $! go_cos cos
-    go (AppCo co arg)        = (mkAppCo $! go co) $! go arg
-    go (ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
-                 , fco_kind = kind_co, fco_body = co })
-      = ((mkForAllCo $! tcv') visL visR
-           $! go_mco kind_co)
-           $! subst_co subst' co
-      where
-        !(subst', tcv') = substVarBndrUnchecked subst tcv
-                          -- Unchecked because used from substTyUnchecked
-    go (FunCo r afl afr w co1 co2)   = ((mkFunCo2 r afl afr $! go w) $! go co1) $! go co2
-    go (CoVarCo cv)          = substCoVar subst cv
-    go (HoleCo h)            = substCoHole subst h
-    go (UnivCo { uco_prov = p, uco_role = r
-               , uco_lty = t1, uco_rty = t2, uco_deps = deps })
-                             = ((((mkUnivCo $! p) $! go_cos deps) $! r) $!
-                                  (go_ty t1)) $! (go_ty t2)
-    go (SymCo co)            = mkSymCo $! (go co)
-    go (TransCo co1 co2)     = (mkTransCo $! (go co1)) $! (go co2)
-    go (SelCo d co)          = mkSelCo d $! (go co)
-    go (LRCo lr co)          = mkLRCo lr $! (go co)
-    go (InstCo co arg)       = (mkInstCo $! (go co)) $! go arg
-    go (KindCo co)           = mkKindCo $! (go co)
-    go (SubCo co)            = mkSubCo $! (go co)
-
-    go_cos cos = let cos' = map go cos
-                 in cos' `seqList` cos'
--}
 
 -- | Perform a substitution within a 'DVarSet' of free variables,
 -- returning the free coercion variables.

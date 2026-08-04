@@ -256,13 +256,13 @@ import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isConcreteTyVar )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Data.FastString
+import GHC.Utils.StrictIdentity
 
+import GHC.Data.FastString
 import GHC.Data.Maybe   ( orElse, isJust )
 import GHC.List (build)
 
 import qualified Data.Monoid as M
-import Data.Functor.Identity
 
 -- $type_classification
 -- #type_classification#
@@ -483,9 +483,9 @@ expandTypeSynonyms ty
 expandTypeSynonymsX :: Subst -> Type -> Type
 expandTypeSynonymsX
   = case mapTyCoX expandTypeSynonymMapper of
-      (exp_ty, _, _, _) -> \subst ty -> runIdentity (exp_ty subst ty)
+      (exp_ty, _, _, _) -> \subst ty -> runStrictIdentity (exp_ty subst ty)
 
-expandTypeSynonymMapper :: TyCoMapper Subst Identity
+expandTypeSynonymMapper :: TyCoMapper Subst StrictIdentity
 -- Just like substitution, but treat TyConApp specially
 expandTypeSynonymMapper
   = substTyCoMapper { tcm_tcapp_ty = tcapp_ty }

@@ -48,14 +48,12 @@ module GHC.Core.TyCo.Make (
     -- Coercions
     , mkReflCo, mkNomReflCo, mkRepReflCo
     , mkCoVarCo, mkCoVarCos, mkHoleCo
-    , mkKindCo, mkSelCo
+    , mkKindCo
     , mkGReflCo, mkGReflRightCo, mkGReflLeftCo
     , mkGReflMCo, mkGReflRightMCo, mkGReflLeftMCo
     , mkSubCo, mkSymCo, mkSymMCo
     , mkFunCo2, mkForAllCo, mkUnivCo
     , mkAxiomCo, mkUnbranchedAxInstCo
-    , mkAppCo, mkTyConAppCo
-    , mkInstCo, mkLRCo
     , mkFunCo, mkNakedFunCo
     , mkNakedForAllCo, mkForAllVisCos, mkHomoForAllCo, mkHomoForAllCos
     , mkAxInstCo
@@ -83,7 +81,7 @@ module GHC.Core.TyCo.Make (
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.Coercion
-    ( mkLRCo, mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkSelCo
+    ( mkLRCo, mkInstCo, mkAppCo, mkAppCos, mkSelCo
     , decomposePiCos
     , isKindCo
     , coercionKind -- Used in toPhantomCo
@@ -222,60 +220,60 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
   = (go_ty, go_tys, go_co, go_cos)
   where
     -- See Note [Use explicit recursion in mapTyCo]
-    go_tys !_   []       = return []
-    go_tys !env (ty:tys) = (:) <$> go_ty env ty <*> go_tys env tys
+    go_tys _   []       = return []
+    go_tys env (ty:tys) = (:) <$> go_ty env ty <*> go_tys env tys
 
-    go_ty !env (TyVarTy tv)    = tyvar env tv
-    go_ty !env (AppTy t1 t2)   = mkAppTy <$> go_ty env t1 <*> go_ty env t2
-    go_ty !_   ty@(LitTy {})   = return ty
-    go_ty !env (CastTy ty co)  = mkCastTy <$> go_ty env ty <*> go_co env co
-    go_ty !env (CoercionTy co) = CoercionTy <$> go_co env co
+    go_ty env (TyVarTy tv)    = tyvar env tv
+    go_ty env (AppTy t1 t2)   = mkAppTy <$> go_ty env t1 <*> go_ty env t2
+    go_ty _   ty@(LitTy {})   = return ty
+    go_ty env (CastTy ty co)  = mkCastTy <$> go_ty env ty <*> go_co env co
+    go_ty env (CoercionTy co) = CoercionTy <$> go_co env co
 
-    go_ty !env ty@(FunTy _ w arg res)
+    go_ty env ty@(FunTy _ w arg res)
       = do { w' <- go_ty env w; arg' <- go_ty env arg; res' <- go_ty env res
            ; return (ty { ft_mult = w', ft_arg = arg', ft_res = res' }) }
 
-    go_ty !env ty@(TyConApp tc tys)
+    go_ty env ty@(TyConApp tc tys)
       = do { tys' <- go_tys env tys; tcapp_ty env ty tc tys' }
 
-    go_ty !env (ForAllTy (Bndr tv vis) inner)
+    go_ty env (ForAllTy (Bndr tv vis) inner)
       = do { tycobinder env tv vis $ \env' tv' -> do
            ; inner' <- go_ty env' inner
            ; return $ ForAllTy (Bndr tv' vis) inner' }
 
     -- See Note [Use explicit recursion in mapTyCo]
-    go_cos !_   []       = return []
-    go_cos !env (co:cos) = (:) <$> go_co env co <*> go_cos env cos
+    go_cos _   []       = return []
+    go_cos env (co:cos) = (:) <$> go_co env co <*> go_cos env cos
 
-    go_mco !_   MRefl    = return MRefl
-    go_mco !env (MCo co) = MCo <$> (go_co env co)
+    go_mco _   MRefl    = return MRefl
+    go_mco env (MCo co) = MCo <$> (go_co env co)
 
     go_co :: env -> Coercion -> m Coercion
-    go_co !env (Refl ty)                  = Refl <$> go_ty env ty
-    go_co !env (GRefl r ty mco)           = mkGReflCo r <$> go_ty env ty <*> go_mco env mco
-    go_co !env (AppCo c1 c2)              = mkAppCo <$> go_co env c1 <*> go_co env c2
-    go_co !env (FunCo r afl afr cw c1 c2) = mkFunCo2 r afl afr <$> go_co env cw
+    go_co env (Refl ty)                  = Refl <$> go_ty env ty
+    go_co env (GRefl r ty mco)           = mkGReflCo r <$> go_ty env ty <*> go_mco env mco
+    go_co env (AppCo c1 c2)              = mkAppCo <$> go_co env c1 <*> go_co env c2
+    go_co env (FunCo r afl afr cw c1 c2) = mkFunCo2 r afl afr <$> go_co env cw
                                            <*> go_co env c1 <*> go_co env c2
-    go_co !env (CoVarCo cv)               = covar env cv
-    go_co !env (HoleCo hole)              = cohole env hole
-    go_co !env (UnivCo { uco_prov = p, uco_role = r
-                       , uco_lty = t1, uco_rty = t2, uco_deps = deps })
-                                          = mkUnivCo <$> pure p
-                                                     <*> go_cos env deps
-                                                     <*> pure r
-                                                     <*> go_ty env t1 <*> go_ty env t2
-    go_co !env (SymCo co)                 = mkSymCo <$> go_co env co
-    go_co !env (TransCo c1 c2)            = mkTransCo <$> go_co env c1 <*> go_co env c2
-    go_co !env (AxiomCo r cos)            = mkAxiomCo r <$> go_cos env cos
-    go_co !env (SelCo i co)               = SelCo i <$> go_co env co
-    go_co !env (LRCo lr co)               = mkLRCo lr <$> go_co env co
-    go_co !env (InstCo co arg)            = mkInstCo <$> go_co env co <*> go_co env arg
-    go_co !env (KindCo co)                = mkKindCo <$> go_co env co
-    go_co !env (SubCo co)                 = mkSubCo <$> go_co env co
-    go_co !env co@(TyConAppCo r tc cos)   = do { cos' <- go_cos env cos
+    go_co env (CoVarCo cv)               = covar env cv
+    go_co env (HoleCo hole)              = cohole env hole
+    go_co env (UnivCo { uco_prov = p, uco_role = r
+                      , uco_lty = t1, uco_rty = t2, uco_deps = deps })
+                                         = mkUnivCo <$> pure p
+                                                    <*> go_cos env deps
+                                                    <*> pure r
+                                                    <*> go_ty env t1 <*> go_ty env t2
+    go_co env (SymCo co)                 = mkSymCo <$> go_co env co
+    go_co env (TransCo c1 c2)            = mkTransCo <$> go_co env c1 <*> go_co env c2
+    go_co env (AxiomCo r cos)            = mkAxiomCo r <$> go_cos env cos
+    go_co env (SelCo i co)               = mkSelCo i <$> go_co env co
+    go_co env (LRCo lr co)               = mkLRCo lr <$> go_co env co
+    go_co env (InstCo co arg)            = mkInstCo <$> go_co env co <*> go_co env arg
+    go_co env (KindCo co)                = mkKindCo <$> go_co env co
+    go_co env (SubCo co)                 = mkSubCo <$> go_co env co
+    go_co env co@(TyConAppCo r tc cos)   = do { cos' <- go_cos env cos
                                                ; tcapp_co env co r tc cos' }
-    go_co !env (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
-                         , fco_kind = kind_co, fco_body = co })
+    go_co env (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
+                        , fco_kind = kind_co, fco_body = co })
       = do { kind_co' <- go_mco env kind_co
            ; tycobinder env tv visL $ \env' tv' ->  do
            ; co' <- go_co env' co

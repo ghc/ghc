@@ -1029,6 +1029,7 @@ Library
         GHC.Utils.Panic.Plain
         GHC.Utils.Ppr
         GHC.Utils.Ppr.Colour
+        GHC.Utils.StrictIdentity
         GHC.Utils.TmpFs
         GHC.Utils.Touch
         GHC.Utils.Trace
