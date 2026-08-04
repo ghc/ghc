@@ -110,6 +110,10 @@ function h$rts_getThreadId(t) { // returns a CULLong
   RETURN_UBX_TUP2((t.tid / Math.pow(2,32))>>>0, (t.tid & 0xFFFFFFFF)>>>0);
 }
 
+function h$eq_thread(t1,t2) {
+  return t1 === t2 ? 1 : 0;
+}
+
 function h$cmp_thread(t1,t2) {
   if(t1.tid < t2.tid) return -1;
   if(t1.tid > t2.tid) return 1;
