@@ -480,7 +480,7 @@ Therefore there is no loss of generality if we make all selectors unrestricted.
 mkDictSelId :: Name          -- Name of one of the *value* selectors
                              -- (dictionary superclass or method)
             -> Class -> Id
--- Important: see Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance
+-- See Note [Dictionary selectors]
 mkDictSelId name clas
   = mkGlobalId (ClassOpId clas terminating) name sel_ty info
   where
