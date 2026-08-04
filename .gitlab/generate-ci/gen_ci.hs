@@ -1,6 +1,7 @@
 #!/usr/bin/env cabal
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -10,6 +11,8 @@
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# HLINT ignore "Use camelCase" #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE TypeFamilies #-}
 
 import Data.Aeson as A
 import qualified Data.Map as Map
@@ -172,6 +175,7 @@ data BuildConfig
                 , textWithSIMDUTF :: Bool
                 , testsuiteUsePerf :: Bool
                 , testsuiteWays :: [String]
+                , extendName :: String -> String
                 }
 
 -- Extra arguments to pass to ./configure due to the BuildConfig
@@ -242,6 +246,7 @@ vanilla = BuildConfig
   , textWithSIMDUTF = False
   , testsuiteUsePerf = False
   , testsuiteWays = []
+  , extendName = id
   }
 
 splitSectionsBroken :: BuildConfig -> BuildConfig
@@ -796,14 +801,17 @@ validateRuleString LoongArch64  = labelString "loongarch"
 -- certain platforms and so on.
 data Job
   = Job { jobStage :: String
-        , jobNeeds :: [String]
+        , jobNeeds :: [(String, Bool)]
+        -- ^ needs mustn't be combined with
+        --   dependencies; since we have needs
+        --   we rule out dependencies by not
+        --   adding it to this record
         , jobTags :: [String]
         , jobAllowFailure :: Bool
         , jobScript :: [String]
         , jobAfterScript :: [String]
         , jobDockerImage :: Maybe String
         , jobVariables :: Variables
-        , jobDependencies :: [String]
         , jobArtifacts :: Artifacts
         , jobCache :: Cache
         , jobRules :: OnOffRules
@@ -818,8 +826,7 @@ instance ToJSON Job where
     [ "stage" A..= jobStage
       -- Convoluted to avoid download artifacts from ghci job
       -- https://docs.gitlab.com/ee/ci/yaml/#needsartifacts
-    , "needs" A..= map (\j -> object [ "job" A..= j, "artifacts" A..= False ]) jobNeeds
-    , "dependencies" A..= jobDependencies
+    , "needs" A..= map (\(j, a) -> object [ "job" A..= j, "artifacts" A..= a ]) jobNeeds
     , "image" A..= jobDockerImage
     , "tags" A..= jobTags
     , "allow_failure" A..= jobAllowFailure
@@ -834,25 +841,44 @@ instance ToJSON Job where
     ]
 
 -- | Build a job description from the system description and 'BuildConfig'
-job :: Arch -> Opsys -> BuildConfig -> NamedJob Job
-job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
+job :: Arch -> Opsys -> BuildConfig -> BuildAndTestJob Job
+job arch opsys buildConfig =
+  MkBuildAndTestJob
+    { buildJob = NamedJob { name = jobName, jobInfo = Job { jobScript = jobBuildScript, jobStage = "full-build", jobNeeds =  [("hadrian-ghc-in-ghci", False)], ..} }
+    , testJobs =
+      NamedJob { name = jobName <> "-test", jobInfo = testJobInfo } :
+      [ NamedJob
+        { name = jobName <> "-testperf"
+        , jobInfo = testJobInfo
+          { jobVariables = testJobInfo.jobVariables <> "RUNTEST_ARGS" =: "--config perf_path=perf"
+          , jobTags = [runnerPerfTag arch opsys]
+          } }
+        | testsuiteUsePerf buildConfig  ] }
   where
+    testJobInfo = Job {jobScript = jobTestScript, jobNeeds = [(jobName, True)], jobStage = "testing", ..}
     jobPlatform = (arch, opsys)
 
     jobRules = emptyRules jobName
 
-    jobName = testEnv arch opsys buildConfig
+    jobName =  extendName buildConfig $ testEnv arch opsys buildConfig
 
     jobTags = tags arch opsys buildConfig
 
     jobDockerImage = dockerImage arch opsys
 
-    jobScript
+    jobTestScript
+      | Windows <- opsys
+      = [ "bash .gitlab/ci.sh setup"
+        , "bash .gitlab/ci.sh test_hadrian" ]
+      | otherwise
+      = [ ".gitlab/ci.sh setup"
+        , ".gitlab/ci.sh test_hadrian" ]
+
+    jobBuildScript
       | Windows <- opsys
       = [ "bash .gitlab/ci.sh setup"
         , "bash .gitlab/ci.sh configure"
         , "bash .gitlab/ci.sh build_hadrian"
-        , "bash .gitlab/ci.sh test_hadrian"
         ]
       | otherwise
       = [ "find libraries -name config.sub -exec cp config.sub {} \\;" | Darwin == opsys ] ++
@@ -860,7 +886,6 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
         [ ".gitlab/ci.sh setup"
         , ".gitlab/ci.sh configure"
         , ".gitlab/ci.sh build_hadrian"
-        , ".gitlab/ci.sh test_hadrian"
         ]
 
     jobAfterScript
@@ -878,7 +903,6 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
 
     jobFlavour = mkJobFlavour buildConfig
 
-    jobDependencies = []
     jobVariables = mconcat
       [ opsysVariables arch opsys
       , "TEST_ENV" =: testEnv arch opsys buildConfig
@@ -915,7 +939,6 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
                 | validateNonmovingGc buildConfig
                 ]
         in "RUNTEST_ARGS" =: (trim . unwords) runtestArgs
-      , if testsuiteUsePerf buildConfig then "RUNTEST_ARGS" =: "--config perf_path=perf" else mempty
       , "TEST_WAYS" =: unwords (testsuiteWays buildConfig)
       ]
 
@@ -945,8 +968,6 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
           }
 
     jobAllowFailure = False
-    jobStage = "full-build"
-    jobNeeds = ["hadrian-ghc-in-ghci"]
 
 ---------------------------------------------------------------------------
 -- Job Modifiers
@@ -997,7 +1018,7 @@ delVariable k j = j { jobVariables = MonoidalMap $ Map.delete k $ unMonoidalMap 
 ---------------------------------------------------------------------
 
 -- | Make a normal validate CI job
-validate :: Arch -> Opsys -> BuildConfig -> NamedJob Job
+validate :: Arch -> Opsys -> BuildConfig -> BuildAndTestJob Job
 validate = job
 
 -- Nightly and release apply the FastCI configuration to all jobs so that they all run in
@@ -1009,25 +1030,28 @@ releaseRule :: Job -> Job
 releaseRule = setJobRule ReleaseOnly
 
 -- | Make a normal nightly CI job
-nightly :: Arch -> Opsys -> BuildConfig -> NamedJob Job
+nightly :: Arch -> Opsys -> BuildConfig -> BuildAndTestJob Job
 nightly arch opsys bc =
-  let NamedJob n j = job arch opsys bc
-  in NamedJob { name = "nightly-" ++ n
+  let MkBuildAndTestJob {buildJob, testJobs} = job arch opsys bc { extendName = ("nightly-" <>) . bc.extendName }
+      mkJob NamedJob {name, jobInfo}
+             = NamedJob { name
               , jobInfo = nightlyRule
                         . keepArtifacts "8 weeks"
-                        . highCompression $ j
+                        . highCompression $ jobInfo
               }
+      in MkBuildAndTestJob { buildJob = mkJob buildJob, testJobs = map mkJob testJobs}
 
 -- | Make a normal release CI job
-release :: Arch -> Opsys -> BuildConfig -> NamedJob Job
+release :: Arch -> Opsys -> BuildConfig -> BuildAndTestJob Job
 release arch opsys bc =
-  let NamedJob n j = job arch opsys (bc { buildFlavour = Release })
-  in NamedJob { name = "release-" ++ n
+  let MkBuildAndTestJob {buildJob, testJobs} = job arch opsys (bc { buildFlavour = Release, extendName = ("release-" <>) . bc.extendName })
+      mkJob NamedJob {name, jobInfo} = NamedJob { name
               , jobInfo = releaseRule
                         . keepArtifacts "1 year"
                         . ignorePerfFailures
-                        . highCompression $ j
+                        . highCompression $ jobInfo
               }
+   in MkBuildAndTestJob {buildJob = mkJob buildJob, testJobs = map mkJob testJobs}
 ---------------------------------------------------------------------
 -- Specific job modification functions
 ---------------------------------------------------------------------
@@ -1053,11 +1077,6 @@ ignorePerfFailures = addVariable "IGNORE_PERF_FAILURES" "all"
 highCompression :: Job -> Job
 highCompression = addVariable "XZ_OPT" "-9"
 
--- | Change the tag of the job to make sure the job is scheduled on a
--- runner that has the necessary capabilties to run the job with 'perf'
--- profiling counters.
-perfProfilingJobTag :: Arch -> Opsys -> Job -> Job
-perfProfilingJobTag arch opsys j = j { jobTags = [ runnerPerfTag arch opsys ] }
 
 -- | Mark the validate job to run in fast-ci mode
 -- This is default way, to enable all jobs you have to apply the `full-ci` label.
@@ -1090,8 +1109,8 @@ disableValidate = modifyValidateJobs (removeValidateJobRule FastCI . removeValid
 
 data NamedJob a = NamedJob { name :: String, jobInfo :: a } deriving (Show, Functor)
 
-renameJob :: (String -> String) -> NamedJob a -> NamedJob a
-renameJob f (NamedJob n i) = NamedJob (f n) i
+data BuildAndTestJob a = MkBuildAndTestJob { buildJob :: NamedJob a, testJobs :: [NamedJob a]}
+  deriving stock (Show, Functor)
 
 instance ToJSON a => ToJSON (NamedJob a) where
   toJSON nj = object
@@ -1105,21 +1124,21 @@ instance ToJSON a => ToJSON (NamedJob a) where
 -- Jobs are grouped into either triples or pairs depending on whether the
 -- job is just validate and nightly, or also release.
 data JobGroup a
-  = StandardTriple { v :: Maybe (NamedJob a)
-                   , n :: Maybe (NamedJob a)
-                   , r :: Maybe (NamedJob a)
+  = StandardTriple { v :: Maybe (BuildAndTestJob a)
+                   , n :: Maybe (BuildAndTestJob a)
+                   , r :: Maybe (BuildAndTestJob a)
                    }
   deriving (Functor, Show)
 
 instance ToJSON a => ToJSON (JobGroup a) where
   toJSON StandardTriple{..} = object
-    [ "v" A..= v
-    , "n" A..= n
-    , "r" A..= r
-    ]
+    [ "v" .= v
+    , "n" .= n
+    , "r" .= r ]
 
-rename :: (String -> String) -> JobGroup a -> JobGroup a
-rename f (StandardTriple nv nn nr) = StandardTriple (renameJob f <$> nv) (renameJob f <$> nn) (renameJob f <$> nr)
+instance ToJSON a => ToJSON (BuildAndTestJob a) where
+  toJSON MkBuildAndTestJob {buildJob, testJobs} =
+    object [ "build" .= buildJob, "test" .= testJobs ]
 
 -- | Construct a 'JobGroup' which consists of a validate, nightly and release build with
 -- a specific config.
@@ -1142,10 +1161,10 @@ validateBuilds a op bc = StandardTriple { v = Just (validate a op bc)
                                         , r = Nothing }
 
 flattenJobGroup :: JobGroup a -> [(String, a)]
-flattenJobGroup (StandardTriple a b c) = map flattenNamedJob (catMaybes [a,b,c])
+flattenJobGroup (StandardTriple a b c) = concatMap flattenNamedJob (catMaybes [a,b,c])
 
-flattenNamedJob :: NamedJob a -> (String, a)
-flattenNamedJob (NamedJob n i) = (n, i)
+flattenNamedJob :: BuildAndTestJob a -> [(String, a)]
+flattenNamedJob MkBuildAndTestJob {buildJob, testJobs} = (buildJob.name, buildJob.jobInfo) :  map (\NamedJob {name, jobInfo} -> (name, jobInfo)) testJobs
 
 -- | Specification for all the jobs we want to build.
 jobs :: Map String Job
@@ -1172,8 +1191,9 @@ debian_x86 =
   , modifyNightlyJobs allowFailure (modifyValidateJobs (allowFailure . manual) tsan_jobs)
   , -- Nightly allowed to fail: #22343
     modifyNightlyJobs allowFailure (modifyValidateJobs manual (validateBuilds Amd64 (Linux validate_debian) noTntc))
+
     -- Run the 'perf' profiling nightly job in the release config.
-  , perfProfilingJob Amd64 (Linux Debian13) releaseConfig
+  , disableValidate (validateBuilds Amd64 (Linux validate_debian) (usePerfProfilingTestsuite releaseConfig))
 
   , onlyRule LLVMBackend (validateBuilds Amd64 (Linux validate_debian) llvm)
   , addValidateRule TestPrimops (standardBuilds Amd64 (Linux validate_debian))
@@ -1183,12 +1203,6 @@ debian_x86 =
   ]
   where
     validate_debian = Debian13
-
-    perfProfilingJob arch sys buildConfig =
-        -- Rename the job to avoid conflicts
-        rename (<> "-perf")
-          $ modifyJobs (perfProfilingJobTag arch sys)
-          $ disableValidate (validateBuilds arch sys $ usePerfProfilingTestsuite buildConfig)
 
     tsan_jobs =
       modifyJobs
@@ -1231,7 +1245,7 @@ fedora_x86 =
     -- validate pipeline which is built with perf.
     fastCI (standardBuildsWithConfig Amd64 (Linux Fedora43) releaseConfig)
     -- This job is only for generating head.hackage docs
-  , hackage_doc_job (disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora43) releaseConfig))
+  , hackage_doc_job
   , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora43) dwarf)
   , disableValidate (standardBuilds Amd64 (Linux Fedora43))
     -- For UBSan jobs, only enable for validate/nightly pipelines.
@@ -1245,7 +1259,10 @@ fedora_x86 =
       $ validateBuilds Amd64 (Linux Fedora43) enableUBSan
   ]
   where
-    hackage_doc_job = rename (<> "-hackage") . modifyJobs (addVariable "HADRIAN_ARGS" "--haddock-for-hackage")
+    hackage_doc_job
+      = modifyJobs (addVariable "HADRIAN_ARGS" "--haddock-for-hackage") $
+        disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora43)
+        releaseConfig { extendName = (<> "-hackage") . releaseConfig.extendName })
 
 windows_x86 :: [JobGroup Job]
 windows_x86 =
@@ -1438,7 +1455,10 @@ platform_mapping = Map.map go combined_result
 
     process sel =
       Map.fromListWith combine
-      [ (uncurry mkPlatform (jobPlatform (jobInfo j)), j)
+      -- for now we only support buildJob platform equals testjob platform
+      -- if this restriction were to be lifted, we just had to indicate that the
+      -- specific testjob runs on a different platform
+      [ (uncurry mkPlatform (jobPlatform (jobInfo (buildJob j))), j)
       | (sel -> Just j) <- job_groups
       ]
 
@@ -1457,15 +1477,15 @@ platform_mapping = Map.map go combined_result
       | platform <- S.toList all_platforms
       ]
 
-    combine a b
+    combine bta@MkBuildAndTestJob {buildJob = a} btb@MkBuildAndTestJob {buildJob = b}
       | name a `elem` whitelist
       , name b `elem` whitelist
       , name a /= name b = error $ unlines
         [ "both selected, can only select one job for a specific key: "
         , show (name a)
         , show (name b) ] -- Explicitly selected
-      | name a `elem` whitelist = a -- Explicitly selected
-      | name b `elem` whitelist = b
+      | name a `elem` whitelist = bta -- Explicitly selected
+      | name b `elem` whitelist = btb
       | otherwise = error (show (name a) ++ show (name b))
 
     go = fmap (BindistInfo . unwords . fromJust . mmlookup "BIN_DIST_NAME" . jobVariables)
