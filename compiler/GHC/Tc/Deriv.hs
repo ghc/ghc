@@ -321,6 +321,7 @@ renameDeriv inst_infos bagBinds
                                                           tyvars binds sigs
               ; let binds' = InstBindings { ib_binds = rn_binds
                                           , ib_tyvars = tyvars
+                                          , ib_scoped_tvs = tyvars
                                           , ib_pragmas = rn_sigs
                                           , ib_extensions = exts
                                           , ib_derived = sa }
@@ -1974,6 +1975,7 @@ genInstBinds spec@(DS { ds_tvs = tyvars, ds_mechanism = mechanism
                , iBinds  = InstBindings
                              { ib_binds = meth_binds
                              , ib_tyvars = map Var.varName tyvars
+                             , ib_scoped_tvs = map Var.varName tyvars
                              , ib_pragmas = meth_sigs
                              , ib_extensions = extensions
                              , ib_derived = True } }

@@ -191,6 +191,7 @@ tcClassDecl2 :: LTyClDecl GhcRn          -- The class declaration
              -> TcM (LHsBinds GhcTc)
 
 tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name,
+                              tcdTyVars = tyvars_rn,
                               tcdCExt =
                                (HsNestedGroup { ng_sigs = sigs, ng_meths = default_binds }, _)}))
   = recoverM (return emptyLHsBinds) $
@@ -215,11 +216,16 @@ tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name,
                     -- This make skolemTcTyVars, but does not clone,
                     -- so we can put them in scope with tcExtendTyVarEnv
               pred = mkClassPred clas (mkTyVarTys clas_tyvars)
+              -- Scope only the lexically-scoped class tyvars over the method
+              -- bodies, matching the renamer (hsAllLTyVarNames). See
+              -- Note [Signature-scoped type variables] in GHC.Tc.Types.BasicTypes.
+              scoped_tvs = hsAllLTyVarNames tyvars_rn
         ; this_dict <- newEvVar pred
 
         ; let tc_item = tcDefMeth clas clas_tyvars this_dict
                                   default_binds sig_fn prag_fn
-        ; dm_binds <- tcExtendTyVarEnv clas_tyvars $
+        ; dm_binds <- tcExtendTyVarEnv [ tv | tv <- clas_tyvars
+                                            , tyVarName tv `elem` scoped_tvs ] $
                       mapM tc_item op_items
 
         ; return (concat dm_binds) }
@@ -297,7 +303,8 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
        ; let local_dm_id = mkLocalId local_dm_name ManyTy local_dm_ty
              local_dm_sig = CSig { sig_bndr = local_dm_id
                                  , sig_ctxt = ctxt
-                                 , sig_loc  = getLocA hs_ty }
+                                 , sig_loc  = getLocA hs_ty
+                                 , sig_scoped_tvs = hsScopedTvs hs_ty }
 
        ; (ev_binds, (tc_bind, _))
                <- checkConstraints skol_info tyvars [this_dict] $

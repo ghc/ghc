@@ -470,14 +470,18 @@ tcSkolemiseCompleteSig :: HasDebugCallStack => TcCompleteSig
 -- See Note [Skolemisation] for the differences between
 -- tcSkolemiseCompleteSig and tcTopSkolemise
 
-tcSkolemiseCompleteSig (CSig { sig_bndr = poly_id, sig_ctxt = ctxt, sig_loc = loc })
+tcSkolemiseCompleteSig (CSig { sig_bndr = poly_id, sig_ctxt = ctxt, sig_loc = loc
+                             , sig_scoped_tvs = scoped_tvs })
                        thing_inside
   = do { cur_loc <- getSrcSpanM
        ; let poly_ty = idType poly_id
        ; setSrcSpan loc $   -- Sets the location for the implication constraint
          tcSkolemiseGeneral Shallow ctxt poly_ty poly_ty $ \tv_prs rho_ty ->
          setSrcSpan cur_loc $ -- Revert to the original location
-         tcExtendNameTyVarEnv (map (fmap binderVar) tv_prs) $
+         -- Bring only the lexically-scoped tyvars into tcl_rdr/tcl_env, matching
+         -- the renamer. See Note [Signature-scoped type variables] in GHC.Tc.Types.BasicTypes.
+         tcExtendNameTyVarEnv [ (nm, binderVar bndr)
+                              | (nm, bndr) <- tv_prs, nm `elem` scoped_tvs ] $
          thing_inside (map (mkInvisExpPatType . snd) tv_prs) rho_ty }
 
 tcSkolemiseExpectedType :: HasDebugCallStack => TcSigmaType

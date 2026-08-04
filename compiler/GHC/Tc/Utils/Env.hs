@@ -1080,6 +1080,12 @@ data InstBindings a
                                -- going to extend the typechecker's envt with
                                --     ib_tyvars -> dfun_forall_tyvars
 
+      , ib_scoped_tvs :: [Name] -- The subset of ib_tyvars that the renamer
+                                -- actually brings into scope over the bindings
+                                -- (splitLHsInstDeclTy); kind-generalised tyvars
+                                -- are excluded.  See Note [Signature-scoped type
+                                -- variables] in GHC.Tc.Types.BasicTypes.
+
       , ib_binds   :: LHsBinds a    -- Bindings for the instance methods
 
       , ib_pragmas :: [LSig a]      -- User pragmas recorded for generating

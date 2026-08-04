@@ -561,9 +561,13 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty
         ; ispec <- newClsInst (fmap unLoc overlap_mode) dfun_name
                               tyvars theta clas inst_tys warn
 
-        ; let inst_binds = InstBindings
+        ; let (inst_scoped_tvs, _, _) = splitLHsInstDeclTy hs_ty
+                -- The instance-head tyvars the renamer scopes over the bindings
+                -- (rnClsInstDecl's ktv_names), excluding kind-generalised ones.
+              inst_binds = InstBindings
                              { ib_binds = binds
                              , ib_tyvars = map Var.varName tyvars -- Scope over bindings
+                             , ib_scoped_tvs = inst_scoped_tvs
                              , ib_pragmas = uprags
                              , ib_extensions = []
                              , ib_derived = False }
@@ -1824,11 +1828,15 @@ tcMethods _skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
                   dfun_ev_binds (spec_inst_prags, prag_fn) op_items
                   (InstBindings { ib_binds      = binds
                                 , ib_tyvars     = lexical_tvs
+                                , ib_scoped_tvs = scoped_tvs
                                 , ib_pragmas    = sigs
                                 , ib_extensions = exts
                                 , ib_derived    = is_derived })
-  = tcExtendNameTyVarEnv (lexical_tvs `zip` tyvars) $
-       -- The lexical_tvs scope over the 'where' part
+  = tcExtendNameTyVarEnv [ (nm, tv) | (nm, tv) <- lexical_tvs `zip` tyvars
+                                    , nm `elem` scoped_tvs ] $
+       -- Only the renamer-scoped instance-head tyvars scope over the 'where'
+       -- part; kind-generalised dfun tyvars do not. See Note [Signature-scoped
+       -- type variables] in GHC.Tc.Types.BasicTypes.
     do { traceTc "tcInstMeth" (ppr sigs $$ ppr binds)
        ; checkMinimalDefinition
        ; checkMethBindMembership
@@ -2123,7 +2131,8 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
              inner_meth_id  = mkLocalId inner_meth_name ManyTy sig_ty
              inner_meth_sig = CSig { sig_bndr = inner_meth_id
                                    , sig_ctxt = ctxt
-                                   , sig_loc  = getLocA hs_sig_ty }
+                                   , sig_loc  = getLocA hs_sig_ty
+                                   , sig_scoped_tvs = hsScopedTvs hs_sig_ty }
 
        ; (tc_bind, [Scaled _ inner_id]) <- tcPolyCheck no_prag_fn inner_meth_sig meth_bind
 

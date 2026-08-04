@@ -115,6 +115,8 @@ data TcCompleteSig  -- A complete signature with no wildcards,
                                      -- latter is '$dmop' or some such
 
          , sig_loc  :: SrcSpan       -- Location of the type signature
+
+         , sig_scoped_tvs :: [Name]  -- See Note [Signature-scoped type variables]
          }
 
 data TcPartialSig  -- A partial type signature (i.e. includes one or more
@@ -140,6 +142,19 @@ data TcPatSynSig
         patsig_prov           :: TcThetaType,
         patsig_body_ty        :: TcSigmaType
     }
+
+{- Note [Signature-scoped type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TODO (int-index): write this Note based on the following:
+
+  sig_scoped_tvs records exactly the lexically-scoped type variables that the
+  signature brings into scope over the body -- the same set the renamer
+  computes with hsWcScopedTvs (i.e. the explicit forall'd tyvars).
+
+  Scoping only these into tcl_rdr/tcl_env keeps the typechecker in step with
+  the renamer and avoids leaking kind-generalised variables.
+
+-}
 
 {- Note [Complete and partial type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -230,7 +230,8 @@ tcUserTypeSig loc hs_sig_ty mb_name
                                    -- definition. Which are all unrestricted in
                                    -- the current implementation.
               , sig_ctxt  = ctxt_rrc  -- Report redundant constraints
-              , sig_loc   = loc } }   -- Location of the <type> in   f :: <type>
+              , sig_loc   = loc       -- Location of the <type> in   f :: <type>
+              , sig_scoped_tvs = hsWcScopedTvs hs_sig_ty } }
 
   -- Partial sig with wildcards
   | otherwise
@@ -273,7 +274,9 @@ completeSigFromId :: UserTypeCtxt -> Id -> TcCompleteSig
 completeSigFromId ctxt id
   = CSig { sig_bndr = id
          , sig_ctxt = ctxt
-         , sig_loc  = getSrcSpan id }
+         , sig_loc  = getSrcSpan id
+         , sig_scoped_tvs = [] }  -- No user-written signature to scope from;
+                                  -- instance-method/selector scoping is separate
 
 isCompleteHsSig :: LHsSigWcType GhcRn -> Bool
 -- ^ If there are no wildcards, return a LHsSigWcType
