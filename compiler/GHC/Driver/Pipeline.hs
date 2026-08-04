@@ -412,8 +412,14 @@ link' hsc_env batch_attempt_linking mHscMessager hpt
         -- know which packages are actually needed at the runtime stage.
         pkg_deps <- map snd . Set.toList <$> hptCollectDependencies hpt
 
-        -- the linkables to link
-        home_mods <- hptCollectHomeModInfo hpt
+        -- the linkables to link; under -fobject-determinism sorted, because
+        -- the HPT holds modules in the order in which they finished compiling,
+        -- which varies with -j
+        let det_sort
+              | gopt Opt_ObjectDeterminism dflags
+                          = sortWith (mi_module . hm_iface)
+              | otherwise = id
+        home_mods <- det_sort <$> hptCollectHomeModInfo hpt
 
         let home_modules = map (mi_module . hm_iface) home_mods
         debugTraceMsg logger 3 (text "link: hmi ..." $$ vcat (map ppr home_modules))
