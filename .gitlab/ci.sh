@@ -614,12 +614,12 @@ function make_install_destdir() {
   fi
   info "merging file tree from $destdir to $instdir"
   cp -a "$destdir/$instdir"/* "$instdir"/
-  "$instdir"/bin/${cross_prefix}ghc-pkg recache
+  "$instdir/bin/${cross_prefix}ghc-pkg" recache
 }
 
 # install the binary distribution in directory $1 to $2.
 function install_bindist() {
-  start_section install-bindist "Install bindist"
+  start_section install-bindist "Install bindist ($1 -> $2)"
   case "${CONFIGURE_WRAPPER:-}" in
     emconfigure) source "$EMSDK/emsdk_env.sh" ;;
     *) ;;
@@ -631,7 +631,7 @@ function install_bindist() {
   case "$(uname)" in
     MSYS_*|MINGW*)
       mkdir -p "$instdir"
-      cp -a * "$instdir"
+      cp -a ./* "$instdir"
       ;;
     *)
       read -r -a args <<< "${INSTALL_CONFIGURE_ARGS:-}"
@@ -648,7 +648,43 @@ function install_bindist() {
   end_section install-bindist
 }
 
+function find_bindist_tar() {
+  local tar_files
+  tar_files=( *ghc*.tar.xz )
+  if [[ ${#tar_files[@]} -gt 0 ]]; then
+    bindist_tar="${tar_files[0]}"
+  else
+    unset bindist_tar
+  fi
+}
+
+# stage 1 tests -- these do not run as part
+# of the test stage but already as part of the
+# build stage as they don't require a bindist
+function test_hadrian_stage1() {
+    if [[ "${CI_JOB_NAME}" != *"windows"* ]] && [ -z "${CROSS_TARGET:-}" ] && [ -x "${REINSTALL_GHC:-}" ]
+
+    then
+      run_hadrian \
+        test \
+        --test-root-dirs=testsuite/tests/stage1 \
+        --test-compiler=stage1 \
+        ${TEST_WAYS[@]/#/--test-way=} \
+        "runtest.opts+=${RUNTEST_ARGS:-}" || fail "hadrian stage1 test"
+      info "STAGE1_TEST=$?"
+    fi
+}
+
 function test_hadrian() {
+
+   find_bindist_tar
+   dist_dir="_build/bindist"
+
+   if [ -n "$bindist_tar" ]; then
+     mkdir -p "$dist_dir"
+     tar -xf "$bindist_tar" -C "$dist_dir"
+   fi
+
   check_msys2_deps _build/stage1/bin/ghc --version
   check_release_build
 
@@ -678,9 +714,10 @@ function test_hadrian() {
     return
   # If we have set CROSS_EMULATOR, then can't test using normal testsuite.
   elif [ -n "${CROSS_EMULATOR:-}" ] && [[ "${CROSS_TARGET:-}" != *"wasm"* ]]; then
+    info "Cross compiling with CROSS_EMULATOR='$CROSS_EMULATOR' and CROSS_TARGET='$CROSS_TARGET'"
     local instdir="$TOP/_build/install"
     local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
-    install_bindist _build/bindist/ghc-*/ "$instdir"
+    install_bindist $dist_dir/ghc-*/ "$instdir"
     echo 'main = putStrLn "hello world"' > expected
     run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -o hello
 
@@ -701,6 +738,7 @@ function test_hadrian() {
     # > main = putStrLn "hello world"
     run diff -w expected actual
   elif [[ -n "${REINSTALL_GHC:-}" ]]; then
+    info "Running with reinstall GHC $REINSTALL_GHC"
     run_hadrian \
       test \
       --test-root-dirs=testsuite/tests/stage1 \
@@ -714,18 +752,7 @@ function test_hadrian() {
   else
     local instdir="$TOP/_build/install"
     local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
-    install_bindist _build/bindist/ghc-*/ "$instdir"
-
-    if [[ "${CI_JOB_NAME}" != *"windows"* ]] && [ -z "${CROSS_TARGET:-}" ]
-    then
-      run_hadrian \
-        test \
-        --test-root-dirs=testsuite/tests/stage1 \
-        --test-compiler=stage1 \
-        ${TEST_WAYS[@]/#/--test-way=} \
-        "runtest.opts+=${RUNTEST_ARGS:-}" || fail "hadrian stage1 test"
-      info "STAGE1_TEST=$?"
-    fi
+    install_bindist $dist_dir/ghc-*/ "$instdir"
 
     # Ensure the resulting compiler has the correct bignum-flavour,
     # except for cross-compilers as they may not support the interpreter
@@ -735,6 +762,8 @@ function test_hadrian() {
       if [ $test_compiler_backend != "\"$BIGNUM_BACKEND\"" ]; then
         fail "Test compiler has a different BIGNUM_BACKEND ($test_compiler_backend) than requested ($BIGNUM_BACKEND)"
       fi
+    else 
+      info "CROSS_TARGET=$CROSS_TARGET"
     fi
 
     # If we are doing a release job, check the compiler can build a profiled executable
@@ -747,7 +776,6 @@ function test_hadrian() {
     run_hadrian \
       test \
       --summary-junit=./junit.xml \
-      --test-have-intree-files \
       --test-compiler="${test_compiler}" \
       ${TEST_WAYS[@]/#/--test-way=} \
       "runtest.opts+=${RUNTEST_ARGS:-}" \
@@ -755,7 +783,7 @@ function test_hadrian() {
       || fail "hadrian main testsuite"
 
     info "STAGE2_TEST=$?"
-
+    # --test-have-intree-files \ -- this will build the entirety of the missing bits in the _build dir
   fi
 }
 
@@ -1129,6 +1157,10 @@ case ${1:-help} in
     res=0
     time_it "test" test_hadrian || res=$?
     push_perf_notes
+    exit $res ;;
+  test_hadrian_stage1)
+    res=0
+    time_it "stage1 tests" test_hadrian_stage1 || res=$?
     exit $res ;;
   run_hadrian) shift; run_hadrian "$@" ;;
   perf_test) run_perf_test ;;

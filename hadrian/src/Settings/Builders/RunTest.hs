@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE NamedFieldPuns #-}
 module Settings.Builders.RunTest (runTestBuilderArgs
                                  , runTestGhcFlags
                                  , assertSameCompilerArgs
@@ -27,7 +28,7 @@ import GHC.Toolchain.Target
 -- | Extra flags to send to the Haskell compiler to run tests.
 runTestGhcFlags :: Stage -> Action String
 runTestGhcFlags stage = do
-    unregisterised <- queryTargetTarget stage tgtUnregisterised
+    unregisterised <- queryPerStageTargetSpec stage tgtUnregisterised
 
     let ifMinGhcVer ver opt = do v <- ghcCanonVersion
                                  if ver <= v then pure opt
@@ -112,10 +113,10 @@ inTreeCompilerArgs stg = do
       ways <- interpretInContext (vanillaContext ghcStage rts) getRtsWays
       return (dynamic `elem` ways, threaded `elem` ways)
     hasDynamic          <- (wayUnit Dynamic) . Context.Type.way <$> (programContext stg ghc)
-    leadingUnderscore   <- queryTargetTarget ghcStage tgtSymbolsHaveLeadingUnderscore
+    leadingUnderscore   <- queryPerStageTargetSpec ghcStage tgtSymbolsHaveLeadingUnderscore
     withInterpreter     <- ghcWithInterpreter ghcStage
-    unregisterised      <- queryTargetTarget ghcStage tgtUnregisterised
-    tables_next_to_code <- queryTargetTarget ghcStage tgtTablesNextToCode
+    unregisterised      <- queryPerStageTargetSpec ghcStage tgtUnregisterised
+    tables_next_to_code <- queryPerStageTargetSpec ghcStage tgtTablesNextToCode
     targetWithSMP       <- targetSupportsSMP ghcStage
     interpForceDyn      <- targetRTSLinkerOnlySupportsSharedLibs ghcStage
 
@@ -124,17 +125,17 @@ inTreeCompilerArgs stg = do
     profiled            <- ghcProfiled        <$> flavour <*> pure ghcStage
 
     os          <- queryHostTarget queryOS
-    arch        <- queryTargetTarget ghcStage queryArch
+    arch        <- queryPerStageTargetSpec ghcStage queryArch
     let codegen_arches = ["x86_64", "i386", "powerpc", "powerpc64", "powerpc64le", "aarch64", "wasm32", "riscv64", "loongarch64"]
     let withNativeCodeGen
           | unregisterised = False
           | arch `elem` codegen_arches = True
           | otherwise = False
-    platform    <- queryTargetTarget ghcStage targetPlatformTriple
-    wordsize    <- show @Int . (*8) <$> queryTargetTarget ghcStage (wordSize2Bytes . tgtWordSize)
+    platform    <- queryPerStageTargetSpec ghcStage targetPlatformTriple
+    wordsize    <- show @Int . (*8) <$> queryPerStageTargetSpec ghcStage (wordSize2Bytes . tgtWordSize)
 
-    llc_cmd   <- queryTargetTarget ghcStage tgtLlc
-    llvm_as_cmd <- queryTargetTarget ghcStage tgtLlvmAs
+    llc_cmd   <- queryPerStageTargetSpec ghcStage tgtLlc
+    llvm_as_cmd <- queryPerStageTargetSpec ghcStage tgtLlvmAs
     let have_llvm = allowHaveLLVM arch && all isJust [llc_cmd, llvm_as_cmd]
 
     top         <- topDirectory
@@ -231,6 +232,8 @@ runTestBuilderArgs = builder Testsuite ? do
 
     keepFiles <- expr (testKeepFiles <$> userSetting defaultTestArgs)
 
+    tgtArchOs <- expr $ queryPerStageTargetSpec stage tgtArchOs
+
     accept <- expr (testAccept <$> userSetting defaultTestArgs)
     (acceptPlatform, acceptOS) <- expr . liftIO $
         (,) <$> (maybe False (=="YES") <$> lookupEnv "PLATFORM")
@@ -266,7 +269,7 @@ runTestBuilderArgs = builder Testsuite ? do
             , arg "-e", arg $ "config.accept=" ++ show accept
             , arg "-e", arg $ "config.accept_platform=" ++ show acceptPlatform
             , arg "-e", arg $ "config.accept_os=" ++ show acceptOS
-            , arg "-e", arg $ "config.exeext=" ++ quote (if null exe then "" else "."<>exe)
+            , arg "-e", arg $ "config.exeext=" ++ quote ("" <.> exe tgtArchOs)
             , arg "-e", arg $ "config.compiler_debugged=" ++ show debugAssertions
             , arg "-e", arg $ "config.debug_rts=" ++ show debugged
 
