@@ -84,9 +84,9 @@ data Class
 --  Here fun-deps are [([a,b],[c]), ([a,c],[b])]
 type FunDep a = ([a],[a])
 
-type ClassOpItem = (Id, DefMethInfo)
-        -- Selector function; contains unfolding
-        -- Default-method info
+type ClassOpItem = ( Id           -- Dictionary selector function
+                                  -- See Note [Dictionary selectors]
+                   , DefMethInfo) -- Default-method info
 
 type DefMethInfo = Maybe (Name, DefMethSpec Type)
    -- Nothing                    No default method
@@ -164,7 +164,19 @@ classMinimalDef :: Class -> ClassMinimalDef
 classMinimalDef Class{ classBody = ConcreteClass{ cls_min_def = d } } = d
 classMinimalDef _ = mkTrue -- TODO: make sure this is the right direction
 
-{-
+{- Note [Dictionary selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Each `ClassOpItem` stores a dictionary selector `Id`:
+
+* The type of the selector is always closed, and has form
+      forall a1..an. C a1 .. an => blah
+  where `a1..an` are the class variables, and
+        `blah` is the method type.
+  See GHC.Types.Id.Make.mkDictSelId, which constructs them.
+
+* The selector has no unfolding, but one RULE.
+  See Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance
+
 Note [Associated type defaults]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The following is an example of associated type defaults:

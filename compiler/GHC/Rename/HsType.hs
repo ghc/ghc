@@ -1188,10 +1188,20 @@ bindHsOuterTyVarBndrs :: OutputableBndrFlag flag 'Renamed
                       -> RnM (a, FreeNames)
 bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
   case outer_bndrs of
+
     HsOuterImplicit{} ->
+      -- Add an implicit `forall a1..an` at the top, where `a1..an`
+      -- are not-otherwise-in-scope type variables.
+      -- Used when there is no forall, or a /visible/ (forall a -> blah)
+      -- See Note [forall-or-nothing rule] in Language.Haskell.Syntax.Type
       rnImplicitTvOccs mb_cls implicit_vars $ \implicit_vars' ->
         thing_inside $ HsOuterImplicit { hso_ximplicit = implicit_vars' }
+
     HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+      -- The type already has an explicit, user-written, invisible forall,
+      --     so do not add an implicit forall
+      -- See Note [forall-or-nothing rule] in Language.Haskell.Syntax.Type
+      --
       -- Note: If we pass mb_cls instead of Nothing below, bindLHsTyVarBndrs
       -- will use class variables for any names the user meant to bring in
       -- scope here. This is an explicit forall, so we want fresh names, not
