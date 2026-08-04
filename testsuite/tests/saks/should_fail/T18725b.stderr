@@ -1,0 +1,6 @@
+T18725b.hs:8:14: error: [GHC-85413]
+    • Type constructor ‘U’ cannot be used here
+        (it is defined and used in the same recursive group)
+    • In the kind ‘U’
+      In the data type declaration for ‘E’
+
