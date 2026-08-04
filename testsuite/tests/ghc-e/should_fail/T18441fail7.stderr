@@ -5,8 +5,12 @@ IO error:  "Abcde" does not exist
 While handling ghc-10.1-inplace:GHC.Utils.Panic.GhcException:
   |
   | IO error:  "Abcde" does not exist
+  |
+  | HasCallStack backtrace:
+  |   throw, called at compiler/GHC/Utils/Panic.hs:180:21 in ghc-10.1-inplace:GHC.Utils.Panic
+  |   throwGhcException, called at ghc/GHCi/UI.hs:2851:21 in ghc-bin-10.1.20260801-inplace:GHCi.UI
 
 HasCallStack backtrace:
-  throwIO, called at compiler\GHC\Utils\Error.hs:499:19 in ghc-10.1-inplace:GHC.Utils.Error
+  throwIO, called at compiler/GHC/Utils/Error.hs:513:19 in ghc-10.1-inplace:GHC.Utils.Error
 
 1
