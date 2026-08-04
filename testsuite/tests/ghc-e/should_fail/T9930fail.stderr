@@ -10,3 +10,7 @@ HasCallStack backtrace:
   throwIO, called at libraries/exceptions/src/Control/Monad/Catch.hs:1:1 in <package-id>:Control.Monad.Catch
   throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:1:1 in <package-id>:Control.Monad.Catch
   onException, called at compiler/GHC/Driver/MakeAction.hs:1:1 in <package-id>:GHC.Driver.MakeAction
+
+HasCallStack backtrace:
+  throw, called at compiler/GHC/Utils/Panic.hs:1:1 in <package-id>:GHC.Utils.Panic
+  throwGhcException, called at compiler/GHC/Driver/Make.hs:1:1 in <package-id>:GHC.Driver.Make

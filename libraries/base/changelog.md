@@ -7,6 +7,7 @@
   * `catchSTM` now annotates exceptions rethrown from the handler with `WhileHandling` ([CLC proposal #298](https://github.com/haskell/core-libraries-committee/issues/298))
   * Hide implementation details of `throw` and `throwSTM` from exception stack traces ([CLC proposal #387](https://github.com/haskell/core-libraries-committee/issues/387), [#26808](https://gitlab.haskell.org/ghc/ghc/-/issues/26808))
   * GHC internals re-exported from `GHC.Num` have been deprecated and will be removed after one major release ([CLC proposal #360](https://github.com/haskell/core-libraries-committee/issues/360))
+  * The implementation of `toException` in `SomeException`'s `Exception` instance no longer drops exception context, in keeping with the behavior originally proposed in [CLC Proposal #200](https://github.com/haskell/core-libraries-committee/issues/200).
 
 ## 4.22.0.0 *December 2025*
   * Shipped with GHC 9.14.1
