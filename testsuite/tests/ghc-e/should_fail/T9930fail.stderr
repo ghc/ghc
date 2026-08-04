@@ -1,4 +1,4 @@
-ghc: Uncaught exception ghc-9.13-inplace:GHC.Utils.Panic.GhcException:
+ghc: Uncaught exception ghc-9.12.4.20260710-inplace:GHC.Utils.Panic.GhcException:
 
 default output name would overwrite the input file; must specify -o explicitly
 Usage: For basic information, try the `--help' option.
@@ -7,7 +7,12 @@ While handling default output name would overwrite the input file; must specify 
   | Usage: For basic information, try the `--help' option.
 
 HasCallStack backtrace:
-  throwIO, called at libraries/exceptions/src/Control/Monad/Catch.hs:371:13 in exceptions-0.10.12-inplace:Control.Monad.Catch
-  throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:860:36 in exceptions-0.10.12-inplace:Control.Monad.Catch
-  onException, called at compiler/GHC/Driver/Make.hs:2955:3 in ghc-9.13-inplace:GHC.Driver.Make
+  throwIO, called at libraries/exceptions/src/Control/Monad/Catch.hs:347:12 in exceptions-0.10.12-inplace:Control.Monad.Catch
+  throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:872:84 in exceptions-0.10.12-inplace:Control.Monad.Catch
+  onException, called at compiler/GHC/Driver/Make.hs:3025:23 in ghc-9.12.4.20260710-inplace:GHC.Driver.Make
+
+HasCallStack backtrace:
+  collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:170:37 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:90:42 in ghc-internal:GHC.Internal.Exception
+  throw, called at compiler/GHC/Utils/Panic.hs:180:21 in ghc-9.12.4.20260710-inplace:GHC.Utils.Panic
 

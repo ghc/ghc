@@ -206,7 +206,16 @@ Caught MismatchedParentheses
 
 -}
 class (Typeable e, Show e) => Exception e where
-    -- | @toException@ should produce a 'SomeException' with no attached 'ExceptionContext'.
+    -- | 'toException' converts an exception into the existential 'SomeException'
+    -- wrapper type.
+    --
+    -- In doing so, 'toException' should not /add/ an 'ExceptionContext'.
+    --
+    --   - In most cases, the exception does not store its own 'ExceptionContext'.
+    --     The default implementation of 'toException' (which does not store any
+    --     'ExceptionContext') is suitable for these cases.
+    --   - In the rare case that the exception itself stores an 'ExceptionContext',
+    --     this context should be preserved by 'toException'.
     toException   :: e -> SomeException
     fromException :: SomeException -> Maybe e
 
@@ -229,13 +238,11 @@ class (Typeable e, Show e) => Exception e where
 -- | @since base-4.8.0.0
 instance Exception Void
 
--- | This drops any attached 'ExceptionContext'.
+-- | NB: this instance preserves the attached 'ExceptionContext'.
 --
 -- @since base-3.0
 instance Exception SomeException where
-    toException (SomeException e) =
-        let ?exceptionContext = emptyExceptionContext
-        in SomeException e
+    toException = id
     fromException = Just
     backtraceDesired (SomeException e) = backtraceDesired e
     displayException (SomeException e) = displayException e

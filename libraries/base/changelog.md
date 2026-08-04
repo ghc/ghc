@@ -2,6 +2,8 @@
 
 ## 4.21.3.0 *June 2026*
   * System.Info.fullCompilerVersion: add 'since' annotation
+  * The implementation of `toException` in `SomeException`'s `Exception` instance no longer drops exception context, in keeping with the behavior originally proposed in [CLC Proposal #200](https://github.com/haskell/core-libraries-committee/issues/200).
+
 
 ## 4.21.2.0 *March 2026*
   * Expose `Backtraces` constructor and fields ([CLC proposal #199](https://github.com/haskell/core-libraries-committee/issues/199), [#26049](https://gitlab.haskell.org/ghc/ghc/-/issues/26049))
