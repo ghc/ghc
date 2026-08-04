@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies     #-}
 {-# LANGUAGE RecordWildCards  #-}
-
+{-# LANGUAGE PartialTypeSignatures #-}
 {-
 
 This module contains miscellaneous functions related to renaming.
@@ -752,7 +752,7 @@ genAppType expr ty = HsAppType noExtField (wrapGenSpan expr) (mkEmptyWildCardBnd
 genAppTypeWith :: SrcSpan -> HsExpr GhcRn -> HsType (NoGhcTc GhcRn) -> HsExpr GhcRn
 genAppTypeWith srcSpan expr ty = HsAppType noExtField (wrapSrcSpan srcSpan expr) (mkEmptyWildCardBndrs (wrapSrcSpan srcSpan ty))
 
-genHsVarWith :: SrcSpan -> Name -> HsExpr GhcRn
+genHsVarWith :: SrcSpan -> WithUserRdr Name -> HsExpr GhcRn
 genHsVarWith srcSpan nm = HsVar noExtField (wrapSrcSpan srcSpan nm)
 
 wrapSrcSpan :: (HasAnnotation an) => SrcSpan -> a -> GenLocated an a

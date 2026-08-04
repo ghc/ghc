@@ -1408,24 +1408,6 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
             -> [ toHie $ RFC RecFieldOcc Nothing (L mspan fld)
                ]
           _ -> []
-      XExpr x
-        | HieTc <- hiePass @p
-        -> case x of
-             WrapExpr (HsWrap w a)
-               -> [ toHie $ L mspan a
-                  , toHie (L mspan w) ]
-             ExpandedThingTc o e
-               ->
-                  [ toHie (L mspan e) ]
-             ConLikeTc con _ _
-               -> [ toHie $ C Use $ L mspan $ conLikeName con ]
-             HsTick _ expr
-               -> [ toHie expr
-                  ]
-             HsBinTick _ _ expr
-               -> [ toHie expr
-                  ]
-        | otherwise -> []
 
 -- NOTE: no longer have the location
 instance HiePass p => ToHie (HsTupArg (GhcPass p)) where
