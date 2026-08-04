@@ -38,3 +38,5 @@ test('T18863d', normal, compile_fail, [''])
 test('T20916', normal, compile_fail, [''])
 test('saks018-fail', normal, compile_fail, [''])
 test('saks021-fail', normal, compile_fail, [''])
+test('T18725b', normal, compile_fail, [''])
+
