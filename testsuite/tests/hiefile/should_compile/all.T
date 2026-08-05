@@ -24,3 +24,4 @@ test('ScopesBug',    expect_broken(18425),     compile, ['-fno-code -fwrite-ide-
 test('T18425',       normal,     compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])
 test('T22416',       normal,     compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])
 test('T24493',       normal,     compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info -ddump-hie'])
+test('T25417',       normal,     compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info -ddump-hie'])
