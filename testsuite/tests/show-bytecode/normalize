@@ -6,9 +6,9 @@ stabilize ()
 {
   sed -E -e '
     s/_r[[:alnum:]]+/_@name_suffix@/g
-    s/^( *hash: )[[:xdigit:]]+/\1@hash@/g
-    s/^( *)[[:xdigit:]]+:/\1@hash@:/g
-    s/word [[:digit:]]{2}[[:digit:]]*/word @large_word@/
+    s/^( *hash: )[[:xdigit:]]+/\1@hash@/
+    s/^( *)[[:xdigit:]]+:/\1@hash@:/
+    s/word [[:digit:]]{2}[[:digit:]]*/word @large_word@/g
   '
 }
 

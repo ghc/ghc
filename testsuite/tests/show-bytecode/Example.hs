@@ -12,9 +12,9 @@
 module Example where
 
 import Numeric.Natural (Natural)
-import GHC.StaticPtr (StaticPtr)
-import Foreign.C.Types (CChar, CSize (CSize))
 import Foreign.Ptr (Ptr)
+import Foreign.C.Types (CChar, CSize (CSize))
+import GHC.StaticPtr (StaticPtr)
 
 fibonaccis :: [Natural]
 fibonaccis = 0 : positiveFibonaccis where
