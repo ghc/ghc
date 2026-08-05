@@ -1,5 +1,8 @@
 {-# language GADTs, LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module GHC.CmmToAsm.AArch64.CodeGen (
       cmmTopCodeGen
@@ -923,18 +926,23 @@ getRegister' config plat expr
     -- XX Conversion
     CmmMachOp (MO_XX_Conv from to) [e] -> do
       register <- getRegister e
-      if to >= W32 || to > from
-        then case register of
-          -- Reuse computation, casting width.
-          Any _fmt code       -> pure $ Any (intFormat to) code
-          Fixed _fmt reg code -> pure $ Fixed (intFormat to) reg code
-        else case register of
-          Any _fmt code ->
-            pure $ Any (intFormat to) $ \dst -> do
-              code dst `appOL` truncateSubwordRegInplace to dst
-          Fixed _fmt reg code -> do
-              (trunc_reg, trunc_code) <- truncateSubwordReg to reg
-              pure $ Fixed (intFormat to) trunc_reg (code `appOL` trunc_code)
+      -- if to >= W32 || to > from
+      --   -- don't do anything in the word case or
+      --   -- when the target register width is larger
+      --   -- than the origin register width; e.g.
+      --   -- mangoiv: what we the tradeoff to not truncate here, too?
+      --   then case register of
+      --     -- Reuse computation, casting width.
+      --     Any _fmt code       -> pure $ Any (intFormat to) code
+      --     Fixed _fmt reg code -> pure $ Fixed (intFormat to) reg code
+      --   else
+      case register of
+        Any _fmt code ->
+          pure $ Any (intFormat to) $ \dst -> do
+            code dst `appOL` truncateSubwordRegInplace to dst
+        Fixed _fmt reg code -> do
+            (trunc_reg, trunc_code) <- truncateSubwordReg SMayClobberSubwordArgReg to reg
+            pure $ Fixed (intFormat to) trunc_reg (code `appOL` trunc_code)
     CmmMachOp op [e] -> do
       (reg, _format, code) <- getSomeReg e
       case op of
@@ -1233,7 +1241,7 @@ getRegister' config plat expr
           -- sign-extend both arguments to 32-bits.
           -- See Note [Signed arithmetic on AArch64].
           intOpImm :: Bool -> Width -> (Operand -> Operand -> Operand -> OrdList Instr) -> (Integer -> Width -> Maybe Operand) -> NatM (Register)
-          intOpImm {- is signed -} True  w op _encode_imm = intOp True w op
+          intOpImm True  w op _encode_imm = intOp True w op {- is signed -}
           intOpImm                 False w op  encode_imm = do
               -- compute x<m> <- x
               -- compute x<o> <- y
@@ -1272,8 +1280,9 @@ getRegister' config plat expr
               let w' = opRegWidth w
                   signExt r
                     -- See Note [Signed arithmetic on AArch64] and #27430
-                    | w >= W32       = pure (r, nilOL)
-                    | not is_signed  = truncateSubwordReg w r
+                    | not is_signed  = truncateSubwordReg SMayClobberSubwordArgReg w r
+                    -- TODO(mangoiv) in the signed case if w> W32,
+                    -- this should be a noop
                     | otherwise      = signExtendReg w w' r
               (reg_x_sx, code_x_sx) <- signExt reg_x
               (reg_y_sx, code_y_sx) <- signExt reg_y
@@ -1914,38 +1923,97 @@ signExtendReg w w' r =
         r' <- getNewRegNat (intFormat w')
         return (r', unitOL $ instr (OpReg w' r') (OpReg w r))
 
--- | Truncate/zero extend the subwords high bits and store the
--- result in a new register. Must be called with w==8 or w==16
-truncateSubwordReg :: Width -> Reg -> NatM (Reg, OrdList Instr)
-truncateSubwordReg w_to r = do
-    massertPpr (w_to == W8 || w_to == W16) (text "truncateSubwordReg:unexpectedWidth")
-    case w_to of
-      -- Asserted false, but be defensive for non-debug builds.
-      W64 -> trunc W64 MOV
-      W32 -> trunc W32 MOV
+-- | Whether the argument register may be clobbered
+--   'NeverClobbers' is an optimization
+data ArgumentClobbering
+  = NeverClobbers
+  | MayClobberArgReg
 
-      -- Actual truncation
-      W16 -> trunc W32 UXTH
-      W8  -> trunc W32 UXTB
-      _   -> panic "truncateSubwordReg:unexpectedWidth"
-  where
-    trunc w instr = do
-        r' <- getNewRegNat (intFormat w_to)
-        return (r', unitOL $ instr (OpReg w r') (OpReg w r))
+-- TODO(mangoiv): come up with better names for these two data strucutes
 
--- | Like @truncateSubwordReg@, but modifes the argument register in place if we
--- need to truncate.
+data SArgumentClobbering (a :: ArgumentClobbering) where
+  SMayClobberSubwordArgReg :: SArgumentClobbering MayClobberArgReg
+  -- ^ the usual case: the register that holds a subword argument may be
+  --   clobbered by the truncation operation; >=W32 is not affected since
+  --   it is a noop
+
+  SAlwaysAllocateReg :: SArgumentClobbering MayClobberArgReg
+  -- ^ subwords may be clobbered, but >=W32 want to allocate a new register
+  --   anyway; to avoid having to allocate twice in the subword case, we
+  --   always allocate a new register
+  --   This is at worst a pessimisation of allocating one more registeer
+  --   in case we don't actually need this.
+
+  SNeverClobbers :: SArgumentClobbering NeverClobbers
+  -- ^ if we are sure that the register is fresh and clobbering doesn't
+  --   matter, we don't have to allocate a new register, ever
+
+
+data SArgumentClobbered (a :: ArgumentClobbering) where
+  SNeverClobbered ::  OrdList Instr -> SArgumentClobbered NeverClobbers
+  -- ^ just returns the instructions; since we never clobber, this is pure since
+  --   we never have to return a new register
+
+  SUnclobbered :: NatM (Reg, OrdList Instr) -> SArgumentClobbered MayClobberArgReg
+  -- ^ return code to allocate a new register and instructions that may depend on it, that is:
+  --   - a new register if we pass a subword register with the potential to be clobbered
+  --   - the input register if we pass a word sized argument with no need to always allocate
+  --     a new register
+  --   - a new register if we were to always create a new register
+
+instrsWithUnclobberedReg :: SArgumentClobbered MayClobberArgReg -> NatM (Reg, OrdList Instr)
+instrsWithUnclobberedReg (SUnclobbered a) = a
+
+instrsNonclobberedCode :: SArgumentClobbered NeverClobbers -> OrdList Instr
+instrsNonclobberedCode (SNeverClobbered a) = a
+
+-- | full words
+pattern WFull :: Width
+pattern WFull <- (\case W32 -> True; W64 -> True; _ -> False -> True)
+
+-- | subwords
+pattern WSub :: (Operand -> Operand -> Instr) -> Width
+pattern WSub {truncInstr} <- (\case W16 -> Just UXTH; W8 -> Just UXTB; _ -> Nothing -> (Just truncInstr))
+
 truncateSubwordRegInplace :: Width -> Reg -> OrdList Instr
-truncateSubwordRegInplace w_to r = do
-    case w_to of
-      W64 -> nilOL
-      W32 -> nilOL
-      W16 -> trunc UXTH
-      W8  -> trunc UXTB
-      _   -> panic "truncateSubwordRegInplace:unexpectedWidth"
+truncateSubwordRegInplace w_to r = instrsNonclobberedCode (truncateSubwordReg' SNeverClobbers w_to r)
+
+truncateSubwordReg :: SArgumentClobbering MayClobberArgReg -> Width -> Reg -> NatM (Reg, OrdList Instr)
+truncateSubwordReg clobbering w_to r = instrsWithUnclobberedReg (truncateSubwordReg' clobbering w_to r)
+
+-- | Truncate/zero extend the subwords high bits and store the
+-- result in a new register.
+truncateSubwordReg' :: SArgumentClobbering a -> Width -> Reg -> SArgumentClobbered a
+truncateSubwordReg' clobbering w_to r = case clobbering of
+  SMayClobberSubwordArgReg
+    -- return the input register
+    | WFull             <- w_to -> SUnclobbered $ pure (r, nilOL)
+    -- allocate a new register
+    | WSub {truncInstr} <- w_to -> SUnclobbered $ do
+      freshReg <- getNewRegNat (intFormat w_to)
+      pure (freshReg, pureTrunc truncInstr W32 freshReg r)
+
+  -- always allocate a new register as the surrounding code
+  -- would allocate one anyways and we don't want to allocate
+  -- multiple times; this may be a pessimation when we don't
+  -- want to allocate a new register for non-subwords
+  SAlwaysAllocateReg -> SUnclobbered $ do
+      freshReg <- getNewRegNat (intFormat w_to)
+      let instrs
+            | WFull <- w_to             = nilOL
+            | WSub {truncInstr} <- w_to = pureTrunc truncInstr W32 freshReg r
+            | otherwise                 = panicUnexpectedWidth
+      pure (freshReg, instrs)
+  SNeverClobbers
+    -- noop
+    | WFull      <- w_to -> SNeverClobbered nilOL
+    -- same register
+    | WSub {truncInstr} <- w_to -> SNeverClobbered $ pureTrunc truncInstr W32 r r
+  _ -> panicUnexpectedWidth
   where
-    trunc instr = do
-        unitOL $ instr (OpReg W32 r) (OpReg W32 r)
+  pureTrunc instr targetWidth destinationReg originReg
+    = unitOL $ instr (OpReg targetWidth destinationReg) (OpReg targetWidth originReg)
+  panicUnexpectedWidth = panic "truncateSubwordReg:unexpectedWidth"
 
 -- -----------------------------------------------------------------------------
 --  The 'Amode' type: Memory addressing modes passed up the tree.
@@ -3027,7 +3095,7 @@ data BlockInRange = InRange | NotInRange Target
 -- See Note [AArch64 far jumps]
 makeFarBranches :: Platform -> LabelMap RawCmmStatics -> [NatBasicBlock Instr]
                 -> UniqDSM [NatBasicBlock Instr]
-makeFarBranches {- only used when debugging -} _platform statics basic_blocks = do
+makeFarBranches _platform statics basic_blocks = do
   -- All offsets/positions are counted in multiples of 4 bytes (the size of AArch64 instructions)
   -- That is an offset of 1 represents a 4-byte/one instruction offset.
   let (func_size, lblMap) = foldl' calc_lbl_positions (0, mapEmpty) basic_blocks
@@ -3143,4 +3211,4 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       CBZ{}   -> Just long_bz_jump_size
       CBNZ{}  -> Just long_bz_jump_size
       BCOND{} -> Just long_bc_jump_size
-      _ -> Nothing
+      _ -> Nothing {- only used when debugging -}
