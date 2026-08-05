@@ -2443,15 +2443,24 @@ run_BCO:
              *           =>
              * a_1 ... a_n, k
              */
+            bool slide_safe = false;
             if (n == 0 || WITHIN_CAP_CHUNK_BOUNDS_W(n - 1 + by)) {
                 while(n-- > 0) {
                     SpW(n+by) = ReadSpW(n);
                 }
             } else {
                 // We write across a chunk boundary: Use safe access
+                slide_safe = true;
+                debugBelch("SLIDE-SAFE: n=%lu by=%lu\n",
+                           (unsigned long)n, (unsigned long)by);
                 while(n-- > 0) {
                     *((StgWord*)SafeSpWP(n+by)) = ReadSpW(n);
                 }
+            }
+            if (slide_safe && WITHIN_CAP_CHUNK_BOUNDS_W(by)) {
+                // Safe copy wrote past the underflow frame, but the pop
+                // loop below will not run: slid words are physically split
+                debugBelch("SLIDE-SPLIT: by=%lu\n", (unsigned long)by);
             }
 
             // If we SLIDE Sp past the chunk bounds we need to handle the underflow
@@ -2464,6 +2473,9 @@ run_BCO:
                 // See Note [Checking for underflow frames]
                 if (IS_UNDERFLOW_FRAME(uf->info)) {
                     W_ sp_to_uf = (StgWord*)uf - (StgWord*)Sp;
+                    debugBelch("SLIDE-POP: by=%lu sp_to_uf=%lu safe=%d\n",
+                               (unsigned long)by, (unsigned long)sp_to_uf,
+                               (int)slide_safe);
                     Sp = (StgPtr)uf;
                     SAVE_STACK_POINTERS;
                     threadStackUnderflow(cap, cap->r.rCurrentTSO);
