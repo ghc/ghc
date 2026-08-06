@@ -1,0 +1,9 @@
+Breakpoint 0 activated at T27633c.hs:20:3-16
+Stopped in Main.poke, T27633c.hs:20:3-16
+_result :: IO Int = _
+x :: Int = 41
+Stopped in Main.scrut, T27633c.hs:23:17-33
+_result :: (# State# RealWorld, Int #) = _
+Stopped in Main.main, T27633c.hs:(27,19)-(29,193)
+_result :: (# State# RealWorld, () #) = _
+300

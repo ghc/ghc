@@ -392,6 +392,10 @@ StgClosure *captureContinuationAndAbort(Capability *cap, StgTSO *tso, StgPromptT
   const StgInfoTable *apply_mask_frame = NULL;
   StgWord mask_frame_offset = 0;
 
+  // see Note [GHCi unboxed tuples stack spills]
+  bool seen_ctoi_tuple_frame = false;
+  StgWord ctoi_tuple_spill_words = 0;
+
   /* --- Phase 1: Find the matching prompt frame ---------------------------- */
 
   IF_DEBUG(continuation,
@@ -459,7 +463,8 @@ StgClosure *captureContinuationAndAbort(Capability *cap, StgTSO *tso, StgPromptT
 
     // see Note [GHCi unboxed tuples stack spills]
     if (info_ptr == &stg_ctoi_t_info) {
-      tso->ctoi_tuple_spill_words = frame[CTOI_OLD_TUPLE_SPILL_WORDS_OFFSET];
+      seen_ctoi_tuple_frame = true;
+      ctoi_tuple_spill_words = frame[CTOI_OLD_TUPLE_SPILL_WORDS_OFFSET];
     }
 
     // Advance to the next frame.
@@ -474,6 +479,11 @@ StgClosure *captureContinuationAndAbort(Capability *cap, StgTSO *tso, StgPromptT
 
   dirty_TSO(cap, tso);
   dirty_STACK(cap, stack);
+
+  // see Note [GHCi unboxed tuples stack spills] in StgMiscClosures.cmm
+  if (seen_ctoi_tuple_frame) {
+    tso->ctoi_tuple_spill_words = ctoi_tuple_spill_words;
+  }
 
   StgContinuation *cont = (StgContinuation *)allocate(cap, CONTINUATION_sizeW(total_words));
   SET_HDR(cont, &stg_CONTINUATION_info, stack->header.prof.ccs);
