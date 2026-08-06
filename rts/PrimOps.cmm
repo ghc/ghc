@@ -51,6 +51,7 @@ import CLOSURE stg_AP_info;
 import CLOSURE stg_ARR_WORDS_info;
 import CLOSURE stg_BCO_info;
 import CLOSURE stg_C_FINALIZER_LIST_info;
+import CLOSURE stg_DEAD_SLOT_closure;
 import CLOSURE stg_DEAD_WEAK_info;
 import CLOSURE stg_END_STM_WATCH_QUEUE_closure;
 import CLOSURE stg_END_TSO_QUEUE_closure;
@@ -1126,7 +1127,7 @@ stg_threadLabelzh ( gcptr tso )
     W_ r;
     r = StgTSO_label(tso);
     if (r == 0) {
-        return (0, 0);
+        return (0, stg_DEAD_SLOT_closure);
     } else {
         return (1, r);
     }

@@ -713,3 +713,7 @@ test('T27477',
      , only_ways(['threaded1', 'threaded2'])
      ],
      compile_and_run, ['-O2'])
+
+test('T27618',
+     [req_target_smp, omit_ghci],
+     compile_and_run, ['-O2 -threaded -with-rtsopts "-N4 -A32k"'])
