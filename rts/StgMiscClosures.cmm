@@ -727,6 +727,18 @@ INFO_TABLE_CONSTR(stg_NO_FINALIZER,0,0,0,CONSTR_NOCAF,"NO_FINALIZER","NO_FINALIZ
 CLOSURE(stg_NO_FINALIZER_closure,stg_NO_FINALIZER);
 
 /* ----------------------------------------------------------------------------
+   DEAD_SLOT
+
+   A static nullary constructor for dead pointer-typed result slots
+   that must still hold a valid closure for the GC (see #27618).
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(stg_DEAD_SLOT,0,0,0,CONSTR_NOCAF,"DEAD_SLOT","DEAD_SLOT")
+{ ccall pbarf("DEAD_SLOT object (%p) entered!", R1 "ptr") never returns; }
+
+CLOSURE(stg_DEAD_SLOT_closure,stg_DEAD_SLOT);
+
+/* ----------------------------------------------------------------------------
    Stable Names are unlifted too.
    ------------------------------------------------------------------------- */
 

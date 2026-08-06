@@ -195,6 +195,7 @@ RTS_ENTRY(stg_SRT_16);
 
 RTS_CLOSURE(stg_END_TSO_QUEUE_closure);
 RTS_CLOSURE(stg_NO_FINALIZER_closure);
+RTS_CLOSURE(stg_DEAD_SLOT_closure);
 RTS_CLOSURE(stg_dummy_ret_closure);
 RTS_CLOSURE(stg_forceIO_closure);
 
@@ -203,6 +204,7 @@ RTS_CLOSURE(stg_END_STM_CHUNK_LIST_closure);
 RTS_CLOSURE(stg_NO_TREC_closure);
 
 RTS_ENTRY(stg_NO_FINALIZER);
+RTS_ENTRY(stg_DEAD_SLOT);
 
 #if IN_STG_CODE
 extern StgWordArray stg_CHARLIKE_closure;
