@@ -3252,6 +3252,10 @@ findRetryFrameHelper (Capability *cap, StgTSO *tso)
     default:
       ASSERT(info->i.type != CATCH_FRAME);
       ASSERT(info->i.type != STOP_FRAME);
+      // see Note [GHCi unboxed tuples stack spills] in StgMiscClosures.cmm
+      if (*p == (StgWord)&stg_ctoi_t_info) {
+          tso->ctoi_tuple_spill_words = p[CTOI_OLD_TUPLE_SPILL_WORDS_OFFSET]; // restore old_spill
+      }
       p = next;
       continue;
     }
@@ -3318,6 +3322,10 @@ findAtomicallyFrameHelper (Capability *cap, StgTSO *tso)
     default:
       ASSERT(info->i.type != CATCH_FRAME);
       ASSERT(info->i.type != STOP_FRAME);
+      // see Note [GHCi unboxed tuples stack spills] in StgMiscClosures.cmm
+      if (*p == (StgWord)&stg_ctoi_t_info) {
+          tso->ctoi_tuple_spill_words = p[CTOI_OLD_TUPLE_SPILL_WORDS_OFFSET]; // restore old_spill
+      }
       p = next;
       continue;
     }

@@ -1,0 +1,13 @@
+:load T27633c.hs
+-- break inside poke, while the generic stg_ctoi_t frame from main's
+-- 24-field tuple case is live on the stack
+:break 20
+main
+-- step out to the small case continuation in scrut
+:stepout
+-- step out again: activates the breakpoint of main's tuple case
+-- continuation BCO, entered through the generic stg_ctoi_t frame
+:stepout
+-- resuming re-enters the stg_ctoi_t frame; with a stale
+-- tso->ctoi_tuple_spill_words this segfaulted
+:continue
