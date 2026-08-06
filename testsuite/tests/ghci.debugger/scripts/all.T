@@ -153,3 +153,5 @@ test('T26042e', extra_files(['T26042e.hs']), ghci_script, ['T26042e.script'])
 test('T26042f1', extra_files(['T26042f.hs', 'T26042f.script']), ghci_script, ['T26042f.script']) # >> is not inlined, so stepout has nowhere to stop
 test('T26042f2', [extra_hc_opts('-O -fno-unoptimized-core-for-interpreter'), extra_files(['T26042f.hs', 'T26042f.script'])], ghci_script, ['T26042f.script'])
 test('T26042g', extra_files(['T26042g.hs']), ghci_script, ['T26042g.script'])
+
+test('T27633c', extra_files(['T27633c_obj.hs']), ghci_script, ['T27633c.script'])

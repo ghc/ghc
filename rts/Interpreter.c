@@ -1982,6 +1982,20 @@ run_BCO:
                     for (i = 0; i < size_words; i++) {
                        new_aps->payload[i] = (StgClosure *)ReadSpW(i);
                     }
+
+                    /* The stg_ctoi_t frame we copied is entered again when
+                       execution resumes, but tso->ctoi_tuple_spill_words
+                       holds the enclosing frame's count: it was restored
+                       from old_spill when this case continuation was entered
+                       (bci_RETURN_T). Put back the count belonging to this
+                       frame, so the invariant holds while the thread sits at
+                       the breakpoint.
+
+                       See Note [GHCi unboxed tuples stack spills] */
+                    if (ReadSpW(size_returned_frame) == (W_)&stg_ctoi_t_info) {
+                        cap->r.rCurrentTSO->ctoi_tuple_spill_words =
+                            ReadSpW(size_returned_frame + CTOI_TUPLE_INFO_OFFSET) >> 24;
+                    }
                   }
                   else {
 
