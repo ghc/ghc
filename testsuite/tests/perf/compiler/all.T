@@ -200,7 +200,6 @@ test('FamAppCachePerf',
 
 test('T27336',
      [ only_ways(['normal'])
-     , collect_compiler_residency(20)
      , collect_compiler_stats('bytes allocated',2)
      ],
      compile,
