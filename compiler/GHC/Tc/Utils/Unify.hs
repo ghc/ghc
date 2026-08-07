@@ -2129,7 +2129,7 @@ mkWpFun_FRR unify pos act_af act_mult act_arg act_res exp_af exp_mult exp_arg ex
                  act_arg_co
                  (mkReflCo Nominal act_res)
             arg_wrap_frr =
-              mkWpCastN (mkSymCo exp_arg_co) <.> arg_wrap <.> mkWpCastN act_arg_co
+              mkWpCastN act_arg_co <.> arg_wrap <.> mkWpCastN (mkSymCo exp_arg_co)
                --  exp_arg_co :: exp_arg ~> exp_arg_frr
                --  act_arg_co :: act_arg ~> act_arg_frr
                --  arg_wrap :: exp_arg ~> act_arg
