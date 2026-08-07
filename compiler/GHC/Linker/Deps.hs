@@ -26,7 +26,6 @@ import GHC.Types.Unique.DSet
 import GHC.Types.Unique.DFM
 
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
 import GHC.Utils.Error
 
 import GHC.Unit.Env
@@ -208,8 +207,6 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                                 <> quotes (text new_file) $$ while_linking_expr
                    else return (DotO new_file ModuleObject)
               DotO file ForeignObject -> pure (DotO file ForeignObject)
-              DotA fp    -> panic ("adjust_ul DotA " ++ show fp)
-              DotDLL fp  -> panic ("adjust_ul DotDLL " ++ show fp)
               DotGBC {}  -> pure part
 
 

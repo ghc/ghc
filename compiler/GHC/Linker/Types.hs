@@ -54,7 +54,6 @@ module GHC.Linker.Types
    , LinkableObjectSort (..)
    , linkableIsNativeCodeOnly
    , linkableObjs
-   , linkableLibs
    , linkableFiles
    , linkableBCOs
    , linkablePartBCOs
@@ -63,7 +62,6 @@ module GHC.Linker.Types
    , linkablePartitionParts
    , linkablePartPath
    , isNativeCode
-   , isNativeLib
    , linkableFilterByteCode
    , linkableFilterNative
    , partitionLinkables
@@ -441,12 +439,6 @@ data LinkablePart
       -- should not be adapted to the interpreter's way. Used for foreign stubs
       -- loaded from interfaces.
 
-  | DotA FilePath
-      -- ^ Static archive file (.a)
-
-  | DotDLL FilePath
-      -- ^ Dynamically linked library file (.so, .dll, .dylib)
-
   | DotGBC
       -- ^ A byte-code object, lives only in memory.
       ModuleByteCode
@@ -477,8 +469,6 @@ instance Outputable LinkablePart where
       pprSort = \case
         ModuleObject -> empty
         ForeignObject -> brackets (text "foreign")
-  ppr (DotA path)       = text "DotA" <+> text path
-  ppr (DotDLL path)     = text "DotDLL" <+> text path
   ppr (DotGBC bco)      = text "DotGBC" <+> ppr bco
 
 -- | Return true if the linkable only consists of native code (no BCO)
@@ -494,7 +484,7 @@ linkableBCOs l = [ gbc_compiled_byte_code gbc | DotGBC gbc <- NE.toList (linkabl
 linkableModuleByteCodes :: Linkable -> [ModuleByteCode]
 linkableModuleByteCodes l = [ mbc | DotGBC mbc <- NE.toList (linkableParts l) ]
 
--- | List the native linkable parts (.o/.so/.dll) of a linkable
+-- | List the native linkable parts (.o) of a linkable
 linkableNativeParts :: Linkable -> [LinkablePart]
 linkableNativeParts l = NE.filter isNativeCode (linkableParts l)
 
@@ -506,55 +496,35 @@ linkablePartitionParts l = NE.partition isNativeCode (linkableParts l)
 linkableObjs :: Linkable -> [FilePath]
 linkableObjs l = concatMap linkablePartObjectPaths (linkableParts l)
 
--- | List the native libraries (.so/.dll) of a linkable
-linkableLibs :: Linkable -> [LinkablePart]
-linkableLibs l = NE.filter isNativeLib (linkableParts l)
-
--- | List the paths of the native objects and libraries (.o/.so/.dll)
+-- | List the paths of the native objects (.o)
 linkableFiles :: Linkable -> [FilePath]
 linkableFiles l = concatMap linkablePartNativePaths (NE.toList (linkableParts l))
 
 -------------------------------------------
 
--- | Is the part a native object or library? (.o/.so/.dll)
+-- | Is the part a native object? (.o)
 isNativeCode :: LinkablePart -> Bool
 isNativeCode = \case
   DotO {}         -> True
-  DotA {}         -> True
-  DotDLL {}       -> True
-  DotGBC {}       -> False
-
--- | Is the part a native library? (.so/.dll)
-isNativeLib :: LinkablePart -> Bool
-isNativeLib = \case
-  DotO {}         -> False
-  DotA {}         -> True
-  DotDLL {}       -> True
   DotGBC {}       -> False
 
 -- | Get the FilePath of linkable part (if applicable)
 linkablePartPath :: LinkablePart -> Maybe FilePath
 linkablePartPath = \case
   DotO fn _       -> Just fn
-  DotA fn         -> Just fn
-  DotDLL fn       -> Just fn
   DotGBC {}       -> Nothing
 
--- | Return the paths of all object code files (.o, .a, .so) contained in this
+-- | Return the paths of all object code files (.o) contained in this
 -- 'LinkablePart'.
 linkablePartNativePaths :: LinkablePart -> [FilePath]
 linkablePartNativePaths = \case
   DotO fn _       -> [fn]
-  DotA fn         -> [fn]
-  DotDLL fn       -> [fn]
   DotGBC {}       -> []
 
 -- | Return the paths of all object files (.o) contained in this 'LinkablePart'.
 linkablePartObjectPaths :: LinkablePart -> [FilePath]
 linkablePartObjectPaths = \case
   DotO fn _ -> [fn]
-  DotA _ -> []
-  DotDLL _ -> []
   DotGBC bco -> gbc_foreign_files bco
 
 -- | Retrieve the compiled byte-code from the linkable part.
@@ -573,8 +543,6 @@ linkableFilter f linkable = do
 linkablePartNative :: LinkablePart -> [LinkablePart]
 linkablePartNative u = case u of
   DotO {}  -> [u]
-  DotA {} -> [u]
-  DotDLL {} -> [u]
   DotGBC bco -> [DotO f ForeignObject | f <- gbc_foreign_files bco]
 
 linkablePartByteCode :: LinkablePart -> [LinkablePart]
@@ -583,7 +551,7 @@ linkablePartByteCode = \case
   _ -> []
 
 -- | Transform the 'LinkablePart' list in this 'Linkable' to contain only
--- object code files (.o, .a, .so) without 'BCOs'.
+-- object code files (.o) without 'BCOs'.
 -- If no 'LinkablePart' remains, return 'Nothing'.
 linkableFilterNative :: Linkable -> Maybe Linkable
 linkableFilterNative = linkableFilter linkablePartNative
@@ -595,7 +563,7 @@ linkableFilterByteCode :: Linkable -> Maybe Linkable
 linkableFilterByteCode = linkableFilter linkablePartByteCode
 
 -- | Split the 'LinkablePart' lists in each 'Linkable' into only object code
--- files (.o, .a, .so) and only byte code, and return two
+-- files (.o) and only byte code, and return two
 -- lists containing the nonempty 'Linkable's for each.
 partitionLinkables :: [Linkable] -> ([Linkable], [Linkable])
 partitionLinkables linkables =
@@ -642,8 +610,6 @@ mkLinkableUsage lnk =
     go :: Module -> LinkablePart -> LinkablePartUsage
     go m lnkPart = case lnkPart of
       DotO fn _ -> mkFileLinkablePartUsage m fn (linkablePartObjectPaths lnkPart)
-      DotA fn -> mkFileLinkablePartUsage m fn (linkablePartObjectPaths lnkPart)
-      DotDLL fn -> mkFileLinkablePartUsage m fn (linkablePartObjectPaths lnkPart)
       DotGBC mbc -> mkByteCodeLinkablePartUsage m (gbc_hash mbc) (linkablePartObjectPaths lnkPart)
 
 mkLinkablesUsage :: [Linkable] -> [LinkableUsage]
