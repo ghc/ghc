@@ -12,7 +12,7 @@ test(
 )
 test(
     'show-bytecode-hpc',
-    extra_files(['Example.hs', 'normalize']),
+    [js_skip, extra_files(['Example.hs', 'normalize'])],
     makefile_test,
     []
 )
