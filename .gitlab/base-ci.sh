@@ -27,6 +27,9 @@ mkdir other-ghcs
 mkdir other-ghcs/src
 mkdir other-ghcs/opt
 
+# Save project root
+project_root=$PWD
+
 # Create Cabal file for `base`
 (
   cd libraries/base
@@ -46,15 +49,16 @@ do
       >${ghc_version}.tar.xz
     tar -xJf ${ghc_version}.tar.xz
     cd ghc-${ghc_version}-*
-    ./configure --prefix "../../opt/${ghc_version}"
+    ./configure --prefix "${project_root}/opt/${ghc_version}"
     make install
   )
 
   # Build `base` with the installed GHC
   (
     cd libraries/base
-    cabal build --with-compiler ../../other-ghcs/opt/${ghc_version}/bin/ghc \
-                --allow-boot-library-installs \
-                -O0
+    cabal build
+      --with-compiler "${project_root}/other-ghcs/opt/${ghc_version}/bin/ghc" \
+      --allow-boot-library-installs \
+      -O0
   )
 done
