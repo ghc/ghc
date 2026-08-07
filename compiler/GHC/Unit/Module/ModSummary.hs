@@ -1,14 +1,16 @@
 -- | A ModSummary is a node in the compilation manager's dependency graph
 -- (ModuleGraph)
 module GHC.Unit.Module.ModSummary
-   ( ModSummary (..)
+   (
+     -- * ModSummary
+     ModSummary (..)
    , ms_unitid
    , ms_installed_mod
    , ms_mod_name
    , ms_imps
+   , ms_srcimps
    , ms_plugin_imps
    , ms_mnwib
-   , ms_home_srcimps
    , ms_home_imps
    , msHiFilePath
    , msDynHiFilePath
@@ -22,7 +24,6 @@ module GHC.Unit.Module.ModSummary
    , msObjFileOsPath
    , msDynObjFileOsPath
    , msBytecodeFileOsPath
-   , msDeps
    , isBootSummary
    , isTemplateHaskellOrQQNonBoot
    , findTarget
@@ -42,6 +43,7 @@ import GHC.Unit.Module
 import GHC.Types.SourceFile ( HscSource(..), hscSourceString )
 import GHC.Types.SrcLoc
 import GHC.Types.Target
+import GHC.Types.UnresolvedImport
 import GHC.Types.PkgQual
 import GHC.Types.Basic
 
@@ -55,12 +57,13 @@ import GHC.Utils.Outputable
 import Data.Time
 
 
+--------------------------------------------------------------------------------
+
 -- | Data for a module node in a 'ModuleGraph'. Module nodes of the module graph
 -- are one of:
 --
 -- * A regular Haskell source module
 -- * A hi-boot source module
---
 data ModSummary
    = ModSummary {
         ms_mod          :: Module,
@@ -82,11 +85,13 @@ data ModSummary
           -- See Note [When source is considered modified] and #9243
         ms_hie_date   :: Maybe UTCTime,
           -- ^ Timestamp of hie file, if we have one
-        ms_srcimps      :: [Located ModuleName],
-          -- ^ Source imports of the module
-        ms_textual_imps :: [(ImportLevel, PkgQual, Located ModuleName)],
-          -- ^ Non-source imports of the module from the module *text*
-          -- Includes 'import Prelude' if -XImplicitPrelude
+        ms_textual_imps :: [UnresolvedImport PkgQual],
+          -- ^ Imports derived from module *text*, including:
+          --
+          --  - @{-# SOURCE #-}@ imports
+          --  - GHC-generated implicit imports (see 'GHC.Parser.Header.mkImplicitImports')
+          --
+          -- Does not store plugin module imports; those are added on by 'ms_imps'.
         ms_parsed_mod   :: Maybe HsParsedModule,
           -- ^ The parsed, nonrenamed source, if we have it.  This is also
           -- used to support "inline module syntax" in Backpack files.
@@ -108,37 +113,37 @@ ms_installed_mod = fst . getModuleInstantiation . ms_mod
 ms_mod_name :: ModSummary -> ModuleName
 ms_mod_name = moduleName . ms_mod
 
--- | Textual imports, plus plugin imports but not SOURCE imports.
-ms_imps :: ModSummary -> [(ImportLevel, PkgQual, Located ModuleName)]
+-- | All imports of the module: textual imports (SOURCE imports included),
+-- generated imports, and plugin imports (imports going via @-fplugin@).
+ms_imps :: ModSummary -> [UnresolvedImport PkgQual]
 ms_imps ms = ms_textual_imps ms ++ ms_plugin_imps ms
 
--- | Plugin imports
-ms_plugin_imps :: ModSummary -> [(ImportLevel, PkgQual, Located ModuleName)]
-ms_plugin_imps ms = map ((SpliceLevel, NoPkgQual,) . noLoc) (pluginModNames (ms_hspp_opts ms))
+-- | The @{-# SOURCE #-}@ imports of the module.
+ms_srcimps :: ModSummary -> [UnresolvedImport PkgQual]
+ms_srcimps = filter ((IsBoot ==) . ui_boot) . ms_textual_imps
+
+-- | Plugin imports (via @-fplugin@).
+ms_plugin_imps :: ModSummary -> [UnresolvedImport PkgQual]
+ms_plugin_imps ms =
+  [ (generatedImport FromPlugin (noLoc mod_name)) { ui_level = SpliceLevel }
+  | mod_name <- pluginModNames (ms_hspp_opts ms) ]
 
 -- | All of the (possibly) home module imports from the given list that is to
 -- say, each of these module names could be a home import if an appropriately
 -- named file existed.  (This is in contrast to package qualified imports, which
 -- are guaranteed not to be home imports.)
-home_imps :: [(ImportLevel, PkgQual, Located ModuleName)] -> [(ImportLevel, PkgQual, Located ModuleName)]
-home_imps imps = filter (maybe_home . pq) imps
+home_imps :: [UnresolvedImport PkgQual] -> [UnresolvedImport PkgQual]
+home_imps imps = filter (maybe_home . ui_pkg_qual) imps
   where maybe_home NoPkgQual    = True
         maybe_home (ThisPkg _)  = True
         maybe_home (OtherPkg _) = False
-
-        pq (_, p, _) = p
-
--- | Like 'ms_home_imps', but for SOURCE imports.
-ms_home_srcimps :: ModSummary -> ([Located ModuleName])
--- [] here because source imports can only refer to the current package.
-ms_home_srcimps = ms_srcimps
 
 -- | All of the (possibly) home module imports from a
 -- 'ModSummary'; that is to say, each of these module names
 -- could be a home import if an appropriately named file
 -- existed.  (This is in contrast to package qualified
 -- imports, which are guaranteed not to be home imports.)
-ms_home_imps :: ModSummary -> ([(ImportLevel, PkgQual, Located ModuleName)])
+ms_home_imps :: ModSummary -> [UnresolvedImport PkgQual]
 ms_home_imps = home_imps . ms_imps
 
 -- The ModLocation contains both the original source filename and the
@@ -180,17 +185,6 @@ isTemplateHaskellOrQQNonBoot ms =
 ms_mnwib :: ModSummary -> ModuleNameWithIsBoot
 ms_mnwib ms = GWIB (ms_mod_name ms) (isBootSummary ms)
 
--- | Returns the dependencies of the ModSummary s.
-msDeps :: ModSummary -> ([(ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName))])
-msDeps s = [ (NormalLevel, NoPkgQual, d) -- Source imports are always NormalLevel
-           | m <- ms_home_srcimps s
-           , d <- [ GWIB { gwib_mod = m, gwib_isBoot = IsBoot }
-                  ]
-           ]
-        ++ [ (stage, pkg, (GWIB { gwib_mod = m, gwib_isBoot = NotBoot }))
-           | (stage, pkg, m) <- ms_imps s
-           ]
-
 instance Outputable ModSummary where
    ppr ms
       = sep [text "ModSummary {",
@@ -198,8 +192,7 @@ instance Outputable ModSummary where
                           text "ms_mod =" <+> ppr (ms_mod ms)
                                 <> text (hscSourceString (ms_hsc_src ms)) <> comma,
                           text "unit =" <+> ppr (ms_unitid ms),
-                          text "ms_textual_imps =" <+> ppr (ms_textual_imps ms),
-                          text "ms_srcimps =" <+> ppr (ms_srcimps ms)]),
+                          text "ms_textual_imps =" <+> ppr (ms_textual_imps ms)]),
              char '}'
             ]
 
@@ -218,4 +211,3 @@ findTarget ms ts =
         = f == f'  && ms_unitid summary == unitid
     _ `matches` _
         = False
-

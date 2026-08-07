@@ -225,8 +225,7 @@ How known-occ entities work
   This is a big reason for (KnownOccNameInvariant): an export list cannot have two
   entities with the same OccName.
 
-  When GHC wants to find GHC.Essentials, it just looks for it in the same
-  way as any other import.
+  See Note [Finding GHC.Essentials] for how GHC finds the GHC.Essentials module.
 
 * There are three flags that control the treatment of known entities:
     -frebindable-known-names
@@ -248,18 +247,16 @@ How known-occ entities work
   or
      dsLookupKnownOccTyCon rationalTyConOcc
 
-  Then, in `GHC.Iface.Load.loadKnownKeyOccMaps`
+  Then, in `GHC.Iface.Load.loadKnownKeyOccMaps` (called once per module compilation):
 
-    * GHC imports GHC.Essentials, i.e. looks for `GHC/KnownKeyNames.hi`
+    * GHC finds the GHC.Essentials module this module implicitly imports, and
+      loads its interface. See Note [Finding GHC.Essentials].
 
-    * Assuming this is successful, GHC uses its `mi_exports` to build `KnownKeyNameMaps`,
+    * It uses the interface's `mi_exports` to build `KnownKeyNameMaps`,
       which has (a) a map from the KnownKey of each known-key entity to its Name
                 (b) a map from the KnownOcc of each known-occ entity to its Name
 
-    * It stashes these maps in the `eps_known_keys` field of the ExternalPackageState
-      so that it doesn't need to repeat the exercise.
-
-  Now it can simply look up `rationalTyConKey` in the `eps_known_keys`.  Easy!
+  Now it can simply look up `rationalTyConKey` in those maps. Easy!
   See `GHC.Iface.Load.lookupKnownKeyThing` and `lookupKnownOccThing`.
 
 * Known-occ lookup (base case: KES_InScope)
@@ -412,10 +409,9 @@ To make `wombat` into a known-key name, do the following.
 * Just like for known-occ names above, in any module in `base` or `ghc-internal` (which
   are compiled with -frebindable-known-names), ensure that `wombat` is
   in scope by saying `import M( wombat )`.
--}
 
-{- Note [Known entities and reinstallable base]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Known entities and reinstallable base]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The design of known-entities in GHC, described in Note [Overview of known entities],
 is carefully crafted to support a single version of GHC to compile different
 versions of base, even though GHC itself is compiled against a fixed version of
@@ -453,6 +449,57 @@ Let's compare two examples: `coerce` and `enumFromTo`.
     `enumFromTo` (see `GHC.Iface.Load.lookupKnownOccName`). This means GHC never
     needs to know where precisely `enumFromTo` is defined, allowing it to be
     defined anywhere (wherever in `base`, or in a module imported by `base`).
+
+Note [Finding GHC.Essentials]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As explained in Note [Overview of known entities], we insert implicit
+dependencies on GHC.Essentials to resolve known entities. This dependency must
+behave exactly like an ordinary dependency: contribute to the the module graph,
+be recorded in the interface file, be re-checked for recompilation, and mark
+the unit that provides it as used.
+
+We achieve this by making it an ordinary dependency: GHC generates a real import
+declaration for GHC.Essentials, in `GHC.Parser.Header.mkEssentialsImports`,
+exactly as it generates one for Prelude. `GHC.Parser.Header.mkImplicitImports`
+is the single source of truth for the implicit imports of a module, and is used
+both when computing module graph edges and when renaming the import declarations.
+Nothing downstream needs to know that GHC.Essentials is special: the module graph,
+`ImportAvails`, `Dependencies`, `Usage` and recompilation checking all treat it
+as the import that it is.
+
+Only two bits of special logic are necessary:
+
+  (Essentials1) The implicit GHC.Essentials import brings nothing into scope.
+
+    We achieve this by setting the 'ImpuserList' to 'ImpUserDependOnly'. Two
+    things follow in 'GHC.Rename.Names.rnImportDecl':
+
+      - it contributes no `GlobalRdrEnv`, and
+
+      - it registers in `imp_mods` as a /system/ import (`ImportedBySystem`),
+        so every user-facing view of the module's imports -- name suggestions,
+        `module M` re-exports, Safe Haskell's import checks, Template Haskell's
+        `reifyModule` -- ignores it, as desired.
+
+    It is nevertheless a "whole module" import, so the 'Usage' recorded for it
+    is keyed on the whole export list of GHC.Essentials: any change to what
+    GHC.Essentials exports triggers recompilation.
+
+  (Essentials2) GHC.Essentials is allowed to be hidden in its unit.
+
+    We don't want GHC.Essentials to be an exposed module in "base", as it's an
+    implementation detail that we don't want to leak to users.
+
+    Hiddenness only ever obstructs the resolution of a `ModuleName` into a
+    `Module`. So every function that does that resolution takes a
+    `ModuleLookupScope` saying whether hidden modules may be resolved, and the
+    generated GHC.Essentials import is the one import resolved with
+    `LookupSystem`. A user-written import is always resolved with
+    `LookupUser`, and so still cannot name a hidden module.
+
+    The scope is derived from the provenance of the import
+    (`importDeclLookupScope`, `unresolvedImportLookupScope`), so a call site
+    cannot pick the wrong one.
 -}
 
 {-

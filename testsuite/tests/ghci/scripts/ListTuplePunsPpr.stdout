@@ -16,9 +16,9 @@ type Solo :: * -> *
 data Solo a = MkSolo a
   	-- Defined in ‘GHC.Internal.Tuple’
 instance Applicative Solo -- Defined in ‘GHC.Internal.Base’
-instance Eq a => Eq (Solo a) -- Defined in ‘GHC.Internal.Classes’
 instance Functor Solo -- Defined in ‘GHC.Internal.Base’
 instance Monad Solo -- Defined in ‘GHC.Internal.Base’
+instance Eq a => Eq (Solo a) -- Defined in ‘GHC.Internal.Classes’
 instance Monoid a => Monoid (Solo a)
   -- Defined in ‘GHC.Internal.Base’
 instance Ord a => Ord (Solo a) -- Defined in ‘GHC.Internal.Classes’
@@ -41,11 +41,11 @@ data Tuple2 a b = (,) a b
   	-- Defined in ‘GHC.Internal.Tuple’
 instance Monoid a => Applicative (Tuple2 a)
   -- Defined in ‘GHC.Internal.Base’
-instance (Eq a, Eq b) => Eq (Tuple2 a b)
-  -- Defined in ‘GHC.Internal.Classes’
 instance Functor (Tuple2 a) -- Defined in ‘GHC.Internal.Base’
 instance Monoid a => Monad (Tuple2 a)
   -- Defined in ‘GHC.Internal.Base’
+instance (Eq a, Eq b) => Eq (Tuple2 a b)
+  -- Defined in ‘GHC.Internal.Classes’
 instance (Monoid a, Monoid b) => Monoid (Tuple2 a b)
   -- Defined in ‘GHC.Internal.Base’
 instance (Ord a, Ord b) => Ord (Tuple2 a b)

@@ -67,8 +67,11 @@ data FindResult
                                            --   manifest, but couldn't find the
                                            --   .hi file
 
-      , fr_mods_hidden :: [Unit]           -- ^ Module is in these units,
-                                           --   but the *module* is hidden
+      , fr_mods_hidden :: [(Unit, HiddenModuleUnitVisibility)]
+                                           -- ^ Module is in these units, but
+                                           --   the *module* is hidden.  The
+                                           --   'HiddenModuleUnitVisibility' says whether
+                                           --   the unit is itself visible.
 
       , fr_pkgs_hidden :: [UnitInfo]       -- ^ Module is in these units,
                                            --   but the *unit* is hidden

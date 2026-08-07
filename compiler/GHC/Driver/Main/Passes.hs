@@ -1213,14 +1213,14 @@ checkSafeImports tcg_env
   where
     impInfo  = tcg_imports tcg_env     -- ImportAvails
     imports  = imp_mods impInfo        -- ImportedMods
-    imports1 = M.toList imports -- (Module, [ImportedBy])
-    imports' = map (fmap importedByUser) imports1 -- (Module, [ImportedModsVal])
+    -- 'importedByUser': only check user-written imports.
+    imports' = M.toList (M.mapMaybe (NE.nonEmpty . importedByUser) imports)
+                 -- (Module, NonEmpty ImportedModsVal)
     pkgReqs  = imp_trust_pkgs impInfo  -- [Unit]
 
-    condense :: SourceErrorContext -> (Module, [ImportedModsVal]) -> Hsc (Module, SrcSpan, IsSafeImport)
-    condense _   (_, [])   = panic "GHC.Driver.Main.condense: Pattern match failure!"
-    condense sec (m, x:xs) = do imv <- foldlM (cond' sec) x xs
-                                return (m, imv_span imv, imv_is_safe imv)
+    condense :: SourceErrorContext -> (Module, NonEmpty ImportedModsVal) -> Hsc (Module, SrcSpan, IsSafeImport)
+    condense sec (m, x :| xs) = do imv <- foldlM (cond' sec) x xs
+                                   return (m, imv_span imv, imv_is_safe imv)
 
     -- ImportedModsVal = (ModuleName, Bool, SrcSpan, IsSafeImport)
     cond' :: SourceErrorContext -> ImportedModsVal -> ImportedModsVal -> Hsc ImportedModsVal
@@ -1485,7 +1485,7 @@ hscTidy hsc_env guts = do
   let logger   = hsc_logger hsc_env
   let this_mod = mg_module guts
 
-  opts <- initTidyOpts hsc_env
+  opts <- initTidyOpts hsc_env guts
   (cgguts, details) <- withTiming logger
     (text "CoreTidy"<+>brackets (ppr this_mod))
     (const ())

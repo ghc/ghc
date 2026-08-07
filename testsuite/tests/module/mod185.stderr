@@ -55,7 +55,7 @@
         (NoEpTok)
         []))
       (NoSourceText)
-      (False))
+      (UserWrittenImport))
      (L
       (EpAnn
        (EpaSpan { mod185.hs:3:8-14 })

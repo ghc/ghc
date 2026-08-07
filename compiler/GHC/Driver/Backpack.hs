@@ -49,7 +49,6 @@ import GHC.Types.SourceError
 import GHC.Types.SourceFile
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
-import GHC.Types.Basic (convImportLevel)
 
 import GHC.Utils.Outputable
 import GHC.Utils.Fingerprint
@@ -64,10 +63,9 @@ import GHC.Unit.External
 import GHC.Unit.Finder
 import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModSummary
+import GHC.Types.UnresolvedImport
 
 import GHC.Linker.Types
-
-import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.Maybe
 import GHC.Data.OsPath (unsafeEncodeUtf, os)
@@ -77,7 +75,6 @@ import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.Data.ShortText as ST
 
 import Data.Containers.ListUtils (nubOrd)
-import Data.List ( partition )
 import System.Exit
 import Control.Monad
 import System.FilePath
@@ -824,8 +821,7 @@ summariseRequirement pn mod_name = do
         ms_iface_date = hi_timestamp,
         ms_hie_date = hie_timestamp,
         ms_bytecode_date = Nothing,
-        ms_srcimps = [],
-        ms_textual_imps = ((,,) NormalLevel NoPkgQual . noLoc) <$> extra_sig_imports,
+        ms_textual_imps = generatedImport FromBackpackSig . noLoc <$> extra_sig_imports,
         ms_parsed_mod = Just (HsParsedModule {
                 hpm_module = L loc (HsModule {
                         hsmodExt = XModulePs {
@@ -894,19 +890,13 @@ hsModuleToModSummary home_keys pn hsc_src modname
     hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file_ospath location)
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file_ospath location)
 
-    -- Also copied from 'getImportEdges'
-    let (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
-
-        implicit_prelude = xopt LangExt.ImplicitPrelude dflags
-        generated_imports = mkPrelImports modname implicit_prelude imps
-
-        rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env) modname
-        convImport (L _ i) = (convImportLevel (ideclLevelSpec i), rn_pkg_qual (ideclPkgQual i), reLoc $ ideclName i)
+    let textual_imports =
+          map (rnUnresolvedImportPkgQual (renameRawPkgQual (hsc_unit_env hsc_env)))
+              (mkUnresolvedImports dflags modname imps)
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env hsc_src modname
 
-    let normal_imports = map convImport (generated_imports ++ ord_idecls)
-    (implicit_sigs, inst_deps) <- liftIO $ implicitRequirementsShallow hsc_env normal_imports
+    (implicit_sigs, inst_deps) <- liftIO $ implicitRequirementsShallow hsc_env textual_imports
 
     -- So that Finder can find it, even though it doesn't exist...
     this_mod <- liftIO $ do
@@ -922,13 +912,12 @@ hsModuleToModSummary home_keys pn hsc_src modname
                             Just d -> d) </> ".." </> moduleNameSlashes modname <.> "hi",
             ms_hspp_opts = dflags,
             ms_hspp_buf = Nothing,
-            ms_srcimps = (\i -> reLoc (ideclName (unLoc i))) <$> src_idecls,
-            ms_textual_imps = normal_imports
+            ms_textual_imps = textual_imports
                            -- We have to do something special here:
                            -- due to merging, requirements may end up with
                            -- extra imports
-                           ++ ((,,) NormalLevel NoPkgQual . noLoc <$> extra_sig_imports)
-                           ++ ((,,) NormalLevel NoPkgQual . noLoc <$> implicit_sigs),
+                           ++ (generatedImport FromBackpackSig . noLoc <$> extra_sig_imports)
+                           ++ (generatedImport FromBackpackSig . noLoc <$> implicit_sigs),
             -- This is our hack to get the parse tree to the right spot
             ms_parsed_mod = Just (HsParsedModule {
                     hpm_module = hsmod,
@@ -951,7 +940,9 @@ hsModuleToModSummary home_keys pn hsc_src modname
           -- hs-boot edge
           [k | k <- [NodeKey_Module (ModNodeKeyWithUid (GWIB (ms_mod_name ms) IsBoot) (moduleUnitId this_mod))], NotBoot == isBootSummary ms,  k `elem` home_keys ] ++
           -- Normal edges
-          [k | (_, _,  mnwib) <- msDeps ms, let k = NodeKey_Module (ModNodeKeyWithUid (fmap unLoc mnwib) (moduleUnitId this_mod)), k `elem` home_keys]
+          [ k | e <- ms_imps ms
+              , let k = NodeKey_Module (ModNodeKeyWithUid (GWIB (unLoc (ui_mod_name e)) (ui_boot e)) (moduleUnitId this_mod))
+              , k `elem` home_keys ]
 
 
     return (ModuleNode (map mkNormalEdge (mod_nodes ++ inst_nodes)) (ModuleNodeCompile ms))

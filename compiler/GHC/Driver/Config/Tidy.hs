@@ -15,20 +15,31 @@ import GHC.Driver.DynFlags
 import GHC.Driver.Env
 import GHC.Driver.Backend
 
+import GHC.Core (bindersOfBinds)
 import GHC.Core.Make (getMkStringIds)
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules (usesEssentialsModule)
+import GHC.Data.Maybe (MaybeErr(..))
+import GHC.Iface.Load (KnownEntitySource(..), loadKnownKeyOccMaps)
 import GHC.Tc.Utils.Env (lookupKnownKeyGlobal)
+import GHC.Tc.Utils.Monad (initIfaceLoad)
+import GHC.Types.Error (pprDiagnostic)
+import GHC.Types.Name.Env (emptyNameEnv)
 import GHC.Types.TyThing
+import GHC.Types.TypeEnv (typeEnvFromEntities)
+import GHC.Unit.Module (moduleName)
+import GHC.Unit.Module.ModGuts
+import GHC.Utils.Panic (throwGhcExceptionIO, GhcException(..))
 import GHC.Platform.Ways
 
 import qualified GHC.LanguageExtensions as LangExt
 
-initTidyOpts :: HscEnv -> IO TidyOpts
-initTidyOpts hsc_env = do
+initTidyOpts :: HscEnv -> ModGuts -> IO TidyOpts
+initTidyOpts hsc_env guts = do
   let dflags = hsc_dflags hsc_env
   static_ptr_opts <- if not (xopt LangExt.StaticPointers dflags)
     then pure Nothing
-    else Just <$> initStaticPtrOpts hsc_env
+    else Just <$> initStaticPtrOpts hsc_env guts
   pure $ TidyOpts
     { opt_name_cache        = hsc_NC hsc_env
     , opt_collect_ccs       = ways dflags `hasWay` WayProf
@@ -43,13 +54,33 @@ initTidyOpts hsc_env = do
     , opt_keep_auto_rules   = gopt Opt_KeepAutoRules dflags
     }
 
-initStaticPtrOpts :: HscEnv -> IO StaticPtrOpts
-initStaticPtrOpts hsc_env = do
+initStaticPtrOpts :: HscEnv -> ModGuts -> IO StaticPtrOpts
+initStaticPtrOpts hsc_env guts = do
   let dflags = hsc_dflags hsc_env
+      this_mod = mg_module guts
 
-  mk_string <- getMkStringIds (fmap tyThingId . lookupKnownKeyGlobal hsc_env)
-  static_ptr_info_datacon <- tyThingDataCon <$> lookupKnownKeyGlobal hsc_env staticPtrInfoDataConKey
-  static_ptr_datacon      <- tyThingDataCon <$> lookupKnownKeyGlobal hsc_env staticPtrDataConKey
+  kk_source <-
+    if usesEssentialsModule (gopt Opt_RebindableKnownNames dflags)
+                            (moduleName this_mod)
+    then do
+      mb_maps <- initIfaceLoad hsc_env loadKnownKeyOccMaps
+      case mb_maps of
+        Succeeded kk_maps -> pure (KES_FromModule kk_maps)
+        Failed err        -> throwGhcExceptionIO $
+          PprProgramError "Could not load GHC.Essentials for the static-pointer table"
+            (pprDiagnostic err)
+    else
+      pure $ KES_InScope { ke_mod          = this_mod
+                         , ke_rdr_env      = mg_rdr_env guts
+                         , ke_gbl_type_env = typeEnvFromEntities (bindersOfBinds (mg_binds guts))
+                                               (mg_tcs guts) (mg_patsyns guts) (mg_fam_insts guts)
+                         , ke_lcl_type_env = emptyNameEnv }
+
+  let lookupKnownKey = lookupKnownKeyGlobal hsc_env kk_source
+
+  mk_string <- getMkStringIds (fmap tyThingId . lookupKnownKey)
+  static_ptr_info_datacon <- tyThingDataCon <$> lookupKnownKey staticPtrInfoDataConKey
+  static_ptr_datacon      <- tyThingDataCon <$> lookupKnownKey staticPtrDataConKey
 
   pure $ StaticPtrOpts
     { opt_platform = targetPlatform dflags

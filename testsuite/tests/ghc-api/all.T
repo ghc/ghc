@@ -35,6 +35,11 @@ test('T9015',
 test('T9595', [extra_run_opts(f'"{config.libdir}"')],
               compile_and_run,
               ['-package ghc'])
+
+# Check that base's GHC.Essentials exports all the known entities GHC expects.
+test('EssentialsCoverage', [extra_run_opts(f'"{config.libdir}"')],
+     compile_and_run,
+     ['-package ghc'])
 test('T10508_api', [ extra_run_opts('"' + config.libdir + '"'),
                      req_process,
                      req_rts_linker ],

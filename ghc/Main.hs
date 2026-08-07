@@ -492,7 +492,7 @@ abiHash strs = do
 
   let find_it str = do
          let modname = mkModuleName str
-         r <- findImportedModule hsc_env modname NoPkgQual
+         r <- findImportedModule hsc_env LookupUser modname NoPkgQual
          case r of
            Found _ m -> return m
            _error    ->

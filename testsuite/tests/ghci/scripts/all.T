@@ -395,9 +395,10 @@ test('bytecodeIPE',
      ghci_script, ['bytecodeIPE.script'])
 
 # Test package renaming in GHCi session
-# (GHC.Essentials from base is needed for known-names)
+# ('base ()' makes base a dependency, so that GHC can find GHC.Essentials to
+#  look up known-names, without exposing base's own Prelude)
 test('GhciPackageRename',
-     [extra_hc_opts("-hide-all-packages -package 'base (GHC.Essentials)' -package 'containers (Data.Map as Prelude)'")],
+     [extra_hc_opts("-hide-all-packages -package 'base ()' -package 'containers (Data.Map as Prelude)'")],
      ghci_script,
      ['GhciPackageRename.script'])
 test('T26233', normal, ghci_script, ['T26233.script'])

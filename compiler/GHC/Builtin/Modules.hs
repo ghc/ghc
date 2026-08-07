@@ -73,6 +73,15 @@ eSSENTIALS_NAME = mkModuleNameFS (fsLit "GHC.Essentials")
 rEBINDABLE_MOD_NAME :: ModuleName
 rEBINDABLE_MOD_NAME = mkModuleName "Rebindable"
 
+-- | Does this module need an implicit dependency on 'GHC.Essentials'?
+--
+-- See Note [Overview of known entities] in GHC.Builtin.
+usesEssentialsModule :: Bool       -- ^ is @-frebindable-known-names@ on?
+                     -> ModuleName -- ^ the module being compiled
+                     -> Bool
+usesEssentialsModule rebindable_known_names this_mod
+  = not rebindable_known_names && this_mod /= eSSENTIALS_NAME
+
 mkGhcInternalModule :: FastString -> Module
 mkGhcInternalModule m = mkGhcInternalModule_ (mkModuleNameFS m)
 

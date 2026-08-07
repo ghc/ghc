@@ -87,6 +87,7 @@ import GHC.Types.SrcLoc as SrcLoc
 import qualified GHC.Parser.Lexer as Lexer
 import GHC.Parser.Header ( toArgs )
 import qualified GHC.Parser.Header as Header
+import GHC.Types.UnresolvedImport ( ImportDeclOrigin(..) )
 import GHC.Types.PkgQual
 
 import GHC.Unit
@@ -534,8 +535,9 @@ interactiveUI config baseDFlags srcs maybe_exprs = do
    eval_wrapper <- mkEvalWrapper default_progname default_args
    let prelude_import =
          case simpleImportDecl preludeModuleName of
-           -- Set to True because Prelude is implicitly imported.
-           impDecl@ImportDecl{ideclExt=ext} -> impDecl{ideclExt = ext{ideclGenerated=True}}
+           -- Prelude is implicitly imported in the interactive context.
+           impDecl@ImportDecl{ideclExt=ext} ->
+             impDecl{ideclExt = ext{ideclOrigin = ImplicitPreludeImport}}
    empty_cache <- liftIO newIfaceCache
    startGHCi (runGHCi srcs maybe_exprs)
         GHCiState{ progname           = default_progname,
@@ -2377,7 +2379,7 @@ addModule files = do
     checkTargetModule m = do
       hsc_env <- GHC.getSession
       result <- liftIO $
-        Finder.findImportedModule hsc_env m NoPkgQual
+        Finder.findImportedModule hsc_env Finder.LookupUser m NoPkgQual
       case result of
         Found _ _ -> return True
         _ -> do reportError (GhciModuleError $ GhciModuleNotFound (moduleNameString m))

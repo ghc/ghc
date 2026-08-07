@@ -1,0 +1,4 @@
+essentials-order-user/U.hs:15:5: error: [GHC-71345]
+    Could not find known occurrence ‘fromInteger’
+      in the exports of GHC.KnownKeys
+

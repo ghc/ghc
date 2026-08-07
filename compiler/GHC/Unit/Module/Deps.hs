@@ -177,11 +177,13 @@ instance Outputable IfaceImportLevel where
 
 -- | Extract information from the rename and typecheck phases to produce
 -- a dependencies information for the module being compiled.
---
--- The fourth argument is a list of plugin modules.
--- The fifth argument is the unit-id of GHC.Essentials, unless -frebindable-known-names.
-mkDependencies :: HomeUnit -> Module -> ImportAvails -> [Module] -> Maybe UnitId -> Dependencies
-mkDependencies home_unit mod imports plugin_mods messentials_pkg =
+mkDependencies
+  :: HomeUnit
+  -> Module         -- ^ The module being compiled
+  -> ImportAvails
+  -> [Module]       -- ^ Plugin modules
+  -> Dependencies
+mkDependencies home_unit mod imports plugin_mods =
   let (home_plugins, external_plugins) = partition (isHomeUnit home_unit . moduleUnit) plugin_mods
       plugin_units = Set.fromList (map (toUnitId . moduleUnit) external_plugins)
       all_direct_mods = foldr (\(s, mn) m -> extendInstalledModuleEnv m mn (s, (GWIB (moduleName mn) NotBoot)))
@@ -208,14 +210,8 @@ mkDependencies home_unit mod imports plugin_mods messentials_pkg =
             -- We must also remove self-references from imp_orphs. See
             -- Note [Module self-dependency]
 
-      direct_pkgs = add_essentials_pkg $
+      direct_pkgs =
         Set.map (\(lvl, uid) -> (IfaceImportLevel lvl, uid)) (imp_dep_direct_pkgs imports)
-
-      -- Add the GHC.Essentials package to direct deps unless -frebindable-known-names is on
-      -- (the modgraph has edges to GHC.Essentials similarly, see `getImportEdges` in GHC.Parser.Header)
-      add_essentials_pkg = case messentials_pkg of
-        Nothing             -> id
-        Just essentials_uid -> Set.insert (IfaceImportLevel NormalLevel, essentials_uid)
 
       -- Set the packages required to be Safe according to Safe Haskell.
       -- See Note [Tracking Trust Transitively] in GHC.Rename.Names
@@ -706,8 +702,12 @@ No: if I need to load the interface for module X from package P I always look fo
 data ImportAvails
    = ImportAvails {
         imp_mods :: ImportedMods,
-          --      = ModuleEnv [ImportedModsVal],
-          -- ^ Domain is all directly-imported modules
+          --      = Map Module [ImportedBy],
+          -- ^ Domain is all directly-imported modules.  Each entry says
+          -- whether a user-written import brought the module in
+          -- ('ImportedByUser', with the details of that import) or the
+          -- system did ('ImportedBySystem'); user-facing consumers filter
+          -- with 'importedByUser'.
           --
           -- See the documentation on ImportedModsVal in
           -- "GHC.Unit.Module.Imported" for the meaning of the fields.

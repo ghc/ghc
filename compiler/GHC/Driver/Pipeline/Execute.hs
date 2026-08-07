@@ -81,6 +81,7 @@ import GHC.Driver.Env.KnotVars
 import GHC.Driver.Config.Finder
 import GHC.Rename.Names
 import GHC.StgToJS.Linker.Linker (embedJsFile)
+import GHC.Types.UnresolvedImport (rnUnresolvedImportPkgQual)
 
 import Language.Haskell.Syntax.Module.Name
 
@@ -669,16 +670,15 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   hsc_env <- initializePlugins hsc_env1
 
   -- gather the imports and module name
-  (hspp_buf,mod_name,imps,src_imps) <- do
+  (hspp_buf,mod_name,imps) <- do
     buf <- hGetStringBuffer input_fn
-    let rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
-        rn_imps = fmap (\(s, rpk, lmn@(L _ mn)) -> (s, rn_pkg_qual mn rpk, lmn))
+    let rn_imps = map (rnUnresolvedImportPkgQual (renameRawPkgQual (hsc_unit_env hsc_env)))
         sec = initSourceErrorContext dflags
-    eimps <- getImportEdges dflags buf input_fn (basename <.> suff)
+    eimps <- parseHeaderImports dflags buf input_fn (basename <.> suff)
     case eimps of
         Left errs -> throwErrors sec (GhcPsMessage <$> errs)
-        Right (src_imps,imps, L _ mod_name) -> return
-              (Just buf, mod_name, rn_imps imps, src_imps)
+        Right (imps, L _ mod_name) -> return
+              (Just buf, mod_name, rn_imps imps)
 
   -- Take -o into account if present
   -- Very like -ohi, but we must *only* do this if we aren't linking
@@ -719,8 +719,7 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
                                 ms_iface_date   = hi_date,
                                 ms_hie_date     = hie_date,
                                 ms_bytecode_date = bytecode_date,
-                                ms_textual_imps = imps,
-                                ms_srcimps      = src_imps }
+                                ms_textual_imps = imps }
 
 
   -- run the compiler!

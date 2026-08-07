@@ -62,7 +62,7 @@
         (NoEpTok)
         []))
       (NoSourceText)
-      (False))
+      (UserWrittenImport))
      (L
       (EpAnn
        (EpaSpan { KindSigs.hs:8:8-16 })

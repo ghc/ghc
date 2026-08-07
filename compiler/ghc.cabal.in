@@ -923,6 +923,7 @@ Library
         GHC.Types.Hint.Ppr
         GHC.Types.HpcInfo
         GHC.Types.Id
+        GHC.Types.UnresolvedImport
         GHC.Types.IPE
         GHC.Types.InlinePragma
         GHC.Types.ThLevelIndex

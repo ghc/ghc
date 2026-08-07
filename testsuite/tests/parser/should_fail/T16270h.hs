@@ -1,7 +1,7 @@
 {-# LANGUAGE GHC2021 #-}
 -- We can't test module header parsing errors using the same file as other
--- parsing errors (in ../T16270.hs) because HeaderInfo.getImportEdges fails fast
--- on parsing imports:
+-- parsing errors (in ../T16270.hs) because GHC.Parser.Header.parseHeaderImports
+-- fails fast on parsing imports:
 --
 --      if errorsFound dflags ms
 --        then throwIO $ mkSrcErr errs

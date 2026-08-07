@@ -210,7 +210,7 @@ cantFindErrorX pkg_hidden_hint may_show_locations mod_or_interface (CantFindInst
           -- package flags when making suggestions.  ToDo: if the original package
           -- also has a reexport, prefer that one
           pp_sugg (SuggestVisible m mod o) = ppr m <+> provenance o
-            where provenance ModHidden = empty
+            where provenance (ModHidden {}) = empty
                   provenance (ModUnusable _) = empty
                   provenance (ModOrigin{ fromOrigUnit = e,
                                          fromExposedReexport = res,
@@ -227,7 +227,7 @@ cantFindErrorX pkg_hidden_hint may_show_locations mod_or_interface (CantFindInst
                           <+> ppr mod)
                     | otherwise = empty
           pp_sugg (SuggestHidden m mod o) = ppr m <+> provenance o
-            where provenance ModHidden =  empty
+            where provenance (ModHidden {}) =  empty
                   provenance (ModUnusable _) = empty
                   provenance (ModOrigin{ fromOrigUnit = e,
                                          fromHiddenReexport = rhs })
@@ -261,7 +261,7 @@ cantFindErrorX pkg_hidden_hint may_show_locations mod_or_interface (CantFindInst
   where
     pprMod (m, o) = text "it is bound as" <+> ppr m <+>
                                 text "by" <+> pprOrigin m o
-    pprOrigin _ ModHidden = panic "cantFindErr: bound by mod hidden"
+    pprOrigin _ (ModHidden {}) = panic "cantFindErr: bound by mod hidden"
     pprOrigin _ (ModUnusable _) = panic "cantFindErr: bound by mod unusable"
     pprOrigin m (ModOrigin e res _ f) = sep $ punctuate comma (
       if e == Just True
@@ -280,8 +280,13 @@ cantFindErrorX pkg_hidden_hint may_show_locations mod_or_interface (CantFindInst
         <> dot $$ pkg_hidden_hint unit
 
 
-    mod_hidden pkg =
-        text "it is a hidden module in the package" <+> quotes (ppr pkg)
+    mod_hidden :: (Unit, HiddenModuleUnitVisibility) -> SDoc
+    mod_hidden (pkg, hmu) =
+        text "It is a hidden module in the" <+> pp_pkg <+> quotes (ppr pkg)
+      where
+        pp_pkg = case hmu of
+          HiddenModInVisibleUnit -> text "package"
+          HiddenModInHiddenUnit  -> text "hidden package"
 
     unusable (UnusableUnit unit reason reexport)
       = text "It is " <> (if reexport then text "reexported from the package"
@@ -326,28 +331,25 @@ interfaceErrorDiagnostic opts = \ case
 
   CantFindEssentials err reason ->
     vcat
-      [ vcat [ hang (text "Failed to load the known-names module" <+> quotes (ppr eSSENTIALS_NAME) <+> text "from the visible packages")
+      [ vcat [ hang (text "Failed to load the known-names module" <+> quotes (ppr eSSENTIALS_NAME))
                   2 (case reason of
                        UnknownLoadEssentialsReason -> empty
-                       LookingForKnownOcc occ      -> text "while looking for known-occ name" <+> quotes (ppr occ)
-                       LookingForKnownKey key      -> text "while looking for known-key" <+> quotes (pprKnownKey key)
-                       LookingForEssentialsModule  -> text "while trying to discover its package")
+                       LookingForEssentialsModule  -> text "which this module implicitly imports")
              , text "Did you mean to use" <+> quotes (text "-package base") <> text "?" ]
       , blankLine
       , missingInterfaceErrorDiagnostic opts err
       , blankLine
       , case reason of
           LookingForEssentialsModule
-            -> vcat [ text "This error was triggered while trying to discover the package of" <+> quotes (ppr eSSENTIALS_NAME) <> comma
-                    , text "rather than when looking up any specific known-name."
-                    , text "If you want to enforce" <+> quotes (ppr eSSENTIALS_NAME) <+> text "is not added to the module graph implicitly,"
-                    , text "you should use" <+> quotes (text "-frebindable-known-names")
+            -> vcat [ text "Every module resolves known entities by implicitly importing" <+> quotes (ppr eSSENTIALS_NAME) <> dot
+                    , text "To avoid this implicit import, looking up known entities in scope instead,"
+                    , text "use" <+> quotes (text "-frebindable-known-names") <> dot
                     ]
-          _ -> hang (text "To lookup known-names in scope rather than in GHC.Essentials" <> comma)
-                  2 (vcat [ text "use" <+> quotes (text "-frebindable-known-names") <> comma <+> text "and import"
-                          , text "the necessary known-names definitions from" <+> quotes (text "ghc-internal") <> dot
-                          -- Alternatively, you may want to unsafely provide your own GHC.Essentials exposing the known-names you need in scope."
-                          ])
+          UnknownLoadEssentialsReason ->
+            hang (text "To lookup known entities in scope rather than implicitly importing GHC.Essentials" <> comma)
+               2 (vcat [ text "use" <+> quotes (text "-frebindable-known-names") <> comma <+> text "and import"
+                       , text "the necessary known entity definitions from" <+> quotes (text "ghc-internal") <> dot
+                       ])
       ]
 
 lookingForHerald :: InterfaceLookingFor -> SDoc

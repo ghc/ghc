@@ -65,6 +65,7 @@ import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, occNameString, mkVarOccFS )
+import GHC.Types.UnresolvedImport ( ImportDeclOrigin(..) )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Error ( GhcHint(..) )
@@ -1156,7 +1157,7 @@ importdecl :: { LImportDecl GhcPs }
                              }
                   ; let loc = (comb6 $1 $7 $8 $9 (snd $10) $11);
                   ; amsA' $ L loc $
-                      ImportDecl { ideclExt = XImportDeclPass anns (snd $ fst $2) False
+                      ImportDecl { ideclExt = XImportDeclPass anns (snd $ fst $2) UserWrittenImport
                                   , ideclName = $7, ideclPkgQual = snd $6
                                   , ideclSource = snd $2
                                   , ideclLevelSpec = snd $ levelSpec

@@ -53,6 +53,7 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Types.Annotations
 import GHC.Types.Avail
 import GHC.Types.Basic ( ImportLevel(..) )
+import GHC.Types.UnresolvedImport
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
@@ -638,13 +639,8 @@ checkMergedSignatures hsc_env mod_summary self_recomp = do
 checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
 checkDependencies hsc_env summary iface
  = do
-    res_normal <- classify_import (findImportedModule hsc_env)
-                                  ([(st, p, m) | (st, p, m) <- (ms_textual_imps summary)]
-                                  ++
-                                  [(NormalLevel, NoPkgQual, m) | m <- ms_srcimps summary ])
-    res_plugin <- classify_import (\mod _ -> findPluginModule hsc_env mod)
-                    [(st, p, m) | (st, p, m) <- (ms_plugin_imps summary) ]
-    case sequence (res_normal ++ res_plugin) of
+    res <- classify_imports (ms_imps summary)
+    case sequence res of
       Left recomp -> return $ NeedsRecompile recomp
       Right es -> do
         let (hs, ps) = partitionEithers es
@@ -655,16 +651,16 @@ checkDependencies hsc_env summary iface
             in check_packages allPkgDeps prev_dep_pkgs
  where
 
-   classify_import :: (ModuleName -> t -> IO FindResult)
-                      -> [(ImportLevel, t, GenLocated l ModuleName)]
+   classify_imports :: [UnresolvedImport PkgQual]
                     -> IfG
                        [Either
                           CompileReason (Either (ImportLevel, UnitId, ModuleName) (FastString, (ImportLevel, UnitId)))]
-   classify_import find_import imports =
-    liftIO $ traverse (\(st, mb_pkg, L _ mod) ->
-           let reason = ModuleChanged mod
-           in classify st reason <$> find_import mod mb_pkg)
+   classify_imports imports =
+    liftIO $ traverse (\e ->
+           let reason = ModuleChanged (unLoc (ui_mod_name e))
+           in classify (ui_level e) reason <$> resolveImport hsc_env e)
            imports
+
    logger        = hsc_logger hsc_env
    all_home_units = hsc_all_home_unit_ids hsc_env
    prev_dep_mods = map (\(IfaceImportLevel s,u, a) -> (s, u, gwib_mod a)) $ Set.toAscList $ dep_direct_mods (mi_deps iface)

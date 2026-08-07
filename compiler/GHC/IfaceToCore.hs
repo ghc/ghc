@@ -983,11 +983,13 @@ mk_top_id (IfGblTopBndr gbl_name)
   -- rather than the current module so we need this special case.
   -- See some similar logic in `GHC.Rename.Env`.
   | Just rOOT_MAIN == nameModule_maybe gbl_name
-    = lookupKnownKeyThing ioTyConKey KES_FromModule >>= \case
-        Failed err          -> failIfM (pprDiagnostic err)
-        Succeeded ioTyThing -> do
-          ATyCon ioTyCon <- pure ioTyThing
-          return $ mkExportedVanillaId gbl_name (mkTyConApp ioTyCon [unitTy])
+    = loadKnownKeyOccMaps >>= \case
+        Failed err -> failIfM (pprDiagnostic err)
+        Succeeded kk_maps -> lookupKnownKeyThing ioTyConKey (KES_FromModule kk_maps) >>= \case
+          Failed err          -> failIfM (pprDiagnostic err)
+          Succeeded ioTyThing -> do
+            ATyCon ioTyCon <- pure ioTyThing
+            return $ mkExportedVanillaId gbl_name (mkTyConApp ioTyCon [unitTy])
   | otherwise = tcIfaceExtId gbl_name
 mk_top_id (IfLclTopBndr raw_name iface_type info details) = do
    ty <- tcIfaceType iface_type
@@ -2235,3 +2237,5 @@ tcIfaceImport (IfaceImport spec (ImpIfaceEverythingBut ns))
   = ImpUserSpec spec (ImpUserEverythingBut (mkNameSet ns))
 tcIfaceImport (IfaceImport spec (ImpIfaceExplicit gre implicit_parents))
   = ImpUserSpec spec (ImpUserExplicit (getDetOrdAvails gre) $ mkNameSet implicit_parents)
+tcIfaceImport (IfaceImport spec ImpIfaceDependOnly)
+  = ImpUserSpec spec ImpUserDependOnly

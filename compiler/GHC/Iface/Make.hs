@@ -244,12 +244,10 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program mb_modBreaks
   = do    let pluginModules = map lpModule (loadedPlugins (hsc_plugins hsc_env))
           let home_unit     = hsc_home_unit hsc_env
           let dflags        = ms_hspp_opts mod_summary
-          essentials_mod <- liftIO $ lookupKnownKeysModule hsc_env dflags
           let deps = mkDependencies home_unit
                                     (tcg_mod tc_result)
                                     (tcg_imports tc_result)
                                     (map mi_module pluginModules)
-                                    (moduleUnitId <$> essentials_mod)
 
           usage <- mkRecompUsageInfo hsc_env tc_result
           docs  <- extractDocs dflags tc_result
@@ -537,6 +535,8 @@ mkIfaceImports = map go
       = IfaceImport decl (ImpIfaceExplicit (sortAvails env) (nameSetElemsStable parents_of_implicits))
     go (ImpUserSpec decl (ImpUserEverythingBut ns))
       = IfaceImport decl (ImpIfaceEverythingBut (nameSetElemsStable ns))
+    go (ImpUserSpec decl ImpUserDependOnly)
+      = IfaceImport decl ImpIfaceDependOnly
 
 mkIfaceExports :: [AvailInfo] -> [IfaceExport] -- Sort to make canonical
 mkIfaceExports as = case sortAvails as of DefinitelyDeterministicAvails sas -> sas

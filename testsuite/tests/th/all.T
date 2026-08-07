@@ -87,6 +87,7 @@ def error_has(pattern):
     return('bash -o pipefail -c \'! (! "$@" {swap12}) | grep {pattern} {swap12} &> /dev/null\' --'.format(**locals()))
 
 test('TH_reifyMkName', normal, compile, ['-v0'])
+test('T27013th', normal, compile, ['-v0'])
 
 test('TH_reifyInstances', normal, compile, ['-v0'])
 

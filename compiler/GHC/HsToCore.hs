@@ -73,6 +73,9 @@ import GHC.Data.OrdList
 import GHC.Data.SizedSeq ( sizeSS )
 import GHC.Data.FastString (mkFastStringShortText)
 
+import GHC.HsToCore.Types (DsGblEnv(..))
+
+import GHC.Iface.Load (KnownEntitySource(..), lookupKnownKeyName)
 import GHC.Iface.Make (mkRecompUsageInfo)
 
 import GHC.Runtime.Interpreter (interpreterProfiled)
@@ -97,6 +100,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Ppr
 import GHC.Types.HpcInfo
+import GHC.Types.Unique.FM
 
 import GHC.Unit
 import GHC.Unit.Module.ModGuts
@@ -105,9 +109,6 @@ import GHC.Unit.Module.Deps
 
 import Data.List (partition)
 import Data.IORef
-import GHC.Types.Unique.FM
-import GHC.Iface.Load (KnownEntitySource(..), lookupKnownKeyName, lookupKnownKeysModule)
-import GHC.HsToCore.Types (DsGblEnv(..))
 
 {-
 ************************************************************************
@@ -228,12 +229,10 @@ deSugar hsc_env
 
         ; let pluginModules = map lpModule (loadedPlugins (hsc_plugins hsc_env))
               home_unit     = hsc_home_unit hsc_env
-        ; essentials_mod <- liftIO $ lookupKnownKeysModule hsc_env dflags
         ; let deps = mkDependencies home_unit
                                     (tcg_mod tcg_env)
                                     (tcg_imports tcg_env)
                                     (map mi_module pluginModules)
-                                    (moduleUnitId <$> essentials_mod)
 
         ; safe_mode <- finalSafeMode dflags tcg_env
 
@@ -732,7 +731,7 @@ moduleHasMagicDefn = do
   -- -fdefines-known-key-names, it certainly doesn't define magic names.
   kksource <- dsGetKnownKeySource
   case kksource of
-    KES_FromModule -> return False
+    KES_FromModule {} -> return False
     kes@KES_InScope{} -> do
       let definesMagicName magicKey = do
             mb_res <- lookupKnownKeyName magicKey kes

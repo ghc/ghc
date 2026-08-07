@@ -87,7 +87,7 @@
         (EpTok (EpaSpan { DumpSemis.hs:5:19 }))
         []))
       (NoSourceText)
-      (False))
+      (UserWrittenImport))
      (L
       (EpAnn
        (EpaSpan { DumpSemis.hs:5:8-16 })
@@ -136,7 +136,7 @@
         (NoEpTok)
         []))
       (NoSourceText)
-      (False))
+      (UserWrittenImport))
      (L
       (EpAnn
        (EpaSpan { DumpSemis.hs:7:8-16 })

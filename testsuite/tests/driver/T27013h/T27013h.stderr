@@ -1,0 +1,5 @@
+GHC/Essentials.hs:1:1: error: [GHC-99040]
+    Could not find known-key entity ‘Module’
+      in the top-level environment (unqualified, or qualified as Rebindable)
+      Consider importing it
+

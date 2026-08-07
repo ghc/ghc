@@ -23,6 +23,7 @@ import GHC.Driver.DynFlags
 import GHC.Utils.Misc
 import GHC.Driver.Env
 import GHC.Driver.Errors.Types
+import GHC.Types.UnresolvedImport
 import qualified GHC.SysTools as SysTools
 import GHC.Data.Graph.Directed ( SCC(..) )
 import GHC.Data.OsPath (unsafeDecodeUtf)
@@ -268,12 +269,11 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ (ModuleN
 
                 -- Emit a dependency for each import
 
-        ; let find_dep loc is_boot pkg_qual imp_mod = findDependency hsc_env loc pkg_qual imp_mod is_boot include_pkg_deps
-
-              find_deps is_boot idecls = sequence
-                    [ find_dep loc is_boot mb_pkg mod
-                    | (_lvl, mb_pkg, L loc mod) <- idecls,
-                      mod `notElem` excl_mods ]
+        ; let find_deps imps = sequence
+                    [ findDependency hsc_env imp include_pkg_deps
+                    | imp <- imps
+                    , unLoc (ui_mod_name imp) `notElem` excl_mods
+                    ]
 
               do_imp hi_file = do
                 let hi_files = insertSuffixes hi_file extra_suffixes
@@ -284,29 +284,23 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ (ModuleN
                  --              A.x_o : B.x_hi
                 mapM_ write_dep (obj_files `zip` hi_files)
 
-        ; (missing_boot_dep_errs, boot_deps) <- partitionEithers <$> find_deps IsBoot (map ((,,) NormalLevel NoPkgQual) (ms_srcimps node))
-        ; (missing_not_boot_dep_errs, not_boot_deps) <- partitionEithers <$> find_deps NotBoot (ms_imps node)
+        ; (missing_dep_errs, deps) <- partitionEithers <$> find_deps (ms_imps node)
 
-        ; let all_missing_errors = missing_boot_dep_errs ++ missing_not_boot_dep_errs
-
-        ; if null all_missing_errors
-            then mapM_ (mapM_ do_imp) (boot_deps ++ not_boot_deps)
+        ; if null missing_dep_errs
+            then mapM_ (mapM_ do_imp) deps
             else do
               let sec = initSourceErrorContext (hsc_dflags hsc_env)
-              throwErrors sec (mkMessages (listToBag all_missing_errors))
+              throwErrors sec (mkMessages (listToBag missing_dep_errs))
         }
 
 findDependency  :: HscEnv
-                -> SrcSpan
-                -> PkgQual              -- package qualifier, if any
-                -> ModuleName           -- Imported module
-                -> IsBootInterface      -- Source import
+                -> UnresolvedImport PkgQual   -- The import to find
                 -> Bool                 -- Record dependency on package modules
                 -> IO (Either (MsgEnvelope GhcMessage) (Maybe FilePath))  -- Interface file
-findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
+findDependency hsc_env imp include_pkg_deps = do
   -- Find the module; this will be fast because
-  -- we've done it once during downsweep
-  r <- findImportedModuleWithIsBoot hsc_env imp is_boot pkg
+  -- we've done it once during downsweep.
+  r <- resolveImport hsc_env imp
   case r of
     Found loc _
         -- Home package: just depend on the .hi or hi-boot file
@@ -322,7 +316,10 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
         Left $
           mkPlainErrorMsgEnvelope srcloc $
           GhcDriverMessage $ DriverInterfaceError $
-             (Can'tFindInterface (cannotFindModule hsc_env imp fail) (LookingForModule imp is_boot))
+             (Can'tFindInterface (cannotFindModule hsc_env mod_name fail) (LookingForModule mod_name is_boot))
+  where
+    L srcloc mod_name = ui_mod_name imp
+    is_boot           = ui_boot imp
 
 -----------------------------
 writeDependency :: FilePath -> Handle -> [FilePath] -> FilePath -> IO ()

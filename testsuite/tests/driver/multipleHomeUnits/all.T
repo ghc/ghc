@@ -67,6 +67,43 @@ test('multipleHomeUnits_recomp', [copy_files,extra_files([ 'Recomp.hs', 'unitRec
 
 test('multipleHomeUnits_recomp_th', [filter_stdout_lines(r'.*Compiling.*'), copy_files, extra_files(['thRecomp.script', 'unitRecompTH', 'unitDep', 'RecompTH.hs', 'Dep.hs'])  , extra_run_opts('-v1 -fno-hide-source-paths -unit @unitRecompTH -unit @unitDep')], ghci_script, ['thRecomp.script'])
 
+# Test for recompilation checking involving a custom GHC.Essentials in a home unit.
+test('multipleHomeUnits_essentials',
+    [ extra_files(
+        [ 'essentials-home/', 'essentials-user/'
+        , 'unitEssentialsHome', 'unitEssentialsUser'])
+    ], makefile_test, [])
+
+# A change to the export list of GHC.Essentials must recompile the modules that
+# resolve their known entities through it.
+test('multipleHomeUnits_essentials_recomp',
+    [ copy_files
+    , filter_stdout_lines(r'.*Compiling.*')
+    , extra_files(
+        [ 'essentials-home/', 'essentials-user/'
+        , 'unitEssentialsHome', 'unitEssentialsUser'])
+    ], makefile_test, [])
+
+# GHC.Essentials may be a hidden module of the home unit that provides it: users
+# cannot import it, but GHC still resolves known entities through it.
+test('multipleHomeUnits_essentials_hidden',
+    [ extra_files(
+        [ 'essentials-home/', 'essentials-user/'
+        , 'unitEssentialsHomeHidden', 'unitEssentialsUserHidden'])
+    ], multiunit_compile,
+    [['unitEssentialsHomeHidden', 'unitEssentialsUserHidden'], '-v0'])
+
+# A module must resolve its known entities through the GHC.Essentials of its own
+# unit, even when another unit in the same session uses a different one and is
+# compiled first.
+test('multipleHomeUnits_essentials_order',
+    [ extra_files(
+        [ 'essentials-home/', 'essentials-order-base/', 'essentials-order-user/'
+        , 'unitEssentialsHome', 'unitEssentialsOrderBase', 'unitEssentialsOrderUser'])
+    ], multiunit_compile_fail,
+    [['unitEssentialsHome', 'unitEssentialsOrderBase', 'unitEssentialsOrderUser'],
+     '-v0'])
+
 test('multipleHomeUnits_shared', [extra_files([ 'A.hs', 'unitShared1', 'unitShared2'])], multiunit_compile, [['unitShared1', 'unitShared2'], '-fhide-source-paths'])
 
 test('multipleHomeUnits_shared_ghci', [extra_files([ 'shared.script', 'A.hs', 'unitShared1', 'unitShared2']), extra_run_opts('-unit @unitShared1 -unit @unitShared2')], ghci_script, ['shared.script'])

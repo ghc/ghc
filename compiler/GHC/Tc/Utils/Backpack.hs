@@ -35,6 +35,7 @@ import GHC.Types.SourceFile
 import GHC.Types.Var
 import GHC.Types.Id( idType )
 import GHC.Types.Unique.DSet
+import GHC.Types.UnresolvedImport ( UnresolvedImport )
 import GHC.Types.Name.Shape
 import GHC.Types.PkgQual
 
@@ -278,12 +279,12 @@ findExtraSigImports _ _ _ = return []
 -- example, if they 'import M' and M resolves to p[A=<B>,C=D], then
 -- they actually also import the local requirement B.
 implicitRequirements :: HscEnv
-                     -> [(PkgQual, Located ModuleName)]
+                     -> [UnresolvedImport PkgQual]
                      -> IO [ModuleName]
 implicitRequirements hsc_env normal_imports
   = fmap concat $
-    forM normal_imports $ \(mb_pkg, L _ imp) -> do
-        found <- findImportedModule hsc_env imp mb_pkg
+    forM normal_imports $ \e -> do
+        found <- resolveImport hsc_env e
         case found of
             Found _ mod | notHomeModuleMaybe mhome_unit mod ->
                 return (uniqDSetToList (moduleFreeHoles mod))
@@ -297,15 +298,15 @@ implicitRequirements hsc_env normal_imports
 -- than a transitive closure done here) all the free holes are still reachable.
 implicitRequirementsShallow
   :: HscEnv
-  -> [(ImportLevel, PkgQual, Located ModuleName)]
+  -> [UnresolvedImport PkgQual]
   -> IO ([ModuleName], [InstantiatedUnit])
 implicitRequirementsShallow hsc_env normal_imports = go ([], []) normal_imports
  where
   mhome_unit = hsc_home_unit_maybe hsc_env
 
   go acc [] = pure acc
-  go (accL, accR) ((_stage, mb_pkg, L _ imp):imports) = do
-    found <- findImportedModule hsc_env imp mb_pkg
+  go (accL, accR) (e:imports) = do
+    found <- resolveImport hsc_env e
     let acc' = case found of
           Found _ mod | notHomeModuleMaybe mhome_unit mod ->
               case moduleUnit mod of
