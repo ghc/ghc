@@ -8,6 +8,9 @@
 # Currently, this script can only test that the in-tree `base` can be *built*
 # with certain *released* GHCs.
 
+# Establish error propagation
+set -e -o pipefail
+
 # Process arguments
 if [ $# -ne 2 ]
 then
