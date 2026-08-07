@@ -322,12 +322,12 @@ objects:
   object ‘cstrlen’:
     arity: 2
     literals: <none>
-    used items:
-      object ‘ds1_@name_suffix@’:
     used items: named item ‘cstrlen1_@name_suffix@’
   object ‘cstrlen1_@name_suffix@’:
     arity: 2
     literals: <none>
+    used items:
+      object ‘ds1_@name_suffix@’:
         arity: 0
         literals:
           label ‘strlen’

@@ -273,6 +273,10 @@ objects:
   object ‘cstrlen’:
     arity: 2
     literals: <none>
+    used items: named item ‘cstrlen1_@name_suffix@’
+  object ‘cstrlen1_@name_suffix@’:
+    arity: 2
+    literals: <none>
     used items:
       object ‘ds1_@name_suffix@’:
         arity: 0
@@ -324,10 +328,6 @@ objects:
   static-construction object ‘$tc'PerfectTree’:
     data constructor: TyCon
     lifted: yes
-    used items: named item ‘cstrlen1_@name_suffix@’
-  object ‘cstrlen1_@name_suffix@’:
-    arity: 2
-    literals: <none>
     literals:
       word @large_word@
       word 1
