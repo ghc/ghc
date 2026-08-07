@@ -2350,7 +2350,7 @@ mkWpFun_FRR (mb_tc_fun, pos) sub_mult act_af act_mult act_arg act_res exp_af exp
                  act_arg_co
                  (mkNomReflCo act_res)
             arg_wrap_frr =    -- exp_arg_frr ~~> act_arg_frr
-              mkWpCastN (mkSymCo exp_arg_co) <.> arg_wrap <.> mkWpCastN act_arg_co
+              mkWpCastN act_arg_co <.> arg_wrap <.> mkWpCastN (mkSymCo exp_arg_co)
 
        ; traceTc "mkWpFun_FRR: WpFun" $
            vcat [ text "act_mult:" <+> ppr act_mult
