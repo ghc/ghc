@@ -1,0 +1,10 @@
+section: compiler
+issues: #27639
+mrs: !16474
+synopsis:
+  Stop representation-polymorphism checks from producing a coercion that fails
+  Core Lint.
+description:
+  The representation-polymorphism check that is done when subsumption performs
+  eta-expansion now composes the coercions it builds in the correct order,
+  avoiding a Core Lint failure.
