@@ -12,7 +12,7 @@
 set -e -o pipefail
 
 # Process arguments
-if [ $# -ne 2 ]
+if [ $# -lt 1 ]
 then
   echo 'Build `base` with released GHCs'
   echo "Usage: base-ci ⟨platform⟩ ⟨ghc-version⟩ …"
