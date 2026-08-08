@@ -35,11 +35,13 @@ differences, and things such as that are not necessary to be considered by the
 test writer anymore. This is due to the fact that the test comparison relies
 entirely on locally collected metrics on the testing machine.
 
-As such, it is perfectly sufficient to write `collect_stats('all',20)` in the
-".T" files to measure the 3 potential stats that can be collected for that test
-and automatically test them for regressions, failing if there is more than a 20%
-change in any direction. In fact, even that is not necessary as
-`collect_stats()` defaults to 'all', and 20% deviation allowed.
+A test states which metric to measure and how much deviation to allow, e.g.
+`collect_stats('bytes allocated', 2)` in the ".T" files. Such a test fails if
+the metric changes by more than 2% in either direction. To gate several metrics,
+use one `collect_stats` call per metric, so that each gets a tolerance matched
+to its noise profile: allocations are nearly deterministic and support tight
+windows, while the residency metrics need considerably slacker ones (see
+Note [Measuring residency] in testlib.py).
 
 The function `collect_compiler_stats()` is completely equivalent in every way to
 `collect_stats` except that it measures the performance of the compiler itself
