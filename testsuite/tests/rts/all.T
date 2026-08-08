@@ -693,3 +693,11 @@ test('T27123', [when(have_profiling(), extra_ways(['prof']))], compile_and_run, 
 test('T27434',
      extra_ways(['compacting_gc']),
      compile_and_run, [''])
+
+test('T27477',
+     [ extra_run_opts('600 24 +RTS -N4 -A1m -RTS')
+     , req_ghc_smp
+     , req_target_smp
+     , only_ways(['threaded1', 'threaded2'])
+     ],
+     compile_and_run, ['-O2'])
