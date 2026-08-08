@@ -156,8 +156,8 @@ class RelativeMetricAcceptanceWindow(MetricAcceptanceWindow):
         self.__tol = tol
 
     def get_bounds(self, baseline: float) -> Tuple[float, float]:
-        lowerBound = trunc(           int(baseline) * ((100 - float(self.__tol))/100))
-        upperBound = trunc(0.5 + ceil(int(baseline) * ((100 + float(self.__tol))/100)))
+        lowerBound = trunc(           baseline * ((100 - float(self.__tol))/100))
+        upperBound = trunc(0.5 + ceil(baseline * ((100 + float(self.__tol))/100)))
 
         return (lowerBound, upperBound)
 
