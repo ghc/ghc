@@ -3,7 +3,8 @@
 # after they have been loaded into the `LoaderState`.
 # However, this property is currently not validated automatically.
 test('LinkableUsage01'
-    , [ collect_compiler_stats('all', 2)
+    , [ collect_compiler_stats('bytes allocated', 2)
+      , collect_compiler_stats('max_bytes_used', 5)
       , extra_files(['genLinkables.sh', 'BCOTemplate.hs'])
       , pre_cmd('$MAKE -s --no-print-directory LinkableUsage01_Prep')
       , req_bco
@@ -18,7 +19,8 @@ test('LinkableUsage01'
 
 # Performance test for bytecode `Linkable`s.
 test('LinkableUsage02'
-    , [ collect_compiler_stats('all', 2)
+    , [ collect_compiler_stats('bytes allocated', 2)
+      , collect_compiler_stats('max_bytes_used', 5)
       , extra_files(['genLinkables.sh', 'BCOTemplate.hs'])
       , pre_cmd('$MAKE -s --no-print-directory LinkableUsage02_Prep')
       , req_bco
