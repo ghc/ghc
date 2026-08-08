@@ -267,12 +267,8 @@ buildBinDistDir root conf@BindistConfig{..} = do
     --
     -- N.B. the ghc-pkg executable may be prefixed with a target triple
     -- (c.f. #20267).
-    -- Recache using the stage1 ghc-pkg executable. This is the unprefixed
-    -- host ghc-pkg for native bindists and the target-triple-prefixed cross
-    -- ghc-pkg for cross bindists; both run on the build host and can handle
-    -- the target package database. The stage3 bindist's package DB is also
-    -- built by the stage1 cross compiler, so stage1 ghc-pkg is correct there
-    -- too.
+    -- Stage1 is also correct for cross-compiler scenarios, because it runs on
+    -- the build host.
     ghcPkgPath <- programPath =<< programContext Stage1 ghcPkg
     cmd_ ghcPkgPath ["recache", "--package-db", bindistFilesDir -/- "lib" -/- "package.conf.d" ]
 
@@ -370,6 +366,7 @@ bindistRules = do
       buildBinDistDir root cfg
 
     phony "binary-dist-dir-cross" $ buildBinDistDir root crossBindist
+
     phony "binary-dist-dir-stage3" $ buildBinDistDir root targetBindist
 
     let buildBinDist compressor = do
@@ -411,7 +408,7 @@ bindistRules = do
           need [distribConfigure]
           copyFile distribConfigure configurePath
 
-      -- Generate the Makefile that enables the "make install" part
+      -- Copy the Makefile that enables the "make install" part
       root -/- bindistFolderName -/- "ghc-*" -/- "Makefile" %> \makefilePath -> do
           top <- topDirectory
           copyFile (top -/- "hadrian" -/- "bindist" -/- "Makefile") makefilePath

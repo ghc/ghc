@@ -25,7 +25,6 @@ import Utilities
 import GHC.Toolchain as Toolchain hiding (HsCpp(HsCpp))
 import GHC.Platform.ArchOS
 import Settings.Program (ghcWithInterpreter)
-import UserSettings (finalStage)
 
 -- | Track this file to rebuild generated files whenever it changes.
 trackGenerateHs :: Expr ()
@@ -252,51 +251,30 @@ generateRules = do
     (root -/- "ghc-stage2") <~+ ghcWrapper Stage2
     (root -/- "ghc-stage3") <~+ ghcWrapper Stage3
 
-    forM_ allStages $ \buildStage -> do
-        let -- Two stages are in play per rule iteration:
-            --
-            --   * @buildStage@    — loop variable; the settings file is written
-            --                      into @_build/<buildStage>/lib/settings@ and
-            --                      describes the compiler at @compilerStage@.
-            --   * @compilerStage@ — the stage whose @bin/@ holds the compiler
-            --                      the settings file describes; also the
-            --                      ambient 'Expr' stage passed to
-            --                      'generateSettings' (via 'semiEmptyTarget'),
-            --                      so it is the value of @executableStage@
-            --                      inside that function.
-            --
-            -- For a cross-compiler the libs it links against live in the
-            -- /successor/ stage's lib dir; @libraryStage@ (computed in the
-            -- rule body below) is that successor. @compilerStage@ normally
-            -- equals @buildStage@, but at @finalStage@ there is no successor
-            -- to hold its libs, so @compilerStage@ drops to the predecessor
-            -- (the final stage's lib dir merely hosts the predecessor
-            -- cross-compiler's target-arch libs).
-            compilerStage = if buildStage == finalStage
-                              then predStage buildStage
-                              else buildStage
-            prefix = root -/- stageString buildStage -/- "lib"
+    forM_ allStages $ \compilerStage -> do
+        let
+            prefix = root -/- stageString compilerStage -/- "lib"
             go gen file = generate file (semiEmptyTarget compilerStage) gen
         (prefix -/- "settings") %> \out -> do
             -- Stage0 has no library or package DB of its own (the
             -- bootstrapping compiler uses Stage1's); for any other stage the
             -- package DB lives where the LibDir redirect points (this stage's
-            -- own lib dir, or the successor's when @buildStage@ is a cross
+            -- own lib dir, or the successor's when @compilerStage@ is a cross
             -- stage).
-            isCross <- crossStage buildStage
-            let libraryStage = case buildStage of
+            isCross <- crossStage compilerStage
+            let libraryStage = case compilerStage of
                     Stage0 {} -> Stage1
-                    _         -> if isCross then succStage buildStage else buildStage
+                    _         -> if isCross then succStage compilerStage else compilerStage
             pkgDb <- packageDbPath (PackageDbLoc libraryStage Final)
             -- addTrailingPathSeparator needed: makeRelativeNoSysLink uses
             -- splitPath where "lib" and "lib/" are distinct components.
             let libTopDir = addTrailingPathSeparator $
-                    if isStage0 buildStage
+                    if isStage0 compilerStage
                       then prefix
                       else root -/- stageString libraryStage -/- "lib"
                 relPkgDb = makeRelativeNoSysLink libTopDir pkgDb
             go (generateSettings out True relPkgDb libraryStage) out
-        (prefix -/- "targets" -/- "default.target") %> \out -> go (show <$> expr (targetStage (succStage buildStage))) out
+        (prefix -/- "targets" -/- "default.target") %> \out -> go (show <$> expr (targetStage (succStage compilerStage))) out
 
   where
     file <~+ gen = file %> \out -> generate out emptyTarget gen >> makeExecutable out
@@ -610,13 +588,10 @@ generateSettings settingsFile includeLibDir rel_pkg_db libraryStage = do
           , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter executableStage)
           -- Advertise the RTS ways that will actually ship with the compiler
           -- described by this settings file, i.e. the ways the @libraryStage@
-          -- RTS is built with. Cabal queries this to decide which library ways
-          -- the compiler supports (see
-          -- 'Distribution.Simple.Compiler.waySupported'); under-advertising
-          -- causes Cabal to silently drop flags like
-          -- @--enable-profiling-shared@.
+          -- RTS is built with.
           -- The settings file is regenerated at install time when installing a bindist.
-          , ("RTS ways", unwords . map show . Set.toList <$> expr (interpretInContext (vanillaContext libraryStage rts) getRtsWays))
+          , ("RTS ways", unwords . map show . Set.toList <$>
+              expr (interpretInContext (vanillaContext libraryStage rts) getRtsWays))
           , ("Relative Global Package DB", pure rel_pkg_db)
           , ("base unit-id", pure base_unit_id)
           ]
