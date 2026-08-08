@@ -1,0 +1,10 @@
+section: rts
+synopsis: Fix a parallel GC race on weakly-ordered architectures (AArch64) that could crash or silently corrupt the heap
+description:
+  On weakly-ordered architectures such as AArch64 programs using
+  could crash during parallel garbage collection (segmentation fault
+  or ``internal error: eval_thunk_selector: strange selectee <n>``) or
+  continue running with silently corrupted heap data, due to a missing
+  memory barrier in the parallel GC.
+mrs: !16488
+issues: #27477
