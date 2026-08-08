@@ -674,13 +674,17 @@ test('T22859',
 
 test('T27123', [when(have_profiling(), extra_ways(['prof']))], compile_and_run, ['-O -package ghc'])
 
+# T27434 and T27649 test the compacting GC on large closures (AP and
+# CONSTR respectively) that only the bytecode interpreter allocates, so
+# they must run in the ghci way. In the ghci way extra_run_opts only
+# sets the interpreted program's argv (via :set args), so enable
+# compaction with GHCRTS to make it reach the RTS of the GHCi process
+# itself (#27615).
 test('T27434',
-     extra_ways(['compacting_gc']),
+     [only_ways(['ghci']),
+      cmd_prefix('GHCRTS=-c ')],
      compile_and_run, [''])
 
-# In the ghci way extra_run_opts only sets the interpreted program's
-# argv (via :set args), so enable compaction with GHCRTS to make it
-# reach the RTS of the GHCi process itself.
 test('T27649',
      [only_ways(['ghci']),
       cmd_prefix('GHCRTS=-c ')],
