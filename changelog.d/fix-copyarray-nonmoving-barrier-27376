@@ -1,0 +1,12 @@
+section: rts
+synopsis: Fix heap corruption under the nonmoving GC when copying boxed arrays
+issues: #27376
+mrs: !16481
+description:
+  The out-of-line code paths for `copyArray#` and `copyMutableArray#` (used
+  whenever the element count is not a compile-time constant) did not push the
+  overwritten destination elements to the nonmoving collector's update
+  remembered set. Under `--nonmoving-gc` (`+RTS -xn`) the concurrent mark
+  could then miss live objects and sweep them, causing silent heap corruption
+  or crashes such as "internal error: ... object entered". Array copies with
+  a constant element count and the small-array variants were not affected.

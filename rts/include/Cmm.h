@@ -863,10 +863,17 @@
                                                                \
     return (dst);
 
+// See Note [Update remembered set] in rts/sm/NonMovingMark.c
+
 #define copyArray(src, src_off, dst, dst_off, n)                  \
   W_ dst_elems_p, dst_p, src_p, bytes;                            \
                                                                   \
     if ((n) != 0) {                                               \
+        IF_NONMOVING_WRITE_BARRIER_ENABLED {                      \
+            call stg_copyArray_barrier(SIZEOF_StgMutArrPtrs,      \
+                                       dst, dst_off, n);          \
+        }                                                         \
+                                                                  \
         SET_HDR(dst, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);          \
                                                                   \
         dst_elems_p = (dst) + SIZEOF_StgMutArrPtrs;               \
@@ -885,6 +892,11 @@
   W_ dst_elems_p, dst_p, src_p, bytes;                            \
                                                                   \
     if ((n) != 0) {                                               \
+        IF_NONMOVING_WRITE_BARRIER_ENABLED {                      \
+            call stg_copyArray_barrier(SIZEOF_StgMutArrPtrs,      \
+                                       dst, dst_off, n);          \
+        }                                                         \
+                                                                  \
         SET_HDR(dst, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);          \
                                                                   \
         dst_elems_p = (dst) + SIZEOF_StgMutArrPtrs;               \

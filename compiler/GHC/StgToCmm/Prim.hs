@@ -3829,6 +3829,8 @@ emitDirtyMutVar mutvar old_val = do
 
 -- | Push a range of pointer-array elements that are about to be copied over to
 -- the update remembered set.
+--
+-- See Note [Update remembered set] in rts/sm/NonMovingMark.c
 emitCopyUpdRemSetPush :: Platform
                       -> ByteOff    -- ^ array header size (in bytes)
                       -> CmmExpr    -- ^ destination array

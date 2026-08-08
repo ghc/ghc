@@ -793,3 +793,10 @@ test('T26169',
       req_target_smp,
       extra_run_opts('+RTS -T -qn2 -RTS')],
      compile_and_run, [''])
+
+test('T27376',
+     [ req_target_smp,
+       extra_ways(['nonmoving_thr', 'nonmoving_thr_sanity']),
+       only_ways(['nonmoving_thr', 'nonmoving_thr_sanity']),
+       extra_run_opts('+RTS -A2m -RTS') ],
+     compile_and_run, ['-O2'])
