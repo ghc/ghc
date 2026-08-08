@@ -148,6 +148,7 @@ stg_control0zh_ll // explicit stack
   // and jump to the frame’s entry code.
   Sp_adj(-3); // Note -3, not -2, because `mask_frame` will
               // try to pop itself off the stack when it returns!
+  Sp(0) = mask_frame; // Can't be omitted, see #27651
   Sp(1) = stg_ap_pv_info;
   Sp(2) = cont;
   R1 = f;
@@ -230,6 +231,7 @@ stg_CONTINUATION_apply // explicit stack
   // Now we just set up the stack so that `apply_mask_frame` will apply `io`
   // when it returns and jump to it.
   Sp_adj(-2);
+  Sp(0) = apply_mask_frame; // Can't be omitted, see #27651
   Sp(1) = stg_ap_v_info;
   R1 = io;
   jump %ENTRY_CODE(apply_mask_frame) [R1];
