@@ -638,13 +638,15 @@ test ('T15164',
       ],
       compile,
       ['-v0 -O'])
+# T15630/T15630a guard against exponential simplifier blowup when inlining
+# join points (#15630).
 test('T15630',
-      [collect_compiler_stats()
+      [collect_compiler_stats('bytes allocated', 2)
       ],
       compile,
       ['-O2'])
 test('T15630a',
-      [collect_compiler_stats()
+      [collect_compiler_stats('bytes allocated', 2)
       ],
       compile,
       ['-O2'])
@@ -768,12 +770,17 @@ test ('T9198',
       compile,
       [''])
 
+# Guards against quadratic demand-analysis cost on wide recursive data
+# types, which manifested as a compile-time memory blowup (#11545).
 test('T11545',
-     [ collect_compiler_stats('all', 15) ],
+     [ collect_compiler_stats('bytes allocated', 2)
+     , collect_compiler_residency(15) ],
      compile, ['-O'])
 
+# Guards against the compile-time memory blowup of #15304
 test('T15304',
-     [ collect_compiler_stats('all', 10) ],
+     [ collect_compiler_stats('bytes allocated', 2)
+     , collect_compiler_residency(10) ],
      compile, ['-O'])
 test ('T20049',
       [ collect_compiler_stats('bytes allocated',2) ],
@@ -795,8 +802,10 @@ test('T16875',  # Testing one hole-fit with a lot in scope for #16875
      collect_compiler_runtime(4),
      compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -package ghc'])
 
+# Guards against renamer/typechecker allocation regressions on very large
+# generated modules (#20261, a Happy-generated parser).
 test ('T20261',
-      [collect_compiler_stats('all')],
+      [collect_compiler_stats('bytes allocated', 2)],
       compile,
       [''])
 
@@ -805,8 +814,7 @@ test ('T20261',
 # does not sensibly handle one test acting as both
 # a compile-time and a run-time performance test
 test('T21839c',
-    [   collect_compiler_stats('all', 10),
-        collect_compiler_runtime(1),
+    [   collect_compiler_runtime(1),
         only_ways(['normal'])],
     compile,
     ['-O'])
@@ -872,8 +880,10 @@ test('interpreter_steplocal',
      ghci_script,
      ['interpreter_steplocal.script'])
 
+# Guards against the compile-time memory blowup of #26425
 test ('T26425',
-      [ collect_compiler_stats('all',20) ],
+      [ collect_compiler_stats('bytes allocated', 2)
+      , collect_compiler_residency(20) ],
       compile,
       ['-O'])
 
