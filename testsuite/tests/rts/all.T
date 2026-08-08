@@ -703,6 +703,14 @@ test('T27434',
      extra_ways(['compacting_gc']),
      compile_and_run, [''])
 
+# In the ghci way extra_run_opts only sets the interpreted program's
+# argv (via :set args), so enable compaction with GHCRTS to make it
+# reach the RTS of the GHCi process itself.
+test('T27649',
+     [only_ways(['ghci']),
+      cmd_prefix('GHCRTS=-c ')],
+     compile_and_run, [''])
+
 test('T19048',
      [ omit_ghci
      , no_check_hp

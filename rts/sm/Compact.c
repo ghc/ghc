@@ -573,6 +573,13 @@ update_fwd_large( bdescr *bd )
         continue;
       }
 
+    case CONSTR:
+    case CONSTR_NOCAF:
+      {
+        thread_obj(info, p);
+        continue;
+      }
+
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN_CLEAN:
