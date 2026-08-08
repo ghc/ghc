@@ -720,3 +720,12 @@ test('T27585',
      , extra_run_opts('+RTS -i0 -RTS')
      ],
      compile_and_run, ['-O -rtsopts'])
+
+test('T27477',
+     [ extra_run_opts('600 24 +RTS -N4 -A1m -RTS')
+     , req_ghc_smp
+     , req_target_smp
+     , only_ways(['threaded1', 'threaded2'])
+     ],
+     compile_and_run, ['-O2'])
+
