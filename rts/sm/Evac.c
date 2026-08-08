@@ -1361,7 +1361,11 @@ selector_loop:
     // from-space during marking, for example.  We rely on the property
     // that evacuate() doesn't mind if it gets passed a to-space pointer.
 
-    info = RELAXED_LOAD((StgInfoTable**) &selectee->header.info);
+    // NB. this load must be ordered: the selectee may be updated
+    // concurrently by another GC thread's unchain_thunk_selectors(),
+    // which publishes an indirection by writing the indirectee and
+    // then RELEASE-storing the info pointer. See #27477.
+    info = ACQUIRE_LOAD((StgInfoTable**) &selectee->header.info);
 
     if (IS_FORWARDING_PTR(info)) {
         // We don't follow pointers into to-space; the constructor
