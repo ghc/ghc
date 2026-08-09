@@ -1036,6 +1036,11 @@ type instance XSplicePat DocNameI = DataConCantHappen
 
 type instance XCInjectivityAnn DocNameI = NoExtField
 
+type instance XDataFamily       DocNameI = NoExtField
+type instance XOpenTypeFamily   DocNameI = NoExtField
+type instance XClosedTypeFamily DocNameI = NoExtField
+type instance XXFamilyInfo      DocNameI = DataConCantHappen
+
 type instance XCFunDep DocNameI = NoExtField
 
 type instance XCTyFamInstDecl DocNameI = NoExtField
