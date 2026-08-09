@@ -589,11 +589,11 @@ Specific cases to add or verify:
 
 Each step should build and pass tests on its own.
 
-1. Add `AnnListLayout`; change `al_anchor :: Maybe EpaLocation` to
+1. X Add `AnnListLayout`; change `al_anchor :: Maybe EpaLocation` to
    `al_layout :: AnnListLayout`; mechanically update all construction sites to
    preserve current behaviour (`Just x` → `AnnListLayout x`, `Nothing` →
    `AnnListNoLayout`). Pure refactor, no output change.
-2. Switch the layout-bearing productions to take the location from the
+2. X Switch the layout-bearing productions to take the location from the
    `vocurly` token, and set `AnnListBraces` in the explicit-brace
    alternatives. Fixes D2, D3, D4, D5. Expect test output churn.
 3. Remove `patch_anchor` / simplify `add_where` in
