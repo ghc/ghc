@@ -306,20 +306,20 @@ synifyTyCon _prr _coax tc
   | Just flav <- famTyConFlav_maybe tc =
       case flav of
         DataFamilyTyCon{} ->
-          mkFamDecl DataFamily
-        OpenTypeFamilyTyCon -> mkFamDecl OpenTypeFamily
+          mkFamDecl (DataFamily noExtField)
+        OpenTypeFamilyTyCon -> mkFamDecl (OpenTypeFamily noExtField)
         ClosedTypeFamilyTyCon ctf ->
           case ctf of
             CTF mb
               | Just (CoAxiom{co_ax_branches = branches}) <- mb
               -> mkFamDecl $
-                   ClosedTypeFamily $
+                   ClosedTypeFamily noExtField $
                      Just $
                        map (noLocA . synifyAxBranch tc) (fromBranches branches)
               | otherwise
-              -> mkFamDecl $ ClosedTypeFamily $ Just []
-            CTF_BuiltIn {} -> mkFamDecl $ ClosedTypeFamily $ Just []
-            CTF_Abstract -> mkFamDecl $ ClosedTypeFamily Nothing
+              -> mkFamDecl $ ClosedTypeFamily noExtField $ Just []
+            CTF_BuiltIn {} -> mkFamDecl $ ClosedTypeFamily noExtField $ Just []
+            CTF_Abstract -> mkFamDecl $ ClosedTypeFamily noExtField Nothing
   where
     resultVar = tyConFamilyResVar_maybe tc
     mkFamDecl i =
