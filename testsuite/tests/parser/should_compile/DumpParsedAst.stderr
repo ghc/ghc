@@ -359,12 +359,14 @@
          (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { DumpParsedAst.hs:10:41-45 }))
-        (EpTok (EpaSpan { <no location info> }))
         (EpTok
-         (EpaSpan { <no location info> }))
-        (EpTok (EpaSpan { <no location info> })))
+         (EpaSpan { <no location info> })))
        (ClosedTypeFamily
-        (NoExtField)
+        (AnnList
+         (AnnListLayout
+          (EpaSpan { DumpParsedAst.hs:11:3 }))
+         (ListNone)
+         [])
         (Just
          [(L
            (EpAnn
@@ -1144,12 +1146,14 @@
          (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { DumpParsedAst.hs:18:50-54 }))
-        (EpTok (EpaSpan { <no location info> }))
         (EpTok
-         (EpaSpan { <no location info> }))
-        (EpTok (EpaSpan { <no location info> })))
+         (EpaSpan { <no location info> })))
        (ClosedTypeFamily
-        (NoExtField)
+        (AnnList
+         (AnnListLayout
+          (EpaSpan { DumpParsedAst.hs:19:3 }))
+         (ListNone)
+         [])
         (Just
          [(L
            (EpAnn
@@ -1543,10 +1547,8 @@
          (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { <no location info> }))
-        (EpTok (EpaSpan { <no location info> }))
         (EpTok
-         (EpaSpan { <no location info> }))
-        (EpTok (EpaSpan { <no location info> })))
+         (EpaSpan { <no location info> })))
        (DataFamily
         (NoExtField))
        (TopLevel)
