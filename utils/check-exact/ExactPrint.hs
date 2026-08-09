@@ -947,7 +947,7 @@ limportDeclAnnPackage k annImp = fmap (\new -> annImp { importDeclAnnPackage = n
 
 -- data AnnList
 --   = AnnList {
---       al_anchor    :: Maybe Anchor, -- ^ start point of a list having layout
+--       al_layout    :: !AnnListLayout,
 --       al_brackets  :: !AnnListBrackets,
 --       al_semis     :: [EpToken ";"], -- decls
 --       al_trailing  :: [TrailingAnn] -- ^ items appearing after the
@@ -3601,7 +3601,7 @@ instance ExactPrint (FamilyDecl GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (FamilyDecl { fdExt = AnnFamilyDecl ops cps t d f dc eq vb w oc dd cc
+  exact (FamilyDecl { fdExt = AnnFamilyDecl ops cps t d f dc eq vb w dd
                     , fdInfo = info
                     , fdTopLevel = top_level
                     , fdLName = ltycon
@@ -3623,23 +3623,21 @@ instance ExactPrint (FamilyDecl GhcPs) where
           vb' <- markEpToken vb
           inj' <- markAnnotated inj
           return (vb', Just inj')
-    (w', oc', dd', cc', info') <-
+    (w', dd', info') <-
              case info of
-               ClosedTypeFamily x mb_eqns -> do
+               ClosedTypeFamily an mb_eqns -> do
                  w' <- markEpToken w
-                 oc' <- markEpToken oc
-                 (dd', mb_eqns') <-
+                 (an', dd', mb_eqns') <-
                    case mb_eqns of
                      Nothing -> do
                        dd' <- markEpToken dd
-                       return (dd', mb_eqns)
+                       return (an, dd', mb_eqns)
                      Just eqns -> do
-                       eqns' <- mapM markAnnotated eqns
-                       return (dd, Just eqns')
-                 cc' <- markEpToken cc
-                 return (w',oc',dd',cc', ClosedTypeFamily x mb_eqns')
-               _ -> return (w,oc,dd,cc, info)
-    return (FamilyDecl { fdExt = AnnFamilyDecl [] [] t' d' f' dc' eq' vb' w' oc' dd' cc'
+                       (an',eqns') <- markAnnList' an $ setLayoutBoth $ mapM markAnnotated eqns
+                       return (an', dd, Just eqns')
+                 return (w', dd', ClosedTypeFamily an' mb_eqns')
+               _ -> return (w, dd, info)
+    return (FamilyDecl { fdExt = AnnFamilyDecl [] [] t' d' f' dc' eq' vb' w' dd'
                        , fdInfo = info'
                        , fdTopLevel = top_level
                        , fdLName = ltycon'

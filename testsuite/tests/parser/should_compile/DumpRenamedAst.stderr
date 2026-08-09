@@ -306,12 +306,14 @@
            (EpaSpan { <no location info> }))
           (EpTok
            (EpaSpan { <no location info> }))
-          (EpTok (EpaSpan { <no location info> }))
           (EpTok
-           (EpaSpan { <no location info> }))
-          (EpTok (EpaSpan { <no location info> })))
+           (EpaSpan { <no location info> })))
          (ClosedTypeFamily
-          (NoExtField)
+          (AnnList
+           (AnnListLayout
+            (EpaSpan { DumpRenamedAst.hs:13:3 }))
+           (ListNone)
+           [])
           (Just
            [(L
              (EpAnn
@@ -795,10 +797,8 @@
            (EpaSpan { <no location info> }))
           (EpTok
            (EpaSpan { <no location info> }))
-          (EpTok (EpaSpan { <no location info> }))
           (EpTok
-           (EpaSpan { <no location info> }))
-          (EpTok (EpaSpan { <no location info> })))
+           (EpaSpan { <no location info> })))
          (DataFamily
           (NoExtField))
          (TopLevel)
@@ -1180,12 +1180,14 @@
            (EpaSpan { <no location info> }))
           (EpTok
            (EpaSpan { <no location info> }))
-          (EpTok (EpaSpan { <no location info> }))
           (EpTok
-           (EpaSpan { <no location info> }))
-          (EpTok (EpaSpan { <no location info> })))
+           (EpaSpan { <no location info> })))
          (ClosedTypeFamily
-          (NoExtField)
+          (AnnList
+           (AnnListLayout
+            (EpaSpan { DumpRenamedAst.hs:26:3 }))
+           (ListNone)
+           [])
           (Just
            [(L
              (EpAnn
@@ -1765,10 +1767,8 @@
                (EpaSpan { <no location info> }))
               (EpTok
                (EpaSpan { <no location info> }))
-              (EpTok (EpaSpan { <no location info> }))
               (EpTok
-               (EpaSpan { <no location info> }))
-              (EpTok (EpaSpan { <no location info> })))
+               (EpaSpan { <no location info> })))
              (OpenTypeFamily
               (NoExtField))
              (NotTopLevel)

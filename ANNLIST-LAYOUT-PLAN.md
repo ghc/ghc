@@ -596,7 +596,7 @@ Each step should build and pass tests on its own.
 2. X Switch the layout-bearing productions to take the location from the
    `vocurly` token, and set `AnnListBraces` in the explicit-brace
    alternatives. Fixes D2, D3, D4, D5. Expect test output churn.
-3. Remove `patch_anchor` / simplify `add_where` in
+3. X Remove `patch_anchor` / simplify `add_where` in
    `compiler/GHC/Parser/PostProcess.hs`. Fixes D6.
 4. Add `AnnListLayout` to the instance / GADT / type-family / decl-quote /
    backpack bodies. Fixes part of D1.

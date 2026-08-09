@@ -310,15 +310,15 @@ synifyTyCon _prr _coax tc
         ClosedSynFamilyTyCon mb
           | Just (CoAxiom{co_ax_branches = branches}) <- mb ->
               mkFamDecl $
-                ClosedTypeFamily noExtField $
+                ClosedTypeFamily noAnn $
                   Just $
                     map (noLocA . synifyAxBranch tc) (fromBranches branches)
           | otherwise ->
-              mkFamDecl $ ClosedTypeFamily noExtField $ Just []
+              mkFamDecl $ ClosedTypeFamily noAnn $ Just []
         BuiltInSynFamTyCon{} ->
-          mkFamDecl $ ClosedTypeFamily noExtField $ Just []
+          mkFamDecl $ ClosedTypeFamily noAnn $ Just []
         AbstractClosedSynFamilyTyCon{} ->
-          mkFamDecl $ ClosedTypeFamily noExtField Nothing
+          mkFamDecl $ ClosedTypeFamily noAnn Nothing
         DataFamilyTyCon{} ->
           mkFamDecl (DataFamily noExtField)
   where

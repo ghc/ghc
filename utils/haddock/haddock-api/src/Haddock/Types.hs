@@ -1033,7 +1033,7 @@ type instance XCInjectivityAnn DocNameI = NoExtField
 
 type instance XDataFamily       DocNameI = NoExtField
 type instance XOpenTypeFamily   DocNameI = NoExtField
-type instance XClosedTypeFamily DocNameI = NoExtField
+type instance XClosedTypeFamily DocNameI = AnnList
 type instance XXFamilyInfo      DocNameI = DataConCantHappen
 
 type instance XCFunDep DocNameI = NoExtField

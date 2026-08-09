@@ -1354,10 +1354,10 @@ ty_decl :: { LTyClDecl GhcPs }
                 -- infix type constructors to be declared
              {% do { let { (tdcolon, tequal) = fst $ unLoc $4 }
                    ; let { tvbar = fst $ unLoc $5 }
-                   ; let { (twhere, (toc, tdd, tcc)) = fst $ unLoc $6  }
+                   ; let { (twhere, tdd) = fst $ unLoc $6  }
                    ; mkFamDecl (comb5 $1 $3 $4 $5 $6) (snd $ unLoc $6) TopLevel $3
                                    (snd $ unLoc $4) (snd $ unLoc $5)
-                           (AnnFamilyDecl [] [] (epTok $1) noAnn (epTok $2) tdcolon tequal tvbar twhere toc tdd tcc) }}
+                           (AnnFamilyDecl [] [] (epTok $1) noAnn (epTok $2) tdcolon tequal tvbar twhere tdd ) }}
 
           -- ordinary data type or newtype declaration
         | type_data_or_newtype capi_ctype tycl_hdr constrs maybe_derivings
@@ -1390,7 +1390,7 @@ ty_decl :: { LTyClDecl GhcPs }
              {% do { let { tdcolon = fst $ unLoc $4 }
                    ; mkFamDecl (comb4 $1 $2 $3 $4) (DataFamily noExtField) TopLevel $3
                                    (snd $ unLoc $4) Nothing
-                           (AnnFamilyDecl [] [] noAnn (epTok $1) (epTok $2) tdcolon noAnn noAnn noAnn noAnn noAnn noAnn) }}
+                           (AnnFamilyDecl [] [] noAnn (epTok $1) (epTok $2) tdcolon noAnn noAnn noAnn noAnn) }}
 
 -- standalone kind signature
 standalone_kind_sig :: { LStandaloneKindSig GhcPs }
@@ -1521,20 +1521,20 @@ inj_varids :: { Located [LocatedN RdrName] }
 
 -- Closed type families
 
-where_type_family :: { Located ((EpToken "where", (EpToken "{", EpToken "..", EpToken "}")),FamilyInfo GhcPs) }
+where_type_family :: { Located ((EpToken "where",  EpToken ".."),FamilyInfo GhcPs) }
         : {- empty -}                      { noLoc (noAnn,OpenTypeFamily noExtField) }
         | 'where' ty_fam_inst_eqn_list
-               { sLL $1 $> ((epTok $1,(fst $ unLoc $2))
-                    , ClosedTypeFamily noExtField (fmap reverse $ snd $ unLoc $2)) }
+               { sLL $1 $> ((epTok $1, (snd $ fst $ unLoc $2))
+                    , ClosedTypeFamily (fst $ fst $ unLoc $2) (fmap reverse $ snd $ unLoc $2)) }
 
-ty_fam_inst_eqn_list :: { Located ((EpToken "{", EpToken "..", EpToken "}"),Maybe [LTyFamInstEqn GhcPs]) }
-        :     '{' ty_fam_inst_eqns '}'     { sLL $1 $> ((epTok $1,noAnn, epTok $3)
+ty_fam_inst_eqn_list :: { Located ((AnnList, EpToken ".."),Maybe [LTyFamInstEqn GhcPs]) }
+        :     '{' ty_fam_inst_eqns '}'     { sLL $1 $> ((AnnList AnnListBraces (ListBraces (epTok $1) (epTok $3)) [], noAnn)
                                                 ,Just (unLoc $2)) }
         | vocurly ty_fam_inst_eqns close   { let (L loc _) = $2 in
-                                             L loc (noAnn,Just (unLoc $2)) }
-        |     '{' '..' '}'                 { sLL $1 $> ((epTok $1,epTok $2 ,epTok $3),Nothing) }
+                                             L loc ((AnnList (AnnListLayout (glR $1)) ListNone [], noAnn),Just (unLoc $2)) }
+        |     '{' '..' '}'                 { sLL $1 $> ((AnnList AnnListBraces (ListBraces (epTok $1) (epTok $3)) [], epTok $2), Nothing) }
         | vocurly '..' close               { let (L loc _) = $2 in
-                                             L loc ((noAnn,epTok $2, noAnn),Nothing) }
+                                             L loc ((AnnList (AnnListLayout (glR $1)) ListNone [], epTok $2),Nothing) }
 
 ty_fam_inst_eqns :: { Located [LTyFamInstEqn GhcPs] }
         : ty_fam_inst_eqns ';' ty_fam_inst_eqn
@@ -1579,7 +1579,7 @@ at_decl_cls :: { LHsDecl GhcPs }
              {% do { let { tdcolon = fst $ unLoc $4 }
                    ; liftM mkTyClD (mkFamDecl (comb3 $1 $3 $4) (DataFamily noExtField) NotTopLevel $3
                                                   (snd $ unLoc $4) Nothing
-                           (AnnFamilyDecl [] [] noAnn (epTok $1) $2 tdcolon noAnn noAnn noAnn noAnn noAnn noAnn)) }}
+                           (AnnFamilyDecl [] [] noAnn (epTok $1) $2 tdcolon noAnn noAnn noAnn noAnn)) }}
 
            -- type family declarations, with optional 'family' keyword
            -- (can't use opt_instance because you get shift/reduce errors
@@ -1589,14 +1589,14 @@ at_decl_cls :: { LHsDecl GhcPs }
                         (mkFamDecl (comb3 $1 $2 $3) (OpenTypeFamily noExtField) NotTopLevel $2
                                    (fst . snd $ unLoc $3)
                                    (snd . snd $ unLoc $3)
-                         (AnnFamilyDecl [] [] (epTok $1) noAnn noAnn tdcolon tequal tvbar noAnn noAnn noAnn noAnn)) }}
+                         (AnnFamilyDecl [] [] (epTok $1) noAnn noAnn tdcolon tequal tvbar noAnn noAnn)) }}
         | 'type' 'family' type opt_at_kind_inj_sig
             {% do { let { (tdcolon, tequal, tvbar) = fst $ unLoc $4 }
                   ; liftM mkTyClD
                         (mkFamDecl (comb3 $1 $3 $4) (OpenTypeFamily noExtField) NotTopLevel $3
                                    (fst . snd $ unLoc $4)
                                    (snd . snd $ unLoc $4)
-                           (AnnFamilyDecl [] [] (epTok $1) noAnn (epTok $2) tdcolon tequal tvbar noAnn noAnn noAnn noAnn)) }}
+                           (AnnFamilyDecl [] [] (epTok $1) noAnn (epTok $2) tdcolon tequal tvbar noAnn noAnn)) }}
            -- default type instances, with optional 'instance' keyword
         | 'type' ty_fam_inst_eqn
                 {% liftM mkInstD (mkTyFamInst (comb2 $1 $2) (unLoc $2)
