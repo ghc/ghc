@@ -473,6 +473,13 @@ type family XXRoleAnnotDecl  x
 type family XCInjectivityAnn  x
 type family XXInjectivityAnn  x
 
+-- -------------------------------------
+-- FamilyInfo type families
+type family XDataFamily       x
+type family XOpenTypeFamily   x
+type family XClosedTypeFamily x
+type family XXFamilyInfo      x
+
 -- =====================================================================
 -- Type families for the HsModule extension points
 

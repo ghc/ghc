@@ -1544,15 +1544,15 @@ hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = (L _ name)
 
 familyInfoTyConFlavour
   :: Maybe tc    -- ^ Just cls <=> this is an associated family of class cls
-  -> FamilyInfo pass
+  -> FamilyInfo (GhcPass pass)
   -> TyConFlavour tc
 familyInfoTyConFlavour mb_parent_tycon info =
   case info of
-    DataFamily         -> OpenFamilyFlavour (IAmData DataType) mb_parent_tycon
-    OpenTypeFamily     -> OpenFamilyFlavour IAmType mb_parent_tycon
-    ClosedTypeFamily _ -> assert (isNothing mb_parent_tycon)
-                          -- See Note [Closed type family mb_parent_tycon]
-                          ClosedTypeFamilyFlavour
+    DataFamily _         -> OpenFamilyFlavour (IAmData DataType) mb_parent_tycon
+    OpenTypeFamily _     -> OpenFamilyFlavour IAmType mb_parent_tycon
+    ClosedTypeFamily _ _ -> assert (isNothing mb_parent_tycon)
+                            -- See Note [Closed type family mb_parent_tycon]
+                            ClosedTypeFamilyFlavour
 
 -------------------
 hsForeignDeclsBinders :: forall p a. (UnXRec (GhcPass p), IsSrcSpanAnn p a)

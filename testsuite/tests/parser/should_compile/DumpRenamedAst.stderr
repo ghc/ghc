@@ -311,6 +311,7 @@
            (EpaSpan { <no location info> }))
           (EpTok (EpaSpan { <no location info> })))
          (ClosedTypeFamily
+          (NoExtField)
           (Just
            [(L
              (EpAnn
@@ -798,7 +799,8 @@
           (EpTok
            (EpaSpan { <no location info> }))
           (EpTok (EpaSpan { <no location info> })))
-         (DataFamily)
+         (DataFamily
+          (NoExtField))
          (TopLevel)
          (L
           (EpAnn
@@ -1183,6 +1185,7 @@
            (EpaSpan { <no location info> }))
           (EpTok (EpaSpan { <no location info> })))
          (ClosedTypeFamily
+          (NoExtField)
           (Just
            [(L
              (EpAnn
@@ -1766,7 +1769,8 @@
               (EpTok
                (EpaSpan { <no location info> }))
               (EpTok (EpaSpan { <no location info> })))
-             (OpenTypeFamily)
+             (OpenTypeFamily
+              (NoExtField))
              (NotTopLevel)
              (L
               (EpAnn

@@ -2431,15 +2431,15 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
 
      ----------------------
      rn_info :: FamilyInfo GhcPs -> RnM (FamilyInfo GhcRn, FreeNames)
-     rn_info (ClosedTypeFamily (Just eqns))
+     rn_info (ClosedTypeFamily x (Just eqns))
        = do { (eqns', fvs)
                 <- rnList (rnTyFamInstEqn (NonAssocTyFamEqn ClosedTyFam)) eqns
                                           -- no class context
-            ; return (ClosedTypeFamily (Just eqns'), fvs) }
-     rn_info (ClosedTypeFamily Nothing)
-       = return (ClosedTypeFamily Nothing, emptyFNs)
-     rn_info OpenTypeFamily = return (OpenTypeFamily, emptyFNs)
-     rn_info DataFamily     = return (DataFamily, emptyFNs)
+            ; return (ClosedTypeFamily x (Just eqns'), fvs) }
+     rn_info (ClosedTypeFamily x Nothing)
+       = return (ClosedTypeFamily x Nothing, emptyFNs)
+     rn_info (OpenTypeFamily x) = return (OpenTypeFamily x, emptyFNs)
+     rn_info (DataFamily x)     = return (DataFamily x, emptyFNs)
 
 rnFamResultSig :: HsDocContext
                -> FamilyResultSig GhcPs
