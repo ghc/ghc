@@ -553,19 +553,19 @@ repFamilyDecl decl@(L loc (FamilyDecl { fdInfo      = info
        ; dec <- addQTyVarBinds ReuseBoundNames tvs $ \bndrs ->
                 addSimpleTyVarBinds ReuseBoundNames (maybeToList res_tv) $
            case info of
-             ClosedTypeFamily Nothing ->
+             ClosedTypeFamily _ Nothing ->
                  notHandled (ThAbstractClosedTypeFamily decl)
-             ClosedTypeFamily (Just eqns) ->
+             ClosedTypeFamily _ (Just eqns) ->
                do { eqns1  <- mapM (repTyFamEqn . unLoc) eqns
                   ; eqns2  <- coreListM tySynEqnTyConOcc eqns1
                   ; result <- repFamilyResultSig resultSig
                   ; inj    <- repInjectivityAnn injectivity
                   ; repClosedFamilyD tc1 bndrs result inj eqns2 }
-             OpenTypeFamily ->
+             OpenTypeFamily _ ->
                do { result <- repFamilyResultSig resultSig
                   ; inj    <- repInjectivityAnn injectivity
                   ; repOpenFamilyD tc1 bndrs result inj }
-             DataFamily ->
+             DataFamily _ ->
                do { kind <- repFamilyResultSigToMaybeKind resultSig
                   ; repDataFamilyD tc1 bndrs kind }
        ; return (locA loc, dec)

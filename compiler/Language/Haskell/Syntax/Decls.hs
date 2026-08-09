@@ -503,15 +503,15 @@ isFamilyDecl _other        = False
 -- | type family declaration
 isTypeFamilyDecl :: TyClDecl pass -> Bool
 isTypeFamilyDecl (FamDecl _ (FamilyDecl { fdInfo = info })) = case info of
-  OpenTypeFamily      -> True
+  OpenTypeFamily {}   -> True
   ClosedTypeFamily {} -> True
   _                   -> False
 isTypeFamilyDecl _ = False
 
 -- | open type family info
 isOpenTypeFamilyInfo :: FamilyInfo pass -> Bool
-isOpenTypeFamilyInfo OpenTypeFamily = True
-isOpenTypeFamilyInfo _              = False
+isOpenTypeFamilyInfo OpenTypeFamily {} = True
+isOpenTypeFamilyInfo _                 = False
 
 -- | closed type family info
 isClosedTypeFamilyInfo :: FamilyInfo pass -> Bool
@@ -520,7 +520,7 @@ isClosedTypeFamilyInfo _                     = False
 
 -- | data family declaration
 isDataFamilyDecl :: TyClDecl pass -> Bool
-isDataFamilyDecl (FamDecl _ (FamilyDecl { fdInfo = DataFamily })) = True
+isDataFamilyDecl (FamDecl _ (FamilyDecl { fdInfo = DataFamily _ })) = True
 isDataFamilyDecl _other      = False
 
 -- Dealing with names
@@ -771,11 +771,12 @@ data InjectivityAnn pass
   | XInjectivityAnn !(XXInjectivityAnn pass)
 
 data FamilyInfo pass
-  = DataFamily
-  | OpenTypeFamily
+  = DataFamily (XDataFamily pass)
+  | OpenTypeFamily (XOpenTypeFamily pass)
      -- | 'Nothing' if we're in an hs-boot file and the user
      -- said "type family Foo x where .."
-  | ClosedTypeFamily (Maybe [LTyFamInstEqn pass])
+  | ClosedTypeFamily (XClosedTypeFamily pass) (Maybe [LTyFamInstEqn pass])
+  | XFamilyInfo !(XXFamilyInfo pass)
 
 {- Note [Closed type family mb_parent_tycon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

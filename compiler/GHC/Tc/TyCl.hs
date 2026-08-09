@@ -2189,7 +2189,7 @@ kcTyClDecl (FamDecl _ (FamilyDecl { fdInfo   = fd_info })) fam_tc
 -- closed type families look at their equations, but other families don't
 -- do anything here
   = case fd_info of
-      ClosedTypeFamily (Just eqns) -> mapM_ (kcTyFamInstEqn fam_tc) eqns
+      ClosedTypeFamily _ (Just eqns) -> mapM_ (kcTyFamInstEqn fam_tc) eqns
       _ -> return ()
 
 -------------------
@@ -3380,7 +3380,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
                               , fdLName = tc_lname@(L _ tc_name)
                               , fdResultSig = L _ sig
                               , fdInjectivityAnn = inj })
-  | DataFamily <- fam_info
+  | DataFamily _ <- fam_info
   = bindTyClTyVarsAndZonk tc_name $ \ kind tc_bndrs nb_eta res_kind -> do
   { traceTc "tcFamDecl1 data family:" (ppr tc_name)
   ; checkFamFlag tc_name
@@ -3406,7 +3406,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
                               parent inj
   ; return (tycon, []) }
 
-  | OpenTypeFamily <- fam_info
+  | OpenTypeFamily _ <- fam_info
   = bindTyClTyVarsAndZonk tc_name $ \ kind tc_bndrs _nb_eta res_kind -> do
   { traceTc "tcFamDecl1 open type family:" (ppr tc_name)
   ; checkFamFlag tc_name
@@ -3417,7 +3417,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
                                parent inj'
   ; return (tycon, []) }
 
-  | ClosedTypeFamily mb_eqns <- fam_info
+  | ClosedTypeFamily _ mb_eqns <- fam_info
   = -- Closed type families are a little tricky, because they contain the definition
     -- of both the type family and the equations for a CoAxiom.
     do { traceTc "tcFamDecl1 Closed type family:" (ppr tc_name)
