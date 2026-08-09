@@ -3625,7 +3625,7 @@ instance ExactPrint (FamilyDecl GhcPs) where
           return (vb', Just inj')
     (w', oc', dd', cc', info') <-
              case info of
-               ClosedTypeFamily mb_eqns -> do
+               ClosedTypeFamily x mb_eqns -> do
                  w' <- markEpToken w
                  oc' <- markEpToken oc
                  (dd', mb_eqns') <-
@@ -3637,7 +3637,7 @@ instance ExactPrint (FamilyDecl GhcPs) where
                        eqns' <- mapM markAnnotated eqns
                        return (dd, Just eqns')
                  cc' <- markEpToken cc
-                 return (w',oc',dd',cc', ClosedTypeFamily mb_eqns')
+                 return (w',oc',dd',cc', ClosedTypeFamily x mb_eqns')
                _ -> return (w,oc,dd,cc, info)
     return (FamilyDecl { fdExt = AnnFamilyDecl [] [] t' d' f' dc' eq' vb' w' oc' dd' cc'
                        , fdInfo = info'
@@ -3671,8 +3671,8 @@ instance ExactPrint (FamilyDecl GhcPs) where
 
 
 exactFlavour :: (Monad m, Monoid w) => (EpToken "data", EpToken "type") -> FamilyInfo GhcPs -> EP w m (EpToken "data", EpToken "type")
-exactFlavour (td,tt) DataFamily            = (\td' -> (td',tt)) <$> markEpToken td
-exactFlavour (td,tt) OpenTypeFamily        = (td,)              <$> markEpToken tt
+exactFlavour (td,tt) DataFamily {}         = (\td' -> (td',tt)) <$> markEpToken td
+exactFlavour (td,tt) OpenTypeFamily {}     = (td,)              <$> markEpToken tt
 exactFlavour (td,tt) (ClosedTypeFamily {}) = (td,)              <$> markEpToken tt
 
 -- ---------------------------------------------------------------------

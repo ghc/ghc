@@ -113,6 +113,7 @@
          (EpaSpan { <no location info> }))
         (EpTok (EpaSpan { <no location info> })))
        (ClosedTypeFamily
+        (NoExtField)
         (Just
          [(L
            (EpAnn

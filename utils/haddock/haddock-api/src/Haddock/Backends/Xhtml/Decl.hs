@@ -548,7 +548,7 @@ ppFamDecl summary associated links instances fixities loc doc decl splice unicod
         ppFamHeader summary associated decl unicode qual <+> ppFixities fixities qual
 
     instancesBit
-      | FamilyDecl{fdInfo = ClosedTypeFamily mb_eqns} <- decl
+      | FamilyDecl{fdInfo = ClosedTypeFamily _ mb_eqns} <- decl
       , not summary =
           subEquations pkg qual $ map (ppFamDeclEqn . unLoc) $ Maybe.fromMaybe [] mb_eqns
       | otherwise =
@@ -603,7 +603,7 @@ ppFamHeader
       ]
     where
       whereBit = case info of
-        ClosedTypeFamily _ -> keyword "where ..."
+        ClosedTypeFamily _ _ -> keyword "where ..."
         _ -> noHtml
 
       injAnn = case injectivity of
@@ -622,9 +622,9 @@ ppFamilyLeader :: Bool -> FamilyInfo DocNameI -> Html
 ppFamilyLeader assoc info = keyword (typ ++ if assoc then "" else " family")
   where
     typ = case info of
-      OpenTypeFamily -> "type"
-      ClosedTypeFamily _ -> "type"
-      DataFamily -> "data"
+      OpenTypeFamily _ -> "type"
+      ClosedTypeFamily _ _ -> "type"
+      DataFamily _ -> "data"
 
 -- | Print the signature attached to a family
 ppResultSig :: FamilyResultSig DocNameI -> Unicode -> Qualification -> Html

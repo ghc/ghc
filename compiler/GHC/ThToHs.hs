@@ -372,7 +372,7 @@ cvtDec (DataFamilyD tc tvs kind)
   = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
        ; result <- cvtMaybeKindToFamilyResultSig kind
        ; returnJustLA $ TyClD noExtField $ FamDecl noExtField $
-         FamilyDecl noAnn DataFamily TopLevel tc' tvs' Prefix result Nothing }
+         FamilyDecl noAnn (DataFamily noExtField) TopLevel tc' tvs' Prefix result Nothing }
 
 cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
   = do { (ctxt', tc', bndrs', typats') <- cvt_datainst_hdr ctxt bndrs tys
@@ -426,14 +426,14 @@ cvtDec (TySynInstD eqn)
 cvtDec (OpenTypeFamilyD head)
   = do { (tc', tyvars', result', injectivity') <- cvt_tyfam_head head
        ; returnJustLA $ TyClD noExtField $ FamDecl noExtField $
-         FamilyDecl noAnn OpenTypeFamily TopLevel tc' tyvars' Prefix result' injectivity'
+         FamilyDecl noAnn (OpenTypeFamily noExtField) TopLevel tc' tyvars' Prefix result' injectivity'
        }
 
 cvtDec (ClosedTypeFamilyD head eqns)
   = do { (tc', tyvars', result', injectivity') <- cvt_tyfam_head head
        ; eqns' <- mapM cvtTySynEqn eqns
        ; returnJustLA $ TyClD noExtField $ FamDecl noExtField $
-         FamilyDecl noAnn (ClosedTypeFamily (Just eqns')) TopLevel tc' tyvars' Prefix
+         FamilyDecl noAnn (ClosedTypeFamily noExtField (Just eqns')) TopLevel tc' tyvars' Prefix
                            result' injectivity' }
 
 cvtDec (TH.RoleAnnotD tc roles)

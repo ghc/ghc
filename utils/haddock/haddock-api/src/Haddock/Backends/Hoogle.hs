@@ -254,7 +254,7 @@ ppFam sDocContext decl@(FamilyDecl{fdInfo = info}) =
     decl' = case info of
       -- We don't need to print out a closed type family's equations
       -- for Hoogle, so pretend it doesn't have any.
-      ClosedTypeFamily{} -> decl{fdInfo = OpenTypeFamily}
+      ClosedTypeFamily{} -> decl{fdInfo = OpenTypeFamily noExtField}
       _ -> decl
 
 ppInstance :: DynFlags -> UnitState -> ClsInst -> [String]

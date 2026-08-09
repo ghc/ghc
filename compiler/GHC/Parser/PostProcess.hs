@@ -383,8 +383,8 @@ mkFamDecl loc info topLevel lhs ksig injAnn annsIn
                                            , fdInjectivityAnn = injAnn }))) }
   where
     equals_or_where = case info of
-                        DataFamily          -> empty
-                        OpenTypeFamily      -> empty
+                        DataFamily {}       -> empty
+                        OpenTypeFamily {}   -> empty
                         ClosedTypeFamily {} -> whereDots
 
 mkSpliceDecl :: LHsExpr GhcPs -> (LHsDecl GhcPs)
