@@ -281,8 +281,8 @@ instance HasTrailing EpAnnSumPat where
   setTrailing a _ = a
 
 instance HasTrailing AnnList where
-  trailing a = al_trailing a
-  setTrailing a ts = a { al_trailing = ts }
+  trailing _ = []
+  setTrailing a _ = a
 
 instance HasTrailing [TrailingAnn] where
   trailing a = a

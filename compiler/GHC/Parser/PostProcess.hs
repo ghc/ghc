@@ -437,7 +437,7 @@ mkRoleAnnotDecl loc tycon roles anns
 
 mkMDo :: (EpToken "{", [EpToken ";"], EpToken "}") -> HsDoFlavour -> LocatedA [ExprLStmt GhcPs] -> EpaLocation -> EpaLocation -> HsExpr GhcPs
 mkMDo (ob, semis, cb) ctxt stmts tok loc
-  = mkHsDoAnns ctxt stmts (AnnList (Just loc) (ListBraces ob cb) semis [], tok)
+  = mkHsDoAnns ctxt stmts (AnnList (Just loc) (ListBraces ob cb) semis, tok)
 
 -- | Converts a list of 'LHsTyVarBndr's annotated with their 'Specificity' to
 -- binders without annotations. Only accepts specified variables, and errors if
@@ -1963,7 +1963,7 @@ instance DisambECP (HsCmd GhcPs) where
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (mkHsCmdIf c a b anns)
   mkHsDoPV l (ob,semis,cb) Nothing stmts tok_loc anc = do
     !cs <- getCommentsFor l
-    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsCmdDo (AnnList (Just anc) (ListBraces ob cb) semis [], tok_loc) stmts)
+    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsCmdDo (AnnList (Just anc) (ListBraces ob cb) semis, tok_loc) stmts)
   mkHsDoPV l _ (Just m) _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l $ PsErrQualifiedDoInCmd m
   mkHsParPV l lpar c rpar = do
     !cs <- getCommentsFor l
@@ -2062,7 +2062,7 @@ instance DisambECP (HsExpr GhcPs) where
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (mkHsIf c a b anns)
   mkHsDoPV l (ob,semis,cb) mod stmts loc_tok anc = do
     !cs <- getCommentsFor l
-    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsDo (AnnList (Just anc) (ListBraces ob cb) semis [], loc_tok) (DoExpr mod) stmts)
+    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsDo (AnnList (Just anc) (ListBraces ob cb) semis, loc_tok) (DoExpr mod) stmts)
   mkHsParPV l lpar e rpar = do
     !cs <- getCommentsFor l
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsPar (lpar, rpar) e)

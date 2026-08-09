@@ -95,7 +95,6 @@
         (AnnList
          (Nothing)
          (ListNone)
-         []
          []))
        (L
         (EpAnn

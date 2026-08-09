@@ -43,7 +43,7 @@ module GHC.Parser.Annotation (
 
   -- ** Trailing annotations in lists
   TrailingAnn(..), ta_location,
-  addTrailingAnnToA, addTrailingAnnToL, addTrailingCommaToN,
+  addTrailingAnnToA, addTrailingCommaToN,
   addTrailingAnnToBF,
   noTrailingN,
 
@@ -529,10 +529,7 @@ data AnnList
   = AnnList {
       al_anchor    :: !(Maybe EpaLocation), -- ^ start point of a list having layout
       al_brackets  :: !AnnListBrackets,
-      al_semis     :: [EpToken ";"], -- decls
-      al_trailing  :: ![TrailingAnn] -- ^ items appearing after the
-                                     -- list, such as '=>' for a
-                                     -- context
+      al_semis     :: [EpToken ";"] -- decls
       } deriving (Data,Eq)
 
 data AnnListBrackets
@@ -672,16 +669,6 @@ data AnnPragSCC
 
 -- ---------------------------------------------------------------------
 
--- | Helper function used in the parser to add a 'TrailingAnn' items
--- to an existing annotation.
-addTrailingAnnToL :: TrailingAnn -> EpAnnComments
-                  -> EpAnn AnnList -> EpAnn AnnList
-addTrailingAnnToL t cs n = n { anns = addTrailing (anns n)
-                               , comments = comments n <> cs }
-  where
-    -- See Note [list append in addTrailing*]
-    addTrailing n = n { al_trailing = al_trailing n ++ [t]}
-
 addTrailingAnnToBF :: TrailingAnn -> EpAnnComments
                   -> EpAnn AnnBooleanFormula -> EpAnn AnnBooleanFormula
 addTrailingAnnToBF t cs n = n { anns = addTrailing (anns n)
@@ -714,7 +701,7 @@ noTrailingN s = s { anns = (anns s) { nann_trailing = [] } }
 {-
 Note [list append in addTrailing*]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The addTrailingAnnToL, addTrailingAnnToA and addTrailingCommaToN
+The addTrailingAnnToA and addTrailingCommaToN
 functions are used to add a separator for an item when it occurs in a
 list.  So they are used to capture a comma, vbar, semicolon and similar.
 
@@ -1047,7 +1034,7 @@ instance NoAnn AnnBooleanFormula where
   noAnn = AnnBooleanFormula noAnn noAnn []
 
 instance NoAnn AnnList where
-  noAnn = AnnList Nothing ListNone noAnn []
+  noAnn = AnnList Nothing ListNone noAnn
 
 instance NoAnn NameAnn where
   noAnn = NameAnnTrailing []
@@ -1141,8 +1128,8 @@ instance Outputable NameAnn where
     = text "NameAnnTrailing" <+> ppr t
 
 instance Outputable AnnList where
-  ppr (AnnList anc p s t)
-    = text "AnnList" <+> ppr anc <+> ppr p <+> ppr s <+> ppr t
+  ppr (AnnList l p s)
+    = text "AnnList" <+> ppr l <+> ppr p <+> ppr s
 
 instance Outputable AnnListBrackets where
   ppr (ListParens o c) = text "ListParens" <+> ppr o <+> ppr c
