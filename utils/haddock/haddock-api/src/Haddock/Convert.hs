@@ -313,13 +313,13 @@ synifyTyCon _prr _coax tc
             CTF mb
               | Just (CoAxiom{co_ax_branches = branches}) <- mb
               -> mkFamDecl $
-                   ClosedTypeFamily noExtField $
+                   ClosedTypeFamily noAnn $
                      Just $
                        map (noLocA . synifyAxBranch tc) (fromBranches branches)
               | otherwise
-              -> mkFamDecl $ ClosedTypeFamily noExtField $ Just []
-            CTF_BuiltIn {} -> mkFamDecl $ ClosedTypeFamily noExtField $ Just []
-            CTF_Abstract -> mkFamDecl $ ClosedTypeFamily noExtField Nothing
+              -> mkFamDecl $ ClosedTypeFamily noAnn $ Just []
+            CTF_BuiltIn {} -> mkFamDecl $ ClosedTypeFamily noAnn $ Just []
+            CTF_Abstract -> mkFamDecl $ ClosedTypeFamily noAnn Nothing
   where
     resultVar = tyConFamilyResVar_maybe tc
     mkFamDecl i =

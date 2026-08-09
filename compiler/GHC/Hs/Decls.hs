@@ -708,13 +708,11 @@ data AnnFamilyDecl
       afd_equal  :: EpToken "=",
       afd_vbar   :: EpToken "|",
       afd_where  :: EpToken "where",
-      afd_openc  :: EpToken "{",
-      afd_dotdot :: EpToken "..",
-      afd_closec :: EpToken "}"
+      afd_dotdot :: EpToken ".."
   } deriving Data
 
 instance NoAnn AnnFamilyDecl where
-  noAnn = AnnFamilyDecl noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn
+  noAnn = AnnFamilyDecl noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn
 
 ------------- Functions over FamilyDecls -----------
 
@@ -744,7 +742,7 @@ type instance XXInjectivityAnn  (GhcPass _) = DataConCantHappen
 
 type instance XDataFamily       (GhcPass _) = NoExtField
 type instance XOpenTypeFamily   (GhcPass _) = NoExtField
-type instance XClosedTypeFamily (GhcPass _) = NoExtField
+type instance XClosedTypeFamily (GhcPass _) = AnnList
 type instance XXFamilyInfo      (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p

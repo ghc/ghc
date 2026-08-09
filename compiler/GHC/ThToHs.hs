@@ -433,7 +433,7 @@ cvtDec (ClosedTypeFamilyD head eqns)
   = do { (tc', tyvars', result', injectivity') <- cvt_tyfam_head head
        ; eqns' <- mapM cvtTySynEqn eqns
        ; returnJustLA $ TyClD noExtField $ FamDecl noExtField $
-         FamilyDecl noAnn (ClosedTypeFamily noExtField (Just eqns')) TopLevel tc' tyvars' Prefix
+         FamilyDecl noAnn (ClosedTypeFamily noAnn (Just eqns')) TopLevel tc' tyvars' Prefix
                            result' injectivity' }
 
 cvtDec (TH.RoleAnnotD tc roles)

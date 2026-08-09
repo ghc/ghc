@@ -252,14 +252,14 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
                                  showAstData' j, showAstData' k]
 
             annFamilyDecl :: AnnFamilyDecl -> SDoc
-            annFamilyDecl (AnnFamilyDecl a b c d e f g h i j k l) = case ba of
+            annFamilyDecl (AnnFamilyDecl a b c d e f g h i j) = case ba of
              BlankEpAnnotations -> parens $ text "blanked:" <+> text "AnnFamilyDecl"
              NoBlankEpAnnotations ->
               parens $ text "AnnFamilyDecl"
                         $$ vcat [showAstData' a, showAstData' b, showAstData' c,
                                  showAstData' d, showAstData' e, showAstData' f,
                                  showAstData' g, showAstData' h, showAstData' i,
-                                 showAstData' j, showAstData' k, showAstData' l]
+                                 showAstData' j]
 
             annClsInstDecl :: AnnClsInstDecl -> SDoc
             annClsInstDecl (AnnClsInstDecl a b c d e) = case ba of
