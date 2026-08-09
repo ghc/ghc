@@ -140,12 +140,12 @@ Grep `Parser.y` for `vocurly`. There are fourteen uses in productions (plus the
 terminal declaration and `getVOCURLY`). Only **five** populate `al_anchor`:
 
 | production | layout keyword(s) | anchor expression |
-| --- | --- | --- |
-| `where_decls` | `where` | `Just (fstOf3 $ unLoc $3)` |
-| `decllist` | `let`, `where` | `Just (fstOf3 $ unLoc $2)` |
-| `dbinds` alternative of `binds` (the `HsIPBinds` one) | `let` with implicit params | `Just $ glR $2` |
-| `altslist` | `of`, `\case`, `\cases` | `Just $ glR $2` |
-| `stmtlist` (via `hsDoAnn`) | `do`, `mdo`, `rec` | `Just $ spanAsAnchor (locA ll)` |
+| --- | --- | --- |--- |
+| X |`where_decls` | `where` | `Just (fstOf3 $ unLoc $3)` |
+| X |`decllist` | `let`, `where` | `Just (fstOf3 $ unLoc $2)` |
+| X |`dbinds` alternative of `binds` (the `HsIPBinds` one) | `let` with implicit params | `Just $ glR $2` |
+| X |`altslist` | `of`, `\case`, `\cases` | `Just $ glR $2` |
+|   |`stmtlist` (via `hsDoAnn`) | `do`, `mdo`, `rec` | `Just $ spanAsAnchor (locA ll)` |
 
 The remaining nine record nothing in an `AnnList`:
 
@@ -321,6 +321,7 @@ layout but `dontGenerateSemic`, and `close` may be an error-triggered
 ## 4. Proposed design
 
 ### 4.1 Replace `Maybe EpaLocation` with an explicit three-way discriminant
+*DONE*
 
 Introduce a dedicated type in `compiler/GHC/Parser/Annotation.hs` next to
 `AnnListBrackets`:
@@ -361,6 +362,7 @@ every construction site to be revisited, which is what this plan is for.
 
 ### 4.2 Derive the layout location from the `vocurly` token, not the contents
 
+*DONE*
 Every `vocurly`-bearing production should pass `$1` (the `vocurly` token) into
 the `AnnList`, e.g. in `altslist`:
 
@@ -380,6 +382,8 @@ It also means the *layout column* becomes recoverable as
 rather than the start of the first item. For MultiWayIf the location is the
 `ITvbar` token, which is exactly the token `new_layout_context` measured.
 
+
+*NOT DONE*
 Note the `decls` production can then stop threading its `EpaLocation`
 component (the `fstOf3`, built with `glR`/`glEE`) purely for this purpose;
 check whether any other consumer wants it before removing it.

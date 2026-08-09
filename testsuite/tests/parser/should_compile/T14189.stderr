@@ -303,7 +303,8 @@
     (ImportDecl
      (XImportDeclPass
       (EpAnnImportDecl
-       (NoEpTok)
+       (EpTok
+        (EpaSpan { <no location info> }))
        (Nothing)
        (Nothing)
        (Nothing)
@@ -311,9 +312,10 @@
        (Nothing)
        (Nothing)
        ((,,,)
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok)
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> }))
+        (EpTok (EpaSpan { <no location info> }))
         []))
       (NoSourceText)
       (ImplicitEssentialsImport))
