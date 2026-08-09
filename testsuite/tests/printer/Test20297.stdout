@@ -161,7 +161,8 @@
               (EpAnn
                (EpaSpan { <no location info> })
                (AnnList
-                (AnnListNoLayout)
+                (AnnListLayout
+                 (EpaSpan { Test20297.hs:9:1 }))
                 (ListNone)
                 [])
                (EpaComments
@@ -597,7 +598,8 @@
               (EpAnn
                (EpaSpan { <no location info> })
                (AnnList
-                (AnnListNoLayout)
+                (AnnListLayout
+                 (EpaSpan { Test20297.ppr.hs:6:1 }))
                 (ListNone)
                 [])
                (EpaComments
