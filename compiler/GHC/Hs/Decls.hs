@@ -482,12 +482,12 @@ instance NoAnn AnnSynDecl where
 
 ------------- Pretty printing FamilyDecls -----------
 
-pprFlavour :: FamilyInfo pass -> SDoc
-pprFlavour DataFamily            = text "data"
-pprFlavour OpenTypeFamily        = text "type"
+pprFlavour :: FamilyInfo (GhcPass pass) -> SDoc
+pprFlavour DataFamily {}         = text "data"
+pprFlavour OpenTypeFamily {}     = text "type"
 pprFlavour (ClosedTypeFamily {}) = text "type"
 
-instance Outputable (FamilyInfo pass) where
+instance Outputable (FamilyInfo (GhcPass pass)) where
   ppr info = pprFlavour info <+> text "family"
 
 
@@ -642,8 +642,8 @@ tyClDeclFlavour (ClassDecl {})   = ClassFlavour
 tyClDeclFlavour (SynDecl {})     = TypeSynonymFlavour
 tyClDeclFlavour (FamDecl { tcdFam = FamilyDecl { fdInfo = info }})
   = case info of
-      DataFamily          -> OpenFamilyFlavour (IAmData DataType) Nothing
-      OpenTypeFamily      -> OpenFamilyFlavour IAmType Nothing
+      DataFamily {}       -> OpenFamilyFlavour (IAmData DataType) Nothing
+      OpenTypeFamily {}   -> OpenFamilyFlavour IAmType Nothing
       ClosedTypeFamily {} -> ClosedTypeFamilyFlavour
 tyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_cons = nd } })
   = case dataDefnConsNewOrData nd of
@@ -742,6 +742,11 @@ resultVariableName _                = Nothing
 type instance XCInjectivityAnn  (GhcPass _) = TokRarrow
 type instance XXInjectivityAnn  (GhcPass _) = DataConCantHappen
 
+type instance XDataFamily       (GhcPass _) = NoExtField
+type instance XOpenTypeFamily   (GhcPass _) = NoExtField
+type instance XClosedTypeFamily (GhcPass _) = NoExtField
+type instance XXFamilyInfo      (GhcPass _) = DataConCantHappen
+
 instance OutputableBndrId p
        => Outputable (FamilyDecl (GhcPass p)) where
   ppr (FamilyDecl { fdInfo = info, fdLName = ltycon
@@ -768,7 +773,7 @@ instance OutputableBndrId p
                    hsep [ vbar, ppr lhs, arrow, hsep (map ppr rhs) ]
                  Nothing -> empty
       (pp_where, pp_eqns) = case info of
-        ClosedTypeFamily mb_eqns ->
+        ClosedTypeFamily _ mb_eqns ->
           ( text "where"
           , case mb_eqns of
               Nothing   -> text ".."
