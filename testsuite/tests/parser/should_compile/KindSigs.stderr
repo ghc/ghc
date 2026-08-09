@@ -108,12 +108,14 @@
          (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { KindSigs.hs:11:19-23 }))
-        (EpTok (EpaSpan { <no location info> }))
         (EpTok
-         (EpaSpan { <no location info> }))
-        (EpTok (EpaSpan { <no location info> })))
+         (EpaSpan { <no location info> })))
        (ClosedTypeFamily
-        (NoExtField)
+        (AnnList
+         (AnnListLayout
+          (EpaSpan { KindSigs.hs:12:3 }))
+         (ListNone)
+         [])
         (Just
          [(L
            (EpAnn
