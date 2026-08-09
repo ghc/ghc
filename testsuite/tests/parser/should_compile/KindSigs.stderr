@@ -964,7 +964,6 @@
         (AnnList
          (Nothing)
          (ListNone)
-         []
          []))
        (L
         (EpAnn
@@ -1664,7 +1663,6 @@
         (AnnList
          (Nothing)
          (ListNone)
-         []
          []))
        (L
         (EpAnn

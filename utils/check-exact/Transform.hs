@@ -1096,7 +1096,7 @@ oldWhereAnnotation (EpAnn anc an cs, _w) ww _oldSpan = an'
   -- TODO: when we set DP (0,0) for the HsValBinds EpEpaLocation,
   -- change the AnnList anchor to have the correct DP too
   where
-    (AnnList ancl p s t) = an
+    (AnnList ancl p s) = an
     w = case ww of
       WithWhere -> EpTok (EpaDelta noSrcSpan (SameLine 0) [])
       WithoutWhere -> NoEpTok
@@ -1105,7 +1105,7 @@ oldWhereAnnotation (EpAnn anc an cs, _w) ww _oldSpan = an'
             WithWhere -> (anc, ancl)
             WithoutWhere -> (anc, ancl)
     an' = (EpAnn anc'
-                 (AnnList ancl' p s t)
+                 (AnnList ancl' p s)
                  cs, w)
 
 newWhereAnnotation :: WithWhere -> (EpAnn AnnList, EpToken "where")
@@ -1117,7 +1117,7 @@ newWhereAnnotation ww = (an, w)
     WithWhere -> EpTok (EpaDelta noSrcSpan (SameLine 0) [])
     WithoutWhere -> NoEpTok
   an = EpAnn anc
-              (AnnList (Just anc2) ListNone [] [])
+              (AnnList (Just anc2) ListNone [])
               emptyComments
 
 -- ---------------------------------------------------------------------
