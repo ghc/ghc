@@ -17,6 +17,7 @@ module GHC.Runtime.Interpreter
   , mallocData
   , createBCOs
   , addSptEntry
+  , removeSptEntry
   , addHpcModule
   , mkCostCentres
   , costCentreStackInfo
@@ -374,6 +375,10 @@ addSptEntry :: Interp -> Fingerprint -> ForeignHValue -> IO ()
 addSptEntry interp fpr ref =
   withForeignRef ref $ \val ->
     interpCmd interp (AddSptEntry fpr val)
+
+removeSptEntry :: Interp -> Fingerprint -> IO ()
+removeSptEntry interp fpr =
+  interpCmd interp (RemoveSptEntry fpr)
 
 addHpcModule :: Interp -> SBS.ShortByteString -> Int -> Int -> SBS.ShortByteString -> IO ()
 addHpcModule interp modLabel tickNo hash tickboxes  =

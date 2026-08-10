@@ -91,3 +91,10 @@ test('T27240', [extra_run_opts(f'"{config.libdir}"')], compile_and_run, ['-packa
 test('T27273', [extra_run_opts(f'"{config.libdir}"')],
                compile_and_run,
                ['-package ghc'])
+
+test('T27740',
+     [extra_run_opts(f'"{config.libdir}"'),
+      req_rts_linker,
+      when(arch('wasm32'), skip)],
+     compile_and_run,
+     ['-package ghc'])
