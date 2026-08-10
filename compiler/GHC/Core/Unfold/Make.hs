@@ -147,7 +147,8 @@ mkInlineUnfoldingWithArity opts src arity expr
   where
     expr' = simpleOptExpr opts expr
     guide = UnfWhen { ug_arity = arity
-                    , ug_unsat_ok = needSaturated
+--                    , ug_unsat_ok = needSaturated
+                    , ug_unsat_ok = unSaturatedOk
                     , ug_boring_ok = boring_ok }
     -- See Note [INLINE pragmas and boring contexts] as to why we need to look
     -- at the arity here.
