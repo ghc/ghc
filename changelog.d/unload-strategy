@@ -1,0 +1,16 @@
+section: linker
+synopsis: Add -funload-strategy to choose between purging and unloading object code
+issues: #27741
+mrs: !16583
+
+description: {
+    When the interpreter drops object code it has loaded it can either
+    purge it, clearing its symbol table entries but leaving it in memory,
+    or unload it, additionally allowing a later garbage collection to
+    reclaim its memory. Unloading is preferable, but its implementation is
+    fragile on a number of platforms, so GHC purges on those instead: it
+    unloads on Linux other than ARM, and purges everywhere else.
+    ``-funload-strategy=unload`` and ``-funload-strategy=purge`` opt into
+    the other choice. The flag has no effect when the interpreter is
+    dynamically linked, as neither happens then.
+}

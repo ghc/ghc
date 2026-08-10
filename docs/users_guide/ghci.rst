@@ -3554,6 +3554,32 @@ breakpoints in object-code modules, for example. Only the exports of an
 object-code module will be visible in GHCi, rather than all top-level
 bindings as in interpreted modules.
 
+.. ghc-flag:: -funload-strategy=⟨strategy⟩
+    :shortdesc: Whether to ``purge`` or ``unload`` object code that the
+        interpreter drops.
+    :type: dynamic
+    :category: linking
+
+    :since: 10.2.1
+
+    When the interpreter drops object code it has loaded, it can either
+    *purge* it or *unload* it.
+
+    Purging clears the symbol table entries the object contributed, so
+    that nothing linked afterwards can refer to it, but the object stays
+    in memory. Unloading does the same, and additionally marks the object
+    as no longer needed, so that a later garbage collection may notice
+    that nothing refers to it and reclaim its memory.
+
+    Unloading is the better choice where it works, but its implementation
+    is fragile on a number of platforms, so GHC purges on those instead.
+    By default GHC unloads on Linux other than ARM, and purges everywhere
+    else. This flag opts into the other choice.
+
+    The distinction is moot when the interpreter is dynamically linked,
+    as neither purging nor unloading happens then. GHC warns that the
+    flag is ignored in that case.
+
 .. _external-interpreter:
 
 Running the interpreter in a separate process

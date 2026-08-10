@@ -53,6 +53,7 @@ import GHC.Platform
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHC.Platform.Ways
 #endif
+import GHC.Driver.DynFlags (UnloadStrategy)
 import GHC.Utils.TmpFs
 import GHC.Utils.Logger
 import GHC.Utils.Outputable ( text, (<+>) )
@@ -87,6 +88,8 @@ data Interp = Interp
   , interpObjSuffix :: !(Maybe (String, String))
       -- ^ @(from, to)@ object suffixes to swap when the interpreter cannot
       -- load objects built the target's way. See 'interpLinkable'.
+
+  , interpUnloadStrategy :: !UnloadStrategy
   }
 
 -- | The linkable, but swap the object to the correct variant (dyn/no-dyn) for the
