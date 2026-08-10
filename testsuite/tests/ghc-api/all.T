@@ -101,3 +101,10 @@ test('T4162', [ extra_run_opts(f'"{config.libdir}"')
               # no subprocesses or signals
               , when(arch('wasm32') or arch('javascript'), skip)
               ], compile_and_run, ['-package ghc'])
+
+test('T27740',
+     [extra_run_opts(f'"{config.libdir}"'),
+      req_rts_linker,
+      when(arch('wasm32'), skip)],
+     compile_and_run,
+     ['-package ghc'])
