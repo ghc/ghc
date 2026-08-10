@@ -95,6 +95,7 @@ import GHC.Unit.External (ExternalPackageState (..))
 import GHC.Unit.Module
 import GHC.Unit.Module.ModNodeKey
 import GHC.Unit.Module.Graph
+import GHC.Unit.Module.Stage (ModuleStage (..))
 import GHC.Unit.Module.ModIface
 import GHC.Unit.State as Packages
 
@@ -713,7 +714,9 @@ get_reachable_nodes hsc_env mods
     go :: ModuleGraph -> IO ([Module], UniqDSet UnitId)
     go mg = do
         let mod_keys = map (hmgModKey mg) mods
-            all_reachable = mod_keys ++ map mkNodeKey (mgReachableLoop mg mod_keys)
+            reached = mgReachableStage mg [ (k, RunStage) | k <- mod_keys ]
+            all_reachable = nubOrd $
+              mod_keys ++ [ k | (k, RunStage) <- reached ]
         (mods_s, pkgs_s) <- partitionEithers <$> mapMaybeM get_mod_info all_reachable
         return (mods_s, mkUniqDSet pkgs_s)
 

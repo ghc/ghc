@@ -79,6 +79,7 @@ module GHC.Unit.Module.Graph
     -- transitive closure of Z?
    , mgReachable
    , mgReachableLoop
+   , mgReachableStage
    , mgQuery
    , ZeroScopeKey(..)
    , mgQueryZero
@@ -191,6 +192,7 @@ data ModuleGraph = ModuleGraph
   , mg_graph :: (ReachabilityIndex SummaryNode, NodeKey -> Maybe SummaryNode)
   , mg_loop_graph :: (ReachabilityIndex SummaryNode, NodeKey -> Maybe SummaryNode)
   , mg_zero_graph :: (ReachabilityIndex ZeroSummaryNode, ZeroScopeKey -> Maybe ZeroSummaryNode)
+  , mg_stage_graph :: (ReachabilityIndex StageSummaryNode, (NodeKey, ModuleStage) -> Maybe StageSummaryNode)
 
     -- `mg_graph` and `mg_loop_graph` cached transitive dependency calculations
     -- so that a lot of work is not repeated whenever the transitive
@@ -230,6 +232,7 @@ emptyMG :: ModuleGraph
 emptyMG = ModuleGraph [] (graphReachability emptyGraph, const Nothing)
                          (graphReachability emptyGraph, const Nothing)
                          (graphReachability emptyGraph, const Nothing)
+                         (cyclicGraphReachability emptyGraph, const Nothing)
                          False
                          emptyUniqMap
 
@@ -585,6 +588,12 @@ mgReachable mg nk = map summaryNodeSummary <$> modules_below where
 mgReachableLoop :: ModuleGraph -> [NodeKey] -> [ModuleGraphNode]
 mgReachableLoop mg nk = map summaryNodeSummary modules_below where
   (td_map, lookup_node) = mg_loop_graph mg
+  modules_below =
+    allReachableMany td_map (mapMaybe lookup_node nk)
+
+mgReachableStage :: ModuleGraph -> [(NodeKey, ModuleStage)] -> [(NodeKey, ModuleStage)]
+mgReachableStage mg nk = map stageSummaryNodeSummary modules_below where
+  (td_map, lookup_node) = mg_stage_graph mg
   modules_below =
     allReachableMany td_map (mapMaybe lookup_node nk)
 
@@ -1079,6 +1088,7 @@ extendMG ModuleGraph{..} node =
     , mg_graph =  mkTransDeps new_mss
     , mg_loop_graph = mkTransLoopDeps new_mss
     , mg_zero_graph = mkTransZeroDeps new_mss
+    , mg_stage_graph = mkStageDeps new_mss
     , mg_has_holes = mg_has_holes || maybe False isHsigFile (moduleNodeInfoHscSource =<< mgNodeIsModule node)
     , mg_home_module_name_providers_map = mkHomeModuleNameProvidersMap new_mss
     }
