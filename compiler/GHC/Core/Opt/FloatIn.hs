@@ -860,6 +860,9 @@ sepBindsByDropPoint platform is_case floaters here_fvs fork_fvs
 
           n_used_alts = count id used_in_flags -- returns number of Trues in list.
 
+          -- A demanded thunk like  let x = factorial y in ... could be pushed, but
+          -- it'll turn into a case-expression so it doesn't allocate directly.
+          -- So I am experimenting with making it stay put.
           strict_thunk = case bind of
                            FloatCase{}           -> False
                            FloatLet (Rec {})     -> False
