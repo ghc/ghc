@@ -57,6 +57,7 @@ data InterpOpts = InterpOpts
   , interpBrowserPlaywrightBrowserType :: Maybe String
   , interpBrowserPlaywrightLaunchOpts :: Maybe String
   , interpExecutableLinkOpts :: ExecutableLinkOpts
+  , interpUnloadStrategyFlag :: Maybe UnloadStrategy
   }
 
 -- | Initialize code interpreter
@@ -92,6 +93,14 @@ initInterpreter dflags tmpfs logger platform finder_cache unit_env opts = do
             Just (objectSuf dflags, waysTag (WayDyn `addWay` target_full_ways) ++ "_o")
 #endif
 
+  -- See Note [Unloading vs purging objects] in GHC.Runtime.Interpreter
+  let unload_strategy = case interpUnloadStrategyFlag opts of
+        Just s -> s
+        Nothing -> case (platformOS platform, platformArch platform) of
+          (OSLinux, ArchARM {}) -> UnloadStrategyPurge
+          (OSLinux, _)          -> UnloadStrategyUnload
+          _                     -> UnloadStrategyPurge
+
   -- see Note [Target code interpreter]
   if
 #if !defined(wasm32_HOST_ARCH)
@@ -121,7 +130,7 @@ initInterpreter dflags tmpfs logger platform finder_cache unit_env opts = do
                 , wasmInterpHsSoSuffix = way_tag ++ dynLibSuffix (interpNameVer opts)
                 , wasmInterpUnitState = ue_homeUnitState unit_env
                 }
-        pure $ Just $ Interp (ExternalInterp $ ExtWasm $ ExtInterpState cfg s) loader lookup_cache fs_cache wasm_obj_suffix
+        pure $ Just $ Interp (ExternalInterp $ ExtWasm $ ExtInterpState cfg s) loader lookup_cache fs_cache wasm_obj_suffix unload_strategy
 #endif
 
     -- JavaScript interpreter
@@ -140,7 +149,7 @@ initInterpreter dflags tmpfs logger platform finder_cache unit_env opts = do
               , jsInterpFinderOpts  = interpFinderOpts opts
               , jsInterpFinderCache = finder_cache
               }
-         return (Just (Interp (ExternalInterp (ExtJS (ExtInterpState cfg s))) loader lookup_cache fs_cache Nothing))
+         return (Just (Interp (ExternalInterp (ExtJS (ExtInterpState cfg s))) loader lookup_cache fs_cache Nothing unload_strategy))
 
     -- external interpreter
     | interpExternal opts
@@ -167,7 +176,7 @@ initInterpreter dflags tmpfs logger platform finder_cache unit_env opts = do
            }
         s <- liftIO $ newMVar InterpPending
         loader <- liftIO Loader.uninitializedLoader
-        return (Just (Interp (ExternalInterp (ExtIServ (ExtInterpState conf s))) loader lookup_cache fs_cache Nothing))
+        return (Just (Interp (ExternalInterp (ExtIServ (ExtInterpState conf s))) loader lookup_cache fs_cache Nothing unload_strategy))
 
     -- Internal interpreter
     | otherwise
@@ -175,7 +184,7 @@ initInterpreter dflags tmpfs logger platform finder_cache unit_env opts = do
 #if defined(HAVE_INTERNAL_INTERPRETER)
      do
       loader <- liftIO Loader.uninitializedLoader
-      return (Just (Interp InternalInterp loader lookup_cache fs_cache internal_obj_suffix))
+      return (Just (Interp InternalInterp loader lookup_cache fs_cache internal_obj_suffix unload_strategy))
 #else
       return Nothing
 #endif

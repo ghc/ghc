@@ -55,6 +55,7 @@ module GHC.Driver.Session (
         PackageDBFlag(..), PkgDbRef(..),
         Option(..), showOpt,
         DynLibLoader(..),
+        UnloadStrategy(..),
         fFlags, fLangFlags, xFlags,
         wWarningFlags,
         makeDynFlagsConsistent,
@@ -724,6 +725,12 @@ parseDynLibLoaderMode f d =
    ("deploy", "")       -> d { dynLibLoader = Deployable }
    ("sysdep", "")       -> d { dynLibLoader = SystemDependent }
    _                    -> throwGhcException (CmdLineError ("Unknown dynlib loader: " ++ f))
+
+parseUnloadStrategy :: String -> DynFlags -> DynFlags
+parseUnloadStrategy f d = case f of
+  "unload" -> d { unloadStrategy = Just UnloadStrategyUnload }
+  "purge"  -> d { unloadStrategy = Just UnloadStrategyPurge }
+  _        -> throwGhcException (CmdLineError ("Unknown unload strategy: " ++ f))
 
 setDumpPrefixForce f d = d { dumpPrefixForce = f}
 
@@ -1892,6 +1899,8 @@ dynamic_flags_deps = [
       (intSuffix (\n d -> d {maxForcedSpecArgs = n}))
   , make_ord_flag defGhciFlag "fghci-hist-size"
       (intSuffix (\n d -> d {ghciHistSize = n}))
+  , make_ord_flag defFlag "funload-strategy"
+      (hasArg parseUnloadStrategy)
 
   -- wasm ghci browser mode
   , make_ord_flag defGhciFlag "fghci-browser-host"

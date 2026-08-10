@@ -24,11 +24,16 @@ import Unsafe.Coerce (unsafeCoerce)
 
 main :: IO ()
 main = do
-  [libdir] <- getArgs
+  libdir:rest <- getArgs
+  let strat = case rest of
+        []         -> Nothing
+        ["purge"]  -> Just UnloadStrategyPurge
+        ["unload"] -> Just UnloadStrategyUnload
+        _          -> error "usage: T27606c <libdir> [purge|unload]"
   writeA 1
   writeC
   runGhc (Just libdir) $ do
-    setupSession ["B.hs", "C.hs"]
+    setupSession strat ["B.hs", "C.hs"]
     _ <- load LoadAllTargets
     setContext [ IIDecl (simpleImportDecl (mkModuleName "Prelude"))
                , IIDecl (simpleImportDecl (mkModuleName "A"))
@@ -61,10 +66,10 @@ writeC = writeFile "C.hs" $ unlines
   , "c = unsafePerformIO (appendFile \"c.log\" \"x\" >> pure 100)"
   ]
 
-setupSession :: [String] -> Ghc ()
-setupSession targets = do
+setupSession :: Maybe UnloadStrategy -> [String] -> Ghc ()
+setupSession strat targets = do
   df <- getSessionDynFlags
-  _ <- setSessionDynFlags df { ghcLink = LinkInMemory }
+  _ <- setSessionDynFlags df { ghcLink = LinkInMemory, unloadStrategy = strat }
   ts <- mapM (\t -> guessTarget t Nothing Nothing) targets
   setTargets ts
 
@@ -74,7 +79,7 @@ setupSession targets = do
 compileA :: String -> NameCache -> IO HomeModInfo
 compileA libdir nc = runGhc (Just libdir) $ do
   getSession >>= \h -> setSession h { hsc_NC = nc }
-  setupSession ["A.hs"]
+  setupSession Nothing ["A.hs"]
   ok <- load LoadAllTargets
   when (failed ok) $ error "compileA: load failed"
   hsc <- getSession
