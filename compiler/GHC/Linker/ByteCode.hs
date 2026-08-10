@@ -8,7 +8,8 @@ import GHC.Utils.Error
 import GHC.Driver.Env
 import GHC.Utils.Outputable
 import GHC.Linker.Loader
-import Data.List (partition)
+import Data.List (partition, sort)
+import GHC.Utils.Fingerprint (fingerprintFingerprints)
 import GHC.Driver.Phases (isBytecodeFilename)
 import GHC.Runtime.Interpreter (interpreterDynamic)
 import Data.Maybe
@@ -40,8 +41,10 @@ linkBytecodeLib hsc_env gbcs = do
     bytecodeLibFiles = all_cbcs,
     bytecodeLibForeign = interpreter_foreign_lib
   }
+  let inputs_hash = fingerprintFingerprints
+        (sort [ gbc_hash m | m <- on_disk_bcos ++ gbcs ])
   let output_fn = fromMaybe "a.out" (outputFile dflags)
-  writeBytecodeLib bytecodeLib' output_fn
+  writeBytecodeLib inputs_hash bytecodeLib' output_fn
   return ()
 
 
