@@ -44,7 +44,6 @@ where
 import GHC.Prelude
 
 import GHC.Settings
-import GHC.Utils.Misc
 
 import GHC.Platform
 import GHC.Platform.Ways
@@ -673,14 +672,13 @@ findWholeCoreBindings hsc_env mod = do
 
 findBytecodeLinkableMaybe :: HscEnv -> ModLocation -> IO (Maybe Linkable)
 findBytecodeLinkableMaybe hsc_env locn = do
-  let bytecode_fn    = ml_bytecode_file locn
-      bytecode_fn_os = ml_bytecode_file_ospath locn
-  maybe_bytecode_time <- modificationTimeIfExists bytecode_fn_os
-  case maybe_bytecode_time of
-    Nothing -> return Nothing
-    Just bytecode_time -> do
+  let bytecode_fn = ml_bytecode_file locn
+  exists <- doesFileExist bytecode_fn
+  if not exists
+    then return Nothing
+    else do
       bco <- readBinByteCode hsc_env bytecode_fn
-      return $ Just $ mkModuleByteCodeLinkable bytecode_time bco
+      return $ Just $ mkModuleByteCodeLinkable bco
 
 get_reachable_nodes :: HscEnv -> [Module] -> IO ([Module], UniqDSet UnitId)
 get_reachable_nodes hsc_env mods
@@ -834,7 +832,7 @@ linkableInSet :: Linkable -> LinkableSet LinkableUsage -> Bool
 linkableInSet l objs_loaded =
   case lookupModuleEnv objs_loaded (linkableModule l) of
         Nothing -> False
-        Just m  -> linkableTime l == linkableTime m
+        Just m  -> linkableHash l == linkableHash m
 
 
 {- **********************************************************************
