@@ -64,6 +64,7 @@ run m = case m of
   LoadDLLs {}                 -> notSupportedJS m
   LoadArchive {}              -> notSupportedJS m
   UnloadObj {}                -> notSupportedJS m
+  PurgeObj {}                 -> notSupportedJS m
   AddLibrarySearchPath {}     -> notSupportedJS m
   RemoveLibrarySearchPath {}  -> notSupportedJS m
   MkConInfoTable {}           -> notSupportedJS m
@@ -77,6 +78,7 @@ run m = case m of
   LoadArchive str -> loadArchive str
   LoadObj str -> loadObj str
   UnloadObj str -> unloadObj str
+  PurgeObj str -> purgeObj str
   AddLibrarySearchPath str -> toRemotePtr <$> addLibrarySearchPath str
   RemoveLibrarySearchPath ptr -> removeLibrarySearchPath (fromRemotePtr ptr)
   MkConInfoTable (ConInfoTable tc ptrs nptrs tag ptrtag desc) ->

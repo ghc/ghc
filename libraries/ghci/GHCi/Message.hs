@@ -93,6 +93,8 @@ data Message a where
   LoadArchive :: String -> Message () -- error?
   LoadObj :: String -> Message () -- error?
   UnloadObj :: String -> Message () -- error?
+  -- | See Note [Unloading vs purging objects] in GHC.Runtime.Interpreter
+  PurgeObj :: String -> Message ()
   AddLibrarySearchPath :: String -> Message (RemotePtr ())
   RemoveLibrarySearchPath :: RemotePtr () -> Message Bool
   ResolveObjs :: Message Bool
@@ -611,6 +613,7 @@ getMessage = do
       40 -> Msg <$> (WhereFrom <$> get)
       41 -> Msg <$> (AddHpcModule <$> get <*> get <*> get <*> get)
       42 -> Msg <$> (CustomMessage <$> get <*> get)
+      43 -> Msg <$> PurgeObj <$> get
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -659,6 +662,7 @@ putMessage m = case m of
   WhereFrom a                 -> putWord8 40 >> put a
   AddHpcModule m n h ticks    -> putWord8 41 >> put m >> put n >> put h >> put ticks
   CustomMessage tag payload   -> putWord8 42 >> put tag >> put payload
+  PurgeObj str                -> putWord8 43 >> put str
 
 {-
 Note [Parallelize CreateBCOs serialization]
