@@ -871,7 +871,8 @@ job arch opsys buildConfig =
       = [ "bash .gitlab/ci.sh setup"
         , "bash .gitlab/ci.sh test_hadrian" ]
       | otherwise
-      = [ ".gitlab/ci.sh setup"
+      = [ "sudo chown ghc:ghc -R ." | Linux {} <- [opsys]] ++
+        [ ".gitlab/ci.sh setup"
         , ".gitlab/ci.sh test_hadrian" ]
 
     jobBuildScript
