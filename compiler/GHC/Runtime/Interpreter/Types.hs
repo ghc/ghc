@@ -79,6 +79,10 @@ data Interp = Interp
 
   , interpStringCache :: !(MVar (FastStringEnv (RemotePtr ())))
       -- ^ MallocStrings cache
+
+  , interpObjSuffix :: !(Maybe (String, String))
+      -- ^ @(from, to)@ object suffixes to swap when the interpreter cannot
+      -- load objects built the target's way
   }
 
 data InterpInstance

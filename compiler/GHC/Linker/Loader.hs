@@ -854,9 +854,9 @@ loadObjects
   -> [Linkable]
   -> IO (LoaderState, SuccessFlag)
 loadObjects interp hsc_env pls objs = do
-        let (objs_loaded', new_objs) = rmDupLinkables (objs_loaded pls) objs
+        let (objs_loaded', new_objs) = rmDupLinkables (interpObjSuffix interp) (objs_loaded pls) objs
             pls1                     = pls { objs_loaded = objs_loaded' }
-            wanted_objs              = concatMap linkableObjs new_objs
+        wanted_objs <- concat <$> mapM (loadableObjs interp) new_objs
 
         if interpreterDynamic interp
             then do pls2 <- dynLoadObjs interp hsc_env pls1 wanted_objs
@@ -874,6 +874,18 @@ loadObjects interp hsc_env pls objs = do
                             pls2 <- unload_wkr interp pls1
                             return (pls2, Failed)
 
+
+loadableObjs :: Interp -> Linkable -> IO [FilePath]
+loadableObjs interp l = concat <$> mapM go (Foldable.toList (linkableParts l))
+  where
+    go (DotO fn ModuleObject)
+      | Just suffixes <- interpObjSuffix interp = do
+          let fn' = swapObjSuffix suffixes fn
+          ok <- doesFileExist fn'
+          if ok
+            then return [fn']
+            else throwGhcExceptionIO (ProgramError ("cannot find object file " ++ fn'))
+    go part = return (linkablePartObjectPaths part)
 
 -- | Create a shared library containing the given object files
 mkDynLoadLib :: HscEnv -> (Ways -> Ways) -> [(FilePath, String)] ->[UnitId] -> [FilePath] -> IO (Maybe (FilePath, FilePath, String))
@@ -959,17 +971,18 @@ dynLoadObjs interp hsc_env pls objs = do
                         then addWay WayProf
                         else id
 
-rmDupLinkables :: LinkableSet LinkableUsage  -- ^ Already loaded
+rmDupLinkables :: Maybe (String, String)
+               -> LinkableSet LinkableUsage  -- ^ Already loaded
                -> [Linkable]    -- ^ New linkables
                -> (LinkableSet LinkableUsage,  -- New loaded set (including new ones)
                    [Linkable])  -- New linkables (excluding dups)
-rmDupLinkables already ls
+rmDupLinkables mb_osuf already ls
   = go already [] ls
   where
     go !already extras [] = (already, extras)
     go !already extras (l:ls)
         | linkableInSet l already = go already     extras     ls
-        | otherwise               = go (extendModuleEnv already (linkableModule l) $! mkLinkableUsage l) (l:extras) ls
+        | otherwise               = go (extendModuleEnv already (linkableModule l) $! mkLinkableUsage mb_osuf l) (l:extras) ls
 
 {- **********************************************************************
 
@@ -981,7 +994,7 @@ rmDupLinkables already ls
 dynLinkBCOs :: Interp -> LoaderState -> KeepModuleLinkableDefinitions -> [Linkable] -> IO LoaderState
 dynLinkBCOs interp pls keep_spec bcos =
 
-        let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
+        let (bcos_loaded', new_bcos) = rmDupLinkables Nothing (bcos_loaded pls) bcos
             pls1                     = pls { bcos_loaded = bcos_loaded' }
 
             cbcs :: [CompiledByteCode]

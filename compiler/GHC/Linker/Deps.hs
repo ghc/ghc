@@ -41,11 +41,10 @@ import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Data.Maybe
 
 import Control.Applicative
+import Control.Monad (forM_, unless)
 
-import Data.List (isSuffixOf)
+import System.Directory (doesFileExist)
 
-import System.FilePath
-import System.Directory
 
 data LinkDepsOpts = LinkDepsOpts
   { ldObjSuffix   :: !String                        -- ^ Suffix of .o files
@@ -87,18 +86,18 @@ getLinkDeps opts interp pls span mods = do
       -- the "normal" way, i.e. no non-std ways like profiling or ticky-ticky.
       -- So here we check the build tag: if we're building a non-standard way
       -- then we need to find & link object files built the "normal" way.
-      maybe_normal_osuf <- checkNonStdWay opts interp span
+      checkNonStdWay opts interp span
 
-      get_link_deps opts pls maybe_normal_osuf span mods
+      get_link_deps opts interp pls span mods
 
 get_link_deps
   :: LinkDepsOpts
+  -> Interp
   -> LoaderState
-  -> Maybe FilePath  -- replace object suffixes?
   -> SrcSpan
   -> [Module]
   -> IO LinkDeps
-get_link_deps opts pls maybe_normal_osuf span mods = do
+get_link_deps opts interp pls span mods = do
 
       -- Three step process:
 
@@ -122,9 +121,9 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         -- 3.  For each dependent module, find its linkable
         --     This will either be in the HPT or (in the case of one-shot
         --     compilation) we may need to use maybe_getFileLinkable
-      lnks_needed <- mapM (get_linkable (ldObjSuffix opts)) mods_needed
+      lnks_needed <- mapM get_linkable mods_needed
       let
-        lnks_needed_usages = mkLinkablesUsage lnks_needed
+        lnks_needed_usages = mkLinkablesUsage (interpObjSuffix interp) lnks_needed
         new_link_deps lnks = LinkDeps
           { ldNeededLinkables = lnks_needed
           , ldAllLinkables    = lnks
@@ -156,9 +155,12 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         then homeModInfoByteCode hmi <|> homeModInfoObject hmi
         else homeModInfoObject hmi   <|> homeModInfoByteCode hmi
 
-    get_linkable osuf mod      -- A home-package module
+    get_linkable mod      -- A home-package module
       = HUG.lookupHugByModule mod (ue_home_unit_graph unit_env) >>= \case
-          Just mod_info -> adjust_linkable (expectJust (homeModLinkable mod_info))
+          Just mod_info -> do
+            let lnk = expectJust (homeModLinkable mod_info)
+            validate_objects lnk
+            pure lnk
           Nothing -> do
            -- It's not in the HPT because we are in one shot mode,
            -- so use the Finder to get a ModLocation...
@@ -185,30 +187,23 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                   mb_lnk <- findObjectLinkableMaybe mod loc
                   case mb_lnk of
                     Nothing  -> no_obj mod
-                    Just lnk -> adjust_linkable lnk
+                    Just lnk -> validate_objects lnk >> pure lnk
                 _ -> no_obj (moduleName mod)
 
-            adjust_linkable lnk
-                | Just new_osuf <- maybe_normal_osuf = do
-                        new_parts <- mapM (adjust_part new_osuf)
-                                        (linkableParts lnk)
-                        return lnk{ linkableParts=new_parts }
-                | otherwise =
-                        return lnk
-
-            adjust_part new_osuf part = case part of
-              DotO file ModuleObject -> do
-                massert (osuf `isSuffixOf` file)
-                let file_base = fromJust (stripExtension osuf file)
-                    new_file = file_base <.> new_osuf
-                ok <- doesFileExist new_file
-                if (not ok)
-                   then dieWith opts span $
-                          text "cannot find object file "
-                                <> quotes (text new_file) $$ while_linking_expr
-                   else return (DotO new_file ModuleObject)
-              DotO file ForeignObject -> pure (DotO file ForeignObject)
-              DotGBC {}  -> pure part
+            -- The loader loads the interpreter's object variant of each
+            -- module object. Check it exists here, where we can say which
+            -- module and expression needed it.
+            validate_objects lnk
+              | Just suffixes <- interpObjSuffix interp =
+                  forM_ (linkableParts lnk) $ \part -> case part of
+                    DotO f ModuleObject -> do
+                      let f' = swapObjSuffix suffixes f
+                      ok <- doesFileExist f'
+                      unless ok $ dieWith opts span $
+                        text "cannot find object file" <+> quotes (text f') $$
+                        while_linking_expr
+                    _ -> pure ()
+              | otherwise = pure ()
 
 
 {-
@@ -241,19 +236,11 @@ dieWith opts span msg = throwProgramError opts (mkLocMessage MCFatal span msg)
 throwProgramError :: LinkDepsOpts -> SDoc -> IO a
 throwProgramError opts doc = throwGhcExceptionIO (ProgramError (renderWithContext (ldPprOpts opts) doc))
 
-checkNonStdWay :: LinkDepsOpts -> Interp -> SrcSpan -> IO (Maybe FilePath)
+checkNonStdWay :: LinkDepsOpts -> Interp -> SrcSpan -> IO ()
 checkNonStdWay _opts interp _srcspan
-  -- On some targets (e.g. wasm) the RTS linker only supports loading
-  -- dynamic code, in which case we need to ensure the .dyn_o object
-  -- is picked (instead of .o which is also present because of
-  -- -dynamic-too)
-  | ldForceDyn _opts = do
-      let target_ways = fullWays $ ldWays _opts
-      pure $ if target_ways `hasWay` WayDyn
-        then Nothing
-        else Just $ waysTag (WayDyn `addWay` target_ways) ++ "_o"
+  | ldForceDyn _opts = return ()
 
-  | ExternalInterp {} <- interpInstance interp = return Nothing
+  | ExternalInterp {} <- interpInstance interp = return ()
     -- with -fexternal-interpreter we load the .o files, whatever way
     -- they were built.  If they were built for a non-std way, then
     -- we will use the appropriate variant of the iserv binary to load them.
@@ -262,26 +249,23 @@ checkNonStdWay _opts interp _srcspan
 -- complain that they are redundant.
 #if defined(HAVE_INTERNAL_INTERPRETER)
 checkNonStdWay opts _interp srcspan
-  | hostFullWays == targetFullWays = return Nothing
+  | hostFullWays == targetFullWays = return ()
     -- Only if we are compiling with the same ways as GHC is built
     -- with, can we dynamically load those object files. (see #3604)
 
   | ldObjSuffix opts == normalObjectSuffix && not (null targetFullWays)
   = failNonStd opts srcspan
 
-  | otherwise = return (Just (hostWayTag ++ "o"))
+  | otherwise = return ()
   where
     targetFullWays = fullWays (ldWays opts)
-    hostWayTag = case waysTag hostFullWays of
-                  "" -> ""
-                  tag -> tag ++ "_"
 
     normalObjectSuffix :: String
     normalObjectSuffix = "o"
 
 data Way' = Normal | Prof | Dyn | ProfDyn
 
-failNonStd :: LinkDepsOpts -> SrcSpan -> IO (Maybe FilePath)
+failNonStd :: LinkDepsOpts -> SrcSpan -> IO ()
 failNonStd opts srcspan = dieWith opts srcspan $
   text "Cannot load" <+> pprWay' compWay <+>
      text "objects when GHC is built" <+> pprWay' ghciWay $$

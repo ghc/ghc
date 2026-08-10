@@ -61,6 +61,7 @@ module GHC.Linker.Types
    , linkableNativeParts
    , linkablePartitionParts
    , linkablePartPath
+   , linkablePartObjectPaths
    , isNativeCode
    , linkableFilterByteCode
    , linkableFilterNative
@@ -70,6 +71,7 @@ module GHC.Linker.Types
    , linkableUsageObjs
    , mkLinkablesUsage
    , mkLinkableUsage
+   , swapObjSuffix
 
    , ModuleByteCode(..)
    )
@@ -95,6 +97,7 @@ import GHC.Unit.Module.Deps (LinkablePartUsage (..), linkablePartUsageObjectPath
 import GHC.Unit.Module.Env
 import GHC.Unit.Module.WholeCoreBindings
 import GHC.Utils.Misc (seqNonEmpty)
+import GHC.Utils.Panic (pprPanic)
 
 import GHC.Utils.Outputable
 
@@ -106,6 +109,7 @@ import Data.Time               ( UTCTime )
 import Data.Maybe (mapMaybe)
 import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import qualified Data.List.NonEmpty as NE
+import System.FilePath (stripExtension, (<.>))
 
 {- **********************************************************************
 
@@ -578,8 +582,13 @@ partitionLinkables linkables =
 --
 -- Each 'LinkablePartUsage' is fully evaluated to avoid retaining any reference
 -- to the original 'LinkablePart'.
-mkLinkableUsage :: Linkable -> LinkableUsage
-mkLinkableUsage lnk =
+swapObjSuffix :: (String, String) -> FilePath -> FilePath
+swapObjSuffix (from, to) file = case stripExtension from file of
+  Just base -> base <.> to
+  Nothing   -> pprPanic "swapObjSuffix" (text file <+> text from)
+
+mkLinkableUsage :: Maybe (String, String) -> Linkable -> LinkableUsage
+mkLinkableUsage mb_osuf lnk =
   let
     linkablesWithUsage = NE.map (go (linkableModule lnk)) (linkableParts lnk)
     lnkUsage = lnk
@@ -609,11 +618,15 @@ mkLinkableUsage lnk =
 
     go :: Module -> LinkablePart -> LinkablePartUsage
     go m lnkPart = case lnkPart of
+      DotO fn ModuleObject
+        | Just suffixes <- mb_osuf
+        , let fn' = swapObjSuffix suffixes fn
+        -> mkFileLinkablePartUsage m fn' [fn']
       DotO fn _ -> mkFileLinkablePartUsage m fn (linkablePartObjectPaths lnkPart)
       DotGBC mbc -> mkByteCodeLinkablePartUsage m (gbc_hash mbc) (linkablePartObjectPaths lnkPart)
 
-mkLinkablesUsage :: [Linkable] -> [LinkableUsage]
-mkLinkablesUsage linkables = map mkLinkableUsage linkables
+mkLinkablesUsage :: Maybe (String, String) -> [Linkable] -> [LinkableUsage]
+mkLinkablesUsage mb_osuf linkables = map (mkLinkableUsage mb_osuf) linkables
 
 linkableUsageObjs :: LinkableUsage -> [FilePath]
 linkableUsageObjs lnkWithUsage = concatMap linkablePartUsageObjectPaths (linkableParts lnkWithUsage)
