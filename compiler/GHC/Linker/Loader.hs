@@ -851,15 +851,6 @@ transitively imports. So when a changed module was loaded as object code, we
 also reload every loaded object module of this link that transitively depends
 on it.
 
-There is a bit of a complication/hack, sometimes we load the .dyn_o in place of
-.o when the interpreter is dynamic. However, the home module graph still has
-the .o linkable (this is the one we are going to link into the static library).
-This is done in adjust_linkable in GHC.Linker.Deps. We **must** keep the hash
-of the original `.o` object instead of the `dyn_o` hash. This is ok because
-the code is the same, only its packaging has changed. It is desired because we
-don't want to reload needlessly: with the dyn_o hash we would never match the
-home unit graph.
-
 Before loading a replacement, loadModuleLinkables calls dropModules to
 remove the old module and its loaded dependents. Both are done within the
 lock, so the replacement is atomic.
@@ -1000,9 +991,9 @@ loadObjects
   -> [Linkable]
   -> IO (LoaderState, SuccessFlag)
 loadObjects interp hsc_env pls objs = do
-        let (objs_loaded', new_objs) = rmDupLinkables (objs_loaded pls) objs
+        let (objs_loaded', new_objs) = rmDupLinkables (interpObjSuffix interp) (objs_loaded pls) objs
             pls1                     = pls { objs_loaded = objs_loaded' }
-            wanted_objs              = concatMap linkableObjs new_objs
+        wanted_objs <- concat <$> mapM (loadableObjs interp) new_objs
 
         if interpreterDynamic interp
             then do pls2 <- dynLoadObjs interp hsc_env pls1 wanted_objs
@@ -1020,6 +1011,18 @@ loadObjects interp hsc_env pls objs = do
                             pls2 <- unload_wkr interp pls1
                             return (pls2, Failed)
 
+
+loadableObjs :: Interp -> Linkable -> IO [FilePath]
+loadableObjs interp l = concat <$> mapM go (Foldable.toList (linkableParts l))
+  where
+    go (DotO fn ModuleObject)
+      | Just suffixes <- interpObjSuffix interp = do
+          let fn' = swapObjSuffix suffixes fn
+          ok <- doesFileExist fn'
+          if ok
+            then return [fn']
+            else throwGhcExceptionIO (ProgramError ("cannot find object file " ++ fn'))
+    go part = return (linkablePartObjectPaths part)
 
 -- | Create a shared library containing the given object files
 mkDynLoadLib :: HscEnv -> (Ways -> Ways) -> [(FilePath, String)] ->[UnitId] -> [FilePath] -> IO (Maybe (FilePath, FilePath, String))
@@ -1105,17 +1108,18 @@ dynLoadObjs interp hsc_env pls objs = do
                         then addWay WayProf
                         else id
 
-rmDupLinkables :: LinkableSet LinkableUsage  -- ^ Already loaded
+rmDupLinkables :: Maybe (String, String)
+               -> LinkableSet LinkableUsage  -- ^ Already loaded
                -> [Linkable]    -- ^ New linkables
                -> (LinkableSet LinkableUsage,  -- New loaded set (including new ones)
                    [Linkable])  -- New linkables (excluding dups)
-rmDupLinkables already ls
+rmDupLinkables mb_osuf already ls
   = go already [] ls
   where
     go !already extras [] = (already, extras)
     go !already extras (l:ls)
         | linkableInSet l already = go already     extras     ls
-        | otherwise               = go (extendModuleEnv already (linkableModule l) $! mkLinkableUsage l) (l:extras) ls
+        | otherwise               = go (extendModuleEnv already (linkableModule l) $! mkLinkableUsage mb_osuf l) (l:extras) ls
 
 {- **********************************************************************
 
@@ -1140,7 +1144,7 @@ linkableLinkDeps l = mkUniqDSet
 dynLinkBCOs :: Interp -> LoaderState -> KeepModuleLinkableDefinitions -> [Linkable] -> IO LoaderState
 dynLinkBCOs interp pls keep_spec bcos = do
 
-        let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
+        let (bcos_loaded', new_bcos) = rmDupLinkables Nothing (bcos_loaded pls) bcos
             loaded_deps'             = extendModuleEnvList (loaded_deps pls)
                                          [ (linkableModule l, linkableLinkDeps l)
                                          | l <- new_bcos

@@ -82,6 +82,8 @@ data Interp = Interp
       -- ^ MallocStrings cache
 
   , interpUnloadStrategy :: !UnloadStrategy
+
+  , interpObjSuffix :: !(Maybe (String, String))
   }
 
 data InterpInstance

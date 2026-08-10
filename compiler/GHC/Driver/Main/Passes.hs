@@ -1695,7 +1695,7 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
     -- state independently to load new objects here.
 
     let objs = mapMaybe linkableFilterNative (ldNeededLinkables deps)
-        (objs_loaded', _new_objs) = rmDupLinkables (objs_loaded pls) objs
+        (objs_loaded', _new_objs) = rmDupLinkables Nothing (objs_loaded pls) objs
 
     -- Compute LoadedPkgInfo metadata for recompilation avoidance.
     -- We don't call loadPackages' because the JS interpreter doesn't load
