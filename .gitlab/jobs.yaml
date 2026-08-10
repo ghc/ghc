@@ -231,6 +231,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -352,6 +353,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -472,6 +474,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -695,6 +698,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -775,6 +779,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -977,6 +982,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -1036,6 +1042,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -1157,6 +1164,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -1278,6 +1286,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -1398,6 +1407,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -1518,6 +1528,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -1770,6 +1781,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -1893,6 +1905,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -2015,6 +2028,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -2241,6 +2255,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -2322,6 +2337,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -2527,6 +2543,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -2587,6 +2604,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -2710,6 +2728,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -2833,6 +2852,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -2955,6 +2975,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -3077,6 +3098,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -3465,6 +3487,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -3589,6 +3612,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -3713,6 +3737,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -3839,6 +3864,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -3967,6 +3993,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -4095,6 +4122,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -4223,6 +4251,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -4410,6 +4439,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -4470,6 +4500,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -4592,6 +4623,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -4717,6 +4749,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -4842,6 +4875,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -4964,6 +4998,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -5087,6 +5122,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -5210,6 +5246,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -5270,6 +5307,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -5395,6 +5433,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -5520,6 +5559,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -5704,6 +5744,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -5826,6 +5867,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -5950,6 +5992,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -6012,6 +6055,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -6134,6 +6178,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -6319,6 +6364,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -6380,6 +6426,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -6628,6 +6675,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -6690,6 +6738,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -6750,6 +6799,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -6872,6 +6922,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -6994,6 +7045,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -7119,6 +7171,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -7244,6 +7297,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -7746,6 +7800,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -7871,6 +7926,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -7995,6 +8051,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -8119,6 +8176,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -8244,6 +8302,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -8369,6 +8428,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -8493,6 +8553,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -8617,6 +8678,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -9011,6 +9073,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -9137,6 +9200,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -9263,6 +9327,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -9451,6 +9516,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -9512,6 +9578,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -9636,6 +9703,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -9760,6 +9828,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -9947,6 +10016,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -10072,6 +10142,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -10134,6 +10205,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -10258,6 +10330,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -10382,6 +10455,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -10506,6 +10580,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -11140,6 +11215,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -11262,6 +11338,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -11384,6 +11461,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -11508,6 +11586,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -11636,6 +11715,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -11764,6 +11844,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -11890,6 +11971,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -12074,6 +12156,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -12133,6 +12216,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -12253,6 +12337,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -12376,6 +12461,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -12499,6 +12585,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -12621,6 +12708,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -12742,6 +12830,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -12863,6 +12952,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -12922,6 +13012,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -13045,6 +13136,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -13168,6 +13260,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -13349,6 +13442,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -13469,6 +13563,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -13593,6 +13688,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -13654,6 +13750,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -13774,6 +13871,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -13956,6 +14054,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -14016,6 +14115,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -14260,6 +14360,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -14321,6 +14422,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -14380,6 +14482,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -14500,6 +14603,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -14620,6 +14724,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -14743,6 +14848,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
@@ -14866,6 +14972,7 @@
       }
     ],
     "script": [
+      "sudo chown ghc:ghc -R .",
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh test_hadrian"
     ],
