@@ -852,7 +852,8 @@ loadObjects
   -> [Linkable]
   -> IO (LoaderState, SuccessFlag)
 loadObjects interp hsc_env pls objs = do
-        let (objs_loaded', new_objs) = rmDupLinkables (objs_loaded pls) objs
+        let objs'                    = map (interpLinkable interp) objs
+            (objs_loaded', new_objs) = rmDupLinkables (objs_loaded pls) objs'
             pls1                     = pls { objs_loaded = objs_loaded' }
             wanted_objs              = concatMap linkableObjs new_objs
 
