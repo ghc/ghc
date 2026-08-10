@@ -601,24 +601,33 @@ unloadObj interp path = do
 
 {- Note [Unloading vs purging objects]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-unloadObj removes the object's symbols and frees its memory. The memory
-is only freed at a major GC, once nothing references the object.
-purgeObj removes the symbols and never frees the memory.
+There are two ways to drop objects:
 
-We only unloadObj in unload, which the driver calls before a
-compilation sweep, when everything is unloaded together. We purgeObj
-when dropModules replaces or removes single modules, because unloading
-is not well supported on many platforms/configurations. Purging is
-enough for correctness: new lookups find the replacement's symbols,
-and values built by the old code and computations still using it keep
-working.
+- unloadObj removes the object's symbols and eventually the RTS may decide to free its memory.
+- purgeObj removes the symbols and never frees the memory.
 
-With a dynamic interpreter there is nothing to purge. Objects are
-linked into temporary shared libraries and their symbols are found by
-searching the loaded libraries, not in the linker's symbol table.
-Dropping a module flushes the symbol cache, and the replacement is
-loaded as a new library, so lookups find the replacement first and the
-old library stays loaded. This behaves like purging.
+purgeObj is enough for correctness, but leaks memory. unloadObj can be finnicky on certain
+platforms and/or may not be implemented correctly.
+
+We use the unload strategy given by -funload-strategy.
+The strategy we use by default depends on platform calculus, given the
+bugs that apply to each platform. We try to unload where we don't know of
+any bugs affecting correctness:
+
+- Linux: mostly unload.
+  - i386/x86_64: unload
+  - AArch64: We unload, but perhaps we should purge instead because of #24170.
+  - 32-bit ARM: purge. Unloading is broken (#21991).
+- FreeBSD: purge. Unloading is not implemented (#25491).
+- Darwin: purge. The process crashes at exit if an unloaded object
+  had C finalizers (#27616).
+- Windows: purge. Unloading code that is still in use is fragile
+  (#20852).
+- Purge as a fallback for everything else
+
+With a dynamic interpreter we never purge, or unload:
+Dynamic objects are linked into temporary shared libraries, and if a library is
+reloaded, then it shadows over the old one.
 -}
 
 -- | Purge an object's symbols.
