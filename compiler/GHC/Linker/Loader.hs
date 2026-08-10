@@ -24,6 +24,7 @@ module GHC.Linker.Loader
    , loadCmdLineLibs
    , loadName
    , unload
+   , unloadModules
    -- * LoadedEnv
    , withExtendedLoadedEnv
    , extendLoadedEnv
@@ -1305,6 +1306,19 @@ unload interp hsc_env
                  return (pls1, pls1)
 
         return ()
+
+-- | Drop the given modules and every loaded module that transitively
+-- refers to them. Reloading stale code does not need this, it happens
+-- automatically. This is for API clients dropping modules they no
+-- longer need. Interactive modules are ignored.
+-- See Note [Automatically reloading stale linkables]
+-- See Note [Unloading vs purging objects] in GHC.Runtime.Interpreter
+unloadModules :: Interp -> HscEnv -> [Module] -> IO ()
+unloadModules interp hsc_env mods
+  = mask_ $ do
+        initLoaderState interp hsc_env
+        modifyLoaderState_ interp $
+          dropModules interp (mkUniqDSet (filter (not . isInteractiveModule) mods))
 
 unload_wkr
   :: Interp
