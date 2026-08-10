@@ -616,8 +616,7 @@ loaded as a new library, so lookups find the replacement first and the
 old library stays loaded. This behaves like purging.
 -}
 
--- | Purge an object's symbols. External interpreters have no purge
--- command, so we fall back to 'unloadObj'.
+-- | Purge an object's symbols.
 -- See Note [Unloading vs purging objects]
 purgeObj :: Interp -> String -> IO ()
 purgeObj interp path = do
@@ -626,7 +625,7 @@ purgeObj interp path = do
 #if defined(HAVE_INTERNAL_INTERPRETER)
     InternalInterp -> ObjLink.purgeObj path'
 #endif
-    ExternalInterp {} -> interpCmd interp (UnloadObj path')
+    ExternalInterp {} -> interpCmd interp (PurgeObj path')
 
 -- Note [loadObj and relative paths]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
