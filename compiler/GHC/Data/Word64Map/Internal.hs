@@ -72,6 +72,7 @@ module GHC.Data.Word64Map.Internal (
     -- * Query
     , null
     , size
+    , sizeAtMost
     , compareSize
     , member
     , notMember
@@ -532,6 +533,10 @@ size = go 0
     go !acc (Bin _ _ l r) = go (go acc l) r
     go acc (Tip _ _) = 1 + acc
     go acc Nil = acc
+
+-- | Check if the map is <= n in O(min(|map|,n))
+sizeAtMost :: Word64Map a -> Int -> Bool
+sizeAtMost map n = compareSize map n /= GT
 
 -- | \(O(\min(n,c))\). Compare the number of entries in the map to an @Int@.
 --
