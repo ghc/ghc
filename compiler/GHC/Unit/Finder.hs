@@ -42,7 +42,7 @@ module GHC.Unit.Finder (
     mkStubPaths,
 
     findObjectLinkableMaybe,
-    findObjectLinkable,
+    mkObjectLinkable,
 
     -- important that GHC.HsToCore.Usage uses the same hashing method for usage dirs as is used here.
     getDirHash,
@@ -76,7 +76,6 @@ import GHC.Unit.State
 import GHC.Unit.Finder.Cache
 import GHC.Unit.Finder.Types
 
-import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 
@@ -88,7 +87,6 @@ import GHC.Types.UnresolvedImport
 
 import Control.Applicative ((<|>))
 import Control.Exception (throwIO)
-import Control.Monad
 import Control.Monad.IO.Class
 import Data.IORef
 import qualified Data.List as L(sort)
@@ -97,7 +95,6 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import Data.Set (Set)
 import qualified Data.Set as Set (empty, intersection, difference, null, toList)
-import Data.Time
 import GHC.Fingerprint
 import GHC.TypeError (ErrorMessage(..), Unsatisfiable, unsatisfiable)
 import qualified System.Directory as SD
@@ -1088,15 +1085,15 @@ mkStubPaths fopts mod location = do
 findObjectLinkableMaybe :: Module -> ModLocation -> IO (Maybe Linkable)
 findObjectLinkableMaybe mod locn
    = do let obj_fn = ml_obj_file locn
-        maybe_obj_time <- modificationTimeIfExists (ml_obj_file_ospath locn)
-        case maybe_obj_time of
-          Nothing -> return Nothing
-          Just obj_time -> liftM Just (findObjectLinkable mod obj_fn obj_time)
+        exists <- doesFileExist (ml_obj_file_ospath locn)
+        if not exists
+          then return Nothing
+          else do
+            obj_hash <- getFileHash obj_fn
+            return (Just (mkObjectLinkable mod obj_fn obj_hash))
 
--- Make an object linkable when we know the object file exists, and we know
--- its modification time.
-findObjectLinkable :: Module -> FilePath -> UTCTime -> IO Linkable
-findObjectLinkable mod obj_fn obj_time =
-  pure (Linkable obj_time mod (NE.singleton (DotO obj_fn ModuleObject)))
+mkObjectLinkable :: Module -> FilePath -> Fingerprint -> Linkable
+mkObjectLinkable mod obj_fn obj_hash =
+  Linkable obj_hash mod (NE.singleton (DotO obj_fn ModuleObject))
   -- We used to look for _stub.o files here, but that was a bug (#706)
   -- Now GHC merges the stub.o into the main .o (#3687)
