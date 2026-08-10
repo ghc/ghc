@@ -351,8 +351,8 @@ foldUDFM :: (elt -> a -> a) -> a -> UniqDFM key elt -> a
 {-# INLINE foldUDFM #-}
 -- Specialises k and z into M.foldr on the small-map path.
 foldUDFM k z (UDFM m ub)
-  | M.compareSize m 1 /= GT = M.foldr (k . taggedFst) z m
-  | otherwise               = fold_udfm k z m ub
+  | M.sizeAtMost m 1 = M.foldr (k . taggedFst) z m
+  | otherwise        = fold_udfm k z m ub
 
 fold_udfm :: (elt -> a -> a) -> a -> M.Word64Map (TaggedVal elt) -> Int -> a
 {-# NOINLINE fold_udfm #-}
@@ -402,8 +402,8 @@ eltsUDFM :: UniqDFM key elt -> [elt]
 {-# INLINE eltsUDFM #-}  -- so the small case is a good producer
                          -- This matters for T13719.
 eltsUDFM (UDFM m ub)
-  | M.compareSize m 1 /= GT = build (\c n -> M.foldr (c . taggedFst) n m)
-  | otherwise               = elts_udfm m ub
+  | M.sizeAtMost m 1 = build (\c n -> M.foldr (c . taggedFst) n m)
+  | otherwise        = elts_udfm m ub
 
 elts_udfm :: M.Word64Map (TaggedVal elt) -> Int -> [elt]
 {-# NOINLINE elts_udfm #-}
@@ -511,7 +511,7 @@ udfmToList :: UniqDFM key elt -> [(Unique, elt)]
 -- traverseUSDFM in the pattern-match checker, which doesn't fuse. Inlining
 -- the size dispatch into it regresses T17836.
 udfmToList (UDFM m ub)
-  | M.compareSize m 1 /= GT =
+  | M.sizeAtMost m 1 =
       M.foldrWithKey (\k tv r -> (mkUniqueGrimily k, taggedFst tv) : r) [] m
   | usePigeonholeSort m ub = pigeonholeSort ub
       (\k tv -> TaggedVal (mkUniqueGrimily k, taggedFst tv) (taggedSnd tv)) m
