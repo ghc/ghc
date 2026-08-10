@@ -33,6 +33,13 @@ test('T27606d',
      compile_and_run,
      ['-package ghc'])
 
+test('T27606f',
+     [extra_run_opts(f'"{config.libdir}"'),
+      req_rts_linker,
+      when(arch('wasm32'), skip)],
+     compile_and_run,
+     ['-package ghc'])
+
 test('T27606e',
      [extra_run_opts(f'"{config.libdir}"'),
       req_rts_linker,

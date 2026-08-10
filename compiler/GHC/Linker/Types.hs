@@ -201,6 +201,10 @@ data LoaderState = LoaderState
         -- the module graph instead.
         -- See Note [Automatically reloading stale linkables] in GHC.Linker.Loader
 
+    , loaded_spt_keys :: !(ModuleEnv [Fingerprint])
+        -- ^ The static pointer table keys each loaded bytecode module
+        -- inserted, so they can be removed when the module is dropped.
+
     , pkgs_loaded :: !PkgsLoaded
         -- ^ The currently-loaded packages;
         -- haskell libraries, system libraries, transitive dependencies

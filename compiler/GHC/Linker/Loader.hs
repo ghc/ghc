@@ -192,6 +192,7 @@ emptyLoaderState unit_env = LoaderState
    , bcos_loaded = emptyModuleEnv
    , objs_loaded = emptyModuleEnv
    , loaded_deps = emptyModuleEnv
+   , loaded_spt_keys = emptyModuleEnv
    , temp_sos = []
    }
   -- Packages that don't need loading, because the compiler
@@ -868,6 +869,12 @@ running computation refers to it.
 Object files are purged but the memory stays mapped and code that still refers
 to it keeps working. When the interpreter uses dynamic linking there is nothing
 to purge. The replacement is loaded as a new library and shadows the old one.
+
+When a module is dropped, its entries in the static pointer table are dropped
+via loaded_spt_keys, which records the keys that were inserted by that module.
+Object code manages its own entries with initialisers and finalisers. A purged
+object keeps its entries. This is fine because its code stays alive, and
+lookups find the replacement's entries first.
 See See Note [Unloading vs purging objects]
 
 No loaded_deps entry is created for an interactive module, and interactive
@@ -904,10 +911,14 @@ dropModules interp mods pls = do
   when (any (not . null . linkableUsageObjs) victim_usages) $
     purgeLookupSymbolCache interp
 
+  mapM_ (removeSptEntry interp)
+    (concat (mapMaybe (lookupModuleEnv (loaded_spt_keys pls)) victim_list))
+
   return $! pls
     { bcos_loaded = delModuleEnvList (bcos_loaded pls) victim_list
     , objs_loaded = delModuleEnvList (objs_loaded pls) victim_list
     , loaded_deps = delModuleEnvList (loaded_deps pls) victim_list
+    , loaded_spt_keys = delModuleEnvList (loaded_spt_keys pls) victim_list
     , bco_loader_state =
         modifyHomePackageBytecodeState (bco_loader_state pls) drop_bytecode_state
     }
@@ -1149,7 +1160,17 @@ dynLinkBCOs interp pls keep_spec bcos = do
                                          [ (linkableModule l, linkableLinkDeps l)
                                          | l <- new_bcos
                                          , not (isInteractiveModule (linkableModule l)) ]
-            pls1                     = pls { bcos_loaded = bcos_loaded', loaded_deps = loaded_deps' }
+            loaded_spt_keys'         = extendModuleEnvList (loaded_spt_keys pls)
+                                         [ (linkableModule l, ks)
+                                         | l <- new_bcos
+                                         , not (isInteractiveModule (linkableModule l))
+                                         , let ks = [ fpr
+                                                    | cbc <- linkableBCOs l
+                                                    , SptEntry _ fpr <- bc_spt_entries cbc ]
+                                         , not (null ks) ]
+            pls1                     = pls { bcos_loaded = bcos_loaded'
+                                           , loaded_deps = loaded_deps'
+                                           , loaded_spt_keys = loaded_spt_keys' }
 
             cbcs :: [CompiledByteCode]
             cbcs = concatMap linkableBCOs new_bcos
@@ -1337,11 +1358,14 @@ unload_wkr interp pls@LoaderState{..}  = do
   when (not (null (filter (not . null . linkableUsageObjs) linkables_to_unload))) $
     purgeLookupSymbolCache interp
 
+  mapM_ (removeSptEntry interp) (concat (moduleEnvElts loaded_spt_keys))
+
   let !new_pls = pls { bco_loader_state = modifyHomePackageBytecodeState bco_loader_state $ \_ -> emptyBytecodeState,
                        -- NB: we don't unload the external package
                        bcos_loaded   = emptyModuleEnv,
                        objs_loaded   = emptyModuleEnv,
-                       loaded_deps   = emptyModuleEnv }
+                       loaded_deps   = emptyModuleEnv,
+                       loaded_spt_keys = emptyModuleEnv }
 
   return new_pls
 

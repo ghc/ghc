@@ -113,6 +113,7 @@ data Message a where
 
   -- | Add entries to the Static Pointer Table
   AddSptEntry :: Fingerprint -> HValueRef -> Message ()
+  RemoveSptEntry :: Fingerprint -> Message ()
   -- | Add module to hpc
   AddHpcModule :: BS.ShortByteString -> Int -> Int -> BS.ShortByteString -> Message ()
 
@@ -614,6 +615,7 @@ getMessage = do
       41 -> Msg <$> (AddHpcModule <$> get <*> get <*> get <*> get)
       42 -> Msg <$> (CustomMessage <$> get <*> get)
       43 -> Msg <$> PurgeObj <$> get
+      44 -> Msg <$> RemoveSptEntry <$> get
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -663,6 +665,7 @@ putMessage m = case m of
   AddHpcModule m n h ticks    -> putWord8 41 >> put m >> put n >> put h >> put ticks
   CustomMessage tag payload   -> putWord8 42 >> put tag >> put payload
   PurgeObj str                -> putWord8 43 >> put str
+  RemoveSptEntry fpr          -> putWord8 44 >> put fpr
 
 {-
 Note [Parallelize CreateBCOs serialization]
