@@ -4,4 +4,7 @@ PartialFieldSelector
 At (18,7), got type: PartialFieldSelector -> Bool
 At (23,7), got type: PartialFieldSelector
 At (23,8), got type: PartialFieldSelector
-At (23,9), got type: Bool
+At (23,9), got type: PartialFieldSelector -> Bool
+At (28,8), got type: PartialFieldSelector -> Bool
+At (28,9), got type: PartialFieldSelector -> Bool
+At (28,12), got type: PartialFieldSelector

@@ -17,7 +17,7 @@ module GHC.Rename.Utils (
         DeprecationWarnings(..), warnIfDeprecated,
         checkUnusedRecordWildcard,
         badQualBndrErr, typeAppErr, badFieldConErr,
-        wrapGenSpan, wrapGenSpan', genHsVar, genHsVarWith, genLHsVar, genHsApp, genHsAppWith, genHsApps, genHsApps', genHsExpApps,
+        wrapGenSpan, wrapGenSpan', wrapNoSpan, genHsVar, genHsVarWith, genLHsVar, genHsApp, genHsAppWith, genHsApps, genHsApps', genHsExpApps,
         genLHsApp, genAppType, genAppTypeWith,
         genLHsLit, genHsIntegralLit, genHsTyLit, genSimpleConPat,
         genVarPat, genWildPat,
@@ -740,7 +740,7 @@ genHsApp :: HsExpr GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
 genHsApp fun arg = HsApp noExtField (wrapGenSpan fun) arg
 
 genHsAppWith :: SrcSpan -> HsExpr GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
-genHsAppWith srcSpan fun arg = HsApp noExtField (wrapSrcSpan srcSpan fun) arg
+genHsAppWith srcSpan fun arg = HsApp noExtField (wrapGenSpan' srcSpan fun) arg
 
 genLHsApp :: HsExpr GhcRn -> LHsExpr GhcRn -> LHsExpr GhcRn
 genLHsApp fun arg = wrapGenSpan (genHsApp fun arg)

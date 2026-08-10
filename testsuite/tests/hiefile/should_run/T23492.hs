@@ -24,12 +24,20 @@ g x = x.a
 --    ^^^
 --    345
 
-p1, p2, p3, p4, p5 :: (Int,Int)
+h :: PartialFieldSelector -> Bool
+h x = (.a) x
+--     ^^  ^
+--     67  8
+
+p1, p2, p3, p4, p5, p6, p7, p8 :: (Int,Int)
 p1 = (13,20)
 p2 = (18,7)
 p3 = (23,7)
 p4 = (23,8)
 p5 = (23,9)
+p6 = (28,8)
+p7 = (28,9)
+p8 = (28,12)
 
 selectPoint' :: HieFile -> (Int,Int) -> HieAST Int
 selectPoint' hf loc =
@@ -37,7 +45,7 @@ selectPoint' hf loc =
 
 main = do
   (df, hf) <- readTestHie "T23492.hie"
-  forM_ [p1,p2,p3,p4,p5] $ \point -> do
+  forM_ [p1,p2,p3,p4,p5,p6,p7,p8] $ \point -> do
     putStr $ "At " ++ show point ++ ", got type: "
     let types = concatMap nodeType $ getSourcedNodeInfo $ sourcedNodeInfo $ selectPoint' hf point
     forM_ types $ \typ -> do

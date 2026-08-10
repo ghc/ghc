@@ -21,7 +21,6 @@ import GHC.Core.Class             ( className, classSCSelIds )
 import GHC.Core.Utils (exprType)
 import GHC.Core.TyCo.Rep (Type(TyConApp))
 import GHC.Core.TyCon (TyCon(..))
-import GHC.Builtin.Names (hasFieldClassName, getFieldName)
 import GHC.Core.ConLike           ( conLikeName )
 import GHC.Core.DataCon           ( dataConWrapperType )
 import GHC.Core.Type              ( Type, ForAllTyFlag(..) )
@@ -38,7 +37,7 @@ import GHC.Types.UnresolvedImport ( isGeneratedImport )
 import GHC.Types.FieldLabel
 import GHC.Types.Avail            ( Avails )
 import GHC.Types.Id               ( isDataConId_maybe )
-import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique, wiredInNameTyThing_maybe, getName )
+import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique, wiredInNameTyThing_maybe, getName, hasKnownKey )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import GHC.Types.Name.Reader      ( RecFieldInfo(..), WithUserRdr(..) )
 import GHC.Types.SrcLoc
@@ -50,6 +49,7 @@ import GHC.Tc.Types
 import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.Evidence
 
+import GHC.Builtin.KnownKeys (hasFieldClassKey)
 import GHC.Builtin.Uniques
 import GHC.Utils.Panic
 
@@ -688,21 +688,12 @@ hieEvIdsOfTerm :: EvTerm -> [EvId]
 -- Returns only EvIds satisfying relevantEvId
 hieEvIdsOfTerm = runFVSelectiveList isEvId . evTermFVs
 
-evFreeVarsOfTermList :: EvTerm -> [Var]
-evFreeVarsOfTermList (EvExpr e) = exprFreeVarsList e
-evFreeVarsOfTermList _ = []
-
-evDepsOfTermList :: EvTerm -> [EvId]
-evDepsOfTermList e
-  | isHasFieldEvTerm e = evFreeVarsOfTermList e
-  | otherwise = evVarsOfTermList e
-
 instance ToHie (EvBindContext (LocatedA TcEvBinds)) where
   toHie (EvBindContext sc sp (L span (EvBinds bs)))
     = concatMapM go $ bagToList bs
     where
       go evbind = do
-          let evDeps = evDepsOfTermList $ eb_rhs evbind
+          let evDeps = hieEvIdsOfTerm $ eb_rhs evbind
               depNames = EvBindDeps $ map varName evDeps
           concatM $
             [ toHie (C (EvidenceVarBind (EvLetBind depNames) (combineScopes sc (mkScope span)) sp)
@@ -714,7 +705,7 @@ instance ToHie (EvBindContext (LocatedA TcEvBinds)) where
 isHasFieldEvTerm :: EvTerm -> Bool
 isHasFieldEvTerm (EvExpr expr)
   | TyConApp tyCon _ <- exprType expr,
-    tyConName tyCon == hasFieldClassName
+    tyConName tyCon `hasKnownKey` hasFieldClassKey
   = True
 isHasFieldEvTerm _ = False
 
@@ -732,7 +723,8 @@ instance ToHie (LocatedA HsWrapper) where
         (WpEvApp a)
           | isHasFieldEvTerm a ->
               -- concatMapM (toHie . C EvidenceVarUse . L osp) $ hieEvIdsOfTerm a
-              pprTrace "HasField" (ppr (a, osp)) $ concatMapM (toHie . C EvidenceVarUse . L osp) $ hieEvIdsOfTerm a
+              pprTrace "HasField" (ppr (a, osp)) $
+              concatMapM (toHie . C EvidenceVarUse . L osp) $ hieEvIdsOfTerm a
           | otherwise ->
               -- pprTrace "Not HasField" (ppr (a, osp)) $ concatMapM (toHie . C EvidenceVarUse . L osp) $ hieEvIdsOfTerm a
               concatMapM (toHie . C EvidenceVarUse . L osp) $ hieEvIdsOfTerm a
