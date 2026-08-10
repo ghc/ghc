@@ -124,7 +124,7 @@ import GHC.Core.FamInstEnv
    ( FamInst, pprFamInst, famInstsRepTyCons, orphNamesOfFamInst
    , famInstEnvElts, extendFamInstEnvList, normaliseType )
 
-import GHC.Parser.Header       ( mkPrelImports )
+import GHC.Parser.Header       ( mkImplicitImports, mkUnresolvedImport )
 
 import GHC.IfaceToCore
 
@@ -149,6 +149,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Avail
 import GHC.Types.Basic hiding( SuccessFlag(..) )
+import GHC.Types.UnresolvedImport
 import GHC.Types.Annotations
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
@@ -277,30 +278,31 @@ tcRnModuleTcRnM hsc_env mod_sum
       ; boot_info <- tcHiBootIface hsc_src this_mod
       ; setGblEnv (tcg_env { tcg_self_boot = boot_info })
         $ do
-        { -- Deal with imports; first add implicit prelude
-          implicit_prelude <- xoptM LangExt.ImplicitPrelude
-        ; let { prel_imports = mkPrelImports (moduleName this_mod) implicit_prelude import_decls }
+        { -- Deal with imports; first add all the implicit imports.
+          dflags <- getDynFlags
+        ; let
+            implicit_imports = mkImplicitImports dflags (moduleName this_mod) import_decls
+            is_prelude_import :: LImportDecl GhcPs -> Bool
+            is_prelude_import (L _ (ImportDecl { ideclExt = ext })) =
+              ideclOrigin ext == ImplicitPreludeImport
 
-        ; when (notNull prel_imports) $ do
+        ; when (any is_prelude_import implicit_imports) $ do
             addDiagnostic TcRnImplicitImportOfPrelude
 
-        ; -- TODO This is a little skeevy; maybe handle a bit more directly
-          let { simplifyImport (L _ idecl) =
-                  ( renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName idecl) (ideclPkgQual idecl)
-                  , reLoc $ ideclName idecl)
-              }
         ; raw_sig_imports <- liftIO
                              $ findExtraSigImports hsc_env hsc_src
                                  (moduleName this_mod)
+        ; let { unresolved_imports =
+                  map (rnUnresolvedImportPkgQual (renameRawPkgQual (hsc_unit_env hsc_env))
+                         . mkUnresolvedImport . unLoc)
+                      (implicit_imports ++ import_decls) }
         ; raw_req_imports <- liftIO
-                             $ implicitRequirements hsc_env
-                                (map simplifyImport (prel_imports
-                                                     ++ import_decls))
+                             $ implicitRequirements hsc_env unresolved_imports
         ; let { mkImport mod_name = noLocA
                 $ (simpleImportDecl mod_name)
                   { ideclImportList = Just (Exactly, [])}}
         ; let { withReason t imps = map (,text t) imps }
-        ; let { all_imports = withReason "is implicitly imported" prel_imports
+        ; let { all_imports = withReason "is implicitly imported" implicit_imports
                   ++ withReason "is directly imported" import_decls
                   ++ withReason "is an extra sig import" (map mkImport raw_sig_imports)
                   ++ withReason "is an implicit req import" (map mkImport raw_req_imports) }
@@ -2147,7 +2149,7 @@ runTcInteractive tcm_plugin_handling hsc_env thing_inside
                                                  , not (null local_gres) ]) ]
 
        ; let getOrphansForModuleName m mb_pkg = do
-              iface <- loadSrcInterface (text "runTcInteractive") m NotBoot mb_pkg
+              iface <- loadSrcInterface (text "runTcInteractive") LookupUser m NotBoot mb_pkg
               pure $ mi_module iface : dep_orphs (mi_deps iface)
 
              getOrphansForModule m = do

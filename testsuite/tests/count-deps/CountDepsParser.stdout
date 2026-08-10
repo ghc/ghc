@@ -226,6 +226,7 @@ GHC.Types.Unique.Map
 GHC.Types.Unique.SDFM
 GHC.Types.Unique.Set
 GHC.Types.Unique.Supply
+GHC.Types.UnresolvedImport
 GHC.Types.Var
 GHC.Types.Var.Env
 GHC.Types.Var.FV

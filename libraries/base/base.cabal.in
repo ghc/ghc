@@ -219,7 +219,6 @@ Library
         , GHC.Integer.Logarithms
         , GHC.IsList
         , GHC.Ix
-        , GHC.Essentials
         , GHC.List
         , GHC.Maybe
         , GHC.MVar
@@ -307,6 +306,7 @@ Library
 
     other-modules:
         Data.List.NubOrdSet
+        GHC.Essentials
         System.CPUTime.Unsupported
         System.CPUTime.Utils
     if os(windows)

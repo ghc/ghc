@@ -1,13 +1,13 @@
-<no location info>: error: [GHC-49917]
-    Failed to load the known-names module ‘GHC.Essentials’ from the visible packages
-      while trying to discover its package
+T27013f.hs:1:1: error: [GHC-49917]
+    Failed to load the known-names module ‘GHC.Essentials’
+      which this module implicitly imports
     Did you mean to use ‘-package base’?
-
+    
     Could not load module ‘GHC.Essentials’.
-    It is a member of the hidden package ‘base-4.23.0.0’.
+    It is a hidden module in the hidden package ‘base-4.23.0.0’
     Use -v to see a list of the files searched for.
+    
+    Every module resolves known entities by implicitly importing ‘GHC.Essentials’.
+    To avoid this implicit import, looking up known entities in scope instead,
+    use ‘-frebindable-known-names’.
 
-    This error was triggered while trying to discover the package of ‘GHC.Essentials’,
-    rather than when looking up any specific known-name.
-    If you want to enforce ‘GHC.Essentials’ is not added to the module graph implicitly,
-    you should use ‘-frebindable-known-names’

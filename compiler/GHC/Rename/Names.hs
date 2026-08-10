@@ -47,7 +47,10 @@ import GHC.Tc.Types.LclEnv
 import GHC.Tc.Zonk.TcType ( tcInitTidyEnv )
 
 import GHC.Hs
-import GHC.Iface.Load   ( loadSrcInterface )
+import GHC.Iface.Load   ( loadSrcInterface, loadSrcInterface_maybe )
+import GHC.Iface.Errors.Types
+  ( IfaceMessage(..), MissingInterfaceError, InterfaceLookingFor(..)
+  , LoadEssentialsReason(..) )
 import GHC.Iface.Syntax ( fromIfaceWarnings )
 import GHC.Builtin.Modules( pRELUDE_NAME, rEBINDABLE_MOD_NAME )
 import GHC.Parser.PostProcess ( setRdrNameSpace )
@@ -72,6 +75,7 @@ import GHC.Types.Hint
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Basic  (TyConFlavour (..), convImportLevel, VisArity)
+import GHC.Types.UnresolvedImport
 import GHC.Types.Id
 import GHC.Types.PkgQual
 import GHC.Types.GREInfo (ConInfo(..), ConFieldInfo (..), ConLikeInfo (ConIsData))
@@ -313,7 +317,7 @@ rnImportDecl this_mod
                                      , ideclSafe = mod_safe
                                      , ideclLevelSpec = import_level
                                      , ideclQualified = qual_style
-                                     , ideclExt = XImportDeclPass { ideclGenerated = generated }
+                                     , ideclExt = XImportDeclPass { ideclOrigin = origin }
                                      , ideclAs = as_mod, ideclImportList = imp_details }), import_reason)
   = setSrcSpanA loc $ do
 
@@ -324,6 +328,9 @@ rnImportDecl this_mod
         when (not pkg_imports) $ addErr TcRnPackageImportsDisabled
 
     let qual_only = isImportDeclQualified qual_style
+        generated = isGeneratedImport origin
+
+        lookup_scope = importDeclLookupScope origin
 
     -- If there's an error in loadInterface, (e.g. interface
     -- file not found) we get lots of spurious errors from 'filterImports'
@@ -365,7 +372,11 @@ rnImportDecl this_mod
            | otherwise  -> addDiagnostic (TcRnNoExplicitImportList imp_mod_name)
 
 
-    iface <- loadSrcInterface doc imp_mod_name want_boot pkg_qual
+    mb_iface <- loadSrcInterface_maybe doc lookup_scope imp_mod_name want_boot pkg_qual
+    iface <- case mb_iface of
+      Succeeded iface -> return iface
+      Failed err -> failWithTc $
+        importDeclLoadFailure origin imp_mod_name want_boot err
 
     -- Compiler sanity check: if the import didn't say
     -- {-# SOURCE #-} we should not get a hi-boot file
@@ -392,12 +403,24 @@ rnImportDecl this_mod
                                   is_pkg_qual = pkg_qual, is_isboot = want_boot,
                                   is_level = convImportLevel import_level }
 
-    -- filter the imports according to the import declaration
-    (new_imp_details, imp_user_list, gbl_env) <- filterImports hsc_env iface imp_spec imp_details
+    let filter_imports = do
+          -- filter the imports according to the import declaration
+          (new_imp_details, imp_user_list, gbl_env)
+            <- filterImports hsc_env iface imp_spec imp_details
+          -- for certain error messages, we’d like to know what could be
+          -- imported here, if everything were imported
+          potential_gres <- (\(_,_,x) -> x) <$> filterImports hsc_env iface imp_spec Nothing
+          return (new_imp_details, imp_user_list, gbl_env, potential_gres)
 
-    -- for certain error messages, we’d like to know what could be imported
-    -- here, if everything were imported
-    potential_gres <- (\(_,_,x) -> x) <$> filterImports hsc_env iface imp_spec Nothing
+    (new_imp_details, imp_user_list, gbl_env, potential_gres) <-
+      case origin of
+        ImplicitEssentialsImport ->
+          -- The implicit GHC.Essentials import does not bring anything into scope.
+          -- See Note [Finding GHC.Essentials] in GHC.Builtin.
+          return (Nothing, ImpUserDependOnly, emptyGlobalRdrEnv, emptyGlobalRdrEnv)
+        UserWrittenImport     -> filter_imports
+        ImplicitPreludeImport -> filter_imports
+        PluginImport          -> filter_imports
 
     let is_hiding | Just (EverythingBut,_) <- imp_details = True
                   | otherwise                             = False
@@ -410,16 +433,21 @@ rnImportDecl this_mod
     hsc_env <- getTopEnv
     let home_unit = hsc_home_unit hsc_env
         other_home_units = hsc_all_home_unit_ids hsc_env
-        imv = ImportedModsVal
-            { imv_name        = is_as imp_spec
-            , imv_span        = locA loc
-            , imv_is_safe     = mod_safe'
-            , imv_is_hiding   = is_hiding
-            , imv_all_exports = potential_gres
-            , imv_qualified   = qual_only
-            , imv_is_level   = convImportLevel import_level
-            }
-        imports = calculateAvails home_unit other_home_units iface mod_safe' want_boot (ImportedByUser imv)
+
+        imported_by
+          | isDependOnlyImport imp_user_list
+          = ImportedBySystem
+          | otherwise
+          = ImportedByUser $ ImportedModsVal
+              { imv_name        = is_as imp_spec
+              , imv_span        = locA loc
+              , imv_is_safe     = mod_safe'
+              , imv_is_hiding   = is_hiding
+              , imv_all_exports = potential_gres
+              , imv_qualified   = qual_only
+              , imv_is_level   = convImportLevel import_level
+              }
+        imports = calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by
 
     -- Complain if we import a deprecated module
     case fromIfaceWarnings (mi_warns iface) of
@@ -440,6 +468,13 @@ rnImportDecl this_mod
 
     return (L loc new_imp_decl, ImpUserSpec imp_spec imp_user_list, gbl_env, imports)
 
+-- | The error message to emit when we failed to load an interface.
+importDeclLoadFailure :: ImportDeclOrigin -> ModuleName -> IsBootInterface
+                      -> MissingInterfaceError -> TcRnMessage
+importDeclLoadFailure ImplicitEssentialsImport _ _ err
+  = TcRnInterfaceError $ CantFindEssentials err LookingForEssentialsModule
+importDeclLoadFailure _ mod_name want_boot err
+  = TcRnInterfaceError $ Can'tFindInterface err $ LookingForModule mod_name want_boot
 
 -- | Rename raw package imports
 renameRawPkgQual :: UnitEnv -> ModuleName -> RawPkgQual -> PkgQual
@@ -1980,7 +2015,7 @@ warnUnusedImportDecls gbl_env hsc_src
 
 -- | Exclude generated imports
 excludeGenerated :: [LImportDecl GhcRn] -> [LImportDecl GhcRn]
-excludeGenerated = filterOut (ideclGenerated . ideclExt . unLoc)
+excludeGenerated = filterOut (isGeneratedImport . ideclOrigin . ideclExt . unLoc)
 
 findImportUsage :: [LImportDecl GhcRn]
                 -> [GlobalRdrElt]
@@ -2282,8 +2317,10 @@ getMinimalImports ie_decls
       | otherwise
       = do { let ImportDecl { ideclName    = L _ mod_name
                             , ideclSource  = is_boot
-                            , ideclPkgQual = pkg_qual } = decl
-           ; iface <- loadSrcInterface doc mod_name is_boot pkg_qual
+                            , ideclPkgQual = pkg_qual
+                            , ideclExt = XImportDeclPass { ideclOrigin = origin } } = decl
+           ; iface <- loadSrcInterface doc (importDeclLookupScope origin)
+                        mod_name is_boot pkg_qual
            ; let used_avails = gresToAvailInfo used_gres
            ; lies <- map (L l) <$> concatMapM (to_ie rdr_env iface) used_avails
            ; return (L l (decl { ideclImportList = Just (Exactly, lies) })) }

@@ -50,6 +50,7 @@ import GHC.Tc.Utils.Backpack
 import GHC.Runtime.Context
 
 import Language.Haskell.Syntax.ImpExp
+import GHC.Types.UnresolvedImport
 
 import GHC.Data.Graph.Directed
 import GHC.Data.FastString
@@ -286,7 +287,7 @@ downsweepInteractiveImports hsc_env ic = unsafeInterleaveIO $ do
 
   where
  --
-    mkEdge :: InteractiveImport -> Either ModuleNodeEdge (UnitId, ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName))
+    mkEdge :: InteractiveImport -> Either ModuleNodeEdge (UnitId, UnresolvedImport PkgQual)
     -- A simple edge to a module from the same home unit
     mkEdge (IIModule n) =
       let
@@ -302,15 +303,13 @@ downsweepInteractiveImports hsc_env ic = unsafeInterleaveIO $ do
       in Left mod_node_edge
     -- A complete import statement
     mkEdge (IIDecl i) =
-      let lvl = convImportLevel (ideclLevelSpec i)
-          wanted_mod = unLoc (ideclName i)
-          is_boot = ideclSource i
-          mb_pkg = renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName i) (ideclPkgQual i)
-          unitId = homeUnitId $ hsc_home_unit hsc_env
-      in Right (unitId, lvl, mb_pkg, GWIB (noLoc wanted_mod) is_boot)
+      let unitId = homeUnitId $ hsc_home_unit hsc_env
+          imp = rnUnresolvedImportPkgQual (renameRawPkgQual (hsc_unit_env hsc_env))
+                                          (mkUnresolvedImport i)
+      in Right (unitId, imp)
 
 loopFromInteractive :: HscEnv
-                    -> [Either ModuleNodeEdge (UnitId, ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName))]
+                    -> [Either ModuleNodeEdge (UnitId, UnresolvedImport PkgQual)]
                     -> M.Map NodeKey ModuleGraphNode
                     -> IO ([ModuleNodeEdge],M.Map NodeKey ModuleGraphNode)
 loopFromInteractive _ [] cached_nodes = return ([], cached_nodes)
@@ -319,12 +318,12 @@ loopFromInteractive hsc_env (edge:edges) cached_nodes =
     Left edge -> do
         (edges, cached_nodes') <- loopFromInteractive hsc_env edges cached_nodes
         return (edge : edges, cached_nodes')
-    Right (unitId, lvl, mb_pkg, GWIB wanted_mod is_boot) -> do
+    Right (unitId, imp@(UnresolvedImport { ui_level = lvl, ui_boot = is_boot })) -> do
       let home_unit = ue_unitHomeUnit unitId (hsc_unit_env hsc_env)
       let k _ loc mod =
             let key = moduleToMnk mod is_boot
             in return $ FoundHome (ModuleNodeFixed key loc)
-      found <- liftIO $ summariseModuleDispatch k hsc_env home_unit is_boot wanted_mod mb_pkg []
+      found <- liftIO $ summariseModuleDispatch k hsc_env home_unit imp []
       case found of
         -- Case 1: Home modules have to already be in the cache.
         FoundHome (ModuleNodeFixed mod _) -> do
@@ -442,13 +441,16 @@ downsweepFromRootNodes hsc_env old_summaries maybe_base_graph excl_mods allow_du
              dup_roots = filterOut isSingleton $ map rights (M.elems root_map)
 
 
-calcDeps :: ModSummary -> [(UnitId, ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName))]
+calcDeps :: ModSummary -> [(UnitId, UnresolvedImport PkgQual)]
 calcDeps ms =
   -- Add a dependency on the HsBoot file if it exists
   -- This gets passed to the loopImports function which just ignores it if it
   -- can't be found.
-  [(ms_unitid ms, NormalLevel, NoPkgQual, GWIB (noLoc $ ms_mod_name ms) IsBoot) | NotBoot <- [isBootSummary ms] ] ++
-  [(ms_unitid ms, lvl, b, c) | (lvl, b, c) <- msDeps ms ]
+  [ (ms_unitid ms, self_boot) | NotBoot <- [isBootSummary ms] ] ++
+  [ (ms_unitid ms, e) | e <- ms_imps ms ]
+  where
+    self_boot = (generatedImport FromSelfBoot (noLoc (ms_mod_name ms)))
+                  { ui_boot = IsBoot }
 
 
 type DownsweepM a = ReaderT DownsweepEnv IO a
@@ -496,7 +498,8 @@ loopSummaries (ms:next) (done, summarised)
 
     hs_file_for_boot
       | HsBootFile <- ms_hsc_src ms
-      = Just $ ((ms_unitid ms), NormalLevel, NoPkgQual, (GWIB (noLoc $ ms_mod_name ms) NotBoot))
+      = Just ( ms_unitid ms
+             , generatedImport FromSelfBoot (noLoc (ms_mod_name ms)) )
       | otherwise
       = Nothing
 
@@ -589,21 +592,19 @@ loopFixedImports (key:keys) done = do
           loopFixedImports keys done
 
 downsweepSummarise :: HomeUnit
-                   -> IsBootInterface
-                   -> Located ModuleName
-                   -> PkgQual
+                   -> UnresolvedImport PkgQual
                    -> Maybe (StringBuffer, UTCTime)
                    -> DownsweepM SummariseResult
-downsweepSummarise home_unit is_boot wanted_mod mb_pkg maybe_buf = do
+downsweepSummarise home_unit imp maybe_buf = do
   DownsweepEnv hsc_env mode old_summaries excl_mods <- ask
   case mode of
-    DownsweepUseCompile -> liftIO $ summariseModule hsc_env home_unit old_summaries is_boot wanted_mod mb_pkg maybe_buf excl_mods
-    DownsweepUseFixed -> liftIO $ summariseModuleInterface hsc_env home_unit is_boot wanted_mod mb_pkg excl_mods
+    DownsweepUseCompile -> liftIO $ summariseModule hsc_env home_unit old_summaries imp maybe_buf excl_mods
+    DownsweepUseFixed -> liftIO $ summariseModuleInterface hsc_env home_unit imp excl_mods
 
 
 -- This loops over each import in each summary. It is mutually recursive with loopSummaries if we discover
 -- a new module by doing this.
-loopImports :: [(UnitId, ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName))]
+loopImports :: [(UnitId, UnresolvedImport PkgQual)]
                 -- Work list: process these modules
      -> M.Map NodeKey ModuleGraphNode
      -> DownsweepCache
@@ -614,11 +615,11 @@ loopImports :: [(UnitId, ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName
           M.Map NodeKey ModuleGraphNode, DownsweepCache)
                 -- The result is the completed NodeMap
 loopImports [] done summarised = return ([], done, summarised)
-loopImports ((home_uid, imp, mb_pkg, gwib) : ss) done summarised
+loopImports ((home_uid, imp) : ss) done summarised
   | Just summs <- M.lookup cache_key summarised
   = case summs of
       [Right ms] -> do
-        let nk = mkModuleEdge imp (NodeKey_Module (mnKey ms))
+        let nk = mkModuleEdge lvl (NodeKey_Module (mnKey ms))
         (rest, summarised', done') <- loopImports ss done summarised
         return (nk: rest, summarised', done')
       [Left _err] ->
@@ -629,9 +630,7 @@ loopImports ((home_uid, imp, mb_pkg, gwib) : ss) done summarised
   = do
        hsc_env <- asks downsweep_hsc_env
        let home_unit = ue_unitHomeUnit home_uid (hsc_unit_env hsc_env)
-       mb_s <- downsweepSummarise home_unit
-                               is_boot wanted_mod mb_pkg
-                               Nothing
+       mb_s <- downsweepSummarise home_unit imp Nothing
        case mb_s of
            NotThere -> loopImports ss done summarised
            External uid -> do
@@ -640,10 +639,10 @@ loopImports ((home_uid, imp, mb_pkg, gwib) : ss) done summarised
             let hsc_env' = hscSetActiveHomeUnit home_unit hsc_env
             let done' = loopUnit hsc_env' done [uid]
             (other_deps, done'', summarised') <- loopImports ss done' summarised
-            return (mkModuleEdge imp (NodeKey_ExternalUnit uid) : other_deps, done'', summarised')
+            return (mkModuleEdge lvl (NodeKey_ExternalUnit uid) : other_deps, done'', summarised')
            FoundInstantiation iud -> do
             (other_deps, done', summarised') <- loopImports ss done summarised
-            return (mkModuleEdge imp (NodeKey_Unit iud) : other_deps, done', summarised')
+            return (mkModuleEdge lvl (NodeKey_Unit iud) : other_deps, done', summarised')
            FoundHomeWithError (_uid, e) ->  loopImports ss done (Map.insert cache_key [(Left e)] summarised)
            FoundHome s -> do
              (done', summarised') <-
@@ -651,11 +650,11 @@ loopImports ((home_uid, imp, mb_pkg, gwib) : ss) done summarised
              (other_deps, final_done, final_summarised) <- loopImports ss done' summarised'
 
              -- MP: This assumes that we can only instantiate non home units, which is probably fair enough for now.
-             return (mkModuleEdge imp (NodeKey_Module (mnKey s)) : other_deps, final_done, final_summarised)
+             return (mkModuleEdge lvl (NodeKey_Module (mnKey s)) : other_deps, final_done, final_summarised)
   where
-    cache_key = (home_uid, mb_pkg, unLoc <$> gwib)
-    GWIB { gwib_mod = L loc mod, gwib_isBoot = is_boot } = gwib
-    wanted_mod = L loc mod
+    UnresolvedImport { ui_level = lvl, ui_pkg_qual = mb_pkg
+                     , ui_boot = is_boot, ui_mod_name = wanted_mod } = imp
+    cache_key = (home_uid, mb_pkg, GWIB (unLoc wanted_mod) is_boot)
 
 loopUnit :: HscEnv -> Map.Map NodeKey ModuleGraphNode -> [UnitId] -> Map.Map NodeKey ModuleGraphNode
 loopUnit _ cache [] = cache
@@ -745,8 +744,9 @@ getRootSummary excl_mods old_summary_map hsc_env target
       mkPlainErrorMsgEnvelope noSrcSpan (DriverFileNotFound offset_file)
   | TargetModule modl <- targetId
   = do
-    maybe_summary <- summariseModule hsc_env home_unit old_summary_map NotBoot
-                     (L rootLoc modl) (ThisPkg (homeUnitId home_unit))
+    let root_imp = (generatedImport FromTarget (L rootLoc modl))
+                     { ui_pkg_qual = ThisPkg (homeUnitId home_unit) }
+    maybe_summary <- summariseModule hsc_env home_unit old_summary_map root_imp
                      maybe_buf excl_mods
     pure case maybe_summary of
       FoundHome (ModuleNodeCompile s)  -> Right s
@@ -1317,36 +1317,32 @@ data SummariseResult =
 summariseModule :: HscEnv
                 -> HomeUnit
                 -> M.Map (UnitId, OsPath) ModSummary
-                -> IsBootInterface
-                -> Located ModuleName
-                -> PkgQual
+                -> UnresolvedImport PkgQual -- ^ The import being summarised
                 -> Maybe (StringBuffer, UTCTime)
                 -> [ModuleName]
                 -> IO SummariseResult
-summariseModule hsc_env home_unit old_summaries is_boot wanted_mod mb_pkg maybe_buf excl_mods =
-  summariseModuleDispatch k hsc_env home_unit is_boot wanted_mod mb_pkg excl_mods
+summariseModule hsc_env home_unit old_summaries imp maybe_buf excl_mods =
+  summariseModuleDispatch k hsc_env home_unit imp excl_mods
   where
-    k = summariseModuleWithSource home_unit old_summaries is_boot maybe_buf
+    k = summariseModuleWithSource home_unit old_summaries (ui_boot imp) maybe_buf
 
 
 -- | Like summariseModule but for interface files that we don't want to compile.
 -- This version always returns a ModuleNodeFixed node.
 summariseModuleInterface :: HscEnv
                         -> HomeUnit
-                        -> IsBootInterface
-                        -> Located ModuleName
-                        -> PkgQual
+                        -> UnresolvedImport PkgQual -- ^ The import being summarised
                         -> [ModuleName]
                         -> IO SummariseResult
-summariseModuleInterface hsc_env home_unit is_boot wanted_mod mb_pkg excl_mods =
-  summariseModuleDispatch k hsc_env home_unit is_boot wanted_mod mb_pkg excl_mods
+summariseModuleInterface hsc_env home_unit imp excl_mods =
+  summariseModuleDispatch k hsc_env home_unit imp excl_mods
   where
     k _hsc_env loc mod = do
       -- The finder will return a path to the .hi-boot even if it doesn't actually
       -- exist. So check if it exists first before concluding it's there.
       does_exist <- doesFileExist (ml_hi_file loc)
       if does_exist
-        then let key = moduleToMnk mod is_boot
+        then let key = moduleToMnk mod (ui_boot imp)
              in return $ FoundHome (ModuleNodeFixed key loc)
         else return NotThere
 
@@ -1357,26 +1353,25 @@ summariseModuleDispatch
           :: (HscEnv -> ModLocation -> Module -> IO SummariseResult) -- ^ Continuation about how to summarise a home module.
           -> HscEnv
           -> HomeUnit
-          -> IsBootInterface    -- True <=> a {-# SOURCE #-} import
-          -> Located ModuleName -- Imported module to be summarised
-          -> PkgQual
-          -> [ModuleName]               -- Modules to exclude
+          -> UnresolvedImport PkgQual -- ^ The import being summarised
+          -> [ModuleName]       -- Modules to exclude
           -> IO SummariseResult
 
 
-summariseModuleDispatch k hsc_env' home_unit is_boot (L _ wanted_mod) mb_pkg excl_mods
+summariseModuleDispatch k hsc_env' home_unit imp excl_mods
   | wanted_mod `elem` excl_mods
   = return NotThere
   | otherwise  = find_it
   where
+    wanted_mod = unLoc (ui_mod_name imp)
+
     -- Temporarily change the currently active home unit so all operations
     -- happen relative to it
     hsc_env   = hscSetActiveHomeUnit home_unit hsc_env'
 
     find_it :: IO SummariseResult
-
     find_it = do
-        found <- findImportedModuleWithIsBoot hsc_env wanted_mod is_boot mb_pkg
+        found <- resolveImport hsc_env imp
         case found of
              Found location mod
                 | moduleUnitId mod `Set.member` hsc_all_home_unit_ids hsc_env ->
@@ -1502,7 +1497,7 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
   hie_timestamp <- modificationTimeIfExists (ml_hie_file_ospath nms_location)
   bytecode_timestamp <- modificationTimeIfExists (ml_bytecode_file_ospath nms_location)
   extra_sig_imports <- findExtraSigImports hsc_env nms_hsc_src pi_mod_name
-  (implicit_sigs, _inst_deps) <- implicitRequirementsShallow (hscSetActiveUnitId (moduleUnitId nms_mod) hsc_env) pi_theimps
+  (implicit_sigs, _inst_deps) <- implicitRequirementsShallow (hscSetActiveUnitId (moduleUnitId nms_mod) hsc_env) pi_imps
 
   return $
         ModSummary
@@ -1513,11 +1508,10 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
         , ms_hspp_opts = pi_local_dflags
         , ms_hspp_buf  = Just pi_hspp_buf
         , ms_parsed_mod = Nothing
-        , ms_srcimps = pi_srcimps
         , ms_textual_imps =
-            ((,,) NormalLevel NoPkgQual . noLoc <$> extra_sig_imports) ++
-            ((,,) NormalLevel NoPkgQual . noLoc <$> implicit_sigs) ++
-            pi_theimps
+            (generatedImport FromBackpackSig . noLoc <$> extra_sig_imports) ++
+            (generatedImport FromBackpackSig . noLoc <$> implicit_sigs) ++
+            pi_imps
         , ms_hs_hash = nms_src_hash
         , ms_iface_date = hi_timestamp
         , ms_hie_date = hie_timestamp
@@ -1529,8 +1523,7 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
 data PreprocessedImports
   = PreprocessedImports
       { pi_local_dflags :: DynFlags
-      , pi_srcimps  :: [Located ModuleName]
-      , pi_theimps  :: [(ImportLevel, PkgQual, Located ModuleName)]
+      , pi_imps     :: [UnresolvedImport PkgQual]
       , pi_hspp_fn  :: FilePath
       , pi_hspp_buf :: StringBuffer
       , pi_mod_name_loc :: SrcSpan
@@ -1550,12 +1543,9 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
   (pi_local_dflags, pi_hspp_fn)
       <- ExceptT $ preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
   pi_hspp_buf <- liftIO $ hGetStringBuffer pi_hspp_fn
-  (pi_srcimps', pi_theimps', L pi_mod_name_loc pi_mod_name)
+  (pi_imps', L pi_mod_name_loc pi_mod_name)
       <- ExceptT $ do
-          mimps <- getImportEdges pi_local_dflags pi_hspp_buf pi_hspp_fn src_fn
+          mimps <- parseHeaderImports pi_local_dflags pi_hspp_buf pi_hspp_fn src_fn
           return (first (mkMessages . fmap mkDriverPsHeaderMessage . getMessages) mimps)
-  let rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
-  let rn_imps = fmap (\(sp, pk, lmn@(L _ mn)) -> (sp, rn_pkg_qual mn pk, lmn))
-  let pi_srcimps = pi_srcimps'
-  let pi_theimps = rn_imps pi_theimps'
+  let pi_imps = map (rnUnresolvedImportPkgQual (renameRawPkgQual (hsc_unit_env hsc_env))) pi_imps'
   return PreprocessedImports {..}

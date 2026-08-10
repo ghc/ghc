@@ -119,7 +119,7 @@ import GHC.Serialized
 import GHC.Unit.Finder
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
-import GHC.Iface.Syntax
+import GHC.IfaceToCore ( tcIfaceImport )
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic as Panic
@@ -155,6 +155,8 @@ import Control.DeepSeq
 import Control.Monad
 import Data.Binary
 import Data.Binary.Get
+import Data.Containers.ListUtils ( nubOrd )
+import Data.List ( sortBy )
 import Data.Maybe
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
@@ -3001,17 +3003,24 @@ reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
   if (reifMod == this_mod) then reifyThisModule else reifyFromIface reifMod
     where
       reifyThisModule = do
-        usages <- fmap (map modToTHMod . Map.keys . imp_mods) getImports
-        return $ TH.ModuleInfo usages
+        import_decls <- tcg_import_decls <$> getGblEnv
+        return $ TH.ModuleInfo (thImportedModules import_decls)
 
       reifyFromIface reifMod = do
         iface <- loadInterfaceForModule (text "reifying module from TH for" <+> ppr reifMod) reifMod
         let IfaceTopEnv _ imports = mi_top_env iface
-            -- Convert IfaceImport to module names
-            usages = [modToTHMod (ifImpModule imp) | imp <- imports]
-        return $ TH.ModuleInfo usages
+        return $ TH.ModuleInfo (thImportedModules (map tcIfaceImport imports))
 
-
+-- | The modules imported by a module, as reported to Template Haskell:
+-- deduplicated, in a deterministic order, and without dependency-only
+-- imports ('isDependOnlyImport') which bring nothing into scope.
+thImportedModules :: [ImportUserSpec] -> [TH.Module]
+thImportedModules import_decls
+  = [ modToTHMod m
+    | m <- sortBy stableModuleCmp $ nubOrd
+             [ is_mod (ius_decl spec)
+             | spec <- import_decls
+             , not (isDependOnlyImport (ius_imports spec)) ] ]
 
 ------------------------------
 mkThAppTs :: TH.Type -> [TH.Type] -> TH.Type

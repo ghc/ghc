@@ -11,8 +11,10 @@
 -----------------------------------------------------------------------------
 
 module GHC.Parser.Header
-   ( getImportEdges
-   , mkPrelImports -- used by the renamer too
+   ( parseHeaderImports
+   , mkImplicitImports -- used when renaming import declarations
+   , mkUnresolvedImports -- used by Backpack
+   , mkUnresolvedImport
    , getOptionsFromFile
    , getOptions
    , toArgs
@@ -33,14 +35,15 @@ import GHC.Parser           ( parseHeader )
 import GHC.Parser.Lexer
 
 import GHC.Hs
-import GHC.Builtin.Modules( mAIN_NAME, eSSENTIALS_NAME, pRELUDE_NAME )
+import GHC.Builtin.Modules( mAIN_NAME, eSSENTIALS_NAME, pRELUDE_NAME, usesEssentialsModule )
 
+import GHC.Types.Basic ( convImportLevel )
 import GHC.Types.Error
+import GHC.Types.UnresolvedImport
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.SourceText
 import GHC.Types.PkgQual
-import GHC.Types.Basic (ImportLevel(..), convImportLevel)
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -58,7 +61,6 @@ import qualified GHC.Data.Strict as Strict
 import Control.Monad
 import System.IO
 import System.IO.Unsafe
-import Data.List (partition)
 import Data.Char (isSpace)
 import Text.ParserCombinators.ReadP (readP_to_S, gather)
 import Text.ParserCombinators.ReadPrec (readPrec_to_P)
@@ -66,12 +68,11 @@ import Text.Read (readPrec)
 
 ------------------------------------------------------------------------------
 
--- | Returns the dependency edges of the module graph, by
---    * parsing the module and looking for `import` declarations
---    * adding edges for Prelude and GHC.Essentials as required
+-- | Parse a module's header and return its corresponding imports,
+-- including the imports GHC generates ('mkImplicitImports').
 --
 -- Throws a 'SourceError' if parsing fails.
-getImportEdges
+parseHeaderImports
   :: DynFlags
   -> StringBuffer -- ^ Parse this.
   -> FilePath     -- ^ Filename the buffer came from.  Used for
@@ -80,15 +81,11 @@ getImportEdges
                   --   in the function result)
   -> IO (Either
       (Messages PsMessage)
-      ([Located ModuleName],                             -- {-# SOURCE #-} imports
-       [(ImportLevel, RawPkgQual, Located ModuleName)],  -- Normal imports
-       Located ModuleName))                              -- Name of current module
-     -- ^ The source imports and normal imports (with optional package
-     -- names from -XPackageImports), and the module name.
-getImportEdges dflags buf filename source_filename = do
+      ([UnresolvedImport RawPkgQual],
+       Located ModuleName))
+     -- ^ The imports, together with the current module name
+parseHeaderImports dflags buf filename source_filename = do
   let loc  = mkRealSrcLoc (mkFastString filename) 1 1
-      imp_prelude   = xopt LangExt.ImplicitPrelude dflags
-      rebindable_kn = gopt Opt_RebindableKnownNames dflags
       popts         = initParserOpts dflags
       sec           = initSourceErrorContext dflags
   case unP parseHeader (initParserState popts buf loc) of
@@ -104,24 +101,38 @@ getImportEdges dflags buf filename source_filename = do
         else
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod
-                imps = hsmodImports hsmod
                 main_loc = srcLocSpan (mkSrcLoc (mkFastString source_filename)
                                        1 1)
                 mod = mb_mod `orElse` L (noAnnSrcSpan main_loc) mAIN_NAME
-                (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
-
-                generated_imports = mkPrelImports (unLoc mod) imp_prelude imps
-                convImport (L _ (i :: ImportDecl GhcPs))     = (convImportLevel (ideclLevelSpec i), ideclPkgQual i, reLoc $ ideclName i)
-                convImport_src (L _ (i :: ImportDecl GhcPs)) = (reLoc $ ideclName i)
-
-                known_key_name_edges   -- Add an edge to GHC.Essentials, unless -frebindable-known-names is on
-                  | rebindable_kn = []
-                  | otherwise = [(NormalLevel, NoRawPkgQual, noLoc eSSENTIALS_NAME)]
+                imps = mkUnresolvedImports dflags (unLoc mod) (hsmodImports hsmod)
               in
-              return ( map convImport_src src_idecls
-                     , known_key_name_edges ++
-                       map convImport (generated_imports ++ ord_idecls)
-                     , reLoc mod)
+              return (imps, reLoc mod)
+
+-- | The imports corresponding to the given user-written import declarations,
+-- together with all generated imports (see 'mkImplicitImports').
+mkUnresolvedImports
+  :: DynFlags
+  -> ModuleName          -- ^ the importing module
+  -> [LImportDecl GhcPs] -- ^ user-written imports
+  -> [UnresolvedImport RawPkgQual]
+mkUnresolvedImports dflags this_mod imps
+  = map (mkUnresolvedImport . unLoc) (mkImplicitImports dflags this_mod imps ++ imps)
+
+-- | The (unresolved) import corresponding to an import declarations.
+mkUnresolvedImport :: ImportDecl GhcPs -> UnresolvedImport RawPkgQual
+mkUnresolvedImport decl =
+  UnresolvedImport { ui_origin   = FromDecl (ideclOrigin (ideclExt decl))
+                   , ui_level    = convImportLevel (ideclLevelSpec decl)
+                   , ui_pkg_qual = ideclPkgQual decl
+                   , ui_boot     = ideclSource decl
+                   , ui_mod_name = reLoc (ideclName decl) }
+
+-- | The import declarations GHC generates: 'Prelude' and 'GHC.Essentials'.
+mkImplicitImports :: DynFlags -> ModuleName -> [LImportDecl GhcPs]
+                  -> [LImportDecl GhcPs]
+mkImplicitImports dflags this_mod import_decls
+  =  mkPrelImports this_mod (xopt LangExt.ImplicitPrelude dflags) import_decls
+  ++ mkEssentialsImports dflags this_mod
 
 mkPrelImports :: ModuleName
               -> Bool -> [LImportDecl GhcPs]
@@ -136,7 +147,7 @@ mkPrelImports this_mod implicit_prelude import_decls
    || explicit_prelude_import
    || not implicit_prelude
   = []
-  | otherwise = [preludeImportDecl]
+  | otherwise = [generatedImportDecl ImplicitPreludeImport pRELUDE_NAME]
   where
       explicit_prelude_import = any is_prelude_import import_decls
 
@@ -152,23 +163,38 @@ mkPrelImports this_mod implicit_prelude import_decls
               NotLevelled -> True
               _ -> False
 
+-- | Construct the implicit 'GHC.Essentials' import declaration used to
+-- resolve known entities.
+--
+-- Empty for a module that resolves known entities in its own top-level scope
+-- instead; see 'usesEssentialsModule'.
+--
+-- See Note [Finding GHC.Essentials] in GHC.Builtin.
+mkEssentialsImports :: DynFlags -> ModuleName -> [LImportDecl GhcPs]
+mkEssentialsImports dflags this_mod
+  | usesEssentialsModule (gopt Opt_RebindableKnownNames dflags) this_mod
+  = [generatedImportDecl ImplicitEssentialsImport eSSENTIALS_NAME]
+  | otherwise
+  = []
 
-      loc = noAnnSrcSpan generatedSrcSpan
-      preludeImportDecl :: LImportDecl GhcPs
-      preludeImportDecl
-        = L loc $ ImportDecl { ideclExt       = XImportDeclPass
-                                                    { ideclAnn = noAnn
-                                                    , ideclSourceText = NoSourceText
-                                                    , ideclGenerated  = True   -- Generated!
-                                                    },
-                                ideclName      = L loc pRELUDE_NAME,
-                                ideclPkgQual   = NoRawPkgQual,
-                                ideclSource    = NotBoot,
-                                ideclSafe      = False,  -- Not a safe import
-                                ideclQualified = NotQualified,
-                                ideclAs        = Nothing,
-                                ideclLevelSpec = NotLevelled,
-                                ideclImportList = Nothing  }
+-- | A whole-module import declaration that GHC generated rather than the user.
+generatedImportDecl :: ImportDeclOrigin -> ModuleName -> LImportDecl GhcPs
+generatedImportDecl origin mod_name
+  = L loc $ ImportDecl { ideclExt       = XImportDeclPass
+                                              { ideclAnn = noAnn
+                                              , ideclSourceText = NoSourceText
+                                              , ideclOrigin = origin
+                                              },
+                          ideclName      = L loc mod_name,
+                          ideclPkgQual   = NoRawPkgQual,
+                          ideclSource    = NotBoot,
+                          ideclSafe      = False,  -- Not a safe import
+                          ideclQualified = NotQualified,
+                          ideclAs        = Nothing,
+                          ideclLevelSpec = NotLevelled,
+                          ideclImportList = Nothing  }
+  where
+    loc = noAnnSrcSpan generatedSrcSpan
 
 --------------------------------------------------------------
 -- Get options
@@ -272,7 +298,7 @@ getOptions opts sec supported buf filename
 -- The token parser is written manually because Happy can't
 -- return a partial result when it encounters a lexer error.
 -- We want to extract options before the buffer is passed through
--- CPP, so we can't use the same trick as 'getImportEdges'.
+-- CPP, so we can't use the same trick as 'parseHeaderImports'.
 getOptions' :: ParserOpts
             -> SourceErrorContext
             -> [String]

@@ -59,7 +59,7 @@ import GHC.Prelude
 
 import GHC.Iface.Load
 import GHC.Iface.Env
-import GHC.Iface.Errors.Types( IfaceMessage(..), LoadEssentialsReason (..) )
+import GHC.Iface.Errors.Types( IfaceMessage(..) )
 
 import GHC.Hs
 import GHC.Types.Name.Reader
@@ -1048,16 +1048,10 @@ rnLookupKnownOccName occ
 lookup_known_occ :: HasDebugCallStack
                    => KnownEntitySource -> KnownOcc
                    -> RnM (MaybeErr IfaceMessage Name)
-lookup_known_occ KES_FromModule occ
-  = do { mb_maps <- initIfaceTcRn loadKnownKeyOccMaps
-       ; return $ case mb_maps of
-           Failed (CantFindEssentials err UnknownLoadEssentialsReason) -- augment error
-                      -> Failed (CantFindEssentials err (LookingForKnownOcc occ))
-           Failed err -> Failed err
-           Succeeded (_, occ_map) ->
-             case lookupOccEnv occ_map occ of
-               Just name -> Succeeded name
-               Nothing   -> Failed (MissingKnownKey3 occ) }
+lookup_known_occ (KES_FromModule (_, occ_map)) occ
+  = return $ case lookupOccEnv occ_map occ of
+      Just name -> Succeeded name
+      Nothing   -> Failed (MissingKnownKey3 occ)
 
 lookup_known_occ (KES_InScope { ke_rdr_env = rdr_env }) occ
   = case lookupKnownGRE rdr_env occ of
@@ -2038,7 +2032,7 @@ lookupQualifiedNameGHCi fos rdr_name
       , is_ghci
       , gopt Opt_ImplicitImportQualified dflags   -- Enables this GHCi behaviour
       , not (safeDirectImpsReq dflags)            -- See Note [Safe Haskell and GHCi]
-      = do { res <- loadSrcInterface_maybe doc mod_name NotBoot NoPkgQual
+      = do { res <- loadSrcInterface_maybe doc LookupUser mod_name NotBoot NoPkgQual
            ; case res of
                 Succeeded iface
                   -> do { hsc_env <- getTopEnv

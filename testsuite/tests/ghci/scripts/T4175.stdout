@@ -41,10 +41,10 @@ type Maybe :: * -> *
 data Maybe a = Nothing | Just a
   	-- Defined in ‘GHC.Internal.Maybe’
 instance Applicative Maybe -- Defined in ‘GHC.Internal.Base’
-instance [safe] Eq a => Eq (Maybe a)
-  -- Defined in ‘GHC.Internal.Maybe’
 instance Functor Maybe -- Defined in ‘GHC.Internal.Base’
 instance Monad Maybe -- Defined in ‘GHC.Internal.Base’
+instance [safe] Eq a => Eq (Maybe a)
+  -- Defined in ‘GHC.Internal.Maybe’
 instance Semigroup a => Monoid (Maybe a)
   -- Defined in ‘GHC.Internal.Base’
 instance [safe] Ord a => Ord (Maybe a)

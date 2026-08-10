@@ -23,7 +23,8 @@ import Language.Haskell.Syntax.ImpExp
 
 import GHC.Prelude
 
-import GHC.Types.SourceText   ( SourceText(..) )
+import GHC.Types.UnresolvedImport ( ImportDeclOrigin(..), isGeneratedImport )
+import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Types.SrcLoc
 import GHC.Types.Name
 import GHC.Types.Name.Reader
@@ -76,16 +77,20 @@ type instance XCImportDecl  GhcTc = DataConCantHappen
 data XImportDeclPass = XImportDeclPass
     { ideclAnn        :: EpAnnImportDecl
     , ideclSourceText :: SourceText -- Note [Pragma source text] in "GHC.Types.SourceText"
-    , ideclGenerated   :: Bool -- ^ See Note [Generated imports]
+    , ideclOrigin     :: ImportDeclOrigin -- ^ See Note [Generated imports]
     }
     deriving (Data)
 
 {- Note [Generated imports]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 GHC generates an `ImportDecl` to represent the invisible `import Prelude`
-that appears in any file that omits `import Prelude`, setting
-this field to indicate that the import doesn't appear in the
-original source.
+that appears in any file that omits `import Prelude`, and the invisible import
+of `GHC.Essentials` through which known entities are resolved.
+'ideclOrigin' records that the import doesn't appear in the original source,
+and which generated import it is.
+
+Generating a real `ImportDecl` (rather than recording the dependency out of
+band) ensures they are handled consistently by the rest of the compiler.
 
 Plugins may also introduce generated imports.
 -}
@@ -143,7 +148,7 @@ instance HasLoc EpAnnLevel where
 
 simpleImportDecl :: ModuleName -> ImportDecl GhcPs
 simpleImportDecl mn = ImportDecl {
-      ideclExt        = XImportDeclPass noAnn NoSourceText False,
+      ideclExt        = XImportDeclPass noAnn NoSourceText UserWrittenImport,
       ideclName       = noLocA mn,
       ideclPkgQual    = NoRawPkgQual,
       ideclSource     = NotBoot,
@@ -172,12 +177,12 @@ instance (OutputableBndrId p
              4 (pp_spec spec)
       where
         pp_generated ext =
-            let generated = case ghcPass @p of
-                            GhcPs | XImportDeclPass { ideclGenerated = generated } <- ext -> generated
-                            GhcRn | XImportDeclPass { ideclGenerated = generated } <- ext -> generated
+            let origin = case ghcPass @p of
+                            GhcPs | XImportDeclPass { ideclOrigin = origin } <- ext -> origin
+                            GhcRn | XImportDeclPass { ideclOrigin = origin } <- ext -> origin
                             GhcTc -> dataConCantHappen ext
-            in if generated then text "(generated)"
-                           else empty
+            in if isGeneratedImport origin then text "(generated)"
+                                           else empty
 
         pp_qual QualifiedPre False = text "qualified" -- Prepositive qualifier/prepositive position.
         pp_qual QualifiedPost True = text "qualified" -- Postpositive qualifier/postpositive position.

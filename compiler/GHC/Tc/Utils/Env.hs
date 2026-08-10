@@ -82,6 +82,7 @@ import GHC.Driver.DynFlags
 
 import GHC.Builtin( isUnboundName )
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules( usesEssentialsModule )
 import GHC.Builtin.WiredIn.Types
 
 import GHC.Runtime.Context
@@ -212,14 +213,14 @@ importDecl_maybe hsc_env name
   | otherwise
   = initIfaceLoad hsc_env (importDecl name)
 
-lookupKnownKeyGlobal :: HscEnv -> KnownKey -> IO TyThing
-lookupKnownKeyGlobal hsc_env key = do
-  eps <- hscEPS hsc_env
-  case eps_known_keys eps of
-    Nothing -> pprPanic "lookupKnownKeyGlobal" (text "eps_known_keys not initialized")
-    Just ((kk_map, _), _) -> case lookupKnownKeysMap kk_map key of
-      Succeeded name -> lookupGlobal hsc_env name
-      Failed err     -> pprPanic "lookupKnownKeyGlobal" (pprDiagnostic err)
+lookupKnownKeyGlobal :: HscEnv -> KnownEntitySource -> KnownKey -> IO TyThing
+lookupKnownKeyGlobal hsc_env kk_source key = do
+  res <- initIfaceLoad hsc_env (lookupKnownKeyThing key kk_source)
+  case res of
+    Succeeded thing -> return thing
+    Failed err      -> throwGhcExceptionIO $
+                         PprProgramError "Could not look up known-key entity"
+                           (pprDiagnostic err)
 
 --------------------------------------------------------------------------------
 
@@ -518,14 +519,30 @@ getKnownKeySource :: TcRn KnownEntitySource
 -- Used by both renamer and typechecker and renamer
 getKnownKeySource
   = do { rebindable_path <- goptM Opt_RebindableKnownNames
-       ; if rebindable_path
-         then do { gbl_env <- getGblEnv
-                 ; lcl_type_env <- getLclTypeEnv
+       ; gbl_env <- getGblEnv
+       ; if usesEssentialsModule rebindable_path (moduleName (tcg_mod gbl_env))
+         then KES_FromModule <$> getKnownKeyNameMaps gbl_env
+         else do { lcl_type_env <- getLclTypeEnv
                  ; return (KES_InScope { ke_mod = tcg_mod gbl_env
                                        , ke_rdr_env = tcg_rdr_env gbl_env
                                        , ke_gbl_type_env = tcg_type_env gbl_env
-                                       , ke_lcl_type_env = lcl_type_env }) }
-         else return KES_FromModule }
+                                       , ke_lcl_type_env = lcl_type_env }) } }
+
+-- | Typechecker version of 'loadKnownKeyOccMaps', caching the loaded maps
+-- into 'tcg_known_key_maps'.
+getKnownKeyNameMaps :: TcGblEnv -> TcRn KnownKeyNameMaps
+getKnownKeyNameMaps gbl_env
+  = do { mb_maps <- readTcRef maps_ref
+       ; case mb_maps of
+           Just maps -> return maps
+           Nothing ->
+             do { res <- initIfaceTcRn loadKnownKeyOccMaps
+                ; case res of
+                    Succeeded maps -> do { writeTcRef maps_ref (Just maps)
+                                         ; return maps }
+                    Failed err -> failWithTc (TcRnInterfaceError err) } }
+  where
+    maps_ref = tcg_known_key_maps gbl_env
 
 tcrn_wrapper :: HasDebugCallStack
              => (KnownEntitySource -> IfG (MaybeErr IfaceMessage a)) -> TcRn a

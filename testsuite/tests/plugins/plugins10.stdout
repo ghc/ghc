@@ -1,5 +1,6 @@
 parsePlugin()
 interfacePlugin: Prelude
+interfacePlugin: GHC.Essentials
 interfacePlugin: Language.Haskell.TH
 interfacePlugin: Language.Haskell.TH.Quote
 interfacePlugin: Data.Version
@@ -11,7 +12,6 @@ interfacePlugin: GHC.Internal.Prim.Ext
 interfacePlugin: GHC.Internal.TH.Monad
 interfacePlugin: GHC.Internal.TH.Syntax
 typeCheckPlugin (rn)
-interfacePlugin: GHC.Essentials
 interfacePlugin: GHC.Internal.Stack.Types
 interfacePlugin: GHC.Internal.Exception.Context
 typeCheckPlugin (tc)

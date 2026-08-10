@@ -90,6 +90,7 @@ import GHC.Tc.Utils.Monad
 
 import GHC.Builtin.KnownOccs (traceIdOcc)
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules (usesEssentialsModule)
 
 import GHC.Data.FastString
 
@@ -415,7 +416,9 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
        ; let tcm_plugin_env = tcMPluginsRunActions $ runningTcMPlugins tcm_plugins
        ; return $ mkDsEnvs unit_env this_mod rdr_env type_env fam_inst_env
                            tcm_plugin_env ptc msg_var cc_st_var statics_var
-                           next_wrapper_num_var ds_complete_matches
+                           next_wrapper_num_var
+                           (tcg_known_key_maps tcg_env) -- Re-use known-entity maps loaded by typechecker
+                           ds_complete_matches
        }
 
 -- | We have in hand the `CompleteMatches` for the module, but when
@@ -464,6 +467,7 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
        ; next_wrapper_num <- newIORef emptyModuleEnv
        ; msg_var          <- newIORef emptyMessages
        ; statics_var      <- newIORef nilOL
+       ; known_key_maps_var <- newIORef Nothing
        ; eps <- liftIO $ hscEPS hsc_env
        ; let unit_env = hsc_unit_env hsc_env
              type_env = typeEnvFromEntities ids tycons patsyns fam_insts
@@ -478,7 +482,8 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
             envs  = mkDsEnvs unit_env this_mod rdr_env type_env
                              fam_inst_env tcm_plugins ptc
                              msg_var cc_st_var statics_var
-                             next_wrapper_num ds_complete_matches
+                             next_wrapper_num known_key_maps_var
+                             ds_complete_matches
        ; runDs hsc_env envs thing_inside
        }
 
@@ -524,7 +529,9 @@ initTcDsForSolver thing_inside
          updGblEnv (\tc_gbl -> tc_gbl { tcg_fam_inst_env = fam_inst_env
                                       , tcg_rdr_env      = rdr_env
                                       , tcg_type_env     = type_env
-                                      , tcg_plugins      = tcm_plugins_ref }) $
+                                      , tcg_plugins      = tcm_plugins_ref
+                                        -- Re-use known-entity maps
+                                      , tcg_known_key_maps = ds_known_key_maps gbl }) $
          thing_inside
        ; case mb_ret of
            Just ret -> pure ret
@@ -535,10 +542,13 @@ mkDsEnvs :: UnitEnv -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
          -> PromotionTickContext
          -> IORef (Messages DsMessage) -> IORef CostCentreState
          -> IORef (OrdList (Id,CoreExpr))
-         -> IORef (ModuleEnv Int) -> DsCompleteMatches
+         -> IORef (ModuleEnv Int)
+         -> IORef (Maybe KnownKeyNameMaps)
+         -> DsCompleteMatches
          -> (DsGblEnv, DsLclEnv)
 mkDsEnvs unit_env mod rdr_env type_env fam_inst_env tcm_plugins ptc msg_var
-         cc_st_var statics_var next_wrapper_num complete_matches
+         cc_st_var statics_var next_wrapper_num known_key_maps_var
+         complete_matches
   = let if_genv = IfGblEnv { if_doc       = text "mkDsEnvs"
                            , if_rec_types = KnotVars [mod] knot_var_fun }
                   -- Failing tests here are `ghci` and `T11985` if you get this wrong.
@@ -568,6 +578,7 @@ mkDsEnvs unit_env mod rdr_env type_env fam_inst_env tcm_plugins ptc msg_var
                            , ds_cc_st   = cc_st_var
                            , ds_static_binds = statics_var
                            , ds_next_wrapper_num = next_wrapper_num
+                           , ds_known_key_maps = known_key_maps_var
                            }
         lcl_env = DsLclEnv { dsl_meta        = emptyNameEnv
                            , dsl_loc         = real_span
@@ -714,13 +725,28 @@ mkNamePprCtxDs = ds_name_ppr_ctx <$> getGblEnv
 dsGetKnownKeySource :: DsM KnownEntitySource
 dsGetKnownKeySource
   = do { rebindable_path <- goptM Opt_RebindableKnownNames
-       ; if rebindable_path
-         then do { env <- getGblEnv
-                 ; return (KES_InScope { ke_mod = ds_mod env
-                                       , ke_rdr_env = ds_gbl_rdr_env env
-                                       , ke_gbl_type_env = ds_type_env env
-                                       , ke_lcl_type_env = emptyNameEnv }) }
-         else return KES_FromModule }
+       ; env <- getGblEnv
+       ; if usesEssentialsModule rebindable_path (moduleName (ds_mod env))
+         then KES_FromModule <$> dsGetKnownKeyNameMaps env
+         else return (KES_InScope { ke_mod = ds_mod env
+                                  , ke_rdr_env = ds_gbl_rdr_env env
+                                  , ke_gbl_type_env = ds_type_env env
+                                  , ke_lcl_type_env = emptyNameEnv }) }
+
+-- | Desugarer version of 'GHC.Tc.Utils.Env.getKnownKeyNameMaps'.
+dsGetKnownKeyNameMaps :: DsGblEnv -> DsM KnownKeyNameMaps
+dsGetKnownKeyNameMaps env
+  = do { mb_maps <- readTcRef (ds_known_key_maps env)
+       ; case mb_maps of
+           Just maps -> return maps
+           Nothing ->
+             do { maps <- dsToIfL $
+                    do { mb_res <- loadKnownKeyOccMaps
+                       ; case mb_res of
+                           Succeeded maps -> return maps
+                           Failed err     -> failIfM (pprDiagnostic err) }
+                ; writeTcRef (ds_known_key_maps env) (Just maps)
+                ; return maps } }
 
 --------------------------------------
 -- Lookups for known-occ things

@@ -17,6 +17,7 @@ import Data.IORef
 
 import GHC.Types.CostCentre.State
 import GHC.Types.Error
+import GHC.Types.Name( KnownKeyNameMaps )
 import GHC.Types.Name.Env
 import GHC.Types.TypeEnv( TypeEnv )
 import GHC.Types.SrcLoc
@@ -90,6 +91,11 @@ data DsGblEnv
   , ds_static_binds :: IORef (OrdList (Id,CoreExpr))
     -- ^ Static bindings
     -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
+
+  , ds_known_key_maps :: IORef (Maybe KnownKeyNameMaps)
+    -- ^ Cache of the looked-up 'KnownKeyNameMaps'.
+    --
+    -- See also 'GHC.Tc.Types.tcg_known_key_maps'.
   }
 
 instance ContainsModule DsGblEnv where

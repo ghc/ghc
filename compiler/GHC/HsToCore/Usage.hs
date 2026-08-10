@@ -382,7 +382,11 @@ moduleImportedAvails mod vis_exp_hash = go [] emptyNameSet
           ImpUserExplicit avails parents_of_implicits
             -> go (avails ++ avails_acc) (parents_acc `unionNameSet` parents_of_implicits)
                   imp_decls
-          _ -> HMIA_Implicit vis_exp_hash
+          -- Any import that is not an explicit import list makes us depend on
+          -- the whole export list of the imported module.
+          ImpUserAll             -> HMIA_Implicit vis_exp_hash
+          ImpUserEverythingBut{} -> HMIA_Implicit vis_exp_hash
+          ImpUserDependOnly      -> HMIA_Implicit vis_exp_hash
       | otherwise
       = go avails_acc parents_acc imp_decls
 

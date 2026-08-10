@@ -3,6 +3,7 @@ module GHC.Unit.External.ModuleOrigin (
   fromExposedModules,
   fromReexportedModules,
   fromFlag,
+  HiddenModuleUnitVisibility(..),
   originVisible,
   originEmpty,
 ) where
@@ -19,10 +20,10 @@ import GHC.Utils.Panic
 -- it could have come into scope.  Warning: don't use the record functions,
 -- they're partial!
 data ModuleOrigin =
-    -- | Module is hidden, and thus never will be available for import.
-    -- (But maybe the user didn't realize), so we'll still keep track
-    -- of these modules.)
+    -- | The module is hidden (thus not available for a user-written import).
     ModHidden
+      !HiddenModuleUnitVisibility
+        -- ^ the module is hidden, but is the unit visible?
 
     -- | Module is unavailable because the unit is unusable.
   | ModUnusable !UnusableUnit
@@ -45,7 +46,7 @@ data ModuleOrigin =
       }
 
 instance Outputable ModuleOrigin where
-    ppr ModHidden = text "hidden module"
+    ppr (ModHidden uvis) = text "hidden module" <+> parens (ppr uvis)
     ppr (ModUnusable _) = text "unusable module"
     ppr (ModOrigin e res rhs f) = sep (punctuate comma (
         (case e of
@@ -62,6 +63,17 @@ instance Outputable ModuleOrigin where
                     sep (map (ppr . mkUnit) rhs)]) ++
         (if f then [text "package flag"] else [])
         ))
+
+-- | For a hidden module @M@ from unit @u@, its 'HiddenModuleUnitVisiblity'
+-- says whether the unit @u@ itself is visible.
+data HiddenModuleUnitVisibility
+  = HiddenModInVisibleUnit    -- ^ the unit of this hidden module is visible
+  | HiddenModInHiddenUnit     -- ^ the unit of this hidden module is not visible
+
+instance Outputable HiddenModuleUnitVisibility where
+  ppr = \case
+    HiddenModInVisibleUnit -> text "visible unit"
+    HiddenModInHiddenUnit  -> text "hidden unit"
 
 -- | Smart constructor for a module which is in @exposed-modules@.  Takes
 -- as an argument whether or not the defining package is exposed.
@@ -99,7 +111,7 @@ instance Monoid ModuleOrigin where
 -- | Is the name from the import actually visible? (i.e. does it cause
 -- ambiguity, or is it only relevant when we're making suggestions?)
 originVisible :: ModuleOrigin -> Bool
-originVisible ModHidden = False
+originVisible (ModHidden {}) = False
 originVisible (ModUnusable _) = False
 originVisible (ModOrigin b res _ f) = b == Just True || not (null res) || f
 

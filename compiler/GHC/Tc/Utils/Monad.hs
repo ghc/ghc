@@ -367,6 +367,7 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
      ; th_needed_deps_var   <- newIORef ([], emptyUDFM)
      ; tcm_plugins_var      <- newIORef TcMPluginsUninitialised
      ; next_wrapper_num     <- newIORef emptyModuleEnv
+     ; known_key_maps_var   <- newIORef Nothing
      ; let
         -- bangs to avoid leaking the env (#19356)
         !dflags = hsc_dflags hsc_env
@@ -406,6 +407,7 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
           , tcg_default_exports    = emptyDefaultEnv
           , tcg_type_env           = emptyNameEnv
           , tcg_knot_vars          = hsc_type_env_vars hsc_env
+          , tcg_known_key_maps     = known_key_maps_var
           , tcg_inst_env           = emptyInstEnv
           , tcg_fam_inst_env       = emptyFamInstEnv
           , tcg_ann_env            = emptyAnnEnv

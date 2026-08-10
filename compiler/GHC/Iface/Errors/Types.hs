@@ -22,7 +22,7 @@ import GHC.Types.Name.Reader (GlobalRdrElt)
 import GHC.Types.TyThing (TyThing)
 
 import GHC.Unit.Types (Module, InstalledModule, UnitId, Unit)
-import GHC.Unit.State (UnitState, ModuleSuggestion, ModuleOrigin, UnusableUnit, UnitInfo)
+import GHC.Unit.State (UnitState, ModuleSuggestion, ModuleOrigin, UnusableUnit, UnitInfo, HiddenModuleUnitVisibility)
 
 import GHC.Exception.Type (SomeException)
 
@@ -106,7 +106,7 @@ data CantFindInstalledReason
   | NotAModule
   | CouldntFindInFiles [FilePath]
   | GenericMissing
-      [UnitInfo] [Unit]
+      [UnitInfo] [(Unit, HiddenModuleUnitVisibility)]
       [UnusableUnit] [FilePath]
   | MultiplePackages [(Module, ModuleOrigin)]
   deriving Generic
@@ -125,9 +125,7 @@ data BuildingCabalPackage
   deriving Eq
 
 data LoadEssentialsReason
-  = LookingForKnownKey KnownKey
-  | LookingForKnownOcc KnownOcc
-  | LookingForEssentialsModule
+  = LookingForEssentialsModule
   | UnknownLoadEssentialsReason
   deriving Generic
 

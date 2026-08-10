@@ -1,8 +1,8 @@
-instance GHC.Internal.Base.Alternative Maybe
-  -- Defined in ‘GHC.Internal.Base’
 instance Applicative Maybe -- Defined in ‘GHC.Internal.Base’
 instance Functor Maybe -- Defined in ‘GHC.Internal.Base’
 instance Monad Maybe -- Defined in ‘GHC.Internal.Base’
+instance GHC.Internal.Base.Alternative Maybe
+  -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.MonadPlus Maybe
   -- Defined in ‘GHC.Internal.Base’
 instance MonadFail Maybe

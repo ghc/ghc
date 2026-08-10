@@ -15,6 +15,9 @@ module GHC.Unit.Types
    , pprInstantiatedModule
    , moduleFreeHoles
 
+     -- ** Module lookups
+   , ModuleLookupScope (..)
+
      -- * Units
    , IsUnitId
    , GenUnit (..)
@@ -129,6 +132,23 @@ type HomeUnitModule  = GenModule UnitId
 -- | An `InstantiatedModule` is a 'Module' whose unit is identified with an `InstantiatedUnit`.
 type InstantiatedModule = GenModule InstantiatedUnit
 
+-- | Which modules a lookup of a 'ModuleName' is allowed to resolve to.
+data ModuleLookupScope
+  = LookupUser
+    -- ^ Only lookup modules the user is allowed to import.
+    --
+    -- Use this to resolve a user-written import declaration.
+  | LookupSystem
+    -- ^ A system lookup: allow looking up modules that are hidden, provided
+    -- that the unit providing them is itself visible.
+    --
+    -- Use this to resolve a dependency GHC itself introduced.
+  deriving stock Eq
+
+instance Outputable ModuleLookupScope where
+  ppr = \case
+    LookupUser   -> text "user"
+    LookupSystem -> text "system"
 
 mkModule :: u -> ModuleName -> GenModule u
 mkModule = Module

@@ -80,7 +80,7 @@ def lndir(srcdir: Path, dstdir: Path, force_copy=False):
             link_or_copy_file(src, dst, force_copy)
         else:
             dst.mkdir()
-            lndir(src, dst)
+            lndir(src, dst, force_copy)
 
 # All possible test metric strings.
 def testing_metrics():

@@ -4,7 +4,6 @@
 
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -24,7 +23,7 @@ module GHC.Iface.Load (
         lookupKnownKeyThing, lookupKnownKeyName,
         lookupKnownOccThing, lookupKnownOccName,
         loadKnownKeyOccMaps, lookupKnownGRE,
-        lookupKnownKeysMap, lookupKnownKeysModule,
+        checkKnownKeyNamesIface,
 
         -- RnM/TcM functions
         loadModuleInterface, loadModuleInterfaces,
@@ -40,6 +39,7 @@ module GHC.Iface.Load (
         needWiredInHomeIface, loadWiredInHomeIface,
 
         WhereFrom(..),
+        ModuleLookupScope(..),
 
         pprModIfaceSimple,
         ifaceStats, pprModIface, showIface,
@@ -61,10 +61,12 @@ import {-# SOURCE #-} GHC.IfaceToCore
 import GHC.Hs.Extension (GhcPass)
 import GHC.Hs.Doc
 
-import GHC.Driver.Env
-import GHC.Driver.Errors.Types
 import GHC.Driver.DynFlags
+import GHC.Driver.Env
+import GHC.Driver.Env.KnotVars
+import GHC.Driver.Errors.Types
 import GHC.Driver.Hooks
+import {-# source #-} GHC.Driver.Main.Compile (loadIfaceByteCode)
 import GHC.Driver.Plugins
 
 import GHC.Iface.Warnings
@@ -74,6 +76,7 @@ import GHC.Iface.Binary
 import GHC.Iface.Rename
 import GHC.Iface.Env
 import GHC.Iface.Errors as Iface_Errors
+import GHC.Iface.Errors.Types
 import GHC.HsToCore.Breakpoints.Types (modBreaks_locs)
 
 import GHC.Tc.Errors.Types
@@ -127,11 +130,13 @@ import GHC.Types.SourceText
 
 import GHC.Unit.External
 import GHC.Unit.Module
+import GHC.Unit.Module.Graph
 import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
 import GHC.Unit.State
 import GHC.Unit.Home
+import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Home.PackageTable
 import GHC.Unit.Finder
 import GHC.Unit.Env
@@ -139,18 +144,14 @@ import GHC.Unit.Env
 import GHC.Stack( callStack )
 import GHC.Data.Maybe
 
+import Language.Haskell.Syntax.Lit (StringLiteral(..))
+
 import Control.Monad
 import qualified Data.Foldable as Foldable
+import Data.Function ((&))
 import Data.Map ( toList )
 import System.FilePath
 import System.Directory
-import GHC.Driver.Env.KnotVars
-import {-# source #-} GHC.Driver.Main.Compile (loadIfaceByteCode)
-import GHC.Iface.Errors.Types
-import Data.Function ((&))
-import GHC.Unit.Module.Graph
-import qualified GHC.Unit.Home.Graph as HUG
-import Language.Haskell.Syntax.Lit (StringLiteral(..))
 
 
 {- *********************************************************************
@@ -160,23 +161,27 @@ import Language.Haskell.Syntax.Lit (StringLiteral(..))
 ********************************************************************* -}
 
 data KnownEntitySource  -- See Note [Overview of known entities]
+  -- | Look up the known-occ name in this GlobalRdrEnv/Type, which
+  --   reflect the top-level scope of the current module.
+  -- This happens when -frebindable-known-name is set, usually when
+  --   we are compiling `ghc-internal` or `base`
+  -- Why both global and local type env?  See (KN4) in Note [Overview of known entities]
   = KES_InScope { ke_mod          :: Module
                 , ke_rdr_env      :: GlobalRdrEnv
                 , ke_gbl_type_env :: TypeEnv
-                , ke_lcl_type_env :: TcTypeEnv }
-      -- ^ Look up the known-occ name in this GlobalRdrEnv/Type, which
-      --   reflect the top-level scope of the current module.
-      -- This happens when -frebindable-known-name is set, usually when
-      --   we are compiling `ghc-internal` or `base`
-      -- Why both global and local type env?  See (KN4) in Note [Overview of known entities]
+                , ke_lcl_type_env :: TcTypeEnv
+                    -- ^ Empty outside of typechecking (e.g. at CoreTidy time)
+                }
 
-  | KES_FromModule
-       -- ^ Look up the known-occ name in the export list of GHC.Essentials
-       -- This is the "normal path", and happens when -frebindable-known-names
-       -- is /not/ set
+  -- | Look up the known-occ name in the export list of GHC.Essentials,
+  -- directly via the stored 'KnownKeyNameMaps'.
+  --
+  -- This is the "normal path", and happens when -frebindable-known-names
+  -- is /not/ set.
+  | KES_FromModule KnownKeyNameMaps
 
 instance Outputable KnownEntitySource where
-  ppr KES_FromModule                         = text "FromModule"
+  ppr (KES_FromModule {})                    = text "FromModule"
   ppr (KES_InScope { ke_rdr_env = rdr_env }) = text "InScope" <> braces (ppr rdr_env)
 
 lookupKnownKeyThing :: HasDebugCallStack
@@ -191,13 +196,8 @@ lookupKnownKeyThing key kk_ns
 lookupKnownKeyName :: HasDebugCallStack
                    => KnownKey -> KnownEntitySource
                    -> IfM lcl (MaybeErr IfaceMessage Name)
-lookupKnownKeyName key KES_FromModule
-  = do { mb_maps <- loadKnownKeyOccMaps
-       ; return $ case mb_maps of
-           Failed (CantFindEssentials err UnknownLoadEssentialsReason) -- augment error
-             -> Failed (CantFindEssentials err (LookingForKnownKey key))
-           Failed err            -> Failed err
-           Succeeded (kk_map, _) -> lookupKnownKeysMap kk_map key }
+lookupKnownKeyName key (KES_FromModule (kk_map, _))
+  = return (lookupKnownKeysMap kk_map key)
 
 lookupKnownKeyName key (KES_InScope { ke_rdr_env = gbl_rdr_env })
   -- Just gbl_rdr_env: we have -frebindable-known-names on, and
@@ -247,16 +247,10 @@ lookupKnownOccThing occ kk_ns
 lookupKnownOccName :: HasDebugCallStack
                    => KnownOcc -> KnownEntitySource
                    -> IfM lcl (MaybeErr IfaceMessage Name)
-lookupKnownOccName occ KES_FromModule
-  = do { mb_maps <- loadKnownKeyOccMaps
-       ; return $ case mb_maps of
-           Failed (CantFindEssentials err UnknownLoadEssentialsReason) -- augment error
-             -> Failed (CantFindEssentials err (LookingForKnownOcc occ))
-           Failed err -> Failed err
-           Succeeded (_, occ_map) ->
-             case lookupOccEnv occ_map occ of
-               Just name -> Succeeded name
-               Nothing   -> Failed (MissingKnownKey3 occ) }
+lookupKnownOccName occ (KES_FromModule (_, occ_map))
+  = return $ case lookupOccEnv occ_map occ of
+      Just name -> Succeeded name
+      Nothing   -> Failed (MissingKnownKey3 occ)
 
 lookupKnownOccName occ (KES_InScope { ke_rdr_env = gbl_rdr_env })
   -- Just gbl_rdr_env: we have -frebindable-known-names on, and
@@ -292,52 +286,55 @@ lookupKnownName kk_ns name
   where
     name_mod = nameModule name
 
+-- | Load the 'KnownKeyNameMaps' by resolving a 'GHC.Essentials' import.
+-- compiled resolves its known entities through.
+--
+-- See Note [Finding GHC.Essentials] in GHC.Builtin.
 loadKnownKeyOccMaps :: IfM lcl (MaybeErr IfaceMessage KnownKeyNameMaps)
 loadKnownKeyOccMaps
-  = do { eps <- getEps
-       ; case eps_known_keys eps of {
-            Just (kk_maps, _) -> return (Succeeded kk_maps) ;
-            Nothing ->
-
-    -- We don't have a KnownKeyOccMap yet, so create it
-    -- from the interface file for KnownKeyName
-    do { hsc_env <- getTopEnv
-       ; mb_res <- liftIO $ findImportedModule hsc_env eSSENTIALS_NAME NoPkgQual
-       ; case mb_res of
-           Found _ mod -> Succeeded <$> build_maps mod
-           fr -> return (Failed (CantFindEssentials
-                                  (cannotFindModule hsc_env eSSENTIALS_NAME fr)
-                                  UnknownLoadEssentialsReason))
-       } } }
+  = do { hsc_env <- getTopEnv
+       ; fr <- liftIO $
+           findImportedModule hsc_env LookupSystem eSSENTIALS_NAME NoPkgQual
+       ; case fr of
+           Found _ mod -> Succeeded <$> known_key_maps mod
+           _ -> return $ Failed $
+                  CantFindEssentials
+                    (cannotFindModule hsc_env eSSENTIALS_NAME fr)
+                    UnknownLoadEssentialsReason
+       }
   where
     doc = text "Need interface for KnownKeyNames"
 
-    build_maps :: Module -> IfM lcl KnownKeyNameMaps
-    build_maps mod
+    known_key_maps :: Module -> IfM lcl KnownKeyNameMaps
+    known_key_maps mod
       = do { iface <- loadInterfaceWithException doc mod ImportBySystem
+           ; let !abi_hash = mi_mod_hash iface
+           ; eps <- getEps
+           ; case lookupModuleEnv (eps_known_keys eps) mod of
+               Just (cached_hash, kk_maps)
+                 | cached_hash == abi_hash
+                 -> return kk_maps
+               _ -> do { let kk_maps = build_maps iface
+                       ; updateEps_ $ \ eps ->
+                           eps { eps_known_keys =
+                                   extendModuleEnv (eps_known_keys eps) mod
+                                     (abi_hash, kk_maps) }
+                       ; return kk_maps } }
 
-       ; let kk_map :: UniqFM KnownKey Name
-             -- Domain is just the KnownKeys in the knownKeyTable
-             kk_map  = listToUFM [ (getUnique nm, nm)
-                                 | avail <- mi_exports iface
-                                 , nm <- availNames avail
-                                 , let uniq = getUnique nm
-                                 , uniq `elemUFM` knownKeyUniqMap ]
-             occ_map :: OccEnv Name
-             occ_map = mkOccEnv [ (nameOccName nm, nm)
-                                | avail <- mi_exports iface
-                                , nm <- availNames avail ]
-
-       -- Record the KnownKeyOccMap in the EPS, so we will find it next time
-       ; updateEps_ (\eps -> eps { eps_known_keys = Just ((kk_map, occ_map), mi_module iface) })
-
-#ifdef DEBUG
-       ; case checkKnownKeyNamesIface kk_map of
-            Just msg -> pprPanic "Missing exports in KnownKeyNames" $
-                        (msg $$ text "Known-key occ-map" <+> ppr occ_map)
-            Nothing  -> return ()
-#endif
-       ; return (kk_map, occ_map) }
+    build_maps :: ModIface -> KnownKeyNameMaps
+    build_maps iface = (kk_map, occ_map)
+      where
+        kk_map :: UniqFM KnownKey Name
+        -- Domain is just the KnownKeys in the knownKeyTable
+        kk_map  = listToUFM [ (getUnique nm, nm)
+                            | avail <- mi_exports iface
+                            , nm <- availNames avail
+                            , let uniq = getUnique nm
+                            , uniq `elemUFM` knownKeyUniqMap ]
+        occ_map :: OccEnv Name
+        occ_map = mkOccEnv [ (nameOccName nm, nm)
+                           | avail <- mi_exports iface
+                           , nm <- availNames avail ]
 
 lookupKnownKeysMap :: UniqFM KnownKey Name -> KnownKey -> MaybeErr IfaceMessage Name
 lookupKnownKeysMap kk_map key = case lookupUFM kk_map key of
@@ -355,10 +352,15 @@ lookupKnownKeysMap kk_map key = case lookupUFM kk_map key of
     | otherwise
     -> Failed (MissingKnownKey1 key)
 
-#ifdef DEBUG
+
+
+-- | Check that the known-key map covers the whole of 'knownKeyTable', with
+-- agreeing uniques and occ-names.
+--
+-- This is only used for sanity checking (see the @EssentialsCoverage@ GHC API
+-- test). Failures to look up known entities report a civilised error (see
+-- 'MissingKnownKey1').
 checkKnownKeyNamesIface :: UniqFM KnownKey Name -> Maybe SDoc
--- Check that KnownKeyNames exports all the things defined in `knownKeyTable`
--- and the the uniques and occ-names agree
 checkKnownKeyNamesIface known_key_names_occ_map
   | null bad_ones = Nothing
   | otherwise     = Just $ braces $ fsep $
@@ -368,27 +370,8 @@ checkKnownKeyNamesIface known_key_names_occ_map
     bad_ones = filter is_bad knownKeyTable
     is_bad (occ, key)
       = case lookupUFM known_key_names_occ_map key of
-            Nothing   -> True  -- Missing from KonwnKeyNames exports
+            Nothing   -> True  -- Missing from the known-key exports
             Just name -> getOccName name /= occ
-#endif
-
--- | Lookup the module exporting the canonical known-entities definitions (GHC.Essentials)
-lookupKnownKeysModule :: HscEnv -> DynFlags {-^ Module dyn flags -} -> IO (Maybe Module)
-lookupKnownKeysModule hsc_env dflags = do
-  eps <- hscEPS hsc_env
-  case eps_known_keys eps of
-    Just (_, kk_mod) -> return (Just kk_mod)
-    Nothing -> do
-      found_essentials <- findImportedModule hsc_env eSSENTIALS_NAME NoPkgQual
-      let rebindable_kn = gopt Opt_RebindableKnownNames dflags
-      let essentials_uid
-            | rebindable_kn                   = return Nothing
-            | Found _ mod <- found_essentials = return (Just mod)
-            | fr          <- found_essentials = do
-                throwOneError (initSourceErrorContext dflags) $
-                  mkPlainErrorMsgEnvelope noSrcSpan $ GhcDriverMessage $ DriverInterfaceError $
-                    CantFindEssentials (cannotFindModule hsc_env eSSENTIALS_NAME fr) LookingForEssentialsModule
-      essentials_uid
 
 {- *********************************************************************
 *                                                                      *
@@ -634,13 +617,14 @@ needWiredInHomeIface _           = False
 -- | Load the interface corresponding to an @import@ directive in
 -- source code.  On a failure, fail in the monad with an error message.
 loadSrcInterface :: SDoc
+                 -> ModuleLookupScope
                  -> ModuleName
                  -> IsBootInterface     -- {-# SOURCE #-} ?
                  -> PkgQual             -- "package", if any
                  -> RnM ModIface
 
-loadSrcInterface doc mod want_boot maybe_pkg
-  = do { res <- loadSrcInterface_maybe doc mod want_boot maybe_pkg
+loadSrcInterface doc scope mod want_boot maybe_pkg
+  = do { res <- loadSrcInterface_maybe doc scope mod want_boot maybe_pkg
        ; case res of
            Failed    err ->
              failWithTc $
@@ -653,19 +637,20 @@ loadSrcInterface doc mod want_boot maybe_pkg
 
 -- | Like 'loadSrcInterface', but returns a 'MaybeErr'.
 loadSrcInterface_maybe :: SDoc
+                       -> ModuleLookupScope
                        -> ModuleName
                        -> IsBootInterface     -- {-# SOURCE #-} ?
                        -> PkgQual             -- "package", if any
                        -> RnM (MaybeErr MissingInterfaceError ModIface)
 
-loadSrcInterface_maybe doc mod want_boot maybe_pkg
+loadSrcInterface_maybe doc scope mod want_boot maybe_pkg
   -- We must first find which Module this import refers to.  This involves
   -- calling the Finder, which as a side effect will search the filesystem
   -- and create a ModLocation.  If successful, loadIface will read the
   -- interface; it will call the Finder again, but the ModLocation will be
   -- cached from the first search.
   = do hsc_env <- getTopEnv
-       res <- liftIO $ findImportedModule hsc_env mod maybe_pkg
+       res <- liftIO $ findImportedModule hsc_env scope mod maybe_pkg
        case res of
            Found _ mod -> initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
            -- TODO: Make sure this error message is good

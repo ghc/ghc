@@ -2602,7 +2602,7 @@
         (NoEpTok)
         []))
       (NoSourceText)
-      (True))
+      (ImplicitPreludeImport))
      (L
       (EpAnn
        (EpaSpan { <generated> })
@@ -2610,6 +2610,43 @@
        (EpaComments
         []))
       {ModuleName: Prelude})
+     (NoPkgQual)
+     (NotBoot)
+     (NotLevelled)
+     (False)
+     (NotQualified)
+     (Nothing)
+     (Nothing)))
+  ,(L
+    (EpAnn
+     (EpaSpan { <generated> })
+     []
+     (EpaComments
+      []))
+    (ImportDecl
+     (XImportDeclPass
+      (EpAnnImportDecl
+       (NoEpTok)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       ((,,,)
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
+        []))
+      (NoSourceText)
+      (ImplicitEssentialsImport))
+     (L
+      (EpAnn
+       (EpaSpan { <generated> })
+       []
+       (EpaComments
+        []))
+      {ModuleName: GHC.Essentials})
      (NoPkgQual)
      (NotBoot)
      (NotLevelled)
@@ -2640,7 +2677,7 @@
         (NoEpTok)
         []))
       (NoSourceText)
-      (False))
+      (UserWrittenImport))
      (L
       (EpAnn
        (EpaSpan { DumpRenamedAst.hs:5:8-16 })
@@ -2678,7 +2715,7 @@
         (EpTok (EpaSpan { DumpRenamedAst.hs:7:23 }))
         []))
       (NoSourceText)
-      (False))
+      (UserWrittenImport))
      (L
       (EpAnn
        (EpaSpan { DumpRenamedAst.hs:7:8-16 })

@@ -37,7 +37,7 @@ module GHC.Tc.Types(
         HsCtxt,
         ImportAvails(..), emptyImportAvails, plusImportAvails,
         ImportUserSpec(..),
-        ImpUserList(..),
+        ImpUserList(..), isDependOnlyImport,
         mkModDeps,
 
         -- Typechecker types
@@ -222,6 +222,21 @@ data ImpUserList
         -- ^ The @T@s in import list items of the form @T(..)@
       }
   | ImpUserEverythingBut !NameSet
+  | ImpUserDependOnly
+    -- ^ The import binds nothing at all, but the importer nevertheless depends
+    -- on the whole export list of the imported module.
+    --
+    -- Used only for the implicit import of 'GHC.Essentials'.
+    -- See Note [Finding GHC.Essentials] in GHC.Builtin.
+
+-- | Is this import only a recorded dependency ('ImpUserDependOnly'), rather
+-- than something the module imports in the ordinary sense?
+isDependOnlyImport :: ImpUserList -> Bool
+isDependOnlyImport = \case
+  ImpUserDependOnly       -> True
+  ImpUserAll              -> False
+  ImpUserExplicit {}      -> False
+  ImpUserEverythingBut {} -> False
 
 -- | A 'NameShape' is a substitution on 'Name's that can be used
 -- to refine the identities of a hole while we are renaming interfaces
@@ -505,6 +520,9 @@ data TcGblEnv
                 -- typechecker in initIfaceTcRn, so that it can see stuff
                 -- bound in this module when dealing with hi-boot recursions
                 -- Updated at intervals (e.g. after dealing with types and classes)
+
+        tcg_known_key_maps :: TcRef (Maybe KnownKeyNameMaps),
+          -- ^ Cache of the known entities that we looked up from 'GHC.Essentials'.
 
         tcg_inst_env     :: !InstEnv,
           -- ^ Instance envt for all /home-package/ modules;

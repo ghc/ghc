@@ -30,6 +30,7 @@ import GHC.Hs.Syn.Type
 import GHC.Utils.Monad            ( concatMapM, MonadIO(liftIO) )
 
 import GHC.Types.Basic
+import GHC.Types.UnresolvedImport ( isGeneratedImport )
 import GHC.Types.FieldLabel
 import GHC.Types.Avail            ( Avails )
 import GHC.Types.Id               ( isDataConId_maybe )
@@ -350,7 +351,7 @@ enrichHie ts (hsGrp, imports, exports, docs, modName) ev_bs insts tcs tte =
     modName <- toHie (IEC Export <$> modName)
     tasts <- toHie $ fmap (BC RegularBind ModuleScope) ts
     rasts <- processGrp hsGrp
-    imps <- toHie $ filter (not . ideclGenerated . ideclExt . unLoc) imports
+    imps <- toHie $ filter (not . isGeneratedImport . ideclOrigin . ideclExt . unLoc) imports
     exps <- toHie $ fmap (map $ IEC Export . fst) exports
     docs <- toHie docs
     -- Add Instance bindings

@@ -22,7 +22,7 @@ module GHC.Driver.Make (
 
         topSortModuleGraph,
 
-        ms_home_srcimps, ms_home_imps,
+        ms_srcimps, ms_home_imps,
 
         hscSourceToIsBoot,
         findExtraSigImports,
@@ -66,6 +66,8 @@ import GHC.Driver.Main
 import GHC.Driver.MakeSem
 import GHC.Driver.Downsweep
 import GHC.Driver.MakeAction
+
+import GHC.Types.UnresolvedImport
 
 import GHC.Iface.Load      ( cannotFindModule, readIface )
 import GHC.IfaceToCore     ( typecheckIface )
@@ -319,7 +321,7 @@ warnUnknownModules hsc_env dflags mod_graph = do
 
     hidden_warns = hidden_mods `minusUniqSet` unit_mods
 
-    lookupModule mn = findImportedModule hsc_env mn NoPkgQual
+    lookupModule mn = findImportedModule hsc_env LookupUser mn NoPkgQual
 
     check_reexport mn = do
       fr <- lookupModule (reexportFrom mn)
@@ -457,9 +459,9 @@ warnUnusedPackages us dflags mod_graph =
 
         home_mod_sum = filter (\ms -> homeUnitId_ dflags == ms_unitid ms) (mgModSummaries mod_graph)
 
-    -- Only need non-source imports here because SOURCE imports are always HPT
         loadedPackages = concat $
-          mapMaybe (\(_st, fs, mn) -> lookupModulePackage us (unLoc mn) fs)
+          mapMaybe (lookupModulePackage us)
+            $ filter ((NotBoot ==) . ui_boot) -- Only need non-source imports here because SOURCE imports are always HPT
             $ concatMap ms_imps home_mod_sum
 
         used_args = Set.fromList (map unitId loadedPackages)
@@ -637,7 +639,7 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
     -- The "bad" boot modules are the ones for which we have
     -- B.hs-boot in the module graph, but no B.hs
     -- The downsweep should have ensured this does not happen
-    -- (see msDeps)
+    -- (see GHC.Driver.Downsweep.calcDeps)
     let all_home_mods =
           Set.fromList [ Module (ms_unitid s) (ms_mod_name s)
                     | s <- mgModSummaries mod_graph, isBootSummary s == NotBoot]
@@ -1397,8 +1399,13 @@ warnUnnecessarySourceImports sccs = do
   when (diag_wopt Opt_WarnUnusedImports diag_opts) $ do
     let check ms =
            let mods_in_this_cycle = map moduleNodeInfoModuleName ms in
-           [ warn i | (ModuleNodeCompile m) <- ms, i <- ms_home_srcimps m,
-                      unLoc i `notElem`  mods_in_this_cycle ]
+           -- NB: source imports can only refer to the current package,
+           -- so these are all home imports.
+           [ warn (ui_mod_name e)
+           | (ModuleNodeCompile m) <- ms
+           , e <- ms_srcimps m
+           , unLoc (ui_mod_name e) `notElem` mods_in_this_cycle
+           ]
 
         warn :: Located ModuleName -> MsgEnvelope GhcMessage
         warn (L loc mod) = GhcDriverMessage <$> mkPlainMsgEnvelope diag_opts

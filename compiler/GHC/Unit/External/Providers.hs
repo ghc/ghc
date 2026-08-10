@@ -87,7 +87,9 @@ mkModuleNameProvidersMap logger allowVirtualUnits pkg_map vis_map =
 
   emptyMap = emptyUniqMap
   setOrigins m os = fmap (const os) m
-  extend_modmap (uid, UnitVisibility { uv_expose_all = b, uv_renamings = rns }) modmap
+  extend_modmap (uid, UnitVisibility { uv_expose_all = b, uv_renamings = rns
+                                     , uv_explicit = explicit })
+                modmap
     = addListTo modmap theBindings
    where
     pkg = unit_lookup uid
@@ -124,7 +126,15 @@ mkModuleNameProvidersMap logger allowVirtualUnits pkg_map vis_map =
     esmap = listToUFM (es False) -- parameter here doesn't matter, orig will
                                  -- be overwritten
 
-    hiddens = [(m, mkModMap pk m ModHidden) | m <- hidden_mods]
+    hiddens = [(m, mkModMap pk m (ModHidden hidden_mod_unit)) | m <- hidden_mods]
+
+    -- Is the unit itself visible in this compilation?
+    -- YES if its modules are exposed (by default or via a package flag), or if
+    -- the user named the package explicitly, even with an empty thinning such
+    -- as '-package base()'.
+    hidden_mod_unit
+      | b || isJust explicit = HiddenModInVisibleUnit
+      | otherwise            = HiddenModInHiddenUnit
 
     pk = mkUnit pkg
     unit_lookup uid = lookupUnit' allowVirtualUnits pkg_map uid

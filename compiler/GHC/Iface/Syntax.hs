@@ -131,6 +131,7 @@ data ImpIfaceList
     , iil_non_explicit_parents :: ![Name]
     }
   | ImpIfaceEverythingBut ![Name]
+  | ImpIfaceDependOnly -- ^ see 'GHC.Tc.Types.ImpUserDependOnly'
 
 -- | Extract the imported module from an IfaceImport
 ifImpModule :: IfaceImport -> Module
@@ -154,6 +155,7 @@ instance Binary ImpIfaceList where
   put_ bh (ImpIfaceEverythingBut ns) = do
     putByte bh 2
     put_ @[Name] bh ns
+  put_ bh ImpIfaceDependOnly = putByte bh 3
   get bh = do
     tag <- getByte bh
     case tag of
@@ -165,6 +167,7 @@ instance Binary ImpIfaceList where
       2 -> do
         ns <- get @[Name] bh
         return $ ImpIfaceEverythingBut ns
+      3 -> return ImpIfaceDependOnly
       _ -> fail $ "instance Binary ImpIfaceList: Invalid tag " ++ show tag
 
 -- | A binding top-level 'Name' in an interface file (e.g. the name of an
@@ -3091,6 +3094,7 @@ instance NFData ImpIfaceList where
   rnf ImpIfaceAll = ()
   rnf (ImpIfaceEverythingBut ns) = rnf ns
   rnf (ImpIfaceExplicit gre explicit) = rnf gre `seq` rnf explicit
+  rnf ImpIfaceDependOnly = ()
 
 instance NFData IfaceDecl where
   rnf = \case

@@ -45,6 +45,8 @@ module GHC.Unit.State (
         LookupResult(..),
         ModuleSuggestion(..),
         ModuleOrigin(..),
+        HiddenModuleUnitVisibility(..),
+        ModuleLookupScope(..),
         UnusableUnit(..),
         UnusableUnitReason(..),
         pprReason,
@@ -82,6 +84,8 @@ import GHC.Prelude
 
 import GHC.Driver.DynFlags
 
+import GHC.Types.UnresolvedImport
+
 import GHC.Platform
 import GHC.Platform.Ways
 
@@ -102,15 +106,16 @@ import GHC.Unit.External.Visibility
 import GHC.Unit.External.Wired
 
 import GHC.Types.PkgQual
+import GHC.Types.SrcLoc (unLoc)
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
 
-import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 
+import GHC.Data.Maybe
 import GHC.Data.FastString
 import GHC.Data.OsPath qualified as OsPath
 import GHC.Data.ShortText qualified as ST
@@ -987,7 +992,7 @@ lookupModuleInAllUnits :: UnitState
                           -> ModuleName
                           -> [(Module, UnitInfo)]
 lookupModuleInAllUnits pkgs m
-  = case lookupModuleWithSuggestions pkgs m NoPkgQual of
+  = case lookupModuleWithSuggestions pkgs LookupUser m NoPkgQual of
       LookupFound a b -> [(a,fst b)]
       LookupMultiple rs -> map f rs
         where f (m,_) = (m, expectJust (lookupUnit pkgs (moduleUnit m)))
@@ -1002,7 +1007,7 @@ data LookupResult =
     -- | No modules found, but there were some hidden ones with
     -- an exact name match.  First is due to package hidden, second
     -- is due to module being hidden
-  | LookupHidden [UnitInfo] [(Module, ModuleOrigin)]
+  | LookupHidden [UnitInfo] [(Module, HiddenModuleUnitVisibility)]
     -- | No modules found, but there were some unusable ones with
     -- an exact name match
   | LookupUnusable [(Module, ModuleOrigin)]
@@ -1013,33 +1018,45 @@ data ModuleSuggestion = SuggestVisible ModuleName Module ModuleOrigin
                       | SuggestHidden ModuleName Module ModuleOrigin
 
 lookupModuleWithSuggestions :: UnitState
+                            -> ModuleLookupScope
                             -> ModuleName
                             -> PkgQual
                             -> LookupResult
 lookupModuleWithSuggestions pkgs
   = lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs)
 
--- | The package which the module **appears** to come from, this could be
--- the one which reexports the module from it's original package. This function
--- is currently only used for -Wunused-packages
-lookupModulePackage :: UnitState -> ModuleName -> PkgQual -> Maybe [UnitInfo]
-lookupModulePackage pkgs mn mfs =
-    case lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs) mn mfs of
-      LookupFound _ (orig_unit, origin) ->
-        case origin of
-          ModOrigin {fromOrigUnit, fromExposedReexport} ->
-            case fromOrigUnit of
-              -- Just True means, the import is available from its original location
-              Just True ->
-                pure [orig_unit]
-              -- Otherwise, it must be available from a reexport
-              _ -> pure fromExposedReexport
+-- | The unit which an imported module **appears** to come from.
+--
+-- Not necessarily the unit the module is defined in: could be a re-export.
+--
+-- Currently only used for @-Wunused-packages@.
+lookupModulePackage :: UnitState -> UnresolvedImport PkgQual -> Maybe [UnitInfo]
+lookupModulePackage pkgs imp =
+  case lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs) scope mn mfs of
+    LookupFound _ (orig_unit, origin) ->
+      case origin of
+        ModOrigin {fromOrigUnit, fromExposedReexport} ->
+          case fromOrigUnit of
+            -- Just True means, the import is available from its original location
+            Just True ->
+              pure [orig_unit]
+            -- Otherwise, it must be available from a reexport
+            _ -> pure fromExposedReexport
 
-          _ -> Nothing
+        -- The module is hidden from the user but the unit was resolved anyway,
+        -- e.g. we used 'LookupSystem'. The unit is used.
+        ModHidden {} -> pure [orig_unit]
 
-      _ -> Nothing
+        ModUnusable {} -> Nothing
+
+    _ -> Nothing
+  where
+    scope = unresolvedImportLookupScope (ui_origin imp)
+    mn = unLoc (ui_mod_name imp)
+    mfs = ui_pkg_qual imp
 
 lookupPluginModuleWithSuggestions :: UnitState
+                                  -> ModuleLookupScope
                                   -> ModuleName
                                   -> PkgQual
                                   -> LookupResult
@@ -1048,10 +1065,11 @@ lookupPluginModuleWithSuggestions pkgs
 
 lookupModuleWithSuggestions' :: UnitState
                             -> ModuleNameProvidersMap
+                            -> ModuleLookupScope
                             -> ModuleName
                             -> PkgQual
                             -> LookupResult
-lookupModuleWithSuggestions' pkgs mod_map name mb_pn
+lookupModuleWithSuggestions' pkgs mod_map scope name mb_pn
   = case lookupUniqMap mod_map name of
         Nothing -> LookupNotFound suggestions
         Just xs ->
@@ -1067,8 +1085,14 @@ lookupModuleWithSuggestions' pkgs mod_map name mb_pn
       let origin = filterOrigin mb_pn (mod_unit m) origin0
           x = (m, origin)
       in case origin of
-          ModHidden
-            -> (hidden_pkg, x:hidden_mod, unusable, exposed)
+          -- A module that is hidden from the user is still resolved by a
+          -- lookup GHC itself makes, provided the unit is visible.
+          -- See Note [Finding GHC.Essentials] in GHC.Builtin.
+          ModHidden HiddenModInVisibleUnit
+            | LookupSystem <- scope
+            -> (hidden_pkg, hidden_mod, unusable, x:exposed)
+          ModHidden hmu
+            -> (hidden_pkg, (m, hmu):hidden_mod, unusable, exposed)
           ModUnusable _
             -> (hidden_pkg, hidden_mod, x:unusable, exposed)
           ModOrigin { fromOrigUnit = origAvailableUnderSameName, fromHiddenReexport }
@@ -1100,8 +1124,8 @@ lookupModuleWithSuggestions' pkgs mod_map name mb_pn
     filterOrigin (OtherPkg u) pkg o =
       let match_pkg p = u == unitId p
       in case o of
-          ModHidden
-            | match_pkg pkg -> ModHidden
+          ModHidden {}
+            | match_pkg pkg -> o
             | otherwise     -> mempty
           ModUnusable _
             | match_pkg pkg -> o

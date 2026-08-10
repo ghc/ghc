@@ -62,7 +62,7 @@
         (NoEpTok)
         []))
       (NoSourceText)
-      (False))
+      (UserWrittenImport))
      (L
       (EpAnn
        (EpaSpan { DumpParsedAst.hs:5:8-16 })
