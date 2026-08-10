@@ -9,10 +9,26 @@ test('T27606a',
      compile_and_run,
      ['-package ghc'])
 
+test('T27606b',
+     [extra_run_opts(f'"{config.libdir}"'),
+      extra_files(['B.hs']),
+      req_rts_linker,
+      when(arch('wasm32'), skip)],
+     compile_and_run,
+     ['-package ghc'])
+
 test('T27606c',
      [extra_run_opts(f'"{config.libdir}"'),
       extra_files(['B.hs']),
       req_rts_linker,
+      when(arch('wasm32'), skip)],
+     compile_and_run,
+     ['-package ghc'])
+
+test('T27606d',
+     [extra_run_opts(f'"{config.libdir}"'),
+      req_rts_linker,
+      req_c,
       when(arch('wasm32'), skip)],
      compile_and_run,
      ['-package ghc'])
