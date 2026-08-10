@@ -4,6 +4,7 @@
 -- | Types used by the runtime interpreter
 module GHC.Runtime.Interpreter.Types
    ( Interp(..)
+   , interpLinkable
    , InterpInstance(..)
    , InterpProcess (..)
    , ExtInterp (..)
@@ -54,6 +55,8 @@ import GHC.Platform.Ways
 #endif
 import GHC.Utils.TmpFs
 import GHC.Utils.Logger
+import GHC.Utils.Outputable ( text, (<+>) )
+import GHC.Utils.Panic ( pprPanic )
 import GHC.Unit.Env
 import GHC.Unit.State
 import GHC.Unit.Types
@@ -62,6 +65,7 @@ import GHC.StgToJS.Linker.Types
 import GHC.Runtime.Interpreter.Types.SymbolCache
 
 import Control.Concurrent
+import System.FilePath  ( stripExtension, (<.>) )
 import System.Process   ( ProcessHandle, CreateProcess )
 import System.IO
 import GHC.Unit.Finder.Types (FinderCache, FinderOpts)
@@ -79,7 +83,24 @@ data Interp = Interp
 
   , interpStringCache :: !(MVar (FastStringEnv (RemotePtr ())))
       -- ^ MallocStrings cache
+
+  , interpObjSuffix :: !(Maybe (String, String))
+      -- ^ @(from, to)@ object suffixes to swap when the interpreter cannot
+      -- load objects built the target's way. See 'interpLinkable'.
   }
+
+-- | The linkable, but swap the object to the correct variant (dyn/no-dyn) for the
+-- interpreter. We don't change the hash on purpose, as the code is the same in
+-- both variants, and we don't want to recompile needlessly.
+interpLinkable :: Interp -> Linkable -> Linkable
+interpLinkable interp lnk = case interpObjSuffix interp of
+  Nothing -> lnk
+  Just (from, to) -> lnk { linkableParts = fmap swap (linkableParts lnk) }
+    where
+      swap (DotO file ModuleObject) = case stripExtension from file of
+        Just base -> DotO (base <.> to) ModuleObject
+        Nothing   -> pprPanic "interpLinkable" (text file <+> text from)
+      swap part = part
 
 data InterpInstance
    = ExternalInterp !ExtInterp -- ^ External interpreter
