@@ -11,3 +11,6 @@ class C rep (a :: TYPE rep) where
 
 upd :: forall rep (a :: TYPE rep). X a -> a
 upd ( MkX bndr_a ) = bndr_a
+
+upd2 :: forall rep (a :: TYPE rep). X a -> ()
+upd2 ( MkX {} ) = ()

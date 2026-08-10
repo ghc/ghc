@@ -1,0 +1,10 @@
+section: compiler
+issues: #20363
+mrs: !16342
+synopsis:
+  Allow type families in representation of newtype constructor patterns
+description:
+  GHC now allows type family applications to occur in the representations of
+  newtype constructor patterns (with ``-XUnliftedNewtypes``) as long as they
+  reduce to a concrete runtime representation, instead of rejecting with a
+  representation polymorphism error.

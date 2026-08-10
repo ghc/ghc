@@ -48,14 +48,14 @@ T23398.$wbar
       ($dShow :: Show a)
       (ww1 :: GHC.Internal.Prim.Int#)
       (eta :: a) ->
-      case ww1 of ds {
+      case ww1 of wild {
         __DEFAULT ->
           T23398.$wbar
             @a
             @b
             @~(ww :: a GHC.Internal.Prim.~# b)
             $dShow
-            (GHC.Internal.Prim.-# ds 1#)
+            (GHC.Internal.Prim.-# wild 1#)
             eta;
         0# -> (# eta `cast` (Sub ww :: a ~R# b), show @a $dShow eta #)
       }

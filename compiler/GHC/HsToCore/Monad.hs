@@ -47,6 +47,8 @@ module GHC.HsToCore.Monad (
         -- Data types
         DsMatchContext(..),
         EquationInfo(..), EquationInfoNE, prependPats, mkEqnInfo, eqnMatchResult,
+        MatchId(..), mkMatchId, castMatchId,
+        matchIdExpr, matchIdType, matchIdMult, matchIdScaledType,
         MatchResult (..), runMatchResult, DsWrapper, idDsWrapper,
 
         -- Trace injection
@@ -69,6 +71,7 @@ import GHC.HsToCore.Pmc.Solver.Types (initNablas)
 
 import GHC.Core.FamInstEnv
 import GHC.Core
+import GHC.Core.Coercion ( MCoercionR, MCoercion(..), coercionRKind, mkTransMCo )
 import GHC.Core.Make  ( unitExpr )
 import GHC.Core.Utils ( exprType )
 import GHC.Core.DataCon
@@ -211,6 +214,118 @@ runMatchResult :: CoreExpr -> MatchResult a -> DsM a
 runMatchResult fail = \case
   MR_Infallible body -> body
   MR_Fallible body_fn -> body_fn fail
+
+{-
+************************************************************************
+*                                                                      *
+                          Match Ids
+*                                                                      *
+************************************************************************
+-}
+
+
+-- | The scrutinee of one column of a pattern match: a (possibly casted) variable.
+--
+-- See Note [Match Ids].
+data MatchId
+  = MatchId
+      { matchId :: Id
+        -- ^ The match variable.
+      , matchCo :: MCoercionR
+      }
+
+instance Outputable MatchId where
+  ppr = ppr . matchIdExpr
+
+-- | Create a 'MatchId' from a match variable.
+mkMatchId :: Id -> MatchId
+mkMatchId v = MatchId { matchId = v, matchCo = MRefl }
+
+-- | Cast a 'MatchId'.
+castMatchId :: MatchId -> MCoercionR -> MatchId
+castMatchId (MatchId v mco) mco' = MatchId v (mco `mkTransMCo` mco')
+
+-- | Compute the scrutinee expression corresponding to a 'MatchId': the casted
+-- match varible.
+matchIdExpr :: MatchId -> CoreExpr
+matchIdExpr (MatchId v MRefl)    = Var v
+matchIdExpr (MatchId v (MCo co)) = Var v `Cast` co
+
+-- | The type of the scrutinee expression ('matchIdExpr').
+matchIdType :: MatchId -> Type
+matchIdType (MatchId v MRefl)    = idType v
+matchIdType (MatchId _ (MCo co)) = coercionRKind co
+
+-- | The multiplicity at which this column of the pattern match was typechecked.
+matchIdMult :: MatchId -> Mult
+matchIdMult = idMult . matchId
+
+-- | The type of the scrutinee expression, scaled by the multiplicity of the
+-- match variable.
+matchIdScaledType :: MatchId -> Scaled Type
+matchIdScaledType mid = Scaled (matchIdMult mid) (matchIdType mid)
+
+{- Note [Match Ids]
+~~~~~~~~~~~~~~~~~~~
+We desugar pattern matching by using casted matching variables as the scrutinees
+of each individual matching function (in GHC.HsToCore.Match and friends).
+
+A match variable is an 'Id'. As such, it contains not only the match variable's
+name, but also its type and the multiplicity at which its column has been typechecked.
+The desugared expression may sometimes use the underlying variable in a local
+binding or as a case binder, so it should not have an External name (Lint
+rejects non-top-level binders with External names, see #13043).
+See Note [Localise pattern binders] in GHC.HsToCore.Utils.
+
+A 'MatchId' is a casted match variable. The cast allows the pattern matching
+functions to accumulate coercions as they go, instead of needing to bind
+intermediate variables as in:
+
+  let v' = v |> co in <match against v'>
+
+Avoiding these intermediate variables is important for
+Note [Typechecking newtype constructor patterns] in GHC.Tc.Gen.Pat.
+The newtype unwrapping coercion of a representation-polymorphic unlifted newtype
+may have LHS/RHS types that do not have a fixed RuntimeRep.
+Instead, two casts from different origins must coalesce: the newtype unwrapping
+coercion and the coercion introduced by representation-polymorphism checking.
+
+Example (T20363):
+
+  type NilRep :: RuntimeRep
+  type family NilRep where { NilRep = TupleRep '[] }
+  type UnitTupleNT :: TYPE NilRep
+  newtype UnitTupleNT = MkNT (# #)
+
+  f :: UnitTupleNT -> ()
+  f (MkNT x) = ()
+
+After elaboration by the typechecker, the pattern has the shape
+
+  (MkNT (x |> arg_co)) |> k_co
+    -- k_co   :: (UnitTupleNT |> kco) ~R# UnitTupleNT
+    -- arg_co :: fld_ty ~R# (fld_ty |> arg_kco)
+
+Matching proceeds by pushing casts onto the match variable:
+
+  v                              :: UnitTupleNT |> kco
+    -- (matchCoercion)
+  v |> k_co                      :: UnitTupleNT
+    -- (matchNewtypeCon)
+  v |> (k_co ; nt_co)            :: fld_ty
+    -- (matchCoercion)
+  v |> (k_co ; nt_co ; arg_co)   :: fld_ty |> arg_kco
+    -- (bindMatchId)
+  let x = v |> (k_co ; nt_co ; arg_co) in ()
+
+We thus end up with a single let binding whose binder, x, has a fixed RuntimeRep.
+Crucially, we avoid ever producing a binding such as
+
+  let y :: UnitTupleNT :: TYPE NilRep
+      y = v |> k_co
+
+in which the binder does not have a fixed RuntimeRep.
+-}
 
 {-
 ************************************************************************

@@ -21,6 +21,10 @@ import {-# SOURCE #-} GHC.HsToCore.Match ( match )
 import GHC.Hs
 import GHC.HsToCore.Binds
 import GHC.Core.ConLike
+import GHC.Core.Coercion ( MCoercion(..), coercionLKind, mkUnbranchedAxInstCo )
+import GHC.Core.DataCon ( dataConTyCon )
+import GHC.Core.TyCon ( isNewTyCon, newTyConCo )
+import GHC.Tc.Types.Evidence ( isEmptyTcEvBinds, isIdHsWrapper )
 import GHC.Tc.Utils.TcType
 import GHC.Core.Multiplicity
 import GHC.HsToCore.Monad
@@ -91,31 +95,92 @@ have-we-used-all-the-constructors? question; the local function
 @match_cons_used@ does all the real work.
 -}
 
-matchConFamily :: NonEmpty Id
+matchConFamily :: NonEmpty MatchId
                -> Type
                -> NonEmpty (NonEmpty EquationInfoNE)
                -> DsM (MatchResult CoreExpr)
 -- Each group of eqns is for a single constructor
-matchConFamily (var :| vars) ty groups
-  = do let mult = idMult var
+matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
+
+  -- Desugar a newtype constructor match using a cast.
+  | RealDataCon dc <- con1
+  , isNewTyCon (dataConTyCon dc)
+  = assertPpr (null other_groups) (ppr con1) $
+    matchNewtypeCon var vars ty group1
+
+  | otherwise
+  = do let mult = matchIdMult var
            -- Each variable in the argument list correspond to one column in the
            -- pattern matching equations. Its multiplicity is the context
            -- multiplicity of the pattern. We extract that multiplicity, so that
            -- 'matchOneconLike' knows the context multiplicity, in case it needs
            -- to come up with new variables.
        alts <- mapM (fmap toRealAlt . matchOneConLike vars ty mult) groups
-       return (mkCoAlgCaseMatchResult var ty alts)
+       return (mkDataConCase var ty alts)
   where
+    ConPat { pat_con = L _ con1 } = firstPat (NE.head group1)
+
     toRealAlt alt = case alt_pat alt of
         RealDataCon dcon -> alt{ alt_pat = dcon }
         _ -> panic "matchConFamily: not RealDataCon"
 
-matchPatSyn :: NonEmpty Id
+matchNewtypeCon
+  :: HasDebugCallStack
+  => MatchId -> [MatchId] -> Type
+  -> NonEmpty EquationInfoNE
+  -> DsM (MatchResult CoreExpr)
+matchNewtypeCon var vars ty eqns
+  = assertPpr (matchIdType var `eqType` coercionLKind nt_co)
+              (ppr var $$ ppr nt_co) $
+
+    -- Push the newtype coercion into the 'MatchId' and continue with
+    -- the inner pattern.
+    match (var `castMatchId` MCo nt_co : vars) ty
+          (NE.toList (field_pat <$> eqns))
+  where
+    ConPat { pat_con = L _ con1
+           , pat_con_ext = ConPatTc { cpt_arg_tys = arg_tys } }
+      = firstPat (NE.head eqns)
+    dc = case con1 of
+      RealDataCon dc' -> dc'
+      PatSynCon {}    -> pprPanic "matchNewtypeCon" (ppr con1)
+
+    fld_tys = conLikeInstOrigArgTys con1 arg_tys -- Newtypes have no existentials
+
+    nt_co = mkUnbranchedAxInstCo Representational
+              (newTyConCo (dataConTyCon dc)) arg_tys []
+      -- nt_co :: N arg_tys ~R# fld_ty
+
+    -- Replace the constructor pattern with its inner field pattern.
+    field_pat :: EquationInfoNE -> EquationInfoNE
+    field_pat ( EqnMatch { eqn_pat = L _ p, eqn_rest = rest })
+      | ConPat
+        { pat_con_ext = _con_pat_tc
+        , pat_args    = args
+        } <- p
+      = assertPpr (isTrivialConPatTc _con_pat_tc) (ppr con1) $
+        prependPats (conArgPats fld_tys args) rest
+    field_pat eqn = pprPanic "matchNewtypeCon" (ppr eqn)
+
+-- | Is this 'ConPatTc' trivial, in that it contains no existentials, no
+-- dictionaries or evidence bindings, only identity 'HsWrapper's, etc?
+isTrivialConPatTc :: ConPatTc -> Bool
+isTrivialConPatTc (ConPatTc _arg_tys tvs dicts binds wrap) =
+  -- NB: Use a positional pattern match in order to guarantee that all fields
+  --     will continue to be handled if new fields are added.
+  and
+    [ null tvs
+    , null dicts
+    , isEmptyTcEvBinds binds
+    , isIdHsWrapper wrap
+    ]
+
+matchPatSyn :: NonEmpty MatchId
             -> Type
             -> NonEmpty EquationInfoNE
             -> DsM (MatchResult CoreExpr)
 matchPatSyn (var :| vars) ty eqns
-  = do let mult = idMult var
+  = do let mult = matchIdMult var
        alt <- fmap toSynAlt $ matchOneConLike vars ty mult eqns
        return (mkCoSynCaseMatchResult var ty alt)
   where
@@ -125,7 +190,7 @@ matchPatSyn (var :| vars) ty eqns
 
 type ConArgPats = HsConPatDetails GhcTc
 
-matchOneConLike :: [Id]
+matchOneConLike :: [MatchId]
                 -> Type
                 -> Mult
                 -> NonEmpty EquationInfoNE
@@ -148,7 +213,7 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
               match_group arg_vars arg_eqn_prs
                 = do { (wraps, eqns') <- liftM NE.unzip (mapM shift arg_eqn_prs)
                      ; let group_arg_vars = select_arg_vars arg_vars arg_eqn_prs
-                     ; match_result <- match (group_arg_vars ++ vars) ty (NE.toList eqns')
+                     ; match_result <- match (map mkMatchId group_arg_vars ++ vars) ty (NE.toList eqns')
                      ; return $ foldr1 (.) wraps <$> match_result
                      }
 

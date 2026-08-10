@@ -37,7 +37,7 @@ import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Core.Multiplicity
-import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_kind )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Core.TyCo.Ppr ( pprTyVars )
@@ -409,6 +409,27 @@ pattern.
 This does not work so well for the HsCtxt carried by the monad: we don't
 want the error-context for the pattern to scope over the RHS.
 Hence the getErrCtxt/setErrCtxt stuff in tcMultiple
+
+Note [Patterns & FixedRuntimeRep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tcPat always checks a pattern against an expected (result) type which has a
+syntactically fixed RuntimeRep (in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete).
+
+This is because all patterns can be thought to be in argument position, in the
+sense of Note [Representation polymorphism invariants] in GHC.Core.
+Indeed, when desugaring:
+
+  - ConPat turns into a case statement, whose scrutinee must be FRR,
+  - Generally, any sub-pattern may become a match variable, also required to be FRR.
+
+To achieve this, we may need to insert some representation-polymorphism casts,
+like we do when typechecking function arguments (in 'matchExpectedFunTy').
+For expressions, any non-FRR argument must be wrapped in a cast making it FRR.
+For patterns (due to their contravariant nature), we instead require that any
+non-FRR pattern must be a CoPat containing a cast that makes the inner pattern
+FRR (see 'withFixedRuntimeRepPat'). The desugarer then accumulates these casts
+into its MatchId type (see Note [Match Ids]), which ensures that every generated
+match variable is FRR.
 -}
 
 --------------------
@@ -446,7 +467,7 @@ tcMultiple tc_pat penv args thing_inside
         ; loop args }
 
 --------------------
-tc_lpat :: Scaled ExpSigmaTypeFRR
+tc_lpat :: Scaled ExpSigmaTypeFRR -- ^ expected type (FRR because of Note [Patterns & FixedRuntimeRep])
         -> Checker (LPat GhcRn) (LPat GhcTc)
 tc_lpat pat_ty penv (L span pat) thing_inside
   = setSrcSpanA span $
@@ -454,7 +475,7 @@ tc_lpat pat_ty penv (L span pat) thing_inside
                                           thing_inside
         ; return (L span pat', res) }
 
-tc_lpats :: [Scaled ExpSigmaTypeFRR]
+tc_lpats :: [Scaled ExpSigmaTypeFRR] -- ^ expected types (FRR because of Note [Patterns & FixedRuntimeRep])
          -> Checker [LPat GhcRn] [LPat GhcTc]
 tc_lpats tys penv pats
   = assertPpr (equalLength pats tys) (ppr pats $$ ppr tys) $
@@ -609,7 +630,7 @@ tc_ty_pat tp tv thing_inside
        ; return (arg_ty, result) }
 
 tc_pat  :: Scaled ExpSigmaTypeFRR
-        -- ^ Fully refined result type
+        -- ^ fully refined result type (FRR because of Note [Patterns & FixedRuntimeRep]))
         -> Checker (Pat GhcRn) (Pat GhcTc)
         -- ^ Translated pattern
 
@@ -1192,15 +1213,9 @@ tcDataConPat (L con_span con_name) data_con pat_ty_scaled
                      -- Why "super"? See Note [Super skolems: binding when looking up instances]
                      -- in GHC.Core.InstEnv.
 
-        ; let arg_tys'       = substScaledTys tenv arg_tys
-              pat_mult       = scaledMult pat_ty_scaled
-              arg_tys_scaled = map (scaleScaled pat_mult) arg_tys'
+        ; let pat_mult       = scaledMult pat_ty_scaled
+              arg_tys_scaled = map (scaleScaled pat_mult) (substScaledTys tenv arg_tys)
               con_like       = RealDataCon data_con
-
-        -- This check is necessary to uphold the invariant that 'tcConArgs'
-        -- is given argument types with a fixed runtime representation.
-        -- See test case T20363.
-        ; checkFixedRuntimeRep data_con arg_tys'
 
         ; traceTc "tcConPat" (vcat [ text "con_name:" <+> ppr con_name
                                    , text "univ_tvs:" <+> pprTyVars univ_tvs
@@ -1210,7 +1225,7 @@ tcDataConPat (L con_span con_name) data_con pat_ty_scaled
                                    , text "ex_tvs':" <+> pprTyVars ex_tvs'
                                    , text "ctxt_res_tys:" <+> ppr ctxt_res_tys
                                    , text "pat_ty:" <+> ppr pat_ty
-                                   , text "arg_tys':" <+> ppr arg_tys'
+                                   , text "arg_tys:" <+> ppr arg_tys_scaled
                                    , text "arg_pats" <+> ppr arg_pats ])
 
         ; (univ_ty_args, ex_ty_args, val_arg_pats) <- splitConTyArgs con_like arg_pats
@@ -1292,7 +1307,6 @@ tcPatSynPat (L con_span con_name) pat_syn pat_ty penv arg_pats thing_inside
         ; let ty'         = substTy tenv ty
               arg_tys'    = substScaledTys tenv arg_tys
               pat_mult    = scaledMult pat_ty
-              arg_tys_scaled = map (scaleScaled pat_mult) arg_tys'
               prov_theta' = substTheta tenv prov_theta
               req_theta'  = substTheta tenv req_theta
               con_like    = PatSynCon pat_syn
@@ -1324,8 +1338,6 @@ tcPatSynPat (L con_span con_name) pat_syn pat_ty penv arg_pats thing_inside
           -- Pattern synonyms can never have representation-polymorphic argument types,
           -- as checked in 'GHC.Tc.Gen.Sig.tcPatSynSig' (see use of 'FixedRuntimeRepPatSynSigArg')
           -- and 'GHC.Tc.TyCl.PatSyn.tcInferPatSynDecl'.
-          -- (If you want to lift this restriction, use 'hasFixedRuntimeRep' here, to match
-          -- 'tcDataConPat'.)
         ; let
             bad_arg_tys :: [(Int, Scaled Type)]
             bad_arg_tys = filter (\ (_, Scaled _ arg_ty) -> not (typeHasFixedRuntimeRep arg_ty))
@@ -1333,6 +1345,7 @@ tcPatSynPat (L con_span con_name) pat_syn pat_ty penv arg_pats thing_inside
         ; massertPpr (null bad_arg_tys) $
             vcat [ text "tcPatSynPat: pattern arguments do not have a fixed RuntimeRep"
                  , text "bad_arg_tys:" <+> ppr bad_arg_tys ]
+        ; let arg_tys_scaled = map (scaleScaled pat_mult) arg_tys'
 
         ; traceTc "checkConstraints {" Outputable.empty
         ; prov_dicts' <- newEvVars prov_theta'
@@ -1358,13 +1371,66 @@ tcPatSynPat (L con_span con_name) pat_syn pat_ty penv arg_pats thing_inside
         ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat wrap res_pat pat_ty, res) }
 
-checkFixedRuntimeRep :: DataCon -> [Scaled TcSigmaTypeFRR] -> TcM ()
-checkFixedRuntimeRep data_con arg_tys
-  = zipWithM_ check_one [1..] arg_tys
-  where
-    check_one i arg_ty = hasFixedRuntimeRep_syntactic
-                            (FRRDataConPatArg data_con i)
-                            (scaledThing arg_ty)
+-- | The context to report to the user when one value argument of a constructor
+-- pattern is found not to have a fixed 'RuntimeRep'.
+conArgFRRContext :: ConLike
+                 -> Int   -- ^ 1-indexed (value) argument position
+                 -> FixedRuntimeRepContext
+conArgFRRContext con_like arg_pos = case con_like of
+  RealDataCon data_con -> FRRDataConPatArg data_con arg_pos
+  PatSynCon   {}       -> FRRPatSynArg
+
+{- Note [Typechecking newtype constructor patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Unlike the fields of ordinary data constructors, the argument type of a
+newtype constructor is not required to have a fixed RuntimeRep at the
+declaration site. For example:
+
+  {-# LANGUAGE UnliftedNewtypes #-}
+  type RR :: Type -> RuntimeRep
+  type family RR a where { RR Int = IntRep }
+  type T :: forall a -> TYPE (RR a)
+  type family T a where { T Int = Int# }
+  type N :: forall a -> TYPE (RR a)
+  newtype N a = MkN (T a)
+
+However, we require that at **occurrences** of 'MkN' the field has a fixed
+RuntimeRep, both in expressions and in patterns. For example, a pattern of type
+'MkN @Int` has a field of type `T Int`, whose kind is `TYPE (RR Int)`. Since
+`RR Int` = `IntRep`, we know the runtime-rep of the pattern. But a pattern of
+type `MkN @Bool` has a field whose kind is `TYPE (RR Bool)` and there is no
+type instance for `RR Bool`, so we don't know the runtime rep.
+
+The mechanism to achieve this in expressions in described in
+Note [Representation-polymorphism checks for unsaturated unlifted newtypes]
+in GHC.Tc.Utils.Concrete.
+
+For occurrences of newtype constructors in patterns, typechecking proceeds as
+follows in 'tcConArg':
+
+  (TcNewConPat1)
+    Perform a representation-polymorphism check on the (instantiated) field
+    type, obtaining a kind coercion
+
+       arg_kco :: typeKind fld_ty ~# TYPE conc_rep
+
+  (TcNewConPat2)
+    Typecheck the argument pattern at the casted type (fld_ty |> arg_kco),
+    which has a syntactically fixed RuntimeRep. Then wrap the result in a cast:
+
+      arg_co :: fld_ty ~R# (fld_ty |> arg_kco)
+
+The cast introduced in (TcNewConPat2) sits /inside/ the 'ConPat', between the
+constructor and the field pattern. This is essential: the purpose of the cast
+is to change the type at which the field pattern is typechecked. If we put the
+cast around the whole 'ConPat', the newtype constructor field pattern would have
+the non-concrete type 'fld_ty', which would lead to a non-FRR binder when
+desugaring the pattern match -- exactly what we are trying to avoid.
+
+The desugarer compiles the match without ever binding a variable at a non-FRR
+type, by accumulating casts into the scrutinee, as per Note [Match Ids]
+in GHC.HsToCore.Monad.
+-}
 
 {- Note [Call-stack tracing of pattern synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1611,15 +1677,17 @@ linearity checking on the omitted fields.
 -}
 
 tcConValArgs :: ConLike
-             -> [Scaled TcSigmaTypeFRR]
+             -> [Scaled TcSigmaType]
              -> Checker (HsConPatDetails GhcRn) (HsConPatDetails GhcTc)
 tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
   PrefixCon x arg_pats -> do
         -- NB: Type arguments already dealt with by splitConTyArgs, tcConTyArgs.
         -- See Note [Type applications in patterns]
         { report_invis_arg_pats arg_pats
-        ; let pats_w_tys = zipEqual arg_pats arg_tys
-        ; (arg_pats', res) <- tcMultiple tcConArg penv pats_w_tys thing_inside
+        ; let pats_w_tys = assert (length arg_pats == length arg_tys)
+                         $ zip3 [1..] arg_pats arg_tys
+
+        ; (arg_pats', res) <- tcMultiple (tcConArg con_like) penv pats_w_tys thing_inside
 
         -- Return only /value/ patterns, all /type/ patterns are discarded.
         -- This is also what tcMatchPats does, and Note [tcMatchPats] explains why.
@@ -1638,7 +1706,8 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
 
   InfixCon x p1 p2 -> do
         { let [arg_ty1,arg_ty2] = arg_tys       -- This can't fail after splitConTyArgs
-        ; ([p1',p2'], res) <- tcMultiple tcConArg penv [(p1,arg_ty1),(p2,arg_ty2)]
+        ; ([p1',p2'], res) <- tcMultiple (tcConArg con_like) penv
+                                                  [(1,p1,arg_ty1),(2,p2,arg_ty2)]
                                                   thing_inside
         ; return (InfixCon x p1' p2', res) }
 
@@ -1653,20 +1722,27 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
                 (L l (HsFieldBind ann (L loc (FieldOcc rdr (L lr sel))) pat pun))
                 thing_inside
         = do { sel'   <- tcLookupId sel
-             ; pat_ty <- setSrcSpanA loc $ find_field_ty sel
+             ; (arg_pos, pat_ty) <- setSrcSpanA loc $ find_field_ty sel
                                             (occNameFS $ rdrNameOcc rdr)
-             ; (pat', res) <- tcConArg penv (pat, pat_ty) thing_inside
+             ; (pat', res) <- tcConArg con_like penv (arg_pos, pat, pat_ty) thing_inside
              ; return (L l (HsFieldBind ann (L loc (FieldOcc rdr (L lr sel'))) pat'
                                                                         pun), res) }
       -- See Note [Omitted record fields and linearity]
       check_omitted_fields_multiplicity :: TcM ()
-      check_omitted_fields_multiplicity = do
-        forM_ omitted_field_tys $ \(fl, pat_ty) ->
+      check_omitted_fields_multiplicity =
+        forM_ omitted_field_tys $ \(fl, _, pat_ty) ->
           tcSubMult (OmittedFieldOrigin fl) ManyTy (scaledMult pat_ty)
 
-      find_field_ty :: Name -> FastString -> TcM (Scaled TcType)
+      -- NB: omitted fields need no representation-polymorphism checks:
+      --
+      --  - non-newtype DataCon arguments always have a syntactically fixed
+      --    RuntimeRep
+      --  - newtype coercion axioms are homogeneous, so an omitted field has the
+      --    same kind as the pattern itself and doesn't need its own check
+
+      find_field_ty :: Name -> FastString -> TcM (Int, Scaled TcType)
       find_field_ty sel lbl
-        = case [ty | (Just fl, ty) <- bound_field_tys, flSelector fl == sel ] of
+        = case [(i,ty) | (Just fl, i, ty) <- bound_field_tys, flSelector fl == sel ] of
 
                 -- No matching field; chances are this field label comes from some
                 -- other record type (or maybe none).  If this happens, just fail,
@@ -1681,15 +1757,16 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
                 traceTc "find_field" (ppr pat_ty <+> ppr extras)
                 assert (null extras) (return pat_ty)
 
-      bound_field_tys, omitted_field_tys :: [(Maybe FieldLabel, Scaled TcType)]
+      -- The 'Int' is the position of the field in the constructor, from 1.
+      bound_field_tys, omitted_field_tys :: [(Maybe FieldLabel, Int, Scaled TcType)]
       (bound_field_tys, omitted_field_tys) = partition is_bound all_field_tys
 
-      is_bound :: (Maybe FieldLabel, Scaled TcType) -> Bool
-      is_bound (Just fl, _) = elem (flSelector fl) (map (\(L _ (HsFieldBind _ (L _ (FieldOcc _ sel )) _ _)) -> unLoc sel) rpats)
+      is_bound :: (Maybe FieldLabel, Int, Scaled TcType) -> Bool
+      is_bound (Just fl, _, _) = elem (flSelector fl) (map (\(L _ (HsFieldBind _ (L _ (FieldOcc _ sel )) _ _)) -> unLoc sel) rpats)
       is_bound _ = False
 
-      all_field_tys :: [(Maybe FieldLabel, Scaled TcType)]
-      all_field_tys = zip con_field_labels arg_tys
+      all_field_tys :: [(Maybe FieldLabel, Int, Scaled TcType)]
+      all_field_tys = zip3 con_field_labels [1..] arg_tys
           -- If the constructor isn't really a record, then dataConFieldLabels
           -- will be empty (and each field in the pattern will generate an error
           -- below). We still need those unnamed fields for
@@ -1845,9 +1922,39 @@ tcConTyArg tenv penv (rn_ty, con_tv) thing_inside
 
        ; return ((), result) }
 
-tcConArg :: Checker (LPat GhcRn, Scaled TcSigmaType) (LPat GhcTc)
-tcConArg penv (arg_pat, Scaled arg_mult arg_ty)
-  = tc_lpat (Scaled arg_mult (mkCheckExpType arg_ty)) penv arg_pat
+-- | Typecheck a constructor argument pattern against its expected type.
+--
+-- See Note [Patterns & FixedRuntimeRep] as well as
+-- Note [Typechecking newtype constructor patterns].
+tcConArg :: ConLike -> Checker (Int, LPat GhcRn, Scaled TcSigmaType) (LPat GhcTc)
+tcConArg con_like penv (arg_pos, arg_pat, Scaled arg_mult arg_ty) thing_inside
+  = withFixedRuntimeRepPat (conArgFRRContext con_like arg_pos) arg_ty $
+    \ arg_ty_frr ->
+      tc_lpat (Scaled arg_mult (mkCheckExpType arg_ty_frr)) penv arg_pat thing_inside
+
+-- | Perform a representation polymorphism check on the expected type of
+-- a pattern:
+--
+--   - takes in @arg_ty@, the expected type of the pattern
+--   - does a representation polymorphism check on @arg_ty@ to obtain @arg_ty_frr = arg_ty |> kco@,
+--   - typechecks the pattern at type @arg_ty_frr@, returning @arg_pat'@,
+--   - returns @CoPat (GRefl arg_ty kco) arg_pat'@, which has type @arg_ty@.
+--
+-- See Note [Patterns & FixedRuntimeRep].
+withFixedRuntimeRepPat
+  :: FixedRuntimeRepContext
+  -> TcType
+      -- ^ expected pattern type
+  -> (TcTypeFRR -> TcM (LPat GhcTc, r))
+      -- ^ typecheck the pattern against the FRR expected type @ty |> kco@
+  -> TcM (LPat GhcTc, r)
+withFixedRuntimeRepPat frr_ctxt ty thing_inside
+  = do { kco <- hasFixedRuntimeRep_kind frr_ctxt ty
+             -- kco :: typeKind ty ~# TYPE conc_rep
+       ; (pat', res) <- thing_inside (ty `mkCastTyMCo` kco)
+       ; let co = mkGReflRightMCo Representational ty kco
+             -- co :: ty ~R# (ty |> kco)
+       ; return (mkLHsWrapPat (mkWpCastR co) pat' ty, res) }
 
 addDataConStupidTheta :: DataCon -> [TcType] -> TcM ()
 -- Instantiate the "stupid theta" of the data con, and throw

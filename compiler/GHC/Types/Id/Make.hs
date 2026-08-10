@@ -19,7 +19,7 @@ module GHC.Types.Id.Make (
 
         mkFCallId,
 
-        wrapNewTypeBody, unwrapNewTypeBody, wrapFamInstBody,
+        wrapNewTypeBody, wrapFamInstBody,
         DataConBoxer(..), vanillaDataConBoxer,
         mkDataConRep, mkDataConWorkId,
         DataConBangOpts (..), BangOpts (..),
@@ -1911,16 +1911,6 @@ wrapNewTypeBody tycon args result_expr
     mkCast result_expr (mkSymCo co)
   where
     co = mkUnbranchedAxInstCo Representational (newTyConCo tycon) args []
-
--- When unwrapping, we do *not* apply any family coercion, because this will
--- be done via a CoPat by the type checker.  We have to do it this way as
--- computing the right type arguments for the coercion requires more than just
--- a splitting operation (cf, GHC.Tc.Gen.Pat.tcConPat).
-
-unwrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
-unwrapNewTypeBody tycon args result_expr
-  = assert (isNewTyCon tycon) $
-    mkCast result_expr (mkUnbranchedAxInstCo Representational (newTyConCo tycon) args [])
 
 -- If the type constructor is a representation type of a data instance, wrap
 -- the expression into a cast adjusting the expression type, which is an

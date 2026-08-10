@@ -8,9 +8,9 @@ $wfoo
       letrec {
         $wblah
           = \ ww2 ->
-              case ww2 of ds {
+              case ww2 of wild {
                 __DEFAULT ->
-                  case $wblah (-# ds 1#) of ww3 { __DEFAULT -> +# ww ww3 };
+                  case $wblah (-# wild 1#) of ww3 { __DEFAULT -> +# ww ww3 };
                 0# -> 0#
               }; } in
       $wblah ww1

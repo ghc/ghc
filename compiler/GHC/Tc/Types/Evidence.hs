@@ -9,7 +9,7 @@ module GHC.Tc.Types.Evidence (
   mkWpEvLams, mkWpLet, mkWpFun, mkWpCastN, mkWpCastR, mkWpEta, mkWpSubType,
   SubMultCo(..), mkSubMultFunCo, subMultCoRKind,
   collectHsWrapBinders,
-  idHsWrapper, isIdHsWrapper,
+  idHsWrapper, isIdHsWrapper, hsWrapperCast_maybe,
   pprHsWrapper, hsWrapDictBinders,
   optSubTypeHsWrapper,
 
@@ -501,6 +501,15 @@ idHsWrapper = WpHole
 isIdHsWrapper :: HsWrapper -> Bool
 isIdHsWrapper WpHole = True
 isIdHsWrapper _      = False
+
+-- | Is this 'HsWrapper' a cast?
+hsWrapperCast_maybe :: HsWrapper -> Maybe TcMCoercionR
+hsWrapperCast_maybe = go
+  where
+    go WpHole      = Just MRefl
+    go (WpCast co) = Just (MCo co)
+    -- NB: <.> composes casts, so no need to check 'WpCompose'.
+    go _           = Nothing
 
 hsWrapDictBinders :: HsWrapper -> Bag DictId
 -- ^ Identifies the /lambda-bound/ dictionaries of an 'HsWrapper'. This is used

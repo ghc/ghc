@@ -164,33 +164,17 @@ applying ``the mixture rule'' (SLPJ, p.~88) [which really {\em
 un}mixes the equations], producing a list of equation-info
 blocks, each block having as its first column patterns compatible with each other.
 
-Note [Match Ids]
-~~~~~~~~~~~~~~~~
-Most of the matching functions take an Id or [Id] as argument.  This Id
-is the scrutinee(s) of the match. The desugared expression may
-sometimes use that Id in a local binding or as a case binder.  So it
-should not have an External name; Lint rejects non-top-level binders
-with External names (#13043).
-
-See also Note [Localise pattern binders] in GHC.HsToCore.Utils
 -}
 
-type MatchId = Id   -- See Note [Match Ids]
-
 match :: [MatchId]        -- ^ Variables rep\'ing the exprs we\'re matching with
-                          -- ^ See Note [Match Ids]
-                          --
-                          -- ^ Note that the Match Ids carry not only a name, but
-                          -- ^ also the multiplicity at which each column has been
-                          -- ^ type checked.
       -> Type             -- ^ Type of the case expression
-      -> [EquationInfo]   -- ^ Info about patterns, etc. (type synonym below)
+      -> [EquationInfo]   -- ^ Info about patterns, etc
       -> DsM (MatchResult CoreExpr) -- ^ Desugared result!
 
 match [] ty eqns = maybe (assertPprPanic (ppr ty)) combineEqnRhss $ nonEmpty eqns
 
 match (v:vs) ty eqns    -- Eqns can be empty, but each equation is nonempty
-  = assertPpr (all (isInternalName . idName) vars) (ppr vars) $
+  = assertPpr (all (isInternalName . idName . matchId) vars) (ppr vars) $
     do  { dflags <- getDynFlags
         ; let platform = targetPlatform dflags
                 -- Tidy the first pattern, generating
@@ -253,7 +237,7 @@ matchEmpty :: MatchId -> Type -> DsM (NonEmpty (MatchResult CoreExpr))
 matchEmpty var res_ty
   = return [MR_Fallible mk_seq]
   where
-    mk_seq fail = return $ mkWildCase (Var var) (idScaledType var) res_ty
+    mk_seq fail = return $ mkWildCase (matchIdExpr var) (matchIdScaledType var) res_ty
                                       [Alt DEFAULT [] fail]
 
 matchVariables :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE -> DsM (MatchResult CoreExpr)
@@ -265,22 +249,26 @@ matchBangs :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE -> DsM (MatchR
 matchBangs (var :| vars) ty eqns
   = do  { match_result <- match (var:vars) ty $ NE.toList $
             decomposeFirstPat getBangPat <$> eqns
-        ; return (mkEvalMatchResult var ty match_result) }
+        ; return (mkEvalMatchResult (matchId var) ty match_result) }
 
 matchCoercion :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE -> DsM (MatchResult CoreExpr)
--- Apply the coercion to the match variable and then match that
+-- Match against a coercion pattern (CoPat)
 matchCoercion (var :| vars) ty eqns@(eqn1 :| _)
-  = do  { let XPat (CoPat co pat _) = firstPat eqn1
-        ; let pat_ty' = hsPatType pat
-        ; var' <- newUniqueId var (idMult var) pat_ty'
-        ; match_result <- match (var':vars) ty $ NE.toList $
-            decomposeFirstPat getCoPat <$> eqns
-        ; dsHsWrapper co $ \core_wrap -> do
-        { let bind = NonRec var' (core_wrap (Var var))
-        ; return (mkCoLetMatchResult bind match_result) } }
+  = do  { let XPat (CoPat wrap pat _) = firstPat eqn1
+              inner_eqns = NE.toList $ decomposeFirstPat getCoPat <$> eqns
+        ; case hsWrapperCast_maybe wrap of
+            -- The wrapper is a cast: push it into the scrutinee.
+            Just mco -> match (var `castMatchId` mco : vars) ty inner_eqns
+            Nothing ->
+              do { let pat_ty' = hsPatType pat
+                 ; var' <- newUniqueId (matchId var) (matchIdMult var) pat_ty'
+                 ; match_result <- match (mkMatchId var' : vars) ty inner_eqns
+                 ; dsHsWrapper wrap $ \core_wrap -> do
+                 { let bind = NonRec var' (core_wrap (matchIdExpr var))
+                 ; return (mkCoLetMatchResult bind match_result) } } }
 
 matchView :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE -> DsM (MatchResult CoreExpr)
--- Apply the view function to the match variable and then match that
+-- Apply the view function to the scrutinee and then match that
 matchView (var :| vars) ty eqns@(eqn1 :| _)
   = do  { -- we could pass in the expr from the PgView,
          -- but this needs to extract the pat anyway
@@ -288,13 +276,13 @@ matchView (var :| vars) ty eqns@(eqn1 :| _)
          let TcViewPat viewExpr pat = firstPat eqn1
          -- do the rest of the compilation
         ; let pat_ty' = hsPatType pat
-        ; var' <- newUniqueId var (idMult var) pat_ty'
-        ; match_result <- match (var':vars) ty $ NE.toList $
+        ; var' <- newUniqueId (matchId var) (matchIdMult var) pat_ty'
+        ; match_result <- match (mkMatchId var' : vars) ty $ NE.toList $
             decomposeFirstPat getViewPat <$> eqns
          -- compile the view expressions
         ; viewExpr' <- dsExpr viewExpr
         ; return (mkViewMatchResult var'
-                    (mkCoreApp viewExpr' (Var var))
+                    (mkCoreApp viewExpr' (matchIdExpr var))
                     match_result) }
 
 -- decompose the first pattern and leave the rest alone
@@ -383,7 +371,7 @@ only these which can be assigned a PatternGroup (see patGroup).
 
 -}
 
-tidyEqnInfo :: Id -> EquationInfo
+tidyEqnInfo :: MatchId -> EquationInfo
             -> DsM (DsWrapper, EquationInfo)
         -- DsM'd because of internal call to dsLHsBinds
         --      and mkSelectorBinds.
@@ -399,7 +387,7 @@ tidyEqnInfo v eqn@(EqnMatch { eqn_pat = (L loc pat) }) = do
   (wrap, pat') <- tidy1 v (not . isGoodSrcSpan . locA $ loc) pat
   return (wrap, eqn{eqn_pat = L loc pat' })
 
-tidy1 :: Id                  -- The Id being scrutinised
+tidy1 :: MatchId             -- The scrutinee
       -> Bool                -- `True` if the pattern was generated, `False` if it was user-written
       -> Pat GhcTc           -- The pattern against which it is to be matched
       -> DsM (DsWrapper,     -- Extra bindings to do before the match
@@ -420,13 +408,13 @@ tidy1 v g (ModifiedPat _ _ pat) = tidy1 v g (unLoc pat)
         -- case v of { x -> mr[] }
         -- = case v of { _ -> let x=v in mr[] }
 tidy1 v _ (VarPat _ (L _ var))
-  = return (wrapBind var v, WildPat (idType var))
+  = return (bindMatchId var v, WildPat (idType var))
 
         -- case v of { x@p -> mr[] }
         -- = case v of { p -> let x=v in mr[] }
 tidy1 v g (AsPat _ (L _ var) pat)
   = do  { (wrap, pat') <- tidy1 v g (unLoc pat)
-        ; return (wrapBind var v . wrap, pat') }
+        ; return (bindMatchId var v . wrap, pat') }
 
 {- now, here we handle lazy patterns:
     tidy1 v ~p bs = (v, v1 = case v of p -> v1 :
@@ -449,9 +437,9 @@ tidy1 v _ (LazyPat _ pat)
         ; unless (null unlifted_bndrs) $
           diagnosticDs (DsLazyPatCantBindVarsOfUnliftedType unlifted_bndrs)
 
-        ; (_,sel_prs) <- mkSelectorBinds [] pat LazyPatCtx (Var v)
+        ; (_,sel_prs) <- mkSelectorBinds [] pat LazyPatCtx (matchIdExpr v)
         ; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
-        ; return (mkCoreLets sel_binds, WildPat (idType v)) }
+        ; return (mkCoreLets sel_binds, WildPat (matchIdType v)) }
 
 tidy1 _ _ (ListPat ty pats)
   = return (idDsWrapper, unLoc list_ConPat)
@@ -530,7 +518,7 @@ tidy1 _ _ non_interesting_pat
   = return (idDsWrapper, non_interesting_pat)
 
 --------------------
-tidy_bang_pat :: Id -> Bool -> SrcSpanAnnA -> Pat GhcTc
+tidy_bang_pat :: MatchId -> Bool -> SrcSpanAnnA -> Pat GhcTc
               -> DsM (DsWrapper, Pat GhcTc)
 
 -- Discard par/sig under a bang
@@ -897,10 +885,10 @@ on the user-written case statement).
 -}
 
 matchEquations  :: HsMatchContextRn
-                -> [MatchId] -> [EquationInfo] -> Type
+                -> [Id] -> [EquationInfo] -> Type
                 -> DsM CoreExpr
 matchEquations ctxt vars eqns_info rhs_ty
-  = do  { match_result <- match vars rhs_ty eqns_info
+  = do  { match_result <- match (map mkMatchId vars) rhs_ty eqns_info
 
         ; fail_expr <- mkFailExpr ctxt rhs_ty
 
@@ -952,7 +940,7 @@ matchSinglePat scrut hs_ctx pat mult ty match_result
        ; return $ bindNonRec var scrut <$> match_result'
        }
 
-matchSinglePatVar :: Id   -- See Note [Match Ids]
+matchSinglePatVar :: Id   -- See Note [Match Ids] in GHC.HsToCore.Monad
                   -> Maybe CoreExpr -- ^ The scrutinee the match id is bound to
                   -> HsMatchContextRn -> LPat GhcTc
                   -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
@@ -975,7 +963,7 @@ matchSinglePatVar var mb_scrut ctx pat ty match_result
                -- See Note [Long-distance information in do notation]
                -- in GHC.HsToCore.Expr.
 
-       ; match [var] ty [eqn_info] }
+       ; match [mkMatchId var] ty [eqn_info] }
 
 updPmNablasMatchResult :: LdiNablas -> MatchResult r -> MatchResult r
 updPmNablasMatchResult nablas = \case
@@ -1290,7 +1278,7 @@ patGroup _ (ViewPat _ expr p)           = PgView expr (hsPatType (unLoc p))
 patGroup platform (LitPat _ lit)        = PgLit (hsLitKey platform lit)
 patGroup _ EmbTyPat{} = PgAny
 patGroup platform (XPat ext) = case ext of
-  CoPat _ p _      -> PgCo (hsPatType p) -- Type of innelexp pattern
+  CoPat _ p _      -> PgCo (hsPatType p) -- Type of inner pattern
   ExpansionPat _ p -> patGroup platform p
 patGroup _ pat                          = pprPanic "patGroup" (ppr pat)
 

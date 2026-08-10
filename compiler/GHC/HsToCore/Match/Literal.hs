@@ -598,7 +598,7 @@ tidyNPat over_lit mb_neg eq outer_ty
 ************************************************************************
 -}
 
-matchLiterals :: NonEmpty Id
+matchLiterals :: NonEmpty MatchId
               -> Type -- ^ Type of the whole case expression
               -> NonEmpty (NonEmpty EquationInfoNE) -- ^ All PgLits
               -> DsM (MatchResult CoreExpr)
@@ -610,7 +610,7 @@ matchLiterals (var :| vars) ty sub_groups
                 -- Combine results.  For everything except String
                 -- we can use a case expression; for String we need
                 -- a chain of if-then-else
-        ; if isStringTy (idType var) then
+        ; if isStringTy (matchIdType var) then
             do  { eq_str <- dsLookupGlobalId eqStringName
                 ; mrs <- mapM (wrap_str_guard eq_str) alts
                 ; return (foldr1 combineMatchResults mrs) }
@@ -633,7 +633,7 @@ matchLiterals (var :| vars) ty sub_groups
                -- should be separate LitBytes and LitString constructors?
                let s'  = mkFastStringByteString s
              ; lit    <- mkStringExprFS s'
-             ; let pred = mkApps (Var eq_str) [Var var, lit]
+             ; let pred = mkApps (Var eq_str) [matchIdExpr var, lit]
              ; return (mkGuardedMatchResult pred mr) }
     wrap_str_guard _ (l, _) = pprPanic "matchLiterals/wrap_str_guard" (ppr l)
 
@@ -675,14 +675,14 @@ hsLitKey _        l                   = pprPanic "hsLitKey" (ppr l)
 ************************************************************************
 -}
 
-matchNPats :: NonEmpty Id -> Type -> NonEmpty EquationInfoNE -> DsM (MatchResult CoreExpr)
+matchNPats :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE -> DsM (MatchResult CoreExpr)
 matchNPats (var :| vars) ty (eqn1 :| eqns)    -- All for the same literal
   = do  { let NPat _ (L _ lit) mb_neg eq_chk = firstPat eqn1
         ; lit_expr <- dsOverLit lit
         ; neg_lit <- case mb_neg of
                             Nothing  -> return lit_expr
                             Just neg -> dsSyntaxExpr neg [lit_expr]
-        ; pred_expr <- dsSyntaxExpr eq_chk [Var var, neg_lit]
+        ; pred_expr <- dsSyntaxExpr eq_chk [matchIdExpr var, neg_lit]
         ; match_result <- match vars ty (shiftEqns (eqn1:eqns))
         ; return (mkGuardedMatchResult pred_expr match_result) }
 
@@ -704,15 +704,15 @@ We generate:
 \end{verbatim}
 -}
 
-matchNPlusKPats :: NonEmpty Id -> Type -> NonEmpty EquationInfoNE -> DsM (MatchResult CoreExpr)
+matchNPlusKPats :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE -> DsM (MatchResult CoreExpr)
 -- All NPlusKPats, for the *same* literal k
 matchNPlusKPats (var :| vars) ty (eqn1 :| eqns)
   = do  { let NPlusKPat _ (L _ n1) (L _ lit1) lit2 ge minus
                 = firstPat eqn1
         ; lit1_expr   <- dsOverLit lit1
         ; lit2_expr   <- dsOverLit lit2
-        ; pred_expr   <- dsSyntaxExpr ge    [Var var, lit1_expr]
-        ; minusk_expr <- dsSyntaxExpr minus [Var var, lit2_expr]
+        ; pred_expr   <- dsSyntaxExpr ge    [matchIdExpr var, lit1_expr]
+        ; minusk_expr <- dsSyntaxExpr minus [matchIdExpr var, lit2_expr]
         ; let (wraps, eqns') = NEL.mapAndUnzip (shift n1) (eqn1:|eqns)
         ; match_result <- match vars ty (NEL.toList eqns')
         ; return  (mkGuardedMatchResult pred_expr               $

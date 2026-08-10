@@ -6,7 +6,7 @@ Result size of Tidy Core
 Rec {
 $wloop
   = \ ww ww1 ww2 ww3 ->
-      case ww of ds {
+      case ww of wild {
         __DEFAULT ->
           let { seed' = plusWord64# ww2 ww3 } in
           let {
@@ -20,7 +20,7 @@ $wloop
                   (xor64# x# (uncheckedShiftRL64# x# 33#))
                   14181476777654086739#Word64 } in
           $wloop
-            (-# ds 1#)
+            (-# wild 1#)
             (+##
                ww1
                (*##

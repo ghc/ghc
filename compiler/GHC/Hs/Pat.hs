@@ -517,7 +517,7 @@ pprConArgs (RecCon _ rpats)      = ppr rpats
 
 mkPrefixConPat :: DataCon ->
                   [LPat GhcTc] -> [Type] -> LPat GhcTc
--- Make a vanilla Prefix constructor pattern
+-- ^ Make a vanilla Prefix constructor pattern.
 mkPrefixConPat dc pats tys
   = noLocA $ ConPat { pat_con = noLocA (RealDataCon dc)
                     , pat_args = PrefixCon noExtField pats

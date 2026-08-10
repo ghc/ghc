@@ -3,14 +3,10 @@ RepPolyRecordUpdate.hs:7:35: error: [GHC-55287]
       does not have a fixed runtime representation.
       Its type is:
         a :: TYPE rep
-    • In the pattern: MkX {fld = fld}
-      In an equation for ‘fld’: fld MkX {fld = fld} = fld
-
-RepPolyRecordUpdate.hs:7:35: error: [GHC-55287]
-    The first pattern in the equation for ‘fld’
-    does not have a fixed runtime representation.
-    Its type is:
-      X a :: TYPE rep
+    • The first pattern in the equation for ‘fld’
+      does not have a fixed runtime representation.
+      Its type is:
+        X a :: TYPE rep
 
 RepPolyRecordUpdate.hs:13:9: error: [GHC-55287]
     • The field ‘fld’ does not have a fixed runtime representation.

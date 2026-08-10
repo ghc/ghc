@@ -8,6 +8,7 @@
 module GHC.Tc.Utils.Concrete
   ( -- * Ensuring that a type has a fixed runtime representation
     hasFixedRuntimeRep
+  , hasFixedRuntimeRep_kind
   , hasFixedRuntimeRep_syntactic
 
   , unifyConcrete
@@ -92,9 +93,9 @@ as a central point of reference for this topic.
 
     The Note explains that this allows us to accept more programs. The Note
     also explains that the implementation is happening in two phases
-    (PHASE 1 and PHASE 2).
-    In PHASE 1 (the current implementation) we only allow trivial evidence
-    of the form `co = Refl`.
+    (PHASE 1 and PHASE 2), migrating one call site at a time.
+    Call sites in PHASE 1 only allow trivial evidence of the form `co = Refl`,
+    while call sites in PHASE 2 make use of non-trivial coercions.
 
   * Fixed runtime representation vs fixed RuntimeRep
     Note [Fixed RuntimeRep]
@@ -246,7 +247,8 @@ has a fixed runtime representation.
 -- PHASE 1 and PHASE 2 --
 -------------------------
 
-The Concrete mechanism is being implemented in two separate phases.
+The Concrete mechanism is being implemented in two separate phases, migrating
+one call site at a time.
 
 In PHASE 1, we enforce that we only solve the emitted constraints
 `co :: ki ~# concrete_tv` with `Refl`. This forbids any program
@@ -255,6 +257,7 @@ is fixed.
 To achieve this, instead of creating a new concrete metavariable, we directly
 ensure that 'ki' is concrete, using 'makeTypeConcrete'. If it fails, then
 we report an error (even though rewriting might have allowed us to proceed).
+This is what 'hasFixedRuntimeRep_syntactic' does.
 
 In PHASE 2, we lift this restriction. This means we replace a call to
 `hasFixedRuntimeRep_syntactic` with a call to `hasFixedRuntimeRep`, and insert the
@@ -281,11 +284,8 @@ this would be:
 As `( a |> kco ) :: TYPE Int#`, the code generator knows to use a machine-sized
 integer register for `x`, and all is good again.
 
-Because we can convert calls from hasFixedRuntimeRep_syntactic to
-hasFixedRuntimeRep one at a time, we can migrate from PHASE 1 to PHASE 2
-incrementally.
-
-Example test cases that require PHASE 2: T13105, T17021, T20363b.
+See the tests in the rep-poly test folder for an overview of which checks have
+been migrated to PHASE 2.
 
 Note [Fixed RuntimeRep]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -689,7 +689,29 @@ hasFixedRuntimeRep :: HasDebugCallStack
                         -- That is, @ty'@ has a syntactically fixed RuntimeRep
                         -- in the sense of Note [Fixed RuntimeRep].
 hasFixedRuntimeRep frr_ctxt ty
-  = checkFRR_with unify_conc frr_ctxt ty
+  = do { kco <- hasFixedRuntimeRep_kind frr_ctxt ty
+       ; return ( mkGReflRightMCo Nominal ty kco
+                , mkCastTyMCo ty kco ) }
+
+-- | Given a type @ty :: ki@, this function ensures that @ty@
+-- has a __fixed__ 'RuntimeRep', by emitting a new equality constraint
+-- @ki ~ concrete_tv@ for a concrete metavariable @concrete_tv@.
+--
+-- Returns a coercion @co :: ki ~# concrete_ki@ as evidence.
+-- If @ty@ obviously has a fixed 'RuntimeRep', e.g @ki = TYPE IntRep@,
+-- then this function immediately returns 'MRefl',
+-- without emitting any constraints.
+hasFixedRuntimeRep_kind :: HasDebugCallStack
+                        => FixedRuntimeRepContext
+                             -- ^ Context to be reported to the user
+                             -- if the type ends up not having a fixed
+                             -- 'RuntimeRep'.
+                        -> TcType
+                             -- ^ The type to check (we only look at its kind).
+                        -> TcM TcMCoercionN
+                             -- ^ @kco :: typeKind ty ~# ki@,
+                             -- where @ki@ is concrete.
+hasFixedRuntimeRep_kind = checkFRR_with unify_conc
   where
     unify_conc frr_orig ki
       = do { co <- unifyConcrete_kind (fsLit "cx") (ConcreteFRR frr_orig) ki
@@ -720,10 +742,11 @@ hasFixedRuntimeRep_syntactic frr_ctxt ty
       ensure_conc :: FixedRuntimeRepOrigin -> TcKind -> TcM TcMCoercionN
       ensure_conc frr_orig ki = ensureConcrete frr_orig ki >> pure MRefl
 
--- | Internal function to check whether the given type has a fixed 'RuntimeRep'.
+-- | Internal function to check whether the given type has a fixed 'RuntimeRep',
+-- returning the kind coercion which makes its kind concrete.
 --
--- Use 'hasFixedRuntimeRep' to allow rewriting, or 'hasFixedRuntimeRep_syntactic'
--- to perform a syntactic check.
+-- Use 'hasFixedRuntimeRep' or 'hasFixedRuntimeRep_kind' to allow rewriting,
+-- or 'hasFixedRuntimeRep_syntactic' to perform a syntactic check.
 checkFRR_with :: HasDebugCallStack
               => (FixedRuntimeRepOrigin -> TcKind -> TcM TcMCoercionN)
                    -- ^ The check to perform on the kind.
@@ -732,30 +755,25 @@ checkFRR_with :: HasDebugCallStack
                    -- e.g. an application, a lambda abstraction, ...
               -> TcType
                    -- ^ The type @ty@ to check (the check itself only looks at its kind).
-              -> TcM (TcCoercionN, TcTypeFRR)
-                  -- ^ Returns @(co, frr_ty)@ with @co :: ty ~# frr_ty@
-                  -- and @frr_ty@ has a fixed 'RuntimeRep'.
+              -> TcM TcMCoercionN
+                  -- ^ Returns @kco :: typeKind ty ~# ki@ where @ki@ is concrete.
 checkFRR_with check_kind frr_ctxt ty
   = do { th_lvl <- getThLevel
        ; if
           -- Shortcut: check for 'Type' and 'UnliftedType' type synonyms.
           | TyConApp tc [] <- ki
           , tc == liftedTypeKindTyCon || tc == unliftedTypeKindTyCon
-          -> return refl
+          -> return MRefl
 
           -- See [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep].
           | TypedBrack {} <- th_lvl
-          -> return refl
+          -> return MRefl
 
           -- Otherwise: ensure that the kind 'ki' of 'ty' is concrete.
           | otherwise
-          -> do { kco <- check_kind frr_orig ki
-                ; return ( mkGReflRightMCo Nominal ty kco
-                         , mkCastTyMCo ty kco ) } }
+          -> check_kind frr_orig ki }
 
   where
-    refl :: (TcCoercionN, TcType)
-    refl = (mkNomReflCo ty, ty)
     ki :: TcKind
     ki = typeKind ty
     frr_orig :: FixedRuntimeRepOrigin

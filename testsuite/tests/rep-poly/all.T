@@ -119,12 +119,13 @@ test('NoEtaRequired', normal, compile, [''])
 ###############################################################################
 ## The following tests require rewriting in RuntimeReps,                     ##
 ## i.e. PHASE 2 of the FixedRuntimeRep plan.                                 ##
-##                                                                           ##
-## These tests work!                                                         ##
                                                                              ##
 test('T13105', js_broken(22364), compile, [''])                              ##
 test('T17021', normal, compile, [''])                                        ##
 test('T17536b', normal, compile, [''])                                       ##
+test('T20363', normal, compile, [''])                                        ##
+test('T20363b', normal, compile, [''])                                       ##
+test('T20363c', normal, compile, [''])                                       ##
 test('T21650_a', js_broken(26578), compile, ['-Wno-deprecated-flags'])       ##
 test('T21650_b', js_broken(26578), compile, ['-Wno-deprecated-flags'])       ##
 test('T26072', js_broken(26578), compile, [''])                              ##
@@ -136,14 +137,5 @@ test('RepPolyTuple2', normal, compile_and_run, [''])                         ##
 test('RepPolyTuple2b', normal, compile_and_run, [''])                        ##
 test('RepPolyTuple3', normal, compile_fail, [''])                            ##
 test('RepPolyUnsafeCoerce2', normal, compile, [''])                          ##
-                                                                             ##
-## These don't!                                                              ##
-## For the moment, we check that we get the expected error message,          ##
-## as we want to reject these in the typechecker instead of getting          ##
-## a compiler crash.                                                         ##
-                                                                             ##
-test('T20363', normal, compile_fail, [''])                                   ##
-test('T20363_show_co', normal, compile_fail, ['-fprint-explicit-coercions']) ##
-test('T20363b', normal, compile_fail, [''])                                  ##
-                                                                             ##
+                                                                             ##                                                                             ##
 ###############################################################################

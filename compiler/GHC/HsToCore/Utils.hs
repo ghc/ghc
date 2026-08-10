@@ -23,8 +23,8 @@ module GHC.HsToCore.Utils (
         dsHandleMonadicFailure,
         mkCoLetMatchResult, mkViewMatchResult, mkGuardedMatchResult,
         matchCanFail, mkEvalMatchResult,
-        mkCoPrimCaseMatchResult, mkCoAlgCaseMatchResult, mkCoSynCaseMatchResult,
-        wrapBind, wrapBinds,
+        mkCoPrimCaseMatchResult, mkDataConCase, mkCoSynCaseMatchResult,
+        wrapBind, wrapBinds, bindMatchId,
 
         mkErrorAppDs, mkCastDs, mkFailExpr,
 
@@ -176,7 +176,7 @@ In fact, even GHC.Core.Subst.simplOptExpr will do this, and simpleOptExpr
 runs on the output of the desugarer, so all is well by the end of
 the desugaring pass.
 
-See also Note [Match Ids] in GHC.HsToCore.Match
+See also Note [Match Ids] in GHC.HsToCore.Monad
 
 ************************************************************************
 *                                                                      *
@@ -249,6 +249,13 @@ wrapBind new old body   -- NB: this function must deal with term
   | new==old    = body  -- variables, type variables or coercion variables
   | otherwise   = Let (NonRec new (varToCoreExpr old)) body
 
+-- | Like 'wrapBind', but for a 'MatchId'.
+bindMatchId :: Id -> MatchId -> CoreExpr -> CoreExpr
+bindMatchId new (MatchId { matchId = old, matchCo = MRefl }) body
+  = wrapBind new old body
+bindMatchId new mid body
+  = Let (NonRec new (matchIdExpr mid)) body
+
 -- Used to force variables when desugaring strict binders. It's crucial that the
 -- variable is shadowed by the case binder. See Wrinkle 1 in
 -- Note [Desugar Strict binds] in GHC.HsToCore.Binds.
@@ -272,16 +279,24 @@ mkGuardedMatchResult pred_expr mr = MR_Fallible $ \fail -> do
   body <- runMatchResult fail mr
   return (mkIfThenElse pred_expr body fail)
 
-mkCoPrimCaseMatchResult :: Id                  -- Scrutinee
-                        -> Type                      -- Type of the case
-                        -> [(Literal, MatchResult CoreExpr)]  -- Alternatives
-                        -> MatchResult CoreExpr               -- Literals are all unlifted
+mkCoPrimCaseMatchResult
+  :: HasDebugCallStack
+  => MatchId                            -- ^ Scrutinee
+  -> Type                               -- ^ Type of the case
+  -> [(Literal, MatchResult CoreExpr)]  -- ^ Alternatives (Literals are all unlifted)
+  -> MatchResult CoreExpr
 mkCoPrimCaseMatchResult var ty match_alts
-  = MR_Fallible mk_case
+  = assertPpr (definitelyUnliftedType _scrut_ty)
+    (text "mkCoPrimCaseMatchResult: unexpected lifted scrutinee type"
+       <+> ppr _scrut_ty <+> dcolon <+> ppr (typeKind _scrut_ty))
+  $ MR_Fallible mk_case
   where
+    _scrut_ty = matchIdType var
+
     mk_case fail = do
-        alts <- mapM (mk_alt fail) sorted_alts
-        return (Case (Var var) var ty (Alt DEFAULT [] fail : alts))
+      alts <- mapM (mk_alt fail) sorted_alts
+      return (mkWildCase (matchIdExpr var) (matchIdScaledType var) ty
+                         (Alt DEFAULT [] fail : alts))
 
     sorted_alts = sortWith fst match_alts       -- Right order for a Case
     mk_alt fail (lit, mr)
@@ -294,43 +309,16 @@ data CaseAlt a = MkCaseAlt{ alt_pat :: a,
                             alt_wrapper :: HsWrapper,
                             alt_result :: MatchResult CoreExpr }
 
-mkCoAlgCaseMatchResult
-  :: Id -- ^ Scrutinee
-  -> Type -- ^ Type of exp
-  -> NonEmpty (CaseAlt DataCon) -- ^ Alternatives (bndrs *include* tyvars, dicts)
-  -> MatchResult CoreExpr
-mkCoAlgCaseMatchResult var ty match_alts
-  | isNewtype  -- Newtype case; use a let
-  = assert (null match_alts_tail && null (tail arg_ids1)) $
-    mkCoLetMatchResult (NonRec arg_id1 newtype_rhs) match_result1
-
-  | otherwise
-  = mkDataConCase var ty match_alts
-  where
-    isNewtype = isNewTyCon (dataConTyCon (alt_pat alt1))
-
-        -- [Interesting: because of GADTs, we can't rely on the type of
-        --  the scrutinised Id to be sufficiently refined to have a TyCon in it]
-
-    alt1@MkCaseAlt{ alt_bndrs = arg_ids1, alt_result = match_result1 } :| match_alts_tail
-      = match_alts
-    -- Stuff for newtype
-    arg_id1       = assert (notNull arg_ids1) $ head arg_ids1
-    var_ty        = idType var
-    (tc, ty_args) = tcSplitTyConApp var_ty      -- Don't look through newtypes
-                                                -- (not that splitTyConApp does, these days)
-    newtype_rhs = unwrapNewTypeBody tc ty_args (Var var)
-
-mkCoSynCaseMatchResult :: Id -> Type -> CaseAlt PatSyn -> MatchResult CoreExpr
+mkCoSynCaseMatchResult :: MatchId -> Type -> CaseAlt PatSyn -> MatchResult CoreExpr
 mkCoSynCaseMatchResult var ty alt = MR_Fallible $ mkPatSynCase var ty alt
 
-mkPatSynCase :: Id -> Type -> CaseAlt PatSyn -> CoreExpr -> DsM CoreExpr
+mkPatSynCase :: MatchId -> Type -> CaseAlt PatSyn -> CoreExpr -> DsM CoreExpr
 mkPatSynCase var ty alt fail = do
     matcher_id <- dsLookupGlobalId matcher_name
     matcher <- dsLExpr $ mkLHsWrap wrapper $
                          nlHsTyApp matcher_id [getRuntimeRep ty, ty]
     cont <- mkCoreLams bndrs <$> runMatchResult fail match_result
-    return $ mkCoreApps matcher [Var var, ensure_unstrict cont, Lam voidArgId fail]
+    return $ mkCoreApps matcher [matchIdExpr var, ensure_unstrict cont, Lam voidArgId fail]
   where
     MkCaseAlt{ alt_pat = psyn,
                alt_bndrs = bndrs,
@@ -343,7 +331,7 @@ mkPatSynCase var ty alt fail = do
     ensure_unstrict cont | needs_void_lam = Lam voidArgId cont
                          | otherwise      = cont
 
-mkDataConCase :: Id -> Type -> NonEmpty (CaseAlt DataCon) -> MatchResult CoreExpr
+mkDataConCase :: MatchId -> Type -> NonEmpty (CaseAlt DataCon) -> MatchResult CoreExpr
 mkDataConCase var ty alts@(alt1 :| _)
     = liftA2 mk_case mk_default mk_alts
     -- The liftA2 combines the failability of all the alternatives and the default
@@ -355,12 +343,12 @@ mkDataConCase var ty alts@(alt1 :| _)
     sorted_alts :: [ CaseAlt DataCon ]
     sorted_alts  = sortWith (dataConTag . alt_pat) $ NEL.toList alts
 
-    var_ty       = idType var
+    var_ty       = matchIdType var
     (_, ty_args) = tcSplitTyConApp var_ty -- Don't look through newtypes
                                           -- (not that splitTyConApp does, these days)
 
     mk_case :: Maybe CoreAlt -> [CoreAlt] -> CoreExpr
-    mk_case def alts = mkWildCase (Var var) (idScaledType var) ty $
+    mk_case def alts = mkWildCase (matchIdExpr var) (matchIdScaledType var) ty $
       maybeToList def ++ alts
 
     mk_alts :: MatchResult [CoreAlt]
@@ -376,7 +364,7 @@ mkDataConCase var ty alts@(alt1 :| _)
           Just (DCB boxer) -> do
             us <- newUniqueSupply
             let (rep_ids, binds) = initUs_ us (boxer ty_args args)
-            let rep_ids' = map (scaleVarBy (idMult var)) rep_ids
+            let rep_ids' = map (scaleVarBy (matchIdMult var)) rep_ids
               -- Upholds the invariant that the binders of a case expression
               -- must be scaled by the case multiplicity. See Note [Case
               -- expression invariants] in CoreSyn.

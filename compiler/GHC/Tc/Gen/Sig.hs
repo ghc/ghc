@@ -457,6 +457,10 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
        -- This is because, when creating a matcher:
        --   - the argument types become the binder types (see test RepPolyPatySynArg),
        --   - the return type becomes the scrutinee type (see test RepPolyPatSynRes).
+       --
+       -- Note that, in practice, reducible type family applications will have
+       -- been reduced already, due to the logic described in
+       -- Note [Prevent unification with type families] in GHC.Tc.Utils.Unify.
        ; let (arg_tys, res_ty) = tcSplitFunTys body_ty
        ; mapM_
            (\(Scaled _ arg_ty) -> checkTypeHasFixedRuntimeRep FixedRuntimeRepPatSynSigArg arg_ty)

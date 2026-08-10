@@ -5,8 +5,8 @@ Result size of Tidy Core = {terms: 60, types: 83, coercions: 8, joins: 0/0}
 Rec {
 foo_$s$wfoo
   = \ @a sc sc1 sc2 ->
-      case sc of ds {
-        __DEFAULT -> foo_$s$wfoo (-# ds 1#) sc2 sc1;
+      case sc of wild {
+        __DEFAULT -> foo_$s$wfoo (-# wild 1#) sc2 sc1;
         0# -> (# (sc1, sc2) #)
       }
 end Rec }
@@ -14,8 +14,8 @@ end Rec }
 foo
   = \ @a ds ds1 ->
       case ds of { I# ww ->
-      case ww of ds2 {
-        __DEFAULT -> case ds1 `cast` <Co:4> of { (x, y) -> case foo_$s$wfoo (-# ds2 1#) y x of { (# ww1 #) -> Just ww1 } };
+      case ww of wild1 {
+        __DEFAULT -> case ds1 `cast` <Co:4> of { (x, y) -> case foo_$s$wfoo (-# wild1 1#) y x of { (# ww1 #) -> Just ww1 } };
         0# -> Just (ds1 `cast` <Co:4>)
       }
       }

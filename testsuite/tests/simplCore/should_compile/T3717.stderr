@@ -35,8 +35,8 @@ T3717.$wfoo [InlPrag=[2], Occ=LoopBreaker]
 [GblId, Arity=1, Str=<1L>, Unf=OtherCon []]
 T3717.$wfoo
   = \ (ww :: GHC.Internal.Prim.Int#) ->
-      case ww of ds {
-        __DEFAULT -> T3717.$wfoo (GHC.Internal.Prim.-# ds 1#);
+      case ww of wild {
+        __DEFAULT -> T3717.$wfoo (GHC.Internal.Prim.-# wild 1#);
         0# -> 0#
       }
 end Rec }
