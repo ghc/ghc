@@ -42,6 +42,7 @@ module GHC.Runtime.Interpreter
   , loadArchive
   , loadObj
   , unloadObj
+  , purgeObj
   , addLibrarySearchPath
   , removeLibrarySearchPath
   , resolveObjs
@@ -100,6 +101,7 @@ import GHC.Unit.Env
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.Run
+import qualified GHCi.ObjLink as ObjLink
 #endif
 
 import Control.Concurrent
@@ -591,6 +593,40 @@ unloadObj :: Interp -> String -> IO ()
 unloadObj interp path = do
   path' <- canonicalizePath path -- Note [loadObj and relative paths]
   interpCmd interp (UnloadObj path')
+
+{- Note [Unloading vs purging objects]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+unloadObj removes the object's symbols and frees its memory. The memory
+is only freed at a major GC, once nothing references the object.
+purgeObj removes the symbols and never frees the memory.
+
+We only unloadObj in unload, which the driver calls before a
+compilation sweep, when everything is unloaded together. We purgeObj
+when dropModules replaces or removes single modules, because unloading
+is not well supported on many platforms/configurations. Purging is
+enough for correctness: new lookups find the replacement's symbols,
+and values built by the old code and computations still using it keep
+working.
+
+With a dynamic interpreter there is nothing to purge. Objects are
+linked into temporary shared libraries and their symbols are found by
+searching the loaded libraries, not in the linker's symbol table.
+Dropping a module flushes the symbol cache, and the replacement is
+loaded as a new library, so lookups find the replacement first and the
+old library stays loaded. This behaves like purging.
+-}
+
+-- | Purge an object's symbols. External interpreters have no purge
+-- command, so we fall back to 'unloadObj'.
+-- See Note [Unloading vs purging objects]
+purgeObj :: Interp -> String -> IO ()
+purgeObj interp path = do
+  path' <- canonicalizePath path -- Note [loadObj and relative paths]
+  case interpInstance interp of
+#if defined(HAVE_INTERNAL_INTERPRETER)
+    InternalInterp -> ObjLink.purgeObj path'
+#endif
+    ExternalInterp {} -> interpCmd interp (UnloadObj path')
 
 -- Note [loadObj and relative paths]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -9,6 +9,7 @@ module GHC.Linker.Types
    ( Loader (..)
    , LoaderState (..)
    , uninitializedLoader
+   , loadedDependentsClosure
 
    -- * Bytecode Loader State
    , BytecodeLoaderState(..)
@@ -74,7 +75,7 @@ module GHC.Linker.Types
 where
 
 import GHC.Prelude
-import GHC.Unit                ( UnitId, Module )
+import GHC.Unit                ( UnitId, Module, isInteractiveModule )
 import GHC.ByteCode.Types
 import GHCi.BreakArray
 import GHCi.RemoteTypes
@@ -185,6 +186,21 @@ data LoaderState = LoaderState
     , objs_loaded :: !(LinkableSet LinkableUsage)
         -- ^ And the currently-loaded compiled modules (home package)
 
+    , loaded_deps :: !(ModuleEnv (UniqDSet Module))
+        -- ^ For each loaded home bco module, its dependencies at the time of the load
+        -- A bco directly references its dependencies, so when
+        -- a bco is unload/replaced, we must replace everything
+        -- that depends on it as well.
+        --
+        -- This is finer than the dependency edges in the module graph,
+        -- we only record an edge if there is an external name to the module
+        -- in the bytecode itself, so dependencies which aren't referred to
+        -- in the compiled bytecode aren't recorded.
+        --
+        -- For object code, we can't do this optimisation, so we use
+        -- the module graph instead.
+        -- See Note [Automatically reloading stale linkables] in GHC.Linker.Loader
+
     , pkgs_loaded :: !PkgsLoaded
         -- ^ The currently-loaded packages;
         -- haskell libraries, system libraries, transitive dependencies
@@ -255,6 +271,22 @@ emptyBytecodeState = BytecodeState
     { bco_linker_env = emptyLinkerEnv
     , bco_linked_breaks = emptyLinkedBreaks
     }
+
+-- | Add every loaded module that transitively refers to one of the given
+-- modules, following the edges in loaded_deps.
+-- See Note [Automatically reloading stale linkables] in GHC.Linker.Loader
+loadedDependentsClosure :: LoaderState -> UniqDSet Module -> UniqDSet Module
+loadedDependentsClosure pls = go
+  where
+    loaded = filter (not . isInteractiveModule) $
+      moduleEnvKeys (bcos_loaded pls) ++ moduleEnvKeys (objs_loaded pls)
+    go vs =
+      let vs' = addListToUniqDSet vs
+                  [ m | m <- loaded
+                      , not (m `elementOfUniqDSet` vs)
+                      , Just ds <- [lookupModuleEnv (loaded_deps pls) m]
+                      , not (isEmptyUniqDSet (intersectUniqDSets ds vs)) ]
+      in if sizeUniqDSet vs' == sizeUniqDSet vs then vs else go vs'
 
 
 -- Some parts of the compiler can be used to load bytecode into either the home package or
