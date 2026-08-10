@@ -53,7 +53,7 @@ do
 
   # Build `base` with the installed GHC
   cd libraries/base
-  cabal build
+  cabal build \
     --with-compiler "${project_root}/other-ghcs/opt/${ghc_version}/bin/ghc" \
     --allow-boot-library-installs \
     -O0
