@@ -13,6 +13,7 @@ module GHC.Iface.Recomp
    , recompileRequired
    , addFingerprints
    , mkSelfRecomp
+   , addIfaceArtifactHashes
    )
 where
 
@@ -1226,7 +1227,9 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
                 , mi_sr_opt_hash = opt_hash
                 , mi_sr_plugin_hash = plugin_hash
                 , mi_sr_src_hash = src_hash
-                , mi_sr_usages = usages })
+                , mi_sr_usages = usages
+                , mi_sr_object_hash = Nothing
+                , mi_sr_bytecode_hash = Nothing })
 
 -- | Add fingerprints for top-level declarations to a 'ModIface'.
 --
@@ -1272,6 +1275,20 @@ addFingerprints hsc_env iface0 = do
                      sorted_decls sorted_extra_decls abiHashes caches
    --
   return final_iface
+
+addIfaceArtifactHashes :: Maybe Fingerprint -> Maybe Fingerprint -> ModIface -> ModIface
+addIfaceArtifactHashes mb_obj mb_bc iface =
+  case mi_self_recomp_info iface of
+    Nothing -> iface
+    Just sr ->
+      let iface' = set_mi_self_recomp
+            (Just sr { mi_sr_object_hash = mb_obj, mi_sr_bytecode_hash = mb_bc })
+            iface
+          !iface_hash = computeFingerprint putNameLiterally
+                            (mi_mod_hash iface',
+                             mi_self_recomp_info iface',
+                             mi_deps iface')
+      in set_mi_iface_hash iface_hash iface'
 
 
 

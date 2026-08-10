@@ -941,11 +941,27 @@ hscGenBackendPipeline pipe_env hsc_env mod_sum result = do
         -- Add the object linkable to the potential bytecode linkable which was generated in HscBackend.
         return (mlinkable { homeMod_object = Just linkable })
 
+  miface' <- case result of
+    HscRecomp { hscs_old_iface_hash = mb_old_iface_hash }
+      | backendWritesFiles (backend (hsc_dflags hsc_env)) -> do
+          let bc_hash = case recompLinkables_bytecode final_linkable of
+                NormalLinkable mb_bc -> fmap linkableHash mb_bc
+                WholeCoreBindingsLinkable {} -> Nothing
+              patched = addIfaceArtifactHashes
+                          (fmap linkableHash (recompLinkables_object final_linkable))
+                          bc_hash
+                          miface
+          -- See Note [Writing interface files]
+          liftIO $ hscMaybeWriteIface (hsc_logger hsc_env) (hsc_dflags hsc_env)
+            False patched mb_old_iface_hash (ms_location mod_sum)
+          return patched
+    _ -> return miface
+
   -- when building ghc-internal with --make (e.g. with cabal-install), we want
   -- the virtual interface for gHC_PRIM in the cache, not the empty one.
   let miface_final
         | ms_mod mod_sum == gHC_PRIM = getGhcPrimIface (hsc_hooks hsc_env)
-        | otherwise                  = miface
+        | otherwise                  = miface'
   return (miface_final, final_linkable)
 
 asPipeline :: P m => Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe ObjFile)

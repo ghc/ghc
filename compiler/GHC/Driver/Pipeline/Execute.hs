@@ -58,6 +58,8 @@ import GHC.Unit.State
 import GHC.Unit.Home
 import GHC.Data.Maybe
 import GHC.Iface.Make
+import GHC.Iface.Recomp (addIfaceArtifactHashes)
+import GHC.Linker.Types (linkableHash)
 import GHC.Driver.Config.Parser
 import GHC.Parser.Header
 import GHC.Data.StringBuffer
@@ -563,8 +565,6 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
 
               final_iface <- mkFullIface hsc_env partial_iface stg_infos cg_infos iface_stubs iface_files
 
-              -- See Note [Writing interface files]
-              hscMaybeWriteIface logger dflags False final_iface mb_old_iface_hash mod_location
               mlinkable <-
                 if gopt Opt_ByteCodeAndObjectCode dflags
                   then do
@@ -583,9 +583,10 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
               -- In interpreted mode the regular codeGen backend is not run so we
               -- generate a interface without codeGen info.
             do
-              final_iface <- mkFullIface hsc_env partial_iface Nothing Nothing NoStubs []
-              hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash location
+              final_iface0 <- mkFullIface hsc_env partial_iface Nothing Nothing NoStubs []
               bc <- generateAndWriteByteCodeLinkable hsc_env (mkCgInteractiveGuts cgguts) mod_location
+              let final_iface = addIfaceArtifactHashes Nothing (Just (linkableHash bc)) final_iface0
+              hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash location
               return ([], final_iface, emptyHomeModInfoLinkable { homeMod_bytecode = Just bc } , panic "interpreter")
 
 
@@ -699,7 +700,6 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   hie_date <- modificationTimeIfExists hie_file
   o_mod <- modificationTimeIfExists o_file
   dyn_o_mod <- modificationTimeIfExists dyn_o_file
-  bytecode_date <- modificationTimeIfExists (ml_bytecode_file_ospath location)
 
   -- Tell the finder cache about this module
   mod <- do
@@ -721,7 +721,6 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
                                 ms_parsed_mod   = Nothing,
                                 ms_iface_date   = hi_date,
                                 ms_hie_date     = hie_date,
-                                ms_bytecode_date = bytecode_date,
                                 ms_textual_imps = imps,
                                 ms_srcimps      = src_imps }
 

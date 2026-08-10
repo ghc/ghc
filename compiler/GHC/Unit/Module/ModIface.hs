@@ -43,6 +43,7 @@ module GHC.Unit.Module.ModIface
    , set_mi_sig_of
    , set_mi_hsc_src
    , set_mi_self_recomp
+   , set_mi_iface_hash
    , set_mi_hi_bytes
    , set_mi_deps
    , set_mi_exports
@@ -978,6 +979,9 @@ set_mi_mod_info val iface = clear_mi_hi_bytes $ iface { mi_mod_info_ = val }
 
 set_mi_self_recomp :: Maybe IfaceSelfRecomp-> ModIface_ phase -> ModIface_ phase
 set_mi_self_recomp val iface = clear_mi_hi_bytes $ iface { mi_self_recomp_ = val }
+
+set_mi_iface_hash :: Fingerprint -> ModIface_ phase -> ModIface_ phase
+set_mi_iface_hash val iface = clear_mi_hi_bytes $ iface { mi_iface_hash_ = val }
 
 set_mi_hi_bytes :: IfaceBinHandle phase -> ModIface_ phase -> ModIface_ phase
 set_mi_hi_bytes val iface = iface { mi_hi_bytes_ = val }

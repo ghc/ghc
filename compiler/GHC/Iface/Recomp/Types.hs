@@ -80,17 +80,23 @@ data IfaceSelfRecomp =
                        -- ^ Hash of hpc flags
                        , mi_sr_plugin_hash :: !Fingerprint
                        -- ^ Hash of plugins
+                       , mi_sr_object_hash :: !(Maybe Fingerprint)
+                       -- ^ Hash of the object file this compilation produced
+                       , mi_sr_bytecode_hash :: !(Maybe Fingerprint)
+                       -- ^ Hash of the bytecode this compilation produced
                        }
 
 
 instance Binary IfaceSelfRecomp where
-  put_ bh (IfaceSelfRecomp{mi_sr_src_hash, mi_sr_usages, mi_sr_flag_hash, mi_sr_opt_hash, mi_sr_hpc_hash, mi_sr_plugin_hash}) = do
+  put_ bh (IfaceSelfRecomp{mi_sr_src_hash, mi_sr_usages, mi_sr_flag_hash, mi_sr_opt_hash, mi_sr_hpc_hash, mi_sr_plugin_hash, mi_sr_object_hash, mi_sr_bytecode_hash}) = do
     put_ bh mi_sr_src_hash
     lazyPut bh mi_sr_usages
     put_ bh mi_sr_flag_hash
     put_ bh mi_sr_opt_hash
     put_ bh mi_sr_hpc_hash
     put_ bh mi_sr_plugin_hash
+    put_ bh mi_sr_object_hash
+    put_ bh mi_sr_bytecode_hash
 
   get bh = do
     src_hash    <- get bh
@@ -99,22 +105,26 @@ instance Binary IfaceSelfRecomp where
     opt_hash    <- get bh
     hpc_hash    <- get bh
     plugin_hash <- get bh
-    return $ IfaceSelfRecomp { mi_sr_src_hash = src_hash, mi_sr_usages = usages, mi_sr_flag_hash = flag_hash, mi_sr_opt_hash = opt_hash, mi_sr_hpc_hash = hpc_hash, mi_sr_plugin_hash = plugin_hash }
+    object_hash <- get bh
+    bytecode_hash <- get bh
+    return $ IfaceSelfRecomp { mi_sr_src_hash = src_hash, mi_sr_usages = usages, mi_sr_flag_hash = flag_hash, mi_sr_opt_hash = opt_hash, mi_sr_hpc_hash = hpc_hash, mi_sr_plugin_hash = plugin_hash, mi_sr_object_hash = object_hash, mi_sr_bytecode_hash = bytecode_hash }
 
 instance Outputable IfaceSelfRecomp where
-  ppr (IfaceSelfRecomp{mi_sr_src_hash, mi_sr_usages, mi_sr_flag_hash, mi_sr_opt_hash, mi_sr_hpc_hash, mi_sr_plugin_hash})
+  ppr (IfaceSelfRecomp{mi_sr_src_hash, mi_sr_usages, mi_sr_flag_hash, mi_sr_opt_hash, mi_sr_hpc_hash, mi_sr_plugin_hash, mi_sr_object_hash, mi_sr_bytecode_hash})
     = vcat [text "Self-Recomp"
             , nest 2 (vcat [ text "src hash:" <+> ppr mi_sr_src_hash
                            , text "flags:" <+> pprFingerprintWithValue missingExtraFlagInfo (fmap pprIfaceDynFlags mi_sr_flag_hash)
                            , text "opt hash:" <+> ppr mi_sr_opt_hash
                            , text "hpc hash:" <+> ppr mi_sr_hpc_hash
                            , text "plugin hash:" <+> ppr mi_sr_plugin_hash
+                           , text "object hash:" <+> ppr mi_sr_object_hash
+                           , text "bytecode hash:" <+> ppr mi_sr_bytecode_hash
                            , text "usages:" <+> ppr (map pprUsage mi_sr_usages)
                            ])]
 
 instance NFData IfaceSelfRecomp where
-  rnf (IfaceSelfRecomp src_hash usages flag_hash opt_hash hpc_hash plugin_hash)
-    = rnf src_hash `seq` rnf usages `seq` rnf flag_hash `seq` rnf opt_hash `seq` rnf hpc_hash `seq` rnf plugin_hash `seq` ()
+  rnf (IfaceSelfRecomp src_hash usages flag_hash opt_hash hpc_hash plugin_hash object_hash bytecode_hash)
+    = rnf src_hash `seq` rnf usages `seq` rnf flag_hash `seq` rnf opt_hash `seq` rnf hpc_hash `seq` rnf plugin_hash `seq` rnf object_hash `seq` rnf bytecode_hash `seq` ()
 
 pprFingerprintWithValue :: SDoc -> FingerprintWithValue SDoc -> SDoc
 pprFingerprintWithValue missingInfo (FingerprintWithValue fp mflags)
