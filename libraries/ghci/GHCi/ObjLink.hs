@@ -103,6 +103,9 @@ loadObj f = throwIO $ ErrorCall $ "loadObj: unsupported on wasm for " <> f
 unloadObj :: String -> IO ()
 unloadObj f = throwIO $ ErrorCall $ "unloadObj: unsupported on wasm for " <> f
 
+-- The loader never purges with a dynamic interpreter, and wasm only
+-- loads dynamic code, so this is unreachable.
+-- See Note [Unloading vs purging objects] in GHC.Runtime.Interpreter
 purgeObj :: String -> IO ()
 purgeObj f = throwIO $ ErrorCall $ "purgeObj: unsupported on wasm for " <> f
 
