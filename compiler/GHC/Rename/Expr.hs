@@ -418,12 +418,11 @@ rnExpr (NegApp _ e _)
 rnExpr (HsGetField _ e f)
  = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
       ; (e, fv_e) <- rnLExpr e
-      ; let f' = rnDotFieldOcc f
-      ; srcSpan <- getSrcSpanM
+      ; let f' = rnDotFieldOcc <$> f
       ; return ( mkExpandedExpr
                    (HsGetField noExtField e f')
-                   (mkGetField srcSpan getField e (fmap (unLoc . dfoLabel) f'))
-               , fv_e `plusFV` fv_getField ) }
+                   (mkGetField getField e (fmap (unLoc . dfoLabel) f'))
+               , fv_e `plusFN` fv_getField ) }
 
 rnExpr (HsProjection _ fs)
   = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
@@ -2860,10 +2859,11 @@ rnHsIf p b1 b2
 
 -- mkGetField arg field calculates a get_field @field arg expression.
 -- e.g. z.x = mkGetField z x = get_field @x z
-mkGetField :: SrcSpan -> Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> HsExpr GhcRn
-mkGetField srcSpan get_field arg (L _ (FieldLabelString field)) =
+mkGetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> HsExpr GhcRn
+mkGetField get_field arg (L ann (FieldLabelString field)) =
+  pprTrace "mkGetField" (ppr ann <+> ppr field)
   -- See Note [Source locations for implicit function calls] in GHC.Iface.Ext.Ast
-  genHsAppWith srcSpan (genAppTypeWith srcSpan (genHsVar get_field) (genHsTyLit field)) arg
+  genHsAppWith (getHasLoc ann) (genHsVar get_field `genAppType` genHsTyLit field) arg
 
 -- mkSetField a field b calculates a set_field @field expression.
 -- e.g mkSetSetField a field b = set_field @"field" a b (read as "set field 'field' to a on b").

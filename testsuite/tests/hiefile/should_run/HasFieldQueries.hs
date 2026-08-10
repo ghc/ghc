@@ -1,6 +1,4 @@
 {-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE DataKinds #-}
 module Main where
 
 import TestUtils
@@ -8,46 +6,43 @@ import GHC.Records
 import GHC.TypeLits
 import Data.Tree
 
-class C a where
-  f :: a -> Char
-
-instance C Char where
-  f x = x
-
 data Thing = Thing {field1 :: Char, field2 :: Bool}
   deriving (Show, Eq)
 
 foo :: Thing -> String
 foo t = show t.field1 ++ show t.field2
-        --      ^ this is the point
-point :: (Int,Int)
-point = (21,17)
+--              ^ this is the point
 
-bar :: Show x => x -> String
-bar x = show [(1,x,A)]
---      ^ this is the point'
-point' :: (Int,Int)
-point' = (21,33)
-
-add :: Num a => a -> a -> a
-add x y = x + y
-
-testing (x :: Int) =
-  add (add x x) x
-  
 testing2 (x :: Thing) = x.field1
+--                      ^ this is the point
+--                        ^ this is the point
 
-data A = A deriving Show
+data NestedThing = NestedThing { nested1 :: Thing }
 
-data Another = Another
+nestedSig :: NestedThing -> Char
+nestedSig n = n.nested1.field1
+--              ^ this is the point
+--                      ^ this is the point
 
-testing3 = (natSing :: SNat 0)
+nestedNoSig n = n.nested1.field2 :: Bool
+--                 ^ this is the point
+--                         ^ this is the point
+
+
+
+points =
+  [ (13,17)
+  , (16,25)
+  , (16,27)
+  , (23,17)
+  , (23,25)
+  , (27,20)
+  , (27,28)
+  ]
 
 main = do
   (df, hf) <- readTestHie "HasFieldQueries.hie"
   let refmap = generateReferencesMap $ getAsts $ hie_asts hf
-  explainEv df hf refmap point
 
-  explainEv df hf refmap point'
-
+  traverse (explainEv df hf refmap) points
   return ()
