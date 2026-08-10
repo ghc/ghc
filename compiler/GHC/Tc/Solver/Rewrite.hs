@@ -1,3 +1,13 @@
+{-# OPTIONS_GHC -fspec-constr-threshold=1200 #-}
+  -- This threshold (smaller than the default 2000) avoids SpecConstr from firing
+  -- on the inner loop of GHC.Core.Reduction.simplifyArgsWorker (inlined into
+  -- this module) based on a 'LiftingContext' argument, as this causes
+  -- significant reboxing (regressing compile-time allocations in T9872d by ~4%),
+  -- as per #27628.
+  --
+  -- The 1200 threshold was chosen to avoid this issue while still allowing
+  -- beneficial SpecConstr to fire in the rest of the module.
+
 module GHC.Tc.Solver.Rewrite(
    rewrite, rewriteForErrors, rewriteArgsNom,
    rewriteType
