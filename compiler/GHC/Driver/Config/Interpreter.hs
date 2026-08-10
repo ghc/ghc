@@ -43,4 +43,5 @@ initInterpOpts dflags = do
     , interpLdConfig = configureLd dflags
     , interpCcConfig = configureCc dflags
     , interpExecutableLinkOpts = initExecutableLinkOpts dflags Dynamic
+    , interpUnloadStrategyFlag = unloadStrategy dflags
     }

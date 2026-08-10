@@ -40,6 +40,7 @@ module GHC.Driver.DynFlags (
         isPackageDbRef,
         Option(..), showOpt,
         DynLibLoader(..),
+        UnloadStrategy(..),
         positionIndependent,
         optimisationFlags,
 
@@ -307,6 +308,7 @@ data DynFlags = DynFlags {
   outputHi              :: Maybe String,
   dynOutputHi           :: Maybe String,
   dynLibLoader          :: DynLibLoader,
+  unloadStrategy        :: Maybe UnloadStrategy,
 
   dynamicNow            :: !Bool, -- ^ Indicate if we are now generating dynamic output
                                   -- because of -dynamic-too. This predicate is
@@ -654,6 +656,7 @@ defaultDynFlags mySettings =
         outputHi                = Nothing,
         dynOutputHi             = Nothing,
         dynLibLoader            = SystemDependent,
+        unloadStrategy          = Nothing,
         dumpPrefix              = "non-module.",
         dumpPrefixForce         = Nothing,
         ldInputs                = [],
@@ -959,6 +962,11 @@ instance Outputable PackageFlag where
 data DynLibLoader
   = Deployable
   | SystemDependent
+  deriving Eq
+
+data UnloadStrategy
+  = UnloadStrategyUnload
+  | UnloadStrategyPurge
   deriving Eq
 
 data RtsOptsEnabled

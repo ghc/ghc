@@ -52,6 +52,7 @@ import GHC.Platform
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHC.Platform.Ways
 #endif
+import GHC.Driver.DynFlags (UnloadStrategy)
 import GHC.Utils.TmpFs
 import GHC.Utils.Logger
 import GHC.Unit.Env
@@ -79,6 +80,8 @@ data Interp = Interp
 
   , interpStringCache :: !(MVar (FastStringEnv (RemotePtr ())))
       -- ^ MallocStrings cache
+
+  , interpUnloadStrategy :: !UnloadStrategy
   }
 
 data InterpInstance

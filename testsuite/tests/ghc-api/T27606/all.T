@@ -25,6 +25,15 @@ test('T27606c',
      compile_and_run,
      ['-package ghc'])
 
+test('T27606c_purge',
+     [extra_run_opts(f'"{config.libdir}" purge'),
+      extra_files(['T27606c.hs', 'B.hs']),
+      req_rts_linker,
+      when(config.ghc_dynamic, skip),
+      when(arch('wasm32'), skip)],
+     multimod_compile_and_run,
+     ['T27606c', '-package ghc'])
+
 test('T27606d',
      [extra_run_opts(f'"{config.libdir}"'),
       req_rts_linker,

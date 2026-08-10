@@ -111,6 +111,7 @@ import GHC.Linker.Types
 import Control.Monad
 
 import Data.Array
+import Data.Containers.ListUtils (nubOrd)
 import Data.ByteString (ByteString)
 import qualified Data.Set as Set
 import Data.Char (isSpace)
@@ -907,8 +908,9 @@ dropModules interp mods pls = do
             }
         }
 
-  mapM_ (purgeLinkableObjs interp) victim_usages
-  when (any (not . null . linkableUsageObjs) victim_usages) $
+  let victim_objs = nubOrd (concatMap linkableUsageObjs victim_usages)
+  dropLinkableObjs interp victim_objs
+  when (not (null victim_objs)) $
     purgeLookupSymbolCache interp
 
   mapM_ (removeSptEntry interp)
@@ -923,31 +925,14 @@ dropModules interp mods pls = do
         modifyHomePackageBytecodeState (bco_loader_state pls) drop_bytecode_state
     }
 
--- | Purge the symbols of a dropped module's objects. We don't unload
--- them, because unloading is not well supported.
--- See Note [Automatically reloading stale linkables]
 -- See Note [Unloading vs purging objects] in GHC.Runtime.Interpreter
-purgeLinkableObjs :: Interp -> LinkableUsage -> IO ()
-purgeLinkableObjs interp lnk
+dropLinkableObjs :: Interp -> [FilePath] -> IO ()
+dropLinkableObjs interp objs
   | interpreterDynamic interp = return ()
   | otherwise
-  = mapM_ (purgeObj interp) (linkableUsageObjs lnk)
-
--- See Note [Unloading vs purging objects] in GHC.Runtime.Interpreter
-unloadLinkableObjs :: Interp -> LinkableUsage -> IO ()
-unloadLinkableObjs interp lnk
-  | interpreterDynamic interp = return ()
-    -- We don't do any cleanup when linking objects with the
-    -- dynamic linker.  Doing so introduces extra complexity for
-    -- not much benefit.
-  | otherwise
-  = mapM_ (unloadObj interp) (linkableUsageObjs lnk)
-      -- The components of a BCO linkable may contain
-      -- dot-o files (generated from C stubs).
-      --
-      -- But the BCO parts can be unlinked just by
-      -- letting go of them (plus of course depopulating
-      -- the symbol table which is done in the main body)
+  = case interpUnloadStrategy interp of
+      UnloadStrategyUnload -> mapM_ (unloadObj interp) objs
+      UnloadStrategyPurge  -> mapM_ (purgeObj interp) objs
 
 -- | Load a linkable from a module, and add all the names from the linkable into the
 -- closure environment.
@@ -1350,12 +1335,13 @@ unload_wkr interp pls@LoaderState{..}  = do
   -- testsuite/ghci can detect space leaks here.
 
   let linkables_to_unload = moduleEnvElts objs_loaded ++ moduleEnvElts bcos_loaded
+      objs_to_unload = nubOrd (concatMap linkableUsageObjs linkables_to_unload)
 
-  mapM_ (unloadLinkableObjs interp) linkables_to_unload
+  dropLinkableObjs interp objs_to_unload
 
   -- If we unloaded any object files at all, we need to purge the cache
   -- of lookupSymbol results.
-  when (not (null (filter (not . null . linkableUsageObjs) linkables_to_unload))) $
+  when (not (null objs_to_unload)) $
     purgeLookupSymbolCache interp
 
   mapM_ (removeSptEntry interp) (concat (moduleEnvElts loaded_spt_keys))

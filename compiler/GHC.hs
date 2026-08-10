@@ -29,7 +29,7 @@ module GHC (
         -- * Flags and settings
         DynFlags(..), GeneralFlag(..), Severity(..), Backend, gopt,
         ncgBackend, llvmBackend, viaCBackend, bytecodeBackend, interpreterBackend, noBackend,
-        GhcMode(..), GhcLink(..),
+        GhcMode(..), GhcLink(..), UnloadStrategy(..),
         parseDynamicFlags, parseTargetFiles,
         getSessionDynFlags,
         setTopSessionDynFlags,
@@ -727,6 +727,12 @@ setTopSessionDynFlags dflags = do
                       }
 
   interp <- liftIO $ initInterpreter dflags tmpfs logger platform finder_cache unit_env interp_opts
+
+  case (hsc_interp hsc_env, unloadStrategy dflags, interp) of
+    (Nothing, Just _, Just i) | interpreterDynamic i ->
+      liftIO $ logInfo logger $ withPprStyle defaultUserStyle $
+        text "warning: -funload-strategy is ignored with a dynamic interpreter"
+    _ -> return ()
 
   modifySession $ \h -> hscSetFlags dflags
                         h{ hsc_IC = (hsc_IC h){ ic_dflags = dflags }
