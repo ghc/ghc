@@ -129,6 +129,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 
 import GHC.Utils.Fingerprint ( getFileHash )
+import GHC.ByteCode.Serialize ( bytecodeLibInputsHash, readBytecodeLibInputsHash )
 import GHC.Tc.Utils.Monad (shutdownTcMPluginsIO, FrontendResult (..), tcg_plugins)
 
 
@@ -538,7 +539,7 @@ linkJSBinary logger tmpfs fc dflags unit_env obj_files pkg_deps = do
 -- | Bytecode libraries are simpler to check for linking needed since they do not
 -- depend on any other libraries.
 checkBytecodeLibraryLinkingNeeded :: Logger -> DynFlags -> UnitEnv -> [Linkable] -> [UnitId] -> IO RecompileRequired
-checkBytecodeLibraryLinkingNeeded _logger dflags unit_env _linkables _pkg_deps = do
+checkBytecodeLibraryLinkingNeeded _logger dflags unit_env linkables _pkg_deps = do
   let platform   = ue_platform unit_env
       arch_os    = platformArchOS platform
       exe_file   = exeFileName arch_os False (outputFile_ dflags)
@@ -548,9 +549,12 @@ checkBytecodeLibraryLinkingNeeded _logger dflags unit_env _linkables _pkg_deps =
   case e_bytecode_lib_time of
     Nothing  -> return $ NeedsRecompile MustCompile
     Just _ -> do
-        -- TODO: the lib doesn't store the hashes of its constituents,
-        -- so we can't check against our in memory linkables
-        return $ needsRecompileBecause ObjectsChanged
+        -- See Note [Hash of bytecode libs] in GHC.ByteCode.Serialize
+        e_recorded <- tryIO (readBytecodeLibInputsHash exe_file)
+        let current = bytecodeLibInputsHash (map linkableHash linkables)
+        case e_recorded of
+          Right recorded | recorded == current -> return UpToDate
+          _ -> return $ needsRecompileBecause ObjectsChanged
 
 checkNativeLibraryLinkingNeeded :: Bool -> Logger -> DynFlags -> UnitEnv -> [Linkable] -> [UnitId] -> IO RecompileRequired
 checkNativeLibraryLinkingNeeded staticLink _ dflags unit_env linkables pkg_deps = do
