@@ -40,8 +40,10 @@ linkBytecodeLib hsc_env gbcs = do
     bytecodeLibFiles = all_cbcs,
     bytecodeLibForeign = interpreter_foreign_lib
   }
+  let inputs_hash = bytecodeLibInputsHash
+        [ gbc_hash m | m <- on_disk_bcos ++ gbcs ]
   let output_fn = fromMaybe "a.out" (outputFile dflags)
-  writeBytecodeLib bytecodeLib' output_fn
+  writeBytecodeLib inputs_hash bytecodeLib' output_fn
   return ()
 
 

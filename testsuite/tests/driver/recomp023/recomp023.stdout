@@ -1,0 +1,7 @@
+first build
+[1 of 2] Compiling M                ( M.hs, M.gbc )
+[2 of 2] Linking recomp023.bytecodelib
+second build
+third build
+[1 of 2] Compiling M                ( M.hs, M.gbc ) [Source file changed]
+[2 of 2] Linking recomp023.bytecodelib [Objects changed]
