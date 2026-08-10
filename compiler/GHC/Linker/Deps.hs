@@ -41,6 +41,7 @@ import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Data.Maybe
 
 import Control.Applicative
+import Control.Monad (filterM)
 
 import Data.List (isSuffixOf)
 
@@ -66,6 +67,10 @@ data LinkDeps = LinkDeps
   , ldAllLinkables    :: [LinkableUsage]
   , ldUnits           :: [UnitId]
   , ldNeededUnits     :: UniqDSet UnitId
+  , ldStaleModules    :: UniqDSet Module
+    -- ^ Loaded modules whose code no longer matches the home unit graph;
+    -- we must drop them before loading their replacements.
+    -- See Note [Automatically reloading stale linkables] in GHC.Linker.Loader
   }
 
 -- | Find all the packages and linkables that a set of modules depends on
@@ -106,13 +111,32 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         -- (omitting modules from the interactive package, which is already linked)
       (mods_s, pkgs_s) <- ldGetDependencies opts relevant_mods
 
+        -- Find loaded modules whose hash disagrees with the home unit graph.
+        -- See Note [Automatically reloading stale linkables] in GHC.Linker.Loader
+      stale_direct <- filterM stale_mod (filter loaded mods_s)
+      let stale_objects = filter is_loaded_object stale_direct
+        -- Changed objects invalidate the loaded objects that transitively
+        -- depend on them.
+        -- See Note [Automatically reloading stale linkables] in GHC.Linker.Loader
+      object_taint <-
+        if null stale_objects
+          then pure []
+          else filterM (depends_on_stale stale_objects)
+                 [ m | m <- mods_s
+                     , is_loaded_object m
+                     , m `notElem` stale_direct ]
+      let stale = loadedDependentsClosure pls
+                    (mkUniqDSet (stale_direct ++ object_taint))
+
       let
         -- 2.  Exclude ones already linked
         --      Main reason: avoid findModule calls in get_linkable
         (mods_needed, links_got) = partitionWith split_mods mods_s
         pkgs_needed = eltsUDFM $ getUniqDSet pkgs_s `minusUDFM` pkgs_loaded pls
 
-        split_mods mod =
+        split_mods mod
+          | mod `elementOfUniqDSet` stale = Left mod
+          | otherwise =
             let is_linked = lookupModuleEnv (objs_loaded pls) mod
                             <|> lookupModuleEnv (bcos_loaded pls) mod
             in case is_linked of
@@ -130,6 +154,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
           , ldAllLinkables    = lnks
           , ldUnits           = pkgs_needed
           , ldNeededUnits     = pkgs_s
+          , ldStaleModules    = stale
           }
         -- Make sure we do not retain 'Linkable' by evaluating '[LinkableUsage]'
         link_deps =
@@ -139,6 +164,27 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
   where
     unit_env = ldUnitEnv opts
     relevant_mods = filterOut isInteractiveModule mods
+
+    loaded m = elemModuleEnv m (bcos_loaded pls) || elemModuleEnv m (objs_loaded pls)
+
+    stale_mod m =
+      HUG.lookupHugByModule m (ue_home_unit_graph unit_env) >>= \case
+        Nothing -> pure False
+        Just hmi
+          | Just l <- homeModLinkable hmi
+          , Just lu <- loaded_usage m
+          -> pure (linkableHash l /= linkableHash lu)
+          | otherwise -> pure False
+
+    is_loaded_object m =
+      elemModuleEnv m (objs_loaded pls) && not (elemModuleEnv m (bcos_loaded pls))
+
+    depends_on_stale stale_objects m = do
+      (deps, _) <- ldGetDependencies opts [m]
+      pure (any (`elem` stale_objects) deps)
+
+    loaded_usage m = lookupModuleEnv (bcos_loaded pls) m
+                 <|> lookupModuleEnv (objs_loaded pls) m
 
     no_obj :: Outputable a => a -> IO b
     no_obj mod = dieWith opts span $

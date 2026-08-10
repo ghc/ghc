@@ -190,6 +190,7 @@ emptyLoaderState unit_env = LoaderState
    , pkgs_loaded = init_pkgs deps
    , bcos_loaded = emptyModuleEnv
    , objs_loaded = emptyModuleEnv
+   , loaded_deps = emptyModuleEnv
    , temp_sos = []
    }
   -- Packages that don't need loading, because the compiler
@@ -286,7 +287,8 @@ loadDependencies interp hsc_env pls span needed_mods = do
 
    -- Link the packages and modules required
    pls1 <- loadPackages' interp hsc_env (ldUnits deps) pls
-   (pls2, succ) <- loadExternalModuleLinkables interp hsc_env pls1 (ldNeededLinkables deps)
+   (pls2, succ) <- loadModuleLinkables interp hsc_env pls1 KeepExternalDefinitions
+                     (ldStaleModules deps) (ldNeededLinkables deps)
    let this_pkgs_loaded = filterNeededPkgsLoaded this_pkgs_needed (pkgs_loaded pls2)
    return (pls2, succ, ldAllLinkables deps, this_pkgs_loaded)
 
@@ -794,20 +796,155 @@ keepDefinitions :: KeepModuleLinkableDefinitions -> (Name -> Bool)
 keepDefinitions KeepAllDefinitions = const True
 keepDefinitions KeepExternalDefinitions = isExternalName
 
--- | Load a linkable from a module, and only add externally visible names to the
--- environment.
-loadExternalModuleLinkables :: Interp -> HscEnv -> LoaderState -> [Linkable] -> IO (LoaderState, SuccessFlag)
-loadExternalModuleLinkables interp hsc_env pls linkables =
-  loadModuleLinkables interp hsc_env pls KeepExternalDefinitions linkables
+{- Note [Automatically reloading stale linkables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A loaded bytecode module is safe to reuse only while it and the modules it was
+linked against agree with the code supplied by the caller. Linked BCOs contain
+direct references to closures, so replacing only a changed module can leave
+stale references in other modules.
+
+For example:
+
+-- A.hs
+f = 1
+
+-- B.hs
+import A
+g = f + 1
+
+After loading A and B, change A so that f = 2 and recompile it. B does
+not need to be recompiled, but its loaded BCO still refers to the old
+closure for f. The next splice should see f = 2 and g = 3. To get the
+correct result, we have to *reload* B, even though we didn't need to
+recompile it.
+
+The GHC driver calls unload before each upsweep, which unloads everything, so
+this situation does not arise during an ordinary GHCi reload - the next load
+would reload everything.
+
+API clients such as HLS may instead want to keep the loader state while
+recompiling individual modules. Forcing them to unload everything or carefully keep track
+of the things they need to unload is not ideal. However, in GHC we can
+automatically handle unloading stale linkables.
+
+The rest of this note describes how we accomplish this.
+
+- For each loaded bytecode module, loaded_deps records its dependencies (the
+modules where the external free names of its BCOs come from).
+- get_link_deps compares the hash of each loaded module with the linkable in the
+current home unit graph. When the hash is different, we must reload.
+- Modules with no entry in the home unit graph, as in one-shot mode, are
+trusted: we have nothing to compare them against, and one-shot mode doesn't do
+reloads.
+
+Reloading the changed module is not enough: every loaded bytecode module
+that transitively refers to it must be reloaded as well, or it would keep
+its references to the old code.
+
+Object code is coarser, we can't walk over object code to see exactly which
+other modules it references, so we use the module dependency graph as an
+overapproximation: an object can only reference symbols of modules it
+transitively imports. So when a changed module was loaded as object code, we
+also reload every loaded object module of this link that transitively depends
+on it.
+
+There is a bit of a complication/hack, sometimes we load the .dyn_o in place of
+.o when the interpreter is dynamic. However, the home module graph still has
+the .o linkable (this is the one we are going to link into the static library).
+This is done in adjust_linkable in GHC.Linker.Deps. We **must** keep the hash
+of the original `.o` object instead of the `dyn_o` hash. This is ok because
+the code is the same, only its packaging has changed. It is desired because we
+don't want to reload needlessly: with the dyn_o hash we would never match the
+home unit graph.
+
+Before loading a replacement, loadModuleLinkables calls dropModules to
+remove the old module and its loaded dependents. Both are done within the
+lock, so the replacement is atomic.
+
+Old bytecode is dropped from the Loader state and can be collected once no
+running computation refers to it.
+
+Object files are purged but the memory stays mapped and code that still refers
+to it keeps working. When the interpreter uses dynamic linking there is nothing
+to purge. The replacement is loaded as a new library and shadows the old one.
+See See Note [Unloading vs purging objects]
+
+No loaded_deps entry is created for an interactive module, and interactive
+modules are never dropped: we don't keep their linkables around so they can't be
+reloaded. This should be fine because the old code is kept alive by the old
+bindings, and new statements are linked against the new code.
+-}
+
+-- | Remove the given modules and every loaded module that transitively
+-- refers to them.
+-- See Note [Automatically reloading stale linkables]
+dropModules :: Interp -> UniqDSet Module -> LoaderState -> IO LoaderState
+dropModules interp mods pls = do
+  let victims = loadedDependentsClosure pls mods
+      victim_list = uniqDSetToList victims
+      victim_usages = mapMaybe (lookupModuleEnv (bcos_loaded pls)) victim_list
+                   ++ mapMaybe (lookupModuleEnv (objs_loaded pls)) victim_list
+      keep_name :: (Name, a) -> Bool
+      keep_name (n, _) = not (isExternalName n)
+                      || not (nameModule n `elementOfUniqDSet` victims)
+      drop_bytecode_state bs = bs
+        { bco_linker_env = (bco_linker_env bs)
+            { closure_env = filterNameEnv keep_name (closure_env (bco_linker_env bs))
+            , itbl_env    = filterNameEnv keep_name (itbl_env (bco_linker_env bs))
+            , addr_env    = filterNameEnv keep_name (addr_env (bco_linker_env bs))
+            }
+        , bco_linked_breaks = (bco_linked_breaks bs)
+            { breakarray_env = delModuleEnvList (breakarray_env (bco_linked_breaks bs)) victim_list
+            , ccs_env        = delModuleEnvList (ccs_env (bco_linked_breaks bs)) victim_list
+            }
+        }
+
+  mapM_ (purgeLinkableObjs interp) victim_usages
+  when (any (not . null . linkableUsageObjs) victim_usages) $
+    purgeLookupSymbolCache interp
+
+  return $! pls
+    { bcos_loaded = delModuleEnvList (bcos_loaded pls) victim_list
+    , objs_loaded = delModuleEnvList (objs_loaded pls) victim_list
+    , loaded_deps = delModuleEnvList (loaded_deps pls) victim_list
+    , bco_loader_state =
+        modifyHomePackageBytecodeState (bco_loader_state pls) drop_bytecode_state
+    }
+
+-- | Purge the symbols of a dropped module's objects. We don't unload
+-- them, because unloading is not well supported.
+-- See Note [Automatically reloading stale linkables]
+-- See Note [Unloading vs purging objects] in GHC.Runtime.Interpreter
+purgeLinkableObjs :: Interp -> LinkableUsage -> IO ()
+purgeLinkableObjs interp lnk
+  | interpreterDynamic interp = return ()
+  | otherwise
+  = mapM_ (purgeObj interp) (linkableUsageObjs lnk)
+
+-- See Note [Unloading vs purging objects] in GHC.Runtime.Interpreter
+unloadLinkableObjs :: Interp -> LinkableUsage -> IO ()
+unloadLinkableObjs interp lnk
+  | interpreterDynamic interp = return ()
+    -- We don't do any cleanup when linking objects with the
+    -- dynamic linker.  Doing so introduces extra complexity for
+    -- not much benefit.
+  | otherwise
+  = mapM_ (unloadObj interp) (linkableUsageObjs lnk)
+      -- The components of a BCO linkable may contain
+      -- dot-o files (generated from C stubs).
+      --
+      -- But the BCO parts can be unlinked just by
+      -- letting go of them (plus of course depopulating
+      -- the symbol table which is done in the main body)
 
 -- | Load a linkable from a module, and add all the names from the linkable into the
 -- closure environment.
 loadInternalModuleLinkables :: Interp -> HscEnv -> LoaderState -> [Linkable] -> IO (LoaderState, SuccessFlag)
 loadInternalModuleLinkables interp hsc_env pls linkables  =
-  loadModuleLinkables interp hsc_env pls KeepAllDefinitions linkables
+  loadModuleLinkables interp hsc_env pls KeepAllDefinitions emptyUniqDSet linkables
 
-loadModuleLinkables :: Interp -> HscEnv -> LoaderState -> KeepModuleLinkableDefinitions -> [Linkable] -> IO (LoaderState, SuccessFlag)
-loadModuleLinkables interp hsc_env pls keep_spec linkables
+loadModuleLinkables :: Interp -> HscEnv -> LoaderState -> KeepModuleLinkableDefinitions -> UniqDSet Module -> [Linkable] -> IO (LoaderState, SuccessFlag)
+loadModuleLinkables interp hsc_env pls keep_spec to_drop linkables
   = mask_ $ do  -- don't want to be interrupted by ^C in here
 
         debugTraceMsg (hsc_logger hsc_env) 3 $
@@ -816,8 +953,14 @@ loadModuleLinkables interp hsc_env pls keep_spec linkables
             hang (text "Bytecode:") 2 (vcat (ppr <$> bcos))
           ]
 
+        -- Drop stale modules before loading their replacements.
+        -- See Note [Automatically reloading stale linkables]
+        pls0 <- if isEmptyUniqDSet stale
+                  then return pls
+                  else dropModules interp stale pls
+
                 -- Load objects first; they can't depend on BCOs
-        (pls1, ok_flag) <- loadObjects interp hsc_env pls objs
+        (pls1, ok_flag) <- loadObjects interp hsc_env pls0 objs
 
         if failed ok_flag then
                 return (pls1, Failed)
@@ -826,6 +969,14 @@ loadModuleLinkables interp hsc_env pls keep_spec linkables
                 return (pls2, Succeeded)
   where
     (objs, bcos) = partitionLinkables linkables
+    stale = unionUniqDSets to_drop $ mkUniqDSet
+      [ m
+      | l <- linkables
+      , let m = linkableModule l
+      , not (isInteractiveModule m)
+      , elemModuleEnv m (bcos_loaded pls) || elemModuleEnv m (objs_loaded pls)
+      , not (linkableInSet l (bcos_loaded pls) || linkableInSet l (objs_loaded pls))
+      ]
 
 
 linkableInSet :: Linkable -> LinkableSet LinkableUsage -> Bool
@@ -976,17 +1127,33 @@ rmDupLinkables already ls
   ********************************************************************* -}
 
 
+-- | The modules where the external free names of a linkable's BCOs come
+-- from. These are the edges in loaded_deps.
+linkableLinkDeps :: Linkable -> UniqDSet Module
+linkableLinkDeps l = mkUniqDSet
+  [ nameModule n
+  | cbc <- linkableBCOs l
+  , bco <- Foldable.toList (bc_bcos cbc)
+  , n <- uniqDSetToList (bcoFreeNames bco)
+  , isExternalName n
+  , not (isWiredInName n)
+  , nameModule n /= linkableModule l
+  ]
+
 dynLinkBCOs :: Interp -> LoaderState -> KeepModuleLinkableDefinitions -> [Linkable] -> IO LoaderState
-dynLinkBCOs interp pls keep_spec bcos =
+dynLinkBCOs interp pls keep_spec bcos = do
 
         let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
-            pls1                     = pls { bcos_loaded = bcos_loaded' }
+            loaded_deps'             = extendModuleEnvList (loaded_deps pls)
+                                         [ (linkableModule l, linkableLinkDeps l)
+                                         | l <- new_bcos
+                                         , not (isInteractiveModule (linkableModule l)) ]
+            pls1                     = pls { bcos_loaded = bcos_loaded', loaded_deps = loaded_deps' }
 
             cbcs :: [CompiledByteCode]
             cbcs = concatMap linkableBCOs new_bcos
-        in do
-          bco_state <- dynLinkCompiledByteCode interp (pkgs_loaded pls) (bco_loader_state pls) traverseHomePackageBytecodeState keep_spec cbcs
-          return $! pls1 { bco_loader_state = bco_state }
+        bco_state <- dynLinkCompiledByteCode interp (pkgs_loaded pls) (bco_loader_state pls) traverseHomePackageBytecodeState keep_spec cbcs
+        return $! pls1 { bco_loader_state = bco_state }
 
 dynLinkCompiledByteCode :: Interp
                         -> PkgsLoaded
@@ -1149,7 +1316,7 @@ unload_wkr interp pls@LoaderState{..}  = do
 
   let linkables_to_unload = moduleEnvElts objs_loaded ++ moduleEnvElts bcos_loaded
 
-  mapM_ unloadObjs linkables_to_unload
+  mapM_ (unloadLinkableObjs interp) linkables_to_unload
 
   -- If we unloaded any object files at all, we need to purge the cache
   -- of lookupSymbol results.
@@ -1159,25 +1326,10 @@ unload_wkr interp pls@LoaderState{..}  = do
   let !new_pls = pls { bco_loader_state = modifyHomePackageBytecodeState bco_loader_state $ \_ -> emptyBytecodeState,
                        -- NB: we don't unload the external package
                        bcos_loaded   = emptyModuleEnv,
-                       objs_loaded   = emptyModuleEnv }
+                       objs_loaded   = emptyModuleEnv,
+                       loaded_deps   = emptyModuleEnv }
 
   return new_pls
-  where
-    unloadObjs :: LinkableUsage -> IO ()
-    unloadObjs lnk
-      | interpreterDynamic interp = return ()
-        -- We don't do any cleanup when linking objects with the
-        -- dynamic linker.  Doing so introduces extra complexity for
-        -- not much benefit.
-
-      | otherwise
-      = mapM_ (unloadObj interp) (linkableUsageObjs lnk)
-                -- The components of a BCO linkable may contain
-                -- dot-o files (generated from C stubs).
-                --
-                -- But the BCO parts can be unlinked just by
-                -- letting go of them (plus of course depopulating
-                -- the symbol table which is done in the main body)
 
 showLS :: LibrarySpec -> String
 showLS (Objects nms)  = "(static) [" ++ intercalate ", " nms ++ "]"
