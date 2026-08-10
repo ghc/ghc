@@ -6,7 +6,7 @@
 {- | This module implements the serialization of bytecode objects to and from disk.
 -}
 module GHC.ByteCode.Serialize
-  ( writeBinByteCode, readBinByteCode
+  ( writeBinByteCode, readBinByteCode, readBinByteCodeHash
   , ModuleByteCode(..)
   , BytecodeLibX(..)
   , BytecodeLib
@@ -199,6 +199,10 @@ readBinByteCode :: HscEnv -> FilePath -> IO ModuleByteCode
 readBinByteCode hsc_env f = do
   odbco <- readOnDiskModuleByteCode hsc_env f
   decodeOnDiskModuleByteCode hsc_env odbco
+
+-- | Read only the hash from the start of a bytecode file
+readBinByteCodeHash :: HscEnv -> FilePath -> IO Fingerprint
+readBinByteCodeHash hsc_env f = odgbc_hash <$> readOnDiskModuleByteCode hsc_env f
 
 readOnDiskModuleByteCode :: HscEnv -> FilePath -> IO OnDiskModuleByteCode
 readOnDiskModuleByteCode hsc_env f = do

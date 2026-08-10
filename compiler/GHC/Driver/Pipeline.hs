@@ -128,7 +128,7 @@ import qualified Data.Set as Set
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 
-import Data.Time ( getCurrentTime )
+import GHC.Utils.Fingerprint ( getFileHash )
 import GHC.Tc.Utils.Monad (shutdownTcMPluginsIO, FrontendResult (..), tcg_plugins)
 
 
@@ -532,7 +532,7 @@ linkJSBinary logger tmpfs fc dflags unit_env obj_files pkg_deps = do
 -- | Bytecode libraries are simpler to check for linking needed since they do not
 -- depend on any other libraries.
 checkBytecodeLibraryLinkingNeeded :: Logger -> DynFlags -> UnitEnv -> [Linkable] -> [UnitId] -> IO RecompileRequired
-checkBytecodeLibraryLinkingNeeded _logger dflags unit_env linkables _pkg_deps = do
+checkBytecodeLibraryLinkingNeeded _logger dflags unit_env _linkables _pkg_deps = do
   let platform   = ue_platform unit_env
       arch_os    = platformArchOS platform
       exe_file   = exeFileName arch_os False (outputFile_ dflags)
@@ -541,11 +541,10 @@ checkBytecodeLibraryLinkingNeeded _logger dflags unit_env linkables _pkg_deps = 
   e_bytecode_lib_time <- modificationTimeIfExists exe_file_os
   case e_bytecode_lib_time of
     Nothing  -> return $ NeedsRecompile MustCompile
-    Just t -> do
-        let bytecode_times =  map linkableTime linkables
-        if any (t <) bytecode_times
-            then return $ needsRecompileBecause ObjectsChanged
-            else return UpToDate
+    Just _ -> do
+        -- TODO: the lib doesn't store the hashes of its constituents,
+        -- so we can't check against our in memory linkables
+        return $ needsRecompileBecause ObjectsChanged
 
 checkNativeLibraryLinkingNeeded :: Bool -> Logger -> DynFlags -> UnitEnv -> [Linkable] -> [UnitId] -> IO RecompileRequired
 checkNativeLibraryLinkingNeeded staticLink _ dflags unit_env linkables pkg_deps = do
@@ -570,8 +569,9 @@ checkNativeLibraryLinkingNeeded staticLink _ dflags unit_env linkables pkg_deps 
     Just t -> do
         -- first check object files and extra_ld_inputs
         let extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
-        (errs,extra_times) <- partitionWithM (tryIO . getModificationUTCTime) extra_ld_inputs
-        let obj_times =  map linkableTime linkables ++ extra_times
+            obj_files = concatMap linkableFiles linkables
+        (errs,obj_times) <- partitionWithM (tryIO . getModificationUTCTime)
+                              (obj_files ++ extra_ld_inputs)
         if not (null errs) || any (t <) obj_times
             then return $ needsRecompileBecause ObjectsChanged
             else do
@@ -930,9 +930,9 @@ hscGenBackendPipeline pipe_env hsc_env mod_sum result = do
       -- No object file produced, bytecode or NoBackend
       Nothing -> return mlinkable
       Just o_fp -> do
-        part_time <- liftIO getCurrentTime
         final_object <- use (T_MergeForeign pipe_env hsc_env o_fp fos)
-        let !linkable = Linkable part_time (ms_mod mod_sum) (NE.singleton (DotO final_object ModuleObject))
+        !obj_hash <- liftIO $ getFileHash final_object
+        let !linkable = Linkable obj_hash (ms_mod mod_sum) (NE.singleton (DotO final_object ModuleObject))
         -- Add the object linkable to the potential bytecode linkable which was generated in HscBackend.
         return (mlinkable { homeMod_object = Just linkable })
 

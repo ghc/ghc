@@ -153,7 +153,7 @@ import GHC.Types.Unique.Set
 import GHC.Types.Var.Env       ( mkEmptyTidyEnv )
 import GHC.Types.Var.Set
 
-import GHC.Utils.Fingerprint ( Fingerprint )
+import GHC.Utils.Fingerprint ( Fingerprint, getFileHash )
 import GHC.Utils.Panic
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -169,7 +169,6 @@ import qualified GHC.Data.Strict as Strict
 
 
 import Data.List ( nub, isPrefixOf, partition )
-import qualified Data.List.NonEmpty as NE
 import Control.Monad
 import Data.IORef
 import System.FilePath as FilePath
@@ -180,7 +179,6 @@ import Data.Set (Set)
 import Control.DeepSeq (force)
 import Control.Exception as E (mask_, finally)
 import Data.List.NonEmpty (NonEmpty ((:|)))
-import Data.Time
 
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import GHC.Iface.Env ( trace_if )
@@ -704,15 +702,24 @@ checkObjects dflags mb_old_linkable summary = do
       -- Not in dynamic-too mode
       else k
 
+  -- We check by date first, even though we have the hash
+  -- If a compilation is interupted after writing the .hi
+  -- but before writing the .o, then we catch this through
+  -- modtimes.
+  -- If the object file is newer than the .hi file, and the
+  -- .hi file is up to date, we also assume the object file
+  -- is up to date.
   checkDynamicObj $
     case (,) <$> mb_obj_date <*> mb_if_date of
       Just (obj_date, if_date)
-        | obj_date >= if_date ->
+        | obj_date >= if_date -> do
+            disk_hash <- getFileHash obj_fn
             case mb_old_linkable of
               Just old_linkable
-                | linkableIsNativeCodeOnly old_linkable, linkableTime old_linkable == obj_date
+                | linkableIsNativeCodeOnly old_linkable
+                , linkableHash old_linkable == disk_hash
                 -> return $ UpToDateItem old_linkable
-              _ -> UpToDateItem <$> findObjectLinkable this_mod obj_fn obj_date
+              _ -> return $ UpToDateItem (findObjectLinkable this_mod obj_fn disk_hash)
       _ -> return $ outOfDateItemBecause MissingObjectFile Nothing
 
 -- | Check to see if we can reuse the old linkable, by this point we will
@@ -721,15 +728,22 @@ checkObjects dflags mb_old_linkable summary = do
 checkByteCodeInMemory :: HscEnv -> ModSummary -> Maybe (LinkableWith ModuleByteCode) -> IO (MaybeValidated (LinkableWith ModuleByteCode))
 checkByteCodeInMemory hsc_env mod_sum mb_old_linkable =
   case mb_old_linkable of
-    Just old_linkable
+    Just old_linkable -> do
       -- If `-fwrite-byte-code` is enabled, then check that the .gbc file is
       -- up-to-date with the linkable we have in our hand.
       -- If ms_bytecode_date is Nothing, then the .gbc file does not exist yet.
-      -- Otherwise, check that the date matches the linkable date exactly.
-      | if gopt Opt_WriteByteCode (hsc_dflags hsc_env)
-          then maybe False (linkableTime old_linkable ==) (ms_bytecode_date mod_sum)
-          else True
-      -> return $ (UpToDateItem old_linkable)
+      -- Otherwise, check that the hash matches the disk.
+      ok <- if gopt Opt_WriteByteCode (hsc_dflags hsc_env)
+              then case ms_bytecode_date mod_sum of
+                     Nothing -> pure False
+                     Just _ -> do
+                       disk_hash <- ByteCode.readBinByteCodeHash hsc_env
+                                      (ml_bytecode_file (ms_location mod_sum))
+                       pure (disk_hash == linkableHash old_linkable)
+              else pure True
+      if ok
+        then return (UpToDateItem old_linkable)
+        else return $ outOfDateItemBecause MissingBytecode Nothing
     _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 
 -- | Load bytecode from a ".gbc" object file if it exists and is up-to-date
@@ -746,7 +760,7 @@ checkByteCodeFromObject hsc_env mod_sum = do
           -- that the one we have on disk would be suitable as well.
           linkable <- unsafeInterleaveIO $ do
             bco <- ByteCode.readBinByteCode hsc_env obj_fn
-            return $ mkOnlyModuleByteCodeLinkable obj_date bco
+            return $ mkOnlyModuleByteCodeLinkable bco
           return $ UpToDateItem linkable
     _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 
@@ -756,9 +770,11 @@ checkByteCodeFromIfaceCoreBindings :: HscEnv -> ModIface -> ModSummary -> IO (Ma
 checkByteCodeFromIfaceCoreBindings _hsc_env iface mod_sum = do
     let
       this_mod   = ms_mod mod_sum
-      if_date    = fromJust $ ms_iface_date mod_sum
+      -- This hash isn't used, initWholeCoreBindings will replace it
+      -- with a real linkable with bytecode that has a hash.
+      wcb_hash   = panic "linkableHash: WholeCoreBindingsLinkable"
     case iface_core_bindings iface (ms_location mod_sum) of
-      Just fi -> return $ UpToDateItem (Linkable if_date this_mod fi)
+      Just fi -> return $ UpToDateItem (Linkable wcb_hash this_mod fi)
       _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 
 
@@ -1618,10 +1634,9 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
                 Strict.Nothing -- no hpc info
 
       {- load it -}
-      bco_time <- getCurrentTime
       mbc <- ByteCode.mkModuleByteCode this_mod bcos []
       (mods_needed, units_needed) <- loadDecls interp hsc_env srcspan $
-        Linkable bco_time this_mod $ NE.singleton (DotGBC mbc)
+        mkModuleByteCodeLinkable mbc
       -- Get the foreign reference to the name we should have just loaded.
       mhvs <- lookupFromLoadedEnv interp (idName binding_id)
       {- Get the HValue for the root -}

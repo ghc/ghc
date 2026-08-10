@@ -102,7 +102,6 @@ import Control.Applicative ((<|>))
 import Control.Concurrent.MVar
 import Data.Array
 import Data.Functor.Identity
-import Data.Time               ( UTCTime )
 import Data.Maybe (mapMaybe)
 import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import qualified Data.List.NonEmpty as NE
@@ -376,10 +375,10 @@ instance Outputable LoadedPkgInfo where
 
 -- | Information we can use to dynamically link modules into the compiler
 data LinkableWith parts = Linkable
-  { linkableTime     :: !UTCTime
-      -- ^ Time at which this linkable was built
-      -- (i.e. when the bytecodes were produced,
-      --       or the mod date on the files)
+  { linkableHash     :: Fingerprint
+      -- ^ The identity of the linkable, derived from the hash of its contents
+      -- Lazy because bytecode is compiled lazily (see loadIfaceByteCodeLazy),
+      -- and inspecting the hash can force compiling the bytecode itself.
 
   , linkableModule   :: !Module
       -- ^ The linkable module itself
@@ -401,17 +400,15 @@ mkLinkableSet ls = mkModuleEnv [(linkableModule l, l) | l <- ls]
 
 -- | Union of LinkableSets.
 --
--- In case of conflict, keep the most recent Linkable (as per linkableTime)
+-- Right biased
 unionLinkableSet :: LinkableSet (LinkableWith a) -> LinkableSet (LinkableWith a) -> LinkableSet (LinkableWith a)
-unionLinkableSet = plusModuleEnv_C go
-  where
-    go l1 l2
-      | linkableTime l1 > linkableTime l2 = l1
-      | otherwise = l2
+unionLinkableSet = plusModuleEnv_C (\_ l2 -> l2)
 
 instance Outputable a => Outputable (LinkableWith a) where
-  ppr (Linkable when_made mod parts)
-     = (text "Linkable" <+> parens (text (show when_made)) <+> ppr mod)
+  -- Don't print the hash, forcing it can trigger compilation
+  -- See the comment on 'linkableHash'
+  ppr (Linkable _ mod parts)
+     = (text "Linkable" <+> ppr mod)
        $$ nest 3 (ppr parts)
 
 type ObjFile = FilePath
@@ -452,13 +449,13 @@ data ModuleByteCode = ModuleByteCode { gbc_module :: Module
                                       , gbc_hash :: !Fingerprint
                                       }
 
-mkModuleByteCodeLinkable :: UTCTime -> ModuleByteCode -> Linkable
-mkModuleByteCodeLinkable linkable_time bco = do
-  Linkable linkable_time (gbc_module bco) (pure (DotGBC bco))
+mkModuleByteCodeLinkable :: ModuleByteCode -> Linkable
+mkModuleByteCodeLinkable bco =
+  Linkable (gbc_hash bco) (gbc_module bco) (pure (DotGBC bco))
 
-mkOnlyModuleByteCodeLinkable :: UTCTime -> ModuleByteCode -> LinkableWith ModuleByteCode
-mkOnlyModuleByteCodeLinkable linkable_time bco = do
-  Linkable linkable_time (gbc_module bco) bco
+mkOnlyModuleByteCodeLinkable :: ModuleByteCode -> LinkableWith ModuleByteCode
+mkOnlyModuleByteCodeLinkable bco =
+  Linkable (gbc_hash bco) (gbc_module bco) bco
 
 instance Outputable ModuleByteCode where
   ppr (ModuleByteCode mod _cbc _fos _) = text "ModuleByteCode" <+> ppr mod
@@ -589,7 +586,9 @@ mkLinkableUsage lnk =
           seqNonEmpty linkablesWithUsage linkablesWithUsage
       }
   in
-    linkableParts lnkUsage `seq` lnkUsage
+    -- Also force the hash so that we don't retain the actual bytecode
+    -- from a LinkableUsage
+    linkableHash lnkUsage `seq` linkableParts lnkUsage `seq` lnkUsage
   where
     mkFileLinkablePartUsage m fp objs =
       FileLinkablePartUsage

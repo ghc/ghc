@@ -26,6 +26,7 @@ import GHC.Types.Unique.DSet
 import GHC.Types.Unique.DFM
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Error
 
 import GHC.Unit.Env
@@ -187,6 +188,17 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                     Just lnk -> adjust_linkable lnk
                 _ -> no_obj (moduleName mod)
 
+            -- We are just swapping the object variant around (.dyn_o for .o)
+            -- This does not change the identity of the code we are loading
+            --
+            -- If the HUG has the .o variant, but the interpreter needs .dyn_o
+            -- When it is time to reload, we use the .o's hash as identity, as
+            -- that is what gets put into the home mod graph. If we swap
+            -- the hash for the .dyn_o's hash, then it will always disagree
+            -- with the home mod graph and force us to unload/reload everytime.
+            --
+            -- This is a bit of a hack, perhaps we should keep both
+            -- variants in the home mod graph
             adjust_linkable lnk
                 | Just new_osuf <- maybe_normal_osuf = do
                         new_parts <- mapM (adjust_part new_osuf)

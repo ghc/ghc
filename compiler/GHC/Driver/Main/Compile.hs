@@ -132,7 +132,6 @@ import GHC.Data.OsPath (unsafeEncodeUtf)
 import qualified GHC.Data.Stream as Stream
 
 
-import Data.Traversable (for)
 import Control.Monad
 import Data.IORef
 import System.Directory
@@ -141,7 +140,6 @@ import Data.Map (Map)
 import qualified Data.Set as S
 import GHC.Unit.Module.WholeCoreBindings
 import GHC.Types.TypeEnv
-import Data.Time
 
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import GHC.Iface.Env ( trace_if )
@@ -218,12 +216,7 @@ loadIfaceByteCode hsc_env iface location type_env =
   where
     compile decls = do
       bco <- compileWholeCoreBindings hsc_env type_env decls
-      linkable $ pure $ DotGBC bco
-
-    linkable parts = do
-      if_time <- modificationTimeIfExists (ml_hi_file_ospath location)
-      time <- maybe getCurrentTime pure if_time
-      return $! Linkable time (mi_module iface) parts
+      return $! Linkable (gbc_hash bco) (mi_module iface) (pure (DotGBC bco))
 
 loadIfaceByteCodeLazy ::
   HscEnv ->
@@ -240,12 +233,7 @@ loadIfaceByteCodeLazy hsc_env iface location type_env =
     compile decls = do
       bco <- unsafeInterleaveIO $ do
           compileWholeCoreBindings hsc_env type_env decls
-      linkable bco
-
-    linkable parts = do
-      if_time <- modificationTimeIfExists (ml_hi_file_ospath location)
-      time <- maybe getCurrentTime pure if_time
-      return $!Linkable time (mi_module iface) parts
+      return $! Linkable (gbc_hash bco) (mi_module iface) bco
 
 -- | If the 'Linkable' contains Core bindings loaded from an interface, replace
 -- them with a lazy IO thunk that compiles them to bytecode and foreign objects,
@@ -283,12 +271,13 @@ initWholeCoreBindings hsc_env iface details (RecompLinkables bc o) = do
 
     go :: RecompBytecodeLinkable -> IO (Maybe (LinkableWith ModuleByteCode))
     go (NormalLinkable l) = pure l
-    go (WholeCoreBindingsLinkable wcbl) =
-      fmap Just $ for wcbl $ \wcb -> do
-        add_iface_to_hpt iface details hsc_env
-        bco <- unsafeInterleaveIO $ do
-            compileWholeCoreBindings hsc_env type_env wcb
-        pure bco
+    go (WholeCoreBindingsLinkable wcbl) = do
+      add_iface_to_hpt iface details hsc_env
+      bco <- unsafeInterleaveIO $ do
+          compileWholeCoreBindings hsc_env type_env (linkableParts wcbl)
+      -- We need to fill in the hash over here, replacing the panic
+      -- because WholeCoreBindingsLinkable doesn't have a hash.
+      pure $ Just $ Linkable (gbc_hash bco) (linkableModule wcbl) bco
 
 -- | Hydrate interface Core bindings and compile them to bytecode.
 --
@@ -842,11 +831,7 @@ make user's opt into writing the files.
 generateAndWriteByteCodeLinkable :: HscEnv -> CgInteractiveGuts -> ModLocation -> IO (LinkableWith ModuleByteCode)
 generateAndWriteByteCodeLinkable hsc_env cgguts mod_location = do
   bco_object <- generateAndWriteByteCode hsc_env cgguts mod_location
-  -- Either, get the same time as the .gbc file if it exists, or just the current time.
-  -- It's important the time of the linkable matches the time of the .gbc file for recompilation
-  -- checking.
-  bco_time <- maybe getCurrentTime pure =<< modificationTimeIfExists (ml_bytecode_file_ospath mod_location)
-  return $ mkOnlyModuleByteCodeLinkable bco_time bco_object
+  return $ mkOnlyModuleByteCodeLinkable bco_object
 
 mkModuleByteCode :: HscEnv -> Module -> ModLocation -> CgInteractiveGuts -> IO ModuleByteCode
 mkModuleByteCode hsc_env mod mod_location cgguts = do
@@ -861,9 +846,8 @@ generateFreshByteCodeLinkable :: HscEnv
   -> ModLocation
   -> IO Linkable
 generateFreshByteCodeLinkable hsc_env mod_name cgguts mod_location = do
-  bco_time <- getCurrentTime
   bco_object <- mkModuleByteCode hsc_env (mkHomeModule (hsc_home_unit hsc_env) mod_name) mod_location cgguts
-  return $ mkModuleByteCodeLinkable bco_time bco_object
+  return $ mkModuleByteCodeLinkable bco_object
 ------------------------------
 
 hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> FilePath -> IO (Maybe FilePath)
