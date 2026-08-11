@@ -28,7 +28,7 @@
      []
      []))
    (EpVirtualBraces
-    (1))
+    (EpaSpan { KindSigs.hs:8:1 }))
    (Nothing)
    (Nothing))
   (Just

@@ -28,7 +28,7 @@
      []
      []))
    (EpVirtualBraces
-    (1))
+    (EpaSpan { T15323.hs:5:1 }))
    (Nothing)
    (Nothing))
   (Just
