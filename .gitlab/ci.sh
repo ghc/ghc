@@ -619,7 +619,7 @@ function make_install_destdir() {
 
 # install the binary distribution in directory $1 to $2.
 function install_bindist() {
-  start_section install-bindist "Install bindist"
+  start_section install-bindist "Install bindist ($1 -> $2)"
   case "${CONFIGURE_WRAPPER:-}" in
     emconfigure) source "$EMSDK/emsdk_env.sh" ;;
     *) ;;
@@ -648,7 +648,26 @@ function install_bindist() {
   end_section install-bindist
 }
 
+function find_bindist_tar() {
+  local tar_files
+  tar_files=( *ghc*.tar.xz )
+  if [[ ${#tar_files[@]} -gt 0 ]]; then
+    bindist_tar="${tar_files[0]}"
+  else
+    unset bindist_tar
+  fi
+}
+
 function test_hadrian() {
+
+   find_bindist_tar
+   dist_dir="_build/bindist"
+
+   if [ -n "$bindist_tar" ]; then
+     mkdir -p "$dist_dir"
+     tar -xf "$bindist_tar" -C "$dist_dir"
+   fi
+
   check_msys2_deps _build/stage1/bin/ghc --version
   check_release_build
 
@@ -680,7 +699,7 @@ function test_hadrian() {
   elif [ -n "${CROSS_EMULATOR:-}" ] && [[ "${CROSS_TARGET:-}" != *"wasm"* ]]; then
     local instdir="$TOP/_build/install"
     local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
-    install_bindist _build/bindist/ghc-*/ "$instdir"
+    install_bindist $dist_dir/ghc-*/ "$instdir"
     echo 'main = putStrLn "hello world"' > expected
     run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -o hello
 
@@ -714,7 +733,7 @@ function test_hadrian() {
   else
     local instdir="$TOP/_build/install"
     local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
-    install_bindist _build/bindist/ghc-*/ "$instdir"
+    install_bindist $dist_dir/ghc-*/ "$instdir"
 
     if [[ "${CI_JOB_NAME}" != *"windows"* ]] && [ -z "${CROSS_TARGET:-}" ]
     then
