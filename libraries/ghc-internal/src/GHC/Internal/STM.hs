@@ -5,6 +5,11 @@
 {-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
+-- Make unused imports warnings instead of errors, because there are seemingly
+-- unused imports of `throw`, `throwIO`, and `rethrowIO`, which are actually
+-- used for documentation hyperlinking.
+{-# OPTIONS_GHC -Wwarn=unused-imports #-}
+
 module GHC.Internal.STM
         (
           -- * the 'STM' monad
@@ -13,6 +18,7 @@ module GHC.Internal.STM
         , retry
         , orElse
         , throwSTM
+        , rethrowSTM
         , catchSTM
         , unsafeIOToSTM
           -- * TVars
@@ -28,7 +34,9 @@ import qualified GHC.Internal.Stack.Types as Rebindable
 import GHC.Internal.Base
 import GHC.Internal.Exception (Exception, toExceptionWithBacktrace, fromException, addExceptionContext)
 import GHC.Internal.Exception.Context (ExceptionAnnotation)
-import GHC.Internal.Exception.Type (WhileHandling(..))
+import GHC.Internal.Exception.Type (
+    WhileHandling(..), ExceptionWithContext, NoBacktrace (NoBacktrace),
+  )
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Prim (
     RealWorld, State#, TVar#, atomically#, catchRetry#, catchSTM#,
@@ -36,6 +44,10 @@ import GHC.Internal.Prim (
   )
 import GHC.Internal.Prim.PtrEq (sameTVar#)
 import GHC.Internal.Stack (HasCallStack, withFrozenCallStack)
+
+-- Imports for documentation hyperlinking
+import GHC.Internal.Exception (throw)
+import GHC.Internal.IO (throwIO, rethrowIO)
 
 -- TVars are shared memory locations which support atomic memory
 -- transactions.
@@ -166,7 +178,7 @@ retry = STM $ \s# -> retry# s#
 orElse :: STM a -> STM a -> STM a
 orElse (STM m) e = STM $ \s -> catchRetry# m (unSTM e) s
 
--- | A variant of 'throw' that can only be used within the 'STM' monad.
+-- | The 'STM' analog of 'throwIO'.
 --
 -- Throwing an exception in @STM@ aborts the transaction and propagates the
 -- exception. If the exception is caught via 'catchSTM', only the changes
@@ -176,19 +188,8 @@ orElse (STM m) e = STM $ \s -> catchRetry# m (unSTM e) s
 -- If the exception is not caught inside of the 'STM', it is re-thrown by
 -- 'atomically', and the entire 'STM' is rolled back.
 --
--- Although 'throwSTM' has a type that is an instance of the type of 'throw', the
--- two functions are subtly different:
---
--- > throw e    `seq` x  ===> throw e
--- > throwSTM e `seq` x  ===> x
---
--- The first example will cause the exception @e@ to be raised,
--- whereas the second one won\'t.  In fact, 'throwSTM' will only cause
--- an exception to be raised when it is used within the 'STM' monad.
--- The 'throwSTM' variant should be used in preference to 'throw' to
--- raise an exception within the 'STM' monad because it guarantees
--- ordering with respect to other 'STM' operations, whereas 'throw'
--- does not.
+-- Note that 'throwSTM' is preferable to 'throw', for the same reasons that
+-- 'throwIO' is preferable to 'throw'.
 throwSTM :: (HasCallStack, Exception e) => e -> STM a
 throwSTM e = do
     -- N.B. Typically use of unsafeIOToSTM is very much frowned upon as this
@@ -197,7 +198,11 @@ throwSTM e = do
     se <- unsafeIOToSTM (withFrozenCallStack $ toExceptionWithBacktrace e)
     STM $ raiseIO# se
 
--- | Exception handling within STM actions.
+-- | The 'STM' analog of 'rethrowIO'.
+rethrowSTM :: Exception e => ExceptionWithContext e -> STM a
+rethrowSTM e = throwSTM (NoBacktrace e)
+
+-- | The 'STM' analog of 'catch'.
 --
 -- @'catchSTM' m f@ catches any exception thrown by @m@ using 'throwSTM',
 -- using the function @f@ to handle the exception. If an exception is
