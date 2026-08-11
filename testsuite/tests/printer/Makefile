@@ -937,3 +937,8 @@ PprQualifiedStrings:
 Haddock1:
 	# $(CHECK_PPR)   $(LIBDIR) Haddock1.hs
 	$(CHECK_EXACT) $(LIBDIR) Haddock1.hs
+
+.PHONY: T27423c
+T27423c:
+	$(CHECK_PPR)   $(LIBDIR) T27423c.hs
+	$(CHECK_EXACT) $(LIBDIR) T27423c.hs

@@ -2287,7 +2287,7 @@ kcConDecl new_or_data _tc_res_kind
     bind_con_tvbs outer_bndrs inner_bndrs thing_inside
       -- Why "_Tv"? See Note [Using TyVarTvs for kind-checking GADTs]
       = discardResult $ bindOuterSigTKBndrs_Tv outer_bndrs $
-                        bindExplicitTKBndrs_Tv (concatMap hsForAllTelescopeBndrs inner_bndrs) $
+                        bindExplicitTKBndrs_Tv (gadtTelescopeBndrs inner_bndrs) $
                         thing_inside
 
 {- Note [kcConDecls: kind-checking data type decls]

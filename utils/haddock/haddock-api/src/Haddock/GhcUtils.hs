@@ -229,7 +229,7 @@ getGADTConType
       ( HsSig
           { sig_ext = noExtField
           , sig_bndrs = unLoc outer_bndrs
-          , sig_body = mkForallTys inner_bndrs phi_ty
+          , sig_body = mkGadtArgTys inner_bndrs phi_ty
           }
       )
     where
@@ -251,13 +251,14 @@ getGADTConType
         noLocA (HsQualTy{ hst_xqual = noAnn
                         , hst_ctxt = ctxt, hst_body = body})
 
-      mkForallTy :: HsForAllTelescope DocNameI -> LHsType DocNameI -> LHsType DocNameI
-      mkForallTy tele body =
-        noLocA (HsForAllTy { hst_xforall = noAnn
+      mkGadtArgTy :: LHsGadtTelescope DocNameI -> LHsType DocNameI -> LHsType DocNameI
+      mkGadtArgTy (L l (HsGadtForAll _ tele)) body =
+        L l (HsForAllTy { hst_xforall = noAnn
                            , hst_tele = tele, hst_body = body })
+      mkGadtArgTy (L l HsGadtPar{}) body = L l (HsParTy noAnn body)
 
-      mkForallTys :: [HsForAllTelescope DocNameI] -> LHsType DocNameI -> LHsType DocNameI
-      mkForallTys = flip (foldr mkForallTy)
+      mkGadtArgTys :: [LHsGadtTelescope DocNameI] -> LHsType DocNameI -> LHsType DocNameI
+      mkGadtArgTys = flip (foldr mkGadtArgTy)
 
 getGADTConType (ConDeclH98{}) = panic "getGADTConType"
 

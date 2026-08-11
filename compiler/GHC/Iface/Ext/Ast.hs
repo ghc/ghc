@@ -1789,7 +1789,7 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
             HsOuterExplicit{} -> []
           exp_bndrs =
             [ L l (updateHsTyVarBndrFlag Invisible b) | L l b <- hsOuterExplicitBndrs outer_bndrs ]
-            ++ concatMap hsForAllTelescopeBndrs inner_bndrs
+            ++ concatMap hsForAllTelescopeBndrs (gadtArgTelescopes inner_bndrs)
       ConDeclH98 { con_name = name, con_ex_tvs = qvars
                  , con_mb_cxt = ctx, con_args = dets
                  , con_doc = doc} ->

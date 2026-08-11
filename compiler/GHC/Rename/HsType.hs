@@ -28,8 +28,7 @@ module GHC.Rename.HsType (
         checkPrecMatch, checkSectionPrec,
 
         -- Binding related stuff
-        bindHsOuterTyVarBndrs, bindHsForAllTelescope,
-        bindHsForAllTelescopes,
+        bindHsOuterTyVarBndrs, bindHsForAllTelescope, bindHsGadtTelescopes,
         bindLHsTyVarBndr, bindLHsTyVarBndrs, WarnUnusedForalls(..),
         rnImplicitTvOccs, bindSigTyVarsFV, bindHsQTyVars,
         FreeKiTyVars, filterInScopeM,
@@ -37,7 +36,7 @@ module GHC.Rename.HsType (
         extractHsTysRdrTyVars, extractRdrKindSigVars,
         extractConDeclGADTDetailsTyVars, extractDataDefnKindVars,
         extractHsOuterTvBndrs, extractHsTyArgRdrKiTyVars,
-        extractHsForAllTelescopes,
+        extractHsGadtTelescopes,
         nubL, nubN,
 
         -- Error helpers
@@ -1249,16 +1248,19 @@ bindHsForAllTelescope doc tele thing_inside =
         checkForAllTelescopeWildcardBndrs doc bndrs'
         thing_inside $ mkHsForAllInvisTele noAnn bndrs'
 
-bindHsForAllTelescopes :: HsDocContext
-                       -> [HsForAllTelescope GhcPs]
-                       -> ([HsForAllTelescope GhcRn] -> RnM (a, FreeNames))
-                       -> RnM (a, FreeNames)
-bindHsForAllTelescopes _ [] thing_inside =
+bindHsGadtTelescopes :: HsDocContext
+                     -> [LHsGadtTelescope GhcPs]
+                     -> ([LHsGadtTelescope GhcRn] -> RnM (a, FreeNames))
+                     -> RnM (a, FreeNames)
+bindHsGadtTelescopes _ [] thing_inside =
   thing_inside []
-bindHsForAllTelescopes doc (tele:teles) thing_inside =
-  bindHsForAllTelescope  doc tele  $ \tele'  ->
-  bindHsForAllTelescopes doc teles $ \teles' ->
-    thing_inside (tele':teles')
+bindHsGadtTelescopes doc (L l HsGadtPar{} : args) thing_inside =
+  bindHsGadtTelescopes doc args $ \args' ->
+    thing_inside (L l (HsGadtPar noExtField) : args')
+bindHsGadtTelescopes doc (L l (HsGadtForAll _ tele) : args) thing_inside =
+  bindHsForAllTelescope doc tele $ \tele' ->
+  bindHsGadtTelescopes        doc args $ \args' ->
+    thing_inside (L l (HsGadtForAll noExtField tele') : args')
 
 -- See Note [Wildcard binders in disallowed contexts] in GHC.Hs.Type
 checkForAllTelescopeWildcardBndrs :: HsDocContext
@@ -2286,13 +2288,15 @@ extractHsOuterTvBndrs outer_bndrs body_fvs =
     HsOuterImplicit{}                  -> body_fvs
     HsOuterExplicit{hso_bndrs = bndrs} -> extract_hs_tv_bndrs bndrs [] body_fvs
 
-extractHsForAllTelescopes :: [HsForAllTelescope GhcPs]
-                          -> FreeKiTyVars -- Free in body
-                          -> FreeKiTyVars -- Free in result
-extractHsForAllTelescopes []           body_fvs = body_fvs
-extractHsForAllTelescopes (tele:teles) body_fvs =
+extractHsGadtTelescopes :: [LHsGadtTelescope GhcPs]
+                        -> FreeKiTyVars -- Free in body
+                        -> FreeKiTyVars -- Free in result
+extractHsGadtTelescopes []                           body_fvs = body_fvs
+extractHsGadtTelescopes (L _ HsGadtPar{} : args)         body_fvs =
+  extractHsGadtTelescopes args body_fvs
+extractHsGadtTelescopes (L _ (HsGadtForAll _ tele) : args) body_fvs =
   extract_hs_for_all_telescope tele [] $
-  extractHsForAllTelescopes teles body_fvs
+  extractHsGadtTelescopes args body_fvs
 
 extract_hs_tv_bndrs :: [LHsTyVarBndr flag GhcPs]
                     -> FreeKiTyVars  -- Accumulator

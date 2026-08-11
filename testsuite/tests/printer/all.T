@@ -224,3 +224,4 @@ test('TestNamedDefaults', [ignore_stderr, req_ppr_deps], makefile_test, ['TestNa
 test('PprModifiers', [ignore_stderr,req_ppr_deps], makefile_test, ['PprModifiers'])
 test('PprQualifiedStrings', [ignore_stderr,req_ppr_deps], makefile_test, ['PprQualifiedStrings'])
 test('Haddock1', [ignore_stderr,req_ppr_deps], makefile_test, ['Haddock1'])
+test('T27423c', [ignore_stderr,req_ppr_deps], makefile_test, ['T27423c'])

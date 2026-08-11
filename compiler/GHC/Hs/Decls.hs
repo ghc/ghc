@@ -974,13 +974,36 @@ pprConDecl (ConDeclGADT { con_names = cons
                         , con_mb_cxt = mcxt, con_g_args = args
                         , con_res_ty = res_ty, con_modifiers = mods, con_doc = doc })
   = pprMaybeWithDoc doc $ pprLHsModifiers mods <+> ppr_con_names (toList cons) <+> dcolon
-    <+> (sep [pprHsOuterSigTyVarBndrs outer_bndrs
-                <+> hsep (map pprHsForAllTelescope inner_bndrs)
-                <+> pprLHsContext mcxt,
-              sep (ppr_args args ++ [ppr res_ty]) ])
+    <+> sep [ppr_outer_bndrs, ppr_inner_bndrs (
+                sep [ pprLHsContext mcxt,
+                      sep (ppr_args args ++ [ppr res_ty])])]
   where
     ppr_args (PrefixConGADT _ args) = map (pprHsConDeclFieldWith (\arr tyDoc -> tyDoc <+> pprHsModifiedFunArr arr)) args
     ppr_args (RecConGADT _ fields) = [pprHsConDeclRecFields (unLoc fields) <+> arrow]
+
+    -- pprint all parentheses and foralls, so parse == parse . ppr . parse
+    ppr_inner_bndrs :: SDoc -> SDoc
+    ppr_inner_bndrs tyDoc = foldr ppr_inner_bndr (tyDoc <> close_parens) inner_bndrs
+
+    ppr_inner_bndr (L _ HsGadtPar{})           rest = lparen <> rest
+    ppr_inner_bndr (L _ (HsGadtForAll _ tele)) rest
+      | HsForAllInvis {hsf_invis_bndrs=[]} <- tele = empty_forall <+> rest
+      | otherwise = pprHsForAllTelescope tele <+> rest
+
+    -- for each open paren generate a closed one
+    close_parens = hcat [ rparen | L _ HsGadtPar{} <- inner_bndrs ]
+
+    -- pprint empty explicit outer forall as `forall.` if there are inner binders, because otherwise
+    -- `forall. forall a. ...` would become `forall a. ...` and that would parse into
+    -- different AST, thus breaking parse == parse . ppr . parse property
+    ppr_outer_bndrs
+      | HsOuterExplicit{hso_bndrs = []} <- outer_bndrs
+      , not (null inner_bndrs)
+      = empty_forall
+      | otherwise
+      = pprHsOuterSigTyVarBndrs outer_bndrs
+
+    empty_forall = forAllLit <> dot
 
 ppr_con_names :: (OutputableBndr a) => [GenLocated l a] -> SDoc
 ppr_con_names = pprWithCommas (pprPrefixOcc . unLoc)

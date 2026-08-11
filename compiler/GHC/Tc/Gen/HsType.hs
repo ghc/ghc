@@ -3549,12 +3549,12 @@ tcOuterTKBndrsX skol_mode skol_info outer_bndrs thing_inside
 ---------------
 tcGadtConTyVarBndrs :: SkolemInfo
                     -> HsOuterSigTyVarBndrs GhcRn
-                    -> [HsForAllTelescope GhcRn]
+                    -> [LHsGadtTelescope GhcRn]
                     -> TcM a -> TcM ([TcTyVarBinder], a)
 tcGadtConTyVarBndrs skol_info outer inner thing_inside
   = do { (outer_bndrs, (inner_tvbs, a)) <-
             tcOuterTKBndrs skol_info outer $
-            tcExplicitTKBndrs skol_info (concatMap hsForAllTelescopeBndrs inner) $
+            tcExplicitTKBndrs skol_info (gadtTelescopeBndrs inner) $
             thing_inside
        ; outer_bndrs <- scopedSortOuter outer_bndrs
        ; let outer_tvbs = tyVarSpecToBinders (outerTyVarBndrs outer_bndrs)

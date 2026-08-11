@@ -567,7 +567,7 @@ synifyDataCon use_gadt_syntax dc =
             , hso_bndrs = map synifyTyVarBndr outer_tvbs
             }
 
-    inner_bndrs = mk_telescopes inner_tvbs
+    inner_bndrs = map noLocA $ mkHsGadtForAlls (mk_telescopes inner_tvbs)
 
     mk_telescopes bs
       | (invis, other) <- split_invis_tvbs bs, not (null invis)
