@@ -623,6 +623,11 @@ deriving instance Data (HsForAllTelescope GhcPs)
 deriving instance Data (HsForAllTelescope GhcRn)
 deriving instance Data (HsForAllTelescope GhcTc)
 
+-- deriving instance (DataIdLR p p) => Data (HsGadtArg p)
+deriving instance Data (HsGadtArg GhcPs)
+deriving instance Data (HsGadtArg GhcRn)
+deriving instance Data (HsGadtArg GhcTc)
+
 -- deriving instance (DataIdLR p p) => Data (HsTyVarBndr p)
 deriving instance (Data flag) => Data (HsTyVarBndr flag GhcPs)
 deriving instance (Data flag) => Data (HsTyVarBndr flag GhcRn)

@@ -2641,7 +2641,7 @@ rnConDecl (ConDeclGADT { con_names   = names
               -- See #14808.
               implicit_bndrs =
                 extractHsOuterTvBndrs outer_bndrs           $
-                extractHsForAllTelescopes inner_bndrs       $
+                extractHsGadtArgs inner_bndrs               $
                 extractHsTysRdrTyVars (hsConDeclTheta mcxt) $
                 extractConDeclGADTDetailsTyVars args        $
                 extractHsTysRdrTyVars [res_ty] []
@@ -2649,7 +2649,7 @@ rnConDecl (ConDeclGADT { con_names   = names
         ; let ctxt = ConDeclCtx (toList new_names)
 
         ; bindHsOuterTyVarBndrs ctxt Nothing implicit_bndrs outer_bndrs $ \outer_bndrs' ->
-          bindHsForAllTelescopes ctxt inner_bndrs $ \inner_bndrs' ->
+          bindHsGadtArgs ctxt inner_bndrs $ \inner_bndrs' ->
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
         ; (new_args, fvs2)   <- rnConDeclGADTDetails (unLoc (head new_names)) ctxt args
         ; (new_res_ty, fvs3) <- rnLHsType ctxt res_ty

@@ -21,6 +21,7 @@ module Language.Haskell.Syntax.Type (
         isHsBndrInvisible,
         isHsBndrWildCard,
         HsForAllTelescope(..),
+        HsGadtArg(..), LHsGadtArg, XGadtForAll, XGadtPar, XXGadtArg,
         HsTyVarBndr(..), LHsTyVarBndr,
         LHsQTyVars(..),
         HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs, HsOuterSigTyVarBndrs,
@@ -391,6 +392,41 @@ data HsForAllTelescope pass
     , hsf_invis_bndrs  :: [LHsTyVarBndr Specificity pass]
     }
   | XHsForAllTelescope !(XXHsForAllTelescope pass)
+
+-- A type for interleaved GADT foralls and prefixes, inspired by HsArg
+--
+-- `HsGadtPar` is only usefull for pretty-printing/exact-printing for recovering
+-- parenthisis interleaved with foralls.
+--
+-- Here's an example:
+--
+--  data D where
+--    MkD :: forall a b. ( forall c. forall d. ( forall. ...
+--           ↑           ↑ ↑         ↑         ↑ ↑
+--           1           2 3         4         5 6
+--
+-- That would correspond to a list
+--
+--   1 → [ HsGadtForAll
+--   2 → , HsGadtPar
+--   3 → , HsGadtForAll
+--   4 → , HsGadtForAll
+--   5 → , HsGadtPar
+--   6 → , HsGadtForAll
+--       , ...]
+--
+-- We can always recover parenthisis structure because they must close after
+-- return type.
+data HsGadtArg pass
+  = HsGadtForAll !(XGadtForAll pass) (HsForAllTelescope pass)
+  | HsGadtPar !(XGadtPar pass)
+  | XHsGadtArg !(XXGadtArg pass)
+
+type LHsGadtArg pass = XRec pass (HsGadtArg pass)
+
+type family XGadtForAll pass
+type family XGadtPar    pass
+type family XXGadtArg   pass
 
 -- | Located Haskell Type Variable Binder
 type LHsTyVarBndr flag pass = XRec pass (HsTyVarBndr flag pass)

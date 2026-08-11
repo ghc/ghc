@@ -961,8 +961,9 @@ data ConDecl pass
         --   cf. HsSigType that also stores the outermost sig_bndrs separately
         --   from the forall telescopes in sig_body.
         --   See Note [Representing type signatures] in Language.Haskell.Syntax.Type
-      , con_inner_bndrs :: [HsForAllTelescope pass]
-        -- ^ The forall telescopes other than the outermost invisible forall.
+      , con_inner_bndrs :: [LHsGadtArg pass]
+        -- ^ The forall telescopes other than the outermost invisible forall,
+        --   interleaved with the parentheses that enclose them.
       , con_mb_cxt  :: Maybe (LHsContext pass)   -- ^ User-written context (if any)
       , con_g_args  :: HsConDeclGADTDetails pass -- ^ Arguments; never infix
       , con_res_ty  :: LHsType pass              -- ^ Result type
@@ -1074,22 +1075,21 @@ the GADT type, in precisely that order. For instance:
     MkT5 :: forall a. Int -> Eq a => a -> T
       -- Rejected, `Eq a` is nested
     MkT6 :: (forall a. a -> T)
-      -- Rejected, `forall a` is nested due to the surrounding parentheses
-    MkT7 :: (Eq a => a -> t)
-      -- Rejected, `Eq a` is nested due to the surrounding parentheses
+      -- OK, the parentheses are recorded in con_inner_bndrs.
+    MkT7 :: (Eq a => a -> T)
+      -- OK, ditto
 
 For the full details, see the "Formal syntax for GADTs" section of the GHC
 User's Guide. GHC enforces that GADT constructors do not have nested `forall`s
 or contexts in two parts:
 
 1. GHC, in the process of splitting apart a GADT's type,
-   extracts out the leading `forall` and context (if they are provided). To
-   accomplish this splitting, the renamer uses the
-   GHC.Hs.Type.splitLHsGADTPrefixTy function, which is careful not to remove
-   parentheses surrounding the leading `forall` or context (as these
-   parentheses can be syntactically significant). If the third result returned
-   by splitLHsGADTPrefixTy contains any `forall`s or contexts, then they must
-   be nested, so they will be rejected.
+   extracts out the leading `forall`s and context (if they are provided). To
+   accomplish this splitting, the parser uses the GHC.Hs.Type.splitLHsGadtTy
+   function, which records the parentheses that surround the leading `forall`s
+   in con_inner_bndrs (as these parentheses are syntactically significant).
+   If the body returned by splitLHsGadtTy still contains any `forall`s or
+   contexts, then they must be nested, so they will be rejected.
 
    Note that this step applies to both prefix and record GADTs alike, as they
    both have syntax which permits `forall`s and contexts. The difference is
