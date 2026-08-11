@@ -289,9 +289,11 @@ type instance XLet           GhcPs = (EpToken "let", EpToken "in")
 type instance XLet           GhcRn = NoExtField
 type instance XLet           GhcTc = NoExtField
 
-type instance XDo            GhcPs = (AnnList, EpaLocation)
+type instance XDo            GhcPs = DoAnn
 type instance XDo            GhcRn = NoExtField
 type instance XDo            GhcTc = Type
+
+type DoAnn = (Either (EpToken "[", EpToken "]") AnnList, EpaLocation)
 
 type instance XExplicitList  GhcPs = (EpToken "[", EpToken "]")
 type instance XExplicitList  GhcRn = NoExtField
@@ -1464,7 +1466,7 @@ type instance XCmdLet     GhcPs = (EpToken "let", EpToken "in")
 type instance XCmdLet     GhcRn = NoExtField
 type instance XCmdLet     GhcTc = NoExtField
 
-type instance XCmdDo      GhcPs = (AnnList, EpaLocation)
+type instance XCmdDo      GhcPs = DoAnn
 type instance XCmdDo      GhcRn = NoExtField
 type instance XCmdDo      GhcTc = Type
 

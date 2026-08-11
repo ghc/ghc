@@ -519,8 +519,7 @@ data AnnList
       } deriving (Data,Eq)
 
 data AnnListBrackets
-  = ListBraces (EpToken "{")         (EpToken "}")
-  | ListSquare (EpToken "[")         (EpToken "]")
+  = ListBraces (EpToken "{") (EpToken "}")
   | ListNone
   deriving (Data,Eq)
 
@@ -1093,7 +1092,6 @@ instance Outputable AnnList where
 
 instance Outputable AnnListBrackets where
   ppr (ListBraces o c) = text "ListBraces" <+> ppr o <+> ppr c
-  ppr (ListSquare o c) = text "ListSquare" <+> ppr o <+> ppr c
   ppr ListNone         = text "ListNone"
 
 instance Outputable AnnCType where

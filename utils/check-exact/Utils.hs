@@ -343,7 +343,6 @@ insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports
 
 annListBracketsLocs :: AnnListBrackets -> (EpaLocation,EpaLocation)
 annListBracketsLocs (ListBraces o c) = (getEpTokenLoc o,    getEpTokenLoc c)
-annListBracketsLocs (ListSquare o c) = (getEpTokenLoc o,    getEpTokenLoc c)
 annListBracketsLocs ListNone         = (noAnn,              noAnn)
 
 data SplitWhere = Before | After

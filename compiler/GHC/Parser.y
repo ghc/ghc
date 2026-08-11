@@ -3152,19 +3152,15 @@ aexp    :: { ECP }
                                       return $ ECP $
                                         $2 >>= \ $2 ->
                                         mkHsDoPV (comb2 $1 $2)
-                                                 (stmtlistAnns $2)
+                                                 (Right $stmtlistAnns $2, glR $1)
                                                  (fmap mkModuleNameFS (getDO $1))
-                                                 (stmtlistStmts $2)
-                                                 (glR $1)
-                                                 (glR $2) }
+                                                 (stmtlistStmts $2) }
         | MDO stmtlist             {% hintQualifiedDo $1 >> runPV $2 >>= \ $2 ->
                                        fmap ecpFromExp $
                                        amsA' (L (comb2 $1 $2)
-                                              (mkMDo (stmtlistAnns $2)
-                                                     (MDoExpr $ fmap mkModuleNameFS (getMDO $1))
-                                                     (stmtlistStmts $2)
-                                                     (glR $1)
-                                                     (glR $2))) }
+                                              (mkHsDoAnns (MDoExpr $ fmap mkModuleNameFS (getMDO $1))
+                                                          (stmtlistStmts $2)
+                                                          (Right $ stmtlistAnns $2, glR $1))) }
         | 'proc' aexp '->' exp
                        {% (checkPattern <=< runPV) (unECP $2) >>= \ p ->
                            runPV (unECP $4) >>= \ $4@cmd ->
@@ -3440,7 +3436,7 @@ list :: { forall b. DisambECP b => SrcSpan -> (EpaLocation, EpaLocation) -> PV (
              { \loc (ao,ac) ->
                 checkMonadComp >>= \ ctxt ->
                 unECP $1 >>= \ $1 -> do { t <- addTrailingVbarA $1 (epTok $2)
-                ; amsA' (L loc $ mkHsCompAnns ctxt (unLoc $3) t (AnnList Nothing (ListSquare (EpTok ao) (EpTok ac)) [], noAnn))
+                ; amsA' (L loc $ mkHsCompAnns ctxt (unLoc $3) t (Left $ (EpTok ao, EpTok ac), noAnn))
                     >>= ecpFromExp' } }
 
 lexps :: { forall b. DisambECP b => PV [LocatedA b] }
@@ -3658,11 +3654,13 @@ apat    : aexp                  {% (checkPattern <=< runPV) (unECP $1) }
 -----------------------------------------------------------------------------
 -- Statement sequences
 
-stmtlist :: { forall b. DisambECP b => PV (LocatedA ((EpToken "{", [EpToken ";"], EpToken "}"), Located [LocatedA (Stmt GhcPs (LocatedA b))])) }
+stmtlist :: { forall b. DisambECP b => PV (LocatedA (AnnList, Located [LocatedA (Stmt GhcPs (LocatedA b))])) }
         : '{'           stmts '}'       { $2 >>= \ $2 ->
-                                          amsA' (sLL $1 $> ((epTok $1, fromOL $ fst $ unLoc $2, epTok $3), sL1 $2 $ reverse $ snd $ unLoc $2))}
+                                          amsA' (sLL $1 $> (AnnList (Just (spanAsAnchor $ stmtsLoc $2)) (ListBraces (epTok $1) (epTok $3)) (fromOL $ fst $ unLoc $2)
+                                                           , sL1 $2 $ reverse $ snd $ unLoc $2))}
         |     vocurly   stmts close     { $2 >>= \ $2 ->
-                                          amsA' (L (stmtsLoc $2) ((noEpTok, fromOL $ fst $ unLoc $2, noEpTok), sL1 $2 $ reverse $ snd $ unLoc $2))}
+                                          amsA' (L (stmtsLoc $2) (AnnList (Just (spanAsAnchor $ stmtsLoc $2)) ListNone (fromOL $ fst $ unLoc $2)
+                                                                 , sL1 $2 $ reverse $ snd $ unLoc $2))}
 
 --      do { ;; s ; s ; ; s ;; }
 -- The last Stmt should be an expression, but that's hard to enforce
@@ -3704,7 +3702,7 @@ e_stmt :: { LStmt GhcPs (LHsExpr GhcPs) }
 stmt  :: { forall b. DisambECP b => PV (LStmt GhcPs (LocatedA b)) }
         : qual                          { $1 }
         | 'rec' stmtlist                {  $2 >>= \ $2 ->
-                                           amsA' (sLL $1 $> $ mkRecStmt (hsDoAnn (epTok $1) (stmtlistAnns $2) $2)
+                                           amsA' (sLL $1 $> $ mkRecStmt (stmtlistAnns $2, epTok $1)
                                                                         (stmtlistStmts $2)) }
 
 qual  :: { forall b. DisambECP b => PV (LStmt GhcPs (LocatedA b)) }
@@ -4724,10 +4722,6 @@ commentsPA la@(L l a) = do
   !cs <- getPriorCommentsFor (getLocA la)
   return (L (addCommentsToEpAnn l cs) a)
 
-hsDoAnn :: EpToken "rec" -> (EpToken "{", [EpToken ";"], EpToken "}") -> LocatedAn t b -> (AnnList, EpToken "rec")
-hsDoAnn rec (ob, semis, cb) (L ll _)
-  = (AnnList (Just $ spanAsAnchor (locA ll)) (ListBraces ob cb) semis, rec)
-
 listAsAnchorM :: [LocatedAn t a] -> Maybe EpaLocation
 listAsAnchorM [] = Nothing
 listAsAnchorM (L l _:_) =
@@ -4757,8 +4751,7 @@ stmtlistStmts :: LocatedA (a, Located [LocatedA (Stmt GhcPs (LocatedA b))])
 stmtlistStmts (L la (_,L l stmts))
   = L ((noAnnSrcSpan l) {comments = comments la}) stmts
 
-stmtlistAnns :: LocatedA ((EpToken "{", [EpToken ";"], EpToken "}"), a)
-             -> (EpToken "{", [EpToken ";"], EpToken "}")
+stmtlistAnns :: LocatedA (AnnList, a) -> AnnList
 stmtlistAnns (L _ (an,_)) = an
 
 -- -------------------------------------

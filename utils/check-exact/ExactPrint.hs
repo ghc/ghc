@@ -767,9 +767,6 @@ markLensBracketsO' a l =
     ListBraces o c -> do
       o' <- markEpToken o
       return (set l (ListBraces o' c) a)
-    ListSquare o c -> do
-      o' <- markEpToken o
-      return (set l (ListSquare o' c) a)
     ListNone -> return (set l ListNone a)
 
 markLensBracketsC :: (Monad m, Monoid w)
@@ -783,9 +780,6 @@ markLensBracketsC' a l =
     ListBraces o c -> do
       c' <- markEpToken c
       return (set l (ListBraces o c') a)
-    ListSquare o c -> do
-      c' <- markEpToken c
-      return (set l (ListSquare o c') a)
     ListNone -> return (set l ListNone a)
 
 -- -------------------------------------
@@ -1254,6 +1248,19 @@ markKwT (AddVbarAnn tok)    = AddVbarAnn    <$> markEpToken tok
 markKwT (AddDarrowAnn tok)  = AddDarrowAnn  <$> markEpUniToken tok
 
 -- ---------------------------------------------------------------------
+
+markAnnListD :: (Monad m, Monoid w)
+  => Either (EpToken "[", EpToken "]") AnnList
+  -> EP w m a
+  -> EP w m (Either (EpToken "[", EpToken "]") AnnList, a)
+markAnnListD (Left (o,c)) action = do
+  o' <- markEpToken o
+  r <- action
+  c' <- markEpToken c
+  return (Left (o',c'), r)
+markAnnListD (Right ann) action = do
+  (ann',r) <- markAnnList' ann action
+  return (Right ann',r)
 
 markAnnList :: (Monad m, Monoid w)
   => EpAnn AnnList -> EP w m a -> EP w m (EpAnn AnnList, a)
@@ -2902,10 +2909,10 @@ instance ExactPrint (HsExpr GhcPs) where
       e' <- markAnnotated e
       return (HsLet (tkLet',tkIn') binds' e')
 
-  exact (HsDo (an,l) do_or_list_comp stmts) = do
+  exact (HsDo an do_or_list_comp stmts) = do
     debugM $ "HsDo"
-    (an',l',stmts') <- exactDo (an,l) do_or_list_comp stmts
-    return (HsDo (an',l') do_or_list_comp stmts')
+    (an',stmts') <- exactDo an do_or_list_comp stmts
+    return (HsDo an' do_or_list_comp stmts')
 
   exact (ExplicitList (o,c) es) = do
     debugM $ "ExplicitList start"
@@ -3077,8 +3084,8 @@ instance ExactPrint (HsExpr GhcPs) where
 -- ---------------------------------------------------------------------
 
 exactDo :: (Monad m, Monoid w, ExactPrint (LocatedAn an a))
-        => (AnnList, EpaLocation) -> HsDoFlavour -> LocatedAn an a
-        -> EP w m (AnnList, EpaLocation, LocatedAn an a)
+        => DoAnn -> HsDoFlavour -> LocatedAn an a
+        -> EP w m (DoAnn, LocatedAn an a)
 exactDo (an,l) (DoExpr m)    stmts = exactMdo l m "do" >>=
                                    \l0 -> markMaybeDodgyStmts (an,l0) stmts
 exactDo (an,l) GhciStmtCtxt  stmts = printStringAtAA l "do" >>=
@@ -3097,15 +3104,26 @@ exactMdo l (Just module_name) kw = printStringAtAA l n
       n = (moduleNameString module_name) ++ "." ++ kw
 
 markMaybeDodgyStmts :: (Monad m, Monoid w, ExactPrint (LocatedAn an a))
-  => (AnnList, EpaLocation) -> LocatedAn an a -> EP w m (AnnList, EpaLocation, LocatedAn an a)
+  => DoAnn -> LocatedAn an a -> EP w m (DoAnn, LocatedAn an a)
 markMaybeDodgyStmts (an,l) stmts =
   if notDodgy stmts
     then do
-      (an0,stmts') <- markAnnListA' an $ \a -> do
-         r <- markAnnotatedWithLayout stmts
-         return (a, r)
-      return (an0, l, stmts')
-    else return (an, l, stmts)
+      (an0,stmts') <- case an of
+        Left (o,c) -> do
+          o' <- markEpToken o
+          r <- markAnnotated stmts
+          c' <- markEpToken c
+          return (Left (o',c'), r)
+        Right an' -> do
+         (an'',r') <- markAnnListA' an' $ \a -> do
+           r <- markAnnotatedWithLayout stmts
+           return (a, r)
+         return (Right an'',r')
+      -- (an0,stmts') <- markAnnListA' an $ \a -> do
+      --    r <- markAnnotatedWithLayout stmts
+      --    return (a, r)
+      return ((an0, l), stmts')
+    else return ((an, l), stmts)
 
 notDodgy :: GenLocated (EpAnn ann) a -> Bool
 notDodgy (L (EpAnn anc _ _) _) = notDodgyE anc
@@ -3388,9 +3406,7 @@ instance ExactPrint (HsCmd GhcPs) where
   exact (HsCmdDo (an0,loc) es) = do
     debugM $ "HsCmdDo"
     loc' <- printStringAtAA loc "do"
-    (an1,es') <- markAnnList' an0 $ do
-      ee <- markAnnotated es
-      return ee
+    (an1,es') <- markAnnListD an0 $ do markAnnotated es
     return (HsCmdDo (an1,loc') es')
 
 -- ---------------------------------------------------------------------
