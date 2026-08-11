@@ -392,8 +392,9 @@ addHaddockInterleaveItems layout get_doc_item = go
     with_layout = case layout of
       EpNoLayout -> id
       EpExplicitBraces{} -> id
-      EpVirtualBraces n ->
-        let loc_range = mempty { loc_range_col = ColumnFrom (n+1) }
+      EpVirtualBraces n' ->
+        let n = getEpaLocationCol n'
+            loc_range = mempty { loc_range_col = ColumnFrom (n+1) }
         in hoistHdkA (inLocRange loc_range)
 
 instance HasHaddock (LocatedA (HsDecl GhcPs)) where
@@ -1304,7 +1305,7 @@ mkDocDecl layout (L l_comment hdk_comment)
     indent_mismatch = case layout of
       EpNoLayout -> False
       EpExplicitBraces{} -> False
-      EpVirtualBraces n -> n /= srcSpanStartCol (psRealSpan l_comment)
+      EpVirtualBraces n -> getEpaLocationCol n /= srcSpanStartCol (psRealSpan l_comment)
 
 mkDocIE :: PsLocated HdkComment -> Maybe (LIE GhcPs)
 mkDocIE (L l_comment hdk_comment) =

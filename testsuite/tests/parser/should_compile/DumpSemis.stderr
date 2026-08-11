@@ -45,7 +45,7 @@
      []
      []))
    (EpVirtualBraces
-    (1))
+    (EpaSpan { DumpSemis.hs:4:1 }))
    (Nothing)
    (Nothing))
   (Just
@@ -1336,7 +1336,7 @@
         (EpTok (EpaSpan { <no location info> }))
         [])
        (EpVirtualBraces
-        (3)))
+        (EpaSpan { DumpSemis.hs:29:3 })))
       []
       (Nothing)
       (L

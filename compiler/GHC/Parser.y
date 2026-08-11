@@ -945,13 +945,13 @@ body    :: { ([TrailingAnn]
              ,([LImportDecl GhcPs], [LHsDecl GhcPs])
              ,EpLayout) }
         :  '{'            top '}'      { (fst $2, snd $2, epExplicitBraces $1 $3) }
-        |      vocurly    top close    { (fst $2, snd $2, EpVirtualBraces (getVOCURLY $1)) }
+        |      vocurly    top close    { (fst $2, snd $2, EpVirtualBraces (glR $1)) }
 
 body2   :: { ([TrailingAnn]
              ,([LImportDecl GhcPs], [LHsDecl GhcPs])
              ,EpLayout) }
         :  '{' top '}'                          { (fst $2, snd $2, epExplicitBraces $1 $3) }
-        |  missing_module_keyword top close     { ([], snd $2, EpVirtualBraces leftmostColumn) }
+        |  missing_module_keyword top close     { ([], snd $2, EpVirtualBraces (EpaDelta noSrcSpan (SameLine 0) [])) }
 
 
 top     :: { ([TrailingAnn]
@@ -1855,7 +1855,7 @@ decllist_cls
         : '{'         decls_cls '}'     { sLL $1 $> ((epTok $1, fst $ unLoc $2, epTok $3)
                                              ,snd $ unLoc $2, epExplicitBraces $1 $3) }
         |     vocurly decls_cls close   { let { L l (anns, decls) = $2 }
-                                           in L l ((noEpTok, anns, noEpTok), decls, EpVirtualBraces (getVOCURLY $1)) }
+                                           in L l ((noEpTok, anns, noEpTok), decls, EpVirtualBraces (glR $1)) }
 
 -- Class body
 --
@@ -4305,7 +4305,6 @@ getINLINE         (L _ (ITinline_prag _ inl conl)) = (inl,conl)
 getSPEC_INLINE    (L _ (ITspec_inline_prag src True))  = (Inline,FunLike)
 getSPEC_INLINE    (L _ (ITspec_inline_prag src False)) = (NoInline,FunLike)
 getCOMPLETE_PRAGs (L _ (ITcomplete_prag x)) = x
-getVOCURLY        (L (RealSrcSpan l _) ITvocurly) = srcSpanStartCol l
 
 getINTEGERs       (L _ (ITinteger (IL src _ _))) = src
 getCHARs          (L _ (ITchar       src _)) = src

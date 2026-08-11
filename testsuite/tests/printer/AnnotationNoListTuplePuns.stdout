@@ -47,7 +47,7 @@
          "-- comment post B")
         { AnnotationNoListTuplePuns.hs:17:3 }))]))
    (EpVirtualBraces
-    (1))
+    (EpaSpan { AnnotationNoListTuplePuns.hs:5:1 }))
    (Nothing)
    (Nothing))
   (Just
@@ -244,7 +244,7 @@
         { AnnotationNoListTuplePuns.ppr.hs:1:1-32 }))]
      []))
    (EpVirtualBraces
-    (1))
+    (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:4:1 }))
    (Nothing)
    (Nothing))
   (Just
