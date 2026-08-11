@@ -5145,6 +5145,7 @@ module GHC.Conc where
   reportError :: GHC.Internal.Exception.Type.SomeException -> GHC.Internal.Types.IO ()
   reportHeapOverflow :: GHC.Internal.Types.IO ()
   reportStackOverflow :: GHC.Internal.Types.IO ()
+  rethrowSTM :: forall e a. GHC.Internal.Exception.Type.Exception e => GHC.Internal.Exception.Type.ExceptionWithContext e -> STM a
   retry :: forall a. STM a
   runSparks :: GHC.Internal.Types.IO ()
   setAllocationCounter :: GHC.Internal.Int.Int64 -> GHC.Internal.Types.IO ()

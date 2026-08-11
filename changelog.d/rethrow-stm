@@ -1,0 +1,4 @@
+section: ghc-internal
+synopsis: Add `rethrowSTM`, an `STM` analog of `rethrowIO`
+issues: #26758
+mrs: !16501

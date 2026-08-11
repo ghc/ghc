@@ -79,6 +79,9 @@ module GHC.Conc
         , retry
         , orElse
         , throwSTM
+#if __GLASGOW_HASKELL__ >= 1000
+        , rethrowSTM
+#endif
         , catchSTM
         , TVar(..)
         , newTVar

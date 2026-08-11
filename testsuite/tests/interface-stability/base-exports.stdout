@@ -5139,6 +5139,7 @@ module GHC.Conc where
   reportError :: GHC.Internal.Exception.Type.SomeException -> GHC.Internal.Types.IO ()
   reportHeapOverflow :: GHC.Internal.Types.IO ()
   reportStackOverflow :: GHC.Internal.Types.IO ()
+  rethrowSTM :: forall e a. GHC.Internal.Exception.Type.Exception e => GHC.Internal.Exception.Type.ExceptionWithContext e -> STM a
   retry :: forall a. STM a
   runHandlers :: GHC.Internal.ForeignPtr.ForeignPtr GHC.Internal.Word.Word8 -> Signal -> GHC.Internal.Types.IO ()
   runSparks :: GHC.Internal.Types.IO ()
