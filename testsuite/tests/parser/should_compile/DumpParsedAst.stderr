@@ -28,7 +28,7 @@
      []
      []))
    (EpVirtualBraces
-    (1))
+    (EpaSpan { DumpParsedAst.hs:5:1 }))
    (Nothing)
    (Nothing))
   (Just

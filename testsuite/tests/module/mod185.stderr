@@ -28,7 +28,7 @@
      []
      []))
    (EpVirtualBraces
-    (1))
+    (EpaDelta { <no location info> } (SameLine 0) []))
    (Nothing)
    (Nothing))
   (Nothing)

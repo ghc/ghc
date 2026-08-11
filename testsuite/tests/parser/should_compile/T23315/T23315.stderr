@@ -24,7 +24,7 @@
     (EpaComments
      []))
    (EpVirtualBraces
-    (1))
+    (EpaSpan { T23315.hsig:3:1 }))
    (Nothing)
    (Nothing))
   (Just

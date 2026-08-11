@@ -28,7 +28,7 @@
      []
      []))
    (EpVirtualBraces
-    (1))
+    (EpaSpan { T17544_kw.hs:13:1 }))
    (Nothing)
    (Nothing))
   (Just
@@ -412,7 +412,7 @@
         (EpTok (EpaSpan { <no location info> }))
         [])
        (EpVirtualBraces
-        (5)))
+        (EpaSpan { T17544_kw.hs:22:5 })))
       []
       (Nothing)
       (L
