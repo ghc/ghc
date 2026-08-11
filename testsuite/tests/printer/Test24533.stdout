@@ -34,7 +34,7 @@
         { Test24533.hs:1:1 }))]
      []))
    (EpVirtualBraces
-    (1))
+    (EpaSpan { Test24533.hs:4:1 }))
    (Nothing)
    (Nothing))
   (Just
@@ -694,7 +694,7 @@
         { Test24533.ppr.hs:1:1 }))]
      []))
    (EpVirtualBraces
-    (1))
+    (EpaSpan { Test24533.ppr.hs:3:1 }))
    (Nothing)
    (Nothing))
   (Just

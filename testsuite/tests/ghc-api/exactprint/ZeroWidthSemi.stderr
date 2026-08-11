@@ -40,7 +40,7 @@
          "-- Trailing comment, should be in HsModule extension point")
         { ZeroWidthSemi.hs:6:5 }))]))
    (EpVirtualBraces
-    (1))
+    (EpaSpan { ZeroWidthSemi.hs:6:1 }))
    (Nothing)
    (Nothing))
   (Just

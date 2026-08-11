@@ -34,7 +34,7 @@
          "-- ^ Run any arbitrary IO code")
         { Test20239.hs:7:86 }))]))
    (EpVirtualBraces
-    (1))
+    (EpaSpan { Test20239.hs:5:1 }))
    (Nothing)
    (Nothing))
   (Just
