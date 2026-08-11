@@ -262,12 +262,11 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
                                  showAstData' j]
 
             annClsInstDecl :: AnnClsInstDecl -> SDoc
-            annClsInstDecl (AnnClsInstDecl a b c d e) = case ba of
+            annClsInstDecl (AnnClsInstDecl a b c) = case ba of
              BlankEpAnnotations -> parens $ text "blanked:" <+> text "AnnFamilyDecl"
              NoBlankEpAnnotations ->
               parens $ text "AnnClsInstDecl"
-                        $$ vcat [showAstData' a, showAstData' b, showAstData' c,
-                                 showAstData' d, showAstData' e]
+                        $$ vcat [showAstData' a, showAstData' b, showAstData' c]
 
 
             annotationExprBracket :: BracketAnn (EpUniToken "[|" "⟦") (EpToken "[e|") -> SDoc

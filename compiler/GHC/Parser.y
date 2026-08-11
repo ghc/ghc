@@ -1434,8 +1434,8 @@ expModifiers1 :: { forall b. DisambECP b => PV (Located [LHsModifierOf (LocatedA
 inst_decl :: { LInstDecl GhcPs }
         : 'instance' maybe_warning_pragma overlap_pragma inst_type where_inst
        {% do { decls <- cvBindsAndSigs (snd $ unLoc $5)
-             ; let (twhere, (openc, closec, semis)) = fst $ unLoc $5
-             ; let anns = AnnClsInstDecl (epTok $1) twhere openc semis closec
+             ; let (twhere, ann_list) = fst $ unLoc $5
+             ; let anns = AnnClsInstDecl (epTok $1) twhere ann_list
              ; let cid = ClsInstDecl
                                   { cid_ext = ($2, anns)
                                   , cid_poly_ty = $4
@@ -1895,14 +1895,13 @@ decls_inst :: { Located ([EpToken ";"],OrdList (LHsDecl GhcPs)) }   -- Reversed
            | {- empty -}                { noLoc ([],nilOL) }
 
 decllist_inst
-        :: { Located ((EpToken "{", EpToken "}", [EpToken ";"])
-                     , OrdList (LHsDecl GhcPs)) }      -- Reversed
-        : '{'         decls_inst '}'    { sLL $1 $> ((epTok $1,epTok $3,fst $ unLoc $2),snd $ unLoc $2) }
-        |     vocurly decls_inst close  { L (gl $2) ((noAnn,noAnn,fst $ unLoc $2),snd $ unLoc $2) }
+        :: { Located (AnnList, OrdList (LHsDecl GhcPs)) }      -- Reversed
+        : '{'         decls_inst '}'    { sLL $1 $> (AnnList AnnListBraces (ListBraces (epTok $1) (epTok $3)) (fst $ unLoc $2), snd $ unLoc $2) }
+        |     vocurly decls_inst close  { L (gl $2) (AnnList (AnnListLayout (glR $1)) ListNone (fst $ unLoc $2),                snd $ unLoc $2) }
 
 -- Instance body
 --
-where_inst :: { Located ((EpToken "where", (EpToken "{", EpToken "}", [EpToken ";"]))
+where_inst :: { Located ((EpToken "where", AnnList)
                         , OrdList (LHsDecl GhcPs)) }   -- Reversed
                                 -- No implicit parameters
                                 -- May have type declarations
