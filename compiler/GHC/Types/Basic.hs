@@ -845,7 +845,6 @@ means that it is /used/ only once. It might occur syntactically many times.
 For example, in (case x of A -> y; B -> y; C -> True),
 * `y` is used only once
 * but it occurs syntactically twice
-
 -}
 
 -- | identifier Occurrence Information
@@ -909,11 +908,9 @@ seqOccInfo occ = occ `seq` ()
 
 -----------------
 -- | Interesting Context
+-- See Note [Interesting occurrences] in GHC.Core.Opt.Occ
 data InterestingCxt
-  = IsInteresting
-    -- ^ Function: is applied
-    --   Data value: scrutinised by a case with at least one non-DEFAULT branch
-  | NotInteresting
+  = IsInteresting | NotInteresting
   deriving (Eq)
 
 -- | If there is any 'interesting' identifier occurrence, then the

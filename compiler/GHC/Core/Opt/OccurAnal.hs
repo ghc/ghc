@@ -3061,10 +3061,45 @@ OccEncl is used to control whether to inline into constructor arguments.
 
   The OccRhs just tells occAnalApp to mark occurrences in constructor args
 
-* OccInteresting: consider (case x of ...).  Here we want to give `x` OneOcc
-  with "interesting context" field int_cxt = True.  The OccInteresting tells
-  occAnalApp (which deals with lone variables too) when to set this field
-  to True.
+* OccInteresting: see Note [Interesting occurrences]
+
+Note [Interesting function occurrences]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have a binding
+   f = \x. blah
+that occurs exactly once, but under a lambda.  Should we substitute `f` at its
+unique occurrence site? (Since there is ony one occurrence, there is no code bloat
+to worry about.)  Consider these cases:
+
+   (a) \y. h f2
+       Do not substitute. If we did, each time we call this lambda we'd have to
+       allocate a \x.blah closure.
+
+   (b) \y. h (\z. f)
+       Do substitute.  The \x will join with the \z, so there will be no new allocation.
+
+   (c) \y. f 3 y
+       Do substitute: the function is applied.
+
+We only want to inline-single-use-under-lambda where the thing to be inlined is
+itself a /lambda/, or a PAP, but not for other HNFs.  In particualr, for data
+constructors we get all the goodness without inlining.  E.g.
+       let x = (p,q) in \y. ...(case x of (a,b) -> rhs)...
+We don't need to inline `x` to eliminate the case.
+
+To accomplish this:
+
+  * Occurrence analysis uses the `occ_encl` field of the `OccEnv` to set
+    `occ_int_cxt` to `IsInteresting`, for variables that are applied (e.g. (c) above)
+    or are the immediate body of a lambda (b).
+
+    `occ_int_cxt` is only used for interesting /function/ occurences.
+
+  * The `uf_is_vlam` field of the `UnfoldingCache` of an unfolding records if the
+    unfolding is a manifest lambda; that is (manifestArity > 0).
+
+  * `preInlineUnconditionally` and `postInlineUnconditionally` both use `occ_int_cxt`
+    and `uf_is_vlam` (via `isValueLamUnfolding`).
 -}
 
 data OccEncl -- See Note [OccEncl]

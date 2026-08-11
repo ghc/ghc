@@ -1863,9 +1863,8 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
       -- the uses in C1, C2 are not 'interesting'
       -- An example that gets worse if you add int_cxt here is 'clausify'
 
-      -- InsideLam: check for acceptable work duplication, using isCheapUnfoldign
-      -- int_cxt to prevent us inlining inside a lambda without some
-      -- good reason.  See the notes on int_cxt in preInlineUnconditionally
+      -- InsideLam: isValueLamUnfolding checks that the function is a manifest lambda
+      -- See Note [Interesting function occurrences] in GHC.Core.Opt.OccurAnal
 
 --    is_unlifted = isUnliftedType (idType bndr)
     is_demanded = isStrUsedDmd (idDemandInfo bndr)
