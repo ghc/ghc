@@ -1827,7 +1827,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsTySigPV
     :: SrcSpanAnnA -> LocatedA b -> LHsType GhcPs -> TokDcolon -> PV (LocatedA b)
   -- | Disambiguate "[a,b,c]" (list syntax)
-  mkHsExplicitListPV :: SrcSpan -> [LocatedA b] -> AnnList -> PV (LocatedA b)
+  mkHsExplicitListPV :: SrcSpan -> [LocatedA b] -> (EpToken "[", EpToken "]") -> PV (LocatedA b)
   -- | Disambiguate "$(...)" and "[quasi|...|]" (TH splices)
   mkHsSplicePV :: Located (HsUntypedSplice GhcPs) -> PV (LocatedA b)
   -- | Disambiguate "f { a = b, ... }" syntax (record construction and record updates)
