@@ -335,11 +335,10 @@ mkHsIntegral   :: IntegralLit   GhcPs -> HsOverLit GhcPs
 mkHsFractional :: FractionalLit GhcPs -> HsOverLit GhcPs
 mkHsIsString   :: SourceText -> HText -> HsOverLit GhcPs
 mkHsDo         :: HsDoFlavour -> LocatedA [ExprLStmt GhcPs] -> HsExpr GhcPs
-mkHsDoAnns     :: HsDoFlavour -> LocatedA [ExprLStmt GhcPs] -> (AnnList, EpaLocation) -> HsExpr GhcPs
+mkHsDoAnns     :: HsDoFlavour -> LocatedA [ExprLStmt GhcPs] -> DoAnn -> HsExpr GhcPs
 mkHsComp       :: HsDoFlavour -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                -> HsExpr GhcPs
-mkHsCompAnns   :: HsDoFlavour -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
-               -> (AnnList, EpaLocation)
+mkHsCompAnns   :: HsDoFlavour -> [ExprLStmt GhcPs] -> LHsExpr GhcPs -> DoAnn
                -> HsExpr GhcPs
 
 mkNPat      :: LocatedAn NoEpAnns (HsOverLit GhcPs) -> Maybe (SyntaxExpr GhcPs) -> EpToken "-"
