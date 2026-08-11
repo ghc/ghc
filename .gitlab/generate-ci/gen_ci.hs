@@ -869,10 +869,12 @@ job arch opsys buildConfig =
     jobTestScript
       | Windows <- opsys
       = [ "bash .gitlab/ci.sh setup"
+        , "bash .gitlab/ci.sh configure" -- configure needs to be run because hadrian gets its config like that
         , "bash .gitlab/ci.sh test_hadrian" ]
       | otherwise
       = [ "sudo chown ghc:ghc -R ." | Linux {} <- [opsys]] ++
         [ ".gitlab/ci.sh setup"
+        , ".gitlab/ci.sh configure"
         , ".gitlab/ci.sh test_hadrian" ]
 
     jobBuildScript
