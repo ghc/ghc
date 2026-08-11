@@ -3282,7 +3282,7 @@ aexp2   :: { ECP }
         -- arrow notation extension
         | '(|' aexp cmdargs '|)'  {% runPV (unECP $2) >>= \ $2 ->
                                       fmap ecpFromCmd $
-                                      amsA' (sLL $1 $> $ HsCmdArrForm (AnnList (glRM $1) (ListBanana (epUniTok $1) (epUniTok $4)) []) $2 Prefix
+                                      amsA' (sLL $1 $> $ HsCmdArrForm (epUniTok $1, epUniTok $4) $2 Prefix
                                                            (reverse $3)) }
 
 projection :: { Located (NonEmpty (LocatedAn NoEpAnns (DotFieldOcc GhcPs))) }
@@ -3414,9 +3414,9 @@ tup_tail :: { forall b. DisambECP b => PV [Either (EpAnn Bool) (LocatedA b)] }
 -- Never empty.
 list :: { forall b. DisambECP b => SrcSpan -> (EpaLocation, EpaLocation) -> PV (LocatedA b) }
         : texp    { \loc (ao,ac) -> unECP $1 >>= \ $1 ->
-                            mkHsExplicitListPV loc [$1] (AnnList Nothing (ListSquare (EpTok ao) (EpTok ac)) []) }
+                            mkHsExplicitListPV loc [$1] (EpTok ao, EpTok ac) }
         | lexps   { \loc (ao,ac) -> $1 >>= \ $1 ->
-                            mkHsExplicitListPV loc (reverse $1) (AnnList Nothing (ListSquare (EpTok ao) (EpTok ac)) []) }
+                            mkHsExplicitListPV loc (reverse $1) (EpTok ao, EpTok ac) }
         | texp '..'  { \loc (ao,ac) -> unECP $1 >>= \ $1 ->
                                   amsA' (L loc $ ArithSeq  (AnnArithSeq (EpTok ao) Nothing (epTok $2) (EpTok ac)) Nothing (From $1))
                                       >>= ecpFromExp' }
