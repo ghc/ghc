@@ -924,11 +924,13 @@ repC (L l (ConDeclGADT { con_names  = cons
   = notHandledL (locA l) ThDataConVisibleForall
 
   where
-    no_explicit_forall = nullOuterExplicit outer_bndrs && null inner_bndrs
+    inner_teles = gadtArgTelescopes inner_bndrs
+
+    no_explicit_forall = nullOuterExplicit outer_bndrs && null inner_teles
     no_context         = isNothing mcxt
 
     m_invis_inner_bndrs :: Maybe [[LHsTyVarBndr Specificity GhcRn]]
-    m_invis_inner_bndrs = traverse get_invis_bndrs inner_bndrs
+    m_invis_inner_bndrs = traverse get_invis_bndrs inner_teles
 
     get_invis_bndrs :: HsForAllTelescope GhcRn -> Maybe [LHsTyVarBndr Specificity GhcRn]
     get_invis_bndrs HsForAllVis{} = Nothing

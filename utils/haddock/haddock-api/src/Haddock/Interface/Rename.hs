@@ -476,6 +476,11 @@ renameHsBndrVis :: HsBndrVis GhcRn -> RnM (HsBndrVis DocNameI)
 renameHsBndrVis (HsBndrRequired _) = return (HsBndrRequired noExtField)
 renameHsBndrVis (HsBndrInvisible at) = return (HsBndrInvisible at)
 
+renameHsGadtTelescope :: LHsGadtTelescope GhcRn -> RnM (LHsGadtTelescope DocNameI)
+renameHsGadtTelescope (L l HsGadtPar{}) = pure $ L l $ HsGadtPar noExtField
+renameHsGadtTelescope (L l (HsGadtForAll _ tele)) =
+  L l . HsGadtForAll noExtField <$> renameHsForAllTelescope tele
+
 renameHsForAllTelescope :: HsForAllTelescope GhcRn -> RnM (HsForAllTelescope DocNameI)
 renameHsForAllTelescope tele = case tele of
   HsForAllVis _ bndrs -> do
@@ -761,7 +766,7 @@ renameCon
     } = do
     lnames' <- mapM renameNameL lnames
     outer_bndrs' <- mapM renameOuterTyVarBndrs outer_bndrs
-    inner_bndrs' <- mapM renameHsForAllTelescope inner_bndrs
+    inner_bndrs' <- mapM renameHsGadtTelescope inner_bndrs
     lcontext' <- traverse renameLContext lcontext
     details' <- renameGADTDetails details
     res_ty' <- renameLType res_ty

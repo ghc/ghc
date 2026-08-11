@@ -370,6 +370,10 @@ cua CanUpdateAnchor f = f
 cua CanUpdateAnchorOnly _ = return []
 cua NoCanUpdateAnchor _ = return []
 
+enterAnn :: (Monad m, Monoid w, ExactPrint a) => Entry -> a -> EP w m a
+enterAnn = enterAnnWith exact setAnnotationAnchor
+
+{-# INLINE enterAnnWith #-}
 -- | "Enter" an annotation, by using the associated 'anchor' field as
 -- the new reference point for calculating all DeltaPos positions.
 -- This is the heart of the exact printing process.
@@ -377,14 +381,17 @@ cua NoCanUpdateAnchor _ = return []
 -- This is combination of the ghc=exactprint Delta.withAST and
 -- Print.exactPC functions and effectively does the delta processing
 -- immediately followed by the print processing.  JIT ghc-exactprint.
-enterAnn :: (Monad m, Monoid w, ExactPrint a) => Entry -> a -> EP w m a
-enterAnn NoEntryVal a = do
+enterAnnWith :: (Monad m, Monoid w, Typeable a, Typeable b) =>
+  (a -> EP w m b) -> -- exact
+  (b -> EpaLocation -> [TrailingAnn] -> EpAnnComments -> b) -> -- setAnnotationAnchor
+  Entry -> a -> EP w m b
+enterAnnWith exactVia _ NoEntryVal a = do
   p <- getPosP
   debugM $ "enterAnn:starting:NO ANN:(p,a) =" ++ show (p, astId a)
-  r <- exact a
+  r <- exactVia a
   debugM $ "enterAnn:done:NO ANN:p =" ++ show (p, astId a)
   return r
-enterAnn !(Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
+enterAnnWith exactVia setAnnAnchor !(Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   acceptSpan <- getAcceptSpan
   setAcceptSpan False
   case anchor' of
@@ -495,7 +502,7 @@ enterAnn !(Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
 
   advance edp
   debugM $ "enterAnn:exact a starting:" ++ show (showAst anchor')
-  a' <- exact a
+  a' <- exactVia a
   debugM $ "enterAnn:exact a done:" ++ show (showAst anchor')
 
   -- Core recursive exactprint done, start end of Entry processing
@@ -549,8 +556,8 @@ enterAnn !(Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
           EpaSpan s -> EpaDelta s         edp []
           _         -> EpaDelta noSrcSpan edp []
   let r = case canUpdateAnchor of
-            CanUpdateAnchor -> setAnnotationAnchor a' newAnchor trailing' (mkEpaComments priorCs postCs)
-            CanUpdateAnchorOnly -> setAnnotationAnchor a' newAnchor [] emptyComments
+            CanUpdateAnchor -> setAnnAnchor a' newAnchor trailing' (mkEpaComments priorCs postCs)
+            CanUpdateAnchorOnly -> setAnnAnchor a' newAnchor [] emptyComments
             NoCanUpdateAnchor -> a'
   return r
 
@@ -4262,21 +4269,22 @@ instance ExactPrint (ConDecl GhcPs) where
       L _ (HsOuterImplicit _) -> return outer_bndrs
       _ -> markAnnotated outer_bndrs
 
-    inner_bndrs' <- mapM markAnnotated inner_bndrs
+    (inner_bndrs', (mcxt', args', res_ty')) <- markGadtArgs inner_bndrs $ do
+      mcxt' <- markAnnotated mcxt
+      args' <-
+        case args of
+            (PrefixConGADT x args0) -> do
+              args0' <- mapM markAnnotated args0
+              return (PrefixConGADT x args0')
+            (RecConGADT (oc,cc,rarr) fields) -> do
+              oc' <- markEpToken oc
+              fields' <- markAnnotated fields
+              cc' <- markEpToken cc
+              rarr' <- markEpUniToken rarr
+              return (RecConGADT (oc',cc',rarr') fields')
+      res_ty' <- markAnnotated res_ty
+      return (mcxt', args', res_ty')
 
-    mcxt' <- markAnnotated mcxt
-    args' <-
-      case args of
-          (PrefixConGADT x args0) -> do
-            args0' <- mapM markAnnotated args0
-            return (PrefixConGADT x args0')
-          (RecConGADT (oc,cc,rarr) fields) -> do
-            oc' <- markEpToken oc
-            fields' <- markAnnotated fields
-            cc' <- markEpToken cc
-            rarr' <- markEpUniToken rarr
-            return (RecConGADT (oc',cc',rarr') fields')
-    res_ty' <- markAnnotated res_ty
     return (ConDeclGADT { con_g_ext = AnnConDeclGADT [] [] dcol'
                         , con_names = cons'
                         , con_outer_bndrs = outer_bndrs'
@@ -4284,6 +4292,44 @@ instance ExactPrint (ConDecl GhcPs) where
                         , con_mb_cxt = mcxt', con_g_args = args'
                         , con_modifiers = mods'
                         , con_res_ty = res_ty', con_doc = doc })
+
+-- | Exact print the inner binders of a GADT signature.
+--
+-- It's that complicated because we need to mark comments/trailing anns
+-- stored inside `L` and mark closing parenthesis _after_ we mark inner
+-- type:
+--
+--   data T a b where
+--    MkT ::
+--      forall a. ( -- mark inside `markGadtArgs`
+--          forall b. some type -> T a b -- mark everything there
+--        ) -- mark inside `markGadtArgs`
+--
+-- We don't have the same problem for `HsArgPar` because we ignore it
+-- during exact-print, "Does not appear in original source"
+markGadtArgs :: (Monad m, Monoid w, Typeable a)
+             => [LHsGadtTelescope GhcPs] -> EP w m a
+             -> EP w m ([LHsGadtTelescope GhcPs], a)
+markGadtArgs args inner_action = go args
+  where
+    go [] = do
+      r <- inner_action
+      return ([], r)
+    go (arg:xs) = enterAnnWith (exact_arg xs) setAnchor (entryFromLocatedA arg) arg
+
+    exact_arg xs (L l (HsGadtForAll _ tele)) = do
+      tele' <- markAnnotated tele
+      (xs', r) <- go xs
+      return (L l (HsGadtForAll noExtField tele') : xs', r)
+    exact_arg xs (L l (HsGadtPar (lp, rp))) = do
+      lp' <- markEpToken lp
+      (xs', r) <- go xs
+      rp' <- markEpToken rp
+      return (L l (HsGadtPar (lp',rp')) : xs', r)
+
+    -- The binder just entered is the head of the returned list
+    setAnchor (arg':xs', r) anc ts cs = (setAnchorAn arg' anc ts cs : xs', r)
+    setAnchor ([], r)       _   _  _  = ([], r)
 
 -- ---------------------------------------------------------------------
 

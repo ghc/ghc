@@ -350,7 +350,7 @@ ppCtor
       typeSig = operator name ++ " :: " ++ outHsSigType sDocContext con_sig_ty
       name = out sDocContext $ unL <$> names
       con_sig_ty = HsSig noExtField outer_bndrs $
-                   mkForallTys inner_bndrs phi_ty
+                   mkGadtArgTys inner_bndrs phi_ty
         where
           phi_ty = case mcxt of
             Just theta -> mkQualTy theta tau_ty
@@ -367,13 +367,14 @@ ppCtor
             noLocA (HsQualTy{ hst_xqual = noExtField
                             , hst_ctxt = ctxt, hst_body = body})
 
-          mkForallTy :: HsForAllTelescope GhcRn -> LHsType GhcRn -> LHsType GhcRn
-          mkForallTy tele body =
-            noLocA (HsForAllTy { hst_xforall = noExtField
+          mkGadtArgTy :: LHsGadtTelescope GhcRn -> LHsType GhcRn -> LHsType GhcRn
+          mkGadtArgTy (L l (HsGadtForAll _ tele)) body =
+            L l (HsForAllTy { hst_xforall = noExtField
                                , hst_tele = tele, hst_body = body })
+          mkGadtArgTy (L l HsGadtPar{}) body = L l (HsParTy noAnn body)
 
-          mkForallTys :: [HsForAllTelescope GhcRn] -> LHsType GhcRn -> LHsType GhcRn
-          mkForallTys = flip (foldr mkForallTy)
+          mkGadtArgTys :: [LHsGadtTelescope GhcRn] -> LHsType GhcRn -> LHsType GhcRn
+          mkGadtArgTys = flip (foldr mkGadtArgTy)
 
 ppFixity :: SDocContext -> (Name, Fixity) -> [String]
 ppFixity sDocContext (name, fixity) = [out sDocContext ((FixitySig noExtField (NoNamespaceSpecifier noExtField) [noLocA name] fixity) :: FixitySig GhcRn)]

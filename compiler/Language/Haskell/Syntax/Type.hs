@@ -21,6 +21,7 @@ module Language.Haskell.Syntax.Type (
         isHsBndrInvisible,
         isHsBndrWildCard,
         HsForAllTelescope(..),
+        HsGadtTelescope(..), LHsGadtTelescope, XGadtForAll, XGadtPar, XXGadtArg,
         HsTyVarBndr(..), LHsTyVarBndr,
         LHsQTyVars(..),
         HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs, HsOuterSigTyVarBndrs,
@@ -391,6 +392,42 @@ data HsForAllTelescope pass
     , hsf_invis_bndrs  :: [LHsTyVarBndr Specificity pass]
     }
   | XHsForAllTelescope !(XXHsForAllTelescope pass)
+
+-- | A type for interleaved GADT foralls and parentheses, inspired by HsArg.
+--
+-- Here's an example:
+--
+--  data D where
+--    MkD :: forall x y. -- these go to the `con_outer_bndrs` field
+--             forall a b. ( forall c. forall d. ( forall. ...
+--             ↑           ↑ ↑         ↑         ↑ ↑
+--             1           2 3         4         5 6
+--
+-- That would correspond to a list
+--
+--   1 → [ HsGadtForAll
+--   2 → , HsGadtPar
+--   3 → , HsGadtForAll
+--   4 → , HsGadtForAll
+--   5 → , HsGadtPar
+--   6 → , HsGadtForAll
+--       , ...]
+data HsGadtTelescope pass
+  = HsGadtForAll !(XGadtForAll pass) (HsForAllTelescope pass)
+  | HsGadtPar !(XGadtPar pass)
+    -- ^ `HsGadtPar` is only usefull for pretty-printing/exact-printing for recovering
+    -- parenthisis interleaved with foralls.
+    --
+    -- This approach differs from `HsPar`, which wraps the inner expression as if
+    -- surrounding it with parentheses. We can ditch the `HsPar` approach because
+    -- we know that all parentheses will be closed after the return type.
+  | XHsGadtTelescope !(XXGadtArg pass)
+
+type LHsGadtTelescope pass = XRec pass (HsGadtTelescope pass)
+
+type family XGadtForAll pass
+type family XGadtPar    pass
+type family XXGadtArg   pass
 
 -- | Located Haskell Type Variable Binder
 type LHsTyVarBndr flag pass = XRec pass (HsTyVarBndr flag pass)

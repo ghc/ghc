@@ -39,6 +39,7 @@ module GHC.Hs.Type (
         HsLit(..),
         HsIPName(..), hsIPNameFS,
         HsArg(..), numVisibleArgs, pprHsArgsApp,
+        HsGadtTelescope(..),
         LHsTypeArg, lhsTypeArgSrcSpan,
         OutputableBndrFlag,
 
@@ -71,6 +72,7 @@ module GHC.Hs.Type (
         hsLTyVarName, hsLTyVarNames,
         hsForAllTelescopeBndrs,
         hsForAllTelescopeNames,
+        gadtArgTelescopes, gadtTelescopeBndrs, mkHsGadtForAlls,
         hsLTyVarLocName, hsExplicitLTyVarNames,
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
         splitLHsPatSynTy,
@@ -621,6 +623,15 @@ hsForAllTelescopeNames :: HsForAllTelescope (GhcPass p) -> [IdP (GhcPass p)]
 hsForAllTelescopeNames (HsForAllVis _ bndrs) = hsLTyVarNames bndrs
 hsForAllTelescopeNames (HsForAllInvis _ bndrs) = hsLTyVarNames bndrs
 
+gadtArgTelescopes :: [LHsGadtTelescope (GhcPass p)] -> [HsForAllTelescope (GhcPass p)]
+gadtArgTelescopes args = [ tele | L _ (HsGadtForAll _ tele) <- args ]
+
+gadtTelescopeBndrs :: [LHsGadtTelescope (GhcPass p)] -> [LHsTyVarBndr ForAllTyFlag (GhcPass p)]
+gadtTelescopeBndrs = concatMap hsForAllTelescopeBndrs . gadtArgTelescopes
+
+mkHsGadtForAlls :: [HsForAllTelescope (GhcPass p)] -> [HsGadtTelescope (GhcPass p)]
+mkHsGadtForAlls = map (HsGadtForAll noExtField)
+
 hsExplicitLTyVarNames :: LHsQTyVars (GhcPass p) -> [IdP (GhcPass p)]
 -- Explicit variables only
 hsExplicitLTyVarNames qtvs = hsLTyVarNames (hsQTvExplicit qtvs)
@@ -750,6 +761,14 @@ type instance XArgPar (GhcPass _) = SrcSpan
 
 type instance XXArg (GhcPass _) = DataConCantHappen
 
+type instance XGadtForAll (GhcPass _) = NoExtField
+
+type instance XGadtPar GhcPs = (EpToken "(", EpToken ")")
+type instance XGadtPar GhcRn = NoExtField
+type instance XGadtPar GhcTc = NoExtField
+
+type instance XXGadtArg (GhcPass _) = DataConCantHappen
+
 type instance XPrefixCon      (GhcPass p) = NoExtField
 type instance XInfixCon       (GhcPass p) = NoExtField
 type instance XRecCon         (GhcPass p) = (EpToken "{", EpToken "}")
@@ -877,43 +896,54 @@ splitLHsSigmaTyInvis ty
   = (tvs, ctxt, ty2)
 
 -- | Decompose a GADT type into its constituent parts.
--- Returns @(outer_bndrs, mb_ctxt, body)@, where:
+-- Returns @(outer_bndrs, inner_bndrs, mb_ctxt, body)@, where:
 --
 -- * @outer_bndrs@ are 'HsOuterExplicit' if the type has explicit, outermost
 --   type variable binders. Otherwise, they are 'HsOuterImplicit'.
+--
+-- * @inner_bndrs@ are the remaining @forall@ telescopes, interleaved with the
+--   parentheses that enclose them.
 --
 -- * @mb_ctxt@ is @Just@ the context, if it is provided.
 --   Otherwise, it is @Nothing@.
 --
 -- * @body@ is the body of the type after the optional @forall@s and context.
 --
--- This function is careful not to look through parentheses.
+-- This function does look through parentheses, but it does not discard them:
+-- they are syntactically significant, so they are recorded in @inner_bndrs@.
 -- See @Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)@
--- "GHC.Hs.Decls" for why this is important.
+-- in "GHC.Hs.Decls" for why this is important.
 splitLHsGadtTy ::
      LHsSigType GhcPs
-  -> (HsOuterSigTyVarBndrs GhcPs, [HsForAllTelescope GhcPs], Maybe (LHsContext GhcPs), LHsType GhcPs)
+  -> (HsOuterSigTyVarBndrs GhcPs, [LHsGadtTelescope GhcPs], Maybe (LHsContext GhcPs), LHsType GhcPs)
 splitLHsGadtTy (L _ sig_ty)
   | (outer_bndrs, sigma_ty) <- split_outer_bndrs sig_ty
   , (inner_bndrs, phi_ty)   <- split_inner_bndrs sigma_ty
   , (mb_ctxt, rho_ty)       <- splitLHsQualTy_KP phi_ty
-  = case rho_ty of
-      L _ (HsFunTy _ _ (L _ (XHsType HsRecTy{})) _) | not (null inner_bndrs)
+  = if is_gadt_rec_ty rho_ty && not (null inner_bndrs)
         -- Bad! Record GADTs are not allowed to have inner_bndrs,
         -- undo the split to get a proper error message later
-        -> (outer_bndrs, [], Nothing, sigma_ty)
-      _ -> (outer_bndrs, inner_bndrs, mb_ctxt, rho_ty)
+      then (outer_bndrs, [], Nothing, sigma_ty)
+      else (outer_bndrs, inner_bndrs, mb_ctxt, rho_ty)
   where
     split_outer_bndrs :: HsSigType GhcPs -> (HsOuterSigTyVarBndrs GhcPs, LHsType GhcPs)
     split_outer_bndrs (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty}) =
       (outer_bndrs, body_ty)
 
-    split_inner_bndrs :: LHsType GhcPs -> ([HsForAllTelescope GhcPs], LHsType GhcPs)
-    split_inner_bndrs (L _ HsForAllTy { hst_tele = tele
+    split_inner_bndrs ::
+      LHsType GhcPs -> ([LHsGadtTelescope GhcPs], LHsType GhcPs)
+    split_inner_bndrs (L l HsForAllTy { hst_tele = tele
                                       , hst_body = body })
-      = let ~(teles, t) = split_inner_bndrs body
-        in (tele:teles, t)
+      = let ~(args, t) = split_inner_bndrs body
+        in (L l (HsGadtForAll noExtField tele) : args, t)
+    split_inner_bndrs (L l (HsParTy toks ty))
+      = let ~(args, t) = split_inner_bndrs ty
+        in (L l (HsGadtPar toks) : args, t)
     split_inner_bndrs t = ([], t)
+
+    -- type of form {fld :: ty, ...} -> ResTy
+    is_gadt_rec_ty (L _ (HsFunTy _ _ (L _ (XHsType HsRecTy{})) _)) = True
+    is_gadt_rec_ty _ = False
 
 -- | Decompose a type of the form @forall <tvs>. body@ into its constituent
 -- parts. Only splits type variable binders that
@@ -1283,6 +1313,11 @@ instance OutputableBndrId p
     ppr (HsForAllInvis { hsf_invis_bndrs = bndrs }) =
       text "HsForAllInvis:" <+> ppr bndrs
 
+instance OutputableBndrId p
+       => Outputable (HsGadtTelescope (GhcPass p)) where
+    ppr (HsGadtForAll _ tele) = text "HsGadtForAll" <+> ppr tele
+    ppr (HsGadtPar _)         = text "HsGadtPar"
+
 instance (OutputableBndrId p, OutputableBndrFlag flag p)
        => Outputable (HsTyVarBndr flag (GhcPass p)) where
     ppr = pprTyVarBndr
@@ -1611,3 +1646,5 @@ type instance Anno (HsConDeclRecField (GhcPass p)) = SrcSpanAnnA
 
 type instance Anno (FieldOcc (GhcPass p)) = SrcSpanAnnA
 type instance Anno (HsModifierOf ty (GhcPass p)) = SrcSpanAnnA
+
+type instance Anno (HsGadtTelescope (GhcPass p)) = SrcSpanAnnA
