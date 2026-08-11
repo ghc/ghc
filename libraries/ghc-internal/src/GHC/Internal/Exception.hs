@@ -75,7 +75,7 @@ import GHC.Internal.Stack.Types
 import GHC.Internal.Types (IO, RuntimeRep)
 import GHC.Internal.IO.Unsafe
 import {-# SOURCE #-} GHC.Internal.Stack (prettyCallStackLines, prettyCallStack, prettySrcLoc, withFrozenCallStack)
-import {-# SOURCE #-} GHC.Internal.Exception.Backtrace (collectExceptionAnnotation)
+import {-# SOURCE #-} GHC.Internal.Exception.Backtrace (collectExceptionContext)
 import GHC.Internal.Exception.Context (SomeExceptionAnnotation(..))
 import GHC.Internal.Exception.Type
 
@@ -175,11 +175,13 @@ throw e =
 --  @since base-4.20.0.0
 toExceptionWithBacktrace :: (HasCallStack, Exception e)
                          => e -> IO SomeException
-toExceptionWithBacktrace e
-  | backtraceDesired e = do
-      SomeExceptionAnnotation ea <- collectExceptionAnnotation
-      return (addExceptionContext ea (toException e))
-  | otherwise = return (toException e)
+toExceptionWithBacktrace e = do
+    anns <- collectExceptionContext (backtraceDesired e)
+    return (applyAnns anns (toException e))
+  where
+    applyAnns [] se = se
+    applyAnns (SomeExceptionAnnotation a : rest) se =
+      applyAnns rest (addExceptionContext a se)
 
 -- | This is thrown when the user calls 'error'. The @String@ is the
 -- argument given to 'error'.

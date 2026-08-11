@@ -16,6 +16,8 @@ import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Ptr
 import GHC.Internal.Data.Maybe (fromMaybe, mapMaybe)
 import GHC.Internal.Stack.Types as GHC.Stack (CallStack, HasCallStack)
+import GHC.Internal.Stack.Annotation (SomeStackAnnotation(..))
+import GHC.Internal.Data.Typeable (cast)
 import qualified GHC.Internal.Stack as HCS
 import qualified GHC.Internal.ExecutionStack.Internal as ExecStack
 import qualified GHC.Internal.Stack.CloneStack as CloneStack
@@ -94,12 +96,12 @@ setBacktraceMechanismState bm enabled = do
 -- | How to collect 'ExceptionAnnotation's on throwing 'Exception's.
 --
 data CollectExceptionAnnotationMechanism = CollectExceptionAnnotationMechanism
-  { ceaCollectExceptionAnnotationMechanism :: HasCallStack => IO SomeExceptionAnnotation
+  { ceaCollectExceptionAnnotationMechanism :: HasCallStack => CloneStack.StackSnapshot -> IO SomeExceptionAnnotation
   }
 
 defaultCollectExceptionAnnotationMechanism :: CollectExceptionAnnotationMechanism
 defaultCollectExceptionAnnotationMechanism = CollectExceptionAnnotationMechanism
-  { ceaCollectExceptionAnnotationMechanism = SomeExceptionAnnotation `fmap` collectBacktraces
+  { ceaCollectExceptionAnnotationMechanism = \snapshot -> SomeExceptionAnnotation `fmap` collectBacktracesFrom snapshot
   }
 
 collectExceptionAnnotationMechanismRef :: IORef CollectExceptionAnnotationMechanism
@@ -117,7 +119,7 @@ getCollectExceptionAnnotationMechanism = readIORef collectExceptionAnnotationMec
 setCollectExceptionAnnotation :: ExceptionAnnotation a => (HasCallStack => IO a) -> IO ()
 setCollectExceptionAnnotation collector = do
   let cea = CollectExceptionAnnotationMechanism
-        { ceaCollectExceptionAnnotationMechanism = fmap SomeExceptionAnnotation collector
+        { ceaCollectExceptionAnnotationMechanism = \_ -> fmap SomeExceptionAnnotation collector
         }
   _ <- atomicModifyIORef'_ collectExceptionAnnotationMechanismRef (const cea)
   return ()
@@ -165,18 +167,42 @@ instance ExceptionAnnotation Backtraces where
 --
 collectExceptionAnnotation :: HasCallStack => IO SomeExceptionAnnotation
 collectExceptionAnnotation = HCS.withFrozenCallStack $ do
+  snapshot <- CloneStack.cloneMyStack
   cea <- getCollectExceptionAnnotationMechanism
-  ceaCollectExceptionAnnotationMechanism cea
+  ceaCollectExceptionAnnotationMechanism cea snapshot
+
+stackAnnotationsFrom :: CloneStack.StackSnapshot -> IO [SomeExceptionAnnotation]
+stackAnnotationsFrom snapshot = do
+  anns <- CloneStack.decodeStackAnnotations snapshot
+  return (mapMaybe (\(SomeStackAnnotation a) -> cast a) anns)
+
+collectExceptionContext :: HasCallStack => Bool -> IO [SomeExceptionAnnotation]
+collectExceptionContext backtrace_desired = HCS.withFrozenCallStack $ do
+  snapshot <- CloneStack.cloneMyStack
+  bt <- if backtrace_desired
+    then do
+      cea <- getCollectExceptionAnnotationMechanism
+      ann <- ceaCollectExceptionAnnotationMechanism cea snapshot
+      return [ann]
+    else return []
+  anns <- stackAnnotationsFrom snapshot
+  return (bt ++ anns)
 
 -- | Collect a set of 'Backtraces'.
 collectBacktraces :: (?callStack :: CallStack) => IO Backtraces
-collectBacktraces = HCS.withFrozenCallStack $ do
-    getEnabledBacktraceMechanisms >>= collectBacktraces'
+collectBacktraces = HCS.withFrozenCallStack $
+    CloneStack.cloneMyStack >>= collectBacktracesFrom
+
+collectBacktracesFrom
+    :: (?callStack :: CallStack)
+    => CloneStack.StackSnapshot -> IO Backtraces
+collectBacktracesFrom snapshot = HCS.withFrozenCallStack $ do
+    getEnabledBacktraceMechanisms >>= collectBacktraces' snapshot
 
 collectBacktraces'
     :: (?callStack :: CallStack)
-    => EnabledBacktraceMechanisms -> IO Backtraces
-collectBacktraces' enabled = HCS.withFrozenCallStack $ do
+    => CloneStack.StackSnapshot -> EnabledBacktraceMechanisms -> IO Backtraces
+collectBacktraces' snapshot enabled = HCS.withFrozenCallStack $ do
     let collect :: BacktraceMechanism -> IO (Maybe a) -> IO (Maybe a)
         collect mech f
           | backtraceMechanismEnabled mech enabled = f
@@ -189,8 +215,7 @@ collectBacktraces' enabled = HCS.withFrozenCallStack $ do
         ExecStack.collectStackTrace
 
     ipe <- collect IPEBacktrace $ do
-        stack <- CloneStack.cloneMyStack
-        return (Just stack)
+        return (Just snapshot)
 
     hcs <- collect HasCallStackBacktrace $ do
         return (Just ?callStack)

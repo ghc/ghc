@@ -4,8 +4,10 @@ module GHC.Internal.Stack.Annotation where
 
 import GHC.Internal.Base (String, (++))
 import GHC.Internal.Data.Typeable
+import GHC.Internal.Exception.Context (SomeExceptionAnnotation(..), ExceptionAnnotation(..))
 import GHC.Internal.Maybe (Maybe(..))
-import GHC.Internal.Stack (SrcLoc, prettySrcLoc)
+import GHC.Internal.Stack.Types (SrcLoc)
+import {-# SOURCE #-} GHC.Internal.Stack (prettySrcLoc)
 
 -- ----------------------------------------------------------------------------
 -- StackAnnotation
@@ -68,3 +70,7 @@ instance StackAnnotation SomeStackAnnotation where
 
   displayStackAnnotationShort (SomeStackAnnotation a) =
     displayStackAnnotationShort a
+
+instance StackAnnotation SomeExceptionAnnotation where
+  displayStackAnnotationShort (SomeExceptionAnnotation a) =
+    displayExceptionAnnotation a

@@ -29,16 +29,17 @@ import GHC.Internal.Base (
     Monoid(..), Semigroup(..), ap, liftM2, ($), (.),
   )
 import GHC.Internal.Classes (Eq(..))
-import GHC.Internal.Exception (Exception, toExceptionWithBacktrace, fromException, addExceptionContext)
-import GHC.Internal.Exception.Context (ExceptionAnnotation)
+import GHC.Internal.Exception (Exception, toExceptionWithBacktrace, fromException)
+import GHC.Internal.Exception.Context (ExceptionAnnotation, SomeExceptionAnnotation(..))
 import GHC.Internal.Exception.Type (WhileHandling(..))
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Prim (
-    RealWorld, State#, TVar#, atomically#, catch#, catchRetry#, catchSTM#,
-    newTVar#, raiseIO#, readTVar#, readTVarIO#, retry#, writeTVar#,
+    RealWorld, State#, TVar#, annotateStack#, atomically#, catchRetry#,
+    catchSTM#, newTVar#, raiseIO#, readTVar#, readTVarIO#, retry#, writeTVar#,
   )
 import GHC.Internal.Prim.PtrEq (sameTVar#)
 import GHC.Internal.Stack (HasCallStack, withFrozenCallStack)
+import GHC.Internal.Stack.Annotation (SomeStackAnnotation(..))
 import GHC.Internal.Types (IO(..), isTrue#)
 
 -- TVars are shared memory locations which support atomic memory
@@ -217,9 +218,8 @@ catchSTM (STM m) handler = STM $ catchSTM# m handler'
 -- | Execute an 'STM' action, adding the given 'ExceptionContext'
 -- to any thrown synchronous exceptions.
 annotateSTM :: forall e a. ExceptionAnnotation e => e -> STM a -> STM a
-annotateSTM ann (STM io) = STM (catch# io handler)
-  where
-    handler se = raiseIO# (addExceptionContext ann se)
+annotateSTM ann (STM io) =
+  STM (annotateStack# (SomeStackAnnotation (SomeExceptionAnnotation ann)) io)
 
 -- |Shared memory locations that support atomic memory transactions.
 data TVar a = TVar (TVar# RealWorld a)

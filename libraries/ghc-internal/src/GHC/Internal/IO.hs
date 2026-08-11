@@ -54,8 +54,9 @@ import GHC.Internal.Classes ( Eq )
 import GHC.Internal.Magic ( lazy )
 import GHC.Internal.Maybe ( Maybe(..) )
 import GHC.Internal.Prim (
-    RealWorld, State#, catch#, getMaskingState#, maskAsyncExceptions#,
-    maskUninterruptible#, raiseIO#, unmaskAsyncExceptions#,
+    RealWorld, State#, annotateStack#, catch#, getMaskingState#,
+    maskAsyncExceptions#, maskUninterruptible#, raiseIO#,
+    unmaskAsyncExceptions#,
   )
 import GHC.Internal.ST
 import GHC.Internal.Types ( Char, IO(..) )
@@ -65,7 +66,8 @@ import GHC.Internal.Show
 import GHC.Internal.IO.Unsafe
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce )
 
-import GHC.Internal.Exception.Context ( ExceptionAnnotation )
+import GHC.Internal.Exception.Context ( ExceptionAnnotation, SomeExceptionAnnotation(..) )
+import GHC.Internal.Stack.Annotation ( SomeStackAnnotation(..) )
 import GHC.Internal.Stack.Types ( HasCallStack )
 import {-# SOURCE #-} GHC.Internal.Stack ( withFrozenCallStack )
 import {-# SOURCE #-} GHC.Internal.IO.Exception ( userError, IOError )
@@ -245,9 +247,8 @@ catchAny !(IO io) handler = IO $ catch# io handler'
 --
 -- @since base-4.20.0.0
 annotateIO :: forall e a. ExceptionAnnotation e => e -> IO a -> IO a
-annotateIO ann (IO io) = IO (catch# io handler)
-  where
-    handler se = raiseIO# (addExceptionContext ann se)
+annotateIO ann (IO io) =
+  IO (annotateStack# (SomeStackAnnotation (SomeExceptionAnnotation ann)) io)
 
 -- Using catchException here means that if `m` throws an
 -- 'IOError' /as an imprecise exception/, we will not catch

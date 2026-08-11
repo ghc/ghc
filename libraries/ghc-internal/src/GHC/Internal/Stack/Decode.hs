@@ -19,6 +19,7 @@ module GHC.Internal.Stack.Decode (
   decode,
   decodeStack,
   decodeStackWithIpe,
+  decodeStackAnnotations,
   -- * Stack decoder helpers
   decodeStackWithFrameUnpack,
   -- * StackEntry
@@ -552,6 +553,26 @@ decodeStack snapshot@(StackSnapshot stack#) = do
 decodeStackWithIpe :: StackSnapshot -> IO [(StackFrame, Maybe InfoProv)]
 decodeStackWithIpe snapshot =
   concat . snd <$> decodeStackWithFrameUnpack unpackStackFrameWithIpe snapshot
+
+stackFrameInfoTable :: StackSnapshot# -> WordOffset -> IO StgInfoTable
+stackFrameInfoTable stackSnapshot# index =
+  case getInfoTableAddrs# stackSnapshot# (wordOffsetToWord# index) of
+    (# itbl#, _ #) -> peekItbl (Ptr itbl#)
+
+decodeStackAnnotations :: StackSnapshot -> IO [SomeStackAnnotation]
+decodeStackAnnotations snapshot =
+  concat . snd <$> decodeStackWithFrameUnpack unpackAnnotationFrame snapshot
+
+unpackAnnotationFrame :: StackFrameLocation -> IO [SomeStackAnnotation]
+unpackAnnotationFrame (StackSnapshot stackSnapshot#, index) = do
+  itbl <- stackFrameInfoTable stackSnapshot# index
+  case tipe itbl of
+    ANN_FRAME ->
+      case getClosureBox stackSnapshot# (index + offsetStgAnnFrameAnn) of
+        Box ann -> pure [unsafeCoerce ann]
+    UNDERFLOW_FRAME ->
+      decodeStackAnnotations (getUnderflowFrameNextChunk stackSnapshot# index)
+    _ -> pure []
 
 -- ----------------------------------------------------------------------------
 -- Write your own stack decoder!
