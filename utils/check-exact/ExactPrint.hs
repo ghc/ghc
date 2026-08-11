@@ -764,18 +764,12 @@ markLensBracketsO' :: (Monad m, Monoid w)
   => a -> Lens a AnnListBrackets -> EP w m a
 markLensBracketsO' a l =
   case view l a of
-    ListParens o c -> do
-      o' <- markEpToken o
-      return (set l (ListParens o' c) a)
     ListBraces o c -> do
       o' <- markEpToken o
       return (set l (ListBraces o' c) a)
     ListSquare o c -> do
       o' <- markEpToken o
       return (set l (ListSquare o' c) a)
-    ListBanana o c -> do
-      o' <- markEpUniToken o
-      return (set l (ListBanana o' c) a)
     ListNone -> return (set l ListNone a)
 
 markLensBracketsC :: (Monad m, Monoid w)
@@ -786,18 +780,12 @@ markLensBracketsC' :: (Monad m, Monoid w)
   => a -> Lens a AnnListBrackets -> EP w m a
 markLensBracketsC' a l =
   case view l a of
-    ListParens o c -> do
-      c' <- markEpToken c
-      return (set l (ListParens o c') a)
     ListBraces o c -> do
       c' <- markEpToken c
       return (set l (ListBraces o c') a)
     ListSquare o c -> do
       c' <- markEpToken c
       return (set l (ListSquare o c') a)
-    ListBanana o c -> do
-      c' <- markEpUniToken c
-      return (set l (ListBanana o c') a)
     ListNone -> return (set l ListNone a)
 
 -- -------------------------------------
@@ -2919,13 +2907,13 @@ instance ExactPrint (HsExpr GhcPs) where
     (an',l',stmts') <- exactDo (an,l) do_or_list_comp stmts
     return (HsDo (an',l') do_or_list_comp stmts')
 
-  exact (ExplicitList an es) = do
+  exact (ExplicitList (o,c) es) = do
     debugM $ "ExplicitList start"
-    an0 <- markLensBracketsO' an lal_brackets
+    o' <- markEpToken o
     es' <- mapM markAnnotated es
-    an1 <- markLensBracketsC' an0 lal_brackets
+    c' <- markEpToken c
     debugM $ "ExplicitList end"
-    return (ExplicitList an1 es')
+    return (ExplicitList (o',c') es')
   exact (RecordCon x con_id binds) = do
     con_id' <- markAnnotated con_id
     binds' <- markAnnotated binds
@@ -3335,8 +3323,8 @@ instance ExactPrint (HsCmd GhcPs) where
     arr' <- markAnnotated arr
     return (HsCmdArrApp (isU, l') arr' arg' HsHigherOrderApp False)
 
-  exact (HsCmdArrForm an e fixity cs) = do
-    an0 <- markLensBracketsO' an lal_brackets
+  exact (HsCmdArrForm (o,c) e fixity cs) = do
+    o' <- markEpUniToken o
     (e',cs') <- case (fixity, cs) of
       (Infix, (arg1:argrest)) -> do
         arg1' <- markAnnotated arg1
@@ -3348,8 +3336,8 @@ instance ExactPrint (HsCmd GhcPs) where
         cs' <- mapM markAnnotated cs
         return (e', cs')
       (Infix, []) -> error "Not possible"
-    an1 <- markLensBracketsC' an0 lal_brackets
-    return (HsCmdArrForm an1 e' fixity cs')
+    c' <- markEpUniToken c
+    return (HsCmdArrForm (o',c') e' fixity cs')
 
   exact (HsCmdApp an e1 e2) = do
     e1' <- markAnnotated e1
@@ -4634,9 +4622,11 @@ instance ExactPrint (Pat GhcPs) where
     pat' <- markAnnotated pat
     return (BangPat an0 pat')
 
-  exact (ListPat an pats) = do
-    (an', pats') <- markAnnList' an (mapM markAnnotated pats)
-    return (ListPat an' pats')
+  exact (ListPat (os,cs) pats) = do
+    os' <- markEpToken os
+    pats' <- mapM markAnnotated pats
+    cs' <- markEpToken cs
+    return (ListPat (os',cs') pats')
 
   exact (TuplePat an pats boxity) = do
     an0 <- markOpeningParen an

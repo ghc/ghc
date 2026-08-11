@@ -293,7 +293,7 @@ type instance XDo            GhcPs = (AnnList, EpaLocation)
 type instance XDo            GhcRn = NoExtField
 type instance XDo            GhcTc = Type
 
-type instance XExplicitList  GhcPs = AnnList
+type instance XExplicitList  GhcPs = (EpToken "[", EpToken "]")
 type instance XExplicitList  GhcRn = NoExtField
 type instance XExplicitList  GhcTc = Type
 -- GhcPs: ExplicitList includes all source-level
@@ -1437,7 +1437,7 @@ type instance XCmdArrApp  GhcPs = (IsUnicodeSyntax, EpaLocation)
 type instance XCmdArrApp  GhcRn = NoExtField
 type instance XCmdArrApp  GhcTc = Type
 
-type instance XCmdArrForm GhcPs = AnnList
+type instance XCmdArrForm GhcPs = (EpUniToken "(|" "⦇", EpUniToken "|)"  "⦈")
 -- | fixity (filled in by the renamer), for forms that were converted from
 -- OpApp's by the renamer
 type instance XCmdArrForm GhcRn = Maybe Fixity
