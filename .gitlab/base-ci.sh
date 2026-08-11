@@ -47,7 +47,7 @@ do
     >${ghc_version}.tar.xz
   tar -xJf ${ghc_version}.tar.xz
   cd ghc-${ghc_version}-*
-  ./configure --prefix "${project_root}/opt/${ghc_version}"
+  ./configure --prefix "${project_root}/other-ghcs/opt/${ghc_version}"
   make install
   cd ${project_root}
 
