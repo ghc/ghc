@@ -28,7 +28,7 @@
      []
      []))
    (EpVirtualBraces
-    (1))
+    (EpaSpan { T17544.hs:5:1 }))
    (Nothing)
    (Nothing))
   (Just
@@ -64,7 +64,7 @@
         (EpTok (EpaSpan { <no location info> }))
         [])
        (EpVirtualBraces
-        (3)))
+        (EpaSpan { T17544.hs:6:3 })))
       []
       (Nothing)
       (L
@@ -243,7 +243,7 @@
         (EpTok (EpaSpan { <no location info> }))
         [])
        (EpVirtualBraces
-        (3)))
+        (EpaSpan { T17544.hs:10:3 })))
       []
       (Nothing)
       (L
@@ -423,7 +423,7 @@
         (EpTok (EpaSpan { <no location info> }))
         [])
        (EpVirtualBraces
-        (3)))
+        (EpaSpan { T17544.hs:14:3 })))
       []
       (Nothing)
       (L
@@ -603,7 +603,7 @@
         (EpTok (EpaSpan { <no location info> }))
         [])
        (EpVirtualBraces
-        (3)))
+        (EpaSpan { T17544.hs:18:3 })))
       []
       (Nothing)
       (L

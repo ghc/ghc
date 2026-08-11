@@ -41,7 +41,7 @@
         { DumpParsedAstComments.hs:1:1-28 }))]
      []))
    (EpVirtualBraces
-    (1))
+    (EpaSpan { DumpParsedAstComments.hs:9:1 }))
    (Nothing)
    (Nothing))
   (Just

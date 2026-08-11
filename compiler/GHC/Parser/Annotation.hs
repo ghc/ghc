@@ -5,7 +5,7 @@ module GHC.Parser.Annotation (
   getEpTokenBufSpan,
   getEpTokenLoc, getEpUniTokenLoc,
   TokDcolon, TokDarrow, TokRarrow, TokForall, TokStar,
-  EpLayout(..),
+  EpLayout(..), getEpaLocationCol,
   EpaComment(..), EpaCommentTok(..),
   IsUnicodeSyntax(..),
   HasE(..),
@@ -282,13 +282,23 @@ data EpLayout =
     --   bar :: a
     -- @
     EpVirtualBraces
-      !Int -- ^ Layout column (indentation level, begins at 1)
+      !EpaLocation -- ^ Layout column (indentation level, begins at 1)
+                   -- We keep this as an 'EpaLocation' so exact printing
+                   -- can use it too. TBD.
   |
     -- | Empty or compiler-generated blocks do not have layout information
     -- associated with them.
     EpNoLayout
 
 deriving instance Data EpLayout
+
+-- | Used in 'GHC.Parser.Haddock' to get layout column. It assumes
+-- | there is a RealSrcSpan in it, falling back to zero otherwise
+getEpaLocationCol :: EpaLocation -> Int
+getEpaLocationCol loc
+  = case loc of
+      EpaSpan (RealSrcSpan l _) -> srcSpanStartCol l
+      _ -> leftmostColumn -- should never happen in Parser output
 
 -- ---------------------------------------------------------------------
 
