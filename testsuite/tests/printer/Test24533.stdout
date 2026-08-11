@@ -64,9 +64,10 @@
          (EpTok (EpaSpan { Test24533.hs:4:1-8 }))
          (EpTok
           (EpaSpan { <no location info> }))
-         (EpTok (EpaSpan { <no location info> }))
-         []
-         (EpTok (EpaSpan { <no location info> }))))
+         (AnnList
+          (AnnListNoLayout)
+          (ListNone)
+          [])))
        []
        (L
         (EpAnn
@@ -451,9 +452,11 @@
          (EpTok (EpaSpan { Test24533.hs:14:1-8 }))
          (EpTok
           (EpaSpan { Test24533.hs:14:17-21 }))
-         (EpTok (EpaSpan { <no location info> }))
-         []
-         (EpTok (EpaSpan { <no location info> }))))
+         (AnnList
+          (AnnListLayout
+           (EpaSpan { Test24533.hs:16:3 }))
+          (ListNone)
+          [])))
        []
        (L
         (EpAnn
@@ -724,9 +727,10 @@
          (EpTok (EpaSpan { Test24533.ppr.hs:3:1-8 }))
          (EpTok
           (EpaSpan { <no location info> }))
-         (EpTok (EpaSpan { <no location info> }))
-         []
-         (EpTok (EpaSpan { <no location info> }))))
+         (AnnList
+          (AnnListNoLayout)
+          (ListNone)
+          [])))
        []
        (L
         (EpAnn
@@ -1038,9 +1042,11 @@
          (EpTok (EpaSpan { Test24533.ppr.hs:5:1-8 }))
          (EpTok
           (EpaSpan { Test24533.ppr.hs:5:17-21 }))
-         (EpTok (EpaSpan { <no location info> }))
-         []
-         (EpTok (EpaSpan { <no location info> }))))
+         (AnnList
+          (AnnListLayout
+           (EpaSpan { Test24533.ppr.hs:6:3 }))
+          (ListNone)
+          [])))
        []
        (L
         (EpAnn

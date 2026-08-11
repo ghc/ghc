@@ -1019,9 +1019,7 @@ data AnnClsInstDecl
   = AnnClsInstDecl {
     acid_instance :: EpToken "instance",
     acid_where    :: EpToken "where",
-    acid_openc    :: EpToken "{",
-    acid_semis    :: [EpToken ";"],
-    acid_closec   :: EpToken "}"
+    acid_decls    :: AnnList
   } deriving Data
 
 
@@ -1038,7 +1036,7 @@ type instance XTyFamInstD   GhcTc = NoExtField
 type instance XXInstDecl    (GhcPass _) = DataConCantHappen
 
 instance NoAnn AnnClsInstDecl where
-  noAnn = AnnClsInstDecl noAnn noAnn noAnn noAnn noAnn
+  noAnn = AnnClsInstDecl noAnn noAnn noAnn
 
 cidDeprecation :: forall p. IsPass p
                => ClsInstDecl (GhcPass p)

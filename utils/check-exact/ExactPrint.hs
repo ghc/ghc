@@ -2184,18 +2184,17 @@ instance ExactPrint (ClsInstDecl GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (ClsInstDecl { cid_ext = (mbWarn, AnnClsInstDecl i w oc semis cc)
+  exact (ClsInstDecl { cid_ext = (mbWarn, AnnClsInstDecl i w ann_list)
                      , cid_poly_ty = inst_ty
                      , cid_decls = decls
                      , cid_overlap_mode = mbOverlap
                      , cid_modifiers = mods })
       = do
           (mbWarn', i', w', mbOverlap', inst_ty', mods') <- top_matter
-          oc' <- markEpToken oc
-          semis' <- mapM markEpToken semis
-          decls' <- mapM markAnnotated decls
-          cc' <- markEpToken cc
-          return (ClsInstDecl { cid_ext = (mbWarn', AnnClsInstDecl i' w' oc' semis' cc')
+          (ann_list',  decls') <- markAnnListA' ann_list $ \a -> do
+            r <- setLayoutBoth $ mapM markAnnotated decls
+            return (a,r)
+          return (ClsInstDecl { cid_ext = (mbWarn', AnnClsInstDecl i' w' ann_list')
                               , cid_poly_ty = inst_ty'
                               , cid_decls = decls'
                               , cid_overlap_mode = mbOverlap'
