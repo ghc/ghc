@@ -338,3 +338,6 @@ test('T27105_fail',
       extra_run_opts('+RTS -C0.2 -RTS'), expect_fail,
       run_timeout_multiplier(0.05)],
      multimod_compile_and_run, ['T27105.hs', ''])
+
+test('T27657a', normal, compile_and_run, [''])
+test('T27657b', normal, compile_and_run, [''])
