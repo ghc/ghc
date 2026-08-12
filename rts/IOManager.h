@@ -61,6 +61,9 @@ extern bool rts_IOManagerIsWin32Native;
 #if defined(IOMGR_BUILD_POLL) && !defined(THREADED_RTS)
     #define IOMGR_ENABLED_POLL
 #endif
+#if defined(IOMGR_BUILD_IO_URING)
+    #define IOMGR_ENABLED_IO_URING
+#endif
 #if defined(IOMGR_BUILD_MIO) && defined(THREADED_RTS)
 /* For MIO, it is really two separate I/O manager implementations: one for
  * Windows and one for non-Windows. This is clear from both the C code on the
@@ -94,6 +97,8 @@ extern bool rts_IOManagerIsWin32Native;
     #define IOMGR_DEFAULT_STR "mio"
 #elif defined(IOMGR_DEFAULT_THREADED_WINIO)
     #define IOMGR_DEFAULT_STR "winio"
+#elif defined(IOMGR_DEFAULT_THREADED_IO_URING)
+    #define IOMGR_DEFAULT_STR "io_uring"
 #else
 #error No I/O default manager. See IOMGR_DEFAULT_THREADED_ flags
 #endif
@@ -106,6 +111,8 @@ extern bool rts_IOManagerIsWin32Native;
     #define IOMGR_DEFAULT_STR "winio"
 #elif defined(IOMGR_DEFAULT_NON_THREADED_WIN32_LEGACY)
     #define IOMGR_DEFAULT_STR "win32-legacy"
+#elif defined(IOMGR_DEFAULT_NON_THREADED_IO_URING)
+    #define IOMGR_DEFAULT_STR "io_uring"
 #else
 #error No I/O default manager. See IOMGR_DEFAULT_NON_THREADED_ flags
 #endif
@@ -125,6 +132,11 @@ extern bool rts_IOManagerIsWin32Native;
 #else
     #define IOMGR_ENABLED_STR_POLL ""
 #endif
+#if defined(IOMGR_ENABLED_IO_URING)
+    #define IOMGR_ENABLED_STR_IO_URING " io_uring"
+#else
+    #define IOMGR_ENABLED_STR_IO_URING ""
+#endif
 #if defined(IOMGR_ENABLED_MIO_POSIX) || defined(IOMGR_ENABLED_MIO_WIN32)
     #define IOMGR_ENABLED_STR_MIO " mio"
 #else
@@ -143,6 +155,7 @@ extern bool rts_IOManagerIsWin32Native;
 #define IOMGRS_ENABLED_STR \
           IOMGR_ENABLED_STR_SELECT \
           IOMGR_ENABLED_STR_POLL \
+          IOMGR_ENABLED_STR_IO_URING \
           IOMGR_ENABLED_STR_MIO \
           IOMGR_ENABLED_STR_WINIO \
           IOMGR_ENABLED_STR_WIN32_LEGACY
@@ -157,6 +170,9 @@ typedef enum {
 #endif
 #if defined(IOMGR_ENABLED_POLL)
     IO_MANAGER_POLL,
+#endif
+#if defined(IOMGR_ENABLED_IO_URING)
+    IO_MANAGER_IO_URING,
 #endif
 #if defined(IOMGR_ENABLED_MIO_POSIX)
     IO_MANAGER_MIO_POSIX,

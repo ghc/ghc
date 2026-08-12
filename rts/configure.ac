@@ -381,11 +381,15 @@ GHC_IOMANAGER_ENABLE([poll], [EnableIOManagerPoll], [IOMGR_BUILD_POLL],
             #include <poll.h>])
        if test "$HostOS" = "darwin" -a "$EnableIOManagerPoll" = "YES"; then
            dnl Sadly poll is broken on macOS. See the macOS man page:
-           dnl it doesn't work for device files!
+           dnl it doesn\'t work for device files!
            AC_MSG_WARN([macOS poll() does not work properly. Disabling.])
            EnableIOManagerPoll=NO
        fi
    fi])
+
+GHC_IOMANAGER_ENABLE([io-uring], [EnableIOManagerIOUring], [IOMGR_BUILD_IO_URING],
+  [EnableIOManagerIOUring=YES]
+)
 
 GHC_IOMANAGER_ENABLE([mio], [EnableIOManagerMIO], [IOMGR_BUILD_MIO],
   [EnableIOManagerMIO=YES])
@@ -407,7 +411,9 @@ if test "$HostOS" = "mingw32"; then
 else
   GHC_IOMANAGER_DEFAULT_SELECT([IOManagerNonThreadedDefault], [select], [EnableIOManagerSelect])
   GHC_IOMANAGER_DEFAULT_SELECT([IOManagerNonThreadedDefault], [poll], [EnableIOManagerPoll])
+  GHC_IOMANAGER_DEFAULT_SELECT([IOManagerNonThreadedDefault], [io-uring], [EnableIOManagerIOUring])
   GHC_IOMANAGER_DEFAULT_SELECT([IOManagerThreadedDefault], [mio], [EnableIOManagerMIO])
+  GHC_IOMANAGER_DEFAULT_SELECT([IOManagerThreadedDefault], [io-uring], [EnableIOManagerIOUring])
 fi
 GHC_IOMANAGER_DEFAULT_CHECK_NOT_EMPTY([IOManagerNonThreadedDefault],[non-threaded])
 GHC_IOMANAGER_DEFAULT_CHECK_NOT_EMPTY([IOManagerThreadedDefault],[threaded])
@@ -428,11 +434,17 @@ GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerNonThreadedDefault], [non-threaded],
 GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerNonThreadedDefault], [non-threaded],
                                 [win32-legacy], [IOMGR_DEFAULT_NON_THREADED_WIN32_LEGACY])
 
+GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerNonThreadedDefault], [non-threaded],
+                                [io-uring], [IOMGR_DEFAULT_NON_THREADED_IO_URING])
+
 GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerThreadedDefault], [threaded],
                                 [mio], [IOMGR_DEFAULT_THREADED_MIO])
 
 GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerThreadedDefault], [threaded],
                                 [winio], [IOMGR_DEFAULT_THREADED_WINIO])
+
+GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerThreadedDefault], [threaded],
+                                [io-uring], [IOMGR_DEFAULT_THREADED_IO_URING])
 
 dnl ** FFI
 dnl --------------------------------------------------------------

@@ -1445,6 +1445,7 @@ Currently the available I/O managers are:
 ================ ========= ============
 ``select``       Posix     Non-threaded
 ``poll``         Posix     Non-threaded
+``io_uring``     Linux     Both
 ``mio``          All       Threaded
 ``win32-legacy`` Windows   Non-threaded
 ``winio``        Windows   Both
@@ -1511,6 +1512,11 @@ simultaneously be waiting on I/O readiness is limited by the prevailing Posix
 limit can be adjusted using OS facilities (e.g. the ``ulimit`` command).
 Exceeding this limit will cause the RTS (and thus typically the process) to
 terminate.
+
+The ``io_uring`` I/O manager
+~~~~~~~~~~~~~~~~~~~~~~~
+
+TODO
 
 The ``mio`` I/O manager
 ~~~~~~~~~~~~~~~~~~~~~~~
