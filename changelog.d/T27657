@@ -1,0 +1,9 @@
+section: base
+issues: #27657
+mrs: !16508
+synopsis:
+  Fix ``retry`` and async exception delivery inside a ``catchSTM`` handler
+description:
+  ``catchSTM``\'s ``WhileHandling`` annotation used ``catch#``, leaving an IO
+  ``CATCH_FRAME`` inside the transaction. Use ``catchSTM#``, which is the
+  correct way to catch exceptions inside STM.
