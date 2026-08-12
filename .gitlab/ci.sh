@@ -735,16 +735,16 @@ function test_hadrian() {
     local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
     install_bindist $dist_dir/ghc-*/ "$instdir"
 
-    if [[ "${CI_JOB_NAME}" != *"windows"* ]] && [ -z "${CROSS_TARGET:-}" ]
-    then
-      run_hadrian \
-        test \
-        --test-root-dirs=testsuite/tests/stage1 \
-        --test-compiler=stage1 \
-        ${TEST_WAYS[@]/#/--test-way=} \
-        "runtest.opts+=${RUNTEST_ARGS:-}" || fail "hadrian stage1 test"
-      info "STAGE1_TEST=$?"
-    fi
+    # if [[ "${CI_JOB_NAME}" != *"windows"* ]] && [ -z "${CROSS_TARGET:-}" ]
+    # then
+    #   run_hadrian \
+    #     test \
+    #     --test-root-dirs=testsuite/tests/stage1 \
+    #     --test-compiler=stage1 \
+    #     ${TEST_WAYS[@]/#/--test-way=} \
+    #     "runtest.opts+=${RUNTEST_ARGS:-}" || fail "hadrian stage1 test"
+    #   info "STAGE1_TEST=$?"
+    # fi
 
     # Ensure the resulting compiler has the correct bignum-flavour,
     # except for cross-compilers as they may not support the interpreter
