@@ -93,9 +93,8 @@
 	ignore = untracked
 [submodule "utils/haddock"]
 	path = utils/haddock
-	url = https://github.com/MercuryTechnologies/haddock.git
+	url = https://gitlab.haskell.org/ghc/haddock.git
 	ignore = untracked
-	branch = mercury-ghc9101-20260729
 [submodule "nofib"]
 	path = nofib
 	url = https://gitlab.haskell.org/ghc/nofib.git
