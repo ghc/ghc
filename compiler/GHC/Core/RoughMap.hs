@@ -168,6 +168,16 @@ each candidate. We only need the full list of unifiers when displaying error mes
 Therefore the list is computed lazily so much work can be avoided constructing the
 list in the first place.
 
+For the same reason the unifiers are enumerated in non-deterministic order (see
+the RML_WildCard case of lookupRM'): a deterministic fold would have to inspect
+every entry of rm_known before it could produce the first unifier, defeating
+that laziness (#27459; see Note [Cost of deterministic iteration] in
+GHC.Types.Unique.DFM). The order is observable only where error messages are
+rendered, so those sites must sort the unifiers they display; see
+fuzzyClsInstCmp in GHC.Core.InstEnv and reportConflictInstErr in
+GHC.Tc.Instance.Family. The matches, by contrast, are still enumerated
+deterministically.
+
 Note [Simple Matching Semantics]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose `rm` is a RoughMap representing a set of (key,vals) pairs,
@@ -420,15 +430,18 @@ lookupRM' (RML_NoKnownTc : tcs) rm =
 
 lookupRM' (RML_WildCard : tcs)    rm  =
 --  pprTrace "RM wild" (ppr tcs $$ ppr (eltsDNameEnv (rm_known rm))) $
-  let (m, u)     = foldDNameEnv add_one (emptyBag, []) (rm_known rm)
+  let m = foldDNameEnv (\rm' acc -> fst (lookupRM' tcs rm') `unionBags` acc)
+                       emptyBag (rm_known rm)
+      -- The unifiers are enumerated non-deterministically: hot consumers
+      -- only test whether the list is empty, and the lazy fold lets that
+      -- test stop at the first unifier instead of paying for deterministic
+      -- iteration over the whole map (#27459).
+      -- See Note [Matches vs Unifiers].
+      u = nonDetFoldDNameEnv (\rm' acc -> snd (lookupRM' tcs rm') ++ acc)
+                             [] (rm_known rm)
       (u_m, u_u) = lookupRM' tcs (rm_wild rm)
   in ( rm_empty rm `unionBags` u_m `unionBags` m
      , bagToList (rm_empty rm) ++ u_u ++ u )
-  where
-     add_one :: RoughMap a -> (Bag a, [a]) -> (Bag a, [a])
-     add_one rm ~(m2, u2) = (m1 `unionBags` m2, u1 ++ u2)
-                          where
-                            (m1,u1) = lookupRM' tcs rm
 
 unionRM :: RoughMap a -> RoughMap a -> RoughMap a
 unionRM RMEmpty a = a

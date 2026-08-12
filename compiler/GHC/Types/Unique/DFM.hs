@@ -66,6 +66,7 @@ module GHC.Types.Unique.DFM (
         udfmToList,
         udfmToUfm,
         nonDetStrictFoldUDFM,
+        nonDetFoldUDFM,
         unsafeCastUDFMKey,
         alwaysUnsafeUfmToUdfm,
     ) where
@@ -378,6 +379,15 @@ nonDetStrictFoldUDFM k z (UDFM m _i) = foldl' k' z m
   where
     k' acc (TaggedVal v _) = k v acc
 
+-- | Performs a nondeterministic lazy right fold over the UniqDFM.
+-- It's O(n), and lazy in the accumulator, so unlike 'foldUDFM' it can
+-- stream and short-circuit; see Note [Cost of deterministic iteration].
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+nonDetFoldUDFM :: (elt -> a -> a) -> a -> UniqDFM key elt -> a
+{-# INLINE nonDetFoldUDFM #-}
+nonDetFoldUDFM k z (UDFM m _i) = M.foldr (k . taggedFst) z m
+
 {- Note [Cost of deterministic iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Deterministic iteration -- foldUDFM, eltsUDFM, udfmToList, and everything
@@ -392,7 +402,8 @@ whether the result was non-empty.
 
 So: to test for emptiness, use isNullUDFM rather than null on eltsUDFM;
 for order-oblivious queries, prefer short-circuiting anyUDFM/allUDFM; and
-if you don't need the deterministic order at all, use nonDetStrictFoldUDFM.
+if you don't need the deterministic order at all, use nonDetStrictFoldUDFM
+(or nonDetFoldUDFM when the fold should stream or short-circuit).
 -}
 
 -- | Deterministic, in order of insertion.

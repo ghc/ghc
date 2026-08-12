@@ -7,7 +7,7 @@ default-fail05.hs:11:10: error: [GHC-39999]
           -- Defined in ‘GHC.Internal.Data.Foldable’
         instance Foldable Maybe -- Defined in ‘GHC.Internal.Data.Foldable’
         ...plus three others
-        ...plus 26 instances involving out-of-scope types
+        ...plus 11 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘($)’, namely ‘toList’
       In the first argument of ‘print’, namely ‘(toList $ pure 21)’
@@ -21,7 +21,7 @@ default-fail05.hs:11:19: error: [GHC-39999]
         instance Applicative IO -- Defined in ‘GHC.Internal.Base’
         instance Applicative Maybe -- Defined in ‘GHC.Internal.Base’
         ...plus six others
-        ...plus 9 instances involving out-of-scope types
+        ...plus one instance involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the second argument of ‘($)’, namely ‘pure 21’
       In the first argument of ‘print’, namely ‘(toList $ pure 21)’
@@ -39,7 +39,7 @@ default-fail05.hs:12:3: error: [GHC-39999]
         instance Traversable Maybe
           -- Defined in ‘GHC.Internal.Data.Traversable’
         ...plus three others
-        ...plus 28 instances involving out-of-scope types
+        ...plus 13 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In a stmt of a 'do' block: traverse print (pure 42)
       In the expression:
@@ -60,7 +60,7 @@ default-fail05.hs:12:19: error: [GHC-39999]
         instance Applicative IO -- Defined in ‘GHC.Internal.Base’
         instance Applicative Maybe -- Defined in ‘GHC.Internal.Base’
         ...plus six others
-        ...plus 9 instances involving out-of-scope types
+        ...plus one instance involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the second argument of ‘traverse’, namely ‘(pure 42)’
       In a stmt of a 'do' block: traverse print (pure 42)

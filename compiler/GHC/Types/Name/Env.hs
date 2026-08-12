@@ -40,6 +40,7 @@ module GHC.Types.Name.Env (
         plusDNameEnv_C,
         foldDNameEnv,
         nonDetStrictFoldDNameEnv,
+        nonDetFoldDNameEnv,
         -- ** Dependency analysis
         depAnal
     ) where
@@ -223,4 +224,8 @@ plusDNameEnv_C = plusUDFM_C
 
 nonDetStrictFoldDNameEnv :: (a -> b -> b) -> b -> DNameEnv a -> b
 nonDetStrictFoldDNameEnv = nonDetStrictFoldUDFM
+
+-- | Lazy nondeterministic fold; can stream and short-circuit.
+nonDetFoldDNameEnv :: (a -> b -> b) -> b -> DNameEnv a -> b
+nonDetFoldDNameEnv = nonDetFoldUDFM
 

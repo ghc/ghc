@@ -939,11 +939,18 @@ buildInjectivityError mkErr fam_tc branches
 reportConflictInstErr :: FamInst -> [FamInst] -> TcRn ()
 reportConflictInstErr _ []
   = return ()  -- No conflicts
-reportConflictInstErr fam_inst (conf_inst : _) =
+reportConflictInstErr fam_inst (conf_inst1 : conf_insts) =
+   -- The conflicts are enumerated in non-deterministic order (see
+   -- Note [Matches vs Unifiers] in GHC.Core.RoughMap), so pick the one to
+   -- report deterministically.
    -- The sortBy just arranges that instances are displayed in order
    -- of source location, which reduced wobbling in error messages,
    -- and is better for users
-  let   sorted  = NE.sortBy (SrcLoc.leftmost_smallest `on` getSpan) (fam_inst NE.:| [conf_inst])
+  let   conf_inst = minimumBy cmp_inst (conf_inst1 :| conf_insts)
+        cmp_inst f1 f2 = case (SrcLoc.leftmost_smallest `on` getSpan) f1 f2 of
+                           EQ -> (stableNameCmp `on` (getName . famInstAxiom)) f1 f2
+                           o  -> o
+        sorted  = NE.sortBy (SrcLoc.leftmost_smallest `on` getSpan) (fam_inst NE.:| [conf_inst])
         fi1     = NE.head sorted
         span    = coAxBranchSpan (coAxiomSingleBranch (famInstAxiom fi1))
         getSpan = getSrcSpan . famInstAxiom
