@@ -210,7 +210,8 @@ library
          -- implicitly added by `cc`, we must explicitly add it here to ensure
          -- that it is ordered correctly with libpthread, since ghc-internal.cabal
          -- also explicitly lists libc. See #19029.
-         extra-libraries: c
+         -- TODO we only want to use liburing if the io manager is enabled
+         extra-libraries: c uring
          extra-libraries-static: c
       if flag(librt)
          extra-libraries: rt
@@ -582,6 +583,7 @@ library
                     posix/FdWakeup.c
                     posix/MIO.c
                     posix/Poll.c
+                    posix/IOUring.c
                     posix/Select.c
                     posix/Signals.c
                     posix/Timeout.c
