@@ -1849,12 +1849,14 @@ botDmdEnv = mkEmptyDmdEnv botDiv
 exnDmdEnv :: DmdEnv
 exnDmdEnv = mkEmptyDmdEnv exnDiv
 
+combineDmdEnv :: (Demand -> Demand -> Demand) -> DmdEnv -> DmdEnv -> DmdEnv
+combineDmdEnv f (DE fv1 d1) (DE fv2 d2)
+  -- See Note [Demand env Equality]
+  = DE (plusVarEnv_CD f fv1 (defaultFvDmd d1) fv2 (defaultFvDmd d2))
+       (lubDivergence d1 d2)
+
 lubDmdEnv :: DmdEnv -> DmdEnv -> DmdEnv
-lubDmdEnv (DE fv1 d1) (DE fv2 d2) = DE lub_fv lub_div
-  where
-    -- See Note [Demand env Equality]
-    lub_fv  = plusVarEnv_CD lubDmd fv1 (defaultFvDmd d1) fv2 (defaultFvDmd d2)
-    lub_div = lubDivergence d1 d2
+lubDmdEnv = combineDmdEnv lubDmd
 
 addVarDmdEnv :: DmdEnv -> Id -> Demand -> DmdEnv
 addVarDmdEnv env@(DE fvs div) id dmd
@@ -1908,36 +1910,31 @@ instance Eq DmdType where
     = ds1 == ds2 -- cheap checks first
       && env1 == env2
 
+-- | The smaller 'DmdType' is eta expanded using its 'defaultArgDmd'.
+-- See Note [Default demand on free variables and arguments].
+zipDmdType :: (Demand -> Demand -> Demand) -> DmdType -> DmdType -> DmdType
+zipDmdType f (DmdType fv1 ds1) (DmdType fv2 ds2)
+  = DmdType (combineDmdEnv f fv1 fv2) (go ds1 ds2)
+  where
+    def1, def2 :: Demand  -- Default argument demands for eta expansion
+    def1 = defaultArgDmd (de_div fv1)
+    def2 = defaultArgDmd (de_div fv2)
+
+    -- If `ds1` is shorter than `ds2`, extend `ds1` with the appropriate
+    -- default demand `def1`; and similarly if `ds2` is shorter
+    go (d1:ds1') (d2:ds2') = f d1 d2 : go ds1' ds2'
+    go []        ds2'      = map (def1 `f`) ds2'
+    go ds1'      []        = map (`f` def2) ds1'
+
 -- | Compute the least upper bound of two 'DmdType's elicited /by the same
 -- incoming demand/!
 lubDmdType :: DmdType -> DmdType -> DmdType
-lubDmdType d1 d2 = DmdType lub_fv lub_ds
-  where
-    n = max (dmdTypeDepth d1) (dmdTypeDepth d2)
-    (DmdType fv1 ds1) = etaExpandDmdType n d1
-    (DmdType fv2 ds2) = etaExpandDmdType n d2
-    lub_ds  = zipWithEqual lubDmd ds1 ds2
-    lub_fv = lubDmdEnv fv1 fv2
+lubDmdType = zipDmdType lubDmd
 
 -- | Combine two 'DmdType's for stable unfolding analysis.
 -- See Note [Combining demands for stable unfoldings].
 maxDmdType :: DmdType -> DmdType -> DmdType
-maxDmdType (DmdType fv1 ds1) (DmdType fv2 ds2)
-  = DmdType combined_fv combined_ds
-  where
-    combined_fv = maxDmdEnv fv1 fv2
-    combined_ds = go ds1 ds2
-    -- If lists have different lengths, keep remaining ds1 (from RHS)
-    go rhs []           = rhs
-    go []  _            = []
-    go (r:rhs) (u:unfs) = maxDmd r u : go rhs unfs
-
--- | See Note [Combining demands for stable unfoldings].
-maxDmdEnv :: DmdEnv -> DmdEnv -> DmdEnv
-maxDmdEnv (DE fv1 d1) (DE fv2 d2) = DE combined_fv combined_div
-  where
-    combined_fv  = plusVarEnv_CD maxDmd fv1 (defaultFvDmd d1) fv2 (defaultFvDmd d2)
-    combined_div = lubDivergence d1 d2
+maxDmdType = zipDmdType maxDmd
 
 discardArgDmds :: DmdType -> DmdEnv
 discardArgDmds (DmdType fv _) = fv
