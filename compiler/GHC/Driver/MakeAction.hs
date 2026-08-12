@@ -1,12 +1,11 @@
 {-# LANGUAGE CPP #-}
 module GHC.Driver.MakeAction
   ( MakeAction(..)
-  , MakeEnv(..)
   , RunMakeM
+  , MakeEnv(..)
+  , withMakeEnv
   -- * Running the pipelines
   , runAllPipelines
-  , runParPipelines
-  , runSeqPipelines
   , runPipelines
   -- * Worker limit
   , WorkerLimit(..)
@@ -66,7 +65,149 @@ import GHC.Driver.Pipeline.LogQueue
 import Control.Concurrent.STM
 import Control.Monad.Trans.Maybe
 
--- Executing the pipelines
+--------------------------------------------------------------------------------
+-- * MakeEnv and MakeAction
+--------------------------------------------------------------------------------
+
+-- | Environment used when compiling a module
+data MakeEnv = MakeEnv { hsc_env :: !HscEnv -- The basic HscEnv which will be augmented for each module
+                       , compile_sem :: !AbstractSem
+                       -- Modify the environment for module k, with the supplied logger modification function.
+                       -- For -j1, this wrapper doesn't do anything
+                       -- For -jn, the wrapper initialised a log queue and then modifies the logger to pipe its output
+                       --          into the log queue.
+                       , withLogger :: forall a . Int -> ((Logger -> Logger) -> IO a) -> IO a
+                       , env_messager :: !(Maybe Messager)
+                       , diag_wrapper :: GhcMessage -> AnyGhcDiagnostic
+                       }
+
+-- | Come up with a 'MakeEnv' based on the given 'WorkerLimit'.
+-- For -j1, it will be a trivial 'MakeEnv' not prepared for parallelism.
+-- For -jn, it can be used from multiple threads (e.g. in runAllPipelines when -jN)
+withMakeEnv
+  :: WorkerLimit    -- ^ How to limit work parallelism
+  -> HscEnv         -- ^ The basic HscEnv which is augmented with specific info for each module
+  -> (GhcMessage -> AnyGhcDiagnostic)
+  -> Maybe Messager -- ^ Optional custom messager to use to report progress
+  -> (MakeEnv -> IO r) -> IO r
+withMakeEnv worker_limit hsc_env diag_wrapper mHscMessager act =
+  if isWorkerLimitSequential worker_limit
+    then withSeqMakeEnv
+    else withParMakeEnv
+  where
+    withSeqMakeEnv = do
+      let seq_env = MakeEnv
+            { hsc_env = hsc_env
+            , withLogger = \_ k -> k id
+            , compile_sem = AbstractSem (return ()) (return ())
+            , env_messager = mHscMessager
+            , diag_wrapper = diag_wrapper
+            }
+      act seq_env
+
+    withParMakeEnv = do
+      -- A variable which we write to when an error has happened and we have to tell the
+      -- logging thread to gracefully shut down.
+      stopped_var <- newTVarIO False
+      -- The queue of LogQueues which actions are able to write to. When an action starts it
+      -- will add it's LogQueue into this queue.
+      log_queue_queue_var <- newTVarIO newLogQueueQueue
+      -- Thread which coordinates the printing of logs
+      wait_log_thread <- logThread (hsc_logger hsc_env) stopped_var log_queue_queue_var
+
+
+      -- Make the logger thread-safe, in case there is some output which isn't sent via the LogQueue.
+      thread_safe_logger <- liftIO $ makeThreadSafe (hsc_logger hsc_env)
+      let thread_safe_hsc_env = hsc_env { hsc_logger = thread_safe_logger }
+
+      runWorkerLimit (hsc_logger hsc_env) (hsc_dflags hsc_env) worker_limit $ \abstract_sem -> do
+        let env = MakeEnv { hsc_env = thread_safe_hsc_env
+                          , withLogger = withParLog log_queue_queue_var
+                          , compile_sem = abstract_sem
+                          , env_messager = mHscMessager
+                          , diag_wrapper = diag_wrapper
+                          }
+        -- Reset the number of capabilities once the upsweep ends.
+        r <- act env
+        atomically $ writeTVar stopped_var True
+        wait_log_thread
+        pure r
+
+-- ** MakeAction ---------------------------------------------------------------
+
+data MakeAction = forall a . MakeAction !(RunMakeM a) !(MVar (Maybe a))
+
+type RunMakeM a = ReaderT MakeEnv (MaybeT IO) a
+
+waitMakeAction :: MakeAction -> IO ()
+waitMakeAction (MakeAction _ mvar) = () <$ readMVar mvar
+
+--------------------------------------------------------------------------------
+-- * Running the pipelines
+--------------------------------------------------------------------------------
+
+-- | Build and run a pipeline using the given worker limit for parallelism
+runPipelines
+  :: WorkerLimit -> HscEnv
+  -> (GhcMessage -> AnyGhcDiagnostic) -> Maybe Messager
+  -> [MakeAction] -- ^ The build plan for all the module nodes
+  -> IO ()
+runPipelines n_job hsc_env diag_wrapper mHscMessager all_pipelines = do
+  liftIO $ label_self "main --make thread"
+  withMakeEnv n_job hsc_env diag_wrapper mHscMessager $ \make_env -> do
+    runAllPipelines n_job make_env all_pipelines
+  where
+    label_self :: String -> IO ()
+    label_self thread_name = do
+        self_tid <- CC.myThreadId
+        CC.labelThread self_tid thread_name
+
+-- | Run the given actions and then wait for them all to finish.
+runAllPipelines :: WorkerLimit -> MakeEnv -> [MakeAction] -> IO ()
+runAllPipelines worker_limit env acts = do
+  let single_worker = isWorkerLimitSequential worker_limit
+      spawn_actions :: IO [ThreadId]
+      spawn_actions = if single_worker
+        then (:[]) <$> (forkIOWithUnmask $ \unmask -> void $ runLoop (\io -> io unmask) env acts)
+        else runLoop forkIOWithUnmask env acts
+
+      kill_actions :: [ThreadId] -> IO ()
+      kill_actions tids = mapM_ killThread tids
+
+  MC.bracket spawn_actions kill_actions $ \_ -> do
+    mapM_ waitMakeAction acts
+
+-- | Execute each action in order, limiting the amount of parallelism by the given
+-- semaphore.
+runLoop :: (((forall a. IO a -> IO a) -> IO ()) -> IO a) -> MakeEnv -> [MakeAction] -> IO [a]
+runLoop _ _env [] = return []
+runLoop fork_thread env (MakeAction act res_var :acts) = do
+
+  -- withLocalTmpFs has to occur outside of fork to remain deterministic
+  new_thread <- withLocalTmpFSMake env $ \lcl_env ->
+    fork_thread $ \unmask -> (do
+            mres <- (unmask $ run_pipeline lcl_env act)
+                      `MC.onException` (putMVar res_var Nothing) -- Defensive: If there's an unhandled exception then still signal the failure.
+            putMVar res_var mres)
+  threads <- runLoop fork_thread env acts
+  return (new_thread : threads)
+  where
+      run_pipeline :: MakeEnv -> RunMakeM a -> IO (Maybe a)
+      run_pipeline env p = runMaybeT (runReaderT p env)
+
+--------------------------------------------------------------------------------
+-- * Worker Limit
+--------------------------------------------------------------------------------
+
+-- | This describes what we use to limit the number of jobs, either we limit it
+-- ourselves to a specific number or we have an external parallelism semaphore
+-- limit it for us.
+data WorkerLimit
+  = NumProcessorsLimit Int
+  | JSemLimit
+    SemaphoreIdentifier
+      -- ^ Semaphore identifier from @-jsem@
+  deriving Eq
 
 mkWorkerLimit :: DynFlags -> IO WorkerLimit
 mkWorkerLimit dflags =
@@ -81,72 +222,6 @@ mkWorkerLimit dflags =
 isWorkerLimitSequential :: WorkerLimit -> Bool
 isWorkerLimitSequential (NumProcessorsLimit x) = x <= 1
 isWorkerLimitSequential (JSemLimit {})         = False
-
--- | This describes what we use to limit the number of jobs, either we limit it
--- ourselves to a specific number or we have an external parallelism semaphore
--- limit it for us.
-data WorkerLimit
-  = NumProcessorsLimit Int
-  | JSemLimit
-    SemaphoreIdentifier
-      -- ^ Semaphore identifier from @-jsem@
-  deriving Eq
-
--- | Environment used when compiling a module
-data MakeEnv = MakeEnv { hsc_env :: !HscEnv -- The basic HscEnv which will be augmented for each module
-                       , compile_sem :: !AbstractSem
-                       -- Modify the environment for module k, with the supplied logger modification function.
-                       -- For -j1, this wrapper doesn't do anything
-                       -- For -jn, the wrapper initialised a log queue and then modifies the logger to pipe its output
-                       --          into the log queue.
-                       , withLogger :: forall a . Int -> ((Logger -> Logger) -> IO a) -> IO a
-                       , env_messager :: !(Maybe Messager)
-                       , diag_wrapper :: GhcMessage -> AnyGhcDiagnostic
-                       }
-
-
-label_self :: String -> IO ()
-label_self thread_name = do
-    self_tid <- CC.myThreadId
-    CC.labelThread self_tid thread_name
-
-
-runPipelines :: WorkerLimit -> HscEnv -> (GhcMessage -> AnyGhcDiagnostic) -> Maybe Messager -> [MakeAction] -> IO ()
--- Don't even initialise plugins if there are no pipelines
-runPipelines n_job hsc_env diag_wrapper mHscMessager all_pipelines = do
-  liftIO $ label_self "main --make thread"
-  case n_job of
-    NumProcessorsLimit n | n <= 1 -> runSeqPipelines hsc_env diag_wrapper mHscMessager all_pipelines
-    _n -> runParPipelines n_job hsc_env diag_wrapper mHscMessager all_pipelines
-
-runSeqPipelines :: HscEnv -> (GhcMessage -> AnyGhcDiagnostic) -> Maybe Messager -> [MakeAction] -> IO ()
-runSeqPipelines plugin_hsc_env diag_wrapper mHscMessager all_pipelines =
-  let env = MakeEnv { hsc_env = plugin_hsc_env
-                    , withLogger = \_ k -> k id
-                    , compile_sem = AbstractSem (return ()) (return ())
-                    , env_messager = mHscMessager
-                    , diag_wrapper = diag_wrapper
-                    }
-  in runAllPipelines (NumProcessorsLimit 1) env all_pipelines
-
-#if !(defined(wasm32_HOST_ARCH) || defined(javascript_HOST_ARCH))
-runNjobsAbstractSem :: Int -> (AbstractSem -> IO a) -> IO a
-runNjobsAbstractSem n_jobs action = do
-  compile_sem <- newQSem n_jobs
-  n_capabilities <- getNumCapabilities
-  n_cpus <- getNumProcessors
-  let
-    asem = AbstractSem (waitQSem compile_sem) (signalQSem compile_sem)
-    set_num_caps n = unless (n_capabilities /= 1) $ setNumCapabilities n
-    updNumCapabilities =  do
-      -- Setting number of capabilities more than
-      -- CPU count usually leads to high userspace
-      -- lock contention. #9221
-      set_num_caps $ min n_jobs n_cpus
-    resetNumCapabilities = set_num_caps n_capabilities
-  MC.bracket_ updNumCapabilities resetNumCapabilities $ action asem
-
-#endif
 
 runWorkerLimit :: Logger -> DynFlags -> WorkerLimit -> (AbstractSem -> IO a) -> IO a
 #if defined(wasm32_HOST_ARCH) || defined(javascript_HOST_ARCH)
@@ -168,41 +243,28 @@ runWorkerLimit logger dflags worker_limit action = case worker_limit of
           runNjobsAbstractSem 1 action
 #endif
 
--- | Build and run a pipeline
-runParPipelines :: WorkerLimit -- ^ How to limit work parallelism
-             -> HscEnv         -- ^ The basic HscEnv which is augmented with specific info for each module
-             -> (GhcMessage -> AnyGhcDiagnostic)
-             -> Maybe Messager   -- ^ Optional custom messager to use to report progress
-             -> [MakeAction]  -- ^ The build plan for all the module nodes
-             -> IO ()
-runParPipelines worker_limit plugin_hsc_env diag_wrapper mHscMessager all_pipelines = do
+#if !(defined(wasm32_HOST_ARCH) || defined(javascript_HOST_ARCH))
+runNjobsAbstractSem :: Int -> (AbstractSem -> IO a) -> IO a
+runNjobsAbstractSem n_jobs action = do
+  compile_sem <- newQSem n_jobs
+  n_capabilities <- getNumCapabilities
+  n_cpus <- getNumProcessors
+  let
+    asem = AbstractSem (waitQSem compile_sem) (signalQSem compile_sem)
+    set_num_caps n = unless (n_capabilities /= 1) $ setNumCapabilities n
+    updNumCapabilities =  do
+      -- Setting number of capabilities more than
+      -- CPU count usually leads to high userspace
+      -- lock contention. #9221
+      set_num_caps $ min n_jobs n_cpus
+    resetNumCapabilities = set_num_caps n_capabilities
+  MC.bracket_ updNumCapabilities resetNumCapabilities $ action asem
 
+#endif
 
-  -- A variable which we write to when an error has happened and we have to tell the
-  -- logging thread to gracefully shut down.
-  stopped_var <- newTVarIO False
-  -- The queue of LogQueues which actions are able to write to. When an action starts it
-  -- will add it's LogQueue into this queue.
-  log_queue_queue_var <- newTVarIO newLogQueueQueue
-  -- Thread which coordinates the printing of logs
-  wait_log_thread <- logThread (hsc_logger plugin_hsc_env) stopped_var log_queue_queue_var
-
-
-  -- Make the logger thread-safe, in case there is some output which isn't sent via the LogQueue.
-  thread_safe_logger <- liftIO $ makeThreadSafe (hsc_logger plugin_hsc_env)
-  let thread_safe_hsc_env = plugin_hsc_env { hsc_logger = thread_safe_logger }
-
-  runWorkerLimit (hsc_logger plugin_hsc_env) (hsc_dflags plugin_hsc_env) worker_limit $ \abstract_sem -> do
-    let env = MakeEnv { hsc_env = thread_safe_hsc_env
-                      , withLogger = withParLog log_queue_queue_var
-                      , compile_sem = abstract_sem
-                      , env_messager = mHscMessager
-                      , diag_wrapper = diag_wrapper
-                      }
-    -- Reset the number of capabilities once the upsweep ends.
-    runAllPipelines worker_limit env all_pipelines
-    atomically $ writeTVar stopped_var True
-    wait_log_thread
+--------------------------------------------------------------------------------
+-- * Utility
+--------------------------------------------------------------------------------
 
 withLoggerHsc :: Int -> MakeEnv -> (HscEnv -> IO a) -> IO a
 withLoggerHsc k MakeEnv{withLogger, hsc_env} cont = do
@@ -238,44 +300,3 @@ withLocalTmpFSMake :: MakeEnv -> (MakeEnv -> IO a) -> IO a
 withLocalTmpFSMake env k =
   withLocalTmpFS (hsc_tmpfs (hsc_env env)) $ \lcl_tmpfs
     -> k (env { hsc_env = (hsc_env env) { hsc_tmpfs = lcl_tmpfs }})
-
-
--- | Run the given actions and then wait for them all to finish.
-runAllPipelines :: WorkerLimit -> MakeEnv -> [MakeAction] -> IO ()
-runAllPipelines worker_limit env acts = do
-  let single_worker = isWorkerLimitSequential worker_limit
-      spawn_actions :: IO [ThreadId]
-      spawn_actions = if single_worker
-        then (:[]) <$> (forkIOWithUnmask $ \unmask -> void $ runLoop (\io -> io unmask) env acts)
-        else runLoop forkIOWithUnmask env acts
-
-      kill_actions :: [ThreadId] -> IO ()
-      kill_actions tids = mapM_ killThread tids
-
-  MC.bracket spawn_actions kill_actions $ \_ -> do
-    mapM_ waitMakeAction acts
-
--- | Execute each action in order, limiting the amount of parallelism by the given
--- semaphore.
-runLoop :: (((forall a. IO a -> IO a) -> IO ()) -> IO a) -> MakeEnv -> [MakeAction] -> IO [a]
-runLoop _ _env [] = return []
-runLoop fork_thread env (MakeAction act res_var :acts) = do
-
-  -- withLocalTmpFs has to occur outside of fork to remain deterministic
-  new_thread <- withLocalTmpFSMake env $ \lcl_env ->
-    fork_thread $ \unmask -> (do
-            mres <- (unmask $ run_pipeline lcl_env act)
-                      `MC.onException` (putMVar res_var Nothing) -- Defensive: If there's an unhandled exception then still signal the failure.
-            putMVar res_var mres)
-  threads <- runLoop fork_thread env acts
-  return (new_thread : threads)
-  where
-      run_pipeline :: MakeEnv -> RunMakeM a -> IO (Maybe a)
-      run_pipeline env p = runMaybeT (runReaderT p env)
-
-type RunMakeM a = ReaderT MakeEnv (MaybeT IO) a
-
-data MakeAction = forall a . MakeAction !(RunMakeM a) !(MVar (Maybe a))
-
-waitMakeAction :: MakeAction -> IO ()
-waitMakeAction (MakeAction _ mvar) = () <$ readMVar mvar
