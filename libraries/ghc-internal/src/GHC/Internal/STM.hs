@@ -206,7 +206,7 @@ catchSTM (STM m) handler = STM $ catchSTM# m handler'
 -- | Execute an 'STM' action, adding the given 'ExceptionContext'
 -- to any thrown synchronous exceptions.
 annotateSTM :: forall e a. ExceptionAnnotation e => e -> STM a -> STM a
-annotateSTM ann (STM io) = STM (catch# io handler)
+annotateSTM ann (STM io) = STM (catchSTM# io handler) -- not catch#, see #27657
   where
     handler se = raiseIO# (addExceptionContext ann se)
 

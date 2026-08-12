@@ -325,3 +325,6 @@ test('T26341b'
     # test uses pipe operations which are not supported by the JS/wasm backends
     , when(arch('wasm32') or arch('javascript'), skip)
     , compile_and_run, ['-package process'])
+
+test('T27657a', normal, compile_and_run, [''])
+test('T27657b', normal, compile_and_run, [''])
