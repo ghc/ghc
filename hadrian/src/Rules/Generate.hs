@@ -319,13 +319,15 @@ packageVersions = foldMap f [ base, ghcPrim, compiler, ghc, cabal, templateHaske
     f pkg = interpolateVar var $ version <$> readPackageData pkg
       where var = "LIBRARY_" <> escapedPkgName pkg <> "_VERSION"
 
-packageUnitIds :: Stage -> Interpolations
-packageUnitIds stage =
+-- We don't want to use the hash in the html documentation because it
+-- makes it harder for non-boot packages to link to boot packages, see #26635
+packageIds :: Interpolations
+packageIds =
     foldMap f [ base, ghcPrim, compiler, ghc, cabal, templateHaskell, ghcCompact, array ]
   where
     f :: Package -> Interpolations
-    f pkg = interpolateVar var $ pkgUnitId stage pkg
-      where var = "LIBRARY_" <> escapedPkgName pkg <> "_UNIT_ID"
+    f pkg = interpolateVar var $ pkgSimpleIdentifier pkg
+      where var = "LIBRARY_" <> escapedPkgName pkg <> "_ID"
 
 escapedPkgName :: Package -> String
 escapedPkgName = map f . pkgName
@@ -381,10 +383,10 @@ templateRules = do
     , interpolateSetting "ProjectPatchLevel1" ProjectPatchLevel1
     , interpolateSetting "ProjectPatchLevel2" ProjectPatchLevel2
     ]
-  templateRule "docs/index.html" $ packageUnitIds Stage1
+  templateRule "docs/index.html" $ packageIds
   templateRule "docs/users_guide/ghc_config.py" $ mconcat
     [ projectVersion
-    , packageUnitIds Stage1
+    , packageIds
     , interpolateSetting "LlvmMinVersion" LlvmMinVersion
     , interpolateSetting "LlvmMaxVersion" LlvmMaxVersion
     ]
