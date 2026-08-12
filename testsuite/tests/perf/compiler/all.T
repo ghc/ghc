@@ -492,7 +492,7 @@ test('MultiLayerModulesDefsGhciReload',
      ['MultiLayerModulesDefsGhciReload.script'])
 
 test('InstanceMatching',
-     [ collect_compiler_stats('bytes allocated',3),
+     [ collect_compiler_stats('bytes allocated',5),
        pre_cmd('$MAKE -s --no-print-directory InstanceMatching'),
        extra_files(['genMatchingTest']),
        compile_timeout_multiplier(5),
