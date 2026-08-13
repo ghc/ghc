@@ -393,17 +393,15 @@ data HsForAllTelescope pass
     }
   | XHsForAllTelescope !(XXHsForAllTelescope pass)
 
--- A type for interleaved GADT foralls and prefixes, inspired by HsArg
---
--- `HsGadtPar` is only usefull for pretty-printing/exact-printing for recovering
--- parenthisis interleaved with foralls.
+-- | A type for interleaved GADT foralls and parentheses, inspired by HsArg.
 --
 -- Here's an example:
 --
 --  data D where
---    MkD :: forall a b. ( forall c. forall d. ( forall. ...
---           ↑           ↑ ↑         ↑         ↑ ↑
---           1           2 3         4         5 6
+--    MkD :: forall x y. -- these go to the `con_outer_bndrs` field
+--             forall a b. ( forall c. forall d. ( forall. ...
+--             ↑           ↑ ↑         ↑         ↑ ↑
+--             1           2 3         4         5 6
 --
 -- That would correspond to a list
 --
@@ -414,12 +412,15 @@ data HsForAllTelescope pass
 --   5 → , HsGadtPar
 --   6 → , HsGadtForAll
 --       , ...]
---
--- We can always recover parenthisis structure because they must close after
--- return type.
 data HsGadtArg pass
   = HsGadtForAll !(XGadtForAll pass) (HsForAllTelescope pass)
   | HsGadtPar !(XGadtPar pass)
+    -- ^ `HsGadtPar` is only usefull for pretty-printing/exact-printing for recovering
+    -- parenthisis interleaved with foralls.
+    --
+    -- This approach differs from `HsPar`, which wraps the inner expression as if
+    -- surrounding it with parentheses. We can ditch the `HsPar` approach because
+    -- we know that all parentheses will be closed after the return type.
   | XHsGadtArg !(XXGadtArg pass)
 
 type LHsGadtArg pass = XRec pass (HsGadtArg pass)

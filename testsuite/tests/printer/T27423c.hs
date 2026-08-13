@@ -18,6 +18,7 @@ data S a where
   MkS :: (forall a. S a)
   MkS2 :: forall. (forall a. S a)
   MkS3 :: forall. forall a. S a
+  MkS4 :: forall a. forall. forall b. forall. forall. forall c. S a
 
 data U a where
   MkU :: (Show a => U a)

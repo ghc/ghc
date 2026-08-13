@@ -201,12 +201,12 @@ syntactically allowed. Some further various observations about this grammar:
   something like ``MkS :: Int -> (forall a. a) -> S`` is allowed, since
   parentheses separate the ``forall`` from the ``->``.)
 
-- Furthermore, GADT constructors do not permit outermost parentheses that
-  surround the ``foralls`` or ``opt_ctxt``, if at least one of them are
-  used. For example, ``MkU :: (forall a. a -> U)`` would be rejected, since
-  it would treat the ``forall`` as being nested.
+- GADT constructors permit outermost parentheses that surround the ``foralls``
+  or ``opt_ctxt``, as well as interleaved parentheses between multiple
+  ``foralls``. For example, ``MkU :: (forall a. a -> U)`` is accepted, as is
+  ``MkW :: forall a. (forall b. a -> b -> W)``.
 
-  Note that it is acceptable to use parentheses in a ``prefix_gadt_body``.
+  Note that it is also acceptable to use parentheses in a ``prefix_gadt_body``.
   For instance, ``MkV1 :: forall a. (a) -> (V1)`` is acceptable, as is
   ``MkV2 :: forall a. (a -> V2)``.
 
