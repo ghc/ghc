@@ -603,7 +603,9 @@ machOpArgReps platform op =
     MO_XX_Conv from _     -> Just [from]
     -- Only supports W32/W64
     MO_SF_Round from _w   -> onlyW32W64 from
-    MO_FS_Truncate from _ -> onlyW32W64 from
+    MO_FS_Truncate from to
+      | to `notElem` [W32, W64] -> Nothing
+      | otherwise -> onlyW32W64 from
     MO_FF_Conv from _     -> onlyW32W64 from
     MO_WF_Bitcast w       -> onlyW32W64 w
     MO_FW_Bitcast w       -> onlyW32W64 w
