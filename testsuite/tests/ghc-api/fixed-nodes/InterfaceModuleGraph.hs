@@ -17,7 +17,7 @@ import GHC.Types.SourceFile
 import System.Environment
 import Control.Monad (void, when)
 import Data.Maybe (fromJust)
-import Data.IORef (newIORef)
+import Control.Concurrent.MVar
 import Control.Exception (ExceptionWithContext(..), SomeException)
 import Control.Monad.Catch (handle, throwM)
 import Control.Exception.Context
@@ -70,8 +70,8 @@ main = do
           keyC = msKey msC
 
       let mkGraph s = do
-            summ_cache <- newIORef mempty
-            imps_cache <- newIORef mempty
+            summ_cache <- newMVar mempty
+            imps_cache <- newMVar mempty
             withMakeEnv n_jobs hsc_env mkUnknownDiagnostic Nothing $ \make_env -> do
               let env = DownsweepEnv
                     { ds_hsc_env         = hsc_env
@@ -114,6 +114,6 @@ main = do
         getModSummaryFromTarget :: FilePath -> Ghc ModSummary
         getModSummaryFromTarget file = do
           hsc_env <- getSession
-          summ_cache <- liftIO $ newIORef mempty
+          summ_cache <- liftIO $ newMVar mempty
           Right ms <- liftIO $ summariseFile hsc_env (DefiniteHomeUnit mainUnitId Nothing) summ_cache file Nothing Nothing
           return ms

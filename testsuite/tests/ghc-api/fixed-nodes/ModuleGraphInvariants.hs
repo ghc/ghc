@@ -23,7 +23,7 @@ import Control.Monad.Catch (handle, throwM)
 import Control.Exception.Context
 import GHC.Utils.Outputable
 import Data.List
-import Data.IORef (newIORef)
+import Control.Concurrent.MVar
 
 -- | Convert a ModuleNodeCompile to a ModuleNodeFixed
 convertToFixed :: ModuleNodeInfo -> ModuleNodeInfo
@@ -133,6 +133,6 @@ main = do
         getModSummaryFromTarget :: FilePath -> Ghc ModSummary
         getModSummaryFromTarget file = do
           hsc_env <- getSession
-          summ_cache <- liftIO $ newIORef mempty
+          summ_cache <- liftIO $ newMVar mempty
           Right ms <- liftIO $ summariseFile hsc_env (DefiniteHomeUnit mainUnitId Nothing) summ_cache file Nothing Nothing
           return ms

@@ -64,7 +64,7 @@ import GHC.Data.OsPath     ( OsPath, unsafeEncodeUtf )
 import GHC.Data.StringBuffer
 import GHC.Data.Graph.Directed.Reachability
 
-import GHC.Utils.Exception ( throwIO, SomeAsyncException )
+import GHC.Utils.Exception ( throwIO, SomeAsyncException, AsyncException (..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
@@ -114,8 +114,11 @@ import Control.Monad.Trans.Reader
 import qualified Data.Map.Strict as M
 import Control.Monad.Trans.Class
 import System.IO.Unsafe (unsafeInterleaveIO)
-import Data.IORef
 import qualified Data.List.NonEmpty as NE
+import Control.Concurrent
+import Control.Concurrent.STM.TQueue
+import Control.Concurrent.STM
+import Control.Applicative
 
 {-
 Note [The ModuleGraph]
@@ -178,8 +181,9 @@ incrementally constructing a ModuleGraph using the GHC API; See #27054). So
 `downsweep` takes a `Maybe ModuleGraph` as one of its arguments.
 
 Downsweep iteratively *expands* each so-called 'DownsweepNode' into a list of
-its dependencies, and recursively traverses all reachable nodes in a
-depth-first order using 'dfsBuild'. A 'DownsweepNode' is *expanded* by 'dsNodeExpand':
+its dependencies, and recursively traverses all reachable nodes in a parallel
+non-det-depth-first order using 'parDfsBuild'. A 'DownsweepNode' is *expanded*
+by 'dsNodeExpand':
 
   dsNodeExpand :: DownsweepNode -> DownsweepM (NodeRes (ModuleGraphNode, [DownsweepNode]))
 
@@ -258,8 +262,8 @@ downsweep :: HscEnv
                 -- which case there can be repeats
 downsweep hsc_env diag_wrapper msg old_summaries maybe_base_graph excl_mods allow_dup_roots = do
   n_jobs     <- mkWorkerLimit (hsc_dflags hsc_env)
-  summ_cache <- newIORef (mkModSummaryCache (zip old_summaries (repeat SummOld)))
-  imps_cache <- newIORef Map.empty
+  summ_cache <- newMVar (mkModSummaryCache (zip old_summaries (repeat SummOld)))
+  imps_cache <- newMVar Map.empty
   withMakeEnv n_jobs hsc_env diag_wrapper msg $ \make_env -> do
     (root_errs, root_summaries) <- rootSummariesParallel n_jobs make_env (hsc_targets hsc_env)
                                      (getRootSummary excl_mods summ_cache imps_cache)
@@ -343,8 +347,8 @@ downsweepThunk :: HscEnv -> ModSummary -> IO ModuleGraph
 downsweepThunk hsc_env mod_summary = unsafeInterleaveIO $ do
   debugTraceMsg (hsc_logger hsc_env) 3 $ text "Computing Module Graph thunk..."
   njobs <- mkWorkerLimit (hsc_dflags hsc_env)
-  summs <- newIORef (mkModSummaryCache [(mod_summary,SummOld)])
-  imps  <- newIORef mempty
+  summs <- newMVar (mkModSummaryCache [(mod_summary,SummOld)])
+  imps  <- newMVar mempty
   withMakeEnv njobs hsc_env mkUnknownDiagnostic Nothing $ \make_env -> do
     let env = DownsweepEnv
           { ds_hsc_env         = hsc_env
@@ -388,8 +392,8 @@ downsweepInteractiveImports hsc_env ic = unsafeInterleaveIO $ do
   let cached_nodes = Map.fromList [ (mkNodeKey n, NSuccess n) | n <- mg_mss (hsc_mod_graph hsc_env) ]
 
   n_jobs     <- mkWorkerLimit (hsc_dflags hsc_env)
-  summ_cache <- newIORef mempty
-  imps_cache <- newIORef mempty
+  summ_cache <- newMVar mempty
+  imps_cache <- newMVar mempty
   withMakeEnv n_jobs hsc_env mkUnknownDiagnostic Nothing $ \make_env -> do
     let env = DownsweepEnv
           { ds_hsc_env         = hsc_env
@@ -433,8 +437,8 @@ downsweepInstalledModules hsc_env mods = do
 
     njobs <- mkWorkerLimit (hsc_dflags hsc_env)
     nodes <- mapM process installed_mods
-    summs <- newIORef mempty
-    imps  <- newIORef mempty
+    summs <- newMVar mempty
+    imps  <- newMVar mempty
     withMakeEnv njobs hsc_env mkUnknownDiagnostic Nothing $ \make_env -> do
       let env = DownsweepEnv
             { ds_hsc_env         = hsc_env
@@ -461,8 +465,8 @@ downsweepInstalledModules hsc_env mods = do
 -- * Orchestrator: downsweepFromRootNodes
 -----------------------------------------------------------------------------
 
-type ModSummaryCache = IORef ModSummaryCacheMap
-type ImportsCache    = IORef ImportsCacheMap
+type ModSummaryCache = MVar ModSummaryCacheMap
+type ImportsCache    = MVar ImportsCacheMap
 
 -- | A cache from file paths to the already summarised modules. The same file
 -- can be used in multiple units so the map is actually also keyed by which
@@ -516,7 +520,7 @@ downsweepFromRootNodes maybe_base_graph allow_dup_roots root_nodes root_uids =
         all_deps    <- loopUnits module_deps (hscActiveUnitId ds_hsc_env) root_uids
         deps'       <- loopInstantiations all_deps (getHomeUnitInstantiations ds_hsc_env)
         return deps'
-     f_cache <- readIORef ds_summaries_cache
+     f_cache <- readMVar ds_summaries_cache
      let downsweep_errs = lefts (M.elems f_cache)
          downsweep_nodes = [ s | NSuccess s <- M.elems deps' ]
 
@@ -575,8 +579,8 @@ addModSummaryCache ms pr fe = upd_fe fe
 
 modifySummCache :: ModSummaryCache -> (ModSummaryCacheMap -> ModSummaryCacheMap) -> IO ()
 modifyImpsCache :: ImportsCache    -> (ImportsCacheMap    -> ImportsCacheMap)    -> IO ()
-modifySummCache r f = atomicModifyIORef' r (\c -> (f c, ()))
-modifyImpsCache r f = atomicModifyIORef' r (\c -> (f c, ()))
+modifySummCache v f = modifyMVar v (\c -> let !r = f c in pure (r, ()))
+modifyImpsCache v f = modifyMVar v (\c -> let !r = f c in pure (r, ()))
 
 -- | A cache from a module import (in given home unit context, with a package
 -- qualifier, and the imported module name (with or without SOURCE)) to the
@@ -599,7 +603,7 @@ loopModuleNodeInfos :: M.Map NodeKey (NodeRes ModuleGraphNode) -> [ModuleNodeInf
 loopUnits           :: M.Map NodeKey (NodeRes ModuleGraphNode) -> UnitId -> [UnitId]            -> DownsweepM (M.Map NodeKey (NodeRes ModuleGraphNode))
 loopInstantiations  :: M.Map NodeKey (NodeRes ModuleGraphNode) -> [(UnitId, InstantiatedUnit)]  -> DownsweepM (M.Map NodeKey (NodeRes ModuleGraphNode))
 loopFromInteractive :: M.Map NodeKey (NodeRes ModuleGraphNode) -> Module -> [InteractiveImport] -> DownsweepM (M.Map NodeKey (NodeRes ModuleGraphNode))
-loopDownsweepNodes  base_map nodes = dfsBuild (Just base_map) nodes dsNodeInfoKey dsNodeExpand
+loopDownsweepNodes  base_map nodes = parDfsBuild (Just base_map) nodes dsNodeInfoKey dsNodeExpand
 loopModuleNodeInfos base_map       = loopDownsweepNodes base_map . map DSMod
 loopUnits           base_map homud = loopDownsweepNodes base_map . map (DSUnit homud)
 loopInstantiations  base_map       = loopDownsweepNodes base_map . map (uncurry DSInst)
@@ -698,7 +702,7 @@ expandModuleSummary ms = do -- Didn't work out what the imports mean yet, now do
         FoundHomeWithError (_uid, _e) -> return
           ( Nothing, [] )
           -- the error @e@ is already stored in the summarisation cache,
-          -- (the IORef in DownsweepM) and will get reported at the end.
+          -- (the MVar in DownsweepM) and will get reported at the end.
         FoundHome s -> return
           -- MP: This assumes that we can only instantiate non home units, which is probably fair enough for now.
           ( Just $ mkModuleEdge lvl (NodeKey_Module (mnKey s))
@@ -1330,7 +1334,7 @@ summariseFile
         -> IO (Either DriverMessages ModSummary)
 
 summariseFile hsc_env' home_unit summ_cache_ref src_fn mb_phase maybe_buf
-   = do file_summ_cache <- readIORef summ_cache_ref
+   = do file_summ_cache <- readMVar summ_cache_ref
         case M.lookup (homeUnitId home_unit, src_fn_os) file_summ_cache of
           Just (Right (chd_summary, SummFresh)) ->
             -- Fresh: use it straight away
@@ -1510,7 +1514,7 @@ summariseModuleDispatch k hsc_env' imps_cache_ref home_unit imp excl_mods
 
     find_it :: IO SummariseResult
     find_it = do
-      imps_cache <- readIORef imps_cache_ref
+      imps_cache <- readMVar imps_cache_ref
       case M.lookup cache_key imps_cache of
         Just result -> return result
         Nothing -> do
@@ -1552,7 +1556,7 @@ summariseModuleWithSource home_unit summ_cache_ref is_boot maybe_buf hsc_env loc
     -- Adjust location to point to the hs-boot source file,
     -- hi file, object file, when is_boot says so
     let src_fn = expectJust (ml_hs_file location)
-    summ_cache <- readIORef summ_cache_ref
+    summ_cache <- readMVar summ_cache_ref
 
     -- Reject the cache result if the module name doesn't match the inferred
     -- module name based on the file name.
@@ -1727,10 +1731,10 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
   return PreprocessedImports {..}
 
 --------------------------------------------------------------------------------
--- * Generic traversal of iteratively-built graph: dfsBuild
+-- * Generic traversal of iteratively-built graph: parDfsBuild
 --------------------------------------------------------------------------------
 
--- | The result of expanding a node in 'dfsBuild'.
+-- | The result of expanding a node in 'parDfsBuild'.
 data NodeRes v
   -- | Computed the node payload successfully
   = NSuccess v
@@ -1743,7 +1747,7 @@ data NodeRes v
   -- abort.
   | NSkip
 
--- | In a depth-first order, and starting from the given roots, traverse a
+-- | In a parallel non-det-depth-first order, and starting from the given roots, traverse a
 -- graph by iteratively expanding a node into a payload and a list of children
 -- nodes to visit next.
 --
@@ -1756,18 +1760,17 @@ data NodeRes v
 -- The result is a mapping from the key of every node transitively reachable
 -- from the root nodes (inclusively) to the payload returned by expanding that
 -- node. The result includes the previously visited nodes given in @base_map@,
--- s.t. @dfsBuild base_map [] _ _ == base_map@.
+-- s.t. @parDfsBuild base_map [] _ _ == base_map@.
 --
 -- The @expand@ function returns an 'NResult'. See the 'NResult' documentation
 -- for more information about each result type.
 --
--- Error handling and exiting early can be achieved by selecting a @Monad m@
--- accordingly, such as @Control.Monad.Except.Except@
---
 -- Example usage: @n@ is instanced to @DownsweepNode@, @k@ is @NodeKey@, and @v@ is @ModuleNodeEdge@.
 --
--- See also Note [Downsweep Control Flow and Caching]
-dfsBuild :: (Ord k, Monad m)
+-- See Note [Parallel Downsweep] for more information about how parallelism is
+-- achieved, and See Note [Downsweep Control Flow and Caching] for information
+-- about the various caches used.
+parDfsBuild :: forall k v n. Ord k
          => Maybe (Map.Map k (NodeRes v))
          -- ^ Base map, existing results. We won't re-expand any of the nodes
          -- already present in this map.
@@ -1775,34 +1778,92 @@ dfsBuild :: (Ord k, Monad m)
          -- ^ The root nodes from where to start traversal
          -> (n -> k)
          -- ^ Compute the key which uniquely identifies this node
-         -> (n -> m (NodeRes (v,[n])))
+         -> (n -> DownsweepM (NodeRes (v,[n])))
          -- ^ Expand this node into its payload result and into the list of
          -- children nodes to visit next.
-         -> m (Map.Map k (NodeRes v))
+         -> DownsweepM (Map.Map k (NodeRes v))
          -- ^ The result accumulates the payload of expanding the root nodes
          -- and all nodes transitively reachable from those roots.
-dfsBuild base_map roots key expand = go roots (fromMaybe Map.empty base_map)
+parDfsBuild base_map roots key expand = ReaderT $ \ds_env -> do
+    exc_var     <- newTVarIO $ Nothing @MC.SomeException
+    visited_var <- newTVarIO $ fromMaybe Map.empty base_map
+    pending     <- newTVarIO $ Set.empty @k
+    worklist    <- newTQueueIO @n
+
+    coord_tid   <- forkIO $
+      coordinator ds_env exc_var visited_var worklist pending
+        `MC.catch` \case
+          (e::MC.SomeException)
+            -- exit cleanly when killed
+            | Just ThreadKilled <- fromException e -> return ()
+            -- if the coordinator somehow else crashes,
+            -- signal the exc_var for the main thread to throw it
+            | otherwise -> atomically (modifyTVar' exc_var (<|> Just e))
+
+    atomically $ mapM_ (writeTQueue worklist) roots
+
+    -- this txn retries until all work is done or there is an exception
+    mb_exc <- atomically $ do
+      readTVar exc_var >>= \case
+        Just e -> return (Just e)
+        Nothing -> do
+          empty_worklist <- isEmptyTQueue worklist
+          empty_pending  <- Set.null <$> readTVar pending
+          check (empty_worklist && empty_pending)
+          return Nothing
+
+    killThread coord_tid
+    case mb_exc of
+      Just e  -> throwIO e
+      Nothing -> readTVarIO visited_var
+
   where
-    go []     visited = pure visited
-    go (s:ss) visited
-      | k `Map.member` visited
-      = go ss visited
-      | otherwise
-      = do r <- expand s
-           case r of
-             NSkip ->
-               go ss
-                  (Map.insert k NSkip        visited) -- Skip!
-             NSuccess (v,ns) ->
-               go (ns ++ ss)
-                  (Map.insert k (NSuccess v) visited)
-      where
-        k = key s
+    coordinator ds_env exc_var visvar worklist pendvar = forever $ do
+      mb_node_to_expand <- atomically $ do
+        node <- readTQueue worklist
+        let k = key node
+
+        visited <- readTVar visvar
+        pending <- readTVar pendvar
+
+        if (k `Set.member` pending || k `Map.member` visited)
+          then return Nothing
+          else do
+            -- must add to pending in the same transaction as worklist dequeue,
+            -- otherwise the main thread may find both the worklist and pending
+            -- lists empty and exit prematurely.
+            modifyTVar' pendvar (Set.insert k)
+            return (Just (k, node))
+
+      case mb_node_to_expand of
+        Nothing        -> return ()
+        Just (k, node) -> void $ do
+          withLocalTmpFSMake (ds_make_env ds_env) $ \make_env ->
+            MC.mask_ $ forkIOWithUnmask $ \unmask ->
+              unmask (worker ds_env{ds_make_env = make_env} visvar worklist pendvar k node)
+                -- write exception in the worker to the main thread
+                `MC.catch` \(e::MC.SomeException) ->
+                  atomically (modifyTVar' exc_var (<|> Just e))
+
+    worker ds_env@DownsweepEnv{..} visvar worklist pendvar k node =
+      withAbstractSem (compile_sem ds_make_env) $ do
+        r <- runDownsweepM ds_env $
+             expand node -- do the main work!
+
+        atomically $ do
+          case r of
+            NSkip ->
+              modifyTVar' visvar (Map.insert k NSkip)
+            NSuccess (v,ns) -> do
+              modifyTVar' visvar (Map.insert k (NSuccess v))
+              mapM_ (writeTQueue worklist) ns
+
+          modifyTVar' pendvar (Set.delete k)
 
 {-
 Note [Downsweep Control Flow and Caching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The control flow of downsweep is extracted into a single function `dfsBuild`,
+The control flow of downsweep is extracted into a single function `parDfsBuild`,
 which takes care of iteratively expanding and traversing all nodes of the
 in-construction module graph necessary to build a full `ModuleGraph` at the
 end.
@@ -1811,7 +1872,7 @@ There are three levels of caching going on, all of which are necessary to make
 sure we don't do repeated work (notably, we NEVER summarise the same module
 twice).
 
-1. `dfsBuild` accumulates the final module graph and never revisits the
+1. `parDfsBuild` accumulates the final module graph and never revisits the
    same node of the module graph. Cache is keyed by the final
    `ModuleGraph`s `NodeKey`s.
 
@@ -1879,8 +1940,35 @@ twice).
 
    See tests T27461a and T27461b.
 
-See also Note [Downsweep: building and maintaining the module graph] and
-Note [The ModuleGraph].
+See also Note [Downsweep: building and maintaining the module graph] and Note [The ModuleGraph].
+
+
+Note [Parallel Downsweep]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Downsweep traverses the modules iteratively to discover the module graph
+structure (see Note [Downsweep: building and maintaining the module graph])
+
+Each module has to be expanded/processed to discover dependencies amongst other
+things, and that processing can often be costly (e.g. see `expandModuleSummary`).
+
+We leverage multiple threads in this traversal to expand more than one module
+at once, respecting -j<N> to mean we never expand more than N modules at once.
+The parallel downsweep is all handled by `parDfsBuild` as follows:
+
+- We launch a thread for every module we discover that needs to be
+  expanded in the `coordinator` thread, popping it from the worklist
+- Every launched `worker` thread blocks waiting for a semaphore token
+  (`withAbstractSem`) to respect -j<N>
+- The main thread waits until both the worklist and pending list is
+  cleared, atomically.
+
+STM is used crucially to guarantee e.g. we don't have race conditions
+between taking from the worklist and writing to the pending list while
+checking whether they are clear.
+
+Exceptions are bubbled up to the main thread. The "main" thread, which is
+typically waiting for the worklist+pending lists to be clear, instead gets
+unblocked by this exception (signaled in `exc_var`) and re-throws it.
 -}
 
 --------------------------------------------------------------------------------

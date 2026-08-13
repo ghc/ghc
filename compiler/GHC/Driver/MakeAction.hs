@@ -185,7 +185,8 @@ runLoop fork_thread env (MakeAction act res_var :acts) = do
 
   -- withLocalTmpFs has to occur outside of fork to remain deterministic
   new_thread <- withLocalTmpFSMake env $ \lcl_env ->
-    fork_thread $ \unmask -> (do
+    MC.mask_ $
+      fork_thread $ \unmask -> (do
             mres <- (unmask $ run_pipeline lcl_env act)
                       `MC.onException` (putMVar res_var Nothing) -- Defensive: If there's an unhandled exception then still signal the failure.
             putMVar res_var mres)

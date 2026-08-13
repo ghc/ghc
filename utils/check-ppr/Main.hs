@@ -18,7 +18,7 @@ import System.Environment( getArgs )
 import System.Exit
 import System.FilePath
 import System.IO
-import Data.IORef
+import Control.Concurrent.MVar
 
 usage :: String
 usage = unlines
@@ -86,7 +86,7 @@ parseOneFile libdir fileName = do
          let dflags2 = dflags `gopt_set` Opt_KeepRawTokenStream
          _ <- setSessionDynFlags dflags2
          hsc_env <- getSession
-         cache <- liftIO $ newIORef mempty
+         cache <- liftIO $ newMVar mempty
          mms <- liftIO $ summariseFile hsc_env (hsc_home_unit hsc_env) cache fileName Nothing Nothing
          case mms of
            Left _err -> error "parseOneFile"
