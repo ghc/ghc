@@ -243,7 +243,7 @@ test('T8684', expect_broken(8684), compile_and_run, [''])
 test('hWaitForInput-accurate-stdin', [js_broken(22349), expect_broken_for(16535, threaded_ways), req_process], compile_and_run, [''])
 test('T9826',normal, compile_and_run,[''])
 test('T9848',
-        [ collect_stats('bytes allocated')
+        [ collect_stats('bytes allocated', 2)
         , only_ways(['normal'])
         , js_broken(22261)
         ],
