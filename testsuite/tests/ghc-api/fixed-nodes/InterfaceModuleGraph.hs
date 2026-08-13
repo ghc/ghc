@@ -6,6 +6,7 @@ import GHC.Driver.Session
 import GHC.Driver.Monad
 import GHC.Driver.Env
 import GHC.Driver.Make (summariseFile)
+import GHC.Driver.MakeAction
 import GHC.Driver.Downsweep
 import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModSummary
@@ -22,6 +23,7 @@ import Control.Monad.Catch (handle, throwM)
 import Control.Exception.Context
 import GHC.Utils.Outputable
 import Data.List
+import GHC.Types.Error
 import GHC.Unit.Env
 import GHC.Unit.State
 import GHC.Tc.Utils.Monad
@@ -60,7 +62,7 @@ main = do
       hsc_env <- getSession
       setSession $ hsc_env { hsc_dflags = (hsc_dflags hsc_env) { ghcMode = OneShot } }
       hsc_env <- getSession
-
+      n_jobs <- liftIO $ mkWorkerLimit (hsc_dflags hsc_env)
 
       -- Create ModNodeKeys with unit IDs
       let keyA = msKey msA
@@ -70,8 +72,19 @@ main = do
       let mkGraph s = do
             summ_cache <- newIORef mempty
             imps_cache <- newIORef mempty
-            ([], nodes) <- downsweepFromRootNodes hsc_env summ_cache imps_cache Nothing [] True DownsweepUseFixed s []
-            return $ mkModuleGraph nodes
+            withMakeEnv n_jobs hsc_env mkUnknownDiagnostic Nothing $ \make_env -> do
+              let env = DownsweepEnv
+                    { ds_hsc_env         = hsc_env
+                    , ds_summaries_cache = summ_cache
+                    , ds_imports_cache   = imps_cache
+                    , ds_mode            = DownsweepUseFixed
+                    , ds_excl_mods       = []
+                    , ds_n_jobs          = n_jobs
+                    , ds_make_env        = make_env
+                    }
+              ([], nodes) <- runDownsweepM env $
+                downsweepFromRootNodes Nothing True s []
+              return $ mkModuleGraph nodes
 
       graph <- liftIO $ mkGraph [ModuleNodeCompile msC]
 
