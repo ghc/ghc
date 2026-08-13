@@ -766,7 +766,6 @@ function test_hadrian() {
     run_hadrian \
       test \
       --summary-junit=./junit.xml \
-      --test-have-intree-files \
       --test-compiler="${test_compiler}" \
       ${TEST_WAYS[@]/#/--test-way=} \
       "runtest.opts+=${RUNTEST_ARGS:-}" \
@@ -774,7 +773,7 @@ function test_hadrian() {
       || fail "hadrian main testsuite"
 
     info "STAGE2_TEST=$?"
-
+    # --test-have-intree-files \ -- this will build the entirety of the missing bits in the _build dir
   fi
 }
 
