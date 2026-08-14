@@ -317,6 +317,64 @@ as such you shouldn't need to set any of them explicitly. A flag
     If you find cases of significant performance regressions, which can
     be traced back to obviously bad code layout please open a ticket.
 
+.. ghc-flag:: -falign-loops
+    :shortdesc: Align blocks which start a loop at the given boundary.
+    :type: dynamic
+    :category:
+
+    :default: off
+
+    :since: 10.2.1
+
+    ``-falign-loops=⟨n⟩`` aligns blocks which start a loop in the emitted
+    code at an ⟨n⟩-byte boundary, padding with (never executed) no-op
+    instructions. Only powers of two are valid values.
+
+    Aligning loop headers can improve the utilisation of the instruction
+    fetch and decode stages of modern processors, at a small code-size
+    cost. ``-falign-loops=16`` is a reasonable choice on x86 processors.
+
+    A block is only aligned when the padding in front of it can never be
+    executed, so entirely fallthrough-entered loop shapes are not
+    affected. Currently only implemented for the x86 native code
+    generator; on other backends the flag has no effect.
+
+.. ghc-flag:: -falign-loops-pad-fallthrough
+    :shortdesc: Align fallthrough-entered loop blocks too, executing the padding.
+    :type: dynamic
+    :reverse: -fno-align-loops-pad-fallthrough
+    :category:
+
+    :default: off
+
+    :since: 10.2.1
+
+    By default :ghc-flag:`-falign-loops` only aligns a loop block when the
+    padding in front of it can never be executed. With this flag,
+    fallthrough-entered loop blocks are aligned as well; the entering path
+    then executes the padding, which consists of no-op instructions.
+    Depending on the loop shape this trades a one-off (per loop entry) nop
+    cost for aligned iterations, or — for bottom-tested loops entered by
+    fallthrough each iteration — pays for the nops every time around.
+
+.. ghc-flag:: -falign-loops-mode
+    :shortdesc: Which loops :ghc-flag:`-falign-loops` applies to.
+    :type: dynamic
+    :category:
+
+    :default: all
+
+    :since: 10.2.1
+
+    ``-falign-loops-mode=⟨all|inner⟩`` controls which loops
+    :ghc-flag:`-falign-loops` pads. With ``all`` every qualifying
+    loop-closing branch target is aligned. With ``inner`` only blocks
+    belonging to *innermost* loops — loops that contain no nested
+    loop — are aligned; nesting is determined from the control flow
+    graph, so given ``Loop1 { Loop2; Loop3 { Loop4 } }`` only ``Loop2``
+    and ``Loop4`` are aligned. When no control flow graph is available
+    for a function, ``inner`` behaves like ``all``.
+
 .. ghc-flag:: -fblock-layout-weights
     :shortdesc: Sets edge weights used by the new code layout algorithm.
     :type: dynamic

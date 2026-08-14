@@ -236,6 +236,10 @@ data DynFlags = DynFlags {
                                         --   into an unknown call.
 
   cmmProcAlignment      :: Maybe Int,   -- ^ Align Cmm functions at this boundary or use default.
+  cmmLoopAlignment      :: Maybe Int,   -- ^ Align loop-top blocks at this boundary (bytes).
+  cmmAlignInnerLoops    :: Bool,        -- ^ Restrict loop alignment to innermost loops.
+  cmmAlignPadFallthrough :: Bool,       -- ^ Also align fallthrough-entered loop blocks
+                                        --   (the entering path then executes the padding).
 
   historySize           :: Int,         -- ^ Simplification history size
 
@@ -577,6 +581,9 @@ defaultDynFlags mySettings =
         liftLamsNonRecArgs      = Just 5, -- Default: the number of available argument hardware registers on x86_64
         liftLamsKnown           = False,  -- Default: don't turn known calls into unknown ones
         cmmProcAlignment        = Nothing,
+        cmmLoopAlignment        = Nothing,
+        cmmAlignInnerLoops      = False,
+        cmmAlignPadFallthrough  = False,
 
         historySize             = 20,
         strictnessBefore        = [],

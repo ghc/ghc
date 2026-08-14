@@ -20,6 +20,11 @@ initNCGConfig dflags this_mod = NCGConfig
    , ncgThisModule            = this_mod
    , ncgAsmContext            = initSDocContext dflags PprCode
    , ncgProcAlignment         = cmmProcAlignment dflags
+   , ncgLoopAlignment         = cmmLoopAlignment dflags
+   , ncgLoopAlignmentMode     = if cmmAlignInnerLoops dflags
+                                   then AlignInnerLoops
+                                   else AlignAllLoops
+   , ncgLoopAlignPadFallthrough = cmmAlignPadFallthrough dflags
    , ncgExternalDynamicRefs   = gopt Opt_ExternalDynamicRefs dflags
    , ncgPIC                   = positionIndependent dflags
    , ncgInlineThresholdMemcpy = fromIntegral $ maxInlineMemcpyInsns dflags

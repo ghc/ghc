@@ -87,6 +87,16 @@ class Instruction instr where
         canFallthroughTo
                 :: instr -> BlockId -> Bool
 
+        -- | Can execution continue past this instruction to the next
+        -- sequential one? Used by block layout to decide whether padding
+        -- inserted in front of the following block would ever be executed.
+        -- Conservatively true; backends that want loop alignment must
+        -- override it for their control-flow instructions.
+        -- See Note [Aligning loop headers] in GHC.CmmToAsm.BlockLayout.
+        mayFallthroughInstr
+                :: instr -> Bool
+        mayFallthroughInstr _ = True
+
 
         -- | Change the destination of this jump instruction.
         --      Used in the linear allocator when adding fixup blocks for join

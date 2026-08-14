@@ -1829,6 +1829,18 @@ dynamic_flags_deps = [
       (noArg (\d -> d { liftLamsKnown = False }))
   , make_ord_flag defFlag "fproc-alignment"
       (intSuffix (\n d -> d { cmmProcAlignment = Just n }))
+  , make_ord_flag defFlag "falign-loops"
+      (intSuffix (\n d -> d { cmmLoopAlignment = Just n }))
+  , make_ord_flag defFlag "falign-loops-mode"
+      (hasArg (\f d -> case f of
+          "all"   -> d { cmmAlignInnerLoops = False }
+          "inner" -> d { cmmAlignInnerLoops = True }
+          _       -> throwGhcException (CmdLineError
+                        ("Unknown -falign-loops-mode (expected all|inner): " ++ f))))
+  , make_ord_flag defFlag "falign-loops-pad-fallthrough"
+      (noArg (\d -> d { cmmAlignPadFallthrough = True }))
+  , make_ord_flag defFlag "fno-align-loops-pad-fallthrough"
+      (noArg (\d -> d { cmmAlignPadFallthrough = False }))
   , make_ord_flag defFlag "fblock-layout-weights"
         (HasArg (\s ->
             upd (\d -> d { cfgWeights =

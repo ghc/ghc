@@ -2,6 +2,7 @@
 module GHC.CmmToAsm.Config
    ( NCGConfig(..)
    , ncgX86Features
+   , LoopAlignMode(..)
    , ncgWordWidth
    , ncgSpillPreallocSize
    , platformWordWidth
@@ -17,12 +18,25 @@ import GHC.Unit.Module (Module)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+-- | Which loops the @-falign-loops@ padding applies to.
+-- See Note [Aligning loop headers] in GHC.CmmToAsm.BlockLayout.
+data LoopAlignMode
+   = AlignAllLoops    -- ^ every qualifying loop-top block
+   | AlignInnerLoops  -- ^ only blocks belonging to innermost loops
+                      --   (loops that contain no nested loop)
+   deriving (Eq, Show)
+
 -- | Native code generator configuration
 data NCGConfig = NCGConfig
    { ncgPlatform              :: !Platform        -- ^ Target platform
    , ncgAsmContext            :: !SDocContext     -- ^ Context for ASM code generation
    , ncgThisModule            :: !Module          -- ^ The name of the module we are currently compiling
    , ncgProcAlignment         :: !(Maybe Int)     -- ^ Mandatory proc alignment
+   , ncgLoopAlignment         :: !(Maybe Int)     -- ^ Align loop-top blocks at this boundary (bytes)
+                                                  -- See Note [Aligning loop headers] in GHC.CmmToAsm.BlockLayout
+   , ncgLoopAlignmentMode     :: !LoopAlignMode   -- ^ Which loops -falign-loops applies to
+   , ncgLoopAlignPadFallthrough :: !Bool          -- ^ Also align fallthrough-entered loop blocks;
+                                                  --   the entering path then executes the nop padding
    , ncgExternalDynamicRefs   :: !Bool            -- ^ Generate code to link against dynamic libraries
    , ncgPIC                   :: !Bool            -- ^ Enable Position-Independent Code
    , ncgInlineThresholdMemcpy :: !Word            -- ^ If inlining `memcpy` produces less than this threshold (in pseudo-instruction unit), do it

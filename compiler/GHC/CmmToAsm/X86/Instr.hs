@@ -34,6 +34,7 @@ module GHC.CmmToAsm.X86.Instr
    , movInstr
    , jumpDestsOfInstr
    , canFallthroughTo
+   , mayFallthroughInstr
    , patchRegsOfInstr
    , patchJumpInstr
    , isMetaInstr
@@ -1077,6 +1078,19 @@ jumpDestsOfInstr insn
         JXX _ id            -> [id]
         JMP_TBL _ ids _ _ _ -> [id | Just (DestBlockId id) <- ids]
         _                   -> []
+
+-- | Can execution continue past this instruction to the next sequential
+-- one? Only unconditional control transfers rule out the fallthrough.
+-- Note that a local unconditional jump is @JXX ALWAYS@; @JMP@ is the
+-- non-local form (tail calls, jumps through pointers).
+mayFallthroughInstr :: Instr -> Bool
+mayFallthroughInstr insn
+  = case insn of
+        JXX ALWAYS _        -> False
+        JXX_GBL ALWAYS _    -> False
+        JMP {}              -> False
+        JMP_TBL {}          -> False
+        _                   -> True
 
 
 patchJumpInstr

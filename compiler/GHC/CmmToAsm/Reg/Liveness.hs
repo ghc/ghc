@@ -133,6 +133,11 @@ instance Instruction instr => Instruction (InstrSR instr) where
                 Instr instr     -> canFallthroughTo instr bid
                 _               -> False
 
+        mayFallthroughInstr i
+         = case i of
+                Instr instr     -> mayFallthroughInstr instr
+                _               -> True
+
         jumpDestsOfInstr i
          = case i of
                 Instr instr     -> jumpDestsOfInstr instr

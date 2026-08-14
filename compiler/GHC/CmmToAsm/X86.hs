@@ -52,6 +52,7 @@ instance Instruction X86.Instr where
    isJumpishInstr          = X86.isJumpishInstr
    jumpDestsOfInstr        = X86.jumpDestsOfInstr
    canFallthroughTo        = X86.canFallthroughTo
+   mayFallthroughInstr     = X86.mayFallthroughInstr
    patchJumpInstr          = X86.patchJumpInstr
    mkSpillInstr            = X86.mkSpillInstr
    mkLoadInstr             = X86.mkLoadInstr
