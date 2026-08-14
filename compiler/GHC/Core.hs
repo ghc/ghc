@@ -648,7 +648,8 @@ Note [NON-BOTTOM-DICTS invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It is a global invariant (not checkable by Lint) that
 
-     every non-newtype dictionary-typed expression is non-bottom.
+  Every dictionary-typed expression is non-bottom
+  /except/: a unary class with a single method (see (NBD1))
 
 These conditions are captured by GHC.Core.Type.isTerminatingType.
 
@@ -659,7 +660,7 @@ How are we so sure about this?  Dictionaries are built by GHC in only two ways:
   See DFunUnfolding in GHC.Core.  So the result of a call to a DFun is always
   non-bottom.
 
-  Exception: newtype dictionaries.
+  Exception: unary dictionaries: see (NBD1) below.
 
   Plus: see the Very Nasty Wrinkle in Note [Speculative evaluation]
   in GHC.CoreToStg.Prep
@@ -682,6 +683,19 @@ Why is it useful to know that dictionaries are non-bottom?
    can be discarded by the Simplifier.  See these Notes:
    Note [exprOkForSpeculation and type classes] in GHC.Core.Utils
    Note[Speculative evaluation] in GHC.CoreToStg.Prep
+
+Wrinkle (NBD1)
+  A unary dictionary with a single method can be non-bottom:
+     class UC a where { meth :: a -> a }
+  because we could say
+     instance UC Int where { meth = error "urk" }
+  See Note [Unary class magic] in GHC.Core.TyCon
+
+  A unary class has a single /superclass/ (rather than method) looks as if it
+  will always terminate, because the superclass does:
+    class C a => UC a where {}
+  But Note [Recursive superclasses] and Note [Solving superclass constraints]
+  are very subtle, so it seems safer to say that /all/ unary might diverge.
 
 Note [Case expression invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

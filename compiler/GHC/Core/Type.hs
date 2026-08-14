@@ -228,24 +228,8 @@ import GHC.Types.Basic
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.FVs
-
--- friends:
-import GHC.Types.Var
-import GHC.Types.Var.Env
-import GHC.Types.Var.Set
-
 import GHC.Core.TyCon
-import GHC.Builtin.WiredIn.Prim
-
-import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
-   ( charTy, naturalTy
-   , typeSymbolKind, liftedTypeKind, unliftedTypeKind
-   , constraintKind, zeroBitTypeKind
-   , manyDataConTy, oneDataConTy
-   , liftedRepTy, unliftedRepTy, zeroBitRepTy )
-
-import GHC.Types.Name( Name, hasKnownKey )
-import GHC.Builtin.KnownKeys
+import GHC.Core.Class( classBigSig )
 import GHC.Core.Coercion.Axiom
 
 import {-# SOURCE #-} GHC.Core.Coercion
@@ -259,6 +243,24 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , isReflexiveCo, seqCo
    , topNormaliseNewType_maybe
    )
+
+-- friends:
+import GHC.Types.Var
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
+
+import GHC.Builtin.WiredIn.Prim
+
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
+   ( charTy, naturalTy
+   , typeSymbolKind, liftedTypeKind, unliftedTypeKind
+   , constraintKind, zeroBitTypeKind
+   , manyDataConTy, oneDataConTy
+   , liftedRepTy, unliftedRepTy, zeroBitRepTy )
+
+import GHC.Types.Name( Name, hasKnownKey )
+import GHC.Builtin.KnownKeys
+
 import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isConcreteTyVar )
 
 -- others
