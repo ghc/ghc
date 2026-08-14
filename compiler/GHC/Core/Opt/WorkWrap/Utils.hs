@@ -32,7 +32,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.FamInstEnv
-import GHC.Core.Predicate( isEqualityClass )
+import GHC.Core.Predicate( isEqualityClass, isPredTy )
 import GHC.Core.TyCon
 import GHC.Core.TyCon.Set
 import GHC.Core.TyCon.RecWalk
@@ -1103,11 +1103,11 @@ unbox_one_arg opts arg_var
 -- same type as @id@. Otherwise, no suitable filler could be found.
 mkAbsentFiller :: Module -> Id -> StrictnessMark -> Maybe CoreExpr
 mkAbsentFiller mod arg str
-  -- We never make a filler for a terminating type: it might be speculatively
+  -- We never make a filler for a constraint type: it might be speculatively
   -- evaluated or have a field projected out of it.
   -- See (AF4) in Note [Absent fillers], and
-  -- Note [Don't make fillers for terminating types].
-  | isTerminatingType arg_ty
+  -- Note [Don't make fillers for constraint types].
+  | isPredTy arg_ty
   = Nothing
 
   -- The lifted case: bind 'absentError'. See (AF1) in Note [Absent fillers]
@@ -1334,8 +1334,8 @@ Needless to say, there are some wrinkles:
      have to be representation monomorphic. But in the future, we might allow
      levity polymorphism, e.g. a polymorphic levity variable in 'BoxedRep'.
 
-(AF4) We never make an absent filler for a terminating type.
-      See Note [Don't make fillers for terminating types].
+(AF4) We never make an absent filler for a constraint type.
+      See Note [Don't make fillers for constraint types].
 
 While (AF1) and (AF2) are simply an optimisation in terms of compiler debugging
 experience, (AF3) should be irrelevant in most programs, if not all.
@@ -1357,30 +1357,53 @@ fragile
    because `MkT` is strict in its Int# argument, so we get an absentError
    exception when we shouldn't.  Very annoying!
 
-Note [Don't make fillers for terminating types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We never make an absent filler, error thunk or rubbish literal, for a terminating
-type (isTerminatingType): a non-unary class dictionary, a boxed equality, or a
-constraint tuple.
+Note [Don't make fillers for constraint types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We never make absent fillers for constraint types (see `isPredTy`).
+Here's why.
 
 GHC relies on a dictionary value never being bottom (see
 Note [NON-BOTTOM-DICTS invariant] in GHC.Core).  GHC uses "speculation" to
-evaluated guaranteed-non-bottom values: see Note [Speculative evaluation] in
-GHC.CoreToStg.Prep. This speculative evaluation is fundamentally incompatible
-with replacing a dictionary with an absent filler.  Attempts to to do so gave
-rise to a succession of bugs including:
+evaluate guaranteed-non-bottom values: see
+  Note [Speculative evaluation] in GHC.CoreToStg.Prep.
+  Note [exprOkForSpeculation and type classes] in GHC.Core.Utils
+
+This speculative evaluation is fundamentally incompatible with replacing a
+dictionary with an absent filler.  Attempts to to do so gave rise to a
+succession of bugs including:
 
   * #24934: we evaluated an absent dictionary
   * #25924: we selected a superclass from an absent dictionary
+  * #27627: we still got it wrong for unary classes
+  * Test T27627f: type families complicate the picture
 
-A terminating type is exactly what speculation will force: see
-Note [exprOkForSpeculation and type classes] in GHC.Core.Utils. So we refuse to
-make a filler for precisely those types.
+It's surprisingly subtle.
 
-So the safe thing is to make no filler at all for a terminating type. Then there
-is no bogus dictionary to evaluate or project from.  Specifically
+* Consider (#27627)
+    class Eq a => UC a where {}
 
-  * `mkAbsentFiller` returns `Nothing` for a terminating type, so worker/wrapper
+    let u :: UC Int           -- UC Int is a "non-terminating type"
+        u = error "Absent"
+    let e :: Eq Int           -- Eq Int is a "terminating type"
+        e = $p1UC u
+
+  We clearly don't want to make an absent filler for `e`, because we'll speculatively
+  evaluate it.  But if we speculatively evalutate `e` that will force `u`, so we
+  must not make an absent filler for `u` either!!
+
+* Type families complicate things too. Consider
+     type family F a :: Constraint
+     type instance F W = TC W
+
+     a :: F W => Int -> Int      -- (F W) argument is absent
+
+  Here `(F W)` doesn't look like a /dictionary/ type, becuase it's a type-family
+  application; see test `T27627f`.
+
+TL;DR: we play safe: we never make an absent filler for any /constraint-kinded/ type,
+using `isPredTy` to decide.
+
+  * `mkAbsentFiller` returns `Nothing` for any constraint type, so worker/wrapper
     keeps the real argument.
 
   * `Specialise.specHeader` calls `mkAbsentFiller` too, so it likewise keeps the

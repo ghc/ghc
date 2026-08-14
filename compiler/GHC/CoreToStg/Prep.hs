@@ -1982,7 +1982,7 @@ rubbish literal filler, and speculation could force a superclass selection out
 of that rubbish literal, causing a segfault (#25924). Nowadays we never make a
 filler for a dictionary in the first place, so this can no longer happen and
 the guard is merely belt and braces.
-See Note [Don't make fillers for terminating types]
+See Note [Don't make fillers for constraint types]
 in GHC.Core.Opt.WorkWrap.Utils.
 
 Note [BindInfo and FloatInfo]
