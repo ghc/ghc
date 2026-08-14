@@ -1789,9 +1789,10 @@ parDfsBuild base_map roots key expand = ReaderT $ \ds_env -> do
     visited_var <- newTVarIO $ fromMaybe Map.empty base_map
     pending     <- newTVarIO $ Set.empty @k
     worklist    <- newTQueueIO @n
+    threads     <- newTVarIO []
 
     coord_tid   <- forkIO $
-      coordinator ds_env exc_var visited_var worklist pending
+      coordinator ds_env exc_var visited_var worklist pending threads
         `MC.catch` \case
           (e::MC.SomeException)
             -- exit cleanly when killed
@@ -1805,6 +1806,7 @@ parDfsBuild base_map roots key expand = ReaderT $ \ds_env -> do
     mb_exc <- wait_done exc_var worklist pending
       `MC.finally` do
         killThread coord_tid
+        mapM_ killThread =<< readTVarIO threads
 
     case mb_exc of
       Just e  -> throwIO e
@@ -1822,7 +1824,7 @@ parDfsBuild base_map roots key expand = ReaderT $ \ds_env -> do
             check (empty_worklist && empty_pending)
             return Nothing
 
-    coordinator ds_env exc_var visvar worklist pendvar = forever $ do
+    coordinator ds_env exc_var visvar worklist pendvar threads = forever $ do
       mb_node_to_expand <- atomically $ do
         node <- readTQueue worklist
         let k = key node
@@ -1841,13 +1843,17 @@ parDfsBuild base_map roots key expand = ReaderT $ \ds_env -> do
 
       case mb_node_to_expand of
         Nothing        -> return ()
-        Just (k, node) -> void $ do
-          withLocalTmpFSMake (ds_make_env ds_env) $ \make_env ->
+        Just (k, node) -> do
+          tid <- withLocalTmpFSMake (ds_make_env ds_env) $ \make_env ->
             MC.mask_ $ forkIOWithUnmask $ \unmask ->
               unmask (worker ds_env{ds_make_env = make_env} visvar worklist pendvar k node)
-                -- write exception in the worker to the main thread
-                `MC.catch` \(e::MC.SomeException) ->
-                  atomically (modifyTVar' exc_var (<|> Just e))
+                `MC.catch` \case
+                  e | Just (_ :: SomeAsyncException) <- fromException e
+                    -> throwIO e -- async exceptions like KillThread get thrown
+                    | otherwise  -- exceptions in workers are written for main thread
+                    -> atomically (modifyTVar' exc_var (<|> Just e))
+
+          atomically $ modifyTVar' threads (tid:)
 
     worker ds_env@DownsweepEnv{..} visvar worklist pendvar k node =
       withAbstractSem (compile_sem ds_make_env) $ do
