@@ -1008,7 +1008,7 @@ data type. Here are the moving parts:
    a terminating type never being bottom, and so may speculatively evaluate
    a dictionary or select a superclass from it. Either would crash on a
    rubbish literal (#24934, #25924).
-   See Note [Don't make fillers for terminating types]
+   See Note [Don't make fillers for constraint types]
    in GHC.Core.Opt.WorkWrap.Utils.
 
 3. STG: The type app in `RUBBISH[IntRep] @Int# :: Int#` is erased and we get
