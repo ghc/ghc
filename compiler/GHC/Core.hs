@@ -649,7 +649,8 @@ Note [NON-BOTTOM-DICTS invariant]
 It is a global invariant (not checkable by Lint) that
 
   Every dictionary-typed expression is non-bottom
-  /except/: a unary class with a single method (see (NBD1))
+  /except/: a unary class with a single field, either a single method,
+            or a single superclass: see (NBD1).
 
 These conditions are captured by GHC.Core.Type.isTerminatingType.
 
@@ -694,8 +695,13 @@ Wrinkle (NBD1)
   A unary class has a single /superclass/ (rather than method) looks as if it
   will always terminate, because the superclass does:
     class C a => UC a where {}
-  But Note [Recursive superclasses] and Note [Solving superclass constraints]
-  are very subtle, so it seems safer to say that /all/ unary might diverge.
+  So we could try to be more clever, and say that a unary class constraint
+  always terminates if has a single superclass.
+
+  But maybe that is too clever!  Note [Recursive superclasses] and
+  Note [Solving superclass constraints] are very subtle, so it seems safer to
+  say that /all/ unary-class constraints might diverge.  Remember, almost all
+  classes are non-unary, and thus definitely non-bottom.
 
 Note [Case expression invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
