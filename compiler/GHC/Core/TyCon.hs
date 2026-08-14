@@ -1504,7 +1504,8 @@ There are a number of wrinkles
 
 (UCM3) Unlike non-unary classes, a value of type (C ty), where `C` is a unary
    class, might be bottom, because it is represented by the method type alone.
-   See GHC.Core.Type.isTerminatingType.
+   See GHC.Core.Type.isTerminatingType, and Note [NON-BOTTOM-DICTS invariant]
+   in GHC.Core
 
    Similarly in exprOkForSpeculation/exprOkToDiscard/exprOkForSpecEval,
    in GHC.Core.Utils.  In the utility funcion `app_ok` we need a special
