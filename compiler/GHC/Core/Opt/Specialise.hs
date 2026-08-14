@@ -2639,7 +2639,7 @@ specHeader mod subst (bndr:bndrs) (_ : args)
       -- NB: mkAbsentFiller returns Nothing for a terminating type (e.g. a
       -- dictionary), so this guard fails and we fall through, keeping the
       -- argument instead of dropping it.
-      -- See Note [Don't make fillers for terminating types]
+      -- See Note [Don't make fillers for dictionary types]
       -- in GHC.Core.Opt.WorkWrap.Utils
   = -- See Note [Drop dead args from specialisations]
     do { (useful, subst2, rule_bs, rule_es, spec_bs, dx, spec_args) <- specHeader mod subst1 bndrs args
