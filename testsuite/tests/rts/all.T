@@ -767,3 +767,12 @@ test('T27526',
       extra_hc_opts('-fno-prof-auto -fprof-late -rtsopts'),
       extra_run_opts('+RTS -kc2k -kb256 -A64k -AL8k -RTS')],
      compile_and_run, [''])
+
+test('T23160',
+     [ req_target_smp
+     , extra_ways(['nonmoving_thr_sanity'])
+     , only_ways(['nonmoving_thr_sanity'])
+     , extra_run_opts('+RTS -A1M -N4 -RTS')
+     , unless(slow(), skip)
+     ],
+     compile_and_run, [''])

@@ -265,6 +265,17 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
               LDVW(to) = 0;
             }
 #endif
+            // The weak we just created is dead and doesn't appear on any
+            // weak pointer list. This means that its value, finalizer and link
+            // pointers will not be updated. However the nonmoving collector
+            // can still see it (update remembered set, mutable list), so we must
+            // tombstone it to avoid following stale pointers. See #23160.
+
+            // The copy is still thread-private here so a plain store
+            // suffices.
+            if (INFO_PTR_TO_STRUCT(info)->type == WEAK) {
+                ((StgClosure *)to)->header.info = &stg_DEAD_WEAK_info;
+            }
             return evacuate(p); // does the failed_to_evac stuff
         } else {
             // This doesn't need to have RELEASE ordering since we are guaranteed

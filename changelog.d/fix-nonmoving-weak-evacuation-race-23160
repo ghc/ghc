@@ -1,0 +1,10 @@
+section: rts
+synopsis: Fix crash in the nonmoving GC caused by racing weak pointer evacuation
+issues: #23160
+mrs: !16522
+description:
+  When two threads compete for evacuating the same ``Weak#`` object, the
+  losing thread would produces an object that is never put on a weak list.
+  This resulted in pointers in the object getting stale, and the nonmoving
+  GC crashing trying to follow them. This is fixed by immediately marking
+  the losing weak object as dead.
