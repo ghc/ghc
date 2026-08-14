@@ -701,3 +701,12 @@ test('T27477',
 test('T27618',
      [req_target_smp, omit_ghci],
      compile_and_run, ['-O2 -threaded -with-rtsopts "-N4 -A32k"'])
+
+test('T23160',
+     [ req_target_smp
+     , extra_ways(['nonmoving_thr_sanity'])
+     , only_ways(['nonmoving_thr_sanity'])
+     , extra_run_opts('+RTS -A1M -N4 -RTS')
+     , unless(slow(), skip)
+     ],
+     compile_and_run, [''])
