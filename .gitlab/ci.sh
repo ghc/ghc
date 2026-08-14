@@ -1120,9 +1120,10 @@ case ${1:-help} in
   setup) setup && cleanup_submodules ;;
   configure) time_it "configure" configure ;;
   build_hadrian) time_it "build" build_hadrian ;;
-  # N.B. Always push notes, even if the build fails. This is okay to do as the
-  # testsuite driver doesn't record notes for tests that fail due to
-  # correctness.
+  # N.B. Always push notes, even if the build fails. Metrics from runs failing
+  # a perf stat check are deliberately recorded too — discarding them would
+  # bias the baseline towards whichever sample came first. Only correctness
+  # failures record nothing.
   test_hadrian)
     fetch_perf_notes
     res=0
