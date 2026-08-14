@@ -1,0 +1,5 @@
+section: compiler
+synopsis: Fix a bug where an absent constraint argument could be replaced by an
+  error thunk, which GHC then evaluated, crashing the program.
+mrs: !16519
+issues: #27627
