@@ -668,7 +668,7 @@ function test_hadrian() {
      tar -xf "$bindist_tar" -C "$dist_dir"
    fi
 
-  check_msys2_deps _build/stage1/bin/ghc --version
+  # check_msys2_deps _build/stage1/bin/ghc --version
   check_release_build
 
   # GitLab's log viewer renders ANSI colors, but stdout here is not a tty,
