@@ -40,9 +40,9 @@ import GHC.Driver.Monad
 import GHC.Driver.Env
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
-import GHC.Driver.Messager
-import GHC.Driver.MakeSem
+import GHC.Driver.Concurrency
 import GHC.Driver.MakeAction
+import GHC.Driver.Config.Concurrency
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Ppr
 
@@ -64,7 +64,6 @@ import GHC.Data.OsPath     ( OsPath, unsafeEncodeUtf )
 import GHC.Data.StringBuffer
 import GHC.Data.Graph.Directed.Reachability
 
-import GHC.Utils.Exception ( throwIO, SomeAsyncException, AsyncException (..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
@@ -101,7 +100,6 @@ import qualified Data.Set as Set
 import Control.Concurrent.MVar
 import Control.Monad
 import Control.Monad.Trans.Except ( ExceptT(..), runExceptT, throwE )
-import qualified Control.Monad.Catch as MC
 import Data.Maybe
 import Data.List (partition)
 import Data.Time
@@ -112,13 +110,8 @@ import System.FilePath
 
 import Control.Monad.Trans.Reader
 import qualified Data.Map.Strict as M
-import Control.Monad.Trans.Class
 import System.IO.Unsafe (unsafeInterleaveIO)
 import qualified Data.List.NonEmpty as NE
-import Control.Concurrent
-import Control.Concurrent.STM.TQueue
-import Control.Concurrent.STM
-import Control.Applicative
 
 {-
 Note [The ModuleGraph]
@@ -245,8 +238,6 @@ See Note [The ModuleGraph] for an overview when we do downsweep.
 --
 -- See also Note [The ModuleGraph]
 downsweep :: HscEnv
-          -> (GhcMessage -> AnyGhcDiagnostic)
-          -> Maybe Messager
           -> [ModSummary]
           -- ^ Old summaries
           -> Maybe ModuleGraph
@@ -260,13 +251,14 @@ downsweep :: HscEnv
                 -- The non-error elements of the returned list all have distinct
                 -- (Modules, IsBoot) identifiers, unless the Bool is true in
                 -- which case there can be repeats
-downsweep hsc_env diag_wrapper msg old_summaries maybe_base_graph excl_mods allow_dup_roots = do
+downsweep hsc_env old_summaries maybe_base_graph excl_mods allow_dup_roots = do
   n_jobs     <- mkWorkerLimit (hsc_dflags hsc_env)
   summ_cache <- newMVar (mkModSummaryCache (zip old_summaries (repeat SummOld)))
   imps_cache <- newMVar Map.empty
-  withMakeEnv n_jobs hsc_env diag_wrapper msg $ \make_env -> do
-    (root_errs, root_summaries) <- rootSummariesParallel n_jobs make_env (hsc_targets hsc_env)
-                                     (getRootSummary excl_mods summ_cache imps_cache)
+  withWorkerLimitHsc hsc_env n_jobs $ \conc hsc_env' -> do
+    (root_errs, root_summaries) <-
+      rootSummariesParallel conc hsc_env' (hsc_targets hsc_env)
+        (getRootSummary excl_mods summ_cache imps_cache)
     let closure_errs = checkHomeUnitsClosed unit_env
         unit_env = hsc_unit_env hsc_env
 
@@ -275,13 +267,12 @@ downsweep hsc_env diag_wrapper msg old_summaries maybe_base_graph excl_mods allo
     case all_errs of
       [] -> do
          let env = DownsweepEnv
-               { ds_hsc_env         = hsc_env
+               { ds_hsc_env         = hsc_env'
                , ds_summaries_cache = summ_cache
                , ds_imports_cache   = imps_cache
                , ds_mode            = DownsweepUseCompile
                , ds_excl_mods       = excl_mods
-               , ds_n_jobs          = n_jobs
-               , ds_make_env        = make_env
+               , ds_concurrency     = conc
                }
          (downsweep_errs, downsweep_nodes) <- runDownsweepM env $
             downsweepFromRootNodes maybe_base_graph allow_dup_roots
@@ -349,15 +340,14 @@ downsweepThunk hsc_env mod_summary = unsafeInterleaveIO $ do
   njobs <- mkWorkerLimit (hsc_dflags hsc_env)
   summs <- newMVar (mkModSummaryCache [(mod_summary,SummOld)])
   imps  <- newMVar mempty
-  withMakeEnv njobs hsc_env mkUnknownDiagnostic Nothing $ \make_env -> do
+  withWorkerLimitHsc hsc_env njobs $ \conc hsc_env' -> do
     let env = DownsweepEnv
-          { ds_hsc_env         = hsc_env
+          { ds_hsc_env         = hsc_env'
           , ds_summaries_cache = summs
           , ds_imports_cache   = imps
           , ds_mode            = DownsweepUseFixed
           , ds_excl_mods       = []
-          , ds_n_jobs          = njobs
-          , ds_make_env        = make_env
+          , ds_concurrency     = conc
           }
     ~(errs, mg) <- runDownsweepM env $
       downsweepFromRootNodes Nothing True
@@ -394,15 +384,14 @@ downsweepInteractiveImports hsc_env ic = unsafeInterleaveIO $ do
   n_jobs     <- mkWorkerLimit (hsc_dflags hsc_env)
   summ_cache <- newMVar mempty
   imps_cache <- newMVar mempty
-  withMakeEnv n_jobs hsc_env mkUnknownDiagnostic Nothing $ \make_env -> do
+  withWorkerLimitHsc hsc_env n_jobs $ \conc hsc_env' -> do
     let env = DownsweepEnv
-          { ds_hsc_env         = hsc_env
+          { ds_hsc_env         = hsc_env'
           , ds_mode            = DownsweepUseFixed{-or DownsweepUseCompile?-}
           , ds_summaries_cache = summ_cache
           , ds_imports_cache   = imps_cache
           , ds_excl_mods       = []
-          , ds_n_jobs          = n_jobs
-          , ds_make_env        = make_env
+          , ds_concurrency     = conc
           }
     graph <- runDownsweepM env do
       loopFromInteractive cached_nodes interactive_mn imps
@@ -439,15 +428,14 @@ downsweepInstalledModules hsc_env mods = do
     nodes <- mapM process installed_mods
     summs <- newMVar mempty
     imps  <- newMVar mempty
-    withMakeEnv njobs hsc_env mkUnknownDiagnostic Nothing $ \make_env -> do
+    withWorkerLimitHsc hsc_env njobs $ \conc hsc_env' -> do
       let env = DownsweepEnv
-            { ds_hsc_env         = hsc_env
+            { ds_hsc_env         = hsc_env'
             , ds_summaries_cache = summs
             , ds_imports_cache   = imps
             , ds_mode            = DownsweepUseFixed
             , ds_excl_mods       = []
-            , ds_n_jobs          = njobs
-            , ds_make_env        = make_env
+            , ds_concurrency     = conc
             }
       (errs, mg) <- runDownsweepM env $
         downsweepFromRootNodes Nothing True nodes external_uids
@@ -562,8 +550,8 @@ data DownsweepEnv = DownsweepEnv {
     , ds_summaries_cache :: ModSummaryCache
     , ds_imports_cache   :: ImportsCache
     , ds_excl_mods       :: [ModuleName]
-    , ds_n_jobs          :: WorkerLimit
-    , ds_make_env        :: MakeEnv
+    , ds_concurrency     :: Concurrency
+      -- ^ The concurrency to use for downsweep
 }
 
 mkModSummaryCache :: [(ModSummary, SummProvenance)] -> ModSummaryCacheMap
@@ -928,15 +916,28 @@ getRootSummary excl_mods summ_cache imports_cache hsc_env target
       rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
       dflags = homeUnitEnv_dflags (ue_findHomeUnitEnv uid (hsc_unit_env hsc_env))
 
--- | Execute 'getRootSummary' for the 'Target's using the parallelism pipeline system.
+-- | Execute 'getRootSummary' for the 'Target's in bundles, spawning one
+-- worker per bundle. The number of bundles processed at once is limited by
+-- the given 'Concurrency'.
 rootSummariesParallel
-  :: WorkerLimit -> MakeEnv -> [Target]
+  :: Concurrency -> HscEnv -> [Target]
   -> (HscEnv -> Target -> IO (Either DriverMessages ModSummary))
   -> IO ([DriverMessages], [ModSummary])
-rootSummariesParallel n_jobs make_env targets get_summary = do
-  partitionEithers <$> mapConcDS n_jobs bundle_size make_env get_summary targets
-    where
-      bundle_size = 20
+rootSummariesParallel conc hsc_env targets get_summary = do
+  results <-
+    mapConcurrentWorkers "root_summary_worker" conc (viewHscWorkerEnv hsc_env)
+      ( \ work_env bundle ->
+          withConcurrency conc $
+            mapM (get_summary (setHscWorkerEnv work_env hsc_env)) bundle )
+      bundles
+  pure $ partitionEithers (concat results)
+  where
+    bundle_size = 20
+
+    bundles = mk_bundles targets
+    mk_bundles = unfoldr \case
+      [] -> Nothing
+      ts -> Just (splitAt bundle_size ts)
 
 --------------------------------------------------------------------------------
 -- * Check/validate properties and error out
@@ -1762,7 +1763,7 @@ data NodeRes v
 -- node. The result includes the previously visited nodes given in @base_map@,
 -- s.t. @parDfsBuild base_map [] _ _ == base_map@.
 --
--- The @expand@ function returns an 'NResult'. See the 'NResult' documentation
+-- The @expand@ function returns a 'NodeRes'. See the 'NodeRes' documentation
 -- for more information about each result type.
 --
 -- Example usage: @n@ is instanced to @DownsweepNode@, @k@ is @NodeKey@, and @v@ is @ModuleNodeEdge@.
@@ -1785,90 +1786,25 @@ parDfsBuild :: forall k v n. Ord k
          -- ^ The result accumulates the payload of expanding the root nodes
          -- and all nodes transitively reachable from those roots.
 parDfsBuild base_map roots key expand = ReaderT $ \ds_env -> do
-    exc_var     <- newTVarIO $ Nothing @MC.SomeException
-    visited_var <- newTVarIO $ fromMaybe Map.empty base_map
-    pending     <- newTVarIO $ Set.empty @k
-    worklist    <- newTQueueIO @n
-    threads     <- newTVarIO []
 
-    coord_tid   <- forkIO $
-      coordinator ds_env exc_var visited_var worklist pending threads
-        `MC.catch` \case
-          (e::MC.SomeException)
-            -- exit cleanly when killed
-            | Just ThreadKilled <- fromException e -> return ()
-            -- if the coordinator somehow else crashes,
-            -- signal the exc_var for the main thread to throw it
-            | otherwise -> atomically (modifyTVar' exc_var (<|> Just e))
+  let
+    conc :: Concurrency
+    conc = ds_concurrency ds_env
 
-    atomically $ mapM_ (writeTQueue worklist) roots
+    expand_node :: ConcurrentWorkerEnv -> n -> IO (NodeRes v, [n])
+    expand_node worker_env node = do
+      result <- withConcurrency conc $
+        runDownsweepM (setDownsweepWorkerEnv worker_env ds_env) (expand node)
+      pure $ case result of
+        NSkip                    -> (NSkip, [])
+        NSuccess (val, new_work) -> (NSuccess val, new_work)
 
-    mb_exc <- wait_done exc_var worklist pending
-      `MC.finally` do
-        killThread coord_tid
-        mapM_ killThread =<< readTVarIO threads
+  concurrentTraversal_DF "downsweep_worker" conc (viewHscWorkerEnv $ ds_hsc_env ds_env)
+    (fromMaybe mempty base_map) roots key expand_node
 
-    case mb_exc of
-      Just e  -> throwIO e
-      Nothing -> readTVarIO visited_var
-
-  where
-    wait_done exc_var worklist pending =
-      -- this txn retries until all work is done or an exception is signaled
-      atomically $ do
-        readTVar exc_var >>= \case
-          Just e -> return (Just e)
-          Nothing -> do
-            empty_worklist <- isEmptyTQueue worklist
-            empty_pending  <- Set.null <$> readTVar pending
-            check (empty_worklist && empty_pending)
-            return Nothing
-
-    coordinator ds_env exc_var visvar worklist pendvar threads = forever $ do
-      mb_node_to_expand <- atomically $ do
-        node <- readTQueue worklist
-        let k = key node
-
-        visited <- readTVar visvar
-        pending <- readTVar pendvar
-
-        if (k `Set.member` pending || k `Map.member` visited)
-          then return Nothing
-          else do
-            -- must add to pending in the same transaction as worklist dequeue,
-            -- otherwise the main thread may find both the worklist and pending
-            -- lists empty and exit prematurely.
-            modifyTVar' pendvar (Set.insert k)
-            return (Just (k, node))
-
-      case mb_node_to_expand of
-        Nothing        -> return ()
-        Just (k, node) -> do
-          tid <- MC.mask_ $ forkIOWithUnmask $ \unmask ->
-            unmask (withLocalTmpFSMake (ds_make_env ds_env) $ \make_env ->
-              worker ds_env{ds_make_env = make_env} visvar worklist pendvar k node)
-                `MC.catch` \case
-                  e | Just (_ :: SomeAsyncException) <- fromException e
-                    -> throwIO e -- async exceptions like KillThread get thrown
-                    | otherwise  -- exceptions in workers are written for main thread
-                    -> atomically (modifyTVar' exc_var (<|> Just e))
-
-          atomically $ modifyTVar' threads (tid:)
-
-    worker ds_env@DownsweepEnv{..} visvar worklist pendvar k node =
-      withAbstractSem (compile_sem ds_make_env) $ do
-        r <- runDownsweepM ds_env $
-             expand node -- do the main work!
-
-        atomically $ do
-          case r of
-            NSkip ->
-              modifyTVar' visvar (Map.insert k NSkip)
-            NSuccess (v,ns) -> do
-              modifyTVar' visvar (Map.insert k (NSuccess v))
-              mapM_ (writeTQueue worklist) ns
-
-          modifyTVar' pendvar (Set.delete k)
+setDownsweepWorkerEnv :: ConcurrentWorkerEnv -> DownsweepEnv -> DownsweepEnv
+setDownsweepWorkerEnv work_env env =
+  env { ds_hsc_env = setHscWorkerEnv work_env (ds_hsc_env env) }
 
 {-
 Note [Downsweep Control Flow and Caching]
@@ -1963,70 +1899,10 @@ things, and that processing can often be costly (e.g. see `expandModuleSummary`)
 
 We leverage multiple threads in this traversal to expand more than one module
 at once, respecting -j<N> to mean we never expand more than N modules at once.
-The parallel downsweep is all handled by `parDfsBuild` as follows:
 
-- We launch a thread for every module we discover that needs to be
-  expanded in the `coordinator` thread, popping it from the worklist
-- Every launched `worker` thread blocks waiting for a semaphore token
-  (`withAbstractSem`) to respect -j<N>
-- The main thread waits until both the worklist and pending list is
-  cleared, atomically.
-
-STM is used crucially to guarantee e.g. we don't have race conditions
-between taking from the worklist and writing to the pending list while
-checking whether they are clear.
-
-Exceptions are bubbled up to the main thread. The "main" thread, which is
-typically waiting for the worklist+pending lists to be clear, instead gets
-unblocked by this exception (signaled in `exc_var`) and re-throws it.
+We use the concurrent scheduling abstraction from GHC.Driver.Concurrency
+('concurrentTraversal_DF'). Each time we discover a new node, a worker is
+spawned to expand it. After each expansion completes, the resulting children
+nodes are pushed onto the worklist. With -j1 no threads are involved: each
+expansion runs in sequence.
 -}
-
---------------------------------------------------------------------------------
--- * Concurrent utilities
---------------------------------------------------------------------------------
-
--- | Map an action over a list using the parallelism pipeline system.
--- Create bundles of the list elems wrapped in a 'MakeAction' that uses
--- 'withAbstractSem' to wait for a free slot, limiting the number of
--- concurrently computed summaries to the value of the @-j@ option or the slots
--- allocated by the job server, if that is used.
---
--- The 'MakeAction' returns 'Maybe', which is not handled as an error, because
--- 'runLoop' only sets it to 'Nothing' when an exception was thrown, so the
--- result won't be read anyway here.
---
--- To emulate the current behavior, we funnel exceptions past the concurrency
--- barrier and rethrow the first one afterwards.
-mapConcDS ::
-  WorkerLimit ->
-  Int {-^ Batch size -} ->
-  MakeEnv ->
-  (HscEnv -> a -> IO b) ->
-  [a] ->
-  IO ([b])
-mapConcDS n_jobs bundle_size make_env run_action xs = do
-  (actions, get_results) <- unzip <$> mapM action_and_result (zip [1..] bundles)
-  runAllPipelines n_jobs make_env actions
-  (sequence . catMaybes <$> sequence get_results) >>= \case
-    Right results -> pure (concat results)
-    Left exc -> throwIO exc
-  where
-    bundles = mk_bundles xs
-
-    mk_bundles = unfoldr \case
-      [] -> Nothing
-      ts -> Just (splitAt bundle_size ts)
-
-    action_and_result (log_queue_id, ts) = do
-      res_var <- liftIO newEmptyMVar
-      pure $! (MakeAction (action log_queue_id ts) res_var, readMVar res_var)
-
-    action log_queue_id target_bundle = do
-      env@MakeEnv {compile_sem} <- ask
-      lift $ lift $
-        withAbstractSem compile_sem $
-        withLoggerHsc log_queue_id env \ lcl_hsc_env ->
-          MC.try (mapM (run_action lcl_hsc_env) target_bundle) >>= \case
-            Left e | Just (_ :: SomeAsyncException) <- fromException e ->
-              throwIO e
-            a -> pure a

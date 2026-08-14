@@ -63,8 +63,9 @@ import GHC.Driver.Env
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.Main
-import GHC.Driver.MakeSem
 import GHC.Driver.Downsweep
+import GHC.Driver.Concurrency
+import GHC.Driver.Config.Concurrency
 import GHC.Driver.MakeAction
 
 import GHC.Types.UnresolvedImport
@@ -156,22 +157,20 @@ depanal :: GhcMonad m =>
 depanal excluded_mods allow_dup_roots = do
     hsc_env <- getSession
     let sec = initSourceErrorContext (hsc_dflags hsc_env)
-    (errs, mod_graph) <- depanalE mkUnknownDiagnostic Nothing excluded_mods allow_dup_roots
+    (errs, mod_graph) <- depanalE excluded_mods allow_dup_roots
     if isEmptyMessages errs
       then pure mod_graph
       else throwErrors sec (fmap GhcDriverMessage errs)
 
 -- | Perform dependency analysis like in 'depanal'.
 -- In case of errors, the errors and an empty module graph are returned.
-depanalE :: GhcMonad m =>     -- New for #17459
-               (GhcMessage -> AnyGhcDiagnostic)
-            -> Maybe Messager
-            -> [ModuleName]      -- ^ excluded modules
+depanalE :: GhcMonad m =>
+               [ModuleName]   -- ^ excluded modules
             -> Bool           -- ^ allow duplicate roots
             -> m (DriverMessages, ModuleGraph)
-depanalE diag_wrapper msg excluded_mods allow_dup_roots = do
+depanalE excluded_mods allow_dup_roots = do
     hsc_env <- getSession
-    (errs, mod_graph) <- depanalPartial diag_wrapper msg excluded_mods allow_dup_roots
+    (errs, mod_graph) <- depanalPartial excluded_mods allow_dup_roots
     if isEmptyMessages errs
       then do
         hsc_env <- getSession
@@ -209,13 +208,11 @@ depanalE diag_wrapper msg excluded_mods allow_dup_roots = do
 -- new module graph.
 depanalPartial
     :: GhcMonad m
-    => (GhcMessage -> AnyGhcDiagnostic)
-    -> Maybe Messager
-    -> [ModuleName]  -- ^ excluded modules
+    => [ModuleName]  -- ^ excluded modules
     -> Bool          -- ^ allow duplicate roots
     -> m (DriverMessages, ModuleGraph)
     -- ^ possibly empty 'Bag' of errors and a module graph.
-depanalPartial diag_wrapper msg excluded_mods allow_dup_roots = do
+depanalPartial excluded_mods allow_dup_roots = do
   hsc_env <- getSession
   let
          targets = hsc_targets hsc_env
@@ -234,7 +231,7 @@ depanalPartial diag_wrapper msg excluded_mods allow_dup_roots = do
     liftIO $ flushFinderCaches (hsc_FC hsc_env) (hsc_unit_env hsc_env)
 
     (errs, mod_graph) <- liftIO $ downsweep
-      hsc_env diag_wrapper msg (mgModSummaries old_graph) Nothing
+      hsc_env (mgModSummaries old_graph) Nothing
       excluded_mods allow_dup_roots
     return (unionManyMessages errs, mod_graph)
 
@@ -438,7 +435,7 @@ loadWithCache :: GhcMonad m => Maybe ModIfaceCache -- ^ Instructions about how t
                             -> m SuccessFlag
 loadWithCache cache diag_wrapper how_much = do
     msg <- mkBatchMsg <$> getSession
-    (errs, mod_graph) <- depanalE diag_wrapper (Just msg) [] False                        -- #17459
+    (errs, mod_graph) <- depanalE [] False                        -- #17459
     success <- load' cache how_much diag_wrapper (Just msg) mod_graph
     hsc_env <- getSession
     let sec = initSourceErrorContext (hsc_dflags hsc_env)
@@ -840,14 +837,15 @@ The Algorithm
 a pair of an `IO a` action and a `MVar a`, where to place the result.
   The list is sorted topologically, so can be executed in order without fear of
   blocking.
-* runPipelines takes this list and eventually passes it to runLoop which executes
-  each action and places the result into the right MVar.
-* The amount of parallelism is controlled by a semaphore. This is just used around the
-  module compilation step, so that only the right number of modules are compiled at
-  the same time which reduces overall memory usage and allocations.
-* Each proper node has a LogQueue, which dictates where to send it's output.
-* The LogQueue is placed into the LogQueueQueue when the action starts and a worker
-  thread processes the LogQueueQueue printing logs for each module in a stable order.
+* runPipelines spawns one worker per action ('GHC.Driver.Concurrency.mapConcurrentWorkers'),
+  which executes the action and places the result into the right MVar.
+* The amount of parallelism is controlled by a semaphore ('withMakeEnvConcurrency'). This is
+  just used around the module compilation step, so that only the right number of
+  modules are compiled at the same time which reduces overall memory usage and
+  allocations.
+* Each worker has a LogQueue, which dictates where to send its output. A log
+  thread processes the LogQueues, printing logs for each module in a stable
+  order (the order in which the actions were spawned).
 * The result variable for an action producing `a` is of type `Maybe a`, therefore
   it is still filled on a failure. If a module fails to compile, the
   failure is propagated through the whole module graph and any modules which didn't
@@ -1137,7 +1135,7 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
           !build_deps = getDependencies (map gwib_mod deps) build_map
       let loop_action = withCurrentUnit loop_unit $ do
             !_ <- wait_deps build_deps
-            hsc_env <- asks hsc_env
+            hsc_env <- asks me_hsc_env
             let mns :: [ModuleName]
                 mns = mapMaybe (nodeKeyModName . gwib_mod) deps
 
@@ -1180,7 +1178,7 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
 
 withCurrentUnit :: UnitId -> RunMakeM a -> RunMakeM a
 withCurrentUnit uid = do
-  local (\env -> env { hsc_env = hscSetActiveUnitId uid (hsc_env env)})
+  local (\env -> env { me_hsc_env = hscSetActiveUnitId uid (me_hsc_env env)})
 
 upsweep
     :: WorkerLimit -- ^ The number of workers we wish to run in parallel
@@ -1556,10 +1554,11 @@ executeInstantiationNode k n deps uid iu = do
         env <- ask
         -- Output of the logger is mediated by a central worker to
         -- avoid output interleaving
-        msg <- asks env_messager
-        wrapper <- asks diag_wrapper
-        lift $ MaybeT $ withLoggerHsc k env $ \hsc_env ->
-          let lcl_hsc_env = setHUG deps hsc_env
+        msg <- asks me_messager
+        wrapper <- asks me_diag_wrapper
+        lift $ MaybeT $
+          let hsc_env = me_hsc_env env
+              lcl_hsc_env = setHUG deps hsc_env
           in wrapAction wrapper lcl_hsc_env $ do
             res <- upsweep_inst lcl_hsc_env msg k n uid iu
             cleanCurrentModuleTempFilesMaybe (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (hsc_dflags hsc_env)
@@ -1582,13 +1581,13 @@ executeCompileNode :: Int
   -> ModuleNodeInfo
   -> RunMakeM HomeModInfo
 executeCompileNode k n !old_hmi hug mrehydrate_mods mni = do
-  me@MakeEnv{..} <- ask
+  make_env <- ask
   -- Rehydrate any dependencies if this module had a boot file or is a signature file.
-  lift $ MaybeT (withAbstractSem compile_sem $ withLoggerHsc k me $ \hsc_env -> do
+  lift $ MaybeT (withMakeEnvConcurrency make_env $ \hsc_env -> do
      hsc_env' <- liftIO $ maybeRehydrateBefore (setHUG hug hsc_env) mni fixed_mrehydrate_mods
      case mni of
-       ModuleNodeCompile mod -> executeCompileNodeWithSource hsc_env' me  mod
-       ModuleNodeFixed key loc -> executeCompileNodeFixed hsc_env' me key loc
+       ModuleNodeCompile mod -> executeCompileNodeWithSource hsc_env' make_env mod
+       ModuleNodeFixed key loc -> executeCompileNodeFixed hsc_env' make_env key loc
     )
 
   where
@@ -1601,9 +1600,9 @@ executeCompileNode k n !old_hmi hug mrehydrate_mods mni = do
         _        -> mrehydrate_mods
 
     executeCompileNodeFixed :: HscEnv -> MakeEnv -> ModNodeKeyWithUid -> ModLocation -> IO (Maybe HomeModInfo)
-    executeCompileNodeFixed hsc_env MakeEnv{diag_wrapper, env_messager} mod loc =
-      wrapAction diag_wrapper hsc_env $ do
-        forM_ env_messager $ \hscMessage -> hscMessage hsc_env (k, n) UpToDate (ModuleNode [] (ModuleNodeFixed mod loc))
+    executeCompileNodeFixed hsc_env MakeEnv{me_diag_wrapper, me_messager} mod loc =
+      wrapAction me_diag_wrapper hsc_env $ do
+        forM_ me_messager $ \hscMessage -> hscMessage hsc_env (k, n) UpToDate (ModuleNode [] (ModuleNodeFixed mod loc))
         read_result <- readIface (hsc_hooks hsc_env) (hsc_logger hsc_env) (hsc_dflags hsc_env) (hsc_NC hsc_env) (mnkToModule mod) (ml_hi_file loc)
         let sec = initSourceErrorContext (hsc_dflags hsc_env)
         case read_result of
@@ -1619,7 +1618,7 @@ executeCompileNode k n !old_hmi hug mrehydrate_mods mni = do
             return (HomeModInfo iface details hm_linkable)
 
     executeCompileNodeWithSource :: HscEnv -> MakeEnv -> ModSummary -> IO (Maybe HomeModInfo)
-    executeCompileNodeWithSource hsc_env MakeEnv{diag_wrapper, env_messager} mod = do
+    executeCompileNodeWithSource hsc_env MakeEnv{me_diag_wrapper, me_messager} mod = do
      let -- Use the cached DynFlags which includes OPTIONS_GHC pragmas
          lcl_dynflags = ms_hspp_opts mod
      let lcl_hsc_env =
@@ -1628,8 +1627,8 @@ executeCompileNode k n !old_hmi hug mrehydrate_mods mni = do
              hsc_env
      -- Compile the module, locking with a semaphore to avoid too many modules
      -- being compiled at the same time leading to high memory usage.
-     wrapAction diag_wrapper lcl_hsc_env $ do
-      res <- upsweep_mod lcl_hsc_env env_messager old_hmi mod k n
+     wrapAction me_diag_wrapper lcl_hsc_env $ do
+      res <- upsweep_mod lcl_hsc_env me_messager old_hmi mod k n
       cleanCurrentModuleTempFilesMaybe (hsc_logger hsc_env) (hsc_tmpfs hsc_env) lcl_dynflags
       return res
 
@@ -1853,15 +1852,15 @@ Also closely related are
 -}
 
 executeLinkNode :: HomeUnitGraph -> (Int, Int) -> UnitId -> [NodeKey] -> RunMakeM ()
-executeLinkNode hug kn@(k, _) uid deps = do
+executeLinkNode hug kn uid deps = do
   withCurrentUnit uid $ do
     make_env@MakeEnv{..} <- ask
-    let dflags = hsc_dflags hsc_env
-        msg' = (\messager -> \recomp -> messager hsc_env kn recomp (LinkNode deps uid)) <$> env_messager
+    let dflags = hsc_dflags me_hsc_env
+        msg' = (\messager -> \recomp -> messager me_hsc_env kn recomp (LinkNode deps uid)) <$> me_messager
 
-    linkresult <- lift $ MaybeT $ withAbstractSem compile_sem $ withLoggerHsc k make_env $ \lcl_hsc_env -> do
+    linkresult <- lift $ MaybeT $ withMakeEnvConcurrency make_env $ \lcl_hsc_env -> do
                              let hsc_env' = setHUG hug lcl_hsc_env
-                             wrapAction diag_wrapper hsc_env' $ do
+                             wrapAction me_diag_wrapper hsc_env' $ do
                                link (ghcLink dflags)
                                  hsc_env'
                                  True -- We already decided to link

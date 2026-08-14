@@ -6,6 +6,7 @@ module GHC.Utils.TmpFs
     , initTmpFs
     , forkTmpFsFrom
     , mergeTmpFsInto
+    , withLocalTmpFS
     , PathsToClean(..)
     , emptyPathsToClean
     , TempFileLifetime(..)
@@ -157,6 +158,16 @@ mergeTmpFsInto src dst = do
     atomicModifyIORef' (tmp_files_to_clean dst) (\s -> (mergePathsToClean src_files s, ()))
     atomicModifyIORef' (tmp_subdirs_to_clean dst) (\s -> (mergePathsToClean src_subdirs s, ()))
 
+-- | Run an action with a local 'TmpFs' forked from the given 'TmpFs'.
+--
+-- The remaining files of the local 'TmpFs' which weren't cleaned up by the
+-- action are merged back into the given 'TmpFs', for clean-up later.
+withLocalTmpFS :: TmpFs -> (TmpFs -> IO a) -> IO a
+withLocalTmpFS tmpfs act =
+    Exception.bracket
+      (forkTmpFsFrom tmpfs)
+      (\tmpfs_local -> mergeTmpFsInto tmpfs_local tmpfs)
+      act
 
 cleanTempDirs :: Logger -> TmpFs -> IO ()
 cleanTempDirs logger tmpfs

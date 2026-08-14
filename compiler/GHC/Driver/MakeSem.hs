@@ -39,6 +39,7 @@ import GHC.Utils.Json
 import System.Semaphore
   ( AbstractSem(..)
   , ClientSemaphore
+  , SemaphoreError
   , SemaphoreIdentifier
   , SemaphoreToken
   , openSemaphore
@@ -534,18 +535,24 @@ makeJobserver sem_ident = do
 
 -- | Implement an abstract semaphore using a semaphore 'Jobserver'
 -- which queries the system semaphore of the given name for resources.
+--
+-- Returns 'Left' if the system semaphore could not be opened, in which case
+-- the operation is not run at all. A 'SemaphoreError' arising after the
+-- semaphore was successfully opened is thrown, not returned.
 runJSemAbstractSem :: SemaphoreIdentifier   -- ^ the semaphore identifier (from @-jsem@)
                    -> (AbstractSem -> IO a) -- ^ the operation to run
                                             -- which requires a semaphore
-                   -> IO a
+                   -> IO (Either SemaphoreError a)
 runJSemAbstractSem sem_ident action = MC.mask \ unmask -> do
-  (abs, cleanup) <- makeJobserver sem_ident
-  r <- try $ unmask $ action abs
-  case r of
-    Left (e1 :: MC.SomeException) -> do
-      (_ :: Either MC.SomeException ()) <- MC.try cleanup
-      MC.throwM e1
-    Right x -> cleanup $> x
+  MC.try @_ @SemaphoreError (makeJobserver sem_ident) >>= \case
+    Left open_failure -> return (Left open_failure)
+    Right (abs, cleanup) -> do
+      r <- try $ unmask $ action abs
+      case r of
+        Left (e1 :: MC.SomeException) -> do
+          (_ :: Either MC.SomeException ()) <- MC.try cleanup
+          MC.throwM e1
+        Right x -> cleanup $> Right x
 
 {- Note [Architecture of the Job Server]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
