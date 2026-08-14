@@ -882,7 +882,8 @@ because:
 
   * The optimised RHS may have had transformations applied that drop usage
     (e.g., a rewrite rule fires that doesn't use an argument, or a seq on
-    a dictionary is dropped because dictionaries are known to terminate).
+    a dictionary is dropped because dictionaries are known to terminate;
+    see Note [NON-BOTTOM-DICTS invariant]).
     Example:
        RHS: a
        Unfolding: fst g
