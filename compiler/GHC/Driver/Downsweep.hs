@@ -1802,22 +1802,26 @@ parDfsBuild base_map roots key expand = ReaderT $ \ds_env -> do
 
     atomically $ mapM_ (writeTQueue worklist) roots
 
-    -- this txn retries until all work is done or there is an exception
-    mb_exc <- atomically $ do
-      readTVar exc_var >>= \case
-        Just e -> return (Just e)
-        Nothing -> do
-          empty_worklist <- isEmptyTQueue worklist
-          empty_pending  <- Set.null <$> readTVar pending
-          check (empty_worklist && empty_pending)
-          return Nothing
+    mb_exc <- wait_done exc_var worklist pending
+      `MC.finally` do
+        killThread coord_tid
 
-    killThread coord_tid
     case mb_exc of
       Just e  -> throwIO e
       Nothing -> readTVarIO visited_var
 
   where
+    wait_done exc_var worklist pending =
+      -- this txn retries until all work is done or an exception is signaled
+      atomically $ do
+        readTVar exc_var >>= \case
+          Just e -> return (Just e)
+          Nothing -> do
+            empty_worklist <- isEmptyTQueue worklist
+            empty_pending  <- Set.null <$> readTVar pending
+            check (empty_worklist && empty_pending)
+            return Nothing
+
     coordinator ds_env exc_var visvar worklist pendvar = forever $ do
       mb_node_to_expand <- atomically $ do
         node <- readTQueue worklist
