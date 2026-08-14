@@ -1844,9 +1844,9 @@ parDfsBuild base_map roots key expand = ReaderT $ \ds_env -> do
       case mb_node_to_expand of
         Nothing        -> return ()
         Just (k, node) -> do
-          tid <- withLocalTmpFSMake (ds_make_env ds_env) $ \make_env ->
-            MC.mask_ $ forkIOWithUnmask $ \unmask ->
-              unmask (worker ds_env{ds_make_env = make_env} visvar worklist pendvar k node)
+          tid <- MC.mask_ $ forkIOWithUnmask $ \unmask ->
+            unmask (withLocalTmpFSMake (ds_make_env ds_env) $ \make_env ->
+              worker ds_env{ds_make_env = make_env} visvar worklist pendvar k node)
                 `MC.catch` \case
                   e | Just (_ :: SomeAsyncException) <- fromException e
                     -> throwIO e -- async exceptions like KillThread get thrown
