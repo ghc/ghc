@@ -1710,8 +1710,8 @@ async def test_common_work(name: TestName, opts,
 
         # Skip tests which require hadrian dependencies if we are testing
         # an out-of-tree compiler as Hadrian is unavailable. See #13897.
-        if not config.in_tree_compiler and getTestOpts().hadrian_deps - {'test:ghc'}:
-            do_ways = []
+        # if not config.in_tree_compiler and getTestOpts().hadrian_deps - {'test:ghc'}:
+        #     do_ways = []
 
         # Run the required tests...
         for way in do_ways:
