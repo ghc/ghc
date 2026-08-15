@@ -3677,7 +3677,7 @@ exactDataDefn
   -> EP w m ( r -- ^ from exactHdr
             , LocatedN RdrName, a, b, HsDataDefn GhcPs)
 exactDataDefn exactHdr
-                 (HsDataDefn { dd_ext = AnnDataDefn ops cps t nt d i dc w oc cc eq
+                 (HsDataDefn { dd_ext = AnnDataDefn ops cps t nt d i dc w al eq
                              , dd_ctxt = context
                              , dd_cType = mb_ct
                              , dd_kindSig = mb_sig
@@ -3710,17 +3710,15 @@ exactDataDefn exactHdr
   w' <- if (needsWhere condecls)
     then markEpToken w
     else return w
-  oc' <- markEpToken oc
-  (eq', condecls') <- exact_condecls eq (toList condecls)
+  (eq', al', condecls') <- exact_condecls eq al (toList condecls)
   let condecls'' = case condecls of
         DataTypeCons td _ -> DataTypeCons td condecls'
         NewTypeCon _     -> case condecls' of
           [decl] -> NewTypeCon decl
           _ -> panic "exacprint NewTypeCon"
-  cc' <- markEpToken cc
   derivings' <- mapM markAnnotated derivings
   return (anx, ln', tvs', b,
-                 (HsDataDefn { dd_ext = AnnDataDefn [] [] t' nt' d' i' dc' w' oc' cc' eq'
+                 (HsDataDefn { dd_ext = AnnDataDefn [] [] t' nt' d' i' dc' w' al' eq'
                              , dd_ctxt = mctxt'
                              , dd_cType = mb_ct'
                              , dd_kindSig = mb_sig'
@@ -4161,17 +4159,19 @@ markTrailing ts = do
 
 -- based on pp_condecls in Decls.hs
 exact_condecls :: (Monad m, Monoid w)
-  => EpToken "=" -> [LConDecl GhcPs] -> EP w m (EpToken "=",[LConDecl GhcPs])
-exact_condecls eq cs
+  => EpToken "=" -> AnnList
+  -> [LConDecl GhcPs]
+  -> EP w m (EpToken "=", AnnList, [LConDecl GhcPs])
+exact_condecls eq al cs
   | gadt_syntax                  -- In GADT syntax
   = do
-      cs' <- mapM markAnnotated cs
-      return (eq, cs')
+      (al',cs') <- markAnnListA' al $ setLayoutBoth $ mapM markAnnotated cs
+      return (eq, al', cs')
   | otherwise                    -- In H98 syntax
   = do
       eq0 <- markEpToken eq
       cs' <- mapM markAnnotated cs
-      return (eq0, cs')
+      return (eq0, al, cs')
   where
     gadt_syntax = case cs of
       []                      -> False

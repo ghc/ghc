@@ -1109,8 +1109,8 @@ checkRecordSyntax lr@(L loc r)
 
 -- | Check if the gadt_constrlist is empty. Only raise parse error for
 -- `data T where` to avoid affecting existing error message, see #8258.
-checkEmptyGADTs :: Located ((EpToken "where", EpToken "{", EpToken "}"), [LConDecl GhcPs])
-                -> P (Located ((EpToken "where", EpToken "{", EpToken "}"), [LConDecl GhcPs]))
+checkEmptyGADTs :: Located ((EpToken "where", AnnList), [LConDecl GhcPs])
+                -> P (Located ((EpToken "where", AnnList), [LConDecl GhcPs]))
 checkEmptyGADTs gadts@(L span (_, []))           -- Empty GADT declaration.
     = do gadtSyntax <- getBit GadtSyntaxBit   -- GADTs implies GADTSyntax
          unless gadtSyntax $ addError $ mkPlainErrorMsgEnvelope span $

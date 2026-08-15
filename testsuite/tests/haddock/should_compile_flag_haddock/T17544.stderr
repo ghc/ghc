@@ -1127,8 +1127,11 @@
                 (NormalSyntax))
                (EpTok
                 (EpaSpan { T17544.hs:24:15-19 }))
-               (EpTok (EpaSpan { <no location info> }))
-               (EpTok (EpaSpan { <no location info> }))
+               (AnnList
+                (AnnListLayout
+                 (EpaSpan { T17544.hs:25:5 }))
+                (ListNone)
+                [])
                (EpTok
                 (EpaSpan { <no location info> })))
               (Nothing)
@@ -1523,8 +1526,11 @@
                 (NormalSyntax))
                (EpTok
                 (EpaSpan { T17544.hs:30:15-19 }))
-               (EpTok (EpaSpan { <no location info> }))
-               (EpTok (EpaSpan { <no location info> }))
+               (AnnList
+                (AnnListLayout
+                 (EpaSpan { T17544.hs:31:5 }))
+                (ListNone)
+                [])
                (EpTok
                 (EpaSpan { <no location info> })))
               (Nothing)
@@ -1919,8 +1925,11 @@
                 (NormalSyntax))
                (EpTok
                 (EpaSpan { T17544.hs:36:15-19 }))
-               (EpTok (EpaSpan { <no location info> }))
-               (EpTok (EpaSpan { <no location info> }))
+               (AnnList
+                (AnnListLayout
+                 (EpaSpan { T17544.hs:37:5 }))
+                (ListNone)
+                [])
                (EpTok
                 (EpaSpan { <no location info> })))
               (Nothing)
@@ -2315,8 +2324,11 @@
                 (NormalSyntax))
                (EpTok
                 (EpaSpan { T17544.hs:42:15-19 }))
-               (EpTok (EpaSpan { <no location info> }))
-               (EpTok (EpaSpan { <no location info> }))
+               (AnnList
+                (AnnListLayout
+                 (EpaSpan { T17544.hs:43:5 }))
+                (ListNone)
+                [])
                (EpTok
                 (EpaSpan { <no location info> })))
               (Nothing)
@@ -2711,8 +2723,11 @@
                 (NormalSyntax))
                (EpTok
                 (EpaSpan { T17544.hs:48:15-19 }))
-               (EpTok (EpaSpan { <no location info> }))
-               (EpTok (EpaSpan { <no location info> }))
+               (AnnList
+                (AnnListLayout
+                 (EpaSpan { T17544.hs:49:5 }))
+                (ListNone)
+                [])
                (EpTok
                 (EpaSpan { <no location info> })))
               (Nothing)
@@ -3107,8 +3122,11 @@
                 (NormalSyntax))
                (EpTok
                 (EpaSpan { T17544.hs:54:16-20 }))
-               (EpTok (EpaSpan { <no location info> }))
-               (EpTok (EpaSpan { <no location info> }))
+               (AnnList
+                (AnnListLayout
+                 (EpaSpan { T17544.hs:55:5 }))
+                (ListNone)
+                [])
                (EpTok
                 (EpaSpan { <no location info> })))
               (Nothing)
