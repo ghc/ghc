@@ -870,7 +870,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
              match = mkMatch (mkPrefixFunRhs (L loc (idName patsyn_id)) noAnn) (noLocA [])
                              (mkHsLams (rr_tv:res_tv:univ_tvs)
                                        req_dicts body')
-                             (EmptyLocalBinds noExtField)
+                             (noLocA $ EmptyLocalBinds noExtField)
              mg :: MatchGroup GhcTc (LHsExpr GhcTc)
              mg = MG{ mg_alts = L (l2l $ getLoc match) [match]
                     , mg_ext = MatchGroupTc [] res_ty gen
@@ -1009,7 +1009,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
                                    | L loc n <- args]
             builder_match = mkMatch (mkPrefixFunRhs ps_lname noAnn)
                                     builder_args body
-                                    (EmptyLocalBinds noExtField)
+                                    (noLocA $ EmptyLocalBinds noExtField)
 
     args = case details of
               PrefixCon _ args     -> args
