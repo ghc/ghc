@@ -376,7 +376,7 @@ hard_hole_fits.hs:33:28: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • In an equation for ‘testMe’: testMe (HsLet xl gl gl') = _
     • Relevant bindings include
         gl' :: LHsExpr GhcPs (bound at hard_hole_fits.hs:33:21)
-        gl :: Language.Haskell.Syntax.Binds.HsLocalBinds GhcPs
+        gl :: Language.Haskell.Syntax.Binds.LHsLocalBinds GhcPs
           (bound at hard_hole_fits.hs:33:18)
         xl :: Language.Haskell.Syntax.Extension.XLet GhcPs
           (bound at hard_hole_fits.hs:33:15)
