@@ -177,8 +177,10 @@
            (NormalSyntax))
           (EpTok
            (EpaSpan { <no location info> }))
-          (EpTok (EpaSpan { <no location info> }))
-          (EpTok (EpaSpan { <no location info> }))
+          (AnnList
+           (AnnListNoLayout)
+           (ListNone)
+           [])
           (EpTok
            (EpaSpan { <no location info> })))
          (Nothing)
@@ -1037,8 +1039,10 @@
            (NormalSyntax))
           (EpTok
            (EpaSpan { <no location info> }))
-          (EpTok (EpaSpan { <no location info> }))
-          (EpTok (EpaSpan { <no location info> }))
+          (AnnList
+           (AnnListNoLayout)
+           (ListNone)
+           [])
           (EpTok
            (EpaSpan { <no location info> })))
          (Nothing)
@@ -2311,8 +2315,10 @@
              (NormalSyntax))
             (EpTok
              (EpaSpan { <no location info> }))
-            (EpTok (EpaSpan { <no location info> }))
-            (EpTok (EpaSpan { <no location info> }))
+            (AnnList
+             (AnnListNoLayout)
+             (ListNone)
+             [])
             (EpTok
              (EpaSpan { <no location info> })))
            (Nothing)
