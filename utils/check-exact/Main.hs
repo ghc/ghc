@@ -68,7 +68,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl4.hs" (Just addLocaLDecl4)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl5.hs" (Just addLocaLDecl5)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl6.hs" (Just addLocaLDecl6)
- -- "../../testsuite/tests/ghc-api/exactprint/AddClassMethod.hs" (Just addClassMethod)
+ "../../testsuite/tests/ghc-api/exactprint/AddClassMethod.hs" (Just addClassMethod)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl1.hs" (Just rmDecl1)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl2.hs" (Just rmDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl3.hs" (Just rmDecl3)
@@ -80,7 +80,6 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/ghc-api/exactprint/RmTypeSig2.hs" (Just rmTypeSig2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddHiding1.hs" (Just addHiding1)
  -- "../../testsuite/tests/ghc-api/exactprint/AddHiding2.hs" (Just addHiding2)
- -- "../../testsuite/tests/ghc-api/exactprint/AddClassMethod.hs" (Just addClassMethod)
  -- "../../testsuite/tests/ghc-api/exactprint/Haddock2.hs" Nothing
  -- "../../testsuite/tests/ghc-api/annotations/CommentsTest.hs" Nothing
  -- "../../testsuite/tests/hiefile/should_compile/Constructors.hs" Nothing
@@ -184,7 +183,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/InTreeAnnotations1.hs" Nothing
  -- "../../testsuite/tests/printer/Test19798.hs" Nothing
  -- "../../testsuite/tests/printer/Test10309.hs" Nothing
- "../../testsuite/tests/printer/Haddock1.hs" Nothing
+ -- "../../testsuite/tests/printer/Haddock1.hs" Nothing
 
  -- "../../testsuite/tests/qualifieddo/should_compile/qdocompile001.hs" Nothing
  -- "../../testsuite/tests/typecheck/should_fail/StrictBinds.hs" Nothing
@@ -916,13 +915,13 @@ addClassMethod :: Changer
 addClassMethod libdir lp = do
   Right sig  <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
   Right decl <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
-  let decl' = setEntryDP decl (DifferentLine 1 2)
-  let  sig' = setEntryDP sig  (DifferentLine 2 2)
+  let decl' = setEntryDP decl (DifferentLine 1 0)
+  let  sig' = setEntryDP sig  (DifferentLine 2 0)
   let doAddMethod = do
         let
           [cd] = hsDecls lp
           (f1:f2s:f2d:_) = hsDecls cd
-          f2s' = setEntryDP f2s  (DifferentLine 2 2)
+          f2s' = setEntryDP f2s  (DifferentLine 2 0)
           cd' = replaceDecls cd [f1, sig', decl', f2s', f2d]
           lp' = replaceDecls lp [cd']
         return lp'
