@@ -11,3 +11,8 @@ determ025:
 	$(RM) A.hi A.o
 	-'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dinitial-unique=16777215 -dunique-increment=-1 A.hs 2> A.err.reversed
 	diff A.err.normal A.err.reversed
+	$(RM) A.hi A.o
+	-'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -fprint-potential-instances -dinitial-unique=0 -dunique-increment=1 A.hs 2> A.err.all.normal
+	$(RM) A.hi A.o
+	-'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -fprint-potential-instances -dinitial-unique=16777215 -dunique-increment=-1 A.hs 2> A.err.all.reversed
+	diff A.err.all.normal A.err.all.reversed

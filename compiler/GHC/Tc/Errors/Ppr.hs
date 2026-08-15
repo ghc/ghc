@@ -4999,10 +4999,12 @@ potentials_msg_with_options
     n_show_matches  = 3
     n_show_unifiers = 2
 
-    (in_scope_matches, not_in_scope_matches) = partition inst_in_scope matches
-    (in_scope_unifiers, not_in_scope_unifiers) = partition inst_in_scope unifiers
-    sorted_matches = sortBy fuzzyClsInstCmp in_scope_matches
-    sorted_unifiers = sortBy fuzzyClsInstCmp in_scope_unifiers
+    -- Sort before partitioning so that the out-of-scope lists are also
+    -- shown in a deterministic order (#27459).
+    (sorted_matches, not_in_scope_matches)
+      = partition inst_in_scope (sortBy fuzzyClsInstCmp matches)
+    (sorted_unifiers, not_in_scope_unifiers)
+      = partition inst_in_scope (sortBy fuzzyClsInstCmp unifiers)
     (show_these_matches, show_these_unifiers)
        | show_all_potentials = (sorted_matches, sorted_unifiers)
        | otherwise           = (take n_show_matches  sorted_matches
