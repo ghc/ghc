@@ -453,36 +453,23 @@ fromSpecTyVarBndr (L loc (HsTvb xtv flag idp k)) = do
   return $ L loc (HsTvb xtv () idp k)
 
 -- | Add the annotation for a 'where' keyword to existing @HsLocalBinds@
-annBinds :: EpToken "where" -> EpAnnComments -> HsLocalBinds GhcPs
-  -> (HsLocalBinds GhcPs, Maybe EpAnnComments)
-annBinds w cs (HsValBinds an bs)  = (HsValBinds (add_where w (fst an) cs) bs, Nothing)
-annBinds w cs (HsIPBinds an bs)   = (HsIPBinds (add_where w (fst an) cs) bs, Nothing)
-annBinds _ cs  (EmptyLocalBinds x) = (EmptyLocalBinds x, Just cs)
+annBinds :: EpToken "where" -> EpAnnComments -> LHsLocalBinds GhcPs -> LHsLocalBinds GhcPs
+annBinds w cs (L l (HsValBinds an bs))  = L (widen_where w l cs) (HsValBinds (fst an, w) bs)
+annBinds w cs (L l (HsIPBinds an bs))   = L (widen_where w l cs) (HsIPBinds  (fst an, w) bs)
+annBinds w cs (L l (EmptyLocalBinds x)) = L (widen_where w l cs) (EmptyLocalBinds x)
 
-add_where :: EpToken "where" -> EpAnn AnnList -> EpAnnComments
-          -> (EpAnn AnnList, EpToken "where")
-add_where w@(EpTok (EpaSpan (RealSrcSpan rs _))) (EpAnn a al cs) cs2
+widen_where :: EpToken "where" -> EpAnn t -> EpAnnComments -> EpAnn t
+widen_where w@(EpTok l@(EpaSpan (RealSrcSpan _ _))) (EpAnn a al cs) cs2
   | valid_anchor a
-  = (EpAnn (widenAnchorT a w) al (cs Semi.<> cs2), w)
+  = EpAnn (widenAnchorT a w) al (cs Semi.<> cs2)
   | otherwise
-  = (EpAnn (patch_anchor rs a)
-           al
-           (cs Semi.<> cs2), w)
-add_where _ _ _ = panic "add_where"
+  = EpAnn l al (cs Semi.<> cs2)
+widen_where _ _ _ = panic "widen_where"
  -- EpaDelta should only be used for transformations
 
 valid_anchor :: EpaLocation -> Bool
 valid_anchor (EpaSpan (RealSrcSpan r _)) = srcSpanStartLine r >= 0
 valid_anchor _ = False
-
--- If the decl list for where binds is empty, the anchor ends up
--- invalid. In this case, use the parent one
-patch_anchor :: RealSrcSpan -> EpaLocation -> EpaLocation
-patch_anchor r EpaDelta{} = EpaSpan (RealSrcSpan r Strict.Nothing)
-patch_anchor r1 (EpaSpan (RealSrcSpan r0 mb)) = EpaSpan (RealSrcSpan r mb)
-  where
-    r = if srcSpanStartLine r0 < 0 then r1 else r0
-patch_anchor _ (EpaSpan ss) = EpaSpan ss
 
 -- | The anchor for a stmtlist is based on either the location or
 -- the first semicolon annotion.
@@ -1758,7 +1745,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsLetPV
     :: SrcSpan
     -> EpToken "let"
-    -> HsLocalBinds GhcPs
+    -> LHsLocalBinds GhcPs
     -> EpToken "in"
     -> LocatedA b
     -> PV (LocatedA b)

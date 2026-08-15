@@ -160,7 +160,13 @@
                     (False)
                     (0))))))))
              [])
-            (EmptyLocalBinds
-             (NoExtField)))))])))))]))
+            (L
+             (EpAnn
+              (EpaSpan { <no location info> })
+              []
+              (EpaComments
+               []))
+             (EmptyLocalBinds
+              (NoExtField))))))])))))]))
 
 

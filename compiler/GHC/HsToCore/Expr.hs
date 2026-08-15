@@ -86,11 +86,11 @@ import GHC.Data.FastString
 ************************************************************************
 -}
 
-dsLocalBinds :: HsLocalBinds GhcTc -> CoreExpr -> DsM CoreExpr
-dsLocalBinds (EmptyLocalBinds _)  body = return body
-dsLocalBinds b@(HsValBinds _ binds) body = putSrcSpanDs (spanHsLocaLBinds b) $
-                                           dsValBinds binds body
-dsLocalBinds (HsIPBinds _ binds)  body = dsIPBinds  binds body
+dsLocalBinds :: LHsLocalBinds GhcTc -> CoreExpr -> DsM CoreExpr
+dsLocalBinds (L _ (EmptyLocalBinds _))  body = return body
+dsLocalBinds (L l (HsValBinds _ binds)) body = putSrcSpanDs (locA l) $
+                                                 dsValBinds binds body
+dsLocalBinds (L _ (HsIPBinds _ binds))  body = dsIPBinds  binds body
 
 -------------------------
 -- caller sets location
@@ -446,7 +446,7 @@ dsExpr (HsIf _ guard_expr then_expr else_expr)
        ; return $ mkIfThenElse pred b1 b2 }
 
 dsExpr (HsMultiIf res_ty alts)
-  = do { let grhss = GRHSs emptyComments  alts emptyLocalBinds
+  = do { let grhss = GRHSs emptyComments  alts (noLocA emptyLocalBinds)
        ; rhss_nablas  <- pmcGRHSs IfAlt grhss
        ; match_result <- dsGRHSs IfAlt grhss res_ty rhss_nablas
        ; error_expr   <- mkErrorExpr

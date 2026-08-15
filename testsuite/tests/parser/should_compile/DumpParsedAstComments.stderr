@@ -168,8 +168,14 @@
                     (False)
                     (1))))))))
              [])
-            (EmptyLocalBinds
-             (NoExtField)))))])))))
+            (L
+             (EpAnn
+              (EpaSpan { <no location info> })
+              []
+              (EpaComments
+               []))
+             (EmptyLocalBinds
+              (NoExtField))))))])))))
   ,(L
     (EpAnn
      (EpaSpan { DumpParsedAstComments.hs:(14,1)-(16,3) })
@@ -330,8 +336,14 @@
                      (NoExtField)
                      (NoExtField)))])))))
              [])
-            (EmptyLocalBinds
-             (NoExtField)))))])))))
+            (L
+             (EpAnn
+              (EpaSpan { <no location info> })
+              []
+              (EpaComments
+               []))
+             (EmptyLocalBinds
+              (NoExtField))))))])))))
   ,(L
     (EpAnn
      (EpaSpan { DumpParsedAstComments.hs:19:1-23 })
@@ -460,7 +472,13 @@
                     (SourceText "hello")
                     "hello")))))))
              [])
-            (EmptyLocalBinds
-             (NoExtField)))))])))))]))
+            (L
+             (EpAnn
+              (EpaSpan { <no location info> })
+              []
+              (EpaComments
+               []))
+             (EmptyLocalBinds
+              (NoExtField))))))])))))]))
 
 

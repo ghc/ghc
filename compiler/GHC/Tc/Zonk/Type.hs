@@ -670,25 +670,25 @@ zonkTopDecls ev_binds binds rules imp_specs fords pat_syns
       ; return (ty_env, ev_binds', binds', fords', specs', rules', pat_syns') }
 
 ---------------------------------------------
-zonkLocalBinds :: HsLocalBinds GhcTc
-               -> ZonkBndrTcM (HsLocalBinds GhcTc)
-zonkLocalBinds (EmptyLocalBinds x)
-  = return (EmptyLocalBinds x)
+zonkLocalBinds :: LHsLocalBinds GhcTc
+               -> ZonkBndrTcM (LHsLocalBinds GhcTc)
+zonkLocalBinds (L l (EmptyLocalBinds x))
+  = return (L l (EmptyLocalBinds x))
 
-zonkLocalBinds (HsValBinds _ (ValBinds {}))
+zonkLocalBinds (L _ (HsValBinds _ (ValBinds {})))
   = panic "zonkLocalBinds" -- Not in typechecker output
 
-zonkLocalBinds (HsValBinds x (XValBindsLR (HsVBG binds sigs)))
+zonkLocalBinds (L l (HsValBinds x (XValBindsLR (HsVBG binds sigs))))
   = do  { new_binds <- mapM go binds
-        ; return (HsValBinds x (XValBindsLR (HsVBG new_binds sigs))) }
+        ; return (L l (HsValBinds x (XValBindsLR (HsVBG new_binds sigs)))) }
   where
     go (r,b) = do { b' <- zonkRecMonoBinds b; return (r,b') }
 
-zonkLocalBinds (HsIPBinds x (IPBinds dict_binds binds )) = do
+zonkLocalBinds (L l (HsIPBinds x (IPBinds dict_binds binds ))) = do
     new_binds <- noBinders $ mapM (wrapLocZonkMA zonk_ip_bind) binds
     extendIdZonkEnvRec [ n | (L _ (IPBind n _ _)) <- new_binds]
     new_dict_binds <- zonkTcEvBinds dict_binds
-    return $ HsIPBinds x (IPBinds new_dict_binds new_binds)
+    return $ (L l (HsIPBinds x (IPBinds new_dict_binds new_binds)))
   where
     zonk_ip_bind (IPBind dict_id n e)
         = do dict_id' <- zonkIdBndr dict_id

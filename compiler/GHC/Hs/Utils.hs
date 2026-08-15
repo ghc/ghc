@@ -55,7 +55,6 @@ module GHC.Hs.Utils(
   mkPatSynBind,
   familyInfoTyConFlavour,
   isInfixFunBind,
-  spanHsLocaLBinds,
 
   -- * Literals
   mkHsIntegral, mkHsFractional, mkHsIsString, mkHsString, mkHsStringFS, mkHsStringPrimLit,
@@ -195,7 +194,7 @@ unguardedGRHSs :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                => SrcSpan -> LocatedA (body (GhcPass p)) -> EpAnn GrhsAnn
                -> GRHSs (GhcPass p) (LocatedA (body (GhcPass p)))
 unguardedGRHSs loc rhs an
-  = GRHSs emptyComments (unguardedRHS an loc rhs) emptyLocalBinds
+  = GRHSs emptyComments (unguardedRHS an loc rhs) (noLocA emptyLocalBinds)
 
 unguardedRHS :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                      ~ EpAnn NoEpAnns
@@ -471,7 +470,7 @@ emptyRecStmtName = emptyRecStmt' noExtField
 emptyRecStmtId   = emptyRecStmt' unitRecStmtTc
                                         -- a panic might trigger during zonking
 
-mkLetStmt :: EpToken "let" -> HsLocalBinds GhcPs -> StmtLR GhcPs GhcPs (LocatedA b)
+mkLetStmt :: EpToken "let" -> LHsLocalBinds GhcPs -> StmtLR GhcPs GhcPs (LocatedA b)
 mkLetStmt anns binds = LetStmt anns binds
 
 -------------------------------
@@ -889,28 +888,6 @@ isInfixFunBind (FunBind { fun_matches = MG _ matches })
   = any (isInfixMatch . unLoc) (unLoc matches)
 isInfixFunBind _ = False
 
--- |Return the 'SrcSpan' encompassing the contents of any enclosed binds
-spanHsLocaLBinds :: forall p. IsPass p => HsLocalBinds (GhcPass p) -> SrcSpan
-spanHsLocaLBinds (EmptyLocalBinds _)
-  = noSrcSpan
-spanHsLocaLBinds (HsIPBinds _ (IPBinds _ bs))
-  = get_bind_spans bs []
-spanHsLocaLBinds (HsValBinds _ (ValBinds _ binds))
-  = get_bind_spans bs ss
-    where
-      bs :: [LHsBindLR (GhcPass p) (GhcPass p)]
-      (bs,ss) = val_binds_and_sigs binds
-spanHsLocaLBinds (HsValBinds _ (XValBindsLR (HsVBG bs ss)))
-  = get_bind_spans (hsValBindGroupsBinds @p bs) ss
-
-get_bind_spans :: (HasLoc l) => [GenLocated l a] -> [GenLocated l b] -> SrcSpan
-get_bind_spans binds sigs
-  = foldr combineSrcSpans noSrcSpan (bs_spans ++ sigs_spans)
-  where
-    bs_spans, sigs_spans :: [SrcSpan]
-    bs_spans   = map getLocA binds
-    sigs_spans = map getLocA sigs
-
 ------------
 -- | Convenience function using 'mkFunBind'.
 -- This is for generated bindings only, do not use for user-written code.
@@ -918,7 +895,7 @@ mkSimpleGeneratedFunBind :: SrcSpan -> RdrName -> LocatedA [LPat GhcPs]
                          -> LHsExpr GhcPs -> LHsBind GhcPs
 mkSimpleGeneratedFunBind loc fun pats expr
   = L (noAnnSrcSpan loc) $ mkFunBind (Generated OtherExpansion SkipPmc) (L (noAnnSrcSpan loc) fun)
-                                     [mkMatch ctxt pats expr emptyLocalBinds]
+                                     [mkMatch ctxt pats expr (noLocA emptyLocalBinds)]
   where
     ctxt :: HsMatchContextPs
     ctxt = mkPrefixFunRhs (L (noAnnSrcSpan loc) fun) noAnn
@@ -935,7 +912,7 @@ mkMatch :: forall p. IsPass p
         => HsMatchContext (LIdP (NoGhcTc (GhcPass p)))
         -> LocatedA [LPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
-        -> HsLocalBinds (GhcPass p)
+        -> LHsLocalBinds (GhcPass p)
         -> LMatch (GhcPass p) (LHsExpr (GhcPass p))
 mkMatch ctxt pats expr binds
   = noLocA (Match { m_ext   = noExtField
@@ -1219,7 +1196,7 @@ collectStmtBinders
   -- Id Binders for a Stmt... [but what about pattern-sig type vars]?
 collectStmtBinders flag = \case
     BindStmt _ pat _ -> collectPatBinders flag pat
-    LetStmt _  binds -> collectLocalBinders flag binds
+    LetStmt _  (L _ binds) -> collectLocalBinders flag binds
     BodyStmt {}      -> []
     LastStmt {}      -> []
     ParStmt _ xs _ _ -> collectLStmtsBinders flag [s | ParStmtBlock _ ss _ _ <- toList xs, s <- ss]
@@ -1840,9 +1817,9 @@ lStmtsImplicits = hs_lstmts
     hs_stmt (TransStmt { trS_stmts = stmts }) = hs_lstmts stmts
     hs_stmt (RecStmt { recS_stmts = L _ ss }) = hs_lstmts ss
 
-    hs_local_binds (HsValBinds _ val_binds) = hsValBindsImplicits val_binds
-    hs_local_binds (HsIPBinds {})           = []
-    hs_local_binds (EmptyLocalBinds _)      = []
+    hs_local_binds (L _ (HsValBinds _ val_binds)) = hsValBindsImplicits val_binds
+    hs_local_binds (L _ (HsIPBinds {}))           = []
+    hs_local_binds (L _ (EmptyLocalBinds _))      = []
 
     hs_applicative_stmt (ApplicativeStmt _ args _) = concatMap do_arg args
       where do_arg (_, ApplicativeArgOne { app_arg_pattern = pat }) = lPatImplicits pat

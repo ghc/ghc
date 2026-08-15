@@ -72,8 +72,8 @@ Global bindings (where clauses)
 -- the ...LR datatypes are parameterized by two id types,
 -- one for the left and one for the right.
 
-type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = (EpAnn AnnList, EpToken "where")
-type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = (EpAnn AnnList, EpToken "where")
+type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = (AnnList, EpToken "where")
+type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = (AnnList, EpToken "where")
 type instance XEmptyLocalBinds (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XXHsLocalBindsLR (GhcPass pL) (GhcPass pR) = DataConCantHappen
 
@@ -1033,6 +1033,7 @@ instance (OutputableBndrId p) => Outputable (RuleBndr (GhcPass p)) where
 ************************************************************************
 -}
 
+type instance Anno (HsLocalBindsLR (GhcPass idL) (GhcPass idR)) = SrcSpanAnnA
 type instance Anno (HsBindLR (GhcPass idL) (GhcPass idR)) = SrcSpanAnnA
 type instance Anno (IPBind (GhcPass p)) = SrcSpanAnnA
 type instance Anno (Sig (GhcPass p)) = SrcSpanAnnA

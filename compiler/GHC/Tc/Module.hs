@@ -2335,7 +2335,7 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
         ; thenIOName     <- rnLookupKnownOccName thenIOIdOcc
         ; let fresh_it  = itName uniq (locA loc)
               matches   = [mkMatch (mkPrefixFunRhs (L loc' fresh_it) noAnn) (noLocA []) rn_expr
-                                   emptyLocalBinds]
+                                   (noLocA emptyLocalBinds)]
               -- [it = expr]
               the_bind  = L loc $ (mkTopFunBind FromSource
                                      (L loc' fresh_it) matches)
@@ -2345,7 +2345,7 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
               -- (if we are at a breakpoint, say).  We must put those free vars
 
               -- [let it = expr]
-              let_stmt  = L loc $ LetStmt noAnn $ HsValBinds noAnn
+              let_stmt  = L loc $ LetStmt noAnn $ noLocA $ HsValBinds noAnn
                            $ XValBindsLR
                                (HsVBG [(NonRecursive,[the_bind])] [])
 
