@@ -446,13 +446,12 @@ data AnnDataDefn
       andd_instance :: EpToken "instance",
       andd_dcolon   :: TokDcolon,
       andd_where    :: EpToken "where",
-      andd_openc    :: EpToken "{",
-      andd_closec   :: EpToken "}",
+      andd_list     :: AnnList,
       andd_equal    :: EpToken "="
   } deriving Data
 
 instance NoAnn AnnDataDefn where
-  noAnn = AnnDataDefn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn
+  noAnn = AnnDataDefn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn
 
 data AnnClassDecl
   = AnnClassDecl {
