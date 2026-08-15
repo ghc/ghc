@@ -320,7 +320,7 @@ data FastStringTable = FastStringTable
   -- ^ Number of computed z-encodings for all buckets.
   --
   -- We mark this as 'NOUNPACK' as this 'FastMutInt' is retained by a thunk
-  -- in 'mkFastStringWith' and needs to be boxed any way.
+  -- in 'intern' and needs to be boxed any way.
   -- If this is unpacked, then we box this single 'FastMutInt' once for each
   -- allocated FastString.
   (Array# (IORef FastStringTableSegment)) -- ^  concurrent segments
@@ -474,9 +474,10 @@ The procedure goes like this:
    * Otherwise, insert and return the string we created.
 -}
 
-mkFastStringWith
-    :: (Int -> FastMutInt-> IO FastString) -> ShortByteString -> IO FastString
-mkFastStringWith mk_fs sbs = do
+-- | Return the interned 'FastString' for the given bytes, creating and
+-- inserting one on a table miss.
+intern :: ShortByteString -> IO FastString
+intern sbs = do
   FastStringTableSegment lock _ buckets# <- readIORef segmentRef
   let idx# = hashToIndex# buckets# hash#
   bucket <- IO $ readArray# buckets# idx#
@@ -487,7 +488,7 @@ mkFastStringWith mk_fs sbs = do
       -- only run partially and putMVar is not called after takeMVar.
       noDuplicate
       n <- get_uid
-      new_fs <- mk_fs n n_zencs
+      new_fs <- mkNewFastStringShortByteString sbs n n_zencs
       withMVar lock $ \_ -> insert new_fs
   where
     !(FastStringTable uid n_zencs segments#) = stringTable
@@ -523,11 +524,11 @@ bucket_match fs sbs = go fs
 
 mkFastStringBytes :: Ptr Word8 -> Int -> FastString
 mkFastStringBytes !ptr !len =
-    -- NB: Might as well use unsafeDupablePerformIO, since mkFastStringWith is
+    -- NB: Might as well use unsafeDupablePerformIO, since intern is
     -- idempotent.
     unsafeDupablePerformIO $ do
         sbs <- newSBSFromPtr ptr len
-        mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
+        intern sbs
 
 newSBSFromPtr :: Ptr a -> Int -> IO ShortByteString
 newSBSFromPtr (Ptr src#) (I# len#) =
@@ -541,14 +542,13 @@ newSBSFromPtr (Ptr src#) (I# len#) =
 mkFastStringByteString :: ByteString -> FastString
 mkFastStringByteString bs =
   let sbs = SBS.toShort bs in
-  inlinePerformIO $
-      mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
+  inlinePerformIO $ intern sbs
 
 -- | Create a 'FastString' from an existing 'ShortByteString' without
 -- copying.
 mkFastStringShortByteString :: ShortByteString -> FastString
 mkFastStringShortByteString sbs =
-  inlinePerformIO $ mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
+  inlinePerformIO $ intern sbs
 
 -- | Create a 'FastString' from an 'HText'
 mkFastStringShortText :: ShortText -> FastString
@@ -560,7 +560,7 @@ mkFastString :: String -> FastString
 mkFastString str =
   inlinePerformIO $ do
     let !sbs = utf8EncodeShortByteString str
-    mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
+    intern sbs
 
 -- The following rule is used to avoid polluting the non-reclaimable FastString
 -- table with transient strings when we only want their encoding.
