@@ -60,9 +60,11 @@
          (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { T17544.hs:5:12-16 }))
-        (EpTok (EpaSpan { <no location info> }))
-        (EpTok (EpaSpan { <no location info> }))
-        [])
+        (AnnList
+         (AnnListLayout
+          (EpaSpan { T17544.hs:6:3 }))
+         (ListNone)
+         []))
        (EpVirtualBraces
         (EpaSpan { T17544.hs:6:3 })))
       []
@@ -239,9 +241,11 @@
          (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { T17544.hs:9:12-16 }))
-        (EpTok (EpaSpan { <no location info> }))
-        (EpTok (EpaSpan { <no location info> }))
-        [])
+        (AnnList
+         (AnnListLayout
+          (EpaSpan { T17544.hs:10:3 }))
+         (ListNone)
+         []))
        (EpVirtualBraces
         (EpaSpan { T17544.hs:10:3 })))
       []
@@ -419,9 +423,11 @@
          (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { T17544.hs:13:12-16 }))
-        (EpTok (EpaSpan { <no location info> }))
-        (EpTok (EpaSpan { <no location info> }))
-        [])
+        (AnnList
+         (AnnListLayout
+          (EpaSpan { T17544.hs:14:3 }))
+         (ListNone)
+         []))
        (EpVirtualBraces
         (EpaSpan { T17544.hs:14:3 })))
       []
@@ -599,9 +605,11 @@
          (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { T17544.hs:17:12-16 }))
-        (EpTok (EpaSpan { <no location info> }))
-        (EpTok (EpaSpan { <no location info> }))
-        [])
+        (AnnList
+         (AnnListLayout
+          (EpaSpan { T17544.hs:18:3 }))
+         (ListNone)
+         []))
        (EpVirtualBraces
         (EpaSpan { T17544.hs:18:3 })))
       []
@@ -846,9 +854,12 @@
          (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { T17544.hs:22:12-16 }))
-        (EpTok (EpaSpan { T17544.hs:22:18 }))
-        (EpTok (EpaSpan { T17544.hs:22:30 }))
-        [])
+        (AnnList
+         (AnnListBraces)
+         (ListBraces
+          (EpTok (EpaSpan { T17544.hs:22:18 }))
+          (EpTok (EpaSpan { T17544.hs:22:30 })))
+         []))
        (EpExplicitBraces
         (EpTok (EpaSpan { T17544.hs:22:18 }))
         (EpTok (EpaSpan { T17544.hs:22:30 }))))
@@ -1245,9 +1256,12 @@
          (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { T17544.hs:28:12-16 }))
-        (EpTok (EpaSpan { T17544.hs:28:18 }))
-        (EpTok (EpaSpan { T17544.hs:28:30 }))
-        [])
+        (AnnList
+         (AnnListBraces)
+         (ListBraces
+          (EpTok (EpaSpan { T17544.hs:28:18 }))
+          (EpTok (EpaSpan { T17544.hs:28:30 })))
+         []))
        (EpExplicitBraces
         (EpTok (EpaSpan { T17544.hs:28:18 }))
         (EpTok (EpaSpan { T17544.hs:28:30 }))))
@@ -1644,9 +1658,12 @@
          (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { T17544.hs:34:12-16 }))
-        (EpTok (EpaSpan { T17544.hs:34:18 }))
-        (EpTok (EpaSpan { T17544.hs:34:30 }))
-        [])
+        (AnnList
+         (AnnListBraces)
+         (ListBraces
+          (EpTok (EpaSpan { T17544.hs:34:18 }))
+          (EpTok (EpaSpan { T17544.hs:34:30 })))
+         []))
        (EpExplicitBraces
         (EpTok (EpaSpan { T17544.hs:34:18 }))
         (EpTok (EpaSpan { T17544.hs:34:30 }))))
@@ -2043,9 +2060,12 @@
          (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { T17544.hs:40:12-16 }))
-        (EpTok (EpaSpan { T17544.hs:40:18 }))
-        (EpTok (EpaSpan { T17544.hs:40:30 }))
-        [])
+        (AnnList
+         (AnnListBraces)
+         (ListBraces
+          (EpTok (EpaSpan { T17544.hs:40:18 }))
+          (EpTok (EpaSpan { T17544.hs:40:30 })))
+         []))
        (EpExplicitBraces
         (EpTok (EpaSpan { T17544.hs:40:18 }))
         (EpTok (EpaSpan { T17544.hs:40:30 }))))
@@ -2442,9 +2462,12 @@
          (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { T17544.hs:46:12-16 }))
-        (EpTok (EpaSpan { T17544.hs:46:18 }))
-        (EpTok (EpaSpan { T17544.hs:46:30 }))
-        [])
+        (AnnList
+         (AnnListBraces)
+         (ListBraces
+          (EpTok (EpaSpan { T17544.hs:46:18 }))
+          (EpTok (EpaSpan { T17544.hs:46:30 })))
+         []))
        (EpExplicitBraces
         (EpTok (EpaSpan { T17544.hs:46:18 }))
         (EpTok (EpaSpan { T17544.hs:46:30 }))))
@@ -2841,9 +2864,12 @@
          (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { T17544.hs:52:13-17 }))
-        (EpTok (EpaSpan { T17544.hs:52:19 }))
-        (EpTok (EpaSpan { T17544.hs:52:32 }))
-        [])
+        (AnnList
+         (AnnListBraces)
+         (ListBraces
+          (EpTok (EpaSpan { T17544.hs:52:19 }))
+          (EpTok (EpaSpan { T17544.hs:52:32 })))
+         []))
        (EpExplicitBraces
         (EpTok (EpaSpan { T17544.hs:52:19 }))
         (EpTok (EpaSpan { T17544.hs:52:32 }))))

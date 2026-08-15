@@ -1322,9 +1322,9 @@ topdecl :: { LHsDecl GhcPs }
 --
 cl_decl :: { LTyClDecl GhcPs }
         : 'class' tycl_hdr fds where_cls
-                {% do { let {(wtok, (oc,semis,cc)) = fstOf3 $ unLoc $4}
+                {% do { let {(wtok, al) = fstOf3 $ unLoc $4}
                       ; mkClassDecl (comb4 $1 $2 $3 $4) $2 $3 (sndOf3 $ unLoc $4) (thdOf3 $ unLoc $4)
-                        (AnnClassDecl (epTok $1) [] [] (fst $ unLoc $3) wtok oc cc semis) }}
+                        (AnnClassDecl (epTok $1) [] [] (fst $ unLoc $3) wtok al) }}
 
 -- Default declarations (toplevel)
 --
@@ -1849,17 +1849,17 @@ decls_cls :: { Located ([EpToken ";"],OrdList (LHsDecl GhcPs)) }  -- Reversed
           | {- empty -}                 { noLoc ([],nilOL) }
 
 decllist_cls
-        :: { Located ((EpToken "{", [EpToken ";"], EpToken "}")
+        :: { Located ( AnnList
                      , OrdList (LHsDecl GhcPs)
                      , EpLayout) }      -- Reversed
-        : '{'         decls_cls '}'     { sLL $1 $> ((epTok $1, fst $ unLoc $2, epTok $3)
+        : '{'         decls_cls '}'     { sLL $1 $> (AnnList AnnListBraces (ListBraces (epTok $1) (epTok $3)) (fst $ unLoc $2)
                                              ,snd $ unLoc $2, epExplicitBraces $1 $3) }
         |     vocurly decls_cls close   { let { L l (anns, decls) = $2 }
-                                           in L l ((noEpTok, anns, noEpTok), decls, EpVirtualBraces (glR $1)) }
+                                           in L l (AnnList (AnnListLayout (glR $1)) ListNone anns, decls, EpVirtualBraces (glR $1)) }
 
 -- Class body
 --
-where_cls :: { Located ((EpToken "where", (EpToken "{", [EpToken ";"], EpToken "}"))
+where_cls :: { Located ((EpToken "where", AnnList)
                        ,(OrdList (LHsDecl GhcPs))    -- Reversed
                        ,EpLayout) }
                                 -- No implicit parameters

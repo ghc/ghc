@@ -460,13 +460,11 @@ data AnnClassDecl
       acd_closep :: [EpToken ")"],
       acd_vbar   :: EpToken "|",
       acd_where  :: EpToken "where",
-      acd_openc  :: EpToken "{",
-      acd_closec :: EpToken "}",
-      acd_semis  :: [EpToken ";"]
+      acd_list   :: AnnList
   } deriving Data
 
 instance NoAnn AnnClassDecl where
-  noAnn = AnnClassDecl noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn
+  noAnn = AnnClassDecl noAnn noAnn noAnn noAnn noAnn noAnn
 
 data AnnSynDecl
   = AnnSynDecl {

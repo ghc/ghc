@@ -3525,19 +3525,19 @@ instance ExactPrint (TyClDecl GhcPs) where
 
   -- -----------------------------------
 
-  exact (ClassDecl {tcdCExt = (AnnClassDecl c ops cps vb w oc cc semis, lo),
+  exact (ClassDecl {tcdCExt = (AnnClassDecl c ops cps vb w al, lo),
                     tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars,
                     tcdFixity = fixity,
                     tcdFDs  = fds,
                     tcdDecls = decls,
                     tcdModifiers = mods})
       -- TODO: add a test that demonstrates tcdDocs
+      -- TODO:AZ do we need the distinction between null decls and not?
       | null decls -- No "where" part
       = do
           (mods', c', w', vb', fds', lclas', tyvars',context') <- top_matter
-          oc' <- markEpToken oc
-          cc' <- markEpToken cc
-          return (ClassDecl {tcdCExt = (AnnClassDecl c' [] [] vb' w' oc' cc' semis, lo),
+          (al',_) <- markAnnListA' al $ return ()
+          return (ClassDecl {tcdCExt = (AnnClassDecl c' [] [] vb' w' al', lo),
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
                              tcdFDs  = fds',
@@ -3547,11 +3547,8 @@ instance ExactPrint (TyClDecl GhcPs) where
       | otherwise       -- Laid out
       = do
           (mods', c', w', vb', fds', lclas', tyvars',context') <- top_matter
-          oc' <- markEpToken oc
-          semis' <- mapM markEpToken semis
-          decls' <- mapM markAnnotated decls
-          cc' <- markEpToken cc
-          return (ClassDecl {tcdCExt = (AnnClassDecl c' [] [] vb' w' oc' cc' semis', lo),
+          (al',decls') <- markAnnListA' al $ setLayoutBoth $ mapM markAnnotated decls
+          return (ClassDecl {tcdCExt = (AnnClassDecl c' [] [] vb' w' al', lo),
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
                              tcdFDs  = fds',
