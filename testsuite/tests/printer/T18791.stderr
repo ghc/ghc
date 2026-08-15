@@ -81,8 +81,11 @@
          (NormalSyntax))
         (EpTok
          (EpaSpan { T18791.hs:4:8-12 }))
-        (EpTok (EpaSpan { <no location info> }))
-        (EpTok (EpaSpan { <no location info> }))
+        (AnnList
+         (AnnListLayout
+          (EpaSpan { T18791.hs:5:3 }))
+         (ListNone)
+         [])
         (EpTok
          (EpaSpan { <no location info> })))
        (Nothing)
