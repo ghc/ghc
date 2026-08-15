@@ -1329,9 +1329,11 @@
          (EpaSpan { <no location info> }))
         (EpTok
          (EpaSpan { DumpSemis.hs:28:40-44 }))
-        (EpTok (EpaSpan { <no location info> }))
-        (EpTok (EpaSpan { <no location info> }))
-        [])
+        (AnnList
+         (AnnListLayout
+          (EpaSpan { DumpSemis.hs:29:3 }))
+         (ListNone)
+         []))
        (EpVirtualBraces
         (EpaSpan { DumpSemis.hs:29:3 })))
       []
