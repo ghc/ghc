@@ -129,8 +129,10 @@
          (NormalSyntax))
         (EpTok
          (EpaSpan { <no location info> }))
-        (EpTok (EpaSpan { <no location info> }))
-        (EpTok (EpaSpan { <no location info> }))
+        (AnnList
+         (AnnListNoLayout)
+         (ListNone)
+         [])
         (EpTok
          (EpaSpan { T20452.hs:5:24 })))
        (Nothing)
@@ -260,8 +262,10 @@
          (NormalSyntax))
         (EpTok
          (EpaSpan { <no location info> }))
-        (EpTok (EpaSpan { <no location info> }))
-        (EpTok (EpaSpan { <no location info> }))
+        (AnnList
+         (AnnListNoLayout)
+         (ListNone)
+         [])
         (EpTok
          (EpaSpan { T20452.hs:6:24 })))
        (Nothing)
