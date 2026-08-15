@@ -231,9 +231,6 @@ setAnchorAn :: (HasTrailing an)
 setAnchorAn (L (EpAnn _ an _) a) anc ts cs = (L (EpAnn anc (setTrailing an ts) cs) a)
      -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
 
-setAnchorEpaL :: EpAnn AnnList -> EpaLocation -> [TrailingAnn] -> EpAnnComments -> EpAnn AnnList
-setAnchorEpaL (EpAnn _ an _) anc ts cs = EpAnn anc (setTrailing (an {al_layout = AnnListNoLayout}) ts) cs
-
 -- ---------------------------------------------------------------------
 
 -- | Key entry point.  Switches to an independent AST element with its
@@ -757,12 +754,8 @@ markExternalSourceTextA ann src txt = do
 -- ---------------------------------------------------------------------
 
 markLensBracketsO :: (Monad m, Monoid w)
-  => EpAnn a -> Lens a AnnListBrackets -> EP w m (EpAnn a)
-markLensBracketsO epann l = markLensBracketsO' epann (lepa . l)
-
-markLensBracketsO' :: (Monad m, Monoid w)
   => a -> Lens a AnnListBrackets -> EP w m a
-markLensBracketsO' a l =
+markLensBracketsO a l =
   case view l a of
     ListBraces o c -> do
       o' <- markEpToken o
@@ -770,12 +763,8 @@ markLensBracketsO' a l =
     ListNone -> return (set l ListNone a)
 
 markLensBracketsC :: (Monad m, Monoid w)
-  => EpAnn a -> Lens a AnnListBrackets -> EP w m (EpAnn a)
-markLensBracketsC epann l = markLensBracketsC' epann (lepa . l)
-
-markLensBracketsC' :: (Monad m, Monoid w)
   => a -> Lens a AnnListBrackets -> EP w m a
-markLensBracketsC' a l =
+markLensBracketsC a l =
   case view l a of
     ListBraces o c -> do
       c' <- markEpToken c
@@ -1225,14 +1214,8 @@ markLensFun a l f = do
 -- -------------------------------------
 
 markEpAnnAllLT :: (Monad m, Monoid w, KnownSymbol tok)
-  => EpAnn ann -> Lens ann [EpToken tok] -> EP w m (EpAnn ann)
-markEpAnnAllLT (EpAnn anc a cs) l = do
-  anns <- mapM markEpToken (view l a)
-  return (EpAnn anc (set l anns a) cs)
-
-markEpAnnAllLT' :: (Monad m, Monoid w, KnownSymbol tok)
   => ann -> Lens ann [EpToken tok] -> EP w m ann
-markEpAnnAllLT' a l = do
+markEpAnnAllLT a l = do
   anns <- mapM markEpToken (view l a)
   return (set l anns a)
 
@@ -1262,38 +1245,20 @@ markAnnListD (Right ann) action = do
   (ann',r) <- markAnnList' ann action
   return (Right ann',r)
 
-markAnnList :: (Monad m, Monoid w)
-  => EpAnn AnnList -> EP w m a -> EP w m (EpAnn AnnList, a)
-markAnnList ann action = do
-  markAnnListA ann $ \a -> do
-    r <- action
-    return (a,r)
-
 markAnnList' :: (Monad m, Monoid w)
   => AnnList -> EP w m a -> EP w m (AnnList, a)
 markAnnList' ann action = do
-  markAnnListA' ann $ action
+  markAnnListA ann $ action
 
 markAnnListA :: (Monad m, Monoid w)
-  => EpAnn AnnList
-  -> (EpAnn AnnList -> EP w m (EpAnn AnnList, a))
-  -> EP w m (EpAnn AnnList, a)
-markAnnListA an action = do
-  an0 <- markLensBracketsO an lal_brackets
-  an1 <- markEpAnnAllLT an0 lal_semis
-  (an2, r) <- action an1
-  an3 <- markLensBracketsC an2 lal_brackets
-  return (an3, r)
-
-markAnnListA' :: (Monad m, Monoid w)
   => AnnList
   -> EP w m a
   -> EP w m (AnnList, a)
-markAnnListA' an action = do
-  an0 <- markLensBracketsO' an lal_brackets
-  an1 <- markEpAnnAllLT' an0 lal_semis
+markAnnListA an action = do
+  an0 <- markLensBracketsO an lal_brackets
+  an1 <- markEpAnnAllLT an0 lal_semis
   r <- action
-  an2 <- markLensBracketsC' an1 lal_brackets
+  an2 <- markLensBracketsC an1 lal_brackets
   return (an2, r)
 
 -- ---------------------------------------------------------------------
@@ -2189,7 +2154,7 @@ instance ExactPrint (ClsInstDecl GhcPs) where
                      , cid_modifiers = mods })
       = do
           (mbWarn', i', w', mbOverlap', inst_ty', mods') <- top_matter
-          (ann_list',  decls') <- markAnnListA' ann_list $  setLayoutBoth $ mapM markAnnotated decls
+          (ann_list',  decls') <- markAnnListA ann_list $  setLayoutBoth $ mapM markAnnotated decls
           return (ClsInstDecl { cid_ext = (mbWarn', AnnClsInstDecl i' w' ann_list')
                               , cid_poly_ty = inst_ty'
                               , cid_decls = decls'
@@ -2444,36 +2409,30 @@ instance ExactPrint (GRHSs GhcPs (LocatedA (HsCmd GhcPs))) where
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (HsLocalBinds GhcPs) where
-  getAnnotationEntry (HsValBinds (an,_) _) = fromAnn an
-  getAnnotationEntry (HsIPBinds{}) = NoEntryVal
-  getAnnotationEntry (EmptyLocalBinds{}) = NoEntryVal
-
-  setAnnotationAnchor (HsValBinds (an,w) a) anc ts cs = HsValBinds (setAnchorEpaL an anc ts cs, w) a
+  getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
   exact (HsValBinds (an0, w) valbinds) = do
     w' <- markEpToken w -- 'where'
 
-    case al_layout $ anns an0 of
+    case al_layout an0 of
       AnnListLayout anc -> do
         when (not $ isEmptyValBinds valbinds) $ setExtraDP (Just anc)
       _ -> return ()
 
-    (an1, valbinds') <- markAnnList an0 $ markAnnotatedWithLayout valbinds
+    (an1, valbinds') <- markAnnListA an0 $ markAnnotatedWithLayout valbinds
     debugM $ "exact HsValBinds: an1=" ++ showAst an1
     medr <- getExtraDPReturn
     an2 <- case medr of
              Nothing -> return an1
              Just (ss,dp) -> do
                  setExtraDPReturn Nothing
-                 return $ an1 { anns = (anns an1) { al_layout = AnnListLayout (EpaDelta ss dp []) }}
+                 return $ an1 { al_layout = AnnListLayout (EpaDelta ss dp []) }
     return (HsValBinds (an2, w') valbinds')
 
   exact (HsIPBinds (an,w) bs) = do
     w' <- markEpToken w
-    (an2,bs') <- markAnnListA an $ \an0 -> do
-                           bs' <- markAnnotated bs
-                           return (an0, bs')
+    (an2,bs') <- markAnnListA an $ markAnnotated bs
     return (HsIPBinds (an2,w') bs')
   exact b@(EmptyLocalBinds _) = return b
 
@@ -3110,9 +3069,9 @@ markMaybeDodgyStmts (an,l) stmts =
           c' <- markEpToken c
           return (Left (o',c'), r)
         Right an' -> do
-         (an'',r') <- markAnnListA' an' $ markAnnotatedWithLayout stmts
+         (an'',r') <- markAnnListA an' $ markAnnotatedWithLayout stmts
          return (Right an'',r')
-      -- (an0,stmts') <- markAnnListA' an $ \a -> do
+      -- (an0,stmts') <- markAnnListA an $ \a -> do
       --    r <- markAnnotatedWithLayout stmts
       --    return (a, r)
       return ((an0, l), stmts')
@@ -3186,7 +3145,7 @@ instance (Typeable body,
     = MG (origin,an) (L (setAnchorEpa l anc ts cs) matches)
 
   exact (MG (origin,an) (L l matches)) = do
-    (an0,matches') <- markAnnListA' an $ markAnnotated matches
+    (an0,matches') <- markAnnListA an $ markAnnotated matches
     return (MG (origin, an0) (L l matches'))
 
 -- ---------------------------------------------------------------------
@@ -3536,7 +3495,7 @@ instance ExactPrint (TyClDecl GhcPs) where
       | null decls -- No "where" part
       = do
           (mods', c', w', vb', fds', lclas', tyvars',context') <- top_matter
-          (al',_) <- markAnnListA' al $ return ()
+          (al',_) <- markAnnListA al $ return ()
           return (ClassDecl {tcdCExt = (AnnClassDecl c' [] [] vb' w' al', lo),
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
@@ -3547,7 +3506,7 @@ instance ExactPrint (TyClDecl GhcPs) where
       | otherwise       -- Laid out
       = do
           (mods', c', w', vb', fds', lclas', tyvars',context') <- top_matter
-          (al',decls') <- markAnnListA' al $ setLayoutBoth $ mapM markAnnotated decls
+          (al',decls') <- markAnnListA al $ setLayoutBoth $ mapM markAnnotated decls
           return (ClassDecl {tcdCExt = (AnnClassDecl c' [] [] vb' w' al', lo),
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
@@ -4162,7 +4121,7 @@ exact_condecls :: (Monad m, Monoid w)
 exact_condecls eq al cs
   | gadt_syntax                  -- In GADT syntax
   = do
-      (al',cs') <- markAnnListA' al $ setLayoutBoth $ mapM markAnnotated cs
+      (al',cs') <- markAnnListA al $ setLayoutBoth $ mapM markAnnotated cs
       return (eq, al', cs')
   | otherwise                    -- In H98 syntax
   = do

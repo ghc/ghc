@@ -68,7 +68,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl4.hs" (Just addLocaLDecl4)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl5.hs" (Just addLocaLDecl5)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl6.hs" (Just addLocaLDecl6)
- "../../testsuite/tests/ghc-api/exactprint/AddClassMethod.hs" (Just addClassMethod)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddClassMethod.hs" (Just addClassMethod)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl1.hs" (Just rmDecl1)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl2.hs" (Just rmDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl3.hs" (Just rmDecl3)
@@ -203,7 +203,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Test19850.hs" Nothing
  -- "../../testsuite/tests/printer/Test20247.hs" Nothing
  -- "../../testsuite/tests/printer/Test20258.hs" Nothing
- -- "../../testsuite/tests/printer/Test20297.hs" Nothing
+ "../../testsuite/tests/printer/Test20297.hs" Nothing
  -- "../../testsuite/tests/printer/PprLinearArrow.hs" Nothing
  -- "../../testsuite/tests/printer/PprRecordSemi.hs" Nothing
  -- "../../testsuite/tests/printer/PprSemis.hs" Nothing
@@ -446,7 +446,7 @@ changeLetIn1 _libdir parsed
     replace :: HsExpr GhcPs -> HsExpr GhcPs
     replace (HsLet (tkLet, _) localDecls expr)
       =
-         let (HsValBinds x (ValBinds xv bs)) = localDecls
+         let (L l (HsValBinds x (ValBinds xv bs))) = localDecls
              [l2,_l1] = bs
              decls' = [l2]
              (L _ e) = expr
@@ -454,7 +454,7 @@ changeLetIn1 _libdir parsed
              expr' = L a e
              tkIn' = EpTok (EpaDelta noSrcSpan (DifferentLine 1 0) [])
          in (HsLet (tkLet, tkIn')
-                (HsValBinds x (ValBinds xv decls')) expr')
+                (L l (HsValBinds x (ValBinds xv decls'))) expr')
 
     replace x = x
 
@@ -515,14 +515,14 @@ changeLocalDecls libdir (L l p) = do
       doAddLocal = everywhereM (mkM replaceLocalBinds) p
       replaceLocalBinds :: LMatch GhcPs (LHsExpr GhcPs)
                         -> Transform (LMatch GhcPs (LHsExpr GhcPs))
-      replaceLocalBinds (L lm (Match an mln pats (GRHSs _ rhs (HsValBinds (van,w) (ValBinds _ bs))))) = do
+      replaceLocalBinds (L lm (Match an mln pats (GRHSs _ rhs (L lb (HsValBinds (van,w) (ValBinds _ bs)))))) = do
         let oldDecls = map unWrapValBind bs
         let oldDecls' = captureLineSpacing oldDecls
         let (VbSig o:oldBinds)  = map wrapValBind oldDecls'
             o' = setEntryDP o (DifferentLine 2 0)
-        let (EpAnn anc (AnnList (AnnListLayout _) a b) cs) = van
-        let van' = (EpAnn anc (AnnList (AnnListLayout (EpaDelta noSrcSpan (DifferentLine 1 4) [])) a b) cs)
-        let binds' = (HsValBinds (van',w)
+        let (AnnList (AnnListLayout _) a b) = van
+        let van' = AnnList (AnnListLayout (EpaDelta noSrcSpan (DifferentLine 1 4) [])) a b
+        let binds' = L lb (HsValBinds (van',w)
                           (ValBinds noExtField (VbSig sig':VbBind decl':VbSig o':oldBinds)))
         return (L lm (Match an mln pats (GRHSs emptyComments rhs binds')))
                    `debug` ("oldDecls=" ++ showAst oldDecls)
@@ -543,15 +543,14 @@ changeLocalDecls2 libdir (L l p) = do
       doAddLocal = everywhereM (mkM replaceLocalBinds) p
       replaceLocalBinds :: LMatch GhcPs (LHsExpr GhcPs)
                         -> Transform (LMatch GhcPs (LHsExpr GhcPs))
-      replaceLocalBinds (L lm (Match ma mln pats (GRHSs _ rhs EmptyLocalBinds{}))) = do
+      replaceLocalBinds (L lm (Match ma mln pats (GRHSs _ rhs (L _ EmptyLocalBinds{})))) = do
         let anc = (EpaDelta noSrcSpan (DifferentLine 1 2) [])
         let anc2 = (EpaDelta noSrcSpan (DifferentLine 1 4) [])
-        let an = (EpAnn anc
-                        (AnnList (AnnListLayout anc2) ListNone
-                                 [])
-                        emptyComments, EpTok (EpaDelta noSrcSpan (SameLine 0) []))
+        let an = ( AnnList (AnnListLayout anc2) ListNone []
+                 , EpTok (EpaDelta noSrcSpan (SameLine 0) []))
+        let lb = EpAnn anc noAnn emptyComments
         let decls = [VbSig sig', VbBind decl']
-        let binds = (HsValBinds an (ValBinds noExtField decls))
+        let binds = L lb (HsValBinds an (ValBinds noExtField decls))
         return (L lm (Match ma mln pats (GRHSs emptyComments rhs binds)))
       replaceLocalBinds x = return x
   return (L l p')

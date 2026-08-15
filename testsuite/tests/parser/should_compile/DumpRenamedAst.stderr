@@ -130,8 +130,14 @@
                         (SourceText "hello")
                         "hello")))))))
                  [])
-                (EmptyLocalBinds
-                 (NoExtField)))))]))))])]
+                (L
+                 (EpAnn
+                  (EpaSpan { <no location info> })
+                  []
+                  (EpaComments
+                   []))
+                 (EmptyLocalBinds
+                  (NoExtField))))))]))))])]
      []))
    []
    [(TyClGroup

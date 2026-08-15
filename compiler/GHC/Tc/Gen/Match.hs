@@ -342,10 +342,10 @@ tcGRHSs :: AnnoBody body
 --      f = \(x::forall a.a->a) -> <stuff>
 -- We used to force it to be a monotype when there was more than one guard
 -- but we don't need to do that any more
-tcGRHSs ctxt tc_body (GRHSs _ grhss binds) res_ty
+tcGRHSs ctxt tc_body (GRHSs _ grhss (L l binds)) res_ty
   = do  { (binds', grhss') <- tcLocalBinds binds $ do
                                        tcGRHSNE ctxt tc_body grhss res_ty
-        ; return (GRHSs emptyComments grhss' binds') }
+        ; return (GRHSs emptyComments grhss' (L l binds')) }
 
 tcGRHSNE :: forall body. AnnoBody body
            => HsMatchContextRn -> TcMatchAltChecker body
@@ -450,11 +450,11 @@ tcStmtsAndThen _ _ [] res_ty thing_inside
         ; return ([], thing) }
 
 -- LetStmts are handled uniformly, regardless of context
-tcStmtsAndThen ctxt stmt_chk (L loc (LetStmt x binds) : stmts)
+tcStmtsAndThen ctxt stmt_chk (L loc (LetStmt x (L l binds)) : stmts)
                                                              res_ty thing_inside
   = do  { (binds', (stmts',thing)) <- tcLocalBinds binds $
               tcStmtsAndThen ctxt stmt_chk stmts res_ty thing_inside
-        ; return (L loc (LetStmt x binds') : stmts', thing) }
+        ; return (L loc (LetStmt x (L l binds')) : stmts', thing) }
 
 -- Don't set the error context for an ApplicativeStmt.  It ought to be
 -- possible to do this with a popErrCtxt in the tcStmt case for

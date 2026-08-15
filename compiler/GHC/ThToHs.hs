@@ -242,7 +242,7 @@ cvtDec (TH.ValD pat body ds)
         ; ds' <- cvtLocalDecs WhereClause ds
         ; returnJustLA $ Hs.ValD noExtField $
           PatBind { pat_lhs = pat'
-                  , pat_rhs = GRHSs emptyComments body' ds'
+                  , pat_rhs = GRHSs emptyComments body' (noLocA ds')
                   , pat_ext = noExtField
                   , pat_mods = []
                   } }
@@ -1057,7 +1057,7 @@ cvtClause ctxt (Clause ps body wheres)
         ; let pps = map (parenthesizePat appPrec) ps'
         ; g'  <- cvtGuard body
         ; ds' <- cvtLocalDecs WhereClause wheres
-        ; returnLA $ Hs.Match noExtField ctxt (noLocA pps) (GRHSs emptyComments g' ds') }
+        ; returnLA $ Hs.Match noExtField ctxt (noLocA pps) (GRHSs emptyComments g' (noLocA ds')) }
 
 cvtImplicitParamBind :: String -> TH.Exp -> CvtM (LIPBind GhcPs)
 cvtImplicitParamBind n e = do
@@ -1125,7 +1125,7 @@ cvtl e = wrapLA (cvt e)
         Nothing -> failWith MultiWayIfWithoutAlts
         Just alts -> HsMultiIf noAnn <$> traverse cvtpair alts
     cvt (LetE ds e)    = do { ds' <- cvtLocalDecs LetExpression ds
-                            ; e' <- cvtl e; return $ HsLet noAnn  ds' e'}
+                            ; e' <- cvtl e; return $ HsLet noAnn  (noLocA ds') e'}
     cvt (CaseE e ms)   = do { e' <- cvtl e; ms' <- mapM (cvtMatch CaseAlt) ms
                             ; th_origin <- getOrigin
                             ; wrapParLA (HsCase noAnn e' . mkMatchGroup th_origin noAnn) ms' }
@@ -1378,7 +1378,7 @@ cvtStmt :: TH.Stmt -> CvtM (Hs.LStmt GhcPs (LHsExpr GhcPs))
 cvtStmt (NoBindS e)    = do { e' <- cvtl e; returnLA $ mkBodyStmt e' }
 cvtStmt (TH.BindS p e) = do { p' <- cvtPat p; e' <- cvtl e; returnLA $ mkPsBindStmt noAnn p' e' }
 cvtStmt (TH.LetS ds)   = do { ds' <- cvtLocalDecs LetBinding ds
-                            ; returnLA $ LetStmt noAnn ds' }
+                            ; returnLA $ LetStmt noAnn (noLocA ds') }
 cvtStmt (TH.ParS dss)  = case nonEmpty dss of
     Nothing -> failWith EmptyParStmt
     Just dss -> do
@@ -1399,7 +1399,7 @@ cvtMatch ctxt (TH.Match p body decs)
                      _                -> p'
         ; g' <- cvtGuard body
         ; decs' <- cvtLocalDecs WhereClause decs
-        ; returnLA $ Hs.Match noExtField ctxt (noLocA [lp]) (GRHSs emptyComments g' decs') }
+        ; returnLA $ Hs.Match noExtField ctxt (noLocA [lp]) (GRHSs emptyComments g' (noLocA decs')) }
 
 cvtGuard :: TH.Body -> CvtM (NonEmpty (LGRHS GhcPs (LHsExpr GhcPs)))
 cvtGuard (GuardedB pairs) = case nonEmpty pairs of

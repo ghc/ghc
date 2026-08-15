@@ -511,7 +511,7 @@ tidy1 _ _ (OrPat ty lpats)
     hs_var :: Var -> LHsExpr GhcTc
     hs_var v = noLocA $ mkHsVar (noLocA v)
     single_grhs :: LHsExpr GhcTc -> GRHSs GhcTc (LHsExpr GhcTc)
-    single_grhs e = GRHSs emptyComments [noLocA $ GRHS noAnn [] e] (EmptyLocalBinds noExtField)
+    single_grhs e = GRHSs emptyComments [noLocA $ GRHS noAnn [] e] (noLocA $ EmptyLocalBinds noExtField)
 
 -- Everything else goes through unchanged...
 tidy1 _ _ non_interesting_pat

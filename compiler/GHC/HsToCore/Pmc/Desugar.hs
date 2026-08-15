@@ -441,8 +441,8 @@ sequenceGrdDagMapM f as = sequenceGrdDags <$> traverse f as
 -- Deals only with simple @let@ or @where@ bindings without any polymorphism,
 -- recursion, pattern bindings etc.
 -- See Note [Long-distance information for HsLocalBinds].
-desugarLocalBinds :: HsLocalBinds GhcTc -> DsM GrdDag
-desugarLocalBinds (HsValBinds _ (XValBindsLR (HsVBG grps _))) =
+desugarLocalBinds :: LHsLocalBinds GhcTc -> DsM GrdDag
+desugarLocalBinds (L _ (HsValBinds _ (XValBindsLR (HsVBG grps _)))) =
   sequenceGrdDagMapM go (hsValBindGroupsBinds grps)
   where
     go :: LHsBind GhcTc -> DsM GrdDag

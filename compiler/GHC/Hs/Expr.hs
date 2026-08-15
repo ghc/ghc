@@ -922,11 +922,11 @@ ppr_expr (HsMultiIf _ alts)
         ppr_alt (L _ (XGRHS x)) = ppr x
 
 -- special case: let ... in let ...
-ppr_expr (HsLet _ binds expr@(L _ (HsLet _ _ _)))
+ppr_expr (HsLet _ (L _ binds) expr@(L _ (HsLet _ _ _)))
   = sep [hang (text "let") 2 (hsep [pprBinds binds, text "in"]),
          ppr_lexpr expr]
 
-ppr_expr (HsLet _ binds expr)
+ppr_expr (HsLet _ (L _ binds) expr)
   = sep [hang (text "let") 2 (pprBinds binds),
          hang (text "in")  2 (ppr expr)]
 
@@ -1598,11 +1598,11 @@ ppr_cmd (HsCmdIf _ _ e ct ce)
          nest 4 (ppr ce)]
 
 -- special case: let ... in let ...
-ppr_cmd (HsCmdLet _ binds cmd@(L _ (HsCmdLet {})))
+ppr_cmd (HsCmdLet _ (L _ binds) cmd@(L _ (HsCmdLet {})))
   = sep [hang (text "let") 2 (hsep [pprBinds binds, text "in"]),
          ppr_lcmd cmd]
 
-ppr_cmd (HsCmdLet _ binds cmd)
+ppr_cmd (HsCmdLet _ (L _ binds) cmd)
   = sep [hang (text "let") 2 (pprBinds binds),
          hang (text "in")  2 (ppr cmd)]
 
@@ -1799,7 +1799,7 @@ pprMatch (Match { m_pats = L _ pats, m_ctxt = ctxt, m_grhss = grhss })
 
 pprGRHSs :: (OutputableBndrId idR, Outputable body)
          => HsMatchContext fn -> GRHSs (GhcPass idR) body -> SDoc
-pprGRHSs ctxt (GRHSs _ grhss binds)
+pprGRHSs ctxt (GRHSs _ grhss (L _ binds))
   = vcat (toList $ NE.map (pprGRHS ctxt . unLoc) grhss)
   -- Print the "where" even if the contents of the binds is empty. Only
   -- EmptyLocalBinds means no "where" keyword
@@ -2007,7 +2007,7 @@ pprStmt (LastStmt _ expr m_dollar_stripped _)
         Nothing -> empty) <+>
       ppr expr
 pprStmt (BindStmt _ pat expr)  = pprBindStmt pat expr
-pprStmt (LetStmt _ binds)      = hsep [text "let", pprBinds binds]
+pprStmt (LetStmt _ (L _ binds))= hsep [text "let", pprBinds binds]
 pprStmt (BodyStmt _ expr _ _)  = ppr expr
 pprStmt (ParStmt _ stmtss _ _) = sep (punctuate (text " | ") (map ppr $ toList stmtss))
 

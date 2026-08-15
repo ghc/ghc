@@ -1635,7 +1635,7 @@ repE (HsMultiIf _ alts)
   = do { (binds, alts') <- NE.unzip <$> mapM repLGRHS alts
        ; expr' <- repMultiIf (nonEmptyCoreList' alts')
        ; wrapGenSyms (concat binds) expr' }
-repE (HsLet _ bs e)       = do { (ss,ds) <- repBinds bs
+repE (HsLet _ (L _ bs) e) = do { (ss,ds) <- repBinds bs
                                ; e2 <- addBinds ss (repLE e)
                                ; z <- repLetE ds e2
                                ; wrapGenSyms ss z }
@@ -1813,7 +1813,7 @@ the choice in ExpandedThingRn, but it seems simpler to consult the flag (again).
 
 repMatchTup ::  LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Match))
 repMatchTup (L _ (Match { m_pats = L _ [p]
-                        , m_grhss = GRHSs _ guards wheres })) =
+                        , m_grhss = GRHSs _ guards (L _ wheres) })) =
   do { ss1 <- mkGenSyms (collectPatBinders CollNoDictBinders p)
      ; addBinds ss1 $ do {
      ; p1 <- repLP p
@@ -1826,7 +1826,7 @@ repMatchTup _ = panic "repMatchTup: case alt with more than one arg or with invi
 
 repClauseTup ::  LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Clause))
 repClauseTup (L _ (Match { m_pats = L _ ps
-                         , m_grhss = GRHSs _ guards  wheres })) =
+                         , m_grhss = GRHSs _ guards (L _ wheres) })) =
   do { ss1 <- mkGenSyms (collectPatsBinders CollNoDictBinders ps)
      ; addBinds ss1 $ do {
        ps1 <- repLPs ps
@@ -1924,7 +1924,7 @@ repSts (BindStmt _ p e : ss) =
       ; (ss2,zs) <- repSts ss
       ; z <- repBindSt p1 e2
       ; return (ss1++ss2, z : zs) }}
-repSts (LetStmt _ bs : ss) =
+repSts (LetStmt _ (L _ bs) : ss) =
    do { (ss1,ds) <- repBinds bs
       ; z <- repLetSt ds
       ; (ss2,zs) <- addBinds ss1 (repSts ss)
@@ -2028,7 +2028,7 @@ rep_bind (L loc (FunBind
                    fun_matches = MG { mg_alts
                            = (L _ [L _ (Match
                                    { m_pats = L _ []
-                                   , m_grhss = GRHSs _ guards wheres
+                                   , m_grhss = GRHSs _ guards (L _ wheres)
                                    -- For a variable declaration I'm pretty
                                    -- sure we always have a FunRhs
                                    , m_ctxt = FunRhs { mc_strictness = strictessAnn }
@@ -2052,7 +2052,7 @@ rep_bind (L loc (FunBind { fun_id = fn
         ; return (locA loc, ans) }
 
 rep_bind (L loc (PatBind { pat_lhs = pat
-                         , pat_rhs = GRHSs _ guards wheres }))
+                         , pat_rhs = GRHSs _ guards (L _ wheres) }))
  =   do { patcore <- repLP pat
         ; (ss,wherecore) <- repBinds wheres
         ; guardcore <- addBinds ss (repGuards guards)
@@ -2169,7 +2169,7 @@ repExplBidirPatSynDir (MkC cls) = rep2 explBidirPatSynName [cls]
 repLambda :: LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Exp))
 repLambda (L _ (Match { m_pats = L _ ps
                       , m_grhss = GRHSs _ (L _ (GRHS _ [] e) :| [])
-                                              (EmptyLocalBinds _) } ))
+                                              (L _ (EmptyLocalBinds _)) } ))
  = do { let bndrs = collectPatsBinders CollNoDictBinders ps ;
       ; ss  <- mkGenSyms bndrs
       ; lam <- addBinds ss (
