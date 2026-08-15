@@ -437,7 +437,7 @@ getRealSpan (UnhelpfulSpan{}) = Nothing
 
 grhss_span :: (IsPass p, Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p)))) ~ EpAnn NoEpAnns)
            => GRHSs (GhcPass p) (LocatedA (body (GhcPass p))) -> SrcSpan
-grhss_span (GRHSs _ xs bs) = foldl' combineSrcSpans (spanHsLocaLBinds bs) (NE.map getLocA xs)
+grhss_span (GRHSs _ xs bs) = foldl' combineSrcSpans (getLocA bs) (NE.map getLocA xs)
 
 bindingsOnly :: [Context Name] -> HieM [HieAST a]
 bindingsOnly [] = pure []
@@ -1443,13 +1443,13 @@ instance ( ToHie (LocatedA (body (GhcPass p)))
                 concatMapM (toHieSyntax . L span) applicative_or_functor
         ]
 
-instance HiePass p => ToHie (RScoped (HsLocalBinds (GhcPass p))) where
-  toHie (RS scope binds) = concatM $ makeNode binds (spanHsLocaLBinds binds) : case binds of
+instance HiePass p => ToHie (RScoped (LocatedA (HsLocalBinds (GhcPass p)))) where
+  toHie (RS scope binds) = concatM $ makeNode binds (getLocA binds) : case unLoc binds of
       EmptyLocalBinds _ -> []
       HsIPBinds _ ipbinds -> case ipbinds of
-        IPBinds evbinds xs -> let sc = combineScopes scope $ scopeHsLocaLBinds binds
+        IPBinds evbinds xs -> let sc = combineScopes scope $ scopeHsLocaLBinds (unLoc binds)
                                   sp :: SrcSpanAnnA
-                                  sp = noAnnSrcSpan $ spanHsLocaLBinds binds in
+                                  sp = noAnnSrcSpan $ getLocA binds in
           [
             case hiePass @p of
               HieTc -> toHie $ EvBindContext sc (getRealSpan $ locA sp) $ L sp evbinds
@@ -1458,7 +1458,7 @@ instance HiePass p => ToHie (RScoped (HsLocalBinds (GhcPass p))) where
           ]
       HsValBinds _ valBinds ->
         [
-          toHie $ RS (combineScopes scope (scopeHsLocaLBinds binds))
+          toHie $ RS (combineScopes scope (scopeHsLocaLBinds (unLoc binds)))
                       valBinds
         ]
 

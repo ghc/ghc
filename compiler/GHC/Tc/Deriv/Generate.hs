@@ -2168,7 +2168,7 @@ mkFunBindSE arity loc fun pats_and_exprs
   where
     matches = [mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun) noAnn)
                               (noLocA (map (parenthesizePat appPrec) p)) e
-                               emptyLocalBinds
+                               (noLocA emptyLocalBinds)
               | (p,e) <-pats_and_exprs]
 
 mkRdrFunBind :: LocatedN RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
@@ -2190,7 +2190,7 @@ mkFunBindEC arity loc fun catch_all pats_and_exprs
     fun_bndr = mkMethBinder loc fun
     matches = [ mkMatch (mkPrefixFunRhs fun_bndr noAnn)
                                 (noLocA (map (parenthesizePat appPrec) p)) e
-                                emptyLocalBinds
+                                (noLocA emptyLocalBinds)
               | (p,e) <- pats_and_exprs ]
 
 -- | Produces a function binding. When no equations are given, it generates
@@ -2218,7 +2218,7 @@ mkRdrFunBindEC arity catch_all fun@(L loc _fun_rdr) matches
               then [mkMatch (mkPrefixFunRhs fun noAnn)
                             (noLocA (replicate (arity - 1) (nlWildPat) ++ [z_Pat]))
                             (catch_all $ nlHsCase z_Expr [])
-                            emptyLocalBinds]
+                            (noLocA emptyLocalBinds)]
               else matches
 
 -- | Produces a function binding. When there are no equations, it generates
@@ -2237,7 +2237,7 @@ mkRdrFunBindSE arity fun@(L loc fun_rdr) matches
    matches' = if null matches
               then [mkMatch (mkPrefixFunRhs fun noAnn)
                             (noLocA (replicate arity nlWildPat))
-                            (error_Expr str) emptyLocalBinds]
+                            (error_Expr str) (noLocA emptyLocalBinds)]
               else matches
    str = fsLit "Void " `appendFS` occNameFS (rdrNameOcc fun_rdr)
 
@@ -2921,4 +2921,3 @@ zonkDerivInstTys dit@(DerivInstTys { dit_cls_tys = cls_tys
           , dit_rep_tc_args     = rep_tc_args'
           , dit_dc_inst_arg_env = buildDataConInstArgEnv rep_tc rep_tc_args'
           }
-

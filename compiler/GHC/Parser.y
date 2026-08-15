@@ -1941,27 +1941,26 @@ decllist :: { Located (AnnList,Located (OrdList (LHsDecl GhcPs))) }
 
 -- Binding groups other than those of class and instance declarations
 --
-binds   ::  { Located (HsLocalBinds GhcPs) }
+binds   ::  { LHsLocalBinds GhcPs }
                                          -- May have implicit parameters
-                                                -- No type declarations
+                                         -- No type declarations
         : decllist          {% do { let { (AnnList la p s, decls) = unLoc $1 }
                                   ; val_binds <- cvBindGroup (unLoc $ decls)
                                   ; !cs <- getCommentsFor (gl $1)
-                                  ; return (sL1 $1 $ HsValBinds (EpAnn (glR $1) (AnnList la p s) cs, noEpTok) val_binds)} }
+                                  ; return (L (EpAnn (glR $1) noAnn cs) $ HsValBinds (AnnList la p s, noEpTok) val_binds)} }
 
-        | '{'            dbinds '}'     {% acs (comb3 $1 $2 $3) (\loc cs -> (L loc
-                                             $ HsIPBinds (EpAnn (spanAsAnchor (comb3 $1 $2 $3)) (AnnList AnnListBraces (ListBraces (epTok $1) (epTok $3)) []) cs, noEpTok) (IPBinds noExtField (reverse $ unLoc $2)))) }
+        | '{'            dbinds '}'     {% amsA' (sLL $1 $>
+                                             $ HsIPBinds (AnnList AnnListBraces (ListBraces (epTok $1) (epTok $3)) [], noEpTok) (IPBinds noExtField (reverse $ unLoc $2))) }
 
-        |     vocurly    dbinds close   {% acs (gl $2) (\loc cs -> (L loc
-                                             $ HsIPBinds (EpAnn (glR $1) (AnnList (AnnListLayout $ glR $1) ListNone []) cs, noEpTok) (IPBinds noExtField (reverse $ unLoc $2)))) }
+        |     vocurly    dbinds close   {% amsA' (sLL $1 $2
+                                             $ HsIPBinds (AnnList (AnnListLayout $ glR $1) ListNone [], noEpTok) (IPBinds noExtField (reverse $ unLoc $2))) }
 
 
-wherebinds :: { Maybe (Located (HsLocalBinds GhcPs, Maybe EpAnnComments )) }
+wherebinds :: { Maybe (LHsLocalBinds GhcPs) }
                                                 -- May have implicit parameters
                                                 -- No type declarations
-        : 'where' binds                 {% do { r <- acs (comb2 $1 $>) (\loc cs ->
-                                                (L loc (annBinds (epTok $1) cs (unLoc $2))))
-                                              ; return $ Just r} }
+        : 'where' binds                 {% do { !cs <- getCommentsFor (comb2 $1 $>)
+                                              ; return $ Just (annBinds (epTok $1) cs $2)} }
         | {- empty -}                   { Nothing }
 
 -----------------------------------------------------------------------------
@@ -2751,15 +2750,15 @@ decl    :: { LHsDecl GhcPs }
 
 rhs     :: { Located (GRHSs GhcPs (LHsExpr GhcPs)) }
         : '=' exp wherebinds    {% runPV (unECP $2) >>= \ $2 ->
-                                  do { let L l (bs, csw) = adaptWhereBinds $3
-                                     ; let loc = (comb3 $1 $2 (L l bs))
+                                  do { let bs = adaptWhereBinds $3
+                                     ; let loc = (comb3 $1 $2 bs)
                                      ; let locg = (comb2 $1 $2)
                                      ; acs loc (\loc cs ->
-                                       sL loc (GRHSs csw (unguardedRHS (EpAnn (spanAsAnchor locg) (GrhsAnn Nothing (Left $ epTok $1)) cs) locg $2)
+                                       sL loc (GRHSs emptyComments (unguardedRHS (EpAnn (spanAsAnchor locg) (GrhsAnn Nothing (Left $ epTok $1)) cs) locg $2)
                                                       bs)) } }
-        | gdrhs wherebinds      {% do { let {L l (bs, csw) = adaptWhereBinds $2}
-                                      ; acs (comb2 $1 (L l bs)) (\loc cs -> L loc
-                                                (GRHSs (cs Semi.<> csw) (NE.reverse (unLoc $1)) bs)) }}
+        | gdrhs wherebinds      {% do { let {bs = adaptWhereBinds $2}
+                                      ; acs (comb2 $1 bs) (\loc cs -> L loc
+                                                (GRHSs cs (NE.reverse (unLoc $1)) bs)) }}
 
 gdrhs :: { Located (NonEmpty (LGRHS GhcPs (LHsExpr GhcPs))) }
         : gdrhs gdrh            { sLL $1 $> ($2 NE.<| unLoc $1) }
@@ -3103,7 +3102,7 @@ aexp    :: { ECP }
                                    mkHsNegAppPV (comb2 $1 $>) $2 (epTok $1) }
         | 'let' binds 'in' exp          {  ECP $
                                            unECP $4 >>= \ $4 ->
-                                           mkHsLetPV (comb2 $1 $>) (epTok $1) (unLoc $2) (epTok $3) $4 }
+                                           mkHsLetPV (comb2 $1 $>) (epTok $1) $2 (epTok $3) $4 }
         | '\\' argpats '->' exp { ECP $
                       unECP $4 >>= \ $4 ->
                       mkHsLamPV (comb2 $1 $>) LamSingle
@@ -3581,8 +3580,8 @@ alt(PATS) :: { forall b. DisambECP b => PV (LMatch GhcPs (LocatedA b)) }
 
 alt_rhs :: { forall b. DisambECP b => PV (Located (GRHSs GhcPs (LocatedA b))) }
         : ralt wherebinds           { $1 >>= \alt ->
-                                      do { let {L l (bs, csw) = adaptWhereBinds $2}
-                                         ; acs (comb2 alt (L l bs)) (\loc cs -> L loc (GRHSs (cs Semi.<> csw) (unLoc alt) bs)) }}
+                                      do { let {bs = adaptWhereBinds $2}
+                                         ; acs (comb2 alt bs) (\loc cs -> L loc (GRHSs cs (unLoc alt) bs)) }}
 
 ralt :: { forall b. DisambECP b => PV (Located (NonEmpty (LGRHS GhcPs (LocatedA b)))) }
         : '->' exp            { unECP $2 >>= \ $2 ->
@@ -3707,7 +3706,7 @@ qual  :: { forall b. DisambECP b => PV (LStmt GhcPs (LocatedA b)) }
                                            amsA' (sLL $1 $> $ mkPsBindStmt (epUniTok $2) $1 $3) }
     | exp                                { unECP $1 >>= \ $1 ->
                                            return $ sL1a $1 $ mkBodyStmt $1 }
-    | 'let' binds                        { amsA' (sLL $1 $> $ mkLetStmt (epTok $1) (unLoc $2)) }
+    | 'let' binds                        { amsA' (sLL $1 $> $ mkLetStmt (epTok $1) $2) }
 
 -----------------------------------------------------------------------------
 -- Record Field Update/Construction
@@ -4794,13 +4793,9 @@ addTrailingCommaN (L anns a) span = do
 isUnicodeSyntax :: Located Token -> IsUnicodeSyntax
 isUnicodeSyntax lt = if isUnicode lt then UnicodeSyntax else NormalSyntax
 
--- We need a location for the where binds, when computing the SrcSpan
--- for the AST element using them.  Where there is a span, we return
--- it, else noLoc, which is ignored in the comb2 call.
-adaptWhereBinds :: Maybe (Located (HsLocalBinds GhcPs, Maybe EpAnnComments))
-                ->        Located (HsLocalBinds GhcPs,       EpAnnComments)
-adaptWhereBinds Nothing = noLoc (EmptyLocalBinds noExtField, emptyComments)
-adaptWhereBinds (Just (L l (b, mc))) = L l (b, maybe emptyComments id mc)
+adaptWhereBinds :: Maybe (LHsLocalBinds GhcPs) -> LHsLocalBinds GhcPs
+adaptWhereBinds Nothing = noLocA (EmptyLocalBinds noExtField)
+adaptWhereBinds (Just lb) = lb
 
 combineHasLocs :: (HasLoc a, HasLoc b) => a -> b -> SrcSpan
 combineHasLocs a b = combineSrcSpans (getHasLoc a) (getHasLoc b)

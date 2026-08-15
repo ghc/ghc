@@ -501,17 +501,17 @@ balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds)))
 
             in (an1', (NE.reverse $ L lg (GRHS ag' grs rhs):|gs), bindsm, (anc1',an1'))
 
-pushTrailingComments :: WithWhere -> EpAnnComments -> HsLocalBinds GhcPs -> (Bool, HsLocalBinds GhcPs)
-pushTrailingComments _ _cs b@EmptyLocalBinds{} = (False, b)
-pushTrailingComments _ _cs (HsIPBinds _ _) = error "TODO: pushTrailingComments:HsIPBinds"
-pushTrailingComments w cs lb@(HsValBinds (an,wt) _) = (True, HsValBinds (an',wt) vb)
+pushTrailingComments :: WithWhere -> EpAnnComments -> LHsLocalBinds GhcPs -> (Bool, LHsLocalBinds GhcPs)
+pushTrailingComments _ _cs b@(L _ EmptyLocalBinds{}) = (False, b)
+pushTrailingComments _ _cs (L _ HsIPBinds{}) = error "TODO: pushTrailingComments:HsIPBinds"
+pushTrailingComments w cs lb@(L l (HsValBinds (an,wt) _)) = (True, L l' (HsValBinds (an,wt) vb))
   where
     decls = hsDeclsLocalBinds lb
-    (an', decls') = case reverse decls of
-      [] -> (addCommentsToEpAnn an cs, decls)
-      (L la d:ds) -> (an, L (addCommentsToEpAnn la cs) d:ds)
+    (l', decls') = case reverse decls of
+      [] -> (addCommentsToEpAnn l cs, decls)
+      (L la d:ds) -> (l, L (addCommentsToEpAnn la cs) d:ds)
     vb = case replaceDeclsValbinds w lb (reverse decls') of
-      (HsValBinds _ vb') -> vb'
+      L _ (HsValBinds _ vb') -> vb'
       _ -> ValBinds noExtField []
 
 -- |Prior to moving an AST element, make sure any trailing comments belonging to
@@ -810,7 +810,7 @@ instance HasDecls (LocatedA (Match GhcPs (LocatedA (HsExpr GhcPs)))) where
     = let
         -- Need to throw in a fresh where clause if the binds were empty,
         -- in the annotations.
-        (l', rhs') = case binds of
+        (l', rhs') = case unLoc binds of
           EmptyLocalBinds{} ->
             let
               L l0 m' = balanceSameLineComments m
@@ -827,7 +827,7 @@ instance HasDecls (LocatedA (HsExpr GhcPs)) where
 
   replaceDecls (L ll (HsLet (tkLet, tkIn) binds ex)) newDecls
     = let
-        lastAnc = realSrcSpan $ spanHsLocaLBinds binds
+        lastAnc = realSrcSpan $ getLocA binds
         -- TODO: may be an intervening comment, take account for lastAnc
         (tkLet', tkIn', ex',newDecls') = case (tkLet, tkIn) of
           (EpTok l, EpTok i) ->
@@ -1006,22 +1006,22 @@ data WithWhere = WithWhere
 -- ordering should be done by the calling function from the 'HsLocalBinds'
 -- context in the AST.
 replaceDeclsValbinds :: WithWhere
-                     -> HsLocalBinds GhcPs -> [LHsDecl GhcPs]
-                     -> HsLocalBinds GhcPs
-replaceDeclsValbinds _ _ [] = EmptyLocalBinds NoExtField
-replaceDeclsValbinds w b@(HsValBinds a _) new
+                     -> LHsLocalBinds GhcPs -> [LHsDecl GhcPs]
+                     -> LHsLocalBinds GhcPs
+replaceDeclsValbinds _ (L l _) [] = L (l { entry = noSpanAnchor}) (EmptyLocalBinds NoExtField)
+replaceDeclsValbinds w (L l (HsValBinds a _)) new
     = let
-        oldSpan = spanHsLocaLBinds b
-        an = oldWhereAnnotation a w (realSrcSpan oldSpan)
-      in (HsValBinds an (ValBinds noExtField (map wrapValBind new)))
-replaceDeclsValbinds _ (HsIPBinds {}) _new    = error "undefined replaceDecls HsIPBinds"
-replaceDeclsValbinds w (EmptyLocalBinds _) new
+        an = oldWhereAnnotation a w
+      in (L l (HsValBinds an (ValBinds noExtField (map wrapValBind new))))
+replaceDeclsValbinds _ (L _ (HsIPBinds {})) _new    = error "undefined replaceDecls HsIPBinds"
+replaceDeclsValbinds w (L l (EmptyLocalBinds _)) new
     = let an = newWhereAnnotation w
-      in (HsValBinds an (ValBinds noExtField (map wrapValBind new)))
+          l' = l { entry = EpaDelta noSrcSpan (DifferentLine 1 2) [] }
+      in (L l' (HsValBinds an (ValBinds noExtField (map wrapValBind new))))
 
-oldWhereAnnotation :: (EpAnn AnnList, EpToken "where")
-  -> WithWhere -> RealSrcSpan -> (EpAnn AnnList, EpToken "where")
-oldWhereAnnotation (EpAnn anc an cs, _w) ww _oldSpan = an'
+oldWhereAnnotation :: (AnnList, EpToken "where")
+  -> WithWhere -> (AnnList, EpToken "where")
+oldWhereAnnotation (an, _w) ww  = an'
   -- TODO: when we set DP (0,0) for the HsValBinds EpEpaLocation,
   -- change the AnnList anchor to have the correct DP too
   where
@@ -1029,25 +1029,16 @@ oldWhereAnnotation (EpAnn anc an cs, _w) ww _oldSpan = an'
     w = case ww of
       WithWhere -> EpTok (EpaDelta noSrcSpan (SameLine 0) [])
       WithoutWhere -> noEpTok
-    (anc', ancl') =
-          case ww of
-            WithWhere -> (anc, ancl)
-            WithoutWhere -> (anc, ancl)
-    an' = (EpAnn anc'
-                 (AnnList ancl' p s)
-                 cs, w)
+    an' = (AnnList ancl p s, w)
 
-newWhereAnnotation :: WithWhere -> (EpAnn AnnList, EpToken "where")
+newWhereAnnotation :: WithWhere -> (AnnList, EpToken "where")
 newWhereAnnotation ww = (an, w)
   where
-  anc  = EpaDelta noSrcSpan (DifferentLine 1 2) []
   anc2 = EpaDelta noSrcSpan (DifferentLine 1 4) []
   w = case ww of
     WithWhere -> EpTok (EpaDelta noSrcSpan (SameLine 0) [])
     WithoutWhere -> noEpTok
-  an = EpAnn anc
-              (AnnList (AnnListLayout anc2) ListNone [])
-              emptyComments
+  an = AnnList (AnnListLayout anc2) ListNone []
 
 -- ---------------------------------------------------------------------
 
