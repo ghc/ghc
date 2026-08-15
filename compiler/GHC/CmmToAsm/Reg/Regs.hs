@@ -13,6 +13,7 @@ module GHC.CmmToAsm.Reg.Regs (
         shrinkingRegs,
         mapRegs,
         elemRegs, lookupReg,
+        equalRegs,
 
   ) where
 
@@ -23,6 +24,7 @@ import GHC.CmmToAsm.Format  ( Format, RegWithFormat(..), isVecFormat )
 
 import GHC.Utils.Outputable ( Outputable )
 import GHC.Types.Unique     ( Uniquable(..) )
+import GHC.Types.Unique.FM  ( equalUFMBy )
 import GHC.Types.Unique.Set
 
 import Data.Coerce ( coerce )
@@ -33,7 +35,7 @@ import Data.Coerce ( coerce )
 -- register liveness analysis.  See Note [Register formats in liveness analysis]
 -- in GHC.CmmToAsm.Reg.Liveness.
 newtype Regs = Regs { getRegs :: UniqSet RegWithFormat }
-  deriving newtype (Eq, Outputable)
+  deriving newtype (Outputable)
 
 maxRegWithFormat :: RegWithFormat -> RegWithFormat -> RegWithFormat
 maxRegWithFormat r1@(RegWithFormat _ fmt1) r2@(RegWithFormat _ fmt2)
@@ -117,3 +119,10 @@ elemRegs r (Regs live) = elemUniqSet_Directly (getUnique r) live
 lookupReg :: Reg -> Regs -> Maybe Format
 lookupReg r (Regs live) =
   regWithFormat_format <$> lookupUniqSet_Directly live (getUnique r)
+
+-- | Do the two sets contain the same registers, at the same formats?
+equalRegs :: Regs -> Regs -> Bool
+equalRegs (Regs a) (Regs b) = equalUFMBy sameFormat (getUniqSet a) (getUniqSet b)
+  where
+    -- Registers with equal uniques are equal, so only compare the formats.
+    sameFormat (RegWithFormat _ fmt1) (RegWithFormat _ fmt2) = fmt1 == fmt2

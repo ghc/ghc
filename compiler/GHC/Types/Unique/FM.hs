@@ -67,6 +67,7 @@ module GHC.Types.Unique.FM (
         strictIntersectUFM_C,
         disjointUFM,
         equalKeysUFM,
+        equalUFMBy,
         diffUFM,
         nonDetStrictFoldUFM, nonDetFoldUFM, nonDetStrictFoldUFM_DirectlyM,
         nonDetFoldWithKeyUFM,
@@ -590,7 +591,12 @@ unsafeCastUFMKey (UFM m) = UFM m
 
 -- Determines whether two 'UniqFM's contain the same keys.
 equalKeysUFM :: UniqFM key a -> UniqFM key b -> Bool
-equalKeysUFM (UFM m1) (UFM m2) = liftEq (\_ _ -> True) m1 m2
+equalKeysUFM = equalUFMBy (\_ _ -> True)
+
+-- | Determines whether two 'UniqFM's contain the same keys, with values
+-- that agree according to the given predicate.
+equalUFMBy :: (a -> b -> Bool) -> UniqFM key a -> UniqFM key b -> Bool
+equalUFMBy eq (UFM m1) (UFM m2) = liftEq eq m1 m2
 
 -- | An edit on type @a@, relating an element of a container (like an entry in a
 -- map or a line in a file) before and after.

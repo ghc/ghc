@@ -879,7 +879,7 @@ computeLiveness platform sccs
                                         , ppr sccs'])
 
 livenessSCCs
-       :: Instruction instr
+       :: forall instr. Instruction instr
        => Platform
        -> BlockMap Regs
        -> [SCC (LiveBasicBlock instr)]          -- accum
@@ -897,37 +897,50 @@ livenessSCCs platform blockmap done (AcyclicSCC block : sccs)
 livenessSCCs platform blockmap done
         (CyclicSCC blocks : sccs) =
         livenessSCCs platform blockmap' (CyclicSCC blocks':done) sccs
- where      (blockmap', blocks')
-                = iterateUntilUnchanged linearLiveness equalBlockMaps
-                                      blockmap blocks
+ where      (blockmap', blocks') = fixpoint blockmap
 
-            iterateUntilUnchanged
-                :: (a -> b -> (a,c)) -> (a -> a -> Bool)
-                -> a -> b
-                -> (a,c)
-
-            iterateUntilUnchanged f eq aa b = go aa
+            -- See Note [Convergence of the liveness fixpoint]
+            fixpoint :: BlockMap Regs -> (BlockMap Regs, [LiveBasicBlock instr])
+            fixpoint bm
+                | all unchanged blocks = (bm', blocks'')
+                | otherwise            = fixpoint bm'
               where
-                go a = if eq a a' then ac else go a'
-                  where
-                    ac@(a', _) = f a b
+                (bm', blocks'') = mapAccumL (livenessBlock platform) bm blocks
 
-            linearLiveness
-                :: Instruction instr
-                => BlockMap Regs -> [LiveBasicBlock instr]
-                -> (BlockMap Regs, [LiveBasicBlock instr])
+                unchanged :: LiveBasicBlock instr -> Bool
+                unchanged block =
+                    case (mapLookup bid bm, mapLookup bid bm') of
+                        (Just old, Just new) -> old `equalRegs` new
+                        (Nothing,  _       ) -> False  -- first iteration
+                        (Just _,   Nothing ) -> False  -- can't happen
+                  where bid = blockId block
 
-            linearLiveness = mapAccumL (livenessBlock platform)
+{- Note [Convergence of the liveness fixpoint]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For a cyclic SCC, we iterate 'livenessBlock' over the SCC's blocks until the
+recorded entry liveness stops changing. Two subtleties in the convergence
+test:
 
-                -- probably the least efficient way to compare two
-                -- BlockMaps for equality.
-            equalBlockMaps :: BlockMap Regs -> BlockMap Regs -> Bool
-            equalBlockMaps a b
-                = a' == b'
-              where a' = mapToList a
-                    b' = mapToList b
-                    -- See Note [Unique Determinism and code generation]
+* It must compare register formats, not just sets of live registers –
+  hence the format-aware 'equalRegs'. A block's live-in set joins the
+  successors' entries with 'unionRegsMaxFmt', so a wide format may take one
+  iteration per control-flow edge to propagate backwards around a loop. The
+  register sets themselves are typically complete after the first iteration.
+  If we stopped as soon as the sets stabilise, a register could be recorded
+  at a narrower format than the reads it flows into. That would violate
+  property (FmtBwd1) of Note [Register formats in liveness analysis], which
+  the register allocator relies on for spill and reload widths. See #27619.
 
+* It is sufficient to compare the entries of the SCC's own blocks. No other
+  entries can change: 'livenessBlock' inserts only the block it processes,
+  and successor SCCs are already final because SCCs are processed in reverse
+  dependency order. Comparing the whole accumulated block map would make the
+  fixpoint quadratic in procedure size (#27437).
+
+The fixpoint terminates because the entries can only grow: registers are
+only added, formats only increase via 'maxRegWithFormat' joins, and both
+lattices are finite.
+-}
 
 
 -- | Annotate a basic block with register liveness information.
