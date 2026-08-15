@@ -4343,6 +4343,8 @@ genPrim bid (MO_AtomicRMW width amop) [dst] [addr, n]
   = genAtomicRMW bid width amop dst addr n
 genPrim bid (MO_Ctz width) [dst] [src]
   = genCtz bid width dst src
+genPrim bid (MO_UF_Conv width) [dst] [src]
+  = genWordToFloat bid width dst src
 
 -- Then we deal with cases which not introducing new blocks in the stream.
 genPrim bid prim dst args
@@ -4369,7 +4371,6 @@ genSimplePrim bid (MO_PopCnt width)    [dst]   [src]          = genPopCnt bid wi
 genSimplePrim bid (MO_Pdep width)      [dst]   [src,mask]     = genPdep bid width dst src mask
 genSimplePrim bid (MO_Pext width)      [dst]   [src,mask]     = genPext bid width dst src mask
 genSimplePrim bid (MO_Clz width)       [dst]   [src]          = genClz bid width dst src
-genSimplePrim bid (MO_UF_Conv width)   [dst]   [src]          = genWordToFloat bid width dst src
 genSimplePrim _   (MO_AtomicRead w mo)  [dst]  [addr]         = genAtomicRead w mo dst addr
 genSimplePrim _   (MO_AtomicWrite w mo) []     [addr,val]     = genAtomicWrite w mo addr val
 genSimplePrim bid (MO_Cmpxchg width)   [dst]   [addr,old,new] = genCmpXchg bid width dst addr old new
@@ -6776,7 +6777,7 @@ The constant 65536.0 (= 0x47800000 in float32 bit-pattern) is loaded
 via a MOV + MOVD, avoiding a memory load.
 -}
 
-genWordToFloat :: BlockId -> Width -> CmmFormal -> CmmActual -> NatM InstrBlock
+genWordToFloat :: BlockId -> Width -> CmmFormal -> CmmActual -> NatM (InstrBlock, Maybe BlockId)
 genWordToFloat bid width dst src = do
   is32Bit <- is32BitPlatform
   platform <- getPlatform
@@ -6792,49 +6793,51 @@ genWordToFloat bid width dst src = do
   (src_r, code_src)  <- getSomeReg src
 
   if is32Bit
-    then case (srcFormat, width) of
-      (II32, W64) -> do
-        -- See Note [Word-to-float64 conversion on i386]
-        cst_r  <- getNewRegNat srcFormat
-        cst_v  <- getNewRegNat dstFormat
-        flip_r <- getNewRegNat srcFormat
-        return $ code_src `appOL` toOL
-          [ MOV srcFormat (OpImm (ImmInt 0x4F000000)) (OpReg cst_r)         -- load the constant
-          , MOVD srcFormat (floatFormat W32) (OpReg cst_r) (OpReg cst_v)
-          , CVTSS2SD cst_v cst_v
-          , MOV srcFormat (OpReg src_r) (OpReg flip_r)                        -- copy src (modified below)
-          , ADD srcFormat (OpImm $ ImmInteger 0x80000000) (OpReg flip_r)      -- flip_r = flip MSB(src)
-          -- XOR dst_r with itself to avoid a false dependency: CVTSI2SD
-          -- (SSE2) only writes the lower 64 bits of the destination XMM
-          -- register, leaving the upper bits unchanged. That creates a
-          -- dependency on the old value of dst_r. Zeroing it first breaks
-          -- the dependency chain.
-          , XOR dstFormat (OpReg dst_r) (OpReg dst_r)
-          , conv srcFormat (OpReg flip_r) dst_r
-          , ADD dstFormat (OpReg cst_v) (OpReg dst_r) -- +2147483648.0
-          ]
-      (II32, W32) -> do
-        -- See Note [Word-to-float32 conversion on i386]
-        tmp_v  <- getNewRegNat dstFormat
-        cst_v  <- getNewRegNat dstFormat
-        cst_r  <- getNewRegNat srcFormat
-        high_r <- getNewRegNat srcFormat
-        low_r  <- getNewRegNat srcFormat
-        return $ code_src `appOL` toOL
-          [ MOV srcFormat (OpImm (ImmInt 0x47800000)) (OpReg cst_r) -- load the constant
-          , MOVD srcFormat dstFormat (OpReg cst_r) (OpReg cst_v)
-          , MOVZxL II16 (OpReg src_r) (OpReg low_r)                  -- low_r   = low 16 bits
-          , MOV srcFormat (OpReg src_r) (OpReg high_r)               -- copy src (modified below)
-          , SHR srcFormat (OpImm $ ImmInt 16) (OpReg high_r)         -- high_r  = high 16 bits
-          , conv srcFormat (OpReg high_r) dst_r                      -- dst_r = float(high)
-          , MUL dstFormat (OpReg cst_v) (OpReg dst_r)                -- dst_r = float(high) * 65536.0
-          -- XOR tmp_v to avoid a false dependency on its previous value
-          -- before the CVTSI2SS below (same reasoning as in the W64 case).
-          , XOR dstFormat (OpReg tmp_v) (OpReg tmp_v)
-          , conv srcFormat (OpReg low_r) tmp_v               -- tmp_v = float(low)
-          , ADD dstFormat (OpReg tmp_v) (OpReg dst_r)        -- dst_r = float(high)*65536.0 + float(low)
-          ]
-      _           -> panic ("genWordToFloat: unsupported source operand format: " ++ show srcFormat)
+    then do
+      code <- case (srcFormat, width) of
+            (II32, W64) -> do
+              -- See Note [Word-to-float64 conversion on i386]
+              cst_r  <- getNewRegNat srcFormat
+              cst_v  <- getNewRegNat dstFormat
+              flip_r <- getNewRegNat srcFormat
+              return $ code_src `appOL` toOL
+                [ MOV srcFormat (OpImm (ImmInt 0x4F000000)) (OpReg cst_r)         -- load the constant
+                , MOVD srcFormat (floatFormat W32) (OpReg cst_r) (OpReg cst_v)
+                , CVTSS2SD cst_v cst_v
+                , MOV srcFormat (OpReg src_r) (OpReg flip_r)                        -- copy src (modified below)
+                , ADD srcFormat (OpImm $ ImmInteger 0x80000000) (OpReg flip_r)      -- flip_r = flip MSB(src)
+                -- XOR dst_r with itself to avoid a false dependency: CVTSI2SD
+                -- (SSE2) only writes the lower 64 bits of the destination XMM
+                -- register, leaving the upper bits unchanged. That creates a
+                -- dependency on the old value of dst_r. Zeroing it first breaks
+                -- the dependency chain.
+                , XOR dstFormat (OpReg dst_r) (OpReg dst_r)
+                , conv srcFormat (OpReg flip_r) dst_r
+                , ADD dstFormat (OpReg cst_v) (OpReg dst_r) -- +2147483648.0
+                ]
+            (II32, W32) -> do
+              -- See Note [Word-to-float32 conversion on i386]
+              tmp_v  <- getNewRegNat dstFormat
+              cst_v  <- getNewRegNat dstFormat
+              cst_r  <- getNewRegNat srcFormat
+              high_r <- getNewRegNat srcFormat
+              low_r  <- getNewRegNat srcFormat
+              return $ code_src `appOL` toOL
+                [ MOV srcFormat (OpImm (ImmInt 0x47800000)) (OpReg cst_r) -- load the constant
+                , MOVD srcFormat dstFormat (OpReg cst_r) (OpReg cst_v)
+                , MOVZxL II16 (OpReg src_r) (OpReg low_r)                  -- low_r   = low 16 bits
+                , MOV srcFormat (OpReg src_r) (OpReg high_r)               -- copy src (modified below)
+                , SHR srcFormat (OpImm $ ImmInt 16) (OpReg high_r)         -- high_r  = high 16 bits
+                , conv srcFormat (OpReg high_r) dst_r                      -- dst_r = float(high)
+                , MUL dstFormat (OpReg cst_v) (OpReg dst_r)                -- dst_r = float(high) * 65536.0
+                -- XOR tmp_v to avoid a false dependency on its previous value
+                -- before the CVTSI2SS below (same reasoning as in the W64 case).
+                , XOR dstFormat (OpReg tmp_v) (OpReg tmp_v)
+                , conv srcFormat (OpReg low_r) tmp_v               -- tmp_v = float(low)
+                , ADD dstFormat (OpReg tmp_v) (OpReg dst_r)        -- dst_r = float(high)*65536.0 + float(low)
+                ]
+            _           -> panic ("genWordToFloat: unsupported source operand format: " ++ show srcFormat)
+      pure (code, Nothing)
     else do
       -- See Note [Word-to-float conversion on x86-64]
       half_r  <- getNewRegNat srcFormat
@@ -6858,27 +6861,28 @@ genWordToFloat bid width dst src = do
                    . addWeightEdge lblLarge lblAfter   1
                    . delEdge bid lblAfter )
 
-      return $ appOL (code_src)
-        $ toOL
-        [ TEST srcFormat (OpReg src_r) (OpReg src_r)
-        , JXX NEG lblLarge
-        -- Adding this label to allow optimizations to either invert condition or just eliminate
-        , JXX ALWAYS lblSmall
-        , NEWBLOCK lblSmall
-        , conv srcFormat (OpReg src_r) dst_r  -- direct conversion for src < 2^63
-        , JXX ALWAYS lblAfter
-        , NEWBLOCK lblLarge
-        -- Halve src, preserving the LSB as a round bit, then convert and double.
-        , MOV srcFormat (OpReg src_r) (OpReg half_r)
-        , SHR srcFormat (OpImm $ ImmInt 1) (OpReg half_r)  -- half_r     = src >> 1
-        , MOV srcFormat (OpReg src_r) (OpReg round_r)      -- copy src (modified below)
-        , AND srcFormat (OpImm $ ImmInt 1) (OpReg round_r) -- round_r = src & 1  (round bit)
-        , OR  srcFormat (OpReg round_r) (OpReg half_r)     -- half_r  = (src >> 1) | (src & 1)
-        , conv srcFormat (OpReg half_r) dst_r
-        , ADD dstFormat (OpReg dst_r) (OpReg dst_r)        -- double the result
-        , JXX ALWAYS lblAfter
-        , NEWBLOCK lblAfter
-        ]
+      let code = appOL (code_src)
+            $ toOL
+            [ TEST srcFormat (OpReg src_r) (OpReg src_r)
+            , JXX NEG lblLarge
+            -- Adding this label to allow optimizations to either invert condition or just eliminate
+            , JXX ALWAYS lblSmall
+            , NEWBLOCK lblSmall
+            , conv srcFormat (OpReg src_r) dst_r  -- direct conversion for src < 2^63
+            , JXX ALWAYS lblAfter
+            , NEWBLOCK lblLarge
+            -- Halve src, preserving the LSB as a round bit, then convert and double.
+            , MOV srcFormat (OpReg src_r) (OpReg half_r)
+            , SHR srcFormat (OpImm $ ImmInt 1) (OpReg half_r)  -- half_r     = src >> 1
+            , MOV srcFormat (OpReg src_r) (OpReg round_r)      -- copy src (modified below)
+            , AND srcFormat (OpImm $ ImmInt 1) (OpReg round_r) -- round_r = src & 1  (round bit)
+            , OR  srcFormat (OpReg round_r) (OpReg half_r)     -- half_r  = (src >> 1) | (src & 1)
+            , conv srcFormat (OpReg half_r) dst_r
+            , ADD dstFormat (OpReg dst_r) (OpReg dst_r)        -- double the result
+            , JXX ALWAYS lblAfter
+            , NEWBLOCK lblAfter
+            ]
+      return (code, Just lblAfter)
 
 genAtomicRead :: Width -> MemoryOrdering -> LocalReg -> CmmExpr -> NatM InstrBlock
 genAtomicRead width _mord dst addr = do

@@ -39,6 +39,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Cmm.BlockId
+import GHC.CmmToAsm.Instr
 import GHC.Cmm as Cmm
 
 import GHC.Cmm.Switch
@@ -208,13 +209,20 @@ hasNode m node =
     where
       found = mapMember node m
 
-
+hasEdge :: CFG -> (BlockId,BlockId) -> Bool
+hasEdge cfg (from,to)
+  | Just to_map <- mapLookup from cfg
+  , Just _ <- mapLookup to to_map
+  = True
+  | otherwise = False
 
 -- | Check if the nodes in the cfg and the set of blocks are the same.
 --   In a case of a mismatch we panic and show the difference.
-sanityCheckCfg :: CFG -> LabelSet -> SDoc -> Bool
-sanityCheckCfg m blockSet msg
-    | blockSet == cfgNodes
+-- Additionally check if the apparent edges in the code are present in the CFG.
+sanityCheckCfg :: Instruction i => CFG -> [GenBasicBlock i] -> SDoc -> Bool
+sanityCheckCfg m blocks msg
+    | blockSet == cfg_nodes
+    , all (m `hasEdge`) edges
     = True
     | otherwise =
         pprPanic "Block list and cfg nodes don't match" (
@@ -224,8 +232,16 @@ sanityCheckCfg m blockSet msg
             msg )
             False
     where
-      cfgNodes = setFromList $ getCfgNodes m :: LabelSet
-      diff = (setUnion cfgNodes blockSet) `setDifference` (setIntersection cfgNodes blockSet) :: LabelSet
+
+      cfg_nodes = setFromList $ getCfgNodes m :: LabelSet
+
+      blockSet = setFromList $ fmap blockId blocks
+      edges = [(from,to)
+              | BasicBlock from instrs <- blocks
+              , to <- concatMap jumpDestsOfInstr instrs
+              ]
+
+      diff = (setUnion cfg_nodes blockSet) `setDifference` (setIntersection cfg_nodes blockSet) :: LabelSet
 
 -- | Filter the CFG with a custom function f.
 --   Parameters are `f from to edgeInfo`

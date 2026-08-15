@@ -636,9 +636,8 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
         when ( ncgEnableDeadCodeElimination config &&
                 (ncgAsmLinting config || debugIsOn )) $ do
                 let blocks = concatMap getBlks shorted
-                let labels = setFromList $ fmap blockId blocks :: LabelSet
                 let cfg = fromJust optimizedCFG
-                return $! seq (sanityCheckCfg cfg labels $
+                return $! seq (sanityCheckCfg cfg blocks $
                                 text "cfg not in lockstep") ()
 
         ---- sequence blocks
