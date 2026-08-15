@@ -13,6 +13,7 @@ module GHC.CmmToAsm.Reg.Regs (
         shrinkingRegs,
         mapRegs,
         elemRegs, lookupReg,
+        equalRegs,
 
   ) where
 
@@ -23,6 +24,7 @@ import GHC.CmmToAsm.Format  ( Format, RegWithFormat(..), isVecFormat )
 
 import GHC.Utils.Outputable ( Outputable )
 import GHC.Types.Unique     ( Uniquable(..) )
+import GHC.Types.Unique.FM  ( equalUFMBy )
 import GHC.Types.Unique.Set
 
 import Data.Coerce ( coerce )
@@ -33,8 +35,11 @@ import Data.Coerce ( coerce )
 -- register liveness analysis.  See Note [Register formats in liveness analysis]
 -- in GHC.CmmToAsm.Reg.Liveness.
 newtype Regs = Regs { getRegs :: UniqSet RegWithFormat }
-  deriving newtype (Eq, Outputable)
+  deriving newtype (Outputable)
 
+-- | Combine two entries for the same register, keeping the larger format.
+--
+-- See Note [Joining register formats].
 maxRegWithFormat :: RegWithFormat -> RegWithFormat -> RegWithFormat
 maxRegWithFormat r1@(RegWithFormat _ fmt1) r2@(RegWithFormat _ fmt2)
   = if fmt1 >= fmt2
@@ -42,6 +47,16 @@ maxRegWithFormat r1@(RegWithFormat _ fmt1) r2@(RegWithFormat _ fmt2)
     else r2
   -- Re-using one of the arguments avoids allocating a new 'RegWithFormat',
   -- compared with returning 'RegWithFormat r1 (max fmt1 fmt2)'.
+
+{- Note [Joining register formats]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When liveness analysis joins two entries for the same register, it keeps the
+larger format, using 'maxRegWithFormat'. This must be the maximum under a
+total order on formats. If distinct formats could tie, e.g. when comparing
+only widths, and ties were broken by argument order, a block's format could
+alternate between them from sweep to sweep, and the liveness fixpoint would
+not terminate. See Note [Computing liveness] in GHC.CmmToAsm.Reg.Liveness.
+-}
 
 noRegs :: Regs
 noRegs = Regs emptyUniqSet
@@ -117,3 +132,10 @@ elemRegs r (Regs live) = elemUniqSet_Directly (getUnique r) live
 lookupReg :: Reg -> Regs -> Maybe Format
 lookupReg r (Regs live) =
   regWithFormat_format <$> lookupUniqSet_Directly live (getUnique r)
+
+-- | Do the two sets contain the same registers, at the same formats?
+equalRegs :: Regs -> Regs -> Bool
+equalRegs (Regs a) (Regs b) = equalUFMBy sameFormat (getUniqSet a) (getUniqSet b)
+  where
+    -- Registers with equal uniques are equal, so only compare the formats.
+    sameFormat (RegWithFormat _ fmt1) (RegWithFormat _ fmt2) = fmt1 == fmt2
