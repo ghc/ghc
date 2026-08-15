@@ -1480,6 +1480,23 @@ getRegister' platform is32Bit (CmmMachOp (MO_Xor w) [x, CmmLit lit@(CmmInt m _)]
   , not (is32BitLit platform lit)
   = genBitTestImmCode (intFormat w) BTC x i
 
+-- Mirrored versions with the literal mask on the left. Constant folding
+-- canonicalizes constants to the right (see GHC.Cmm.Opt.cmmMachOpFoldM), so
+-- these only fire on Cmm that reaches the NCG unfolded, e.g. hand-written
+-- .cmm code.
+getRegister' platform is32Bit (CmmMachOp (MO_And w) [CmmLit lit@(CmmInt m _), x])
+  | Just i <- clearBitLit_maybe w m, bitTestOpWidthOK is32Bit w
+  , not (is32BitLit platform lit)
+  = genBitTestImmCode (intFormat w) BTR x i
+getRegister' platform is32Bit (CmmMachOp (MO_Or w) [CmmLit lit@(CmmInt m _), x])
+  | Just i <- setBitLit_maybe w m, bitTestOpWidthOK is32Bit w
+  , not (is32BitLit platform lit)
+  = genBitTestImmCode (intFormat w) BTS x i
+getRegister' platform is32Bit (CmmMachOp (MO_Xor w) [CmmLit lit@(CmmInt m _), x])
+  | Just i <- setBitLit_maybe w m, bitTestOpWidthOK is32Bit w
+  , not (is32BitLit platform lit)
+  = genBitTestImmCode (intFormat w) BTC x i
+
 getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
   sse4_1 <- sse4_1Enabled
   sse4_2 <- sse4_2Enabled

@@ -1,0 +1,17 @@
+#include "Cmm.h"
+
+// Single-bit literal masks written on the left of the operator. Constant
+// folding canonicalizes literals to the right, so these shapes only reach
+// the NCG from hand-written Cmm like this (#25233).
+
+clearBit40 (W_ x) {
+    return ((0xFFFFFEFFFFFFFFFF :: bits64) & x);
+}
+
+setBit40 (W_ x) {
+    return ((0x10000000000 :: bits64) | x);
+}
+
+complementBit40 (W_ x) {
+    return ((0x10000000000 :: bits64) ^ x);
+}
