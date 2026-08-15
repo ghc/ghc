@@ -13,10 +13,11 @@
 
 module GHC.Data.Unboxed (
   MaybeUB(JustUB, NothingUB),
-  fmapMaybeUB, fromMaybeUB, apMaybeUB, maybeUB
+  fmapMaybeUB, fromMaybeUB, apMaybeUB, maybeUB,
+  traverseMaybeUB
   ) where
 
-import GHC.Prelude hiding (Maybe(..), Either(..))
+import GHC.Prelude
 
 -- | Like Maybe, but using unboxed sums.
 --
@@ -54,3 +55,28 @@ fmapMaybeUB f (JustUB x) = JustUB $ f x
 maybeUB :: b -> (a -> b) -> MaybeUB a -> b
 maybeUB _def f (JustUB x) = f x
 maybeUB def _f NothingUB = def
+
+toMaybe :: MaybeUB a -> Maybe a
+toMaybe NothingUB = Nothing
+toMaybe (JustUB a) = Just a
+
+-- | Like 'traverse' for the 'Maybe' applicative, but avoiding intermediate
+-- allocations.
+--
+-- The passed-in function must inline for this to help at all.
+traverseMaybeUB
+  :: forall a b
+  .  (a -> Maybe b) -- ^ @INLINE@ function to map over the list
+  -> [a] -> Maybe [b]
+{-# INLINE traverseMaybeUB #-}
+  -- 'traverseMaybeUB' must inline so that the function it is passed can inline
+traverseMaybeUB f = \ xs -> toMaybe $ go xs
+  where
+    go :: [a] -> MaybeUB [b]
+    go [] = JustUB []
+    go (a:as)
+      | Just b <- f a -- f is assumed to inline
+      , JustUB bs <- go as
+      = JustUB (b:bs)
+      | otherwise
+      = NothingUB
