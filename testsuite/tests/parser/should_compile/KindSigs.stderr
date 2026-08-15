@@ -1102,8 +1102,14 @@
                    (ExactName
                     {Name: ()})))))))
              [])
-            (EmptyLocalBinds
-             (NoExtField)))))])))))
+            (L
+             (EpAnn
+              (EpaSpan { <no location info> })
+              []
+              (EpaComments
+               []))
+             (EmptyLocalBinds
+              (NoExtField))))))])))))
   ,(L
     (EpAnn
      (EpaSpan { KindSigs.hs:26:1-29 })
@@ -1802,7 +1808,13 @@
                   (Unqual
                    {OccName: True}))))))
              [])
-            (EmptyLocalBinds
-             (NoExtField)))))])))))]))
+            (L
+             (EpAnn
+              (EpaSpan { <no location info> })
+              []
+              (EpaComments
+               []))
+             (EmptyLocalBinds
+              (NoExtField))))))])))))]))
 
 
