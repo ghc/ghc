@@ -506,10 +506,10 @@ tcExpr (ExplicitSum _ alt arity expr) res_ty
 ************************************************************************
 -}
 
-tcExpr (HsLet x binds expr) res_ty
+tcExpr (HsLet x (L l binds) expr) res_ty
   = do  { (binds', expr') <- tcLocalBinds binds $
                              tcMonoLExpr expr res_ty
-        ; return (HsLet x binds' expr') }
+        ; return (HsLet x (L l binds') expr') }
 
 tcExpr (HsCase ctxt scrut matches) res_ty
   = do  {  -- We used to typecheck the case alternatives first.
@@ -1488,7 +1488,7 @@ expandRecordUpd record_expr@(L lspan _) possible_parents rbnds res_ty
 
        -- STEP 2 (b): expand to HsCase, as per Note [Record Updates]
        ; let ds_expr :: HsExpr GhcRn
-             ds_expr = HsLet noExtField let_binds (wrapGenSpan case_expr)
+             ds_expr = HsLet noExtField (noLocA let_binds) (wrapGenSpan case_expr)
 
              case_expr :: HsExpr GhcRn
              case_expr = HsCase RecUpd (wrapGenSpan' (locA lspan) (unLoc record_expr))

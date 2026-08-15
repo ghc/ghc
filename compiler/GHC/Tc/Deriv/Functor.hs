@@ -643,7 +643,7 @@ mkSimpleConMatch ctxt fold extra_pats con insides = do
           else nlParPat bare_pat
     rhs <- fold con_name
                 (zipWith (\i v -> i $ nlHsVar v) insides vars_needed)
-    return $ mkMatch ctxt (noLocA (extra_pats ++ [pat])) rhs emptyLocalBinds
+    return $ mkMatch ctxt (noLocA (extra_pats ++ [pat])) rhs (noLocA emptyLocalBinds)
 
 -- "Con a1 a2 a3 -> fmap (\b2 -> Con a1 b2 a3) (traverse f a2)"
 --
@@ -693,7 +693,7 @@ mkSimpleConMatch2 ctxt fold extra_pats con insides = do
               in mkHsLam (noLocA (map nlVarPat bs)) (nlHsApps con_name vars)
 
     rhs <- fold con_expr exps
-    return $ mkMatch ctxt (noLocA (extra_pats ++ [pat])) rhs emptyLocalBinds
+    return $ mkMatch ctxt (noLocA (extra_pats ++ [pat])) rhs (noLocA emptyLocalBinds)
 
 -- "case x of (a1,a2,a3) -> fold [x1 a1, x2 a2, x3 a3]"
 mkSimpleTupleCase :: Monad m => ([LPat GhcPs] -> DataCon -> [a]
@@ -879,7 +879,7 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
           case convert parts of
             Nothing -> return $
               mkMatch null_match_ctxt (noLocA [nlParPat (nlWildConPat con)])
-                false_Expr emptyLocalBinds
+                false_Expr (noLocA emptyLocalBinds)
             Just cp -> match_null [] con cp
 
     -- Yields 'Just' an expression if we're folding over a type that mentions

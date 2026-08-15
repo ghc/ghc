@@ -479,10 +479,10 @@ rnExpr (HsCase _ expr matches)
        ; (new_matches, ms_fvs) <- rnMatchGroup CaseAlt rnLExpr matches
        ; return (HsCase CaseAlt new_expr new_matches, e_fvs `plusFN` ms_fvs) }
 
-rnExpr (HsLet _ binds expr)
+rnExpr (HsLet _ (L l binds) expr)
   = rnLocalBindsAndThen binds $ \binds' _ -> do
       { (expr',fvExpr) <- rnLExpr expr
-      ; return (HsLet noExtField binds' expr', fvExpr) }
+      ; return (HsLet noExtField (L l binds') expr', fvExpr) }
 
 rnExpr (HsDo _ do_or_lc (L l stmts))
  = do { ((stmts1, _), fvs1) <-
@@ -993,10 +993,10 @@ rnCmd (HsCmdIf _ _ p b1 b2)
 
        ; return (HsCmdIf noExtField ite p' b1' b2', plusFNs [fvITE, fvP, fvB1, fvB2])}
 
-rnCmd (HsCmdLet _ binds cmd)
+rnCmd (HsCmdLet _ (L l binds) cmd)
   = rnLocalBindsAndThen binds $ \ binds' _ -> do
       { (cmd',fvExpr) <- rnLCmd cmd
-      ; return (HsCmdLet noExtField binds' cmd', fvExpr) }
+      ; return (HsCmdLet noExtField (L l binds') cmd', fvExpr) }
 
 rnCmd (HsCmdDo _ (L l stmts))
   = do  { ((stmts', _), fvs) <-
@@ -1315,10 +1315,10 @@ rnStmt ctxt rnBody (L loc (BindStmt _ pat (L lb body))) thing_inside
        -- fv_expr shouldn't really be filtered by the rnPatsAndThen
         -- but it does not matter because the names are unique
 
-rnStmt _ _ (L loc (LetStmt _ binds)) thing_inside
+rnStmt _ _ (L loc (LetStmt _ (L l binds))) thing_inside
   =     rnLocalBindsAndThen binds $ \binds' bind_fvs -> do
         { (thing, fvs) <- thing_inside (collectLocalBinders CollNoDictBinders binds')
-        ; return ( ([(L loc (LetStmt noAnn binds'), bind_fvs)], thing)
+        ; return ( ([(L loc (LetStmt noAnn (L l binds')), bind_fvs)], thing)
                  , fvs) }
 
 rnStmt ctxt rnBody (L loc (RecStmt { recS_stmts = L _ rec_stmts })) thing_inside
@@ -1580,7 +1580,7 @@ rnRecStmtsAndThen ctxt rnBody s cont
 collectRecStmtsFixities :: [LStmtLR GhcPs GhcPs body] -> [LFixitySig GhcPs]
 collectRecStmtsFixities l =
     foldr (\ s -> \acc -> case s of
-            (L _ (LetStmt _ (HsValBinds _ (ValBinds _ bs)))) ->
+            (L _ (LetStmt _ (L _(HsValBinds _ (ValBinds _ bs))))) ->
               foldr (\ sig -> \ acc -> case sig of
                                          (L loc (FixSig _ s)) -> (L loc s) : acc
                                          _ -> acc) acc (val_sigs bs)
@@ -1607,13 +1607,13 @@ rn_rec_stmt_lhs fix_env (L loc (BindStmt _ pat body))
       (pat', fv_pat) <- rnBindPat (localRecNameMaker fix_env) pat
       return [(L loc (BindStmt noAnn pat' body), fv_pat)]
 
-rn_rec_stmt_lhs _ (L _ (LetStmt _ binds@(HsIPBinds {})))
+rn_rec_stmt_lhs _ (L _ (LetStmt _ (L _ binds@(HsIPBinds {}))))
   = failWith (badIpBinds (Left binds))
 
 
-rn_rec_stmt_lhs fix_env (L loc (LetStmt _ (HsValBinds x binds)))
+rn_rec_stmt_lhs fix_env (L loc (LetStmt _ (L l (HsValBinds x binds))))
     = do (_bound_names, (bs',sigs')) <- rnLocalValBindsLHS fix_env binds
-         return [(L loc (LetStmt noAnn (HsValBinds x (makeRnValBinds noExtField bs' sigs'))),
+         return [(L loc (LetStmt noAnn (L l (HsValBinds x (makeRnValBinds noExtField bs' sigs')))),
                  -- Warning: this is bogus; see function invariant
                  emptyFNs
                  )]
@@ -1628,7 +1628,7 @@ rn_rec_stmt_lhs _ stmt@(L _ (ParStmt {}))       -- Syntactically illegal in mdo
 rn_rec_stmt_lhs _ stmt@(L _ (TransStmt {}))     -- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt" (ppr stmt)
 
-rn_rec_stmt_lhs _ (L _ (LetStmt _ (EmptyLocalBinds _)))
+rn_rec_stmt_lhs _ (L _ (LetStmt _ (L _ (EmptyLocalBinds _))))
   = panic "rn_rec_stmt LetStmt EmptyLocalBinds"
 
 rn_rec_stmts_lhs :: AnnoBody body => MiniFixityEnv
@@ -1679,15 +1679,15 @@ rn_rec_stmt ctxt rnBody _ (L loc (BindStmt _ pat' (L lb body)), fv_pat)
        ; return [(bndrs, fvs, bndrs `intersectNameSet` fvs,
                   L loc (BindStmt xbsrn pat' (L lb body')))] }
 
-rn_rec_stmt _ _ _ (L _ (LetStmt _ binds@(HsIPBinds {})), _)
+rn_rec_stmt _ _ _ (L _ (LetStmt _ (L _ binds@(HsIPBinds {}))), _)
   = failWith (badIpBinds (Right binds))
 
-rn_rec_stmt _ _ all_bndrs (L loc (LetStmt _ (HsValBinds x binds')), _)
+rn_rec_stmt _ _ all_bndrs (L loc (LetStmt _ (L l (HsValBinds x binds'))), _)
   = do { (binds', du_binds) <- rnLocalValBindsRHS (mkNameSet all_bndrs) binds'
            -- fixities and unused are handled above in rnRecStmtsAndThen
        ; let fvs = allUses du_binds
        ; return [(duDefs du_binds, fvs, emptyNameSet,
-                 L loc (LetStmt noAnn (HsValBinds x binds')))] }
+                 L loc (LetStmt noAnn (L l (HsValBinds x binds'))))] }
 
 -- no RecStmt case because they get flattened above when doing the LHSes
 rn_rec_stmt _ _ _ stmt@(L _ (RecStmt {}), _)
@@ -1699,7 +1699,7 @@ rn_rec_stmt _ _ _ stmt@(L _ (ParStmt {}), _)       -- Syntactically illegal in m
 rn_rec_stmt _ _ _ stmt@(L _ (TransStmt {}), _)     -- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt: TransStmt" (ppr stmt)
 
-rn_rec_stmt _ _ _ (L _ (LetStmt _ (EmptyLocalBinds _)), _)
+rn_rec_stmt _ _ _ (L _ (LetStmt _ (L _ (EmptyLocalBinds _))), _)
   = panic "rn_rec_stmt: LetStmt EmptyLocalBinds"
 
 rn_rec_stmts :: AnnoBody body
@@ -2724,8 +2724,8 @@ okPatGuardStmt stmt
 -------------
 okParStmt dflags ctxt stmt
   = case stmt of
-      LetStmt _ (HsIPBinds {}) -> emptyInvalid
-      _                        -> okStmt dflags ctxt stmt
+      LetStmt _ (L _ (HsIPBinds {})) -> emptyInvalid
+      _                              -> okStmt dflags ctxt stmt
 
 ----------------
 okDoStmt dflags ctxt stmt

@@ -1461,10 +1461,10 @@ rnGRHSs :: AnnoBody body
         -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeNames))
         -> GRHSs GhcPs (LocatedA (body GhcPs))
         -> RnM (GRHSs GhcRn (LocatedA (body GhcRn)), FreeNames)
-rnGRHSs ctxt rnBody (GRHSs _ grhss binds)
+rnGRHSs ctxt rnBody (GRHSs _ grhss (L l binds))
   = rnLocalBindsAndThen binds   $ \ binds' _ -> do
     (grhss', fvGRHSs) <- mapFvRn (rnGRHS ctxt rnBody) grhss
-    return (GRHSs emptyComments grhss' binds', fvGRHSs)
+    return (GRHSs emptyComments grhss' (L l binds'), fvGRHSs)
 
 rnGRHS :: AnnoBody body
        => HsMatchContextRn

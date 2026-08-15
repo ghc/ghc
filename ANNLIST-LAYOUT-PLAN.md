@@ -606,3 +606,12 @@ Each step should build and pass tests on its own.
    `DifferentLine 1 0` scheme.
 7. *(follow-up)* MultiWayIf: give `XMultiIf GhcPs` an `AnnList`. Completes D1.
 8. *(follow-up)* Reconcile `EpLayout` per §4.5.
+9. *(follow-up)* Locate `HsLocalBinds` per §4.7, dropping the `EpAnn` from
+   `XHsValBinds` / `XHsIPBinds`. Removes the last `EpAnn AnnList`, retires
+   `add_where` / `patch_anchor`, and subsumes step 5.
+
+AZ Notes:
+- The vocurly location can be bogus. It is sometimes emitted on the
+  occurence of the next non-whitespace token. What are the
+  implications?
+- can we use virtual semi colons for anything useful?

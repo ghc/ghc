@@ -591,7 +591,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
     isAliasMG (MG {mg_alts = (L _ [L _ (Match { m_pats = L _ []
                                               , m_grhss = grhss })])}) key
         | GRHSs _ (L _ (GRHS _ [] body) :| []) lbinds <- grhss
-        , EmptyLocalBinds _ <- lbinds
+        , L _ (EmptyLocalBinds _) <- lbinds
         , HsVar _ (L _ rhsName)  <- unLoc body
         = getName rhsName `hasKnownKey` key
     isAliasMG _ _ = False
