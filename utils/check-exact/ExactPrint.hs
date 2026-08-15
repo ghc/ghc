@@ -1272,9 +1272,7 @@ markAnnList ann action = do
 markAnnList' :: (Monad m, Monoid w)
   => AnnList -> EP w m a -> EP w m (AnnList, a)
 markAnnList' ann action = do
-  markAnnListA' ann $ \a -> do
-    r <- action
-    return (a,r)
+  markAnnListA' ann $ action
 
 markAnnListA :: (Monad m, Monoid w)
   => EpAnn AnnList
@@ -1289,14 +1287,14 @@ markAnnListA an action = do
 
 markAnnListA' :: (Monad m, Monoid w)
   => AnnList
-  -> (AnnList -> EP w m (AnnList, a))
+  -> EP w m a
   -> EP w m (AnnList, a)
 markAnnListA' an action = do
   an0 <- markLensBracketsO' an lal_brackets
   an1 <- markEpAnnAllLT' an0 lal_semis
-  (an2, r) <- action an1
-  an3 <- markLensBracketsC' an2 lal_brackets
-  return (an3, r)
+  r <- action
+  an2 <- markLensBracketsC' an1 lal_brackets
+  return (an2, r)
 
 -- ---------------------------------------------------------------------
 
@@ -2191,9 +2189,7 @@ instance ExactPrint (ClsInstDecl GhcPs) where
                      , cid_modifiers = mods })
       = do
           (mbWarn', i', w', mbOverlap', inst_ty', mods') <- top_matter
-          (ann_list',  decls') <- markAnnListA' ann_list $ \a -> do
-            r <- setLayoutBoth $ mapM markAnnotated decls
-            return (a,r)
+          (ann_list',  decls') <- markAnnListA' ann_list $  setLayoutBoth $ mapM markAnnotated decls
           return (ClsInstDecl { cid_ext = (mbWarn', AnnClsInstDecl i' w' ann_list')
                               , cid_poly_ty = inst_ty'
                               , cid_decls = decls'
@@ -3114,9 +3110,7 @@ markMaybeDodgyStmts (an,l) stmts =
           c' <- markEpToken c
           return (Left (o',c'), r)
         Right an' -> do
-         (an'',r') <- markAnnListA' an' $ \a -> do
-           r <- markAnnotatedWithLayout stmts
-           return (a, r)
+         (an'',r') <- markAnnListA' an' $ markAnnotatedWithLayout stmts
          return (Right an'',r')
       -- (an0,stmts') <- markAnnListA' an $ \a -> do
       --    r <- markAnnotatedWithLayout stmts
@@ -3192,9 +3186,7 @@ instance (Typeable body,
     = MG (origin,an) (L (setAnchorEpa l anc ts cs) matches)
 
   exact (MG (origin,an) (L l matches)) = do
-    (an0,matches') <- markAnnListA' an $ \a -> do
-        m' <- markAnnotated matches
-        return (a,m')
+    (an0,matches') <- markAnnListA' an $ markAnnotated matches
     return (MG (origin, an0) (L l matches'))
 
 -- ---------------------------------------------------------------------
