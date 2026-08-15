@@ -86,6 +86,7 @@ GHC.Data.Pair
 GHC.Data.Strict
 GHC.Data.StringBuffer
 GHC.Data.TrieMap
+GHC.Data.Unboxed
 GHC.Data.Word64Map
 GHC.Data.Word64Map.Internal
 GHC.Data.Word64Map.Lazy

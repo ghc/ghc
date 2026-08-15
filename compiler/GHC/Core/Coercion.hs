@@ -147,6 +147,7 @@ import GHC.Types.Basic
 import GHC.Types.Unique
 import GHC.Data.FastString
 import GHC.Data.Pair
+import GHC.Data.Unboxed (traverseMaybeUB)
 import GHC.Types.SrcLoc
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.WiredIn.Prim
@@ -166,6 +167,7 @@ import Data.Char( isDigit )
 import qualified Data.Monoid as Monoid
 import Data.List.NonEmpty ( NonEmpty (..) )
 import Control.DeepSeq
+import GHC.Exts (inline)
 
 {-
 %************************************************************************
@@ -722,6 +724,19 @@ isReflexiveCo_maybe co
   = Nothing
   where (Pair ty1 ty2, r) = coercionKindRole co
 
+-- | Like @\\ cos -> map fst <$> traverse isReflCo_maybe cos@,
+-- but avoiding wasteful allocations (see #27648).
+reflCos_maybe :: [Coercion] -> Maybe [Type]
+reflCos_maybe =
+  traverseMaybeUB
+    ( fmap fst
+    . inline isReflCo_maybe
+        -- isReflCo_maybe must inline so that 'fmap fst' fuses and the whole
+        -- function inlines into 'traverseMaybeUB'
+    )
+{-# INLINE reflCos_maybe #-}
+  -- to avoid allocating the result's 'Just' constructor application
+
 forAllCoKindCo :: TyCoVar -> KindMCoercion -> KindCoercion
 -- Get the kind coercion from a ForAllCo
 forAllCoKindCo _   (MCo co) = co
@@ -811,8 +826,8 @@ mkTyConAppCo r tc cos
   | ExpandsSyn tv_co_prs rhs_ty leftover_cos <- expandSynTyCon_maybe tc cos
   = mkAppCos (liftCoSubst r (mkLiftingContext tv_co_prs) rhs_ty) leftover_cos
 
-  | Just tys_roles <- traverse isReflCo_maybe cos
-  = mkReflCo r (mkTyConApp tc (map fst tys_roles))
+  | Just tys <- reflCos_maybe cos
+  = mkReflCo r $! mkTyConApp tc tys
   -- See Note [Refl invariant]
 
   | otherwise = TyConAppCo r tc cos
