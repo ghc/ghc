@@ -5955,11 +5955,14 @@ in any case undefined).
 The bit-offset operand of these instructions must be an immediate or a
 register.  When the bit index is a literal, no shift reaches the NCG:
 constant folding has already turned the whole mask into a literal.  If that
-mask fits in an imm32, an ordinary and/or/xor with an immediate is at least
-as good; but a W64 mask touching the upper bits, e.g. ~(1 << 40), would have
-to be moved into a register first.  For such masks we recognise the folded
-literal itself (exactly one bit clear resp. set) and emit btr/bts/btc with
-an immediate bit offset.
+mask fits in an imm32, we keep the ordinary and/or/xor with an immediate:
+it has the same latency and better throughput (more execution ports) than
+the bit-test instructions,  and at worst two bytes of extra code size for bit
+indices 7..30.
+But a W64 mask touching the upper bits, e.g. ~(1 << 40), would have to be moved
+into a register first.  For such masks we recognise the folded literal itself
+(exactly one bit clear resp. set) and emit btr/bts/btc with an immediate
+bit offset.
 
 We restrict the pattern to W32 and native-width W64: the instructions do not
 exist at width 8, and sub-word Cmm operations at W8/W16 are rare enough that
