@@ -173,8 +173,12 @@ procPointLattice = DataflowLattice unreached add_to
 -- introduced because they're reachable from multiple proc points.
 --
 -- Extract the set of Continuation BlockIds, see Note [Continuation BlockIds].
+--
+-- Fold over reachable blocks only: the continuation of an unreachable
+-- call must not become a proc point.  See Note [unreachable blocks]
+-- in GHC.Cmm.Pipeline.
 callProcPoints      :: CmmGraph -> ProcPointSet
-callProcPoints g = foldlGraphBlocks add (setSingleton (g_entry g)) g
+callProcPoints g = foldl' add (setSingleton (g_entry g)) (revPostorder g)
   where add :: LabelSet -> CmmBlock -> LabelSet
         add set b = case lastNode b of
                       CmmCall {cml_cont = Just k} -> setInsert k set

@@ -353,10 +353,19 @@ _GLOBAL_OFFSET_TABLE_, regardless of which entry point we arrived via.
 
 {- Note [unreachable blocks]
    ~~~~~~~~~~~~~~~~~~~~~~~~~
-The control-flow optimiser sometimes leaves unreachable blocks behind
-containing junk code.  These aren't necessarily a problem, but
-removing them is good because it might save time in the native code
-generator later.
+The control-flow optimiser and the common block eliminator sometimes
+leave unreachable blocks behind.  Some later passes drop them, as a
+side effect of rebuilding the graph from a reachability traversal,
+but only the removeUnreachableBlocksProc pass at the end of the
+pipeline guarantees a graph free of them.  So every pass must
+tolerate unreachable blocks in its input, and must not let them
+influence the reachable part of the graph.
+
+In particular, callProcPoints in GHC.Cmm.ProcPoint must only consider
+reachable blocks: the continuation of a call in an unreachable
+block may itself be unreachable, and must not become a proc point.
+Otherwise attachContInfoTables would attach an info table to it,
+resulting in a setInfoTableStackMap panic (#27368).
 
 To make unreachable blocks visible in -ddump-cmm-* output, add -dppr-debug.
 -}

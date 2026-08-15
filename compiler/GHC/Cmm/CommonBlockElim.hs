@@ -30,20 +30,23 @@ import Control.Arrow (first, second)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 
--- -----------------------------------------------------------------------------
--- Eliminate common blocks
-
+-- | Merge identical blocks
+--
 -- If two blocks are identical except for the label on the first node,
 -- then we can eliminate one of the blocks. To ensure that the semantics
 -- of the program are preserved, we have to rewrite each predecessor of the
 -- eliminated block to proceed with the block we keep.
-
+--
+-- Tolerates unreachable blocks in its input, and produces them: the
+-- losing copy of a merged pair stays in the block map, now
+-- unreachable.  See Note [unreachable blocks] in GHC.Cmm.Pipeline.
+--
 -- The algorithm iterates over the blocks in the graph,
 -- checking whether it has seen another block that is equal modulo labels.
 -- If so, then it adds an entry in a map indicating that the new block
 -- is made redundant by the old block.
 -- Otherwise, it is added to the useful blocks.
-
+--
 -- To avoid comparing every block with every other block repeatedly, we group
 -- them by
 --   * a hash of the block, ignoring labels (explained below)
@@ -57,16 +60,13 @@ import qualified Data.List.NonEmpty as NE
 -- All in all, two blocks should never be compared if they have different
 -- hashes, and at most once otherwise. Previously, we were slower, and people
 -- rightfully complained: #10397
-
--- TODO: Use optimization fuel
 elimCommonBlocks :: CmmGraph -> CmmGraph
+-- TODO: Use optimization fuel
 elimCommonBlocks g = replaceLabels env $ copyTicks env g
   where
      env = iterate mapEmpty blocks_with_key
-     -- The order of blocks doesn't matter here. While we could use
-     -- revPostorder which drops unreachable blocks this is done in
-     -- ContFlowOpt already which runs before this pass. So we use
-     -- toBlockList since it is faster.
+     -- Block order doesn't matter here, so we use toBlockList,
+     -- which is faster than revPostorder.
      groups = groupByInt hash_block (toBlockList g) :: [[CmmBlock]]
      blocks_with_key = [ [ (successors b, [b]) | b <- bs] | bs <- groups]
 
