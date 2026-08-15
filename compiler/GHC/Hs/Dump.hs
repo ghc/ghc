@@ -225,13 +225,12 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
                                       )
 
             annClassDecl :: AnnClassDecl -> SDoc
-            annClassDecl (AnnClassDecl c ops cps v w oc cc s) = case ba of
+            annClassDecl (AnnClassDecl c ops cps v w al) = case ba of
              BlankEpAnnotations -> parens $ text "blanked:" <+> text "AnnClassDecl"
              NoBlankEpAnnotations ->
               parens $ text "AnnClassDecl"
                         $$ vcat [showAstData' c, showAstData' ops, showAstData' cps,
-                                 showAstData' v, showAstData' w, showAstData' oc,
-                                 showAstData' cc, showAstData' s]
+                                 showAstData' v, showAstData' w, showAstData' al]
 
             annSynDecl :: AnnSynDecl -> SDoc
             annSynDecl (AnnSynDecl ops cps t e) = case ba of
