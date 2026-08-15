@@ -415,7 +415,7 @@ data HsExpr p
 
   -- | let(rec)
   | HsLet       (XLet p)
-                (HsLocalBinds p)
+                (LHsLocalBinds p)
                 (LHsExpr  p)
 
   | HsDo        (XDo p)                  -- Type of the whole expression
@@ -794,7 +794,7 @@ data HsCmd id
                 (LHsCmd id)             -- else part
 
   | HsCmdLet    (XCmdLet id)
-                (HsLocalBinds id)      -- let(rec)
+                (LHsLocalBinds id)      -- let(rec)
                 (LHsCmd  id)
 
   | HsCmdDo     (XCmdDo id)                     -- Type of the whole expression
@@ -941,7 +941,7 @@ data GRHSs p body
   = GRHSs {
       grhssExt :: XCGRHSs p body,
       grhssGRHSs :: NonEmpty (LGRHS p body),     -- ^ Guarded RHSs
-      grhssLocalBinds :: HsLocalBinds p -- ^ The where clause
+      grhssLocalBinds :: LHsLocalBinds p -- ^ The where clause
     }
   | XGRHSs !(XXGRHSs p body)
 
@@ -1031,7 +1031,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
              (SyntaxExpr idR)  -- The `guard` operator; used only in MonadComp
                                -- See notes [Monad Comprehensions]
 
-  | LetStmt  (XLetStmt idL idR body) (HsLocalBindsLR idL idR)
+  | LetStmt  (XLetStmt idL idR body) (LHsLocalBindsLR idL idR)
 
   -- ParStmts only occur in a list/monad comprehension
   | ParStmt  (XParStmt idL idR body)    -- Post typecheck,

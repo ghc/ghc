@@ -640,7 +640,7 @@ addTickHsExpr (HsMultiIf ty alts)
        ; return $ HsMultiIf ty alts' }
 addTickHsExpr (HsLet x binds e) =
         bindLocals binds $ do
-          binds' <- addTickHsLocalBinds binds -- to think about: !patterns.
+          binds' <- addTickLHsLocalBinds binds -- to think about: !patterns.
           e' <- addTickLHsExprLetBody e
           return (HsLet x binds' e')
 addTickHsExpr (ExplicitList ty es)
@@ -762,7 +762,7 @@ addTickGRHSs :: Bool -> Bool -> Bool -> GRHSs GhcTc (LHsExpr GhcTc)
              -> TM (GRHSs GhcTc (LHsExpr GhcTc))
 addTickGRHSs isOneOfMany isLambda isDoExp (GRHSs x guarded local_binds) =
   bindLocals local_binds $ do
-    local_binds' <- addTickHsLocalBinds local_binds
+    local_binds' <- addTickLHsLocalBinds local_binds
     guarded' <- mapM (traverse (addTickGRHS isOneOfMany isLambda isDoExp)) guarded
     return $ GRHSs x guarded' local_binds'
 
@@ -834,7 +834,7 @@ addTickStmt isGuard (BodyStmt x e bind' guard') =
                 (addTickSyntaxExpr hpcSrcSpan guard')
 addTickStmt _isGuard (LetStmt x binds) =
         liftM (LetStmt x)
-                (addTickHsLocalBinds binds)
+                (addTickLHsLocalBinds binds)
 addTickStmt isGuard (ParStmt x pairs mzipExpr bindExpr) =
     liftM3 (ParStmt x)
         (mapM (addTickStmtAndBinders isGuard) pairs)
@@ -899,14 +899,14 @@ addTickStmtAndBinders isGuard (ParStmtBlock x stmts ids returnExpr) =
         (return ids)
         (addTickSyntaxExpr hpcSrcSpan returnExpr)
 
-addTickHsLocalBinds :: HsLocalBinds GhcTc -> TM (HsLocalBinds GhcTc)
-addTickHsLocalBinds (HsValBinds x binds) =
-        liftM (HsValBinds x)
-                (addTickHsValBinds binds)
-addTickHsLocalBinds (HsIPBinds x binds)  =
-        liftM (HsIPBinds x)
-                (addTickHsIPBinds binds)
-addTickHsLocalBinds (EmptyLocalBinds x)  = return (EmptyLocalBinds x)
+addTickLHsLocalBinds :: LHsLocalBinds GhcTc -> TM (LHsLocalBinds GhcTc)
+addTickLHsLocalBinds (L l (HsValBinds x binds)) =
+        L l <$> liftM (HsValBinds x)
+                      (addTickHsValBinds binds)
+addTickLHsLocalBinds (L l (HsIPBinds x binds))  =
+        L l <$> liftM (HsIPBinds x)
+                      (addTickHsIPBinds binds)
+addTickLHsLocalBinds (L l (EmptyLocalBinds x))  = return (L l (EmptyLocalBinds x))
 
 addTickHsValBinds :: HsValBindsLR GhcTc (GhcPass a)
                   -> TM (HsValBindsLR GhcTc (GhcPass b))
@@ -978,7 +978,7 @@ addTickHsCmd (HsCmdIf x cnd e1 c2 c3) =
                 (addTickLHsCmd c3)
 addTickHsCmd (HsCmdLet x binds c) =
         bindLocals binds $ do
-          binds' <- addTickHsLocalBinds binds -- to think about: !patterns.
+          binds' <- addTickLHsLocalBinds binds -- to think about: !patterns.
           c' <- addTickLHsCmd c
           return (HsCmdLet x binds' c')
 addTickHsCmd (HsCmdDo srcloc (L l stmts))
@@ -1020,7 +1020,7 @@ addTickCmdMatch match@(Match { m_pats = L _ pats, m_grhss = gRHSs }) =
 addTickCmdGRHSs :: GRHSs GhcTc (LHsCmd GhcTc) -> TM (GRHSs GhcTc (LHsCmd GhcTc))
 addTickCmdGRHSs (GRHSs x guarded local_binds) =
   bindLocals local_binds $ do
-    local_binds' <- addTickHsLocalBinds local_binds
+    local_binds' <- addTickLHsLocalBinds local_binds
     guarded' <- mapM (traverse addTickCmdGRHS) guarded
     return $ GRHSs x guarded' local_binds'
 
@@ -1064,7 +1064,7 @@ addTickCmdStmt (BodyStmt x c bind' guard') =
                 (addTickSyntaxExpr hpcSrcSpan guard')
 addTickCmdStmt (LetStmt x binds) =
         liftM (LetStmt x)
-                (addTickHsLocalBinds binds)
+                (addTickLHsLocalBinds binds)
 addTickCmdStmt stmt@(RecStmt {})
   = do { stmts' <- addTickLCmdStmts (unLoc $ recS_stmts stmt)
        ; ret'   <- addTickSyntaxExpr hpcSrcSpan (recS_ret_fn stmt)
@@ -1462,6 +1462,8 @@ instance CollectBinders [LocatedA (Pat GhcTc)] where
   collectBinds = collectPatsBinders CollNoDictBinders
 instance CollectBinders (HsLocalBinds GhcTc) where
   collectBinds = collectLocalBinders CollNoDictBinders
+instance CollectBinders (LocatedA (HsLocalBinds GhcTc)) where
+  collectBinds (L _ binds) = collectLocalBinders CollNoDictBinders binds
 instance CollectBinders [LocatedA (Stmt GhcTc (LocatedA (HsExpr GhcTc)))] where
   collectBinds = collectLStmtsBinders CollNoDictBinders
 instance CollectBinders [LocatedA (Stmt GhcTc (LocatedA (HsCmd GhcTc)))] where

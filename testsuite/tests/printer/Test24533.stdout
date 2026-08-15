@@ -657,8 +657,14 @@
                        (Unqual
                         {OccName: True}))))))
                   [])
-                 (EmptyLocalBinds
-                  (NoExtField)))))])))))]
+                 (L
+                  (EpAnn
+                   (EpaSpan { <no location info> })
+                   []
+                   (EpaComments
+                    []))
+                  (EmptyLocalBinds
+                   (NoExtField))))))])))))]
        (Nothing)))))]))
 
 
@@ -1248,8 +1254,14 @@
                        (Unqual
                         {OccName: True}))))))
                   [])
-                 (EmptyLocalBinds
-                  (NoExtField)))))])))))]
+                 (L
+                  (EpAnn
+                   (EpaSpan { <no location info> })
+                   []
+                   (EpaComments
+                    []))
+                  (EmptyLocalBinds
+                   (NoExtField))))))])))))]
        (Nothing)))))]))
 
 
