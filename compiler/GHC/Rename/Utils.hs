@@ -775,7 +775,7 @@ genSimpleFunBind :: Name -> [LPat GhcRn]
 genSimpleFunBind fun pats expr
   = noLocA $ genFunBind (noLocA fun)
         [mkMatch (mkPrefixFunRhs (noLocA fun) noAnn) (noLocA pats) expr
-                 emptyLocalBinds]
+                 (noLocA emptyLocalBinds)]
 
 genFunBind :: LocatedN Name -> [LMatch GhcRn (LHsExpr GhcRn)]
            -> HsBind GhcRn
@@ -785,7 +785,7 @@ genFunBind fn ms
             , fun_ext = emptyNameSet
             }
 
-genHsLet :: HsLocalBindsLR GhcRn GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
+genHsLet :: LHsLocalBindsLR GhcRn GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
 genHsLet bindings body = HsLet noExtField bindings body
 
 genHsLamDoExp :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ (Origin, MatchGroupAnn))
