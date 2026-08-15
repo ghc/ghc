@@ -1366,7 +1366,7 @@ ty_decl :: { LTyClDecl GhcPs }
                   ; mkTyData (comb4 $1 $3 $4 $5) (sndOf3 $ unLoc $1) (thdOf3 $ unLoc $1) $2 $3
                            Nothing (reverse (snd $ unLoc $4))
                                    (fmap reverse $5)
-                           (AnnDataDefn [] [] ttype tnewtype tdata noEpTok noEpUniTok noEpTok noEpTok noEpTok tequal)
+                           (AnnDataDefn [] [] ttype tnewtype tdata noEpTok noEpUniTok noEpTok noAnn tequal)
                              }}
                                    -- We need the location on tycl_hdr in case
                                    -- constrs and deriving are both empty
@@ -1377,11 +1377,11 @@ ty_decl :: { LTyClDecl GhcPs }
                  maybe_derivings
             {% do { let { (tdata, tnewtype, ttype) = fstOf3 $ unLoc $1}
                   ; let { tdcolon = fst $ unLoc $4 }
-                  ; let { (twhere, oc, cc) = fst $ unLoc $5 }
+                  ; let { (twhere, al) = fst $ unLoc $5 }
                   ; mkTyData (comb5 $1 $3 $4 $5 $6) (sndOf3 $ unLoc $1) (thdOf3 $ unLoc $1) $2 $3
                             (snd $ unLoc $4) (snd $ unLoc $5)
                             (fmap reverse $6)
-                            (AnnDataDefn [] [] ttype tnewtype tdata noEpTok tdcolon twhere oc cc noEpTok)}}
+                            (AnnDataDefn [] [] ttype tnewtype tdata noEpTok tdcolon twhere al noEpTok)}}
                                    -- We need the location on tycl_hdr in case
                                    -- constrs and deriving are both empty
 
@@ -1459,7 +1459,7 @@ inst_decl :: { LInstDecl GhcPs }
                   ; mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (unLoc $4)
                                       Nothing (reverse (snd  $ unLoc $5))
                                               (fmap reverse $6)
-                            (AnnDataDefn [] [] noEpTok tnewtype tdata (epTok $2) noEpUniTok noEpTok noEpTok noEpTok tequal)}}
+                            (AnnDataDefn [] [] noEpTok tnewtype tdata (epTok $2) noEpUniTok noEpTok noAnn tequal)}}
 
           -- GADT instance declaration
         | data_or_newtype 'instance' capi_ctype datafam_inst_hdr opt_kind_sig
@@ -1467,11 +1467,11 @@ inst_decl :: { LInstDecl GhcPs }
                  maybe_derivings
             {% do { let { (tdata, tnewtype) = fst $ unLoc $1 }
                   ; let { dcolon = fst $ unLoc $5 }
-                  ; let { (twhere, oc, cc) = fst $ unLoc $6 }
+                  ; let { (twhere, al) = fst $ unLoc $6 }
                   ; mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3 (unLoc $4)
                                    (snd $ unLoc $5) (snd $ unLoc $6)
                                    (fmap reverse $7)
-                            (AnnDataDefn [] [] noEpTok tnewtype tdata (epTok $2) dcolon twhere oc cc noEpTok)}}
+                            (AnnDataDefn [] [] noEpTok tnewtype tdata (epTok $2) dcolon twhere al noEpTok)}}
 
 overlap_pragma :: { Maybe (LocatedA (OverlapMode GhcPs)) }
   : '{-# OVERLAPPABLE'    '#-}' {% fmap Just $ amsA' (sLL $1 $> (Overlappable (getOVERLAPPABLE_PRAGs $1,
@@ -1630,7 +1630,7 @@ at_decl_inst :: { LInstDecl GhcPs }
                   ; mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (unLoc $4)
                                     Nothing (reverse (snd $ unLoc $5))
                                              (fmap reverse $6)
-                            (AnnDataDefn [] [] noEpTok tnewtype tdata $2 noEpUniTok noEpTok noEpTok noEpTok tequal)}}
+                            (AnnDataDefn [] [] noEpTok tnewtype tdata $2 noEpUniTok noEpTok noAnn tequal)}}
 
         -- GADT instance declaration, with optional 'instance' keyword
         | data_or_newtype opt_instance capi_ctype datafam_inst_hdr opt_kind_sig
@@ -1638,11 +1638,11 @@ at_decl_inst :: { LInstDecl GhcPs }
                  maybe_derivings
              {% do { let { (tdata, tnewtype) = fst $ unLoc $1 }
                    ; let { dcolon = fst $ unLoc $5 }
-                   ; let { (twhere, oc, cc) = fst $ unLoc $6 }
+                   ; let { (twhere, al) = fst $ unLoc $6 }
                    ; mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3
                                 (unLoc $4) (snd $ unLoc $5) (snd $ unLoc $6)
                                 (fmap reverse $7)
-                            (AnnDataDefn [] [] noEpTok tnewtype tdata $2 dcolon twhere oc cc noEpTok)}}
+                            (AnnDataDefn [] [] noEpTok tnewtype tdata $2 dcolon twhere al noEpTok)}}
 
 type_data_or_newtype :: { Located ((EpToken "data", EpToken "newtype", EpToken "type")
                                    , Bool, NewOrData) }
@@ -2551,18 +2551,16 @@ constructors.
 -----------------------------------------------------------------------------
 -- Datatype declarations
 
-gadt_constrlist :: { Located ((EpToken "where", EpToken "{", EpToken "}")
-                          ,[LConDecl GhcPs]) } -- Returned in order
+gadt_constrlist :: { Located ((EpToken "where", AnnList)
+                             , [LConDecl GhcPs]) } -- Returned in order
 
         : 'where' '{'        gadt_constrs '}'    {% checkEmptyGADTs $
                                                       L (comb2 $1 $4)
-                                                        ((epTok $1
-                                                         ,epTok $2
-                                                         ,epTok $4)
+                                                        ((epTok $1, AnnList AnnListBraces (ListBraces (epTok $2) (epTok $4)) [])
                                                         , unLoc $3) }
         | 'where' vocurly    gadt_constrs close  {% checkEmptyGADTs $
                                                       L (comb2 $1 $3)
-                                                        ((epTok $1, noEpTok, noEpTok)
+                                                        ((epTok $1,  AnnList (AnnListLayout $ glR $2) ListNone [])
                                                         , unLoc $3) }
         | {- empty -}                            { noLoc (noAnn,[]) }
 
