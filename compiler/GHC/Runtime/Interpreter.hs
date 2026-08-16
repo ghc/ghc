@@ -113,6 +113,7 @@ import qualified GHC.Exts.Heap as Heap
 import GHC.Stack.CCS (CostCentre,CostCentreStack)
 import System.Directory
 import System.Process
+import System.Timeout (timeout)
 import qualified GHC.InfoProv as InfoProv
 
 import GHC.Builtin.Modules( gHC_PRIM, gHC_PRIMOPWRAPPERS )
@@ -652,10 +653,16 @@ stopInterp interp = case interpInstance interp of
         case state of
           InterpPending    -> pure state -- already stopped
           InterpRunning i  -> do
-            ex <- getProcessExitCode (interpHandle (instProcess i))
-            if isJust ex
-               then pure ()
-               else sendMessage i Shutdown
+            let hdl = interpHandle (instProcess i)
+            ex <- getProcessExitCode hdl
+            unless (isJust ex) $ do
+              sendMessage i Shutdown
+              -- The interpreter process shares our stdout/stderr; wait for
+              -- it to exit (flushing its output), lest output it produced
+              -- on our behalf be lost if it is killed once we exit.
+              -- Bounded, in case the process is wedged.
+              _ <- timeout 5000000 {- 5s -} (waitForProcess hdl)
+              pure ()
             pure InterpPending
 
 -- -----------------------------------------------------------------------------
