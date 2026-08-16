@@ -23,6 +23,7 @@ module GHC.CmmToAsm.Format (
     vecFormat,
     isVecFormat,
     cmmTypeFormat,
+    compareFormat,
     formatToWidth,
     scalarWidth,
     formatInBytes,
@@ -40,11 +41,13 @@ where
 
 import GHC.Prelude
 
+import Data.Semigroup ( (<>) )
+
 import GHC.Cmm
 import GHC.Platform.Reg ( Reg(..), RealReg, VirtualReg )
 import GHC.Types.Unique ( Uniquable(..) )
 import GHC.Types.Unique.Set
-import GHC.Utils.Outputable
+import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
 
 {- Note [GHC's data format representations]
@@ -92,7 +95,9 @@ data Format
         | FF64
         | VecFormat !Length       -- ^ number of elements (always at least 2)
                     !ScalarFormat -- ^ format of each element
-        deriving (Show, Eq, Ord)
+        deriving (Show, Eq)
+        -- No Ord: compare via 'formatToWidth', or use 'compareFormat' where a
+        -- total order is needed.
 
 pattern IntegerFormat :: Format
 pattern IntegerFormat <- ( isIntegerFormat -> True )
@@ -117,7 +122,7 @@ data ScalarFormat
   | FmtInt64
   | FmtFloat
   | FmtDouble
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq)
 
 scalarFormatFormat :: ScalarFormat -> Format
 scalarFormatFormat = \case
@@ -247,6 +252,33 @@ scalarWidth = \case
 
 formatInBytes :: Format -> Int
 formatInBytes = widthInBytes . formatToWidth
+
+-- | Total order on formats: by width, with an arbitrary but fixed tiebreak
+-- between distinct formats of the same width.
+--
+-- See Note [Convergence of the liveness fixpoint] in GHC.CmmToAsm.Reg.Liveness.
+compareFormat :: Format -> Format -> Ordering
+compareFormat f1 f2 =
+    compare (formatToWidth f1) (formatToWidth f2) <> compare (tag f1) (tag f2)
+  where
+    tag :: Format -> (Int, Length)
+    tag = \case
+      II8           -> (0, 0)
+      II16          -> (1, 0)
+      II32          -> (2, 0)
+      II64          -> (3, 0)
+      FF32          -> (4, 0)
+      FF64          -> (5, 0)
+      VecFormat l s -> (6 + scalarTag s, l)
+
+    scalarTag :: ScalarFormat -> Int
+    scalarTag = \case
+      FmtInt8   -> 0
+      FmtInt16  -> 1
+      FmtInt32  -> 2
+      FmtInt64  -> 3
+      FmtFloat  -> 4
+      FmtDouble -> 5
 
 --------------------------------------------------------------------------------
 

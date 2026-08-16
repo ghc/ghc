@@ -20,7 +20,8 @@ module GHC.CmmToAsm.Reg.Regs (
 import GHC.Prelude
 
 import GHC.Platform.Reg     ( Reg )
-import GHC.CmmToAsm.Format  ( Format, RegWithFormat(..), isVecFormat )
+import GHC.CmmToAsm.Format  ( Format, RegWithFormat(..), isVecFormat,
+                              compareFormat, formatToWidth )
 
 import GHC.Utils.Outputable ( Outputable )
 import GHC.Types.Unique     ( Uniquable(..) )
@@ -39,11 +40,12 @@ newtype Regs = Regs { getRegs :: UniqSet RegWithFormat }
 
 maxRegWithFormat :: RegWithFormat -> RegWithFormat -> RegWithFormat
 maxRegWithFormat r1@(RegWithFormat _ fmt1) r2@(RegWithFormat _ fmt2)
-  = if fmt1 >= fmt2
-    then r1
-    else r2
-  -- Re-using one of the arguments avoids allocating a new 'RegWithFormat',
-  -- compared with returning 'RegWithFormat r1 (max fmt1 fmt2)'.
+  | LT <- compareFormat fmt1 fmt2 = r2
+  | otherwise                     = r1
+  -- See Note [Convergence of the liveness fixpoint] in
+  -- GHC.CmmToAsm.Reg.Liveness.
+  --
+  -- Re-using one of the arguments avoids allocating a new 'RegWithFormat'.
 
 noRegs :: Regs
 noRegs = Regs emptyUniqSet
@@ -66,7 +68,7 @@ minusCoveredRegs = coerce $ minusUniqSet_C f
   where
     f :: RegWithFormat -> RegWithFormat -> Maybe RegWithFormat
     f r1@(RegWithFormat _ fmt1) (RegWithFormat _ fmt2) =
-      if fmt2 >= fmt1
+      if formatToWidth fmt2 >= formatToWidth fmt1
            ||
          not ( isVecFormat fmt1 )
           -- See Wrinkle [Don't allow scalar partial writes]
@@ -99,7 +101,7 @@ shrinkingRegs = coerce $ minusUniqSet_C f
   where
     f :: RegWithFormat -> RegWithFormat -> Maybe RegWithFormat
     f (RegWithFormat _ fmt1) r2@(RegWithFormat _ fmt2)
-      | fmt2 < fmt1
+      | formatToWidth fmt2 < formatToWidth fmt1
       = Just r2
       | otherwise
       = Nothing

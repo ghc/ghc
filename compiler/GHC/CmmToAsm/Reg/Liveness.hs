@@ -937,9 +937,9 @@ test:
   dependency order. Comparing the whole accumulated block map would make the
   fixpoint quadratic in procedure size (#27437).
 
-The fixpoint terminates because the entries can only grow: registers are
-only added, formats only increase via 'maxRegWithFormat' joins, and both
-lattices are finite.
+To ensure termination, 'maxRegWithFormat' uses 'compareFormat' which defines a
+total order on formats. Comparing the widths only would introduce the risk of
+an infinite loop where each iteration swaps two formats of the same width.
 -}
 
 
