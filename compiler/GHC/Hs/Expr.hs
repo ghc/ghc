@@ -2327,7 +2327,7 @@ ppr_splice herald mn e
 
 type instance XExpBr  GhcPs       = (BracketAnn (EpUniToken "[|" "⟦") (EpToken "[e|"), EpUniToken "|]" "⟧")
 type instance XPatBr  GhcPs       = (EpToken "[p|", EpUniToken "|]" "⟧")
-type instance XDecBrL GhcPs       = (EpToken "[d|", EpUniToken "|]" "⟧", (EpToken "{", EpToken "}"))
+type instance XDecBrL GhcPs       = (EpToken "[d|", EpUniToken "|]" "⟧", AnnList)
 type instance XDecBrG GhcPs       = NoExtField
 type instance XTypBr  GhcPs       = (EpToken "[t|", EpUniToken "|]" "⟧")
 type instance XVarBr  GhcPs       = EpaLocation
