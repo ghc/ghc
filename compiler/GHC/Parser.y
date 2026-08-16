@@ -3134,8 +3134,8 @@ aexp    :: { ECP }
 
         | 'if' ifgdpats                 {% hintMultiWayIf (getLoc $1) >>= \_ ->
                                            fmap ecpFromExp $
-                                           do { let (L _ ((o,c),_)) = $2
-                                              ; amsA' (sLL $1 $> $ HsMultiIf (epTok $1, o, c)
+                                           do { let (L _ (al,_)) = $2
+                                              ; amsA' (sLL $1 $> $ HsMultiIf (epTok $1, al)
                                                      (NE.reverse $ snd $ unLoc $2)) }}
         | 'case' exp 'of' altslist(pats1) {% runPV (unECP $2) >>= \ ($2 :: LHsExpr GhcPs) ->
                                              return $ ECP $
@@ -3598,11 +3598,11 @@ gdpats :: { forall b. DisambECP b => PV (Located (NonEmpty (LGRHS GhcPs (Located
 -- layout for MultiWayIf doesn't begin with an open brace, because it's hard to
 -- generate the open brace in addition to the vertical bar in the lexer, and
 -- we don't need it.
-ifgdpats :: { Located ((EpToken "{", EpToken "}"), NonEmpty (LGRHS GhcPs (LHsExpr GhcPs))) }
+ifgdpats :: { Located (AnnList, NonEmpty (LGRHS GhcPs (LHsExpr GhcPs))) }
          : '{' gdpats '}'                 {% runPV $2 >>= \ $2 ->
-                                             return $ sLL $1 $> ((epTok $1,epTok $3),unLoc $2)  }
+                                             return $ sLL $1 $> (AnnList AnnListBraces (ListBraces (epTok $1) (epTok $3)) [], unLoc $2)  }
          |     gdpats close               {% runPV $1 >>= \ $1 ->
-                                             return $ sL1 $1 ((noEpTok, noEpTok),unLoc $1) }
+                                             return $ sL1 $1 (AnnList (AnnListLayout (glR $1)) ListNone [], unLoc $1) }
 
 gdpat   :: { forall b. DisambECP b => PV (LGRHS GhcPs (LocatedA b)) }
         : '|' guardquals '->' exp
