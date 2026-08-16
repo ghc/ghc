@@ -2949,13 +2949,11 @@ instance ExactPrint (HsExpr GhcPs) where
     c' <- markEpUniToken c
     return (HsUntypedBracket a (PatBr (o',c') e'))
 
-  exact (HsUntypedBracket a (DecBrL (o,c, (oc,cc)) e)) = do
+  exact (HsUntypedBracket a (DecBrL (o,c, al) e)) = do
     o' <- markEpToken o
-    oc' <- markEpToken oc
-    e' <- mapM markAnnotated e
-    cc' <- markEpToken cc
+    (al',e') <- markAnnListA al $ setLayoutBoth $ mapM markAnnotated e
     c' <- markEpUniToken c
-    return (HsUntypedBracket a (DecBrL (o',c',(oc',cc')) e'))
+    return (HsUntypedBracket a (DecBrL (o',c',al') e'))
 
   exact (HsUntypedBracket a (TypBr (o,c) e)) = do
     o' <- markEpToken o
