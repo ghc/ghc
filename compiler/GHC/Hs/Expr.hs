@@ -281,7 +281,7 @@ type instance XIf            GhcPs = AnnsIf
 type instance XIf            GhcRn = NoExtField
 type instance XIf            GhcTc = NoExtField
 
-type instance XMultiIf       GhcPs = (EpToken "if", EpToken "{", EpToken "}")
+type instance XMultiIf       GhcPs = (EpToken "if", AnnList)
 type instance XMultiIf       GhcRn = NoExtField
 type instance XMultiIf       GhcTc = Type
 

@@ -2848,12 +2848,10 @@ instance ExactPrint (HsExpr GhcPs) where
     e3' <- markAnnotated e3
     return (HsIf an4 e1' e2' e3')
 
-  exact (HsMultiIf (i,o,c) mg) = do
+  exact (HsMultiIf (i,al) mg) = do
     i0 <- markEpToken i
-    o0 <- markEpToken o
-    mg' <- markAnnotated mg
-    c0 <- markEpToken c
-    return (HsMultiIf (i0,o0,c0) mg')
+    (al',mg') <- markAnnListA al $ setLayoutBoth $ markAnnotated mg
+    return (HsMultiIf (i0,al') mg')
 
   exact (HsLet (tkLet, tkIn) binds e) = do
     setLayoutBoth $ do -- Make sure the 'in' gets indented too
