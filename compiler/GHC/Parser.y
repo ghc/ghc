@@ -3308,9 +3308,9 @@ acmd    :: { LHsCmdTop GhcPs }
                                    runPV (checkCmdBlockArguments cmd) >>= \ _ ->
                                    return (sL1a cmd $ HsCmdTop noExtField cmd) }
 
-cvtopbody :: { ((EpToken "{", EpToken "}"),[LHsDecl GhcPs]) }
-        :  '{'            cvtopdecls0 '}'      { ((epTok $1 ,epTok $3),$2) }
-        |      vocurly    cvtopdecls0 close    { ((noEpTok, noEpTok),$2) }
+cvtopbody :: { (AnnList,[LHsDecl GhcPs]) }
+        :  '{'            cvtopdecls0 '}'      { (AnnList AnnListBraces (ListBraces (epTok $1) (epTok $3)) [],$2) }
+        |      vocurly    cvtopdecls0 close    { (AnnList (AnnListLayout (glR $1)) ListNone [],$2) }
 
 cvtopdecls0 :: { [LHsDecl GhcPs] }
         : topdecls_semi         { cvTopDecls $1 }
