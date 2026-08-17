@@ -70,8 +70,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn
@@ -165,9 +164,8 @@
              (HsValBinds
               ((,)
                (AnnList
-                (AnnListLayout
+                (EpVirtualBraces
                  (EpaSpan { Test20297.hs:9:1 }))
-                (ListNone)
                 [])
                (EpTok
                 (EpaSpan { Test20297.hs:7:3-7 })))
@@ -203,8 +201,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn
@@ -298,9 +295,8 @@
              (HsValBinds
               ((,)
                (AnnList
-                (AnnListLayout
+                (EpVirtualBraces
                  (EpaSpan { Test20297.hs:11:9 }))
-                (ListNone)
                 [])
                (EpTok
                 (EpaSpan { Test20297.hs:10:3-7 })))
@@ -328,8 +324,7 @@
                     ((,)
                      (FromSource)
                      (AnnList
-                      (AnnListNoLayout)
-                      (ListNone)
+                      (EpNoLayout)
                       []))
                     (L
                      (EpAnn
@@ -400,9 +395,8 @@
                               ((,)
                                (Right
                                 (AnnList
-                                 (AnnListLayout
+                                 (EpVirtualBraces
                                   (EpaSpan { Test20297.hs:11:22 }))
-                                 (ListNone)
                                  []))
                                (EpaSpan { Test20297.hs:11:19-20 }))
                               (DoExpr
@@ -523,8 +517,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn
@@ -612,9 +605,8 @@
              (HsValBinds
               ((,)
                (AnnList
-                (AnnListLayout
+                (EpVirtualBraces
                  (EpaSpan { Test20297.ppr.hs:6:1 }))
-                (ListNone)
                 [])
                (EpTok
                 (EpaSpan { Test20297.ppr.hs:5:3-7 })))
@@ -644,8 +636,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn
@@ -733,9 +724,8 @@
              (HsValBinds
               ((,)
                (AnnList
-                (AnnListLayout
+                (EpVirtualBraces
                  (EpaSpan { Test20297.ppr.hs:9:7 }))
-                (ListNone)
                 [])
                (EpTok
                 (EpaSpan { Test20297.ppr.hs:8:3-7 })))
@@ -763,8 +753,7 @@
                     ((,)
                      (FromSource)
                      (AnnList
-                      (AnnListNoLayout)
-                      (ListNone)
+                      (EpNoLayout)
                       []))
                     (L
                      (EpAnn
@@ -835,9 +824,8 @@
                               ((,)
                                (Right
                                 (AnnList
-                                 (AnnListLayout
+                                 (EpVirtualBraces
                                   (EpaSpan { Test20297.ppr.hs:9:20 }))
-                                 (ListNone)
                                  []))
                                (EpaSpan { Test20297.ppr.hs:9:17-18 }))
                               (DoExpr
