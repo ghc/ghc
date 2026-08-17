@@ -90,8 +90,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn
@@ -219,8 +218,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn
@@ -297,9 +295,8 @@
                  ((,)
                   (Right
                    (AnnList
-                    (AnnListLayout
+                    (EpVirtualBraces
                      (EpaSpan { DumpParsedAstComments.hs:16:3 }))
-                    (ListNone)
                     []))
                   (EpaSpan { DumpParsedAstComments.hs:14:7-8 }))
                  (DoExpr
@@ -373,8 +370,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn

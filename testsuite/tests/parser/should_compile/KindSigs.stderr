@@ -112,9 +112,8 @@
          (EpaSpan { <no location info> })))
        (ClosedTypeFamily
         (AnnList
-         (AnnListLayout
+         (EpVirtualBraces
           (EpaSpan { KindSigs.hs:12:3 }))
-         (ListNone)
          [])
         (Just
          [(L
@@ -1003,8 +1002,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn
@@ -1728,8 +1726,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn
