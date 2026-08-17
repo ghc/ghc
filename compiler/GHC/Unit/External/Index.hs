@@ -64,6 +64,7 @@ module GHC.Unit.External.Index (
   -- * 'GlobalUnitInfoMap'
   GlobalUnitInfoMap,
   lookupGlobalUnitInfoMap,
+  unitInfosOfUnitId,
   emptyGlobalUnitInfoMap,
   mkGlobalUnitInfoMap,
   -- * 'GlobalUnitKey'
@@ -286,6 +287,12 @@ lookupGlobalUnitInfoMap (GlobalUnitKey uid abiHash) (GlobalUnitInfoMap globalMap
   case lookupUniqMap globalMap uid of
     Nothing -> Nothing
     Just sameUnitId -> Map.lookup abiHash sameUnitId
+
+-- | Lookup all 'UnitInfo' entries of a given 'UnitId'. This can result in more
+-- than one 'UnitInfo' only if the given 'UnitId' is a conflicting one.
+unitInfosOfUnitId :: UnitId -> GlobalUnitInfoMap -> Maybe [UnitInfo]
+unitInfosOfUnitId uid (GlobalUnitInfoMap globalMap) =
+  Map.elems <$> lookupUniqMap globalMap uid
 
 mkGlobalUnitInfoMap :: [(UnitId, UnitInfo)] -> GlobalUnitInfoMap
 mkGlobalUnitInfoMap unitInfos =
