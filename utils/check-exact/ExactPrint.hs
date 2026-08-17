@@ -1210,13 +1210,8 @@ markAnnListD (Left (o,c)) action = do
   c' <- markEpToken c
   return (Left (o',c'), r)
 markAnnListD (Right ann) action = do
-  (ann',r) <- markAnnList' ann action
+  (ann',r) <- markAnnListA ann action
   return (Right ann',r)
-
-markAnnList' :: (Monad m, Monoid w)
-  => AnnList -> EP w m a -> EP w m (AnnList, a)
-markAnnList' ann action = do
-  markAnnListA ann $ action
 
 markAnnListA :: (Monad m, Monoid w)
   => AnnList
@@ -1225,7 +1220,10 @@ markAnnListA :: (Monad m, Monoid w)
 markAnnListA (AnnList la semis) action = do
   la0 <- markEpLayoutO la
   semis' <- mapM markEpToken semis
-  r <- action
+  r <- case la of
+         EpNoLayout -> action
+         -- strictly speaking EpExplicitBraces should be without layoyut too
+         _          -> setLayoutBoth $ action
   la1 <- markEpLayoutC la0
   return ((AnnList la1 semis'), r)
 
@@ -1315,10 +1313,6 @@ commentAllocationIn ss = do
   putUnallocatedComments later
   -- debugM $ "commentAllocation:(ss,earlier,later)" ++ show (rs2range ss,earlier,later)
   return earlier
--- ---------------------------------------------------------------------
-
-markAnnotatedWithLayout :: (Monad m, Monoid w) => ExactPrint ast => ast -> EP w m ast
-markAnnotatedWithLayout a = setLayoutBoth $ markAnnotated a
 
 -- ---------------------------------------------------------------------
 -- End of utility functions
@@ -2122,7 +2116,7 @@ instance ExactPrint (ClsInstDecl GhcPs) where
                      , cid_modifiers = mods })
       = do
           (mbWarn', i', w', mbOverlap', inst_ty', mods') <- top_matter
-          (ann_list',  decls') <- markAnnListA ann_list $  setLayoutBoth $ mapM markAnnotated decls
+          (ann_list',  decls') <- markAnnListA ann_list $ mapM markAnnotated decls
           return (ClsInstDecl { cid_ext = (mbWarn', AnnClsInstDecl i' w' ann_list')
                               , cid_poly_ty = inst_ty'
                               , cid_decls = decls'
@@ -2388,7 +2382,7 @@ instance ExactPrint (HsLocalBinds GhcPs) where
         when (not $ isEmptyValBinds valbinds) $ setExtraDP (Just anc)
       _ -> return ()
 
-    (an1, valbinds') <- markAnnListA an0 $ markAnnotatedWithLayout valbinds
+    (an1, valbinds') <- markAnnListA an0 $ markAnnotated valbinds
     debugM $ "exact HsValBinds: an1=" ++ showAst an1
     medr <- getExtraDPReturn
     an2 <- case medr of
@@ -2818,7 +2812,7 @@ instance ExactPrint (HsExpr GhcPs) where
 
   exact (HsMultiIf (i,al) mg) = do
     i0 <- markEpToken i
-    (al',mg') <- markAnnListA al $ setLayoutBoth $ markAnnotated mg
+    (al',mg') <- markAnnListA al $ markAnnotated mg
     return (HsMultiIf (i0,al') mg')
 
   exact (HsLet (tkLet, tkIn) binds e) = do
@@ -2919,7 +2913,7 @@ instance ExactPrint (HsExpr GhcPs) where
 
   exact (HsUntypedBracket a (DecBrL (o,c, al) e)) = do
     o' <- markEpToken o
-    (al',e') <- markAnnListA al $ setLayoutBoth $ mapM markAnnotated e
+    (al',e') <- markAnnListA al $ mapM markAnnotated e
     c' <- markEpUniToken c
     return (HsUntypedBracket a (DecBrL (o',c',al') e'))
 
@@ -3033,11 +3027,8 @@ markMaybeDodgyStmts (an,l) stmts =
           c' <- markEpToken c
           return (Left (o',c'), r)
         Right an' -> do
-         (an'',r') <- markAnnListA an' $ markAnnotatedWithLayout stmts
+         (an'',r') <- markAnnListA an' $ markAnnotated stmts
          return (Right an'',r')
-      -- (an0,stmts') <- markAnnListA an $ \a -> do
-      --    r <- markAnnotatedWithLayout stmts
-      --    return (a, r)
       return ((an0, l), stmts')
     else return ((an, l), stmts)
 
@@ -3371,7 +3362,7 @@ instance (
   exact (RecStmt (an,r) stmts a b c d e) = do
     debugM $ "RecStmt"
     r' <- markEpToken r
-    (an1, stmts') <- markAnnList' an (markAnnotated stmts)
+    (an1, stmts') <- markAnnListA an (markAnnotated stmts)
     return (RecStmt (an1,r') stmts' a b c d e)
 
 -- ---------------------------------------------------------------------
@@ -3470,7 +3461,7 @@ instance ExactPrint (TyClDecl GhcPs) where
       | otherwise       -- Laid out
       = do
           (mods', c', w', vb', fds', lclas', tyvars',context') <- top_matter
-          (al',decls') <- markAnnListA al $ setLayoutBoth $ mapM markAnnotated decls
+          (al',decls') <- markAnnListA al $ mapM markAnnotated decls
           return (ClassDecl {tcdCExt = (AnnClassDecl c' [] [] vb' w' al', lo),
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
@@ -3544,7 +3535,7 @@ instance ExactPrint (FamilyDecl GhcPs) where
                        dd' <- markEpToken dd
                        return (an, dd', mb_eqns)
                      Just eqns -> do
-                       (an',eqns') <- markAnnList' an $ setLayoutBoth $ mapM markAnnotated eqns
+                       (an',eqns') <- markAnnListA an $ mapM markAnnotated eqns
                        return (an', dd, Just eqns')
                  return (w', dd', ClosedTypeFamily an' mb_eqns')
                _ -> return (w, dd, info)
@@ -4085,7 +4076,7 @@ exact_condecls :: (Monad m, Monoid w)
 exact_condecls eq al cs
   | gadt_syntax                  -- In GADT syntax
   = do
-      (al',cs') <- markAnnListA al $ setLayoutBoth $ mapM markAnnotated cs
+      (al',cs') <- markAnnListA al $ mapM markAnnotated cs
       return (eq, al', cs')
   | otherwise                    -- In H98 syntax
   = do
