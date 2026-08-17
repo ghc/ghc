@@ -947,3 +947,8 @@ T27423c:
 T27424c:
 	$(CHECK_PPR)   $(LIBDIR) T27424c.hs
 	$(CHECK_EXACT) $(LIBDIR) T27424c.hs
+
+.PHONY: Layout
+Layout:
+	$(CHECK_PPR)   $(LIBDIR) Layout.hs
+	$(CHECK_EXACT) $(LIBDIR) Layout.hs
