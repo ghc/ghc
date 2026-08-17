@@ -15,10 +15,9 @@ import Language.Haskell.Syntax.Expr
   , GRHSs
   , HsUntypedSplice
   , HsTypedSplice
-  , HsMatchContext
-  , HsStmtContext
+  , HsMatchContextP
+  , HsStmtContextP
   )
-import Language.Haskell.Syntax.Extension (LIdP)
 import GHC.Hs.Extension ( OutputableBndrId, GhcPass, GhcRn)
 import GHC.Types.Name   ( Name )
 import Data.Bool  ( Bool )
@@ -52,7 +51,10 @@ data HsUntypedSpliceResult thing
       }
   | HsUntypedSpliceNested SplicePointName
 
-type HsMatchContextRn = HsMatchContext (LIdP GhcRn)
-type HsStmtContextRn = HsStmtContext (LIdP GhcRn)
+type HsMatchContext p = HsMatchContextP p
+type HsMatchContextRn = HsMatchContextP GhcRn
+
+type HsStmtContext p = HsStmtContextP p
+type HsStmtContextRn = HsStmtContextP GhcRn
 
 data HoleKind

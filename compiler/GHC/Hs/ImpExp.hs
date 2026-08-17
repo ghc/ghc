@@ -18,7 +18,6 @@ module GHC.Hs.ImpExp
     ) where
 
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Module.Name
 import Language.Haskell.Syntax.ImpExp
 
 import GHC.Prelude
@@ -37,6 +36,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc ((<||>))
 
 import GHC.Unit.Module.Warnings
+import GHC.Unit.Module.Name
 
 import Data.Data
 import Data.Maybe
@@ -93,6 +93,9 @@ Plugins may also introduce generated imports.
 type instance XXImportDecl  (GhcPass _) = DataConCantHappen
 
 type instance Anno ModuleName = SrcSpanAnnA
+type instance Anno (ModuleNamePs) = SrcSpanAnnA
+type instance Anno (ModuleNameP GhcRn) = SrcSpanAnnA
+type instance Anno (ModuleNameP GhcTc) = SrcSpanAnnA
 
 deriving instance Data (IEWrappedName GhcPs)
 deriving instance Data (IEWrappedName GhcRn)
@@ -141,7 +144,7 @@ instance HasLoc EpAnnLevel where
 
 -- ---------------------------------------------------------------------
 
-simpleImportDecl :: ModuleName -> ImportDecl GhcPs
+simpleImportDecl :: ModuleNamePs -> ImportDecl GhcPs
 simpleImportDecl mn = ImportDecl {
       ideclExt        = XImportDeclPass noAnn NoSourceText False,
       ideclName       = noLocA mn,
@@ -166,7 +169,7 @@ instance (OutputableBndrId p
                     , ideclAs = as, ideclImportList = spec })
       = hang (hsep [text "import", ppr_imp impExt from, pp_generated impExt,
                     pp_level level False, pp_safe safe, pp_qual qual False,
-                    ppr pkg, ppr mod',
+                    ppr pkg, ppr_module mod',
                     pp_level level True, pp_qual qual True,
                     pp_as as])
              4 (pp_spec spec)
@@ -198,7 +201,9 @@ instance (OutputableBndrId p
         pp_safe True    = text "safe"
 
         pp_as Nothing   = empty
-        pp_as (Just a)  = text "as" <+> ppr a
+        pp_as (Just a)  = text "as" <+> ppr_module a
+
+        ppr_module mod = ppr (unLoc mod)
 
         ppr_imp ext IsBoot =
             let mSrcText = case ghcPass @p of
@@ -398,7 +403,7 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
                 let (bs, as) = splitAt pos (map (ppr . unLoc) withs)
                 in bs ++ [text ".."] ++ as
     ppr ie@(IEModuleContents _ mod')
-        = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ text "module" <+> ppr mod']
+        = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ text "module" <+> ppr (unLoc mod')]
     ppr (IEWholeNamespace _ ns_spec) = ppr ns_spec <+> text ".."
     ppr (IEGroup _ n _)           = text ("<IEGroup: " ++ show n ++ ">")
     ppr (IEDoc _ doc)             = ppr doc

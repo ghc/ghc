@@ -8,6 +8,7 @@
 
 module GHC.Hs.Extension
   ( module GHC.Hs.Extension
+  , module GHC.Hs.Extension.Instances
   , module GHC.Hs.Extension.Pass
   ) where
 
@@ -17,6 +18,7 @@ module GHC.Hs.Extension
 import GHC.Prelude
 
 import Language.Haskell.Syntax.Extension
+import GHC.Hs.Extension.Instances
 import GHC.Hs.Extension.Pass
 import GHC.Types.Name
 import GHC.Types.Name.Reader

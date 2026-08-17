@@ -438,7 +438,7 @@ mkRoleAnnotDecl loc tycon roles anns
             addFatalError $ mkPlainErrorMsgEnvelope loc_role $
               (PsErrIllegalRoleName role nearby)
 
-mkMDo :: (EpToken "{", [EpToken ";"], EpToken "}") -> HsDoFlavour -> LocatedA [ExprLStmt GhcPs] -> EpaLocation -> EpaLocation -> HsExpr GhcPs
+mkMDo :: (EpToken "{", [EpToken ";"], EpToken "}") -> HsDoFlavourPs -> LocatedA [ExprLStmt GhcPs] -> EpaLocation -> EpaLocation -> HsExpr GhcPs
 mkMDo (ob, semis, cb) ctxt stmts tok loc
   = mkHsDoAnns ctxt stmts (AnnList (Just loc) (ListBraces ob cb) semis tok [])
 
@@ -1693,7 +1693,7 @@ addUnpackednessP (L lprag (UnpackednessPragma anns prag unpk)) ty = do
 -- If the flag MonadComprehensions is set, return a 'MonadComp' context,
 -- otherwise use the usual 'ListComp' context
 
-checkMonadComp :: PV HsDoFlavour
+checkMonadComp :: PV HsDoFlavourPs
 checkMonadComp = do
     monadComprehensions <- getBit MonadComprehensionsBit
     return $ if monadComprehensions
@@ -1821,7 +1821,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsDoPV ::
     SrcSpan ->
     (EpToken "{", [EpToken ";"], EpToken "}") ->
-    Maybe ModuleName ->
+    Maybe ModuleNamePs ->
     LocatedA [LStmt GhcPs (LocatedA b)] ->
     EpaLocation -> -- Token
     EpaLocation -> -- Anchor

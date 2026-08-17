@@ -87,6 +87,7 @@ import GHC.Parser.Annotation
 import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.String
+import GHC.Unit.Module.Name (ModuleName, rnModuleName)
 
 import GHC.Builtin.Types ( unitTyCon, unitDataCon, sumTyCon,
                            tupleTyCon, tupleDataCon, nilDataCon,
@@ -823,12 +824,12 @@ msubsts :: { OrdList (LHsModuleSubst PackageName) }
         | msubst             { unitOL $1 }
 
 msubst :: { LHsModuleSubst PackageName }
-        : modid '=' moduleid { sLL $1 $> $ (reLoc $1, $3) }
-        | modid VARSYM modid VARSYM { sLL $1 $> $ (reLoc $1, sLL $2 $> $ HsModuleVar (reLoc $3)) }
+        : modid '=' moduleid { sLL $1 $> $ (reLocModuleName $1, $3) }
+        | modid VARSYM modid VARSYM { sLL $1 $> $ (reLocModuleName $1, sLL $2 $> $ HsModuleVar (reLocModuleName $3)) }
 
 moduleid :: { LHsModuleId PackageName }
-          : VARSYM modid VARSYM { sLL $1 $> $ HsModuleVar (reLoc $2) }
-          | unitid ':' modid    { sLL $1 $> $ HsModuleId $1 (reLoc $3) }
+          : VARSYM modid VARSYM { sLL $1 $> $ HsModuleVar (reLocModuleName $2) }
+          | unitid ':' modid    { sLL $1 $> $ HsModuleId $1 (reLocModuleName $3) }
 
 pkgname :: { Located PackageName }
         : STRING     { sL1 $1 $ PackageName (mkFastStringShortText $ getSTRING $1) }
@@ -861,8 +862,8 @@ rns :: { OrdList LRenaming }
         | rn         { unitOL $1 }
 
 rn :: { LRenaming }
-        : modid 'as' modid { sLL $1 $> $ Renaming (reLoc $1) (Just (reLoc $3)) }
-        | modid            { sL1 $1    $ Renaming (reLoc $1) Nothing }
+        : modid 'as' modid { sLL $1 $> $ Renaming (reLocModuleName $1) (Just (reLocModuleName $3)) }
+        | modid            { sL1 $1    $ Renaming (reLocModuleName $1) Nothing }
 
 unitbody :: { OrdList (LHsUnitDecl PackageName) }
         : '{'     unitdecls '}'   { $2 }
@@ -880,12 +881,12 @@ unitdecl :: { LHsUnitDecl PackageName }
                  (case snd $2 of
                    NotBoot -> HsSrcFile
                    IsBoot  -> HsBootFile)
-                 (reLoc $3)
+                 (reLocModuleName $3)
                  (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $7) $4 Nothing) (Just $3) (snd $5) (fst $ sndOf3 $7) (snd $ sndOf3 $7))) }
         | 'signature' modid maybe_warning_pragma maybeexports 'where' body
              { sL1 $1 $ DeclD
                  HsigFile
-                 (reLoc $2)
+                 (reLocModuleName $2)
                  (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $6) $3 Nothing) (Just $2) (snd $4) (fst $ sndOf3 $6) (snd $ sndOf3 $6))) }
         | 'dependency' unitid mayberns
              { sL1 $1 $ IncludeD (IncludeDecl { idUnitId = $2
@@ -1193,7 +1194,7 @@ optqualified :: { Maybe (EpToken "qualified") }
         : 'qualified'                           { Just (epTok $1) }
         | {- empty -}                           { Nothing }
 
-maybeas :: { (Maybe (EpToken "as"),Located (Maybe (LocatedA ModuleName))) }
+maybeas :: { (Maybe (EpToken "as"),Located (Maybe (LocatedA (ModuleNamePs)))) }
         : 'as' modid                           { (Just (epTok $1)
                                                  ,sLL $1 $> (Just $2)) }
         | {- empty -}                          { (Nothing, noLoc Nothing) }
@@ -4247,7 +4248,7 @@ close :: { () }
 -----------------------------------------------------------------------------
 -- Miscellaneous (mostly renamings)
 
-modid   :: { LocatedA ModuleName }
+modid   :: { LocatedA (ModuleNamePs) }
         : CONID                 { sL1a $1 $ mkModuleNameFS (getCONID $1) }
         | QCONID                { sL1a $1 $ let (mod,c) = getQCONID $1 in
                                   mkModuleNameFS
@@ -4345,6 +4346,9 @@ getINCOHERENT_PRAGs   (L _ (ITincoherent_prag   src)) = src
 getCTYPEs             (L _ (ITctype             src)) = src
 
 getQualStringMod (L _ (ITstring _ StringMeta{strMetaQualified = Just modName} _)) = modName
+
+reLocModuleName :: LocatedA (ModuleNamePs) -> Located ModuleName
+reLocModuleName = fmap rnModuleName . reLoc
 
 getStringLiteral l = StringLiteral (getSTRINGs l) (getSTRING l)
 

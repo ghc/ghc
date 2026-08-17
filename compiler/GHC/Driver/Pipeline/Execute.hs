@@ -83,7 +83,7 @@ import GHC.Driver.Config.Finder
 import GHC.Rename.Names
 import GHC.StgToJS.Linker.Linker (embedJsFile)
 
-import Language.Haskell.Syntax.Module.Name
+import GHC.Unit.Module.Name
 
 newtype HookedUse a = HookedUse { runHookedUse :: (Hooks, PhaseHook) -> IO a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask)

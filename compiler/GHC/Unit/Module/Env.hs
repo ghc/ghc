@@ -54,7 +54,7 @@ import qualified Data.Semigroup as S
 import qualified GHC.Data.FiniteMap as Map
 import GHC.Utils.Outputable
 
-import Language.Haskell.Syntax.Module.Name
+import GHC.Unit.Module.Name
 
 -- | A map keyed off of 'Module's
 newtype ModuleEnv elt = ModuleEnv (Map NDModule elt)
@@ -292,4 +292,3 @@ plusInstalledModuleEnv :: (elt -> elt -> elt)
   -> InstalledModuleEnv elt
 plusInstalledModuleEnv f (InstalledModuleEnv xm) (InstalledModuleEnv ym) =
   InstalledModuleEnv $ Map.unionWith f xm ym
-

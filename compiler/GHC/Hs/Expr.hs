@@ -14,6 +14,7 @@
 module GHC.Hs.Expr
   ( module Language.Haskell.Syntax.Expr
   , module GHC.Hs.Expr
+  , HsDoFlavour
   ) where
 
 import Language.Haskell.Syntax.Expr
@@ -47,7 +48,7 @@ import GHC.Types.Tickish (CoreTickish)
 import GHC.Types.Unique.Set (UniqSet)
 import GHC.Types.ThLevelIndex
 import GHC.Core.ConLike ( conLikeName, ConLike )
-import GHC.Unit.Module (ModuleName)
+import GHC.Unit.Module (ModuleNameP)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -1952,7 +1953,7 @@ data ApplicativeArg idL
     , app_stmts         :: [ExprLStmt idL] -- stmts
     , final_expr        :: HsExpr idL    -- return (v1,..,vn), or just (v1,..,vn)
     , bv_pattern        :: LPat idL      -- (v1,...,vn)
-    , stmt_context      :: HsDoFlavour
+    , stmt_context      :: HsDoFlavourP (NoGhcTc idL)
       -- ^ context of the do expression, used in pprArg
     }
   | XApplicativeArg !(XXApplicativeArg idL)
@@ -2094,7 +2095,7 @@ pprBy (Just e) = text "by" <+> ppr e
 pprDo :: (OutputableBndrId p, Outputable body,
                  Anno (StmtLR (GhcPass p) (GhcPass p) body) ~ SrcSpanAnnA
          )
-      => HsDoFlavour -> [LStmt (GhcPass p) body] -> SDoc
+      => HsDoFlavourP (NoGhcTc (GhcPass p)) -> [LStmt (GhcPass p) body] -> SDoc
 pprDo (DoExpr m)    stmts =
   ppr_module_name_prefix m <> text "do"  <+> ppr_do_stmts stmts
 pprDo GhciStmtCtxt  stmts = text "do"  <+> ppr_do_stmts stmts
@@ -2109,7 +2110,7 @@ pprArrowExpr :: (OutputableBndrId p, Outputable body,
       => [LStmt (GhcPass p) body] -> SDoc
 pprArrowExpr stmts = text "do"  <+> ppr_do_stmts stmts
 
-ppr_module_name_prefix :: Maybe ModuleName -> SDoc
+ppr_module_name_prefix :: Maybe (ModuleNameP (GhcPass p)) -> SDoc
 ppr_module_name_prefix = \case
   Nothing -> empty
   Just module_name -> ppr module_name <> char '.'
@@ -2398,12 +2399,17 @@ pp_dotdot = text " .. "
 ************************************************************************
 -}
 
-type HsMatchContextPs = HsMatchContext (LIdP GhcPs)
-type HsMatchContextRn = HsMatchContext (LIdP GhcRn)
+type HsMatchContext p = HsMatchContextP p
+type HsMatchContextPs = HsMatchContextP GhcPs
+type HsMatchContextRn = HsMatchContextP GhcRn
 
-type HsStmtContextRn = HsStmtContext (LIdP GhcRn)
+type HsStmtContext p = HsStmtContextP p
+type HsStmtContextRn = HsStmtContextP GhcRn
 
-instance Outputable fn => Outputable (HsMatchContext fn) where
+type HsDoFlavourPs = HsDoFlavourP GhcPs
+--type HsDoFlavour   = HsDoFlavourP GhcRn
+
+instance Outputable (LIdP fn) => Outputable (HsMatchContext fn) where
   ppr m@(FunRhs{})            = text "FunRhs" <+> ppr (mc_fun m) <+> ppr (mc_fixity m)
   ppr CaseAlt                 = text "CaseAlt"
   ppr (LamAlt lam_variant)    = text "LamAlt" <+> ppr lam_variant
@@ -2444,11 +2450,11 @@ pprHsArrType HsFirstOrderApp  = text "first order arrow application"
 
 -----------------
 
-instance Outputable fn => Outputable (HsStmtContext fn) where
+instance Outputable (LIdP fn) => Outputable (HsStmtContext fn) where
     ppr = pprStmtContext
 
 -- Used to generate the string for a *runtime* error message
-matchContextErrString :: Outputable fn => HsMatchContext fn -> SDoc
+matchContextErrString :: HsMatchContextRn -> SDoc
 matchContextErrString (FunRhs{mc_fun=fun})          = text "function" <+> ppr fun
 matchContextErrString CaseAlt                       = text "case"
 matchContextErrString (LamAlt lam_variant)          = lamCaseKeyword lam_variant
@@ -2488,7 +2494,7 @@ pprMatchInCtxt match  = hang (text "In" <+> pprMatchContext (m_ctxt match)
 
 pprStmtInCtxt :: (OutputableBndrId idL,
                   OutputableBndrId idR,
-                  Outputable fn,
+                  Outputable (LIdP fn),
                   Outputable body,
                  Anno (StmtLR (GhcPass idL) (GhcPass idR) body) ~ SrcSpanAnnA)
               => HsStmtContext fn
@@ -2508,7 +2514,7 @@ pprStmtInCtxt ctxt stmt
     ppr_stmt stmt = pprStmt stmt
 
 
-pprMatchContext :: Outputable p => HsMatchContext p -> SDoc
+pprMatchContext :: Outputable (LIdP fn) => HsMatchContext fn -> SDoc
 pprMatchContext ctxt
   | want_an ctxt = text "an" <+> pprMatchContextNoun ctxt
   | otherwise    = text "a"  <+> pprMatchContextNoun ctxt
@@ -2519,7 +2525,7 @@ pprMatchContext ctxt
     want_an LazyPatCtx                               = True
     want_an _                                        = False
 
-pprMatchContextNoun :: Outputable fn => HsMatchContext fn -> SDoc
+pprMatchContextNoun :: Outputable (LIdP fn) => HsMatchContext fn -> SDoc
 pprMatchContextNoun (FunRhs {mc_fun=fun})   = text "equation for" <+> quotes (ppr fun)
 pprMatchContextNoun CaseAlt                 = text "case alternative"
 pprMatchContextNoun (LamAlt LamSingle)      = text "lambda abstraction"
@@ -2537,7 +2543,7 @@ pprMatchContextNoun (StmtCtxt ctxt)         = text "pattern binding in"
 pprMatchContextNoun PatSynCtx               = text "pattern synonym declaration"
 pprMatchContextNoun LazyPatCtx              = text "irrefutable pattern"
 
-pprMatchContextNouns :: Outputable fn => HsMatchContext fn -> SDoc
+pprMatchContextNouns :: HsMatchContextRn -> SDoc
 pprMatchContextNouns (FunRhs {mc_fun=fun})   = text "equations for" <+> quotes (ppr fun)
 pprMatchContextNouns PatBindGuards           = text "pattern binding guards"
 pprMatchContextNouns (ArrowMatchCtxt c)      = pprArrowMatchContextNouns c
@@ -2560,7 +2566,7 @@ pprArrowMatchContextNouns (ArrowLamAlt lam_variant) = lamCaseKeyword lam_variant
 pprArrowMatchContextNouns ctxt                      = pprArrowMatchContextNoun ctxt <> char 's'
 
 -----------------
-pprAStmtContext, pprStmtContext :: Outputable fn => HsStmtContext fn -> SDoc
+pprAStmtContext, pprStmtContext :: Outputable (LIdP fn) => HsStmtContext fn -> SDoc
 pprAStmtContext (HsDoStmt flavour) = pprAHsDoFlavour flavour
 pprAStmtContext ctxt = text "a" <+> pprStmtContext ctxt
 
@@ -2591,7 +2597,7 @@ pprStmtCat (RecStmt {})         = text "rec"
 pprStmtCat (ParStmt {})         = text "parallel"
 pprStmtCat (XStmtLR _)          = text "applicative"
 
-pprAHsDoFlavour, pprHsDoFlavour :: HsDoFlavour -> SDoc
+pprAHsDoFlavour, pprHsDoFlavour :: HsDoFlavourP fn -> SDoc
 pprAHsDoFlavour flavour = article <+> pprHsDoFlavour flavour
   where
     pp_an = text "an"
@@ -2606,7 +2612,7 @@ pprHsDoFlavour ListComp        = text "list comprehension"
 pprHsDoFlavour MonadComp       = text "monad comprehension"
 pprHsDoFlavour GhciStmtCtxt    = text "interactive GHCi command"
 
-prependQualified :: Maybe ModuleName -> SDoc -> SDoc
+prependQualified :: Maybe (ModuleNameP p) -> SDoc -> SDoc
 prependQualified Nothing  t = t
 prependQualified (Just _) t = text "qualified" <+> t
 

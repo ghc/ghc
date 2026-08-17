@@ -305,9 +305,9 @@ downsweepInteractiveImports hsc_env ic = unsafeInterleaveIO $ do
     -- A complete import statement
     mkEdge (IIDecl i) =
       let lvl = convImportLevel (ideclLevelSpec i)
-          wanted_mod = unLoc (ideclName i)
+          wanted_mod = rnModuleName (unLoc (ideclName i))
           is_boot = ideclSource i
-          mb_pkg = renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName i) (ideclPkgQual i)
+          mb_pkg = renameRawPkgQual (hsc_unit_env hsc_env) wanted_mod (ideclPkgQual i)
           unitId = homeUnitId $ hsc_home_unit hsc_env
       in Right (unitId, lvl, mb_pkg, GWIB (noLoc wanted_mod) is_boot)
 

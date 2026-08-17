@@ -963,7 +963,7 @@ instance ( HiePass p
       , toHie grhss
       ]
 
-toHieHsMatchContext :: forall p. HiePass p => HsMatchContext (LIdP (NoGhcTc (GhcPass p)))
+toHieHsMatchContext :: forall p. HiePass p => HsMatchContext (NoGhcTc (GhcPass p))
                                            -> HieM [HieAST Type]
 toHieHsMatchContext ctxt
   = case ctxt of
@@ -977,7 +977,7 @@ toHieHsMatchContext ctxt
                       HieRn -> name
                       HieTc -> name
 
-toHieHsStmtContext :: forall p. HiePass p => HsStmtContext (LIdP (NoGhcTc (GhcPass p)))
+toHieHsStmtContext :: forall p. HiePass p => HsStmtContext (NoGhcTc (GhcPass p))
                                           -> HieM [HieAST Type]
 toHieHsStmtContext ctxt
   = case ctxt of

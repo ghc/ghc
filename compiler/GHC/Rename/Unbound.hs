@@ -404,8 +404,8 @@ sameQualImportSuggestions looking_for ic currMod imports rdr_name
     filter pick_interactive (ic_imports ic)
 
   pick_interactive :: InteractiveImport -> Bool
-  pick_interactive (IIDecl d)   | mb_rdr_mod_name == Just (unLoc (ideclName d)) = True
-                                | mb_rdr_mod_name == fmap unLoc (ideclAs d) = True
+  pick_interactive (IIDecl d)   | mb_rdr_mod_name == Just (rnModuleName (unLoc (ideclName d))) = True
+                                | mb_rdr_mod_name == fmap (rnModuleName . unLoc) (ideclAs d) = True
   pick_interactive (IIModule m) | mb_rdr_mod_name == Just (moduleName m) = True
   pick_interactive _ = False
 

@@ -484,11 +484,13 @@ rnExpr (HsLet _ binds expr)
       ; return (HsLet noExtField binds' expr', fvExpr) }
 
 rnExpr (HsDo _ do_or_lc (L l stmts))
- = do { ((stmts1, _), fvs1) <-
-          rnStmtsWithFreeNames (HsDoStmt do_or_lc) rnExpr stmts
+ = do { let do_or_lc' = rnHsDoFlavour do_or_lc
+      ; ((stmts1, _), fvs1) <-
+          rnStmtsWithFreeNames (HsDoStmt do_or_lc') rnExpr stmts
             (\ _ -> return ((), emptyFNs))
-      ; (pp_stmts, fvs2) <- postProcessStmtsForApplicativeDo do_or_lc stmts1
-      ; return ( HsDo noExtField do_or_lc (L l pp_stmts), fvs1 `plusFN` fvs2 ) }
+      ; (pp_stmts, fvs2) <- postProcessStmtsForApplicativeDo do_or_lc' stmts1
+      ; return ( HsDo noExtField do_or_lc' (L l pp_stmts), fvs1 `plusFN` fvs2 ) }
+
 -- ExplicitList: see Note [Handling overloaded and rebindable constructs]
 rnExpr (ExplicitList _ exps)
   = do  { (exps', fvs) <- rnExprs exps
@@ -690,6 +692,15 @@ rnExpr (HsProc x pat body)
     rnPat (ArrowMatchCtxt ProcExpr) pat $ \ pat' -> do
       { (body',fvBody) <- rnCmdTop body
       ; return (HsProc x pat' body', fvBody) }
+
+-- | Rename a 'HsDoFlavour', converting the module name of a qualified
+-- do-block from its parsed representation to the renamed one.
+rnHsDoFlavour :: HsDoFlavourPs -> HsDoFlavour
+rnHsDoFlavour (DoExpr m)   = DoExpr (rnModuleName <$> m)
+rnHsDoFlavour (MDoExpr m)  = MDoExpr (rnModuleName <$> m)
+rnHsDoFlavour GhciStmtCtxt = GhciStmtCtxt
+rnHsDoFlavour ListComp     = ListComp
+rnHsDoFlavour MonadComp    = MonadComp
 
 
 {-
@@ -2796,7 +2807,7 @@ using fromString:
                         Nothing -> M.fail (fromString "Pattern match error")
 
 -}
-getMonadFailOp :: HsStmtContext fn -> RnM (FailOperator GhcRn, FreeNames) -- Syntax expr fail op
+getMonadFailOp :: HsStmtContextRn -> RnM (FailOperator GhcRn, FreeNames) -- Syntax expr fail op
 getMonadFailOp ctxt
  = do { xOverloadedStrings <- fmap (xopt LangExt.OverloadedStrings) getDynFlags
       ; xRebindableSyntax <- fmap (xopt LangExt.RebindableSyntax) getDynFlags

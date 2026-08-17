@@ -28,6 +28,7 @@ module GHC.Hs (
         module GHC.Hs.Doc,
         module GHC.Hs.Extension,
         module GHC.Parser.Annotation,
+        module GHC.Unit.Module.Name,
 
         HsModule(..), AnnsModule(..),
         HsParsedModule(..), XModulePs(..), AnnListExportDecl
@@ -56,6 +57,7 @@ import Language.Haskell.Syntax
 import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import GHC.Unit.Module.Warnings
+import GHC.Unit.Module.Name
 
 -- libraries:
 import Data.Data hiding ( Fixity )
@@ -131,7 +133,7 @@ instance Outputable (HsModule GhcPs) where
            Nothing -> pp_modname <+> rest
            Just d -> vcat [ pp_modname, ppr d, rest ]
 
-        pp_modname = text "module" <+> ppr name
+        pp_modname = text "module" <+> ppr (unLoc name)
 
 pp_nonnull :: Outputable t => [t] -> SDoc
 pp_nonnull [] = empty

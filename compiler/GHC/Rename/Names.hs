@@ -327,7 +327,7 @@ rnImportDecl this_mod
 
     -- If there's an error in loadInterface, (e.g. interface
     -- file not found) we get lots of spurious errors from 'filterImports'
-    let imp_mod_name = unLoc loc_imp_mod_name
+    let imp_mod_name = rnModuleName (unLoc loc_imp_mod_name)
         doc = ppr imp_mod_name <+> import_reason
 
     hsc_env <- getTopEnv
@@ -386,7 +386,7 @@ rnImportDecl this_mod
         addErr (TcRnSafeImportsDisabled imp_mod_name)
 
     let imp_mod = mi_module iface
-        qual_mod_name = fmap unLoc as_mod `orElse` imp_mod_name
+        qual_mod_name = fmap (rnModuleName . unLoc) as_mod `orElse` imp_mod_name
         imp_spec  = ImpDeclSpec { is_mod = imp_mod, is_qual = qual_only,
                                   is_dloc = locA loc, is_as = qual_mod_name,
                                   is_pkg_qual = pkg_qual, is_isboot = want_boot,
@@ -428,12 +428,12 @@ rnImportDecl this_mod
 
     let new_imp_decl = ImportDecl
           { ideclExt       = ideclExt decl
-          , ideclName      = ideclName decl
+          , ideclName      = fmap rnModuleName (ideclName decl)
           , ideclPkgQual   = pkg_qual
           , ideclSource    = ideclSource decl
           , ideclSafe      = mod_safe'
           , ideclQualified = ideclQualified decl
-          , ideclAs        = ideclAs decl
+          , ideclAs        = fmap (fmap rnModuleName) (ideclAs decl)
           , ideclImportList = new_imp_details
           , ideclLevelSpec  = ideclLevelSpec decl
           }
@@ -2286,7 +2286,7 @@ getMinimalImports ie_decls
       , Just (Exactly, _) <- ideclImportList decl
       = return (L l decl)
       | otherwise
-      = do { let ImportDecl { ideclName    = L _ mod_name
+           = do { let ImportDecl { ideclName    = L _ mod_name
                             , ideclSource  = is_boot
                             , ideclPkgQual = pkg_qual } = decl
            ; iface <- loadSrcInterface doc mod_name is_boot pkg_qual

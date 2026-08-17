@@ -10,7 +10,7 @@ import GHC.Driver.Phases (Phase)
 import GHC.Driver.Errors.Types (DriverMessages)
 import GHC.Types.Target (InputFileBuffer)
 
-import Language.Haskell.Syntax.Module.Name
+import GHC.Unit.Module.Name
 
 -- These are used in GHC.Driver.Pipeline.Execute, but defined in terms of runPipeline
 compileForeign :: HscEnv -> ForeignSrcLang -> FilePath -> IO FilePath
@@ -21,4 +21,3 @@ preprocess :: HscEnv
            -> Maybe InputFileBuffer
            -> Maybe Phase
            -> IO (Either DriverMessages (DynFlags, FilePath))
-

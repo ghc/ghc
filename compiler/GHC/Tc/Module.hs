@@ -239,7 +239,7 @@ tcRnModule hsc_env mod_sum
 
     this_mod
       | Just (L _ mod) <- hsmodName this_module
-      = mkHomeModule home_unit mod
+      = mkHomeModule home_unit (rnModuleName mod)
 
       | otherwise   -- 'module M where' is omitted
       = mkHomeModule home_unit mAIN_NAME
@@ -282,8 +282,9 @@ tcRnModuleTcRnM hsc_env mod_sum
 
         ; -- TODO This is a little skeevy; maybe handle a bit more directly
           let { simplifyImport (L _ idecl) =
-                  ( renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName idecl) (ideclPkgQual idecl)
-                  , reLoc $ ideclName idecl)
+                  let lmod = reLoc (fmap rnModuleName (ideclName idecl))
+                  in ( renameRawPkgQual (hsc_unit_env hsc_env) (unLoc lmod) (ideclPkgQual idecl)
+                     , lmod )
               }
         ; raw_sig_imports <- liftIO
                              $ findExtraSigImports hsc_env hsc_src
@@ -293,7 +294,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                                 (map simplifyImport (prel_imports
                                                      ++ import_decls))
         ; let { mkImport mod_name = noLocA
-                $ (simpleImportDecl mod_name)
+                $ (simpleImportDecl (mkModuleNameFS (moduleNameFS mod_name)))
                   { ideclImportList = Just (Exactly, [])}}
         ; let { withReason t imps = map (,text t) imps }
         ; let { all_imports = withReason "is implicitly imported" prel_imports
@@ -313,7 +314,7 @@ tcRnModuleTcRnM hsc_env mod_sum
         ; let noHdrIds (L loc (WithHsDocIdentifiers str _)) =
                 L loc (WithHsDocIdentifiers (rnHsDocString str) [])
         ; tcg_env <- return (tcg_env
-                              { tcg_hdr_info = (noHdrIds <$> maybe_doc_hdr, maybe_mod) })
+                              { tcg_hdr_info = (noHdrIds <$> maybe_doc_hdr, (fmap . fmap) rnModuleName maybe_mod) })
         ; -- If the whole module is warned about or deprecated
           -- (via mod_deprec) record that in tcg_warns. If we do thereby add
           -- a WarnAll, it will override any subsequent deprecations added to tcg_warns
@@ -366,7 +367,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                       -- Rename the module header properly after we have renamed everything else
                       ; maybe_doc_hdr <- traverse rnLHsDoc maybe_doc_hdr;
                       ; tcg_env <- return (tcg_env
-                                            { tcg_hdr_info = (maybe_doc_hdr, maybe_mod) })
+                                            { tcg_hdr_info = (maybe_doc_hdr, (fmap . fmap) rnModuleName maybe_mod) })
 
                       ; -- add extra source files to tcg_dependent_files
                         addDependentFiles src_files
@@ -2151,8 +2152,9 @@ runTcInteractive tcm_plugin_handling hsc_env thing_inside
        ; !orphs <- fmap (force . concat) . forM (ic_imports icxt) $ \i ->
             case i of                   -- force above: see #15111
                 IIModule n -> getOrphansForModule n
-                IIDecl i   -> getOrphansForModuleName (unLoc (ideclName i))
-                                         (renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName i) (ideclPkgQual i))
+                IIDecl i   -> let i_mod_name = rnModuleName (unLoc (ideclName i))
+                              in getOrphansForModuleName i_mod_name
+                                         (renameRawPkgQual (hsc_unit_env hsc_env) i_mod_name (ideclPkgQual i))
 
 
        ; (home_insts, home_fam_insts) <- liftIO $ UnitEnv.hugAllInstances (hsc_unit_env hsc_env)

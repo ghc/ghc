@@ -140,7 +140,7 @@ import GHC.Parser.Lexer.Interface
 import qualified GHC.Parser.Lexer.String as Lexer.String
 import GHC.Parser.String
 
-import Language.Haskell.Syntax.Module.Name (ModuleName(..))
+import GHC.Unit.Module.Name (ModuleNameP(..))
 import Language.Haskell.Syntax.Text
 }
 

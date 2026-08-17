@@ -37,7 +37,7 @@ import GHC.Parser.CharClass (
  )
 import GHC.Parser.Errors.Types (LexErr (..))
 import GHC.Utils.Panic (panic)
-import Language.Haskell.Syntax.Module.Name (ModuleName)
+import GHC.Unit.Module.Name (ModuleNamePs)
 
 type BufPos = Int
 data StringLexError = StringLexError LexErr BufPos
@@ -288,7 +288,7 @@ isSingleSmartQuote = \case
 
 data StringMeta = StringMeta
   { strMetaMultiline  :: Bool
-  , strMetaQualified  :: Maybe ModuleName
+  , strMetaQualified  :: Maybe ModuleNamePs
   }
   deriving (Show, Data)
 

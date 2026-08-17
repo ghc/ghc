@@ -42,6 +42,7 @@ module GHC.Types.Basic (
         Origin(..), isGenerated, DoPmc(..), requiresPMC,
         GenReason(..), isDoExpansionGenerated, doExpansionFlavour,
         doExpansionOrigin,
+        HsDoFlavour,
 
         RuleName, pprRuleName,
 
@@ -110,11 +111,13 @@ import GHC.ForeignSrcLang
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Binary
+import GHC.Hs.Extension.Pass (GhcRn)
 import GHC.Types.Arity
+import GHC.Unit.Module.Name ()
 
 import qualified GHC.LanguageExtensions as LangExt
 import Language.Haskell.Syntax.Type (PromotionFlag(..), isPromoted)
-import Language.Haskell.Syntax.Expr (HsDoFlavour)
+import Language.Haskell.Syntax.Expr (HsDoFlavourP)
 
 import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.ImpExp (ImportDeclLevel(..), ImportDeclLevelStyle(..))
@@ -533,6 +536,9 @@ data Origin = FromSource
 isGenerated :: Origin -> Bool
 isGenerated Generated{}  = True
 isGenerated FromSource   = False
+
+-- | Monomorphized, GHC-specific type alias
+type HsDoFlavour = HsDoFlavourP GhcRn
 
 -- | This metadata stores the information as to why was the piece of code generated
 --   It is useful for generating the right error context

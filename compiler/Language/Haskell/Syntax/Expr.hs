@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 
@@ -17,7 +18,7 @@ import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Pat
 import Language.Haskell.Syntax.Lit
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Module.Name (ModuleName)
+import Language.Haskell.Syntax.Module.Name (ModuleNameP)
 import Language.Haskell.Syntax.Text
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Binds
@@ -420,7 +421,7 @@ data HsExpr p
                 (LHsExpr  p)
 
   | HsDo        (XDo p)                  -- Type of the whole expression
-                HsDoFlavour
+                (HsDoFlavourP (NoGhcTc p))
                 (XRec p [ExprLStmt p])   -- "do":one or more stmts
 
   -- | Syntactic list: [a,b,c,...]
@@ -880,7 +881,7 @@ type LMatch id body = XRec id (Match id body)
 data Match p body
   = Match {
         m_ext   :: XCMatch p body,
-        m_ctxt  :: HsMatchContext (LIdP (NoGhcTc p)), -- See Note [m_ctxt in Match]
+        m_ctxt  :: HsMatchContextP (NoGhcTc p), -- See Note [m_ctxt in Match]
         m_pats  :: XRec p [LPat p],                   -- The patterns
         m_grhss :: (GRHSs p body)
   }
@@ -1376,11 +1377,11 @@ data ArithSeqInfo id
 --
 -- Context of a pattern match. This is more subtle than it would seem. See
 -- Note [FunBind vs PatBind].
-data HsMatchContext fn
+data HsMatchContextP p
   = FunRhs
     -- ^ A pattern matching on an argument of a
     -- function binding
-      { mc_fun        :: fn    -- ^ function binder of @f@
+      { mc_fun        :: LIdP p    -- ^ function binder of @f@
                                -- See Note [mc_fun field of FunRhs]
                                -- See #20415 for a long discussion about this field
       , mc_fixity     :: LexicalFixity -- ^ fixing of @f@
@@ -1402,7 +1403,7 @@ data HsMatchContext fn
                                 --    tell matchWrapper what sort of
                                 --    runtime error message to generate]
 
-  | StmtCtxt (HsStmtContext fn)  -- ^Pattern of a do-stmt, list comprehension,
+  | StmtCtxt (HsStmtContextP p)  -- ^Pattern of a do-stmt, list comprehension,
                                  --  pattern guard, etc
 
   | ThPatSplice            -- ^A Template Haskell pattern splice
@@ -1412,12 +1413,12 @@ data HsMatchContext fn
 
 {- Note [mc_fun field of FunRhs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-HsMatchContext is parameterised over `fn`, the function binder stored in `FunRhs`.
-This makes pretty printing easy.
+`HsMatchContextP` is parameterised over the pass `p`, and the function binder
+stored in `FunRhs` is `mc_fun :: LIdP p`.
 
-In the use of `HsMatchContext` in `Match`, it is parameterised thus:
-    data Match p body = Match { m_ctxt  :: HsMatchContext (LIdP (NoGhcTc p)), ... }
-So in a Match, the mc_fun field `FunRhs` will be a `RdrName` in pass `GhcPs`, a `Name`
+In the use of `HsMatchContextP` in `Match`, it is parameterised thus:
+    data Match p body = Match { m_ctxt  :: HsMatchContextP (NoGhcTc p), ... }
+So in a Match, the mc_fun field of `FunRhs` will be a `RdrName` in pass `GhcPs`, a `Name`
 in `GhcRn`, and (importantly) still a `Name` in `GhcTc` -- not an `Id`.
 See Note [NoGhcTc] in GHC.Hs.Extension.
 
@@ -1431,21 +1432,22 @@ See Note [NoGhcTc] in GHC.Hs.Extension.
     xs  &&&  [] = xs
   The two occurrences of `&&&` have different locations.
 
-* Why parameterise `HsMatchContext` over `fn` rather than over the pass `p`?
-  Because during typechecking (specifically GHC.Tc.Gen.Match.tcMatch) we need to convert
-     HsMatchContext (LIdP (NoGhcTc GhcRn)) --> HsMatchContext (LIdP (NoGhcTc GhcTc))
-  With this parameterisation it's easy; if it was parametersed over `p` we'd  need
-  a recursive traversal of the HsMatchContext.
+* Why apply `NoGhcTc` to the /field/ rather than parameterise `HsMatchContextP`
+  over `fn` directly?  During typechecking (specifically GHC.Tc.Gen.Match.tcMatch)
+  we need to reuse the context when converting a `Match GhcRn` into a `Match GhcTc`:
+     HsMatchContextP (NoGhcTc GhcRn) --> HsMatchContextP (NoGhcTc GhcTc)
+  Because `NoGhcTc` collapses both `GhcRn` and `GhcTc` to `GhcRn`, these two types
+  are /identical/, so `tcMatch` reuses `m_ctxt` verbatim with no recursive traversal.
 
 See #20415 for a long discussion.
 -}
 
 -- | Haskell Statement Context.
-data HsStmtContext fn
-  = HsDoStmt HsDoFlavour              -- ^ Context for HsDo (do-notation and comprehensions)
-  | PatGuard (HsMatchContext fn)      -- ^ Pattern guard for specified thing
-  | ParStmtCtxt (HsStmtContext fn)    -- ^ A branch of a parallel stmt
-  | TransStmtCtxt (HsStmtContext fn)  -- ^ A branch of a transform stmt
+data HsStmtContextP p
+  = HsDoStmt (HsDoFlavourP p)          -- ^ Context for HsDo (do-notation and comprehensions)
+  | PatGuard (HsMatchContextP p)    -- ^ Pattern guard for specified thing
+  | ParStmtCtxt (HsStmtContextP p)  -- ^ A branch of a parallel stmt
+  | TransStmtCtxt (HsStmtContextP p) -- ^ A branch of a transform stmt
   | ArrowExpr                         -- ^ do-notation in an arrow-command context
 
 -- | Haskell arrow match context.
@@ -1454,27 +1456,29 @@ data HsArrowMatchContext
   | ArrowCaseAlt                   -- ^ A case alternative inside arrow notation
   | ArrowLamAlt HsLamVariant       -- ^ A \, \case or \cases alternative inside arrow notation
 
-data HsDoFlavour
-  = DoExpr (Maybe ModuleName)        -- ^[ModuleName.]do { ... }
-  | MDoExpr (Maybe ModuleName)       -- ^[ModuleName.]mdo { ... }  ie recursive do-expression
+data HsDoFlavourP p
+  = DoExpr (Maybe (ModuleNameP p))   -- ^[ModuleName.]do { ... }
+  | MDoExpr (Maybe (ModuleNameP p))  -- ^[ModuleName.]mdo { ... }  ie recursive do-expression
   | GhciStmtCtxt                     -- ^A command-line Stmt in GHCi pat <- rhs
   | ListComp
   | MonadComp
-  deriving (Eq, Data)
 
-qualifiedDoModuleName_maybe :: HsStmtContext fn -> Maybe ModuleName
+deriving instance Eq (ModuleNameP p) => Eq (HsDoFlavourP p)
+deriving instance (Data p, Data (ModuleNameP p)) => Data (HsDoFlavourP p)
+
+qualifiedDoModuleName_maybe :: HsStmtContextP p -> Maybe (ModuleNameP p)
 qualifiedDoModuleName_maybe ctxt = case ctxt of
   HsDoStmt (DoExpr m) -> m
   HsDoStmt (MDoExpr m) -> m
   _ -> Nothing
 
-isPatSynCtxt :: HsMatchContext fn -> Bool
+isPatSynCtxt :: HsMatchContextP p -> Bool
 isPatSynCtxt ctxt =
   case ctxt of
     PatSynCtx -> True
     _         -> False
 
-isComprehensionContext :: HsStmtContext fn -> Bool
+isComprehensionContext :: HsStmtContextP p -> Bool
 -- Uses comprehension syntax [ e | quals ]
 isComprehensionContext (ParStmtCtxt c)   = isComprehensionContext c
 isComprehensionContext (TransStmtCtxt c) = isComprehensionContext c
@@ -1482,7 +1486,7 @@ isComprehensionContext ArrowExpr = False
 isComprehensionContext (PatGuard _) = False
 isComprehensionContext (HsDoStmt flavour) = isDoComprehensionContext flavour
 
-isDoComprehensionContext :: HsDoFlavour -> Bool
+isDoComprehensionContext :: HsDoFlavourP p -> Bool
 isDoComprehensionContext GhciStmtCtxt = False
 isDoComprehensionContext (DoExpr _) = False
 isDoComprehensionContext (MDoExpr _) = False
@@ -1490,28 +1494,28 @@ isDoComprehensionContext ListComp = True
 isDoComprehensionContext MonadComp = True
 
 -- | Is this a monadic context?
-isMonadStmtContext :: HsStmtContext fn -> Bool
+isMonadStmtContext :: HsStmtContextP p -> Bool
 isMonadStmtContext (ParStmtCtxt ctxt)   = isMonadStmtContext ctxt
 isMonadStmtContext (TransStmtCtxt ctxt) = isMonadStmtContext ctxt
 isMonadStmtContext (HsDoStmt flavour) = isMonadDoStmtContext flavour
 isMonadStmtContext (PatGuard _) = False
 isMonadStmtContext ArrowExpr = False
 
-isMonadDoStmtContext :: HsDoFlavour -> Bool
+isMonadDoStmtContext :: HsDoFlavourP p -> Bool
 isMonadDoStmtContext ListComp     = False
 isMonadDoStmtContext MonadComp    = True
 isMonadDoStmtContext DoExpr{}     = True
 isMonadDoStmtContext MDoExpr{}    = True
 isMonadDoStmtContext GhciStmtCtxt = True
 
-isMonadCompContext :: HsStmtContext fn -> Bool
+isMonadCompContext :: HsStmtContextP p -> Bool
 isMonadCompContext (HsDoStmt flavour)   = isMonadDoCompContext flavour
 isMonadCompContext (ParStmtCtxt _)   = False
 isMonadCompContext (TransStmtCtxt _) = False
 isMonadCompContext (PatGuard _)      = False
 isMonadCompContext ArrowExpr         = False
 
-isMonadDoCompContext :: HsDoFlavour -> Bool
+isMonadDoCompContext :: HsDoFlavourP p -> Bool
 isMonadDoCompContext MonadComp    = True
 isMonadDoCompContext ListComp     = False
 isMonadDoCompContext GhciStmtCtxt = False

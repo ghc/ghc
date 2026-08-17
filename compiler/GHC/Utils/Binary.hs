@@ -119,10 +119,11 @@ import GHC.Prelude
 
 import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Binds.InlinePragma
-import Language.Haskell.Syntax.Module.Name (ModuleName(..))
 import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
 
 import {-# SOURCE #-} GHC.Types.Name (Name)
+import GHC.Unit.Module.Name (ModuleNameP, mkModuleNameFS, moduleNameFS)
+import GHC.Hs.Extension.Pass (GhcPass)
 import GHC.Data.ShortText (ShortText)
 import GHC.Data.FastString
 import GHC.Data.TrieMap
@@ -1922,9 +1923,9 @@ instance Binary Fingerprint where
   put_ h (Fingerprint w1 w2) = do put_ h w1; put_ h w2
   get  h = do w1 <- get h; w2 <- get h; return (Fingerprint w1 w2)
 
-instance Binary ModuleName where
-  put_ bh (ModuleName fs) = put_ bh fs
-  get bh = do fs <- get bh; return (ModuleName fs)
+instance Binary (ModuleNameP (GhcPass p)) where
+  put_ bh mod = put_ bh (moduleNameFS mod)
+  get bh = do fs <- get bh; return (mkModuleNameFS fs)
 
 newtype BinLocated a = BinLocated { unBinLocated :: Located a }
 

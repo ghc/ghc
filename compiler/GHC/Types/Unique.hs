@@ -68,7 +68,8 @@ import GHC.Exts (indexCharOffAddr#, Char(..), Int(..))
 import GHC.Word         ( Word64 )
 import Data.Char        ( chr, ord, isPrint )
 
-import Language.Haskell.Syntax.Module.Name
+import GHC.Unit.Module.Name (ModuleNameP, moduleNameFS)
+import GHC.Hs.Extension.Pass (GhcPass)
 
 {-
 ************************************************************************
@@ -416,8 +417,8 @@ instance Uniquable Int where
 instance Uniquable Word64 where
   getUnique i = mkUniqueGrimily i
 
-instance Uniquable ModuleName where
-  getUnique (ModuleName nm) = getUnique nm
+instance Uniquable (ModuleNameP (GhcPass p)) where
+  getUnique mod = getUnique (moduleNameFS mod)
 
 
 {-

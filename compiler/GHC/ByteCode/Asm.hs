@@ -57,7 +57,7 @@ import GHC.Cmm.Reg             ( GlobalArgRegs(..) )
 import GHC.Cmm.CallConv        ( allArgRegsCover )
 import GHC.Platform
 import GHC.Platform.Profile
-import Language.Haskell.Syntax.Module.Name
+import GHC.Unit.Module.Name
 
 import Control.Monad
 import qualified Control.Monad.Trans.State.Strict as MTL

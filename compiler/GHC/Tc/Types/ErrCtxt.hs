@@ -31,6 +31,7 @@ import GHC.Types.SrcLoc      ( SrcSpan, noSrcSpan )
 import GHC.Types.Var         ( Id, TyCoVar )
 
 import GHC.Unit.Types ( Module, InstantiatedModule )
+import GHC.Unit.Module.Name ( ModuleName )
 
 import GHC.Core.Class    ( Class )
 import GHC.Core.ConLike  ( ConLike )

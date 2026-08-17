@@ -378,8 +378,9 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                         expacc_wildcards  = wcs,
                         expacc_warn_spans = export_warn_spans,
                         expacc_dont_warn  = dont_warn_export
-                      } (L loc ie@(IEModuleContents (warn_txt_ps, _) lmod@(L _ mod)))
-      | Just exported_names <- lookupUniqMap earlier_mods mod  -- Duplicate export of M
+                      } (L loc ie@(IEModuleContents (warn_txt_ps, _) lmod@(L _ mod_name)))
+      | let mod = rnModuleName mod_name
+      , Just exported_names <- lookupUniqMap earlier_mods mod  -- Duplicate export of M
       = do { addDiagnostic (TcRnDupeModuleExport mod)
            ; (export_warn_spans', dont_warn_export', _) <-
                 process_warning export_warn_spans
@@ -394,7 +395,8 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                     , Nothing ) }
 
       | otherwise
-      = do { let { exportValid    = (mod `elem` imported_modules)
+      = do { let { mod            = rnModuleName mod_name
+                 ; exportValid    = (mod `elem` imported_modules)
                                   || (moduleName this_mod == mod)
                  ; gre_prs        = pickGREsModExp mod (globalRdrEnvElts rdr_env)
                                     -- NB: this filters out non level 0 exports
@@ -437,7 +439,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                                    , expacc_wildcards  = wcs
                                    , expacc_warn_spans = export_warn_spans'
                                    , expacc_dont_warn  = dont_warn_export' }
-                     , Just (L loc (IEModuleContents warn_txt_rn lmod), new_exports) ) }
+                     , Just (L loc (IEModuleContents warn_txt_rn (fmap rnModuleName lmod)), new_exports) ) }
 
     exports_from_item expacc@ExportAccum{
                         expacc_exp_occs   = occs,

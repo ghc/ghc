@@ -95,7 +95,7 @@ getImports popts sec implicit_prelude buf filename source_filename = do
         then throwErrors sec (GhcPsMessage <$> errs)
         else
           let   hsmod = unLoc rdr_module
-                mb_mod = hsmodName hsmod
+                mb_mod = fmap (fmap rnModuleName) (hsmodName hsmod)
                 imps = hsmodImports hsmod
                 main_loc = srcLocSpan (mkSrcLoc (mkFastString source_filename)
                                        1 1)
@@ -103,8 +103,8 @@ getImports popts sec implicit_prelude buf filename source_filename = do
                 (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
 
                 generated_imports = mkPrelImports (unLoc mod) implicit_prelude imps
-                convImport (L _ (i :: ImportDecl GhcPs)) = (convImportLevel (ideclLevelSpec i), ideclPkgQual i, reLoc $ ideclName i)
-                convImport_src (L _ (i :: ImportDecl GhcPs)) = (reLoc $ ideclName i)
+                convImport (L _ (i :: ImportDecl GhcPs)) = (convImportLevel (ideclLevelSpec i), ideclPkgQual i, reLoc $ fmap rnModuleName (ideclName i))
+                convImport_src (L _ (i :: ImportDecl GhcPs)) = (reLoc $ fmap rnModuleName (ideclName i))
               in
               return (map convImport_src src_idecls
                      , map convImport (generated_imports ++ ord_idecls)
@@ -130,7 +130,7 @@ mkPrelImports this_mod implicit_prelude import_decls
       explicit_prelude_import = any is_prelude_import import_decls
 
       is_prelude_import (L _ (decl::ImportDecl GhcPs)) =
-        unLoc (ideclName decl) == pRELUDE_NAME
+        rnModuleName (unLoc (ideclName decl)) == pRELUDE_NAME
         -- See #17045, package qualified imports are never counted as
         -- explicit prelude imports
         && case ideclPkgQual decl of
@@ -150,7 +150,7 @@ mkPrelImports this_mod implicit_prelude import_decls
                                                     , ideclSourceText = NoSourceText
                                                     , ideclGenerated  = True   -- Generated!
                                                     },
-                                ideclName      = L loc pRELUDE_NAME,
+                                ideclName      = L loc (mkModuleNameFS (moduleNameFS pRELUDE_NAME)),
                                 ideclPkgQual   = NoRawPkgQual,
                                 ideclSource    = NotBoot,
                                 ideclSafe      = False,  -- Not a safe import

@@ -136,7 +136,7 @@ import GHC.Data.FastString
 import GHC.Data.List.Infinite (Infinite (..))
 import qualified GHC.Data.List.Infinite as Inf
 
-import Language.Haskell.Syntax.Module.Name
+import GHC.Unit.Module.Name
 
 {-
 ************************************************************************

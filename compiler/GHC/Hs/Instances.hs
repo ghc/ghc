@@ -51,7 +51,7 @@ import GHC.Data.BooleanFormula (BooleanFormula(..))
 import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Decls.Foreign (CType(..), Header(..))
 import Language.Haskell.Syntax.Decls.Overlap (OverlapMode(..))
-import Language.Haskell.Syntax.Extension (Anno)
+import Language.Haskell.Syntax.Extension (Anno, LIdP)
 import Language.Haskell.Syntax.Binds.InlinePragma (ActivationX(..), InlinePragma(..))
 import GHC.Tc.Types.ErrCtxt
 
@@ -460,8 +460,8 @@ deriving instance Data (ApplicativeArg GhcTc)
 
 deriving instance Data HsArrowMatchContext
 
-deriving instance Data fn => Data (HsStmtContext fn)
-deriving instance Data fn => Data (HsMatchContext fn)
+deriving instance (Data p, Data (HsDoFlavourP p), Data (LIdP p)) => Data (HsStmtContextP p)
+deriving instance (Data p, Data (HsDoFlavourP p), Data (LIdP p)) => Data (HsMatchContextP p)
 
 -- deriving instance (DataIdLR p p) => Data (HsUntypedSplice p)
 deriving instance Data (HsUntypedSplice GhcPs)

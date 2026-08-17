@@ -816,7 +816,7 @@ summariseRequirement pn mod_name = do
                             hsmodDeprecMessage = Nothing,
                             hsmodHaddockModHeader = Nothing
                                              },
-                        hsmodName = Just (L (noAnnSrcSpan loc) mod_name),
+                        hsmodName = Just (L (noAnnSrcSpan loc) (mkModuleNameFS (moduleNameFS mod_name))),
                         hsmodExports = Nothing,
                         hsmodImports = [],
                         hsmodDecls = []
@@ -883,7 +883,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
         generated_imports = mkPrelImports modname implicit_prelude imps
 
         rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env) modname
-        convImport (L _ i) = (convImportLevel (ideclLevelSpec i), rn_pkg_qual (ideclPkgQual i), reLoc $ ideclName i)
+        convImport (L _ i) = (convImportLevel (ideclLevelSpec i), rn_pkg_qual (ideclPkgQual i), reLoc $ fmap rnModuleName (ideclName i))
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env hsc_src modname
 
@@ -904,7 +904,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
                             Just d -> d) </> ".." </> moduleNameSlashes modname <.> "hi",
             ms_hspp_opts = dflags,
             ms_hspp_buf = Nothing,
-            ms_srcimps = (\i -> reLoc (ideclName (unLoc i))) <$> src_idecls,
+            ms_srcimps = (\i -> reLoc (fmap rnModuleName (ideclName (unLoc i)))) <$> src_idecls,
             ms_textual_imps = normal_imports
                            -- We have to do something special here:
                            -- due to merging, requirements may end up with

@@ -24,7 +24,7 @@ module Language.Haskell.Syntax (
         module Language.Haskell.Syntax.Pat,
         module Language.Haskell.Syntax.Type,
         module Language.Haskell.Syntax.Extension,
-        ModuleName(..), HsModule(..)
+        ModuleNameP(..), HsModule(..)
 ) where
 
 import Language.Haskell.Syntax.Decls
@@ -68,7 +68,7 @@ data HsModule p
     = HsModule {
       hsmodExt :: XCModule p,
         -- ^ HsModule extension point
-      hsmodName :: Maybe (XRec p ModuleName),
+      hsmodName :: Maybe (XRec p (ModuleNameP p)),
         -- ^ @Nothing@: \"module X where\" is omitted (in which case the next
         --     field is Nothing too)
       hsmodExports :: Maybe [LIE p],

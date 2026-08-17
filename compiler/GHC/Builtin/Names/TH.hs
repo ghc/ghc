@@ -17,7 +17,7 @@ import GHC.Types.Unique ( Unique )
 import GHC.Builtin.Uniques
 import GHC.Data.FastString
 
-import Language.Haskell.Syntax.Module.Name
+import GHC.Unit.Module.Name
 
 -- To add a name, do three things
 --

@@ -19,6 +19,7 @@ import GHC.Rename.Utils (genHsApps, genLHsLit)
 import GHC.Tc.Utils.Monad (RnM)
 import GHC.Types.Name.Set (FreeNames)
 import GHC.Types.SrcLoc (GenLocated(..))
+import GHC.Unit.Module (ModuleName, rnModuleName)
 
 import Language.Haskell.Syntax.Expr (HsExpr)
 
@@ -28,7 +29,8 @@ rnQualLit QualLit{..} = do
         case ql_val of
           -- See Note [Implementation of QualifiedStrings]
           HsQualString st s -> (fromStringName, HsString st s, HsQualString st s)
-  (funName, fvs) <- lookupNameWithQualifier funNameBase ql_mod
-  let lit = QualLit{ql_ext = L noAnn funName, ql_val = ql_val', ..}
+  let ql_mod' = rnModuleName ql_mod :: ModuleName
+  (funName, fvs) <- lookupNameWithQualifier funNameBase ql_mod'
+  let lit = QualLit{ql_ext = L noAnn funName, ql_mod = ql_mod', ql_val = ql_val'}
   let expr = genHsApps funName [genLHsLit hsLit]
   pure ((lit, expr), fvs)

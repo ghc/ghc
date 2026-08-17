@@ -310,7 +310,7 @@ data PsMessage
    | PsErrUnallowedPragma !(HsPragE GhcPs)
 
    -- | Qualified do block in command
-   | PsErrQualifiedDoInCmd !ModuleName
+   | PsErrQualifiedDoInCmd !(ModuleNamePs)
 
    -- | Invalid infix hole, expected an infix operator
    | PsErrInvalidInfixHole
@@ -350,10 +350,10 @@ data PsMessage
    | PsErrDoCmdInFunAppCmd !(LHsCmd GhcPs)
 
    -- | Unexpected do block in function application
-   | PsErrDoInFunAppExpr !(Maybe ModuleName) !(LHsExpr GhcPs)
+   | PsErrDoInFunAppExpr !(Maybe (ModuleNamePs)) !(LHsExpr GhcPs)
 
    -- | Unexpected mdo block in function application
-   | PsErrMDoInFunAppExpr !(Maybe ModuleName) !(LHsExpr GhcPs)
+   | PsErrMDoInFunAppExpr !(Maybe (ModuleNamePs)) !(LHsExpr GhcPs)
 
    -- | Unexpected case expression in function application
    | PsErrCaseInFunAppExpr !(LHsExpr GhcPs)

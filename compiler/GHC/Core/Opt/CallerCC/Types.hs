@@ -21,7 +21,7 @@ import qualified GHC.Utils.Binary as B
 import Data.Char
 import Control.DeepSeq
 
-import Language.Haskell.Syntax.Module.Name
+import GHC.Unit.Module.Name
 
 
 data NamePattern

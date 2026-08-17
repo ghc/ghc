@@ -115,7 +115,6 @@ import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
 import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Binds.InlinePragma
 import Language.Haskell.Syntax.Decls.Overlap ( OverlapMode(..) )
-import Language.Haskell.Syntax.Module.Name ( ModuleName(..) )
 import Language.Haskell.Syntax.Text
 
 import GHC.Prelude.Basic
@@ -127,6 +126,8 @@ import qualified GHC.Utils.Ppr.Colour as Col
 import GHC.Utils.Ppr       ( Doc, Mode(..) )
 import GHC.Utils.Panic.Plain (assert)
 import GHC.Serialized
+import GHC.Unit.Module.Name ( ModuleName, ModuleNameP, moduleNameFS )
+import GHC.Hs.Extension.Pass ( GhcPass )
 import GHC.LanguageExtensions (Extension)
 import GHC.Utils.GlobalVars( unsafeHasPprDebug )
 import GHC.Utils.Misc (lastMaybe, snocView)
@@ -1105,14 +1106,15 @@ instance Outputable Serialized where
 instance Outputable Extension where
     ppr = text . show
 
-instance Outputable ModuleName where
+instance Outputable (ModuleNameP (GhcPass p)) where
   ppr = pprModuleName
 
 instance Outputable OsPath where
   ppr p = text $ either show id (decodeUtf p)
 
-pprModuleName :: IsLine doc => ModuleName -> doc
-pprModuleName (ModuleName nm) =
+pprModuleName :: IsLine doc => ModuleNameP (GhcPass p) -> doc
+pprModuleName mod =
+  let nm = moduleNameFS mod in
     docWithStyle (ztext (zEncodeFS nm)) (\_ -> ftext nm)
 {-# SPECIALIZE pprModuleName :: ModuleName -> SDoc #-}
 {-# SPECIALIZE pprModuleName :: ModuleName -> HLine #-} -- see Note [SPECIALIZE to HDoc]

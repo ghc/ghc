@@ -49,13 +49,13 @@ data ImportDeclLevel = ImportDeclQuote | ImportDeclSplice deriving (Eq, Data)
 data ImportDecl pass
   = ImportDecl {
       ideclExt        :: XCImportDecl pass, -- ^ Locations of keywords like @import@, @qualified@, etc. are captured here.
-      ideclName       :: XRec pass ModuleName, -- ^ Module name.
+      ideclName       :: XRec pass (ModuleNameP pass), -- ^ Module name.
       ideclPkgQual    :: ImportDeclPkgQual pass,  -- ^ Package qualifier.
       ideclSource     :: IsBootInterface,      -- ^ IsBoot \<=> {-\# SOURCE \#-} import
       ideclLevelSpec  :: ImportDeclLevelStyle,
       ideclSafe       :: Bool,          -- ^ True => safe import
       ideclQualified  :: ImportDeclQualifiedStyle, -- ^ If/how the import is qualified.
-      ideclAs         :: Maybe (XRec pass ModuleName),  -- ^ as Module
+      ideclAs         :: Maybe (XRec pass (ModuleNameP pass)),  -- ^ as Module
       ideclImportList :: Maybe (ImportListInterpretation, [LIE pass])
                                        -- ^ Explicit import list (EverythingBut => hiding, names)
     }
@@ -122,7 +122,7 @@ data IE pass
         -- module Mod ( Test(f, g) )
         -- import Mod ( Test(f, g) )
         -- @
-  | IEModuleContents  (XIEModuleContents pass) (XRec pass ModuleName)
+  | IEModuleContents  (XIEModuleContents pass) (XRec pass (ModuleNameP pass))
         -- ^ Export of entire module. Can only occur in export list.
         --
         -- @

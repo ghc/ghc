@@ -16,7 +16,7 @@ import qualified Text.ParserCombinators.ReadP as Parse
 import Text.ParserCombinators.ReadP (ReadP, (<++))
 import Data.Char (isAlphaNum)
 
-import Language.Haskell.Syntax.Module.Name (ModuleName, parseModuleName)
+import GHC.Unit.Module.Name (ModuleName, parseModuleName)
 
 parseUnit :: ReadP Unit
 parseUnit = parseVirtUnitId <++ parseDefUnitId
@@ -55,4 +55,3 @@ parseModSubst = Parse.between (Parse.char '[') (Parse.char ']')
            _ <- Parse.char '='
            v <- parseHoleyModule
            return (k, v)
-

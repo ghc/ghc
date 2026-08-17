@@ -101,6 +101,7 @@ import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Hs.DocString () -- Required for Data, Eq, Show instances
 import GHC.Hs.Extension.Pass (GhcPs)
+import GHC.Hs.Extension.Instances ()
 import Language.Haskell.Syntax.Doc
 import GHC.Utils.Misc
 import GHC.Utils.Outputable hiding ( (<>) )

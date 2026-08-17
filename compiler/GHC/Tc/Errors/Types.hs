@@ -7093,7 +7093,7 @@ data ConversionFailReason
   | IllegalSumAlt !TH.SumAlt
   | IllegalSumArity !TH.SumArity
   | MalformedType !TypeOrKind !TH.Type
-  | IllegalLastStatement !HsDoFlavour !(LStmt GhcPs (LHsExpr GhcPs))
+  | IllegalLastStatement !HsDoFlavourPs !(LStmt GhcPs (LHsExpr GhcPs))
   | KindSigsOnlyAllowedOnGADTs
   | IllegalDeclaration !THDeclDescriptor !IllegalDecls
   | CannotMixGADTConsWith98Cons

@@ -1546,7 +1546,7 @@ instance ExactPrint HsModuleImpDecls where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint ModuleName where
+instance Typeable p => ExactPrint (ModuleNameP (GhcPass p)) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor n _anc _ cs = n
      `debug` ("ModuleName.setAnnotationAnchor:cs=" ++ showAst cs)
@@ -3158,7 +3158,7 @@ instance ExactPrint (HsExpr GhcPs) where
 -- ---------------------------------------------------------------------
 
 exactDo :: (Monad m, Monoid w, ExactPrint (LocatedAn an a))
-        => AnnList EpaLocation -> HsDoFlavour -> LocatedAn an a
+        => AnnList EpaLocation -> HsDoFlavourPs -> LocatedAn an a
         -> EP w m (AnnList EpaLocation, LocatedAn an a)
 exactDo an (DoExpr m)    stmts = exactMdo an m "do" >>=
                                  \an0 -> markMaybeDodgyStmts an0 stmts
@@ -3170,7 +3170,7 @@ exactDo an ListComp      stmts = markMaybeDodgyStmts an stmts
 exactDo an MonadComp     stmts = markMaybeDodgyStmts an stmts
 
 exactMdo :: (Monad m, Monoid w)
-  => AnnList EpaLocation -> Maybe ModuleName -> String -> EP w m (AnnList EpaLocation)
+  => AnnList EpaLocation -> Maybe (ModuleNameP (GhcPass p)) -> String -> EP w m (AnnList EpaLocation)
 exactMdo an Nothing            kw = markLensFun an lal_rest (\l -> printStringAtAA l kw)
 exactMdo an (Just module_name) kw = markLensFun an lal_rest (\l -> printStringAtAA l n)
     where

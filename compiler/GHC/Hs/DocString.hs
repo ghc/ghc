@@ -40,6 +40,7 @@ import GHC.Utils.Outputable as Outputable hiding ((<>))
 import GHC.Types.SrcLoc
 
 import GHC.Hs.Extension.Pass (GhcPass, GhcPs, GhcRn, GhcTc)
+import GHC.Hs.Extension.Instances ()
 
 import Language.Haskell.Syntax.Doc
 import Language.Haskell.Syntax.Extension

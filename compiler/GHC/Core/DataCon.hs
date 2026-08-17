@@ -69,7 +69,7 @@ module GHC.Core.DataCon (
 import GHC.Prelude
 
 import Language.Haskell.Syntax.Basic
-import Language.Haskell.Syntax.Module.Name
+import GHC.Unit.Module.Name
 
 import {-# SOURCE #-} GHC.Types.Id.Make ( DataConBoxer )
 import GHC.Core.Type as Type

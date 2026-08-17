@@ -788,11 +788,11 @@ genFunBind fn ms
 genHsLet :: HsLocalBindsLR GhcRn GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
 genHsLet bindings body = HsLet noExtField bindings body
 
-genHsLamDoExp :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ (Origin, MatchGroupAnn))
+genHsLamDoExp :: (XMG GhcRn (LHsExpr GhcRn) ~ (Origin, MatchGroupAnn))
         => HsDoFlavour
-        -> [LPat (GhcPass p)]
-        -> LHsExpr (GhcPass p)
-        -> LHsExpr (GhcPass p)
+        -> [LPat GhcRn]
+        -> LHsExpr GhcRn
+        -> LHsExpr GhcRn
 genHsLamDoExp doFlav pats body = mkHsPar (wrapGenSpan $ HsLam noAnn LamSingle matches)
   where
     matches = mkMatchGroup (doExpansionOrigin doFlav)
@@ -801,23 +801,23 @@ genHsLamDoExp doFlav pats body = mkHsPar (wrapGenSpan $ HsLam noAnn LamSingle ma
     pats' = map (parenthesizePat appPrec) pats
 
 
-genHsCaseAltDoExp :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
+genHsCaseAltDoExp :: (Anno (GRHS GhcRn (LocatedA (body GhcRn)))
                      ~ EpAnnCO,
-                 Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
+                 Anno (Match GhcRn (LocatedA (body GhcRn)))
                         ~ SrcSpanAnnA)
-            => HsDoFlavour -> LPat (GhcPass p) -> (LocatedA (body (GhcPass p)))
-            -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
+            => HsDoFlavour -> LPat GhcRn -> (LocatedA (body GhcRn))
+            -> LMatch GhcRn (LocatedA (body GhcRn))
 genHsCaseAltDoExp doFlav pat expr
   = genSimpleMatch (StmtCtxt (HsDoStmt doFlav)) [pat] expr
 
 
-genSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
+genSimpleMatch :: (Anno (Match GhcRn (LocatedA (body GhcRn)))
                         ~ SrcSpanAnnA,
-                  Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
+                  Anno (GRHS GhcRn (LocatedA (body GhcRn)))
                         ~ EpAnnCO)
-              => HsMatchContext (LIdP (NoGhcTc (GhcPass p)))
-              -> [LPat (GhcPass p)] -> LocatedA (body (GhcPass p))
-              -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
+              => HsMatchContextRn
+              -> [LPat GhcRn] -> LocatedA (body GhcRn)
+              -> LMatch GhcRn (LocatedA (body GhcRn))
 genSimpleMatch ctxt pats rhs
   = wrapGenSpan $
     Match { m_ext = noExtField, m_ctxt = ctxt, m_pats = noLocA pats

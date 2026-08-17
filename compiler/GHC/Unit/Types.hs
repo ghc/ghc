@@ -98,7 +98,7 @@ import Data.Bifunctor
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS.Char8
 
-import Language.Haskell.Syntax.Module.Name
+import GHC.Unit.Module.Name
 import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
 
 ---------------------------------------------------------------------

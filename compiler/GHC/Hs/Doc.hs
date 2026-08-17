@@ -56,7 +56,7 @@ import GHC.Hs.DocString
 
 import Language.Haskell.Syntax.Doc
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Module.Name
+import GHC.Unit.Module.Name
 
 type instance Anno (WithHsDocIdentifiers (HsDocString (GhcPass pass)) (GhcPass pass)) = SrcSpan
 

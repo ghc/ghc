@@ -11,11 +11,13 @@ module Language.Haskell.Syntax.Extension where
 
 import Data.Type.Equality (type (~))
 
+import Control.DeepSeq
 import Data.Data hiding ( Fixity )
 import Data.Kind (Type)
 
 import Data.Eq
 import Data.Ord
+import Text.Show
 
 {-
 Note [Trees That Grow]
@@ -95,7 +97,10 @@ can only do that if the extension field was strict (#18764).
 See also [DataConCantHappen and strict fields].
 -}
 data DataConCantHappen
-  deriving (Data,Eq,Ord)
+  deriving (Data,Eq,Ord,Show)
+
+instance NFData DataConCantHappen where
+  rnf = dataConCantHappen
 
 -- | Eliminate a 'DataConCantHappen'. See Note [Constructor cannot occur].
 dataConCantHappen :: DataConCantHappen -> a
@@ -156,6 +161,10 @@ class WrapXRec p a where
 type family IdP p
 
 type LIdP p = XRec p (IdP p)
+
+-- | Extension points for the textual payload of a module name.
+type family XCModuleName p
+type family XXModuleName p
 
 -- | Like 'IdP', except it keeps track of the user-written module qualification,
 -- if any.

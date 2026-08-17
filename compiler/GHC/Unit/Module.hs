@@ -15,7 +15,7 @@ module GHC.Unit.Module
     ( module GHC.Unit.Types
 
       -- * The ModuleName type
-    , module Language.Haskell.Syntax.Module.Name
+    , module GHC.Unit.Module.Name
 
       -- * The ModLocation type
     , module GHC.Unit.Module.Location
@@ -46,8 +46,7 @@ import GHC.Types.Unique.DSet
 import GHC.Unit.Types
 import GHC.Unit.Module.Location
 import GHC.Unit.Module.Env
-
-import Language.Haskell.Syntax.Module.Name
+import GHC.Unit.Module.Name
 
 import Data.Semigroup
 
