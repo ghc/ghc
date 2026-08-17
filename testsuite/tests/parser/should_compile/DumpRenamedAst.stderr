@@ -30,8 +30,7 @@
            ((,)
             (FromSource)
             (AnnList
-             (AnnListNoLayout)
-             (ListNone)
+             (EpNoLayout)
              []))
            (L
             (EpAnn
@@ -184,8 +183,7 @@
           (EpTok
            (EpaSpan { <no location info> }))
           (AnnList
-           (AnnListNoLayout)
-           (ListNone)
+           (EpNoLayout)
            [])
           (EpTok
            (EpaSpan { <no location info> })))
@@ -318,9 +316,8 @@
            (EpaSpan { <no location info> })))
          (ClosedTypeFamily
           (AnnList
-           (AnnListLayout
+           (EpVirtualBraces
             (EpaSpan { DumpRenamedAst.hs:13:3 }))
-           (ListNone)
            [])
           (Just
            [(L
@@ -1046,8 +1043,7 @@
           (EpTok
            (EpaSpan { <no location info> }))
           (AnnList
-           (AnnListNoLayout)
-           (ListNone)
+           (EpNoLayout)
            [])
           (EpTok
            (EpaSpan { <no location info> })))
@@ -1194,9 +1190,8 @@
            (EpaSpan { <no location info> })))
          (ClosedTypeFamily
           (AnnList
-           (AnnListLayout
+           (EpVirtualBraces
             (EpaSpan { DumpRenamedAst.hs:26:3 }))
-           (ListNone)
            [])
           (Just
            [(L
@@ -2322,8 +2317,7 @@
             (EpTok
              (EpaSpan { <no location info> }))
             (AnnList
-             (AnnListNoLayout)
-             (ListNone)
+             (EpNoLayout)
              [])
             (EpTok
              (EpaSpan { <no location info> })))

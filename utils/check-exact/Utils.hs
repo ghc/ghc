@@ -341,10 +341,6 @@ insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports
         cs4' = workInComments cs4 these
         (xs',rest') = allocPreceding xs rest
 
-annListBracketsLocs :: AnnListBrackets -> (EpaLocation,EpaLocation)
-annListBracketsLocs (ListBraces o c) = (getEpTokenLoc o,    getEpTokenLoc c)
-annListBracketsLocs ListNone         = (noAnn,              noAnn)
-
 data SplitWhere = Before | After
 
 splitOnWhere :: SplitWhere -> EpToken "where" -> [LEpaComment] -> ([LEpaComment], [LEpaComment])
