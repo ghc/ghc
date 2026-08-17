@@ -111,9 +111,8 @@
         (EpTok
          (EpaSpan { T15323.hs:5:21-25 }))
         (AnnList
-         (AnnListLayout
+         (EpVirtualBraces
           (EpaSpan { T15323.hs:6:5 }))
-         (ListNone)
          [])
         (EpTok
          (EpaSpan { <no location info> })))
