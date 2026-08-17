@@ -84,17 +84,12 @@ PerfStat = NamedTuple('PerfStat', [('test_env', TestEnv),
                                    ('value', float)])
 
 # A test's metric recovered from a commit's git note: the raw sample values
-# recorded there, and a PerfStat whose value is their mean.
+# recorded there, and a PerfStat whose value is their mean. Serves as the
+# baseline when comparing a test run against an earlier commit.
 class CommitMetric(NamedTuple):
     perfStat: PerfStat
-    samples: List[float]
-
-# A baseline recovered form stored metrics.
-class Baseline(NamedTuple):
-    perfStat: PerfStat
     commit: GitHash
-    # The raw samples the baseline value was averaged over.
-    samples: List[float] = []
+    samples: List[float]
 
 # The type of exceptions which are thrown when computing the current stat value
 # fails.
@@ -486,7 +481,7 @@ _commit_metric_cache: Dict[Tuple[NoteNamespace, GitHash],
 #                      instead when looking for ci results)
 # metric: str - test metric
 # way: str - test way
-# returns: the Baseline or None if no metric was found within
+# returns: the baseline CommitMetric or None if no metric was found within
 #          BaselineSearchDepth commits and since the last expected change
 #          (ignoring any expected change in the given commit).
 def baseline_metric(commit: GitHash,
@@ -495,7 +490,7 @@ def baseline_metric(commit: GitHash,
                     metric: MetricName,
                     way: WayName,
                     baseline_ref: Optional[GitRef]
-                    ) -> Optional[Baseline]:
+                    ) -> Optional[CommitMetric]:
     # For performance reasons (in order to avoid calling commit_hash), we assert
     # commit is already a commit hash.
     assert is_commit_hash(commit)
@@ -511,22 +506,16 @@ def baseline_metric(commit: GitHash,
     # Searches through previous commits trying local then ci for each commit in.
     def find_baseline(namespace: NoteNamespace,
                       test_env: TestEnv
-                      ) -> Optional[Baseline]:
+                      ) -> Optional[CommitMetric]:
         if baseline_commit is not None:
-            current_metric = get_commit_metric(namespace, baseline_commit, test_env, name, metric, way)
-            if current_metric is not None:
-                return Baseline(current_metric.perfStat, baseline_commit,
-                                current_metric.samples)
-            else:
-                return None
+            return get_commit_metric(namespace, baseline_commit, test_env, name, metric, way)
 
         for depth, current_commit in list(enumerate(commit_hashes)):
             if current_commit == commit: continue
             # Check for a metric on this commit.
             current_metric = get_commit_metric(namespace, current_commit, test_env, name, metric, way)
             if current_metric is not None:
-                return Baseline(current_metric.perfStat, current_commit,
-                                current_metric.samples)
+                return current_metric
 
             # Stop if there is an expected change at this commit. In that case
             # metrics on ancestor commits will not be a valid baseline.
@@ -538,7 +527,7 @@ def baseline_metric(commit: GitHash,
     # Test environment to use when comparing against CI namespace
     ci_test_env = best_fit_ci_test_env()
 
-    baseline = find_baseline(LocalNamespace, test_env) # type: Optional[Baseline]
+    baseline = find_baseline(LocalNamespace, test_env) # type: Optional[CommitMetric]
     if baseline is None and ci_test_env is not None:
         baseline = find_baseline(CiNamespace, ci_test_env)
 
@@ -608,6 +597,7 @@ def get_commit_metric(gitNoteRef,
                     currentCacheKey[3],
                     currentCacheKey[2],
                     sum(currentValues) / len(currentValues)),
+                commit,
                 currentValues)
 
     # Save metrics to the cache.
@@ -621,7 +611,7 @@ def format_samples(samples: List[float]) -> str:
     return ', '.join(format_sample(s) for s in samples)
 
 def check_stats_change(actual: PerfStat,
-                       baseline: Baseline,
+                       baseline: CommitMetric,
                        acceptance_window: MetricAcceptanceWindow,
                        allowed_perf_changes: Dict[TestName, List[AllowedPerfChange]] = {},
                        force_print = False
@@ -631,8 +621,8 @@ def check_stats_change(actual: PerfStat,
 
     Parameters:
     actual: the PerfStat with actual value
-    baseline: the expected Baseline value (this should generally be derived
-        from baseline_metric())
+    baseline: the CommitMetric to compare against (this should generally be
+        derived from baseline_metric())
     acceptance_window: allowed deviation of the actual value from the expected
         value.
     allowed_perf_changes: allowed changes in stats. This is a dictionary as
