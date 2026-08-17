@@ -353,6 +353,7 @@ except Exception as e:
     print('Failed to detect CPU features: ', e)
 
 sys.stdout.flush()
+sys.stderr.flush()
 
 if config.local:
     tempdir = ''
@@ -479,6 +480,9 @@ for name in config.only:
         # .T file errors.
         pass
 
+sys.stdout.flush()
+sys.stderr.flush()
+
 if config.list_broken:
     print('')
     print('Broken tests:')
@@ -506,12 +510,17 @@ else:
         # wait for parallel tests to finish
         asyncio.run(run_parallelTests())
 
+        sys.stdout.flush()
+        sys.stderr.flush()
+
         # Run the following tests purely sequential
         async def run_aloneTests():
             for oneTest in aloneTests:
                 if stopping():
                     break
                 await oneTest(None)
+                sys.stdout.flush()
+                sys.stderr.flush()
 
         asyncio.run(run_aloneTests())
 
@@ -520,6 +529,7 @@ else:
 
     # flush everything before we continue
     sys.stdout.flush()
+    sys.stderr.flush()
 
     # Dump metrics data.
     print("\nPerformance Metrics (test environment: {}):\n".format(config.test_env))
