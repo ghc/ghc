@@ -54,7 +54,6 @@ import GHC.Runtime.Context
 import Language.Haskell.Syntax.ImpExp
 import GHC.Types.UnresolvedImport
 
-import GHC.Data.Graph.Directed
 import GHC.Data.FastString
 import GHC.Data.Maybe      ( expectJust )
 import qualified GHC.Data.Maybe as M
@@ -77,6 +76,7 @@ import GHC.Types.Target
 import GHC.Types.SourceFile
 import GHC.Types.SourceError
 import GHC.Types.SrcLoc
+import GHC.Types.Unique.Set
 import GHC.Types.Unique.Map
 import GHC.Types.PkgQual
 import GHC.Types.Basic
@@ -91,10 +91,13 @@ import GHC.Unit.Module.Graph
 import GHC.Unit.Module.Deps
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Module.Stage
+import GHC.Unit.External.Index
 
 import Data.Either ( partitionEithers, lefts )
-import qualified Data.Map as Map
+import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Map (Map)
+import qualified Data.Map as Map
 
 import Control.Concurrent.MVar
 import Control.Monad
@@ -260,11 +263,9 @@ downsweep hsc_env diag_wrapper msg old_summaries maybe_base_graph excl_mods allo
   imps_cache <- newIORef Map.empty
   (root_errs, root_summaries) <- rootSummariesParallel n_jobs hsc_env diag_wrapper msg
                                    (getRootSummary excl_mods summ_cache imps_cache)
-  let closure_errs = checkHomeUnitsClosed unit_env
-      unit_env = hsc_unit_env hsc_env
-
-      all_errs = closure_errs ++ root_errs
-
+  let unit_env = hsc_unit_env hsc_env
+  closure_errs <- checkHomeUnitsClosed unit_env
+  let all_errs = closure_errs ++ root_errs
   case all_errs of
     [] -> do
        (downsweep_errs, downsweep_nodes) <-
@@ -933,52 +934,81 @@ rootSummariesParallel n_jobs hsc_env diag_wrapper msg get_summary = do
 -- * Check/validate properties and error out
 --------------------------------------------------------------------------------
 
--- | This function checks then important property that if both p and q are home units
--- then any dependency of p, which transitively depends on q is also a home unit.
---
--- See Note [Multiple Home Units], section 'Closure Property'.
-checkHomeUnitsClosed ::  UnitEnv -> [DriverMessages]
-checkHomeUnitsClosed ue
-    | Set.null bad_unit_ids = []
-    | otherwise = [singleMessage $ mkPlainErrorMsgEnvelope rootLoc $ DriverHomePackagesNotClosed (Set.toList bad_unit_ids)]
+-- | Checks whether the given unit environment has the closure property. See
+--   the section “Closure Property” in @Note [Multiple Home Units]@.
+checkHomeUnitsClosed :: UnitEnv -> IO [DriverMessages]
+checkHomeUnitsClosed unit_env = do
+  global_unit_infos <- globalUnits <$> readIORef (uic_index (ue_uic unit_env))
+  return $ case offending_dependencies global_unit_infos of
+    []        -> []
+    offenders -> [
+                   singleMessage                             $
+                   mkPlainErrorMsgEnvelope error_source_span $
+                   DriverHomePackagesNotClosed offenders
+                 ]
   where
-    home_id_set = HUG.allUnits $ ue_home_unit_graph ue
-    bad_unit_ids = upwards_closure Set.\\ home_id_set {- Remove all home units reached, keep only bad nodes -}
-    rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
 
-    downwards_closure :: Graph (Node UnitId UnitId)
-    downwards_closure = graphFromEdgedVerticesUniq graphNodes
+  home_unit_data :: [(UnitId, HomeUnitEnv)]
+  home_unit_data = HUG.unitEnv_assocs (ue_home_unit_graph unit_env)
 
-    inverse_closure = graphReachability $ transposeG downwards_closure
+  home_unit_ids :: UniqSet UnitId
+  home_unit_ids = mkUniqSet (map fst home_unit_data)
 
-    upwards_closure = Set.fromList $ map node_key $ allReachableMany inverse_closure [DigraphNode uid uid [] | uid <- Set.toList home_id_set]
+  looked_up_unit_info :: UnitId -> Maybe UnitInfo -> UnitInfo
+  looked_up_unit_info unit_id
+    = fromMaybe $
+      pprPanic "Unit not found during closure property check" (ppr unit_id)
 
-    all_unit_direct_deps :: UniqMap UnitId (Set.Set UnitId)
-    all_unit_direct_deps
-      = HUG.unitEnv_foldWithKey go emptyUniqMap $ ue_home_unit_graph ue
-      where
-        go rest this this_uis =
-           plusUniqMap_C Set.union
-             (addToUniqMap_C Set.union external_depends this (Set.fromList $ this_deps))
-             rest
-           where
-             external_depends = mapUniqMap (Set.fromList . unitDepends) (unitInfoMap this_units)
-             this_units = homeUnitEnv_units this_uis
-             this_deps = [ toUnitId unit | (unit,Just _) <- explicitUnits this_units]
+  referenced_external_units :: [GlobalUnitKey]
+  referenced_external_units
+    = [
+        globalUnitKeyFromUnitInfo $
+        looked_up_unit_info unit_id $
+        lookupUniqMap (unitInfoMap unit_state) unit_id
+          | (_, home_unit_env) <- home_unit_data,
+            let unit_state = homeUnitEnv_units home_unit_env,
+            (unit, _) <- explicitUnits unit_state,
+            let unit_id = toUnitId unit
+      ]
 
-    graphNodes :: [Node UnitId UnitId]
-    graphNodes = go Set.empty home_id_set
-      where
-        go done todo
-          = case Set.minView todo of
-              Nothing -> []
-              Just (uid, todo')
-                | Set.member uid done -> go done todo'
-                | otherwise -> case lookupUniqMap all_unit_direct_deps uid of
-                    Nothing -> pprPanic "uid not found" (ppr (uid, all_unit_direct_deps))
-                    Just depends ->
-                      let todo'' = (depends Set.\\ done) `Set.union` todo'
-                      in DigraphNode uid uid (Set.toList depends) : go (Set.insert uid done) todo''
+  offending_dependencies :: GlobalUnitInfoMap -> [(UnitId, UnitId)]
+  offending_dependencies global_unit_infos
+    = collect Set.empty referenced_external_units
+    where
+
+    collect :: Set GlobalUnitKey -> [GlobalUnitKey] -> [(UnitId, UnitId)]
+    collect _ [] = []
+    collect processed (current : remaining)
+      | current `Set.member` processed
+        = collect processed remaining
+      | otherwise
+        = let
+
+            current_unit_id :: UnitId
+            current_unit_id = globalUnitKeyUnitId current
+
+            needed :: [GlobalUnitKey]
+            needed = map (uncurry mkGlobalUnitKey)                     $
+                     unitAbiDepends                                    $
+                     looked_up_unit_info current_unit_id               $
+                     lookupGlobalUnitInfoMap current global_unit_infos
+
+            current_offenders :: [(UnitId, UnitId)]
+            current_offenders
+              | current_unit_id `elementOfUniqSet` home_unit_ids
+                = []
+              | otherwise
+                = map ((,) current_unit_id) $
+                  nonDetEltsUniqSet $
+                  intersectUniqSets (mkUniqSet (map globalUnitKeyUnitId needed))
+                                    home_unit_ids
+
+          in
+          current_offenders ++ collect (Set.insert current processed)
+                                       (needed ++ remaining)
+
+  error_source_span :: SrcSpan
+  error_source_span = mkGeneralSrcSpan (fsLit "<command line>")
 
 --------------------------------------------------------------------------------
 -- * Enable Code Gen for Template Haskell
@@ -1763,7 +1793,7 @@ data NodeRes v
 --
 -- See also Note [Downsweep Control Flow and Caching]
 dfsBuild :: (Ord k, Monad m)
-         => Maybe (Map.Map k (NodeRes v))
+         => Maybe (Map k (NodeRes v))
          -- ^ Base map, existing results. We won't re-expand any of the nodes
          -- already present in this map.
          -> [n]
@@ -1773,7 +1803,7 @@ dfsBuild :: (Ord k, Monad m)
          -> (n -> m (NodeRes (v,[n])))
          -- ^ Expand this node into its payload result and into the list of
          -- children nodes to visit next.
-         -> m (Map.Map k (NodeRes v))
+         -> m (Map k (NodeRes v))
          -- ^ The result accumulates the payload of expanding the root nodes
          -- and all nodes transitively reachable from those roots.
 dfsBuild base_map roots key expand = go roots (fromMaybe Map.empty base_map)

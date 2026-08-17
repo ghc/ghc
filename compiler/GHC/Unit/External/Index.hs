@@ -71,6 +71,7 @@ module GHC.Unit.External.Index (
   UnitAbiHash,
   mkGlobalUnitKey,
   globalUnitKeyFromUnitInfo,
+  globalUnitKeyUnitId,
   -- * Wired-in units
   setupWiredInUnits,
   updateWiredInUnitIndex,
@@ -308,12 +309,17 @@ data GlobalUnitKey =
   GlobalUnitKey
     !UnitId -- ^ Unit Id of the 'UnitInfo'
     !UnitAbiHash -- ^ ABI hash of the 'UnitInfo'
+  deriving (Eq, Ord)
 
 globalUnitKeyFromUnitInfo :: UnitInfo -> GlobalUnitKey
 globalUnitKeyFromUnitInfo ui = mkGlobalUnitKey (unitId ui) (unitAbiHash ui)
 
 mkGlobalUnitKey :: UnitId -> UnitAbiHash -> GlobalUnitKey
 mkGlobalUnitKey = GlobalUnitKey
+
+-- | Yields the 'UnitId' of a 'GlobalUnitKey'
+globalUnitKeyUnitId :: GlobalUnitKey -> UnitId
+globalUnitKeyUnitId (GlobalUnitKey unit_id _) = unit_id
 
 -- -----------------------------------------------------------------------------
 -- Wired-in units
