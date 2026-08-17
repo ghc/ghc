@@ -4,7 +4,7 @@
 
 from my_typing import *
 from pathlib import Path
-from perf_notes import MetricChange, PerfStat, Baseline, GitRef
+from perf_notes import MetricChange, PerfStat, CommitMetric, GitRef
 from datetime import datetime
 
 # -----------------------------------------------------------------------------
@@ -312,7 +312,7 @@ class TestResult:
 PerfMetric = NamedTuple('PerfMetric',
                         [('change', MetricChange),
                          ('stat', PerfStat),
-                         ('baseline', Optional[Baseline]) ])
+                         ('baseline', Optional[CommitMetric]) ])
 
 class TestRun:
    def __init__(self) -> None:
