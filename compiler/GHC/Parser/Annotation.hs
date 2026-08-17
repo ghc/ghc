@@ -41,7 +41,7 @@ module GHC.Parser.Annotation (
 
   -- ** Annotation data types used in TTG extension points
 
-  AnnList(..), AnnListBrackets(..), AnnListLayout(..),
+  AnnList(..),
   AnnParen(..),
   AnnCType(..),AnnWarningTxt(..),AnnOverlap(..),AnnAnnDecl(..),AnnPragSCC(..),
 
@@ -291,6 +291,7 @@ data EpLayout =
     EpNoLayout
 
 deriving instance Data EpLayout
+deriving instance Eq EpLayout
 
 -- | Used in 'GHC.Parser.Haddock' to get layout column. It assumes
 -- | there is a RealSrcSpan in it, falling back to zero otherwise
@@ -522,30 +523,11 @@ instance Outputable TrailingAnn where
 -- surrounding items such as braces if present, and introductory
 -- keywords such as 'where'.
 
--- AZ: goal: only used when there is layout, so vertical alignment matters
 data AnnList
   = AnnList {
-      al_layout    :: !AnnListLayout,
-      al_brackets  :: !AnnListBrackets,
+      al_layout    :: !EpLayout,
       al_semis     :: [EpToken ";"] -- decls
       } deriving (Data,Eq)
-
-data AnnListBrackets
-  = ListBraces (EpToken "{") (EpToken "}")
-  | ListNone
-  deriving (Data,Eq)
-
--- | How the extent of a list was delimited in the source.
-data AnnListLayout
-  = AnnListBraces   -- ^ Explicit @{ ; }@ written by the user. The tokens
-                    --   live in 'al_brackets' and 'al_semis'.
-  | AnnListLayout !EpaLocation
-                    -- ^ The lexer opened an implicit layout context.
-                    --   The 'EpaLocation' is the @vocurly@ token (or, for
-                    --   MultiWayIf, the leading @|@), whose start column is
-                    --   the layout column chosen by 'new_layout_context'.
-  | AnnListNoLayout -- ^ Neither: a bracketed or compiler-generated list.
-  deriving (Data, Eq)
 
 -- ---------------------------------------------------------------------
 -- Annotations for parenthesised elements, such as tuples, lists
@@ -1017,10 +999,10 @@ instance NoAnn NoEpAnns where
   noAnn = NoEpAnns
 
 instance NoAnn AnnList where
-  noAnn = AnnList noAnn ListNone noAnn
+  noAnn = AnnList noAnn noAnn
 
-instance NoAnn AnnListLayout where
-  noAnn = AnnListNoLayout
+instance NoAnn EpLayout where
+  noAnn = EpNoLayout
 
 instance NoAnn NameAnn where
   noAnn = NameAnnTrailing []
@@ -1114,17 +1096,13 @@ instance Outputable NameAnn where
     = text "NameAnnTrailing" <+> ppr t
 
 instance Outputable AnnList where
-  ppr (AnnList l p s)
-    = text "AnnList" <+> ppr l <+> ppr p <+> ppr s
+  ppr (AnnList l s)
+    = text "AnnList" <+> ppr l <+> ppr s
 
-instance Outputable AnnListBrackets where
-  ppr (ListBraces o c) = text "ListBraces" <+> ppr o <+> ppr c
-  ppr ListNone         = text "ListNone"
-
-instance Outputable AnnListLayout where
-  ppr AnnListBraces     = text "AnnListBraces"
-  ppr (AnnListLayout l) = text "AnnListLayout" <+> ppr l
-  ppr AnnListNoLayout   = text "AnnListNoLayout"
+instance Outputable EpLayout where
+  ppr (EpExplicitBraces o c) = text "EpExplicitBraces" <+> ppr o <+> ppr c
+  ppr (EpVirtualBraces l)    = text "EpVirtualBraces" <+> ppr l
+  ppr EpNoLayout             = text "EpNoLayout"
 
 instance Outputable AnnCType where
   ppr (AnnCType o c l ca)

@@ -28,7 +28,7 @@
      []
      []))
    (EpVirtualBraces
-    (1))
+    (EpaSpan { T15279.hs:5:1 }))
    (Nothing)
    (Nothing))
   (Just
@@ -155,8 +155,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn
@@ -239,8 +238,14 @@
                   (SourceText 'b')
                   ('b'))))))
              [])
-            (EmptyLocalBinds
-             (NoExtField)))))
+            (L
+             (EpAnn
+              (EpaSpan { <no location info> })
+              []
+              (EpaComments
+               []))
+             (EmptyLocalBinds
+              (NoExtField))))))
         ,(L
           (EpAnn
            (EpaSpan { T15279.hs-incl:2:1-13 })
@@ -316,8 +321,14 @@
                   (SourceText 'c')
                   ('c'))))))
              [])
-            (EmptyLocalBinds
-             (NoExtField)))))
+            (L
+             (EpAnn
+              (EpaSpan { <no location info> })
+              []
+              (EpaComments
+               []))
+             (EmptyLocalBinds
+              (NoExtField))))))
         ,(L
           (EpAnn
            (EpaSpan { T15279.hs:7:1-11 })
@@ -390,7 +401,13 @@
                   (SourceText 'a')
                   ('a'))))))
              [])
-            (EmptyLocalBinds
-             (NoExtField)))))])))))]))
+            (L
+             (EpAnn
+              (EpaSpan { <no location info> })
+              []
+              (EpaComments
+               []))
+             (EmptyLocalBinds
+              (NoExtField))))))])))))]))
 
 

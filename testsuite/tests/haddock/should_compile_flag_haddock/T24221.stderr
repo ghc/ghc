@@ -82,8 +82,7 @@
         (EpTok
          (EpaSpan { <no location info> }))
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          [])
         (EpTok
          (EpaSpan { T24221.hs:5:3 })))
@@ -419,8 +418,7 @@
         (EpTok
          (EpaSpan { <no location info> }))
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          [])
         (EpTok
          (EpaSpan { T24221.hs:11:11 })))
@@ -590,8 +588,7 @@
         (EpTok
          (EpaSpan { <no location info> }))
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          [])
         (EpTok
          (EpaSpan { T24221.hs:14:11 })))
@@ -787,8 +784,7 @@
         (EpTok
          (EpaSpan { <no location info> }))
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          [])
         (EpTok
          (EpaSpan { T24221.hs:19:11 })))
@@ -984,8 +980,7 @@
         (EpTok
          (EpaSpan { <no location info> }))
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          [])
         (EpTok
          (EpaSpan { T24221.hs:27:11 })))
@@ -1228,8 +1223,7 @@
         (EpTok
          (EpaSpan { <no location info> }))
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          [])
         (EpTok
          (EpaSpan { T24221.hs:31:11 })))
@@ -1485,8 +1479,7 @@
         (EpTok
          (EpaSpan { <no location info> }))
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          [])
         (EpTok
          (EpaSpan { T24221.hs:36:11 })))

@@ -134,8 +134,7 @@
           (EpTok
            (EpaSpan { <no location info> }))
           (AnnList
-           (AnnListNoLayout)
-           (ListNone)
+           (EpNoLayout)
            [])
           (EpTok
            (EpaSpan { Test20239.hs:5:34 })))

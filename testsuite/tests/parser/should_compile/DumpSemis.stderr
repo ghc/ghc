@@ -261,8 +261,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn
@@ -333,9 +332,8 @@
                  ((,)
                   (Right
                    (AnnList
-                    (AnnListLayout
+                    (EpVirtualBraces
                      (EpaSpan { DumpSemis.hs:11:3 }))
-                    (ListNone)
                     []))
                   (EpaSpan { DumpSemis.hs:10:7-8 }))
                  (DoExpr
@@ -364,8 +362,7 @@
                        ((,)
                         (Right
                          (AnnList
-                          (AnnListBraces)
-                          (ListBraces
+                          (EpExplicitBraces
                            (EpTok (EpaSpan { DumpSemis.hs:11:6 }))
                            (EpTok (EpaSpan { DumpSemis.hs:11:15 })))
                           [(EpTok
@@ -560,8 +557,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn
@@ -632,8 +628,7 @@
                  ((,)
                   (Right
                    (AnnList
-                    (AnnListBraces)
-                    (ListBraces
+                    (EpExplicitBraces
                      (EpTok (EpaSpan { DumpSemis.hs:16:3 }))
                      (EpTok (EpaSpan { DumpSemis.hs:19:3 })))
                     [(EpTok
@@ -818,8 +813,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn
@@ -890,8 +884,7 @@
                  ((,)
                   (Right
                    (AnnList
-                    (AnnListBraces)
-                    (ListBraces
+                    (EpExplicitBraces
                      (EpTok (EpaSpan { DumpSemis.hs:22:10 }))
                      (EpTok (EpaSpan { DumpSemis.hs:22:30 })))
                     [(EpTok
@@ -1032,8 +1025,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn
@@ -1143,8 +1135,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn
@@ -1256,8 +1247,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn
@@ -1366,9 +1356,8 @@
         (EpTok
          (EpaSpan { DumpSemis.hs:28:40-44 }))
         (AnnList
-         (AnnListLayout
+         (EpVirtualBraces
           (EpaSpan { DumpSemis.hs:29:3 }))
-         (ListNone)
          []))
        (EpVirtualBraces
         (EpaSpan { DumpSemis.hs:29:3 })))
@@ -1766,8 +1755,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn
@@ -1898,8 +1886,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn
@@ -1981,8 +1968,7 @@
                   (HsValBinds
                    ((,)
                     (AnnList
-                     (AnnListBraces)
-                     (ListBraces
+                     (EpExplicitBraces
                       (EpTok (EpaSpan { DumpSemis.hs:34:13 }))
                       (EpTok (EpaSpan { DumpSemis.hs:34:31 })))
                      [(EpTok
@@ -2026,8 +2012,7 @@
                          ((,)
                           (FromSource)
                           (AnnList
-                           (AnnListNoLayout)
-                           (ListNone)
+                           (EpNoLayout)
                            []))
                          (L
                           (EpAnn
@@ -2145,8 +2130,7 @@
                          ((,)
                           (FromSource)
                           (AnnList
-                           (AnnListNoLayout)
-                           (ListNone)
+                           (EpNoLayout)
                            []))
                          (L
                           (EpAnn
@@ -2282,8 +2266,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn
@@ -2393,8 +2376,7 @@
                   ((,)
                    (FromSource)
                    (AnnList
-                    (AnnListBraces)
-                    (ListBraces
+                    (EpExplicitBraces
                      (EpTok (EpaSpan { DumpSemis.hs:38:4 }))
                      (EpTok (EpaSpan { DumpSemis.hs:44:4 })))
                     [(EpTok

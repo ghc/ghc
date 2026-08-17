@@ -520,8 +520,8 @@ changeLocalDecls libdir (L l p) = do
         let oldDecls' = captureLineSpacing oldDecls
         let (VbSig o:oldBinds)  = map wrapValBind oldDecls'
             o' = setEntryDP o (DifferentLine 2 0)
-        let (AnnList (AnnListLayout _) a b) = van
-        let van' = AnnList (AnnListLayout (EpaDelta noSrcSpan (DifferentLine 1 4) [])) a b
+        let (AnnList _ b) = van
+        let van' = AnnList (EpVirtualBraces (EpaDelta noSrcSpan (DifferentLine 1 4) [])) b
         let binds' = L lb (HsValBinds (van',w)
                           (ValBinds noExtField (VbSig sig':VbBind decl':VbSig o':oldBinds)))
         return (L lm (Match an mln pats (GRHSs emptyComments rhs binds')))
@@ -546,7 +546,7 @@ changeLocalDecls2 libdir (L l p) = do
       replaceLocalBinds (L lm (Match ma mln pats (GRHSs _ rhs (L _ EmptyLocalBinds{})))) = do
         let anc = (EpaDelta noSrcSpan (DifferentLine 1 2) [])
         let anc2 = (EpaDelta noSrcSpan (DifferentLine 1 4) [])
-        let an = ( AnnList (AnnListLayout anc2) ListNone []
+        let an = ( AnnList (EpVirtualBraces anc2) []
                  , EpTok (EpaDelta noSrcSpan (SameLine 0) []))
         let lb = EpAnn anc noAnn emptyComments
         let decls = [VbSig sig', VbBind decl']
