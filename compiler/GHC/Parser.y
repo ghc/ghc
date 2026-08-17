@@ -1528,13 +1528,13 @@ where_type_family :: { Located ((EpToken "where",  EpToken ".."),FamilyInfo GhcP
                     , ClosedTypeFamily (fst $ fst $ unLoc $2) (fmap reverse $ snd $ unLoc $2)) }
 
 ty_fam_inst_eqn_list :: { Located ((AnnList, EpToken ".."),Maybe [LTyFamInstEqn GhcPs]) }
-        :     '{' ty_fam_inst_eqns '}'     { sLL $1 $> ((AnnList AnnListBraces (ListBraces (epTok $1) (epTok $3)) [], noAnn)
+        :     '{' ty_fam_inst_eqns '}'     { sLL $1 $> ((AnnList (EpExplicitBraces (epTok $1) (epTok $3)) [], noAnn)
                                                 ,Just (unLoc $2)) }
         | vocurly ty_fam_inst_eqns close   { let (L loc _) = $2 in
-                                             L loc ((AnnList (AnnListLayout (glR $1)) ListNone [], noAnn),Just (unLoc $2)) }
-        |     '{' '..' '}'                 { sLL $1 $> ((AnnList AnnListBraces (ListBraces (epTok $1) (epTok $3)) [], epTok $2), Nothing) }
+                                             L loc ((AnnList (EpVirtualBraces (glR $1)) [], noAnn),Just (unLoc $2)) }
+        |     '{' '..' '}'                 { sLL $1 $> ((AnnList (EpExplicitBraces (epTok $1) (epTok $3)) [], epTok $2), Nothing) }
         | vocurly '..' close               { let (L loc _) = $2 in
-                                             L loc ((AnnList (AnnListLayout (glR $1)) ListNone [], epTok $2),Nothing) }
+                                             L loc ((AnnList (EpVirtualBraces (glR $1)) [], epTok $2),Nothing) }
 
 ty_fam_inst_eqns :: { Located [LTyFamInstEqn GhcPs] }
         : ty_fam_inst_eqns ';' ty_fam_inst_eqn
@@ -1796,10 +1796,10 @@ cvars1 :: { [RecordPatSynField GhcPs] }
 where_decls :: { LocatedA (OrdList (LHsDecl GhcPs), EpToken "where", AnnList) }
         : 'where' '{' decls '}'       {% amsA' (sLL $1 $> (thdOf3 $ unLoc $3,
                                                 epTok $1,
-                                                AnnList AnnListBraces (ListBraces (epTok $2) (epTok $4)) (sndOf3 $ unLoc $3))) }
+                                                AnnList (EpExplicitBraces (epTok $2) (epTok $4)) (sndOf3 $ unLoc $3))) }
         | 'where' vocurly decls close {% amsA' (sLL $1 $3 (thdOf3 $ unLoc $3,
                                                 epTok $1,
-                                                AnnList (AnnListLayout (glR $2)) ListNone (sndOf3 $ unLoc $3))) }
+                                                AnnList (EpVirtualBraces (glR $2)) (sndOf3 $ unLoc $3))) }
 
 pattern_synonym_sig :: { LSig GhcPs }
         : 'pattern' con_list '::' sigtype
@@ -1852,10 +1852,10 @@ decllist_cls
         :: { Located ( AnnList
                      , OrdList (LHsDecl GhcPs)
                      , EpLayout) }      -- Reversed
-        : '{'         decls_cls '}'     { sLL $1 $> (AnnList AnnListBraces (ListBraces (epTok $1) (epTok $3)) (fst $ unLoc $2)
+        : '{'         decls_cls '}'     { sLL $1 $> (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) (fst $ unLoc $2)
                                              ,snd $ unLoc $2, epExplicitBraces $1 $3) }
         |     vocurly decls_cls close   { let { L l (anns, decls) = $2 }
-                                           in L l (AnnList (AnnListLayout (glR $1)) ListNone anns, decls, EpVirtualBraces (glR $1)) }
+                                           in L l (AnnList (EpVirtualBraces (glR $1)) anns, decls, EpVirtualBraces (glR $1)) }
 
 -- Class body
 --
@@ -1896,8 +1896,8 @@ decls_inst :: { Located ([EpToken ";"],OrdList (LHsDecl GhcPs)) }   -- Reversed
 
 decllist_inst
         :: { Located (AnnList, OrdList (LHsDecl GhcPs)) }      -- Reversed
-        : '{'         decls_inst '}'    { sLL $1 $> (AnnList AnnListBraces (ListBraces (epTok $1) (epTok $3)) (fst $ unLoc $2), snd $ unLoc $2) }
-        |     vocurly decls_inst close  { L (gl $2) (AnnList (AnnListLayout (glR $1)) ListNone (fst $ unLoc $2),                snd $ unLoc $2) }
+        : '{'         decls_inst '}'    { sLL $1 $> (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) (fst $ unLoc $2), snd $ unLoc $2) }
+        |     vocurly decls_inst close  { L (gl $2) (AnnList (EpVirtualBraces (glR $1)) (fst $ unLoc $2),                snd $ unLoc $2) }
 
 -- Instance body
 --
@@ -1934,9 +1934,9 @@ decls   :: { Located (EpaLocation, [EpToken ";"], OrdList (LHsDecl GhcPs)) }
         | {- empty -}                   { noLoc (noAnn, [],nilOL) }
 
 decllist :: { Located (AnnList,Located (OrdList (LHsDecl GhcPs))) }
-        : '{'            decls '}'     { sLL $1 $> (AnnList AnnListBraces (ListBraces (epTok $1) (epTok $3)) (sndOf3 $ unLoc $2)
+        : '{'            decls '}'     { sLL $1 $> (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) (sndOf3 $ unLoc $2)
                                                    ,sL1 $2 $ thdOf3 $ unLoc $2) }
-        |     vocurly    decls close   { sL1 $2    (AnnList (AnnListLayout (glR $1)) ListNone (sndOf3 $ unLoc $2)
+        |     vocurly    decls close   { sL1 $2    (AnnList (EpVirtualBraces (glR $1)) (sndOf3 $ unLoc $2)
                                                    ,sL1 $2 $ thdOf3 $ unLoc $2) }
 
 -- Binding groups other than those of class and instance declarations
@@ -1944,16 +1944,16 @@ decllist :: { Located (AnnList,Located (OrdList (LHsDecl GhcPs))) }
 binds   ::  { LHsLocalBinds GhcPs }
                                          -- May have implicit parameters
                                          -- No type declarations
-        : decllist          {% do { let { (AnnList la p s, decls) = unLoc $1 }
+        : decllist          {% do { let { (ann, decls) = unLoc $1 }
                                   ; val_binds <- cvBindGroup (unLoc $ decls)
                                   ; !cs <- getCommentsFor (gl $1)
-                                  ; return (L (EpAnn (glR $1) noAnn cs) $ HsValBinds (AnnList la p s, noEpTok) val_binds)} }
+                                  ; return (L (EpAnn (glR $1) noAnn cs) $ HsValBinds (ann, noEpTok) val_binds)} }
 
         | '{'            dbinds '}'     {% amsA' (sLL $1 $>
-                                             $ HsIPBinds (AnnList AnnListBraces (ListBraces (epTok $1) (epTok $3)) [], noEpTok) (IPBinds noExtField (reverse $ unLoc $2))) }
+                                             $ HsIPBinds (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) [], noEpTok) (IPBinds noExtField (reverse $ unLoc $2))) }
 
         |     vocurly    dbinds close   {% amsA' (sLL $1 $2
-                                             $ HsIPBinds (AnnList (AnnListLayout $ glR $1) ListNone [], noEpTok) (IPBinds noExtField (reverse $ unLoc $2))) }
+                                             $ HsIPBinds (AnnList (EpVirtualBraces $ glR $1) [], noEpTok) (IPBinds noExtField (reverse $ unLoc $2))) }
 
 
 wherebinds :: { Maybe (LHsLocalBinds GhcPs) }
@@ -2555,11 +2555,11 @@ gadt_constrlist :: { Located ((EpToken "where", AnnList)
 
         : 'where' '{'        gadt_constrs '}'    {% checkEmptyGADTs $
                                                       L (comb2 $1 $4)
-                                                        ((epTok $1, AnnList AnnListBraces (ListBraces (epTok $2) (epTok $4)) [])
+                                                        ((epTok $1, AnnList (EpExplicitBraces (epTok $2) (epTok $4)) [])
                                                         , unLoc $3) }
         | 'where' vocurly    gadt_constrs close  {% checkEmptyGADTs $
                                                       L (comb2 $1 $3)
-                                                        ((epTok $1,  AnnList (AnnListLayout $ glR $2) ListNone [])
+                                                        ((epTok $1,  AnnList (EpVirtualBraces $ glR $2) [])
                                                         , unLoc $3) }
         | {- empty -}                            { noLoc (noAnn,[]) }
 
@@ -3309,8 +3309,8 @@ acmd    :: { LHsCmdTop GhcPs }
                                    return (sL1a cmd $ HsCmdTop noExtField cmd) }
 
 cvtopbody :: { (AnnList,[LHsDecl GhcPs]) }
-        :  '{'            cvtopdecls0 '}'      { (AnnList AnnListBraces (ListBraces (epTok $1) (epTok $3)) [],$2) }
-        |      vocurly    cvtopdecls0 close    { (AnnList (AnnListLayout (glR $1)) ListNone [],$2) }
+        :  '{'            cvtopdecls0 '}'      { (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) [],$2) }
+        |      vocurly    cvtopdecls0 close    { (AnnList (EpVirtualBraces (glR $1)) [],$2) }
 
 cvtopdecls0 :: { [LHsDecl GhcPs] }
         : topdecls_semi         { cvTopDecls $1 }
@@ -3538,12 +3538,12 @@ guardquals1 :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }
 altslist(PATS) :: { forall b. DisambECP b => PV (LocatedA ([LMatch GhcPs (LocatedA b)], AnnList)) }
         : '{'        alts(PATS) '}'    { $2 >>= \ $2 -> amsA'
                                            (sLL $1 $> (reverse (snd $ unLoc $2),
-                                           (AnnList AnnListBraces (ListBraces (epTok $1) (epTok $3)) (fst $ unLoc $2)))) }
+                                           (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) (fst $ unLoc $2)))) }
         | vocurly    alts(PATS)  close { $2 >>= \ $2 -> amsA'
                                            (L (getLoc $2) (reverse (snd $ unLoc $2),
-                                           (AnnList (AnnListLayout $ glR $1) ListNone (fst $ unLoc $2)))) }
-        | '{'              '}'   { amsA' (sLL $1 $> ([], (AnnList AnnListBraces (ListBraces (epTok $1) (epTok $2)) []))) }
-        | vocurly          close { return $ noLocA ([], AnnList (AnnListLayout $ glR $1) ListNone []) }
+                                           (AnnList (EpVirtualBraces $ glR $1) (fst $ unLoc $2)))) }
+        | '{'              '}'   { amsA' (sLL $1 $> ([], (AnnList (EpExplicitBraces (epTok $1) (epTok $2)) []))) }
+        | vocurly          close { return $ noLocA ([], AnnList (EpVirtualBraces $ glR $1) []) }
 
 alts(PATS) :: { forall b. DisambECP b => PV (Located ([EpToken ";"],[LMatch GhcPs (LocatedA b)])) }
         : alts1(PATS)              { $1 >>= \ $1 -> return $
@@ -3600,9 +3600,9 @@ gdpats :: { forall b. DisambECP b => PV (Located (NonEmpty (LGRHS GhcPs (Located
 -- we don't need it.
 ifgdpats :: { Located (AnnList, NonEmpty (LGRHS GhcPs (LHsExpr GhcPs))) }
          : '{' gdpats '}'                 {% runPV $2 >>= \ $2 ->
-                                             return $ sLL $1 $> (AnnList AnnListBraces (ListBraces (epTok $1) (epTok $3)) [], unLoc $2)  }
+                                             return $ sLL $1 $> (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) [], unLoc $2)  }
          |     gdpats close               {% runPV $1 >>= \ $1 ->
-                                             return $ sL1 $1 (AnnList (AnnListLayout (glR $1)) ListNone [], unLoc $1) }
+                                             return $ sL1 $1 (AnnList (EpVirtualBraces (glR $1)) [], unLoc $1) }
 
 gdpat   :: { forall b. DisambECP b => PV (LGRHS GhcPs (LocatedA b)) }
         : '|' guardquals '->' exp
@@ -3652,10 +3652,10 @@ apat    : aexp                  {% (checkPattern <=< runPV) (unECP $1) }
 
 stmtlist :: { forall b. DisambECP b => PV (LocatedA (AnnList, Located [LocatedA (Stmt GhcPs (LocatedA b))])) }
         : '{'           stmts '}'       { $2 >>= \ $2 ->
-                                          amsA' (sLL $1 $> (AnnList AnnListBraces (ListBraces (epTok $1) (epTok $3)) (fromOL $ fst $ unLoc $2)
+                                          amsA' (sLL $1 $> (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) (fromOL $ fst $ unLoc $2)
                                                            , sL1 $2 $ reverse $ snd $ unLoc $2))}
         |     vocurly   stmts close     { $2 >>= \ $2 ->
-                                          amsA' (L (stmtsLoc $2) (AnnList (AnnListLayout (glR $1)) ListNone (fromOL $ fst $ unLoc $2)
+                                          amsA' (L (stmtsLoc $2) (AnnList (EpVirtualBraces (glR $1)) (fromOL $ fst $ unLoc $2)
                                                                  , sL1 $2 $ reverse $ snd $ unLoc $2))}
 
 --      do { ;; s ; s ; ; s ;; }
