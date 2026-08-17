@@ -552,6 +552,8 @@ stack-hadrian-build:
     - . .gitlab/ci.sh setup
     - . .gitlab/ci.sh configure
     - hadrian/build-stack --version
+  rules:
+    - *full-ci
 
 ####################################
 # Testing reinstallable ghc codepath
