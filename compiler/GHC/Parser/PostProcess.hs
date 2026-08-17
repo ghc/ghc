@@ -473,13 +473,13 @@ valid_anchor (EpaSpan (RealSrcSpan r _)) = srcSpanStartLine r >= 0
 valid_anchor _ = False
 
 patch_annlist_layout :: AnnList -> AnnList
-patch_annlist_layout (AnnList lo bs s) = AnnList (patch_layout lo) bs s
+patch_annlist_layout (AnnList lo s) = AnnList (patch_layout lo) s
 
 -- If the decl list for where binds is empty, the anchor ends up
 -- invalid. Explicitly mark it as not having layout
-patch_layout :: AnnListLayout -> AnnListLayout
-patch_layout lo@(AnnListLayout (EpaSpan (RealSrcSpan _ _)) ) = lo
-patch_layout (AnnListLayout _ ) = AnnListNoLayout
+patch_layout :: EpLayout -> EpLayout
+patch_layout lo@(EpVirtualBraces (EpaSpan (RealSrcSpan _ _)) ) = lo
+patch_layout (EpVirtualBraces _ ) = EpNoLayout
 patch_layout lo = lo
 
 -- | The anchor for a stmtlist is based on either the location or
