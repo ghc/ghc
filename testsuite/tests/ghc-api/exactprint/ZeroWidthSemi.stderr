@@ -82,8 +82,7 @@
        ((,)
         (FromSource)
         (AnnList
-         (AnnListNoLayout)
-         (ListNone)
+         (EpNoLayout)
          []))
        (L
         (EpAnn

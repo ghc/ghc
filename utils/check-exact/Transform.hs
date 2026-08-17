@@ -1021,15 +1021,13 @@ replaceDeclsValbinds w (L l (EmptyLocalBinds _)) new
 
 oldWhereAnnotation :: (AnnList, EpToken "where")
   -> WithWhere -> (AnnList, EpToken "where")
-oldWhereAnnotation (an, _w) ww  = an'
+oldWhereAnnotation (an, _w) ww  = (an, w')
   -- TODO: when we set DP (0,0) for the HsValBinds EpEpaLocation,
   -- change the AnnList anchor to have the correct DP too
   where
-    (AnnList ancl p s) = an
-    w = case ww of
+    w' = case ww of
       WithWhere -> EpTok (EpaDelta noSrcSpan (SameLine 0) [])
       WithoutWhere -> noEpTok
-    an' = (AnnList ancl p s, w)
 
 newWhereAnnotation :: WithWhere -> (AnnList, EpToken "where")
 newWhereAnnotation ww = (an, w)
@@ -1038,7 +1036,7 @@ newWhereAnnotation ww = (an, w)
   w = case ww of
     WithWhere -> EpTok (EpaDelta noSrcSpan (SameLine 0) [])
     WithoutWhere -> noEpTok
-  an = AnnList (AnnListLayout anc2) ListNone []
+  an = AnnList (EpVirtualBraces anc2) []
 
 -- ---------------------------------------------------------------------
 

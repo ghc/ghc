@@ -54,8 +54,7 @@
           (EpTok
            (EpaSpan { <no location info> }))
           (AnnList
-           (AnnListNoLayout)
-           (ListNone)
+           (EpNoLayout)
            [])
           (EpTok
            (EpaSpan { <no location info> })))
