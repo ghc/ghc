@@ -78,7 +78,7 @@ import Data.Functor.Const
 import Data.Typeable
 import Data.List ( partition, sort )
 import qualified Data.List.NonEmpty as NE
-import Data.Maybe ( isJust )
+import Data.Maybe ( isJust, isNothing, fromMaybe )
 import Data.Void
 
 import Utils
@@ -122,13 +122,11 @@ defaultEPState = EPState
              , uExtraDPReturn = Nothing
              , pAcceptSpan = False
 
-             , epPos       = (1,1)
-             , pMarkLayout = False
-             , pLHS = LayoutStartCol 1
+             , pPos        = (1,1)
+             , pLayout = [LayoutFrame (LayoutStartCol 1) (Just (LayoutStartCol 1))]
 
              , dPriorEndPosition = (1,1)
-             , dMarkLayout = False
-             , dLHS        = LayoutStartCol 1
+             , dLayout = [LayoutFrame (LayoutStartCol 1) (Just (LayoutStartCol 1))]
 
              , epComments = []
              , epCommentsApplied = []
@@ -172,6 +170,13 @@ instance Monoid w => Semigroup (EPWriter w) where
 instance Monoid w => Monoid (EPWriter w) where
   mempty = EPWriter mempty
 
+-- ---------------------------------------------------------------------
+
+data LayoutFrame = LayoutFrame
+  { lfSaved    :: !LayoutStartCol         -- ^ effective offset at scope entry
+  , lfResolved :: !(Maybe LayoutStartCol) -- ^ column of the first token printed in this scope
+  }
+
 data EPState = EPState
              { uAnchorSpan :: !RealSrcSpan -- ^ in pre-changed AST
                                           -- reference frame, from
@@ -189,16 +194,14 @@ data EPState = EPState
                                    -- end of the span.
 
              -- Print phase
-             , epPos        :: !Pos -- ^ Current output position
-             , pMarkLayout  :: !Bool
-             , pLHS   :: !LayoutStartCol
+             , pPos         :: !Pos -- ^ Current output position
+             , pLayout      :: [LayoutFrame]
 
              -- Delta phase
              , dPriorEndPosition :: !Pos -- ^ End of Position reached
                                          -- when processing the
                                          -- preceding element
-             , dMarkLayout :: !Bool
-             , dLHS        :: !LayoutStartCol
+             , dLayout     :: [LayoutFrame]
 
              -- Shared
              , epComments :: ![Comment]
@@ -2644,7 +2647,7 @@ instance ExactPrint (HsIPBinds GhcPs) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (IPBinds x binds) = setLayoutBoth $ do
+  exact (IPBinds x binds) = do
       binds' <- mapM markAnnotated binds
       return (IPBinds x binds')
 
@@ -3018,7 +3021,7 @@ instance ExactPrint (HsExpr GhcPs) where
     an0 <- markLensFun an lhsCaseAnnCase markEpToken
     e' <- markAnnotated e
     an1 <- markLensFun an0 lhsCaseAnnOf markEpToken
-    alts' <- setLayoutBoth $ markAnnotated alts
+    alts' <- markAnnotated alts
     return (HsCase an1 e' alts')
 
   exact (HsIf an e1 e2 e3) = do
@@ -3040,7 +3043,7 @@ instance ExactPrint (HsExpr GhcPs) where
   exact (HsLet (tkLet, tkIn) binds e) = do
     setLayoutBoth $ do -- Make sure the 'in' gets indented too
       tkLet' <- markEpToken tkLet
-      binds' <- setLayoutBoth $ markAnnotated binds
+      binds' <- markAnnotated binds
       tkIn' <- markEpToken tkIn
       e' <- markAnnotated e
       return (HsLet (tkLet',tkIn') binds' e')
@@ -3302,7 +3305,7 @@ instance ExactPrint (HsUntypedSplice GhcPs) where
     -- the colOffset for now.
     -- TODO: use local?
     oldOffset <- getLayoutOffsetP
-    EPState{pMarkLayout} <- get
+    pMarkLayout <- queryLayoutStack <$> gets pLayout
     unless pMarkLayout $ setLayoutOffsetP 0
     printStringAdvance
             -- Note: Lexer.x does not provide unicode alternative. 2017-02-26
@@ -3525,7 +3528,7 @@ instance ExactPrint (HsCmd GhcPs) where
   exact (HsCmdLet (tkLet, tkIn) binds e) = do
     setLayoutBoth $ do -- Make sure the 'in' gets indented too
       tkLet' <- markEpToken tkLet
-      binds' <- setLayoutBoth $ markAnnotated binds
+      binds' <- markAnnotated binds
       tkIn' <- markEpToken tkIn
       e' <- markAnnotated e
       return (HsCmdLet (tkLet', tkIn') binds' e')
@@ -5026,30 +5029,51 @@ printQueuedComment Comment{commentContents} dp = do
 
 ------------------------------------------------------------------------
 
+effectiveLayout :: [LayoutFrame] -> LayoutStartCol
+effectiveLayout (f:_) = fromMaybe (lfSaved f) (lfResolved f)
+effectiveLayout [] = LayoutStartCol 1
+
+popLayoutStack :: [LayoutFrame] -> [LayoutFrame]
+popLayoutStack (_:rest) = rest
+popLayoutStack [] = []
+
+queryLayoutStack :: [LayoutFrame] -> Bool
+queryLayoutStack (f:_) = isNothing (lfResolved f)
+queryLayoutStack [] = False
+
+
+-- | Work down the stack filling in the resolved layout column for all
+-- so-far-unresolved ones. These can only be in the prefix of the
+-- list.
+resolveLayoutStack :: [LayoutFrame] -> LayoutStartCol -> [LayoutFrame]
+resolveLayoutStack (f:rest) c =
+  case lfResolved f of
+    Nothing -> f { lfResolved = Just c } : resolveLayoutStack rest c
+    Just _  -> f:rest
+resolveLayoutStack [] _ = []
+
 setLayoutBoth :: (Monad m, Monoid w) => EP w m a -> EP w m a
-setLayoutBoth k = do
+setLayoutBoth action = do
   oldLHS <- getLayoutOffsetD
   oldAnchorOffset <- getLayoutOffsetP
   debugM $ "setLayoutBoth: (oldLHS,oldAnchorOffset)=" ++ show (oldLHS,oldAnchorOffset)
-  modify (\a -> a { dMarkLayout = True
-                  , pMarkLayout = True } )
+  modify (\a -> a { dLayout = (LayoutFrame (effectiveLayout (dLayout a)) Nothing:dLayout a)
+                  , pLayout = (LayoutFrame (effectiveLayout (pLayout a)) Nothing:pLayout a)} )
   let reset = do
-        debugM $ "setLayoutBoth:reset: (oldLHS,oldAnchorOffset)=" ++ show (oldLHS,oldAnchorOffset)
-        modify (\a -> a { dMarkLayout = False
-                        , dLHS = oldLHS
-                        , pMarkLayout = False
-                        , pLHS = oldAnchorOffset} )
-  k <* reset
+        debugM $ "pushLayout:reset: (oldLHS,oldAnchorOffset)=" ++ show (oldLHS,oldAnchorOffset)
+        modify (\a -> a { dLayout = popLayoutStack (dLayout a)
+                        , pLayout = popLayoutStack (pLayout a) })
+  action <* reset
 
 ------------------------------------------------------------------------
 
 getPosP :: (Monad m, Monoid w) => EP w m Pos
-getPosP = gets epPos
+getPosP = gets pPos
 
 setPosP :: (Monad m, Monoid w) => Pos -> EP w m ()
 setPosP l = do
   debugM $ "setPosP:" ++ show l
-  modify (\s -> s {epPos = l})
+  modify (\s -> s {pPos = l})
 
 getExtraDP :: (Monad m, Monoid w) => EP w m (Maybe EpaLocation)
 getExtraDP = gets uExtraDP
@@ -5100,14 +5124,13 @@ setPriorEndASTPD pe@(fm,to) = do
 
 setLayoutStartD :: (Monad m, Monoid w) => Int -> EP w m ()
 setLayoutStartD p = do
-  EPState{dMarkLayout} <- get
+  dMarkLayout <- queryLayoutStack <$> gets dLayout
   when dMarkLayout $ do
     debugM $ "setLayoutStartD: setting dLHS=" ++ show p
-    modify (\s -> s { dMarkLayout = False
-                    , dLHS = LayoutStartCol p})
+    modify (\s -> s { dLayout = resolveLayoutStack (dLayout s) (LayoutStartCol p)})
 
 getLayoutOffsetD :: (Monad m, Monoid w) => EP w m LayoutStartCol
-getLayoutOffsetD = gets dLHS
+getLayoutOffsetD = effectiveLayout <$> gets dLayout
 
 setAnchorU :: (Monad m, Monoid w) => RealSrcSpan -> EP w m ()
 setAnchorU rss = do
@@ -5168,12 +5191,12 @@ applyComment c = do
     (h:t) -> modify (\s -> s { epCommentsApplied = (c:h):t } )
 
 getLayoutOffsetP :: (Monad m, Monoid w) => EP w m LayoutStartCol
-getLayoutOffsetP = gets pLHS
+getLayoutOffsetP = effectiveLayout <$> gets pLayout
 
 setLayoutOffsetP :: (Monad m, Monoid w) => LayoutStartCol -> EP w m ()
 setLayoutOffsetP c = do
   debugM $ "setLayoutOffsetP:" ++ show c
-  modify (\s -> s { pLHS = c })
+  modify (\s -> s { pLayout = resolveLayoutStack (pLayout s) c})
 
 
 -- ---------------------------------------------------------------------
@@ -5208,11 +5231,12 @@ adjustDeltaForOffsetM dp = do
 
 printString :: (Monad m, Monoid w) => Bool -> String -> EP w m ()
 printString layout str = do
-  EPState{epPos = (_,c), pMarkLayout} <- get
+  pMarkLayout <- queryLayoutStack <$> gets pLayout
+  EPState{pPos = (_,c) } <- get
   EPOptions{epTokenPrint, epWhitespacePrint} <- ask
   when (pMarkLayout && layout) $ do
     debugM $ "printString: setting pLHS to " ++ show c
-    modify (\s -> s { pLHS = LayoutStartCol c, pMarkLayout = False } )
+    setLayoutOffsetP (LayoutStartCol c)
 
   -- Advance position, taking care of any newlines in the string
   let strDP = dpFromString str
