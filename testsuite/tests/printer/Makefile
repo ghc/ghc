@@ -942,3 +942,9 @@ Haddock1:
 T27423c:
 	$(CHECK_PPR)   $(LIBDIR) T27423c.hs
 	$(CHECK_EXACT) $(LIBDIR) T27423c.hs
+
+.PHONY: Layout
+Layout:
+	$(CHECK_PPR)   $(LIBDIR) Layout.hs
+	$(CHECK_EXACT) $(LIBDIR) Layout.hs
+
