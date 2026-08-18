@@ -1,0 +1,6 @@
+section: compiler
+synopsis: Fix a bug where a class declared abstractly in an hs-boot file was
+  assumed not to be unary, so GHC speculatively evaluated a dictionary that
+  could be bottom, crashing the program.
+mrs: !16519
+issues: #27704

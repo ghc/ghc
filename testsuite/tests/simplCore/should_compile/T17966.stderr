@@ -160,7 +160,7 @@ end Rec }
 
 -- RHS size: {terms: 5, types: 6, coercions: 0, joins: 0/0}
 T17966.$fCBoolb [InlPrag=CONLIKE] :: forall b. Show b => C Bool b
-[LclIdX[DFunId(nt)],
+[LclIdX[DFunId(may-be-bottom)],
  Arity=1,
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
