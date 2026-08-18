@@ -2,7 +2,12 @@
 
 ## Status
 
-Draft / analysis. No code changes made yet.
+In progress. Steps 1–3 of §7 are done, step 4 is partly done. See §7 for the
+per-step state.
+
+**Out of scope.** The backpack unit body (`unitbody`) and the header-only
+parsers (`header_body`, `header_body2`) are excluded: neither produces an AST
+that is exact printed, so their `vocurly` alternatives need no `AnnList`.
 
 All references below are by *production name*, *function name*, or *constructor
 name* rather than line number, so they survive movement within the tree. Grep
@@ -157,8 +162,10 @@ The remaining nine record nothing in an `AnnList`:
 - the `'where' vocurly gadt_constrs close` alternative (GADT `where`) —
   `NoEpTok, NoEpTok`
 - `cvtopbody` (`[d| ... |]` declaration quote) — `NoEpTok, NoEpTok`
-- the `vocurly unitdecls close` alternative in the backpack unit body
 - the empty-alts alternative `vocurly close` in `altslist` — explicitly `noAnn`
+
+(The backpack `vocurly unitdecls close` and the `header_body` alternatives also
+record nothing, but are out of scope — see §Status.)
 
 And MultiWayIf (`ifgdpats`) has no `AnnList` at all; `HsMultiIf` is annotated
 with a bare `(EpToken "{", EpToken "}")` pair.
@@ -221,10 +228,9 @@ end of the span is discarded.
 ### D1 — Under-capture
 
 Three of the eight layout keywords have no `al_anchor`: `[d|`, MultiWayIf's
-`|`, and the class / instance / GADT / type-family / module / backpack `where`
-variants. Of those, module and class bodies are served by `EpLayout`; instance
-bodies, GADT bodies, type-family bodies, declaration quotes and backpack unit
-bodies are served by nothing.
+`|`, and the class / instance / GADT / type-family / module `where` variants.
+Of those, module and class bodies are served by `EpLayout`; instance bodies,
+GADT bodies, type-family bodies and declaration quotes are served by nothing.
 
 ### D2 — Over-capture
 
@@ -282,6 +288,8 @@ The `alts` production has an alternative
 using `sLL $1 $>`, so for `case x of ; a -> b` the anchor starts at the `;`
 rather than at the first alt. `decls` has the analogous `decls ';'` shape.
 
+AZ: This is the way GHC works. The leading semi does indeed introduce layout, and the rest of the case statement clauses have to line up with it.
+
 ### D6 — Empty-list repair hack
 
 `add_where` / `patch_anchor` in `compiler/GHC/Parser/PostProcess.hs` exist
@@ -306,6 +314,8 @@ setAnchorEpaL (EpAnn _ an _) anc ts cs = EpAnn anc (setTrailing (an {al_anchor =
 ```
 
 so any re-anchoring loses the layout information.
+
+AZ: function no longer exists
 
 ### D8 — Layout, braces and semis are conflated
 
@@ -360,6 +370,11 @@ with the shape `EpLayout` already uses, which is a prerequisite for §4.5.
 Renaming the field (rather than reusing `al_anchor`) is deliberate: it forces
 every construction site to be revisited, which is what this plan is for.
 
+*As implemented*, `AnnList` lost its type parameter along with `al_rest` and
+`al_trailing`, and `AnnListBrackets` was reduced to `ListBraces` / `ListNone`,
+so the record is now just `al_layout` / `al_brackets` / `al_semis`. That makes
+D3 structurally impossible rather than merely discouraged.
+
 ### 4.2 Derive the layout location from the `vocurly` token, not the contents
 
 *DONE*
@@ -404,7 +419,6 @@ Set `AnnListLayout (glR $1)` at, adding an `AnnList` where none exists today:
 - the type-family `vocurly ty_fam_inst_eqns close` and `vocurly '..' close`
   alternatives (**new**)
 - `cvtopbody` — `[d| ... |]` (**new**)
-- the backpack `vocurly unitdecls close` alternative (**new**)
 - `ifgdpats` — MultiWayIf (**new**; see §4.4)
 
 Set `AnnListBraces` in the corresponding `'{' ... '}'` alternative of each of
@@ -459,15 +473,105 @@ Recommend option 1 for this change and revisiting option 2 separately.
 
 ### 4.6 Preserve the field across transformations
 
-`setAnchorEpaL` in `utils/check-exact/ExactPrint.hs` must stop clearing it:
+`setAnchorEpaL` in `utils/check-exact/ExactPrint.hs` currently reads
 
 ```haskell
-setAnchorEpaL (EpAnn _ an _) anc ts cs = EpAnn anc (setTrailing an ts) cs
+setAnchorEpaL (EpAnn _ an _) anc ts cs = EpAnn anc (setTrailing (an {al_layout = AnnListNoLayout}) ts) cs
 ```
 
-Re-anchoring a node does not change whether it was written with layout. If
-some caller genuinely needs it cleared, that caller should do so explicitly.
+Since `al_trailing` was removed from `AnnList`, the `HasTrailing AnnList`
+instance is `setTrailing a _ = a`, so the `ts` argument is discarded and the
+layout-clearing is the *only* remaining difference from the generic
+`setAnchorEpa`. Delete `setAnchorEpaL` and point its single call site (the
+`HsValBinds` case of `setAnnotationAnchor`) at `setAnchorEpa`.
+
+This matters because `enterAnn` calls `setAnnotationAnchor` on the value
+`exact` has just returned, so the `al_layout = AnnListLayout (EpaDelta ss dp [])`
+that the `HsValBinds` case carefully writes back from `getExtraDPReturn` is
+overwritten with `AnnListNoLayout` a few steps later, in the same traversal.
+Re-anchoring a node does not change whether it was written with layout. If some
+caller genuinely needs it cleared, that caller should do so explicitly.
 (Fixes D7.)
+
+Note this step is subsumed by §4.7: if `HsValBinds` loses its `EpAnn`, its
+`setAnnotationAnchor` becomes the trivial `a _ _ _ = a` case and D7 ceases to
+exist rather than being fixed. It is still worth doing first — it is one line
+and it unblocks §5.2.
+
+### 4.7 Locate `HsLocalBinds`
+
+`XHsValBinds` and `XHsIPBinds` are the last extension points holding an
+`EpAnn AnnList`:
+
+```haskell
+type instance XHsValBinds (GhcPass pL) (GhcPass pR) = (EpAnn AnnList, EpToken "where")
+type instance XHsIPBinds  (GhcPass pL) (GhcPass pR) = (EpAnn AnnList, EpToken "where")
+```
+
+Every other `AnnList` in the tree is now a *bare* `AnnList` in an extension
+point, anchored by the enclosing `GenLocated`: `acd_list` (class), `acid_decls`
+(instance), `andd_list`, `XClosedTypeFamily`, `MatchGroupAnn`, `XRecStmt`.
+That is the target model — the anchor lives in the `x` of `GenLocated x a`, and
+the extension point carries only annotations printed *within* the anchored
+space.
+
+`HsValBinds` is the outlier for a structural reason, not a stylistic one:
+`HsLocalBinds` is never wrapped. `LHsLocalBinds` is defined in
+`compiler/Language/Haskell/Syntax/Binds.hs` but has no uses in `compiler/`, and
+there is no `Anno (HsLocalBinds …)` instance. The three occurrence sites all
+take the unlocated type:
+
+- `grhssLocalBinds :: HsLocalBinds p` in `GRHSs`
+- `HsLet (XLet p) (HsLocalBinds p) …`
+- `HsCmdLet (XCmdLet id) (HsLocalBinds id) …`
+
+So the `EpAnn` in the extension point is doing double duty — supplying the node
+anchor *and* the internal annotations — and
+`getAnnotationEntry (HsValBinds (an,_) _) = fromAnn an` reaches into the
+extension point for an entry precisely because the `GenLocated` layer is
+absent.
+
+**The anchor is largely redundant.** The `where` token carries its own
+`EpaLocation` and is printed first; `al_layout = AnnListLayout <vocurly>` now
+gives the layout column directly (§4.2); each bound decl is an `LHsBind` with
+its own anchor. The redundancy is visible in `setExtraDP`, whose entire job is
+to *override* the first decl's own entry delta with the block anchor — two
+encodings of one position, one overwriting the other.
+
+**What the anchor uniquely provides is a comment store.** `EpAnn`'s
+`EpAnnComments` is where the where-block's comments live; see
+`addCommentsList :: EpAnn AnnList -> …` in `utils/check-exact/Utils.hs`. This
+is why the extension point cannot simply be demoted to a bare `AnnList` with
+`getAnnotationEntry = NoEntryVal` — the comments would have nowhere to go.
+
+**The change.** Use `LHsLocalBinds` at the three occurrence sites above, add
+the `Anno` instance (or its replacement), and reduce the extension points to
+
+```haskell
+type instance XHsValBinds (GhcPass pL) (GhcPass pR) = (AnnList, EpToken "where")
+type instance XHsIPBinds  (GhcPass pL) (GhcPass pR) = (AnnList, EpToken "where")
+```
+
+The anchor and comments move into the `XRec` wrapper, where the rest of the
+tree keeps them. `AnnList` then retains only brackets, semis and layout — all
+printed within the anchored space.
+
+Knock-on sites to revisit, all of which currently thread the `EpAnn`:
+
+- `add_where` / `patch_anchor` / `annBinds` in
+  `compiler/GHC/Parser/PostProcess.hs` — `add_where` exists to repair the
+  *anchor*, so it should disappear entirely with it, finishing D6.
+- `oldWhereAnnotation` / `newWhereAnnotation` in
+  `utils/check-exact/Transform.hs`.
+- `addCommentsList` in `utils/check-exact/Utils.hs`.
+- the `HsValBinds` / `HsIPBinds` cases of `ExactPrint`: `getAnnotationEntry`
+  becomes `NoEntryVal`, `setAnnotationAnchor` becomes trivial, and
+  `markAnnList` / `markAnnListA` take a bare `AnnList`.
+- `annotationAnnListEpAnn` in `compiler/GHC/Hs/Dump.hs`.
+
+This is a `Language.Haskell.Syntax` change touching all three passes, Haddock,
+and every `grhssLocalBinds` consumer. The fallout from locating the binds is
+being handled separately; it is not sized here.
 
 ---
 
@@ -598,15 +702,20 @@ Each step should build and pass tests on its own.
    alternatives. Fixes D2, D3, D4, D5. Expect test output churn.
 3. X Remove `patch_anchor` / simplify `add_where` in
    `compiler/GHC/Parser/PostProcess.hs`. Fixes D6.
-4. Add `AnnListLayout` to the instance / GADT / type-family / decl-quote /
-   backpack bodies. Fixes part of D1.
-5. Stop clearing the field in `setAnchorEpaL`. Fixes D7.
+4. ~ Add `AnnListLayout` to the instance / GADT / type-family / decl-quote
+   bodies. Fixes part of D1.
+   Instance, GADT, type-family and class bodies are done;
+   `cvtopbody` (`[d| ... |]`) and the `stmtlist` fix below DONE.
+   `stmtlist` still derives its location from `stmtsLoc` rather than the
+   `vocurly`, and its explicit-brace alternative still emits `AnnListLayout`
+   alongside `ListBraces` — the step 2 change never reached it.
+5. X Stop clearing the field in `setAnchorEpaL`. Fixes D7.
 6. Move `setLayoutBoth` into the `MatchGroup` exact instance; drop it from
    `HsCase`; add the `setExtraDP` gate. Enables the uniform
    `DifferentLine 1 0` scheme.
-7. *(follow-up)* MultiWayIf: give `XMultiIf GhcPs` an `AnnList`. Completes D1.
+7. X *(follow-up)* MultiWayIf: give `XMultiIf GhcPs` an `AnnList`. Completes D1.
 8. *(follow-up)* Reconcile `EpLayout` per §4.5.
-9. *(follow-up)* Locate `HsLocalBinds` per §4.7, dropping the `EpAnn` from
+9. X *(follow-up)* Locate `HsLocalBinds` per §4.7, dropping the `EpAnn` from
    `XHsValBinds` / `XHsIPBinds`. Removes the last `EpAnn AnnList`, retires
    `add_where` / `patch_anchor`, and subsumes step 5.
 
@@ -615,3 +724,6 @@ AZ Notes:
   occurence of the next non-whitespace token. What are the
   implications?
 - can we use virtual semi colons for anything useful?
+- X Push setLayoutBoth into the AnnList printing, depending on if layout
+    is enabled or not
+
