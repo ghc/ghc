@@ -930,37 +930,55 @@ static Capability * find_capability_for_task(const Task * task)
 #endif /* THREADED_RTS */
 
 /* ----------------------------------------------------------------------------
- * waitForCapability (Capability **pCap, Task *task)
+ * Capability *waitForCapability (Task *task)
  *
- * Purpose:  when an OS thread returns from an external call,
- * it calls waitForCapability() (via Schedule.resumeThread())
- * to wait for permission to enter the RTS & communicate the
- * result of the external call back to the Haskell thread that
- * made it.
+ * Purpose:  when an OS thread returns from an external call, it calls
+ * waitForCapability() (via Schedule.resumeThread()) to wait for
+ * permission to enter the RTS & communicate the result of the external
+ * call back to the Haskell thread that made it. The task must already
+ * be associated with a capability.
  *
- * pCap is strictly an output.
+ * Capability *waitForSomeCapability (Task *task)
  *
+ * Like waitForCapability but the task need not already be associated
+ * with a capability. If it is not associated, an appropriate one will
+ * be chosen. Used in rts_lock(), for calling into the RTS from outside.
  * ------------------------------------------------------------------------- */
 
-void waitForCapability (Capability **pCap, Task *task)
-{
 #if !defined(THREADED_RTS)
-
+Capability *waitForSomeCapability (Task *task)
+{
     MainCapability.running_task = task;
     task->cap = &MainCapability;
-    *pCap = &MainCapability;
+    return &MainCapability;
+}
+
+void waitForCapability (Task *task)
+{
+    waitForSomeCapability(task);
+}
 
 #else
-    Capability *cap = *pCap;
 
+Capability *waitForSomeCapability (Task *task)
+{
+    Capability *cap = task->cap;
     if (cap == NULL) {
         cap = find_capability_for_task(task);
 
         // record the Capability as the one this Task is now associated with.
         task->cap = cap;
-    } else {
-        ASSERT(task->cap == cap);
     }
+
+    waitForCapability(task);
+
+    return task->cap;
+}
+
+void waitForCapability (Task *task)
+{
+    Capability *cap = task->cap;
+    ASSERT(task->cap);
 
     debugTrace(DEBUG_sched, "returning; I want capability %d", cap->no);
 
@@ -982,10 +1000,8 @@ void waitForCapability (Capability **pCap, Task *task)
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap, task);
 
     debugTrace(DEBUG_sched, "resuming capability %d", cap->no);
-
-    *pCap = cap;
-#endif
 }
+#endif
 
 /* ----------------------------------------------------------------------------
  * yieldCapability
@@ -1252,7 +1268,7 @@ void resetSync (void)
 #if defined(THREADED_RTS)
 void acquireAllCapabilities(Capability *cap, Task *task)
 {
-    Capability *tmpcap;
+    Capability *tmpcap = NULL;
     uint32_t i;
 
     ASSERT(SEQ_CST_LOAD(&pending_sync) != NULL);
@@ -1267,12 +1283,13 @@ void acquireAllCapabilities(Capability *cap, Task *task)
             // all the Capabilities, but even so it's a slightly
             // unsavoury invariant.
             task->cap = tmpcap;
-            waitForCapability(&tmpcap, task);
+            waitForCapability(task);
             if (tmpcap->no != i) {
                 barf("acquireAllCapabilities: got the wrong capability");
             }
         }
     }
+    ASSERT(tmpcap != NULL);
     task->cap = cap == NULL ? tmpcap : cap;
 }
 #endif
