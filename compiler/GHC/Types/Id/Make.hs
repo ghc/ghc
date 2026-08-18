@@ -1849,11 +1849,10 @@ mkDictFunId :: Name      -- Name to use for the dict fun;
 -- See Note [Dict funs and default methods]
 
 mkDictFunId dfun_name tvs theta clas tys
-  = mkExportedLocalId (DFunId is_nt)
+  = mkExportedLocalId (mkDFunIdDetails clas)
                       dfun_name
                       dfun_ty
   where
-    is_nt = isNewTyCon (classTyCon clas)
     dfun_ty = TcType.tcMkDFunSigmaTy tvs theta (mkClassPred clas tys)
 
 {-

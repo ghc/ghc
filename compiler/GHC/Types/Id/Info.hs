@@ -20,6 +20,7 @@ Haskell. [WDP 94/11])
 module GHC.Types.Id.Info (
         -- * The IdDetails type
         IdDetails(..), pprIdDetails, coVarDetails, isCoVarDetails,
+        mkDFunIdDetails,
         JoinArity, isJoinIdDetails_maybe,
         RecSelParent(..), recSelParentName, recSelFirstConName,
         recSelParentCons, idDetailsConcreteTvs,
@@ -201,9 +202,8 @@ data IdDetails
   | TickBoxOpId TickBoxOp       -- ^ The 'Id' is for a HPC tick box (both traditional and binary)
 
   | DFunId Bool                 -- ^ A dictionary function.
-       -- Bool = True <=> the class has only one method, so may be
-       --                  implemented with a newtype, so it might be bad
-       --                  to be strict on this dictionary
+       -- Bool = True <=> a dictionary of this class cannot be bottom
+       -- See Note [NON-BOTTOM-DICTS invariant] in GHC.Core
 
   | CoVarId    -- ^ A coercion variable
                -- This only covers /un-lifted/ coercions, of type
@@ -372,6 +372,9 @@ isJoinIdDetails_maybe :: IdDetails -> Maybe (JoinArity, (Maybe [CbvMark]))
 isJoinIdDetails_maybe (JoinId join_arity marks) = Just (join_arity, marks)
 isJoinIdDetails_maybe _                   = Nothing
 
+mkDFunIdDetails :: Class -> IdDetails
+mkDFunIdDetails cls = DFunId (isTerminatingTyCon (classTyCon cls))
+
 instance Outputable IdDetails where
     ppr = pprIdDetails
 
@@ -388,7 +391,8 @@ pprIdDetails other     = brackets (pp other)
    pp (PrimOpId {})           = text "PrimOp"
    pp (FCallId _)             = text "ForeignCall"
    pp (TickBoxOpId _)         = text "TickBoxOp"
-   pp (DFunId nt)             = text "DFunId" <> ppWhen nt (text "(nt)")
+   pp (DFunId terminating)    = text "DFunId"
+                                <> ppWhen (not terminating) (text "(may-be-bottom)")
    pp (RecSelId { sel_naughty = is_naughty })
                               = brackets $ text "RecSel" <>
                                            ppWhen is_naughty (text "(naughty)")

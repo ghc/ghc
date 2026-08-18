@@ -1934,7 +1934,7 @@ app_ok fun_ok primop_ok fun args
 
   | otherwise
   = case idDetails fun of
-      DFunId new_type -> not new_type
+      DFunId terminating -> terminating
          -- DFuns terminate, unless the dict is implemented
          -- with a newtype in which case they may not
 
