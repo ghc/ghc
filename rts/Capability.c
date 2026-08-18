@@ -560,7 +560,7 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
 #endif
 
 /* ----------------------------------------------------------------------------
- * releaseCapability_
+ * releaseCapability and releaseCapability_
  *
  * This serves two purposes:
  *
@@ -570,32 +570,56 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
  *
  * 2. There is no current task (cap->task == NULL), and thus the Capability
  *    is idle, and we want to wake up an idle Task to animate the Capability.
- *    In this case set always_wakeup. See also prodCapability.
+ *    See also prodCapability.
  *
- * Setting the always_wakeup parameter (almost) ensures that the capability is
- * not left idle: even if there is no known work to do, the capability will be
- * given to a worker task. There are two exceptions to this:
- *  1. if there is a pending sync then the capability is left idle, but in
- *     anticipation of whichever task initiated the sync picking it up shortly.
- *  2. if the scheduler is shutting down and there are no threads on the run
- *     queue and there are no spare workers then the capability is left idle.
- *     It is not entirely clear if this corner case is intentional.
- *
- * The caller must hold cap->lock and will still hold it after the call returns.
+ * Difference:
+ * - releaseCapability  the caller /must not/ hold cap->lock.
+ * - releaseCapability_ the caller /must/ hold cap->lock.
  *
  * N.B. May need to take all_tasks_mutex, if it needs to start a new task.
  *
  * ------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
-void
-releaseCapability_ (Capability* cap,
-                    bool always_wakeup)
+static void releaseCapability__ (Capability* cap,
+                                 bool always_wakeup);
+
+void releaseCapability (Capability* cap)
+{
+    ACQUIRE_LOCK(&cap->lock);
+    releaseCapability__(cap, false /*always_wakeup*/);
+    RELEASE_LOCK(&cap->lock);
+}
+
+void releaseCapability_ (Capability* cap)
+{
+    releaseCapability__(cap, false /*always_wakeup*/);
+}
+
+/* The fact that we need an always_wakeup parameter for releaseCapability__ is
+ * a design wart. The Capability layer knows about most but not all sources of
+ * work for a capability. The always_wakeup parameter is there to account for
+ * the ones it does /not/ know about (which is I/O manager stuff: I/O, timers
+ * & signals).
+ *
+ * There are two sane designs:
+ * 1. the Capability layer knows nothing about the sources of work that the
+ *    scheduler might want to do
+ * 2. the Capability layer knows *everything* about the sources of work.
+ *
+ * In neither sane design would we need this parameter. In the first design we
+ * would know externally if we should be waking or releasing a task and would
+ * instruct accordingly (probably by splitting releaseCapability to cover the
+ * two cases). In the second design, it would simply know about all the sources
+ * and so again there would be no need.
+ */
+
+static void releaseCapability__ (Capability* cap,
+                                 bool always_wakeup)
 {
     {
         Task *task = cap->running_task;
 
-        ASSERT(task || always_wakeup);
         // To cover purpose 2 above, we allow the cap->running_task to be
         // NULL, to handle cases where a thread (that is not itself a Task)
         // needs to wake up an idle task for the capability.
@@ -709,22 +733,6 @@ releaseCapability_ (Capability* cap,
     debugTrace(DEBUG_sched, "freeing capability %d", cap->no);
 }
 
-void
-releaseCapability (Capability* cap)
-{
-    ACQUIRE_LOCK(&cap->lock);
-    releaseCapability_(cap, false);
-    RELEASE_LOCK(&cap->lock);
-}
-
-void
-releaseAndWakeupCapability (Capability* cap)
-{
-    ACQUIRE_LOCK(&cap->lock);
-    releaseCapability_(cap, true);
-    RELEASE_LOCK(&cap->lock);
-}
-
 static void
 enqueueWorker (Capability* cap)
 {
@@ -747,7 +755,7 @@ enqueueWorker (Capability* cap)
     {
         debugTrace(DEBUG_sched, "%d spare workers already, exiting",
                    cap->n_spare_workers);
-        releaseCapability_(cap,false);
+        releaseCapability_(cap);
         // hold the lock until after workerTaskStop; c.f. scheduleWorker()
         workerTaskStop(task);
         RELEASE_LOCK(&cap->lock);
@@ -1131,7 +1139,7 @@ yieldCapability
         enqueueWorker(cap);
     }
 
-    releaseCapability_(cap, false);
+    releaseCapability_(cap);
 
     if (isWorker(task) || isBoundTask(task)) {
         RELEASE_LOCK(&cap->lock);
@@ -1402,7 +1410,13 @@ prodCapability (Capability *cap)
 {
     ACQUIRE_LOCK(&cap->lock);
     if (!cap->running_task) {
-        releaseCapability_(cap,true);
+        /* We have to use always_wakeup here because when prodCapability is
+         * used for ctl-c, releaseCapability__ does not know about pending
+         * signals (or the I/O managers generally) as one of the set of
+         * conditions to look for when deciding if a Task should be woken up
+         * to run the Capability. This is a bit of a design wart.
+         */
+        releaseCapability__(cap, true /*always_wakeup*/);
     }
     RELEASE_LOCK(&cap->lock);
 }
@@ -1523,7 +1537,7 @@ shutdownCapability (Capability *cap USED_IF_THREADS,
         if (!emptyRunQueue(cap) || cap->spare_workers) {
             debugTrace(DEBUG_sched,
                        "runnable threads or workers still alive, yielding");
-            releaseCapability_(cap,false); // this will wake up a worker
+            releaseCapability_(cap); // this will wake up a worker
             RELEASE_LOCK(&cap->lock);
             yieldThread();
             continue;

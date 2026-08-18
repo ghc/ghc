@@ -837,13 +837,9 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
         // release the capabilities
         for (i = 0; i < n_free_caps; i++) {
             task->cap = free_caps[i];
-            if (sparkPoolSizeCap(cap) > 0) {
-                // If we have sparks to steal, wake up a worker on the
-                // capability, even if it has no threads to run.
-                releaseAndWakeupCapability(free_caps[i]);
-            } else {
-                releaseCapability(free_caps[i]);
-            }
+            // If there are sparks available, this will wake up a Task to run
+            // the Capability, even if it has no threads to run.
+            releaseCapability(free_caps[i]);
         }
     }
     task->cap = cap; // reset to point to our Capability.
@@ -1905,7 +1901,7 @@ forkProcess(HsStablePtr *entry
 #endif
 
         for (i=0; i < n_capabilities; i++) {
-            releaseCapability_(getCapability(i),false);
+            releaseCapability_(getCapability(i));
             RELEASE_LOCK(&getCapability(i)->lock);
         }
 
@@ -2320,7 +2316,7 @@ suspendThread (StgRegTable *reg, bool interruptible)
 
   suspendTask(cap,task);
   cap->in_haskell = false;
-  releaseCapability_(cap,false);
+  releaseCapability_(cap);
 
   RELEASE_LOCK(&cap->lock);
 
@@ -2513,7 +2509,7 @@ void scheduleWorker (Capability *cap, Task *task)
     // Capability has been shut down.
     //
     ACQUIRE_LOCK(&cap->lock);
-    releaseCapability_(cap,false);
+    releaseCapability_(cap);
     workerTaskStop(task);
     RELEASE_LOCK(&cap->lock);
 }
