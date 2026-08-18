@@ -153,11 +153,6 @@ rs :: SrcSpan -> RealSrcSpan
 rs (RealSrcSpan s _) = s
 rs _ = badRealSrcSpan
 
-range2rs :: (Pos,Pos) -> RealSrcSpan
-range2rs (s,e) = mkRealSrcSpan (mkLoc s) (mkLoc e)
-  where
-    mkLoc (l,c) = mkRealSrcLoc (fsLit "ghc-exactprint") l c
-
 badRealSrcSpan :: RealSrcSpan
 badRealSrcSpan = mkRealSrcSpan bad bad
   where
@@ -171,12 +166,6 @@ spanLength = (-) <$> srcSpanEndCol <*> srcSpanStartCol
 eloc2str :: EpaLocation -> String
 eloc2str (EpaSpan r) = "EpaSpan " ++ show (ss2range r)
 eloc2str epaLoc = show epaLoc
-
--- ---------------------------------------------------------------------
--- | Checks whether a SrcSpan has zero length.
-isPointSrcSpan :: RealSrcSpan -> Bool
-isPointSrcSpan ss = spanLength ss == 0
-                  && srcSpanStartLine ss == srcSpanEndLine ss
 
 -- ---------------------------------------------------------------------
 
