@@ -1927,87 +1927,131 @@ long as the callee might evaluate it. And if it is evaluated on
 most code paths anyway, we get to turn the unknown eval in the
 callee into a known call at the call site.
 
-Very Nasty Wrinkle
+(SEV1) There is a very nasty wrinkle: we must be very careful not to speculate
+       recursive calls!  Doing so might well change termination behavior.
 
-We must be very careful not to speculate recursive calls!  Doing so
-might well change termination behavior.
+       That comes up in practice for DFuns, which are considered ok-for-spec,
+       because they always immediately return a constructor.
+       See Note [NON-BOTTOM-DICTS invariant] in GHC.Core.
 
-That comes up in practice for DFuns, which are considered ok-for-spec,
-because they always immediately return a constructor.
-See Note [NON-BOTTOM-DICTS invariant] in GHC.Core.
+       But not so if you speculate the recursive call, as #20836 shows:
 
-But not so if you speculate the recursive call, as #20836 shows:
+         class Foo m => Foo m where
+           runFoo :: m a -> m a
+         newtype Trans m a = Trans { runTrans :: m a }
+         instance Monad m => Foo (Trans m) where
+           runFoo = id
 
-  class Foo m => Foo m where
-    runFoo :: m a -> m a
-  newtype Trans m a = Trans { runTrans :: m a }
-  instance Monad m => Foo (Trans m) where
-    runFoo = id
+       (NB: class Foo m => Foo m` looks weird and needs -XUndecidableSuperClasses. The
+       example in #20836 is more compelling, but boils down to the same thing.)
+       This program compiles to the following DFun for the `Trans` instance:
 
-(NB: class Foo m => Foo m` looks weird and needs -XUndecidableSuperClasses. The
-example in #20836 is more compelling, but boils down to the same thing.)
-This program compiles to the following DFun for the `Trans` instance:
+         Rec {
+         $fFooTrans
+           = \ @m $dMonad -> C:Foo ($fFooTrans $dMonad) (\ @a -> id)
+         end Rec }
 
-  Rec {
-  $fFooTrans
-    = \ @m $dMonad -> C:Foo ($fFooTrans $dMonad) (\ @a -> id)
-  end Rec }
+       Note that the DFun immediately terminates and produces a dictionary, just
+       like DFuns ought to, but it calls itself recursively to produce the `Foo m`
+       dictionary. But alas, if we treat `$fFooTrans` as always-terminating, so
+       that we can speculate its calls, and hence use call-by-value, we get:
 
-Note that the DFun immediately terminates and produces a dictionary, just
-like DFuns ought to, but it calls itself recursively to produce the `Foo m`
-dictionary. But alas, if we treat `$fFooTrans` as always-terminating, so
-that we can speculate its calls, and hence use call-by-value, we get:
+         $fFooTrans
+           = \ @m $dMonad -> case ($fFooTrans $dMonad) of sc ->
+                             C:Foo sc (\ @a -> id)
 
-  $fFooTrans
-    = \ @m $dMonad -> case ($fFooTrans $dMonad) of sc ->
-                      C:Foo sc (\ @a -> id)
+       and that's an infinite loop!
+       Note that this bad-ness only happens in `$fFooTrans`'s own RHS. In the
+       *body* of the letrec, it's absolutely fine to use call-by-value on
+       `foo ($fFooTrans d)`.
 
-and that's an infinite loop!
-Note that this bad-ness only happens in `$fFooTrans`'s own RHS. In the
-*body* of the letrec, it's absolutely fine to use call-by-value on
-`foo ($fFooTrans d)`.
+       Our solution is this: we track in cpe_rec_ids the set of enclosing
+       recursively-bound Ids, the RHSs of which we are currently transforming and then
+       in 'exprOkForSpecEval' (a special entry point to 'exprOkForSpeculation',
+       basically) we'll say that any binder in this set is not ok-for-spec.
 
-Our solution is this: we track in cpe_rec_ids the set of enclosing
-recursively-bound Ids, the RHSs of which we are currently transforming and then
-in 'exprOkForSpecEval' (a special entry point to 'exprOkForSpeculation',
-basically) we'll say that any binder in this set is not ok-for-spec.
+       Note if we have a letrec group `Rec { f1 = rhs1; ...; fn = rhsn }`, and we
+       prep up `rhs1`, we have to include not only `f1`, but all binders of the group
+       `f1..fn` in this set, otherwise our fix is not robust wrt. mutual recursive
+       DFuns.
 
-Note if we have a letrec group `Rec { f1 = rhs1; ...; fn = rhsn }`, and we
-prep up `rhs1`, we have to include not only `f1`, but all binders of the group
-`f1..fn` in this set, otherwise our fix is not robust wrt. mutual recursive
-DFuns.
+       NB: If at some point we decide to have a termination analysis for general
+       functions (#8655, !1866), we need to take similar precautions for (guarded)
+       recursive functions:
 
-NB: If at some point we decide to have a termination analysis for general
-functions (#8655, !1866), we need to take similar precautions for (guarded)
-recursive functions:
+         repeat x = x : repeat x
 
-  repeat x = x : repeat x
+       Same problem here: As written, repeat evaluates rapidly to WHNF. So `repeat x`
+       is a cheap call that we are willing to speculate, but *not* in repeat's RHS.
+       Fortunately, pce_rec_ids already has all the information we need in that case.
 
-Same problem here: As written, repeat evaluates rapidly to WHNF. So `repeat x`
-is a cheap call that we are willing to speculate, but *not* in repeat's RHS.
-Fortunately, pce_rec_ids already has all the information we need in that case.
+       The problem is very similar to Note [Eta reduction in recursive RHSs].
+       Here as well as there it is *unsound* to change the termination properties
+       of the very function whose termination properties we are exploiting.
 
-The problem is very similar to Note [Eta reduction in recursive RHSs].
-Here as well as there it is *unsound* to change the termination properties
-of the very function whose termination properties we are exploiting.
+       It is also similar to Note [Do not strictify a DFun's parameter dictionaries],
+       where marking recursive DFuns (of undecidable *instances*) strict in dictionary
+       *parameters* leads to quite the same change in termination as above.
 
-It is also similar to Note [Do not strictify a DFun's parameter dictionaries],
-where marking recursive DFuns (of undecidable *instances*) strict in dictionary
-*parameters* leads to quite the same change in termination as above.
+(SEV2) The situation in (SEV1) can cross modules.  `cpe_rec_ids` is module-local,
+       so it does not catch a recursion that goes through an hs-boot import.
+       Suppose Mid and Callee form a module loop, and Mid sees Callee through its
+       hs-boot file:
 
-Belt and braces: do not speculate absent bindings
+         -- Mid.hs
+         $fCAT = \ @a $dCB -> C:CA ($fxCBT $dCB) ...
+         -- Callee.hs
+         $fCBT = \ @a $dCB -> C:CB ($fCAT  $dCB) ...
 
-In 'decideFloatInfo' we decline to speculate a binding whose demand is absent.
-There is no point in speculating an absent binding, since its value is
-(presumably) not needed.
+       Neither module can see that these two call each other, so each looks
+       non-recursive, and we speculate the inner call in both:
 
-This used to matter more. Worker/wrapper would bind an absent dictionary to a
-rubbish literal filler, and speculation could force a superclass selection out
-of that rubbish literal, causing a segfault (#25924). Nowadays we never make a
-filler for a dictionary in the first place, so this can no longer happen and
-the guard is merely belt and braces.
-See Note [Don't make fillers for constraint types]
-in GHC.Core.Opt.WorkWrap.Utils.
+         $fCAT = \ @a $dCB -> case $fxCBT $dCB of s { __DEFAULT -> C:CA s ... }
+         $fCBT = \ @a $dCB -> case $fCAT  $dCB of s { __DEFAULT -> C:CB s ... }
+
+       Now each forces the other and the program loops. Such a cycle must cross an
+       hs-boot edge, so we do not speculate a call whose callee has a BootUnfolding.
+       Note [Inlining and hs-boot files] in GHC.CoreToIface does the same for
+       infinite inlining.
+
+(SEV3) Belt and braces: do not speculate absent bindings.
+
+       In 'decideFloatInfo' we decline to speculate a binding whose demand is
+       absent.  There is no point in speculating an absent binding, since its
+       value is (presumably) not needed.
+
+       This used to matter more. Worker/wrapper would bind an absent dictionary
+       to a rubbish literal filler, and speculation could force a superclass
+       selection out of that rubbish literal, causing a segfault (#25924).
+       Nowadays we never make a filler for a dictionary in the first place, so
+       this can no longer happen and the guard is merely belt and braces.
+       See Note [Don't make fillers for constraint types]
+       in GHC.Core.Opt.WorkWrap.Utils.
+
+Note [Controlling Speculative Evaluation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Most of the time, speculative evaluation in the coreprep phase has a positive
+effect on performance, however we have found that some forms of speculative
+evaluation can lead to large performance regressions. See #25284.
+
+Therefore we have some flags to control which types of speculative evaluation
+are done:
+
+  -fspec-eval
+     Globally enable/disable speculative evaluation ( -fno-spec-eval also turns
+     off all other speculative evaluation). On by default for all
+     optimization levels. Turning on this flag by itself should never cause
+     a performance regression. Please open a ticket if you find any.
+
+  -fspec-eval-dictfun
+     Enable speculative evaluation for dictionary functions. Off by default
+     since it can cause an increase in allocations (#24284). We have no
+     examples that show a large performance improvement when turning on this
+     flag. Please open a ticket if you find any.
+
+Also see the optimization section in the User's Guide for the description of
+these flags and when to use them.
 
 Note [BindInfo and FloatInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2064,31 +2108,6 @@ conceptually.
 
 See also Note [Floats and FloatDecision] for how we maintain whole groups of
 floats and how far they go.
-
-Note [Controlling Speculative Evaluation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Most of the time, speculative evaluation in the coreprep phase has a positive
-effect on performance, however we have found that some forms of speculative
-evaluation can lead to large performance regressions. See #25284.
-
-Therefore we have some flags to control which types of speculative evaluation
-are done:
-
-  -fspec-eval
-     Globally enable/disable speculative evaluation ( -fno-spec-eval also turns
-     off all other speculative evaluation). On by default for all
-     optimization levels. Turning on this flag by itself should never cause
-     a performance regression. Please open a ticket if you find any.
-
-  -fspec-eval-dictfun
-     Enable speculative evaluation for dictionary functions. Off by default
-     since it can cause an increase in allocations (#24284). We have no
-     examples that show a large performance improvement when turning on this
-     flag. Please open a ticket if you find any.
-
-Also see the optimization section in the User's Guide for the description of
-these flags and when to use them.
 
 Note [Floats and FloatDecision]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2268,7 +2287,7 @@ decideFloatInfo FIA{fia_levity=lev, fia_demand=dmd, fia_is_hnf=is_hnf,
   | ok_for_spec
   , not (isAbsDmd dmd)    = (CaseBound, case lev of Unlifted -> LazyContextFloatable
                                                     Lifted   -> TopLvlFloatable)
-      -- See Note [Speculative evaluation]
+      -- See Note [Speculative evaluation], and (SEV3) for isAbsDmd
       -- Ok-for-spec-eval things will be case-bound, lifted or not.
       -- But when it's lifted we are ok with floating it to top-level
       -- (where it is actually bound lazily).
@@ -2320,11 +2339,18 @@ mkNonRecFloat env lev bndr rhs
     ok_for_spec = exprOkForSpecEval call_ok_for_spec rhs
     -- See Note [Controlling Speculative Evaluation]
     call_ok_for_spec x
-      | is_rec_call x                           = False
-      | not (cp_specEval cfg)                   = False
-      | not (cp_specEvalDFun cfg) && isDFunId x = False
+      -- See Note [Speculative evaluation]
+      | is_rec_call x                           = False  -- See (SEV1)
+      | is_boot_call x                          = False  -- See (SEV2)
+
+      -- See [Controlling speculative evaluation]
+      | not (cp_specEval cfg)                   = False  -- Flag -fspec-eval
+      | not (cp_specEvalDFun cfg) && isDFunId x = False  -- Flag -fspec-eval-dictfun
+
       | otherwise                               = True
-    is_rec_call = (`elemUnVarSet` cpe_rec_ids env)
+    is_rec_call  = (`elemUnVarSet` cpe_rec_ids env)
+    is_boot_call = isBootUnfolding . realIdUnfolding
+      -- See Note [Speculative evaluation], Very Nasty Wrinkle
 
     -- See Note [Pin evaluatedness on floats]
     bndr' | is_hnf    = bndr `setIdUnfolding` evaldUnfolding
