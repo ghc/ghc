@@ -573,6 +573,17 @@ Wrinkle (NBD1)
   say that /all/ unary-class constraints might diverge.  Remember, almost all
   classes are non-unary, and thus definitely non-bottom.
 
+Wrinkle (NBD2)
+  A class declared in an hs-boot file is an AbstractTyCon inside the module
+  loop:
+      module Callee where { class UC (a :: Type) }                -- Callee.hs-boot
+      module Callee where { class UC a where { ucm :: a -> a } }  -- Callee.hs
+  isUnaryClassTyCon returns False for it, but compiling the real declaration
+  may reveal a UnaryClassTyCon, whose dictionary is `ucm` and can be bottom.
+
+  Speculating a superclass selection from such a dictionary crashes (#27704).
+  So we must treat an AbstractTyCon as possibly unary.
+
 Note [Case expression invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Case expressions are one of the more complicated elements of the Core
