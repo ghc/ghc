@@ -48,7 +48,7 @@ void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
     recordClosureMutated(from_cap,(StgClosure*)msg);
 
     if (to_cap->running_task == NULL) {
-        releaseCapability_(to_cap, false);
+        releaseCapability_(to_cap);
     } else {
         interruptCapability(to_cap);
     }

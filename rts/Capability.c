@@ -560,7 +560,7 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
 #endif
 
 /* ----------------------------------------------------------------------------
- * releaseCapability_
+ * releaseCapability and releaseCapability_
  *
  * This serves two purposes:
  *
@@ -570,6 +570,11 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
  *
  * 2. There is no current task (cap->task == NULL), and thus the Capability
  *    is idle, and we want to wake up an idle Task to animate the Capability.
+ *    See also prodCapability.
+ *
+ * Difference:
+ * - releaseCapability  the caller /must not/ hold cap->lock.
+ * - releaseCapability_ the caller /must/ hold cap->lock.
  *
  * N.B. May need to take all_tasks_mutex, if it needs to start a new task.
  *
@@ -577,8 +582,7 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
 
 #if defined(THREADED_RTS)
 void
-releaseCapability_ (Capability* cap,
-                    bool always_wakeup)
+releaseCapability_ (Capability* cap)
 {
     {
         Task *task = cap->running_task;
@@ -683,8 +687,7 @@ releaseCapability_ (Capability* cap,
     // We also check the cap->interrupt flag to avoid a race condition.
     // See Note [prodCapability reliability].
     //
-    if (always_wakeup ||
-        !emptyRunQueue(cap) || !emptyInbox(cap) || cap->interrupt ||
+    if (!emptyRunQueue(cap) || !emptyInbox(cap) || cap->interrupt ||
         (!cap->disabled && !emptySparkPoolCap(cap)) || globalWorkToDo()) {
         if (cap->spare_workers) {
             giveCapabilityToTask(cap, cap->spare_workers);
@@ -704,7 +707,7 @@ void
 releaseCapability (Capability* cap)
 {
     ACQUIRE_LOCK(&cap->lock);
-    releaseCapability_(cap, false);
+    releaseCapability_(cap);
     RELEASE_LOCK(&cap->lock);
 }
 
@@ -730,7 +733,7 @@ enqueueWorker (Capability* cap)
     {
         debugTrace(DEBUG_sched, "%d spare workers already, exiting",
                    cap->n_spare_workers);
-        releaseCapability_(cap,false);
+        releaseCapability_(cap);
         // hold the lock until after workerTaskStop; c.f. scheduleWorker()
         workerTaskStop(task);
         RELEASE_LOCK(&cap->lock);
@@ -1114,7 +1117,7 @@ yieldCapability
         enqueueWorker(cap);
     }
 
-    releaseCapability_(cap, false);
+    releaseCapability_(cap);
 
     if (isWorker(task) || isBoundTask(task)) {
         RELEASE_LOCK(&cap->lock);
@@ -1428,7 +1431,7 @@ prodCapability (Capability *cap)
          * cap is given to a task. See Note [prodCapability reliability].
          */
         interruptCapability(cap);
-        releaseCapability_(cap, false);
+        releaseCapability_(cap);
     }
     /* Notice that we use interruptCapability either way, but for different
      * reasons */
@@ -1551,7 +1554,7 @@ shutdownCapability (Capability *cap USED_IF_THREADS,
         if (!emptyRunQueue(cap) || cap->spare_workers) {
             debugTrace(DEBUG_sched,
                        "runnable threads or workers still alive, yielding");
-            releaseCapability_(cap,false); // this will wake up a worker
+            releaseCapability_(cap); // this will wake up a worker
             RELEASE_LOCK(&cap->lock);
             yieldThread();
             continue;

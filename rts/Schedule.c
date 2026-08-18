@@ -1902,7 +1902,7 @@ forkProcess(HsStablePtr *entry
 #endif
 
         for (i=0; i < n_capabilities; i++) {
-            releaseCapability_(getCapability(i),false);
+            releaseCapability_(getCapability(i));
             RELEASE_LOCK(&getCapability(i)->lock);
         }
 
@@ -2317,7 +2317,7 @@ suspendThread (StgRegTable *reg, bool interruptible)
 
   suspendTask(cap,task);
   cap->in_haskell = false;
-  releaseCapability_(cap,false);
+  releaseCapability_(cap);
 
   RELEASE_LOCK(&cap->lock);
 
@@ -2510,7 +2510,7 @@ void scheduleWorker (Capability *cap, Task *task)
     // Capability has been shut down.
     //
     ACQUIRE_LOCK(&cap->lock);
-    releaseCapability_(cap,false);
+    releaseCapability_(cap);
     workerTaskStop(task);
     RELEASE_LOCK(&cap->lock);
 }
