@@ -72,7 +72,6 @@ import GHC.Core.Unfold.Make
 import GHC.Core.Lint
 import GHC.Core.Make
 import GHC.Core.Class
-import GHC.Core.Predicate( isUnaryClass )
 import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
@@ -1802,7 +1801,7 @@ tcIfaceDataAlt mult con inst_tys arg_strs rhs
 tcIdDetails :: Name -> Type -> IfaceIdDetails -> IfL IdDetails
 tcIdDetails _ _  IfVanillaId           = return VanillaId
 tcIdDetails _ _  (IfWorkerLikeId dmds) = return $ WorkerLikeId dmds
-tcIdDetails _ ty IfDFunId              = return (DFunId (isUnaryClass cls))
+tcIdDetails _ ty IfDFunId              = return (mkDFunIdDetails cls)
   where
     (_, _, cls, _) = tcSplitDFunTy ty
 
