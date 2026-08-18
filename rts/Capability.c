@@ -1277,16 +1277,12 @@ void acquireAllCapabilities(Capability *cap, Task *task)
                    i, getNumCapabilities());
         tmpcap = getCapability(i);
         if (tmpcap != cap) {
-            // we better hope this task doesn't get migrated to
-            // another Capability while we're waiting for this one.
-            // It won't, because load balancing happens while we have
-            // all the Capabilities, but even so it's a slightly
-            // unsavoury invariant.
             task->cap = tmpcap;
             waitForCapability(task);
-            if (tmpcap->no != i) {
-                barf("acquireAllCapabilities: got the wrong capability");
-            }
+
+            // Note that waitForCapability only waits for the capability
+            // the task is associated with. There's no task migration here.
+            ASSERT(task->cap == tmpcap);
         }
     }
     ASSERT(tmpcap != NULL);
