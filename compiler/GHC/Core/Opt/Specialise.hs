@@ -20,13 +20,12 @@ import GHC.Core.Multiplicity
 import GHC.Core.SimpleOpt( defaultSimpleOpts, simpleOptExprWith )
 import GHC.Core.Predicate
 import GHC.Core.Coercion( Coercion )
-import GHC.Core.DataCon ( StrictnessMark (..) )
-import GHC.Core.Opt.Monad
+import GHC.Core.DataCon (dataConTyCon)
 
 import qualified GHC.Core.Subst as Core
 import GHC.Core.Unfold.Make
 import GHC.Core
-import GHC.Core.Opt.WorkWrap.Utils ( mkAbsentFiller )
+import GHC.Core.Make      ( wrapFloats )
 import GHC.Core.Unify     ( tcMatchTy )
 import GHC.Core.Rules
 import GHC.Core.Utils     ( exprIsTrivial, exprIsTopLevelBindable
@@ -70,6 +69,7 @@ import GHC.Core.Unfold
 import Data.List( partition )
 import Data.List.NonEmpty ( NonEmpty (..) )
 import GHC.Core.Subst (substTickish)
+import GHC.Core.Opt.Monad
 
 {-
 ************************************************************************
@@ -1713,7 +1713,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
 
            ; ( useful, rhs_env2, leftover_bndrs
              , rule_bndrs, rule_lhs_args
-             , spec_bndrs1, dx_binds, spec_args) <- specHeader this_mod env rhs_bndrs all_call_args
+             , spec_bndrs1, dx_binds, spec_args) <- specHeader env rhs_bndrs all_call_args
 
 --           ; pprTrace "spec_call" (vcat
 --                [ text "fun:       "  <+> ppr fn
@@ -2014,49 +2014,22 @@ In the rule, d1 and d2 are just wildcards, not used in the RHS.  Note
 additionally that 'x' isn't captured by this rule --- we bind only
 enough etas in order to capture all of the *specialised* arguments.
 
-Note [Drop dead args from specialisations]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When specialising a function, it’s possible some of the arguments may
-actually be dead. For example, consider:
+Note [Do not drop dead args from specialisations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When specialising a function, some of its arguments may be dead. For example
 
     f :: forall a. () -> Show a => a -> String
     f x y = show y ++ "!"
 
-We might generate the following CallInfo for `f @Int`:
+gives the CallInfo [SpecType Int, UnspecArg, SpecDict $dShowInt, UnspecArg]
+for `f @Int`, in which `x` is dead. We used to drop such an argument from the
+specialisation and pass an absent filler in its place.
 
-    [SpecType Int, UnspecArg, SpecDict $dShowInt, UnspecArg]
-
-Normally we’d include both the x and y arguments in the
-specialisation, since we’re not specialising on either of them. But
-that’s silly, since x is actually unused! So we might as well drop it
-in the specialisation:
-
-    $sf :: Int -> String
-    $sf y = show y ++ "!"
-
-    {-# RULE "SPEC f @Int" forall x. f @Int x $dShow = $sf #-}
-
-This doesn’t save us much, since the arg would be removed later by
-worker/wrapper, anyway, but it’s easy to do.
-
-Wrinkles
-
-* Note that we only drop dead arguments if:
-    1. We don’t specialise on them.
-    2. They come before an argument we do specialise on.
-  Doing the latter would require eta-expanding the RULE, which could
-  make it match less often, so it’s not worth it. Doing the former could
-  be more useful --- it would stop us from generating pointless
-  specialisations --- but it’s more involved to implement and unclear if
-  it actually provides much benefit in practice.
-
-* If the function has a stable unfolding, specHeader has to come up with
-  arguments to pass to that stable unfolding, when building the stable
-  unfolding of the specialised function: this is the last field in specHeader's
-  big result tuple.
-
-  The right thing to do is to produce a LitRubbish; it should rapidly
-  disappear.  Rather like GHC.Core.Opt.WorkWrap.Utils.mk_absent_let.
+We no longer do so, because the filler is applied to the function's stable
+unfolding template rather than to its optimised RHS, and the two may differ:
+the argument can be dead in the RHS and not in the template. The specialised
+function's unfolding then contains the filler, and any call site that inlines
+it evaluates the error thunk. See #27703 for an instance of how this goes wrong.
 
 Note [Specialisation modulo dictionary selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2121,8 +2094,7 @@ since we’ll generate a RULE like
     RULE "SPEC f @Int" forall x [Occ=Dead].
       f @Int x $dShow = $sf
 
-and Core Lint complains, even though x only appears on the LHS (due to
-Note [Drop dead args from specialisations]).
+and Core Lint complains, even though x only appears on the LHS.
 
 Why is that a Lint error? Because the arguments on the LHS of a rule
 are syntactically expressions, not patterns, so Lint treats the
@@ -2564,8 +2536,7 @@ isSpecDict _             = False
 --    , [T1, T2, c, i, dEqT1, dShow1]
 --    )
 specHeader
-     :: Module      -- The module being compiled, for mkAbsentFiller
-     -> SpecEnv
+     :: SpecEnv
      -> [InBndr]    -- The binders from the original function 'f'
      -> [SpecArg]   -- From the CallInfo
      -> SpecM ( Bool     -- True <=> some useful specialisation happened
@@ -2591,7 +2562,7 @@ specHeader
 -- We want to specialise on type 'T1', and so we must construct a substitution
 -- 'a->T1', as well as a LHS argument for the resulting RULE and unfolding
 -- details.
-specHeader mod env (bndr : bndrs) (SpecType ty : args)
+specHeader env (bndr : bndrs) (SpecType ty : args)
   = do { -- Find qvars, the type variables to add to the binders for the rule
          -- Namely those free in `ty` that aren't in scope
          -- See (MP2) in Note [Specialising polymorphic dictionaries]
@@ -2603,7 +2574,7 @@ specHeader mod env (bndr : bndrs) (SpecType ty : args)
              ty'            = substTy env1 ty
              env2           = extendTvSubst env1 bndr ty'
        ; (useful, env3, leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
-            <- specHeader mod env2 bndrs args
+            <- specHeader env2 bndrs args
        ; pure ( useful
               , env3
               , leftover_bndrs
@@ -2619,10 +2590,10 @@ specHeader mod env (bndr : bndrs) (SpecType ty : args)
 -- a substitution on it (in case the type refers to 'a'). Additionally, we need
 -- to produce a binder, LHS argument and RHS argument for the resulting rule,
 -- /and/ a binder for the specialised body.
-specHeader mod env (bndr : bndrs) (UnspecType : args)
+specHeader env (bndr : bndrs) (UnspecType : args)
   = do { let (env', bndr') = substBndr env bndr
        ; (useful, env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
-            <- specHeader mod env' bndrs args
+            <- specHeader env' bndrs args
        ; pure ( useful
               , env''
               , leftover_bndrs
@@ -2636,14 +2607,14 @@ specHeader mod env (bndr : bndrs) (UnspecType : args)
 -- Next we want to specialise the 'Eq a' dict away. We need to construct
 -- a wildcard binder to match the dictionary (See Note [Specialising Calls] for
 -- the nitty-gritty), as a LHS rule and unfolding details.
-specHeader mod env (bndr : bndrs) (SpecDict d : args)
+specHeader env (bndr : bndrs) (SpecDict d : args)
   | not (isDeadBinder bndr)
   , allVarSet (`elemInScopeSet` in_scope) (exprFreeVars d)
     -- See Note [Weird special case for SpecDict]
   = do { (env1, bndr') <- newDictBndr env bndr -- See Note [Zap occ info in rule binders]
        ; let (env2, dx_bind, spec_dict) = bindAuxiliaryDict env1 bndr bndr' d
        ; (_, env3, leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
-             <- specHeader mod env2 bndrs args
+             <- specHeader env2 bndrs args
        ; pure ( True      -- Ha!  A useful specialisation!
               , env3
               , leftover_bndrs
@@ -2668,27 +2639,14 @@ specHeader mod env (bndr : bndrs) (SpecDict d : args)
 -- why 'i' doesn't appear in our RULE above. But we have no guarantee that
 -- there aren't 'UnspecArg's which come /before/ all of the dictionaries, so
 -- this case must be here.
-specHeader mod env (bndr : bndrs) (_ : args)
+specHeader env (bndr : bndrs) (_ : args)
     -- The "_" can be UnSpecArg, or SpecDict where the bndr is dead
   = do { -- see Note [Zap occ info in rule binders]
          let (env', bndr') = substBndr env (zapIdOccInfo bndr)
        ; (useful, env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
-             <- specHeader mod env' bndrs args
+             <- specHeader env' bndrs args
 
-       ; let -- See Note [Drop dead args from specialisations]
-             -- C.f. GHC.Core.Opt.WorkWrap.Utils.mk_absent_let
-             (mb_spec_bndr, spec_arg)
-                | isDeadBinder bndr
-                , Just filler <- mkAbsentFiller mod bndr' NotMarkedStrict
-                     -- NB: mkAbsentFiller returns Nothing for a terminating type (e.g. a
-                     -- dictionary), so this guard fails and we fall through, keeping the
-                     -- argument instead of dropping it.
-                     -- See Note [Don't make fillers for terminating types]
-                     -- in GHC.Core.Opt.WorkWrap.Utils
-                = (Nothing, filler)
-                | otherwise
-                = (Just bndr', varToCoreExpr bndr')
-
+       ; let (mb_spec_bndr, spec_arg) = (Just bndr', varToCoreExpr bndr')
        ; pure ( useful
               , env''
               , leftover_bndrs
@@ -2704,12 +2662,12 @@ specHeader mod env (bndr : bndrs) (_ : args)
 
 -- If we run out of binders, stop immediately
 -- See Note [Specialisation Must Preserve Sharing]
-specHeader _ env [] _ = pure (False, env, [], [], [], [], [], [])
+specHeader env [] _ = pure (False, env, [], [], [], [], [], [])
 
 -- Return all remaining binders from the original function. These have the
 -- invariant that they should all correspond to unspecialised arguments, so
 -- it's safe to stop processing at this point.
-specHeader _ env bndrs []
+specHeader env bndrs []
   = pure (False, env', bndrs', [], [], [], [], [])
   where
     (env', bndrs') = substBndrs env bndrs
