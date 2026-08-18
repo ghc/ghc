@@ -17,7 +17,7 @@ module GHC.Core.Predicate (
 
   -- Class predicates
   mkClassPred, isDictTy, typeDeterminesValue,
-  isClassPred, isEqualityClass, isCTupleClass, isUnaryClass,
+  isClassPred, isEqualityClass, isCTupleClass, isUnaryClass, mayBeUnaryClass,
   getClassPredTys, getClassPredTys_maybe,
   classMethodTy, classMethodInstTy,
 
@@ -269,6 +269,11 @@ isCTupleClass cls = isTupleTyCon (classTyCon cls)
 
 isUnaryClass :: Class -> Bool
 isUnaryClass cls = isUnaryClassTyCon (classTyCon cls)
+
+mayBeUnaryClass :: Class -> Bool
+mayBeUnaryClass cls = isUnaryClassTyCon tc || isAbstractTyCon tc
+  where
+    tc = classTyCon cls
 
 getClassPredTys :: HasDebugCallStack => PredType -> (Class, [Type])
 getClassPredTys ty = case getClassPredTys_maybe ty of

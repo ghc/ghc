@@ -43,7 +43,7 @@ module GHC.Core.TyCon(
 
         -- ** Predicates on TyCons
         isAlgTyCon, isVanillaAlgTyCon, isClassTyCon,
-        isUnaryClassTyCon, isUnaryClassTyCon_maybe,
+        isUnaryClassTyCon, isUnaryClassTyCon_maybe, isTerminatingTyCon,
         isFamInstTyCon,
         isPrimTyCon,
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon,
@@ -3033,6 +3033,16 @@ isUnaryClassTyCon tc@(TyCon { tyConDetails = details })
     True
   | otherwise
   = False
+
+isTerminatingTyCon :: TyCon -> Bool
+-- ^ True <=> a value of this TyCon cannot be bottom.
+-- That means a non-unary class TyCon, and nothing else.
+-- See (UCM3) in Note [Unary class magic], and
+-- Note [NON-BOTTOM-DICTS invariant] in GHC.Core.
+-- An AbstractTyCon returns False: it comes from an hs-boot file, and the real
+-- declaration may turn out to be a unary class. See (NBD2) in that Note.
+isTerminatingTyCon tc = isClassTyCon tc && not (isUnaryClassTyCon tc)
+                                        && not (isAbstractTyCon tc)
 
 isUnaryClassTyCon_maybe :: TyCon -> Maybe (Class, DataCon)
 isUnaryClassTyCon_maybe (TyCon { tyConDetails = details })
