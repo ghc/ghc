@@ -1576,7 +1576,7 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
                     if (i != cap->no && idle_cap[i]) {
                         Capability *tmpcap = getCapability(i);
                         task->cap = tmpcap;
-                        waitForCapability(&tmpcap, task);
+                        waitForCapability(task);
                         n_idle_caps++;
                     }
                 }
@@ -1848,8 +1848,7 @@ forkProcess(HsStablePtr *entry
 
     task = newBoundTask();
 
-    cap = NULL;
-    waitForCapability(&cap, task);
+    cap = waitForSomeCapability(task);
 
 #if defined(THREADED_RTS)
     stopAllCapabilities(&cap, task);
@@ -2354,7 +2353,7 @@ resumeThread (void *task_)
     task->cap = cap;
 
     // Wait for permission to re-enter the RTS with the result.
-    waitForCapability(&cap,task);
+    waitForCapability(task);
     // we might be on a different capability now... but if so, our
     // entry on the suspended_ccalls list will also have been
     // migrated.
@@ -2598,8 +2597,7 @@ exitScheduler (bool wait_foreign USED_IF_THREADS)
     // If we haven't killed all the threads yet, do it now.
     if (getSchedState() < SCHED_SHUTTING_DOWN) {
         setSchedState(SCHED_INTERRUPTING);
-        Capability *cap = task->cap;
-        waitForCapability(&cap,task);
+        Capability *cap = waitForSomeCapability(task);
         scheduleDoGC(&cap,task,true,false,false,true);
         ASSERT(task->incall->tso == NULL);
         releaseCapability(cap);
@@ -2644,17 +2642,14 @@ freeScheduler( void )
 static void
 performGC_(bool force_major, bool nonconcurrent)
 {
-    Task *task;
-    Capability *cap = NULL;
-
     // We must grab a new Task here, because the existing Task may be
     // associated with a particular Capability, and chained onto the
     // suspended_ccalls queue.
-    task = newBoundTask();
+    Task *task = newBoundTask();
 
     // TODO: do we need to traceTask*() here?
 
-    waitForCapability(&cap,task);
+    Capability *cap = waitForSomeCapability(task);
     scheduleDoGC(&cap,task,force_major,false,false,nonconcurrent);
     releaseCapability(cap);
     exitMyTask();

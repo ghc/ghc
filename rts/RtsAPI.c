@@ -654,8 +654,7 @@ rts_lock (void)
     }
 #endif
 
-    cap = NULL;
-    waitForCapability(&cap, task);
+    cap = waitForSomeCapability(task);
 
     if (task->incall->prev_stack == NULL) {
       // This is a new outermost call from C into Haskell land.

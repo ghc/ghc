@@ -291,16 +291,22 @@ INLINE_HEADER Capability *getCapability(uint32_t i)
     return RELAXED_LOAD(&capabilities[i]);
 }
 
-// Acquires a capability at a return point.  If *cap is non-NULL, then
-// this is taken as a preference for the Capability we wish to
-// acquire.
+// Acquire the task's associated capability, waiting as necessary.
 //
-// OS threads waiting in this function get priority over those waiting
-// in waitForCapability().
+// Note this acquires the specific capability the task is already associated
+// with (i.e. task->cap must be set). Alternatively, use waitForSomeCapability
+// to acquire some appropriate choice of capability.
 //
-// On return, *cap is non-NULL, and points to the Capability acquired.
+void waitForCapability (Task *task);
+
+// If the task is not already associated with a capability, select some
+// reasonable choice of capability and associate the task with the chosen
+// capability (i.e. the task->cap is set to the new choice). Then acquire the
+// chosen capability, waiting as necessary.
 //
-void waitForCapability (Capability **cap/*in/out*/, Task *task);
+// Returns the now-acquired cap that was newly associated with the task.
+//
+Capability *waitForSomeCapability (Task *task);
 
 EXTERN_INLINE void recordMutableCap (const StgClosure *p, Capability *cap,
                                         uint32_t gen);
