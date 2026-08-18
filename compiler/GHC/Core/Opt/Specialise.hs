@@ -1647,6 +1647,14 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
     (rhs_bndrs, rhs_body) = collectBindersPushingCo rhs
                             -- See Note [Account for casts in binding]
 
+    -- Binders of the stable unfolding template, if there is one.
+    -- See Note [Dead args and stable unfoldings]
+    unf_bndrs | isStableUnfolding fn_unf
+              , Just tmpl <- maybeUnfoldingTemplate fn_unf
+              = Just (fst (collectBinders tmpl))
+              | otherwise
+              = Nothing
+
     -- Copy InlinePragma information from the parent Id.
     -- So if f has INLINE[1] so does spec_fn
     spec_inl_prag
@@ -1670,7 +1678,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                                         | otherwise    = UnspecArg
 
            ; (useful, subst', rule_bndrs, rule_lhs_args, spec_bndrs, dx_binds, spec_args)
-                 <- specHeader this_mod subst rhs_bndrs all_call_args
+                 <- specHeader this_mod subst rhs_bndrs unf_bndrs all_call_args
            ; let env' = env { se_subst = subst' }
 
            -- Check for (a) usefulness and (b) not already covered
@@ -2049,10 +2057,26 @@ Wrinkles
 * If the function has a stable unfolding, specHeader has to come up with
   arguments to pass to that stable unfolding, when building the stable
   unfolding of the specialised function: this is the last field in specHeader's
-  big result tuple.
+  big result tuple. We pass an absent filler, but only once we have checked
+  that the unfolding does not use the argument either.
+  See Note [Dead args and stable unfoldings]
 
-  The right thing to do is to produce a LitRubbish; it should rapidly
-  disappear.  Rather like GHC.Core.Opt.WorkWrap.Utils.mk_absent_let.
+Note [Dead args and stable unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+specHeader decides an argument is dead with isDeadBinder on a binder of the
+optimised RHS, then applies the filler to the stable unfolding template instead.
+The two may differ, so the argument can be dead in the RHS and not in the
+template. See #27703 for an instance of this. The specialised function's
+unfolding then contains the filler, and any call site that inlines it evaluates
+the error thunk.
+
+It is not enough to ask whether the RHS binder occurs free in the template: the
+template has its own binders, so it never does. We must walk the arguments in
+lockstep. If the template runs out of binders, the RHS was eta-expanded past
+it, and we assume the argument is used.
+
+DmdAnal does the same job in addUnfoldingDemands. See Wrinkle (W3) of
+Note [Absence analysis for stable unfoldings and RULES].
 
 Note [Specialisation modulo dictionary selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2577,6 +2601,9 @@ specHeader
      :: Module      -- The module being compiled, for mkAbsentFiller
      -> Core.Subst  -- This substitution applies to the [InBndr]
      -> [InBndr]    -- Binders from the original function `f`
+     -> Maybe [InBndr]
+                    -- Binders of f's stable unfolding template, if it has one
+                    -- See Note [Dead args and stable unfoldings]
      -> [SpecArg]   -- From the CallInfo
      -> SpecM ( Bool     -- True <=> some useful specialisation happened
                          -- Not the same as any (isSpecDict args) because
@@ -2600,13 +2627,13 @@ specHeader
 
 -- If we run out of binders, stop immediately
 -- See Note [Specialisation Must Preserve Sharing]
-specHeader _ subst [] _  = pure (False, subst, [], [], [], [], [])
-specHeader _ subst _  [] = pure (False, subst, [], [], [], [], [])
+specHeader _ subst [] _ _  = pure (False, subst, [], [], [], [], [])
+specHeader _ subst _  _ [] = pure (False, subst, [], [], [], [], [])
 
 -- We want to specialise on type 'T1', and so we must construct a substitution
 -- 'a->T1', as well as a LHS argument for the resulting RULE and unfolding
 -- details.
-specHeader mod subst (bndr:bndrs) (SpecType ty : args)
+specHeader mod subst (bndr:bndrs) unf_bndrs (SpecType ty : args)
   = do { -- Find free_tvs, the type variables to add to the binders for the rule
          -- Namely those deeply free in `ty` that aren't in scope
          -- See (MP2) in Note [Specialising polymorphic dictionaries]
@@ -2619,7 +2646,7 @@ specHeader mod subst (bndr:bndrs) (SpecType ty : args)
 
        ; let subst2 = Core.extendTvSubst subst1 bndr ty
        ; (useful, subst3, rule_bs, rule_args, spec_bs, dx, spec_args)
-             <- specHeader mod subst2 bndrs args
+             <- specHeader mod subst2 bndrs (fmap (drop 1) unf_bndrs) args
        ; pure ( useful, subst3
               , free_tvs ++ rule_bs,     Type ty : rule_args
               , free_tvs ++ spec_bs, dx, Type ty : spec_args ) }
@@ -2628,17 +2655,19 @@ specHeader mod subst (bndr:bndrs) (SpecType ty : args)
 -- a substitution on it (in case the type refers to 'a'). Additionally, we need
 -- to produce a binder, LHS argument and RHS argument for the resulting rule,
 -- /and/ a binder for the specialised body.
-specHeader mod subst (bndr:bndrs) (UnspecType : args)
+specHeader mod subst (bndr:bndrs) unf_bndrs (UnspecType : args)
   = do { let (subst1, bndr') = Core.substBndr subst bndr
        ; (useful, subst2, rule_bs, rule_es, spec_bs, dx, spec_args)
-             <- specHeader mod subst1 bndrs args
+             <- specHeader mod subst1 bndrs (fmap (drop 1) unf_bndrs) args
        ; let ty_e' = Type (mkTyVarTy bndr')
        ; pure ( useful, subst2
               , bndr' : rule_bs,     ty_e' : rule_es
               , bndr' : spec_bs, dx, ty_e' : spec_args ) }
 
-specHeader mod subst (bndr:bndrs) (_ : args)
+specHeader mod subst (bndr:bndrs) unf_bndrs (_ : args)
   | isDeadBinder bndr
+  , dead_in_unfolding unf_bndrs
+      -- See Note [Dead args and stable unfoldings]
   , let (subst1, bndr') = Core.substBndr subst (zapIdOccInfo bndr)
   , Just filler <- mkAbsentFiller mod bndr' NotMarkedStrict
       -- NB: mkAbsentFiller returns Nothing for a terminating type (e.g. a
@@ -2647,7 +2676,8 @@ specHeader mod subst (bndr:bndrs) (_ : args)
       -- See Note [Don't make fillers for dictionary types]
       -- in GHC.Core.Opt.WorkWrap.Utils
   = -- See Note [Drop dead args from specialisations]
-    do { (useful, subst2, rule_bs, rule_es, spec_bs, dx, spec_args) <- specHeader mod subst1 bndrs args
+    do { (useful, subst2, rule_bs, rule_es, spec_bs, dx, spec_args)
+             <- specHeader mod subst1 bndrs (fmap (drop 1) unf_bndrs) args
        ; pure ( useful, subst2
               , bndr' : rule_bs, Var bndr'   : rule_es
               , spec_bs,     dx, filler : spec_args ) }
@@ -2655,7 +2685,7 @@ specHeader mod subst (bndr:bndrs) (_ : args)
 -- Next we want to specialise the 'Eq a' dict away. We need to construct
 -- a wildcard binder to match the dictionary (See Note [Specialising Calls] for
 -- the nitty-gritty), as a LHS rule and unfolding details.
-specHeader mod subst (bndr:bndrs) (SpecDict dict_arg : args)
+specHeader mod subst (bndr:bndrs) unf_bndrs (SpecDict dict_arg : args)
   = do { -- Make up a fresh binder to use in the RULE
          -- It might turn into a dict binding (via bindAuxiliaryDict) which we
          -- then float, so we use cloneIdBndr to get a completely fresh binder
@@ -2666,7 +2696,8 @@ specHeader mod subst (bndr:bndrs) (SpecDict dict_arg : args)
          -- Extend the substitution to map bndr :-> dict_arg, for use in the RHS
        ; let (subst2, dx_bind, spec_dict) = bindAuxiliaryDict subst1 bndr bndr' dict_arg
 
-       ; (_, subst3, rule_bs, rule_es, spec_bs, dx, spec_args) <- specHeader mod subst2 bndrs args
+       ; (_, subst3, rule_bs, rule_es, spec_bs, dx, spec_args)
+             <- specHeader mod subst2 bndrs (fmap (drop 1) unf_bndrs) args
 
        ; let dx' = case dx_bind of { Nothing -> dx; Just d -> d : dx }
        ; pure ( True, subst3      -- Ha!  A useful specialisation!
@@ -2681,10 +2712,11 @@ specHeader mod subst (bndr:bndrs) (SpecDict dict_arg : args)
 -- why 'i' doesn't appear in our RULE above. But we have no guarantee that
 -- there aren't 'UnspecArg's which come /before/ all of the dictionaries, so
 -- this case must be here.
-specHeader mod subst (bndr:bndrs) (UnspecArg : args)
+specHeader mod subst (bndr:bndrs) unf_bndrs (UnspecArg : args)
   = do { let (subst1, bndr') = Core.substBndr subst (zapIdOccInfo bndr)
                  -- zapIdOccInfo: see Note [Zap occ info in rule binders]
-       ; (useful, subst2, rule_bs, rule_es, spec_bs, dx, spec_args) <- specHeader mod subst1 bndrs args
+       ; (useful, subst2, rule_bs, rule_es, spec_bs, dx, spec_args)
+             <- specHeader mod subst1 bndrs (fmap (drop 1) unf_bndrs) args
 
        ; let dummy_arg = varToCoreExpr bndr'
                -- dummy_arg is usually just (Var bndr),
@@ -2697,6 +2729,14 @@ specHeader mod subst (bndr:bndrs) (UnspecArg : args)
               , bndrs ++ rule_bs,     dummy_arg : rule_es
               , bndrs ++ spec_bs, dx, dummy_arg : spec_args ) }
 
+
+dead_in_unfolding :: Maybe [InBndr] -> Bool
+-- ^ Is the argument at this position dead in the stable unfolding template?
+-- Nothing means there is no stable unfolding, so no filler can escape into one.
+-- If the template runs out of binders we cannot tell, so we say No.
+dead_in_unfolding Nothing                 = True
+dead_in_unfolding (Just (unf_bndr : _))   = isDeadBinder unf_bndr
+dead_in_unfolding (Just [])               = False
 
 -- | Binds a dictionary argument to a fresh name, to preserve sharing
 bindAuxiliaryDict
