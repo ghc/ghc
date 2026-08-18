@@ -401,11 +401,18 @@ context is unrepresented.
 
 Each step should build and pass the exactprint tests on its own.
 
-1. Introduce `LayoutFrame` and the two stacks in `EPState`, with
+1.X Introduce `LayoutFrame` and the two stacks in `EPState`, with
    `effectiveLayout`, the resolve-all-pending operation, and the pending query.
-   Rewrite `setLayoutBoth`, `getLayoutOffsetP`, `getLayoutOffsetD`,
-   `setLayoutOffsetP`, `setLayoutStartD` and the `printString` arm-consumption
-   in terms of them. Port `HsQuasiQuote` to the query. No call-site changes.
+   Rewrite
+   - [X] `setLayoutBoth`, -> becomes `setLayoutBoth'`
+   - [X] `getLayoutOffsetP`,
+   - [X] `getLayoutOffsetD`,
+   - [X] `setLayoutOffsetP`,
+   - [X] `setLayoutStartD` and the
+   - [X] `printString` arm-consumption
+          in terms of them.
+   - [ ] Port `HsQuasiQuote` to the query.
+   No call-site changes.
    Expect no test churn: for every currently-working nesting the new scheme
    computes the same columns.
 2. Delete the redundant `setLayoutBoth` calls in `HsCase`, `IPBinds`, and the
