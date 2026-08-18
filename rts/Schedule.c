@@ -2354,9 +2354,6 @@ resumeThread (void *task_)
 
     // Wait for permission to re-enter the RTS with the result.
     waitForCapability(task);
-    // we might be on a different capability now... but if so, our
-    // entry on the suspended_ccalls list will also have been
-    // migrated.
 
     // Remove the thread from the suspended list
     recoverSuspendedTask(cap,task);
@@ -2642,9 +2639,14 @@ freeScheduler( void )
 static void
 performGC_(bool force_major, bool nonconcurrent)
 {
-    // We must grab a new Task here, because the existing Task may be
-    // associated with a particular Capability, and chained onto the
-    // suspended_ccalls queue.
+    // We must use a new InCall for our Task here, because the existing Task's
+    // InCall may be chained onto the suspended_ccalls queue.
+    //
+    // If we could guarante there's an existing Task then we could just use
+    // newInCall/endInCall. But it's not clear the calling thread necessarily
+    // has an existing Task, so we play it safe and use newBoundTask/exitMyTask.
+    // This does the same newInCall/endInCall when there is an initialised Task,
+    // but will also do the right thing if there's no existing Task.
     Task *task = newBoundTask();
 
     // TODO: do we need to traceTask*() here?
