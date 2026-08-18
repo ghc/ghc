@@ -37,7 +37,7 @@ $cmyfmap_aG7
 
 -- RHS size: {terms: 1, types: 0, coercions: 3, joins: 0/0}
 Foo.$fMyFunctor[] [InlPrag=INLINE (sat-args=0)] :: MyFunctor []
-[LclIdX[DFunId(nt)],
+[LclIdX[DFunId(may-be-bottom)],
  Arity=4,
  Str=<A><A><U><SU>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
