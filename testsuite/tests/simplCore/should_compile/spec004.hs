@@ -1,6 +1,7 @@
 {-# LANGUAGE RankNTypes #-}
 
--- Dead arguments should be dropped in specialisations. See !2913.
+-- Dead arguments are kept in specialisations.
+-- See Note [Do not drop dead args from specialisations] in GHC.Core.Opt.Specialise
 
 module ShouldCompile where
 
