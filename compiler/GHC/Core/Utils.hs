@@ -2240,7 +2240,7 @@ app_ok fun_ok primop_ok fun args
 
   | otherwise
   = case idDetails fun of
-      DFunId unary_class -> not unary_class
+      DFunId terminating -> terminating
          -- DFuns terminate, unless the dict is implemented
          -- by a no-op in which case they may not
          -- See (UCM3) in Note [Unary class magic] in GHC.Core.TyCon
