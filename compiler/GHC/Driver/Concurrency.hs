@@ -12,7 +12,8 @@ module GHC.Driver.Concurrency
     -- * Concurrent worker scheduling
   , ConcurrentWorkerEnv(..)
   , mapConcurrentWorkers
-  , concurrentTraversal_DF
+  , NodeExpander(..)
+  , concurrentTraversal
   )
   where
 
@@ -20,12 +21,16 @@ import GHC.Prelude
 
 import GHC.Driver.MakeSem
 import GHC.Driver.Pipeline.LogQueue
-  ( LogQueueQueue, finishLogQueue, initLogQueue, logThread
-  , newLogQueue, newLogQueueQueue, parLogAction )
+  ( LogQueue, LogQueueQueue, finishLogQueue, initLogQueue, logThread
+  , newLogQueue, newLogQueueQueue, parLogAction, printLogs )
 import GHC.Utils.Logger
   ( Logger, makeThreadSafe, pushLogHook )
+import GHC.Utils.Misc
+  ( HasDebugCallStack )
+import GHC.Utils.Outputable
+  ( Outputable(..), text, (<+>) )
 import GHC.Utils.Panic
-  ( panic )
+  ( massertPpr, pprPanic )
 import GHC.Utils.TmpFs
   ( TmpFs, forkTmpFsFrom, mergeTmpFsInto, withLocalTmpFS )
 
@@ -36,31 +41,30 @@ import System.Semaphore
 import Control.Concurrent
   ( ThreadId, forkIOWithUnmask, killThread, myThreadId )
 import Control.Concurrent.MVar
-  ( MVar, newEmptyMVar, newMVar, putMVar, takeMVar )
+  ( MVar, newMVar, putMVar, takeMVar )
 import GHC.Conc
   ( labelThread )
 #else
 import Control.Concurrent
   ( ThreadId, forkIOWithUnmask, killThread, myThreadId
-  , newQSem, signalQSem, waitQSem, MVar, takeMVar, putMVar, newEmptyMVar )
-import Control.Monad
-  ( unless )
+  , newQSem, signalQSem, waitQSem )
 import qualified Control.Monad.Catch as MC
 import GHC.Conc
   ( getNumCapabilities, getNumProcessors, labelThread, setNumCapabilities )
 #endif
 import Control.Concurrent.STM
-  ( TVar, atomically, check, modifyTVar', newTVarIO, readTVar, writeTVar )
+  ( TVar, atomically, check, modifyTVar', newTVarIO, readTVar, readTVarIO
+  , writeTVar )
 import Control.Exception
   ( AsyncException(ThreadKilled), SomeAsyncException, SomeException
-  , finally, fromException, mask, mask_, onException
+  , catch, finally, fromException, mask, mask_, onException
   , throwIO, try, uninterruptibleMask_ )
 import Control.Monad
-  ( replicateM )
+  ( unless )
 import Data.Foldable
-  ( for_ )
+  ( for_, traverse_ )
 import Data.IORef
-  ( IORef, atomicModifyIORef', modifyIORef', newIORef, readIORef, writeIORef )
+  ( IORef, atomicModifyIORef', modifyIORef', newIORef, readIORef )
 import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -211,72 +215,163 @@ withWorkerLimit logger tmpfs report_semaphore_failure limit action
           action conc parent_work_env
 
 --------------------------------------------------------------------------------
--- * Scheduling concurrent workers
+-- * Monotone data structures
 --------------------------------------------------------------------------------
 
--- | Internal scheduler abstraction with two capabilities:
---
---  - spawn a new worker thread
---  - wait for a worker thread to complete
-data Scheduler r = Scheduler
-  { spawnWorker :: (ConcurrentWorkerEnv -> IO r) -> IO ()
-    -- ^ Spawn one concurrent worker.
-    --
-    -- The worker does not hold a token of the concurrency semaphore: the
-    -- worker action should use 'withConcurrency' around the work whose
-    -- concurrency should be limited.
-  , awaitWorker :: IO (Either SomeException r)
-    -- ^ Wait for one worker to complete.
-    --
-    -- Will crash if there are no outstanding workers.
-  }
+-- | A map that only ever grows, and whose entries are written at most once.
+newtype MonotoneMap k v = MonotoneMap ( IORef ( Map.Map k v ) )
 
--- | Internal implementation of a concurrent worker scheduler.
+newMonotoneMap :: Map.Map k v -> IO ( MonotoneMap k v )
+newMonotoneMap initial = MonotoneMap <$> newIORef initial
+
+-- | The outcome of inserting into a 'MonotoneMap' or a 'MonotoneSet'.
+data InsertionResult
+  -- | The key was absent before the insertion.
+  = Inserted
+  -- | The key was already present; the container is unchanged.
+  | AlreadyPresent
+
+-- | Write an entry into a 'MonotoneMap' unless the key is already present.
+insertMonotoneMap :: Ord k => MonotoneMap k v -> k -> v -> IO InsertionResult
+insertMonotoneMap ( MonotoneMap ref ) k v =
+  atomicModifyIORef' ref \ m ->
+    case Map.insertLookupWithKey ( \ _ _ old -> old ) k v m of
+      ( Nothing , m' ) -> ( m', Inserted )
+      ( Just _  , _  ) -> ( m , AlreadyPresent )
+
+-- | Write a new entry into a 'MonotoneMap'.
 --
--- Usage of this function requires the following:
+-- Panics if the entry is already present.
+insertMonotoneMap_new
+  :: ( HasDebugCallStack, Ord k, Outputable k )
+  => MonotoneMap k v -> k -> v -> IO ()
+insertMonotoneMap_new  mm k v =
+  insertMonotoneMap mm k v >>= \case
+    Inserted       -> pure ()
+    AlreadyPresent -> pprPanic "monotone map: duplicate key" $ ppr k
+
+-- | The contents of a monotone map.
+freezeMonotoneMap :: MonotoneMap k v -> IO ( Map.Map k v )
+freezeMonotoneMap ( MonotoneMap ref ) = readIORef ref
+
+-- | A set that only ever grows.
+newtype MonotoneSet k = MonotoneSet ( IORef ( Set.Set k ) )
+
+newMonotoneSet :: Set.Set k -> IO ( MonotoneSet k )
+newMonotoneSet initial = MonotoneSet <$> newIORef initial
+
+-- | Add an element, unless it is already present.
+insertMonotoneSet :: Ord k => MonotoneSet k -> k -> IO InsertionResult
+insertMonotoneSet ( MonotoneSet ref ) k =
+  atomicModifyIORef' ref \ s ->
+    if k `Set.member` s
+    then ( s              , AlreadyPresent )
+    else ( Set.insert k s , Inserted )
+
+--------------------------------------------------------------------------------
+-- * Pools of concurrent workers
+--------------------------------------------------------------------------------
+
+-- | The order in which logging should happen when using concurrent workers.
+data LogOrder
+  -- | Log as we go.
+  --
+  -- Only valid when workers are spawned in a deterministic order.
+  = LogAsWeGo
+  -- | Accumulate logs per worker. Once all work is done, sort the logs
+  -- before proceeding.
+  --
+  -- Used when workers may be spawned in a non-deterministic order.
+  | SortLogs
+
+-- | A pool of concurrent workers with a given worker key type, supporting two
+-- operations:
 --
---  - all spawn/await actions are performed by a single thread,
---  - we never wait for more workers than were spawned,
---  - no worker outlives 'run_schedule'.
-run_schedule
-  :: forall r a
-  .  String
-      -- ^ thread label for workers
+--  - spawning a new worker,
+--  - waiting on all workers to finish.
+--
+-- See Note [Deterministic concurrent workers].
+data WorkerPool worker_key =
+  WorkerPool
+    { spawnWorker :: worker_key -> ( ConcurrentWorkerEnv -> IO () ) -> IO ()
+      -- ^ Spawn one worker with the given worker key.
+      --
+      -- May be called from inside another worker.
+      --
+      -- The worker does not hold a token of the concurrency semaphore: the
+      -- worker action should use 'withConcurrency' around the work whose
+      -- concurrency should be limited.
+      --
+      -- An exception escaping the action stops further workers from being
+      -- spawned, and is rethrown by 'waitForWorkers'.
+    , waitForWorkers :: IO ()
+      -- ^ Wait until all workers are done, throwing an exception if any
+      -- worker failed (which exception is thrown is not deterministic).
+    }
+
+-- | Internal implementation of a pool of concurrent workers.
+run_pool
+  :: forall worker_key a
+  .  ( HasDebugCallStack, Ord worker_key, Outputable worker_key )
+  => String -- ^ thread label for workers
+  -> LogOrder
   -> Concurrency
   -> ConcurrentWorkerEnv
-  -> (Scheduler r -> IO a)
-        -- ^ worker action
+  -> ( WorkerPool worker_key -> IO a )
   -> IO a
-run_schedule worker_label conc parent_work_env withScheduler =
+run_pool worker_label log_order conc parent_work_env withPool =
   case conc of
 
     Serial -> do
-      results_var <- newIORef Seq.empty
+      queued_var <- newIORef $ Seq.empty @( worker_key, ConcurrentWorkerEnv -> IO () )
+      logs_var   <- newMonotoneMap $ Map.empty @worker_key @LogQueue
+
       let
-        spawnWorker :: (ConcurrentWorkerEnv -> IO r) -> IO ()
-        spawnWorker action = do
-          res <- try @SomeException $
+        spawnWorker :: worker_key -> ( ConcurrentWorkerEnv -> IO () ) -> IO ()
+        spawnWorker worker_key action =
+          modifyIORef' queued_var ( Seq.|> ( worker_key, action ) )
+
+        run_worker :: worker_key -> ( ConcurrentWorkerEnv -> IO () ) -> IO ()
+        run_worker worker_key action = case log_order of
+          LogAsWeGo ->
             workerEnv_withLocalTmpFS parent_work_env action
-          case res of
-            Left e
-              | Just _ <- fromException @SomeAsyncException e
-              -> throwIO e
-            _ -> modifyIORef' results_var (Seq.|> res)
+          SortLogs -> do
+            -- Use a log queue for consistency with the concurrent case.
+            lq <- newLogQueue
+            insertMonotoneMap_new logs_var worker_key lq
+            let
+              worker_work_env :: ConcurrentWorkerEnv
+              worker_work_env =
+                parent_work_env
+                  { cwe_logger = pushLogHook ( const ( parLogAction lq ) )
+                                   ( cwe_logger parent_work_env ) }
+            workerEnv_withLocalTmpFS worker_work_env action
+              `finally` finishLogQueue lq
 
-        awaitWorker :: IO (Either SomeException r)
-        awaitWorker =
-          readIORef results_var >>= \case
-            res Seq.:<| rest -> do
-              writeIORef results_var rest
-              pure res
-            Seq.Empty ->
-              panic "run_schedule: no outstanding job"
+        waitForWorkers :: IO ()
+        waitForWorkers = do
+          next <- atomicModifyIORef' queued_var \ queued ->
+            case queued of
+              work Seq.:<| rest -> ( rest  , Just work )
+              Seq.Empty         -> ( queued, Nothing )
+          case next of
+            Nothing -> pure ()
+            Just ( worker_key, action ) ->
+              run_worker worker_key action *> waitForWorkers
 
-      withScheduler $ Scheduler { spawnWorker, awaitWorker }
+        print_logs :: IO ()
+        print_logs = do
+          logs <- freezeMonotoneMap logs_var
+          for_ ( Map.elems logs ) $ printLogs ( cwe_logger parent_work_env )
+
+      withPool ( WorkerPool { spawnWorker, waitForWorkers } )
+        `finally` print_logs
 
     Concurrent ( ConcurrencyEnv { ce_next_log_queue_id, ce_log_queue_queue } ) -> do
-      worker_tids_var <- newTVarIO $ Set.empty @ThreadId
-      all_results_vars_var <- newIORef $ Seq.empty @(MVar (Either SomeException r))
+      worker_tids_var  <- newTVarIO $ Set.empty @ThreadId
+      failure_var      <- newTVarIO $ Nothing @SomeException
+      logs_var         <- newMonotoneMap $ Map.empty @worker_key @LogQueue
+      last_spawned_var <- newIORef $ Nothing @worker_key
 
       let
         wait_for_workers :: IO ()
@@ -291,92 +386,118 @@ run_schedule worker_label conc parent_work_env withScheduler =
             for_ tids killThread
           wait_for_workers
 
-        awaitWorker :: IO (Either SomeException r)
-        awaitWorker =
-          readIORef all_results_vars_var >>= \case
-            first_worker_res_var Seq.:<| rest -> do
-              writeIORef all_results_vars_var rest
-              -- block on the earliest-spawned outstanding worker
-              takeMVar first_worker_res_var
-            Seq.Empty ->
-              panic "run_schedule: no outstanding job"
+        -- Record a worker failure, preventing any further work from starting.
+        record_failure :: SomeException -> IO ()
+        record_failure e =
+          atomically $ modifyTVar' failure_var \ failure ->
+            case failure of
+              Nothing -> Just e
+              Just {} -> failure
 
-        spawnWorker :: (ConcurrentWorkerEnv -> IO r) -> IO ()
-        spawnWorker action = mask_ do
+        waitForWorkers :: IO ()
+        waitForWorkers = do
+          wait_for_workers
+          traverse_ throwIO =<< readTVarIO failure_var
 
-          worker_res_var <- newEmptyMVar
+        -- Create the log queue of a worker, ordering it according to the worker key.
+        new_worker_log_queue :: worker_key -> IO LogQueue
+        new_worker_log_queue worker_key = do
+          lq <- newLogQueue
+          case log_order of
+            LogAsWeGo -> do
+              last_spawned <-
+                atomicModifyIORef' last_spawned_var \ last_spawned ->
+                  ( Just worker_key, last_spawned )
+              massertPpr ( all ( < worker_key ) last_spawned ) $
+                text "run_pool: LogAsWeGo workers spawned out of order:"
+                  <+> ppr last_spawned <+> text "then" <+> ppr worker_key
+              job_id <- atomicModifyIORef' ce_next_log_queue_id \ n -> ( n + 1, n )
+              atomically $ initLogQueue ce_log_queue_queue job_id lq
+            SortLogs ->
+              insertMonotoneMap_new logs_var worker_key lq
+          pure lq
 
-          -- TmpFs
-          lcl_tmpfs <- forkTmpFsFrom (cwe_tmpfs parent_work_env)
+        -- Hand the log queues over for printing, in worker key order.
+        release_queued_logs :: IO ()
+        release_queued_logs = do
+          queued <- freezeMonotoneMap logs_var
+          unless ( Map.null queued ) do
+            first_id <-
+              atomicModifyIORef' ce_next_log_queue_id \ n ->
+                ( n + Map.size queued, n )
+            atomically $
+              for_ ( zip [ first_id .. ] ( Map.elems queued ) ) \ ( job_id, lq ) ->
+                initLogQueue ce_log_queue_queue job_id lq
 
-          -- LogQueue
-          lq <- do
-            job_id <- atomicModifyIORef' ce_next_log_queue_id \n -> (n + 1, n)
-            lq <- newLogQueue job_id
-            atomically $ initLogQueue ce_log_queue_queue lq
-            pure lq
+        spawnWorker :: worker_key -> ( ConcurrentWorkerEnv -> IO () ) -> IO ()
+        spawnWorker worker_key action = mask_ do
+          failure <- readTVarIO failure_var
+          case failure of
+            -- A worker has failed: don't start any more work.
+            Just {} -> pure ()
+            Nothing -> do
 
-          let
+              -- TmpFs
+              lcl_tmpfs <- forkTmpFsFrom ( cwe_tmpfs parent_work_env )
 
-            worker_work_env :: ConcurrentWorkerEnv
-            worker_work_env =
-              parent_work_env
-                { cwe_tmpfs  = lcl_tmpfs
-                , cwe_logger = pushLogHook (const (parLogAction lq))
-                                (cwe_logger parent_work_env)
-                }
+              -- LogQueue
+              lq <- new_worker_log_queue worker_key
 
-            -- Run a worker action and record its result.
-            run_worker_and_record :: IO r -> IO ()
-            run_worker_and_record worker_action = do
-              res <- try @SomeException worker_action
-              case res of
-                Left e
-                  -- Worker is being cancelled: don't record anything.
-                  | Just ThreadKilled <- fromException e
-                  -> pure ()
-                _ -> putMVar worker_res_var res
-
-            -- Record that a worker thread is done.
-            mark_worker_done :: ThreadId -> IO ()
-            mark_worker_done tid =
-              uninterruptibleMask_ do
-                -- Uninterruptible: the deletion below /must/ occur.
-                -- An uninterruptible mask is OK as we only ever block for (GAP) below.
-                mergeTmpFsInto lcl_tmpfs $ cwe_tmpfs parent_work_env
-                finishLogQueue lq
-                atomically do
-                  tids <- readTVar worker_tids_var
-                  check $ tid `Set.member` tids
-                    -- Ensure we never end up with a dead ThreadId in 'worker_tids_var'
-                    -- (if the worker thread finishes before the parent thread has
-                    -- the time to add its ThreadId to 'worker_tids_var').
-
-                  writeTVar worker_tids_var $ Set.delete tid tids
-
-            run_worker :: (forall b. IO b -> IO b) -> IO ()
-            run_worker unmask = do
-              tid <- myThreadId
-              labelThread tid worker_label
               let
-                worker_action :: IO r
-                worker_action = unmask $ action worker_work_env
 
-              run_worker_and_record worker_action `finally`
-                mark_worker_done tid
+                worker_work_env :: ConcurrentWorkerEnv
+                worker_work_env =
+                  parent_work_env
+                    { cwe_tmpfs  = lcl_tmpfs
+                    , cwe_logger = pushLogHook ( const ( parLogAction lq ) )
+                                    ( cwe_logger parent_work_env )
+                    }
 
-          worker_tid <-
-            forkIOWithUnmask run_worker
-              `onException` finishLogQueue lq
-          -- Very short (GAP) between forking the thread and recording its ThreadId.
-          atomically $ modifyTVar' worker_tids_var $ Set.insert worker_tid
-          modifyIORef' all_results_vars_var (Seq.|> worker_res_var)
+                -- Record that a worker thread is done.
+                mark_worker_done :: ThreadId -> IO ()
+                mark_worker_done tid =
+                  uninterruptibleMask_ do
+                    -- Uninterruptible: the deletion below /must/ occur.
+                    -- An uninterruptible mask is OK as we only ever block for (GAP) below.
+                    mergeTmpFsInto lcl_tmpfs $ cwe_tmpfs parent_work_env
+                    finishLogQueue lq
+                    atomically do
+                      tids <- readTVar worker_tids_var
+                      check $ tid `Set.member` tids
+                        -- Ensure we never end up with a dead ThreadId in 'worker_tids_var'
+                        -- (if the worker thread finishes before the parent thread has
+                        -- the time to add its ThreadId to 'worker_tids_var').
 
-      mask \ restore -> do
-        result <- restore (withScheduler $ Scheduler { spawnWorker, awaitWorker })
-                    `onException` cancel_workers
-        restore wait_for_workers `onException` cancel_workers
-        pure result
+                      writeTVar worker_tids_var $ Set.delete tid tids
+
+                handle_worker_exception :: SomeException -> IO ()
+                handle_worker_exception e
+                  -- Worker is being cancelled: not a failure to report.
+                  | Just ThreadKilled <- fromException e
+                  = pure ()
+                  | otherwise
+                  = record_failure e
+
+                run_worker :: ( forall b. IO b -> IO b ) -> IO ()
+                run_worker unmask = do
+                  tid <- myThreadId
+                  labelThread tid worker_label
+                  ( unmask ( action worker_work_env )
+                      `catch` handle_worker_exception )
+                    `finally` mark_worker_done tid
+
+              worker_tid <-
+                forkIOWithUnmask run_worker
+                  `onException` finishLogQueue lq
+              -- Very short (GAP) between forking the thread and recording its ThreadId.
+              atomically $ modifyTVar' worker_tids_var $ Set.insert worker_tid
+
+      ( `finally` release_queued_logs ) $
+        mask \ restore -> do
+          result <- restore ( withPool $ WorkerPool { spawnWorker, waitForWorkers } )
+                      `onException` cancel_workers
+          restore wait_for_workers `onException` cancel_workers
+          pure result
 
 --------------------------------------------------------------------------------
 -- * Derived scheduling functionality
@@ -387,7 +508,9 @@ run_schedule worker_label conc parent_work_env withScheduler =
 -- Workers run to completion (no early abort); the first exception
 -- (in input order) is rethrown at the end.
 mapConcurrentWorkers
-  :: String -- ^ thread label for workers
+  :: forall a b
+  .  HasDebugCallStack
+  => String -- ^ thread label for workers
   -> Concurrency
   -> ConcurrentWorkerEnv
   -> (ConcurrentWorkerEnv -> a -> IO b)
@@ -398,67 +521,111 @@ mapConcurrentWorkers
   -> [a]
   -> IO [b]
 mapConcurrentWorkers worker_label conc work_env f xs =
-  run_schedule worker_label conc work_env \ scheduler -> do
-    for_ xs \ x -> spawnWorker scheduler \ worker_env -> f worker_env x
-    results <- replicateM (length xs) (awaitWorker scheduler)
-    either throwIO pure (sequence results)
+  -- LogAsWeGo: workers are keyed by their position in the input list and
+  -- spawned in that same order, so their output can be printed as it is produced.
+  run_pool worker_label LogAsWeGo conc work_env \ pool -> do
+    results <- newMonotoneMap $ Map.empty @Int @( Either SomeException b )
+    for_ ( zip [ 0 .. ] xs ) \ ( i, x ) ->
+      spawnWorker pool i \ worker_env -> do
+        res <- try @SomeException $ f worker_env x
+        case res of
+          Left e
+            -- Take care to avoid swallowing async exceptions.
+            | Just _ <- fromException @SomeAsyncException e
+            -> throwIO e
+          _ -> insertMonotoneMap_new results i res
+    waitForWorkers pool
+    all_results <- freezeMonotoneMap results
+    massertPpr ( Map.size all_results == length xs ) $
+      text "mapConcurrentWorkers: missing results"
+    either throwIO pure $ sequence $ Map.elems all_results
 
--- | Depth-first traversal with on-the-fly expansion of nodes.
+-- | How to expand a node in a graph for 'concurrentTraversal'.
+data NodeExpander k n v =
+  NodeExpander
+    { nodeKey :: n -> k
+      -- ^ The identity of a node.
+    , expandNode :: ConcurrentWorkerEnv -> n -> IO ( v, [n] )
+      -- ^ Expand a node into its result and the children to visit next.
+      --
+      -- To guarantee determinism, the children must be a pure function of the
+      -- input, and IO effects must not observably depend on the order in
+      -- which nodes are expanded.
+      --
+      -- NB: workers do not hold semaphore tokens by default; use
+      -- 'withConcurrency' to acquire one
+    }
+
+-- | Deterministically traverse a graph whose nodes are discovered as they are
+-- expanded.
 --
--- Each expansion step is handled by a worker thread under the given
--- concurrency control.
---
--- Deterministic: expansions are consumed in the order the nodes were
--- discovered, so the traversal is a function of the node graph alone.
---
--- Fails fast: the first worker exception cancels the outstanding workers and
--- is rethrown.
-concurrentTraversal_DF
-  :: forall k n r
-  .  Ord k
+-- Fails fast: once a worker throws an exception, no further work is started,
+-- and the exception is rethrown once the outstanding workers finish.
+concurrentTraversal
+  :: forall k n v
+  .  ( HasDebugCallStack, Ord k, Outputable k )
   => String -- ^ thread label for workers
   -> Concurrency
   -> ConcurrentWorkerEnv
-  -> Map.Map k r
+  -> NodeExpander k n v
+  -> Map.Map k v
      -- ^ results known ahead of time (no expansion needed)
   -> [n]
      -- ^ root nodes
-  -> (n -> k)
-     -- ^ node key from node
-  -> (ConcurrentWorkerEnv -> n -> IO (r, [n]))
-     -- ^ worker action: expand a node into its result and the children to visit next
-     --
-     -- NB: workers do not hold semaphore tokens by default; use
-     -- 'withConcurrency' to acquire one
-  -> IO (Map.Map k r)
-concurrentTraversal_DF worker_label conc work_env base_map roots key expand =
-  run_schedule worker_label conc work_env \ scheduler -> do
+  -> IO ( Map.Map k v )
+concurrentTraversal
+  worker_label conc work_env
+  ( NodeExpander { nodeKey, expandNode } )
+  base_map roots
+  =
+  -- SortLogs: nodes are discovered in an order that depends on the schedule,
+  -- so the workers' logs must be ordered before being printed.
+  run_pool worker_label SortLogs conc work_env \ pool -> do
+
+    -- The keys whose expansion has been started.
+    claims  <- newMonotoneSet $ Map.keysSet base_map
+    results <- newMonotoneMap base_map
+
     let
-      expand_node :: n -> ConcurrentWorkerEnv -> IO (k, (r, [n]))
-      expand_node node worker_env = do
-        res <- expand worker_env node
-        pure (key node, res)
-
-      go
-        :: Map.Map k r -- expanded nodes and their results
-        -> Set.Set k   -- nodes currently being expanded
-        -> [n]         -- discovered nodes, to expand next
-        -> IO (Map.Map k r)
-      go !visited !pending (node : worklist)
-        | k `Set.member` pending || k `Map.member` visited
-        = go visited pending worklist
-        | otherwise
-        = do spawnWorker scheduler (expand_node node)
-             go visited (Set.insert k pending) worklist
+      discover :: n -> IO ()
+      discover node =
+        -- Claim the work for this node to avoid any other worker duplicating it.
+        insertMonotoneSet claims key >>= \case
+          AlreadyPresent -> pure ()
+          Inserted ->
+            spawnWorker pool key \ worker_env -> do
+              ( result, children ) <- expandNode worker_env node
+              insertMonotoneMap_new results key result
+              for_ children discover
         where
-          k = key node
-      go visited pending []
-        | Set.null pending
-        = pure visited
-        | otherwise
-        = awaitWorker scheduler >>= \case
-            Left e -> throwIO e
-            Right (k, (result, children)) ->
-              go (Map.insert k result visited) (Set.delete k pending) children
+          key = nodeKey node
 
-    go base_map Set.empty roots
+    for_ roots discover
+    waitForWorkers pool
+    freezeMonotoneMap results
+
+{- Note [Deterministic concurrent workers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To provide deterministic output when doing graph traversal (as in downsweep)
+despite using concurrent workers, we ensure that nothing can observe the order
+in which workers do their work:
+
+  1. Any chunk of work is performed at most once: every worker atomically claims
+     ownership of the work it is going to do before it starts that work.
+
+  2. Workers report results by writing to a 'MonotoneMap', whose entries are
+     written at most once. Other outputs (such as logging output) is accumulated
+     in a deterministic order and reported at the end.
+
+This scheme allows us to retain maximum concurrency: it allows new edges to be
+discovered by any worker and immediately processed.
+
+For this scheme to provide deterministic output, we require that:
+
+  * The expansion of a node is a pure function of the node.
+  * The work itself should not observably depend on when it was run.
+
+Failure is not deterministic: which worker's exception is reported depends on
+the schedule. When deterministic error messages are desired, the workers should
+return an error value instead (as 'mapConcurrentWorkers' does).
+-}

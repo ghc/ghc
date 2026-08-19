@@ -174,9 +174,8 @@ incrementally constructing a ModuleGraph using the GHC API; See #27054). So
 `downsweep` takes a `Maybe ModuleGraph` as one of its arguments.
 
 Downsweep iteratively *expands* each so-called 'DownsweepNode' into a list of
-its dependencies, and recursively traverses all reachable nodes in a parallel
-non-det-depth-first order using 'parDfsBuild'. A 'DownsweepNode' is *expanded*
-by 'dsNodeExpand':
+its dependencies, and recursively traverses all reachable nodes concurrently
+using 'parBuild'. A 'DownsweepNode' is *expanded* by 'dsNodeExpand':
 
   dsNodeExpand :: DownsweepNode -> DownsweepM (NodeRes (ModuleGraphNode, [DownsweepNode]))
 
@@ -591,7 +590,7 @@ loopModuleNodeInfos :: M.Map NodeKey (NodeRes ModuleGraphNode) -> [ModuleNodeInf
 loopUnits           :: M.Map NodeKey (NodeRes ModuleGraphNode) -> UnitId -> [UnitId]            -> DownsweepM (M.Map NodeKey (NodeRes ModuleGraphNode))
 loopInstantiations  :: M.Map NodeKey (NodeRes ModuleGraphNode) -> [(UnitId, InstantiatedUnit)]  -> DownsweepM (M.Map NodeKey (NodeRes ModuleGraphNode))
 loopFromInteractive :: M.Map NodeKey (NodeRes ModuleGraphNode) -> Module -> [InteractiveImport] -> DownsweepM (M.Map NodeKey (NodeRes ModuleGraphNode))
-loopDownsweepNodes  base_map nodes = parDfsBuild (Just base_map) nodes dsNodeInfoKey dsNodeExpand
+loopDownsweepNodes  base_map nodes = parBuild (Just base_map) nodes dsNodeInfoKey dsNodeExpand
 loopModuleNodeInfos base_map       = loopDownsweepNodes base_map . map DSMod
 loopUnits           base_map homud = loopDownsweepNodes base_map . map (DSUnit homud)
 loopInstantiations  base_map       = loopDownsweepNodes base_map . map (uncurry DSInst)
@@ -1732,10 +1731,10 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
   return PreprocessedImports {..}
 
 --------------------------------------------------------------------------------
--- * Generic traversal of iteratively-built graph: parDfsBuild
+-- * Generic traversal of iteratively-built graph: parBuild
 --------------------------------------------------------------------------------
 
--- | The result of expanding a node in 'parDfsBuild'.
+-- | The result of expanding a node in 'parBuild'.
 data NodeRes v
   -- | Computed the node payload successfully
   = NSuccess v
@@ -1748,20 +1747,18 @@ data NodeRes v
   -- abort.
   | NSkip
 
--- | In a parallel non-det-depth-first order, and starting from the given roots, traverse a
--- graph by iteratively expanding a node into a payload and a list of children
--- nodes to visit next.
+-- | Starting from the given roots, traverse a graph by iteratively expanding a
+-- node into a payload and a list of children nodes to visit next, expanding
+-- nodes concurrently.
 --
--- A node is NEVER visited/expanded more than once, as long as the node key
--- @k@, computed from the node @n@, uniquely identifies that node.
---
--- The first argument @base_map@ is the starting set of already visited nodes
--- (these nodes won't be expanded again!).
+-- A node is NEVER visited/expanded more than once: nodes are identified by
+-- their key @k@, and the first node discovered under a key is the one that is
+-- expanded.
 --
 -- The result is a mapping from the key of every node transitively reachable
 -- from the root nodes (inclusively) to the payload returned by expanding that
 -- node. The result includes the previously visited nodes given in @base_map@,
--- s.t. @parDfsBuild base_map [] _ _ == base_map@.
+-- s.t. @parBuild base_map [] _ _ _ == base_map@.
 --
 -- The @expand@ function returns a 'NodeRes'. See the 'NodeRes' documentation
 -- for more information about each result type.
@@ -1771,7 +1768,7 @@ data NodeRes v
 -- See Note [Parallel Downsweep] for more information about how parallelism is
 -- achieved, and See Note [Downsweep Control Flow and Caching] for information
 -- about the various caches used.
-parDfsBuild :: forall k v n. Ord k
+parBuild :: forall k v n. (Ord k, Outputable k)
          => Maybe (Map.Map k (NodeRes v))
          -- ^ Base map, existing results. We won't re-expand any of the nodes
          -- already present in this map.
@@ -1785,22 +1782,26 @@ parDfsBuild :: forall k v n. Ord k
          -> DownsweepM (Map.Map k (NodeRes v))
          -- ^ The result accumulates the payload of expanding the root nodes
          -- and all nodes transitively reachable from those roots.
-parDfsBuild base_map roots key expand = ReaderT $ \ds_env -> do
+parBuild base_map roots nodeKey expand = ReaderT $ \ds_env -> do
 
   let
     conc :: Concurrency
     conc = ds_concurrency ds_env
 
-    expand_node :: ConcurrentWorkerEnv -> n -> IO (NodeRes v, [n])
-    expand_node worker_env node = do
+    expandNode :: ConcurrentWorkerEnv -> n -> IO (NodeRes v, [n])
+    expandNode worker_env node = do
       result <- withConcurrency conc $
         runDownsweepM (setDownsweepWorkerEnv worker_env ds_env) (expand node)
       pure $ case result of
         NSkip                    -> (NSkip, [])
         NSuccess (val, new_work) -> (NSuccess val, new_work)
 
-  concurrentTraversal_DF "downsweep_worker" conc (viewHscWorkerEnv $ ds_hsc_env ds_env)
-    (fromMaybe mempty base_map) roots key expand_node
+  concurrentTraversal "downsweep_worker"
+    conc
+    (viewHscWorkerEnv $ ds_hsc_env ds_env)
+    (NodeExpander { nodeKey, expandNode })
+    (fromMaybe mempty base_map)
+    roots
 
 setDownsweepWorkerEnv :: ConcurrentWorkerEnv -> DownsweepEnv -> DownsweepEnv
 setDownsweepWorkerEnv work_env env =
@@ -1809,7 +1810,7 @@ setDownsweepWorkerEnv work_env env =
 {-
 Note [Downsweep Control Flow and Caching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The control flow of downsweep is extracted into a single function `parDfsBuild`,
+The control flow of downsweep is extracted into a single function `parBuild`,
 which takes care of iteratively expanding and traversing all nodes of the
 in-construction module graph necessary to build a full `ModuleGraph` at the
 end.
@@ -1818,7 +1819,7 @@ There are three levels of caching going on, all of which are necessary to make
 sure we don't do repeated work (notably, we NEVER summarise the same module
 twice).
 
-1. `parDfsBuild` accumulates the final module graph and never revisits the
+1. `parBuild` accumulates the final module graph and never revisits the
    same node of the module graph. Cache is keyed by the final
    `ModuleGraph`s `NodeKey`s.
 
@@ -1900,9 +1901,12 @@ things, and that processing can often be costly (e.g. see `expandModuleSummary`)
 We leverage multiple threads in this traversal to expand more than one module
 at once, respecting -j<N> to mean we never expand more than N modules at once.
 
-We use the concurrent scheduling abstraction from GHC.Driver.Concurrency
-('concurrentTraversal_DF'). Each time we discover a new node, a worker is
-spawned to expand it. After each expansion completes, the resulting children
-nodes are pushed onto the worklist. With -j1 no threads are involved: each
-expansion runs in sequence.
+We use the concurrent traversal abstraction from GHC.Driver.Concurrency
+('concurrentTraversal'). Each time we discover a new node, a worker is spawned
+to expand it; a worker spawns the workers for the children it discovers itself,
+so an expansion never waits on an unrelated one. With -j1 no threads are
+involved: each expansion runs in sequence.
+
+The traversal is deterministic despite the fact that the order in which workers
+are spawned is not: see Note [Deterministic concurrent workers] in GHC.Driver.Concurrency.
 -}
