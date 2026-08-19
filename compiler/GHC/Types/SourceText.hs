@@ -7,17 +7,15 @@
 --
 module GHC.Types.SourceText
    ( SourceText (..)
-   , pprWithSourceText
    )
 where
 
-import GHC.Prelude
+-- 'GHC.Prelude.Basic' rather than 'GHC.Prelude': the latter reaches
+-- 'GHC.Utils.Outputable' via 'GHC.Utils.Trace', and 'GHC.Utils.Outputable'
+-- now imports this module to define 'Outputable SourceText'.
+import GHC.Prelude.Basic
 
 import GHC.Data.FastString
-
-import GHC.Utils.Outputable
-import GHC.Utils.Binary
-import GHC.Utils.Panic
 
 import Data.Data
 import Control.DeepSeq
@@ -85,31 +83,7 @@ data SourceText
       -- its own representation of the item.
    deriving (Data, Show, Eq )
 
-instance Outputable SourceText where
-  ppr (SourceText s) = text "SourceText" <+> ftext s
-  ppr NoSourceText   = text "NoSourceText"
-
 instance NFData SourceText where
     rnf = \case
         SourceText s -> rnf s
         NoSourceText -> ()
-
-instance Binary SourceText where
-  put_ bh NoSourceText = putByte bh 0
-  put_ bh (SourceText s) = do
-        putByte bh 1
-        put_ bh s
-
-  get bh = do
-    h <- getByte bh
-    case h of
-      0 -> return NoSourceText
-      1 -> do
-        s <- get bh
-        return (SourceText s)
-      _ -> panic $ "Binary SourceText:" ++ show h
-
--- | Special combinator for showing string literals.
-pprWithSourceText :: SourceText -> SDoc -> SDoc
-pprWithSourceText NoSourceText     d = d
-pprWithSourceText (SourceText src) _ = ftext src

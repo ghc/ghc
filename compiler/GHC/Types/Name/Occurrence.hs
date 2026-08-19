@@ -3,6 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
+{-# LANGUAGE UndecidableInstances #-} -- for HasOccName (IEWrappedName p)
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -122,6 +123,8 @@ import GHC.Types.Unique.Set
 import GHC.Data.FastString
 import GHC.Data.FastString.Env
 import GHC.Utils.Outputable
+import Language.Haskell.Syntax.Extension ( DataConCantHappen, IdP, UnXRec(..), XXIEWrappedName )
+import Language.Haskell.Syntax.ImpExp ( IEWrappedName, ieWrappedLIdP )
 import GHC.Utils.Lexeme
 import GHC.Utils.Binary
 import GHC.Utils.Panic.Plain
@@ -384,6 +387,12 @@ instance Data OccName where
 
 instance HasOccName OccName where
   occName = id
+
+instance ( HasOccName (IdP p)
+         , UnXRec p
+         , XXIEWrappedName p ~ DataConCantHappen
+         ) => HasOccName (IEWrappedName p) where
+  occName w = occName (unXRec @p (ieWrappedLIdP w))
 
 instance NFData OccName where
   rnf x = x `seq` ()

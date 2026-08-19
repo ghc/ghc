@@ -194,9 +194,6 @@ partitionBindsAndSigs = go
 -- ---------------------------------------------------------------------
 
 -- Okay, I need to reconstruct the document comments, but for now:
-instance Outputable (DocDecl name) where
-  ppr _ = text "<document comment>"
-
 type instance XCHsGroup (GhcPass _) = NoExtField
 type instance XXHsGroup (GhcPass _) = DataConCantHappen
 
@@ -285,22 +282,6 @@ appendGroups
         hs_ruleds = rulds1 ++ rulds2,
         hs_docs   = docs1  ++ docs2 }
 
-instance (OutputableBndrId p) => Outputable (HsDecl (GhcPass p)) where
-    ppr (TyClD _ dcl)             = ppr dcl
-    ppr (ValD _ binds)            = ppr binds
-    ppr (DefD _ def)              = ppr def
-    ppr (InstD _ inst)            = ppr inst
-    ppr (DerivD _ deriv)          = ppr deriv
-    ppr (ForD _ fd)               = ppr fd
-    ppr (SigD _ sd)               = ppr sd
-    ppr (KindSigD _ ksd)          = ppr ksd
-    ppr (RuleD _ rd)              = ppr rd
-    ppr (WarningD _ wd)           = ppr wd
-    ppr (AnnD _ ad)               = ppr ad
-    ppr (SpliceD _ dd)            = ppr dd
-    ppr (DocD _ doc)              = ppr doc
-    ppr (RoleAnnotD _ ra)         = ppr ra
-
 instance (OutputableBndrId p) => Outputable (HsGroup (GhcPass p)) where
     ppr (HsGroup { hs_valds  = val_decls,
                    hs_tyclds = tycl_decls,
@@ -342,9 +323,6 @@ instance OutputableBndrId p
        => Outputable (SpliceDecl (GhcPass p)) where
   ppr (SpliceDecl _ (L _ e) DollarSplice) = pprUntypedSplice True Nothing e
   ppr (SpliceDecl _ (L _ e) BareSplice)   = pprUntypedSplice False Nothing e
-
-instance Outputable SpliceDecoration where
-  ppr x = text $ show x
 
 
 
@@ -482,14 +460,6 @@ instance NoAnn AnnSynDecl where
 
 ------------- Pretty printing FamilyDecls -----------
 
-pprFlavour :: FamilyInfo pass -> SDoc
-pprFlavour DataFamily            = text "data"
-pprFlavour OpenTypeFamily        = text "type"
-pprFlavour (ClosedTypeFamily {}) = text "type"
-
-instance Outputable (FamilyInfo pass) where
-  ppr info = pprFlavour info <+> text "family"
-
 
 -- Dealing with names
 
@@ -601,20 +571,6 @@ instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
                                                map (ppr . unLoc) docs ++
                                                pprLHsBindsForUser methods sigs) ]
 
-instance OutputableBndrId p
-       => Outputable (TyClGroup (GhcPass p)) where
-  ppr (TyClGroup { group_tyclds = tyclds
-                 , group_roles = roles
-                 , group_kisigs = kisigs
-                 , group_instds = instds
-                 }
-      )
-    = hang (text "TyClGroup") 2 $
-      ppr kisigs $$
-      ppr tyclds $$
-      ppr roles $$
-      ppr instds
-
 pp_vanilla_decl_head :: (OutputableBndrId p)
    => XRecGhc (IdGhcP p)
    -> LHsQTyVars (GhcPass p)
@@ -650,18 +606,13 @@ tyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_cons = nd } })
       NewType  -> NewtypeFlavour
       DataType -> DataTypeFlavour
 
-instance OutputableBndrId p => Outputable (FunDep (GhcPass p)) where
-  ppr = pprFunDep
-
 type instance XCFunDep    (GhcPass _) = TokRarrow
 type instance XXFunDep    (GhcPass _) = DataConCantHappen
 
 pprFundeps :: OutputableBndrId p => [FunDep (GhcPass p)] -> SDoc
 pprFundeps []  = empty
-pprFundeps fds = hsep (vbar : punctuate comma (map pprFunDep fds))
+pprFundeps fds = hsep (vbar : punctuate comma (map ppr fds))
 
-pprFunDep :: OutputableBndrId p => FunDep (GhcPass p) -> SDoc
-pprFunDep (FunDep _ us vs) = hsep [interppSP us, arrow, interppSP vs]
 
 {- *********************************************************************
 *                                                                      *
@@ -818,10 +769,6 @@ type instance XDctSingle (GhcPass _) = NoExtField
 type instance XDctMulti  (GhcPass _) = (EpToken "(", EpToken ")")
 type instance XXDerivClauseTys (GhcPass _) = DataConCantHappen
 
-instance OutputableBndrId p => Outputable (DerivClauseTys (GhcPass p)) where
-  ppr (DctSingle _ ty) = ppr ty
-  ppr (DctMulti _ tys) = parens (interpp'SP tys)
-
 type instance XStandaloneKindSig GhcPs = (EpToken "type", TokDcolon)
 type instance XStandaloneKindSig GhcRn = NoExtField
 type instance XStandaloneKindSig GhcTc = NoExtField
@@ -930,11 +877,6 @@ pp_data_defn pp_hdr defn@HsDataDefn
 instance OutputableBndrId p
        => Outputable (HsDataDefn (GhcPass p)) where
    ppr d = pp_data_defn (\_ -> text "Naked HsDataDefn") d
-
-instance OutputableBndrId p
-       => Outputable (StandaloneKindSig (GhcPass p)) where
-  ppr (StandaloneKindSig _ v ki)
-    = text "type" <+> pprPrefixOcc (unLoc v) <+> dcolon <+> ppr ki
 
 pp_condecls :: forall p. OutputableBndrId p => [LConDecl (GhcPass p)] -> SDoc
 pp_condecls cs
@@ -1178,11 +1120,6 @@ ppOverlapPragma mb =
                 (GhcRn, (s,_)) -> s
                 (GhcTc, s) -> s
 
-instance (OutputableBndrId p) => Outputable (InstDecl (GhcPass p)) where
-    ppr (ClsInstD     { cid_inst  = decl }) = ppr decl
-    ppr (TyFamInstD   { tfid_inst = decl }) = ppr decl
-    ppr (DataFamInstD { dfid_inst = decl }) = ppr decl
-
 -- Extract the declarations of associated data types from an instance
 
 instDeclDataFamInsts :: [LInstDecl GhcRn] -> [DataFamInstDecl GhcRn]
@@ -1407,11 +1344,6 @@ instance forall p. (IsPass p, OutputableBndrId p)
         doubleQuotes $ text "dynamic"
       pprCEntity CWrapper _ = doubleQuotes $ text "wrapper"
 
-instance OutputableBndrId p
-       => Outputable (ForeignExport (GhcPass p)) where
-  ppr (CExport _ (L _ (CExportStatic lbl cconv))) =
-    ppr cconv <+> char '"' <> ppr lbl <> char '"'
-
 {-
 ************************************************************************
 *                                                                      *
@@ -1508,18 +1440,6 @@ instance OutputableBndrId p
               GhcTc | SourceText src <- ext -> src
               _ -> panic "WarnDecls"
 
-instance OutputableBndrId p
-       => Outputable (WarnDecl (GhcPass p)) where
-    ppr (Warning _ ns_spec thing txt)
-      = ppr_category
-              <+> ppr ns_spec
-              <+> hsep (punctuate comma (map ppr thing))
-              <+> ppr txt
-      where
-        ppr_category = case txt of
-                         WarningTxt _ (Just cat) _ -> ppr cat
-                         _ -> empty
-
 {-
 ************************************************************************
 *                                                                      *
@@ -1555,15 +1475,6 @@ type instance XCRoleAnnotDecl GhcRn = NoExtField
 type instance XCRoleAnnotDecl GhcTc = NoExtField
 
 type instance XXRoleAnnotDecl (GhcPass _) = DataConCantHappen
-
-instance OutputableBndr (IdP (GhcPass p))
-       => Outputable (RoleAnnotDecl (GhcPass p)) where
-  ppr (RoleAnnotDecl _ ltycon roles)
-    = text "type role" <+> pprPrefixOcc (unLoc ltycon) <+>
-      hsep (map (pp_role . unLoc) roles)
-    where
-      pp_role Nothing  = underscore
-      pp_role (Just r) = ppr r
 
 roleAnnotDeclName :: RoleAnnotDecl (GhcPass p) -> IdP (GhcPass p)
 roleAnnotDeclName (RoleAnnotDecl _ (L _ name) _) = name

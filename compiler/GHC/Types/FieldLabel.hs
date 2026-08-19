@@ -82,6 +82,9 @@ flLabel = FieldLabelString . fastStringToShortText . occNameFS . nameOccName . f
 instance HasOccName FieldLabel where
   occName = nameOccName . flSelector
 
+instance NFData FieldLabel where
+  rnf (FieldLabel a b c) = rnf a `seq` rnf b `seq` rnf c
+
 instance Outputable FieldLabel where
     ppr fl = ppr (flLabel fl) <> whenPprDebug (braces (ppr (flSelector fl))
                                                 <> ppr (flHasDuplicateRecordFields fl)

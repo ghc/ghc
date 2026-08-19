@@ -1981,10 +1981,6 @@ type instance XApplicativeArgOne GhcTc = FailOperator GhcTc
 type instance XApplicativeArgMany (GhcPass _) = NoExtField
 type instance XXApplicativeArg    (GhcPass _) = DataConCantHappen
 
-instance (Outputable (StmtLR (GhcPass idL) (GhcPass idL) (LHsExpr (GhcPass idL))),
-          Outputable (XXParStmtBlock (GhcPass idL) (GhcPass idR)))
-        => Outputable (ParStmtBlock (GhcPass idL) (GhcPass idR)) where
-  ppr (ParStmtBlock _ stmts _ _) = interpp'SP stmts
 
 instance (OutputableBndrId pl, OutputableBndrId pr,
                  Anno (StmtLR (GhcPass pl) (GhcPass pr) body) ~ SrcSpanAnnA,
@@ -2386,17 +2382,6 @@ ppr_with_pending_tc_splices x ps = x $$ whenPprDebug (text "pending(tc)" <+> ppr
 ************************************************************************
 -}
 
-instance OutputableBndrId p
-         => Outputable (ArithSeqInfo (GhcPass p)) where
-    ppr (From e1)             = hcat [ppr e1, pp_dotdot]
-    ppr (FromThen e1 e2)      = hcat [ppr e1, comma, space, ppr e2, pp_dotdot]
-    ppr (FromTo e1 e3)        = hcat [ppr e1, pp_dotdot, ppr e3]
-    ppr (FromThenTo e1 e2 e3)
-      = hcat [ppr e1, comma, space, ppr e2, pp_dotdot, ppr e3]
-
-pp_dotdot :: SDoc
-pp_dotdot = text " .. "
-
 {-
 ************************************************************************
 *                                                                      *
@@ -2410,27 +2395,6 @@ type HsMatchContextRn = HsMatchContext (LIdP GhcRn)
 
 type HsStmtContextRn = HsStmtContext (LIdP GhcRn)
 
-instance Outputable fn => Outputable (HsMatchContext fn) where
-  ppr m@(FunRhs{})            = text "FunRhs" <+> ppr (mc_fun m) <+> ppr (mc_fixity m)
-  ppr CaseAlt                 = text "CaseAlt"
-  ppr (LamAlt lam_variant)    = text "LamAlt" <+> ppr lam_variant
-  ppr IfAlt                   = text "IfAlt"
-  ppr (ArrowMatchCtxt c)      = text "ArrowMatchCtxt" <+> ppr c
-  ppr PatBindRhs              = text "PatBindRhs"
-  ppr PatBindGuards           = text "PatBindGuards"
-  ppr RecUpd                  = text "RecUpd"
-  ppr (StmtCtxt _)            = text "StmtCtxt _"
-  ppr ThPatSplice             = text "ThPatSplice"
-  ppr ThPatQuote              = text "ThPatQuote"
-  ppr PatSynCtx               = text "PatSynCtx"
-  ppr LazyPatCtx              = text "LazyPatCtx"
-
-instance Outputable HsLamVariant where
-  ppr = text . \case
-    LamSingle -> "LamSingle"
-    LamCase   -> "LamCase"
-    LamCases  -> "LamCases"
-
 lamCaseKeyword :: HsLamVariant -> SDoc
 lamCaseKeyword LamSingle = text "lambda"
 lamCaseKeyword LamCase   = text "\\case"
@@ -2439,11 +2403,6 @@ lamCaseKeyword LamCases  = text "\\cases"
 pprExternalSrcLoc :: (StringLiteral (GhcPass p), (Int, Int), (Int, Int)) -> SDoc
 pprExternalSrcLoc (sLit, (n1,n2), (n3,n4))
   = ppr (stringLitSourceText sLit, (n1,n2), (n3,n4))
-
-instance Outputable HsArrowMatchContext where
-  ppr ProcExpr                  = text "ProcExpr"
-  ppr ArrowCaseAlt              = text "ArrowCaseAlt"
-  ppr (ArrowLamAlt lam_variant) = parens $ text "ArrowLamCaseAlt" <+> ppr lam_variant
 
 pprHsArrType :: HsArrAppType -> SDoc
 pprHsArrType HsHigherOrderApp = text "higher order arrow application"
@@ -2625,21 +2584,10 @@ FieldLabelStrings
 ************************************************************************
 -}
 
-instance (UnXRec p, Outputable (XRec p FieldLabelString)) => Outputable (FieldLabelStrings p) where
-  ppr (FieldLabelStrings flds) =
-    hcat (punctuate dot (toList $ NE.map (ppr . unXRec @p) flds))
-
-instance (UnXRec p, Outputable (XRec p FieldLabelString)) => OutputableBndr (FieldLabelStrings p) where
-  pprInfixOcc = pprFieldLabelStrings
-  pprPrefixOcc = pprFieldLabelStrings
-
+{-
 instance (UnXRec p,  Outputable (XRec p FieldLabelString)) => OutputableBndr (Located (FieldLabelStrings p)) where
   pprInfixOcc = pprInfixOcc . unLoc
   pprPrefixOcc = pprInfixOcc . unLoc
-
-pprFieldLabelStrings :: forall p. (UnXRec p, Outputable (XRec p FieldLabelString)) => FieldLabelStrings p -> SDoc
-pprFieldLabelStrings (FieldLabelStrings flds) =
-    hcat (punctuate dot (toList $ NE.map (ppr . unXRec @p) flds))
 
 pprPrefixFastString :: FastString -> SDoc
 pprPrefixFastString fs = pprPrefixOcc (mkVarUnqual fs)
@@ -2647,6 +2595,7 @@ pprPrefixFastString fs = pprPrefixOcc (mkVarUnqual fs)
 instance UnXRec p => Outputable (DotFieldOcc p) where
   ppr (DotFieldOcc _ s) = (pprPrefixFastString . mkFastStringShortText . field_label . unXRec @p) s
   ppr XDotFieldOcc{} = text "XDotFieldOcc"
+-}
 
 {-
 ************************************************************************
@@ -2685,7 +2634,3 @@ type instance Anno HText                           = EpAnnCO
   -- Used in HsQuasiQuote and perhaps elsewhere
 
 type instance Anno (DotFieldOcc (GhcPass p))       = EpAnnCO
-
-instance (HasAnnotation (Anno a))
-   => WrapXRec (GhcPass p) a where
-  wrapXRec = noLocA

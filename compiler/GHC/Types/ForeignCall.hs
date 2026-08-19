@@ -1,15 +1,19 @@
 {-# LANGUAGE TypeFamilies #-}
 {-
-Orphan 'Binary' and 'Outputable' instances for the following types:
+Orphan 'Eq', 'Binary' and 'Outputable' instances for the following types:
 
-  * CCallConv
   * CCallTarget
-  * CExportSpec
   * CType
   * Header
-  * Safety
 
-To be resolved at a later time, see TODO at the end of this module.
+'Binary' and 'Outputable' cannot be moved to the modules defining those
+classes: each instance body reduces the GhcPass instantiation of a
+Trees-that-Grow extension point (XStaticTarget, XCType, XHeader) whose
+equation is defined in this module, and GHC.Utils.Binary and
+GHC.Utils.Outputable cannot see those equations without an import cycle.
+
+'Eq' is defined in base, so it can only ever move to the module defining
+the data-type, Language.Haskell.Syntax.Decls.Foreign.
 
 -}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -94,7 +98,7 @@ module GHC.Types.ForeignCall (
 import GHC.Prelude
 
 import GHC.Hs.Extension
-import GHC.Types.SourceText (SourceText(..), pprWithSourceText)
+import GHC.Types.SourceText (SourceText(..))
 import GHC.Unit.Types
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
@@ -106,7 +110,6 @@ import Language.Haskell.Syntax.Text
 
 import Data.Char
 import Data.Data (Data)
-import Data.Functor ((<&>))
 
 import Control.DeepSeq (NFData(..))
 import GHC.Parser.Annotation (AnnCType, noAnn)
@@ -258,26 +261,6 @@ instance NFData ForeignCall where
 instance NFData CCallSpec where
   rnf (CCallSpec t c s) = rnf t `seq` rnf c `seq` rnf s
 
-instance Binary CCallConv where
-    put_ bh CCallConv =
-            putByte bh 0
-    put_ bh StdCallConv =
-            putByte bh 1
-    put_ bh PrimCallConv =
-            putByte bh 2
-    put_ bh CApiConv =
-            putByte bh 3
-    put_ bh JavaScriptCallConv =
-            putByte bh 4
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> return CCallConv
-              1 -> return StdCallConv
-              2 -> return PrimCallConv
-              3 -> return CApiConv
-              _ -> return JavaScriptCallConv
-
 -- |
 -- Which compilation 'Unit' is the static target in,
 -- either it is in this currently compiling compilation 'Unit',
@@ -384,90 +367,6 @@ instance forall p. IsPass p => Eq (CCallTarget (GhcPass p)) where
           GhcTc -> x1 == x2
         _ -> False
 
-instance forall p. IsPass p => Binary (CCallTarget (GhcPass p)) where
-    put_ bh = \case
-      StaticTarget x a b -> do
-        putByte bh 0
-        put_ bh a
-        put_ bh b
-        case ghcPass @p of
-          GhcPs -> put_ bh x
-          GhcRn -> put_ bh x
-          GhcTc -> put_ bh x
-
-      DynamicTarget NoExtField -> putByte bh 1
-
-    get bh = do
-      h <- getByte bh
-      case h of
-        0 -> do
-          (a :: CLabelString) <- get bh
-          (b :: ForeignKind ) <- get bh
-          case ghcPass @p of
-            GhcPs -> (\x -> StaticTarget x a b) <$> get bh
-            GhcRn -> (\x -> StaticTarget x a b) <$> get bh
-            GhcTc -> (\x -> StaticTarget x a b) <$> get bh
-
-        _ -> return $ DynamicTarget NoExtField
-
-instance Binary CExportSpec where
-    put_ bh (CExportStatic aa ab) = do
-      put_ bh aa
-      put_ bh ab
-    get bh = do
-      aa <- get bh
-      ab <- get bh
-      return (CExportStatic aa ab)
-
-instance Binary (CType (GhcPass p)) where
-    put_ bh (CType ext mh fs) = do
-        put_ bh ext
-        put_ bh mh
-        put_ bh fs
-    get bh = do
-      ext <- get bh
-      mh  <- get bh
-      fs  <- get bh
-      return (CType ext mh fs)
-
-instance Binary ForeignKind where
-    put_ bh = putByte bh . \case
-      ForeignValue -> 0
-      ForeignFunction -> 1
-    get bh = getByte bh <&> \case
-      0 -> ForeignValue
-      _ -> ForeignFunction
-
-instance Binary (Header (GhcPass p)) where
-    put_ bh (Header s h) = put_ bh s >> put_ bh h
-    get bh = do
-      s <- get bh
-      h <- get bh
-      return (Header s h)
-
-instance Binary Safety where
-    put_ bh = putByte bh . \case
-      PlaySafe -> 0
-      PlayInterruptible -> 1
-      PlayRisky -> 2
-
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> return PlaySafe
-              1 -> return PlayInterruptible
-              _ -> return PlayRisky
-
-instance Outputable CCallConv where
-    ppr StdCallConv = text "stdcall"
-    ppr CCallConv   = text "ccall"
-    ppr CApiConv    = text "capi"
-    ppr PrimCallConv = text "prim"
-    ppr JavaScriptCallConv = text "javascript"
-
-instance Outputable CExportSpec where
-    ppr (CExportStatic str _) = pprCLabelString str
-
 instance Outputable (CType (GhcPass p)) where
     ppr (CType ext mh ct) =
         pprWithSourceText stp (text "{-# CTYPE") <+> hDoc <+>
@@ -479,10 +378,5 @@ instance Outputable (CType (GhcPass p)) where
           Nothing -> empty
           Just h -> ppr h
 
-instance Outputable (Header (GhcPass p)) where
-    ppr (Header st h) = pprWithSourceText st (doubleQuotes $ ppr h)
 
-instance Outputable Safety where
-    ppr PlaySafe = text "safe"
-    ppr PlayInterruptible = text "interruptible"
-    ppr PlayRisky = text "unsafe"
+

@@ -41,7 +41,8 @@ import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
 import GHC.Utils.Outputable
-import GHC.Data.BooleanFormula () -- for BooleanFormulaDefault instance
+import GHC.Data.BooleanFormula () -- for the XBFAnd/XBFOr equations that
+                                 -- discharge the BooleanFormulaDefault context
 import Language.Haskell.Syntax.BooleanFormula ( BooleanFormula, mkTrue )
 
 import qualified Data.Data as Data

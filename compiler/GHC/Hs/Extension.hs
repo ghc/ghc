@@ -4,10 +4,14 @@
 {-# LANGUAGE UndecidableInstances    #-} -- Wrinkle in Note [Trees That Grow]
                                          -- in module Language.Haskell.Syntax.Extension
 
-{-# OPTIONS_GHC -Wno-orphans #-} -- Outputable
+{-# OPTIONS_GHC -Wno-orphans #-}
+-- The above is required for the type-family instances:
+--   * Anno RdrName, Anno Name, Anno Id, Anno (WithUserRdr a)
+--   * IdP (GhcPass p), IdOccP (GhcPass p), NoGhcTc (GhcPass pass)
 
 module GHC.Hs.Extension
   ( module GHC.Hs.Extension
+  , module GHC.Hs.Extension.Instances
   , module GHC.Hs.Extension.Pass
   ) where
 
@@ -17,6 +21,7 @@ module GHC.Hs.Extension
 import GHC.Prelude
 
 import Language.Haskell.Syntax.Extension
+import GHC.Hs.Extension.Instances
 import GHC.Hs.Extension.Pass
 import GHC.Types.Name
 import GHC.Types.Name.Reader
@@ -128,31 +133,6 @@ Bottom line: if you add a TTG extension constructor that uses DataConCantHappen,
 sure that any uses of it as a field are strict.
 -}
 
--- | Allows us to check what phase we're in at GHC's runtime.
--- For example, this class allows us to write
---
--- @
--- f :: forall p. IsPass p => HsExpr (GhcPass p) -> blah
--- f e = case ghcPass @p of
---         GhcPs ->    ... in this RHS we have HsExpr GhcPs...
---         GhcRn ->    ... in this RHS we have HsExpr GhcRn...
---         GhcTc ->    ... in this RHS we have HsExpr GhcTc...
--- @
---
--- which is very useful, for example, when pretty-printing.
--- See Note [IsPass].
-class ( NoGhcTcPass (NoGhcTcPass p) ~ NoGhcTcPass p
-      , IsPass (NoGhcTcPass p)
-      ) => IsPass p where
-  ghcPass :: GhcPass p
-
-instance IsPass 'Parsed where
-  ghcPass = GhcPs
-instance IsPass 'Renamed where
-  ghcPass = GhcRn
-instance IsPass 'Typechecked where
-  ghcPass = GhcTc
-
 type instance IdP (GhcPass p) = IdGhcP p
 
 -- | Maps the "normal" id type for a given GHC pass
@@ -179,9 +159,10 @@ type LIdOccGhcP p = XRecGhc (IdOccGhcP p)
 -- Breaking it up this way, GHC can figure out that the result is a GhcPass
 type instance NoGhcTc (GhcPass pass) = GhcPass (NoGhcTcPass pass)
 
-type family NoGhcTcPass (p :: Pass) :: Pass where
-  NoGhcTcPass 'Typechecked = 'Renamed
-  NoGhcTcPass other        = other
+-- This is the first place that the GhcPass machinery can import
+-- 'noLocA' from 'GHC.Parser.Annotation' without forming a cycle.
+instance HasAnnotation (Anno a) => WrapXRec (GhcPass p) a where
+   wrapXRec = noLocA
 
 -- |Constraint type to bundle up the requirement for 'OutputableBndr' on both
 -- the @id@ and the 'NoGhcTc' of it. See Note [NoGhcTc].
@@ -195,6 +176,11 @@ type OutputableBndrId pass =
   , Outputable (LIdGhcP (NoGhcTcPass pass))
   , Outputable (LIdOccGhcP (NoGhcTcPass pass))
   , IsPass pass
+    -- The GhcPass instantiation of extension points that pass-polymorphic
+    -- printers in GHC.Utils.Outputable now take as a constraint instead of
+    -- discharging with a 'ghcPass' dispatch. See Note [IsPass].
+  , Outputable (XXLit (GhcPass pass))
+  , Outputable (XXLit (GhcPass (NoGhcTcPass pass)))
   )
 
 -- useful helper functions:
@@ -209,11 +195,3 @@ pprIfRn pp = case ghcPass @p of GhcRn -> pp
 pprIfTc :: forall p. IsPass p => (p ~ 'Typechecked => SDoc) -> SDoc
 pprIfTc pp = case ghcPass @p of GhcTc -> pp
                                 _     -> empty
-
---- Outputable
-
-instance Outputable NoExtField where
-  ppr _ = text "NoExtField"
-
-instance Outputable DataConCantHappen where
-  ppr = dataConCantHappen

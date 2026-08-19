@@ -362,12 +362,6 @@ instance (Outputable arg, Outputable (XRec p (HsRecField p arg)), XRec p RecFiel
         where
           dotdot = text ".." <+> whenPprDebug (ppr (drop n flds))
 
-instance (Outputable p, OutputableBndr p, Outputable arg)
-      => Outputable (HsFieldBind p arg) where
-  ppr (HsFieldBind { hfbLHS = f, hfbRHS = arg,
-                     hfbPun = pun })
-    = pprPrefixOcc f <+> (ppUnless pun $ equals <+> ppr arg)
-
 instance OutputableBndrId p => Outputable (Pat (GhcPass p)) where
     ppr = pprPat
 

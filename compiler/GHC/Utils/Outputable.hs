@@ -1,4 +1,6 @@
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE UndecidableInstances #-} -- for the Trees-that-Grow instances below
 {-# LANGUAGE TypeFamilyDependencies #-}
 
 {-
@@ -24,6 +26,8 @@ module GHC.Utils.Outputable (
         SDoc, runSDoc, PDoc(..),
         docToSDoc,
         interppSP, interpp'SP, interpp'SP',
+        pprFlavour, pprHsStringLit, pprIntegralLit, pprWithSourceText,
+        pprBooleanFormulaNormal,
         pprQuotedList, pprWithCommas, pprWithSemis,
         unquotedListWith, pprUnquotedSet,
         quotedListWithOr, quotedListWithNor, quotedListWithAnd,
@@ -114,27 +118,82 @@ import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
 
 import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Binds.InlinePragma
+import Language.Haskell.Syntax.Decls ( AnnDecl, ClsInstDecl, DataFamInstDecl
+                                    , DefaultDecl, DerivClauseTys(..), DerivDecl
+                                    , DocDecl, FamilyInfo(..), FunDep(..)
+                                    , ForeignDecl, HsDecl(..), InWarningCategory(..)
+                                    , InstDecl(..), LInstDecl, LRoleAnnotDecl
+                                    , LStandaloneKindSig, LTyClDecl, RoleAnnotDecl(..)
+                                    , RuleDecls, SpliceDecl, SpliceDecoration
+                                    , StandaloneKindSig(..), TyClDecl, TyClGroup(..)
+                                    , TyFamInstDecl, WarnDecl(..), WarnDecls
+                                    , WarningCategory(..), WarningTxt(..) )
+import Language.Haskell.Syntax.Decls.Foreign ( CCallConv(..), CExportSpec(..)
+                                            , ForeignExport(..), Header(..), Safety(..) )
 import Language.Haskell.Syntax.Decls.Overlap ( OverlapMode(..) )
+import Language.Haskell.Syntax.BooleanFormula
 import Language.Haskell.Syntax.Doc
-import Language.Haskell.Syntax.ImpExp ( NamespaceSpecifier(..) )
-import Language.Haskell.Syntax.Module.Name ( ModuleName(..) )
+import Language.Haskell.Syntax.Expr ( ArithSeqInfo(..), DotFieldOcc(..), FieldLabelStrings(..)
+                                   , HsArrowMatchContext(..), HsLamVariant(..)
+                                   , ExprLStmt, HsMatchContext(..), LHsExpr
+                                   , ParStmtBlock(..) )
+import Language.Haskell.Syntax.Extension ( DataConCantHappen, IdP, LIdP, NoExtField(..)
+                                         , UnXRec(..), XRec, XXDerivClauseTys
+                                         , XXFieldOcc, XXForeignExport, XXFunDep
+                                         , XXHsForAllTelescope, XXHsPatSigType
+                                         , XXHsTyPat, XXHsWildCardBndrs, XXInstDecl
+                                         , XFractionalLit, XIntegralLit, XStringLit
+                                         , XHeader, XXFractionalLit, XXHeader
+                                         , XXIntegralLit, XXLHsQTyVars, XXQualLitVal
+                                         , XXRoleAnnotDecl, XXStandaloneKindSig
+                                         , XHsChar, XHsCharPrim, XHsInt16Prim
+                                         , XHsInt32Prim, XHsInt64Prim, XHsInt8Prim
+                                         , XHsIntPrim, XHsString, XHsStringPrim
+                                         , XHsWord16Prim, XHsWord32Prim, XHsWord64Prim
+                                         , XHsWord8Prim, XHsWordPrim, XXLit
+                                         , XQualLitString, XXHsDecl
+                                         , XXIEWrappedName, XXInWarningCategory
+                                         , XXStringLit, XXTyClGroup
+                                         , NoGhcTc, XXFixitySig, XXHsLocalBindsLR
+                                         , XXParStmtBlock, XXQualLit, XXRuleBndr
+                                         , XXRuleBndrs, XXWarnDecl
+                                         , dataConCantHappen )
+import Language.Haskell.Syntax.Binds ( FixitySig(..), HsBind, HsIPBinds
+                                    , HsLocalBindsLR(..), HsValBindsLR, LRuleBndr
+                                    , RecordPatSynField(..), RuleBndr(..)
+                                    , RuleBndrs(..), Sig )
+import Language.Haskell.Syntax.ImpExp ( IEWrappedName(..), NamespaceSpecifier(..)
+                                     , ieWrappedLIdP )
+import Language.Haskell.Syntax.Lit ( FractionalExponentBase(..), FractionalLit(..)
+                                  , IntegralLit(..), OverLitVal(..), QualLitVal(..)
+                                  , HsLit(..), HsQualLit(..), StringLiteral(..) )
+import Language.Haskell.Syntax.Module.Name ( ModuleName(..), moduleNameString )
+import Language.Haskell.Syntax.Pat ( HsFieldBind(..) )
 import Language.Haskell.Syntax.Specificity
 import Language.Haskell.Syntax.Text
-import Language.Haskell.Syntax.Type ( PromotionFlag(..) )
+import Language.Haskell.Syntax.Type ( FieldOcc(..), HsArg(..), HsBndrVar(..), HsBndrVis
+                                    , HsConDetails(..), HsContextDetails(..)
+                                    , HsForAllTelescope(..), HsIPName(..)
+                                    , HsPatSigType(..), HsTyPat(..), HsWildCardBndrs(..)
+                                    , LHsQTyVars(..), LHsSigType, LHsType, LHsTyVarBndr
+                                    , PromotionFlag(..), XArgPar, XXArg, XXBndrVar
+                                    , XXHsConDetails, XXHsContextDetails )
 
 import GHC.Prelude.Basic
 
 import GHC.Utils.BufHandle (BufHandle, bPutChar, bPutStr, bPutFS, bPutFZS)
 import GHC.Utils.Encoding ( utf8DecodeByteString )
 import GHC.Data.FastString
+import qualified GHC.Utils.Lexeme as Lex
 import qualified GHC.Utils.Ppr as Pretty
 import qualified GHC.Utils.Ppr.Colour as Col
 import GHC.Utils.Ppr       ( Doc, Mode(..) )
 import GHC.Utils.Panic.Plain (assert)
+import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Serialized
 import GHC.LanguageExtensions (Extension)
 import GHC.Utils.GlobalVars( unsafeHasPprDebug )
-import GHC.Utils.Misc (lastMaybe, snocView)
+import GHC.Utils.Misc (lastMaybe, snocView, split)
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -2092,6 +2151,35 @@ instance Outputable PromotionFlag where
   ppr NotPromoted = text "NotPromoted"
   ppr IsPromoted  = text "IsPromoted"
 
+-- 'unLoc' is not available here, so the two XRec projections the original bodies
+-- used are written with 'unXRec' under an 'UnXRec' constraint instead.
+instance ( UnXRec p, OutputableBndr (IdP p)
+         ) => Outputable (BooleanFormula p) where
+  ppr = pprBooleanFormulaNormal
+
+pprBooleanFormulaNormal :: forall p. (UnXRec p, OutputableBndr (IdP p))
+                        => BooleanFormula p -> SDoc
+pprBooleanFormulaNormal = go
+  where
+    go (Var _ x)    = pprPrefixOcc (unXRec @p x)
+    go (And _ xs)   = fsep $ punctuate comma (map (go . unXRec @p) xs)
+    go (Or _ [])    = keyword $ text "FALSE"
+    go (Or _ xs)    = fsep $ intersperse vbar (map (go . unXRec @p) xs)
+    go (Parens _ x) = parens (go $ unXRec @p x)
+    go (XBooleanFormula _) = text "XBooleanFormula"
+
+instance UnXRec p => Outputable (HsDocString p) where
+  ppr = text . renderHsDocString
+
+instance Outputable SourceText where
+  ppr (SourceText s) = text "SourceText" <+> ftext s
+  ppr NoSourceText   = text "NoSourceText"
+
+-- | Special combinator for showing string literals.
+pprWithSourceText :: SourceText -> SDoc -> SDoc
+pprWithSourceText NoSourceText     d = d
+pprWithSourceText (SourceText src) _ = ftext src
+
 instance Outputable Role where
   ppr = ftext . strFromRole
 
@@ -2109,3 +2197,436 @@ instance Outputable (NamespaceSpecifier p) where
   ppr TypeNamespaceSpecifier{} = text "type"
   ppr DataNamespaceSpecifier{} = text "data"
   ppr (XNamespaceSpecifier _)  = text "[user TTG extension]"
+
+instance Outputable NoExtField where
+  ppr _ = text "NoExtField"
+
+instance Outputable DataConCantHappen where
+  ppr = dataConCantHappen
+
+instance Outputable HsIPName where
+    ppr (HsIPName n) = char '?' <> ppr n -- Ordinary implicit parameters
+
+instance OutputableBndr HsIPName where
+    pprBndr _ n   = ppr n         -- Simple for now
+    pprInfixOcc  n = ppr n
+    pprPrefixOcc n = ppr n
+
+instance Outputable CCallConv where
+    ppr StdCallConv = text "stdcall"
+    ppr CCallConv   = text "ccall"
+    ppr CApiConv    = text "capi"
+    ppr PrimCallConv = text "prim"
+    ppr JavaScriptCallConv = text "javascript"
+
+instance Outputable CExportSpec where
+    ppr (CExportStatic str _) = ppr str
+
+instance Outputable Safety where
+    ppr PlaySafe = text "safe"
+    ppr PlayInterruptible = text "interruptible"
+    ppr PlayRisky = text "unsafe"
+
+instance ( Outputable arg, Outputable rec
+         , XXHsConDetails p ~ DataConCantHappen
+         ) => Outputable (HsConDetails p arg rec) where
+  ppr (PrefixCon _ args) = text "PrefixCon:" <+> ppr args
+  ppr (RecCon _ rec)     = text "RecCon:" <+> ppr rec
+  ppr (InfixCon _ l r)   = text "InfixCon:" <+> ppr [l, r]
+
+instance ( Outputable arg
+         , XXHsContextDetails p ~ DataConCantHappen
+         ) => Outputable (HsContextDetails p arg) where
+  ppr (HsContext _ ctxt) = ppr ctxt
+
+-- | This instance is meant for debug-printing purposes. If you wish to
+-- pretty-print an application of 'HsArg's, use 'pprHsArgsApp' instead.
+instance ( Outputable (XArgPar p), Outputable tm, Outputable ty
+         , XXArg p ~ DataConCantHappen
+         ) => Outputable (HsArg p tm ty) where
+  ppr (HsValArg _ tm)   = text "HsValArg"  <+> ppr tm
+  ppr (HsTypeArg _ ty)  = text "HsTypeArg" <+> ppr ty
+  ppr (HsArgPar sp)     = text "HsArgPar"  <+> ppr sp
+
+instance ( Outputable thing
+         , XXHsWildCardBndrs p thing ~ DataConCantHappen
+         ) => Outputable (HsWildCardBndrs p thing) where
+    ppr (HsWC { hswc_body = ty }) = ppr ty
+
+instance ( Outputable (LIdP p)
+         , XXFieldOcc p ~ DataConCantHappen
+         ) => Outputable (FieldOcc p) where
+  ppr = ppr . foLabel
+
+instance ( UnXRec p
+         , Outputable (LIdP p)
+         , OutputableBndr (IdP p)
+         , XXFieldOcc p ~ DataConCantHappen
+         ) => OutputableBndr (FieldOcc p) where
+  pprInfixOcc  = pprInfixOcc . unXRec @p . foLabel
+  pprPrefixOcc = pprPrefixOcc . unXRec @p . foLabel
+
+instance ( Outputable (LHsType p)
+         , XXHsPatSigType p ~ DataConCantHappen
+         ) => Outputable (HsPatSigType p) where
+    ppr (HsPS { hsps_body = ty }) = ppr ty
+
+instance ( Outputable (LHsType p)
+         , XXHsTyPat p ~ DataConCantHappen
+         ) => Outputable (HsTyPat p) where
+    ppr (HsTP { hstp_body = ty }) = ppr ty
+
+instance Outputable (DocDecl name) where
+  ppr _ = text "<document comment>"
+
+instance Outputable SpliceDecoration where
+  ppr x = text $ show x
+
+pprFlavour :: FamilyInfo pass -> SDoc
+pprFlavour DataFamily            = text "data"
+pprFlavour OpenTypeFamily        = text "type"
+pprFlavour (ClosedTypeFamily {}) = text "type"
+
+instance Outputable (FamilyInfo pass) where
+  ppr info = pprFlavour info <+> text "family"
+
+instance ( Outputable (LIdP p)
+         , XXFunDep p ~ DataConCantHappen
+         ) => Outputable (FunDep p) where
+  ppr (FunDep _ us vs) = hsep [interppSP us, arrow, interppSP vs]
+
+instance ( Outputable (LIdP p)
+         , XXBndrVar p ~ DataConCantHappen
+         ) => Outputable (HsBndrVar p) where
+  ppr (HsBndrVar _ name) = ppr name
+  ppr (HsBndrWildCard _) = char '_'
+
+instance ( Outputable (LHsTyVarBndr (HsBndrVis p) p)
+         , XXLHsQTyVars p ~ DataConCantHappen
+         ) => Outputable (LHsQTyVars p) where
+    ppr (HsQTvs { hsq_explicit = tvs }) = interppSP tvs
+
+instance ( Outputable (LHsTyVarBndr () p)
+         , Outputable (LHsTyVarBndr Specificity p)
+         , XXHsForAllTelescope p ~ DataConCantHappen
+         ) => Outputable (HsForAllTelescope p) where
+    ppr (HsForAllVis { hsf_vis_bndrs = bndrs }) =
+      text "HsForAllVis:" <+> ppr bndrs
+    ppr (HsForAllInvis { hsf_invis_bndrs = bndrs }) =
+      text "HsForAllInvis:" <+> ppr bndrs
+
+instance (Outputable p, OutputableBndr p, Outputable arg)
+      => Outputable (HsFieldBind p arg) where
+  ppr (HsFieldBind { hfbLHS = f, hfbRHS = arg,
+                     hfbPun = pun })
+    = pprPrefixOcc f <+> (ppUnless pun $ equals <+> ppr arg)
+
+instance Outputable (LHsExpr p) => Outputable (ArithSeqInfo p) where
+    ppr (From e1)             = hcat [ppr e1, pp_dotdot]
+    ppr (FromThen e1 e2)      = hcat [ppr e1, comma, space, ppr e2, pp_dotdot]
+    ppr (FromTo e1 e3)        = hcat [ppr e1, pp_dotdot, ppr e3]
+    ppr (FromThenTo e1 e2 e3)
+      = hcat [ppr e1, comma, space, ppr e2, pp_dotdot, ppr e3]
+
+pp_dotdot :: SDoc
+pp_dotdot = text " .. "
+
+instance Outputable fn => Outputable (HsMatchContext fn) where
+  ppr m@(FunRhs{})            = text "FunRhs" <+> ppr (mc_fun m) <+> ppr (mc_fixity m)
+  ppr CaseAlt                 = text "CaseAlt"
+  ppr (LamAlt lam_variant)    = text "LamAlt" <+> ppr lam_variant
+  ppr IfAlt                   = text "IfAlt"
+  ppr (ArrowMatchCtxt c)      = text "ArrowMatchCtxt" <+> ppr c
+  ppr PatBindRhs              = text "PatBindRhs"
+  ppr PatBindGuards           = text "PatBindGuards"
+  ppr RecUpd                  = text "RecUpd"
+  ppr (StmtCtxt _)            = text "StmtCtxt _"
+  ppr ThPatSplice             = text "ThPatSplice"
+  ppr ThPatQuote              = text "ThPatQuote"
+  ppr PatSynCtx               = text "PatSynCtx"
+  ppr LazyPatCtx              = text "LazyPatCtx"
+
+instance Outputable HsLamVariant where
+  ppr = text . \case
+    LamSingle -> "LamSingle"
+    LamCase   -> "LamCase"
+    LamCases  -> "LamCases"
+
+instance Outputable HsArrowMatchContext where
+  ppr ProcExpr                  = text "ProcExpr"
+  ppr ArrowCaseAlt              = text "ArrowCaseAlt"
+  ppr (ArrowLamAlt lam_variant) = parens $ text "ArrowLamCaseAlt" <+> ppr lam_variant
+
+instance (UnXRec p, Outputable (DotFieldOcc p)) => Outputable (FieldLabelStrings p) where
+  ppr (FieldLabelStrings flds) =
+    hcat (punctuate dot (NEL.toList (NEL.map (ppr . unXRec @p) flds)))
+
+instance (UnXRec p, Outputable (DotFieldOcc p)) => OutputableBndr (FieldLabelStrings p) where
+  pprInfixOcc  = ppr
+  pprPrefixOcc = ppr
+
+instance ( Outputable (LHsSigType p)
+         , XXDerivClauseTys p ~ DataConCantHappen
+         ) => Outputable (DerivClauseTys p) where
+  ppr (DctSingle _ ty) = ppr ty
+  ppr (DctMulti _ tys) = parens (interpp'SP tys)
+
+instance ( UnXRec p
+         , OutputableBndr (IdP p)
+         , Outputable (LHsSigType p)
+         , XXStandaloneKindSig p ~ DataConCantHappen
+         ) => Outputable (StandaloneKindSig p) where
+  ppr (StandaloneKindSig _ v ki)
+    = text "type" <+> pprPrefixOcc (unXRec @p v) <+> dcolon <+> ppr ki
+
+instance ( Outputable (ClsInstDecl p)
+         , Outputable (DataFamInstDecl p)
+         , Outputable (TyFamInstDecl p)
+         , XXInstDecl p ~ DataConCantHappen
+         ) => Outputable (InstDecl p) where
+    ppr (ClsInstD     { cid_inst  = decl }) = ppr decl
+    ppr (TyFamInstD   { tfid_inst = decl }) = ppr decl
+    ppr (DataFamInstD { dfid_inst = decl }) = ppr decl
+
+instance ( UnXRec p
+         , XXForeignExport p ~ DataConCantHappen
+         ) => Outputable (ForeignExport p) where
+  ppr (CExport _ spec) = case unXRec @p spec of
+    CExportStatic lbl cconv -> ppr cconv <+> char '"' <> ppr lbl <> char '"'
+
+instance ( UnXRec p
+         , OutputableBndr (IdP p)
+         , XXRoleAnnotDecl p ~ DataConCantHappen
+         ) => Outputable (RoleAnnotDecl p) where
+  ppr (RoleAnnotDecl _ ltycon roles)
+    = text "type role" <+> pprPrefixOcc (unXRec @p ltycon) <+>
+      hsep (map (pp_role . unXRec @p) roles)
+    where
+      pp_role Nothing  = underscore
+      pp_role (Just r) = ppr r
+
+instance ( XStringLit p ~ SourceText
+         , XXStringLit p ~ DataConCantHappen
+         ) => Outputable (StringLiteral p) where
+  ppr (StringLiteral{..}) = pprWithSourceText sl_src (doubleQuotes $ ppr sl_fs)
+
+instance ( XIntegralLit p ~ SourceText
+         , XXIntegralLit p ~ DataConCantHappen
+         ) => Outputable (IntegralLit p) where
+  ppr (IL (SourceText src) _ _) = ftext src
+  ppr (IL NoSourceText _ value) = text (show value)
+
+pprIntegralLit :: ( XIntegralLit p ~ SourceText
+                  , XXIntegralLit p ~ DataConCantHappen
+                  ) => IntegralLit p -> SDoc
+pprIntegralLit (IL{..}) = pprWithSourceText il_text $ integer il_value
+
+instance ( XFractionalLit p ~ SourceText
+         , XXFractionalLit p ~ DataConCantHappen
+         ) => Outputable (FractionalLit p) where
+  ppr (FL{..}) =
+    let base = case fl_exp_base of
+          Base2 -> 2
+          Base10 -> 10
+        rat = fl_signi * (base ^^ fl_exp)
+    in  pprWithSourceText fl_text $ rational rat
+
+pprHsStringLit :: SourceText -> HText -> SDoc
+pprHsStringLit NoSourceText     s = pprHsString (unpackHText s)
+pprHsStringLit (SourceText src) _ = vcat $ map text $ split '\n' (unpackFS src)
+
+instance ( XIntegralLit p ~ SourceText
+         , XXIntegralLit p ~ DataConCantHappen
+         , XFractionalLit p ~ SourceText
+         , XXFractionalLit p ~ DataConCantHappen
+         , XStringLit p ~ SourceText
+         , XXStringLit p ~ DataConCantHappen
+         ) => Outputable (OverLitVal p) where
+  ppr (HsIntegral   i) = pprIntegralLit i
+  ppr (HsFractional f) = ppr f
+  ppr (HsIsString   s) = ppr s
+
+instance ( XQualLitString p ~ SourceText
+         , XXQualLitVal p ~ DataConCantHappen
+         ) => Outputable (QualLitVal p) where
+  ppr (HsQualString st s) = pprHsStringLit st s
+
+-- The @st@ fields must be 'SourceText' exactly (they are fed to
+-- 'pprWithSourceText'), and the extension constructor is reached through
+-- @Outputable (XXLit p)@ rather than an @IsPass p@ / @ghcPass@ dispatch.
+instance ( XHsChar p ~ SourceText, XHsCharPrim p ~ SourceText
+         , XHsString p ~ SourceText, XHsStringPrim p ~ SourceText
+         , XHsIntPrim p ~ SourceText, XHsWordPrim p ~ SourceText
+         , XHsInt8Prim p ~ SourceText, XHsInt16Prim p ~ SourceText
+         , XHsInt32Prim p ~ SourceText, XHsInt64Prim p ~ SourceText
+         , XHsWord8Prim p ~ SourceText, XHsWord16Prim p ~ SourceText
+         , XHsWord32Prim p ~ SourceText, XHsWord64Prim p ~ SourceText
+         , XIntegralLit p ~ SourceText, XXIntegralLit p ~ DataConCantHappen
+         , XFractionalLit p ~ SourceText, XXFractionalLit p ~ DataConCantHappen
+         , Outputable (XXLit p)
+         ) => Outputable (HsLit p) where
+    ppr (HsChar st c)       = pprWithSourceText st (pprHsChar c)
+    ppr (HsCharPrim st c)   = pprWithSourceText st (pprPrimChar c)
+    ppr (HsString st s)     = pprHsStringLit st s
+    ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
+    ppr (HsDouble _ d)      = ppr d
+    ppr (HsNatural _ i)     = pprIntegralLit i
+    ppr (HsInt _ i)         = pprIntegralLit i
+    ppr (HsFloatPrim _ f)   = ppr f <> primFloatSuffix
+    ppr (HsDoublePrim _ d)  = ppr d <> primDoubleSuffix
+    ppr (HsIntPrim st i)    = pprWithSourceText st (pprPrimInt i)
+    ppr (HsInt8Prim st i)   = pprWithSourceText st (pprPrimInt8 i)
+    ppr (HsInt16Prim st i)  = pprWithSourceText st (pprPrimInt16 i)
+    ppr (HsInt32Prim st i)  = pprWithSourceText st (pprPrimInt32 i)
+    ppr (HsInt64Prim st i)  = pprWithSourceText st (pprPrimInt64 i)
+    ppr (HsWordPrim st w)   = pprWithSourceText st (pprPrimWord w)
+    ppr (HsWord8Prim st w)  = pprWithSourceText st (pprPrimWord8 w)
+    ppr (HsWord16Prim st w) = pprWithSourceText st (pprPrimWord16 w)
+    ppr (HsWord32Prim st w) = pprWithSourceText st (pprPrimWord32 w)
+    ppr (HsWord64Prim st w) = pprWithSourceText st (pprPrimWord64 w)
+    ppr (XLit x)            = ppr x
+
+instance ( Outputable (QualLitVal p)
+         , XXQualLit p ~ DataConCantHappen
+         ) => Outputable (HsQualLit p) where
+  ppr QualLit{..} = text (moduleNameString ql_mod) <> char '.' <> ppr ql_val
+
+instance ( Outputable (HsValBindsLR pl pr)
+         , Outputable (HsIPBinds pr)
+         , XXHsLocalBindsLR pl pr ~ DataConCantHappen
+         ) => Outputable (HsLocalBindsLR pl pr) where
+  ppr (HsValBinds _ bs)   = ppr bs
+  ppr (HsIPBinds _ bs)    = ppr bs
+  ppr (EmptyLocalBinds _) = empty
+
+instance Outputable (FieldOcc p) => Outputable (RecordPatSynField p) where
+    ppr (RecordPatSynField { recordPatSynField = v }) = ppr v
+
+instance ( UnXRec p
+         , OutputableBndr (IdP p)
+         , XXFixitySig p ~ DataConCantHappen
+         ) => Outputable (FixitySig p) where
+  ppr (FixitySig _ ns_spec names fixity) = sep [ppr fixity, ppr ns_spec, pprops]
+    where
+      pprops = hsep $ punctuate comma (map (pprInfixOcc . unXRec @p) names)
+
+instance ( Outputable (LHsTyVarBndr () (NoGhcTc p))
+         , Outputable (LRuleBndr (NoGhcTc p))
+         , XXRuleBndrs p ~ DataConCantHappen
+         ) => Outputable (RuleBndrs p) where
+   ppr (RuleBndrs { rb_tyvs = tyvs, rb_tmvs = tmvs })
+     = pp_forall_ty tyvs <+> pp_forall_tm tyvs
+     where
+       pp_forall_ty Nothing     = empty
+       pp_forall_ty (Just qtvs) = forAllLit <+> fsep (map ppr qtvs) <> dot
+       pp_forall_tm Nothing | null tmvs = empty
+       pp_forall_tm _ = forAllLit <+> fsep (map ppr tmvs) <> dot
+
+instance ( Outputable (LIdP p)
+         , Outputable (HsPatSigType p)
+         , XXRuleBndr p ~ DataConCantHappen
+         ) => Outputable (RuleBndr p) where
+   ppr (RuleBndr _ name) = ppr name
+   ppr (RuleBndrSig _ name ty) = parens (ppr name <> dcolon <> ppr ty)
+
+instance ( Outputable (LIdP p)
+         , Outputable (WarningTxt p)
+         , Outputable (XRec p (InWarningCategory p))
+         , XXWarnDecl p ~ DataConCantHappen
+         ) => Outputable (WarnDecl p) where
+    ppr (Warning _ ns_spec thing txt)
+      = ppr_category
+              <+> ppr ns_spec
+              <+> hsep (punctuate comma (map ppr thing))
+              <+> ppr txt
+      where
+        ppr_category = case txt of
+                         WarningTxt _ (Just cat) _ -> ppr cat
+                         _ -> empty
+
+instance ( Outputable (ExprLStmt idL)
+         , XXParStmtBlock idL idR ~ DataConCantHappen
+         ) => Outputable (ParStmtBlock idL idR) where
+  ppr (ParStmtBlock _ stmts _ _) = interpp'SP stmts
+
+instance ( XHeader p ~ SourceText
+         , XXHeader p ~ DataConCantHappen
+         ) => Outputable (Header p) where
+    ppr (Header st h) = pprWithSourceText st (doubleQuotes $ ppr h)
+
+instance ( UnXRec p
+         , OutputableBndr (IdP p)
+         , XXIEWrappedName p ~ DataConCantHappen
+         ) => Outputable (IEWrappedName p) where
+  ppr (IEDefault _ n) = text "default" <+> pprPrefixOcc (unXRec @p n)
+  ppr (IEName    _ n) =                    pprPrefixOcc (unXRec @p n)
+  ppr (IEPattern _ n) = text "pattern" <+> pprPrefixOcc (unXRec @p n)
+  ppr (IEType    _ n) = text "type"    <+> pprPrefixOcc (unXRec @p n)
+  ppr (IEData    _ n) = text "data"    <+> pprPrefixOcc (unXRec @p n)
+
+instance ( UnXRec p
+         , OutputableBndr (IdP p)
+         , XXIEWrappedName p ~ DataConCantHappen
+         ) => OutputableBndr (IEWrappedName p) where
+  pprBndr bs   w = pprBndr bs   (unXRec @p (ieWrappedLIdP w))
+  pprPrefixOcc w = pprPrefixOcc (unXRec @p (ieWrappedLIdP w))
+  pprInfixOcc  w = pprInfixOcc  (unXRec @p (ieWrappedLIdP w))
+
+-- 'Outputable' has the single method 'ppr', so this is exactly what
+-- GeneralizedNewtypeDeriving would emit; written out to avoid needing the
+-- 'HText' newtype constructor in scope here.
+instance Outputable WarningCategory where
+  ppr (WarningCategory w) = ppr w
+
+instance ( Outputable (XRec p WarningCategory)
+         , XXInWarningCategory p ~ DataConCantHappen
+         ) => Outputable (InWarningCategory p) where
+  ppr (InWarningCategory _ wt) = text "in" <+> doubleQuotes (ppr wt)
+
+instance ( Outputable (TyClDecl p), Outputable (InstDecl p)
+         , Outputable (DerivDecl p), Outputable (HsBind p)
+         , Outputable (Sig p), Outputable (StandaloneKindSig p)
+         , Outputable (DefaultDecl p), Outputable (ForeignDecl p)
+         , Outputable (WarnDecls p), Outputable (AnnDecl p)
+         , Outputable (RuleDecls p), Outputable (SpliceDecl p)
+         , Outputable (DocDecl p), Outputable (RoleAnnotDecl p)
+         , XXHsDecl p ~ DataConCantHappen
+         ) => Outputable (HsDecl p) where
+    ppr (TyClD _ dcl)             = ppr dcl
+    ppr (ValD _ binds)            = ppr binds
+    ppr (DefD _ def)              = ppr def
+    ppr (InstD _ inst)            = ppr inst
+    ppr (DerivD _ deriv)          = ppr deriv
+    ppr (ForD _ fd)               = ppr fd
+    ppr (SigD _ sd)               = ppr sd
+    ppr (KindSigD _ ksd)          = ppr ksd
+    ppr (RuleD _ rd)              = ppr rd
+    ppr (WarningD _ wd)           = ppr wd
+    ppr (AnnD _ ad)               = ppr ad
+    ppr (SpliceD _ dd)            = ppr dd
+    ppr (DocD _ doc)              = ppr doc
+    ppr (RoleAnnotD _ ra)         = ppr ra
+
+instance ( Outputable (LTyClDecl p), Outputable (LRoleAnnotDecl p)
+         , Outputable (LStandaloneKindSig p), Outputable (LInstDecl p)
+         , XXTyClGroup p ~ DataConCantHappen
+         ) => Outputable (TyClGroup p) where
+  ppr (TyClGroup { group_tyclds = tyclds
+                 , group_roles = roles
+                 , group_kisigs = kisigs
+                 , group_instds = instds
+                 }
+      )
+    = hang (text "TyClGroup") 2 $
+      ppr kisigs $$
+      ppr tyclds $$
+      ppr roles $$
+      ppr instds
+
+instance UnXRec p => Outputable (DotFieldOcc p) where
+  ppr (DotFieldOcc _ s) = (pprPrefixFastString . mkFastStringShortText . field_label . unXRec @p) s
+  ppr XDotFieldOcc{} = text "XDotFieldOcc"
+
+pprPrefixFastString :: FastString -> SDoc
+pprPrefixFastString = \fs -> pprPrefixVar (Lex.isLexConSym fs || Lex.isLexVarSym fs)
+                                          (docWithStyle (ztext (zEncodeFS fs)) (\_ -> ftext fs <> whenPprDebug (braces (char 'v'))))

@@ -50,7 +50,7 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Var
 import GHC.Types.Name
 
-import GHC.Data.BooleanFormula ( LBooleanFormula, pprBooleanFormulaNormal )
+import GHC.Data.BooleanFormula ( LBooleanFormula )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -153,10 +153,6 @@ data AnnPSB
 
 instance NoAnn AnnPSB where
   noAnn = AnnPSB noAnn noAnn noAnn noAnn
-
-instance HasLoc (ValBind (GhcPass p) (GhcPass p)) where
-  getHasLoc (VbBind b) = getHasLoc b
-  getHasLoc (VbSig  s) = getHasLoc s
 
 -- ---------------------------------------------------------------------
 
@@ -439,12 +435,6 @@ Specifically,
 -}
 
 instance (OutputableBndrId pl, OutputableBndrId pr)
-        => Outputable (HsLocalBindsLR (GhcPass pl) (GhcPass pr)) where
-  ppr (HsValBinds _ bs)   = ppr bs
-  ppr (HsIPBinds _ bs)    = ppr bs
-  ppr (EmptyLocalBinds _) = empty
-
-instance (OutputableBndrId pl, OutputableBndrId pr)
         => Outputable (HsValBindsLR (GhcPass pl) (GhcPass pr)) where
   ppr (ValBinds _ binds)
    = pprDeclList (pprLHsBindsForUser' binds)
@@ -669,9 +659,6 @@ pprTicks pp_no_debug pp_when_debug
       if debug || dumpStyle sty
          then pp_when_debug
          else pp_no_debug
-
-instance Outputable (XRecGhc (IdGhcP p)) => Outputable (RecordPatSynField (GhcPass p)) where
-    ppr (RecordPatSynField { recordPatSynField = v }) = ppr v
 
 {-
 ************************************************************************
@@ -939,12 +926,6 @@ extractSpecPragName srcTxt =  case (words $ show srcTxt) of
      (_:_:pragName:_) -> filter (/= '\"') pragName
      _                -> pprPanic "hsSigDoc: Misformed SPECIALISE instance pragma:" (ppr srcTxt)
 
-instance OutputableBndrId p
-       => Outputable (FixitySig (GhcPass p)) where
-  ppr (FixitySig _ ns_spec names fixity) = sep [ppr fixity, ppr ns_spec, pprops]
-    where
-      pprops = hsep $ punctuate comma (map (pprInfixOcc . unLoc) names)
-
 pragBrackets :: SDoc -> SDoc
 pragBrackets doc = text "{-#" <+> doc <+> text "#-}"
 
@@ -1011,19 +992,6 @@ type instance XCRuleBndrs   GhcTc = [Var]   -- Binders of the rule, not
 type instance XRuleBndrSig  (GhcPass _) = AnnTyVarBndr
 type instance XCRuleBndr    (GhcPass _) = AnnTyVarBndr
 type instance XXRuleBndr    (GhcPass _) = DataConCantHappen
-
-instance (OutputableBndrId p) => Outputable (RuleBndrs (GhcPass p)) where
-   ppr (RuleBndrs { rb_tyvs = tyvs, rb_tmvs = tmvs })
-     = pp_forall_ty tyvs <+> pp_forall_tm tyvs
-     where
-       pp_forall_ty Nothing     = empty
-       pp_forall_ty (Just qtvs) = forAllLit <+> fsep (map ppr qtvs) <> dot
-       pp_forall_tm Nothing | null tmvs = empty
-       pp_forall_tm _ = forAllLit <+> fsep (map ppr tmvs) <> dot
-
-instance (OutputableBndrId p) => Outputable (RuleBndr (GhcPass p)) where
-   ppr (RuleBndr _ name) = ppr name
-   ppr (RuleBndrSig _ name ty) = parens (ppr name <> dcolon <> ppr ty)
 
 {-
 ************************************************************************

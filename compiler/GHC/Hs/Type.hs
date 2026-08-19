@@ -815,13 +815,6 @@ ppr_single_hs_arg (HsTypeArg _ ty) = char '@' <> ppr ty
 -- allows this to be reachable, so don't fail here.
 ppr_single_hs_arg (HsArgPar{})     = empty
 
--- | This instance is meant for debug-printing purposes. If you wish to
--- pretty-print an application of 'HsArg's, use 'pprHsArgsApp' instead.
-instance (Outputable tm, Outputable ty) => Outputable (HsArg (GhcPass p) tm ty) where
-  ppr (HsValArg _ tm)   = text "HsValArg"  <+> ppr tm
-  ppr (HsTypeArg _ ty)  = text "HsTypeArg" <+> ppr ty
-  ppr (HsArgPar sp)     = text "HsArgPar"  <+> ppr sp
-
 --------------------------------
 
 -- | Decompose a pattern synonym type signature into its constituent parts.
@@ -1210,10 +1203,6 @@ pprHsModifier (HsModifier x ty) = char '%' <> case ghcPass @p of
 pprLHsModifiers :: (OutputableBndrId p, Outputable ty) => [LHsModifierOf ty (GhcPass p)] -> SDoc
 pprLHsModifiers mods = hsep $ pprHsModifier <$> fmap unLoc mods
 
-instance OutputableBndrId p => Outputable (HsBndrVar (GhcPass p)) where
-  ppr (HsBndrVar _ name) = ppr name
-  ppr (HsBndrWildCard _) = char '_'
-
 class OutputableBndrFlag flag p where
   pprTyVarBndr :: OutputableBndrId p => HsTyVarBndr flag (GhcPass p) -> SDoc
 
@@ -1260,10 +1249,6 @@ instance OutputableBndrId p => Outputable (HsSigType (GhcPass p)) where
 instance OutputableBndrId p => Outputable (HsType (GhcPass p)) where
     ppr ty = pprHsType ty
 
-instance OutputableBndrId p
-       => Outputable (LHsQTyVars (GhcPass p)) where
-    ppr (HsQTvs { hsq_explicit = tvs }) = interppSP tvs
-
 instance (OutputableBndrFlag flag p,
           OutputableBndrFlag flag (NoGhcTcPass p),
           OutputableBndrId p)
@@ -1276,47 +1261,9 @@ instance (OutputableBndrFlag flag p,
     ppr (HsOuterExplicit{hso_bndrs = exp_tvs}) =
       text "HsOuterExplicit:" <+> ppr exp_tvs
 
-instance OutputableBndrId p
-       => Outputable (HsForAllTelescope (GhcPass p)) where
-    ppr (HsForAllVis { hsf_vis_bndrs = bndrs }) =
-      text "HsForAllVis:" <+> ppr bndrs
-    ppr (HsForAllInvis { hsf_invis_bndrs = bndrs }) =
-      text "HsForAllInvis:" <+> ppr bndrs
-
 instance (OutputableBndrId p, OutputableBndrFlag flag p)
        => Outputable (HsTyVarBndr flag (GhcPass p)) where
     ppr = pprTyVarBndr
-
-instance Outputable thing
-       => Outputable (HsWildCardBndrs (GhcPass p) thing) where
-    ppr (HsWC { hswc_body = ty }) = ppr ty
-
-instance (OutputableBndrId p)
-       => Outputable (HsPatSigType (GhcPass p)) where
-    ppr (HsPS { hsps_body = ty }) = ppr ty
-
-
-instance (OutputableBndrId p)
-       => Outputable (HsTyPat (GhcPass p)) where
-    ppr (HsTP { hstp_body = ty }) = ppr ty
-
-instance Outputable HsIPName where
-    ppr (HsIPName n) = char '?' <> ppr n -- Ordinary implicit parameters
-
-instance OutputableBndr HsIPName where
-    pprBndr _ n   = ppr n         -- Simple for now
-    pprInfixOcc  n = ppr n
-    pprPrefixOcc n = ppr n
-
-instance (Outputable arg, Outputable rec)
-         => Outputable (HsConDetails (GhcPass p) arg rec) where
-  ppr (PrefixCon _ args) = text "PrefixCon:" <+> ppr args
-  ppr (RecCon _ rec)     = text "RecCon:" <+> ppr rec
-  ppr (InfixCon _ l r)   = text "InfixCon:" <+> ppr [l, r]
-
-instance Outputable arg
-          => Outputable (HsContextDetails (GhcPass p) arg) where
-  ppr (HsContext _ ctxt) = ppr ctxt
 
 pprHsConDeclFieldWith :: (OutputableBndrId p)
                       => (HsModifiedFunArr (GhcPass p) -> SDoc -> SDoc)
@@ -1335,17 +1282,6 @@ mkConDeclField mult (L _ (HsDocTy _ ty lds)) = (mkConDeclField mult ty) { cdf_do
 mkConDeclField mult (L _ (XHsType (HsBangTy ann (HsSrcBang srcTxt unp str) t))) = CDF (ann, srcTxt) unp str mult t Nothing
 mkConDeclField mult t = CDF noAnn NoSrcUnpack NoSrcStrict mult t Nothing
 
-instance Outputable (XRecGhc (IdGhcP p)) =>
-       Outputable (FieldOcc (GhcPass p)) where
-  ppr = ppr . foLabel
-
-instance (OutputableBndrId pass) => OutputableBndr (FieldOcc (GhcPass pass)) where
-  pprInfixOcc  = pprInfixOcc . unXRec @(GhcPass pass) . foLabel
-  pprPrefixOcc = pprPrefixOcc . unXRec @(GhcPass pass) . foLabel
-
-instance (OutputableBndrId pass) => OutputableBndr (GenLocated SrcSpan (FieldOcc (GhcPass pass))) where
-  pprInfixOcc  = pprInfixOcc . unLoc
-  pprPrefixOcc = pprPrefixOcc . unLoc
 
 pprAnonWildCard :: SDoc
 pprAnonWildCard = char '_'

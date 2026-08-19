@@ -14,7 +14,7 @@ module GHC.Data.BooleanFormula (
         bfMap, bfTraverse,
         eval, simplify, isUnsatisfied,
         implies, impliesAtom,
-        pprBooleanFormula, pprBooleanFormulaNice, pprBooleanFormulaNormal
+        pprBooleanFormula, pprBooleanFormulaNice
   ) where
 
 import Data.List ( intersperse )
@@ -26,9 +26,9 @@ import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc (unLoc)
 import GHC.Utils.Outputable
 import GHC.Parser.Annotation ( SrcSpanAnnA, EpToken(..) )
-import GHC.Hs.Extension (GhcPass (..), OutputableBndrId)
+import GHC.Hs.Extension (GhcPass (..))
 import Language.Haskell.Syntax.Extension (Anno, LIdP, IdP,
-                                          noExtField, NoExtField, DataConCantHappen,
+                                          NoExtField, DataConCantHappen,
                                           XBFVar, XBFAnd, XBFOr, XBFParens,
                                           XXBooleanFormula)
 import Language.Haskell.Syntax.BooleanFormula
@@ -46,9 +46,6 @@ type instance XBFOr            (GhcPass _) = NoExtField
 type instance XBFParens        (GhcPass _) = (EpToken "(", EpToken ")")
 type instance XXBooleanFormula (GhcPass _) = DataConCantHappen
 
-instance BooleanFormulaDefault (GhcPass p) where
-  bfAnnAnd = noExtField
-  bfAnnOr = noExtField
 
 
 -- if we had Functor/Traversable (LbooleanFormula p) we could use that
@@ -241,15 +238,3 @@ pprBooleanFormulaNice = pprBooleanFormula' pprVar pprAnd pprOr 0
   pprAnd' (x:xs) = fsep (punctuate comma (init (x:|xs))) <> text ", and" <+> last (x:|xs)
   pprOr p xs = cparen (p > 1) $ text "either" <+> sep (intersperse (text "or") xs)
 
-instance OutputableBndrId p => Outputable (BooleanFormula (GhcPass p)) where
-  ppr = pprBooleanFormulaNormal
-
-pprBooleanFormulaNormal :: OutputableBndrId p => BooleanFormula (GhcPass p) -> SDoc
-pprBooleanFormulaNormal = go
-  where
-    go (Var _ x)    = pprPrefixOcc (unLoc x)
-    go (And _ xs)   = fsep $ punctuate comma (map (go . unLoc) xs)
-    go (Or _ [])    = keyword $ text "FALSE"
-    go (Or _ xs)    = fsep $ intersperse vbar (map (go . unLoc) xs)
-    go (Parens _ x) = parens (go $ unLoc x)
-    go (XBooleanFormula _) = text "XBooleanFormula"

@@ -344,11 +344,7 @@ ieDeprecation = fmap unLoc . ie_deprecation (ghcPass @p)
     ie_deprecation _ _ = Nothing
 
 ieWrappedLName :: IEWrappedName (GhcPass p) -> LIdP (GhcPass p)
-ieWrappedLName (IEDefault _ (L l n)) = L l n
-ieWrappedLName (IEName    _ (L l n)) = L l n
-ieWrappedLName (IEPattern _ (L l n)) = L l n
-ieWrappedLName (IEType    _ (L l n)) = L l n
-ieWrappedLName (IEData    _ (L l n)) = L l n
+ieWrappedLName = ieWrappedLIdP
 
 ieWrappedName :: IEWrappedName (GhcPass p) -> IdP (GhcPass p)
 ieWrappedName = unLoc . ieWrappedLName
@@ -408,21 +404,6 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
     ppr (IEGroup _ n _)           = text ("<IEGroup: " ++ show n ++ ">")
     ppr (IEDoc _ doc)             = ppr doc
     ppr (IEDocNamed _ string)     = text ("<IEDocNamed: " ++ string ++ ">")
-
-instance (HasOccName (IdP (GhcPass p)), OutputableBndrId p) => HasOccName (IEWrappedName (GhcPass p)) where
-  occName w = occName (ieWrappedName w)
-
-instance OutputableBndrId p => OutputableBndr (IEWrappedName (GhcPass p)) where
-  pprBndr bs   w = pprBndr bs   (ieWrappedName w)
-  pprPrefixOcc w = pprPrefixOcc (ieWrappedName w)
-  pprInfixOcc  w = pprInfixOcc  (ieWrappedName w)
-
-instance OutputableBndrId p => Outputable (IEWrappedName (GhcPass p)) where
-  ppr (IEDefault _ (L _ n)) = text "default" <+> pprPrefixOcc n
-  ppr (IEName    _ (L _ n)) = pprPrefixOcc n
-  ppr (IEPattern _ (L _ n)) = text "pattern" <+> pprPrefixOcc n
-  ppr (IEType    _ (L _ n)) = text "type"    <+> pprPrefixOcc n
-  ppr (IEData    _ (L _ n)) = text "data"    <+> pprPrefixOcc n
 
 pprImpExp :: (HasOccName name, OutputableBndr name) => name -> SDoc
 pprImpExp name = type_pref <+> pprPrefixOcc name
