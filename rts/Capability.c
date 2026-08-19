@@ -570,7 +570,6 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
  *
  * 2. There is no current task (cap->task == NULL), and thus the Capability
  *    is idle, and we want to wake up an idle Task to animate the Capability.
- *    In this case set always_wakeup. See also prodCapability.
  *
  * Setting the always_wakeup parameter (almost) ensures that the capability is
  * not left idle: even if there is no known work to do, the capability will be
@@ -595,7 +594,6 @@ releaseCapability_ (Capability* cap,
     {
         Task *task = cap->running_task;
 
-        ASSERT(task || always_wakeup);
         // To cover purpose 2 above, we allow the cap->running_task to be
         // NULL, to handle cases where a thread (that is not itself a Task)
         // needs to wake up an idle task for the capability.
