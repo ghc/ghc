@@ -571,17 +571,6 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
  * 2. There is no current task (cap->task == NULL), and thus the Capability
  *    is idle, and we want to wake up an idle Task to animate the Capability.
  *
- * Setting the always_wakeup parameter (almost) ensures that the capability is
- * not left idle: even if there is no known work to do, the capability will be
- * given to a worker task. There are two exceptions to this:
- *  1. if there is a pending sync then the capability is left idle, but in
- *     anticipation of whichever task initiated the sync picking it up shortly.
- *  2. if the scheduler is shutting down and there are no threads on the run
- *     queue and there are no spare workers then the capability is left idle.
- *     It is not entirely clear if this corner case is intentional.
- *
- * The caller must hold cap->lock and will still hold it after the call returns.
- *
  * N.B. May need to take all_tasks_mutex, if it needs to start a new task.
  *
  * ------------------------------------------------------------------------- */
@@ -712,14 +701,6 @@ releaseCapability (Capability* cap)
 {
     ACQUIRE_LOCK(&cap->lock);
     releaseCapability_(cap, false);
-    RELEASE_LOCK(&cap->lock);
-}
-
-void
-releaseAndWakeupCapability (Capability* cap)
-{
-    ACQUIRE_LOCK(&cap->lock);
-    releaseCapability_(cap, true);
     RELEASE_LOCK(&cap->lock);
 }
 

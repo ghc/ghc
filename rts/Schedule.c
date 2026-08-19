@@ -837,13 +837,9 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
         // release the capabilities
         for (i = 0; i < n_free_caps; i++) {
             task->cap = free_caps[i];
-            if (sparkPoolSizeCap(cap) > 0) {
-                // If we have sparks to steal, wake up a worker on the
-                // capability, even if it has no threads to run.
-                releaseAndWakeupCapability(free_caps[i]);
-            } else {
-                releaseCapability(free_caps[i]);
-            }
+            // If there are sparks available, this will wake up a Task to run
+            // the Capability, even if it has no threads to run.
+            releaseCapability(free_caps[i]);
         }
     }
     task->cap = cap; // reset to point to our Capability.
