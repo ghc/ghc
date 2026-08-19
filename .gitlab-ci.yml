@@ -1193,7 +1193,7 @@ base-with-other-ghcs-windows:
   dependencies: null
   image: null
   tags:
-    - x86_64-windows
+    - new-x86_64-windows
   script: bash .gitlab/base-ci.sh x86_64-unknown-mingw32 9.14.1
   rules:
     - *full-ci
