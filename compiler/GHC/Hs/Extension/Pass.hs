@@ -2,20 +2,13 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
-
-{-# OPTIONS_GHC -Wno-orphans #-}
--- The above is required for the type-family instances:
---   * Anno HsDocStringChunk = SrcSpan
+{-# LANGUAGE UndecidableSuperClasses #-} -- for IsPass; see Note [NoGhcTc] in GHC.Hs.Extension
 
 module GHC.Hs.Extension.Pass where
 
-import GHC.Prelude
-
 import Data.Data
-import GHC.Types.SrcLoc (GenLocated(..), SrcSpan, unLoc)
-import GHC.Utils.Panic
-import Language.Haskell.Syntax.Doc (HsDocString, HsDocStringChunk)
-import Language.Haskell.Syntax.Extension
+import Data.Type.Equality (type (~))
+import GHC.Utils.Panic.Plain
 
 -- | Used as a data type index for the hsSyn AST; also serves
 -- as a singleton type for Pass
@@ -39,24 +32,31 @@ type GhcPs   = GhcPass 'Parsed      -- Output of parser
 type GhcRn   = GhcPass 'Renamed     -- Output of renamer
 type GhcTc   = GhcPass 'Typechecked -- Output of typechecker
 
--- See Note [XRec and Anno in the AST] in GHC.Parser.Annotation
-type instance XRec (GhcPass p) a = XRecGhc a
+-- | Allows us to check what phase we're in at GHC's runtime.
+-- For example, this class allows us to write
+--
+-- @
+-- f :: forall p. IsPass p => HsExpr (GhcPass p) -> blah
+-- f e = case ghcPass @p of
+--         GhcPs ->    ... in this RHS we have HsExpr GhcPs...
+--         GhcRn ->    ... in this RHS we have HsExpr GhcRn...
+--         GhcTc ->    ... in this RHS we have HsExpr GhcTc...
+-- @
+--
+-- which is very useful, for example, when pretty-printing.
+-- See Note [IsPass] in GHC.Hs.Extension.
+class ( NoGhcTcPass (NoGhcTcPass p) ~ NoGhcTcPass p
+      , IsPass (NoGhcTcPass p)
+      ) => IsPass p where
+  ghcPass :: GhcPass p
 
--- (XRecGhc tree) wraps `tree` in a GHC-specific,
--- but pass-independent, source location
-type XRecGhc a = GenLocated (Anno a) a
+instance IsPass 'Parsed where
+  ghcPass = GhcPs
+instance IsPass 'Renamed where
+  ghcPass = GhcRn
+instance IsPass 'Typechecked where
+  ghcPass = GhcTc
 
-type instance Anno (HsDocString (GhcPass _))  = SrcSpan
-type instance Anno HsDocStringChunk           = SrcSpan
-
-type instance XMultiLineDocString (GhcPass _) = NoExtField
-type instance XNestedDocString    (GhcPass _) = NoExtField
-type instance XGeneratedDocString (GhcPass _) = NoExtField
-type instance XXHsDocString       (GhcPass _) = DataConCantHappen
-
-instance UnXRec (GhcPass p) where
-  unXRec = unLoc
-instance MapXRec (GhcPass p) where
-  mapXRec = fmap
--- instance WrapXRec (GhcPass p) a where
---   wrapXRec = noLocA
+type family NoGhcTcPass (p :: Pass) :: Pass where
+  NoGhcTcPass 'Typechecked = 'Renamed
+  NoGhcTcPass other        = other

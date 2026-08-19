@@ -1,8 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
 
-{-# OPTIONS_GHC -Wno-orphans #-} -- instance NFData FieldLabel
-
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -96,7 +94,6 @@ import GHC.Platform
 import GHC.Types.Name.Occurrence
 import GHC.Unit.Module
 import GHC.Unit.Home
-import GHC.Types.FieldLabel
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
@@ -287,10 +284,6 @@ instance Outputable NameSort where
 
 instance NFData Name where
   rnf Name{..} = rnf n_sort `seq` rnf n_occ `seq` n_uniq `seq` rnf n_loc
-
--- Needs NFData Name, so the instance is here to avoid cyclic imports.
-instance NFData FieldLabel where
-  rnf (FieldLabel a b c) = rnf a `seq` rnf b `seq` rnf c
 
 instance NFData NameSort where
   rnf (External m) = rnf m

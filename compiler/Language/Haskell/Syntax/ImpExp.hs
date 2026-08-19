@@ -13,6 +13,7 @@ import Data.Data (Data)
 import Data.Bool (Bool(..))
 import Data.Maybe (Maybe)
 import Data.String (String)
+import Data.Type.Equality (type (~))
 import Data.Int (Int)
 
 import Control.DeepSeq
@@ -189,6 +190,17 @@ data IEWrappedName p
 
 -- | Located name with possible adornment
 type LIEWrappedName p = XRec p (IEWrappedName p)
+
+-- | The located identifier wrapped by an 'IEWrappedName', discarding the
+-- adornment. Lives here rather than in @GHC.Hs.ImpExp@ so that the class
+-- modules defining 'Outputable'\/'OutputableBndr'\/'HasOccName' can each reach
+-- it without duplicating the match.
+ieWrappedLIdP :: XXIEWrappedName p ~ DataConCantHappen => IEWrappedName p -> LIdP p
+ieWrappedLIdP (IEDefault _ n) = n
+ieWrappedLIdP (IEName    _ n) = n
+ieWrappedLIdP (IEPattern _ n) = n
+ieWrappedLIdP (IEType    _ n) = n
+ieWrappedLIdP (IEData    _ n) = n
 
 -- | Optional namespace specifier for:
 --

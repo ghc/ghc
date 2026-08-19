@@ -1,3 +1,5 @@
+{-# LANGUAGE UndecidableInstances #-} -- for the Anno constraints on HasLoc below
+
 module GHC.Parser.Annotation (
   -- * Core Exact Print Annotation types
   EpToken(..), noEpTok, EpUniToken(..), noEpUniTok,
@@ -86,6 +88,7 @@ module GHC.Parser.Annotation (
 import GHC.Prelude
 
 import Data.Data
+import Data.Foldable (toList)
 import Data.Function (on)
 import Data.List (sortBy)
 import Data.Semigroup
@@ -94,8 +97,12 @@ import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Hs.DocString () -- Required for Data, Eq, Show instances
-import GHC.Hs.Extension.Pass (GhcPs)
+import GHC.Hs.Extension.Pass (GhcPass, GhcPs, GhcRn)
+import Language.Haskell.Syntax.Binds ( HsBindLR, Sig, ValBind(..) )
+import Language.Haskell.Syntax.Decls ( ConDecl, DataDefnCons, HsDataDefn(..) )
 import Language.Haskell.Syntax.Doc
+import Language.Haskell.Syntax.Extension ( Anno, DataConCantHappen, XXHsDataDefn )
+import Language.Haskell.Syntax.Type ( HsArg(..), XArgPar, XXArg )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
@@ -745,6 +752,28 @@ instance (HasLoc l) => HasLoc (GenLocated l a) where
 
 instance HasLoc SrcSpan where
   getHasLoc l = l
+
+instance HasLoc a => HasLoc (DataDefnCons a) where
+  getHasLoc = getHasLocList . toList
+
+instance ( HasLoc (Anno (ConDecl GhcRn))
+         , XXHsDataDefn GhcRn ~ DataConCantHappen
+         ) => HasLoc (HsDataDefn GhcRn) where
+  getHasLoc def@(HsDataDefn{}) = getHasLoc $ dd_cons def
+
+instance ( HasLoc (Anno (HsBindLR (GhcPass p) (GhcPass p)))
+         , HasLoc (Anno (Sig (GhcPass p)))
+         ) => HasLoc (ValBind (GhcPass p) (GhcPass p)) where
+  getHasLoc (VbBind b) = getHasLoc b
+  getHasLoc (VbSig  s) = getHasLoc s
+
+instance ( HasLoc tm, HasLoc ty
+         , XArgPar p ~ SrcSpan
+         , XXArg p ~ DataConCantHappen
+         ) => HasLoc (HsArg p tm ty) where
+  getHasLoc (HsValArg _ tm)  = getHasLoc tm
+  getHasLoc (HsTypeArg _ ty) = getHasLoc ty
+  getHasLoc (HsArgPar sp)    = sp
 
 instance (HasLoc a) => (HasLoc (Maybe a)) where
   getHasLoc (Just a) = getHasLoc a

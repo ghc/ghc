@@ -52,7 +52,6 @@ import GHC.Hs.Lit
 import GHC.Parser.Annotation
 
 import GHC.Utils.Outputable
-import GHC.Utils.Binary
 import GHC.Unicode
 
 import Language.Haskell.Syntax.Extension
@@ -155,9 +154,6 @@ warningTxtSame w1 w2
               | WarningTxt    {} <- w1, WarningTxt {} <- w2    = True
               | otherwise                                      = False
 
-instance Outputable (InWarningCategory (GhcPass pass)) where
-  ppr (InWarningCategory _ wt) = text "in" <+> doubleQuotes (ppr wt)
-
 type instance XDeprecatedTxt       (GhcPass _) = (SourceText, AnnWarningTxt)
 type instance XWarningTxt          (GhcPass _) = (SourceText, AnnWarningTxt)
 type instance XXWarningTxt         (GhcPass _) = DataConCantHappen
@@ -176,16 +172,6 @@ deriving stock instance Eq (WarningTxt GhcTc)
 deriving stock instance Eq (InWarningCategory GhcPs)
 deriving stock instance Eq (InWarningCategory GhcRn)
 deriving stock instance Eq (InWarningCategory GhcTc)
-
--- TODO: Move to respecitive type-class definition modules after removing
--- the Language.Haskell.Syntax.Decls module's dependency on GHC.Hs.Doc.
--- Subsequently, create a Language.Haskell.Syntax.Decls.Warnings sub-module
--- with the "warning declaration" types and have Language.Haskell.Syntax.Decls
--- re-export Language.Haskell.Syntax.Decls.Warnings. This will prevent cyclic
--- import, but it will only work once GHC.Hs.Doc is no longer a GHC dependency.
-deriving instance Binary WarningCategory
-
-deriving instance Outputable WarningCategory
 
 instance Outputable (WarningTxt (GhcPass pass)) where
     ppr (WarningTxt lsrc mcat ws)

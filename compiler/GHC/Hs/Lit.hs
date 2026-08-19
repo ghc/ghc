@@ -76,7 +76,6 @@ module GHC.Hs.Lit (
   -- *** Data-type
   , StringLiteral(..)
   -- *** Conversion
-  , pprHsStringLit
   , rnStringLit
   , tcStringLit
   -- *** Query
@@ -97,7 +96,6 @@ import GHC.Types.Basic (PprPrec(..), topPrec )
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import GHC.Types.SourceText
 import GHC.Core.Type
-import GHC.Utils.Misc (split)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic (panic)
 import GHC.Hs.Extension
@@ -105,8 +103,6 @@ import GHC.Hs.Extension
 import Language.Haskell.Syntax.Expr ( HsExpr )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Lit
-import Language.Haskell.Syntax.Module.Name (moduleNameString)
-import Language.Haskell.Syntax.Text
 
 import Data.Function (on)
 import Data.Ratio ((%))
@@ -332,35 +328,12 @@ instance Eq (XXLit (GhcPass p)) => Eq (HsLit (GhcPass p)) where
   XLit x1           == XLit x2           = x1 == x2
   XLit{}            == _                 = False
 
--- Instance specific to GhcPs, need the SourceText
-instance IsPass p => Outputable (HsLit (GhcPass p)) where
-    ppr (HsChar st c)       = pprWithSourceText st (pprHsChar c)
-    ppr (HsCharPrim st c)   = pprWithSourceText st (pprPrimChar c)
-    ppr (HsString st s)     = pprHsStringLit st s
-    ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
-    ppr (HsDouble _ d)      = ppr d
-    ppr (HsNatural _ i)     = pprIntegralLit i
-    ppr (HsInt _ i)         = pprIntegralLit i
-    ppr (HsFloatPrim _ f)   = ppr f <> primFloatSuffix
-    ppr (HsDoublePrim _ d)  = ppr d <> primDoubleSuffix
-    ppr (HsIntPrim st i)    = pprWithSourceText st (pprPrimInt i)
-    ppr (HsInt8Prim st i)   = pprWithSourceText st (pprPrimInt8 i)
-    ppr (HsInt16Prim st i)  = pprWithSourceText st (pprPrimInt16 i)
-    ppr (HsInt32Prim st i)  = pprWithSourceText st (pprPrimInt32 i)
-    ppr (HsInt64Prim st i)  = pprWithSourceText st (pprPrimInt64 i)
-    ppr (HsWordPrim st w)   = pprWithSourceText st (pprPrimWord w)
-    ppr (HsWord8Prim st w)  = pprWithSourceText st (pprPrimWord8 w)
-    ppr (HsWord16Prim st w) = pprWithSourceText st (pprPrimWord16 w)
-    ppr (HsWord32Prim st w) = pprWithSourceText st (pprPrimWord32 w)
-    ppr (HsWord64Prim st w) = pprWithSourceText st (pprPrimWord64 w)
-    ppr (XLit x)            = case ghcPass @p of
-      GhcTc -> case x of
-         (HsInteger st i _) -> pprWithSourceText st (integer i)
-         (HsRat  f _)       -> ppr f
-
-pprHsStringLit :: SourceText -> HText -> SDoc
-pprHsStringLit NoSourceText     s = pprHsString (unpackHText s)
-pprHsStringLit (SourceText src) _ = vcat $ map text $ split '\n' (unpackFS src)
+-- | The @GhcTc@-only extension payload of 'HsLit'. Non-orphan here, which is
+-- what lets 'Outputable' (HsLit p) live in GHC.Utils.Outputable with an
+-- @Outputable (XXLit p)@ constraint instead of an @IsPass p@ dispatch.
+instance Outputable HsLitTc where
+    ppr (HsInteger st i _) = pprWithSourceText st (integer i)
+    ppr (HsRat  f _)       = ppr f
 
 -- -----------------------------------------------------------------------------
 -- HsOverLit
@@ -404,11 +377,6 @@ instance Ord (OverLitVal (GhcPass p)) where
   HsIsString{}    `compare` HsFractional{}  = GT
   HsIsString   s1 `compare` HsIsString   s2 = sl_fs s1 `compare` sl_fs s2
 
-instance Outputable (OverLitVal (GhcPass p)) where
-  ppr (HsIntegral   i) = pprIntegralLit i
-  ppr (HsFractional f) = ppr f
-  ppr (HsIsString   s) = ppr s
-
 negateOverLitVal :: OverLitVal (GhcPass p) -> OverLitVal (GhcPass p)
 negateOverLitVal (HsIntegral i) = HsIntegral (negateIntegralLit i)
 negateOverLitVal (HsFractional f) = HsFractional (negateFractionalLit f)
@@ -447,9 +415,6 @@ instance Ord (HsQualLit (GhcPass p)) where
   -- QualLit
   QualLit _ m1 v1 `compare` QualLit _ m2 v2 = (m1, v1) `compare` (m2, v2)
 
-instance OutputableBndrId p => Outputable (HsQualLit (GhcPass p)) where
-  ppr QualLit{..} = text (moduleNameString ql_mod) <> char '.' <> ppr ql_val
-
 -- -----------------------------------------------------------------------------
 -- QualLitVal
 
@@ -461,9 +426,6 @@ instance Eq (QualLitVal (GhcPass p)) where
 
 instance Ord (QualLitVal (GhcPass p)) where
   HsQualString _ s1 `compare` HsQualString _ s2 = s1 `compare` s2
-
-instance Outputable (QualLitVal (GhcPass p)) where
-  ppr (HsQualString st s) = pprHsStringLit st s
 
 -- -----------------------------------------------------------------------------
 -- FractionalLit
@@ -495,25 +457,6 @@ instance Eq (FractionalLit (GhcPass p)) where
 -- won't compare as equal when any of the exponents is >= 100.
 instance Ord (FractionalLit (GhcPass p)) where
   compare = compareFractionalLit
-
-instance Outputable (FractionalLit (GhcPass p)) where
-  ppr (FL{..}) =
-    let base = case fl_exp_base of
-          Base2 -> 2
-          Base10 -> 10
-        rat = fl_signi * (base ^^ fl_exp)
-    in  pprWithSourceText fl_text $ rational rat
-
--- The 'Show' instance is required for the derived
--- 'GHC.Parser.Lexer.Token' instance when DEBUG is enabled.
-instance Show (FractionalLit (GhcPass p)) where
-  show (FL{..}) = unwords
-    [ show fl_text
-    , show fl_neg
-    , show fl_signi
-    , show fl_exp
-    , show fl_exp_base
-    ]
 
 mkFractionalLit ::
   SourceText ->
@@ -621,13 +564,6 @@ instance Eq (IntegralLit (GhcPass p)) where
 instance Ord (IntegralLit (GhcPass p)) where
   compare x y = il_value x `compare` il_value y
 
-instance Outputable (IntegralLit (GhcPass p)) where
-  ppr (IL (SourceText src) _ _) = ftext src
-  ppr (IL NoSourceText _ value) = text (show value)
-
-instance Show (IntegralLit (GhcPass p)) where
-  show (IL{..}) = unwords [ show il_text, show il_neg, show il_value ]
-
 mkIntegralLit :: Integral a => a -> IntegralLit (GhcPass p)
 mkIntegralLit i = IL
   { il_text = SourceText (fsLit $ show i_integer)
@@ -643,9 +579,6 @@ negateIntegralLit (IL{..}) = case il_text of
   SourceText (unconsFS -> Just ('-',src)) -> IL (SourceText src)                False (negate il_value)
   SourceText src                          -> IL (SourceText ('-' `consFS` src)) True  (negate il_value)
   NoSourceText                            -> IL NoSourceText             (not il_neg) (negate il_value)
-
-pprIntegralLit :: IntegralLit (GhcPass p) -> SDoc
-pprIntegralLit (IL{..}) = pprWithSourceText il_text $ integer il_value
 
 -- For internal use only. DO NOT EXPORT!
 convertIntegralLit :: IntegralLit (GhcPass p) -> IntegralLit (GhcPass p')
@@ -673,13 +606,6 @@ type instance XXStringLit (GhcPass p) = DataConCantHappen
 
 instance Eq (StringLiteral (GhcPass p)) where
   (StringLiteral _ a) == (StringLiteral _ b) = a == b
-
-instance Outputable (StringLiteral (GhcPass p)) where
-  ppr (StringLiteral{..}) = pprWithSourceText sl_src (doubleQuotes $ ppr sl_fs)
-
--- The 'Show' instance is required the 'parsed' test case of GHC's test-suite.
-instance Show (StringLiteral (GhcPass p)) where
-  show (StringLiteral srcTxt litFS) = unwords [ show srcTxt, show litFS ]
 
 -- | Get the 'SourceText' of a 'StringLiteral'
 {-# INLINE stringLitSourceText #-}

@@ -122,6 +122,10 @@ import GHC.Prelude
 
 import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Binds.InlinePragma
+import Language.Haskell.Syntax.Decls.Foreign ( CCallConv(..), CCallTarget(..), CExportSpec(..)
+                                            , CLabelString, CType(..), ForeignKind(..)
+                                            , Header(..), Safety(..) )
+import Language.Haskell.Syntax.Decls ( WarningCategory(..) )
 import Language.Haskell.Syntax.Decls.Overlap
 import Language.Haskell.Syntax.Doc
 import Language.Haskell.Syntax.Extension
@@ -139,12 +143,14 @@ import GHC.Utils.Panic.Plain
 import GHC.Types.Unique.FM
 import GHC.Data.FastMutInt
 import GHC.Utils.Fingerprint
+import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Data.SmallArray
 import qualified GHC.Data.Strict as Strict
 import GHC.Utils.Outputable( JoinPointHood(..) )
 import GHCi.FFI
+import GHCi.ResolvedBCO ( BCOByteArray(..) )
 import GHCi.Message
 
 import Control.DeepSeq
@@ -165,6 +171,7 @@ import qualified Data.ByteString.Short.Internal as SBS
 import qualified Data.Text.Internal as T
 import Data.IORef
 import Data.Char                ( ord, chr )
+import Data.Functor             ( (<&>) )
 import Data.List.NonEmpty       ( NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
@@ -1883,6 +1890,17 @@ getBS bh = do
   BS.create l $ \dest -> do
     getPrim bh l (\src -> copyBytes dest src l)
 
+-- Also see Note [BCOByteArray serialization] in GHC.ByteCode.Binary. This
+-- instance is unlike the `Binary` instances in `ghci`, which are for the
+-- `Binary` class in `binary` and are used across host/target platforms; here
+-- this instance is only used on the host for bytecode object serialization
+-- and doesn't cross host/target boundary. Therefore it's safe to
+-- serialize the underlying buffer directly.
+instance Binary (BCOByteArray a) where
+  put_ bh (BCOByteArray ba#) = put_ bh $ SBS.SBS ba#
+
+  get bh = (\(SBS.SBS ba#) -> BCOByteArray ba#) <$> get bh
+
 instance Binary SBS.ShortByteString where
   put_ bh f = putSBS bh f
   get bh = getSBS bh
@@ -1976,6 +1994,33 @@ instance Binary HsDocStringDecorator where
       2 -> HsDocStringNamed <$> get bh
       3 -> HsDocStringGroup <$> get bh
       t -> fail $ "HsDocStringDecorator: invalid tag " ++ show t
+
+instance ( XMultiLineDocString p ~ NoExtField
+         , XNestedDocString    p ~ NoExtField
+         , XGeneratedDocString p ~ NoExtField
+         , XXHsDocString       p ~ DataConCantHappen
+         , XRec p HsDocStringChunk ~ Located HsDocStringChunk
+         ) => Binary (HsDocString p) where
+  put_ bh x = case x of
+    MultiLineDocString _ dec xs -> do
+      putByte bh 0
+      put_ bh dec
+      put_ bh $ BinLocated <$> xs
+    NestedDocString _ dec x -> do
+      putByte bh 1
+      put_ bh dec
+      put_ bh $ BinLocated x
+    GeneratedDocString _ x -> do
+      putByte bh 2
+      put_ bh x
+
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> MultiLineDocString noExtField <$> get bh <*> (fmap unBinLocated <$> get bh)
+      1 -> NestedDocString noExtField <$> get bh <*> (unBinLocated <$> get bh)
+      2 -> GeneratedDocString noExtField <$> get bh
+      t -> fail $ "HsDocString: invalid tag " ++ show t
 
 instance Binary HsDocStringChunk where
   put_ bh (HsDocStringChunk bs) = put_ bh bs
@@ -2263,6 +2308,29 @@ instance Binary RuleMatchInfo where
       if h == 1 then pure ConLike
                 else pure FunLike
 
+-- 'Binary ShortText' (the representation of 'HText') defines only 'put_' and
+-- 'get', taking the class default for 'put', so this is exactly what
+-- GeneralizedNewtypeDeriving would emit. Written out because neither newtype's
+-- constructor is importable here ('ShortText' lives in @ghc-boot@).
+instance Binary WarningCategory where
+  put_ bh (WarningCategory w) = put_ bh w
+  get bh = WarningCategory <$> get bh
+
+instance Binary SourceText where
+  put_ bh NoSourceText = putByte bh 0
+  put_ bh (SourceText s) = do
+        putByte bh 1
+        put_ bh s
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return NoSourceText
+      1 -> do
+        s <- get bh
+        return (SourceText s)
+      _ -> panic $ "Binary SourceText:" ++ show h
+
 instance Binary Role where
   put_ bh Nominal          = putByte bh 1
   put_ bh Representational = putByte bh 2
@@ -2297,6 +2365,102 @@ instance Binary SrcUnpackedness where
            0 -> return SrcNoUnpack
            1 -> return SrcUnpack
            _ -> return NoSrcUnpack
+
+instance Binary CCallConv where
+    put_ bh CCallConv =
+            putByte bh 0
+    put_ bh StdCallConv =
+            putByte bh 1
+    put_ bh PrimCallConv =
+            putByte bh 2
+    put_ bh CApiConv =
+            putByte bh 3
+    put_ bh JavaScriptCallConv =
+            putByte bh 4
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> return CCallConv
+              1 -> return StdCallConv
+              2 -> return PrimCallConv
+              3 -> return CApiConv
+              _ -> return JavaScriptCallConv
+
+instance Binary CExportSpec where
+    put_ bh (CExportStatic aa ab) = do
+      put_ bh aa
+      put_ bh ab
+    get bh = do
+      aa <- get bh
+      ab <- get bh
+      return (CExportStatic aa ab)
+
+instance Binary ForeignKind where
+    put_ bh = putByte bh . \case
+      ForeignValue -> 0
+      ForeignFunction -> 1
+    get bh = getByte bh <&> \case
+      0 -> ForeignValue
+      _ -> ForeignFunction
+
+instance Binary Safety where
+    put_ bh = putByte bh . \case
+      PlaySafe -> 0
+      PlayInterruptible -> 1
+      PlayRisky -> 2
+
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> return PlaySafe
+              1 -> return PlayInterruptible
+              _ -> return PlayRisky
+
+instance ( Binary (XStaticTarget p)
+         , XDynamicTarget p ~ NoExtField
+         , XXCCallTarget  p ~ DataConCantHappen
+         ) => Binary (CCallTarget p) where
+    put_ bh = \case
+      StaticTarget x a b -> do
+        putByte bh 0
+        put_ bh a
+        put_ bh b
+        put_ bh x
+
+      DynamicTarget NoExtField -> putByte bh 1
+
+    get bh = do
+      h <- getByte bh
+      case h of
+        0 -> do
+          (a :: CLabelString) <- get bh
+          (b :: ForeignKind ) <- get bh
+          (\x -> StaticTarget x a b) <$> get bh
+
+        _ -> return $ DynamicTarget NoExtField
+
+instance ( Binary (XCType p)
+         , Binary (Header p)
+         , XXCType p ~ DataConCantHappen
+         ) => Binary (CType p) where
+    put_ bh (CType ext mh fs) = do
+        put_ bh ext
+        put_ bh mh
+        put_ bh fs
+    get bh = do
+      ext <- get bh
+      mh  <- get bh
+      fs  <- get bh
+      return (CType ext mh fs)
+
+instance ( Binary (XHeader p)
+         , XXHeader p ~ DataConCantHappen
+         ) => Binary (Header p) where
+    put_ bh (Header s h) = put_ bh s >> put_ bh h
+    get bh = do
+      s <- get bh
+      h <- get bh
+      return (Header s h)
 
 instance Binary PromotionFlag where
    put_ bh NotPromoted = putByte bh 0

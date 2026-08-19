@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
@@ -158,6 +159,19 @@ data FractionalLit pass = FL
   }
   | XFractionalLit !(XXFractionalLit pass)
 
+-- The 'Show' instance is required for the derived
+-- 'GHC.Parser.Lexer.Token' instance when DEBUG is enabled.
+instance ( Show (XFractionalLit pass)
+         , XXFractionalLit pass ~ DataConCantHappen
+         ) => Show (FractionalLit pass) where
+  show (FL{..}) = unwords
+    [ show fl_text
+    , show fl_neg
+    , show fl_signi
+    , show fl_exp
+    , show fl_exp_base
+    ]
+
 {- Note [fractional exponent bases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For hexadecimal rationals of
@@ -183,6 +197,11 @@ data IntegralLit pass = IL
   }
   | XIntegralLit !(XXIntegralLit pass)
 
+instance ( Show (XIntegralLit pass)
+         , XXIntegralLit pass ~ DataConCantHappen
+         ) => Show (IntegralLit pass) where
+  show (IL{..}) = unwords [ show il_text, show il_neg, show il_value ]
+
 -- | Located Haskell String Literal
 type LStringLit p = XRec p (StringLiteral p)
 
@@ -193,3 +212,9 @@ data StringLiteral pass = StringLiteral
   , sl_fs  :: HText -- literal string value
   }
   | XStringLit !(XXStringLit pass)
+
+-- The 'Show' instance is required the 'parsed' test case of GHC's test-suite.
+instance ( Show (XStringLit pass)
+         , XXStringLit pass ~ DataConCantHappen
+         ) => Show (StringLiteral pass) where
+  show (StringLiteral srcTxt litFS) = unwords [ show srcTxt, show litFS ]

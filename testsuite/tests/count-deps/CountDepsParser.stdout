@@ -113,6 +113,7 @@ GHC.Hs.Doc
 GHC.Hs.DocString
 GHC.Hs.Expr
 GHC.Hs.Extension
+GHC.Hs.Extension.Instances
 GHC.Hs.Extension.Pass
 GHC.Hs.ImpExp
 GHC.Hs.Instances

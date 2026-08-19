@@ -11,6 +11,7 @@
 -- | Bytecode assembler types
 module GHC.ByteCode.Types
   ( CompiledByteCode(..), seqCompiledByteCode
+  , BinName(..), getViaBinName, putViaBinName
   , BCOByteArray(..), mkBCOByteArray
   , FFIInfo(..)
   , RegBitmap(..)
@@ -35,6 +36,10 @@ module GHC.ByteCode.Types
   ) where
 
 import GHC.Prelude
+
+import Control.Monad ( replicateM )
+import Data.Foldable ( for_ )
+import Data.Proxy
 import qualified Data.ByteString.Char8 as BS8
 
 import GHC.Data.FastString
@@ -44,6 +49,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
+import GHC.Utils.Panic ( panic )
 import GHC.Builtin.PrimOps
 import GHC.Types.SptEntry
 import GHC.HsToCore.Breakpoints.Types
@@ -376,3 +382,154 @@ instance Binary FFIInfo where
   get bh = FFIInfo <$> get bh <*> get bh
 
   put_ bh FFIInfo {..} = put_ bh ffiInfoArgs *> put_ bh ffiInfoRet
+
+{-
+Note [Bytecode Binary instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+These 'Binary' instances live here, beside their data-types, rather than in
+GHC.ByteCode.Binary. They cannot live in GHC.Utils.Binary (the class module)
+because this module imports it, so an instance there would be an orphan; and
+placing them here makes them non-orphans. The 'BinName' indirection they use to
+serialise 'Name's comes along for the same reason -- GHC.ByteCode.Binary still
+uses it, and imports it back from here.
+-}
+
+instance Binary CompiledByteCode where
+  get bh = do
+    bc_bcos <- get bh
+    bc_itbls_len <- get bh
+    bc_itbls <- replicateM bc_itbls_len $ do
+      nm <- getViaBinName bh
+      itbl <- get bh
+      pure (nm, itbl)
+    bc_strs_len <- get bh
+    bc_strs <-
+      replicateM bc_strs_len $ (,) <$> getViaBinName bh <*> get bh
+    bc_breaks <- get bh
+    bc_spt_entries <- get bh
+    bc_hpc_info <- get bh
+    return $
+      CompiledByteCode
+        { bc_bcos,
+          bc_itbls,
+          bc_strs,
+          bc_breaks,
+          bc_spt_entries,
+          bc_hpc_info
+        }
+
+  put_ bh CompiledByteCode {..} = do
+    put_ bh bc_bcos
+    put_ bh $ length bc_itbls
+    for_ bc_itbls $ \(nm, itbl) -> do
+      putViaBinName bh nm
+      put_ bh itbl
+    put_ bh $ length bc_strs
+    for_ bc_strs $ \(nm, str) -> putViaBinName bh nm *> put_ bh str
+    put_ bh bc_breaks
+    put_ bh bc_spt_entries
+    put_ bh bc_hpc_info
+
+instance Binary ByteCodeHpcInfo where
+  put_ bh ByteCodeHpcInfo{bchi_tick_count,bchi_hash,bchi_tickbox_name,bchi_module_name} = do
+    put_ bh bchi_module_name
+    put_ bh bchi_tickbox_name
+    put_ bh bchi_tick_count
+    put_ bh bchi_hash
+
+  get bh = do
+    bchi_module_name <- get bh
+    bchi_tickbox_name <- get bh
+    bchi_tick_count <- get bh
+    bchi_hash <- get bh
+    pure ByteCodeHpcInfo
+      { bchi_tick_count
+      , bchi_hash
+      , bchi_tickbox_name
+      , bchi_module_name
+      }
+
+instance Binary UnlinkedBCO where
+  get bh = do
+    t <- getByte bh
+    case t of
+      0 -> UnlinkedBCO
+        <$> getViaBinName bh
+        <*> get bh
+        <*> get bh
+        <*> get bh
+        <*> get bh
+        <*> get bh
+      1 -> UnlinkedStaticCon
+        <$> getViaBinName bh
+        <*> getViaBinName bh
+        <*> get bh
+        <*> get bh
+        <*> get bh
+      _ -> panic "Binary UnlinkedBCO: invalid byte"
+
+  put_ bh UnlinkedBCO {..} = do
+    putByte bh 0
+    putViaBinName bh unlinkedBCOName
+    put_ bh unlinkedBCOArity
+    put_ bh unlinkedBCOInstrs
+    put_ bh unlinkedBCOBitmap
+    put_ bh unlinkedBCOLits
+    put_ bh unlinkedBCOPtrs
+  put_ bh UnlinkedStaticCon {..} = do
+    putByte bh 1
+    putViaBinName bh unlinkedStaticConName
+    putViaBinName bh unlinkedStaticConDataConName
+    put_ bh unlinkedStaticConLits
+    put_ bh unlinkedStaticConPtrs
+    put_ bh unlinkedStaticConIsUnlifted
+
+instance Binary BCOPtr where
+  get bh = do
+    t <- getByte bh
+    case t of
+      0 -> BCOPtrName <$> getViaBinName bh
+      1 -> BCOPtrPrimOp <$> get bh
+      2 -> BCOPtrBCO <$> get bh
+      3 -> BCOPtrBreakArray <$> get bh
+      _ -> panic "Binary BCOPtr: invalid byte"
+
+  put_ bh ptr = case ptr of
+    BCOPtrName nm -> putByte bh 0 *> putViaBinName bh nm
+    BCOPtrPrimOp op -> putByte bh 1 *> put_ bh op
+    BCOPtrBCO bco -> putByte bh 2 *> put_ bh bco
+    BCOPtrBreakArray info_mod -> putByte bh 3 *> put_ bh info_mod
+
+instance Binary BCONPtr where
+  get bh = do
+    t <- getByte bh
+    case t of
+      0 -> BCONPtrWord . fromIntegral <$> (get bh :: IO Word64)
+      1 -> BCONPtrLbl <$> get bh
+      2 -> BCONPtrItbl <$> getViaBinName bh
+      3 -> BCONPtrAddr <$> getViaBinName bh
+      4 -> BCONPtrStr <$> get bh
+      5 -> BCONPtrFS <$> get bh
+      6 -> BCONPtrFFIInfo <$> get bh
+      7 -> BCONPtrCostCentre <$> get bh
+      _ -> panic "Binary BCONPtr: invalid byte"
+
+  put_ bh ptr = case ptr of
+    BCONPtrWord lit -> putByte bh 0 *> put_ bh (fromIntegral lit :: Word64)
+    BCONPtrLbl sym -> putByte bh 1 *> put_ bh sym
+    BCONPtrItbl nm -> putByte bh 2 *> putViaBinName bh nm
+    BCONPtrAddr nm -> putByte bh 3 *> putViaBinName bh nm
+    BCONPtrStr str -> putByte bh 4 *> put_ bh str
+    BCONPtrFS fs -> putByte bh 5 *> put_ bh fs
+    BCONPtrFFIInfo ffi -> putByte bh 6 *> put_ bh ffi
+    BCONPtrCostCentre ibi -> putByte bh 7 *> put_ bh ibi
+
+newtype BinName = BinName {unBinName :: Name}
+
+getViaBinName :: ReadBinHandle -> IO Name
+getViaBinName bh = case findUserDataReader Proxy bh of
+  BinaryReader f -> unBinName <$> f bh
+
+putViaBinName :: WriteBinHandle -> Name -> IO ()
+putViaBinName bh nm = case findUserDataWriter Proxy bh of
+  BinaryWriter f -> f bh $ BinName nm

@@ -18,6 +18,10 @@ module Language.Haskell.Syntax.Doc
   , mkHsDocStringChunkUtf8ByteString
   -- ** Query
   , nullHDSC
+  , unpackHDSCText
+  -- ** Rendering
+  , renderHsDocString
+  , renderHsDocStringText
 
   , HsDocStringDecorator(..)
   , LHsDoc
@@ -30,6 +34,8 @@ import qualified Data.ByteString as BS
 import Data.Data
 import Data.Kind (Type)
 import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as Text.Encoding
 import Prelude
 import Language.Haskell.Syntax.Extension
 
@@ -96,6 +102,19 @@ mkHsDocStringChunkUtf8ByteString = HsDocStringChunk
 nullHDSC :: HsDocStringChunk -> Bool
 nullHDSC (HsDocStringChunk bs) = BS.null bs
 
+instance ( Show (LHsDocStringChunk pass)
+         , XXHsDocString pass ~ DataConCantHappen
+         ) => Show (HsDocString pass) where
+  showsPrec d (MultiLineDocString _ dec xs) =
+    showParen (d > 10) $
+      showString "MultiLineDocString " . showsPrec 11 dec . showChar ' ' . showsPrec 11 xs
+  showsPrec d (NestedDocString _ dec x) =
+    showParen (d > 10) $
+      showString "NestedDocString " . showsPrec 11 dec . showChar ' ' . showsPrec 11 x
+  showsPrec d (GeneratedDocString _ x) =
+    showParen (d > 10) $
+      showString "GeneratedDocString " . showsPrec 11 x
+
 data HsDocStringDecorator
   = HsDocStringNext          -- ^ '|' is the decorator
   | HsDocStringPrevious      -- ^ '^' is the decorator
@@ -125,3 +144,18 @@ data WithHsDocIdentifiers a pass = WithHsDocIdentifiers
 
 instance (UnXRec pass, NFData (IdP pass), NFData a) => NFData (WithHsDocIdentifiers a pass) where
   rnf (WithHsDocIdentifiers d i) = rnf d `seq` rnf (map (unXRec @pass) i)
+
+-- | Decode a docstring chunk to 'T.Text'.
+unpackHDSCText :: HsDocStringChunk -> T.Text
+unpackHDSCText (HsDocStringChunk bs) = Text.Encoding.decodeUtf8Lenient bs
+
+-- | Just get the docstring, without any decorators
+renderHsDocString :: forall pass. UnXRec pass => HsDocString pass -> String
+renderHsDocString = T.unpack . renderHsDocStringText
+
+-- | Just get the docstring as 'Text', without any decorators.
+renderHsDocStringText :: forall pass. UnXRec pass => HsDocString pass -> T.Text
+renderHsDocStringText (MultiLineDocString _ _ (x :| xs)) = T.intercalate (T.singleton '\n') $ map (unpackHDSCText . unXRec @pass) (x:xs)
+renderHsDocStringText (NestedDocString _ _ ds) = unpackHDSCText $ unXRec @pass ds
+renderHsDocStringText (GeneratedDocString _ x) = unpackHDSCText x
+renderHsDocStringText (XHsDocString _) = mempty

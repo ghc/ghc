@@ -1,5 +1,7 @@
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE TypeFamilies       #-}
+{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+                                      -- in module Language.Haskell.Syntax.Extension
 
 -- (c) The University of Glasgow, 1992-2006
 
@@ -129,6 +131,11 @@ import Data.List (sortBy, intercalate)
 import Data.Function (on)
 import qualified Data.Map as Map
 import qualified Data.Semigroup as S
+
+import Language.Haskell.Syntax.Basic (FieldLabelString)
+import Language.Haskell.Syntax.Expr (DotFieldOcc, FieldLabelStrings)
+import Language.Haskell.Syntax.Extension (UnXRec, XRec)
+import Language.Haskell.Syntax.Type (FieldOcc)
 
 {-
 ************************************************************************
@@ -842,6 +849,16 @@ instance (Outputable e) => Outputable (GenLocated RealSrcSpan e) where
                 -- Print spans without the file name etc
                 whenPprDebug (braces (pprUserSpan False (RealSrcSpan l Strict.Nothing)))
              $$ ppr e
+
+instance (UnXRec p, Outputable (DotFieldOcc p), Outputable (XRec p FieldLabelString)) => OutputableBndr (Located (FieldLabelStrings p)) where
+  pprInfixOcc = pprInfixOcc . unLoc
+  pprPrefixOcc = pprInfixOcc . unLoc
+
+-- 'OutputableBndrId pass' cannot be named here (GHC.Hs.Extension sits above this
+-- module), so the one superclass the body actually needs is stated directly.
+instance OutputableBndr (FieldOcc p) => OutputableBndr (GenLocated SrcSpan (FieldOcc p)) where
+  pprInfixOcc  = pprInfixOcc . unLoc
+  pprPrefixOcc = pprPrefixOcc . unLoc
 
 
 pprLocated :: (Outputable l, Outputable e) => GenLocated l e -> SDoc

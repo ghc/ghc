@@ -68,7 +68,6 @@ import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
-import Data.Foldable              ( toList )
 import Data.Functor.Identity      ( Identity(..) )
 import Data.List.NonEmpty         ( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
@@ -558,9 +557,6 @@ This case in handled in the instance for HsPatSigType
 instance HasLoc thing => HasLoc (PScoped thing) where
   getHasLoc (PS _ _ _ a) = getHasLoc a
 
-instance HasLoc a => HasLoc (DataDefnCons a) where
-  getHasLoc = getHasLocList . toList
-
 instance (HasLoc a, HiePass p) => HasLoc (FamEqn (GhcPass p) a) where
   getHasLoc (FamEqn _ a outer_bndrs b _ c) = case outer_bndrs of
     HsOuterImplicit{} ->
@@ -568,15 +564,6 @@ instance (HasLoc a, HiePass p) => HasLoc (FamEqn (GhcPass p) a) where
     HsOuterExplicit{hso_bndrs = tvs} ->
       foldl1' combineSrcSpans (getHasLoc a :| getHasLocList tvs : getHasLocList b : getHasLoc c : [])
 
-instance (HasLoc tm, HasLoc ty) => HasLoc (HsArg (GhcPass p) tm ty) where
-  getHasLoc (HsValArg _ tm) = getHasLoc tm
-  getHasLoc (HsTypeArg _ ty) = getHasLoc ty
-  getHasLoc (HsArgPar sp)  = sp
-
-instance HasLoc (HsDataDefn GhcRn) where
-  getHasLoc def@(HsDataDefn{}) = getHasLoc $ dd_cons def
-    -- Only used for data family instances, so we only need rhs
-    -- Most probably the rest will be unhelpful anyway
 
 -- | The main worker class
 -- See Note [Updating HieAst for changes in the GHC AST] for more information
