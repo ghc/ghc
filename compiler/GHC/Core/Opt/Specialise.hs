@@ -1178,7 +1178,6 @@ data SpecEnv
              --    to avoid name clashes
              -- b) we carry a type substitution to use when analysing
              --    the RHS of specialised bindings (no type-let!)
-
        , se_module :: Module
        , se_rules  :: RuleEnv  -- From the home package and this module
        , se_dflags :: DynFlags
@@ -3116,12 +3115,12 @@ wantCallsFor _env f
       WorkerLikeId {}  -> True
       RepPolyId {}     -> True
 
-interestingDict :: SpecEnv -> CoreExpr -> Bool
+interestingDict :: HasCallStack => SpecEnv -> CoreExpr -> Bool
 -- This is a subtle and important function
 -- See Note [Interesting dictionary arguments]
 interestingDict env (Var v)  -- See (ID3) and (ID5)
+  -- (ID9) Might fail for loop breaker dicts but that seems fine.
   | Just rhs <- maybeUnfoldingTemplate (idUnfolding v)
-  -- Might fail for loop breaker dicts but that seems fine.
   = interestingDict env rhs
 
 interestingDict env arg  -- Main Plan: use exprIsConApp_maybe
@@ -3152,7 +3151,7 @@ interestingDict env arg  -- Main Plan: use exprIsConApp_maybe
   where
     arg_ty                  = exprType arg
     definitely_not_ip_like  = not (couldBeIPLike arg_ty)
-    in_scope_env = ISE (substInScopeSet $ se_subst env) realIdUnfolding
+    in_scope_env = ISE (substInScopeSet $ se_subst env) idUnfolding
 
 {- Note [Ticks on applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3293,6 +3292,20 @@ case we can clearly specialise. But there are wrinkles:
 
    So why do the `exprIsConApp_maybe` and `Cast` stuff? Because we want to look
    under type-family casts (ID1) and constraint tuples (ID6).
+
+(ID9) If we deal with a recursive dictionary we want to avoid infinite recursion.
+
+    For example we might have:
+
+    class D1 a => D2 a
+      someConstant :: a
+    class D2 a => D1 a
+
+  The primary concern is that we want to avoid looping on recursive instances.
+  We can achieve this by simply not looking through loop breakers.
+
+  The secondary concern is we would like to specialize uses of D1/D2 even if that
+  requires looking through the loopbreaker. Currently we simply don't for simplicity.
 
 Note [Update unfolding after specialisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
