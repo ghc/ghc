@@ -3119,8 +3119,8 @@ interestingDict :: SpecEnv -> CoreExpr -> Bool
 -- This is a subtle and important function
 -- See Note [Interesting dictionary arguments]
 interestingDict env (Var v)  -- See (ID3) and (ID5)
+  -- (ID6.a) Might fail for loop breaker dicts but that seems fine.
   | Just rhs <- maybeUnfoldingTemplate (idUnfolding v)
-  -- Might fail for loop breaker dicts but that seems fine.
   = interestingDict env rhs
 
 interestingDict env arg  -- Main Plan: use exprIsConApp_maybe
@@ -3135,9 +3135,9 @@ interestingDict env arg  -- Main Plan: use exprIsConApp_maybe
        , isIPClass cls      -- See (ID5)
        -> False
 
-       -- Otherwise we are unwrapping a unary type class
+       -- Shouldn't happen.
        | otherwise
-       -> exprIsHNF arg   -- See (ID7)
+       -> pprTraceDebug "shouldn't happen anymore" (ppr arg) $ exprIsHNF arg -- See (ID7)
 
   | Just (_, _, data_con, _tys, args) <- exprIsConApp_maybe in_scope_env arg
   , Just cls <- tyConClass_maybe (dataConTyCon data_con)
@@ -3151,7 +3151,8 @@ interestingDict env arg  -- Main Plan: use exprIsConApp_maybe
   where
     arg_ty                  = exprType arg
     definitely_not_ip_like  = not (couldBeIPLike arg_ty)
-    in_scope_env = ISE (substInScopeSet $ se_subst env) realIdUnfolding
+    -- idUnfolding rather than realIdUnfolding: See (ID6.a)
+    in_scope_env = ISE (substInScopeSet $ se_subst env) idUnfolding
 
 {- Note [Ticks on applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3262,11 +3263,27 @@ case we can clearly specialise. But there are wrinkles:
    in point is constraint tuples (% d1, .., dn %); a constraint N-tuple is a class
    with N superclasses and no methods.
 
-(ID7) A unary (single-method) class is currently represented by (meth |> co).  We
-   will unwrap the cast (see (ID5)) and then want to reply "yes" if the method
-   has any struture.  We rather arbitrarily use `exprIsHNF` for this.  (We plan a
-   new story for unary classes, see #23109, and this special case will become
-   irrelevant.)
+(ID6.a) If we deal with a recursive dictionary as in #27705 we want to avoid
+    infinite recursion while recursing into superclasses.
+
+    For example we might have:
+
+    class D1 a => D2 a
+    class D2 a => D1 a
+
+  The primary concern is that we want to avoid looping on recursive instances.
+  We can achieve this by simply not looking through loop breakers by using idUnfolding
+  rather than realIdUnfolding.
+
+  It's possible that this prevents specialization of edge cases that have loop breakers
+  in their recursive loop. But even if we can find a dictionary like this the simplifier
+  won't look through loopbreaker dictionaries either killing any potential benefit.
+  So while we could handle this case via a already-seen set or fuel we simply don't bother
+  for now.
+
+(ID7) A unary (single-method) class is currently handled by the same path as regular dicts
+   since they are represented by faking a regular Dictionary.
+   See Note [Unary class magic] for the details.
 
 (ID8) Sadly, if `exprIsConApp_maybe` says Nothing, we still want to treat a
    non-trivial argument as interesting. In T19695 we have this:
