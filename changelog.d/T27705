@@ -1,0 +1,5 @@
+section: compiler
+synopsis: Fixed an issue that caused the specializer to sometimes loop on recursive dictionary superclasses.
+issues: #27705
+mrs: !16559
+
