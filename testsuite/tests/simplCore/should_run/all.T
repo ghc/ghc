@@ -123,3 +123,5 @@ test('T24359b', normal, compile_and_run, ['-O'])
 test('T23429', normal, compile_and_run, ['-O'])
 test('T27071', normal, compile_and_run, ['-O -fworker-wrapper-cbv'])
 test('T27005', [], multimod_compile_and_run, ['T27005', '-O'])
+test('T27705', [extra_hc_opts('+RTS -M500M -RTS')], multimod_compile_and_run,
+     ['T27705', '-O2 -fexpose-all-unfoldings'])
