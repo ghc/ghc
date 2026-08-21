@@ -168,9 +168,6 @@ lookupOrig mod occ = do
 -- A fresh Name allocated here has 'noSrcSpan', which sticks unless its
 -- binding site is renamed in this session ('allocateGlobalBinder').
 -- See the caveats on 'n_loc' in "GHC.Types.Name".
--- cq-ref[name-loc-span]
--- Q: this noSrcSpan sticks to the Name for the whole session — what
---    does that do to consumers expecting a definition site?
 lookupNameCache :: HasDebugCallStack => NameCache -> Module -> OccName -> IO Name
 lookupNameCache nc mod occ = updateNameCache nc mod occ $ \cache0 ->
   case lookupOrigNameCache cache0 mod occ of

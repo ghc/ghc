@@ -1280,7 +1280,6 @@ inGeneratedCode = lclEnvInGeneratedCode <$> getLclEnv
 --     Beware: @setSrcSpan (getSrcSpan n)@ therefore silently no-ops
 --     when @n@ is interface-loaded (@n_loc = noSrcSpan@). See the caveats
 --     on 'n_loc' in "GHC.Types.Name".
--- cq[setsrcspan-unhelpful-noop]
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
 -- NB: This is the only place where `tcl_loc` and `tcl_in_gen_code`
 --     are modified
@@ -1288,21 +1287,6 @@ setSrcSpan (RealSrcSpan loc _) thing_inside
   = updLclCtxt (\ctxt -> ctxt {tcl_loc = loc, tcl_in_gen_code = False}) thing_inside
 setSrcSpan (GeneratedSrcSpan{}) thing_inside
   = updLclCtxt (\ctxt -> ctxt {tcl_in_gen_code = True}) thing_inside
--- cq[setsrcspan-unhelpful-noop]
--- Q: an UnhelpfulSpan is silently dropped, keeping the previous location —
---    is any caller aware of that?
--- A= callers doing `setSrcSpan (getSrcSpan n)` on an interface-loaded Name
---    (n_loc = noSrcSpan, `lookupNameCache` in GHC.Iface.Env) hit this case:
---    errors get attributed to whatever enclosing span was set last, so
---    reported locations can differ between --make and one-shot mode.
---    See CQ[name-loc-span] in GHC.Types.Name. Evidence: SrcSpan has exactly
---    three constructors, so this fallthrough is precisely UnhelpfulSpan
---    (incl. noSrcSpan = UnhelpfulSpan UnhelpfulNoLocationInfo, GHC.Types.
---    SrcLoc); full chain traced by cold verifier 2026-08-21.
--- D~ none viable: noSrcSpan is a legitimate argument at many call sites
---    (there is often no better span to give), so this case can neither be
---    asserted away nor split into a separate entry point without touching
---    every caller.
 setSrcSpan _ thing_inside
   = thing_inside
 

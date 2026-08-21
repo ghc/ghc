@@ -875,9 +875,6 @@ getLocalNonValBinders fixity_env
 
     -- The span on each input RdrName is the whole declaration's, not the
     -- name's.  See Note [SrcSpan for binders] in GHC.Hs.Utils
-    -- cq-ref[name-loc-span]
-    -- Q: why is the span on the input RdrName the whole declaration's,
-    --    not the name's?
     new_simple :: LocatedN RdrName -> RnM GlobalRdrElt
     new_simple rdr_name = do { nm <- newTopSrcBinder rdr_name
                              ; return (mkLocalVanillaGRE NoParent nm) }

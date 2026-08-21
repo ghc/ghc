@@ -1757,9 +1757,6 @@ NB: `setSrcSpan (getSrcSpan n)` relies on n's binding site having been
 renamed in the current session.  An interface-loaded Name has noSrcSpan,
 on which setSrcSpan is a no-op.  See the caveats on n_loc in
 GHC.Types.Name.
-cq-ref[name-loc-span]
-Q: the `setSrcSpan (getSrcSpan n)` idiom this design enables — does it
-   work for every Name, or only for binders of the module being compiled?
 
 Note [Binders in family instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1771,8 +1768,6 @@ constructor is an *occurrence* not a binding site
 Consequently the family tycon's Name carries the span of the *family
 declaration* (or noSrcSpan, if the family is interface-loaded), not the
 instance's.  See the caveats on n_loc in GHC.Types.Name.
-cq-ref[name-loc-span]
-Q: what SrcSpan does the occurrence Name (the family tycon) carry, then?
 
 
 ************************************************************************
