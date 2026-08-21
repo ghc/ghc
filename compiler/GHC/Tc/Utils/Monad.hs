@@ -1273,6 +1273,13 @@ setSrcSpan (RealSrcSpan loc _) thing_inside
   = updLclCtxt (\ctxt -> ctxt {tcl_loc = loc, tcl_in_gen_code = False}) thing_inside
 setSrcSpan (GeneratedSrcSpan{}) thing_inside
   = updLclCtxt (\ctxt -> ctxt {tcl_in_gen_code = True}) thing_inside
+-- CQ[setsrcspan-unhelpful-noop]
+-- Q: an UnhelpfulSpan is silently dropped, keeping the previous location —
+--    is any caller aware of that?
+-- A~ callers doing `setSrcSpan (getSrcSpan n)` on an interface-loaded Name
+--    (n_loc = noSrcSpan) hit this case: errors get attributed to whatever
+--    enclosing span was set last, so reported locations can differ between
+--    --make and one-shot mode. See CQ[name-loc-span] in GHC.Types.Name.
 setSrcSpan _ thing_inside
   = thing_inside
 

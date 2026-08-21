@@ -169,6 +169,9 @@ lookupNameCache nc mod occ = updateNameCache nc mod occ $ \cache0 ->
     Just name -> pure (cache0, name)
     Nothing   -> do
       uniq <- takeUniqFromNameCache nc
+      -- CQ-REF[name-loc-span]
+      -- Q: this noSrcSpan sticks to the Name for the whole session — what
+      --    does that do to consumers expecting a definition site?
       let name      = mkExternalName uniq mod occ noSrcSpan
       let new_cache = extendOrigNameCache cache0 mod occ name
       -- pprTrace "lookupNameCache miss" (ppr name) $

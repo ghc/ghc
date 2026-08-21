@@ -250,7 +250,22 @@ data Name = Name
     -- ^ Its unique.
 
   , n_loc  :: !SrcSpan
-    -- ^ Definition site
+    -- CQ[name-loc-span]
+    -- Q: what span is this, exactly — the identifier, or something else?
+    -- A~ definition site, with two wrinkles: (1) for a top-level binder it is
+    --    deliberately the span of the *whole declaration*, not the identifier
+    --    (Note [SrcSpan for binders] in GHC.Hs.Utils, #8607), precisely so
+    --    that `setSrcSpan (getSrcSpan n)` points error messages at the decl;
+    --    (2) for a Name loaded from an interface file it is `noSrcSpan`
+    --    (`mkExternalName … noSrcSpan` in GHC.Iface.Env), so the same idiom
+    --    silently keeps the old location there — reported locations can
+    --    differ between --make and one-shot mode.
+    -- Q: given (2), when may a consumer rely on n_loc being a real span?
+    -- A~ only for Names born in the module being compiled; anything
+    --    interface-loaded has no span. An *occurrence* Name (e.g. the family
+    --    tycon in a data/type family instance, Note [Binders in family
+    --    instances] in GHC.Hs.Utils) carries its definition's span, which may
+    --    be in another module or missing entirely.
     --
     -- NOTE: we make the n_loc field strict to eliminate some potential
     -- (and real!) space leaks, due to the fact that we don't look at
@@ -322,6 +337,7 @@ nameUnique    name = n_uniq name
 nameOccName   name = n_occ  name
 nameNameSpace name = occNameSpace (n_occ name)
 nameSrcLoc    name = srcSpanStart (n_loc name)
+-- CQ-REF[name-loc-span]
 nameSrcSpan   name = n_loc  name
 
 {- *********************************************************************
@@ -990,6 +1006,7 @@ getOccString        :: NamedThing a => a -> String
 getOccFS            :: NamedThing a => a -> FastString
 
 getSrcLoc           = nameSrcLoc           . getName
+-- CQ-REF[name-loc-span]
 getSrcSpan          = nameSrcSpan          . getName
 getOccString        = occNameString        . getOccName
 getOccFS            = occNameFS            . getOccName

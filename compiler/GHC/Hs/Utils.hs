@@ -1753,12 +1753,19 @@ the @SrcSpan@ of the whole /declaration/, not just the name itself
 entire declaration) is used as the SrcSpan for the Name that is
 finally produced, and hence for error messages.  (See #8607.)
 
+CQ-REF[name-loc-span]
+Q: the `setSrcSpan (getSrcSpan n)` idiom this design enables — does it
+   work for every Name, or only for binders of the module being compiled?
+
 Note [Binders in family instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In a type or data family instance declaration, the type
 constructor is an *occurrence* not a binding site
     type instance T Int = Int -> Int   -- No binders
     data instance S Bool = S1 | S2     -- Binders are S1,S2
+
+CQ-REF[name-loc-span]
+Q: what SrcSpan does the occurrence Name (the family tycon) carry, then?
 
 
 ************************************************************************

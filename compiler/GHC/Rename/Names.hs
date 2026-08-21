@@ -873,8 +873,9 @@ getLocalNonValBinders fixity_env
     for_hs_bndrs :: [LocatedN RdrName]
     for_hs_bndrs = hsForeignDeclsBinders foreign_decls
 
-      -- the SrcSpan attached to the input should be the span of the
-      -- declaration, not just the name
+    -- CQ-REF[name-loc-span]
+    -- Q: why is the span on the input RdrName the whole declaration's,
+    --    not the name's?
     new_simple :: LocatedN RdrName -> RnM GlobalRdrElt
     new_simple rdr_name = do { nm <- newTopSrcBinder rdr_name
                              ; return (mkLocalVanillaGRE NoParent nm) }
