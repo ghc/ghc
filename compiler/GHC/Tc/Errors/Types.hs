@@ -2865,6 +2865,10 @@ data TcRnMessage where
        type-data/should_fail/TDRecordsH98
        type-data/should_fail/TDStrictnessGADT
        type-data/should_fail/TDStrictnessH98
+       type-data/should_fail/T27732a
+       type-data/should_fail/T27732b
+       type-data/should_fail/T27732c
+       type-data/should_fail/T27732d
   -}
   TcRnTypeDataForbids :: !TypeDataForbids -> TcRnMessage
 
@@ -4523,15 +4527,15 @@ data ZonkerMessage where
 data TypeDataForbids
   = TypeDataForbidsDatatypeContexts
   | TypeDataForbidsLabelledFields
-  | TypeDataForbidsStrictnessAnnotations
+  | TypeDataForbidsFieldAnnotations
   | TypeDataForbidsDerivingClauses
   deriving Generic
 
 instance Outputable TypeDataForbids where
-  ppr TypeDataForbidsDatatypeContexts      = text "Data type contexts"
-  ppr TypeDataForbidsLabelledFields        = text "Labelled fields"
-  ppr TypeDataForbidsStrictnessAnnotations = text "Strictness flags"
-  ppr TypeDataForbidsDerivingClauses       = text "Deriving clauses"
+  ppr TypeDataForbidsDatatypeContexts = text "Data type contexts"
+  ppr TypeDataForbidsLabelledFields   = text "Labelled fields"
+  ppr TypeDataForbidsFieldAnnotations = text "Strictness or unpackedness annotations"
+  ppr TypeDataForbidsDerivingClauses  = text "Deriving clauses"
 
 -- | Specifies which back ends can handle a requested foreign import or export
 type ExpectedBackends = [Backend]

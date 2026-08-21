@@ -1,0 +1,8 @@
+section: language
+synopsis: Reject `~` and UNPACK annotations on type data fields
+description:
+  ``type data`` declarations (:extension:`TypeData`) now reject any
+  strictness or unpackedness annotation on constructor fields.
+  Previously only ``!`` was rejected.
+mrs: !16563
+issues: #27732

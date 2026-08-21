@@ -33,7 +33,7 @@ either an ordinary algebraic data type or a GADT, prefixed with the keyword
 ``type``, except that it may not contain
 a datatype context (even with :extension:`DatatypeContexts`),
 labelled fields,
-strictness flags, or
+:ref:`strictness <strict-haskell>` or :ref:`unpackedness <unpack-pragma>` annotations, or
 a ``deriving`` clause.
 
 The only constraints permitted in the types of constructors are

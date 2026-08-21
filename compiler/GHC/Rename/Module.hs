@@ -71,7 +71,6 @@ import GHC.Data.Graph.Directed ( SCC, flattenSCC, Node(..)
                                , stronglyConnCompFromEdgedVerticesUniq )
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.Core.DataCon ( isSrcStrict )
 
 import Control.Monad
 import Data.Bifunctor ( first )
@@ -2116,8 +2115,8 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
       = do {
            ; when (has_labelled_fields condecl) $
                failWith $ TcRnTypeDataForbids TypeDataForbidsLabelledFields
-           ; when (has_strictness_flags condecl) $
-               failWith $ TcRnTypeDataForbids TypeDataForbidsStrictnessAnnotations
+           ; when (has_field_annotations condecl) $
+               failWith $ TcRnTypeDataForbids TypeDataForbidsFieldAnnotations
            }
 
     has_labelled_fields (ConDeclGADT { con_g_args = RecConGADT _ _ }) = True
@@ -2125,13 +2124,16 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
       = not (null (unLoc flds))
     has_labelled_fields _ = False
 
-    has_strictness_flags condecl
-      = any isSrcStrict (con_arg_bangs condecl)
+    has_field_annotations condecl
+      = any is_annotated (con_arg_fields condecl)
+      where
+        is_annotated (CDF { cdf_bang = bang, cdf_unpack = unpack })
+          = bang /= NoSrcStrict || unpack /= NoSrcUnpack
 
-    con_arg_bangs (ConDeclGADT { con_g_args = PrefixConGADT _ args }) = map cdf_bang args
-    con_arg_bangs (ConDeclH98 { con_args = PrefixCon _ args }) = map cdf_bang args
-    con_arg_bangs (ConDeclH98 { con_args = InfixCon _ arg1 arg2 }) = [cdf_bang arg1, cdf_bang arg2]
-    con_arg_bangs _ = []
+    con_arg_fields (ConDeclGADT { con_g_args = PrefixConGADT _ args }) = args
+    con_arg_fields (ConDeclH98 { con_args = PrefixCon _ args }) = args
+    con_arg_fields (ConDeclH98 { con_args = InfixCon _ arg1 arg2 }) = [arg1, arg2]
+    con_arg_fields _ = []
 
 {-
 Note [Type data declarations]
@@ -2166,8 +2168,9 @@ preceded by `type`, with the following restrictions:
 (R2) There are no labelled fields.  Perhaps these could be supported
      using type families, but they are omitted for now.
 
-(R3) There are no strictness flags, because they don't make sense at
-     the type level.
+(R3) There are no strictness or unpackedness annotations (!, ~,
+     {-# UNPACK #-}, {-# NOUNPACK #-}), because they don't make sense
+     at the type level.
 
 (R4) The types of the constructors contain no constraints.
 
