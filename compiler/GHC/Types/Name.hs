@@ -258,7 +258,7 @@ data Name = Name
     --     declaration. See Note [SrcSpan for binders] in GHC.Hs.Utils.
     --
     --   * It is a real span only if the binding site was renamed in the
-    --     current session. A Name merely loaded from an interface file
+    --     current session. A 'Name' merely loaded from an interface file
     --     has 'noSrcSpan' (see 'lookupNameCache' in "GHC.Iface.Env"), on
     --     which 'GHC.Tc.Utils.Monad.setSrcSpan' silently no-ops — so the
     --     idiom above can report different locations in @--make@ and
@@ -370,7 +370,8 @@ nameOccName             :: Name -> OccName
 nameNameSpace           :: Name -> NameSpace
 nameModule              :: HasDebugCallStack => Name -> Module
 nameSrcLoc              :: Name -> SrcLoc
--- | See the caveats on 'n_loc' for what this span is, and when it is missing.
+-- | Definition site of the named entity; see the caveats on 'n_loc' for
+-- what this span is, and when it is missing.
 -- cq-ref[name-loc-span]
 nameSrcSpan             :: Name -> SrcSpan
 
@@ -1041,7 +1042,8 @@ instance NamedThing e => NamedThing (Located e) where
     getName = getName . unLoc
 
 getSrcLoc           :: NamedThing a => a -> SrcLoc
--- | See the caveats on 'n_loc' for what this span is, and when it is missing.
+-- | Definition site of the thing's 'Name'; see the caveats on 'n_loc' for
+-- what this span is, and when it is missing.
 -- cq-ref[name-loc-span]
 getSrcSpan          :: NamedThing a => a -> SrcSpan
 getOccString        :: NamedThing a => a -> String

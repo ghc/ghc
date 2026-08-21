@@ -157,9 +157,9 @@ lookupOrig mod occ = do
   traceIf (text "lookup_orig" <+> ppr mod <+> ppr occ)
   liftIO $ lookupNameCache (hsc_NC hsc_env) mod occ
 
--- | Look up the (Module,OccName) in the NameCache.
+-- | Look up the @('Module', 'OccName')@ in the 'NameCache'.
 -- If you find it, return it; if not, allocate a fresh original name and extend
--- the NameCache.
+-- the 'NameCache'.
 -- Reason: this may be the first occurrence of (say) Foo.bar we have
 -- encountered.  If we need to explore its value we will load Foo.hi; but
 -- meanwhile all we need is a Name for it.

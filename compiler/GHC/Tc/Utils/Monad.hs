@@ -1258,7 +1258,10 @@ getRealSrcSpanM = do { env <- getLclEnv; return $ getLclEnvLoc env }
 inGeneratedCode :: TcRn Bool
 inGeneratedCode = lclEnvInGeneratedCode <$> getLclEnv
 
--- | See Note [Error contexts in generated code]
+-- | Run a computation with the given span as the location for error
+-- messages.
+--
+-- See Note [Error contexts in generated code]
 --
 -- When entering a node decorated with a /user/ span:
 --
@@ -1275,7 +1278,7 @@ inGeneratedCode = lclEnvInGeneratedCode <$> getLclEnv
 --
 --   * Do not touch anything: errors keep the previous location.
 --     Beware: @setSrcSpan (getSrcSpan n)@ therefore silently no-ops
---     when n is interface-loaded (@n_loc = noSrcSpan@); see the caveats
+--     when @n@ is interface-loaded (@n_loc = noSrcSpan@); see the caveats
 --     on 'n_loc' in "GHC.Types.Name".
 -- cq[setsrcspan-unhelpful-noop]
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
