@@ -1,0 +1,5 @@
+section: compiler
+synopsis: Remove a too strict assert in coreprep; fixes a bug where debug builds
+    of GHC would fail to compile correctly optimized programs.
+mrs: !16558
+issues: #27556
