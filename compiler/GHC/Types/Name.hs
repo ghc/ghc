@@ -250,7 +250,20 @@ data Name = Name
     -- ^ Its unique.
 
   , n_loc  :: !SrcSpan
-    -- CQ[name-loc-span]
+    -- ^ Definition site of the named entity, with two caveats:
+    --
+    --   * For a top-level binder this is deliberately the span of the
+    --     whole declaration, not of the identifier, so that
+    --     @setSrcSpan (getSrcSpan n)@ points error messages at the
+    --     declaration. See Note [SrcSpan for binders] in GHC.Hs.Utils.
+    --
+    --   * It is a real span only if the binding site was renamed in the
+    --     current session. A Name merely loaded from an interface file
+    --     has 'noSrcSpan' (see 'lookupNameCache' in "GHC.Iface.Env"), on
+    --     which 'GHC.Tc.Utils.Monad.setSrcSpan' silently no-ops — so the
+    --     idiom above can report different locations in @--make@ and
+    --     one-shot mode.
+    -- cq[name-loc-span]
     -- Q: what span is this, exactly — the identifier, or something else?
     -- A= definition site, with two wrinkles: (1) for a top-level binder it is
     --    deliberately the span of the *whole declaration*, not the identifier,
@@ -363,7 +376,8 @@ nameUnique    name = n_uniq name
 nameOccName   name = n_occ  name
 nameNameSpace name = occNameSpace (n_occ name)
 nameSrcLoc    name = srcSpanStart (n_loc name)
--- CQ-REF[name-loc-span]
+-- See the caveats on 'n_loc' for what this span is, and when it is missing.
+-- cq-ref[name-loc-span]
 nameSrcSpan   name = n_loc  name
 
 {- *********************************************************************
@@ -1032,7 +1046,8 @@ getOccString        :: NamedThing a => a -> String
 getOccFS            :: NamedThing a => a -> FastString
 
 getSrcLoc           = nameSrcLoc           . getName
--- CQ-REF[name-loc-span]
+-- See the caveats on 'n_loc' for what this span is, and when it is missing.
+-- cq-ref[name-loc-span]
 getSrcSpan          = nameSrcSpan          . getName
 getOccString        = occNameString        . getOccName
 getOccFS            = occNameFS            . getOccName

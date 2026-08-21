@@ -1267,13 +1267,19 @@ setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
 -- When entering a node decorated with a /generated/ span:
 --   * Do not touch `tcl_loc`, so that `tcl_loc` always records
 --     the innermost user span.
+-- When entering a node decorated with an /unhelpful/ span:
+--   * Do not touch anything: errors keep the previous location.
+--     Beware: `setSrcSpan (getSrcSpan n)` therefore silently no-ops
+--     when n is interface-loaded (n_loc = noSrcSpan); see the caveats
+--     on `n_loc` in GHC.Types.Name.
+-- cq[setsrcspan-unhelpful-noop]
 -- NB: This is the only place where `tcl_loc` and `tcl_in_gen_code`
 --     are modified
 setSrcSpan (RealSrcSpan loc _) thing_inside
   = updLclCtxt (\ctxt -> ctxt {tcl_loc = loc, tcl_in_gen_code = False}) thing_inside
 setSrcSpan (GeneratedSrcSpan{}) thing_inside
   = updLclCtxt (\ctxt -> ctxt {tcl_in_gen_code = True}) thing_inside
--- CQ[setsrcspan-unhelpful-noop]
+-- cq[setsrcspan-unhelpful-noop]
 -- Q: an UnhelpfulSpan is silently dropped, keeping the previous location —
 --    is any caller aware of that?
 -- A= callers doing `setSrcSpan (getSrcSpan n)` on an interface-loaded Name

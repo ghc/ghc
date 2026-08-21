@@ -1753,7 +1753,11 @@ the @SrcSpan@ of the whole /declaration/, not just the name itself
 entire declaration) is used as the SrcSpan for the Name that is
 finally produced, and hence for error messages.  (See #8607.)
 
-CQ-REF[name-loc-span]
+NB: `setSrcSpan (getSrcSpan n)` relies on n's binding site having been
+renamed in the current session; an interface-loaded Name has noSrcSpan,
+on which setSrcSpan is a no-op.  See the caveats on n_loc in
+GHC.Types.Name.
+cq-ref[name-loc-span]
 Q: the `setSrcSpan (getSrcSpan n)` idiom this design enables — does it
    work for every Name, or only for binders of the module being compiled?
 
@@ -1764,7 +1768,10 @@ constructor is an *occurrence* not a binding site
     type instance T Int = Int -> Int   -- No binders
     data instance S Bool = S1 | S2     -- Binders are S1,S2
 
-CQ-REF[name-loc-span]
+Consequently the family tycon's Name carries the span of the *family
+declaration* (or noSrcSpan, if the family is interface-loaded), not the
+instance's.  See the caveats on n_loc in GHC.Types.Name.
+cq-ref[name-loc-span]
 Q: what SrcSpan does the occurrence Name (the family tycon) carry, then?
 
 

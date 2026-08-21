@@ -169,7 +169,10 @@ lookupNameCache nc mod occ = updateNameCache nc mod occ $ \cache0 ->
     Just name -> pure (cache0, name)
     Nothing   -> do
       uniq <- takeUniqFromNameCache nc
-      -- CQ-REF[name-loc-span]
+      -- The missing location sticks to the Name unless its binding site is
+      -- renamed in this session ('allocateGlobalBinder'); see the caveats
+      -- on 'n_loc' in GHC.Types.Name
+      -- cq-ref[name-loc-span]
       -- Q: this noSrcSpan sticks to the Name for the whole session — what
       --    does that do to consumers expecting a definition site?
       let name      = mkExternalName uniq mod occ noSrcSpan
