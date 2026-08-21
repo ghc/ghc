@@ -19,7 +19,14 @@ module GHC.CmmToAsm.Monad (
         addImportNat,
         addNodeBetweenNat,
         addImmediateSuccessorNat,
-        updateCfgNat,
+        getCurrentBlock,
+        setCurrentBlock,
+        currentBlock,
+        continueInNewBlock,
+        addDiamondFlow,
+        addCondBlock,
+        addColdSelfLoop,
+        increaseEdgeWeight,
         getUniqueNat,
         setDeltaNat,
         getConfig,
@@ -66,11 +73,12 @@ import GHC.Types.Unique         ( Unique )
 import GHC.Unit.Module
 
 import GHC.Utils.Outputable (SDoc, HDoc, ppr)
-import GHC.Utils.Panic      (pprPanic)
+import GHC.Utils.Panic      (panic, pprPanic)
 import GHC.Utils.Monad.State.Strict (State (..), runState, state)
 import GHC.Utils.Misc
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.CFG.Weight
+import GHC.Data.Unboxed (MaybeUB (..))
 
 -- | A Native Code Generator implementation is parametrised over
 -- * The type of static data (typically related to 'CmmStatics')
@@ -184,10 +192,13 @@ data NatM_State
                 natm_config      :: NCGConfig,
                 natm_fileid      :: DwarfFiles,
                 natm_debug_map   :: LabelMap DebugBlock,
-                natm_cfg         :: CFG
+                natm_cfg         :: CFG,
         -- ^ Having a CFG with additional information is essential for some
         -- operations. However we can't reconstruct all information once we
         -- generated instructions. So instead we update the CFG as we go.
+                natm_cur_block   :: !(MaybeUB BlockId)
+        -- ^ Keep track of the current block during code generation for
+        -- CFG updates. Only used by backends using the CFG for code layout.
         }
 
 type DwarfFiles = UniqFM FastString (FastString, Int)
@@ -217,6 +228,7 @@ mkNatM_State us delta config
                         , natm_fileid = dwf
                         , natm_debug_map = dbg
                         , natm_cfg = cfg
+                        , natm_cur_block = NothingUB
                         }
 
 initNat :: NatM_State -> NatM a -> (a, NatM_State)
@@ -254,6 +266,167 @@ updateCfgNat :: (CFG -> CFG) -> NatM ()
 updateCfgNat f
         = NatM $ \ st -> let !cfg' = f (natm_cfg st)
                          in ((), st { natm_cfg = cfg'})
+
+setCurrentBlock :: BlockId -> NatM ()
+setCurrentBlock bid = NatM $ \ st -> ((), st { natm_cur_block = JustUB bid })
+
+getCurrentBlock :: NatM (Maybe BlockId)
+getCurrentBlock = NatM $ \ st ->
+  let !cbid = case natm_cur_block st of
+        JustUB bid -> Just bid
+        NothingUB  -> Nothing
+  in
+  ( cbid, st )
+
+{- Note [Updating the CFG during CodeGen]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At the CMM level life is simple:
+Blocks consist of a sequence of statements.
+Control flow exists only between blocks.
+
+We are not so lucky for CodeGen. There we may introduce
+intra-block control flow. For example we might turn a
+simple ´MO_Ctz width arg` into branching code like this:
+
+       arg_block
+        ╱     ╲
+    left       right
+        ╲     ╱
+          cont
+
+We update the CFG to account for this. (See also Note [CFG based code layout]).
+To do so we generally:
+* Keep track of the current block in the NatM state.
+* Compute code for all dependencies (arg in this case)
+* Then generate the instructions for the MachOp at hand.
+  + If that involves branching control flow we call update the CFG
+    by calling one of continueInNewBlock, addCondBlock or addDiamondFlow,
+    which will adjust the CFG
+    and update the current block.
+* We then return our generated instructions, and the parent expression
+  can use the update CFG/currentBlock to generate it's own code.
+-}
+
+-- | The block instructions are currently being generated for.
+--
+-- Panics if the current block isn't being tracked, which is a code generator
+-- bug: any backend using the CFG based operations below must set the current
+-- block for each basic block it starts to generate code for.
+currentBlock :: HasDebugCallStack => NatM BlockId
+currentBlock = NatM $ \ st ->
+  case natm_cur_block st of
+    JustUB bid -> (bid, st)
+    NothingUB  -> panic "currentBlock: current block not tracked"
+
+-- | Continue/extend the current block under a new label.
+--
+-- >   Before:  cur -> S       After:  cur -> cont -> S
+--
+-- All cur->S edges get rewritten to cont->S.
+-- @cont@ becomes the current block.
+-- Returns @cur@ (the old current block).
+--
+-- Use for example for self loops. See also Note [Updating the CFG during CodeGen]
+continueInNewBlock :: HasDebugCallStack => BlockId -> NatM BlockId
+continueInNewBlock cont = do
+    cur <- currentBlock
+    addImmediateSuccessorNat cur cont
+    setCurrentBlock cont
+    return cur
+
+-- | Register diamond shaped control flow.
+--
+-- >     Before:            After:
+-- >
+-- >       cur                cur
+-- >        │                ╱   ╲
+-- >        │          likely     unlikely
+-- >        │                ╲   ╱
+-- >        │                 cont
+-- >        ▼                  │
+-- >        S                  ▼
+-- >                           S
+--
+-- * All cur->S edges get rewritten to cont->S.
+-- * @cont becomes the current block.
+--
+-- See also Note [Updating the CFG during CodeGen]
+addDiamondFlow :: HasDebugCallStack
+               => BlockId -- ^ the arm we expect to be taken
+               -> BlockId -- ^ the arm we expect not to be taken
+               -> BlockId -- ^ the block both arms converge on
+               -> NatM ()
+addDiamondFlow likely unlikely cont = do
+    weights <- getCfgWeights
+    cur <- continueInNewBlock cont
+    -- Both arms end in an unconditional jump to cont. Control never passes
+    -- from cur to cont directly, so we drop the edge continueInNewBlock added.
+    updateCfgNat ( addWeightEdge cur likely    (fromIntegral $ likelyCondWeight weights)
+                 . addWeightEdge cur unlikely  (fromIntegral $ unlikelyCondWeight weights)
+                 . addWeightEdge likely   cont (fromIntegral $ uncondWeight weights)
+                 . addWeightEdge unlikely cont (fromIntegral $ uncondWeight weights)
+                 . delEdge cur cont )
+
+-- | Register a conditional block that converges again on the same path.
+--
+-- >     Before:            After:
+-- >
+-- >       cur                cur ────╮
+-- >        │                  │      │
+-- >        │                  │  cond_block
+-- >        │                  │      │
+-- >        │                 cont ◀─╯
+-- >        ▼                  │
+-- >        S                  ▼
+-- >                           S
+--
+-- Takes a bool @is_likely@ that indicates if the new block is the likely code
+-- path or not.
+--
+-- @cont@ takes over the successors of the current block and becomes the
+-- current block.
+--
+-- See also Note [Updating the CFG during CodeGen]
+addCondBlock :: HasDebugCallStack
+             => BlockId -- ^ the new code block
+             -> Bool    -- ^ Is the newly given block the likely code path?
+             -> BlockId -- ^ the block control flow converges on
+             -> NatM ()
+addCondBlock cond_block is_likely cont = do
+    weights <- getCfgWeights
+    cur <- continueInNewBlock cont
+    let likely   = fromIntegral (likelyCondWeight weights)
+        unlikely = fromIntegral (unlikelyCondWeight weights)
+        (w_cond, w_skip) | is_likely = (likely, unlikely)
+                         | otherwise = (unlikely, likely)
+    -- This overwrites the cur -> cont edge added by continueInNewBlock, which
+    -- is no longer an unconditional jump now that cond_block can be taken.
+    updateCfgNat ( addWeightEdge cur cond_block w_cond
+                 . addWeightEdge cur cont       w_skip
+                 . addWeightEdge cond_block cont (fromIntegral $ uncondWeight weights) )
+
+-- | Register a self loop on the given block, e.g. the retry loop of a
+-- cmpxchg based sequence.
+--
+-- >   bid ──╮
+-- >    ▲    │
+-- >    ╰────╯
+--
+-- The edge gets a weight of zero, which keeps it irrelevant for layout:
+-- 'optimizeCFG' deliberately does not apply its back edge bonus to zero weight
+-- edges, so @bid@ is not treated as the head of a hot loop.
+--
+-- See also Note [Updating the CFG during CodeGen]
+-- See also Note [Introducing cfg edges inside basic blocks] for some wrinkles around
+-- self loops in particular.
+addColdSelfLoop :: BlockId -> NatM ()
+addColdSelfLoop bid = updateCfgNat (addWeightEdge bid bid 0)
+
+-- | Allows us to bias layout towards a specific edge.
+increaseEdgeWeight :: HasDebugCallStack => BlockId -> EdgeWeight -> NatM ()
+increaseEdgeWeight target bonus = do
+    cur <- currentBlock
+    updateCfgNat (\cfg -> adjustEdgeWeight cfg (+ bonus) cur target)
 
 -- | Record that we added a block between `from` and `old`.
 addNodeBetweenNat :: BlockId -> BlockId -> BlockId -> NatM ()

@@ -66,6 +66,11 @@ import GHC.Types.Unique.DSM (UniqDSM)
   * Feed this CFG into the block layout code (`sequenceTop`) in this
     module. Which will then produce a code layout based on the input weights.
 
+  It's worth mentioning that instead of maintaining a CFG in the backend we
+  could re-create one from the assembly. But a naive version of this would lose
+  some essential information, like weither or not a branch is known to be
+  likely/unlikely. But we could get a similar effect by encoding the relevant
+  information directly in the instruction stream as meta instructions or similar.
 
   Note [Chain based CFG serialization]
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
