@@ -1754,7 +1754,7 @@ entire declaration) is used as the SrcSpan for the Name that is
 finally produced, and hence for error messages.  (See #8607.)
 
 NB: `setSrcSpan (getSrcSpan n)` relies on n's binding site having been
-renamed in the current session; an interface-loaded Name has noSrcSpan,
+renamed in the current session.  An interface-loaded Name has noSrcSpan,
 on which setSrcSpan is a no-op.  See the caveats on n_loc in
 GHC.Types.Name.
 cq-ref[name-loc-span]

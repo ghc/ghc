@@ -1278,7 +1278,7 @@ inGeneratedCode = lclEnvInGeneratedCode <$> getLclEnv
 --
 --   * Do not touch anything: errors keep the previous location.
 --     Beware: @setSrcSpan (getSrcSpan n)@ therefore silently no-ops
---     when @n@ is interface-loaded (@n_loc = noSrcSpan@); see the caveats
+--     when @n@ is interface-loaded (@n_loc = noSrcSpan@). See the caveats
 --     on 'n_loc' in "GHC.Types.Name".
 -- cq[setsrcspan-unhelpful-noop]
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a

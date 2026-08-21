@@ -874,7 +874,7 @@ getLocalNonValBinders fixity_env
     for_hs_bndrs = hsForeignDeclsBinders foreign_decls
 
     -- The span on each input RdrName is the whole declaration's, not the
-    -- name's; see Note [SrcSpan for binders] in GHC.Hs.Utils
+    -- name's.  See Note [SrcSpan for binders] in GHC.Hs.Utils
     -- cq-ref[name-loc-span]
     -- Q: why is the span on the input RdrName the whole declaration's,
     --    not the name's?

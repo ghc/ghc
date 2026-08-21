@@ -250,7 +250,9 @@ data Name = Name
     -- ^ Its unique.
 
   , n_loc  :: !SrcSpan
-    -- ^ Definition site of the named entity, with two caveats:
+    -- ^ Definition site of the named entity.
+    --
+    -- Two caveats:
     --
     --   * For a top-level binder this is deliberately the span of the
     --     whole declaration, not of the identifier, so that
@@ -370,8 +372,9 @@ nameOccName             :: Name -> OccName
 nameNameSpace           :: Name -> NameSpace
 nameModule              :: HasDebugCallStack => Name -> Module
 nameSrcLoc              :: Name -> SrcLoc
--- | Definition site of the named entity; see the caveats on 'n_loc' for
--- what this span is, and when it is missing.
+-- | Definition site of the named entity.
+--
+-- See the caveats on 'n_loc' for what this span is, and when it is missing.
 -- cq-ref[name-loc-span]
 nameSrcSpan             :: Name -> SrcSpan
 
@@ -1042,8 +1045,9 @@ instance NamedThing e => NamedThing (Located e) where
     getName = getName . unLoc
 
 getSrcLoc           :: NamedThing a => a -> SrcLoc
--- | Definition site of the thing's 'Name'; see the caveats on 'n_loc' for
--- what this span is, and when it is missing.
+-- | Definition site of the thing's 'Name'.
+--
+-- See the caveats on 'n_loc' for what this span is, and when it is missing.
 -- cq-ref[name-loc-span]
 getSrcSpan          :: NamedThing a => a -> SrcSpan
 getOccString        :: NamedThing a => a -> String

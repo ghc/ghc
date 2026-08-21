@@ -158,15 +158,16 @@ lookupOrig mod occ = do
   liftIO $ lookupNameCache (hsc_NC hsc_env) mod occ
 
 -- | Look up the @('Module', 'OccName')@ in the 'NameCache'.
--- If you find it, return it; if not, allocate a fresh original name and extend
--- the 'NameCache'.
+--
+-- If you find it, return it. If not, allocate a fresh original name and
+-- extend the 'NameCache'.
 -- Reason: this may be the first occurrence of (say) Foo.bar we have
--- encountered.  If we need to explore its value we will load Foo.hi; but
+-- encountered.  If we need to explore its value we will load Foo.hi, but
 -- meanwhile all we need is a Name for it.
 --
 -- A fresh Name allocated here has 'noSrcSpan', which sticks unless its
--- binding site is renamed in this session ('allocateGlobalBinder'); see
--- the caveats on 'n_loc' in "GHC.Types.Name".
+-- binding site is renamed in this session ('allocateGlobalBinder').
+-- See the caveats on 'n_loc' in "GHC.Types.Name".
 -- cq-ref[name-loc-span]
 -- Q: this noSrcSpan sticks to the Name for the whole session — what
 --    does that do to consumers expecting a definition site?
