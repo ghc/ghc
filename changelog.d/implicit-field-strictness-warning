@@ -1,0 +1,10 @@
+section: compiler
+synopsis: Add `-Wimplicit-field-strictness`
+issues: #16836
+mrs: !16555
+
+description: {
+    The new opt-in warning :ghc-flag:`-Wimplicit-field-strictness` reports
+    data constructor fields that lack an explicit strictness annotation
+    (``!`` or ``~``).
+}

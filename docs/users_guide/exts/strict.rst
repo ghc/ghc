@@ -194,6 +194,9 @@ The ``~`` annotation must be written in prefix form::
 See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
 for the precise rules.
 
+See also :ghc-flag:`-Wimplicit-field-strictness`, which warns about
+fields lacking an explicit annotation.
+
 .. _strict-data:
 
 Strict-by-default data types

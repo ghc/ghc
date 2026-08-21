@@ -1,0 +1,6 @@
+T16836c.hs:6:1: warning: [GHC-47032] [-Wimplicit-field-strictness]
+    • These constructor fields lack an explicit strictness annotation:
+        • In ‘MkT’: field 1
+    • In the data type declaration for ‘T’
+    Suggested fix: Annotate each field with ‘!’ (strict) or ‘~’ (lazy)
+

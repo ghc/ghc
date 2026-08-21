@@ -91,3 +91,7 @@ test('T25901_imp_unused_3', [extra_files(['T25901_helper_3.hs'])], multimod_comp
 test('T25901_imp_unused_4', normal, compile, ['-Wunused-imports'])
 test('T25901_imp_dodgy_1', [extra_files(['T25901_helper_1.hs'])], multimod_compile, ['T25901_imp_dodgy_1', '-v0 -Wdodgy-imports'])
 test('T25901_imp_dodgy_2', [extra_files(['T25901_helper_2.hs'])], multimod_compile, ['T25901_imp_dodgy_2', '-v0 -Wdodgy-imports'])
+test('T16836a', normal, compile, [''])
+test('T16836b', normal, compile, [''])
+test('T16836c', normal, compile, [''])
+test('T16836d', normal, compile, [''])

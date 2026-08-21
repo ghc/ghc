@@ -123,6 +123,7 @@ module GHC.Tc.Errors.Types (
   , TypeSyntax(..)
   , typeSyntaxExtension
   , SuggestLinear(..)
+  , ImplicitStrictnessField(..)
 
     -- * Errors for hs-boot and signature files
   , BadBootDecls(..)
@@ -4235,6 +4236,23 @@ data TcRnMessage where
 
   -}
   TcRnMissingRoleAnnotation :: Name -> [Role] -> TcRnMessage
+
+  {-| TcRnImplicitFieldStrictness is a warning that occurs when a data
+     constructor field lacks an explicit strictness annotation (@!@ or @~@)
+
+     Controlled by flags:
+       - Wimplicit-field-strictness
+
+     Test cases:
+       T16836a, T16836b, T16836c, T16836d
+
+  -}
+  TcRnImplicitFieldStrictness
+    :: Bool -- ^ whether @LazyFieldAnnotations@ is enabled
+    -> NonEmpty (Name, NonEmpty ImplicitStrictnessField)
+       -- ^ per data constructor, the fields lacking annotations
+    -> TcRnMessage
+
   {-| TcRnPatersonCondFailure is an error that occurs when an instance
       declaration fails to conform to the Paterson conditions. Which particular condition
       fails depends on the constructor of PatersonCondFailure
@@ -6398,6 +6416,14 @@ data PatSynInvalidRhsReason
   = PatSynNotInvertible !(Pat GhcRn)
   | PatSynUnboundVar !Name
   deriving (Generic)
+
+-- | A constructor field lacking an explicit strictness annotation, as
+-- reported by 'TcRnImplicitFieldStrictness'.
+data ImplicitStrictnessField
+    -- | A record field
+  = ImplicitStrictnessRecField FieldLabelString
+    -- | A positional argument (1-based index)
+  | ImplicitStrictnessPosField Int
 
 data BadFieldAnnotationReason where
   {-| A lazy data type field annotation (~) was used without enabling the

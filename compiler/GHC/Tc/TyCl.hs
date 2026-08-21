@@ -5022,6 +5022,16 @@ checkValidTyCon tc
                ; mapM_ (checkValidDataCon dflags ex_ok tc) data_cons
                ; mapM_ (checkPartialRecordField data_cons) (tyConFieldLabels tc)
 
+               ; warn_implicit_strictness <- woptM Opt_WarnImplicitFieldStrictness
+               ; when (warn_implicit_strictness
+                       && not (isNewTyCon tc)
+                       && not (isTypeDataTyCon tc)) $
+                 whenIsJust (NE.nonEmpty (mapMaybe conImplicitStrictnessFields data_cons)) $
+                   \offenders ->
+                     do { lazy_anns <- xoptM LangExt.LazyFieldAnnotations
+                        ; addDiagnosticTc $
+                          TcRnImplicitFieldStrictness lazy_anns offenders }
+
                 -- Check that fields with the same name share a type
                ; mapM_ check_fields groups }}
   where
@@ -5071,6 +5081,29 @@ checkValidTyCon tc
             where
                 res2 = dataConOrigResTy con2
                 fty2 = dataConFieldType con2 lbl
+
+-- | For a given data constructor, collect the fields to report for
+-- @-Wimplicit-field-strictness@.
+--
+-- Only fields whose type is known to be lifted are collected: unlifted
+-- fields are unconditionally strict, and annotating one with @!@ or
+-- @~@ would trigger @-Wredundant-strictness-flags@.
+conImplicitStrictnessFields :: DataCon -> Maybe (Name, NonEmpty ImplicitStrictnessField)
+conImplicitStrictnessFields con
+  | Just ne_fields <- NE.nonEmpty fields
+  = Just (dataConName con, ne_fields)
+  | otherwise
+  = Nothing
+  where
+    fld_refs = case dataConFieldLabels con of
+      []   -> map ImplicitStrictnessPosField [1..]
+      lbls -> map (ImplicitStrictnessRecField . flLabel) lbls
+    fields = [ ref
+             | (ref, arg_ty, HsSrcBang _ _ NoSrcStrict)
+                 <- zip3 fld_refs
+                         (map scaledThing (dataConOrigArgTys con))
+                         (dataConSrcBangs con)
+             , typeLevity_maybe arg_ty == Just Lifted ]
 
 checkPartialRecordField :: [DataCon] -> FieldLabel -> TcM ()
 -- Checks the partial record field selector, and warns.
