@@ -58,17 +58,55 @@ import qualified Data.List.NonEmpty as NE
 -- hashes, and at most once otherwise. Previously, we were slower, and people
 -- rightfully complained: #10397
 
+-- Note that this pass both consumes and produces graphs that may
+-- contain unreachable blocks: the control-flow optimiser that runs
+-- before it can orphan blocks without deleting them, and such orphans
+-- pass through this pass untouched. (The losing copy of each merge,
+-- by contrast, is deleted here; see deleteLosers.) See
+-- Note [unreachable blocks] in GHC.Cmm.Pipeline.
+
 -- TODO: Use optimization fuel
 elimCommonBlocks :: CmmGraph -> CmmGraph
-elimCommonBlocks g = replaceLabels env $ copyTicks env g
+elimCommonBlocks g = replaceLabels env $ deleteLosers $ copyTicks env g
   where
-     env = iterate mapEmpty blocks_with_key
-     -- The order of blocks doesn't matter here. While we could use
-     -- revPostorder which drops unreachable blocks this is done in
-     -- ContFlowOpt already which runs before this pass. So we use
-     -- toBlockList since it is faster.
+     -- Safe: replaceLabels is about to rewrite every in-graph reference
+     -- to a loser to its surviving chain end.
+     -- See Note [Resolving the CBE substitution].
+     deleteLosers g'
+       | mapNull env = g'
+       | otherwise   = ofBlockMap (g_entry g')
+                                  (toBlockMap g' `mapDifference` env)
+     env = resolveSubst (iterate mapEmpty blocks_with_key)
+     -- The order of blocks doesn't matter here, so we use toBlockList,
+     -- which is faster than revPostorder.
      groups = groupByInt hash_block (toBlockList g) :: [[CmmBlock]]
      blocks_with_key = [ [ (successors b, [b]) | b <- bs] | bs <- groups]
+
+-- Note [Resolving the CBE substitution]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The substitution that `iterate` produces may contain chains
+-- (k1 :-> k2, k2 :-> k3): the winner of one merge can lose a later one.
+-- Its consumers, however, apply it non-transitively: replaceLabels
+-- rewrites each label with a single map lookup, and copyTicks inverts
+-- the substitution only one level deep. So before applying it we
+-- resolve each entry to the end of its chain (resolveSubst, via
+-- lookupBid, which does follow chains); the resolved substitution maps
+-- every eliminated label directly to its final surviving
+-- representative.
+--
+-- Applying the unresolved substitution instead would let replaceLabels
+-- leave edges pointing at eliminated labels. Such edges can occur only
+-- in blocks that themselves lost a merge, i.e. in unreachable code, but
+-- even there they are harmful (#27368; analysed on the ticket). See
+-- Note [unreachable blocks] in GHC.Cmm.Pipeline.
+
+-- | Resolve the substitution: follow chains (@k1 :-> k2@, @k2 :-> k3@)
+-- to their ends, so that every eliminated label maps directly to its
+-- final surviving representative.
+--
+-- See Note [Resolving the CBE substitution].
+resolveSubst :: Subst -> Subst
+resolveSubst env = mapMap (lookupBid env) env
 
 -- Invariant: The blocks in the list are pairwise distinct
 -- (so avoid comparing them again)

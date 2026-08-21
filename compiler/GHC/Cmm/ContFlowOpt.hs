@@ -44,7 +44,8 @@ import Control.Monad
 --
 -- In this situation we say that we shortcut L2 to L3. One of
 -- consequences of shortcutting is that some blocks of code may become
--- unreachable (in the example above this is true for L2).
+-- unreachable (in the example above this is true for L2). See
+-- Note [unreachable blocks] in GHC.Cmm.Pipeline.
 
 
 -- Note [Control-flow optimisations]
@@ -66,7 +67,9 @@ import Control.Monad
 --
 -- Blocks are processed using postorder DFS traversal. A side effect
 -- of determining traversal order with a graph search is elimination
--- of any blocks that are unreachable.
+-- of any blocks that are unreachable in the input; shortcutting can in
+-- turn leave blocks unreachable in the output, see
+-- Note [unreachable blocks] in GHC.Cmm.Pipeline.
 --
 -- Transformations are improved by working from the end of the graph
 -- towards the beginning, because we may be able to perform many
@@ -341,8 +344,7 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
 -- Invariant: if a block has no predecessors it should be dropped from the
 -- graph because it is unreachable. maybe_concat is constructed to maintain
 -- that invariant, but calling replaceLabels may introduce unreachable blocks.
--- We rely on subsequent passes in the Cmm pipeline to remove unreachable
--- blocks.
+-- See Note [unreachable blocks] in GHC.Cmm.Pipeline.
 incPreds, decPreds :: BlockId -> LabelMap Int -> LabelMap Int
 incPreds bid edges = mapInsertWith (+) bid 1 edges
 decPreds bid edges = case mapLookup bid edges of
