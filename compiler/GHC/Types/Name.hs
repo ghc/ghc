@@ -287,6 +287,11 @@ data Name = Name
     -- D~ none viable in-patch: distinguishing real from missing spans in
     --    n_loc's type is a compiler-wide representation change, and noSrcSpan
     --    is a legitimate value so nothing can be asserted here.
+    -- P: commit message — why this docs patch exists: the
+    --    `setSrcSpan (getSrcSpan n)` idiom mislocated a new warning in
+    --    !16555 (data family instance → family's decl span), and the facts
+    --    were documented nowhere near Name; docs deliberately split out of
+    --    that MR.
     --
     -- NOTE: we make the n_loc field strict to eliminate some potential
     -- (and real!) space leaks, due to the fact that we don't look at
