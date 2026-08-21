@@ -66,6 +66,48 @@ void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
    Handle a message
    ------------------------------------------------------------------------- */
 
+/*
+Note [TSO owner may change in between Msg being sent and received]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a message is sent from Capability (C1) to a target TSO (T2) (e.g.
+MessageUpdTSOFlag, MessageCloneStack, ...), it is queued on the TSO's owner
+Capability (C3) inbox (inboxes are owned by Capabilities, not TSOs).
+
+At a later point, the Capability (C3) will process its inbox. Upon receiving
+the message meant for a specific TSO (T2), it must first always check that the
+TSO's owner is *still* itself (C3).
+
+The target TSO (T2) may have migrated after the message was queued on its old
+capability (C3). In that case we must forward the request to the new owner
+(say, C4); otherwise the Capability C3 could be modifying a TSO it no longer
+owns, racing with its actual owner mutating it, since it is no longer the owner.
+
+The message meant for a TSO should only be executed when the receiving
+Capability is still the owner of that TSO. Otherwise, it must be forwarded to
+the new owner. The pseudo code for handling a message that targets a particular
+TSO will look something like:
+
+  executeMessage(...) {
+
+    if (i == &stg_MY_MSG_info) {
+
+      MessageMyMsg* msg = (MessageMyMsg*) m
+
+      Capability *owner = RELAXED_LOAD(&msg->tso->cap);
+      if (owner != cap) {
+        sendMessage(cap, owner, (Message *)msg);
+        return;
+      }
+
+      actuallyExecute(...)
+
+    }
+  }
+
+See `executeMessage`'s `stg_MSG_UPD_TSO_FLAG_info` and
+`stg_MSG_CLONE_STACK_info` for two live examples.
+*/
+
 #if defined(THREADED_RTS)
 
 void
@@ -142,12 +184,18 @@ loop:
     }
     else if(i == &stg_MSG_UPD_TSO_FLAG_info){
         MessageUpdTSOFlag *u = (MessageUpdTSOFlag*) m;
-        if (u->set) {
-            u->tso->flags |= u->flag;
+
+        // We must check that the current owner of the thread is still this capability.
+        // See Note [TSO owner may change in between Msg being sent and received]
+        Capability *owner = RELAXED_LOAD(&u->tso->cap);
+        if (owner != cap) {
+          sendMessage(cap, owner, (Message *)u);
+          return;
         }
-        else {
-            u->tso->flags &= ~u->flag;
-        }
+
+        if (u->set) { u->tso->flags |= u->flag;  }
+        else        { u->tso->flags &= ~u->flag; }
+
         return;
     }
     else
