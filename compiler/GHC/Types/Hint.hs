@@ -343,6 +343,14 @@ data GhcHint
     -}
   | SuggestAddStandaloneKindSignature Name
 
+    {-| Suggests to annotate each constructor field with explicit strictness
+        (@!@ or @~@).
+
+        Triggered by: 'GHC.Tc.Errors.Types.TcRnImplicitFieldStrictness'
+        Test case(s): warnings/should_compile/T16836a
+    -}
+  | SuggestExplicitFieldStrictness
+
     {-| Suggests the user to fill in the wildcard constraint to
         disambiguate which constraint that is.
 

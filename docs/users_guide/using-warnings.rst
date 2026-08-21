@@ -2505,6 +2505,21 @@ of ``-W(no-)*``.
     In other words the type-class role cannot be accidentally left
     representational or phantom, which could affected the code correctness.
 
+.. ghc-flag:: -Wimplicit-field-strictness
+    :shortdesc: warn when constructor fields lack explicit strictness annotations
+    :type: dynamic
+    :reverse: -Wno-implicit-field-strictness
+    :category:
+
+    :since: 10.2.1
+    :default: off
+
+    .. index::
+         single: strictness annotations, missing
+
+    This warning reports data constructor fields that lack an explicit
+    strictness annotation (``!`` or ``~``).
+
 .. ghc-flag:: -Wimplicit-rhs-quantification
     :shortdesc: warn when type variables on the RHS of a type synonym are implicitly quantified
     :type: dynamic

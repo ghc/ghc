@@ -1384,6 +1384,21 @@ instance Diagnostic TcRnMessage where
       hang (text "Missing role annotation" <> colon)
          2 (text "type role" <+> ppr name <+> hsep (map ppr roles))
 
+    TcRnImplicitFieldStrictness _lazy_anns cons -> mkSimpleDecorated $
+      hang (text "These constructor fields lack an explicit strictness annotation" <> colon)
+         2 (vcat (map ppr_con (NE.toList cons)))
+      where
+        ppr_con (con, fields) =
+          bullet <+> text "In" <+> quotes (ppr con) <> colon <+> ppr_fields (NE.toList fields)
+        ppr_fields fields
+          | let names = [n | ImplicitStrictnessRecField n <- fields]
+          , not (null names)
+          = text "field" <> plural names <+> quotedListWithAnd (map ppr names)
+          | otherwise
+          = let poss = [i | ImplicitStrictnessPosField i <- fields]
+            in text "field" <> plural poss
+               <+> unquotedListWith (text "and") (map int poss)
+
     TcRnIllformedTypePattern p
       -> mkSimpleDecorated $
           hang (text "Ill-formed type pattern:") 2 (ppr p)
@@ -2693,6 +2708,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnMissingRoleAnnotation{}
       -> WarningWithFlag Opt_WarnMissingRoleAnnotations
+    TcRnImplicitFieldStrictness{}
+      -> WarningWithFlag Opt_WarnImplicitFieldStrictness
     TcRnIllegalInvisTyVarBndr{}
       -> ErrorWithoutFlag
     TcRnIllegalWildcardTyVarBndr{}
@@ -3428,6 +3445,12 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnMissingRoleAnnotation{}
       -> noHints
+    TcRnImplicitFieldStrictness lazy_anns _
+      -> SuggestExplicitFieldStrictness
+         : [ useExtensionInOrderTo
+               (text "to allow" <+> quotes (char '~') <+> text "annotations")
+               LangExt.LazyFieldAnnotations
+           | not lazy_anns ]
     TcRnIllegalInvisTyVarBndr{}
       -> [suggestExtension LangExt.TypeAbstractions]
     TcRnIllegalWildcardTyVarBndr{}

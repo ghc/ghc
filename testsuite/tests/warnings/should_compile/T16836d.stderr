@@ -1,0 +1,9 @@
+T16836d.hs:20:1: warning: [GHC-47032] [-Wimplicit-field-strictness]
+    • These constructor fields lack an explicit strictness annotation:
+        • In ‘MkM’: field 2
+    • In the data type declaration for ‘M’
+    Suggested fixes:
+      • Annotate each field with ‘!’ (strict) or ‘~’ (lazy)
+      • Use the ‘LazyFieldAnnotations’ extension (implied by ‘StrictData’)
+        to allow ‘~’ annotations
+
