@@ -370,14 +370,14 @@ nameOccName             :: Name -> OccName
 nameNameSpace           :: Name -> NameSpace
 nameModule              :: HasDebugCallStack => Name -> Module
 nameSrcLoc              :: Name -> SrcLoc
+-- | See the caveats on 'n_loc' for what this span is, and when it is missing.
+-- cq-ref[name-loc-span]
 nameSrcSpan             :: Name -> SrcSpan
 
 nameUnique    name = n_uniq name
 nameOccName   name = n_occ  name
 nameNameSpace name = occNameSpace (n_occ name)
 nameSrcLoc    name = srcSpanStart (n_loc name)
--- See the caveats on 'n_loc' for what this span is, and when it is missing.
--- cq-ref[name-loc-span]
 nameSrcSpan   name = n_loc  name
 
 {- *********************************************************************
@@ -1041,13 +1041,13 @@ instance NamedThing e => NamedThing (Located e) where
     getName = getName . unLoc
 
 getSrcLoc           :: NamedThing a => a -> SrcLoc
+-- | See the caveats on 'n_loc' for what this span is, and when it is missing.
+-- cq-ref[name-loc-span]
 getSrcSpan          :: NamedThing a => a -> SrcSpan
 getOccString        :: NamedThing a => a -> String
 getOccFS            :: NamedThing a => a -> FastString
 
 getSrcLoc           = nameSrcLoc           . getName
--- See the caveats on 'n_loc' for what this span is, and when it is missing.
--- cq-ref[name-loc-span]
 getSrcSpan          = nameSrcSpan          . getName
 getOccString        = occNameString        . getOccName
 getOccFS            = occNameFS            . getOccName

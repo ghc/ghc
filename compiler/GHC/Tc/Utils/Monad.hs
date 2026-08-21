@@ -1258,21 +1258,27 @@ getRealSrcSpanM = do { env <- getLclEnv; return $ getLclEnvLoc env }
 inGeneratedCode :: TcRn Bool
 inGeneratedCode = lclEnvInGeneratedCode <$> getLclEnv
 
-setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
--- See Note [Error contexts in generated code]
+-- | See Note [Error contexts in generated code]
+--
 -- When entering a node decorated with a /user/ span:
---   * Record that span in `tcl_loc`
---   * Set `tcl_in_gen_code` to False, to record that we
+--
+--   * Record that span in @tcl_loc@
+--   * Set @tcl_in_gen_code@ to False, to record that we
 --     are in user code.
+--
 -- When entering a node decorated with a /generated/ span:
---   * Do not touch `tcl_loc`, so that `tcl_loc` always records
+--
+--   * Do not touch @tcl_loc@, so that @tcl_loc@ always records
 --     the innermost user span.
+--
 -- When entering a node decorated with an /unhelpful/ span:
+--
 --   * Do not touch anything: errors keep the previous location.
---     Beware: `setSrcSpan (getSrcSpan n)` therefore silently no-ops
---     when n is interface-loaded (n_loc = noSrcSpan); see the caveats
---     on `n_loc` in GHC.Types.Name.
+--     Beware: @setSrcSpan (getSrcSpan n)@ therefore silently no-ops
+--     when n is interface-loaded (@n_loc = noSrcSpan@); see the caveats
+--     on 'n_loc' in "GHC.Types.Name".
 -- cq[setsrcspan-unhelpful-noop]
+setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
 -- NB: This is the only place where `tcl_loc` and `tcl_in_gen_code`
 --     are modified
 setSrcSpan (RealSrcSpan loc _) thing_inside
