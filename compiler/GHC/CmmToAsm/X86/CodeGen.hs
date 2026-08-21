@@ -331,7 +331,7 @@ stmtsToInstrs bid stmts =
     go bid (s:stmts)  instrs = do
       (instrs',bid') <- stmtToInstrs bid s
       -- If the statement introduced a new block, we use that one
-      let !newBid = fromMaybe bid bid'
+      let !newBid = case bid' of { ContInBlock bid' -> bid'; ContInCurrent -> bid; }
       go newBid stmts (instrs `appOL` instrs')
 
 -- | `bid` refers to the current block and is used to update the CFG
@@ -339,7 +339,7 @@ stmtsToInstrs bid stmts =
 -- See Note [Keeping track of the current block] for more details.
 stmtToInstrs :: BlockId -- ^ Basic block this statement will start to be placed in.
              -> CmmNode e x
-             -> NatM (InstrBlock, Maybe BlockId)
+             -> NatM (InstrBlock, ContBlock)
              -- ^ Instructions, and bid of new block if successive
              -- statements are placed in a different basic block.
 stmtToInstrs bid stmt = do
@@ -349,7 +349,7 @@ stmtToInstrs bid stmt = do
     CmmUnsafeForeignCall target result_regs args
        -> genForeignCall target result_regs args bid
 
-    _ -> (,Nothing) <$> case stmt of
+    _ -> (,ContInCurrent) <$> case stmt of
       CmmComment s   -> return (unitOL (COMMENT s))
       CmmTick {}     -> return nilOL
 
@@ -402,6 +402,16 @@ jumpRegs platform gregs =
 --
 type InstrBlock
         = OrdList Instr
+
+-- Could be folded into InstrBlock, but left out for ease of backporting for now.
+data ContBlock
+    = ContInCurrent
+      -- ^ We deal with a linear instruction stream, so we are still
+      -- in the same basic block.
+    | ContInBlock { cont_block_id :: BlockId }
+    -- ^ The instruction stream forked inside the statement/expression,
+    -- but eventually converged onto cont_block_id.
+    deriving Eq
 
 
 -- | Condition codes passed up the tree.
@@ -4324,19 +4334,19 @@ genForeignCall
     -> [CmmFormal]   -- ^ where to put the result
     -> [CmmActual]   -- ^ arguments (of mixed type)
     -> BlockId       -- ^ The block we are in
-    -> NatM (InstrBlock, Maybe BlockId)
+    -> NatM (InstrBlock, ContBlock)
 
 genForeignCall target dst args bid = do
   case target of
     PrimTarget prim         -> genPrim bid prim dst args
-    ForeignTarget addr conv -> (,Nothing) <$> genCCall bid addr conv dst args
+    ForeignTarget addr conv -> (,ContInCurrent) <$> genCCall bid addr conv dst args
 
 genPrim
     :: BlockId       -- ^ The block we are in
     -> CallishMachOp -- ^ MachOp
     -> [CmmFormal]   -- ^ where to put the result
     -> [CmmActual]   -- ^ arguments (of mixed type)
-    -> NatM (InstrBlock, Maybe BlockId)
+    -> NatM (InstrBlock, ContBlock)
 
 -- First we deal with cases which might introduce new blocks in the stream.
 genPrim bid (MO_AtomicRMW width amop) [dst] [addr, n]
@@ -4348,7 +4358,7 @@ genPrim bid (MO_UF_Conv width) [dst] [src]
 
 -- Then we deal with cases which not introducing new blocks in the stream.
 genPrim bid prim dst args
-  = (,Nothing) <$> genSimplePrim bid prim dst args
+  = (,ContInCurrent) <$> genSimplePrim bid prim dst args
 
 genSimplePrim
     :: BlockId       -- ^ the block we are in
@@ -4519,9 +4529,9 @@ evalArgs bid actuals
     evalArg actual = do
         platform <- getPlatform
         lreg <- newLocalReg $ cmmExprType platform actual
-        (instrs, bid1) <- stmtToInstrs bid $ CmmAssign (CmmLocal lreg) actual
+        (instrs, block_cont) <- stmtToInstrs bid $ CmmAssign (CmmLocal lreg) actual
         -- The above assignment shouldn't change the current block
-        massert (isNothing bid1)
+        massert (block_cont == ContInCurrent)
         return (instrs, CmmReg $ CmmLocal lreg)
 
     newLocalReg :: CmmType -> NatM LocalReg
@@ -6130,7 +6140,7 @@ genAtomicRMW
   -> LocalReg
   -> CmmExpr
   -> CmmExpr
-  -> NatM (InstrBlock, Maybe BlockId)
+  -> NatM (InstrBlock, ContBlock)
 genAtomicRMW bid width amop dst addr n = do
     Amode amode addr_code <-
         if amop `elem` [AMO_Add, AMO_Sub]
@@ -6142,13 +6152,13 @@ genAtomicRMW bid width amop dst addr n = do
 
     let dst_r    = getRegisterReg platform  (CmmLocal dst)
     (code, lbl) <- op_code dst_r arg amode
-    return (addr_code `appOL` arg_code arg `appOL` code, Just lbl)
+    return (addr_code `appOL` arg_code arg `appOL` code, ContInBlock lbl)
   where
     -- Code for the operation
     op_code :: Reg       -- Destination reg
             -> Reg       -- Register containing argument
             -> AddrMode  -- Address of location to mutate
-            -> NatM (OrdList Instr,BlockId) -- TODO: Return Maybe BlockId
+            -> NatM (OrdList Instr,BlockId) -- TODO: Return ContBlock
     op_code dst_r arg amode = do
         case amop of
           -- In the common case where dst_r is a virtual register the
@@ -6206,12 +6216,12 @@ genAtomicRMW bid width amop dst addr n = do
     format = intFormat width
 
 -- | Count trailing zeroes
-genCtz :: BlockId -> Width -> LocalReg -> CmmExpr -> NatM (InstrBlock, Maybe BlockId)
+genCtz :: BlockId -> Width -> LocalReg -> CmmExpr -> NatM (InstrBlock, ContBlock)
 genCtz bid width dst src = do
   is32Bit <- is32BitPlatform
   if is32Bit && width == W64
     then genCtz64_32 bid dst src
-    else (,Nothing) <$> genCtzGeneric width dst src
+    else (,ContInCurrent) <$> genCtzGeneric width dst src
 
 -- | Count trailing zeroes
 --
@@ -6220,7 +6230,7 @@ genCtz64_32
   :: BlockId
   -> LocalReg
   -> CmmExpr
-  -> NatM (InstrBlock, Maybe BlockId)
+  -> NatM (InstrBlock, ContBlock)
 genCtz64_32 bid dst src = do
   RegCode64 vcode rhi rlo <- iselExpr64 src
   let dst_r = getLocalRegReg dst
@@ -6260,7 +6270,7 @@ genCtz64_32 bid dst src = do
 
             , NEWBLOCK   lbl2
             ])
-  return (instrs, Just lbl2)
+  return (instrs, ContInBlock lbl2)
 
 -- | Count trailing zeroes
 --
@@ -6777,7 +6787,7 @@ The constant 65536.0 (= 0x47800000 in float32 bit-pattern) is loaded
 via a MOV + MOVD, avoiding a memory load.
 -}
 
-genWordToFloat :: BlockId -> Width -> CmmFormal -> CmmActual -> NatM (InstrBlock, Maybe BlockId)
+genWordToFloat :: BlockId -> Width -> CmmFormal -> CmmActual -> NatM (InstrBlock, ContBlock)
 genWordToFloat bid width dst src = do
   is32Bit <- is32BitPlatform
   platform <- getPlatform
@@ -6837,7 +6847,7 @@ genWordToFloat bid width dst src = do
                 , ADD dstFormat (OpReg tmp_v) (OpReg dst_r)        -- dst_r = float(high)*65536.0 + float(low)
                 ]
             _           -> panic ("genWordToFloat: unsupported source operand format: " ++ show srcFormat)
-      pure (code, Nothing)
+      pure (code, ContInCurrent)
     else do
       -- See Note [Word-to-float conversion on x86-64]
       half_r  <- getNewRegNat srcFormat
@@ -6882,7 +6892,7 @@ genWordToFloat bid width dst src = do
             , JXX ALWAYS lblAfter
             , NEWBLOCK lblAfter
             ]
-      return (code, Just lblAfter)
+      return (code, ContInBlock { cont_block_id = lblAfter })
 
 genAtomicRead :: Width -> MemoryOrdering -> LocalReg -> CmmExpr -> NatM InstrBlock
 genAtomicRead width _mord dst addr = do
