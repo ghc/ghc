@@ -252,20 +252,41 @@ data Name = Name
   , n_loc  :: !SrcSpan
     -- CQ[name-loc-span]
     -- Q: what span is this, exactly — the identifier, or something else?
-    -- A~ definition site, with two wrinkles: (1) for a top-level binder it is
-    --    deliberately the span of the *whole declaration*, not the identifier
-    --    (Note [SrcSpan for binders] in GHC.Hs.Utils, #8607), precisely so
-    --    that `setSrcSpan (getSrcSpan n)` points error messages at the decl;
-    --    (2) for a Name loaded from an interface file it is `noSrcSpan`
-    --    (`mkExternalName … noSrcSpan` in GHC.Iface.Env), so the same idiom
-    --    silently keeps the old location there — reported locations can
-    --    differ between --make and one-shot mode.
+    -- A= definition site, with two wrinkles: (1) for a top-level binder it is
+    --    deliberately the span of the *whole declaration*, not the identifier,
+    --    precisely so that `setSrcSpan (getSrcSpan n)` points error messages
+    --    at the decl; evidence: Note [SrcSpan for binders] in GHC.Hs.Utils
+    --    ("used as the SrcSpan for the Name that is finally produced, and
+    --    hence for error messages"), hsLTyClDeclBinders returning `L loc name`
+    --    with loc the decl's span, #8607 ("The def site associated with the
+    --    name itself is also 3:1-12, which *does* make sense" — NB the
+    --    ticket's actual complaint is that the *identifier's* Located Name
+    --    wrongly got the decl span too).
+    --    (2) for a Name interface-loaded via `lookupNameCache` it is
+    --    `noSrcSpan`, and the same idiom then silently keeps the old
+    --    location; the cache entry is repaired only when the binding site is
+    --    renamed in the same session, so reported locations can differ
+    --    between --make and one-shot mode. Evidence: `mkExternalName …
+    --    noSrcSpan` in lookupNameCache (GHC.Iface.Env); `allocateGlobalBinder`
+    --    cache hit → `setNameLoc`; `setSrcSpan`'s UnhelpfulSpan fallthrough
+    --    (GHC.Tc.Utils.Monad); chain traced by cold verifier 2026-08-21.
     -- Q: given (2), when may a consumer rely on n_loc being a real span?
-    -- A~ only for Names born in the module being compiled; anything
-    --    interface-loaded has no span. An *occurrence* Name (e.g. the family
-    --    tycon in a data/type family instance, Note [Binders in family
-    --    instances] in GHC.Hs.Utils) carries its definition's span, which may
-    --    be in another module or missing entirely.
+    -- A= only for Names renamed as *binders* in this session's NameCache
+    --    (--make: any earlier home module; GHCi via `newInteractiveBinder`;
+    --    one-shot: just the module being compiled); anything merely
+    --    interface-loaded has no span, and wired-in Names carry
+    --    `UnhelpfulSpan UnhelpfulWiredIn`. An *occurrence* Name (e.g. the
+    --    family tycon in a data/type family instance, Note [Binders in
+    --    family instances] in GHC.Hs.Utils) carries its definition's span,
+    --    which may be in another module or missing entirely — in !16555 this
+    --    mislocated a new warning at the family's decl instead of the
+    --    instance. Evidence: `dataDeclChecks fam_name` in
+    --    GHC.Tc.TyCl.Instance with fam_name from `feqn_tycon` (an
+    --    occurrence); !16555 diff (`setSrcSpan (getSrcSpan tc_name)`);
+    --    cold verifier 2026-08-21.
+    -- D~ none viable in-patch: distinguishing real from missing spans in
+    --    n_loc's type is a compiler-wide representation change, and noSrcSpan
+    --    is a legitimate value so nothing can be asserted here.
     --
     -- NOTE: we make the n_loc field strict to eliminate some potential
     -- (and real!) space leaks, due to the fact that we don't look at
