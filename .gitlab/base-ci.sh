@@ -46,9 +46,14 @@ do
   curl https://downloads.haskell.org/~ghc/${ghc_version}/${archive_file} \
     >${ghc_version}.tar.xz
   tar -xJf ${ghc_version}.tar.xz
-  cd ghc-${ghc_version}-*
-  ./configure --prefix "${project_root}/other-ghcs/opt/${ghc_version}"
-  make install
+  if [ -f ghc-${ghc_version}-*/configure ]
+  then # Unix
+    cd ghc-${ghc_version}-*
+    ./configure --prefix "${project_root}/other-ghcs/opt/${ghc_version}"
+    make install
+  else # Windows
+    mv ghc-${ghc_version}-* "${project_root}/other-ghcs/opt/${ghc_version}"
+  fi
   cd ${project_root}
 
   # Build `base` with the installed GHC
