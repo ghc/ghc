@@ -1260,10 +1260,9 @@ cpeApp top_env expr
 
       -- See Note [Ticks and mandatory eta expansion]
       AITick tickish
-        | tickishPlace tickish == PlaceRuntime
+        | PlaceRuntime <- tickishPlace tickish
         , req_depth > 0
-        -> assert (isProfTick tickish) $
-           rebuild_app' env as fun' floats ss (tickish:rt_ticks) req_depth
+        -> rebuild_app' env as fun' floats ss (tickish:rt_ticks) req_depth
         | otherwise
         -- See [Floating Ticks in CorePrep]
         -> rebuild_app' env as fun' (snocFloat floats (FloatTick tickish)) ss rt_ticks req_depth

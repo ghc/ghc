@@ -1,0 +1,4 @@
+section: compiler
+synopsis: Remove a too strict assert in coreprep
+mrs: !16558
+issues: #27556
