@@ -21,6 +21,7 @@ void migrateThread       (Capability *from, StgTSO *tso, Capability *to);
 
 void setThreadFlag       (Capability *from, StgTSO *tso, StgWord32 flag);
 void unsetThreadFlag     (Capability *from, StgTSO *tso, StgWord32 flag);
+void updThreadFlag       (Capability *from, StgTSO *tso, StgWord32 flag, StgBool set);
 
 // Wakes up a thread on a Capability (probably a different Capability
 // from the one held by the current Task).
