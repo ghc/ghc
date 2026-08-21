@@ -1142,6 +1142,7 @@ data WarningFlag =
    | Opt_WarnUnrecognisedModifiers                   -- ^ @since 10.0
    | Opt_WarnSemaphoreOpenFailure                   -- Since 10.0.1
    | Opt_WarnDefaultedCallStack                      -- ^ @since 10.2
+   | Opt_WarnImplicitFieldStrictness                 -- ^ @since 10.2
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -1251,6 +1252,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnTypeEqualityRequiresOperators           -> "type-equality-requires-operators" :| []
   Opt_WarnMissingRoleAnnotations                  -> "missing-role-annotations" :| []
   Opt_WarnImplicitRhsQuantification               -> "implicit-rhs-quantification" :| []
+  Opt_WarnImplicitFieldStrictness                 -> "implicit-field-strictness" :| []
   Opt_WarnIncompleteExportWarnings                -> "incomplete-export-warnings" :| []
   Opt_WarnIncompleteRecordSelectors               -> "incomplete-record-selectors" :| []
   Opt_WarnBadlyLevelledTypes                      -> "badly-levelled-types" :| []

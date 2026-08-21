@@ -185,6 +185,9 @@ instance Outputable GhcHint where
       -> text "Use a standalone deriving declaration instead"
     SuggestAddStandaloneKindSignature name
       -> text "Add a standalone kind signature for" <+> quotes (ppr name)
+    SuggestExplicitFieldStrictness
+      -> text "Annotate each field with" <+> quotes (char '!')
+         <+> text "(strict) or" <+> quotes (char '~') <+> text "(lazy)"
     SuggestFillInWildcardConstraint
       -> text "Fill in the wildcard constraint yourself"
     SuggestAppropriateTHTick ns

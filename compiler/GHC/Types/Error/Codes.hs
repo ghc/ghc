@@ -542,6 +542,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnNegativeNumTypeLiteral"                    = 93632
   GhcDiagnosticCode "TcRnUnusedQuantifiedTypeVar"                   = 54180
   GhcDiagnosticCode "TcRnMissingRoleAnnotation"                     = 65490
+  GhcDiagnosticCode "TcRnImplicitFieldStrictness"                   = 47032
 
   GhcDiagnosticCode "TcRnUntickedPromotedThing"                     = 49957
   GhcDiagnosticCode "TcRnIllegalBuiltinSyntax"                      = 39716
