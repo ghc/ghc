@@ -625,6 +625,7 @@ typedef struct MessageUpdTSOFlag_ {
     Message   *link;
     StgTSO    *tso;
     StgWord   flag;
+    StgWord   set; // bool: true=SET; false=UNSET
 } MessageUpdTSOFlag;
 
 /* ----------------------------------------------------------------------------
