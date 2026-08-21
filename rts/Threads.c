@@ -379,31 +379,45 @@ migrateThread (Capability *from, StgTSO *tso, Capability *to)
    sets or unsets a flag in a given TSO
    ------------------------------------------------------------------------- */
 
-#if defined(THREADED_RTS)
 static void
-updThreadFlag(Capability *from, StgTSO *tso, StgWord32 flag, const StgInfoTable* info);
+updThreadFlag(Capability *from, StgTSO *tso, StgWord32 flag, StgBool set);
 
 void setThreadFlag(Capability *from, StgTSO *tso, StgWord32 flag)
 {
-    updThreadFlag(from, tso, flag, &stg_MSG_SET_TSO_FLAG_info);
+    updThreadFlag(from, tso, flag, 1);
 }
 
 void unsetThreadFlag(Capability *from, StgTSO *tso, StgWord32 flag)
 {
-    updThreadFlag(from, tso, flag, &stg_MSG_UNSET_TSO_FLAG_info);
+    updThreadFlag(from, tso, flag, 0);
 }
 
 static void
-updThreadFlag(Capability *from, StgTSO *tso, StgWord32 flag, const StgInfoTable* info)
+updThreadFlag(Capability *from, StgTSO *tso, StgWord32 flag, StgBool set /* true=set, false=unset */)
 {
-    MessageUpdTSOFlag *msg;
-    msg = (MessageUpdTSOFlag *)allocate(from,sizeofW(MessageUpdTSOFlag));
-    msg->tso  = tso;
-    msg->flag = flag;
-    SET_HDR_RELEASE(msg, info, CCS_SYSTEM);
-    sendMessage(from, tso->cap, (Message*)msg);
-}
+#if defined(THREADED_RTS)
+    Capability *tso_owner = RELAXED_LOAD(&tso->cap);
+    if (from != tso_owner) {
+      MessageUpdTSOFlag *msg;
+      msg = (MessageUpdTSOFlag *)allocate(from,sizeofW(MessageUpdTSOFlag));
+      msg->tso  = tso;
+      msg->flag = flag;
+      msg->set  = set;
+      SET_HDR_RELEASE(msg, &stg_MSG_UPD_TSO_FLAG_info, CCS_SYSTEM);
+      sendMessage(from, tso_owner, (Message*)msg);
+      return;
+    }
+#else
+    (void)from; // unused in non-threaded case
 #endif
+
+    if (set) {
+      tso->flags |= flag;
+    }
+    else {
+      tso->flags &= ~flag;
+    }
+}
 
 /* ----------------------------------------------------------------------------
    awakenBlockedQueue
