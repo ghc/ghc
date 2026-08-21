@@ -416,22 +416,14 @@ void rts_disableStopNextBreakpointAll(void)
 
 void rts_enableStopNextBreakpoint(StgTSO* tso)
 {
-#if defined(THREADED_RTS)
   Capability* cap = rts_unsafeGetMyCapability();
   setThreadFlag(cap, tso, TSO_STOP_NEXT_BREAKPOINT);
-#else
-  tso->flags |= TSO_STOP_NEXT_BREAKPOINT;
-#endif
 }
 
 void rts_disableStopNextBreakpoint(StgTSO* tso)
 {
-#if defined(THREADED_RTS)
   Capability* cap = rts_unsafeGetMyCapability();
   unsetThreadFlag(cap, tso, TSO_STOP_NEXT_BREAKPOINT);
-#else
-  tso->flags &= ~TSO_STOP_NEXT_BREAKPOINT;
-#endif
 }
 
 /* ---------------------------------------------------------------------------
@@ -440,22 +432,14 @@ void rts_disableStopNextBreakpoint(StgTSO* tso)
 
 void rts_enableStopAfterReturn(StgTSO* tso)
 {
-#if defined(THREADED_RTS)
   Capability* cap = rts_unsafeGetMyCapability();
   setThreadFlag(cap, tso, TSO_STOP_AFTER_RETURN);
-#else
-  tso->flags |= TSO_STOP_AFTER_RETURN;
-#endif
 }
 
 void rts_disableStopAfterReturn(StgTSO* tso)
 {
-#if defined(THREADED_RTS)
   Capability* cap = rts_unsafeGetMyCapability();
   unsetThreadFlag(cap, tso, TSO_STOP_AFTER_RETURN);
-#else
-  tso->flags &= ~TSO_STOP_AFTER_RETURN;
-#endif
 }
 
 /*
