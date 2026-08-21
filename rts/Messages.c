@@ -64,6 +64,62 @@ void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
    Handle a message
    ------------------------------------------------------------------------- */
 
+/*
+Note [TSO owner may change in between Msg being sent and received]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a message is sent from Capability (C1) to a target TSO (T2) (e.g.
+MessageUpdTSOFlag, MessageCloneStack, ...), it is queued on the TSO's owner
+Capability (C3) inbox (inboxes are owned by Capabilities, not TSOs).
+
+At a later point, the Capability (C3) will process its inbox. Upon receiving
+the message meant for a specific TSO (T2), it must first always check that the
+TSO's owner is *still* itself (C3).
+
+The target TSO (T2) may have migrated after the message was queued on its old
+capability (C3). In that case we must forward the request to the new owner
+(say, C4); otherwise the Capability C3 could be modifying a TSO it no longer
+owns, racing with its actual owner mutating it, since it is no longer the owner.
+
+The message meant for a TSO should only be executed when the receiving
+Capability is still the owner of that TSO. Otherwise, it must be forwarded to
+the new owner.
+
+The general pattern is one where there's a top-level function which assumes it
+can be called by capabilities other than the TSO's owner. The function checks
+whether the current capability is the TSO owner. If yes, execute the action. If
+not, then it sends a message to the current TSO's owner. On receiving the
+message, the new capability will just call that top-level function, which will
+ensure the message is forwarded again if the TSO owner changed.
+It will look something like:
+
+  runMyMsg(Capability *from, StgTSO *target, ...) {
+
+#if defined(THREADED_RTS)
+    Capability *owner = RELAXED_LOAD(&target->cap)
+    if (owner != from) {
+      MessageMyMsg* msg = ...
+      sendMessage(cap, owner, msg)
+      return
+    }
+#endif
+
+    actuallyDoTheWork(...)
+  }
+
+  executeMessage(...) {
+
+    if (i == &stg_MY_MSG_info) {
+
+      MessageMyMsg* msg = (MessageMyMsg*) m
+      runMyMsg(cap, m->tso, ...)
+
+    }
+  }
+
+See example `updThreadFlag` and `executeMessage`'s `stg_MSG_UPD_TSO_FLAG_info`,
+or `tryWakeUpThread` and `stg_MSG_TRY_WAKEUP_info` for two live examples.
+*/
+
 #if defined(THREADED_RTS)
 
 void
@@ -140,13 +196,9 @@ loop:
     }
     else if(i == &stg_MSG_UPD_TSO_FLAG_info){
         MessageUpdTSOFlag *u = (MessageUpdTSOFlag*) m;
-        if (u->set) {
-            u->tso->flags |= u->flag;
-        }
-        else {
-            u->tso->flags &= ~u->flag;
-        }
-        return;
+
+        StgTSO *tso = RELAXED_LOAD(&u->tso);
+        updThreadFlag(cap, tso, u->flag, u->set);
     }
     else
     {
