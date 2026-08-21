@@ -379,23 +379,25 @@ migrateThread (Capability *from, StgTSO *tso, Capability *to)
    sets or unsets a flag in a given TSO
    ------------------------------------------------------------------------- */
 
-static void
-updThreadFlag(Capability *from, StgTSO *tso, StgWord32 flag, StgBool set);
-
 void setThreadFlag(Capability *from, StgTSO *tso, StgWord32 flag)
 {
-    updThreadFlag(from, tso, flag, 1);
+    updThreadFlag(from, tso, flag, true);
 }
 
 void unsetThreadFlag(Capability *from, StgTSO *tso, StgWord32 flag)
 {
-    updThreadFlag(from, tso, flag, 0);
+    updThreadFlag(from, tso, flag, false);
 }
 
-static void
-updThreadFlag(Capability *from, StgTSO *tso, StgWord32 flag, StgBool set /* true=set, false=unset */)
+void
+updThreadFlag(Capability *from USED_IF_THREADS, StgTSO *tso, StgWord32 flag, StgBool set /* true=set, false=unset */)
 {
 #if defined(THREADED_RTS)
+    // If we're the current owner of the thread we want to modify, do it.
+    // Otherwise, we must forward the message to the actual owner.
+    // When executing the upd message, we check again that we're still the TSO
+    // owner (which may have changed since the message was queued on this cap.)
+    // See Note [TSO owner may change in between Msg being sent and received]
     Capability *tso_owner = RELAXED_LOAD(&tso->cap);
     if (from != tso_owner) {
       MessageUpdTSOFlag *msg;
@@ -407,8 +409,6 @@ updThreadFlag(Capability *from, StgTSO *tso, StgWord32 flag, StgBool set /* true
       sendMessage(from, tso_owner, (Message*)msg);
       return;
     }
-#else
-    (void)from; // unused in non-threaded case
 #endif
 
     if (set) {

@@ -88,6 +88,7 @@ void sendCloneStackMessage(StgTSO *tso, HsStablePtr mvar) {
 void handleCloneStackMessage(Capability *cap, MessageCloneStack *msg){
   // We must check that the current owner of the thread we want to clone the stack for
   // is still this capability.
+  // See Note [TSO owner may change in between Msg being sent and received]
   Capability *owner = RELAXED_LOAD(&msg->tso->cap);
   if (owner != cap) {
     // The target TSO may have migrated after the message was queued on the old
