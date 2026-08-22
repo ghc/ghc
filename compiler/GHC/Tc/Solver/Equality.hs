@@ -2908,16 +2908,16 @@ rewriteEqEvidence old_ev swapped (Reduction lhs_co nlhs) (Reduction rhs_co nrhs)
        ; setWantedEq dest (CPH { cph_co    = co
                                , cph_holes = new_holes `mappend` unitCoHoleSet hole })
              -- cph_holes: new_holes has all the holes from lhs_co and rhs_co
-       ; traceTcS "rewriteEqEvidence" (vcat [ ppr old_ev
-                                            , ppr nlhs
-                                            , ppr nrhs
-                                            , ppr co
-                                            , ppr new_holes ])
+       ; traceTcS "rewriteEqEvidence[W]" (vcat [ ppr old_ev
+                                               , ppr nlhs
+                                               , ppr nrhs
+                                               , ppr co
+                                               , ppr new_holes ])
        ; return $ CtWanted new_ev }
 
   where
-    new_pred = mkTcEqPredLikeEv old_ev nlhs nrhs
     loc      = ctEvLoc old_ev
+    new_pred = mkTcEqPredLikeEv old_ev nlhs nrhs
 
 rewriteEqEvidenceSwapOnly :: CtEvidence -> EqRel -> SwapFlag -> CanEqLHS -> TcType
                           -> TcS CtEvidence

@@ -1,4 +1,3 @@
-
 T7437.hs:14:13: error: [GHC-72771]
     • The default type signature for put:
         forall t. (Generic t, GPut (Rep t)) => t -> [()]
@@ -18,3 +17,4 @@ T7437.hs:14:13: error: [GHC-39999]
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the class method: put :: forall a. Put a => a -> [()]
       In the class declaration for ‘Put’
+

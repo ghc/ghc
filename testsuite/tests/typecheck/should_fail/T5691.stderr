@@ -1,4 +1,3 @@
-
 T5691.hs:24:10: error: [GHC-39999]
     • No instance for ‘Alternative RecDecParser’
         arising from the superclasses of an instance declaration
@@ -8,3 +7,4 @@ T5691.hs:24:10: error: [GHC-39999]
     • No instance for ‘Monad RecDecParser’
         arising from the superclasses of an instance declaration
     • In the instance declaration for ‘MonadPlus RecDecParser’
+
