@@ -975,7 +975,12 @@ data ScEnv = SCE { sc_opts      :: !SpecConstrOpts,
                         -- Domain is OutIds (*after* applying the substitution)
                         -- Used even for top-level bindings (but not imported ones)
 
-                   sc_annotations :: UniqFM Name SpecConstrAnnotation
+                   sc_annotations :: UniqFM Name SpecConstrAnnotation,
+
+                   sc_top_fn    :: Maybe Name
+                        -- The top-level binder whose RHS we are inside,
+                        -- used to attribute warnings about local functions
+                        -- See Note [Reboxing warning]
              }
 
 ---------------------
@@ -1025,7 +1030,8 @@ initScEnv guts
                        sc_subst       = init_subst,
                        sc_how_bound   = emptyVarEnv,
                        sc_vals        = emptyVarEnv,
-                       sc_annotations = anns }) }
+                       sc_annotations = anns,
+                       sc_top_fn      = Nothing }) }
   where
     init_subst = mkEmptySubst $ mkInScopeSetBndrs (mg_binds guts)
         -- Acccount for top-level bindings that are not in dependency order;
@@ -1045,6 +1051,11 @@ instance Outputable HowBound where
 
 scForce :: ScEnv -> Bool -> ScEnv
 scForce env b = env { sc_force = b }
+
+-- Keeps the outermost binder; see Note [Reboxing warning]
+setTopFn :: ScEnv -> OutId -> ScEnv
+setTopFn env@(SCE { sc_top_fn = Nothing }) bndr = env { sc_top_fn = Just (idName bndr) }
+setTopFn env _ = env
 
 lookupHowBound :: ScEnv -> OutId -> Maybe HowBound
 lookupHowBound env id = lookupVarEnv (sc_how_bound env) id
@@ -1448,6 +1459,12 @@ that decision bites, without changing which specialisations are made:
   preserves pointer identity.  Such patterns are common (Nil, [], Nothing,
   ...) and warning about them would be pure noise.
 
+* Warnings about local functions (join points, local workers) name the
+  enclosing top-level binder too: locals often have meaningless names and
+  no source location, and any remedy is applied at the enclosing function
+  anyway.  sc_top_fn tracks that binder, set when entering a top-level
+  RHS (or a specialised copy of one) and kept unchanged below that.
+
 Why BoxPassAlong does not warn: if the callee is specialised at that argument
 position, its RULE rewrites the constructor-shaped call in the specialised
 body and no box is ever rebuilt.  That is exactly the good case that
@@ -1539,7 +1556,7 @@ scBind top_lvl env (NonRec bndr rhs) do_body
     --
     -- I tried always specialising non-recursive top-level bindings too,
     -- but found some regressions (see !8135).  So I backed off.
-  = do { (rhs_usage, rhs', ws_rhs)   <- scExpr env rhs
+  = do { (rhs_usage, rhs', ws_rhs)   <- scExpr (setTopFn env bndr) rhs
 
        -- At top level, we've already put all binders into scope; see initScEnv
        -- Hence no need to call `extendBndr`. But we still want to
@@ -1559,7 +1576,8 @@ scBind top_lvl env (Rec prs) do_body
     --       why it only applies at top level. But that's the way it has been
     --       for a while. See #21456.
     do  { (body_usg, body', warnings_body) <- do_body rhs_env2
-        ; (rhs_usgs, rhss', rhs_ws) <- mapAndUnzip3M (scExpr env) rhss
+        ; (rhs_usgs, rhss', rhs_ws) <- mapAndUnzip3M (\(b,r) -> scExpr (setTopFn env b) r)
+                                                     (bndrs' `zip` rhss)
         ; let all_usg = (combineUsages rhs_usgs `combineUsage` body_usg)
                         `delCallsFor` bndrs'
               bind'   = Rec (bndrs' `zip` rhss')
@@ -1817,7 +1835,7 @@ mkVarUsage env fn args
 scRecRhs :: ScEnv -> (OutId, InExpr) -> UniqSM (RhsInfo, SpecConstrWarnings)
 scRecRhs env (bndr,rhs)
   = do  { let (arg_bndrs,body)       = collectBinders rhs
-              (body_env, arg_bndrs') = extendBndrsWith RecArg env arg_bndrs
+              (body_env, arg_bndrs') = extendBndrsWith RecArg (setTopFn env bndr) arg_bndrs
         ; (body_usg, body', body_ws)         <- scExpr body_env body
         ; let (rhs_usg, arg_occs)    = lookupOccs body_usg arg_bndrs'
         ; return (RI { ri_rhs_usg = rhs_usg
@@ -2006,7 +2024,7 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
         ; let n_pats = length new_pats
               -- Warn about committed specialisations that will rebox;
               -- see Note [Reboxing warning]
-              rebox_ws = [ SpecReboxed (idName fn) (cp_rebox p)
+              rebox_ws = [ SpecReboxed (idName fn) (sc_top_fn env) (cp_rebox p)
                          | p <- new_pats, not (null (cp_rebox p)) ]
 --        ; when (not (null new_pats) || isJust mb_unspec) $
 --          pprTraceM "specialise" (vcat [ ppr fn <+> text "with" <+> int n_pats <+> text "good patterns"
@@ -2018,7 +2036,9 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
 --                                       , text "arg_occs" <+> ppr arg_occs
 --                                       , text "new_pats" <+> ppr new_pats])
 
-        ; let spec_env = decreaseSpecCount env n_pats
+        ; let spec_env = setTopFn (decreaseSpecCount env n_pats) fn
+                -- setTopFn: attribute warnings from re-analysing the
+                -- specialised copies of a top-level fn's body to fn
         ; (spec_usgs, new_specs, new_wss) <- mapAndUnzip3M (spec_one spec_env fn arg_bndrs body)
                                                  (new_pats `zip` [spec_count..])
                 -- See Note [Specialise original body]
@@ -2585,6 +2605,8 @@ instance Outputable CallPat where
 data SpecConstrWarning
   = SpecFailForcedArgCount { spec_failed_fun_name :: Name }
   | SpecReboxed { spec_rebox_fun_name :: Name    -- The specialised function
+                , spec_rebox_parent :: Maybe Name -- Its enclosing top-level
+                                                  -- binder, if fn is local
                 , spec_rebox_cons :: [Name] }    -- The reboxed constructor(s)
     -- See Note [Reboxing warning]
   deriving Eq
@@ -2593,7 +2615,14 @@ type SpecConstrWarnings = [SpecConstrWarning]
 
 instance Outputable SpecConstrWarning where
   ppr (SpecFailForcedArgCount name) = ppr name <+> pprDefinedAt name
-  ppr (SpecReboxed fn dcs) = ppr fn <+> parens (pprWithCommas ppr dcs) <+> pprDefinedAt fn
+  ppr (SpecReboxed fn mb_parent dcs)
+    = ppr fn <+> parens (pprWithCommas ppr dcs) <+> pp_defn
+    where
+      -- A local fn often has no useful location; point at its
+      -- enclosing top-level binder instead
+      pp_defn = case mb_parent of
+        Just parent -> text "in" <+> ppr parent <> comma <+> pprDefinedAt parent
+        Nothing     -> pprDefinedAt fn
 
 combineSpecWarning :: SpecConstrWarnings -> SpecConstrWarnings -> SpecConstrWarnings
 combineSpecWarning = (++)
