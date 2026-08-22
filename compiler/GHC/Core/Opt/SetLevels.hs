@@ -108,8 +108,8 @@ import GHC.Types.Var.Env
 import GHC.Types.Literal      ( litIsTrivial )
 import GHC.Types.Demand       ( DmdSig, prependArgsDmdSig )
 import GHC.Types.Cpr          ( CprSig, prependArgsCprSig )
-import GHC.Types.Name         ( getOccName )
-import GHC.Types.Name.Occurrence ( occNameFS )
+import GHC.Types.Name         ( getOccName, getSrcSpan, mkSystemNameAt )
+import GHC.Types.Name.Occurrence ( occNameFS, mkVarOccFS )
 import GHC.Types.Unique       ( hasKey )
 import GHC.Types.Tickish      ( tickishIsCode )
 import GHC.Types.Unique.Supply
@@ -1872,7 +1872,10 @@ newPolyBndrs dest_lvl
 
     mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $ -- Note [transferPolyIdInfo] in GHC.Types.Id
                              transfer_join_info bndr $
-                             mkSysLocal str uniq (idMult bndr) poly_ty
+                             -- Keep bndr's srcspan so that diagnostics can
+                             -- still point at the original definition
+                             mkLocalId (mkSystemNameAt uniq (mkVarOccFS str) (getSrcSpan bndr))
+                                       (idMult bndr) poly_ty
                            where
                              str     = fsLit "poly_" `appendFS` occNameFS (getOccName bndr)
                              poly_ty = mkLamTypes abs_vars (substTyUnchecked subst (idType bndr))
