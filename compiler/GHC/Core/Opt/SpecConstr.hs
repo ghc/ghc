@@ -806,11 +806,17 @@ specConstrProgram guts
     -- see Note [Reboxing warning]
     aggregateRebox :: SpecConstrWarnings -> SpecConstrWarnings
     aggregateRebox ws
-      = [ SpecReboxed fn parent (nub (concat [ cons | SpecReboxed fn' _ cons <- ws
-                                                    , fn' == fn ]))
-        | SpecReboxed fn parent _ <- nubBy same_fn ws ]
+      = [ SpecReboxed fn parent (nub (concat [ cons | w'@(SpecReboxed _ _ cons) <- ws
+                                                    , same_fn w w' ]))
+        | w@(SpecReboxed fn parent _) <- nubBy same_fn ws ]
       where
-        same_fn (SpecReboxed fn1 _ _) (SpecReboxed fn2 _ _) = fn1 == fn2
+        -- Distinct locals with the same occurrence name and parent render
+        -- identically, so key on those rather than on the Name's unique.
+        -- Without a parent the fn's own location is displayed, which the
+        -- occurrence name does not determine, so key on the Name itself.
+        same_fn (SpecReboxed fn1 p1 _) (SpecReboxed fn2 p2 _)
+          | isJust p1 || isJust p2 = getOccName fn1 == getOccName fn2 && p1 == p2
+          | otherwise              = fn1 == fn2
         same_fn _ _ = False
 
     -- See Note [Reboxing warning]
