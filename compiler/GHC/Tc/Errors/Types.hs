@@ -5477,7 +5477,7 @@ data SolverReportErrCtxt
           , cec_suppress :: Bool    -- ^ True <=> More important errors have occurred,
                                     --            so create bindings if need be, but
                                     --            don't issue any more errors/warnings
-                                    -- See Note [Suppressing error messages]
+                -- See Note [cec_suppress: suppressing less-important error messages]
       }
 
 ----------------------------------------------------------------------------

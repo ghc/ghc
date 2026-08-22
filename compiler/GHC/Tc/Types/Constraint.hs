@@ -1214,15 +1214,16 @@ insolubleWantedCt :: Ct -> Bool
 --
 -- See Note [Insoluble Wanteds]
 insolubleWantedCt ct
-  | CtWanted (WantedCt { ctev_loc = loc, ctev_rewriters = rewriters })
-      <- ctEvidence ct
+  | CtWanted (WantedCt {}) <- ctEvidence ct
       -- It's a Wanted
   , insolubleCt ct
       -- It's insoluble
-  , isEmptyCoHoleSet rewriters
+--  , isEmptyCoHoleSet rewriters
       -- It has no rewriters – see (IW1) in Note [Insoluble Wanteds]
-  , not (isGivenLoc loc)
-      -- isGivenLoc: see (IW2) in Note [Insoluble Wanteds]
+
+-- I don't understand IW2 so I'm going to get rid of it
+--  , not (isGivenLoc loc)
+--      -- isGivenLoc: see (IW2) in Note [Insoluble Wanteds]
     -- See also historical (IW3) in Note [Insoluble Wanteds]
   = True
 
