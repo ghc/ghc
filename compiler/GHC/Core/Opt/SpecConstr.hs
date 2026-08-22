@@ -1443,6 +1443,11 @@ that decision bites, without changing which specialisations are made:
   SpecReboxed warnings, which specConstrProgram emits under
   -Wspec-constr-reboxing (off by default).
 
+* Nullary constructors are exempt: "reboxing" a nullary constructor just
+  references its shared static closure, so it costs no allocation and even
+  preserves pointer identity.  Such patterns are common (Nil, [], Nothing,
+  ...) and warning about them would be pure noise.
+
 Why BoxPassAlong does not warn: if the callee is specialised at that argument
 position, its RULE rewrites the constructor-shaped call in the specialised
 body and no box is ever rebuilt.  That is exactly the good case that
@@ -2888,8 +2893,10 @@ argToPat1 env in_scope val_env arg arg_occ _arg_str
        ; let args'        = [ p    | (_, p, _, _)   <- prs ] :: [CoreArg]
              cbvs         = concat [ cbv | (_, _, cbv, _) <- prs ]
              rebox_nested = concat [ rbs | (_, _, _, rbs) <- prs ]
-             -- rebox_here: see Note [Reboxing warning]
-             rebox_here   = [ dataConName dc | box_use == BoxOther ]
+             -- rebox_here: see Note [Reboxing warning]; nullary
+             -- constructors rebox for free, so don't warn about them
+             rebox_here   = [ dataConName dc
+                            | box_use == BoxOther, dataConRepArity dc > 0 ]
        ; assertPpr (length con_str == length (filter isRuntimeArg rest_args))
             ( ppr con_str $$ ppr rest_args $$
               ppr (length con_str) $$ ppr (length rest_args)
