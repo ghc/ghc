@@ -452,16 +452,6 @@ reportBadTelescope ctxt env (ForAllSkol telescope) skols
 reportBadTelescope _ _ skol_info skols
   = pprPanic "reportBadTelescope" (ppr skol_info $$ ppr skols)
 
--- | Should we completely ignore this constraint in error reporting?
--- It *must* be the case that any constraint for which this returns True
--- somehow causes an error to be reported elsewhere.
--- See Note [Constraints to ignore].
-ignoreConstraint :: Ct -> Bool
-ignoreConstraint ct
-  = case ctOrigin ct of
-      AssocFamPatOrigin         -> True  -- See (CIG1)
-      _                         -> False
-
 -- | Makes an error item from a constraint, calculating whether or not the item
 -- should be suppressed. See Note [Wanteds rewrite Wanteds: rewriter-sets]
 -- in GHC.Tc.Types.Constraint. Returns Nothing if we should just ignore
@@ -473,33 +463,176 @@ mkErrorItem ct
        ; return Nothing }   -- See Note [Constraints to ignore]
 
   | otherwise
-  = do { let loc = ctLoc ct
-             flav = ctFlavour ct
+  = do { let ev = ctEvidence ct
 
-             -- For this `suppress` stuff see
-             -- Note [Wanteds rewrite Wanteds: rewriter-sets] in GHC.Tc.Types.Constraint
-             (suppress, m_evdest) = case ctEvidence ct of
-                     CtGiven {} -> (False, Nothing)
-                     CtWanted (WantedCt { ctev_rewriters = rws, ctev_dest = dest })
-                                -> (not (isEmptyCoHoleSet rws), Just dest)
+             m_evdest =  case ev of
+                           CtGiven {}                               -> Nothing
+                           CtWanted (WantedCt { ctev_dest = dest }) -> Just dest
 
-       ; let m_reason = case ct of
+
+             m_reason = case ct of
                 CIrredCan (IrredCt { ir_reason = reason }) -> Just reason
                 _                                          -> Nothing
 
-             insoluble_ct = insolubleCt ct
-
        ; return $ Just $ EI { ei_pred      = ctPred ct
                             , ei_evdest    = m_evdest
-                            , ei_flavour   = flav
-                            , ei_loc       = loc
+                            , ei_flavour   = ctFlavour ct
+                            , ei_loc       = ctLoc ct
                             , ei_m_reason  = m_reason
-                            , ei_insoluble = insoluble_ct
-                            , ei_suppress  = suppress }}
+                            , ei_insoluble = insolubleCt ct
+                            , ei_suppress  = suppressCtError ev }}
 
 -- | Actually report this 'ErrorItem'.
 unsuppressErrorItem :: ErrorItem -> ErrorItem
 unsuppressErrorItem ei = ei { ei_suppress = False }
+
+-- | Should we completely ignore this constraint in error reporting?
+-- It *must* be the case that any constraint for which this returns True
+-- somehow causes an error to be reported elsewhere.
+-- See Note [Constraints to ignore].
+ignoreConstraint :: Ct -> Bool
+ignoreConstraint ct
+  = case ctOrigin ct of
+      AssocFamPatOrigin         -> True  -- See (CIG1)
+      _                         -> False
+
+suppressCtError :: CtEvidence -> Bool
+-- See Note [Suppressing confusing errors]
+suppressCtError (CtGiven {})
+  = False
+suppressCtError (CtWanted (WantedCt { ctev_rewriters = rws, ctev_loc = loc }))
+  | not (isEmptyCoHoleSet rws)
+  = True  -- See (SCE1)
+
+  | isWantedSuperclassOrigin (ctLocOrigin loc)
+  = True  -- See (SCE2)
+
+  | otherwise
+  = False
+
+{- Note [Constraints to ignore]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Some constraints are meant only to aid the solver by unification; a failure
+to solve them is not necessarily an error to report to the user. It is critical
+that compilation is aborted elsewhere if there are any ignored constraints here;
+they will remain unfilled, and might have been used to rewrite another constraint.
+
+Currently, the constraints to ignore are:
+
+(CIG1) Constraints generated in order to unify associated type instance parameters
+   with class parameters. Here are two illustrative examples:
+
+     class C (a :: k) where
+       type F (b :: k)
+
+     instance C True where
+       type F a = Int
+
+     instance C Left where
+       type F (Left :: a -> Either a b) = Bool
+
+   In the first instance, we want to infer that `a` has type Bool. So we emit
+   a constraint unifying kappa (the guessed type of `a`) with Bool. All is well.
+
+   In the second instance, we process the associated type instance only
+   after fixing the quantified type variables of the class instance. We thus
+   have skolems a1 and b1 such that the class instance is for (Left :: a1 -> Either a1 b1).
+   Unifying a1 and b1 with a and b in the type instance will fail, but harmlessly so.
+   checkConsistentFamInst checks for this, and will fail if anything has gone
+   awry. Really the equality constraints emitted are just meant as an aid, not
+   a requirement. This is test case T13972.
+
+   We detect this case by looking for an origin of AssocFamPatOrigin; constraints
+   with this origin are dropped entirely during error message reporting.
+
+   If there is any trouble, checkValidFamInst bleats, aborting compilation.
+
+(Note: Aug 25: this seems a rather tricky corner;
+               c.f. Note [Suppressing confusing errors])
+
+Note [Suppressing confusing errors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Certain errors we might encounter are potentially confusing to users.
+If there are any other errors to report, at all, we want to suppress these.
+We achieve this by setting the `ei_suppress` flag in the `ErrorItem`.
+
+Which errors should be suppressed?
+
+(SCE1) Non-empty rewriter sets.  See Note [Wanteds rewrite Wanteds: rewriter-sets]
+   in  GHC.Tc.Types.Constraint
+
+(SCE2) Superclasses of Wanteds.  These are generated only in case they trigger functional
+   dependencies.  If such a constraint is unsolved, then its "parent" constraint must
+   also be unsolved, and is much more informative to the user.  Example (#26255):
+        class (MinVersion <= F era) => Era era where { ... }
+        f :: forall era. EraFamily era -> IO ()
+        f = ..blah...   -- [W] Era era
+   Here we have simply omitted "Era era =>" from f's type.  But we'll end up with
+   /two/ Wanted constraints:
+        [W] d1 :  Era era
+        [W] d2 : MinVersion <= F era  -- Superclass of d1
+   We definitely want to report d1 and not d2!  Happily it's easy to filter out those
+   superclass-Wanteds, becuase their Origin betrays them.
+
+There are wrinkles
+
+(SCE3) In rare cases we may suppress /all/ errors. That is catastrophic: GHC proceeds
+  to desguar and optimise the program, even though it is full of type errors (#22702,
+  #22793), and/or we fail to bind evidence (#27731).
+
+  If this happens, Unless we are sure that an error will be reported some other way
+  (details in the defn of `tidy_items` in `reportWanteds) we just un-suppress the lot,
+  which is brutal but safe.  It's a rare case.
+
+   How can it happen that there are /all/ errors are suppressed?
+   * See test T18851 for an example of how it is (just, barely) possible for the
+     /only/ errors to be superclass-of-Wanted constraints.
+   * Similarly #27731, which also involves a superclass-of-Wanted:
+          class (a ~ F b) => Ren a b
+     If we have a [W] Ren a b, we'll emit the superclass [W] a ~ F b, which will
+     rewrite the original class constraint to [W] Ren (F b) b.  Now we have two
+     constraints: one has a non-empty rewriter set (SEC1) and one is a superclass of
+     a Wanted (SEC2).
+   * Also see Wrinkle (PER2) in Note [Prioritise Wanteds with empty
+     CoHoleSet] in GHC.Tc.Types.Constraint.
+
+Historical note.  We used to suppress errors arising from the interaction of two
+   fundep constraints.  But nowadays fundep constraints never "escape" into the main
+   solver and so never show up in error messages.  See (SOLVE-FD) in Note [Overview
+   of functional dependencies in type inference] in GHC.Tc.Solver.FunDeps.  So this
+   wrinkle is now just a historical note.
+
+   Errors which arise from the interaction of two Wanted fun-dep constraints.
+   Example:
+
+     class C a b | a -> b where
+       op :: a -> b -> b
+
+     foo _ = op True Nothing
+
+     bar _ = op False []
+
+   Here, we could infer
+     foo :: C Bool (Maybe a) => p -> Maybe a
+     bar :: C Bool [a]       => p -> [a]
+
+   (The unused arguments suppress the monomorphism restriction.) The problem
+   is that these types can't both be correct, as they violate the functional
+   dependency. Yet reporting an error here is awkward: we must
+   non-deterministically choose either foo or bar to reject. We thus want
+   to report this problem only when there is nothing else to report.
+   See typecheck/should_fail/T13506 for an example of when to suppress
+   the error. The case above is actually accepted, because foo and bar
+   are checked separately, and thus the two fundep constraints never
+   encounter each other. It is test case typecheck/should_compile/FunDepOrigin1.
+
+   This case applies only when both fundeps are *Wanted* fundeps; when
+   both are givens, the error represents unreachable code. For
+   a Given/Wanted case, see #9612.
+
+   End of historical note
+
+-}
 
 ----------------------------------------------------------------
 reportWanteds :: SolverReportErrCtxt -> TcLevel -> WantedConstraints -> TcM ()
@@ -508,21 +641,9 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
   | isEmptyWC wc = traceTc "reportWanteds empty WC" empty
   | otherwise
   = do { tidy_items1 <- mapMaybeM mkErrorItem tidy_cts
-       ; traceTc "reportWanteds 1" (vcat [ text "Simples =" <+> ppr simples
-                                         , text "Suppress =" <+> ppr (cec_suppress ctxt)
-                                         , text "tidy_cts   =" <+> ppr tidy_cts
-                                         , text "tidy_items1 =" <+> ppr tidy_items1
-                                         , text "tidy_errs =" <+> ppr tidy_errs ])
 
          -- Catch an awkward (and probably rare) case in which /all/ errors are
-         -- suppressed: see Wrinkle (PER2) in Note [Prioritise Wanteds with empty
-         -- CoHoleSet] in GHC.Tc.Types.Constraint.
-         --
-         -- Unless we are sure that an error will be reported some other way
-         -- (details in the defn of tidy_items) un-suppress the lot. This makes
-         -- sure we don't forget to report an error at all, which is
-         -- catastrophic: GHC proceeds to desguar and optimise the program, even
-         -- though it is full of type errors (#22702, #22793)
+         -- suppressed: see (SCE3) in Note [Suppressing confusing errors]
        ; errs_already <- ifErrsM (return True) (return False)
        ; let tidy_items
                | not errs_already                     -- Have not already reported an error (perhaps
@@ -530,8 +651,15 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
                , not (any ignoreConstraint simples)   -- No error is ignorable (is reported elsewhere)
                , all ei_suppress tidy_items1          -- All errors are suppressed
                = map unsuppressErrorItem tidy_items1
+
                | otherwise
                = tidy_items1
+
+       ; traceTc "reportWanteds 1" (vcat [ text "Simples =" <+> ppr simples
+                                         , text "Suppress =" <+> ppr (cec_suppress ctxt)
+                                         , text "tidy_cts   =" <+> ppr tidy_cts
+                                         , text "tidy_items1 =" <+> ppr tidy_items1
+                                         , text "tidy_errs =" <+> ppr tidy_errs ])
 
          -- First, deal with any out-of-scope errors:
        ; let (out_of_scope, other_holes, not_conc_errs, mult_co_errs) = partition_errors tidy_errs
@@ -558,10 +686,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
        -- See wrinkle (DME1) in Note [Coercion errors in tcSubMult] in GHC.Tc.Utils.Unify.
        ; when (null simples) $ reportMultiplicityCoercionErrs ctxt_for_insols mult_co_errs
 
-          -- See Note [Suppressing confusing errors]
-       ; let (suppressed_items, reportable_items) = partition suppressItem tidy_items
-       ; traceTc "reportWanteds suppressed:" (ppr suppressed_items)
-       ; (ctxt1, items1) <- tryReporters ctxt_for_insols report1 reportable_items
+       ; (ctxt1, items1) <- tryReporters ctxt_for_insols report1 tidy_items
 
          -- Now all the other constraints.  We suppress errors here if
          -- any of the first batch failed, or if the enclosing context
@@ -577,18 +702,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
             -- NB ctxt2: don't suppress inner insolubles if there's only a
             -- wanted insoluble here; but do suppress inner insolubles
             -- if there's a *given* insoluble here (= inaccessible code)
-
-         -- If there are no other errors to report, report suppressed errors.
-         -- See (SCE3) in Note [Suppressing confusing errors].
-         -- NB: with -fdefer-type-errors we might have reported warnings only from
-         -- reportable_items`, but we still want to suppress the `suppressed_items`.
-       ; when (null reportable_items) $
-         do { (_, more_leftovers) <- tryReporters ctxt_for_insols (report1++report2)
-                                                  suppressed_items
-                 -- ctxt_for_insols: the suppressed errors can be Int~Bool, which
-                 -- will have made the incoming `ctxt` be True; don't make that
-                 -- suppress the Int~Bool error!
-            ; massertPpr (null more_leftovers) (ppr more_leftovers) } }
+       }
  where
     env       = cec_tidy ctxt
     tidy_cts  = bagToList (mapBag (tidyCt env)   simples)
@@ -752,15 +866,6 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
       = has_gadt_match implics
 
 ---------------
-suppressItem :: ErrorItem -> Bool
- -- See Note [Suppressing confusing errors]
-suppressItem item
-  | Wanted <- ei_flavour item
-  , let orig = errorItemOrigin item
-  = isWantedSuperclassOrigin orig       -- See (SCE1)
-  | otherwise
-  = False
-
 isSkolemTy :: TcLevel -> Type -> Bool
 -- The type is a skolem tyvar
 isSkolemTy tc_lvl ty
@@ -778,113 +883,8 @@ isTyFun_maybe ty = case tcSplitTyConApp_maybe ty of
                       Just (tc,_) | isTypeFamilyTyCon tc -> Just tc
                       _ -> Nothing
 
-{- Note [Suppressing confusing errors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Certain errors we might encounter are potentially confusing to users.
-If there are any other errors to report, at all, we want to suppress these.
-
-Which errors should be suppressed?
-
-(SCE1) Superclasses of Wanteds.  These are generated only in case they trigger functional
-   dependencies.  If such a constraint is unsolved, then its "parent" constraint must
-   also be unsolved, and is much more informative to the user.  Example (#26255):
-        class (MinVersion <= F era) => Era era where { ... }
-        f :: forall era. EraFamily era -> IO ()
-        f = ..blah...   -- [W] Era era
-   Here we have simply omitted "Era era =>" from f's type.  But we'll end up with
-   /two/ Wanted constraints:
-        [W] d1 :  Era era
-        [W] d2 : MinVersion <= F era  -- Superclass of d1
-   We definitely want to report d1 and not d2!  Happily it's easy to filter out those
-   superclass-Wanteds, becuase their Origin betrays them.
-
-Historical (SCE2).  Fundep constraints never "escape" into the
-   main solver and so never show up in error messages.
-   See (SOLVE-FD) in Note [Overview of functional dependencies in type inference]
-   in GHC.Tc.Solver.FunDeps.  So this wrinkle is now just a historical note.
-
-   Errors which arise from the interaction of two Wanted fun-dep constraints.
-   Example:
-
-     class C a b | a -> b where
-       op :: a -> b -> b
-
-     foo _ = op True Nothing
-
-     bar _ = op False []
-
-   Here, we could infer
-     foo :: C Bool (Maybe a) => p -> Maybe a
-     bar :: C Bool [a]       => p -> [a]
-
-   (The unused arguments suppress the monomorphism restriction.) The problem
-   is that these types can't both be correct, as they violate the functional
-   dependency. Yet reporting an error here is awkward: we must
-   non-deterministically choose either foo or bar to reject. We thus want
-   to report this problem only when there is nothing else to report.
-   See typecheck/should_fail/T13506 for an example of when to suppress
-   the error. The case above is actually accepted, because foo and bar
-   are checked separately, and thus the two fundep constraints never
-   encounter each other. It is test case typecheck/should_compile/FunDepOrigin1.
-
-   This case applies only when both fundeps are *Wanted* fundeps; when
-   both are givens, the error represents unreachable code. For
-   a Given/Wanted case, see #9612.
-
-   End of historical (SCE2)
-
-(SCE3) How can it happen that there are /only/ suppressed errors?  See test T18851
-   for an example of how it is (just, barely) possible for the /only/ errors to
-   be superclass-of-Wanted constraints.
-
-Mechanism:
-
-We use the `suppress` function within reportWanteds to filter out these
-"suppress" cases, then report all other errors. After doing so, we return to these
-suppressed ones and report them only if there have been no errors so far.
-
-Note [Constraints to ignore]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Some constraints are meant only to aid the solver by unification; a failure
-to solve them is not necessarily an error to report to the user. It is critical
-that compilation is aborted elsewhere if there are any ignored constraints here;
-they will remain unfilled, and might have been used to rewrite another constraint.
-
-Currently, the constraints to ignore are:
-
-(CIG1) Constraints generated in order to unify associated type instance parameters
-   with class parameters. Here are two illustrative examples:
-
-     class C (a :: k) where
-       type F (b :: k)
-
-     instance C True where
-       type F a = Int
-
-     instance C Left where
-       type F (Left :: a -> Either a b) = Bool
-
-   In the first instance, we want to infer that `a` has type Bool. So we emit
-   a constraint unifying kappa (the guessed type of `a`) with Bool. All is well.
-
-   In the second instance, we process the associated type instance only
-   after fixing the quantified type variables of the class instance. We thus
-   have skolems a1 and b1 such that the class instance is for (Left :: a1 -> Either a1 b1).
-   Unifying a1 and b1 with a and b in the type instance will fail, but harmlessly so.
-   checkConsistentFamInst checks for this, and will fail if anything has gone
-   awry. Really the equality constraints emitted are just meant as an aid, not
-   a requirement. This is test case T13972.
-
-   We detect this case by looking for an origin of AssocFamPatOrigin; constraints
-   with this origin are dropped entirely during error message reporting.
-
-   If there is any trouble, checkValidFamInst bleats, aborting compilation.
-
-(Note: Aug 25: this seems a rather tricky corner;
-               c.f. Note [Suppressing confusing errors])
-
-Note [Implementation of Unsatisfiable constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Implementation of Unsatisfiable constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The Unsatisfiable constraint was introduced in GHC proposal #433 (https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0433-unsatisfiable.rst).
 See Note [The Unsatisfiable constraint] in GHC.TypeError.
 
