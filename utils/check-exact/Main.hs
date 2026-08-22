@@ -74,7 +74,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl3.hs" (Just rmDecl3)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl4.hs" (Just rmDecl4)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl5.hs" (Just rmDecl5)
- "../../testsuite/tests/ghc-api/exactprint/RmDecl6.hs" (Just rmDecl6)
+ -- "../../testsuite/tests/ghc-api/exactprint/RmDecl6.hs" (Just rmDecl6)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl7.hs" (Just rmDecl7)
  -- "../../testsuite/tests/ghc-api/exactprint/RmTypeSig1.hs" (Just rmTypeSig1)
  -- "../../testsuite/tests/ghc-api/exactprint/RmTypeSig2.hs" (Just rmTypeSig2)
@@ -208,7 +208,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/PprRecordSemi.hs" Nothing
  -- "../../testsuite/tests/printer/PprSemis.hs" Nothing
  -- "../../testsuite/tests/printer/PprEmptyMostly.hs" Nothing
- -- "../../testsuite/tests/parser/should_compile/DumpSemis.hs" Nothing
+ "../../testsuite/tests/parser/should_compile/DumpSemis.hs" Nothing
  -- "../../testsuite/tests/ghc-api/exactprint/Test20239.hs" Nothing
  -- "../../testsuite/tests/printer/PprArrowLambdaCase.hs" Nothing
  -- "../../testsuite/tests/printer/PprParenFunBind.hs" Nothing
