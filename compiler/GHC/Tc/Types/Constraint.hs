@@ -1206,24 +1206,11 @@ insolubleWC (WC { wc_impl = implics, wc_simple = simples, wc_errors = errors })
       is_insoluble (DE_Multiplicity {}) = False
 
 insolubleWantedCt :: Ct -> Bool
--- | Is this a definitely insoluble Wanted constraint? Namely:
---
---   - a Wanted,
---   - which is insoluble (as per 'insolubleCt'),
---   - that does not arise from a Given or a Wanted/Wanted fundep interaction.
---
--- See Note [Insoluble Wanteds]
+-- | Is this a definitely insoluble Wanted constraint?
 insolubleWantedCt ct
-  | CtWanted (WantedCt { ctev_loc = loc, ctev_rewriters = rewriters })
-      <- ctEvidence ct
+  | CtWanted (WantedCt {}) <- ctEvidence ct
       -- It's a Wanted
   , insolubleCt ct
-      -- It's insoluble
-  , isEmptyCoHoleSet rewriters
-      -- It has no rewriters – see (IW1) in Note [Insoluble Wanteds]
-  , not (isGivenLoc loc)
-      -- isGivenLoc: see (IW2) in Note [Insoluble Wanteds]
-    -- See also historical (IW3) in Note [Insoluble Wanteds]
   = True
 
   | otherwise
@@ -1293,28 +1280,6 @@ in GHC.Tc.Errors), so we may fail to report anything at all!  Yikes.
 
 Bottom line: insolubleWC (called in GHC.Tc.Solver.setImplicationStatus)
              should ignore givens even if they are insoluble.
-
-Note [Insoluble Wanteds]
-~~~~~~~~~~~~~~~~~~~~~~~~
-insolubleWantedCt returns True of a Wanted constraint that definitely
-can't be solved.  But not quite all such constraints; see wrinkles.
-
-(IW1) We only treat it as insoluble if it has an empty rewriter set.  (See Note
-   [Wanteds rewrite Wanteds: rewriter-sets].)  Otherwise #25325 happens: a
-   Wanted constraint A that is /not/ insoluble rewrites some other Wanted
-   constraint B, so B has A in its rewriter set.  Now B looks insoluble.  The
-   danger is that we'll suppress reporting B because of its empty rewriter set;
-   and suppress reporting A because there is an insoluble B lying around.  (This
-   suppression happens in GHC.Tc.Errors.mkErrorItem.)  Solution: don't treat B
-   as insoluble.
-
-(IW2) If the Wanted arises from a Given (how can that happen?), don't
-   treat it as a Wanted insoluble (obviously).
-
-(IW3) Historical note: we used to have equalities arising from
-   Wanted/Wanted fundep interactions, which we did not want to treat
-   as insoluble.  But now such fundep constraints never escape.
-   See Note [Overview of functional dependencies in type inference]
 
 Note [Insoluble holes]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -1858,8 +1823,8 @@ type ApproxWC = ( Bag Ct          -- Free quantifiable constraints
    -- Why do we need that TcTyCoVarSet of non-quantifiable constraints?
    -- See (DP1) in Note [decideAndPromoteTyVars] in GHC.Tc.Solver
 approximateWC :: Bool -> WantedConstraints -> Bag Ct
-approximateWC include_non_quantifiable cts
-  = fst (approximateWCX include_non_quantifiable cts)
+approximateWC include_non_quantifiable wc
+  = fst (approximateWCX include_non_quantifiable wc)
 
 approximateWCX :: Bool -> WantedConstraints -> ApproxWC
 -- The "X" means "extended";
@@ -1867,36 +1832,41 @@ approximateWCX :: Bool -> WantedConstraints -> ApproxWC
 -- See Note [ApproximateWC]
 -- See Note [floatKindEqualities vs approximateWC]
 approximateWCX include_non_quantifiable wc
-  = float_wc False emptyVarSet wc (emptyBag, emptyVarSet)
+  = approx_wc include_non_quantifiable False emptyVarSet wc
+              (emptyBag, emptyVarSet)
+
+approx_wc :: Bool           -- True <=> including non-quantifiable constraints
+          -> Bool           -- True <=> there are enclosing equalities
+          -> TcTyCoVarSet   -- Enclosing skolem binders
+          -> WantedConstraints
+          -> ApproxWC -> ApproxWC
+approx_wc incl_nq encl_eqs skol_tvs (WC { wc_simple = simples, wc_impl = implics }) acc
+  | any insolubleWantedCt simples -- See (W5) in Note [ApproximateWC]
+  = acc
+
+  | otherwise
+  = foldBag_flip float_ct     simples $
+    foldBag_flip float_implic implics $
+    acc
+
   where
-    float_wc :: Bool           -- True <=> there are enclosing equalities
-             -> TcTyCoVarSet   -- Enclosing skolem binders
-             -> WantedConstraints
-             -> ApproxWC -> ApproxWC
-    float_wc encl_eqs trapping_tvs (WC { wc_simple = simples, wc_impl = implics }) acc
-      = foldBag_flip (float_ct     encl_eqs trapping_tvs) simples $
-        foldBag_flip (float_implic encl_eqs trapping_tvs) implics $
-        acc
-
-    float_implic :: Bool -> TcTyCoVarSet -> Implication
-                 -> ApproxWC -> ApproxWC
-    float_implic encl_eqs trapping_tvs imp
-      = float_wc new_encl_eqs new_trapping_tvs (ic_wanted imp)
+    float_implic :: Implication -> ApproxWC -> ApproxWC
+    float_implic (Implic { ic_wanted = wc
+                         , ic_given_eqs = given_eqs, ic_skols = skols }) acc
+      = approx_wc incl_nq new_encl_eqs new_skol_tvs wc acc
       where
-        new_trapping_tvs = trapping_tvs `extendVarSetList` ic_skols imp
-        new_encl_eqs = encl_eqs || ic_given_eqs imp == MaybeGivenEqs
+        new_skol_tvs = skol_tvs `extendVarSetList` skols
+        new_encl_eqs = encl_eqs || given_eqs == MaybeGivenEqs
 
-    float_ct :: Bool -> TcTyCoVarSet -> Ct
-             -> ApproxWC -> ApproxWC
-    float_ct encl_eqs skol_tvs ct acc@(quant, no_quant)
-       | isGivenCt ct                                = acc
+    float_ct :: Ct -> ApproxWC -> ApproxWC
+    float_ct ct acc@(quant, no_quant)
+       | isGivenCt ct                         = acc
            -- There can be (insoluble) Given constraints in wc_simple,
            -- there so that we get error reports for unreachable code
            -- See `given_insols` in GHC.Tc.Solver.Solve.solveImplication
-       | insolubleCt ct                       = acc
+       | insolubleCt ct                       = acc  -- See (W5)
        | pred_tvs `intersectsVarSet` skol_tvs = acc
-       | include_non_quantifiable             = add_to_quant
-       | is_quantifiable encl_eqs (ctPred ct) = add_to_quant
+       | incl_nq || is_quantifiable pred      = add_to_quant
        | otherwise                            = add_to_no_quant
        where
          pred     = ctPred ct
@@ -1904,7 +1874,7 @@ approximateWCX include_non_quantifiable wc
          add_to_quant    = (ct `consBag` quant, no_quant)
          add_to_no_quant = (quant, no_quant `unionVarSet` pred_tvs)
 
-    is_quantifiable encl_eqs pred
+    is_quantifiable pred
        = case classifyPredType pred of
            -- See the classification in Note [ApproximateWC]
            EqPred eq_rel ty1 ty2
@@ -1985,9 +1955,9 @@ Wrinkle (W2)
   better advised to simply write a type signature.
 
 Wrinkle (W3)
-  In findDefaultableGroups we are not worried about the most-general type; and
-  we /do/ want to float out of equalities (#12797).  Hence we just union the two
-  returned lists.
+  In `applyDefaultingRules` we are not worried about the most-general type; and
+  we /do/ want to float out of equalities (#12797).  Hence the `True` argument
+  to `approximateWC` in `applyDefaultingaRules`.
 
 Wrinkle (W4)
   In #26376 we had constraints
@@ -2004,6 +1974,23 @@ Wrinkle (W4)
   that quantified constraint into a implication constraint.  (Exception:
   SPECIALISE pragmas: see (WFA4) in Note [Solving a Wanted forall-constraint].
   But there we don't use approximateWC.)
+
+Wrinkle (W5)
+  If an implication has insoluble `wc_simple` we give up and return no constraints.
+  We do this locally, per-implication, so that sister soluble implications are
+  defulted normally.
+
+  * For inferring types in `simplifyInfer` here is no point in inferring a
+    type with carefully chosen constraints if there is a type error anyway
+
+  * For defaulting see Note [When to do type-class defaulting].  A tiresome
+    complication is that in the top-level WantedConstraints we have no
+    outer implication, so the test appears both in `float_implic` and in
+    the `approximateWC` wrapper.
+
+  Note that in this test we ignore `wc_errors`, because out-of-scope errors
+  tend to give rise to ambiguity, and then defaulting helps gets rid of
+  some of that ambiguity.
 
 ------ Historical note -----------
 There used to be a second caveat, driven by #8155

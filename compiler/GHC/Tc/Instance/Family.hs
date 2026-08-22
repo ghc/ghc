@@ -618,16 +618,16 @@ addLocalFamInst (home_fie, my_fis) fam_inst
              home_fie' = extendFamInstEnv home_fie fam_inst
 
            -- Check for conflicting instance decls and injectivity violations
-       ; ((), no_errs) <- askNoErrs $
+       ; ((), has_errs) <- askErrsFound $
          do { checkForConflicts            inst_envs fam_inst
             ; checkForInjectivityConflicts inst_envs fam_inst
             ; checkInjectiveEquation       fam_inst
             }
 
-       ; if no_errs then
-            return (home_fie', fam_inst : my_fis)
+       ; if has_errs then
+            return (home_fie,  my_fis)
          else
-            return (home_fie,  my_fis) }
+            return (home_fie', fam_inst : my_fis) }
 
 {-
 ************************************************************************

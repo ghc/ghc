@@ -1,7 +1,8 @@
 T26823.hs:12:14: error: [GHC-25897]
-    • Couldn't match expected type ‘a0 -> a0 -> t’ with actual type ‘t’
+    • Couldn't match expected type ‘Integer -> Integer -> t’
+                  with actual type ‘t’
       ‘t’ is a rigid type variable bound by
-        the inferred type of rem :: a0 -> a0 -> t
+        the inferred type of rem :: Integer -> Integer -> t
         at T26823.hs:12:5-29
     • In the expression: off `rem` vecAli
       In an equation for ‘rem’: !rem = off `rem` vecAli
@@ -12,21 +13,13 @@ T26823.hs:12:14: error: [GHC-25897]
             !rem = off `rem` vecAli
             !start = if rem == 0 then off else off + (vecAli - rem)
     • Relevant bindings include
-        rem :: a0 -> a0 -> t (bound at T26823.hs:12:6)
-        off :: a0 (bound at T26823.hs:8:6)
-        vecAli :: a0 (bound at T26823.hs:10:6)
-        size :: a0 (bound at T26823.hs:9:6)
+        rem :: Integer -> Integer -> t (bound at T26823.hs:12:6)
 
-T26823.hs:13:57: error: [GHC-27958]
-    • Couldn't match expected type ‘a0’
-                  with actual type ‘a0 -> a0 -> t0’
-    • In the second argument of ‘(-)’, namely ‘rem’
+T26823.hs:13:57: error: [GHC-83865]
+    • Couldn't match expected type ‘Integer’
+                  with actual type ‘Integer -> Integer -> t0’
+    • Probable cause: ‘rem’ is applied to too few arguments
+      In the second argument of ‘(-)’, namely ‘rem’
       In the second argument of ‘(+)’, namely ‘(vecAli - rem)’
       In the expression: off + (vecAli - rem)
-    • Relevant bindings include
-        start :: a0 (bound at T26823.hs:13:6)
-        rem :: forall {t}. a0 -> a0 -> t (bound at T26823.hs:12:6)
-        off :: a0 (bound at T26823.hs:8:6)
-        vecAli :: a0 (bound at T26823.hs:10:6)
-        size :: a0 (bound at T26823.hs:9:6)
 

@@ -607,17 +607,32 @@ combineStrategies default1 default2 ct
 
 {- Note [When to do type-class defaulting]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In GHC 7.6 and 7.8.2, we did type-class defaulting only if insolubleWC
-was false, on the grounds that defaulting can't help solve insoluble
-constraints.  But if we *don't* do defaulting we may report a whole
-lot of errors that would be solved by defaulting; these errors are
-quite spurious because fixing the single insoluble error means that
-defaulting happens again, which makes all the other errors go away.
-This is jolly confusing: #9033.
+When exactly should we do type-class defaulting?  Our current plan is this:
 
-So it seems better to always do type-class defaulting.
+* We always /attempt/ type-class defaulting; but we switch it off
+  if a peer constraint, or constraint in an ancestor implication, is insoluble.
+  That is, if we have
+    [W] Int ~ Bool
+    [W] Num alpha
+  we don't default the (Num alpha) constraint.
 
-However, always doing defaulting does mean that we'll do it in
+* However, when checking for insoluble peer constraints we ignore out-of-scope
+  errors (in `wc_errors`).  Reason: if we have (foo 1) and `foo` is out of
+  scope, we don't really want to get ambiguity errors from the `1`, even with
+  -fdeferred-out-of-scope-errors.
+
+This decision is made (surprisingly) in `GHC.Tc.Types.Constraint.approximateWC`;
+see wrinkle (W5) in Note [ApproximateWC].
+
+In GHC 7.6 and 7.8.2, we did type-class defaulting only if insolubleWC was false,
+on the grounds that defaulting can't help solve insoluble constraints.  But if we
+*don't* do defaulting we may report a whole lot of errors that would be solved by
+defaulting; these errors are quite spurious because fixing the single insoluble
+error means that defaulting happens again, which makes all the other errors go
+away.  This is jolly confusing: #9033.
+
+
+Always doing defaulting does mean that we'll do it in
 situations like this (#5934):
    run :: (forall s. GenST s) -> Int
    run = fromInteger 0
@@ -627,10 +642,6 @@ type, because the latter involves foralls.  So we're left with
 Now we do defaulting, get alpha := Integer, and report that we can't
 match Integer with (forall s. GenST s) -> Int.  That's not totally
 stupid, but perhaps a little strange.
-
-Another potential alternative would be to suppress *all* non-insoluble
-errors if there are *any* insoluble errors, anywhere, but that seems
-too drastic.
 
 Note [Defaulting equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -993,9 +1004,9 @@ last example above.
 
 tryTypeClassDefaulting :: WantedConstraints -> TcS WantedConstraints
 tryTypeClassDefaulting wc
-  | isEmptyWC wc || insolubleWC wc -- See Note [Defaulting insolubles]
+  | isSolvedWC wc -- Not isEmptyWC, see (SCS5) in Note [Shortcut solving]
   = return wc
-  | otherwise  -- See Note [When to do type-class defaulting]
+  | otherwise     -- See Note [When to do type-class defaulting]
   = do { something_happened <- applyDefaultingRules wc
                                -- See Note [Top-level Defaulting Plan]
        ; solveAgainIf something_happened wc }
@@ -1006,9 +1017,6 @@ applyDefaultingRules :: WantedConstraints -> TcS Bool
 -- See Note [How type-class constraints are defaulted]
 
 applyDefaultingRules wanteds
-  | isSolvedWC wanteds -- not isEmptyWC, see (SCS5) in Note [Shortcut solving]
-  = return False
-  | otherwise
   = do { (default_env, extended_rules) <- getDefaultInfo
        ; wanteds                       <- TcS.zonkWC wanteds
 
@@ -1028,13 +1036,23 @@ applyDefaultingRules wanteds
              ; return (wanteds, defaultedGroups)
              }
 
-       ; let groups = findDefaultableGroups (default_tys, extended_rules) wanteds
+      -- Extract from the WantedConstraints
+      -- a bag of constraints we might default
+      ; let possibly_defaultable_cts = approximateWC True wanteds
+              -- True: for the purpose of defaulting we don't care
+              --       about shape or enclosing equalities
+              -- See (W3) in Note [ApproximateWC] in GHC.Tc.Types.Constraint
+
+       -- Divide then into groups, by the tyvar they constrain
+       ; let groups = findDefaultableGroups (default_tys, extended_rules)
+                                            possibly_defaultable_cts
 
        ; traceTcS "applyDefaultingRules {" $
                   vcat [ text "wanteds =" <+> ppr wanteds
                        , text "groups  =" <+> ppr groups
                        , text "info    =" <+> ppr (default_tys, extended_rules) ]
 
+       -- Try defaulting each group separately
        ; something_happeneds <- mapM (disambigGroup wanteds default_tys) groups
 
        ; traceTcS "applyDefaultingRules }" (ppr something_happeneds)
@@ -1063,10 +1081,10 @@ applyDefaultingRules wanteds
 
 findDefaultableGroups
     :: ( [ClassDefaults]
-       , Bool )            -- extended default rules
-    -> WantedConstraints   -- Unsolved
+       , Bool )            -- Extended default rules
+    -> Bag Ct              -- Unsolved, perhpas defaultable
     -> [(TyVar, [Ct])]
-findDefaultableGroups (default_tys, extended_defaults) wanteds
+findDefaultableGroups (default_tys, extended_defaults) simples
   | null default_tys
   = []
   | otherwise
@@ -1076,11 +1094,6 @@ findDefaultableGroups (default_tys, extended_defaults) wanteds
     , defaultable_tyvar tv
     , defaultable_classes (map sndOf3 group) ]
   where
-    simples  = approximateWC True wanteds
-      -- True: for the purpose of defaulting we don't care
-      --       about shape or enclosing equalities
-      -- See (W3) in Note [ApproximateWC] in GHC.Tc.Types.Constraint
-
     (unaries, non_unaries) = partitionWith find_unary (bagToList simples)
     unary_groups           = equivClasses cmp_tv unaries
 

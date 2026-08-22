@@ -1,0 +1,16 @@
+T27731.hs:16:28: [GHC-05617]
+    • Could not deduce ‘St (Ev g0) ~ St g0’
+        arising from a superclass required to satisfy ‘Ren
+                                                         (St (Ev g0)) (Ev g0) g0’,
+        arising from a use of ‘f2’
+      from the context: (s ~ St h, Ren s h g, ?settings::settings)
+        bound by the type signature for:
+                   f1 :: forall s (h :: * -> *) (g :: * -> *) settings v.
+                         (s ~ St h, Ren s h g, ?settings::settings) =>
+                         (g v -> g ()) -> g v -> g ()
+        at T27731.hs:(13,1)-(15,33)
+      Note: ‘St’ is a non-injective type family.
+      The type variable ‘g0’ is ambiguous
+    • In the first argument of ‘C1’, namely ‘(f2)’
+      In the first argument of ‘\ _ a -> a’, namely ‘(C1 (f2))’
+      In the expression: (\ _ a -> a) (C1 (f2)) form

@@ -3,8 +3,8 @@
     It is not a module in the current program, or in any known package.
 
 <interactive>:14:1: error: [GHC-88464]
-    Variable not in scope: g :: t0 -> t
+    Variable not in scope: g :: Integer -> t
 
 <interactive>:15:1: error: [GHC-88464]
-    Variable not in scope: h :: t0 -> t
+    Variable not in scope: h :: Integer -> t
 
