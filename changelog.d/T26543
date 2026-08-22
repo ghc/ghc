@@ -1,0 +1,7 @@
+section: compiler
+synopsis: Fix a bug in ImpredicativeTypes
+description:
+  The QuickLook algorithm (which implements `ImpredicativeTypes`) was defeated if there
+  was a kind coercion in the types being unified.  That bug is now fixed.
+mrs: !16566
+issues: #26543

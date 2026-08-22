@@ -767,4 +767,4 @@ test('T27210', normal, compile_fail, [''])
 test('T26532', normal, compile_fail, [''])
 test('T27731', normal, compile_fail, [''])
 test('T27844', normal, compile_fail, [''])
-
+test('T26543a', normal, compile_fail, [''])

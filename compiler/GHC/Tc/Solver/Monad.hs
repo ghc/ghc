@@ -2325,7 +2325,7 @@ wrapUnifier rws loc role do_unifications
 -}
 
 -- | Fill in CycleBreakerTvs with the variables they stand for.
--- See Note [Type equality cycles] in GHC.Tc.Solver.Equality
+-- See Note [Type equality cycles: Givens] in GHC.Tc.Solver.Equality
 restoreTyVarCycles :: InertSet -> TcM ()
 restoreTyVarCycles is
   = TcM.liftZonkM

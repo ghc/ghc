@@ -1,0 +1,10 @@
+T26543a.hs:18:13: error: [GHC-27958]
+    • Couldn't match type ‘t0’ with ‘m0 a0’
+      Expected: (Proxy t0, Proxy t0)
+        Actual: (Proxy t0, Proxy (m0 a0))
+      Type variable kinds:
+        m0 :: t0 -> *
+        a0 :: t0
+    • In the first argument of ‘use2’, namely ‘h’
+      In the expression: use2 h
+      In an equation for ‘test’: test = use2 h
