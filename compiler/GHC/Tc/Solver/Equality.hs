@@ -2584,15 +2584,15 @@ turn controls the behaviour of the workhorse: GHC.Tc.Utils.Unify.checkTyEqRhs.
 
 The details depend on whether we're working with a Given or a Wanted.
 
-Given
------
+Note [Type equality cycles: Givens]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We emit a new Given, [G] F a ~ cbv, equating the type family application
 to our new cbv. This is actually done by `break_given` in
 `GHC.Tc.Solver.Monad.checkTypeEq`.
 
-Note its orientation: The type family ends up on the left; see
-Note [Orienting TyFamLHS/TyFamLHS]. No special treatment for
-CycleBreakerTvs is necessary. This scenario is now easily soluble, by using
+Note its orientation: The type family ends up on the left;
+see Note [Orienting TyFamLHS/TyFamLHS]. No special treatment for
+GivenCycleBreakerTvs is necessary. This scenario is now easily soluble, by using
 the first Given to rewrite the Wanted, which can now be solved.
 
 (The first Given actually also rewrites the second one, giving
@@ -2613,10 +2613,11 @@ to
 
 Note that
 * `cbv` is a fresh cycle breaker variable.
-* `cbv` is a meta-tyvar, but it is completely untouchable.
+* `cbv` is a meta-tyvar, of flavour GivenCycleBreakerTv, but it is
+  completely untouchable.
 * We track the cycle-breaker variables in inert_cycle_breakers in InertSet
-* We eventually fill in the cycle-breakers, with `cbv := F lhs`.
-  No one else fills in CycleBreakerTvs!
+* We eventually fill in the cycle-breakers, with `cbv := F lhs`,
+  via `restoreTyVarCycles`.  No one else fills in GivenCycleBreakerTvs!
 * The evidence for the new `F lhs ~ cbv` constraint is Refl, because we know
   this fill-in is ultimately going to happen.
 * In `inert_cycle_breakers`, we remember the (cbv, F lhs) pair; that is, we
@@ -2626,8 +2627,8 @@ Note that
 * This fill-in is done when solving is complete, by restoreTyVarCycles
   in nestImplicTcS and runTcSWithEvBinds.
 
-Wanted
-------
+Note [Type equality cycles: Wanteds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 First, we do not cycle-break unless the LHS is a unifiable type variable
 See Note [Don't cycle-break Wanteds when not unifying] in GHC.Tc.Solver.Monad.
 
@@ -2686,9 +2687,9 @@ to unify the cbvs:
   [W] AllEqF '[Bool] alpha
 
 Without the logic detailed in this Note, we're stuck here, as AllEqF cannot
-reduce and alpha cannot unify. Let's instead apply our cycle-breaker approach,
-just as described above. We thus invent cbv1 and cbv2 and unify
-alpha := cbv1 -> cbv2, yielding (after zonking)
+reduce and alpha cannot unify (occurs check). Let's instead apply our
+cycle-breaker approach, just as described above. We thus invent cbv1 and cbv2
+and unify alpha := (cbv1 : cbv2), yielding (after zonking)
 
   [W] Head (cbv1 : cbv2) ~ cbv1
   [W] Tail (cbv1 : cbv2) ~ cbv2
@@ -2726,8 +2727,8 @@ Note that we need to unify the cbvs here; if we did not, there would be
 no way to solve those constraints. That's why the cycle-breakers are
 ordinary TauTvs.
 
-How all this is implemented
----------------------------
+Note [Type equality cycles: implementation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We implement all this via the `TEFA_Break` constructor of `TyEqFamApp`,
 itself stored in the `tef_fam_app` field of `TyEqFlags`, which controls
 the behaviour of `GHC.Tc.Utils.Unify.checkTyEqRhs`.  The `TEFA_Break`
@@ -2854,7 +2855,7 @@ More details:
      CycleBreakerOrigin. This works for both Givens and Wanteds, as we need the
      logic in the W case for e.g. typecheck/should_fail/T17139.  Because this
      logic needs to work for Wanteds, too, we cannot simply look for a
-     CycleBreakerTv on the left: Wanteds don't use them.
+     GivenCycleBreakerTv on the left: Wanteds don't use them.
 
 
 **********************************************************************
