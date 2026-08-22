@@ -103,7 +103,6 @@ import GHC.Types.Id( idType )
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Types.Var.FV
 import GHC.Types.Basic
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 
@@ -120,7 +119,6 @@ import GHC.Data.Maybe (firstJusts)
 import Control.Monad
 import Data.Functor.Identity (Identity(..))
 import qualified Data.List.NonEmpty as NE
-import Data.Monoid as DM ( Any(..) )
 import qualified Data.Semigroup as S ( (<>) )
 import Data.Traversable (for)
 
@@ -3143,6 +3141,7 @@ uUnfilledVar2 env@(UE { u_defer = def_eq_ref, u_given_eq_lvl = given_eq_lvl })
     do { traceTc "uUnfilledVar2 not ok" $
              vcat [ text "tv1:" <+> ppr tv1
                   , text "ty2:" <+> ppr ty2
+                  , text "given_eq_lvl:" <+> ppr given_eq_lvl
                   , text "simple-unify-chk:" <+> ppr (simpleUnifyCheck UC_OnTheFly given_eq_lvl tv1 ty2)
                   ]
                -- Occurs check or an untouchable: just defer
@@ -3246,6 +3245,7 @@ lhsPriority tv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Question: given a homogeneous equality (alpha ~# ty), when is it OK to
 unify alpha := ty?
+
 (This note only applies to /homogeneous/ equalities, in which both
 sides have the same kind.)
 
@@ -3353,6 +3353,14 @@ Needless to say, all there are wrinkles:
     as you can see if you look at the long series of Notes associated with
     GHC.Tc.Solver.floatEqualities, around Nov 2020.  It's much easier
     to unify in-place, with no floating.
+
+* (COERCIONS) What if there are coercions in the RHS?  E.g.
+        alpha ~ (ty |> co)
+   or   alpha ~ (ty co)
+   We only recurse into the `coercionType` of `co` rather than `co` itself.
+   Why? Mainly because `co` might be a coercion hole, in which case we /can't/
+   recurse into the coercion that will eventually fill the hole.  This came
+   up in #26543.
 
 Note [TyVar/TyVar orientation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3619,6 +3627,8 @@ simpleUnifyCheck :: UnifyCheckCaller -> TcLevel -> TcTyVar -> TcType -> SimpleUn
 -- unification might still be OK, but it'll take more work to do
 -- (use the full 'checkTypeEq').
 --
+-- See Note [simpleUnifyCheck]
+--
 -- * Rejects if lhs_tv occurs in rhs_ty (occurs check)
 -- * Rejects foralls unless
 --      lhs_tv is RuntimeUnk (used by GHCi debugger)
@@ -3638,12 +3648,10 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
   | otherwise
   = SUC_NotSure
   where
-    lhs_info = metaTyVarInfo lhs_tv
-
-    !(occ_in_ty, occ_in_co) = mkOccFolders (tyVarName lhs_tv)
-
+    lhs_info           = metaTyVarInfo lhs_tv
     lhs_tv_lvl         = tcTyVarLevel lhs_tv
     lhs_tv_is_concrete = isConcreteTyVar lhs_tv
+    lhs_tv_nm          = tyVarName lhs_tv
 
     forall_ok = case caller of
                    UC_QuickLook -> isQLInstTyVar lhs_tv
@@ -3660,11 +3668,11 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
                UC_OnTheFly   -> False
 
     rhs_is_ok (TyVarTy tv)
-      | lhs_tv == tv                                    = False
-      | tcTyVarLevel tv `strictlyDeeperThan` lhs_tv_lvl = False
-      | lhs_tv_is_concrete, not (isConcreteTyVar tv)    = False
-      | occ_in_ty $! (tyVarKind tv)                     = False
-      | otherwise                                       = True
+       -- c.f. checkTyVar, the TEFTyVar case
+       | tcTyVarLevel tv `strictlyDeeperThan` lhs_tv_lvl = False
+       | lhs_tv_is_concrete, not (isConcreteTyVar tv)    = False
+       | simple_occurs_check lhs_tv_nm tv                = False
+       | otherwise                                       = True
 
     rhs_is_ok (FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
       | not forall_ok, isInvisibleFunArg af = False
@@ -3681,33 +3689,57 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
       | otherwise = False
 
     rhs_is_ok (AppTy t1 t2)    = rhs_is_ok t1 && rhs_is_ok t2
-    rhs_is_ok (CastTy ty co)   = not (occ_in_co co) && rhs_is_ok ty
-    rhs_is_ok (CoercionTy co)  = not (occ_in_co co)
+    rhs_is_ok (CastTy ty co)   = co_is_ok co && rhs_is_ok ty
+    rhs_is_ok (CoercionTy co)  = co_is_ok co
     rhs_is_ok (LitTy {})       = True
 
+    -- For coercions we look only in the /type/ of the coercion
+    -- See (SUC1) in Note [simpleUnifyCheck]
+    co_is_ok co = rhs_is_ok (coercionType co)
 
-mkOccFolders :: Name -> (TcType -> Bool, TcCoercion -> Bool)
--- These functions return True
---   * if lhs_tv occurs (incl deeply, in the kind of variable)
---   * if there is a coercion hole
--- No expansion of type synonyms
-mkOccFolders lhs_tv = ( getAny . runFVTop . check_ty
-                      , getAny . runFVTop . check_co)
-  where
-    check_ty :: Type -> FV BoundVars Any
-    !(check_ty, _, check_co, _) = foldTyCo occ_folder
+{- Note [simpleUnifyCheck]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+The function `simpleUnifyCheck` is asimple, /fast/ check for unifying (tv ~ rhs).
+It can return a definite decision (SUC_CannotUnify of SUC_CanUnify), or uncertainty
+(SUC_NotSure).  In the latter case we will later use `checkTyEqRhs` to resolve.
+In particular, `simpleUnifyCheck`:
 
-    occ_folder :: TyCoFolder (FV BoundVars Any)
-    occ_folder = TyCoFolder { tcf_view  = noView  -- Don't expand synonyms
-                            , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                            , tcf_hole  = do_hole
-                            , tcf_tycobinder = addBndrFV }
+* Rejects if lhs_tv occurs in rhs_ty (occurs check)
+* Rejects foralls unless
+      lhs_tv is RuntimeUnk (used by GHCi debugger)
+          or is a QL instantiation variable
+* Rejects a non-concrete type if lhs_tv is concrete
+* Rejects type families unless fam_ok=True
+* Does a level-check for type variables, to avoid skolem escape
 
-    do_tcv v = (MkFV $ \ bvs ->
-                Any (not (v `elemVarSet` bvs) && tyVarName v == lhs_tv))
-               `mappend` check_ty (varType v)
+This function is pretty heavily used, so it's optimised not to allocate.
 
-    do_hole _hole = MkFV $ \ _bvs -> DM.Any True  -- Reject coercion holes
+(SUC1) `simpleUnifyCheck` used by QuickLook's `qlUnify`, and anything other than
+  SUC_CanUnify will tell `qlUnify` not to proceed.  That makes QuickLook depend
+  (regrettably, delicately) on the exact choices made by `simpleUnifyCheck`.
+
+  A case in point: in #26543. In the repro case in the Descriptions, `qlUnify` failed
+  because there was a coercion /hole/ in the RHS; but one that was ultimately Refl.
+
+  So in `simpleUnifyCheck` we only look at the /kind/ of a coercion, not the
+  evidence itself.  I'm a bit worried about building a loop, if the evidence
+  mentions the LHS unification variable; but I can't see how that can happen, and
+  I /really/ don't want to be super-conservative for coercion holes (#26543).  So,
+  for now at least, we look just at the kind of the coercion.
+
+  Note that this (unsatisfactorily) differs from the choice in `checkCo`, but
+  changing that too is an unforced change so I have left the inconsistency.
+
+(SUC2) When we come across a type variable, we use `simple_occurs_check`, as also
+  does `checkTyEqRhs`.  That `simple_occurs_check` checks for occurrences in the
+  /kind/ if the type variable, using `anyFreeVarsOfType`.  And that /does/ look
+  inside coercions; while for coercion holes it just looks in the type of the
+  coercion hole.
+
+  This is all sadly inconsistent with (SUC1), but it's not currently causing
+  problems, so I am just leaving breadcrumbs (this Note) to point this out for
+  now.
+-}
 
 {- *********************************************************************
 *                                                                      *
@@ -4337,7 +4369,11 @@ checkCo flags co =
         -- Occurs check (can promote)
         | OC_Check lhs_tv occ_prob <- occ
         , LC_Promote { lc_lvlp = lhs_tv_lvl } <- lc
-        -> do { reason <- checkPromoteFreeVars occ_prob lhs_tv lhs_tv_lvl (tyCoVarsOfCo co)
+        -> do { reason <- checkPromoteFreeVars occ_prob lhs_tv lhs_tv_lvl $
+                          tyCoVarsOfCo co
+                          -- Maybe we should just check the free vars of the
+                          -- /type/ of the coercion, to line up with
+                          -- (SUC1) in Note [simpleUnifyCheck]
               ; return $
                 if cterHasNoProblem reason
                 then pure co
@@ -4697,12 +4733,21 @@ simpleOccursCheck :: OccursCheck -> TcTyVar -> TyVarCheckResult m
 simpleOccursCheck OC_None _
   = TyVarCheck_Success
 simpleOccursCheck (OC_Check lhs_tv occ_prob) occ_tv
-  | lhs_tv == tyVarName occ_tv || check_kind (tyVarKind occ_tv)
-  = TyVarCheck_Error (cteProblem occ_prob)
-  | otherwise
-  = TyVarCheck_Success
+  | simple_occurs_check lhs_tv occ_tv = TyVarCheck_Error (cteProblem occ_prob)
+  | otherwise                         = TyVarCheck_Success
+
+simple_occurs_check :: Name -> TcTyVar -> Bool  -- True <=> occurs check
+-- Check for an occurrence of lhs_tv in occ_tv or its kind
+-- This is a heavily-used bit of code, and experiments show that
+-- it's worth inlining this function
+{-# INLINE simple_occurs_check #-}
+simple_occurs_check lhs_tv occ_tv
+  = go occ_tv
   where
-    (check_kind, _) = mkOccFolders lhs_tv
+    -- See (SUC2) in Note [simpleUnifyCheck]
+    go occ_tv | lhs_tv == tyVarName occ_tv                 = True
+              | anyFreeVarsOfType go $! (tyVarKind occ_tv) = True
+              | otherwise                                  = False
 
 -------------------------
 tyVarLevelCheck :: LevelCheck m -> TcTyVar -> TyVarCheckResult m
