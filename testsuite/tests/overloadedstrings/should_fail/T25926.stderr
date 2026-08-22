@@ -1,3 +1,11 @@
+T25926.hs:3:6: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
+    • No instance for ‘Eq a’ arising from the literal ‘0’
+      Possible fix:
+        add (Eq a) to the context of
+          the inferred type of f :: () -> a -> ()
+    • In the pattern: 0
+      In an equation for ‘f’: f () 0 = ()
+
 T25926.hs:4:3: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘()’ with actual type ‘Char’
     • In the pattern: 'a'

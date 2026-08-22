@@ -59,6 +59,20 @@ DoExpansion2.hs:34:22: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefaul
       In the expression: getVal 3 4
       In a stmt of a 'do' block: Just x <- getVal 3 4
 
+DoExpansion2.hs:34:31: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
+    • Ambiguous type variable ‘t0’ arising from the literal ‘4’
+      prevents the constraint ‘(Num t0)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘t0’ should be.
+      Potentially matching instances:
+        instance Num Integer -- Defined in ‘GHC.Internal.Num’
+        instance Num Double -- Defined in ‘GHC.Internal.Float’
+        ...plus three others
+        ...plus one instance involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the second argument of ‘getVal’, namely ‘4’
+      In the expression: getVal 3 4
+      In a stmt of a 'do' block: Just x <- getVal 3 4
+
 DoExpansion2.hs:39:19: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘[Char]’ with ‘Int’
       Expected: Int

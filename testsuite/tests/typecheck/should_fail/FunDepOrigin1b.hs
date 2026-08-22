@@ -8,4 +8,4 @@ class C a b | a -> b where
 -- foo :: (C Bool (Maybe a), C Bool [b]) => x -> (Maybe a, [b])
 foo _ = (op True Nothing, op False [])
 
--- See Note [Suppressing confusing errors] in GHC.Tc.Errors
+-- See Note [ei_suppress: suppressing confusing errors] in GHC.Tc.Errors

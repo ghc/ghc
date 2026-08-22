@@ -5480,10 +5480,11 @@ data SolverReportErrCtxt
           , cec_warn_redundant :: Bool    -- ^ True <=> -Wredundant-constraints
           , cec_expand_syns    :: Bool    -- ^ True <=> -fprint-expanded-synonyms
 
-          , cec_suppress :: Bool    -- ^ True <=> More important errors have occurred,
-                                    --            so create bindings if need be, but
-                                    --            don't issue any more errors/warnings
-                                    -- See Note [Suppressing error messages]
+          , cec_error_reported :: Bool
+                -- ^ True <=> A "serious" error has already been reported,
+                --            so create bindings if need be, but don't
+                --            issue any more less-important errors/warnings
+                -- See Note [cec_error_reported: suppressing less-serious errors]
       }
 
 ----------------------------------------------------------------------------
@@ -5514,9 +5515,7 @@ data ErrorItem
        , ei_insoluble :: Bool   -- True if the constraint is definitely insoluble
                                 -- Cache of `insolubleCt`
 
-       , ei_suppress  :: Bool   -- Suppress because of
-                                -- Note [Wanteds rewrite Wanteds: rewriter-sets]
-                                -- in GHC.Tc.Constraint
+       , ei_suppress  :: Bool   -- See Note [ei_suppress: suppressing confusing errors]
        }
 
 instance Outputable ErrorItem where

@@ -600,8 +600,8 @@ Wrinkles
 (W1) Sometimes case (2) above needs to apply `noinline` to a type of kind
      Constraint; e.g.
                     noinline @(Eq Int) $dfEqInt
-     We don't have type-or-kind polymorphism, so we simply have two `inline`
-     Ids, namely `noinlineId` and `noinlineConstraintId`.
+     We don't have type-or-constraint polymorphism, so we simply have two
+     `inline` Ids, namely `noinlineId` and `noinlineConstraintId`.
 
 (W2) Note that noinline as currently implemented can hide some simplifications
      since it hides strictness from the demand analyser. Specifically, the

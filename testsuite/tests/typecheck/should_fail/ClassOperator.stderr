@@ -1,4 +1,3 @@
-
 ClassOperator.hs:14:3: error: [GHC-39999]
     • Could not deduce ‘a ><> b0’
       from the context: a ><> b
@@ -50,3 +49,4 @@ ClassOperator.hs:14:3: error: [GHC-39999]
       When checking the class method:
         (<**) :: forall a b. (a ><> b) => a -> a -> ()
       In the class declaration for ‘><>’
+
