@@ -1,0 +1,11 @@
+section: compiler
+synopsis: Fix a compiler crash after typechecking
+issues: #27731
+mrs: !16564
+description: {
+  The type checker was failing to report an error, even though it had found one,
+  due to over-zealous error suppression. That led to subsequent chaos. This
+  MR fixes it *and* simplifies the code.
+
+  Claude found a second, closely-related bug, now immortalised as test ``T18851d``.
+}

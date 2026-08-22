@@ -1,0 +1,20 @@
+T18851e.hs:36:5: error: [GHC-39999]
+    • Ambiguous type variable ‘int0’ arising from a use of ‘f’
+      prevents the constraint ‘(Num int0)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘int0’ should be.
+      Potentially matching instances:
+        instance Num Integer -- Defined in ‘GHC.Internal.Num’
+        instance Num Double -- Defined in ‘GHC.Internal.Float’
+        ...plus three others
+        ...plus one instance involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the first argument of ‘(++)’, namely ‘f @A @B’
+      In the expression: f @A @B ++ show (undefined :: D)
+      In an equation for ‘g’: g = f @A @B ++ show (undefined :: D)
+
+T18851e.hs:36:17: error: [GHC-39999]
+    • No instance for ‘Show D’ arising from a use of ‘show’
+    • In the second argument of ‘(++)’, namely ‘show (undefined :: D)’
+      In the expression: f @A @B ++ show (undefined :: D)
+      In an equation for ‘g’: g = f @A @B ++ show (undefined :: D)
+
