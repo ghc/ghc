@@ -183,7 +183,7 @@ data EPState = EPState
                                           -- Annotation
              , uExtraDP :: !(Maybe EpaLocation) -- ^ Used to anchor a
                                                 -- list
-             , uExtraDPReturn :: !(Maybe (SrcSpan, DeltaPos))
+             , uExtraDPReturn :: !(Maybe EpaLocation)
                   -- ^ Used to return Delta version of uExtraDP
              , pAcceptSpan :: Bool -- ^ When we have processed an
                                    -- entry of EpaDelta, accept the
@@ -468,7 +468,7 @@ enterAnn !(Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
         Just (EpaDelta _ dp _) -> (dp, Nothing)
                    -- Replace original with desired one. Allows all
                    -- list entry values to be DP (1,0)
-        Just (EpaSpan ss@(RealSrcSpan r _)) -> (dp, Just (ss, dp))
+        Just (EpaSpan ss@(RealSrcSpan r _)) -> (dp, Just (EpaDelta ss dp []))
           where
             dp = adjustDeltaForOffset
                    off (ss2delta priorEndAfterComments r)
@@ -756,20 +756,6 @@ markExternalSourceTextA ann src txt = do
 
 -- ---------------------------------------------------------------------
 
-markEpLayoutO :: (Monad m, Monoid w) => EpLayout -> EP w m EpLayout
-markEpLayoutO (EpExplicitBraces o c) = do
-  o' <- markEpToken o
-  return (EpExplicitBraces o' c)
-markEpLayoutO ep = return ep
-
-markEpLayoutC :: (Monad m, Monoid w) => EpLayout -> EP w m EpLayout
-markEpLayoutC (EpExplicitBraces o c) = do
-  c' <- markEpToken c
-  return (EpExplicitBraces o c')
-markEpLayoutC ep = return ep
-
--- -------------------------------------
-
 markEpToken :: forall m w tok . (Monad m, Monoid w, KnownSymbol tok)
   => EpToken tok -> EP w m (EpToken tok)
 markEpToken (EpTok aa) = do
@@ -790,6 +776,48 @@ markEpUniToken (EpUniTok aa isUnicode)  = do
     NormalSyntax  -> printStringAtAA aa (symbolVal (Proxy @tok))
     UnicodeSyntax -> printStringAtAA aa (symbolVal (Proxy @utok))
   return (EpUniTok aa' isUnicode)
+
+-- | Used only when printing semis in a layout context. It needs to
+-- | consume the extraDP
+markEpTokenExtra :: forall m w tok . (Monad m, Monoid w, KnownSymbol tok)
+  => EpToken tok -> EP w m (EpToken tok)
+markEpTokenExtra (EpTok aa) = do
+  med <- getExtraDP
+  case (med, aa) of
+    (Nothing, _) -> EpTok <$> printStringAtAA aa (symbolVal (Proxy @tok))
+    -- a token with no location prints nothing: leave extraDP pending
+    -- for whatever really comes first
+    (Just d@(EpaSpan (RealSrcSpan _ _)), _) -> do
+      setExtraDP Nothing
+      aa' <- printStringAtAA d (symbolVal (Proxy @tok))
+      setExtraDPReturn (Just aa')
+      return (EpTok aa')
+    (Just _, EpaDelta{}) -> do
+      setExtraDP Nothing
+      EpTok <$> printStringAtAA aa (symbolVal (Proxy @tok))  -- own delta already correct
+    (Just d@EpaDelta{}, _) -> do
+      setExtraDP Nothing
+      aa' <- printStringAtAA d (symbolVal (Proxy @tok))
+      setExtraDPReturn (Just aa')
+      return (EpTok aa')
+    (_, _) -> return (EpTok aa)
+
+--------------------------------------------------------
+  -- let (edp, medr) = case med of
+  --       Nothing -> (edp'', Nothing)
+  --       Just (EpaDelta _ dp _) -> (dp, Nothing)
+  --                  -- Replace original with desired one. Allows all
+  --                  -- list entry values to be DP (1,0)
+  --       Just (EpaSpan ss@(RealSrcSpan r _)) -> (dp, Just (ss, dp))
+  --         where
+  --           dp = adjustDeltaForOffset
+  --                  off (ss2delta priorEndAfterComments r)
+  --       Just (EpaSpan (UnhelpfulSpan r)) -> panic $ "enterAnn: UnhelpfulSpan:" ++ show r
+  --       Just (EpaSpan (GeneratedSrcSpan r)) -> panic $ "enterAnn: UnhelpfulSpan:" ++ show r
+  -- when (isJust med) $ debugM $ "enterAnn:(med,edp)=" ++ showAst (med,edp)
+  -- when (isJust medr) $ setExtraDPReturn medr
+
+---------------------------------------------------------
 
 -- ---------------------------------------------------------------------
 
@@ -1221,14 +1249,35 @@ markAnnListA :: (Monad m, Monoid w)
   -> EP w m a
   -> EP w m (AnnList, a)
 markAnnListA (AnnList la semis) action = do
-  la0 <- markEpLayoutO la
-  semis' <- mapM markEpToken semis
-  r <- case la of
-         EpNoLayout -> action
-         -- strictly speaking EpExplicitBraces should be without layoyut too
-         _          -> setLayoutBoth $ action
-  la1 <- markEpLayoutC la0
-  return ((AnnList la1 semis'), r)
+  (r, semis0, la0) <- case la of
+         EpVirtualBraces anc -> do
+           -- The next non-comment thing that prints will use 'anc' as
+           -- its anchor, in addition to whatever it has. So the list
+           -- as a whole is anchored at this point
+           setExtraDP (Just anc)
+           -- The semis are included in layout too
+           (r0, semis') <- setLayoutBoth $ do
+             semis0 <- mapM markEpTokenExtra semis
+             r0' <- action
+             return (r0', semis0)
+           -- Retrieve the updated anchor, for 'makeDelta' processing
+           medr <- getExtraDPReturn
+           -- Always reset, in case the list was empty ('action' printed nothing)
+           setExtraDPReturn Nothing
+           return (r0, semis', EpVirtualBraces (fromMaybe anc medr))
+         EpNoLayout -> do
+           semis' <- mapM markEpToken semis
+           r0 <- action
+           return (r0, semis', EpNoLayout)
+         EpExplicitBraces o c -> do
+           o' <- markEpToken o
+           semis' <- mapM markEpToken semis
+           -- TBD: we use layout for brace-introduced processing too.
+           -- This allows consistent spacing wrt the opening brace
+           r0 <- setLayoutBoth $ action
+           c' <- markEpToken c
+           return (r0, semis', EpExplicitBraces o' c')
+  return ((AnnList la0 semis0), r)
 
 -- ---------------------------------------------------------------------
 
@@ -2380,20 +2429,9 @@ instance ExactPrint (HsLocalBinds GhcPs) where
   exact (HsValBinds (an0, w) valbinds) = do
     w' <- markEpToken w -- 'where'
 
-    case al_layout an0 of
-      EpVirtualBraces anc -> do
-        when (not $ isEmptyValBinds valbinds) $ setExtraDP (Just anc)
-      _ -> return ()
-
     (an1, valbinds') <- markAnnListA an0 $ markAnnotated valbinds
     debugM $ "exact HsValBinds: an1=" ++ showAst an1
-    medr <- getExtraDPReturn
-    an2 <- case medr of
-             Nothing -> return an1
-             Just (ss,dp) -> do
-                 setExtraDPReturn Nothing
-                 return $ an1 { al_layout = EpVirtualBraces (EpaDelta ss dp []) }
-    return (HsValBinds (an2, w') valbinds')
+    return (HsValBinds (an1, w') valbinds')
 
   exact (HsIPBinds (an,w) bs) = do
     w' <- markEpToken w
@@ -4818,10 +4856,10 @@ setExtraDP md = do
   debugM $ "setExtraDP:" ++ show md
   modify (\s -> s {uExtraDP = md})
 
-getExtraDPReturn :: (Monad m, Monoid w) => EP w m (Maybe (SrcSpan, DeltaPos))
+getExtraDPReturn :: (Monad m, Monoid w) => EP w m (Maybe EpaLocation)
 getExtraDPReturn = gets uExtraDPReturn
 
-setExtraDPReturn :: (Monad m, Monoid w) => Maybe (SrcSpan, DeltaPos) -> EP w m ()
+setExtraDPReturn :: (Monad m, Monoid w) => Maybe EpaLocation -> EP w m ()
 setExtraDPReturn md = do
   debugM $ "setExtraDPReturn:" ++ show md
   modify (\s -> s {uExtraDPReturn = md})
