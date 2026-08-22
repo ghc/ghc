@@ -726,11 +726,11 @@ cloneMetaTyVarName name
 metaInfoToTyVarName :: MetaInfo -> FastString
 metaInfoToTyVarName  meta_info =
   case meta_info of
-       TauTv          -> fsLit "t"
-       TyVarTv        -> fsLit "a"
-       RuntimeUnkTv   -> fsLit "r"
-       CycleBreakerTv -> fsLit "b"
-       ConcreteTv {}  -> fsLit "c"
+       TauTv               -> fsLit "t"
+       TyVarTv             -> fsLit "a"
+       RuntimeUnkTv        -> fsLit "r"
+       GivenCycleBreakerTv -> fsLit "b"
+       ConcreteTv {}       -> fsLit "c"
 
 newAnonMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
 newAnonMetaTyVar mi = newNamedAnonMetaTyVar (metaInfoToTyVarName mi) mi
@@ -824,7 +824,7 @@ cloneAnonMetaTyVar info tv kind
 -- in GHC.Tc.Solver.Equality.
 newCycleBreakerTyVar :: TcKind -> TcM TcTyVar
 newCycleBreakerTyVar kind
-  = do { details <- newMetaDetails CycleBreakerTv
+  = do { details <- newMetaDetails GivenCycleBreakerTv
        ; name <- newMetaTyVarName (fsLit "cbv")
        ; return (mkTcTyVar name kind details) }
 

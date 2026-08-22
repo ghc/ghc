@@ -37,6 +37,7 @@ import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.DataCon ( dataConConcreteTyVars, isNewDataCon, dataConOrigArgTys )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCo.Subst ( substTyWithInScope )
 import GHC.Core.Type
@@ -631,11 +632,13 @@ tcInstFun :: QLFlag
 -- plus the modification in Fig 5, of the QL paper:
 -- "A quick look at impredicativity" (ICFP'20).
 tcInstFun do_ql inst_final rn_head@(_, fun_lspan) tc_fun fun_sigma rn_args
-  = do { traceTc "tcInstFun" (vcat [ text "tc_fun" <+> ppr tc_fun
+  = do { lvl <- getTcLevel
+       ; traceTc "tcInstFun" (vcat [ text "tc_fun" <+> ppr tc_fun
                                    , text "rn_fun" <+> ppr rn_head
                                    , text "fun_sigma" <+> ppr fun_sigma
                                    , text "args:" <+> ppr rn_args
-                                   , text "do_ql" <+> ppr do_ql])
+                                   , text "do_ql" <+> ppr do_ql
+                                   , text "lvl:" <+> ppr lvl ])
        ; fun_origin <- mk_origin rn_head
        ; res@(_, fun_ty) <- go fun_origin 1 [] fun_sigma rn_args
        ; traceTc "tcInstFun:ret" (ppr fun_ty)
@@ -1377,13 +1380,15 @@ tc_inst_forall_arg conc_tvs (tvb, inner_ty) hs_ty
                -- is not fully zonked, because ty_arg is fully zonked.
                -- See Note [Type application substitution].
 
+       ; lvl <- getTcLevel
        ; traceTc "tc_inst_forall_arg (VTA/VDQ)" (
                   vcat [ text "fun_ty" <+> ppr fun_ty
                        , text "tv" <+> ppr tv <+> dcolon <+> debugPprType kind
                        , text "ty_arg" <+> debugPprType ty_arg <+> dcolon
                                        <+> debugPprType (typeKind ty_arg)
                        , text "inner_ty" <+> debugPprType inner_ty
-                       , text "insted_ty" <+> debugPprType insted_ty ])
+                       , text "insted_ty" <+> debugPprType insted_ty
+                       , text "lvl:" <+> ppr lvl ])
        ; return (ty_arg, insted_ty) }
 
 {- Note [Visible type application and abstraction]
@@ -1934,11 +1939,13 @@ quickLookArg1 pos app_lspan rn_head larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_
          -- capture and save it in the `EValArgQL`.  See (QLA6) in
          -- Note [Quick Look at value arguments]
 
+       ; lvl <- getTcLevel
        ; traceTc "quickLookArg {" $
          vcat [ text "arg:" <+> ppr arg
               , text "orig_arg_rho:" <+> ppr orig_arg_rho
               , text "head:" <+> ppr rn_fun_arg <+> dcolon <+> ppr mb_fun_ty
-              , text "args:" <+> ppr rn_args ]
+              , text "args:" <+> ppr rn_args
+              , text "level:" <+> ppr lvl ]
 
        ; case mb_fun_ty of {
            Nothing -> skipQuickLook app_lspan larg sc_arg_ty ;    -- fun is too complicated
@@ -2149,8 +2156,7 @@ foldQLInstVars check_tv ty
 
 qlUnify ::  TcType -> TcType -> TcM ()
 -- Unify ty1 with ty2:
---   * It can unify both instantiation variables (possibly with polytypes),
---     and ordinary unification variables (but only with monotypes)
+--   * It unifies /only/ instantiation variables (see (UQL6)), hopefully with polytypes
 --   * It does not return a coercion (unlike unifyType); it is called
 --     for the sole purpose of unifying instantiation variables, although it
 --     may also (opportunistically) unify regular unification variables.
@@ -2158,18 +2164,23 @@ qlUnify ::  TcType -> TcType -> TcM ()
 --   * It may return without having made the argument types equal, of course;
 --     it just makes best efforts.
 qlUnify ty1 ty2
-  = do { traceTc "qlUnify" (ppr ty1 $$ ppr ty2)
+  = do { lvl <- getTcLevel
+       ; traceTc "qlUnify" (ppr lvl $$ ppr ty1 $$ ppr ty2)
        ; go ty1 ty2 }
   where
     go :: TcType -> TcType -> TcM ()
 
+    go t1 t2 = do { traceTc "qlUinfy:go" (ppr t1 <+> char '~' <+> ppr t2)
+                  ; go' t1 t2 }
+
     -- Decompose (arg1 -> res1) ~ (arg2 -> res2)
     -- and         (c1 => res1) ~   (c2 => res2)
     -- But for the latter we only learn instantiation info from res1~res2
-    go (FunTy { ft_af = af1, ft_arg = arg1, ft_res = res1 })
+    go' (FunTy { ft_af = af1, ft_arg = arg1, ft_res = res1 })
        (FunTy { ft_af = af2, ft_arg = arg2, ft_res = res2 })
       | af1 == af2 -- Match the arrow TyCon
-      = do { when (isVisibleFunArg af1) (go arg1 arg2)
+      = do { traceTc "go_fun" (ppr arg1 $$ ppr arg2)
+           ; when (isVisibleFunArg af1) (go arg1 arg2)
 
         -- NB: we do not unify the multiplicities; that would be too strong.
         -- We might only require mult1 ⩽ mult2, as in Note [Multiplicity in deep subsumption].
@@ -2178,30 +2189,29 @@ qlUnify ty1 ty2
            ; go res1 res2 }
 
     -- Make sure to not unify "kappa := (a %1 -> b)". See (UQL5).
-    go (FunTy { ft_mult = OneTy }) _ = return ()
-    go _ (FunTy { ft_mult = OneTy }) = return ()
+    go' (FunTy { ft_mult = OneTy }) _ = return ()
+    go' _ (FunTy { ft_mult = OneTy }) = return ()
       -- NB: we do want to be able to unify "kappa := a => b", as that's
       -- the main point of QuickLook (allowing meta-variables to be unified
       -- with qualified types).
 
-    go (TyVarTy tv) ty2
-      | isMetaTyVar tv = go_kappa tv ty2
-    go ty1 (TyVarTy tv)
-      | isMetaTyVar tv = go_kappa tv ty1
+    -- Type variables; see (UQL6) in Note [QuickLook unification]
+    go' (TyVarTy tv) ty2 | isQLInstTyVar tv = go_kappa tv ty2
+    go' ty1 (TyVarTy tv) | isQLInstTyVar tv = go_kappa tv ty1
 
-    go (CastTy ty1 _) ty2 = go ty1 ty2
-    go ty1 (CastTy ty2 _) = go ty1 ty2
+    go' (CastTy ty1 _) ty2 = go ty1 ty2
+    go' ty1 (CastTy ty2 _) = go ty1 ty2
 
-    go (TyConApp tc1 []) (TyConApp tc2 [])
+    go' (TyConApp tc1 []) (TyConApp tc2 [])
       | tc1 == tc2 -- See GHC.Tc.Utils.Unify
       = return ()  -- Note [Expanding synonyms during unification]
 
     -- Now, and only now, expand synonyms
-    go rho1 rho2
+    go' rho1 rho2
       | Just rho1 <- coreView rho1 = go rho1 rho2
       | Just rho2 <- coreView rho2 = go rho1 rho2
 
-    go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
+    go' (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       | tc1 == tc2
       , not (isTypeFamilyTyCon tc1)
       , tys1 `equalLength` tys2
@@ -2209,14 +2219,14 @@ qlUnify ty1 ty2
 
     -- Don't allow unifying (a => b) with the AppTy 'arr[tau] a b'.
     -- To ensure this, use 'tcSplitAppTyNoView_maybe' which does not split (=>).
-    go (AppTy t1a t1b) ty2
+    go' (AppTy t1a t1b) ty2
       | Just (t2a, t2b) <- tcSplitAppTyNoView_maybe ty2
       = do { go t1a t2a; go t1b t2b }
-    go ty1 (AppTy t2a t2b)
+    go' ty1 (AppTy t2a t2b)
       | Just (t1a, t1b) <- tcSplitAppTyNoView_maybe ty1
       = do { go t1a t2a; go t1b t2b }
 
-    go _ _ = return ()
+    go' _ _ = return ()
        -- Don't look under foralls; see (UQL4) of Note [QuickLook unification]
 
     ----------------
@@ -2229,32 +2239,20 @@ qlUnify ty1 ty2
                                   ; go_flexi kappa ty2 } }
 
     ----------------
-    -- Swap (kappa1[conc] ~ kappa2[tau])
-    -- otherwise we'll fail to unify and emit a coercion.
-    -- Just an optimisation: emitting a coercion is fine
-    go_flexi kappa (TyVarTy tv2)
-      | lhsPriority tv2 > lhsPriority kappa
-      = go_flexi1 tv2 (TyVarTy kappa)
-    go_flexi kappa ty2
-      = go_flexi1 kappa ty2
-
-    go_flexi1 kappa ty2  -- ty2 is zonked
-      = do { cur_lvl <- getTcLevel
-              -- See Note [Unification preconditions], (UNTOUCHABLE) wrinkles
-              -- Here we are in the TcM monad, which does not track enclosing
-              -- Given equalities; so for quick-look unification we conservatively
-              -- treat /any/ level outside this one as untouchable. Hence cur_lvl.
-           ; case simpleUnifyCheck UC_QuickLook cur_lvl kappa ty2 of
-              SUC_CanUnify ->
-                do { co <- unifyKind (Just (TypeThing ty2)) ty2_kind kappa_kind
-                           -- unifyKind: see (UQL2) in Note [QuickLook unification]
-                           --            and (MIV2) in Note [Monomorphise instantiation variables]
-                   ; let ty2' = mkCastTy ty2 co
-                   ; traceTc "qlUnify:update" $
-                     ppr kappa <+> text ":=" <+> ppr ty2
-                   ; liftZonkM $ writeMetaTyVar kappa ty2' }
-              _ -> return () -- e.g. occurs-check or forall-bound variable
-           }
+    go_flexi kappa ty2  -- ty2 is zonked
+      | isConcreteTyVar kappa  -- See (UQL7) in Note [QuickLook unification]
+      = return ()
+      | anyFreeVarsOfType (== kappa) ty2
+      = return ()  -- Occurs check
+      | otherwise
+      = do { co <- unifyKind (Just (TypeThing ty2)) ty2_kind kappa_kind
+                   -- unifyKind: see (UQL2) in Note [QuickLook unification]
+                   --            and (MIV2) in Note [Monomorphise instantiation variables]
+           ; let ty2' = mkCastTy ty2 co
+           ; traceTc "qlUnify:update" $
+             ppr kappa <+> text ":=" <+> ppr ty2
+           ; liftZonkM $ writeMetaTyVar kappa ty2'
+           ; return () }
       where
         kappa_kind = tyVarKind kappa
         ty2_kind   = typeKind ty2
@@ -2265,11 +2263,11 @@ In qlUnify, if we find (kappa ~ ty), we are going to update kappa := ty.
 That is the entire point of qlUnify!   Wrinkles:
 
 (UQL1) Before unifying an instantiation variable in `go_flexi`, we must check
-  the usual unification conditions, by calling `GHC.Tc.Utils.Unify.simpleUnifyCheck`.
-  For example that checks for
+  the usual unification conditions. In particular:
     * An occurs-check
-    * Level mis-match
     * An attempt to unify a concrete type variable with a non-concrete type.
+  We don't need a level-check because the level of an instantiation variable
+  is infinity -- see (UQL3).
 
 (UQL2) What if kappa and ty have different kinds?  We simply call the
   ordinary unifier and use the coercion to connect the two.
@@ -2341,6 +2339,25 @@ That is the entire point of qlUnify!   Wrinkles:
   The general principle is: treat linear arrows %1 -> similar to foralls and
   constraint arrows =>, so that (UQL4) applies to them as well.
   See Note [Multiplicity in deep subsumption].
+
+(UQL6) What if `qlUnify` sees a regular (monotyped) unification variable, `alpha`, rather
+  than an instantiation variable `kappa`?  Thus (alpha ~ ty).   It's tempting to just
+  unify it, but the regular, on-the-fly unifier has lots of careful checks (levels,
+  concreteness etc).  In regular unification it doesn't matter whether we unify on-the-fly
+  or later -- it's just an efficiency issue -- but here it matters because `qlUnify` has
+  /user-visible/ consequences.   This led to #26543.
+
+  The simplest thing is to say that `qlUnify` unifies /only/ instantiation variables
+  (see calls to `isQLInstTyVar`).  We could be more ambitious, perhaps, in future.
+  Remember, though, that the /only/ reason for QuickLoook is to unify instantiation variables
+  with polytypes; anything else is optional, and will be picked up with later "ordinary"
+  typechecking.  So unifing only instantiation variables is enough.
+
+(UQL7) If `qlUnify` sees a concrete `kaapa`, thus
+            kappa[conc] ~ some-type
+  we just give up. It's tiresome to do all the checks for concreteness; and concrete
+  type variables are never unified with polytypes, so it's fine to leave it for the
+  regular unifier.
 
 Sadly discarded design alternative
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -103,7 +103,6 @@ import GHC.Types.Id( idType )
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Types.Var.FV
 import GHC.Types.Basic
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 
@@ -120,7 +119,6 @@ import GHC.Data.Maybe (firstJusts)
 import Control.Monad
 import Data.Functor.Identity (Identity(..))
 import qualified Data.List.NonEmpty as NE
-import Data.Monoid as DM ( Any(..) )
 import qualified Data.Semigroup as S ( (<>) )
 import Data.Traversable (for)
 
@@ -3143,6 +3141,7 @@ uUnfilledVar2 env@(UE { u_defer = def_eq_ref, u_given_eq_lvl = given_eq_lvl })
     do { traceTc "uUnfilledVar2 not ok" $
              vcat [ text "tv1:" <+> ppr tv1
                   , text "ty2:" <+> ppr ty2
+                  , text "given_eq_lvl:" <+> ppr given_eq_lvl
                   , text "simple-unify-chk:" <+> ppr (simpleUnifyCheck UC_OnTheFly given_eq_lvl tv1 ty2)
                   ]
                -- Occurs check or an untouchable: just defer
@@ -3236,16 +3235,17 @@ lhsPriority tv
         -> 5  -- Eliminate instantiation variables first
         | otherwise
         -> case info of
-             CycleBreakerTv -> 0
-             TyVarTv        -> 1
-             ConcreteTv {}  -> 2
-             TauTv          -> 3
-             RuntimeUnkTv   -> 4
+             GivenCycleBreakerTv -> 0
+             TyVarTv             -> 1
+             ConcreteTv {}       -> 2
+             TauTv               -> 3
+             RuntimeUnkTv        -> 4
 
 {- Note [Unification preconditions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Question: given a homogeneous equality (alpha ~# ty), when is it OK to
 unify alpha := ty?
+
 (This note only applies to /homogeneous/ equalities, in which both
 sides have the same kind.)
 
@@ -3285,7 +3285,7 @@ There are five reasons not to unify:
      structured type.  So if 'ty' is a structured type, such as (Maybe x),
      don't unify.
 
-   * CycleBreakerTv: never unified, except by restoreTyVarCycles.
+   * GivenCycleBreakerTv: never unified, except by restoreGivenCycles.
 
 4. (CONCRETE) A ConcreteTv can only unify with a concrete type,
     by definition.
@@ -3354,6 +3354,14 @@ Needless to say, all there are wrinkles:
     GHC.Tc.Solver.floatEqualities, around Nov 2020.  It's much easier
     to unify in-place, with no floating.
 
+* (COERCIONS) What if there are coercions in the RHS?  E.g.
+        alpha ~ (ty |> co)
+   or   alpha ~ (ty co)
+   We only recurse into the `coercionType` of `co` rather than `co` itself.
+   Why? Mainly because `co` might be a coercion hole, in which case we /can't/
+   recurse into the coercion that will eventually fill the hole.  This came
+   up in #26543.
+
 Note [TyVar/TyVar orientation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also Note [Fundeps with instances, and equality orientation]
@@ -3382,7 +3390,7 @@ So we look for a positive reason to swap, using a three-step test:
   touchable and can be unified.
 
   Tie-breaking rules for MetaTvs:
-  - CycleBreakerTv: This is essentially a stand-in for another type;
+  - GivenCycleBreakerTv: This is essentially a stand-in for another type;
        it's untouchable and should have the same priority as a skolem: 0.
 
   - TyVarTv: These can unify only with another tyvar, but we can't unify
@@ -3588,7 +3596,6 @@ matchExpectedFunKind hs_ty n k = go n k
 
 data UnifyCheckCaller
   = UC_OnTheFly   -- Called from the on-the-fly unifier
-  | UC_QuickLook  -- Called from Quick Look
   | UC_Solver     -- Called from constraint solver
 
 -- | The result type of 'simpleUnifyCheck'.
@@ -3619,35 +3626,28 @@ simpleUnifyCheck :: UnifyCheckCaller -> TcLevel -> TcTyVar -> TcType -> SimpleUn
 -- unification might still be OK, but it'll take more work to do
 -- (use the full 'checkTypeEq').
 --
+-- See Note [simpleUnifyCheck]
+--
 -- * Rejects if lhs_tv occurs in rhs_ty (occurs check)
 -- * Rejects foralls unless
 --      lhs_tv is RuntimeUnk (used by GHCi debugger)
---          or is a QL instantiation variable
 -- * Rejects a non-concrete type if lhs_tv is concrete
 -- * Rejects type families unless fam_ok=True
 -- * Does a level-check for type variables, to avoid skolem escape
 --
 -- This function is pretty heavily used, so it's optimised not to allocate
 simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
-  | not $ touchabilityTest given_eq_lvl lhs_tv
-  = SUC_CannotUnify
-  | not $ checkTopShape lhs_info rhs
-  = SUC_CannotUnify
-  | rhs_is_ok rhs
-  = SUC_CanUnify
-  | otherwise
-  = SUC_NotSure
+  | not $ touchabilityTest given_eq_lvl lhs_tv = SUC_CannotUnify
+  | not $ checkTopShape lhs_info rhs           = SUC_CannotUnify
+  | not (rhs_is_bad rhs)                       = SUC_CanUnify
+  | otherwise                                  = SUC_NotSure
   where
-    lhs_info = metaTyVarInfo lhs_tv
-
-    !(occ_in_ty, occ_in_co) = mkOccFolders (tyVarName lhs_tv)
-
+    lhs_info           = metaTyVarInfo lhs_tv
     lhs_tv_lvl         = tcTyVarLevel lhs_tv
     lhs_tv_is_concrete = isConcreteTyVar lhs_tv
+    lhs_tv_nm          = tyVarName lhs_tv
 
-    forall_ok = case caller of
-                   UC_QuickLook -> isQLInstTyVar lhs_tv
-                   _            -> isRuntimeUnkTyVar lhs_tv
+    forall_ok = isRuntimeUnkTyVar lhs_tv
 
     -- This fam_ok thing relates to a very specific perf problem
     -- See Note [Prevent unification with type families]
@@ -3656,58 +3656,74 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
     --   see if it bites us)
     fam_ok = case caller of
                UC_Solver     -> True
-               UC_QuickLook  -> True
                UC_OnTheFly   -> False
 
-    rhs_is_ok (TyVarTy tv)
-      | lhs_tv == tv                                    = False
-      | tcTyVarLevel tv `strictlyDeeperThan` lhs_tv_lvl = False
-      | lhs_tv_is_concrete, not (isConcreteTyVar tv)    = False
-      | occ_in_ty $! (tyVarKind tv)                     = False
-      | otherwise                                       = True
+    rhs_tcv_is_bad tcv
+       -- c.f. checkTyVar, the TEFTyVar case
+       | isCoVar tcv                                      = occ_check
+       | tcTyVarLevel tcv `strictlyDeeperThan` lhs_tv_lvl = True
+       | lhs_tv_is_concrete, not (isConcreteTyVar tcv)    = True
+       | occ_check                                        = True
+       | otherwise                                        = False
+       where
+         occ_check = simpleOccursCheck lhs_tv_nm tcv
 
-    rhs_is_ok (FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
-      | not forall_ok, isInvisibleFunArg af = False
-      | otherwise                           = rhs_is_ok w && rhs_is_ok a && rhs_is_ok r
+    rhs_is_bad (TyVarTy tv) = rhs_tcv_is_bad tv
 
-    rhs_is_ok (TyConApp tc tys)
-      | lhs_tv_is_concrete, not (isConcreteTyCon tc) = False
-      | not forall_ok, not (isTauTyCon tc)           = False
-      | not fam_ok,    not (isFamFreeTyCon tc)       = False
-      | otherwise                                    = all rhs_is_ok tys
+    rhs_is_bad (FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
+      | not forall_ok, isInvisibleFunArg af = True
+      | otherwise                           = rhs_is_bad w || rhs_is_bad a || rhs_is_bad r
 
-    rhs_is_ok (ForAllTy (Bndr tv _) ty)
-      | forall_ok = rhs_is_ok (tyVarKind tv) && (tv == lhs_tv || rhs_is_ok ty)
-      | otherwise = False
+    rhs_is_bad (TyConApp tc tys)
+      | lhs_tv_is_concrete, not (isConcreteTyCon tc) = True
+      | not forall_ok, not (isTauTyCon tc)           = True
+      | not fam_ok,    not (isFamFreeTyCon tc)       = True
+      | otherwise                                    = any rhs_is_bad tys
 
-    rhs_is_ok (AppTy t1 t2)    = rhs_is_ok t1 && rhs_is_ok t2
-    rhs_is_ok (CastTy ty co)   = not (occ_in_co co) && rhs_is_ok ty
-    rhs_is_ok (CoercionTy co)  = not (occ_in_co co)
-    rhs_is_ok (LitTy {})       = True
+    rhs_is_bad (ForAllTy (Bndr tv _) ty)
+      | not forall_ok               = True
+      | rhs_is_bad (tyVarKind tv)   = True
+      | tv /= lhs_tv, rhs_is_bad ty = True
+      | otherwise                   = False
 
+    rhs_is_bad (AppTy t1 t2)    = rhs_is_bad t1 || rhs_is_bad t2
+    rhs_is_bad (CastTy ty co)   = co_is_bad co || rhs_is_bad ty
+    rhs_is_bad (CoercionTy co)  = co_is_bad co
+    rhs_is_bad (LitTy {})       = False
 
-mkOccFolders :: Name -> (TcType -> Bool, TcCoercion -> Bool)
--- These functions return True
---   * if lhs_tv occurs (incl deeply, in the kind of variable)
---   * if there is a coercion hole
--- No expansion of type synonyms
-mkOccFolders lhs_tv = ( getAny . runFVTop . check_ty
-                      , getAny . runFVTop . check_co)
-  where
-    check_ty :: Type -> FV BoundVars Any
-    !(check_ty, _, check_co, _) = foldTyCo occ_folder
+    -- Coercions: see Note [Occurs check and coercions]
+    co_is_bad co = anyFreeVarsOfCo rhs_tcv_is_bad co
 
-    occ_folder :: TyCoFolder (FV BoundVars Any)
-    occ_folder = TyCoFolder { tcf_view  = noView  -- Don't expand synonyms
-                            , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                            , tcf_hole  = do_hole
-                            , tcf_tycobinder = addBndrFV }
+{- Note [simpleUnifyCheck]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+The function `simpleUnifyCheck` is a simple, /fast/ check for unifying (tv ~ rhs).
+It can return a definite decision (SUC_CannotUnify of SUC_CanUnify), or uncertainty
+(SUC_NotSure).  In the latter case we will later use `checkTyEqRhs` to resolve.
+In particular, `simpleUnifyCheck`:
 
-    do_tcv v = (MkFV $ \ bvs ->
-                Any (not (v `elemVarSet` bvs) && tyVarName v == lhs_tv))
-               `mappend` check_ty (varType v)
+* Rejects if lhs_tv occurs in rhs_ty (see Note [Simple occurs check])
+* Rejects foralls unless
+      lhs_tv is RuntimeUnk (used by GHCi debugger)
+* Rejects a non-concrete type if lhs_tv is concrete
+* Rejects type families unless fam_ok=True
+* Does a level-check for type variables, to avoid skolem escape
 
-    do_hole _hole = MkFV $ \ _bvs -> DM.Any True  -- Reject coercion holes
+This function is pretty heavily used, so it's optimised not to allocate.
+
+Note [Occurs check and coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What if we have
+    alpha ~ Int |>  (CoHole ch :: Type ~ blah)
+
+Clearly we want to check that `alpha` doesn't appear free in `blah`.  But even if
+it doesn't, what if `ch` is later filled in with a coercion mentioning `alpha`?
+Tht would be bad: we'd get an infinite structure.
+
+The right thing to do is to check for a loop when (later) filling in `ch`.
+We don't do that right now, and it's very obscure.  But in `simpleUnifyCheck`
+we just look in the free vars of the /kind/ of the hole, which is what
+`anyFreeVarsOfCo` does.
+-}
 
 {- *********************************************************************
 *                                                                      *
@@ -4081,13 +4097,14 @@ wantConcreteCheck = \case
 -- where @cbv@ is a fresh loop-breaker tyvar (for Given), or
 -- just a fresh 'TauTv' (for Wanted)
 famAppBreaker :: FamAppBreaker a -> TcType -> TcM (PuResult a Reduction)
-famAppBreaker BreakGiven fam_app
+famAppBreaker BreakGiven fam_app    -- Givens
    = do { new_tv <- TcM.newCycleBreakerTyVar (typeKind fam_app)
         ; return (PuOK (unitBag (new_tv, fam_app))
                        (mkReflRedn Nominal (mkTyVarTy new_tv))) }
                  -- Why reflexive? See Detail (4) of Note [Type equality cycles]
                  -- in GHC.Tc.Solver.Equality
-famAppBreaker (BreakWanted ev lhs_tv) fam_app
+
+famAppBreaker (BreakWanted ev lhs_tv) fam_app   -- Wanteds
   -- Occurs check or skolem escape; so flatten
   = do { reason <- checkPromoteFreeVars cteInsolubleOccurs
                      (tyVarName lhs_tv) lhs_tv_lvl
@@ -4337,7 +4354,10 @@ checkCo flags co =
         -- Occurs check (can promote)
         | OC_Check lhs_tv occ_prob <- occ
         , LC_Promote { lc_lvlp = lhs_tv_lvl } <- lc
-        -> do { reason <- checkPromoteFreeVars occ_prob lhs_tv lhs_tv_lvl (tyCoVarsOfCo co)
+        -> do { reason <- checkPromoteFreeVars occ_prob lhs_tv lhs_tv_lvl $
+                          tyCoVarsOfCo co
+                           -- See Note [Occurs check and coercions]
+                          --  and Note [checkCo] (2)
               ; return $
                 if cterHasNoProblem reason
                 then pure co
@@ -4634,7 +4654,7 @@ checkTyVar flags occ_tv
                   -- so the only reason for a filled meta-tyvar is promotion
 
                 else do_rhs_checks
-                     [ simpleOccursCheck      occ  occ_tv
+                     [ tyVarOccursCheck      occ  occ_tv
                      , tyVarLevelCheck        lc   occ_tv
                      , tyVarConcretenessCheck conc occ_tv ]
               }
@@ -4692,17 +4712,24 @@ promotionDone occ_tv _ (CC_Promote {}) = isFilledMetaTyVar occ_tv
 promotionDone _      _               _ = return False
 
 ---------------------
-simpleOccursCheck :: OccursCheck -> TcTyVar -> TyVarCheckResult m
+tyVarOccursCheck :: OccursCheck -> TcTyCoVar -> TyVarCheckResult m
 -- ^ The "interpreter" for 'OccursCheck'
-simpleOccursCheck OC_None _
+-- Check for an occurrence of lhs_tv in occ_tv /or/ its kind
+tyVarOccursCheck OC_None _
   = TyVarCheck_Success
-simpleOccursCheck (OC_Check lhs_tv occ_prob) occ_tv
-  | lhs_tv == tyVarName occ_tv || check_kind (tyVarKind occ_tv)
-  = TyVarCheck_Error (cteProblem occ_prob)
-  | otherwise
-  = TyVarCheck_Success
+tyVarOccursCheck (OC_Check { occurs_tv_name = lhs_tv, occurs_problem = prob }) occ_tcv
+  | simpleOccursCheck lhs_tv occ_tcv = TyVarCheck_Error (cteProblem prob)
+  | otherwise                        = TyVarCheck_Success
+
+simpleOccursCheck :: Name -> TyCoVar -> Bool
+-- Check for an occurrence of lhs_tv in occ_tv /or/ its kind
+-- True <=> occurs check fires
+simpleOccursCheck lhs_tv occ_tcv
+  = is_bad occ_tcv || anyFreeVarsOfType is_bad (varType occ_tcv)
+    -- anyFreeVarsOfType looks at the /deep/ free vars of the type
   where
-    (check_kind, _) = mkOccFolders lhs_tv
+    is_bad :: TyCoVar -> Bool
+    is_bad occ_tcv = lhs_tv == tyVarName occ_tcv
 
 -------------------------
 tyVarLevelCheck :: LevelCheck m -> TcTyVar -> TyVarCheckResult m
@@ -4823,7 +4850,7 @@ checkTopShape info xi
                         RuntimeUnk  -> True
                         MetaTv { mtv_info = TyVarTv } -> True
                         _                             -> False
-      CycleBreakerTv -> False  -- We never unify these
+      GivenCycleBreakerTv -> False  -- We never unify these
       _ -> True
 
 --------------------------------------------------------------------------------
@@ -5136,14 +5163,14 @@ mightEqualLater inert_set given_pred given_loc wanted_pred wanted_loc
 
     -- True for TauTv and TyVarTv (and RuntimeUnkTv) meta-tyvars
     -- (as they can be unified)
-    -- and also for CycleBreakerTvs that mentions meta-tyvars
+    -- and also for GivenCycleBreakerTvs that mentions meta-tyvars
     mentions_meta_ty_var :: TyVar -> Bool
     mentions_meta_ty_var tv
       | isMetaTyVar tv
       = case metaTyVarInfo tv of
           -- See Examples 8 and 9 in the Note
-          CycleBreakerTv -> anyFreeVarsOfType mentions_meta_ty_var
-                              (lookupCycleBreakerVar tv inert_set)
+          GivenCycleBreakerTv -> anyFreeVarsOfType mentions_meta_ty_var
+                                    (lookupCycleBreakerVar tv inert_set)
           _ -> True
       | otherwise
       = False
@@ -5186,7 +5213,7 @@ We want to solve w1 using g1 and g2. The presence of g3 is irrelevant, because
 we cannot unify 'f[tau:1] v[tau:1]' and 'g[sk:1] x[sk:3]' due to skolem escape.
 -}
 
--- | Return the type family application a CycleBreakerTv maps to.
+-- | Return the type family application a GivenCycleBreakerTv maps to.
 lookupCycleBreakerVar :: TcTyVar    -- ^ cbv, must be a CycleBreakerTv
                       -> InertSet
                       -> TcType     -- ^ type family application the cbv maps to

@@ -688,9 +688,10 @@ data MetaInfo
    | RuntimeUnkTv  -- ^ A unification variable used in the GHCi debugger.
                    -- It /is/ allowed to unify with a polytype, unlike TauTv
 
-   | CycleBreakerTv  -- ^ Used to fix occurs-check problems in Givens
-                     -- See Note [Type equality cycles] in
-                     -- GHC.Tc.Solver.Equality
+   | GivenCycleBreakerTv  -- ^ Used to fix occurs-check problems in Givens
+                          -- Never used for Wanteds
+                          -- See Note [Type equality cycles] in
+                          -- GHC.Tc.Solver.Equality
 
    | ConcreteTv ConcreteTvOrigin
         -- ^ A unification variable that can only be unified
@@ -705,11 +706,11 @@ instance Outputable MetaDetails where
   ppr (Indirect ty) = text "Indirect" <+> ppr ty
 
 instance Outputable MetaInfo where
-  ppr TauTv           = text "tau"
-  ppr TyVarTv         = text "tyv"
-  ppr RuntimeUnkTv    = text "rutv"
-  ppr CycleBreakerTv  = text "cbv"
-  ppr (ConcreteTv {}) = text "conc"
+  ppr TauTv               = text "tau"
+  ppr TyVarTv             = text "tyv"
+  ppr RuntimeUnkTv        = text "rutv"
+  ppr GivenCycleBreakerTv = text "cbv"
+  ppr (ConcreteTv {})     = text "conc"
 
 -- | What caused us to create a 'ConcreteTv' metavariable?
 -- See Note [ConcreteTv] in GHC.Tc.Utils.Concrete.
@@ -1299,7 +1300,7 @@ isRuntimeUnkTyVar tv
 
 isCycleBreakerTyVar tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
-  , MetaTv { mtv_info = CycleBreakerTv } <- tcTyVarDetails tv
+  , MetaTv { mtv_info = GivenCycleBreakerTv } <- tcTyVarDetails tv
   = True
 
   | otherwise
@@ -1350,8 +1351,8 @@ metaTyVarInfo tv
 
 isTouchableInfo :: MetaInfo -> Bool
 isTouchableInfo info
-  | CycleBreakerTv <- info = False
-  | otherwise              = True
+  | GivenCycleBreakerTv <- info = False
+  | otherwise                   = True
 
 metaTyVarTcLevel :: TcTyVar -> TcLevel
 metaTyVarTcLevel tv
