@@ -1,9 +1,6 @@
 T27628.hs: warning: [-Wspec-constr-reboxing]
-    SpecConstr specialised the following function(s) on a constructor argument that is also used boxed:
-      $wgo (LC) Defined at T27628.hs:17:1
-    The specialised code allocates a fresh constructor at each such use ("reboxing"),
-    which can increase allocation and defeat pointer-equality-based sharing.
-    Possible remedies: exclude the type with an {-# ANN type T NoSpecConstr #-} pragma,
-    hide the constructor from SpecConstr by wrapping the call-site argument in GHC.Exts.lazy,
-    or use -fno-spec-constr.
+    SpecConstr specialised $wgo (defined at T27628.hs:17:1)
+    on a constructor argument (LC) that is also used boxed ("reboxing").
+    Reboxing can increase allocation and defeat pointer-equality-based sharing.
+    See -Wspec-constr-reboxing in the users guide for possible remedies.
 

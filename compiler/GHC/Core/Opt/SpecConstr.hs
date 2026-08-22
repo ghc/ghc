@@ -75,7 +75,7 @@ import GHC.Exts( SpecConstrAnnotation(..) )
 import GHC.Serialized   ( deserializeWithData )
 
 import Control.Monad
-import Data.List ( sortBy, partition, dropWhileEnd, mapAccumL, nub, unzip4 )
+import Data.List ( sortBy, partition, dropWhileEnd, mapAccumL, nub, nubBy, unzip4 )
 import Data.List.NonEmpty ( NonEmpty (..) )
 import Data.Maybe( mapMaybe )
 import Data.Ord( comparing )
@@ -790,8 +790,8 @@ specConstrProgram guts
              is_rebox _                = False
 
        ; when (not (null forced_ws)) $ diagnostic WarningWithoutFlag (forced_msg forced_ws)
-       ; when (not (null rebox_ws)) $ diagnostic (WarningWithFlag Opt_WarnSpecConstrReboxing)
-                                                 (rebox_msg (nub rebox_ws))
+       ; mapM_ (diagnostic (WarningWithFlag Opt_WarnSpecConstrReboxing) . rebox_msg)
+               (aggregateRebox rebox_ws)
 
        ; return (guts { mg_binds = binds' }) }
 
@@ -802,15 +802,31 @@ specConstrProgram guts
                         nest 2 (vcat (map ppr warnings)) $$
                         (text "If this is expected you might want to increase -fmax-forced-spec-args to force specialization anyway.")
 
+    -- One warning per specialised function, reboxed constructors merged;
+    -- see Note [Reboxing warning]
+    aggregateRebox :: SpecConstrWarnings -> SpecConstrWarnings
+    aggregateRebox ws
+      = [ SpecReboxed fn parent (nub (concat [ cons | SpecReboxed fn' _ cons <- ws
+                                                    , fn' == fn ]))
+        | SpecReboxed fn parent _ <- nubBy same_fn ws ]
+      where
+        same_fn (SpecReboxed fn1 _ _) (SpecReboxed fn2 _ _) = fn1 == fn2
+        same_fn _ _ = False
+
     -- See Note [Reboxing warning]
-    rebox_msg :: SpecConstrWarnings -> SDoc
-    rebox_msg warnings = text "SpecConstr specialised the following function(s) on a constructor argument that is also used boxed:" $$
-                         nest 2 (vcat (map ppr warnings)) $$
-                         text "The specialised code allocates a fresh constructor at each such use (\"reboxing\")," $$
-                         text "which can increase allocation and defeat pointer-equality-based sharing." $$
-                         text "Possible remedies: exclude the type with an {-# ANN type T NoSpecConstr #-} pragma," $$
-                         text "hide the constructor from SpecConstr by wrapping the call-site argument in GHC.Exts.lazy," $$
-                         text "or use -fno-spec-constr."
+    rebox_msg :: SpecConstrWarning -> SDoc
+    rebox_msg w@(SpecFailForcedArgCount {}) = pprPanic "rebox_msg" (ppr w)
+    rebox_msg (SpecReboxed fn mb_parent cons)
+      = vcat [ text "SpecConstr specialised" <+> ppr fn <+> pp_site
+             , text "on a constructor argument" <+> parens (pprWithCommas ppr cons)
+                 <+> text "that is also used boxed (\"reboxing\")."
+             , text "Reboxing can increase allocation and defeat pointer-equality-based sharing."
+             , text "See -Wspec-constr-reboxing in the users guide for possible remedies." ]
+      where
+        pp_site = parens $ case mb_parent of
+          Just parent -> text "in" <+> ppr parent <> comma
+                         <+> text "defined" <+> pprNameDefnLoc parent
+          Nothing     -> text "defined" <+> pprNameDefnLoc fn
 scTopBinds :: ScEnv -> [InBind] -> UniqSM (ScUsage, [OutBind], [SpecConstrWarning])
 scTopBinds _env []     = return (nullUsage, [], [])
 scTopBinds env  (b:bs) = do { (usg, b', bs', warnings) <- scBind TopLevel env b $
@@ -1452,7 +1468,8 @@ that decision bites, without changing which specialisations are made:
   BoxOther, the constructor's Name is recorded in the pattern (cp_rebox);
   `specialise` turns surviving patterns with a non-empty cp_rebox into
   SpecReboxed warnings, which specConstrProgram emits under
-  -Wspec-constr-reboxing (off by default).
+  -Wspec-constr-reboxing (off by default), one warning per function with
+  the reboxed constructors of all its patterns merged.
 
 * Nullary constructors are exempt: "reboxing" a nullary constructor just
   references its shared static closure, so it costs no allocation and even

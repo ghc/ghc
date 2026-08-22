@@ -534,6 +534,11 @@ of ``-W(no-)*``.
     the call-pattern analysis by wrapping the argument in ``GHC.Exts.lazy``
     at the call site, or :ghc-flag:`-fno-spec-constr`.
 
+    One warning is emitted per specialised function. Warnings about local
+    functions also name the enclosing top-level binding. Specialisations on
+    nullary constructors are not reported, since "reboxing" a nullary
+    constructor simply references its shared static closure.
+
     The analysis behind this warning is approximate: it can both miss genuine
     reboxing and report reboxing that later optimisations eliminate or that
     only occurs on cold code paths.
