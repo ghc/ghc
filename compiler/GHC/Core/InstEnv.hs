@@ -53,6 +53,8 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Id
 import GHC.Generics (Generic)
+import Data.Function    ( on )
+import Data.List        ( sortBy )
 import Data.List.NonEmpty ( NonEmpty (..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe       ( isJust )
@@ -1122,6 +1124,9 @@ data PotentialUnifiers
        -- printing an error message. It can be expensive to compute all
        -- the unifiers because if you are matching something like C a[sk] then
        -- all instances will unify.
+       -- CQ-REF[coherent-unifiers-sort]
+       -- D~ "when printing an error message" is incomplete: TH's
+       --    reifyInstances also consumes the full list.
 
 {- Note [Recording coherence information in `PotentialUnifiers`]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1167,11 +1172,24 @@ instance Semigroup PotentialUnifiers where
   NoUnifiers c1 <> NoUnifiers c2 = NoUnifiers (c1 `andCanEv` c2)
   NoUnifiers _ <> u = u
   OneOrMoreUnifiers (unifier :| unifiers) <> u
-    = OneOrMoreUnifiers (unifier :| (unifiers <> getCoherentUnifiers u))
+    = OneOrMoreUnifiers (unifier :| (unifiers <> nonDetCoherentUnifiers u))
 
+-- CQ[coherent-unifiers-sort]
+-- Q: Why does the exported accessor sort, and why is there a raw
+--    (non-deterministic, unexported) variant?
+-- A~ The unifiers are enumerated in non-deterministic order (see
+--    Note [Matches vs Unifiers] in GHC.Core.RoughMap). Sorting here makes
+--    the order deterministic for every external consumer (error messages,
+--    TH's reifyInstances). The internal construction sites (the Semigroup
+--    instance, add_unifier) must use the raw variant: they build the list
+--    incrementally, and sorting a partial list would both be wasted work
+--    and force the lazily-enumerated tail.
 getCoherentUnifiers :: PotentialUnifiers -> [ClsInst]
-getCoherentUnifiers NoUnifiers{} = []
-getCoherentUnifiers (OneOrMoreUnifiers cls) = NE.toList cls
+getCoherentUnifiers = sortBy (stableNameCmp `on` is_dfun_name) . nonDetCoherentUnifiers
+
+nonDetCoherentUnifiers :: PotentialUnifiers -> [ClsInst]
+nonDetCoherentUnifiers NoUnifiers{} = []
+nonDetCoherentUnifiers (OneOrMoreUnifiers cls) = NE.toList cls
 
 -- | Are there no *coherent* unifiers?
 nullUnifiers :: PotentialUnifiers -> Bool
@@ -1262,7 +1280,7 @@ instEnvMatchesAndUnifiers (InstEnv rm) vis_mods cls tys
         -- Note [Coherence and specialisation: overview]
     add_unifier item other_unifiers
       | not (isIncoherent item)
-      = OneOrMoreUnifiers (item :| getCoherentUnifiers other_unifiers)
+      = OneOrMoreUnifiers (item :| nonDetCoherentUnifiers other_unifiers)
 
       -- So `item` is incoherent; see Note [Incoherent instances]
       | otherwise

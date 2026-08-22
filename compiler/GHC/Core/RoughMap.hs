@@ -172,11 +172,18 @@ For the same reason the unifiers are enumerated in non-deterministic order (see
 the RML_WildCard case of lookupRM'): a deterministic fold would have to inspect
 every entry of rm_known before it could produce the first unifier, defeating
 that laziness (#27459; see Note [Cost of deterministic iteration] in
-GHC.Types.Unique.DFM). The order is observable only where error messages are
-rendered, so those sites must sort the unifiers they display; see
-fuzzyClsInstCmp in GHC.Core.InstEnv and reportConflictInstErr in
-GHC.Tc.Instance.Family. The matches, by contrast, are still enumerated
+GHC.Types.Unique.DFM). The matches, by contrast, are still enumerated
 deterministically.
+
+CQ[unifier-order-consumers]
+Q: Where does the non-deterministic unifier order become user-visible, and
+   who restores determinism?
+A~ Wherever the full list is consumed: class-instance consumers (error
+   messages, TH's reifyInstances — see #27459 review finding) all go through
+   getCoherentUnifiers in GHC.Core.InstEnv, which sorts; family-instance
+   conflicts are sorted where displayed, see reportConflictInstErr in
+   GHC.Tc.Instance.Family. Consumers that only test emptiness (the hot
+   paths) never observe the order.
 
 Note [Simple Matching Semantics]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
