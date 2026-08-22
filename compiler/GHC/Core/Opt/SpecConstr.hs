@@ -13,12 +13,13 @@ ToDo [Oct 2013]
 module GHC.Core.Opt.SpecConstr(
         specConstrProgram,
         SpecConstrAnnotation(..),
-        SpecFailWarning(..)
+        SpecConstrWarning(..)
     ) where
 
 import GHC.Prelude
 
 import GHC.Driver.DynFlags ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
+                          , WarningFlag( Opt_WarnSpecConstrReboxing )
                           , gopt, hasPprDebug )
 
 import GHC.Core
@@ -74,7 +75,7 @@ import GHC.Exts( SpecConstrAnnotation(..) )
 import GHC.Serialized   ( deserializeWithData )
 
 import Control.Monad
-import Data.List ( sortBy, partition, dropWhileEnd, mapAccumL )
+import Data.List ( sortBy, partition, dropWhileEnd, mapAccumL, nub, unzip4 )
 import Data.List.NonEmpty ( NonEmpty (..) )
 import Data.Maybe( mapMaybe )
 import Data.Ord( comparing )
@@ -183,6 +184,9 @@ for the best.
 
 So my current choice is to make SpecConstr similarly aggressive, and
 ignore the bad potential of reboxing.
+
+-Wspec-constr-reboxing reports the specialisations where this choice may
+bite; see Note [Reboxing warning].
 
 
 Note [Good arguments]
@@ -781,17 +785,33 @@ specConstrProgram guts
        ; let (_usg, binds', warnings) = initUs_ us $
                               scTopBinds env0 (mg_binds guts)
 
-       ; when (not (null warnings)) $ diagnostic WarningWithoutFlag (warn_msg warnings)
+       ; let (rebox_ws, forced_ws) = partition is_rebox warnings
+             is_rebox (SpecReboxed {}) = True
+             is_rebox _                = False
+
+       ; when (not (null forced_ws)) $ diagnostic WarningWithoutFlag (forced_msg forced_ws)
+       ; when (not (null rebox_ws)) $ diagnostic (WarningWithFlag Opt_WarnSpecConstrReboxing)
+                                                 (rebox_msg (nub rebox_ws))
 
        ; return (guts { mg_binds = binds' }) }
 
   where
-    warn_msg :: SpecFailWarnings -> SDoc
-    warn_msg warnings = text "SpecConstr encountered one or more function(s) with a SPEC argument that resulted in too many arguments," $$
+    forced_msg :: SpecConstrWarnings -> SDoc
+    forced_msg warnings = text "SpecConstr encountered one or more function(s) with a SPEC argument that resulted in too many arguments," $$
                         text "which resulted in no specialization being generated for these functions:" $$
                         nest 2 (vcat (map ppr warnings)) $$
                         (text "If this is expected you might want to increase -fmax-forced-spec-args to force specialization anyway.")
-scTopBinds :: ScEnv -> [InBind] -> UniqSM (ScUsage, [OutBind], [SpecFailWarning])
+
+    -- See Note [Reboxing warning]
+    rebox_msg :: SpecConstrWarnings -> SDoc
+    rebox_msg warnings = text "SpecConstr specialised the following function(s) on a constructor argument that is also used boxed:" $$
+                         nest 2 (vcat (map ppr warnings)) $$
+                         text "The specialised code allocates a fresh constructor at each such use (\"reboxing\")," $$
+                         text "which can increase allocation and defeat pointer-equality-based sharing." $$
+                         text "Possible remedies: exclude the type with an {-# ANN type T NoSpecConstr #-} pragma," $$
+                         text "hide the constructor from SpecConstr by wrapping the call-site argument in GHC.Exts.lazy," $$
+                         text "or use -fno-spec-constr."
+scTopBinds :: ScEnv -> [InBind] -> UniqSM (ScUsage, [OutBind], [SpecConstrWarning])
 scTopBinds _env []     = return (nullUsage, [], [])
 scTopBinds env  (b:bs) = do { (usg, b', bs', warnings) <- scBind TopLevel env b $
                                                 (\env -> scTopBinds env bs)
@@ -1306,18 +1326,36 @@ lookupOccs (SCU { scu_calls = sc_calls, scu_occs = sc_occs }) bndrs
 data ArgOcc = NoOcc     -- Doesn't occur at all; or a type argument
             | UnkOcc    -- Used in some unknown way
 
+            | PassAlongOcc  -- Passed, whole and unmodified, to a call of a
+                            -- RecFun function; see Note [Reboxing warning]
+
             | ScrutOcc  -- See Note [ScrutOcc]
+                 !BoxUse -- How the box itself is used, besides being taken
+                         -- apart; see Note [Reboxing warning]
                  (DataConEnv [ArgOcc])
                      -- [ArgOcc]: how the sub-components are used
+
+-- | How a scrutinised argument's box is used, in ascending order of
+-- reboxing risk; see Note [Reboxing warning]
+data BoxUse = NoBoxUse      -- Only taken apart or applied
+            | BoxPassAlong  -- Also passed, whole, to a RecFun call
+            | BoxOther      -- Some other boxed use: returned, stored,
+                            -- passed to an unknown function, ...
+            deriving (Eq, Ord)
+
+lubBoxUse :: BoxUse -> BoxUse -> BoxUse
+lubBoxUse = max
 
 deadArgOcc :: ArgOcc -> Bool
 deadArgOcc (ScrutOcc {}) = False
 deadArgOcc UnkOcc        = False
+deadArgOcc PassAlongOcc  = False
 deadArgOcc NoOcc         = True
 
 specialisableArgOcc :: ArgOcc -> Bool
 -- | Does this occurrence represent one worth specializing for.
 specialisableArgOcc UnkOcc        = False
+specialisableArgOcc PassAlongOcc  = False
 specialisableArgOcc NoOcc         = False
 specialisableArgOcc (ScrutOcc {}) = True
 
@@ -1327,8 +1365,8 @@ specialisableArgOcc (ScrutOcc {}) = True
 An occurrence of ScrutOcc indicates that the thing, or a `cast` version of the thing,
 is *only* taken apart or applied.
 
-  Functions, literal: ScrutOcc emptyUFM
-  Data constructors:  ScrutOcc subs,
+  Functions, literal: ScrutOcc NoBoxUse emptyUFM
+  Data constructors:  ScrutOcc box_use subs,
 
 where (subs :: UniqFM [ArgOcc]) gives usage of the *pattern-bound* components,
 The domain of the UniqFM is the Unique of the data constructor
@@ -1341,30 +1379,94 @@ A pattern binds b, x::a, y::b, z::b->a, but not 'a'!
 -}
 
 instance Outputable ArgOcc where
-  ppr (ScrutOcc xs) = text "scrut-occ" <> ppr xs
-  ppr UnkOcc        = text "unk-occ"
-  ppr NoOcc         = text "no-occ"
+  ppr (ScrutOcc b xs) = text "scrut-occ" <> ppr b <> ppr xs
+  ppr UnkOcc          = text "unk-occ"
+  ppr PassAlongOcc    = text "pass-along-occ"
+  ppr NoOcc           = text "no-occ"
+
+instance Outputable BoxUse where
+  ppr NoBoxUse     = empty
+  ppr BoxPassAlong = text "[box-pass-along]"
+  ppr BoxOther     = text "[box-other]"
 
 evalScrutOcc :: ArgOcc
 -- We use evalScrutOcc for
 --   - mkVarUsage: applied functions
 --   - scApp: dicts that are the argument of a classop
-evalScrutOcc = ScrutOcc emptyUFM
+evalScrutOcc = ScrutOcc NoBoxUse emptyUFM
 
 -- Experimentally, this version of combineOcc makes ScrutOcc "win", so
 -- that if the thing is scrutinised anywhere then we get to see that
 -- in the overall result, even if it's also used in a boxed way
 -- This might be too aggressive; see Note [Reboxing] Alternative 3
+-- The BoxUse field records that a boxed use was absorbed here;
+-- see Note [Reboxing warning]
 combineOcc :: ArgOcc -> ArgOcc -> ArgOcc
 combineOcc NoOcc         occ           = occ
 combineOcc occ           NoOcc         = occ
-combineOcc (ScrutOcc xs) (ScrutOcc ys) = ScrutOcc (plusUFM_C combineOccs xs ys)
-combineOcc UnkOcc        (ScrutOcc ys) = ScrutOcc ys
-combineOcc (ScrutOcc xs) UnkOcc        = ScrutOcc xs
-combineOcc UnkOcc        UnkOcc        = UnkOcc
+combineOcc (ScrutOcc b1 xs) (ScrutOcc b2 ys) = ScrutOcc (b1 `lubBoxUse` b2) (plusUFM_C combineOccs xs ys)
+combineOcc UnkOcc        (ScrutOcc b ys) = ScrutOcc (b `lubBoxUse` BoxOther) ys
+combineOcc (ScrutOcc b xs) UnkOcc        = ScrutOcc (b `lubBoxUse` BoxOther) xs
+combineOcc PassAlongOcc  (ScrutOcc b ys) = ScrutOcc (b `lubBoxUse` BoxPassAlong) ys
+combineOcc (ScrutOcc b xs) PassAlongOcc  = ScrutOcc (b `lubBoxUse` BoxPassAlong) xs
+combineOcc PassAlongOcc  PassAlongOcc  = PassAlongOcc
+combineOcc UnkOcc        _             = UnkOcc
+combineOcc _             UnkOcc        = UnkOcc
 
 combineOccs :: [ArgOcc] -> [ArgOcc] -> [ArgOcc]
 combineOccs xs ys = zipWithEqual combineOcc xs ys
+
+{- Note [Reboxing warning]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Reboxing] deliberately accepts reboxing (its ALTERNATIVE 3): combineOcc
+lets ScrutOcc win even when the argument is also used boxed, and the
+specialised body then allocates a fresh box at each boxed use.  That can
+regress allocation (#27628) and defeats pointer-equality-based sharing tricks
+(e.g. IntSet.difference in containers).  -Wspec-constr-reboxing reports where
+that decision bites, without changing which specialisations are made:
+
+* ScrutOcc's BoxUse field records how the box itself is used, beyond being
+  taken apart:
+    NoBoxUse      not used boxed at all
+    BoxPassAlong  only passed, whole and unmodified, to calls of RecFun
+                  functions (recorded via PassAlongOcc; see below)
+    BoxOther      some other boxed use: returned, stored, passed to an
+                  unknown function, ...
+  A boxed use is absorbed into ScrutOcc in combineOcc: plain UnkOcc joins in
+  as BoxOther, PassAlongOcc as BoxPassAlong.  scApp marks a bare RecArg
+  variable passed to a RecFun call as PassAlongOcc (markPassAlongArg);
+  every other boxed use remains UnkOcc.
+
+* When argToPat commits to a constructor pattern whose occurrence carries
+  BoxOther, the constructor's Name is recorded in the pattern (cp_rebox);
+  `specialise` turns surviving patterns with a non-empty cp_rebox into
+  SpecReboxed warnings, which specConstrProgram emits under
+  -Wspec-constr-reboxing (off by default).
+
+Why BoxPassAlong does not warn: if the callee is specialised at that argument
+position, its RULE rewrites the constructor-shaped call in the specialised
+body and no box is ever rebuilt.  That is exactly the good case that
+ALTERNATIVE 3 exists to keep:
+        foo x@(Just m) n = foo x (n-m)
+RecFun covers the whole Rec group and any enclosing SpecConstr candidate, so
+mutually recursive pass-alongs stay quiet too.
+
+The carve-out is approximate in both directions, which is why the warning is
+opt-in and promises no precision:
+
+* Under-warning: the RecFun callee may not, in fact, be specialised at that
+  position (spec count/size limits, boring occurrence in the callee), and
+  then reboxing happens unreported.  Likewise, a bare RecArg that is both
+  passed along and used boxed inside another argument of the same call is
+  treated as pass-along.
+
+* Over-warning: the BoxOther use may sit on a cold path, or the box may be
+  eliminated by later optimisation.
+
+Remedies to suggest to users: {-# ANN type T NoSpecConstr #-} (see
+Note [NoSpecConstr]), wrapping the call-site argument in GHC.Exts.lazy so the
+call-pattern analysis cannot see the constructor, or -fno-spec-constr.
+-}
 
 setScrutOcc :: ScEnv -> ScUsage -> OutExpr -> ArgOcc -> ScUsage
 -- _Overwrite_ the occurrence info for the scrutinee, if the scrutinee
@@ -1389,8 +1491,8 @@ creates specialised versions of functions.
 -}
 
 scBind :: TopLevelFlag -> ScEnv -> InBind
-       -> (ScEnv -> UniqSM (ScUsage, a, [SpecFailWarning]))   -- Specialise the scope of the binding
-       -> UniqSM (ScUsage, [OutBind], a, [SpecFailWarning])
+       -> (ScEnv -> UniqSM (ScUsage, a, [SpecConstrWarning]))   -- Specialise the scope of the binding
+       -> UniqSM (ScUsage, [OutBind], a, [SpecConstrWarning])
 scBind top_lvl env (NonRec bndr rhs) do_body
   | isTyVar bndr         -- Type-lets may be created by doBeta
   = do { (final_usage, body', warnings) <- do_body (extendScSubst env bndr rhs)
@@ -1503,11 +1605,11 @@ recursive function, but that's not essential and might even be
 harmful.  I'm not sure.
 -}
 
-withWarnings :: SpecFailWarnings -> (ScUsage, CoreExpr, SpecFailWarnings) -> (ScUsage, CoreExpr, SpecFailWarnings)
+withWarnings :: SpecConstrWarnings -> (ScUsage, CoreExpr, SpecConstrWarnings) -> (ScUsage, CoreExpr, SpecConstrWarnings)
 withWarnings ws (use,expr,ws2) = (use,expr,ws ++ ws2)
 
 ------------------------
-scExpr, scExpr' :: ScEnv -> CoreExpr -> UniqSM (ScUsage, CoreExpr, SpecFailWarnings)
+scExpr, scExpr' :: ScEnv -> CoreExpr -> UniqSM (ScUsage, CoreExpr, SpecConstrWarnings)
         -- The unique supply is needed when we invent
         -- a new name for the specialised function and its args
 
@@ -1581,7 +1683,7 @@ scExpr' env (Case scrut b ty alts)
                 scrut_occ = case con of
                                DataAlt dc -- See Note [Do not specialise evals]
                                   | not (single_alt && all deadArgOcc arg_occs)
-                                  -> ScrutOcc (unitUFM dc arg_occs)
+                                  -> ScrutOcc NoBoxUse (unitUFM dc arg_occs)
                                _  -> UnkOcc
           ; return (usg', b_occ `combineOcc` scrut_occ, Alt con bs2 rhs', ws) }
 
@@ -1632,7 +1734,7 @@ follows.
   still worth specialising on x. Hence the /single-alternative/ guard.
 -}
 
-scApp :: ScEnv -> (InExpr, [InExpr]) -> UniqSM (ScUsage, CoreExpr, SpecFailWarnings)
+scApp :: ScEnv -> (InExpr, [InExpr]) -> UniqSM (ScUsage, CoreExpr, SpecConstrWarnings)
 
 scApp env (Var fn, args)        -- Function is a variable
   = assert (not (null args)) $
@@ -1647,12 +1749,19 @@ scApp env (Var fn, args)        -- Function is a variable
             Var fn' -> return (arg_usg' `combineUsage` mkVarUsage env fn' args',
                                mkApps (Var fn') args', arg_w )
                where
+                 -- rec_arg_usg: see Note [Reboxing warning]
+                 rec_arg_usg
+                   | Just RecFun <- lookupHowBound env fn'
+                   = combineUsages (zipWith (markPassAlongArg env) args' arg_usgs)
+                   | otherwise
+                   = arg_usg
+
                  -- arg_usg': see Note [Specialising on dictionaries]
                  arg_usg' | Just cls <- isClassOpId_maybe fn'
                           , dict_arg : _ <- dropList (classTyVars cls) args'
-                          = setScrutOcc env arg_usg dict_arg evalScrutOcc
+                          = setScrutOcc env rec_arg_usg dict_arg evalScrutOcc
                           | otherwise
-                          = arg_usg
+                          = rec_arg_usg
 
             other_fn' -> return (arg_usg, mkApps other_fn' args', arg_w) }
                 -- NB: doing this ignores any usage info from the substituted
@@ -1673,6 +1782,20 @@ scApp env (other_fn, args)
         ; return (combineUsages arg_usgs `combineUsage` fn_usg, mkApps fn' args', combineSpecWarning fn_ws (concat arg_ws)) }
 
 ----------------------
+markPassAlongArg :: ScEnv -> OutExpr -> ScUsage -> ScUsage
+-- Demote a bare RecArg argument of a RecFun call from UnkOcc to
+-- PassAlongOcc; see Note [Reboxing warning]
+markPassAlongArg env (Cast e _) usg = markPassAlongArg env e usg
+markPassAlongArg env (Tick _ e) usg = markPassAlongArg env e usg
+markPassAlongArg env (Var v) usg
+  | Just RecArg <- lookupHowBound env v
+  = usg { scu_occs = modifyVarEnv demote (scu_occs usg) v }
+  where
+    demote UnkOcc = PassAlongOcc
+    demote occ    = occ
+markPassAlongArg _env _other usg = usg
+
+----------------------
 mkVarUsage :: ScEnv -> Id -> [CoreExpr] -> ScUsage
 mkVarUsage env fn args
   = case lookupHowBound env fn of
@@ -1686,7 +1809,7 @@ mkVarUsage env fn args
             | otherwise = evalScrutOcc
 
 ----------------------
-scRecRhs :: ScEnv -> (OutId, InExpr) -> UniqSM (RhsInfo, SpecFailWarnings)
+scRecRhs :: ScEnv -> (OutId, InExpr) -> UniqSM (RhsInfo, SpecConstrWarnings)
 scRecRhs env (bndr,rhs)
   = do  { let (arg_bndrs,body)       = collectBinders rhs
               (body_env, arg_bndrs') = extendBndrsWith RecArg env arg_bndrs
@@ -1764,7 +1887,7 @@ initSpecInfo (RI { ri_rhs_usg = rhs_usg })
 specNonRec :: ScEnv
            -> CallEnv         -- Calls in body
            -> RhsInfo         -- Structure info usage info for un-specialised RHS
-           -> UniqSM (ScUsage, SpecInfo, [SpecFailWarning])       -- Usage from RHSs (specialised and not)
+           -> UniqSM (ScUsage, SpecInfo, [SpecConstrWarning])       -- Usage from RHSs (specialised and not)
                                                --     plus details of specialisations
 
 specNonRec env body_calls rhs_info
@@ -1774,7 +1897,7 @@ specNonRec env body_calls rhs_info
 specRec :: ScEnv
         -> CallEnv                         -- Calls in body
         -> [RhsInfo]                       -- Structure info and usage info for un-specialised RHSs
-        -> UniqSM (ScUsage, [SpecInfo], SpecFailWarnings)
+        -> UniqSM (ScUsage, [SpecInfo], SpecConstrWarnings)
                                            -- Usage from all RHSs (specialised and not)
                                            --     plus details of specialisations
 
@@ -1795,8 +1918,8 @@ specRec env body_calls rhs_infos
                               -- Two accumulating parameters:
                  -> ScUsage      -- Usage from earlier specialisations
                  -> [SpecInfo]   -- Details of specialisations so far
-                 -> SpecFailWarnings -- Warnings so far
-                 -> UniqSM (ScUsage, [SpecInfo], SpecFailWarnings)
+                 -> SpecConstrWarnings -- Warnings so far
+                 -> UniqSM (ScUsage, [SpecInfo], SpecConstrWarnings)
     go n_iter seed_calls usg_so_far spec_infos ws_so_far
       = -- pprTrace "specRec3" (vcat [ text "bndrs" <+> ppr (map ri_fn rhs_infos)
         --                           , text "iteration" <+> int n_iter
@@ -1843,7 +1966,7 @@ specialise
    -> CallEnv                     -- Info on newly-discovered calls to this function
    -> RhsInfo
    -> SpecInfo                    -- Original RHS plus patterns dealt with
-   -> UniqSM (ScUsage, SpecInfo, [SpecFailWarning])  -- New specialised versions and their usage
+   -> UniqSM (ScUsage, SpecInfo, [SpecConstrWarning])  -- New specialised versions and their usage
 
 -- See Note [spec_usg includes rhs_usg]
 
@@ -1876,6 +1999,10 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
              <- callsToNewPats env fn spec_info arg_occs all_calls
 
         ; let n_pats = length new_pats
+              -- Warn about committed specialisations that will rebox;
+              -- see Note [Reboxing warning]
+              rebox_ws = [ SpecReboxed (idName fn) (cp_rebox p)
+                         | p <- new_pats, not (null (cp_rebox p)) ]
 --        ; when (not (null new_pats) || isJust mb_unspec) $
 --          pprTraceM "specialise" (vcat [ ppr fn <+> text "with" <+> int n_pats <+> text "good patterns"
 --                                       , text "boring_call:" <+> ppr boring_call
@@ -1912,7 +2039,7 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
         ; return (new_usg, SI { si_specs     = new_specs ++ specs
                               , si_n_specs   = spec_count + n_pats
                               , si_mb_unspec = mb_unspec' }
-                 ,warnings ++ concat new_wss) }
+                 ,warnings ++ rebox_ws ++ concat new_wss) }
 
   | otherwise  -- No calls, inactive, or not a function
                -- Behave as if there was a single, boring call
@@ -1929,7 +2056,7 @@ spec_one :: ScEnv
          -> [InVar]     -- Lambda-binders of RHS; should match patterns
          -> InExpr      -- Body of the original function
          -> (CallPat, Int)
-         -> UniqSM (ScUsage, OneSpec, SpecFailWarnings)   -- Rule and binding, warnings if any
+         -> UniqSM (ScUsage, OneSpec, SpecConstrWarnings)   -- Rule and binding, warnings if any
 
 -- spec_one creates a specialised copy of the function, together
 -- with a rule for using it.  I'm very proud of how short this
@@ -2436,25 +2563,34 @@ Then it's fine for `co2` to mention `a`.  We'll get
 
 data CallPat = CP { cp_qvars :: [Var]           -- Quantified variables
                   , cp_args  :: [CoreExpr]      -- Arguments
-                  , cp_strict_args :: [Var] }   -- Arguments we want to pass unlifted even if they are boxed
+                  , cp_strict_args :: [Var]     -- Arguments we want to pass unlifted even if they are boxed
                                                 -- See Note [SpecConstr and strict fields]
+                  , cp_rebox :: [Name] }        -- Constructors matched by this pattern whose box
+                                                -- is also used; see Note [Reboxing warning]
 
      -- See Note [SpecConstr call patterns]
 
 instance Outputable CallPat where
-  ppr (CP { cp_qvars = qvars, cp_args = args, cp_strict_args =  strict })
+  ppr (CP { cp_qvars = qvars, cp_args = args, cp_strict_args = strict, cp_rebox = rebox })
     = text "CP" <> braces (sep [ text "cp_qvars =" <+> ppr qvars <> comma
                                , text "cp_args =" <+> ppr args
-                               , text "cp_strict_args = " <> ppr strict ])
+                               , text "cp_strict_args = " <> ppr strict
+                               , text "cp_rebox = " <> ppr rebox ])
 
-newtype SpecFailWarning = SpecFailForcedArgCount { spec_failed_fun_name :: Name }
+data SpecConstrWarning
+  = SpecFailForcedArgCount { spec_failed_fun_name :: Name }
+  | SpecReboxed { spec_rebox_fun_name :: Name    -- The specialised function
+                , spec_rebox_cons :: [Name] }    -- The reboxed constructor(s)
+    -- See Note [Reboxing warning]
+  deriving Eq
 
-type SpecFailWarnings = [SpecFailWarning]
+type SpecConstrWarnings = [SpecConstrWarning]
 
-instance Outputable SpecFailWarning where
+instance Outputable SpecConstrWarning where
   ppr (SpecFailForcedArgCount name) = ppr name <+> pprDefinedAt name
+  ppr (SpecReboxed fn dcs) = ppr fn <+> parens (pprWithCommas ppr dcs) <+> pprDefinedAt fn
 
-combineSpecWarning :: SpecFailWarnings -> SpecFailWarnings -> SpecFailWarnings
+combineSpecWarning :: SpecConstrWarnings -> SpecConstrWarnings -> SpecConstrWarnings
 combineSpecWarning = (++)
 
 data ArgCountResult = WorkerSmallEnough | WorkerTooLarge | WorkerTooLargeForced Name
@@ -2465,7 +2601,7 @@ callsToNewPats :: ScEnv -> Id
                -> UniqSM ( Bool        -- At least one boring call
                          , Bool        -- Patterns were discarded
                          , [CallPat]   -- Patterns to specialise
-                         , [SpecFailWarning] -- Things that didn't specialise we want to warn the user about)
+                         , [SpecConstrWarning] -- Things that didn't specialise we want to warn the user about)
                          )
 -- Result has no duplicate patterns,
 -- nor ones mentioned in si_specs (hence "new" patterns)
@@ -2494,7 +2630,7 @@ callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
               -- Remove ones that have too many worker variables
               (small_pats, arg_count_warnings) = partitionByWorkerSize too_many_worker_args non_dups
 
-              -- too_many_worker_args :: CallPat -> Either SpecFailWarning Bool
+              -- too_many_worker_args :: CallPat -> Either SpecConstrWarning Bool
               too_many_worker_args (CP { cp_qvars = vars, cp_args = args })
                 | sc_force env
                 -- See (FS5) of Note [Forcing specialisation]
@@ -2602,16 +2738,16 @@ callToPat :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe CallPat)
 callToPat env bndr_occs call@(Call fn args con_env)
   = do  { let in_scope = substInScopeSet (sc_subst env)
 
-        ; arg_triples <- zipWith3M (argToPat env in_scope con_env) args bndr_occs (map (const NotMarkedStrict) args)
+        ; arg_quads <- zipWith3M (argToPat env in_scope con_env) args bndr_occs (map (const NotMarkedStrict) args)
                    -- This zip trims the args to be no longer than
                    -- the lambdas in the function definition (bndr_occs)
 
           -- Drop boring patterns from the end
           -- See Note [SpecConstr call patterns]
-        ; let arg_triples' | isJoinId fn     = arg_triples
-                           | otherwise       = dropWhileEnd is_boring arg_triples
-              is_boring (interesting, _,_)   = not interesting
-              (interesting_s, pats, cbv_ids) = unzip3 arg_triples'
+        ; let arg_quads' | isJoinId fn     = arg_quads
+                         | otherwise       = dropWhileEnd is_boring arg_quads
+              is_boring (interesting, _,_,_) = not interesting
+              (interesting_s, pats, cbv_ids, rebox_cons) = unzip4 arg_quads'
               interesting                    = or interesting_s
 
         ; let pat_fvs = exprsFreeVarsList pats
@@ -2647,7 +2783,8 @@ callToPat env bndr_occs call@(Call fn args con_env)
 
           if interesting && null bad_covars
           then do { let cp_res = CP { cp_qvars = qvars', cp_args = pats
-                                    , cp_strict_args = concat cbv_ids }
+                                    , cp_strict_args = concat cbv_ids
+                                    , cp_rebox = concat rebox_cons }
 --                  ; pprTraceM "callToPatOut" $
 --                    vcat [ text "fn:" <+> ppr fn
 --                         , text "args:" <+> ppr args
@@ -2670,7 +2807,9 @@ argToPat :: ScEnv
          -> ArgOcc
          -> StrictnessMark              -- Tells us if this argument is a strict field of a data constructor
                                         -- See Note [SpecConstr and strict fields]
-         -> UniqSM (Bool, CoreArg, [Id])
+         -> UniqSM (Bool, CoreArg, [Id], [Name])
+                -- [Name]: constructors matched by the pattern whose box is
+                --         also used; see Note [Reboxing warning]
 
 -- Returns (interesting, pat),
 -- where pat is the pattern derived from the argument
@@ -2695,9 +2834,9 @@ argToPat1 :: ScEnv
   -> Expr CoreBndr
   -> ArgOcc
   -> StrictnessMark
-  -> UniqSM (Bool, Expr CoreBndr, [Id])
+  -> UniqSM (Bool, Expr CoreBndr, [Id], [Name])
 argToPat1 _env _in_scope _val_env arg@(Type {}) _arg_occ _arg_str
-  = return (False, arg, [])
+  = return (False, arg, [], [])
 
 argToPat1 env in_scope val_env (Tick _ arg) arg_occ arg_str
   = argToPat env in_scope val_env arg arg_occ arg_str
@@ -2719,11 +2858,11 @@ argToPat1 env in_scope val_env (Let _ arg) arg_occ arg_str
    -- Casts: see Note [SpecConstr and casts]
 argToPat1 env in_scope val_env (Cast arg co) arg_occ arg_str
   | not (ignoreType env ty2)
-  = do  { (interesting, arg', strict_args) <- argToPat env in_scope val_env arg arg_occ arg_str
+  = do  { (interesting, arg', strict_args, rebox) <- argToPat env in_scope val_env arg arg_occ arg_str
         ; if not interesting then
                 wildCardPat ty2 arg_str
           else
-                return (interesting, Cast arg' co, strict_args) }
+                return (interesting, Cast arg' co, strict_args, rebox) }
   where
     ty2 = coercionRKind co
 
@@ -2733,7 +2872,7 @@ argToPat1 env in_scope val_env arg arg_occ _arg_str
   | Just (ConVal _wf (DataAlt dc) args) <- isValue val_env arg
     -- Ignore `_wf` here; see Note [ConVal work-free-ness] (2)
   , not (ignoreDataCon env dc)        -- See Note [NoSpecConstr]
-  , Just arg_occs <- mb_scrut dc
+  , Just (box_use, arg_occs) <- mb_scrut dc
   = do { let (ty_args, rest_args) = splitAtList (dataConUnivTyVars dc) args
              con_str, matched_str :: [StrictnessMark]
              -- con_str corresponds 1-1 with the /value/ arguments
@@ -2746,18 +2885,22 @@ argToPat1 env in_scope val_env arg arg_occ _arg_str
       --       ppr rest_args $$
       --       ppr (map isTypeArg rest_args))
        ; prs <- zipWith3M (argToPat env in_scope val_env) rest_args arg_occs matched_str
-       ; let args' = map sndOf3 prs :: [CoreArg]
+       ; let args'        = [ p    | (_, p, _, _)   <- prs ] :: [CoreArg]
+             cbvs         = concat [ cbv | (_, _, cbv, _) <- prs ]
+             rebox_nested = concat [ rbs | (_, _, _, rbs) <- prs ]
+             -- rebox_here: see Note [Reboxing warning]
+             rebox_here   = [ dataConName dc | box_use == BoxOther ]
        ; assertPpr (length con_str == length (filter isRuntimeArg rest_args))
             ( ppr con_str $$ ppr rest_args $$
               ppr (length con_str) $$ ppr (length rest_args)
             ) $ return ()
-       ; return (True, mkConApp dc (ty_args ++ args'), concat (map thdOf3 prs)) }
+       ; return (True, mkConApp dc (ty_args ++ args'), cbvs, rebox_here ++ rebox_nested) }
   where
     mb_scrut dc = case arg_occ of
-                ScrutOcc bs | Just occs <- lookupUFM bs dc
-                            -> Just (occs)  -- See Note [Reboxing]
+                ScrutOcc bu bs | Just occs <- lookupUFM bs dc
+                            -> Just (bu, occs)  -- See Note [Reboxing]
                 _other      | sc_force env || sc_keen (sc_opts env)
-                            -> Just (repeat UnkOcc)
+                            -> Just (NoBoxUse, repeat UnkOcc)
                             | otherwise
                             -> Nothing
     match_vals bangs (arg:args)
@@ -2788,7 +2931,7 @@ argToPat1 env in_scope val_env (Var v) arg_occ arg_str
        -- box that we can eliminate in the caller
   , not (ignoreType env (varType v))
   -- See Note [SpecConstr and strict fields]
-  = return (True, Var v, if isMarkedStrict arg_str then [v] else mempty)
+  = return (True, Var v, if isMarkedStrict arg_str then [v] else mempty, [])
   where
     is_value
         | isLocalId v = v `elemInScopeSet` in_scope
@@ -2840,11 +2983,11 @@ argToPat1 _env _in_scope _val_env arg _arg_occ arg_str
   = wildCardPat (exprType arg) arg_str
 
 -- | wildCardPats are always boring
-wildCardPat :: Type -> StrictnessMark -> UniqSM (Bool, CoreArg, [Id])
+wildCardPat :: Type -> StrictnessMark -> UniqSM (Bool, CoreArg, [Id], [Name])
 wildCardPat ty str
   = do { id <- mkSysLocalOrCoVarM (fsLit "sc") ManyTy ty
        -- ; pprTraceM "wildCardPat" (ppr id' <+> ppr (idUnfolding id'))
-       ; return (False, varToCoreExpr id, if isMarkedStrict str then [id] else []) }
+       ; return (False, varToCoreExpr id, if isMarkedStrict str then [id] else [], []) }
 
 isValue :: ValueEnv -> CoreExpr -> Maybe Value
 isValue _env (Lit lit)

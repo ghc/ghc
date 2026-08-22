@@ -1142,6 +1142,7 @@ data WarningFlag =
    | Opt_WarnUnrecognisedModifiers                   -- ^ @since 10.0
    | Opt_WarnSemaphoreOpenFailure                   -- Since 10.0.1
    | Opt_WarnDefaultedCallStack                      -- ^ @since 10.2
+   | Opt_WarnSpecConstrReboxing                      -- ^ @since 10.2
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -1198,6 +1199,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnOverlappingPatterns                     -> "overlapping-patterns" :| []
   Opt_WarnMissedSpecs                             -> "missed-specialisations" :| ["missed-specializations"]
   Opt_WarnAllMissedSpecs                          -> "all-missed-specialisations" :| ["all-missed-specializations"]
+  Opt_WarnSpecConstrReboxing                      -> "spec-constr-reboxing" :| []
   Opt_WarnSafe                                    -> "safe" :| []
   Opt_WarnTrustworthySafe                         -> "trustworthy-safe" :| []
   Opt_WarnInferredSafeImports                     -> "inferred-safe-imports" :| []

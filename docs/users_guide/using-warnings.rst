@@ -509,6 +509,35 @@ of ``-W(no-)*``.
 
     Alias for :ghc-flag:`-Wall-missed-specialisations`
 
+.. ghc-flag:: -Wspec-constr-reboxing
+    :shortdesc: warn when a SpecConstr specialisation may re-allocate a
+        constructor argument
+    :type: dynamic
+    :reverse: -Wno-spec-constr-reboxing
+    :category:
+
+    :since: 10.2
+
+    :default: off
+
+    Emits a warning when the SpecConstr optimisation (see
+    :ghc-flag:`-fspec-constr`) specialises a function on a constructor-shaped
+    argument that the function also uses in its boxed form, for example by
+    returning it or passing it to another function. The specialised code must
+    then allocate a fresh copy of the constructor at each such use
+    ("reboxing"). This can increase allocation compared to not specialising at
+    all, and it defeats sharing schemes that rely on pointer equality with the
+    original argument.
+
+    Possible remedies include excluding the type from SpecConstr with an
+    ``{-# ANN type T NoSpecConstr #-}`` pragma, hiding the constructor from
+    the call-pattern analysis by wrapping the argument in ``GHC.Exts.lazy``
+    at the call site, or :ghc-flag:`-fno-spec-constr`.
+
+    The analysis behind this warning is approximate: it can both miss genuine
+    reboxing and report reboxing that later optimisations eliminate or that
+    only occurs on cold code paths.
+
 .. ghc-flag:: -Wuseless-specialisations
     :shortdesc: warn on useless SPECIALISE pragmas
     :type: dynamic

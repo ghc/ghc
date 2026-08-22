@@ -1,0 +1,9 @@
+section: compiler
+synopsis: Add ``-Wspec-constr-reboxing``
+description:
+  New opt-in warning ``-Wspec-constr-reboxing``, which reports when the
+  SpecConstr optimisation specialises a function on a constructor-shaped
+  argument that the function also uses boxed, so that the specialised code
+  re-allocates the constructor ("reboxing"). Reboxing can increase
+  allocation and defeat sharing schemes based on pointer equality.
+issues: #27628
