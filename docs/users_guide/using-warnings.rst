@@ -540,6 +540,14 @@ of ``-W(no-)*``.
     nullary constructors are not reported, since "reboxing" a nullary
     constructor simply references its shared static closure.
 
+    A warning reading ``inlined from another module; no source location``
+    concerns a function that reached the module being compiled through
+    another module's unfolding; interface files record no source locations
+    for local functions. Such reboxing cannot be addressed in the module
+    being compiled — consider reporting it against the package defining the
+    inlined code. Constructors imported from other modules are shown
+    qualified with their defining module as a hint to where that is.
+
     The analysis behind this warning is approximate: it can both miss genuine
     reboxing and report reboxing that later optimisations eliminate or that
     only occurs on cold code paths.

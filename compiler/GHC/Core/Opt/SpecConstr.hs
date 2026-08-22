@@ -834,16 +834,29 @@ specConstrProgram guts
     rebox_msg :: SpecConstrWarning -> SDoc
     rebox_msg w@(SpecFailForcedArgCount {}) = pprPanic "rebox_msg" (ppr w)
     rebox_msg (SpecReboxed fn mb_parent cons)
-      = vcat [ text "SpecConstr specialised" <+> ppr fn <+> pp_site
-             , text "on a constructor argument" <+> parens (pprWithCommas ppr cons)
+      = vcat [ text "SpecConstr specialised" <+> quotes (ppr fn) <+> pp_site
+             , text "on a constructor argument" <+> parens (pprWithCommas pp_con cons)
                  <+> text "that is also used boxed (\"reboxing\")."
              , text "Reboxing can increase allocation and defeat pointer-equality-based sharing."
              , text "See -Wspec-constr-reboxing in the users guide for possible remedies." ]
       where
         pp_site = parens $ case mb_parent of
-          Just parent -> text "in" <+> ppr parent <> comma
-                         <+> text "defined" <+> pprNameDefnLoc (rebox_loc_name fn mb_parent)
-          Nothing     -> text "defined" <+> pprNameDefnLoc fn
+          Just parent -> text "in" <+> quotes (ppr parent) <> comma
+                         <+> pp_defn (rebox_loc_name fn mb_parent)
+          Nothing     -> pp_defn fn
+
+        -- A name with no source span reached this module in an interface
+        -- unfolding: iface files record no spans for local binders
+        pp_defn n
+          | isGoodSrcSpan (nameSrcSpan n) = text "defined" <+> pprNameDefnLoc n
+          | otherwise = text "inlined from another module; no source location"
+
+        -- Qualify imported constructors: they identify the package to
+        -- follow up with when the function itself has no location
+        pp_con con
+          | Just m <- nameModule_maybe con, m /= mg_module guts
+          = quotes (ppr m <> dot <> ppr con)
+          | otherwise = quotes (ppr con)
 scTopBinds :: ScEnv -> [InBind] -> UniqSM (ScUsage, [OutBind], [SpecConstrWarning])
 scTopBinds _env []     = return (nullUsage, [], [])
 scTopBinds env  (b:bs) = do { (usg, b', bs', warnings) <- scBind TopLevel env b $
@@ -1504,6 +1517,14 @@ that decision bites, without changing which specialisations are made:
   shown is the local's own definition site, so same-named locals can be
   told apart; only when that is missing (e.g. for simplifier-made join
   points) does the warning fall back to the parent's location.
+
+* A function with no source span and no parent reached this module in an
+  interface unfolding: iface files record no spans for local binders, and
+  such loops typically float to top level in the consuming module.  The
+  warning says "inlined from another module" instead of showing an
+  unhelpful span.  Imported constructors are shown qualified — with the
+  function anonymous, they are what identifies the package to report the
+  reboxing to.
 
 Why BoxPassAlong does not warn: if the callee is specialised at that argument
 position, its RULE rewrites the constructor-shaped call in the specialised
