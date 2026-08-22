@@ -9,6 +9,8 @@
   * Introduce `Data.Double` and `Data.Float` modules. ([CLC proposal #378](https://github.com/haskell/core-libraries-committee/issues/378))
   * Change `Generically a`'s `Monoid` definition to require a `Semigroup` constraint, and define its `mconcat` using `(<>)` from that constraint. ([CLC proposal #413](https://github.com/haskell/core-libraries-committee/issues/413))
   * Add `withEmptyCallStack` to `GHC.Stack`. ([CLC proposal #428](https://github.com/haskell/core-libraries-committee/issues/428))
+  * Add new `Data.RealFloat` module re-exporting `RealFloat` from `GHC.Float` ([CLC proposal #394](https://github.com/haskell/core-libraries-committee/issues/394))
+  * Add `Infinity`, `NegInfinity`, and `NaN` pattern synonyms to `Data.RealFloat` ([CLC proposal #394](https://github.com/haskell/core-libraries-committee/issues/394))
 
 ## 4.23.0.0 *TBA*
   * Add `System.IO.hGetNewlineMode`. ([CLC proposal #370](https://github.com/haskell/core-libraries-committee/issues/370))
