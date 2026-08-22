@@ -850,15 +850,15 @@ invisibleVarsOfTypes = foldr (unionVarSet . invisibleVarsOfType) emptyVarSet
 {-# INLINE afvFolder #-}   -- so that specialization to (const True) works
 afvFolder :: (TyCoVar -> Bool) -> TyCoFolder (FV TyCoVarSet DM.Any)
 -- 'afvFolder' is short for "any-free-var folder", good for checking
--- if any free var of a type satisfies a predicate `check_fv`
+-- if any shallow free var of a type satisfies a predicate `check_fv`
 afvFolder check_fv = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                                 , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                                 , tcf_hole = do_hole
                                 , tcf_tycobinder = addBndrFV }
   where
-    do_tcv tv = MkFV $ \ bvs ->
-                Any (not (tv `elemVarSet` bvs) && check_fv tv)
-    do_hole _ = mempty    -- I'm unsure; probably never happens
+    do_tcv tv    = MkFV $ \ bvs ->
+                   Any (not (tv `elemVarSet` bvs) && check_fv tv)
+    do_hole hole = do_tcv (coHoleCoVar hole)
 
 anyFreeVarsOfType :: (TyCoVar -> Bool) -> Type -> Bool
 anyFreeVarsOfType check_fv ty = DM.getAny (runFVTop (f ty))
