@@ -52,3 +52,12 @@ fon x =
      3 -> 'd'   -- case 3
           ;;;   -- case 4
 ;
+
+g :: Int
+g = let ; x = 1
+        ; y = 2
+    in x + y
+
+h :: Int
+h = i
+  where ;; i = 3
