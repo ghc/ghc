@@ -535,7 +535,8 @@ of ``-W(no-)*``.
     at the call site, or :ghc-flag:`-fno-spec-constr`.
 
     One warning is emitted per specialised function. Warnings about local
-    functions also name the enclosing top-level binding. Specialisations on
+    functions also name the enclosing top-level binding and point at the
+    local function's definition site. Specialisations on
     nullary constructors are not reported, since "reboxing" a nullary
     constructor simply references its shared static closure.
 

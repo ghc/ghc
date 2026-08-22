@@ -51,6 +51,7 @@ import GHC.Types.Id.Info ( IdDetails(..) )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name
+import GHC.Types.SrcLoc ( isGoodSrcSpan )
 import GHC.Types.Tickish
 import GHC.Types.Basic
 import GHC.Types.Demand
@@ -810,14 +811,24 @@ specConstrProgram guts
                                                     , same_fn w w' ]))
         | w@(SpecReboxed fn parent _) <- nubBy same_fn ws ]
       where
-        -- Distinct locals with the same occurrence name and parent render
-        -- identically, so key on those rather than on the Name's unique.
-        -- Without a parent the fn's own location is displayed, which the
-        -- occurrence name does not determine, so key on the Name itself.
+        -- Merge warnings that would render identically: same occurrence
+        -- name, parent, and displayed location. Such duplicates are
+        -- simplifier-made copies of one binding, so a single source-level
+        -- remedy addresses all of them. Distinct same-named locals have
+        -- distinct definition sites and stay separate.
         same_fn (SpecReboxed fn1 p1 _) (SpecReboxed fn2 p2 _)
-          | isJust p1 || isJust p2 = getOccName fn1 == getOccName fn2 && p1 == p2
-          | otherwise              = fn1 == fn2
+          | isJust p1 || isJust p2
+          = getOccName fn1 == getOccName fn2 && p1 == p2
+            && nameSrcSpan (rebox_loc_name fn1 p1) == nameSrcSpan (rebox_loc_name fn2 p2)
+          | otherwise = fn1 == fn2
         same_fn _ _ = False
+
+    -- The definition site shown in a reboxing warning: the fn's own when
+    -- known, otherwise the parent's (e.g. for simplifier-made join points)
+    rebox_loc_name :: Name -> Maybe Name -> Name
+    rebox_loc_name fn (Just parent)
+      | not (isGoodSrcSpan (nameSrcSpan fn)) = parent
+    rebox_loc_name fn _ = fn
 
     -- See Note [Reboxing warning]
     rebox_msg :: SpecConstrWarning -> SDoc
@@ -831,7 +842,7 @@ specConstrProgram guts
       where
         pp_site = parens $ case mb_parent of
           Just parent -> text "in" <+> ppr parent <> comma
-                         <+> text "defined" <+> pprNameDefnLoc parent
+                         <+> text "defined" <+> pprNameDefnLoc (rebox_loc_name fn mb_parent)
           Nothing     -> text "defined" <+> pprNameDefnLoc fn
 scTopBinds :: ScEnv -> [InBind] -> UniqSM (ScUsage, [OutBind], [SpecConstrWarning])
 scTopBinds _env []     = return (nullUsage, [], [])
@@ -1475,7 +1486,10 @@ that decision bites, without changing which specialisations are made:
   `specialise` turns surviving patterns with a non-empty cp_rebox into
   SpecReboxed warnings, which specConstrProgram emits under
   -Wspec-constr-reboxing (off by default), one warning per function with
-  the reboxed constructors of all its patterns merged.
+  the reboxed constructors of all its patterns merged.  Warnings that
+  would render identically — same name, parent, and definition site —
+  come from simplifier-made copies of one binding, so they are merged
+  too: a single source-level remedy addresses all of them.
 
 * Nullary constructors are exempt: "reboxing" a nullary constructor just
   references its shared static closure, so it costs no allocation and even
@@ -1483,10 +1497,13 @@ that decision bites, without changing which specialisations are made:
   ...) and warning about them would be pure noise.
 
 * Warnings about local functions (join points, local workers) name the
-  enclosing top-level binder too: locals often have meaningless names and
-  no source location, and any remedy is applied at the enclosing function
-  anyway.  sc_top_fn tracks that binder, set when entering a top-level
-  RHS (or a specialised copy of one) and kept unchanged below that.
+  enclosing top-level binder too: locals often have meaningless names,
+  and any remedy is applied at the enclosing function anyway.
+  sc_top_fn tracks that binder, set when entering a top-level RHS (or a
+  specialised copy of one) and kept unchanged below that.  The location
+  shown is the local's own definition site, so same-named locals can be
+  told apart; only when that is missing (e.g. for simplifier-made join
+  points) does the warning fall back to the parent's location.
 
 Why BoxPassAlong does not warn: if the callee is specialised at that argument
 position, its RULE rewrites the constructor-shaped call in the specialised
