@@ -36,6 +36,8 @@ import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.Rules
 import GHC.Core.Predicate ( scopedSort, typeDeterminesValue )
 import GHC.Core.Type     hiding ( substTy )
+import GHC.Core.TyCo.Compare ( eqType )
+import GHC.Core.TyCo.Tidy ( tidyTopType )
 import GHC.Core.TyCon   (TyCon, tyConName )
 import GHC.Core.Multiplicity
 import GHC.Core.Ppr     ( pprParendExpr )
@@ -807,18 +809,18 @@ specConstrProgram guts
     -- see Note [Reboxing warning]
     aggregateRebox :: SpecConstrWarnings -> SpecConstrWarnings
     aggregateRebox ws
-      = [ SpecReboxed fn parent (nub (concat [ cons | w'@(SpecReboxed _ _ cons) <- ws
-                                                    , same_fn w w' ]))
-        | w@(SpecReboxed fn parent _) <- nubBy same_fn ws ]
+      = [ SpecReboxed fn ty parent (nub (concat [ cons | w'@(SpecReboxed _ _ _ cons) <- ws
+                                                       , same_fn w w' ]))
+        | w@(SpecReboxed fn ty parent _) <- nubBy same_fn ws ]
       where
         -- Merge warnings that would render identically: same occurrence
-        -- name, parent, and displayed location. The reader could not tell
-        -- them apart, so printing both is noise; see Note [Reboxing warning].
-        -- Distinct located functions differ in name or location and stay
-        -- separate.
-        same_fn (SpecReboxed fn1 p1 _) (SpecReboxed fn2 p2 _)
+        -- name, type, parent, and displayed location. The reader could not
+        -- tell them apart, so printing both is noise; see
+        -- Note [Reboxing warning].
+        same_fn (SpecReboxed fn1 ty1 p1 _) (SpecReboxed fn2 ty2 p2 _)
           = getOccName fn1 == getOccName fn2 && p1 == p2
             && nameSrcSpan (rebox_loc_name fn1 p1) == nameSrcSpan (rebox_loc_name fn2 p2)
+            && ty1 `eqType` ty2
         same_fn _ _ = False
 
     -- The definition site shown in a reboxing warning: the fn's own when
@@ -831,13 +833,22 @@ specConstrProgram guts
     -- See Note [Reboxing warning]
     rebox_msg :: SpecConstrWarning -> SDoc
     rebox_msg w@(SpecFailForcedArgCount {}) = pprPanic "rebox_msg" (ppr w)
-    rebox_msg (SpecReboxed fn mb_parent cons)
-      = vcat [ text "SpecConstr specialised" <+> quotes (ppr fn) <+> pp_site
+    rebox_msg (SpecReboxed fn ty mb_parent cons)
+      = vcat [ hang (text "SpecConstr specialised"
+                       <+> quotes (ppr fn <+> dcolon <+> pp_ty))
+                  2 pp_site
              , text "on a constructor argument" <+> parens (pprWithCommas pp_con cons)
                  <+> text "that is also used boxed (\"reboxing\")."
              , text "Reboxing can increase allocation and defeat pointer-equality-based sharing."
              , text "See -Wspec-constr-reboxing in the users guide for possible remedies." ]
       where
+        -- Truncate only pathologically large types
+        pp_ty = sdocWithContext $ \ctx ->
+                  case splitAt 10000 (showSDocOneLine ctx pp_tidy) of
+                    (_, [])        -> pp_tidy
+                    (prefix, _)    -> text prefix <> text "..."
+          where pp_tidy = ppr (tidyTopType ty)
+
         pp_site = parens $ case mb_parent of
           Just parent -> text "in" <+> quotes (ppr parent) <> comma
                          <+> pp_defn (rebox_loc_name fn mb_parent)
@@ -1497,14 +1508,17 @@ that decision bites, without changing which specialisations are made:
   `specialise` turns surviving patterns with a non-empty cp_rebox into
   SpecReboxed warnings, which specConstrProgram emits under
   -Wspec-constr-reboxing (off by default), one warning per function with
-  the reboxed constructors of all its patterns merged.  Warnings that
-  would render identically — same name, parent, and definition site —
-  are merged too, their constructor lists combined: the reader could not
-  tell them apart, so printing both is noise.  For located functions the
-  merged warnings are simplifier-made copies of one binding, addressed
-  by a single source-level remedy; span-less loops inlined from other
-  modules (last bullet below) may merge across genuinely different
-  origins, but none of them can be located anyway.
+  the reboxed constructors of all its patterns merged.  The warning shows
+  the function's type: names like `go1` say nothing, and for span-less
+  functions (last bullet below) the type is the main identifying clue.
+  Warnings that would render identically — same name, type, parent, and
+  definition site — are merged too, their constructor lists combined: the
+  reader could not tell them apart, so printing both is noise.  For
+  located functions the merged warnings are simplifier-made copies of one
+  binding, addressed by a single source-level remedy; span-less loops
+  inlined from other modules can in principle merge across different
+  origins, but sharing name and type they are almost certainly copies of
+  one function.
 
 * Nullary constructors are exempt: "reboxing" a nullary constructor just
   references its shared static closure, so it costs no allocation and even
@@ -2087,7 +2101,7 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
         ; let n_pats = length new_pats
               -- Warn about committed specialisations that will rebox;
               -- see Note [Reboxing warning]
-              rebox_ws = [ SpecReboxed (idName fn) (sc_top_fn env) (cp_rebox p)
+              rebox_ws = [ SpecReboxed (idName fn) (idType fn) (sc_top_fn env) (cp_rebox p)
                          | p <- new_pats, not (null (cp_rebox p)) ]
 --        ; when (not (null new_pats) || isJust mb_unspec) $
 --          pprTraceM "specialise" (vcat [ ppr fn <+> text "with" <+> int n_pats <+> text "good patterns"
@@ -2668,17 +2682,18 @@ instance Outputable CallPat where
 data SpecConstrWarning
   = SpecFailForcedArgCount { spec_failed_fun_name :: Name }
   | SpecReboxed { spec_rebox_fun_name :: Name    -- The specialised function
+                , spec_rebox_fun_ty :: Type      -- Its type: often the only clue
+                                                 -- to a span-less function's identity
                 , spec_rebox_parent :: Maybe Name -- Its enclosing top-level
                                                   -- binder, if fn is local
                 , spec_rebox_cons :: [Name] }    -- The reboxed constructor(s)
     -- See Note [Reboxing warning]
-  deriving Eq
 
 type SpecConstrWarnings = [SpecConstrWarning]
 
 instance Outputable SpecConstrWarning where
   ppr (SpecFailForcedArgCount name) = ppr name <+> pprDefinedAt name
-  ppr (SpecReboxed fn mb_parent dcs)
+  ppr (SpecReboxed fn _ty mb_parent dcs)
     = ppr fn <+> parens (pprWithCommas ppr dcs) <+> pp_defn
     where
       -- A local fn often has no useful location; point at its

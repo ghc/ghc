@@ -1,11 +1,14 @@
 ./T27628h_M.hs: warning: [-Wspec-constr-reboxing]
-    SpecConstr specialised ‘poly_merge’ (defined at T27628h_M.hs:11:5)
+    SpecConstr specialised ‘poly_merge :: forall a. T a -> T a -> T a’
+      (defined at T27628h_M.hs:11:5)
     on a constructor argument (‘Bin’) that is also used boxed ("reboxing").
     Reboxing can increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.
 
 T27628h.hs: warning: [-Wspec-constr-reboxing]
-    SpecConstr specialised ‘merge’ (inlined from another module; no source location)
+    SpecConstr specialised ‘merge :: T Int -> T Int -> T Int’
+      (inlined from another module; no source location)
     on a constructor argument (‘T27628h_M.Bin’) that is also used boxed ("reboxing").
     Reboxing can increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.
+
