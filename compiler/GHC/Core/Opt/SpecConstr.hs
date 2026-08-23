@@ -812,15 +812,13 @@ specConstrProgram guts
         | w@(SpecReboxed fn parent _) <- nubBy same_fn ws ]
       where
         -- Merge warnings that would render identically: same occurrence
-        -- name, parent, and displayed location. Such duplicates are
-        -- simplifier-made copies of one binding, so a single source-level
-        -- remedy addresses all of them. Distinct same-named locals have
-        -- distinct definition sites and stay separate.
+        -- name, parent, and displayed location. The reader could not tell
+        -- them apart, so printing both is noise; see Note [Reboxing warning].
+        -- Distinct located functions differ in name or location and stay
+        -- separate.
         same_fn (SpecReboxed fn1 p1 _) (SpecReboxed fn2 p2 _)
-          | isJust p1 || isJust p2
           = getOccName fn1 == getOccName fn2 && p1 == p2
             && nameSrcSpan (rebox_loc_name fn1 p1) == nameSrcSpan (rebox_loc_name fn2 p2)
-          | otherwise = fn1 == fn2
         same_fn _ _ = False
 
     -- The definition site shown in a reboxing warning: the fn's own when
@@ -1501,8 +1499,12 @@ that decision bites, without changing which specialisations are made:
   -Wspec-constr-reboxing (off by default), one warning per function with
   the reboxed constructors of all its patterns merged.  Warnings that
   would render identically — same name, parent, and definition site —
-  come from simplifier-made copies of one binding, so they are merged
-  too: a single source-level remedy addresses all of them.
+  are merged too, their constructor lists combined: the reader could not
+  tell them apart, so printing both is noise.  For located functions the
+  merged warnings are simplifier-made copies of one binding, addressed
+  by a single source-level remedy; span-less loops inlined from other
+  modules (last bullet below) may merge across genuinely different
+  origins, but none of them can be located anyway.
 
 * Nullary constructors are exempt: "reboxing" a nullary constructor just
   references its shared static closure, so it costs no allocation and even

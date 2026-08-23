@@ -534,7 +534,9 @@ of ``-W(no-)*``.
     the call-pattern analysis by wrapping the argument in ``GHC.Exts.lazy``
     at the call site, or :ghc-flag:`-fno-spec-constr`.
 
-    One warning is emitted per specialised function. Warnings about local
+    One warning is emitted per specialised function, and warnings that
+    would read identically are merged into one, with their constructor
+    lists combined. Warnings about local
     functions also name the enclosing top-level binding and point at the
     local function's definition site. Specialisations on
     nullary constructors are not reported, since "reboxing" a nullary

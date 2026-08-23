@@ -1,0 +1,18 @@
+./T27628i_M.hs: warning: [-Wspec-constr-reboxing]
+    SpecConstr specialised ‘poly_merge’ (defined at T27628i_M.hs:23:5)
+    on a constructor argument (‘Node’) that is also used boxed ("reboxing").
+    Reboxing can increase allocation and defeat pointer-equality-based sharing.
+    See -Wspec-constr-reboxing in the users guide for possible remedies.
+
+./T27628i_M.hs: warning: [-Wspec-constr-reboxing]
+    SpecConstr specialised ‘poly_merge’ (defined at T27628i_M.hs:13:5)
+    on a constructor argument (‘Bin’) that is also used boxed ("reboxing").
+    Reboxing can increase allocation and defeat pointer-equality-based sharing.
+    See -Wspec-constr-reboxing in the users guide for possible remedies.
+
+T27628i.hs: warning: [-Wspec-constr-reboxing]
+    SpecConstr specialised ‘merge’ (inlined from another module; no source location)
+    on a constructor argument (‘T27628i_M.Node’,
+                               ‘T27628i_M.Bin’) that is also used boxed ("reboxing").
+    Reboxing can increase allocation and defeat pointer-equality-based sharing.
+    See -Wspec-constr-reboxing in the users guide for possible remedies.
