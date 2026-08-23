@@ -3,7 +3,7 @@
       source:                T27628h_M.hs:11:5
       recursivity:           self-recursive
       called from:           ‘f’
-      reboxed constructors:  ‘Bin’
+      call pattern:          poly_merge (Bin _ _ _) (reboxing ‘Bin’)
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.
@@ -13,7 +13,7 @@ T27628h.hs: warning: [-Wspec-constr-reboxing]
       source:                inlined from another module (no source location)
       recursivity:           self-recursive
       called from:           ‘g’
-      reboxed constructors:  ‘T27628h_M.Bin’
+      call pattern:          merge (Bin _ _ _) (reboxing ‘T27628h_M.Bin’)
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.

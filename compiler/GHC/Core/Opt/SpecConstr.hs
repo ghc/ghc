@@ -48,7 +48,7 @@ import GHC.Unit.Module.ModGuts
 
 import GHC.Types.InlinePragma
 import GHC.Types.Error (DiagnosticReason(..))
-import GHC.Types.Literal ( litIsLifted )
+import GHC.Types.Literal ( Literal, litIsLifted )
 import GHC.Types.Id
 import GHC.Types.Id.Info ( IdDetails(..) )
 import GHC.Types.Var.Env
@@ -806,34 +806,41 @@ specConstrProgram guts
                         nest 2 (vcat (map ppr warnings)) $$
                         (text "If this is expected you might want to increase -fmax-forced-spec-args to force specialization anyway.")
 
-    -- One warning per specialised function (constructors of all its
-    -- patterns merged), then warnings that would render identically
-    -- merged too; see Note [Reboxing warning]
+    -- One warning per specialised function (all its patterns listed),
+    -- then warnings that would render identically merged too; see
+    -- Note [Reboxing warning]
     aggregateRebox :: SpecConstrWarnings -> SpecConstrWarnings
     aggregateRebox = mergeBy same_render . mergeBy same_fn
       where
         mergeBy eq ws
-          = [ SpecReboxed fn ty parent recur (nub (concat conss)) (nub (concat callerss))
+          = [ SpecReboxed fn ty parent recur (nubBy same_pat (concat patss)) (nub (concat callerss))
             | w@(SpecReboxed fn ty parent recur _ _) <- nubBy eq ws
-            , let (conss, callerss) = unzip [ (cons, callers)
-                                            | w'@(SpecReboxed _ _ _ _ cons callers) <- ws
+            , let (patss, callerss) = unzip [ (pats, callers)
+                                            | w'@(SpecReboxed _ _ _ _ pats callers) <- ws
                                             , eq w w' ] ]
 
-        same_fn (SpecReboxed fn1 _ _ _ _ _) (SpecReboxed fn2 _ _ _ _ _) = fn1 == fn2
+        -- Also compare the parents: the fn Name alone is ambiguous
+        -- between top-level bindings; see Note [Reboxing warning]
+        same_fn (SpecReboxed fn1 _ p1 _ _ _) (SpecReboxed fn2 _ p2 _ _ _)
+          = fn1 == fn2 && p1 == p2
         same_fn _ _ = False
 
         -- Merge warnings that would render identically: same occurrence
         -- name, type, parent, displayed location, recursivity, and
-        -- constructors. The reader could not tell them apart, so printing
+        -- patterns. The reader could not tell them apart, so printing
         -- both is noise; see Note [Reboxing warning].  Callers are
         -- aggregated, not compared.
-        same_render (SpecReboxed fn1 ty1 p1 r1 cons1 _) (SpecReboxed fn2 ty2 p2 r2 cons2 _)
+        same_render (SpecReboxed fn1 ty1 p1 r1 pats1 _) (SpecReboxed fn2 ty2 p2 r2 pats2 _)
           = getOccName fn1 == getOccName fn2 && p1 == p2
             && nameSrcSpan (rebox_loc_name fn1 p1) == nameSrcSpan (rebox_loc_name fn2 p2)
             && ty1 `eqType` ty2
             && r1 `same_recur` r2
-            && sortBy stableNameCmp cons1 == sortBy stableNameCmp cons2
+            && equalLength pats1 pats2
+            && and (zipWith same_pat (sortBy cmpReboxedPat pats1)
+                                     (sortBy cmpReboxedPat pats2))
         same_render _ _ = False
+
+        same_pat p1 p2 = cmpReboxedPat p1 p2 == EQ
 
         -- Recursivity as displayed: siblings compare by occurrence name,
         -- so span-less copies of one mutual group still merge
@@ -854,14 +861,14 @@ specConstrProgram guts
     -- See Note [Reboxing warning]
     rebox_msg :: SpecConstrWarning -> SDoc
     rebox_msg w@(SpecFailForcedArgCount {}) = pprPanic "rebox_msg" (ppr w)
-    rebox_msg (SpecReboxed fn ty mb_parent recur cons callers)
+    rebox_msg (SpecReboxed fn ty mb_parent recur pats callers)
       = vcat [ hang (text "SpecConstr specialised") 2
                     (quotes (ppr fn <+> dcolon <+> pp_ty))
              , nest 2 $ vcat $ catMaybes
                  [ Just (fact "source:" pp_source)
                  , Just (fact "recursivity:" pp_recur)
                  , fact "called from:" <$> pp_callers
-                 , Just (fact "reboxed constructors:" pp_cons) ]
+                 , Just (fact pats_label pp_pats) ]
              , pp_trailer
              , text "See -Wspec-constr-reboxing in the users guide for possible remedies." ]
       where
@@ -907,7 +914,16 @@ specConstrProgram guts
           [] -> Nothing
           cs -> Just (pprWithCommas (quotes . ppr) cs)
 
-        pp_cons = vcat (map pp_con (sortBy stableNameCmp cons))
+        pats_label = case pats of
+          [_] -> "call pattern:"
+          _   -> "call patterns:"
+
+        pp_pats = vcat (map pp_pat (sortBy cmpReboxedPat pats))
+
+        pp_pat (ReboxedPat shapes cons)
+          = hang (hang (ppr fn) 2 (fsep (map pprPatShape shapes))) 2
+                 (parens (text "reboxing" <+>
+                          pprWithCommas pp_con (sortBy stableNameCmp cons)))
 
         -- Qualify imported constructors: they identify the package to
         -- follow up with when the function itself has no location
@@ -916,7 +932,9 @@ specConstrProgram guts
           = quotes (ppr m <> dot <> ppr con)
           | otherwise = quotes (ppr con)
 
-        pp_trailer = fsep $ map text $ words $ case cons of
+        all_cons = nub [ con | ReboxedPat _ cons <- pats, con <- cons ]
+
+        pp_trailer = fsep $ map text $ words $ case all_cons of
           [_] -> "This constructor argument is also used boxed, so the specialisation may increase allocation and defeat pointer-equality-based sharing."
           _   -> "These constructor arguments are also used boxed, so the specialisations may increase allocation and defeat pointer-equality-based sharing."
 scTopBinds :: ScEnv -> [InBind] -> UniqSM (ScUsage, [OutBind], [SpecConstrWarning])
@@ -1562,12 +1580,27 @@ that decision bites, without changing which specialisations are made:
   BoxOther, the constructor's Name is recorded in the pattern (cp_rebox);
   `specialise` turns surviving patterns with a non-empty cp_rebox into
   SpecReboxed warnings, which specConstrProgram emits under
-  -Wspec-constr-reboxing (off by default), one warning per function with
-  the reboxed constructors of all its patterns merged.  The warning shows
+  -Wspec-constr-reboxing (off by default).
+
+* One warning per function, listing each call pattern the function was
+  specialised for — the constructor skeletons of the call's arguments,
+  e.g. `go (_ : _) (BMap _)` — alongside that pattern's reboxed
+  constructors.  The shapes show where in the argument each reboxed
+  constructor sits, and picture what SpecConstr did: it made a copy of
+  the function for calls of exactly that shape.  The warning also shows
   the function's type: names like `go1` say nothing, and for span-less
   functions (last bullet below) the type is the main identifying clue.
+
+  "Per function" means per (parent, function) *pair*: the function's
+  Name alone is ambiguous, because distinct top-level bindings can bind
+  distinct locals that share a unique.  That happens when several
+  bindings inline one stable unfolding (e.g. a class's default-method
+  template): each copy keeps the template's uniques, and the simplifier
+  only freshens a binder on an in-scope clash, which cannot arise
+  between sibling top-level RHSs.
+
   Warnings that would render identically — same name, type, parent,
-  definition site, and constructors — are merged too: the
+  definition site, recursivity, and patterns — are merged too: the
   reader could not tell them apart, so printing both is noise.  For
   located functions the merged warnings are simplifier-made copies of one
   binding, addressed by a single source-level remedy; span-less loops
@@ -2186,7 +2219,8 @@ specialise env recur bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
               -- Warn about committed specialisations that will rebox;
               -- see Note [Reboxing warning]
               rebox_ws = [ SpecReboxed (idName fn) (idType fn) (sc_top_fn env)
-                                       recur (cp_rebox p) (cp_callers p)
+                                       recur [ReboxedPat (patShapes p) (cp_rebox p)]
+                                       (cp_callers p)
                          | p <- new_pats, not (null (cp_rebox p)) ]
 --        ; when (not (null new_pats) || isJust mb_unspec) $
 --          pprTraceM "specialise" (vcat [ ppr fn <+> text "with" <+> int n_pats <+> text "good patterns"
@@ -2768,6 +2802,78 @@ instance Outputable CallPat where
                                , text "cp_rebox = " <> ppr rebox
                                , text "cp_callers = " <> ppr callers ])
 
+-- | One call pattern as displayed by the reboxing warning: the shapes of
+-- the pattern's arguments, and the reboxed constructors among them.
+-- See Note [Reboxing warning]
+data ReboxedPat = ReboxedPat [PatShape] [Name]
+
+-- | The constructor skeleton of one call-pattern argument, as displayed
+-- by the reboxing warning
+data PatShape = ShapeWild
+              | ShapeLit Literal
+              | ShapeCon DataCon [PatShape]
+
+-- | The displayed shapes of a pattern's value arguments
+patShapes :: CallPat -> [PatShape]
+patShapes (CP { cp_args = args }) = mapMaybe arg_shape args
+  where
+    arg_shape (Type {})     = Nothing
+    arg_shape (Coercion {}) = Nothing
+    arg_shape (Cast e _)    = arg_shape e
+    arg_shape (Tick _ e)    = arg_shape e
+    arg_shape (Lit l)       = Just (ShapeLit l)
+    arg_shape e
+      | (Var f, f_args) <- collectArgs e
+      , Just dc <- isDataConWorkId_maybe f
+      = Just (ShapeCon dc (mapMaybe arg_shape f_args))
+      | otherwise
+      = Just ShapeWild
+
+-- | Stable comparison, used both to merge identically-rendering warnings
+-- and to order a warning's patterns deterministically
+cmpReboxedPat :: ReboxedPat -> ReboxedPat -> Ordering
+cmpReboxedPat (ReboxedPat ss1 cs1) (ReboxedPat ss2 cs2)
+  = cmpListBy cmpShape ss1 ss2
+    `mappend` cmpListBy stableNameCmp (sortBy stableNameCmp cs1)
+                                      (sortBy stableNameCmp cs2)
+
+cmpShape :: PatShape -> PatShape -> Ordering
+cmpShape ShapeWild        ShapeWild        = EQ
+cmpShape ShapeWild        _                = LT
+cmpShape _                ShapeWild        = GT
+cmpShape (ShapeLit l1)    (ShapeLit l2)    = compare l1 l2
+cmpShape (ShapeLit _)     _                = LT
+cmpShape _                (ShapeLit _)     = GT
+cmpShape (ShapeCon c1 a1) (ShapeCon c2 a2)
+  = stableNameCmp (dataConName c1) (dataConName c2)
+    `mappend` cmpListBy cmpShape a1 a2
+
+cmpListBy :: (a -> a -> Ordering) -> [a] -> [a] -> Ordering
+cmpListBy _   []       []       = EQ
+cmpListBy _   []       _        = LT
+cmpListBy _   _        []       = GT
+cmpListBy cmp (x1:xs1) (x2:xs2) = cmp x1 x2 `mappend` cmpListBy cmp xs1 xs2
+
+-- Constructors are shown by bare occurrence name: shapes illustrate,
+-- while the warning's "reboxing" list identifies (with qualification)
+pprPatShape :: PatShape -> SDoc
+pprPatShape = go (10 :: Int)   -- Depth cap against pathological patterns
+  where
+    go _ ShapeWild        = underscore
+    go _ (ShapeLit l)     = ppr l
+    go _ (ShapeCon dc []) = ppr (getOccName dc)
+    go 0 (ShapeCon {})    = text "..."
+    go d (ShapeCon dc args)
+      | isTupleDataCon dc
+      = parens (pprWithCommas (go d') args)
+      | isUnboxedTupleDataCon dc
+      = text "(#" <+> pprWithCommas (go d') args <+> text "#)"
+      | dataConIsInfix dc, [a1, a2] <- args
+      = parens (go d' a1 <+> pprInfixOcc (getOccName dc) <+> go d' a2)
+      | otherwise
+      = parens (pprPrefixOcc (getOccName dc) <+> sep (map (go d') args))
+      where d' = d - 1
+
 -- | How the function that SpecConstr specialised recurses, as bound in
 -- the post-optimisation program.  See Note [Reboxing warning]
 data ReboxRecursivity
@@ -2783,7 +2889,7 @@ data SpecConstrWarning
                 , spec_rebox_parent :: Maybe Name -- Its enclosing top-level
                                                   -- binder, if fn is local
                 , spec_rebox_recur :: ReboxRecursivity
-                , spec_rebox_cons :: [Name]      -- The reboxed constructor(s)
+                , spec_rebox_pats :: [ReboxedPat] -- The patterns that rebox
                 , spec_rebox_callers :: [Name] } -- Top-level binders containing
                                                  -- the specialised calls
     -- See Note [Reboxing warning]
@@ -2792,9 +2898,10 @@ type SpecConstrWarnings = [SpecConstrWarning]
 
 instance Outputable SpecConstrWarning where
   ppr (SpecFailForcedArgCount name) = ppr name <+> pprDefinedAt name
-  ppr (SpecReboxed fn _ty mb_parent _recur dcs _callers)
+  ppr (SpecReboxed fn _ty mb_parent _recur pats _callers)
     = ppr fn <+> parens (pprWithCommas ppr dcs) <+> pp_defn
     where
+      dcs = [ dc | ReboxedPat _ cons <- pats, dc <- cons ]
       -- A local fn often has no useful location; point at its
       -- enclosing top-level binder instead
       pp_defn = case mb_parent of

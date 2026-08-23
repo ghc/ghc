@@ -543,12 +543,14 @@ of ``-W(no-)*``.
     group), or non-recursive (for example a join point), as bound in the
     optimised program, whose shape can differ from the source's;
     ``called from:`` — the top-level bindings containing the specialised
-    calls; ``reboxed constructors:`` — the constructors the
-    specialisation reboxes. One warning is emitted per specialised
-    function, and warnings that would read identically are merged into
-    one. Specialisations on nullary constructors are not reported, since
-    "reboxing" a nullary constructor simply references its shared static
-    closure.
+    calls; ``call patterns:`` — the calls the function was specialised
+    for, shown as the constructor skeletons of their arguments (for
+    example ``go (_ : _) (Bin _ _ _)``), each alongside the constructors
+    that the specialisation reboxes. One warning is emitted per
+    specialised function, and warnings that would read identically are
+    merged into one. Specialisations on nullary constructors are not
+    reported, since "reboxing" a nullary constructor simply references
+    its shared static closure.
 
     A ``source:`` reading ``inlined from another module (no source
     location)`` concerns a function that reached the module being compiled

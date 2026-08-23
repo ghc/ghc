@@ -3,7 +3,7 @@
       source:                T27628i_M.hs:36:5
       recursivity:           self-recursive
       called from:           ‘f3’
-      reboxed constructors:  ‘Bin’
+      call pattern:          poly_merge (Bin _ _ _) (reboxing ‘Bin’)
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.
@@ -13,7 +13,7 @@
       source:                T27628i_M.hs:24:5
       recursivity:           self-recursive
       called from:           ‘f2’
-      reboxed constructors:  ‘Node’
+      call pattern:          poly_merge (Node _ _ _) (reboxing ‘Node’)
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.
@@ -23,7 +23,7 @@
       source:                T27628i_M.hs:14:5
       recursivity:           self-recursive
       called from:           ‘f1’
-      reboxed constructors:  ‘Bin’
+      call pattern:          poly_merge (Bin _ _ _) (reboxing ‘Bin’)
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.
@@ -33,7 +33,7 @@ T27628i.hs: warning: [-Wspec-constr-reboxing]
       source:                inlined from another module (no source location)
       recursivity:           self-recursive
       called from:           ‘g1’, ‘g3’
-      reboxed constructors:  ‘T27628i_M.Bin’
+      call pattern:          merge (Bin _ _ _) (reboxing ‘T27628i_M.Bin’)
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.
@@ -43,7 +43,8 @@ T27628i.hs: warning: [-Wspec-constr-reboxing]
       source:                inlined from another module (no source location)
       recursivity:           self-recursive
       called from:           ‘g2’
-      reboxed constructors:  ‘T27628i_M.Node’
+      call pattern:          merge (Node _ _ _)
+                               (reboxing ‘T27628i_M.Node’)
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.

@@ -3,7 +3,7 @@ T27628f.hs: warning: [-Wspec-constr-reboxing]
       source:                ‘f’ at T27628f.hs:12:5
       recursivity:           self-recursive
       called from:           ‘f’
-      reboxed constructors:  ‘Bin’
+      call pattern:          merge (Bin _ _ _) (reboxing ‘Bin’)
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.
