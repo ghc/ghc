@@ -53,11 +53,11 @@ fon x =
           ;;;   -- case 4
 ;
 
-f :: Int
-f = let ; x = 1
+g :: Int
+g = let ; x = 1
         ; y = 2
     in x + y
 
-g :: Int
-g = h
-  where ;; h = 3
+h :: Int
+h = i
+  where ;; i = 3
