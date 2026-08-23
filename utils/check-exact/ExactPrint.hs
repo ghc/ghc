@@ -117,8 +117,9 @@ runEP epReader action = do
 defaultEPState :: EPState
 defaultEPState = EPState
              { uAnchorSpan = badRealSrcSpan
-             , uExtraDP = Nothing
-             , uExtraDPReturn = Nothing
+
+             , uListLayout = []
+
              , pAcceptSpan = False
 
              , epPos       = (1,1)
@@ -177,14 +178,21 @@ data LayoutFrame = LayoutFrame
   , lfResolved :: !(Maybe LayoutStartCol) -- ^ column of the first token printed in this scope
   }
 
+data ListLayoutFrame = ListLayoutFrame
+  { _llfAnchor      :: !(Maybe EpaLocation) -- ^ When printing a list, this is the offset of the list
+  , llfAnchorReturn :: !(Maybe EpaLocation) -- ^ Return delta version of the list offset
+  }
+  -- temporary
+  deriving (Data)
+
+
 data EPState = EPState
              { uAnchorSpan :: !RealSrcSpan -- ^ in pre-changed AST
-                                          -- reference frame, from
-                                          -- Annotation
-             , uExtraDP :: !(Maybe EpaLocation) -- ^ Used to anchor a
-                                                -- list
-             , uExtraDPReturn :: !(Maybe EpaLocation)
-                  -- ^ Used to return Delta version of uExtraDP
+                                           -- reference frame, from
+                                           -- Annotation
+
+             , uListLayout :: [ListLayoutFrame]
+
              , pAcceptSpan :: Bool -- ^ When we have processed an
                                    -- entry of EpaDelta, accept the
                                    -- next `EpaSpan` start as the
@@ -461,8 +469,7 @@ enterAnn !(Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
         EpaDelta _ dp _ -> dp
         _ -> edp'
   -- ---------------------------------------------
-  med <- getExtraDP
-  setExtraDP Nothing
+  med <- getListLayoutAnchor
   let (edp, medr) = case med of
         Nothing -> (edp'', Nothing)
         Just (EpaDelta _ dp _) -> (dp, Nothing)
@@ -475,7 +482,10 @@ enterAnn !(Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
         Just (EpaSpan (UnhelpfulSpan r)) -> panic $ "enterAnn: UnhelpfulSpan:" ++ show r
         Just (EpaSpan (GeneratedSrcSpan r)) -> panic $ "enterAnn: UnhelpfulSpan:" ++ show r
   when (isJust med) $ debugM $ "enterAnn:(med,edp)=" ++ showAst (med,edp)
-  when (isJust medr) $ setExtraDPReturn medr
+  case medr of
+    Just edr -> setListLayoutReturn edr
+    Nothing -> return ()
+
   -- ---------------------------------------------
   -- Preparation complete, perform the action
   let spanStart = ss2pos curAnchor
@@ -782,13 +792,12 @@ markEpUniToken (EpUniTok aa isUnicode)  = do
 markEpTokenExtra :: forall m w tok . (Monad m, Monoid w, KnownSymbol tok)
   => EpToken tok -> EP w m (EpToken tok)
 markEpTokenExtra (EpTok aa) = do
-  med <- getExtraDP
+  med <- getListLayoutAnchor
   case (med, aa) of
     (Nothing, _) -> EpTok <$> printStringAtAA aa (symbolVal (Proxy @tok))
     -- a token with no location prints nothing: leave extraDP pending
     -- for whatever really comes first
     (Just (EpaSpan s@(RealSrcSpan r _)), _) -> do
-      setExtraDP Nothing
 
       -- TODO:AZ: check how this works, on exact print side.
       --          Set the returned extra dp to take account of comments
@@ -805,19 +814,17 @@ markEpTokenExtra (EpTok aa) = do
                          (srcLocCol start + length symbolStr)
           s' = mkSrcSpan (srcSpanStart s) end
       aa' <- printStringAtAA (EpaSpan s') symbolStr
-      setExtraDPReturn (Just aa')
+      setListLayoutReturn aa'
       -- The layout will position things, so the delta for this token becomes zero
       -- TODO:AZ: How can comments intervene? This should always be zero.
       --          And this dp sorts out printing after delta. It should have
       --           zero impact on first pass.
       return (EpTok (EpaDelta s dp []))
     (Just _, EpaDelta{}) -> do
-      setExtraDP Nothing
       EpTok <$> printStringAtAA aa (symbolVal (Proxy @tok))  -- own delta already correct
     (Just d@EpaDelta{}, _) -> do
-      setExtraDP Nothing
       aa' <- printStringAtAA d (symbolVal (Proxy @tok))
-      setExtraDPReturn (Just aa')
+      setListLayoutReturn aa'
       return (EpTok aa')
     (_, _) -> return (EpTok aa)
 
@@ -1256,16 +1263,17 @@ markAnnListA (AnnList la semis) action = do
            -- The next non-comment thing that prints will use 'anc' as
            -- its anchor, in addition to whatever it has. So the list
            -- as a whole is anchored at this point
-           setExtraDP (Just anc)
+           pushListLayout anc
            -- The semis are included in layout too
            (r0, semis') <- setLayoutBoth $ do
              semis0 <- mapM markEpTokenExtra semis
              r0' <- action
              return (r0', semis0)
            -- Retrieve the updated anchor, for 'makeDelta' processing
-           medr <- getExtraDPReturn
+           medr <- popListLayout
            -- Always reset, in case the list was empty ('action' printed nothing)
-           setExtraDPReturn Nothing
+           -- AZ:not needed, we have a stack for this, action returns immediately, pop
+           -- clearExtraDPReturn
            return (r0, semis', EpVirtualBraces (fromMaybe anc medr))
          EpNoLayout -> do
            semis' <- mapM markEpToken semis
@@ -1312,7 +1320,9 @@ printOneComment c@(Comment _str loc _r _mo) = do
         debugM $ "printOneComment:(dp,pe,loc)=" ++ showGhc (dp,pe,loc)
         adjustDeltaForOffsetM dp
     EpaSpan _ -> return (SameLine 0)
-  mep <- getExtraDP
+  -- TODO:AZ: does this still make sense?
+  --          I think so, leading comments for a list item, transferred as a unit
+  mep <- peekListLayoutAnchor
   dp' <- case mep of
     Just (EpaDelta _ edp _) -> do
       debugM $ "printOneComment:edp=" ++ show edp
@@ -1330,8 +1340,8 @@ updateAndApplyComment (Comment str anc pp mo) dp = do
   applyComment (Comment str anc' pp mo)
   where
     ss = case anc of
-        EpaSpan ss' -> ss'
-        _          -> noSrcSpan
+        EpaSpan ss'       -> ss'
+        EpaDelta ss' _ _  -> ss'
     anc' = EpaDelta ss dp NoComments
 
 -- ---------------------------------------------------------------------
@@ -3504,7 +3514,7 @@ instance ExactPrint (TyClDecl GhcPs) where
       | otherwise       -- Laid out
       = do
           (mods', c', w', vb', fds', lclas', tyvars',context') <- top_matter
-          (al',decls') <- markAnnListA al $ mapM markAnnotated decls
+          (al',decls') <- markAnnListA al $ mapM markAnnotated (filter notDocDecl decls)
           return (ClassDecl {tcdCExt = (AnnClassDecl c' [] [] vb' w' al', lo),
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
@@ -4850,21 +4860,67 @@ setPosP l = do
   debugM $ "setPosP:" ++ show l
   modify (\s -> s {epPos = l})
 
-getExtraDP :: (Monad m, Monoid w) => EP w m (Maybe EpaLocation)
-getExtraDP = gets uExtraDP
+-- ---------------------------------------------------------------------
 
-setExtraDP :: (Monad m, Monoid w) => Maybe EpaLocation -> EP w m ()
-setExtraDP md = do
-  debugM $ "setExtraDP:" ++ show md
-  modify (\s -> s {uExtraDP = md})
+--------
 
-getExtraDPReturn :: (Monad m, Monoid w) => EP w m (Maybe EpaLocation)
-getExtraDPReturn = gets uExtraDPReturn
+-- | Start a new layout frame, with the anchor for the items to be
+--   printed for this layout
+pushListLayout :: (Monad m, Monoid w) => EpaLocation -> EP w m ()
+pushListLayout d = do
+  debugM $ "pushListLayout:" ++ showAst d
+  modify (\s -> s { uListLayout = (ListLayoutFrame (Just d) Nothing):uListLayout s })
+  stack <- gets uListLayout
+  debugM $ "pushListLayout:stack" ++ showAst stack
 
-setExtraDPReturn :: (Monad m, Monoid w) => Maybe EpaLocation -> EP w m ()
-setExtraDPReturn md = do
-  debugM $ "setExtraDPReturn:" ++ show md
-  modify (\s -> s {uExtraDPReturn = md})
+-- | One-shot read of the layout list anchor, so it can be updated on the first
+-- print where it is active
+getListLayoutAnchor :: (Monad m, Monoid w) => EP w m (Maybe EpaLocation)
+getListLayoutAnchor = do
+  r <- peekListLayoutAnchor
+  debugM $ "getListLayoutAnchor:" ++ showAst r
+  let reset [] = []
+      reset (ListLayoutFrame _ rr:t) = (ListLayoutFrame Nothing rr):t
+  modify (\s -> s { uListLayout = reset (uListLayout s) })
+  return r
+
+peekListLayoutAnchor :: (Monad m, Monoid w) => EP w m (Maybe EpaLocation)
+peekListLayoutAnchor = do
+  let val [] = Nothing
+      val (ListLayoutFrame a _:_) = a
+  stack <- gets uListLayout
+  debugM $ "peeklistlayoutanchor:stack:" ++ showAst stack
+  debugM $ "peeklistlayoutanchor:val:" ++ showAst (val stack)
+  return (val stack)
+
+
+setListLayoutReturn :: (Monad m, Monoid w) => EpaLocation -> EP w m ()
+setListLayoutReturn d = do
+  debugM $ "setListLayoutReturn:" ++ showAst d
+  -- TODO:AZ: do we need to gate this so it only updates a Nothing?
+  let update [] = []
+      update (ListLayoutFrame a _:t) = ListLayoutFrame a (Just d):t
+  modify (\s -> s { uListLayout = update (uListLayout s) })
+  stack <- gets uListLayout
+  debugM $ "setListLayoutReturn:stack:" ++ showAst stack
+
+-- | Ends a layout frame, returning the anchor if it has been updated
+-- | to be a delta
+popListLayout :: (Monad m, Monoid w) => EP w m (Maybe EpaLocation)
+popListLayout = do
+  let pop [] = []
+      pop (_:t) = t
+  cur <- gets uListLayout
+  let r = case cur of
+            (h:_) -> llfAnchorReturn h
+            [] -> Nothing
+  modify (\s -> s { uListLayout = pop (uListLayout s) })
+  debugM $ "popListLayout:r" ++ showAst r
+  stack <- gets uListLayout
+  debugM $ "popListLayout:stack:" ++ showAst stack
+  return r
+
+-- ---------------------------------------------------------------------
 
 getPriorEndD :: (Monad m, Monoid w) => EP w m Pos
 getPriorEndD = gets dPriorEndPosition
@@ -4930,7 +4986,9 @@ putUnallocatedComments !cs = modify (\s -> s { epComments = cs } )
 
 -- | Push a fresh stack frame for the applied comments gatherer
 pushAppliedComments  :: (Monad m, Monoid w) => EP w m ()
-pushAppliedComments = modify (\s -> s { epCommentsApplied = []:(epCommentsApplied s) })
+pushAppliedComments = do
+  debugM "pushAppliedComments"
+  modify (\s -> s { epCommentsApplied = []:(epCommentsApplied s) })
 
 -- | Return the comments applied since the last call
 -- takeAppliedComments, and clear them, not popping the stack
@@ -4943,6 +5001,7 @@ takeAppliedComments = do
       return []
     h:t -> do
       modify (\s -> s { epCommentsApplied = []:t })
+      debugM $ "takeAppliedComments:h=" ++ showAst (reverse h)
       return (reverse h)
 
 -- | Return the comments applied since the last call
@@ -4956,6 +5015,7 @@ takeAppliedCommentsPop = do
       return []
     h:t -> do
       modify (\s -> s { epCommentsApplied = t })
+      debugM $ "takeAppliedCommentsPop:h=" ++ showAst (reverse h)
       return (reverse h)
 
 -- | Mark a comment as being applied.  This is used to update comments
