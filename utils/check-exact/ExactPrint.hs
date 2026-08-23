@@ -787,11 +787,30 @@ markEpTokenExtra (EpTok aa) = do
     (Nothing, _) -> EpTok <$> printStringAtAA aa (symbolVal (Proxy @tok))
     -- a token with no location prints nothing: leave extraDP pending
     -- for whatever really comes first
-    (Just d@(EpaSpan (RealSrcSpan _ _)), _) -> do
+    (Just (EpaSpan s@(RealSrcSpan r _)), _) -> do
       setExtraDP Nothing
-      aa' <- printStringAtAA d (symbolVal (Proxy @tok))
+
+      -- TODO:AZ: check how this works, on exact print side.
+      --          Set the returned extra dp to take account of comments
+      !off <- getLayoutOffsetD
+      !priorEndAfterComments <- getPriorEndD
+      let dp = adjustDeltaForOffset off (ss2delta priorEndAfterComments r)
+
+      -- Use the span start with and according to symbol length
+      -- so the dPriorEndPosition ends up correct
+      let symbolStr = symbolVal (Proxy @tok)
+      let start = realSrcSpanStart r
+          end = mkSrcLoc (srcLocFile start)
+                         (srcLocLine start)
+                         (srcLocCol start + length symbolStr)
+          s' = mkSrcSpan (srcSpanStart s) end
+      aa' <- printStringAtAA (EpaSpan s') symbolStr
       setExtraDPReturn (Just aa')
-      return (EpTok aa')
+      -- The layout will position things, so the delta for this token becomes zero
+      -- TODO:AZ: How can comments intervene? This should always be zero.
+      --          And this dp sorts out printing after delta. It should have
+      --           zero impact on first pass.
+      return (EpTok (EpaDelta s dp []))
     (Just _, EpaDelta{}) -> do
       setExtraDP Nothing
       EpTok <$> printStringAtAA aa (symbolVal (Proxy @tok))  -- own delta already correct
@@ -801,23 +820,6 @@ markEpTokenExtra (EpTok aa) = do
       setExtraDPReturn (Just aa')
       return (EpTok aa')
     (_, _) -> return (EpTok aa)
-
---------------------------------------------------------
-  -- let (edp, medr) = case med of
-  --       Nothing -> (edp'', Nothing)
-  --       Just (EpaDelta _ dp _) -> (dp, Nothing)
-  --                  -- Replace original with desired one. Allows all
-  --                  -- list entry values to be DP (1,0)
-  --       Just (EpaSpan ss@(RealSrcSpan r _)) -> (dp, Just (ss, dp))
-  --         where
-  --           dp = adjustDeltaForOffset
-  --                  off (ss2delta priorEndAfterComments r)
-  --       Just (EpaSpan (UnhelpfulSpan r)) -> panic $ "enterAnn: UnhelpfulSpan:" ++ show r
-  --       Just (EpaSpan (GeneratedSrcSpan r)) -> panic $ "enterAnn: UnhelpfulSpan:" ++ show r
-  -- when (isJust med) $ debugM $ "enterAnn:(med,edp)=" ++ showAst (med,edp)
-  -- when (isJust medr) $ setExtraDPReturn medr
-
----------------------------------------------------------
 
 -- ---------------------------------------------------------------------
 
