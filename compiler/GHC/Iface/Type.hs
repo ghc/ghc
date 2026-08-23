@@ -1258,6 +1258,8 @@ Wrinkles:
      The toplevel function type is matched as IfaceFunTy, where we recurse into
      'go' by passing False for 'rank1'.
      The forall in the first argument then skips adding a substitution for 'r2'.
+     The same wrinkle applies to Haddock, which has its own copy of defaulting
+     in 'defaultRuntimeRepVars'.
 
 (W2) 'defaultIfaceTyVarsOfKind' ought to be called only once when printing a
      type.

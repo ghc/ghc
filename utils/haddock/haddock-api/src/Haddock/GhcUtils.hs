@@ -843,37 +843,40 @@ orderedFVs ignore_tvs tys
 
 -------------------------------------------------------------------------------
 
--- | Traverses the type, defaulting type variables of kind 'RuntimeRep' to
--- 'LiftedType'. See 'defaultRuntimeRepVars' in GHC.Iface.Type the original such
+-- | Traverses the type, defaulting top-level type variables of kind 'RuntimeRep' to
+-- 'LiftedType'. See 'defaultIfaceTyVarsOfKind' in GHC.Iface.Type the original such
 -- function working over `IfaceType`'s.
 defaultRuntimeRepVars :: Type -> Type
-defaultRuntimeRepVars = go emptyVarEnv
+defaultRuntimeRepVars = go True emptyVarEnv
   where
-    go :: TyVarEnv () -> Type -> Type
-    go subs (ForAllTy (Bndr var flg) ty)
-      | isRuntimeRepVar var
+    go :: Bool -> TyVarEnv () -> Type -> Type
+    -- See Wrinkle (W1) in Note [Defaulting RuntimeRep variables] in GHC.Iface.Type
+    -- for why we have the 'rank1' parameter.
+    go rank1 subs (ForAllTy (Bndr var flg) ty)
+      | rank1
+      , isRuntimeRepVar var
       , isInvisibleForAllTyFlag flg =
           let subs' = extendVarEnv subs var ()
-           in go subs' ty
+           in go rank1 subs' ty
       | otherwise =
           ForAllTy
-            (Bndr (updateTyVarKind (go subs) var) flg)
-            (go subs ty)
-    go subs (TyVarTy tv)
+            (Bndr (updateTyVarKind (go False subs) var) flg)
+            (go rank1 subs ty)
+    go _ subs (TyVarTy tv)
       | tv `elemVarEnv` subs =
           liftedRepTy
       | otherwise =
-          TyVarTy (updateTyVarKind (go subs) tv)
-    go subs (TyConApp tc tc_args) =
-      TyConApp tc (map (go subs) tc_args)
-    go subs (FunTy af w arg res) =
-      FunTy af (go subs w) (go subs arg) (go subs res)
-    go subs (AppTy t u) =
-      AppTy (go subs t) (go subs u)
-    go subs (CastTy x co) =
-      CastTy (go subs x) co
-    go _ ty@(LitTy{}) = ty
-    go _ ty@(CoercionTy{}) = ty
+          TyVarTy (updateTyVarKind (go False subs) tv)
+    go _ subs (TyConApp tc tc_args) =
+      TyConApp tc (map (go False subs) tc_args)
+    go rank1 subs (FunTy af w arg res) =
+      FunTy af (go False subs w) (go False subs arg) (go rank1 subs res)
+    go _ subs (AppTy t u) =
+      AppTy (go False subs t) (go False subs u)
+    go rank1 subs (CastTy x co) =
+      CastTy (go rank1 subs x) co
+    go _ _ ty@(LitTy{}) = ty
+    go _ _ ty@(CoercionTy{}) = ty
 
 fromMaybeContext :: Maybe (LHsContext DocNameI) -> HsContext DocNameI
 fromMaybeContext Nothing = HsContext noExtField []
