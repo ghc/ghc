@@ -37,6 +37,7 @@ import GHC.Core.Rules
 import GHC.Core.Predicate ( scopedSort, typeDeterminesValue )
 import GHC.Core.Type     hiding ( substTy )
 import GHC.Core.TyCo.Compare ( eqType )
+import GHC.Core.TyCo.Ppr ( pprSigmaType )
 import GHC.Core.TyCo.Tidy ( tidyTopType )
 import GHC.Core.TyCon   (TyCon, tyConName )
 import GHC.Core.Multiplicity
@@ -805,25 +806,32 @@ specConstrProgram guts
                         nest 2 (vcat (map ppr warnings)) $$
                         (text "If this is expected you might want to increase -fmax-forced-spec-args to force specialization anyway.")
 
-    -- One warning per specialised function, reboxed constructors merged;
-    -- see Note [Reboxing warning]
+    -- One warning per specialised function (constructors of all its
+    -- patterns merged), then warnings that would render identically
+    -- merged too; see Note [Reboxing warning]
     aggregateRebox :: SpecConstrWarnings -> SpecConstrWarnings
-    aggregateRebox ws
-      = [ SpecReboxed fn ty parent (nub (concat conss)) (nub (concat callerss))
-        | w@(SpecReboxed fn ty parent _ _) <- nubBy same_fn ws
-        , let (conss, callerss) = unzip [ (cons, callers)
-                                        | w'@(SpecReboxed _ _ _ cons callers) <- ws
-                                        , same_fn w w' ] ]
+    aggregateRebox = mergeBy same_render . mergeBy same_fn
       where
+        mergeBy eq ws
+          = [ SpecReboxed fn ty parent (nub (concat conss)) (nub (concat callerss))
+            | w@(SpecReboxed fn ty parent _ _) <- nubBy eq ws
+            , let (conss, callerss) = unzip [ (cons, callers)
+                                            | w'@(SpecReboxed _ _ _ cons callers) <- ws
+                                            , eq w w' ] ]
+
+        same_fn (SpecReboxed fn1 _ _ _ _) (SpecReboxed fn2 _ _ _ _) = fn1 == fn2
+        same_fn _ _ = False
+
         -- Merge warnings that would render identically: same occurrence
-        -- name, type, parent, and displayed location. The reader could not
-        -- tell them apart, so printing both is noise; see
+        -- name, type, parent, displayed location, and constructors. The
+        -- reader could not tell them apart, so printing both is noise; see
         -- Note [Reboxing warning].  Callers are aggregated, not compared.
-        same_fn (SpecReboxed fn1 ty1 p1 _ _) (SpecReboxed fn2 ty2 p2 _ _)
+        same_render (SpecReboxed fn1 ty1 p1 cons1 _) (SpecReboxed fn2 ty2 p2 cons2 _)
           = getOccName fn1 == getOccName fn2 && p1 == p2
             && nameSrcSpan (rebox_loc_name fn1 p1) == nameSrcSpan (rebox_loc_name fn2 p2)
             && ty1 `eqType` ty2
-        same_fn _ _ = False
+            && sortBy stableNameCmp cons1 == sortBy stableNameCmp cons2
+        same_render _ _ = False
 
     -- The definition site shown in a reboxing warning: the fn's own when
     -- known, otherwise the parent's (e.g. for simplifier-made join points)
@@ -836,38 +844,44 @@ specConstrProgram guts
     rebox_msg :: SpecConstrWarning -> SDoc
     rebox_msg w@(SpecFailForcedArgCount {}) = pprPanic "rebox_msg" (ppr w)
     rebox_msg (SpecReboxed fn ty mb_parent cons callers)
-      = vcat [ hang (text "SpecConstr specialised"
-                       <+> quotes (ppr fn <+> dcolon <+> pp_ty))
-                  2 pp_site
-             , text "on a constructor argument" <+> parens (pprWithCommas pp_con cons)
-                 <+> text "that is also used boxed (\"reboxing\")."
-             , text "Reboxing can increase allocation and defeat pointer-equality-based sharing."
+      = vcat [ hang (text "SpecConstr specialised") 2
+                    (quotes (ppr fn <+> dcolon <+> pp_ty))
+             , nest 2 $ vcat $ catMaybes
+                 [ Just (fact "source:" pp_source)
+                 , fact "called from:" <$> pp_callers
+                 , Just (fact "reboxed constructors:" pp_cons) ]
+             , pp_trailer
              , text "See -Wspec-constr-reboxing in the users guide for possible remedies." ]
       where
+        -- Aligned label column; $$ overlaps, so a multi-line value keeps
+        -- its lines aligned under the first
+        fact l v = text l $$ nest 23 v
+
         -- Truncate only pathologically large types
         pp_ty = sdocWithContext $ \ctx ->
                   case splitAt 10000 (showSDocOneLine ctx pp_tidy) of
                     (_, [])        -> pp_tidy
                     (prefix, _)    -> text prefix <> text "..."
-          where pp_tidy = ppr (tidyTopType ty)
-
-        pp_site = parens $ case mb_parent of
-          Just parent -> text "in" <+> quotes (ppr parent) <> comma
-                         <+> pp_defn (rebox_loc_name fn mb_parent)
-          Nothing     -> pp_defn fn
+          where pp_tidy = pprSigmaType (tidyTopType ty)
+                -- pprSigmaType: suppress the printed forall
 
         -- A name with no source span reached this module in an interface
         -- unfolding: iface files record no spans for local binders
-        pp_defn n
-          | isGoodSrcSpan (nameSrcSpan n) = text "defined" <+> pprNameDefnLoc n
-          | otherwise = text "inlined from another module; no source location"
-                        <> pp_callers
+        pp_source = case (mb_parent, isGoodSrcSpan (nameSrcSpan loc_name)) of
+          (Nothing, True)  -> pp_loc
+          (Just p,  True)  -> quotes (ppr p) <+> text "at" <+> pp_loc
+          (Just p,  False) -> quotes (ppr p) <> comma <+> pp_no_loc
+          (Nothing, False) -> pp_no_loc
+          where
+            loc_name  = rebox_loc_name fn mb_parent
+            pp_loc    = ppr (nameSrcLoc loc_name)
+            pp_no_loc = text "inlined from another module (no source location)"
 
-        -- The call sites are the only located code a span-less warning
-        -- can point at
-        pp_callers = case sortBy stableNameCmp (filter (\c -> Just c /= mb_parent) callers) of
-          [] -> empty
-          cs -> semi <+> text "called from" <+> pprWithCommas (quotes . ppr) cs
+        pp_callers = case sortBy stableNameCmp callers of
+          [] -> Nothing
+          cs -> Just (pprWithCommas (quotes . ppr) cs)
+
+        pp_cons = vcat (map pp_con (sortBy stableNameCmp cons))
 
         -- Qualify imported constructors: they identify the package to
         -- follow up with when the function itself has no location
@@ -875,6 +889,10 @@ specConstrProgram guts
           | Just m <- nameModule_maybe con, m /= mg_module guts
           = quotes (ppr m <> dot <> ppr con)
           | otherwise = quotes (ppr con)
+
+        pp_trailer = fsep $ map text $ words $ case cons of
+          [_] -> "This constructor argument is also used boxed, so the specialisation may increase allocation and defeat pointer-equality-based sharing."
+          _   -> "These constructor arguments are also used boxed, so the specialisations may increase allocation and defeat pointer-equality-based sharing."
 scTopBinds :: ScEnv -> [InBind] -> UniqSM (ScUsage, [OutBind], [SpecConstrWarning])
 scTopBinds _env []     = return (nullUsage, [], [])
 scTopBinds env  (b:bs) = do { (usg, b', bs', warnings) <- scBind TopLevel env b $
@@ -1522,8 +1540,8 @@ that decision bites, without changing which specialisations are made:
   the reboxed constructors of all its patterns merged.  The warning shows
   the function's type: names like `go1` say nothing, and for span-less
   functions (last bullet below) the type is the main identifying clue.
-  Warnings that would render identically — same name, type, parent, and
-  definition site — are merged too, their constructor lists combined: the
+  Warnings that would render identically — same name, type, parent,
+  definition site, and constructors — are merged too: the
   reader could not tell them apart, so printing both is noise.  For
   located functions the merged warnings are simplifier-made copies of one
   binding, addressed by a single source-level remedy; span-less loops
@@ -1545,17 +1563,22 @@ that decision bites, without changing which specialisations are made:
   told apart; only when that is missing (e.g. for simplifier-made join
   points) does the warning fall back to the parent's location.
 
+* The warning lists the top-level binders containing the specialised
+  calls ("called from"); each Call records the sc_top_fn of its call
+  site for this purpose.  Self-calls of a top-level loop are dropped as
+  uninformative (in callToPat); a *local* loop's self-calls record its
+  parent, indistinguishable from the parent's entry call, so the parent
+  appears among the callers.
+
 * A function with no source span and no parent reached this module in an
   interface unfolding: iface files record no spans for local binders, and
   such loops typically float to top level in the consuming module.  The
   warning says "inlined from another module" instead of showing an
   unhelpful span.  Imported constructors are shown qualified — with the
   function anonymous, they are what identifies the package to report the
-  reboxing to.  The warning also names the top-level binders containing
-  the specialised calls ("called from"): the call sites are the only
-  located code such a warning can point at, and following the inlining
-  from one of them identifies the reboxed loop.  Each Call records the
-  sc_top_fn of its call site for this purpose.
+  reboxing to.  For such a warning the call sites ("called from") are the
+  only located code to point at: following the inlining from one of them
+  identifies the reboxed loop.
 
 Why BoxPassAlong does not warn: if the callee is specialised at that argument
 position, its RULE rewrites the constructor-shaped call in the specialised

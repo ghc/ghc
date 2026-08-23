@@ -1,7 +1,9 @@
 T27628b.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘merge :: T -> T -> T’
-      (defined at T27628b.hs:10:1)
-    on a constructor argument (‘Bin’) that is also used boxed ("reboxing").
-    Reboxing can increase allocation and defeat pointer-equality-based sharing.
+      source:                T27628b.hs:10:1
+      called from:           ‘f’
+      reboxed constructors:  ‘Bin’
+    This constructor argument is also used boxed, so the specialisation
+    may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.
 

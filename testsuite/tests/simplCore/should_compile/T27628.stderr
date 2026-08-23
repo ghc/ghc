@@ -1,10 +1,13 @@
 T27628.hs: warning: [-Wspec-constr-reboxing]
-    SpecConstr specialised ‘$wgo :: LC
-                                    -> GHC.Internal.Prim.Int#
-                                    -> GHC.Internal.Prim.Int#
-                                    -> GHC.Internal.Prim.Int#’
-      (defined at T27628.hs:17:1)
-    on a constructor argument (‘LC’) that is also used boxed ("reboxing").
-    Reboxing can increase allocation and defeat pointer-equality-based sharing.
+    SpecConstr specialised
+      ‘$wgo :: LC
+               -> GHC.Internal.Prim.Int#
+               -> GHC.Internal.Prim.Int#
+               -> GHC.Internal.Prim.Int#’
+      source:                T27628.hs:17:1
+      called from:           ‘f’
+      reboxed constructors:  ‘LC’
+    This constructor argument is also used boxed, so the specialisation
+    may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.
 

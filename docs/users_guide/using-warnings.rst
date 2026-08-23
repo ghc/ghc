@@ -535,25 +535,27 @@ of ``-W(no-)*``.
     at the call site, or :ghc-flag:`-fno-spec-constr`.
 
     The warning shows the specialised function's type, which is often the
-    clearest clue to its identity when its name carries no meaning. One
-    warning is emitted per specialised function, and warnings that
-    would read identically are merged into one, with their constructor
-    lists combined. Warnings about local
-    functions also name the enclosing top-level binding and point at the
-    local function's definition site. Specialisations on
-    nullary constructors are not reported, since "reboxing" a nullary
-    constructor simply references its shared static closure.
+    clearest clue to its identity when its name carries no meaning,
+    followed by a block of labelled facts: ``source:`` — the function's
+    definition site (for a local function, also the enclosing top-level
+    binding); ``called from:`` — the top-level bindings containing the
+    specialised calls; ``reboxed constructors:`` — the constructors the
+    specialisation reboxes. One warning is emitted per specialised
+    function, and warnings that would read identically are merged into
+    one. Specialisations on nullary constructors are not reported, since
+    "reboxing" a nullary constructor simply references its shared static
+    closure.
 
-    A warning reading ``inlined from another module; no source location``
-    concerns a function that reached the module being compiled through
-    another module's unfolding; interface files record no source locations
-    for local functions. Such reboxing cannot be addressed in the module
-    being compiled — consider reporting it against the package defining the
-    inlined code. Constructors imported from other modules are shown
-    qualified with their defining module as a hint to where that is. Such a
-    warning also lists the functions containing the specialised calls
-    (``called from``) — following the inlining from one of those call sites
-    identifies the reboxed code.
+    A ``source:`` reading ``inlined from another module (no source
+    location)`` concerns a function that reached the module being compiled
+    through another module's unfolding; interface files record no source
+    locations for local functions. Such reboxing cannot be addressed in
+    the module being compiled — consider reporting it against the package
+    defining the inlined code. Constructors imported from other modules
+    are shown qualified with their defining module as a hint to where that
+    is. For such a warning the ``called from:`` sites are the only located
+    code — following the inlining from one of them identifies the reboxed
+    code.
 
     The analysis behind this warning is approximate: it can both miss genuine
     reboxing and report reboxing that later optimisations eliminate or that
