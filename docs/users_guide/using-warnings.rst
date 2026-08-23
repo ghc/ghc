@@ -538,8 +538,12 @@ of ``-W(no-)*``.
     clearest clue to its identity when its name carries no meaning,
     followed by a block of labelled facts: ``source:`` — the function's
     definition site (for a local function, also the enclosing top-level
-    binding); ``called from:`` — the top-level bindings containing the
-    specialised calls; ``reboxed constructors:`` — the constructors the
+    binding); ``recursivity:`` — whether the function is self-recursive,
+    mutually recursive (naming the other functions of its recursive
+    group), or non-recursive (for example a join point), as bound in the
+    optimised program, whose shape can differ from the source's;
+    ``called from:`` — the top-level bindings containing the specialised
+    calls; ``reboxed constructors:`` — the constructors the
     specialisation reboxes. One warning is emitted per specialised
     function, and warnings that would read identically are merged into
     one. Specialisations on nullary constructors are not reported, since

@@ -813,25 +813,36 @@ specConstrProgram guts
     aggregateRebox = mergeBy same_render . mergeBy same_fn
       where
         mergeBy eq ws
-          = [ SpecReboxed fn ty parent (nub (concat conss)) (nub (concat callerss))
-            | w@(SpecReboxed fn ty parent _ _) <- nubBy eq ws
+          = [ SpecReboxed fn ty parent recur (nub (concat conss)) (nub (concat callerss))
+            | w@(SpecReboxed fn ty parent recur _ _) <- nubBy eq ws
             , let (conss, callerss) = unzip [ (cons, callers)
-                                            | w'@(SpecReboxed _ _ _ cons callers) <- ws
+                                            | w'@(SpecReboxed _ _ _ _ cons callers) <- ws
                                             , eq w w' ] ]
 
-        same_fn (SpecReboxed fn1 _ _ _ _) (SpecReboxed fn2 _ _ _ _) = fn1 == fn2
+        same_fn (SpecReboxed fn1 _ _ _ _ _) (SpecReboxed fn2 _ _ _ _ _) = fn1 == fn2
         same_fn _ _ = False
 
         -- Merge warnings that would render identically: same occurrence
-        -- name, type, parent, displayed location, and constructors. The
-        -- reader could not tell them apart, so printing both is noise; see
-        -- Note [Reboxing warning].  Callers are aggregated, not compared.
-        same_render (SpecReboxed fn1 ty1 p1 cons1 _) (SpecReboxed fn2 ty2 p2 cons2 _)
+        -- name, type, parent, displayed location, recursivity, and
+        -- constructors. The reader could not tell them apart, so printing
+        -- both is noise; see Note [Reboxing warning].  Callers are
+        -- aggregated, not compared.
+        same_render (SpecReboxed fn1 ty1 p1 r1 cons1 _) (SpecReboxed fn2 ty2 p2 r2 cons2 _)
           = getOccName fn1 == getOccName fn2 && p1 == p2
             && nameSrcSpan (rebox_loc_name fn1 p1) == nameSrcSpan (rebox_loc_name fn2 p2)
             && ty1 `eqType` ty2
+            && r1 `same_recur` r2
             && sortBy stableNameCmp cons1 == sortBy stableNameCmp cons2
         same_render _ _ = False
+
+        -- Recursivity as displayed: siblings compare by occurrence name,
+        -- so span-less copies of one mutual group still merge
+        same_recur ReboxSelfRec        ReboxSelfRec        = True
+        same_recur (ReboxNonRec j1)    (ReboxNonRec j2)    = j1 == j2
+        same_recur (ReboxMutualRec s1) (ReboxMutualRec s2)
+          = map getOccName (sortBy stableNameCmp s1)
+            == map getOccName (sortBy stableNameCmp s2)
+        same_recur _ _ = False
 
     -- The definition site shown in a reboxing warning: the fn's own when
     -- known, otherwise the parent's (e.g. for simplifier-made join points)
@@ -843,11 +854,12 @@ specConstrProgram guts
     -- See Note [Reboxing warning]
     rebox_msg :: SpecConstrWarning -> SDoc
     rebox_msg w@(SpecFailForcedArgCount {}) = pprPanic "rebox_msg" (ppr w)
-    rebox_msg (SpecReboxed fn ty mb_parent cons callers)
+    rebox_msg (SpecReboxed fn ty mb_parent recur cons callers)
       = vcat [ hang (text "SpecConstr specialised") 2
                     (quotes (ppr fn <+> dcolon <+> pp_ty))
              , nest 2 $ vcat $ catMaybes
                  [ Just (fact "source:" pp_source)
+                 , Just (fact "recursivity:" pp_recur)
                  , fact "called from:" <$> pp_callers
                  , Just (fact "reboxed constructors:" pp_cons) ]
              , pp_trailer
@@ -876,6 +888,20 @@ specConstrProgram guts
             loc_name  = rebox_loc_name fn mb_parent
             pp_loc    = ppr (nameSrcLoc loc_name)
             pp_no_loc = text "inlined from another module (no source location)"
+
+        pp_recur = case recur of
+          ReboxSelfRec        -> text "self-recursive"
+          ReboxNonRec True    -> text "non-recursive (a join point)"
+          ReboxNonRec False   -> text "non-recursive"
+          ReboxMutualRec sibs
+            -> text "mutually recursive with"
+               <+> pprWithCommas (quotes . ppr) named <> pp_rest
+            where
+              (named, rest) = splitAt 3 (sortBy stableNameCmp sibs)
+              pp_rest = case length rest of
+                0 -> empty
+                1 -> text " and 1 other"
+                n -> text " and" <+> int n <+> text "others"
 
         pp_callers = case sortBy stableNameCmp callers of
           [] -> Nothing
@@ -1549,6 +1575,15 @@ that decision bites, without changing which specialisations are made:
   origins, but sharing name and type they are almost certainly copies of
   one function.
 
+* The warning classifies how the specialised function recurses
+  ("recursivity"), taken from the binding SpecConstr saw: a Rec group of
+  one is self-recursive (the occurrence analyser demotes non-recursive
+  singletons to NonRec), a larger group is mutually recursive and the
+  siblings are named, and a nested NonRec binding — typically a join
+  point, see Note [Specialising local let bindings] — is non-recursive.
+  This reflects the post-optimisation program, whose shape can differ
+  from the source's.
+
 * Nullary constructors are exempt: "reboxing" a nullary constructor just
   references its shared static closure, so it costs no allocation and even
   preserves pointer identity.  Such patterns are common (Nil, [], Nothing,
@@ -2029,7 +2064,9 @@ specNonRec :: ScEnv
                                                --     plus details of specialisations
 
 specNonRec env body_calls rhs_info
-  = specialise env body_calls rhs_info (initSpecInfo rhs_info)
+  = specialise env recur body_calls rhs_info (initSpecInfo rhs_info)
+  where
+    recur = ReboxNonRec (isJoinId (ri_fn rhs_info))
 
 ----------------------
 specRec :: ScEnv
@@ -2049,6 +2086,13 @@ specRec env body_calls rhs_infos
   where
     opts = sc_opts env
 
+    -- A Rec group of one is genuinely self-recursive: the occurrence
+    -- analyser demotes non-recursive singletons to NonRec
+    recur ri = case rhs_infos of
+      [_] -> ReboxSelfRec
+      _   -> ReboxMutualRec [ idName (ri_fn ri') | ri' <- rhs_infos
+                            , ri_fn ri' /= ri_fn ri ]
+
     -- Loop, specialising, until you get no new specialisations
     go, go_again :: Int   -- Which iteration of the "until no new specialisations"
                           -- loop we are on; first iteration is 1
@@ -2063,7 +2107,8 @@ specRec env body_calls rhs_infos
         --                           , text "iteration" <+> int n_iter
         --                           , text "spec_infos" <+> ppr (map (map os_pat . si_specs) spec_infos)
         --                    ]) $
-        do  { specs_w_usg <- zipWithM (specialise env seed_calls) rhs_infos spec_infos
+        do  { specs_w_usg <- zipWithM (\ri si -> specialise env (recur ri) seed_calls ri si)
+                                      rhs_infos spec_infos
 
             ; let (extra_usg_s, all_spec_infos, extra_ws ) = unzip3 specs_w_usg
                   extra_usg = combineUsages extra_usg_s
@@ -2101,6 +2146,7 @@ specRec env body_calls rhs_infos
 ----------------------
 specialise
    :: ScEnv
+   -> ReboxRecursivity            -- How the function recurses, for warnings
    -> CallEnv                     -- Info on newly-discovered calls to this function
    -> RhsInfo
    -> SpecInfo                    -- Original RHS plus patterns dealt with
@@ -2115,8 +2161,8 @@ specialise
 -- So when we make a specialised copy of the RHS, we're starting
 -- from an RHS whose nested functions have been optimised already.
 
-specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
-                              , ri_lam_body = body, ri_arg_occs = arg_occs })
+specialise env recur bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
+                                    , ri_lam_body = body, ri_arg_occs = arg_occs })
                spec_info@(SI { si_specs = specs, si_n_specs = spec_count
                              , si_mb_unspec = mb_unspec })
   | isDeadEndId fn  -- Note [Do not specialise diverging functions]
@@ -2140,7 +2186,7 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
               -- Warn about committed specialisations that will rebox;
               -- see Note [Reboxing warning]
               rebox_ws = [ SpecReboxed (idName fn) (idType fn) (sc_top_fn env)
-                                       (cp_rebox p) (cp_callers p)
+                                       recur (cp_rebox p) (cp_callers p)
                          | p <- new_pats, not (null (cp_rebox p)) ]
 --        ; when (not (null new_pats) || isJust mb_unspec) $
 --          pprTraceM "specialise" (vcat [ ppr fn <+> text "with" <+> int n_pats <+> text "good patterns"
@@ -2722,6 +2768,13 @@ instance Outputable CallPat where
                                , text "cp_rebox = " <> ppr rebox
                                , text "cp_callers = " <> ppr callers ])
 
+-- | How the function that SpecConstr specialised recurses, as bound in
+-- the post-optimisation program.  See Note [Reboxing warning]
+data ReboxRecursivity
+  = ReboxSelfRec
+  | ReboxMutualRec [Name]  -- The sibling binders of its Rec group
+  | ReboxNonRec Bool       -- True <=> a join point
+
 data SpecConstrWarning
   = SpecFailForcedArgCount { spec_failed_fun_name :: Name }
   | SpecReboxed { spec_rebox_fun_name :: Name    -- The specialised function
@@ -2729,6 +2782,7 @@ data SpecConstrWarning
                                                  -- to a span-less function's identity
                 , spec_rebox_parent :: Maybe Name -- Its enclosing top-level
                                                   -- binder, if fn is local
+                , spec_rebox_recur :: ReboxRecursivity
                 , spec_rebox_cons :: [Name]      -- The reboxed constructor(s)
                 , spec_rebox_callers :: [Name] } -- Top-level binders containing
                                                  -- the specialised calls
@@ -2738,7 +2792,7 @@ type SpecConstrWarnings = [SpecConstrWarning]
 
 instance Outputable SpecConstrWarning where
   ppr (SpecFailForcedArgCount name) = ppr name <+> pprDefinedAt name
-  ppr (SpecReboxed fn _ty mb_parent dcs _callers)
+  ppr (SpecReboxed fn _ty mb_parent _recur dcs _callers)
     = ppr fn <+> parens (pprWithCommas ppr dcs) <+> pp_defn
     where
       -- A local fn often has no useful location; point at its

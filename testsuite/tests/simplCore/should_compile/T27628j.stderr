@@ -1,8 +1,8 @@
-T27628b.hs: warning: [-Wspec-constr-reboxing]
-    SpecConstr specialised ‘merge :: T -> T -> T’
-      source:                T27628b.hs:10:1
-      recursivity:           self-recursive
-      called from:           ‘f’
+T27628j.hs: warning: [-Wspec-constr-reboxing]
+    SpecConstr specialised ‘mergeB :: T -> T -> T’
+      source:                T27628j.hs:17:1
+      recursivity:           mutually recursive with ‘mergeA’
+      called from:           ‘g’
       reboxed constructors:  ‘Bin’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.

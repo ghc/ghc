@@ -1,6 +1,7 @@
 ./T27628i_M.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘poly_merge :: T a -> T a -> T a’
       source:                T27628i_M.hs:36:5
+      recursivity:           self-recursive
       called from:           ‘f3’
       reboxed constructors:  ‘Bin’
     This constructor argument is also used boxed, so the specialisation
@@ -10,6 +11,7 @@
 ./T27628i_M.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘poly_merge :: S a -> S a -> S a’
       source:                T27628i_M.hs:24:5
+      recursivity:           self-recursive
       called from:           ‘f2’
       reboxed constructors:  ‘Node’
     This constructor argument is also used boxed, so the specialisation
@@ -19,6 +21,7 @@
 ./T27628i_M.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘poly_merge :: T a -> T a -> T a’
       source:                T27628i_M.hs:14:5
+      recursivity:           self-recursive
       called from:           ‘f1’
       reboxed constructors:  ‘Bin’
     This constructor argument is also used boxed, so the specialisation
@@ -28,6 +31,7 @@
 T27628i.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘merge :: T Int -> T Int -> T Int’
       source:                inlined from another module (no source location)
+      recursivity:           self-recursive
       called from:           ‘g1’, ‘g3’
       reboxed constructors:  ‘T27628i_M.Bin’
     This constructor argument is also used boxed, so the specialisation
@@ -37,6 +41,7 @@ T27628i.hs: warning: [-Wspec-constr-reboxing]
 T27628i.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘merge :: S Int -> S Int -> S Int’
       source:                inlined from another module (no source location)
+      recursivity:           self-recursive
       called from:           ‘g2’
       reboxed constructors:  ‘T27628i_M.Node’
     This constructor argument is also used boxed, so the specialisation

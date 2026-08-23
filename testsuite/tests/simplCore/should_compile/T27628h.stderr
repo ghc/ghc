@@ -1,6 +1,7 @@
 ./T27628h_M.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘poly_merge :: T a -> T a -> T a’
       source:                T27628h_M.hs:11:5
+      recursivity:           self-recursive
       called from:           ‘f’
       reboxed constructors:  ‘Bin’
     This constructor argument is also used boxed, so the specialisation
@@ -10,6 +11,7 @@
 T27628h.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘merge :: T Int -> T Int -> T Int’
       source:                inlined from another module (no source location)
+      recursivity:           self-recursive
       called from:           ‘g’
       reboxed constructors:  ‘T27628h_M.Bin’
     This constructor argument is also used boxed, so the specialisation

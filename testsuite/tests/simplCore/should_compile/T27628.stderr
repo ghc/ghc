@@ -5,6 +5,7 @@ T27628.hs: warning: [-Wspec-constr-reboxing]
                -> GHC.Internal.Prim.Int#
                -> GHC.Internal.Prim.Int#’
       source:                T27628.hs:17:1
+      recursivity:           self-recursive
       called from:           ‘f’
       reboxed constructors:  ‘LC’
     This constructor argument is also used boxed, so the specialisation
