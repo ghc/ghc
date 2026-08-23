@@ -7,7 +7,7 @@
 
 T27628h.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘merge :: T Int -> T Int -> T Int’
-      (inlined from another module; no source location)
+      (inlined from another module; no source location; called from ‘g’)
     on a constructor argument (‘T27628h_M.Bin’) that is also used boxed ("reboxing").
     Reboxing can increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.

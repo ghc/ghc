@@ -809,15 +809,17 @@ specConstrProgram guts
     -- see Note [Reboxing warning]
     aggregateRebox :: SpecConstrWarnings -> SpecConstrWarnings
     aggregateRebox ws
-      = [ SpecReboxed fn ty parent (nub (concat [ cons | w'@(SpecReboxed _ _ _ cons) <- ws
-                                                       , same_fn w w' ]))
-        | w@(SpecReboxed fn ty parent _) <- nubBy same_fn ws ]
+      = [ SpecReboxed fn ty parent (nub (concat conss)) (nub (concat callerss))
+        | w@(SpecReboxed fn ty parent _ _) <- nubBy same_fn ws
+        , let (conss, callerss) = unzip [ (cons, callers)
+                                        | w'@(SpecReboxed _ _ _ cons callers) <- ws
+                                        , same_fn w w' ] ]
       where
         -- Merge warnings that would render identically: same occurrence
         -- name, type, parent, and displayed location. The reader could not
         -- tell them apart, so printing both is noise; see
-        -- Note [Reboxing warning].
-        same_fn (SpecReboxed fn1 ty1 p1 _) (SpecReboxed fn2 ty2 p2 _)
+        -- Note [Reboxing warning].  Callers are aggregated, not compared.
+        same_fn (SpecReboxed fn1 ty1 p1 _ _) (SpecReboxed fn2 ty2 p2 _ _)
           = getOccName fn1 == getOccName fn2 && p1 == p2
             && nameSrcSpan (rebox_loc_name fn1 p1) == nameSrcSpan (rebox_loc_name fn2 p2)
             && ty1 `eqType` ty2
@@ -833,7 +835,7 @@ specConstrProgram guts
     -- See Note [Reboxing warning]
     rebox_msg :: SpecConstrWarning -> SDoc
     rebox_msg w@(SpecFailForcedArgCount {}) = pprPanic "rebox_msg" (ppr w)
-    rebox_msg (SpecReboxed fn ty mb_parent cons)
+    rebox_msg (SpecReboxed fn ty mb_parent cons callers)
       = vcat [ hang (text "SpecConstr specialised"
                        <+> quotes (ppr fn <+> dcolon <+> pp_ty))
                   2 pp_site
@@ -859,6 +861,13 @@ specConstrProgram guts
         pp_defn n
           | isGoodSrcSpan (nameSrcSpan n) = text "defined" <+> pprNameDefnLoc n
           | otherwise = text "inlined from another module; no source location"
+                        <> pp_callers
+
+        -- The call sites are the only located code a span-less warning
+        -- can point at
+        pp_callers = case sortBy stableNameCmp (filter (\c -> Just c /= mb_parent) callers) of
+          [] -> empty
+          cs -> semi <+> text "called from" <+> pprWithCommas (quotes . ppr) cs
 
         -- Qualify imported constructors: they identify the package to
         -- follow up with when the function itself has no location
@@ -1352,9 +1361,11 @@ data ScUsage
      }                                  -- The domain is OutIds
 
 type CallEnv = IdEnv [Call]  -- Domain is OutIds
-data Call    = Call OutId [CoreArg] ValueEnv
+data Call    = Call OutId [CoreArg] ValueEnv (Maybe Name)
         -- The arguments of the call, together with the
         -- env giving the constructor bindings at the call site
+        -- and the enclosing top-level binder of the call site
+        -- (sc_top_fn, for reboxing warnings)
         -- We keep the function mainly for debug output
         --
         -- The call is not necessarily saturated; we just put
@@ -1366,7 +1377,7 @@ instance Outputable ScUsage where
                                  , text "occs =" <+> ppr occs ])
 
 instance Outputable Call where
-  ppr (Call fn args _) = ppr fn <+> fsep (map pprParendExpr args)
+  ppr (Call fn args _ _) = ppr fn <+> fsep (map pprParendExpr args)
 
 nullUsage :: ScUsage
 nullUsage = SCU { scu_calls = emptyVarEnv, scu_occs = emptyVarEnv }
@@ -1540,7 +1551,11 @@ that decision bites, without changing which specialisations are made:
   warning says "inlined from another module" instead of showing an
   unhelpful span.  Imported constructors are shown qualified — with the
   function anonymous, they are what identifies the package to report the
-  reboxing to.
+  reboxing to.  The warning also names the top-level binders containing
+  the specialised calls ("called from"): the call sites are the only
+  located code such a warning can point at, and following the inlining
+  from one of them identifies the reboxed loop.  Each Call records the
+  sc_top_fn of its call site for this purpose.
 
 Why BoxPassAlong does not warn: if the callee is specialised at that argument
 position, its RULE rewrites the constructor-shaped call in the specialised
@@ -1899,7 +1914,7 @@ markPassAlongArg _env _other usg = usg
 mkVarUsage :: ScEnv -> Id -> [CoreExpr] -> ScUsage
 mkVarUsage env fn args
   = case lookupHowBound env fn of
-        Just RecFun -> SCU { scu_calls = unitVarEnv fn [Call fn args (sc_vals env)]
+        Just RecFun -> SCU { scu_calls = unitVarEnv fn [Call fn args (sc_vals env) (sc_top_fn env)]
                            , scu_occs  = emptyVarEnv }
         Just RecArg -> SCU { scu_calls = emptyVarEnv
                            , scu_occs  = unitVarEnv fn arg_occ }
@@ -2101,7 +2116,8 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
         ; let n_pats = length new_pats
               -- Warn about committed specialisations that will rebox;
               -- see Note [Reboxing warning]
-              rebox_ws = [ SpecReboxed (idName fn) (idType fn) (sc_top_fn env) (cp_rebox p)
+              rebox_ws = [ SpecReboxed (idName fn) (idType fn) (sc_top_fn env)
+                                       (cp_rebox p) (cp_callers p)
                          | p <- new_pats, not (null (cp_rebox p)) ]
 --        ; when (not (null new_pats) || isJust mb_unspec) $
 --          pprTraceM "specialise" (vcat [ ppr fn <+> text "with" <+> int n_pats <+> text "good patterns"
@@ -2667,17 +2683,21 @@ data CallPat = CP { cp_qvars :: [Var]           -- Quantified variables
                   , cp_args  :: [CoreExpr]      -- Arguments
                   , cp_strict_args :: [Var]     -- Arguments we want to pass unlifted even if they are boxed
                                                 -- See Note [SpecConstr and strict fields]
-                  , cp_rebox :: [Name] }        -- Constructors matched by this pattern whose box
+                  , cp_rebox :: [Name]          -- Constructors matched by this pattern whose box
                                                 -- is also used; see Note [Reboxing warning]
+                  , cp_callers :: [Name] }      -- Enclosing top-level binders of the calls this
+                                                -- pattern came from; see Note [Reboxing warning]
 
      -- See Note [SpecConstr call patterns]
 
 instance Outputable CallPat where
-  ppr (CP { cp_qvars = qvars, cp_args = args, cp_strict_args = strict, cp_rebox = rebox })
+  ppr (CP { cp_qvars = qvars, cp_args = args, cp_strict_args = strict, cp_rebox = rebox
+          , cp_callers = callers })
     = text "CP" <> braces (sep [ text "cp_qvars =" <+> ppr qvars <> comma
                                , text "cp_args =" <+> ppr args
                                , text "cp_strict_args = " <> ppr strict
-                               , text "cp_rebox = " <> ppr rebox ])
+                               , text "cp_rebox = " <> ppr rebox
+                               , text "cp_callers = " <> ppr callers ])
 
 data SpecConstrWarning
   = SpecFailForcedArgCount { spec_failed_fun_name :: Name }
@@ -2686,14 +2706,16 @@ data SpecConstrWarning
                                                  -- to a span-less function's identity
                 , spec_rebox_parent :: Maybe Name -- Its enclosing top-level
                                                   -- binder, if fn is local
-                , spec_rebox_cons :: [Name] }    -- The reboxed constructor(s)
+                , spec_rebox_cons :: [Name]      -- The reboxed constructor(s)
+                , spec_rebox_callers :: [Name] } -- Top-level binders containing
+                                                 -- the specialised calls
     -- See Note [Reboxing warning]
 
 type SpecConstrWarnings = [SpecConstrWarning]
 
 instance Outputable SpecConstrWarning where
   ppr (SpecFailForcedArgCount name) = ppr name <+> pprDefinedAt name
-  ppr (SpecReboxed fn _ty mb_parent dcs)
+  ppr (SpecReboxed fn _ty mb_parent dcs _callers)
     = ppr fn <+> parens (pprWithCommas ppr dcs) <+> pp_defn
     where
       -- A local fn often has no useful location; point at its
@@ -2847,7 +2869,7 @@ callToPat :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe CallPat)
         --      Type variables come first, since they may scope
         --      over the following term variables
         -- The [CoreExpr] are the argument patterns for the rule
-callToPat env bndr_occs call@(Call fn args con_env)
+callToPat env bndr_occs call@(Call fn args con_env mb_caller)
   = do  { let in_scope = substInScopeSet (sc_subst env)
 
         ; arg_quads <- zipWith3M (argToPat env in_scope con_env) args bndr_occs (map (const NotMarkedStrict) args)
@@ -2896,7 +2918,11 @@ callToPat env bndr_occs call@(Call fn args con_env)
           if interesting && null bad_covars
           then do { let cp_res = CP { cp_qvars = qvars', cp_args = pats
                                     , cp_strict_args = concat cbv_ids
-                                    , cp_rebox = concat rebox_cons }
+                                    , cp_rebox = concat rebox_cons
+                                      -- Self-recursive calls are no clue
+                                      -- to the function's identity
+                                    , cp_callers = [ c | Just c <- [mb_caller]
+                                                       , c /= idName fn ] }
 --                  ; pprTraceM "callToPatOut" $
 --                    vcat [ text "fn:" <+> ppr fn
 --                         , text "args:" <+> ppr args

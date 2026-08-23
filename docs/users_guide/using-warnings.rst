@@ -550,7 +550,10 @@ of ``-W(no-)*``.
     for local functions. Such reboxing cannot be addressed in the module
     being compiled — consider reporting it against the package defining the
     inlined code. Constructors imported from other modules are shown
-    qualified with their defining module as a hint to where that is.
+    qualified with their defining module as a hint to where that is. Such a
+    warning also lists the functions containing the specialised calls
+    (``called from``) — following the inlining from one of those call sites
+    identifies the reboxed code.
 
     The analysis behind this warning is approximate: it can both miss genuine
     reboxing and report reboxing that later optimisations eliminate or that
