@@ -532,7 +532,9 @@ of ``-W(no-)*``.
     Possible remedies include excluding the type from SpecConstr with an
     ``{-# ANN type T NoSpecConstr #-}`` pragma, hiding the constructor from
     the call-pattern analysis by wrapping the argument in ``GHC.Exts.lazy``
-    at the call site, or :ghc-flag:`-fno-spec-constr`.
+    at the call site, lowering :ghc-flag:`-fspec-constr-threshold=⟨n⟩` in
+    the affected module below the function's body size, or
+    :ghc-flag:`-fno-spec-constr`.
 
     The warning shows the specialised function's type, which is often the
     clearest clue to its identity when its name carries no meaning,
