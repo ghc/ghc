@@ -15,7 +15,7 @@ module GHC.HsToCore.Monad (
         duplicateLocalDs, newSysLocalDs, newSysLocalsDs,
         newSysLocalMDs, newSysLocalsMDs, newFailLocalMDs,
         newUniqueId, newPredVarDs, newStaticId,
-        getSrcSpanDs, putSrcSpanDs, putSrcSpanDsA,
+        getSrcSpanDs, inGeneratedCodeDs, putSrcSpanDs, putSrcSpanDsA,
         mkNamePprCtxDs,
         newUnique,
         UniqSupply, newUniqueSupply,
@@ -584,6 +584,7 @@ mkDsEnvs unit_env mod rdr_env type_env fam_inst_env tcm_plugins ptc msg_var
                            , dsl_loc         = real_span
                            , dsl_nablas      = Ldi initNablas
                            , dsl_unspecables = Just emptyVarSet
+                           , dsl_in_generated_code = False
                            }
     in (gbl_env, lcl_env)
 
@@ -676,13 +677,17 @@ getSrcSpanDs :: DsM SrcSpan
 getSrcSpanDs = do { env <- getLclEnv
                   ; return (RealSrcSpan (dsl_loc env) Strict.Nothing) }
 
+-- | See 'dsl_in_generated_code'
+inGeneratedCodeDs :: DsM Bool
+inGeneratedCodeDs = dsl_in_generated_code <$> getLclEnv
+
 putSrcSpanDs :: SrcSpan -> DsM a -> DsM a
 putSrcSpanDs (RealSrcSpan real_span _) thing_inside
-  = updLclEnv (\ env -> env {dsl_loc = real_span}) thing_inside
+  = updLclEnv (\ env -> env {dsl_loc = real_span, dsl_in_generated_code = False}) thing_inside
 putSrcSpanDs UnhelpfulSpan{} thing_inside
   = thing_inside
 putSrcSpanDs GeneratedSrcSpan{} thing_inside
-  = thing_inside
+  = updLclEnv (\ env -> env {dsl_in_generated_code = True}) thing_inside
 
 putSrcSpanDsA :: EpAnn ann -> DsM a -> DsM a
 putSrcSpanDsA loc = putSrcSpanDs (locA loc)
