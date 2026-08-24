@@ -1,9 +1,12 @@
 T27628b.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘merge :: T -> T -> T’
-      source:         T27628b.hs:10:1
-      recursivity:    self-recursive
-      called from:    ‘f’
-      call pattern:   merge (Bin _ _ _) -- reboxes ‘Bin’
+      source:       T27628b.hs:10:1
+      recursivity:  self-recursive
+      called from:  ‘f’
+      call pattern:
+        merge (Bin _ _ _)
+          -- reboxes ‘Bin’
+          --      as ‘$smerge :: Int -> T -> T -> T -> T’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the user's guide for possible remedies.

@@ -545,12 +545,30 @@ of ``-W(no-)*``.
     ``called from:`` — the top-level bindings containing the specialised
     calls; ``call patterns:`` — the calls the function was specialised
     for, shown as the constructor skeletons of their arguments, each
-    alongside the constructors that the specialisation reboxes (for
-    example ``go (_ : _) (Bin _ _ _) -- reboxes ‘Bin’``). One warning is emitted per
+    followed by the constructors that the specialisation reboxes and by
+    the name and type the specialisation was created with::
+
+        call patterns:
+          go (_ : _) (Bin _ _ _)
+            -- reboxes ‘Bin’
+            --      as ‘$sgo :: Int -> Int -> Map Int Bool -> Bool’
+
+    One warning is emitted per
     specialised function, and warnings that would read identically are
     merged into one. Specialisations on nullary constructors are not
     reported, since "reboxing" a nullary constructor simply references
     its shared static closure.
+
+    The ``as`` signature is a guide for finding the specialisation in a
+    Core dump (:ghc-flag:`-ddump-simpl`), for example to judge how much
+    reboxing survives optimisation. Later passes may rename the binder —
+    typically to ``<parent>_$s<function>``, possibly with a digit appended
+    — so search for the shown name as a substring; the type normally
+    survives unchanged. A specialisation can also be inlined, or merged
+    with another one, and then appears in no dump. The calls rewritten to
+    use specialisations can be traced with
+    :ghc-flag:`-ddump-rule-firings`; the rewrite rules are named
+    ``SC:<function><n>``.
 
     A ``source:`` reading ``inlined from another module (no source
     location)`` concerns a function that reached the module being compiled

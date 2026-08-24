@@ -1,61 +1,77 @@
 T27628l.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘go1 :: [Max a] -> Max a -> Max a’
-      source:         ‘$cmconcat’ at T27628l.hs:22:5
-      recursivity:    self-recursive
-      called from:    ‘$cmconcat’
-      call pattern:   go1 _ (Just _) -- reboxes ‘GHC.Internal.Maybe.Just’
+      source:       ‘$cmconcat’ at T27628l.hs:22:5
+      recursivity:  self-recursive
+      called from:  ‘$cmconcat’
+      call pattern:
+        go1 _ (Just _)
+          -- reboxes ‘GHC.Internal.Maybe.Just’
+          --      as ‘$sgo1 :: [Max a] -> a -> Max a’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the user's guide for possible remedies.
 
 T27628l.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘exit :: Max a -> b -> Max a’
-      source:         ‘$cstimes’ at T27628l.hs:12:10
-      recursivity:    non-recursive (a join point)
-      called from:    ‘$cstimes’
-      call pattern:   exit (Just _) _
-                        -- reboxes ‘GHC.Internal.Maybe.Just’
+      source:       ‘$cstimes’ at T27628l.hs:12:10
+      recursivity:  non-recursive (a join point)
+      called from:  ‘$cstimes’
+      call pattern:
+        exit (Just _) _
+          -- reboxes ‘GHC.Internal.Maybe.Just’
+          --      as ‘$sexit :: a -> b -> Max a’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the user's guide for possible remedies.
 
 T27628l.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘g :: Max a -> b -> Max a -> Max a’
-      source:         ‘$cstimes’ at T27628l.hs:12:10
-      recursivity:    self-recursive
-      called from:    ‘$cstimes’
-      call pattern:   g (Just _) _ _ -- reboxes ‘GHC.Internal.Maybe.Just’
+      source:       ‘$cstimes’ at T27628l.hs:12:10
+      recursivity:  self-recursive
+      called from:  ‘$cstimes’
+      call pattern:
+        g (Just _) _ _
+          -- reboxes ‘GHC.Internal.Maybe.Just’
+          --      as ‘$sg :: a -> b -> Max a -> Max a’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the user's guide for possible remedies.
 
 T27628l.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘go1 :: [Min a] -> Min a -> Min a’
-      source:         ‘$cmconcat’ at T27628l.hs:37:5
-      recursivity:    self-recursive
-      called from:    ‘$cmconcat’
-      call pattern:   go1 _ (Just _) -- reboxes ‘GHC.Internal.Maybe.Just’
+      source:       ‘$cmconcat’ at T27628l.hs:37:5
+      recursivity:  self-recursive
+      called from:  ‘$cmconcat’
+      call pattern:
+        go1 _ (Just _)
+          -- reboxes ‘GHC.Internal.Maybe.Just’
+          --      as ‘$sgo1 :: [Min a] -> a -> Min a’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the user's guide for possible remedies.
 
 T27628l.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘exit :: Min a -> b -> Min a’
-      source:         ‘$cstimes’ at T27628l.hs:27:10
-      recursivity:    non-recursive (a join point)
-      called from:    ‘$cstimes’
-      call pattern:   exit (Just _) _
-                        -- reboxes ‘GHC.Internal.Maybe.Just’
+      source:       ‘$cstimes’ at T27628l.hs:27:10
+      recursivity:  non-recursive (a join point)
+      called from:  ‘$cstimes’
+      call pattern:
+        exit (Just _) _
+          -- reboxes ‘GHC.Internal.Maybe.Just’
+          --      as ‘$sexit :: a -> b -> Min a’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the user's guide for possible remedies.
 
 T27628l.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘g :: Min a -> b -> Min a -> Min a’
-      source:         ‘$cstimes’ at T27628l.hs:27:10
-      recursivity:    self-recursive
-      called from:    ‘$cstimes’
-      call pattern:   g (Just _) _ _ -- reboxes ‘GHC.Internal.Maybe.Just’
+      source:       ‘$cstimes’ at T27628l.hs:27:10
+      recursivity:  self-recursive
+      called from:  ‘$cstimes’
+      call pattern:
+        g (Just _) _ _
+          -- reboxes ‘GHC.Internal.Maybe.Just’
+          --      as ‘$sg :: a -> b -> Min a -> Min a’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the user's guide for possible remedies.

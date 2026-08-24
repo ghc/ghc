@@ -1,9 +1,14 @@
 T27628k.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘go :: T -> Int -> Int’
-      source:         T27628k.hs:17:1
-      recursivity:    self-recursive
-      call patterns:  go (A _) (I# _) -- reboxes ‘A’
-                      go (B _) (I# _) -- reboxes ‘B’
+      source:       T27628k.hs:17:1
+      recursivity:  self-recursive
+      call patterns:
+        go (A _) (I# _)
+          -- reboxes ‘A’
+          --      as ‘$sgo :: Int -> GHC.Internal.Prim.Int# -> Int’
+        go (B _) (I# _)
+          -- reboxes ‘B’
+          --      as ‘$sgo :: Int -> GHC.Internal.Prim.Int# -> Int’
     These constructor arguments are also used boxed, so the
     specialisations may increase allocation and defeat
     pointer-equality-based sharing.
