@@ -1,20 +1,20 @@
 ./T27628h_M.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘poly_merge :: T a -> T a -> T a’
-      source:                T27628h_M.hs:11:5
-      recursivity:           self-recursive
-      called from:           ‘f’
-      call pattern:          poly_merge (Bin _ _ _) -- reboxes ‘Bin’
+      source:         T27628h_M.hs:11:5
+      recursivity:    self-recursive
+      called from:    ‘f’
+      call pattern:   poly_merge (Bin _ _ _) -- reboxes ‘Bin’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
-    See -Wspec-constr-reboxing in the users guide for possible remedies.
+    See -Wspec-constr-reboxing in the user's guide for possible remedies.
 
 T27628h.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘merge :: T Int -> T Int -> T Int’
-      source:                inlined from another module (no source location)
-      recursivity:           self-recursive
-      called from:           ‘g’
-      call pattern:          merge (Bin _ _ _) -- reboxes ‘T27628h_M.Bin’
+      source:         inlined from another module (no source location)
+      recursivity:    self-recursive
+      called from:    ‘g’
+      call pattern:   merge (Bin _ _ _) -- reboxes ‘T27628h_M.Bin’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
-    See -Wspec-constr-reboxing in the users guide for possible remedies.
+    See -Wspec-constr-reboxing in the user's guide for possible remedies.
 

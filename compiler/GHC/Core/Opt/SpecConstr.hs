@@ -870,11 +870,11 @@ specConstrProgram guts
                  , fact "called from:" <$> pp_callers
                  , Just (fact pats_label pp_pats) ]
              , pp_trailer
-             , text "See -Wspec-constr-reboxing in the users guide for possible remedies." ]
+             , text "See -Wspec-constr-reboxing in the user's guide for possible remedies." ]
       where
         -- Aligned label column; $$ overlaps, so a multi-line value keeps
         -- its lines aligned under the first
-        fact l v = text l $$ nest 23 v
+        fact l v = text l $$ nest 16 v
 
         -- Truncate only pathologically large types
         pp_ty = sdocWithContext $ \ctx ->

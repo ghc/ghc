@@ -4,11 +4,11 @@ T27628.hs: warning: [-Wspec-constr-reboxing]
                -> GHC.Internal.Prim.Int#
                -> GHC.Internal.Prim.Int#
                -> GHC.Internal.Prim.Int#’
-      source:                T27628.hs:17:1
-      recursivity:           self-recursive
-      called from:           ‘f’
-      call pattern:          $wgo (LC _ _) -- reboxes ‘LC’
+      source:         T27628.hs:17:1
+      recursivity:    self-recursive
+      called from:    ‘f’
+      call pattern:   $wgo (LC _ _) -- reboxes ‘LC’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
-    See -Wspec-constr-reboxing in the users guide for possible remedies.
+    See -Wspec-constr-reboxing in the user's guide for possible remedies.
 

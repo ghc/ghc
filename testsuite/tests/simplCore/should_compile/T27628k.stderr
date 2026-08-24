@@ -1,11 +1,11 @@
 T27628k.hs: warning: [-Wspec-constr-reboxing]
     SpecConstr specialised ‘go :: T -> Int -> Int’
-      source:                T27628k.hs:17:1
-      recursivity:           self-recursive
-      call patterns:         go (A _) (I# _) -- reboxes ‘A’
-                             go (B _) (I# _) -- reboxes ‘B’
+      source:         T27628k.hs:17:1
+      recursivity:    self-recursive
+      call patterns:  go (A _) (I# _) -- reboxes ‘A’
+                      go (B _) (I# _) -- reboxes ‘B’
     These constructor arguments are also used boxed, so the
     specialisations may increase allocation and defeat
     pointer-equality-based sharing.
-    See -Wspec-constr-reboxing in the users guide for possible remedies.
+    See -Wspec-constr-reboxing in the user's guide for possible remedies.
 
