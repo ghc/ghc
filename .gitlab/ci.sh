@@ -697,6 +697,7 @@ function test_hadrian() {
     return
   # If we have set CROSS_EMULATOR, then can't test using normal testsuite.
   elif [ -n "${CROSS_EMULATOR:-}" ] && [[ "${CROSS_TARGET:-}" != *"wasm"* ]]; then
+    info "Cross compiling with CROSS_EMULATOR='$CROSS_EMULATOR' and CROSS_TARGET='$CROSS_TARGET'"
     local instdir="$TOP/_build/install"
     local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
     install_bindist $dist_dir/ghc-*/ "$instdir"
@@ -720,6 +721,7 @@ function test_hadrian() {
     # > main = putStrLn "hello world"
     run diff -w expected actual
   elif [[ -n "${REINSTALL_GHC:-}" ]]; then
+    info "Running with reinstall GHC $REINSTALL_GHC"
     run_hadrian \
       test \
       --test-root-dirs=testsuite/tests/stage1 \
@@ -754,6 +756,8 @@ function test_hadrian() {
       if [ $test_compiler_backend != "\"$BIGNUM_BACKEND\"" ]; then
         fail "Test compiler has a different BIGNUM_BACKEND ($test_compiler_backend) than requested ($BIGNUM_BACKEND)"
       fi
+    else 
+      info "CROSS_TARGET=$CROSS_TARGET"
     fi
 
     # If we are doing a release job, check the compiler can build a profiled executable
