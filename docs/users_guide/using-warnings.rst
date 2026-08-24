@@ -551,26 +551,30 @@ of ``-W(no-)*``.
     the name and type the specialisation was created with::
 
         call patterns:
-          go (_ : _) (Bin _ _ _)
+          go_s2Xy (_ : _) (Bin _ _ _)
             -- reboxes ‘Bin’
-            --      as ‘$sgo :: Int -> Int -> Map Int Bool -> Bool’
+            --      as ‘$sgo_s3k1 :: Int -> Int -> Map Int Bool -> Bool’
 
     One warning is emitted per
-    specialised function, and warnings that would read identically are
-    merged into one. Specialisations on nullary constructors are not
-    reported, since "reboxing" a nullary constructor simply references
-    its shared static closure.
+    specialised function. Under :ghc-flag:`-dsuppress-uniques`, warnings
+    that would read identically are merged into one. Specialisations on
+    nullary constructors are not reported, since "reboxing" a nullary
+    constructor simply references its shared static closure.
 
-    The ``as`` signature is a guide for finding the specialisation in a
-    Core dump (:ghc-flag:`-ddump-simpl`), for example to judge how much
-    reboxing survives optimisation. Later passes may rename the binder —
-    typically to ``<parent>_$s<function>``, possibly with a digit appended
-    — so search for the shown name as a substring; the type normally
-    survives unchanged. A specialisation can also be inlined, or merged
-    with another one, and then appears in no dump. The calls rewritten to
-    use specialisations can be traced with
-    :ghc-flag:`-ddump-rule-firings`; the rewrite rules are named
-    ``SC:<function><n>``.
+    Compiler-generated bindings are shown with their unique suffix (as
+    in ``$sgo_s2Xy``), matching the Core dump of the SpecConstr pass
+    (:ghc-flag:`-ddump-spec-constr`) of the same compilation, where the
+    specialisation can therefore be located verbatim — for example to
+    judge how much reboxing survives optimisation. In later dumps, such
+    as final Core (:ghc-flag:`-ddump-simpl`) and STG
+    (:ghc-flag:`-ddump-stg-final`), the unique is renumbered and the
+    binder may be renamed — typically to ``<parent>_$s<function>``,
+    possibly with a digit appended — so search there for the shown name
+    without its unique as a substring; the type normally survives
+    unchanged. A specialisation can also be inlined, or merged with
+    another one, and then appears in no dump. The calls rewritten to use
+    specialisations can be traced with :ghc-flag:`-ddump-rule-firings`;
+    the rewrite rules are named ``SC:<function><n>``.
 
     A ``source:`` reading ``inlined from another module (no source
     location)`` concerns a function that reached the module being compiled

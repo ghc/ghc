@@ -18,7 +18,8 @@ module GHC.Core.Opt.SpecConstr(
 
 import GHC.Prelude
 
-import GHC.Driver.DynFlags ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
+import GHC.Driver.DynFlags ( DynFlags(..)
+                          , GeneralFlag( Opt_SpecConstrKeen, Opt_SuppressUniques )
                           , WarningFlag( Opt_WarnSpecConstrReboxing )
                           , gopt, hasPprDebug )
 
@@ -61,7 +62,7 @@ import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.FM
-import GHC.Types.Unique( hasKey )
+import GHC.Types.Unique( hasKey, pprUniqueAlways )
 
 import GHC.Data.Maybe     ( fromMaybe, orElse, catMaybes, isJust, isNothing )
 import GHC.Data.FastString
@@ -785,6 +786,7 @@ unbox the strict fields, because T is polymorphic!)
 specConstrProgram :: ModGuts -> CoreM ModGuts
 specConstrProgram guts
   = do { env0 <- initScEnv guts
+       ; dflags <- getDynFlags
        ; us   <- getUniqueSupplyM
        ; let (_usg, binds', warnings) = initUs_ us $
                               scTopBinds env0 (mg_binds guts)
@@ -795,7 +797,7 @@ specConstrProgram guts
 
        ; when (not (null forced_ws)) $ diagnostic WarningWithoutFlag (forced_msg forced_ws)
        ; mapM_ (diagnostic (WarningWithFlag Opt_WarnSpecConstrReboxing) . rebox_msg)
-               (aggregateRebox rebox_ws)
+               (aggregateRebox (gopt Opt_SuppressUniques dflags) rebox_ws)
 
        ; return (guts { mg_binds = binds' }) }
 
@@ -806,11 +808,13 @@ specConstrProgram guts
                         nest 2 (vcat (map ppr warnings)) $$
                         (text "If this is expected you might want to increase -fmax-forced-spec-args to force specialization anyway.")
 
-    -- One warning per specialised function (all its patterns listed),
-    -- then warnings that would render identically merged too; see
-    -- Note [Reboxing warning]
-    aggregateRebox :: SpecConstrWarnings -> SpecConstrWarnings
-    aggregateRebox = mergeBy same_render . mergeBy same_fn
+    -- One warning per specialised function (all its patterns listed).
+    -- Under -dsuppress-uniques, warnings that would render identically
+    -- are merged too; see Note [Reboxing warning]
+    aggregateRebox :: Bool -> SpecConstrWarnings -> SpecConstrWarnings
+    aggregateRebox uniqs_suppressed
+      | uniqs_suppressed = mergeBy same_render . mergeBy same_fn
+      | otherwise        = mergeBy same_fn
       where
         mergeBy eq ws
           = [ SpecReboxed fn ty parent recur (nubBy same_pat (concat patss)) (nub (concat callerss))
@@ -828,8 +832,10 @@ specConstrProgram guts
         -- Merge warnings that would render identically: same occurrence
         -- name, type, parent, displayed location, recursivity, and
         -- patterns (with their spec signatures). The reader could not
-        -- tell them apart, so printing both is noise; see
-        -- Note [Reboxing warning].  Callers are aggregated, not compared.
+        -- tell them apart, so printing both is noise.  Only applied under
+        -- -dsuppress-uniques: with uniques shown, distinct copies render
+        -- distinctly; see Note [Reboxing warning].  Callers are
+        -- aggregated, not compared.
         same_render (SpecReboxed fn1 ty1 p1 r1 pats1 _) (SpecReboxed fn2 ty2 p2 r2 pats2 _)
           = getOccName fn1 == getOccName fn2 && p1 == p2
             && nameSrcSpan (rebox_loc_name fn1 p1) == nameSrcSpan (rebox_loc_name fn2 p2)
@@ -841,10 +847,16 @@ specConstrProgram guts
         same_render _ _ = False
 
         -- Spec signatures of merge candidates are alpha-equivalent copies,
-        -- so eqType; a mismatch just leaves two warnings unmerged
-        same_pat p1@(ReboxedPat _ _ occ1 sty1) p2@(ReboxedPat _ _ occ2 sty2)
+        -- so eqType; a mismatch just leaves two warnings unmerged.  Spec
+        -- names compare as displayed: by occurrence name only when the
+        -- uniques are suppressed
+        same_pat p1@(ReboxedPat _ _ nm1 sty1) p2@(ReboxedPat _ _ nm2 sty2)
           = cmpReboxedPat p1 p2 == EQ
-            && occ1 == occ2 && sty1 `eqType` sty2
+            && same_disp_name nm1 nm2 && sty1 `eqType` sty2
+
+        same_disp_name n1 n2
+          | uniqs_suppressed = getOccName n1 == getOccName n2
+          | otherwise        = n1 == n2
 
         -- Recursivity as displayed: siblings compare by occurrence name,
         -- so span-less copies of one mutual group still merge
@@ -862,12 +874,23 @@ specConstrProgram guts
       | not (isGoodSrcSpan (nameSrcSpan fn)) = parent
     rebox_loc_name fn _ = fn
 
+    -- Local binders display occ plus unique, as pre-tidy dumps print
+    -- them, so the binder can be grepped in -ddump-spec-constr output
+    -- of the same compilation; see Note [Reboxing warning].
+    -- -dsuppress-uniques hides the unique.
+    pp_name :: Name -> SDoc
+    pp_name n
+      | isExternalName n = ppr n
+      | otherwise        = ppr (getOccName n)
+                           <> ppUnlessOption sdocSuppressUniques
+                                (char '_' <> pprUniqueAlways (nameUnique n))
+
     -- See Note [Reboxing warning]
     rebox_msg :: SpecConstrWarning -> SDoc
     rebox_msg w@(SpecFailForcedArgCount {}) = pprPanic "rebox_msg" (ppr w)
     rebox_msg (SpecReboxed fn ty mb_parent recur pats callers)
       = vcat [ hang (text "SpecConstr specialised") 2
-                    (quotes (ppr fn <+> dcolon <+> pp_ty ty))
+                    (quotes (pp_name fn <+> dcolon <+> pp_ty ty))
              , nest 2 $ vcat $ catMaybes
                  [ Just (fact "source:" pp_source)
                  , Just (fact "recursivity:" pp_recur)
@@ -892,8 +915,8 @@ specConstrProgram guts
         -- unfolding: iface files record no spans for local binders
         pp_source = case (mb_parent, isGoodSrcSpan (nameSrcSpan loc_name)) of
           (Nothing, True)  -> pp_loc
-          (Just p,  True)  -> quotes (ppr p) <+> text "at" <+> pp_loc
-          (Just p,  False) -> quotes (ppr p) <> comma <+> pp_no_loc
+          (Just p,  True)  -> quotes (pp_name p) <+> text "at" <+> pp_loc
+          (Just p,  False) -> quotes (pp_name p) <> comma <+> pp_no_loc
           (Nothing, False) -> pp_no_loc
           where
             loc_name  = rebox_loc_name fn mb_parent
@@ -906,7 +929,7 @@ specConstrProgram guts
           ReboxNonRec False   -> text "non-recursive"
           ReboxMutualRec sibs
             -> text "mutually recursive with"
-               <+> pprWithCommas (quotes . ppr) named <> pp_rest
+               <+> pprWithCommas (quotes . pp_name) named <> pp_rest
             where
               (named, rest) = splitAt 3 (sortBy stableNameCmp sibs)
               pp_rest = case length rest of
@@ -916,7 +939,7 @@ specConstrProgram guts
 
         pp_callers = case sortBy stableNameCmp callers of
           [] -> Nothing
-          cs -> Just (pprWithCommas (quotes . ppr) cs)
+          cs -> Just (pprWithCommas (quotes . pp_name) cs)
 
         pats_label = case pats of
           [_] -> "call pattern:"
@@ -926,12 +949,12 @@ specConstrProgram guts
 
         -- "-- reboxes" and "--      as" have equal width, aligning the
         -- payloads; a wrapping signature continues under the type's start
-        pp_pat (ReboxedPat shapes cons spec_occ spec_ty)
-          = hang (hang (ppr fn) 2 (fsep (map pprPatShape shapes))) 2 $ vcat
+        pp_pat (ReboxedPat shapes cons spec_nm spec_ty)
+          = hang (hang (pp_name fn) 2 (fsep (map pprPatShape shapes))) 2 $ vcat
               [ text "-- reboxes" <+>
                 pprWithCommas pp_con (sortBy stableNameCmp cons)
               , text "--      as" <+>
-                quotes (ppr spec_occ <+> dcolon <+> pp_ty spec_ty) ]
+                quotes (pp_name spec_nm <+> dcolon <+> pp_ty spec_ty) ]
 
         -- Qualify imported constructors: they identify the package to
         -- follow up with when the function itself has no location.
@@ -1614,9 +1637,11 @@ that decision bites, without changing which specialisations are made:
   the common inlined-library-loop case — Core Tidy drops them.)  Both
   parts of the signature are approximate:
 
-  - The name is the spec's occurrence name at creation ($s<fn>); tidying
-    can prefix the parent and suffix a digit (`$sgo` may end up as
-    `go_$sgo1`), so it is a substring of the final name.
+  - The name is the spec binder's at creation, unique included
+    ($s<fn>_sXYZ): it matches -ddump-spec-constr output exactly.  Core
+    Tidy renumbers the unique and can rename (`$sgo` may end up as
+    `go_$sgo1`), so in Tidy Core (-ddump-simpl) and STG dumps only the
+    occurrence-name part is a substring of the final name.
 
   - The type is the spec binder's type at creation.  It normally survives
     to the final program — the default pipeline runs no worker/wrapper
@@ -1635,14 +1660,18 @@ that decision bites, without changing which specialisations are made:
   only freshens a binder on an in-scope clash, which cannot arise
   between sibling top-level RHSs.
 
-  Warnings that would render identically — same name, type, parent,
-  definition site, recursivity, and patterns — are merged too: the
-  reader could not tell them apart, so printing both is noise.  For
-  located functions the merged warnings are simplifier-made copies of one
-  binding, addressed by a single source-level remedy; span-less loops
-  inlined from other modules can in principle merge across different
-  origins, but sharing name and type they are almost certainly copies of
-  one function.
+  Local binder names in the warning — the function, its parent, the
+  callers, and the spec — display with their uniques, exactly as
+  -ddump-spec-constr prints them, so unique-distinct copies render
+  distinctly and each can be grepped in that dump.  Under
+  -dsuppress-uniques the uniques disappear, and warnings that would then
+  render identically — same name, type, parent, definition site,
+  recursivity, and patterns — are merged: the reader could not tell
+  them apart, so printing both is noise.  For located functions the
+  merged warnings are simplifier-made copies of one binding, addressed
+  by a single source-level remedy; span-less loops inlined from other
+  modules can in principle merge across different origins, but sharing
+  name and type they are almost certainly copies of one function.
 
 * The warning classifies how the specialised function recurses
   ("recursivity"), taken from the binding SpecConstr saw: a Rec group of
@@ -2277,7 +2306,7 @@ specialise env recur bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
               rebox_ws = [ SpecReboxed (idName fn) (idType fn) (sc_top_fn env)
                                        recur
                                        [ReboxedPat (patShapes p) (cp_rebox p)
-                                                   (getOccName spec_id) (idType spec_id)]
+                                                   (idName spec_id) (idType spec_id)]
                                        (cp_callers p)
                          | (p, OS { os_id = spec_id }) <- new_pats `zip` new_specs
                          , not (null (cp_rebox p)) ]
@@ -2845,9 +2874,9 @@ instance Outputable CallPat where
 
 -- | One call pattern as displayed by the reboxing warning: the shapes of
 -- the pattern's arguments, the reboxed constructors among them, and the
--- occurrence name and type of the specialisation made for the pattern.
+-- name and type of the specialisation made for the pattern.
 -- See Note [Reboxing warning]
-data ReboxedPat = ReboxedPat [PatShape] [Name] OccName Type
+data ReboxedPat = ReboxedPat [PatShape] [Name] Name Type
 
 -- | The constructor skeleton of one call-pattern argument, as displayed
 -- by the reboxing warning
