@@ -934,10 +934,12 @@ specConstrProgram guts
                 quotes (ppr spec_occ <+> dcolon <+> pp_ty spec_ty) ]
 
         -- Qualify imported constructors: they identify the package to
-        -- follow up with when the function itself has no location
+        -- follow up with when the function itself has no location.
+        -- OccName only: the ambient qual policy may qualify 'ppr con' too,
+        -- doubling the prefix
         pp_con con
           | Just m <- nameModule_maybe con, m /= mg_module guts
-          = quotes (ppr m <> dot <> ppr con)
+          = quotes (ppr m <> dot <> ppr (getOccName con))
           | otherwise = quotes (ppr con)
 
         all_cons = nub [ con | ReboxedPat _ cons _ _ <- pats, con <- cons ]

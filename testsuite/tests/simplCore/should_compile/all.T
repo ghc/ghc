@@ -625,3 +625,4 @@ test('T27628i', [extra_files(['T27628i_M.hs'])], multimod_compile, ['T27628i', '
 test('T27628j', normal, compile, ['-O2 -Wspec-constr-reboxing'])
 test('T27628k', normal, compile, ['-O2 -Wspec-constr-reboxing'])
 test('T27628l', normal, compile, ['-O2 -Wspec-constr-reboxing -dsuppress-uniques'])
+test('T27628m', [extra_files(['T27628h_M.hs'])], multimod_compile, ['T27628m', '-v0 -O2 -Wspec-constr-reboxing -dsuppress-uniques'])
