@@ -15,6 +15,7 @@ test('CaretDiagnostics1',
      [normalise_whitespace_fun(normalise_whitespace_carefully)],
      compile_fail,
      ['-fdiagnostics-show-caret -ferror-spans'])
+test('WExpectedNoArgError', normal, compile_fail, ['-W='])
 test('CaretDiagnostics2', normal, compile_fail, ['-fdiagnostics-show-caret'])
 test('Colour', normal, compile_fail, ['-fdiagnostics-color=always'])
 test('T20263', normal, compile_fail, ['-Wunicode-bidirectional-format-characters -Werror'])
