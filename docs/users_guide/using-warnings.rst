@@ -565,13 +565,15 @@ of ``-W(no-)*``.
     in ``$sgo_s2Xy``), matching the Core dump of the SpecConstr pass
     (:ghc-flag:`-ddump-spec-constr`) of the same compilation, where the
     specialisation can therefore be located verbatim — for example to
-    judge how much reboxing survives optimisation. In later dumps, such
-    as final Core (:ghc-flag:`-ddump-simpl`) and STG
-    (:ghc-flag:`-ddump-stg-final`), the unique is renumbered and the
-    binder may be renamed — typically to ``<parent>_$s<function>``,
-    possibly with a digit appended — so search there for the shown name
-    without its unique as a substring; the type normally survives
-    unchanged. A specialisation can also be inlined, or merged with
+    judge how much reboxing survives optimisation. In final Core
+    (:ghc-flag:`-ddump-simpl`) a specialisation that remained local to
+    its enclosing binding still carries the same name, unique included;
+    one floated to the top level is renamed — typically to
+    ``<parent>_$s<function>``, possibly with a digit appended and a
+    fresh unique. In STG dumps (:ghc-flag:`-ddump-stg-final`) all
+    uniques are renumbered. Where the exact name fails, search for the
+    shown name without its unique as a substring; the type normally
+    survives unchanged. A specialisation can also be inlined, or merged with
     another one, and then appears in no dump. The calls rewritten to use
     specialisations can be traced with :ghc-flag:`-ddump-rule-firings`;
     the rewrite rules are named ``SC:<function><n>``.

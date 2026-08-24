@@ -1638,10 +1638,12 @@ that decision bites, without changing which specialisations are made:
   parts of the signature are approximate:
 
   - The name is the spec binder's at creation, unique included
-    ($s<fn>_sXYZ): it matches -ddump-spec-constr output exactly.  Core
-    Tidy renumbers the unique and can rename (`$sgo` may end up as
-    `go_$sgo1`), so in Tidy Core (-ddump-simpl) and STG dumps only the
-    occurrence-name part is a substring of the final name.
+    ($s<fn>_sXYZ): it matches -ddump-spec-constr output exactly.  A spec
+    that stays local keeps it through Tidy Core (-ddump-simpl); one
+    floated to top level is renamed by Core Tidy (`$sgo` may end up as
+    `go_$sgo1` with a fresh unique), and STG dumps renumber all uniques
+    — there only the occurrence-name part is a substring of the final
+    name.
 
   - The type is the spec binder's type at creation.  It normally survives
     to the final program — the default pipeline runs no worker/wrapper
