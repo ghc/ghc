@@ -11,7 +11,7 @@ module GHC.HsToCore.Types (
         DsMetaEnv, DsMetaVal(..), CompleteMatches
     ) where
 
-import GHC.Prelude (Int)
+import GHC.Prelude (Bool, Int)
 
 import Data.IORef
 
@@ -125,6 +125,7 @@ data DsLclEnv
   -- ^ See Note [Desugaring non-canonical evidence]
   -- This field collects all un-specialisable evidence variables in scope.
   -- Nothing <=> don't collect this info (used for the LHS of Rules)
+  , dsl_in_generated_code :: Bool -- Desugaring compiler-generated or user-written code
   }
 
 -- Inside [| |] brackets, the desugarer looks

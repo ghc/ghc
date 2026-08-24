@@ -104,7 +104,7 @@ whenDoingPmc no_pmc thing_inside
             Ldi nablas -> thing_inside nablas }
 
 -- | Check a pattern binding (let, where) for exhaustiveness.
-pmcPatBind :: DsMatchContext -> Id -> Pat GhcTc -> DsM LdiNablas
+pmcPatBind :: DsMatchContext -> Id -> LPat GhcTc -> DsM LdiNablas
 pmcPatBind ctxt@(DsMatchContext match_ctxt loc) var p
   = whenDoingPmc NoPmc $ \ !missing ->
     mb_discard_warnings $ do
