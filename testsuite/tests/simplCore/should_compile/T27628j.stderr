@@ -3,7 +3,7 @@ T27628j.hs: warning: [-Wspec-constr-reboxing]
       source:                T27628j.hs:17:1
       recursivity:           mutually recursive with ‘mergeA’
       called from:           ‘g’
-      call pattern:          mergeB (Bin _ _ _) (reboxing ‘Bin’)
+      call pattern:          mergeB (Bin _ _ _) -- reboxes ‘Bin’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.

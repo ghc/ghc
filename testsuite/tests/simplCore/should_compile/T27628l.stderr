@@ -4,7 +4,7 @@ T27628l.hs: warning: [-Wspec-constr-reboxing]
       recursivity:           self-recursive
       called from:           ‘$cmconcat’
       call pattern:          go1 _ (Just _)
-                               (reboxing ‘GHC.Internal.Maybe.Just’)
+                               -- reboxes ‘GHC.Internal.Maybe.Just’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.
@@ -15,7 +15,7 @@ T27628l.hs: warning: [-Wspec-constr-reboxing]
       recursivity:           non-recursive (a join point)
       called from:           ‘$cstimes’
       call pattern:          exit (Just _) _
-                               (reboxing ‘GHC.Internal.Maybe.Just’)
+                               -- reboxes ‘GHC.Internal.Maybe.Just’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.
@@ -26,7 +26,7 @@ T27628l.hs: warning: [-Wspec-constr-reboxing]
       recursivity:           self-recursive
       called from:           ‘$cstimes’
       call pattern:          g (Just _) _ _
-                               (reboxing ‘GHC.Internal.Maybe.Just’)
+                               -- reboxes ‘GHC.Internal.Maybe.Just’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.
@@ -37,7 +37,7 @@ T27628l.hs: warning: [-Wspec-constr-reboxing]
       recursivity:           self-recursive
       called from:           ‘$cmconcat’
       call pattern:          go1 _ (Just _)
-                               (reboxing ‘GHC.Internal.Maybe.Just’)
+                               -- reboxes ‘GHC.Internal.Maybe.Just’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.
@@ -48,7 +48,7 @@ T27628l.hs: warning: [-Wspec-constr-reboxing]
       recursivity:           non-recursive (a join point)
       called from:           ‘$cstimes’
       call pattern:          exit (Just _) _
-                               (reboxing ‘GHC.Internal.Maybe.Just’)
+                               -- reboxes ‘GHC.Internal.Maybe.Just’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.
@@ -59,7 +59,7 @@ T27628l.hs: warning: [-Wspec-constr-reboxing]
       recursivity:           self-recursive
       called from:           ‘$cstimes’
       call pattern:          g (Just _) _ _
-                               (reboxing ‘GHC.Internal.Maybe.Just’)
+                               -- reboxes ‘GHC.Internal.Maybe.Just’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.

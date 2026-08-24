@@ -922,8 +922,8 @@ specConstrProgram guts
 
         pp_pat (ReboxedPat shapes cons)
           = hang (hang (ppr fn) 2 (fsep (map pprPatShape shapes))) 2
-                 (parens (text "reboxing" <+>
-                          pprWithCommas pp_con (sortBy stableNameCmp cons)))
+                 (text "-- reboxes" <+>
+                  pprWithCommas pp_con (sortBy stableNameCmp cons))
 
         -- Qualify imported constructors: they identify the package to
         -- follow up with when the function itself has no location
@@ -1584,9 +1584,10 @@ that decision bites, without changing which specialisations are made:
 
 * One warning per function, listing each call pattern the function was
   specialised for — the constructor skeletons of the call's arguments,
-  e.g. `go (_ : _) (BMap _)` — alongside that pattern's reboxed
-  constructors.  The shapes show where in the argument each reboxed
-  constructor sits, and picture what SpecConstr did: it made a copy of
+  e.g. `go (_ : _) (BMap _) -- reboxes ‘BMap’` — alongside that
+  pattern's reboxed constructors.  The shapes show where in the
+  argument each reboxed constructor sits, and picture what SpecConstr
+  did: it made a copy of
   the function for calls of exactly that shape.  The warning also shows
   the function's type: names like `go1` say nothing, and for span-less
   functions (last bullet below) the type is the main identifying clue.
@@ -2855,7 +2856,7 @@ cmpListBy _   _        []       = GT
 cmpListBy cmp (x1:xs1) (x2:xs2) = cmp x1 x2 `mappend` cmpListBy cmp xs1 xs2
 
 -- Constructors are shown by bare occurrence name: shapes illustrate,
--- while the warning's "reboxing" list identifies (with qualification)
+-- while the warning's "reboxes" list identifies (with qualification)
 pprPatShape :: PatShape -> SDoc
 pprPatShape = go (10 :: Int)   -- Depth cap against pathological patterns
   where

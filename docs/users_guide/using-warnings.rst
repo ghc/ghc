@@ -544,9 +544,9 @@ of ``-W(no-)*``.
     optimised program, whose shape can differ from the source's;
     ``called from:`` — the top-level bindings containing the specialised
     calls; ``call patterns:`` — the calls the function was specialised
-    for, shown as the constructor skeletons of their arguments (for
-    example ``go (_ : _) (Bin _ _ _)``), each alongside the constructors
-    that the specialisation reboxes. One warning is emitted per
+    for, shown as the constructor skeletons of their arguments, each
+    alongside the constructors that the specialisation reboxes (for
+    example ``go (_ : _) (Bin _ _ _) -- reboxes ‘Bin’``). One warning is emitted per
     specialised function, and warnings that would read identically are
     merged into one. Specialisations on nullary constructors are not
     reported, since "reboxing" a nullary constructor simply references

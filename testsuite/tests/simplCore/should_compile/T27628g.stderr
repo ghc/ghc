@@ -3,7 +3,7 @@ T27628g.hs: warning: [-Wspec-constr-reboxing]
       source:                T27628g.hs:11:5
       recursivity:           self-recursive
       called from:           ‘f’
-      call pattern:          poly_merge (Bin _ _ _) (reboxing ‘Bin’)
+      call pattern:          poly_merge (Bin _ _ _) -- reboxes ‘Bin’
     This constructor argument is also used boxed, so the specialisation
     may increase allocation and defeat pointer-equality-based sharing.
     See -Wspec-constr-reboxing in the users guide for possible remedies.
