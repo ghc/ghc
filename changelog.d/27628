@@ -7,3 +7,4 @@ description:
   re-allocates the constructor ("reboxing"). Reboxing can increase
   allocation and defeat sharing schemes based on pointer equality.
 issues: #27628
+mrs: !7
