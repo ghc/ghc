@@ -1523,7 +1523,6 @@ waitForGcThreads (Capability *cap, bool idle_cap[])
             if (i == me || idle_cap[i]) { continue; }
             if (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_STANDING_BY) {
                 prodCapability(getCapability(i));
-                interruptCapability(getCapability(i));
             }
         }
         // this 1ms timeout is not well justified. It's the shortest timeout we

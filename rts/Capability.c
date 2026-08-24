@@ -679,8 +679,12 @@ releaseCapability_ (Capability* cap,
 
     // If we have an unbound thread on the run queue, or if there's
     // anything else to do, give the Capability to a worker thread.
+    //
+    // We also check the cap->interrupt flag to avoid a race condition.
+    // See Note [prodCapability reliability].
+    //
     if (always_wakeup ||
-        !emptyRunQueue(cap) || !emptyInbox(cap) ||
+        !emptyRunQueue(cap) || !emptyInbox(cap) || cap->interrupt ||
         (!cap->disabled && !emptySparkPoolCap(cap)) || globalWorkToDo()) {
         if (cap->spare_workers) {
             giveCapabilityToTask(cap, cap->spare_workers);
@@ -1370,8 +1374,40 @@ void releaseAllCapabilities(uint32_t n, Capability *keep_cap, Task *task)
 /* ----------------------------------------------------------------------------
  * prodCapability
  *
- * If a Capability is currently idle, wake up a Task on it.  Used to
- * get every Capability into the GC.
+ * If a Capability is currently idle, wake up a Task on it. If it is not idle,
+ * interrupt it.
+ *
+ * Used to get every Capability into the GC. Also used for ctl-C handling
+ * to get the capability to run the scheduler.
+ *
+ * Note [prodCapability reliability]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * There's a potential race condition with prodCapability: a task running a
+ * capability may be just about to yield when it is prodded and then let the
+ * capability go idle, thus missing the prod. To avoid this we must check if
+ * the capability has been prodded in a reliable fashion when the task is
+ * yielding the capability. This is much like the issue of the race between
+ * sending a capability a message and the capability going idle (where it's
+ * vital that we don't let a capability go idle if there's a pending message).
+ * The solution we use is much the same as the solution for messages: rely on
+ * a shared variable set and tested while holding the cap->lock.
+ *
+ * The scheme is as follows:
+ * 1. Set the cap->interrupt flag in prodCapability while holding the cap->lock
+ * 2. Test the cap->interrupt flag in releaseCapability_ while holding the
+ *    cap->lock. If the flag is set then make sure to pass the capability to
+ *    a worker task (which often would be the task that was just releasing it).
+ * 3. Make sure to reset the cap->interrupt flag at the start of the scheduler
+ *    loop. (Historically it was only reset when running a Haskell thread.)
+ *    We must do this before the scheduler yields again or we could loop
+ *    indefinitely.
+ *
+ * This scheme ensures that we run the scheduler loop once more, which will
+ * react to the prod or reset the flag and yield again. In particular for
+ * getting tasks into GC they will do that in yieldCapability, and for ctl-c
+ * the scheduler will asks the I/O manager to poll for events which will pick
+ * up pending signals.
  * ------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
@@ -1380,9 +1416,22 @@ void
 prodCapability (Capability *cap)
 {
     ACQUIRE_LOCK(&cap->lock);
-    if (!cap->running_task) {
-        releaseCapability_(cap,true);
+    if (cap->running_task) {
+        /* Set the cap->interrupt so that the capability will not go idle
+         * before attending to the reason for the interrupt.
+         * See Note [prodCapability reliability].
+         */
+        interruptCapability(cap);
+    } else {
+        /* Set the cap->interrupt first so that releaseCapability_ will see
+         * that there is something to do on this capability and ensure the
+         * cap is given to a task. See Note [prodCapability reliability].
+         */
+        interruptCapability(cap);
+        releaseCapability_(cap, false);
     }
+    /* Notice that we use interruptCapability either way, but for different
+     * reasons */
     RELEASE_LOCK(&cap->lock);
 }
 

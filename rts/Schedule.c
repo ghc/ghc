@@ -283,6 +283,10 @@ schedule (Capability *initialCapability, Task *task)
         barf("sched_state: %" FMT_Word, sched_state);
     }
 
+    // Reset the interrupt flag upon starting the scheduler loop.
+    // See Note [prodCapability reliability].
+    RELAXED_STORE(&cap->interrupt, false);
+
     scheduleFindWork(&cap);
 
     /* work pushing, currently relevant only for THREADED_RTS:
@@ -429,9 +433,6 @@ run_thread:
 #if defined(mingw32_HOST_OS)
     SetLastError(t->saved_winerror);
 #endif
-
-    // reset the interrupt flag before running Haskell code
-    RELAXED_STORE(&cap->interrupt, false);
 
     cap->in_haskell = true;
     RELAXED_STORE(&cap->idle, false);
