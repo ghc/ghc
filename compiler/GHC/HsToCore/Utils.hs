@@ -951,6 +951,9 @@ Specifically:
 
 
 -- | Use -XStrict to add a ! or remove a ~
+-- The bang we insert is compiler-generated, so we put it at a generatedSrcSpan.
+-- The pattern-match checker uses this (via dsl_in_generated_code) to avoid reporting
+-- such bangs under -Wredundant-bang-patterns (#27323).
 -- See Note [decideBangHood]
 decideBangHood :: DynFlags
                -> LPat GhcTc  -- ^ Original pattern
@@ -966,7 +969,7 @@ decideBangHood dflags lpat
            ParPat x p -> L l (ParPat x (go p))
            LazyPat _ lp' -> lp'
            BangPat _ _   -> lp
-           _             -> L l (BangPat noExtField lp)
+           _             -> L (noAnnSrcSpan generatedSrcSpan) (BangPat noExtField lp)
 
 isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
 

@@ -1,0 +1,7 @@
+section: compiler
+synopsis: Don't report ``-XStrict``-generated bang patterns under ``-Wredundant-bang-patterns``
+description:
+  Bangs introduced by ``-XStrict`` are no longer reported as redundant under
+  ``-Wredundant-bang-patterns``, as they are not user-written.
+issues: #27323
+mrs: !16395

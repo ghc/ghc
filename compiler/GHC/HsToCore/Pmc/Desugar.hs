@@ -155,11 +155,15 @@ desugarPat x pat = case pat of
   VarPat _ y   -> pure (mkPmLetVar (unLoc y) x)
   ParPat _ p   -> desugarLPat x p
   LazyPat _ _  -> pure GdEnd -- like a wildcard
-  BangPat _ p@(L l p') ->
+  BangPat _ p@(L l p') -> do
     -- Add the bang in front of the list, because it will happen before any
     -- nested stuff.
+    in_gen <- inGeneratedCodeDs
+    -- A bang inserted by -XStrict (decideBangHood) has no SrcInfo: it is
+    -- divergence-checked but never reported as redundant (#27323).
+    let pm_loc | in_gen    = Nothing
+               | otherwise = Just (SrcInfo (L (locA l) (ppr p')))
     consGrdDag (PmBang x pm_loc) <$> desugarLPat x p
-      where pm_loc = Just (SrcInfo (L (locA l) (ppr p')))
 
   -- (x@pat)   ==>   Desugar pat with x as match var and handle impedance
   --                 mismatch with incoming match var
@@ -311,7 +315,7 @@ desugarPatV pat = do
   pure (x, grds)
 
 desugarLPat :: Id -> LPat GhcTc -> DsM GrdDag
-desugarLPat x = desugarPat x . unLoc
+desugarLPat x (L loc pat) = putSrcSpanDsA loc (desugarPat x pat)
 
 -- | 'desugarLPat', but also select and return a new match var.
 desugarLPatV :: LPat GhcTc -> DsM (Id, GrdDag)
@@ -650,4 +654,19 @@ user *had* written a bang:
 +    In an equation for ‘idV’: idV !v = ...
 
 So we live with the duplication.
+
+Note that 'decideBangHood' places the bangs it inserts at a 'generatedSrcSpan'.
+When 'desugarLPat' enters such a span, 'putSrcSpanDs' (GHC.HsToCore.Monad)
+records in 'dsl_in_generated_code' that we are desugaring compiler-generated
+code. For a bang in generated code, 'desugarPat' emits a 'PmBang' with no
+'SrcInfo': the checker still performs the divergence check (so the
+inaccessible-RHS warning above survives), but -Wredundant-bang-patterns only
+ever reports bangs the user actually wrote (#27323). See
+Note [Dead bang patterns] in GHC.HsToCore.Pmc.Check.
+
+Eventually the bangs inserted by -XStrict should become expanded patterns,
+following Note [Handling overloaded and rebindable constructs] in
+GHC.Rename.Expr. That would let warnings always display the original
+user-written code, making the decideBangHood duplication described above
+unnecessary. This is tracked as #27677.
 -}
