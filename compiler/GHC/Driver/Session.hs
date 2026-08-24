@@ -1989,8 +1989,7 @@ dynamic_flags_deps = [
  ++
 
         ------ Warning flags -------------------------------------------------
-  [ make_ord_flag defFlag "W"       (NoArg (setWarningGroup W_extra))
-  , make_ord_flag defFlag "Werror"
+  [ make_ord_flag defFlag "Werror"
                (NoArg (do { setGeneralFlag Opt_WarnIsError
                           ; setFatalWarningGroup W_everything }))
   , make_ord_flag defFlag "Wwarn"
@@ -2016,7 +2015,7 @@ dynamic_flags_deps = [
     , (NotDeprecated, customOrUnrecognisedWarning "Werror="    setCustomWErrorFlag)
     , (NotDeprecated, customOrUnrecognisedWarning "Wwarn="     unSetCustomFatalWarningFlag)
     , (NotDeprecated, customOrUnrecognisedWarning "Wno-error=" unSetCustomFatalWarningFlag)
-    , (NotDeprecated, customOrUnrecognisedWarning "W"          setCustomWarningFlag)
+    , flagW
     , (Deprecated,    customOrUnrecognisedWarning "fwarn-"     setCustomWarningFlag)
     , (Deprecated,    customOrUnrecognisedWarning "fno-warn-"  unSetCustomWarningFlag)
     ]
@@ -2052,19 +2051,35 @@ warningControls set unset set_werror unset_fatal xs =
  ++ map (mkFlag turnOn  "fwarn-"     set   . hideFlag) xs
  ++ map (mkFlag turnOff "fno-warn-"  unset . hideFlag) xs
 
+-- | The "W" flag is special in that it can mean enable extra warnings ('W_extra')
+-- or enable a custom warning, if the suffix is non-empty.
+flagW :: (Deprecation, Flag (CmdLineP DynFlags))
+flagW =
+  make_ord_flag defFlag "W" $ OptPrefix $ \suffix ->
+    if null suffix then do
+      -- Reject "-W=" instead of taking it to mean "-W".
+      arg <- getArg
+      if arg == "-W" then
+        setWarningGroup W_extra
+      else
+        addErr ("missing argument for flag: " ++ arg)
+    else
+      customOrUnrecognisedWarningAction "W" setCustomWarningFlag suffix
+
 -- | This is where we handle unrecognised warning flags. If the flag is valid as
 -- an extended warning category, we call the supplied action. Otherwise, issue a
 -- warning if -Wunrecognised-warning-flags is set. See #11429 for context.
 -- See Note [Warning categories] in GHC.Unit.Module.Warnings.
 customOrUnrecognisedWarning :: String -> (WarningCategory -> DynP ()) -> Flag (CmdLineP DynFlags)
-customOrUnrecognisedWarning prefix custom = defHiddenFlag prefix (Prefix action)
-  where
-    action :: String -> DynP ()
-    action flag
+customOrUnrecognisedWarning prefix custom =
+  defHiddenFlag prefix $ Prefix $ customOrUnrecognisedWarningAction prefix custom
+
+customOrUnrecognisedWarningAction :: String -> (WarningCategory -> DynP ()) -> String -> DynP ()
+customOrUnrecognisedWarningAction prefix custom flag
       | validWarningCategory cat = custom cat
       | otherwise = unrecognised flag
-      where
-        cat = mkWarningCategory (packHText flag)
+  where
+    cat = mkWarningCategory (packHText flag)
 
     unrecognised flag = do
       -- #23402 and #12056
