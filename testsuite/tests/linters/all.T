@@ -34,5 +34,7 @@ test('whitespace', [ req_ls_files
                    , req_hadrian_deps(["lint:whitespace"]) ]
                  , makefile_test, ['whitespace'])
 
-test('changelog-d', [ req_hadrian_deps(["lint:changelog"]) ]
+# In CI the changelog is checked by the dedicated lint-changelog job.
+test('changelog-d', [ req_hadrian_deps(["lint:changelog"])
+                    , when('GITLAB_CI' in os.environ, skip) ]
                    , makefile_test, ['changelog-d'])
