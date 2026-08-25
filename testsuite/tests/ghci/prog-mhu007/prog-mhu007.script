@@ -1,0 +1,5 @@
+:m + A B
+"Loaded A and B"
+import Foo
+import Bar
+"Loaded dependencies Foo and Bar"
