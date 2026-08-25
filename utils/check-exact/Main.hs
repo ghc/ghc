@@ -61,7 +61,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl2.hs" (Just changeAddDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl3.hs" (Just changeAddDecl3)
  -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls.hs" (Just changeLocalDecls)
- -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls2.hs" (Just changeLocalDecls2)
+ "../../testsuite/tests/ghc-api/exactprint/LocalDecls2.hs" (Just changeLocalDecls2)
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn3a.hs" (Just changeWhereIn3a)
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn3b.hs" (Just changeWhereIn3b)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl1.hs" (Just addLocaLDecl1)
@@ -269,6 +269,7 @@ changers =
   ,("addHiding1",        addHiding1)
   ,("addHiding2",        addHiding2)
   ,("addClassMethod",    addClassMethod)
+  ,("makeDelta",         makeDelta)
    ]
 
 -- ---------------------------------------------------------------------
@@ -467,7 +468,7 @@ changeLetIn1 _libdir parsed
     replace :: HsExpr GhcPs -> HsExpr GhcPs
     replace (HsLet (tkLet, _) localDecls expr)
       =
-         let (L l (HsValBinds x (ValBinds xv bs))) = localDecls
+         let (L l (HsValBinds w (L llb (ValBinds xv bs)))) = localDecls
              [l2,_l1] = bs
              decls' = [l2]
              (L _ e) = expr
@@ -475,7 +476,7 @@ changeLetIn1 _libdir parsed
              expr' = L a e
              tkIn' = EpTok (EpaDelta noSrcSpan (DifferentLine 1 0) [])
          in (HsLet (tkLet, tkIn')
-                (L l (HsValBinds x (ValBinds xv decls'))) expr')
+                (L l (HsValBinds w (L llb (ValBinds xv decls')))) expr')
 
     replace x = x
 
@@ -536,15 +537,13 @@ changeLocalDecls libdir (L l p) = do
       doAddLocal = everywhereM (mkM replaceLocalBinds) p
       replaceLocalBinds :: LMatch GhcPs (LHsExpr GhcPs)
                         -> Transform (LMatch GhcPs (LHsExpr GhcPs))
-      replaceLocalBinds (L lm (Match an mln pats (GRHSs _ rhs (L lb (HsValBinds (van,w) (ValBinds _ bs)))))) = do
+      replaceLocalBinds (L lm (Match an mln pats (GRHSs _ rhs (L lb (HsValBinds w (L llb (ValBinds van bs))))))) = do
         let oldDecls = map unWrapValBind bs
         let oldDecls' = captureLineSpacing oldDecls
         let (VbSig o:oldBinds)  = map wrapValBind oldDecls'
             o' = setEntryDP o (DifferentLine 2 0)
-        let (AnnList _ b) = van
-        let van' = AnnList (EpVirtualBraces (EpaDelta noSrcSpan (DifferentLine 1 4) [])) b
-        let binds' = L lb (HsValBinds (van',w)
-                          (ValBinds noExtField (VbSig sig':VbBind decl':VbSig o':oldBinds)))
+        let binds' = L lb (HsValBinds w
+                          (L llb (ValBinds van (VbSig sig':VbBind decl':VbSig o':oldBinds))))
         return (L lm (Match an mln pats (GRHSs emptyComments rhs binds')))
                    `debug` ("oldDecls=" ++ showAst oldDecls)
       replaceLocalBinds x = return x
@@ -567,11 +566,11 @@ changeLocalDecls2 libdir (L l p) = do
       replaceLocalBinds (L lm (Match ma mln pats (GRHSs _ rhs (L _ EmptyLocalBinds{})))) = do
         let anc = (EpaDelta noSrcSpan (DifferentLine 1 2) [])
         let anc2 = (EpaDelta noSrcSpan (DifferentLine 1 4) [])
-        let an = ( AnnList (EpVirtualBraces anc2) []
-                 , EpTok (EpaDelta noSrcSpan (SameLine 0) []))
+        let wt = EpTok (EpaDelta noSrcSpan (SameLine 0) [])
         let lb = EpAnn anc noAnn emptyComments
+        let llb = EpAnn (EpaDelta noSrcSpan (SameLine 0) []) noAnn emptyComments
         let decls = [VbSig sig', VbBind decl']
-        let binds = L lb (HsValBinds an (ValBinds noExtField decls))
+        let binds = L lb (HsValBinds wt (L llb (ValBinds (AnnList (EpVirtualBraces anc2) []) decls)))
         return (L lm (Match ma mln pats (GRHSs emptyComments rhs binds)))
       replaceLocalBinds x = return x
   return (L l p')
@@ -608,7 +607,7 @@ changeWhereIn3b _libdir (L l p) = do
 addLocaLDecl1 :: Changer
 addLocaLDecl1 libdir top = do
   Right (L ld (ValD _ decl)) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
-  let decl' = setEntryDP (L ld decl) (DifferentLine 1 5)
+  let decl' = setEntryDP (L ld decl) (DifferentLine 1 4)
       doAddLocal :: ParsedSource
       doAddLocal = replaceDecls lp [de1', d2', d3]
         where

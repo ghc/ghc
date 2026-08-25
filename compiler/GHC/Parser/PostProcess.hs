@@ -454,7 +454,7 @@ fromSpecTyVarBndr (L loc (HsTvb xtv flag idp k)) = do
 
 -- | Add the annotation for a 'where' keyword to existing @HsLocalBinds@
 annBinds :: EpToken "where" -> EpAnnComments -> LHsLocalBinds GhcPs -> LHsLocalBinds GhcPs
-annBinds w cs (L l (HsValBinds an bs))  = L (widen_where w l cs) (HsValBinds (fst an, w) bs)
+annBinds w cs (L l (HsValBinds _ bs))  = L (widen_where w l cs) (HsValBinds w bs)
 annBinds w cs (L l (HsIPBinds an bs))   = L (widen_where w l cs) (HsIPBinds  (fst an, w) bs)
 annBinds w cs (L l (EmptyLocalBinds x)) = L (widen_where w l cs) (EmptyLocalBinds x)
 
@@ -500,10 +500,10 @@ cvTopDecls :: OrdList (LHsDecl GhcPs) -> [LHsDecl GhcPs]
 cvTopDecls decls = getMonoBindAll (fromOL decls)
 
 -- Declaration list may only contain value bindings and signatures.
-cvBindGroup :: OrdList (LHsDecl GhcPs) -> P (HsValBinds GhcPs)
-cvBindGroup binding
+cvBindGroup :: AnnList -> OrdList (LHsDecl GhcPs) -> P (HsValBinds GhcPs)
+cvBindGroup ann binding
   = do { binds <- cvBindsAndSigsOnly binding
-       ; return $ ValBinds noExtField binds }
+       ; return $ ValBinds ann binds }
 
 cvBindsAndSigsOnly :: OrdList (LHsDecl GhcPs)
   -> P [ValBind GhcPs GhcPs]

@@ -675,12 +675,12 @@ zonkLocalBinds :: LHsLocalBinds GhcTc
 zonkLocalBinds (L l (EmptyLocalBinds x))
   = return (L l (EmptyLocalBinds x))
 
-zonkLocalBinds (L _ (HsValBinds _ (ValBinds {})))
+zonkLocalBinds (L _ (HsValBinds _ (L _ ValBinds {})))
   = panic "zonkLocalBinds" -- Not in typechecker output
 
-zonkLocalBinds (L l (HsValBinds x (XValBindsLR (HsVBG binds sigs))))
+zonkLocalBinds (L l (HsValBinds x (L lb (XValBindsLR (HsVBG binds sigs)))))
   = do  { new_binds <- mapM go binds
-        ; return (L l (HsValBinds x (XValBindsLR (HsVBG new_binds sigs)))) }
+        ; return (L l (HsValBinds x (L lb (XValBindsLR (HsVBG new_binds sigs))))) }
   where
     go (r,b) = do { b' <- zonkRecMonoBinds b; return (r,b') }
 

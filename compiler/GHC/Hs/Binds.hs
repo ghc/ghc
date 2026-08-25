@@ -72,13 +72,13 @@ Global bindings (where clauses)
 -- the ...LR datatypes are parameterized by two id types,
 -- one for the left and one for the right.
 
-type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = (AnnList, EpToken "where")
+type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = EpToken "where"
 type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = (AnnList, EpToken "where")
 type instance XEmptyLocalBinds (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XXHsLocalBindsLR (GhcPass pL) (GhcPass pR) = DataConCantHappen
 
 -- ---------------------------------------------------------------------
-type instance XValBinds    (GhcPass pL) (GhcPass pR) = NoExtField
+type instance XValBinds    (GhcPass pL) (GhcPass pR) = AnnList
 
 type instance XXValBindsLR (GhcPass pL) _ = HsValBindGroups pL
 
@@ -530,7 +530,7 @@ isEmptyValBinds (ValBinds _ binds)  = null binds
 isEmptyValBinds (XValBindsLR (HsVBG ds sigs)) = null ds && null sigs
 
 emptyValBindsIn :: HsValBindsLR (GhcPass a) (GhcPass b)
-emptyValBindsIn  = ValBinds noExtField []
+emptyValBindsIn  = ValBinds noAnn []
 emptyValBindsRn :: HsValBindsLR GhcRn GhcRn
 emptyValBindsRn  = XValBindsLR (HsVBG [] [])
 
@@ -552,7 +552,7 @@ hsValBindGroupsBinds binds
 plusHsValBinds :: HsValBinds (GhcPass a) -> HsValBinds (GhcPass a)
                -> HsValBinds(GhcPass a)
 plusHsValBinds (ValBinds _ ds1) (ValBinds _ ds2)
-  = ValBinds noExtField (ds1 ++ ds2)
+  = ValBinds noAnn (ds1 ++ ds2)
 plusHsValBinds (XValBindsLR (HsVBG ds1 ss1)) (XValBindsLR (HsVBG ds2 ss2))
   = XValBindsLR (HsVBG (ds1++ds2) (ss1++ss2))
 plusHsValBinds _ _
@@ -1034,6 +1034,7 @@ instance (OutputableBndrId p) => Outputable (RuleBndr (GhcPass p)) where
 -}
 
 type instance Anno (HsLocalBindsLR (GhcPass idL) (GhcPass idR)) = SrcSpanAnnA
+type instance Anno (HsValBindsLR   (GhcPass idL) (GhcPass idR)) = SrcSpanAnnA
 type instance Anno (HsBindLR (GhcPass idL) (GhcPass idR)) = SrcSpanAnnA
 type instance Anno (IPBind (GhcPass p)) = SrcSpanAnnA
 type instance Anno (Sig (GhcPass p)) = SrcSpanAnnA
