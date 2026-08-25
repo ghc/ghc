@@ -300,7 +300,7 @@ findDependency  :: HscEnv
 findDependency hsc_env imp include_pkg_deps = do
   -- Find the module; this will be fast because
   -- we've done it once during downsweep.
-  r <- resolveImport hsc_env imp
+  r <- runFinderM $ resolveImport hsc_env imp
   case r of
     Found loc _
         -- Home package: just depend on the .hi or hi-boot file

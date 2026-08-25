@@ -104,7 +104,8 @@ tcPluginTrace a b = unsafeTcPluginTcM (traceTc a b)
 findImportedModule :: ModuleName -> PkgQual -> TcPluginM Finder.FindResult
 findImportedModule mod_name mb_pkg = do
     hsc_env <- getTopEnv
-    tcPluginIO $ Finder.findImportedModule hsc_env Finder.LookupUser mod_name mb_pkg
+    tcPluginIO $ Finder.runFinderM $
+      Finder.findImportedModule hsc_env Finder.LookupUser mod_name mb_pkg
 
 lookupOrig :: Module -> OccName -> TcPluginM Name
 lookupOrig mod = unsafeTcPluginTcM . IfaceEnv.lookupOrig mod

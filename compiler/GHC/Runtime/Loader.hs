@@ -57,7 +57,7 @@ import GHC.Types.Name.Occurrence ( OccName, mkVarOccFS )
 import GHC.Types.Name.Reader
 import GHC.Types.Unique.DFM
 
-import GHC.Unit.Finder         ( findPluginModule, FindResult(..) )
+import GHC.Unit.Finder ( FindResult(..), runFinderM, findPluginModule )
 import GHC.Driver.Config.Diagnostic ( initIfaceMessageOpts )
 import GHC.Unit.Module   ( Module, ModuleName, thisGhcUnit, GenModule(moduleUnit), IsBootInterface(NotBoot) )
 import GHC.Unit.Module.ModIface
@@ -345,7 +345,7 @@ lookupRdrNameInModuleForPlugins :: HasDebugCallStack
 lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     let dflags     = hsc_dflags hsc_env
     -- First find the unit the module resides in by searching exposed units and home modules
-    found_module <- findPluginModule hsc_env mod_name
+    found_module <- runFinderM $ findPluginModule hsc_env mod_name
     case found_module of
         Found _ mod -> do
             -- Find the exports of the module

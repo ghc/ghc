@@ -284,7 +284,7 @@ implicitRequirements :: HscEnv
 implicitRequirements hsc_env normal_imports
   = fmap concat $
     forM normal_imports $ \e -> do
-        found <- resolveImport hsc_env e
+        found <- runFinderM $ resolveImport hsc_env e
         case found of
             Found _ mod | notHomeModuleMaybe mhome_unit mod ->
                 return (uniqDSetToList (moduleFreeHoles mod))
@@ -306,7 +306,7 @@ implicitRequirementsShallow hsc_env normal_imports = go [] normal_imports
 
   go acc [] = pure acc
   go accR (e:imports) = do
-    found <- resolveImport hsc_env e
+    found <- runFinderM $ resolveImport hsc_env e
     let acc' = case found of
           Found _ mod | notHomeModuleMaybe mhome_unit mod ->
               case moduleUnit mod of

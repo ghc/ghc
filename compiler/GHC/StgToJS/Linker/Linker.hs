@@ -118,7 +118,7 @@ import System.Directory ( createDirectoryIfMissing
                         )
 
 import GHC.Unit.Finder.Types
-import GHC.Unit.Finder (findObjectLinkableMaybe, findHomeModule)
+import GHC.Unit.Finder (findObjectLinkableMaybe, findHomeModule, runFinderM)
 import GHC.Driver.Config.Finder (initFinderOpts)
 import qualified GHC.Unit.Home.Graph as HUG
 
@@ -491,7 +491,7 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache
               case ue_homeUnit unit_env of
                 Nothing -> pprPanic "getDeps: No home-unit: " (pprModule mod)
                 Just home_unit -> do
-                    mb_stuff <- findHomeModule finder_cache finder_opts home_unit (moduleName mod)
+                    mb_stuff <- runFinderM $ findHomeModule finder_cache finder_opts home_unit (moduleName mod)
                     case mb_stuff of
                       Found loc mod -> found loc mod
                       _ -> pprPanic "getDeps: Couldn't find home-module: " (pprModule mod)

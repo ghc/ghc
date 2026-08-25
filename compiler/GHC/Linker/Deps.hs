@@ -168,7 +168,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
 
               let fc = ldFinderCache opts
               let fopts = ldFinderOpts opts
-              mb_stuff <- findHomeModule fc fopts home_unit (moduleName mod)
+              mb_stuff <- runFinderM $ findHomeModule fc fopts home_unit (moduleName mod)
               case mb_stuff of
                 Found loc _ -> do
                   from_bc <- ldLoadByteCode opts mod loc
@@ -179,7 +179,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
             fallback_no_bytecode home_unit mod = do
               let fc = ldFinderCache opts
               let fopts = ldFinderOpts opts
-              mb_stuff <- findHomeModule fc fopts home_unit (moduleName mod)
+              mb_stuff <- runFinderM $ findHomeModule fc fopts home_unit (moduleName mod)
               case mb_stuff of
                 Found loc _ -> do
                   mb_lnk <- findObjectLinkableMaybe mod loc

@@ -67,7 +67,7 @@ import GHC.Types.PkgQual
 import GHC.Tc.Utils.Monad
   ( initIfaceLoad )
 import GHC.Unit.Finder
-  ( FindResult(..), ModuleLookupScope(..), findImportedModule )
+  ( FindResult(..), ModuleLookupScope(..), findImportedModule, runFinderM )
 import GHC.Utils.Outputable
   ( text )
 import Language.Haskell.Syntax.Module.Name
@@ -157,7 +157,7 @@ ghcDiagnosticCodeTyCon mb_libDir =
      ; liftIO
 
   -- STEP 2: look up the module "GHC.Types.Error.Codes"
-  do { res <- findImportedModule hsc_env LookupUser (mkModuleName "GHC.Types.Error.Codes") NoPkgQual
+  do { res <- runFinderM $ findImportedModule hsc_env LookupUser (mkModuleName "GHC.Types.Error.Codes") NoPkgQual
      ; case res of
      { Found _ modl ->
 

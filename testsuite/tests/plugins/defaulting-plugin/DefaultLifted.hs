@@ -6,7 +6,7 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Plugin
 import GHC.Core.InstEnv
 import GHC.Tc.Solver (approximateWC)
-import GHC.Unit.Finder (findPluginModule)
+import GHC.Unit.Finder (findPluginModule, runFinderM)
 import GHC.Driver.Config.Finder (initFinderOpts)
 import Data.List
 import GHC.Tc.Types
@@ -50,7 +50,7 @@ lookupModule :: ModuleName -- ^ Name of the module
 lookupModule mod_nm = do
   hsc_env <- getTopEnv
   let home_unit = hsc_home_unit hsc_env
-  found_module <- tcPluginIO $ findPluginModule hsc_env mod_nm
+  found_module <- tcPluginIO $ runFinderM $ findPluginModule hsc_env mod_nm
   case found_module of
     FoundModule h -> return (fr_mod h)
     _          -> do
