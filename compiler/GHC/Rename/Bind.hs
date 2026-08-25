@@ -244,9 +244,9 @@ rnLocalBindsAndThen :: HsLocalBinds GhcPs
 rnLocalBindsAndThen (EmptyLocalBinds x) thing_inside =
   thing_inside (EmptyLocalBinds x) emptyNameSet
 
-rnLocalBindsAndThen (HsValBinds x val_binds) thing_inside
+rnLocalBindsAndThen (HsValBinds x (L lb val_binds)) thing_inside
   = rnLocalValBindsAndThen val_binds $ \ val_binds' ->
-      thing_inside (HsValBinds x val_binds')
+      thing_inside (HsValBinds x (L lb val_binds'))
 
 rnLocalBindsAndThen (HsIPBinds x binds) thing_inside = do
     (binds',fv_binds) <- rnIPBinds binds
@@ -396,7 +396,7 @@ rnLocalValBindsAndThen binds@(ValBinds _ vbinds) thing_inside
           addLocalFixities new_fixities bound_names $ do
 
         {      -- (C) Do the RHS and thing inside
-          let new_lhs :: HsValBindsLR GhcRn GhcPs = ValBinds noExtField (map VbBind binds' ++ map VbSig sigs')
+          let new_lhs :: HsValBindsLR GhcRn GhcPs = ValBinds noAnn (map VbBind binds' ++ map VbSig sigs')
         ; (binds', dus) <- rnLocalValBindsRHS (mkNameSet bound_names) new_lhs
         ; (result, result_fvs) <- thing_inside binds' (allUses dus)
 
