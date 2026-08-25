@@ -1,0 +1,11 @@
+name: testpkg-foo
+version: 0.1.0.0
+id: testpkg-foo-0.1.0.0-XXX
+key: testpkg-foo-0.1.0.0-XXX
+exposed: True
+exposed-modules: Foo
+hidden-modules:
+import-dirs: ${pkgroot}/testpkg-foo/dist-testpkg-foo-0.1.0.0
+library-dirs:
+include-dirs:
+hs-libraries:

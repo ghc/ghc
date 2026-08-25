@@ -1,0 +1,11 @@
+-i
+-ib/
+B
+-this-unit-id b-0.0.0
+-this-package-name b
+-clear-package-db
+-global-package-db
+-no-user-package-db
+-package-db local-foo.package.conf
+-package base
+-package-id testpkg-foo-0.1.0.0-XXX

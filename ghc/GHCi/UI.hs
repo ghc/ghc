@@ -756,7 +756,7 @@ installInteractiveHomeUnits dflags = do
     -- However, in the case of multiple home units, initialised via @ghci -unit ... -unit ...@, there
     -- are not @-package-db@ arguments in the base 'DynFlags'...
     -- To fix this, we look at the home units and merge their package dbs stacks.
-    -- We assume, that many package db stacks look almost identical, and only differ in view elements.
+    -- We assume, that many package db stacks look almost identical, and only differ in few unit databases.
     -- Thus, we try to extract a common package db stack (i.e., longest common prefix), and then concat
     -- the rest of the package db stacks. At last, we add the two result package db stacks.
     -- This should work reliably with cabal and stack, but it is hacky.
@@ -855,8 +855,14 @@ installInteractiveHomeUnits dflags = do
       pure (HUG.mkHomeUnitEnv unit_state (Just dbs) dflags hpt (Just home_unit))
 
     concatPackageDbStacksUsingLongestCommonPrefix :: [[PackageDBFlag]] -> [PackageDBFlag]
-    concatPackageDbStacksUsingLongestCommonPrefix stacks =
+    concatPackageDbStacksUsingLongestCommonPrefix stacks' =
       let
+        -- Package DB stacks are accumulated from the cli right to left.
+        -- E.g., @-clear-package-db -global-package-db@ is stored as
+        -- @[PackageDB GlobalPkgDb, ClearPackageDBs]@.
+        -- Hence, we reverse the stacks, before computing the longest common prefix,
+        -- otherwise the prefix won't match at all.
+        stacks = map List.reverse stacks'
         -- O (m * n)
         -- m ... Number of PackageDBFlag stacks
         -- n ... Size of the stacks
@@ -864,8 +870,21 @@ installInteractiveHomeUnits dflags = do
           map List.head . List.takeWhile ((List.all . (==) . List.head) <*> List.tail) . List.transpose
         prefix =
           longestCommonPrefix stacks
+
+        -- We reverse each individual stack segment to maintain the relative order within in a package
+        -- db stack.
+        -- There should be no 'ClearPackageDBs' in here, otherwise we are going to overwrite
+        -- the longest common prefix stacks.
+        --
+        -- @ordNub@ can silently change precedence of package db stack merging.
+        -- This is not trivially avoidable right now, since multiple home units could simply
+        -- have package db stacks that cannot be unified.
+        unmergeableStack =
+          ordNub (concatMap (List.reverse . List.drop (length prefix)) stacks)
       in
-        prefix ++ ordNub (concatMap (List.drop (length prefix)) stacks)
+        -- We reverse the final common package db stack again to match the expectation of 'packageDBFlags' that they are
+        -- stord in reverse order.
+        unmergeableStack ++ reverse prefix
 
 reportError :: GhciMonad m => GhciCommandMessage -> m ()
 reportError err = do
