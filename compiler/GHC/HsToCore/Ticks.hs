@@ -849,21 +849,21 @@ addTickStmtAndBinders isGuard (ParStmtBlock x stmts ids returnExpr) =
 addTickLHsLocalBinds :: LHsLocalBinds GhcTc -> TM (LHsLocalBinds GhcTc)
 addTickLHsLocalBinds (L l (HsValBinds x binds)) =
         L l <$> liftM (HsValBinds x)
-                      (addTickHsValBinds binds)
+                      (addTickLHsValBinds binds)
 addTickLHsLocalBinds (L l (HsIPBinds x binds))  =
         L l <$> liftM (HsIPBinds x)
                       (addTickHsIPBinds binds)
 addTickLHsLocalBinds (L l (EmptyLocalBinds x))  = return (L l (EmptyLocalBinds x))
 
-addTickHsValBinds :: HsValBindsLR GhcTc (GhcPass a)
-                  -> TM (HsValBindsLR GhcTc (GhcPass b))
-addTickHsValBinds (XValBindsLR (HsVBG grps sigs)) = do
+addTickLHsValBinds :: LHsValBindsLR GhcTc (GhcPass a)
+                  -> TM (LHsValBindsLR GhcTc (GhcPass b))
+addTickLHsValBinds (L l (XValBindsLR (HsVBG grps sigs))) = do
         grps' <- mapM (\ (rec,binds) ->
                        do { binds' <- addTickLHsBinds binds
                           ; return (rec,binds') })
                       grps
-        return $ XValBindsLR (HsVBG grps' sigs)
-addTickHsValBinds _ = panic "addTickHsValBinds"
+        return $ (L l (XValBindsLR (HsVBG grps' sigs)))
+addTickLHsValBinds _ = panic "addTickLHsValBinds"
 
 addTickHsIPBinds :: HsIPBinds GhcTc -> TM (HsIPBinds GhcTc)
 addTickHsIPBinds (IPBinds dictbinds ipbinds) =

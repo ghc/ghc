@@ -2346,7 +2346,7 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
 
               -- [let it = expr]
               let_stmt  = L loc $ LetStmt noAnn $ noLocA $ HsValBinds noAnn
-                           $ XValBindsLR
+                           $ noLocA $ XValBindsLR
                                (HsVBG [(NonRecursive,[the_bind])] [])
 
               -- [it <- e]

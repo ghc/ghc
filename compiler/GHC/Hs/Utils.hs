@@ -1063,8 +1063,8 @@ collectLocalBinders :: (IsPass idL, CollectPass (GhcPass idL))
                     -> HsLocalBindsLR (GhcPass idL) (GhcPass idR)
                     -> [IdP (GhcPass idL)]
 collectLocalBinders flag = \case
-    HsValBinds _ binds -> collectHsIdBinders flag binds
-                          -- No pattern synonyms here
+    HsValBinds _ (L _ binds) -> collectHsIdBinders flag binds
+                              -- No pattern synonyms here
     HsIPBinds {}       -> []
     EmptyLocalBinds _  -> []
 
@@ -1817,7 +1817,7 @@ lStmtsImplicits = hs_lstmts
     hs_stmt (TransStmt { trS_stmts = stmts }) = hs_lstmts stmts
     hs_stmt (RecStmt { recS_stmts = L _ ss }) = hs_lstmts ss
 
-    hs_local_binds (L _ (HsValBinds _ val_binds)) = hsValBindsImplicits val_binds
+    hs_local_binds (L _ (HsValBinds _ (L _ val_binds))) = hsValBindsImplicits val_binds
     hs_local_binds (L _ (HsIPBinds {}))           = []
     hs_local_binds (L _ (EmptyLocalBinds _))      = []
 

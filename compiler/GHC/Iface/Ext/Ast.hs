@@ -1456,19 +1456,19 @@ instance HiePass p => ToHie (RScoped (LocatedA (HsLocalBinds (GhcPass p)))) wher
               HieRn -> pure []
           , toHie $ map (RS sc) xs
           ]
-      HsValBinds _ valBinds ->
+      HsValBinds _ (L _ valBinds) ->
         [
           toHie $ RS (combineScopes scope (scopeHsLocaLBinds (unLoc binds)))
                       valBinds
         ]
 
 scopeHsLocaLBinds :: forall p. IsPass p => HsLocalBinds (GhcPass p) -> Scope
-scopeHsLocaLBinds (HsValBinds _ (ValBinds _ bs))
+scopeHsLocaLBinds (HsValBinds _ (L _ (ValBinds _ bs)))
   = foldr combineScopes NoScope bsScope
   where
     bsScope :: [Scope]
     bsScope = map (mkScope . getHasLoc) bs
-scopeHsLocaLBinds (HsValBinds _ (XValBindsLR (HsVBG grps sigs)))
+scopeHsLocaLBinds (HsValBinds _ (L _ (XValBindsLR (HsVBG grps sigs))))
   = foldr combineScopes NoScope (bsScope ++ sigsScope)
   where
     bsScope :: [Scope]

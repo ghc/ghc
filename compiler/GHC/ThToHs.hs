@@ -1039,7 +1039,7 @@ cvtLocalDecs declDescr ds
         let (binds, bads) = partitionWith is_valbind ds'
         for_ (nonEmpty bads) $ \ bad_decls ->
           failWith (IllegalDeclaration declDescr $ IllegalDecls bad_decls)
-        return (HsValBinds noAnn (ValBinds noExtField binds))
+        return (HsValBinds noAnn (noLocA (ValBinds noAnn binds)))
       (ip_binds, []) -> do
         binds <- mapM (uncurry cvtImplicitParamBind) ip_binds
         return (HsIPBinds noAnn (IPBinds noExtField binds))
