@@ -1,0 +1,10 @@
+Reading package info from "testpkg-foo/testpkg-foo.pkg" ... done.
+local-foo.package.conf
+    (testpkg-foo-0.1.0.0)
+
+Reading package info from "testpkg-bar/testpkg-bar.pkg" ... done.
+local-bar.package.conf
+    (testpkg-bar-0.1.0.0)
+
+"Loaded A and B"
+"Loaded dependencies Foo and Bar"
