@@ -223,10 +223,10 @@ tcLocalBinds (EmptyLocalBinds x) thing_inside
   = do  { thing <- thing_inside
         ; return (EmptyLocalBinds x, thing) }
 
-tcLocalBinds (HsValBinds x (XValBindsLR (HsVBG grps sigs))) thing_inside
+tcLocalBinds (HsValBinds x (L lb (XValBindsLR (HsVBG grps sigs)))) thing_inside
   = do  { (grps', thing) <- tcValBinds NotTopLevel grps sigs thing_inside
-        ; return (HsValBinds x (XValBindsLR (HsVBG grps' sigs)), thing) }
-tcLocalBinds (HsValBinds _ (ValBinds {})) _ = panic "tcLocalBinds"
+        ; return (HsValBinds x (L lb (XValBindsLR (HsVBG grps' sigs))), thing) }
+tcLocalBinds (HsValBinds _ (L _ ValBinds {})) _ = panic "tcLocalBinds"
 
 tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
   = do  { ipClass <- tcLookupKnownKeyClass ipClassKey

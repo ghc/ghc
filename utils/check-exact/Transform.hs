@@ -504,7 +504,8 @@ balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds)))
 pushTrailingComments :: WithWhere -> EpAnnComments -> LHsLocalBinds GhcPs -> (Bool, LHsLocalBinds GhcPs)
 pushTrailingComments _ _cs b@(L _ EmptyLocalBinds{}) = (False, b)
 pushTrailingComments _ _cs (L _ HsIPBinds{}) = error "TODO: pushTrailingComments:HsIPBinds"
-pushTrailingComments w cs lb@(L l (HsValBinds (an,wt) _)) = (True, L l' (HsValBinds (an,wt) vb))
+pushTrailingComments w cs lb@(L l (HsValBinds wt (L llb (ValBinds an _))))
+  = (True, L l' (HsValBinds wt vb))
   where
     decls = hsDeclsLocalBinds lb
     (l', decls') = case reverse decls of
@@ -512,7 +513,8 @@ pushTrailingComments w cs lb@(L l (HsValBinds (an,wt) _)) = (True, L l' (HsValBi
       (L la d:ds) -> (l, L (addCommentsToEpAnn la cs) d:ds)
     vb = case replaceDeclsValbinds w lb (reverse decls') of
       L _ (HsValBinds _ vb') -> vb'
-      _ -> ValBinds noExtField []
+      _ -> (L llb (ValBinds an []))
+pushTrailingComments _ _ lb@(L _ (HsValBinds _ (L _ (XValBindsLR _)))) = (False, lb)
 
 -- |Prior to moving an AST element, make sure any trailing comments belonging to
 -- it are attached to it, and not the following element. Of necessity this is a
@@ -1009,19 +1011,20 @@ replaceDeclsValbinds :: WithWhere
                      -> LHsLocalBinds GhcPs -> [LHsDecl GhcPs]
                      -> LHsLocalBinds GhcPs
 replaceDeclsValbinds _ (L l _) [] = L (l { entry = noSpanAnchor}) (EmptyLocalBinds NoExtField)
-replaceDeclsValbinds w (L l (HsValBinds a _)) new
+replaceDeclsValbinds ww (L l (HsValBinds wt (L lb (ValBinds al _)))) new
     = let
-        an = oldWhereAnnotation a w
-      in (L l (HsValBinds an (ValBinds noExtField (map wrapValBind new))))
+        wt' = oldWhereAnnotation wt ww
+      in (L l (HsValBinds wt' (L lb (ValBinds al (map wrapValBind new)))))
 replaceDeclsValbinds _ (L _ (HsIPBinds {})) _new    = error "undefined replaceDecls HsIPBinds"
-replaceDeclsValbinds w (L l (EmptyLocalBinds _)) new
-    = let an = newWhereAnnotation w
+replaceDeclsValbinds ww (L l _) new
+    = let wt = newWhereAnnotation ww
           l' = l { entry = EpaDelta noSrcSpan (DifferentLine 1 2) [] }
-      in (L l' (HsValBinds an (ValBinds noExtField (map wrapValBind new))))
+          ll' = l { entry = EpaDelta noSrcSpan (SameLine 0) [] }
+          ann_list = AnnList (EpVirtualBraces (EpaDelta noSrcSpan (DifferentLine 1 4) [])) []
+      in (L l' (HsValBinds wt (L ll' (ValBinds ann_list (map wrapValBind new)))))
 
-oldWhereAnnotation :: (AnnList, EpToken "where")
-  -> WithWhere -> (AnnList, EpToken "where")
-oldWhereAnnotation (an, _w) ww  = (an, w')
+oldWhereAnnotation :: EpToken "where" -> WithWhere -> EpToken "where"
+oldWhereAnnotation _w ww  = w'
   -- TODO: when we set DP (0,0) for the HsValBinds EpEpaLocation,
   -- change the AnnList anchor to have the correct DP too
   where
@@ -1029,14 +1032,10 @@ oldWhereAnnotation (an, _w) ww  = (an, w')
       WithWhere -> EpTok (EpaDelta noSrcSpan (SameLine 0) [])
       WithoutWhere -> noEpTok
 
-newWhereAnnotation :: WithWhere -> (AnnList, EpToken "where")
-newWhereAnnotation ww = (an, w)
-  where
-  anc2 = EpaDelta noSrcSpan (DifferentLine 1 4) []
-  w = case ww of
+newWhereAnnotation :: WithWhere -> EpToken "where"
+newWhereAnnotation ww = case ww of
     WithWhere -> EpTok (EpaDelta noSrcSpan (SameLine 0) [])
     WithoutWhere -> noEpTok
-  an = AnnList (EpVirtualBraces anc2) []
 
 -- ---------------------------------------------------------------------
 
