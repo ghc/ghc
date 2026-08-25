@@ -45,7 +45,7 @@ import GHC.Runtime.Loader   ( loadFrontendPlugin, initializeSessionPlugins )
 import GHC.Unit.Module ( ModuleName, mkModuleName )
 import GHC.Unit.Module.ModIface
 import GHC.Unit.State  ( pprUnits, pprUnitsSimple )
-import GHC.Unit.Finder ( findImportedModule, FindResult(..) )
+import GHC.Unit.Finder ( findImportedModule, runFinderM, FindResult(..) )
 import GHC.Unit.Types  ( IsBootInterface(..) )
 
 import GHC.Types.Basic     ( failed )
@@ -495,7 +495,7 @@ abiHash strs = do
 
   let find_it str = do
          let modname = mkModuleName str
-         r <- findImportedModule hsc_env LookupUser modname NoPkgQual
+         r <- runFinderM $ findImportedModule hsc_env LookupUser modname NoPkgQual
          case r of
            Found _ m -> return m
            _error    ->
