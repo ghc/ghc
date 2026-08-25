@@ -1,9 +1,11 @@
 {-# OPTIONS -ddump-parsed-ast #-}
 {-# LANGUAGE Arrows #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE ImplicitParams #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
 module Test20297 where
 
 -- ValBinds
@@ -47,28 +49,32 @@ mwi = if -- comment12
          | otherwise -> 2
 
 -- HsUntypedBracket/DecBrL
-declBracket = [d| -- comment10
+declBracket = [d| -- comment13
                   dee = 1
-                  -- comment11
+                  -- comment14
                 |]
 
 -- Do statement
-dodo = do -- comment12
+dodo = do -- comment15
           stmt1
           stmt2
 
 dodo2 = do
-    -- comment13
+    -- comment16
     stmt1
-
 
 -- RecStmt
 recdo = do
-  rec -- comment14
+  rec -- comment17
       a <- f b
       b <- g a
   return a
 
 -- HsCmdDo
-cmd = proc x -> do -- comment15
+cmd = proc x -> do -- comment18
                    returnA -< x
+
+-- MatchGroup
+mg y = case y of -- comment19
+         1 -> a
+         _ -> b
