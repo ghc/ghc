@@ -1,0 +1,11 @@
+name: testpkg-bar
+version: 0.1.0.0
+id: testpkg-bar-0.1.0.0-XXX
+key: testpkg-bar-0.1.0.0-XXX
+exposed: True
+exposed-modules: Bar
+hidden-modules:
+import-dirs: ${pkgroot}/testpkg-bar/dist-testpkg-bar-0.1.0.0
+library-dirs:
+include-dirs:
+hs-libraries:
