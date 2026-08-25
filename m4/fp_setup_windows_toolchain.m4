@@ -57,7 +57,11 @@ AC_DEFUN([FP_INSTALL_WINDOWS_TOOLCHAIN],[
             rm ".PKGINFO" &&
             cd .. ) || AC_MSG_ERROR([Could not extract Windows toolchains.])
 
-            mv "inplace/${tarball_mingw_dir}" inplace/mingw &&
+            # "BLODA" problem - the file can be locked for a few moments after
+            # extraction. Try moving, if it fails try again after a sec. See #27491
+            (   mv "inplace/${tarball_mingw_dir}" inplace/mingw ||
+                { sleep 1 && mv "inplace/${tarball_mingw_dir}" inplace/mingw; }
+            ) &&
             touch inplace/mingw
             AC_MSG_NOTICE([In-tree MingW-w64 tree created])
         fi
