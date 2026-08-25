@@ -630,8 +630,8 @@ replaceDeclsClassDecl decl decls = case decl of
 
 hsDeclsLocalBinds :: LHsLocalBinds GhcPs -> [LHsDecl GhcPs]
 hsDeclsLocalBinds (L _ lb) = case lb of
-    HsValBinds _ (ValBinds _ bs) -> map unWrapValBind bs
-    HsValBinds _ (XValBindsLR _) -> error $ "hsDecls.XValBindsLR not valid"
+    HsValBinds _ (L _ (ValBinds _ bs)) -> map unWrapValBind bs
+    HsValBinds _ (L _ (XValBindsLR _)) -> error $ "hsDecls.XValBindsLR not valid"
     HsIPBinds {}       -> []
     EmptyLocalBinds {} -> []
 

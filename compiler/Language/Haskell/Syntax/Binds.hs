@@ -60,7 +60,7 @@ type LHsLocalBinds id = XRec id (HsLocalBinds id)
 data HsLocalBindsLR idL idR
   = HsValBinds
         (XHsValBinds idL idR)
-        (HsValBindsLR idL idR)
+        (LHsValBindsLR idL idR)
       -- ^ Haskell Value Bindings
 
          -- There should be no pattern synonyms in the HsValBindsLR
@@ -84,6 +84,7 @@ type LHsLocalBindsLR idL idR = XRec idL (HsLocalBindsLR idL idR)
 
 -- | Haskell Value Bindings
 type HsValBinds id = HsValBindsLR id id
+type LHsValBindsLR idL idR = XRec idR (HsValBindsLR idL idR)
 
 -- | Haskell Value bindings with separate Left and Right identifier types
 -- (not implicit parameters)
