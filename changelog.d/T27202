@@ -1,7 +1,7 @@
 section: ghci
 synopsis: Fix regression to honour module targets in nested directories into GHCi after startup.
-issues: #27202
-mrs: !15980
+issues: #27202 #27640
+mrs: !15980 !16591
 
 description: {
     Fix a regression that made it impossible to import modules using `:load <Mod>` and `:add <Mod>` after GHCi startup.
