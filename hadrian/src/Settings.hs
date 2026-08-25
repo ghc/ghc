@@ -19,7 +19,6 @@ import Settings.Flavours.Development
 import Settings.Flavours.GhcInGhci
 import Settings.Flavours.Performance
 import Settings.Flavours.Quick
-import Settings.Flavours.Quickest
 import Settings.Flavours.QuickCross
 import Settings.Flavours.Validate
 import Settings.Flavours.Release
@@ -55,7 +54,6 @@ hadrianFlavours =
     , developmentFlavour Stage2, performanceFlavour
     , releaseFlavour
     , quickFlavour, quickValidateFlavour, quickDebugFlavour
-    , quickestFlavour
     , quickCrossFlavour
     , ghcInGhciFlavour, validateFlavour, slowValidateFlavour
     ]
@@ -69,6 +67,10 @@ hadrianFlavours =
 flavour :: Action Flavour
 flavour = do
     flavourName <- fromMaybe userDefaultFlavour <$> cmdFlavour
+    when ("quickest" `isPrefixOf` flavourName) $
+      fail $ "The `quickest` flavour has been deprecated. Use `quick` instead.\n"
+          ++ "Skip building dynamic libraries with `quick+no_dynamic_libs`\n"
+          ++ "to get closer to the old quickest behaviour."
     kvs <- userSetting ([] :: [KeyVal])
     let flavours = hadrianFlavours ++ userFlavours
         (settingErrs, tweak) = applySettings kvs

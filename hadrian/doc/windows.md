@@ -20,7 +20,7 @@ stack exec -- pacman -S autoconf automake-wrapper make patch python tar --noconf
 stack build
 
 # Build GHC
-stack exec hadrian -- --directory ".." -j --flavour=quickest
+stack exec hadrian -- --directory ".." -j --flavour=quick
 
 # Test GHC
 cd ..
@@ -28,7 +28,7 @@ _build\stage1\bin\ghc -e 1+2
 ```
 
 The entire process should take about 20 minutes. Note, this will build GHC
-without optimisations. If you need an optimised GHC, drop the `--flavour=quickest`
+without optimisations. If you need an optimised GHC, drop the `--flavour=quick`
 flag from the build command line (this will slow down the build to about an hour).
 
 These are currently not the
@@ -37,7 +37,7 @@ but are much simpler and may also be more robust.
 
 The `stack build` and `stack exec hadrian` commands can be replaced by an
 invocation of Hadrian's Stack-based build script:
-`build-stack.bat -j --flavour=quickest`. Use this script if you plan to work on
+`build-stack.bat -j --flavour=quick`. Use this script if you plan to work on
 Hadrian and/or rebuild GHC often.
 
 ## Prerequisites

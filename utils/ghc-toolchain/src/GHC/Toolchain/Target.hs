@@ -199,7 +199,7 @@ tgtSupportsSMP Target{..} = do
 -- 5. The testsuite driver will use dyn way for TH/ghci tests even
 --    when host GHC is static.
 -- 6. TH/ghci doesn't work if stage1 is built without shared libraries
---    (e.g. quickest/fully_static).
+--    (e.g. no_dynamic_libs/fully_static).
 tgtRTSLinkerOnlySupportsSharedLibs :: Target -> Bool
 tgtRTSLinkerOnlySupportsSharedLibs Target{tgtArchOs} =
   archOS_arch tgtArchOs `elem`
