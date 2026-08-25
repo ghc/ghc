@@ -321,7 +321,7 @@ warnUnknownModules hsc_env dflags mod_graph = do
 
     hidden_warns = hidden_mods `minusUniqSet` unit_mods
 
-    lookupModule mn = findImportedModule hsc_env LookupUser mn NoPkgQual
+    lookupModule mn = runFinderM $ findImportedModule hsc_env LookupUser mn NoPkgQual
 
     check_reexport mn = do
       fr <- lookupModule (reexportFrom mn)

@@ -1633,7 +1633,7 @@ metaHandlersTcM runInIO = TH.MetaHandlers {
         let home_unit = hsc_home_unit hsc_env
         let dflags    = hsc_dflags hsc_env
         let fopts     = initFinderOpts dflags
-        r <- liftIO $ findHomeModule fc fopts home_unit (mkModuleName plugin)
+        r <- liftIO $ runFinderM $ findHomeModule fc fopts home_unit (mkModuleName plugin)
         let err = TcRnTHError $ AddInvalidCorePlugin plugin
         case r of
           Found {} -> addErr err
