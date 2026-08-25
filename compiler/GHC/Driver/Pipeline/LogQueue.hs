@@ -1,43 +1,50 @@
+{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DerivingVia #-}
 module GHC.Driver.Pipeline.LogQueue ( LogQueue(..)
                                   , newLogQueue
                                   , finishLogQueue
                                   , writeLogQueue
                                   , parLogAction
+                                  , printLogs
 
-                                  , LogQueueQueue(..)
-                                  , initLogQueue
-                                  , allLogQueues
-                                  , newLogQueueQueue
-
-                                  , logThread
+                                  , withLogPrinter
                                   ) where
 
 import GHC.Prelude
 import Control.Concurrent
+import Control.Exception ( finally )
+import Data.Foldable ( for_ )
 import Data.IORef
 import GHC.Types.Error
 import GHC.Types.SrcLoc
+import GHC.Utils.Concurrent.Scope ( scoped, fork, activeCount )
 import GHC.Utils.Logger
-import qualified Data.IntMap as IM
 import Control.Concurrent.STM
-import Control.Monad
 
 -- LogQueue Abstraction
 
--- | Each module is given a unique 'LogQueue' to redirect compilation messages
--- to. A 'Nothing' value contains the result of compilation, and denotes the
--- end of the message queue.
-data LogQueue = LogQueue { logQueueId :: !Int
-                         , logQueueMessages :: !(IORef [Maybe (MessageClass, SrcSpan, SDoc, LogFlags)])
-                         , logQueueSemaphore :: !(MVar ())
-                         }
+-- | A 'LogQueue' is used to accumulate compilation messages.
+--
+-- This allows compilation output to be reported to the user without
+-- interleaving concurrent messages (garbled text).
+data LogQueue =
+  LogQueue
+    { logQueueMessages  :: !(IORef [Maybe (MessageClass, SrcSpan, SDoc, LogFlags)])
+       -- ^ All logged messages, in reverse chronological order (later messages
+       -- appearing nearer the start of the list), with 'Nothing' denoting the
+       -- end of the message queue.
+       --
+       -- A typical message queue will look like:
+       --
+       -- > <ignored_data> : Nothing : Just msg_9 : Just msg_8 : ... : Just msg_1 : []
+    , logQueueSemaphore :: !(MVar ())
+    }
 
-newLogQueue :: Int -> IO LogQueue
-newLogQueue n = do
+newLogQueue :: IO LogQueue
+newLogQueue = do
   mqueue <- newIORef []
   sem <- newMVar ()
-  return (LogQueue n mqueue sem)
+  return (LogQueue mqueue sem)
 
 finishLogQueue :: LogQueue -> IO ()
 finishLogQueue lq = do
@@ -50,7 +57,7 @@ writeLogQueue lq msg = do
 
 -- | Internal helper for writing log messages
 writeLogQueueInternal :: LogQueue -> Maybe (MessageClass,SrcSpan,SDoc, LogFlags) -> IO ()
-writeLogQueueInternal (LogQueue _n ref sem) msg = do
+writeLogQueueInternal (LogQueue ref sem) msg = do
     atomicModifyIORef' ref $ \msgs -> (msg:msgs,())
     _ <- tryPutMVar sem ()
     return ()
@@ -61,9 +68,11 @@ parLogAction :: LogQueue -> LogAction
 parLogAction log_queue log_flags !msgClass !srcSpan !msg =
     writeLogQueue log_queue (msgClass,srcSpan,msg, log_flags)
 
--- Print each message from the log_queue using the global logger
+-- | Print each message from the log queue using the given logger.
+--
+-- Blocks until the queue has been finished with 'finishLogQueue'.
 printLogs :: Logger -> LogQueue -> IO ()
-printLogs !logger (LogQueue _n ref sem) = read_msgs
+printLogs !logger (LogQueue ref sem) = read_msgs
   where read_msgs = do
             takeMVar sem
             msgs <- atomicModifyIORef' ref $ \xs -> ([], reverse xs)
@@ -77,46 +86,37 @@ printLogs !logger (LogQueue _n ref sem) = read_msgs
             -- Exit the loop once we encounter the end marker.
             Nothing -> return ()
 
--- The LogQueueQueue abstraction
+-- Printing log queues as they are being written
 
-data LogQueueQueue = LogQueueQueue Int (IM.IntMap LogQueue)
-
-newLogQueueQueue :: LogQueueQueue
-newLogQueueQueue = LogQueueQueue 1 IM.empty
-
-addToQueueQueue :: LogQueue -> LogQueueQueue -> LogQueueQueue
-addToQueueQueue lq (LogQueueQueue n im) = LogQueueQueue n (IM.insert (logQueueId lq) lq im)
-
-initLogQueue :: TVar LogQueueQueue -> LogQueue -> STM ()
-initLogQueue lqq lq = modifyTVar lqq (addToQueueQueue lq)
-
--- | Return all items in the queue in ascending order
-allLogQueues :: LogQueueQueue -> [LogQueue]
-allLogQueues (LogQueueQueue _n im) = IM.elems im
-
-dequeueLogQueueQueue :: LogQueueQueue -> Maybe (LogQueue, LogQueueQueue)
-dequeueLogQueueQueue (LogQueueQueue n lqq) = case IM.minViewWithKey lqq of
-                                                Just ((k, v), lqq') | k == n -> Just (v, LogQueueQueue (n + 1) lqq')
-                                                _ -> Nothing
-
-logThread :: Logger -> TVar Bool -- Signal that no more new logs will be added, clear the queue and exit
-                    -> TVar LogQueueQueue -- Queue for logs
-                    -> IO (IO ())
-logThread logger stopped lqq_var = do
-  finished_var <- newEmptyMVar
-  _ <- forkIO $ print_logs *> putMVar finished_var ()
-  return (takeMVar finished_var)
-  where
-    finish = mapM (printLogs logger)
-
-    print_logs = join $ atomically $ do
-      lqq <- readTVar lqq_var
-      case dequeueLogQueueQueue lqq of
-        Just (lq, lqq') -> do
-          writeTVar lqq_var lqq'
-          return (printLogs logger lq *> print_logs)
-        Nothing -> do
-          -- No log to print, check if we are finished.
-          stopped <- readTVar stopped
-          if not stopped then retry
-                         else return (finish (allLogQueues lqq))
+-- | Run an action that can submit log queues for printing.
+--
+-- The log queues are printed concurrently with the action, one after the other,
+-- in the order in which they were submitted.
+--
+-- Does not return until every submitted log queue has been printed, whether
+-- the action returns or throws an exception. All of the submitted log queues
+-- must have been finished (with 'finishLogQueue') by the time the action ends.
+--
+-- An exception arising from printing is rethrown.
+withLogPrinter
+  :: Logger
+  -> ( ( LogQueue -> IO () ) -> IO a )
+     -- ^ the action, given how to submit a log queue for printing
+  -> IO a
+withLogPrinter logger action =
+  scoped \ scope -> do
+    -- 'Nothing' denotes the end of the queue.
+    queue <- newTQueueIO @( Maybe LogQueue )
+    let
+      print_queued :: IO ()
+      print_queued = do
+        next <- atomically $ readTQueue queue
+        for_ next \ lq -> do
+          printLogs logger lq
+          print_queued
+    fork scope print_queued
+    action ( atomically . writeTQueue queue . Just )
+      `finally` do
+        atomically $ writeTQueue queue Nothing
+        -- Wait for the remaining log queues to be printed.
+        atomically $ activeCount scope >>= check . ( == 0 )
