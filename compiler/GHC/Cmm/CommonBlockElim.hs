@@ -26,6 +26,7 @@ import GHC.Types.Literal.Floating
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
 import GHC.Utils.Word64 (truncateWord64ToWord32)
+import GHC.Utils.Panic.Plain (assert)
 import Control.Arrow (first, second)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
@@ -60,15 +61,30 @@ import qualified Data.List.NonEmpty as NE
 
 -- TODO: Use optimization fuel
 elimCommonBlocks :: CmmGraph -> CmmGraph
-elimCommonBlocks g = replaceLabels env $ copyTicks env g
+elimCommonBlocks g =
+    assert (g_entry g == g_entry g') g'
   where
+     g' = replaceLabels env $ copyTicks env g
      env = iterate mapEmpty blocks_with_key
      -- The order of blocks doesn't matter here. While we could use
      -- revPostorder which drops unreachable blocks this is done in
      -- ContFlowOpt already which runs before this pass. So we use
      -- toBlockList since it is faster.
-     groups = groupByInt hash_block (toBlockList g) :: [[CmmBlock]]
+     -- One exception: The entry block most come first or we risk eliminating it
+     -- in favour of another block. See Note [Retain entry block during common block elimination.]
+     groups = groupByInt hash_block (toBlockListEntryFirst g) :: [[CmmBlock]]
      blocks_with_key = [ [ (successors b, [b]) | b <- bs] | bs <- groups]
+
+-- Note [Retain entry block during common block elimination.]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- At the stage we run common block elimination (CBE) we only have one info
+-- table for the entry label. Which means we can get away without applying the
+-- block label substitution to the info table *as long as we keep the first block*.
+-- When combining blocks the first block in the list of blocks is kept, and the later
+-- one eliminated, so we can achieve this by simply using toBlockListEntryFirst.
+--
+-- If we don't we end up with #27722 where the entry block was eliminated in favour
+-- of another block.
 
 -- Invariant: The blocks in the list are pairwise distinct
 -- (so avoid comparing them again)
