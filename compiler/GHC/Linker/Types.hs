@@ -36,8 +36,6 @@ module GHC.Linker.Types
    , LinkedBreaks(..)
    , emptyLinkedBreaks
    , LinkableSet
-   , mkLinkableSet
-   , unionLinkableSet
    , ObjFile
    , SptEntry(..)
    , LibrarySpec(..)
@@ -58,8 +56,6 @@ module GHC.Linker.Types
    , linkableBCOs
    , linkablePartBCOs
    , linkableModuleByteCodes
-   , linkableNativeParts
-   , linkablePartitionParts
    , linkablePartPath
    , linkablePartObjectPaths
    , isNativeCode
@@ -399,14 +395,6 @@ type LinkableUsage = LinkableWith (NonEmpty LinkablePartUsage)
 
 type LinkableSet = ModuleEnv
 
-mkLinkableSet :: [Linkable] -> LinkableSet Linkable
-mkLinkableSet ls = mkModuleEnv [(linkableModule l, l) | l <- ls]
-
--- | Union of LinkableSets.
---
--- Right biased
-unionLinkableSet :: LinkableSet (LinkableWith a) -> LinkableSet (LinkableWith a) -> LinkableSet (LinkableWith a)
-unionLinkableSet = plusModuleEnv_C (\_ l2 -> l2)
 
 instance Outputable a => Outputable (LinkableWith a) where
   -- Don't print the hash, forcing it can trigger compilation
@@ -485,21 +473,13 @@ linkableBCOs l = [ gbc_compiled_byte_code gbc | DotGBC gbc <- NE.toList (linkabl
 linkableModuleByteCodes :: Linkable -> [ModuleByteCode]
 linkableModuleByteCodes l = [ mbc | DotGBC mbc <- NE.toList (linkableParts l) ]
 
--- | List the native linkable parts (.o) of a linkable
-linkableNativeParts :: Linkable -> [LinkablePart]
-linkableNativeParts l = NE.filter isNativeCode (linkableParts l)
-
--- | Split linkable parts into (native code parts, BCOs parts)
-linkablePartitionParts :: Linkable -> ([LinkablePart],[LinkablePart])
-linkablePartitionParts l = NE.partition isNativeCode (linkableParts l)
-
 -- | List the native objects (.o) of a linkable
 linkableObjs :: Linkable -> [FilePath]
 linkableObjs l = concatMap linkablePartObjectPaths (linkableParts l)
 
 -- | List the paths of the native objects (.o)
 linkableFiles :: Linkable -> [FilePath]
-linkableFiles l = concatMap linkablePartNativePaths (NE.toList (linkableParts l))
+linkableFiles l = mapMaybe linkablePartPath (NE.toList (linkableParts l))
 
 -------------------------------------------
 
@@ -514,13 +494,6 @@ linkablePartPath :: LinkablePart -> Maybe FilePath
 linkablePartPath = \case
   DotO fn _       -> Just fn
   DotGBC {}       -> Nothing
-
--- | Return the paths of all object code files (.o) contained in this
--- 'LinkablePart'.
-linkablePartNativePaths :: LinkablePart -> [FilePath]
-linkablePartNativePaths = \case
-  DotO fn _       -> [fn]
-  DotGBC {}       -> []
 
 -- | Return the paths of all object files (.o) contained in this 'LinkablePart'.
 linkablePartObjectPaths :: LinkablePart -> [FilePath]
