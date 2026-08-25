@@ -15,7 +15,6 @@ import GHC.Utils.Ppr (Mode (PageMode))
 import GHC.Utils.Outputable (vcat, defaultSDocContext, printSDocLn, ppr)
 import GHC.Utils.Logger (getLogger)
 import GHC.Types.SrcLoc (noLoc)
-import GHC.Types.Error (mkUnknownDiagnostic)
 import GHC.Unit.Types (moduleName)
 import GHC.Unit.Module.ModSummary (ms_mod)
 import GHC.Unit.Module.Graph (ModuleGraph, mgModSummaries)
@@ -57,8 +56,6 @@ performDownsweepTurn maybeGivenModuleGraph rootModuleName = do
     session <- getSession
     (driverMsgs, resultingModuleGraph)
         <- liftIO $ downsweep session
-                              mkUnknownDiagnostic
-                              Nothing
                               []
                               maybeGivenModuleGraph
                               []

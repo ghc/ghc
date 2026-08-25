@@ -6,6 +6,7 @@ module GHC.Utils.TmpFs
     , initTmpFs
     , forkTmpFsFrom
     , mergeTmpFsInto
+    , withLocalTmpFS
     , PathsToClean(..)
     , emptyPathsToClean
     , TempFileLifetime(..)
@@ -131,6 +132,8 @@ initTmpFs = do
 --
 -- It's not safe to use the subdirs created by the original TmpFs with the
 -- forked one. Use @newTempSubDir@ to create new subdirs instead.
+--
+-- See Note [Deterministic base name].
 forkTmpFsFrom :: TmpFs -> IO TmpFs
 forkTmpFsFrom old = do
     files <- newIORef emptyPathsToClean
@@ -157,6 +160,16 @@ mergeTmpFsInto src dst = do
     atomicModifyIORef' (tmp_files_to_clean dst) (\s -> (mergePathsToClean src_files s, ()))
     atomicModifyIORef' (tmp_subdirs_to_clean dst) (\s -> (mergePathsToClean src_subdirs s, ()))
 
+-- | Run an action with a local 'TmpFs' forked from the given 'TmpFs'.
+--
+-- The remaining files of the local 'TmpFs' which weren't cleaned up by the
+-- action are merged back into the given 'TmpFs', for clean-up later.
+withLocalTmpFS :: TmpFs -> (TmpFs -> IO a) -> IO a
+withLocalTmpFS tmpfs act =
+    Exception.bracket
+      (forkTmpFsFrom tmpfs)
+      (\tmpfs_local -> mergeTmpFsInto tmpfs_local tmpfs)
+      act
 
 cleanTempDirs :: Logger -> TmpFs -> IO ()
 cleanTempDirs logger tmpfs
@@ -377,8 +390,7 @@ getTempDir logger tmpfs (TempDir tmp_dir) = do
                       then mkTempDir prefix else ioError e
 
 {- Note [Deterministic base name]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The filename of temporary files, especially the basename of C files, can end
 up in the output in some form, e.g. as part of linker debug information. In the
 interest of bit-wise exactly reproducible compilation (#4012), the basename of
@@ -391,6 +403,11 @@ In addition to this, multiple threads can race against each other creating tempo
 files. Therefore we supply a prefix when creating temporary files, when a thread is
 forked, each thread must be given an TmpFs with a unique prefix. This is achieved
 by forkTmpFsFrom creating a fresh prefix from the parent TmpFs.
+
+The prefixes are drawn from a counter shared by all TmpFs forked from the same
+parent, in whatever order threads happen to fork them, so temporary file names
+are NOT stable from one run to the next: nothing that affects compilation
+output may depend on the name of a temporary file.
 -}
 
 manyWithTrace :: Logger -> String -> ([FilePath] -> IO ()) -> [FilePath] -> IO ()

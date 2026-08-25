@@ -10,7 +10,7 @@ module GHC.Driver.MakeSem
 #if !(defined(wasm32_HOST_ARCH) || defined(javascript_HOST_ARCH))
     -- * JSem: parallelism semaphore backed
     -- by a system semaphore (Posix/Windows)
-    runJSemAbstractSem,
+    acquireJSemAbstractSem,
 #endif
 
   -- * Abstract semaphores
@@ -39,6 +39,7 @@ import GHC.Utils.Json
 import System.Semaphore
   ( AbstractSem(..)
   , ClientSemaphore
+  , SemaphoreError
   , SemaphoreIdentifier
   , SemaphoreToken
   , openSemaphore
@@ -52,7 +53,6 @@ import qualified Control.Monad.Catch as MC
 import Control.Concurrent.MVar
 import Control.Concurrent.STM
 import Data.Foldable
-import Data.Functor
 import GHC.Stack
 import Debug.Trace
 
@@ -532,20 +532,18 @@ makeJobserver sem_ident = do
 
   return (AbstractSem{..}, cleanupSem)
 
--- | Implement an abstract semaphore using a semaphore 'Jobserver'
--- which queries the system semaphore of the given name for resources.
-runJSemAbstractSem :: SemaphoreIdentifier   -- ^ the semaphore identifier (from @-jsem@)
-                   -> (AbstractSem -> IO a) -- ^ the operation to run
-                                            -- which requires a semaphore
-                   -> IO a
-runJSemAbstractSem sem_ident action = MC.mask \ unmask -> do
-  (abs, cleanup) <- makeJobserver sem_ident
-  r <- try $ unmask $ action abs
-  case r of
-    Left (e1 :: MC.SomeException) -> do
-      (_ :: Either MC.SomeException ()) <- MC.try cleanup
-      MC.throwM e1
-    Right x -> cleanup $> x
+-- | Open an abstract semaphore backed by a semaphore 'Jobserver', which
+-- queries the system semaphore of the given name for resources.
+--
+-- Returns 'Left' if the system semaphore could not be opened, and otherwise
+-- the abstract semaphore together with the action that tears the jobserver
+-- down. A 'SemaphoreError' arising after the semaphore was successfully
+-- opened is thrown.
+acquireJSemAbstractSem
+  :: SemaphoreIdentifier -- ^ the semaphore identifier (from @-jsem@)
+  -> IO (Either SemaphoreError (AbstractSem, IO ()))
+acquireJSemAbstractSem sem_ident =
+  MC.try @_ @SemaphoreError (makeJobserver sem_ident)
 
 {- Note [Architecture of the Job Server]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

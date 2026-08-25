@@ -822,3 +822,7 @@ T25382:
 T26018:
 	touch foo.c
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c foo.c -clear-package-db
+
+T28009:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -outputdir j1 T28009.hs 2>&1 | true
+	"$(TEST_HC)" $(TEST_HC_OPTS) -outputdir j2 -j2 T28009.hs 2>&1 | true
