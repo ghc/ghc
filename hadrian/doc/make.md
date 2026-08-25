@@ -80,15 +80,15 @@ time you fire up a build. This is not possible with the Make build system.
   build _build/stage1/lib/package.conf.d/text-1.2.3.0.conf # OR actual path
   ```
 
-- Building with a particular flavour (e.g `quickest`)
+- Building with a particular flavour (e.g `quick`)
 
   ``` sh
   # Make
-  echo "BuildFlavour=quickest" >> mk/build.mk
+  echo "BuildFlavour=quick" >> mk/build.mk
   make
 
   # Hadrian
-  build --flavour=quickest
+  build --flavour=quick
   ```
   See [flavours documentation](https://gitlab.haskell.org/ghc/ghc/blob/master/hadrian/doc/flavours.md) for info on flavours.
 

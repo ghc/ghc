@@ -125,7 +125,6 @@ executable hadrian
                        , Settings.Flavours.Performance
                        , Settings.Flavours.Quick
                        , Settings.Flavours.QuickCross
-                       , Settings.Flavours.Quickest
                        , Settings.Flavours.Validate
                        , Settings.Flavours.Release
                        , Settings.Packages

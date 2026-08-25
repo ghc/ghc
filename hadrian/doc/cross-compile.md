@@ -16,7 +16,7 @@ After all the dependencies are in place:
 - `git submodule update --init`
 - `./configure --target=arm-linux-gnueabihf`
 - `cd hadrian`
-- Build the compiler by e.g. `./build.sh --flavour=quickest --integer-simple -V -j`
+- Build the compiler by e.g. `./build.sh --flavour=quick --integer-simple -V -j`
 
 After that, you should have built `inplace/bin/ghc-stage1` cross compiler. We will go to the next section to validate this.
 

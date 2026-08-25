@@ -55,10 +55,9 @@ changes. Build results are placed into `_build` by default.
 There are many different ways to build a compiler, each way is called a flavour.
 
 * `--flavour=FLAVOUR`: choose a build flavour. The following settings are
-currently supported: `default`, `quick`, `quickest`, `perf`, `prof`, `devel1`
-and `devel2`. As an example, the `quickest` flavour adds `-O0` flag to all GHC
-invocations and builds libraries only in the `vanilla` way, which speeds up
-builds by 3-4x.
+currently supported: `default`, `quick`, `perf`, `prof`, `devel1`
+and `devel2`. As an example, the `quick` flavour builds the GHC binary with `-O0`
+which speeds up builds and rebuilds significantly.
 
 In addition to the overall build flavour there are also "flavour transformers"
 which can slightly modify the build settings for a flavour. Some common flavour

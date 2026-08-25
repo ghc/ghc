@@ -531,7 +531,7 @@ It now also offers a more "old-school" interface, in the form of
 @foo.bar.baz = v@ or @foo.bar.baz += v@ expressions, that one can
 pass on the command line that invokes hadrian:
 
-> $ hadrian/build --flavour=quickest -j "stage1.ghc-bin.ghc.link.opts += -v3"
+> $ hadrian/build --flavour=quick -j "stage1.ghc-bin.ghc.link.opts += -v3"
 
 or in a file at <build root>/hadrian.settings, where <build root>
 is the build root to be used for the build, which is _build by default.
