@@ -415,7 +415,7 @@ downsweepInstalledModules hsc_env mods = do
 
         process :: InstalledModule -> IO ModuleNodeInfo
         process i = do
-          res <- findExactModule hsc_env i NotBoot
+          res <- runFinderM $ findExactModule hsc_env i NotBoot
           case res of
             InstalledFound loc -> return $ ModuleNodeFixed (installedModuleToMnk i) loc
             -- It is an internal-ish error if this happens, since we any call to this function should
@@ -736,7 +736,7 @@ expandFixedModuleNode key loc = do
   where
     mk_dep hsc_env (Left key) = do
       -- Like expandImports, but we already know exactly which module we are looking for.
-      read_result <- liftIO $ findExactModule hsc_env (mnkToInstalledModule key) (mnkIsBoot key)
+      read_result <- liftIO $ runFinderM $ findExactModule hsc_env (mnkToInstalledModule key) (mnkIsBoot key)
       case read_result of
         InstalledFound loc -> do
           pure $ Just $ DSMod (ModuleNodeFixed key loc)
@@ -1505,7 +1505,7 @@ summariseModuleDispatch k hsc_env' imps_cache_ref home_unit imp excl_mods
       case M.lookup cache_key imps_cache of
         Just result -> return result
         Nothing -> do
-          found <- resolveImport hsc_env imp
+          found <- runFinderM $ resolveImport hsc_env imp
           r <- case found of
                Found location mod
                   | moduleUnitId mod `Set.member` hsc_all_home_unit_ids hsc_env ->

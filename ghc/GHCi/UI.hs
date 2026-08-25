@@ -2378,7 +2378,7 @@ addModule files = do
     checkTargetModule :: GhciMonad m => ModuleName -> m Bool
     checkTargetModule m = do
       hsc_env <- GHC.getSession
-      result <- liftIO $
+      result <- liftIO $ Finder.runFinderM $
         Finder.findImportedModule hsc_env Finder.LookupUser m NoPkgQual
       case result of
         Found _ _ -> return True

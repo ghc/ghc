@@ -1693,14 +1693,14 @@ findQualifiedModule pkgqual mod_name = withSession $ \hsc_env -> do
       case home of
         Just m  -> return m
         Nothing -> liftIO $ do
-           res <- findImportedModule hsc_env LookupUser mod_name pkgqual
+           res <- runFinderM $ findImportedModule hsc_env LookupUser mod_name pkgqual
            case res of
              Found loc m | notHomeModuleMaybe mhome_unit m -> return m
                          | otherwise -> modNotLoadedError dflags m loc
              err -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err
 
     _ -> liftIO $ do
-      res <- findImportedModule hsc_env LookupUser mod_name pkgqual
+      res <- runFinderM $ findImportedModule hsc_env LookupUser mod_name pkgqual
       case res of
         Found _ m -> return m
         err       -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err
@@ -1741,7 +1741,7 @@ lookupQualifiedModule NoPkgQual mod_name = withSession $ \hsc_env -> do
       let dflags = hsc_dflags hsc_env
       let sec    = initSourceErrorContext dflags
       let fopts  = initFinderOpts dflags
-      res <- findExposedPackageModule fc fopts units LookupUser mod_name NoPkgQual
+      res <- runFinderM $ findExposedPackageModule fc fopts units LookupUser mod_name NoPkgQual
       case res of
         Found _ m -> return m
         err       -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err
@@ -1791,7 +1791,7 @@ lookupAllQualifiedModuleNames NoPkgQual mod_name = withSession $ \hsc_env -> do
       let dflags = hsc_dflags hsc_env
       let sec    = initSourceErrorContext dflags
       let fopts  = initFinderOpts dflags
-      res <- findExposedPackageModule fc fopts units LookupUser mod_name NoPkgQual
+      res <- runFinderM $ findExposedPackageModule fc fopts units LookupUser mod_name NoPkgQual
       case res of
         Found _ m -> return [m]
         err       -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err

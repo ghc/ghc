@@ -658,7 +658,7 @@ checkDependencies hsc_env summary iface
    classify_imports imports =
     liftIO $ traverse (\e ->
            let reason = ModuleChanged (unLoc (ui_mod_name e))
-           in classify (ui_level e) reason <$> resolveImport hsc_env e)
+           in classify (ui_level e) reason <$> runFinderM (resolveImport hsc_env e))
            imports
 
    logger        = hsc_logger hsc_env

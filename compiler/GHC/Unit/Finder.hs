@@ -3,19 +3,26 @@
 
 -}
 
-
-{-# LANGUAGE RecordWildCards  #-}
-
 -- | Module finder
 module GHC.Unit.Finder (
+
+    -- * Finder result
     FindResult(..),
     InstalledFindResult(..),
+
+    -- * Finder cache
     FinderOpts(..),
     FinderCache(..),
     initFinderCache,
+
+    -- ** Finder monad
+    FinderM, runFinderCacheM, runFinderM,
+    InCache(..),
+
+    -- * Finder operations
+    ModuleLookupScope(..),
     findImportedModule,
     resolveImport,
-    ModuleLookupScope(..),
     findPluginModule,
     findExactModule,
     findHomeModule,
@@ -40,7 +47,14 @@ import GHC.Prelude
 
 import GHC.Platform.Ways
 
+import GHC.Data.IOEnv (IOEnv, runIOEnv, getEnv)
 import GHC.Data.OsPath
+import qualified GHC.Data.ShortText as ST
+
+import GHC.Driver.Env
+import GHC.Driver.Config.Finder
+
+import GHC.Linker.Types
 
 import GHC.Unit.Env
 import GHC.Unit.Types
@@ -56,35 +70,33 @@ import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.State
 import GHC.Unit.Finder.Types
 
-import qualified GHC.Data.ShortText as ST
-
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 
-import GHC.Linker.Types
-import GHC.Types.UnresolvedImport
 import GHC.Types.PkgQual
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc ( unLoc )
-
-import GHC.Fingerprint
-import Data.IORef
-import Control.Applicative ((<|>))
-import Control.Monad
-import Data.Time
-import qualified Data.Map as M
 import GHC.Types.Unique.Map
-import GHC.Driver.Env
-import GHC.Driver.Config.Finder
 import GHC.Types.Unique.Set
+import GHC.Types.UnresolvedImport
+
+import Control.Applicative ((<|>))
+import Control.Exception (throwIO)
+import Control.Monad
+import Control.Monad.IO.Class
+import Data.IORef
 import qualified Data.List as L(sort)
 import Data.List.NonEmpty ( NonEmpty (..) )
+import qualified Data.List.NonEmpty as NE
+import qualified Data.Map as M
 import Data.Set (Set)
 import qualified Data.Set as Set (empty, intersection, difference, null, toList)
+import Data.Time
+import GHC.Fingerprint
+import GHC.TypeError (ErrorMessage(..), Unsatisfiable, unsatisfiable)
 import qualified System.Directory as SD
 import qualified System.OsPath as OsPath
-import qualified Data.List.NonEmpty as NE
 
 type FileExt = OsString -- Filename extension
 type BaseName = OsPath  -- Basename of file
@@ -102,10 +114,8 @@ type BaseName = OsPath  -- Basename of file
 -- -----------------------------------------------------------------------------
 -- The finder's cache
 
-{-
-[Note: Monotonic addToFinderCache]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+{- Note [Monotonic addToFinderCache]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 addToFinderCache is only used by functions that return the cached value
 if there is one, or by functions that always write an InstalledFound value.
 Without multithreading it is then safe to always directly write the value
@@ -135,7 +145,7 @@ initFinderCache = do
         atomicModifyIORef' mod_cache $ \c ->
           case (lookupInstalledModuleEnv c key, val) of
             -- Don't overwrite an InstalledFound with an InstalledNotFound
-            -- See [Note Monotonic addToFinderCache]
+            -- See Note [Monotonic addToFinderCache]
             (Just InstalledFound{}, InstalledNotFound{}) -> (c, ())
             _ -> (extendInstalledModuleEnv c key val, ())
 
@@ -162,7 +172,14 @@ initFinderCache = do
              atomicModifyIORef' dir_cache $ \c -> (M.insert key hash c, ())
              return hash
            Just fp -> return fp
-  return FinderCache{..}
+  return $
+    FinderCache
+      { flushFinderCaches
+      , addToFinderCache
+      , lookupFinderCache
+      , lookupFileCache
+      , lookupDirCache
+      }
 
 -- | This function computes a shallow hash of a directory, so really just what files and directories are directly inside it.
 -- It does not look at the contents of the files, or the contents of the directories it contains.
@@ -175,13 +192,109 @@ getDirHash dir = do
   return hash
 
 -- -----------------------------------------------------------------------------
---External entry points
+-- Finder monad, handling finder cache hits
+
+-- | The result of a lookup that consults the finder caches before searching
+-- the file system.
+data InCache a
+  -- | The result was in a cache; no filesystem access was performed.
+  = InCache !a
+  -- | The result was not cached.
+  | NotInCache (IO a) -- ^ search action to compute the result
+                      -- (may perform filesystem access)
+
+-- | The phase a finder operation runs in.
+data SearchPhase
+  -- | Only consult the search caches.
+  --
+  -- A cache miss aborts the whole operation.
+  = CachePhase
+  -- | Consult the search caches, searching the filesystem on a cache miss.
+  | SearchPhase
+
+-- | Monad for finder operations.
+--
+-- A finder operation is split into two phases (see 'SearchPhase'):
+--
+--  - a cache-only phase with no filesystem access,
+--  - from the first cache miss onwards, a residual 'IO' computation that may
+--    access the filesystem.
+newtype FinderM a = FinderM (IOEnv SearchPhase a)
+  deriving newtype ( Functor, Applicative, Monad )
+    -- Invariant: in 'CachePhase', the I/O action only performs benign I/O
+    -- (such as reading from a search cache, e.g. 'lookupHomeFinderCache').
+    --
+    -- It is not allowed to perform any filesystem access.
+
+-- | Internal exception type thrown by 'withCacheOrElse' on a cache miss
+-- in 'CachePhase' and caught by 'runFinderCacheM'.
+data FinderCacheMiss = FinderCacheMiss
+  deriving stock Show
+instance Exception FinderCacheMiss
+
+-- | Like 'runFinderM', but separates the finder action into the cache lookup
+-- and the search action.
+--
+-- The cache lookup runs immediately; the search action runs the whole finder
+-- operation again with filesystem access allowed. (The cache lookups it
+-- repeats are cheap.)
+runFinderCacheM :: FinderM a -> IO (InCache a)
+runFinderCacheM (FinderM m) =
+  try @FinderCacheMiss (runIOEnv CachePhase m) >>= \ case
+    Right a              -> pure $ InCache a
+    Left FinderCacheMiss -> pure $ NotInCache (runIOEnv SearchPhase m)
+
+-- | Run a finder action.
+runFinderM :: FinderM a -> IO a
+runFinderM (FinderM m) = runIOEnv SearchPhase m
+
+-- | There is no lawful 'MonadIO' instance for 'FinderM': to guarantee that
+-- @liftIO . pure = pure@, 'liftIO' would have to run the action in the
+-- cache-only phase, defeating the guarantee that 'InCache' results involve
+-- no filesystem access.
+--
+-- All I/O in 'FinderM' enters through 'withCacheOrElse'.
+instance
+  Unsatisfiable
+    (     Text "No (lawful) 'MonadIO' instance for 'FinderM'."
+     :$$: Text "Use 'withCacheOrElse' to embed an I/O operation into the search phase of 'FinderM'."
+    )
+  => MonadIO FinderM where
+  liftIO = unsatisfiable
+
+-- | Look up a cached search result, falling back to the given search
+-- action in case of cache miss (recording its result in the cache).
+--
+-- Every I/O operation within 'FinderM' is introduced by this function:
+--
+--  - cache lookups in either phase,
+--  - the search action in 'SearchPhase' only.
+withCacheOrElse
+  :: IO (Maybe a) -- ^ cache lookup (must not access the filesystem)
+  -> (a -> IO ()) -- ^ record a result in the cache
+  -> IO a         -- ^ search action (only executed on cache miss)
+  -> FinderM a
+withCacheOrElse cache_lookup add_to_cache search = FinderM $ do
+  phase <- getEnv
+  liftIO $ do
+    mb_res <- cache_lookup
+    case mb_res of
+      Just res -> pure res
+      Nothing  -> case phase of
+        CachePhase  -> throwIO FinderCacheMiss
+        SearchPhase -> do
+          res <- search
+          add_to_cache res
+          return res
+
+--------------------------------------------------------------------------------
+-- External entry points
 
 -- | Resolve an import to its corresponding 'Module'.
 --
 -- Handles user-written module imports, @SOURCE@ imports, plugin module imports,
 -- system imports, etc.
-resolveImport :: HscEnv -> UnresolvedImport PkgQual -> IO FindResult
+resolveImport :: HscEnv -> UnresolvedImport PkgQual -> FinderM FindResult
 resolveImport hsc_env imp =
   case ui_origin imp of
     FromPlugin      -> findPluginModule hsc_env mod_name
@@ -207,7 +320,7 @@ findImportedModule
      -- ^ The module name to look up
   -> PkgQual
      -- ^ Optional PackageImports package name
-  -> IO FindResult
+  -> FinderM FindResult
 findImportedModule hsc_env scope mod pkg_qual =
   let fc           = hsc_FC hsc_env
       mb_home_unit = hsc_home_unit_maybe hsc_env
@@ -234,14 +347,24 @@ findImportedModuleNoHsc
   -> ModuleLookupScope
   -> ModuleName
   -> PkgQual
-  -> IO FindResult
-findImportedModuleNoHsc fc fopts ue home_module_name_providers_map mb_home_unit scope mod_name mb_pkg =
-  case mb_pkg of
-    NoPkgQual  -> unqual_import
-    ThisPkg uid | (homeUnitId <$> mb_home_unit) == Just uid -> home_import
-                | Just os <- lookup uid other_fopts -> home_pkg_import (uid, os)
-                | otherwise -> pprPanic "findImportModule" (ppr mod_name $$ ppr mb_pkg $$ ppr (homeUnitId <$> mb_home_unit) $$ ppr uid $$ ppr (map fst all_opts))
-    OtherPkg _ -> pkg_import
+  -> FinderM FindResult
+findImportedModuleNoHsc fc fopts ue home_module_name_providers_map mb_home_unit scope mod_name mb_pkg
+  = case mb_pkg of
+      NoPkgQual  -> unqual_import
+      ThisPkg uid
+        | (homeUnitId <$> mb_home_unit) == Just uid
+        -> home_import
+        | Just os <- lookup uid other_fopts
+        -> home_pkg_import (uid, os)
+        | otherwise
+        -> pprPanic "findImportModule" $
+            vcat [ ppr mod_name
+                 , ppr mb_pkg
+                 , ppr (homeUnitId <$> mb_home_unit)
+                 , ppr uid
+                 , ppr (map fst all_opts)
+                 ]
+      OtherPkg _ -> pkg_import
   where
 
     mb_home_unit_id :: Maybe UnitId
@@ -252,19 +375,19 @@ findImportedModuleNoHsc fc fopts ue home_module_name_providers_map mb_home_unit 
         Nothing           -> other_fopts
         Just home_unit_id -> (home_unit_id, fopts) : other_fopts
 
-    home_import :: IO FindResult
+    home_import :: FinderM FindResult
     home_import = case mb_home_unit of
         Just home_unit -> findHomeModule fc fopts home_unit mod_name
         Nothing        -> pure $
                           NoPackage (panic "findImportedModule: no home-unit")
 
-    home_pkg_import :: (UnitId, FinderOpts) -> IO FindResult
+    home_pkg_import :: (UnitId, FinderOpts) -> FinderM FindResult
     home_pkg_import = findHomeUnitDepModule fc ue home_module_name_providers_map scope mod_name
 
-    pkg_import :: IO FindResult
+    pkg_import :: FinderM FindResult
     pkg_import = findExposedPackageModule fc fopts unit_state scope mod_name mb_pkg
 
-    unqual_import :: IO FindResult
+    unqual_import :: FinderM FindResult
     unqual_import = findHomeOrRegularPackageModule fc fopts ue
                         home_module_name_providers_map mb_home_unit scope mod_name
 
@@ -289,7 +412,7 @@ findPluginModuleNoHsc
   -> HomeModuleNameProvidersMap
   -> Maybe HomeUnit
   -> ModuleName
-  -> IO FindResult
+  -> FinderM FindResult
 findPluginModuleNoHsc fc fopts ue home_module_name_providers_map mb_home_unit@(Just home_unit) mod_name =
     findHomeModuleAmongDeps fc fopts ue home_module_name_providers_map
                             mb_home_unit LookupUser mod_name
@@ -301,7 +424,7 @@ findPluginModuleNoHsc fc fopts ue home_module_name_providers_map mb_home_unit@(J
 findPluginModuleNoHsc fc fopts ue _ Nothing mod_name =
   findExposedPluginPackageModule fc fopts (ue_homeUnitState ue) mod_name
 
-findPluginModule :: HscEnv -> ModuleName -> IO FindResult
+findPluginModule :: HscEnv -> ModuleName -> FinderM FindResult
 findPluginModule hsc_env mod_name = do
   let fc           = hsc_FC hsc_env
       mb_home_unit = hsc_home_unit_maybe hsc_env
@@ -373,7 +496,7 @@ findHomeUnitDepModule
   -> ModuleLookupScope
   -> ModuleName
   -> (UnitId, FinderOpts)
-  -> IO FindResult
+  -> FinderM FindResult
 findHomeUnitDepModule fc ue home_module_name_providers_map scope mod_name (uid, opts)
     -- If the module is reexported, then look for it as if it was from the
     -- perspective of the package which reexports it.
@@ -400,7 +523,7 @@ findHomeModuleAmongDeps
   -> Maybe HomeUnit
   -> ModuleLookupScope
   -> ModuleName
-  -> IO FindResult
+  -> FinderM FindResult
 findHomeModuleAmongDeps fc fopts ue home_module_name_providers_map mb_home_unit scope mod_name =
     foldr1 orIfNotFound (home_import :| map home_pkg_import other_fopts)
     -- Do not try to be smart and change this to `foldr orIfNotFound home_import
@@ -431,7 +554,7 @@ findHomeOrRegularPackageModule
   -> Maybe HomeUnit
   -> ModuleLookupScope
   -> ModuleName
-  -> IO FindResult
+  -> FinderM FindResult
 findHomeOrRegularPackageModule fc fopts ue home_module_name_providers_map mb_home_unit scope mod_name =
     findHomeModuleAmongDeps fc fopts ue home_module_name_providers_map
                             mb_home_unit scope mod_name
@@ -446,7 +569,15 @@ findHomeOrRegularPackageModule fc fopts ue home_module_name_providers_map mb_hom
 
 -- | A version of findExactModule which takes the exact parts of the HscEnv it needs
 -- directly.
-findExactModuleNoHsc :: FinderCache -> FinderOpts -> UnitEnvGraph FinderOpts -> UnitState -> Maybe HomeUnit -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
+findExactModuleNoHsc
+  :: FinderCache
+  -> FinderOpts
+  -> UnitEnvGraph FinderOpts
+  -> UnitState
+  -> Maybe HomeUnit
+  -> InstalledModule
+  -> IsBootInterface
+  -> FinderM InstalledFindResult
 findExactModuleNoHsc fc fopts other_fopts unit_state mb_home_unit mod is_boot = do
   res <- case mb_home_unit of
     Just home_unit
@@ -459,13 +590,12 @@ findExactModuleNoHsc fc fopts other_fopts unit_state mb_home_unit mod is_boot = 
     (InstalledFound loc, IsBoot) -> return (InstalledFound (addBootSuffixLocn loc))
     _ -> return res
 
-
 -- | Locate a specific 'Module'.  The purpose of this function is to
 -- create a 'ModLocation' for a given 'Module', that is to find out
 -- where the files associated with this module live.  It is used when
 -- reading the interface for a module mentioned by another interface,
 -- for example (a "system import").
-findExactModule :: HscEnv -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
+findExactModule :: HscEnv -> InstalledModule -> IsBootInterface -> FinderM InstalledFindResult
 findExactModule hsc_env mod is_boot = do
   let dflags = hsc_dflags hsc_env
   let fc = hsc_FC hsc_env
@@ -473,7 +603,6 @@ findExactModule hsc_env mod is_boot = do
   let home_unit = hsc_home_unit_maybe hsc_env
   let other_fopts = initFinderOpts . homeUnitEnv_dflags <$> (hsc_HUG hsc_env)
   findExactModuleNoHsc fc (initFinderOpts dflags) other_fopts unit_state home_unit mod is_boot
-
 
 -- -----------------------------------------------------------------------------
 -- Helpers
@@ -502,28 +631,17 @@ orIfNotFound this or_this = do
              _other -> return res2
     _other -> return res
 
--- | Helper function for 'findHomeModule': this function wraps an IO action
--- which would look up @mod_name@ in the file system (the home package),
--- and first consults the 'hsc_FC' cache to see if the lookup has already
--- been done.  Otherwise, do the lookup (with the IO action) and save
--- the result in the finder cache and the module location cache (if it
--- was successful.)
-homeSearchCache :: FinderCache -> UnitId -> ModuleName -> IO InstalledFindResult -> IO InstalledFindResult
-homeSearchCache fc home_unit mod_name do_this = do
-  let mod = mkModule home_unit mod_name
-  modLocationCache fc mod do_this
-
-findExposedPackageModule :: FinderCache -> FinderOpts -> UnitState -> ModuleLookupScope -> ModuleName -> PkgQual -> IO FindResult
+findExposedPackageModule :: FinderCache -> FinderOpts -> UnitState -> ModuleLookupScope -> ModuleName -> PkgQual -> FinderM FindResult
 findExposedPackageModule fc fopts units scope mod_name mb_pkg =
   findLookupResult fc fopts
     $ lookupModuleWithSuggestions units scope mod_name mb_pkg
 
-findExposedPluginPackageModule :: FinderCache -> FinderOpts -> UnitState -> ModuleName -> IO FindResult
+findExposedPluginPackageModule :: FinderCache -> FinderOpts -> UnitState -> ModuleName -> FinderM FindResult
 findExposedPluginPackageModule fc fopts units mod_name =
   findLookupResult fc fopts
     $ lookupPluginModuleWithSuggestions units LookupUser mod_name NoPkgQual
 
-findLookupResult :: FinderCache -> FinderOpts -> LookupResult -> IO FindResult
+findLookupResult :: FinderCache -> FinderOpts -> LookupResult -> FinderM FindResult
 findLookupResult fc fopts r = case r of
      LookupFound m pkg_conf -> do
        let im = fst (getModuleInstantiation m)
@@ -568,16 +686,6 @@ findLookupResult fc fopts r = case r of
                        , fr_unusables = []
                        , fr_suggestions = suggest' })
 
-modLocationCache :: FinderCache -> InstalledModule -> IO InstalledFindResult -> IO InstalledFindResult
-modLocationCache fc mod do_this = do
-  m <- lookupFinderCache fc mod
-  case m of
-    Just result -> return result
-    Nothing     -> do
-        result <- do_this
-        addToFinderCache fc mod result
-        return result
-
 addModuleToFinder :: FinderCache -> Module -> ModLocation -> HscSource -> IO ()
 addModuleToFinder fc mod loc src_flavour = do
   let imod = toUnitId <$> mod
@@ -595,8 +703,8 @@ addHomeModuleToFinder fc home_unit mod_name loc src_flavour = do
 -- -----------------------------------------------------------------------------
 --      The internal workers
 
-findHomeModule :: FinderCache -> FinderOpts -> HomeUnit -> ModuleName -> IO FindResult
-findHomeModule fc fopts  home_unit mod_name = do
+findHomeModule :: FinderCache -> FinderOpts -> HomeUnit -> ModuleName -> FinderM FindResult
+findHomeModule fc fopts home_unit mod_name = do
   let uid       = homeUnitAsUnit home_unit
   r <- findInstalledHomeModule fc fopts (homeUnitId home_unit) mod_name
   return $ case r of
@@ -620,8 +728,8 @@ mkHomeHidden uid =
            , fr_unusables = []
            , fr_suggestions = []}
 
-findHomePackageModule :: FinderCache -> FinderOpts -> UnitId -> ModuleName -> IO FindResult
-findHomePackageModule fc fopts  home_unit mod_name = do
+findHomePackageModule :: FinderCache -> FinderOpts -> UnitId -> ModuleName -> FinderM FindResult
+findHomePackageModule fc fopts home_unit mod_name = do
   let uid       = RealUnit (Definite home_unit)
   r <- findInstalledHomeModule fc fopts home_unit mod_name
   return $ case r of
@@ -653,9 +761,9 @@ findHomePackageModule fc fopts  home_unit mod_name = do
 --
 --  4. Some special-case code in GHCi (ToDo: Figure out why that needs to
 --  call this.)
-findInstalledHomeModule :: FinderCache -> FinderOpts -> UnitId -> ModuleName -> IO InstalledFindResult
-findInstalledHomeModule fc fopts home_unit mod_name = do
-  homeSearchCache fc home_unit mod_name $
+findInstalledHomeModule :: FinderCache -> FinderOpts -> UnitId -> ModuleName -> FinderM InstalledFindResult
+findInstalledHomeModule fc fopts home_unit mod_name
+  = withCacheOrElse (lookupFinderCache fc mod) (addToFinderCache fc mod) $
    let
      maybe_working_dir = finder_workingDirectory fopts
      home_path = case maybe_working_dir of
@@ -668,7 +776,6 @@ findInstalledHomeModule fc fopts home_unit mod_name = do
           Just fp -> [fp </> hiDir]
         Nothing -> home_path
      hisuf = finder_hiSuf fopts
-     mod = mkModule home_unit mod_name
 
      source_exts =
       [ (os "hs",    mkHomeModLocationSearched fopts mod_name $ os "hs")
@@ -690,6 +797,8 @@ findInstalledHomeModule fc fopts home_unit mod_name = do
           | finder_lookupHomeInterfaces fopts = (hi_dir_path, hi_exts)
           | otherwise                         = (home_path, source_exts)
    in searchPathExts search_dirs mod exts
+  where
+    mod = mkModule home_unit mod_name
 
 -- | Prepend the working directory to the search path.
 augmentImports :: OsPath -> [OsPath] -> [OsPath]
@@ -699,7 +808,7 @@ augmentImports work_dir (fp:fps)
   | otherwise            = (work_dir </> fp) : augmentImports work_dir fps
 
 -- | Search for a module in external packages only.
-findPackageModule :: FinderCache -> UnitState -> FinderOpts -> InstalledModule -> IO InstalledFindResult
+findPackageModule :: FinderCache -> UnitState -> FinderOpts -> InstalledModule -> FinderM InstalledFindResult
 findPackageModule fc unit_state fopts mod = do
   let pkg_id = moduleUnit mod
   case lookupUnitId unit_state pkg_id of
@@ -713,11 +822,11 @@ findPackageModule fc unit_state fopts mod = do
 -- the 'UnitInfo' must be consistent with the unit id in the 'Module'.
 -- The redundancy is to avoid an extra lookup in the package state
 -- for the appropriate config.
-findPackageModule_ :: FinderCache -> FinderOpts -> InstalledModule -> UnitInfo -> IO InstalledFindResult
+findPackageModule_ :: FinderCache -> FinderOpts -> InstalledModule -> UnitInfo -> FinderM InstalledFindResult
 findPackageModule_ fc fopts mod pkg_conf = do
   massertPpr (moduleUnit mod == unitId pkg_conf)
              (ppr (moduleUnit mod) <+> ppr (unitId pkg_conf))
-  modLocationCache fc mod $
+  withCacheOrElse (lookupFinderCache fc mod) (addToFinderCache fc mod) $
     let
        tag = waysBuildTag (finder_ways fopts)
 
