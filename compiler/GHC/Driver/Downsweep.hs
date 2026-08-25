@@ -42,9 +42,8 @@ import GHC.Driver.Monad
 import GHC.Driver.Env
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
-import GHC.Driver.Messager
-import GHC.Driver.MakeSem
-import GHC.Driver.MakeAction
+import GHC.Driver.Concurrency ( mapIndependentWorkers )
+import GHC.Driver.MakeAction ( hscWorkerPool, setHscWorkerEnv )
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Ppr
 
@@ -66,7 +65,6 @@ import GHC.Data.OsPath     ( OsPath, unsafeEncodeUtf )
 import GHC.Data.StringBuffer
 import GHC.Data.Graph.Directed.Reachability
 
-import GHC.Utils.Exception ( throwIO, SomeAsyncException )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
@@ -100,10 +98,8 @@ import Data.Either ( partitionEithers, lefts )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Control.Concurrent.MVar
 import Control.Monad
 import Control.Monad.Trans.Except ( ExceptT(..), runExceptT, throwE )
-import qualified Control.Monad.Catch as MC
 import Data.Maybe
 import Data.List (partition)
 import Data.Time
@@ -114,7 +110,6 @@ import System.FilePath
 
 import Control.Monad.Trans.Reader
 import qualified Data.Map.Strict as M
-import Control.Monad.Trans.Class
 import System.IO.Unsafe (unsafeInterleaveIO)
 import Data.IORef
 import qualified Data.List.NonEmpty as NE
@@ -240,8 +235,6 @@ See Note [The ModuleGraph] for an overview when we do downsweep.
 --
 -- See also Note [The ModuleGraph]
 downsweep :: HscEnv
-          -> (GhcMessage -> AnyGhcDiagnostic)
-          -> Maybe Messager
           -> [ModSummary]
           -- ^ Old summaries
           -> Maybe ModuleGraph
@@ -255,61 +248,56 @@ downsweep :: HscEnv
                 -- The non-error elements of the returned list all have distinct
                 -- (Modules, IsBoot) identifiers, unless the Bool is true in
                 -- which case there can be repeats
-downsweep hsc_env0 diag_wrapper msg old_summaries maybe_base_graph excl_mods allow_dup_roots = do
-  n_jobs     <- mkWorkerLimit (hsc_dflags hsc_env0)
+downsweep hsc_env0 old_summaries maybe_base_graph excl_mods allow_dup_roots = do
   summ_cache <- newIORef (mkModSummaryCache (zip old_summaries (repeat SummOld)))
   imps_cache <- newIORef Map.empty
   let (file_targets, module_targets) = partition is_file_target (hsc_targets hsc_env0)
       get_root_summary = getRootSummary excl_mods summ_cache imps_cache
-  withMakeEnv n_jobs hsc_env0 diag_wrapper msg $ \make_env0 -> do
-    -- First summarise the file targets: they may live off the search path and
-    -- declare a module name unrelated to their file name, so their modules
-    -- can only be known from their summaries.
-    (file_errs, file_root_summaries) <-
-      rootSummariesParallel n_jobs make_env0 file_targets get_root_summary
 
-    -- Only now start to resolve module targets, which may name modules
-    -- that the file targets provide.
-    -- See Note [Known home modules] in GHC.Unit.Finder.Types.
-    let known    = knownHomeModulesOfSummaries file_root_summaries
-        hsc_env  = setKnownHomeModules known hsc_env0
-        make_env = make_env0 { hsc_env = setKnownHomeModules known make_hsc_env }
-        MakeEnv { hsc_env = make_hsc_env } = make_env0
-    (module_errs, module_root_summaries) <-
-      rootSummariesParallel n_jobs make_env module_targets get_root_summary
+  -- First summarise the file targets: they may live off the search path and
+  -- declare a module name unrelated to their file name, so their modules
+  -- can only be known from their summaries.
+  (file_errs, file_root_summaries) <-
+    rootSummariesParallel hsc_env0 get_root_summary file_targets
 
-    let root_errs      = file_errs ++ module_errs
-        root_summaries = file_root_summaries ++ module_root_summaries
+  -- Only now start to resolve module targets, which may name modules
+  -- that the file targets provide.
+  -- See Note [Known home modules] in GHC.Unit.Finder.Types.
+  let known   = knownHomeModulesOfSummaries file_root_summaries
+      hsc_env = setKnownHomeModules known hsc_env0
+  (module_errs, module_root_summaries) <-
+    rootSummariesParallel hsc_env get_root_summary module_targets
 
-        closure_errs = checkHomeUnitsClosed unit_env
-        unit_env = hsc_unit_env hsc_env
+  let root_errs      = file_errs ++ module_errs
+      root_summaries = file_root_summaries ++ module_root_summaries
 
-        all_errs = closure_errs ++ root_errs
+      closure_errs = checkHomeUnitsClosed unit_env
+      unit_env = hsc_unit_env hsc_env
 
-    case all_errs of
-      [] -> do
-         let env = DownsweepEnv
-               { ds_hsc_env         = hsc_env
-               , ds_summaries_cache = summ_cache
-               , ds_imports_cache   = imps_cache
-               , ds_mode            = DownsweepUseCompile
-               , ds_excl_mods       = excl_mods
-               , ds_n_jobs          = n_jobs
-               , ds_make_env        = make_env
-               }
-         (downsweep_errs, downsweep_nodes) <- runDownsweepM env $
-            downsweepFromRootNodes maybe_base_graph allow_dup_roots
-              (map ModuleNodeCompile root_summaries) []
+      all_errs = closure_errs ++ root_errs
 
-         let (other_errs, unit_nodes) = partitionEithers $
-                HUG.unitEnv_foldWithKey (\nodes uid hue -> nodes ++ unitModuleNodes downsweep_nodes uid hue) []
-                                        (hsc_HUG hsc_env)
+  case all_errs of
+    [] -> do
+       let env = DownsweepEnv
+             { ds_hsc_env         = hsc_env
+             , ds_summaries_cache = summ_cache
+             , ds_imports_cache   = imps_cache
+             , ds_mode            = DownsweepUseCompile
+             , ds_excl_mods       = excl_mods
+             }
+       (downsweep_errs, downsweep_nodes) <- runDownsweepM env $
+          downsweepFromRootNodes maybe_base_graph allow_dup_roots
+            (map ModuleNodeCompile root_summaries) []
 
-         let all_nodes = downsweep_nodes ++ unit_nodes
-         let all_errs = downsweep_errs ++ other_errs
+       let (other_errs, unit_nodes) = partitionEithers $
+              HUG.unitEnv_foldWithKey (\nodes uid hue -> nodes ++ unitModuleNodes downsweep_nodes uid hue) []
+                                      (hsc_HUG hsc_env)
 
-         return (all_errs, mkModuleGraph all_nodes)
-      _  -> return (all_errs, emptyMG)
+       let all_nodes = downsweep_nodes ++ unit_nodes
+       let all_errs = downsweep_errs ++ other_errs
+
+       return (all_errs, mkModuleGraph all_nodes)
+    _  -> return (all_errs, emptyMG)
   where
     is_file_target :: Target -> Bool
     is_file_target (Target { targetId }) =
@@ -358,28 +346,24 @@ downsweep hsc_env0 diag_wrapper msg old_summaries maybe_base_graph excl_mods all
 downsweepThunk :: HscEnv -> ModSummary -> IO ModuleGraph
 downsweepThunk hsc_env mod_summary = unsafeInterleaveIO $ do
   debugTraceMsg (hsc_logger hsc_env) 3 $ text "Computing Module Graph thunk..."
-  njobs <- mkWorkerLimit (hsc_dflags hsc_env)
   summs <- newIORef (mkModSummaryCache [(mod_summary,SummOld)])
   imps  <- newIORef mempty
-  withMakeEnv njobs hsc_env mkUnknownDiagnostic Nothing $ \make_env -> do
-    let env = DownsweepEnv
-          { ds_hsc_env         = hsc_env
-          , ds_summaries_cache = summs
-          , ds_imports_cache   = imps
-          , ds_mode            = DownsweepUseFixed
-          , ds_excl_mods       = []
-          , ds_n_jobs          = njobs
-          , ds_make_env        = make_env
-          }
-    ~(errs, mg) <- runDownsweepM env $
-      downsweepFromRootNodes Nothing True
-        [ModuleNodeCompile mod_summary] []
-    let dflags = hsc_dflags hsc_env
-    liftIO $ printOrThrowDiagnostics (hsc_logger hsc_env)
-                                     (initPrintConfig dflags)
-                                     (initDiagOpts dflags)
-                                     (GhcDriverMessage <$> unionManyMessages errs)
-    return (mkModuleGraph mg)
+  let env = DownsweepEnv
+        { ds_hsc_env         = hsc_env
+        , ds_summaries_cache = summs
+        , ds_imports_cache   = imps
+        , ds_mode            = DownsweepUseFixed
+        , ds_excl_mods       = []
+        }
+  ~(errs, mg) <- runDownsweepM env $
+    downsweepFromRootNodes Nothing True
+      [ModuleNodeCompile mod_summary] []
+  let dflags = hsc_dflags hsc_env
+  liftIO $ printOrThrowDiagnostics (hsc_logger hsc_env)
+                                   (initPrintConfig dflags)
+                                   (initDiagOpts dflags)
+                                   (GhcDriverMessage <$> unionManyMessages errs)
+  return (mkModuleGraph mg)
 
 -- | Construct a module graph starting from the interactive context.
 -- Produces, a thunk, which when forced will perform the downsweep.
@@ -403,23 +387,19 @@ downsweepInteractiveImports hsc_env ic = unsafeInterleaveIO $ do
   -- :load. Any home package modules need to already be in here.
   let cached_nodes = Map.fromList [ (mkNodeKey n, NSuccess n) | n <- mg_mss (hsc_mod_graph hsc_env) ]
 
-  n_jobs     <- mkWorkerLimit (hsc_dflags hsc_env)
   summ_cache <- newIORef mempty
   imps_cache <- newIORef mempty
-  withMakeEnv n_jobs hsc_env mkUnknownDiagnostic Nothing $ \make_env -> do
-    let env = DownsweepEnv
-          { ds_hsc_env         = hsc_env
-          , ds_mode            = DownsweepUseFixed{-or DownsweepUseCompile?-}
-          , ds_summaries_cache = summ_cache
-          , ds_imports_cache   = imps_cache
-          , ds_excl_mods       = []
-          , ds_n_jobs          = n_jobs
-          , ds_make_env        = make_env
-          }
-    graph <- runDownsweepM env do
-      loopFromInteractive cached_nodes interactive_mn imps
-    let all_nodes  = [s | NSuccess s <- M.elems graph ]
-    return $ mkModuleGraph all_nodes
+  let env = DownsweepEnv
+        { ds_hsc_env         = hsc_env
+        , ds_mode            = DownsweepUseFixed{-or DownsweepUseCompile?-}
+        , ds_summaries_cache = summ_cache
+        , ds_imports_cache   = imps_cache
+        , ds_excl_mods       = []
+        }
+  graph <- runDownsweepM env do
+    loopFromInteractive cached_nodes interactive_mn imps
+  let all_nodes  = [s | NSuccess s <- M.elems graph ]
+  return $ mkModuleGraph all_nodes
 
 -- | Create a module graph from a list of installed modules.
 -- This is used by the loader when we need to load modules but there
@@ -447,31 +427,27 @@ downsweepInstalledModules hsc_env mods = do
             -- already know that we can find the modules we need to load.
             _ -> throwGhcException $ ProgramError $ showSDoc (hsc_dflags hsc_env) $ text "downsweepInstalledModules: Could not find installed module" <+> ppr i
 
-    njobs <- mkWorkerLimit (hsc_dflags hsc_env)
     nodes <- mapM process installed_mods
     summs <- newIORef mempty
     imps  <- newIORef mempty
-    withMakeEnv njobs hsc_env mkUnknownDiagnostic Nothing $ \make_env -> do
-      let env = DownsweepEnv
-            { ds_hsc_env         = hsc_env
-            , ds_summaries_cache = summs
-            , ds_imports_cache   = imps
-            , ds_mode            = DownsweepUseFixed
-            , ds_excl_mods       = []
-            , ds_n_jobs          = njobs
-            , ds_make_env        = make_env
-            }
-      (errs, mg) <- runDownsweepM env $
-        downsweepFromRootNodes Nothing True nodes external_uids
+    let env = DownsweepEnv
+          { ds_hsc_env         = hsc_env
+          , ds_summaries_cache = summs
+          , ds_imports_cache   = imps
+          , ds_mode            = DownsweepUseFixed
+          , ds_excl_mods       = []
+          }
+    (errs, mg) <- runDownsweepM env $
+      downsweepFromRootNodes Nothing True nodes external_uids
 
-      -- Similarly here, we should really not get any errors, but print them out if we do.
-      let dflags = hsc_dflags hsc_env
-      liftIO $ printOrThrowDiagnostics (hsc_logger hsc_env)
-                                       (initPrintConfig dflags)
-                                       (initDiagOpts dflags)
-                                       (GhcDriverMessage <$> unionManyMessages errs)
+    -- Similarly here, we should really not get any errors, but print them out if we do.
+    let dflags = hsc_dflags hsc_env
+    liftIO $ printOrThrowDiagnostics (hsc_logger hsc_env)
+                                     (initPrintConfig dflags)
+                                     (initDiagOpts dflags)
+                                     (GhcDriverMessage <$> unionManyMessages errs)
 
-      return (mkModuleGraph mg)
+    return (mkModuleGraph mg)
 
 -----------------------------------------------------------------------------
 -- * Orchestrator: downsweepFromRootNodes
@@ -574,8 +550,6 @@ data DownsweepEnv = DownsweepEnv {
     , ds_summaries_cache :: ModSummaryCache
     , ds_imports_cache   :: ImportsCache
     , ds_excl_mods       :: [ModuleName]
-    , ds_n_jobs          :: WorkerLimit
-    , ds_make_env        :: MakeEnv
 }
 
 mkModSummaryCache :: [(ModSummary, SummProvenance)] -> ModSummaryCacheMap
@@ -939,15 +913,29 @@ getRootSummary excl_mods summ_cache imports_cache hsc_env target
       home_unit = ue_unitHomeUnit uid (hsc_unit_env hsc_env)
       dflags = homeUnitEnv_dflags (ue_findHomeUnitEnv uid (hsc_unit_env hsc_env))
 
--- | Execute 'getRootSummary' for the 'Target's using the parallelism pipeline system.
+-- | Execute 'getRootSummary' for the 'Target's in bundles, spawning one
+-- worker per bundle. The number of bundles processed at once is limited by
+-- the session's concurrency.
 rootSummariesParallel
-  :: WorkerLimit -> MakeEnv -> [Target]
+  :: HscEnv
   -> (HscEnv -> Target -> IO (Either DriverMessages ModSummary))
+  -> [Target]
   -> IO ([DriverMessages], [ModSummary])
-rootSummariesParallel n_jobs make_env targets get_summary = do
-  partitionEithers <$> mapConcDS n_jobs bundle_size make_env get_summary targets
-    where
-      bundle_size = 20
+rootSummariesParallel hsc_env get_summary targets = do
+  pool <- hscWorkerPool "root_summary_worker" hsc_env
+  results <-
+    mapIndependentWorkers pool
+      ( \ work_env bundle ->
+          mapM (get_summary (setHscWorkerEnv work_env hsc_env)) bundle )
+      bundles
+  pure $ partitionEithers (concat results)
+  where
+    bundle_size = 20
+
+    bundles = mk_bundles targets
+    mk_bundles = unfoldr \case
+      [] -> Nothing
+      ts -> Just (splitAt bundle_size ts)
 
 --------------------------------------------------------------------------------
 -- * Check/validate properties and error out
@@ -1888,48 +1876,3 @@ Note [The ModuleGraph].
 -- * Concurrent utilities
 --------------------------------------------------------------------------------
 
--- | Map an action over a list using the parallelism pipeline system.
--- Create bundles of the list elems wrapped in a 'MakeAction' that uses
--- 'withAbstractSem' to wait for a free slot, limiting the number of
--- concurrently computed summaries to the value of the @-j@ option or the slots
--- allocated by the job server, if that is used.
---
--- The 'MakeAction' returns 'Maybe', which is not handled as an error, because
--- 'runLoop' only sets it to 'Nothing' when an exception was thrown, so the
--- result won't be read anyway here.
---
--- To emulate the current behavior, we funnel exceptions past the concurrency
--- barrier and rethrow the first one afterwards.
-mapConcDS ::
-  WorkerLimit ->
-  Int {-^ Batch size -} ->
-  MakeEnv ->
-  (HscEnv -> a -> IO b) ->
-  [a] ->
-  IO ([b])
-mapConcDS n_jobs bundle_size make_env run_action xs = do
-  (actions, get_results) <- unzip <$> mapM action_and_result (zip [1..] bundles)
-  runAllPipelines n_jobs make_env actions
-  (sequence . catMaybes <$> sequence get_results) >>= \case
-    Right results -> pure (concat results)
-    Left exc -> throwIO exc
-  where
-    bundles = mk_bundles xs
-
-    mk_bundles = unfoldr \case
-      [] -> Nothing
-      ts -> Just (splitAt bundle_size ts)
-
-    action_and_result (log_queue_id, ts) = do
-      res_var <- liftIO newEmptyMVar
-      pure $! (MakeAction (action log_queue_id ts) res_var, readMVar res_var)
-
-    action log_queue_id target_bundle = do
-      env@MakeEnv {compile_sem} <- ask
-      lift $ lift $
-        withAbstractSem compile_sem $
-        withLoggerHsc log_queue_id env \ lcl_hsc_env ->
-          MC.try (mapM (run_action lcl_hsc_env) target_bundle) >>= \case
-            Left e | Just (_ :: SomeAsyncException) <- fromException e ->
-              throwIO e
-            a -> pure a

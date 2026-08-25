@@ -489,11 +489,13 @@ Library
         GHC.Driver.ByteCode
         GHC.Driver.CmdLine
         GHC.Driver.CodeOutput
+        GHC.Driver.Concurrency
         GHC.Driver.Config
         GHC.Driver.Config.Cmm
         GHC.Driver.Config.Cmm.Parser
         GHC.Driver.Config.CmmToAsm
         GHC.Driver.Config.CmmToLlvm
+        GHC.Driver.Config.Concurrency
         GHC.Driver.Config.Core.Lint
         GHC.Driver.Config.Core.Lint.Interactive
         GHC.Driver.Config.Core.Opt.Arity
@@ -1013,6 +1015,7 @@ Library
         GHC.Utils.Binary
         GHC.Utils.BufHandle
         GHC.Utils.CliOption
+        GHC.Utils.Concurrent.Scope
         GHC.Utils.Constants
         GHC.Utils.Containers.Internal.BitUtil
         GHC.Utils.Containers.Internal.StrictPair

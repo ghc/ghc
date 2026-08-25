@@ -172,7 +172,7 @@ createIfaces verbosity modules flags instIfaceMap = do
   _ <- setSessionDynFlags dflags''
   targets <- mapM (\(filePath, _) -> guessTarget filePath Nothing Nothing) hs_srcs
   setTargets targets
-  (_errs, modGraph) <- depanalE mkUnknownDiagnostic (Just batchMsg) [] False
+  (_errs, modGraph) <- depanalE [] False
 
   -- Create (if necessary) and load .hi-files. With --no-compilation this happens later.
   when (Flag_NoCompilation `notElem` flags) $ do

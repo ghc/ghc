@@ -4,6 +4,7 @@ module GHC.Driver.Pipeline.LogQueue ( LogQueue(..)
                                   , finishLogQueue
                                   , writeLogQueue
                                   , parLogAction
+                                  , printLogs
 
                                   , LogQueueQueue(..)
                                   , initLogQueue
@@ -25,19 +26,28 @@ import Control.Monad
 
 -- LogQueue Abstraction
 
--- | Each module is given a unique 'LogQueue' to redirect compilation messages
--- to. A 'Nothing' value contains the result of compilation, and denotes the
--- end of the message queue.
-data LogQueue = LogQueue { logQueueId :: !Int
-                         , logQueueMessages :: !(IORef [Maybe (MessageClass, SrcSpan, SDoc, LogFlags)])
-                         , logQueueSemaphore :: !(MVar ())
-                         }
+-- | A 'LogQueue' is used to accumulate compilation messages.
+--
+-- This allows compilation output to be reported to the user without
+-- interleaving concurrent messages (garbled text).
+data LogQueue =
+  LogQueue
+    { logQueueMessages  :: !(IORef [Maybe (MessageClass, SrcSpan, SDoc, LogFlags)])
+       -- ^ All logged messages, in reverse chronological order (later messages
+       -- appearing nearer the start of the list), with 'Nothing' denoting the
+       -- end of the message queue.
+       --
+       -- A typical message queue will look like:
+       --
+       -- > <ignored_data> : Nothing : Just msg_9 : Just msg_8 : ... : Just msg_1 : []
+    , logQueueSemaphore :: !(MVar ())
+    }
 
-newLogQueue :: Int -> IO LogQueue
-newLogQueue n = do
+newLogQueue :: IO LogQueue
+newLogQueue = do
   mqueue <- newIORef []
   sem <- newMVar ()
-  return (LogQueue n mqueue sem)
+  return (LogQueue mqueue sem)
 
 finishLogQueue :: LogQueue -> IO ()
 finishLogQueue lq = do
@@ -50,7 +60,7 @@ writeLogQueue lq msg = do
 
 -- | Internal helper for writing log messages
 writeLogQueueInternal :: LogQueue -> Maybe (MessageClass,SrcSpan,SDoc, LogFlags) -> IO ()
-writeLogQueueInternal (LogQueue _n ref sem) msg = do
+writeLogQueueInternal (LogQueue ref sem) msg = do
     atomicModifyIORef' ref $ \msgs -> (msg:msgs,())
     _ <- tryPutMVar sem ()
     return ()
@@ -61,9 +71,11 @@ parLogAction :: LogQueue -> LogAction
 parLogAction log_queue log_flags !msgClass !srcSpan !msg =
     writeLogQueue log_queue (msgClass,srcSpan,msg, log_flags)
 
--- Print each message from the log_queue using the global logger
+-- | Print each message from the log queue using the given logger.
+--
+-- Blocks until the queue has been finished with 'finishLogQueue'.
 printLogs :: Logger -> LogQueue -> IO ()
-printLogs !logger (LogQueue _n ref sem) = read_msgs
+printLogs !logger (LogQueue ref sem) = read_msgs
   where read_msgs = do
             takeMVar sem
             msgs <- atomicModifyIORef' ref $ \xs -> ([], reverse xs)
@@ -84,11 +96,23 @@ data LogQueueQueue = LogQueueQueue Int (IM.IntMap LogQueue)
 newLogQueueQueue :: LogQueueQueue
 newLogQueueQueue = LogQueueQueue 1 IM.empty
 
-addToQueueQueue :: LogQueue -> LogQueueQueue -> LogQueueQueue
-addToQueueQueue lq (LogQueueQueue n im) = LogQueueQueue n (IM.insert (logQueueId lq) lq im)
+addToQueueQueue
+  :: Int -- ^ 1-indexed position in which to add
+  -> LogQueue
+  -> LogQueueQueue
+  -> LogQueueQueue
+addToQueueQueue i lq (LogQueueQueue n im) = LogQueueQueue n (IM.insert i lq im)
 
-initLogQueue :: TVar LogQueueQueue -> LogQueue -> STM ()
-initLogQueue lqq lq = modifyTVar lqq (addToQueueQueue lq)
+-- | Hand a log queue to the log thread, to be printed at the given position.
+--
+-- Positions must be contiguous: the log thread prints position @n@ only after
+-- every position below @n@ is done.
+initLogQueue
+  :: TVar LogQueueQueue
+  -> Int -- ^ position in the 'LogQueueQueue' in which to insert the 'LogQueue'
+  -> LogQueue
+  -> STM ()
+initLogQueue lqq i lq = modifyTVar lqq (addToQueueQueue i lq)
 
 -- | Return all items in the queue in ascending order
 allLogQueues :: LogQueueQueue -> [LogQueue]

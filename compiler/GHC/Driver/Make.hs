@@ -63,7 +63,6 @@ import GHC.Driver.Env
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.Main
-import GHC.Driver.MakeSem
 import GHC.Driver.Downsweep
 import GHC.Driver.MakeAction
 
@@ -74,6 +73,7 @@ import GHC.IfaceToCore     ( typecheckIface )
 import GHC.Iface.Recomp    ( RecompileRequired(..), CompileReason(..) )
 
 import GHC.Data.Bag        ( listToBag )
+import GHC.Data.Dependent  ( Some(..) )
 import GHC.Data.Graph.Directed
 import GHC.Data.Maybe      ( expectJust )
 
@@ -106,7 +106,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import GHC.Types.Unique.Set
 
-import Control.Concurrent.MVar
+import Control.Concurrent.STM ( STM, atomically )
 import Control.Monad
 import qualified Control.Monad.Catch as MC
 import Data.IORef
@@ -156,22 +156,20 @@ depanal :: GhcMonad m =>
 depanal excluded_mods allow_dup_roots = do
     hsc_env <- getSession
     let sec = initSourceErrorContext (hsc_dflags hsc_env)
-    (errs, mod_graph) <- depanalE mkUnknownDiagnostic Nothing excluded_mods allow_dup_roots
+    (errs, mod_graph) <- depanalE excluded_mods allow_dup_roots
     if isEmptyMessages errs
       then pure mod_graph
       else throwErrors sec (fmap GhcDriverMessage errs)
 
 -- | Perform dependency analysis like in 'depanal'.
 -- In case of errors, the errors and an empty module graph are returned.
-depanalE :: GhcMonad m =>     -- New for #17459
-               (GhcMessage -> AnyGhcDiagnostic)
-            -> Maybe Messager
-            -> [ModuleName]      -- ^ excluded modules
+depanalE :: GhcMonad m =>
+               [ModuleName]   -- ^ excluded modules
             -> Bool           -- ^ allow duplicate roots
             -> m (DriverMessages, ModuleGraph)
-depanalE diag_wrapper msg excluded_mods allow_dup_roots = do
+depanalE excluded_mods allow_dup_roots = do
     hsc_env <- getSession
-    (errs, mod_graph) <- depanalPartial diag_wrapper msg excluded_mods allow_dup_roots
+    (errs, mod_graph) <- depanalPartial excluded_mods allow_dup_roots
     if isEmptyMessages errs
       then do
         hsc_env <- getSession
@@ -213,13 +211,11 @@ depanalE diag_wrapper msg excluded_mods allow_dup_roots = do
 -- new module graph.
 depanalPartial
     :: GhcMonad m
-    => (GhcMessage -> AnyGhcDiagnostic)
-    -> Maybe Messager
-    -> [ModuleName]  -- ^ excluded modules
+    => [ModuleName]  -- ^ excluded modules
     -> Bool          -- ^ allow duplicate roots
     -> m (DriverMessages, ModuleGraph)
     -- ^ possibly empty 'Bag' of errors and a module graph.
-depanalPartial diag_wrapper msg excluded_mods allow_dup_roots = do
+depanalPartial excluded_mods allow_dup_roots = do
   hsc_env <- getSession
   let
          targets = hsc_targets hsc_env
@@ -238,7 +234,7 @@ depanalPartial diag_wrapper msg excluded_mods allow_dup_roots = do
     liftIO $ flushFinderCaches (hsc_FC hsc_env)
 
     (errs, mod_graph) <- liftIO $ downsweep
-      hsc_env diag_wrapper msg (mgModSummaries old_graph) Nothing
+      hsc_env (mgModSummaries old_graph) Nothing
       excluded_mods allow_dup_roots
     return (unionManyMessages errs, mod_graph)
 
@@ -442,7 +438,7 @@ loadWithCache :: GhcMonad m => Maybe ModIfaceCache -- ^ Instructions about how t
                             -> m SuccessFlag
 loadWithCache cache diag_wrapper how_much = do
     msg <- mkBatchMsg <$> getSession
-    (errs, mod_graph) <- depanalE diag_wrapper (Just msg) [] False                        -- #17459
+    (errs, mod_graph) <- depanalE [] False                        -- #17459
     success <- load' cache how_much diag_wrapper (Just msg) mod_graph
     hsc_env <- getSession
     let sec = initSourceErrorContext (hsc_dflags hsc_env)
@@ -735,11 +731,9 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph0 = do
     liftIO $ debugTraceMsg logger 2 (hang (text "Ready for upsweep")
                                     2 (ppr build_plan))
 
-    worker_limit <- liftIO $ mkWorkerLimit dflags
-
     (upsweep_ok, new_deps) <- withDeferredDiagnostics $ do
       hsc_env <- getSession
-      liftIO $ upsweep worker_limit hsc_env mhmi_cache diag_wrapper mHscMessage (toCache pruned_cache) build_plan
+      liftIO $ upsweep hsc_env mhmi_cache diag_wrapper mHscMessage (toCache pruned_cache) build_plan
 
     -- At this point, all the HPT variables will be populated, but we don't want
     -- to leak the contents of a failed session.
@@ -858,23 +852,27 @@ compilation graph using multiple Haskell threads.
 
 The Algorithm
 
-* The list of `MakeAction`s are created by `interpretBuildPlan`. A `MakeAction` is
-a pair of an `IO a` action and a `MVar a`, where to place the result.
-  The list is sorted topologically, so can be executed in order without fear of
-  blocking.
-* runPipelines takes this list and eventually passes it to runLoop which executes
-  each action and places the result into the right MVar.
-* The amount of parallelism is controlled by a semaphore. This is just used around the
-  module compilation step, so that only the right number of modules are compiled at
-  the same time which reduces overall memory usage and allocations.
-* Each proper node has a LogQueue, which dictates where to send it's output.
-* The LogQueue is placed into the LogQueueQueue when the action starts and a worker
-  thread processes the LogQueueQueue printing logs for each module in a stable order.
-* The result variable for an action producing `a` is of type `Maybe a`, therefore
-  it is still filled on a failure. If a module fails to compile, the
-  failure is propagated through the whole module graph and any modules which didn't
-  depend on the failure can still be compiled. This behaviour also makes the code
-  quite a bit cleaner.
+* The list of `MakeAction`s are created by `interpretBuildPlan`. A `MakeAction`
+  bundles:
+    - the result cells of its dependencies,
+    - the IO action to run,
+    - the result cell in which to place the result.
+  The list is sorted topologically.
+* runPipelines spawns one worker per action ('GHC.Driver.Concurrency.runCoordinatingWorkers').
+  Each action waits for its dependencies' results to be filled; if they all
+  succeeded it executes the action, and otherwise it skips it, in both cases
+  filling its own result cell.
+* The amount of parallelism is controlled by a semaphore. Each worker acquires
+  a token once it is ready to start work. This ensures that only the right
+  number of modules are compiled at the same time, which reduces overall memory
+  usage and allocations.
+* Each worker has a LogQueue, which dictates where to send its output. A log
+  thread processes the LogQueues, printing logs for each module in a stable
+  order (the order in which the actions were spawned).
+* The result cell of an action holds a 'Maybe' value; it is still filled on
+  compilation failure. This ensures that, when a module fails to compile, we
+  propagate the failure through the whole module graph; any modules which didn't
+  depend on the failure can still be compiled.
 -}
 
 
@@ -954,10 +952,8 @@ This plan also ensures the most important invariant to do with module loops:
 > If you depend on anything within a module loop, before you can use the dependency,
   the whole loop has to finish compiling.
 
-The end result of `interpretBuildPlan` is a `[MakeAction]`, which are pairs
-of `IO a` actions and a `MVar (Maybe a)`, somewhere to put the result of running
-the action. This list is topologically sorted, so can be run in order to compute
-the whole graph.
+The end result of `interpretBuildPlan` is a `[MakeAction]`. This list is
+topologically sorted, so can be run in order to compute the whole graph.
 
 As well as this `interpretBuildPlan` also outputs an `IO [Maybe (Maybe HomeModInfo)]` which
 can be queried at the end to get the result of all modules at the end, with their proper
@@ -967,17 +963,17 @@ these modules together.
 
 -}
 
--- | Simple wrapper around MVar which allows a functor instance.
-data ResultVar b = forall a . ResultVar (a -> b) (MVar (Maybe a))
+-- | Simple wrapper around 'ResultCell' which allows a functor instance.
+data ResultVar b = forall a . ResultVar (a -> b) (ResultCell a)
 
 deriving instance Functor ResultVar
 
-mkResultVar :: MVar (Maybe a) -> ResultVar a
+mkResultVar :: ResultCell a -> ResultVar a
 mkResultVar = ResultVar id
 
--- | Block until the result is ready.
-waitResult :: ResultVar a -> MaybeT IO a
-waitResult (ResultVar f var) = MaybeT (fmap f <$> readMVar var)
+-- | The result of an action; retries until it has been written.
+waitResult :: ResultVar a -> MaybeT STM a
+waitResult (ResultVar f var) = MaybeT (fmap f <$> awaitResultCell var)
 
 data BuildResult = BuildResult { _resultOrigin :: ResultOrigin
                                , resultVar    :: ResultVar (Maybe HomeModInfo)
@@ -991,6 +987,9 @@ data ResultLoopOrigin = Initialise | Rehydrated | Finalised deriving (Show)
 mkBuildResult :: ResultOrigin -> ResultVar (Maybe HomeModInfo) -> BuildResult
 mkBuildResult = BuildResult
 
+-- | The 'ResultCell' an action depending on this 'BuildResult' must wait on.
+buildResultCell :: BuildResult -> Some ResultCell
+buildResultCell (BuildResult { resultVar = ResultVar _ cell }) = Some cell
 
 data BuildLoopState = BuildLoopState { buildDep :: M.Map NodeKey BuildResult
                                           -- The current way to build a specific TNodeKey, without cycles this just points to
@@ -1041,10 +1040,12 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
   return (mcycle, plans, wait)
 
   where
+    -- Runs after 'runPipelines' has finished, when every result variable has
+    -- been filled, so 'waitResult' does not block.
     collect_results build_map =
       sequence (map (\br -> collect_result (resultVar br)) (M.elems build_map))
       where
-        collect_result res_var = runMaybeT (waitResult res_var)
+        collect_result res_var = atomically $ runMaybeT (waitResult res_var)
 
     -- Just used for an assertion
     count_mods :: BuildPlan -> Int
@@ -1098,7 +1099,6 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
               InstantiationNode uid iu -> do
                 mod_idx <- nodeId
                 return $ withCurrentUnit (mgNodeUnitId mod) $ do
-                  !_ <- wait_deps build_deps
                   executeInstantiationNode mod_idx n_mods hug uid iu
                   return Nothing
               ModuleNode _build_deps ms -> do
@@ -1106,27 +1106,33 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
                     rehydrate_mods = mapMaybe nodeKeyModName <$> rehydrate_nodes
                 mod_idx <- nodeId
                 return $ withCurrentUnit (mgNodeUnitId mod) $ do
-                     !_ <- wait_deps build_deps
-                     hmi <- executeCompileNode mod_idx n_mods old_hmi hug rehydrate_mods ms
-                     -- Write the HMI to an external cache (if one exists)
-                     -- See Note [Caching HomeModInfo]
-                     liftIO $ forM mhmi_cache $ \hmi_cache -> addHmiToCache hmi_cache hmi
-                     -- Make sure the result is written to the HPT var
-                     liftIO $ HUG.addHomeModInfoToHug hmi hug
-                     return (Just hmi)
+                  hmi <- executeCompileNode mod_idx n_mods old_hmi hug rehydrate_mods ms
+                  -- Write the HMI to an external cache (if one exists)
+                  -- See Note [Caching HomeModInfo]
+                  liftIO $ forM mhmi_cache $ \hmi_cache -> addHmiToCache hmi_cache hmi
+                  -- Make sure the result is written to the HPT var
+                  liftIO $ HUG.addHomeModInfoToHug hmi hug
+                  return (Just hmi)
               LinkNode _nks uid -> do
                   mod_idx <- nodeId
                   return $ withCurrentUnit (mgNodeUnitId mod) $ do
-                    !_ <- wait_deps build_deps
                     executeLinkNode hug (mod_idx, n_mods) uid direct_deps
                     return Nothing
               UnitNode {} -> return $ return Nothing
 
 
-      res_var <- liftIO newEmptyMVar
-      let result_var = mkResultVar res_var
+      res_cell <- liftIO newResultCell
+      let result_var = mkResultVar res_cell
+          -- The results the action awaits before it can run (without counting
+          -- against the concurrency limit), and which must all have succeeded
+          -- for the action to run at all.
+          deps = case mod of
+            UnitNode {}          -> [] -- no work to do, nothing to await
+            InstantiationNode {} -> map buildResultCell build_deps
+            ModuleNode {}        -> map buildResultCell build_deps
+            LinkNode {}          -> map buildResultCell build_deps
       setModulePipeline (mkNodeKey mod) (mkBuildResult origin result_var)
-      return $! (MakeAction build_action res_var)
+      return $! MakeAction deps build_action res_cell
 
 
     buildOneLoopyModule :: ModuleGraphNodeWithBootFile -> BuildM [MakeAction]
@@ -1153,13 +1159,12 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
     rehydrateAction :: ResultLoopOrigin -> [GenWithIsBoot NodeKey] -> BuildM MakeAction
     rehydrateAction origin deps = do
       !build_map <- getBuildMap
-      res_var <- liftIO newEmptyMVar
+      res_cell <- liftIO newResultCell
       let loop_unit :: UnitId
           !loop_unit = nodeKeyUnitId (gwib_mod (head deps))
           !build_deps = getDependencies (map gwib_mod deps) build_map
       let loop_action = withCurrentUnit loop_unit $ do
-            !_ <- wait_deps build_deps
-            hsc_env <- asks hsc_env
+            hsc_env <- asks me_hsc_env
             let mns :: [ModuleName]
                 mns = mapMaybe (nodeKeyModName . gwib_mod) deps
 
@@ -1171,7 +1176,7 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
             liftIO $ mapM_ (\hmi -> HUG.addHomeModInfoToHug hmi hug) hmis'
             return hmis'
 
-      let fanout i = Just . (!! i) <$> mkResultVar res_var
+      let fanout i = Just . (!! i) <$> mkResultVar res_cell
       -- From outside the module loop, anyone must wait for the loop to finish and then
       -- use the result of the rehydrated iface. This makes sure that things not in the
       -- module loop will see the updated interfaces for all the identifiers in the loop.
@@ -1188,9 +1193,9 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
                 setModulePipeline (boot_key (gwib_mod m)) (mkBuildResult (Loop origin) (fanout i))
 
       let deps_i = zip deps [0..]
-      mapM update_module_pipeline deps_i
+      mapM_ update_module_pipeline deps_i
 
-      return $ MakeAction loop_action res_var
+      return $! MakeAction (map buildResultCell build_deps) loop_action res_cell
 
       -- Checks that the interfaces returned from hydration match-up with the names of the
       -- modules which were fed into the function.
@@ -1202,20 +1207,19 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
 
 withCurrentUnit :: UnitId -> RunMakeM a -> RunMakeM a
 withCurrentUnit uid = do
-  local (\env -> env { hsc_env = hscSetActiveUnitId uid (hsc_env env)})
+  local (\env -> env { me_hsc_env = hscSetActiveUnitId uid (me_hsc_env env)})
 
 upsweep
-    :: WorkerLimit -- ^ The number of workers we wish to run in parallel
-    -> HscEnv -- ^ The base HscEnv, which is augmented for each module
+    :: HscEnv -- ^ The base HscEnv, which is augmented for each module
     -> Maybe ModIfaceCache -- ^ A cache to incrementally write final interface files to
     -> (GhcMessage -> AnyGhcDiagnostic)
     -> Maybe Messager
     -> M.Map ModNodeKeyWithUid HomeModInfo
     -> [BuildPlan]
     -> IO (SuccessFlag, [HomeModInfo])
-upsweep n_jobs hsc_env hmi_cache diag_wrapper mHscMessage old_hpt build_plan = do
+upsweep hsc_env hmi_cache diag_wrapper mHscMessage old_hpt build_plan = do
     (cycle, pipelines, collect_result) <- interpretBuildPlan (hsc_HUG hsc_env) hmi_cache old_hpt build_plan
-    runPipelines n_jobs hsc_env diag_wrapper mHscMessage pipelines
+    runPipelines hsc_env diag_wrapper mHscMessage pipelines
     res <- collect_result
     let sec = initSourceErrorContext (hsc_dflags hsc_env)
 
@@ -1578,10 +1582,11 @@ executeInstantiationNode k n deps uid iu = do
         env <- ask
         -- Output of the logger is mediated by a central worker to
         -- avoid output interleaving
-        msg <- asks env_messager
-        wrapper <- asks diag_wrapper
-        lift $ MaybeT $ withLoggerHsc k env $ \hsc_env ->
-          let lcl_hsc_env = setHUG deps hsc_env
+        msg <- asks me_messager
+        wrapper <- asks me_diag_wrapper
+        lift $ MaybeT $
+          let hsc_env = me_hsc_env env
+              lcl_hsc_env = setHUG deps hsc_env
           in wrapAction wrapper lcl_hsc_env $ do
             res <- upsweep_inst lcl_hsc_env msg k n uid iu
             cleanCurrentModuleTempFilesMaybe (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (hsc_dflags hsc_env)
@@ -1604,13 +1609,16 @@ executeCompileNode :: Int
   -> ModuleNodeInfo
   -> RunMakeM HomeModInfo
 executeCompileNode k n !old_hmi hug mrehydrate_mods mni = do
-  me@MakeEnv{..} <- ask
+  make_env <- ask
   -- Rehydrate any dependencies if this module had a boot file or is a signature file.
-  lift $ MaybeT (withAbstractSem compile_sem $ withLoggerHsc k me $ \hsc_env -> do
+  -- NB: the worker already holds a semaphore token here
+  -- (see 'GHC.Driver.Concurrency.runCoordinatingWorkers').
+  lift $ MaybeT (do
+     let hsc_env = me_hsc_env make_env
      hsc_env' <- liftIO $ maybeRehydrateBefore (setHUG hug hsc_env) mni fixed_mrehydrate_mods
      case mni of
-       ModuleNodeCompile mod -> executeCompileNodeWithSource hsc_env' me  mod
-       ModuleNodeFixed key loc -> executeCompileNodeFixed hsc_env' me key loc
+       ModuleNodeCompile mod -> executeCompileNodeWithSource hsc_env' make_env mod
+       ModuleNodeFixed key loc -> executeCompileNodeFixed hsc_env' make_env key loc
     )
 
   where
@@ -1623,9 +1631,9 @@ executeCompileNode k n !old_hmi hug mrehydrate_mods mni = do
         _        -> mrehydrate_mods
 
     executeCompileNodeFixed :: HscEnv -> MakeEnv -> ModNodeKeyWithUid -> ModLocation -> IO (Maybe HomeModInfo)
-    executeCompileNodeFixed hsc_env MakeEnv{diag_wrapper, env_messager} mod loc =
-      wrapAction diag_wrapper hsc_env $ do
-        forM_ env_messager $ \hscMessage -> hscMessage hsc_env (k, n) UpToDate (ModuleNode [] (ModuleNodeFixed mod loc))
+    executeCompileNodeFixed hsc_env MakeEnv{me_diag_wrapper, me_messager} mod loc =
+      wrapAction me_diag_wrapper hsc_env $ do
+        forM_ me_messager $ \hscMessage -> hscMessage hsc_env (k, n) UpToDate (ModuleNode [] (ModuleNodeFixed mod loc))
         read_result <- readIface (hsc_hooks hsc_env) (hsc_logger hsc_env) (hsc_dflags hsc_env) (hsc_NC hsc_env) (mnkToModule mod) (ml_hi_file loc)
         let sec = initSourceErrorContext (hsc_dflags hsc_env)
         case read_result of
@@ -1641,7 +1649,7 @@ executeCompileNode k n !old_hmi hug mrehydrate_mods mni = do
             return (HomeModInfo iface details hm_linkable)
 
     executeCompileNodeWithSource :: HscEnv -> MakeEnv -> ModSummary -> IO (Maybe HomeModInfo)
-    executeCompileNodeWithSource hsc_env MakeEnv{diag_wrapper, env_messager} mod = do
+    executeCompileNodeWithSource hsc_env MakeEnv{me_diag_wrapper, me_messager} mod = do
      let -- Use the cached DynFlags which includes OPTIONS_GHC pragmas
          lcl_dynflags = ms_hspp_opts mod
      let lcl_hsc_env =
@@ -1650,8 +1658,8 @@ executeCompileNode k n !old_hmi hug mrehydrate_mods mni = do
              hsc_env
      -- Compile the module, locking with a semaphore to avoid too many modules
      -- being compiled at the same time leading to high memory usage.
-     wrapAction diag_wrapper lcl_hsc_env $ do
-      res <- upsweep_mod lcl_hsc_env env_messager old_hmi mod k n
+     wrapAction me_diag_wrapper lcl_hsc_env $ do
+      res <- upsweep_mod lcl_hsc_env me_messager old_hmi mod k n
       cleanCurrentModuleTempFilesMaybe (hsc_logger hsc_env) (hsc_tmpfs hsc_env) lcl_dynflags
       return res
 
@@ -1875,37 +1883,28 @@ Also closely related are
 -}
 
 executeLinkNode :: HomeUnitGraph -> (Int, Int) -> UnitId -> [NodeKey] -> RunMakeM ()
-executeLinkNode hug kn@(k, _) uid deps = do
+executeLinkNode hug kn uid deps = do
   withCurrentUnit uid $ do
-    make_env@MakeEnv{..} <- ask
-    let dflags = hsc_dflags hsc_env
-        msg' = (\messager -> \recomp -> messager hsc_env kn recomp (LinkNode deps uid)) <$> env_messager
+    MakeEnv{..} <- ask
+    let dflags = hsc_dflags me_hsc_env
+        msg' = (\messager recomp -> messager me_hsc_env kn recomp (LinkNode deps uid))
+            <$> me_messager
 
-    linkresult <- lift $ MaybeT $ withAbstractSem compile_sem $ withLoggerHsc k make_env $ \lcl_hsc_env -> do
-                             let hsc_env' = setHUG hug lcl_hsc_env
-                             wrapAction diag_wrapper hsc_env' $ do
-                               link (ghcLink dflags)
-                                 hsc_env'
-                                 True -- We already decided to link
-                                 msg'
-                                 (hsc_HPT hsc_env')
+    linkresult <-
+      lift $ MaybeT $ do
+        let hsc_env' = setHUG hug me_hsc_env
+        wrapAction me_diag_wrapper hsc_env' $ do
+          link (ghcLink dflags)
+            hsc_env'
+            True -- We already decided to link
+            msg'
+            (hsc_HPT hsc_env')
     case linkresult of
       Failed -> fail "Link Failed"
       Succeeded -> return ()
 
--- | Wait for dependencies to finish, and then return their results.
-wait_deps :: [BuildResult] -> RunMakeM [HomeModInfo]
-wait_deps [] = return []
-wait_deps (x:xs) = do
-  res <- lift $ waitResult (resultVar x)
-  hmis <- wait_deps xs
-  case res of
-    Nothing -> return hmis
-    Just hmi -> return (hmi:hmis)
-
-
 {- Note [GHC Heap Invariants]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This note is a general place to explain some of the heap invariants which should
 hold for a program compiled with --make mode. These invariants are all things
 which can be checked easily using ghc-debug.
