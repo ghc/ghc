@@ -1982,7 +1982,7 @@ repBinds (HsIPBinds _ (IPBinds _ decs))
         ; return ([], core_list)
         }
 
-repBinds (HsValBinds _ decs)
+repBinds (HsValBinds _ (L _ decs))
  = do   { let { bndrs = hsScopedTvBinders decs ++ collectHsValBinders CollNoDictBinders decs }
                 -- No need to worry about detailed scopes within
                 -- the binding group, because we are talking Names

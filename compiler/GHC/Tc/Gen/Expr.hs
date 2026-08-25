@@ -1497,7 +1497,7 @@ expandRecordUpd record_expr@(L lspan _) possible_parents rbnds res_ty
              matches = map make_pat (NE.toList relevant_cons)
 
              let_binds :: HsLocalBindsLR GhcRn GhcRn
-             let_binds = HsValBinds noAnn $ XValBindsLR
+             let_binds = HsValBinds noAnn $ noLocA $ XValBindsLR
                        $ HsVBG upd_ids_lhs (map mk_idSig upd_ids)
              upd_ids_lhs :: [(RecFlag, LHsBindsLR GhcRn GhcRn)]
              upd_ids_lhs = [ (NonRecursive, [genSimpleFunBind (idName id) [] rhs])

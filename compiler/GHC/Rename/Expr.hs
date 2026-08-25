@@ -1580,7 +1580,7 @@ rnRecStmtsAndThen ctxt rnBody s cont
 collectRecStmtsFixities :: [LStmtLR GhcPs GhcPs body] -> [LFixitySig GhcPs]
 collectRecStmtsFixities l =
     foldr (\ s -> \acc -> case s of
-            (L _ (LetStmt _ (L _(HsValBinds _ (ValBinds _ bs))))) ->
+            (L _ (LetStmt _ (L _(HsValBinds _ (L _ (ValBinds _ bs)))))) ->
               foldr (\ sig -> \ acc -> case sig of
                                          (L loc (FixSig _ s)) -> (L loc s) : acc
                                          _ -> acc) acc (val_sigs bs)
@@ -1611,9 +1611,9 @@ rn_rec_stmt_lhs _ (L _ (LetStmt _ (L _ binds@(HsIPBinds {}))))
   = failWith (badIpBinds (Left binds))
 
 
-rn_rec_stmt_lhs fix_env (L loc (LetStmt _ (L l (HsValBinds x binds))))
+rn_rec_stmt_lhs fix_env (L loc (LetStmt _ (L l (HsValBinds x (L lb binds)))))
     = do (_bound_names, (bs',sigs')) <- rnLocalValBindsLHS fix_env binds
-         return [(L loc (LetStmt noAnn (L l (HsValBinds x (makeRnValBinds noExtField bs' sigs')))),
+         return [(L loc (LetStmt noAnn (L l (HsValBinds x (L lb (makeRnValBinds noAnn bs' sigs'))))),
                  -- Warning: this is bogus; see function invariant
                  emptyFNs
                  )]
@@ -1682,12 +1682,12 @@ rn_rec_stmt ctxt rnBody _ (L loc (BindStmt _ pat' (L lb body)), fv_pat)
 rn_rec_stmt _ _ _ (L _ (LetStmt _ (L _ binds@(HsIPBinds {}))), _)
   = failWith (badIpBinds (Right binds))
 
-rn_rec_stmt _ _ all_bndrs (L loc (LetStmt _ (L l (HsValBinds x binds'))), _)
+rn_rec_stmt _ _ all_bndrs (L loc (LetStmt _ (L l (HsValBinds x (L lb binds')))), _)
   = do { (binds', du_binds) <- rnLocalValBindsRHS (mkNameSet all_bndrs) binds'
            -- fixities and unused are handled above in rnRecStmtsAndThen
        ; let fvs = allUses du_binds
        ; return [(duDefs du_binds, fvs, emptyNameSet,
-                 L loc (LetStmt noAnn (L l (HsValBinds x binds'))))] }
+                 L loc (LetStmt noAnn (L l (HsValBinds x (L lb binds')))))] }
 
 -- no RecStmt case because they get flattened above when doing the LHSes
 rn_rec_stmt _ _ _ stmt@(L _ (RecStmt {}), _)

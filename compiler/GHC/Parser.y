@@ -1945,9 +1945,9 @@ binds   ::  { LHsLocalBinds GhcPs }
                                          -- May have implicit parameters
                                          -- No type declarations
         : decllist          {% do { let { (ann, decls) = unLoc $1 }
-                                  ; val_binds <- cvBindGroup (unLoc $ decls)
+                                  ; val_binds <- cvBindGroup ann (unLoc $ decls)
                                   ; !cs <- getCommentsFor (gl $1)
-                                  ; return (L (EpAnn (glR $1) noAnn cs) $ HsValBinds (ann, noEpTok) val_binds)} }
+                                  ; return (L (EpAnn (glR $1) noAnn cs) $ HsValBinds noEpTok (L (noAnnSrcSpan $ gl $1) val_binds))} }
 
         | '{'            dbinds '}'     {% amsA' (sLL $1 $>
                                              $ HsIPBinds (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) [], noEpTok) (IPBinds noExtField (reverse $ unLoc $2))) }
