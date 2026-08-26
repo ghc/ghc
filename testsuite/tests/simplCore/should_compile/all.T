@@ -608,3 +608,5 @@ test('T27261', [extra_files(['T27261_aux.hs'])], multimod_compile, ['T27261', '-
 test('T27749',
      multiline_grep_errmsg(r'ordering\n.*\n(\s+src<[^>]*>\n)+'),
      compile, ['-O -g3 -ddump-simpl -dsuppress-uniques'])
+
+test('T27629', only_ways(['optasm']), makefile_test, ['T27629'])
