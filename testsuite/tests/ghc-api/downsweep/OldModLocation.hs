@@ -50,7 +50,7 @@ main = do
 
     _emss <- downsweep hsc_env mkUnknownDiagnostic Nothing [] Nothing [] False
 
-    flushFinderCaches (hsc_FC hsc_env) (hsc_unit_env hsc_env)
+    flushFinderCaches (hsc_FC hsc_env)
     createDirectoryIfMissing False "mydir"
     renameFile "B.hs" "mydir/B.hs"
 

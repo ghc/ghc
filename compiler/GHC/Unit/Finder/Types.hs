@@ -1,7 +1,5 @@
 module GHC.Unit.Finder.Types
    ( FinderCache (..)
-   , FinderCacheState
-   , FileCacheState
    , FindResult (..)
    , InstalledFindResult (..)
    , FinderOpts(..)
@@ -11,40 +9,35 @@ where
 import GHC.Prelude
 import GHC.Unit
 import GHC.Data.OsPath
-import qualified Data.Map as M
 import GHC.Types.Unique.Map
 import GHC.Fingerprint
 import GHC.Platform.Ways
-import GHC.Unit.Env
+import GHC.Unit.Finder.Cache
 
 import GHC.Data.FastString
 import GHC.Types.Unique.Set
 
--- | The 'FinderCache' maps modules to the result of
+-- | The 'FinderCache' maps __home__ modules to the result of
 -- searching for that module. It records the results of searching for
 -- modules along the search path. On @:load@, we flush the entire
 -- contents of this cache.
 --
-type FinderCacheState = InstalledModuleEnv InstalledFindResult
-type FileCacheState   = M.Map FilePath Fingerprint
-data FinderCache = FinderCache { flushFinderCaches :: UnitEnv -> IO ()
-                               -- ^ remove all the home modules from the cache; package modules are
-                               -- assumed to not move around during a session; also flush the file hash
-                               -- cache.
-                               , addToFinderCache  :: InstalledModule -> InstalledFindResult -> IO ()
-                               -- ^ Add a found location to the cache for the module.
-                               , lookupFinderCache :: InstalledModule -> IO (Maybe InstalledFindResult)
-                               -- ^ Look for a location in the cache.
-                               , lookupFileCache   :: FilePath -> IO Fingerprint
-                               -- ^ Look for the hash of a file in the cache. This should add it to the
-                               -- cache. If the file doesn't exist, raise an IOException.
-                               , lookupDirCache    :: FilePath -> IO Fingerprint
-                               }
-
-data InstalledFindResult
-  = InstalledFound ModLocation
-  | InstalledNoPackage UnitId
-  | InstalledNotFound [OsPath] (Maybe UnitId)
+-- Searches for modules of external units are cached separately, in the
+-- 'ExternalFinderCache' of the 'UnitState' being searched.
+-- See Note [The finder caches] in GHC.Unit.Finder.Cache.
+data FinderCache =
+  FinderCache
+  { homeFinderCache :: !HomeFinderCache
+    -- ^ Cache of home-module searches. See 'HomeFinderCache'.
+  , flushFinderCaches :: IO ()
+    -- ^ Flush all home-module search caches, and also flush the file and
+    -- directory hash caches.
+  , lookupFileCache   :: FilePath -> IO Fingerprint
+    -- ^ Look for the hash of a file in the cache. This should add it to the
+    -- cache. If the file doesn't exist, raise an IOException.
+  , lookupDirCache    :: FilePath -> IO Fingerprint
+    -- ^ Like 'lookupFileCache', but for a directory.
+  }
 
 -- | The result of searching for an imported module.
 --

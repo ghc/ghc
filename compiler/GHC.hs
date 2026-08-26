@@ -1216,7 +1216,7 @@ unitIdOrHomeUnit mUnitId = do
 workingDirectoryChanged :: GhcMonad m => m ()
 workingDirectoryChanged = do
   hsc_env <- getSession
-  liftIO $ flushFinderCaches (hsc_FC hsc_env) (hsc_unit_env hsc_env)
+  liftIO $ flushFinderCaches (hsc_FC hsc_env)
 
 
 -- %************************************************************************
@@ -1736,12 +1736,11 @@ lookupQualifiedModule NoPkgQual mod_name = withSession $ \hsc_env -> do
   case home of
     Just m  -> return m
     Nothing -> liftIO $ do
-      let fc     = hsc_FC hsc_env
       let units  = hsc_units hsc_env
       let dflags = hsc_dflags hsc_env
       let sec    = initSourceErrorContext dflags
       let fopts  = initFinderOpts dflags
-      res <- runFinderM $ findExposedPackageModule fc fopts units LookupUser mod_name NoPkgQual
+      res <- runFinderM $ findExposedPackageModule fopts units LookupUser mod_name NoPkgQual
       case res of
         Found _ m -> return m
         err       -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err
@@ -1786,12 +1785,11 @@ lookupAllQualifiedModuleNames NoPkgQual mod_name = withSession $ \hsc_env -> do
   case home of
     Just m  -> return m
     Nothing -> liftIO $ do
-      let fc     = hsc_FC hsc_env
       let units  = hsc_units hsc_env
       let dflags = hsc_dflags hsc_env
       let sec    = initSourceErrorContext dflags
       let fopts  = initFinderOpts dflags
-      res <- runFinderM $ findExposedPackageModule fc fopts units LookupUser mod_name NoPkgQual
+      res <- runFinderM $ findExposedPackageModule fopts units LookupUser mod_name NoPkgQual
       case res of
         Found _ m -> return [m]
         err       -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err

@@ -242,6 +242,7 @@ GHC.Unit.External.Substitution
 GHC.Unit.External.Validate
 GHC.Unit.External.Visibility
 GHC.Unit.External.Wired
+GHC.Unit.Finder.Cache
 GHC.Unit.Home
 GHC.Unit.Info
 GHC.Unit.Module

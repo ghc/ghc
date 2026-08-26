@@ -104,6 +104,7 @@ import GHC.Unit.External.Substitution
 import GHC.Unit.External.Validate
 import GHC.Unit.External.Visibility
 import GHC.Unit.External.Wired
+import GHC.Unit.Finder.Cache
 
 import GHC.Types.PkgQual
 import GHC.Types.SrcLoc (unLoc)
@@ -398,7 +399,15 @@ data UnitState = UnitState {
   --
   -- This should only be true when we are type-checking an indefinite unit.
   -- See Note [About units] in GHC.Unit.
-  allowVirtualUnits :: !Bool
+  allowVirtualUnits :: !Bool,
+
+  -- | Cached results of searching for interface files of the external
+  -- units visible from within this 'UnitState'.
+  --
+  -- Stored in 'UnitState' instead of alongside the 'HomeFinderCache' in order
+  -- to correctly handle cache invalidation.
+  -- See Note [The finder caches] in GHC.Unit.Finder.Cache.
+  unitExternalFinderCache :: !ExternalFinderCache
   }
 
 emptyUnitState :: UnitState
@@ -412,7 +421,8 @@ emptyUnitState = UnitState {
     moduleNameProvidersMap       = emptyUniqMap,
     pluginModuleNameProvidersMap = emptyUniqMap,
     requirementContext           = emptyUniqMap,
-    allowVirtualUnits = False
+    allowVirtualUnits = False,
+    unitExternalFinderCache = noExternalFinderCache
     }
 
 -- | Find the unit we know about with the given unit, if any
@@ -946,6 +956,8 @@ mkUnitState logger unit_index cfg = do
       mod_map2 = mkUnusableModuleNameProvidersMap unusable
       mod_map = mod_map2 `plusUniqMap` mod_map1
 
+  external_finder_cache <- newExternalFinderCache
+
   -- Force the result to avoid leaking input parameters
   let !state = UnitState
          { preloadUnits                 = dep_preload
@@ -958,6 +970,7 @@ mkUnitState logger unit_index cfg = do
          , packageNameMap               = pkgname_map
          , requirementContext           = req_ctx
          , allowVirtualUnits            = unitConfigAllowVirtual cfg
+         , unitExternalFinderCache      = external_finder_cache
          }
   return state
 

@@ -231,7 +231,7 @@ depanalPartial diag_wrapper msg excluded_mods allow_dup_roots = do
     -- source files may have appeared in the home package that shadow
     -- external package modules, so we have to discard the existing
     -- cached finder data.
-    liftIO $ flushFinderCaches (hsc_FC hsc_env) (hsc_unit_env hsc_env)
+    liftIO $ flushFinderCaches (hsc_FC hsc_env)
 
     (errs, mod_graph) <- liftIO $ downsweep
       hsc_env diag_wrapper msg (mgModSummaries old_graph) Nothing

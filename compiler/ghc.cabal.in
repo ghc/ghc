@@ -982,6 +982,7 @@ Library
         GHC.Unit.External.Visibility
         GHC.Unit.External.Wired
         GHC.Unit.Finder
+        GHC.Unit.Finder.Cache
         GHC.Unit.Finder.Types
         GHC.Unit.Home
         GHC.Unit.Home.Graph
