@@ -1,10 +1,28 @@
 
 <command line>: error: [GHC-03271]
-    Home units are not closed.
-    It is necessary to also load the following units:
-    - q-0.1.0.0
+    Some units are not loaded but depend on loaded units.
+        q-0.1.0.0 -> p-0.1.0.0
 
 <command line>: error: [GHC-03271]
-    Home units are not closed.
-    It is necessary to also load the following units:
-    - q-0.1.0.0
+    Some units are not loaded but depend on loaded units.
+        r-0.1.0.0 -> q-0.1.0.0
+
+<command line>: error: [GHC-03271]
+    Some units are not loaded but depend on loaded units.
+        q-0.1.0.0 -> p-0.1.0.0
+
+<command line>: error: [GHC-03271]
+    Some units are not loaded but depend on loaded units.
+        q-0.1.0.0 -> p-0.1.0.0
+
+<command line>: error: [GHC-03271]
+    Some units are not loaded but depend on loaded units.
+        r-0.1.0.0 -> q-0.1.0.0
+
+<command line>: error: [GHC-03271]
+    Some units are not loaded but depend on loaded units.
+        q-0.1.0.0 -> p-0.1.0.0
+
+<command line>: error: [GHC-03271]
+    Some units are not loaded but depend on loaded units.
+        q-0.1.0.0 -> p-0.1.0.0
