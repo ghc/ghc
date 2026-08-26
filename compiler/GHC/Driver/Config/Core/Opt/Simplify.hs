@@ -112,15 +112,58 @@ precedes the first float-out transformation.  Implementation:
 
   * `sm_case_case` field in SimplMode
 
-  * Consult `sm_case_case` (via `seCaseCase`) before doing case-of-case
-    in GHC.Core.Opt.Simplify.Iteration.rebuildCall.
+  * If `sm_case_case` is False (tested via `seCaseCase`), then:
+    (COC1) When simplifying (case scrut of alts), do not make a Select continuation.
+           This happens in the `Case` case of `simplExprF`.
+    (COC2) When simplifying (f arg), where `f` is strict, do not make a StrictArg
+           continuation.  See the `ApplyToVal` case of `rebuildArg`.
 
-Wrinkles
+    ...more to come...
+           in GHC.Core.Opt.Simplify.Iteration.rebuildCall.
 
-* This applies equally to the case-of-runRW# transformation:
-    case (runRW# (\s. body)) of (a,b) -> blah
-    --->
-    runRW# (\s. case body of (a,b) -> blah)
-  Again, don't do this when `sm_case_case` is off.  See #25055 for
-  a motivating example.
+    (COC3) This applies equally to the case-of-runRW# transformation:
+           case (runRW# (\s. body)) of (a,b) -> blah
+           --->
+           runRW# (\s. case body of (a,b) -> blah)
+           Again, don't do this when `sm_case_case` is off.
+           See #25055 for a motivating example.
+
+Note [Join points with -fno-case-of-case]   FIX ME
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Supose case-of-case is switched off, and we are simplifying
+
+    case (join j x = <j-rhs> in
+          case y of
+             A -> j 1
+             B -> j 2
+             C -> e) of <outer-alts>
+
+Usually, we'd push the outer continuation (case . of <outer-alts>) into
+both the RHS and the body of the join point j.  But since we aren't doing
+case-of-case we may then end up with this totally bogus result
+
+    join x = case <j-rhs> of <outer-alts> in
+    case (case y of
+             A -> j 1
+             B -> j 2
+             C -> e) of <outer-alts>
+
+This would be OK in the language of the paper, but not in GHC: j is no longer
+a join point.  We can only do the "push continuation into the RHS of the
+join point j" if we also push the continuation right down to the /jumps/ to
+j, so that it can evaporate there (trimJoinCont). Then, if we are doing
+case-of-case, we'll get to:
+
+    join x = case <j-rhs> of <outer-alts> in
+    case y of
+      A -> j 1
+      B -> j 2
+      C -> case e of <outer-alts>
+
+which is great.
+
+Bottom line: if case-of-case is off, we must stop pushing the continuation
+inwards altogether at any join point.  Instead simplify the (join ... in ...)
+with a Stop continuation, and wrap the original continuation around the
+outside.  Surprisingly tricky!
 -}
