@@ -18,6 +18,8 @@
 -- @stm@ (software transactional memory) library has a more robust implementation
 -- of channels called @TChan@s.
 --
+-- A variant that forces its contents to weak head normal form is available in
+-- "Control.Concurrent.Chan.Strict".
 -----------------------------------------------------------------------------
 
 module Control.Concurrent.Chan

@@ -1,0 +1,9 @@
+section: base
+synopsis: Add strict variants to mutable types (IORef, Chan, MVar)
+issues: #27343
+mrs: !15450
+
+description: {
+	These new types prevent users from (easily) mis-using existing and dangerous APIs (writeIORef, modifyIORef, modifyMVar, etc) which can lead to space leaks when stored in mutable containers.
+	They also prevent invisible coercions to and from their lazy equivalents by not exposing their constructors.
+}

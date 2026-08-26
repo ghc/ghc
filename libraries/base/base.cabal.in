@@ -41,6 +41,7 @@ Library
           Control.Applicative
         , Control.Concurrent
         , Control.Concurrent.Chan
+        , Control.Concurrent.Chan.Strict
         , Control.Concurrent.QSem
         , Control.Concurrent.QSemN
         , Control.Monad.IO.Class
@@ -80,6 +81,7 @@ Library
         , Control.Arrow
         , Control.Category
         , Control.Concurrent.MVar
+        , Control.Concurrent.MVar.Strict
         , Control.Exception
         , Control.Exception.Annotation
         , Control.Exception.Backtrace
@@ -109,6 +111,7 @@ Library
         , Data.Functor.Const
         , Data.Functor.Identity
         , Data.IORef
+        , Data.IORef.Strict
         , Data.Int
         , Data.Ix
         , Data.Kind
