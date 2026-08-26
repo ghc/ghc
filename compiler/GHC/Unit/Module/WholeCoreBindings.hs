@@ -228,7 +228,7 @@ enabled.
 To adapt to the interpreter's 'Way', 'getLinkDeps' substitutes all object files'
 extensions with that corresponding to that 'Way' – e.g. changing @.o@ to
 @.dyn_o@, which requires dependencies to be built with @-dynamic[-too]@, which
-in turn is enforced after downsweep in 'GHC.Driver.Make.enableCodeGenWhen'.
+in turn is enforced before the upsweep in 'GHC.Driver.Downsweep.enableCodeGenWhen'.
 
 This doesn't work for stub objects, though – they are compiled to temporary
 files with mismatching names, so simply switching out the suffix would refer to
