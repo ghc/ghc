@@ -110,7 +110,7 @@ import GHC.Data.Maybe
 import GHC.Data.List.SetOps( minusList )
 import GHC.Data.OrdList
 
-import GHC.Data.Bag        (emptyBag, snocBag, bagToList)
+import GHC.Data.Bag        (Bag, emptyBag, snocBag, bagToList)
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -444,15 +444,30 @@ tickTickedExpr preserve_anf t1 t2s e
     apply_ticks ts e' = foldr Tick e' ts
 
     -- Try to combine 't1' into a stack of ticks.
+    --
+    --  - If 't1' is subsumed by any inner tick then combine it into the stack.
+    --  - If an inner tick is subsumed by 't1', then keep 't1' on the outside (#27749)
+    --    and discard inner ticks that are now subsumed by it.
     combine_into_stack :: NE.NonEmpty CoreTickish -> Maybe (NE.NonEmpty CoreTickish)
-    combine_into_stack (t2 NE.:| rest)
-      | Just t2' <- combineTickish_maybe t1 t2
-      = Just (t2' NE.:| rest)
-      | r_hd : r_tl <- rest
-      , Just rest' <- combine_into_stack (r_hd NE.:| r_tl)
-      = Just (t2 NE.:| NE.toList rest')
-      | otherwise
-      = Nothing
+    combine_into_stack ts = go t1 emptyBag (NE.toList ts)
+      where
+        go :: CoreTickish -> Bag CoreTickish -> [CoreTickish]
+           -> Maybe (NE.NonEmpty CoreTickish)
+        go _ _ [] = Nothing
+        go t outer (t2 : inner)
+          | Just t2' <- combineTickish_maybe t t2
+          = Just $
+              if t2' == t2
+              then
+                -- t is redundant: drop it, keeping the rest of the stack
+                NE.prependList (bagToList outer) (t2 NE.:| inner)
+              else
+                -- t2 is redundant: drop it, keep t2' on the outside, and
+                -- carry on: t2' may subsume further ticks in the stack.
+                go t2' outer inner
+                  `orElse` (t2' NE.:| (bagToList outer ++ inner))
+          | otherwise
+          = go t (outer `snocBag` t2) inner
 
 {- Note [Pushing SCCs inwards]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

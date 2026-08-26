@@ -1,0 +1,8 @@
+section: compiler
+issues: #27749
+mrs: !16601
+synopsis:
+  Avoid re-ordering source note ticks
+description:
+  Avoid re-ordering source note ticks when combining a tick into an existing
+  stack of ticks.
