@@ -147,8 +147,15 @@ initMulti unitArgsFiles lintDynFlagsAndSrcs = do
   checkUnitCycles initial_dflags home_unit_graph
 
   let dflags = homeUnitEnv_dflags $ HUG.unitEnv_lookup mainUnitId home_unit_graph
-  unitEnv <- assertUnitEnvInvariant <$> (liftIO $ initUnitEnv mainUnitId home_unit_graph (ghcNameVersion dflags) (targetPlatform dflags))
-  let final_hsc_env = hsc_env { hsc_unit_env = unitEnv }
+  newUnitEnv <-  do
+    env <- liftIO $ initUnitEnv mainUnitId home_unit_graph (ghcNameVersion dflags) (targetPlatform dflags)
+    -- We need to reuse the 'UnitIndexCache' as we used it above in 'initUnits'.
+    -- See Note [Sharing 'UnitInfo's across the 'UnitEnv'] why this must be shared.
+    pure $ assertUnitEnvInvariant $ env
+      { ue_uic = hscUIC hsc_env
+      }
+
+  let final_hsc_env = hsc_env { hsc_unit_env = newUnitEnv }
 
   GHC.setSession final_hsc_env
 
