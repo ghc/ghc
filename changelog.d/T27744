@@ -1,0 +1,4 @@
+section: compiler
+synopsis: Fixes a bug in arity computation for INLINE pattern synonyms, which led to a compiler crash
+issues: #27744
+mrs: !16602
