@@ -12,6 +12,8 @@
 --
 -- Mutable references in the IO monad.
 --
+-- A variant that forces its contents to weak head normal form is available in
+-- "Data.IORef.Strict".
 
 module Data.IORef
     (-- *  IORefs

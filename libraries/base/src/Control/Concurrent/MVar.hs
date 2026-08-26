@@ -65,6 +65,11 @@
 -- in an 'MVar' to the appropriate normal form, or utilize a strict
 -- @MVar@ provided by the [strict-concurrency](https://hackage.haskell.org/package/strict-concurrency) package.
 --
+-- A variant that forces its contents to weak head normal form is available in
+-- "Control.Concurrent.MVar.Strict".  Note that weak head normal form is often
+-- not the appropriate normal form: it does not force the fields of the
+-- constructor it exposes.
+--
 -- === Ordering
 --
 -- 'MVar' operations are always observed to take place in the order

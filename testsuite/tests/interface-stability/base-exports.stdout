@@ -173,11 +173,44 @@ module Control.Concurrent.Chan where
   writeChan :: forall a. Chan a -> a -> GHC.Internal.Types.IO ()
   writeList2Chan :: forall a. Chan a -> [a] -> GHC.Internal.Types.IO ()
 
+module Control.Concurrent.Chan.Strict where
+  -- Safety: None
+  type Chan :: * -> *
+  newtype Chan a = ...
+  dupChan :: forall a. Chan a -> GHC.Internal.Types.IO (Chan a)
+  getChanContents :: forall a. Chan a -> GHC.Internal.Types.IO [a]
+  newChan :: forall a. GHC.Internal.Types.IO (Chan a)
+  readChan :: forall a. Chan a -> GHC.Internal.Types.IO a
+  writeChan :: forall a. Chan a -> a -> GHC.Internal.Types.IO ()
+  writeList2Chan :: forall a. Chan a -> [a] -> GHC.Internal.Types.IO ()
+
 module Control.Concurrent.MVar where
   -- Safety: Safe
   type MVar :: * -> *
   data MVar a = ...
   addMVarFinalizer :: forall a. MVar a -> GHC.Internal.Types.IO () -> GHC.Internal.Types.IO ()
+  isEmptyMVar :: forall a. MVar a -> GHC.Internal.Types.IO GHC.Internal.Types.Bool
+  mkWeakMVar :: forall a. MVar a -> GHC.Internal.Types.IO () -> GHC.Internal.Types.IO (GHC.Internal.Weak.Weak (MVar a))
+  modifyMVar :: forall a b. MVar a -> (a -> GHC.Internal.Types.IO (a, b)) -> GHC.Internal.Types.IO b
+  modifyMVarMasked :: forall a b. MVar a -> (a -> GHC.Internal.Types.IO (a, b)) -> GHC.Internal.Types.IO b
+  modifyMVarMasked_ :: forall a. MVar a -> (a -> GHC.Internal.Types.IO a) -> GHC.Internal.Types.IO ()
+  modifyMVar_ :: forall a. MVar a -> (a -> GHC.Internal.Types.IO a) -> GHC.Internal.Types.IO ()
+  newEmptyMVar :: forall a. GHC.Internal.Types.IO (MVar a)
+  newMVar :: forall a. a -> GHC.Internal.Types.IO (MVar a)
+  putMVar :: forall a. MVar a -> a -> GHC.Internal.Types.IO ()
+  readMVar :: forall a. MVar a -> GHC.Internal.Types.IO a
+  swapMVar :: forall a. MVar a -> a -> GHC.Internal.Types.IO a
+  takeMVar :: forall a. MVar a -> GHC.Internal.Types.IO a
+  tryPutMVar :: forall a. MVar a -> a -> GHC.Internal.Types.IO GHC.Internal.Types.Bool
+  tryReadMVar :: forall a. MVar a -> GHC.Internal.Types.IO (GHC.Internal.Maybe.Maybe a)
+  tryTakeMVar :: forall a. MVar a -> GHC.Internal.Types.IO (GHC.Internal.Maybe.Maybe a)
+  withMVar :: forall a b. MVar a -> (a -> GHC.Internal.Types.IO b) -> GHC.Internal.Types.IO b
+  withMVarMasked :: forall a b. MVar a -> (a -> GHC.Internal.Types.IO b) -> GHC.Internal.Types.IO b
+
+module Control.Concurrent.MVar.Strict where
+  -- Safety: None
+  type MVar :: * -> *
+  newtype MVar a = ...
   isEmptyMVar :: forall a. MVar a -> GHC.Internal.Types.IO GHC.Internal.Types.Bool
   mkWeakMVar :: forall a. MVar a -> GHC.Internal.Types.IO () -> GHC.Internal.Types.IO (GHC.Internal.Weak.Weak (MVar a))
   modifyMVar :: forall a b. MVar a -> (a -> GHC.Internal.Types.IO (a, b)) -> GHC.Internal.Types.IO b
@@ -1282,6 +1315,18 @@ module Data.IORef where
   mkWeakIORef :: forall a. IORef a -> GHC.Internal.Types.IO () -> GHC.Internal.Types.IO (GHC.Internal.Weak.Weak (IORef a))
   modifyIORef :: forall a. IORef a -> (a -> a) -> GHC.Internal.Types.IO ()
   modifyIORef' :: forall a. IORef a -> (a -> a) -> GHC.Internal.Types.IO ()
+  newIORef :: forall a. a -> GHC.Internal.Types.IO (IORef a)
+  readIORef :: forall a. IORef a -> GHC.Internal.Types.IO a
+  writeIORef :: forall a. IORef a -> a -> GHC.Internal.Types.IO ()
+
+module Data.IORef.Strict where
+  -- Safety: None
+  type IORef :: * -> *
+  newtype IORef a = ...
+  atomicModifyIORef :: forall a b. IORef a -> (a -> (a, b)) -> GHC.Internal.Types.IO b
+  atomicWriteIORef :: forall a. IORef a -> a -> GHC.Internal.Types.IO ()
+  mkWeakIORef :: forall a. IORef a -> GHC.Internal.Types.IO () -> GHC.Internal.Types.IO (GHC.Internal.Weak.Weak (IORef a))
+  modifyIORef :: forall a. IORef a -> (a -> a) -> GHC.Internal.Types.IO ()
   newIORef :: forall a. a -> GHC.Internal.Types.IO (IORef a)
   readIORef :: forall a. IORef a -> GHC.Internal.Types.IO a
   writeIORef :: forall a. IORef a -> a -> GHC.Internal.Types.IO ()
@@ -11232,6 +11277,8 @@ instance forall a. GHC.Internal.Classes.Eq (GHC.Internal.MVar.MVar a) -- Defined
 instance GHC.Internal.Classes.Eq GHC.Internal.Conc.Sync.BlockReason -- Defined in ‘GHC.Internal.Conc.Sync’
 instance GHC.Internal.Classes.Eq GHC.Internal.Conc.Sync.ThreadId -- Defined in ‘GHC.Internal.Conc.Sync’
 instance GHC.Internal.Classes.Eq GHC.Internal.Conc.Sync.ThreadStatus -- Defined in ‘GHC.Internal.Conc.Sync’
+instance forall a. GHC.Internal.Classes.Eq (Control.Concurrent.Chan.Strict.Chan a) -- Defined in ‘Control.Concurrent.Chan.Strict’
+instance forall a. GHC.Internal.Classes.Eq (Control.Concurrent.MVar.Strict.MVar a) -- Defined in ‘Control.Concurrent.MVar.Strict’
 instance GHC.Internal.Classes.Eq GHC.Internal.IO.Exception.ArrayException -- Defined in ‘GHC.Internal.IO.Exception’
 instance GHC.Internal.Classes.Eq GHC.Internal.IO.Exception.AsyncException -- Defined in ‘GHC.Internal.IO.Exception’
 instance GHC.Internal.Classes.Eq GHC.Internal.IO.Exception.ExitCode -- Defined in ‘GHC.Internal.IO.Exception’
@@ -11291,6 +11338,7 @@ instance forall a. GHC.Internal.Classes.Eq a => GHC.Internal.Classes.Eq (GHC.Int
 instance [safe] forall k (f :: k -> *) (a :: k) (g :: k -> *). (GHC.Internal.Classes.Eq (f a), GHC.Internal.Classes.Eq (g a)) => GHC.Internal.Classes.Eq (Data.Functor.Product.Product f g a) -- Defined in ‘Data.Functor.Product’
 instance [safe] forall k (f :: k -> *) (a :: k) (g :: k -> *). (GHC.Internal.Classes.Eq (f a), GHC.Internal.Classes.Eq (g a)) => GHC.Internal.Classes.Eq (Data.Functor.Sum.Sum f g a) -- Defined in ‘Data.Functor.Sum’
 instance forall a. GHC.Internal.Classes.Eq (GHC.Internal.IORef.IORef a) -- Defined in ‘GHC.Internal.IORef’
+instance forall a. GHC.Internal.Classes.Eq (Data.IORef.Strict.IORef a) -- Defined in ‘Data.IORef.Strict’
 instance GHC.Internal.Classes.Eq GHC.Internal.Int.Int16 -- Defined in ‘GHC.Internal.Int’
 instance GHC.Internal.Classes.Eq GHC.Internal.Int.Int32 -- Defined in ‘GHC.Internal.Int’
 instance GHC.Internal.Classes.Eq GHC.Internal.Int.Int64 -- Defined in ‘GHC.Internal.Int’

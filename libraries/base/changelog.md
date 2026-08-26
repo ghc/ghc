@@ -12,6 +12,7 @@
   * Add `withEmptyCallStack` to `GHC.Stack`. ([CLC proposal #428](https://github.com/haskell/core-libraries-committee/issues/428))
   * Add new `Data.RealFloat` module re-exporting `RealFloat` from `GHC.Float` ([CLC proposal #394](https://github.com/haskell/core-libraries-committee/issues/394))
   * Add `Infinity`, `NegInfinity`, and `NaN` pattern synonyms to `Data.RealFloat` ([CLC proposal #394](https://github.com/haskell/core-libraries-committee/issues/394))
+  * Add strict variants to mutable types (IORef, Chan, MVar). ([CLC Proposal #341](https://github.com/haskell/core-libraries-committee/issues/341))
 
 ## 4.23.0.0 *TBA*
   * Add `System.IO.hGetNewlineMode`. ([CLC proposal #370](https://github.com/haskell/core-libraries-committee/issues/370))
