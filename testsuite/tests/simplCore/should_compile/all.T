@@ -572,3 +572,5 @@ test('T26903', [grep_errmsg(r'reverse')], compile, ['-O -dno-typeable-binds -ddu
 
 test('T26826', normal, compile, ['-O'])
 test('T27261', [extra_files(['T27261_aux.hs'])], multimod_compile, ['T27261', '-v0 -O'])
+
+test('T27629', only_ways(['optasm']), makefile_test, ['T27629'])
