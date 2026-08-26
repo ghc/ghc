@@ -621,13 +621,29 @@ createBuildPlan mod_graph maybe_top_mod =
 -- | Generalized version of 'load' which also supports a custom
 -- 'Messager' (for reporting progress) and 'ModuleGraph' (generally
 -- produced by calling 'depanal'.
-load' :: GhcMonad m => Maybe ModIfaceCache -> LoadHowMuch -> (GhcMessage -> AnyGhcDiagnostic) -> Maybe Messager -> ModuleGraph -> m SuccessFlag
-load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
+load'
+  :: GhcMonad m
+  => Maybe ModIfaceCache
+  -> LoadHowMuch
+  -> (GhcMessage -> AnyGhcDiagnostic)
+  -> Maybe Messager
+  -> ModuleGraph
+  -> m SuccessFlag
+load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph0 = do
     -- In normal usage plugins are initialised already by ghc/Main.hs this is protective
     -- for any client who might interact with GHC via load'.
     -- See Note [Timing of plugin initialization]
     initializeSessionPlugins
+    hsc_env0 <- getSession
+
+    -- With -fno-code, enable code generation for modules that use Template Haskell,
+    -- updating the module graph.
+    mod_graph <- liftIO $
+      enableCodeGenForTH (hsc_logger hsc_env0) (hsc_tmpfs hsc_env0)
+        (hsc_unit_env hsc_env0) mod_graph0
+
     modifySession (setModuleGraph mod_graph)
+
     guessOutputFile
     hsc_env <- getSession
 
