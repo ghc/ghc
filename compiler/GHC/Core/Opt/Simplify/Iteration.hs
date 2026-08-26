@@ -1283,17 +1283,19 @@ simplExprF1 env expr@(Lam {}) cont
         -- and likewise drop counts all binders (incl type lambdas)
 
 simplExprF1 env (Case scrut bndr _ alts) cont
+  | not (seCaseCase env)  -- See Note [Case-of-case and full laziness]
+  = do { let scrut_out_ty = substTy env (idType bndr)
+       ; scrut' <- simplExprC env scrut (mkBoringStop scrut_out_ty)
+       ; rebuildCase (SAF_In, env) scrut' bndr alts cont }
+
+  | otherwise
   = {-#SCC "simplExprF1-Case" #-}
     simplExprF env scrut (Select { sc_bndr = bndr, sc_alts = alts
                                  , sc_env = UnSimplified env, sc_cont = cont })
 
-simplExprF1 env (Let (Rec pairs) body) cont
-  | Just pairs' <- joinPointBindings_maybe pairs
-  = {-#SCC "simplRecJoinPoin" #-} simplRecJoinPoint env pairs' body cont
+-- Let-expressions
 
-  | otherwise
-  = {-#SCC "simplRecE" #-} simplRecE env pairs body cont
-
+-- Try to eiminate the let altogether
 simplExprF1 env (Let (NonRec bndr rhs) body) cont
   | Type ty <- rhs    -- First deal with type lets (let a = Type ty in e)
   = {-#SCC "simplExprF1-NonRecLet-Type" #-}
@@ -1308,6 +1310,16 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
          tick (PreInlineUnconditionally bndr)
        ; simplExprF env' body cont }
 
+-- If -fno-case-of-case, push /nothing/ inside a 'let', lest we
+-- lose a join point.  See Note [Case-of-case and full laziness]
+simplExprF1 env let_expr@(Let {}) cont
+  | not (contIsStop cont)
+  , not (seCaseCase env)
+  = do { let_expr' <- simplExprC env let_expr (mkBoringStop (contHoleType cont))
+       ; rebuild env let_expr' cont }
+
+-- Non-recursive let
+simplExprF1 env (Let (NonRec bndr rhs) body) cont
   -- Now check for a join point.  It's better to do the preInlineUnconditionally
   -- test first, because joinPointBinding_maybe has to eta-expand, so a trivial
   -- binding like { j = j2 |> co } would first be eta-expanded and then inlined
@@ -1319,6 +1331,14 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
   | otherwise
   = {-#SCC "simplNonRecE" #-}
     simplNonRecE env FromLet bndr (rhs, env) body cont
+
+simplExprF1 env (Let (Rec pairs) body) cont
+  | Just pairs' <- joinPointBindings_maybe pairs
+  = {-#SCC "simplRecJoinPoin" #-} simplRecJoinPoint env pairs' body cont
+
+  | otherwise
+  = {-#SCC "simplRecE" #-} simplRecE env pairs body cont
+
 
 {- Note [Avoiding space leaks in OutType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2128,13 +2148,6 @@ wrapJoinCont env cont thing_inside
   | contIsStop cont        -- Common case; no need for fancy footwork
   = thing_inside env cont
 
-  | not (seCaseCase env)
-    -- See Note [Join points with -fno-case-of-case]
-  = do { (floats1, expr1) <- thing_inside env (mkBoringStop (contHoleType cont))
-       ; let (floats2, expr2) = wrapJoinFloatsX floats1 expr1
-       ; (floats3, expr3) <- rebuild (env `setInScopeFromF` floats2) expr2 cont
-       ; return (floats2 `addFloats` floats3, expr3) }
-
   | otherwise
     -- Normal case; see Note [Join points and case-of-case]
   = do { (floats1, cont')  <- mkDupableCont env cont
@@ -2198,44 +2211,6 @@ optional!
 We need to make the continuation E duplicable (since we are duplicating it)
 with mkDupableCont.
 
-Note [Join points with -fno-case-of-case]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Supose case-of-case is switched off, and we are simplifying
-
-    case (join j x = <j-rhs> in
-          case y of
-             A -> j 1
-             B -> j 2
-             C -> e) of <outer-alts>
-
-Usually, we'd push the outer continuation (case . of <outer-alts>) into
-both the RHS and the body of the join point j.  But since we aren't doing
-case-of-case we may then end up with this totally bogus result
-
-    join x = case <j-rhs> of <outer-alts> in
-    case (case y of
-             A -> j 1
-             B -> j 2
-             C -> e) of <outer-alts>
-
-This would be OK in the language of the paper, but not in GHC: j is no longer
-a join point.  We can only do the "push continuation into the RHS of the
-join point j" if we also push the continuation right down to the /jumps/ to
-j, so that it can evaporate there (trimJoinCont). Then, if we are doing
-case-of-case, we'll get to:
-
-    join x = case <j-rhs> of <outer-alts> in
-    case y of
-      A -> j 1
-      B -> j 2
-      C -> case e of <outer-alts>
-
-which is great.
-
-Bottom line: if case-of-case is off, we must stop pushing the continuation
-inwards altogether at any join point.  Instead simplify the (join ... in ...)
-with a Stop continuation, and wrap the original continuation around the
-outside.  Surprisingly tricky!
 
 
 ************************************************************************
@@ -2366,7 +2341,7 @@ simplOutId env fun cont
                 | seCaseCase env = (mkBoringStop overall_res_ty, overall_res_ty, cont3)
                 | otherwise      = (cont3, hole_ty, mkBoringStop hole_ty)
                 -- Only when case-of-case is on. See GHC.Driver.Config.Core.Opt.Simplify
-                --    Note [Case-of-case and full laziness]
+                -- See (COC1) in Note [Case-of-case and full laziness]
 
        -- If the argument is a literal lambda already, take a short cut
        -- This isn't just efficiency:
@@ -2469,7 +2444,7 @@ rebuildCall env fun_info
               , sc_cont = cont }
                 -- Note [Shadowing in the Simplifier]
 
-  | otherwise      -- Lazy, or already simplified arguments
+  | otherwise      -- Lazy, or already simplified arguments, or -fno-case-of-case
   -- DO NOT float anything outside, hence simplExprC
   -- There is no benefit (unlike in a let-binding), and we'd
   -- have to be very careful about bogus strictness through
@@ -3348,14 +3323,6 @@ doCaseToLet scrut case_bndr
 --------------------------------------------------
 
 reallyRebuildCase (saf,env) scrut case_bndr alts cont
-  | not (seCaseCase env)    -- Only when case-of-case is on.
-                            -- See GHC.Driver.Config.Core.Opt.Simplify
-                            --    Note [Case-of-case and full laziness]
-  = do { case_expr <- simplAlts (saf,env) scrut case_bndr alts
-                                (mkBoringStop (contHoleType cont))
-       ; rebuild env case_expr cont }
-
-  | otherwise
   = do { (floats, env', cont') <- mkDupableCaseCont env alts cont
        ; case_expr <- simplAlts (saf,env') scrut
                                 (scaleIdBy holeScaling case_bndr)
