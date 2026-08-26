@@ -1713,9 +1713,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
            ; let spec_rhs_bndrs = spec_bndrs ++ inner_rhs_bndrs'
                  (rhs_uds2, inner_dumped_dbs) = dumpUDs spec_rhs_bndrs $
                                                 dx_binds `consDictBinds` rhs_uds
-                 -- dx_binds comes from the arguments to the call,
-                 -- and so can mention poly_qvars but no other local binders
-                 spec_rhs = mkLams spec_rhs_bndrs           $
+                 spec_rhs = mkLams spec_rhs_bndrs $
                             wrapDictBindsE inner_dumped_dbs rhs_body'
                  rule_rhs_args = spec_bndrs
 
@@ -1784,8 +1782,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                                        , text "rule_act" <+> ppr rule_act
                                        ]
 
---           ; pprTrace "spec_call: rule" (vcat [ -- text "poly_qvars" <+> ppr poly_qvars
---                                                text "rule_bndrs" <+> ppr rule_bndrs
+--           ; pprTrace "spec_call: rule" (vcat [ text "rule_bndrs" <+> ppr rule_bndrs
 --                                              , text "rule_lhs_args" <+> ppr rule_lhs_args
 --                                              , text "all_call_args" <+> ppr all_call_args
 --                                              , ppr spec_rule ]) $
@@ -2611,6 +2608,14 @@ specHeader subst (bndr:bndrs) (UnspecType : args)
 -- a wildcard binder to match the dictionary (See Note [Specialising Calls] for
 -- the nitty-gritty), as a LHS rule and unfolding details.
 specHeader subst (bndr:bndrs) (SpecDict dict_arg : args)
+  | let in_scope = getInScopeVars (substInScopeSet subst)
+        bad_dict_fv v = isLocalVar v && not (v `elemVarSet` in_scope)
+  , not $ isEmptyVarSet $ exprSomeFreeVars bad_dict_fv dict_arg
+  = -- Do not specialise if `dict_arg` has any any free vars that are /not/ in scope
+    -- See Note [Weird special case for SpecDict]
+    specHeader subst (bndr:bndrs) (UnspecArg : args)
+
+  | otherwise
   = do { -- Make up a fresh binder to use in the RULE
          -- It might turn into a dict binding (via bindAuxiliaryDict) which we
          -- then float, so we use cloneIdBndr to get a completely fresh binder
@@ -2886,13 +2891,15 @@ We could zap `k` to (Any @Type) and `a` to (Any @(Any @Type)), but that
 is a lot of hard work for a very strange case.
 
 So we simply refrain from specialising in this case; hence the guard
-   allVarSet (`elemInScopeSet` in_scope) (exprFreeVars d)
-in the SpecDict cased of specHeader.
+   not $ isEmptyVarSet $ exprSomeFreeVars bad_dict_fv dict_arg
+in the SpecDict case of `specHeader`.
 
-How did this strange polymorphic mkD arise in the first place?
-From GHC.Core.Opt.Utils.abstractFloats, which was abstracting
-over too many type variables. But that too is now fixed;
-see Note [Which type variables to abstract over] in that module.
+How did this strange polymorphic mkD arise in the first place?  From
+GHC.Core.Opt.Utils.abstractFloats, which was abstracting over too many type
+variables. But that too is now fixed; see Note [Which type variables to abstract
+over] in that module.  So we don't actually have a Haskell source program that
+triggers it (see #27629) -- only test T27629 that uses a plugin to inject a strange
+definition.
 -}
 
 instance Outputable DictBind where
