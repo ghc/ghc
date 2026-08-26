@@ -875,8 +875,9 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
              mg = MG{ mg_alts = L (l2l $ getLoc match) [match]
                     , mg_ext = MatchGroupTc [] res_ty gen
                     }
-             matcher_arity = length req_theta + 3
-             -- See Note [Pragmas for pattern synonyms]
+
+             matcher_arity :: VisArity -- VisArity excludes dictionary arguments!
+             matcher_arity = 3         -- See Note [Pragmas for pattern synonyms]
 
        -- Add INLINE pragmas; see Note [Pragmas for pattern synonyms]
        -- NB: prag_fn is keyed by the PatSyn Name, not the (internal) matcher name
@@ -967,9 +968,8 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
          let builder_id = mkExportedVanillaId builder_name builder_ty
                          -- See Note [Exported LocalIds] in GHC.Types.Id
 
-             (_, req_theta, _, prov_theta, arg_tys, _) = patSynSigBndr patsyn
-             builder_arity = length req_theta + length prov_theta
-                             + length arg_tys
+             builder_arity :: VisArity   -- VisArity excludes dictionary arguments!
+             builder_arity = length (patSynArgs patsyn)
                              + (if need_dummy_arg then 1 else 0)
 
        -- Add INLINE pragmas; see Note [Pragmas for pattern synonyms]
@@ -1348,13 +1348,20 @@ entire pattern synonym is supported. For example:
 When no pragma is provided for a pattern, the inlining decision might change
 between different versions of GHC.
 
-Implementation notes.  The prag_fn passed in to tcPatSynDecl will have a binding
-for the /pattern synonym/ Name, thus
-      InlinedPattern :-> INLINE
-From this we cook up an INLINE pragma for the matcher (in tcPatSynMatcher)
-and builder (in tcPatSynBuilderBind), by looking up the /pattern synonym/
-Name in the prag_fn, and then using addInlinePragArity to add the right
-inl_sat field to that INLINE pragma for the matcher or builder respectively.
+Implementation notes.
+
+* The prag_fn passed in to tcPatSynDecl will have a binding
+  for the /pattern synonym/ Name, thus
+        InlinedPattern :-> INLINE
+  From this we cook up an INLINE pragma for the matcher (in tcPatSynMatcher)
+  and builder (in tcPatSynBuilderBind), by looking up the /pattern synonym/
+  Name in the prag_fn, and then using `addInlinePragArity` to add the right
+  inl_sat field to that INLINE pragma for the matcher or builder respectively.
+
+* Note that the arity passed to `addInlinePragArity` is the `VisArity`, the /visible/
+  arity.  That specifically /excludes/ dictionary arguments, which are dealt with
+  later by `GHC.HsToCore.Binds.makeCorePair`. The builder and matcher have no Required
+  type args, so we don't need to worry about them in the `VisArity`.
  -}
 
 
