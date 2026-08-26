@@ -24,6 +24,8 @@ module GHC.Driver.Downsweep
   -- * Helper functions
   , instantiationNodes
   , checkHomeUnitsClosed
+  -- * Enabling code generation for Template Haskell
+  , enableCodeGenForTH
   ) where
 
 import GHC.Prelude
@@ -236,9 +238,6 @@ See Note [The ModuleGraph] for an overview when we do downsweep.
 -- This function is intendned for use by --make mode and will also insert
 -- LinkNodes and InstantiationNodes for any home units.
 --
--- It will also turn on code generation for any modules that need it by calling
--- 'enableCodeGenForTH'.
---
 -- See also Note [The ModuleGraph]
 downsweep :: HscEnv
           -> (GhcMessage -> AnyGhcDiagnostic)
@@ -290,15 +289,7 @@ downsweep hsc_env diag_wrapper msg old_summaries maybe_base_graph excl_mods allo
          let all_nodes = downsweep_nodes ++ unit_nodes
          let all_errs = downsweep_errs ++ other_errs
 
-         let logger = hsc_logger hsc_env
-             tmpfs = hsc_tmpfs hsc_env
-         -- if we have been passed -fno-code, we enable code generation
-         -- for dependencies of modules that have -XTemplateHaskell,
-         -- otherwise those modules will fail to compile.
-         -- See Note [-fno-code mode] #8025
-         th_configured_nodes <- enableCodeGenForTH logger tmpfs unit_env all_nodes
-
-         return (all_errs, th_configured_nodes)
+         return (all_errs, mkModuleGraph all_nodes)
       _  -> return (all_errs, emptyMG)
   where
     -- Dependencies arising on a unit (backpack and module linking deps)
@@ -998,7 +989,7 @@ enableCodeGenForTH
   :: Logger
   -> TmpFs
   -> UnitEnv
-  -> [ModuleGraphNode]
+  -> ModuleGraph
   -> IO ModuleGraph
 enableCodeGenForTH logger tmpfs unit_env =
   enableCodeGenWhen logger tmpfs TFL_CurrentModule TFL_GhcSession unit_env
@@ -1021,10 +1012,10 @@ enableCodeGenWhen
   -> TempFileLifetime
   -> TempFileLifetime
   -> UnitEnv
-  -> [ModuleGraphNode]
+  -> ModuleGraph
   -> IO ModuleGraph
 enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph = do
-  mgMapM enable_code_gen mg
+  mgMapM enable_code_gen mod_graph
   where
     defaultBackendOf ms = platformDefaultBackend (targetPlatform $ ue_unitFlags (ms_unitid ms) unit_env)
 
@@ -1161,9 +1152,9 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph = do
        internalInterpreter = not (gopt Opt_ExternalInterpreter lcl_dflags)
 
 
-    mg = mkModuleGraph mod_graph
+    nodes = mgModSummaries' mod_graph
 
-    (td_map, lookup_node) = mkStageDeps mod_graph
+    (td_map, lookup_node) = mkStageDeps nodes
 
     queryReachable ns = isReachableMany td_map (mapMaybe lookup_node ns)
 
@@ -1183,7 +1174,7 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph = do
         -- Note we don't need object code for a module if it uses TemplateHaskell itself. Only
         -- it's dependencies.
         [ (mkNodeKey m, RunStage)
-        | m@(ModuleNode _deps (ModuleNodeCompile ms)) <- mod_graph
+        | m@(ModuleNode _deps (ModuleNodeCompile ms)) <- nodes
         , isTemplateHaskellOrQQNonBoot ms
         , not (gopt Opt_UseBytecodeRatherThanObjects (ms_hspp_opts ms))
         ]
@@ -1191,7 +1182,7 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph = do
     -- The direct dependencies of modules which require byte code
     need_bc_set =
         [ (mkNodeKey m, RunStage)
-        | m@(ModuleNode _deps (ModuleNodeCompile ms)) <- mod_graph
+        | m@(ModuleNode _deps (ModuleNodeCompile ms)) <- nodes
         , isTemplateHaskellOrQQNonBoot ms
         , gopt Opt_UseBytecodeRatherThanObjects (ms_hspp_opts ms)
         ]
@@ -1261,9 +1252,9 @@ Template Haskell
 A module using Template Haskell may invoke an imported function from inside a
 splice. This will cause the type-checker to attempt to execute that code, which
 would fail if no object files had been generated. See #8025. To rectify this,
-during the downsweep we patch the DynFlags in the ModSummary of any home module
-that is imported by a module that uses Template Haskell to generate object
-code.
+before computing the build plan, we patch the DynFlags in the ModSummary of
+any home module that is imported by a module that uses Template Haskell to
+generate object code.
 
 The flavour of the generated code depends on whether `-fprefer-byte-code` is enabled
 or not in the module which needs the code generation. If the module requires byte-code then
