@@ -37,12 +37,7 @@ AC_DEFUN([FIND_PYTHON],[
         AC_MSG_WARN([Python 3.7 or later is required, but $PYTHON reports $PythonVersion])
     ])
 
-    dnl Canonicalise path for Windows
-    if test "$HostOS" = "mingw32"
-    then
-      PythonCmd=$(cygpath -m "$PYTHON")
-    else
-      PythonCmd="$PYTHON"
-    fi
+    PythonCmd="$PYTHON"
+    FP_CANONICALISE_WIN_PATH([PythonCmd])
     AC_SUBST([PythonCmd])
 ])

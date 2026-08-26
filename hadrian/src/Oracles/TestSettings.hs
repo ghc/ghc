@@ -13,7 +13,6 @@ import Hadrian.Oracles.TextFile
 import Oracles.Setting (topDirectory, setting, ProjectSetting(..), crossStage)
 import Packages
 import Settings.Program (programContext)
-import Hadrian.Oracles.Path
 
 testConfigFile :: Action FilePath
 testConfigFile = buildRoot <&> (-/- "test/ghcconfig")
@@ -156,8 +155,5 @@ getTestExePath testGhc pkg = do
      cross <- getBooleanSetting TestCrossCompiling
      let cross_prefix = if cross then dropWhileEnd ((/=) '-') (takeFileName compiler_path) else ""
      -- get relative path for the given program in the given stage
-     let make_absolute rel_path = do
-           abs_path <- liftIO (makeAbsolute rel_path)
-           fixAbsolutePathOnWindows abs_path
-     make_absolute (bindir </> (cross_prefix ++ programBasename pkg) <.> exe)
+     liftIO $ makeAbsolute (bindir </> (cross_prefix ++ programBasename pkg) <.> exe)
     -- get relative path for the given program in the given stage

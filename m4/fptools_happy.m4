@@ -10,7 +10,9 @@ dnl https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation/tools
 dnl
 AC_DEFUN([FPTOOLS_HAPPY],
 [AC_PATH_PROG(HAPPY,[happy],)
-AC_SUBST(HappyCmd,$HAPPY)
+HappyCmd="$HAPPY"
+FP_CANONICALISE_WIN_PATH([HappyCmd])
+AC_SUBST(HappyCmd)
 AC_CACHE_CHECK([for version of happy], fptools_cv_happy_version,
 changequote(, )dnl
 [if test x"$HappyCmd" != x; then

@@ -306,15 +306,15 @@ instance H.Builder Builder where
                 Ar Unpack _ -> cmd' [Cwd output] [path] buildArgs buildOptions
 
                 Autoreconf dir -> do
-                  bash <- bashPath
-                  cmd' [Cwd dir] [bash, path] buildArgs buildOptions
+                  sh <- shPath
+                  cmd' [Cwd dir] [sh, path] buildArgs buildOptions
 
                 Configure  dir -> do
-                    -- Inject /bin/bash into `libtool`, instead of /bin/sh,
+                    -- Also inject the shell into `libtool` via CONFIG_SHELL,
                     -- otherwise Windows breaks. TODO: Figure out why.
-                    bash <- bashPath
-                    let env = AddEnv "CONFIG_SHELL" bash
-                    cmd' env [Cwd dir] ["sh", path] buildOptions buildArgs
+                    sh <- shPath
+                    let env = AddEnv "CONFIG_SHELL" sh
+                    cmd' env [Cwd dir] [sh, path] buildOptions buildArgs
 
                 GenApply {} -> captureStdout
 
@@ -469,6 +469,12 @@ systemBuilderPath builder = case builder of
                 ++ quote keyname ++ " is not specified" ++ inCfg
             return "" -- TODO: Use a safe interface.
         else do
+            when (windowsHost && isMsysPath path) . error $
+             unlines
+               [ "The path to builder " ++ quote keyname ++ inCfg
+               , "is an MSYS path: " ++ quote path ++ "."
+               , "Please re-run ./configure to fix this issue."
+               ]
             -- angerman: I find this lookupInPath rather questionable.
             -- if we specify CC, LD, ... *without* a path, that is intentional
             -- lookupInPath should be done by the person invoking the configure
@@ -478,8 +484,8 @@ systemBuilderPath builder = case builder of
             fullPath <- lookupInPath path
             case (windowsHost, hasExtension fullPath) of
                 (False, _    ) -> return path
-                (True , True ) -> fixAbsolutePathOnWindows fullPath
-                (True , False) -> fixAbsolutePathOnWindows fullPath <&> (<.> exe)
+                (True , True ) -> return $ unifyPath fullPath
+                (True , False) -> return $ unifyPath fullPath <.> exe
 
     -- Without this function, on Windows we can observe a bad builder path
     -- for 'autoreconf'. If the relevant system.config field is set to

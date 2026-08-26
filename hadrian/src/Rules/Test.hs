@@ -20,7 +20,6 @@ import qualified System.Directory as IO
 
 import GHC.Toolchain as Toolchain
 import GHC.Toolchain.Program as Toolchain
-import Hadrian.Oracles.Path
 
 checkPprProgPath, checkPprSourcePath :: FilePath
 checkPprProgPath = "test/bin/check-ppr" <.> exe
@@ -292,11 +291,7 @@ relativePathStage s p = programPath =<< programContext s p
 
 absolutePathStage :: Stage -> Package -> Action FilePath
 absolutePathStage s p =
-    relativePathStage s p >>= make_absolute
-  where
-    make_absolute rel_path = do
-      abs_path <- liftIO (makeAbsolute rel_path)
-      fixAbsolutePathOnWindows abs_path
+    liftIO . makeAbsolute =<< relativePathStage s p
 
 -- | Given a test compiler and a hadrian dependency (target), check if we
 -- can build the target with the compiler

@@ -9,12 +9,11 @@ AC_DEFUN([FP_FIND_NM],
             AC_MSG_ERROR([cannot find nm in your PATH])
         fi
     fi
+    NmCmd="$NM"
+    FP_CANONICALISE_WIN_PATH([NmCmd])
     if test "$HostOS" = "mingw32"
     then
-      NmCmd=$(cygpath -m "$NM")
       NM_STAGE0=$NmCmd
-    else
-      NmCmd="$NM"
     fi
     AC_SUBST([NmCmd])
     if test "$HostOS" != "mingw32"; then

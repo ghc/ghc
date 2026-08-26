@@ -238,16 +238,10 @@ if test "${WithGhc}" != ""
 then
     ghc_host_os=`"${WithGhc}" +RTS --info | grep 'Host OS' | sed -e 's/.*, "//' -e 's/")//'`
 
+    dnl NB: can't use FP_CANONICALISE_WIN_PATH here, as $windows is not yet set.
     if test "$ghc_host_os" = "mingw32"
     then
-        if test "${OSTYPE}" = "msys"
-        then
-            WithGhc=`echo "${WithGhc}" | sed "s#^/\([a-zA-Z]\)/#\1:/#"`
-        else
-            # Canonicalise to <drive>:/path/to/ghc
-            WithGhc=`cygpath -m "${WithGhc}"`
-        fi
-        echo "GHC path canonicalised to: ${WithGhc}"
+        WithGhc=`cygpath -m "${WithGhc}"`
     fi
 fi
 AC_SUBST([WithGhc])
@@ -329,12 +323,11 @@ else
         AC_CHECK_TARGET_TOOL([DlltoolCmd],[llvm-dlltool])
         AC_CHECK_TARGET_TOOL([OBJDUMP],[objdump])
 
-        WindresCmd="$(cygpath -m $WindresCmd)"
-        DlltoolCmd="$(cygpath -m $DlltoolCmd)"
+        FP_CANONICALISE_WIN_PATH([WindresCmd])
+        FP_CANONICALISE_WIN_PATH([DlltoolCmd])
 
-        if test "$Genlib" != ""; then
-            GenlibCmd="$(cygpath -m $Genlib)"
-        fi
+        GenlibCmd="$Genlib"
+        FP_CANONICALISE_WIN_PATH([GenlibCmd])
     fi
 fi
 
@@ -510,12 +503,8 @@ case $HostOS_CPP in
     ;;
 esac
 
-if test "$HostOS" = "mingw32"
-then
-  ObjdumpCmd=$(cygpath -m "$OBJDUMP")
-else
-  ObjdumpCmd="$OBJDUMP"
-fi
+ObjdumpCmd="$OBJDUMP"
+FP_CANONICALISE_WIN_PATH([ObjdumpCmd])
 AC_SUBST([ObjdumpCmd])
 
 dnl ** Which ranlib to use?
@@ -524,12 +513,8 @@ AC_PROG_RANLIB
 if test "$RANLIB" = ":"; then
     AC_MSG_ERROR([cannot find ranlib in your PATH])
 fi
-if test "$HostOS" = "mingw32"
-then
-  RanlibCmd=$(cygpath -m "$RANLIB")
-else
-  RanlibCmd="$RANLIB"
-fi
+RanlibCmd="$RANLIB"
+FP_CANONICALISE_WIN_PATH([RanlibCmd])
 AC_SUBST([RanlibCmd])
 
 LINKER_SUPPORTS_VERBATIM_LINKING
@@ -791,13 +776,16 @@ AC_PROG_LN_S
 
 dnl ** Find the path to sed
 AC_PATH_PROGS(SedCmd,gsed sed,sed)
+FP_CANONICALISE_WIN_PATH([SedCmd])
 
 dnl ** check for tar
 dnl   if GNU tar is named gtar, look for it first.
 AC_PATH_PROGS(TarCmd,gnutar gtar tar,tar)
+FP_CANONICALISE_WIN_PATH([TarCmd])
 
 dnl ** check for autoreconf
 AC_PATH_PROG(AutoreconfCmd, autoreconf, autoreconf)
+FP_CANONICALISE_WIN_PATH([AutoreconfCmd])
 
 dnl ** check for dtrace (currently only implemented for Mac OS X)
 AC_ARG_ENABLE(dtrace,
@@ -822,17 +810,11 @@ fi
 AC_SUBST(HaveDtrace)
 
 AC_PATH_PROG(HSCOLOUR,HsColour)
-# HsColour is passed to Cabal, so we need a native path
-if test "$HostOS"      = "mingw32" && \
-   test "${OSTYPE}"   != "msys"    && \
-   test "${HSCOLOUR}" != ""
-then
-    # Canonicalise to <drive>:/path/to/gcc
-    HSCOLOUR=`cygpath -m ${HSCOLOUR}`
-fi
+FP_CANONICALISE_WIN_PATH([HSCOLOUR])
 
 dnl ** check for Sphinx toolchain
 AC_PATH_PROG(SPHINXBUILD,sphinx-build)
+FP_CANONICALISE_WIN_PATH([SPHINXBUILD])
 AC_CACHE_CHECK([for version of sphinx-build], fp_cv_sphinx_version,
 changequote(, )dnl
 [if test -n "$SPHINXBUILD"; then
@@ -851,14 +833,19 @@ fi
 
 dnl ** check for xelatex
 AC_PATH_PROG(XELATEX,xelatex)
+FP_CANONICALISE_WIN_PATH([XELATEX])
 AC_PATH_PROG(MAKEINDEX,makeindex)
+FP_CANONICALISE_WIN_PATH([MAKEINDEX])
 AC_PATH_PROG(GIT,git)
+FP_CANONICALISE_WIN_PATH([GIT])
 
 dnl ** check for makeinfo
 AC_PATH_PROG(MAKEINFO,makeinfo)
+FP_CANONICALISE_WIN_PATH([MAKEINFO])
 
 dnl ** check for cabal
 AC_PATH_PROG(CABAL,cabal)
+FP_CANONICALISE_WIN_PATH([CABAL])
 
 
 dnl ** check for Python for testsuite driver

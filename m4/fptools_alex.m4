@@ -10,7 +10,9 @@ dnl https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation/tools
 dnl
 AC_DEFUN([FPTOOLS_ALEX],
 [AC_PATH_PROG(ALEX,[alex],)
-AC_SUBST(AlexCmd,$ALEX)
+AlexCmd="$ALEX"
+FP_CANONICALISE_WIN_PATH([AlexCmd])
+AC_SUBST(AlexCmd)
 AC_CACHE_CHECK([for version of alex], fptools_cv_alex_version,
 changequote(, )dnl
 [if test x"$AlexCmd" != x; then

@@ -10,6 +10,7 @@ module Hadrian.Utilities (
 
     -- * FilePath manipulation
     unifyPath, (-/-), makeRelativeNoSysLink, makeAbsolute,
+    isMsysPath, windowsToMsysPathList,
 
     -- * Accessing Shake's type-indexed map
     insertExtra, lookupExtra, userSetting,
@@ -144,17 +145,51 @@ zeroOne True  = "1"
 unifyPath :: FilePath -> FilePath
 unifyPath = toStandard . normaliseEx
 
-{- Note [Absolute paths and MSYS]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When dealing with absolute paths in Hadrian, we opt to always use Unix-style
-forward slashes for separating paths.
-This is because, on Windows, the MSYS toolchain can reliably handle paths such
-as /c/foo, while it occasionally falls over on paths of the form C:\foo.
+{- Note [MSYS paths]
+~~~~~~~~~~~~~~~~~~~~
+On Windows, GHC is built using an MSYS toolchain, which understands two
+different types of paths:
+  - Windows   C:\foo\bar  (forward slashes also accepted)
+  - POSIX     /c/foo/bar  /usr/baz/quux
+
+On the other hand, like any other Haskell program that depends on 'filepath',
+when compiled on Windows, Hadrian by default only understands Windows file paths.
+
+Separately, backslashes are a source of tricky bugs, as they require escaping
+in most circumstances.
+
+So, on Windows, we settle on using Windows-style paths with forward slashes.
+Hadrian manipulates existing paths using '(-/-)' and 'makeAbsolute', which
+maintain this convention. What's left to handle are the paths Hadrian receives,
+such as the paths of toolchain programs. Those are converted to the standing
+path convention using FP_CANONICALISE_WIN_PATH, which uses 'cygpath'.
+
+The end result is that Hadrian itself never needs to turn a POSIX path into a
+Windows path, and hence never needs to call 'cygpath'.
 -}
+
+-- | Is this an MSYS path, e.g. @\/usr\/bin\/tar@ or @\/c\/foo@, rather than a
+-- Windows one?
+--
+-- See Note [MSYS paths].
+isMsysPath :: FilePath -> Bool
+isMsysPath ('/' : _) = True
+isMsysPath _         = False
+
+-- | Rewrite a Windows path list, e.g. @C:\\foo;C:\\msys64\\usr\\share@, into
+-- the MSYS syntax @\/c\/foo:\/c\/msys64\/usr\/share@ that MSYS tools expect.
+--
+-- See Note [MSYS paths].
+windowsToMsysPathList :: String -> String
+windowsToMsysPathList = intercalate ":" . map toMsysPath . splitOn ";"
+  where
+    toMsysPath path = case replaceEq '\\' '/' path of
+        drive : ':' : rest | isAlpha drive -> '/' : toLower drive : rest
+        msysPath                           -> msysPath
 
 -- | Combine paths with a forward slash regardless of platform.
 --
--- See Note [Absolute paths and MSYS].
+-- See Note [MSYS paths].
 (-/-) :: FilePath -> FilePath -> FilePath
 _  -/- b
     | isAbsolute b
@@ -170,7 +205,7 @@ infixr 6 -/-
 -- | Like 'System.Directory.makeAbsolute' from @directory@, but always
 -- using forward slashes.
 --
--- See Note [Absolute paths and MSYS].
+-- See Note [MSYS paths].
 makeAbsolute :: FilePath -> IO FilePath
 makeAbsolute fp = do
   cwd <- IO.getCurrentDirectory
