@@ -30,12 +30,8 @@ else
   fi
 fi])
 fp_prog_ar_args=$fp_cv_prog_ar_args
-if test "$HostOS" = "mingw32"
-then
-  ArCmd=$(cygpath -m "$fp_prog_ar")
-else
-  ArCmd="$fp_prog_ar"
-fi
+ArCmd="$fp_prog_ar"
+FP_CANONICALISE_WIN_PATH([ArCmd])
 AC_SUBST([ArCmd])
 AC_SUBST([ArArgs], ["$fp_prog_ar_args"])
 

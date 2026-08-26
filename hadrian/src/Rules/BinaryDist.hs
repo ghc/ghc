@@ -6,7 +6,6 @@ import Context
 import Data.Either
 import qualified Data.Set as Set
 import Expression
-import Hadrian.Oracles.Path (fixUnixPathsOnWindows)
 import Oracles.Flavour
 import Oracles.Setting
 import Packages
@@ -393,16 +392,11 @@ bindistRules = do
         -- style paths. This happens because MSYS2 automatically converts env variables to
         -- Windows-style paths. To fix this, we convert ACLOCAL_PATH back to Unix style.
         -- This is done both in the boot Python script and here when building a bindist.
+        -- See Note [MSYS paths].
         win_host <- isWinHost
-        env <- if not win_host
-          then pure []
-          else do
-            aclocalPathMay <- getEnv "ACLOCAL_PATH"
-            case aclocalPathMay of
-              Nothing -> pure []
-              Just aclocalPath -> do
-                unixAclocalPath <- fixUnixPathsOnWindows aclocalPath
-                pure [AddEnv "ACLOCAL_PATH" unixAclocalPath]
+        aclocalPathMay <- if win_host then getEnv "ACLOCAL_PATH" else pure Nothing
+        let env = [ AddEnv "ACLOCAL_PATH" (windowsToMsysPathList aclocalPath)
+                  | Just aclocalPath <- [aclocalPathMay] ]
 
         buildWithCmdOptions env $
             target (vanillaContext Stage1 ghc) (Autoreconf $ ghcRoot -/- "distrib") [] []

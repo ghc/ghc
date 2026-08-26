@@ -10,9 +10,7 @@ if test -z "$fp_prog_ar"; then
   if test "$HostOS" = "mingw32"
   then
     AC_PATH_PROG([fp_prog_ar], [ar])
-    if test -n "$fp_prog_ar"; then
-      fp_prog_ar=$(cygpath -m $fp_prog_ar)
-    fi
+    FP_CANONICALISE_WIN_PATH([fp_prog_ar])
   else
     AC_CHECK_TARGET_TOOL([AR], [ar])
     fp_prog_ar="$AR"

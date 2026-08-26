@@ -6,7 +6,7 @@ module Oracles.Setting (
 
     -- * Helpers
     ghcCanonVersion, cmdLineLengthLimit, targetSupportsRPaths, topDirectory,
-    libsuf, ghcVersionStage, bashPath, targetStage, crossStage, queryTarget, queryTargetTarget,
+    libsuf, ghcVersionStage, shPath, targetStage, crossStage, queryTarget, queryTargetTarget,
     isHostStage,
 
     -- ** Target platform things
@@ -20,7 +20,6 @@ import System.Directory
 import System.Info.Extra
 import Hadrian.Expression
 import Hadrian.Oracles.TextFile
-import Hadrian.Oracles.Path
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe (runMaybeT)
 
@@ -133,9 +132,9 @@ buildSetting key stage = tgtConfig stage $ case key of
 getSetting :: ProjectSetting -> Expr c b String
 getSetting = expr . setting
 
--- | The path to a Bourne shell interpreter.
-bashPath :: Action FilePath
-bashPath = setting BourneShell
+-- | The path to a Bourne shell interpreter (@sh@).
+shPath :: Action FilePath
+shPath = setting BourneShell
 
 isWinHost :: Action Bool
 isWinHost = anyHostOs [OSMinGW32]
@@ -203,11 +202,12 @@ ghcCanonVersion = do
 -- | Absolute path to the GHC source tree.
 topDirectory :: Action FilePath
 topDirectory = do
-    x <- fixAbsolutePathOnWindows =<< setting GhcSourcePath
-    canonicalize x
-  where
-    -- We must canonicalize as the source directory may be accessed via a symlink. See #22451.
-    canonicalize = if isWindows then return else liftIO . canonicalizePath
+  ghcSourcePath <- setting GhcSourcePath
+  if isWindows
+  -- On Windows: enforce the path convention of Note [MSYS paths].
+  then return $ unifyPath ghcSourcePath
+  -- Otherwise: canonicalise to handle symlinks; see #22451.
+  else liftIO $ canonicalizePath ghcSourcePath
 
 ghcVersionStage :: Stage -> Action String
 ghcVersionStage (Stage0 {}) = setting GhcVersion

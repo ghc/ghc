@@ -1,17 +1,13 @@
 {-# LANGUAGE TypeFamilies #-}
 module Hadrian.Oracles.Path (
-    lookupInPath, fixAbsolutePathOnWindows, fixUnixPathsOnWindows,
-    pathOracle
+    lookupInPath, pathOracle
     ) where
 
 import Control.Monad
-import Data.Char
-import Data.List.Extra
 import Development.Shake
 import Development.Shake.Classes
 import Development.Shake.FilePath
 import System.Directory
-import System.Info.Extra
 
 import Hadrian.Utilities
 
@@ -21,54 +17,13 @@ lookupInPath name
     | name == takeFileName name = askOracle $ LookupInPath name
     | otherwise                 = return name
 
--- | Fix an absolute path on Windows:
--- * "/c/" => "C:/"
--- * "/usr/bin/tar.exe" => "C:/msys/usr/bin/tar.exe"
-fixAbsolutePathOnWindows :: FilePath -> Action FilePath
-fixAbsolutePathOnWindows path =
-    if isWindows
-    then do
-        let (dir, file) = splitFileName path
-        winDir <- askOracle $ WindowsPath dir
-        return $ winDir -/- file
-    else
-        return path
-
--- | Fix a unix path list on Windows:
--- * "C:\\foo\\bar;C:\\msys2\\bin" => "/c/foo/bar:/c/msys2/bin"
-fixUnixPathsOnWindows :: FilePath -> Action FilePath
-fixUnixPathsOnWindows paths =
-    if isWindows
-    then askOracle $ UnixPathList paths
-    else return paths
-
 newtype LookupInPath = LookupInPath String
     deriving (Binary, Eq, Hashable, NFData, Show)
 type instance RuleResult LookupInPath = String
 
-newtype WindowsPath = WindowsPath FilePath
-    deriving (Binary, Eq, Hashable, NFData, Show)
-type instance RuleResult WindowsPath = String
-
-newtype UnixPathList = UnixPathList FilePath
-    deriving (Binary, Eq, Hashable, NFData, Show)
-type instance RuleResult UnixPathList = String
-
 -- | Oracles for looking up paths. These are slow and require caching.
 pathOracle :: Rules ()
 pathOracle = do
-    void $ addOracleCache $ \(WindowsPath path) -> do
-        Stdout out <- quietly $ cmd ["cygpath", "-m", path]
-        let windowsPath = unifyPath $ dropWhileEnd isSpace out
-        putVerbose $ "| Windows path mapping: " ++ path ++ " => " ++ windowsPath
-        return windowsPath
-
-    void $ addOracleCache $ \(UnixPathList paths) -> do
-        Stdout out <- quietly $ cmd ["cygpath", "-p", "-u", paths]
-        let unixPaths = unifyPath $ dropWhileEnd isSpace out
-        putVerbose $ "| Unix path mapping: " ++ paths ++ " => " ++ unixPaths
-        return unixPaths
-
     void $ addOracleCache $ \(LookupInPath name) -> do
         path <- liftIO getSearchPath
         exes <- liftIO (findExecutablesInDirectories path name)
