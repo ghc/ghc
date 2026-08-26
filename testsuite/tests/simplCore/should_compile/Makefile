@@ -3,6 +3,12 @@ include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
 
+# T27629 runs a plugin that injects a Core binding
+# that made the specialiser crash
+T27629:
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -package ghc -dynamic-too -c T27629Plugin.hs -v0
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -fpolymorphic-specialisation -dcore-lint T27629.hs
+
 # T18815 should not have a non-recursive join-point for 'go'
 # Previously we ended up with
 #      join {go_sPI w_sQ3 = case w_sQ3 of { GHC.Types.I# ww1_sQ6 ->

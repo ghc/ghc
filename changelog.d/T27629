@@ -1,0 +1,6 @@
+section: compiler
+synopsis: Fix a scoping bug in the type-class specialiser
+description: We don't know of any user programs that can trigger this bug
+  (the repro involves a plugin) so there no user-visible effect.
+mrs: !16603
+issues: #27629
