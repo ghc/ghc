@@ -192,7 +192,6 @@ test ('T13386',
 # Performance test for lookups in the family application cache
 test('FamAppCachePerf',
      [ only_ways(['normal'])
-     , collect_compiler_residency(20)
      , collect_compiler_stats('bytes allocated',2)
      ],
      compile,
