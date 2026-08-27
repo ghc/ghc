@@ -1950,10 +1950,10 @@ binds   ::  { LHsLocalBinds GhcPs }
                                   ; return (L (EpAnn (glR $1) noAnn cs) $ HsValBinds noEpTok (L (noAnnSrcSpan $ gl $1) val_binds))} }
 
         | '{'            dbinds '}'     {% amsA' (sLL $1 $>
-                                             $ HsIPBinds (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) [], noEpTok) (IPBinds noExtField (reverse $ unLoc $2))) }
+                                             $ HsIPBinds noEpTok (L (noAnnSrcSpan $ gl $1) (IPBinds (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) []) (reverse $ unLoc $2)))) }
 
         |     vocurly    dbinds close   {% amsA' (sLL $1 $2
-                                             $ HsIPBinds (AnnList (EpVirtualBraces $ glR $1) [], noEpTok) (IPBinds noExtField (reverse $ unLoc $2))) }
+                                             $ HsIPBinds noEpTok (L (noAnnSrcSpan $ gl $1) (IPBinds (AnnList (EpVirtualBraces $ glR $1) []) (reverse $ unLoc $2)))) }
 
 
 wherebinds :: { Maybe (LHsLocalBinds GhcPs) }
