@@ -89,8 +89,8 @@ import GHC.Data.FastString
 dsLocalBinds :: LHsLocalBinds GhcTc -> CoreExpr -> DsM CoreExpr
 dsLocalBinds (L _ (EmptyLocalBinds _))  body = return body
 dsLocalBinds (L l (HsValBinds _ (L _ binds))) body = putSrcSpanDs (locA l) $
-                                                      dsValBinds binds body
-dsLocalBinds (L _ (HsIPBinds _ binds))  body = dsIPBinds  binds body
+                                                       dsValBinds binds body
+dsLocalBinds (L _ (HsIPBinds _ (L _ binds)))  body = dsIPBinds  binds body
 
 -------------------------
 -- caller sets location

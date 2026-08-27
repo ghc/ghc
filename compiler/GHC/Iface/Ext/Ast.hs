@@ -1446,7 +1446,7 @@ instance ( ToHie (LocatedA (body (GhcPass p)))
 instance HiePass p => ToHie (RScoped (LocatedA (HsLocalBinds (GhcPass p)))) where
   toHie (RS scope binds) = concatM $ makeNode binds (getLocA binds) : case unLoc binds of
       EmptyLocalBinds _ -> []
-      HsIPBinds _ ipbinds -> case ipbinds of
+      HsIPBinds _ (L _ ipbinds) -> case ipbinds of
         IPBinds evbinds xs -> let sc = combineScopes scope $ scopeHsLocaLBinds (unLoc binds)
                                   sp :: SrcSpanAnnA
                                   sp = noAnnSrcSpan $ getLocA binds in
@@ -1476,7 +1476,7 @@ scopeHsLocaLBinds (HsValBinds _ (L _ (XValBindsLR (HsVBG grps sigs))))
     sigsScope :: [Scope]
     sigsScope = map (mkScope . getLocA) sigs
 
-scopeHsLocaLBinds (HsIPBinds _ (IPBinds _ bs))
+scopeHsLocaLBinds (HsIPBinds _ (L _ (IPBinds _ bs)))
   = foldr combineScopes NoScope (map (mkScope . getLoc) bs)
 scopeHsLocaLBinds (EmptyLocalBinds _) = NoScope
 

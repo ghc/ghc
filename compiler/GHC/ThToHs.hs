@@ -1042,7 +1042,7 @@ cvtLocalDecs declDescr ds
         return (HsValBinds noAnn (noLocA (ValBinds noAnn binds)))
       (ip_binds, []) -> do
         binds <- mapM (uncurry cvtImplicitParamBind) ip_binds
-        return (HsIPBinds noAnn (IPBinds noExtField binds))
+        return (HsIPBinds noAnn (noLocA (IPBinds noAnn binds)))
       ((_:_), (_:_)) ->
         failWith ImplicitParamsWithOtherBinds
 

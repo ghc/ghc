@@ -1975,7 +1975,7 @@ repBinds (EmptyLocalBinds _)
   = do  { core_list <- coreListM decTyConOcc []
         ; return ([], core_list) }
 
-repBinds (HsIPBinds _ (IPBinds _ decs))
+repBinds (HsIPBinds _ (L _ (IPBinds _ decs)))
  = do   { ips <- mapM rep_implicit_param_bind decs
         ; core_list <- coreListM decTyConOcc
                                 (de_loc (sort_by_loc ips))

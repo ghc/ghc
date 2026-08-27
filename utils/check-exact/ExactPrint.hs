@@ -2443,10 +2443,11 @@ instance ExactPrint (HsLocalBinds GhcPs) where
     valbinds' <- markAnnotated valbinds
     return (HsValBinds w' valbinds')
 
-  exact (HsIPBinds (an,w) bs) = do
+  exact (HsIPBinds w bs) = do
     w' <- markEpToken w
-    (an2,bs') <- markAnnListA an $ markAnnotated bs
-    return (HsIPBinds (an2,w') bs')
+    -- (an2,bs') <- markAnnListA an $ markAnnotated bs
+    bs' <- markAnnotated bs
+    return (HsIPBinds w' bs')
   exact b@(EmptyLocalBinds _) = return b
 
 
@@ -2473,9 +2474,9 @@ instance ExactPrint (HsIPBinds GhcPs) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (IPBinds x binds) = do
-      binds' <- mapM markAnnotated binds
-      return (IPBinds x binds')
+  exact (IPBinds an binds) = do
+    (an1,binds') <- markAnnListA an $ mapM markAnnotated binds
+    return (IPBinds an1 binds')
 
 -- ---------------------------------------------------------------------
 
