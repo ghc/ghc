@@ -47,9 +47,8 @@ import GHC.Cmm.Dataflow.Label
 
 import Data.Maybe
 import Data.List     ( nubBy )
-import Data.List.NonEmpty ( NonEmpty (..), nonEmpty )
+import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified Data.List.NonEmpty as NE
-import Data.Ord      ( comparing )
 import qualified Data.Map as Map
 import Data.Foldable ( toList )
 import Data.Either ( partitionEithers )
@@ -152,10 +151,6 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
       -- from the same source file.  Furthermore, dumps take priority
       -- (if we generated one, we probably want debug information to
       -- refer to it).
-      bestSrcTick = minimumBy (comparing rangeRating)
-      rangeRating (span, _)
-        | srcSpanFile span == thisFile = 1
-        | otherwise                    = 2 :: Int
       thisFile = maybe nilFS mkFastString $ ml_hs_file modLoc
 
       -- Returns block tree for this scope as well as all nested
@@ -189,17 +184,14 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
                       blocks | top       = seqList childs childs
                              | otherwise = []
 
-              -- A source tick scopes over all nested blocks. However
-              -- their source ticks might take priority.
-              isSourceTick (SourceNote span a) = Just (span, a)
-              isSourceTick _ = Nothing
               -- Collect ticks from all blocks inside the tick scope.
               -- We attempt to filter out duplicates while we're at it.
               ticks = nubBy (flip tickishContains) $
                       bCtxsTicks bctxs ++ ticksToCopy scope
-              stick = case nonEmpty $ mapMaybe isSourceTick ticks of
-                Nothing -> cstick
-                Just sticks -> Just $! bestSrcTick (sticks `NE.appendList` maybeToList cstick)
+              -- A source tick scopes over all nested blocks. However
+              -- their source ticks might take priority.
+              !stick = bestSourceNote True thisFile $
+                       ticks ++ map (uncurry SourceNote) (maybeToList cstick)
 
 -- | Build a map of blocks sorted by their tick scopes
 --
