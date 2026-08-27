@@ -775,7 +775,8 @@ hsunitModuleGraph do_link unit = do
     let inodes = instantiationNodes (homeUnitId $ hsc_home_unit hsc_env) (hsc_units hsc_env)
     -- TODO: Backpack mode does not properly support ExternalPackage nodes yet
     -- Module nodes do not get given package dependencies (see hsModuleToModSummary).
-    let pkg_nodes =  nubOrd $ map (\(_, iud) -> UnitNode [] (instUnitInstanceOf iud)) inodes
+    let home_uid = homeUnitId $ hsc_home_unit hsc_env
+    let pkg_nodes =  nubOrd $ map (\(_, iud) -> UnitNode { un_home_uid = home_uid, un_deps = [], un_uid = instUnitInstanceOf iud }) inodes
     let graph_nodes = nodes ++ req_nodes ++ (map (uncurry InstantiationNode) $ inodes) ++ pkg_nodes
         key_nodes = map mkNodeKey graph_nodes
         all_nodes = graph_nodes ++ [LinkNode key_nodes (homeUnitId $ hsc_home_unit hsc_env) | do_link]
@@ -812,6 +813,7 @@ summariseRequirement pn mod_name = do
 
     let ms = ModSummary {
         ms_mod = mod,
+        ms_mod_name_loc = loc,
         ms_hsc_src = HsigFile,
         ms_location = location,
         ms_hs_hash = src_hash,
@@ -820,7 +822,7 @@ summariseRequirement pn mod_name = do
         ms_iface_date = hi_timestamp,
         ms_hie_date = hie_timestamp,
         ms_bytecode_date = Nothing,
-        ms_textual_imps = generatedImport FromBackpackSig . noLoc <$> extra_sig_imports,
+        ms_textual_imps = noLoc . generatedImport LookupUser <$> extra_sig_imports,
         ms_parsed_mod = Just (HsParsedModule {
                 hpm_module = L loc (HsModule {
                         hsmodExt = XModulePs {
@@ -890,16 +892,17 @@ hsModuleToModSummary home_keys pn hsc_src modname
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file_ospath location)
 
     let textual_imports =
-          map (rnUnresolvedImportPkgQual (renameRawPkgQual (hsc_unit_env hsc_env)))
+          map (fmap (rnUnresolvedImportPkgQual (renameRawPkgQual (hsc_unit_env hsc_env))))
               (mkUnresolvedImports dflags modname imps)
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env hsc_src modname
 
-    inst_deps <- liftIO $ implicitRequirementsShallow hsc_env textual_imports
+    inst_deps <- liftIO $ implicitRequirementsShallow hsc_env (map unLoc textual_imports)
 
     let this_mod = mkHomeModule (hsc_home_unit hsc_env) modname
     let ms = ModSummary {
             ms_mod = this_mod,
+            ms_mod_name_loc = maybe (getLoc hsmod) getLocA (hsmodName (unLoc hsmod)),
             ms_hsc_src = hsc_src,
             ms_location = location,
             ms_hspp_file = (case hiDir dflags of
@@ -911,7 +914,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
                            -- We have to do something special here:
                            -- due to merging, requirements may end up with
                            -- extra imports
-                           ++ (generatedImport FromBackpackSig . noLoc <$> extra_sig_imports),
+                           ++ (noLoc . generatedImport LookupUser <$> extra_sig_imports),
             -- This is our hack to get the parse tree to the right spot
             ms_parsed_mod = Just (HsParsedModule {
                     hpm_module = hsmod,
@@ -934,8 +937,8 @@ hsModuleToModSummary home_keys pn hsc_src modname
           -- hs-boot edge
           [k | k <- [NodeKey_Module (ModNodeKeyWithUid (GWIB (ms_mod_name ms) IsBoot) (moduleUnitId this_mod))], NotBoot == isBootSummary ms,  k `elem` home_keys ] ++
           -- Normal edges
-          [ k | e <- ms_imps ms
-              , let k = NodeKey_Module (ModNodeKeyWithUid (GWIB (unLoc (ui_mod_name e)) (ui_boot e)) (moduleUnitId this_mod))
+          [ k | L _ e <- ms_imps ms
+              , let k = NodeKey_Module (ModNodeKeyWithUid (GWIB (ui_mod_name e) (ui_boot e)) (moduleUnitId this_mod))
               , k `elem` home_keys ]
 
 

@@ -294,7 +294,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                                  (moduleName this_mod)
         ; let { unresolved_imports =
                   map (rnUnresolvedImportPkgQual (renameRawPkgQual (hsc_unit_env hsc_env))
-                         . mkUnresolvedImport . unLoc)
+                         . unLoc . mkUnresolvedImport . unLoc)
                       (implicit_imports ++ import_decls) }
         ; raw_req_imports <- liftIO
                              $ implicitRequirements hsc_env unresolved_imports

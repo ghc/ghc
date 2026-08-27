@@ -670,15 +670,15 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   hsc_env <- initializePlugins hsc_env1
 
   -- gather the imports and module name
-  (hspp_buf,mod_name,imps) <- do
+  (hspp_buf,L mod_name_loc mod_name,imps) <- do
     buf <- hGetStringBuffer input_fn
-    let rn_imps = map (rnUnresolvedImportPkgQual (renameRawPkgQual (hsc_unit_env hsc_env)))
+    let rn_imps = map (fmap (rnUnresolvedImportPkgQual (renameRawPkgQual (hsc_unit_env hsc_env))))
         sec = initSourceErrorContext dflags
     eimps <- parseHeaderImports dflags buf input_fn (basename <.> suff)
     case eimps of
         Left errs -> throwErrors sec (GhcPsMessage <$> errs)
-        Right (imps, L _ mod_name) -> return
-              (Just buf, mod_name, rn_imps imps)
+        Right (imps, lmod_name) -> return
+              (Just buf, lmod_name, rn_imps imps)
 
   -- Take -o into account if present
   -- Very like -ohi, but we must *only* do this if we aren't linking
@@ -704,6 +704,7 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   -- Make the ModSummary to hand to hscMain
   let
     mod_summary = ModSummary {  ms_mod       = mod,
+                                ms_mod_name_loc = mod_name_loc,
                                 ms_hsc_src   = src_flavour,
                                 ms_hspp_file = input_fn,
                                 ms_hspp_opts = dflags,

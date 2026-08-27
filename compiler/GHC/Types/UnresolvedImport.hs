@@ -10,8 +10,6 @@ module GHC.Types.UnresolvedImport
   , isGeneratedImport
 
     -- * Unresolved imports
-  , UnresolvedImportOrigin (..)
-  , unresolvedImportLookupScope
   , UnresolvedImport (..)
   , generatedImport
   , rnUnresolvedImportPkgQual
@@ -22,7 +20,6 @@ import GHC.Prelude
 
 import GHC.Types.Basic ( ImportLevel(..) )
 import GHC.Types.PkgQual
-import GHC.Types.SrcLoc ( Located, unLoc )
 import GHC.Unit.Types ( ModuleLookupScope(..) )
 
 import GHC.Utils.Outputable
@@ -31,6 +28,8 @@ import Language.Haskell.Syntax.ImpExp.IsBoot ( IsBootInterface(..) )
 import Language.Haskell.Syntax.Module.Name ( ModuleName )
 
 import Data.Data ( Data )
+
+--------------------------------------------------------------------------------
 
 -- | Where an import declaration came from.
 --
@@ -87,71 +86,39 @@ isGeneratedImport = \case
 ************************************************************************
 -}
 
--- | Where an unresolved import came from.
+-- | The input of a module lookup query: everything 'GHC.Unit.Finder.resolveImport'
+-- needs in order to turn a 'ModuleName' into a 'GHC.Unit.Types.Module'.
 --
--- The origin determines the 'ModuleLookupScope' with which the imported
--- 'ModuleName' is resolved ('unresolvedImportLookupScope').
-data UnresolvedImportOrigin
-  = FromDecl !ImportDeclOrigin
-      -- ^ An import declaration, user-written or GHC-generated
-      -- (see 'ImportDeclOrigin').
-  | FromBackpackSig
-      -- ^ A signature import GHC introduces for Backpack.
-  | FromPlugin
-      -- ^ A plugin module import (via @-fplugin@).
-  | FromSelfBoot
-      -- ^ The import of a module's own @hs-boot@ file (or vice versa).
-  | FromTarget
-      -- ^ A root of the compilation, e.g. a module named on the command line.
-
-instance Outputable UnresolvedImportOrigin where
-  ppr = \case
-    FromDecl origin -> ppr origin
-    FromBackpackSig -> text "backpack sig"
-    FromPlugin      -> text "plugin"
-    FromSelfBoot    -> text "self-boot"
-    FromTarget      -> text "target"
-
--- | The scope in which to resolve the imported module.
-unresolvedImportLookupScope :: UnresolvedImportOrigin -> ModuleLookupScope
-unresolvedImportLookupScope = \case
-  FromDecl origin -> importDeclLookupScope origin
-  FromBackpackSig -> LookupUser
-  FromPlugin      -> LookupUser
-  FromSelfBoot    -> LookupUser
-  FromTarget      -> LookupUser
-
--- | A module name together with everything needed to resolve that name
--- to a module: package qualifier, IsBoot flag, etc.
---
--- Resolved by 'GHC.Unit.Finder.resolveImport' wherever GHC processes a
--- module's imports: downsweep, @ghc -M@, recompilation checking.
+-- Handles all kinds of imports: user-written, generated imports, SOURCE
+-- imports, plugin module imports, etc.
 data UnresolvedImport pkgQual
   = UnresolvedImport
-  { ui_origin   :: !UnresolvedImportOrigin
+  { ui_scope    :: !ModuleLookupScope
   , ui_level    :: !ImportLevel
   , ui_pkg_qual :: !pkgQual
   , ui_boot     :: !IsBootInterface
-  , ui_mod_name :: !(Located ModuleName)
+  , ui_mod_name :: !ModuleName
   }
+  deriving stock ( Eq, Ord )
 
 instance Outputable pkgQual => Outputable (UnresolvedImport pkgQual) where
-  ppr (UnresolvedImport origin lvl pkg_qual boot mod_name)
+  ppr (UnresolvedImport scope lvl pkg_qual boot mod_name)
     = hsep [ ppr lvl, ppr pkg_qual
            , case boot of { IsBoot -> text "{-# SOURCE #-}"; NotBoot -> empty }
-           , ppr mod_name, parens (ppr origin) ]
+           , ppr mod_name, parens (ppr scope) ]
 
 -- | An import GHC creates out of thin air (not from an import declaration):
 -- a normal-level, unqualified, non-boot import of the given module.
-generatedImport :: UnresolvedImportOrigin -> Located ModuleName -> UnresolvedImport PkgQual
-generatedImport origin mod_name =
-  UnresolvedImport { ui_origin = origin, ui_level = NormalLevel
+generatedImport :: ModuleLookupScope -> ModuleName -> UnresolvedImport PkgQual
+generatedImport scope mod_name =
+  UnresolvedImport { ui_scope = scope, ui_level = NormalLevel
                    , ui_pkg_qual = NoPkgQual, ui_boot = NotBoot
                    , ui_mod_name = mod_name }
 
 -- | Rename the raw package qualifier of an unresolved import against the unit
 -- environment (with 'GHC.Rename.Names.renameRawPkgQual').
-rnUnresolvedImportPkgQual :: (ModuleName -> RawPkgQual -> PkgQual)
-                          -> UnresolvedImport RawPkgQual -> UnresolvedImport PkgQual
+rnUnresolvedImportPkgQual
+  :: (ModuleName -> RawPkgQual -> PkgQual)
+  -> UnresolvedImport RawPkgQual -> UnresolvedImport PkgQual
 rnUnresolvedImportPkgQual rn imp =
-  imp { ui_pkg_qual = rn (unLoc (ui_mod_name imp)) (ui_pkg_qual imp) }
+  imp { ui_pkg_qual = rn (ui_mod_name imp) (ui_pkg_qual imp) }

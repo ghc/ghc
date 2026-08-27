@@ -82,7 +82,6 @@ import GHC.Utils.Panic
 
 import GHC.Types.PkgQual
 import GHC.Types.SourceFile
-import GHC.Types.SrcLoc ( unLoc )
 import GHC.Types.Unique.Map
 import GHC.Types.Unique.Set
 import GHC.Types.UnresolvedImport
@@ -272,21 +271,11 @@ withCacheOrElse cache_lookup add_to_cache search = FinderM $ do
 -- Handles user-written module imports, @SOURCE@ imports, plugin module imports,
 -- system imports, etc.
 resolveImport :: HscEnv -> UnresolvedImport PkgQual -> FinderM FindResult
-resolveImport hsc_env imp =
-  case ui_origin imp of
-    FromPlugin      -> findPluginModule hsc_env mod_name
-    FromDecl {}     -> find_normal
-    FromBackpackSig -> find_normal
-    FromSelfBoot    -> find_normal
-    FromTarget      -> find_normal
-  where
-    scope = unresolvedImportLookupScope (ui_origin imp)
-    mod_name = unLoc (ui_mod_name imp)
-    find_normal = do
-      res <- findImportedModule hsc_env scope mod_name (ui_pkg_qual imp)
-      case (res, ui_boot imp) of
-        (Found loc mod, IsBoot) -> return (Found (addBootSuffixLocn loc) mod)
-        _ -> return res
+resolveImport hsc_env (UnresolvedImport { ui_scope, ui_pkg_qual, ui_boot, ui_mod_name }) = do
+  res <- findImportedModule hsc_env ui_scope ui_mod_name ui_pkg_qual
+  case (res, ui_boot) of
+    (Found loc mod, IsBoot) -> return (Found (addBootSuffixLocn loc) mod)
+    _ -> return res
 
 -- | Resolve a 'ModuleName' into a 'Module'.
 findImportedModule
@@ -326,6 +315,9 @@ findImportedModuleNoHsc
   -> PkgQual
   -> FinderM FindResult
 findImportedModuleNoHsc fc fopts ue home_module_name_providers_map mb_home_unit scope mod_name mb_pkg
+  | LookupPlugin <- scope
+  = findPluginModuleNoHsc fc fopts ue home_module_name_providers_map mb_home_unit mod_name
+  | otherwise
   = case mb_pkg of
       NoPkgQual  -> unqual_import
       ThisPkg uid

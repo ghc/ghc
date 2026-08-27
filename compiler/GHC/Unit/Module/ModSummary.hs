@@ -68,6 +68,8 @@ data ModSummary
    = ModSummary {
         ms_mod          :: Module,
           -- ^ Identity of the module
+        ms_mod_name_loc :: SrcSpan,
+          -- ^ Where the module header names the module
         ms_hsc_src      :: HscSource,
           -- ^ The module source either plain Haskell, hs-boot, or hsig
         ms_location     :: ModLocation,
@@ -85,7 +87,7 @@ data ModSummary
           -- See Note [When source is considered modified] and #9243
         ms_hie_date   :: Maybe UTCTime,
           -- ^ Timestamp of hie file, if we have one
-        ms_textual_imps :: [UnresolvedImport PkgQual],
+        ms_textual_imps :: [Located (UnresolvedImport PkgQual)],
           -- ^ Imports derived from module *text*, including:
           --
           --  - @{-# SOURCE #-}@ imports
@@ -115,25 +117,25 @@ ms_mod_name = moduleName . ms_mod
 
 -- | All imports of the module: textual imports (SOURCE imports included),
 -- generated imports, and plugin imports (imports going via @-fplugin@).
-ms_imps :: ModSummary -> [UnresolvedImport PkgQual]
+ms_imps :: ModSummary -> [Located (UnresolvedImport PkgQual)]
 ms_imps ms = ms_textual_imps ms ++ ms_plugin_imps ms
 
 -- | The @{-# SOURCE #-}@ imports of the module.
-ms_srcimps :: ModSummary -> [UnresolvedImport PkgQual]
-ms_srcimps = filter ((IsBoot ==) . ui_boot) . ms_textual_imps
+ms_srcimps :: ModSummary -> [Located (UnresolvedImport PkgQual)]
+ms_srcimps = filter ((IsBoot ==) . ui_boot . unLoc) . ms_textual_imps
 
 -- | Plugin imports (via @-fplugin@).
-ms_plugin_imps :: ModSummary -> [UnresolvedImport PkgQual]
+ms_plugin_imps :: ModSummary -> [Located (UnresolvedImport PkgQual)]
 ms_plugin_imps ms =
-  [ (generatedImport FromPlugin (noLoc mod_name)) { ui_level = SpliceLevel }
+  [ noLoc $ (generatedImport LookupPlugin mod_name) { ui_level = SpliceLevel }
   | mod_name <- pluginModNames (ms_hspp_opts ms) ]
 
 -- | All of the (possibly) home module imports from the given list that is to
 -- say, each of these module names could be a home import if an appropriately
 -- named file existed.  (This is in contrast to package qualified imports, which
 -- are guaranteed not to be home imports.)
-home_imps :: [UnresolvedImport PkgQual] -> [UnresolvedImport PkgQual]
-home_imps imps = filter (maybe_home . ui_pkg_qual) imps
+home_imps :: [Located (UnresolvedImport PkgQual)] -> [Located (UnresolvedImport PkgQual)]
+home_imps imps = filter (maybe_home . ui_pkg_qual . unLoc) imps
   where maybe_home NoPkgQual    = True
         maybe_home (ThisPkg _)  = True
         maybe_home (OtherPkg _) = False
@@ -143,7 +145,7 @@ home_imps imps = filter (maybe_home . ui_pkg_qual) imps
 -- could be a home import if an appropriately named file
 -- existed.  (This is in contrast to package qualified
 -- imports, which are guaranteed not to be home imports.)
-ms_home_imps :: ModSummary -> [UnresolvedImport PkgQual]
+ms_home_imps :: ModSummary -> [Located (UnresolvedImport PkgQual)]
 ms_home_imps = home_imps . ms_imps
 
 -- The ModLocation contains both the original source filename and the
