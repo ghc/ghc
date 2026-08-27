@@ -1,7 +1,8 @@
 {-# OPTIONS -ddump-parsed-ast #-}
+{-# LANGUAGE ImplicitParams #-}
 module Test20297 where
 
-
+-- ValBinds
 bar = x
   -- comment0
   where -- comment1
@@ -9,3 +10,8 @@ bar = x
 foo = x
   where -- comment2
         doStuff = do stuff
+
+-- IPBinds
+ipb = ?y
+  where -- comment3
+        ?y = 1
