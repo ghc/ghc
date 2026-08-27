@@ -1,3 +1,6 @@
 T26545.hs:12:23: error: [GHC-88431]
-    ‘v’ is used in a static form but it is not defined at top level
+    • ‘v’ is used in a static form but it is not defined at top level
+    • In the expression: static (I# (v +# 1#))
+      In the expression: let v = f 3# in static (I# (v +# 1#))
+      In an equation for ‘h’: h x = let v = f 3# in static (I# (v +# 1#))
 

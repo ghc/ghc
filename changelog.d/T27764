@@ -1,0 +1,8 @@
+section: compiler
+synopsis: Fix bug in ``static`` forms
+issues: #27664
+mrs: !16624
+description: A ``static`` form should have no free *term* variables, but it
+  can have free *type* variables.  Alas, the renamer does not really know what
+  is a term variable and what is a type variable, because of required type
+  arguments. This patch moves the test to the typechecker, which does know.
