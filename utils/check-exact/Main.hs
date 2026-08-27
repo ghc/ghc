@@ -11,6 +11,7 @@
 
 import Data.Data
 import Data.List (intercalate)
+import Data.Maybe
 -- import Language.Haskell.Syntax.Binds
 import GHC hiding (moduleName)
 import GHC.Driver.Ppr
@@ -21,6 +22,7 @@ import GHC.Types.Name.Reader
 import GHC.Utils.Error
 import System.Environment( getArgs )
 import System.Exit
+import System.Directory
 import System.FilePath
 import System.IO
 
@@ -203,7 +205,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Test19850.hs" Nothing
  -- "../../testsuite/tests/printer/Test20247.hs" Nothing
  -- "../../testsuite/tests/printer/Test20258.hs" Nothing
- "../../testsuite/tests/printer/Test20297.hs" Nothing
+ -- "../../testsuite/tests/printer/Test20297.hs" Nothing
  -- "../../testsuite/tests/printer/PprLinearArrow.hs" Nothing
  -- "../../testsuite/tests/printer/PprRecordSemi.hs" Nothing
  -- "../../testsuite/tests/printer/PprSemis.hs" Nothing
@@ -213,7 +215,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/PprArrowLambdaCase.hs" Nothing
  -- "../../testsuite/tests/printer/PprParenFunBind.hs" Nothing
  -- "../../testsuite/tests/printer/Test16279.hs" Nothing
- -- "../../testsuite/tests/printer/HsDocTy.hs" Nothing
+ "../../testsuite/tests/printer/HsDocTy.hs" Nothing
  -- "../../testsuite/tests/printer/Test21355.hs" Nothing
  --  "../../testsuite/tests/printer/Test22765.hs" Nothing
  -- "../../testsuite/tests/printer/Test22771.hs" Nothing
@@ -229,6 +231,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
 changers :: [(String, Changer)]
 changers =
   [("noChange",          noChange)
+  ,("makeDelta",         makeDelta)
   ,("changeRenameCase1", changeRenameCase1)
   ,("changeLayoutLet2",  changeLayoutLet2)
   ,("changeLayoutLet3",  changeLayoutLet3)
@@ -309,12 +312,25 @@ testOneFile _ libdir fileName mchanger = do
          origAst = ppAst p
          pped    = exactPrint p
 
-         newFile         = dropExtension fileName <.> "ppr"      <.> takeExtension fileName
-         newFileChanged  = dropExtension fileName <.> "changed"  <.> takeExtension fileName
-         newFileExpected = dropExtension fileName <.> "expected" <.> takeExtension fileName
-         astFile        = fileName <.> "ast"
-         newAstFile     = fileName <.> "ast.new"
-         changedAstFile = fileName <.> "ast.changed"
+         newFile          = dropExtension fileName <.> "ppr"      <.> takeExtension fileName
+         newFileChanged   = dropExtension fileName <.> "changed"  <.> takeExtension fileName
+         newFileExpected' = dropExtension fileName <.> "expected" <.> takeExtension fileName
+         astFile          = fileName <.> "ast"
+         newAstFile       = fileName <.> "ast.new"
+         changedAstFile   = fileName <.> "ast.changed"
+       exists <- doesFileExist newFileExpected'
+       -- newFileExpected <- if isJust mchanger && exists
+       --                      then return newFileExpected'
+       --                      else do
+       --                        putStrLn $ "Expected file `" ++ newFileExpected' ++ "` not found, using original"
+       --                        return fileName
+       newFileExpected <- if isJust mchanger
+                            then if exists
+                                   then return newFileExpected'
+                                   else do
+                                     putStrLn $ "Expected file `" ++ newFileExpected' ++ "` not found, using original"
+                                     return fileName
+                            else return fileName
 
        writeBinFile astFile origAst
        writeBinFile newFile pped
@@ -383,6 +399,11 @@ type Changer = FilePath -> (ParsedSource -> IO ParsedSource)
 
 noChange :: Changer
 noChange _libdir parsed = return parsed
+
+-- | Convert the whole AST to delta form, and print it back. The result
+-- should be identical to the original source.
+makeDelta :: Changer
+makeDelta _libdir parsed = return (makeDeltaAst parsed)
 
 changeRenameCase1 :: Changer
 changeRenameCase1 _libdir parsed = return (rename "bazLonger" [((3,15),(3,18))] parsed)
