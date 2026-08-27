@@ -5,6 +5,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module Base (
     -- * General utilities
@@ -22,6 +23,7 @@ module Base (
     module Development.Shake.Util,
 
     Vec(..), (&%>),
+    exe,
 
     -- * Basic data types
     module Hadrian.Package,
@@ -57,7 +59,7 @@ import Development.Shake hiding (unit, (&%>), (*>), Normal)
 #endif
 import qualified Development.Shake as Shake
 import Development.Shake.Classes
-import Development.Shake.FilePath
+import Development.Shake.FilePath hiding (exe)
 import Development.Shake.Util
 import Hadrian.Oracles.DirectoryContents
 import Hadrian.Utilities
@@ -67,6 +69,13 @@ import GHC.Stack ( HasCallStack )
 
 import Stage
 import Way
+import GHC.Platform.ArchOS (ArchOS(..), Arch (..), OS (..))
+
+exe :: ArchOS -> FilePath
+exe arch
+  | ArchWasm32 <- archOS_arch arch = "wasm"
+  | OSMinGW32 <- archOS_OS arch = "exe"
+  | otherwise = ""
 
 -- | Hadrian lives in the 'hadrianPath' directory of the GHC tree.
 hadrianPath :: FilePath

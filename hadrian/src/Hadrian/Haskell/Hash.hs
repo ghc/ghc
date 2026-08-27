@@ -125,7 +125,7 @@ pkgHashOracle = void $ addOracleCache $ \(PkgHashKey (stag, pkg)) -> do
   flav <- flavour
   let flavourArgs = extraArgs flav
 
-  targetOs       <- queryTargetTarget stag queryOS
+  targetOs       <- queryPerStageTargetSpec stag queryOS
   projectVersion <- setting ProjectVersion
   let pkgHashCompilerId = "ghc-" ++ projectVersion
       pkgHashPlatform = targetOs

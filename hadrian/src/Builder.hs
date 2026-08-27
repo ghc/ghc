@@ -15,7 +15,6 @@ import Control.Exception.Extra (Partial)
 import qualified Data.ByteString.Lazy.Char8 as BSL
 import Development.Shake.Classes
 import Development.Shake.Command
-import Development.Shake.FilePath
 import GHC.Generics
 import GHC.Platform.ArchOS (ArchOS(..), Arch(..), OS(..))
 import qualified Hadrian.Builder as H
@@ -458,7 +457,7 @@ systemBuilderPath builder = case builder of
 
     -- Get program from a certain stage's target configuration
     fromStageTC stage keyname key = do
-        path <- prgPath . key <$> targetStage stage
+        path <- prgPath . key <$> perStageTarget stage
         validate keyname path
 
     validate keyname path = do
@@ -479,7 +478,7 @@ systemBuilderPath builder = case builder of
             case (windowsHost, hasExtension fullPath) of
                 (False, _    ) -> return path
                 (True , True ) -> fixAbsolutePathOnWindows fullPath
-                (True , False) -> fixAbsolutePathOnWindows fullPath <&> (<.> exe)
+                (True , False) -> fixAbsolutePathOnWindows fullPath <&> (<.> exe (tgtArchOs target))
 
     -- Without this function, on Windows we can observe a bad builder path
     -- for 'autoreconf'. If the relevant system.config field is set to

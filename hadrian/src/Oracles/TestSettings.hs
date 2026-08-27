@@ -14,6 +14,7 @@ import Oracles.Setting (topDirectory, setting, ProjectSetting(..), crossStage)
 import Packages
 import Settings.Program (programContext)
 import Hadrian.Oracles.Path
+import GHC.Toolchain (Target(tgtArchOs))
 
 testConfigFile :: Action FilePath
 testConfigFile = buildRoot <&> (-/- "test/ghcconfig")
@@ -154,10 +155,11 @@ getTestExePath testGhc pkg = do
      bindir <- getBinaryDirectory testGhc
      compiler_path <- getCompilerPath testGhc
      cross <- getBooleanSetting TestCrossCompiling
+     tgt <- getTargetTarget -- FIXME: is this right -- ask rodrigo about the targettarget and query/get versions of this function
      let cross_prefix = if cross then dropWhileEnd ((/=) '-') (takeFileName compiler_path) else ""
      -- get relative path for the given program in the given stage
      let make_absolute rel_path = do
            abs_path <- liftIO (makeAbsolute rel_path)
            fixAbsolutePathOnWindows abs_path
-     make_absolute (bindir </> (cross_prefix ++ programBasename pkg) <.> exe)
+     make_absolute (bindir </> (cross_prefix ++ programBasename pkg) <.> exe (tgtArchOs tgt))
     -- get relative path for the given program in the given stage

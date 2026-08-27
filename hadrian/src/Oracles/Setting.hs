@@ -6,7 +6,7 @@ module Oracles.Setting (
 
     -- * Helpers
     ghcCanonVersion, cmdLineLengthLimit, targetSupportsRPaths, topDirectory,
-    libsuf, ghcVersionStage, bashPath, targetStage, crossStage, queryTarget, queryTargetTarget,
+    libsuf, ghcVersionStage, bashPath, perStageTarget, crossStage, queryTarget, queryPerStageTargetSpec,
     isHostStage,
 
     -- ** Target platform things
@@ -153,7 +153,7 @@ isOsxTarget :: Stage -> Action Bool
 isOsxTarget stage = anyTargetOs stage [OSDarwin]
 
 isArmTarget :: Stage -> Action Bool
-isArmTarget stage = queryTargetTarget stage (isARM . archOS_arch . tgtArchOs)
+isArmTarget stage = queryPerStageTargetSpec stage (isARM . archOS_arch . tgtArchOs)
 
 -- | Check whether the host OS setting matches one of the given strings.
 anyHostOs :: [OS] -> Action Bool
@@ -162,15 +162,15 @@ anyHostOs oss = (`elem` oss) <$> queryHostTarget (archOS_OS . tgtArchOs)
 -- | Check whether the target architecture setting matches one of the given
 -- strings.
 anyTargetArch :: Stage -> [Arch] -> Action Bool
-anyTargetArch stage archs = (`elem` archs) <$> queryTargetTarget stage (archOS_arch . tgtArchOs)
+anyTargetArch stage archs = (`elem` archs) <$> queryPerStageTargetSpec stage (archOS_arch . tgtArchOs)
 
 -- | Check whether the target OS setting matches one of the given strings.
 anyTargetOs :: Stage -> [OS] -> Action Bool
-anyTargetOs stage oss = (`elem` oss) <$> queryTargetTarget stage (archOS_OS . tgtArchOs)
+anyTargetOs stage oss = (`elem` oss) <$> queryPerStageTargetSpec stage (archOS_OS . tgtArchOs)
 
 -- | Check whether the target OS uses the ELF object format.
 isElfTarget :: Stage -> Action Bool
-isElfTarget stage = queryTargetTarget stage (osElfTarget . archOS_OS . tgtArchOs)
+isElfTarget stage = queryPerStageTargetSpec stage (osElfTarget . archOS_OS . tgtArchOs)
 
 -- | Check whether the target OS supports the @-rpath@ linker option when
 -- using dynamic linking.
@@ -180,7 +180,7 @@ isElfTarget stage = queryTargetTarget stage (osElfTarget . archOS_OS . tgtArchOs
 -- TODO: Windows supports lazy binding (but GHC doesn't currently support
 --       dynamic way on Windows anyways).
 targetSupportsRPaths :: Stage -> Action Bool
-targetSupportsRPaths stage = queryTargetTarget stage
+targetSupportsRPaths stage = queryPerStageTargetSpec stage
                                 (\t -> let os = archOS_OS (tgtArchOs t)
                                        in osElfTarget os || osMachOTarget os)
 
@@ -188,7 +188,7 @@ targetSupportsRPaths stage = queryTargetTarget stage
 -- ARM)?
 targetArmVersion :: Stage -> Action (Maybe ArmISA)
 targetArmVersion stage = runMaybeT $ do
-    ArchARM isa _ _ <- lift $ queryTargetTarget stage (archOS_arch . tgtArchOs)
+    ArchARM isa _ _ <- lift $ queryPerStageTargetSpec stage (archOS_arch . tgtArchOs)
     return isa
 
 -- | Canonicalised GHC version number, used for integer version comparisons. We
@@ -231,33 +231,34 @@ libsuf st way
         let suffix = waySuffix (removeWayUnit Dynamic way)
         return (suffix ++ "-ghc" ++ version ++ extension)
 
--- | Build libraries for this `Stage` targetting this `Target`
+-- | Determine the 'Target' that this 'Stage' is supposed to build libraries for.
 --
--- For example, we want to build RTS with stage1 for the host target as we
+-- For example, we want to build RTS with stage1 for the host as we
 -- produce a host executable with stage1 (which cross-compiles to stage2).
-targetStage :: Stage -> Action Target
-targetStage Stage0 {} = getHostTarget
-targetStage stage | isHostStage stage = do
+perStageTarget :: Stage -> Action Target
+perStageTarget Stage0 {} = getHostTarget
+perStageTarget stage | isHostStage stage = do
    ht <- getHostTarget
    tt <- getTargetTarget
    if targetPlatformTriple ht == targetPlatformTriple tt
      then return tt
      else return ht
-targetStage _ = getTargetTarget
+perStageTarget _ = getTargetTarget
 
 isHostStage :: Stage -> Bool
 isHostStage stage | stage <= Stage1 = True
 isHostStage _ = False
 
-queryTarget :: Stage -> (Target -> a) -> (Expr c b a)
-queryTarget s f = expr (f <$> targetStage s)
+queryTarget :: Stage -> (Target -> a) -> Expr c b a
+queryTarget s f = expr (f <$> perStageTarget s)
 
-queryTargetTarget :: Stage -> (Target -> a) -> Action a
-queryTargetTarget s f = f <$> targetStage s
+-- | get the conentents of the .target file for the specified stage
+queryPerStageTargetSpec :: Stage -> (Target -> a) -> Action a
+queryPerStageTargetSpec s f = f <$> perStageTarget s
 
 -- | A 'Stage' is a cross-stage if the produced compiler is a cross-compiler.
 crossStage :: Stage -> Action Bool
 crossStage st = do
-  st_target <- targetStage (succStage st)
-  st_host   <- targetStage st
+  st_target <- perStageTarget (succStage st)
+  st_host   <- perStageTarget st
   return (targetPlatformTriple st_target /= targetPlatformTriple st_host)

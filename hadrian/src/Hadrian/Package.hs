@@ -23,7 +23,7 @@ module Hadrian.Package (
     ) where
 
 import Development.Shake.Classes
-import Development.Shake.FilePath
+import Development.Shake.FilePath ((<.>))
 import GHC.Generics
 
 import Hadrian.Utilities

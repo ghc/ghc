@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 module Rules.Test (testRules) where
 
@@ -22,58 +23,70 @@ import GHC.Toolchain as Toolchain
 import GHC.Toolchain.Program as Toolchain
 import Hadrian.Oracles.Path
 import Hadrian.Oracles.TextFile (getHostTarget, getTargetTarget)
+import GHC.Platform.ArchOS (ArchOS (..), Arch (..), OS (..))
 
-checkPprProgPath, checkPprSourcePath :: FilePath
-checkPprProgPath = "test/bin/check-ppr" <.> exe
+checkPprProgPath :: ArchOS -> FilePath
+checkPprProgPath archos = "test/bin/check-ppr" <.> exe archos
+checkPprSourcePath :: FilePath
 checkPprSourcePath = "utils/check-ppr/Main.hs"
 checkPprExtra :: [String]
 checkPprExtra = []
 
-checkExactProgPath, checkExactSourcePath :: FilePath
-checkExactProgPath = "test/bin/check-exact" <.> exe
+checkExactProgPath :: ArchOS -> FilePath
+checkExactProgPath archos = "test/bin/check-exact" <.> exe archos
+checkExactSourcePath :: FilePath
 checkExactSourcePath = "utils/check-exact/Main.hs"
 checkExactExtra :: [String]
 checkExactExtra = ["-iutils/check-exact"]
 
-countDepsProgPath, countDepsSourcePath :: FilePath
-countDepsProgPath = "test/bin/count-deps" <.> exe
+countDepsProgPath :: ArchOS -> FilePath
+countDepsProgPath archos = "test/bin/count-deps" <.> exe archos
+countDepsSourcePath :: FilePath
 countDepsSourcePath = "utils/count-deps/Main.hs"
 countDepsExtra :: [String]
 countDepsExtra = ["-iutils/count-deps"]
 
-dumpDeclsProgPath, dumpDeclsSourcePath :: FilePath
-dumpDeclsProgPath = "test/bin/dump-decls" <.> exe
+dumpDeclsProgPath :: ArchOS -> FilePath
+dumpDeclsProgPath archos = "test/bin/dump-decls" <.> exe archos
+dumpDeclsSourcePath :: FilePath
 dumpDeclsSourcePath = "utils/dump-decls/Main.hs"
 dumpDeclsExtra :: [String]
 dumpDeclsExtra = []
 
-noteLinterProgPath, noteLinterSourcePath :: FilePath
-noteLinterProgPath = "test/bin/lint-notes" <.> exe
+noteLinterProgPath :: ArchOS -> FilePath
+noteLinterProgPath archos = "test/bin/lint-notes" <.> exe archos
+noteLinterSourcePath :: FilePath
 noteLinterSourcePath = "linters/lint-notes/Main.hs"
 noteLinterExtra :: [String]
 noteLinterExtra = ["-ilinters/lint-notes"]
 
-codeLinterProgPath, codeLinterSourcePath :: FilePath
-codeLinterProgPath = "test/bin/lint-codes" <.> exe
+codeLinterProgPath :: ArchOS -> FilePath
+codeLinterProgPath archos = "test/bin/lint-codes" <.> exe archos
+codeLinterSourcePath :: FilePath
 codeLinterSourcePath = "linters/lint-codes/Main.hs"
 codeLinterExtra :: [String]
 codeLinterExtra = ["-ilinters/lint-codes"]
 
-whitespaceLinterProgPath, whitespaceLinterSourcePath :: FilePath
-whitespaceLinterProgPath = "test/bin/lint-whitespace" <.> exe
+whitespaceLinterProgPath :: ArchOS -> FilePath
+whitespaceLinterProgPath archos = "test/bin/lint-whitespace" <.> exe archos
+whitespaceLinterSourcePath :: FilePath
 whitespaceLinterSourcePath = "linters/lint-whitespace/Main.hs"
 whitespaceLinterExtra :: [String]
 whitespaceLinterExtra = ["-ilinters/lint-whitespace", "-ilinters/linters-common"]
 
-changelogDProgPath, changelogDSourcePath :: FilePath
-changelogDProgPath = "test/bin/changelog-d" <.> exe
+changelogDProgPath :: ArchOS -> FilePath
+changelogDProgPath archos = "test/bin/changelog-d" <.> exe archos
+changelogDSourcePath :: FilePath
 changelogDSourcePath = "utils/changelog-d/ChangelogD.hs"
 changelogDExtra :: [String]
 changelogDExtra = ["-iutils/changelog-d"]
 
 data CheckProgram =
         CheckProgram { cp_target :: String -- ^ Name for the hadrian target
-                     , cp_exe_path :: FilePath -- ^ Path to resulting executable
+                     , cp_exe_path :: ArchOS -> FilePattern
+                        -- ^ Path to resulting executable.
+                        -- This depends on the taret the program is built for,
+                        -- not the host that hadrian is built on
                      , cp_src_path :: FilePath -- ^ Source to the Main.hs for the executable
                      , cp_extra_args :: [String] -- ^ Any extra arguments to use when compiling Main.hs
                      , cp_hadrian_pkg :: Package -- ^ How to build the executable when using in-tree compiler.
@@ -83,16 +96,16 @@ data CheckProgram =
 
 checkPrograms :: [CheckProgram]
 checkPrograms =
-    [ CheckProgram "test:check-ppr" checkPprProgPath checkPprSourcePath checkPprExtra checkPpr id id
-    , CheckProgram "test:check-exact" checkExactProgPath checkExactSourcePath checkExactExtra checkExact id id
-    , CheckProgram "test:count-deps" countDepsProgPath countDepsSourcePath countDepsExtra countDeps id id
-    , CheckProgram "test:dump-decls" dumpDeclsProgPath dumpDeclsSourcePath dumpDeclsExtra dumpDecls id id
-    , CheckProgram "lint:notes" noteLinterProgPath  noteLinterSourcePath  noteLinterExtra  lintNotes  (const stage0Boot)  id
-    , CheckProgram "lint:codes" codeLinterProgPath  codeLinterSourcePath  codeLinterExtra  lintCodes  id id
-    , CheckProgram "lint:whitespace"  whitespaceLinterProgPath  whitespaceLinterSourcePath  whitespaceLinterExtra  lintWhitespace  (const stage0Boot)  (filter (/= lintersCommon))
+    [ CheckProgram { cp_target = "test:check-ppr", cp_exe_path = checkPprProgPath, cp_src_path = checkPprSourcePath, cp_extra_args = checkPprExtra, cp_hadrian_pkg = checkPpr, cp_modify_stage = id, cp_modify_deps = id }
+    , CheckProgram { cp_target = "test:check-exact", cp_exe_path = checkExactProgPath, cp_src_path = checkExactSourcePath, cp_extra_args = checkExactExtra, cp_hadrian_pkg = checkExact, cp_modify_stage = id, cp_modify_deps = id }
+    , CheckProgram { cp_target = "test:count-deps", cp_exe_path = countDepsProgPath, cp_src_path = countDepsSourcePath, cp_extra_args = countDepsExtra, cp_hadrian_pkg = countDeps, cp_modify_stage = id, cp_modify_deps = id }
+    , CheckProgram { cp_target = "test:dump-decls", cp_exe_path = dumpDeclsProgPath, cp_src_path = dumpDeclsSourcePath, cp_extra_args = dumpDeclsExtra, cp_hadrian_pkg = dumpDecls, cp_modify_stage = id, cp_modify_deps = id }
+    , CheckProgram { cp_target = "lint:notes", cp_exe_path = noteLinterProgPath, cp_src_path = noteLinterSourcePath, cp_extra_args = noteLinterExtra, cp_hadrian_pkg = lintNotes, cp_modify_stage = (const stage0Boot), cp_modify_deps = id }
+    , CheckProgram { cp_target = "lint:codes", cp_exe_path = codeLinterProgPath, cp_src_path = codeLinterSourcePath, cp_extra_args = codeLinterExtra, cp_hadrian_pkg = lintCodes, cp_modify_stage = id, cp_modify_deps = id }
+    , CheckProgram { cp_target = "lint:whitespace", cp_exe_path = whitespaceLinterProgPath, cp_src_path = whitespaceLinterSourcePath, cp_extra_args = whitespaceLinterExtra, cp_hadrian_pkg = lintWhitespace, cp_modify_stage = (const stage0Boot), cp_modify_deps = (filter (/= lintersCommon)) }
     -- N.B. The lint:changelog build is replicated by lint_changelog in
     -- .gitlab/ci.sh. Keep its package dependencies in sync with this target.
-    , CheckProgram "lint:changelog"  changelogDProgPath  changelogDSourcePath  changelogDExtra  changelogD  (const stage0Boot)  id
+    , CheckProgram { cp_target = "lint:changelog", cp_exe_path = changelogDProgPath, cp_src_path = changelogDSourcePath, cp_extra_args = changelogDExtra, cp_hadrian_pkg = changelogD, cp_modify_stage = (const stage0Boot), cp_modify_deps = id }
     ]
 
 inTreeOutTree :: (Stage -> Action b) -> Action b -> Action b
@@ -136,12 +149,23 @@ testRules = do
 
     testsuiteDeps
 
+    -- the test targets will all be compiled by the test comppiler which is going
+    -- to produce artifacts for its target
+
     -- Rules for building check-ppr, check-exact and
     -- check-ppr-annotations with the compiler we are going to test
     -- (in-tree or out-of-tree).
-    forM_ checkPrograms $ \(CheckProgram name progPath sourcePath mextra progPkg mod_stage mod_pkgs) -> do
-        name ~> need [root -/- progPath]
-        root -/- progPath %> \path -> do
+    forM_ checkPrograms $ \(CheckProgram name progPathForArch sourcePath mextra progPkg mod_stage mod_pkgs) -> do
+        name ~> do
+          tt <- getTargetTarget
+          need [root -/- progPathForArch (tgtArchOs tt)]
+
+        -- HACK: we don't havea program path here and just a pattern
+        -- because we can't query the target before declaring the rule.
+        -- we specify target arch linux (no extension), then append a pattern
+        -- for any extension
+        let filePat = progPathForArch ArchOS { archOS_arch = ArchUnknown, archOS_OS = OSLinux } <> "*"
+        root -/- filePat %> \path -> do
             need [ sourcePath ]
             testGhc <- testCompiler <$> userSetting defaultTestArgs
 
@@ -167,7 +191,7 @@ testRules = do
                      | targetPlatformTriple ht /= targetPlatformTriple tt = targetPlatform ++ "-" ++ prog
                      | otherwise = prog
                 let dynPrograms = hasDynamic test_args
-                cmd [bindir </> mkGhcProg "ghc" <.> exe] $ -- FIXME: needs proper prefix!
+                cmd [bindir </> mkGhcProg "ghc" <.> exe (tgtArchOs ht)] $
                     concatMap (\p -> ["-package", pkgName p]) depsPkgs ++
                     ["-o", top -/- path, top -/- sourcePath] ++
                     mextra ++
@@ -243,8 +267,12 @@ testEnv stg = do
     top             <- topDirectory
     pythonPath      <- builderPath Python
     -- MP: TODO wrong, should use the ccPath and ccFlags from the bindist we are testing.
-    ccPath          <- queryTargetTarget stg (Toolchain.prgPath . Toolchain.ccProgram . Toolchain.tgtCCompiler)
-    ccFlags         <- queryTargetTarget stg (unwords . Toolchain.prgFlags . Toolchain.ccProgram . Toolchain.tgtCCompiler)
+    tgt <- queryPerStageTargetSpec stg id
+    let ccPath = tgt.tgtCCompiler.ccProgram.prgPath
+    let ccFlags = unwords tgt.tgtCCompiler.ccProgram.prgFlags
+    let archos = tgt.tgtArchOs
+    let mkProgPath k = top -/- root -/- k archos
+
     ghcFlags        <- runTestGhcFlags stg
     let ghciFlags = ghcFlags ++ unwords
           [ "--interactive", "-v0", "-ignore-dot-ghci"
@@ -262,14 +290,14 @@ testEnv stg = do
       , "TEST_HC_OPTS_INTERACTIVE" .= ghciFlags
       , "TEST_CC" .= ccPath
       , "TEST_CC_OPTS" .= ccFlags
-      , "CHECK_PPR" .= (top -/- root -/- checkPprProgPath)
-      , "CHECK_EXACT" .= (top -/- root -/- checkExactProgPath)
-      , "DUMP_DECLS" .= (top -/- root -/- dumpDeclsProgPath)
-      , "COUNT_DEPS" .= (top -/- root -/- countDepsProgPath)
-      , "LINT_NOTES" .= (top -/- root -/- noteLinterProgPath)
-      , "LINT_CODES" .= (top -/- root -/- codeLinterProgPath)
-      , "LINT_WHITESPACE" .= (top -/- root -/- whitespaceLinterProgPath)
-      , "CHANGELOG_D" .= (top -/- root -/- changelogDProgPath)
+      , "CHECK_PPR" .= mkProgPath checkPprProgPath
+      , "CHECK_EXACT" .= mkProgPath checkExactProgPath
+      , "DUMP_DECLS" .= mkProgPath dumpDeclsProgPath
+      , "COUNT_DEPS" .= mkProgPath countDepsProgPath
+      , "LINT_NOTES" .= mkProgPath noteLinterProgPath
+      , "LINT_CODES" .= mkProgPath codeLinterProgPath
+      , "LINT_WHITESPACE" .= mkProgPath whitespaceLinterProgPath
+      , "CHANGELOG_D" .= mkProgPath changelogDProgPath
       -- This lets us bypass the need to generate a config
       -- through Make, which happens in testsuite/mk/boilerplate.mk
       -- which is in turn included by all test 'Makefile's.
