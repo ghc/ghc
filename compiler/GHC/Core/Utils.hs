@@ -426,8 +426,10 @@ tickTickedExpr preserve_anf t1 t2s e
   -- combination.
   -- See Note [Avoiding duplicate ticks] in GHC.Core.Opt.FloatOut
   -- and Note [Ordering of source notes] in GHC.Types.Tickish.
-  | Just t2s' <- combine_into_stack t2s
-  = apply_ticks t2s' e
+  | Just combined <- combine_into_stack t1 (NE.toList t2s)
+  = case combined of
+      DropIncomingTick          -> apply_ticks t2s e
+      TickOutsideStack t1' t2s' -> Tick t1' (apply_ticks t2s' e)
 
   -- Case 2: 't1' can be commuted past all the ticks in the stack, e.g. because
   -- it has tighter placement properties than all the ticks in the stack.
@@ -437,22 +439,48 @@ tickTickedExpr preserve_anf t1 t2s e
 
   -- Fallback: keep the new tick on the outside.
   | otherwise
-  = apply_ticks (t1 NE.:| NE.toList t2s) e
+  = Tick t1 (apply_ticks t2s e)
 
   where
-    apply_ticks :: NE.NonEmpty CoreTickish -> CoreExpr -> CoreExpr
+    apply_ticks :: Foldable f => f CoreTickish -> CoreExpr -> CoreExpr
     apply_ticks ts e' = foldr Tick e' ts
+    {-# INLINE apply_ticks #-}
 
-    -- Try to combine 't1' into a stack of ticks.
-    combine_into_stack :: NE.NonEmpty CoreTickish -> Maybe (NE.NonEmpty CoreTickish)
-    combine_into_stack (t2 NE.:| rest)
-      | Just t2' <- combineTickish_maybe t1 t2
-      = Just (t2' NE.:| rest)
-      | r_hd : r_tl <- rest
-      , Just rest' <- combine_into_stack (r_hd NE.:| r_tl)
-      = Just (t2 NE.:| NE.toList rest')
+-- | The result of combining a tick into a stack of ticks.
+data CombineIntoStack
+  -- | Drop the incoming tick: it's subsumed by a tick in the stack.
+  = DropIncomingTick
+  -- | Keep the incoming tick on the outside (possibly merged with an inner tick),
+  -- and wrap it around the given stack (from which we removed subsumed ticks).
+  | TickOutsideStack !CoreTickish [CoreTickish]
+
+-- | Try to combine a tick into a stack of ticks, never re-ordering any ticks.
+--
+--  - If the tick is subsumed by a tick in the stack, drop it.
+--  - Otherwise merge it with the ticks it subsumes and keep the result outside
+--    the whole stack (#27749), discarding the ticks it makes redundant.
+combine_into_stack :: CoreTickish -> [CoreTickish] -> Maybe CombineIntoStack
+combine_into_stack _ [] = Nothing
+combine_into_stack s (t : ts) =
+  case combineTickish_maybe s t of
+    Just s1
+      -- 's1 is redundant: drop it, keeping the stack as it is.
+      | s1 == t  -> Just DropIncomingTick
+      -- 't' is redundant: put 's1' outside the stack.
+      -- Carry on, as 's1' may subsume further ticks in the stack.
+      | otherwise -> Just $ combine_into_stack s1 ts `orElse` TickOutsideStack s1 ts
+    -- Didn't combine: recur, and discard 't' if we end up putting a tick on the
+    -- outside that subsumes it.
+    Nothing -> retain t <$> combine_into_stack s ts
+  where
+    retain _  DropIncomingTick = DropIncomingTick -- retains it
+    retain t1 res@(TickOutsideStack s1 ss)
+      | Just t1' <- combineTickish_maybe s1 t1
+      , s1 == t1'
+      -- s1 subsumes t1: drop t1
+      = res
       | otherwise
-      = Nothing
+      = TickOutsideStack s1 (t1 : ss)
 
 {- Note [Pushing SCCs inwards]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
