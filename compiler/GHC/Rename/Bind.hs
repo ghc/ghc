@@ -253,10 +253,10 @@ rnLocalBindsAndThen (HsIPBinds x binds) thing_inside = do
     (thing, fvs_thing) <- thing_inside (HsIPBinds x binds') fv_binds
     return (thing, fvs_thing `plusFN` fv_binds)
 
-rnIPBinds :: HsIPBinds GhcPs -> RnM (HsIPBinds GhcRn, FreeNames)
-rnIPBinds (IPBinds _ ip_binds ) = do
+rnIPBinds :: LHsIPBinds GhcPs -> RnM (LHsIPBinds GhcRn, FreeNames)
+rnIPBinds (L l (IPBinds x ip_binds )) = do
     (ip_binds', fvs_s) <- mapAndUnzipM (wrapLocFstMA rnIPBind) ip_binds
-    return (IPBinds noExtField ip_binds', plusFNs fvs_s)
+    return (L l (IPBinds x ip_binds'), plusFNs fvs_s)
 
 rnIPBind :: IPBind GhcPs -> RnM (IPBind GhcRn, FreeNames)
 rnIPBind (IPBind _ n expr) = do

@@ -852,7 +852,7 @@ addTickLHsLocalBinds (L l (HsValBinds x binds)) =
                       (addTickLHsValBinds binds)
 addTickLHsLocalBinds (L l (HsIPBinds x binds))  =
         L l <$> liftM (HsIPBinds x)
-                      (addTickHsIPBinds binds)
+                      (addTickLHsIPBinds binds)
 addTickLHsLocalBinds (L l (EmptyLocalBinds x))  = return (L l (EmptyLocalBinds x))
 
 addTickLHsValBinds :: LHsValBindsLR GhcTc (GhcPass a)
@@ -865,8 +865,9 @@ addTickLHsValBinds (L l (XValBindsLR (HsVBG grps sigs))) = do
         return $ (L l (XValBindsLR (HsVBG grps' sigs)))
 addTickLHsValBinds _ = panic "addTickLHsValBinds"
 
-addTickHsIPBinds :: HsIPBinds GhcTc -> TM (HsIPBinds GhcTc)
-addTickHsIPBinds (IPBinds dictbinds ipbinds) =
+addTickLHsIPBinds :: LHsIPBinds GhcTc -> TM (LHsIPBinds GhcTc)
+addTickLHsIPBinds (L l (IPBinds dictbinds ipbinds)) =
+      L l <$>
         liftM2 IPBinds
                 (return dictbinds)
                 (mapM (traverse (addTickIPBind)) ipbinds)
