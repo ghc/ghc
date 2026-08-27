@@ -1,0 +1,4 @@
+ordering
+  = \ (m :: Maybe Int) (b :: Int) ->
+      src<T27749.hs:8:1-37>
+      src<T27749.hs:4:1-54>
