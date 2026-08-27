@@ -189,12 +189,16 @@ depanalE diag_wrapper msg excluded_mods allow_dup_roots = do
 
         all_errs <- liftIO $ HUG.unitEnv_foldWithKey one_unit_messages (return emptyMessages) (hsc_HUG hsc_env)
         logDiagnostics (GhcDriverMessage <$> all_errs)
-        setSession (setModuleGraph mod_graph hsc_env)
+        setSession $ setKnownHomeModules (knownHomeModulesOfGraph mod_graph)
+                   $ setModuleGraph mod_graph hsc_env
+
         pure (emptyMessages, mod_graph)
       else do
         -- We don't have a complete module dependency graph,
         -- The graph may be disconnected and is unusable.
-        setSession (setModuleGraph emptyMG hsc_env)
+        setSession $ setKnownHomeModules emptyKnownHomeModules
+                   $ setModuleGraph emptyMG hsc_env
+
         pure (errs, emptyMG)
 
 
@@ -642,7 +646,8 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph0 = do
       enableCodeGenForTH (hsc_logger hsc_env0) (hsc_tmpfs hsc_env0)
         (hsc_unit_env hsc_env0) mod_graph0
 
-    modifySession (setModuleGraph mod_graph)
+    modifySession $ setKnownHomeModules (knownHomeModulesOfGraph mod_graph)
+                  . setModuleGraph mod_graph
 
     guessOutputFile
     hsc_env <- getSession

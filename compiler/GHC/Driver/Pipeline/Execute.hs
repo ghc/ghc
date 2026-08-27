@@ -698,11 +698,8 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   dyn_o_mod <- modificationTimeIfExists dyn_o_file
   bytecode_date <- modificationTimeIfExists (ml_bytecode_file_ospath location)
 
-  -- Tell the finder cache about this module
-  mod <- do
-    let home_unit = hsc_home_unit hsc_env
-    let fc        = hsc_FC hsc_env
-    addHomeModuleToFinder fc home_unit mod_name location src_flavour
+  let home_unit = hsc_home_unit hsc_env
+      mod = mkHomeModule home_unit mod_name
 
   -- Make the ModSummary to hand to hscMain
   let
@@ -734,6 +731,11 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   -- See also Note [hsc_type_env_var hack]
   type_env_var <- newIORef emptyNameEnv
   let hsc_env' =
+        -- The module being compiled may live anywhere and declare any module
+        -- name, so lookups of its own module (e.g. to read its hs-boot
+        -- interface) can only be answered from its summary.
+        -- See Note [Known home modules] in GHC.Unit.Finder.Types.
+        setKnownHomeModules (knownHomeModulesOfSummaries [mod_summary]) $
         setModuleGraph mg
           hsc_env { hsc_type_env_vars = knotVarsFromModuleEnv (mkModuleEnv [(mod, type_env_var)]) }
 

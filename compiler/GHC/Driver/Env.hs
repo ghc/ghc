@@ -4,6 +4,7 @@ module GHC.Driver.Env
    , HasHscEnv (..)
    , hsc_mod_graph
    , setModuleGraph
+   , setKnownHomeModules
    , hscUpdateFlags
    , hscSetFlags
    , hsc_home_unit
@@ -70,6 +71,7 @@ import GHC.Unit.Module.Graph
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Env as UnitEnv
 import GHC.Unit.External
+import GHC.Unit.Finder.Types ( FinderCache(..), KnownHomeModules )
 
 import GHC.Types.Error ( emptyMessages, Messages )
 import GHC.Types.Name
@@ -153,6 +155,15 @@ hscUpdateHUG f hsc_env = hsc_env { hsc_unit_env = updateHug f (hsc_unit_env hsc_
 
 setModuleGraph :: ModuleGraph -> HscEnv -> HscEnv
 setModuleGraph mod_graph hsc_env = hsc_env { hsc_unit_env = (hsc_unit_env hsc_env) { ue_module_graph = mod_graph } }
+
+-- | Declare the home modules whose defining file is already known.
+--
+-- Only for use by the driver, in between phases of concurrent work.
+--
+-- See Note [Known home modules] in GHC.Unit.Finder.Types.
+setKnownHomeModules :: KnownHomeModules -> HscEnv -> HscEnv
+setKnownHomeModules known hsc_env =
+  hsc_env { hsc_FC = (hsc_FC hsc_env) { knownHomeModules = known } }
 
 {-
 

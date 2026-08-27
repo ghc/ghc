@@ -255,14 +255,33 @@ downsweep :: HscEnv
                 -- The non-error elements of the returned list all have distinct
                 -- (Modules, IsBoot) identifiers, unless the Bool is true in
                 -- which case there can be repeats
-downsweep hsc_env diag_wrapper msg old_summaries maybe_base_graph excl_mods allow_dup_roots = do
-  n_jobs     <- mkWorkerLimit (hsc_dflags hsc_env)
+downsweep hsc_env0 diag_wrapper msg old_summaries maybe_base_graph excl_mods allow_dup_roots = do
+  n_jobs     <- mkWorkerLimit (hsc_dflags hsc_env0)
   summ_cache <- newIORef (mkModSummaryCache (zip old_summaries (repeat SummOld)))
   imps_cache <- newIORef Map.empty
-  withMakeEnv n_jobs hsc_env diag_wrapper msg $ \make_env -> do
-    (root_errs, root_summaries) <- rootSummariesParallel n_jobs make_env (hsc_targets hsc_env)
-                                     (getRootSummary excl_mods summ_cache imps_cache)
-    let closure_errs = checkHomeUnitsClosed unit_env
+  let (file_targets, module_targets) = partition is_file_target (hsc_targets hsc_env0)
+      get_root_summary = getRootSummary excl_mods summ_cache imps_cache
+  withMakeEnv n_jobs hsc_env0 diag_wrapper msg $ \make_env0 -> do
+    -- First summarise the file targets: they may live off the search path and
+    -- declare a module name unrelated to their file name, so their modules
+    -- can only be known from their summaries.
+    (file_errs, file_root_summaries) <-
+      rootSummariesParallel n_jobs make_env0 file_targets get_root_summary
+
+    -- Only now start to resolve module targets, which may name modules
+    -- that the file targets provide.
+    -- See Note [Known home modules] in GHC.Unit.Finder.Types.
+    let known    = knownHomeModulesOfSummaries file_root_summaries
+        hsc_env  = setKnownHomeModules known hsc_env0
+        make_env = make_env0 { hsc_env = setKnownHomeModules known make_hsc_env }
+        MakeEnv { hsc_env = make_hsc_env } = make_env0
+    (module_errs, module_root_summaries) <-
+      rootSummariesParallel n_jobs make_env module_targets get_root_summary
+
+    let root_errs      = file_errs ++ module_errs
+        root_summaries = file_root_summaries ++ module_root_summaries
+
+        closure_errs = checkHomeUnitsClosed unit_env
         unit_env = hsc_unit_env hsc_env
 
         all_errs = closure_errs ++ root_errs
@@ -292,6 +311,12 @@ downsweep hsc_env diag_wrapper msg old_summaries maybe_base_graph excl_mods allo
          return (all_errs, mkModuleGraph all_nodes)
       _  -> return (all_errs, emptyMG)
   where
+    is_file_target :: Target -> Bool
+    is_file_target (Target { targetId }) =
+      case targetId of
+        TargetFile {}   -> True
+        TargetModule {} -> False
+
     -- Dependencies arising on a unit (backpack and module linking deps)
     unitModuleNodes :: [ModuleGraphNode] -> UnitId -> HomeUnitEnv -> [Either (Messages DriverMessage) ModuleGraphNode]
     unitModuleNodes summaries uid hue =
@@ -1374,12 +1399,7 @@ summariseFile hsc_env' home_unit summ_cache_ref src_fn mb_phase maybe_buf
             -- all paths if the original was a boot file.
             location = mkHomeModLocation fopts pi_mod_name (unsafeEncodeUtf basename) (unsafeEncodeUtf extension) hsc_src
 
-        -- Tell the Finder cache where it is, so that subsequent calls
-        -- to findModule will find it, even if it's not on any search path
-        mod <- liftIO $ do
-          let home_unit = hsc_home_unit hsc_env
-          let fc        = hsc_FC hsc_env
-          addHomeModuleToFinder fc home_unit pi_mod_name location hsc_src
+        let mod = mkHomeModule (hsc_home_unit hsc_env) pi_mod_name
 
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
@@ -1407,16 +1427,6 @@ checkSummaryHash
       not (gopt Opt_ForceRecomp (hsc_dflags hsc_env)) = do
            -- update the object-file timestamp
            obj_timestamp <- modificationTimeIfExists (ml_obj_file_ospath location)
-
-           -- We have to repopulate the Finder's cache for file targets
-           -- because the file might not even be on the regular search path
-           -- and it was likely flushed in depanal. This is not technically
-           -- needed when we're called from sumariseModule but it shouldn't
-           -- hurt.
-           let fc      = hsc_FC hsc_env
-               mod     = ms_mod old_summary
-               hsc_src = ms_hsc_src old_summary
-           addModuleToFinder fc mod location hsc_src
 
            hi_timestamp <- modificationTimeIfExists (ml_hi_file_ospath location)
            hie_timestamp <- modificationTimeIfExists (ml_hie_file_ospath location)

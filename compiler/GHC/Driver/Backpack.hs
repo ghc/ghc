@@ -806,8 +806,7 @@ summariseRequirement pn mod_name = do
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file_ospath location)
     let loc = srcLocSpan (mkSrcLoc (mkFastString (bkp_filename env)) 1 1)
 
-    let fc = hsc_FC hsc_env
-    mod <- liftIO $ addHomeModuleToFinder fc home_unit mod_name location HsigFile
+    let mod = mkHomeModule home_unit mod_name
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env HsigFile mod_name
 
@@ -898,11 +897,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
 
     inst_deps <- liftIO $ implicitRequirementsShallow hsc_env textual_imports
 
-    -- So that Finder can find it, even though it doesn't exist...
-    this_mod <- liftIO $ do
-      let home_unit = hsc_home_unit hsc_env
-      let fc        = hsc_FC hsc_env
-      addHomeModuleToFinder fc home_unit modname location hsc_src
+    let this_mod = mkHomeModule (hsc_home_unit hsc_env) modname
     let ms = ModSummary {
             ms_mod = this_mod,
             ms_hsc_src = hsc_src,

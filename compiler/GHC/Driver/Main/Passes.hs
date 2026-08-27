@@ -1707,7 +1707,7 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
   -- link code containing binding "id_sym = expr", using id_sym as root
   withJSInterp i $ \inst -> do
     let roots = mkExportedModFuns this_mod [id_sym]
-    jsLinkObject logger tmpfs tmp_dir js_config unit_env inst out_obj roots needed_units
+    jsLinkObject logger tmpfs tmp_dir js_config unit_env (hsc_FC hsc_env) inst out_obj roots needed_units
 
   -- look up "id_sym" closure and create a StablePtr (HValue) from it
   href <- lookupClosure interp (IFaststringSymbol id_sym) >>= \case

@@ -19,6 +19,13 @@ module GHC.Unit.Finder (
     FinderM, runFinderCacheM, runFinderM,
     InCache(..),
 
+    -- * Known home modules
+    KnownHomeModules,
+    emptyKnownHomeModules,
+    lookupKnownHomeModule,
+    knownHomeModulesOfGraph,
+    knownHomeModulesOfSummaries,
+
     -- * Finder operations
     ModuleLookupScope(..),
     findImportedModule,
@@ -32,8 +39,6 @@ module GHC.Unit.Finder (
     mkHiOnlyModLocation,
     mkHiPath,
     mkObjPath,
-    addModuleToFinder,
-    addHomeModuleToFinder,
     mkStubPaths,
 
     findObjectLinkableMaybe,
@@ -146,7 +151,8 @@ initFinderCache = do
            Just fp -> return fp
   return $
     FinderCache
-      { homeFinderCache = home_cache
+      { knownHomeModules = emptyKnownHomeModules
+      , homeFinderCache = home_cache
       , flushFinderCaches
       , lookupFileCache
       , lookupDirCache
@@ -657,20 +663,6 @@ findLookupResult units fopts r = case r of
                        , fr_unusables = []
                        , fr_suggestions = suggest' })
 
-addModuleToFinder :: FinderCache -> Module -> ModLocation -> HscSource -> IO ()
-addModuleToFinder fc mod loc src_flavour = do
-  let imod = toUnitId <$> mod
-  unless (src_flavour == HsBootFile) $
-    insertHomeFinderCache (homeFinderCache fc) imod (InstalledFound loc)
-
--- This returns a module because it's more convenient for users
-addHomeModuleToFinder :: FinderCache -> HomeUnit -> ModuleName -> ModLocation -> HscSource -> IO Module
-addHomeModuleToFinder fc home_unit mod_name loc src_flavour = do
-  let mod = mkHomeInstalledModule home_unit mod_name
-  unless (src_flavour == HsBootFile) $
-    insertHomeFinderCache (homeFinderCache fc) mod (InstalledFound loc)
-  return (mkHomeModule home_unit mod_name)
-
 -- -----------------------------------------------------------------------------
 --      The internal workers
 
@@ -734,6 +726,11 @@ findHomePackageModule fc fopts home_unit mod_name = do
 --  call this.)
 findInstalledHomeModule :: FinderCache -> FinderOpts -> UnitId -> ModuleName -> FinderM InstalledFindResult
 findInstalledHomeModule fc fopts home_unit mod_name
+  -- A known module's defining file overrides the search:
+  -- see Note [Known home modules] in GHC.Unit.Finder.Types.
+  | Just loc <- lookupKnownHomeModule (knownHomeModules fc) mod
+  = pure (InstalledFound loc)
+  | otherwise
   = withCacheOrElse (lookupHomeFinderCache home_cache mod)
                     (insertHomeFinderCache home_cache mod) $
    let
