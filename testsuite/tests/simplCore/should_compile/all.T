@@ -602,3 +602,9 @@ test('T25718b', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress
 test('T25718c', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-all -dno-typeable-binds'])
 test('T19166', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-all -dno-typeable-binds'])
 test('T27261', [extra_files(['T27261_aux.hs'])], multimod_compile, ['T27261', '-v0 -O'])
+
+# Check the stack of source notes at the top of the body of 'ordering'
+# is in the correct order.
+test('T27749',
+     multiline_grep_errmsg(r'ordering\n.*\n(\s+src<[^>]*>\n)+'),
+     compile, ['-O -g3 -ddump-simpl -dsuppress-uniques'])
