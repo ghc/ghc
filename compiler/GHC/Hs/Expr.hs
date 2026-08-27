@@ -39,6 +39,7 @@ import GHC.Tc.Types.ErrCtxt
 import GHC.Types.Id.Info ( RecSelParent )
 import GHC.Types.Name
 import GHC.Types.Name.Reader
+import GHC.Types.Name.Set( FreeNames )
 import GHC.Types.Basic
 import GHC.Types.Fixity
 import GHC.Types.SourceText
@@ -363,7 +364,9 @@ type instance XArithSeq      GhcTc = PostTcExpr
 type instance XProc          (GhcPass _) = (EpToken "proc", TokRarrow)
 
 type instance XStatic        GhcPs = EpToken "static"
-type instance XStatic        GhcRn = NoExtField
+type instance XStatic        GhcRn = FreeNames
+  -- Free variables of the body; we can't tell if they are
+  -- type or term variables until we are typechecking
 type instance XStatic        GhcTc = (Type, HsExpr GhcTc)
   -- Type of expression, and the (fromStaticPtr function)
   -- These are stored for convenience as the wiring in

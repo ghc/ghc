@@ -667,18 +667,7 @@ rnExpr e@(HsStatic _ expr)
        -- Rename the payload
        ; (expr',fvs) <- rnLExpr expr
 
-       -- Check that the free variables of the static form are top-level defined
-       -- It's OK to use nonDetEltsUniqSet here as the only side effects of
-       -- checkClosedInStaticForm are error messages.
-       -- See (SF2) Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
-       ; mapM_ check_fv (nonDetEltsUniqSet fvs)
-
-       ; return (HsStatic noExtField expr', fvs) }
-  where
-    check_fv :: Name -> RnM ()
-    -- Check for free vars not defined at top level
-    check_fv n = unless (isExternalName n) $
-                 addErrTc (TcRnStaticFormNotClosed n)
+       ; return (HsStatic fvs expr', fvs) }
 
 {-
 ************************************************************************
