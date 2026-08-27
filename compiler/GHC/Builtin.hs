@@ -493,8 +493,7 @@ Only two bits of special logic are necessary:
     `LookupUser`, and so still cannot name a hidden module.
 
     The scope is derived from the provenance of the import
-    (`importDeclLookupScope`, `unresolvedImportLookupScope`), so a call site
-    cannot pick the wrong one.
+    (`importDeclLookupScope`), so a call site cannot pick the wrong one.
 -}
 
 {-

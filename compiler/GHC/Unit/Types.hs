@@ -143,12 +143,18 @@ data ModuleLookupScope
     -- that the unit providing them is itself visible.
     --
     -- Use this to resolve a dependency GHC itself introduced.
-  deriving stock Eq
+  | LookupPlugin
+    -- ^ A plugin lookup: consult the modules the plugin package database
+    -- provides, rather than the ordinary imports.
+    --
+    -- Use this to resolve a @-fplugin@ module.
+  deriving stock ( Eq, Ord )
 
 instance Outputable ModuleLookupScope where
   ppr = \case
     LookupUser   -> text "user"
     LookupSystem -> text "system"
+    LookupPlugin -> text "plugin"
 
 mkModule :: u -> ModuleName -> GenModule u
 mkModule = Module

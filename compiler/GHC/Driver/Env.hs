@@ -165,11 +165,8 @@ setKnownHomeModules :: KnownHomeModules -> HscEnv -> HscEnv
 setKnownHomeModules known hsc_env =
   hsc_env { hsc_FC = (hsc_FC hsc_env) { knownHomeModules = known } }
 
-{-
-
-Note [Target code interpreter]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+{- Note [Target code interpreter]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Template Haskell and GHCi use an interpreter to execute code that is built for
 the compiler target platform (= code host platform) on the compiler host
 platform (= code build platform).
@@ -190,50 +187,48 @@ The target code interpreter to use can be selected per session via the
 which case Template Haskell and GHCi will fail to run. The interpreter to use is
 configured via command-line flags (in `GHC.setTopSessionDynFlags`).
 
+Note [hsc_type_env_var hack]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+hsc_type_env_var is used to initialize tcg_knot_vars, and
+eventually it is the mutable variable that is queried from
+if_rec_types to get a TypeEnv.  So, clearly, it's something
+related to knot-tying (see Note [Tying the knot]).
+hsc_type_env_var is used in two places: initTcRn (where
+it initializes tcg_knot_vars) and initIfaceCheck
+(where it initializes if_rec_types).
 
+But why do we need a way to feed a mutable variable in?  Why
+can't we just initialize tcg_knot_vars when we start
+typechecking?  The problem is we need to knot-tie the
+EPS, and we may start adding things to the EPS before type
+checking starts.
+
+Here is a concrete example. Suppose we are running
+"ghc -c A.hs", and we have this file system state:
+
+ A.hs-boot   A.hi-boot **up to date**
+ B.hs        B.hi      **up to date**
+ A.hs        A.hi      **stale**
+
+The first thing we do is run checkOldIface on A.hi.
+checkOldIface will call loadInterface on B.hi so it can
+get its hands on the fingerprints, to find out if A.hi
+needs recompilation.  But loadInterface also populates
+the EPS!  And so if compilation turns out to be necessary,
+as it is in this case, the thunks we put into the EPS for
+B.hi need to have the correct if_rec_types mutable variable
+to query.
+
+If the mutable variable is only allocated WHEN we start
+typechecking, then that's too late: we can't get the
+information to the thunks.  So we need to pre-commit
+to a type variable in 'hscIncrementalCompile' BEFORE we
+check the old interface.
+
+This is all a massive hack because arguably checkOldIface
+should not populate the EPS. But that's a refactor for
+another day.
 -}
-
--- Note [hsc_type_env_var hack]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- hsc_type_env_var is used to initialize tcg_knot_vars, and
--- eventually it is the mutable variable that is queried from
--- if_rec_types to get a TypeEnv.  So, clearly, it's something
--- related to knot-tying (see Note [Tying the knot]).
--- hsc_type_env_var is used in two places: initTcRn (where
--- it initializes tcg_knot_vars) and initIfaceCheck
--- (where it initializes if_rec_types).
---
--- But why do we need a way to feed a mutable variable in?  Why
--- can't we just initialize tcg_knot_vars when we start
--- typechecking?  The problem is we need to knot-tie the
--- EPS, and we may start adding things to the EPS before type
--- checking starts.
---
--- Here is a concrete example. Suppose we are running
--- "ghc -c A.hs", and we have this file system state:
---
---  A.hs-boot   A.hi-boot **up to date**
---  B.hs        B.hi      **up to date**
---  A.hs        A.hi      **stale**
---
--- The first thing we do is run checkOldIface on A.hi.
--- checkOldIface will call loadInterface on B.hi so it can
--- get its hands on the fingerprints, to find out if A.hi
--- needs recompilation.  But loadInterface also populates
--- the EPS!  And so if compilation turns out to be necessary,
--- as it is in this case, the thunks we put into the EPS for
--- B.hi need to have the correct if_rec_types mutable variable
--- to query.
---
--- If the mutable variable is only allocated WHEN we start
--- typechecking, then that's too late: we can't get the
--- information to the thunks.  So we need to pre-commit
--- to a type variable in 'hscIncrementalCompile' BEFORE we
--- check the old interface.
---
--- This is all a massive hack because arguably checkOldIface
--- should not populate the EPS. But that's a refactor for
--- another day.
 
 -- | Retrieve the ExternalPackageState cache.
 hscEPS :: HscEnv -> IO ExternalPackageState

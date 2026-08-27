@@ -81,7 +81,7 @@ parseHeaderImports
                   --   in the function result)
   -> IO (Either
       (Messages PsMessage)
-      ([UnresolvedImport RawPkgQual],
+      ([Located (UnresolvedImport RawPkgQual)],
        Located ModuleName))
      -- ^ The imports, together with the current module name
 parseHeaderImports dflags buf filename source_filename = do
@@ -114,18 +114,22 @@ mkUnresolvedImports
   :: DynFlags
   -> ModuleName          -- ^ the importing module
   -> [LImportDecl GhcPs] -- ^ user-written imports
-  -> [UnresolvedImport RawPkgQual]
+  -> [Located (UnresolvedImport RawPkgQual)]
 mkUnresolvedImports dflags this_mod imps
   = map (mkUnresolvedImport . unLoc) (mkImplicitImports dflags this_mod imps ++ imps)
 
--- | The (unresolved) import corresponding to an import declarations.
-mkUnresolvedImport :: ImportDecl GhcPs -> UnresolvedImport RawPkgQual
+-- | The (unresolved) import corresponding to an import declaration, at the
+-- source location of the module name it names.
+mkUnresolvedImport :: ImportDecl GhcPs -> Located (UnresolvedImport RawPkgQual)
 mkUnresolvedImport decl =
-  UnresolvedImport { ui_origin   = FromDecl (ideclOrigin (ideclExt decl))
-                   , ui_level    = convImportLevel (ideclLevelSpec decl)
-                   , ui_pkg_qual = ideclPkgQual decl
-                   , ui_boot     = ideclSource decl
-                   , ui_mod_name = reLoc (ideclName decl) }
+  case reLoc (ideclName decl) of
+    L loc mod_name ->
+      L loc $
+        UnresolvedImport { ui_scope    = importDeclLookupScope (ideclOrigin (ideclExt decl))
+                         , ui_level    = convImportLevel (ideclLevelSpec decl)
+                         , ui_pkg_qual = ideclPkgQual decl
+                         , ui_boot     = ideclSource decl
+                         , ui_mod_name = mod_name }
 
 -- | The import declarations GHC generates: 'Prelude' and 'GHC.Essentials'.
 mkImplicitImports :: DynFlags -> ModuleName -> [LImportDecl GhcPs]

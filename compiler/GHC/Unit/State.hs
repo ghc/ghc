@@ -107,7 +107,6 @@ import GHC.Unit.External.Wired
 import GHC.Unit.Finder.Cache
 
 import GHC.Types.PkgQual
-import GHC.Types.SrcLoc (unLoc)
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
@@ -1064,8 +1063,8 @@ lookupModulePackage pkgs imp =
 
     _ -> Nothing
   where
-    scope = unresolvedImportLookupScope (ui_origin imp)
-    mn = unLoc (ui_mod_name imp)
+    scope = ui_scope imp
+    mn = ui_mod_name imp
     mfs = ui_pkg_qual imp
 
 lookupPluginModuleWithSuggestions :: UnitState

@@ -651,13 +651,13 @@ checkDependencies hsc_env summary iface
             in check_packages allPkgDeps prev_dep_pkgs
  where
 
-   classify_imports :: [UnresolvedImport PkgQual]
+   classify_imports :: [Located (UnresolvedImport PkgQual)]
                     -> IfG
                        [Either
                           CompileReason (Either (ImportLevel, UnitId, ModuleName) (FastString, (ImportLevel, UnitId)))]
    classify_imports imports =
-    liftIO $ traverse (\e ->
-           let reason = ModuleChanged (unLoc (ui_mod_name e))
+    liftIO $ traverse (\ (L _ e) ->
+           let reason = ModuleChanged (ui_mod_name e)
            in classify (ui_level e) reason <$> runFinderM (resolveImport hsc_env e))
            imports
 

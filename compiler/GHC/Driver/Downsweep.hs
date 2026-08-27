@@ -688,7 +688,7 @@ expandModuleSummary ms = do -- Didn't work out what the imports mean yet, now do
     boot_todo <-
       if | HsBootFile <- ms_hsc_src ms
          -> do
-            r <- downsweepSummarise home_unit (generatedImport FromSelfBoot (noLoc (ms_mod_name ms))) Nothing
+            r <- downsweepSummarise home_unit (generatedImport LookupUser (ms_mod_name ms)) Nothing
             case r of
               FoundHome s -> pure [DSMod s]
               _           -> pure []
@@ -726,9 +726,9 @@ expandModuleSummary ms = do -- Didn't work out what the imports mean yet, now do
       -- This gets passed to the loopImports function which just ignores it if it
       -- can't be found.
       [ self_boot | NotBoot <- [isBootSummary ms] ] ++
-      [ e | e <- ms_imps ms ]
+      [ unLoc e | e <- ms_imps ms ]
       where
-        self_boot = (generatedImport FromSelfBoot (noLoc (ms_mod_name ms)))
+        self_boot = (generatedImport LookupUser (ms_mod_name ms))
                       { ui_boot = IsBoot }
 
 -- | Expand a 'ModuleNodeFixed' node
@@ -797,7 +797,7 @@ expandUnitNode node_uid home_context_uid = do
     hsc_env <- asks ds_hsc_env
     let lcl_hsc_env = hscSetActiveUnitId home_context_uid hsc_env
     case unitDepends <$> lookupUnitId (hsc_units lcl_hsc_env) node_uid of
-      Just us -> pure $ NSuccess ((UnitNode us node_uid), map (\u -> DSUnit{node_uid=u, home_context_uid{-inherit-}}) us)
+      Just us -> pure $ NSuccess (UnitNode { un_home_uid = home_context_uid, un_deps = us, un_uid = node_uid }, map (\u -> DSUnit{node_uid=u, home_context_uid{-inherit-}}) us)
       Nothing -> pprPanic "loopUnit" (text "Malformed package database, missing " <+> ppr node_uid)
 
 expandInstantiatedUnit :: InstantiatedUnit -> UnitId {-^ Home unit -} -> DownsweepM (NodeRes (ModuleGraphNode, [DownsweepNode]))
@@ -827,7 +827,7 @@ expandInteractiveImports imod imps = do
     mkEdge (IIDecl i) =
       let unitId = homeUnitId $ hsc_home_unit hsc_env
           imp = rnUnresolvedImportPkgQual (renameRawPkgQual (hsc_unit_env hsc_env))
-                                          (mkUnresolvedImport i)
+                                          (unLoc (mkUnresolvedImport i))
           UnresolvedImport { ui_level = lvl, ui_boot = is_boot } = imp
       in do
         let home_unit = ue_unitHomeUnit unitId (hsc_unit_env hsc_env)
@@ -926,7 +926,7 @@ getRootSummary excl_mods summ_cache imports_cache hsc_env target
       mkPlainErrorMsgEnvelope noSrcSpan (DriverFileNotFound offset_file)
   | TargetModule modl <- targetId
   = do
-    let root_imp = (generatedImport FromTarget (L rootLoc modl))
+    let root_imp = (generatedImport LookupUser modl)
                      { ui_pkg_qual = ThisPkg (homeUnitId home_unit) }
     maybe_summary <- summariseModule hsc_env home_unit summ_cache imports_cache root_imp
                      maybe_buf excl_mods
@@ -937,7 +937,6 @@ getRootSummary excl_mods summ_cache imports_cache hsc_env target
     where
       Target {targetId, targetContents = maybe_buf, targetUnitId = uid} = target
       home_unit = ue_unitHomeUnit uid (hsc_unit_env hsc_env)
-      rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
       dflags = homeUnitEnv_dflags (ue_findHomeUnitEnv uid (hsc_unit_env hsc_env))
 
 -- | Execute 'getRootSummary' for the 'Target's using the parallelism pipeline system.
@@ -1501,7 +1500,7 @@ summariseModuleDispatch
 
 
 summariseModuleDispatch k hsc_env' imps_cache_ref home_unit imp excl_mods
-  | unLoc wanted_mod `elem` excl_mods
+  | wanted_mod `elem` excl_mods
   = return NotThere
   | otherwise  = find_it
   where
@@ -1535,7 +1534,7 @@ summariseModuleDispatch k hsc_env' imps_cache_ref home_unit imp excl_mods
     UnresolvedImport { ui_pkg_qual = mb_pkg, ui_boot = is_boot
                      , ui_mod_name = wanted_mod } = imp
     cache_key = ( homeUnitId home_unit, mb_pkg
-                , GWIB{ gwib_mod = unLoc wanted_mod, gwib_isBoot = is_boot })
+                , GWIB{ gwib_mod = wanted_mod, gwib_isBoot = is_boot })
 
 -- | The continuation to summarise a home module if we want to find the source file
 -- for it and potentially compile it.
@@ -1680,6 +1679,7 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
   return $
         ModSummary
         { ms_mod = nms_mod
+        , ms_mod_name_loc = pi_mod_name_loc
         , ms_hsc_src = nms_hsc_src
         , ms_location = nms_location
         , ms_hspp_file = pi_hspp_fn
@@ -1687,7 +1687,7 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
         , ms_hspp_buf  = Just pi_hspp_buf
         , ms_parsed_mod = Nothing
         , ms_textual_imps =
-            (generatedImport FromBackpackSig . noLoc <$> extra_sig_imports) ++
+            (noLoc . generatedImport LookupUser <$> extra_sig_imports) ++
             pi_imps
         , ms_hs_hash = nms_src_hash
         , ms_iface_date = hi_timestamp
@@ -1700,7 +1700,7 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
 data PreprocessedImports
   = PreprocessedImports
       { pi_local_dflags :: DynFlags
-      , pi_imps     :: [UnresolvedImport PkgQual]
+      , pi_imps     :: [Located (UnresolvedImport PkgQual)]
       , pi_hspp_fn  :: FilePath
       , pi_hspp_buf :: StringBuffer
       , pi_mod_name_loc :: SrcSpan
@@ -1724,7 +1724,7 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
       <- ExceptT $ do
           mimps <- parseHeaderImports pi_local_dflags pi_hspp_buf pi_hspp_fn src_fn
           return (first (mkMessages . fmap mkDriverPsHeaderMessage . getMessages) mimps)
-  let pi_imps = map (rnUnresolvedImportPkgQual (renameRawPkgQual (hsc_unit_env hsc_env))) pi_imps'
+  let pi_imps = map (fmap (rnUnresolvedImportPkgQual (renameRawPkgQual (hsc_unit_env hsc_env)))) pi_imps'
   return PreprocessedImports {..}
 
 --------------------------------------------------------------------------------

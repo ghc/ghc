@@ -271,8 +271,18 @@ data ModuleGraphNode
   | ModuleNode [ModuleNodeEdge] ModuleNodeInfo
   -- | Link nodes are whether are are creating a linked product (ie executable/shared object etc) for a unit.
   | LinkNode [NodeKey] UnitId
-  -- | Package dependency
-  | UnitNode [UnitId] UnitId
+  -- | Package dependency.
+  --
+  -- Records the home unit it was expanded in, because its dependencies were
+  -- looked up in that unit's view of the package database.
+  | UnitNode
+  { un_home_uid :: !UnitId
+    -- ^ The home unit whose package flags this expansion used
+  , un_deps     :: ![UnitId]
+    -- ^ The unit's direct dependencies
+  , un_uid      :: !UnitId
+    -- ^ The unit being expanded
+  }
 
 
 data ModuleNodeEdge = ModuleNodeEdge { edgeLevel :: ImportLevel
@@ -452,7 +462,7 @@ mgNodeDependencies drop_hs_boot_nodes = \case
       ++ [ NodeKey_ExternalUnit (instUnitInstanceOf iuid) ]
     ModuleNode deps _ms ->
       map (drop_hs_boot . edgeTargetKey) deps
-    UnitNode deps _ -> map NodeKey_ExternalUnit deps
+    UnitNode { un_deps } -> map NodeKey_ExternalUnit un_deps
   where
     -- Drop hs-boot nodes by using HsSrcFile as the key
     hs_boot_key | drop_hs_boot_nodes = NotBoot -- is regular mod or signature
@@ -473,14 +483,14 @@ mgNodeUnitId mgn =
     InstantiationNode uid _iud -> uid
     ModuleNode _ ms           -> toUnitId (moduleUnit (moduleNodeInfoModule ms))
     LinkNode _ uid             -> uid
-    UnitNode _ uid          -> uid
+    UnitNode { un_uid } -> un_uid
 
 instance Outputable ModuleGraphNode where
   ppr = \case
     InstantiationNode _ iuid -> ppr iuid
     ModuleNode nks ms -> ppr (mnKey ms) <+> ppr nks
     LinkNode uid _     -> text "LN:" <+> ppr uid
-    UnitNode _ uid  -> text "P:" <+> ppr uid
+    UnitNode { un_uid } -> text "P:" <+> ppr un_uid
 
 instance Eq ModuleGraphNode where
   (==) = (==) `on` mkNodeKey
@@ -516,7 +526,7 @@ mapMG f mg@ModuleGraph{..} = mg
         LinkNode uid nks -> LinkNode uid nks
         ModuleNode deps (ModuleNodeFixed key loc)  -> ModuleNode deps (ModuleNodeFixed key loc)
         ModuleNode deps (ModuleNodeCompile ms) -> ModuleNode deps (ModuleNodeCompile (f ms))
-        UnitNode deps uid -> UnitNode deps uid
+        node@(UnitNode {}) -> node
 
 -- | Map a function 'f' over all the 'ModSummaries', in 'IO'.
 -- To preserve invariants, 'f' can't change the isBoot status.
@@ -526,7 +536,7 @@ mgMapM f mg@ModuleGraph{..} = do
     InstantiationNode uid iuid -> pure $ InstantiationNode uid iuid
     LinkNode uid nks -> pure $ LinkNode uid nks
     ModuleNode deps ms  -> ModuleNode deps <$> (f ms)
-    UnitNode deps uid -> pure $ UnitNode deps uid
+    node@(UnitNode {}) -> pure node
   return $ mg { mg_mss = mss' }
 
 
@@ -779,7 +789,7 @@ mkNodeKey = \case
   InstantiationNode _ iu -> NodeKey_Unit iu
   ModuleNode _ x -> NodeKey_Module $ mnKey x
   LinkNode _ uid   -> NodeKey_Link uid
-  UnitNode _ uid -> NodeKey_ExternalUnit uid
+  UnitNode { un_uid } -> NodeKey_ExternalUnit un_uid
 
 nodeKeyUnitId :: NodeKey -> UnitId
 nodeKeyUnitId (NodeKey_Unit iu)   = instUnitInstanceOf iu
@@ -829,7 +839,7 @@ showModMsg dflags (LinkNode {}) =
           arch_os   = platformArchOS platform
           exe_file  = exeFileName arch_os staticLink (outputFile_ dflags)
       in text exe_file
-showModMsg _ (UnitNode _deps uid) = ppr uid
+showModMsg _ (UnitNode { un_uid }) = ppr un_uid
 showModMsg _ (InstantiationNode _uid indef_unit) =
   ppr $ instUnitInstanceOf indef_unit
 showModMsg dflags (ModuleNode _ mni) =
@@ -940,7 +950,7 @@ moduleGraphNodesZero summaries =
         go (((ModuleNode nks ms), s), key) = Just $
                DigraphNode (ModuleScope (mnKey ms) s) key $ out_edge_keys $
                     mapMaybe (classifyDeps s) nks
-        go (((UnitNode uids uid), _s), key) =
+        go (((UnitNode { un_deps = uids, un_uid = uid }), _s), key) =
           Just $ DigraphNode (UnitScope uid) key (mapMaybe lookup_key $ map UnitScope uids)
         go _ = Nothing
 

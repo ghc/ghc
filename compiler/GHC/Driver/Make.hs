@@ -466,6 +466,7 @@ warnUnusedPackages us dflags mod_graph =
         loadedPackages = concat $
           mapMaybe (lookupModulePackage us)
             $ filter ((NotBoot ==) . ui_boot) -- Only need non-source imports here because SOURCE imports are always HPT
+            $ map unLoc
             $ concatMap ms_imps home_mod_sum
 
         used_args = Set.fromList (map unitId loadedPackages)
@@ -1422,10 +1423,10 @@ warnUnnecessarySourceImports sccs = do
            let mods_in_this_cycle = map moduleNodeInfoModuleName ms in
            -- NB: source imports can only refer to the current package,
            -- so these are all home imports.
-           [ warn (ui_mod_name e)
+           [ warn (ui_mod_name <$> e)
            | (ModuleNodeCompile m) <- ms
            , e <- ms_srcimps m
-           , unLoc (ui_mod_name e) `notElem` mods_in_this_cycle
+           , ui_mod_name (unLoc e) `notElem` mods_in_this_cycle
            ]
 
         warn :: Located ModuleName -> MsgEnvelope GhcMessage

@@ -272,7 +272,7 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ (ModuleN
         ; let find_deps imps = sequence
                     [ findDependency hsc_env imp include_pkg_deps
                     | imp <- imps
-                    , unLoc (ui_mod_name imp) `notElem` excl_mods
+                    , ui_mod_name (unLoc imp) `notElem` excl_mods
                     ]
 
               do_imp hi_file = do
@@ -294,10 +294,10 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ (ModuleN
         }
 
 findDependency  :: HscEnv
-                -> UnresolvedImport PkgQual   -- The import to find
+                -> Located (UnresolvedImport PkgQual)   -- The import to find
                 -> Bool                 -- Record dependency on package modules
                 -> IO (Either (MsgEnvelope GhcMessage) (Maybe FilePath))  -- Interface file
-findDependency hsc_env imp include_pkg_deps = do
+findDependency hsc_env (L srcloc imp) include_pkg_deps = do
   -- Find the module; this will be fast because
   -- we've done it once during downsweep.
   r <- runFinderM $ resolveImport hsc_env imp
@@ -318,8 +318,8 @@ findDependency hsc_env imp include_pkg_deps = do
           GhcDriverMessage $ DriverInterfaceError $
              (Can'tFindInterface (cannotFindModule hsc_env mod_name fail) (LookingForModule mod_name is_boot))
   where
-    L srcloc mod_name = ui_mod_name imp
-    is_boot           = ui_boot imp
+    mod_name = ui_mod_name imp
+    is_boot  = ui_boot imp
 
 -----------------------------
 writeDependency :: FilePath -> Handle -> [FilePath] -> FilePath -> IO ()
