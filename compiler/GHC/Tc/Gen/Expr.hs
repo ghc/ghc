@@ -602,12 +602,18 @@ tcExpr (HsProc x pat cmd) res_ty
 -- and wrap (static e) in a call to
 --    fromStaticPtr :: IsStatic p => StaticPtr a -> p a
 
-tcExpr (HsStatic _ expr) res_ty
+tcExpr (HsStatic free_names expr) res_ty
   = do  { res_ty          <- expTypeToType res_ty
         ; (co, (p_ty, expr_ty)) <- matchExpectedAppTy res_ty
         ; (expr', lie) <- captureConstraints $
                           addErrCtxt (StaticFormCtxt expr) $
                           tcCheckPolyExprNC expr expr_ty
+
+        -- Check that the free variables of the static form are top-level defined
+        -- It's OK to use nonDetEltsUniqSet here as the only side effects of
+        -- checkClosedInStaticForm are error messages.
+        -- See (SF2) Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
+        ; mapM_ check_free_name (nonDetEltsUniqSet free_names)
 
         -- Emit an implication that captures the constraints of `expr`,
         -- but with a `ic_info` of StaticFormSkol
@@ -637,6 +643,24 @@ tcExpr (HsStatic _ expr) res_ty
           HsStatic (static_expr_ty, mkHsWrap wrap fromStaticPtr)
                    expr''
         }
+  where
+    check_free_name :: Name -> TcM ()
+    -- Check for free /term/ vars not defined at top level
+    -- We use isExternalName as a proxy for top-level-defined
+    check_free_name n
+      = do { mb_thing <- tcLookupLcl_maybe n
+           ; case mb_thing of
+               Nothing  -> return ()  -- Imports, tycons, classes allowed
+               Just (ATcId {})  -> unless (isExternalName n) $
+                                   addErrTc (TcRnStaticFormNotClosed n)
+
+               Just (ATyVar {}) -> return ()  -- Free type variables are allowed
+
+                   -- Not really expecting these, but we'll get an error from
+                   -- elsewhere, so don't produce an error here
+               Just (ATcTyCon {})      -> return ()
+               Just (APromotionErr {}) -> return ()
+               Just (AGlobal {})       -> return () }
 
 tcExpr (HsEmbTy _ _)      _ = failWith (TcRnIllegalTypeExpr TypeKeywordSyntax)
 tcExpr (HsQual _ _ _)     _ = failWith (TcRnIllegalTypeExpr ContextArrowSyntax)
