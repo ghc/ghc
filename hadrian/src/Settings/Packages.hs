@@ -295,8 +295,8 @@ rtsPackageArgs = package rts ? do
     path           <- getBuildPath
     top            <- expr topDirectory
     useSystemFfi   <- succStaged (buildFlag UseSystemFfi)
-    libdwIncludeDir   <- staged (\s -> queryTargetTarget s (Lib.includePath <=< tgtRTSWithLibdw))
-    libdwLibraryDir   <- staged (\s -> queryTargetTarget s (Lib.libraryPath <=< tgtRTSWithLibdw))
+    libdwIncludeDir   <- staged (\s -> queryPerStageTargetSpec s (Lib.includePath <=< tgtRTSWithLibdw))
+    libdwLibraryDir   <- staged (\s -> queryPerStageTargetSpec s (Lib.libraryPath <=< tgtRTSWithLibdw))
     libnumaIncludeDir <- staged (buildSetting LibnumaIncludeDir)
     libnumaLibraryDir <- staged (buildSetting LibnumaLibDir)
     libzstdIncludeDir <- staged (buildSetting LibZstdIncludeDir)
@@ -412,7 +412,7 @@ rtsPackageArgs = package rts ? do
           , buildFlag UseLibnuma stage        `cabalFlag` "libnuma"
           , buildFlag UseLibzstd stage        `cabalFlag` "libzstd"
           , buildFlag StaticLibzstd stage     `cabalFlag` "static-libzstd"
-          , queryTargetTarget stage tgtSymbolsHaveLeadingUnderscore `cabalFlag` "leading-underscore"
+          , queryPerStageTargetSpec stage tgtSymbolsHaveLeadingUnderscore `cabalFlag` "leading-underscore"
           , ghcUnreg                          `cabalFlag` "unregisterised"
           , ghcEnableTNC                      `cabalFlag` "tables-next-to-code"
           ]

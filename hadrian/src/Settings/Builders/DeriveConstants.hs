@@ -42,8 +42,8 @@ includeCcArgs = do
     stage <- getStage
     rtsPath <- expr $ rtsBuildPath stage
     mconcat [ cWarnings
-            , prgFlags . ccProgram . tgtCCompiler <$> expr (targetStage stage)
-            , queryTargetTarget stage tgtUnregisterised ? arg "-DUSE_MINIINTERPRETER"
+            , prgFlags . ccProgram . tgtCCompiler <$> expr (perStageTarget stage)
+            , queryPerStageTargetSpec stage tgtUnregisterised ? arg "-DUSE_MINIINTERPRETER"
             , arg "-Irts"
             , arg "-Irts/include"
             , arg $ "-I" ++ rtsPath </> "include"

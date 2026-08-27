@@ -9,7 +9,7 @@ import Base
 import Context
 import Expression hiding (stage, way)
 import Oracles.ModuleFiles
-import Oracles.Setting (topDirectory)
+import Oracles.Setting (topDirectory, perStageTarget)
 import Packages
 import Settings
 import Settings.Default
@@ -18,6 +18,7 @@ import Target
 import Utilities
 import Rules.Library
 import Rules.Register
+import GHC.Toolchain (Target(tgtArchOs))
 
 -- | TODO: Drop code duplication
 buildProgramRules :: [(Resource, Int)] -> Rules ()
@@ -49,13 +50,14 @@ getProgramContexts stage = do
   -- 'Rules', because it is an 'Action' depending on an oracle.
   sPackages <- filter isProgram <$> stagePackages stage
   tPackages <- testsuitePackages
+  tgt <- perStageTarget stage
   -- TODO: Shall we use Stage2 for testsuite packages instead?
   let allPackages = sPackages
                  ++ tPackages
   forM allPackages $ \pkg -> do
     ctx <- programContext stage pkg -- TODO: see todo on programContext.
     name <- programName ctx
-    return (name <.> exe, ctx)
+    return (name <.> exe (tgtArchOs tgt), ctx)
 
 lookupProgramContext :: FilePath -> [(FilePath, Context)] -> Maybe Context
 lookupProgramContext wholePath progs = lookup (takeFileName wholePath) progs

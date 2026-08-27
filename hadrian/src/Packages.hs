@@ -24,6 +24,8 @@ import Hadrian.Utilities
 import Base
 import Context.Type
 import Oracles.Setting
+import GHC.Toolchain (tgtArchOs)
+import qualified Development.Shake.FilePath as Shake
 
 -- | These are all GHC packages we know about. Build rules will be generated for
 -- all of them. However, not all of these packages will be built. For example,
@@ -196,12 +198,13 @@ programPath :: Context -> Action FilePath
 programPath context@Context {..} = do
     name <- programName context
     path <- stageBinPath stage
-    return $ path -/- name <.> exe
+    arch <- queryPerStageTargetSpec stage tgtArchOs
+    return $ path -/- name <.> exe arch
 
 -- TODO: Move @timeout@ to the @util@ directory and build in a more standard
 -- location like other programs used only by the testsuite.
 timeoutPath :: FilePath
-timeoutPath = "testsuite/timeout/install-inplace/bin/timeout" <.> exe
+timeoutPath = "testsuite/timeout/install-inplace/bin/timeout" <.> Shake.exe
 
 -- TODO: Can we extract this information from Cabal files?
 -- | Some program packages should not be linked with Haskell main function.
