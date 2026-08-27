@@ -170,7 +170,7 @@ werror = addArgs $ do
             -- TODO: get rid of EFF_ altogether (#14647) and make sure
             -- unregisterised backend emits clean C without needing
             -- these hacks.
-          , queryTargetTarget stage tgtUnregisterised ? arg "-optc-Wno-error"
+          , queryPerStageTargetSpec stage tgtUnregisterised ? arg "-optc-Wno-error"
           ]
       -- N.B. We currently don't build the boot libraries' C sources with -Werror
       -- as this tends to be a portability nightmare.
