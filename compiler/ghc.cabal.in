@@ -442,6 +442,7 @@ Library
         GHC.Data.Bitmap
         GHC.Data.Bool
         GHC.Data.BooleanFormula
+        GHC.Data.Dependent
         GHC.Data.EnumSet
         GHC.Data.FastMutInt
         GHC.Data.FastString
