@@ -1,12 +1,34 @@
 RnStaticPointersFail03.hs:8:7: error: [GHC-88431]
-    ‘x’ is used in a static form but it is not defined at top level
+    • ‘x’ is used in a static form but it is not defined at top level
+    • In the expression: static (x . id)
+      In an equation for ‘f’: f x = static (x . id)
 
 RnStaticPointersFail03.hs:10:8: error: [GHC-88431]
-    ‘k’ is used in a static form but it is not defined at top level
+    • ‘k’ is used in a static form but it is not defined at top level
+    • In the expression: static (k . id)
+      In an equation for ‘f0’:
+          f0 x
+            = static (k . id)
+            where
+                k = const (const () x)
 
 RnStaticPointersFail03.hs:14:8: error: [GHC-88431]
-    ‘k’ is used in a static form but it is not defined at top level
+    • ‘k’ is used in a static form but it is not defined at top level
+    • In the expression: static (k . id)
+      In an equation for ‘f1’:
+          f1 x
+            = static (k . id)
+            where
+                k = id
 
 RnStaticPointersFail03.hs:19:15: error: [GHC-88431]
-    ‘g’ is used in a static form but it is not defined at top level
+    • ‘g’ is used in a static form but it is not defined at top level
+    • In the first argument of ‘const’, namely ‘(static (g undefined))’
+      In the expression: const (static (g undefined)) (h x)
+      In an equation for ‘f2’:
+          f2 x
+            = const (static (g undefined)) (h x)
+            where
+                g = h
+                h = typeOf
 
