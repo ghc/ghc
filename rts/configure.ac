@@ -387,8 +387,8 @@ GHC_IOMANAGER_ENABLE([poll], [EnableIOManagerPoll], [IOMGR_BUILD_POLL],
        fi
    fi])
 
-GHC_IOMANAGER_ENABLE([io-uring], [EnableIOManagerIOUring], [IOMGR_BUILD_IO_URING],
-  [EnableIOManagerIOUring=YES]
+GHC_IOMANAGER_ENABLE([io-uring], [EnableIOManagerIOURing], [IOMGR_BUILD_IO_URING],
+  [EnableIOManagerIOURing=YES]
 )
 
 GHC_IOMANAGER_ENABLE([mio], [EnableIOManagerMIO], [IOMGR_BUILD_MIO],
@@ -411,9 +411,8 @@ if test "$HostOS" = "mingw32"; then
 else
   GHC_IOMANAGER_DEFAULT_SELECT([IOManagerNonThreadedDefault], [select], [EnableIOManagerSelect])
   GHC_IOMANAGER_DEFAULT_SELECT([IOManagerNonThreadedDefault], [poll], [EnableIOManagerPoll])
-  GHC_IOMANAGER_DEFAULT_SELECT([IOManagerNonThreadedDefault], [io-uring], [EnableIOManagerIOUring])
+  GHC_IOMANAGER_DEFAULT_SELECT([IOManagerNonThreadedDefault], [io-uring], [EnableIOManagerIOURing])
   GHC_IOMANAGER_DEFAULT_SELECT([IOManagerThreadedDefault], [mio], [EnableIOManagerMIO])
-  GHC_IOMANAGER_DEFAULT_SELECT([IOManagerThreadedDefault], [io-uring], [EnableIOManagerIOUring])
 fi
 GHC_IOMANAGER_DEFAULT_CHECK_NOT_EMPTY([IOManagerNonThreadedDefault],[non-threaded])
 GHC_IOMANAGER_DEFAULT_CHECK_NOT_EMPTY([IOManagerThreadedDefault],[threaded])

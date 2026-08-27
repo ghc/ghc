@@ -61,9 +61,6 @@ struct _CapIOManager {
 #if defined(IOMGR_ENABLED_POLL) || defined(IOMGR_ENABLED_IO_URING)
     /* AIOP and timeout collections shared by several I/O manager impls */
     ClosureTable     aiop_table;
-#endif
-
-#if defined(IOMGR_ENABLED_POLL)
     StgTimeoutQueue *timeout_queue;
 #endif
 
@@ -76,7 +73,51 @@ struct _CapIOManager {
 #endif
 
 #if defined(IOMGR_ENABLED_IO_URING)
-    struct io_uring ring;
+    /* io_uring library structure */
+    struct io_uring *uring;
+
+    /* The number of operations submitted (by Haskell threads to the I/O
+       manager) and not yet notified of completion. */
+    int n_submitted_b;  /* for blocking operations */
+    int n_submitted_nb; /* for non-blocking operations */
+
+    /* The number of operations pending in the submission queue, but not yet
+       submitted to the kernel (so not in-flight). */
+    int n_prepared_b;  /* for blocking operations */
+    int n_prepared_nb; /* for non-blocking operations */
+
+    /* The number of operations submitted to the kernel but where the
+       corresponding completion has not yet been processed. */
+    int n_inflight_b;  /* for blocking operations */
+    int n_inflight_nb; /* for non-blocking operations */
+
+    /* The limit on the number of operations we allow to be in-flight */
+    int limit_inflight_b;  /* for blocking operations */
+    int limit_inflight_nb; /* for non-blocking operations */
+
+    /* The number of operations pending in the overflow queue (so not in the
+       submission queue or in flight) */
+    /* no overflow for blocking operations */
+    int n_overflow_nb;  /* for non-blocking operations */
+
+    /* Invariants:
+         n_submitted_b  = n_prepared_b  + n_inflight_b
+         n_submitted_nb = n_prepared_nb + n_inflight_nb + n_overflow_nb
+         n_prepared_b + n_prepared_nb <= size of submission queue
+     */
+
+    /* A queue of threads blocked on I/O submission and a parallel queue of
+     * their corresponding SQEs. This is only used when there are more pending
+     * (non-blocking) I/O operations than the inflight limit.
+     */
+    StgTSO *overflow_tso_q_hd, *overflow_tso_q_tl;
+    struct overflow_sqe_q_t {
+        struct io_uring_sqe     *sqe;
+        struct overflow_sqe_q_t *next;
+#if defined(DEBUG)
+        StgThreadID              tid;
+#endif
+    } *overflow_sqe_q_hd, *overflow_sqe_q_tl;
 #endif
 
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)

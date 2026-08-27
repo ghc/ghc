@@ -15,10 +15,10 @@
  *
  * -------------------------------------------------------------------------*/
 
- #include "Rts.h"
- #include "ClosureTable.h"
+#include "Rts.h"
+#include "ClosureTable.h"
 #include "rts/IOInterface.h" // exported
-#include "IOManager.h"       // RTS internal
+#include "IOManager.h" // RTS internal
 #include "Capability.h"
 #include "Schedule.h"
 #include "Prelude.h"
@@ -39,17 +39,18 @@
 #endif
 
 #if defined(IOMGR_ENABLED_IO_URING)
-#include "posix/IOUring.h"
+#include "posix/IOURing.h"
+#include "posix/Timeout.h"
 #endif
 
 #if defined(IOMGR_ENABLED_MIO_POSIX)
-#include "posix/MIO.h"
 #include "Prelude.h"
+#include "posix/MIO.h"
 #endif
 
 #if defined(IOMGR_ENABLED_MIO_WIN32)
-#include "win32/ThrIOManager.h"
 #include "win32/AsyncMIO.h"
+#include "win32/ThrIOManager.h"
 #endif
 
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
@@ -60,15 +61,14 @@
 #endif
 
 #if defined(IOMGR_ENABLED_WINIO)
-#include "win32/ThrIOManager.h"
 #include "win32/AsyncWinIO.h"
+#include "win32/ThrIOManager.h"
 #if !defined(THREADED_RTS)
 #include "win32/AwaitEvent.h"
 #endif
 #endif
 
 #include <string.h>
-
 
 /* We have lots of functions below with conditional implementations for
  * different I/O managers. Some functions, for some I/O managers, naturally
@@ -95,11 +95,11 @@
  * We put this check here since it has to live somewhere, and the main users
  * of StgAsyncIOOp are I/O managers.
  */
-GHC_STATIC_ASSERT(sizeof(StgAsyncIOOp)
-               == sizeof(StgHeader)
-                + sizeof(StgPtr)  * stg_ASYNCIOOP_NUM_PTRS
-                + sizeof(StgWord) * stg_ASYNCIOOP_NUM_NONPTRS,
-                "sizeof(StgAsyncIOOp) does not match expected size");
+GHC_STATIC_ASSERT(sizeof(StgAsyncIOOp) ==
+                      sizeof(StgHeader) +
+                          sizeof(StgPtr) * stg_ASYNCIOOP_NUM_PTRS +
+                          sizeof(StgWord) * stg_ASYNCIOOP_NUM_NONPTRS,
+                  "sizeof(StgAsyncIOOp) does not match expected size");
 
 /* Global var to tell us which I/O manager impl we are using */
 IOManagerType iomgr_type;
@@ -112,103 +112,94 @@ IOManagerType iomgr_type;
 bool rts_IOManagerIsWin32Native = false;
 #endif
 
-enum IOManagerAvailability
-parseIOManagerFlag(const char *iomgrstr, IO_MANAGER_FLAG *flag)
-{
-    if (strcmp("select", iomgrstr) == 0) {
+enum IOManagerAvailability parseIOManagerFlag(const char *iomgrstr,
+                                              IO_MANAGER_FLAG *flag) {
+  if (strcmp("select", iomgrstr) == 0) {
 #if defined(IOMGR_ENABLED_SELECT)
-        *flag = IO_MNGR_FLAG_SELECT;
-        return IOManagerAvailable;
+    *flag = IO_MNGR_FLAG_SELECT;
+    return IOManagerAvailable;
 #else
-        return IOManagerUnavailable;
+    return IOManagerUnavailable;
 #endif
-    }
-    else if (strcmp("poll", iomgrstr) == 0) {
+  } else if (strcmp("poll", iomgrstr) == 0) {
 #if defined(IOMGR_ENABLED_POLL)
-        *flag = IO_MNGR_FLAG_POLL;
-        return IOManagerAvailable;
+    *flag = IO_MNGR_FLAG_POLL;
+    return IOManagerAvailable;
 #else
-        return IOManagerUnavailable;
+    return IOManagerUnavailable;
 #endif
-    }
-    else if (strcmp("io-uring", iomgrstr) == 0) {
+  } else if (strcmp("io-uring", iomgrstr) == 0) {
 #if defined(IOMGR_ENABLED_IO_URING)
-        *flag = IO_MNGR_FLAG_IO_URING;
-        return IOManagerAvailable;
+    *flag = IO_MNGR_FLAG_IO_URING;
+    return IOManagerAvailable;
 #else
-        return IOManagerUnavailable;
+    return IOManagerUnavailable;
 #endif
-    }
-    else if (strcmp("mio", iomgrstr) == 0) {
+  } else if (strcmp("mio", iomgrstr) == 0) {
 #if defined(IOMGR_ENABLED_MIO_POSIX) || defined(IOMGR_ENABLED_MIO_WIN32)
-        *flag = IO_MNGR_FLAG_MIO;
-        return IOManagerAvailable;
+    *flag = IO_MNGR_FLAG_MIO;
+    return IOManagerAvailable;
 #else
-        return IOManagerUnavailable;
+    return IOManagerUnavailable;
 #endif
-    }
-    else if (strcmp("winio", iomgrstr) == 0) {
+  } else if (strcmp("winio", iomgrstr) == 0) {
 #if defined(IOMGR_ENABLED_WINIO)
-        *flag = IO_MNGR_FLAG_WINIO;
-        return IOManagerAvailable;
+    *flag = IO_MNGR_FLAG_WINIO;
+    return IOManagerAvailable;
 #else
-        return IOManagerUnavailable;
+    return IOManagerUnavailable;
 #endif
-    }
-    else if (strcmp("win32-legacy", iomgrstr) == 0) {
+  } else if (strcmp("win32-legacy", iomgrstr) == 0) {
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
-        *flag = IO_MNGR_FLAG_WIN32_LEGACY;
-        return IOManagerAvailable;
+    *flag = IO_MNGR_FLAG_WIN32_LEGACY;
+    return IOManagerAvailable;
 #else
-        return IOManagerUnavailable;
+    return IOManagerUnavailable;
 #endif
-    }
-    else if (strcmp("auto", iomgrstr) == 0) {
-        *flag = IO_MNGR_FLAG_AUTO;
-        return IOManagerAvailable;
-    }
-    /* Two deprecated aliases. These aliases only had any effect on Windows,
-     * but were available as RTS flags on all platforms. The "native" flag
-     * refers to the newer Windows WinIO IO manager (threaded or non-threaded),
-     * while (somewhat confusingly) the "posix" flag refers to the older
-     * Windows I/O managers (win32-legacy and mio). On non-Windows, we now make
-     * these flags equivalent to IO_MNGR_FLAG_AUTO.
-     */
-    else if (strcmp("native", iomgrstr) == 0) {
+  } else if (strcmp("auto", iomgrstr) == 0) {
+    *flag = IO_MNGR_FLAG_AUTO;
+    return IOManagerAvailable;
+  }
+  /* Two deprecated aliases. These aliases only had any effect on Windows,
+   * but were available as RTS flags on all platforms. The "native" flag
+   * refers to the newer Windows WinIO IO manager (threaded or non-threaded),
+   * while (somewhat confusingly) the "posix" flag refers to the older
+   * Windows I/O managers (win32-legacy and mio). On non-Windows, we now make
+   * these flags equivalent to IO_MNGR_FLAG_AUTO.
+   */
+  else if (strcmp("native", iomgrstr) == 0) {
 #if defined(mingw32_HOST_OS)
     /* On windows "native" is now an alias for IO_MNGR_FLAG_WINIO */
 #if defined(IOMGR_ENABLED_WINIO)
-        *flag = IO_MNGR_FLAG_WINIO;
-        return IOManagerAvailable;
+    *flag = IO_MNGR_FLAG_WINIO;
+    return IOManagerAvailable;
 #else
-        return IOManagerUnavailable;
+    return IOManagerUnavailable;
 #endif
 #else // !defined(mingw32_HOST_OS)
-        *flag = IO_MNGR_FLAG_AUTO;
-        return IOManagerAvailable;
+    *flag = IO_MNGR_FLAG_AUTO;
+    return IOManagerAvailable;
 #endif
-    }
-    else if (strcmp("posix", iomgrstr) == 0) {
+  } else if (strcmp("posix", iomgrstr) == 0) {
 #if defined(mingw32_HOST_OS)
-        /* On Windows "posix" is now an alias for either IO_MNGR_FLAG_MIO or
-         * IO_MNGR_FLAG_WIN32_LEGACY */
+    /* On Windows "posix" is now an alias for either IO_MNGR_FLAG_MIO or
+     * IO_MNGR_FLAG_WIN32_LEGACY */
 #if defined(IOMGR_ENABLED_MIO_WIN32)
-        *flag = IO_MNGR_FLAG_MIO;
-        return IOManagerAvailable;
+    *flag = IO_MNGR_FLAG_MIO;
+    return IOManagerAvailable;
 #elif defined(IOMGR_ENABLED_WIN32_LEGACY)
-        *flag = IO_MNGR_FLAG_WIN32_LEGACY;
-        return IOManagerAvailable;
+    *flag = IO_MNGR_FLAG_WIN32_LEGACY;
+    return IOManagerAvailable;
 #else
-        return IOManagerUnavailable;
+    return IOManagerUnavailable;
 #endif
 #else // !defined(mingw32_HOST_OS)
-        *flag = IO_MNGR_FLAG_AUTO;
-        return IOManagerAvailable;
+    *flag = IO_MNGR_FLAG_AUTO;
+    return IOManagerAvailable;
 #endif
-    }
-    else {
-        return IOManagerUnrecognised;
-    }
+  } else {
+    return IOManagerUnrecognised;
+  }
 }
 
 /* Based on the I/O manager RTS flag, select an I/O manager to use.
@@ -219,140 +210,135 @@ parseIOManagerFlag(const char *iomgrstr, IO_MANAGER_FLAG *flag)
  * Called early in the RTS initialisation, after the RTS flags have been
  * processed.
  */
-void selectIOManager(void)
-{
-    switch (RtsFlags.MiscFlags.ioManager) {
-        case IO_MNGR_FLAG_AUTO:
+void selectIOManager(void) {
+  switch (RtsFlags.MiscFlags.ioManager) {
+  case IO_MNGR_FLAG_AUTO:
 #if defined(THREADED_RTS)
 #if defined(IOMGR_DEFAULT_THREADED_MIO)
 #if defined(mingw32_HOST_OS)
-            iomgr_type = IO_MANAGER_MIO_WIN32;
+    iomgr_type = IO_MANAGER_MIO_WIN32;
 #else
-            iomgr_type = IO_MANAGER_MIO_POSIX;
+    iomgr_type = IO_MANAGER_MIO_POSIX;
 #endif
 #elif defined(IOMGR_DEFAULT_THREADED_WINIO)
-            iomgr_type = IO_MANAGER_WINIO;
+    iomgr_type = IO_MANAGER_WINIO;
 #elif defined(IOMGR_DEFAULT_THREADED_IO_URING)
-            iomgr_type = IO_MANAGER_IO_URING;
+    iomgr_type = IO_MANAGER_IO_URING;
 #else
 #error No I/O default manager. See IOMGR_DEFAULT_THREADED_ flags
 #endif
 #else // !defined(THREADED_RTS)
-#if   defined(IOMGR_DEFAULT_NON_THREADED_SELECT)
-            iomgr_type = IO_MANAGER_SELECT;
+#if defined(IOMGR_DEFAULT_NON_THREADED_SELECT)
+    iomgr_type = IO_MANAGER_SELECT;
 #elif defined(IOMGR_DEFAULT_NON_THREADED_POLL)
-            iomgr_type = IO_MANAGER_POLL;
+    iomgr_type = IO_MANAGER_POLL;
 #elif defined(IOMGR_DEFAULT_NON_THREADED_WINIO)
-            iomgr_type = IO_MANAGER_WINIO;
+    iomgr_type = IO_MANAGER_WINIO;
 #elif defined(IOMGR_DEFAULT_NON_THREADED_WIN32_LEGACY)
-            iomgr_type = IO_MANAGER_WIN32_LEGACY;
+    iomgr_type = IO_MANAGER_WIN32_LEGACY;
 #elif defined(IOMGR_DEFAULT_NON_THREADED_IO_URING)
-            iomgr_type = IO_MANAGER_IO_URING;
+    iomgr_type = IO_MANAGER_IO_URING;
 #else
 #error No I/O default manager. See IOMGR_DEFAULT_NON_THREADED_ flags
 #endif
 #endif
-            break;
+    break;
 
 #if defined(IOMGR_ENABLED_SELECT)
-        case IO_MNGR_FLAG_SELECT:
-            iomgr_type = IO_MANAGER_SELECT;
-            break;
+  case IO_MNGR_FLAG_SELECT:
+    iomgr_type = IO_MANAGER_SELECT;
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_IO_URING)
-        case IO_MNGR_FLAG_IO_URING:
-            iomgr_type = IO_MANAGER_IO_URING;
-            break;
+  case IO_MNGR_FLAG_IO_URING:
+    iomgr_type = IO_MANAGER_IO_URING;
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_POLL)
-        case IO_MNGR_FLAG_POLL:
-            iomgr_type = IO_MANAGER_POLL;
-            break;
+  case IO_MNGR_FLAG_POLL:
+    iomgr_type = IO_MANAGER_POLL;
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_MIO_POSIX)
-        case IO_MNGR_FLAG_MIO:
-            iomgr_type = IO_MANAGER_MIO_POSIX;
-            break;
+  case IO_MNGR_FLAG_MIO:
+    iomgr_type = IO_MANAGER_MIO_POSIX;
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_MIO_WIN32)
-        case IO_MNGR_FLAG_MIO:
-            iomgr_type = IO_MANAGER_MIO_WIN32;
-            break;
+  case IO_MNGR_FLAG_MIO:
+    iomgr_type = IO_MANAGER_MIO_WIN32;
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_WINIO)
-        case IO_MNGR_FLAG_WINIO:
-            iomgr_type = IO_MANAGER_WINIO;
-            break;
+  case IO_MNGR_FLAG_WINIO:
+    iomgr_type = IO_MANAGER_WINIO;
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
-        case IO_MNGR_FLAG_WIN32_LEGACY:
-            iomgr_type = IO_MANAGER_WIN32_LEGACY;
-            break;
+  case IO_MNGR_FLAG_WIN32_LEGACY:
+    iomgr_type = IO_MANAGER_WIN32_LEGACY;
+    break;
 #endif
 
-        default:
-          barf("selectIOManager: %d", RtsFlags.MiscFlags.ioManager);
-    }
+  default:
+    barf("selectIOManager: %d", RtsFlags.MiscFlags.ioManager);
+  }
 
 #if defined(mingw32_HOST_OS)
-    rts_IOManagerIsWin32Native = iomgr_type == IO_MANAGER_WINIO;
+  rts_IOManagerIsWin32Native = iomgr_type == IO_MANAGER_WINIO;
 #endif
 }
 
-
-char * showIOManager(void)
-{
-    switch (iomgr_type) {
+char *showIOManager(void) {
+  switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
-        case IO_MANAGER_SELECT:
-            return "select";
+  case IO_MANAGER_SELECT:
+    return "select";
 #endif
 #if defined(IOMGR_ENABLED_POLL)
-        case IO_MANAGER_POLL:
-            return "poll";
+  case IO_MANAGER_POLL:
+    return "poll";
 #endif
 #if defined(IOMGR_ENABLED_IO_URING)
-        case IO_MANAGER_IO_URING:
-            return "io-uring";
+  case IO_MANAGER_IO_URING:
+    return "io-uring";
 #endif
 #if defined(IOMGR_ENABLED_MIO_POSIX)
-        case IO_MANAGER_MIO_POSIX:
-            return "mio";
+  case IO_MANAGER_MIO_POSIX:
+    return "mio";
 #endif
 #if defined(IOMGR_ENABLED_MIO_WIN32)
-        case IO_MANAGER_MIO_WIN32:
-            return "mio";
+  case IO_MANAGER_MIO_WIN32:
+    return "mio";
 #endif
 #if defined(IOMGR_ENABLED_WINIO)
-        case IO_MANAGER_WINIO:
-            return "winio";
+  case IO_MANAGER_WINIO:
+    return "winio";
 #endif
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
-        case IO_MANAGER_WIN32_LEGACY:
-            return "win32-legacy";
+  case IO_MANAGER_WIN32_LEGACY:
+    return "win32-legacy";
 #endif
-        default:
-          barf("showIOManager: %d", iomgr_type);
-    }
+  default:
+    barf("showIOManager: %d", iomgr_type);
+  }
 }
 
 /* Allocate a CapIOManager for a given Capability. Having this helps us keep
  * struct CapIOManager opaque from most of the rest of the RTS.
  */
-CapIOManager *allocCapabilityIOManager(Capability *cap)
-{
-    CapIOManager *iomgr = stgMallocBytes(sizeof(CapIOManager),
-                                         "allocCapabilityIOManager");
-    iomgr->cap = cap; /* link back */
-    return iomgr;
+CapIOManager *allocCapabilityIOManager(Capability *cap) {
+  CapIOManager *iomgr =
+      stgMallocBytes(sizeof(CapIOManager), "allocCapabilityIOManager");
+  iomgr->cap = cap; /* link back */
+  return iomgr;
 }
-
 
 /* Initialise the per-capability CapIOManager that lives in each Capability.
  * Called from initCapability(), which is done in the RTS startup in
@@ -361,593 +347,555 @@ CapIOManager *allocCapabilityIOManager(Capability *cap)
  * Note that during RTS startup this is called _before_ the storage manager
  * is initialised, so this is not allowed to allocate on the GC heap.
  */
-void initCapabilityIOManager(CapIOManager *iomgr)
-{
-    debugTrace(DEBUG_iomanager, "initialising I/O manager %s for cap %d",
-               showIOManager(), iomgr->cap->no);
+void initCapabilityIOManager(CapIOManager *iomgr) {
+  debugTrace(DEBUG_iomanager, "initialising I/O manager %s for cap %d",
+             showIOManager(), iomgr->cap->no);
 
-    switch (iomgr_type) {
+  switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
-        case IO_MANAGER_SELECT:
-            initCapabilityIOManagerSelect(iomgr);
-            break;
+  case IO_MANAGER_SELECT:
+    initCapabilityIOManagerSelect(iomgr);
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_POLL)
-        case IO_MANAGER_POLL:
-            initCapabilityIOManagerPoll(iomgr);
-            break;
+  case IO_MANAGER_POLL:
+    initCapabilityIOManagerPoll(iomgr);
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_IO_URING)
-        case IO_MANAGER_IO_URING:
-            initCapabilityIOManagerIOUring(iomgr);
-            break;
+  case IO_MANAGER_IO_URING:
+    initCapabilityIOManagerIOURing(iomgr);
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
-        case IO_MANAGER_WIN32_LEGACY:
-            iomgr->blocked_queue_hd = END_TSO_QUEUE;
-            iomgr->blocked_queue_tl = END_TSO_QUEUE;
-            break;
+  case IO_MANAGER_WIN32_LEGACY:
+    iomgr->blocked_queue_hd = END_TSO_QUEUE;
+    iomgr->blocked_queue_tl = END_TSO_QUEUE;
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_MIO_POSIX)
-        case IO_MANAGER_MIO_POSIX:
-            iomgr->control_fd = -1;
-            break;
+  case IO_MANAGER_MIO_POSIX:
+    iomgr->control_fd = -1;
+    break;
 #endif
-        default:
-            break;
-    }
+  default:
+    break;
+  }
 }
 
-
-void freeCapabilityIOManager(CapIOManager *iomgr)
-{
-    switch (iomgr_type) {
+void freeCapabilityIOManager(CapIOManager *iomgr) {
+  switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
-        case IO_MANAGER_SELECT:
-            freeCapabilityIOManagerSelect(iomgr);
-            break;
+  case IO_MANAGER_SELECT:
+    freeCapabilityIOManagerSelect(iomgr);
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_POLL)
-        case IO_MANAGER_POLL:
-            freeCapabilityIOManagerPoll(iomgr);
-            break;
+  case IO_MANAGER_POLL:
+    freeCapabilityIOManagerPoll(iomgr);
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_IO_URING)
-        case IO_MANAGER_IO_URING:
-            freeCapabilityIOManagerIOUring(iomgr);
-            break;
+  case IO_MANAGER_IO_URING:
+    freeCapabilityIOManagerIOURing(iomgr);
+    break;
 #endif
-        default:
-            break;
-    }
+  default:
+    break;
+  }
 }
-
 
 /* Called late in the RTS initialisation
  */
-void startIOManager(void)
-{
-    debugTrace(DEBUG_iomanager, "starting %s I/O manager", showIOManager());
+void startIOManager(void) {
+  debugTrace(DEBUG_iomanager, "starting %s I/O manager", showIOManager());
 
-    switch (iomgr_type) {
+  switch (iomgr_type) {
 
 #if defined(IOMGR_ENABLED_SELECT) || defined(IOMGR_ENABLED_POLL)
 #if defined(IOMGR_ENABLED_SELECT)
-        case IO_MANAGER_SELECT:
+  case IO_MANAGER_SELECT:
 #endif
 #if defined(IOMGR_ENABLED_POLL)
-        case IO_MANAGER_POLL:
+  case IO_MANAGER_POLL:
 #endif
-            /* Make the exception CAF a GC root. See initBuiltinGcRoots for
-             * similar examples. We throw this exception if a thread tries to
-             * wait on an invalid FD.
-             */
-            getStablePtr((StgPtr)blockedOnBadFD_closure);
-            break;
+    /* Make the exception CAF a GC root. See initBuiltinGcRoots for
+     * similar examples. We throw this exception if a thread tries to
+     * wait on an invalid FD.
+     */
+    getStablePtr((StgPtr)blockedOnBadFD_closure);
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_MIO_POSIX)
-        case IO_MANAGER_MIO_POSIX:
-            /* Posix implementation in posix/Signals.c
-             * TODO: rename ioManagerStart to be less generic, impl specific
-             */
-            ioManagerStart();
-            break;
+  case IO_MANAGER_MIO_POSIX:
+    /* Posix implementation in posix/Signals.c
+     * TODO: rename ioManagerStart to be less generic, impl specific
+     */
+    ioManagerStart();
+    break;
 #endif
 #if defined(IOMGR_ENABLED_MIO_WIN32)
-        case IO_MANAGER_MIO_WIN32:
-            /* Win32 implementation in win32/ThrIOManager.c
-             * TODO: rename ioManagerStart to be less generic, impl specific
-             */
-            ioManagerStart();
-            break;
+  case IO_MANAGER_MIO_WIN32:
+    /* Win32 implementation in win32/ThrIOManager.c
+     * TODO: rename ioManagerStart to be less generic, impl specific
+     */
+    ioManagerStart();
+    break;
 #endif
 #if defined(IOMGR_ENABLED_WINIO)
-        case IO_MANAGER_WINIO:
-            /* The WinIO I/O manager sadly has two implementations of this
-             * startup, depending on the threading mode.
-             * TODO: rationalise this into one entry point, that internally
-             * can do different things in the two cases.
-             */
+  case IO_MANAGER_WINIO:
+    /* The WinIO I/O manager sadly has two implementations of this
+     * startup, depending on the threading mode.
+     * TODO: rationalise this into one entry point, that internally
+     * can do different things in the two cases.
+     */
 #if defined(THREADED_RTS)
-            /* Win32 implementation in win32/ThrIOManager.c
-             */
-            ioManagerStart();
+    /* Win32 implementation in win32/ThrIOManager.c
+     */
+    ioManagerStart();
 #else
-            startupAsyncWinIO();
+    startupAsyncWinIO();
 #endif
-            break;
+    break;
 #endif
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
-        case IO_MANAGER_WIN32_LEGACY:
-            startupAsyncIO();
-            break;
+  case IO_MANAGER_WIN32_LEGACY:
+    startupAsyncIO();
+    break;
 #endif
-        default:
-            break;
-    }
+  default:
+    break;
+  }
 }
 
 /* Called from forkProcess in the child process on the surviving capability.
  */
-void
-restartIOManager(CapIOManager *iomgr, Capability **pcap)
-{
+void restartIOManager(CapIOManager *iomgr, Capability **pcap) {
 
-    switch (iomgr_type) {
+  switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_MIO_POSIX)
-        case IO_MANAGER_MIO_POSIX:
-            /* Posix implementation in posix/Signals.c
-             *
-             * TODO: figure out if it is necessary for the threaded MIO case
-             * for the starting of the IO manager threads to be synchronous.
-             * It would be simpler if it could start them asynchronously and
-             * thus not have to have the pcap as an inout param, that could be
-             * modified. In practice it cannot be modified anyway since in the
-             * contexts where it is called (forkProcess), there is only a
-             * single cap available.
-             */
-            ioManagerStartCap(pcap);
-            break;
+  case IO_MANAGER_MIO_POSIX:
+    /* Posix implementation in posix/Signals.c
+     *
+     * TODO: figure out if it is necessary for the threaded MIO case
+     * for the starting of the IO manager threads to be synchronous.
+     * It would be simpler if it could start them asynchronously and
+     * thus not have to have the pcap as an inout param, that could be
+     * modified. In practice it cannot be modified anyway since in the
+     * contexts where it is called (forkProcess), there is only a
+     * single cap available.
+     */
+    ioManagerStartCap(pcap);
+    break;
 #endif
-        /* The IO_MANAGER_SELECT needs no initialisation */
-        /* The IO_MANAGER_POLL needs no initialisation */
+  /* The IO_MANAGER_SELECT needs no initialisation */
+  /* The IO_MANAGER_POLL needs no initialisation */
 
-        /* No impl for any of the Windows I/O managers, since no forking. */
-        default:
-            break;
-    }
+  /* No impl for any of the Windows I/O managers, since no forking. */
+  default:
+    break;
+  }
 }
-
 
 /* Called from setNumCapabilities.
  */
-void notifyIOManagerCapabilitiesChanged(CapIOManager *iomgr, Capability **pcap)
-{
-    switch (iomgr_type) {
+void notifyIOManagerCapabilitiesChanged(CapIOManager *iomgr,
+                                        Capability **pcap) {
+  switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_MIO_POSIX)
-        case IO_MANAGER_MIO_POSIX:
-            rts_evalIO(pcap, ioManagerCapabilitiesChanged_closure, NULL);
-            break;
+  case IO_MANAGER_MIO_POSIX:
+    rts_evalIO(pcap, ioManagerCapabilitiesChanged_closure, NULL);
+    break;
 #endif
-        default:
-            break;
-    }
+  default:
+    break;
+  }
 }
-
 
 /* Called in the RTS shutdown before the scheduler exits
  */
-void
-stopIOManager(void)
-{
-    switch (iomgr_type) {
+void stopIOManager(void) {
+  switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_MIO_POSIX)
-        case IO_MANAGER_MIO_POSIX:
-            /* Posix implementation in posix/Signals.c
-             * TODO: rename ioManagerDie to be less generic, impl specific
-             */
-            ioManagerDie();
-            break;
+  case IO_MANAGER_MIO_POSIX:
+    /* Posix implementation in posix/Signals.c
+     * TODO: rename ioManagerDie to be less generic, impl specific
+     */
+    ioManagerDie();
+    break;
 #endif
 #if defined(IOMGR_ENABLED_MIO_WIN32) || defined(IOMGR_ENABLED_WINIO)
 #if defined(IOMGR_ENABLED_MIO_WIN32)
-        case IO_MANAGER_MIO_WIN32:
+  case IO_MANAGER_MIO_WIN32:
 #endif
 #if defined(IOMGR_ENABLED_WINIO)
-        case IO_MANAGER_WINIO:
+  case IO_MANAGER_WINIO:
 #endif
-            /* Win32 implementation in win32/ThrIOManager.c
-             * This impl is currently shared by both MIO and WinIO I/O managers
-             * TODO: rename ioManagerDie to be less generic, impl specific
-             */
-            ioManagerDie();
-            break;
+    /* Win32 implementation in win32/ThrIOManager.c
+     * This impl is currently shared by both MIO and WinIO I/O managers
+     * TODO: rename ioManagerDie to be less generic, impl specific
+     */
+    ioManagerDie();
+    break;
 #endif
-        default:
-            break;
-    }
+  default:
+    break;
+  }
 }
-
 
 /* Called in the RTS shutdown after the scheduler exits
  */
-void
-exitIOManager(bool wait_threads)
-{
-    switch (iomgr_type) {
+void exitIOManager(bool wait_threads) {
+  switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_WINIO)
-        case IO_MANAGER_WINIO:
-            shutdownAsyncWinIO(wait_threads);
-            break;
+  case IO_MANAGER_WINIO:
+    shutdownAsyncWinIO(wait_threads);
+    break;
 #endif
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
-        case IO_MANAGER_WIN32_LEGACY:
-            shutdownAsyncIO(wait_threads);
-            break;
+  case IO_MANAGER_WIN32_LEGACY:
+    shutdownAsyncIO(wait_threads);
+    break;
 #endif
-        default:
-            break;
-    }
+  default:
+    break;
+  }
 }
 
-void markCapabilityIOManager(evac_fn evac, void *user, CapIOManager *iomgr)
-{
-    switch (iomgr_type) {
+void markCapabilityIOManager(evac_fn evac, void *user, CapIOManager *iomgr) {
+  switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
-        case IO_MANAGER_SELECT:
-            evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_hd);
-            evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_tl);
-            evac(user, (StgClosure **)(void *)&iomgr->sleeping_queue);
-            break;
+  case IO_MANAGER_SELECT:
+    evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_hd);
+    evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_tl);
+    evac(user, (StgClosure **)(void *)&iomgr->sleeping_queue);
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_POLL)
-        case IO_MANAGER_POLL:
-            markClosureTable(evac, user, &iomgr->aiop_table);
-            evac(user, (StgClosure **)(void *)&iomgr->timeout_queue);
-            break;
+  case IO_MANAGER_POLL:
+    markClosureTable(evac, user, &iomgr->aiop_table);
+    evac(user, (StgClosure **)(void *)&iomgr->timeout_queue);
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_IO_URING)
-        case IO_MANAGER_IO_URING:
-            markClosureTable(evac, user, &iomgr->aiop_table);
-            break;
+  case IO_MANAGER_IO_URING:
+    markClosureTable(evac, user, &iomgr->aiop_table);
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
-        case IO_MANAGER_WIN32_LEGACY:
-            evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_hd);
-            evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_tl);
-            break;
+  case IO_MANAGER_WIN32_LEGACY:
+    evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_hd);
+    evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_tl);
+    break;
 #endif
-        default:
-            break;
-    }
+  default:
+    break;
+  }
 }
-
 
 /* Declared in rts/IOInterface.h. Used only by the MIO threaded I/O manager on
  * Unix platforms.
  */
 #if !defined(mingw32_HOST_OS)
-void
-setIOManagerControlFd(uint32_t cap_no, int fd) {
+void setIOManagerControlFd(uint32_t cap_no, int fd) {
 #if defined(THREADED_RTS)
-    if (cap_no < getNumCapabilities()) {
-        RELAXED_STORE(&getCapability(cap_no)->iomgr->control_fd, fd);
-    } else {
-        errorBelch("warning: setIOManagerControlFd called with illegal capability number.");
-    }
+  if (cap_no < getNumCapabilities()) {
+    RELAXED_STORE(&getCapability(cap_no)->iomgr->control_fd, fd);
+  } else {
+    errorBelch("warning: setIOManagerControlFd called with illegal capability "
+               "number.");
+  }
 #endif
 }
 #endif
 
-
-void pollCompletedTimeoutsOrIO(CapIOManager *iomgr)
-{
-    debugTrace(DEBUG_iomanager, "polling for completed IO or timeouts");
-    switch (iomgr_type) {
+void pollCompletedTimeoutsOrIO(CapIOManager *iomgr) {
+  debugTrace(DEBUG_iomanager, "polling for completed IO or timeouts");
+  switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
-        case IO_MANAGER_SELECT:
-          awaitCompletedTimeoutsOrIOSelect(iomgr, false);
-          break;
+  case IO_MANAGER_SELECT:
+    awaitCompletedTimeoutsOrIOSelect(iomgr, false);
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_POLL)
-        case IO_MANAGER_POLL:
-          pollCompletedTimeoutsOrIOPoll(iomgr);
-          break;
+  case IO_MANAGER_POLL:
+    pollCompletedTimeoutsOrIOPoll(iomgr);
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_IO_URING)
-        case IO_MANAGER_IO_URING:
-          pollCompletedTimeoutsOrIOIOUring(iomgr);
-          break;
+  case IO_MANAGER_IO_URING:
+    pollCompletedTimeoutsOrIOIOURing(iomgr);
+    break;
 #endif
 
-#if defined(IOMGR_ENABLED_WIN32_LEGACY) || \
-   (defined(IOMGR_ENABLED_WINIO) && !defined(THREADED_RTS))
+#if defined(IOMGR_ENABLED_WIN32_LEGACY) ||                                     \
+    (defined(IOMGR_ENABLED_WINIO) && !defined(THREADED_RTS))
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
-        case IO_MANAGER_WIN32_LEGACY:
+  case IO_MANAGER_WIN32_LEGACY:
 #endif
 #if defined(IOMGR_ENABLED_WINIO)
-        case IO_MANAGER_WINIO:
+  case IO_MANAGER_WINIO:
 #endif
-          awaitCompletedTimeoutsOrIOWin32(iomgr->cap, false);
-          break;
+    awaitCompletedTimeoutsOrIOWin32(iomgr->cap, false);
+    break;
 #endif
-        default:
-            barf("pollCompletedTimeoutsOrIO not implemented");
-    }
+  default:
+    barf("pollCompletedTimeoutsOrIO not implemented");
+  }
 }
 
-
-bool awaitCompletedTimeoutsOrIO(CapIOManager *iomgr)
-{
-    debugTrace(DEBUG_iomanager, "waiting for completed IO or timeouts");
-    bool completed = true; // wait completed or interrupted?
-    switch (iomgr_type) {
+bool awaitCompletedTimeoutsOrIO(CapIOManager *iomgr) {
+  debugTrace(DEBUG_iomanager, "waiting for completed IO or timeouts");
+  bool completed = true; // wait completed or interrupted?
+  switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
-        case IO_MANAGER_SELECT:
-          completed = awaitCompletedTimeoutsOrIOSelect(iomgr, true);
-          break;
+  case IO_MANAGER_SELECT:
+    completed = awaitCompletedTimeoutsOrIOSelect(iomgr, true);
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_POLL)
-        case IO_MANAGER_POLL:
-          completed = awaitCompletedTimeoutsOrIOPoll(iomgr);
-          break;
+  case IO_MANAGER_POLL:
+    completed = awaitCompletedTimeoutsOrIOPoll(iomgr);
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_IO_URING)
-        case IO_MANAGER_IO_URING:
-          completed = awaitCompletedTimeoutsOrIOIOUring(iomgr);
-          break;
+  case IO_MANAGER_IO_URING:
+    completed = awaitCompletedTimeoutsOrIOIOURing(iomgr);
+    break;
 #endif
 
-#if defined(IOMGR_ENABLED_WIN32_LEGACY) || \
-   (defined(IOMGR_ENABLED_WINIO) && !defined(THREADED_RTS))
+#if defined(IOMGR_ENABLED_WIN32_LEGACY) ||                                     \
+    (defined(IOMGR_ENABLED_WINIO) && !defined(THREADED_RTS))
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
-        case IO_MANAGER_WIN32_LEGACY:
+  case IO_MANAGER_WIN32_LEGACY:
 #endif
 #if defined(IOMGR_ENABLED_WINIO)
-        case IO_MANAGER_WINIO:
+  case IO_MANAGER_WINIO:
 #endif
-          completed = awaitCompletedTimeoutsOrIOWin32(iomgr->cap, true);
-          break;
+    completed = awaitCompletedTimeoutsOrIOWin32(iomgr->cap, true);
+    break;
 #endif
-        default:
-            barf("awaitCompletedTimeoutsOrIO not implemented");
-    }
-    ASSERT(!emptyRunQueue(iomgr->cap) ||
-           getSchedState() != SCHED_RUNNING ||
-           !completed);
-    return completed;
+  default:
+    barf("awaitCompletedTimeoutsOrIO not implemented");
+  }
+  ASSERT(!emptyRunQueue(iomgr->cap) || getSchedState() != SCHED_RUNNING ||
+         !completed);
+  return completed;
 }
-
 
 /* Interrupt the I/O manager if it is blocked in awaitCompletedTimeoutsOrIO,
  * causing it to return early and return false.
  */
-void interruptIOManager(CapIOManager *iomgr)
-{
-    debugTrace(DEBUG_iomanager, "Interrupting the I/O manager...");
-    switch (iomgr_type) {
+void interruptIOManager(CapIOManager *iomgr) {
+  debugTrace(DEBUG_iomanager, "Interrupting the I/O manager...");
+  switch (iomgr_type) {
 
 #if defined(IOMGR_ENABLED_SELECT)
-        case IO_MANAGER_SELECT:
-            interruptIOManagerSelect(iomgr);
-            break;
+  case IO_MANAGER_SELECT:
+    interruptIOManagerSelect(iomgr);
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_IO_URING)
-        case IO_MANAGER_IO_URING:
-            interruptIOManagerIOUring(iomgr);
-            break;
+  case IO_MANAGER_IO_URING:
+    interruptIOManagerIOURing(iomgr);
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_POLL)
-        case IO_MANAGER_POLL:
-            interruptIOManagerPoll(iomgr);
-            break;
+  case IO_MANAGER_POLL:
+    interruptIOManagerPoll(iomgr);
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
-        case IO_MANAGER_WIN32_LEGACY:
-            abandonRequestWait();
-            break;
+  case IO_MANAGER_WIN32_LEGACY:
+    abandonRequestWait();
+    break;
 #endif
 
 #if defined(IOMGR_ENABLED_WINIO)
-        case IO_MANAGER_WINIO:
-            /* FIXME: no support yet for interrupting in WinIO I/O manager
-             * See issue #27403
-             */
-            break;
+  case IO_MANAGER_WINIO:
+    /* FIXME: no support yet for interrupting in WinIO I/O manager
+     * See issue #27403
+     */
+    break;
 #endif
 
-        default:
-            break;
-    }
+  default:
+    break;
+  }
 }
-
 
 /* CMM primop. Result is true on success, or false on allocation failure. */
-bool syncIOWaitReady(CapIOManager *iomgr,
-                     StgTSO       *tso,
-                     IOReadOrWrite rw,
-                     HsInt         fd)
-{
-    debugTrace(DEBUG_iomanager,
-               "thread %ld waiting for %s I/O readiness on fd %d",
-               (long) tso->id, rw == IORead ? "read" : "write", (int) fd);
-    ASSERT(tso->why_blocked == NotBlocked);
-    switch (iomgr_type) {
+bool syncIOWaitReady(CapIOManager *iomgr, StgTSO *tso, IOReadOrWrite rw,
+                     HsInt fd) {
+  debugTrace(DEBUG_iomanager,
+             "thread %ld waiting for %s I/O readiness on fd %d", (long)tso->id,
+             rw == IORead ? "read" : "write", (int)fd);
+  ASSERT(tso->why_blocked == NotBlocked);
+  switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
-        case IO_MANAGER_SELECT:
-        {
-            StgThreadWhyBlocked why_blocked = (rw == IORead ? BlockedOnRead
-                                                            : BlockedOnWrite)
-                                            | BlockInfoForceNonClosure;
-            tso->block_info.fd = fd;
-            appendToIOBlockedQueue(iomgr, tso);
-            RELEASE_STORE(&tso->why_blocked, why_blocked);
-            return true;
-        }
+  case IO_MANAGER_SELECT: {
+    StgThreadWhyBlocked why_blocked =
+        (rw == IORead ? BlockedOnRead : BlockedOnWrite) |
+        BlockInfoForceNonClosure;
+    tso->block_info.fd = fd;
+    appendToIOBlockedQueue(iomgr, tso);
+    RELEASE_STORE(&tso->why_blocked, why_blocked);
+    return true;
+  }
 #endif
 #if defined(IOMGR_ENABLED_POLL)
-        case IO_MANAGER_POLL:
-            return syncIOWaitReadyPoll(iomgr, tso, rw, fd);
+  case IO_MANAGER_POLL:
+    return syncIOWaitReadyPoll(iomgr, tso, rw, fd);
 #endif
 #if defined(IOMGR_ENABLED_IO_URING)
-        case IO_MANAGER_IO_URING:
-            return syncIOWaitReadyIOUring(iomgr, tso, rw, fd);
+  case IO_MANAGER_IO_URING:
+    return syncIOWaitReadyIOURing(iomgr, tso, rw, fd);
 #endif
-        default:
-            barf("waitRead# / waitWrite# not available for current I/O manager");
-    }
+  default:
+    barf("waitRead# / waitWrite# not available for current I/O manager");
+  }
 }
 
-
-void syncIOCancel(CapIOManager *iomgr, StgTSO *tso)
-{
-    debugTrace(DEBUG_iomanager, "cancelling I/O for thread %ld", (long) tso->id);
-    switch (iomgr_type) {
+void syncIOCancel(CapIOManager *iomgr, StgTSO *tso) {
+  debugTrace(DEBUG_iomanager, "cancelling I/O for thread %ld", (long)tso->id);
+  switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
-        case IO_MANAGER_SELECT:
-            removeThreadFromDeQueue(iomgr->cap,
-                                    &iomgr->blocked_queue_hd,
-                                    &iomgr->blocked_queue_tl,
-                                    tso);
-            break;
+  case IO_MANAGER_SELECT:
+    removeThreadFromDeQueue(iomgr->cap, &iomgr->blocked_queue_hd,
+                            &iomgr->blocked_queue_tl, tso);
+    break;
 #endif
 #if defined(IOMGR_ENABLED_POLL)
-        case IO_MANAGER_POLL:
-            syncIOCancelPoll(iomgr, tso);
-            break;
+  case IO_MANAGER_POLL:
+    syncIOCancelPoll(iomgr, tso);
+    break;
 #endif
 #if defined(IOMGR_ENABLED_IO_URING)
-        case IO_MANAGER_IO_URING:
-            syncIOCancelIOUring(iomgr, tso);
-            break;
+  case IO_MANAGER_IO_URING:
+    syncIOCancelIOURing(iomgr, tso);
+    break;
 #endif
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
-        case IO_MANAGER_WIN32_LEGACY:
-            removeThreadFromDeQueue(iomgr->cap,
-                                    &iomgr->blocked_queue_hd,
-                                    &iomgr->blocked_queue_tl,
-                                    tso);
-            abandonWorkRequest(tso->block_info.async_reqID);
-            break;
+  case IO_MANAGER_WIN32_LEGACY:
+    removeThreadFromDeQueue(iomgr->cap, &iomgr->blocked_queue_hd,
+                            &iomgr->blocked_queue_tl, tso);
+    abandonWorkRequest(tso->block_info.async_reqID);
+    break;
 #endif
-        default:
-            barf("syncIOCancel not supported for I/O manager %d", iomgr_type);
-    }
+  default:
+    barf("syncIOCancel not supported for I/O manager %d", iomgr_type);
+  }
 }
 
-
 #if defined(IOMGR_ENABLED_SELECT)
-static void insertIntoSleepingQueue(CapIOManager *iomgr, StgTSO *tso, LowResTime target);
+static void insertIntoSleepingQueue(CapIOManager *iomgr, StgTSO *tso,
+                                    LowResTime target);
 #endif
-
 
 /* CMM primop. Result is true on success, or false on allocation failure. */
-bool syncDelay(CapIOManager *iomgr, StgTSO *tso, HsInt us_delay)
-{
-    debugTrace(DEBUG_iomanager, "thread %ld waiting for %lld us", tso->id, us_delay);
-    ASSERT(tso->why_blocked == NotBlocked);
-    switch (iomgr_type) {
+bool syncDelay(CapIOManager *iomgr, StgTSO *tso, HsInt us_delay) {
+  debugTrace(DEBUG_iomanager, "thread %ld waiting for %lld us", tso->id,
+             us_delay);
+  ASSERT(tso->why_blocked == NotBlocked);
+  switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
-        case IO_MANAGER_SELECT:
-        {
-            LowResTime target = getDelayTarget(us_delay);
-            tso->block_info.target = target;
-            insertIntoSleepingQueue(iomgr, tso, target);
-            RELEASE_STORE(&tso->why_blocked, BlockedOnDelay | BlockInfoForceNonClosure);
-            return true;
-        }
+  case IO_MANAGER_SELECT: {
+    LowResTime target = getDelayTarget(us_delay);
+    tso->block_info.target = target;
+    insertIntoSleepingQueue(iomgr, tso, target);
+    RELEASE_STORE(&tso->why_blocked, BlockedOnDelay | BlockInfoForceNonClosure);
+    return true;
+  }
 #endif
+#if defined(IOMGR_ENABLED_POLL) || defined(IOMGR_ENABLED_IO_URING)
+
 #if defined(IOMGR_ENABLED_POLL)
-        case IO_MANAGER_POLL:
-            return syncDelayTimeout(iomgr, tso, us_delay);
+  case IO_MANAGER_POLL:
 #endif
 #if defined(IOMGR_ENABLED_IO_URING)
-        case IO_MANAGER_IO_URING:
-            return syncDelayTimeoutIOUring(iomgr, tso, us_delay);
+  case IO_MANAGER_IO_URING:
+#endif
+    return syncDelayTimeout(iomgr, tso, us_delay);
 #endif
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
-        case IO_MANAGER_WIN32_LEGACY:
-            /* It would be nice to allocate this on the heap instead as it
-             * would make the primops more consistent.
-             */
-        {
-            tso->block_info.async_reqID = addDelayRequest(us_delay);
+  case IO_MANAGER_WIN32_LEGACY:
+    /* It would be nice to allocate this on the heap instead as it
+     * would make the primops more consistent.
+     */
+    {
+      tso->block_info.async_reqID = addDelayRequest(us_delay);
 
-            /* Having all async-blocked threads reside on the blocked_queue
-             * simplifies matters, so set the status to OnDoProc and put the
-             * delayed thread on the blocked_queue.
-             */
-            appendToIOBlockedQueue(iomgr, tso);
-            RELEASE_STORE(&tso->why_blocked, BlockedOnDoProc);
-            return true;
-        }
-#endif
-        default:
-            barf("syncDelay not supported for I/O manager %d", iomgr_type);
+      /* Having all async-blocked threads reside on the blocked_queue
+       * simplifies matters, so set the status to OnDoProc and put the
+       * delayed thread on the blocked_queue.
+       */
+      appendToIOBlockedQueue(iomgr, tso);
+      RELEASE_STORE(&tso->why_blocked, BlockedOnDoProc);
+      return true;
     }
+#endif
+  default:
+    barf("syncDelay not supported for I/O manager %d", iomgr_type);
+  }
 }
 
-
-void syncDelayCancel(CapIOManager *iomgr, StgTSO *tso)
-{
-    debugTrace(DEBUG_iomanager, "cancelling delay for thread %ld", (long) tso->id);
-    switch (iomgr_type) {
+void syncDelayCancel(CapIOManager *iomgr, StgTSO *tso) {
+  debugTrace(DEBUG_iomanager, "cancelling delay for thread %ld", (long)tso->id);
+  switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
-        case IO_MANAGER_SELECT:
-            ASSERT(tso->why_blocked == (BlockedOnDelay | BlockInfoForceNonClosure));
-            removeThreadFromQueue(iomgr->cap, &iomgr->sleeping_queue, tso);
-            break;
+  case IO_MANAGER_SELECT:
+    ASSERT(tso->why_blocked == (BlockedOnDelay | BlockInfoForceNonClosure));
+    removeThreadFromQueue(iomgr->cap, &iomgr->sleeping_queue, tso);
+    break;
 #endif
 #if defined(IOMGR_ENABLED_POLL)
-        case IO_MANAGER_POLL:
-            syncDelayCancelTimeout(iomgr, tso);
-            break;
+  case IO_MANAGER_POLL:
+    syncDelayCancelTimeout(iomgr, tso);
+    break;
 #endif
 #if defined(IOMGR_ENABLED_IO_URING)
-        case IO_MANAGER_IO_URING:
-            syncIOCancelIOUring(iomgr, tso);
-            break;
+  case IO_MANAGER_IO_URING:
+    syncIOCancelIOURing(iomgr, tso);
+    break;
 #endif
-        /* Note: no case for IO_MANAGER_WIN32_LEGACY despite it having a case
-         * for syncDelay above. This is because the win32 legacy I/O manager
-         * treats delay as an I/O operation, using the BlockedOnDoProc blocking
-         * reason, rather than the BlockedOnDelay reason. As a consequence,
-         * cancellation goes via syncIOCancel instead. Yes, it's a bit weird.
-         */
+    /* Note: no case for IO_MANAGER_WIN32_LEGACY despite it having a case
+     * for syncDelay above. This is because the win32 legacy I/O manager
+     * treats delay as an I/O operation, using the BlockedOnDoProc blocking
+     * reason, rather than the BlockedOnDelay reason. As a consequence,
+     * cancellation goes via syncIOCancel instead. Yes, it's a bit weird.
+     */
 
-        default:
-            barf("syncDelayCancel not supported for I/O manager %d", iomgr_type);
-    }
+  default:
+    barf("syncDelayCancel not supported for I/O manager %d", iomgr_type);
+  }
 }
-
 
 #if defined(IOMGR_ENABLED_SELECT) || defined(IOMGR_ENABLED_WIN32_LEGACY)
-void appendToIOBlockedQueue(CapIOManager *iomgr, StgTSO *tso)
-{
-    ASSERT(tso->_link == END_TSO_QUEUE);
-    if (iomgr->blocked_queue_hd == END_TSO_QUEUE) {
-        iomgr->blocked_queue_hd = tso;
-    } else {
-        setTSOLink(iomgr->cap, iomgr->blocked_queue_tl, tso);
-    }
-    iomgr->blocked_queue_tl = tso;
+void appendToIOBlockedQueue(CapIOManager *iomgr, StgTSO *tso) {
+  ASSERT(tso->_link == END_TSO_QUEUE);
+  if (iomgr->blocked_queue_hd == END_TSO_QUEUE) {
+    iomgr->blocked_queue_hd = tso;
+  } else {
+    setTSOLink(iomgr->cap, iomgr->blocked_queue_tl, tso);
+  }
+  iomgr->blocked_queue_tl = tso;
 }
 #endif
 
@@ -960,39 +908,37 @@ void appendToIOBlockedQueue(CapIOManager *iomgr, StgTSO *tso)
  * used. This is a wart that should be excised.
  */
 // TODO: move to Select.c and rename
-static void insertIntoSleepingQueue(CapIOManager *iomgr, StgTSO *tso, LowResTime target)
-{
-    StgTSO *prev = NULL;
-    StgTSO *t = iomgr->sleeping_queue;
-    while (t != END_TSO_QUEUE && t->block_info.target < target) {
-        prev = t;
-        t = t->_link;
-    }
+static void insertIntoSleepingQueue(CapIOManager *iomgr, StgTSO *tso,
+                                    LowResTime target) {
+  StgTSO *prev = NULL;
+  StgTSO *t = iomgr->sleeping_queue;
+  while (t != END_TSO_QUEUE && t->block_info.target < target) {
+    prev = t;
+    t = t->_link;
+  }
 
-    tso->_link = t;
-    if (prev == NULL) {
-        iomgr->sleeping_queue = tso;
-    } else {
-        setTSOLink(iomgr->cap, prev, tso);
-    }
+  tso->_link = t;
+  if (prev == NULL) {
+    iomgr->sleeping_queue = tso;
+  } else {
+    setTSOLink(iomgr->cap, prev, tso);
+  }
 }
 #endif
 
 /* Temporary compat helper function used in the Win32 I/O managers.
  * TODO: replace by consulting the iomgr_type global instead.
  */
-bool is_io_mng_native_p (void)
-{
-    switch (iomgr_type) {
+bool is_io_mng_native_p(void) {
+  switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_WINIO)
-        case IO_MANAGER_WINIO:
-            return true;
+  case IO_MANAGER_WINIO:
+    return true;
 #endif
-        default:
-            return false;
-    }
+  default:
+    return false;
+  }
 }
-
 
 /* See comment above with the #pragma GCC diagnostic push */
 #pragma GCC diagnostic pop

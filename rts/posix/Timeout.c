@@ -24,7 +24,7 @@
 /* Currently only used by the poll I/O manager, but in future may be used by
    several in-RTS I/O managers.
  */
-#if defined(IOMGR_ENABLED_POLL)
+#if defined(IOMGR_ENABLED_POLL) || defined(IOMGR_ENABLED_IO_URING)
 
 bool syncDelayTimeout(CapIOManager *iomgr, StgTSO *tso, HsInt us_delay)
 {

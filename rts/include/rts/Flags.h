@@ -286,6 +286,8 @@ typedef struct _MISC_FLAGS {
                                   * for the linker, NULL ==> off */
     IO_MANAGER_FLAG ioManager;   /* The I/O manager to use.  */
     uint32_t numIoWorkerThreads; /* Number of I/O worker threads to use.  */
+    uint32_t io_uring_sq_entries; /* io_uring submission queue size */
+    uint32_t io_uring_cq_entries; /* io_uring completion queue size */
 } MISC_FLAGS;
 
 /* See Note [Synchronization of flags and base APIs] */

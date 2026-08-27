@@ -583,7 +583,7 @@ library
                     posix/FdWakeup.c
                     posix/MIO.c
                     posix/Poll.c
-                    posix/IOUring.c
+                    posix/IOURing.c
                     posix/Select.c
                     posix/Signals.c
                     posix/Timeout.c

@@ -1445,7 +1445,7 @@ Currently the available I/O managers are:
 ================ ========= ============
 ``select``       Posix     Non-threaded
 ``poll``         Posix     Non-threaded
-``io_uring``     Linux     Both
+``io-uring``     Linux     Non-threaded
 ``mio``          All       Threaded
 ``win32-legacy`` Windows   Non-threaded
 ``winio``        Windows   Both

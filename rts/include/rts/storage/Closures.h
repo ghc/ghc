@@ -728,7 +728,12 @@ union NotifyCompletion {
 enum NotifyCompletionType {
     NotifyTSO  = 0, // thread-synchronous I/O
     NotifyMVar = 1, // async I/O with MVar notification
-    NotifyTVar = 2  // async I/O with TVar notification
+    NotifyTVar = 2, // async I/O with TVar notification
+    // If a TSO receives an async exception while it's waiting on I/O then
+    // the TSO stops waiting but the I/O may still be outstanding, and we
+    // need the corresponding StgAsyncIOOp until the I/O completes. We use
+    // NotifyNone in this case to avoid disturbing the original TSO.
+    NotifyNone = 3
 };
 
 /* A node in the leftist heap. */

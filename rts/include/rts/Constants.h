@@ -315,6 +315,8 @@
 #define ThreadMigrating              11 /* Uses block_info.unused */
 #define BlockedOnDoProc              12 /* Uses block_info.async_reqID */
 
+#define BlockedOnIOSubmission 15
+
 /* Reserved values, not values that why_blocked currently use. They
  * are used in primop stg_threadStatuszh and must not overlap with
  * other why_blocked status values. They could be changed, if the
