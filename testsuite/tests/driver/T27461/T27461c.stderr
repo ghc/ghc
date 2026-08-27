@@ -1,0 +1,4 @@
+src/Wrong.hs:1:8: error: [GHC-28623]
+    File name does not match module name:
+    Saw     : ‘Other’
+    Expected: ‘Wrong’
