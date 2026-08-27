@@ -6,7 +6,6 @@ import GHC
 import GHC.Driver.Make
 import GHC.Driver.Session
 import GHC.Driver.Env
-import GHC.Types.Error (mkUnknownDiagnostic)
 import GHC.Unit.Module.Graph
 import GHC.Unit.Finder
 
@@ -48,13 +47,13 @@ main = do
 
     liftIO $ do
 
-    _emss <- downsweep hsc_env [] Nothing [] False
+    _emss <- downsweep hsc_env emptyDownsweepCache [] False
 
     flushFinderCaches (hsc_FC hsc_env)
     createDirectoryIfMissing False "mydir"
     renameFile "B.hs" "mydir/B.hs"
 
-    (_, nodes) <- downsweep hsc_env [] Nothing [] False
+    (_, nodes) <- downsweep hsc_env emptyDownsweepCache [] False
 
     -- If 'checkSummaryTimestamp' were to call 'addHomeModuleToFinder' with
     -- (ms_location old_summary) like summariseFile used to instead of

@@ -245,7 +245,12 @@ instance Diagnostic DriverMessage where
         pprDependency :: (UnitId, UnitId) -> SDoc
         pprDependency (external_unit, home_unit)
           = ppr external_unit <+> arrow <+> ppr home_unit
-
+    DriverInconsistentUnitDependencies unit answers
+      -> mkSimpleDecorated $
+           vcat ( [ text "The dependencies of unit" <+> quotes (ppr unit)
+                      <+> text "depend on the home unit it is used from:" ]
+                  ++ [ nest 2 $ ppr home <+> text "->" <+> ppr deps
+                     | (home, deps) <- answers ] )
     DriverInterfaceError reason -> diagnosticMessage (ifaceDiagnosticOpts opts) reason
 
     DriverInconsistentDynFlags msg
@@ -363,6 +368,8 @@ instance Diagnostic DriverMessage where
       -> ErrorWithoutFlag
     DriverHomePackagesNotClosed {}
       -> ErrorWithoutFlag
+    DriverInconsistentUnitDependencies {}
+      -> ErrorWithoutFlag
     DriverInterfaceError reason -> diagnosticReason reason
     DriverInconsistentDynFlags {}
       -> WarningWithFlag Opt_WarnInconsistentFlags
@@ -439,6 +446,8 @@ instance Diagnostic DriverMessage where
     DriverRedirectedNoMain {}
       -> noHints
     DriverHomePackagesNotClosed {}
+      -> noHints
+    DriverInconsistentUnitDependencies {}
       -> noHints
     DriverInterfaceError reason -> diagnosticHints reason
     DriverInconsistentDynFlags {}

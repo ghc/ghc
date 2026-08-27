@@ -5,7 +5,6 @@ module GHC.Driver.Env
    , hsc_mod_graph
    , hsc_known_home_modules
    , setModuleGraph
-   , setKnownHomeModules
    , hscUpdateFlags
    , hscSetFlags
    , hsc_home_unit
@@ -170,17 +169,10 @@ setModuleGraph
   -> ModuleGraph
   -> HscEnv -> HscEnv
 setModuleGraph known mod_graph hsc_env =
-  setKnownHomeModules known $
-    hsc_env { hsc_unit_env = (hsc_unit_env hsc_env) { ue_module_graph = mod_graph } }
-
--- | Declare the home modules whose defining file is already known.
---
--- Only for use by the driver, in between phases of concurrent work.
---
--- See Note [Known home modules] in GHC.Unit.Finder.Types.
-setKnownHomeModules :: KnownHomeModules -> HscEnv -> HscEnv
-setKnownHomeModules known hsc_env =
-  hsc_env { hsc_FC = (hsc_FC hsc_env) { knownHomeModules = known } }
+  hsc_env
+    { hsc_unit_env = (hsc_unit_env hsc_env) { ue_module_graph = mod_graph }
+    , hsc_FC       = (hsc_FC hsc_env) { knownHomeModules = known }
+    }
 
 {- Note [Target code interpreter]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

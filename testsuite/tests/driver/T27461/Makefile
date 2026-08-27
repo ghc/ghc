@@ -7,3 +7,7 @@ include $(TOP)/mk/test.mk
 T27461a :
 	cp Main1.hs src/Main.hs
 	! '$(TEST_HC)' $(TEST_HC_OPTS) --make -fno-code -v0 -isrc src/Main.hs src/Bar.hs
+
+# Like T27461a, but for a module target instead of a file target.
+T27461c :
+	! '$(TEST_HC)' $(TEST_HC_OPTS) --make -fno-code -v0 -isrc Wrong
