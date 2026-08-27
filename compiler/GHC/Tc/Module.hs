@@ -2137,7 +2137,9 @@ for the unit portion of the graph, if it's not already been performed.
 withInteractiveModuleNode :: HscEnv -> TcM a -> TcM a
 withInteractiveModuleNode hsc_env thing_inside = do
   mg <- liftIO $ downsweepInteractiveImports hsc_env (hsc_IC hsc_env)
-  updTopEnv (setModuleGraph mg) thing_inside
+  -- The interactive module is not defined by a file, so the known home modules
+  -- are unchanged.
+  updTopEnv (\ env -> setModuleGraph (hsc_known_home_modules env) mg env) thing_inside
 
 runTcInteractive
   :: TcMPluginHandling

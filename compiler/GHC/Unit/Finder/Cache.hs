@@ -59,6 +59,10 @@ queries we are performing:
     points: whenever package flags or unit databases change ('setSessionDynFlags',
     GHCi's `:set -package`), or when Backpack registers a new unit after
     instantiation.
+
+Separately from all of this, certain home modules cannot be found by searching
+the file system, as they were passed explicitly as file targets. These are
+handled by 'KnownHomeModules'; see Note [Known home modules] in GHC.Unit.Finder.Types.
 -}
 
 --------------------------------------------------------------------------------

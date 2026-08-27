@@ -4860,7 +4860,9 @@ clearHPTs = do
   let pruneHomeUnitEnv hme = liftIO $ do
         emptyHpt <- emptyHomePackageTable
         pure  hme{ homeUnitEnv_hpt = emptyHpt }
-      discardMG hsc = setModuleGraph GHC.emptyMG hsc
+      -- Also clear the known home modules, since they were derived from the
+      -- discarded module graph.
+      discardMG = setModuleGraph mempty GHC.emptyMG
   modifySessionM $ \hsc_env -> do
     hug' <- traverse pruneHomeUnitEnv $ hsc_HUG hsc_env
     pure $ discardMG $ discardIC $ hscUpdateHUG (const hug') hsc_env

@@ -915,7 +915,11 @@ setProgramHUG_ invalidate_needed new_hug0 = do
 --
 invalidateModSummaryCache :: GhcMonad m => m ()
 invalidateModSummaryCache =
-  modifySession $ \hsc_env -> setModuleGraph (mapMG inval (hsc_mod_graph hsc_env)) hsc_env
+  modifySession $ \hsc_env ->
+    -- The locations of the modules are unaffected, so the known home modules
+    -- are unchanged.
+    setModuleGraph (hsc_known_home_modules hsc_env)
+      (mapMG inval (hsc_mod_graph hsc_env)) hsc_env
  where
   inval ms = ms { ms_hs_hash = fingerprint0 }
 

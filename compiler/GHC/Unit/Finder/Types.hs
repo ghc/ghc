@@ -3,6 +3,13 @@ module GHC.Unit.Finder.Types
    , FindResult (..)
    , InstalledFindResult (..)
    , FinderOpts(..)
+     -- * Known home modules
+   , KnownHomeModules
+   , emptyKnownHomeModules
+   , mkKnownHomeModules
+   , lookupKnownHomeModule
+   , knownHomeModulesOfSummaries
+   , knownHomeModulesOfGraph
    )
 where
 
@@ -16,6 +23,10 @@ import GHC.Unit.Finder.Cache
 
 import GHC.Data.FastString
 import GHC.Types.Unique.Set
+import GHC.Unit.Module.Graph ( ModuleGraph, mgModSummaries )
+import GHC.Unit.Module.ModSummary ( ModSummary(ms_location), ms_mod, isBootSummary )
+
+import qualified Data.Semigroup ( (<>) )
 
 -- | The 'FinderCache' maps __home__ modules to the result of
 -- searching for that module. It records the results of searching for
@@ -27,7 +38,12 @@ import GHC.Types.Unique.Set
 -- See Note [The finder caches] in GHC.Unit.Finder.Cache.
 data FinderCache =
   FinderCache
-  { homeFinderCache :: !HomeFinderCache
+  { knownHomeModules :: KnownHomeModules
+    -- ^ Home modules whose defining file is known ahead of any search,
+    -- overriding the search.
+    --
+    -- See Note [Known home modules].
+  , homeFinderCache :: !HomeFinderCache
     -- ^ Cache of home-module searches. See 'HomeFinderCache'.
   , flushFinderCaches :: IO ()
     -- ^ Flush all home-module search caches, and also flush the file and
@@ -38,6 +54,63 @@ data FinderCache =
   , lookupDirCache    :: FilePath -> IO Fingerprint
     -- ^ Like 'lookupFileCache', but for a directory.
   }
+
+{- Note [Known home modules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Most home modules are found by searching the import paths for a file whose
+filename matches the module name. However, a file target is allowed to live
+outside the search paths, and its module name is allowed to differ from the
+file name. Such module names can therefore only be resolved by consulting
+the file's parsed header, and never by search.
+
+'KnownHomeModules' holds exactly this information, as an immutable value.
+This is in contrast to the search memos of the 'FinderCache', which may be
+extended at any time but only ever memoise the pure search function.
+-}
+
+-- | Home modules whose defining file is known ahead of time, overriding
+-- the file search. See Note [Known home modules].
+newtype KnownHomeModules = KnownHomeModules (InstalledModuleEnv ModLocation)
+
+emptyKnownHomeModules :: KnownHomeModules
+emptyKnownHomeModules = KnownHomeModules emptyInstalledModuleEnv
+
+-- | Left-biased: on a duplicate module, the earlier entry wins.
+mkKnownHomeModules :: [(InstalledModule, ModLocation)] -> KnownHomeModules
+mkKnownHomeModules entries =
+  KnownHomeModules $
+    foldr (\ (m, loc) env -> extendInstalledModuleEnv env m loc)
+      emptyInstalledModuleEnv entries
+
+lookupKnownHomeModule :: KnownHomeModules -> InstalledModule -> Maybe ModLocation
+lookupKnownHomeModule (KnownHomeModules env) mod =
+  lookupInstalledModuleEnv env mod
+
+-- | Left-biased.
+instance Semigroup KnownHomeModules where
+  KnownHomeModules l <> KnownHomeModules r =
+    KnownHomeModules (plusInstalledModuleEnv (\ left _right -> left) l r)
+
+instance Monoid KnownHomeModules where
+  mempty = emptyKnownHomeModules
+
+-- | The known home modules of the given summaries (left-biased).
+-- See Note [Known home modules].
+knownHomeModulesOfSummaries :: [ModSummary] -> KnownHomeModules
+knownHomeModulesOfSummaries summaries =
+  mkKnownHomeModules
+    [ (toUnitId <$> ms_mod ms, ms_location ms)
+    | ms <- summaries
+    , NotBoot <- [isBootSummary ms]
+    ]
+
+-- | The known home modules of a module graph's summaries.
+-- See Note [Known home modules].
+--
+-- Beware: this forces the module graph, so it must not be used on a lazily
+-- built graph (such as the one-shot graph of 'GHC.Driver.Downsweep.downsweepThunk').
+knownHomeModulesOfGraph :: ModuleGraph -> KnownHomeModules
+knownHomeModulesOfGraph = knownHomeModulesOfSummaries . mgModSummaries
 
 -- | The result of searching for an imported module.
 --

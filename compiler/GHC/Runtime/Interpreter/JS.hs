@@ -31,6 +31,7 @@ import GHC.StgToJS.Object
 import GHC.Unit.Env
 import GHC.Unit.Types
 import GHC.Unit.State
+import GHC.Unit.Finder.Types ( FinderCache )
 
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
@@ -287,8 +288,8 @@ jsLinkInterp logger tmpfs tmp_dir cfg unit_env inst = do
 
 
 -- | Link object files
-jsLinkObjects :: Logger -> TmpFs -> TempDir -> StgToJSConfig -> UnitEnv -> ExtInterpInstance JSInterpExtra -> [FilePath] -> (ExportedFun -> Bool) -> [UnitId] -> IO ()
-jsLinkObjects logger tmpfs tmp_dir cfg unit_env inst objs is_root extra_units = do
+jsLinkObjects :: Logger -> TmpFs -> TempDir -> StgToJSConfig -> UnitEnv -> FinderCache -> ExtInterpInstance JSInterpExtra -> [FilePath] -> (ExportedFun -> Bool) -> [UnitId] -> IO ()
+jsLinkObjects logger tmpfs tmp_dir cfg unit_env finder_cache inst objs is_root extra_units = do
   let link_cfg = JSLinkConfig
         { lcNoStats         = True  -- we don't need the stats
         , lcNoRts           = True  -- we don't need the RTS (already linked)
@@ -312,8 +313,7 @@ jsLinkObjects logger tmpfs tmp_dir cfg unit_env inst objs is_root extra_units = 
         , lks_objs_cc         = mempty
         }
 
-  let finder_opts  = instFinderOpts (instExtra inst)
-      finder_cache = instFinderCache (instExtra inst)
+  let finder_opts = instFinderOpts (instExtra inst)
 
   ar_cache <- newArchiveCache
   link_plan <- computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache
@@ -322,11 +322,11 @@ jsLinkObjects logger tmpfs tmp_dir cfg unit_env inst objs is_root extra_units = 
 
 
 -- | Link an object file using the given functions as roots
-jsLinkObject :: Logger -> TmpFs -> TempDir -> StgToJSConfig -> UnitEnv -> ExtInterpInstance JSInterpExtra -> FilePath -> [ExportedFun] -> [UnitId] -> IO ()
-jsLinkObject logger tmpfs tmp_dir cfg unit_env inst obj roots extra_units = do
+jsLinkObject :: Logger -> TmpFs -> TempDir -> StgToJSConfig -> UnitEnv -> FinderCache -> ExtInterpInstance JSInterpExtra -> FilePath -> [ExportedFun] -> [UnitId] -> IO ()
+jsLinkObject logger tmpfs tmp_dir cfg unit_env finder_cache inst obj roots extra_units = do
   let is_root f = Set.member f (Set.fromList roots)
   let objs      = [obj]
-  jsLinkObjects logger tmpfs tmp_dir cfg unit_env inst objs is_root extra_units
+  jsLinkObjects logger tmpfs tmp_dir cfg unit_env finder_cache inst objs is_root extra_units
 
 
 -- | Link the given link plan
