@@ -73,7 +73,7 @@ Global bindings (where clauses)
 -- one for the left and one for the right.
 
 type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = EpToken "where"
-type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = (AnnList, EpToken "where")
+type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = EpToken "where"
 type instance XEmptyLocalBinds (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XXHsLocalBindsLR (GhcPass pL) (GhcPass pR) = DataConCantHappen
 
@@ -681,8 +681,8 @@ instance Outputable (XRecGhc (IdGhcP p)) => Outputable (RecordPatSynField (GhcPa
 ************************************************************************
 -}
 
-type instance XIPBinds       GhcPs = NoExtField
-type instance XIPBinds       GhcRn = NoExtField
+type instance XIPBinds       GhcPs = AnnList
+type instance XIPBinds       GhcRn = AnnList
 type instance XIPBinds       GhcTc = TcEvBinds -- binds uses of the
                                                -- implicit parameters
 
@@ -1035,6 +1035,7 @@ instance (OutputableBndrId p) => Outputable (RuleBndr (GhcPass p)) where
 
 type instance Anno (HsLocalBindsLR (GhcPass idL) (GhcPass idR)) = SrcSpanAnnA
 type instance Anno (HsValBindsLR   (GhcPass idL) (GhcPass idR)) = SrcSpanAnnA
+type instance Anno (HsIPBinds                    (GhcPass idR)) = SrcSpanAnnA
 type instance Anno (HsBindLR (GhcPass idL) (GhcPass idR)) = SrcSpanAnnA
 type instance Anno (IPBind (GhcPass p)) = SrcSpanAnnA
 type instance Anno (Sig (GhcPass p)) = SrcSpanAnnA

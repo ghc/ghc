@@ -455,7 +455,7 @@ fromSpecTyVarBndr (L loc (HsTvb xtv flag idp k)) = do
 -- | Add the annotation for a 'where' keyword to existing @HsLocalBinds@
 annBinds :: EpToken "where" -> EpAnnComments -> LHsLocalBinds GhcPs -> LHsLocalBinds GhcPs
 annBinds w cs (L l (HsValBinds _ bs))  = L (widen_where w l cs) (HsValBinds w bs)
-annBinds w cs (L l (HsIPBinds an bs))   = L (widen_where w l cs) (HsIPBinds  (fst an, w) bs)
+annBinds w cs (L l (HsIPBinds _ bs))   = L (widen_where w l cs) (HsIPBinds  w bs)
 annBinds w cs (L l (EmptyLocalBinds x)) = L (widen_where w l cs) (EmptyLocalBinds x)
 
 widen_where :: EpToken "where" -> EpAnn t -> EpAnnComments -> EpAnn t

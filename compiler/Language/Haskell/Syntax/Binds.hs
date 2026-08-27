@@ -70,7 +70,7 @@ data HsLocalBindsLR idL idR
 
   | HsIPBinds
         (XHsIPBinds idL idR)
-        (HsIPBinds idR)
+        (LHsIPBinds idR)
       -- ^ Haskell Implicit Parameter Bindings
 
   | EmptyLocalBinds (XEmptyLocalBinds idL idR)
@@ -85,6 +85,7 @@ type LHsLocalBindsLR idL idR = XRec idL (HsLocalBindsLR idL idR)
 -- | Haskell Value Bindings
 type HsValBinds id = HsValBindsLR id id
 type LHsValBindsLR idL idR = XRec idR (HsValBindsLR idL idR)
+type LHsIPBinds idR = XRec idR (HsIPBinds idR)
 
 -- | Haskell Value bindings with separate Left and Right identifier types
 -- (not implicit parameters)

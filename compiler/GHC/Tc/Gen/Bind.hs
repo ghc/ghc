@@ -228,7 +228,7 @@ tcLocalBinds (HsValBinds x (L lb (XValBindsLR (HsVBG grps sigs)))) thing_inside
         ; return (HsValBinds x (L lb (XValBindsLR (HsVBG grps' sigs))), thing) }
 tcLocalBinds (HsValBinds _ (L _ ValBinds {})) _ = panic "tcLocalBinds"
 
-tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
+tcLocalBinds (HsIPBinds x (L l (IPBinds _ ip_binds))) thing_inside
   = do  { ipClass <- tcLookupKnownKeyClass ipClassKey
         ; (given_ips, ip_binds') <-
             mapAndUnzipM (wrapLocSndMA (tc_ip_bind ipClass)) ip_binds
@@ -237,7 +237,7 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
         ; (ev_binds, result) <- checkConstraints (IPSkol ips)
                                   [] given_ips thing_inside
 
-        ; return (HsIPBinds x (IPBinds ev_binds ip_binds') , result) }
+        ; return (HsIPBinds x (L l (IPBinds ev_binds ip_binds')) , result) }
   where
     ips = [ip | (L _ (IPBind _ (L _ ip) _)) <- ip_binds]
 
