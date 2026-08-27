@@ -699,7 +699,7 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
             Just _          ->
               do
               cmms <- {-# SCC "StgToCmm" #-}
-                doCodeGen hsc_env this_mod denv tycons
+                doCodeGen hsc_env this_mod mod_loc denv tycons
                 cost_centre_info
                 stg_binds
 
@@ -957,14 +957,14 @@ This reduces residency towards the end of the CodeGen phase significantly
 (5-10%).
 -}
 
-doCodeGen :: HscEnv -> Module -> InfoTableProvMap -> [TyCon]
+doCodeGen :: HscEnv -> Module -> ModLocation -> InfoTableProvMap -> [TyCon]
           -> CollectedCCs
           -> [CgStgTopBinding] -- ^ Bindings come already annotated with fvs
           -> IO (CgStream CmmGroupSRTs CmmCgInfos)
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
-doCodeGen hsc_env this_mod denv tycons
+doCodeGen hsc_env this_mod mod_loc denv tycons
               cost_centre_info stg_binds_w_fvs = do
     let dflags     = hsc_dflags hsc_env
         logger     = hsc_logger hsc_env
@@ -972,6 +972,7 @@ doCodeGen hsc_env this_mod denv tycons
         tmpfs      = hsc_tmpfs  hsc_env
         platform   = targetPlatform dflags
         stg_ppr_opts = (initStgPprOpts dflags)
+        this_file  = maybe nilFS mkFastString $ ml_hs_file mod_loc
 
     putDumpFileMaybe logger Opt_D_dump_stg_final "Final STG:" FormatSTG
         (pprGenStgTopBindings stg_ppr_opts stg_binds_w_fvs)
@@ -1033,7 +1034,7 @@ doCodeGen hsc_env this_mod denv tycons
           -- Positions] in GHC.Stg.Debug.
           (ipes', stats') <-
             if (gopt Opt_InfoTableMap dflags) then
-              liftIO $ lookupEstimatedTicks hsc_env ipes stats cmm_srts
+              liftIO $ lookupEstimatedTicks hsc_env this_file ipes stats cmm_srts
             else
               return (ipes, stats)
 

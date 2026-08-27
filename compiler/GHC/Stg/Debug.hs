@@ -135,10 +135,12 @@ collectAlt alt = do e' <- collectExpr $ alt_rhs alt
 -- propagated downwards by 'withSpan'. It's "quick" because it works only using immediate context rather
 -- than looking at the parent context like 'withSpan'
 quickSourcePos :: FastString -> StgExpr -> Maybe SpanWithLabel
-quickSourcePos cur_mod (StgTick (SourceNote ss m) e)
-  | srcSpanFile ss == cur_mod = Just (SpanWithLabel ss m)
-  | otherwise = quickSourcePos cur_mod e
-quickSourcePos _ _ = Nothing
+quickSourcePos cur_mod e
+  = uncurry SpanWithLabel <$> bestSourceNote False cur_mod (head_ticks e)
+  where
+    -- The ticks at the head of the expression, outermost first.
+    head_ticks (StgTick t e') = t : head_ticks e'
+    head_ticks _              = []
 
 recordStgIdPosition :: Id -> Maybe SpanWithLabel -> Maybe SpanWithLabel -> M ()
 recordStgIdPosition id best_span ss = do
