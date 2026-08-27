@@ -180,6 +180,11 @@ test('Test20247', [ignore_stderr, req_ppr_deps], makefile_test, ['Test20247'])
 test('Test20256', [ignore_stderr, req_ppr_deps], makefile_test, ['Test20256'])
 test('Test20258', [ignore_stderr, req_ppr_deps], makefile_test, ['Test20258'])
 test('Test20297', [ignore_stderr, req_ppr_deps], makefile_test, ['Test20297'])
+
+# We test file Test2097.hs twice, once for ppr and exact printing, and
+# here again for exact printing after applying exact print makeDeltaAst
+test('Test20297MD',[extra_files(['Test20297.hs']), ignore_stderr, req_ppr_deps], makefile_test, ['Test20297MD'])
+
 test('Test20315', normal, compile_fail, [''])
 test('Test20846', [ignore_stderr, req_ppr_deps], makefile_test, ['Test20846'])
 test('Test21355', [ignore_stderr, req_ppr_deps], makefile_test, ['Test21355'])
