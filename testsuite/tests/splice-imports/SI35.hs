@@ -4,7 +4,8 @@ module Main where
 import GHC
 import GHC.Driver.Session
 import GHC.Driver.Monad
-import GHC.Driver.Make (load', summariseFile)
+import GHC.Driver.Make (load', summariseSourceFile, defaultSourceFileOptions, SummariseResult(..))
+import GHC.Data.OsPath (unsafeEncodeUtf)
 import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Types
@@ -28,7 +29,7 @@ import GHC.Unit.Module.Stage
 import GHC.Data.Graph.Directed.Reachability
 import GHC.Utils.Trace
 import GHC.Unit.Module.Graph
-import Data.IORef (newIORef)
+import Control.Concurrent.MVar
 
 main :: IO ()
 main = do
@@ -76,6 +77,7 @@ main = do
         getModSummaryFromTarget :: FilePath -> Ghc ModSummary
         getModSummaryFromTarget file = do
           hsc_env <- getSession
-          summ_cache <- liftIO $ newIORef mempty
-          Right ms <- liftIO $ summariseFile hsc_env (DefiniteHomeUnit mainUnitId Nothing) summ_cache file Nothing Nothing
+          SummariseFound ms <- liftIO $
+            summariseSourceFile hsc_env (DefiniteHomeUnit mainUnitId Nothing)
+              defaultSourceFileOptions (unsafeEncodeUtf file)
           return ms
