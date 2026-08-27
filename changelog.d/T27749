@@ -1,0 +1,8 @@
+section: compiler
+issues: #27749
+mrs: !16601
+synopsis:
+  Consistently prefer local source note ticks
+description:
+  When generating IPE stack frames, we now insist on using a source location
+  that is local to the current module.

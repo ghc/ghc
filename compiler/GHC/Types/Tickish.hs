@@ -18,6 +18,7 @@ module GHC.Types.Tickish (
   tickishContains,
   combineTickish_maybe,
   tickishCommutable,
+  bestSourceNote,
 
   -- * Breakpoint tick identifiers
   BreakpointId(..), BreakTickIndex
@@ -32,7 +33,7 @@ import GHC.Core.Type
 import GHC.Unit.Module
 
 import GHC.Types.CostCentre
-import GHC.Types.SrcLoc ( RealSrcSpan, containsSpan )
+import GHC.Types.SrcLoc ( RealSrcSpan, containsSpan, srcSpanFile )
 import GHC.Types.Var
 
 import GHC.Utils.Panic
@@ -40,6 +41,8 @@ import GHC.Utils.Panic
 import Language.Haskell.Syntax.Extension ( NoExtField )
 
 import Data.Data
+import Data.List ( partition )
+import Data.Maybe ( listToMaybe, mapMaybe )
 import GHC.Utils.Binary
 import GHC.Utils.Outputable (Outputable (ppr), text, (<+>))
 
@@ -645,3 +648,25 @@ tickishContains (SourceNote sp1 n1) (SourceNote sp2 n2)
     -- compare the String last
 tickishContains t1 t2
   = t1 == t2
+
+-- | Choose the "best" source note in the given candidate list of ticks,
+-- preferring source notes that are local to the source file being consdiered.
+bestSourceNote
+  :: Bool
+      -- ^ accept a location in another module if there are none in the
+      -- current module?
+  -> FastString        -- ^ the "local" source file
+  -> [GenTickish pass] -- ^ candidates (best first)
+  -> Maybe (RealSrcSpan, LexicalFastString)
+bestSourceNote accept_outside_loc this_file ticks
+  = listToMaybe $
+      if accept_outside_loc
+      then here ++ elsewhere
+      else here
+  where
+    (here, elsewhere)
+      = partition ((this_file ==) . srcSpanFile . fst)
+      $ mapMaybe source_location ticks
+
+    source_location (SourceNote span name) = Just (span, name)
+    source_location _                      = Nothing
