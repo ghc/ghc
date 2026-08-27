@@ -612,3 +612,9 @@ test('T27296b', [], makefile_test, ['T27296b'])
 test('T27589', [grep_errmsg(r'wombat')], compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-uniques'])
 test('T27590', [grep_errmsg(r'wombat')], compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-uniques'])
 test('T27556', [only_ways('ghci'), extra_hc_opts('-O -fno-unoptimized-core-for-interpreter')], ghci_script, ['T27556.script'])
+
+# Check the stack of source notes at the top of the body of 'ordering'
+# is in the correct order.
+test('T27749',
+     multiline_grep_errmsg(r'ordering\n.*\n(\s+src<[^>]*>\n)+'),
+     compile, ['-O -g3 -ddump-simpl -dsuppress-uniques'])
