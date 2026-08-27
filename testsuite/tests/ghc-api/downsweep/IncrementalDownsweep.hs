@@ -17,10 +17,11 @@ import GHC.Utils.Logger (getLogger)
 import GHC.Types.SrcLoc (noLoc)
 import GHC.Unit.Types (moduleName)
 import GHC.Unit.Module.ModSummary (ms_mod)
-import GHC.Unit.Module.Graph (ModuleGraph, mgModSummaries)
+import GHC.Unit.Module.Graph (ModuleGraph, mgModSummaries, mgModSummaries', mkNodeKey)
 import GHC.Driver.DynFlags (defaultFatalMessager, defaultFlushOut)
 import GHC.Driver.Monad (Ghc, getSession, getSessionDynFlags)
-import GHC.Driver.Make (downsweep)
+import GHC.Driver.Make (downsweep, CachedDownsweepResult(..), emptyDownsweepCache)
+import qualified Data.Map.Strict as Map
 import GHC.Driver.Errors.Types (DriverMessages)
 import GHC
        (
@@ -54,12 +55,13 @@ performDownsweepTurn maybeGivenModuleGraph rootModuleName = do
     target <- guessTarget rootModuleName Nothing Nothing
     setTargets [target]
     session <- getSession
+    let reuse = case maybeGivenModuleGraph of
+          Nothing         -> emptyDownsweepCache
+          Just givenGraph -> emptyDownsweepCache
+            { cdr_nodes =
+                Map.fromList [ (mkNodeKey n, n) | n <- mgModSummaries' givenGraph ] }
     (driverMsgs, resultingModuleGraph)
-        <- liftIO $ downsweep session
-                              []
-                              maybeGivenModuleGraph
-                              []
-                              False
+        <- liftIO $ downsweep session reuse [] False
     liftIO $ handleDriverMessages driverMsgs
     return resultingModuleGraph
 

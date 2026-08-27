@@ -1,0 +1,11 @@
+section: compiler
+synopsis: Parallelize the downsweep/module-discovery pass
+issues: #27514
+mrs: !16394
+description: {
+    Parallelize the downsweep pass s.t. processing and discovering the module
+    graph can be done in parallel (parallelizing work like pre-processing CPP
+    in modules) according to the -j<N> flag used. Using Cabal as an example
+    with -j8, parallel downsweep was 2x faster (from 2s to 1s in downsweep time).
+}
+

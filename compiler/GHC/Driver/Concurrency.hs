@@ -16,11 +16,18 @@ module GHC.Driver.Concurrency
     -- ** Coordinating workers
   , runCoordinatingWorkers
 
+    -- ** Demand-driven work (push-based concurrency)
+  , Demand
+  , Rule
+  , RuleAnswer(..)
+  , RuleSet(..)
+  , runRules
   )
   where
 
 import GHC.Prelude
 
+import GHC.Data.Dependent
 
 import GHC.Driver.MakeSem
 import GHC.Driver.Pipeline.LogQueue
@@ -60,11 +67,15 @@ import Control.Exception
   ( SomeAsyncException, SomeException
   , bracket, finally, fromException, mask, onException, throwIO, try )
 import Control.Monad
-  ( unless )
+  ( unless, void, when )
 import Data.Foldable
   ( for_ )
+import Data.Traversable
+  ( for )
+import Data.Functor.Identity
+  ( Identity(..) )
 import Data.IORef
-  ( IORef, atomicModifyIORef', modifyIORef', newIORef, readIORef )
+  ( IORef, atomicModifyIORef', modifyIORef', newIORef, readIORef, writeIORef )
 import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
 
@@ -216,8 +227,8 @@ before it had also finished.
 To solve this problem, GHC.Driver.Concurrency defines two kinds of concurrent
 workers:
 
-  - Independent workers ('mapIndependentWorkers'), which cannot wait for one
-    another at all.
+  - Independent workers ('mapIndependentWorkers', and the workers running the
+    rules of 'runRules'), which cannot wait for one another at all.
     The only scheduling operation is quiescence: wait for all workers to
     complete, and only then observe the final state.
 
@@ -228,7 +239,8 @@ To achieve determinism, we must guarantee that every worker operation is
 insensitive to the precise time it was run. We guarantee this as follows:
 
   - Workers can only report a result by writing to write-once state: monotone
-    maps for independent workers, and each work item's own result variable for
+    maps for independent workers (holding a write-once cell per query, for the
+    workers of 'runRules'), and each work item's own result variable for
     coordinating workers.
 
   - Any read of this mutable state happens after the unique write:
@@ -452,6 +464,119 @@ withWorkerPool
     worker_logger :: Logger -> LogQueue -> Logger
     worker_logger parent_logger worker_log_queue =
       pushLogHook ( const ( parLogAction worker_log_queue ) ) parent_logger
+
+--------------------------------------------------------------------------------
+-- * Demand-driven work
+--------------------------------------------------------------------------------
+
+-- | Push a demand for a rule answering a query to be run.
+--
+-- Does not wait for an answer.
+type Demand query = forall x. query x -> IO ()
+
+-- | The rule's answer to a query.
+data RuleAnswer x
+  -- | The rule answered the query inline.
+  = AnswerInline !x
+  -- | The rule defers answering the question, returning a computation
+  -- to be run by a concurrent worker whose concurrency will be limited.
+  | AnswerDefer !(ConcurrentWorkerEnv -> IO x)
+
+-- | How to answer a query.
+--
+-- The @IO@ action computing the 'RuleAnswer' runs on the thread that makes the
+-- demand, with no concurrency limiting. This action must be cheap, non-blocking,
+-- and produce no log output. Computations that do not satisfy these requirements
+-- should use 'AnswerDefer' instead.
+type Rule query = forall x. query x -> IO (RuleAnswer x)
+
+-- | A set of rules to be run by 'runRules'.
+data RuleSet query =
+  RuleSet
+    { runRule :: Demand query -> Rule query
+      -- ^ How to answer a query, given the ability to demand others.
+    , initialDemands :: Demand query -> IO ()
+      -- ^ What is wanted, before anything has been discovered.
+    }
+
+-- | The state of one query of a 'runRules' computation: a write-once variable
+-- for its answer, empty while a worker has taken on the query and has yet to
+-- answer it.
+newtype Cell answer = Cell ( IORef ( Maybe answer ) )
+
+-- | Answer every query reachable from the initial demands, and return the
+-- answers.
+--
+-- Each query is answered at most once, and no worker ever waits for an answer.
+--
+-- See Note [Deterministic concurrent workers].
+runRules
+  :: forall query
+  .  ( HasDebugCallStack, GCompare query, Outputable ( Some query ) )
+  => WorkerPoolConfig
+  -> DMap query Identity -- ^ queries whose answer is known ahead of time;
+                         -- their rule is never run
+  -> RuleSet query
+  -> IO ( DMap query Identity )
+runRules pool_config known ( RuleSet { runRule, initialDemands } ) = do
+  known_cells <-
+    for ( toListDMap known ) \ ( q :=> Identity answer ) ->
+      ( q :=> ) . Cell <$> newIORef ( Just answer )
+  cells_var <- newIORef @(DMap query Cell) $ fromListDMap known_cells
+
+  -- SortLogs: queries are demanded in an order that depends on the schedule, so
+  -- the workers' logs must be ordered before being printed.
+  withWorkerPool pool_config SortLogs \ spawnWorker -> do
+    let
+      demand :: Demand query
+      demand query = do
+        -- Claim the query before its rule starts, so that two demands of the
+        -- same query does not duplicate the computation.
+
+        -- Do a fast read-before-modify check.
+        cells <- readIORef cells_var
+        unless ( memberDMap query cells ) do
+          cell <- newIORef Nothing
+          is_new <-
+            atomicModifyIORef' cells_var \ cells' ->
+              insertNewDMap query ( Cell cell ) cells'
+          let
+            write_answer answer = writeIORef cell ( Just answer )
+          when is_new do
+            ans <- runRule demand query
+            case ans of
+              AnswerInline ans ->
+                write_answer ans
+              AnswerDefer worker_action ->
+                -- 'spawnWorker' returns whether we actually spawned a worker thread.
+                -- 'False' <=> scope is being torn down due to an exception.
+                -- It doesn't matter that we claimed a cell above: the exception will
+                -- be raised before reading from the 'DMap'.
+                void $ spawnWorker ( Some query ) \ worker_env -> do
+                  res <-
+                    -- AnswerDefer workers run with limited concurrency.
+                    with_concurrency (cwe_conc worker_env) $
+                    worker_action worker_env
+                  write_answer res
+
+    initialDemands demand
+
+  cells <- readIORef cells_var
+  unanswered_var <- newIORef @[Some query] []
+  answers <-
+    traverseMaybeWithKeyDMap
+      ( \ q ( Cell cell ) -> readIORef cell >>= \ case
+          Just answer -> pure ( Just ( Identity answer ) )
+          Nothing     -> Nothing <$ modifyIORef' unanswered_var ( Some q : ) )
+      cells
+  -- Every demanded query must end up with an answer. A query left without one
+  -- means its rule silently dropped it, giving an incomplete result rather
+  -- than a hang. 'withWorkerPool' has rethrown any worker failure by this
+  -- point, so reaching here means all work succeeded.
+  unanswered <- readIORef unanswered_var
+  unless ( null unanswered ) $
+    pprPanic "runRules: queries were never answered" $ ppr unanswered
+  pure answers
 
 --------------------------------------------------------------------------------
 -- * Independent workers

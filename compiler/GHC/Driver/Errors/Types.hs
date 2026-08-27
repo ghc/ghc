@@ -371,6 +371,14 @@ data DriverMessage where
 
   DriverHomePackagesNotClosed :: ![UnitId] -> DriverMessage
 
+  {-| DriverInconsistentUnitDependencies is an error that occurs when one unit
+      has different dependencies depending on which home unit it is reached from.
+  -}
+  DriverInconsistentUnitDependencies
+    :: !UnitId               -- ^ the external unit
+    -> ![(UnitId, [UnitId])] -- ^ its dependencies, per home unit it was reached from
+    -> DriverMessage
+
   DriverInterfaceError :: !IfaceMessage -> DriverMessage
 
   -- TODO: Add structure messages rather than a String

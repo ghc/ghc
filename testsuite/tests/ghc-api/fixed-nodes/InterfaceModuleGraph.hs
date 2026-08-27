@@ -5,7 +5,8 @@ import GHC
 import GHC.Driver.Session
 import GHC.Driver.Monad
 import GHC.Driver.Env
-import GHC.Driver.Make (summariseFile)
+import qualified Data.Map.Strict as Map
+import GHC.Data.OsPath (unsafeEncodeUtf)
 import GHC.Driver.MakeAction
 import GHC.Driver.Downsweep
 import GHC.Unit.Module.Graph
@@ -17,7 +18,7 @@ import GHC.Types.SourceFile
 import System.Environment
 import Control.Monad (void, when)
 import Data.Maybe (fromJust)
-import Data.IORef (newIORef)
+import Control.Concurrent.MVar
 import Control.Exception (ExceptionWithContext(..), SomeException)
 import Control.Monad.Catch (handle, throwM)
 import Control.Exception.Context
@@ -68,21 +69,19 @@ main = do
           keyB = msKey msB
           keyC = msKey msC
 
-      let mkGraph s = do
-            summ_cache <- newIORef mempty
-            imps_cache <- newIORef mempty
+      let mkGraph roots = do
             let env = DownsweepEnv
-                  { ds_hsc_env         = hsc_env
-                  , ds_summaries_cache = summ_cache
-                  , ds_imports_cache   = imps_cache
-                  , ds_mode            = DownsweepUseFixed
-                  , ds_excl_mods       = []
+                  { ds_hsc_env   = hsc_env
+                  , ds_mode      = DownsweepUseFixed
+                  , ds_prior     = Map.fromList [ (root_key ms, (ms, SummFresh)) | ms <- roots ]
+                  , ds_excl_mods = []
                   }
-            ([], nodes) <- runDownsweepM env $
-              downsweepFromRootNodes Nothing True s []
+            ([], nodes, _) <- downsweepFromRootNodes env emptyDownsweepCache
+              (mempty { dr_summarise = map root_key roots })
             return $ mkModuleGraph nodes
+          root_key ms = (ms_unitid ms, fromJust (ml_hs_file_ospath (ms_location ms)))
 
-      graph <- liftIO $ mkGraph [ModuleNodeCompile msC]
+      graph <- liftIO $ mkGraph [msC]
 
       liftIO $ putStrLn "loaded"
       -- 1. Check that the module graph is valid
@@ -110,6 +109,7 @@ main = do
         getModSummaryFromTarget :: FilePath -> Ghc ModSummary
         getModSummaryFromTarget file = do
           hsc_env <- getSession
-          summ_cache <- liftIO $ newIORef mempty
-          Right ms <- liftIO $ summariseFile hsc_env (DefiniteHomeUnit mainUnitId Nothing) summ_cache file Nothing Nothing
+          SummariseFound ms <- liftIO $
+            summariseSourceFile hsc_env (DefiniteHomeUnit mainUnitId Nothing)
+              defaultSourceFileOptions (unsafeEncodeUtf file)
           return ms

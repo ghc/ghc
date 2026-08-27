@@ -37,10 +37,11 @@ module GHC.Driver.Make (
 
         -- * Re-exports from Downsweep
         checkHomeUnitsClosed,
-        summariseModule,
-        summariseModuleInterface,
+        CachedDownsweepResult(..), emptyDownsweepCache, modSummaryReuseMap,
         SummariseResult(..),
-        summariseFile,
+        SourceFileOptions(..), defaultSourceFileOptions,
+        SummProvenance(..),
+        summariseSourceFile,
 
         instantiationNodes,
         ) where
@@ -234,7 +235,7 @@ depanalPartial excluded_mods allow_dup_roots = do
     liftIO $ flushFinderCaches (hsc_FC hsc_env)
 
     (errs, mod_graph) <- liftIO $ downsweep
-      hsc_env (mgModSummaries old_graph) Nothing
+      hsc_env (emptyDownsweepCache { cdr_summaries = modSummaryReuseMap (mgModSummaries old_graph) })
       excluded_mods allow_dup_roots
     return (unionManyMessages errs, mod_graph)
 
