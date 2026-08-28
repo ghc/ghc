@@ -1,0 +1,1 @@
+-march=native is only supported on x86 and x86_64 targets

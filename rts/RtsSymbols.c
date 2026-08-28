@@ -1039,6 +1039,30 @@ extern char **environ;
 #define RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
 #endif
 
+// libgcc/compiler-rt symbols behind __builtin_cpu_supports/__builtin_cpu_init,
+// referenced by compiler/cbits/cpu_features_x86.c (-march=native).
+// Without them the runtime linker cannot load the ghc library's object code
+// (e.g. for plugins in a statically linked GHCi). Keep the guards in sync
+// with cpu_features_x86.c.
+#if (defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)) \
+    && (defined(__GNUC__) || defined(__clang__))
+// __cpu_features2 holds the feature words beyond the first 32 (e.g. GFNI)
+// and only exists in the runtimes of GCC >= 11 resp. LLVM >= 12.
+#if (defined(__clang_major__) && __clang_major__ >= 12) \
+    || (!defined(__clang__) && defined(__GNUC__) && __GNUC__ >= 11)
+#define RTS_X86_CPU_FEATURES2_SYMBOLS \
+      SymI_NeedsDataProto(__cpu_features2)
+#else
+#define RTS_X86_CPU_FEATURES2_SYMBOLS
+#endif
+#define RTS_X86_CPU_MODEL_SYMBOLS \
+      SymI_NeedsProto(__cpu_indicator_init) \
+      SymI_NeedsDataProto(__cpu_model) \
+      RTS_X86_CPU_FEATURES2_SYMBOLS
+#else
+#define RTS_X86_CPU_MODEL_SYMBOLS
+#endif
+
 // Symbols defined by libc
 #define RTS_LIBC_SYMBOLS                               \
       SymI_HasProto_redirect(atexit, atexit, STRENGTH_STRONG, SYM_TYPE_CODE) /* See Note [Strong symbols] */ \
@@ -1199,6 +1223,7 @@ RTS_OPENBSD_ONLY_SYMBOLS
 RTS_LIBC_SYMBOLS
 RTS_LIBGCC_SYMBOLS
 RTS_ARCH_LIBGCC_SYMBOLS
+RTS_X86_CPU_MODEL_SYMBOLS
 RTS_FINI_ARRAY_SYMBOLS
 RTS_LIBFFI_SYMBOLS
 RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
@@ -1254,6 +1279,7 @@ void initLinkerRtsSyms (StrHashTable *symhash) {
       RTS_OPENBSD_ONLY_SYMBOLS
       RTS_LIBGCC_SYMBOLS
       RTS_ARCH_LIBGCC_SYMBOLS
+      RTS_X86_CPU_MODEL_SYMBOLS
       RTS_FINI_ARRAY_SYMBOLS
       RTS_LIBFFI_SYMBOLS
       RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
