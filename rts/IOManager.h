@@ -325,8 +325,33 @@ typedef enum { IORead = 0, IOWrite = 1 } IOReadOrWrite;
  * false on heap allocation failure.
  */
 
+/* Note [Encoding of result of I/O manager operations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We have quite a bit of information that to return from the I/O manager calls
+back to the I/O primops. It (somewhat uncomfortably) fits into a C int.
+
+We use the following encoding of the result:
+
+ * negative: synchronous failure, with -errno as the result.
+ * 0: ok, result successful, proceed to async: suspend the TSO.
+ * 1: synchronous success, return without suspending the TSO. This can occur
+      for example when waiting on readiness of a regular file (which is always
+      ready).
+ * 2: heap overflow
+ * >2: unallocated status codes
+*/
+typedef int IOSubmitResult;
+
+/* Provide constants for IOSubmitResult */
+enum IOSubmitResultCodes {
+  /* negative numbers are -errno error codes */
+  IOSubmitResultAsyncContinue = 0,
+  IOSubmitResultSyncSuccess   = 1,
+  IOSubmitResultHeapOverflow  = 2
+};
+
 /* Called from CMM primop */
-bool syncIOWaitReady(CapIOManager *iomgr, StgTSO *tso, IOReadOrWrite rw, HsInt fd);
+IOSubmitResult syncIOWaitReady(CapIOManager *iomgr, StgTSO *tso, IOReadOrWrite rw, HsInt fd);
 
 void syncIOCancel(CapIOManager *iomgr, StgTSO *tso);
 

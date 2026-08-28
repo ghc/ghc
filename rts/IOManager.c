@@ -776,10 +776,10 @@ void interruptIOManager(CapIOManager *iomgr)
 
 
 /* CMM primop. Result is true on success, or false on allocation failure. */
-bool syncIOWaitReady(CapIOManager *iomgr,
-                     StgTSO       *tso,
-                     IOReadOrWrite rw,
-                     HsInt         fd)
+IOSubmitResult syncIOWaitReady(CapIOManager *iomgr,
+                               StgTSO       *tso,
+                               IOReadOrWrite rw,
+                               HsInt         fd)
 {
     debugTrace(DEBUG_iomanager,
                "thread %ld waiting for %s I/O readiness on fd %d",
@@ -795,7 +795,7 @@ bool syncIOWaitReady(CapIOManager *iomgr,
             tso->block_info.fd = fd;
             appendToIOBlockedQueue(iomgr, tso);
             RELEASE_STORE(&tso->why_blocked, why_blocked);
-            return true;
+            return IOSubmitResultAsyncContinue;
         }
 #endif
 #if defined(IOMGR_ENABLED_POLL)

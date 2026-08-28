@@ -171,14 +171,13 @@ void freeCapabilityIOManagerPoll(CapIOManager *iomgr)
 }
 
 
-/* Used to implement syncIOWaitReady.
- * Result is true on success, or false on allocation failure. */
-bool syncIOWaitReadyPoll(CapIOManager *iomgr, StgTSO *tso,
-                         IOReadOrWrite rw, HsInt fd)
+/* Used to implement syncIOWaitReady. */
+IOSubmitResult syncIOWaitReadyPoll(CapIOManager *iomgr, StgTSO *tso,
+                                   IOReadOrWrite rw, HsInt fd)
 {
     StgAsyncIOOp *aiop;
     aiop = (StgAsyncIOOp *)allocateMightFail(iomgr->cap, sizeofW(StgAsyncIOOp));
-    if (RTS_UNLIKELY(aiop == NULL)) return false;
+    if (RTS_UNLIKELY(aiop == NULL)) return IOSubmitResultHeapOverflow;
     SET_HDR(aiop, &stg_ASYNCIOOP_info, iomgr->cap->r.rCCCS);
     aiop->notify.tso     = tso;
     aiop->notify_type    = NotifyTSO;
@@ -189,13 +188,12 @@ bool syncIOWaitReadyPoll(CapIOManager *iomgr, StgTSO *tso,
     return asyncIOWaitReadyPoll(iomgr, aiop, rw, fd);
 }
 
-/* Result is true on success, or false on allocation failure. */
-bool asyncIOWaitReadyPoll(CapIOManager *iomgr, StgAsyncIOOp *aiop,
-                         IOReadOrWrite rw, int fd)
+IOSubmitResult asyncIOWaitReadyPoll(CapIOManager *iomgr, StgAsyncIOOp *aiop,
+                                    IOReadOrWrite rw, int fd)
 {
     if (RTS_UNLIKELY(isFullClosureTable(&iomgr->aiop_table))) {
         bool ok = enlargeTables(iomgr);
-        if (RTS_UNLIKELY(!ok)) return false;
+        if (RTS_UNLIKELY(!ok)) return IOSubmitResultHeapOverflow;
     }
 
     int ix = insertClosureTable(iomgr->cap, &iomgr->aiop_table, aiop);
@@ -216,7 +214,7 @@ bool asyncIOWaitReadyPoll(CapIOManager *iomgr, StgAsyncIOOp *aiop,
                                    .events  = rw == IORead ? POLLIN : POLLOUT,
                                    .revents = 0
                                  };
-    return true;
+    return IOSubmitResultAsyncContinue;
 }
 
 
