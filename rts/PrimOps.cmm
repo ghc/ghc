@@ -2297,32 +2297,60 @@ stg_whereFromzh (P_ clos, W_ buf)
    Thread I/O blocking primitives
    -------------------------------------------------------------------------- */
 
+stg_handleIOSubmitResult ( CInt result )
+{
+    /* See Note [Encoding of result of I/O manager operations] */
+
+    /* case IOSubmitResultAsyncContinue */
+    if (result == 0::CInt) (likely: True) {
+        /* See Note [Thread blocking for new I/O primops] */
+        jump stg_block_noregs();
+    }
+
+    /* case IOSubmitResultSyncSuccess*/
+    if (result == 1::CInt) (likely: True) {
+        /* Success, don't even go via scheduler. */
+        return ();
+    }
+
+    /* negative numbers are -errno error codes */
+    if (result < 0::CInt) {
+        /* See Note [Calling convention for raisePrimIOException] */
+        W_ dummyR1; W_ errno;
+        dummyR1 = 0;
+        errno   = TO_W_(-result);
+        jump %ENTRY_CODE(HsIface_raisePrimIOException_info(W_[ghc_hs_iface]))
+                                                          (dummyR1, errno);
+    }
+
+    /* case IOSubmitResultHeapOverflow */
+    if (result == 2::CInt) {
+        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
+
+    }
+    ccall sbarf("syncIOWaitReady result encoding error") never returns;
+}
+
 stg_waitReadzh ( W_ fd )
 {
-    CBool ok; /* Ok, or heap alloc failure. */
+    CInt result;
 
-    (ok) = ccall syncIOWaitReady(Capability_iomgr(MyCapability()) "ptr",
-                                 CurrentTSO "ptr",
-                                 /* IORead */ 0::CInt, fd);
-    if (ok != 0::CBool) (likely: True) {
-        jump stg_block_noregs();
-    } else {
-        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
-    }
+    (result) = ccall syncIOWaitReady(Capability_iomgr(MyCapability()) "ptr",
+                                     CurrentTSO "ptr",
+                                     /* IORead */ 0::CInt, fd);
+
+    jump stg_handleIOSubmitResult(result);
 }
 
 stg_waitWritezh ( W_ fd )
 {
-    CBool ok; /* Ok, or heap alloc failure. */
+    CInt result;
 
-    (ok) = ccall syncIOWaitReady(Capability_iomgr(MyCapability()) "ptr",
-                                 CurrentTSO "ptr",
-                                 /* IOWrite */ 1::CInt, fd);
-    if (ok != 0::CBool) (likely: True) {
-        jump stg_block_noregs();
-    } else {
-        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
-    }
+    (result) = ccall syncIOWaitReady(Capability_iomgr(MyCapability()) "ptr",
+                                     CurrentTSO "ptr",
+                                     /* IOWrite */ 1::CInt, fd);
+
+    jump stg_handleIOSubmitResult(result);
 }
 
 stg_delayzh ( W_ us_delay )
