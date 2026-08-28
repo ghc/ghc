@@ -58,6 +58,7 @@ module GHC.Types.Unique (
 import GHC.Prelude
 
 import GHC.Data.FastString
+import GHC.Unit.Module.Name ( ModuleName(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain (panic)
 import GHC.Utils.Word64 (intToWord64, word64ToInt)
@@ -70,7 +71,6 @@ import Data.Char        ( chr, ord, isPrint )
 import Data.Data        ( Data )
 
 import Language.Haskell.Syntax.Basic ( FieldLabelString(..) )
-import Language.Haskell.Syntax.Module.Name ( ModuleName(..) )
 
 {-
 ************************************************************************

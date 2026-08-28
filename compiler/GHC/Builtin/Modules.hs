@@ -8,8 +8,6 @@ import GHC.Unit.Types
 
 import GHC.Data.FastString
 
-import Language.Haskell.Syntax.Module.Name
-
 {-
 ************************************************************************
 *                                                                      *

@@ -127,7 +127,7 @@ findLoc infos span0 string = do
 
     case getSrcSpan name' of
         UnhelpfulSpan{} -> throwE $ GhciNoLocationInfoForModule
-          (maybe (ModuleName "<unknown>") moduleName (nameModule_maybe name'))
+          (maybe (mkModuleName "<unknown>") moduleName (nameModule_maybe name'))
         span' -> return (info,name',span')
 
 -- | Find any uses of the given identifier in the codebase.

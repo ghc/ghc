@@ -15,8 +15,9 @@ import GHC.Iface.Ext.Utils (emptyNodeInfo, isEvidenceContext)
 import GHC.Types.Name (Name, getOccString, isInternalName, nameModule, nameUnique)
 import GHC.Types.SrcLoc
 import GHC.Types.Unique (showUnique)
-import GHC.Unit.Module (Module, ModuleName, moduleNameString)
+import GHC.Unit.Module (Module, hsModuleName)
 import GHC.Utils.Encoding (utf8DecodeByteString)
+import Language.Haskell.Syntax.Module.Name (HsModuleName, hsModuleNameString)
 import System.FilePath.Posix ((</>))
 import Text.XHtml (Html, HtmlAttr, (!))
 import qualified Text.XHtml as Html
@@ -188,8 +189,8 @@ annotate ni content =
           concatMap (\(n, t) -> printName n ++ " :: " ++ t ++ "\n") typedIdents
       | otherwise = ""
 
-    printName :: Either ModuleName Name -> String
-    printName = either moduleNameString getOccString
+    printName :: Either HsModuleName Name -> String
+    printName = either hsModuleNameString getOccString
 
 richTokenStyle
   :: Bool
@@ -264,7 +265,7 @@ hyperlink thisModule (srcs, srcs') ident = case ident of
   Right name
     | isInternalName name -> internalHyperlink name
     | otherwise -> externalNameHyperlink name
-  Left name -> externalModHyperlink name
+  Left name -> externalModHyperlink (hsModuleName name)
   where
     -- In a Nix environment, we have file:// URLs with absolute paths
     makeHyperlinkUrl url | List.isPrefixOf "file://" url = url

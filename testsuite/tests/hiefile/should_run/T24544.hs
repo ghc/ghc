@@ -7,9 +7,9 @@ import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Data.Either
 import Data.Maybe
-import Data.Bifunctor (first)
-import GHC.Plugins (moduleNameString, nameStableString, nameOccName, occNameString, isDerivedOccName)
+import GHC.Plugins (nameStableString, nameOccName, occNameString, isDerivedOccName)
 import GHC.Iface.Ext.Types
+import Language.Haskell.Syntax.Module.Name (hsModuleNameString)
 -- data EntityInfo
 --   =
 --   EntityVariable
@@ -50,5 +50,5 @@ main = do
   (df, hf) <- readTestHie "T24544.hie"
   let asts = fmap (fromMaybe (error "nothing") . selectPoint hf) points
       idents = concatMap (M.toList . sourcedNodeIdents . sourcedNodeInfo) asts
-      names = map (\(x, _) -> (either moduleNameString  (occNameString . nameOccName) x, getIdentifierEntityInfo hf x)) $ filter isNotDerived idents
+      names = map (\(x, _) -> (either hsModuleNameString (occNameString . nameOccName) x, getIdentifierEntityInfo hf x)) $ filter isNotDerived idents
   mapM_ (print) names

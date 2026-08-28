@@ -38,7 +38,7 @@
      []
      (EpaComments
       []))
-    {ModuleName: T17544_kw}))
+    {HsModuleName: T17544_kw}))
   (Just
    [(L
      (EpAnn

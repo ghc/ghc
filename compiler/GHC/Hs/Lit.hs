@@ -105,8 +105,8 @@ import GHC.Hs.Extension
 import Language.Haskell.Syntax.Expr ( HsExpr )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Lit
-import Language.Haskell.Syntax.Module.Name (moduleNameString)
 import Language.Haskell.Syntax.Text
+import Language.Haskell.Syntax.Module.Name
 
 import Data.Function (on)
 import Data.Ratio ((%))
@@ -448,7 +448,8 @@ instance Ord (HsQualLit (GhcPass p)) where
   QualLit _ m1 v1 `compare` QualLit _ m2 v2 = (m1, v1) `compare` (m2, v2)
 
 instance OutputableBndrId p => Outputable (HsQualLit (GhcPass p)) where
-  ppr QualLit{..} = text (moduleNameString ql_mod) <> char '.' <> ppr ql_val
+  ppr QualLit{ql_mod = HsModuleName ql_mod, ..} =
+    text (unpackHText ql_mod) <> char '.' <> ppr ql_val
 
 -- -----------------------------------------------------------------------------
 -- QualLitVal

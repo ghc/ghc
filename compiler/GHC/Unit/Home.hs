@@ -35,8 +35,6 @@ import GHC.Prelude
 import GHC.Unit.Types
 import Data.Maybe
 
-import Language.Haskell.Syntax.Module.Name
-
 -- | Information about the home unit (i.e., the until that will contain the
 -- modules we are compiling)
 --

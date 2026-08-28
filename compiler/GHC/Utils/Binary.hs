@@ -125,12 +125,12 @@ import Language.Haskell.Syntax.Binds.InlinePragma
 import Language.Haskell.Syntax.Decls.Overlap
 import Language.Haskell.Syntax.Doc
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Module.Name (ModuleName(..))
 import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
 import Language.Haskell.Syntax.Specificity
 import Language.Haskell.Syntax.Type (PromotionFlag(..))
 
 import {-# SOURCE #-} GHC.Types.Name (Name)
+import GHC.Unit.Module.Name (ModuleName(..))
 import GHC.Data.ShortText (ShortText)
 import GHC.Data.FastString
 import GHC.Data.TrieMap
@@ -194,6 +194,7 @@ import GHC.Serialized
 import Data.Kind (Type)
 import Data.Typeable (tyConPackage, tyConModule)
 import Data.Typeable (tyConName)
+import Language.Haskell.Syntax.Module.Name
 
 type BinArray = ForeignPtr Word8
 
@@ -1938,6 +1939,10 @@ instance Binary Fingerprint where
 instance Binary ModuleName where
   put_ bh (ModuleName fs) = put_ bh fs
   get bh = do fs <- get bh; return (ModuleName fs)
+
+instance Binary HsModuleName where
+  put_ bh (HsModuleName t) = put_ bh t
+  get bh = do t <- get bh; return (HsModuleName t)
 
 instance Binary Specificity where
   put_ bh SpecifiedSpec = putByte bh 0

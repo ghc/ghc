@@ -15,7 +15,7 @@ import GHC.Unit.Module.Location ( ModLocation )
 import GHC.Unit.Module.ModIface
 import GHC.Driver.Phases
 
-import Language.Haskell.Syntax.Module.Name ( ModuleName )
+import GHC.Unit.Module.Name ( ModuleName )
 import GHC.Unit.Home.ModInfo
 
 -- Typed Pipeline Phases

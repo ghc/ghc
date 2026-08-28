@@ -45,6 +45,7 @@ import GHC.Types.SourceError
 import GHC.Types.SourceText
 import GHC.Types.PkgQual
 
+import GHC.Unit.Module.Name
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Monad
@@ -100,7 +101,7 @@ parseHeaderImports dflags buf filename source_filename = do
         then throwErrors sec (GhcPsMessage <$> errs)
         else
           let   hsmod = unLoc rdr_module
-                mb_mod = hsmodName hsmod
+                mb_mod = fmap hsModuleName <$> hsmodName hsmod
                 main_loc = srcLocSpan (mkSrcLoc (mkFastString source_filename)
                                        1 1)
                 mod = mb_mod `orElse` L (noAnnSrcSpan main_loc) mAIN_NAME
@@ -125,7 +126,7 @@ mkUnresolvedImport decl =
                    , ui_level    = convImportLevel (ideclLevelSpec decl)
                    , ui_pkg_qual = ideclPkgQual decl
                    , ui_boot     = ideclSource decl
-                   , ui_mod_name = reLoc (ideclName decl) }
+                   , ui_mod_name = reLoc (hsModuleName <$> ideclName decl) }
 
 -- | The import declarations GHC generates: 'Prelude' and 'GHC.Essentials'.
 mkImplicitImports :: DynFlags -> ModuleName -> [LImportDecl GhcPs]
@@ -152,7 +153,7 @@ mkPrelImports this_mod implicit_prelude import_decls
       explicit_prelude_import = any is_prelude_import import_decls
 
       is_prelude_import (L _ (decl::ImportDecl GhcPs)) =
-        unLoc (ideclName decl) == pRELUDE_NAME
+        hsModuleName (unLoc (ideclName decl)) == pRELUDE_NAME
         -- See #17045, package qualified imports are never counted as
         -- explicit prelude imports
         && case ideclPkgQual decl of
@@ -185,7 +186,7 @@ generatedImportDecl origin mod_name
                                               , ideclSourceText = NoSourceText
                                               , ideclOrigin = origin
                                               },
-                          ideclName      = L loc mod_name,
+                          ideclName      = L loc (toHsModuleName mod_name),
                           ideclPkgQual   = NoRawPkgQual,
                           ideclSource    = NotBoot,
                           ideclSafe      = False,  -- Not a safe import

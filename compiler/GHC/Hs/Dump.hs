@@ -22,6 +22,8 @@ module GHC.Hs.Dump (
 import GHC.Prelude
 
 import GHC.Hs
+import GHC.Unit.Module.Name (ModuleName)
+import Language.Haskell.Syntax.Module.Name (HsModuleName)
 
 import GHC.Core.DataCon
 
@@ -91,7 +93,8 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` maybe_epaLocation
               `extQ` shortText
               `extQ` bytestring
-              `extQ` name `extQ` occName `extQ` moduleName `extQ` var
+              `extQ` name `extQ` occName `extQ` moduleName `extQ` hsModuleName
+              `extQ` var
               `extQ` dataCon
               `extQ` bagName `extQ` bagRdrName `extQ` bagVar `extQ` nameSet
               `ext2Q` located
@@ -203,6 +206,9 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             moduleName :: ModuleName -> SDoc
             moduleName m = braces $ text "ModuleName:" <+> ppr m
+
+            hsModuleName :: HsModuleName -> SDoc
+            hsModuleName m = braces $ text "HsModuleName:" <+> ppr m
 
             srcSpan :: SrcSpan -> SDoc
             srcSpan ss = case bs of

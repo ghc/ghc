@@ -70,7 +70,7 @@ import GHC.Unit.Finder
   ( FindResult(..), ModuleLookupScope(..), findImportedModule )
 import GHC.Utils.Outputable
   ( text )
-import Language.Haskell.Syntax.Module.Name
+import GHC.Unit.Module.Name
   ( mkModuleName )
 
 --------------------------------------------------------------------------------
