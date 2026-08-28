@@ -386,6 +386,10 @@ RTS_FUN_DECL(stg_block_throwto);
 RTS_RET(stg_block_throwto);
 
 /* Blocking for I/O primops */
+RTS_FUN_DECL(stg_block_io_unit);
+RTS_RET(stg_block_io_unit);
+RTS_FUN_DECL(stg_block_io_int);
+RTS_RET(stg_block_io_int);
 #if defined(mingw32_HOST_OS)
 RTS_FUN_DECL(stg_block_async);
 RTS_RET(stg_block_async);
