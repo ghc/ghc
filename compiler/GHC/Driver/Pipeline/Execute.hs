@@ -83,8 +83,6 @@ import GHC.Rename.Names
 import GHC.StgToJS.Linker.Linker (embedJsFile)
 import GHC.Types.UnresolvedImport (rnUnresolvedImportPkgQual)
 
-import Language.Haskell.Syntax.Module.Name
-
 newtype HookedUse a = HookedUse { runHookedUse :: (Hooks, PhaseHook) -> IO a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask)
     via (ReaderT (Hooks, PhaseHook) IO)

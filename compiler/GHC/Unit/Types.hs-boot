@@ -1,7 +1,7 @@
 module GHC.Unit.Types where
 
 -- No Prelude. See Note [Exporting pprTrace from GHC.Prelude]
-import Language.Haskell.Syntax.Module.Name (ModuleName)
+import GHC.Unit.Module.Name (ModuleName)
 import Data.Kind (Type)
 
 data UnitId

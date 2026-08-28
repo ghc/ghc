@@ -37,7 +37,7 @@ import GHC.Parser.CharClass (
  )
 import GHC.Parser.Errors.Types (LexErr (..))
 import GHC.Utils.Panic (panic)
-import Language.Haskell.Syntax.Module.Name (ModuleName)
+import GHC.Unit.Module.Name (ModuleName)
 
 type BufPos = Int
 data StringLexError = StringLexError LexErr BufPos

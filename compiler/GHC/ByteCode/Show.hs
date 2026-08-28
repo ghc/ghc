@@ -62,13 +62,12 @@ import GHC.Utils.Outputable
          ppr,
          withPprStyle
        )
-import GHC.Unit.Types (Module, moduleName)
+import GHC.Unit.Types (Module, moduleName, moduleNameString)
 import GHC.Iface.Type (IfaceType, IfaceTvBndr, IfaceIdBndr)
 import GHC.HsToCore.Breakpoints (ModBreaks (..))
 import GHC.Driver.Env.Types (HscEnv)
 import GHCi.FFI (FFIType)
 import GHCi.Message (ConInfoTable (..))
-import Language.Haskell.Syntax.Module.Name (moduleNameString)
 
 -- Basic things
 import Control.Arrow ((>>>))

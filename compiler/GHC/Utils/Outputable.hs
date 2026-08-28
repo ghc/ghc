@@ -111,13 +111,13 @@ module GHC.Utils.Outputable (
 
 import {-# SOURCE #-}   GHC.Unit.Types ( Unit, Module, moduleName )
 import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
+import GHC.Unit.Module.Name ( ModuleName(..) )
 
 import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Binds.InlinePragma
 import Language.Haskell.Syntax.Decls.Overlap ( OverlapMode(..) )
 import Language.Haskell.Syntax.Doc
 import Language.Haskell.Syntax.ImpExp ( NamespaceSpecifier(..) )
-import Language.Haskell.Syntax.Module.Name ( ModuleName(..) )
 import Language.Haskell.Syntax.Specificity
 import Language.Haskell.Syntax.Text
 import Language.Haskell.Syntax.Type ( PromotionFlag(..) )

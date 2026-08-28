@@ -18,7 +18,6 @@ module GHC.Hs.ImpExp
     ) where
 
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Module.Name
 import Language.Haskell.Syntax.ImpExp
 
 import GHC.Prelude
@@ -37,6 +36,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc ((<||>))
 
+import GHC.Unit.Module.Name
 import GHC.Unit.Module.Warnings
 
 import Data.Data

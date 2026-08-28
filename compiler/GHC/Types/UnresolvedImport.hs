@@ -23,12 +23,11 @@ import GHC.Prelude
 import GHC.Types.Basic ( ImportLevel(..) )
 import GHC.Types.PkgQual
 import GHC.Types.SrcLoc ( Located, unLoc )
-import GHC.Unit.Types ( ModuleLookupScope(..) )
+import GHC.Unit.Types ( ModuleLookupScope(..), ModuleName )
 
 import GHC.Utils.Outputable
 
 import Language.Haskell.Syntax.ImpExp.IsBoot ( IsBootInterface(..) )
-import Language.Haskell.Syntax.Module.Name ( ModuleName )
 
 import Data.Data ( Data )
 

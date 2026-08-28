@@ -54,8 +54,6 @@ import qualified Data.Semigroup as S
 import qualified GHC.Data.FiniteMap as Map
 import GHC.Utils.Outputable
 
-import Language.Haskell.Syntax.Module.Name
-
 -- | A map keyed off of 'Module's
 newtype ModuleEnv elt = ModuleEnv (Map NDModule elt)
 

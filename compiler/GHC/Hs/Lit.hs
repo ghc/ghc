@@ -101,11 +101,11 @@ import GHC.Utils.Misc (split)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic (panic)
 import GHC.Hs.Extension
+import GHC.Unit.Module.Name (moduleNameString)
 
 import Language.Haskell.Syntax.Expr ( HsExpr )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Lit
-import Language.Haskell.Syntax.Module.Name (moduleNameString)
 import Language.Haskell.Syntax.Text
 
 import Data.Function (on)

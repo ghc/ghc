@@ -35,6 +35,7 @@ import GHC.Parser           ( parseHeader )
 import GHC.Parser.Lexer
 
 import GHC.Hs
+import GHC.Unit.Module.Name (ModuleName)
 import GHC.Builtin.Modules( mAIN_NAME, eSSENTIALS_NAME, pRELUDE_NAME, usesEssentialsModule )
 
 import GHC.Types.Basic ( convImportLevel )

@@ -125,12 +125,12 @@ import Language.Haskell.Syntax.Binds.InlinePragma
 import Language.Haskell.Syntax.Decls.Overlap
 import Language.Haskell.Syntax.Doc
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Module.Name (ModuleName(..))
 import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
 import Language.Haskell.Syntax.Specificity
 import Language.Haskell.Syntax.Type (PromotionFlag(..))
 
 import {-# SOURCE #-} GHC.Types.Name (Name)
+import GHC.Unit.Module.Name (ModuleName(..))
 import GHC.Data.ShortText (ShortText)
 import GHC.Data.FastString
 import GHC.Data.TrieMap

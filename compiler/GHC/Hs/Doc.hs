@@ -53,10 +53,10 @@ import Data.List (sortBy)
 import Data.Function
 
 import GHC.Hs.DocString
+import GHC.Unit.Module.Name
 
 import Language.Haskell.Syntax.Doc
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Module.Name
 
 -- Exact print annotations ignore LHsDoc, so bare SrcSpan is fine
 type instance Anno (WithHsDocIdentifiers (HsDocString (GhcPass pass)) (GhcPass pass)) = SrcSpan

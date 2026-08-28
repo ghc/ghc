@@ -41,7 +41,6 @@ module Language.Haskell.Syntax.Lit (
 
 import Language.Haskell.Syntax.Text
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Module.Name (ModuleName)
 
 
 import Data.Bool
@@ -122,7 +121,7 @@ data OverLitVal x
 data HsQualLit p
   = QualLit
       { ql_ext :: !(XQualLit p)
-      , ql_mod :: !ModuleName
+      , ql_mod :: !(ModuleNameP p)
       , ql_val :: !(QualLitVal p)
       }
   | XQualLit !(XXQualLit p)

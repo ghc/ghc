@@ -17,10 +17,11 @@ import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Pat
 import Language.Haskell.Syntax.Lit
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Module.Name (ModuleName)
 import Language.Haskell.Syntax.Text
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Binds
+
+import GHC.Unit.Module.Name (ModuleName)
 
 
 -- libraries:

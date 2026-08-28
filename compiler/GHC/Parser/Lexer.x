@@ -128,6 +128,7 @@ import GHC.Hs.Lit
 
 import Language.Haskell.Syntax.Doc
 import Language.Haskell.Syntax.Extension (noExtField)
+import Language.Haskell.Syntax.Text
 
 import GHC.Parser.CharClass
 
@@ -139,9 +140,7 @@ import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.Lexer.Interface
 import qualified GHC.Parser.Lexer.String as Lexer.String
 import GHC.Parser.String
-
-import Language.Haskell.Syntax.Module.Name (ModuleName(..))
-import Language.Haskell.Syntax.Text
+import GHC.Unit.Module.Name (ModuleName(..))
 }
 
 -- -----------------------------------------------------------------------------

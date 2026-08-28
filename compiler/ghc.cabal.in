@@ -991,6 +991,7 @@ Library
         GHC.Unit.Module
         GHC.Unit.Module.Deps
         GHC.Unit.Module.Env
+        GHC.Unit.Module.Name
         GHC.Unit.Module.Graph
         GHC.Unit.Module.ModNodeKey
         GHC.Unit.Module.Stage
@@ -1059,7 +1060,6 @@ Library
         Language.Haskell.Syntax.ImpExp
         Language.Haskell.Syntax.ImpExp.IsBoot
         Language.Haskell.Syntax.Lit
-        Language.Haskell.Syntax.Module.Name
         Language.Haskell.Syntax.Pat
         Language.Haskell.Syntax.Specificity
         Language.Haskell.Syntax.Text

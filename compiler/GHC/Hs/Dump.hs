@@ -22,6 +22,7 @@ module GHC.Hs.Dump (
 import GHC.Prelude
 
 import GHC.Hs
+import GHC.Unit.Module.Name (ModuleName)
 
 import GHC.Core.DataCon
 

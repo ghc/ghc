@@ -1,4 +1,4 @@
-module Language.Haskell.Syntax.Module.Name where
+module GHC.Unit.Module.Name where
 
 import Prelude
 
@@ -8,7 +8,7 @@ import Control.DeepSeq
 import qualified Text.ParserCombinators.ReadP as Parse
 import System.FilePath
 
-import GHC.Data.FastString -- todo: make 'ModuleName' parametrized? we don't want to use Text here.
+import GHC.Data.FastString
 
 -- | A ModuleName is essentially a simple string, e.g. @Data.List@.
 newtype ModuleName = ModuleName FastString deriving (Show, Eq)

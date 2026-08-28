@@ -3,8 +3,16 @@
 -- This module is used to resolve the loops between Unit and Module types
 -- (Module references a Unit and vice-versa).
 module GHC.Unit.Types
-   ( -- * Modules
-     GenModule (..)
+   ( -- * Module names
+     ModuleName
+   , mkModuleName
+   , mkModuleNameFS
+   , moduleNameString
+   , moduleNameFS
+   , parseModuleName
+
+     -- * Modules
+   , GenModule (..)
    , Module
    , InstalledModule
    , HomeUnitModule
@@ -101,7 +109,7 @@ import Data.Bifunctor
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS.Char8
 
-import Language.Haskell.Syntax.Module.Name
+import GHC.Unit.Module.Name
 import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
 
 ---------------------------------------------------------------------
