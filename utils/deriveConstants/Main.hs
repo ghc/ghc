@@ -644,6 +644,7 @@ wanteds os = concat
           ,structField C "HsIface" "divZZeroException_closure"
           ,structField C "HsIface" "underflowException_closure"
           ,structField C "HsIface" "overflowException_closure"
+          ,structField C "HsIface" "raisePrimIOException_info"
           ,structField C "HsIface" "unpackCStringzh_info"
           ,structField C "HsIface" "unpackCStringUtf8zh_info"
 

@@ -29,6 +29,7 @@ typedef struct {
     StgClosure *nestedAtomically_closure;  // GHC.Internal.Control.Exception.Base.nestedAtomically_closure
     StgClosure *noMatchingContinuationPrompt_closure;  // GHC.Internal.Control.Exception.Base.noMatchingContinuationPrompt_closure
     StgClosure *blockedOnBadFD_closure;  // GHC.Internal.Event.Thread.blockedOnBadFD_closure
+    StgClosure *raisePrimIOException_info; // GHC.Internal.Conc.IO.raisePrimIOException_info
     StgClosure *runSparks_closure;  // GHC.Internal.Conc.Sync.runSparks_closure
     StgClosure *ensureIOManagerIsRunning_closure;  // GHC.Internal.Conc.IO.ensureIOManagerIsRunning_closure
     StgClosure *interruptIOManager_closure;  // GHC.Internal.Conc.IO.interruptIOManager_closure
