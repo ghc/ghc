@@ -694,6 +694,37 @@ stg_block_putmvar (P_ mvar, P_ val)
    }
 }
 
+
+/* -----------------------------------------------------------------------------
+   STM-specific waiting
+   -------------------------------------------------------------------------- */
+
+stg_block_stmwait
+{
+    // When blocking on an MVar we have to be careful to only release
+    // the lock on the MVar at the very last moment (using
+    // BLOCK_BUT_FIRST()), since when we release the lock another
+    // Capability can wake up the thread, which modifies its stack and
+    // other state.  This is not a problem for STM, because STM
+    // wakeups are non-destructive; the waker simply calls
+    // tryWakeupThread() which sends a message to the owner
+    // Capability.  So the moment we release this lock we might start
+    // getting wakeup messages, but that's perfectly harmless.
+    //
+    // Furthermore, we *must* release these locks, just in case an
+    // exception is raised in this thread by
+    // maybePerformBlockedException() while exiting to the scheduler,
+    // which will abort the transaction, which needs to obtain a lock
+    // on all the TVars to remove the thread from the queues.
+    //
+    ccall stmWaitUnlock(MyCapability() "ptr", R3 "ptr");
+    BLOCK_GENERIC;
+}
+
+/* -----------------------------------------------------------------------------
+   Blocks for blackholes and throwto
+   -------------------------------------------------------------------------- */
+
 stg_block_blackhole (P_ node)
 {
     Sp_adj(-2);
@@ -730,6 +761,13 @@ stg_block_throwto (P_ tso, P_ exception)
     }
 }
 
+/* -----------------------------------------------------------------------------
+   Thread blocking for I/O primops
+   -------------------------------------------------------------------------- */
+
+/* Thread blocking for primops used only by the win32-legacy I/O manager:
+ * asyncRead, asyncWrite and asyncDoProc.
+ */
 #if defined(mingw32_HOST_OS)
 INFO_TABLE_RET ( stg_block_async, RET_SMALL, W_ info_ptr, W_ len, W_ errCode )
     return ()
@@ -751,32 +789,5 @@ stg_block_async
     Sp(2) = eintr;                 // errCode: interrupted
     BLOCK_GENERIC;
 }
-
 #endif
 
-
-/* -----------------------------------------------------------------------------
-   STM-specific waiting
-   -------------------------------------------------------------------------- */
-
-stg_block_stmwait
-{
-    // When blocking on an MVar we have to be careful to only release
-    // the lock on the MVar at the very last moment (using
-    // BLOCK_BUT_FIRST()), since when we release the lock another
-    // Capability can wake up the thread, which modifies its stack and
-    // other state.  This is not a problem for STM, because STM
-    // wakeups are non-destructive; the waker simply calls
-    // tryWakeupThread() which sends a message to the owner
-    // Capability.  So the moment we release this lock we might start
-    // getting wakeup messages, but that's perfectly harmless.
-    //
-    // Furthermore, we *must* release these locks, just in case an
-    // exception is raised in this thread by
-    // maybePerformBlockedException() while exiting to the scheduler,
-    // which will abort the transaction, which needs to obtain a lock
-    // on all the TVars to remove the thread from the queues.
-    //
-    ccall stmWaitUnlock(MyCapability() "ptr", R3 "ptr");
-    BLOCK_GENERIC;
-}

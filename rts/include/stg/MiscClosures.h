@@ -369,6 +369,7 @@ RTS_FUN_DECL(stg_gc_bpp);
 RTS_RET(stg_gc_fun);
 RTS_FUN_DECL(__stg_gc_fun);
 
+/* Blocking for various primops */
 RTS_FUN_DECL(stg_yield_noregs);
 RTS_FUN_DECL(stg_yield_to_interpreter);
 RTS_FUN_DECL(stg_block_noregs);
@@ -380,13 +381,15 @@ RTS_RET(stg_block_takemvar);
 RTS_RET(stg_block_readmvar);
 RTS_FUN_DECL(stg_block_putmvar);
 RTS_RET(stg_block_putmvar);
+RTS_FUN_DECL(stg_block_stmwait);
+RTS_FUN_DECL(stg_block_throwto);
+RTS_RET(stg_block_throwto);
+
+/* Blocking for I/O primops */
 #if defined(mingw32_HOST_OS)
 RTS_FUN_DECL(stg_block_async);
 RTS_RET(stg_block_async);
 #endif
-RTS_FUN_DECL(stg_block_stmwait);
-RTS_FUN_DECL(stg_block_throwto);
-RTS_RET(stg_block_throwto);
 
 /* Entry/exit points from StgStartup.cmm */
 
