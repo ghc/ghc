@@ -95,6 +95,7 @@ import Data.Function
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
 import Language.Haskell.Syntax.Text
+import Language.Haskell.Syntax.Module.Name
 
 data MetaWrappers = MetaWrappers {
       -- Applies its argument to a type argument `m` and dictionary `Quote m`
@@ -2606,13 +2607,13 @@ repLetE (MkC ds) (MkC e) = krep2 letEOcc [ds, e]
 repCaseE :: Core (M TH.Exp) -> Core [(M TH.Match)] -> MetaM (Core (M TH.Exp))
 repCaseE (MkC e) (MkC ms) = krep2 caseEOcc [e, ms]
 
-repDoE :: Maybe ModuleName -> Core [(M TH.Stmt)] -> MetaM (Core (M TH.Exp))
+repDoE :: Maybe HsModuleName -> Core [(M TH.Stmt)] -> MetaM (Core (M TH.Exp))
 repDoE = repDoBlock doEOcc
 
-repMDoE :: Maybe ModuleName -> Core [(M TH.Stmt)] -> MetaM (Core (M TH.Exp))
+repMDoE :: Maybe HsModuleName -> Core [(M TH.Stmt)] -> MetaM (Core (M TH.Exp))
 repMDoE = repDoBlock mdoEOcc
 
-repDoBlock :: KnownOcc -> Maybe ModuleName -> Core [(M TH.Stmt)] -> MetaM (Core (M TH.Exp))
+repDoBlock :: KnownOcc -> Maybe HsModuleName -> Core [(M TH.Stmt)] -> MetaM (Core (M TH.Exp))
 repDoBlock doName maybeModName (MkC ss) = do
     MkC coreModName <- coreModNameM
     krep2 doName [coreModName, ss]
@@ -2620,7 +2621,7 @@ repDoBlock doName maybeModName (MkC ss) = do
     coreModNameM :: MetaM (Core (Maybe TH.ModName))
     coreModNameM = case maybeModName of
       Just m -> do
-        MkC s <- lift $ coreStringLit (moduleNameFS m)
+        MkC s <- lift $ coreStringLit (moduleNameFS (hsModuleName m))
         mName <- rep2_nw mkModNameOcc [s]
         coreJust modNameTyConOcc mName
       _ -> coreNothing modNameTyConOcc
@@ -3173,7 +3174,7 @@ repOverLiteralVal lit = do
 
 repQualLit :: HsQualLit GhcRn -> MetaM (Core (M TH.Exp))
 repQualLit QualLit{ql_mod = modName, ql_val = lit} = do
-  modNameStr <- lift $ coreStringLit (moduleNameFS modName)
+  modNameStr <- lift $ coreStringLit (moduleNameFS (hsModuleName modName))
   funNameStr <- lift $ coreStringLit (occNameFS funOcc)
   funExp <- repVar =<< repNameQ modNameStr funNameStr
   litCore <- lift . dsLit =<< mkHsLit

@@ -2,6 +2,7 @@
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -161,6 +162,7 @@ import GHC.Unit.Types
 import GHC.Unit.State
 import GHC.Unit.Home
 import GHC.Unit.Module
+import Language.Haskell.Syntax.Module.Name (HsModuleName)
 import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.ModIface
@@ -244,7 +246,7 @@ tcRnModule hsc_env mod_sum
 
     this_mod
       | Just (L _ mod) <- hsmodName this_module
-      = mkHomeModule home_unit mod
+      = mkHomeModule home_unit (hsModuleName mod)
 
       | otherwise   -- 'module M where' is omitted
       = mkHomeModule home_unit mAIN_NAME
@@ -2168,8 +2170,8 @@ runTcInteractive tcm_plugin_handling hsc_env thing_inside
        ; !orphs <- fmap (force . concat) . forM (ic_imports icxt) $ \i ->
             case i of                   -- force above: see #15111
                 IIModule n -> getOrphansForModule n
-                IIDecl i   -> getOrphansForModuleName (unLoc (ideclName i))
-                                         (renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName i) (ideclPkgQual i))
+                IIDecl i   -> getOrphansForModuleName (hsModuleName (unLoc (ideclName i)))
+                                         (renameRawPkgQual (hsc_unit_env hsc_env) (hsModuleName $ unLoc $ ideclName i) (ideclPkgQual i))
 
 
        ; (home_insts, home_fam_insts) <- liftIO $ UnitEnv.hugAllInstances (hsc_unit_env hsc_env)
@@ -3264,7 +3266,7 @@ runRenamerPlugin gbl_env hs_group = do
 -- exception/signal an error.
 type RenamedStuff =
         (Maybe (HsGroup GhcRn, [LImportDecl GhcRn], Maybe [(LIE GhcRn, Avails)],
-                Maybe (LHsDoc GhcRn), Maybe (XRec GhcRn ModuleName)))
+                Maybe (LHsDoc GhcRn), Maybe (XRec GhcRn HsModuleName)))
 
 -- | Extract the renamed information from TcGblEnv.
 getRenamedStuff :: TcGblEnv -> RenamedStuff

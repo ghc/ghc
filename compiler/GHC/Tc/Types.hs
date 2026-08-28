@@ -125,6 +125,7 @@ import {-# SOURCE #-} GHC.Driver.Hooks
 import GHC.Linker.Types
 
 import GHC.Hs
+import Language.Haskell.Syntax.Module.Name (HsModuleName)
 
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Constraint
@@ -675,7 +676,7 @@ data TcGblEnv
         tcg_fords     :: [LForeignDecl GhcTc], -- ...Foreign import & exports
         tcg_patsyns   :: [PatSyn],            -- ...Pattern synonyms
 
-        tcg_hdr_info   :: (Maybe (LHsDoc GhcRn), Maybe (XRec GhcRn ModuleName)),
+        tcg_hdr_info   :: (Maybe (LHsDoc GhcRn), Maybe (XRec GhcRn HsModuleName)),
         -- ^ Maybe Haddock header docs and Maybe located module name
 
         tcg_self_boot :: SelfBootInfo,       -- ^ Whether this module has a

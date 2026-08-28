@@ -24,6 +24,7 @@ module Language.Haskell.Syntax.Text
   , unpackHText
   , bytesHText
   , shortByteStringToHText
+
     -- * Utils
   , lengthHText, nullHText
   ) where

@@ -38,7 +38,7 @@
      []
      (EpaComments
       []))
-    {ModuleName: KindSigs}))
+    {HsModuleName: KindSigs}))
   (Nothing)
   [(L
     (EpAnn
@@ -71,7 +71,7 @@
        []
        (EpaComments
         []))
-      {ModuleName: Data.Kind})
+      {HsModuleName: Data.Kind})
      (NoRawPkgQual)
      (NotBoot)
      (NotLevelled)

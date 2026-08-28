@@ -17,11 +17,10 @@ import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Pat
 import Language.Haskell.Syntax.Lit
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Module.Name (ModuleName)
 import Language.Haskell.Syntax.Text
+import Language.Haskell.Syntax.Module.Name
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Binds
-
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
@@ -1455,14 +1454,14 @@ data HsArrowMatchContext
   | ArrowLamAlt HsLamVariant       -- ^ A \, \case or \cases alternative inside arrow notation
 
 data HsDoFlavour
-  = DoExpr (Maybe ModuleName)        -- ^[ModuleName.]do { ... }
-  | MDoExpr (Maybe ModuleName)       -- ^[ModuleName.]mdo { ... }  ie recursive do-expression
+  = DoExpr (Maybe HsModuleName)      -- ^[ModuleName.]do { ... }
+  | MDoExpr (Maybe HsModuleName)     -- ^[ModuleName.]mdo { ... }  ie recursive do-expression
   | GhciStmtCtxt                     -- ^A command-line Stmt in GHCi pat <- rhs
   | ListComp
   | MonadComp
   deriving (Eq, Data)
 
-qualifiedDoModuleName_maybe :: HsStmtContext fn -> Maybe ModuleName
+qualifiedDoModuleName_maybe :: HsStmtContext fn -> Maybe HsModuleName
 qualifiedDoModuleName_maybe ctxt = case ctxt of
   HsDoStmt (DoExpr m) -> m
   HsDoStmt (MDoExpr m) -> m

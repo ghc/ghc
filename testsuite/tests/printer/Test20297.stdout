@@ -44,7 +44,7 @@
      []
      (EpaComments
       []))
-    {ModuleName: Test20297}))
+    {HsModuleName: Test20297}))
   (Nothing)
   []
   [(L
@@ -486,7 +486,7 @@
      []
      (EpaComments
       []))
-    {ModuleName: Test20297}))
+    {HsModuleName: Test20297}))
   (Nothing)
   []
   [(L

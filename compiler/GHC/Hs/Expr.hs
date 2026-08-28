@@ -28,6 +28,7 @@ import GHC.Hs.Lit
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import Language.Haskell.Syntax.Text
+import Language.Haskell.Syntax.Module.Name
 import GHC.Hs.Extension
 import GHC.Hs.Type
 import GHC.Hs.Binds
@@ -48,7 +49,6 @@ import GHC.Types.Tickish (CoreTickish)
 import GHC.Types.Unique.Set (UniqSet)
 import GHC.Types.ThLevelIndex
 import GHC.Core.ConLike ( conLikeName, ConLike )
-import GHC.Unit.Module (ModuleName)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -2121,7 +2121,7 @@ pprArrowExpr :: (OutputableBndrId p, Outputable body,
       => [LStmt (GhcPass p) body] -> SDoc
 pprArrowExpr stmts = text "do"  <+> ppr_do_stmts stmts
 
-ppr_module_name_prefix :: Maybe ModuleName -> SDoc
+ppr_module_name_prefix :: Maybe HsModuleName -> SDoc
 ppr_module_name_prefix = \case
   Nothing -> empty
   Just module_name -> ppr module_name <> char '.'
@@ -2618,7 +2618,7 @@ pprHsDoFlavour ListComp        = text "list comprehension"
 pprHsDoFlavour MonadComp       = text "monad comprehension"
 pprHsDoFlavour GhciStmtCtxt    = text "interactive GHCi command"
 
-prependQualified :: Maybe ModuleName -> SDoc -> SDoc
+prependQualified :: Maybe a -> SDoc -> SDoc
 prependQualified Nothing  t = t
 prependQualified (Just _) t = text "qualified" <+> t
 

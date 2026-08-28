@@ -219,6 +219,7 @@ module GHC (
 
         -- ** Modules
         Module, mkModule, pprModule, moduleName, moduleUnit,
+        ModuleName, mkModuleName, moduleNameString, moduleNameFS,
 
         -- ** Names
         Name,
@@ -379,6 +380,7 @@ import GHC.Parser.Utils
 import GHC.Iface.Env ( trace_if )
 import GHC.Iface.Load        ( loadSysInterface )
 import GHC.Hs
+import Language.Haskell.Syntax.Module.Name (HsModuleName)
 import GHC.Builtin.WiredIn.Prim ( alphaTyVars )
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
@@ -1295,7 +1297,7 @@ instance DesugaredMod DesugaredModule where
 
 type ParsedSource      = Located (HsModule GhcPs)
 type RenamedSource     = (HsGroup GhcRn, [LImportDecl GhcRn], Maybe [(LIE GhcRn, Avails)],
-                          Maybe (LHsDoc GhcRn), Maybe (XRec GhcRn ModuleName))
+                          Maybe (LHsDoc GhcRn), Maybe (XRec GhcRn HsModuleName))
 type TypecheckedSource = LHsBinds GhcTc
 
 -- NOTE:
