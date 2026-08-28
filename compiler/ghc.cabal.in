@@ -32,6 +32,7 @@ extra-source-files:
     GHC/Builtin/primops.txt.pp
     Unique.h
     CodeGen.Platform.h
+    HostCpuFeaturesX86.h
     -- Shared with rts via hard-link at configure time. This is safer
     -- for Windows, where symlinks don't work out of the box, so we
     -- can't just commit some in git.
@@ -186,6 +187,7 @@ Library
       c-sources:
         cbits/cutils.c
         cbits/genSym.c
+        cbits/host_cpu_features_x86.c
         cbits/keepCAFsForGHCi.c
 
     hs-source-dirs:
@@ -691,6 +693,7 @@ Library
         GHC.Platform.AArch64
         GHC.Platform.Constants
         GHC.Platform.CpuFeatures
+        GHC.Platform.HostCpuFeatures
         GHC.Platform.LA64
         GHC.Platform.NoRegs
         GHC.Platform.PPC

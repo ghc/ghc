@@ -31,6 +31,13 @@ ignoreSymbols = S.fromList [
       "__umoddi3",
       "__umodti3",
 
+      -- Defined in libgcc/compiler-rt. RtsSymbols.c declares them on x86 only
+      -- (+Declared)
+      "__cpu_features2",
+      "__cpu_indicator_init",
+      "__cpu_indicator_init_local",
+      "__cpu_model",
+
       -- These may be a CPP mismatch between rts/prim/vectorQuotRem.c and RtsSymbols.c
       "hs_quotInt16X8",
       "hs_quotInt32X4",

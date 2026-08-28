@@ -1,0 +1,4 @@
+section: packaging
+synopsis: GHC's configure scripts now require GCC 6 or newer, up from 4.7.
+issues: #25450
+mrs: !16126

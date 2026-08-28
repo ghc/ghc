@@ -1,0 +1,5 @@
+section: compiler
+synopsis: Add :ghc-flag:`-march=native`, which on x86 and x86_64 enables the
+  CPU features of the machine running GHC.
+issues: #25450
+mrs: !16126

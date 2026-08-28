@@ -1887,6 +1887,30 @@ Some flags only make sense for particular target platforms.
     so this flag has no effect when used with the :ref:`native code generator <native-code-gen>`
     or the :ref:`LLVM backend <llvm-code-gen>`.
 
+.. ghc-flag:: -march=native
+    :shortdesc: (x86 only) Enable the CPU features of the host
+    :type: dynamic
+    :category: platform-options
+
+    (x86 only) Probe the CPU of the machine running GHC and enable the
+    corresponding ``-m...`` CPU-feature options (for example ``-msse4.2``,
+    ``-mavx2``, ``-mbmi2``, ``-mfma``). The detected features apply to both the
+    :ref:`native code generator <native-code-gen>` and the
+    :ref:`LLVM backend <llvm-code-gen>`.
+
+    The detected features are enabled in addition to any ``-m...`` options
+    given explicitly, regardless of their order on the command line.
+
+    .. warning::
+
+        Code compiled with ``-march=native`` may use instructions that are not
+        available on other CPUs, and is therefore not portable to a different
+        machine.
+
+    The flag is rejected on other targets. A cross-compiler also rejects it
+    when its target architecture differs from the one GHC itself runs on, since
+    the probed CPU then says nothing about the target.
+
 Haddock
 -------
 

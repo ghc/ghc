@@ -223,6 +223,15 @@ test('T9938B', [], makefile_test, [])
 test('T9963', exit_code(1), run_command,
      ['{compiler} --interactive -ignore-dot-ghci --print-libdir'])
 
+test('march_native_unsupported_arch',
+     [when(arch('x86_64') or arch('i386'), skip)],
+     compile_fail,
+     ['-march=native'])
+
+test('march_native_matches_cc',
+     [unless(arch('x86_64') or arch('i386'), skip), when(config.cross, skip)],
+     makefile_test, [])
+
 test('T10219', normal, run_command,
      # `-x hspp` in make mode should work.
      # Note: need to specify `-x hspp` before the filename.

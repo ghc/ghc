@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MultiWayIf #-}
 
 -------------------------------------------------------------------------------
 --
@@ -228,6 +229,8 @@ import GHC.Platform.CpuFeatures
 import GHC.Platform.Ways
 import GHC.Platform.Profile
 import GHC.Platform.ArchOS
+import GHC.Platform.Host (hostPlatformArch)
+import GHC.Platform.HostCpuFeatures (hostX86CpuFeatures)
 
 import GHC.Unit.Types
 import GHC.Unit.Parser
@@ -1737,6 +1740,7 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_faststrings)
 
         ------ Machine dependent (-m<blah>) stuff ---------------------------
+  , make_ord_flag defGhcFlag "march=native" (NoArg enableHostCpuFeatures)
 
   , make_ord_flag defGhcFlag "mla664"       (noArg (\d -> d { la664 = True }))
 
@@ -2862,6 +2866,17 @@ setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)
 
 setCpuFeature :: CpuFeature -> DynFlags -> DynFlags
 setCpuFeature feat dflags = dflags { cpuFeatures = EnumSet.insert feat (cpuFeatures dflags) }
+
+-- | @-march=native@: enable the CPU features of the host GHC is running on.
+enableHostCpuFeatures :: DynP ()
+enableHostCpuFeatures = do
+  arch <- platformArch . targetPlatform <$> liftEwM getCmdLineState
+  if | arch /= ArchX86 && arch /= ArchX86_64
+     -> addErr "-march=native is only supported on x86 and x86_64 targets"
+     | arch /= hostPlatformArch
+     -> addErr "-march=native is not supported when the target architecture differs from the host's"
+     | otherwise
+     -> upd $ \d -> d { cpuFeatures = cpuFeatures d `mappend` hostX86CpuFeatures }
 
 -- | The @-m\<feature\>@ flag for a 'CpuFeature'.
 cpuFeatureFlagDep :: CpuFeature -> (Deprecation, Flag (CmdLineP DynFlags))

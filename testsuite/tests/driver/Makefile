@@ -500,6 +500,15 @@ withRtsOpts:
 T3364:
 	-"$(TEST_HC)" $(TEST_HC_OPTS) -H
 
+# GHC and the C compiler should detect the same host CPU features.
+.PHONY: march_native_matches_cc
+march_native_matches_cc:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -march=native -E -cpp march_native_matches_cc.hs -o ghc.out
+	"$(TEST_CC)" $(TEST_CC_OPTS) -march=native -E -x c march_native_matches_cc.hs > cc.out
+	sed -n 's/^\(feat [a-z0-9.]*\).*/\1/p' ghc.out > ghc.feats
+	sed -n 's/^\(feat [a-z0-9.]*\).*/\1/p' cc.out > cc.feats
+	diff -u ghc.feats cc.feats
+
 .PHONY: T706
 T706:
 	cp T706a.hs T706.hs

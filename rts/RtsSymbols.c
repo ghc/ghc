@@ -1050,6 +1050,33 @@ extern char **environ;
 #define RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
 #endif
 
+// libgcc/compiler-rt symbols behind __builtin_cpu_supports and
+// __builtin_cpu_init, used by compiler/cbits/host_cpu_features_x86.c for
+// -march=native. Without them the runtime linker cannot load the ghc
+// library's object code, e.g. for plugins in a statically linked GHCi.
+#if defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+// Weak: missing before GCC 8 and LLVM 8.
+extern StgWord __cpu_features2[] __attribute__((weak));
+#define RTS_X86_CPU_MODEL_SYMBOLS \
+      SymI_NeedsProto(__cpu_indicator_init) \
+      SymI_NeedsDataProto(__cpu_model) \
+      SymI_HasDataProto(__cpu_features2) \
+      RTS_X86_CPU_INIT_LOCAL_SYMBOLS
+#else
+#define RTS_X86_CPU_MODEL_SYMBOLS
+#endif
+
+// Alpine's and Gentoo's musl GCCs patch __builtin_cpu_init to call this
+// alias of __cpu_indicator_init. Weak: other musl toolchains lack it.
+#if (defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)) \
+    && defined(linux_HOST_OS) && !defined(__GLIBC__)
+extern void __cpu_indicator_init_local(void) __attribute__((weak));
+#define RTS_X86_CPU_INIT_LOCAL_SYMBOLS \
+      SymI_HasProto(__cpu_indicator_init_local)
+#else
+#define RTS_X86_CPU_INIT_LOCAL_SYMBOLS
+#endif
+
 // Symbols defined by libc
 #define RTS_LIBC_SYMBOLS                               \
       SymI_HasProto_redirect(atexit, atexit, STRENGTH_STRONG, SYM_TYPE_CODE) /* See Note [Strong symbols] */ \
@@ -1210,6 +1237,7 @@ RTS_OPENBSD_ONLY_SYMBOLS
 RTS_LIBC_SYMBOLS
 RTS_LIBGCC_SYMBOLS
 RTS_ARCH_LIBGCC_SYMBOLS
+RTS_X86_CPU_MODEL_SYMBOLS
 RTS_FINI_ARRAY_SYMBOLS
 RTS_LIBFFI_SYMBOLS
 RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
@@ -1265,6 +1293,7 @@ RtsSymbolVal const * getRtsSymbols(void) {
             RTS_OPENBSD_ONLY_SYMBOLS
             RTS_LIBGCC_SYMBOLS
             RTS_ARCH_LIBGCC_SYMBOLS
+            RTS_X86_CPU_MODEL_SYMBOLS
             RTS_FINI_ARRAY_SYMBOLS
             RTS_LIBFFI_SYMBOLS
             RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
