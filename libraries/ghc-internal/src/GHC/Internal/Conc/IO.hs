@@ -56,13 +56,19 @@ module GHC.Internal.Conc.IO
         , win32ConsoleHandler
         , toWin32ConsoleEvent
 #endif
+        , raisePrimIOException -- exported for use within RTS
         ) where
 
 import GHC.Internal.Base
 import GHC.Internal.Conc.Sync as Sync
 import GHC.Internal.Err (errorWithoutStackTrace)
+import GHC.Internal.Exception (SomeException, Exception(toException))
+import qualified GHC.Internal.Foreign.C.Error as C
+import GHC.Internal.Foreign.C.Types (CInt)
+import GHC.Internal.Maybe (Maybe(Nothing))
 import GHC.Internal.STM as STM
-import GHC.Internal.Prim (delay#, waitRead#, waitWrite#)
+import GHC.Internal.Prim (Int#, State#, RealWorld,
+                          delay#, waitRead#, waitWrite#, raiseIO#)
 import GHC.Internal.Real ( fromIntegral )
 import GHC.Internal.System.Posix.Types
 
@@ -249,3 +255,39 @@ registerDelay _usecs
 #if !defined(javascript_HOST_ARCH)
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 #endif
+
+
+-- ---------------------------------------------------------------------------
+-- PrimIOException
+
+-- FIXME: raisePrimIOException throws an IOException, which is not ideal. It is
+-- not in a position to fill in most of the information for an IOException.
+-- Much better would be to have a new PrimIOException exception type, and for
+-- I/O primops to catch that and rethrow with the proper context. In particular
+-- we do not have a proper location, since that's fundamantally something from
+-- a higher level library.
+--
+-- Unfortunately, catching and throwing converts async exceptions to sync ones.
+-- This breaks any thunks that, via unsafePerformIO, use such operations. We
+-- have tests that check for this, e.g. T26341a T26341b. Catching and rethrowing
+-- here would break those tests.
+--
+-- See issue #2558, #24189 and #26368.
+
+-- | Internal helper funtion used by the in-RTS I\/O managers for reporting
+-- exceptions. Do not use directly.
+--
+-- Do not change the type signature \/ ABI without updating the Cmm callers!
+-- There is no signature checking for Cmm to Hs calls.
+--
+raisePrimIOException :: Int# -> State# RealWorld -> (# State# RealWorld, a #)
+raisePrimIOException errno# s =
+    let exception :: SomeException
+        exception = toException
+                      (C.errnoToIOError "threadWaitRead/Write"
+                                        (toCErrno errno#)
+                                        Nothing Nothing)
+     in raiseIO# exception s
+  where
+    toCErrno :: Int# -> C.Errno
+    toCErrno e = C.Errno ((fromIntegral :: Int -> CInt) (I# e))
