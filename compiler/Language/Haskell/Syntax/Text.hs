@@ -24,6 +24,9 @@ module Language.Haskell.Syntax.Text
   , unpackHText
   , bytesHText
   , shortByteStringToHText
+
+  , HsModuleName
+
     -- * Utils
   , lengthHText, nullHText
   ) where
@@ -41,6 +44,9 @@ import qualified GHC.Data.ShortText as ST
 -- 'Data.Text.Text': the bytes are GHC's Modified UTF-8 so that arbitrary code
 -- points (including surrogates and NUL) round-trip.
 type HText = ShortText
+
+-- | A module name in the AST is just 'HText'
+type HsModuleName = HText
 
 -- | Encode a 'String' into an 'HText'.
 packHText :: String -> HText
