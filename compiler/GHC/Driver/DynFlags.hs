@@ -446,7 +446,7 @@ data DynFlags = DynFlags {
   interactivePrint      :: Maybe String,
 
   -- Machine dependent flags (-m\<blah> stuff)
-  cpuFeatures           :: EnumSet CpuFeature, -- ^ The @-m\<feature\>@ flags that were passed.
+  cpuFeatures           :: EnumSet CpuFeature, -- ^ The CPU features requested by @-m...@ flags.
                                                -- See Note [CPU features] in GHC.Platform.CpuFeatures.
   la664                 :: Bool, -- ^ Enable LA664 instructions
 

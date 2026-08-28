@@ -65,8 +65,9 @@ others:
 
 We keep two representations:
 
-  A. 'DynFlags' records the set of flags that were passed, as an
-     'EnumSet' of 'CpuFeature'. Nothing is implied at this stage.
+  A. 'DynFlags' records the set of requested features, as an 'EnumSet' of
+     'CpuFeature': one per -m<feature> flag passed, plus the features of the
+     host under -march=native. Nothing is implied at this stage.
 
   B. 'initCpuFeatures' turns this set into a 'CpuFeatures' value, applying the
      implications and the baseline of the target architecture. This

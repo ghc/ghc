@@ -7,8 +7,10 @@ description:
   GHC now supports a new mode flag ``--print-enabled-cpu-features``, which
   prints a JSON object describing the CPU features currently enabled for code
   generation, each named by its ``-m...`` flag.
-  Dynamic options such as ``-mavx2`` and ``-mbmi2`` are respected. ::
+  Dynamic options such as ``-mavx2`` and ``-mbmi2`` are respected, so the flag
+  can also be used to inspect which features :ghc-flag:`-march=native` detected
+  and enabled. ::
 
-    $ ghc -mavx2 --print-enabled-cpu-features
+    $ ghc -march=native --print-enabled-cpu-features
     {"tag":"enabled-cpu-features","version":1,
-     "features":["sse","sse2","sse3","ssse3","sse4","sse4.2","avx","avx2"]}
+     "features":["sse","sse2","sse3","ssse3","sse4","sse4.2","avx","avx2","fma","bmi","bmi2"]}

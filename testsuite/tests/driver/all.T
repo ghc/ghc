@@ -1,3 +1,9 @@
+def normalise_march_native_error(msg):
+    # Keep only the stable '-march=native ...' diagnostic; the program-name
+    # prefix and any usage trailer vary across configurations.
+    m = re.search(r'-march=native is [^\n]+', msg)
+    return m.group(0) + '\n' if m else msg
+
 test('driver011', [extra_files(['A011.hs'])], makefile_test, ['test011'])
 
 test('driver012', [extra_files(['A012.hs'])], makefile_test, ['test012'])
@@ -247,6 +253,22 @@ test('print_enabled_cpu_features_avx512',
      [unless(arch('x86_64'), skip)],
      run_command,
      ['{compiler} -mavx512dq -mavx512vl --print-enabled-cpu-features'])
+
+# On non-x86 targets -march=native must be rejected.
+test('march_native_unsupported_arch',
+     [when(arch('x86_64') or arch('i386'), skip),
+      normalise_errmsg_fun(normalise_march_native_error), exit_code(1)],
+     run_command,
+     ['{compiler} -march=native --print-enabled-cpu-features'])
+
+# -march=native is additive with explicit -m flags, regardless of order: an
+# explicitly requested feature (here AVX2, forced on independent of the host) is
+# still present whether the flag comes before or after -march=native.
+test('march_native_additive',
+     [unless(arch('x86_64') or arch('i386'), skip)],
+     run_command,
+     ['{compiler} -mavx2 -march=native --print-enabled-cpu-features | grep -o \'"avx2"\' && '
+      '{compiler} -march=native -mavx2 --print-enabled-cpu-features | grep -o \'"avx2"\''])
 
 test('T10219', normal, run_command,
      # `-x hspp` in make mode should work.
