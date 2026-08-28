@@ -224,6 +224,7 @@ void syncIOCancelPoll(CapIOManager *iomgr, StgTSO *tso)
     ASSERT(aiop->notify_type == NotifyTSO);
     ASSERT(indexClosureTable(&iomgr->aiop_table, aiop->index) == aiop);
     ioCancel(iomgr, aiop);
+    setTsoIOOpOutcome(tso, aiop->outcome, aiop->result);
     /* We cannot use the normal notifyIOCompletion here. We are in the context
      * of throwTo, interrupting a thread blocked on IO via an async exception.
      * We don't put the TSO back on the run queue or change the why_blocked
@@ -299,6 +300,8 @@ static void notifyIOCompletion(CapIOManager *iomgr, StgAsyncIOOp *aiop)
                  * so is not subject to thread migration.
                  */
                 StgTSO *tso = aiop->notify.tso;
+                /* Fill in the outcome and result/error on the TSO's stack frame */
+                setTsoIOOpOutcome(tso, aiop->outcome, aiop->result);
                 pushOnRunQueue(iomgr->cap, tso);
                 RELEASE_STORE(&tso->why_blocked, NotBlocked);
             }
