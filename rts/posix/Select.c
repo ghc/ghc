@@ -15,7 +15,6 @@
 #include "Signals.h"
 #include "Schedule.h"
 #include "Prelude.h"
-#include "RaiseAsync.h"
 #include "RtsUtils.h"
 #include "Capability.h"
 #include "Select.h"
@@ -480,8 +479,11 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
                   IF_DEBUG(scheduler,
                       debugBelch("Killing blocked thread %" FMT_StgThreadID
                                  " on bad fd=%i\n", tso->id, fd));
-                  raiseAsync(iomgr->cap, tso,
-                      (StgClosure *)blockedOnBadFD_closure, false, NULL);
+
+                  /* Fill in the outcome and error on the TSO's stack frame */
+                  setTsoIOOpOutcome(tso, IOOpOutcomeFailed, EBADF);
+                  pushOnRunQueue(iomgr->cap,tso);
+                  RELEASE_STORE(&tso->why_blocked, NotBlocked);
                   break;
               case RTS_FD_IS_READY:
                   IF_DEBUG(scheduler,

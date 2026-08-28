@@ -20,7 +20,6 @@
 #include "Prelude.h"
 #include "RtsUtils.h"
 #include "rts/Time.h"
-#include "RaiseAsync.h"
 #include "Trace.h"
 
 #include "Poll.h"
@@ -283,28 +282,18 @@ static void notifyIOCompletion(CapIOManager *iomgr, StgAsyncIOOp *aiop)
     switch (aiop->notify_type) {
         case NotifyTSO:
         {
-            if (aiop->outcome == IOOpOutcomeFailed && aiop->error == EBADF) {
-                /* The fd is invalid: raise an IOError exception in the blocked
-                 * thread. (See bug #4934 for what happens without this.)
-                 */
-                StgTSO *tso = aiop->notify.tso;
-                debugTrace(DEBUG_iomanager,
-                           "Raising exception in thread %" FMT_StgThreadID
-                           " blocked on an invalid fd", tso->id);
-                raiseAsync(iomgr->cap, tso,
-                           (StgClosure *)blockedOnBadFD_closure,
-                           false, NULL);
-            } else {
-                /* We should be guaranteed that the tso is still on the same
-                 * cap because the tso was not on the run queue of any cap and
-                 * so is not subject to thread migration.
-                 */
-                StgTSO *tso = aiop->notify.tso;
-                /* Fill in the outcome and result/error on the TSO's stack frame */
-                setTsoIOOpOutcome(tso, aiop->outcome, aiop->result);
-                pushOnRunQueue(iomgr->cap, tso);
-                RELEASE_STORE(&tso->why_blocked, NotBlocked);
-            }
+            /* We should be guaranteed that the tso is still on the same
+             * cap because the tso was not on the run queue of any cap and
+             * so is not subject to thread migration.
+             */
+            StgTSO *tso = aiop->notify.tso;
+            ASSERT(tso->cap == iomgr->cap);
+
+            /* Fill in the outcome and result/error on the TSO's stack frame */
+            setTsoIOOpOutcome(tso, aiop->outcome, aiop->result);
+            pushOnRunQueue(iomgr->cap, tso);
+            RELEASE_STORE(&tso->why_blocked, NotBlocked);
+
             /* For the TSO case, the aiop was only reachable from the TSO
              * itself, and thus it is now no longer be reachable at all.
              */
