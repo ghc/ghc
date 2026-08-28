@@ -38,6 +38,10 @@ import term_color
 from term_color import Color, colored
 import cpu_features
 
+# Line-buffer stdout: when it is a pipe (as in CI), the block-buffered
+# default setting delays test and progress output (#12934).
+sys.stdout.reconfigure(line_buffering=True)  # type: ignore[union-attr]
+
 # Readline sometimes spews out ANSI escapes for some values of TERM,
 # which result in test failures. Thus set TERM to a nice, simple, safe
 # value.
