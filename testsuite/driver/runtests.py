@@ -38,6 +38,12 @@ import term_color
 from term_color import Color, colored
 import cpu_features
 
+# Line-buffer stdout: when it is a pipe (as in CI), the block-buffered
+# default delays test and progress output (#12934). stderr is included
+# for consistency, although Python line-buffers it by default since 3.9.
+sys.stdout.reconfigure(line_buffering=True)  # type: ignore[union-attr]
+sys.stderr.reconfigure(line_buffering=True)  # type: ignore[union-attr]
+
 # Readline sometimes spews out ANSI escapes for some values of TERM,
 # which result in test failures. Thus set TERM to a nice, simple, safe
 # value.
@@ -352,8 +358,6 @@ try:
 except Exception as e:
     print('Failed to detect CPU features: ', e)
 
-sys.stdout.flush()
-
 if config.local:
     tempdir = ''
 else:
@@ -517,9 +521,6 @@ else:
 
     except KeyboardInterrupt:
         pass
-
-    # flush everything before we continue
-    sys.stdout.flush()
 
     # Dump metrics data.
     print("\nPerformance Metrics (test environment: {}):\n".format(config.test_env))
