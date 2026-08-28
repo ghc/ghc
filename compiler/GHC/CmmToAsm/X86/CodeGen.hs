@@ -514,7 +514,7 @@ assignMem_I64Code addrTree valueTree = do
         -- Little-endian store
         mov_lo = MOV II32 (OpReg rlo) (OpAddr addr)
         mov_hi = MOV II32 (OpReg rhi) (OpAddr (fromJust (addrOffset addr 4)))
-  return (vcode `appOL` addr_code `snocOL` mov_lo `snocOL` mov_hi)
+  return (addr_code `appOL` vcode `snocOL` mov_lo `snocOL` mov_hi)
 
 
 assignReg_I64Code :: CmmReg  -> CmmExpr -> NatM InstrBlock
