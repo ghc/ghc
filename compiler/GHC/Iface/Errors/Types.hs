@@ -21,15 +21,13 @@ import GHC.Types.Name (Name, KnownKey, KnownOcc)
 import GHC.Types.Name.Reader (GlobalRdrElt)
 import GHC.Types.TyThing (TyThing)
 
-import GHC.Unit.Types (Module, InstalledModule, UnitId, Unit)
+import GHC.Unit.Types (Module, InstalledModule, UnitId, Unit, ModuleName)
 import GHC.Unit.State (UnitState, ModuleSuggestion, ModuleOrigin, UnusableUnit, UnitInfo, HiddenModuleUnitVisibility)
 
 import GHC.Exception.Type (SomeException)
 
 import GHC.Unit.Types ( IsBootInterface )
 import GHC.Unit.Module.Location
-
-import Language.Haskell.Syntax.Module.Name ( ModuleName )
 
 import GHC.Stack( CallStack )
 import GHC.Generics ( Generic )

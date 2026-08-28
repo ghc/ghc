@@ -18,7 +18,6 @@ module GHC.Hs.ImpExp
     ) where
 
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Module.Name
 import Language.Haskell.Syntax.ImpExp
 
 import GHC.Prelude
@@ -37,10 +36,12 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc ((<||>))
 
+import GHC.Unit.Module.Name
 import GHC.Unit.Module.Warnings
 
 import Data.Data
 import Data.Maybe
+import Language.Haskell.Syntax.Module.Name (HsModuleName)
 import Language.Haskell.Syntax.Doc (LHsDoc)
 
 
@@ -97,7 +98,8 @@ Plugins may also introduce generated imports.
 
 type instance XXImportDecl  (GhcPass _) = DataConCantHappen
 
-type instance Anno ModuleName = SrcSpanAnnA
+type instance Anno HsModuleName = SrcSpanAnnA
+type instance Anno ModuleName   = SrcSpanAnnA
 
 deriving instance Data (IEWrappedName GhcPs)
 deriving instance Data (IEWrappedName GhcRn)
@@ -149,7 +151,7 @@ instance HasLoc EpAnnLevel where
 simpleImportDecl :: ModuleName -> ImportDecl GhcPs
 simpleImportDecl mn = ImportDecl {
       ideclExt        = XImportDeclPass noAnn NoSourceText UserWrittenImport,
-      ideclName       = noLocA mn,
+      ideclName       = noLocA (toHsModuleName mn),
       ideclPkgQual    = NoRawPkgQual,
       ideclSource     = NotBoot,
       ideclSafe       = False,

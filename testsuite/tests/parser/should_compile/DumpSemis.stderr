@@ -55,7 +55,7 @@
      []
      (EpaComments
       []))
-    {ModuleName: DumpSemis}))
+    {HsModuleName: DumpSemis}))
   (Nothing)
   [(L
     (EpAnn
@@ -96,7 +96,7 @@
        []
        (EpaComments
         []))
-      {ModuleName: Data.List})
+      {HsModuleName: Data.List})
      (NoRawPkgQual)
      (NotBoot)
      (NotLevelled)
@@ -146,7 +146,7 @@
        []
        (EpaComments
         []))
-      {ModuleName: Data.Kind})
+      {HsModuleName: Data.Kind})
      (NoRawPkgQual)
      (NotBoot)
      (NotLevelled)

@@ -15,7 +15,7 @@ import GHC.Settings.Config
 import GHC.Utils.Binary
 import GHC.Data.FastString
 import GHC.Iface.Type
-import GHC.Unit.Module            ( ModuleName, Module )
+import GHC.Unit.Module            ( Module )
 import GHC.Types.Name
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Types.SrcLoc
@@ -41,6 +41,7 @@ import Control.Applicative        ( (<|>) )
 import Data.Coerce                ( coerce  )
 import Data.Function              ( on )
 import qualified Data.Semigroup as S
+import Language.Haskell.Syntax.Module.Name
 
 type Span = RealSrcSpan
 
@@ -384,7 +385,7 @@ pprIdentifier :: Identifier -> SDoc
 pprIdentifier (Left mod) = text "module" <+> ppr mod
 pprIdentifier (Right name) = text "name" <+> ppr name
 
-type Identifier = Either ModuleName Name
+type Identifier = Either HsModuleName Name
 
 type NodeIdentifiers a = M.Map Identifier (IdentifierDetails a)
 

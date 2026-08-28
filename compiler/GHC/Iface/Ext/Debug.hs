@@ -10,6 +10,7 @@ import GHC.Prelude
 
 import GHC.Types.SrcLoc
 import GHC.Unit.Module
+import Language.Haskell.Syntax.Module.Name (HsModuleName)
 import GHC.Utils.Outputable
 
 import GHC.Iface.Ext.Types
@@ -60,7 +61,7 @@ diffAst diffType (Node info1 span1 xs1) (Node info2 span2 xs2) =
       _ -> eqDiff a b
     diffName a b = eqDiff a b
 
-type DiffIdent = Either ModuleName HieName
+type DiffIdent = Either HsModuleName HieName
 
 normalizeIdents :: Ord a => NodeIdentifiers a -> [(DiffIdent,IdentifierDetails a)]
 normalizeIdents = sortOn go . map (first toHieName) . M.toList

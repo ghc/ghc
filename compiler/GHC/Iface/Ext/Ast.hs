@@ -81,6 +81,7 @@ import Control.Applicative        ( (<|>) )
 import GHC.Types.TypeEnv          ( TypeEnv )
 import Control.Arrow              ( second )
 import Data.Traversable           ( mapAccumR )
+import Language.Haskell.Syntax.Module.Name (HsModuleName)
 
 {- Note [Updating HieAst for changes in the GHC AST]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -104,7 +105,7 @@ For 1), you need to call `toHie` for one of the following instances
 
 instance ToHie (Context (Located Name)) where ...
 instance ToHie (Context (Located Var)) where ...
-instance ToHie (IEContext (Located ModuleName)) where ...
+instance ToHie (IEContext (Located HsModuleName)) where ...
 
 `Context` is a data type that looks like:
 
@@ -211,7 +212,7 @@ call and just recurse directly in to the subexpressions.
 type RenamedSource     = ( HsGroup GhcRn, [LImportDecl GhcRn]
                          , Maybe [(LIE GhcRn, Avails)]
                          , Maybe (LHsDoc GhcRn)
-                         , Maybe (XRec GhcRn ModuleName) )
+                         , Maybe (XRec GhcRn HsModuleName) )
 type TypecheckedSource = LHsBinds GhcTc
 
 
@@ -606,7 +607,7 @@ instance (ToHie a) => ToHie (Bag a) where
 instance (ToHie a) => ToHie (Maybe a) where
   toHie = maybe (pure []) toHie
 
-instance ToHie (IEContext (LocatedA ModuleName)) where
+instance ToHie (IEContext (LocatedA HsModuleName)) where
   toHie (IEC c (L (EpAnn (EpaSpan (RealSrcSpan span _)) _ _) mname)) = do
       org <- ask
       pure [Node (mkSourcedNodeInfo org $ NodeInfo S.empty [] idents) span []]

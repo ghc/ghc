@@ -34,7 +34,7 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.FamInstEnv ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 
-import GHC.Unit.Module ( moduleName, moduleUnit
+import GHC.Unit.Module ( moduleName, moduleNameFS, moduleUnit
                        , unitFS, getModule )
 
 import GHC.Iface.Env    ( newGlobalBinder )

@@ -213,7 +213,7 @@ import GHC.Types.Var.Env (TidyEnv)
 import GHC.Types.Var.Set (TyVarSet, VarSet)
 import GHC.Types.DefaultEnv (ClassDefaults)
 
-import GHC.Unit.Types (Module)
+import GHC.Unit.Types (Module, ModuleName)
 import GHC.Unit.State (UnitState)
 import GHC.Unit.Module.ModIface (ModIface)
 
