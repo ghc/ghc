@@ -65,8 +65,6 @@ extern StgClosure ZCMain_main_closure;
 #define overflowException_closure ghc_hs_iface->overflowException_closure
 #define divZeroException_closure  ghc_hs_iface->divZZeroException_closure
 
-#define blockedOnBadFD_closure    ghc_hs_iface->blockedOnBadFD_closure
-
 #define Czh_con_info              ghc_hs_iface->Czh_con_info
 #define Izh_con_info              ghc_hs_iface->Izh_con_info
 #define Fzh_con_info              ghc_hs_iface->Fzh_con_info

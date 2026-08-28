@@ -23,14 +23,13 @@ import GHC.Internal.Types ()
     , closeFdWith
     , threadDelay
     , registerDelay
-    , blockedOnBadFD -- used by RTS
     ) where
 
 
 -- TODO: Use new Windows I/O manager
 import qualified GHC.Internal.Stack.Types as Rebindable
 import GHC.Internal.Base
-import GHC.Internal.Control.Exception (finally, SomeException, toException)
+import GHC.Internal.Control.Exception (finally)
 import GHC.Internal.Data.Foldable (forM_, mapM_, sequence_)
 import GHC.Internal.Data.IORef (IORef, newIORef, readIORef, writeIORef, atomicWriteIORef)
 import GHC.Internal.Data.Maybe (fromMaybe)
@@ -184,10 +183,6 @@ threadWait evt fd = mask_ $ do
   if evt' `eventIs` evtClose
     then ioError $ errnoToIOError "threadWait" eBADF Nothing Nothing
     else return ()
-
--- used at least by RTS in 'select()' IO manager backend
-blockedOnBadFD :: SomeException
-blockedOnBadFD = toException $ errnoToIOError "awaitEvent" eBADF Nothing Nothing
 
 threadWaitSTM :: Event -> Fd -> IO (STM (), IO ())
 threadWaitSTM evt fd = mask_ $ do
