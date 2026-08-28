@@ -23,11 +23,6 @@ CLOSURE(GHCziInternalziIOziException, cannotCompactMutable_closure)
 CLOSURE(GHCziInternalziControlziExceptionziBase, nonTermination_closure)
 CLOSURE(GHCziInternalziControlziExceptionziBase, nestedAtomically_closure)
 CLOSURE(GHCziInternalziControlziExceptionziBase, noMatchingContinuationPrompt_closure)
-#if defined(mingw32_HOST_OS)
-UNDEF_CLOSURE(GHCziInternalziEventziThread, blockedOnBadFD_closure)
-#else
-CLOSURE(GHCziInternalziEventziThread, blockedOnBadFD_closure)
-#endif
 CLOSURE(GHCziInternalziConcziSync, runSparks_closure)
 CLOSURE(GHCziInternalziConcziIO, ensureIOManagerIsRunning_closure)
 CLOSURE(GHCziInternalziConcziIO, interruptIOManager_closure)
