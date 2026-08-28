@@ -81,5 +81,25 @@ struct _CapIOManager {
 
 };
 
+/* Fill in the outcome and result/error on the TSO's stack frame.
+ * The TSO must be blocked using one of the stg_block_io_* blocking actions.
+ *
+ * Once the thread is resumed (by the scheduler) the code for stg_block_*_info
+ * will pick up the info from the stack frame and use it to see if there's been
+ * a failure, and if so to raise a PrimIOException.
+ *
+ * See Note [Thread blocking for new I/O primops].
+ */
+INLINE_HEADER void setTsoIOOpOutcome (StgTSO *tso,
+                                      enum IOOpOutcome outcome,
+                                      uint32_t result)
+{
+    ASSERT((StgPtr *)tso->stackobj->sp[0] == (StgPtr *)&stg_block_io_unit_info
+        || (StgPtr *)tso->stackobj->sp[0] == (StgPtr *)&stg_block_io_int_info);
+
+    tso->stackobj->sp[1] = (W_)outcome;
+    tso->stackobj->sp[2] = (W_)result;
+}
+
 #include "EndPrivate.h"
 

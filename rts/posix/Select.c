@@ -487,6 +487,8 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
                   IF_DEBUG(scheduler,
                       debugBelch("Waking up blocked thread %" FMT_StgThreadID "\n",
                                  tso->id));
+                 /* Fill in the outcome and result on the TSO's stack frame */
+                  setTsoIOOpOutcome(tso, IOOpOutcomeSuccess, 0);
                   pushOnRunQueue(iomgr->cap,tso);
                   RELEASE_STORE(&tso->why_blocked, NotBlocked);
                   break;

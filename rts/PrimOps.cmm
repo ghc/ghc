@@ -2304,7 +2304,7 @@ stg_handleIOSubmitResult ( CInt result )
     /* case IOSubmitResultAsyncContinue */
     if (result == 0::CInt) (likely: True) {
         /* See Note [Thread blocking for new I/O primops] */
-        jump stg_block_noregs();
+        jump stg_block_io_unit();
     }
 
     /* case IOSubmitResultSyncSuccess*/
