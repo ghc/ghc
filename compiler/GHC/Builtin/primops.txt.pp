@@ -3305,21 +3305,28 @@ section "Delay/wait operations"
 
 primop  DelayOp "delay#" GenPrimOp
    Int# -> State# s -> State# s
-   {Sleep specified number of microseconds.}
+   {Suspend the calling thread for a specified number of microseconds. This
+    operation is /interruptible/ by async exceptions.}
    with
    effect = ReadWriteEffect
    out_of_line      = True
 
 primop  WaitReadOp "waitRead#" GenPrimOp
    Int# -> State# s -> State# s
-   {Block until input is available on specified file descriptor.}
+   {Suspend the calling thread until input is available (or an I/O error
+    occurs) on the given file descriptor. This operation can throw exceptions
+    of type 'IOException'. The operation is also /interruptible/ by async
+    exceptions.}
    with
    effect = ReadWriteEffect
    out_of_line      = True
 
 primop  WaitWriteOp "waitWrite#" GenPrimOp
    Int# -> State# s -> State# s
-   {Block until output is possible on specified file descriptor.}
+   {Suspend the calling thread until output is possible (or an I/O error
+    occurs) on the given file descriptor. This operation can throw exceptions
+    of type 'IOException'. The operation is also /interruptible/ by async
+    exceptions.}
    with
    effect = ReadWriteEffect
    out_of_line      = True
