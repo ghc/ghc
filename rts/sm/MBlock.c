@@ -398,7 +398,8 @@ void releaseFreeMemory(void)
     // Do nothing if USE_LARGE_ADDRESS_SPACE, we never want
     // to release address space
 
-    debugTrace(DEBUG_gc, "mblock_high_watermark: %p\n", mblock_high_watermark);
+    debugTrace(DEBUG_gc, "mblock_high_watermark: %p\n",
+                         (void*)mblock_high_watermark);
 }
 
 #else // !USE_LARGE_ADDRESS_SPACE

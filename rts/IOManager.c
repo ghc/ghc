@@ -848,7 +848,9 @@ static void insertIntoSleepingQueue(CapIOManager *iomgr, StgTSO *tso, LowResTime
 /* CMM primop. Result is true on success, or false on allocation failure. */
 bool syncDelay(CapIOManager *iomgr, StgTSO *tso, HsInt us_delay)
 {
-    debugTrace(DEBUG_iomanager, "thread %ld waiting for %lld us", tso->id, us_delay);
+    debugTrace(DEBUG_iomanager, "thread %" FMT_StgThreadID
+                                " waiting for %" FMT_Word " us",
+                                tso->id, us_delay);
     ASSERT(tso->why_blocked == NotBlocked);
     switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)

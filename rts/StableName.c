@@ -195,7 +195,7 @@ lookupStableName (StgPtr p)
 
   if (sn != 0) {
     ASSERT(stable_name_table[sn].addr == p);
-    debugTrace(DEBUG_stable, "cached stable name %ld at %p",sn,p);
+    debugTrace(DEBUG_stable, "cached stable name %" FMT_Word " at %p", sn, p);
     stableNameUnlock();
     return sn;
   }
@@ -275,8 +275,8 @@ gcStableNameTable( void )
                 p->sn_obj = isAlive(p->sn_obj);
                 if (p->sn_obj == NULL) {
                     // StableName object died
-                    debugTrace(DEBUG_stable, "GC'd StableName %ld (addr=%p)",
-                               (long)(p - stable_name_table), p->addr);
+                    debugTrace(DEBUG_stable, "GC'd StableName %td (addr=%p)",
+                               p - stable_name_table, p->addr);
                     freeSnEntry(p);
                 } else if (p->addr != NULL) {
                     // sn_obj is alive, update pointee

@@ -431,14 +431,14 @@ void pollCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
         int res = ppoll(poll_table, nfds, &tv, NULL);
 
         debugTrace(DEBUG_iomanager,
-                   "ppoll(nfds = %d, timeout.sec = 0, timeout.nsec = 0) = %d",
-                   nfds, res);
+                   "ppoll(nfds = %lu, timeout.sec = 0, timeout.nsec = 0) = %d",
+                   (unsigned long) nfds, res);
 #else
         int res = poll(poll_table, nfds, 0);
 
         debugTrace(DEBUG_iomanager,
-                   "poll(nfds = %d, timeout_ms = 0) = %d",
-                   nfds, res);
+                   "poll(nfds = %lu, timeout_ms = 0) = %d",
+                   (unsigned long) nfds, res);
 #endif
         if (res == 0) {
             /* There is no I/O ready. We'll return to the scheduler. */
@@ -512,15 +512,17 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
         int res = ppoll(poll_table, nfds, timeout_ns, NULL);
 
         debugTrace(DEBUG_iomanager,
-                   "ppoll(nfds = %d, timeout.sec = %d, timeout.nsec = %d) = %d",
-                   nfds, timeout_ns == NULL ? -1 : timeout_ns->tv_sec,
-                         timeout_ns == NULL ?  0 : timeout_ns->tv_nsec,
+                   "ppoll(nfds = %lu, timeout.sec = %lld, timeout.nsec = %lld)"
+                   " = %d",
+                   (unsigned long) nfds,
+                   (long long) (timeout_ns == NULL ? -1 : timeout_ns->tv_sec),
+                   (long long) (timeout_ns == NULL ?  0 : timeout_ns->tv_nsec),
                    res);
 #else
         int res = poll(poll_table, nfds, timeout_ms);
 
         debugTrace(DEBUG_iomanager,
-                   "poll(nfds = %d, timeout_ms = %d) = %d",
+                   "poll(nfds = %lu, timeout_ms = %d) = %d",
                    nfds, timeout_ms, res);
 #endif
 

@@ -315,8 +315,8 @@ threadPaused(Capability *cap, StgTSO *tso)
                 || (bh_info == &stg_WHITEHOLE_info))
             {
                 debugTrace(DEBUG_squeeze,
-                           "suspending duplicate work: %ld words of stack",
-                           (long)((StgPtr)frame - tso->stackobj->sp));
+                           "suspending duplicate work: %td words of stack",
+                           (StgPtr)frame - tso->stackobj->sp);
 
                 // If this closure is already an indirection, then
                 // suspend the computation up to this point.

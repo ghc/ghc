@@ -1396,7 +1396,9 @@ bool checkSparkCountInvariant (void)
     /* The invariant is
      *   created = converted + remaining + gcd + fizzled
      */
-    debugTrace(DEBUG_sparks,"spark invariant: %ld == %ld + %ld + %ld + %ld "
+    debugTrace(DEBUG_sparks,"spark invariant: %" FMT_Word " == "
+                            "%" FMT_Word " + %" FMT_Word64 " + "
+                            "%" FMT_Word " + %" FMT_Word " "
                             "(created == converted + remaining + gcd + fizzled)",
                             sparks.created, sparks.converted, remaining,
                             sparks.gcd, sparks.fizzled);

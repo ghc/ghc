@@ -1049,7 +1049,7 @@ compact(StgClosure *static_objects,
     // 2. update forward ptrs
     for (W_ g = 0; g < RtsFlags.GcFlags.generations; g++) {
         generation *gen = &generations[g];
-        debugTrace(DEBUG_gc, "update_fwd:  %d", g);
+        debugTrace(DEBUG_gc, "update_fwd:  %" FMT_Word, g);
 
         update_fwd(gen->blocks);
         for (W_ n = 0; n < getNumCapabilities(); n++) {
@@ -1059,7 +1059,7 @@ compact(StgClosure *static_objects,
         update_fwd_large(gen->scavenged_large_objects);
         update_fwd_cnf(gen->live_compact_objects);
         if (g == RtsFlags.GcFlags.generations-1 && gen->old_blocks != NULL) {
-            debugTrace(DEBUG_gc, "update_fwd:  %d (compact)", g);
+            debugTrace(DEBUG_gc, "update_fwd:  %" FMT_Word " (compact)", g);
             update_fwd_compact(gen->old_blocks);
         }
     }
@@ -1069,7 +1069,8 @@ compact(StgClosure *static_objects,
     if (gen->old_blocks != NULL) {
         W_ blocks = update_bkwd_compact(gen);
         debugTrace(DEBUG_gc,
-                   "update_bkwd: %d (compact, old: %d blocks, now %d blocks)",
+                   "update_bkwd: %d (compact, old: %" FMT_Word " blocks, "
+                                              "now %" FMT_Word " blocks)",
                    gen->no, gen->n_old_blocks, blocks);
         gen->n_old_blocks = blocks;
     }

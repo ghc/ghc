@@ -874,7 +874,8 @@ resizeNurseriesEach (W_ blocks)
 
         node = capNoToNumaNode(i);
         if (nursery_blocks < blocks) {
-            debugTrace(DEBUG_gc, "increasing size of nursery from %d to %d blocks",
+            debugTrace(DEBUG_gc, "increasing size of nursery from %" FMT_Word
+                                 " to %" FMT_Word " blocks",
                        nursery_blocks, blocks);
             nursery->blocks = allocNursery(node, nursery->blocks,
                                            blocks-nursery_blocks);
@@ -883,7 +884,8 @@ resizeNurseriesEach (W_ blocks)
         {
             bdescr *next_bd;
 
-            debugTrace(DEBUG_gc, "decreasing size of nursery from %d to %d blocks",
+            debugTrace(DEBUG_gc, "decreasing size of nursery from %" FMT_Word
+                                 " to %" FMT_Word " blocks",
                        nursery_blocks, blocks);
 
             bd = nursery->blocks;
@@ -898,7 +900,8 @@ resizeNurseriesEach (W_ blocks)
             // might have gone just under, by freeing a large block, so make
             // up the difference.
             if (nursery_blocks < blocks) {
-                debugTrace(DEBUG_gc, "reincreasing size of nursery from %d to %d blocks",
+                debugTrace(DEBUG_gc, "reincreasing size of nursery from"
+                                     " %" FMT_Word " to %" FMT_Word " blocks",
                              nursery_blocks, blocks);
                 nursery->blocks = allocNursery(node, nursery->blocks,
                                                blocks-nursery_blocks);

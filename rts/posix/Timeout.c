@@ -54,7 +54,8 @@ bool syncDelayTimeout(CapIOManager *iomgr, StgTSO *tso, HsInt us_delay)
     insertTimeoutQueue(&iomgr->timeout_queue, timeout, target);
 
     debugTrace(DEBUG_iomanager,
-               "timer for delay of %lld usec installed at time %lld ns",
+               "timer for delay of %" FMT_Int " usec installed "
+               "at time %" FMT_Int64 " ns",
                us_delay, target);
     return true;
 }
@@ -98,7 +99,8 @@ void processTimeoutCompletions(CapIOManager *iomgr, Time now)
         if (now < waketime) {
             break;
         }
-        debugTrace(DEBUG_iomanager,"timer expired at %lld ns", waketime);
+        debugTrace(DEBUG_iomanager, "timer expired at %" FMT_Int64 " ns",
+                                    waketime);
         StgTimeout *timeout;
         deleteMinTimeoutQueue(&iomgr->timeout_queue, &timeout);
         notifyTimeoutCompletion(iomgr, timeout);

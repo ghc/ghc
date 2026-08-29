@@ -140,7 +140,8 @@ pruneSparkQueue (bool nonmovingMarkFinished, Capability *cap)
     pool->top     &= pool->moduloSize;
 
     debugTrace(DEBUG_sparks,
-               "markSparkQueue: current spark queue len=%ld; (hd=%ld; tl=%ld)",
+               "markSparkQueue: current spark queue len=%ld; "
+               "(hd=%" FMT_Int "; tl=%" FMT_Int ")",
                sparkPoolSize(pool), pool->bottom, pool->top);
 
     ASSERT_WSDEQUE_INVARIANTS(pool);
@@ -288,7 +289,7 @@ pruneSparkQueue (bool nonmovingMarkFinished, Capability *cap)
     debugTrace(DEBUG_sparks, "pruned %d sparks", pruned_sparks);
 
     debugTrace(DEBUG_sparks,
-               "new spark queue len=%ld; (hd=%ld; tl=%ld)",
+               "new spark queue len=%ld; (hd=%" FMT_Int "; tl=%" FMT_Int ")",
                sparkPoolSize(pool), pool->bottom, pool->top);
 
     ASSERT_WSDEQUE_INVARIANTS(pool);
@@ -322,7 +323,8 @@ traverseSparkQueue (evac_fn evac, void *user, Capability *cap)
     }
 
     debugTrace(DEBUG_sparks,
-               "traversed spark queue, len=%ld; (hd=%ld; tl=%ld)",
+               "traversed spark queue, len=%ld; "
+               "(hd=%" FMT_Int "; tl=%" FMT_Int ")",
                sparkPoolSize(pool), pool->bottom, pool->top);
 }
 
