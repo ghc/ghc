@@ -609,7 +609,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
 
         debugTrace(DEBUG_gc,
                    "threadStackOverflow of TSO %" FMT_StgThreadID " (%p): stack"
-                   " too large (now %ld; max is %ld)", tso->id, tso,
+                   " too large (now %ld; max is %u)", tso->id, tso,
                    (long)tso->stackobj->stack_size, RtsFlags.GcFlags.maxStkSize);
         IF_DEBUG(gc,
                  /* If we're debugging, just print out the top of the stack */
@@ -667,7 +667,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
     }
 
     debugTraceCap(DEBUG_sched, cap,
-                  "allocating new stack chunk of size %d bytes",
+                  "allocating new stack chunk of size %" FMT_Word " bytes",
                   chunk_size * sizeof(W_));
 
     // Charge the current thread for allocating stack.  Stack usage is
@@ -966,7 +966,8 @@ printThreadBlockage(StgTSO *tso)
   switch (UntagWhyBlocked(ACQUIRE_LOAD(&tso->why_blocked))) {
 #if defined(mingw32_HOST_OS)
     case BlockedOnDoProc:
-    debugBelch("is blocked on proc (request: %" FMT_Word ")", tso->block_info.async_reqID);
+    debugBelch("is blocked on proc (request: %" FMT_Word ")",
+               tso->block_info.async_reqID);
     break;
 #endif
 #if !defined(THREADED_RTS)

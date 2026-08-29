@@ -1157,8 +1157,9 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 
 #if defined(DEBUG)
         debugTrace(DEBUG_sched,
-                   "--<< thread %ld (%s) stopped: requesting a large block (size %ld)\n",
-                   (long)t->id, what_next_strs[t->what_next], blocks);
+                   "--<< thread %" FMT_StgThreadID " (%s) stopped: "
+                   "requesting a large block (size %" FMT_Word ")\n",
+                   t->id, what_next_strs[t->what_next], blocks);
 #endif
 
         // don't do this if the nursery is (nearly) full, we'll GC first.

@@ -636,13 +636,13 @@ GarbageCollect (struct GcConfig config,
               if(idle_cap[i]) { continue; }
               thread = gc_threads[i];
               debugTrace(DEBUG_gc,"thread %d:", i);
-              debugTrace(DEBUG_gc,"   copied           %ld",
+              debugTrace(DEBUG_gc,"   copied           %" FMT_Word,
                          RELAXED_LOAD(&thread->copied) * sizeof(W_));
-              debugTrace(DEBUG_gc,"   scanned          %ld",
+              debugTrace(DEBUG_gc,"   scanned          %" FMT_Word,
                          RELAXED_LOAD(&thread->scanned) * sizeof(W_));
-              debugTrace(DEBUG_gc,"   any_work         %ld",
+              debugTrace(DEBUG_gc,"   any_work         %" FMT_Word,
                          RELAXED_LOAD(&thread->any_work));
-              debugTrace(DEBUG_gc,"   scav_find_work %ld",
+              debugTrace(DEBUG_gc,"   scav_find_work   %" FMT_Word ,
                          RELAXED_LOAD(&thread->scav_find_work));
 
               any_work += RELAXED_LOAD(&thread->any_work);
@@ -694,7 +694,15 @@ GarbageCollect (struct GcConfig config,
 
 #if defined(DEBUG)
         debugTrace(DEBUG_gc,
-                   "mut_list_size: %lu (%d vars, %d arrays, %d MVARs, %d TVARs, %d TVAR_WATCH_QUEUEs, %d TREC_CHUNKs, %d TREC_HEADERs, %d others)",
+                   "mut_list_size: %lu ("
+                   "%" FMT_Word " vars, "
+                   "%" FMT_Word " arrays, "
+                   "%" FMT_Word " MVARs, "
+                   "%" FMT_Word " TVARs, "
+                   "%" FMT_Word " TVAR_WATCH_QUEUEs, "
+                   "%" FMT_Word " TREC_CHUNKs, "
+                   "%" FMT_Word " TREC_HEADERs, "
+                   "%" FMT_Word " others)",
                    (unsigned long)(mut_list_size * sizeof(W_)),
                    mutlist_scav_stats.n_MUTVAR,
                    mutlist_scav_stats.n_MUTARR,
@@ -914,7 +922,7 @@ GarbageCollect (struct GcConfig config,
 
   // Free the mark stack.
   if (mark_stack_top_bd != NULL) {
-      debugTrace(DEBUG_gc, "mark stack: %d blocks",
+      debugTrace(DEBUG_gc, "mark stack: %" FMT_Word " blocks",
                  countBlocks(mark_stack_top_bd));
       freeChain(mark_stack_top_bd);
   }
@@ -1018,7 +1026,9 @@ GarbageCollect (struct GcConfig config,
       need_copied_live = BLOCK_ROUND_UP(need_copied_live) / BLOCK_SIZE_W;
       need_uncopied_live = BLOCK_ROUND_UP(need_uncopied_live) / BLOCK_SIZE_W;
 
-      debugTrace(DEBUG_gc, "(before) copied_live: %d; uncopied_live: %d", need_copied_live, need_uncopied_live );
+      debugTrace(DEBUG_gc, "(before) copied_live: %" FMT_Word "; "
+                           "uncopied_live: %" FMT_Word,
+                           need_copied_live, need_uncopied_live);
 
 
       // minOldGenSize states that the size of the oldest generation must be at least
@@ -1027,7 +1037,8 @@ GarbageCollect (struct GcConfig config,
       if (RtsFlags.GcFlags.minOldGenSize >= need_copied_live + need_uncopied_live){
         extra_needed = RtsFlags.GcFlags.minOldGenSize - (need_copied_live + need_uncopied_live);
       }
-      debugTrace(DEBUG_gc, "(minOldGen: %d; extra_needed: %d", RtsFlags.GcFlags.minOldGenSize, extra_needed);
+      debugTrace(DEBUG_gc, "(minOldGen: %d; extra_needed: %" FMT_Word,
+                           RtsFlags.GcFlags.minOldGenSize, extra_needed);
 
       // If oldest gen is uncopying in some manner (compact or non-moving) then
       // add the extra requested by minOldGenSize to uncopying portion of memory.
@@ -1041,7 +1052,9 @@ GarbageCollect (struct GcConfig config,
 
       ASSERT(need_uncopied_live + need_copied_live >= RtsFlags.GcFlags.minOldGenSize );
 
-      debugTrace(DEBUG_gc, "(after) copied_live: %d; uncopied_live: %d", need_copied_live, need_uncopied_live );
+      debugTrace(DEBUG_gc, "(after) copied_live: %" FMT_Word "; "
+                           "uncopied_live: %" FMT_Word,
+                           need_copied_live, need_uncopied_live);
 
       need_prealloc = 0;
       for (i = 0; i < n_nurseries; i++) {
@@ -1098,7 +1111,7 @@ GarbageCollect (struct GcConfig config,
       need = BLOCKS_TO_MBLOCKS(need);
 
       got = mblocks_allocated;
-      debugTrace(DEBUG_gc,"Returning: %d %d", got, need);
+      debugTrace(DEBUG_gc, "Returning: %" FMT_Word " %" FMT_Word, got, need);
 
       uint32_t returned = 0;
       if (got > need) {
@@ -1772,7 +1785,7 @@ prepare_collected_gen (generation *gen)
             gen->bitmap = bitmap_bdescr;
             bitmap = bitmap_bdescr->start;
 
-            debugTrace(DEBUG_gc, "bitmap_size: %d, bitmap: %p",
+            debugTrace(DEBUG_gc, "bitmap_size: %" FMT_Word ", bitmap: %p",
                        bitmap_size, bitmap);
 
             // don't forget to fill it with zeros!
@@ -2109,7 +2122,8 @@ resize_nursery (void)
 
             adjusted_blocks = (RtsFlags.GcFlags.maxHeapSize - 2 * blocks);
 
-            debugTrace(DEBUG_gc, "near maximum heap size of 0x%x blocks, blocks = %d, adjusted to %ld",
+            debugTrace(DEBUG_gc, "near maximum heap size of 0x%x blocks, "
+                                 "blocks = %" FMT_Word ", adjusted to %ld",
                        RtsFlags.GcFlags.maxHeapSize, blocks, adjusted_blocks);
 
             pc_free = adjusted_blocks * 100 / RtsFlags.GcFlags.maxHeapSize;

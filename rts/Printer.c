@@ -554,7 +554,7 @@ printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap,
     uint32_t i;
 
     for(i = 0; i < size; i++, bitmap >>= 1 ) {
-        debugBelch("   stk[%ld] (%p) = ", (long)(spBottom-(payload+i)), payload+i);
+        debugBelch("   stk[%td] (%p) = ", spBottom-(payload+i), payload+i);
         if ((bitmap & 1) == 0) {
             printPtr((P_)payload[i]);
             debugBelch(" -- ");
@@ -577,7 +577,7 @@ printLargeBitmap( StgPtr spBottom, StgPtr payload, StgLargeBitmap* large_bitmap,
         StgWord bitmap = large_bitmap->bitmap[bmp];
         j = 0;
         for(; i < size && j < BITS_IN(W_); j++, i++, bitmap >>= 1 ) {
-            debugBelch("   stk[%" FMT_Word "] (%p) = ", (W_)(spBottom-(payload+i)), payload+i);
+            debugBelch("   stk[%td] (%p) = ", spBottom-(payload+i), payload+i);
             if ((bitmap & 1) == 0) {
                 printPtr((P_)payload[i]);
                 debugBelch(" -- ");

@@ -707,7 +707,7 @@ void nonmovingPruneFreeSegmentList(void)
   oldest_gen->n_words  -= pruned_segments * NONMOVING_SEGMENT_SIZE;
   nonmovingHeap.saved_free = NULL;
   debugTrace(DEBUG_nonmoving_gc,
-            "Pruned %d free segments, leaving %d on the free segment list.",
+            "Pruned %zd free segments, leaving %zd on the free segment list.",
             pruned_segments, new_length);
   traceNonmovingPrunedSegments(pruned_segments, new_length);
   trace(TRACE_nonmoving_gc, "Finished pruning free segment list.");

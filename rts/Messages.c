@@ -134,8 +134,8 @@ loop:
     if (i == &stg_MSG_TRY_WAKEUP_info)
     {
         StgTSO *tso = ((MessageWakeup *)m)->tso;
-        debugTraceCap(DEBUG_sched, cap, "message: try wakeup thread %"
-                      FMT_StgThreadID, tso->id);
+        debugTraceCap(DEBUG_sched, cap,
+                      "message: try wakeup thread %" FMT_StgThreadID, tso->id);
         tryWakeupThread(cap, tso);
     }
     else if (i == &stg_MSG_THROWTO_info)
@@ -150,8 +150,8 @@ loop:
             goto loop;
         }
 
-        debugTraceCap(DEBUG_sched, cap, "message: throwTo %ld -> %ld",
-                      (W_)t->source->id, (W_)t->target->id);
+        debugTraceCap(DEBUG_sched, cap, "message: throwTo %" FMT_StgThreadID
+                      " -> %" FMT_StgThreadID, t->source->id, t->target->id);
 
         r = throwToMsg(cap, t);
 
