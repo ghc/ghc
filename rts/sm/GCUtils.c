@@ -173,9 +173,10 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
 void
 push_todo_block(bdescr *bd, gen_workspace *ws)
 {
-    debugTrace(DEBUG_gc, "push todo block %p (%ld words), step %d, todo_q: %ld",
-            bd->start, (unsigned long)(bd->free - bd->u.scan),
-            ws->gen->no, dequeElements(ws->todo_q));
+    debugTrace(DEBUG_gc, "push todo block %p (%ld words), step %d, "
+                         "todo_q: %" FMT_Int,
+               bd->start, (unsigned long)(bd->free - bd->u.scan),
+               ws->gen->no, dequeElements(ws->todo_q));
 
     ASSERT(bd->link == NULL);
 

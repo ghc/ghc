@@ -134,7 +134,8 @@ static int shake(void) {
   StgTRecHeader *__t = (_t);                                                    \
   StgTRecChunk *__c = __t -> current_chunk;                                     \
   StgWord __limit = __c -> next_entry_idx;                                      \
-  TRACE("%p : FOR_EACH_ENTRY, current_chunk=%p limit=%ld", __t, __c, __limit);  \
+  TRACE("%p : FOR_EACH_ENTRY, current_chunk=%p limit=%" FMT_Word,               \
+              __t, __c, __limit);                                               \
   while (__c != END_STM_CHUNK_LIST) {                                           \
     StgWord __i;                                                                \
     for (__i = 0; __i < __limit; __i ++) {                                      \
@@ -780,7 +781,7 @@ static StgBool validate_and_acquire_ownership (Capability *cap,
             result = false;
             BREAK_FOR_EACH;
           } else {
-            TRACE("%p : need to check version %ld", trec, e -> num_updates);
+            TRACE("%p : need to check version %" FMT_Int, trec, e->num_updates);
           }
         });
       }
@@ -815,7 +816,8 @@ static StgBool check_read_only(StgTRecHeader *trec STG_UNUSED) {
       StgTVar *s;
       s = e -> tvar;
       if (entry_is_read_only(e)) {
-        TRACE("%p : check_read_only for TVar %p, saw %ld", trec, s, e -> num_updates);
+        TRACE("%p : check_read_only for TVar %p, saw %" FMT_Int,
+              trec, s, e->num_updates);
 
         // We must first load current_value then num_updates; this is inverse of
         // the order of the stores in stmCommitTransaction.
@@ -1199,7 +1201,7 @@ of these false-positives causing actual issues.
 StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec, StgBool optimistically) {
   StgTRecHeader *t;
 
-  TRACE("%p : stmValidateNestOfTransactions, %b", trec, optimistically);
+  TRACE("%p : stmValidateNestOfTransactions, %d", trec, optimistically);
   ASSERT(trec != NO_TREC);
   ASSERT((trec -> state == TREC_ACTIVE) ||
          (trec -> state == TREC_WAITING) ||

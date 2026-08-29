@@ -113,7 +113,7 @@ extern RUNTIME_TRACE_FLAG_CACHE RuntimeTraceFlagCache;
 // -----------------------------------------------------------------------------
 
 #if defined(DEBUG)
-void traceBegin (const char *str, ...);
+void traceBegin (const char *str, ...) STG_PRINTF_ATTR(1, 2);
 void traceEnd (void);
 #endif
 
@@ -265,7 +265,8 @@ void traceSparkEvent_ (Capability *cap, EventTypeNum tag, StgWord info1);
         traceCap_(cap, msg, ##__VA_ARGS__);     \
     }
 
-void traceCap_(Capability *cap, char *msg, ...);
+void traceCap_(Capability *cap, char *msg, ...)
+    STG_PRINTF_ATTR(2, 3);
 
 /*
  * Emit a trace message
@@ -275,7 +276,8 @@ void traceCap_(Capability *cap, char *msg, ...);
         trace_(msg, ##__VA_ARGS__);             \
     }
 
-void trace_(char *msg, ...);
+void trace_(char *msg, ...)
+    STG_PRINTF_ATTR(1, 2);
 
 /*
  * A message or event emitted by the program

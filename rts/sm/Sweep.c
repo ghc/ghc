@@ -74,7 +74,11 @@ sweep(generation *gen)
 
     gen->live_estimate = live;
 
-    debugTrace(DEBUG_gc, "sweeping: %d blocks, %d were copied, %d freed (%d%%), %d are fragmented, live estimate: %ld%%",
+    debugTrace(DEBUG_gc, "sweeping: %" FMT_Word " blocks, "
+                                   "%" FMT_Word " were copied, "
+                                   "%" FMT_Word " freed (%" FMT_Word "%%), "
+                                   "%" FMT_Word " are fragmented, "
+                         "live estimate: %lu%%",
           gen->n_old_blocks + freed,
           gen->n_old_blocks - blocks + freed,
           freed,

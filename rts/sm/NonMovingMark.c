@@ -370,7 +370,8 @@ void nonmovingBeginFlush(Task *task)
 bool nonmovingWaitForFlush(void)
 {
     ACQUIRE_LOCK(&upd_rem_set_lock);
-    debugTrace(DEBUG_nonmoving_gc, "Flush count %d", upd_rem_set_flush_count);
+    debugTrace(DEBUG_nonmoving_gc, "Flush count %" FMT_Word,
+                                   upd_rem_set_flush_count);
     bool finished = upd_rem_set_flush_count == getNumCapabilities();
     if (!finished) {
         waitCondition(&upd_rem_set_flushed_cond, &upd_rem_set_lock);
@@ -1872,7 +1873,8 @@ nonmovingMark (MarkBudget* budget, MarkQueue *queue)
                 RELEASE_SM_LOCK;
             } else {
                 // Nothing more to do
-                debugTrace(DEBUG_nonmoving_gc, "Finished mark pass: %d", count);
+                debugTrace(DEBUG_nonmoving_gc,
+                           "Finished mark pass: %" FMT_Word64, count);
                 traceConcMarkEnd(count);
                 return;
             }
