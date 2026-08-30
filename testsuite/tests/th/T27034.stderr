@@ -1,0 +1,4 @@
+T27034.hs:6:4-17: Splicing pattern
+    tupP [wildP] ======> MkSolo _
+T27034.hs:7:4-29: Splicing pattern
+    tupP [varP (mkName "x")] ======> MkSolo x
