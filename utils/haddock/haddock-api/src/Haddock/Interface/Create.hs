@@ -890,7 +890,7 @@ extractDecl prr dflags sDocContext name decl
           _
           d@DataDecl
             { tcdLName = L _ dataNm
-            , tcdDataDefn = HsDataDefn{dd_cons = dataCons}
+            , tcdDataDefn = HsDataDefn{dd_cons = L _ dataCons}
             } -> pure $ do
             let ty_args = lHsQTyVarsToTypes (tyClDeclTyVars d)
             lsig <-
@@ -912,19 +912,19 @@ extractDecl prr dflags sDocContext name decl
                   ( FamEqn
                       { feqn_tycon = L _ n
                       , feqn_pats = tys
-                      , feqn_rhs = defn
+                      , feqn_rhs = HsDataDefn { dd_cons = L _ dd_cons }
                       }
                     )
                 )
             ) ->
             pure $
               if isDataConName name
-                then fmap (SigD noExtField) <$> extractPatternSyn name n tys (toList $ dd_cons defn)
-                else fmap (SigD noExtField) <$> extractRecSel name n tys (toList $ dd_cons defn)
+                then fmap (SigD noExtField) <$> extractPatternSyn name n tys (toList dd_cons)
+                else fmap (SigD noExtField) <$> extractRecSel name n tys (toList dd_cons)
         InstD _ (ClsInstD _ ClsInstDecl{ cid_ext = (_, HsNestedGroup { ng_datafam_insts = insts})})
           | isDataConName name ->
               let matches =
-                    [ d' | L _ d'@(DataFamInstDecl (FamEqn{feqn_rhs = dd})) <- insts, name `elem` map unLoc (concatMap (toList . getConNames . unLoc) (dd_cons dd))
+                    [ d' | L _ d'@(DataFamInstDecl (FamEqn{feqn_rhs = dd})) <- insts, name `elem` map unLoc (concatMap (toList . getConNames . unLoc) (unLoc $ dd_cons dd))
                     ]
                in case matches of
                     [d0] -> extractDecl prr dflags sDocContext name (noLocA (InstD noExtField (DataFamInstD noExtField d0)))
@@ -935,7 +935,7 @@ extractDecl prr dflags sDocContext name decl
                     | L _ d'@(DataFamInstDecl d) <-
                         insts
                     , -- , L _ ConDecl { con_details = RecCon rec } <- toList $ dd_cons (feqn_rhs d)
-                    Just rec <- toList $ getRecConArgs_maybe . unLoc <$> dd_cons (feqn_rhs d)
+                    Just rec <- toList $ getRecConArgs_maybe . unLoc <$> unLoc (dd_cons (feqn_rhs d))
                     , HsConDeclRecField{cdrf_names = ns} <- map unLoc (unLoc rec)
                     , L _ n <- ns
                     , unLoc (foLabel n) == name
