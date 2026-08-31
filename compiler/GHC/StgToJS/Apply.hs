@@ -774,8 +774,9 @@ genericFastApply s =
                   , postIncrS regs
                     -- copy high registers with a loop
                   , WhileStat False (regs .>. toJExpr max_low_reg) $ mconcat
-                      -- rN stored in stack[sp - N - 2] so that r2 is stored in stack[sp], etc.
-                      [ stack .! (sp - regs - 2) |= highReg_expr regs
+                      -- rN stored in stack[sp - (N - 2)] so that r2 is stored in stack[sp], etc.
+                      -- (same layout as pushReg below and as the readers in h$ap_gen; see #27624)
+                      [ stack .! (sp - (regs - 2)) |= highReg_expr regs
                       , postDecrS regs
                       ]
                   , SwitchStat regs (map pushReg low_regs) mempty

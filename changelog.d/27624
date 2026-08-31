@@ -1,0 +1,8 @@
+section: js-backend
+synopsis: Fix stack corruption in the generic apply with 31 or more argument registers.
+  ``h$ap_gen_fast`` wrote registers above R31 to wrong stack slots (off by 4),
+  corrupting the stack frame below and reloading stale values for the
+  affected arguments. This affected unknown calls to thunks with 31 or more
+  argument register slots.
+issues: #27624
+mrs: !16614
