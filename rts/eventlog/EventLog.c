@@ -113,8 +113,6 @@ static eventlog_init_func_t *eventlog_header_funcs = NULL;
 // See Note [Maximum event length]
 #define EVENT_LOG_SIZE 2 * (1024 * 1024) // 2MB
 
-static int flushCount = 0;
-
 // Struct for record keeping of buffer to store event types and events.
 //
 // Invariant: The event buffer will always begin with a block-start marker.
@@ -1514,7 +1512,6 @@ void printAndClearEventBuf (EventsBuf *ebuf)
         }
 
         resetEventsBuf(ebuf);
-        flushCount++;
 
         postBlockMarker(ebuf);
     }
