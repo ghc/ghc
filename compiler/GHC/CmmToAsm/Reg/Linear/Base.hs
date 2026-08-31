@@ -7,7 +7,8 @@ module GHC.CmmToAsm.Reg.Linear.Base (
         BlockAssignment,
         lookupBlockAssignment,
         lookupFirstUsed,
-        emptyBlockAssignment,
+        blockHints,
+        initBlockAssignment,
         updateBlockAssignment,
 
         VLoc(..), Loc(..), IgnoreFormat(..),
@@ -28,6 +29,7 @@ import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Linear.StackMap
 import GHC.CmmToAsm.Reg.Liveness
+import GHC.CmmToAsm.Reg.RegHints
 import GHC.CmmToAsm.Config
 import GHC.Platform.Reg
 
@@ -42,14 +44,23 @@ import GHC.CmmToAsm.Format
 
 data ReadingOrWriting = Reading | Writing deriving (Eq,Ord)
 
--- | Used to store the register assignment on entry to a basic block.
+-- | The linear allocator's per-procedure memory.
+--
+--      'blockMap' stores the register assignment on entry to a basic block.
 --      We use this to handle join points, where multiple branch instructions
 --      target a particular label. We have to insert fixup code to make
 --      the register assignments from the different sources match up.
 --
+--      'firstUsed' records which real register each vreg was first given, so
+--      that it can be given the same one again (#18208).
+--
+--      'blockHints' are the procedure's register hints, constant for the whole
+--      procedure. See Note [Register hints for the linear allocator].
+--
 data BlockAssignment freeRegs
         = BlockAssignment { blockMap :: !(BlockMap (freeRegs, RegMap Loc))
-                          , firstUsed :: !(UniqFM VirtualReg RealReg) }
+                          , firstUsed :: !(UniqFM VirtualReg RealReg)
+                          , blockHints :: !RegHints }
 
 -- | Find the register mapping for a specific BlockId.
 lookupBlockAssignment :: BlockId -> BlockAssignment freeRegs -> Maybe (freeRegs, RegMap Loc)
@@ -59,9 +70,9 @@ lookupBlockAssignment bid ba = mapLookup bid (blockMap ba)
 lookupFirstUsed :: VirtualReg -> BlockAssignment freeRegs -> Maybe RealReg
 lookupFirstUsed vr ba = lookupUFM (firstUsed ba) vr
 
--- | An initial empty 'BlockAssignment'
-emptyBlockAssignment :: BlockAssignment freeRegs
-emptyBlockAssignment = BlockAssignment mapEmpty mempty
+-- | An initial 'BlockAssignment' carrying a procedure's register hints.
+initBlockAssignment :: RegHints -> BlockAssignment freeRegs
+initBlockAssignment hints = BlockAssignment mapEmpty mempty hints
 
 -- | Add new register mappings for a specific block.
 updateBlockAssignment :: BlockId
@@ -76,6 +87,7 @@ updateBlockAssignment dest (freeRegs, regMap) (BlockAssignment {..}) =
         firstUsed
         (toVRegMap regMap)
     )
+    blockHints
   where
     -- The blocks are processed in dependency order, so if there's already an
     -- entry in the map then keep that assignment rather than writing the new

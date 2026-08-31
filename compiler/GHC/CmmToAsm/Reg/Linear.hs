@@ -114,6 +114,7 @@ import qualified GHC.CmmToAsm.Reg.Linear.RV64    as RV64
 import qualified GHC.CmmToAsm.Reg.Linear.LA64    as LA64
 import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Reg.Liveness
+import GHC.CmmToAsm.Reg.RegHints
 import GHC.CmmToAsm.Reg.Utils
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Config
@@ -140,6 +141,7 @@ import GHC.Platform
 
 import Data.Containers.ListUtils
 import Data.Maybe
+import qualified Data.IntMap.Strict as IM
 import Data.List (sortOn)
 import Control.Monad
 
@@ -252,8 +254,11 @@ linearRegAlloc'
 
 linearRegAlloc' config initFreeRegs entry_ids block_live sccs
  = UDSM $ \us -> do
-    let !(_, !stack, !stats, !blocks, us') =
-            runR config emptyBlockAssignment initFreeRegs emptyRegMap emptyStackMap us
+    let -- See Note [Register hints for the linear allocator]. Computed once per
+        -- procedure and carried in the BlockAssignment.
+        !hints = computeRegHints (ncgPlatform config) block_live sccs
+        !(_, !stack, !stats, !blocks, us') =
+            runR config (initBlockAssignment hints) initFreeRegs emptyRegMap emptyStackMap us
                 $ linearRA_SCCs entry_ids block_live [] sccs
      in DUniqResult (blocks, stats, getStackUse stack) us'
 
@@ -879,6 +884,75 @@ findPrefRealReg vreg = do
   bassig <- getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
   return $ lookupFirstUsed vreg bassig
 
+-- | Choose which of the free registers of a class to give to a virtual register.
+--
+-- Without hints: prefer the register the vreg was already assigned to if it
+-- happens to be free (see 'findPrefRealReg'), otherwise take the first free one.
+--
+-- With hints, order the free registers by
+--
+--   1. the cost of this vreg living there (see Note [Register hints for the
+--      linear allocator]), least first;
+--   2. then the vreg's previous assignment. This is above the hinted
+--      preference on purpose: a mismatch at a back edge is repaired by
+--      'joinToTargets', which may cost a fixup block and a jump, whereas a
+--      missed preference costs one move. At a loop carried value's first
+--      assignment there is no previous assignment, so the preference still
+--      decides where it matters.
+--   3. then the hinted preference;
+--   4. then the order 'frGetFreeRegs' returned them in, i.e. 'first_free'.
+--
+-- With equal scores this is exactly the unhinted rule, so a procedure whose
+-- hint tables are empty gets bit for bit the code it got before.
+chooseFreeReg
+        :: RegHints        -- ^ the procedure's hints, 'NoRegHints' if it has none
+        -> VirtualReg      -- ^ the vreg being placed
+        -> Maybe RealReg   -- ^ the vreg's previous assignment, if any
+        -> RealReg         -- ^ the first free register of the class
+        -> [RealReg]       -- ^ all free registers of the class, first one first
+        -> RealReg
+chooseFreeReg hints vr pref_reg first_free free_regs
+  = case hints of
+        NoRegHints -> unhinted
+        RegHints prefs scores
+          | Just sc <- lookupUFM scores vr
+          -> best sc (lookupUFM prefs vr)
+          | Just reg <- pref_reg
+          , reg `elem` free_regs
+          -> reg
+          | Just hp <- lookupUFM prefs vr
+          , hp `elem` free_regs
+          -> hp
+          | otherwise
+          -> first_free
+  where
+        unhinted
+                | Just reg <- pref_reg
+                , reg `elem` free_regs
+                = reg
+                | otherwise
+                = first_free
+
+        best sc mb_hint
+                = case free_regs of
+                    (r0:rs) -> fst (foldl' step (r0, keyOf r0) rs)
+                    []      -> first_free   -- unreachable: this is case (2)
+          where
+            -- Moving off the register the vreg already had costs a fixup move
+            -- at the back edge (joinToTargets), so charge staying-put nothing
+            -- and moving one unit -- the same unit a clobber crossing costs.
+            -- A vreg therefore only leaves its old register when that saves
+            -- strictly more than the one move the change itself costs.
+            keyOf r@(RealRegSingle n)
+                | Just r == pref_reg = (IM.findWithDefault 0 n sc,     rank r)
+                | otherwise          = (IM.findWithDefault 0 n sc + 1, rank r)
+            rank r
+                | Just r == pref_reg = 0 :: Int
+                | Just r == mb_hint  = 1
+                | otherwise          = 2
+            step acc@(_, k) r
+                = let k' = keyOf r in if k' < k then (r, k') else acc
+
 -- reading is redundant with reason, but we keep it around because it's
 -- convenient and it maintains the recursive structure of the allocator. -- EZY
 allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr)
@@ -899,16 +973,12 @@ allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr vrF
 
         -- Can we put the variable into a register it already was?
         pref_reg <- findPrefRealReg vr
+        hints    <- getRegHintsR
 
         case freeRegs_thisClass of
          -- case (2): we have a free register
          (first_free : _) ->
-           do   let !final_reg
-                        | Just reg <- pref_reg
-                        , reg `elem` freeRegs_thisClass
-                        = reg
-                        | otherwise
-                        = first_free
+           do   let !final_reg = chooseFreeReg hints vr pref_reg first_free freeRegs_thisClass
 
                 spills'   <- loadTemp r spill_loc final_reg spills
 

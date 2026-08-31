@@ -22,6 +22,7 @@ module GHC.CmmToAsm.Reg.Linear.State (
 
         getBlockAssigR,
         setBlockAssigR,
+        getRegHintsR,
 
         setDeltaR,
         getDeltaR,
@@ -41,6 +42,7 @@ import GHC.CmmToAsm.Reg.Linear.Stats
 import GHC.CmmToAsm.Reg.Linear.StackMap
 import GHC.CmmToAsm.Reg.Linear.Base
 import GHC.CmmToAsm.Reg.Liveness
+import GHC.CmmToAsm.Reg.RegHints
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Config
@@ -151,6 +153,12 @@ getBlockAssigR = mkRegM $ \ s@RA_State{ra_blockassig = assig} ->
 setBlockAssigR :: BlockAssignment freeRegs -> RegM freeRegs ()
 setBlockAssigR assig = mkRegM $ \ s ->
   RA_Result s{ra_blockassig = assig} ()
+
+-- | The register hints computed for this procedure.
+--      'NoRegHints' if the procedure has none.
+getRegHintsR :: RegM freeRegs RegHints
+getRegHintsR = mkRegM $ \ s ->
+  RA_Result s (blockHints (ra_blockassig s))
 
 setDeltaR :: Int -> RegM freeRegs ()
 setDeltaR n = mkRegM $ \ s ->
