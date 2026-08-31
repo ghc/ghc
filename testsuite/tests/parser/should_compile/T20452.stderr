@@ -137,39 +137,45 @@
        (Nothing)
        (Nothing)
        (Nothing)
-       (DataTypeCons
-        (False)
-        [(L
-          (EpAnn
-           (EpaSpan { T20452.hs:5:26-31 })
-           []
-           (EpaComments
-            []))
-          (ConDeclH98
-           (AnnConDeclH98
-            (EpUniTok (EpaSpan { <no location info> }) NormalSyntax)
-            (EpTok
-             (EpaSpan { <no location info> }))
-            (EpUniTok
-             (EpaSpan { <no location info> })
-             (NormalSyntax)))
-           []
-           (L
-            (EpAnn
-             (EpaSpan { T20452.hs:5:26-31 })
-             (NameAnnTrailing
-              [])
-             (EpaComments
-              []))
-            (Unqual
-             {OccName: Proxy1}))
-           (False)
-           []
-           (Nothing)
-           (PrefixCon
-            (NoExtField)
-            [])
-           (Nothing)))])
+       (L
+        (EpAnn
+         (EpaSpan { T20452.hs:5:26-31 })
+         []
+         (EpaComments
+          []))
+        (DataTypeCons
+         (False)
+         [(L
+           (EpAnn
+            (EpaSpan { T20452.hs:5:26-31 })
+            []
+            (EpaComments
+             []))
+           (ConDeclH98
+            (AnnConDeclH98
+             (EpUniTok (EpaSpan { <no location info> }) NormalSyntax)
+             (EpTok
+              (EpaSpan { <no location info> }))
+             (EpUniTok
+              (EpaSpan { <no location info> })
+              (NormalSyntax)))
+            []
+            (L
+             (EpAnn
+              (EpaSpan { T20452.hs:5:26-31 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
+             (Unqual
+              {OccName: Proxy1}))
+            (False)
+            []
+            (Nothing)
+            (PrefixCon
+             (NoExtField)
+             [])
+            (Nothing)))]))
        []))))
   ,(L
     (EpAnn
@@ -269,39 +275,45 @@
        (Nothing)
        (Nothing)
        (Nothing)
-       (DataTypeCons
-        (False)
-        [(L
-          (EpAnn
-           (EpaSpan { T20452.hs:6:26-31 })
-           []
-           (EpaComments
-            []))
-          (ConDeclH98
-           (AnnConDeclH98
-            (EpUniTok (EpaSpan { <no location info> }) NormalSyntax)
-            (EpTok
-             (EpaSpan { <no location info> }))
-            (EpUniTok
-             (EpaSpan { <no location info> })
-             (NormalSyntax)))
-           []
-           (L
-            (EpAnn
-             (EpaSpan { T20452.hs:6:26-31 })
-             (NameAnnTrailing
-              [])
-             (EpaComments
-              []))
-            (Unqual
-             {OccName: Proxy2}))
-           (False)
-           []
-           (Nothing)
-           (PrefixCon
-            (NoExtField)
-            [])
-           (Nothing)))])
+       (L
+        (EpAnn
+         (EpaSpan { T20452.hs:6:26-31 })
+         []
+         (EpaComments
+          []))
+        (DataTypeCons
+         (False)
+         [(L
+           (EpAnn
+            (EpaSpan { T20452.hs:6:26-31 })
+            []
+            (EpaComments
+             []))
+           (ConDeclH98
+            (AnnConDeclH98
+             (EpUniTok (EpaSpan { <no location info> }) NormalSyntax)
+             (EpTok
+              (EpaSpan { <no location info> }))
+             (EpUniTok
+              (EpaSpan { <no location info> })
+              (NormalSyntax)))
+            []
+            (L
+             (EpAnn
+              (EpaSpan { T20452.hs:6:26-31 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
+             (Unqual
+              {OccName: Proxy2}))
+            (False)
+            []
+            (Nothing)
+            (PrefixCon
+             (NoExtField)
+             [])
+            (Nothing)))]))
        []))))
   ,(L
     (EpAnn

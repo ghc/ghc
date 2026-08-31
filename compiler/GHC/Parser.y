@@ -1365,7 +1365,7 @@ ty_decl :: { LTyClDecl GhcPs }
             {% do { let { (tdata, tnewtype, ttype) = fstOf3 $ unLoc $1}
                   ; let { tequal = fst $ unLoc $4 }
                   ; mkTyData (comb4 $1 $3 $4 $5) (sndOf3 $ unLoc $1) (thdOf3 $ unLoc $1) $2 $3
-                           Nothing (reverse (snd $ unLoc $4))
+                           Nothing (fmap reverse (snd $ unLoc $4))
                                    (fmap reverse $5)
                            (AnnDataDefn [] [] ttype tnewtype tdata noEpTok noEpUniTok noEpTok noAnn tequal)
                              }}
@@ -1459,7 +1459,7 @@ inst_decl :: { LInstDecl GhcPs }
             {% do { let { (tdata, tnewtype) = fst $ unLoc $1 }
                   ; let { tequal = fst $ unLoc $5 }
                   ; mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (unLoc $4)
-                                      Nothing (reverse (snd  $ unLoc $5))
+                                      Nothing (fmap reverse (snd  $ unLoc $5))
                                               (fmap reverse $6)
                             (AnnDataDefn [] [] noEpTok tnewtype tdata (epTok $2) noEpUniTok noEpTok noAnn tequal)}}
 
@@ -1630,7 +1630,7 @@ at_decl_inst :: { LInstDecl GhcPs }
             {% do { let { (tdata, tnewtype) = fst $ unLoc $1 }
                   ; let { tequal = fst $ unLoc $5 }
                   ; mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (unLoc $4)
-                                    Nothing (reverse (snd $ unLoc $5))
+                                    Nothing (fmap reverse (snd $ unLoc $5))
                                              (fmap reverse $6)
                             (AnnDataDefn [] [] noEpTok tnewtype tdata $2 noEpUniTok noEpTok noAnn tequal)}}
 
@@ -2563,17 +2563,20 @@ constructors.
 -- Datatype declarations
 
 gadt_constrlist :: { Located ((EpToken "where", AnnList)
-                             , [LConDecl GhcPs]) } -- Returned in order
+                             , Located [LConDecl GhcPs]) } -- Returned in order
 
         : 'where' '{'        gadt_constrs '}'    {% checkEmptyGADTs $
                                                       L (comb2 $1 $4)
                                                         ((epTok $1, AnnList (EpExplicitBraces (epTok $2) (epTok $4)) [])
-                                                        , unLoc $3) }
-        | 'where' vocurly    gadt_constrs close  {% checkEmptyGADTs $
-                                                      L (comb2 $1 $3)
-                                                        ((epTok $1,  pal $ AnnList (epVirtualBraces (glR $2) $3) [])
-                                                        , unLoc $3) }
-        | {- empty -}                            { noLoc (noAnn,[]) }
+                                                        , sLL $2 $4 (unLoc $3)) }
+        | 'where' vocurly    gadt_constrs close  {% do { let { loc = if isGoodSrcSpan (getLoc $3)
+                                                                       then comb2 $2 $3
+                                                                       else noSrcSpan }
+                                                       ; checkEmptyGADTs $
+                                                           L (comb2 $1 $3)
+                                                             ((epTok $1, pal $ AnnList (epVirtualBraces (glR $2) $3) [])
+                                                             , L loc (unLoc $3)) }}
+        | {- empty -}                            { noLoc (noAnn,noLocA []) }
 
 gadt_constrs :: { Located [LConDecl GhcPs] }
         : gadt_constr ';' gadt_constrs
@@ -2608,8 +2611,8 @@ consequence, GADT constructor names are restricted (names like '(*)' are
 allowed in usual data constructors, but not in GADTs).
 -}
 
-constrs :: { Located (EpToken "=",[LConDecl GhcPs]) }
-        : '=' constrs1    { sLL $1 $2 (epTok $1,unLoc $2)}
+constrs :: { Located (EpToken "=",Located [LConDecl GhcPs]) }
+        : '=' constrs1    { sLL $1 $2 (epTok $1,$2)}
 
 constrs1 :: { Located [LConDecl GhcPs] }
         : constrs1 '|' constr
