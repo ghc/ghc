@@ -167,7 +167,7 @@ minLlvmVersion = 13
 
 -- Max llvm version (exclusive)
 maxLlvmVersionExcl :: Int
-maxLlvmVersionExcl = 23
+maxLlvmVersionExcl = 24
 
 -- Max llvm version (inclusive)
 maxLlvmVersion :: Int
