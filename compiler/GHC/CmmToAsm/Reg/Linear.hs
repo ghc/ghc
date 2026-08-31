@@ -114,6 +114,7 @@ import qualified GHC.CmmToAsm.Reg.Linear.RV64    as RV64
 import qualified GHC.CmmToAsm.Reg.Linear.LA64    as LA64
 import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Reg.Liveness
+import GHC.CmmToAsm.Reg.RegHints
 import GHC.CmmToAsm.Reg.Utils
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Config
@@ -140,6 +141,7 @@ import GHC.Platform
 
 import Data.Containers.ListUtils
 import Data.Maybe
+import qualified Data.IntMap.Strict as IM
 import Data.List (sortOn)
 import Control.Monad
 
@@ -252,8 +254,11 @@ linearRegAlloc'
 
 linearRegAlloc' config initFreeRegs entry_ids block_live sccs
  = UDSM $ \us -> do
-    let !(_, !stack, !stats, !blocks, us') =
-            runR config emptyBlockAssignment initFreeRegs emptyRegMap emptyStackMap us
+    let -- See Note [Register hints for the linear allocator]. Computed once per
+        -- proc and passed as read only state.
+        !hints = computeRegHints (ncgPlatform config) block_live sccs
+        !(_, !stack, !stats, !blocks, us') =
+            runR config (initBlockAssignment hints) initFreeRegs emptyRegMap emptyStackMap us
                 $ linearRA_SCCs entry_ids block_live [] sccs
      in DUniqResult (blocks, stats, getStackUse stack) us'
 
@@ -879,6 +884,61 @@ findPrefRealReg vreg = do
   bassig <- getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
   return $ lookupFirstUsed vreg bassig
 
+-- | The core register choice logic:
+--
+--  The core idea is to rank choices by:
+--    * A "cost", determined by the likelyhood of the choice forcing a reg-move onto
+--      another vreg. (see Note [Register hints for the linear allocator]). (Lowest first).
+--    * Registers the vregs was assigned to already in other blocks.
+--    * Hinted preferences, these come from hardcode choices. Calling conventions,
+--      instructions with fixed in/outputs etc.
+--    * The 'frGetFreeRegs' order, which has no real impact on performance.
+--
+chooseFreeReg
+        :: RegHints        -- ^ the procedure's hints, 'NoRegHints' if it has none
+        -> VirtualReg      -- ^ the vreg being placed
+        -> Maybe RealReg   -- ^ the vreg's previous assignment, if any
+        -> RealReg         -- ^ the first free register of the class
+        -> [RealReg]       -- ^ all free registers of the class, first one first
+        -> RealReg
+chooseFreeReg hints vr pref_reg first_free free_regs
+  = case hints of
+        NoRegHints -> unhinted
+        RegHints prefs scores
+          | Just sc <- lookupUFM scores vr
+          -> best sc (lookupUFM prefs vr)
+          | Just reg <- pref_reg
+          , reg `elem` free_regs
+          -> reg
+          | Just hp <- lookupUFM prefs vr
+          , hp `elem` free_regs
+          -> hp
+          | otherwise
+          -> first_free
+  where
+        unhinted
+                | Just reg <- pref_reg
+                , reg `elem` free_regs
+                = reg
+                | otherwise
+                = first_free
+
+        best sc mb_hint
+                = case free_regs of
+                    (r0:rs) -> fst (foldl' step (r0, keyOf r0) rs)
+                    []      -> first_free
+          where
+            -- Prefer a reg staying in a real reg it's already placed in by another block.
+            keyOf r@(RealRegSingle n)
+                | Just r == pref_reg = (IM.findWithDefault 0 n sc,     rank r)
+                | otherwise          = (IM.findWithDefault 0 n sc + 1, rank r)
+            rank r
+                | Just r == pref_reg = 0 :: Int
+                | Just r == mb_hint  = 1
+                | otherwise          = 2
+            step acc@(_, k) r
+                = let k' = keyOf r in if k' < k then (r, k') else acc
+
 -- reading is redundant with reason, but we keep it around because it's
 -- convenient and it maintains the recursive structure of the allocator. -- EZY
 allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr)
@@ -899,16 +959,12 @@ allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr vrF
 
         -- Can we put the variable into a register it already was?
         pref_reg <- findPrefRealReg vr
+        hints    <- getRegHintsR
 
         case freeRegs_thisClass of
          -- case (2): we have a free register
          (first_free : _) ->
-           do   let !final_reg
-                        | Just reg <- pref_reg
-                        , reg `elem` freeRegs_thisClass
-                        = reg
-                        | otherwise
-                        = first_free
+           do   let !final_reg = chooseFreeReg hints vr pref_reg first_free freeRegs_thisClass
 
                 spills'   <- loadTemp r spill_loc final_reg spills
 
