@@ -140,7 +140,10 @@ restore_locale( void )
  * store only up to (max_era - 1) as its creation or last use time.
  * -------------------------------------------------------------------------- */
 unsigned int era;
+
+#if defined(PROFILING)
 static uint32_t max_era;
+#endif
 
 StgWord user_era;
 
@@ -511,8 +514,10 @@ initHeapProfiling(void)
         n_censuses = 1;
     }
 
+#if defined(PROFILING)
     // max_era = 2^LDV_SHIFT
     max_era = 1 << LDV_SHIFT;
+#endif
 
     censuses = stgMallocBytes(sizeof(Census) * n_censuses, "initHeapProfiling");
 
