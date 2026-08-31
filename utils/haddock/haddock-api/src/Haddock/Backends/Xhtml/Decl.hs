@@ -1111,7 +1111,7 @@ ppInstHead links splice unicode qual mdoc origin orphan no ihd@(InstHead{..}) md
       , [subFamInstDetails iid pdecl mname]
       )
       where
-        cons = dd_cons (tcdDataDefn dd)
+        cons = unLoc $ dd_cons (tcdDataDefn dd)
         pref = case cons of NewTypeCon _ -> keyword "newtype"; DataTypeCons _ _ -> keyword "data"
         pdata = pref <+> typ
         pdecl = pdata <+> ppShortDataDecl False True dd [] unicode qual
@@ -1217,7 +1217,7 @@ ppShortDataDecl summary dataInst dataDecl@(DataDecl {}) pats unicode qual
     doConstr c con = toHtml [c] <+> ppShortConstr summary (unLoc con) unicode qual
     doGADTConstr con = ppShortConstr summary (unLoc con) unicode qual
 
-    cons = dd_cons (tcdDataDefn dataDecl)
+    cons = unLoc $ dd_cons (tcdDataDefn dataDecl)
     isH98 = flip any (unLoc <$> cons) $ \case
       ConDeclH98{} -> True
       ConDeclGADT{} -> False
@@ -1274,7 +1274,7 @@ ppDataDecl
     where
       docname = tcdNameI dataDecl
       curname = Just $ getName docname
-      cons = dd_cons (tcdDataDefn dataDecl)
+      cons = unLoc $ dd_cons (tcdDataDefn dataDecl)
       isH98 = flip any (unLoc <$> cons) $ \case
         ConDeclH98{} -> True
         ConDeclGADT{} -> False
@@ -1647,7 +1647,7 @@ ppDataHeader
   unicode
   qual =
     -- newtype or data
-    ( case cons of
+    ( case unLoc cons of
         NewTypeCon _ -> keyword "newtype"
         DataTypeCons False _ -> keyword "data"
         DataTypeCons True _ -> keyword "type" <+> keyword "data"

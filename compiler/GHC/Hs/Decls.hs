@@ -510,7 +510,7 @@ tyClDeclTyVars :: TyClDecl (GhcPass p) -> LHsQTyVars (GhcPass p)
 tyClDeclTyVars (FamDecl { tcdFam = FamilyDecl { fdTyVars = tvs } }) = tvs
 tyClDeclTyVars d = tcdTyVars d
 
-countTyClDecls :: [TyClDecl pass] -> (Int, Int, Int, Int, Int)
+countTyClDecls :: [TyClDecl (GhcPass pass)] -> (Int, Int, Int, Int, Int)
         -- class, synonym decls, data, newtype, family decls
 countTyClDecls decls
  = (count isClassDecl    decls,
@@ -519,11 +519,11 @@ countTyClDecls decls
     count isNewTy        decls,  -- ...instances
     count isFamilyDecl   decls)
  where
-   isDataTy DataDecl{ tcdDataDefn = HsDataDefn { dd_cons = DataTypeCons _ _ } } = True
-   isDataTy _                                                       = False
+   isDataTy DataDecl{ tcdDataDefn = HsDataDefn { dd_cons = L _ DataTypeCons{} } } = True
+   isDataTy _                                                                     = False
 
-   isNewTy DataDecl{ tcdDataDefn = HsDataDefn { dd_cons = NewTypeCon _ } } = True
-   isNewTy _                                                      = False
+   isNewTy DataDecl{ tcdDataDefn = HsDataDefn { dd_cons = L _ NewTypeCon{} } } = True
+   isNewTy _                                                                   = False
 
 -- FIXME: tcdName is commonly used by both GHC and third-party tools, so it
 -- needs to be polymorphic in the pass
@@ -642,7 +642,7 @@ tyClDeclFlavour (FamDecl { tcdFam = FamilyDecl { fdInfo = info }})
       DataFamily {}       -> OpenFamilyFlavour (IAmData DataType) Nothing
       OpenTypeFamily {}   -> OpenFamilyFlavour IAmType Nothing
       ClosedTypeFamily {} -> ClosedTypeFamilyFlavour
-tyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_cons = nd } })
+tyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_cons = L _ nd } })
   = case dataDefnConsNewOrData nd of
       NewType  -> NewtypeFlavour
       DataType -> DataTypeFlavour
@@ -899,7 +899,7 @@ ppDataDefnHeader pp_hdr HsDataDefn
   { dd_ctxt = context
   , dd_cType = mb_ct
   , dd_kindSig = mb_sig
-  , dd_cons = condecls }
+  , dd_cons = L _ condecls }
   = pp_type <+> ppr (dataDefnConsNewOrData condecls) <+> pp_ct <+> pp_hdr context <+> pp_sig
   where
     pp_type
@@ -917,7 +917,7 @@ pp_data_defn :: (OutputableBndrId p)
                   -> HsDataDefn (GhcPass p)
                   -> SDoc
 pp_data_defn pp_hdr defn@HsDataDefn
-  { dd_cons = condecls
+  { dd_cons = L _ condecls
   , dd_derivs = derivings }
   | null condecls
   = ppDataDefnHeader pp_hdr defn <+> pp_derivings derivings
@@ -1094,7 +1094,7 @@ pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_eqn =
 
 pprDataFamInstFlavour :: DataFamInstDecl (GhcPass p) -> SDoc
 pprDataFamInstFlavour DataFamInstDecl
-  { dfid_eqn = FamEqn { feqn_rhs = HsDataDefn { dd_cons = cons }}}
+  { dfid_eqn = FamEqn { feqn_rhs = HsDataDefn { dd_cons = L _ cons }}}
   = ppr (dataDefnConsNewOrData cons)
 
 pprHsFamInstLHS :: (OutputableBndrId p)
@@ -1577,6 +1577,7 @@ roleAnnotDeclName (RoleAnnotDecl _ (L _ name) _) = name
 type instance Anno (HsDecl (GhcPass _)) = SrcSpanAnnA
 type instance Anno [LocatedA (HsDecl (GhcPass _))] = SrcSpanAnnA
 type instance Anno [LocatedA (FamEqn pass (LocatedA (HsType pass)))] = SrcSpanAnnA
+type instance Anno (DataDefnCons _) = SrcSpanAnnA
 type instance Anno (SpliceDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (TyClDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (FunDep (GhcPass p)) = SrcSpanAnnA

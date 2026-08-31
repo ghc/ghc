@@ -694,7 +694,7 @@ renameDataDefn
       { dd_ctxt = lcontext
       , dd_cType = cType
       , dd_kindSig = k
-      , dd_cons = cons
+      , dd_cons = L ld cons
       }
     ) = do
     lcontext' <- traverse renameLContext lcontext
@@ -707,7 +707,7 @@ renameDataDefn
           , dd_ctxt = lcontext'
           , dd_cType = fmap renameCType <$> cType
           , dd_kindSig = k'
-          , dd_cons = cons'
+          , dd_cons = L ld cons'
           , dd_derivs = []
           }
       )

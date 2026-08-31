@@ -3660,7 +3660,7 @@ exactDataDefn exactHdr
                              , dd_ctxt = context
                              , dd_cType = mb_ct
                              , dd_kindSig = mb_sig
-                             , dd_cons = condecls, dd_derivs = derivings }) = do
+                             , dd_cons = L ld condecls, dd_derivs = derivings }) = do
 
 
   epTokensToComments "(" ops
@@ -3689,19 +3689,14 @@ exactDataDefn exactHdr
   w' <- if (needsWhere condecls)
     then markEpToken w
     else return w
-  (eq', al', condecls') <- exact_condecls eq al (toList condecls)
-  let condecls'' = case condecls of
-        DataTypeCons td _ -> DataTypeCons td condecls'
-        NewTypeCon _     -> case condecls' of
-          [decl] -> NewTypeCon decl
-          _ -> panic "exacprint NewTypeCon"
+  (eq', al', condecls') <- exact_condecls eq al (L ld condecls)
   derivings' <- mapM markAnnotated derivings
   return (anx, ln', tvs', b,
                  (HsDataDefn { dd_ext = AnnDataDefn [] [] t' nt' d' i' dc' w' al' eq'
                              , dd_ctxt = mctxt'
                              , dd_cType = mb_ct'
                              , dd_kindSig = mb_sig'
-                             , dd_cons = condecls'', dd_derivs = derivings' }))
+                             , dd_cons = condecls', dd_derivs = derivings' }))
 
 
 exactVanillaDeclHead :: (Monad m, Monoid w)
@@ -4139,24 +4134,30 @@ markTrailing ts = do
 -- based on pp_condecls in Decls.hs
 exact_condecls :: (Monad m, Monoid w)
   => EpToken "=" -> AnnList
-  -> [LConDecl GhcPs]
-  -> EP w m (EpToken "=", AnnList, [LConDecl GhcPs])
-exact_condecls eq al cs
+  -> LocatedA (DataDefnCons (LConDecl GhcPs))
+  -> EP w m (EpToken "=", AnnList, LocatedA (DataDefnCons (LConDecl GhcPs)))
+exact_condecls eq al (L ld decls)
   | gadt_syntax                  -- In GADT syntax
   = do
-      (al',cs') <- markAnnListA al $ mapM markAnnotated cs
-      return (eq, al', cs')
+      (L ld' (List al' cs')) <- markAnnotated (L ld (List al cs))
+      return (eq, al', L ld' (conds cs'))
   | otherwise                    -- In H98 syntax
   = do
       eq0 <- markEpToken eq
-      cs' <- mapM markAnnotated cs
-      return (eq0, al, cs')
+      -- cs' <- mapM markAnnotated cs
+      L ld' cs' <- markAnnotated (L ld cs)
+      return (eq0, al, L ld' (conds cs'))
   where
+    cs = toList decls
     gadt_syntax = case cs of
       []                      -> False
       (L _ ConDeclH98{}  : _) -> False
       (L _ ConDeclGADT{} : _) -> True
-
+    conds condecls'  = case decls of
+        DataTypeCons td _ -> DataTypeCons td condecls'
+        NewTypeCon _     -> case condecls' of
+          [decl] -> NewTypeCon decl
+          _ -> panic "exacprint NewTypeCon"
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (ConDecl GhcPs) where
@@ -4464,6 +4465,11 @@ instance ExactPrint [LocatedA (HsConDeclRecField GhcPs)] where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
   exact fs = mapM markAnnotated fs
+
+instance ExactPrint [LocatedA (ConDecl GhcPs)] where
+  getAnnotationEntry _ = NoEntryVal
+  setAnnotationAnchor a _ _ _ = a
+  exact ds = mapM markAnnotated ds
 
 instance ExactPrint [RecordPatSynField GhcPs] where
   getAnnotationEntry _ = NoEntryVal

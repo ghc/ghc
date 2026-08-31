@@ -1914,7 +1914,7 @@ rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
 rnTyClDecl (DataDecl
     { tcdLName = tycon, tcdTyVars = tyvars,
       tcdFixity = fixity,
-      tcdDataDefn = defn@HsDataDefn{ dd_cons = cons, dd_kindSig = kind_sig},
+      tcdDataDefn = defn@HsDataDefn{ dd_cons = L _ cons, dd_kindSig = kind_sig},
       tcdModifiers = mods })
   = do { tycon' <- lookupLocatedTopBndrRnN WL_TyCon tycon
        ; let kvs = extractDataDefnKindVars defn
@@ -2048,7 +2048,7 @@ rnTySyn doc rhs = rnLHsType doc rhs
 
 rnDataDefn :: HsDocContext -> HsDataDefn GhcPs
            -> RnM (HsDataDefn GhcRn, FreeNames)
-rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = condecls
+rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = L ld condecls
                            , dd_kindSig = m_sig, dd_derivs = derivs })
   = do  { -- DatatypeContexts (i.e., stupid contexts) can't be combined with
           -- GADT syntax. See Note [The stupid context] in GHC.Core.DataCon.
@@ -2081,7 +2081,7 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
                               , dd_cType = fmap rn_ctype <$> cType
                               , dd_ctxt = context'
                               , dd_kindSig = m_sig'
-                              , dd_cons = condecls'
+                              , dd_cons = L ld condecls'
                               , dd_derivs = derivs' }
                  , all_fvs )
         }

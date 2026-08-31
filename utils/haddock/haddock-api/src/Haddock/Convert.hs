@@ -278,7 +278,7 @@ synifyTyCon prr _coax tc
                 { dd_ext = noAnn
                 -- No constructors; arbitrary lie, they are neither
                 -- algebraic data nor newtype:
-                , dd_cons = DataTypeCons False []
+                , dd_cons = noLocA $ DataTypeCons False []
                 , dd_ctxt = Nothing
                 , dd_cType = Nothing
                 , dd_kindSig =
@@ -410,7 +410,7 @@ synifyTyCon _prr coax tc
             , dd_ctxt = alg_ctx
             , dd_cType = Nothing
             , dd_kindSig = kindSig
-            , dd_cons = cons
+            , dd_cons = noLocA cons
             , dd_derivs = alg_deriv
             }
       pure

@@ -367,10 +367,10 @@ restrictTo names (L loc decl) = L loc $ case decl of
 restrictDataDefn :: [Name] -> HsDataDefn GhcRn -> HsDataDefn GhcRn
 restrictDataDefn names d = d{dd_cons = restrictDataDefnCons names (dd_cons d)}
 
-restrictDataDefnCons :: [Name] -> DataDefnCons (LConDecl GhcRn) -> DataDefnCons (LConDecl GhcRn)
+restrictDataDefnCons :: [Name] -> LocatedA (DataDefnCons (LConDecl GhcRn)) -> LocatedA (DataDefnCons (LConDecl GhcRn))
 restrictDataDefnCons names = \case
-  DataTypeCons is_type_data cons -> DataTypeCons is_type_data (restrictCons names cons)
-  NewTypeCon con -> maybe (DataTypeCons False []) NewTypeCon $ restrictCons names (Just con)
+  L l (DataTypeCons is_type_data cons) -> L l $ DataTypeCons is_type_data (restrictCons names cons)
+  L l (NewTypeCon con) -> L l $ maybe (DataTypeCons False []) NewTypeCon $ restrictCons names (Just con)
 
 restrictCons :: MonadFail m => [Name] -> m (LConDecl GhcRn) -> m (LConDecl GhcRn)
 restrictCons names decls = [L p d | L p (Just d) <- fmap keep <$> decls]
@@ -594,7 +594,7 @@ instance Parent (TyClDecl GhcRn) where
   children d
     | DataDecl { tcdDataDefn = dd } <- d
     = map unLoc $
-      concatMap (toList . getConNames . unLoc) (dd_cons dd)
+      concatMap (toList . getConNames . unLoc) (unLoc $ dd_cons dd)
     | ClassDecl{ tcdCExt = (HsNestedGroup { ng_sigs = sigs, ng_ats = ats }, _)} <- d
     = map (unLoc . fdLName . unLoc) ats
       ++ [unLoc n | L _ (TypeSig _ _ ns _) <- sigs, n <- ns]
@@ -611,7 +611,7 @@ familyConDecl d = zip (toList $ unLoc <$> getConNames d) (repeat $ children d)
 -- child to its grand-children, recursively.
 families :: TyClDecl GhcRn -> [(Name, [Name])]
 families d
-  | DataDecl {}  <- d = family d : concatMap (familyConDecl . unLoc) (dd_cons (tcdDataDefn d))
+  | DataDecl {}  <- d = family d : concatMap (familyConDecl . unLoc) (unLoc $ dd_cons (tcdDataDefn d))
   | ClassDecl {} <- d = [family d]
   | otherwise         = []
 
