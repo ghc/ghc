@@ -224,7 +224,7 @@ hsGroupTopLevelFixitySigs (HsGroup{ hs_fixds = fixds, hs_tyclds = tyclds }) =
     fixds ++ cls_fixds
   where
     cls_fixds = [ L loc sig
-                | L _ ClassDecl{tcdDecls = decls} <- tyClGroupTyClDecls tyclds
+                | L _ ClassDecl{tcdDecls = L _ decls} <- tyClGroupTyClDecls tyclds
                 , HsNestedGroup { ng_sigs = sigs } <- (singleton . partitionBindsAndSigs) decls
                 , L loc (FixSig _ sig) <- sigs
                 ]
@@ -568,7 +568,7 @@ instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
                     tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars,
                     tcdFixity = fixity,
                     tcdFDs  = fds,
-                    tcdDecls = decls,
+                    tcdDecls = L _ decls,
                     tcdModifiers = mods})
       = case ghcPass @p of
           GhcPs -> if null decls -- No "where" part

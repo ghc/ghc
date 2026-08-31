@@ -503,15 +503,15 @@ instance HasHaddock (HsDecl GhcPs) where
   addHaddock (TyClD _ decl)
     | ClassDecl { tcdCExt = (x, layout),
                   tcdCtxt, tcdLName, tcdTyVars, tcdFixity, tcdFDs,
-                  tcdDecls, tcdModifiers } <- decl
+                  tcdDecls = L ld decls, tcdModifiers } <- decl
     = do
         registerHdkA tcdLName
         registerEpTokenHdkA (acd_where x)
-        tcdDecls' <- addHaddockInterleaveItems layout (mkDocHsDecl layout) tcdDecls
+        decls' <- addHaddockInterleaveItems layout (mkDocHsDecl layout) decls
         pure $
           let decl' = ClassDecl { tcdCExt = (x, layout)
                                 , tcdCtxt, tcdLName, tcdTyVars, tcdFixity, tcdFDs
-                                , tcdDecls = tcdDecls'
+                                , tcdDecls = L ld decls'
                                 , tcdModifiers }
           in TyClD noExtField decl'
 

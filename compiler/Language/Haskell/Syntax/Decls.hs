@@ -422,7 +422,7 @@ data TyClDecl pass
                 tcdTyVars  :: LHsQTyVars pass,         -- ^ Class type variables
                 tcdFixity  :: LexicalFixity, -- ^ Fixity used in the declaration
                 tcdFDs     :: [LHsFunDep pass],         -- ^ Functional deps
-                tcdDecls   :: [LHsDecl pass] -- ^ Class declarations.
+                tcdDecls   :: XRec pass [LHsDecl pass] -- ^ Class declarations.
                                              -- only SigD, ValD, TyClD _ FamDecl, InstD _ TyFamInstD,
                                              -- InstD _ DataFamInstD and DocD
     }
