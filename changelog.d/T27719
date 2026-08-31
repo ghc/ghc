@@ -1,0 +1,18 @@
+section: rts
+synopsis: Occasionally sort nursery blocks when needed to improve cache locality.
+issues: #27719
+description: {
+  GHC Allocates space in the nursery in block groups. These can be reordered
+  for one reason or another during the lifetime of a program. If such shuffling
+  happens too often it leads to bad cache locality and corresponding slowdowns.
+
+  The RTS now keeps a rough count of those re-orderings, and once a nursery has
+  been shuffled sufficiently for sorting to be worthwhile it will be sorted by
+  block address.
+
+  Deeper details are documented in
+  Note [Nursery Block Chain scrambling] in rts/sm/Storage.c.
+
+  Note that this doesn't prevent *fragmentation* of the the nursery. That remains
+  as a problem for another day.
+}
