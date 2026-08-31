@@ -1433,13 +1433,14 @@ expModifiers1 :: { forall b. DisambECP b => PV (Located [LHsModifierOf (LocatedA
 
 inst_decl :: { LInstDecl GhcPs }
         : 'instance' maybe_warning_pragma overlap_pragma inst_type where_inst
-       {% do { decls <- cvBindsAndSigs (snd $ unLoc $5)
+       {% do { let { L ld decs = snd $ unLoc $5 }
+             ; decls <- cvBindsAndSigs decs
              ; let (twhere, ann_list) = fst $ unLoc $5
              ; let anns = AnnClsInstDecl (epTok $1) twhere ann_list
              ; let cid = ClsInstDecl
                                   { cid_ext = ($2, anns)
                                   , cid_poly_ty = $4
-                                  , cid_decls = cvClassDecls decls
+                                  , cid_decls = L (noAnnSrcSpan ld) $ cvClassDecls decls
                                   , cid_overlap_mode = $3
                                   , cid_modifiers = [] }
              ; amsA' (L (comb3 $1 $4 $5)
@@ -1902,12 +1903,12 @@ decllist_inst
 -- Instance body
 --
 where_inst :: { Located ((EpToken "where", AnnList)
-                        , OrdList (LHsDecl GhcPs)) }   -- Reversed
+                        , Located (OrdList (LHsDecl GhcPs))) }   -- Reversed
                                 -- No implicit parameters
                                 -- May have type declarations
         : 'where' decllist_inst         { sLL $1 $> ((epTok $1,(fst $ unLoc $2))
-                                             ,snd $ unLoc $2) }
-        | {- empty -}                   { noLoc (noAnn,nilOL) }
+                                             , sL1 $2 (snd $ unLoc $2)) }
+        | {- empty -}                   { noLoc (noAnn,noLoc nilOL) }
 
 -- Declarations in binding groups other than classes and instances
 --

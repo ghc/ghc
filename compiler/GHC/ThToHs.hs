@@ -348,7 +348,7 @@ cvtDec (InstanceD o ctxt ty decs)
                          mkHsQualTy ctxt loc ctxt' $ L loc ty'
         ; returnJustLA $ InstD noExtField $ ClsInstD noExtField $
           ClsInstDecl { cid_ext = (Nothing, noAnn), cid_poly_ty = inst_ty'
-                      , cid_decls = cvClassDecls decls'
+                      , cid_decls = noLocA $ cvClassDecls decls'
                       , cid_overlap_mode
                                    = fmap (L (l2l loc) . overlap) o
                       , cid_modifiers = []
