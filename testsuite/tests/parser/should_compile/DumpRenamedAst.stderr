@@ -1902,7 +1902,13 @@
              (NoExtField))))])
         (Prefix)
         []
-        []))]
+        (L
+         (EpAnn
+          (EpaSpan { DumpRenamedAst.hs:29:3-12 })
+          []
+          (EpaComments
+           []))
+         [])))]
      []
      []
      [])

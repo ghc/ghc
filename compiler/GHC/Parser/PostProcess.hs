@@ -207,12 +207,12 @@ mkInstD (L loc d) = L loc (InstD noExtField d)
 mkClassDecl :: SrcSpan
             -> Located (Maybe (LHsContext GhcPs), LHsType GhcPs)
             -> Located (a,[LHsFunDep GhcPs])
-            -> OrdList (LHsDecl GhcPs)
+            -> Located (OrdList (LHsDecl GhcPs))
             -> EpLayout
             -> AnnClassDecl
             -> P (LTyClDecl GhcPs)
 
-mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layout annsIn
+mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds (L ld where_cls) layout annsIn
   = do { decls <- cvBindsAndSigs where_cls
        ; (cls, tparams, fixity, ops, cps, cs) <- checkTyClHdr True tycl_hdr
        ; tyvars <- checkTyVars (text "class") whereDots cls tparams
@@ -223,7 +223,7 @@ mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layout annsIn
                                   , tcdLName = cls, tcdTyVars = tyvars
                                   , tcdFixity = fixity
                                   , tcdFDs = snd (unLoc fds)
-                                  , tcdDecls = cvClassDecls decls
+                                  , tcdDecls = L (noAnnSrcSpan ld) $ cvClassDecls decls
                                   , tcdModifiers = [] })) }
 
 mkTyData :: SrcSpan

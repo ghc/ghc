@@ -1493,7 +1493,7 @@ hsLTyClDeclBinders (L loc (SynDecl
 hsLTyClDeclBinders (L loc (ClassDecl
                                { tcdCExt = ext
                                , tcdLName = (L _ cls_name)
-                               , tcdDecls  = decls}))
+                               , tcdDecls  = L _ decls}))
   = let
     HsNestedGroup { ng_sigs = sigs, ng_ats = ats } :: HsNestedGroup (GhcPass p)
         = case ghcPass @p of

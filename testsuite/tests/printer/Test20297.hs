@@ -19,3 +19,9 @@ ipb = ?y
 -- ClsInstDecl
 instance C Int where -- comment4
   meth = x
+
+-- ClassDecl
+class C a where -- comment5
+
+class D a where -- comment6
+  meth :: a

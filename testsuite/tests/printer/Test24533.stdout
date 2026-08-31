@@ -419,7 +419,13 @@
                {OccName: Type})))))))])
       (Prefix)
       []
-      [])))
+      (L
+       (EpAnn
+        (EpaSpan { <no location info> })
+        []
+        (EpaComments
+         []))
+       []))))
   ,(L
     (EpAnn
      (EpaSpan { Test24533.hs:(14,1)-(16,19) })
@@ -1044,7 +1050,13 @@
                {OccName: Type})))))))])
       (Prefix)
       []
-      [])))
+      (L
+       (EpAnn
+        (EpaSpan { <no location info> })
+        []
+        (EpaComments
+         []))
+       []))))
   ,(L
     (EpAnn
      (EpaSpan { Test24533.ppr.hs:(5,1)-(6,19) })

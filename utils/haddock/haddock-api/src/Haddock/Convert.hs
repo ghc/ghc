@@ -177,7 +177,7 @@ tyThingToLHsDecl prr t = case t of
                       )
                       $ snd
                       $ classTvsFds cl
-                , tcdDecls = []
+                , tcdDecls = noLocA []
                 , tcdCExt = (HsNestedGroup {
                     ng_sigs =
                       noLocA (MinimalSig (noAnn, NoSourceText) . noLocA $ classMinimalDef cl)
