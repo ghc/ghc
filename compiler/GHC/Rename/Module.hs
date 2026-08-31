@@ -1938,7 +1938,7 @@ rnTyClDecl (DataDecl
 rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                         tcdTyVars = tyvars, tcdFixity = fixity,
                         tcdFDs = fds,
-                        tcdDecls = decls,
+                        tcdDecls = L ld decls,
                         tcdModifiers = modifiers})
   = do  { let HsNestedGroup { ng_meths = mbinds, ng_sigs = sigs, ng_ats = ats
                             , ng_tyfam_insts = at_defs, ng_docs = docs} = partitionBindsAndSigs decls
@@ -1995,7 +1995,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
         ; return (ClassDecl { tcdCtxt = context', tcdLName = lcls',
                               tcdTyVars = tyvars', tcdFixity = fixity,
                               tcdFDs = fds',
-                              tcdDecls = [], -- See Note [Pass-sensitive decls for ClassDecls/ClsInstDecls]
+                              tcdDecls = L ld [], -- See Note [Pass-sensitive decls for ClassDecls/ClsInstDecls]
                               tcdCExt = (HsNestedGroup { ng_sigs          = sigs',
                                                          ng_meths         = mbinds',
                                                          ng_ats           = ats',

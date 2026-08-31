@@ -3511,7 +3511,7 @@ instance ExactPrint (TyClDecl GhcPs) where
                     tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars,
                     tcdFixity = fixity,
                     tcdFDs  = fds,
-                    tcdDecls = decls,
+                    tcdDecls = L ld decls,
                     tcdModifiers = mods})
       -- TODO: add a test that demonstrates tcdDocs
       -- TODO:AZ do we need the distinction between null decls and not?
@@ -3523,18 +3523,18 @@ instance ExactPrint (TyClDecl GhcPs) where
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
                              tcdFDs  = fds',
-                             tcdDecls = decls,
+                             tcdDecls = L ld decls,
                              tcdModifiers = mods'})
 
       | otherwise       -- Laid out
       = do
           (mods', c', w', vb', fds', lclas', tyvars',context') <- top_matter
-          (al',decls') <- markAnnListA al $ mapM markAnnotated (filter notDocDecl decls)
+          (L ld' (List al' decls')) <- markAnnotated (L ld (List al (filter notDocDecl decls)))
           return (ClassDecl {tcdCExt = (AnnClassDecl c' [] [] vb' w' al', lo),
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
                              tcdFDs  = fds',
-                             tcdDecls = decls',
+                             tcdDecls = L ld' decls',
                              tcdModifiers = mods'})
       where
         top_matter = do
