@@ -392,7 +392,7 @@ subordinates env instMap decl = case decl of
              -> [(Name, [HsDoc GhcRn], IntMap (HsDoc GhcRn))]
     dataSubs dd = constrs ++ fields  ++ derivs
       where
-        cons = unLoc <$> dd_cons dd
+        cons = unLoc <$> (unLoc $ dd_cons dd)
         constrs = [ ( unLoc cname
                     , maybeToList $ fmap unLoc $ con_doc c
                     , conArgDocs c)

@@ -119,198 +119,204 @@
        (Nothing)
        (Nothing)
        (Nothing)
-       (DataTypeCons
-        (False)
-        [(L
-          (EpAnn
-           (EpaSpan { T15323.hs:6:5-54 })
-           []
-           (EpaComments
-            []))
-          (ConDeclGADT
-           (AnnConDeclGADT
+       (L
+        (EpAnn
+         (EpaSpan { T15323.hs:6:5-54 })
+         []
+         (EpaComments
+          []))
+        (DataTypeCons
+         (False)
+         [(L
+           (EpAnn
+            (EpaSpan { T15323.hs:6:5-54 })
             []
+            (EpaComments
+             []))
+           (ConDeclGADT
+            (AnnConDeclGADT
+             []
+             []
+             (EpUniTok
+              (EpaSpan { T15323.hs:6:17-18 })
+              (NormalSyntax)))
             []
-            (EpUniTok
-             (EpaSpan { T15323.hs:6:17-18 })
-             (NormalSyntax)))
-           []
-           (:|
+            (:|
+             (L
+              (EpAnn
+               (EpaSpan { T15323.hs:6:5-14 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: TestParens}))
+             [])
             (L
              (EpAnn
-              (EpaSpan { T15323.hs:6:5-14 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: TestParens}))
-            [])
-           (L
-            (EpAnn
-             (EpaSpan { T15323.hs:6:20-29 })
-             []
-             (EpaComments
-              []))
-            (HsOuterExplicit
-             (EpAnn
               (EpaSpan { T15323.hs:6:20-29 })
-              ((,)
-               (EpUniTok (EpaSpan { T15323.hs:6:20-25 }) NormalSyntax)
-               (EpTok
-                (EpaSpan { T15323.hs:6:29 })))
+              []
               (EpaComments
                []))
-             [(L
+             (HsOuterExplicit
+              (EpAnn
+               (EpaSpan { T15323.hs:6:20-29 })
+               ((,)
+                (EpUniTok (EpaSpan { T15323.hs:6:20-25 }) NormalSyntax)
+                (EpTok
+                 (EpaSpan { T15323.hs:6:29 })))
+               (EpaComments
+                []))
+              [(L
+                (EpAnn
+                 (EpaSpan { T15323.hs:6:27 })
+                 []
+                 (EpaComments
+                  []))
+                (HsTvb
+                 (AnnTyVarBndr
+                  []
+                  []
+                  (EpTok
+                   (EpaSpan { <no location info> }))
+                  (EpUniTok
+                   (EpaSpan { <no location info> })
+                   (NormalSyntax)))
+                 (SpecifiedSpec)
+                 (HsBndrVar
+                  (NoExtField)
+                  (L
+                   (EpAnn
+                    (EpaSpan { T15323.hs:6:27 })
+                    (NameAnnTrailing
+                     [])
+                    (EpaComments
+                     []))
+                   (Unqual
+                    {OccName: v})))
+                 (HsBndrNoKind
+                  (NoExtField))))]))
+            []
+            (Just
+             (L
+              (EpAnn
+               (EpaSpan { T15323.hs:6:31-36 })
+               [(AddDarrowAnn
+                 (EpUniTok
+                  (EpaSpan { T15323.hs:6:38-39 })
+                  (NormalSyntax)))]
+               (EpaComments
+                []))
+              (HsContext
+               ((,)
+                []
+                [])
+               [(L
+                 (EpAnn
+                  (EpaSpan { T15323.hs:6:31-36 })
+                  []
+                  (EpaComments
+                   []))
+                 (HsParTy
+                  ((,)
+                   (EpTok (EpaSpan { T15323.hs:6:31 }))
+                   (EpTok (EpaSpan { T15323.hs:6:36 })))
+                  (L
+                   (EpAnn
+                    (EpaSpan { T15323.hs:6:32-35 })
+                    []
+                    (EpaComments
+                     []))
+                   (HsAppTy
+                    (NoExtField)
+                    (L
+                     (EpAnn
+                      (EpaSpan { T15323.hs:6:32-33 })
+                      []
+                      (EpaComments
+                       []))
+                     (HsTyVar
+                      (EpTok
+                       (EpaSpan { <no location info> }))
+                      (NotPromoted)
+                      (L
+                       (EpAnn
+                        (EpaSpan { T15323.hs:6:32-33 })
+                        (NameAnnTrailing
+                         [])
+                        (EpaComments
+                         []))
+                       (Unqual
+                        {OccName: Eq}))))
+                    (L
+                     (EpAnn
+                      (EpaSpan { T15323.hs:6:35 })
+                      []
+                      (EpaComments
+                       []))
+                     (HsTyVar
+                      (EpTok
+                       (EpaSpan { <no location info> }))
+                      (NotPromoted)
+                      (L
+                       (EpAnn
+                        (EpaSpan { T15323.hs:6:35 })
+                        (NameAnnTrailing
+                         [])
+                        (EpaComments
+                         []))
+                       (Unqual
+                        {OccName: v}))))))))])))
+            (PrefixConGADT
+             (NoExtField)
+             [])
+            (L
+             (EpAnn
+              (EpaSpan { T15323.hs:6:41-54 })
+              []
+              (EpaComments
+               []))
+             (HsAppTy
+              (NoExtField)
+              (L
                (EpAnn
-                (EpaSpan { T15323.hs:6:27 })
+                (EpaSpan { T15323.hs:6:41-52 })
                 []
                 (EpaComments
                  []))
-               (HsTvb
-                (AnnTyVarBndr
-                 []
-                 []
-                 (EpTok
-                  (EpaSpan { <no location info> }))
-                 (EpUniTok
-                  (EpaSpan { <no location info> })
-                  (NormalSyntax)))
-                (SpecifiedSpec)
-                (HsBndrVar
-                 (NoExtField)
-                 (L
-                  (EpAnn
-                   (EpaSpan { T15323.hs:6:27 })
-                   (NameAnnTrailing
-                    [])
-                   (EpaComments
-                    []))
-                  (Unqual
-                   {OccName: v})))
-                (HsBndrNoKind
-                 (NoExtField))))]))
-           []
-           (Just
-            (L
-             (EpAnn
-              (EpaSpan { T15323.hs:6:31-36 })
-              [(AddDarrowAnn
-                (EpUniTok
-                 (EpaSpan { T15323.hs:6:38-39 })
-                 (NormalSyntax)))]
-              (EpaComments
-               []))
-             (HsContext
-              ((,)
-               []
-               [])
-              [(L
-                (EpAnn
-                 (EpaSpan { T15323.hs:6:31-36 })
-                 []
-                 (EpaComments
-                  []))
-                (HsParTy
-                 ((,)
-                  (EpTok (EpaSpan { T15323.hs:6:31 }))
-                  (EpTok (EpaSpan { T15323.hs:6:36 })))
-                 (L
-                  (EpAnn
-                   (EpaSpan { T15323.hs:6:32-35 })
-                   []
-                   (EpaComments
-                    []))
-                  (HsAppTy
-                   (NoExtField)
-                   (L
-                    (EpAnn
-                     (EpaSpan { T15323.hs:6:32-33 })
-                     []
-                     (EpaComments
-                      []))
-                    (HsTyVar
-                     (EpTok
-                      (EpaSpan { <no location info> }))
-                     (NotPromoted)
-                     (L
-                      (EpAnn
-                       (EpaSpan { T15323.hs:6:32-33 })
-                       (NameAnnTrailing
-                        [])
-                       (EpaComments
-                        []))
-                      (Unqual
-                       {OccName: Eq}))))
-                   (L
-                    (EpAnn
-                     (EpaSpan { T15323.hs:6:35 })
-                     []
-                     (EpaComments
-                      []))
-                    (HsTyVar
-                     (EpTok
-                      (EpaSpan { <no location info> }))
-                     (NotPromoted)
-                     (L
-                      (EpAnn
-                       (EpaSpan { T15323.hs:6:35 })
-                       (NameAnnTrailing
-                        [])
-                       (EpaComments
-                        []))
-                      (Unqual
-                       {OccName: v}))))))))])))
-           (PrefixConGADT
-            (NoExtField)
-            [])
-           (L
-            (EpAnn
-             (EpaSpan { T15323.hs:6:41-54 })
-             []
-             (EpaComments
-              []))
-            (HsAppTy
-             (NoExtField)
-             (L
-              (EpAnn
-               (EpaSpan { T15323.hs:6:41-52 })
-               []
-               (EpaComments
-                []))
-              (HsTyVar
-               (EpTok
-                (EpaSpan { <no location info> }))
-               (NotPromoted)
-               (L
-                (EpAnn
-                 (EpaSpan { T15323.hs:6:41-52 })
-                 (NameAnnTrailing
-                  [])
-                 (EpaComments
-                  []))
-                (Unqual
-                 {OccName: MaybeDefault}))))
-             (L
-              (EpAnn
-               (EpaSpan { T15323.hs:6:54 })
-               []
-               (EpaComments
-                []))
-              (HsTyVar
-               (EpTok
-                (EpaSpan { <no location info> }))
-               (NotPromoted)
-               (L
-                (EpAnn
-                 (EpaSpan { T15323.hs:6:54 })
-                 (NameAnnTrailing
-                  [])
-                 (EpaComments
-                  []))
-                (Unqual
-                 {OccName: v}))))))
-           (Nothing)))])
+               (HsTyVar
+                (EpTok
+                 (EpaSpan { <no location info> }))
+                (NotPromoted)
+                (L
+                 (EpAnn
+                  (EpaSpan { T15323.hs:6:41-52 })
+                  (NameAnnTrailing
+                   [])
+                  (EpaComments
+                   []))
+                 (Unqual
+                  {OccName: MaybeDefault}))))
+              (L
+               (EpAnn
+                (EpaSpan { T15323.hs:6:54 })
+                []
+                (EpaComments
+                 []))
+               (HsTyVar
+                (EpTok
+                 (EpaSpan { <no location info> }))
+                (NotPromoted)
+                (L
+                 (EpAnn
+                  (EpaSpan { T15323.hs:6:54 })
+                  (NameAnnTrailing
+                   [])
+                  (EpaComments
+                   []))
+                 (Unqual
+                  {OccName: v}))))))
+            (Nothing)))]))
        []))))]))
 
 

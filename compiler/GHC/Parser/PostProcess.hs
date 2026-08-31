@@ -232,17 +232,17 @@ mkTyData :: SrcSpan
          -> Maybe (LocatedA (CType GhcPs))
          -> Located (Maybe (LHsContext GhcPs), LHsType GhcPs)
          -> Maybe (LHsKind GhcPs)
-         -> [LConDecl GhcPs]
+         -> Located [LConDecl GhcPs]
          -> Located (HsDeriving GhcPs)
          -> AnnDataDefn
          -> P (LTyClDecl GhcPs)
 mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
-         ksig data_cons (L _ maybe_deriv) annsIn
+         ksig (L ld data_cons) (L _ maybe_deriv) annsIn
   = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False tycl_hdr
        ; tyvars <- checkTyVars (ppr new_or_data) equalsDots tc tparams
        ; let anns = annsIn {andd_openp = ops, andd_closep = cps}
        ; data_cons <- checkNewOrData loc' (unLoc tc) is_type_data new_or_data data_cons
-       ; defn <- mkDataDefn cType mcxt ksig data_cons maybe_deriv anns
+       ; defn <- mkDataDefn cType mcxt ksig (L (noAnnSrcSpan ld) data_cons) maybe_deriv anns
        ; !cs' <- getCommentsFor loc'
        ; let loc = EpAnn (spanAsAnchor loc') noAnn (cs' Semi.<> cs)
        ; return (L loc (DataDecl { tcdDExt = noExtField,
@@ -254,7 +254,7 @@ mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
 mkDataDefn :: Maybe (LocatedA (CType GhcPs))
            -> Maybe (LHsContext GhcPs)
            -> Maybe (LHsKind GhcPs)
-           -> DataDefnCons (LConDecl GhcPs)
+           -> LocatedA (DataDefnCons (LConDecl GhcPs))
            -> HsDeriving GhcPs
            -> AnnDataDefn
            -> P (HsDataDefn GhcPs)
@@ -330,16 +330,16 @@ mkDataFamInst :: SrcSpan
               -> (Maybe ( LHsContext GhcPs), HsOuterFamEqnTyVarBndrs GhcPs
                         , LHsType GhcPs)
               -> Maybe (LHsKind GhcPs)
-              -> [LConDecl GhcPs]
+              -> Located [LConDecl GhcPs]
               -> Located (HsDeriving GhcPs)
               -> AnnDataDefn
               -> P (LInstDecl GhcPs)
 mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
-              ksig data_cons (L _ maybe_deriv) anns
+              ksig (L ld data_cons) (L _ maybe_deriv) anns
   = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False tycl_hdr
        ; data_cons <- checkNewOrData loc (unLoc tc) False new_or_data data_cons
        ; let anns' = anns {andd_openp = ops, andd_closep = cps}
-       ; defn <- mkDataDefn cType mcxt ksig data_cons maybe_deriv anns'
+       ; defn <- mkDataDefn cType mcxt ksig (L (noAnnSrcSpan ld) data_cons) maybe_deriv anns'
        ; let loc' = EpAnn (spanAsAnchor loc) noAnn cs
        ; return (L loc' (DataFamInstD noExtField (DataFamInstDecl
                   (FamEqn { feqn_ext    = ([], [], noEpTok)
@@ -1096,9 +1096,9 @@ checkRecordSyntax lr@(L loc r)
 
 -- | Check if the gadt_constrlist is empty. Only raise parse error for
 -- `data T where` to avoid affecting existing error message, see #8258.
-checkEmptyGADTs :: Located ((EpToken "where", AnnList), [LConDecl GhcPs])
-                -> P (Located ((EpToken "where", AnnList), [LConDecl GhcPs]))
-checkEmptyGADTs gadts@(L span (_, []))           -- Empty GADT declaration.
+checkEmptyGADTs :: Located ((EpToken "where", AnnList), Located [LConDecl GhcPs])
+                -> P (Located ((EpToken "where", AnnList), Located [LConDecl GhcPs]))
+checkEmptyGADTs gadts@(L span (_, L _ []))           -- Empty GADT declaration.
     = do gadtSyntax <- getBit GadtSyntaxBit   -- GADTs implies GADTSyntax
          unless gadtSyntax $ addError $ mkPlainErrorMsgEnvelope span $
                                           PsErrIllegalWhereInDataDecl
