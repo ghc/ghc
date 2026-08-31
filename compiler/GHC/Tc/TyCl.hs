@@ -1885,7 +1885,7 @@ mk_prom_err_env (ClassDecl { tcdLName = L _ nm, tcdCExt = (HsNestedGroup { ng_at
               | L _ at <- ats ]
 
 mk_prom_err_env (DataDecl { tcdLName = L _ name
-                          , tcdDataDefn = HsDataDefn { dd_cons = cons } })
+                          , tcdDataDefn = HsDataDefn { dd_cons = L _ cons } })
   = unitNameEnv name (APromotionErr TyConPE)
     `plusNameEnv`
     mkNameEnv [ (con, APromotionErr conPE)
@@ -1964,7 +1964,7 @@ getInitialKind strategy
 getInitialKind strategy
     (DataDecl { tcdLName = L _ name
               , tcdTyVars = ktvs
-              , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig, dd_cons = cons } })
+              , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig, dd_cons = L _ cons } })
   = do  { let flav = newOrDataToFlavour (dataDefnConsNewOrData cons)
               ctxt = DataKindCtxt name
         ; tc <- kcDeclHeader strategy name flav ktvs $
@@ -2157,7 +2157,7 @@ kcTyClDecl :: TyClDecl GhcRn -> MonoTcTyCon -> TcM ()
 --   kind inference (see GHC.Tc.TyCl Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon])
 
 kcTyClDecl (DataDecl { tcdLName    = (L _ _name)
-                     , tcdDataDefn = HsDataDefn { dd_ctxt = ctxt, dd_cons = cons } })
+                     , tcdDataDefn = HsDataDefn { dd_ctxt = ctxt, dd_cons = L _ cons } })
            tycon
   = tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
        -- NB: binding these tyvars isn't necessary for GADTs, but it does no
@@ -3553,7 +3553,7 @@ tcDataDefn err_ctxt roles_info tc_name
                        , dd_ctxt = ctxt
                        , dd_kindSig = mb_ksig  -- Already in tc's kind
                                                -- via inferInitialKinds
-                       , dd_cons = cons
+                       , dd_cons = L _ cons
                        , dd_derivs = derivs })
   = bindTyClTyVars tc_name $ \ kind tc_bndrs nb_eta res_kind ->
        -- The TyCon tyvars must scope over

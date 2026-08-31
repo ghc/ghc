@@ -821,7 +821,7 @@ ppInstDecl unicode (InstHead{..}) = case ihdInstType of
   ClassInst ctx _ _ _ -> keyword "instance" <+> ppContextNoLocs ctx unicode <+> typ
   TypeInst rhs -> keyword "type" <+> keyword "instance" <+> typ <+> tibody rhs
   DataInst dd@(DataDecl {}) ->
-    let cons = dd_cons (tcdDataDefn dd)
+    let cons = unLoc $ dd_cons (tcdDataDefn dd)
         pref = case cons of NewTypeCon _ -> keyword "newtype"; DataTypeCons _ _ -> keyword "data"
      in pref <+> keyword "instance" <+> typ
   DataInst _ -> error "ppInstDecl"
@@ -874,7 +874,7 @@ ppDataDecl pats instances subdocs doc dataDecl@(DataDecl {}) unicode =
       , null pats =
           (empty, [])
       | null cons = (text "where", repeat empty)
-      | otherwise = case toList cons of
+      | otherwise = case toList (unLoc cons) of
           L _ ConDeclGADT{} : _ -> (text "where", repeat empty)
           _ -> (empty, (decltt (text "=") : repeat (decltt (text "|"))))
 
@@ -884,7 +884,7 @@ ppDataDecl pats instances subdocs doc dataDecl@(DataDecl {}) unicode =
           Just $
             text "\\enspace" <+> emph (text "Constructors") <> text "\\par"
               $$ text "\\haddockbeginconstrs"
-              $$ vcat (zipWith (ppSideBySideConstr subdocs unicode) leaders (toList cons))
+              $$ vcat (zipWith (ppSideBySideConstr subdocs unicode) leaders (toList (unLoc cons)))
               $$ text "\\end{tabulary}\\par"
 
     patternBit
@@ -1110,7 +1110,7 @@ ppDataHeader
     )
   unicode =
     -- newtype or data
-    ( case cons of
+    ( case unLoc cons of
         NewTypeCon _ -> keyword "newtype"
         DataTypeCons False _ -> keyword "data"
         DataTypeCons True _ -> keyword "type" <+> keyword "data"

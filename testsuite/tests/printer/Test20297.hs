@@ -29,3 +29,10 @@ class D a where -- comment6
 -- FamilyDecl/ClosedTypeFamily
 type family F a where -- comment7
   F Int = Bool
+
+-- exact_condecls in GADT syntax
+data G a where -- comment8
+  { -- comment9
+  MkG :: G Int
+  ; -- comment10
+  } -- comment11

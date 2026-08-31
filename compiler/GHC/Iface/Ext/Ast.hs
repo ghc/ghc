@@ -1721,7 +1721,7 @@ instance ToHie (LocatedAn NoEpAnns (InjectivityAnn GhcRn)) where
         ]
 
 instance ToHie (HsDataDefn GhcRn) where
-  toHie (HsDataDefn _ ctx _ mkind cons derivs) = concatM
+  toHie (HsDataDefn _ ctx _ mkind (L _ cons) derivs) = concatM
     [ toHie ctx
     , toHie mkind
     , toHie cons

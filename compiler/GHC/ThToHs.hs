@@ -309,7 +309,7 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
                                 , dd_cType = Nothing
                                 , dd_ctxt = mkHsContextMaybe ctxt'
                                 , dd_kindSig = ksig'
-                                , dd_cons = con'
+                                , dd_cons = noLocA con'
                                 , dd_derivs = derivs' }
         ; returnJustLA $ TyClD noExtField $
           DataDecl { tcdDExt = noExtField
@@ -383,7 +383,7 @@ cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
                                , dd_cType = Nothing
                                , dd_ctxt = mkHsContextMaybe ctxt'
                                , dd_kindSig = ksig'
-                               , dd_cons = cons'
+                               , dd_cons = noLocA cons'
                                , dd_derivs = derivs' }
 
        ; returnJustLA $ InstD noExtField $ DataFamInstD
@@ -405,7 +405,7 @@ cvtDec (NewtypeInstD ctxt bndrs tys ksig constr derivs)
                                , dd_cType = Nothing
                                , dd_ctxt = mkHsContextMaybe ctxt'
                                , dd_kindSig = ksig'
-                               , dd_cons = con'
+                               , dd_cons = noLocA con'
                                , dd_derivs = derivs' }
        ; returnJustLA $ InstD noExtField $ DataFamInstD
            { dfid_ext = noExtField
@@ -524,7 +524,7 @@ cvtGenDataDec type_data ctxt tc tvs ksig constrs derivs
                                 , dd_cType = Nothing
                                 , dd_ctxt = mkHsContextMaybe ctxt'
                                 , dd_kindSig = ksig'
-                                , dd_cons = cons'
+                                , dd_cons = noLocA cons'
                                 , dd_derivs = derivs' }
         ; returnJustLA $ TyClD noExtField $
           DataDecl { tcdDExt = noExtField

@@ -1517,7 +1517,7 @@ hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = (L _ name)
   , tyDeclOpSigs = []
   , tyDeclConsWithFields = hsDataDefnBinders defn }
   where
-    flav = newOrDataToFlavour $ dataDefnConsNewOrData $ dd_cons defn
+    flav = newOrDataToFlavour $ dataDefnConsNewOrData $ unLoc $ dd_cons defn
 
 familyInfoTyConFlavour
   :: Maybe tc    -- ^ Just cls <=> this is an associated family of class cls
@@ -1585,7 +1585,7 @@ hsDataFamInstBinders (DataFamInstDecl { dfid_eqn = FamEqn { feqn_rhs = defn }})
 hsDataDefnBinders :: (IsPass p, OutputableBndrId p)
                   => HsDataDefn (GhcPass p)
                   -> LConsWithFields p
-hsDataDefnBinders (HsDataDefn { dd_cons = cons })
+hsDataDefnBinders (HsDataDefn { dd_cons = L _ cons })
   = hsConDeclsBinders (toList cons)
   -- See Note [Binders in family instances]
 

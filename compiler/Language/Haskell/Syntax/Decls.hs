@@ -815,7 +815,7 @@ data HsDataDefn pass   -- The payload of a data type defn
                      --
                      -- Always @Nothing@ for H98-syntax decls
 
-                 dd_cons   :: DataDefnCons (LConDecl pass),
+                 dd_cons   :: XRec pass (DataDefnCons (LConDecl pass)),
                      -- ^ Data constructors
                      --
                      -- For @data T a = T1 | T2 a@
