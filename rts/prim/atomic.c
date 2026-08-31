@@ -96,8 +96,6 @@ StgWord64 hs_atomic_nand64(StgWord x, StgWord64 val)
   return __atomic_fetch_nand((volatile StgWord64 *) x, val, __ATOMIC_SEQ_CST);
 }
 
-#pragma GCC diagnostic pop
-
 // FetchOrByteArrayOp_Int
 
 StgWord hs_atomic_or8(StgWord x, StgWord val)
