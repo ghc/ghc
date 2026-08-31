@@ -550,7 +550,7 @@ ppFamDecl summary associated links instances fixities loc doc decl splice unicod
     instancesBit
       | FamilyDecl{fdInfo = ClosedTypeFamily _ mb_eqns} <- decl
       , not summary =
-          subEquations pkg qual $ map (ppFamDeclEqn . unLoc) $ Maybe.fromMaybe [] mb_eqns
+          subEquations pkg qual $ map (ppFamDeclEqn . unLoc) $ unLoc $ Maybe.fromMaybe (noLocA []) mb_eqns
       | otherwise =
           ppInstances links (OriginFamily docname) instances splice unicode pkg qual
 
