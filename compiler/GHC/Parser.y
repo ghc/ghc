@@ -1860,14 +1860,15 @@ decllist_cls
 
 -- Class body
 --
-where_cls :: { Located ((EpToken "where", AnnList)
-                       ,(OrdList (LHsDecl GhcPs))    -- Reversed
-                       ,EpLayout) }
+where_cls :: { Located ( (EpToken "where", AnnList)
+                       , Located (OrdList (LHsDecl GhcPs))    -- Reversed
+                       , EpLayout) }
                                 -- No implicit parameters
                                 -- May have type declarations
         : 'where' decllist_cls          { sLL $1 $> ((epTok $1,fstOf3 $ unLoc $2)
-                                             ,sndOf3 $ unLoc $2,thdOf3 $ unLoc $2) }
-        | {- empty -}                   { noLoc ((noAnn, noAnn),nilOL,EpNoLayout) }
+                                             , sL1 $2 (sndOf3 $ unLoc $2)
+                                             , thdOf3 $ unLoc $2) }
+        | {- empty -}                   { noLoc ((noAnn, noAnn),noLoc nilOL,EpNoLayout) }
 
 -- Declarations in instance bodies
 --

@@ -333,7 +333,7 @@ cvtDec (ClassD ctxt cl tvs fds decs)
                     , tcdCtxt = mkHsContextMaybe cxt', tcdLName = tc', tcdTyVars = tvs'
                     , tcdFixity = Prefix
                     , tcdFDs = fds'
-                    , tcdDecls =  cvClassDecls decls'
+                    , tcdDecls = noLocA $ cvClassDecls decls'
                     , tcdModifiers = [] }
         }
 
