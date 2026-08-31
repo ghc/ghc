@@ -17,6 +17,10 @@ ipb = ?y
   where -- comment3
         ?y = 1
 
+-- ClsInstDecl
+instance C Int where -- comment4
+  meth = x
+
 -- Layout in multi-if
 f = if | x -> y
        | z -> w
