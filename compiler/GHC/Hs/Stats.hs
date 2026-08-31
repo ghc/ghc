@@ -152,7 +152,7 @@ ppSourceStats short (L _ (HsModule{ hsmodExports = exports, hsmodImports = impor
     inst_info :: InstDecl GhcPs -> (Int, Int, Int, Int, Int)
     inst_info (TyFamInstD {}) = (0,0,0,1,0)
     inst_info (DataFamInstD {}) = (0,0,0,0,1)
-    inst_info (ClsInstD { cid_inst = ClsInstDecl { cid_decls = decls } })
+    inst_info (ClsInstD { cid_inst = ClsInstDecl { cid_decls = L _ decls } })
         = case count_sigs (map unLoc inst_sigs) of
             (_,_,ss,is,_) ->
                   (addpr (sum3 (map count_bind methods)),
