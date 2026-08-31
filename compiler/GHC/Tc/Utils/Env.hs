@@ -984,7 +984,7 @@ tcAddDataFamConPlaceholders inst_decls thing_inside
 
     get_fi_cons :: DataFamInstDecl GhcRn -> [Name]
     get_fi_cons (DataFamInstDecl { dfid_eqn =
-                  FamEqn { feqn_rhs = HsDataDefn { dd_cons = cons } }})
+                  FamEqn { feqn_rhs = HsDataDefn { dd_cons = L _ cons } }})
       = map unLoc $ concatMap (getConNames . unLoc) cons
 
 

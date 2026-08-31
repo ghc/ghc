@@ -568,7 +568,7 @@ instance HasHaddock (HsDecl GhcPs) where
 
 -- The right-hand side of a data/newtype declaration or data family instance.
 instance HasHaddock (HsDataDefn GhcPs) where
-  addHaddock defn@HsDataDefn{} = do
+  addHaddock defn@HsDataDefn{ dd_cons = L ld dd_cons} = do
 
     -- Register the kind signature:
     --    data D :: Type -> Type        where ...
@@ -582,7 +582,7 @@ instance HasHaddock (HsDataDefn GhcPs) where
     --      = MkT1 Int Bool  -- ^ Comment on MkT1
     --      | MkT2 Char Int  -- ^ Comment on MkT2
     --
-    dd_cons' <- traverse addHaddock (dd_cons defn)
+    dd_cons' <- traverse addHaddock dd_cons
 
     -- Process the deriving clauses:
     --
@@ -592,7 +592,7 @@ instance HasHaddock (HsDataDefn GhcPs) where
     --
     dd_derivs' <- addHaddock (dd_derivs defn)
 
-    pure $ defn { dd_cons = dd_cons',
+    pure $ defn { dd_cons = L ld dd_cons',
                   dd_derivs = dd_derivs' }
 
 -- Process the deriving clauses of a data/newtype declaration.
