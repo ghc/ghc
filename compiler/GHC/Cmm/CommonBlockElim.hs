@@ -59,18 +59,25 @@ import qualified Data.List.NonEmpty as NE
 -- hashes, and at most once otherwise. Previously, we were slower, and people
 -- rightfully complained: #10397
 
+-- The input graph may contain unreachable blocks (see
+-- Note [unreachable blocks] in GHC.Cmm.Pipeline). They take part in
+-- deduplication like any other block, and stay in the graph unless
+-- eliminated by a merge (deleteLosers removes those).
+
 -- TODO: Use optimization fuel
 elimCommonBlocks :: CmmGraph -> CmmGraph
 elimCommonBlocks g =
     assert (g_entry g == g_entry g') g'
   where
-     g' = replaceLabels env $ copyTicks env g
+     g' = replaceLabels env $ deleteLosers $ copyTicks env g
+     deleteLosers g0
+       | mapNull env = g0
+       | otherwise   = ofBlockMap (g_entry g0)
+                                  (toBlockMap g0 `mapDifference` env)
      env = resolveSubst (iterate mapEmpty blocks_with_key)
-     -- The order of blocks doesn't matter here. While we could use
-     -- revPostorder which drops unreachable blocks this is done in
-     -- ContFlowOpt already which runs before this pass. So we use
-     -- toBlockList since it is faster.
-     -- One exception: The entry block most come first or we risk eliminating it
+     -- The order of blocks doesn't matter here, so we use toBlockList,
+     -- which is faster than revPostorder.
+     -- One exception: The entry block must come first or we risk eliminating it
      -- in favour of another block. See Note [Retain entry block during common block elimination.]
      groups = groupByInt hash_block (toBlockListEntryFirst g) :: [[CmmBlock]]
      blocks_with_key = [ [ (successors b, [b]) | b <- bs] | bs <- groups]

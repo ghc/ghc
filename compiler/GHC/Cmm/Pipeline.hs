@@ -358,6 +358,20 @@ containing junk code.  These aren't necessarily a problem, but
 removing them is good because it might save time in the native code
 generator later.
 
+Who removes them, and when?  Any pass that rebuilds the graph from
+revPostorder drops them as a side effect.  Normally the first pass to
+do so is stack layout.  In addition, removeUnreachableBlocksProc at the
+very end of cpsTop removes the blocks that the second round of
+control-flow optimisation orphans, and prunes their info tables.  No
+pass between the first control-flow optimisation and stack layout
+removes unreachable blocks (common block elimination deletes the losing
+blocks of its merges, but leaves other unreachable code alone), so every
+pass in that window may encounter them.
+
+Note that unreachable blocks are not entirely harmless, though: some later
+passes read them. callProcPoints, for example, folds over the whole block map,
+so a stale edge in an unreachable block caused the panic in #27368.
+
 To make unreachable blocks visible in -ddump-cmm-* output, add -dppr-debug.
 -}
 
