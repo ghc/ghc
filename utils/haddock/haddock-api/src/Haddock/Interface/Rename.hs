@@ -957,7 +957,7 @@ renameClsInstD
       ( ClsInstDecl
           { cid_overlap_mode = fmap convertOverlapMode <$> omode
           , cid_poly_ty = ltype'
-          , cid_decls = []
+          , cid_decls = noLocA []
           , cid_ext = HsNestedGroup
             { ng_meths = []
             , ng_sigs = []

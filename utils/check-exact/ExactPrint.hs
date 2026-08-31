@@ -2168,6 +2168,23 @@ instance (ExactPrint tm, ExactPrint ty, Outputable tm, Outputable ty)
   exact x@(HsArgPar _sp)    = withPpr x -- Does not appear in original source
 
 -- ---------------------------------------------------------------------
+-- Manage a located list of items that may have layout
+
+data List a
+  = List {
+      _li_ann :: AnnList,
+      _li_items :: [a]
+  }
+
+instance ExactPrint a => ExactPrint (List a) where
+  getAnnotationEntry _ = NoEntryVal
+  setAnnotationAnchor a _ _ _ = a
+
+  exact (List an ls) = do
+    (an',  ls') <- markAnnListA an $ mapM markAnnotated ls
+    return (List an' ls')
+
+-- ---------------------------------------------------------------------
 
 instance ExactPrint (ClsInstDecl GhcPs) where
   getAnnotationEntry _ = NoEntryVal
@@ -2175,15 +2192,15 @@ instance ExactPrint (ClsInstDecl GhcPs) where
 
   exact (ClsInstDecl { cid_ext = (mbWarn, AnnClsInstDecl i w ann_list)
                      , cid_poly_ty = inst_ty
-                     , cid_decls = decls
+                     , cid_decls = L ld decls
                      , cid_overlap_mode = mbOverlap
                      , cid_modifiers = mods })
       = do
           (mbWarn', i', w', mbOverlap', inst_ty', mods') <- top_matter
-          (ann_list',  decls') <- markAnnListA ann_list $ mapM markAnnotated decls
+          (L ld' (List ann_list' decls')) <- markAnnotated (L ld (List ann_list decls))
           return (ClsInstDecl { cid_ext = (mbWarn', AnnClsInstDecl i' w' ann_list')
                               , cid_poly_ty = inst_ty'
-                              , cid_decls = decls'
+                              , cid_decls = L ld' decls'
                               , cid_overlap_mode = mbOverlap'
                               , cid_modifiers = mods' })
       where
@@ -2445,7 +2462,6 @@ instance ExactPrint (HsLocalBinds GhcPs) where
 
   exact (HsIPBinds w bs) = do
     w' <- markEpToken w
-    -- (an2,bs') <- markAnnListA an $ markAnnotated bs
     bs' <- markAnnotated bs
     return (HsIPBinds w' bs')
   exact b@(EmptyLocalBinds _) = return b

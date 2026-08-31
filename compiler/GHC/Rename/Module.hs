@@ -608,7 +608,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
 rnClsInstDecl :: ClsInstDecl GhcPs -> RnM (ClsInstDecl GhcRn, FreeNames)
 rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _)
                            , cid_poly_ty = inst_ty
-                           , cid_decls = decls
+                           , cid_decls = L ld decls
                            , cid_overlap_mode = omode
                            , cid_modifiers = modifiers })
   = do { rec { let HsNestedGroup { ng_meths = mbinds, ng_sigs = uprags
@@ -693,7 +693,7 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _)
                                 `plusFN` mods_fvs
        ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
        ; return (ClsInstDecl { cid_poly_ty = inst_ty'
-                             , cid_decls = [] -- See Note [Pass-sensitive decls for ClassDecls/ClsInstDecls]
+                             , cid_decls = L ld [] -- See Note [Pass-sensitive decls for ClassDecls/ClsInstDecls]
                              , cid_ext = (inst_warn_rn, HsNestedGroup
                                             { ng_meths = mbinds'
                                             , ng_sigs = uprags'

@@ -1113,7 +1113,7 @@ instance OutputableBndrId p
        => Outputable (ClsInstDecl (GhcPass p)) where
     ppr (cid@ClsInstDecl { cid_ext = ext
                          , cid_poly_ty = inst_ty
-                         , cid_decls = decls
+                         , cid_decls = L _ decls
                          , cid_overlap_mode = mbOverlap
                          , cid_modifiers = mods })
       = case ghcPass @p of
@@ -1575,6 +1575,7 @@ roleAnnotDeclName (RoleAnnotDecl _ (L _ name) _) = name
 -}
 
 type instance Anno (HsDecl (GhcPass _)) = SrcSpanAnnA
+type instance Anno ([LocatedA (HsDecl (GhcPass _))]) = SrcSpanAnnA
 type instance Anno (SpliceDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (TyClDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (FunDep (GhcPass p)) = SrcSpanAnnA

@@ -1260,8 +1260,8 @@ data ClsInstDecl pass
       , cid_poly_ty :: LHsSigType pass      -- Context => Class Instance-type
                                             -- Using a polytype means that the renamer conveniently
                                             -- figures out the quantified type variables for us.
-      , cid_decls   :: [LHsDecl pass]       -- ^ Class instance declarations.
-                                            -- only SigD, ValD, InstD _ TyFamInstD or InstD _ DataFamInstD
+      , cid_decls   :: XRec pass [LHsDecl pass] -- ^ Class instance declarations.
+                                                -- only SigD, ValD, InstD _ TyFamInstD or InstD _ DataFamInstD
       , cid_overlap_mode  :: Maybe (XRec pass (OverlapMode pass))
       }
   | XClsInstDecl !(XXClsInstDecl pass)
