@@ -742,6 +742,12 @@ allocNursery (uint32_t node, bdescr *tail, W_ blocks)
         // allocLargeChunk will prefer large chunks, but will pick up
         // small chunks if there are any available.  We must allow
         // single blocks here to avoid fragmentation (#7257)
+        //
+        // We also deliberately don't increment n_shuffles for the
+        // nursery here. This is the common nursery grow path, and we
+        // are likely to get rid of any non-monotone block order introduced
+        // here if we shrink the nursery again later which is quite likely.
+        // See Note [Nursery Block Chain shuffling] in sm/Storage.c
         bd = allocLargeChunkOnNode(node, 1, n);
         n = bd->blocks;
         blocks -= n;
@@ -818,7 +824,152 @@ allocNurseries (uint32_t from, uint32_t to)
     for (i = from; i < to; i++) {
         nurseries[i].blocks = allocNursery(capNoToNumaNode(i), NULL, n_blocks);
         nurseries[i].n_blocks = n_blocks;
+        nurseries[i].n_shuffles = 0;
     }
+}
+
+/* Note [Nursery Block Chain shuffling]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * As #27719 has shown nurseries consisting of non-consecutive memory blocks
+ * can lead to significant overhead in execution. This can happen because during
+ * execution our priority is to try and preserve long sub-sequences of consecutive
+ * blocks and we are willing to move individual blocks "out of the way" to achieve
+ * this. See for example the comment in allocateMightFail().
+ *
+ * However if we don't do anything this means we will end up with more and more
+ * non-consecutive blocks in the nursery chain. As we repeatedly insert blocks into
+ * the middle of the nursery or push a block from within to it's front. And just
+ * like when shuffling a deck this eventually results in a completely randomized
+ * block order. The worst case for any prefetching modern CPUs would like to do for us!
+ *
+ * So we do something very simple: Whenever we "shuffle" the blocks belonging to
+ * a nursery we increment a counter. Whenever the counter reaches some threshold
+ * the cost of sorting the blocks likely is lower than the ongoing cost of having
+ * the nursery blocks out of order. Or rather we sort block *groups*, treating each
+ * run of increasing/decreasing adjecent blocks as a single element.
+ *
+ * The cost of sorting is bounded by O(n*log n) for the number of block groups in
+ * the nursery chain.
+ * The worst case for a scrambled nursery is pretty catastrophic and would be a
+ * repeated scan across non-consecutive blocks never allowing the prefetcher to
+ * settle into a pattern where we would get perfect prefetching with consecutive
+ * blocks. In practice it will be far less catastrophic, but can go up to 10-40% as shown
+ * in #27719.
+ *
+ * For now I've decided to sort the nursery block chain once we get more than one
+ * shuffle operation per 20 blocks. Not because of deep thought but it was the
+ * first threshold I tried and it seemed to work well enough.
+ *
+ * Last but not least we might try to tackle this issue differently in the future.
+ * Temporarily allowing non-free block groups in the middle of the chain: This would
+ * cost a small but constant overhead whenever we grab a new nursery block.
+ * Splitting out blocks we grabbed and put into the front/middle of the chain onto
+ * another list that gets merged back in during GC.
+ * Or something else entirely. Sorting works but might not be the best solution
+ * overall.
+ */
+
+/*
+ * Merge two nursery block chains into one ascending block chain without setting
+ * the back edges.
+ */
+STATIC_INLINE bdescr *
+mergeBlockChains (bdescr *a, bdescr *b)
+{
+    bdescr *head;
+    bdescr **tailp = &head;
+
+    while (a != NULL && b != NULL) {
+        if (a->start < b->start) {
+            *tailp = a; tailp = &a->link; a = a->link;
+        } else {
+            *tailp = b; tailp = &b->link; b = b->link;
+        }
+    }
+    *tailp = (a != NULL) ? a : b;
+    return head;
+}
+
+/* See Note [Nursery Block Chain shuffling].
+ * TLDR: Sort nursery block groups by their address for better cache locality.
+ */
+STATIC_INLINE void
+sortNursery (nursery *nur)
+{
+    uint32_t i;
+    bdescr *rest, *run, *bd, *prev, *sorted;
+
+    // Only sort if there was sufficient shuffling to make it worthwhile.
+    // See Note [Nursery Block Chain shuffling] for how this threshold
+    // was chosen.
+    if (nur->n_blocks < 21 || nur->n_shuffles * 20 <= nur->n_blocks) {
+        return;
+    }
+
+    // Not quite as nice as the haskell "merge sort" we all love.
+    // Rather than the typical recursive implementation we merge pairwise as
+    // we find new runs of ascending/descending blocks.
+    // Roughly:
+    // * While there is a next ascending/descending run.
+    //   * In a loop:
+    //     + If we have no run at the current "level" simply store the run and we are done.
+    //     + If we have one, merge them with the current run. The result becomes the
+    //     + "current run" and we try to store/merge it into one level higher.
+    //   * Reset the "level" and repeat.
+    bdescr *pending[64] = { NULL };
+
+    rest = nur->blocks;
+    while (rest != NULL) {
+        // Find the next ascending/descending run of block groups:
+        // Descending: Reverse it while collecting it to get a ascending
+        // sub-list right away.
+        if (rest->link != NULL && rest->link->start < rest->start) {
+            run = NULL;
+            do {
+                bd = rest->link;
+                rest->link = run;
+                run = rest;
+                rest = bd;
+            } while (rest != NULL && rest->start < run->start);
+        // Ascending. Just take the sublist until the next descending block.
+        } else {
+            run = rest;
+            while (rest->link != NULL && rest->link->start > rest->start) {
+                rest = rest->link;
+            }
+            bd = rest->link;
+            rest->link = NULL;
+            rest = bd;
+        }
+
+        // Merge the current run, repeatedly, until it ends up in a free slot.
+        for (i = 0; i < 64 && pending[i] != NULL; i++) {
+            run = mergeBlockChains(pending[i], run);
+            pending[i] = NULL;
+        }
+        ASSERT(i < 64);
+        pending[i] = run;
+    }
+
+    sorted = NULL;
+    for (i = 0; i < 64; i++) {
+        // NULL entries in pending act as neutral elements:
+        // mergeBlockChains(x,y)
+        // | null y = x
+        // | null x = y
+        // | otherwise = MERGE(x,y)
+        sorted = mergeBlockChains(pending[i], sorted);
+    }
+
+    // Up to here we only updated the forward links, now backfill the back links.
+    nur->blocks = sorted;
+    prev = NULL;
+    for (bd = sorted; bd != NULL; bd = bd->link) {
+        bd->u.back = prev;
+        prev = bd;
+    }
+
+    nur->n_shuffles = 0;
 }
 
 void
@@ -829,6 +980,11 @@ resetNurseries (void)
     for (n = 0; n < n_numa_nodes; n++) {
         next_nursery[n] = n;
     }
+
+    for (n = 0; n < n_nurseries; n++) {
+        sortNursery(&nurseries[n]);
+    }
+
     assignNurseriesToCapabilities(0, getNumCapabilities());
 
 #if defined(DEBUG)
@@ -1186,6 +1342,8 @@ allocateMightFail (Capability *cap, W_ n)
                 bd->link->u.back = cap->r.rCurrentNursery;
             }
         }
+        // See Note [Nursery Block Chain shuffling] in sm/Storage.c
+        cap->r.rNursery->n_shuffles++;
         dbl_link_onto(bd, &cap->r.rNursery->blocks);
         cap->r.rCurrentAlloc = bd;
         IF_DEBUG(sanity, checkNurserySanity(cap->r.rNursery));
@@ -1260,6 +1418,8 @@ start_new_pinned_block(Capability *cap)
       if (nbd->link != NULL) {
           nbd->link->u.back = cap->r.rCurrentNursery;
         }
+      // See Note [Nursery Block Chain shuffling] in sm/Storage.c
+      cap->r.rNursery->n_shuffles++;
       dbl_link_onto(nbd, &cap->r.rNursery->blocks);
       // Important for accounting purposes
       if (cap->r.rCurrentAlloc){

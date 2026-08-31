@@ -1173,6 +1173,9 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 
             // link the new group after CurrentNursery
             dbl_link_insert_after(bd, cap->r.rCurrentNursery);
+            // The freshly allocated group lands mid-chain out of address
+            // See Note [Nursery Block Chain shuffling] in sm/Storage.c
+            cap->r.rNursery->n_shuffles++;
 
             // initialise it as a nursery block.  We initialise the
             // step, gen_no, and flags field of *every* sub-block in

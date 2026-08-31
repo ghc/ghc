@@ -10,6 +10,7 @@
 
 #include <stddef.h>
 #include "rts/OSThreads.h"
+#include "stg/Types.h"
 
 /* -----------------------------------------------------------------------------
  * Generational GC
@@ -57,6 +58,7 @@ typedef StgWord memcount;
 typedef struct nursery_ {
     bdescr *       blocks;
     memcount       n_blocks;
+    StgWord        n_shuffles; // How often we moved/added blocks inside this nursery.
 } nursery;
 
 // Nursery invariants:
