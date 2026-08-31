@@ -61,189 +61,195 @@
          (Nothing)
          (Nothing)
          (Nothing)
-         (DataTypeCons
-          (False)
-          [(L
-            (EpAnn
-             (EpaSpan { T14189.hs:6:15-20 })
-             [(AddVbarAnn
-               (EpTok
-                (EpaSpan { T14189.hs:6:22 })))]
-             (EpaComments
-              []))
-            (ConDeclH98
-             (NoExtField)
-             []
-             (L
-              (EpAnn
-               (EpaSpan { T14189.hs:6:15-16 })
-               (NameAnnTrailing
-                [])
-               (EpaComments
-                []))
-              {Name: T14189.MT})
-             (False)
-             []
-             (Nothing)
-             (PrefixCon
+         (L
+          (EpAnn
+           (EpaSpan { T14189.hs:6:15-42 })
+           []
+           (EpaComments
+            []))
+          (DataTypeCons
+           (False)
+           [(L
+             (EpAnn
+              (EpaSpan { T14189.hs:6:15-20 })
+              [(AddVbarAnn
+                (EpTok
+                 (EpaSpan { T14189.hs:6:22 })))]
+              (EpaComments
+               []))
+             (ConDeclH98
               (NoExtField)
-              [(CDF
-                ((,)
-                 ((,,)
-                  (EpaDelta { <no location info> } (SameLine 0) [])
-                  (EpTok
-                   (EpaSpan { <no location info> }))
-                  (EpaDelta { <no location info> } (SameLine 0) []))
-                 (NoSourceText))
-                (NoSrcUnpack)
-                (NoSrcStrict)
-                (HsModifiedFunArr
-                 (NoExtField)
-                 []
-                 (HsStandardArr
-                  (NoExtField)))
-                (L
-                 (EpAnn
-                  (EpaSpan { T14189.hs:6:18-20 })
-                  []
-                  (EpaComments
-                   []))
-                 (HsTyVar
-                  (EpTok
-                   (EpaSpan { <no location info> }))
-                  (NotPromoted)
-                  (L
-                   (EpAnn
-                    (EpaSpan { T14189.hs:6:18-20 })
-                    (NameAnnTrailing
-                     [])
-                    (EpaComments
-                     []))
-                   (WithUserRdr
-                    (Unqual
-                     {OccName: Int})
-                    {Name: GHC.Internal.Types.Int}))))
-                (Nothing))])
-             (Nothing)))
-          ,(L
-            (EpAnn
-             (EpaSpan { T14189.hs:6:24-25 })
-             [(AddVbarAnn
-               (EpTok
-                (EpaSpan { T14189.hs:6:27 })))]
-             (EpaComments
-              []))
-            (ConDeclH98
-             (NoExtField)
-             []
-             (L
-              (EpAnn
-               (EpaSpan { T14189.hs:6:24-25 })
-               (NameAnnTrailing
-                [])
-               (EpaComments
-                []))
-              {Name: T14189.NT})
-             (False)
-             []
-             (Nothing)
-             (PrefixCon
-              (NoExtField)
-              [])
-             (Nothing)))
-          ,(L
-            (EpAnn
-             (EpaSpan { T14189.hs:6:29-42 })
-             []
-             (EpaComments
-              []))
-            (ConDeclH98
-             (NoExtField)
-             []
-             (L
-              (EpAnn
-               (EpaSpan { T14189.hs:6:29 })
-               (NameAnnTrailing
-                [])
-               (EpaComments
-                []))
-              {Name: T14189.F})
-             (False)
-             []
-             (Nothing)
-             (RecCon
-              ((,)
-               (EpTok (EpaSpan { T14189.hs:6:31 }))
-               (EpTok (EpaSpan { T14189.hs:6:42 })))
+              []
               (L
                (EpAnn
-                (EpaSpan { T14189.hs:6:33-40 })
-                []
+                (EpaSpan { T14189.hs:6:15-16 })
+                (NameAnnTrailing
+                 [])
                 (EpaComments
                  []))
-               [(L
-                 (EpAnn
-                  (EpaSpan { T14189.hs:6:33-40 })
-                  []
-                  (EpaComments
-                   []))
-                 (HsConDeclRecField
+               {Name: T14189.MT})
+              (False)
+              []
+              (Nothing)
+              (PrefixCon
+               (NoExtField)
+               [(CDF
+                 ((,)
+                  ((,,)
+                   (EpaDelta { <no location info> } (SameLine 0) [])
+                   (EpTok
+                    (EpaSpan { <no location info> }))
+                   (EpaDelta { <no location info> } (SameLine 0) []))
+                  (NoSourceText))
+                 (NoSrcUnpack)
+                 (NoSrcStrict)
+                 (HsModifiedFunArr
                   (NoExtField)
-                  [(L
-                    (EpAnn
-                     (EpaSpan { T14189.hs:6:33 })
-                     []
-                     (EpaComments
-                      []))
-                    (FieldOcc
-                     (Unqual
-                      {OccName: f})
-                     (L
-                      (EpAnn
-                       (EpaSpan { T14189.hs:6:33 })
-                       (NameAnnTrailing
-                        [])
-                       (EpaComments
-                        []))
-                      {Name: T14189.f})))]
-                  (CDF
-                   ((,)
-                    ((,,)
-                     (EpaDelta { <no location info> } (SameLine 0) [])
-                     (EpTok
-                      (EpaSpan { <no location info> }))
-                     (EpaDelta { <no location info> } (SameLine 0) []))
-                    (NoSourceText))
-                   (NoSrcUnpack)
-                   (NoSrcStrict)
-                   (HsModifiedFunArr
-                    (NoExtField)
-                    []
-                    (HsStandardArr
-                     (NoExtField)))
+                  []
+                  (HsStandardArr
+                   (NoExtField)))
+                 (L
+                  (EpAnn
+                   (EpaSpan { T14189.hs:6:18-20 })
+                   []
+                   (EpaComments
+                    []))
+                  (HsTyVar
+                   (EpTok
+                    (EpaSpan { <no location info> }))
+                   (NotPromoted)
                    (L
                     (EpAnn
-                     (EpaSpan { T14189.hs:6:38-40 })
-                     []
+                     (EpaSpan { T14189.hs:6:18-20 })
+                     (NameAnnTrailing
+                      [])
                      (EpaComments
                       []))
-                    (HsTyVar
-                     (EpTok
-                      (EpaSpan { <no location info> }))
-                     (NotPromoted)
-                     (L
-                      (EpAnn
-                       (EpaSpan { T14189.hs:6:38-40 })
-                       (NameAnnTrailing
-                        [])
-                       (EpaComments
-                        []))
-                      (WithUserRdr
-                       (Unqual
-                        {OccName: Int})
-                       {Name: GHC.Internal.Types.Int}))))
-                   (Nothing))))]))
-             (Nothing)))])
+                    (WithUserRdr
+                     (Unqual
+                      {OccName: Int})
+                     {Name: GHC.Internal.Types.Int}))))
+                 (Nothing))])
+              (Nothing)))
+           ,(L
+             (EpAnn
+              (EpaSpan { T14189.hs:6:24-25 })
+              [(AddVbarAnn
+                (EpTok
+                 (EpaSpan { T14189.hs:6:27 })))]
+              (EpaComments
+               []))
+             (ConDeclH98
+              (NoExtField)
+              []
+              (L
+               (EpAnn
+                (EpaSpan { T14189.hs:6:24-25 })
+                (NameAnnTrailing
+                 [])
+                (EpaComments
+                 []))
+               {Name: T14189.NT})
+              (False)
+              []
+              (Nothing)
+              (PrefixCon
+               (NoExtField)
+               [])
+              (Nothing)))
+           ,(L
+             (EpAnn
+              (EpaSpan { T14189.hs:6:29-42 })
+              []
+              (EpaComments
+               []))
+             (ConDeclH98
+              (NoExtField)
+              []
+              (L
+               (EpAnn
+                (EpaSpan { T14189.hs:6:29 })
+                (NameAnnTrailing
+                 [])
+                (EpaComments
+                 []))
+               {Name: T14189.F})
+              (False)
+              []
+              (Nothing)
+              (RecCon
+               ((,)
+                (EpTok (EpaSpan { T14189.hs:6:31 }))
+                (EpTok (EpaSpan { T14189.hs:6:42 })))
+               (L
+                (EpAnn
+                 (EpaSpan { T14189.hs:6:33-40 })
+                 []
+                 (EpaComments
+                  []))
+                [(L
+                  (EpAnn
+                   (EpaSpan { T14189.hs:6:33-40 })
+                   []
+                   (EpaComments
+                    []))
+                  (HsConDeclRecField
+                   (NoExtField)
+                   [(L
+                     (EpAnn
+                      (EpaSpan { T14189.hs:6:33 })
+                      []
+                      (EpaComments
+                       []))
+                     (FieldOcc
+                      (Unqual
+                       {OccName: f})
+                      (L
+                       (EpAnn
+                        (EpaSpan { T14189.hs:6:33 })
+                        (NameAnnTrailing
+                         [])
+                        (EpaComments
+                         []))
+                       {Name: T14189.f})))]
+                   (CDF
+                    ((,)
+                     ((,,)
+                      (EpaDelta { <no location info> } (SameLine 0) [])
+                      (EpTok
+                       (EpaSpan { <no location info> }))
+                      (EpaDelta { <no location info> } (SameLine 0) []))
+                     (NoSourceText))
+                    (NoSrcUnpack)
+                    (NoSrcStrict)
+                    (HsModifiedFunArr
+                     (NoExtField)
+                     []
+                     (HsStandardArr
+                      (NoExtField)))
+                    (L
+                     (EpAnn
+                      (EpaSpan { T14189.hs:6:38-40 })
+                      []
+                      (EpaComments
+                       []))
+                     (HsTyVar
+                      (EpTok
+                       (EpaSpan { <no location info> }))
+                      (NotPromoted)
+                      (L
+                       (EpAnn
+                        (EpaSpan { T14189.hs:6:38-40 })
+                        (NameAnnTrailing
+                         [])
+                        (EpaComments
+                         []))
+                       (WithUserRdr
+                        (Unqual
+                         {OccName: Int})
+                        {Name: GHC.Internal.Types.Int}))))
+                    (Nothing))))]))
+              (Nothing)))]))
          [])))]
      []
      []
