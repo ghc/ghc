@@ -555,7 +555,7 @@ repFamilyDecl decl@(L loc (FamilyDecl { fdInfo      = info
            case info of
              ClosedTypeFamily _ Nothing ->
                  notHandled (ThAbstractClosedTypeFamily decl)
-             ClosedTypeFamily _ (Just eqns) ->
+             ClosedTypeFamily _ (Just (L _ eqns)) ->
                do { eqns1  <- mapM (repTyFamEqn . unLoc) eqns
                   ; eqns2  <- coreListM tySynEqnTyConOcc eqns1
                   ; result <- repFamilyResultSig resultSig

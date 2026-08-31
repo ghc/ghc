@@ -311,12 +311,12 @@ synifyTyCon _prr _coax tc
           | Just (CoAxiom{co_ax_branches = branches}) <- mb ->
               mkFamDecl $
                 ClosedTypeFamily noAnn $
-                  Just $
+                  Just $ noLocA $
                     map (noLocA . synifyAxBranch tc) (fromBranches branches)
           | otherwise ->
-              mkFamDecl $ ClosedTypeFamily noAnn $ Just []
+              mkFamDecl $ ClosedTypeFamily noAnn $ Just (noLocA [])
         BuiltInSynFamTyCon{} ->
-          mkFamDecl $ ClosedTypeFamily noAnn $ Just []
+          mkFamDecl $ ClosedTypeFamily noAnn $ Just (noLocA [])
         AbstractClosedSynFamilyTyCon{} ->
           mkFamDecl $ ClosedTypeFamily noAnn Nothing
         DataFamilyTyCon{} ->

@@ -1523,16 +1523,16 @@ inj_varids :: { Located [LocatedN RdrName] }
 -- Closed type families
 
 where_type_family :: { Located ((EpToken "where",  EpToken ".."),FamilyInfo GhcPs) }
-        : {- empty -}                      { noLoc (noAnn,OpenTypeFamily noExtField) }
+        : {- empty -}                      { noLocA (noAnn,OpenTypeFamily noExtField) }
         | 'where' ty_fam_inst_eqn_list
                { sLL $1 $> ((epTok $1, (snd $ fst $ unLoc $2))
-                    , ClosedTypeFamily (fst $ fst $ unLoc $2) (fmap reverse $ snd $ unLoc $2)) }
+                    , ClosedTypeFamily (fst $ fst $ unLoc $2) (snd $ unLoc $2)) }
 
-ty_fam_inst_eqn_list :: { Located ((AnnList, EpToken ".."),Maybe [LTyFamInstEqn GhcPs]) }
+ty_fam_inst_eqn_list :: { Located ((AnnList, EpToken ".."),Maybe (LocatedA [LTyFamInstEqn GhcPs])) }
         :     '{' ty_fam_inst_eqns '}'     { sLL $1 $> ((AnnList (EpExplicitBraces (epTok $1) (epTok $3)) [], noAnn)
-                                                ,Just (unLoc $2)) }
+                                                ,Just (sLLa $1 $> (reverse $ unLoc $2))) }
         | vocurly ty_fam_inst_eqns close   { let (L loc _) = $2 in
-                                             L loc ((AnnList (EpVirtualBraces (glR $1)) [], noAnn),Just (unLoc $2)) }
+                                             L loc ((AnnList (EpVirtualBraces (glR $1)) [], noAnn),Just (sL1a $2 (reverse $ unLoc $2))) }
         |     '{' '..' '}'                 { sLL $1 $> ((AnnList (EpExplicitBraces (epTok $1) (epTok $3)) [], epTok $2), Nothing) }
         | vocurly '..' close               { let (L loc _) = $2 in
                                              L loc ((AnnList (EpVirtualBraces (glR $1)) [], epTok $2),Nothing) }

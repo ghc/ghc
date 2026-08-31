@@ -377,7 +377,7 @@ ppFamDecl associated doc instances decl@(FamDecl{}) unicode =
       _ -> empty
 
     familyEqns
-      | FamilyDecl{fdInfo = ClosedTypeFamily _ (Just eqns)} <- tcdFam decl
+      | FamilyDecl{fdInfo = ClosedTypeFamily _ (Just (L _ eqns))} <- tcdFam decl
       , not (null eqns) =
           Just
             ( text "\\haddockbeginargs"
