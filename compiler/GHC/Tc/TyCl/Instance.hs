@@ -712,7 +712,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
              , feqn_fixity = fixity
              , feqn_rhs    = HsDataDefn { dd_cType   = cType
                                         , dd_ctxt    = hs_ctxt
-                                        , dd_cons    = hs_cons
+                                        , dd_cons    = L _ hs_cons
                                         , dd_kindSig = m_ksig
                                         , dd_derivs  = derivs } }}))
   = setSrcSpanA loc                      $

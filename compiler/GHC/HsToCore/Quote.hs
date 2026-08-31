@@ -520,7 +520,7 @@ repDataDefn :: Core TH.Name
             -> MetaM (Core (M TH.Dec))
 repDataDefn tc opts
           (HsDataDefn { dd_ctxt = cxt, dd_kindSig = ksig
-                      , dd_cons = cons, dd_derivs = mb_derivs })
+                      , dd_cons = L _ cons, dd_derivs = mb_derivs })
   = do { cxt1     <- repLContext cxt
        ; derivs1  <- repDerivs mb_derivs
        ; case cons of

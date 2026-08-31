@@ -842,6 +842,7 @@ type instance Anno (HsModifierOf (LocatedA (HsType DocNameI)) DocNameI) = SrcSpa
 type instance Anno (HsContextDetails DocNameI a) = SrcSpanAnnA
 type instance Anno (HsGadtTelescope DocNameI) = SrcSpanAnnA
 type instance Anno [LocatedA (HsDecl DocNameI)] = SrcSpanAnnA
+type instance Anno (DataDefnCons _) = SrcSpanAnnA
 
 type XRecCond a =
   ( XParTy a ~ (EpToken "(", EpToken ")")
