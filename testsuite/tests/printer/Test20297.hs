@@ -25,3 +25,7 @@ class C a where -- comment5
 
 class D a where -- comment6
   meth :: a
+
+-- FamilyDecl/ClosedTypeFamily
+type family F a where -- comment7
+  F Int = Bool
