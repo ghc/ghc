@@ -22,8 +22,8 @@
      []
      (Just
       ((,)
-       { Test20297.hs:29:1 }
-       { Test20297.hs:28:1-6 })))
+       { Test20297.hs:35:1 }
+       { Test20297.hs:34:1-6 })))
     (EpaCommentsBalanced
      [(L
        (EpaSpan
@@ -48,11 +48,11 @@
         { Test20297.hs:2:1-31 }))]
      [(L
        (EpaSpan
-        { Test20297.hs:28:1-6 })
+        { Test20297.hs:34:1-6 })
        (EpaComment
         (EpaLineComment
          "-- eof")
-        { Test20297.hs:26:15 }))]))
+        { Test20297.hs:32:15 }))]))
    (EpVirtualBraces
     (EpaSpan { Test20297.hs:7:1 }))
    (Nothing)
@@ -845,23 +845,248 @@
        (Nothing)))))
   ,(L
     (EpAnn
-     (EpaSpan { Test20297.hs:(25,1)-(26,15) })
+     (EpaSpan { Test20297.hs:25:1-15 })
      []
      (EpaComments
       [(L
         (EpaSpan
-         { Test20297.hs:24:1-21 })
+         { Test20297.hs:24:1-12 })
+        (EpaComment
+         (EpaLineComment
+          "-- ClassDecl")
+         { Test20297.hs:22:10 }))]))
+    (TyClD
+     (NoExtField)
+     (ClassDecl
+      ((,)
+       (AnnClassDecl
+        (EpTok
+         (EpaSpan { Test20297.hs:25:1-5 }))
+        []
+        []
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { Test20297.hs:25:11-15 }))
+        (AnnList
+         (EpNoLayout)
+         []))
+       (EpVirtualBraces
+        (EpaDelta { <no location info> } (SameLine 0) [])))
+      []
+      (Nothing)
+      (L
+       (EpAnn
+        (EpaSpan { Test20297.hs:25:7 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: C}))
+      (HsQTvs
+       (NoExtField)
+       [(L
+         (EpAnn
+          (EpaSpan { Test20297.hs:25:9 })
+          []
+          (EpaComments
+           []))
+         (HsTvb
+          (AnnTyVarBndr
+           []
+           []
+           (EpTok
+            (EpaSpan { <no location info> }))
+           (EpUniTok
+            (EpaSpan { <no location info> })
+            (NormalSyntax)))
+          (HsBndrRequired
+           (NoExtField))
+          (HsBndrVar
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { Test20297.hs:25:9 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: a})))
+          (HsBndrNoKind
+           (NoExtField))))])
+      (Prefix)
+      []
+      (L
+       (EpAnn
+        (EpaSpan { <no location info> })
+        []
+        (EpaComments
+         []))
+       []))))
+  ,(L
+    (EpAnn
+     (EpaSpan { Test20297.hs:(27,1)-(28,11) })
+     []
+     (EpaComments
+      [(L
+        (EpaSpan
+         { Test20297.hs:25:17-27 })
+        (EpaComment
+         (EpaLineComment
+          "-- comment5")
+         { Test20297.hs:25:11-15 }))
+      ,(L
+        (EpaSpan
+         { Test20297.hs:27:17-27 })
+        (EpaComment
+         (EpaLineComment
+          "-- comment6")
+         { Test20297.hs:27:11-15 }))]))
+    (TyClD
+     (NoExtField)
+     (ClassDecl
+      ((,)
+       (AnnClassDecl
+        (EpTok
+         (EpaSpan { Test20297.hs:27:1-5 }))
+        []
+        []
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { Test20297.hs:27:11-15 }))
+        (AnnList
+         (EpVirtualBraces
+          (EpaSpan { Test20297.hs:28:3 }))
+         []))
+       (EpVirtualBraces
+        (EpaSpan { Test20297.hs:28:3 })))
+      []
+      (Nothing)
+      (L
+       (EpAnn
+        (EpaSpan { Test20297.hs:27:7 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: D}))
+      (HsQTvs
+       (NoExtField)
+       [(L
+         (EpAnn
+          (EpaSpan { Test20297.hs:27:9 })
+          []
+          (EpaComments
+           []))
+         (HsTvb
+          (AnnTyVarBndr
+           []
+           []
+           (EpTok
+            (EpaSpan { <no location info> }))
+           (EpUniTok
+            (EpaSpan { <no location info> })
+            (NormalSyntax)))
+          (HsBndrRequired
+           (NoExtField))
+          (HsBndrVar
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { Test20297.hs:27:9 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: a})))
+          (HsBndrNoKind
+           (NoExtField))))])
+      (Prefix)
+      []
+      (L
+       (EpAnn
+        (EpaSpan { Test20297.hs:28:3-11 })
+        []
+        (EpaComments
+         []))
+       [(L
+         (EpAnn
+          (EpaSpan { Test20297.hs:28:3-11 })
+          []
+          (EpaComments
+           []))
+         (SigD
+          (NoExtField)
+          (ClassOpSig
+           (AnnSig
+            (EpUniTok
+             (EpaSpan { Test20297.hs:28:8-9 })
+             (NormalSyntax))
+            (Nothing)
+            (Nothing))
+           (False)
+           [(L
+             (EpAnn
+              (EpaSpan { Test20297.hs:28:3-6 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
+             (Unqual
+              {OccName: meth}))]
+           (L
+            (EpAnn
+             (EpaSpan { Test20297.hs:28:11 })
+             []
+             (EpaComments
+              []))
+            (HsSig
+             (NoExtField)
+             (HsOuterImplicit
+              (NoExtField))
+             (L
+              (EpAnn
+               (EpaSpan { Test20297.hs:28:11 })
+               []
+               (EpaComments
+                []))
+              (HsTyVar
+               (EpTok
+                (EpaSpan { <no location info> }))
+               (NotPromoted)
+               (L
+                (EpAnn
+                 (EpaSpan { Test20297.hs:28:11 })
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  []))
+                (Unqual
+                 {OccName: a})))))))))]))))
+  ,(L
+    (EpAnn
+     (EpaSpan { Test20297.hs:(31,1)-(32,15) })
+     []
+     (EpaComments
+      [(L
+        (EpaSpan
+         { Test20297.hs:30:1-21 })
         (EpaComment
          (EpaLineComment
           "-- Layout in multi-if")
-         { Test20297.hs:22:10 }))]))
+         { Test20297.hs:28:11 }))]))
     (ValD
      (NoExtField)
      (FunBind
       (NoExtField)
       (L
        (EpAnn
-        (EpaSpan { Test20297.hs:25:1 })
+        (EpaSpan { Test20297.hs:31:1 })
         (NameAnnTrailing
          [])
         (EpaComments
@@ -876,13 +1101,13 @@
          []))
        (L
         (EpAnn
-         (EpaSpan { Test20297.hs:(25,1)-(26,15) })
+         (EpaSpan { Test20297.hs:(31,1)-(32,15) })
          []
          (EpaComments
           []))
         [(L
           (EpAnn
-           (EpaSpan { Test20297.hs:(25,1)-(26,15) })
+           (EpaSpan { Test20297.hs:(31,1)-(32,15) })
            []
            (EpaComments
             []))
@@ -891,7 +1116,7 @@
            (FunRhs
             (L
              (EpAnn
-              (EpaSpan { Test20297.hs:25:1 })
+              (EpaSpan { Test20297.hs:31:1 })
               (NameAnnTrailing
                [])
               (EpaComments
@@ -918,58 +1143,58 @@
             (:|
              (L
               (EpAnn
-               (EpaSpan { Test20297.hs:(25,3)-(26,15) })
+               (EpaSpan { Test20297.hs:(31,3)-(32,15) })
                (NoEpAnns)
                (EpaComments
                 []))
               (GRHS
                (EpAnn
-                (EpaSpan { Test20297.hs:(25,3)-(26,15) })
+                (EpaSpan { Test20297.hs:(31,3)-(32,15) })
                 (GrhsAnn
                  (Nothing)
                  (Left
                   (EpTok
-                   (EpaSpan { Test20297.hs:25:3 }))))
+                   (EpaSpan { Test20297.hs:31:3 }))))
                 (EpaComments
                  []))
                []
                (L
                 (EpAnn
-                 (EpaSpan { Test20297.hs:(25,5)-(26,15) })
+                 (EpaSpan { Test20297.hs:(31,5)-(32,15) })
                  []
                  (EpaComments
                   []))
                 (HsMultiIf
                  ((,)
                   (EpTok
-                   (EpaSpan { Test20297.hs:25:5-6 }))
+                   (EpaSpan { Test20297.hs:31:5-6 }))
                   (AnnList
                    (EpVirtualBraces
-                    (EpaSpan { Test20297.hs:25:8 }))
+                    (EpaSpan { Test20297.hs:31:8 }))
                    []))
                  (:|
                   (L
                    (EpAnn
-                    (EpaSpan { Test20297.hs:25:8-15 })
+                    (EpaSpan { Test20297.hs:31:8-15 })
                     (NoEpAnns)
                     (EpaComments
                      []))
                    (GRHS
                     (EpAnn
-                     (EpaSpan { Test20297.hs:25:8-15 })
+                     (EpaSpan { Test20297.hs:31:8-15 })
                      (GrhsAnn
                       (Just
                        (EpTok
-                        (EpaSpan { Test20297.hs:25:8 })))
+                        (EpaSpan { Test20297.hs:31:8 })))
                       (Right
                        (EpUniTok
-                        (EpaSpan { Test20297.hs:25:12-13 })
+                        (EpaSpan { Test20297.hs:31:12-13 })
                         (NormalSyntax))))
                      (EpaComments
                       []))
                     [(L
                       (EpAnn
-                       (EpaSpan { Test20297.hs:25:10 })
+                       (EpaSpan { Test20297.hs:31:10 })
                        []
                        (EpaComments
                         []))
@@ -977,7 +1202,7 @@
                        (NoExtField)
                        (L
                         (EpAnn
-                         (EpaSpan { Test20297.hs:25:10 })
+                         (EpaSpan { Test20297.hs:31:10 })
                          []
                          (EpaComments
                           []))
@@ -985,7 +1210,7 @@
                          (NoExtField)
                          (L
                           (EpAnn
-                           (EpaSpan { Test20297.hs:25:10 })
+                           (EpaSpan { Test20297.hs:31:10 })
                            (NameAnnTrailing
                             [])
                            (EpaComments
@@ -996,7 +1221,7 @@
                        (NoExtField)))]
                     (L
                      (EpAnn
-                      (EpaSpan { Test20297.hs:25:15 })
+                      (EpaSpan { Test20297.hs:31:15 })
                       []
                       (EpaComments
                        []))
@@ -1004,7 +1229,7 @@
                       (NoExtField)
                       (L
                        (EpAnn
-                        (EpaSpan { Test20297.hs:25:15 })
+                        (EpaSpan { Test20297.hs:31:15 })
                         (NameAnnTrailing
                          [])
                         (EpaComments
@@ -1013,26 +1238,26 @@
                         {OccName: y}))))))
                   [(L
                     (EpAnn
-                     (EpaSpan { Test20297.hs:26:8-15 })
+                     (EpaSpan { Test20297.hs:32:8-15 })
                      (NoEpAnns)
                      (EpaComments
                       []))
                     (GRHS
                      (EpAnn
-                      (EpaSpan { Test20297.hs:26:8-15 })
+                      (EpaSpan { Test20297.hs:32:8-15 })
                       (GrhsAnn
                        (Just
                         (EpTok
-                         (EpaSpan { Test20297.hs:26:8 })))
+                         (EpaSpan { Test20297.hs:32:8 })))
                        (Right
                         (EpUniTok
-                         (EpaSpan { Test20297.hs:26:12-13 })
+                         (EpaSpan { Test20297.hs:32:12-13 })
                          (NormalSyntax))))
                       (EpaComments
                        []))
                      [(L
                        (EpAnn
-                        (EpaSpan { Test20297.hs:26:10 })
+                        (EpaSpan { Test20297.hs:32:10 })
                         []
                         (EpaComments
                          []))
@@ -1040,7 +1265,7 @@
                         (NoExtField)
                         (L
                          (EpAnn
-                          (EpaSpan { Test20297.hs:26:10 })
+                          (EpaSpan { Test20297.hs:32:10 })
                           []
                           (EpaComments
                            []))
@@ -1048,7 +1273,7 @@
                           (NoExtField)
                           (L
                            (EpAnn
-                            (EpaSpan { Test20297.hs:26:10 })
+                            (EpaSpan { Test20297.hs:32:10 })
                             (NameAnnTrailing
                              [])
                             (EpaComments
@@ -1059,7 +1284,7 @@
                         (NoExtField)))]
                      (L
                       (EpAnn
-                       (EpaSpan { Test20297.hs:26:15 })
+                       (EpaSpan { Test20297.hs:32:15 })
                        []
                        (EpaComments
                         []))
@@ -1067,7 +1292,7 @@
                        (NoExtField)
                        (L
                         (EpAnn
-                         (EpaSpan { Test20297.hs:26:15 })
+                         (EpaSpan { Test20297.hs:32:15 })
                          (NameAnnTrailing
                           [])
                          (EpaComments
@@ -1109,8 +1334,8 @@
      []
      (Just
       ((,)
-       { Test20297.ppr.hs:19:16 }
-       { Test20297.ppr.hs:19:15 })))
+       { Test20297.ppr.hs:22:16 }
+       { Test20297.ppr.hs:22:15 })))
     (EpaCommentsBalanced
      [(L
        (EpaSpan
@@ -1877,7 +2102,212 @@
        (Nothing)))))
   ,(L
     (EpAnn
-     (EpaSpan { Test20297.ppr.hs:(18,1)-(19,15) })
+     (EpaSpan { Test20297.ppr.hs:18:1-9 })
+     []
+     (EpaComments
+      []))
+    (TyClD
+     (NoExtField)
+     (ClassDecl
+      ((,)
+       (AnnClassDecl
+        (EpTok
+         (EpaSpan { Test20297.ppr.hs:18:1-5 }))
+        []
+        []
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (AnnList
+         (EpNoLayout)
+         []))
+       (EpNoLayout))
+      []
+      (Nothing)
+      (L
+       (EpAnn
+        (EpaSpan { Test20297.ppr.hs:18:7 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: C}))
+      (HsQTvs
+       (NoExtField)
+       [(L
+         (EpAnn
+          (EpaSpan { Test20297.ppr.hs:18:9 })
+          []
+          (EpaComments
+           []))
+         (HsTvb
+          (AnnTyVarBndr
+           []
+           []
+           (EpTok
+            (EpaSpan { <no location info> }))
+           (EpUniTok
+            (EpaSpan { <no location info> })
+            (NormalSyntax)))
+          (HsBndrRequired
+           (NoExtField))
+          (HsBndrVar
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { Test20297.ppr.hs:18:9 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: a})))
+          (HsBndrNoKind
+           (NoExtField))))])
+      (Prefix)
+      []
+      (L
+       (EpAnn
+        (EpaSpan { <no location info> })
+        []
+        (EpaComments
+         []))
+       []))))
+  ,(L
+    (EpAnn
+     (EpaSpan { Test20297.ppr.hs:(19,1)-(20,11) })
+     []
+     (EpaComments
+      []))
+    (TyClD
+     (NoExtField)
+     (ClassDecl
+      ((,)
+       (AnnClassDecl
+        (EpTok
+         (EpaSpan { Test20297.ppr.hs:19:1-5 }))
+        []
+        []
+        (EpTok
+         (EpaSpan { <no location info> }))
+        (EpTok
+         (EpaSpan { Test20297.ppr.hs:19:11-15 }))
+        (AnnList
+         (EpVirtualBraces
+          (EpaSpan { Test20297.ppr.hs:20:3 }))
+         []))
+       (EpVirtualBraces
+        (EpaSpan { Test20297.ppr.hs:20:3 })))
+      []
+      (Nothing)
+      (L
+       (EpAnn
+        (EpaSpan { Test20297.ppr.hs:19:7 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: D}))
+      (HsQTvs
+       (NoExtField)
+       [(L
+         (EpAnn
+          (EpaSpan { Test20297.ppr.hs:19:9 })
+          []
+          (EpaComments
+           []))
+         (HsTvb
+          (AnnTyVarBndr
+           []
+           []
+           (EpTok
+            (EpaSpan { <no location info> }))
+           (EpUniTok
+            (EpaSpan { <no location info> })
+            (NormalSyntax)))
+          (HsBndrRequired
+           (NoExtField))
+          (HsBndrVar
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { Test20297.ppr.hs:19:9 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: a})))
+          (HsBndrNoKind
+           (NoExtField))))])
+      (Prefix)
+      []
+      (L
+       (EpAnn
+        (EpaSpan { Test20297.ppr.hs:20:3-11 })
+        []
+        (EpaComments
+         []))
+       [(L
+         (EpAnn
+          (EpaSpan { Test20297.ppr.hs:20:3-11 })
+          []
+          (EpaComments
+           []))
+         (SigD
+          (NoExtField)
+          (ClassOpSig
+           (AnnSig
+            (EpUniTok
+             (EpaSpan { Test20297.ppr.hs:20:8-9 })
+             (NormalSyntax))
+            (Nothing)
+            (Nothing))
+           (False)
+           [(L
+             (EpAnn
+              (EpaSpan { Test20297.ppr.hs:20:3-6 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
+             (Unqual
+              {OccName: meth}))]
+           (L
+            (EpAnn
+             (EpaSpan { Test20297.ppr.hs:20:11 })
+             []
+             (EpaComments
+              []))
+            (HsSig
+             (NoExtField)
+             (HsOuterImplicit
+              (NoExtField))
+             (L
+              (EpAnn
+               (EpaSpan { Test20297.ppr.hs:20:11 })
+               []
+               (EpaComments
+                []))
+              (HsTyVar
+               (EpTok
+                (EpaSpan { <no location info> }))
+               (NotPromoted)
+               (L
+                (EpAnn
+                 (EpaSpan { Test20297.ppr.hs:20:11 })
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  []))
+                (Unqual
+                 {OccName: a})))))))))]))))
+  ,(L
+    (EpAnn
+     (EpaSpan { Test20297.ppr.hs:(21,1)-(22,15) })
      []
      (EpaComments
       []))
@@ -1887,7 +2317,7 @@
       (NoExtField)
       (L
        (EpAnn
-        (EpaSpan { Test20297.ppr.hs:18:1 })
+        (EpaSpan { Test20297.ppr.hs:21:1 })
         (NameAnnTrailing
          [])
         (EpaComments
@@ -1902,13 +2332,13 @@
          []))
        (L
         (EpAnn
-         (EpaSpan { Test20297.ppr.hs:(18,1)-(19,15) })
+         (EpaSpan { Test20297.ppr.hs:(21,1)-(22,15) })
          []
          (EpaComments
           []))
         [(L
           (EpAnn
-           (EpaSpan { Test20297.ppr.hs:(18,1)-(19,15) })
+           (EpaSpan { Test20297.ppr.hs:(21,1)-(22,15) })
            []
            (EpaComments
             []))
@@ -1917,7 +2347,7 @@
            (FunRhs
             (L
              (EpAnn
-              (EpaSpan { Test20297.ppr.hs:18:1 })
+              (EpaSpan { Test20297.ppr.hs:21:1 })
               (NameAnnTrailing
                [])
               (EpaComments
@@ -1944,58 +2374,58 @@
             (:|
              (L
               (EpAnn
-               (EpaSpan { Test20297.ppr.hs:(18,3)-(19,15) })
+               (EpaSpan { Test20297.ppr.hs:(21,3)-(22,15) })
                (NoEpAnns)
                (EpaComments
                 []))
               (GRHS
                (EpAnn
-                (EpaSpan { Test20297.ppr.hs:(18,3)-(19,15) })
+                (EpaSpan { Test20297.ppr.hs:(21,3)-(22,15) })
                 (GrhsAnn
                  (Nothing)
                  (Left
                   (EpTok
-                   (EpaSpan { Test20297.ppr.hs:18:3 }))))
+                   (EpaSpan { Test20297.ppr.hs:21:3 }))))
                 (EpaComments
                  []))
                []
                (L
                 (EpAnn
-                 (EpaSpan { Test20297.ppr.hs:(18,5)-(19,15) })
+                 (EpaSpan { Test20297.ppr.hs:(21,5)-(22,15) })
                  []
                  (EpaComments
                   []))
                 (HsMultiIf
                  ((,)
                   (EpTok
-                   (EpaSpan { Test20297.ppr.hs:18:5-6 }))
+                   (EpaSpan { Test20297.ppr.hs:21:5-6 }))
                   (AnnList
                    (EpVirtualBraces
-                    (EpaSpan { Test20297.ppr.hs:18:8 }))
+                    (EpaSpan { Test20297.ppr.hs:21:8 }))
                    []))
                  (:|
                   (L
                    (EpAnn
-                    (EpaSpan { Test20297.ppr.hs:18:8-15 })
+                    (EpaSpan { Test20297.ppr.hs:21:8-15 })
                     (NoEpAnns)
                     (EpaComments
                      []))
                    (GRHS
                     (EpAnn
-                     (EpaSpan { Test20297.ppr.hs:18:8-15 })
+                     (EpaSpan { Test20297.ppr.hs:21:8-15 })
                      (GrhsAnn
                       (Just
                        (EpTok
-                        (EpaSpan { Test20297.ppr.hs:18:8 })))
+                        (EpaSpan { Test20297.ppr.hs:21:8 })))
                       (Right
                        (EpUniTok
-                        (EpaSpan { Test20297.ppr.hs:18:12-13 })
+                        (EpaSpan { Test20297.ppr.hs:21:12-13 })
                         (NormalSyntax))))
                      (EpaComments
                       []))
                     [(L
                       (EpAnn
-                       (EpaSpan { Test20297.ppr.hs:18:10 })
+                       (EpaSpan { Test20297.ppr.hs:21:10 })
                        []
                        (EpaComments
                         []))
@@ -2003,7 +2433,7 @@
                        (NoExtField)
                        (L
                         (EpAnn
-                         (EpaSpan { Test20297.ppr.hs:18:10 })
+                         (EpaSpan { Test20297.ppr.hs:21:10 })
                          []
                          (EpaComments
                           []))
@@ -2011,7 +2441,7 @@
                          (NoExtField)
                          (L
                           (EpAnn
-                           (EpaSpan { Test20297.ppr.hs:18:10 })
+                           (EpaSpan { Test20297.ppr.hs:21:10 })
                            (NameAnnTrailing
                             [])
                            (EpaComments
@@ -2022,7 +2452,7 @@
                        (NoExtField)))]
                     (L
                      (EpAnn
-                      (EpaSpan { Test20297.ppr.hs:18:15 })
+                      (EpaSpan { Test20297.ppr.hs:21:15 })
                       []
                       (EpaComments
                        []))
@@ -2030,7 +2460,7 @@
                       (NoExtField)
                       (L
                        (EpAnn
-                        (EpaSpan { Test20297.ppr.hs:18:15 })
+                        (EpaSpan { Test20297.ppr.hs:21:15 })
                         (NameAnnTrailing
                          [])
                         (EpaComments
@@ -2039,26 +2469,26 @@
                         {OccName: y}))))))
                   [(L
                     (EpAnn
-                     (EpaSpan { Test20297.ppr.hs:19:8-15 })
+                     (EpaSpan { Test20297.ppr.hs:22:8-15 })
                      (NoEpAnns)
                      (EpaComments
                       []))
                     (GRHS
                      (EpAnn
-                      (EpaSpan { Test20297.ppr.hs:19:8-15 })
+                      (EpaSpan { Test20297.ppr.hs:22:8-15 })
                       (GrhsAnn
                        (Just
                         (EpTok
-                         (EpaSpan { Test20297.ppr.hs:19:8 })))
+                         (EpaSpan { Test20297.ppr.hs:22:8 })))
                        (Right
                         (EpUniTok
-                         (EpaSpan { Test20297.ppr.hs:19:12-13 })
+                         (EpaSpan { Test20297.ppr.hs:22:12-13 })
                          (NormalSyntax))))
                       (EpaComments
                        []))
                      [(L
                        (EpAnn
-                        (EpaSpan { Test20297.ppr.hs:19:10 })
+                        (EpaSpan { Test20297.ppr.hs:22:10 })
                         []
                         (EpaComments
                          []))
@@ -2066,7 +2496,7 @@
                         (NoExtField)
                         (L
                          (EpAnn
-                          (EpaSpan { Test20297.ppr.hs:19:10 })
+                          (EpaSpan { Test20297.ppr.hs:22:10 })
                           []
                           (EpaComments
                            []))
@@ -2074,7 +2504,7 @@
                           (NoExtField)
                           (L
                            (EpAnn
-                            (EpaSpan { Test20297.ppr.hs:19:10 })
+                            (EpaSpan { Test20297.ppr.hs:22:10 })
                             (NameAnnTrailing
                              [])
                             (EpaComments
@@ -2085,7 +2515,7 @@
                         (NoExtField)))]
                      (L
                       (EpAnn
-                       (EpaSpan { Test20297.ppr.hs:19:15 })
+                       (EpaSpan { Test20297.ppr.hs:22:15 })
                        []
                        (EpaComments
                         []))
@@ -2093,7 +2523,7 @@
                        (NoExtField)
                        (L
                         (EpAnn
-                         (EpaSpan { Test20297.ppr.hs:19:15 })
+                         (EpaSpan { Test20297.ppr.hs:22:15 })
                          (NameAnnTrailing
                           [])
                          (EpaComments

@@ -618,12 +618,12 @@ name2String = showPprUnsafe
 
 hsDeclsClassDecl :: TyClDecl GhcPs -> [LHsDecl GhcPs]
 hsDeclsClassDecl dec = case dec of
-  ClassDecl { tcdDecls = decls} -> decls
+  ClassDecl { tcdDecls = L _ decls} -> decls
   _ -> error $ "hsDeclsClassDecl:dec=" ++ showAst dec
 
 replaceDeclsClassDecl :: TyClDecl GhcPs -> [LHsDecl GhcPs] -> TyClDecl GhcPs
 replaceDeclsClassDecl decl decls = case decl of
-  ClassDecl {} -> decl { tcdDecls = decls }
+  ClassDecl { tcdDecls = L ld _ } -> decl { tcdDecls = L ld decls }
   _ -> error $ "replaceDeclsClassDecl:decl=" ++ showAst decl
 
 -- ---------------------------------------------------------------------

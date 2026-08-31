@@ -536,7 +536,13 @@
                     {OccName: String}))))])))))))])
       (Prefix)
       []
-      [])))
+      (L
+       (EpAnn
+        (EpaSpan { T20452.hs:8:84-85 })
+        []
+        (EpaComments
+         []))
+       []))))
   ,(L
     (EpAnn
      (EpaSpan { T20452.hs:9:1-85 })
@@ -776,6 +782,12 @@
                     {OccName: String}))))])))))))])
       (Prefix)
       []
-      [])))]))
+      (L
+       (EpAnn
+        (EpaSpan { T20452.hs:9:84-85 })
+        []
+        (EpaComments
+         []))
+       []))))]))
 
 
