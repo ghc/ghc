@@ -65,7 +65,7 @@ elimCommonBlocks g =
     assert (g_entry g == g_entry g') g'
   where
      g' = replaceLabels env $ copyTicks env g
-     env = iterate mapEmpty blocks_with_key
+     env = resolveSubst (iterate mapEmpty blocks_with_key)
      -- The order of blocks doesn't matter here. While we could use
      -- revPostorder which drops unreachable blocks this is done in
      -- ContFlowOpt already which runs before this pass. So we use
@@ -85,6 +85,27 @@ elimCommonBlocks g =
 --
 -- If we don't we end up with #27722 where the entry block was eliminated in favour
 -- of another block.
+
+{- Note [Resolving the CBE substitution]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The substitution that `iterate` produces may contain chains
+(k1 :-> k2, k2 :-> k3): the winner of one merge can lose a later one.
+So before applying it we resolve each entry to the end of its chain
+(resolveSubst).
+
+Applying the unresolved substitution instead would let replaceLabels leave
+edges pointing at eliminated labels. Such edges can occur in blocks that
+themselves lost a merge, i.e. in unreachable code, but even there they can be
+harmful (see #27368). Also see Note [unreachable blocks] in GHC.Cmm.Pipeline.
+-}
+
+-- | Resolve the substitution: follow chains (@k1 :-> k2@, @k2 :-> k3@)
+-- to their ends, so that every eliminated label maps directly to its
+-- final surviving representative.
+--
+-- See Note [Resolving the CBE substitution].
+resolveSubst :: Subst -> Subst
+resolveSubst env = mapMap (lookupBid env) env
 
 -- Invariant: The blocks in the list are pairwise distinct
 -- (so avoid comparing them again)
