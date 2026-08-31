@@ -3602,9 +3602,9 @@ instance ExactPrint (FamilyDecl GhcPs) where
                      Nothing -> do
                        dd' <- markEpToken dd
                        return (an, dd', mb_eqns)
-                     Just eqns -> do
-                       (an',eqns') <- markAnnListA an $ mapM markAnnotated eqns
-                       return (an', dd, Just eqns')
+                     Just (L le eqns) -> do
+                       (L le' (List an' eqns')) <- markAnnotated (L le (List an eqns))
+                       return (an', dd, Just (L le' eqns'))
                  return (w', dd', ClosedTypeFamily an' mb_eqns')
                _ -> return (w, dd, info)
     return (FamilyDecl { fdExt = AnnFamilyDecl [] [] t' d' f' dc' eq' vb' w' dd'

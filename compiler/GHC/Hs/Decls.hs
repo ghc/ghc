@@ -772,7 +772,7 @@ instance OutputableBndrId p
           ( text "where"
           , case mb_eqns of
               Nothing   -> text ".."
-              Just eqns -> vcat $ map (ppr_fam_inst_eqn . unLoc) eqns )
+              Just (L _ eqns) -> vcat $ map (ppr_fam_inst_eqn . unLoc) eqns )
         _ -> (empty, empty)
 
 
@@ -1575,7 +1575,8 @@ roleAnnotDeclName (RoleAnnotDecl _ (L _ name) _) = name
 -}
 
 type instance Anno (HsDecl (GhcPass _)) = SrcSpanAnnA
-type instance Anno ([LocatedA (HsDecl (GhcPass _))]) = SrcSpanAnnA
+type instance Anno [LocatedA (HsDecl (GhcPass _))] = SrcSpanAnnA
+type instance Anno [LocatedA (FamEqn pass (LocatedA (HsType pass)))] = SrcSpanAnnA
 type instance Anno (SpliceDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (TyClDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (FunDep (GhcPass p)) = SrcSpanAnnA

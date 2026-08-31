@@ -2189,7 +2189,7 @@ kcTyClDecl (FamDecl _ (FamilyDecl { fdInfo   = fd_info })) fam_tc
 -- closed type families look at their equations, but other families don't
 -- do anything here
   = case fd_info of
-      ClosedTypeFamily _ (Just eqns) -> mapM_ (kcTyFamInstEqn fam_tc) eqns
+      ClosedTypeFamily _ (Just (L _ eqns)) -> mapM_ (kcTyFamInstEqn fam_tc) eqns
       _ -> return ()
 
 -------------------
@@ -3440,7 +3440,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
                                      AbstractClosedSynFamilyTyCon parent
                                      inj'
               in return (tc, [])
-           Just eqns -> do {
+           Just (L _ eqns) -> do {
 
          -- Process the equations, creating CoAxBranches
        ; let tc_fam_tc = mkTcTyCon tc_name kind tc_bndrs 0 res_kind

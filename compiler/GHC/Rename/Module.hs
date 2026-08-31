@@ -2431,11 +2431,11 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
 
      ----------------------
      rn_info :: FamilyInfo GhcPs -> RnM (FamilyInfo GhcRn, FreeNames)
-     rn_info (ClosedTypeFamily x (Just eqns))
+     rn_info (ClosedTypeFamily x (Just (L le eqns)))
        = do { (eqns', fvs)
                 <- rnList (rnTyFamInstEqn (NonAssocTyFamEqn ClosedTyFam)) eqns
                                           -- no class context
-            ; return (ClosedTypeFamily x (Just eqns'), fvs) }
+            ; return (ClosedTypeFamily x (Just (L le eqns')), fvs) }
      rn_info (ClosedTypeFamily x Nothing)
        = return (ClosedTypeFamily x Nothing, emptyFNs)
      rn_info (OpenTypeFamily x) = return (OpenTypeFamily x, emptyFNs)

@@ -1668,7 +1668,7 @@ instance ToHie (LocatedA (FamilyDecl GhcRn)) where
           injSpan = maybe NoScope (mkScope . getLocA) inj
 
 instance ToHie (FamilyInfo GhcRn) where
-  toHie (ClosedTypeFamily _ (Just eqns)) = concatM $
+  toHie (ClosedTypeFamily _ (Just (L _ eqns))) = concatM $
     [ concatMapM (locOnly . getLocA) eqns
     , toHie $ map go eqns
     ]

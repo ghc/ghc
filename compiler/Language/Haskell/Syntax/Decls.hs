@@ -775,7 +775,7 @@ data FamilyInfo pass
   | OpenTypeFamily (XOpenTypeFamily pass)
      -- | 'Nothing' if we're in an hs-boot file and the user
      -- said "type family Foo x where .."
-  | ClosedTypeFamily (XClosedTypeFamily pass) (Maybe [LTyFamInstEqn pass])
+  | ClosedTypeFamily (XClosedTypeFamily pass) (Maybe (XRec pass [LTyFamInstEqn pass]))
   | XFamilyInfo !(XXFamilyInfo pass)
 
 {- Note [Closed type family mb_parent_tycon]
