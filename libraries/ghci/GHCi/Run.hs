@@ -211,7 +211,7 @@ resumeSeq hvref = clearEvalStatus <$> do
       mask_ $ do
         putMVar resumeBreakMVar () -- this awakens the stopped thread...
         redirectInterrupts resumeThreadId $ do
-          takeMVar resumeStatusMVar
+          takeMVar globalDbgStatusMVar
 
 evalOptsSeq :: EvalOpts
 evalOptsSeq = EvalOpts
@@ -241,12 +241,12 @@ sandboxIO opts io = do
        then do
          tid <- forkIO $ do
            tid <- myThreadId
-           ResumeContext{..} <- getThreadResumeContext tid
            labelThread tid "GHCi sandbox"
-           unsafeUnmask runIt >>= putMVar resumeStatusMVar
+           unsafeUnmask runIt >>= putMVar globalDbgStatusMVar -- TODO: see IDEA in 'globalDbgStatusMVar'
                                 -- empty: can't block
-         ResumeContext{..} <- getThreadResumeContext tid
-         redirectInterrupts tid $ unsafeUnmask $ takeMVar resumeStatusMVar
+         redirectInterrupts tid $ unsafeUnmask $
+          takeMVar globalDbgStatusMVar -- TODO: following IDEA, here we should block
+                                       -- on either the globalDbgStatusVar or on the per-call EvalSuccess mvar (written above, needs diff var).
        else
           -- GLUT on OS X needs to run on the main thread. If you
           -- try to use it from another thread then you just get a
@@ -375,7 +375,8 @@ resumeStmt opts rtid = do
   withBreakAction opts (Just resumeThreadId) $
     mask_ $ do
       putMVar resumeBreakMVar () -- this awakens the stopped thread...
-      redirectInterrupts resumeThreadId $ takeMVar resumeStatusMVar
+      redirectInterrupts resumeThreadId $
+        takeMVar globalDbgStatusMVar -- TODO: See IDEA. This here is wrongish
 
 -- when abandoning a computation we have to
 --      (a) kill the thread with an async exception, so that the
@@ -395,7 +396,7 @@ abandonStmt hvref = do
   ResumeContext{..} <- getThreadResumeContext tid
   killThread tid
   putMVar resumeBreakMVar ()
-  _ <- takeMVar resumeStatusMVar
+  _ <- takeMVar globalDbgStatusMVar -- TODO: See IDEA: this here is wrongish
   return ()
 
 globalBreakStablePtr :: StablePtr BreakpointCallback
@@ -415,7 +416,7 @@ globalBreakAction info_mod# info_mod_uid# infox# is_exception apStack = do
       info_mod <- BS.packCString (Ptr info_mod#)
       info_mod_uid <- BS.packCString (Ptr info_mod_uid#)
       pure (Just (EvalBreakpoint info_mod info_mod_uid (I# infox#)))
-  putMVar resumeStatusMVar $ EvalBreak apStack_r breakpoint resume_r ccs
+  putMVar globalDbgStatusMVar $ EvalBreak apStack_r breakpoint resume_r ccs
 
   -- Block until this thread is resumed (by the thread which took the
   -- `ResumeContext` from the `statusMVar`).
@@ -476,21 +477,40 @@ clearEvalStatus = \case
 -- Global Debugger Per-Thread Context
 -- TODO: when to clean?
 
-getThreadResumeContext :: ThreadId -> IO (ResumeContext [HValueRef])
+getThreadResumeContext :: ThreadId -> IO ResumeContext
 getThreadResumeContext tid = modifyMVar globalBreakActionMap $ \gbm0 -> do
   case Map.lookup tid gbm0 of
     Nothing  -> do
-      r <- ResumeContext <$> newEmptyMVar <*> newEmptyMVar
+      r <- ResumeContext <$> newEmptyMVar
       let !gbm1 = Map.insert tid r gbm0
       pure (gbm1, r)
     Just ctx -> do
       pure (gbm0, ctx)
 
-globalBreakActionMap :: MVar (Map.Map ThreadId (ResumeContext [HValueRef]))
+-- | A global mapping from thread ids to the MVars on which they block when stopped.
+globalBreakActionMap :: MVar (Map.Map ThreadId ResumeContext)
 globalBreakActionMap = unsafePerformIO $ newMVar Map.empty
 {-# NOINLINE globalBreakActionMap #-}
 
-data ResumeContext a = ResumeContext
+newtype ResumeContext = ResumeContext
   { resumeBreakMVar :: MVar ()
-  , resumeStatusMVar :: MVar (EvalStatus a)
+  -- ^ A thread that hits a breakpoint blocks reading its corresponding MVar
+  -- (gotten from the 'globalBreakActionMap').
+  -- The debugger can unblock that thread by signaling its MVar.
   }
+
+-- | A global synchronization variable which a thread writes an 'EvalBreak' to
+-- when it hits a breakpoint. This variable is shared across all threads, and
+-- the debugger can read the threads which hit breakpoints by reading from this
+-- variable. It will also be written with 'EvalSuccess' when a `sandboxIO`
+-- action finishes (TODO: wait what? that is a bit weird. so what if we run two
+-- evalStmt? they will both race to write a result? but then how do we tell
+-- which result we got from where? this won't do in general, but let's see if
+-- it can solve some problems first)
+--
+-- IDEA: maybe `sandboxIO` and friends receive as an argument the var on which
+-- to expect the result specifically? And distinguish that from the global break var?
+-- Then we split the EvalSuccess and EvalBreak into two datatypes.
+globalDbgStatusMVar :: MVar (EvalStatus [HValueRef])
+globalDbgStatusMVar = unsafePerformIO $ newEmptyMVar
+{-# NOINLINE globalDbgStatusMVar #-}
