@@ -2170,13 +2170,13 @@ instance (ExactPrint tm, ExactPrint ty, Outputable tm, Outputable ty)
 -- ---------------------------------------------------------------------
 -- Manage a located list of items that may have layout
 
-data List a
+data List t a
   = List {
       _li_ann :: AnnList,
-      _li_items :: [a]
+      _li_items :: t a
   }
 
-instance ExactPrint a => ExactPrint (List a) where
+instance (ExactPrint a, Typeable t, Traversable t) => ExactPrint (List t a) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
@@ -2878,10 +2878,10 @@ instance ExactPrint (HsExpr GhcPs) where
     e3' <- markAnnotated e3
     return (HsIf an4 e1' e2' e3')
 
-  exact (HsMultiIf (i,al) mg) = do
+  exact (HsMultiIf (i,al) (L lm mg)) = do
     i0 <- markEpToken i
-    (al',mg') <- markAnnListA al $ markAnnotated mg
-    return (HsMultiIf (i0,al') mg')
+    (L lm' (List al' mg')) <- markAnnotated (L lm (List al mg))
+    return (HsMultiIf (i0,al') (L lm' mg'))
 
   exact (HsLet (tkLet, tkIn) binds e) = do
     setLayoutBoth $ do -- Make sure the 'in' gets indented too

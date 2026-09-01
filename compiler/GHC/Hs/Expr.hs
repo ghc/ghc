@@ -915,7 +915,7 @@ ppr_expr (HsIf _ e1 e2 e3)
          text "else",
          nest 4 (ppr e3)]
 
-ppr_expr (HsMultiIf _ alts)
+ppr_expr (HsMultiIf _ (L _ alts))
   = hang (text "if") 3  (vcat $ toList $ NE.map ppr_alt alts)
   where ppr_alt (L _ (GRHS _ guards expr)) =
           hang vbar 2 (hang (interpp'SP guards) 2 (arrow <+> pprDeeper (ppr expr)))
@@ -2659,6 +2659,7 @@ instance UnXRec p => Outputable (DotFieldOcc p) where
 -}
 
 type instance Anno (HsExpr (GhcPass p)) = SrcSpanAnnA
+type instance Anno (NonEmpty (GenLocated EpAnnCO (GRHS (GhcPass p) (LocatedA (HsExpr (GhcPass p)))))) = SrcSpanAnnA
 type instance Anno [LocatedA (HsExpr (GhcPass p))] = SrcSpanAnnA
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr))))] = SrcSpanAnnA
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr))))] = SrcSpanAnnA

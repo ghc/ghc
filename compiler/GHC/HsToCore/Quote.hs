@@ -1631,7 +1631,7 @@ repE (HsIf _ x y z)       = do
                             b <- repLE y
                             c <- repLE z
                             repCond a b c
-repE (HsMultiIf _ alts)
+repE (HsMultiIf _ (L _ alts))
   = do { (binds, alts') <- NE.unzip <$> mapM repLGRHS alts
        ; expr' <- repMultiIf (nonEmptyCoreList' alts')
        ; wrapGenSyms (concat binds) expr' }

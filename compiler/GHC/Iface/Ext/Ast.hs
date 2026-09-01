@@ -1263,7 +1263,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         , toHie b
         , toHie c
         ]
-      HsMultiIf _ grhss ->
+      HsMultiIf _ (L _ grhss) ->
         [ toHie grhss
         ]
       HsLet _ binds expr ->
