@@ -3141,7 +3141,7 @@ aexp    :: { ECP }
                                            fmap ecpFromExp $
                                            do { let (L _ (al,_)) = $2
                                               ; amsA' (sLL $1 $> $ HsMultiIf (epTok $1, al)
-                                                     (NE.reverse $ snd $ unLoc $2)) }}
+                                                     (sL1a $2 (NE.reverse $ snd $ unLoc $2))) }}
         | 'case' exp 'of' altslist(pats1) {% runPV (unECP $2) >>= \ ($2 :: LHsExpr GhcPs) ->
                                              return $ ECP $
                                                $4 >>= \ $4 ->
