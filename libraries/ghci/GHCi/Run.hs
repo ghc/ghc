@@ -339,16 +339,17 @@ withBreakAction opts mtid act
  = bracket setBreakAction resetBreakAction (\_ -> act)
  where
    setBreakAction = do
-     poke breakPointIOAction globalBreakStablePtr -- TODO: This is thread unsafe, as one thread might be accessing this global variable while this thread tries to overwrite it.
+     poke breakPointIOAction globalBreakStablePtr -- TODO: This is thread unsafe, as one thread might be accessing this global variable while this thread tries to overwrite it. We should rather do it when the interpreter process/internal is initialized somehow.
      when (breakOnException opts) $ poke exceptionFlag 1
      when (singleStep opts) $ do
+      rts_enableStopNextBreakpointAll
       case mtid of
-        Nothing -> rts_enableStopNextBreakpointAll
+        Nothing -> pure ()
         Just (ThreadId tid) -> do
           rts_enableStopNextBreakpoint tid
      when (stepOut opts) $ do
       case mtid of
-        Nothing -> rts_enableStopNextBreakpointAll -- just enable single-step when no thread is stopped
+        Nothing -> pure ()
         Just (ThreadId tid) -> do
           rts_enableStopAfterReturn tid
      return ()
@@ -360,10 +361,13 @@ withBreakAction opts mtid act
      -- poke breakPointIOAction noBreakStablePtr -- Never unset it.
      -- TODO: What about evaluating a thunk with breakpoints? when did we get "ignoring breakpoint..." before?
      poke exceptionFlag 0
-     rts_disableStopNextBreakpointAll
      case mtid of
       Just (ThreadId tid) -> rts_disableStopAfterReturn tid
       _                   -> pure ()
+     case mtid of
+       Nothing -> rts_disableStopNextBreakpointAll
+       Just (ThreadId tid) -> do
+         rts_disableStopNextBreakpoint tid
      -- freeStablePtr stablePtr
 
 resumeStmt
