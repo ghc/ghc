@@ -565,11 +565,11 @@ If we add linear guards, this code will have to be revisited.
 Not using 'sup' caused #23814.
 -}
 
-tcExpr (HsMultiIf _ alts) res_ty
+tcExpr (HsMultiIf _ (L la alts)) res_ty
   = do { alts' <- tcGRHSNE IfAlt tcBody alts res_ty
                   -- See Note [MultiWayIf linearity checking]
        ; res_ty <- readExpType res_ty
-       ; return (HsMultiIf res_ty alts') }
+       ; return (HsMultiIf res_ty (L la alts')) }
 
 tcExpr (HsDo _ do_or_lc stmts) res_ty
   | DoExpr{} <- do_or_lc

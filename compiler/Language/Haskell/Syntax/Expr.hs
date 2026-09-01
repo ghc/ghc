@@ -412,7 +412,7 @@ data HsExpr p
                 (LHsExpr p)    --  else part
 
   -- | Multi-way if
-  | HsMultiIf   (XMultiIf p) (NonEmpty (LGRHS p (LHsExpr p)))
+  | HsMultiIf   (XMultiIf p) (XRec p (NonEmpty (LGRHS p (LHsExpr p))))
 
   -- | let(rec)
   | HsLet       (XLet p)

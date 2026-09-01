@@ -1123,7 +1123,7 @@ cvtl e = wrapLA (cvt e)
                             ; return $ mkHsIf x' y' z' noAnn }
     cvt (MultiIfE alts) = case nonEmpty alts of
         Nothing -> failWith MultiWayIfWithoutAlts
-        Just alts -> HsMultiIf noAnn <$> traverse cvtpair alts
+        Just alts -> HsMultiIf noAnn <$> noLocA <$> traverse cvtpair alts
     cvt (LetE ds e)    = do { ds' <- cvtLocalDecs LetExpression ds
                             ; e' <- cvtl e; return $ HsLet noAnn  (noLocA ds') e'}
     cvt (CaseE e ms)   = do { e' <- cvtl e; ms' <- mapM (cvtMatch CaseAlt) ms
