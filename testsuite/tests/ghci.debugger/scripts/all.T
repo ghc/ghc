@@ -160,3 +160,4 @@ test('RttiSharedTyVar', extra_files(['RttiSharedTyVar.hs']), ghci_script, ['Rtti
 test('break032', extra_files(['break032.hs']), ghci_script, ['break032.script'])
 test('break033', extra_files(['break033.hs']), ghci_script, ['break033.script'])
 test('break034', extra_files(['break034.hs']), ghci_script, ['break034.script'])
+test('break035', extra_files(['break035.hs']), ghci_script, ['break035.script'])

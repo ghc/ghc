@@ -37,14 +37,15 @@ initSimpleOpts dflags = SimpleOpts
    }
 
 -- | Extract GHCi options from DynFlags and step
-initEvalOpts :: DynFlags -> EvalStep -> EvalOpts
-initEvalOpts dflags step =
+initEvalOpts :: DynFlags -> EvalStep -> Bool -> EvalOpts
+initEvalOpts dflags step isolate_breaks =
   EvalOpts
     { useSandboxThread = gopt Opt_GhciSandbox dflags
     , singleStep       = singleStep
     , stepOut          = stepOut
     , breakOnException = gopt Opt_BreakOnException dflags
     , breakOnError     = gopt Opt_BreakOnError dflags
+    , isolateThreadBreaks = isolate_breaks
     }
   where
     (singleStep, stepOut) = case step of

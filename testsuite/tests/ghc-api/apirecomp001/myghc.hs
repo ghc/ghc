@@ -9,6 +9,7 @@
 -- argument.
 module Main where
 
+import Control.Monad (join)
 import GHC
 import GHC.Driver.Session
 import GHC.Driver.Backend
@@ -50,7 +51,7 @@ main = do
     setContext [IIModule mod]
     liftIO $ hFlush stdout  -- make sure things above are printed before
                             -- interactive output
-    r <- execStmt "main" execOptions
+    r <- join $ execStmt "main" execOptions
     case r of
       ExecComplete { execResult = Right _ } -> prn "ok"
       ExecComplete { execResult = Left _ } -> prn "exception"

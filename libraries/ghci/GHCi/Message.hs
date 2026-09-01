@@ -1,6 +1,6 @@
 {-# LANGUAGE RecursiveDo, GADTs, DeriveGeneric, StandaloneDeriving, ScopedTypeVariables,
     GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards, CPP,
-    NamedFieldPuns, LambdaCase, TypeAbstractions, TypeApplications,
+    NamedFieldPuns, LambdaCase, TypeAbstractions, TypeApplications, PatternSynonyms,
     LinearTypes, RankNTypes, UnboxedTuples, BlockArguments, TupleSections, MagicHash #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
 
@@ -15,12 +15,11 @@ module GHCi.Message
   , ConInfoTable(..)
   , THMessage(..), THMsg(..)
   , QResult(..)
-  , EvalStatus_(..), EvalStatus, EvalResult(..), EvalOpts(..), EvalExpr(..)
-  , EvalBreakpoint (..)
+  , EvalStatus(..,EvalBreak), EvalResult(..), EvalOpts(..), EvalExpr(..)
+  , EvalBreak(..), EvalBreakpoint (..)
   , SerializableException(..)
   , toSerializableException, fromSerializableException
   , THResult(..), THResultType(..)
-  , ResumeContext(..)
   , QState(..)
   , getMessage, putMessage, getTHMessage, putTHMessage
 
@@ -137,17 +136,17 @@ data Message a where
   EvalStmt
     :: EvalOpts
     -> EvalExpr HValueRef {- IO [a] -}
-    -> Message (EvalStatus [HValueRef]) {- [a] -}
+    -> Message (RemoteRef ThreadId) {- 'WaitThreadResult' of this thread yields [a] -}
 
   -- | Resume evaluation of a statement after a breakpoint
   ResumeStmt
    :: EvalOpts
-   -> RemoteRef (ResumeContext [HValueRef])
-   -> Message (EvalStatus [HValueRef])
+   -> RemoteRef ThreadId
+   -> Message ()
 
   -- | Abandon evaluation of a statement after a breakpoint
   AbandonStmt
-   :: RemoteRef (ResumeContext [HValueRef])
+   :: RemoteRef ThreadId
    -> Message ()
 
   -- | Evaluate something of type @IO String@
@@ -247,12 +246,28 @@ data Message a where
   -- | Evaluate something. This is used to support :force in GHCi.
   Seq
     :: HValueRef
-    -> Message (EvalStatus ())
+    -> Message (RemoteRef ThreadId)
 
   -- | Resume forcing a free variable in a breakpoint (#2950)
   ResumeSeq
-    :: RemoteRef (ResumeContext ())
-    -> Message (EvalStatus ())
+    :: RemoteRef ThreadId
+    -> Message ()
+
+  WaitThreadResult
+    :: RemoteRef ThreadId
+    -> Message (EvalStatus [HValueRef])
+
+  WaitAnyThreadBreak
+    :: Message EvalBreak
+
+  WaitThreadResultOrAnyThreadBreak
+    :: RemoteRef ThreadId
+    -> Message (EvalStatus [HValueRef])
+
+  ThrowTo
+    :: RemoteRef ThreadId
+    -> SerializableException
+    -> Message ()
 
   -- | User-defined request encoded as a tag/payload pair.  This is left
   -- uninterpreted by GHC and is meant for GHC API applications to be able to supply
@@ -395,22 +410,26 @@ putTHMessage m = case m of
   GetPackageRoot              -> putWord8 25
   AddDependentDirectory a     -> putWord8 26 >> put a
 
-data EvalOpts = EvalOpts
+data EvalOpts
+  = EvalOpts
   { useSandboxThread :: Bool
   , singleStep :: Bool
   , stepOut :: Bool
   , breakOnException :: Bool
   , breakOnError :: Bool
+  , isolateThreadBreaks :: !Bool
+  -- ^ If @isolateThreadBreaks == True@, any breakpoint hit by the thread
+  -- forked~[1] to execute this expression is only seen by a caller observing
+  -- this thread's result explicitly. That is, this thread's 'EvalStatus' can
+  -- be read by 'WaitThreadResult', or 'WaitThreadResultOrAnyThreadBreak', but
+  -- will be ignored by 'WaitAnyThreadBreak'.
+  --
+  -- [1] a thread is forked to execute the expression by default, unless
+  -- @-fno-ghci-sandbox@ which sets @useSandboxThread = False@
   }
   deriving (Generic, Show)
 
 instance Binary EvalOpts
-
-data ResumeContext a = ResumeContext
-  { resumeBreakMVar :: MVar ()
-  , resumeStatusMVar :: MVar (EvalStatus a)
-  , resumeThreadId :: ThreadId
-  }
 
 -- | We can pass simple expressions to EvalStmt, consisting of values
 -- and application.  This allows us to wrap the statement to be
@@ -424,18 +443,25 @@ data EvalExpr a
 
 instance Binary a => Binary (EvalExpr a)
 
-type EvalStatus a = EvalStatus_ a a
-
-data EvalStatus_ a b
+data EvalStatus a
   = EvalComplete Word64 (EvalResult a)
-  | EvalBreak
+  | EvalPaused EvalBreak
+  deriving (Generic, Show)
+
+pattern EvalBreak :: HValueRef -> (Maybe EvalBreakpoint) -> (RemoteRef ThreadId) -> (RemotePtr CostCentreStack) -> EvalStatus a
+pattern EvalBreak a b c d = EvalPaused (EvalBreak_ a b c d)
+{-# COMPLETE EvalComplete, EvalBreak #-}
+
+data EvalBreak
+  = EvalBreak_
        HValueRef{- AP_STACK -}
        (Maybe EvalBreakpoint)
-       (RemoteRef (ResumeContext b))
+       (RemoteRef ThreadId)
        (RemotePtr CostCentreStack) -- Cost centre stack
   deriving (Generic, Show)
 
-instance Binary a => Binary (EvalStatus_ a b)
+instance Binary EvalBreak
+instance Binary a => Binary (EvalStatus a)
 
 data EvalBreakpoint = EvalBreakpoint
   { eb_info_mod      :: !BS.ShortByteString -- ^ Breakpoint info module
@@ -580,6 +606,10 @@ getMessage = do
       40 -> Msg <$> (WhereFrom <$> get)
       41 -> Msg <$> (AddHpcModule <$> get <*> get <*> get <*> get)
       42 -> Msg <$> (CustomMessage <$> get <*> get)
+      43 -> Msg <$> (WaitThreadResult <$> get)
+      44 -> Msg <$> return WaitAnyThreadBreak
+      45 -> Msg <$> (WaitThreadResultOrAnyThreadBreak <$> get)
+      46 -> Msg <$> (ThrowTo <$> get <*> get)
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -628,6 +658,11 @@ putMessage m = case m of
   WhereFrom a                 -> putWord8 40 >> put a
   AddHpcModule m n h ticks    -> putWord8 41 >> put m >> put n >> put h >> put ticks
   CustomMessage tag payload   -> putWord8 42 >> put tag >> put payload
+  WaitThreadResult tid        -> putWord8 43 >> put tid
+  WaitAnyThreadBreak          -> putWord8 44
+  WaitThreadResultOrAnyThreadBreak tid
+                              -> putWord8 45 >> put tid
+  ThrowTo tid ex              -> putWord8 46 >> put tid >> put ex
 
 {-
 Note [Parallelize CreateBCOs serialization]

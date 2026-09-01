@@ -10,13 +10,14 @@ module GHC.Runtime.Eval.Types (
         Resume(..), ResumeBindings, IcGlobalRdrEnv(..),
         History(..), ExecResult(..),
         SingleStep(..), EvalStep(..), enableGhcStepMode, breakHere,
+        ThreadBreaksIsolationMode(..), enableIsolateThreadBreaks,
         ExecOptions(..)
         ) where
 
 import GHC.Prelude
 
 import GHCi.RemoteTypes
-import GHCi.Message (EvalExpr, ResumeContext)
+import GHCi.Message (EvalExpr)
 import GHC.ByteCode.Types (InternalBreakpointId(..))
 import GHC.Types.Id
 import GHC.Types.TyThing
@@ -26,6 +27,7 @@ import GHC.Utils.Exception
 
 import Data.Word
 import GHC.Stack.CCS
+import Control.Concurrent (ThreadId)
 
 data ExecOptions
  = ExecOptions
@@ -33,6 +35,8 @@ data ExecOptions
      , execSourceFile :: String             -- ^ filename (for errors)
      , execLineNumber :: Int                -- ^ line number (for errors)
      , execWrap :: ForeignHValue -> EvalExpr ForeignHValue
+     , execIsolateMode :: ThreadBreaksIsolationMode
+                                            -- ^ like @'isolateThreadBreaks'@
      }
 
 -- | What kind of stepping are we doing?
@@ -61,6 +65,17 @@ data SingleStep
    | ModuleStep
       { breakAt :: SrcSpan }
 
+-- | Just like @'isolateThreadBreaks'@, on whether breakpoints hit during the
+-- execution of this expression should be visible by 'WaitAnyThreadBreak' or
+-- isolated and only visible using @'WaitThreadResult' <tid>@ specifically.
+data ThreadBreaksIsolationMode
+  -- | Hide this thread breakpoint hits from 'WaitAnyThreadBreak'; read the
+  -- result or break hits using @'WaitThreadResult' <tid>@ directly instead.
+  = ThreadBreaksIsolated
+  -- | If this thread hits a breakpoint, 'WaitAnyThreadBreak' anywhere might
+  -- return this thread's 'EvalBreak'.
+  | ThreadBreaksVisible
+
 -- | Whether this 'SingleStep' mode requires instructing the interpreter to
 -- step at every breakpoint or after every return (see @'EvalStep'@).
 enableGhcStepMode :: SingleStep -> EvalStep
@@ -78,6 +93,10 @@ data EvalStep
   | EvalStepOut
   -- | ... only on explicit breakpoints
   | EvalStepNone
+
+enableIsolateThreadBreaks :: ThreadBreaksIsolationMode -> Bool
+enableIsolateThreadBreaks ThreadBreaksIsolated = True
+enableIsolateThreadBreaks ThreadBreaksVisible  = False
 
 -- | Given a 'SingleStep' mode, whether the breakpoint was explicitly active,
 -- and the SrcSpan of a breakpoint we hit, return @True@ if we should stop at
@@ -180,7 +199,7 @@ data IcGlobalRdrEnv = IcGlobalRdrEnv
 
 data Resume = Resume
        { resumeStmt      :: String       -- the original statement
-       , resumeContext   :: ForeignRef (ResumeContext [HValueRef])
+       , resumeContext   :: ForeignRef ThreadId
        , resumeBindings  :: ResumeBindings
        , resumeFinalIds  :: [Id]         -- [Id] to bind on completion
        , resumeApStack   :: ForeignHValue -- The object from which we can get

@@ -1,0 +1,8 @@
+:l break035
+:break f
+main
+-- The timeout fires while the thread is stopped at f, throwing an exception
+Control.Concurrent.threadDelay 1000000
+-- :continue must return the completed exception result rather than hang
+:continue
+putStrLn "after continue"

@@ -1,0 +1,6 @@
+Breakpoint 0 activated at break035.hs:6:7-11
+Stopped in Main.f, break035.hs:6:7-11
+_result :: Int = _
+x :: Int = 1
+Nothing
+after continue
