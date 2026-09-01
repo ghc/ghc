@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, DeriveGeneric, StandaloneDeriving, ScopedTypeVariables,
     GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards,
-    CPP, NamedFieldPuns #-}
+    CPP, NamedFieldPuns, PatternSynonyms #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
 
 -- |
@@ -14,12 +14,11 @@ module GHCi.Message
   , ConInfoTable(..)
   , THMessage(..), THMsg(..)
   , QResult(..)
-  , EvalStatus_(..), EvalStatus, EvalResult(..), EvalOpts(..), EvalExpr(..)
-  , EvalBreakpoint (..)
+  , EvalStatus_(..,EvalBreak), EvalStatus, EvalResult(..), EvalOpts(..), EvalExpr(..)
+  , EvalBreak(..), EvalBreakpoint (..)
   , SerializableException(..)
   , toSerializableException, fromSerializableException
   , THResult(..), THResultType(..)
-  , ResumeContext(..)
   , QState(..)
   , getMessage, putMessage, getTHMessage, putTHMessage
   , Pipe, mkPipeFromHandles, mkPipeFromContinuations, remoteCall, remoteTHCall, readPipe, writePipe
@@ -138,12 +137,12 @@ data Message a where
   -- | Resume evaluation of a statement after a breakpoint
   ResumeStmt
    :: EvalOpts
-   -> RemoteRef (ResumeContext [HValueRef])
+   -> RemoteRef ThreadId
    -> Message (EvalStatus [HValueRef])
 
   -- | Abandon evaluation of a statement after a breakpoint
   AbandonStmt
-   :: RemoteRef (ResumeContext [HValueRef])
+   :: RemoteRef ThreadId
    -> Message ()
 
   -- | Evaluate something of type @IO String@
@@ -245,7 +244,7 @@ data Message a where
 
   -- | Resume forcing a free variable in a breakpoint (#2950)
   ResumeSeq
-    :: RemoteRef (ResumeContext ())
+    :: RemoteRef ThreadId
     -> Message (EvalStatus ())
 
   -- | User-defined request encoded as a tag/payload pair.  This is left
@@ -389,22 +388,42 @@ putTHMessage m = case m of
   GetPackageRoot              -> putWord8 25
   AddDependentDirectory a     -> putWord8 26 >> put a
 
-data EvalOpts = EvalOpts
+data EvalOpts
+  = EvalOpts
   { useSandboxThread :: Bool
   , singleStep :: Bool
   , stepOut :: Bool
   , breakOnException :: Bool
   , breakOnError :: Bool
+  , isolateThreadBreaks :: Bool
+  -- ^ If @isolateThreadBreaks == True@, any breakpoint hit by the thread
+  -- forked~[1] to execute this expression is only seen by a caller observing
+  -- this thread's result explicitly. That is, this thread's 'EvalStatus' can
+  -- be read by 'readThreadEvalStatus', but will be ignored by
+  -- 'readAnyThreadEvalBreak'.
+  --
+  -- Secondly, we only return the 'EvalStatus' of this thread specifically --
+  -- either a breakpoint was hit *in this thread*, or it has finished
+  -- evaluating the main expression and produced a result.
+  -- Notably, if any other thread in the interpreter hits a breakpoint, ignore it.
+  --
+  -- If @isolateThreadBreaks == False@, any breakpoint hit in *any* thread
+  -- (except isolated ones) will make this evaluation return the 'EvalBreak'
+  -- for that thread that stopped. This is typically what you want if debugging
+  -- a "main" program, since you care to know if any thread forked off of that
+  -- main program hits a breakpoint, not just the main thread specifically.
+  -- However, we will only return an 'EvalCompleted' for the main thread's
+  -- result. The results of other threads spawned by main are ignored.
+  --
+  -- In essence, when @False@, the result of evaluation is
+  -- @readAnyThreadEvalBreak `orElse` readThreadEvalStatus mainThreadId@.
+  --
+  -- [1] a thread is forked to execute the expression by default, unless
+  -- @-fno-ghci-sandbox@ which sets @useSandboxThread = False@
   }
   deriving (Generic, Show)
 
 instance Binary EvalOpts
-
-data ResumeContext a = ResumeContext
-  { resumeBreakMVar :: MVar ()
-  , resumeStatusMVar :: MVar (EvalStatus a)
-  , resumeThreadId :: ThreadId
-  }
 
 -- | We can pass simple expressions to EvalStmt, consisting of values
 -- and application.  This allows us to wrap the statement to be
@@ -422,13 +441,22 @@ type EvalStatus a = EvalStatus_ a a
 
 data EvalStatus_ a b
   = EvalComplete Word64 (EvalResult a)
-  | EvalBreak
+  | EvalPaused EvalBreak
+  deriving (Generic, Show)
+
+pattern EvalBreak :: HValueRef -> (Maybe EvalBreakpoint) -> (RemoteRef ThreadId) -> (RemotePtr CostCentreStack) -> EvalStatus_ a b
+pattern EvalBreak a b c d = EvalPaused (EvalBreak_ a b c d)
+{-# COMPLETE EvalComplete, EvalBreak #-}
+
+data EvalBreak
+  = EvalBreak_
        HValueRef{- AP_STACK -}
        (Maybe EvalBreakpoint)
-       (RemoteRef (ResumeContext b))
+       (RemoteRef ThreadId)
        (RemotePtr CostCentreStack) -- Cost centre stack
   deriving (Generic, Show)
 
+instance Binary EvalBreak
 instance Binary a => Binary (EvalStatus_ a b)
 
 data EvalBreakpoint = EvalBreakpoint

@@ -49,6 +49,9 @@ initEvalOpts dflags step =
     , stepOut          = stepOut
     , breakOnException = gopt Opt_BreakOnException dflags
     , breakOnError     = gopt Opt_BreakOnError dflags
+    , isolateThreadBreaks = True
+      -- Must opt-in to listening to all thread's breakpoints.
+      -- (e.g. for running 'main' in a debugger)
     }
   where
     (singleStep, stepOut) = case step of
