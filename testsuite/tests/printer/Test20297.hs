@@ -1,5 +1,6 @@
 {-# OPTIONS -ddump-parsed-ast #-}
 {-# LANGUAGE ImplicitParams #-}
+{-# LANGUAGE MultiWayIf #-}
 module Test20297 where
 
 -- ValBinds
@@ -36,3 +37,8 @@ data G a where -- comment8
   MkG :: G Int
   ; -- comment10
   } -- comment11
+
+-- HsMultiIf
+mwi = if -- comment12
+         | x -> 1
+         | otherwise -> 2
