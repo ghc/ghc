@@ -198,7 +198,7 @@ module GHC (
         isStmt, hasImport, isImport, isDecl,
 
         -- ** The debugger
-        SingleStep(..),
+        SingleStep(..), ThreadBreaksIsolationMode(..),
         Resume(..),
         History(historyBreakpointId, historyEnclosingDecls),
         GHC.getHistorySpan, getHistoryModule,

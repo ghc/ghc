@@ -10,13 +10,14 @@ module GHC.Runtime.Eval.Types (
         Resume(..), ResumeBindings, IcGlobalRdrEnv(..),
         History(..), ExecResult(..),
         SingleStep(..), enableGhcStepMode, breakHere,
+        ThreadBreaksIsolationMode(..), enableIsolateThreadBreaks,
         ExecOptions(..)
         ) where
 
 import GHC.Prelude
 
 import GHCi.RemoteTypes
-import GHCi.Message (EvalExpr, ResumeContext)
+import GHCi.Message (EvalExpr)
 import GHC.ByteCode.Types (InternalBreakpointId(..))
 import GHC.Driver.Config (EvalStep(..))
 import GHC.Types.Id
@@ -28,6 +29,7 @@ import GHC.Utils.Exception
 
 import Data.Word
 import GHC.Stack.CCS
+import Control.Concurrent (ThreadId)
 
 data ExecOptions
  = ExecOptions
@@ -35,6 +37,8 @@ data ExecOptions
      , execSourceFile :: String             -- ^ filename (for errors)
      , execLineNumber :: Int                -- ^ line number (for errors)
      , execWrap :: ForeignHValue -> EvalExpr ForeignHValue
+     , execIsolateMode :: ThreadBreaksIsolationMode
+                                            -- ^ like @'isolateThreadBreaks'@
      }
 
 -- | What kind of stepping are we doing?
@@ -63,6 +67,17 @@ data SingleStep
    | ModuleStep
       { breakAt :: SrcSpan }
 
+-- | Just like @'isolateThreadBreaks'@, determining whether the
+-- execution/resuming execution of an expression should stop whenever any
+-- non-isolated thread hits a breakpoint, or only when the thread executing
+-- that expression specifically stops.
+data ThreadBreaksIsolationMode
+  -- | Stop exclusively on the breakpoints in this thread
+  = SingleThreadedBreaks
+  -- | Stop whenever any thread that is not running in 'SingleThreadedBreaks'
+  -- isolation mode hits a breakpoint
+  | MultiThreadedBreaks
+
 -- | Whether this 'SingleStep' mode requires instructing the interpreter to
 -- step at every breakpoint or after every return (see @'EvalStep'@).
 enableGhcStepMode :: SingleStep -> EvalStep
@@ -70,6 +85,10 @@ enableGhcStepMode RunToCompletion = EvalStepNone
 enableGhcStepMode StepOut{}       = EvalStepOut
 -- for the remaining step modes we need to stop at every single breakpoint.
 enableGhcStepMode _               = EvalStepSingle
+
+enableIsolateThreadBreaks :: ThreadBreaksIsolationMode -> Bool
+enableIsolateThreadBreaks SingleThreadedBreaks = True
+enableIsolateThreadBreaks MultiThreadedBreaks  = False
 
 -- | Given a 'SingleStep' mode, whether the breakpoint was explicitly active,
 -- and the SrcSpan of a breakpoint we hit, return @True@ if we should stop at
@@ -170,7 +189,7 @@ data IcGlobalRdrEnv = IcGlobalRdrEnv
 
 data Resume = Resume
        { resumeStmt      :: String       -- the original statement
-       , resumeContext   :: ForeignRef (ResumeContext [HValueRef])
+       , resumeContext   :: ForeignRef ThreadId
        , resumeBindings  :: ResumeBindings
        , resumeFinalIds  :: [Id]         -- [Id] to bind on completion
        , resumeApStack   :: ForeignHValue -- The object from which we can get
