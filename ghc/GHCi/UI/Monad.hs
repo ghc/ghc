@@ -412,7 +412,7 @@ resume step mbIgnoreCnt = do
     withProgName (progname st) $
     withArgs (args st) $
       reflectGHCi x $ do
-        GHC.resumeExec step mbIgnoreCnt
+        GHC.resumeExec step GHC.SingleThreadedBreaks mbIgnoreCnt
 
 -- --------------------------------------------------------------------------
 -- timing & statistics

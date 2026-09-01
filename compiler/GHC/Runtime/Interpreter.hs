@@ -303,16 +303,16 @@ evalStmt interp opts foreign_expr = do
 resumeStmt
   :: Interp
   -> EvalOpts
-  -> ForeignRef (ResumeContext [HValueRef])
+  -> ForeignRef ThreadId
   -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
-resumeStmt interp opts resume_ctxt = do
-  status <- withForeignRef resume_ctxt $ \rhv ->
+resumeStmt interp opts resume_tid = do
+  status <- withForeignRef resume_tid $ \rhv ->
     interpCmd interp (ResumeStmt opts rhv)
   handleEvalStatus interp status
 
-abandonStmt :: Interp -> ForeignRef (ResumeContext [HValueRef]) -> IO ()
-abandonStmt interp resume_ctxt =
-  withForeignRef resume_ctxt $ \rhv ->
+abandonStmt :: Interp -> ForeignRef ThreadId -> IO ()
+abandonStmt interp resume_tid =
+  withForeignRef resume_tid $ \rhv ->
     interpCmd interp (AbandonStmt rhv)
 
 handleEvalStatus
