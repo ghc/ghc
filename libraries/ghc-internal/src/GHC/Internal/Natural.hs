@@ -93,7 +93,7 @@ plusNatural = N.naturalAdd
 minusNatural :: Natural -> Natural -> Natural
 minusNatural = N.naturalSubThrow
 
--- | 'Natural' subtraction. Returns 'Nothing's for negative results.
+-- | 'Natural' subtraction. Returns 'Nothing' if the result would be negative.
 --
 -- @since base-4.8.0.0
 minusNaturalMaybe :: Natural -> Natural -> Maybe Natural
