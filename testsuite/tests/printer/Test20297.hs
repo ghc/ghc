@@ -38,8 +38,9 @@ data G a where -- comment8
   ; -- comment10
   } -- comment11
 
--- Layout in multi-if
-f = if | x -> y
+-- HsMultiIf
+f = if -- comment12
+       | x -> y
        | z -> w
 
 -- eof
