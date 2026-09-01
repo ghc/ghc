@@ -19,7 +19,6 @@ module GHCi.Message
   , SerializableException(..)
   , toSerializableException, fromSerializableException
   , THResult(..), THResultType(..)
-  , ResumeContext(..)
   , QState(..)
   , getMessage, putMessage, getTHMessage, putTHMessage
   , Pipe, mkPipeFromHandles, mkPipeFromContinuations, remoteCall, remoteTHCall, readPipe, writePipe
@@ -138,12 +137,12 @@ data Message a where
   -- | Resume evaluation of a statement after a breakpoint
   ResumeStmt
    :: EvalOpts
-   -> RemoteRef (ResumeContext [HValueRef])
+   -> RemoteRef ThreadId
    -> Message (EvalStatus [HValueRef])
 
   -- | Abandon evaluation of a statement after a breakpoint
   AbandonStmt
-   :: RemoteRef (ResumeContext [HValueRef])
+   :: RemoteRef ThreadId
    -> Message ()
 
   -- | Evaluate something of type @IO String@
@@ -245,7 +244,7 @@ data Message a where
 
   -- | Resume forcing a free variable in a breakpoint (#2950)
   ResumeSeq
-    :: RemoteRef (ResumeContext ())
+    :: RemoteRef ThreadId
     -> Message (EvalStatus ())
 
   -- | User-defined request encoded as a tag/payload pair.  This is left
@@ -400,12 +399,6 @@ data EvalOpts = EvalOpts
 
 instance Binary EvalOpts
 
-data ResumeContext a = ResumeContext
-  { resumeBreakMVar :: MVar ()
-  , resumeStatusMVar :: MVar (EvalStatus a)
-  , resumeThreadId :: ThreadId
-  }
-
 -- | We can pass simple expressions to EvalStmt, consisting of values
 -- and application.  This allows us to wrap the statement to be
 -- executed in another function, which is used by GHCi to implement
@@ -425,7 +418,7 @@ data EvalStatus_ a b
   | EvalBreak
        HValueRef{- AP_STACK -}
        (Maybe EvalBreakpoint)
-       (RemoteRef (ResumeContext b))
+       (RemoteRef ThreadId)
        (RemotePtr CostCentreStack) -- Cost centre stack
   deriving (Generic, Show)
 

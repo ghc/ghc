@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs, RecordWildCards, MagicHash, ScopedTypeVariables, CPP,
     UnboxedTuples, LambdaCase, UnliftedFFITypes #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- |
 -- Execute GHCi messages.
@@ -30,6 +31,7 @@ import GHCi.TH
 import GHCi.BreakArray
 import GHCi.StaticPtrTable
 
+import qualified Data.Map as Map
 import Control.Concurrent
 import Control.DeepSeq
 import Control.Exception
@@ -194,20 +196,22 @@ evalStringToString r str = do
 -- information about the breakpoint than the current iserv
 -- process.
 doSeq :: RemoteRef a -> IO (EvalStatus ())
-doSeq ref = do
+doSeq ref = clearEvalStatus <$> do
     sandboxIO evalOptsSeq $ do
       _ <- (void $ evaluate =<< localRef ref)
-      return ()
+      return []
 
 -- | Process a ResumeSeq message. Continue the :force processing     #2950
 -- after a breakpoint.
-resumeSeq :: RemoteRef (ResumeContext ()) -> IO (EvalStatus ())
-resumeSeq hvref = do
-    ResumeContext{..} <- localRef hvref
-    withBreakAction evalOptsSeq resumeBreakMVar resumeStatusMVar (Just resumeThreadId) $
+resumeSeq :: RemoteRef ThreadId -> IO (EvalStatus ())
+resumeSeq hvref = clearEvalStatus <$> do
+    resumeThreadId <- localRef hvref
+    withBreakAction evalOptsSeq (Just resumeThreadId) $ do
+      ResumeContext{..} <- getThreadResumeContext resumeThreadId
       mask_ $ do
         putMVar resumeBreakMVar () -- this awakens the stopped thread...
-        redirectInterrupts resumeThreadId $ takeMVar resumeStatusMVar
+        redirectInterrupts resumeThreadId $ do
+          takeMVar resumeStatusMVar
 
 evalOptsSeq :: EvalOpts
 evalOptsSeq = EvalOpts
@@ -228,21 +232,21 @@ evalOptsSeq = EvalOpts
 -- only while we execute the user's code.  We can't afford to lose the final
 -- putMVar, otherwise deadlock ensues. (#1583, #1922, #1946)
 
-sandboxIO :: EvalOpts -> IO a -> IO (EvalStatus a)
+sandboxIO :: EvalOpts -> IO [HValueRef] -> IO (EvalStatus [HValueRef])
 sandboxIO opts io = do
   -- We are running in uninterruptibleMask
-  breakMVar <- newEmptyMVar
-  statusMVar <- newEmptyMVar
-  withBreakAction opts breakMVar statusMVar Nothing $ do
+  withBreakAction opts Nothing $ do
     let runIt = measureAlloc $ tryEval $ rethrow opts $ clearCCS io
     if useSandboxThread opts
        then do
          tid <- forkIO $ do
            tid <- myThreadId
+           ResumeContext{..} <- getThreadResumeContext tid
            labelThread tid "GHCi sandbox"
-           unsafeUnmask runIt >>= putMVar statusMVar
+           unsafeUnmask runIt >>= putMVar resumeStatusMVar
                                 -- empty: can't block
-         redirectInterrupts tid $ unsafeUnmask $ takeMVar statusMVar
+         ResumeContext{..} <- getThreadResumeContext tid
+         redirectInterrupts tid $ unsafeUnmask $ takeMVar resumeStatusMVar
        else
           -- GLUT on OS X needs to run on the main thread. If you
           -- try to use it from another thread then you just get a
@@ -328,71 +332,47 @@ tryEval io = do
 -- resets everything when the computation has stopped running.  This
 -- is a not-very-good way to ensure that only the interactive
 -- evaluation should generate breakpoints.
-withBreakAction :: EvalOpts -> MVar ()
-                -> MVar (EvalStatus b)
+withBreakAction :: EvalOpts
                 -> Maybe ThreadId -- ^ If resuming, the current threadId
                 -> IO a -> IO a
-withBreakAction opts breakMVar statusMVar mtid act
+withBreakAction opts mtid act
  = bracket setBreakAction resetBreakAction (\_ -> act)
  where
    setBreakAction = do
-     stablePtr <- newStablePtr onBreak
-     poke breakPointIOAction stablePtr
+     poke breakPointIOAction globalBreakStablePtr -- TODO: This is thread unsafe, as one thread might be accessing this global variable while this thread tries to overwrite it.
      when (breakOnException opts) $ poke exceptionFlag 1
-     when (singleStep opts) rts_enableStopNextBreakpointAll
+     when (singleStep opts) $ do
+      case mtid of
+        Nothing -> rts_enableStopNextBreakpointAll
+        Just (ThreadId tid) -> do
+          rts_enableStopNextBreakpoint tid
      when (stepOut opts) $ do
       case mtid of
         Nothing -> rts_enableStopNextBreakpointAll -- just enable single-step when no thread is stopped
         Just (ThreadId tid) -> do
           rts_enableStopAfterReturn tid
-     return stablePtr
+     return ()
         -- Breaking on exceptions is not enabled by default, since it
         -- might be a bit surprising.  The exception flag is turned off
         -- as soon as it is hit, or in resetBreakAction below.
 
-   onBreak :: BreakpointCallback
-   onBreak info_mod# info_mod_uid# infox# is_exception apStack = do
-     tid <- myThreadId
-     let resume = ResumeContext
-           { resumeBreakMVar = breakMVar
-           , resumeStatusMVar = statusMVar
-           , resumeThreadId = tid }
-     resume_r <- mkRemoteRef resume
-     apStack_r <- mkRemoteRef apStack
-     ccs <- toRemotePtr <$> getCCSOf apStack
-     breakpoint <-
-       if is_exception
-       then pure Nothing
-       else do
-         info_mod <- BS.packCString (Ptr info_mod#)
-         info_mod_uid <- BS.packCString (Ptr info_mod_uid#)
-         pure (Just (EvalBreakpoint info_mod info_mod_uid (I# infox#)))
-     putMVar statusMVar $ EvalBreak apStack_r breakpoint resume_r ccs
-
-     -- Block until this thread is resumed (by the thread which took the
-     -- `ResumeContext` from the `statusMVar`).
-     --
-     -- The `onBreak` function must have been called from `rts/Interpreter.c`
-     -- when interpreting a `BRK_FUN`. After taking from the MVar, the function
-     -- returns to the continuation on the stack which is where the interpreter
-     -- was stopped.
-     takeMVar breakMVar
-
-   resetBreakAction stablePtr = do
-     poke breakPointIOAction noBreakStablePtr
+   resetBreakAction {-stablePtr-}() = do
+     -- poke breakPointIOAction noBreakStablePtr -- Never unset it.
+     -- TODO: What about evaluating a thunk with breakpoints? when did we get "ignoring breakpoint..." before?
      poke exceptionFlag 0
      rts_disableStopNextBreakpointAll
      case mtid of
       Just (ThreadId tid) -> rts_disableStopAfterReturn tid
       _                   -> pure ()
-     freeStablePtr stablePtr
+     -- freeStablePtr stablePtr
 
 resumeStmt
-  :: EvalOpts -> RemoteRef (ResumeContext [HValueRef])
+  :: EvalOpts -> RemoteRef ThreadId
   -> IO (EvalStatus [HValueRef])
-resumeStmt opts hvref = do
-  ResumeContext{..} <- localRef hvref
-  withBreakAction opts resumeBreakMVar resumeStatusMVar (Just resumeThreadId) $
+resumeStmt opts rtid = do
+  resumeThreadId <- localRef rtid
+  ResumeContext{..} <- getThreadResumeContext resumeThreadId
+  withBreakAction opts (Just resumeThreadId) $
     mask_ $ do
       putMVar resumeBreakMVar () -- this awakens the stopped thread...
       redirectInterrupts resumeThreadId $ takeMVar resumeStatusMVar
@@ -409,20 +389,42 @@ resumeStmt opts hvref = do
 --          step is necessary to prevent race conditions with
 --          -fbreak-on-exception (see #5975).
 --  See test break010.
-abandonStmt :: RemoteRef (ResumeContext [HValueRef]) -> IO ()
+abandonStmt :: RemoteRef ThreadId -> IO ()
 abandonStmt hvref = do
-  ResumeContext{..} <- localRef hvref
-  killThread resumeThreadId
+  tid <- localRef hvref
+  ResumeContext{..} <- getThreadResumeContext tid
+  killThread tid
   putMVar resumeBreakMVar ()
   _ <- takeMVar resumeStatusMVar
   return ()
 
-noBreakStablePtr :: StablePtr BreakpointCallback
-noBreakStablePtr = unsafePerformIO $ newStablePtr noBreakAction
+globalBreakStablePtr :: StablePtr BreakpointCallback
+globalBreakStablePtr = unsafePerformIO $ newStablePtr globalBreakAction
 
-noBreakAction :: BreakpointCallback
-noBreakAction _ _ _ False _ = putStrLn "*** Ignoring breakpoint"
-noBreakAction _ _ _ True  _ = return () -- exception: just continue
+globalBreakAction :: BreakpointCallback
+globalBreakAction info_mod# info_mod_uid# infox# is_exception apStack = do
+  tid <- myThreadId
+  ResumeContext{..} <- getThreadResumeContext tid
+  resume_r <- mkRemoteRef tid
+  apStack_r <- mkRemoteRef apStack
+  ccs <- toRemotePtr <$> getCCSOf apStack
+  breakpoint <-
+    if is_exception
+    then pure Nothing
+    else do
+      info_mod <- BS.packCString (Ptr info_mod#)
+      info_mod_uid <- BS.packCString (Ptr info_mod_uid#)
+      pure (Just (EvalBreakpoint info_mod info_mod_uid (I# infox#)))
+  putMVar resumeStatusMVar $ EvalBreak apStack_r breakpoint resume_r ccs
+
+  -- Block until this thread is resumed (by the thread which took the
+  -- `ResumeContext` from the `statusMVar`).
+  --
+  -- The `onBreak` function must have been called from `rts/Interpreter.c`
+  -- when interpreting a `BRK_FUN`. After taking from the MVar, the function
+  -- returns to the continuation on the stack which is where the interpreter
+  -- was stopped.
+  takeMVar resumeBreakMVar
 
 -- Malloc and copy the bytes.  We don't have any way to monitor the
 -- lifetime of this memory, so it just leaks.
@@ -463,3 +465,32 @@ getIdValFromApStack apStack (I# stackDepth) = do
             case ok of
               0# -> return Nothing -- AP_STACK not found
               _  -> return (Just (unsafeCoerce# result))
+
+clearEvalStatus :: EvalStatus a -> EvalStatus ()
+clearEvalStatus = \case
+  EvalComplete w (EvalException se) -> EvalComplete w (EvalException se)
+  EvalComplete w (EvalSuccess _)    -> EvalComplete w (EvalSuccess ())
+  EvalBreak ap mb rt rccs           -> EvalBreak ap mb rt rccs
+
+--------------------------------------------------------------------------------
+-- Global Debugger Per-Thread Context
+-- TODO: when to clean?
+
+getThreadResumeContext :: ThreadId -> IO (ResumeContext [HValueRef])
+getThreadResumeContext tid = modifyMVar globalBreakActionMap $ \gbm0 -> do
+  case Map.lookup tid gbm0 of
+    Nothing  -> do
+      r <- ResumeContext <$> newEmptyMVar <*> newEmptyMVar
+      let !gbm1 = Map.insert tid r gbm0
+      pure (gbm1, r)
+    Just ctx -> do
+      pure (gbm0, ctx)
+
+globalBreakActionMap :: MVar (Map.Map ThreadId (ResumeContext [HValueRef]))
+globalBreakActionMap = unsafePerformIO $ newMVar Map.empty
+{-# NOINLINE globalBreakActionMap #-}
+
+data ResumeContext a = ResumeContext
+  { resumeBreakMVar :: MVar ()
+  , resumeStatusMVar :: MVar (EvalStatus a)
+  }

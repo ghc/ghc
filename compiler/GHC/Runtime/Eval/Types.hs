@@ -16,7 +16,7 @@ module GHC.Runtime.Eval.Types (
 import GHC.Prelude
 
 import GHCi.RemoteTypes
-import GHCi.Message (EvalExpr, ResumeContext)
+import GHCi.Message (EvalExpr)
 import GHC.ByteCode.Types (InternalBreakpointId(..))
 import GHC.Driver.Config (EvalStep(..))
 import GHC.Types.Id
@@ -28,6 +28,7 @@ import GHC.Utils.Exception
 
 import Data.Word
 import GHC.Stack.CCS
+import Control.Concurrent (ThreadId)
 
 data ExecOptions
  = ExecOptions
@@ -170,7 +171,7 @@ data IcGlobalRdrEnv = IcGlobalRdrEnv
 
 data Resume = Resume
        { resumeStmt      :: String       -- the original statement
-       , resumeContext   :: ForeignRef (ResumeContext [HValueRef])
+       , resumeContext   :: ForeignRef ThreadId
        , resumeBindings  :: ResumeBindings
        , resumeFinalIds  :: [Id]         -- [Id] to bind on completion
        , resumeApStack   :: ForeignHValue -- The object from which we can get
