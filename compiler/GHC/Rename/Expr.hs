@@ -583,9 +583,9 @@ rnExpr (ExprWithTySig _ expr pty)
 -- expand HsIf; unless we are in rebindable syntax.
 rnExpr (HsIf _ p b1 b2) = rnHsIf p b1 b2
 
-rnExpr (HsMultiIf _ alts)
+rnExpr (HsMultiIf _ (L la alts))
   = do { (alts', fvs) <- mapFvRn (rnGRHS IfAlt rnLExpr) alts
-       ; return (HsMultiIf noExtField alts', fvs) }
+       ; return (HsMultiIf noExtField (L la alts'), fvs) }
 
 rnExpr (ArithSeq _ _ seq)
   = do { opt_OverloadedLists <- xoptM LangExt.OverloadedLists

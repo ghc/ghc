@@ -1018,10 +1018,10 @@ zonkExpr (HsIf x e1 e2 e3)
        new_e3 <- zonkLExpr e3
        return (HsIf x new_e1 new_e2 new_e3)
 
-zonkExpr (HsMultiIf ty alts)
+zonkExpr (HsMultiIf ty (L la alts))
   = do { alts' <- mapM (wrapLocZonkMA zonk_alt) alts
        ; ty'   <- zonkTcTypeToTypeX ty
-       ; return $ HsMultiIf ty' alts' }
+       ; return $ HsMultiIf ty' (L la alts') }
   where zonk_alt (GRHS x guard expr)
           = runZonkBndrT (zonkStmts zonkLExpr guard) $ \ guard' ->
             do { expr' <- zonkLExpr expr

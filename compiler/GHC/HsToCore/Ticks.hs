@@ -581,10 +581,10 @@ addTickHsExpr (HsIf x e1 e2 e3) =
                 (addBinTickLHsExpr (BinBox CondBinBox) e1)
                 (addTickLHsExprOptAlt True e2)
                 (addTickLHsExprOptAlt True e3)
-addTickHsExpr (HsMultiIf ty alts)
+addTickHsExpr (HsMultiIf ty (L la alts))
   = do { let isOneOfMany = case alts of { (_ :| []) -> False; _ -> True; }
        ; alts' <- mapM (traverse $ addTickGRHS isOneOfMany False False) alts
-       ; return $ HsMultiIf ty alts' }
+       ; return $ HsMultiIf ty (L la alts') }
 addTickHsExpr (HsLet x binds e) =
         bindLocals binds $ do
           binds' <- addTickLHsLocalBinds binds -- to think about: !patterns.
