@@ -196,7 +196,8 @@ rn_utbracket (PatBr _ p)
 rn_utbracket (TypBr _ t) = do { (t', fvs) <- rnLHsType TypBrCtx t
                                 ; return (TypBr noExtField t', fvs) }
 
-rn_utbracket (DecBrL _ decls)
+
+rn_utbracket (DecBrL _ (L _ decls))
   = do { group <- groupDecls decls
        ; gbl_env  <- getGblEnv
        ; let new_gbl_env = gbl_env { tcg_dus = emptyDUs }

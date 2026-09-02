@@ -2353,11 +2353,11 @@ instance OutputableBndrId p
     where
       pprHsQuote :: forall p. (OutputableBndrId p)
                    => HsQuote (GhcPass p) -> SDoc
-      pprHsQuote (ExpBr _ e)   = thBrackets empty (ppr e)
-      pprHsQuote (PatBr _ p)   = thBrackets (char 'p') (ppr p)
-      pprHsQuote (DecBrG _ gp) = thBrackets (char 'd') (ppr gp)
-      pprHsQuote (DecBrL _ ds) = thBrackets (char 'd') (vcat (map ppr ds))
-      pprHsQuote (TypBr _ t)   = thBrackets (char 't') (ppr t)
+      pprHsQuote (ExpBr _ e)         = thBrackets empty (ppr e)
+      pprHsQuote (PatBr _ p)         = thBrackets (char 'p') (ppr p)
+      pprHsQuote (DecBrG _ gp)       = thBrackets (char 'd') (ppr gp)
+      pprHsQuote (DecBrL _ (L _ ds)) = thBrackets (char 'd') (vcat (map ppr ds))
+      pprHsQuote (TypBr _ t)         = thBrackets (char 't') (ppr t)
       pprHsQuote (VarBr _ True n)
         = char '\'' <> pprPrefixOcc (unLoc n)
       pprHsQuote (VarBr _ False n)
