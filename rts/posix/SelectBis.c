@@ -443,6 +443,16 @@ bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr)
             if (interrupt) break;
         }
 
+#if !defined(THREADED_IDLEGC)
+        /* Without threaded idle GC, select() does not get interrupted for an
+         * idle GC. Instead we just limit our wait time to the idle gc delay
+         * time, and if that timeout is reached then we schedule an idle GC
+         * (see handleIdleGcTimeout below).
+         */
+        bool timeout_idlegc_delay;
+        adjustTimeoutForIdleGc(&timeout, &timeout_idlegc_delay);
+#endif
+
         /* Check for I/O readiness, possibly waiting. */
         struct timeval tv, *timeout_us = timeoutAsTimeval(timeout, &tv);
         int res = select(maxfd+1, iomgr->rfds, iomgr->wfds, NULL, timeout_us);
@@ -458,6 +468,9 @@ bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr)
              * loop condition will handle it.
              */
             ASSERT(timeout != -1);
+#if !defined(THREADED_IDLEGC)
+            handleIdleGcTimeout(timeout_idlegc_delay, &interrupt);
+#endif
 
         } else if (res > 0) {
             int ncompletions = res;
