@@ -471,6 +471,17 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
             if (interrupt) break;
         }
 
+#if !defined(THREADED_IDLEGC)
+        /* Without threaded idle GC, poll() does not get interrupted for an
+         * idle GC. Instead we just limit our wait time to the idle gc delay
+         * time, and if that timeout is reached then we schedule an idle GC
+         * (see handleIdleGcTimeout below).
+         */
+        bool any_pending_io = nfds > 0;
+        int timeout_idlegc_delay;
+        adjustTimeoutForIdleGc(any_pending_io, &timeout, &timeout_idlegc_delay);
+#endif
+
         /* Check for I/O readiness, possibly waiting. */
 #if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
         struct timespec ts, *timeout_ns = timeoutAsTimespec(timeout, &ts);
@@ -495,6 +506,9 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
              * loop condition will handle it.
              */
             ASSERT(timeout != -1);
+#if !defined(THREADED_IDLEGC)
+            handleIdleGcTimeout(timeout_idlegc_delay, &interrupt);
+#endif
 
         } else if (res > 0) {
             int ncompletions = res;

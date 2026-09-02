@@ -281,5 +281,49 @@ struct timeval *timeoutAsTimeval(Time waittime, struct timeval *tv)
     }
 }
 
+
+#if !defined(THREADED_IDLEGC)
+/* Utilities for handling the non-threaded idle GC variation.
+ *
+ * See Note [Idle GC without preemption]
+ *
+ * Before calling poll()/select() etc, adjust the timeout to account for the
+ * idle GC delay time.
+ *
+ * If the timeout occurs, call handleIdleGcTimeout, which will schedule an idle
+ * GC if the timeout was reached.
+ *
+ * The timeout_is_idlegc_delay must be passed from adjustTimeoutForIdleGc to
+ * handleIdleGcTimeout.
+ */
+void adjustTimeoutForIdleGc(bool  any_pending_io,
+                            Time *timeout,                /* in/out */
+                            bool *timeout_is_idlegc_delay /* out */)
+{
+    Time idlegc_delay = getNextIdleGcDelayTime();
+    /* Note that idlegc_delay can be -1 for indefinite wait, if we've already
+     * done an idle GC and there's been no activity since.
+     */
+
+    if (RtsFlags.GcFlags.doIdleGC &&
+        (*timeout == -1 || (idlegc_delay > 0 && idlegc_delay < *timeout))) {
+        /* The idle GC delay will be the next timeout. */
+        *timeout                 = idlegc_delay;
+        *timeout_is_idlegc_delay = true;
+
+    } else {
+        *timeout_is_idlegc_delay = false;
+    }
+}
+
+void handleIdleGcTimeout(int timeout_is_idlegc_delay, bool *interrupt)
+{
+    if (timeout_is_idlegc_delay) {
+        notifyIdleGcIdle();
+        *interrupt = true;
+    }
+}
+#endif
+
 #endif // defined(IOMGR_ENABLED_POLL) || ... etc
 

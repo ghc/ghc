@@ -364,6 +364,17 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
           if (interrupt) break;
       }
 
+#if !defined(THREADED_IDLEGC)
+      /* Without threaded idle GC, select() does not get interrupted for an
+       * idle GC. Instead we just limit our wait time to the idle gc delay
+       * time, and if that timeout is reached then we schedule an idle GC
+       * (see handleIdleGcTimeout below).
+       */
+      bool any_pending_io = maxfd > 0;
+      int timeout_idlegc_delay;
+      adjustTimeoutForIdleGc(any_pending_io, &timeout, &timeout_idlegc_delay);
+#endif
+
       /* Check for any interesting events */
 
       ptv = timeoutAsTimeval(timeout, &tv);
@@ -402,6 +413,10 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
               return true; /* still hold the lock */
           }
       }
+
+#if !defined(THREADED_IDLEGC)
+      if (numFound == 0) handleIdleGcTimeout(timeout_idlegc_delay, &interrupt);
+#endif
 
 #if defined(HAVE_PREEMPTION)
       /* If the interrupt_fd_r is ready, collect it */
