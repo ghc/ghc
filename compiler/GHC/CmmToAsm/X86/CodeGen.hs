@@ -1442,6 +1442,22 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
                                     (PUNPCKLQDQ fmt (OpReg dst) dst)
                                     )
 
+-- Use the bit-test instructions btr/bts/btc for clearing, setting and
+-- complementing a single bit: e.g. x .&. complement (1 `shiftL` i) is btr.
+-- See Note [Bit-test instructions].
+getRegister' platform is32Bit (CmmMachOp (MO_And w) [x, y])
+  | bitTestOpWidthOK is32Bit w
+  , Just (opnd, ix) <- clearBitArgs_maybe platform w x y
+  = genBitTestCode (intFormat w) BTR opnd ix
+getRegister' platform is32Bit (CmmMachOp (MO_Or w) [x, y])
+  | bitTestOpWidthOK is32Bit w
+  , Just (opnd, ix) <- setBitArgs_maybe platform w x y
+  = genBitTestCode (intFormat w) BTS opnd ix
+getRegister' platform is32Bit (CmmMachOp (MO_Xor w) [x, y])
+  | bitTestOpWidthOK is32Bit w
+  , Just (opnd, ix) <- setBitArgs_maybe platform w x y
+  = genBitTestCode (intFormat w) BTC opnd ix
+
 getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
   sse4_1 <- sse4_1Enabled
   sse4_2 <- sse4_2Enabled
@@ -5881,6 +5897,138 @@ genTrivialCode rep instr a b = do
                 b_code `appOL`
                 a_code dst `snocOL`
                 instr b_op dst
+  return (Any rep code)
+
+{- Note [Bit-test instructions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+x86 has dedicated instructions for clearing (btr), setting (bts) and
+complementing (btc) a single bit whose index is given in a register.  We use
+them for Cmm patterns such as
+
+  x & ~(1 << i)     ==>     btr i, x       (#25233)
+
+replacing a mov/shl/not/and sequence with a single instruction.  The
+shift-count register operand of shl is masked modulo the operand width, and
+the bit-offset register operand of btr/bts/btc is masked the same way, so
+the replacement is faithful even for out-of-range i (where the Cmm shift is
+in any case undefined).
+
+The bit-offset operand of these instructions must be an immediate or a
+register.  When the bit index is a literal, no shift reaches the NCG:
+constant folding has already turned the whole mask into a literal.  If that
+mask fits in an imm32, we keep the ordinary and/or/xor with an immediate:
+it has the same latency and better throughput (more execution ports) than
+the bit-test instructions,  and at worst two bytes of extra code size for bit
+indices 7..30.
+But a W64 mask touching the upper bits, e.g. ~(1 << 40), would have to be moved
+into a register first.  For such masks we recognise the folded literal itself
+(exactly one bit clear resp. set) and emit btr/bts/btc with an immediate
+bit offset.
+
+We restrict the pattern to W32 and native-width W64: the instructions do not
+exist at width 8, and sub-word Cmm operations at W8/W16 are rare enough that
+they are not worth the extra care.
+-}
+
+-- | Match @1 << i@, returning @i@.
+--
+-- The returned expression is always at word width ('machOpArgReps' fixes
+-- shift amounts at 'wordWidth'). See Note [Bit-test instructions].
+singleBit_maybe :: CmmExpr -> Maybe CmmExpr
+singleBit_maybe (CmmMachOp (MO_Shl _) [CmmLit (CmmInt 1 _), i]) = Just i
+singleBit_maybe _ = Nothing
+
+-- | If exactly one bit of @m@, taken at width @w@, is set, return its index.
+--
+-- See Note [Bit-test instructions].
+setBitLit_maybe :: Width -> Integer -> Maybe Int
+setBitLit_maybe w m
+  | popCount m' == 1 = Just (countTrailingZeros m')
+  | otherwise        = Nothing
+  where
+    -- w <= W64 in this X86-specific code, so a Word64 suffices.
+    m' = fromInteger (narrowU w m) :: Word64
+
+-- | If exactly one bit of @m@, taken at width @w@, is clear, return its
+-- index.
+--
+-- See Note [Bit-test instructions].
+clearBitLit_maybe :: Width -> Integer -> Maybe Int
+clearBitLit_maybe w m = setBitLit_maybe w (complement m)
+
+bitTestOpWidthOK :: Bool -> Width -> Bool
+bitTestOpWidthOK is32Bit w = w == W32 || (w == W64 && not is32Bit)
+
+-- | The bit-offset operand of a bit-test instruction (btr/bts/btc).
+data BitIndex
+  = BitIndexReg CmmExpr  -- ^ variable index, computed into a register
+  | BitIndexImm Int      -- ^ literal index, emitted as an immediate
+
+-- | Match the operands of a single-bit set or complement operation: one
+-- operand is a mask @1 << i@, or a literal with exactly one bit set that
+-- does not fit in an imm32. Returns the other operand and the bit index.
+--
+-- Both operand orders are matched, e.g. @x | (1 << i)@ and @(1 << i) | x@.
+--
+-- See Note [Bit-test instructions].
+setBitArgs_maybe :: Platform -> Width -> CmmExpr -> CmmExpr
+                 -> Maybe (CmmExpr, BitIndex)
+setBitArgs_maybe platform w x y = go x y `mplus` go y x
+  where
+    go opnd mask
+      | Just i <- singleBit_maybe mask
+      = Just (opnd, BitIndexReg i)
+      | CmmLit lit@(CmmInt m _) <- mask
+      , Just i <- setBitLit_maybe w m
+      , not (is32BitLit platform lit)
+      = Just (opnd, BitIndexImm i)
+      | otherwise
+      = Nothing
+
+-- | As 'setBitArgs_maybe', for a single-bit clear operation: the mask is
+-- @~(1 << i)@, or a literal with exactly one bit clear.
+clearBitArgs_maybe :: Platform -> Width -> CmmExpr -> CmmExpr
+                   -> Maybe (CmmExpr, BitIndex)
+clearBitArgs_maybe platform w x y = go x y `mplus` go y x
+  where
+    go opnd mask
+      | CmmMachOp (MO_Not _) [b] <- mask
+      , Just i <- singleBit_maybe b
+      = Just (opnd, BitIndexReg i)
+      | CmmLit lit@(CmmInt m _) <- mask
+      , Just i <- clearBitLit_maybe w m
+      , not (is32BitLit platform lit)
+      = Just (opnd, BitIndexImm i)
+      | otherwise
+      = Nothing
+
+-- | Generate code for @dst := x@ followed by a bit-test instruction
+-- (btr/bts/btc).
+--
+-- See Note [Bit-test instructions].
+genBitTestCode :: Format -> (Format -> Operand -> Operand -> Instr)
+               -> CmmExpr -> BitIndex -> NatM Register
+genBitTestCode rep instr x (BitIndexImm i) = do
+  x_code <- getAnyReg x
+  let code dst = x_code dst `snocOL` instr rep (OpImm (ImmInt i)) (OpReg dst)
+  return (Any rep code)
+genBitTestCode rep instr x (BitIndexReg i) = do
+  (i_reg, i_code) <- getNonClobberedReg i
+  x_code <- getAnyReg x
+  tmp <- getNewRegNat rep
+  let
+     -- As in genTrivialCode, 'i' must stay alive across the computation of
+     -- 'x' into dst, so save it in a temporary if dst holds 'i'.
+     code dst
+        | dst == i_reg =
+                i_code `appOL`
+                unitOL (MOV rep (OpReg i_reg) (OpReg tmp)) `appOL`
+                x_code dst `snocOL`
+                instr rep (OpReg tmp) (OpReg dst)
+        | otherwise =
+                i_code `appOL`
+                x_code dst `snocOL`
+                instr rep (OpReg i_reg) (OpReg dst)
   return (Any rep code)
 
 regClashesWithOp :: Reg -> Operand -> Bool

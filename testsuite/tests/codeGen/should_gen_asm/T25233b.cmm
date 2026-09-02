@@ -1,0 +1,27 @@
+#include "Cmm.h"
+
+// Single-bit masks written on the left of the operator (#25233).
+
+clearBitVar (W_ x, W_ i) {
+    return ((~((1 :: bits64) << i)) & x);
+}
+
+setBitVar (W_ x, W_ i) {
+    return (((1 :: bits64) << i) | x);
+}
+
+complementBitVar (W_ x, W_ i) {
+    return (((1 :: bits64) << i) ^ x);
+}
+
+clearBit40 (W_ x) {
+    return ((0xFFFFFEFFFFFFFFFF :: bits64) & x);
+}
+
+setBit40 (W_ x) {
+    return ((0x10000000000 :: bits64) | x);
+}
+
+complementBit40 (W_ x) {
+    return ((0x10000000000 :: bits64) ^ x);
+}
