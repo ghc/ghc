@@ -33,7 +33,8 @@ void processTimeoutCompletions(CapIOManager *iomgr, Time now);
  * timeout in milliseconds, with special values of -1 for indefinite wait,
  * and 0 for no waiting.
  */
-#if !(defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1)
+#if !(defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1) \
+ || !defined(THREADED_IDLEGC)
 int timeoutInMilliseconds(CapIOManager *iomgr, bool wait, Time now);
 #endif
 
@@ -44,6 +45,18 @@ int timeoutInMilliseconds(CapIOManager *iomgr, bool wait, Time now);
 #if (defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1)
 struct timespec *timeoutInNanoseconds(CapIOManager *iomgr, bool wait,
                                       Time now, struct timespec *tv);
+#endif
+
+#if !defined(THREADED_IDLEGC)
+/* Utilities for handling the non-threaded idle GC variation.
+ *
+ * See Note [Idle GC without preemption]
+ */
+void adjustTimeoutForIdleGc(bool any_pending_io,
+                            int *timeout_ms      /* in/out */,
+                            int *idlegc_status   /* out */);
+
+void handleIdleGcTimeout(int idlegc_status, bool *interrupt);
 #endif
 
 #include "EndPrivate.h"
