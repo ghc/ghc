@@ -68,7 +68,9 @@ handle_tick(int unused STG_UNUSED)
   }
 #endif
 
+#if defined(THREADED_IDLEGC)
   handleIdleGcTick();
+#endif
 }
 
 void initTimer(void)
