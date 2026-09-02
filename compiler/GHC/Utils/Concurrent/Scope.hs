@@ -11,6 +11,8 @@ module GHC.Utils.Concurrent.Scope
   ( Scope
   , scoped
   , forkIn
+  , interruptOne
+  , activeCount
   )
   where
 
@@ -25,12 +27,12 @@ import Control.Exception
   , asyncExceptionFromException, asyncExceptionToException
   , catch, finally, mask, mask_, onException, throwIO, try, uninterruptibleMask_ )
 import Control.Monad
-  ( when )
+  ( void, when )
 import Data.Foldable
   ( for_, traverse_ )
 import Data.Maybe
   ( isNothing )
-import qualified Data.Set as Set
+import qualified Data.Map.Strict as Map
 
 --------------------------------------------------------------------------------
 
@@ -45,29 +47,28 @@ data ScopeState =
     , scope_running  :: !Int
       -- ^ The count of active threads within the scope.
       --
-      -- NB: separate from 'scope_threads' to protect against race conditions
+      -- NB: separate from 'scope_members' to protect against race conditions
       -- in between forking a thread and recording its 'ThreadId'.
-    , scope_threads  :: !( Set.Set ThreadId )
-      -- ^ All threads active within the scope.
-      --
-      -- Used only to know which threads to interrupt when tearing down the
-      -- scope, never directly awaited on.
+    , scope_members  :: !( Map.Map ThreadId MemberState )
+      -- ^ All threads active within the scope, and whether each has been
+      -- interrupted.
+    , scope_interrupted :: !Int
+      -- ^ How many members are in the 'Interrupted' state.
     , scope_failure  :: !( Maybe SomeException )
       -- ^ The first exception that a thread in the scope failed with (if any).
     , scope_starting :: !Bool
       -- ^ Does the scope still allow starting new threads?
     }
 
--- | The exception delivered to the scope's threads on teardown.
---
--- Asynchronous, and separate from 'ThreadKilled' so that we can distinguish
--- the two.
-data ScopeTeardown = ScopeTeardown
+-- | Whether a thread of the scope has been told to stop.
+data MemberState = Running | Interrupted
+
+-- | The exception delivered to a scope's thread to stop it: to every thread
+-- on teardown, and to a single thread by 'interruptOne'.
+data ScopeInterrupt = ScopeInterrupt
   deriving stock Show
 
--- | Asynchronous, so that worker thread code catching synchronous exceptions
--- does not swallow teardown.
-instance Exception ScopeTeardown where
+instance Exception ScopeInterrupt where
   toException   = asyncExceptionToException
   fromException = asyncExceptionFromException
 
@@ -78,11 +79,12 @@ scoped body = do
   owner <- myThreadId
   scope <-
     Scope <$> newTVarIO
-      ScopeState { scope_owner    = owner
-                 , scope_running  = 0
-                 , scope_threads  = Set.empty
-                 , scope_failure  = Nothing
-                 , scope_starting = True }
+      ScopeState { scope_owner       = owner
+                 , scope_running     = 0
+                 , scope_members     = Map.empty
+                 , scope_interrupted = 0
+                 , scope_failure     = Nothing
+                 , scope_starting    = True }
   mask \ restore -> do
     result <- try @SomeException $ restore do
       result <- body scope
@@ -98,7 +100,7 @@ scoped body = do
 -- (a scope refuses new threads once one has failed or teardown has begun).
 -- A refused thread's @acquire@, @action@ and @release@ never run at all.
 --
--- An exception escaping @action@ or @release@ (other than scope teardown)
+-- An exception escaping @action@ or @release@ (other than 'ScopeInterrupt')
 -- becomes the scope's failure: it tears the scope down and is rethrown.
 forkIn
   :: Scope
@@ -119,12 +121,17 @@ forkIn ( Scope state ) acquire release action = mask_ do
     -- If acquisition fails, roll the claim back: 'awaitAll' must not count a
     -- thread that never existed.
     r <- acquire `onException` unclaim
-    tid <-
+    void $
       -- The child starts masked, so its handlers below are installed before
       -- its first interruptible point.
       forkIOWithUnmask
         ( \ unmask -> do
             me <- myThreadId
+            -- The thread registers itself, masked, before its first
+            -- interruptible point: a member of 'scope_members' is therefore
+            -- always a live thread, deregistered by 'finished' below.
+            atomically $ modifyTVar' state \ st ->
+              st { scope_members = Map.insert me Running ( scope_members st ) }
             ( ( unmask ( action r ) `catch` record_failure )
                 `finally` ( uninterruptibleMask_ ( release r ) `catch` record_failure ) )
               `finally` finished me )
@@ -133,11 +140,6 @@ forkIn ( Scope state ) acquire release action = mask_ do
         `onException` do
           uninterruptibleMask_ ( release r ) `catch` record_failure
           unclaim
-    -- The thread may already have finished, in which case the following
-    -- leaves a dead 'ThreadId' behind. That's harmless: all 'killAll' does
-    -- with it is a no-op 'throwTo'.
-    atomically $ modifyTVar' state \ st ->
-      st { scope_threads = Set.insert tid ( scope_threads st ) }
   pure started
   where
     unclaim :: IO ()
@@ -148,7 +150,7 @@ forkIn ( Scope state ) acquire release action = mask_ do
     record_failure :: SomeException -> IO ()
     record_failure e =
       case fromException e of
-        Just ScopeTeardown -> pure ()
+        Just ScopeInterrupt -> pure ()
         _ -> do
           mb_owner <- uninterruptibleMask_ $
             atomically do
@@ -170,7 +172,43 @@ forkIn ( Scope state ) acquire release action = mask_ do
       -- avoid deadlock in 'awaitAll'.
       uninterruptibleMask_ $ atomically $ modifyTVar' state \ st ->
         st { scope_running = scope_running st - 1
-           , scope_threads = Set.delete me ( scope_threads st ) }
+           , scope_members = Map.delete me ( scope_members st )
+           , scope_interrupted =
+               case Map.lookup me ( scope_members st ) of
+                 Just Interrupted -> scope_interrupted st - 1
+                 _                -> scope_interrupted st }
+
+-- | How many threads are running in the scope and have not been interrupted.
+--
+-- Reflects an interruption immediately, even though the interrupted thread
+-- takes a moment to die.
+activeCount :: Scope -> STM Int
+activeCount ( Scope state ) = do
+  st <- readTVar state
+  pure ( scope_running st - scope_interrupted st )
+
+-- | Interrupt one arbitrarily chosen thread of the scope.
+--
+-- Returns whether a thread was actually interrupted.
+interruptOne :: Scope -> IO Bool
+interruptOne ( Scope state ) = mask_ do
+  mb_tid <-
+    atomically do
+      st <- readTVar state
+      case [ tid | ( tid, Running ) <- Map.toList ( scope_members st ) ] of
+        [] -> pure Nothing
+        tid : _ -> do
+          writeTVar state st
+            { scope_members     = Map.insert tid Interrupted ( scope_members st )
+            , scope_interrupted = scope_interrupted st + 1 }
+          pure ( Just tid )
+  case mb_tid of
+    Nothing  -> pure False
+    Just tid -> do
+      -- NB: this 'throwTo' may well be itself interrupted.
+      -- 'killAll' repairs that by killing threads marked as interrupted too.
+      throwTo tid ScopeInterrupt
+      pure True
 
 -- | Wait until every thread in the scope has finished, rethrowing the first
 -- exception one of them failed with (if any).
@@ -191,10 +229,10 @@ killAll :: Scope -> IO ()
 killAll ( Scope state ) =
   -- Interruptible: a failing thread may be trying to tear the owner down
   -- (see 'record_failure' in 'forkIn'). Don't deadlock with that.
-  mask_ $ go Set.empty
+  mask_ go
   where
-    go :: Set.Set ThreadId -> IO ()
-    go killed = do
+    go :: IO ()
+    go = do
       step <-
         -- Every interruptible point of the loop is inside this 'try', so a
         -- delivered exception cannot end the wait: it is absorbed and the loop
@@ -203,14 +241,20 @@ killAll ( Scope state ) =
           todo <-
             atomically do
               st <- readTVar state
-              writeTVar state $ st { scope_starting = False }
-              let new = scope_threads st Set.\\ killed
-              if | not ( Set.null new )  -> pure ( Just new )
-                 | scope_running st == 0 -> pure Nothing
-                 | otherwise             -> retry
-          for_ todo \ new -> for_ new ( `throwTo` ScopeTeardown )
-          pure ( Set.union killed <$> todo )
+              writeTVar state st
+                { scope_starting    = False
+                , scope_members     = Interrupted <$ scope_members st
+                , scope_interrupted = Map.size ( scope_members st ) }
+              if | scope_running st == 0                -> pure Nothing
+                 | not ( Map.null ( scope_members st ) ) ->
+                     pure ( Just ( Map.keys ( scope_members st ) ) )
+                 | otherwise                            -> retry
+          -- Interrupt every live member, marked or not: re-delivery to one
+          -- already dying is a no-op, and it repairs an 'interruptOne' whose
+          -- own delivery was cut short.
+          for_ todo \ tids ->
+            for_ tids \ tid -> throwTo tid ScopeInterrupt
+          pure ( isNothing todo )
       case step of
-        Left _absorbed         -> go killed
-        Right Nothing          -> pure ()
-        Right ( Just killed' ) -> go killed'
+        Left _absorbed -> go
+        Right done     -> if done then pure () else go

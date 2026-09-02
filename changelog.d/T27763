@@ -1,0 +1,10 @@
+section: compiler
+issues: #27763
+mrs: !16394
+synopsis: Acquire/release semaphore tokens more readily
+description:
+  GHC now acquires semaphore tokens more readily, waiting on the semaphore for
+  as many tokens as there are outstanding work items, instead of asking one
+  token at a time.
+
+  The release debounce period was also considerably shortened, from 1s to 10ms.

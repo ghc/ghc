@@ -32,6 +32,8 @@ import GHC.Prelude
 import GHC.Conc
 import GHC.Data.OrdList
 import GHC.IO.Exception
+import GHC.Utils.Concurrent.Scope
+  ( Scope, scoped, forkIn, interruptOne, activeCount )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Json
@@ -67,18 +69,19 @@ data Jobserver
   = Jobserver
   { jSemaphore :: !ClientSemaphore
     -- ^ The semaphore which controls available resources
+  , jMaxTokens :: !Int
+    -- ^ Maximum number of tokens to ever use: a cache of 'getNumProcessors'
   , jobs :: !(TVar JobResources)
     -- ^ The currently pending jobs, and the resources
     -- obtained from the semaphore
-  , activeChild :: !(TVar (Maybe (ThreadId, TMVar (Maybe MC.SomeException))))
-    -- ^ Handle on the current acquire thread (if any). The loop's exit
-    -- handler reads this to drain a still-running child on shutdown.
+  , jAcquirers :: !Scope
+    -- ^ The acquire threads: one outstanding semaphore wait each
   }
 
 data JobserverOptions
   = JobserverOptions
   { releaseDebounce    :: !Int
-     -- ^ Minimum delay, in milliseconds, between acquiring a token
+     -- ^ Minimum delay, in milliseconds, between wanting a token
      -- and releasing a token.
   , setNumCapsDebounce :: !Int
     -- ^ Minimum delay, in milliseconds, between two consecutive
@@ -87,40 +90,45 @@ data JobserverOptions
 
 defaultJobserverOptions :: JobserverOptions
 defaultJobserverOptions =
+  -- NB: semaphore operations cost microseconds (not milliseconds).
+  -- The debounce nudges us towards preferring continuing work with a given
+  -- GHC instead of bouncing around multiple concurrent GHCs.
   JobserverOptions
-    { releaseDebounce    = 1000 -- 1 second
-    , setNumCapsDebounce = 1000 -- 1 second
+    { releaseDebounce    = 10 -- ms
+    , setNumCapsDebounce = 10 -- ms
     }
 
 -- | Resources available for running jobs, i.e.
 -- tokens obtained from the parallelism semaphore.
 data JobResources
   = Jobs
-  { tokensOwned :: !Int
-    -- ^ How many tokens have been claimed from the semaphore
+  { extraTokens :: ![SemaphoreToken]
+    -- ^ Tokens acquired from the semaphore (not including the implicit token).
   , tokensFree  :: !Int
     -- ^ How many tokens are not currently being used
   , jobsWaiting :: !(OrdList (TMVar ()))
     -- ^ Pending jobs waiting on a token, the job will be blocked on the TMVar so putting into
     -- the TMVar will allow the job to continue.
-  , heldTokens  :: [SemaphoreToken]
-    -- ^ Actual semaphore tokens (for release/cleanup).
-    -- Length should equal tokensOwned - 1 (the implicit token has no SemaphoreToken).
   }
 
+-- | How many tokens this process owns: the implicit token, plus those
+-- acquired from the semaphore.
+tokensOwned :: JobResources -> Int
+tokensOwned ( Jobs { extraTokens } ) = 1 + length extraTokens
+
 instance Outputable JobResources where
-  ppr Jobs{..}
+  ppr jobs@Jobs{..}
     = text "JobResources" <+>
         ( braces $ hsep
-          [ text "owned=" <> ppr tokensOwned
+          [ text "owned=" <> ppr (tokensOwned jobs)
           , text "free=" <> ppr tokensFree
           , text "num_waiting=" <> ppr (length jobsWaiting)
           ] )
 
--- | Add one new token.
+-- | Add one newly acquired token.
 addToken :: SemaphoreToken -> JobResources -> JobResources
-addToken tok jobs@( Jobs { tokensOwned = owned, tokensFree = free, heldTokens = toks })
-  = jobs { tokensOwned = owned + 1, tokensFree = free + 1, heldTokens = tok : toks }
+addToken tok jobs@( Jobs { tokensFree = free, extraTokens = toks })
+  = jobs { tokensFree = free + 1, extraTokens = tok : toks }
 
 -- | Free one token.
 addFreeToken :: JobResources -> JobResources
@@ -136,14 +144,12 @@ removeFreeToken jobs@( Jobs { tokensFree = free })
       (text "removeFreeToken:" <+> ppr free)
   $ jobs { tokensFree = free - 1 }
 
--- | Return one owned token, extracting the 'SemaphoreToken' for release.
-removeOwnedToken :: JobResources -> (SemaphoreToken, JobResources)
-removeOwnedToken jobs@( Jobs { tokensOwned = owned, heldTokens = toks })
-  = assertPpr (owned > 1)
-      (text "removeOwnedToken:" <+> ppr owned)
-  $ case toks of
-      (t:rest) -> (t, jobs { tokensOwned = owned - 1, heldTokens = rest })
-      []       -> panic "removeOwnedToken: no held tokens"
+-- | Give up one extra token, extracting the 'SemaphoreToken' for release.
+removeExtraToken :: JobResources -> (SemaphoreToken, JobResources)
+removeExtraToken jobs@( Jobs { extraTokens = toks })
+  = case toks of
+      t : rest -> (t, jobs { extraTokens = rest })
+      []       -> panic "removeExtraToken: no extra tokens"
 
 -- | Add one new job to the end of the list of pending jobs.
 addJob :: TMVar () -> JobResources -> JobResources
@@ -153,43 +159,28 @@ addJob job jobs@( Jobs { jobsWaiting = wait })
 -- | The state of the semaphore job server.
 data JobserverState
   = JobserverState
-    { jobserverAction  :: !JobserverAction
-      -- ^ The current action being performed by the
-      -- job server.
-    , canChangeNumCaps :: !(TVar Bool)
+    { canChangeNumCaps :: !(TVar Bool)
       -- ^ A TVar that signals whether it has been long
       -- enough since we last changed 'numCapabilities'.
     , canReleaseToken  :: !(TVar Bool)
-      -- ^ A TVar that signals whether we last acquired
-      -- a token long enough ago that we can now release
-      -- a token.
+      -- ^ A TVar that signals whether we last wanted a token
+      -- long enough ago that we can now release one.
+    , numCapsSet       :: !Int
+      -- ^ What 'setNumCapabilities' was last given.
     }
-data JobserverAction
-  -- | The jobserver is idle: no thread is currently
-  -- interacting with the semaphore.
-  = Idle
-  -- | A thread is waiting for a token on the semaphore.
-  | Acquiring
-    { activeThreadId :: ThreadId
-    , threadFinished :: TMVar (Maybe MC.SomeException) }
 
--- | Retrieve the 'TMVar' that signals if the current thread has finished,
--- if any thread is currently active in the jobserver.
-activeThread_maybe :: JobserverAction -> Maybe (TMVar (Maybe MC.SomeException))
-activeThread_maybe Idle                                   = Nothing
-activeThread_maybe (Acquiring { threadFinished = tmvar }) = Just tmvar
+-- | How many outstanding semaphore waits we want: one per pending job that no
+-- free token covers, without ever owning more tokens than 'jMaxTokens'.
+acquirersWanted :: Int -> JobResources -> Int
+acquirersWanted max_tokens jobs@( Jobs { tokensFree, jobsWaiting } )
+  = max 0 $ min ( length jobsWaiting - tokensFree )
+                ( max_tokens - tokensOwned jobs )
 
--- | Whether we should try to acquire a new token from the semaphore:
--- there is a pending job and no free tokens.
-guardAcquire :: JobResources -> Bool
-guardAcquire ( Jobs { tokensFree, jobsWaiting } )
-  = tokensFree == 0 && not (null jobsWaiting)
-
--- | Whether we should release a token from the semaphore:
--- there are no pending jobs and we can release a token.
+-- | Whether we should release a token back to the semaphore:
+-- there are no pending jobs and we have a free extra token.
 guardRelease :: JobResources -> Bool
-guardRelease ( Jobs { tokensFree, tokensOwned, jobsWaiting } )
-  = null jobsWaiting && tokensFree > 0 && tokensOwned > 1
+guardRelease ( Jobs { tokensFree, extraTokens, jobsWaiting } )
+  = null jobsWaiting && tokensFree > 0 && not (null extraTokens)
 
 ---------------------------------------
 -- Semaphore jobserver implementation
@@ -215,31 +206,14 @@ releaseJob jobs_tvar = do
         (text "releaseJob: more free jobs than owned jobs!")
       return ((), addFreeToken jobs)
 
-
--- | Kill the current acquire thread, if any, and wait for it to exit.
---
--- Called from the jobserver loop's exit handler, which runs masked.
--- Relies on the invariant from 'acquireThread' that a forked child
--- always fills its 'threadFinished' TMVar before it dies; this is what
--- lets the 'takeTMVar' below terminate after the 'killThread'.
-drainActiveChild :: Jobserver -> IO ()
-drainActiveChild (Jobserver { activeChild = active_tvar }) = do
-  mb <- readTVarIO active_tvar
-  for_ mb $ \(tid, tmv) -> do
-    killThread tid
-    void $ atomically (takeTMVar tmv)
-    atomically $ writeTVar active_tvar Nothing
-
--- | Release every token currently in 'heldTokens'.
---
--- Called from the jobserver loop's exit handler, which runs masked,
--- after 'drainActiveChild': no other thread is mutating 'JobResources'
--- at this point.
-releaseAllHeld :: Jobserver -> IO ()
-releaseAllHeld (Jobserver { jobs = jobs_tvar }) = do
-  Jobs { heldTokens = toks } <- readTVarIO jobs_tvar
-  forM_ toks $ \t ->
-    void $ MC.try @_ @MC.SomeException (releaseSemaphoreToken t)
+-- | Release every held token, when shutting down the jobserver.
+releaseAllHeld :: TVar JobResources -> IO ()
+releaseAllHeld jobs_tvar =
+  -- Uninterruptible, to avoid loss of tokens.
+  MC.uninterruptibleMask_ do
+    Jobs { extraTokens = toks } <- readTVarIO jobs_tvar
+    forM_ toks $ \t ->
+      void $ MC.try @_ @MC.SomeException (releaseSemaphoreToken t)
 
 -- | Dispatch the available tokens acquired from the semaphore
 -- to the pending jobs in the job server.
@@ -274,7 +248,7 @@ modifyJobResources jobs_tvar action = do
   -- Check the invariant: if the number of free tokens has decreased,
   -- there must be no pending jobs.
   massertPpr (null (jobsWaiting jobs) || tokensFree jobs >= tokensFree old_jobs) $
-    vcat [ text "modiyJobResources: pending jobs but fewer free tokens" ]
+    vcat [ text "modifyJobResources: pending jobs but fewer free tokens" ]
   dispatched_jobs <- dispatchTokens jobs
   writeTVar jobs_tvar dispatched_jobs
   return (a, Just dispatched_jobs)
@@ -292,195 +266,115 @@ tracedAtomically origin act = do
   return a
 
 renderJobResources :: String -> JobResources -> String
-renderJobResources origin (Jobs own free pending _heldToks) = showSDocUnsafe $ renderJSON $
-  JSObject [ ("name", JSString origin)
-           , ("owned", JSInt own)
-           , ("free", JSInt free)
-           , ("pending", JSInt (length pending) )
-           ]
+renderJobResources origin jobs@(Jobs { tokensFree = free, jobsWaiting = pending }) =
+  showSDocUnsafe $ renderJSON $
+    JSObject [ ("name", JSString origin)
+             , ("owned", JSInt (tokensOwned jobs))
+             , ("free", JSInt free)
+             , ("pending", JSInt (length pending) )
+             ]
 
-
--- | Spawn a new thread that waits on the semaphore in order to acquire
--- an additional token.
---
--- The child is forked masked so the only async-exception delivery point
--- is the interruptible 'waitOnSemaphore'; the STM commit afterwards then
--- always runs to completion, so 'threadFinished' is always filled.
---
--- The (tid, threadFinished) pair is also published to 'activeChild' so
--- shutdown can drain the child even after the in-loop 'JobserverState'
--- is gone.
-acquireThread :: Jobserver -> IO JobserverAction
-acquireThread (Jobserver { jSemaphore = sem, jobs = jobs_tvar, activeChild = active_tvar }) = do
-    threadFinished_tmvar <- newEmptyTMVarIO
-    tid <- MC.mask_ $ do
-      tid <- forkIO $ do
-        wait_res <- MC.try @_ @MC.SomeException $ waitOnSemaphore sem
-        tracedAtomically_ "acquire_thread" do
-          (r, jb) <- case wait_res of
-            Left (e :: MC.SomeException) -> do
-              return $ (Just e, Nothing)
-            Right tok -> do
-              modifyJobResources jobs_tvar \ jobs ->
-                return (Nothing, addToken tok jobs)
-          putTMVar threadFinished_tmvar r
-          return jb
-      atomically $ writeTVar active_tvar (Just (tid, threadFinished_tmvar))
-      return tid
-    labelThread tid "acquire_thread"
-    return $ Acquiring { activeThreadId = tid
-                       , threadFinished = threadFinished_tmvar }
-
--- | Spawn a thread to release ownership of one resource from the semaphore,
--- provided we have spare resources and no pending jobs.
-releaseThread :: Jobserver -> IO JobserverAction
-releaseThread (Jobserver { jobs = jobs_tvar }) = do
-  threadFinished_tmvar <- newEmptyTMVarIO
+-- | The body of one acquire thread: wait for one semaphore token and add it
+-- to the pool.
+acquirerAction :: Jobserver -> IO ()
+acquirerAction ( Jobserver { jSemaphore = sem, jobs = jobs_tvar } ) = do
+  myThreadId >>= \ tid -> labelThread tid "acquire_thread"
+  -- Masked: once the waiter acquires a token, we don't want to lose it on the
+  -- way to recording it in our local accounting.
+  -- The wait itself remains interruptible.
   MC.mask_ do
-    -- Pre-release the resource so that another thread doesn't take control of it
-    -- just as we release the lock on the semaphore.
-    mb_tok
-      <- tracedAtomically "pre_release" $
-         modifyJobResources jobs_tvar \ jobs ->
-           if guardRelease jobs
-           then let (tok, jobs') = removeOwnedToken $ removeFreeToken jobs
-                in return (Just tok, jobs')
-           else return (Nothing, jobs)
-    case mb_tok of
-      Nothing ->
-        -- Not OK to release: there are other pending jobs that could make use of the token.
-        return Idle
-      Just tok -> do
-        tid <- forkIO $ do
-          x <- MC.try @_ @MC.SomeException $ releaseSemaphoreToken tok
-          tracedAtomically_ "post-release" $ do
-            (r, jobs) <- case x of
-              Left (e :: MC.SomeException) -> do
-                modifyJobResources jobs_tvar \ jobs ->
-                  return (Just e, addToken tok jobs)
-              Right _ -> do
-                return (Nothing, Nothing)
-            putTMVar threadFinished_tmvar r
-            return jobs
-        labelThread tid "release_thread"
-        return Idle
+    tok <- waitOnSemaphore sem
+    tracedAtomically_ "acquire_thread" $
+      snd <$> modifyJobResources jobs_tvar \ jobs ->
+        return ((), addToken tok jobs)
 
--- | When there are pending jobs but no free tokens,
--- spawn a thread to acquire a new token from the semaphore.
---
--- See 'acquireThread'.
+-- | Keep as many acquire threads outstanding as there are tokens wanted:
+-- spawn the missing ones, interrupt the surplus ones.
 tryAcquire :: JobserverOptions
            -> Jobserver
            -> JobserverState
            -> STM (IO JobserverState)
-tryAcquire opts js@( Jobserver { jobs = jobs_tvar })
-  st@( JobserverState { jobserverAction = Idle } )
-  = do
-    jobs <- readTVar jobs_tvar
-    guard $ guardAcquire jobs
-    return do
-      action           <- acquireThread js
-      -- Set a debounce after acquiring a token.
-      can_release_tvar <- registerDelay $ (releaseDebounce opts * 1000)
-      return $ st { jobserverAction = action
-                  , canReleaseToken = can_release_tvar }
-tryAcquire _ _ _ = retry
+tryAcquire opts js@( Jobserver { jobs = jobs_tvar, jAcquirers = acquirers } ) st = do
+  jobs <- readTVar jobs_tvar
+  outstanding <- activeCount acquirers
+  let wanted = acquirersWanted (jMaxTokens js) jobs
+  guard $ outstanding /= wanted
+  return
+    if outstanding < wanted
+    then do
+      _ <- replicateM (wanted - outstanding) $
+             forkIn acquirers (pure ()) (const $ pure ()) (\_ -> acquirerAction js)
+      can_release_tvar <- registerDelay $ releaseDebounce opts * 1000
+      return $ st { canReleaseToken = can_release_tvar }
+    else do
+      replicateM_ (outstanding - wanted) $ interruptOne acquirers
+      return st
 
--- | When there are free tokens and no pending jobs,
--- spawn a thread to release a token from the semaphore.
---
--- See 'releaseThread'.
+-- | When there is a free extra token, no pending jobs, and the release
+-- debounce has expired, give one token back to the semaphore.
 tryRelease :: Jobserver
            -> JobserverState
            -> STM (IO JobserverState)
-tryRelease sjs@( Jobserver { jobs = jobs_tvar } )
-  st@( JobserverState
-      { jobserverAction = Idle
-      , canReleaseToken = can_release_tvar } )
-  = do
+tryRelease ( Jobserver { jobs = jobs_tvar } )
+  st@( JobserverState { canReleaseToken = can_release_tvar } ) = do
     jobs <- readTVar jobs_tvar
-    guard  $ guardRelease jobs
-    can_release <- readTVar can_release_tvar
-    guard can_release
+    guard $ guardRelease jobs
+    readTVar can_release_tvar >>= guard
+    -- Masked, to avoid removing the token from the local accounting without
+    -- actually giving it back to the semaphore.
+    return $ MC.mask_ do
+      -- Check we still want to release the token (no new work arrived since).
+      mb_tok <- tracedAtomically "pre_release" $
+        modifyJobResources jobs_tvar \ jobs' ->
+          if guardRelease jobs'
+          then
+            let (tok, jobs'') = removeExtraToken (removeFreeToken jobs')
+            in  return (Just tok, jobs'')
+          else  return (Nothing , jobs')
+      for_ mb_tok \ tok ->
+        releaseSemaphoreToken tok `MC.onException`
+          tracedAtomically_ "release_failed"
+            ( snd <$> modifyJobResources jobs_tvar \ jobs' ->
+                return ((), addToken tok jobs') )
+      return st
+
+-- | Keep 'setNumCapabilities' in sync with the number of owned tokens
+-- (debounced), so that parallel garbage collection uses as many capabilities
+-- as there are tokens to run on.
+trySyncNumCaps :: JobserverOptions
+               -> Jobserver
+               -> JobserverState
+               -> STM (IO JobserverState)
+trySyncNumCaps opts ( Jobserver { jobs = jobs_tvar } )
+  st@( JobserverState { canChangeNumCaps = can_change_tvar, numCapsSet = prev } ) = do
+    jobs <- readTVar jobs_tvar
+    let owned = tokensOwned jobs
+    guard $ owned /= prev
+    readTVar can_change_tvar >>= guard
     return do
-      action <- releaseThread sjs
-      return $ st { jobserverAction = action }
-tryRelease _ _ = retry
+      setNumCapabilities owned
+      can_change_tvar' <- registerDelay $ setNumCapsDebounce opts * 1000
+      return $ st { canChangeNumCaps = can_change_tvar'
+                  , numCapsSet       = owned }
 
--- | Wait for an active thread to finish. Once it finishes:
---
---  - set the 'JobserverAction' to 'Idle',
---  - clear the 'activeChild' handle,
---  - update the number of capabilities to reflect the number
---    of owned tokens from the semaphore.
-tryNoticeIdle :: JobserverOptions
-              -> Jobserver
-              -> JobserverState
-              -> STM (IO JobserverState)
-tryNoticeIdle opts (Jobserver { jobs = jobs_tvar, activeChild = active_tvar }) jobserver_state
-  | Just threadFinished_tmvar <- activeThread_maybe $ jobserverAction jobserver_state
-  = sync_num_caps (canChangeNumCaps jobserver_state) threadFinished_tmvar
-  | otherwise
-  = retry -- no active thread: wait until jobserver isn't idle
-  where
-    sync_num_caps :: TVar Bool
-                  -> TMVar (Maybe MC.SomeException)
-                  -> STM (IO JobserverState)
-    sync_num_caps can_change_numcaps_tvar threadFinished_tmvar = do
-      mb_ex <- takeTMVar threadFinished_tmvar
-      for_ mb_ex MC.throwM
-      writeTVar active_tvar Nothing
-      Jobs { tokensOwned } <- readTVar jobs_tvar
-      can_change_numcaps <- readTVar can_change_numcaps_tvar
-      guard can_change_numcaps
-      return do
-        x <- getNumCapabilities
-        can_change_numcaps_tvar_2 <-
-          if x == tokensOwned
-          then return can_change_numcaps_tvar
-          else do
-            setNumCapabilities tokensOwned
-            registerDelay $ (setNumCapsDebounce opts * 1000)
-        return $
-          jobserver_state
-            { jobserverAction  = Idle
-            , canChangeNumCaps = can_change_numcaps_tvar_2 }
-
--- | Try to stop the current thread which is acquiring/releasing resources
--- if that operation is no longer relevant.
-tryStopThread :: TVar JobResources
-              -> JobserverState
-              -> STM (IO JobserverState)
-tryStopThread jobs_tvar jsj = do
-  case jobserverAction jsj of
-    Acquiring { activeThreadId = tid } -> do
-     jobs <- readTVar jobs_tvar
-     guard $ null (jobsWaiting jobs)
-     return do
-       killThread tid
-       return $ jsj { jobserverAction = Idle }
-    _ -> retry
-
--- | Main jobserver loop: acquire/release resources as
--- needed for the pending jobs and available semaphore tokens.
+-- | Main jobserver loop.
 jobserverLoop :: JobserverOptions -> Jobserver -> IO ()
-jobserverLoop opts sjs@(Jobserver { jobs = jobs_tvar })
-  = do
-      true_tvar <- newTVarIO True
-      let init_state :: JobserverState
-          init_state =
-            JobserverState
-              { jobserverAction  = Idle
-              , canChangeNumCaps = true_tvar
-              , canReleaseToken  = true_tvar }
-      loop init_state
+jobserverLoop opts js = do
+  true_tvar <- newTVarIO True
+  num_caps <- getNumCapabilities
+  let init_state :: JobserverState
+      init_state =
+        JobserverState
+          { canChangeNumCaps = true_tvar
+          , canReleaseToken  = true_tvar
+          , numCapsSet       = num_caps }
+  loop init_state
   where
     loop s = do
       action <- atomically $ asum $ (\x -> x s) <$>
-        [ tryRelease    sjs
-        , tryAcquire    opts sjs
-        , tryNoticeIdle opts sjs
-        , tryStopThread jobs_tvar
+        [ tryRelease          js
+        , tryAcquire     opts js
+        , trySyncNumCaps opts js
         ]
       s <- action
       loop s
@@ -489,28 +383,26 @@ jobserverLoop opts sjs@(Jobserver { jobs = jobs_tvar })
 makeJobserver :: SemaphoreIdentifier -> IO (AbstractSem, IO ())
 makeJobserver sem_ident = do
   semaphore <- openSemaphore sem_ident >>= either MC.throwM pure
+  max_tokens <- getNumProcessors
   let
     init_jobs =
-      Jobs { tokensOwned = 1
+      Jobs { extraTokens = []
            , tokensFree  = 1
            , jobsWaiting = NilOL
-           , heldTokens  = []
            }
   jobs_tvar <- newTVarIO init_jobs
-  active_tvar <- newTVarIO Nothing
   let
     opts = defaultJobserverOptions -- TODO: allow this to be configured
-    sjs = Jobserver { jSemaphore  = semaphore
-                    , jobs        = jobs_tvar
-                    , activeChild = active_tvar }
   loop_finished_mvar <- newEmptyMVar
-  loop_tid <- forkIOWithUnmask \ unmask -> do
-    r <- try $ unmask $ jobserverLoop opts sjs
-    -- Always-run exit handler: any child the loop spawned is still alive
-    -- in its own thread, so drain it before touching jobs_tvar. No one
-    -- else can mutate the resources once both are dead.
-    drainActiveChild sjs
-    releaseAllHeld sjs
+  loop_tid <- MC.mask_ $ forkIOWithUnmask \ unmask -> do
+    r <- try $ unmask $
+      scoped \ scope ->
+        jobserverLoop opts
+          Jobserver { jSemaphore = semaphore
+                    , jMaxTokens = max_tokens
+                    , jobs       = jobs_tvar
+                    , jAcquirers = scope }
+    releaseAllHeld jobs_tvar
     putMVar loop_finished_mvar $
       case r of
         Left e
@@ -524,8 +416,6 @@ makeJobserver sem_ident = do
     acquireSem = acquireJob jobs_tvar
     releaseSem = releaseJob jobs_tvar
     cleanupSem = do
-      -- Trigger the loop's exit handler; it drains the active child and
-      -- releases all held tokens, then signals loop_finished_mvar.
       killThread loop_tid
       mb_ex <- takeMVar loop_finished_mvar
       for_ mb_ex MC.throwM
@@ -571,31 +461,17 @@ When the job is finished, the token is released by calling `releaseJob`, which j
 increases the number of `free` jobs. If there are more pending jobs when the free count
 is increased, the token is immediately reused (see `modifyJobResources`).
 
-The `jobServerLoop` interacts with the system semaphore: when there are pending
-jobs, `acquireThread` forks a child that calls the interruptible
-`waitOnSemaphore`. The child is forked in the masked state, so the only place
-an async exception can be delivered is the wait itself; once the wait returns,
-the child's STM commit always completes, recording either the new token in
-`heldTokens` or the failure exception in `threadFinished`. The (tid, tmvar)
-pair is also published in `activeChild` so the loop's exit handler can drain
-the child on shutdown even after the in-loop `JobserverState` is gone.
+The `jobserverLoop` continually tries to reconcile the available work with
+the demand for semaphore tokens:
 
-When GHC has free tokens (tokens from the semaphore that it is not using),
-no pending jobs, and the debounce has expired, then `releaseThread` will
-release tokens back to the global semaphore.
+  - One acquire thread per piece of outstanding work waiting for a token.
+    When demand drops, these waiter threads are cancelled.
 
-`tryStopThread` attempts to kill threads which are waiting to acquire a resource
-when we no longer need it. For example, consider that we attempt to acquire two
-tokens, but the first job finishes before we acquire the second token.
-This second token is no longer needed, so we should cancel the wait
-(as it would not be used to do any work, and not be returned until the debounce).
-We only need to kill `acquireJob`, because `releaseJob` never blocks.
+  - When we have a free token with no pending jobs, we give it back, after
+    the release debounce period has expired.
 
-Shutdown starts with `killThread loop_tid`. The loop's exit handler then
-runs `drainActiveChild` followed by `releaseAllHeld`; only then does the
-loop signal `loop_finished_mvar`. This sequence makes the heldTokens
-snapshot consistent because no other thread can mutate it once the loop and
-its child are both dead.
+Shutdown relies on the the scoped machinery from GHC.Utils.Concurrent.Scope,
+releasing all held semaphore tokens before finishing.
 
 Note [Eventlog Messages for jsem]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
