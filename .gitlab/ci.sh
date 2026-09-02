@@ -976,7 +976,6 @@ function run_hadrian() {
   # Before running the compiler, unset variables gitlab env vars as these
   # can destabilise the performance test (see #20341)
   (unset $(compgen -v | grep -E '^(CI_|FF_|GITLAB_)');
-    # dump the env before running hdarian itself.
     run "${HADRIAN_PATH:-hadrian/build-cabal}" \
       --flavour="$BUILD_FLAVOUR" \
       -j"$cores" \
