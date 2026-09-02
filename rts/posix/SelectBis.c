@@ -23,6 +23,7 @@
 #include "RtsUtils.h"
 #include "rts/Time.h"
 #include "Trace.h"
+#include "IdleGC.h"
 
 #include "SelectBis.h"
 #include "RtsSignals.h"
@@ -428,6 +429,17 @@ bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr)
          */
         Time timeout = timeoutWaitTime(iomgr, wait, now);
 
+#if !defined(THREADED_IDLEGC)
+        /* Without threaded idle GC, poll() does not get interrupted for an
+         * idle GC. Instead we just limit our wait time to the idle gc delay
+         * time, and if that timeout is reached then we schedule an idle GC
+         * (see handleTimeoutForIdleGc below).
+         */
+        bool any_pending_io = nfds > 0;
+        int idlegc_status;
+        adjustTimeoutForIdleGc(any_pending_io, &timeout, &idlegc_status);
+#endif
+
         /* Check for I/O readiness, possibly waiting. */
         struct timeval tv, *timeout_us = timeoutAsTimeval(timeout, &tv);
         int res = select(maxfd+1, iomgr->rfds, iomgr->wfds, NULL, timeout_us);
@@ -443,6 +455,9 @@ bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr)
              * loop condition will handle it.
              */
             ASSERT(timeout != -1);
+#if !defined(THREADED_IDLEGC)
+            handleIdleGcTimeout(idlegc_status, &interrupt);
+#endif
 
         } else if (res > 0) {
             int ncompletions = res;

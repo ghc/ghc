@@ -18,6 +18,7 @@
 #include "IOManagerInternals.h"
 #include "Timeout.h"
 #include "TimeoutQueue.h"
+#include "IdleGC.h"
 
 #include <limits.h>
 
@@ -280,6 +281,58 @@ struct timeval *timeoutAsTimeval(Time waittime, struct timeval *tv)
         }
     }
 }
+
+
+#if !defined(THREADED_IDLEGC)
+enum {
+    timeout_is_idlegc_delay   = 1 << 0,
+    system_must_be_deadlocked = 1 << 1
+};
+
+/* Utilities for handling the non-threaded idle GC variation.
+ *
+ * See Note [Idle GC without preemption]
+ *
+ * Before calling poll()/select() etc, adjust the timeout to account for the
+ * idle GC delay time.
+ *
+ * If the timeout occurs, call handleIdleGcTimeout, which will schedule an idle
+ * GC if the timeout was reached.
+ *
+ * The idlegc_status must be passed from adjustTimeoutForIdleGc to
+ * handleIdleGcTimeout.
+ */
+void adjustTimeoutForIdleGc(bool  any_pending_io,
+                            Time *timeout         /* in/out */,
+                            int  *idlegc_status   /* out */)
+{
+    Time idlegc_delay = getNextIdleGcDelayTime();
+
+    if (RTS_UNLIKELY(!any_pending_io && *timeout == -1)) {
+        /* We must be deadlocked. Schedule an idle GC unconditionally. */
+        *timeout       = 0; /* Time 0 for no waiting. */
+        *idlegc_status = timeout_is_idlegc_delay
+                       | system_must_be_deadlocked;
+
+    } else if (RTS_UNLIKELY(RtsFlags.GcFlags.doIdleGC &&
+                 (idlegc_delay < *timeout || *timeout == -1))) {
+        /* The idle GC delay will be the next timeout. */
+        *timeout       = idlegc_delay;
+        *idlegc_status = timeout_is_idlegc_delay;
+
+    } else {
+        *idlegc_status = 0;
+    }
+}
+
+void handleIdleGcTimeout(int idlegc_status, bool *interrupt)
+{
+    if (idlegc_status & timeout_is_idlegc_delay) {
+        notifyIdleGcIdle(idlegc_status & system_must_be_deadlocked);
+        *interrupt = true;
+    }
+}
+#endif
 
 #endif // defined(IOMGR_ENABLED_POLL) || ... etc
 

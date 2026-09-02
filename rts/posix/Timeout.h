@@ -59,5 +59,17 @@ struct timeval *timeoutAsTimeval(Time waittime, struct timeval *tv);
  */
 struct timespec *timeoutAsTimespec(Time waittime, struct timespec *tv);
 
+#if !defined(THREADED_IDLEGC)
+/* Utilities for handling the non-threaded idle GC variation.
+ *
+ * See Note [Idle GC without preemption]
+ */
+void adjustTimeoutForIdleGc(bool  any_pending_io,
+                            Time *timeout         /* in/out */,
+                            int  *idlegc_status   /* out */);
+
+void handleIdleGcTimeout(int idlegc_status, bool *interrupt);
+#endif
+
 #include "EndPrivate.h"
 
