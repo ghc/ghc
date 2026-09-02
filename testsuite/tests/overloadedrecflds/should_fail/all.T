@@ -63,3 +63,4 @@ test('T23010_fail', [extra_files(['T23010_fail.hs-boot', 'T23010_fail_aux.hs'])]
                   , multimod_compile_fail
                   , ['T23010_fail T23010_fail_aux', '-v0'])
 test('T23063', extra_files(['T23063_aux.hs']), multimod_compile_fail, ['T23063', '-v0'])
+test('RecordDotErrCtxt', normal, compile_fail, [''])

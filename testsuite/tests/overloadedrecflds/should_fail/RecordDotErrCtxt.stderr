@@ -1,0 +1,13 @@
+RecordDotErrCtxt.hs:26:11: error: [GHC-39999]
+    • No instance for ‘GHC.Internal.Records.HasField "fld" Char Int’
+        arising from selecting the field ‘fld’
+      NB: ‘Char’ is not a record type.
+    • In the expression: ('c' + 1).fld
+      In an equation for ‘argCtxt’: argCtxt = ('c' + 1).fld
+
+RecordDotErrCtxt.hs:26:16: error: [GHC-39999]
+    • No instance for ‘Num Char’ arising from a use of ‘+’
+    • In the expression: 'c' + 1
+      In the expression: ('c' + 1).fld
+      In an equation for ‘argCtxt’: argCtxt = ('c' + 1).fld
+
