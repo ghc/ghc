@@ -57,17 +57,25 @@ At point (23,25), we found:
 ==========================
 ┌
 │ $dHasField at HasFieldQueries.hs:1:1, of type: HasField "field1" Thing Char
-│     is an evidence variable bound by a let, depending on: [C:HasField]
+│     is an evidence variable bound by a let, depending on: [$dHasField]
 │           with scope: ModuleScope
 │           
 │     Defined at <no location info>
 └
 |
 `- ┌
-   │ C:HasField at HasFieldQueries.hs:1:1, of type: forall {k} (x :: k) r a. (r -> a) -> HasField x r a
-   │     is a usage of an external evidence variable
-   │     Defined in `GHC.Internal.Records'
+   │ $dHasField at HasFieldQueries.hs:1:1, of type: HasField "field1" Thing Char
+   │     is an evidence variable bound by a let, depending on: [C:HasField]
+   │           with scope: ModuleScope
+   │           
+   │     Defined at <no location info>
    └
+   |
+   `- ┌
+      │ C:HasField at HasFieldQueries.hs:1:1, of type: forall {k} (x :: k) r a. (r -> a) -> HasField x r a
+      │     is a usage of an external evidence variable
+      │     Defined in `GHC.Internal.Records'
+      └
 
 ==========================
 At point (27,20), we found:
@@ -105,5 +113,81 @@ At point (27,28), we found:
    │           with scope: LocalScope HasFieldQueries.hs:27:1-40
    │           bound at: HasFieldQueries.hs:27:1-40
    │     Defined at <no location info>
+   └
+
+==========================
+At point (37,17), we found:
+==========================
+┌
+│ $dHasField at HasFieldQueries.hs:1:1, of type: HasField "nested1" NestedThing Thing
+│     is an evidence variable bound by a let, depending on: [C:HasField]
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ C:HasField at HasFieldQueries.hs:1:1, of type: forall {k} (x :: k) r a. (r -> a) -> HasField x r a
+   │     is a usage of an external evidence variable
+   │     Defined in `GHC.Internal.Records'
+   └
+
+==========================
+At point (37,25), we found:
+==========================
+┌
+│ $dHasField at HasFieldQueries.hs:1:1, of type: HasField "field1" Thing Char
+│     is an evidence variable bound by a let, depending on: [$dHasField]
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ $dHasField at HasFieldQueries.hs:1:1, of type: HasField "field1" Thing Char
+   │     is an evidence variable bound by a let, depending on: [C:HasField]
+   │           with scope: ModuleScope
+   │           
+   │     Defined at <no location info>
+   └
+   |
+   `- ┌
+      │ C:HasField at HasFieldQueries.hs:1:1, of type: forall {k} (x :: k) r a. (r -> a) -> HasField x r a
+      │     is a usage of an external evidence variable
+      │     Defined in `GHC.Internal.Records'
+      └
+
+==========================
+At point (40,26), we found:
+==========================
+┌
+│ $dHasField at HasFieldQueries.hs:1:1, of type: HasField "nested1" NestedThing Thing
+│     is an evidence variable bound by a let, depending on: [C:HasField]
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ C:HasField at HasFieldQueries.hs:1:1, of type: forall {k} (x :: k) r a. (r -> a) -> HasField x r a
+   │     is a usage of an external evidence variable
+   │     Defined in `GHC.Internal.Records'
+   └
+
+==========================
+At point (40,34), we found:
+==========================
+┌
+│ $dHasField at HasFieldQueries.hs:1:1, of type: HasField "field1" Thing Char
+│     is an evidence variable bound by a let, depending on: [C:HasField]
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ C:HasField at HasFieldQueries.hs:1:1, of type: forall {k} (x :: k) r a. (r -> a) -> HasField x r a
+   │     is a usage of an external evidence variable
+   │     Defined in `GHC.Internal.Records'
    └
 

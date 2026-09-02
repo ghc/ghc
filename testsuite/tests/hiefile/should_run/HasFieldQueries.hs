@@ -29,6 +29,16 @@ nestedNoSig n = n.nested1.field2 :: Bool
 --                         ^ this is the point
 
 
+-- Multi-label projection sections: each getField gets the SrcSpan of its own
+-- field label, so both HasField dictionaries are reachable.  Before that, no
+-- node inside the section had a usable span and hovering it found nothing at
+-- all.  The points below are on 'nested1' and 'field1' respectively.
+projSection :: NestedThing -> Char
+projSection = (.nested1.field1)
+
+projSectionApplied :: NestedThing -> Char
+projSectionApplied n = (.nested1.field1) n
+
 
 points =
   [ (13,17)
@@ -38,6 +48,10 @@ points =
   , (23,25)
   , (27,20)
   , (27,28)
+  , (37,17)
+  , (37,25)
+  , (40,26)
+  , (40,34)
   ]
 
 main = do

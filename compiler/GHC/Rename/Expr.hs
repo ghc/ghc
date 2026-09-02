@@ -431,7 +431,7 @@ rnExpr (HsProjection _ fs)
        ; let fs' = NE.map rnDotFieldOcc fs
        ; return ( mkExpandedExpr
                     (HsProjection noExtField fs')
-                    (mkProjection getField circ $ NE.map (unLoc . dfoLabel) fs')
+                    (mkProjection getField circ $ NE.map dfoLabel fs')
                 , unitFN circ `plusFN` fv_getField) }
 
 ------------------------------------------
@@ -2916,14 +2916,24 @@ mkSet set_field acc (field, g) = wrapGenSpan (mkSetField set_field g field acc)
 -- mkProjection fields calculates a projection.
 -- e.g. .x = mkProjection [x] = getField @"x"
 --      .x.y = mkProjection [.x, .y] = (.y) . (.x) = getField @"y" . getField @"x"
-mkProjection :: Name -> Name -> NonEmpty FieldLabelString -> HsExpr GhcRn
-mkProjection getFieldName circName (field :| fields) = foldl' f (proj field) fields
+mkProjection :: Name -> Name -> NonEmpty (XRec GhcRn FieldLabelString)
+             -> HsExpr GhcRn
+mkProjection getFieldName circName (field :| fields)
+  = unLoc $ foldl' f (proj field) fields
   where
-    f :: HsExpr GhcRn -> FieldLabelString -> HsExpr GhcRn
-    f acc field = genHsApps circName $ map wrapGenSpan [proj field, acc]
+    f :: LHsExpr GhcRn -> XRec GhcRn FieldLabelString -> LHsExpr GhcRn
+    f acc field = wrapGenSpan $ genHsApps circName [proj field, acc]
 
-    proj :: FieldLabelString -> HsExpr GhcRn
-    proj (FieldLabelString f) = genHsVar getFieldName `genAppType` genHsTyLit f
+    -- Give each `getField` the SrcSpan of the label it projects, so that the
+    -- HasField evidence for that label can be found at the label itself.
+    -- Without this a multi-label section like (.x.y) has no usable span
+    -- anywhere inside it, and the whole section shows no type and no
+    -- evidence at all.
+    -- See Note [Source locations for implicit function calls] in GHC.Iface.Ext.Ast
+    proj :: XRec GhcRn FieldLabelString -> LHsExpr GhcRn
+    proj lfield@(L _ (FieldLabelString f))
+      = wrapGenSpan' (getHasLoc lfield)
+      $ genHsVar getFieldName `genAppType` genHsTyLit f
 
 -- mkProjUpdateSetField calculates functions representing dot notation record updates.
 -- e.g. Suppose an update like foo.bar = 1.
