@@ -47,7 +47,7 @@ info() { echo_color "${LT_BLUE}" "$1"; }
 fail() { error "error: $1"; exit 1; }
 
 function run() {
-  info "Running $*..."
+  info "Running $*"
   "$@" || ( error "$* failed"; return 1; )
 }
 
