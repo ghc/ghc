@@ -435,6 +435,16 @@ bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr)
             if (interrupt) break;
         }
 
+#if !defined(THREADED_IDLEGC)
+        /* Without threaded idle GC, select() does not get interrupted for an
+         * idle GC. Instead we just limit our wait time to the idle gc delay
+         * time, and if that timeout is reached then we schedule an idle GC
+         * (see handleIdleGcTimeout below).
+         */
+        bool timeout_idlegc_delay;
+        adjustTimeoutForIdleGc(&timeout, &timeout_idlegc_delay);
+#endif
+
 #if defined(RTS_USER_SIGNALS)
         /* Final check for pending signals before calling poll. There is
          * Still a window between here and calling poll when signals could
@@ -458,6 +468,9 @@ bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr)
              * loop condition will handle it.
              */
             ASSERT(timeout != -1);
+#if !defined(THREADED_IDLEGC)
+            handleIdleGcTimeout(timeout_idlegc_delay, &interrupt);
+#endif
 
         } else if (res > 0) {
             int ncompletions = res;
