@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, DeriveGeneric, StandaloneDeriving, ScopedTypeVariables,
     GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards,
-    CPP, NamedFieldPuns #-}
+    CPP, NamedFieldPuns, PatternSynonyms #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
 
 -- |
@@ -14,8 +14,8 @@ module GHCi.Message
   , ConInfoTable(..)
   , THMessage(..), THMsg(..)
   , QResult(..)
-  , EvalStatus_(..), EvalStatus, EvalResult(..), EvalOpts(..), EvalExpr(..)
-  , EvalBreakpoint (..)
+  , EvalStatus_(..,EvalBreak), EvalStatus, EvalResult(..), EvalOpts(..), EvalExpr(..)
+  , EvalBreak(..), EvalBreakpoint (..)
   , SerializableException(..)
   , toSerializableException, fromSerializableException
   , THResult(..), THResultType(..)
@@ -415,13 +415,22 @@ type EvalStatus a = EvalStatus_ a a
 
 data EvalStatus_ a b
   = EvalComplete Word64 (EvalResult a)
-  | EvalBreak
+  | EvalPaused EvalBreak
+  deriving (Generic, Show)
+
+pattern EvalBreak :: HValueRef -> (Maybe EvalBreakpoint) -> (RemoteRef ThreadId) -> (RemotePtr CostCentreStack) -> EvalStatus_ a b
+pattern EvalBreak a b c d = EvalPaused (EvalBreak_ a b c d)
+{-# COMPLETE EvalComplete, EvalBreak #-}
+
+data EvalBreak
+  = EvalBreak_
        HValueRef{- AP_STACK -}
        (Maybe EvalBreakpoint)
        (RemoteRef ThreadId)
        (RemotePtr CostCentreStack) -- Cost centre stack
   deriving (Generic, Show)
 
+instance Binary EvalBreak
 instance Binary a => Binary (EvalStatus_ a b)
 
 data EvalBreakpoint = EvalBreakpoint

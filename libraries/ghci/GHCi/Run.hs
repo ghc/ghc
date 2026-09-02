@@ -210,7 +210,8 @@ resumeSeq hvref = clearEvalStatus <$> do
       ResumeContext{..} <- getThreadResumeContext resumeThreadId
       mask_ $ do
         putMVar resumeBreakMVar () -- this awakens the stopped thread...
-        redirectInterrupts resumeThreadId $
+        redirectInterrupts resumeThreadId $ atomically $
+          -- TODO: can't allow resumeThreadId to be stopped on by readAnyThreadEvalBreak
           readThreadEvalStatus resumeThreadId
 
 evalOptsSeq :: EvalOpts
@@ -472,7 +473,8 @@ globalBreakAction info_mod# info_mod_uid# infox# is_exception apStack = do
       info_mod <- BS.packCString (Ptr info_mod#)
       info_mod_uid <- BS.packCString (Ptr info_mod_uid#)
       pure (Just (EvalBreakpoint info_mod info_mod_uid (I# infox#)))
-  writeThreadEvalStatus tid $ EvalBreak apStack_r breakpoint resume_r ccs
+  writeThreadEvalStatus tid $ DbgBreak $
+    EvalBreak_ apStack_r breakpoint resume_r ccs
 
   -- Block until this thread is resumed (by the thread which took the
   -- `ResumeContext` from the `statusMVar`).
@@ -505,42 +507,57 @@ newtype ResumeContext = ResumeContext
   -- The debugger can unblock that thread by signaling its MVar.
   }
 
--- brilliant STM
--- * only retries when the map is written again
--- * essentially blocks until the result for this thread is there
-readThreadEvalStatus :: ThreadId -> IO (EvalStatus [HValueRef])
+-- | Waits for this thread to yield a result in the global thread to
+-- 'DbgEvalStatus' mapping.
+readThreadEvalStatus :: ThreadId -> STM DbgEvalStatus
 readThreadEvalStatus tid = do
-  atomically $ do
-    dbgmap <- readTVar globalDbgStatusVar
-    case Map.lookup tid dbgmap of
-      Just r  -> do
-        writeTVar globalDbgStatusVar $!
-          Map.delete tid dbgmap -- clear it
-        pure r
-      Nothing -> retry -- until someone writes the result for this thread
+  dbgmap <- readTVar globalDbgStatusVar
+  case Map.lookup tid dbgmap of
+    Just r  -> do
+      writeTVar globalDbgStatusVar $!
+        Map.delete tid dbgmap -- clear it
+      pure r
+    Nothing -> retry -- until someone writes the result for this thread
 
-writeThreadEvalStatus :: ThreadId -> EvalStatus [HValueRef] -> IO ()
+-- | Succeeds when any thread hits a breakpoint.
+readAnyThreadEvalBreak :: STM EvalBreak
+readAnyThreadEvalBreak = do
+  dbgmap <- readTVar globalDbgStatusVar
+  -- try reading all mvars and retry if none yield a result
+  foldr (\x next -> readStatus dbgmap x `orElse` next) retry (Map.toList dbgmap)
+  where
+    readStatus dbgmap (tid, status) = do
+      case status of
+        DbgDone{}  -> retry -- successes can be read with `readThreadEvalStatus`
+        DbgBreak b -> do
+          writeTVar globalDbgStatusVar $!
+            Map.delete tid dbgmap
+          pure b
+
+writeThreadEvalStatus :: ThreadId -> DbgEvalStatus -> IO ()
 writeThreadEvalStatus tid new = do
   atomically $ do
     dbgmap <- readTVar globalDbgStatusVar
     writeTVar globalDbgStatusVar $!
       Map.insertWith (\_ _ -> error "writeThreadEvalStatus: should be impossible") tid new dbgmap
 
--- | A global synchronization variable which a thread writes an 'EvalBreak' to
--- when it hits a breakpoint. This variable is shared across all threads, and
--- the debugger can read the threads which hit breakpoints by reading from this
--- variable. It will also be written with 'EvalSuccess' when a `sandboxIO`
--- action finishes (TODO: wait what? that is a bit weird. so what if we run two
--- evalStmt? they will both race to write a result? but then how do we tell
--- which result we got from where? this won't do in general, but let's see if
--- it can solve some problems first)
---
--- IDEA: maybe `sandboxIO` and friends receive as an argument the var on which
--- to expect the result specifically? And distinguish that from the global break var?
--- Then we split the EvalSuccess and EvalBreak into two datatypes.
---
--- Instead, let's just assume we may wait for a single thread's result and this
--- kind of falls out nicely. See my impl. notes.
-globalDbgStatusVar :: TVar (Map.Map ThreadId (EvalStatus [HValueRef]))
+globalDbgStatusVar :: TVar (Map.Map ThreadId DbgEvalStatus)
 globalDbgStatusVar = unsafePerformIO $ newTVarIO Map.empty
 {-# NOINLINE globalDbgStatusVar #-}
+
+data DbgEvalStatus
+
+  -- | All threads running in the interpreter will be debugger-enabled, meaning
+  -- if they hit an enabled breakpoint, the 'globalBreakAction' will be
+  -- executed and write a 'DbgBreak' value to the global thread dbg status map.
+  -- The debugger will be waiting for threads to break using `readAnyThreadEvalBreak`.
+  = DbgBreak EvalBreak
+
+  -- | To evaluate a statement in the interpreter, a thread is forked by
+  -- `sandboxIO` to run the statement. To synchronize, the statement result
+  -- will be written by the thread to the global thread dbg status
+  -- (`writeThreadEvalStatus`). `sandboxIO` will block waiting for either any
+  -- breakpoint to be hit /or/ for the thread specifically to write its final result.
+  --
+  -- (The Word64 are the allocations just like in 'EvalComplete')
+  | DbgDone Word64 (EvalResult [HValueRef])
