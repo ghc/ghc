@@ -22,12 +22,18 @@
 #include "rts/Time.h"
 #include "RaiseAsync.h"
 #include "Trace.h"
+#include "IdleGC.h"
 
 #include "Poll.h"
 #include "RtsSignals.h"
 
 #include <limits.h>
 #include <errno.h>
+
+#if !defined(THREADED_IDLEGC)
+#undef HAVE_DECL_PPOLL // for simplicity, always use poll when !THREADED_IDLEGC
+#endif
+
 #if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
 /* We prefer the ppoll() function if available since it allows more precise
  * timeouts. It is not in the posix standard however and some platforms
@@ -505,6 +511,17 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
         int timeout_ms = timeoutInMilliseconds(iomgr, wait, now);
 #endif
 
+#if !defined(THREADED_IDLEGC)
+        /* Without threaded idle GC, poll() does not get interrupted for an
+         * idle GC. Instead we just limit our wait time to the idle gc delay
+         * time, and if that timeout is reached then we schedule an idle GC
+         * (see handleTimeoutForIdleGc below).
+         */
+        bool any_pending_io = nfds > 0;
+        int idlegc_status;
+        adjustTimeoutForIdleGc(any_pending_io, &timeout_ms, &idlegc_status);
+#endif
+
         /* Check for I/O readiness, possibly waiting. */
 #if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
         int res = ppoll(poll_table, nfds, timeout_ns, NULL);
@@ -532,6 +549,9 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
             ASSERT(timeout_ns != NULL);
 #else
             ASSERT(timeout_ms != -1);
+#endif
+#if !defined(THREADED_IDLEGC)
+            handleIdleGcTimeout(idlegc_status, &interrupt);
 #endif
 
         } else if (res > 0) {

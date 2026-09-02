@@ -55,6 +55,8 @@
  automatic GCs.  Both timers must expire before an automatic GC is triggered.
 
  See issue #11134 for additional detail.
+
+ See also Note [Deadlock detection].
 */
 
 
@@ -113,6 +115,8 @@ bool isIdleGcPending(void)
     return (getRecentActivity() == ACTIVITY_INACTIVE);
 }
 
+#if defined(THREADED_IDLEGC)
+
 /* - countdown for minimum idle time before we start a GC (set by -I) */
 static int idle_ticks_to_gc = 0;
 
@@ -170,6 +174,47 @@ void handleIdleGcTick(void)
   }
 }
 
+#else // !defined(THREADED_IDLEGC)
+
+/* Note [Idle GC without preemption]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+On non-threaded platforms without pre-emption, e.g. wasm, we have to use a
+different design for scheduling idle GC (and thus deadlock detection, see
+Note [Deadlock detection]).
+
+Instead of a ticker thread that interrupts the idle capability after some delay,
+we arrange for the I/O manager to only sleep for a maximum of the idle GC delay
+time. The function getNextIdleGcDelayTime() returns this time, accounting for
+the interIdleGCWait.
+
+Then if that timeout is reached the I/O manager calls notifyIdleGcIdle(),
+which schedules an idle GC (by seting the recent activity state). The I/O
+manager must then behave as if it had been interrupted (as happens with the
+threaded idle GC design).
+*/
+
+static Time last_idle_gc_time = 0;
+
+Time getNextIdleGcDelayTime()
+{
+    Time now   = getProcessElapsedTime();
+    Time delay =
+        stg_max (last_idle_gc_time + RtsFlags.GcFlags.interIdleGCWait - now,
+                 RtsFlags.GcFlags.idleGCDelayTime);
+    ASSERT(delay >= 0);
+    return delay;
+}
+
+void notifyIdleGcIdle(bool deadlocked)
+{
+    if (RtsFlags.GcFlags.doIdleGC || deadlocked) {
+        setRecentActivity(ACTIVITY_INACTIVE);
+    }
+}
+
+#endif // defined(THREADED_IDLEGC)
+
 void notifyIdleGcActive(void)
 {
     switch (getRecentActivity())
@@ -209,6 +254,9 @@ void notifyIdleGcDone(bool force_major)
             setRecentActivity(ACTIVITY_DONE_GC);
 #if !defined(PROFILING)
             pauseTimer();
+#endif
+#if !defined(THREADED_IDLEGC)
+            last_idle_gc_time = getProcessElapsedTime();
 #endif
             break;
         }
