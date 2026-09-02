@@ -862,6 +862,15 @@ pprInstr platform i = case i of
    BT format imm src
       -> pprFormatImmOp (text "bt") format imm src
 
+   BTR format off dst
+      -> pprFormatOpOp (text "btr") format off dst
+
+   BTS format off dst
+      -> pprFormatOpOp (text "bts") format off dst
+
+   BTC format off dst
+      -> pprFormatOpOp (text "btc") format off dst
+
    CMP format src dst
      | isFloatFormat format -> pprFormatOpOp (text "ucomi") format src dst -- SSE2
      | otherwise            -> pprFormatOpOp (text "cmp")   format src dst
