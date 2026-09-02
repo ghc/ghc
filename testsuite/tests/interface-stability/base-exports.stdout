@@ -717,7 +717,6 @@ module Data.Bits where
     complementBit :: a -> GHC.Internal.Types.Int -> a
     testBit :: a -> GHC.Internal.Types.Int -> GHC.Internal.Types.Bool
     bitSizeMaybe :: a -> GHC.Internal.Maybe.Maybe GHC.Internal.Types.Int
-    bitSize :: a -> GHC.Internal.Types.Int
     isSigned :: a -> GHC.Internal.Types.Bool
     shiftL :: a -> GHC.Internal.Types.Int -> a
     unsafeShiftL :: a -> GHC.Internal.Types.Int -> a
@@ -726,7 +725,7 @@ module Data.Bits where
     rotateL :: a -> GHC.Internal.Types.Int -> a
     rotateR :: a -> GHC.Internal.Types.Int -> a
     popCount :: a -> GHC.Internal.Types.Int
-    {-# MINIMAL (.&.), (.|.), xor, complement, (shift | (shiftL, shiftR)), (rotate | (rotateL, rotateR)), bitSize, bitSizeMaybe, isSigned, testBit, bit, popCount #-}
+    {-# MINIMAL (.&.), (.|.), xor, complement, (shift | (shiftL, shiftR)), (rotate | (rotateL, rotateR)), bitSizeMaybe, isSigned, testBit, bit, popCount #-}
   type FiniteBits :: * -> Constraint
   class Bits b => FiniteBits b where
     finiteBitSize :: b -> GHC.Internal.Types.Int
@@ -2015,7 +2014,6 @@ module Foreign where
     complementBit :: a -> Int -> a
     testBit :: a -> Int -> GHC.Internal.Types.Bool
     bitSizeMaybe :: a -> GHC.Internal.Maybe.Maybe Int
-    bitSize :: a -> Int
     isSigned :: a -> GHC.Internal.Types.Bool
     shiftL :: a -> Int -> a
     unsafeShiftL :: a -> Int -> a
@@ -2024,7 +2022,7 @@ module Foreign where
     rotateL :: a -> Int -> a
     rotateR :: a -> Int -> a
     popCount :: a -> Int
-    {-# MINIMAL (.&.), (.|.), xor, complement, (shift | (shiftL, shiftR)), (rotate | (rotateL, rotateR)), bitSize, bitSizeMaybe, isSigned, testBit, bit, popCount #-}
+    {-# MINIMAL (.&.), (.|.), xor, complement, (shift | (shiftL, shiftR)), (rotate | (rotateL, rotateR)), bitSizeMaybe, isSigned, testBit, bit, popCount #-}
   type FinalizerEnvPtr :: * -> * -> *
   type FinalizerEnvPtr env a = FunPtr (Ptr env -> Ptr a -> GHC.Internal.Types.IO ())
   type FinalizerPtr :: * -> *
@@ -2929,7 +2927,6 @@ module Foreign.Safe where
     complementBit :: a -> Int -> a
     testBit :: a -> Int -> GHC.Internal.Types.Bool
     bitSizeMaybe :: a -> GHC.Internal.Maybe.Maybe Int
-    bitSize :: a -> Int
     isSigned :: a -> GHC.Internal.Types.Bool
     shiftL :: a -> Int -> a
     unsafeShiftL :: a -> Int -> a
@@ -2938,7 +2935,7 @@ module Foreign.Safe where
     rotateL :: a -> Int -> a
     rotateR :: a -> Int -> a
     popCount :: a -> Int
-    {-# MINIMAL (.&.), (.|.), xor, complement, (shift | (shiftL, shiftR)), (rotate | (rotateL, rotateR)), bitSize, bitSizeMaybe, isSigned, testBit, bit, popCount #-}
+    {-# MINIMAL (.&.), (.|.), xor, complement, (shift | (shiftL, shiftR)), (rotate | (rotateL, rotateR)), bitSizeMaybe, isSigned, testBit, bit, popCount #-}
   type FinalizerEnvPtr :: * -> * -> *
   type FinalizerEnvPtr env a = FunPtr (Ptr env -> Ptr a -> GHC.Internal.Types.IO ())
   type FinalizerPtr :: * -> *
@@ -5071,7 +5068,6 @@ module GHC.Bits where
     complementBit :: a -> GHC.Internal.Types.Int -> a
     testBit :: a -> GHC.Internal.Types.Int -> GHC.Internal.Types.Bool
     bitSizeMaybe :: a -> GHC.Internal.Maybe.Maybe GHC.Internal.Types.Int
-    bitSize :: a -> GHC.Internal.Types.Int
     isSigned :: a -> GHC.Internal.Types.Bool
     shiftL :: a -> GHC.Internal.Types.Int -> a
     unsafeShiftL :: a -> GHC.Internal.Types.Int -> a
@@ -5080,7 +5076,7 @@ module GHC.Bits where
     rotateL :: a -> GHC.Internal.Types.Int -> a
     rotateR :: a -> GHC.Internal.Types.Int -> a
     popCount :: a -> GHC.Internal.Types.Int
-    {-# MINIMAL (.&.), (.|.), xor, complement, (shift | (shiftL, shiftR)), (rotate | (rotateL, rotateR)), bitSize, bitSizeMaybe, isSigned, testBit, bit, popCount #-}
+    {-# MINIMAL (.&.), (.|.), xor, complement, (shift | (shiftL, shiftR)), (rotate | (rotateL, rotateR)), bitSizeMaybe, isSigned, testBit, bit, popCount #-}
   type FiniteBits :: * -> Constraint
   class Bits b => FiniteBits b where
     finiteBitSize :: b -> GHC.Internal.Types.Int

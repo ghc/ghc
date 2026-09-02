@@ -106,7 +106,7 @@ shiftL x n
   = error ("shiftL: negative shift value: " ++ show n)
   | Just s <- bitSizeMaybe x
   , n >= s
-  = error ("shiftL: shift value greater than bitSize: " ++ show n ++ " >= " ++ show s)
+  = error ("shiftL: shift value greater than bitSizeMaybe: " ++ show n ++ " >= " ++ show s)
   | otherwise
   = Bits.unsafeShiftL x n
 shiftR x n
@@ -114,7 +114,7 @@ shiftR x n
   = error ("shiftR: negative shift value: " ++ show n)
   | Just s <- bitSizeMaybe x
   , n >= s
-  = error ("shiftR: shift value greater than bitSize: " ++ show n ++ " >= " ++ show s)
+  = error ("shiftR: shift value greater than bitSizeMaybe: " ++ show n ++ " >= " ++ show s)
   | otherwise
   = Bits.unsafeShiftR x n
 #else

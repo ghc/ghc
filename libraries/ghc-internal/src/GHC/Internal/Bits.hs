@@ -37,7 +37,6 @@ module GHC.Internal.Bits (
     complementBit,
     testBit,
     bitSizeMaybe,
-    bitSize,
     isSigned,
     shiftL, shiftR,
     unsafeShiftL, unsafeShiftR,
@@ -80,8 +79,6 @@ infixl 7 .&.
 infixl 6 `xor`
 infixl 5 .|.
 
-{-# DEPRECATED bitSize "Use 'bitSizeMaybe' or 'finiteBitSize' instead" #-} -- deprecated in 7.8
-
 -- | The 'Bits' class defines bitwise operations over integral types.
 --
 -- * Bits are numbered from 0 with bit 0 being the least
@@ -90,7 +87,7 @@ class Eq a => Bits a where
     {-# MINIMAL (.&.), (.|.), xor, complement,
                 (shift | (shiftL, shiftR)),
                 (rotate | (rotateL, rotateR)),
-                bitSize, bitSizeMaybe, isSigned, testBit, bit, popCount #-}
+                bitSizeMaybe, isSigned, testBit, bit, popCount #-}
 
     -- | Bitwise \"and\"
     (.&.) :: a -> a -> a
@@ -132,20 +129,6 @@ class Eq a => Bits a where
     x `rotate`  i | i<0       = x `rotateR` (-i)
                   | i>0       = x `rotateL` i
                   | otherwise = x
-
-    {-
-    -- Rotation can be implemented in terms of two shifts, but care is
-    -- needed for negative values.  This suggested implementation assumes
-    -- 2's-complement arithmetic.  It is commented out because it would
-    -- require an extra context (Ord a) on the signature of 'rotate'.
-    x `rotate`  i | i<0 && isSigned x && x<0
-                         = let left = i+bitSize x in
-                           ((x `shift` i) .&. complement ((-1) `shift` left))
-                           .|. (x `shift` left)
-                  | i<0  = (x `shift` i) .|. (x `shift` (i+bitSize x))
-                  | i==0 = x
-                  | i>0  = (x `shift` i) .|. (x `shift` (i-bitSize x))
-    -}
 
     -- | 'zeroBits' is the value with all bits unset.
     --
@@ -199,16 +182,6 @@ class Eq a => Bits a where
         -}
     bitSizeMaybe      :: a -> Maybe Int
 
-    {-| Return the number of bits in the type of the argument.  The actual
-        value of the argument is ignored.  The function 'bitSize' is
-        undefined for types that do not have a fixed bitsize, like 'Integer'.
-
-        Default implementation based upon 'bitSizeMaybe' provided since
-        4.12.0.0.
-        -}
-    bitSize           :: a -> Int
-    bitSize b = fromMaybe (error "bitSize is undefined") (bitSizeMaybe b)
-
     {-| Return 'True' if the argument is a signed type.  The actual
         value of the argument is ignored -}
     isSigned          :: a -> Bool
@@ -233,7 +206,7 @@ class Eq a => Bits a where
 
     {-| Shift the argument left by the specified number of bits.  The
         result is undefined for negative shift amounts and shift amounts
-        greater or equal to the 'bitSize'.
+        greater or equal to the bitsize.
 
         Defaults to 'shiftL' unless defined explicitly by an instance.
 
@@ -244,7 +217,7 @@ class Eq a => Bits a where
 
     {-| Shift the first argument right by the specified number of bits. The
         result is undefined for negative shift amounts and shift amounts
-        greater or equal to the 'bitSize'. Some instances may throw an
+        greater or equal to the bitsize. Some instances may throw an
         'Control.Exception.Overflow' exception if given a negative input.
 
         Right shifts perform sign extension on signed number types;
@@ -306,11 +279,9 @@ class Eq a => Bits a where
 -- @since base-4.7.0.0
 class Bits b => FiniteBits b where
     -- | Return the number of bits in the type of the argument.
-    -- The actual value of the argument is ignored. Moreover, 'finiteBitSize'
-    -- is total, in contrast to the deprecated 'bitSize' function it replaces.
+    -- The actual value of the argument is ignored.
     --
     -- @
-    -- 'finiteBitSize' = 'bitSize'
     -- 'bitSizeMaybe' = 'Just' . 'finiteBitSize'
     -- @
     --
@@ -435,8 +406,6 @@ instance Bits Bool where
 
     bitSizeMaybe _ = Just 1
 
-    bitSize _ = 1
-
     isSigned _ = False
 
     popCount False = 0
@@ -486,7 +455,6 @@ instance Bits Int where
         !i'# = i# `andI#` (wsib -# 1#)
         !wsib = WORD_SIZE_IN_BITS#   {- work around preprocessor problem (??) -}
     bitSizeMaybe i         = Just (finiteBitSize i)
-    bitSize i              = finiteBitSize i
 
     popCount (I# x#) = I# (word2Int# (popCnt# (int2Word# x#)))
 
@@ -529,7 +497,6 @@ instance Bits Word where
         !i'# = i# `andI#` (wsib -# 1#)
         !wsib = WORD_SIZE_IN_BITS#  {- work around preprocessor problem (??) -}
     bitSizeMaybe i           = Just (finiteBitSize i)
-    bitSize i                = finiteBitSize i
     isSigned _               = False
     popCount (W# x#)         = I# (word2Int# (popCnt# x#))
     bit                      = bitDefault
@@ -577,7 +544,6 @@ instance Bits Integer where
    rotate x i = shift x i   -- since an Integer never wraps around
 
    bitSizeMaybe _ = Nothing
-   bitSize _  = errorWithoutStackTrace "GHC.Internal.Data.Bits.bitSize(Integer)"
    isSigned _ = True
 
 -- | @since base-4.8.0
@@ -610,7 +576,6 @@ instance Bits Natural where
    rotate x i = shift x i   -- since an Natural never wraps around
 
    bitSizeMaybe _ = Nothing
-   bitSize _  = errorWithoutStackTrace "GHC.Internal.Data.Bits.bitSize(Natural)"
    isSigned _ = False
 
 -----------------------------------------------------------------------------

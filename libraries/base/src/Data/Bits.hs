@@ -19,7 +19,7 @@
 
 module Data.Bits
     (-- *  Type classes
-     Bits((.&.), (.|.), xor, complement, shift, rotate, zeroBits, bit, setBit, clearBit, complementBit, testBit, bitSizeMaybe, bitSize, isSigned, shiftL, shiftR, unsafeShiftL, unsafeShiftR, rotateL, rotateR, popCount),
+     Bits((.&.), (.|.), xor, complement, shift, rotate, zeroBits, bit, setBit, clearBit, complementBit, testBit, bitSizeMaybe, isSigned, shiftL, shiftR, unsafeShiftL, unsafeShiftR, rotateL, rotateR, popCount),
      FiniteBits(finiteBitSize, countLeadingZeros, countTrailingZeros),
      -- *  Extra functions
      bitDefault,

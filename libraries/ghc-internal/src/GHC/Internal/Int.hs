@@ -218,7 +218,6 @@ instance Bits Int8 where
         !x'# = narrow8Word# (int2Word# (int8ToInt# x#))
         !i'# = word2Int# (int2Word# i# `and#` 7##)
     bitSizeMaybe i            = Just (finiteBitSize i)
-    bitSize i                 = finiteBitSize i
     isSigned _                = True
     popCount (I8# x#)         = I# (word2Int# (popCnt8# (int2Word# (int8ToInt# x#))))
     bit i                     = bitDefault i
@@ -429,7 +428,6 @@ instance Bits Int16 where
         !x'# = narrow16Word# (int2Word# (int16ToInt# x#))
         !i'# = word2Int# (int2Word# i# `and#` 15##)
     bitSizeMaybe i             = Just (finiteBitSize i)
-    bitSize i                  = finiteBitSize i
     isSigned _                 = True
     popCount (I16# x#)         = I# (word2Int# (popCnt16# (int2Word# (int16ToInt# x#))))
     bit i                      = bitDefault i
@@ -627,7 +625,6 @@ instance Bits Int32 where
         !x'# = narrow32Word# (int2Word# (int32ToInt# x#))
         !i'# = word2Int# (int2Word# i# `and#` 31##)
     bitSizeMaybe i             = Just (finiteBitSize i)
-    bitSize i                  = finiteBitSize i
     isSigned _                 = True
     popCount (I32# x#)         = I# (word2Int# (popCnt32# (int2Word# (int32ToInt# x#))))
     bit i                      = bitDefault i
@@ -1010,7 +1007,6 @@ instance Bits Int64 where
         !x'# = int64ToWord64# x#
         !i'# = word2Int# (int2Word# i# `and#` 63##)
     bitSizeMaybe i             = Just (finiteBitSize i)
-    bitSize i                  = finiteBitSize i
     isSigned _                 = True
     popCount (I64# x#)         =
         I# (word2Int# (popCnt64# (int64ToWord64# x#)))

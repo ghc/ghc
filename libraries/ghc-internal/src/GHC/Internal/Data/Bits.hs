@@ -35,7 +35,6 @@ module GHC.Internal.Data.Bits (
     complementBit,
     testBit,
     bitSizeMaybe,
-    bitSize,
     isSigned,
     shiftL, shiftR,
     unsafeShiftL, unsafeShiftR,
