@@ -1,6 +1,7 @@
 {-# OPTIONS -ddump-parsed-ast #-}
 {-# LANGUAGE ImplicitParams #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Test20297 where
 
 -- ValBinds
@@ -42,3 +43,9 @@ data G a where -- comment8
 mwi = if -- comment12
          | x -> 1
          | otherwise -> 2
+
+-- HsUntypedBracket/DecBrL
+declBracket = [d| -- comment10
+                  dee = 1
+                  -- comment11
+                |]
