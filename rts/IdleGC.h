@@ -12,6 +12,15 @@
 
 #include "BeginPrivate.h"
 
+/* See Note [GC During Idle Time] */
+
+#if defined(HAVE_PREEMPTION)
+#define THREADED_IDLEGC
+#else
+/* See Note [Idle GC without preemption] */
+#endif
+
+
 /* Are we in a state where we are want an idle GC to occur?
  * Used in Capability globalWorkToDo() and Schedule scheduleDetectDeadlock.
  */
@@ -28,7 +37,19 @@ void notifyIdleGcDone(bool force_major);
  */
 bool notifyIdleGcDeadlock(void);
 
+#if defined(THREADED_IDLEGC)
+
 /* Called from handle_tick() */
 void handleIdleGcTick(void);
+
+#else // !defined(THREADED_IDLEGC)
+
+/* Called from I/O managers before waiting */
+Time getNextIdleGcDelayTime(void);
+
+/* Called from I/O managers after waiting */
+void notifyIdleGcIdle(void);
+
+#endif
 
 #include "EndPrivate.h"

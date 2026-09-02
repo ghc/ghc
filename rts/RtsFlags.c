@@ -1914,8 +1914,13 @@ static void normaliseRtsOpts (void)
     // If the master timer is disabled, turn off the other timers.
     if (RtsFlags.MiscFlags.tickInterval == 0) {
         RtsFlags.ConcFlags.ctxtSwitchTime  = 0;
+#if defined(HAVE_PREEMPTION)
         RtsFlags.GcFlags.idleGCDelayTime   = 0;
         RtsFlags.GcFlags.doIdleGC          = false;
+#else
+        /* We use idleGCDelayTime and doIdleGC without timers.
+         * See Note [Idle GC without preemption] */
+#endif
         RtsFlags.ProfFlags.heapProfileInterval = 0;
     }
 
@@ -1928,11 +1933,16 @@ static void normaliseRtsOpts (void)
                     RtsFlags.MiscFlags.tickInterval);
     }
 
+#if defined(HAVE_PREEMPTION)
     if (RtsFlags.GcFlags.idleGCDelayTime > 0) {
         RtsFlags.MiscFlags.tickInterval =
             stg_min(RtsFlags.GcFlags.idleGCDelayTime,
                     RtsFlags.MiscFlags.tickInterval);
     }
+#else
+    /* We use idleGCDelayTime and doIdleGC without timers.
+     * See Note [Idle GC without preemption] */
+#endif
 
     if (RtsFlags.ProfFlags.heapProfileInterval > 0) {
         RtsFlags.MiscFlags.tickInterval =

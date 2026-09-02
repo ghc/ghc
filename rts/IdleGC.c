@@ -59,6 +59,34 @@
  thus implemented deadlock detection differently. See Note [Deadlock detection]
  for the current and historical designs.
 
+ The design for idle GC is (now) the same for the threaded and non-threaded
+ RTS ways, with the only difference being in how wakeUpRts works. However, in
+ the non-threaded RTS mode without preemption there is a design difference in
+ how to schedule idle GC. See Note [Idle GC without preemption].
+
+
+Note [Idle GC without preemption]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+On non-threaded platforms without pre-emption, e.g. wasm, we have to use a
+different design for scheduling idle GC (and thus deadlock detection, see
+Note [Deadlock detection]).
+
+Instead of a ticker thread that interrupts the idle capability after some delay,
+we arrange for the I/O manager to only sleep for a maximum of the idle GC delay
+time. The function getNextIdleGcDelayTime() returns this time, accounting for
+the interIdleGCWait.
+
+Then if that timeout is reached the I/O manager calls notifyIdleGcIdle(),
+which schedules an idle GC (by seting the recent activity state). The I/O
+manager must then behave as if it had been interrupted (as happens with the
+threaded idle GC design).
+
+See adjustTimeoutForIdleGc() and handleIdleGcTimeout(), which are the helper
+functions used by the in-RTS I/O managers on posix platforms to implement this.
+
+See Note [GC During Idle Time] for the general design.
+
 
 Note [Deadlock detection]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -276,6 +304,8 @@ bool isIdleGcPending(void)
     return (getRecentActivity() == ACTIVITY_INACTIVE);
 }
 
+#if defined(THREADED_IDLEGC)
+
 /* - countdown for minimum idle time before we start a GC (set by -I) */
 static int idle_ticks_to_gc = 0;
 
@@ -332,6 +362,31 @@ void handleIdleGcTick(void)
       break;
   }
 }
+
+#else // !defined(THREADED_IDLEGC)
+
+static Time last_idle_gc_time = 0;
+
+Time getNextIdleGcDelayTime(void)
+{
+    if (getRecentActivity() == ACTIVITY_DONE_GC) return -1; // indefinite
+
+    Time now   = getProcessElapsedTime();
+    Time delay =
+        stg_max (last_idle_gc_time + RtsFlags.GcFlags.interIdleGCWait - now,
+                 RtsFlags.GcFlags.idleGCDelayTime);
+    ASSERT(delay >= 0);
+    return delay;
+}
+
+void notifyIdleGcIdle(void)
+{
+    if (RtsFlags.GcFlags.doIdleGC && getRecentActivity() < ACTIVITY_INACTIVE) {
+        setRecentActivity(ACTIVITY_INACTIVE);
+    }
+}
+
+#endif // defined(THREADED_IDLEGC)
 
 /* If the I/O manager can see that there is very likely a deadlock (no I/O and
  * no timers) then it lets us know. If we have not already done an idle GC then
@@ -399,6 +454,9 @@ void notifyIdleGcDone(bool force_major)
             setRecentActivity(ACTIVITY_DONE_GC);
 #if !defined(PROFILING)
             pauseTimer();
+#endif
+#if !defined(THREADED_IDLEGC)
+            last_idle_gc_time = getProcessElapsedTime();
 #endif
             break;
         }
