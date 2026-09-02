@@ -22,11 +22,11 @@ import GHC.Core.Utils (exprType)
 import GHC.Core.TyCo.Rep (Type(TyConApp))
 import GHC.Core.TyCon (TyCon(..))
 import GHC.Core.ConLike           ( conLikeName )
-import GHC.Core.DataCon           ( dataConWrapperType )
+import GHC.Core.DataCon           ( dataConWrapperType, dataConTyCon )
 import GHC.Core.Type              ( Type, ForAllTyFlag(..) )
-import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
+import GHC.Core.TyCon             ( TyCon, tyConClass_maybe, isClassTyCon )
 import GHC.Core.InstEnv
-import GHC.Core.Predicate         ( isEvId )
+import GHC.Core.Predicate         ( isEvId, getClassPredTys_maybe )
 
 import GHC.Hs
 import GHC.Hs.Syn.Type
@@ -36,12 +36,12 @@ import GHC.Types.Basic
 import GHC.Types.UnresolvedImport ( isGeneratedImport )
 import GHC.Types.FieldLabel
 import GHC.Types.Avail            ( Avails )
-import GHC.Types.Id               ( isDataConId_maybe )
+import GHC.Types.Id               ( isDataConId_maybe, isRecordSelector )
 import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique, wiredInNameTyThing_maybe, getName, hasKnownKey )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import GHC.Types.Name.Reader      ( RecFieldInfo(..), WithUserRdr(..) )
 import GHC.Types.SrcLoc
-import GHC.Types.Var              ( Id, Var, EvId, varName, varType, varUnique )
+import GHC.Types.Var              ( Id, Var, EvId, varName, varType, varUnique, isId )
 import GHC.Types.Var.Env
 import GHC.Types.Var.FV
 
@@ -684,9 +684,73 @@ instance ToHie (Context (Located Name)) where
 instance ToHie (Context (Located (WithUserRdr Name))) where
   toHie (C c (L l (WithUserRdr _ n))) = toHie $ C c (L l n)
 
-hieEvIdsOfTerm :: EvTerm -> [EvId]
--- Returns only EvIds satisfying relevantEvId
-hieEvIdsOfTerm = runFVSelectiveList isEvId . evTermFVs
+{- Note [Evidence dependencies in HIE files]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'EvBindDeps' of an 'EvLetBind' record what a dictionary was built out of,
+so that a tool can answer "where does the evidence for this constraint come
+from?" by walking 'getEvidenceTree' (in GHC.Iface.Ext.Utils).  For that to be
+useful, the dependencies have to /discriminate/ one solution from another.  So
+we make two adjustments to the plain free evidence variables of the right hand
+side:
+
+(1) We drop the data constructor of a class dictionary, e.g. @C:HasField@.
+    These do satisfy 'isEvId', but they /construct/ a dictionary rather than
+    being evidence in their own right, and which one appears is already
+    determined by the constraint being solved.  Reporting one tells a user
+    nothing they did not know from the constraint they hovered over, and is
+    actively misleading: it points into the module defining the /class/,
+    rather than at whatever provided the instance.
+
+(2) We keep record selectors, which are not evidence and so do not satisfy
+    'isEvId'.  When a constraint is solved by a built-in rule that builds the
+    dictionary out of a record selector instead of applying a dictionary
+    function, that selector plays exactly the role the dictionary function
+    would, and is the only thing recording /which/ instance was used.  Such a
+    selector is additionally recorded as an 'EvInstBind' for the constraint's
+    own class, so that 'getEvidenceTree' describes it as providing the
+    instance instead of falling through to its "external evidence variable"
+    case (which is what it reports for a dependency it can find no evidence
+    binding for).
+
+@HasField@ is what motivates both rules: a constraint @HasField "fld" T Int@
+for a real record field is solved by building @MkHasField (fld |> co)@ -- see
+Note [HasField instances] in GHC.Tc.Instance.Class -- so without (1) and (2)
+the evidence for every record selection, however different, bottomed out at
+@GHC.Internal.Records.C:HasField@.  Neither rule names @HasField@, though, and
+neither should: they say "a dictionary constructor explains nothing" and "a
+selector used as evidence explains something", which holds for any class
+solved this way.
+
+The 'EvInstBind' of (2) is deliberately recorded at the span of the /evidence
+binding/, not at the selector's own 'nameSrcSpan'.  Attaching an evidence
+context to the field's declaration would merge it into the
+'IdentifierDetails' of the declaration itself, and consumers reasonably skip
+identifiers mentioning evidence when deciding what a source token refers to --
+Haddock's hyperlinked source would then stop linking the field declaration.
+The 'Name' recorded is the selector either way, which is what an IDE needs in
+order to navigate to it.
+-}
+
+-- | Is this the data constructor of a class dictionary, e.g. @C:HasField@?
+--
+-- See Note [Evidence dependencies in HIE files]
+isClassDataConId :: Id -> Bool
+isClassDataConId v
+  | Just dc <- isDataConId_maybe v = isClassTyCon (dataConTyCon dc)
+  | otherwise                      = False
+
+hieEvIdsOfTerm :: EvTerm -> [Var]
+-- See Note [Evidence dependencies in HIE files]
+hieEvIdsOfTerm = runFVSelectiveList relevant . evTermFVs
+  where
+    -- NB: this traversal offers us TyVars as well as Ids, and 'idDetails'
+    -- panics on a TyVar, so the Id-only predicates must be guarded by
+    -- 'isId'.  'isEvId' only looks at the type and is safe on either; it
+    -- deliberately admits coercion variables, which are TyVars.
+    relevant v
+      | not (isId v) = isEvId v
+      | otherwise    = (isEvId v && not (isClassDataConId v))
+                    || isRecordSelector v
 
 instance ToHie (EvBindContext (LocatedA TcEvBinds)) where
   toHie (EvBindContext sc sp (L span (EvBinds bs)))
@@ -699,6 +763,13 @@ instance ToHie (EvBindContext (LocatedA TcEvBinds)) where
             [ toHie (C (EvidenceVarBind (EvLetBind depNames) (combineScopes sc (mkScope span)) sp)
                                         (L span $ eb_lhs evbind))
             , toHie $ map (C EvidenceVarUse . L span) $ evDeps
+              -- See Note [Evidence dependencies in HIE files]
+            , toHie [ C (EvidenceVarBind (EvInstBind False (className cls))
+                                         ModuleScope Nothing)
+                        (L span sel)
+                    | Just (cls, _) <- [getClassPredTys_maybe (varType (eb_lhs evbind))]
+                    , sel <- evDeps
+                    , isId sel, isRecordSelector sel ]
             ]
   toHie _ = pure []
 
