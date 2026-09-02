@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs, RecordWildCards, MagicHash, ScopedTypeVariables, CPP,
-    UnboxedTuples, LambdaCase, UnliftedFFITypes #-}
+    UnboxedTuples, LambdaCase, UnliftedFFITypes, NamedFieldPuns #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 {-# LANGUAGE BangPatterns #-}
 
@@ -32,6 +32,7 @@ import GHCi.BreakArray
 import GHCi.StaticPtrTable
 
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Control.Concurrent
 import Control.DeepSeq
 import Control.Exception
@@ -210,9 +211,10 @@ resumeSeq hvref = clearEvalStatus <$> do
       ResumeContext{..} <- getThreadResumeContext resumeThreadId
       mask_ $ do
         putMVar resumeBreakMVar () -- this awakens the stopped thread...
-        redirectInterrupts resumeThreadId $ atomically $
-          -- TODO: can't allow resumeThreadId to be stopped on by readAnyThreadEvalBreak
-          readThreadEvalStatus resumeThreadId
+        redirectInterrupts resumeThreadId $
+          withShadowThread resumeThreadId $
+            atomically $
+            readThreadEvalStatus resumeThreadId
 
 evalOptsSeq :: EvalOpts
 evalOptsSeq = EvalOpts
@@ -245,8 +247,9 @@ sandboxIO opts io = do
            labelThread tid "GHCi sandbox"
            unsafeUnmask runIt >>= writeThreadEvalStatus tid
 
-         redirectInterrupts tid $ unsafeUnmask $
-           readThreadEvalStatus tid
+         redirectInterrupts tid $ unsafeUnmask $ atomically $
+           (EvalPaused <$> readAnyThreadEvalBreak)
+            `orElse` readThreadEvalStatus tid
        else
           -- GLUT on OS X needs to run on the main thread. If you
           -- try to use it from another thread then you just get a
@@ -380,7 +383,8 @@ resumeStmt opts rtid = do
     mask_ $ do
       putMVar resumeBreakMVar () -- this awakens the stopped thread...
       redirectInterrupts resumeThreadId $
-        readThreadEvalStatus resumeThreadId
+        withShadowThread resumeThreadId $
+          atomically $ readThreadEvalStatus resumeThreadId
 
 -- when abandoning a computation we have to
 --      (a) kill the thread with an async exception, so that the
@@ -400,7 +404,8 @@ abandonStmt hvref = do
   ResumeContext{..} <- getThreadResumeContext tid
   killThread tid
   putMVar resumeBreakMVar ()
-  _ <- readThreadEvalStatus tid
+  _ <- withShadowThread tid $ atomically $
+    readThreadEvalStatus tid
   return ()
 
 -- Malloc and copy the bytes.  We don't have any way to monitor the
@@ -473,8 +478,7 @@ globalBreakAction info_mod# info_mod_uid# infox# is_exception apStack = do
       info_mod <- BS.packCString (Ptr info_mod#)
       info_mod_uid <- BS.packCString (Ptr info_mod_uid#)
       pure (Just (EvalBreakpoint info_mod info_mod_uid (I# infox#)))
-  writeThreadEvalStatus tid $ DbgBreak $
-    EvalBreak_ apStack_r breakpoint resume_r ccs
+  writeThreadEvalStatus tid $ EvalBreak apStack_r breakpoint resume_r ccs
 
   -- Block until this thread is resumed (by the thread which took the
   -- `ResumeContext` from the `statusMVar`).
@@ -507,57 +511,114 @@ newtype ResumeContext = ResumeContext
   -- The debugger can unblock that thread by signaling its MVar.
   }
 
--- | Waits for this thread to yield a result in the global thread to
--- 'DbgEvalStatus' mapping.
-readThreadEvalStatus :: ThreadId -> STM DbgEvalStatus
+-- | To evaluate a statement in the interpreter, a thread is forked by
+-- `sandboxIO` to run the statement. To synchronize, the statement result will
+-- be written by the thread to the global thread dbg status
+-- (`writeThreadEvalStatus`) and `sandboxIO` will block waiting for either any
+-- breakpoint to be hit ('readAnyThreadEvalBreak') /or/ for the thread
+-- specifically to write its final result. To wait for that thread
+-- specifically, use this function.
+--
+-- Succeeds when the given thread writes to the global debugger map an eval result.
+readThreadEvalStatus :: ThreadId -> STM (EvalStatus [HValueRef])
 readThreadEvalStatus tid = do
-  dbgmap <- readTVar globalDbgStatusVar
-  case Map.lookup tid dbgmap of
+  GlobalDbgStatus{..} <- readTVar globalDbgStatusVar
+  case Map.lookup tid threadEvalStatuses of
     Just r  -> do
-      writeTVar globalDbgStatusVar $!
-        Map.delete tid dbgmap -- clear it
+      writeTVar globalDbgStatusVar
+        GlobalDbgStatus
+          { threadEvalStatuses = Map.delete tid threadEvalStatuses -- clear it
+          , shadowedThreads
+          }
       pure r
     Nothing -> retry -- until someone writes the result for this thread
 
--- | Succeeds when any thread hits a breakpoint.
+-- | All threads running in the interpreter will be debugger-enabled, meaning
+-- if they hit an enabled breakpoint, the 'globalBreakAction' will be
+-- executed and write a 'EvalBreak' value to the global thread dbg status map.
+-- The debugger will be waiting for threads to break using `readAnyThreadEvalBreak`.
+--
+-- Succeeds when any thread hits a breakpoint.
 readAnyThreadEvalBreak :: STM EvalBreak
 readAnyThreadEvalBreak = do
-  dbgmap <- readTVar globalDbgStatusVar
+  dbgs <- readTVar globalDbgStatusVar
   -- try reading all mvars and retry if none yield a result
-  foldr (\x next -> readStatus dbgmap x `orElse` next) retry (Map.toList dbgmap)
+  foldr (\x next -> readStatus dbgs x `orElse` next) retry (Map.toList (threadEvalStatuses dbgs))
   where
-    readStatus dbgmap (tid, status) = do
+    readStatus GlobalDbgStatus{..} (tid, _) -- don't look at dbg-shadowed threads
+      | Set.member tid shadowedThreads
+      = retry
+
+    readStatus GlobalDbgStatus{..} (tid, status)
+      = do
       case status of
-        DbgDone{}  -> retry -- successes can be read with `readThreadEvalStatus`
-        DbgBreak b -> do
-          writeTVar globalDbgStatusVar $!
-            Map.delete tid dbgmap
+        EvalComplete{} -> retry -- successes can be read with `readThreadEvalStatus`
+        EvalPaused b   -> do
+          writeTVar globalDbgStatusVar
+            GlobalDbgStatus
+              { threadEvalStatuses = Map.delete tid threadEvalStatuses
+              , shadowedThreads
+              }
           pure b
 
-writeThreadEvalStatus :: ThreadId -> DbgEvalStatus -> IO ()
-writeThreadEvalStatus tid new = do
+writeThreadEvalStatus :: ThreadId -> EvalStatus [HValueRef] -> IO ()
+writeThreadEvalStatus tid new =
   atomically $ do
-    dbgmap <- readTVar globalDbgStatusVar
-    writeTVar globalDbgStatusVar $!
-      Map.insertWith (\_ _ -> error "writeThreadEvalStatus: should be impossible") tid new dbgmap
+    GlobalDbgStatus{..} <- readTVar globalDbgStatusVar
+    writeTVar globalDbgStatusVar $
+      GlobalDbgStatus
+        { threadEvalStatuses =
+            Map.insertWith (\_ _ -> error "writeThreadEvalStatus: should be impossible")
+                tid new threadEvalStatuses
+        , shadowedThreads }
 
-globalDbgStatusVar :: TVar (Map.Map ThreadId DbgEvalStatus)
-globalDbgStatusVar = unsafePerformIO $ newTVarIO Map.empty
+-- | Make sure that anyone watching for threads hitting breakpoints with
+-- 'readAnyThreadEvalBreak' ignore the given thread if it ever hits a breakpoint.
+--
+-- This forces this thread's result to be received solely through
+-- 'readThreadEvalStatus' for that ThreadId, which is typically desired when an
+-- expression to run should not be seen at all by the debugger (e.g. when
+-- evaluating an expr to :force a variable)
+withShadowThread :: ThreadId -> IO a -> IO a
+withShadowThread tid = bracket_ setShadowThread unsetShadowThread
+  where
+    setShadowThread = atomically $ do
+      GlobalDbgStatus{..} <- readTVar globalDbgStatusVar
+      writeTVar globalDbgStatusVar
+        GlobalDbgStatus
+          { threadEvalStatuses
+          , shadowedThreads = Set.insert tid shadowedThreads
+          }
+    unsetShadowThread = atomically $ do
+      GlobalDbgStatus{..} <- readTVar globalDbgStatusVar
+      writeTVar globalDbgStatusVar
+        GlobalDbgStatus
+          { threadEvalStatuses
+          , shadowedThreads = Set.delete tid shadowedThreads
+          }
+
+-- | When we launch a new thread using the debugger, we map ... TODO ... all
+-- threads launched by that main stmt may further spawn threads, and any of
+-- them might hit a breakpoint (break array toggled, or per-thread step in
+-- might be used, or pause button, etc...).
+--
+-- When we launch that main thread we also write its result to this map. So
+-- this map will only contain the results of threads we explicitly care to
+-- observe the result of. Not all threads will write their results here,
+-- certainly not ones spawned unknowningly by the main stmt.
+-- ...
+-- todo words
+globalDbgStatusVar :: TVar GlobalDbgStatus
+globalDbgStatusVar = unsafePerformIO $ newTVarIO $ GlobalDbgStatus Map.empty Set.empty
 {-# NOINLINE globalDbgStatusVar #-}
 
-data DbgEvalStatus
-
-  -- | All threads running in the interpreter will be debugger-enabled, meaning
-  -- if they hit an enabled breakpoint, the 'globalBreakAction' will be
-  -- executed and write a 'DbgBreak' value to the global thread dbg status map.
-  -- The debugger will be waiting for threads to break using `readAnyThreadEvalBreak`.
-  = DbgBreak EvalBreak
-
-  -- | To evaluate a statement in the interpreter, a thread is forked by
-  -- `sandboxIO` to run the statement. To synchronize, the statement result
-  -- will be written by the thread to the global thread dbg status
-  -- (`writeThreadEvalStatus`). `sandboxIO` will block waiting for either any
-  -- breakpoint to be hit /or/ for the thread specifically to write its final result.
-  --
-  -- (The Word64 are the allocations just like in 'EvalComplete')
-  | DbgDone Word64 (EvalResult [HValueRef])
+data GlobalDbgStatus = GlobalDbgStatus
+  { threadEvalStatuses :: !(Map.Map ThreadId (EvalStatus [HValueRef]))
+  -- ^ Whenever a thread hits a breakpoint it inserts in this map its 'EvalBreak'.
+  -- We can additionally observe the result of a thread by calling
+  -- `writeThreadEvalStatus` at the end with its result, e.g. in 'sandboxIO'
+  , shadowedThreads    :: !(Set.Set ThreadId)
+  -- ^ Threads in this map are meant to be ignored by 'readAnyThreadEvalBreak'.
+  -- That is, even if one of the threads in this set hits a breakpoint, we
+  -- can only read its 'EvalBreak' with @'readThreadEvalStatus' tid@ directly.
+  }
