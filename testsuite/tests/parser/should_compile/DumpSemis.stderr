@@ -378,7 +378,7 @@
                         (Nothing))
                        (L
                         (EpAnn
-                         (EpaSpan { DumpSemis.hs:11:8-13 })
+                         (EpaSpan { DumpSemis.hs:11:6-15 })
                          []
                          (EpaComments
                           []))
@@ -640,7 +640,7 @@
                   (Nothing))
                  (L
                   (EpAnn
-                   (EpaSpan { DumpSemis.hs:(16,5)-(18,5) })
+                   (EpaSpan { DumpSemis.hs:(16,3)-(19,3) })
                    []
                    (EpaComments
                     []))
@@ -896,7 +896,7 @@
                   (Nothing))
                  (L
                   (EpAnn
-                   (EpaSpan { DumpSemis.hs:22:12-28 })
+                   (EpaSpan { DumpSemis.hs:22:10-30 })
                    []
                    (EpaComments
                     []))
