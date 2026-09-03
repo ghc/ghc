@@ -3063,9 +3063,9 @@ instance ExactPrint (HsExpr GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-exactDo :: (Monad m, Monoid w, ExactPrint (LocatedAn an a))
-        => DoAnn -> HsDoFlavour -> LocatedAn an a
-        -> EP w m (DoAnn, LocatedAn an a)
+exactDo :: (Monad m, Monoid w, ExactPrint a, Typeable t, Traversable t, ExactPrint (LocatedA (t a)))
+        => DoAnn -> HsDoFlavour -> LocatedA (t a)
+        -> EP w m (DoAnn, LocatedA (t a))
 exactDo (an,l) (DoExpr m)    stmts = exactMdo l m "do" >>=
                                    \l0 -> markMaybeDodgyStmts (an,l0) stmts
 exactDo (an,l) GhciStmtCtxt  stmts = printStringAtAA l "do" >>=
@@ -3083,22 +3083,23 @@ exactMdo l (Just module_name) kw = printStringAtAA l n
     where
       n = (moduleNameString module_name) ++ "." ++ kw
 
-markMaybeDodgyStmts :: (Monad m, Monoid w, ExactPrint (LocatedAn an a))
-  => DoAnn -> LocatedAn an a -> EP w m (DoAnn, LocatedAn an a)
-markMaybeDodgyStmts (an,l) stmts =
-  if notDodgy stmts
+markMaybeDodgyStmts :: (Monad m, Monoid w, Typeable t, Traversable t, ExactPrint a, ExactPrint (LocatedA (t a)))
+  => DoAnn -> LocatedA (t a) -> EP w m (DoAnn, LocatedA (t a))
+markMaybeDodgyStmts (an,l) s@(L ls stmts) =
+  if notDodgy s
     then do
-      (an0,stmts') <- case an of
+      (an0,L ls' stmts') <- case an of
         Left (o,c) -> do
           o' <- markEpToken o
-          r <- markAnnotated stmts
+          r <- markAnnotated (L ls stmts)
           c' <- markEpToken c
           return (Left (o',c'), r)
         Right an' -> do
-         (an'',r') <- markAnnListA an' $ markAnnotated stmts
-         return (Right an'',r')
-      return ((an0, l), stmts')
-    else return ((an, l), stmts)
+         L ls' (List an'' stmts'') <- markAnnotated (L ls (List an' stmts))
+         -- (an'',r') <- markAnnListA an' $ markAnnotated stmts
+         return (Right an'', L ls' stmts'')
+      return ((an0, l), L ls' stmts')
+    else return ((an, l), L ls stmts)
 
 notDodgy :: GenLocated (EpAnn ann) a -> Bool
 notDodgy (L (EpAnn anc _ _) _) = notDodgyE anc
