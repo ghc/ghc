@@ -1,0 +1,12 @@
+True
+"Foo (T' a) instance"
+(1,"$fEqT","Eq")
+(0,"$fFooT","Foo (T a)")
+(1,"$fFooT'","Foo (T' a)")
+(1,"$fFunctorT","Functor")
+(0,"$fShowT","Show")
+(0,"defMeth","defMeth = const \"class default\"")
+(0,"defMeth","defMeth = const \"Foo (T' a) instance\"")
+(0,"defMeth'","defMeth' = const \"class default\"")
+(0,"reqMeth","reqMeth = const \"Foo (T a) instance\"")
+(1,"reqMeth","reqMeth = const \"Foo (T' a) instance\"")
