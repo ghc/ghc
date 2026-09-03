@@ -19,11 +19,17 @@ lintRules = do
   "libraries" -/- "base" -/- "include" -/- "HsBaseConfig.h" %> \_ ->
       -- ./configure is called here manually because we need to generate
       -- HsBaseConfig.h, which is created from HsBaseConfig.h.in. ./configure
-      cmd_ (Cwd "libraries/base") "./configure"
+      runConfigure "libraries/base"
   "rts" -/- "include" -/- "ghcautoconf.h" %> \_ ->
-      cmd_ (Cwd "rts") "./configure"
+      runConfigure "rts"
   "rts" -/- "include" -/- "ghcplatform.h" %> \_ ->
-      cmd_ (Cwd "rts") "./configure"
+      runConfigure "rts"
+
+-- | Run a package's @configure@ script, from that package's directory.
+runConfigure :: FilePath -> Action ()
+runConfigure dir = do
+  configureProg <- exeSpawnPath (dir -/- "configure")
+  cmdExe configureProg [Cwd dir]
 
 lint :: Action () -> Action ()
 lint lintAction = do
@@ -46,9 +52,8 @@ runHLint includeDirs defines dir = do
   hostArch <- (<> "_HOST_ARCH") <$> queryHostTarget queryArch
   let hlintYaml = dir </> ".hlint.yaml"
       defines' = hostArch : defines
-      cmdLine = unwords $
-        [ "hlint"
-        , "--colour=never"
+      hlintArgs =
+        [ "--colour=never"
         , "-j" <> show threads
         ] ++
         map ("--cpp-define=" <>) defines' ++
@@ -56,8 +61,10 @@ runHLint includeDirs defines dir = do
         [ "-h" <> hlintYaml
         , dir
         ]
+      cmdLine = unwords ("hlint" : hlintArgs)
   putBuild $ "| " <> cmdLine
-  cmd_ cmdLine
+  hlintProg <- exeSpawnPath "hlint"
+  cmdExe hlintProg hlintArgs
 
 base :: Action ()
 base = do

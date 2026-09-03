@@ -61,10 +61,10 @@ class ShakeValue b => Builder b where
     runBuilderWith builder buildInfo = do
         let args = buildArgs buildInfo
         needBuilders [builder]
-        path <- builderPath builder
+        prog <- exeSpawnPath =<< builderPath builder
         let msg = if null args then "" else " (" ++ intercalate ", " args ++ ")"
         putBuild $ "| Run " ++ show builder ++ msg
-        quietly $ cmd (buildOptions buildInfo) [path] args
+        quietly $ cmdExe prog (buildOptions buildInfo) args
 
 needBuilders :: Builder b => [b] -> Action ()
 needBuilders bs = do

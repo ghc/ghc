@@ -42,8 +42,9 @@ changelogRules = do
 
         top <- topDirectory
         let outFile = top -/- "docs" -/- "users_guide" -/- version ++ "-notes.rst"
-        quietly $ cmd (FileStdout outFile)
-            [progPath] [top -/- "changelog.d/", "--version", version]
+        prog <- exeSpawnPath progPath
+        quietly $ cmdExe prog (FileStdout outFile)
+            [top -/- "changelog.d/", "--version", version]
             :: Action ()
         putSuccess $ "| Generated release notes: " ++ outFile
 

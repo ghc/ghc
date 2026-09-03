@@ -34,4 +34,5 @@ codes usage = do
       cmdLine = unwords ( codesProgram : args )
   putBuild $ "| Computing " ++ describeUsage usage ++ " diagnostic codes."
   putBuild $ "| " <> cmdLine
-  cmd_ cmdLine
+  codesProg <- exeSpawnPath codesProgram
+  cmdExe codesProg args

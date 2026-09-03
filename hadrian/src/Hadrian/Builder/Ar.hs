@@ -36,7 +36,7 @@ instance NFData   ArMode
 -- via a response file is not supported by some versions of @ar@, in which
 -- case you should use 'runArWithoutTempFile' instead.
 runAr :: FilePath    -- ^ base name to use for response files
-      -> FilePath    -- ^ path to @ar@
+      -> ExeSpawnPath   -- ^ path to @ar@
       -> [String]    -- ^ other arguments
       -> [FilePath]  -- ^ input file paths
       -> [CmdOption] -- ^ Additional options
@@ -44,17 +44,17 @@ runAr :: FilePath    -- ^ base name to use for response files
 runAr outputFilePath arPath flagArgs fileArgs buildOptions = do
     rspFile <- responseFilePath outputFilePath
     writeFileAtomic rspFile $ unwords fileArgs
-    cmd [arPath] flagArgs ('@' : rspFile) buildOptions
+    cmdExe arPath flagArgs ('@' : rspFile) buildOptions
 
 -- | Invoke @ar@ given a path to it and a list of arguments. Note that @ar@
 -- will be called multiple times if the list of files to be archived is too
 -- long and doesn't fit into the command line length limit. This function is
 -- typically much slower than 'runAr'.
-runArWithoutTempFile :: FilePath    -- ^ path to @ar@
+runArWithoutTempFile :: ExeSpawnPath   -- ^ path to @ar@
                      -> [String]    -- ^ other arguments
                      -> [FilePath]  -- ^ input file paths
                      -> [CmdOption] -- ^ Additional options
                      -> Action ()
 runArWithoutTempFile arPath flagArgs fileArgs buildOptions =
     forM_ (chunksOfSize cmdLineLengthLimit fileArgs) $ \argsChunk ->
-        unit (cmd [arPath] (flagArgs ++ argsChunk) buildOptions)
+        unit (cmdExe arPath (flagArgs ++ argsChunk) buildOptions)

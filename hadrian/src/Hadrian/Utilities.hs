@@ -11,6 +11,7 @@ module Hadrian.Utilities (
     -- * FilePath manipulation
     unifyPath, (-/-), makeRelativeNoSysLink, makeAbsolute,
     isMsysPath, windowsToMsysPathList,
+    ExeSpawnPath, exeSpawnPath, cmdExe,
 
     -- * Accessing Shake's type-indexed map
     insertExtra, lookupExtra, userSetting,
@@ -53,7 +54,9 @@ import Data.Typeable (TypeRep, typeOf)
 import Development.Shake hiding (Normal)
 import qualified Development.Shake as Shake
 import Development.Shake.Classes
-import Development.Shake.Command (CmdArgument (..), IsCmdArgument (toCmdArgument))
+import Control.Exception.Extra (Partial)
+import Development.Shake.Command
+  (CmdArgument (..), CmdArguments (cmdArguments), IsCmdArgument (toCmdArgument))
 import Development.Shake.FilePath
 import GHC.ResponseFile (escapeArgs)
 import System.Environment (lookupEnv)
@@ -212,6 +215,76 @@ makeAbsolute fp = do
   let fp' = cwd -/- fp
   return $ Posix.normalise fp'
 
+{- Note [NeedCurrentDirectoryForExePath]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The Windows API specifies some rather convoluted rules for whether the current
+directory is included in the search when looking for an executable (e.g. for
+CreateProcess). The documentation states:
+
+  https://learn.microsoft.com/en-us/windows/win32/api/processenv/nf-processenv-needcurrentdirectoryforexepatha
+
+  NeedCurrentDirectoryForExePathA function
+  Determines whether the current directory should be included in the search path
+  for the specified executable.
+
+  If CreateProcess is called with a relative executable name, it will
+  automatically search for the executable, calling this function to determine
+  the search path.
+
+  The value of the NoDefaultCurrentDirectoryInExePath environment variable
+  determines the value this function returns.
+  If the value of the ExeName parameter contains a backslash (\), this function
+  will always return TRUE. If it does not contain a backslash, the existence of
+  the NoDefaultCurrentDirectoryInExePath environment variable is checked, and
+  not its value.
+
+In practice, this means that when we create a process with the executable being
+specified using a relative path, whether the lookup succeeds depends on
+minutiae of the path. Assuming that NoDefaultCurrentDirectoryInExePath is set,
+the behaviour is as follows:
+
+  bin\target.exe   -- SUCCEEDS: contains backslash
+  bin/target.exe   -- FAILS
+  ./bin/target.exe -- SUCCEEDS: ./ specifically means "in CWD"
+
+To avoid process spawning behaviour depending on the value of the
+NoDefaultCurrentDirectoryInExePath environment variable, we have a few choices
+for how to specify executable paths when creating a process:
+
+  1. Always use absolute paths.
+  2. Always use backslashes.
+  3. Add "./" to the front of relative paths.
+
+We choose to implement (1), see 'exeSpawnPath'. It's the most robust option, as
+it pins down the exact executable path (no search needed); (2) would go against
+Note [MSYS paths].
+-}
+
+-- | An executable path suitable for 'createProcess'.
+--
+-- See Note [NeedCurrentDirectoryForExePath].
+newtype ExeSpawnPath = ExeSpawnPath FilePath
+
+instance IsCmdArgument ExeSpawnPath where
+  toCmdArgument (ExeSpawnPath path) = toCmdArgument [path]
+
+-- | Resolve the path of a program into an 'ExeSpawnPath' suitable for a
+-- 'createProcess' invocation.
+--
+-- See Note [NeedCurrentDirectoryForExePath].
+exeSpawnPath :: FilePath -> Action ExeSpawnPath
+exeSpawnPath path
+  -- Don't touch a bare program name (e.g. "clang"), as that resolves from PATH.
+  | path == takeFileName path = return $ ExeSpawnPath path
+  | otherwise                 = ExeSpawnPath <$> liftIO (makeAbsolute path)
+
+-- | Like Shake's 'cmd', except that the program to run must be given as an
+-- 'ExeSpawnPath'. Prefer this over 'cmd', which would accept any 'String'.
+--
+-- See Note [NeedCurrentDirectoryForExePath].
+cmdExe :: (Partial, CmdArguments args) => ExeSpawnPath -> args
+cmdExe = cmdArguments . toCmdArgument
+
 -- | This is like Posix makeRelative, but assumes no sys links in the input
 -- paths. This allows the result to start with possibly many "../"s. Input
 -- paths must both be relative, or be on the same drive
@@ -364,23 +437,25 @@ isGeneratedSource file = buildRoot <&> (`isPrefixOf` file)
 -- response file arguments are placed into a response file and escaped with @GHC.ResponseFile.escapeArgs@.
 withResponseFileIfLongCmd ::
     CmdResult c
-    => FilePath     -- ^ Response base name. The reponse file is placed in @_build/rsp/\<Response base name\>@.
-    -> CmdArgument  -- ^ Command and arguments before the response file arguments.
-    -> [String]     -- ^ Response file aruguments.
-    -> CmdArgument  -- ^ Command arguments after the response file arguments.
+    => FilePath      -- ^ Response base name. The reponse file is placed in @_build/rsp/\<Response base name\>@.
+    -> ExeSpawnPath  -- ^ The program to run.
+    -> CmdArgument   -- ^ Command arguments before the response file arguments.
+    -> [String]      -- ^ Response file aruguments.
+    -> CmdArgument   -- ^ Command arguments after the response file arguments.
     -> Action c
-withResponseFileIfLongCmd outputFilePath argsPre argsResp argsPost = do
+withResponseFileIfLongCmd outputFilePath prog argsPre argsResp argsPost = do
     let cmdLineLengh = sum
             [ 1 + length arg -- add one to account for space inbetween arguments
-            | let CmdArgument args = argsPre <> toCmdArgument argsResp <> argsPost
+            | let CmdArgument args =
+                    toCmdArgument prog <> argsPre <> toCmdArgument argsResp <> argsPost
             , Right arg <- args
             ]
     if cmdLineLengh < cmdLineLengthLimit
-        then cmd argsPre argsResp argsPost
+        then cmdExe prog argsPre argsResp argsPost
         else do
             rspFile <- responseFilePath outputFilePath
             writeFileAtomic rspFile (escapeArgs argsResp)
-            cmd argsPre ['@' : rspFile] argsPost
+            cmdExe prog argsPre ['@' : rspFile] argsPost
 
 -- | Convert a command's output file path to a response file path to be used for that command.
 -- Response files are placed in a dedicated @rps@ directory under the build directory. This avoids
@@ -466,14 +541,16 @@ fixFile file f = do
 makeExecutable :: FilePath -> Action ()
 makeExecutable file = do
     putProgressInfo $ "| Make " ++ quote file ++ " executable."
-    quietly $ cmd "chmod +x " [file]
+    chmodProg <- exeSpawnPath "chmod"
+    quietly $ cmdExe chmodProg ["+x", file]
 
 
 -- | Move a file. Note that we cannot track the source, because it is moved.
 moveFile :: FilePath -> FilePath -> Action ()
 moveFile source target = do
     putProgressInfo =<< renderAction "Move file" source target
-    quietly $ cmd ["mv", source, target]
+    mvProg <- exeSpawnPath "mv"
+    quietly $ cmdExe mvProg [source, target]
 
 -- | Remove a file that doesn't necessarily exist.
 removeFile :: FilePath -> Action ()
@@ -491,13 +568,15 @@ createDirectory dir = do
 copyDirectory :: FilePath -> FilePath -> Action ()
 copyDirectory source target = do
     putProgressInfo =<< renderAction "Copy directory" source target
-    quietly $ cmd ["cp", "-r", source, target]
+    cpProg <- exeSpawnPath "cp"
+    quietly $ cmdExe cpProg ["-r", source, target]
 
 -- | Move a directory. The contents of the source directory is untracked.
 moveDirectory :: FilePath -> FilePath -> Action ()
 moveDirectory source target = do
     putProgressInfo =<< renderAction "Move directory" source target
-    quietly $ cmd ["mv", source, target]
+    mvProg <- exeSpawnPath "mv"
+    quietly $ cmdExe mvProg [source, target]
 
 -- | Remove a directory that doesn't necessarily exist.
 removeDirectory :: FilePath -> Action ()
