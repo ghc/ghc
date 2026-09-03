@@ -235,10 +235,17 @@ instance Diagnostic DriverMessage where
                        "but no output will be generated.") $$
                        (text "There is no module named" <+>
                        quotes (ppr mod_name) <> text "."))
-    DriverHomePackagesNotClosed needed_unit_ids
-      -> mkSimpleDecorated $ vcat ([text "Home units are not closed."
-                                  , text "It is necessary to also load the following units:" ]
-                                  ++ map (\uid -> text "-" <+> ppr uid) needed_unit_ids)
+    DriverHomePackagesNotClosed offending_dependencies
+      -> mkSimpleDecorated $
+         hang (text "Some units are not loaded but depend on loaded units.")
+              4
+              (vcat (map pprDependency offending_dependencies))
+      where
+
+        pprDependency :: (UnitId, UnitId) -> SDoc
+        pprDependency (external_unit, home_unit)
+          = ppr external_unit <+> arrow <+> ppr home_unit
+
     DriverInterfaceError reason -> diagnosticMessage (ifaceDiagnosticOpts opts) reason
 
     DriverInconsistentDynFlags msg

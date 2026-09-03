@@ -10,14 +10,21 @@ CONFIGURE=configure \
 	  --ghc-options='$(TEST_HC_OPTS)' \
 	  --package-db=../tmp.d
 TEST_BUILD='$(TEST_HC)' $(TEST_HC_OPTS) -fhide-source-paths -fforce-recomp
+ONLY_BASE=-hide-all-packages -package base
 
 mhu-closure: clean pkg-database
-	$(TEST_BUILD) -unit @unitP
-	$(TEST_BUILD) -unit @unitP -unit @unitQ
+	! $(TEST_BUILD) -unit @unitP
+	! $(TEST_BUILD) -unit @unitP -unit @unitQ
 	! $(TEST_BUILD) -unit @unitP -unit @unitR
 	! $(TEST_BUILD) -unit @unitP -unit @unitR1
 	$(TEST_BUILD) -unit @unitP -unit @unitQ -unit @unitR
-	$(TEST_BUILD) -unit @unitP -unit @unitQ -unit @unitR1
+	! $(TEST_BUILD) -unit @unitP -unit @unitQ -unit @unitR1
+	$(TEST_BUILD) $(ONLY_BASE) -unit @unitP
+	$(TEST_BUILD) $(ONLY_BASE) -unit @unitP -unit @unitQ
+	! $(TEST_BUILD) $(ONLY_BASE) -unit @unitP -unit @unitR
+	! $(TEST_BUILD) $(ONLY_BASE) -unit @unitP -unit @unitR1
+	$(TEST_BUILD) $(ONLY_BASE) -unit @unitP -unit @unitQ -unit @unitR
+	$(TEST_BUILD) $(ONLY_BASE) -unit @unitP -unit @unitQ -unit @unitR1
 
 .PHONY: pkg-database
 pkg-database:

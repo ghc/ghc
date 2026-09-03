@@ -308,6 +308,7 @@ data GlobalUnitKey =
   GlobalUnitKey
     !UnitId -- ^ Unit Id of the 'UnitInfo'
     !UnitAbiHash -- ^ ABI hash of the 'UnitInfo'
+  deriving (Eq, Ord)
 
 globalUnitKeyFromUnitInfo :: UnitInfo -> GlobalUnitKey
 globalUnitKeyFromUnitInfo ui = mkGlobalUnitKey (unitId ui) (unitAbiHash ui)

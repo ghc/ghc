@@ -6,6 +6,8 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-invalid-haddock #-}
+
 -- | See Note [The ModuleGraph]
 module GHC.Driver.Downsweep
   ( downsweep
@@ -54,7 +56,6 @@ import GHC.Runtime.Context
 import Language.Haskell.Syntax.ImpExp
 import GHC.Types.UnresolvedImport
 
-import GHC.Data.Graph.Directed
 import GHC.Data.FastString
 import GHC.Data.Maybe      ( expectJust )
 import qualified GHC.Data.Maybe as M
@@ -71,12 +72,14 @@ import GHC.Utils.Logger
 import GHC.Utils.Fingerprint
 import GHC.Utils.TmpFs
 import GHC.Utils.Constants
+import GHC.Utils.Monad.State.Strict
 
 import GHC.Types.Error
 import GHC.Types.Target
 import GHC.Types.SourceFile
 import GHC.Types.SourceError
 import GHC.Types.SrcLoc
+import GHC.Types.Unique.Set
 import GHC.Types.Unique.Map
 import GHC.Types.PkgQual
 import GHC.Types.Basic
@@ -91,9 +94,12 @@ import GHC.Unit.Module.Graph
 import GHC.Unit.Module.Deps
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Module.Stage
+import GHC.Unit.External.Index (GlobalUnitKey, mkGlobalUnitKey)
 
 import Data.Either ( partitionEithers, lefts )
+import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Set (Set)
 import qualified Data.Set as Set
 
 import Control.Concurrent.MVar
@@ -101,7 +107,7 @@ import Control.Monad
 import Control.Monad.Trans.Except ( ExceptT(..), runExceptT, throwE )
 import qualified Control.Monad.Catch as MC
 import Data.Maybe
-import Data.List (partition)
+import Data.List (sort, partition)
 import Data.Time
 import Data.List (unfoldr)
 import Data.Bifunctor (first, bimap)
@@ -933,52 +939,172 @@ rootSummariesParallel n_jobs hsc_env diag_wrapper msg get_summary = do
 -- * Check/validate properties and error out
 --------------------------------------------------------------------------------
 
--- | This function checks then important property that if both p and q are home units
--- then any dependency of p, which transitively depends on q is also a home unit.
+-- | Checks whether the given 'UnitEnv' has the closure property.
 --
--- See Note [Multiple Home Units], section 'Closure Property'.
-checkHomeUnitsClosed ::  UnitEnv -> [DriverMessages]
-checkHomeUnitsClosed ue
-    | Set.null bad_unit_ids = []
-    | otherwise = [singleMessage $ mkPlainErrorMsgEnvelope rootLoc $ DriverHomePackagesNotClosed (Set.toList bad_unit_ids)]
+--   See the section “Closure Property” in @Note [Multiple Home Units]@ for the
+--   definition of the closure property an @Note [Home unit closure property
+--   check]@ below for a discussion of the algorithm used for this check, its
+--   justification, and a potential alternative.
+checkHomeUnitsClosed :: UnitEnv -> [DriverMessages]
+checkHomeUnitsClosed unit_env
+  | null offenders = []
+  | otherwise      = [
+                        singleMessage                                $
+                        mkPlainErrorMsgEnvelope error_source_span    $
+                        DriverHomePackagesNotClosed (sort offenders)
+                     ]
   where
-    home_id_set = HUG.allUnits $ ue_home_unit_graph ue
-    bad_unit_ids = upwards_closure Set.\\ home_id_set {- Remove all home units reached, keep only bad nodes -}
-    rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
 
-    downwards_closure :: Graph (Node UnitId UnitId)
-    downwards_closure = graphFromEdgedVerticesUniq graphNodes
+  -- | The 'UnitId' and 'HomeUnitEnv' of each home unit.
+  home_unit_data :: [(UnitId, HomeUnitEnv)]
+  home_unit_data = HUG.unitEnv_assocs (ue_home_unit_graph unit_env)
 
-    inverse_closure = graphReachability $ transposeG downwards_closure
+  -- | The 'UnitId's of all home units.
+  home_units :: UniqSet UnitId
+  home_units = mkUniqSet (map fst home_unit_data)
 
-    upwards_closure = Set.fromList $ map node_key $ allReachableMany inverse_closure [DigraphNode uid uid [] | uid <- Set.toList home_id_set]
+  -- | All offending dependencies. A dependency of a unit /u/ on a unit /v/ is
+  --   offending exactly if /u/ is an external unit reachable from a home unit
+  --   and /v/ is a home unit. Each such dependency is represented in this list
+  --   by the pair of the 'UnitId' of /u/ and the 'UnitId' of /v/.
+  offenders :: [(UnitId, UnitId)]
+  offenders
+    = evalState (collect (map (homeUnitEnv_units . snd) home_unit_data)) $
+      Set.empty
+    where
 
-    all_unit_direct_deps :: UniqMap UnitId (Set.Set UnitId)
-    all_unit_direct_deps
-      = HUG.unitEnv_foldWithKey go emptyUniqMap $ ue_home_unit_graph ue
+    -- | Collects offending dependencies.
+    collect :: [UnitState]
+               -- ^ The 'UnitState's of the home units from which to traverse
+               --   the dependency graph.
+            -> State (Set GlobalUnitKey) [(UnitId, UnitId)]
+               -- ^ A stateful computation that collects offending dependencies
+               --   that have not yet been found, using its state to keep track
+               --   of which units have already been considered as sources of
+               --   offending dependencies.
+    collect []
+      = pure []
+    collect (current_unit_state : remaining_unit_states)
+      = (++) <$> collect_for_home_unit
+                   (unitInfoMap current_unit_state)
+                   (map (toUnitId . fst) $ explicitUnits $ current_unit_state)
+             <*> collect remaining_unit_states
       where
-        go rest this this_uis =
-           plusUniqMap_C Set.union
-             (addToUniqMap_C Set.union external_depends this (Set.fromList $ this_deps))
-             rest
-           where
-             external_depends = mapUniqMap (Set.fromList . unitDepends) (unitInfoMap this_units)
-             this_units = homeUnitEnv_units this_uis
-             this_deps = [ toUnitId unit | (unit,Just _) <- explicitUnits this_units]
 
-    graphNodes :: [Node UnitId UnitId]
-    graphNodes = go Set.empty home_id_set
-      where
-        go done todo
-          = case Set.minView todo of
-              Nothing -> []
-              Just (uid, todo')
-                | Set.member uid done -> go done todo'
-                | otherwise -> case lookupUniqMap all_unit_direct_deps uid of
-                    Nothing -> pprPanic "uid not found" (ppr (uid, all_unit_direct_deps))
-                    Just depends ->
-                      let todo'' = (depends Set.\\ done) `Set.union` todo'
-                      in DigraphNode uid uid (Set.toList depends) : go (Set.insert uid done) todo''
+      -- | Collects offending dependencies that are reachable from a particular
+      --   home unit.
+      collect_for_home_unit
+        :: UnitInfoMap
+           -- ^ The 'UnitInfoMap' of the home unit.
+        -> [UnitId]
+           -- ^ The 'UnitId's of the units from which to traverse the dependency
+           --   graph.
+        -> State (Set GlobalUnitKey) [(UnitId, UnitId)]
+           -- ^ A stateful computation that collects offending dependencies that
+           --   have not yet been found, using its state to keep track of which
+           --   units have already been considered as sources of offending
+           --   dependencies.
+      collect_for_home_unit _ []
+        = return []
+      collect_for_home_unit unit_info_map (current_unit : remaining_units) = do
+        let
+
+          -- | The 'UnitInfo' of the current unit.
+          unit_info :: UnitInfo
+          unit_info
+            = fromMaybe (pprPanic unit_not_found_msg (ppr current_unit)) $
+              lookupUniqMap unit_info_map current_unit
+            where
+
+            -- | The message that says that a unit was not found.
+            unit_not_found_msg :: String
+            unit_not_found_msg = "Unit not found during closure property check"
+
+          -- | A 'GlobalUnitKey' that identifies the current unit.
+          global_unit_key :: GlobalUnitKey
+          global_unit_key = mkGlobalUnitKey current_unit (unitAbiHash unit_info)
+
+        has_been_processed <- gets (Set.member global_unit_key)
+        if has_been_processed
+          then collect_for_home_unit unit_info_map remaining_units
+          else do
+            modify (Set.insert global_unit_key)
+            let
+
+              -- | The 'UnitId's of the units that the current unit depends on.
+              needed_units :: [UnitId]
+              needed_units = unitDepends unit_info
+
+              -- | The offending dependencies of the current unit.
+              current_offenders :: [(UnitId, UnitId)]
+              current_offenders
+                | current_unit `elementOfUniqSet` home_units
+                  = []
+                | otherwise
+                  = map ((,) current_unit) $
+                    nonDetEltsUniqSet $
+                    mkUniqSet needed_units `intersectUniqSets` home_units
+
+            remaining_offenders <- collect_for_home_unit unit_info_map $
+                                   needed_units ++ remaining_units
+            return $ current_offenders ++ remaining_offenders
+
+  -- | A fake source span used for reporting violations of the closure property.
+  error_source_span :: SrcSpan
+  error_source_span = mkGeneralSrcSpan (fsLit "<command line>")
+
+{-
+
+Note [Home unit closure property check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Per the definition in Note [Multiple Home Units], a unit environment has the
+closure property exactly if there are no paths /h/₁ →* /e/ →* /h/₂ in the
+dependency graph, where /h/₁ and /h/₂ are home units and /e/ is an external
+unit. However, the algorithm used by 'checkHomeUnitsClosed' searches for
+so-called offending dependencies, which are dependencies /e/ → /h/₂ that are
+part of a path /h/₁ →* /e/ → /h/₂ in the dependency graph. To see that this is a
+viable approach, consider the following:
+
+  * A path /h/₁ →* /e/ → /h/₂ is also a path /h/₁ →* /e/ →* /h/₂.
+
+  * For each path /h/₁ →* /e/ →* /h/₂, there exists a path /h/₁ →* /e/′ → /h/₂′,
+    where /e/′ is an external unit and /h/₂′ is a home unit. Such a path can be
+    constructed by taking as /h/₂′ the first home unit on the path /e/ →* /h/₂
+    and as /e/′ the, necessarily external, unit preceding it.
+
+Concretely, the algorithm picks one home unit after the other, determines what
+units it directly depends on, and, starting from them, follows unit dependencies
+to search for offending dependencies. It does not follow dependencies that have
+been followed before, possibly when processing another home unit. To achieve
+this, the algorithm tracks, across home units, from which units it has already
+followed dependencies. For this tracking, it identifies each unit by a
+'GlobalUnitKey', which is a pair of a 'UnitId' and an ABI hash. Using only a
+'UnitId' would not work, because 'UnitId's are not always globally unique. Also
+using only an ABI hash is not an option, because an ABI hash is not necessarily
+an ABI hash: it can also be the string @"inline"@.
+
+The correctness of this algorithm rests on the, likely correct, assumption that,
+among the units mentioned in the 'UnitState' of a particular home unit, any unit
+can be uniquely identified by its 'UnitId' and thus 'UnitId' clashes can only
+occur across the 'UnitState's of different home units.
+
+An alternative approach to finding offending dependencies would be to follow
+dependencies starting from all units that /any/ home unit directly depends on
+instead of considering the different home units separately. A corresponding
+algorithm could in principle find the dependencies of a particular unit
+independently of any home unit by fetching the 'UnitInfo' of that unit from the
+'GlobalUnitInfoMap'. However, for such a lookup the algorithm would need not
+only the 'UnitId' but also the ABI hash of the unit in question. Therefore,
+whenever following a dependency of a unit /u/ on a unit /v/, it would have to
+determine the ABI hash of /v/, so that it could later look up /v/’s
+dependencies. The ABI hashes of all units that /u/ depends on should be
+available in the 'unitAbiDepends' field of /u/’s 'UnitInfo'. However, at the
+time of writing, 'unitAbiDepends' never contained anything other than the empty
+list during GHC test runs, which indicated that this alternative solution was
+impossible to realize.
+
+-}
 
 --------------------------------------------------------------------------------
 -- * Enable Code Gen for Template Haskell
@@ -1763,7 +1889,7 @@ data NodeRes v
 --
 -- See also Note [Downsweep Control Flow and Caching]
 dfsBuild :: (Ord k, Monad m)
-         => Maybe (Map.Map k (NodeRes v))
+         => Maybe (Map k (NodeRes v))
          -- ^ Base map, existing results. We won't re-expand any of the nodes
          -- already present in this map.
          -> [n]
@@ -1773,7 +1899,7 @@ dfsBuild :: (Ord k, Monad m)
          -> (n -> m (NodeRes (v,[n])))
          -- ^ Expand this node into its payload result and into the list of
          -- children nodes to visit next.
-         -> m (Map.Map k (NodeRes v))
+         -> m (Map k (NodeRes v))
          -- ^ The result accumulates the payload of expanding the root nodes
          -- and all nodes transitively reachable from those roots.
 dfsBuild base_map roots key expand = go roots (fromMaybe Map.empty base_map)
