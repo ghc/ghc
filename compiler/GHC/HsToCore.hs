@@ -170,7 +170,8 @@ deSugar hsc_env
                                        (hsc_logger hsc_env)
                                        (initTicksConfig (hsc_dflags hsc_env))
                                        mod mod_loc
-                                       export_set (typeEnvTyCons type_env) binds
+                                       export_set (typeEnvTyCons type_env)
+                                       insts binds
                               else return (binds, Nothing)
         ; let modBreaks
                 | Just (_, _, breakpointSpecs) <- m_tickInfo
