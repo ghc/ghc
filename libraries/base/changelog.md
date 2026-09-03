@@ -8,6 +8,7 @@
   * Hide implementation details of `throw` and `throwSTM` from exception stack traces ([CLC proposal #387](https://github.com/haskell/core-libraries-committee/issues/387), [#26808](https://gitlab.haskell.org/ghc/ghc/-/issues/26808))
   * GHC internals re-exported from `GHC.Num` have been deprecated and will be removed after one major release ([CLC proposal #360](https://github.com/haskell/core-libraries-committee/issues/360))
   * The implementation of `toException` in `SomeException`'s `Exception` instance no longer drops exception context, in keeping with the behavior originally proposed in [CLC Proposal #200](https://github.com/haskell/core-libraries-committee/issues/200).
+  * Fix `retry` and async exception delivery inside a `catchSTM` handler ([#27657](https://gitlab.haskell.org/ghc/ghc/-/issues/27657))
 
 ## 4.22.0.0 *December 2025*
   * Shipped with GHC 9.14.1
