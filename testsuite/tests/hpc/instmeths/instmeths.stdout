@@ -1,0 +1,12 @@
+True
+"Foo (T' a) instance"
+(1,"Eq a => Eq (T a)","Eq")
+(0,"Foo (T a)","Foo (T a)")
+(1,"Foo (T' a)","Foo (T' a)")
+(1,"Functor T","Functor")
+(0,"Show a => Show (T a)","Show")
+(0,"defMeth","defMeth = const \"class default\"")
+(0,"defMeth","defMeth = const \"Foo (T' a) instance\"")
+(0,"defMeth'","defMeth' = const \"class default\"")
+(0,"reqMeth","reqMeth = const \"Foo (T a) instance\"")
+(1,"reqMeth","reqMeth = const \"Foo (T' a) instance\"")
