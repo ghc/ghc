@@ -409,6 +409,7 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
           , tcg_knot_vars          = hsc_type_env_vars hsc_env
           , tcg_known_key_maps     = known_key_maps_var
           , tcg_inst_env           = emptyInstEnv
+          , tcg_inst_meths         = emptyVarEnv
           , tcg_fam_inst_env       = emptyFamInstEnv
           , tcg_ann_env            = emptyAnnEnv
           , tcg_complete_match_env = []
