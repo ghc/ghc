@@ -1770,7 +1770,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- Second pass over class and instance declarations,
                 -- now using the kind-checked decls
         traceTc "Tc6" empty ;
-        inst_binds <- tcInstDecls2 (tyClGroupTyClDecls tycl_decls) inst_infos ;
+        (inst_binds, inst_meths) <- tcInstDecls2 (tyClGroupTyClDecls tycl_decls) inst_infos ;
 
                 -- Foreign exports
         traceTc "Tc7" empty ;
@@ -1802,8 +1802,9 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                                  , tcg_anns    = tcg_anns tcg_env ++ annotations
                                  , tcg_ann_env = extendAnnEnvList (tcg_ann_env tcg_env) annotations
                                  , tcg_fords   = tcg_fords tcg_env ++ foe_decls ++ fi_decls
-                                 , tcg_dus     = tcg_dus tcg_env `plusDU` usesOnly fo_fvs } } ;
+                                 , tcg_dus     = tcg_dus tcg_env `plusDU` usesOnly fo_fvs
                                  -- tcg_dus: see Note [Newtype constructor usage in foreign declarations]
+                                 , tcg_inst_meths = tcg_inst_meths tcg_env `plusVarEnv` inst_meths } } ;
 
         -- See Note [Newtype constructor usage in foreign declarations]
         addUsedGREs NoDeprecationWarnings (bagToList fo_gres) ;

@@ -157,6 +157,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Avail
 import GHC.Types.Var
+import GHC.Types.Var.Env
 import GHC.Types.TypeEnv
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
@@ -530,6 +531,8 @@ data TcGblEnv
           -- NB. BangPattern is to fix a leak, see #15111
         tcg_fam_inst_env :: !FamInstEnv, -- ^ Ditto for family instances
           -- NB. BangPattern is to fix a leak, see #15111
+        tcg_inst_meths   :: IdEnv DFunId,
+          -- ^ Maps instance method Ids to the DFunId of the instance they belong to.
         tcg_ann_env      :: AnnEnv,     -- ^ And for annotations
         tcg_complete_match_env :: CompleteMatches,
         -- ^ The complete matches for all /home-package/ modules;
