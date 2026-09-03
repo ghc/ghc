@@ -184,6 +184,8 @@ execOptions = ExecOptions
   , execSourceFile = "<interactive>"
   , execLineNumber = 1
   , execWrap = EvalThis -- just run the statement, don't wrap it in anything
+  , execIsolateBreaks = True
+    -- by default we just care about breakpoints hit in this "main" thread
   }
 
 -- | Run a statement in the current interactive context.
@@ -209,7 +211,7 @@ execStmt input exec_opts@ExecOptions{..} = do
 -- doing preprocessing on the AST before execution, e.g. in GHCi (see
 -- GHCi.UI.runStmt).
 execStmt' :: GhcMonad m => GhciLStmt GhcPs -> String -> ExecOptions -> m ExecResult
-execStmt' stmt stmt_text ExecOptions{..} = do
+execStmt' stmt stmt_text opts@ExecOptions{..} = do
     hsc_env <- getSession
     let interp = hscInterp hsc_env
 
@@ -231,6 +233,7 @@ execStmt' stmt stmt_text ExecOptions{..} = do
         status <-
           liftIO $ do
             let eval_opts = initEvalOpts idflags' (enableGhcStepMode execSingleStep)
+                              { isolateThreadBreaks = execIsolateThreadBreaks }
             evalStmt interp eval_opts (execWrap hval)
 
         let ic = hsc_IC hsc_env
@@ -238,7 +241,7 @@ execStmt' stmt stmt_text ExecOptions{..} = do
 
             size = ghciHistSize idflags'
 
-        handleRunStatus execSingleStep stmt_text bindings ids
+        handleRunStatus opts stmt_text bindings ids
                         status (emptyHistory size)
 
 runDecls :: GhcMonad m => String -> m [Name]
@@ -290,14 +293,15 @@ emptyHistory size = nilBL size
 -- breakpoint if we don't care about that breakpoint (e.g. if using :steplocal
 -- or :stepmodule, rather than :step, we only care about certain breakpoints).
 handleRunStatus :: GhcMonad m
-                => SingleStep -> String
+                => ExecOptions
+                -> String
                 -> ResumeBindings
                 -> [Id]
                 -> EvalStatus_ [ForeignHValue] [HValueRef]
                 -> BoundedList History
                 -> m ExecResult
-
-handleRunStatus step expr bindings final_ids status history0 = do
+handleRunStatus ExecOptions{execSingleStep = step, execIsolateThreadBreaks}
+                expr bindings final_ids status history0 = do
   hsc_env <- getSession
   let
     interp = hscInterp hsc_env
@@ -392,6 +396,7 @@ handleRunStatus step expr bindings final_ids status history0 = do
       else do
         -- resume with the same step type
         let eval_opts = initEvalOpts dflags (enableGhcStepMode step)
+                          { isolateThreadBreaks = execIsolateThreadBreaks }
         status <- liftIO $ GHCi.resumeStmt interp eval_opts resume_ctxt_fhv
         history <- if not tracing then pure history0 else do
           history1 <- liftIO $ mkHistory hug apStack_fhv ibi

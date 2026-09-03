@@ -36,6 +36,7 @@ data ExecOptions
      , execSourceFile :: String             -- ^ filename (for errors)
      , execLineNumber :: Int                -- ^ line number (for errors)
      , execWrap :: ForeignHValue -> EvalExpr ForeignHValue
+     , execIsolateThreadBreaks :: Bool      -- ^ just like @'isolateThreadBreaks'@
      }
 
 -- | What kind of stepping are we doing?

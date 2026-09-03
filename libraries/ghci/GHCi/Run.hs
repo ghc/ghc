@@ -493,7 +493,12 @@ clearEvalStatus = \case
 --
 -- TODO: Note which explains when things are evacuated from the map, why
 -- EvalSuccess's don't leak, what is the idea, why have MVar and TVar, why have
--- shadowed threads
+-- shadowed threads. Must also explain whatever we come up with for Finalizers
+-- to make sure threads evacuate themselves out of the map. Explain in the note
+-- as well the status of GHCi multi-threaded, explaining it currently uses
+-- single-threaded
+--
+-- TODO: Write a blog post about multi-threaded debugging (mby with the contents of the note..)
 
 globalBreakStablePtr :: StablePtr BreakpointCallback
 globalBreakStablePtr = unsafePerformIO $ newStablePtr globalBreakAction
