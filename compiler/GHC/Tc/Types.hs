@@ -533,6 +533,7 @@ data TcGblEnv
           -- NB. BangPattern is to fix a leak, see #15111
         tcg_inst_meths   :: IdEnv DFunId,
           -- ^ Maps instance method Ids to the DFunId of the instance they belong to.
+          -- See Note [Instance Method Coverage] in GHC.HsToCore.Ticks.
         tcg_ann_env      :: AnnEnv,     -- ^ And for annotations
         tcg_complete_match_env :: CompleteMatches,
         -- ^ The complete matches for all /home-package/ modules;
