@@ -664,15 +664,8 @@ rnExpr e@(HsStatic _ expr) = do
         Splice _ _ -> addErr $ TcRnTHError $ IllegalStaticFormInSplice e
         _        -> return ()
 
-     -- Complain about nested-bound free vars
-     -- This is a deprecation warning in 9.14 only
-     -- In 9.16 it becomes an error
      ; mod <- getModule
      ; let fvExpr' = filterNameSet (nameIsLocalOrFrom mod) fvExpr
-           bad_fvs = filterNameSet (not . isExternalName) fvExpr'
-     ; unless (isEmptyNameSet bad_fvs) $
-       addDiagnostic (TcRnStaticFormWarning (nameSetElemsStable bad_fvs))
-
      ; return (HsStatic fvExpr' expr', fvExpr) }
 
 {-

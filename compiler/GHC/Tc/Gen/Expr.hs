@@ -573,9 +573,12 @@ tcExpr (HsStatic fvs expr) res_ty
               tcCheckPolyExprNC expr expr_ty
 
         -- Check that the free variables of the static form are closed.
-        -- It's OK to use nonDetEltsUniqSet here as the only side effects of
-        -- checkClosedInStaticForm are error messages.
-        ; mapM_ checkClosedInStaticForm $ nonDetEltsUniqSet fvs
+        -- Complain about nested-bound free vars
+        -- This is a deprecation warning in 9.14 only
+        -- In 10.0 it becomes an error
+        ; bad_fvs <- filterM checkClosedInStaticForm (nameSetElemsStable fvs)
+        ; unless (null bad_fvs) $
+          addDiagnostic (TcRnStaticFormWarning bad_fvs)
 
         -- Require the type of the argument to be Typeable.
         ; typeableClass <- tcLookupClass typeableClassName
@@ -1798,15 +1801,24 @@ checkMissingFields con_like rbinds arg_tys
 -}
 
 -- | Checks if the given name is closed and emits an error if not.
+-- Returns True if the name is a nested let-bound variable, for the
+-- deprecation warning.
 --
 -- See Note [Not-closed error messages].
-checkClosedInStaticForm :: Name -> TcM ()
+checkClosedInStaticForm :: Name -> TcM Bool
 checkClosedInStaticForm name = do
     type_env <- getLclTypeEnv
     case checkClosed type_env name of
-      Nothing -> return ()
-      Just reason -> addErrTc $ explain name reason
+      Nothing -> return (nested_term_var type_env)
+      Just reason -> do addErrTc $ explain name reason
+                        return False
   where
+    nested_term_var :: TcTypeEnv -> Bool
+    nested_term_var type_env
+      | isExternalName name = False
+      | Just (ATcId {}) <- lookupNameEnv type_env name = True
+      | otherwise = False
+
     -- See Note [Checking closedness].
     checkClosed :: TcTypeEnv -> Name -> Maybe NotClosedReason
     checkClosed type_env n = checkLoop type_env (unitNameSet n) n

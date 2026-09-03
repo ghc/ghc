@@ -1836,7 +1836,7 @@ instance Diagnostic TcRnMessage where
          pprUnusedName name reason
     TcRnStaticFormWarning names
       -> mkSimpleDecorated $
-         vcat [ hang (text "From GHC 9.16, static forms cannot mention nested let-bound variables")
+         vcat [ hang (text "From GHC 10.0, static forms cannot mention nested let-bound variables")
                    2 (text "Offending variables:" <+> pprWithCommas ppr names)
               , text "Solution: move these free variables to top level" ]
     TcRnQualifiedBinder rdr_name
