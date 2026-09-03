@@ -1,8 +1,0 @@
-section: compiler
-issues: #27440
-mrs: !16434
-synopsis:
-  Fix a panic on ``@ty`` in a pattern synonym RHS
-description:
-  An invisible type argument (``@ty``) in the right-hand side of an implicitly
-  bidirectional pattern synonym no longer causes a panic.

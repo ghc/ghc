@@ -1,5 +1,0 @@
-section: compiler
-synopsis: Fix a bug where the specialiser could drop an argument that the
-  function's stable unfolding still used, resulting in a runtime crash.
-mrs: !16519
-issues: #27703

@@ -87,13 +87,28 @@ Compiler
 - Make the order of usages deterministic (:ghc-ticket:`26877`)
 - Fix the interaction of ExplicitLevelImports with qualified imports (:ghc-ticket:`26616`, :ghc-ticket:`27385`)
 - Rename ZonkAny to UnusedType and add pretty printing logic for it (:ghc-ticket:`27390`)
+- Cache unit databases and use a global ``UnitIndex`` to deduplicate
+  ``UnitInfo``\s across multiple home units, reducing memory usage
+  (:ghc-ticket:`26423`, :ghc-ticket:`27500`, :ghc-ticket:`27748`)
+- Drop ``preloadClosure`` from ``UnitState`` (:ghc-ticket:`27308`)
+- Fix a bug where an argument used only by a function's stable unfolding could still be marked absent, resulting in a runtime crash. (:ghc-ticket:`27626`)
+- Fix a bug where an absent constraint argument could be replaced by an error thunk, which GHC then evaluated, crashing the program. (:ghc-ticket:`27627`)
+- Fix a bug where the specialiser could drop an argument that the function's stable unfolding still used, resulting in a runtime crash. (:ghc-ticket:`27703`)
+- Fix a bug where a class declared abstractly in an hs-boot file was assumed not to be unary, so GHC speculatively evaluated a dictionary that could be bottom, crashing the program. (:ghc-ticket:`27704`)
+- Fix a bug where ``-fspec-eval-dictfun`` could speculatively evaluate a looping dictionary whose recursion went through an hs-boot import, hanging the program. (:ghc-ticket:`27717`)
+- Fix a panic on ``@ty`` in a pattern synonym RHS (:ghc-ticket:`27440`)
+- Fix spurious out-of-scope errors from ``type ty`` in a pattern synonym RHS (:ghc-ticket:`27583`)
+- Fix a panic on a required type argument in a pattern synonym RHS (:ghc-ticket:`27586`)
+- Stop representation-polymorphism checks from producing a coercion that fails Core Lint. (:ghc-ticket:`27639`)
+- Fixed an issue that caused the specializer to sometimes loop on recursive dictionary superclasses. (:ghc-ticket:`27705`)
+- Bumped the maximum supported LLVM version to 23 (:ghc-ticket:`27764`)
 
 GHCi
 ~~~~
 
 - Added the ``-fimport-loaded-targets`` flag, which automatically imports all loaded targets into the GHCi session (:ghc-ticket:`26866`)
 - Added support for custom external interpreter commands, allowing GHC API clients to extend the external interpreter with their own message handlers (:ghc-ticket:`26652`)
-- Fix regression to allow loading modules into the GHCi after startup (:ghc-ticket:`27202`)
+- Fix regression to allow loading modules into the GHCi after startup (:ghc-ticket:`27202`, :ghc-ticket:`27640`)
 - Fixed the GHCi prompt and session home units to use a consistent package database stack, avoiding spurious ambiguous-import errors for home unit dependencies (:ghc-ticket:`27202`)
 - Fixed the order in which ``:info`` lists instances, which previously depended on the order in which interface files happened to be loaded (:ghc-ticket:`27532`)
 
@@ -128,6 +143,7 @@ Runtime System
 - Fix several black hole handling bugs that could lead to deadlocks or crashes in multithreaded programs. These could show up as the program hanging or "END_TSO_QUEUE object entered" errors (:ghc-ticket:`26922`, :ghc-ticket:`26936`)
 - Rethrow exceptions in overlapped IO when using the WinIO IO manager (:ghc-ticket:`27283`)
 - Fix "unknown/strange object 24 crash" in compacting GC (:ghc-ticket:`27434`)
+- Fix a possible use-after-free bug with TSOs (:ghc-ticket:`26716`, :ghc-ticket:`26717`)
 
 Code Generation
 ~~~~~~~~~~~~~~~
@@ -139,6 +155,10 @@ Code Generation
 - Fix module finalizers on multiple platforms (:ghc-ticket:`27072`)
 - Fix miscompiled %load_relaxed primop, add missing %store_relaxed (:ghc-ticket:`27483`)
 - Fix redundant AP thunk codegen when not using -ticky-ap-thunk (:ghc-ticket:`27502`)
+- A number of fixes to the ARM64 ncg, fixing a number of bugs, including
+  incorrect runtime results when using subword operations
+  (:ghc-ticket:`27430`, :ghc-ticket:`27539`, :ghc-ticket:`27538`,
+  :ghc-ticket:`27537`, :ghc-ticket:`27550`, :ghc-ticket:`27533`)
 
 Bytecode Compiler
 ~~~~~~~~~~~~~~~~~
@@ -151,6 +171,8 @@ Bytecode Compiler
 ~~~~~~~~~~~~~~~~
 
 - Added ``@since`` annotation to ``System.Info.fullCompilerVersion`` (:ghc-ticket:`26973`)
+- Don't drop ``ExceptionContext`` in ``SomeException(toException)`` (:ghc-ticket:`27455`)
+- Fix ``retry`` and async exception delivery inside a ``catchSTM`` handler (:ghc-ticket:`27657`)
 
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~
