@@ -125,7 +125,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Ppr030.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr031.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr032.hs" Nothing
- -- "../../testsuite/tests/printer/Ppr033.hs" Nothing
+ "../../testsuite/tests/printer/Ppr033.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr034.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr035.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr036.hs" Nothing
@@ -205,7 +205,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Test19850.hs" Nothing
  -- "../../testsuite/tests/printer/Test20247.hs" Nothing
  -- "../../testsuite/tests/printer/Test20258.hs" Nothing
- "../../testsuite/tests/printer/Test20297.hs" Nothing
+ -- "../../testsuite/tests/printer/Test20297.hs" Nothing
  -- "../../testsuite/tests/printer/Test20297.hs" (Just makeDelta)
  -- "../../testsuite/tests/printer/PprLinearArrow.hs" Nothing
  -- "../../testsuite/tests/printer/PprRecordSemi.hs" Nothing

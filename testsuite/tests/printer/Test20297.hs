@@ -49,3 +49,12 @@ declBracket = [d| -- comment10
                   dee = 1
                   -- comment11
                 |]
+
+-- Do statement
+dodo = do -- comment12
+          stmt1
+          stmt2
+
+dodo2 = do
+    -- comment13
+    stmt1

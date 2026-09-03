@@ -3658,10 +3658,10 @@ apat    : aexp                  {% (checkPattern <=< runPV) (unECP $1) }
 stmtlist :: { forall b. DisambECP b => PV (LocatedA (AnnList, Located [LocatedA (Stmt GhcPs (LocatedA b))])) }
         : '{'           stmts '}'       { $2 >>= \ $2 ->
                                           amsA' (sLL $1 $> (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) (fromOL $ fst $ unLoc $2)
-                                                           , sL1 $2 $ reverse $ snd $ unLoc $2))}
+                                                           , sLL $1 $> $ reverse $ snd $ unLoc $2))}
         |     vocurly   stmts close     { $2 >>= \ $2 ->
                                           amsA' (L (stmtsLoc $2) (AnnList (EpVirtualBraces (glR $1)) (fromOL $ fst $ unLoc $2)
-                                                                 , sL1 $2 $ reverse $ snd $ unLoc $2))}
+                                                                 , sLL $1 $2 $ reverse $ snd $ unLoc $2))}
 
 --      do { ;; s ; s ; ; s ;; }
 -- The last Stmt should be an expression, but that's hard to enforce
