@@ -1,6 +1,7 @@
 {-# OPTIONS -ddump-parsed-ast #-}
 {-# LANGUAGE ImplicitParams #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Test20297 where
 
@@ -58,5 +59,13 @@ dodo = do -- comment12
 dodo2 = do
     -- comment13
     stmt1
+
+
+-- RecStmt
+recdo = do
+  rec -- comment14
+      a <- f b
+      b <- g a
+  return a
 
 -- eof
