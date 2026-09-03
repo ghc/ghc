@@ -388,12 +388,38 @@ putTHMessage m = case m of
   GetPackageRoot              -> putWord8 25
   AddDependentDirectory a     -> putWord8 26 >> put a
 
-data EvalOpts = EvalOpts
+data EvalOpts
+  = EvalOpts
   { useSandboxThread :: Bool
   , singleStep :: Bool
   , stepOut :: Bool
   , breakOnException :: Bool
   , breakOnError :: Bool
+  , isolateThreadBreaks :: Bool
+  -- ^ If @isolateThreadBreaks == True@, any breakpoint hit by the thread
+  -- forked~[1] to execute this expression is only seen by a caller observing
+  -- this thread's result explicitly. That is, this thread's 'EvalStatus' can
+  -- be read by 'readThreadEvalStatus', but will be ignored by
+  -- 'readAnyThreadEvalBreak'.
+  --
+  -- Secondly, we only return the 'EvalStatus' of this thread specifically --
+  -- either a breakpoint was hit *in this thread*, or it has finished
+  -- evaluating the main expression and produced a result.
+  -- Notably, if any other thread in the interpreter hits a breakpoint, ignore it.
+  --
+  -- If @isolateThreadBreaks == False@, any breakpoint hit in *any* thread
+  -- (except isolated ones) will make this evaluation return the 'EvalBreak'
+  -- for that thread that stopped. This is typically what you want if debugging
+  -- a "main" program, since you care to know if any thread forked off of that
+  -- main program hits a breakpoint, not just the main thread specifically.
+  -- However, we will only return an 'EvalCompleted' for the main thread's
+  -- result. The results of other threads spawned by main are ignored.
+  --
+  -- In essence, when @False@, the result of evaluation is
+  -- @readAnyThreadEvalBreak `orElse` readThreadEvalStatus mainThreadId@.
+  --
+  -- [1] a thread is forked to execute the expression by default, unless
+  -- @-fno-ghci-sandbox@ which sets @useSandboxThread = False@
   }
   deriving (Generic, Show)
 

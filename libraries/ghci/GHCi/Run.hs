@@ -157,257 +157,6 @@ notSupportedJS :: Message a -> b
 notSupportedJS m = error ("Message not supported with the JavaScript interpreter: " ++ show m)
 #endif
 
-evalStmt :: EvalOpts -> EvalExpr HValueRef -> IO (EvalStatus [HValueRef])
-evalStmt opts expr = do
-  io <- mkIO expr
-  sandboxIO opts $ do
-    rs <- unsafeCoerce io :: IO [HValue]
-    mapM mkRemoteRef rs
- where
-  mkIO (EvalThis href) = localRef href
-  mkIO (EvalApp l r) = do
-    l' <- mkIO l
-    r' <- mkIO r
-    return ((unsafeCoerce l' :: HValue -> HValue) r')
-
-evalIO :: HValueRef -> IO (EvalResult ())
-evalIO r = do
-  io <- localRef r
-  tryEval (unsafeCoerce io :: IO ())
-
-evalString :: HValueRef -> IO (EvalResult String)
-evalString r = do
-  io <- localRef r
-  tryEval $ do
-    r <- unsafeCoerce io :: IO String
-    evaluate (force r)
-
-evalStringToString :: HValueRef -> String -> IO (EvalResult String)
-evalStringToString r str = do
-  io <- localRef r
-  tryEval $ do
-    r <- (unsafeCoerce io :: String -> IO String) str
-    evaluate (force r)
-
--- | Process the Seq message to force a value.                       #2950
--- If during this processing a breakpoint is hit, return
--- an EvalBreak value in the EvalStatus to the UI process,
--- otherwise return an EvalComplete.
--- The UI process has more and therefore also can show more
--- information about the breakpoint than the current iserv
--- process.
-doSeq :: RemoteRef a -> IO (EvalStatus ())
-doSeq ref = clearEvalStatus <$> do
-    sandboxIO evalOptsSeq $ do
-      _ <- (void $ evaluate =<< localRef ref)
-      return []
-
--- | Process a ResumeSeq message. Continue the :force processing     #2950
--- after a breakpoint.
-resumeSeq :: RemoteRef ThreadId -> IO (EvalStatus ())
-resumeSeq hvref = clearEvalStatus <$> do
-    resumeThreadId <- localRef hvref
-    withBreakAction evalOptsSeq (Just resumeThreadId) $ do
-      ResumeContext{..} <- getThreadResumeContext resumeThreadId
-      mask_ $ do
-        putMVar resumeBreakMVar () -- this awakens the stopped thread...
-        redirectInterrupts resumeThreadId $
-          withShadowThread resumeThreadId $
-            atomically $
-            readThreadEvalStatus resumeThreadId
-
-evalOptsSeq :: EvalOpts
-evalOptsSeq = EvalOpts
-              { useSandboxThread = True
-              , singleStep = False
-              , stepOut    = False
-              , breakOnException = False
-              , breakOnError = False
-              }
-
--- When running a computation, we redirect ^C exceptions to the running
--- thread.  ToDo: we might want a way to continue even if the target
--- thread doesn't die when it receives the exception... "this thread
--- is not responding".
---
--- Careful here: there may be ^C exceptions flying around, so we start the new
--- thread blocked (forkIO inherits mask from the parent, #1048), and unblock
--- only while we execute the user's code.  We can't afford to lose the final
--- putMVar, otherwise deadlock ensues. (#1583, #1922, #1946)
-
-sandboxIO :: EvalOpts -> IO [HValueRef] -> IO (EvalStatus [HValueRef])
-sandboxIO opts io = do
-  -- We are running in uninterruptibleMask
-  withBreakAction opts Nothing $ do
-    let runIt = measureAlloc $ tryEval $ rethrow opts $ clearCCS io
-    if useSandboxThread opts
-       then do
-         tid <- forkIO $ do
-           tid <- myThreadId
-           labelThread tid "GHCi sandbox"
-           unsafeUnmask runIt >>= writeThreadEvalStatus tid
-
-         redirectInterrupts tid $ unsafeUnmask $ atomically $
-           (EvalPaused <$> readAnyThreadEvalBreak)
-            `orElse` readThreadEvalStatus tid
-       else
-          -- GLUT on OS X needs to run on the main thread. If you
-          -- try to use it from another thread then you just get a
-          -- white rectangle rendered. For this, or anything else
-          -- with such restrictions, you can turn the GHCi sandbox off
-          -- and things will be run in the main thread.
-          --
-          -- BUT, note that the debugging features (breakpoints,
-          -- tracing, etc.) need the expression to be running in a
-          -- separate thread, so debugging is only enabled when
-          -- using the sandbox.
-         runIt
-
--- We want to turn ^C into a break when -fbreak-on-exception is on,
--- but it's an async exception and we only break for sync exceptions.
--- Idea: if we catch and re-throw it, then the re-throw will trigger
--- a break.  Great - but we don't want to re-throw all exceptions, because
--- then we'll get a double break for ordinary sync exceptions (you'd have
--- to :continue twice, which looks strange).  So if the exception is
--- not "Interrupted", we unset the exception flag before throwing.
---
-rethrow :: EvalOpts -> IO a -> IO a
-rethrow EvalOpts{..} io =
-  catchNoPropagate io $ \(ExceptionWithContext cx se) -> do
-    -- If -fbreak-on-error, we break unconditionally,
-    --  but with care of not breaking twice
-    if breakOnError && not breakOnException
-       then poke exceptionFlag 1
-       else case fromException se of
-               -- If it is a "UserInterrupt" exception, we allow
-               --  a possible break by way of -fbreak-on-exception
-               Just UserInterrupt -> return ()
-               -- In any other case, we don't want to break
-               _ -> poke exceptionFlag 0
-    rethrowIO (ExceptionWithContext cx se)
-
---
--- While we're waiting for the sandbox thread to return a result, if
--- the current thread receives an asynchronous exception we re-throw
--- it at the sandbox thread and continue to wait.
---
--- This is for two reasons:
---
---  * So that ^C interrupts runStmt (e.g. in GHCi), allowing the
---    computation to run its exception handlers before returning the
---    exception result to the caller of runStmt.
---
---  * clients of the GHC API can terminate a runStmt in progress
---    without knowing the ThreadId of the sandbox thread (#1381)
---
--- NB. use a weak pointer to the thread, so that the thread can still
--- be considered deadlocked by the RTS and sent a BlockedIndefinitely
--- exception.  A symptom of getting this wrong is that conc033(ghci)
--- will hang.
---
-redirectInterrupts :: ThreadId -> IO a -> IO a
-redirectInterrupts target wait = do
-  wtid <- mkWeakThreadId target
-  wait `catch` \e -> do
-     m <- deRefWeak wtid
-     case m of
-       Nothing -> wait
-       Just target -> do throwTo target (e :: SomeException); wait
-
-measureAlloc :: IO (EvalResult a) -> IO (EvalStatus a)
-measureAlloc io = do
-  setAllocationCounter 0                                 -- #16012
-  a <- io
-  ctr <- getAllocationCounter
-  let allocs = negate $ fromIntegral ctr
-  return (EvalComplete allocs a)
-
--- Exceptions can't be marshaled because they're dynamically typed, so
--- everything becomes a String.
-tryEval :: IO a -> IO (EvalResult a)
-tryEval io = do
-  e <- try io
-  case e of
-    Left ex -> return (EvalException (toSerializableException ex))
-    Right a -> return (EvalSuccess a)
-
--- This function sets up the interpreter for catching breakpoints, and
--- resets everything when the computation has stopped running.  This
--- is a not-very-good way to ensure that only the interactive
--- evaluation should generate breakpoints.
-withBreakAction :: EvalOpts
-                -> Maybe ThreadId -- ^ If resuming, the current threadId
-                -> IO a -> IO a
-withBreakAction opts mtid act
- = bracket setBreakAction resetBreakAction (\_ -> act)
- where
-   setBreakAction = do
-     poke breakPointIOAction globalBreakStablePtr -- TODO: This is thread unsafe, as one thread might be accessing this global variable while this thread tries to overwrite it. We should rather do it when the interpreter process/internal is initialized somehow.
-     when (breakOnException opts) $ poke exceptionFlag 1
-     when (singleStep opts) $ do
-      rts_enableStopNextBreakpointAll
-      case mtid of
-        Nothing -> pure ()
-        Just (ThreadId tid) -> do
-          rts_enableStopNextBreakpoint tid
-     when (stepOut opts) $ do
-      case mtid of
-        Nothing -> pure ()
-        Just (ThreadId tid) -> do
-          rts_enableStopAfterReturn tid
-     return ()
-        -- Breaking on exceptions is not enabled by default, since it
-        -- might be a bit surprising.  The exception flag is turned off
-        -- as soon as it is hit, or in resetBreakAction below.
-
-   resetBreakAction {-stablePtr-}() = do
-     -- poke breakPointIOAction noBreakStablePtr -- Never unset it.
-     -- TODO: What about evaluating a thunk with breakpoints? when did we get "ignoring breakpoint..." before?
-     poke exceptionFlag 0
-     case mtid of
-      Just (ThreadId tid) -> rts_disableStopAfterReturn tid
-      _                   -> pure ()
-     case mtid of
-       Nothing -> rts_disableStopNextBreakpointAll
-       Just (ThreadId tid) -> do
-         rts_disableStopNextBreakpoint tid
-     -- freeStablePtr stablePtr
-
-resumeStmt
-  :: EvalOpts -> RemoteRef ThreadId
-  -> IO (EvalStatus [HValueRef])
-resumeStmt opts rtid = do
-  resumeThreadId <- localRef rtid
-  ResumeContext{..} <- getThreadResumeContext resumeThreadId
-  withBreakAction opts (Just resumeThreadId) $
-    mask_ $ do
-      putMVar resumeBreakMVar () -- this awakens the stopped thread...
-      redirectInterrupts resumeThreadId $
-        withShadowThread resumeThreadId $
-          atomically $ readThreadEvalStatus resumeThreadId
-
--- when abandoning a computation we have to
---      (a) kill the thread with an async exception, so that the
---          computation itself is stopped, and
---      (b) fill in the MVar.  This step is necessary because any
---          thunks that were under evaluation will now be updated
---          with the partial computation, which still ends in takeMVar,
---          so any attempt to evaluate one of these thunks will block
---          unless we fill in the MVar.
---      (c) wait for the thread to terminate by taking its status MVar.  This
---          step is necessary to prevent race conditions with
---          -fbreak-on-exception (see #5975).
---  See test break010.
-abandonStmt :: RemoteRef ThreadId -> IO ()
-abandonStmt hvref = do
-  tid <- localRef hvref
-  ResumeContext{..} <- getThreadResumeContext tid
-  killThread tid
-  putMVar resumeBreakMVar ()
-  _ <- withShadowThread tid $ atomically $
-    readThreadEvalStatus tid
-  return ()
-
 -- Malloc and copy the bytes.  We don't have any way to monitor the
 -- lifetime of this memory, so it just leaks.
 mkString :: ByteString -> IO (RemotePtr ())
@@ -448,6 +197,287 @@ getIdValFromApStack apStack (I# stackDepth) = do
               0# -> return Nothing -- AP_STACK not found
               _  -> return (Just (unsafeCoerce# result))
 
+-- Exceptions can't be marshaled because they're dynamically typed, so
+-- everything becomes a String.
+tryEval :: IO a -> IO (EvalResult a)
+tryEval io = do
+  e <- try io
+  case e of
+    Left ex -> return (EvalException (toSerializableException ex))
+    Right a -> return (EvalSuccess a)
+
+--------------------------------------------------------------------------------
+
+evalStmt :: EvalOpts -> EvalExpr HValueRef -> IO (EvalStatus [HValueRef])
+evalStmt opts expr = do
+  io <- mkIO expr
+  sandboxIO opts $ do
+    rs <- unsafeCoerce io :: IO [HValue]
+    mapM mkRemoteRef rs
+ where
+  mkIO (EvalThis href) = localRef href
+  mkIO (EvalApp l r) = do
+    l' <- mkIO l
+    r' <- mkIO r
+    return ((unsafeCoerce l' :: HValue -> HValue) r')
+
+evalIO :: HValueRef -> IO (EvalResult ())
+evalIO r = do
+  io <- localRef r
+  tryEval (unsafeCoerce io :: IO ())
+
+evalString :: HValueRef -> IO (EvalResult String)
+evalString r = do
+  io <- localRef r
+  tryEval $ do
+    r <- unsafeCoerce io :: IO String
+    evaluate (force r)
+
+evalStringToString :: HValueRef -> String -> IO (EvalResult String)
+evalStringToString r str = do
+  io <- localRef r
+  tryEval $ do
+    r <- (unsafeCoerce io :: String -> IO String) str
+    evaluate (force r)
+
+
+--------------------------------------------------------------------------------
+
+-- | Process the Seq message to force a value.                       #2950
+-- If during this processing a breakpoint is hit, return
+-- an EvalBreak value in the EvalStatus to the UI process,
+-- otherwise return an EvalComplete.
+-- The UI process has more and therefore also can show more
+-- information about the breakpoint than the current iserv
+-- process.
+doSeq :: RemoteRef a -> IO (EvalStatus ())
+doSeq ref = clearEvalStatus <$> do
+    sandboxIO evalOptsSeq $ do
+      _ <- (void $ evaluate =<< localRef ref)
+      return []
+
+-- | Process a ResumeSeq message. Continue the :force processing     #2950
+-- after a breakpoint.
+resumeSeq :: RemoteRef ThreadId -> IO (EvalStatus ())
+resumeSeq hvref = clearEvalStatus <$> resumeStmt evalOptsSeq hvref
+
+evalOptsSeq :: EvalOpts
+evalOptsSeq = EvalOpts
+              { useSandboxThread = True
+              , singleStep = False
+              , stepOut    = False
+              , breakOnException = False
+              , breakOnError = False
+              , isolateThreadBreaks = True
+              }
+
+--------------------------------------------------------------------------------
+
+-- | When abandoning a computation we have to
+--      (a) kill the thread with an async exception, so that the
+--          computation itself is stopped, and
+--      (b) fill in the MVar.  This step is necessary because any
+--          thunks that were under evaluation will now be updated
+--          with the partial computation, which still ends in takeMVar,
+--          so any attempt to evaluate one of these thunks will block
+--          unless we fill in the MVar.
+--      (c) wait for the thread to terminate by taking its status MVar.  This
+--          step is necessary to prevent race conditions with
+--          -fbreak-on-exception (see #5975).
+--  See test break010.
+abandonStmt :: RemoteRef ThreadId -> IO ()
+abandonStmt hvref = do
+  tid <- localRef hvref
+  ResumeContext{..} <- getThreadResumeContext tid
+  killThread tid
+  withShadowThread tid $ do
+    putMVar resumeBreakMVar ()
+    _ <- atomically $
+      readThreadEvalStatus tid
+    return ()
+
+--------------------------------------------------------------------------------
+
+resumeStmt :: EvalOpts -> RemoteRef ThreadId -> IO (EvalStatus [HValueRef])
+resumeStmt opts rtid = do
+  resumeThreadId <- localRef rtid
+  ResumeContext{..} <- getThreadResumeContext resumeThreadId
+  withBreakAction opts resumeThreadId $ \waitForResult ->
+    mask_ $ do
+      putMVar resumeBreakMVar () -- this awakens the stopped thread...
+      redirectInterrupts resumeThreadId $
+        waitForResult
+
+-- When running a computation, we redirect ^C exceptions to the running
+-- thread.  ToDo: we might want a way to continue even if the target
+-- thread doesn't die when it receives the exception... "this thread
+-- is not responding".
+--
+-- Careful here: there may be ^C exceptions flying around, so we start the new
+-- thread blocked (forkIO inherits mask from the parent, #1048), and unblock
+-- only while we execute the user's code.  We can't afford to lose the final
+-- putMVar, otherwise deadlock ensues. (#1583, #1922, #1946)
+
+sandboxIO :: EvalOpts -> IO [HValueRef] -> IO (EvalStatus [HValueRef])
+sandboxIO opts io
+    | useSandboxThread opts
+    = do
+        wait <- newEmptyMVar
+
+        tid <- forkIO $ do
+
+          takeMVar wait -- don't run anything in this thread before
+                        -- `withBreakAction` has a chance to set up.
+
+          tid <- myThreadId
+          labelThread tid "GHCi sandbox"
+          unsafeUnmask runIt >>= writeThreadEvalStatus tid
+
+        -- We are running in uninterruptibleMask
+        withBreakAction opts tid $ \waitForResult -> do
+          putMVar wait ()
+          redirectInterrupts tid $ unsafeUnmask $
+            waitForResult
+
+    | otherwise
+    = do
+      -- GLUT on OS X needs to run on the main thread. If you
+      -- try to use it from another thread then you just get a
+      -- white rectangle rendered. For this, or anything else
+      -- with such restrictions, you can turn the GHCi sandbox off
+      -- and things will be run in the main thread.
+      --
+      -- BUT, note that the debugging features (breakpoints,
+      -- tracing, etc.) need the expression to be running in a
+      -- separate thread, so debugging is only enabled when
+      -- using the sandbox.
+      runIt
+  where
+    runIt = measureAlloc $ tryEval $ rethrow opts $ clearCCS io
+
+    -- We want to turn ^C into a break when -fbreak-on-exception is on,
+    -- but it's an async exception and we only break for sync exceptions.
+    -- Idea: if we catch and re-throw it, then the re-throw will trigger
+    -- a break.  Great - but we don't want to re-throw all exceptions, because
+    -- then we'll get a double break for ordinary sync exceptions (you'd have
+    -- to :continue twice, which looks strange).  So if the exception is
+    -- not "Interrupted", we unset the exception flag before throwing.
+    --
+    rethrow :: EvalOpts -> IO a -> IO a
+    rethrow EvalOpts{..} io =
+      catchNoPropagate io $ \(ExceptionWithContext cx se) -> do
+        -- If -fbreak-on-error, we break unconditionally,
+        --  but with care of not breaking twice
+        if breakOnError && not breakOnException
+           then poke exceptionFlag 1
+           else case fromException se of
+                   -- If it is a "UserInterrupt" exception, we allow
+                   --  a possible break by way of -fbreak-on-exception
+                   Just UserInterrupt -> return ()
+                   -- In any other case, we don't want to break
+                   _ -> poke exceptionFlag 0
+        rethrowIO (ExceptionWithContext cx se)
+
+    measureAlloc :: IO (EvalResult a) -> IO (EvalStatus a)
+    measureAlloc io = do
+      setAllocationCounter 0                                 -- #16012
+      a <- io
+      ctr <- getAllocationCounter
+      let allocs = negate $ fromIntegral ctr
+      return (EvalComplete allocs a)
+
+-- | This function sets up the given thread for catching breakpoints, and
+-- resets everything when the computation has stopped running. It unfortunately
+-- still does some global things (namely, may set the global
+-- break-on-exceptions rts flag), but otherwise acts only on the given thread.
+--
+-- The continuation `IO` action receives an `IO` argument. That IO argument
+-- will block waiting for a result from the interpreter; when 'EvalOpts' sets
+-- @isolateThreadBreaks == True@, this result will come from the given thread
+-- exclusively (either Break or Complete), otherwise, the result might be a
+-- Break from any non-isolated thread or Complete from this thread specifically.
+--
+-- Note that 'EvalComplete' results must be written by the thread explicitly to the
+-- global thread eval status mapping using 'writeThreadEvalStatus'. 'EvalBreak'
+-- results are automatically written by a thread which hits a breakpoint.
+-- See e.g. 'sandboxIO' for an example of writing 'EvalComplete'.
+--
+-- Typically, @isolatedThreadBreaks == False@ is used to make sure we stop
+-- whenever "main" or one of the threads spawned by "main" hit a breakpoint,
+-- rather than just "main" being observed. This should be used for the main
+-- debuggee execution of a debugger.
+withBreakAction :: EvalOpts -> ThreadId -> (IO (EvalStatus [HValueRef]) -> IO a) -> IO a
+withBreakAction opts tid@(ThreadId tid#) act
+  = bracket setBreakAction resetBreakAction (\_ -> act waitForResult)
+  where
+    setBreakAction = do
+      poke breakPointIOAction globalBreakStablePtr
+         -- TODO: This is poke thread unsafe, as one thread might be accessing this
+         -- global variable while this thread tries to overwrite it. We should
+         -- rather do it when the interpreter process/internal is initialized
+         -- somehow.
+
+      runIf breakOnException $ \_ -> poke exceptionFlag 1
+        -- Breaking on exceptions is not enabled by default, since it
+        -- might be a bit surprising. The exception flag is turned off
+        -- as soon as it is hit, or in resetBreakAction below.
+
+      runIf# singleStep rts_enableStopNextBreakpoint
+      runIf# stepOut    rts_enableStopAfterReturn
+      runIf  isolateThreadBreaks setShadowThread
+
+    resetBreakAction () = do
+      poke exceptionFlag 0
+      rts_disableStopAfterReturn    tid#
+      rts_disableStopNextBreakpoint tid#
+      runIf isolateThreadBreaks unsetShadowThread
+
+      -- freeStablePtr stablePtr TODO: we never free the global stablePtr for
+      -- global action. Maybe we should have a de-init for clean up.
+      -- TODO: don't set it in `setBreakAction` either. Should be on
+      -- interpreter initialization.
+
+    runIf  pred what = when (pred opts) (what tid)
+    runIf# pred what = when (pred opts) (what tid#)
+
+    waitForResult
+      | isolateThreadBreaks opts
+      = atomically $
+          readThreadEvalStatus tid
+
+      | otherwise
+      = atomically $
+          (EvalPaused <$> readAnyThreadEvalBreak)
+          `orElse`
+          readThreadEvalStatus tid
+
+-- While we're waiting for the sandbox thread to return a result, if
+-- the current thread receives an asynchronous exception we re-throw
+-- it at the sandbox thread and continue to wait.
+--
+-- This is for two reasons:
+--
+--  * So that ^C interrupts runStmt (e.g. in GHCi), allowing the
+--    computation to run its exception handlers before returning the
+--    exception result to the caller of runStmt.
+--
+--  * clients of the GHC API can terminate a runStmt in progress
+--    without knowing the ThreadId of the sandbox thread (#1381)
+--
+-- NB. use a weak pointer to the thread, so that the thread can still
+-- be considered deadlocked by the RTS and sent a BlockedIndefinitely
+-- exception.  A symptom of getting this wrong is that conc033(ghci)
+-- will hang.
+--
+redirectInterrupts :: ThreadId -> IO a -> IO a
+redirectInterrupts target wait = do
+  wtid <- mkWeakThreadId target
+  wait `catch` \e -> do
+     m <- deRefWeak wtid
+     case m of
+       Nothing -> wait
+       Just target -> do throwTo target (e :: SomeException); wait
+
 clearEvalStatus :: EvalStatus a -> EvalStatus ()
 clearEvalStatus = \case
   EvalComplete w (EvalException se) -> EvalComplete w (EvalException se)
@@ -460,6 +490,10 @@ clearEvalStatus = \case
 -- TODO: Move to independent module, and don't expose the global variables at all. move also the global break action maybe.
 -- Maybe there could even be something in that module for setting the global
 -- break action on start. maybe just an init function
+--
+-- TODO: Note which explains when things are evacuated from the map, why
+-- EvalSuccess's don't leak, what is the idea, why have MVar and TVar, why have
+-- shadowed threads
 
 globalBreakStablePtr :: StablePtr BreakpointCallback
 globalBreakStablePtr = unsafePerformIO $ newStablePtr globalBreakAction
@@ -542,7 +576,7 @@ readThreadEvalStatus tid = do
 readAnyThreadEvalBreak :: STM EvalBreak
 readAnyThreadEvalBreak = do
   dbgs <- readTVar globalDbgStatusVar
-  -- try reading all mvars and retry if none yield a result
+  -- try reading any thread's 'EvalBreak' and retry if none have yielded one yet
   foldr (\x next -> readStatus dbgs x `orElse` next) retry (Map.toList (threadEvalStatuses dbgs))
   where
     readStatus GlobalDbgStatus{..} (tid, _) -- don't look at dbg-shadowed threads
@@ -572,6 +606,10 @@ writeThreadEvalStatus tid new =
                 tid new threadEvalStatuses
         , shadowedThreads }
 
+-- | Brackets 'setShadowThread'
+withShadowThread :: ThreadId -> IO a -> IO a
+withShadowThread tid = bracket_ (setShadowThread tid) (unsetShadowThread tid)
+
 -- | Make sure that anyone watching for threads hitting breakpoints with
 -- 'readAnyThreadEvalBreak' ignore the given thread if it ever hits a breakpoint.
 --
@@ -579,23 +617,24 @@ writeThreadEvalStatus tid new =
 -- 'readThreadEvalStatus' for that ThreadId, which is typically desired when an
 -- expression to run should not be seen at all by the debugger (e.g. when
 -- evaluating an expr to :force a variable)
-withShadowThread :: ThreadId -> IO a -> IO a
-withShadowThread tid = bracket_ setShadowThread unsetShadowThread
-  where
-    setShadowThread = atomically $ do
-      GlobalDbgStatus{..} <- readTVar globalDbgStatusVar
-      writeTVar globalDbgStatusVar
-        GlobalDbgStatus
-          { threadEvalStatuses
-          , shadowedThreads = Set.insert tid shadowedThreads
-          }
-    unsetShadowThread = atomically $ do
-      GlobalDbgStatus{..} <- readTVar globalDbgStatusVar
-      writeTVar globalDbgStatusVar
-        GlobalDbgStatus
-          { threadEvalStatuses
-          , shadowedThreads = Set.delete tid shadowedThreads
-          }
+setShadowThread :: ThreadId -> IO ()
+setShadowThread tid = atomically $ do
+  GlobalDbgStatus{..} <- readTVar globalDbgStatusVar
+  writeTVar globalDbgStatusVar
+    GlobalDbgStatus
+      { threadEvalStatuses
+      , shadowedThreads = Set.insert tid shadowedThreads
+      }
+
+-- | Undoes 'setShadowThread'
+unsetShadowThread :: ThreadId -> IO ()
+unsetShadowThread tid = atomically $ do
+  GlobalDbgStatus{..} <- readTVar globalDbgStatusVar
+  writeTVar globalDbgStatusVar
+    GlobalDbgStatus
+      { threadEvalStatuses
+      , shadowedThreads = Set.delete tid shadowedThreads
+      }
 
 -- | When we launch a new thread using the debugger, we map ... TODO ... all
 -- threads launched by that main stmt may further spawn threads, and any of
@@ -615,8 +654,9 @@ globalDbgStatusVar = unsafePerformIO $ newTVarIO $ GlobalDbgStatus Map.empty Set
 data GlobalDbgStatus = GlobalDbgStatus
   { threadEvalStatuses :: !(Map.Map ThreadId (EvalStatus [HValueRef]))
   -- ^ Whenever a thread hits a breakpoint it inserts in this map its 'EvalBreak'.
-  -- We can additionally observe the result of a thread by calling
-  -- `writeThreadEvalStatus` at the end with its result, e.g. in 'sandboxIO'
+  -- We can additionally observe a thread's result by calling
+  -- `writeThreadEvalStatus tid (EvalComplete ...)` when the main expression
+  -- finishes evaluating, see e.g. 'sandboxIO'.
   , shadowedThreads    :: !(Set.Set ThreadId)
   -- ^ Threads in this map are meant to be ignored by 'readAnyThreadEvalBreak'.
   -- That is, even if one of the threads in this set hits a breakpoint, we
