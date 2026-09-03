@@ -1,5 +1,0 @@
-section: compiler
-synopsis: Fix a bug where an argument used only by a function's stable unfolding
-  could still be marked absent, resulting in a runtime crash.
-mrs: !16503
-issues: #27626

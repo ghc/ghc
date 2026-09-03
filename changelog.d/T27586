@@ -1,9 +1,0 @@
-section: compiler
-issues: #27586
-mrs: !16440
-synopsis:
-  Fix a panic on a required type argument in a pattern synonym RHS
-description:
-  An argument of a pattern synonym that is matched against a required type
-  argument in the right-hand side no longer causes a panic; it is reported as
-  an illegal term-level use of a type variable.
