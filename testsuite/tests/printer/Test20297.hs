@@ -50,4 +50,13 @@ declBracket = [d| -- comment10
                   -- comment11
                 |]
 
+-- Do statement
+dodo = do -- comment12
+          stmt1
+          stmt2
+
+dodo2 = do
+    -- comment13
+    stmt1
+
 -- eof
