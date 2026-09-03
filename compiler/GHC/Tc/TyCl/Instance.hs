@@ -59,7 +59,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
-import GHC.Core.Predicate( classMethodInstTy )
+import GHC.Core.Predicate( classMethodInstTy, isCoVarType )
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.DataCon
@@ -72,6 +72,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.ForeignCall ( typeCheckCType )
 import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Types.InlinePragma
 import GHC.Types.SourceFile
 import GHC.Types.SourceText
@@ -1859,7 +1860,7 @@ tcMethods _skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
     tc_item :: ClassOpItem -> TcM (Id, LHsBind GhcTc, Maybe Implication)
     tc_item (sel_id, dm_info)
       | Just (user_bind, bndr_loc, prags) <- findMethodBind (idName sel_id) binds prag_fn
-      = tcMethodBody False clas tyvars dfun_ev_vars inst_tys
+      = tcMethodBody False dfun_id clas tyvars dfun_ev_vars inst_tys
                      dfun_ev_binds is_derived hs_sig_fn
                      spec_inst_prags prags
                      sel_id user_bind bndr_loc
@@ -1879,7 +1880,7 @@ tcMethods _skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
       -- See Note [Implementation of Unsatisfiable constraints],
       -- in GHC.Tc.Errors, point (D).
       _ | (theta_id,unsat_msg) : _ <- unsat_thetas
-        -> do { (meth_id, _) <- mkMethIds clas tyvars dfun_ev_vars
+        -> do { (meth_id, _) <- mkMethIds dfun_id clas tyvars dfun_ev_vars
                                          inst_tys sel_id
              ; unsat_id <- tcLookupKnownKeyId unsatisfiableIdKey
              -- Recall that unsatisfiable :: forall {rep} (msg :: ErrorMessage) (a :: TYPE rep). Unsatisfiable msg => a
@@ -1896,7 +1897,7 @@ tcMethods _skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
       Just (dm_name, dm_spec) ->
         do { (meth_bind, inline_prags) <- mkDefMethBind inst_loc dfun_id clas sel_id dm_name dm_spec
            ; tcMethodBody (is_vanilla_dm dm_spec)
-                          clas tyvars dfun_ev_vars inst_tys
+                          dfun_id clas tyvars dfun_ev_vars inst_tys
                           dfun_ev_binds is_derived hs_sig_fn
                           spec_inst_prags inline_prags
                           sel_id meth_bind inst_loc }
@@ -1904,7 +1905,7 @@ tcMethods _skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
       -- No default method
       Nothing ->
         do { traceTc "tc_def: warn" (ppr sel_id)
-           ; (meth_id, _) <- mkMethIds clas tyvars dfun_ev_vars
+           ; (meth_id, _) <- mkMethIds dfun_id clas tyvars dfun_ev_vars
                                        inst_tys sel_id
            ; dflags <- getDynFlags
             -- Add a binding whose RHS is an error
@@ -2030,13 +2031,13 @@ Instead, we take the following approach:
 tcMethodBody :: Bool   -- True <=> This is a vanilla default method
                        -- See (TRC5) in Note [Tracking needed EvIds]
                        --            in GHC.Tc.Solver.Solve
-             -> Class -> [TcTyVar] -> [EvVar] -> [TcType]
+             -> DFunId -> Class -> [TcTyVar] -> [EvVar] -> [TcType]
              -> TcEvBinds -> Bool
              -> HsSigFun
              -> [LTcSpecPrag] -> [LSig GhcRn]
              -> Id -> LHsBind GhcRn -> SrcSpan
              -> TcM (TcId, LHsBind GhcTc, Maybe Implication)
-tcMethodBody is_vanilla_dm clas tyvars dfun_ev_vars inst_tys
+tcMethodBody is_vanilla_dm dfun_id clas tyvars dfun_ev_vars inst_tys
              dfun_ev_binds is_derived
              sig_fn spec_inst_prags prags
              sel_id (L bind_loc meth_bind) bndr_loc
@@ -2044,7 +2045,7 @@ tcMethodBody is_vanilla_dm clas tyvars dfun_ev_vars inst_tys
     do { traceTc "tcMethodBody" (ppr sel_id <+> ppr (idType sel_id) $$ ppr bndr_loc)
        ; let skol_info = MethSkol meth_name is_vanilla_dm
        ; (global_meth_id, local_meth_id) <- setSrcSpan bndr_loc $
-                                            mkMethIds clas tyvars dfun_ev_vars
+                                            mkMethIds dfun_id clas tyvars dfun_ev_vars
                                                       inst_tys sel_id
 
        ; let lm_bind = meth_bind { fun_id = L (noAnnSrcSpan bndr_loc)
@@ -2162,16 +2163,19 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
                                 -- they are all for meth_id
 
 ------------------------
-mkMethIds :: Class -> [TcTyVar] -> [EvVar]
+mkMethIds :: DFunId -> Class -> [TcTyVar] -> [EvVar]
           -> [TcType] -> Id -> TcM (TcId, TcId)
              -- returns (poly_id, local_id), but ignoring any instance signature
              -- See Note [Instance method signatures]
-mkMethIds clas tyvars dfun_ev_vars inst_tys sel_id
+mkMethIds dfun_id clas tyvars dfun_ev_vars inst_tys sel_id
   = do  { poly_meth_name  <- newName (mkClassOpAuxOcc sel_occ)
         ; local_meth_name <- newName sel_occ
                   -- Base the local_meth_name on the selector name, because
                   -- type errors from tcMethodBody come from here
-        ; let poly_meth_id  = mkLocalId poly_meth_name  ManyTy poly_meth_ty
+        ; let poly_meth_id =
+                assert (not (isCoVarType poly_meth_ty)) $
+                Var.mkLocalVar (InstMethId (idName dfun_id))
+                               poly_meth_name ManyTy poly_meth_ty vanillaIdInfo
               local_meth_id = mkLocalId local_meth_name ManyTy local_meth_ty
 
         ; return (poly_meth_id, local_meth_id) }

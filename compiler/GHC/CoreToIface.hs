@@ -454,6 +454,7 @@ toIfaceTopBndr id
 toIfaceIdDetails :: Name   -- ^ for trace/panic messages only
                  -> IdDetails -> IfaceIdDetails
 toIfaceIdDetails _ VanillaId                      = IfVanillaId
+toIfaceIdDetails _ (InstMethId {})                = IfVanillaId
 toIfaceIdDetails _ (WorkerLikeId dmds)            = IfWorkerLikeId dmds
 toIfaceIdDetails _ (DFunId {})                    = IfDFunId
 toIfaceIdDetails _ (RecSelId { sel_naughty = n
