@@ -1240,19 +1240,6 @@ markKwT (AddDarrowAnn tok)  = AddDarrowAnn  <$> markEpUniToken tok
 
 -- ---------------------------------------------------------------------
 
-markAnnListD :: (Monad m, Monoid w)
-  => Either (EpToken "[", EpToken "]") AnnList
-  -> EP w m a
-  -> EP w m (Either (EpToken "[", EpToken "]") AnnList, a)
-markAnnListD (Left (o,c)) action = do
-  o' <- markEpToken o
-  r <- action
-  c' <- markEpToken c
-  return (Left (o',c'), r)
-markAnnListD (Right ann) action = do
-  (ann',r) <- markAnnListA ann action
-  return (Right ann',r)
-
 markAnnListA :: (Monad m, Monoid w)
   => AnnList
   -> EP w m a
@@ -3377,11 +3364,19 @@ instance ExactPrint (HsCmd GhcPs) where
       e' <- markAnnotated e
       return (HsCmdLet (tkLet', tkIn') binds' e')
 
-  exact (HsCmdDo (an0,loc) es) = do
+  exact (HsCmdDo (an0,loc) (L le es)) = do
     debugM $ "HsCmdDo"
     loc' <- printStringAtAA loc "do"
-    (an1,es') <- markAnnListD an0 $ do markAnnotated es
-    return (HsCmdDo (an1,loc') es')
+    (an1, L le' es') <- case an0 of
+      Left (o,c) -> do
+        o' <- markEpToken o
+        r <- markAnnotated (L le es)
+        c' <- markEpToken c
+        return (Left (o',c'), r)
+      Right an1 -> do
+        (L le' (List an2 es')) <- markAnnotated (L le (List an1 es))
+        return (Right an2, L le' es')
+    return (HsCmdDo (an1,loc') (L le' es'))
 
 -- ---------------------------------------------------------------------
 
