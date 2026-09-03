@@ -1,4 +1,5 @@
 {-# OPTIONS -ddump-parsed-ast #-}
+{-# LANGUAGE Arrows #-}
 {-# LANGUAGE ImplicitParams #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RecursiveDo #-}
@@ -67,3 +68,7 @@ recdo = do
       a <- f b
       b <- g a
   return a
+
+-- HsCmdDo
+cmd = proc x -> do -- comment15
+                   returnA -< x
