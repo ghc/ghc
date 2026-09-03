@@ -5,7 +5,7 @@
 {-
 (c) Galois, 2006
 (c) University of Glasgow, 2007
-(c) Florian Ragwitz, 2025
+(c) Florian Ragwitz, 2025-2026
 -}
 
 module GHC.HsToCore.Ticks
@@ -24,6 +24,7 @@ import GHC.Unit
 
 import GHC.Core.Type
 import GHC.Core.TyCon
+import GHC.Core.InstEnv
 
 import GHC.Data.Maybe
 import GHC.Data.FastString
@@ -100,11 +101,12 @@ addTicksToBinds
                                 -- isExportedId doesn't work yet (the desugarer
                                 -- hasn't set it), so we have to work from this set.
         -> [TyCon]              -- ^ Type constructors in this module
+        -> IdEnv DFunId
         -> LHsBinds GhcTc
         -> IO (LHsBinds GhcTc, Maybe (FilePath, SizedSeq Tick, SizedSeq Tick))
 
 addTicksToBinds logger cfg
-                mod mod_loc exports tyCons binds
+                mod mod_loc exports tyCons inst_meths binds
   | let passes = ticks_passes cfg
   , not (null passes)
   , Just orig_file <- ml_hs_file mod_loc = do
@@ -129,6 +131,7 @@ addTicksToBinds logger cfg
                       , this_mod     = mod
                       , tickishType  = tickish
                       , recSelBinds  = emptyVarEnv
+                      , instMeths    = inst_meths
                       }
                 (binds',_,st') = unTM (addTickLHsBinds binds) env st
             in (binds', st')
@@ -231,7 +234,7 @@ addTickLHsBind :: LHsBind GhcTc -> TM (LHsBind GhcTc)
 addTickLHsBind (L pos (XHsBindsLR bind@(AbsBinds { abs_binds = binds
                                                  , abs_exports = abs_exports
                                                  }))) =
-  withEnv (add_rec_sels . add_inlines . add_exports) $ do
+  withEnv (add_inst_meths . add_rec_sels . add_inlines . add_exports) $ do
       binds' <- addTickLHsBinds binds
       return $ L pos $ XHsBindsLR $ bind { abs_binds = binds' }
   where
@@ -259,19 +262,24 @@ addTickLHsBind (L pos (XHsBindsLR bind@(AbsBinds { abs_binds = binds
                           | ABE{ abe_poly, abe_mono } <- abs_exports
                           , RecSelId{} <- [idDetails abe_poly] ] }
 
+   add_inst_meths env =
+     env{ instMeths = instMeths env `extendVarEnvList`
+                        [ (abe_mono, dfun)
+                        | ABE{ abe_poly, abe_mono } <- abs_exports
+                        , Just dfun <- [lookupVarEnv (instMeths env) abe_poly] ] }
+
 addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id, fun_matches = matches }))) = do
   let name = getOccString id
   decl_path <- getPathEntry
   density <- getDensity
+  env <- getEnv
 
-  inline_ids <- liftM inlines getEnv
   -- See Note [inline sccs]
   let inline   = isInlinePragma (idInlinePragma id)
-                 || id `elemVarSet` inline_ids
+                 || id `elemVarSet` inlines env
 
   -- See Note [inline sccs]
-  tickish <- tickishType `liftM` getEnv
-  case tickish of { ProfNotes | inline -> return (L pos funBind); _ -> do
+  case tickishType env of { ProfNotes | inline -> return (L pos funBind); _ -> do
 
   -- See Note [Record-selector ticks]
   selTicks <- recSelTick id
@@ -294,8 +302,13 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id, fun_matches = matches
       toplev = null decl_path
       exported = idName id `elemNameSet` exported_names
 
-  tick <- if not blackListed &&
-               shouldTickBind density toplev exported simple inline
+  let generatedInstMeth = density == TickForCoverage
+        && id `elemVarEnv` instMeths env
+        && isGenerated (mg_origin (mg_ext matches))
+
+  tick <- if not generatedInstMeth
+               && not blackListed
+               && shouldTickBind density toplev exported simple inline
              then
                 bindTick density name (locA pos) fvs
              else
@@ -1098,6 +1111,7 @@ data TickTransEnv = TTE { fileName     :: FastString
                         , this_mod     :: Module
                         , tickishType  :: TickishType
                         , recSelBinds  :: IdEnv DVarSet
+                        , instMeths    :: IdEnv DFunId
                         }
 
 --      deriving Show
