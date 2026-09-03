@@ -1282,7 +1282,7 @@ takes a slightly different approach.
 ********************************************************************* -}
 
 tcInstDecls2 :: [LTyClDecl GhcRn] -> [InstInfo GhcRn]
-             -> TcM (LHsBinds GhcTc)
+             -> TcM (LHsBinds GhcTc, IdEnv DFunId)
 -- (a) From each class declaration,
 --      generate any default-method bindings
 -- (b) From each instance decl
@@ -1299,11 +1299,11 @@ tcInstDecls2 tycl_decls inst_decls
               -- Add the default method Ids (again)
               -- (they were already added in GHC.Tc.TyCl.Utils.tcAddImplicits)
               -- See Note [Default methods in the type environment]
-        ; inst_binds_s <- tcExtendGlobalValEnv dm_ids $
-                          mapM tcInstDecl2 inst_decls
+        ; (inst_binds_s, inst_meths_s) <- unzip <$> (tcExtendGlobalValEnv dm_ids $
+                                                     mapM tcInstDecl2 inst_decls)
 
           -- Done
-        ; return (dm_binds ++ concat inst_binds_s) }
+        ; return (dm_binds ++ concat inst_binds_s, plusVarEnvList inst_meths_s) }
 
 {- Note [Default methods in the type environment]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1319,12 +1319,12 @@ So right here in tcInstDecls2 we must re-extend the type envt with
 the default method Ids replete with their INLINE pragmas.  Urk.
 -}
 
-tcInstDecl2 :: InstInfo GhcRn -> TcM (LHsBinds GhcTc)
+tcInstDecl2 :: InstInfo GhcRn -> TcM (LHsBinds GhcTc, IdEnv DFunId)
             -- Returns a binding for the dfun
 tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
-  = recoverM (return emptyLHsBinds)    $
-    setSrcSpan loc                     $
-    addErrCtxt (instDeclCtxt2 dfun_ty) $
+  = recoverM (return (emptyLHsBinds, emptyVarEnv)) $
+    setSrcSpan loc                                 $
+    addErrCtxt (instDeclCtxt2 dfun_ty)             $
     do {  -- Instantiate the instance decl with skolem constants
          (skol_info, inst_tyvars, dfun_theta, clas, inst_tys) <- tcSkolDFunType dfun_ty
        ; dfun_ev_vars <- newEvVars dfun_theta
@@ -1342,7 +1342,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
          -- See Note [Typechecking plan for instance declarations]
        ; dfun_ev_binds_var <- newTcEvBinds
        ; let dfun_ev_binds = TcEvBinds dfun_ev_binds_var
-       ; (tclvl, (sc_meth_ids, sc_meth_binds, sc_meth_implics))
+       ; (tclvl, (sc_meth_ids, sc_meth_binds, sc_meth_implics, meth_ids))
              <- pushTcLevelM $
                 do { (sc_ids, sc_binds, sc_implics)
                         <- tcSuperClasses skol_info dfun_id clas inst_tyvars
@@ -1356,7 +1356,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
 
                    ; return ( sc_ids     ++          meth_ids
                             , sc_binds   ++ meth_binds
-                            , sc_implics `unionBags` meth_implics ) }
+                            , sc_implics `unionBags` meth_implics
+                            , meth_ids ) }
 
        ; imp <- newImplication
        ; emitImplication $
@@ -1413,7 +1414,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                                   , abs_binds = [dict_bind]
                                   , abs_sig = True }
 
-       ; return (L loc' main_bind : sc_meth_binds)
+       ; return (L loc' main_bind : sc_meth_binds, mkVarEnv $ (,dfun_id) <$> meth_ids)
        }
  where
    dfun_id = instanceDFunId ispec
