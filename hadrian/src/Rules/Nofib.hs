@@ -39,9 +39,10 @@ nofibRules = do
         -- the GHC to benchmark and perl to
         -- nofib's makefiles.
         let nofibArgs = ["WithNofibHc=" ++ (top -/- ghcPath)]
-        unit $ cmd (Cwd "nofib") [makePath] ["clean"]
-        unit $ cmd (Cwd "nofib") [makePath] (nofibArgs ++ ["boot"])
-        (Exit e, Stdouterr log) <- cmd (Cwd "nofib") [makePath] nofibArgs
+        makeProg <- exeSpawnPath makePath
+        unit $ cmdExe makeProg (Cwd "nofib") ["clean"]
+        unit $ cmdExe makeProg (Cwd "nofib") (nofibArgs ++ ["boot"])
+        (Exit e, Stdouterr log) <- cmdExe makeProg (Cwd "nofib") nofibArgs
         writeFileAtomic fp log
         if e == ExitSuccess
             then putVerbose $ "nofib log available at " ++ fp

@@ -254,38 +254,43 @@ instance H.Builder Builder where
                 msgIn  = "[askBuilder] Exactly one input file expected."
             needBuilders [builder]
             path <- H.builderPath builder
+            prog <- exeSpawnPath path
             -- we do not depend on bare builders. E.g. we won't depend on `clang`
             -- or `ld` or `ar`.  Unless they are provided with fully qualified paths
             -- this is the job of the person invoking ./configure to pass e.g.
             -- CC=$(which clang) if they want the fully qualified clang path!
             when (path /= takeFileName path) $
                 need [path]
-            Stdout stdout <- cmd' [path] ["--no-user-package-db", "field", input, "depends"]
+            Stdout stdout <- cmd' prog ["--no-user-package-db", "field", input, "depends"]
             return stdout
         Testsuite GetExtraDeps -> do
           path <- builderPath builder
+          prog <- exeSpawnPath path
           withResources buildResources $
               withTempFile $ \temp -> do
-                () <- cmd' [path] (buildArgs ++ ["--only-report-hadrian-deps", temp])
+                () <- cmd' prog (buildArgs ++ ["--only-report-hadrian-deps", temp])
                 readFile' temp
         Git ListFiles -> do
           path <- builderPath builder
+          prog <- exeSpawnPath path
           withResources buildResources $ do
               -- NUL separated list of files
               -- We need to read this in the filesystem encoding
               enc <- liftIO getFileSystemEncoding
-              Stdout stdout <- cmd' BinaryPipes [path] buildArgs
+              Stdout stdout <- cmd' prog BinaryPipes buildArgs
               liftIO $ BS.useAsCStringLen stdout $ \fp -> GHC.peekCStringLen enc fp
         Win32Tarballs ListTarballs -> do
           path <- builderPath builder
+          prog <- exeSpawnPath path
           withResources buildResources $ do
-              Stdout stdout <- cmd' [path] buildArgs
+              Stdout stdout <- cmd' prog buildArgs
               pure stdout
         _ -> error $ "Builder " ++ show builder ++ " can not be asked!"
 
     runBuilderWith :: Builder -> BuildInfo -> Action ()
     runBuilderWith builder BuildInfo {..} = do
         path <- builderPath builder
+        prog <- exeSpawnPath path
         withResources buildResources $ do
             verbosity <- getVerbosity
             let input  = fromSingleton msgIn buildInputs
@@ -294,52 +299,54 @@ instance H.Builder Builder where
                 msgOut = "[runBuilderWith] Exactly one output file expected."
                 -- Capture stdout and write it to the output file.
                 captureStdout = do
-                    Stdout stdout <- cmd' [path] buildArgs buildOptions
+                    Stdout stdout <- cmd' prog buildArgs buildOptions
                     -- see Note [Capture stdout as a ByteString]
                     writeFileChangedBS output stdout
             case builder of
                 Ar Pack stg -> do
                     useTempFile <- arSupportsAtFile stg
-                    if useTempFile then runAr output         path buildArgs buildInputs buildOptions
-                                   else runArWithoutTempFile path buildArgs buildInputs buildOptions
+                    if useTempFile then runAr output         prog buildArgs buildInputs buildOptions
+                                   else runArWithoutTempFile prog buildArgs buildInputs buildOptions
 
-                Ar Unpack _ -> cmd' [Cwd output] [path] buildArgs buildOptions
+                Ar Unpack _ -> cmd' prog [Cwd output] buildArgs buildOptions
 
                 Autoreconf dir -> do
                   sh <- shPath
-                  cmd' [Cwd dir] [sh, path] buildArgs buildOptions
+                  shProg <- exeSpawnPath sh
+                  cmd' shProg [Cwd dir] [path] buildArgs buildOptions
 
                 Configure  dir -> do
                     -- Also inject the shell into `libtool` via CONFIG_SHELL,
                     -- otherwise Windows breaks. TODO: Figure out why.
                     sh <- shPath
+                    shProg <- exeSpawnPath sh
                     let env = AddEnv "CONFIG_SHELL" sh
-                    cmd' env [Cwd dir] [sh, path] buildOptions buildArgs
+                    cmd' shProg env [Cwd dir] [path] buildOptions buildArgs
 
                 GenApply {} -> captureStdout
 
                 GenPrimopCode -> do
                     need [input]
-                    Stdout stdout <- cmd' (FileStdin input) [path] buildArgs buildOptions
+                    Stdout stdout <- cmd' prog (FileStdin input) buildArgs buildOptions
                     -- see Note [Capture stdout as a ByteString]
                     writeFileChangedBS output stdout
 
                 GhcPkg Copy _ -> do
-                    Stdout pkgDesc <- cmd' [path]
+                    Stdout pkgDesc <- cmd' prog
                       [ "--expand-pkgroot"
                       , "--no-user-package-db"
                       , "describe"
                       , input -- the package name
                       ]
-                    cmd' (Stdin pkgDesc) [path] (buildArgs ++ ["-"]) buildOptions
+                    cmd' prog (Stdin pkgDesc) (buildArgs ++ ["-"]) buildOptions
 
                 GhcPkg Unregister _ -> do
                     -- unregistering is allowed to fail (e.g. when a package
                     -- isn't already present)
-                    Exit _ <- cmd' [path] (buildArgs ++ [input]) buildOptions
+                    Exit _ <- cmd' prog (buildArgs ++ [input]) buildOptions
                     return ()
 
-                Haddock BuildPackage -> runHaddock output path buildArgs buildInputs
+                Haddock BuildPackage -> runHaddock output prog buildArgs buildInputs
 
                 Ghc _ _ ->
                   -- Use a response file for ghc invocations to avoid issues with command line
@@ -349,52 +356,54 @@ instance H.Builder Builder where
                   -- yet due to #26560.
                   withResponseFileIfLongCmd
                     output
-                    (toCmdArgument [path] <> toCmdArgument buildArgs)
+                    prog
+                    (toCmdArgument buildArgs)
                     buildInputs
                     (toCmdArgument buildOptions)
 
                 HsCpp {}    -> captureStdout
 
-                Make dir -> cmd' buildOptions path ["-C", dir] buildArgs
+                Make dir -> cmd' prog buildOptions ["-C", dir] buildArgs
 
                 Makeinfo -> do
-                  cmd' [path] "--no-split" [ "-o", output] [input] buildOptions
+                  cmd' prog "--no-split" [ "-o", output] [input] buildOptions
 
                 Xelatex   ->
                   -- xelatex produces an incredible amount of output, almost
                   -- all of which is useless. Suppress it unless user
                   -- requests a loud build.
                   if verbosity >= Diagnostic
-                    then cmd' [Cwd output] [path] buildArgs buildOptions
-                    else do (Stdouterr out, Exit code) <- cmd' [Cwd output] [path] buildArgs buildOptions
+                    then cmd' prog [Cwd output] buildArgs buildOptions
+                    else do (Stdouterr out, Exit code) <- cmd' prog [Cwd output] buildArgs buildOptions
                             when (code /= ExitSuccess) $ do
                               liftIO $ BSL.hPutStrLn stderr out
                               putFailure "xelatex failed!"
                               fail "xelatex failed"
 
-                Makeindex -> unit $ cmd' [Cwd output] [path] (buildArgs ++ [input]) buildOptions
+                Makeindex -> unit $ cmd' prog [Cwd output] (buildArgs ++ [input]) buildOptions
 
-                Tar _ -> cmd' buildOptions [path] buildArgs
+                Tar _ -> cmd' prog buildOptions buildArgs
 
                 -- RunTest produces a very large amount of (colorised) output;
                 -- Don't attempt to capture it.
                 Testsuite RunTest -> do
-                  Exit code <- cmd [path] buildArgs buildOptions
+                  Exit code <- cmd' prog buildArgs buildOptions
                   when (code /= ExitSuccess) $ do
                     fail "tests failed"
 
-                _  -> cmd' [path] buildArgs buildOptions
+                _  -> cmd' prog buildArgs buildOptions
 
 -- | Invoke @haddock@ given a path to it and a list of arguments. On Windows,
 -- the input file arguments are passed as a response file.
 runHaddock :: FilePath -- ^ base name to use for response file
-      -> FilePath    -- ^ path to @haddock@
+      -> ExeSpawnPath   -- ^ path to @haddock@
       -> [String]
       -> [FilePath]  -- ^ input file paths
       -> Action ()
 runHaddock outputFilePath haddockPath flagArgs fileInputs = withResponseFileIfLongCmd
   outputFilePath
-  (toCmdArgument [haddockPath] <> toCmdArgument flagArgs)
+  haddockPath
+  (toCmdArgument flagArgs)
   fileInputs
   (CmdArgument [])
 
@@ -551,8 +560,8 @@ isSpecified = fmap (not . null) . systemBuilderPath
 -- | Wrapper for Shake's 'cmd'
 --
 -- See Note [cmd wrapper]
-cmd' :: (Partial, CmdWrap args) => args :-> Action r
-cmd' = cmdArgs mempty
+cmd' :: (Partial, CmdWrap args) => ExeSpawnPath -> args :-> Action r
+cmd' = cmdArgs . toCmdArgument
 
 
 -- See Note [cmd wrapper]

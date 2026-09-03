@@ -159,7 +159,8 @@ testRules = do
                 bindir <- getBinaryDirectory testGhc
                 test_args <- outOfTreeCompilerArgs
                 let dynPrograms = hasDynamic test_args
-                cmd [bindir </> "ghc" <.> exe] $
+                ghcProg <- exeSpawnPath (bindir </> "ghc" <.> exe)
+                cmdExe ghcProg $
                     concatMap (\p -> ["-package", pkgName p]) depsPkgs ++
                     ["-o", top -/- path, top -/- sourcePath] ++
                     mextra ++
@@ -176,7 +177,8 @@ testRules = do
         ghcConfigProgPath <- programPath =<< programContext stage0InTree ghcConfig
         cwd <- liftIO $ IO.getCurrentDirectory
         need [makeRelative cwd ghcPath, ghcConfigProgPath]
-        cmd [FileStdout $ root -/- ghcConfigPath] ghcConfigProgPath [ghcPath]
+        ghcConfigProg <- exeSpawnPath ghcConfigProgPath
+        cmdExe ghcConfigProg [FileStdout $ root -/- ghcConfigPath] [ghcPath]
 
     root -/- timeoutPath %> \_ -> timeoutProgBuilder
 

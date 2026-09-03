@@ -247,7 +247,9 @@ buildBinDistDir root conf@BindistConfig{..} = do
 
     -- Not going to work for cross
     ghcPkgName <- programName (vanillaContext Stage1 ghcPkg)
-    cmd_ (bindistFilesDir -/- "bin" -/- ghcPkgName) ["recache", "--package-db", bindistFilesDir -/- "lib" -/- "package.conf.d" ]
+    ghcPkgProg <- exeSpawnPath (bindistFilesDir -/- "bin" -/- ghcPkgName)
+    cmdExe ghcPkgProg ["recache", "--package-db", bindistFilesDir -/- "lib" -/- "package.conf.d" ]
+        :: Action ()
 
 
     need ["docs"]
@@ -363,8 +365,8 @@ bindistRules = do
             let ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
 
             -- Finally, we create the archive <root>/bindist/ghc-X.Y.Z-platform.tar.xz
-            tarPath <- builderPath (Tar Create)
-            cmd [Cwd $ root -/- bindist_folder] tarPath
+            tarProg <- exeSpawnPath =<< builderPath (Tar Create)
+            cmdExe tarProg [Cwd $ root -/- bindist_folder]
                 [ "-c", compressorTarFlag compressor, "-f"
                 , ghcVersionPretty <.> "tar" <.> compressorExtension compressor
                 , ghcVersionPretty ]
@@ -562,7 +564,8 @@ createVersionWrapper executable_stage pkg versioned_exe install_path = do
         | pkg == ghciWrapper = (1 :: Int)
         | otherwise = 0
 
-  cmd ghcPath (["-no-hs-main", "-o", install_path, "-I"++version_wrapper_dir
+  ghcProg <- exeSpawnPath ghcPath
+  cmdExe ghcProg (["-no-hs-main", "-o", install_path, "-I"++version_wrapper_dir
               , "-optc-DEXE_PATH=\"" ++ versioned_exe ++ "\""
               , "-optc-DINTERACTIVE_PROCESS=" ++ show interactive
               ] ++ wrapper_files)
