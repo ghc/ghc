@@ -25,6 +25,7 @@ import GHC.Unit
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.InstEnv
+import GHC.Core.Class
 
 import GHC.Data.Maybe
 import GHC.Data.FastString
@@ -1266,8 +1267,10 @@ allocInstTicks :: [ClsInst] -> TM (IdEnv CoreTickish)
 allocInstTicks insts =
     ifDensity TickForCoverage (mkVarEnv . catMaybes <$> mapM alloc insts) (pure emptyVarEnv)
   where
-    alloc ClsInst{ is_dfun } = fmap (is_dfun,) <$> allocATickBox (TopLevelBox [getOccString is_dfun])
-                                                                 False True (getSrcSpan is_dfun) noFVs
+    alloc ClsInst{ is_dfun, is_cls }
+      | null (classMethods is_cls) = pure Nothing
+      | otherwise = fmap (is_dfun,) <$> allocATickBox (TopLevelBox [getOccString is_dfun])
+                                                      False True (getSrcSpan is_dfun) noFVs
 
 instMethTick :: Id -> TM (Maybe CoreTickish)
 instMethTick id = getEnv <&> \e -> lookupVarEnv (instMeths e) id >>= lookupVarEnv (instTicks e)
