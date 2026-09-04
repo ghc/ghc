@@ -61,6 +61,7 @@ library
         exposed-modules:
             GHCi.Coverage
             GHCi.Run
+            GHCi.Run.Breakpoints
             GHCi.Debugger
             GHCi.CreateBCO
             GHCi.ObjLink
