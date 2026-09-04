@@ -1,0 +1,23 @@
+section: compiler
+synopsis: Improve coverage reporting for class instances and their methods
+description:
+
+  Coverage reporting (:ghc-flag:`-fhpc`) now treats class instances more
+  naturally.
+
+  Compiler-generated instance methods, such as inherited default methods, no
+  longer receive separate top-level coverage boxes. Explicitly implemented
+  instance methods retain their own declaration coverage.
+
+  This means that it is no longer necessary to exercise all of a class' methods
+  in order for it to appear "covered".
+
+  Additionally, top-level coverage boxes are now created for all instances of
+  classes with methods, and ticked by the use of *any* of the class' methods.
+  This indicates that an instance was in fact used at run-time.
+
+  Note that classes without any instance methods are currently excluded from
+  this, and won't have any coverage boxes created.
+
+mrs: !16632
+issues: #17155
