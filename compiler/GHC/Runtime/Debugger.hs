@@ -78,7 +78,8 @@ pprintClosureCommand bindThings force str = do
 
   -- Apply the substitutions obtained after recovering the types
   modifySession $ \hsc_env ->
-    hsc_env{hsc_IC = substInteractiveContext (hsc_IC hsc_env) subst}
+    let ic = hsc_IC hsc_env in
+    hsc_env{hsc_IC = ic{ ic_tythings = substInteractiveContext (ic_tythings ic) subst} }
 
   -- Finally, print the Results
   docterms <- mapM showTerm terms
@@ -121,8 +122,7 @@ pprintClosureCommand bindThings force str = do
      --  Then, we extract a substitution,
      --  mapping the old tyvars to the reconstructed types.
        let reconstructed_type = termType term
-       hsc_env <- getSession
-       case (improveRTTIType hsc_env id_ty' reconstructed_type) of
+       case improveRTTIType id_ty' reconstructed_type of
          Nothing     -> return (subst, term')
          Just subst' -> do { logger <- getLogger
                            ; liftIO $

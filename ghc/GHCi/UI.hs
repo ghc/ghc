@@ -1473,7 +1473,7 @@ runOneCommand eh gCmd = do
 
     -- runStmt wrapper for temporarily overridden line-number
     runStmtWithLineNum :: Int -> String -> SingleStep
-                       -> GHCi (Maybe GHC.ExecResult)
+                       -> GHCi (Maybe RunResult)
     runStmtWithLineNum lnum stmt step = do
         st0 <- getGHCiState
         setGHCiState st0 { line_number = lnum }
@@ -1538,7 +1538,7 @@ enqueueCommands cmds = do
 
 -- | Entry point to execute some haskell code from user.
 -- The return value True indicates success, as in `runOneCommand`.
-runStmt :: GhciMonad m => String -> SingleStep -> m (Maybe GHC.ExecResult)
+runStmt :: GhciMonad m => String -> SingleStep -> m (Maybe RunResult)
 runStmt input step = do
   dflags <- GHC.getInteractiveDynFlags
   let pflags = initParserOpts dflags
@@ -1560,7 +1560,7 @@ runStmt input step = do
          case mb_stmt of
            Nothing ->
              -- empty statement / comment
-             return (Just exec_complete)
+             return (Just (RunDeclsResult []))
            Just stmt ->
              run_stmt stmt
 
@@ -1583,8 +1583,6 @@ runStmt input step = do
              run_imports imports
              run_decls decls
   where
-    exec_complete = GHC.ExecComplete (Right []) 0
-
     run_imports imports = mapM_ (addImportToContext . unLoc) imports
 
     set_pragmas pflags sec supported =
@@ -1593,12 +1591,12 @@ runStmt input step = do
           opts = unLoc <$> loc_opts
       in setOptions opts
 
-    run_stmt :: GhciMonad m => GhciLStmt GhcPs -> m (Maybe GHC.ExecResult)
+    run_stmt :: GhciMonad m => GhciLStmt GhcPs -> m (Maybe RunResult)
     run_stmt stmt = do
            m_result <- GhciMonad.runStmt stmt input step
            case m_result of
                Nothing     -> return Nothing
-               Just result -> Just <$> afterRunStmt step result
+               Just result -> Just <$> afterRunStmt (RunStmtResult result)
 
     -- `x = y` (a declaration) should be treated as `let x = y` (a statement).
     -- The reason is because GHCi wasn't designed to support `x = y`, but then
@@ -1614,7 +1612,7 @@ runStmt input step = do
     --
     -- Instead of dealing with all these problems individually here we fix this
     -- mess by just treating `x = y` as `let x = y`.
-    run_decls :: GhciMonad m => [LHsDecl GhcPs] -> m (Maybe GHC.ExecResult)
+    run_decls :: GhciMonad m => [LHsDecl GhcPs] -> m (Maybe RunResult)
     -- Only turn `FunBind` and `VarBind` into statements, other bindings
     -- (e.g. `PatBind`) need to stay as decls.
     run_decls [L l (ValD _ bind@FunBind{})] = run_stmt (mk_stmt (locA l) bind)
@@ -1629,8 +1627,8 @@ runStmt input step = do
       -- a file, otherwise the read buffer can't be flushed).
       _ <- liftIO $ tryIO $ hFlushAll stdin
       m_result <- GhciMonad.runDecls' decls
-      forM m_result $ \result ->
-        afterRunStmt step (GHC.ExecComplete (Right result) 0)
+      forM m_result $ \result -> do
+        afterRunStmt (RunDeclsResult result)
 
     mk_stmt :: SrcSpan -> HsBind GhcPs -> GhciLStmt GhcPs
     mk_stmt loc bind =
@@ -1646,32 +1644,33 @@ runStmt input step = do
       where
         modStr = moduleNameString $ moduleName $ icInteractiveModule $ ic
 
--- | Clean up the GHCi environment after a statement has run
-afterRunStmt :: GhciMonad m => SingleStep {-^ Type of step we took just before -}
-             -> GHC.ExecResult -> m GHC.ExecResult
-afterRunStmt step run_result = do
-  resumes <- GHC.getResumeContext
-  case run_result of
-     GHC.ExecComplete{..} ->
-       case execResult of
-          Left ex -> liftIO $ Exception.throwIO ex
-          Right names -> do
-            show_types <- isOptionSet ShowType
-            when show_types $ printTypeOfNames names
-     GHC.ExecBreak names mb_info
-         | first_resume : _ <- resumes
-         -> do mb_id_loc <- toBreakIdAndLocation mb_info
-               let bCmd = maybe "" ( \(_,l) -> onBreakCmd l ) mb_id_loc
-               if (null bCmd)
-                 then printStoppedAtBreakInfo first_resume names
-                 else enqueueCommands [bCmd]
-               -- run the command set with ":set stop <cmd>"
-               st <- getGHCiState
-               enqueueCommands [stop st]
-               return ()
+data RunResult
+  = RunStmtResult GHC.ExecResult
+  | RunDeclsResult [TyThing]
 
-         | otherwise -> resume step Nothing >>=
-                        afterRunStmt step >> return ()
+-- | Clean up the GHCi environment after a statement has run
+afterRunStmt :: GhciMonad m
+             => RunResult -> m RunResult
+afterRunStmt run_result = do
+  case run_result of
+    RunDeclsResult things -> do
+      show_types <- isOptionSet ShowType
+      when show_types $ printTypeOfThings things
+    RunStmtResult GHC.ExecComplete{..} ->
+      case execResult of
+        Left ex -> liftIO $ Exception.throwIO ex
+        Right ids -> do
+          show_types <- isOptionSet ShowType
+          when show_types $ printTypeOfIds ids
+    RunStmtResult (GHC.ExecBreak ids mb_info resume) -> do
+      mb_id_loc <- toBreakIdAndLocation mb_info
+      let bCmd = maybe "" ( \(_,l) -> onBreakCmd l ) mb_id_loc
+      if (null bCmd)
+        then printStoppedAtBreakInfo resume ids
+        else enqueueCommands [bCmd]
+      -- run the command set with ":set stop <cmd>"
+      st <- getGHCiState
+      enqueueCommands [stop st]
 
   flushInterpBuffers
   withSignalHandlers $ do
@@ -1680,16 +1679,18 @@ afterRunStmt step run_result = do
 
   return run_result
 
-runSuccess :: Maybe GHC.ExecResult -> Bool
+runSuccess :: Maybe RunResult -> Bool
 runSuccess run_result
-  | Just (GHC.ExecComplete { execResult = Right _ }) <- run_result = True
+  | Just (RunDeclsResult _) <- run_result = True
+  | Just (RunStmtResult GHC.ExecComplete { execResult = Right _ })
+                            <- run_result = True
   | otherwise = False
 
-runAllocs :: Maybe GHC.ExecResult -> Maybe Integer
+runAllocs :: Maybe RunResult -> Maybe Integer
 runAllocs m = do
   res <- m
   case res of
-    GHC.ExecComplete{..} -> Just (fromIntegral execAllocation)
+    RunStmtResult GHC.ExecComplete{..} -> Just (fromIntegral execAllocation)
     _ -> Nothing
 
 toBreakIdAndLocation :: GhciMonad m
@@ -1703,29 +1704,22 @@ toBreakIdAndLocation (Just inf) = do
   return $ listToMaybe [ id_loc | id_loc@(_,loc) <- IntMap.assocs (breaks st),
                                   breakId loc == bi ]
 
-printStoppedAtBreakInfo :: GHC.GhcMonad m => Resume -> [Name] -> m ()
-printStoppedAtBreakInfo res names = do
+printStoppedAtBreakInfo :: GHC.GhcMonad m => Resume -> [GHC.Id] -> m ()
+printStoppedAtBreakInfo res ids = do
   printForUser =<< pprStopped res
-  --  printTypeOfNames session names
-  let namesSorted = sortBy compareNames names
-  tythings <- catMaybes `liftM` mapM GHC.lookupName namesSorted
-  docs <- mapM pprTypeAndContents [i | AnId i <- tythings]
+  let idsSorted = sortBy (compareNames `on` getName) ids
+  docs <- mapM pprTypeAndContents idsSorted
   printForUserPartWay $ vcat docs
 
-printTypeOfNames :: GHC.GhcMonad m => [Name] -> m ()
-printTypeOfNames names
- = mapM_ (printTypeOfName ) $ sortBy compareNames names
+printTypeOfIds :: GHC.GhcMonad m => [GHC.Id] -> m ()
+printTypeOfIds = printTypeOfThings . map AnId
+
+printTypeOfThings :: GHC.GhcMonad m => [GHC.TyThing] -> m ()
+printTypeOfThings things
+ = mapM_ printTyThing $ sortBy (compareNames `on` getName) things
 
 compareNames :: Name -> Name -> Ordering
 compareNames = on compare getOccString S.<> on SrcLoc.leftmost_smallest getSrcSpan
-
-printTypeOfName :: GHC.GhcMonad m => Name -> m ()
-printTypeOfName n
-   = do maybe_tything <- GHC.lookupName n
-        case maybe_tything of
-            Nothing    -> return ()
-            Just thing -> printTyThing thing
-
 
 data MaybeCommand = GotCommand Command | BadCommand | NoLastCommand
 
@@ -4375,7 +4369,7 @@ doContinue step = doContinue' step Nothing
 doContinue' :: GhciMonad m => SingleStep -> Maybe Int -> m ()
 doContinue' step mbCnt= do
   runResult <- resume step mbCnt
-  _ <- afterRunStmt step runResult
+  _ <- afterRunStmt (RunStmtResult runResult)
   return ()
 
 abandonCmd :: GhciMonad m => String -> m ()
@@ -4526,9 +4520,9 @@ backCmd arg
   | otherwise       = liftIO $ putStrLn "Syntax:  :back [num]"
   where
   back num = withSandboxOnly ":back" $ do
-      (names, _, pan) <- GHC.back num
+      (ids, _, pan) <- GHC.back num
       printForUser $ text "Logged breakpoint at" <+> ppr pan
-      printTypeOfNames names
+      printTypeOfIds ids
        -- run the command set with ":set stop <cmd>"
       st <- getGHCiState
       enqueueCommands [stop st]
@@ -4540,11 +4534,11 @@ forwardCmd arg
   | otherwise       = liftIO $ putStrLn "Syntax:  :forward [num]"
   where
   forward num = withSandboxOnly ":forward" $ do
-      (names, ix, pan) <- GHC.forward num
+      (ids, ix, pan) <- GHC.forward num
       printForUser $ (if (ix == 0)
                         then text "Stopped at"
                         else text "Logged breakpoint at") <+> ppr pan
-      printTypeOfNames names
+      printTypeOfIds ids
        -- run the command set with ":set stop <cmd>"
       st <- getGHCiState
       enqueueCommands [stop st]

@@ -381,7 +381,7 @@ runStmt stmt stmt_text step = do
                                                    (EvalThis fhv) }
     Just <$> GHC.execStmt' stmt stmt_text opts
 
-runDecls :: GhciMonad m => String -> m (Maybe [GHC.Name])
+runDecls :: GhciMonad m => String -> m (Maybe [GHC.TyThing])
 runDecls decls = do
   st <- getGHCiState
   reifyGHCi $ \x ->
@@ -393,7 +393,7 @@ runDecls decls = do
           r <- GHC.runDeclsWithLocation (progname st) (line_number st) decls
           return (Just r)
 
-runDecls' :: GhciMonad m => [LHsDecl GhcPs] -> m (Maybe [GHC.Name])
+runDecls' :: GhciMonad m => [LHsDecl GhcPs] -> m (Maybe [GHC.TyThing])
 runDecls' decls = do
   st <- getGHCiState
   reifyGHCi $ \x ->

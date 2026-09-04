@@ -493,10 +493,10 @@ icExtendGblRdrEnv drop_only_qualified env tythings
                              _            -> False
     is_sub_bndr _ = False
 
-substInteractiveContext :: InteractiveContext -> Subst -> InteractiveContext
-substInteractiveContext ictxt@InteractiveContext{ ic_tythings = tts } subst
-  | isEmptyTCvSubst subst = ictxt
-  | otherwise             = ictxt { ic_tythings = map subst_ty tts }
+substInteractiveContext :: [TyThing] -> Subst -> [TyThing]
+substInteractiveContext tts subst
+  | isEmptyTCvSubst subst = tts
+  | otherwise             = map subst_ty tts
   where
     subst_ty (AnId id)
       = AnId $ updateIdTypeAndMult (substTyAddInScope subst) id
