@@ -70,7 +70,6 @@ import Data.Array.Base  ( unsafeWrite )
 import Foreign hiding (shiftL, shiftR)
 import Data.ByteString (ByteString)
 import Data.Char  (ord)
-import Data.Maybe (fromMaybe)
 import GHC.Float (castFloatToWord32, castDoubleToWord64)
 
 import qualified Data.List as List ( any )
