@@ -136,7 +136,6 @@ import Data.List.NonEmpty (NonEmpty)
 import Unsafe.Coerce ( unsafeCoerce )
 import qualified GHC.Unit.Home.Graph as HUG
 import GHCi.BreakArray (BreakArray)
-import Data.Either (fromRight)
 
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
@@ -315,8 +314,10 @@ handleRunStatus step isolateMode expr bindings final_ids status history0 = do
         final_names = map getName final_ids
       liftIO $ Loader.extendLoadedEnv interp modifyHomePackageBytecodeState (zip final_names hvals)
       hsc_env' <- liftIO $ rttiEnvironment hsc_env{hsc_IC=final_ic}
+      let improved_final_ids = -- the final_ids are at the head of hsc_IC
+            take (length final_ids) [ i | AnId i <- ic_tythings (hsc_IC hsc_env') ]
       setSession hsc_env'
-      return (ExecComplete (Right final_ids {- TODO: THESE MUST BE IMPROVED BEFORE RETURNED -}) allocs)
+      return (ExecComplete (Right improved_final_ids) allocs)
 
     -- Completed with an exception
     EvalComplete alloc (EvalException e) ->
@@ -327,7 +328,7 @@ handleRunStatus step isolateMode expr bindings final_ids status history0 = do
       resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
       apStack_fhv     <- liftIO $ mkFinalizedHValue interp apStack_ref
       let span = mkGeneralSrcSpan (fsLit "<unknown>")
-      (hsc_env1, names) <- liftIO $
+      (hsc_env1, break_ids) <- liftIO $
         bindLocalsAtBreakpoint hsc_env apStack_fhv span Nothing
       let
         resume = Resume
@@ -346,7 +347,7 @@ handleRunStatus step isolateMode expr bindings final_ids status history0 = do
         hsc_env2 = pushResume hsc_env1 resume
 
       setSession hsc_env2
-      return (ExecBreak final_ids Nothing resume)
+      return (ExecBreak break_ids Nothing resume)
 
     -- EvalBreak (Just ...) case: the interpreter stopped at a breakpoint
     --
@@ -374,7 +375,7 @@ handleRunStatus step isolateMode expr bindings final_ids status history0 = do
         -- This function only returns control to ghci with 'ExecBreak' when it is really meant to break.
         -- Specifically, for :steplocal or :stepmodule, don't return control
         -- and simply resume execution from here until we hit a breakpoint we do want to stop at.
-        (hsc_env1, final_ids) <- liftIO $
+        (hsc_env1, break_ids) <- liftIO $
           bindLocalsAtBreakpoint hsc_env apStack_fhv span (Just ibi)
         let
           resume = Resume
@@ -392,7 +393,7 @@ handleRunStatus step isolateMode expr bindings final_ids status history0 = do
             }
           hsc_env2 = pushResume hsc_env1 resume
         setSession hsc_env2
-        return (ExecBreak final_ids (Just ibi) resume)
+        return (ExecBreak break_ids (Just ibi) resume)
       else do
         -- resume with the same step type
         let eval_opts = (initEvalOpts dflags (enableGhcStepMode step))
@@ -645,7 +646,9 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv span (Just ibi) = do
    Loader.extendLoadedEnv interp modifyHomePackageBytecodeState (zip names fhvs)
    when result_ok $ Loader.extendLoadedEnv interp modifyHomePackageBytecodeState [(result_name, apStack_fhv)]
    hsc_env1 <- rttiEnvironment hsc_env{ hsc_IC = ictxt1 }
-   return (hsc_env1, final_ids {-TODO: IMPROVE RTTI -})
+   let improved_final_ids = -- the final_ids are at the head of hsc_IC
+         take (length final_ids) [ i | AnId i <- ic_tythings (hsc_IC hsc_env1) ]
+   return (hsc_env1, improved_final_ids)
   where
         -- We need a fresh Unique for each Id we bind, because the linker
         -- state is single-threaded and otherwise we'd spam old bindings
