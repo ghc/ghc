@@ -78,8 +78,7 @@ pprintClosureCommand bindThings force str = do
 
   -- Apply the substitutions obtained after recovering the types
   modifySession $ \hsc_env ->
-    let ic = hsc_IC hsc_env in
-    hsc_env{hsc_IC = ic{ ic_tythings = substInteractiveContext (ic_tythings ic) subst} }
+    hsc_env{hsc_IC = substInteractiveContext (hsc_IC hsc_env) subst}
 
   -- Finally, print the Results
   docterms <- mapM showTerm terms
