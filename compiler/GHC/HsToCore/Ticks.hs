@@ -25,6 +25,7 @@ import GHC.Unit
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.InstEnv
+import GHC.Core.Class
 
 import GHC.Data.Maybe
 import GHC.Data.FastString
@@ -384,6 +385,12 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id, fun_matches = matches
 -- instance as a whole has been used at run-time. To do so, we create a single
 -- tick box at the instance head and tick that box when any method of that
 -- instance is evaluated.
+--
+-- As marker/tag-like class instances without any methods would always appear
+-- as uncovered using the above mechanism, we exclude them when creating
+-- instance tick boxes. This could potentially be improved in the future by
+-- tracking if any functions requiring an instance of an empty class have been
+-- evaluated.
 
 -- TODO: Revisit this
 addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs
@@ -1292,8 +1299,10 @@ allocInstTicks :: [ClsInst] -> TM (IdEnv CoreTickish)
 allocInstTicks insts =
     ifDensity TickForCoverage (mkVarEnv . catMaybes <$> mapM alloc insts) (pure emptyVarEnv)
   where
-    alloc ClsInst{ is_dfun } = fmap (is_dfun,) <$> allocATickBox (TopLevelBox [s])
-                                                                 False True (getSrcSpan is_dfun) noFVs
+    alloc ClsInst{ is_dfun, is_cls }
+      | null (classMethods is_cls) = pure Nothing
+      | otherwise = fmap (is_dfun,) <$> allocATickBox (TopLevelBox [s])
+                                                      False True (getSrcSpan is_dfun) noFVs
       where s = showSDocOneLine defaultSDocContext (pprSigmaType (idType is_dfun))
 
 -- See Note [Instance Method Coverage].
