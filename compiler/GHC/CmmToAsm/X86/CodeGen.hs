@@ -6739,20 +6739,23 @@ genPopCnt bid width dst src = do
 
     True -> do
       code_src <- getAnyReg src
-      src_r <- getNewRegNat format
+      -- Sub-word popcounts use 32-bit POPCNT, whose write zero-extends the
+      -- result to the full register.
+      src_r <- getNewRegNat (max II32 format)
       let dst_r = getRegisterReg platform  (CmmLocal dst)
+          -- A sub-word argument is a full Word# whose upper bits may be
+          -- dirty, so zero-extend it unless it visibly already is.
+          zx_src
+            | CmmMachOp (MO_UU_Conv from _) [_] <- src, from <= width
+            = nilOL
+            | otherwise
+            = unitOL (MOVZxL format (OpReg src_r) (OpReg src_r))
       return $ code_src src_r `appOL`
-          (if width == W8 then
-               -- The POPCNT instruction doesn't take a r/m8
-               unitOL (MOVZxL II8 (OpReg src_r) (OpReg src_r)) `appOL`
-               unitOL (POPCNT II16 (OpReg src_r) dst_r)
-           else
-               unitOL (POPCNT format (OpReg src_r) dst_r)) `appOL`
           (if width == W8 || width == W16 then
-               -- We used a 16-bit destination register above,
-               -- so zero-extend
-               unitOL (MOVZxL II16 (OpReg dst_r) (OpReg dst_r))
-           else nilOL)
+               zx_src `appOL`
+               unitOL (POPCNT II32 (OpReg src_r) dst_r)
+           else
+               unitOL (POPCNT format (OpReg src_r) dst_r))
 
     False ->
       -- generate C call to hs_popcntN in ghc-prim

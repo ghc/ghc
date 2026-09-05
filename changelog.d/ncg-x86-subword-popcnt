@@ -1,0 +1,5 @@
+section: compiler
+synopsis: The x86 native code generator now emits shorter code for 8-bit and
+  16-bit ``popCount`` when :ghc-flag:`-msse4.2` is enabled.
+mrs: !16640
+issues: #24813
