@@ -321,6 +321,7 @@ resolveContextData context@Context {..} = do
                                   (C.hsSourceDirs buildInfo)
           , depIds          = depIds
           , depNames        = map (C.display . C.mungedName . snd) extDeps
+          , transitiveDepNames = map (C.display . C.mungedName') depPkgs
           , includeDirs     = map C.getSymbolicPath (C.includeDirs     buildInfo)
           , includes        = map C.getSymbolicPath (C.includes        buildInfo)
           , installIncludes = map C.getSymbolicPath (C.installIncludes buildInfo)
