@@ -1,0 +1,10 @@
+section: compiler
+synopsis: The x86 native code generator now emits shorter code for ``popCnt8#``
+  and ``popCnt16#`` with ``-msse4.2``
+description:
+  Sub-word popcounts now use the 32-bit ``popcnt`` instruction, which
+  zero-extends its result for free, and skip zero-extending an argument that
+  is already zero-extended, as in ``popCount`` on ``Word8`` or ``Word16``.
+  The popcount sequence shrinks from up to five instructions to one to three.
+mrs: !16640
+issues: #24813
