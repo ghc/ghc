@@ -1,0 +1,16 @@
+#include "Cmm.h"
+
+// Popcount of a zero-extended sub-word value should be a single
+// zero-extending load followed by one POPCNT (#24813).
+
+popcnt8 (W_ p) {
+    W_ r;
+    (r) = prim %popcnt8(%zx64(bits8[p]));
+    return (r);
+}
+
+popcnt16 (W_ p) {
+    W_ r;
+    (r) = prim %popcnt16(%zx64(bits16[p]));
+    return (r);
+}
