@@ -8,6 +8,7 @@ import Base
 import Context
 import Oracles.ModuleFiles
 import Packages
+import Rules.Documentation (haddockDependencies)
 import Settings
 import Target
 import Utilities
@@ -70,6 +71,11 @@ testDependencies = do
     test $ vanillaContext Stage2 compiler `notElem` stage1Deps
     test $ stage1Deps /= stage0Deps
     test $ stage1Deps == stage2Deps
+
+    putBuild "==== T25850: Transitive Haddock dependencies"
+    haddockDeps <- map fst <$> haddockDependencies (vanillaContext Stage1 templateHaskell)
+    unless (ghcPrim `elem` haddockDeps) $
+        fail "T25850: Haddock is missing the indirect ghc-prim dependency of template-haskell"
 
 testLookupAll :: Action ()
 testLookupAll = do

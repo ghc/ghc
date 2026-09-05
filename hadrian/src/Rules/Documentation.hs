@@ -422,9 +422,12 @@ buildManPage = do
             checkSphinxWarnings dir
             copyFileUntracked (dir -/- "ghc.1") file
 
--- | Find the Haddock files for the dependencies of the current library.
+-- | Find the Haddock files for the direct and indirect dependencies of the current library.
 haddockDependencies :: Context -> Action [(Package, FilePath)]
 haddockDependencies context = do
-    depNames <- interpretInContext context (getContextData depNames)
+    directDeps <- interpretInContext context (getContextData depNames)
+    transitiveDeps <- interpretInContext context (getContextData transitiveDepNames)
+    -- Preserve the preference for direct dependencies when resolving links.
+    let depNames = nub (directDeps ++ transitiveDeps)
     sequence [ (,) <$> pure depPkg <*> (pkgHaddockFile $ vanillaContext (stage context) depPkg)
              | Just depPkg <- map findPackageByName depNames, (pkgName depPkg) `notElem` haddockExclude ]

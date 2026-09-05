@@ -1,0 +1,5 @@
+section: packaging
+synopsis: Include transitive dependencies when building library documentation with
+  Hadrian, so Haddock can resolve references to indirect dependencies.
+issues: #25850 #27786
+mrs: !16638

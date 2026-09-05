@@ -48,6 +48,7 @@ data ContextData = ContextData
     , srcDirs            :: [String]
     , depIds             :: [String]
     , depNames           :: [String]
+    , transitiveDepNames :: [String]
     , includeDirs        :: [String]
     , includes           :: [String]
     , installIncludes    :: [String]

@@ -68,7 +68,7 @@ main = do
               -- from PackageData or other oracle value types). This forces
               -- Shake to wipe the stale database instead of crashing on
               -- deserialisation.
-              shakeVersion  = "3"
+              shakeVersion  = "4"
             , shakeChange   = ChangeModtimeAndDigest
             , shakeFiles    = buildRoot -/- Base.shakeFilesDir
             , shakeProgress = Progress.hadrianProgress cwd
