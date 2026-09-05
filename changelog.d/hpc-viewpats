@@ -1,0 +1,14 @@
+section: compiler
+synopsis: Support coverage reporting for view patterns
+issues: #18590
+mrs: !16805
+description:
+  Coverage reporting (:ghc-flag:`-fhpc`) now traverses into patterns and
+  creates ticks for expressions contained within :extension:`ViewPatterns`.
+
+  This provides normal coverage semantics for those embedded expressions,
+  which were previously entirely ignored in coverage reporting.
+
+  Since tick insertion is shared by coverage reporting, source notes,
+  breakpoints, and profiling, this also allows those other modes to instrument
+  expressions inside patterns where applicable.
