@@ -7,6 +7,8 @@ test('T10138', [extra_files(['.keepme.hpc.T10138/']),
 
 test('T11798', normal, makefile_test, [])
 
+test('viewpats', normal, compile_and_run, ['-fhpc'])
+
 # Run tests below only for the hpc way.
 #
 # Do not explicitly specify '-fhpc' in extra_hc_opts, unless also setting

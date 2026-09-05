@@ -401,8 +401,9 @@ addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs
   -- TODO: better name for rhs's for non-simple patterns?
   let name = maybe "(...)" getOccString simplePatId
 
+  lhs' <- addTickLPat lhs
   (fvs, rhs') <- getFreeVars $ addPathEntry name $ addTickGRHSs False False False rhs
-  let pat' = pat { pat_rhs = rhs'}
+  let pat' = pat { pat_lhs = lhs', pat_rhs = rhs'}
 
   -- Should create ticks here?
   density <- getDensity
@@ -752,11 +753,12 @@ addTickMatchGroup is_lam mg@(MG { mg_alts = L l matches, mg_ext = ctxt }) = do
 
 addTickMatch :: Bool -> Bool -> Bool {-Is this Do Expansion-} ->  Match GhcTc (LHsExpr GhcTc)
              -> TM (Match GhcTc (LHsExpr GhcTc))
-addTickMatch isOneOfMany isLambda isDoExp match@(Match { m_pats = L _ pats
+addTickMatch isOneOfMany isLambda isDoExp match@(Match { m_pats = L l pats
                                                        , m_grhss = gRHSs }) =
   bindLocals pats $ do
+    pats' <- mapM addTickLPat pats
     gRHSs' <- addTickGRHSs isOneOfMany isLambda isDoExp gRHSs
-    return $ match { m_grhss = gRHSs' }
+    return $ match { m_pats = L l pats', m_grhss = gRHSs' }
 
 addTickGRHSs :: Bool -> Bool -> Bool -> GRHSs GhcTc (LHsExpr GhcTc)
              -> TM (GRHSs GhcTc (LHsExpr GhcTc))
@@ -936,9 +938,60 @@ addTickSyntaxExpr pos syn@(SyntaxExprTc { syn_expr = x }) = do
         return $ syn { syn_expr = x' }
 addTickSyntaxExpr _ NoSyntaxExprTc = return NoSyntaxExprTc
 
--- we do not walk into patterns.
+-- ViewPat contains an LHsExpr, so we have to walk into patterns.
 addTickLPat :: LPat GhcTc -> TM (LPat GhcTc)
-addTickLPat pat = return pat
+addTickLPat = traverse addTickPat
+
+addTickPat :: Pat GhcTc -> TM (Pat GhcTc)
+addTickPat (ViewPat x expr pat) =
+  ViewPat x <$> addTickLHsExpr expr <*> addTickLPat pat
+addTickPat (LazyPat x pat) = LazyPat x <$> addTickLPat pat
+addTickPat (AsPat x var pat) = AsPat x var <$> addTickLPat pat
+addTickPat (ParPat x pat) = ParPat x <$> addTickLPat pat
+addTickPat (BangPat x pat) = BangPat x <$> addTickLPat pat
+addTickPat (SigPat x pat sig) = SigPat x <$> addTickLPat pat <*> pure sig
+addTickPat (ModifiedPat x mods pat) = ModifiedPat x mods <$> addTickLPat pat
+addTickPat (ListPat x pats) = ListPat x <$> mapM addTickLPat pats
+addTickPat (TuplePat x pats boxity) =
+  TuplePat x <$> mapM addTickLPat pats <*> pure boxity
+addTickPat (OrPat x pats) = OrPat x <$> mapM addTickLPat pats
+addTickPat (SumPat x pat alt arity) =
+  SumPat x <$> addTickLPat pat <*> pure alt <*> pure arity
+addTickPat pat@ConPat{ pat_args } = do
+  pat_args' <- addTickConPatDetails pat_args
+  pure pat{ pat_args = pat_args' }
+  where
+    addTickConPatDetails :: HsConPatDetails GhcTc -> TM (HsConPatDetails GhcTc)
+    addTickConPatDetails (PrefixCon x pats) =
+      PrefixCon x <$> mapM addTickLPat pats
+    addTickConPatDetails (InfixCon x pat1 pat2) =
+      InfixCon x <$> addTickLPat pat1 <*> addTickLPat pat2
+    addTickConPatDetails (RecCon x fields) =
+      RecCon x <$> addTickRecFields fields
+      where
+        addTickRecFields flds@HsRecFields{ rec_flds } = do
+          rec_flds' <- mapM (traverse addTickRecField) rec_flds
+          pure flds{ rec_flds = rec_flds' }
+        addTickRecField fld = do
+          rhs' <- addTickLPat (hfbRHS fld)
+          pure fld{ hfbRHS = rhs' }
+addTickPat (NPat x lit neg eq) =
+  NPat x lit <$> traverse (addTickSyntaxExpr hpcSrcSpan) neg
+             <*> addTickSyntaxExpr hpcSrcSpan eq
+addTickPat (NPlusKPat x n k lit ge minus) =
+  NPlusKPat x n k lit <$> addTickSyntaxExpr hpcSrcSpan ge
+                      <*> addTickSyntaxExpr hpcSrcSpan minus
+addTickPat (XPat ext@CoPat{ co_pat_inner }) =
+  XPat . (\pat -> ext{ co_pat_inner = pat }) <$> addTickPat co_pat_inner
+addTickPat (XPat (ExpansionPat orig expansion)) =
+  XPat . ExpansionPat orig <$> addTickPat expansion
+addTickPat p@WildPat{} = pure p
+addTickPat p@VarPat{} = pure p
+addTickPat p@LitPat{} = pure p
+addTickPat p@QualLitPat{} = pure p
+addTickPat p@EmbTyPat{} = pure p
+addTickPat p@InvisPat{} = pure p
+addTickPat (SplicePat x _) = dataConCantHappen x
 
 addTickHsCmdTop :: HsCmdTop GhcTc -> TM (HsCmdTop GhcTc)
 addTickHsCmdTop (HsCmdTop x cmd) =
@@ -1012,10 +1065,11 @@ addTickCmdMatchGroup mg@(MG { mg_alts = (L l matches) }) = do
   return $ mg { mg_alts = L l matches' }
 
 addTickCmdMatch :: Match GhcTc (LHsCmd GhcTc) -> TM (Match GhcTc (LHsCmd GhcTc))
-addTickCmdMatch match@(Match { m_pats = L _ pats, m_grhss = gRHSs }) =
+addTickCmdMatch match@(Match { m_pats = L l pats, m_grhss = gRHSs }) =
   bindLocals pats $ do
+    pats' <- mapM addTickLPat pats
     gRHSs' <- addTickCmdGRHSs gRHSs
-    return $ match { m_grhss = gRHSs' }
+    return $ match { m_pats = L l pats', m_grhss = gRHSs' }
 
 addTickCmdGRHSs :: GRHSs GhcTc (LHsCmd GhcTc) -> TM (GRHSs GhcTc (LHsCmd GhcTc))
 addTickCmdGRHSs (GRHSs x guarded local_binds) =
