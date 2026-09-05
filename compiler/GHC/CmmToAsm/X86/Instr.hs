@@ -192,7 +192,8 @@ data Instr
         | SHRD        Format Operand{-amount-} Operand Operand
         | SHLD        Format Operand{-amount-} Operand Operand
 
-        | BT          Format Imm Operand
+        -- | Bit test
+        | BT          Format Operand{- ^ bit offset (imm/reg) -} Operand
         -- | Bit test-and-reset
         | BTR         Format Operand{- ^ bit offset (imm/reg) -} Operand
         -- | Bit set
@@ -501,7 +502,7 @@ regUsageOfInstr platform instr
     SHR    fmt imm dst    -> usageRM fmt imm dst
     SHLD   fmt imm dst1 dst2 -> usageRMM fmt imm dst1 dst2
     SHRD   fmt imm dst1 dst2 -> usageRMM fmt imm dst1 dst2
-    BT     fmt _   src    -> mkRUR (use_R fmt src [])
+    BT     fmt off src    -> mkRUR (use_R fmt off $! use_R fmt src [])
     BTR    fmt off dst    -> usageRM fmt off dst
     BTS    fmt off dst    -> usageRM fmt off dst
     BTC    fmt off dst    -> usageRM fmt off dst
@@ -838,7 +839,7 @@ patchRegsOfInstr platform instr env
     SHR  fmt imm dst     -> patch1 (SHR fmt imm) dst
     SHLD fmt imm dst1 dst2 -> patch2 (SHLD fmt imm) dst1 dst2
     SHRD fmt imm dst1 dst2 -> patch2 (SHRD fmt imm) dst1 dst2
-    BT   fmt imm src     -> patch1 (BT  fmt imm) src
+    BT   fmt off src     -> patch2 (BT  fmt) off src
     BTR  fmt off dst     -> patch2 (BTR fmt) off dst
     BTS  fmt off dst     -> patch2 (BTS fmt) off dst
     BTC  fmt off dst     -> patch2 (BTC fmt) off dst
