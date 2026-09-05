@@ -1,0 +1,21 @@
+#include "Cmm.h"
+
+// Single-bit tests whose result is used as a value rather than as a branch
+// condition, a literal mask that does not fit in an imm32, and the mask on
+// the left of the operator (#27688).
+
+testBitValue (W_ x, W_ i) {
+    return ((x & (1 << i)) != 0);
+}
+
+testBitValueEq (W_ x, W_ i) {
+    return ((x & (1 << i)) == 0);
+}
+
+testBit40 (W_ x) {
+    return (((0x10000000000 :: bits64) & x) != 0);
+}
+
+testBitLeft (W_ x, W_ i) {
+    return (((1 << i) & x) != 0);
+}

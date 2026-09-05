@@ -3945,6 +3945,24 @@ condIntCode' platform cond (CmmLoad x ty _) (CmmLit lit)
     --
     return (CondCode False cond code)
 
+-- single-bit test, e.g. (x & (1 << i)) != 0
+-- see Note [Bit-test instructions]
+condIntCode' platform cond (CmmMachOp (MO_And w) [x, y]) (CmmLit (CmmInt 0 _))
+  | Just bt_cond <- bitTestCond cond
+  , bitTestOpWidthOK (target32Bit platform) w
+  , Just (opnd, ix) <- setBitArgs_maybe platform w x y
+  , let fmt = intFormat w
+  = case ix of
+      BitIndexImm i -> do
+        (x_reg, x_code) <- getSomeReg opnd
+        return $ CondCode False bt_cond $
+          x_code `snocOL` BT fmt (OpImm (ImmInt i)) (OpReg x_reg)
+      BitIndexReg i -> do
+        (i_reg, i_code) <- getNonClobberedReg i
+        (x_reg, x_code) <- getSomeReg opnd
+        return $ CondCode False bt_cond $
+          i_code `appOL` x_code `snocOL` BT fmt (OpReg i_reg) (OpReg x_reg)
+
 -- anything vs zero, using a mask
 -- TODO: Add some sanity checking!!!!
 condIntCode' platform cond (CmmMachOp (MO_And _) [x,o2]) (CmmLit (CmmInt 0 ty))
@@ -5901,17 +5919,18 @@ genTrivialCode rep instr a b = do
 
 {- Note [Bit-test instructions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-x86 has dedicated instructions for clearing (btr), setting (bts) and
-complementing (btc) a single bit whose index is given in a register.  We use
-them for Cmm patterns such as
+x86 has dedicated instructions for testing (bt), clearing (btr), setting
+(bts) and complementing (btc) a single bit whose index is given in a
+register.  We use them for Cmm patterns such as
 
-  x & ~(1 << i)     ==>     btr i, x       (#25233)
+  (x & (1 << i)) != 0      ==>     bt i, x; jc
+  x & ~(1 << i)            ==>     btr i, x
 
-replacing a mov/shl/not/and sequence with a single instruction.  The
-shift-count register operand of shl is masked modulo the operand width, and
-the bit-offset register operand of btr/bts/btc is masked the same way, so
-the replacement is faithful even for out-of-range i (where the Cmm shift is
-in any case undefined).
+replacing a mov/shl/and/test or mov/shl/not/and sequence with a single
+instruction.  The shift-count register operand of shl is masked modulo the
+operand width, and the bit-offset register operand of the bit-test
+instructions is masked the same way, so the replacement is faithful even for
+out-of-range i (where the Cmm shift is in any case undefined).
 
 The bit-offset operand of these instructions must be an immediate or a
 register.  When the bit index is a literal, no shift reaches the NCG:
@@ -5919,10 +5938,11 @@ constant folding has already turned the whole mask into a literal.  If that
 mask fits in an imm32, we keep the ordinary and/or/xor with an immediate:
 it has the same latency and better throughput (more execution ports) than
 the bit-test instructions,  and at worst two bytes of extra code size for bit
-indices 7..30.
+indices 7..30.  Likewise a single-bit test keeps 'test' with an immediate:
+test+jcc macro-fuse into one uop, bt+jcc do not.
 But a W64 mask touching the upper bits, e.g. ~(1 << 40), would have to be moved
 into a register first.  For such masks we recognise the folded literal itself
-(exactly one bit clear resp. set) and emit btr/bts/btc with an immediate
+(exactly one bit clear resp. set) and emit bt/btr/bts/btc with an immediate
 bit offset.
 
 We restrict the pattern to W32 and native-width W64: the instructions do not
@@ -5959,14 +5979,25 @@ clearBitLit_maybe w m = setBitLit_maybe w (complement m)
 bitTestOpWidthOK :: Bool -> Width -> Bool
 bitTestOpWidthOK is32Bit w = w == W32 || (w == W64 && not is32Bit)
 
--- | The bit-offset operand of a bit-test instruction (btr/bts/btc).
+-- | The condition to branch on after @bt@, for a @mask != 0@ ('NE') or
+-- @mask == 0@ ('EQQ') comparison. 'Nothing' for any other condition.
+--
+-- @bt@ reports the tested bit in CF, so we branch on 'CARRY' or 'GEU'
+-- rather than on ZF via 'NE' or 'EQQ'.
+bitTestCond :: Cond -> Maybe Cond
+bitTestCond NE  = Just CARRY
+bitTestCond EQQ = Just GEU
+bitTestCond _   = Nothing
+
+-- | The bit-offset operand of a bit-test instruction.
 data BitIndex
   = BitIndexReg CmmExpr  -- ^ variable index, computed into a register
   | BitIndexImm Int      -- ^ literal index, emitted as an immediate
 
--- | Match the operands of a single-bit set or complement operation: one
--- operand is a mask @1 << i@, or a literal with exactly one bit set that
--- does not fit in an imm32. Returns the other operand and the bit index.
+-- | Match the operands of a single-bit set, complement or test operation:
+-- one operand is a mask @1 << i@, or a literal with exactly one bit set
+-- that does not fit in an imm32. Returns the other operand and the bit
+-- index.
 --
 -- Both operand orders are matched, e.g. @x | (1 << i)@ and @(1 << i) | x@.
 --

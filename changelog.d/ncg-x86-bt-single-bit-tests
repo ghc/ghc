@@ -1,0 +1,15 @@
+section: compiler
+synopsis: The x86 native code generator now uses the bit-test instruction
+  ``bt`` to test a single bit
+description:
+  Cmm patterns such as ``(x & (1 << i)) != 0`` and ``(x & (1 << i)) == 0``
+  now compile to a single ``bt`` instruction, whose carry flag feeds the
+  conditional branch directly, instead of a mov/shl/and/test sequence,
+  matching what C compilers produce. The same applies to a literal mask
+  that doesn't fit in an imm32 operand, such as ``x & (1 << 40)``.
+
+  As for ``btr``/``bts``/``btc``, a variable bit index benefits only when
+  the shift is unchecked. The bounds mask added by the checked ``shiftL``,
+  and hence by the default ``Data.Bits.testBit``, hides the pattern.
+mrs: !16639
+issues: #27688
