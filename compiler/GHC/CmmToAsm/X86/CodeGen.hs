@@ -1428,16 +1428,16 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
 -- See Note [Bit-test instructions].
 getRegister' platform is32Bit (CmmMachOp (MO_And w) [x, y])
   | bitTestOpWidthOK is32Bit w
-  , Just (opnd, ix) <- clearBitArgs_maybe platform w x y
-  = genBitTestCode (intFormat w) BTR opnd ix
+  , Just (opnd, ix) <- matchEitherArg (invSingleBitMask_maybe platform w) x y
+  = genBitModifyCode (intFormat w) BTR opnd ix
 getRegister' platform is32Bit (CmmMachOp (MO_Or w) [x, y])
   | bitTestOpWidthOK is32Bit w
-  , Just (opnd, ix) <- setBitArgs_maybe platform w x y
-  = genBitTestCode (intFormat w) BTS opnd ix
+  , Just (opnd, ix) <- matchEitherArg (singleBitMask_maybe platform w) x y
+  = genBitModifyCode (intFormat w) BTS opnd ix
 getRegister' platform is32Bit (CmmMachOp (MO_Xor w) [x, y])
   | bitTestOpWidthOK is32Bit w
-  , Just (opnd, ix) <- setBitArgs_maybe platform w x y
-  = genBitTestCode (intFormat w) BTC opnd ix
+  , Just (opnd, ix) <- matchEitherArg (singleBitMask_maybe platform w) x y
+  = genBitModifyCode (intFormat w) BTC opnd ix
 
 getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
   sse4_1 <- x86Feature x86Sse4_1Enabled
@@ -3926,6 +3926,24 @@ condIntCode' platform cond (CmmLoad x ty _) (CmmLit lit)
     --
     return (CondCode False cond code)
 
+-- single-bit test, e.g. (x & (1 << i)) != 0
+-- see Note [Bit-test instructions]
+condIntCode' platform cond (CmmMachOp (MO_And w) [x, y]) (CmmLit (CmmInt 0 _))
+  | Just bt_cond <- bitTestCond cond
+  , bitTestOpWidthOK (target32Bit platform) w
+  , Just (opnd, ix) <- matchEitherArg (singleBitMask_maybe platform w) x y
+  , let fmt = intFormat w
+  = case ix of
+      BitIndexImm i -> do
+        (x_reg, x_code) <- getSomeReg opnd
+        return $ CondCode False bt_cond $
+          x_code `snocOL` BT fmt (OpImm (ImmInt i)) (OpReg x_reg)
+      BitIndexReg i -> do
+        (i_reg, i_code) <- getNonClobberedReg i
+        (x_reg, x_code) <- getSomeReg opnd
+        return $ CondCode False bt_cond $
+          i_code `appOL` x_code `snocOL` BT fmt (OpReg i_reg) (OpReg x_reg)
+
 -- anything vs zero, using a mask
 -- TODO: Add some sanity checking!!!!
 condIntCode' platform cond (CmmMachOp (MO_And _) [x,o2]) (CmmLit (CmmInt 0 ty))
@@ -5883,17 +5901,18 @@ genTrivialCode rep instr a b = do
 
 {- Note [Bit-test instructions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-x86 has dedicated instructions for clearing (btr), setting (bts) and
-complementing (btc) a single bit whose index is given in a register.  We use
-them for Cmm patterns such as
+x86 has dedicated instructions for testing (bt), clearing (btr), setting
+(bts) and complementing (btc) a single bit whose index is given in a
+register.  We use them for Cmm patterns such as
 
-  x & ~(1 << i)     ==>     btr i, x       (#25233)
+  (x & (1 << i)) != 0      ==>     bt i, x; jc
+  x & ~(1 << i)            ==>     btr i, x
 
-replacing a mov/shl/not/and sequence with a single instruction.  The
-shift-count register operand of shl is masked modulo the operand width, and
-the bit-offset register operand of btr/bts/btc is masked the same way, so
-the replacement is faithful even for out-of-range i (where the Cmm shift is
-in any case undefined).
+replacing a mov/shl/and/test or mov/shl/not/and sequence with a single
+instruction.  The shift-count register operand of shl is masked modulo the
+operand width, and the bit-offset register operand of the bit-test
+instructions is masked the same way, so the replacement is faithful even for
+out-of-range i (where the Cmm shift is in any case undefined).
 
 The bit-offset operand of these instructions must be an immediate or a
 register.  When the bit index is a literal, no shift reaches the NCG:
@@ -5901,10 +5920,11 @@ constant folding has already turned the whole mask into a literal.  If that
 mask fits in an imm32, we keep the ordinary and/or/xor with an immediate:
 it has the same latency and better throughput (more execution ports) than
 the bit-test instructions,  and at worst two bytes of extra code size for bit
-indices 7..30.
+indices 7..30.  Likewise a single-bit test keeps 'test' with an immediate:
+test+jcc macro-fuse into one uop, bt+jcc do not.
 But a W64 mask touching the upper bits, e.g. ~(1 << 40), would have to be moved
 into a register first.  For such masks we recognise the folded literal itself
-(exactly one bit clear resp. set) and emit btr/bts/btc with an immediate
+(exactly one bit clear resp. set) and emit bt/btr/bts/btc with an immediate
 bit offset.
 
 We restrict the pattern to W32 and native-width W64: the instructions do not
@@ -5916,15 +5936,15 @@ they are not worth the extra care.
 --
 -- The returned expression is always at word width ('machOpArgReps' fixes
 -- shift amounts at 'wordWidth'). See Note [Bit-test instructions].
-singleBit_maybe :: CmmExpr -> Maybe CmmExpr
-singleBit_maybe (CmmMachOp (MO_Shl _) [CmmLit (CmmInt 1 _), i]) = Just i
-singleBit_maybe _ = Nothing
+singleBitShift_maybe :: CmmExpr -> Maybe CmmExpr
+singleBitShift_maybe (CmmMachOp (MO_Shl _) [CmmLit (CmmInt 1 _), i]) = Just i
+singleBitShift_maybe _ = Nothing
 
 -- | If exactly one bit of @m@, taken at width @w@, is set, return its index.
 --
 -- See Note [Bit-test instructions].
-setBitLit_maybe :: Width -> Integer -> Maybe Int
-setBitLit_maybe w m
+singleBitLit_maybe :: Width -> Integer -> Maybe Int
+singleBitLit_maybe w m
   | popCount m' == 1 = Just (countTrailingZeros m')
   | otherwise        = Nothing
   where
@@ -5935,66 +5955,74 @@ setBitLit_maybe w m
 -- index.
 --
 -- See Note [Bit-test instructions].
-clearBitLit_maybe :: Width -> Integer -> Maybe Int
-clearBitLit_maybe w m = setBitLit_maybe w (complement m)
+invSingleBitLit_maybe :: Width -> Integer -> Maybe Int
+invSingleBitLit_maybe w m = singleBitLit_maybe w (complement m)
 
 bitTestOpWidthOK :: Bool -> Width -> Bool
 bitTestOpWidthOK is32Bit w = w == W32 || (w == W64 && not is32Bit)
 
--- | The bit-offset operand of a bit-test instruction (btr/bts/btc).
-data BitIndex
-  = BitIndexReg CmmExpr  -- ^ variable index, computed into a register
-  | BitIndexImm Int      -- ^ literal index, emitted as an immediate
-
--- | Match the operands of a single-bit set or complement operation: one
--- operand is a mask @1 << i@, or a literal with exactly one bit set that
--- does not fit in an imm32. Returns the other operand and the bit index.
+-- | The condition to branch on after @bt@, for a @mask != 0@ ('NE') or
+-- @mask == 0@ ('EQQ') comparison. 'Nothing' for any other condition.
 --
--- Both operand orders are matched, e.g. @x | (1 << i)@ and @(1 << i) | x@.
+-- @bt@ reports the tested bit in CF, so we branch on 'CARRY' or 'GEU'
+-- rather than on ZF via 'NE' or 'EQQ'.
+bitTestCond :: Cond -> Maybe Cond
+bitTestCond NE  = Just CARRY
+bitTestCond EQQ = Just GEU
+bitTestCond _   = Nothing
+
+-- | The bit-offset operand of a bit-test instruction.
+data BitIndex
+  = BitIndexReg !CmmExpr -- ^ variable index, computed into a register
+  | BitIndexImm !Int     -- ^ literal index, emitted as an immediate
+
+-- | Match a single-bit mask: @1 << i@, or a literal with exactly one bit set
+-- that does not fit in an imm32. Returns the bit index.
 --
 -- See Note [Bit-test instructions].
-setBitArgs_maybe :: Platform -> Width -> CmmExpr -> CmmExpr
-                 -> Maybe (CmmExpr, BitIndex)
-setBitArgs_maybe platform w x y = go x y `mplus` go y x
-  where
-    go opnd mask
-      | Just i <- singleBit_maybe mask
-      = Just (opnd, BitIndexReg i)
-      | CmmLit lit@(CmmInt m _) <- mask
-      , Just i <- setBitLit_maybe w m
-      , not (is32BitLit platform lit)
-      = Just (opnd, BitIndexImm i)
-      | otherwise
-      = Nothing
+singleBitMask_maybe :: Platform -> Width -> CmmExpr -> Maybe BitIndex
+singleBitMask_maybe platform w mask
+  | Just i <- singleBitShift_maybe mask
+  = Just (BitIndexReg i)
+  | CmmLit lit@(CmmInt m _) <- mask
+  , Just i <- singleBitLit_maybe w m
+  , not (is32BitLit platform lit)
+  = Just (BitIndexImm i)
+  | otherwise
+  = Nothing
 
--- | As 'setBitArgs_maybe', for a single-bit clear operation: the mask is
--- @~(1 << i)@, or a literal with exactly one bit clear.
-clearBitArgs_maybe :: Platform -> Width -> CmmExpr -> CmmExpr
-                   -> Maybe (CmmExpr, BitIndex)
-clearBitArgs_maybe platform w x y = go x y `mplus` go y x
-  where
-    go opnd mask
-      | CmmMachOp (MO_Not _) [b] <- mask
-      , Just i <- singleBit_maybe b
-      = Just (opnd, BitIndexReg i)
-      | CmmLit lit@(CmmInt m _) <- mask
-      , Just i <- clearBitLit_maybe w m
-      , not (is32BitLit platform lit)
-      = Just (opnd, BitIndexImm i)
-      | otherwise
-      = Nothing
+-- | As 'singleBitMask_maybe', for an inverted single-bit mask: @~(1 << i)@,
+-- or a literal with exactly one bit clear.
+invSingleBitMask_maybe :: Platform -> Width -> CmmExpr -> Maybe BitIndex
+invSingleBitMask_maybe platform w mask
+  | CmmMachOp (MO_Not _) [b] <- mask
+  , Just i <- singleBitShift_maybe b
+  = Just (BitIndexReg i)
+  | CmmLit lit@(CmmInt m _) <- mask
+  , Just i <- invSingleBitLit_maybe w m
+  , not (is32BitLit platform lit)
+  = Just (BitIndexImm i)
+  | otherwise
+  = Nothing
+
+-- | Apply a matcher to either of two operands, returning the other operand
+-- alongside the match, e.g. for both @x | (1 << i)@ and @(1 << i) | x@.
+matchEitherArg :: (CmmExpr -> Maybe a) -> CmmExpr -> CmmExpr
+               -> Maybe (CmmExpr, a)
+matchEitherArg match x y =
+  ((,) x <$> match y) `mplus` ((,) y <$> match x)
 
 -- | Generate code for @dst := x@ followed by a bit-test instruction
 -- (btr/bts/btc).
 --
 -- See Note [Bit-test instructions].
-genBitTestCode :: Format -> (Format -> Operand -> Operand -> Instr)
-               -> CmmExpr -> BitIndex -> NatM Register
-genBitTestCode rep instr x (BitIndexImm i) = do
+genBitModifyCode :: Format -> (Format -> Operand -> Operand -> Instr)
+                 -> CmmExpr -> BitIndex -> NatM Register
+genBitModifyCode rep instr x (BitIndexImm i) = do
   x_code <- getAnyReg x
   let code dst = x_code dst `snocOL` instr rep (OpImm (ImmInt i)) (OpReg dst)
   return (Any rep code)
-genBitTestCode rep instr x (BitIndexReg i) = do
+genBitModifyCode rep instr x (BitIndexReg i) = do
   (i_reg, i_code) <- getNonClobberedReg i
   x_code <- getAnyReg x
   tmp <- getNewRegNat rep
