@@ -859,8 +859,8 @@ pprInstr platform i = case i of
    SHRD format src dst1 dst2
       -> pprShift2 (text "shrd") format src dst1 dst2
 
-   BT format imm src
-      -> pprFormatImmOp (text "bt") format imm src
+   BT format off src
+      -> pprFormatOpOp (text "bt") format off src
 
    BTR format off dst
       -> pprFormatOpOp (text "btr") format off dst
@@ -1249,16 +1249,6 @@ pprInstr platform i = case i of
          FmtInt32  -> text "d"
          FmtInt64  -> text "q"
    pprBroadcastFormat _ = panic "Scalar Format invading vector operation"
-
-   pprFormatImmOp :: Line doc -> Format -> Imm -> Operand -> doc
-   pprFormatImmOp name format imm op1
-     = line $ hcat [
-           pprMnemonic name format,
-           char '$',
-           pprImm platform imm,
-           comma,
-           pprOperand platform format op1
-       ]
 
    pprFormatOp_ :: Line doc -> Format -> Operand -> doc
    pprFormatOp_ name format op1
