@@ -3,9 +3,11 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ImplicitParams #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 module Test20297 where
 
 -- ValBinds
@@ -78,3 +80,10 @@ cmd = proc x -> do -- comment18
 mg y = case y of -- comment19
          1 -> a
          _ -> b
+
+pattern A :: Int -> String
+pattern A n <- (read -> n) where -- comment20
+        A 0 = "hi"
+        A 1 = "bye"
+
+-- eof
