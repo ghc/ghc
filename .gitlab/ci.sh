@@ -982,23 +982,24 @@ function lint_changelog() {
     exit 0
   fi
 
-  # Check that the MR adds at least one changelog entry.
+  # Check that the MR adds or modifies at least one changelog entry.
   git fetch --depth=1 \
     "$CI_MERGE_REQUEST_PROJECT_URL" \
     "$CI_MERGE_REQUEST_DIFF_BASE_SHA"
 
-  local added
-  added=$(git diff --name-only --diff-filter=A \
+  local entries
+  entries=$(git diff --name-only --diff-filter=AM \
     "$CI_MERGE_REQUEST_DIFF_BASE_SHA..$CI_COMMIT_SHA" -- \
     'changelog.d/' | grep -v '^changelog.d/config$' || true)
 
-  if [ -z "$added" ]; then
+  if [ -z "$entries" ]; then
     error "No changelog entry found in changelog.d/"
-    echo "Please add a changelog entry file describing your user-facing changes."
+    echo "Please add a changelog entry file describing your user-facing changes,"
+    echo "or add this MR to the 'mrs' field of an existing entry."
     echo "If this MR does not need a changelog entry, apply the 'no-changelog' label."
     exit 1
   fi
-  echo "Found changelog entries: $added"
+  echo "Found changelog entries: $entries"
 
   # Build changelog-d with the bootstrap compiler and validate all entries
   # (checks required fields, section names, and the MR number).
