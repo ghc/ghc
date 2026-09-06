@@ -1794,13 +1794,13 @@ cvars1 :: { [RecordPatSynField GhcPs] }
        | var ',' cvars1               {% do { h <- addTrailingCommaN $1 (gl $2)
                                             ; return ((RecordPatSynField (mkFieldOcc h) h) : $3 )}}
 
-where_decls :: { LocatedA (OrdList (LHsDecl GhcPs), EpToken "where", AnnList) }
-        : 'where' '{' decls '}'       {% amsA' (sLL $1 $> (thdOf3 $ unLoc $3,
-                                                epTok $1,
-                                                AnnList (EpExplicitBraces (epTok $2) (epTok $4)) (sndOf3 $ unLoc $3))) }
-        | 'where' vocurly decls close {% amsA' (sLL $1 $3 (thdOf3 $ unLoc $3,
-                                                epTok $1,
-                                                AnnList (EpVirtualBraces (glR $2)) (sndOf3 $ unLoc $3))) }
+where_decls :: { Located (Located (OrdList (LHsDecl GhcPs)), EpToken "where", AnnList) }
+        : 'where' '{' decls '}'       { sLL $1 $> (sLL $2 $> (thdOf3 $ unLoc $3),
+                                                  epTok $1,
+                                                  AnnList (EpExplicitBraces (epTok $2) (epTok $4)) (sndOf3 $ unLoc $3)) }
+        | 'where' vocurly decls close { sLL $1 $3 (sLL $2 $3 (thdOf3 $ unLoc $3),
+                                                  epTok $1,
+                                                  AnnList (EpVirtualBraces (glR $2)) (sndOf3 $ unLoc $3)) }
 
 pattern_synonym_sig :: { LSig GhcPs }
         : 'pattern' con_list '::' sigtype

@@ -711,12 +711,12 @@ tyConToDataCon (L loc tc)
     occ = rdrNameOcc tc
 
 mkPatSynMatchGroup :: LocatedN RdrName
-                   -> LocatedA (OrdList (LHsDecl GhcPs), EpToken "where", AnnList)
+                   -> Located (Located (OrdList (LHsDecl GhcPs)), EpToken "where", AnnList)
                    -> P (MatchGroup GhcPs (LHsExpr GhcPs))
-mkPatSynMatchGroup (L loc patsyn_name) (L ld (decls, _, ann)) =
+mkPatSynMatchGroup (L loc patsyn_name) (L ld (L ldd decls, _, ann)) =
     do { matches <- mapM fromDecl (fromOL decls)
        ; when (null matches) (wrongNumberErr (locA loc))
-       ; return $ mkMatchGroup FromSource ann (L ld matches) }
+       ; return $ mkMatchGroup FromSource ann (L (l2l ldd) matches) }
   where
     fromDecl (L loc decl@(ValD _ (PatBind _
                          pat@(L _ (ConPat _conAnn ln@(L _ name) details))
