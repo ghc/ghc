@@ -1,0 +1,6 @@
+section: codegen
+synopsis: The Cmm sinking pass no longer treats ``touch#`` as clobbering
+  memory, so a load preceding a ``touch#`` can be folded into the
+  instruction that uses it, as in ``ByteString`` indexing.
+issues: #27782
+mrs: !16650

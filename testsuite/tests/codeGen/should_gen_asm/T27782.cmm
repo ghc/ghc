@@ -1,0 +1,18 @@
+#include "Cmm.h"
+
+// A load must sink past touch# and prefetch, which don't clobber memory,
+// so that it can be folded into the instruction that uses it.
+
+loadTouch (W_ p, P_ o) {
+    bits8 b;
+    b = bits8[p];
+    prim %touch(o);
+    return (%zx64(b));
+}
+
+loadPrefetch (W_ p, W_ q) {
+    bits8 b;
+    b = bits8[p];
+    prim %prefetch0(q);
+    return (%zx64(b));
+}

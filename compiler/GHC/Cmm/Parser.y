@@ -1203,6 +1203,8 @@ callishMachOps platform = listToUFM $
         ( "prefetch2", (MO_Prefetch_Data 2,)),
         ( "prefetch3", (MO_Prefetch_Data 3,)),
 
+        ( "touch", (MO_Touch,) ),
+
         ( "bswap16", (MO_BSwap W16,) ),
         ( "bswap32", (MO_BSwap W32,) ),
         ( "bswap64", (MO_BSwap W64,) )
