@@ -370,10 +370,6 @@ cua CanUpdateAnchor f = f
 cua CanUpdateAnchorOnly _ = return []
 cua NoCanUpdateAnchor _ = return []
 
-enterAnn :: (Monad m, Monoid w, ExactPrint a) => Entry -> a -> EP w m a
-enterAnn = enterAnnWith exact setAnnotationAnchor
-
-{-# INLINE enterAnnWith #-}
 -- | "Enter" an annotation, by using the associated 'anchor' field as
 -- the new reference point for calculating all DeltaPos positions.
 -- This is the heart of the exact printing process.
@@ -381,17 +377,14 @@ enterAnn = enterAnnWith exact setAnnotationAnchor
 -- This is combination of the ghc=exactprint Delta.withAST and
 -- Print.exactPC functions and effectively does the delta processing
 -- immediately followed by the print processing.  JIT ghc-exactprint.
-enterAnnWith :: (Monad m, Monoid w, Typeable a, Typeable b) =>
-  (a -> EP w m b) -> -- exact
-  (b -> EpaLocation -> [TrailingAnn] -> EpAnnComments -> b) -> -- setAnnotationAnchor
-  Entry -> a -> EP w m b
-enterAnnWith exactVia _ NoEntryVal a = do
+enterAnn :: (Monad m, Monoid w, ExactPrint a) => Entry -> a -> EP w m a
+enterAnn NoEntryVal a = do
   p <- getPosP
   debugM $ "enterAnn:starting:NO ANN:(p,a) =" ++ show (p, astId a)
-  r <- exactVia a
+  r <- exact a
   debugM $ "enterAnn:done:NO ANN:p =" ++ show (p, astId a)
   return r
-enterAnnWith exactVia setAnnAnchor !(Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
+enterAnn !(Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   acceptSpan <- getAcceptSpan
   setAcceptSpan False
   case anchor' of
@@ -502,7 +495,7 @@ enterAnnWith exactVia setAnnAnchor !(Entry anchor' trailing_anns cs flush canUpd
 
   advance edp
   debugM $ "enterAnn:exact a starting:" ++ show (showAst anchor')
-  a' <- exactVia a
+  a' <- exact a
   debugM $ "enterAnn:exact a done:" ++ show (showAst anchor')
 
   -- Core recursive exactprint done, start end of Entry processing
@@ -556,8 +549,8 @@ enterAnnWith exactVia setAnnAnchor !(Entry anchor' trailing_anns cs flush canUpd
           EpaSpan s -> EpaDelta s         edp []
           _         -> EpaDelta noSrcSpan edp []
   let r = case canUpdateAnchor of
-            CanUpdateAnchor -> setAnnAnchor a' newAnchor trailing' (mkEpaComments priorCs postCs)
-            CanUpdateAnchorOnly -> setAnnAnchor a' newAnchor [] emptyComments
+            CanUpdateAnchor -> setAnnotationAnchor a' newAnchor trailing' (mkEpaComments priorCs postCs)
+            CanUpdateAnchorOnly -> setAnnotationAnchor a' newAnchor [] emptyComments
             NoCanUpdateAnchor -> a'
   return r
 
@@ -4264,26 +4257,13 @@ instance ExactPrint (ConDecl GhcPs) where
     epTokensToComments "(" ops
     epTokensToComments ")" cps
 
-    -- Work around https://gitlab.haskell.org/ghc/ghc/-/issues/20558
     outer_bndrs' <- case outer_bndrs of
       L _ (HsOuterImplicit _) -> return outer_bndrs
       _ -> markAnnotated outer_bndrs
 
-    (inner_bndrs', (mcxt', args', res_ty')) <- markGadtArgs inner_bndrs $ do
-      mcxt' <- markAnnotated mcxt
-      args' <-
-        case args of
-            (PrefixConGADT x args0) -> do
-              args0' <- mapM markAnnotated args0
-              return (PrefixConGADT x args0')
-            (RecConGADT (oc,cc,rarr) fields) -> do
-              oc' <- markEpToken oc
-              fields' <- markAnnotated fields
-              cc' <- markEpToken cc
-              rarr' <- markEpUniToken rarr
-              return (RecConGADT (oc',cc',rarr') fields')
-      res_ty' <- markAnnotated res_ty
-      return (mcxt', args', res_ty')
+    let ib = toInnerBindings inner_bndrs (mcxt, args, res_ty)
+    ib' <- markAnnotated ib
+    let (inner_bndrs', (mcxt', args', res_ty')) = fromInnerBindings ib'
 
     return (ConDeclGADT { con_g_ext = AnnConDeclGADT [] [] dcol'
                         , con_names = cons'
@@ -4293,43 +4273,54 @@ instance ExactPrint (ConDecl GhcPs) where
                         , con_modifiers = mods'
                         , con_res_ty = res_ty', con_doc = doc })
 
--- | Exact print the inner binders of a GADT signature.
---
--- It's that complicated because we need to mark comments/trailing anns
--- stored inside `L` and mark closing parenthesis _after_ we mark inner
--- type:
---
---   data T a b where
---    MkT ::
---      forall a. ( -- mark inside `markGadtArgs`
---          forall b. some type -> T a b -- mark everything there
---        ) -- mark inside `markGadtArgs`
---
--- We don't have the same problem for `HsArgPar` because we ignore it
--- during exact-print, "Does not appear in original source"
-markGadtArgs :: (Monad m, Monoid w, Typeable a)
-             => [LHsGadtTelescope GhcPs] -> EP w m a
-             -> EP w m ([LHsGadtTelescope GhcPs], a)
-markGadtArgs args inner_action = go args
+-- ---------------------------------------------------------------------
+
+data InnerBindings
+  = InnerMore (LHsGadtTelescope GhcPs) InnerBindings
+  | InnerDone (Maybe (LHsContext GhcPs), HsConDeclGADTDetails GhcPs, LHsType GhcPs)
+
+toInnerBindings :: [LHsGadtTelescope GhcPs]
+                -> (Maybe (LHsContext GhcPs), HsConDeclGADTDetails GhcPs, LHsType GhcPs) -> InnerBindings
+toInnerBindings [] inner = InnerDone inner
+toInnerBindings (b:bs) inner = InnerMore b (toInnerBindings bs inner)
+
+fromInnerBindings :: InnerBindings -> ([LHsGadtTelescope GhcPs], (Maybe (LHsContext GhcPs), HsConDeclGADTDetails GhcPs, LHsType GhcPs))
+fromInnerBindings = go []
   where
-    go [] = do
-      r <- inner_action
-      return ([], r)
-    go (arg:xs) = enterAnnWith (exact_arg xs) setAnchor (entryFromLocatedA arg) arg
+    go acc (InnerMore b n) = go (b:acc) n
+    go acc (InnerDone x) = (acc,x)
 
-    exact_arg xs (L l (HsGadtForAll _ tele)) = do
-      tele' <- markAnnotated tele
-      (xs', r) <- go xs
-      return (L l (HsGadtForAll noExtField tele') : xs', r)
-    exact_arg xs (L l (HsGadtPar (lp, rp))) = do
-      lp' <- markEpToken lp
-      (xs', r) <- go xs
-      rp' <- markEpToken rp
-      return (L l (HsGadtPar (lp',rp')) : xs', r)
+instance ExactPrint InnerBindings where
+  getAnnotationEntry (InnerMore (L li _) _) = fromAnn li
+  getAnnotationEntry (InnerDone _)          = NoEntryVal
 
-    -- The binder just entered is the head of the returned list
-    setAnchor (arg':xs', r) anc ts cs = (setAnchorAn arg' anc ts cs : xs', r)
-    setAnchor ([], r)       _   _  _  = ([], r)
+  setAnnotationAnchor (InnerMore li n) anc ts cs = InnerMore (setAnchorAn li anc ts cs) n
+  setAnnotationAnchor (InnerDone x) _ _ _ = InnerDone x
+
+  exact (InnerMore (L li (HsGadtForAll x tele)) n) = do
+    tele' <- markAnnotated tele
+    n' <- markAnnotated n
+    return (InnerMore (L li (HsGadtForAll x tele')) n')
+  exact  (InnerMore (L l (HsGadtPar (lp, rp))) xs) = do
+    lp' <- markEpToken lp
+    xs' <- markAnnotated xs
+    rp' <- markEpToken rp
+    return (InnerMore (L l (HsGadtPar (lp',rp'))) xs')
+  exact (InnerDone (mcxt, args, res_ty)) = do
+    mcxt' <- markAnnotated mcxt
+    args' <-
+      case args of
+          (PrefixConGADT x args0) -> do
+            args0' <- mapM markAnnotated args0
+            return (PrefixConGADT x args0')
+          (RecConGADT (oc,cc,rarr) fields) -> do
+            oc' <- markEpToken oc
+            fields' <- markAnnotated fields
+            cc' <- markEpToken cc
+            rarr' <- markEpUniToken rarr
+            return (RecConGADT (oc',cc',rarr') fields')
+    res_ty' <- markAnnotated res_ty
+    return (InnerDone (mcxt', args', res_ty'))
 
 -- ---------------------------------------------------------------------
 
