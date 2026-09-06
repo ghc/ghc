@@ -387,7 +387,7 @@ instance H.Builder Builder where
                 -- RunTest produces a very large amount of (colorised) output;
                 -- Don't attempt to capture it.
                 Testsuite RunTest -> do
-                  Exit code <- cmd' prog buildArgs buildOptions
+                  Exit code <- cmdExe prog buildArgs buildOptions
                   when (code /= ExitSuccess) $ do
                     fail "tests failed"
 
