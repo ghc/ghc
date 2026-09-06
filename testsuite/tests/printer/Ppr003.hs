@@ -9,3 +9,6 @@ foo x =
    ; 3 -> 'd'   -- case 3
           ;;;   -- case 4
    }
+
+h = i
+  where ;; i = 3
