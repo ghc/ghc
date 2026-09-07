@@ -141,7 +141,7 @@ allocationLimitExceeded = toException AllocationLimitExceeded
 
 -- | Compaction found an object that cannot be compacted.  Functions
 -- cannot be compacted, nor can mutable objects or pinned objects.
--- See 'GHC.Compact.compact'.
+-- See [@compact@](https://hackage.haskell.org/package/ghc-compact/docs/GHC-Compact.html#v:compact).
 --
 -- @since base-4.10.0.0
 newtype CompactionFailed = CompactionFailed String
