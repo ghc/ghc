@@ -28,7 +28,7 @@ module GHC.Parser.PostProcess (
         mkRdrRecordCon, mkRdrRecordUpd,
         setRdrNameSpace,
         fromSpecTyVarBndr, fromSpecTyVarBndrs,
-        annBinds,
+        annBinds, patchAnnlistLayout,
         stmtsAnchor, stmtsLoc,
         addModifiersToDecl,
 
@@ -455,8 +455,8 @@ fromSpecTyVarBndr (L loc (HsTvb xtv flag idp k)) = do
 
 -- | Add the annotation for a 'where' keyword to existing @HsLocalBinds@
 annBinds :: EpToken "where" -> EpAnnComments -> LHsLocalBinds GhcPs -> LHsLocalBinds GhcPs
-annBinds w cs (L l (HsValBinds an bs))  = L (widen_where w l cs) (HsValBinds (patch_annlist_layout $ fst an, w) bs)
-annBinds w cs (L l (HsIPBinds an bs))   = L (widen_where w l cs) (HsIPBinds  (patch_annlist_layout $ fst an, w) bs)
+annBinds w cs (L l (HsValBinds an bs))  = L (widen_where w l cs) (HsValBinds (patchAnnlistLayout $ fst an, w) bs)
+annBinds w cs (L l (HsIPBinds an bs))   = L (widen_where w l cs) (HsIPBinds  (patchAnnlistLayout $ fst an, w) bs)
 annBinds w cs (L l (EmptyLocalBinds x)) = L (widen_where w l cs) (EmptyLocalBinds x)
 
 widen_where :: EpToken "where" -> EpAnn t -> EpAnnComments -> EpAnn t
@@ -472,15 +472,13 @@ valid_anchor :: EpaLocation -> Bool
 valid_anchor (EpaSpan (RealSrcSpan r _)) = srcSpanStartLine r >= 0
 valid_anchor _ = False
 
-patch_annlist_layout :: AnnList -> AnnList
-patch_annlist_layout (AnnList lo s) = AnnList (patch_layout lo) s
-
--- If the decl list for where binds is empty, the anchor ends up
--- invalid. Explicitly mark it as not having layout
-patch_layout :: EpLayout -> EpLayout
-patch_layout lo@(EpVirtualBraces (EpaSpan (RealSrcSpan _ _)) ) = lo
-patch_layout (EpVirtualBraces _ ) = EpNoLayout
-patch_layout lo = lo
+-- | Reject virtual braces without a RealSrcSpan, and widen it to accomadate any leading semicolons
+patchAnnlistLayout :: AnnList -> AnnList
+patchAnnlistLayout (AnnList lo@(EpVirtualBraces (EpaSpan (RealSrcSpan _ _))) []) = AnnList lo []
+patchAnnlistLayout (AnnList (EpVirtualBraces l@(EpaSpan (RealSrcSpan _ _))) (sh:st)) =
+     AnnList (EpVirtualBraces (widenAnchorT l sh)) (sh:st)
+patchAnnlistLayout (AnnList  (EpVirtualBraces _ ) s) = AnnList EpNoLayout s
+patchAnnlistLayout ann_list = ann_list
 
 -- | The anchor for a stmtlist is based on either the location or
 -- the first semicolon annotion.

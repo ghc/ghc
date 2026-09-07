@@ -408,7 +408,7 @@
                                (Right
                                 (AnnList
                                  (EpVirtualBraces
-                                  (EpaSpan { Test20297.hs:13:22-26 }))
+                                  (EpaSpan { Test20297.hs:13:22 }))
                                  []))
                                (EpaSpan { Test20297.hs:13:19-20 }))
                               (DoExpr
@@ -1083,7 +1083,7 @@
                                (Right
                                 (AnnList
                                  (EpVirtualBraces
-                                  (EpaSpan { Test20297.ppr.hs:10:20-24 }))
+                                  (EpaSpan { Test20297.ppr.hs:10:20 }))
                                  []))
                                (EpaSpan { Test20297.ppr.hs:10:17-18 }))
                               (DoExpr
