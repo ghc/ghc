@@ -1,0 +1,7 @@
+section: compiler
+synopsis: Fix instance resolution for shadowed modules
+description:
+  Instances imported from modules with the same module name as the importing module
+  were dropped accidentally since we didn't account for the unit id of the imported module.
+mrs: !16648
+issues: #26610
