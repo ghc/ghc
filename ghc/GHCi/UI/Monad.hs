@@ -38,6 +38,7 @@ import GHCi.UI.Info (ModInfo)
 import qualified GHC
 import GHC.Driver.Monad hiding (liftIO)
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import qualified GHC.Driver.Ppr as Ppr
 import GHC.Types.Name.Occurrence
 import GHC.Driver.Session
@@ -412,7 +413,12 @@ resume step mbIgnoreCnt = do
     withProgName (progname st) $
     withArgs (args st) $
       reflectGHCi x $ do
-        GHC.resumeExec step GHC.SingleThreadedBreaks mbIgnoreCnt
+        GHC.getResumeContext >>= \case
+          [] -> liftIO $
+                throwGhcExceptionIO (GHC.ProgramError "not stopped at a breakpoint")
+          (r:rs) -> do
+            modifySession $ \env -> env{hsc_IC = (hsc_IC env){ ic_resume = rs }}
+            GHC.resumeExec step GHC.SingleThreadedBreaks mbIgnoreCnt r
 
 -- --------------------------------------------------------------------------
 -- timing & statistics

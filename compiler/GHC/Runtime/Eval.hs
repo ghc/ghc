@@ -413,65 +413,58 @@ resumeExec :: GhcMonad m
            => SingleStep
            -> ThreadBreaksIsolationMode
            -> Maybe Int
+           -> Resume
            -> m ExecResult
-resumeExec step isolateMode mbCnt
- = do
-   hsc_env <- getSession
-   let ic = hsc_IC hsc_env
-       resume = ic_resume ic
+resumeExec step isolateMode mbCnt r = do
+  hsc_env <- getSession
+  let ic = hsc_IC hsc_env
+  -- unbind the temporary locals by restoring the TypeEnv from
+  -- before the breakpoint, and drop this Resume from the
+  -- InteractiveContext.
+  let (resume_tmp_te,resume_gre_cache) = resumeBindings r
+      ic' = ic { ic_tythings = resume_tmp_te,
+                 ic_gre_cache = resume_gre_cache }
+  setSession hsc_env{ hsc_IC = ic' }
 
-   case resume of
-     [] -> liftIO $
-           throwGhcExceptionIO (ProgramError "not stopped at a breakpoint")
-     (r:rs) -> do
-        -- unbind the temporary locals by restoring the TypeEnv from
-        -- before the breakpoint, and drop this Resume from the
-        -- InteractiveContext.
-        let (resume_tmp_te,resume_gre_cache) = resumeBindings r
-            ic' = ic { ic_tythings = resume_tmp_te,
-                       ic_gre_cache = resume_gre_cache,
-                       ic_resume   = rs }
-        setSession hsc_env{ hsc_IC = ic' }
+  -- remove any bindings created since the breakpoint from the
+  -- linker's environment
+  let old_names = map getName resume_tmp_te
+      new_names = [ n | thing <- ic_tythings ic
+                      , let n = getName thing
+                      , not (n `elem` old_names) ]
+      interp    = hscInterp hsc_env
+      dflags    = hsc_dflags hsc_env
+  liftIO $ Loader.deleteFromLoadedHomeEnv interp new_names
 
-        -- remove any bindings created since the breakpoint from the
-        -- linker's environment
-        let old_names = map getName resume_tmp_te
-            new_names = [ n | thing <- ic_tythings ic
-                            , let n = getName thing
-                            , not (n `elem` old_names) ]
-            interp    = hscInterp hsc_env
-            dflags    = hsc_dflags hsc_env
-        liftIO $ Loader.deleteFromLoadedHomeEnv interp new_names
+  case r of
+    Resume { resumeStmt = expr
+           , resumeContext = fhv
+           , resumeBindings = bindings
+           , resumeFinalIds = final_ids
+           , resumeApStack = apStack
+           , resumeBreakpointId = mb_brkpt
+           , resumeSpan = span
+           , resumeHistory = hist } ->
+         do
+          -- When the user specified a break ignore count, set it
+          -- in the interpreter
+          case (mb_brkpt, mbCnt) of
+            (Just brkpt, Just cnt) -> setupBreakpoint interp brkpt cnt
+            _ -> return ()
 
-        case r of
-          Resume { resumeStmt = expr
-                 , resumeContext = fhv
-                 , resumeBindings = bindings
-                 , resumeFinalIds = final_ids
-                 , resumeApStack = apStack
-                 , resumeBreakpointId = mb_brkpt
-                 , resumeSpan = span
-                 , resumeHistory = hist } ->
-               do
-                -- When the user specified a break ignore count, set it
-                -- in the interpreter
-                case (mb_brkpt, mbCnt) of
-                  (Just brkpt, Just cnt) -> setupBreakpoint interp brkpt cnt
-                  _ -> return ()
-
-                let eval_opts = (initEvalOpts dflags (enableGhcStepMode step))
-                                  { isolateThreadBreaks = enableIsolateThreadBreaks isolateMode }
-                status <- liftIO $ GHCi.resumeStmt interp eval_opts fhv
-                let prevHistoryLst = fromListBL 50 hist
-                    hug = hsc_HUG hsc_env
-                    hist' = case mb_brkpt of
-                       Nothing -> pure prevHistoryLst
-                       Just bi
-                         | breakHere False step span -> do
-                            hist1 <- liftIO (mkHistory hug apStack bi)
-                            return $ hist1 `consBL` fromListBL 50 hist
-                         | otherwise -> pure prevHistoryLst
-                handleRunStatus step isolateMode expr bindings final_ids status =<< hist'
+          let eval_opts = (initEvalOpts dflags (enableGhcStepMode step))
+                            { isolateThreadBreaks = enableIsolateThreadBreaks isolateMode }
+          status <- liftIO $ GHCi.resumeStmt interp eval_opts fhv
+          let prevHistoryLst = fromListBL 50 hist
+              hug = hsc_HUG hsc_env
+              hist' = case mb_brkpt of
+                 Nothing -> pure prevHistoryLst
+                 Just bi
+                   | breakHere False step span -> do
+                      hist1 <- liftIO (mkHistory hug apStack bi)
+                      return $ hist1 `consBL` fromListBL 50 hist
+                   | otherwise -> pure prevHistoryLst
+          handleRunStatus step isolateMode expr bindings final_ids status =<< hist'
 
 setupBreakpoint :: GhcMonad m => Interp -> InternalBreakpointId -> Int -> m ()   -- #19157
 setupBreakpoint interp ibi cnt = do
