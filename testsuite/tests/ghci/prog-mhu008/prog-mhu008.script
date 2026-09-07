@@ -1,0 +1,5 @@
+:set -XPackageImports
+import "a" M qualified as MA
+import "b" M qualified as MB
+
+MB.cmp (MA.MkT 1) (MA.MkT 2)

@@ -263,13 +263,13 @@ hugCompleteSigsBelow hsc uid mn = foldr (++) [] <$>
 -- | Find instances visible from the given set of imports
 hugInstancesBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO (InstEnv, [FamInst])
 hugInstancesBelow hsc_env uid mnwib = do
- let mn = gwib_mod mnwib
+ let mn = mkModule uid (gwib_mod mnwib)
  (insts, famInsts) <-
      unzip . concat <$>
        hugSomeThingsBelowUs (\mod_info ->
                                   let details = hm_details mod_info
                                   -- Don't include instances for the current module
-                                  in if moduleName (mi_module (hm_iface mod_info)) == mn
+                                  in if fmap toUnitId (mi_module (hm_iface mod_info)) == mn
                                        then []
                                        else [(md_insts details, md_fam_insts details)])
                           True -- Include -hi-boot
