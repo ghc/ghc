@@ -1,5 +1,6 @@
 {-# LANGUAGE Safe #-}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ImplicitParams #-}
 
@@ -54,6 +55,12 @@ module GHC.Stack
      ) where
 
 import GHC.Internal.Stack
+
+#if __GLASGOW_HASKELL__ > 1000
+
+import GHC.Essentials as Rebindable
+
+#endif
 
 -- | Explicitly bring the empty call stack into scope.
 --
