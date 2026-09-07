@@ -1948,8 +1948,6 @@ decllist :: { Located (AnnList,Located (OrdList (LHsDecl GhcPs))) }
                                                        ,sL1 $2 $ thdOf3 $ unLoc $2)
                                             else sLL $1 $2 (pal $ AnnList (epVirtualBraces (fstOf3 $ unLoc $2) $2) (sndOf3 $ unLoc $2)
                                                            ,sL1 $2 $ thdOf3 $ unLoc $2) }
-        -- |     vocurly    decls close   { sLL $1 $2 (pal $ AnnList (epVirtualBraces (fstOf3 $ unLoc $2) $2) (sndOf3 $ unLoc $2)
-        --                                            ,sL1 $2 $ thdOf3 $ unLoc $2) }
 
 -- Binding groups other than those of class and instance declarations
 --
