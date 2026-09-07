@@ -27,15 +27,15 @@ def junit(t: TestRun) -> ET.ElementTree:
             testcase = ET.SubElement(testsuite, 'testcase',
                                      classname = tr.way,
                                      name = '%s(%s)' % (tr.testname, tr.way))
-            message = [] # type: List[str]
+            # GitLab shows only the element text, not the message attribute,
+            # so the reason must lead the text.
+            message = [tr.reason] # type: List[str]
             if tr.diff:
-                message += ['diff:', '==========', tr.diff]
+                message += ['', 'diff:', '==========', tr.diff]
             if tr.stdout:
                 message += ['', 'stdout:', '==========', tr.stdout]
             if tr.stderr:
                 message += ['', 'stderr:', '==========', tr.stderr]
-            if not message:
-                message = [tr.reason]
 
             result = ET.SubElement(testcase, kind,
                                    type = res_type,
@@ -49,6 +49,7 @@ def junit(t: TestRun) -> ET.ElementTree:
         result = ET.SubElement(testcase, 'error',
                                type = "framework failure",
                                message = tr.reason)
+        result.text = tr.reason
 
     for tr in t.expected_passes:
         testcase = ET.SubElement(testsuite, 'testcase',
