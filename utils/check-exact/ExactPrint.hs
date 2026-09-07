@@ -469,7 +469,6 @@ data FlushComments = FlushComments
 
 -- | For GenLocated SrcSpan, we construct an entry location but cannot update it.
 data CanUpdateAnchor = CanUpdateAnchor
-                     | CanUpdateAnchorOnly
                      | NoCanUpdateAnchor
                    deriving (Eq, Show, Data)
 
@@ -586,8 +585,7 @@ astId :: (Typeable a) => a -> String
 astId a = show (typeOf a)
 
 cua :: (Monad m, Monoid w) => CanUpdateAnchor -> EP w m [a] -> EP w m [a]
-cua CanUpdateAnchor f = f
-cua CanUpdateAnchorOnly _ = return []
+cua CanUpdateAnchor   f = f
 cua NoCanUpdateAnchor _ = return []
 
 -- | "Enter" an annotation, by using the associated 'anchor' field as
@@ -773,7 +771,6 @@ enterAnn !(Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
           _         -> EpaDelta noSrcSpan edp []
   let r = case canUpdateAnchor of
             CanUpdateAnchor -> setAnnotationAnchor a' newAnchor trailing' (mkEpaComments priorCs postCs)
-            CanUpdateAnchorOnly -> setAnnotationAnchor a' newAnchor [] emptyComments
             NoCanUpdateAnchor -> a'
   return r
 
@@ -1593,9 +1590,9 @@ commentAllocationIn ss = do
 instance (ExactPrint a) => ExactPrint (Located a) where
   getAnnotationEntry (L l _) = case l of
     UnhelpfulSpan _ -> NoEntryVal
-    _ -> Entry (EpaSpan l) [] emptyComments NoFlushComments CanUpdateAnchorOnly
+    _ -> Entry (EpaSpan l) [] emptyComments NoFlushComments NoCanUpdateAnchor
 
-  setAnnotationAnchor (L l a) _anc _ts _cs = L l a
+  setAnnotationAnchor a _ _ _ = a
 
   exact (L l a) = L l <$> markAnnotated a
 
