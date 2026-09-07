@@ -128,10 +128,9 @@ import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Module.Name (ModuleName(..))
 import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
 import Language.Haskell.Syntax.Specificity
-import Language.Haskell.Syntax.Type (PromotionFlag(..))
 
 import GHC.Types.Unique.FM
-import GHC.Types.Basic
+import GHC.Types.Basic hiding( Levity(..) )
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import {-# SOURCE #-} GHC.Types.Name (Name)
@@ -146,7 +145,6 @@ import GHC.Data.FastString
 import GHC.Data.TrieMap
 import GHC.Data.SmallArray
 import qualified GHC.Data.Strict as Strict
-import GHC.Utils.Outputable( JoinPointHood(..) )
 import GHCi.FFI
 import GHCi.Message
 
@@ -188,7 +186,7 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import GHC.ByteOrder
 import GHC.ForeignPtr           ( unsafeWithForeignPtr )
-import GHC.Exts hiding( Levity(..) )
+import GHC.Exts
 import GHC.IO
 import GHC.Word
 
