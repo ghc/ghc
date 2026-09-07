@@ -1852,6 +1852,11 @@ async def do_test(name: TestName,
             if tag == 'stat':
                 if_verbose(1, '*** unexpected stat test failure for %s' % full_name)
                 t.unexpected_stat_failures.append(TestResult(directory, name, reason, way))
+            elif tag == 'timeout':
+                if_verbose(1, '*** timeout for %s' % full_name)
+                t.timeouts.append(TestResult(directory, name, reason, way,
+                                             stdout=result.stdout,
+                                             stderr=result.stderr))
             else:
                 if_verbose(1, '*** unexpected failure for %s' % full_name)
                 tr = TestResult(directory, name, reason, way,
@@ -2373,11 +2378,11 @@ async def simple_build(name: Union[TestName, str],
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    timed_out = exit_code == 99
-    if timed_out or (exit_code != 0 and not should_fail):
+    if timed_out(exit_code) or (exit_code != 0 and not should_fail):
         stderr_contents = actual_stderr_path.read_text(encoding='UTF-8', errors='replace')
         message = format_bad_exit_code_message(exit_code, opts.compile_timeout_multiplier)
-        return failBecause('compile: ' + message, stderr=stderr_contents)
+        return failBecause('compile: ' + message, tag=exit_code_tag(exit_code),
+                           stderr=stderr_contents)
     if should_fail and exit_code == 0:
         stderr_contents = actual_stderr_path.read_text(encoding='UTF-8', errors='replace')
         return failBecause('exit code 0', stderr=stderr_contents)
@@ -2448,7 +2453,7 @@ async def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: st
             dump_stdout(name)
             dump_stderr(name)
         message = format_bad_exit_code_message(exit_code, opts.run_timeout_multiplier)
-        return failBecause(message,
+        return failBecause(message, tag=exit_code_tag(exit_code),
                            stderr=read_stderr(name),
                            stdout=read_stdout(name))
 
@@ -2564,7 +2569,7 @@ async def interpreter_run(name: TestName,
             dump_stdout(name)
             dump_stderr(name)
         message = format_bad_exit_code_message(exit_code, opts.run_timeout_multiplier)
-        return failBecause(message,
+        return failBecause(message, tag=exit_code_tag(exit_code),
                            stderr=read_stderr(name),
                            stdout=read_stdout(name))
 
@@ -3391,11 +3396,18 @@ def timeout_seconds(timeout_multiplier: float) -> int:
     return int(ceil(config.timeout * timeout_multiplier))
 
 # Exit code 99 is how the timeout wrapper reports that it killed the command.
+def timed_out(exit_code: int) -> bool:
+    return exit_code == 99
+
 def format_bad_exit_code_message(exit_code: int, timeout_multiplier: float=1.0) -> str:
     msg = 'bad exit code (%d)' % exit_code
-    if exit_code == 99:
+    if timed_out(exit_code):
         msg += ': timed out after %ds' % timeout_seconds(timeout_multiplier)
     return msg
+
+# The failBecause tag that routes the result into TestRun.timeouts.
+def exit_code_tag(exit_code: int) -> Optional[str]:
+    return 'timeout' if timed_out(exit_code) else None
 
 # -----------------------------------------------------------------------------
 # checking if ghostscript is available for checking the output of hp2ps
@@ -3607,6 +3619,11 @@ def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=No
         file.write(colored_if(color, Color.RED, header) + '\n')
         printTestInfosSummary(file, t.unexpected_stat_failures)
 
+    if t.timeouts:
+        header = 'Timeouts:'
+        file.write(colored_if(color, Color.RED, header) + '\n')
+        printTestInfosSummary(file, t.timeouts)
+
     if t.framework_failures:
         header = 'Framework failures:'
         file.write(colored_if(color, Color.RED, header) + '\n')
@@ -3623,10 +3640,11 @@ def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=No
 
     printUnexpectedTests(file,
         [t.unexpected_passes, t.unexpected_failures,
-         t.unexpected_stat_failures, t.framework_failures], color)
+         t.unexpected_stat_failures, t.timeouts, t.framework_failures], color)
 
     if len(t.unexpected_failures) > 0 or \
         len(t.unexpected_stat_failures) > 0 or \
+        len(t.timeouts) > 0 or \
         len(t.unexpected_passes) > 0 or \
         len(t.framework_failures) > 0:
         summary_color = Color.RED
@@ -3663,6 +3681,8 @@ def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=No
                + ' unexpected failures\n'
                + repr(len(t.unexpected_stat_failures)).rjust(8)
                + ' unexpected stat failures\n'
+               + repr(len(t.timeouts)).rjust(8)
+               + ' timeouts\n'
                + repr(len(t.fragile_failures) + len(t.fragile_passes)).rjust(8)
                + ' fragile tests\n'
                + '\n')

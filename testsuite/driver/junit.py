@@ -12,12 +12,14 @@ def junit(t: TestRun) -> ET.ElementTree:
                               tests = str(t.total_tests),
                               failures = str(len(t.unexpected_failures)
                                              + len(t.unexpected_stat_failures)
+                                             + len(t.timeouts)
                                              + len(t.unexpected_passes)),
                               errors = str(len(t.framework_failures)),
                               skipped = str(len(t.fragile_failures)),
                               timestamp = datetime.now().isoformat())
 
     for kind, res_type, group in [('failure', 'stat failure', t.unexpected_stat_failures),
+                                  ('failure', 'timeout', t.timeouts),
                                   ('failure', 'unexpected failure', t.unexpected_failures),
                                   ('failure', 'unexpected pass', t.unexpected_passes),
                                   ('skipped', 'fragile failure', t.fragile_failures)]:

@@ -625,6 +625,7 @@ else:
 
 if len(t.unexpected_failures) > 0 or \
    len(t.unexpected_stat_failures) > 0 or \
+   len(t.timeouts) > 0 or \
    len(t.unexpected_passes) > 0 or \
    len(t.framework_failures) > 0:
     exitcode = 1
