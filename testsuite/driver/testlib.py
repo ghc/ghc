@@ -1811,7 +1811,8 @@ async def do_test(name: TestName,
 
         # If user used expect_broken then don't record failures of pre_cmd
         if exit_code != 0 and opts.expect not in ['fail']:
-            framework_fail(name, way, 'pre_cmd failed: {0}'.format(exit_code))
+            message = format_bad_exit_code_message(exit_code, opts.pre_cmd_timeout_multiplier)
+            framework_fail(name, way, 'pre_cmd: ' + message)
             if_verbose(1, '** pre_cmd was "{0}".'.format(override_options(opts.pre_cmd)))
             stderr_contents = stderr_path.read_text(encoding='UTF-8', errors='replace')
             stdout_contents = stdout_path.read_text(encoding='UTF-8', errors='replace')
@@ -2372,14 +2373,14 @@ async def simple_build(name: Union[TestName, str],
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    if should_fail:
-        if exit_code == 0:
-            stderr_contents = actual_stderr_path.read_text(encoding='UTF-8', errors='replace')
-            return failBecause('exit code 0', stderr=stderr_contents)
-    else:
-        if exit_code != 0:
-            stderr_contents = actual_stderr_path.read_text(encoding='UTF-8', errors='replace')
-            return failBecause('exit code non-0', stderr=stderr_contents)
+    timed_out = exit_code == 99
+    if timed_out or (exit_code != 0 and not should_fail):
+        stderr_contents = actual_stderr_path.read_text(encoding='UTF-8', errors='replace')
+        message = format_bad_exit_code_message(exit_code, opts.compile_timeout_multiplier)
+        return failBecause('compile: ' + message, stderr=stderr_contents)
+    if should_fail and exit_code == 0:
+        stderr_contents = actual_stderr_path.read_text(encoding='UTF-8', errors='replace')
+        return failBecause('exit code 0', stderr=stderr_contents)
 
     return passed()
 
@@ -2446,7 +2447,7 @@ async def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: st
             print('Wrong exit code for ' + name + '(' + way + ')' + '(expected', opts.exit_code, ', actual', exit_code, ')')
             dump_stdout(name)
             dump_stderr(name)
-        message = format_bad_exit_code_message(exit_code)
+        message = format_bad_exit_code_message(exit_code, opts.run_timeout_multiplier)
         return failBecause(message,
                            stderr=read_stderr(name),
                            stdout=read_stdout(name))
@@ -2562,7 +2563,7 @@ async def interpreter_run(name: TestName,
             print('Wrong exit code for ' + name + '(' + way + ') (expected', getTestOpts().exit_code, ', actual', exit_code, ')')
             dump_stdout(name)
             dump_stderr(name)
-        message = format_bad_exit_code_message(exit_code)
+        message = format_bad_exit_code_message(exit_code, opts.run_timeout_multiplier)
         return failBecause(message,
                            stderr=read_stderr(name),
                            stdout=read_stdout(name))
@@ -3331,7 +3332,7 @@ async def runCmd(cmd: str,
     """
 
     timeout_prog = strip_quotes(config.timeout_prog)
-    timeout = str(int(ceil(config.timeout * timeout_multiplier)))
+    timeout = str(timeout_seconds(timeout_multiplier))
 
     # Format cmd using config. Example: cmd='{hpc} report A.tix'
     cmd = cmd.format(**config.__dict__)
@@ -3386,17 +3387,15 @@ async def runCmd(cmd: str,
         if_verbose(1, 'Timeout happened...killed process "{0}"...\n'.format(cmd))
     return proc.returncode # type: ignore
 
-# Each message should be kept lowercase
-def exit_code_specific_message(exit_code: int) -> str:
-    messages = {99: "test timeout"}
-    return messages.get(exit_code, "")
+def timeout_seconds(timeout_multiplier: float) -> int:
+    return int(ceil(config.timeout * timeout_multiplier))
 
-def format_bad_exit_code_message(exit_code: int) -> str:
-    ex_msg = exit_code_specific_message(exit_code)
-    if ex_msg == "":
-        return 'bad exit code (%d)' % exit_code
-    else:
-        return ': '.join(['bad exit code (%d)' % exit_code, ex_msg])
+# Exit code 99 is how the timeout wrapper reports that it killed the command.
+def format_bad_exit_code_message(exit_code: int, timeout_multiplier: float=1.0) -> str:
+    msg = 'bad exit code (%d)' % exit_code
+    if exit_code == 99:
+        msg += ': timed out after %ds' % timeout_seconds(timeout_multiplier)
+    return msg
 
 # -----------------------------------------------------------------------------
 # checking if ghostscript is available for checking the output of hp2ps
