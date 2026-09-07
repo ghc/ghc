@@ -5002,7 +5002,7 @@ printStringAtLsDelta cl s = do
       printStringAt (undelta p cl colOffset) s
       p' <- getPosP
       d <- getPriorEndD
-      debugM $ "printStringAtLsDelta:(pos,p,p',d,s):" ++ show (undelta p cl colOffset,p,p',d,s)
+      debugM $ "printStringAtLsDelta:(pos,p,p',d,colOffset,s):" ++ show (undelta p cl colOffset,p,p',d,colOffset,s)
     else return () `debug` ("printStringAtLsDelta:bad delta for (mc,s):" ++ show (cl,s))
 
 -- ---------------------------------------------------------------------
@@ -5250,7 +5250,7 @@ printString layout str = do
   d <- getPriorEndD
   colOffsetP <- getLayoutOffsetP
   colOffsetD <- getLayoutOffsetD
-  -- debugM $ "printString:(p,colOffset,strDP,cr)="  ++ show (p,colOffset,strDP,cr)
+  -- debugM $ "printString:(p,colOffsetP,strDP,cr)="  ++ show (p,colOffsetP,strDP,cr)
   if cr == 0
     then do
       setPosP      (undelta p strDP colOffsetP)

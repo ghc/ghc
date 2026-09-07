@@ -128,6 +128,7 @@ data XPatBindTc = XPatBindTc
 
 type instance XVarBind (GhcPass pL) (GhcPass pR) = XVarBindGhc pL pR
 type family XVarBindGhc pL pR where
+
   XVarBindGhc 'Typechecked 'Typechecked = NoExtField
   XVarBindGhc _     _                   = DataConCantHappen
 
