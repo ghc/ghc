@@ -341,12 +341,32 @@ processBlock
 processBlock block_live (BasicBlock id instrs)
  = do   -- pprTraceM "processBlock" $ text "" $$ ppr (BasicBlock id instrs)
         initBlock id block_live
+        platform <- getPlatform
+        setHintsR (copyHints platform instrs)
 
         (instrs', fixups)
                 <- linearRA block_live id instrs
         -- pprTraceM "blockResult" $ ppr (instrs', fixups)
         return  $ BasicBlock id instrs' : fixups
 
+
+-- CQ-REF[ra-hints]
+copyHints :: Instruction instr => Platform -> [LiveInstr instr] -> UniqFM VirtualReg RealReg
+copyHints platform instrs
+        = foldl' add emptyUFM [ i | LiveInstr (Instr i) _ <- instrs ]
+  where
+    add hints i
+        | Just (RegVirtual vr, RegReal rr) <- takeRegRegMoveInstr platform i
+        = addToUFM_C (\old _ -> old) hints vr rr
+        | otherwise
+        = hints
+
+-- CQ-REF[ra-avoid]
+realRegsWritten :: Instruction instr => Platform -> [LiveInstr instr] -> [RealReg]
+realRegsWritten platform (LiveInstr (Instr i) _ : _)
+        | RU _ written <- regUsageOfInstr platform i
+        = [ rr | RegWithFormat (RegReal rr) _ <- written ]
+realRegsWritten _ _ = []
 
 -- | Load the freeregs and current reg assignment into the RegM state
 --      for the basic block with this BlockId.
@@ -400,6 +420,8 @@ linearRA block_live block_id = go [] []
                , accFixups )                    -- it doesn't matter what order the fixup blocks are returned in.
 
     go accInstr accFixups (instr:instrs) = do
+        platform <- getPlatform
+        setAvoidR (realRegsWritten platform instrs)
         (accInstr', new_fixups) <- raInsn block_live accInstr block_id instr
         go accInstr' (new_fixups ++ accFixups) instrs
 
@@ -714,10 +736,19 @@ saveClobberedTemps clobbered dying
             platform <- getPlatform
 
             freeRegs <- getFreeRegsR
+            hints    <- getHintsR
             let regclass = targetClassOfRealReg platform reg
                 freeRegs_thisClass = frGetFreeRegs regclass freeRegs
+                usable = filter (`notElem` clobbered) freeRegs_thisClass
+                -- CQ-REF[ra-hints]
+                preferred
+                  | Just hint <- lookupUFM_Directly hints temp
+                  , hint `elem` usable
+                  = hint : usable
+                  | otherwise
+                  = usable
 
-            case filter (`notElem` clobbered) freeRegs_thisClass of
+            case preferred of
 
               -- (1) we have a free reg of the right class that isn't
               -- clobbered by this instruction; use it to save the
@@ -899,6 +930,8 @@ allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr vrF
 
         -- Can we put the variable into a register it already was?
         pref_reg <- findPrefRealReg vr
+        hints    <- getHintsR
+        avoid    <- getAvoidR
 
         case freeRegs_thisClass of
          -- case (2): we have a free register
@@ -906,6 +939,14 @@ allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr vrF
            do   let !final_reg
                         | Just reg <- pref_reg
                         , reg `elem` freeRegs_thisClass
+                        = reg
+                        -- CQ-REF[ra-hints]
+                        | Just reg <- lookupUFM hints vr
+                        , reg `elem` freeRegs_thisClass
+                        , reg `notElem` avoid
+                        = reg
+                        -- CQ-REF[ra-avoid]
+                        | (reg : _) <- filter (`notElem` avoid) freeRegs_thisClass
                         = reg
                         | otherwise
                         = first_free

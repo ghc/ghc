@@ -23,6 +23,11 @@ module GHC.CmmToAsm.Reg.Linear.State (
         getBlockAssigR,
         setBlockAssigR,
 
+        getHintsR,
+        setHintsR,
+        getAvoidR,
+        setAvoidR,
+
         setDeltaR,
         getDeltaR,
 
@@ -47,7 +52,9 @@ import GHC.CmmToAsm.Config
 import GHC.Cmm.BlockId
 
 import GHC.Platform
+import GHC.Platform.Reg
 import GHC.Types.Unique
+import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSM
 import GHC.Exts (oneShot)
 
@@ -98,7 +105,9 @@ runR config block_assig freeregs assig stack us thing =
                 , ra_us         = us
                 , ra_spills     = []
                 , ra_config     = config
-                , ra_fixups     = [] })
+                , ra_fixups     = []
+                , ra_hints      = emptyUFM
+                , ra_avoid      = [] })
    of
         RA_Result state returned_thing
          ->  (ra_blockassig state, ra_stack state, makeRAStats state, returned_thing, ra_us state)
@@ -151,6 +160,22 @@ getBlockAssigR = mkRegM $ \ s@RA_State{ra_blockassig = assig} ->
 setBlockAssigR :: BlockAssignment freeRegs -> RegM freeRegs ()
 setBlockAssigR assig = mkRegM $ \ s ->
   RA_Result s{ra_blockassig = assig} ()
+
+getHintsR :: RegM freeRegs (UniqFM VirtualReg RealReg)
+getHintsR = mkRegM $ \ s@RA_State{ra_hints = hints} ->
+  RA_Result s hints
+
+setHintsR :: UniqFM VirtualReg RealReg -> RegM freeRegs ()
+setHintsR hints = mkRegM $ \ s ->
+  RA_Result s{ra_hints = hints} ()
+
+getAvoidR :: RegM freeRegs [RealReg]
+getAvoidR = mkRegM $ \ s@RA_State{ra_avoid = avoid} ->
+  RA_Result s avoid
+
+setAvoidR :: [RealReg] -> RegM freeRegs ()
+setAvoidR avoid = mkRegM $ \ s ->
+  RA_Result s{ra_avoid = avoid} ()
 
 setDeltaR :: Int -> RegM freeRegs ()
 setDeltaR n = mkRegM $ \ s ->

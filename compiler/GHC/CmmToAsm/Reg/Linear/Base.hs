@@ -219,5 +219,19 @@ data RA_State freeRegs
         -- | (from,fixup,to) : We inserted fixup code between from and to
         , ra_fixups     :: [(BlockId,BlockId,BlockId)]
 
+        -- CQ[ra-hints]
+        -- Q: Why per block, and why does the first move win when a vreg is
+        --    moved into several real registers?
+        -- A~ Hints are only sound within the block being allocated; the first
+        --    move is the nearest use, and the value must reach it anyway.
+        , ra_hints      :: UniqFM VirtualReg RealReg
+
+        -- CQ[ra-avoid]
+        -- Q: Why only the next instruction?
+        -- A~ saveClobberedTemps evacuates a vreg allocated one instruction
+        --    before a fixed write; longer distances are rare (see the
+        --    scan in the todo note).
+        , ra_avoid      :: [RealReg]
+
         }
 
