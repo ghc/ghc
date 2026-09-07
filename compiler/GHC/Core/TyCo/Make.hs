@@ -94,7 +94,7 @@ import {-# SOURCE #-} GHC.Core.Type
    , typeKind     -- Used in mkKindCo
    )
 
-import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
    ( liftedTypeKind, unliftedTypeKind
    , constraintKind, zeroBitTypeKind
    , manyDataConTy, liftedRepTy, unliftedRepTy, zeroBitRepTy
@@ -105,8 +105,8 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.Coercion.Axiom
 
-import GHC.Builtin.Names
-import GHC.Builtin.Types.Prim( tYPETyCon, cONSTRAINTTyCon )
+-- import GHC.Builtin.Names
+import GHC.Builtin.WiredIn.Prim( tYPETyCon, cONSTRAINTTyCon )
 
 import GHC.Types.Basic
 import GHC.Types.Var
@@ -446,7 +446,7 @@ e.g., during comparison.
 
  3. We have a single, statically allocated top-level binding to
     represent `TyConApp GHC.Types.Type []` (namely
-    'GHC.Builtin.Types.Prim.liftedTypeKind'), ensuring that we don't
+    'GHC.Builtin.Types.WiredIn.Prim.liftedTypeKind'), ensuring that we don't
     need to allocate such types (goal (a)).  See functions
     mkTYPEapp and mkBoxedRepApp
 
@@ -573,7 +573,7 @@ mkTYPEapp_maybe :: RuntimeRepType -> Maybe Type
 --     because those inner types should already have been rewritten
 --     to LiftedRep and UnliftedRep respectively, by mkTyConApp
 --
--- see Note [TYPE and CONSTRAINT] in GHC.Builtin.Types.Prim.
+-- see Note [TYPE and CONSTRAINT] in GHC.Builtin.WiredIn.Prim.
 -- See Note [Using synonyms to compress types] in GHC.Core.Type
 {-# NOINLINE mkTYPEapp_maybe #-}
 mkTYPEapp_maybe (TyConApp tc args)
@@ -606,7 +606,7 @@ mkBoxedRepApp_maybe :: LevityType -> Maybe Type
 -- On the fly, rewrite
 --      BoxedRep Lifted     -->   liftedRepTy    (a synonym)
 --      BoxedRep Unlifted   -->   unliftedRepTy  (ditto)
--- See Note [TYPE and CONSTRAINT] in GHC.Builtin.Types.Prim.
+-- See Note [TYPE and CONSTRAINT] in GHC.Builtin.WiredIn.Prim.
 -- See Note [Using synonyms to compress types] in GHC.Core.Type
 {-# NOINLINE mkBoxedRepApp_maybe #-}
 mkBoxedRepApp_maybe (TyConApp tc args)
@@ -620,7 +620,7 @@ mkTupleRepApp_maybe :: Type -> Maybe Type
 -- ^ Given a `[RuntimeRep]`, apply `TupleRep` to it
 -- On the fly, rewrite
 --      TupleRep [] -> zeroBitRepTy   (a synonym)
--- See Note [TYPE and CONSTRAINT] in GHC.Builtin.Types.Prim.
+-- See Note [TYPE and CONSTRAINT] in GHC.Builtin.WiredIn.Prim.
 -- See Note [Using synonyms to compress types] in GHC.Core.Type
 {-# NOINLINE mkTupleRepApp_maybe #-}
 mkTupleRepApp_maybe (TyConApp tc args)
