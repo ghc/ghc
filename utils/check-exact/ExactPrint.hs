@@ -1460,6 +1460,10 @@ markAnnListA :: (Monad m, Monoid w)
 markAnnListA (AnnList la semis) action = do
   (r, semis0, la0) <- case la of
          EpVirtualBraces anc -> do
+           debugM $ "markAnnListA:anc:" ++ showAst anc
+           case anc of
+             EpaSpan s -> debugM $ "markAnnListA:EpVirtualBraces:" ++ showAst (s, isZeroWidthSpan s)
+             _ -> return ()
            -- The next non-comment thing that prints will use 'anc' as
            -- its anchor, in addition to whatever it has. So the list
            -- as a whole is anchored at this point
@@ -5052,7 +5056,7 @@ printStringAtLsDelta cl s = do
       printStringAt (undelta p cl colOffset) s
       p' <- getPosP
       d <- getPriorEndD
-      debugM $ "printStringAtLsDelta:(pos,p,p',d,s):" ++ show (undelta p cl colOffset,p,p',d,s)
+      debugM $ "printStringAtLsDelta:(pos,p,p',d,colOffset,s):" ++ show (undelta p cl colOffset,p,p',d,colOffset,s)
     else return () `debug` ("printStringAtLsDelta:bad delta for (mc,s):" ++ show (cl,s))
 
 -- ---------------------------------------------------------------------
@@ -5350,7 +5354,7 @@ printString layout str = do
   d <- getPriorEndD
   colOffsetP <- getLayoutOffsetP
   colOffsetD <- getLayoutOffsetD
-  -- debugM $ "printString:(p,colOffset,strDP,cr)="  ++ show (p,colOffset,strDP,cr)
+  -- debugM $ "printString:(p,colOffsetP,strDP,cr)="  ++ show (p,colOffsetP,strDP,cr)
   if cr == 0
     then do
       setPosP      (undelta p strDP colOffsetP)
