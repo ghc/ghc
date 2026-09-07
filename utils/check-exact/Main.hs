@@ -347,9 +347,9 @@ testOneFile _ libdir fileName mchanger = do
            then do
              putStrLn "exactPrint: AST Match Failed"
              putStrLn "\n===================================\nOrig\n\n"
-             putStrLn origAst
+             -- putStrLn origAst
              putStrLn "\n===================================\nNew\n\n"
-             putStrLn newAstStr
+             -- putStrLn newAstStr
              exitFailure
            else do
              putStrLn "exactPrint: Changed AST Source Mismatch"
