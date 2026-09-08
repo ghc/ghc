@@ -889,8 +889,10 @@ data AbsMem
 -- GHC.Cmm.MachOp classifies them):
 --
 --  * MO_Touch is a pure liveness marker: no backend emits any code for it.
---    Sinking is intra-block, so the Core-level touch# reordering hazard
---    of #18040 does not arise.
+--    The hazard of #18040, a read of the touched object delayed past a GC
+--    safe point, cannot arise here: after stack layout the only safe points
+--    are CmmCall nodes, which rule (C3)(d) still blocks, and
+--    suspendThread/resumeThread, which stay clobbering.
 --
 --  * MO_Prefetch_Data reads memory but writes nothing.
 
