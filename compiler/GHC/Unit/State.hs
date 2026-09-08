@@ -369,16 +369,15 @@ data UnitState = UnitState {
   -- is always mentioned before the units it depends on.
   preloadUnits      :: [UnitId],
 
-  -- | The units that can be used by the respective home unit. Despite the
-  -- identifier, this does not just cover units that are enabled explicitly
-  -- using flags but also units from the package database that are enabled
-  -- implicitly in case @-hide-all-packages@ is absent. The former are paired
-  -- with 'Just' applied to the respective flags, the latter are paired with
-  -- 'Nothing'.
+  -- | The units that can be used by the respective home unit. This covers units
+  -- that are enabled explicitly using flags as well as units from the package
+  -- database that are enabled implicitly in case @-hide-all-packages@ is
+  -- absent. The former are paired with 'Just' applied to the respective flags,
+  -- the latter are paired with 'Nothing'.
   --
   -- This field is used for generating version macros and “unused packages”
   -- warnings.
-  explicitUnits :: [(Unit, Maybe PackageArg)],
+  availableUnits :: [(Unit, Maybe PackageArg)],
 
   homeUnitDepends    :: Set UnitId,
 
@@ -412,7 +411,7 @@ emptyUnitState = UnitState {
     trustedUnits   = emptyTrustOverlay,
     packageNameMap = emptyUFM,
     preloadUnits   = [],
-    explicitUnits  = [],
+    availableUnits = [],
     homeUnitDepends = Set.empty,
     moduleNameProvidersMap       = emptyUniqMap,
     pluginModuleNameProvidersMap = emptyUniqMap,
@@ -912,7 +911,7 @@ mkUnitState logger unit_index cfg = do
   let pkgname_map = listToUFM [ (unitPackageName p, unitInstanceOf p)
                               | p <- pkgs2
                               ]
-  -- The explicitUnits accurately reflects the set of units that are turned
+  -- 'availableUnits' accurately reflects the set of units that are turned
   -- on; as such, it also is the only way one can come up with requirements.
   -- The requirement context is directly based off of this: we simply
   -- look for nested unit IDs that are directly fed holes: the requirements
@@ -954,7 +953,7 @@ mkUnitState logger unit_index cfg = do
   -- Force the result to avoid leaking input parameters
   let !state = UnitState
          { preloadUnits                 = dep_preload
-         , explicitUnits                = explicit_pkgs
+         , availableUnits               = explicit_pkgs
          , homeUnitDepends              = home_unit_deps
          , unitInfoMap                  = pkg_db
          , trustedUnits                 = trustUnitsOverlay

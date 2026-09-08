@@ -835,7 +835,7 @@ instantiationNodes uid unit_state = map (uid,) iuids_to_check
   where
     iuids_to_check :: [InstantiatedUnit]
     iuids_to_check =
-      nubSort $ concatMap (goUnitId . fst) (explicitUnits unit_state)
+      nubSort $ concatMap (goUnitId . fst) (availableUnits unit_state)
      where
       goUnitId uid =
         [ recur
@@ -964,7 +964,7 @@ checkHomeUnitsClosed ue
            where
              external_depends = mapUniqMap (Set.fromList . unitDepends) (unitInfoMap this_units)
              this_units = homeUnitEnv_units this_uis
-             this_deps = [ toUnitId unit | (unit,Just _) <- explicitUnits this_units]
+             this_deps = [ toUnitId unit | (unit,Just _) <- availableUnits this_units]
 
     graphNodes :: [Node UnitId UnitId]
     graphNodes = go Set.empty home_id_set
