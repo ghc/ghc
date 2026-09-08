@@ -60,7 +60,7 @@ import GHC.Types.Tickish
 import GHC.Types.Var    ( isTyCoVar )
 
 import GHC.Builtin.WiredIn.Prim( realWorldStatePrimTy )
-import GHC.Builtin.KnownKeys( runRWKey, seqHashKey )
+import GHC.Builtin.KnownKeys( runRWKey, seqHashKey, noinlineIdKey )
 import GHC.Builtin.WiredIn.Ids( seqId )
 
 import qualified GHC.Data.List.Infinite as Inf
@@ -1220,10 +1220,12 @@ simplExprF1 _ (Type ty) cont
     -- The (Type ty) case is handled separately by simplExpr
     -- and by the other callers of simplExprF
 
-simplExprF1 env (Var v)        cont = {-#SCC "simplInId" #-} simplInId env v cont
-simplExprF1 env (Lit lit)      cont = {-#SCC "rebuild" #-} rebuild env (Lit lit) cont
-simplExprF1 env (Tick t expr)  cont = {-#SCC "simplTick" #-} simplTick env t expr cont
-simplExprF1 env (Coercion co)  cont = {-#SCC "simplCoercionF" #-} simplCoercionF env co cont
+simplExprF1 env (Var v)       cont = {-#SCC "simplInId" #-} simplInId env v cont
+simplExprF1 env (Lit lit)     cont = {-#SCC "rebuild" #-} rebuild env (Lit lit) cont
+simplExprF1 env (Tick t expr) cont = {-#SCC "simplTick" #-} simplTick env t expr cont
+simplExprF1 env (Coercion co) cont = {-#SCC "simplCoercionF" #-} simplCoercionF env co cont
+simplExprF1 env (App fun arg) cont = do { cont' <- pushAppCont env fun arg cont
+                                        ; simplExprF env fun cont' }
 
 simplExprF1 env (Cast body co) cont
   = do  { co1 <- {-#SCC "simplCast-simplCoercion" #-}
@@ -1238,35 +1240,6 @@ simplExprF1 env (Cast body co) cont
         ; {-#SCC "simplCast-simplExprF" #-}
           simplExprF env body cont1 }
 
-simplExprF1 env (App fun arg) cont
-  = {-#SCC "simplExprF1-App" #-} case arg of
-      Type ty -> do { -- The argument type will (almost) certainly be used
-                      -- in the output program, so just force it now.
-                      -- See Note [Avoiding space leaks in OutType]
-                      arg' <- simplType env ty
-
-                      -- But use substTy, not simplType, to avoid forcing
-                      -- the hole type; it will likely not be needed.
-                      -- See Note [The hole type in ApplyToTy]
-                    ; let hole' = substTy env (exprType fun)
-
-                    ; simplExprF env fun $
-                      ApplyToTy { sc_arg_ty  = arg'
-                                , sc_hole_ty = hole'
-                                , sc_cont    = cont } }
-      _       ->
-          -- Crucially, sc_hole_ty is a /lazy/ binding.  It will
-          -- be forced only if we need to run contHoleType.
-          -- When these are forced, we might get quadratic behavior;
-          -- this quadratic blowup could be avoided by drilling down
-          -- to the function and getting its multiplicities all at once
-          -- (instead of one-at-a-time). But in practice, we have not
-          -- observed the quadratic behavior, so this extra entanglement
-          -- seems not worthwhile.
-        simplExprF env fun $
-        ApplyToVal { sc_arg = arg, sc_env = UnSimplified env
-                   , sc_hole_ty = substTy env (exprType fun)
-                   , sc_cast = MRefl, sc_cont = cont }
 
 simplExprF1 env expr@(Lam {}) cont
   = {-#SCC "simplExprF1-Lam" #-}
@@ -1851,9 +1824,8 @@ simplArg :: SimplEnvIS              -- ^ Used only for its InScopeSet
          -> SimplM OutExpr
 simplArg _ _ _ (Simplified {}) arg mco
   = -- See Note [Avoid repeated simplification]
-    case mco of
-       MRefl  -> return arg       -- Vastly common case
-       MCo co -> return (mkCast arg co)
+    return (mkCastMCo arg mco)  -- Handles the very common case of mco=MRefl
+
 simplArg env mb_arg_info fun_ty (UnSimplified arg_se) arg mco
   = do { let arg_env' = arg_se `setInScopeFromE` env
              arg_ty   = funArgTy fun_ty
@@ -2397,7 +2369,29 @@ simplOutId env fun cont
              call' = mkApps (Var fun) [mkTyArg rr', mkTyArg new_runrw_res_ty, arg']
        ; rebuild_go env call' outer_cont }
 
--- Normal case for (f e1 .. en)
+simplOutId env inline_fun cont
+  | inline_fun `hasKey` noinlineIdKey
+  , ApplyToTy  { sc_cont = cont1 } <- cont
+  , ApplyToVal { sc_cont = cont2, sc_arg = the_call, sc_cast = arg_mco
+               , sc_env = UnSimplified arg_se } <- cont1
+  = do { let (encl_app_cont, rest_cont) = splitContArgs cont2
+             -- push_args just pushes multiple arguments onto the continuation
+             push_args (App fun arg) cont = do { cont' <- pushAppCont arg_se fun arg cont
+                                               ; push_args fun cont' }
+             push_args fun           cont = return (fun, cont)
+       ; (inner_fun, call_cont) <- push_args the_call encl_app_cont
+
+       -- Now look at the function itself, setting sm_inline = False
+       ; let call_env = updMode updModeForNoInline $
+                        arg_se `setInScopeFromE` env
+       ; (floats1, call') <- simplExprF call_env inner_fun call_cont
+       ; let noinline_expr = Var inline_fun `App` Type (contHoleType rest_cont)
+                                            `App` mkCastMCo call' arg_mco
+       ; (floats2, res) <- rebuild env noinline_expr rest_cont
+       ; return (floats2 `addFloats` floats1 , res) }
+
+-----------------------
+-- General fall-through case for (f e1 .. en)
 simplOutId env fun cont
   = -- Try rewrite rules: Plan (BEFORE) in Note [When to apply rewrite rules]
     do { rule_base <- getSimplRules
@@ -2429,6 +2423,34 @@ simplOutId env fun cont
     do { let arg_info = mkArgInfo env fun rules_for_me cont
        ; rebuildCall env arg_info cont
     } } } } }
+
+-----------------------
+pushAppCont :: SimplEnv -> InExpr -> InExpr -> SimplCont -> SimplM SimplCont
+-- Push a single argument onto the the continuation
+pushAppCont env fun (Type arg_ty) cont
+  = do { -- The argument type will (almost) certainly be used
+         -- in the output program, so just force it now using `simplType`
+         -- See Note [Avoiding space leaks in OutType]
+         arg_ty' <- simplType env arg_ty
+
+         -- But use `substTy`, not `simplType`, to avoid forcing
+         -- the hole type; it will likely not be needed.
+         -- See Note [The hole type in ApplyToTy]
+        ; let hole' = substTy env (exprType fun)
+
+        ; return (ApplyToTy { sc_arg_ty  = arg_ty'
+                            , sc_hole_ty = hole'
+                            , sc_cont    = cont }) }
+pushAppCont env fun arg cont
+  = return (ApplyToVal { sc_arg = arg, sc_env = UnSimplified env
+                       , sc_hole_ty = substTy env (exprType fun)
+                       , sc_cast = MRefl, sc_cont = cont })
+    -- Crucially, sc_hole_ty is a /lazy/ binding.  It will be forced only if we
+    -- need to run `contHoleType`.  When these are forced, we might get
+    -- quadratic behavior; this quadratic blowup could be avoided by drilling
+    -- down to the function and getting its arguments all at once (instead of
+    -- one-at-a-time). But in practice, we have not observed the quadratic
+    -- behavior, so this extra entanglement seems not worthwhile.
 
 ---------------------------------------------------------
 --      Dealing with a call site

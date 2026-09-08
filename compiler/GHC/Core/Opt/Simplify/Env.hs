@@ -13,7 +13,7 @@ module GHC.Core.Opt.Simplify.Env (
         -- * Environments
         SimplEnv(..), pprSimplEnv,   -- Temp not abstract
         SimplPhase(..), isActive, simplStartPhase, simplEndPhase,
-        seArityOpts, seCaseCase, seCaseFolding, seCaseMerge, seCastSwizzle,
+        seArityOpts, seCaseCase, seCaseFolding, seCaseMerge, seRuleLHS,
         seDoEtaReduction, seEtaExpand, seFloatEnable, seInline, seNames,
         seOptCoercionOpts, sePhase, sePlatform, sePreInline,
         seRuleOpts, seRules, seUnfoldingOpts,
@@ -144,9 +144,9 @@ are computed on environment initialization and we wish not to expose the field
 to the "user" or the pass -- it is an internal value. Therefore the distinction
 here is between "freely set by the caller" and "internally managed by the pass".
 
-Note that it doesn't matter for the decision procedure wheter a value is altered
+Note that it doesn't matter for the decision procedure whether a value is altered
 throughout an iteration of the Simplify pass: The fields sm_phase, sm_inline,
-sm_rules, sm_cast_swizzle and sm_eta_expand are updated locally (See the
+sm_rules, sm_rule_lhs, and sm_eta_expand are updated locally (See the
 definitions of `updModeForStableUnfoldings` and `updModeForRule{LHS,RHS}` in
 GHC.Core.Opt.Simplify.Utils) but they are still part of `SimplMode` as the
 caller of the Simplify pass needs to provide the initial values for those fields.
@@ -231,9 +231,6 @@ seCaseFolding env = sm_case_folding (seMode env)
 seCaseMerge :: SimplEnv -> Bool
 seCaseMerge env = sm_case_merge (seMode env)
 
-seCastSwizzle :: SimplEnv -> Bool
-seCastSwizzle env = sm_cast_swizzle (seMode env)
-
 seDoEtaReduction :: SimplEnv -> Bool
 seDoEtaReduction env = sm_do_eta_reduction (seMode env)
 
@@ -267,6 +264,9 @@ seRuleOpts env = sm_rule_opts (seMode env)
 seRules :: SimplEnv -> Bool
 seRules env = sm_rules (seMode env)
 
+seRuleLHS :: SimplEnv -> Bool
+seRuleLHS env = sm_rule_lhs (seMode env)
+
 seUnfoldingOpts :: SimplEnv -> UnfoldingOpts
 seUnfoldingOpts env = sm_uf_opts (seMode env)
 
@@ -274,20 +274,28 @@ seUnfoldingOpts env = sm_uf_opts (seMode env)
 data SimplMode = SimplMode -- See comments in GHC.Core.Opt.Simplify.Monad
   { sm_phase        :: !SimplPhase    -- ^ The phase of the simplifier
   , sm_names        :: ![String]      -- ^ Name(s) of the phase
-  , sm_rules        :: !Bool          -- ^ Whether RULES are enabled
-  , sm_inline       :: !Bool          -- ^ Whether inlining is enabled
-  , sm_eta_expand   :: !Bool          -- ^ Whether eta-expansion is enabled
-  , sm_cast_swizzle :: !Bool          -- ^ Do we swizzle casts past lambdas?
-  , sm_uf_opts      :: !UnfoldingOpts -- ^ Unfolding options
-  , sm_case_case    :: !Bool          -- ^ Whether case-of-case is enabled
+
+  -- Inlining
   , sm_pre_inline   :: !Bool          -- ^ Whether pre-inlining is enabled
-  , sm_float_enable :: !FloatEnable   -- ^ Whether to enable floating out
+  , sm_inline       :: !Bool          -- ^ Whether inlining is enabled
+  , sm_uf_opts      :: !UnfoldingOpts -- ^ Unfolding options
+
+  -- Eta expansion and reduction
+  , sm_eta_expand   :: !Bool          -- ^ Whether eta-expansion is enabled
   , sm_do_eta_reduction :: !Bool
   , sm_arity_opts :: !ArityOpts
-  , sm_rule_opts :: !RuleOpts
+
+  -- RULES
+  , sm_rules        :: !Bool          -- ^ Whether RULES are enabled
+  , sm_rule_opts    :: !RuleOpts
+  , sm_rule_lhs     :: !Bool          -- ^ True on LHS of a RULE
+                                      -- See Note [XXXX]
+
+  , sm_case_case    :: !Bool          -- ^ Whether case-of-case is enabled
+  , sm_float_enable :: !FloatEnable   -- ^ Whether to enable floating out
   , sm_case_folding :: !Bool
-  , sm_case_merge :: !Bool
-  , sm_co_opt_opts :: !OptCoercionOpts -- ^ Coercion optimiser options
+  , sm_case_merge   :: !Bool
+  , sm_co_opt_opts  :: !OptCoercionOpts -- ^ Coercion optimiser options
   }
 
 -- | See Note [SimplPhase]
@@ -366,16 +374,16 @@ See Note [What is active in the RHS of a RULE or unfolding?] in GHC.Core.Opt.Sim
 instance Outputable SimplMode where
     ppr (SimplMode { sm_phase = phase , sm_names = ss
                    , sm_rules = r, sm_inline = i
-                   , sm_cast_swizzle = cs
+                   , sm_rule_lhs = rlhs
                    , sm_eta_expand = eta, sm_case_case = cc })
        = text "SimplMode" <+> braces (
          sep [ text "Phase =" <+> ppr phase <+>
                brackets (text (concat $ intersperse "," ss)) <> comma
-             , pp_flag i   (text "inline") <> comma
-             , pp_flag r   (text "rules") <> comma
-             , pp_flag eta (text "eta-expand") <> comma
-             , pp_flag cs (text "cast-swizzle") <> comma
-             , pp_flag cc  (text "case-of-case") ])
+             , pp_flag i    (text "inline") <> comma
+             , pp_flag r    (text "rules") <> comma
+             , pp_flag eta  (text "eta-expand") <> comma
+             , pp_flag rlhs (text "rule-lhs") <> comma
+             , pp_flag cc   (text "case-of-case") ])
          where
            pp_flag f s = ppUnless f (text "no") <+> s
 

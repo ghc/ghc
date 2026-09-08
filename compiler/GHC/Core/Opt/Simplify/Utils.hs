@@ -15,7 +15,8 @@ module GHC.Core.Opt.Simplify.Utils (
         preInlineUnconditionally, postInlineUnconditionally,
         activeRule,
         getUnfoldingInRuleMatch,
-        updModeForStableUnfoldings, updModeForRuleLHS, updModeForRuleRHS,
+        updModeForStableUnfoldings, updModeForRuleLHS,
+        updModeForRuleRHS, updModeForNoInline,
 
         -- The BindContext type
         BindContext(..), bindContextLevel,
@@ -28,7 +29,7 @@ module GHC.Core.Opt.Simplify.Utils (
         contIsTrivial, contArgs, contIsRhs, mkBottomCont,
         hasArgs, countArgs, contOutArgs, dropContArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
-        interestingCallContext,
+        interestingCallContext, splitContArgs,
 
         -- ArgInfo
         ArgInfo(..), ArgSpec(..), RemainingArgDmds, mkArgInfo,
@@ -567,7 +568,12 @@ contHoleScaling (ApplyToTy { sc_cont = k }) = contHoleScaling k
 contHoleScaling (ApplyToVal { sc_cont = k }) = contHoleScaling k
 contHoleScaling (TickIt _ k) = contHoleScaling k
 
--------------------
+{- *********************************************************************
+*                                                                      *
+       Dealing with application contexts: ApplyToTy, ApplyToVal
+*                                                                      *
+********************************************************************* -}
+
 hasArgs :: SimplCont -> Bool
 -- True <=> some leading arguments
 hasArgs (ApplyToTy {})  = True
@@ -609,6 +615,7 @@ contArgs env cont
     go args (CastIt { sc_cont = k })    = go args k
     go args k                           = (False, reverse args, k)
 
+-----------------------
 contOutArgs :: SimplEnv -> SimplCont -> [OutExpr]
 -- Get the leading arguments from the `SimplCont`, as /OutExprs/
 contOutArgs env cont
@@ -632,11 +639,28 @@ contOutArgs env cont
     -- No more arguments
     go _ = []
 
+-----------------------
+splitContArgs :: SimplCont -> (SimplCont, SimplCont)
+-- Peel off an initial prefix of applications
+splitContArgs cont@(ApplyToTy { sc_cont = cont1 })
+  | (inner, outer) <- splitContArgs cont1 = (cont { sc_cont = inner }, outer)
+splitContArgs cont@(ApplyToVal { sc_cont = cont1 })
+  | (inner, outer) <- splitContArgs cont1 = (cont { sc_cont = inner }, outer)
+splitContArgs cont
+  | contIsStop cont  = (cont, cont)
+  | otherwise        = (mkBoringStop (contHoleType cont), cont)
+
 dropContArgs :: FullArgCount -> SimplCont -> SimplCont
 dropContArgs 0 cont = cont
 dropContArgs n (ApplyToTy  { sc_cont = cont }) = dropContArgs (n-1) cont
 dropContArgs n (ApplyToVal { sc_cont = cont }) = dropContArgs (n-1) cont
 dropContArgs n cont = pprPanic "dropContArgs" (ppr n $$ ppr cont)
+
+{- *********************************************************************
+*                                                                      *
+       Strictness and bottom
+*                                                                      *
+********************************************************************* -}
 
 -- | Describes how the 'SimplCont' will evaluate the hole as a 'SubDemand'.
 -- This can be more insightful than the limited syntactic context that
@@ -737,8 +761,8 @@ mkArgInfo env fun rules_for_fun cont
 
     arg_dmds :: RemainingArgDmds
     arg_dmds
-      | not (seInline env)
-      = vanilla_dmds -- See Note [Do not expose strictness if sm_inline=False]
+      | seRuleLHS env
+      = vanilla_dmds -- See Note [Do not expose strictness on RULE LHSs]
       | otherwise
       = -- add_type_str fun_ty $
         case splitDmdSig (idDmdSig fun) of
@@ -795,8 +819,8 @@ where f has arity 2.  Then we do not want to inline 'x', because
 it'll just be floated out again.  Even if f has lots of discounts
 on its first argument -- it must be saturated for these to kick in
 
-Note [Do not expose strictness if sm_inline=False]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Do not expose strictness on RULE LHSs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #15163 showed a case in which we had
 
   {-# INLINE [1] zip #-}
@@ -813,8 +837,7 @@ LHS of a rule it's not, because 'as' and 'bs' are now not bound on
 the LHS.
 
 This is a pretty pathological example, so I'm not losing sleep over
-it, but the simplest solution was to check sm_inline; if it is False,
-which it is on the LHS of a rule (see updModeForRuleLHS), then don't
+it, but we solve it by checking sm_rule_lhs: if that is on, don't
 make use of the strictness info for the function.
 -}
 
@@ -1210,11 +1233,9 @@ updModeForRuleLHS :: SimplMode -> SimplMode
 -- See Note [The environments of the Simplify pass]
 updModeForRuleLHS current_mode
   = current_mode { sm_phase        = SimplPhase InitialPhase -- doesn't matter
-                 , sm_inline       = False
-                      -- See Note [Do not expose strictness if sm_inline=False]
+                 , sm_inline       = False  -- Do not inline on a RULE lhs
                  , sm_rules        = False
-                 , sm_cast_swizzle = False
-                      -- See Note [Cast swizzling on rule LHSs]
+                 , sm_rule_lhs     = True
                  , sm_eta_expand   = False }
 
 updModeForRuleRHS :: ActivationGhc -> SimplMode -> SimplMode
@@ -1225,6 +1246,9 @@ updModeForRuleRHS rule_act current_mode =
     , sm_eta_expand = False
         -- See Note [Eta expansion in stable unfoldings and rules]
     }
+
+updModeForNoInline :: SimplMode -> SimplMode
+updModeForNoInline mode = mode { sm_inline = False }
 
 -- | `phaseForRuleOrUnf` computes the phase range to use when
 -- simplifying the RHS of a rule or of a stable unfolding.
@@ -1255,16 +1279,17 @@ of other RULES. Doing anything to the LHS is plain confusing, because
 it means that what the rule matches is not what the user
 wrote. c.f. #10595, and #10528.
 
-* sm_inline, sm_rules: inlining (or applying rules) on rule LHSs risks
+* `sm_rule_lhs` is set True, obviously
+  See Note [Do not expose strictness on RULE LHSs]
+
+* `sm_inline`, `sm_rules`: inlining (or applying rules) on rule LHSs risks
   introducing Ticks into the LHS, which makes matching
   trickier. #10665, #10745.
 
   Doing this to either side confounds tools like HERMIT, which seek to reason
   about and apply the RULES as originally written. See #10829.
 
-  See also Note [Do not expose strictness if sm_inline=False]
-
-* sm_eta_expand: the template (LHS) of a rule must only mention coercion
+* `sm_eta_expand`: the template (LHS) of a rule must only mention coercion
   /variables/ not arbitrary coercions.  See Note [Casts in the template] in
   GHC.Core.Rules.  Eta expansion can create new coercions; so we switch
   it off.
@@ -2059,7 +2084,7 @@ rebuildLam env bndrs@(bndr:_) body cont
 
     mk_lams bndrs (Cast body co)
       | -- Note [Casts and lambdas]
-        seCastSwizzle env
+        not (seRuleLHS env)  -- See Note [Cast swizzling on rule LHSs]
       , not (any bad bndrs)
       = mkCast (mk_lams bndrs body) (mkPiCos Representational bndrs co)
       where
@@ -2125,8 +2150,8 @@ In general, here's the transformation:
         /\g. e `cast` co  ===>   (/\g. e) `cast` (/\g. co)
                           (if not (g `in` co))
 
-We call this "cast swizzling". It is controlled by sm_cast_swizzle.
-See also Note [Cast swizzling on rule LHSs]
+We call this "cast swizzling". It is on all the time, EXCEPT
+see Note [Cast swizzling on rule LHSs]
 
 Wrinkles
 
