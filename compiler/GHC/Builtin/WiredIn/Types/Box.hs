@@ -343,7 +343,7 @@ mkBoxDataCon :: DataCon
   mkWiredInNewTyCon boxTyConName mkBoxDataConName boxCoKey bndrs roles rep_ty
   where
     r = runtimeRep1TyVar
-    a = openAlphaTyVar
+    a = rrPolyTyVar1
 
     -- type Box :: forall (r :: RuntimeRep). TYPE r -> Type
     bndrs = [ mkNamedTyConBinder Specified r

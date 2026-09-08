@@ -706,8 +706,10 @@ patchMagicDefn orig_pair@(orig_id, orig_rhs)
   = do { magic_pair@(magic_id, _) <- mk_magic_pair orig_id orig_rhs
 
        -- Patching should not change the Name or the type of the Id
-       ; massert (getUnique magic_id == getUnique orig_id)
-       ; massert (varType magic_id `eqType` varType orig_id)
+       ; massertPpr (getUnique magic_id == getUnique orig_id) (ppr orig_id)
+       ; massertPpr (varType magic_id `eqType` varType orig_id) $
+         vcat [ text "orig_id:"  <+> ppr orig_id  <+> dcolon <+> ppr (varType orig_id)
+              , text "magic_id:" <+> ppr magic_id <+> dcolon <+> ppr (varType magic_id) ]
 
        ; return magic_pair }
   | otherwise
@@ -752,7 +754,7 @@ mkUnsafeCoercePrimPair _old_id old_expr
        ; let [unsafe_refl_data_con] = tyConDataCons unsafe_equality_tc
 
              rhs = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar
-                          , openAlphaTyVar, openBetaTyVar
+                          , rrPolyTyVar1, rrPolyTyVar2
                           , x ] $
                    mkSingleAltCase scrut1
                                    (mkWildValBinder ManyTy scrut1_ty)
@@ -765,7 +767,7 @@ mkUnsafeCoercePrimPair _old_id old_expr
                    Var x `mkCast` x_co
 
              [x, rr_cv, ab_cv] = mkTemplateLocals
-               [ openAlphaTy -- x :: a
+               [ rrPolyTy1   -- x :: a
                , rr_cv_ty    -- rr_cv :: r1 ~# r2
                , ab_cv_ty    -- ab_cv :: (alpha |> alpha_co ~# beta)
                ]
@@ -783,15 +785,15 @@ mkUnsafeCoercePrimPair _old_id old_expr
                                                              runtimeRep1Ty
                                                              runtimeRep2Ty
              (scrut2, scrut2_ty, ab_cv_ty) = unsafe_equality (mkTYPEapp runtimeRep2Ty)
-                                                             (openAlphaTy `mkCastTy` alpha_co)
-                                                             openBetaTy
+                                                             (rrPolyTy1 `mkCastTy` alpha_co)
+                                                             rrPolyTy2
 
              -- alpha_co :: TYPE r1 ~# TYPE r2
              -- alpha_co = TYPE rr_cv
              alpha_co = mkTyConAppCo Nominal tYPETyCon [mkCoVarCo rr_cv]
 
              -- x_co :: alpha ~R# beta
-             x_co = mkGReflMCo Representational openAlphaTy alpha_co `mkTransCo`
+             x_co = mkGReflMCo Representational rrPolyTy1 alpha_co `mkTransCo`
                     mkSubCo (mkCoVarCo ab_cv)
 
 
@@ -800,13 +802,13 @@ mkUnsafeCoercePrimPair _old_id old_expr
                                 `setArityInfo`     arity
 
              ty = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
-                                  , openAlphaTyVar, openBetaTyVar ] $
-                  mkVisFunTyMany openAlphaTy openBetaTy
+                                  , rrPolyTyVar1, rrPolyTyVar2 ] $
+                  mkVisFunTyMany rrPolyTy1 rrPolyTy2
 
              arity = 1
 
              concs = mkRepPolyIdConcreteTyVars
-                     [((mkTyVarTy openAlphaTyVar, mkArgPos 1 Top), runtimeRep1TyVar)]
+                     [((rrPolyTy1, mkArgPos 1 Top), runtimeRep1TyVar)]
                      unsafeCoercePrimName
 
              id   = mkExportedLocalId (RepPolyId concs) unsafeCoercePrimName ty `setIdInfo` info

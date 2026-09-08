@@ -107,3 +107,4 @@ test('T23398', normal, compile, ['-dsuppress-uniques -ddump-simpl -dno-typeable-
 test('T24623', normal, compile, [''])
 test('T25196', [ req_th, collect_compiler_stats('bytes allocated', 10) ],
                multimod_compile, ['T25196', '-v0'])
+test('T23911', [ grep_errmsg(r'Str') ], compile, ['-dsuppress-uniques -ddump-dmdanal'])
