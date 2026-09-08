@@ -1,0 +1,19 @@
+#include "Cmm.h"
+
+// A load must sink past callish ops that don't clobber memory, so that it
+// can be folded into the instruction that uses it. mul2u_64 also clobbers
+// rax/rdx, so keeping the load live across it would cost extra moves.
+
+loadMul2 (W_ p, W_ x, W_ y) {
+    W_ a, hi, lo;
+    a = W_[p];
+    (hi, lo) = prim %mul2u_64(x, y);
+    return (a + hi + lo);
+}
+
+loadBSwap (W_ p, W_ x) {
+    W_ a, b;
+    a = W_[p];
+    (b) = prim %bswap64(x);
+    return (a + b);
+}

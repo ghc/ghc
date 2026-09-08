@@ -885,9 +885,139 @@ callishMachOpHints op = case op of
 -- in GHC.Cmm.Sink.
 callishMachOpClobbersMemory :: CallishMachOp -> Bool
 callishMachOpClobbersMemory op = case op of
+  -- CQ[clobber-libm]
+  -- Q: these become C calls on most backends. Why is a C call to sin/pow
+  --    safe to sink a load past, given the stmCommitNestedTransaction
+  --    story in Note [Foreign calls clobber heap]?
+  -- A~ the counterexample is about RTS functions reached via ForeignTarget,
+  --    which stays clobbering. libm/ghc-prim helpers only read their
+  --    arguments and write errno, thread-local C memory no Cmm load reads.
+  --    Loads through caller-saved STG registers are stopped by rule (C1)
+  --    anyway (foreignTargetRegs in GHC.Cmm.Node).
+  MO_F64_Pwr   -> False
+  MO_F64_Sin   -> False
+  MO_F64_Cos   -> False
+  MO_F64_Tan   -> False
+  MO_F64_Sinh  -> False
+  MO_F64_Cosh  -> False
+  MO_F64_Tanh  -> False
+  MO_F64_Asin  -> False
+  MO_F64_Acos  -> False
+  MO_F64_Atan  -> False
+  MO_F64_Asinh -> False
+  MO_F64_Acosh -> False
+  MO_F64_Atanh -> False
+  MO_F64_Log   -> False
+  MO_F64_Log1P -> False
+  MO_F64_Exp   -> False
+  MO_F64_ExpM1 -> False
+  MO_F64_Fabs  -> False
+  MO_F64_Sqrt  -> False
+  MO_F32_Pwr   -> False
+  MO_F32_Sin   -> False
+  MO_F32_Cos   -> False
+  MO_F32_Tan   -> False
+  MO_F32_Sinh  -> False
+  MO_F32_Cosh  -> False
+  MO_F32_Tanh  -> False
+  MO_F32_Asin  -> False
+  MO_F32_Acos  -> False
+  MO_F32_Atan  -> False
+  MO_F32_Asinh -> False
+  MO_F32_Acosh -> False
+  MO_F32_Atanh -> False
+  MO_F32_Log   -> False
+  MO_F32_Log1P -> False
+  MO_F32_Exp   -> False
+  MO_F32_ExpM1 -> False
+  MO_F32_Fabs  -> False
+  MO_F32_Sqrt  -> False
+
+  MO_I64_ToI   -> False
+  MO_I64_FromI -> False
+  MO_W64_ToW   -> False
+  MO_W64_FromW -> False
+  MO_x64_Neg   -> False
+  MO_x64_Add   -> False
+  MO_x64_Sub   -> False
+  MO_x64_Mul   -> False
+  MO_I64_Quot  -> False
+  MO_I64_Rem   -> False
+  MO_W64_Quot  -> False
+  MO_W64_Rem   -> False
+  MO_x64_And   -> False
+  MO_x64_Or    -> False
+  MO_x64_Xor   -> False
+  MO_x64_Not   -> False
+  MO_x64_Shl   -> False
+  MO_I64_Shr   -> False
+  MO_W64_Shr   -> False
+  MO_x64_Eq    -> False
+  MO_x64_Ne    -> False
+  MO_I64_Ge    -> False
+  MO_I64_Gt    -> False
+  MO_I64_Le    -> False
+  MO_I64_Lt    -> False
+  MO_W64_Ge    -> False
+  MO_W64_Gt    -> False
+  MO_W64_Le    -> False
+  MO_W64_Lt    -> False
+
+  MO_UF_Conv _    -> False
+  MO_S_Mul2 _     -> False
+  MO_S_QuotRem _  -> False
+  MO_U_QuotRem _  -> False
+  MO_U_QuotRem2 _ -> False
+  MO_Add2 _       -> False
+  MO_AddWordC _   -> False
+  MO_SubWordC _   -> False
+  MO_AddIntC _    -> False
+  MO_SubIntC _    -> False
+  MO_U_Mul2 _     -> False
+
+  MO_VS_Quot _ _ -> False
+  MO_VS_Rem _ _  -> False
+  MO_VU_Quot _ _ -> False
+  MO_VU_Rem _ _  -> False
+  MO_I64X2_Min   -> False
+  MO_I64X2_Max   -> False
+  MO_W64X2_Min   -> False
+  MO_W64X2_Max   -> False
+
   MO_Touch           -> False  -- pure liveness marker, no instructions
   MO_Prefetch_Data _ -> False  -- reads memory, writes nothing
-  _                  -> True
+
+  MO_Memcpy _  -> True
+  MO_Memset _  -> True
+  MO_Memmove _ -> True
+  -- CQ[clobber-memcmp]
+  -- Q: memcmp reads both buffers and writes nothing, like prefetch.
+  --    Is there any RTS use where sinking a load past it matters?
+  MO_Memcmp _  -> False
+
+  MO_PopCnt _ -> False
+  MO_Pdep _   -> False
+  MO_Pext _   -> False
+  MO_Clz _    -> False
+  MO_Ctz _    -> False
+  MO_BSwap _  -> False
+  MO_BRev _   -> False
+
+  MO_AcquireFence -> True
+  MO_ReleaseFence -> True
+  MO_SeqCstFence  -> True
+  MO_AtomicRMW {} -> True
+  -- CQ[clobber-atomic-read]
+  -- Q: an atomic read writes nothing. Why keep it clobbering?
+  -- A~ it carries an ordering: a plain load may not move past a seq-cst
+  --    read, and there is nothing to gain from allowing the relaxed case.
+  MO_AtomicRead {}  -> True
+  MO_AtomicWrite {} -> True
+  MO_Cmpxchg _      -> True
+  MO_Xchg _         -> True
+
+  MO_SuspendThread -> True
+  MO_ResumeThread  -> True
 
 -- | The alignment of a 'memcpy'-ish operation.
 machOpMemcpyishAlign :: CallishMachOp -> Maybe Int

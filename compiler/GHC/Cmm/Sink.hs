@@ -884,9 +884,17 @@ data AbsMem
 -- float accesses to heap, stack or virtual global registers stored in the
 -- capability (e.g. with unregisterised build, see #19237).
 --
--- Conversely, a few CallishMachOps neither write memory nor imply a
+-- Conversely, most CallishMachOps neither write memory nor imply a
 -- barrier, and needn't block sinking ('callishMachOpClobbersMemory' in
--- GHC.Cmm.MachOp classifies them):
+-- GHC.Cmm.MachOp classifies them). Two deserve a word:
+-- CQ[clobber-note-scope]
+-- Q: the Note now says "most" but only explains touch# and prefetch. Where
+--    is the argument for the arithmetic and libm ops?
+-- A~ at callishMachOpClobbersMemory, see CQ[clobber-libm]. The
+--    per-constructor rationale should live next to the classification,
+--    the Note keeps the two cases that need a safety argument.
+-- D~ move the touch#/prefetch bullets to the classification too, and have
+--    the Note only point there.
 --
 --  * MO_Touch is a pure liveness marker: no backend emits any code for it.
 --    The hazard of #18040, a read of the touched object delayed past a GC

@@ -1,0 +1,12 @@
+loadMul2:
+        movq
+        mulq
+        addq
+        movq
+        addq
+        jmp
+loadBSwap:
+        bswapq
+        movq
+        addq
+        jmp
