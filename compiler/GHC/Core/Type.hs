@@ -226,20 +226,15 @@ import GHC.Types.Basic
 -- Many things are reexported, but not the representation!
 
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Make
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
 import {-# SOURCE #-} GHC.Core.Coercion
-   ( mkNomReflCo, mkGReflCo, mkReflCo
-   , mkTyConAppCo, mkAppCo
-   , mkForAllCo, mkFunCo2, mkAxiomCo, mkUnivCo
-   , mkSymCo, mkTransCo, mkSelCo, mkLRCo, mkInstCo
-   , mkKindCo, mkSubCo, mkFunCo, funRole
-   , decomposePiCos
+   ( isReflexiveCo
    , coercionRKind, coercionType
-   , isReflexiveCo, seqCo
    , topNormaliseNewType_maybe
    )
 
@@ -253,9 +248,8 @@ import GHC.Builtin.WiredIn.Prim
 import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
    ( charTy, naturalTy
    , typeSymbolKind, liftedTypeKind, unliftedTypeKind
-   , constraintKind, zeroBitTypeKind
    , manyDataConTy, oneDataConTy
-   , liftedRepTy, unliftedRepTy, zeroBitRepTy )
+   , liftedRepTy )
 
 import GHC.Types.Name( Name, hasKnownKey )
 import GHC.Builtin.KnownKeys

@@ -156,7 +156,6 @@ import GHC.Types.SrcLoc
 
 import GHC.Types.Unique.FM
 
-import GHC.Builtin.KnownKeys
 import GHC.Builtin.WiredIn.Prim
 
 import GHC.Data.FastString
