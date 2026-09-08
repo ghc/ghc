@@ -369,10 +369,15 @@ data UnitState = UnitState {
   -- is always mentioned before the units it depends on.
   preloadUnits      :: [UnitId],
 
-  -- | Units which we explicitly depend on (from a command line flag).
-  -- We'll use this to generate version macros and the unused packages warning. The
-  -- original flag which was used to bring the unit into scope is recorded for the
-  -- -Wunused-packages warning.
+  -- | The units that can be used by the respective home unit. Despite the
+  -- identifier, this does not just cover units that are enabled explicitly
+  -- using flags but also units from the package database that are enabled
+  -- implicitly in case @-hide-all-packages@ is absent. The former are paired
+  -- with 'Just' applied to the respective flags, the latter are paired with
+  -- 'Nothing'.
+  --
+  -- This field is used for generating version macros and “unused packages”
+  -- warnings.
   explicitUnits :: [(Unit, Maybe PackageArg)],
 
   homeUnitDepends    :: Set UnitId,
@@ -907,7 +912,7 @@ mkUnitState logger unit_index cfg = do
   let pkgname_map = listToUFM [ (unitPackageName p, unitInstanceOf p)
                               | p <- pkgs2
                               ]
-  -- The explicitUnits accurately reflects the set of units we have turned
+  -- The explicitUnits accurately reflects the set of units that are turned
   -- on; as such, it also is the only way one can come up with requirements.
   -- The requirement context is directly based off of this: we simply
   -- look for nested unit IDs that are directly fed holes: the requirements
