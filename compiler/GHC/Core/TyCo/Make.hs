@@ -105,7 +105,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.Coercion.Axiom
 
--- import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.WiredIn.Prim( tYPETyCon, cONSTRAINTTyCon )
 
 import GHC.Types.Basic
