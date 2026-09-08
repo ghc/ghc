@@ -28,7 +28,7 @@ import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids
 import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
-import GHC.Builtin.WiredIn.Ids ( realWorldPrimId )
+import GHC.Builtin.WiredIn.Ids ( realWorldPrimId, isNoinlineId )
 
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
@@ -1050,53 +1050,42 @@ cpeApp top_env expr
         go (Cast fun co)      as
             = go fun (AICast co : as)
         go (Tick tickish fun) as
-            -- Try to move a tick out of the way, if:
+            -- Try to move a tick out of the way (i.e push it onto `as`), if:
             --   - the tick can be floated out of the way ('tickishFloatable'), or
             --   - the tick must be moved out of the way because it stands in between
             --     an 'Id' that must be saturated and some of its arguments;
             --     see Note [Ticks and mandatory eta expansion].
-            | Var vh <- head
+            | (head, as') <- go fun (AITick tickish : as)
+            , Var vh <- head
             , Just head' <- getIdFromTrivialExpr_maybe (lookupCorePrepEnv top_env vh)
             , canCollectArgsThroughTick head' tickish
-            = (head,as')
-            where
-              (head,as') = go fun (AITick tickish : as)
+            = (head, as')
 
         -- Terminal could still be an app if it's wrapped by a tick.
-        -- E.g. Tick<foo> (f x) can give us (f x) as terminal.
+        -- E.g. Tick<foo> (f x) can give us (Tick <foo>> (f x)) as terminal.
         go terminal as = (terminal, as)
 
     cpe_app :: CorePrepEnv
             -> CoreExpr -- The thing we are calling
             -> [ArgInfo]
             -> UniqSM (Floats, CpeBody)
-    cpe_app env (Var f) (AIApp Type{} : AIApp arg : args)
-        | f `hasKey` lazyIdKey          -- Replace (lazy a) with a, and
-            -- See Note [lazyId magic] in GHC.Types.Id.Make
-       || f `hasKey` noinlineIdKey || f `hasKey` noinlineConstraintIdKey
-            -- Replace (noinline a) with a
-            -- See Note [noinlineId magic] in GHC.Types.Id.Make
-       || f `hasKey` nospecIdKey        -- Replace (nospec a) with a
-            -- See Note [nospecId magic] in GHC.Types.Id.Make
-
+    cpe_app env (Var f) args
+       | Just (arg, args) <- eliminateMagicCall f args
         -- NB: keep this in sync with GHC.HsToCore.Pmc.Solver.Types.coreExprAsPmLit,
         -- as that also needs to see through these magic Ids.
-
-        -- Consider the code:
-        --
-        --      lazy (f x) y
-        --
-        -- We need to make sure that we need to recursively collect arguments on
-        -- "f x", otherwise we'll float "f x" out (it's not a variable) and
-        -- end up with this awful -ddump-prep:
-        --
-        --      case f x of f_x {
-        --        __DEFAULT -> f_x y
-        --      }
-        --
-        -- rather than the far superior "f x y".  Test case is par01.
         = let (terminal, args') = collect_args arg
           in cpe_app env terminal (args' ++ args)
+          -- Why this recursive call?  For example, consider the code:
+          --      lazy (f x) y
+          -- We need to make sure that we need to recursively collect arguments on
+          -- "f x", otherwise we'll float "f x" out (it's not a variable) and
+          -- end up with this awful -ddump-prep:
+          --
+          --      case f x of f_x {
+          --        __DEFAULT -> f_x y
+          --      }
+          --
+          -- rather than the far superior "f x y".  Test case is par01.
 
     -- runRW# magic
     cpe_app env (Var f) (AIApp _runtimeRep@Type{} : AIApp _type@Type{} : AIApp arg : rest)
@@ -1147,7 +1136,7 @@ cpeApp top_env expr
                Nothing    -> do { massert (null unsat_ticks); return (floats, app) }
                Just fn_id -> return (floats, maybeSaturate fn_id app depth unsat_ticks) }
         where
-          depth = val_args args
+          depth = count_val_args args
           stricts = case idDmdSig v of
                             DmdSig (DmdType _ demands)
                               | listLengthCmp demands depth /= GT -> demands
@@ -1176,24 +1165,20 @@ cpeApp top_env expr
            ; return (floats, app) }
 
     -- Count the number of value arguments *and* coercions (since we don't eliminate the later in STG)
-    val_args :: [ArgInfo] -> Int
-    val_args args = go args 0
+    count_val_args :: [ArgInfo] -> Int
+    count_val_args args = go args 0
       where
         go [] !n = n
         go (info:infos) n =
           case info of
-            AICast {} -> go infos n
             AITick tickish
-              | tickishFloatable tickish                 -> go infos n
+              | tickishFloatable tickish -> go infos n
+              | otherwise                -> n  -- Stop now
               -- If we can't guarantee a tick will be floated out of the application
               -- we can't guarantee the value args following it will be applied.
-              | otherwise                             -> n
-            AIApp e                                  -> go infos n'
-              where
-                !n'
-                  | isTypeArg e = n
-                  | otherwise   = n+1
-
+            AIApp e | isTypeArg e -> go infos n
+                    | otherwise   -> go infos (n+1)
+            AICast {} -> go infos n
 
     -- Deconstruct and rebuild the application, floating any non-atomic
     -- arguments to the outside.  We collect the type of the expression,
@@ -1231,8 +1216,8 @@ cpeApp top_env expr
     rebuild_app' env (a : as) fun' floats ss rt_ticks req_depth = case a of
       -- See Note [Ticks and mandatory eta expansion]
       _ | not (null rt_ticks), req_depth <= 0
-        -> let tick_fun = foldr mkTickCpe fun' rt_ticks
-           in rebuild_app' env (a : as) tick_fun floats ss rt_ticks req_depth
+        -> let ticked_fun = foldr mkTickCpe fun' rt_ticks
+           in rebuild_app' env (a : as) ticked_fun floats ss rt_ticks req_depth
 
       AIApp (Type arg_ty)
         -> rebuild_app' env as (App fun' (Type arg_ty')) floats ss rt_ticks req_depth
@@ -1273,6 +1258,53 @@ isLazyExpr (Cast e _)              = isLazyExpr e
 isLazyExpr (Tick _ e)              = isLazyExpr e
 isLazyExpr (Var f `App` _ `App` _) = f `hasKey` lazyIdKey
 isLazyExpr _                       = False
+
+eliminateMagicCall :: Id -> [ArgInfo] -> Maybe (CoreExpr, [ArgInfo])
+
+eliminateMagicCall f all_args
+  -- Replace (lazy a) with a, and
+  -- See Note [lazyId magic] in GHC.Types.Id.Make
+  | f `hasKey` lazyIdKey
+  , AIApp Type{} : AIApp arg : args <- pushed_args
+  = Just (arg,args)
+
+  -- Replace (nospec a) with a
+  -- See Note [nospecId magic] in GHC.Types.Id.Make
+  | f `hasKey` nospecIdKey
+  , AIApp Type{} : AIApp arg : args <- pushed_args
+  = Just (arg,args)
+
+  -- Replace (noinline a) with a
+  -- See Note [noinlineId magic] in GHC.Types.Id.Make
+  | isNoinlineId f
+  = case pushed_args of
+      AIApp Type{} : AIApp (Type {}) : AIApp arg : args
+        -> -- noinline @rep @ty e --> e
+           Just (arg,args)   -- Applied to a value argument
+
+      AIApp Type{} : AIApp (Type arg_ty) : args
+        -> -- noinline @rep @ty --> \(x:ty).x
+           Just (Lam x (Var x), args)  -- Type args only, make a lambda
+        where
+           x = mkTemplateLocal 0 arg_ty
+
+      _ -> pprPanic "Un-applied noinline" (ppr pushed_args)
+
+  | otherwise
+  = Nothing
+
+  where
+    pushed_args :: [ArgInfo]
+    -- Push the ticks past all the args
+    -- For soft-scoped ticks this is 100% kosher.  For non-soft-scoped (e.g. HPC)
+    -- not so kosher, but we really need to see those arguments becuase we can't
+    -- eta-expand 'noinline'
+    -- ToDo: better story needed here: #27141
+    pushed_args = go [] all_args
+
+    go rev_ticks []                              = reverse rev_ticks
+    go rev_ticks (arg : args) | AITick {} <- arg = go (arg:rev_ticks) args
+                              | otherwise        = arg : go rev_ticks args
 
 {- Note [runRW magic]
 ~~~~~~~~~~~~~~~~~~~~~

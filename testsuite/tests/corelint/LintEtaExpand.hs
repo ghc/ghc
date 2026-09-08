@@ -28,7 +28,7 @@ import GHC.Builtin.PrimOps.Ids
   ( primOpId )
 import GHC.Builtin.WiredIn.Prim
   ( runtimeRep1Ty, runtimeRep1TyVar
-  , openAlphaTy, openAlphaTyVar
+  , rrPolyTyVar1, rrPolyTy1
   )
 
 import GHC.Core
@@ -79,7 +79,7 @@ test_exprs  =
         [ Type liftedDataConTy
         , Type liftedRepTy
         , Type intTy
-        , Type $ mkVisFunTyMany openAlphaTy openAlphaTy
+        , Type $ mkVisFunTyMany rrPolyTy1 rrPolyTy1
         ]
   , ("raise# OK 2", ) $
       -- raise# @Lifted @r
@@ -107,7 +107,7 @@ test_exprs  =
 
 -- These will be considered in-scope by the Core Lint checks.
 in_scope :: [ Id ]
-in_scope = [ runtimeRep1TyVar, openAlphaTyVar ]
+in_scope = [ runtimeRep1TyVar, rrPolyTyVar1 ]
 
 main :: IO ()
 main = do

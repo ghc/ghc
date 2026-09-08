@@ -1,0 +1,5 @@
+Rule fired: Class op + (BUILTIN)
+Rule fired: Class op - (BUILTIN)
+Rule fired: Class op show (BUILTIN)
+Rule fired: SPEC f @Int (T27724a)
+Rule fired: SPEC f @Int (T27724a)
