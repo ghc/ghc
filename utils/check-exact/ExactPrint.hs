@@ -140,9 +140,9 @@ defaultEPState = EPState
 
 -- | The R part of RWS. The environment. Updated via 'local' as we
 -- enter a new AST element, having a different anchor point.
-data EPOptions m a = EPOptions
-            { epTokenPrint :: String -> m a
-            , epWhitespacePrint :: String -> m a
+data EPOptions m w = EPOptions
+            { epTokenPrint :: String -> m w
+            , epWhitespacePrint :: String -> m w
             }
 
 -- | Helper to create a 'EPOptions'
@@ -163,8 +163,7 @@ stringOptions = epOptions return return
 deltaOptions :: EPOptions Identity ()
 deltaOptions = epOptions (\_ -> return ()) (\_ -> return ())
 
-data EPWriter a = EPWriter
-              { output :: !a }
+data EPWriter w = EPWriter { output :: !w }
 
 instance Monoid w => Semigroup (EPWriter w) where
   (EPWriter a) <> (EPWriter b) = EPWriter (a <> b)
@@ -239,7 +238,220 @@ setAnchorEpaL (EpAnn _ an _) anc ts cs = EpAnn anc (setTrailing (an {al_anchor =
 -- | Key entry point.  Switches to an independent AST element with its
 -- own annotation, calculating new offsets, etc
 markAnnotated :: (Monad m, Monoid w, ExactPrint a) => a -> EP w m a
-markAnnotated a = enterAnn (getAnnotationEntry a) a
+markAnnotated a = enterAnn (getAnnotationEntry a) a -- See Note [Exact print main loop]
+
+{-
+Note [Exact print main loop]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Exact printing is the process of taking the ParsedSource, or some
+subtree from it, and rendering it to a string, which accurately
+reflects the original source that was parsed, except detail of
+whitespace (such as spaces vs tabs) is discarded.
+
+The ParsedSource or fragment from it must implement the ExactPrint
+class, and this file does that, as well as supporting machinery to
+drive the process. The ExactPrint class is described later in this
+note.
+
+The entry point for exact printing is the exactPrint function, defined
+as
+
+  exactPrint :: ExactPrint ast => ast -> String
+  exactPrint ast = snd $ runIdentity (runEP stringOptions (markAnnotated ast))
+
+  type EP w m a = RWST (EPOptions m w) (EPWriter w) EPState m a
+
+  runEP :: (Monad m) => EPOptions m w -> EP w m a -> m (a, w)
+  runEP epReader action = do
+    (ast, w) <- evalRWST action epReader defaultEPState
+    return (ast, output w)
+
+  data EPWriter w = EPWriter { output :: !w }
+
+  data EPOptions m w = EPOptions
+              { epTokenPrint :: String -> m w
+              , epWhitespacePrint :: String -> m w
+              }
+
+This offers some flexibility in how the output is produced, in that
+the EpWriter and EPOptions work together, defining an output type and
+a function to render whitespace and non-whitepace.
+
+In normal operation (via exactPrint) these are simply returning the
+string unchanged and accumulating a larger string. But it has also been
+used to render an HTML version of the source as it prints.
+
+The main reason exact print exists is to make it easier for tool
+writers to manipulate the ParsedSource, and render this back to the
+original source, except for the changed parts. One manipulation is to
+simply take say a FunBind with its signature from one place in the
+code to another. When doing this, the original parsed locations are no
+longer useful when rendering the source back to a string. To enable
+this, we have another entry point, for converting all absolute
+locations to relative ones, using DeltaPos, which captures the line
+and col offset relative to the prior output.
+
+The function to do this is
+
+  makeDeltaAst :: ExactPrint ast => ast -> ast
+  makeDeltaAst ast = fst $ runIdentity (runEP deltaOptions (markAnnotated ast))
+
+The implementation is practically identical for exactPrint and
+makeDeltaAst, they simply return the second or first part of the same
+calculation.
+
+This simplifies the implementation of the required ExactPrint
+implmentations, in that we only need one per ast item, which encodes
+how to print it, and this print process does bookkeeping to keep track
+of what spacing it used when doing the print, so it can return the
+updated item, with the original absolute SrcSpan's converted to
+DeltaPos values instead.
+
+This information is captured in the XRec/Anno instances used in GHC
+Hs, which are mostly LocatedA a, defined as
+
+  GenLocated (EpAnn [TrailingAnn]) a
+
+  data EpAnn ann
+    = EpAnn { entry   :: !EpaLocation
+            , anns     :: !ann
+            , comments :: !EpAnnComments
+            }
+
+  data EpaLocation = EpaSpan !SrcSpan
+                   | EpaDelta !SrcSpan !DeltaPos [LEpaComment]
+
+When parsed, the entry EpaLocation captures an EpaSpan with the parsed
+absolute location. After makeDeltaAst, this instead uses EpaDelta,
+including the original SrcSpan, the relative spaceing as a DeltaPos,
+and any comments that may come before the item, e.g. comments before a
+semicolon.
+
+Both exactPrint and makeDeltaAst call markAnnotated on the item to be
+printed, inside the monad machinery.
+
+  markAnnotated :: (Monad m, Monoid w, ExactPrint a) => a -> EP w m a
+  markAnnotated a = enterAnn (getAnnotationEntry a) a
+
+This makes use of the ExactPrint instance for the ParsedSource and
+for every other part of the ParsedSource as a tree.
+
+  class (Typeable a) => ExactPrint a where
+    getAnnotationEntry :: a -> Entry
+    exact :: (Monad m, Monoid w) => a -> EP w m a
+    setAnnotationAnchor :: a -> EpaLocation -> [TrailingAnn] -> EpAnnComments -> a
+
+- getAnnotationEntry : returns the Entry information, normally derived
+                       directly from the EpAnn in the LocatedA enclosing the item.
+    Entry contains
+    - The location of the first non-comment part of the item to be printed.
+    - Any [TrailingAnn] (semis, commas, etc) to follow the item.
+    - Any comments associated with the item, but not with enclosed items.
+      These comments may also precede or follow the entry location
+    - Some technical flags, relating to flushing remaining comments at the
+      last (topmost) item, and if the anchor can be updated (see below).
+
+- exact : Do the actual printing of the item, having been put in the right
+  place in terms of print location by the main loop, based on a call to
+  getAnnotationEntry for it. This printing normally comprises making nested
+  markAnnotated calls on the nested items in the current one, e.g.
+
+    exact (HsApp an e1 e2) = do
+      e1' <- markAnnotated e1
+      e2' <- markAnnotated e2
+      return (HsApp an e1' e2')
+
+- setAnnotationAnchor : the main loop printing does two things:
+  - produce output, reflecting the items being printed
+  - convert all the locations in the item (each an EpaLocation) from its
+    EpaSpan version to an EpaDelta one, which is independent of absolute
+    location, being the spacing from the previous print output to this
+    entry point
+  To allow these updated locations to be captured, the item implements
+  the setAnnotationAnchor method, which updates the fields of the Entry
+  returned by getAnnotationEntry
+
+You will recall
+
+  markAnnotated a = enterAnn (getAnnotationEntry a) a
+  enterAnn :: (Monad m, Monoid w, ExactPrint a) => Entry -> a -> EP w m a
+
+enterAnn is the part that is repeatedly called via markAnnotated, to
+manage the bookkeeping around printing and calculating the updated
+delta positions.
+
+It manages the printing state, adding the new comments from the Entry,
+positioning the print head to the entry point, takes account of whether
+it is an absolute span or a delta, and prints any comments that must come
+before this location.
+
+At this print location, it calls the `exact` method on the item. This
+is the only place `exact` can be called. Within `exact` implementations
+the `markAnnotated` function should be used instead, to ensure the state
+is managed properly for printing.
+
+Once the item is printed via its `exact` method, which normally
+recurses via `markAnnotated` into any nested items inside it, the
+`enterAnn` function prints any [TrailingAnn] from the entry and any
+trailing comments. It then wraps up by calling
+`setAnnotationAnchor`with the updated (now delta-based) values for the
+Entry
+
+Printing Complicated Items
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Sometimes we need to print a sub-item which does not map cleanly onto the
+ExactPrint class, usually because there are parts spread through the item
+that need to be managed together while printing.
+
+An example is in
+https://gitlab.haskell.org/ghc/ghc/-/merge_requests/16321, where
+ConDeclGADT needs to print its inner_bindings, but the these in turn
+may have parens, e.g.
+
+  data V a where
+    MkV4 :: forall a. ((forall b. (Show a => a -> (b -> V a))))
+
+Here there are inner bindings for the first forall, the multiple
+parens around the second forall, and the second forall, wrapping the
+inner content within this.
+
+But the inner content `Show a => a -> (b -> V a)` had to be printed "inside"
+the inner_bindings, to correctly close the nested parens.
+
+The approach in !16321 modified `enterAnn`, to pass in alternate versions
+of the `exact` implementation. This works, but it makes an already
+complicated function even more complicated.
+
+An ExactPrint-idiomatic approach is to create a helper data structure
+to represent this nested organisation, and provide ExactPrint
+instances for that.
+
+This is done in
+https://gitlab.haskell.org/ghc/ghc/-/merge_requests/16644, using
+
+  data InnerBindings
+    = InnerMore (LHsGadtTelescope GhcPs) InnerBindings
+    | InnerDone (Maybe (LHsContext GhcPs), HsConDeclGADTDetails GhcPs, LHsType GhcPs)
+
+The key part of the ExactPrint instance for this is
+
+  exact  (InnerMore (L l (HsGadtPar (lp, rp))) xs) = do
+    lp' <- markEpToken lp
+    xs' <- markAnnotated xs
+    rp' <- markEpToken rp
+    return (InnerMore (L l (HsGadtPar (lp',rp'))) xs')
+
+This first prints the opening paren, prints the balance of the cons list, then
+prints the closing paren.
+
+Conversions to and from this structure populate the initial values from
+the ConDeclGADT, and retrieve the updated delta-based values after
+printing.
+
+Another use of this technique involves HsModuleImpDecls.
+
+-}
 
 -- | For HsModule, because we do not have a proper SrcSpan, we must
 -- indicate to flush trailing comments when done.
@@ -377,6 +589,7 @@ cua NoCanUpdateAnchor _ = return []
 -- This is combination of the ghc=exactprint Delta.withAST and
 -- Print.exactPC functions and effectively does the delta processing
 -- immediately followed by the print processing.  JIT ghc-exactprint.
+-- See Note [Exact print main loop]
 enterAnn :: (Monad m, Monoid w, ExactPrint a) => Entry -> a -> EP w m a
 enterAnn NoEntryVal a = do
   p <- getPosP
