@@ -1428,6 +1428,7 @@ instance Outputable (Position p) where
       aux i pos = case pos of { Top -> empty; _ -> text "of the" <+> go i pos }
 
 -- | @'mkArgPos' i p@ makes the 'Position' @p@ relative to the @ith@ argument.
+-- where `i` is 1-indexed
 --
 -- Example: @ppr (mkArgPos 3 (Result Top)) == "in the result of the 3rd argument"@.
 mkArgPos :: Int -> Position p -> Position (FlipPolarity p)
