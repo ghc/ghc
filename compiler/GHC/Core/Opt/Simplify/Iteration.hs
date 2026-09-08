@@ -61,7 +61,7 @@ import GHC.Types.Var    ( isTyCoVar )
 
 import GHC.Builtin.WiredIn.Prim( realWorldStatePrimTy )
 import GHC.Builtin.KnownKeys( runRWKey, seqHashKey )
-import GHC.Builtin.WiredIn.Ids( seqId )
+import GHC.Builtin.WiredIn.Ids( seqId, getNoinlineId, isNoinlineId )
 
 import qualified GHC.Data.List.Infinite as Inf
 import GHC.Data.Maybe   ( isNothing, orElse, mapMaybe )
@@ -345,7 +345,9 @@ simplLazyBind top_lvl is_rec (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
         -- Simplify the RHS
         ; let rhs_cont = mkRhsStop (substTy body_env (exprType body))
                                    is_rec (idDemandInfo bndr)
-        ; (body_floats0, body0) <- {-#SCC "simplExprF" #-} simplExprF body_env body rhs_cont
+        ; (body_floats0, body0) <- {-#SCC "simplExprF" #-}
+                                   wrapJoinFloatsX $
+                                   simplExprF body_env body rhs_cont
 
         -- ANF-ise a constructor or PAP rhs
         ; (body_floats2, body2) <- {-#SCC "prepareBinding" #-}
@@ -727,34 +729,32 @@ prepareBinding :: SimplEnv -> TopLevelFlag -> RecFlag -> Bool
 --    tmp  = g x
 --    bndr = K a a tmp
 -- That's what prepareBinding does
--- Precondition: binder is not a JoinId
--- Postcondition: the returned SimplFloats contains only let-floats
+-- Precondition: binder is not a JoinId, rhs_floats contains only let-floats
+-- Postcondition: returned SimplFloats contains only let-floats
 prepareBinding env top_lvl is_rec strict_bind bndr rhs_floats rhs
-  = do { -- Never float join-floats out of a non-join let-binding (which this is)
-         -- So wrap the body in the join-floats right now
-         -- Hence: rhs_floats1 consists only of let-floats
-         let (rhs_floats1, rhs1) = wrapJoinFloatsX rhs_floats rhs
-
-         -- rhs_env: add to in-scope set the binders from rhs_floats
+  = assertPpr (hasNoJoinFloats rhs_floats) (ppr rhs_floats) $
+    -- Never float join-floats out of a non-join let-binding (which this is)
+    -- So caller must ensure that there are no join-floats in rhs_floats
+    do { -- rhs_env: add to in-scope set the binders from rhs_floats
          -- so that prepareRhs knows what is in scope in rhs
-       ; let rhs_env = env `setInScopeFromF` rhs_floats1
+       ; let rhs_env = env `setInScopeFromF` rhs_floats
              -- Force the occ_fs so that the old Id is not retained in the new Id.
              !occ_fs = getOccFS bndr
 
        -- Now ANF-ise the remaining rhs
-       ; (anf_floats, rhs2) <- prepareRhs rhs_env top_lvl occ_fs rhs1
+       ; (anf_floats, rhs1) <- prepareRhs rhs_env top_lvl occ_fs rhs
 
        -- Finally, decide whether or not to float
-       ; let all_floats = rhs_floats1 `addLetFloats` anf_floats
-       ; if doFloatFromRhs (seFloatEnable env) top_lvl is_rec strict_bind all_floats rhs2
+       ; let all_floats = rhs_floats `addLetFloats` anf_floats
+       ; if doFloatFromRhs (seFloatEnable env) top_lvl is_rec strict_bind all_floats rhs1
          then -- Float!
               do { tick LetFloatFromLet
-                 ; return (all_floats, rhs2) }
+                 ; return (all_floats, rhs1) }
 
          else -- Abandon floating altogether; revert to original rhs
-              -- Since we have already built rhs1, we just need to add
-              -- rhs_floats1 to it
-              return (emptyFloats env, wrapFloats rhs_floats1 rhs1) }
+              -- Since we have already built rhs, we just need to add
+              -- rhs_floats to it
+              return (emptyFloats env, wrapFloats rhs_floats rhs) }
 
 {- Note [prepareRhs]
 ~~~~~~~~~~~~~~~~~~~~
@@ -1220,53 +1220,16 @@ simplExprF1 _ (Type ty) cont
     -- The (Type ty) case is handled separately by simplExpr
     -- and by the other callers of simplExprF
 
-simplExprF1 env (Var v)        cont = {-#SCC "simplInId" #-} simplInId env v cont
-simplExprF1 env (Lit lit)      cont = {-#SCC "rebuild" #-} rebuild env (Lit lit) cont
-simplExprF1 env (Tick t expr)  cont = {-#SCC "simplTick" #-} simplTick env t expr cont
-simplExprF1 env (Coercion co)  cont = {-#SCC "simplCoercionF" #-} simplCoercionF env co cont
+simplExprF1 env (Var v)       cont = {-#SCC "simplInId" #-} simplInId env v cont
+simplExprF1 env (Lit lit)     cont = {-#SCC "rebuild" #-} rebuild env (Lit lit) cont
+simplExprF1 env (Tick t expr) cont = {-#SCC "simplTick" #-} simplTick env t expr cont
+simplExprF1 env (Coercion co) cont = {-#SCC "simplCoercionF" #-} simplCoercionF env co cont
+simplExprF1 env (App fun arg) cont = do { cont' <- pushAppCont env fun arg cont
+                                        ; simplExprF env fun cont' }
 
 simplExprF1 env (Cast body co) cont
-  = do  { co1 <- {-#SCC "simplCast-simplCoercion" #-}
-                 simplCoercion env co
-
-        ; cont1 <- {-#SCC "simplCast-addCoerce" #-}
-                   if isReflCo co1
-                   then return cont  -- See Note [Optimising reflexivity]
-                   else pushCast env co1 cont
-                        -- True <=> co1 is optimised
-
-        ; {-#SCC "simplCast-simplExprF" #-}
-          simplExprF env body cont1 }
-
-simplExprF1 env (App fun arg) cont
-  = {-#SCC "simplExprF1-App" #-} case arg of
-      Type ty -> do { -- The argument type will (almost) certainly be used
-                      -- in the output program, so just force it now.
-                      -- See Note [Avoiding space leaks in OutType]
-                      arg' <- simplType env ty
-
-                      -- But use substTy, not simplType, to avoid forcing
-                      -- the hole type; it will likely not be needed.
-                      -- See Note [The hole type in ApplyToTy]
-                    ; let hole' = substTy env (exprType fun)
-
-                    ; simplExprF env fun $
-                      ApplyToTy { sc_arg_ty  = arg'
-                                , sc_hole_ty = hole'
-                                , sc_cont    = cont } }
-      _       ->
-          -- Crucially, sc_hole_ty is a /lazy/ binding.  It will
-          -- be forced only if we need to run contHoleType.
-          -- When these are forced, we might get quadratic behavior;
-          -- this quadratic blowup could be avoided by drilling down
-          -- to the function and getting its multiplicities all at once
-          -- (instead of one-at-a-time). But in practice, we have not
-          -- observed the quadratic behavior, so this extra entanglement
-          -- seems not worthwhile.
-        simplExprF env fun $
-        ApplyToVal { sc_arg = arg, sc_env = UnSimplified env
-                   , sc_hole_ty = substTy env (exprType fun)
-                   , sc_cast = MRefl, sc_cont = cont }
+  = do  { cont1 <- pushInCast env co cont
+        ; simplExprF env body cont1 }
 
 simplExprF1 env expr@(Lam {}) cont
   = {-#SCC "simplExprF1-Lam" #-}
@@ -1737,7 +1700,7 @@ on each successive composition -- that's at least quadratic.  So:
   unfolding (seInlineDepth > 0), then instead of /optimising/ it again,
   just /substitute/ which is cheaper.  See `simplCoercion`.
 
-* In `pushCast` if we combine this new coercion with an existing one,
+* In `pushOutCast` if we combine this new coercion with an existing one,
   we build a CastIt for (co1 ; co2) with sc_opt=False.
 
 * When unpacking a CastIt, in `rebuild`, we optimise the (presumably
@@ -1751,7 +1714,7 @@ on each successive composition -- that's at least quadratic.  So:
 
 Note [The sc_cast field of ApplyToVal]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In the `ApplyToVal` case of `pushCast` we want to push an `OutCoercion` into the
+In the `ApplyToVal` case of `pushOutCast` we want to push an `OutCoercion` into the
 argument.  But the argument may or may not have been simplified (see Note [StaticEnv])
 so we definitely can't just wrap the cast around the argument. Instead we store it
 in the `sc_cast` field -- this is the whole reason for the `sc_cast` field.
@@ -1782,14 +1745,25 @@ addCastMCo (MCo co) cont = CastIt { sc_co = co, sc_opt = False, sc_cont = cont }
 
 pushCastMCo :: SimplEnv -> MOutCoercion -> SimplCont -> SimplM SimplCont
 pushCastMCo _env MRefl    cont = return cont
-pushCastMCo env  (MCo co) cont = pushCast env co cont
+pushCastMCo env  (MCo co) cont = pushOutCast env co cont
 
-pushCast :: SimplEnv -> OutCoercion -> SimplCont -> SimplM SimplCont
-pushCast env co cont
+pushInCast :: SimplEnv -> InCoercion -> SimplCont -> SimplM SimplCont
+pushInCast env co cont
+  = do { co1 <- {-#SCC "simplCast-simplCoercion" #-}
+                simplCoercion env co
+
+        ; if isReflCo co1
+          then return cont  -- See Note [Optimising reflexivity]
+          else {-#SCC "simplCast-addCoerce" #-}
+               pushOutCast env co1 cont
+        }
+
+pushOutCast :: SimplEnv -> OutCoercion -> SimplCont -> SimplM SimplCont
+pushOutCast env co cont
   = go co True cont
   where
 
-    -- ToDo:   pushCast Refl (ApplylToVal arg1 (ApplyToVal arg2 ...))
+    -- ToDo:   pushOutCast Refl (ApplylToVal arg1 (ApplyToVal arg2 ...))
     --         will do lots of unnecessary work.
     go :: OutCoercion -> Bool -> SimplCont -> SimplM SimplCont
     go co1 _ (CastIt { sc_co = co2, sc_cont = cont })  -- See Note [Optimising reflexivity]
@@ -1851,9 +1825,8 @@ simplArg :: SimplEnvIS              -- ^ Used only for its InScopeSet
          -> SimplM OutExpr
 simplArg _ _ _ (Simplified {}) arg mco
   = -- See Note [Avoid repeated simplification]
-    case mco of
-       MRefl  -> return arg       -- Vastly common case
-       MCo co -> return (mkCast arg co)
+    return (mkCastMCo arg mco)  -- Handles the very common case of mco=MRefl
+
 simplArg env mb_arg_info fun_ty (UnSimplified arg_se) arg mco
   = do { let arg_env' = arg_se `setInScopeFromE` env
              arg_ty   = funArgTy fun_ty
@@ -2130,10 +2103,10 @@ wrapJoinCont env cont thing_inside
 
   | not (seCaseCase env)
     -- See Note [Join points with -fno-case-of-case]
-  = do { (floats1, expr1) <- thing_inside env (mkBoringStop (contHoleType cont))
-       ; let (floats2, expr2) = wrapJoinFloatsX floats1 expr1
-       ; (floats3, expr3) <- rebuild (env `setInScopeFromF` floats2) expr2 cont
-       ; return (floats2 `addFloats` floats3, expr3) }
+  = do { (floats1, expr1) <- wrapJoinFloatsX $
+                             thing_inside env (mkBoringStop (contHoleType cont))
+       ; (floats2, expr2) <- rebuild (env `setInScopeFromF` floats1) expr1 cont
+       ; return (floats1 `addFloats` floats2, expr2) }
 
   | otherwise
     -- Normal case; see Note [Join points and case-of-case]
@@ -2322,7 +2295,7 @@ simplOutExpr env expr cont
 
   | Cast e co <- expr  -- The inlined expression may be (x |> co)
                        -- and the cast may cancel with `cont`
-  = do { cont' <- pushCast env co cont
+  = do { cont' <- pushOutCast env co cont
        ; simplOutExpr env e cont' }
 
   | (Var v, args) <- collectArgs expr
@@ -2397,7 +2370,52 @@ simplOutId env fun cont
              call' = mkApps (Var fun) [mkTyArg rr', mkTyArg new_runrw_res_ty, arg']
        ; rebuild_go env call' outer_cont }
 
--- Normal case for (f e1 .. en)
+------------ Special case for (noinline fun e1 e2) ---------------
+-- See Note [noinlineId magic] in GHC.Builtin.WiredIn.Ids esp (NOI1)
+simplOutId env noinline_fun cont
+  | isNoinlineId noinline_fun
+  , ApplyToTy  { sc_cont = cont1 } <- cont
+  , ApplyToTy  { sc_cont = cont2 } <- cont1
+  , ApplyToVal { sc_cont = cont3, sc_arg = the_call, sc_cast = arg_mco
+               , sc_env = UnSimplified arg_se } <- cont2
+  , let -- encl_app_cont collects any /arguments/ from `cont3`
+        (encl_app_cont, rest_cont) = splitContArgs cont3
+        new_call_ty                = contHoleType rest_cont
+  , typeHasFixedRuntimeRep new_call_ty  -- See (NOI6) in Note [noinlineId magic]
+  = do { -- Push any arguments in `the_call` onto `encl_app_cont`
+         let push_args :: InExpr -> SimplCont -> SimplM (InExpr, SimplCont)
+             -- push_args just pushes multiple arguments onto the continuation
+             push_args (Cast f co) cont = do { cont' <- pushInCast arg_se co cont
+                                             ; push_args f cont' }
+             push_args (App f a)   cont = do { cont' <- pushAppCont arg_se f a cont
+                                             ; push_args f cont' }
+             push_args fun         cont = return (fun, cont)
+       ;  (inner_fun, call_cont) <- push_args the_call $
+                                    addCastMCo arg_mco $
+                                    encl_app_cont
+
+       -- Now simplify the function itself, crucially setting sm_inline = False
+       -- The /arguments/, in `call_cont` will be simplified with their own
+       -- flags, captured in `arg_se`
+       ; let call_env = updMode updModeForNoInline $
+                        arg_se `setInScopeFromE` env
+       ; (floats1, call1) <- wrapJoinFloatsX $
+                             simplExprF call_env inner_fun call_cont
+             -- wrapJoinFloatsX: any floating join bindings must stay
+             --                  around the call, not be floated out
+
+       -- Now `rebuild` does the rest
+       ; let (new_noinline_fun, rep) = getNoinlineId new_call_ty
+             noinline_expr = Var new_noinline_fun
+                             `App` Type rep
+                             `App` Type new_call_ty
+                             `App` call1
+       ; (floats2, res) <- rebuild env noinline_expr rest_cont
+       ; return (floats1 `addFloats` floats2 , res) }
+  where
+
+-----------------------
+-- General fall-through case for (f e1 .. en)
 simplOutId env fun cont
   = -- Try rewrite rules: Plan (BEFORE) in Note [When to apply rewrite rules]
     do { rule_base <- getSimplRules
@@ -2429,6 +2447,34 @@ simplOutId env fun cont
     do { let arg_info = mkArgInfo env fun rules_for_me cont
        ; rebuildCall env arg_info cont
     } } } } }
+
+-----------------------
+pushAppCont :: SimplEnv -> InExpr -> InExpr -> SimplCont -> SimplM SimplCont
+-- Push a single argument onto the the continuation
+pushAppCont env fun (Type arg_ty) cont
+  = do { -- The argument type will (almost) certainly be used
+         -- in the output program, so just force it now using `simplType`
+         -- See Note [Avoiding space leaks in OutType]
+         arg_ty' <- simplType env arg_ty
+
+         -- But use `substTy`, not `simplType`, to avoid forcing
+         -- the hole type; it will likely not be needed.
+         -- See Note [The hole type in ApplyToTy]
+        ; let hole' = substTy env (exprType fun)
+
+        ; return (ApplyToTy { sc_arg_ty  = arg_ty'
+                            , sc_hole_ty = hole'
+                            , sc_cont    = cont }) }
+pushAppCont env fun arg cont
+  = return (ApplyToVal { sc_arg = arg, sc_env = UnSimplified env
+                       , sc_hole_ty = substTy env (exprType fun)
+                       , sc_cast = MRefl, sc_cont = cont })
+    -- Crucially, sc_hole_ty is a /lazy/ binding.  It will be forced only if we
+    -- need to run `contHoleType`.  When these are forced, we might get
+    -- quadratic behavior; this quadratic blowup could be avoided by drilling
+    -- down to the function and getting its arguments all at once (instead of
+    -- one-at-a-time). But in practice, we have not observed the quadratic
+    -- behavior, so this extra entanglement seems not worthwhile.
 
 ---------------------------------------------------------
 --      Dealing with a call site

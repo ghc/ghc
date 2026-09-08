@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -336,6 +337,12 @@ import GHC.Internal.Unsafe.Coerce ( unsafeCoerce# ) -- just for re-export
 import GHC.Internal.Tuple (maxTupleSize)
 import GHC.Internal.Box (Box)
 
+{- **********************************************************************
+*                                                                       *
+*              Some list functions
+*                                                                       *
+********************************************************************** -}
+
 -- | 'the' ensures that all the elements of the list are identical
 -- and then returns that unique element
 the :: Eq a => [a] -> a
@@ -369,8 +376,11 @@ groupByFB c n eq xs0 = groupByFBCore xs0
             where (ys, zs) = span (eq x) xs
 
 
--- -----------------------------------------------------------------------------
--- tracing
+{- **********************************************************************
+*                                                                       *
+*              Tracing
+*                                                                       *
+********************************************************************** -}
 
 traceEvent :: String -> IO ()
 traceEvent = GHC.Internal.Debug.Trace.traceEventIO
@@ -398,6 +408,11 @@ data SpecConstrAnnotation = NoSpecConstr | ForceSpecConstr
                          )
 
 
+{- **********************************************************************
+*                                                                       *
+*              Mutable variables and arrays
+*                                                                       *
+********************************************************************** -}
 
 -- | An implementation of the old @atomicModifyMutVar#@ primop in
 -- terms of the new 'atomicModifyMutVar2#' primop, for backwards

@@ -1,13 +1,16 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 
 {-# OPTIONS_GHC -fdefines-known-key-names #-}
-    -- Defines inline etc
+    -- Defines `inline` etc
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+    -- Suppress warning from case () of {} in `noinline`
 
 {-# OPTIONS_HADDOCK print-explicit-runtime-reps #-}
 
@@ -40,6 +43,13 @@ module GHC.Internal.Magic ( inline, noinline, lazy, oneShot, runRW#, DataToTag(.
 import GHC.Internal.Prim (State#, realWorld#, RealWorld, Int#)
 import GHC.Internal.Types
 
+{- **********************************************************************
+*                                                                       *
+*              inline and noinline
+
+*                                                                       *
+********************************************************************** -}
+
 -- | The call @inline f@ arranges that @f@ is inlined, regardless of
 -- its size. More precisely, the call @inline f@ rewrites to the
 -- right-hand side of @f@'s definition. This allows the programmer to
@@ -62,9 +72,29 @@ inline x = x
 -- | The call @noinline f@ arranges that @f@ will not be inlined.
 -- It is removed during CorePrep so that its use imposes no overhead
 -- (besides the fact that it blocks inlining.)
-noinline :: a -> a
-{-# NOINLINE noinline #-}  -- noinline is inlined manually in CorePrep
-noinline x = x
+--
+-- You can write @noinline f e1 e2@, or @noinline (f e1 e2)@, or
+-- even @noinline (f e1) e1@.  In all cases, @f@ is not inlined, but
+-- optimisation of @e1@ and @e2@ is unaffected.
+--
+-- In all cases, type-class specialisation, and demand analysis, and
+-- RULE rewriting, are unaffected.
+noinline :: forall (r :: RuntimeRep) (a :: TYPE r).
+            a -> a
+{-# NOINLINE noinline #-}
+-- See Note [noinlineId magic] in GHC.Builtin.WiredIn.Ids
+noinline = case () of {}
+  -- `noinline` should never be called -- it is eliminated in CorePrep
+  -- We can't conveniently call 'error' here, so we sneakly use an empty case
+  --       case () of {}
+  -- which expands to a call to GHC.Internal.Control.Exception.Base.patError
+
+
+{- **********************************************************************
+*                                                                       *
+*              lazy
+*                                                                       *
+********************************************************************** -}
 
 -- | The 'lazy' function restrains strictness analysis a little. The
 -- call @lazy e@ means the same as @e@, but 'lazy' has a magical
@@ -92,6 +122,12 @@ lazy x = x
 -- Result: happiness
 
 
+{- **********************************************************************
+*                                                                       *
+*              oneShot
+*                                                                       *
+********************************************************************** -}
+
 -- | The 'oneShot' function can be used to give a hint to the compiler that its
 -- argument will be called at most once, which may (or may not) enable certain
 -- optimizations. It can be useful to improve the performance of code in continuation
@@ -110,6 +146,13 @@ oneShot f = f
 -- Implementation note: This is wired in in GHC.Types.Id.Make, so the code here is
 -- mostly there to have a place for the documentation.
 
+
+{- **********************************************************************
+*                                                                       *
+*              runRW#
+*                                                                       *
+********************************************************************** -}
+
 -- | Apply a function to a @'State#' 'RealWorld'@ token. When manually applying
 -- a function to `realWorld#`, it is necessary to use @NOINLINE@ to prevent
 -- semantically undesirable floating. `runRW#` is inlined, but only very late
@@ -123,6 +166,13 @@ runRW# :: forall (r :: RuntimeRep) (o :: TYPE r).
 -- See Note [runRW magic] in GHC.CoreToStg.Prep.
 {-# NOINLINE runRW# #-}  -- runRW# is inlined manually in CorePrep
 runRW# m = m realWorld#
+
+
+{- **********************************************************************
+*                                                                       *
+*              DataToTag and dataToTag#
+*                                                                       *
+********************************************************************** -}
 
 -- | @'dataToTag#'@ evaluates its argument and returns the index
 -- (starting at zero) of the constructor used to produce that
@@ -141,6 +191,13 @@ type DataToTag :: forall {lev :: Levity}. TYPE (BoxedRep lev) -> Constraint
 -- So it does not get its own Unsafe module, unlike WithDict.
 class DataToTag a where
   dataToTag# :: a -> Int#
+
+
+{- **********************************************************************
+*                                                                       *
+*              considerAccessible
+*                                                                       *
+********************************************************************** -}
 
 -- | Semantically, @considerAccessible = True@. But it has special meaning
 -- to the pattern-match checker, which will never flag the clause in which
