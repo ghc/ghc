@@ -33,9 +33,10 @@ Library
         ghc-internal == @ProjectVersionForLib@.*,
         ghc-prim,
 
-    -- Set -frebindable-known-names,
-    -- since GHC.Essentials isn't available yet
-    ghc-options: -frebindable-known-names
+    if impl(ghc >= 10.1)
+        -- Set -frebindable-known-names,
+        -- since GHC.Essentials isn't available yet
+        ghc-options: -frebindable-known-names
 
     exposed-modules:
           Control.Applicative
