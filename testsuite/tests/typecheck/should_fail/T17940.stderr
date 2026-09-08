@@ -10,6 +10,10 @@ T17940.hs:7:14: error: [GHC-88464]
         notWord8# :: Word8# -> Word8#
           (imported from ‘GHC.Exts’ at T17940.hs:4:1-15
            (and originally defined in ‘GHC.Internal.Prim’))
+        noinline :: forall a. a -> a
+          with noinline @Word8#
+          (imported from ‘GHC.Exts’ at T17940.hs:4:1-15
+           (and originally defined in ‘GHC.Internal.Magic’))
         coerce :: forall a b. Coercible a b => a -> b
           with coerce @Word8# @Word8#
           (imported from ‘GHC.Exts’ at T17940.hs:4:1-15

@@ -794,15 +794,6 @@ ds_app_var (L loc fun_id) hs_args core_args
        ; ds_app_finish fun_id core_args }
 
   -----------------------
-  -- Deal with `noinline`
-  -- See Note [noinlineId magic] in GHC.Types.Id.Make
-  | fun_id `hasKey` noinlineIdKey
-  , Type _ : arg1 : rest_args <- core_args
-  , (inner_fun, inner_args) <- collectArgs arg1
-  = return (Var fun_id `App` Type (exprType inner_fun) `App` inner_fun
-            `mkCoreApps` inner_args `mkCoreApps` rest_args)
-
-  -----------------------
   -- Deal with `seq`
   -- See Note [Desugaring seq], points (1) and (2)
   | fun_id `hasKey` seqIdKey

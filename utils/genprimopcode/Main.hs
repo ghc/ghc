@@ -751,15 +751,16 @@ ppTyVar "a" = nonDepTyVarBinder "alphaTyVarSpec"
 ppTyVar "b" = nonDepTyVarBinder "betaTyVarSpec"
 ppTyVar "c" = nonDepTyVarBinder "gammaTyVarSpec"
 ppTyVar "s" = nonDepTyVarBinder "deltaTyVarSpec"
+
 -- See Note [Levity and representation polymorphic primops] in primops.txt.pp
 ppTyVar "a_reppoly"
   = PrimOpTyVarBinder
   { inferredTyVarBinders = ["runtimeRep1TyVarInf"]
-  , primOpTyVarBinder    = "openAlphaTyVarSpec" }
+  , primOpTyVarBinder    = "rrPolyTyVarSpec1" }
 ppTyVar "b_reppoly"
   = PrimOpTyVarBinder
   { inferredTyVarBinders = ["runtimeRep2TyVarInf"]
-  , primOpTyVarBinder    = "openBetaTyVarSpec" }
+  , primOpTyVarBinder    = "rrPolyTyVarSpec2" }
 ppTyVar "a_levpoly"
   = PrimOpTyVarBinder
   { inferredTyVarBinders = ["levity1TyVarInf"]
@@ -802,8 +803,8 @@ ppType (TyVar "b")                      = "betaTy"
 ppType (TyVar "c")                      = "gammaTy"
 ppType (TyVar "s")                      = "deltaTy"
 -- See Note [Levity and representation polymorphic primops] in primops.txt.pp
-ppType (TyVar "a_reppoly")              = "openAlphaTy"
-ppType (TyVar "b_reppoly")              = "openBetaTy"
+ppType (TyVar "a_reppoly")              = "rrPolyTy1"
+ppType (TyVar "b_reppoly")              = "rrPolyTy2"
 ppType (TyVar "a_levpoly")              = "levPolyAlphaTy"
 ppType (TyVar "b_levpoly")              = "levPolyBetaTy"
 
