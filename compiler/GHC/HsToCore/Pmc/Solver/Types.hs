@@ -63,6 +63,7 @@ import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
 import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
+import GHC.Builtin.WiredIn.Ids( isNoinlineId )
 import GHC.Tc.Solver.InertSet (InertSet, emptyInertSet)
 import GHC.Tc.Utils.TcType (isStringTy, topTcLevel)
 import GHC.Types.CompleteMatch
@@ -702,8 +703,10 @@ coreExprAsPmLit e = case collectArgs e of
   -- See Note [coreExprAsPmLit and nospec]
   (Var x, Type _ : inner : rest_args)
     | x `hasKey` nospecIdKey
-   || x `hasKey` noinlineIdKey
    || x `hasKey` lazyIdKey
+    -> coreExprAsPmLit (mkApps inner rest_args)
+  (Var x, Type _ : Type _ : inner : rest_args)
+    | isNoinlineId x  -- noline takes two type arguments
     -> coreExprAsPmLit (mkApps inner rest_args)
 
   (Var x, [Lit l])

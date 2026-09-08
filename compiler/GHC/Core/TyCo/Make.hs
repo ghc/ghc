@@ -272,7 +272,9 @@ mapTyCo (TyCoMapper { tcm_tyvar = tyvar
            ; return $ mkUnivCoAddTypeDeps p deps' r t1' t2' }
     go_co (SymCo co)                 = mkSymCo <$> go_co co
     go_co (TransCo c1 c2)            = mkTransCo <$> go_co c1 <*> go_co c2
-    go_co (AxiomCo r cos)            = mkAxiomCo r <$> go_cos cos
+    go_co (AxiomCo r cos)            = AxiomCo r <$> go_cos cos
+                                       -- We could call mkAxiomCo, but it's a no-op,
+                                       -- and doing so builds an extra thunk
     go_co (SelCo i co)               = mkSelCo i <$> go_co co
     go_co (LRCo lr co)               = mkLRCo lr <$> go_co co
     go_co (InstCo co arg)            = mkInstCo <$> go_co co <*> go_co arg
