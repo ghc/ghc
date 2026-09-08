@@ -110,14 +110,13 @@ import GHC.Types.Demand       ( DmdSig, prependArgsDmdSig )
 import GHC.Types.Cpr          ( CprSig, prependArgsCprSig )
 import GHC.Types.Name         ( getOccName )
 import GHC.Types.Name.Occurrence ( occNameFS )
-import GHC.Types.Unique       ( hasKey )
 import GHC.Types.Tickish      ( tickishIsCode )
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.DFM
 import GHC.Types.Basic  ( Arity, RecFlag(..), isRec )
 
 import GHC.Builtin.WiredIn.Types
-import GHC.Builtin.KnownKeys      ( runRWKey )
+import GHC.Builtin.KnownKeys
 
 import GHC.Data.FastString
 
@@ -394,11 +393,14 @@ lvlApp :: LevelEnv
        -> (CoreExprWithFVs, [CoreExprWithFVs]) -- Input application
        -> LvlM LevelledExpr                    -- Result expression
 lvlApp env orig_expr ((_,AnnVar fn), args)
-  -- Try to ensure that runRW#'s continuation isn't floated out.
-  -- See Note [Simplification of runRW#].
-  | fn `hasKey` runRWKey
+  -- Do not float out from the argument(s) of these magic Ids
+  -- E.g. if we have (noinline (f x)) we definitely do not want to get
+  --      let lvl = f x in noinline lvl
+  -- Ditto `lazy (f x)`, and `runRW# (\s -> blah)` and `oneShot (\x.e)`
+  |   idUnique fn `elem` [ runRWKey, noinlineIdKey, lazyIdKey
+                         , oneShotKey, nospecIdKey ]
   = do { args' <- mapM (lvlExpr env) args
-       ; return (foldl' App (lookupVar env fn) args') }
+       ; return (foldl' App (Var fn) args') }
 
   | floatOverSat env   -- See Note [Floating over-saturated applications]
   , arity > 0

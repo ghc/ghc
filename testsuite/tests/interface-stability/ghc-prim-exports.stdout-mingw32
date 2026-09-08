@@ -1235,7 +1235,7 @@ module GHC.Magic where
   considerAccessible :: GHC.Internal.Types.Bool
   inline :: forall a. a -> a
   lazy :: forall a. a -> a
-  noinline :: forall a. a -> a
+  noinline :: forall {q :: RuntimeRep} (a :: TYPE q). a -> a
   oneShot :: forall {q :: GHC.Internal.Types.RuntimeRep} {r :: GHC.Internal.Types.RuntimeRep} (a :: TYPE q) (b :: TYPE r). (a -> b) -> a -> b
   runRW# :: forall (r :: GHC.Internal.Types.RuntimeRep) (o :: TYPE r). (GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> o) -> o
 

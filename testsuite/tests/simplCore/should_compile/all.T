@@ -620,3 +620,5 @@ test('T27749',
      compile, ['-O -g3 -ddump-simpl -dsuppress-uniques'])
 
 test('T27629', only_ways(['optasm']), makefile_test, ['T27629'])
+test('T27724a', [grep_errmsg(r'SPEC')], compile, ['-O -ddump-rule-firings'])
+test('T27803', [grep_errmsg(r'SPEC')], compile, ['-O -ddump-rule-firings'])

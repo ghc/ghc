@@ -114,7 +114,8 @@ type KindOrType = Type -- See Note [Arguments to type constructors]
 -- | The key type representing kinds in the compiler.
 type Kind = Type
 
--- | Type synonym used for types of kind RuntimeRep.
+-- | Type synonym used for Types of kind RuntimeRep.
+-- E.g.  The type   IntRep :: RuntimeRep
 type RuntimeRepType = Type
 
 -- | Type synonym used for types of kind Levity.

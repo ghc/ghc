@@ -4249,7 +4249,7 @@ module GHC.Base where
   newSmallArray# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. Int# -> a -> State# d -> (# State# d, SmallMutableArray# d a #)
   newTVar# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. a -> State# d -> (# State# d, TVar# d a #)
   noDuplicate# :: forall d. State# d -> State# d
-  noinline :: forall a. a -> a
+  noinline :: forall {q :: RuntimeRep} (a :: TYPE q). a -> a
   not :: Bool -> Bool
   not# :: Word# -> Word#
   not64# :: Word64# -> Word64#
@@ -6470,7 +6470,7 @@ module GHC.Exts where
   newSmallArray# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. Int# -> a -> State# d -> (# State# d, SmallMutableArray# d a #)
   newTVar# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. a -> State# d -> (# State# d, TVar# d a #)
   noDuplicate# :: forall d. State# d -> State# d
-  noinline :: forall a. a -> a
+  noinline :: forall {q :: RuntimeRep} (a :: TYPE q). a -> a
   not# :: Word# -> Word#
   not64# :: Word64# -> Word64#
   notI# :: Int# -> Int#
