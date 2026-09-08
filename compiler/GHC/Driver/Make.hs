@@ -479,7 +479,7 @@ warnUnusedPackages us dflags mod_graph =
                   guard (not $ null $ unitExposedModules ui)
                   return (unitId ui, unitPackageName ui, unitPackageVersion ui, flag)
 
-        unusedArgs = sortOn (\(u,_,_,_) -> u) $ mapMaybe resolve (explicitUnits us)
+        unusedArgs = sortOn (\(u,_,_,_) -> u) $ mapMaybe resolve (availableUnits us)
 
         warn = singleMessage $ mkPlainMsgEnvelope diag_opts noSrcSpan (DriverUnusedPackages unusedArgs)
 
