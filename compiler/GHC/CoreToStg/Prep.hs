@@ -28,7 +28,7 @@ import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids
 import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
-import GHC.Builtin.WiredIn.Ids ( realWorldPrimId )
+import GHC.Builtin.WiredIn.Ids ( realWorldPrimId, isNoinlineId )
 
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
@@ -1070,33 +1070,23 @@ cpeApp top_env expr
             -> CoreExpr -- The thing we are calling
             -> [ArgInfo]
             -> UniqSM (Floats, CpeBody)
-    cpe_app env (Var f) (AIApp Type{} : AIApp arg : args)
-        | f `hasKey` lazyIdKey          -- Replace (lazy a) with a, and
-            -- See Note [lazyId magic] in GHC.Types.Id.Make
-       || f `hasKey` noinlineIdKey || f `hasKey` noinlineConstraintIdKey
-            -- Replace (noinline a) with a
-            -- See Note [noinlineId magic] in GHC.Types.Id.Make
-       || f `hasKey` nospecIdKey        -- Replace (nospec a) with a
-            -- See Note [nospecId magic] in GHC.Types.Id.Make
-
+    cpe_app env (Var f) args
+       | Just (arg, args) <- eliminateMagicCall f args
         -- NB: keep this in sync with GHC.HsToCore.Pmc.Solver.Types.coreExprAsPmLit,
         -- as that also needs to see through these magic Ids.
-
-        -- Consider the code:
-        --
-        --      lazy (f x) y
-        --
-        -- We need to make sure that we need to recursively collect arguments on
-        -- "f x", otherwise we'll float "f x" out (it's not a variable) and
-        -- end up with this awful -ddump-prep:
-        --
-        --      case f x of f_x {
-        --        __DEFAULT -> f_x y
-        --      }
-        --
-        -- rather than the far superior "f x y".  Test case is par01.
         = let (terminal, args') = collect_args arg
           in cpe_app env terminal (args' ++ args)
+          -- Why this recursive call?  For example, consider the code:
+          --      lazy (f x) y
+          -- We need to make sure that we need to recursively collect arguments on
+          -- "f x", otherwise we'll float "f x" out (it's not a variable) and
+          -- end up with this awful -ddump-prep:
+          --
+          --      case f x of f_x {
+          --        __DEFAULT -> f_x y
+          --      }
+          --
+          -- rather than the far superior "f x y".  Test case is par01.
 
     -- runRW# magic
     cpe_app env (Var f) (AIApp _runtimeRep@Type{} : AIApp _type@Type{} : AIApp arg : rest)
@@ -1273,6 +1263,39 @@ isLazyExpr (Cast e _)              = isLazyExpr e
 isLazyExpr (Tick _ e)              = isLazyExpr e
 isLazyExpr (Var f `App` _ `App` _) = f `hasKey` lazyIdKey
 isLazyExpr _                       = False
+
+eliminateMagicCall :: Id -> [ArgInfo] -> Maybe (CoreExpr, [ArgInfo])
+eliminateMagicCall f all_args
+  -- Replace (lazy a) with a, and
+  -- See Note [lazyId magic] in GHC.Types.Id.Make
+  | f `hasKey` lazyIdKey
+  , AIApp Type{} : AIApp arg : args <- all_args
+  = Just (arg,args)
+
+  -- Replace (nospec a) with a
+  -- See Note [nospecId magic] in GHC.Types.Id.Make
+  | f `hasKey` nospecIdKey
+  , AIApp Type{} : AIApp arg : args <- all_args
+  = Just (arg,args)
+
+  -- Replace (noinline a) with a
+  -- See Note [noinlineId magic] in GHC.Types.Id.Make
+  | isNoinlineId f
+  = case all_args of
+      AIApp Type{} : AIApp (Type {}) : AIApp arg : args
+        -> -- noinline @rep @ty e --> e
+           Just (arg,args)   -- Applied to a value argument
+
+      AIApp Type{} : AIApp (Type arg_ty) : args
+        -> -- noinline @rep @ty --> \(x:ty).x
+           Just (Lam x (Var x), args)  -- Type args only, make a lambda
+        where
+           x = mkTemplateLocal 0 arg_ty
+
+      _ -> pprPanic "Un-applied noinline" (ppr all_args)
+
+  | otherwise
+  = Nothing
 
 {- Note [runRW magic]
 ~~~~~~~~~~~~~~~~~~~~~

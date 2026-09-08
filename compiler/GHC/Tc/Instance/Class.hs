@@ -443,7 +443,7 @@ matchWithDict [cls_ty, mty]
   , Just (cls, dict_dc) <- isUnaryClassTyCon_maybe dict_tc
   , [inst_meth_ty] <- dataConInstArgTys dict_dc dict_args
   = do { sv <- mkSysLocalM (fsLit "withDict_s") ManyTy mty
-       ; k  <- mkSysLocalM (fsLit "withDict_k") ManyTy (mkInvisFunTy cls_ty openAlphaTy)
+       ; k  <- mkSysLocalM (fsLit "withDict_k") ManyTy (mkInvisFunTy cls_ty rrPolyTy1)
        ; wd_cls <- tcLookupKnownKeyClass withDictClassKey
 
        -- Given ev_expr : mty ~N# inst_meth_ty, construct the method of
@@ -452,7 +452,7 @@ matchWithDict [cls_ty, mty]
        --   \@(r :: RuntimeRep) @(a :: TYPE r) (sv :: mty) (k :: cls => a) ->
        --     k (MkC tys (sv |> sub co2))
        ; let evWithDict ev_expr
-               = mkCoreLams [ runtimeRep1TyVar, openAlphaTyVar, sv, k ] $
+               = mkCoreLams [ runtimeRep1TyVar, rrPolyTyVar1, sv, k ] $
                  Var k `App` (evUnaryDictAppE cls dict_args meth_arg)
                where
                  meth_arg = Var sv `mkCast` mkSubCo (evExprCoercion ev_expr)
