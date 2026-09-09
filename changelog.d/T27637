@@ -1,0 +1,10 @@
+section: rts
+synopsis: Fix DWARF unwinding information for ``StgRun`` on x86-64
+issues: #27637
+mrs: !16665
+description: {
+    A previous change that aligns the C stack to a 64-byte boundary in ``StgRun``
+    on x86-64 (!15473) introduced an incorrect unwinding rule for ``rsp``.
+    As a result, DWARF-based unwinders such as ``gdb`` could produce broken
+    backtraces through ``StgRun``. This has been fixed.
+}

@@ -516,37 +516,44 @@ StgRunIsImplementedInAssembler(void)
         ".cfi_offset r14, %c6\n\t"
         ".cfi_offset r15, %c7\n\t"
         /*
-         * The original rsp is saved at RESERVED_C_STACK_BYTES + 56 from
-         * current rsp. We use DW_CFA_expression to indicate that rsp's
-         * value can be found by loading from that stack location.
+         * The rsp value _on entrance_ is saved at
+         * RESERVED_C_STACK_BYTES + 56 from current rsp.
+         * We use DW_CFA_val_expression to indicate that rsp's value can be
+         * found by loading from that stack location. We add 8 to that value
+         * to recover the rsp value _before the call instruction_.
+         *   previous_rsp = saved_rsp + 8
+         *                = *(rsp + 8 + RESERVED_C_STACK_BYTES + 48) + 8.
          */
 #define RSP_DELTA (RESERVED_C_STACK_BYTES + 56)
         ".cfi_escape "
-          "0x10, "  // DW_CFA_expression
+          "0x16, "  // DW_CFA_val_expression
           "0x07, "  // register num 7 - rsp
 #if (RSP_DELTA >> 20) > 0
-          "0x05, "  // block length = 5
+          "0x08, "  // block length = 8
 #elif (RSP_DELTA >> 13) > 0
-          "0x04, "  // block length = 4
+          "0x07, "  // block length = 7
 #elif (RSP_DELTA >> 6) > 0
-          "0x03, "  // block length = 3
+          "0x06, "  // block length = 6
 #else
-          "0x02, "  // block length = 2
+          "0x05, "  // block length = 5
 #endif
           "0x77, "  // DW_OP_breg7 (rsp + offset)
-          "%c8"     // signed LEB128 offset to saved rsp (RESERVED_C_STACK_BYTES + 56)
+          "%c8, "   // signed LEB128 offset to saved rsp (RESERVED_C_STACK_BYTES + 56)
 #if (RSP_DELTA >> 6) > 0
-          ", %c9"   // signed LEB128 encoded delta - byte 2
+          "%c9, "   // signed LEB128 encoded delta - byte 2
 #endif
 #if (RSP_DELTA >> 13) > 0
-          ", %c10"  // signed LEB128 encoded delta - byte 3
+          "%c10, "  // signed LEB128 encoded delta - byte 3
 #endif
 #if (RSP_DELTA >> 20) > 0
-          ", %c11"  // signed LEB128 encoded delta - byte 4
+          "%c11, "  // signed LEB128 encoded delta - byte 4
 #endif
 #if (RSP_DELTA >> 27) > 0
 #error "RSP_DELTA too big"
 #endif
+          "0x06, "  // DW_OP_deref
+          "0x38, "  // DW_OP_lit8
+          "0x22"    // DW_OP_plus
           "\n\t"
         /*
          * The return address (rip) is at the original rsp location.
@@ -566,17 +573,17 @@ StgRunIsImplementedInAssembler(void)
           "0x03, "  // block length = 3
 #endif
           "0x77, "  // DW_OP_breg7 (rsp + offset)
-          "%c8"     // signed LEB128 offset to saved rsp
+          "%c8, "   // signed LEB128 offset to saved rsp
 #if (RSP_DELTA >> 6) > 0
-          ", %c9"   // signed LEB128 encoded delta - byte 2
+          "%c9, "   // signed LEB128 encoded delta - byte 2
 #endif
 #if (RSP_DELTA >> 13) > 0
-          ", %c10"  // signed LEB128 encoded delta - byte 3
+          "%c10, "  // signed LEB128 encoded delta - byte 3
 #endif
 #if (RSP_DELTA >> 20) > 0
-          ", %c11"  // signed LEB128 encoded delta - byte 4
+          "%c11, "  // signed LEB128 encoded delta - byte 4
 #endif
-          ", 0x06"  // DW_OP_deref
+          "0x06"    // DW_OP_deref
           "\n\t"
 #endif /* defined(ENABLE_UNWINDING) */
 
