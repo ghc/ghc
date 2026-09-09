@@ -443,11 +443,11 @@ selectiveTcvFolder
                , tcf_hole  = do_hole
                , tcf_tycobinder = addBndrSelectiveFV }
   where
-    do_tcv v = MkFV (\bvs -> EndoOS (do_it bvs))
+    do_tcv v = MkFV (\env -> EndoOS (do_it env))
       where
-        do_it (is_interesting,bvs) acc
+        do_it (bvs,is_interesting) acc
+          | v `elemVarSet` bvs     = acc  -- First exclude bound variables
           | not (is_interesting v) = acc  -- The "selective" bit
-          | v `elemVarSet` bvs     = acc
           | v `elemDVarSet` acc    = acc
           | otherwise              = acc `extendDVarSet` v
 
@@ -847,43 +847,67 @@ invisibleVarsOfTypes = foldr (unionVarSet . invisibleVarsOfType) emptyVarSet
 *                                                                      *
 ********************************************************************* -}
 
-{-# INLINE afvFolder #-}   -- so that specialization to (const True) works
-afvFolder :: (TyCoVar -> Bool) -> TyCoFolder (FV TyCoVarSet DM.Any)
+{- Note [Any-free-var folder]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The "any-free-var" folders take a `check_fv` predicate (TyCoVar -> Bool) and
+check if any free variable of the type/coercion satisfies it.  Our main folders
+look like:
+
+   afv_type :: Type -> FV (BoundVars, TyVar -> Bool) Any
+
+where we cleverly pair the predicate with the forall-bound variables of the type
+in the "env" field of (FV env Any).  This way we can build the /folder/ once and
+for all (independent of the `check_fv` predicate), and the loop passes down
+the pair.
+
+The same idiom is used in `exprFreeVarsDSet` and friends.
+
+However we are careful to inline `atvFolder` and `runAny` so that we get those
+nice tight loops.
+-}
+
+{-# INLINE afvFolder #-}   -- See Note [Inlining any-fvs]
+afvFolder :: TyCoFolder (FV (BoundVars, TyCoVar -> Bool) DM.Any)
 -- 'afvFolder' is short for "any-free-var folder", good for checking
--- if any shallow free var of a type satisfies a predicate `check_fv`
-afvFolder check_fv = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
-                                , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                                , tcf_hole = do_hole
-                                , tcf_tycobinder = addBndrFV }
+--   if any shallow free var of a type satisfies a predicate `check_fv`
+-- The "env" of the (FV env Any) is a pair (bvs,pred) of
+--    the bound variables (which are definitely not free), and
+--    an "interesting var" predicate which the client supplies
+afvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
+                       , tcf_tyvar = do_tcv, tcf_covar = do_tcv
+                       , tcf_hole = do_hole
+                       , tcf_tycobinder = addBndrSelectiveFV }
   where
-    do_tcv tv    = MkFV $ \ bvs ->
+    do_tcv tv    = MkFV $ \ (bvs,check_fv) ->
                    Any (not (tv `elemVarSet` bvs) && check_fv tv)
     do_hole hole = do_tcv (coHoleCoVar hole)
 
+afv_type  :: Type     -> FV (BoundVars, TyVar -> Bool) DM.Any
+afv_types :: [Type]   -> FV (BoundVars, TyVar -> Bool) DM.Any
+afv_co    :: Coercion -> FV (BoundVars, TyVar -> Bool) DM.Any
+(afv_type, afv_types, afv_co, _) = foldTyCo afvFolder
+
+runAny :: (TyVar -> Bool) -> FV (BoundVars, TyCoVar -> Bool) DM.Any -> Bool
+{-# INLINE runAny #-}
+runAny check_fv fvs = DM.getAny $ runFV fvs (emptyVarSet, check_fv)
+
 anyFreeVarsOfType :: (TyCoVar -> Bool) -> Type -> Bool
-anyFreeVarsOfType check_fv ty = DM.getAny (runFVTop (f ty))
-  where (f, _, _, _) = foldTyCo (afvFolder check_fv)
+anyFreeVarsOfType check_fv ty = runAny check_fv (afv_type ty)
 
 anyFreeVarsOfTypes :: (TyCoVar -> Bool) -> [Type] -> Bool
-anyFreeVarsOfTypes check_fv tys = DM.getAny (runFVTop (f tys))
-  where (_, f, _, _) = foldTyCo (afvFolder check_fv)
+anyFreeVarsOfTypes check_fv tys = runAny check_fv (afv_types tys)
 
 anyFreeVarsOfCo :: (TyCoVar -> Bool) -> Coercion -> Bool
-anyFreeVarsOfCo check_fv co = DM.getAny (runFVTop (f co))
-  where (_, _, f, _) = foldTyCo (afvFolder check_fv)
+anyFreeVarsOfCo check_fv co = runAny check_fv (afv_co co)
 
 noFreeVarsOfType :: Type -> Bool
-noFreeVarsOfType ty = not $ DM.getAny (runFVTop (f ty))
-  where (f, _, _, _) = foldTyCo (afvFolder (const True))
+noFreeVarsOfType ty = not $ runAny (const True) (afv_type ty)
 
 noFreeVarsOfTypes :: [Type] -> Bool
-noFreeVarsOfTypes tys = not $ DM.getAny (runFVTop (f tys))
-  where (_, f, _, _) = foldTyCo (afvFolder (const True))
+noFreeVarsOfTypes tys = not $ runAny (const True) (afv_types tys)
 
 noFreeVarsOfCo :: Coercion -> Bool
-noFreeVarsOfCo co = not $ DM.getAny (runFVTop (f co))
-  where (_, _, f, _) = foldTyCo (afvFolder (const True))
-
+noFreeVarsOfCo co = not $ runAny (const True) (afv_co co)
 
 {-
 ************************************************************************
