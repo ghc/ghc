@@ -9,7 +9,7 @@ module GHC.Types.Var.FV (
         runFVSelective, runFVSelectiveList, runFVSelectiveSet,
         InterestingVarFun,
 
-        addBndrFV, addBndrsFV, addBndrSelectiveFV, addBndrsSelectiveFV,
+        updEnvFV, addBndrFV, addBndrsFV, addBndrSelectiveFV, addBndrsSelectiveFV,
         emptyFV,   -- or `mempty`
         unionFV,   -- or `mappend`
         mapUnionFV
@@ -138,7 +138,7 @@ type BoundVars = TyCoVarSet
 
 type VarSetFV     = FV BoundVars (EndoOS TyCoVarSet)
 type DVarSetFV    = FV BoundVars (EndoOS DTyCoVarSet)
-type SelectiveDFV = FV (InterestingVarFun, BoundVars) (EndoOS DVarSet)
+type SelectiveDFV = FV (BoundVars, InterestingVarFun) (EndoOS DVarSet)
 -- VarSetFV:     collects a VarSet
 -- DVarSetFV:    collects a DVarSet (deterministic)
 -- SelectiveDFV: selectively collects a DVarSet
@@ -174,28 +174,28 @@ emptyFV = MkFV (\_ -> mempty)
 unionFV :: Semigroup a => FV env a -> FV env a -> FV env a
 unionFV (MkFV' f1) (MkFV' f2) = MkFV (\env -> f1 env <> f2 env)
 
-upd_bndrs_fv :: (env -> env) -> FV env a -> FV env a
-{-# INLINE addBndrFV #-}
-upd_bndrs_fv upd f = MkFV (\bvs -> runFV f $! upd bvs)
+updEnvFV :: (env -> env) -> FV env a -> FV env a
+updEnvFV upd f = MkFV (\bvs -> runFV f $! upd bvs)
     -- Strict application to avoid making a thunk
 
 addBndrFV :: TyCoVar -> FV BoundVars a -> FV BoundVars a
-addBndrFV tcv = upd_bndrs_fv (\bvs -> extendVarSet bvs tcv)
+{-# INLINE addBndrFV #-}
+addBndrFV tcv = updEnvFV (\bvs -> extendVarSet bvs tcv)
 
 addBndrsFV :: [Var] -> FV BoundVars a -> FV BoundVars a
-addBndrsFV tcvs = upd_bndrs_fv (\bvs -> extendVarSetList bvs tcvs)
+addBndrsFV tcvs = updEnvFV (\bvs -> extendVarSetList bvs tcvs)
 
-addBndrSelectiveFV :: TyCoVar -> FV (f, BoundVars) a -> FV (f, BoundVars) a
+addBndrSelectiveFV :: TyCoVar -> FV (BoundVars, f) a -> FV (BoundVars, f) a
 addBndrSelectiveFV tcv
-  = upd_bndrs_fv (\(f,bvs) -> let !bvs' = extendVarSet bvs tcv
+  = updEnvFV (\(bvs,f) -> let !bvs' = extendVarSet bvs tcv
                                   -- Strict let to avoid thunks
-                              in (f,bvs'))
+                          in (bvs',f))
 
-addBndrsSelectiveFV :: [Var] -> FV (f, BoundVars) a -> FV (f, BoundVars) a
+addBndrsSelectiveFV :: [Var] -> FV (BoundVars, f) a -> FV (BoundVars, f) a
 addBndrsSelectiveFV bs
-  = upd_bndrs_fv (\(f,bvs) -> let !bvs' = extendVarSetList bvs bs
+  = updEnvFV (\(bvs,f) -> let !bvs' = extendVarSetList bvs bs
                                   -- Strict let to avoid thunks
-                              in (f,bvs'))
+                          in (bvs',f))
 
 mapUnionFV :: (Foldable t, Monoid acc)
           => (a -> FV env acc) -> t a -> FV env acc
@@ -221,7 +221,7 @@ runTyCoVarsDSet f = runFVAcc f emptyDVarSet
 
 runFVSelective :: InterestingVarFun -> SelectiveDFV -> DVarSet
 runFVSelective interesting f
-  = runEndoOS (runFV f (interesting, emptyVarSet)) emptyDVarSet
+  = runEndoOS (runFV f (emptyVarSet, interesting)) emptyDVarSet
 
 runFVSelectiveList :: InterestingVarFun -> SelectiveDFV -> [Var]
 runFVSelectiveList interesting f = dVarSetElems (runFVSelective interesting f)
