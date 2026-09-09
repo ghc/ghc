@@ -1,7 +1,7 @@
 -- | An abstract interface for a fast reachability data structure constructed
 -- from a 'GHC.Data.Graph.Directed' graph.
 module GHC.Data.Graph.Directed.Reachability
-  ( ReachabilityIndex
+  ( ReachabilityIndex (..)
 
   -- * Constructing a reachability index
   , graphReachability, cyclicGraphReachability
