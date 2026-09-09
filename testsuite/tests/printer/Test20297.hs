@@ -15,6 +15,9 @@ bar = x
   -- comment0
   where -- comment1
 
+h = i
+  where ;; i = 3
+
 foo = x
   where -- comment2
         doStuff = do stuff
