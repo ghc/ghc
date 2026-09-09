@@ -269,8 +269,10 @@ noinlineId :: Id -- See Note [noinlineId magic]
 noinlineId = pcMiscPrelId noinlineIdName ty info
   where
     info = noCafIdInfo
-    ty  = mkSpecForAllTys [alphaTyVar] $
-          mkVisFunTyMany alphaTy alphaTy
+    -- noinline :: forall r (a :: TYPE r). a -> a
+    ty   = mkInfForAllTy runtimeRep1TyVar   $
+           mkSpecForAllTys [openAlphaTyVar] $
+           mkVisFunTyMany openAlphaTy openAlphaTy
 
 noinlineConstraintId :: Id -- See Note [noinlineId magic]
 noinlineConstraintId = pcMiscPrelId noinlineConstraintIdName ty info

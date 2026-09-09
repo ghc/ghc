@@ -2372,9 +2372,10 @@ simplOutId env fun cont
 simplOutId env inline_fun cont
   | inline_fun `hasKey` noinlineIdKey
   , ApplyToTy  { sc_cont = cont1 } <- cont
-  , ApplyToVal { sc_cont = cont2, sc_arg = the_call, sc_cast = arg_mco
-               , sc_env = UnSimplified arg_se } <- cont1
-  = do { let (encl_app_cont, rest_cont) = splitContArgs cont2
+  , ApplyToTy  { sc_cont = cont2 } <- cont1
+  , ApplyToVal { sc_cont = cont3, sc_arg = the_call, sc_cast = arg_mco
+               , sc_env = UnSimplified arg_se } <- cont2
+  = do { let (encl_app_cont, rest_cont) = splitContArgs cont3
              -- push_args just pushes multiple arguments onto the continuation
              push_args (App fun arg) cont = do { cont' <- pushAppCont arg_se fun arg cont
                                                ; push_args fun cont' }
@@ -2385,7 +2386,9 @@ simplOutId env inline_fun cont
        ; let call_env = updMode updModeForNoInline $
                         arg_se `setInScopeFromE` env
        ; (floats1, call') <- simplExprF call_env inner_fun call_cont
-       ; let noinline_expr = Var inline_fun `App` Type (contHoleType rest_cont)
+       ; let new_call_ty = contHoleType rest_cont
+             noinline_expr = Var inline_fun `App` Type (getRuntimeRep new_call_ty)
+                                            `App` Type new_call_ty
                                             `App` mkCastMCo call' arg_mco
        ; (floats2, res) <- rebuild env noinline_expr rest_cont
        ; return (floats2 `addFloats` floats1 , res) }

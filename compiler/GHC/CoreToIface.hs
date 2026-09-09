@@ -63,7 +63,7 @@ import GHC.Core.TyCo.Tidy
 
 import GHC.Builtin.WiredIn.Prim ( eqPrimTyCon, eqReprPrimTyCon )
 import GHC.Builtin.WiredIn.Types ( heqTyCon )
-import GHC.Builtin.WiredIn.Ids ( noinlineIdName, noinlineConstraintIdName )
+import GHC.Builtin.WiredIn.Ids ( noinlineIdName )
 
 import GHC.Iface.Syntax
 import GHC.Data.FastString
@@ -658,9 +658,10 @@ toIfaceVar :: Id -> IfaceExpr
 toIfaceVar v
     | isBootUnfolding (idUnfolding v)
     = -- See Note [Inlining and hs-boot files]
-      IfaceApp (IfaceApp (IfaceExt noinline_id)
-                         (IfaceType (toIfaceType ty)))
-               (IfaceExt name) -- don't use mkIfaceApps, or infinite loop
+      IfaceExt noinlineIdName     `IfaceApp`
+      IfaceType (toIfaceType rep) `IfaceApp`
+      IfaceType (toIfaceType ty)  `IfaceApp`
+      IfaceExt name      -- Don't use mkIfaceApps, or infinite loop
 
     | Just fcall <- isFCallId_maybe v = IfaceFCall fcall (toIfaceType (idType v))
                                       -- Foreign calls have special syntax
@@ -670,10 +671,7 @@ toIfaceVar v
   where
     name = idName v
     ty   = idType v
-    noinline_id | isConstraintKind (typeKind ty) = noinlineConstraintIdName
-                | otherwise                      = noinlineIdName
-
-
+    rep  = getRuntimeRep ty
 
 ---------------------
 toIfaceLFInfo :: Name -> LambdaFormInfo -> IfaceLFInfo
