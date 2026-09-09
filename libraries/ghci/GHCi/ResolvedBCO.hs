@@ -1,6 +1,11 @@
-{-# LANGUAGE RecordWildCards, DeriveGeneric, GeneralizedNewtypeDeriving,
-    BangPatterns, CPP, MagicHash, FlexibleInstances, FlexibleContexts,
-    TypeApplications, ScopedTypeVariables, UnboxedTuples, UndecidableInstances #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module GHCi.ResolvedBCO
   ( ResolvedBCO(..)
   , ResolvedBCOPtr(..)
