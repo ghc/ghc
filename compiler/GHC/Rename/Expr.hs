@@ -422,7 +422,7 @@ rnExpr (HsGetField _ e f)
       ; let f' = rnDotFieldOcc <$> f
       ; return ( mkExpandedExpr
                    (HsGetField noExtField e f')
-                   (mkGetField getField e (fmap (unLoc . dfoLabel) f'))
+                   (mkGetField getField e (dfoLabel $ unLoc f'))
                , fv_e `plusFN` fv_getField ) }
 
 rnExpr (HsProjection _ fs)
@@ -431,7 +431,7 @@ rnExpr (HsProjection _ fs)
        ; let fs' = NE.map rnDotFieldOcc fs
        ; return ( mkExpandedExpr
                     (HsProjection noExtField fs')
-                    (mkProjection getField circ $ NE.map (unLoc . dfoLabel) fs')
+                    (mkProjection getField circ $ NE.map dfoLabel fs')
                 , unitFN circ `plusFN` fv_getField) }
 
 ------------------------------------------
@@ -2882,8 +2882,9 @@ rnHsIf p b1 b2
 
 -- mkGetField arg field calculates a get_field @field arg expression.
 -- e.g. z.x = mkGetField z x = get_field @x z
-mkGetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> HsExpr GhcRn
-mkGetField get_field arg field = unLoc (head $ mkGet get_field (arg :| []) field)
+mkGetField :: Name -> LHsExpr GhcRn -> XRec GhcRn FieldLabelString -> HsExpr GhcRn
+mkGetField get_field arg field =
+  HsApp noExtField (mkGetField' get_field field) arg
 
 -- mkSetField a field b calculates a set_field @field expression.
 -- e.g mkSetSetField a field b = set_field @"field" a b (read as "set field 'field' to a on b").
@@ -2902,14 +2903,16 @@ mkSet set_field acc (field, g) = wrapGenSpan (mkSetField set_field g field acc)
 -- mkProjection fields calculates a projection.
 -- e.g. .x = mkProjection [x] = getField @"x"
 --      .x.y = mkProjection [.x, .y] = (.y) . (.x) = getField @"y" . getField @"x"
-mkProjection :: Name -> Name -> NonEmpty FieldLabelString -> HsExpr GhcRn
-mkProjection getFieldName circName (field :| fields) = foldl' f (proj field) fields
+mkProjection :: Name -> Name -> NonEmpty (XRec GhcRn FieldLabelString) -> HsExpr GhcRn
+mkProjection getFieldName circName (field :| fields) =
+  unLoc $ foldl' f (mkGetField' getFieldName field) fields
   where
-    f :: HsExpr GhcRn -> FieldLabelString -> HsExpr GhcRn
-    f acc field = genHsApps circName $ map wrapGenSpan [proj field, acc]
+    f :: LHsExpr GhcRn -> XRec GhcRn FieldLabelString -> LHsExpr GhcRn
+    f acc field = wrapGenSpan $ genHsApps circName [mkGetField' getFieldName field, acc]
 
-    proj :: FieldLabelString -> HsExpr GhcRn
-    proj (FieldLabelString f) = genHsVar getFieldName `genAppType` genHsTyLit f
+mkGetField' :: Name -> XRec GhcRn FieldLabelString -> LHsExpr GhcRn
+mkGetField' getFieldName (L ann (FieldLabelString f)) =
+  wrapGenSpan' (getHasLoc ann) (genHsVar getFieldName `genAppType` genHsTyLit f)
 
 -- mkProjUpdateSetField calculates functions representing dot notation record updates.
 -- e.g. Suppose an update like foo.bar = 1.
