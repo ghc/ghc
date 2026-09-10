@@ -159,7 +159,7 @@ testRules = do
           tt <- getTargetTarget
           need [root -/- progPathForArch (tgtArchOs tt)]
 
-        -- HACK: we don't havea program path here and just a pattern
+        -- HACK: we don't have a program path here and just a pattern
         -- because we can't query the target before declaring the rule.
         -- we specify target arch linux (no extension), then append a pattern
         -- for any extension
