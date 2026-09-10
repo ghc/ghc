@@ -7,6 +7,7 @@
   * Add `Data.List.NonEmpty.{zip{3..7},zipWith{3..7},unzip{3..7}}` ([CLC proposal #409)(https://github.com/haskell/core-libraries-committee/issues/409))
   * Ensure that `Data.List.elem` and `notElem` can be specialized even when no list fusion happens. ([CLC proposal #412)(https://github.com/haskell/core-libraries-committee/issues/412))
   * Introduce `Data.Double` and `Data.Float` modules. ([CLC proposal #378](https://github.com/haskell/core-libraries-committee/issues/378))
+  * Remove `bitSize` from `MINIMAL` pragma of `class Bits`. ([CLC proposal #440](https://github.com/haskell/core-libraries-committee/issues/440))
   * Change `Generically a`'s `Monoid` definition to require a `Semigroup` constraint, and define its `mconcat` using `(<>)` from that constraint. ([CLC proposal #413](https://github.com/haskell/core-libraries-committee/issues/413))
   * Add `withEmptyCallStack` to `GHC.Stack`. ([CLC proposal #428](https://github.com/haskell/core-libraries-committee/issues/428))
   * Add new `Data.RealFloat` module re-exporting `RealFloat` from `GHC.Float` ([CLC proposal #394](https://github.com/haskell/core-libraries-committee/issues/394))
