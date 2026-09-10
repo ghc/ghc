@@ -1140,8 +1140,8 @@ instance ToJSON a => ToJSON (JobGroup a) where
     , "r" .= r ]
 
 instance ToJSON a => ToJSON (BuildAndTestJob a) where
-  toJSON MkBuildAndTestJob {buildJob, testJobs} =
-    object [ "build" .= buildJob, "test" .= testJobs ]
+    -- the test job is not relevant for the job metadata output
+  toJSON MkBuildAndTestJob {buildJob} = toJSON buildJob
 
 -- | Construct a 'JobGroup' which consists of a validate, nightly and release build with
 -- a specific config.
