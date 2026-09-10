@@ -1,27 +1,155 @@
 ==========================
 At point (23,16), we found:
 ==========================
+┌
+│ $dHasField at NoFieldSelectorQueries.hs:1:1, of type: HasField "a" A Int
+│     is an evidence variable bound by a let, depending on: [C:HasField]
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ C:HasField at NoFieldSelectorQueries.hs:1:1, of type: forall {k} (x :: k) r a. (r -> a) -> HasField x r a
+   │     is a usage of an external evidence variable
+   │     Defined in `GHC.Internal.Records'
+   └
+
 ==========================
 At point (27,19), we found:
 ==========================
+┌
+│ $dHasField at NoFieldSelectorQueries.hs:27:1-19, of type: HasField "a" r Int
+│     is an evidence variable bound by a let, depending on: [$dHasField]
+│           with scope: LocalScope NoFieldSelectorQueries.hs:27:1-19
+│           bound at: NoFieldSelectorQueries.hs:27:1-19
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ $dHasField at NoFieldSelectorQueries.hs:27:1-19, of type: HasField "a" r Int
+   │     is an evidence variable bound by a HsWrapper
+   │           with scope: LocalScope NoFieldSelectorQueries.hs:27:1-19
+   │           bound at: NoFieldSelectorQueries.hs:27:1-19
+   │     Defined at <no location info>
+   └
+
 ==========================
 At point (30,15), we found:
 ==========================
+┌
+│ $dHasField at NoFieldSelectorQueries.hs:30:1-17, of type: HasField "n" B A
+│     is an evidence variable bound by a let, depending on: [C:HasField]
+│           with scope: LocalScope NoFieldSelectorQueries.hs:30:1-17
+│           bound at: NoFieldSelectorQueries.hs:30:1-17
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ C:HasField at NoFieldSelectorQueries.hs:1:1, of type: forall {k} (x :: k) r a. (r -> a) -> HasField x r a
+   │     is a usage of an external evidence variable
+   │     Defined in `GHC.Internal.Records'
+   └
+
 ==========================
 At point (30,17), we found:
 ==========================
+┌
+│ $dHasField at NoFieldSelectorQueries.hs:30:1-17, of type: HasField "b" A Char
+│     is an evidence variable bound by a let, depending on: [C:HasField]
+│           with scope: LocalScope NoFieldSelectorQueries.hs:30:1-17
+│           bound at: NoFieldSelectorQueries.hs:30:1-17
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ C:HasField at NoFieldSelectorQueries.hs:1:1, of type: forall {k} (x :: k) r a. (r -> a) -> HasField x r a
+   │     is a usage of an external evidence variable
+   │     Defined in `GHC.Internal.Records'
+   └
+
 ==========================
 At point (33,16), we found:
 ==========================
+┌
+│ $dHasField at NoFieldSelectorQueries.hs:33:1-16, of type: HasField "c" C Float
+│     is an evidence variable bound by a let, depending on: [C:HasField]
+│           with scope: LocalScope NoFieldSelectorQueries.hs:33:1-16
+│           bound at: NoFieldSelectorQueries.hs:33:1-16
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ C:HasField at NoFieldSelectorQueries.hs:1:1, of type: forall {k} (x :: k) r a. (r -> a) -> HasField x r a
+   │     is a usage of an external evidence variable
+   │     Defined in `GHC.Internal.Records'
+   └
+
 ==========================
 At point (36,16), we found:
 ==========================
+┌
+│ $dHasField at NoFieldSelectorQueries.hs:36:1-16, of type: HasField "c" C Float
+│     is an evidence variable bound by a let, depending on: [C:HasField]
+│           with scope: LocalScope NoFieldSelectorQueries.hs:36:1-16
+│           bound at: NoFieldSelectorQueries.hs:36:1-16
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ C:HasField at NoFieldSelectorQueries.hs:1:1, of type: forall {k} (x :: k) r a. (r -> a) -> HasField x r a
+   │     is a usage of an external evidence variable
+   │     Defined in `GHC.Internal.Records'
+   └
+
 ==========================
 At point (40,23), we found:
 ==========================
+┌
+│ $dHasField at NoFieldSelectorQueries.hs:1:1, of type: HasField "c" C Float
+│     is an evidence variable bound by a let, depending on: [C:HasField]
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ C:HasField at NoFieldSelectorQueries.hs:1:1, of type: forall {k} (x :: k) r a. (r -> a) -> HasField x r a
+   │     is a usage of an external evidence variable
+   │     Defined in `GHC.Internal.Records'
+   └
+
 ==========================
 At point (43,15), we found:
 ==========================
+┌
+│ $dHasField at NoFieldSelectorQueries.hs:43:1-15, of type: HasField "e" C Int
+│     is an evidence variable bound by a let, depending on: [C:HasField]
+│           with scope: LocalScope NoFieldSelectorQueries.hs:43:1-15
+│           bound at: NoFieldSelectorQueries.hs:43:1-15
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ C:HasField at NoFieldSelectorQueries.hs:1:1, of type: forall {k} (x :: k) r a. (r -> a) -> HasField x r a
+   │     is a usage of an external evidence variable
+   │     Defined in `GHC.Internal.Records'
+   └
+
 ==========================
 At point (46,15), we found:
 ==========================
+┌
+│ $dHasField at NoFieldSelectorQueries.hs:46:1-15, of type: HasField "e" C Int
+│     is an evidence variable bound by a let, depending on: [C:HasField]
+│           with scope: LocalScope NoFieldSelectorQueries.hs:46:1-15
+│           bound at: NoFieldSelectorQueries.hs:46:1-15
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ C:HasField at NoFieldSelectorQueries.hs:1:1, of type: forall {k} (x :: k) r a. (r -> a) -> HasField x r a
+   │     is a usage of an external evidence variable
+   │     Defined in `GHC.Internal.Records'
+   └
+
