@@ -367,11 +367,13 @@ enum IOSubmitResultCodes {
 /* Called from CMM primop */
 IOSubmitResult syncIOWaitReady(CapIOManager *iomgr, StgTSO *tso, IOReadOrWrite rw, HsInt fd);
 
+/* Cancel the I/O the TSO is blocked on and add the TSO to the run queue */
 void syncIOCancel(CapIOManager *iomgr, StgTSO *tso);
 
 /* Called from CMM primop */
 bool syncDelay(CapIOManager *iomgr, StgTSO *tso, HsInt us_delay);
 
+/* Cancel the timeout the TSO is blocked on and add the TSO to the run queue */
 void syncDelayCancel(CapIOManager *iomgr, StgTSO *tso);
 
 #if defined(IOMGR_ENABLED_SELECT) || defined(IOMGR_ENABLED_WIN32_LEGACY)

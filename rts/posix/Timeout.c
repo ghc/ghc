@@ -70,14 +70,13 @@ void syncDelayCancelTimeout(CapIOManager *iomgr, StgTSO *tso)
 
     deleteTimeoutQueue(&iomgr->timeout_queue, timeout);
 
+    appendToRunQueue(iomgr->cap, tso);
+    RELEASE_STORE(&tso->why_blocked, NotBlocked);
+
     /* the timeout is no longer accessible from anywhere (except here) */
     IF_NONMOVING_WRITE_BARRIER_ENABLED {
         updateRemembSetPushClosure(iomgr->cap, (StgClosure *)timeout);
     }
-
-    /* We don't put the TSO back on the run queue or change the why_blocked
-       status, as that is done by removeFromQueues (in the throwTo* functions).
-     */
 }
 
 static void notifyTimeoutCompletion(CapIOManager *iomgr, StgTimeout *timeout);

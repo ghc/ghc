@@ -229,21 +229,7 @@ void syncIOCancelSelectBis(CapIOManager *iomgr, StgTSO *tso)
     StgAsyncIOOp *aiop  = tso->block_info.aiop;
     ASSERT(aiop->notify_type == NotifyTSO);
     ASSERT(indexClosureTable(&iomgr->aiop_table, aiop->index) == aiop);
-    removeFromTables(iomgr, aiop->index);
-    aiop->outcome = IOOpOutcomeCancelled;
-    setTsoIOOpOutcome(tso, aiop->outcome, aiop->result);
-    /* We cannot use the normal notifyIOCompletion here. We are in the context
-     * of throwTo, interrupting a thread blocked on IO via an async exception.
-     * We don't put the TSO back on the run queue or change the why_blocked
-     * status, as that is done by removeFromQueues (in the throwTo* functions).
-     */
-
-    /* We are in the TSO case, where the aiop was only reachable from the TSO
-     * itself, and thus it is now no longer be reachable at all.
-     */
-    IF_NONMOVING_WRITE_BARRIER_ENABLED {
-        updateRemembSetPushClosure(iomgr->cap, (StgClosure *)aiop);
-    }
+    asyncIOCancelSelectBis(iomgr, aiop);
 }
 
 
@@ -254,7 +240,6 @@ void asyncIOCancelSelectBis(CapIOManager *iomgr, StgAsyncIOOp *aiop)
      * because each aiop is GC heap allocated, so cannot be recycled until it
      * is no longer retained by the application.
      */
-    ASSERT(aiop->notify_type != NotifyTSO);
     if (indexClosureTable(&iomgr->aiop_table, aiop->index) == aiop) {
         removeFromTables(iomgr, aiop->index);
         aiop->outcome = IOOpOutcomeCancelled;

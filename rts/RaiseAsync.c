@@ -28,7 +28,7 @@
 static void blockedThrowTo (Capability *cap,
                             StgTSO *target, MessageThrowTo *msg);
 
-static void removeFromQueues(Capability *cap, StgTSO *tso);
+static void unblockAndAppendToRunQueue(Capability *cap, StgTSO *tso);
 
 static void removeFromMVarBlockedQueue (StgTSO *tso);
 
@@ -62,8 +62,10 @@ throwToSingleThreaded__ (Capability *cap, StgTSO *tso, StgClosure *exception,
         return;
     }
 
-    // Remove it from any blocking queues
-    removeFromQueues(cap,tso);
+    // Remove it from any blocking queues and add it to the run queue
+    unblockAndAppendToRunQueue(cap,tso);
+    ASSERT(tso->why_blocked == NotBlocked ||
+           tso->why_blocked == ThreadMigrating);
 
     raiseAsync(cap, tso, exception, stop_at_atomically, stop_here);
 }
@@ -471,7 +473,7 @@ check_target:
             blockedThrowTo(cap,target,msg);
             return THROWTO_BLOCKED;
         } else {
-            removeFromQueues(cap,target);
+            unblockAndAppendToRunQueue(cap,target);
             raiseAsync(cap, target, msg->exception, false, NULL);
             return THROWTO_SUCCESS;
         }
@@ -612,16 +614,7 @@ awakenBlockedExceptionQueue (Capability *cap, StgTSO *tso)
     tso->blocked_exceptions = END_BLOCKED_EXCEPTIONS_QUEUE;
 }
 
-/* -----------------------------------------------------------------------------
-   Remove a thread from blocking queues.
-
-   This is for use when we raise an exception in another thread, which
-   may be blocked.
-
-   Precondition: we have exclusive access to the TSO, via the same set
-   of conditions as throwToSingleThreaded() (c.f.).
-   -------------------------------------------------------------------------- */
-
+// Helper for unblockAndAppendToRunQueue
 static void
 removeFromMVarBlockedQueue (StgTSO *tso)
 {
@@ -664,13 +657,24 @@ removeFromMVarBlockedQueue (StgTSO *tso)
     tso->_link = END_TSO_QUEUE;
 }
 
+/* -----------------------------------------------------------------------------
+   Remove a thread from blocking queues (if any) and add it to the run queue
+   (if it wasn't on the run queue already).
+
+   This is for use when we raise an exception in another thread, which
+   may be blocked.
+
+   Precondition: we have exclusive access to the TSO, via the same set
+   of conditions as throwToSingleThreaded() (c.f.).
+   -------------------------------------------------------------------------- */
+
 static void
-removeFromQueues(Capability *cap, StgTSO *tso)
+unblockAndAppendToRunQueue(Capability *cap, StgTSO *tso)
 {
   switch (UntagWhyBlocked(ACQUIRE_LOAD(&tso->why_blocked))) {
 
-  case NotBlocked:
-  case ThreadMigrating:
+  case NotBlocked:      // Already on the run queue
+  case ThreadMigrating: // Not added to the run queue
       return;
 
   case BlockedOnSTM:
@@ -680,16 +684,16 @@ removeFromQueues(Capability *cap, StgTSO *tso)
     // perhaps have a debugging test to make sure that this really
     // happens and that the 'zombie' transaction does not get
     // committed.
-    goto done;
+    break;
 
   case BlockedOnMVar:
   case BlockedOnMVarRead:
       removeFromMVarBlockedQueue(tso);
-      goto done;
+      break;
 
   case BlockedOnBlackHole:
       // nothing to do
-      goto done;
+      break;
 
   case BlockedOnMsgThrowTo:
   {
@@ -709,18 +713,19 @@ removeFromQueues(Capability *cap, StgTSO *tso)
   case BlockedOnDoProc:
       // These blocking reasons are only used by some I/O managers
       syncIOCancel(cap->iomgr, tso);
-      goto done;
+      return;
 
   case BlockedOnDelay:
       // This blocking reasons is only used by some I/O managers
       syncDelayCancel(cap->iomgr, tso);
-      goto done;
+      return;
 
   default:
-      barf("removeFromQueues: %d", tso->why_blocked);
+      barf("unblockAndAppendToRunQueue: %d", tso->why_blocked);
   }
 
- done:
+  // The cases above that use return add the TSO to the run queue themselves
+  // (or don't need to). For the rest (that use break) we do it here.
   appendToRunQueue(cap, tso);
   RELEASE_STORE(&tso->why_blocked, NotBlocked);
 }

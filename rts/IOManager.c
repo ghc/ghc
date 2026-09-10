@@ -874,6 +874,8 @@ void syncIOCancel(CapIOManager *iomgr, StgTSO *tso)
                                     &iomgr->blocked_queue_hd,
                                     &iomgr->blocked_queue_tl,
                                     tso);
+            appendToRunQueue(iomgr->cap, tso);
+            RELEASE_STORE(&tso->why_blocked, NotBlocked);
             break;
 #endif
 #if defined(IOMGR_ENABLED_SELECTBIS)
@@ -893,11 +895,14 @@ void syncIOCancel(CapIOManager *iomgr, StgTSO *tso)
                                     &iomgr->blocked_queue_tl,
                                     tso);
             abandonWorkRequest(tso->block_info.async_reqID);
+            appendToRunQueue(iomgr->cap, tso);
+            RELEASE_STORE(&tso->why_blocked, NotBlocked);
             break;
 #endif
         default:
             barf("syncIOCancel not supported for I/O manager %d", iomgr_type);
     }
+    ASSERT(tso->why_blocked == NotBlocked);
 }
 
 
@@ -965,6 +970,8 @@ void syncDelayCancel(CapIOManager *iomgr, StgTSO *tso)
         case IO_MANAGER_SELECT:
             ASSERT(tso->why_blocked == (BlockedOnDelay | BlockInfoForceNonClosure));
             removeThreadFromQueue(iomgr->cap, &iomgr->sleeping_queue, tso);
+            appendToRunQueue(iomgr->cap, tso);
+            RELEASE_STORE(&tso->why_blocked, NotBlocked);
             break;
 #endif
 #if defined(IOMGR_ENABLED_SELECTBIS) \
@@ -988,6 +995,7 @@ void syncDelayCancel(CapIOManager *iomgr, StgTSO *tso)
         default:
             barf("syncDelayCancel not supported for I/O manager %d", iomgr_type);
     }
+    ASSERT(tso->why_blocked == NotBlocked);
 }
 
 
