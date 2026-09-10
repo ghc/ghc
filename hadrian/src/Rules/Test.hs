@@ -20,6 +20,7 @@ import qualified System.Directory as IO
 
 import GHC.Toolchain as Toolchain
 import GHC.Toolchain.Program as Toolchain
+import Hadrian.Oracles.TextFile (getHostTarget, getTargetTarget)
 
 checkPprProgPath, checkPprSourcePath :: FilePath
 checkPprProgPath = "test/bin/check-ppr" <.> exe
@@ -158,9 +159,15 @@ testRules = do
                 depsPkgs <- mod_pkgs . packageDependencies <$> readPackageData progPkg
                 bindir <- getBinaryDirectory testGhc
                 test_args <- outOfTreeCompilerArgs
+                ht <- getHostTarget
+                tt <- getTargetTarget
+                targetPlatform <- setting TargetPlatformFull
+                let mkGhcProg prog
+                     | targetPlatformTriple ht /= targetPlatformTriple tt = targetPlatform ++ "-" ++ prog
+                     | otherwise = prog
                 let dynPrograms = hasDynamic test_args
-                ghcProg <- exeSpawnPath (bindir </> "ghc" <.> exe)
-                cmdExe ghcProg $
+                ghcProg <- exeSpawnPath (bindir </> mkGhcProg "ghc" <.> exe) -- FIXME: needs proper prefix!
+                cmdExe ghcProg $ -- FIXME: needs proper prefix!
                     concatMap (\p -> ["-package", pkgName p]) depsPkgs ++
                     ["-o", top -/- path, top -/- sourcePath] ++
                     mextra ++
