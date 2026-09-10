@@ -90,7 +90,7 @@ class Eq a => Bits a where
     {-# MINIMAL (.&.), (.|.), xor, complement,
                 (shift | (shiftL, shiftR)),
                 (rotate | (rotateL, rotateR)),
-                bitSize, bitSizeMaybe, isSigned, testBit, bit, popCount #-}
+                bitSizeMaybe, isSigned, testBit, bit, popCount #-}
 
     -- | Bitwise \"and\"
     (.&.) :: a -> a -> a

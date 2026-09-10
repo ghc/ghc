@@ -726,7 +726,7 @@ module Data.Bits where
     rotateL :: a -> GHC.Internal.Types.Int -> a
     rotateR :: a -> GHC.Internal.Types.Int -> a
     popCount :: a -> GHC.Internal.Types.Int
-    {-# MINIMAL (.&.), (.|.), xor, complement, (shift | (shiftL, shiftR)), (rotate | (rotateL, rotateR)), bitSize, bitSizeMaybe, isSigned, testBit, bit, popCount #-}
+    {-# MINIMAL (.&.), (.|.), xor, complement, (shift | (shiftL, shiftR)), (rotate | (rotateL, rotateR)), bitSizeMaybe, isSigned, testBit, bit, popCount #-}
   type FiniteBits :: * -> Constraint
   class Bits b => FiniteBits b where
     finiteBitSize :: b -> GHC.Internal.Types.Int
@@ -2024,7 +2024,7 @@ module Foreign where
     rotateL :: a -> Int -> a
     rotateR :: a -> Int -> a
     popCount :: a -> Int
-    {-# MINIMAL (.&.), (.|.), xor, complement, (shift | (shiftL, shiftR)), (rotate | (rotateL, rotateR)), bitSize, bitSizeMaybe, isSigned, testBit, bit, popCount #-}
+    {-# MINIMAL (.&.), (.|.), xor, complement, (shift | (shiftL, shiftR)), (rotate | (rotateL, rotateR)), bitSizeMaybe, isSigned, testBit, bit, popCount #-}
   type FinalizerEnvPtr :: * -> * -> *
   type FinalizerEnvPtr env a = FunPtr (Ptr env -> Ptr a -> GHC.Internal.Types.IO ())
   type FinalizerPtr :: * -> *
@@ -2938,7 +2938,7 @@ module Foreign.Safe where
     rotateL :: a -> Int -> a
     rotateR :: a -> Int -> a
     popCount :: a -> Int
-    {-# MINIMAL (.&.), (.|.), xor, complement, (shift | (shiftL, shiftR)), (rotate | (rotateL, rotateR)), bitSize, bitSizeMaybe, isSigned, testBit, bit, popCount #-}
+    {-# MINIMAL (.&.), (.|.), xor, complement, (shift | (shiftL, shiftR)), (rotate | (rotateL, rotateR)), bitSizeMaybe, isSigned, testBit, bit, popCount #-}
   type FinalizerEnvPtr :: * -> * -> *
   type FinalizerEnvPtr env a = FunPtr (Ptr env -> Ptr a -> GHC.Internal.Types.IO ())
   type FinalizerPtr :: * -> *
@@ -5083,7 +5083,7 @@ module GHC.Bits where
     rotateL :: a -> GHC.Internal.Types.Int -> a
     rotateR :: a -> GHC.Internal.Types.Int -> a
     popCount :: a -> GHC.Internal.Types.Int
-    {-# MINIMAL (.&.), (.|.), xor, complement, (shift | (shiftL, shiftR)), (rotate | (rotateL, rotateR)), bitSize, bitSizeMaybe, isSigned, testBit, bit, popCount #-}
+    {-# MINIMAL (.&.), (.|.), xor, complement, (shift | (shiftL, shiftR)), (rotate | (rotateL, rotateR)), bitSizeMaybe, isSigned, testBit, bit, popCount #-}
   type FiniteBits :: * -> Constraint
   class Bits b => FiniteBits b where
     finiteBitSize :: b -> GHC.Internal.Types.Int
