@@ -28,7 +28,7 @@ import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids
 import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
-import GHC.Builtin.WiredIn.Ids ( realWorldPrimId )
+import GHC.Builtin.WiredIn.Ids ( realWorldPrimId, isNoinlineId )
 
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
@@ -1274,7 +1274,7 @@ eliminateMagicCall f (AIApp Type{} : AIApp arg : args)
       -- See Note [nospecId magic] in GHC.Types.Id.Make
 
 eliminateMagicCall f (AIApp Type{} : AIApp Type{} : AIApp arg : args)
-  | f `hasKey` noinlineIdKey = Just (arg,args)
+  | isNoinlineId f = Just (arg,args)
     -- Replace (noinline a) with a
     -- See Note [noinlineId magic] in GHC.Types.Id.Make
 

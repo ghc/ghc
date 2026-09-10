@@ -62,9 +62,14 @@ inline x = x
 -- | The call @noinline f@ arranges that @f@ will not be inlined.
 -- It is removed during CorePrep so that its use imposes no overhead
 -- (besides the fact that it blocks inlining.)
-noinline :: a -> a
-{-# NOINLINE noinline #-}  -- noinline is inlined manually in CorePrep
-noinline x = x
+noinline :: forall (r :: RuntimeRep) (a :: TYPE r).
+            a -> a
+{-# NOINLINE noinline #-}
+-- See Note [noinlineId magic] in GHC.Builtin.WiredIn.Ids
+noinline = noinline  -- Never called, eliminated in CorePrep
+  -- We can't conveniently call `error` here because
+  -- GHC.Internal.Err depends on GHC.Internal.Magic.noinline!
+  -- Hence this silly loop.
 
 -- | The 'lazy' function restrains strictness analysis a little. The
 -- call @lazy e@ means the same as @e@, but 'lazy' has a magical

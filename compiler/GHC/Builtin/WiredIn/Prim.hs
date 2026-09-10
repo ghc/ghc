@@ -32,10 +32,13 @@ module GHC.Builtin.WiredIn.Prim(
 
         alphaConstraintTyVar, alphaConstraintTy,
 
-        openAlphaTyVar, openBetaTyVar, openGammaTyVar,
-        openAlphaTyVarSpec, openBetaTyVarSpec, openGammaTyVarSpec,
-        openAlphaTy, openBetaTy, openGammaTy,
+        -- Runtime-rep-polymorphic tyvars, of kind (TYPE rr)
+        rrPolyTyVar1,     rrPolyTyVar2,     rrPolyTyVar3,
+        rrPolyTy1,        rrPolyTy2,        rrPolyTy3,
+        rrPolyTyVarSpec1, rrPolyTyVarSpec2, rrPolyTyVarSpec3,
+        rrPolyConstraintVar1, rrPolyConstraintTy1,
 
+        -- Levity-polymorphic tyvars
         levPolyAlphaTyVar, levPolyBetaTyVar,
         levPolyAlphaTyVarSpec, levPolyBetaTyVarSpec,
         levPolyAlphaTy, levPolyBetaTy,
@@ -503,24 +506,29 @@ runtimeRep1Ty, runtimeRep2Ty, runtimeRep3Ty :: RuntimeRepType
 runtimeRep1Ty = mkTyVarTy runtimeRep1TyVar
 runtimeRep2Ty = mkTyVarTy runtimeRep2TyVar
 runtimeRep3Ty = mkTyVarTy runtimeRep3TyVar
-openAlphaTyVar, openBetaTyVar, openGammaTyVar :: TyVar
--- alpha :: TYPE r1
--- beta  :: TYPE r2
--- gamma :: TYPE r3
-[openAlphaTyVar,openBetaTyVar,openGammaTyVar]
+
+rrPolyTyVar1, rrPolyTyVar2, rrPolyTyVar3, rrPolyConstraintVar1 :: TyVar
+--   rrPolyTyVar1         :: TYPE r1
+--   rrPolyTyVar2         :: TYPE r2
+--   rrPolyTyVar2         :: TYPE r3
+--   rrPolyConstraintVar1 :: CONSTRAINT r1
+-- All have distinct uniques
+[ rrPolyTyVar1, rrPolyTyVar2, rrPolyTyVar3, rrPolyConstraintVar1 ]
   = mkTemplateTyVars [ mk_TYPE_app runtimeRep1Ty
                      , mk_TYPE_app runtimeRep2Ty
-                     , mk_TYPE_app runtimeRep3Ty]
+                     , mk_TYPE_app runtimeRep3Ty
+                     , mk_CONSTRAINT_app runtimeRep1Ty ]
 
-openAlphaTyVarSpec, openBetaTyVarSpec, openGammaTyVarSpec :: TyVarBinder
-openAlphaTyVarSpec = mkTyVarBinder Specified openAlphaTyVar
-openBetaTyVarSpec  = mkTyVarBinder Specified openBetaTyVar
-openGammaTyVarSpec = mkTyVarBinder Specified openGammaTyVar
+rrPolyTyVarSpec1, rrPolyTyVarSpec2, rrPolyTyVarSpec3 :: TyVarBinder
+rrPolyTyVarSpec1 = mkTyVarBinder Specified rrPolyTyVar1
+rrPolyTyVarSpec2 = mkTyVarBinder Specified rrPolyTyVar2
+rrPolyTyVarSpec3 = mkTyVarBinder Specified rrPolyTyVar3
 
-openAlphaTy, openBetaTy, openGammaTy :: Type
-openAlphaTy = mkTyVarTy openAlphaTyVar
-openBetaTy  = mkTyVarTy openBetaTyVar
-openGammaTy = mkTyVarTy openGammaTyVar
+rrPolyTy1, rrPolyTy2, rrPolyTy3, rrPolyConstraintTy1 :: Type
+rrPolyTy1           = mkTyVarTy rrPolyTyVar1
+rrPolyTy2           = mkTyVarTy rrPolyTyVar2
+rrPolyTy3           = mkTyVarTy rrPolyTyVar3
+rrPolyConstraintTy1 = mkTyVarTy rrPolyConstraintVar1
 
 levity1TyVar, levity2TyVar :: TyVar
 (levity2TyVar : levity1TyVar : _) -- NB: levity2TyVar before levity1TyVar

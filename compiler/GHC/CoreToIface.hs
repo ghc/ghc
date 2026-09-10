@@ -63,7 +63,7 @@ import GHC.Core.TyCo.Tidy
 
 import GHC.Builtin.WiredIn.Prim ( eqPrimTyCon, eqReprPrimTyCon )
 import GHC.Builtin.WiredIn.Types ( heqTyCon )
-import GHC.Builtin.WiredIn.Ids ( noinlineIdName )
+import GHC.Builtin.WiredIn.Ids ( getNoinlineId )
 
 import GHC.Iface.Syntax
 import GHC.Data.FastString
@@ -658,9 +658,9 @@ toIfaceVar :: Id -> IfaceExpr
 toIfaceVar v
     | isBootUnfolding (idUnfolding v)
     = -- See Note [Inlining and hs-boot files]
-      IfaceExt noinlineIdName     `IfaceApp`
-      IfaceType (toIfaceType rep) `IfaceApp`
-      IfaceType (toIfaceType ty)  `IfaceApp`
+      IfaceExt  (idName noinline_id) `IfaceApp`
+      IfaceType (toIfaceType rep)    `IfaceApp`
+      IfaceType (toIfaceType ty)     `IfaceApp`
       IfaceExt name      -- Don't use mkIfaceApps, or infinite loop
 
     | Just fcall <- isFCallId_maybe v = IfaceFCall fcall (toIfaceType (idType v))
@@ -671,7 +671,7 @@ toIfaceVar v
   where
     name = idName v
     ty   = idType v
-    rep  = getRuntimeRep ty
+    (noinline_id, rep) = getNoinlineId ty
 
 ---------------------
 toIfaceLFInfo :: Name -> LambdaFormInfo -> IfaceLFInfo
@@ -750,7 +750,7 @@ But how do we arrange for this to happen?  There are two ingredients:
     1. When we serialize out unfoldings to IfaceExprs (toIfaceVar),
     for every variable reference we see if we are referring to an
     'Id' that came from an hs-boot file.  If so, we add a `noinline`
-    to the reference.  See Note [noinlineId magic]
+    to the reference.  See Note [noinlineId magic] esp (NOI3)
     in GHC.Types.Id.Make
 
     2. But how do we know if a reference came from an hs-boot file

@@ -18,13 +18,16 @@ module GHC.Builtin.WiredIn.Ids (
         wiredInIds, ghcPrimIds,
         realWorldPrimId,
         voidPrimId, voidArgId,
-        nullAddrId, seqId, lazyId, lazyIdKey,
-        coercionTokenId, coerceId,
-        proxyHashId,
+        nullAddrId, seqId, lazyId, lazyIdKey, proxyHashId,
+        coercionTokenId, coerceId, coerceName,
         nospecId, nospecIdName,
-        noinlineId, noinlineIdName,
-        noinlineConstraintId, noinlineConstraintIdName,
-        coerceName, leftSectionName, rightSectionName,
+
+        getNoinlineId, isNoinlineId,
+          noinlineId,           noinlineIdName,
+          noinlineConstraintId, noinlineConstraintIdName,
+
+        leftSectionName, rightSectionName,
+
         pcRepPolyId,
 
         unboxedUnitExpr,
@@ -54,11 +57,14 @@ import GHC.Types.Name.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.InlinePragma
-import GHC.Types.Var (VarBndr(Bndr), visArgConstraintLike, tyVarName)
+import GHC.Types.Var (VarBndr(Bndr), invisArgConstraintLike, tyVarName)
+import GHC.Types.Basic( TypeOrConstraint(..) )
 
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
 
+import GHC.Utils.Panic
+import GHC.Utils.Outputable
 import GHC.Data.FastString
 
 
@@ -92,7 +98,7 @@ that module's interface file; instead, the full definition is right
 here.
 
 Note [ghcPrimIds (aka pseudoops)]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The ghcPrimIds
 
   * Are exported from GHC.Prim (see ghcPrimExports, used in ghcPrimInterface)
@@ -239,15 +245,15 @@ seqId = pcRepPolyId seqName ty concs info
     -- seq :: forall (r :: RuntimeRep) a (b :: TYPE r). a -> b -> b
     ty  =
       mkInfForAllTy runtimeRep2TyVar
-      $ mkSpecForAllTys [alphaTyVar, openBetaTyVar]
-      $ mkVisFunTyMany alphaTy (mkVisFunTyMany openBetaTy openBetaTy)
+      $ mkSpecForAllTys [alphaTyVar, rrPolyTyVar2]
+      $ mkVisFunTyMany alphaTy (mkVisFunTyMany rrPolyTy2 rrPolyTy2)
 
-    [x,y] = mkTemplateLocals [alphaTy, openBetaTy]
-    rhs = mkLams ([runtimeRep2TyVar, alphaTyVar, openBetaTyVar, x, y]) $
-          Case (Var x) x openBetaTy [Alt DEFAULT [] (Var y)]
+    [x,y] = mkTemplateLocals [rrPolyTy1, rrPolyTy2]
+    rhs = mkLams ([runtimeRep2TyVar, alphaTyVar, rrPolyTyVar2, x, y]) $
+          Case (Var x) x rrPolyTy2 [Alt DEFAULT [] (Var y)]
 
     concs = mkRepPolyIdConcreteTyVars
-        [ ((openBetaTy, mkArgPos 2 Top), runtimeRep2TyVar)]
+        [ ((rrPolyTy2, mkArgPos 2 Top), runtimeRep2TyVar)]
 
     arity = 2
 
@@ -271,15 +277,27 @@ noinlineId = pcMiscPrelId noinlineIdName ty info
     info = noCafIdInfo
     -- noinline :: forall r (a :: TYPE r). a -> a
     ty   = mkInfForAllTy runtimeRep1TyVar   $
-           mkSpecForAllTys [openAlphaTyVar] $
-           mkVisFunTyMany openAlphaTy openAlphaTy
+           mkSpecForAllTys [rrPolyTyVar1] $
+           mkVisFunTyMany rrPolyTy1 rrPolyTy1
 
 noinlineConstraintId :: Id -- See Note [noinlineId magic]
 noinlineConstraintId = pcMiscPrelId noinlineConstraintIdName ty info
   where
     info = noCafIdInfo
-    ty   = mkSpecForAllTys [alphaConstraintTyVar] $
-           mkFunTy visArgConstraintLike ManyTy alphaTy alphaConstraintTy
+    ty   = mkInfForAllTy runtimeRep1TyVar   $
+           mkSpecForAllTys [rrPolyConstraintVar1] $
+           mkFunTy invisArgConstraintLike ManyTy rrPolyConstraintTy1 rrPolyConstraintTy1
+
+isNoinlineId :: Id -> Bool
+isNoinlineId fn = key == noinlineIdKey || key == noinlineConstraintIdKey
+  where
+    key = getUnique fn
+
+getNoinlineId :: Type -> (Id, RuntimeRepType)
+getNoinlineId ty = case sORTKind_maybe (typeKind ty) of
+                     Just (TypeLike,       rep) -> (noinlineId,           rep)
+                     Just (ConstraintLike, rep) -> (noinlineConstraintId, rep)
+                     Nothing -> pprPanic "getNoinlineId" (ppr ty)
 
 ------------------------------------------------
 nospecId :: Id -- See Note [nospecId magic]
@@ -296,19 +314,19 @@ oneShotId = pcRepPolyId oneShotName ty concs info
                        `setArityInfo`      arity
     -- oneShot :: forall {r1 r2} (a :: TYPE r1) (b :: TYPE r2). (a -> b) -> (a -> b)
     ty  = mkInfForAllTys  [ runtimeRep1TyVar, runtimeRep2TyVar ] $
-          mkSpecForAllTys [ openAlphaTyVar, openBetaTyVar ]      $
+          mkSpecForAllTys [ rrPolyTyVar1, rrPolyTyVar2 ]      $
           mkVisFunTyMany fun_ty fun_ty
-    fun_ty = mkVisFunTyMany openAlphaTy openBetaTy
-    [body, x] = mkTemplateLocals [fun_ty, openAlphaTy]
+    fun_ty = mkVisFunTyMany rrPolyTy1 rrPolyTy2
+    [body, x] = mkTemplateLocals [fun_ty, rrPolyTy1]
     x' = setOneShotLambda x  -- Here is the magic bit!
     rhs = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar
-                 , openAlphaTyVar, openBetaTyVar
+                 , rrPolyTyVar1, rrPolyTyVar2
                  , body, x'] $
           Var body `App` Var x'
     arity = 2
 
     concs = mkRepPolyIdConcreteTyVars
-        [((openAlphaTy, mkArgPos 2 Top), runtimeRep1TyVar)]
+              [((rrPolyTy1, mkArgPos 2 Top), runtimeRep1TyVar)]
 
 ----------------------------------------------------------------------
 {- Note [Wired-in Ids for rebindable syntax]
@@ -340,20 +358,20 @@ leftSectionId = pcRepPolyId leftSectionName ty concs info
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
                        `setArityInfo`      arity
     ty  = mkInfForAllTys  [runtimeRep1TyVar,runtimeRep2TyVar, multiplicityTyVar1] $
-          mkSpecForAllTys [openAlphaTyVar,  openBetaTyVar]    $
+          mkSpecForAllTys [rrPolyTyVar1,  rrPolyTyVar2]    $
           exprType body
-    [f,x] = mkTemplateLocals [mkVisFunTy mult openAlphaTy openBetaTy, openAlphaTy]
+    [f,x] = mkTemplateLocals [mkVisFunTy mult rrPolyTy1 rrPolyTy2, rrPolyTy1]
 
     mult = mkTyVarTy multiplicityTyVar1 :: Mult
     xmult = setIdMult x mult
 
     rhs  = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar, multiplicityTyVar1
-                  , openAlphaTyVar,   openBetaTyVar   ] body
+                  , rrPolyTyVar1,   rrPolyTyVar2   ] body
     body = mkLams [f,xmult] $ App (Var f) (Var xmult)
     arity = 2
 
     concs = mkRepPolyIdConcreteTyVars
-            [((openAlphaTy, mkArgPos 2 Top), runtimeRep1TyVar)]
+            [((rrPolyTy1, mkArgPos 2 Top), runtimeRep1TyVar)]
 
 -- See Note [Left and right sections] in GHC.Rename.Expr
 -- See Note [Wired-in Ids for rebindable syntax]
@@ -369,26 +387,26 @@ rightSectionId = pcRepPolyId rightSectionName ty concs info
                        `setArityInfo`      arity
     ty  = mkInfForAllTys  [runtimeRep1TyVar,runtimeRep2TyVar,runtimeRep3TyVar
                           , multiplicityTyVar1, multiplicityTyVar2 ] $
-          mkSpecForAllTys [openAlphaTyVar,  openBetaTyVar,   openGammaTyVar ]  $
+          mkSpecForAllTys [rrPolyTyVar1, rrPolyTyVar2, rrPolyTyVar3]  $
           exprType body
     mult1 = mkTyVarTy multiplicityTyVar1
     mult2 = mkTyVarTy multiplicityTyVar2
 
-    [f,x,y] = mkTemplateLocals [ mkScaledFunTys [ Scaled mult1 openAlphaTy
-                                                , Scaled mult2 openBetaTy ] openGammaTy
-                               , openAlphaTy, openBetaTy ]
+    [f,x,y] = mkTemplateLocals [ mkScaledFunTys [ Scaled mult1 rrPolyTy1
+                                                , Scaled mult2 rrPolyTy2 ] rrPolyTy3
+                               , rrPolyTy1, rrPolyTy2 ]
     xmult = setIdMult x mult1
     ymult = setIdMult y mult2
     rhs  = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep3TyVar
                   , multiplicityTyVar1, multiplicityTyVar2
-                  , openAlphaTyVar,   openBetaTyVar,    openGammaTyVar ] body
+                  , rrPolyTyVar1, rrPolyTyVar2, rrPolyTyVar3 ] body
     body = mkLams [f,ymult,xmult] $ mkVarApps (Var f) [xmult,ymult]
     arity = 3
 
     concs =
       mkRepPolyIdConcreteTyVars
-        [ ((openAlphaTy, mkArgPos 3 Top), runtimeRep1TyVar)
-        , ((openBetaTy , mkArgPos 2 Top), runtimeRep2TyVar)]
+        [ ((rrPolyTy1, mkArgPos 3 Top), runtimeRep1TyVar)
+        , ((rrPolyTy2, mkArgPos 2 Top), runtimeRep2TyVar)]
 
 --------------------------------------------------------------------------------
 
@@ -521,55 +539,55 @@ Implementing 'lazy' is a bit tricky:
 
 Note [noinlineId magic]
 ~~~~~~~~~~~~~~~~~~~~~~~
-'noinline' is used to make sure that a function f is never inlined,
-e.g., as in 'noinline f x'.  We won't inline f because we never inline
-lone variables (see Note [Lone variables] in GHC.Core.Unfold
+'noinline' is used to make sure that a function f is never inlined, e.g
+   noinline f x
+   noinline (f x)
+Both of these will work.  Here are the moving parts:
 
-You might think that we could implement noinline like this:
-   {-# NOINLINE #-}
-   noinline :: forall a. a -> a
-   noinline x = x
+* `noinline` is magic Id (see Note [magicIds]), whose wired-in behaviour is
+  defined in this module,  GHC.Builtin.WiredIn.Ids.
 
-But actually we give 'noinline' a wired-in name for three distinct reasons:
+* In the Simplifier, see the `isNoInlineId` case of `simplOutId`.
+  When we encounter    noinline (f e1 e2) e3 e4:
+  * We switch off inlining before simplifying `f` (#18995)
+  * We slide `e3` and `e4` under the `noinline` to give
+         noinline (f e1 e2 e3 e4)
+    See wrinkle (NOI1)
 
-1. We don't want to leave a (useless) call to noinline in the final program,
-   to be executed at runtime. So we have a little bit of magic to
-   optimize away 'noinline' after we are done running the simplifier.
-   This is done in GHC.CoreToStg.Prep.cpeApp.
-
-2. 'noinline' sometimes gets inserted automatically when we serialize an
-   expression to the interface format, in GHC.CoreToIface.toIfaceVar.
-   See Note [Inlining and hs-boot files] in GHC.CoreToIface
-
-3. Given foo :: Eq a => [a] -> Bool, the expression
-     noinline foo x xs
-   where x::Int, will naturally desugar to
-      noinline @Int (foo @Int dEqInt) x xs
-   But now it's entirely possible that (foo @Int dEqInt) will inline foo,
-   since 'foo' is no longer a lone variable -- see #18995
-
-   Solution: in the desugarer, rewrite
-      noinline (f x y)  ==>  noinline f x y
-   This is done in the `noinlineId` case of `GHC.HsToCore.Expr.ds_app_var`
-   This is only needed for noinlineId, not noInlineConstraintId (wrinkle
-   (W1) below), because the latter never shows up in user code.
+* In GHC.CoreToStg.Prep.cpe_app, we discard the `noinline`, so that
+  there is no runtime overhead.
 
 Wrinkles
 
-(W1) Sometimes case (2) above needs to apply `noinline` to a type of kind
+(NOI1) It's very important to have
+            noinline (f e1 e2)      -- `f` visibly applied
+       and NOT
+            noinline f e1 e2        -- `f` is not applied
+       Because we want
+         * Strictness                (#18396, #23911, #16588)
+         * Type-class specialisation (#27724)
+         * Rewrite rules
+       all to work, and they won't if `f` isn't applied to anything
+
+(NOI2) `noinline` needs to apply to unboxed types, so that
+          noinline (f x y)
+   works even if `f` happens to return Int#.  So
+     noinline :: forall (r::RuntimeRep) (a::TYPE r). a -> a
+
+(NOI3) Very trickily, 'noinline' sometimes gets inserted automatically when we
+   serialize an expression to the interface format, in `GHC.CoreToIface.toIfaceVar`.
+   See Note [Inlining and hs-boot files] in GHC.CoreToIface
+
+(NOI4) Sometimes case (NOI3) needs to apply `noinline` to a type of kind
      Constraint; e.g.
                     noinline @(Eq Int) $dfEqInt
-     We don't have type-or-kind polymorphism, so we simply have two `inline`
-     Ids, namely `noinlineId` and `noinlineConstraintId`.
+     We don't have type-or-constraint polymorphism, so we simply have two
+     `inline` Ids, namely `noinlineId` and `noinlineConstraintId`:
 
-(W2) Note that noinline as currently implemented can hide some simplifications
-     since it hides strictness from the demand analyser. Specifically, the
-     demand analyser will treat 'noinline f x' as lazy in 'x', even if the
-     demand signature of 'f' specifies that it is strict in its argument. We
-     considered fixing this this by adding a special case to the demand
-     analyser to address #16588. However, the special case seemed like a large
-     and expensive hammer to address a rare case and consequently we rather
-     opted to use a more minimal solution.
+       noinline           :: forall (r::RuntimeRep) (a::TYPE r).       a -> a
+       noinlineConstraint :: forall (r::RuntimeRep) (a::CONSTRAINT r). a => a
+
+     Tiresome but simple.
 
 Note [nospecId magic]
 ~~~~~~~~~~~~~~~~~~~~~

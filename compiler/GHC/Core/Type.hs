@@ -2686,7 +2686,7 @@ typeKind ty@(ForAllTy {})
 
 ---------------------------------------------
 
-sORTKind_maybe :: Kind -> Maybe (TypeOrConstraint, Type)
+sORTKind_maybe :: Kind -> Maybe (TypeOrConstraint, RuntimeRepType)
 -- Sees if the argument is of form (TYPE rep) or (CONSTRAINT rep)
 -- and if so returns which, and the runtime rep
 --

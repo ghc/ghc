@@ -60,8 +60,8 @@ import GHC.Types.Tickish
 import GHC.Types.Var    ( isTyCoVar )
 
 import GHC.Builtin.WiredIn.Prim( realWorldStatePrimTy )
-import GHC.Builtin.KnownKeys( runRWKey, seqHashKey, noinlineIdKey )
-import GHC.Builtin.WiredIn.Ids( seqId )
+import GHC.Builtin.KnownKeys( runRWKey, seqHashKey )
+import GHC.Builtin.WiredIn.Ids( seqId, getNoinlineId, isNoinlineId )
 
 import qualified GHC.Data.List.Infinite as Inf
 import GHC.Data.Maybe   ( isNothing, orElse, mapMaybe )
@@ -2369,8 +2369,8 @@ simplOutId env fun cont
              call' = mkApps (Var fun) [mkTyArg rr', mkTyArg new_runrw_res_ty, arg']
        ; rebuild_go env call' outer_cont }
 
-simplOutId env inline_fun cont
-  | inline_fun `hasKey` noinlineIdKey
+simplOutId env noinline_fun cont
+  | isNoinlineId noinline_fun
   , ApplyToTy  { sc_cont = cont1 } <- cont
   , ApplyToTy  { sc_cont = cont2 } <- cont1
   , ApplyToVal { sc_cont = cont3, sc_arg = the_call, sc_cast = arg_mco
@@ -2386,10 +2386,12 @@ simplOutId env inline_fun cont
        ; let call_env = updMode updModeForNoInline $
                         arg_se `setInScopeFromE` env
        ; (floats1, call') <- simplExprF call_env inner_fun call_cont
-       ; let new_call_ty = contHoleType rest_cont
-             noinline_expr = Var inline_fun `App` Type (getRuntimeRep new_call_ty)
-                                            `App` Type new_call_ty
-                                            `App` mkCastMCo call' arg_mco
+       ; let new_call_ty  = contHoleType rest_cont
+             (new_noinline_fun, rep) = getNoinlineId new_call_ty
+             noinline_expr = Var new_noinline_fun
+                             `App` Type rep
+                             `App` Type new_call_ty
+                             `App` mkCastMCo call' arg_mco
        ; (floats2, res) <- rebuild env noinline_expr rest_cont
        ; return (floats2 `addFloats` floats1 , res) }
 
