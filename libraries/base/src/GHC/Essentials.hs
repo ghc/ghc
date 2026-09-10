@@ -1,6 +1,9 @@
 {-# LANGUAGE MagicHash, Trustworthy, RankNTypes, CPP #-}
 {-# OPTIONS_HADDOCK hide #-}
+
+#if __GLASGOW_HASKELL__ >= 1001
 {-# OPTIONS_GHC -fdefines-known-key-names #-} -- See Note [JS/WASM primitives known-keys for other targets]
+#endif
 
 -- |
 --

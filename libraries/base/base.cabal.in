@@ -308,11 +308,9 @@ Library
 
     other-modules:
         Data.List.NubOrdSet
+        GHC.Essentials
         System.CPUTime.Unsupported
         System.CPUTime.Utils
-    if impl(ghc >= 10.1)
-      other-modules:
-        GHC.Essentials
     if os(windows)
       other-modules:
         System.CPUTime.Windows
