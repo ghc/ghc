@@ -782,16 +782,26 @@ classOpSize :: UnfoldingOpts -> Class -> [Id] -> [CoreExpr] -> ExprSize
 classOpSize _opts _cls _top_args []
   = sizeZero   -- A non-applied classop
 classOpSize opts cls top_args (dict_arg:other_val_args)
-  = SizeIs size (arg_discount dict_arg) 0
+  = SizeIs size dict_arg_discount 0
   where
-    size | isUnaryClass cls = 0    -- See (UCM4) in Note [Unary class magic] in GHC.Core.TyCon
-         | otherwise        = 20 + (10 * length other_val_args)
+    -- See (UCM4) in Note [Unary class magic] in GHC.Core.TyCon
+    op_app_size = if isUnaryClass cls then 0 else 20
+
+    -- Size penalty for applying the extracted class method to it's
+    -- arguments.
+    method_app_size
+      | null other_val_args = 0
+      | otherwise           = callSize (length other_val_args) 0
+
+    size = op_app_size + method_app_size
 
     -- If the class op is scrutinising a lambda bound dictionary then
     -- give it a discount, to encourage the inlining of this function
-    arg_discount (Cast arg _co)                    = arg_discount arg
-    arg_discount (Var dict) | dict `elem` top_args = unitBag (dict, dict_discount)
-    arg_discount _                                 = emptyBag
+    dict_arg_discount = case getIdFromTrivialExpr_maybe dict_arg of
+      Nothing -> emptyBag
+      Just dict
+        | dict `elem` top_args -> unitBag (dict, dict_discount)
+        | otherwise -> emptyBag
 
     -- If we have (class-op d arg1 .. argn) then it's super-good to inline
     -- to expose `d`; not only can we do the dictionary selection

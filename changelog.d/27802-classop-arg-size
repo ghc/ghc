@@ -1,0 +1,5 @@
+section: compiler
+synopsis: For code like `m x y z` where m is a class method of a unary type class
+  we now account (again) for the size of applying the x/y/z arguments.
+mrs: !16675
+issues: #27802

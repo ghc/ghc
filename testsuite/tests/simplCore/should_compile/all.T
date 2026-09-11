@@ -618,3 +618,8 @@ test('T27556', [only_ways('ghci'), extra_hc_opts('-O -fno-unoptimized-core-for-i
 test('T27749',
      multiline_grep_errmsg(r'ordering\n.*\n(\s+src<[^>]*>\n)+'),
      compile, ['-O -g3 -ddump-simpl -dsuppress-uniques'])
+
+# Check that we account for the size of arguments x1..xn when calculating size
+# of expressions like `op d x1 ... xn`  See #27802.
+test('T27802', [grep_errmsg(r'Inlining done: T27802\.apply')], compile,
+     ['-O -fno-specialise -ddump-inlinings -dsuppress-uniques'])
