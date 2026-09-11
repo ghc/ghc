@@ -1,0 +1,5 @@
+section: compiler
+issues: #27818
+mrs: !16675
+synopsis:
+  Fixed a bug that caused newtypes and cost centres to affect inlining decisions.

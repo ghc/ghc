@@ -1,0 +1,11 @@
+section: compiler
+issues: #27802
+mrs: !16675
+synopsis:
+  Account for arguments applied to unary class methods when computing unfolding size.
+description: {
+  Due to a bug we considered the application of arguments to a unary class method free
+  during expression size calculation. We now accurately calculate the discount again.
+
+  This might make some functions heavy on single-class method use no longer inline.
+}

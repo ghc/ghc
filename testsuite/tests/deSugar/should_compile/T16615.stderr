@@ -9,7 +9,7 @@ g :: Int -> Bool
 [LclIdX,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [0] 120 10}]
+         Guidance=IF_ARGS [0] 140 10}]
 g = \ (i :: Int) ->
       case ==
              @Int GHC.Internal.Classes.$fEqInt i (GHC.Internal.Types.I# 0#)
@@ -23,7 +23,7 @@ f [Occ=LoopBreaker] :: Int -> Bool
 [LclIdX,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [0] 120 10}]
+         Guidance=IF_ARGS [0] 140 10}]
 f = \ (i :: Int) ->
       case ==
              @Int GHC.Internal.Classes.$fEqInt i (GHC.Internal.Types.I# 0#)

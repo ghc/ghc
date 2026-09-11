@@ -9,6 +9,12 @@
 {-# LANGUAGE TypeOperators       #-}
 
 {-# OPTIONS_GHC -flate-specialise -O2 #-}
+-- The purpose of this test it to ensure we get a nice recursive loop inside main.
+-- Where otherwise we would allocate a intermediate tuple if we fail to inline a join
+-- point (#25723).
+-- As unfolding guidance changed the join point never materialized so we use a
+-- different threshold to ensure we still test the expect behaviour.
+{-# OPTIONS_GHC -funfolding-use-threshold=120 #-}
 
 module Main (main) where
 

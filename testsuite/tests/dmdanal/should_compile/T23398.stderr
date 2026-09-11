@@ -10,7 +10,7 @@ foo :: forall a. PairDict a => a -> a -> String
  Str=<SP(SP(1C(1,C(1,L)),A),SP(A,1C(1,L),A))><L><L>,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [90 0 0] 180 0}]
+         Guidance=IF_ARGS [90 0 0] 210 0}]
 foo
   = \ (@a) ($dCTuple2 :: PairDict a) (eta :: a) (eta1 :: a) ->
       case ==

@@ -19,7 +19,7 @@ F11.fib1 = GHC.Internal.Bignum.Integer.IS 0#
 
 -- RHS size: {terms: 54, types: 27, coercions: 0, joins: 0/5}
 fib :: forall {t1} {t2}. (Eq t1, Num t1, Num t2) => t1 -> t2
-[GblId, Arity=4, Str=<SP(SC(S,C(1,L)),A)><LP(A,LC(L,C(1,L)),A,A,A,A,L)><LP(LC(S,C(1,L)),A,A,A,A,A,MC(1,L))><L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [180 450 180 0] 480 0}]
+[GblId, Arity=4, Str=<SP(SC(S,C(1,L)),A)><LP(A,LC(L,C(1,L)),A,A,A,A,L)><LP(LC(S,C(1,L)),A,A,A,A,A,MC(1,L))><L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [180 450 180 0] 570 0}]
 fib
   = \ (@t) (@t1) ($dEq :: Eq t) ($dNum :: Num t) ($dNum1 :: Num t1) (eta :: t) ->
       let {
@@ -105,7 +105,7 @@ F11.f11f1 = \ (y :: Integer) -> GHC.Internal.Bignum.Integer.integerAdd F11.f11_x
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
 f11f :: forall {p}. p -> Integer -> Integer
 [GblId, Arity=2, Str=<A><SL>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
-f11f = \ (@p) _ [Occ=Dead] -> F11.f11f1
+f11f = \ (@p) (z [Occ=Dead] :: p) -> F11.f11f1
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 F11.f5 :: Integer
