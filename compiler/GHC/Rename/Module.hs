@@ -2820,7 +2820,7 @@ findSplice ds = addl emptyRdrGroup ds
 addl :: HsGroup GhcPs -> [LHsDecl GhcPs]
      -> RnM (HsGroup GhcPs, Maybe (SpliceDecl GhcPs, [LHsDecl GhcPs]))
 -- This stuff reverses the declarations (again) but it doesn't matter
-addl gp []           = return (gp, Nothing)
+addl gp []           = return (finish_group gp, Nothing)
 addl gp (L l d : ds) = add gp l d ds
 
 
@@ -2844,7 +2844,7 @@ add gp loc (SpliceD _ splice@(SpliceDecl _ _ flag)) ds
                             $ setSrcSpan (locA loc)
                             $ failWith badImplicitSplice }
 
-       ; return (gp, Just (splice, ds)) }
+       ; return (finish_group gp, Just (splice, ds)) }
   where
     badImplicitSplice :: TcRnMessage
     badImplicitSplice = TcRnTHError (THSyntaxError BadImplicitSplice)
@@ -2942,10 +2942,31 @@ add_kisig d [] = [TyClGroup { group_ext    = noExtField
 add_kisig d (tycls@(TyClGroup { group_kisigs = kisigs }) : rest)
   = tycls { group_kisigs = d : kisigs } : rest
 
+-- CQ[add-bind-cons]
+-- Q: Why cons here when the binds must end up in source order?
+-- A~ `bs ++ [b]` per declaration is O(n^2) in the number of top-level
+--    bindings and forces an n-deep chain of `++` thunks in rnSrcDecls;
+--    finish_group restores source order with one reverse.
 add_bind :: LHsBind a -> HsValBinds a -> HsValBinds a
-add_bind b (ValBinds x bs) = ValBinds x (bs ++ [VbBind b])
+add_bind b (ValBinds x bs) = ValBinds x (VbBind b : bs)
 add_bind _ (XValBindsLR {})     = panic "GHC.Rename.Module.add_bind"
 
 add_sig :: LSig (GhcPass a) -> HsValBinds (GhcPass a) -> HsValBinds (GhcPass a)
 add_sig s (ValBinds x bs) = ValBinds x (VbSig s:bs)
 add_sig _ (XValBindsLR {})     = panic "GHC.Rename.Module.add_sig"
+
+-- CQ[finish-group-order]
+-- Q: Why this order (sigs reversed, then binds in source order) rather
+--    than plain source order, and why touch hs_valds only?
+-- A~ It is exactly the layout the old snoc/cons code produced, so no
+--    downstream output changes. Plain source order (`reverse vbs`) is
+--    simpler but changes 10 expected outputs: duplicate-signature errors
+--    report a different "first" location, -ddump-splices lists splices in
+--    source order, and unique-dependent names shift (T15360b,
+--    DsSpecPragmas, and T12603 via ghc-internal). The other group lists
+--    have always been reversed, see the comment on addl.
+finish_group :: HsGroup GhcPs -> HsGroup GhcPs
+finish_group gp@(HsGroup { hs_valds = ValBinds x vbs })
+  = gp { hs_valds = ValBinds x (map VbSig sigs ++ map VbBind (reverse binds)) }
+  where (binds, sigs) = val_binds_and_sigs vbs
+finish_group gp = gp
