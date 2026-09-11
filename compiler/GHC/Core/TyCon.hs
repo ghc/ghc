@@ -1517,7 +1517,7 @@ There are a number of wrinkles
    in GHC.Core.Utils.  In the utility funcion `app_ok` we need a special
    case for the DFunIds; they generally terminate, but not for unary classes.
 
-(UMC4) To avoid regressions, in Core we want to remember that
+(UCM4) To avoid regressions, in Core we want to remember that
              (MkUC x) is really just  x
              (op d)   is really just  d
     We account for this in several places:
@@ -1532,20 +1532,11 @@ There are a number of wrinkles
       always-inline (MkUC op), even into a boring context. See (IB6)
       in Note [inlineBoringOk]
 
-(UCM5) `GHC.Core.Unfold.Make.mkDFunUnfolding` builds a `DFunUnfolding` for
-   non-unary classes, but just an /ordinary/ unfolding for unary classes.
-       instance Num a => Num [a] where { .. }       -- (I1)
-       instance UC a => UC [a] where { op = $cop }  -- (I2)
-   From (I1) we get
-       $fNumList = /\a \(d:Num a). MkNum (..) (..) (..)
-         -- $fNumList has a DFunUnfolding
-    But from (I2) we get
-       $fUCList = /\a (d:UC a). MkUC ($cop a d)
-       -- $fUCList has a regular CoreUnfolding
+(UCM5) We used to try using regular unfoldings for unary class DFuns. This turned
+  out rather brittle. There are quite a few special cases across GHC keying on
+  wether or not a unfolding is a dfun.
 
-    Why?  Because we can safely inline $fUCList without code-size blow-up.
-    Just one less indirection. It'd probably work ok with a DFunUnfolding;
-    and it'd add another case for (UCM4) to spot.
+  See also #27750 where this caused a compile time blowup.
 
 (UCM6) In the constraint solver, when constructing evidence for a unary class
     (e.g. implicit parameters, withDict) be careful to use
