@@ -335,6 +335,10 @@ isValFun :: CoreExpr -> Bool
 -- one top-level value lambda
 isValFun (Lam b e) | isRuntimeVar b = True
                    | otherwise      = isValFun e
+-- A tick can be code which *can* change the runtime semantics here.
+-- But we want to ignore it anyway. See Note [Ticks and Cast should not impact unfolding guidance]
+isValFun (Tick _t e)                = isValFun e
+isValFun (Cast e _co)               = isValFun e
 isValFun _                          = False
 
 calcUnfoldingGuidance
@@ -669,6 +673,11 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
           is_inline_scrut (Var v) =
             isUnliftedType (idType v)
               -- isUnliftedType is OK here: scrutinees have a fixed RuntimeRep (search for FRRCase)
+          -- Even if this makes the check technically wrong we want to
+          -- look through ticks here.
+          -- See Note [Ticks and Cast should not impact unfolding guidance]
+          is_inline_scrut (Tick _t e)  = is_inline_scrut e
+          is_inline_scrut (Cast e _co) = is_inline_scrut e
           is_inline_scrut scrut
               | (Var f, _) <- collectArgs scrut
                 = case idDetails f of
@@ -709,7 +718,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
            FCallId _                     -> sizeN (callSize (length val_args) voids)
            DataConWorkId dc              -> conSize    dc (length val_args)
            PrimOpId op _                 -> primOpSize op (length val_args)
-           ClassOpId cls _               -> classOpSize opts cls top_args val_args
+           ClassOpId cls _               -> classOpSize opts cls top_args val_args voids
            _ | fun `hasKey` buildIdKey   -> buildSize
              | fun `hasKey` augmentIdKey -> augmentSize
              | otherwise                 -> funSize opts top_args fun (length val_args) voids
@@ -761,9 +770,11 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
     -- and typePrimRep will crash
     isZeroBitId id = not (isJoinId id) && isZeroBitTy (idType id)
 
-    isZeroBitExpr (Var id)   = isZeroBitId id
-    isZeroBitExpr (Tick _ e) = isZeroBitExpr e
-    isZeroBitExpr _          = False
+    -- [Ticks and Cast should not impact unfolding guidance]
+    isZeroBitExpr (Var id)     = isZeroBitId id
+    isZeroBitExpr (Tick _t e)  = isZeroBitExpr e
+    isZeroBitExpr (Cast e _co) = isZeroBitExpr e
+    isZeroBitExpr _            = False
 
 -- | Finds a nominal size of a string literal.
 litSize :: Literal -> Int
@@ -777,21 +788,29 @@ litSize _other = 0    -- Must match size of nullary constructors
                       -- Key point: if  x |-> 4, then x must inline unconditionally
                       --            (eg via case binding)
 
-classOpSize :: UnfoldingOpts -> Class -> [Id] -> [CoreExpr] -> ExprSize
+classOpSize :: UnfoldingOpts -> Class -> [Id] -> [CoreExpr] -> Int -> ExprSize
 -- See (IA1) in Note [Interesting arguments] in GHC.Core.Opt.Simplify.Utils
-classOpSize _opts _cls _top_args []
+classOpSize _opts _cls _top_args [] _voids
   = sizeZero   -- A non-applied classop
-classOpSize opts cls top_args (dict_arg:other_val_args)
-  = SizeIs size (arg_discount dict_arg) 0
+classOpSize opts cls top_args (dict_arg:other_val_args) voids
+  = SizeIs size dict_arg_discount 0
   where
-    size | isUnaryClass cls = 0    -- See (UCM4) in Note [Unary class magic] in GHC.Core.TyCon
-         | otherwise        = 20 + (10 * length other_val_args)
+    -- See (UCM4) in Note [Unary class magic] in GHC.Core.TyCon
+    op_app_size = if isUnaryClass cls then 0 else 20
+
+    -- Size penalty for applying the extracted class method to it's
+    -- arguments.
+    method_app_size = callSize (length other_val_args) voids
+
+    size = op_app_size + method_app_size
 
     -- If the class op is scrutinising a lambda bound dictionary then
     -- give it a discount, to encourage the inlining of this function
-    arg_discount (Cast arg _co)                    = arg_discount arg
-    arg_discount (Var dict) | dict `elem` top_args = unitBag (dict, dict_discount)
-    arg_discount _                                 = emptyBag
+    dict_arg_discount = case getIdFromTrivialExpr_maybe dict_arg of
+      Nothing -> emptyBag
+      Just var
+        | var `elem` top_args -> unitBag (var, dict_discount)
+        | otherwise -> emptyBag
 
     -- If we have (class-op d arg1 .. argn) then it's super-good to inline
     -- to expose `d`; not only can we do the dictionary selection
@@ -1051,6 +1070,23 @@ In a function application (f a b)
     get a saturated application)
 
 Code for manipulating sizes
+
+Note [Ticks and Cast should not impact unfolding guidance]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to ignore ticks and casts when
+computing unfolding guidance. The reason is simple:
+
+We want inlining to be robust if a user changes a type alias
+to a newtype, if the code is otherwise the same.
+
+Similarly we want inlining to behave the same for a core expression
+(<tick> e) as it does for `e`.
+This is **independent** of the kind of tick we are dealing with.
+Even for ticks that represent code at runtime we generally want
+to inline as-if no tick is present. This way profiled code will
+be closer to non-profiled code, which leads to more accurate profiles.
+
+So we take care to look through Cast/Ticks wherever possible.
 -}
 
 -- | The size of a candidate expression for unfolding
