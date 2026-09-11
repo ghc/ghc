@@ -42,7 +42,7 @@ import GHC.Core.Utils
 import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Core.Class( Class )
-import GHC.Core.Predicate( isUnaryClass )
+import GHC.Core.Predicate( isUnaryClass, isDictId )
 
 import GHC.Types.Id
 import GHC.Types.Literal
@@ -782,7 +782,7 @@ classOpSize :: UnfoldingOpts -> Class -> [Id] -> [CoreExpr] -> ExprSize
 classOpSize _opts _cls _top_args []
   = sizeZero   -- A non-applied classop
 classOpSize opts cls top_args (dict_arg:other_val_args)
-  = SizeIs size (dict_arg_discount dict_arg) 0
+  = SizeIs size dict_arg_discount 0
   where
     -- See (UCM4) in Note [Unary class magic] in GHC.Core.TyCon
     op_app_size = if isUnaryClass cls then 0 else 20
@@ -797,8 +797,8 @@ classOpSize opts cls top_args (dict_arg:other_val_args)
     -- give it a discount, to encourage the inlining of this function
     dict_arg_discount = case getIdFromTrivialExpr_maybe dict_arg of
       Nothing -> emptyBag
-      Just var
-        | var `elem` top_args = unitBag (dict, dict_discount)
+      Just dict
+        | dict `elem` top_args -> unitBag (dict, dict_discount)
         | otherwise -> emptyBag
 
     -- If we have (class-op d arg1 .. argn) then it's super-good to inline
@@ -808,7 +808,15 @@ classOpSize opts cls top_args (dict_arg:other_val_args)
     -- See the discussion on #26831, esp "Delicate inlining".
     dict_discount
       | null other_val_args = unfoldingDictDiscount opts
-      | otherwise           = unfoldingDictDiscount opts + unfoldingFunAppDiscount opts
+      | otherwise           = unfoldingDictDiscount opts + unfoldingFunAppDiscount opts +
+                                -- Just trying things.
+                                5 * numTopDictArgs
+    numTopDictArgs = (count (isTopArgDict) other_val_args)
+    isTopArgDict expr
+      | Just v <- getIdFromTrivialExpr_maybe expr
+      , v `elem` top_args
+      = isDictId v
+      | otherwise = False
 
 -- | The size of a function call
 callSize
