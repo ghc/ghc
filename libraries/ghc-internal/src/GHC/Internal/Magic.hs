@@ -62,6 +62,13 @@ inline x = x
 -- | The call @noinline f@ arranges that @f@ will not be inlined.
 -- It is removed during CorePrep so that its use imposes no overhead
 -- (besides the fact that it blocks inlining.)
+--
+-- You can write @noinline f e1 e2@, or @noinline (f e1 e2)@, or
+-- even @noinline (f e1) e1@.  In all cases, @f@ is not inlined, but
+-- optimisation of @e1@ and @e2@ is unaffected.
+--
+-- In all cases, type-class specialisation, and demand analysis, and
+-- RULE rewriting, are unaffected.
 noinline :: forall (r :: RuntimeRep) (a :: TYPE r).
             a -> a
 {-# NOINLINE noinline #-}

@@ -949,7 +949,9 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
                                                      <*> go_ty env t1 <*> go_ty env t2
     go_co !env (SymCo co)                 = mkSymCo <$> go_co env co
     go_co !env (TransCo c1 c2)            = mkTransCo <$> go_co env c1 <*> go_co env c2
-    go_co !env (AxiomCo r cos)            = mkAxiomCo r <$> go_cos env cos
+    go_co !env (AxiomCo r cos)            = AxiomCo r <$> go_cos env cos
+                                            -- We could call mkAxiomCo, but it's a no-op,
+                                            -- and doing so builds an extra thunk
     go_co !env (SelCo i co)               = mkSelCo i <$> go_co env co
     go_co !env (LRCo lr co)               = mkLRCo lr <$> go_co env co
     go_co !env (InstCo co arg)            = mkInstCo <$> go_co env co <*> go_co env arg

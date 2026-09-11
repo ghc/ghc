@@ -618,3 +618,5 @@ test('T27556', [only_ways('ghci'), extra_hc_opts('-O -fno-unoptimized-core-for-i
 test('T27749',
      multiline_grep_errmsg(r'ordering\n.*\n(\s+src<[^>]*>\n)+'),
      compile, ['-O -g3 -ddump-simpl -dsuppress-uniques'])
+test('T27724a', [grep_errmsg(r'SPEC')], compile, ['-O -drule-firings'])
+test('T27803', [grep_errmsg(r'SPEC')], compile, ['-O -drule-firings'])

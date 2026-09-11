@@ -1,0 +1,17 @@
+section: compiler
+synopsis: ``noinline`` now works with specialisation and demand analysis
+issues: #18396, #23911, 16588, #27724
+mrs: !16658
+description: {
+  Saying ``(noinline f x)`` previously meant that the call would no longer be
+  type-class specialised, nor would it be recognised as strict, nor would RULEs
+  fire.  Now all of these things work.
+
+  Moreover you can also say ``noinline (f <arg>)`` if you prefer, with the argument
+  inside the ``noinline`` call.  Then ``f`` will not be inlined, but inlining within
+  ``<arg>>`` is unaffected.
+
+  Moreover, previously there was a danger that if ``f`` was defined trivially as
+  ``f = Just`` (say) then it would be inlined anyway, despite the ``noinline``.
+  Now ``noinline`` is fully respected.
+}
