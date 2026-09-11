@@ -55,6 +55,7 @@ import GHC.Types.Literal
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Id
+import GHC.Types.Demand
 import GHC.Types.Id.Info
 import GHC.Types.InlinePragma
 import GHC.Types.Var (VarBndr(Bndr), invisArgConstraintLike, tyVarName)
@@ -275,6 +276,12 @@ noinlineId :: Id -- See Note [noinlineId magic]
 noinlineId = pcMiscPrelId noinlineIdName ty info
   where
     info = noCafIdInfo
+           `setArityInfo`  1
+           `setDmdSigInfo` strict_sig
+
+    -- noinline certainly calls its argument!
+    strict_sig = mkClosedDmdSig [seqDmd] topDiv
+
     -- noinline :: forall r (a :: TYPE r). a -> a
     ty   = mkInfForAllTy runtimeRep1TyVar   $
            mkSpecForAllTys [rrPolyTyVar1] $
