@@ -823,6 +823,8 @@ typedef struct {
       // In the threaded way there is one I/O manager per capability. We have
       // to handle cross-capability I/O op cancellation specially, so we need
       // to know which capability an aiop is being managed on.
+      //
+      // We could probably afford to steal some bits here if needed.
     uint16_t capno;
 
       // This tells us which thing the notify union above contains. It is a
@@ -837,7 +839,30 @@ typedef struct {
       // 3: IOOpOutcomeCancelled: cancelled, no further detail.
     uint16_t outcome: 2;
 
-      // 12 bits going spare!
+      // The I/O operation we are performing. It is a value from enum IOOpCode,
+      // but we don't use the enum type here due to portability concerns for
+      // this C bitfield.
+      //
+      // The size of this field, allows us up to 64 opcodes.
+    uint16_t operation: 6;
+
+      // 6 bits going spare!
+    uint16_t padding: 6;
+
+      // The file descriptor the operation is on. This is used in several I/O
+      // managers to group StgAsyncIOOps by fd. In particular this is needed
+      // for cancelling all wait-notification ops when closing an fd. It is
+      // also handy for logging and debugging.
+      //
+      // Note that it is technically possible to stuff Win32 HANDLEs into here,
+      // but no Win32 I/O manager does this _yet_. See:
+      // https://learn.microsoft.com/en-us/windows/win32/winprog64/interprocess-communication
+      // > 64-bit versions of Windows use 32-bit handles for interoperability.
+      // > When sharing a handle between 32-bit and 64-bit applications, only
+      // > the lower 32 bits are significant, so it is safe to truncate the
+      // > handle (when passing it from 64-bit to 32-bit) or sign-extend the
+      // > handle (when passing it from 32-bit to 64-bit).
+    uint32_t fd;
 
     union {
           // For successful outcomes, this is the result code of the operation.
@@ -849,10 +874,6 @@ typedef struct {
           // For failed outcomes, this is the error code.
         uint32_t error;
     };
-
-        // Round it up to 2 words on 64bit platforms.
-        // This is also space for future extension, without increasing the size.
-    uint32_t padding;
 
       // Note that because we use fixed size Ctypes here then the size in words
       // of this heap object is different on 32bit and 64bit platforms.

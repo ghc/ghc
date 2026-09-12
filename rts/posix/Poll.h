@@ -21,12 +21,12 @@ void freeCapabilityIOManagerPoll(CapIOManager *iomgr);
 
 /* Synchronous I/O and timer operations */
 IOSubmitResult syncIOWaitReadyPoll(CapIOManager *iomgr, StgTSO *tso,
-                                   IOReadOrWrite rw, HsInt fd);
+                                   enum IOReadOrWrite rw, HsInt fd);
 void syncIOCancelPoll(CapIOManager *iomgr, StgTSO *tso);
 
 /* Asynchronous operations */
 IOSubmitResult asyncIOWaitReadyPoll(CapIOManager *iomgr, StgAsyncIOOp *aiop,
-                                    IOReadOrWrite rw, int fd);
+                                    enum IOReadOrWrite rw, int fd);
 void asyncIOCancelPoll(CapIOManager *iomgr, StgAsyncIOOp *aiop);
 
 /* Scheduler operations */

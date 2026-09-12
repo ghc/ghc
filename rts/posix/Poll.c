@@ -172,7 +172,7 @@ void freeCapabilityIOManagerPoll(CapIOManager *iomgr)
 
 /* Used to implement syncIOWaitReady. */
 IOSubmitResult syncIOWaitReadyPoll(CapIOManager *iomgr, StgTSO *tso,
-                                   IOReadOrWrite rw, HsInt fd)
+                                   enum IOReadOrWrite rw, HsInt fd)
 {
     StgAsyncIOOp *aiop;
     aiop = (StgAsyncIOOp *)allocateMightFail(iomgr->cap, sizeofW(StgAsyncIOOp));
@@ -188,7 +188,7 @@ IOSubmitResult syncIOWaitReadyPoll(CapIOManager *iomgr, StgTSO *tso,
 }
 
 IOSubmitResult asyncIOWaitReadyPoll(CapIOManager *iomgr, StgAsyncIOOp *aiop,
-                                    IOReadOrWrite rw, int fd)
+                                    enum IOReadOrWrite rw, int fd)
 {
     if (RTS_UNLIKELY(isFullClosureTable(&iomgr->aiop_table))) {
         bool ok = enlargeTables(iomgr);
@@ -203,9 +203,11 @@ IOSubmitResult asyncIOWaitReadyPoll(CapIOManager *iomgr, StgAsyncIOOp *aiop,
     /* The syncIO wrapper or CMM primop filled in the notify and live fields,
      * we fill the rest.
      */
-    aiop->capno   = iomgr->cap->no;
-    aiop->index   = ix;
-    aiop->outcome = IOOpOutcomeInFlight;
+    aiop->capno     = iomgr->cap->no;
+    aiop->index     = ix;
+    aiop->outcome   = IOOpOutcomeInFlight;
+    aiop->operation = convIOReadOrWriteToIOOpCode(rw);
+    aiop->fd        = fd;
 
     /* Fill in the corresponding entry in the aiop_poll_table */
     iomgr->aiop_poll_table[ix] = (struct pollfd) {
