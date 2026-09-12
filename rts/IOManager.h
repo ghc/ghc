@@ -212,7 +212,19 @@ char * showIOManager(void);
  */
 bool is_io_mng_native_p (void);
 
+/* Values for StgAsyncIOOp.operation.
+ *
+ * Note: this is encoded in 6 bits in StgAsyncIOOp.
+ */
+enum IOOpCode {
+    IOOpCodeWaitRead  = 0,
+    IOOpCodeWaitWrite = 1
+    /* This will be extended, e.g. for Read/Write */
+};
+
 /* Values for StgAsyncIOOp.outcome.
+ *
+ * Note: this is encoded in 2 bits in StgAsyncIOOp.
  */
 enum IOOpOutcome {
     IOOpOutcomeInFlight  = 0,
@@ -314,7 +326,17 @@ void markCapabilityIOManager(evac_fn evac, void *user, CapIOManager *iomgr);
 /* Several code paths are almost identical between read and write paths. In
  * such cases we use a shared code path with an enum to say which we're doing.
  */
-typedef enum { IORead = 0, IOWrite = 1 } IOReadOrWrite;
+enum IOReadOrWrite { IORead = 0, IOWrite = 1 };
+
+INLINE_HEADER enum IOOpCode convIOReadOrWriteToIOOpCode (enum IOReadOrWrite rw)
+{
+    // The codes are compatible:
+    ASSERT((int) IOOpCodeWaitRead  == (int) IORead &&
+           (int) IOOpCodeWaitWrite == (int) IOWrite);
+
+    return (enum IOOpCode) rw;
+}
+
 
 /* Synchronous operations: I/O and delays. As synchronous operations they
  * necessarily operate on threads. The thread is suspended until the operation
@@ -351,7 +373,8 @@ enum IOSubmitResultCodes {
 };
 
 /* Called from CMM primop */
-IOSubmitResult syncIOWaitReady(CapIOManager *iomgr, StgTSO *tso, IOReadOrWrite rw, HsInt fd);
+IOSubmitResult syncIOWaitReady(CapIOManager *iomgr, StgTSO *tso,
+                               enum IOReadOrWrite rw, HsInt fd);
 
 /* Cancel the I/O the TSO is blocked on and add the TSO to the run queue */
 void syncIOCancel(CapIOManager *iomgr, StgTSO *tso);
