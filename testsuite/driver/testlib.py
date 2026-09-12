@@ -22,7 +22,8 @@ import collections.abc
 import subprocess
 
 from testglobals import config, ghc_env, default_testopts, brokens, t, \
-                        TestRun, TestResult, TestOptions, PerfMetric
+                        TestRun, TestResult, TestOptions, PerfMetric, \
+                        TestTiming
 from testutil import strip_quotes, lndir, link_or_copy_file, passed, \
                      failBecause, residency_testing_metrics, \
                      stable_perf_counters, \
@@ -1799,6 +1800,10 @@ async def do_test(name: TestName,
             makefile = re.sub('TOP=.*', 'TOP=%s' % config.top, makefile, count=1)
             dst_makefile.write_text(makefile, encoding='UTF-8')
 
+    # Timed from here so that driver setup (cleanup, mkdir, linking sources)
+    # stays out of the number. pre_cmd counts: tests do real work there.
+    started = time.monotonic()
+
     if opts.pre_cmd:
         stdout_path = in_testdir(name, 'pre_cmd_stdout')
         stderr_path = in_testdir(name, 'pre_cmd_stderr')
@@ -1821,6 +1826,9 @@ async def do_test(name: TestName,
             return
 
     result = await func(*[name,way] + args)
+
+    t.timings.append(TestTiming(name, way, opts.is_stats_test,
+                                time.monotonic() - started))
 
     if opts.expect not in ['pass', 'fail', 'missing-lib']:
         framework_fail(name, way, 'bad expected ' + opts.expect)
@@ -1859,6 +1867,7 @@ async def do_test(name: TestName,
                                 diff=result.diff)
                 t.unexpected_failures.append(tr)
         else:
+            t.expected_failures.append(TestResult(directory, name, result.reason, way))
             t.n_expected_failures += 1
 
 # Make is often invoked with -s, which means if it fails, we get
@@ -3667,6 +3676,26 @@ def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=No
                + repr(len(t.fragile_failures) + len(t.fragile_passes)).rjust(8)
                + ' fragile tests\n'
                + '\n')
+
+    printTimingSummary(t, file)
+
+SLOWEST_TESTS_SHOWN = 25
+
+def printTimingSummary(t: TestRun, file: TextIO) -> None:
+    if not t.timings:
+        return
+    stats = [x for x in t.timings if x.is_stats_test]
+    other = [x for x in t.timings if not x.is_stats_test]
+    def minutes(xs): return sum(x.elapsed for x in xs) / 60
+    file.write('Test time (sum over test cases, not wall clock):\n'
+               + '%8.1f min in %d stats test cases\n' % (minutes(stats), len(stats))
+               + '%8.1f min in %d other test cases\n' % (minutes(other), len(other))
+               + '\n')
+    file.write('Slowest test cases:\n')
+    for x in sorted(t.timings, key=lambda x: x.elapsed, reverse=True)[:SLOWEST_TESTS_SHOWN]:
+        file.write('%8.1f s  %s(%s)%s\n' % (x.elapsed, x.testname, x.way,
+                                             ' [stats]' if x.is_stats_test else ''))
+    file.write('\n')
 
 def printUnexpectedTests(file: TextIO, testInfoss, color=False):
     unexpected = set(result.testname

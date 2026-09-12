@@ -308,6 +308,13 @@ class TestResult:
         self.stderr = stderr
         self.diff = diff
 
+# Wall-clock seconds one (test, way) took, pre_cmd included.
+TestTiming = NamedTuple('TestTiming',
+                        [('testname', TestName),
+                         ('way', WayName),
+                         ('is_stats_test', bool),
+                         ('elapsed', float)])
+
 # A performance metric measured in this test run.
 PerfMetric = NamedTuple('PerfMetric',
                         [('change', MetricChange),
@@ -329,6 +336,7 @@ class TestRun:
        self.framework_warnings = [] # type: List[TestResult]
 
        self.expected_passes = [] # type: List[TestResult]
+       self.expected_failures = [] # type: List[TestResult]
        self.unexpected_passes = [] # type: List[TestResult]
        self.unexpected_failures = [] # type: List[TestResult]
        self.unexpected_stat_failures = [] # type: List[TestResult]
@@ -342,6 +350,7 @@ class TestRun:
        # constants: NewMetric, NoChange, Increase, Decrease.
        # NewMetric happens when the previous git commit has no metric recorded.
        self.metrics = [] # type: List[PerfMetric]
+       self.timings = [] # type: List[TestTiming]
 
 global t
 t = TestRun()

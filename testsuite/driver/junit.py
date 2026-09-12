@@ -5,6 +5,13 @@ import xml.etree.ElementTree as ET
 from testglobals import TestRun
 
 def junit(t: TestRun) -> ET.ElementTree:
+    elapsed = {(x.testname, x.way): x.elapsed for x in t.timings}
+    def testcase(testsuite, tr):
+        attrs = {'classname': tr.way, 'name': '%s(%s)' % (tr.testname, tr.way)}
+        if (tr.testname, tr.way) in elapsed:
+            attrs['time'] = '%.3f' % elapsed[(tr.testname, tr.way)]
+        return ET.SubElement(testsuite, 'testcase', attrs)
+
     testsuites = ET.Element('testsuites')
     testsuite = ET.SubElement(testsuites, 'testsuite',
                               id = "0",
@@ -22,9 +29,7 @@ def junit(t: TestRun) -> ET.ElementTree:
                                   ('failure', 'unexpected pass', t.unexpected_passes),
                                   ('skipped', 'fragile failure', t.fragile_failures)]:
         for tr in group:
-            testcase = ET.SubElement(testsuite, 'testcase',
-                                     classname = tr.way,
-                                     name = '%s(%s)' % (tr.testname, tr.way))
+            tc = testcase(testsuite, tr)
             message = [] # type: List[str]
             if tr.diff:
                 message += ['diff:', '==========', tr.diff]
@@ -35,23 +40,21 @@ def junit(t: TestRun) -> ET.ElementTree:
             if not message:
                 message = [tr.reason]
 
-            result = ET.SubElement(testcase, kind,
+            result = ET.SubElement(tc, kind,
                                    type = res_type,
                                    message = tr.reason)
             result.text = '\n'.join(message)
 
     for tr in t.framework_failures:
-        testcase = ET.SubElement(testsuite, 'testcase',
-                                 classname = tr.way,
-                                 name = '%s(%s)' % (tr.testname, tr.way))
-        result = ET.SubElement(testcase, 'error',
+        tc = testcase(testsuite, tr)
+        result = ET.SubElement(tc, 'error',
                                type = "framework failure",
                                message = tr.reason)
 
-    for tr in t.expected_passes:
-        testcase = ET.SubElement(testsuite, 'testcase',
-                                 classname = tr.way,
-                                 name = '%s(%s)' % (tr.testname, tr.way))
+    # A testcase without a failure/error/skipped child is a pass. Expected
+    # failures and fragile passes are passes by the driver's verdict too.
+    for tr in t.expected_passes + t.expected_failures + t.fragile_passes:
+        testcase(testsuite, tr)
 
     return ET.ElementTree(testsuites)
 
