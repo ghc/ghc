@@ -159,3 +159,8 @@ T6107:
 	"$(TEST_HC)" -c T6107_sym2.s -o T6107_sym2.o -v0
 	"$(TEST_HC)" $(TEST_HC_OPTS) T6107.hs -o T6107 -v0
 	./T6107
+
+T27807:
+	'$(TEST_CC)' $(TEST_CC_OPTS) -c -o T27807.o T27807.s
+	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RTSOPTS) -v0 --make -no-rtsopts-suggestions -no-hs-main -o runner runner.c
+	./runner T27807.o probe

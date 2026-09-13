@@ -1,0 +1,9 @@
+section: rts
+synopsis: Fix AArch64 veneer target for relocations with an addend
+description:
+  The RTS linker would construct invalid relocation veneers on AArch64 if the
+  addend was non-zero, which typically caused SIGILL crashes.
+  This could be triggered by evaluating Template Haskell in a package with a
+  large number of dependencies using a static build of GHC.
+mrs: !16686
+issues: #27807

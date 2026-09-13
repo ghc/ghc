@@ -236,17 +236,21 @@ computeAddend(Section * section, Elf_Rel * rel,
                 // counter reflects the address of the currently
                 // executing instruction.
 
+                // The stub jumps to an absolute address, which should be the
+                // symbol's address plus the addend (S + A).
+                addr_t target = S + A;
+
                 /* need a stub */
                 /* check if we already have that stub */
-                if(findStub(section, (void**)&S, 0)) {
+                if(findStub(section, (void**)&target, 0)) {
                     /* did not find it. Crete a new stub. */
-                    if(makeStub(section, (void**)&S, NULL, 0)) {
+                    if(makeStub(section, (void**)&target, NULL, 0)) {
                         abort(/* could not find or make stub */);
                     }
                 }
 
-                CHECK(0 == (0xffff000000000000 & S));
-                V = S + A - P;
+                CHECK(0 == (0xffff000000000000 & target));
+                V = target - P;
                 CHECK(isInt64(26+2, V)); /* X in range */
             }
             return V;

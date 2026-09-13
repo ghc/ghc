@@ -189,3 +189,13 @@ test('T6107',
       extra_files(['T6107_sym1.s', 'T6107_sym2.s'])
      ],
      makefile_test, ['T6107'])
+
+######################################
+# Test the RTS linker's handling of relocations (with addends) when building
+# veneers. Only architectures that compile the veneer machinery can exercise this.
+test('T27807',
+     [ unless(arch('aarch64'), skip)
+     , unless(opsys('linux'), skip)
+     , extra_files(['runner.c', 'T27807.s'])
+     ],
+     makefile_test, [])
