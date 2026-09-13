@@ -1,0 +1,11 @@
+Group Binary
+  Group Literal
+    Running round trip
+      Passed 1000 iterations
+    Running batch round trip
+      Passed 1000 iterations
+  Group Integer
+    Running round trip
+      Passed 1000 iterations
+    Running SLEB128 encoding
+      Passed 1000 iterations

@@ -1,0 +1,8 @@
+section: compiler
+synopsis: Improved ``.hi`` file encoding resulting in less space used on disk.
+issues: #27808
+mrs: !16683
+description: {
+  This was mostly done by moving from simple pointwise encoding to adding
+  special cases for common cases.
+}

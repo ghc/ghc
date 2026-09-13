@@ -651,16 +651,19 @@ toIfaceApp (Var v) as
 toIfaceApp e as = mkIfaceApps (toIfaceExpr e) as
 
 mkIfaceApps :: IfaceExpr -> [CoreExpr] -> IfaceExpr
-mkIfaceApps f as = foldl' (\f a -> IfaceApp f (toIfaceExpr a)) f as
+-- `mkIfaceApp` is just a smart constructor for the IfaceApp[s] constructors.
+-- See Note [Iface applications] in GHC.Iface.Syntax
+mkIfaceApps f as = mkIfaceApp f (map toIfaceExpr as)
 
 ---------------------
 toIfaceVar :: Id -> IfaceExpr
 toIfaceVar v
     | isBootUnfolding (idUnfolding v)
     = -- See Note [Inlining and hs-boot files]
-      IfaceApp (IfaceApp (IfaceExt noinline_id)
-                         (IfaceType (toIfaceType ty)))
-               (IfaceExt name) -- don't use mkIfaceApps, or infinite loop
+      IfaceApps (IfaceExt noinline_id)
+                [IfaceType (toIfaceType ty), IfaceExt name]
+                -- don't use mkIfaceApps, or infinite loop since it ends up calling
+                -- toIfaceVar indirectly again.
 
     | Just fcall <- isFCallId_maybe v = IfaceFCall fcall (toIfaceType (idType v))
                                       -- Foreign calls have special syntax

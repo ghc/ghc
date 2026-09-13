@@ -393,7 +393,7 @@ unpkUnique u = case unpkUniqueGrimily u of
 isValidKnownKeyUnique :: Unique -> Bool
 isValidKnownKeyUnique u =
     case unpkUniqueGrimily u of
-      (c, x) -> ord c < 0xff && x <= (1 `shiftL` 22)
+      (c, x) -> ord c < 0xff && x < (1 `shiftL` 22)
 
 {-
 ************************************************************************

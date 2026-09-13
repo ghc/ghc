@@ -1073,7 +1073,18 @@ pprIfaceTyConBinders suppress_sig = sep . map go
       where
         ppr_bndr = pprIfaceTvBndr bndr suppress_sig
 
+-- | IfaceBndr shortcuts:
+--
+-- In the vast majority of cases binder multiplicity is `Many` so storing it is
+-- a pure waste of space. Instead of storing (Many, Name, Ty) we simply store
+-- (Name,Ty) in the common case where multiplicity == Many.
 instance Binary IfaceBndr where
+    put_ bh (IfaceIdBndr (mult, name, ty))
+      -- The implicit Many shortcut.
+      | mult == many_ty = do
+            putByte bh 2
+            put_ bh name
+            put_ bh ty
     put_ bh (IfaceIdBndr aa) = do
             putByte bh 0
             put_ bh aa
@@ -1085,8 +1096,11 @@ instance Binary IfaceBndr where
             case h of
               0 -> do aa <- get bh
                       return (IfaceIdBndr aa)
-              _ -> do ab <- get bh
+              1 -> do ab <- get bh
                       return (IfaceTvBndr ab)
+              _ -> do name <- get bh
+                      ty <- get bh
+                      return (IfaceIdBndr (many_ty, name, ty))
 
 instance Binary IfaceOneShot where
     put_ bh IfaceNoOneShot =
