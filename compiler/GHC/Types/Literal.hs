@@ -167,7 +167,7 @@ data LitNumType
   | LitNumWord16  -- ^ @Word16#@ - exactly 16 bits
   | LitNumWord32  -- ^ @Word32#@ - exactly 32 bits
   | LitNumWord64  -- ^ @Word64#@ - exactly 64 bits
-  deriving (Data,Enum,Eq,Ord)
+  deriving (Data,Enum,Eq,Ord,Bounded)
 
 -- | Indicate if a numeric literal type supports negative numbers
 litNumIsSigned :: LitNumType -> Bool
@@ -259,6 +259,38 @@ for more details.
 
 -}
 
+{-
+Note [Binary Literal encoding]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Rather than write `LitNumType` into it's own tag byte we encode it in the
+surplus space of the `Literal` tag space.
+
+This means for `Literal` tag 0 .. 5 are the non-num literals.
+Literals 6 .. (maxBound LitNumType) encode the LitNumType.
+
+We could use the `LitNumType` information to slightly improve the encoding of
+the actual values too. But we just write/read them at Integer for simplicity for
+now.
+-}
+
+-- | The 'Binary' tag byte of @'LitNumber' nt _@.
+--
+-- These continue the tags of the non-numeric 'Literal' constructors. The
+-- mapping is total and part of the interface file format.
+-- See Note [Binary Literal encoding].
+litNumTypeTag :: LitNumType -> Word8
+litNumTypeTag nt =
+  -- 6 .. 16
+  6 + (fromIntegral $ fromEnum nt)
+
+-- | The inverse of 'litNumTypeTag'. 'Nothing' for a tag which isn't the tag
+-- of a numeric literal. See Note [Binary Literal encoding].
+litNumTypeOfTag :: Word8 -> Maybe LitNumType
+litNumTypeOfTag tag
+  | tag >= 6 && tag <= 16
+  = Just (toEnum $ (fromIntegral tag) - 6)
+  | otherwise = Nothing
+
 instance Binary Literal where
     put_ bh (LitChar aa)     = do putByte bh 0; put_ bh aa
     put_ bh (LitString ab)   = do putByte bh 1; put_ bh ab
@@ -269,9 +301,10 @@ instance Binary Literal where
         = do putByte bh 5
              put_ bh aj
              put_ bh fod
+    -- The LitNumType is part of the tag byte.
+    -- See Note [Binary Literal encoding]
     put_ bh (LitNumber nt i)
-        = do putByte bh 6
-             put_ bh nt
+        = do putByte bh (litNumTypeTag nt)
              put_ bh i
     put_ _ lit@(LitRubbish {}) = pprPanic "Binary LitRubbish" (ppr lit)
      -- We use IfaceLitRubbish; see Note [Rubbish literals], item (6)
@@ -296,11 +329,11 @@ instance Binary Literal where
                     aj <- get bh
                     fod <- get bh
                     return (LitLabel aj fod)
-              6 -> do
-                    nt <- get bh
-                    i  <- get bh
-                    return (LitNumber nt i)
-              _ -> pprPanic "Binary:Literal" (int (fromIntegral h))
+              _ | Just nt <- litNumTypeOfTag h
+                -> do i <- get bh
+                      return (LitNumber nt i)
+                | otherwise
+                -> pprPanic "Binary:Literal" (int (fromIntegral h))
 
 instance NFData Literal where
     rnf (LitChar c) = rnf c

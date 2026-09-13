@@ -1446,6 +1446,7 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
     ifTopFreeName (IfaceType (IfaceTyConApp tc _ )) = Just (ifaceTyConName tc)
     ifTopFreeName (IfaceType (IfaceTupleTy s _ ts)) = Just (tupleTyConName s (length (appArgsIfaceTypes ts)))
     ifTopFreeName (IfaceApp f _)                    = ifTopFreeName f
+    ifTopFreeName (IfaceApps f _)                   = ifTopFreeName f
     ifTopFreeName (IfaceExt n)                      = Just n
     ifTopFreeName _                                 = Nothing
 
@@ -1681,6 +1682,9 @@ tcIfaceExpr (IfaceLam (bndr, os) body)
 
 tcIfaceExpr (IfaceApp fun arg)
   = App <$> tcIfaceExpr fun <*> tcIfaceExpr arg
+
+tcIfaceExpr (IfaceApps fun args)
+  = mkApps <$> tcIfaceExpr fun <*> mapM tcIfaceExpr args
 
 tcIfaceExpr (IfaceECase scrut ty)
   = do { scrut' <- tcIfaceExpr scrut

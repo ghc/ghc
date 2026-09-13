@@ -60,6 +60,7 @@ import Text.ParserCombinators.ReadP (readP_to_S)
 import qualified Data.Text as T
 
 import Haddock.Options (Visibility (..))
+import qualified Data.Bits as Bits
 
 data InterfaceFile = InterfaceFile
   { ifLinkEnv :: LinkEnv
@@ -143,7 +144,7 @@ binaryInterfaceMagic = 0xD0Cface
 --
 binaryInterfaceVersion :: Word16
 #if MIN_VERSION_ghc(9,11,0) && !MIN_VERSION_ghc(10,2,0)
-binaryInterfaceVersion = 47
+binaryInterfaceVersion = 48
 
 binaryInterfaceVersionCompatibility :: [Word16]
 binaryInterfaceVersionCompatibility = [binaryInterfaceVersion]
@@ -274,7 +275,7 @@ putName
     do
       (symtab_map, symtab_tbl) <- readIORef symtab_map_ref
       case lookupNameEnv symtab_map name of
-        Just off -> put_ bh (fromIntegral off :: Word32)
+        Just off -> putNameIndex (fromIntegral off :: Word32)
         Nothing -> do
           off <- freshIndex
           let mod' = nameModule name
@@ -283,8 +284,10 @@ putName
           let !symtab_map' = extendNameEnv symtab_map name off
           let !symtab_tbl' = extendModuleEnv symtab_tbl mod' ((off, name):mod_nms)
           writeIORef symtab_map_ref $! (symtab_map', symtab_tbl')
-          put_ bh (fromIntegral off :: Word32)
+          putNameIndex (fromIntegral off)
   where
+    putNameIndex :: Word32 -> IO ()
+    putNameIndex off = put_ bh (off `Bits.shiftL` 1)
     freshIndex :: IO Int
     freshIndex = do
       off <- readFastMutInt symtab_next

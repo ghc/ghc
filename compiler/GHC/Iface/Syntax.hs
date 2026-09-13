@@ -10,7 +10,8 @@ module GHC.Iface.Syntax (
 
         IfaceDecl(..), IfaceFamTyConFlav(..), IfaceClassOp(..), IfaceAT(..),
         IfaceConDecl(..), IfaceConDecls(..), IfaceEqSpec,
-        IfaceExpr(..), IfaceAlt(..), IfaceLetBndr(..), IfaceBinding,
+        IfaceExpr(..), mkIfaceApp,
+        IfaceAlt(..), IfaceLetBndr(..), IfaceBinding,
         IfaceBindingX(..), IfaceMaybeRhs(..), IfaceConAlt(..),
         IfaceIdInfo, IfaceIdDetails(..), IfaceUnfolding(..), IfGuidance(..),
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
@@ -96,8 +97,8 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Binary
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
-                       zipWithEqual )
+import GHC.Utils.Misc( dropList, filterByList, notNull,
+                       unzipWith, zipWithEqual )
 
 import GHC.Data.FastString
 import GHC.Data.BooleanFormula (pprBooleanFormula, isTrue)
@@ -700,6 +701,11 @@ data IfaceExpr
   | IfaceTuple  TupleSort [IfaceExpr]   -- Saturated; type arguments omitted
   | IfaceLam    IfaceLamBndr IfaceExpr
   | IfaceApp    IfaceExpr IfaceExpr
+        -- ^ Application to exactly one argument.
+        -- See Note [Iface applications]
+  | IfaceApps   IfaceExpr [IfaceExpr]
+        -- ^ Application to two or more arguments.
+        -- See Note [Iface applications]
   | IfaceCase   IfaceExpr IfLclName [IfaceAlt]
   | IfaceECase  IfaceExpr IfaceType     -- See Note [Empty case alternatives]
   | IfaceLet    (IfaceBinding IfaceLetBndr) IfaceExpr
@@ -710,6 +716,18 @@ data IfaceExpr
   | IfaceFCall  ForeignCall IfaceType
   | IfaceTick   IfaceTickish IfaceExpr    -- from Tick tickish E
 
+-- | Apply an expression to a (possibly empty) list of arguments, maintaining
+-- the invariants of 'IfaceApp' and 'IfaceApps'.
+-- See Note [Iface applications].
+mkIfaceApp :: IfaceExpr -> [IfaceExpr] -> IfaceExpr
+mkIfaceApp fun args = go fun args
+  where
+    go (IfaceApp f a)   as = go f (a : as)
+    go (IfaceApps f fs) as = go f (fs ++ as)
+
+    go f []  = f
+    go f [a] = IfaceApp f a
+    go f as  = IfaceApps f as
 
 data IfaceTickish
   = IfaceHpcTick    Module Int               -- from HpcTick x
@@ -745,6 +763,30 @@ data IfaceTopBndrInfo = IfLclTopBndr IfLclName IfaceType IfaceIdInfo IfaceIdDeta
 data IfaceMaybeRhs = IfUseUnfoldingRhs | IfRhs IfaceExpr
 
 {-
+Note [Iface applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+A Core application chain (f a1 a2 ... an) could be represented by a chain of
+n nested IfaceApp nodes like Core does. However this is generally a worse
+representation for *serialization* which is the main purpose of the Iface type.
+
+So we keep the single argument constructor as it's fairly common, and add one
+to represent multiple arguments:
+
+  * IfaceApp  f a        -- exactly one argument
+  * IfaceApps f [a1,..]  -- two or more arguments
+
+with two invariants:
+
+  (1) The argument list of an IfaceApps has at least two elements.
+      (A one-argument application is an IfaceApp, and a zero-argument
+      "application" is just the head itself.)
+
+  (2) The head of an IfaceApp or IfaceApps is never itself an IfaceApp or
+      IfaceApps: application chains are fully flattened.
+
+The smart constructor 'mkIfaceApp' establishes both invariants; producers
+should use it rather than building IfaceApps directly.
+
 Note [Empty case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In Iface syntax an IfaceCase does not record the types of the alternatives,
@@ -1797,7 +1839,8 @@ pprIfaceExpr _ (IfaceLitRubbish tc r)
     <> (case tc of { TypeLike -> empty; ConstraintLike -> text "[c]" })
     <> parens (ppr r)
 
-pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
+pprIfaceExpr add_par app@(IfaceApp _ _)  = add_par (pprIfaceApp app [])
+pprIfaceExpr add_par app@(IfaceApps _ _) = add_par (pprIfaceApp app [])
 
 pprIfaceExpr add_par i@(IfaceLam _ _)
   = add_par (sep [char '\\' <+> sep (map pprIfaceLamBndr bndrs) <+> arrow,
@@ -1869,9 +1912,13 @@ pprIfaceTickish (IfaceBreakpoint (BreakpointId m ix) fvs)
 
 ------------------
 pprIfaceApp :: IfaceExpr -> [SDoc] -> SDoc
-pprIfaceApp (IfaceApp fun arg) args = pprIfaceApp fun $
+-- NB: IfaceApps must print exactly like the equivalent IfaceApp chain, so
+-- that --show-iface output does not depend on which one the producer emitted.
+pprIfaceApp (IfaceApp fun arg)   args = pprIfaceApp fun $
                                           nest 2 (pprParendIfaceExpr arg) : args
-pprIfaceApp fun                args = sep (pprParendIfaceExpr fun : args)
+pprIfaceApp (IfaceApps fun as)   args = pprIfaceApp fun $
+                                          map (nest 2 . pprParendIfaceExpr) as ++ args
+pprIfaceApp fun                  args = sep (pprParendIfaceExpr fun : args)
 
 ------------------
 instance Outputable IfaceConAlt where
@@ -2170,6 +2217,7 @@ freeNamesIfExpr (IfaceCo co)          = freeNamesIfCoercion co
 freeNamesIfExpr (IfaceTuple _ as)     = fnList freeNamesIfExpr as
 freeNamesIfExpr (IfaceLam (b,_) body) = freeNamesIfBndr b &&& freeNamesIfExpr body
 freeNamesIfExpr (IfaceApp f a)        = freeNamesIfExpr f &&& freeNamesIfExpr a
+freeNamesIfExpr (IfaceApps f as)      = freeNamesIfExpr f &&& fnList freeNamesIfExpr as
 freeNamesIfExpr (IfaceCast e co)      = freeNamesIfExpr e &&& freeNamesIfCoercion co
 freeNamesIfExpr (IfaceTick t e)       = freeNamesIfTickish t &&& freeNamesIfExpr e
 freeNamesIfExpr (IfaceECase e ty)     = freeNamesIfExpr e &&& freeNamesIfType ty
@@ -2830,17 +2878,46 @@ infixl 9 .<<|.
 x .<<|. b = (if b then (`setBit` 0) else id) (x `shiftL` 1)
 {-# INLINE (.<<|.) #-}
 
+-- Encoding shortcuts:
+-- Since only IfaceDataAlt can have binders
+-- we can skip the binder list for DEFAULT and Literal alternatives.
 instance Binary IfaceAlt where
     put_ bh (IfaceAlt a b c) = do
         put_ bh a
-        put_ bh b
+        case a of
+          IfaceDataAlt {}  -> put_ bh b
+          _                -> assertPpr (null b) (ppr a $$ ppr b) $ return ()
         put_ bh c
     get bh = do
         a <- get bh
-        b <- get bh
+        b <- case a of
+               IfaceDataAlt {}  -> get bh
+               _                -> return []
         c <- get bh
         return (IfaceAlt a b c)
 
+{- Note [IfaceExpr encoding shortcuts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We use a full byte to encode the constructor tag for `IfaceExpr`.
+This leaves room to encode additional information. Concretely we
+use:
+
+0  .. 14: "Simple" constructor tags.
+15 .. 22: "IfaceApps", encoding the constructor *and* arity.
+      23: "IfaceCase" for a case with a single default alternative.
+
+Note [Binary encoding of IfaceApps]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For IfaceApps we use the following scheme:
+
+  * arity 2..8:  one byte encoding the arity as (15 + (n-2))
+                 Which is followed by the head expression and then exactly `arity` arguments.
+
+  * arity > 8:   tag 22, and we serialize the argument count as a ULEB128, followed by the
+                 head expression and arguments.
+
+This saves us one byte per application with `2 <= arity <= 8`.
+-}
 instance Binary IfaceExpr where
     put_ bh (IfaceLcl aa) = do
         putByte bh 0
@@ -2864,6 +2941,12 @@ instance Binary IfaceExpr where
         putByte bh 5
         put_ bh ag
         put_ bh ah
+    -- See Note [IfaceExpr encoding shortcuts]
+    put_ bh (IfaceCase ai aj [IfaceAlt IfaceDefaultAlt [] ak]) = do
+        putByte bh 23
+        put_ bh ai
+        put_ bh aj
+        put_ bh ak
     put_ bh (IfaceCase ai aj ak) = do
         putByte bh 6
         put_ bh ai
@@ -2899,6 +2982,17 @@ instance Binary IfaceExpr where
         putByte bh 14
         put_ bh r
         put_ bh torc
+    -- See Note [Iface applications] and Note [Binary encoding of IfaceApps]
+    -- and Note [IfaceExpr encoding shortcuts]
+    put_ bh (IfaceApps fun args) = do
+        let !n = length args
+        massertPpr (n >= 2) (text "put_ IfaceApps" <+> ppr n)
+        if n <= maxIfaceAppsTagArity
+          then putByte bh (fromIntegral (ifaceAppsTag0 + n - 2))
+          else do putByte bh (fromIntegral ifaceAppsBigTag)
+                  put_ bh n
+        put_ bh fun
+        mapM_ (put_ bh) args
     get bh = do
         h <- getByte bh
         case h of
@@ -2944,7 +3038,41 @@ instance Binary IfaceExpr where
             14 -> do r <- get bh
                      torc <- get bh
                      return (IfaceLitRubbish torc r)
+            -- Tags 15..21 encode an IfaceApps of arity 2..8 in the tag itself;
+            -- tag 22 is followed by an explicit (LEB128) argument count.
+            -- See Note [Binary encoding of IfaceApps]
+            15 -> getApps 2
+            16 -> getApps 3
+            17 -> getApps 4
+            18 -> getApps 5
+            19 -> getApps 6
+            20 -> getApps 7
+            21 -> getApps 8
+            22 -> do n <- get bh
+                     getApps n
+            -- case scrut of bndr { DEFAULT -> rhs}
+            23 -> do ai <- get bh
+                     aj <- get bh
+                     ak <- get bh
+                     return (IfaceCase ai aj [IfaceAlt IfaceDefaultAlt [] ak])
             _ -> panic ("get IfaceExpr " ++ show h)
+      where
+        getApps :: Int -> IO IfaceExpr
+        getApps n = do fun  <- get bh
+                       args <- replicateM n (get bh)
+                       return (IfaceApps fun args)
+-- | Tag used for an 'IfaceApps' with exactly two arguments and start
+-- of the ifaceApps tag range.
+ifaceAppsTag0 :: Int
+ifaceAppsTag0 = 15
+
+-- | Highest arity encoded directly in tag byte.
+maxIfaceAppsTagArity :: Int
+maxIfaceAppsTagArity = 8
+
+-- | Tag for an 'IfaceApps' whose arity is serialized as ULEB128.
+ifaceAppsBigTag :: Int
+ifaceAppsBigTag = 22
 
 instance Binary IfaceTickish where
     put_ bh (IfaceHpcTick m ix) = do
@@ -3211,6 +3339,7 @@ instance NFData IfaceExpr where
     IfaceTuple sort exprs -> rnf sort `seq` rnf exprs
     IfaceLam bndr expr -> rnf bndr `seq` rnf expr
     IfaceApp e1 e2 -> rnf e1 `seq` rnf e2
+    IfaceApps e es -> rnf e `seq` rnf es
     IfaceCase e nm alts -> rnf e `seq` rnf nm `seq` rnf alts
     IfaceECase e ty -> rnf e `seq` rnf ty
     IfaceLet bind e -> rnf bind `seq` rnf e

@@ -741,25 +741,38 @@ In more detail:
   Tuples aren't included in the wired-in names map: see (ST1) below
 
 * Serialisation is done by `putName`:
-  - When we serialise a compact Name,
-    we serialise it as a single 32-bit word:
-      10xxxxxx xxyyyyyy yyyyyyyy yyyyyyyy
-    where xxxx is the tag, and yyyy is the payload.
-    The function `wiredInNamesOkay` checks that the wired-in names all have
-    uniques that fit into the `yyy` field.
+  - When we serialise a compact Name, we serialise its Unique, split by
+    `unpkUniqueGrimily` into the tag character and the payload:
+
+      yyyyyyyy yyyyyyyy yyyyyyyx xxxxxxx1
+      \________ payload _______/\_ tag _/^ marker bit
+
+    Why are we storing the marker/tag in the low rather than high bits? Because
+    we LEB128 encode the whole word when writing to disk so we want to keep as
+    many of the high bits zero as possible to allow for shorter encodings. See
+    also wrinkle ST3.
+
+    Tags are 8 bits by construction, and there is a check that the actual unique
+    part fits in 22 bits which `wiredInNamesOkay` (in GHC.Builtin) checks for all
+    known-key names.
 
   - When we serialise a non-compact name:
       - We look it up in the (stateful, growing) symbol table
-      - If it not there we add it to the symbol table
-      - We serialise the occurrenc to a single 32-bit word:
-          00xxxxxx xxxxxxxx xxxxxxxx xxxxxxxx
-        where `xxxxx` is an index into the symbol table.
+      - If it is not there we add it to the symbol table
+      - We serialise the occurrence as
 
-* Deserialision is done by `getName`.  We read a 32-bit word
-  - If the MSB is `10` it must be a compact name, so we use
+          0xxxxxxx xxxxxxxx xxxxxxxx xxxxxxx0
+
+        In other words we simply shift the index by a bit.
+        The high bit is currently unused. But `putSymtabNameRef`
+        asserts that `ix` fits in 30 bits.
+
+* Deserialisation is done by `getSymtabName`, which dispatches on the low bit
+  of the word it reads:
+  - If it is 1 it must be a compact name, so we reassemble the Unique and use
     `lookupCompactName` to get from the Unique to the Name.
-  - If the MSB is `00` it must be a non-compact Name,
-    so we look it up in the symbol table.
+  - If it is 0 it must be a non-compact Name, so we look it up in the
+    symbol table.
 
 Wrinkles:
 
@@ -785,6 +798,20 @@ Wrinkles:
   `isCompactName` that tests for `knownUniqueTupleName` and then the
   TyConRepNames would be serialised as non-compact names, and everything would
   work. Fewer tests, but Typeable-heavy code might have bigger interface files.
+
+(ST3) Both kinds of Name are serialised as a single `Word32`, which is serialized to
+  disk in it's ULEB128 encoded variable-length form (see `putULEB128`).
+  This has consequences as it means we want to keep the high bits zero where possible
+  to allow for a shorter ULEB128 encoding.
+
+  This is why we put both the tag and the marker bit at the LSB end of the word. They
+  are always present. But by putting them at the low end we ensure LEB128 encoding
+  still works as expected, producing smaller encodings for compact names with small
+  uniques.
+
+  The downside is that we steal one bit from non-compact names for which the marker
+  bit and tag would have been zero either way. But in practice this matters far less
+  than ensuring built in (compact) names encode well.
 -}
 
 isCompactName :: Name -> Bool
@@ -803,6 +830,31 @@ lookupCompactName u
   where
      (tag, ix) = unpkUniqueGrimily u
 
+-- | Write a reference to a symbol table index.
+-- See Note [Symbol table representation of names]
+putSymtabNameRef :: WriteBinHandle -> Int -> IO ()
+{-# INLINE putSymtabNameRef #-}
+putSymtabNameRef bh ix
+  = assertPpr (ix >= 0 && ix < (1 `shiftL` 30))
+              (text "putSymtabNameRef: symbol table index out of range:" <+> int ix) $
+    -- Bit 0 == False marks a symbol table reference
+    put_ bh ((fromIntegral ix `shiftL` 1) :: Word32)
+
+-- | Write a reference to a compact (known-key) 'Name'.
+-- See Note [Symbol table representation of names]
+putCompactNameRef :: WriteBinHandle -> Unique -> IO ()
+{-# INLINE putCompactNameRef #-}
+putCompactNameRef bh uniq
+  = -- INVARIANTS:
+    --    * 8 bits tag (true by construction)
+    --    * the payload fits in 22 bits (checked for all known keys elsewhere)
+    -- Bit 0 == True marks a compact (known-key) name
+    put_ bh (   (fromIntegral payload `shiftL` 9)
+            .|. (fromIntegral (ord tag) `shiftL` 1)
+            .|. 1 :: Word32)
+  where
+    (tag, payload) = unpkUniqueGrimily uniq
+
 -- See Note [Symbol table representation of names]
 putName :: BinSymbolTable -> WriteBinHandle -> Name -> IO ()
 putName BinSymbolTable{
@@ -810,16 +862,12 @@ putName BinSymbolTable{
                bin_symtab_next = symtab_next }
         bh name
   | isCompactName name
-  , let (c, u) = unpkUniqueGrimily (nameUnique name) -- INVARIANT: (ord c) fits in 8 bits
-  = -- assert (u < 2^(22 :: Int))
-    put_ bh (0x80000000
-             .|. (fromIntegral (ord c) `shiftL` 22)
-             .|. (fromIntegral u :: Word32))
+  = putCompactNameRef bh (nameUnique name)
 
   | otherwise
   = do (symtab_map,symtab_tbl) <- readIORef symtab_map_ref
        case lookupNameEnv symtab_map name of
-         Just off -> put_ bh (fromIntegral off :: Word32)
+         Just off -> putSymtabNameRef bh off
          Nothing -> do
           off <- freshIndex
           let mod = nameModule name
@@ -829,12 +877,11 @@ putName BinSymbolTable{
           let !symtab_tbl' = extendModuleEnv symtab_tbl mod ((off,name):mod_nms)
           writeIORef symtab_map_ref $! ( symtab_map',  symtab_tbl' )
 
-          put_ bh (fromIntegral off :: Word32)
+          putSymtabNameRef bh off
   where
     freshIndex :: IO Int
     freshIndex = do
       off <- readFastMutInt symtab_next
-      -- massert (off < 2^(30 :: Int))
       writeFastMutInt symtab_next (off+1)
       return off
 
@@ -843,12 +890,10 @@ getSymtabName :: SymbolTable Name
               -> ReadBinHandle -> IO Name
 getSymtabName symtab bh = do
     i :: Word32 <- get bh
-    case i .&. 0xC0000000 of
-      0x00000000 -> return $! symtab ! fromIntegral i
-      0x80000000 -> return $! lookupCompactName u
-        where
-          tag = chr (fromIntegral ((i .&. 0x3FC00000) `shiftR` 22))
-          ix  = fromIntegral i .&. 0x003FFFFF
-          u   = mkUniqueGrimilyWithTag tag ix
-
-      _ -> pprPanic "getSymtabName:unknown name tag" (ppr i)
+    if i .&. 1 == 0
+      then -- Symbol table reference, written by putSymtabNameRef
+           return $! symtab ! fromIntegral (i `shiftR` 1)
+      else -- Compact name, written by putCompactNameRef
+           let tag     = chr (fromIntegral ((i `shiftR` 1) .&. 0xFF))
+               payload = fromIntegral (i `shiftR` 9) :: Word64
+           in return $! lookupCompactName (mkUniqueGrimilyWithTag tag payload)

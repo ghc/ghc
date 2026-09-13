@@ -828,6 +828,8 @@ rnIfaceExpr (IfaceLam lam_bndr expr)
     = IfaceLam <$> rnIfaceLamBndr lam_bndr <*> rnIfaceExpr expr
 rnIfaceExpr (IfaceApp fun arg)
     = IfaceApp <$> rnIfaceExpr fun <*> rnIfaceExpr arg
+rnIfaceExpr (IfaceApps fun args)
+    = IfaceApps <$> rnIfaceExpr fun <*> rnIfaceExprs args
 rnIfaceExpr (IfaceCase scrut case_bndr alts)
     = IfaceCase <$> rnIfaceExpr scrut
                 <*> pure case_bndr
