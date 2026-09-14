@@ -392,6 +392,11 @@ void pollCompletedTimeoutsOrIO(CapIOManager *iomgr);
  * does complete (or we get a signal with a handler) and process the
  * completions as appropriate.
  *
+ * This should _only_ be called when there are no runnable threads and it is
+ * thus accepable to block and wait for I/O or timeouts. Notably this means it
+ * must _not_ be used in the threaded RTS (where it is unacceptable to block
+ * a capability).
+ *
  * Upon returning true this guarantees that the scheduler run queue is
  * non-empty or that the scheduler is no longer in the running state.
  * Succinctly, the post-condition in the return true case is
