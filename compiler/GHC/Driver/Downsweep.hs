@@ -942,9 +942,10 @@ rootSummariesParallel n_jobs hsc_env diag_wrapper msg get_summary = do
 -- | Checks whether the given 'UnitEnv' has the closure property.
 --
 --   See the section “Closure Property” in @Note [Multiple Home Units]@ for the
---   definition of the closure property an @Note [Home unit closure property
---   check]@ below for a discussion of the algorithm used for this check, its
---   justification, and a potential alternative.
+--   definition of the closure property and
+--   @Note [Home unit closure property check]@ below for a discussion of the
+--   algorithm used for this check, its justification, and a potential
+--   alternative.
 checkHomeUnitsClosed :: UnitEnv -> [DriverMessages]
 checkHomeUnitsClosed unit_env
   | null offenders = []
