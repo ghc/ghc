@@ -971,6 +971,8 @@ optimisationFlags = EnumSet.fromList
    , Opt_SolveConstantDicts
    , Opt_SpecEval
    , Opt_SpecEvalDictFun
+   , Opt_ExposeAllUnfoldings
+   , Opt_ExposeOverloadedUnfoldings
    ]
 
 -- | The set of flags which affect code generation and can change a program's
@@ -1001,8 +1003,6 @@ codeGenFlags = EnumSet.fromList
    , Opt_OmitYields
 
      -- Flags that affect generated code
-   , Opt_ExposeAllUnfoldings
-   , Opt_ExposeOverloadedUnfoldings
    , Opt_NoTypeableBinds
    , Opt_NoBuiltinRules
    , Opt_NoBignumRules

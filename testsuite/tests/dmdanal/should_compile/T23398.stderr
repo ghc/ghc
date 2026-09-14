@@ -40,7 +40,9 @@ T23398.$wbar [InlPrag=[2], Occ=LoopBreaker]
 [GblId[StrictWorker([~, !])],
  Arity=4,
  Str=<L><SP(A,SC(S,L),A)><1L><L>,
- Unf=OtherCon []]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [0 90 60 0] 91 70}]
 T23398.$wbar
   = \ (@a)
       (@b)
