@@ -685,6 +685,7 @@ void pollCompletedTimeoutsOrIO(CapIOManager *iomgr)
 bool awaitCompletedTimeoutsOrIO(CapIOManager *iomgr)
 {
     debugTrace(DEBUG_iomanager, "waiting for completed IO or timeouts");
+    ASSERT(emptyRunQueue(iomgr->cap));
     bool completed = true; // wait completed or interrupted?
     switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
