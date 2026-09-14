@@ -1036,7 +1036,12 @@ updates s = do
                           [ si' |= ss' .! i
                           , sir' |= (closureField2 si') `ApplExpr` [r1]
                           , ifS (app "typeof" [sir'] .===. jTyObject)
-                            (copyClosure DontCopyCC si' sir')
+                            (ifS (isThunk sir' .||. isBlackhole sir')
+                              (mconcat [ closureInfo   si' |= hdUpdThunkEntry
+                                       , closureField1 si' |= sir'
+                                       , closureField2 si' |= null_
+                                       ])
+                              (copyClosure DontCopyCC si' sir'))
                             (assignClosure si' $ unbox_closure sir')
                           , postIncrS i
                           ]
@@ -1066,7 +1071,8 @@ updates s = do
                                , -- update selectors
                                  jwhenS ((app typeof [closureMeta updatee] .===. jTyObject) .&&. (closureMeta updatee .^ "sel"))
                                  ((ss |= closureMeta updatee .^ "sel")
-                                  <> upd_loop)
+                                  <> upd_loop
+                                  <> (closureMeta updatee .^ "sel" |= null_))
                                , -- overwrite the object
                                  ifS (app typeof [r1] .===. jTyObject)
                                  (mconcat [ traceRts s (jString "$upd_frame: boxed: " + ((closureInfo r1) .^ "n"))

@@ -375,6 +375,9 @@ hdCAFsResetStr       = name "h$CAFsReset"
 hdUpdThunkEntryStr :: Ident
 hdUpdThunkEntryStr = name "h$upd_thunk_e"
 
+hdUpdThunkEntry :: JStgExpr
+hdUpdThunkEntry = global (identFS hdUpdThunkEntryStr)
+
 hdAp3EntryStr :: Ident
 hdAp3EntryStr = name "h$ap3_e"
 
