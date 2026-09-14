@@ -595,7 +595,7 @@ tcExprNoExpand (HsProc x pat cmd) res_ty
 -- and wrap (static e) in a call to
 --    fromStaticPtr :: IsStatic p => StaticPtr a -> p a
 
-tcExprNoExpand (HsStatic _ expr) res_ty
+tcExprNoExpand (HsStatic free_names expr) res_ty
   = do  { res_ty          <- expTypeToType res_ty
         ; (co, (p_ty, expr_ty)) <- matchExpectedAppTy res_ty
         ; (expr', lie) <- captureConstraints $
