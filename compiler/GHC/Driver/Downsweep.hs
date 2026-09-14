@@ -72,6 +72,7 @@ import GHC.Utils.Logger
 import GHC.Utils.Fingerprint
 import GHC.Utils.TmpFs
 import GHC.Utils.Constants
+import GHC.Utils.Monad (concatMapM)
 import GHC.Utils.Monad.State.Strict
 
 import GHC.Types.Error
@@ -983,13 +984,10 @@ checkHomeUnitsClosed unit_env
                --   that have not yet been found, using its state to keep track
                --   of which units have already been considered as sources of
                --   offending dependencies.
-    collect []
-      = pure []
-    collect (current_unit_state : remaining_unit_states)
-      = (++) <$> collect_for_home_unit
-                   (unitInfoMap current_unit_state)
-                   (map (toUnitId . fst) $ explicitUnits $ current_unit_state)
-             <*> collect remaining_unit_states
+    collect = concatMapM $ \ unit_state ->
+              collect_for_home_unit
+                (unitInfoMap unit_state)
+                (map (toUnitId . fst) $ explicitUnits $ unit_state)
       where
 
       -- | Collects offending dependencies that are reachable from a particular
