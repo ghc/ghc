@@ -1,0 +1,6 @@
+section: compiler
+issues: #13090
+mrs: !16684
+synopsis:
+  Enable :ghc-flag:`-fexpose-overloaded-unfoldings` by default with :ghc-flag:`-O` or higher.
+

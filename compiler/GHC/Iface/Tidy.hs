@@ -806,8 +806,19 @@ anyway we allow for some false positives and simply expose all functions which
 have a constraint. This means we might expose more unhelpful unfoldings. But
 it seems like the better choice.
 
-Currently this option is off by default and has to be enabled manually. But
-we might change this in the future.
+We enable the flag by default with -O/O2 to allow users to opt into specialization
+at call sites. We do not enable -fspecialize-aggressively. See also #13090.
+
+In terms of performance impact the cost is very modest:
+On GHC and it's boot libraries overall enabling this flag increases overall disk
+space used by ~1%. With a highly variant distribution across various .hi files.
+In terms of compile times the overhead is low enough to be hard to measure, but
+seemed to be less than 0.2% if anything at all.
+
+It seems tempting to do the same for -fspecialize-aggressively, but that comes in
+at a hefty 20% compile time overhead. So we only provide the unfoldings and leave
+the choice of how much specialization to enable up to the user.
+
 -}
 
 {-
