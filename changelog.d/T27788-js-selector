@@ -1,0 +1,4 @@
+section: js-backend
+synopsis: Fix a bug in the JavaScript backend: Entering a selector thunk whose selected field was an unevaluated thunk could duplicate work or crash the program with a type error.
+issues: #27788
+mrs: !16681
