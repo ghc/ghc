@@ -970,8 +970,8 @@ checkHomeUnitsClosed unit_env
   --   by the pair of the 'UnitId' of /u/ and the 'UnitId' of /v/.
   offenders :: [(UnitId, UnitId)]
   offenders
-    = evalState (collect (map (homeUnitEnv_units . snd) home_unit_data)) $
-      Set.empty
+    = evalState (collect (map (homeUnitEnv_units . snd) home_unit_data))
+                Set.empty
     where
 
     -- | Collects offending dependencies.
