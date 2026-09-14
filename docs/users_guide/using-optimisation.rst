@@ -624,10 +624,10 @@ as such you shouldn't need to set any of them explicitly. A flag
     :reverse: -fno-expose-overloaded-unfoldings
     :category:
 
-    :default: off
+    :default: -O and above
     :since: 9.12.1
 
-    This experimental flag is a slightly less heavy weight alternative
+    This flag is a slightly less heavy weight alternative
     to :ghc-flag:`-fexpose-all-unfoldings`.
 
     Instead of exposing all functions it exposes only those functions which
