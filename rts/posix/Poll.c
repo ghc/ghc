@@ -532,6 +532,10 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
                          timeout_ns == NULL ?  0 : timeout_ns->tv_nsec,
                    res);
 #else
+        debugTrace(DEBUG_iomanager,
+                   "poll(nfds = %d, timeout_ms = %d)",
+                   nfds, timeout_ms);
+
         int res = poll(poll_table, nfds, timeout_ms);
 
         debugTrace(DEBUG_iomanager,

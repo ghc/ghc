@@ -196,7 +196,7 @@ threaded idle GC design).
 
 static Time last_idle_gc_time = 0;
 
-Time getNextIdleGcDelayTime()
+Time getNextIdleGcDelayTime(void)
 {
     Time now   = getProcessElapsedTime();
     Time delay =
@@ -209,6 +209,7 @@ Time getNextIdleGcDelayTime()
 void notifyIdleGcIdle(bool deadlocked)
 {
     if (RtsFlags.GcFlags.doIdleGC || deadlocked) {
+        debugTrace(DEBUG_iomanager, "notifyIdleGcIdle(): setting ACTIVITY_INACTIVE");
         setRecentActivity(ACTIVITY_INACTIVE);
     }
 }

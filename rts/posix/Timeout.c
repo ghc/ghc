@@ -245,13 +245,18 @@ void adjustTimeoutForIdleGc(bool any_pending_io,
                             int *timeout_ms      /* in/out */,
                             int *idlegc_status   /* out */)
 {
+    debugTrace(DEBUG_iomanager,
+                "adjustTimeoutForIdleGc(any_pending_io = %d, timeout_ms = %d)",
+                any_pending_io,
+                *timeout_ms);
+
     int idlegc_delay_ms = TimeToMS(getNextIdleGcDelayTime());
 
     if (RTS_UNLIKELY(!any_pending_io && *timeout_ms == -1)) {
         /* We must be deadlocked. Schedule an idle GC unconditionally. */
         *timeout_ms    = 0; /* Cause poll() to return res == 0 immediately. */
         *idlegc_status = timeout_is_idlegc_delay
-                       & system_must_be_deadlocked;
+                       | system_must_be_deadlocked;
 
     } else if (RTS_UNLIKELY(RtsFlags.GcFlags.doIdleGC &&
                  (idlegc_delay_ms < *timeout_ms || *timeout_ms == -1))) {
@@ -262,14 +267,30 @@ void adjustTimeoutForIdleGc(bool any_pending_io,
     } else {
         *idlegc_status = 0;
     }
+
+    debugTrace(DEBUG_iomanager,
+                "adjustTimeoutForIdleGc(any_pending_io = %d, timeout_ms = %d) -> idlegc_status = %d",
+                any_pending_io,
+                *timeout_ms,
+                *idlegc_status);
 }
 
 void handleIdleGcTimeout(int idlegc_status, bool *interrupt)
 {
+
+    debugTrace(DEBUG_iomanager,
+                "handleIdleGcTimeout(idlegc_status = %d)",
+                idlegc_status);
+
     if (idlegc_status & timeout_is_idlegc_delay) {
         notifyIdleGcIdle(idlegc_status & system_must_be_deadlocked);
         *interrupt = true;
     }
+
+    debugTrace(DEBUG_iomanager,
+                "handleIdleGcTimeout(idlegc_status = %d) -> interrupt = %d",
+                idlegc_status,
+                *interrupt);
 }
 #endif
 
