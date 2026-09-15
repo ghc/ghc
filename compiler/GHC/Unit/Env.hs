@@ -443,11 +443,10 @@ The flow:
 Closure Property
 ----------------
 
-A unit environment must have the closure property, which means that, whenever
-some units /h/₁ and /h/₂ have been loaded as home units, /h/₁ does not directly
-or indirectly depend on an external unit that directly or indirectly depends
-on /h/₂. 'GHC.Driver.Downsweep.checkHomeUnitsClosed' checks whether a given unit
-environment indeed has this property.
+A unit environment must have the closure property, which means that a home unit
+must not directly or indirectly depend on an external unit that directly or
+indirectly depends on a home unit. 'GHC.Driver.Downsweep.checkHomeUnitsClosed'
+checks whether a given unit environment indeed has this property.
 
 Offsetting Paths
 ----------------
