@@ -57,6 +57,7 @@ import Language.Haskell.Syntax.ImpExp
 import GHC.Types.UnresolvedImport
 
 import GHC.Data.FastString
+import GHC.Data.ShortText  ( ShortText )
 import GHC.Data.Maybe      ( expectJust )
 import qualified GHC.Data.Maybe as M
 import GHC.Data.OsPath     ( OsPath, unsafeEncodeUtf )
@@ -95,7 +96,6 @@ import GHC.Unit.Module.Graph
 import GHC.Unit.Module.Deps
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Module.Stage
-import GHC.Unit.External.Index (GlobalUnitKey, mkGlobalUnitKey)
 
 import Data.Either ( partitionEithers, lefts )
 import Data.Map (Map)
@@ -972,18 +972,19 @@ checkHomeUnitsClosed unit_env
   offenders :: [(UnitId, UnitId)]
   offenders
     = evalState (collect (map (homeUnitEnv_units . snd) home_unit_data))
-                Set.empty
+                emptyUniqMap
     where
 
     -- | Collects offending dependencies.
     collect :: [UnitState]
                -- ^ The 'UnitState's of the home units from which to traverse
                --   the dependency graph.
-            -> State (Set GlobalUnitKey) [(UnitId, UnitId)]
+            -> State (UniqMap UnitId (Set ShortText)) [(UnitId, UnitId)]
                -- ^ A stateful computation that collects offending dependencies
-               --   that have not yet been found, using its state to keep track
-               --   of which units have already been considered as sources of
-               --   offending dependencies.
+               --   that have not yet been found. It uses its state, which is an
+               --   efficent representation of a set of 'GlobalUnitKey's, to
+               --   keep track of which units have already been considered as
+               --   sources of offending dependencies.
     collect = concatMapM $ \ unit_state ->
               collect_for_home_unit
                 (unitInfoMap unit_state)
@@ -998,10 +999,11 @@ checkHomeUnitsClosed unit_env
         -> [UnitId]
            -- ^ The 'UnitId's of the units from which to traverse the dependency
            --   graph.
-        -> State (Set GlobalUnitKey) [(UnitId, UnitId)]
+        -> State (UniqMap UnitId (Set ShortText)) [(UnitId, UnitId)]
            -- ^ A stateful computation that collects offending dependencies that
-           --   have not yet been found, using its state to keep track of which
-           --   units have already been considered as sources of offending
+           --   have not yet been found. It uses its state, which is an efficent
+           --   representation of a set of 'GlobalUnitKey's, to keep track of
+           --   which units have already been considered as sources of offending
            --   dependencies.
       collect_for_home_unit _ []
         = return []
@@ -1019,15 +1021,19 @@ checkHomeUnitsClosed unit_env
             unit_not_found_msg :: String
             unit_not_found_msg = "Unit not found during closure property check"
 
-          -- | A 'GlobalUnitKey' that identifies the current unit.
-          global_unit_key :: GlobalUnitKey
-          global_unit_key = mkGlobalUnitKey current_unit (unitAbiHash unit_info)
+          -- | The ABI hash of the current unit.
+          unit_abi_hash :: ShortText
+          unit_abi_hash = unitAbiHash unit_info
 
-        has_been_processed <- gets (Set.member global_unit_key)
+        has_been_processed <- gets $ maybe False (Set.member unit_abi_hash) .
+                                     (`lookupUniqMap` current_unit)
         if has_been_processed
           then collect_for_home_unit unit_info_map remaining_units
           else do
-            modify (Set.insert global_unit_key)
+            modify $ \ processed -> addToUniqMap_C Set.union
+                                                   processed
+                                                   current_unit
+                                                   (Set.singleton unit_abi_hash)
             let
 
               -- | The 'UnitId's of the units that the current unit depends on.
@@ -1077,11 +1083,10 @@ units it directly depends on, and, starting from them, follows unit dependencies
 to search for offending dependencies. It does not follow dependencies that have
 been followed before, possibly when processing another home unit. To achieve
 this, the algorithm tracks, across home units, from which units it has already
-followed dependencies. For this tracking, it identifies each unit by a
-'GlobalUnitKey', which is a pair of a 'UnitId' and an ABI hash. Using only a
-'UnitId' would not work, because 'UnitId's are not always globally unique. Also
-using only an ABI hash is not an option, because an ABI hash is not necessarily
-an ABI hash: it can also be the string @"inline"@.
+followed dependencies. For this tracking, it identifies each unit by a 'UnitId'
+and an ABI hash. Using only a 'UnitId' would not work, because 'UnitId's are not
+always globally unique. Also using only an ABI hash is not an option, because an
+ABI hash is not necessarily an ABI hash: it can also be the string @"inline"@.
 
 The correctness of this algorithm rests on the, likely correct, assumption that,
 among the units mentioned in the 'UnitState' of a particular home unit, any unit
