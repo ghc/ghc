@@ -279,6 +279,10 @@ frames and nested BCOs)
 
 This makes case continuation BCOs special: unlike normal BCOs, case cont BCO
 frames cannot be moved on the stack independently from their parent BCOs.
+
+Not every source `case` gets a continuation BCO: when the scrutinee cannot
+leave the current BCO the alternatives are emitted inline and no frame is
+involved. See Note [Inlined case continuations] in GHC.StgToByteCode.
 -}
 
 data UnlinkedBCO

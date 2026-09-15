@@ -17,3 +17,16 @@ test('T26216', extra_files(["T26216_aux.hs"]), ghci_script, ['T26216.script'])
 test('T27001', [extra_files(['T27001.hs']), req_interp],
      run_command,
      ['{compiler} -e main -O -fno-unoptimized-core-for-interpreter T27001.hs'])
+
+# Case alternatives are inlined into the parent BCO when the scrutinee cannot
+# leave it (Note [Inlined case continuations]); count the resulting ProtoBCOs
+# with and without -fbc-inline-case-conts.
+inline_case_conts_cmd = ("{compiler} -fbyte-code -no-link -ddump-bcos -fforce-recomp "
+                         "-fno-break-points -dno-typeable-binds -v0 {flags} InlineCaseConts.hs "
+                         "| grep -c '^ *ProtoBCO'")
+test('InlineCaseConts',
+     [extra_files(['InlineCaseConts.hs']), req_interp, only_ways(['normal'])],
+     run_command, [inline_case_conts_cmd.format(compiler='{compiler}', flags='')])
+test('InlineCaseContsOff',
+     [extra_files(['InlineCaseConts.hs']), req_interp, only_ways(['normal'])],
+     run_command, [inline_case_conts_cmd.format(compiler='{compiler}', flags='-fno-bc-inline-case-conts')])

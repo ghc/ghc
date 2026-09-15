@@ -606,6 +606,7 @@ data GeneralFlag
    | Opt_DoAnnotationLinting
    | Opt_DoBoundsChecking
    | Opt_AddBcoName
+   | Opt_BcInlineCaseConts
    | Opt_NoLlvmMangler                  -- hidden flag
    | Opt_FastLlvm                       -- hidden flag
    | Opt_NoTypeableBinds

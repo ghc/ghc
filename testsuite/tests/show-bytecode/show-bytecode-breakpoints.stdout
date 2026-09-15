@@ -30,19 +30,11 @@ objects:
   object ‘static_ptr1_sat_@name_suffix@’:
     arity: 0
     literals: top-level string "main"
-    used items:
-      object ‘static_ptr1_sat_@name_suffix@’:
-        arity: 0
-        literals: <none>
-        used items: named item ‘unpackCString#’
+    used items: named item ‘unpackCString#’
   object ‘static_ptr1_sat_@name_suffix@’:
     arity: 0
     literals: top-level string "Example"
-    used items:
-      object ‘static_ptr1_sat_@name_suffix@’:
-        arity: 0
-        literals: <none>
-        used items: named item ‘unpackCString#’
+    used items: named item ‘unpackCString#’
   static-construction object ‘static_ptr1_sat_@name_suffix@’:
     data constructor: (,)
     lifted: yes
@@ -219,19 +211,11 @@ objects:
   object ‘static_ptr_sat_@name_suffix@’:
     arity: 0
     literals: top-level string "main"
-    used items:
-      object ‘static_ptr_sat_@name_suffix@’:
-        arity: 0
-        literals: <none>
-        used items: named item ‘unpackCString#’
+    used items: named item ‘unpackCString#’
   object ‘static_ptr_sat_@name_suffix@’:
     arity: 0
     literals: top-level string "Example"
-    used items:
-      object ‘static_ptr_sat_@name_suffix@’:
-        arity: 0
-        literals: <none>
-        used items: named item ‘unpackCString#’
+    used items: named item ‘unpackCString#’
   static-construction object ‘static_ptr_sat_@name_suffix@’:
     data constructor: (,)
     lifted: yes

@@ -1299,3 +1299,20 @@ Other
     These are printed by the bytecode disassembler, aiding in correlating
     bytecode with STG.
 
+.. ghc-flag:: -fbc-inline-case-conts
+    :shortdesc: Compile case alternatives inline in bytecode when the
+        scrutinee cannot leave the current BCO.
+    :reverse: -fno-bc-inline-case-conts
+    :type: dynamic
+
+    :since: 10.2.1
+    :default: enabled
+
+    When the scrutinee of a ``case`` is computed entirely inside the current
+    bytecode object (literals, unlifted variables, constructor applications and
+    primops the interpreter implements inline), the bytecode generator emits the
+    alternatives directly after the scrutinee instead of pushing a case
+    continuation frame and allocating a separate continuation BCO.
+    ``-fno-bc-inline-case-conts`` restores the old code shape, which is useful
+    for bisecting interpreter bugs.
+

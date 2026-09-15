@@ -656,6 +656,48 @@ schemeE d s p (StgCase scrut bndr _ alts)
   and then compile the code as if it was just the expression E.
 -}
 
+-- | Compile an expression that cannot leave the current BCO, leaving its value
+-- on top of the stack instead of returning it. Also returns the size of that
+-- value in bytes.
+-- 'Nothing' if the expression might leave the BCO. The decision is made
+-- without running any 'BcM' action.
+-- See Note [Inlined case continuations].
+schemeIntoStack :: Platform -> StackDepth -> BCEnv -> CgStgExpr
+                -> Maybe (BcM (BCInstrList, ByteOff))
+schemeIntoStack platform d p e = case e of
+  StgLit lit -> Just $ pushAtom d p (StgLitArg lit)
+  StgApp x []
+    | isUnliftedType (idType x) -> Just $ pushAtom d p (StgVarArg x)
+  _ | Just _ <- maybe_is_tagToEnum_call e -> Nothing
+  StgOpApp (StgPrimOp op) args _ty -> do
+    compute <- doPrimOpCode platform op d p args
+    Just $ do
+      (prim_code, width) <- compute
+      return (prim_code, wordsToBytes platform (primOpResultWords platform width))
+  StgConApp con _cn args _tys
+    | not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con)
+    -> Just $ do
+      alloc_con <- mkConAppCode d d p con args
+      return (alloc_con, wordSize platform)
+  StgTick (HpcTick tick_mod ix) rhs -> do
+    compute <- schemeIntoStack platform d p rhs
+    Just $ first (HPC_TICK (mkHpcTickBoxesLabell platform tick_mod) (fromIntegral ix) `consOL`)
+      <$> compute
+  StgTick Breakpoint{} _ -> Nothing
+  StgTick _ rhs -> schemeIntoStack platform d p rhs
+  StgLetNoEscape xlet bnd body -> schemeIntoStack platform d p (StgLet xlet bnd body)
+  StgLet _xlet (StgNonRec x (StgRhsCon _cc data_con _cnum _ticks args _typ)) body -> do
+    let !d2 = d + wordSize platform
+    compute_body <- schemeIntoStack platform d2 (UniqMap.addToUniqMap p x d2) body
+    Just $ do
+      alloc_code <- mkConAppCode d d p data_con args
+      (body_code, szb) <- compute_body
+      -- drop the let-bound constructor from under the value
+      return ( alloc_code `appOL` body_code `appOL`
+               unitOL (SLIDE (bytesToWords platform szb) 1)
+             , szb )
+  _ -> Nothing
+
 -- | Compile code to do a tail call.  Specifically, push the fn,
 -- slide the on-stack app back down to the sequel depth,
 -- and enter.  Four cases:
@@ -1405,68 +1447,155 @@ doCase d s p scrut bndr alts
      alt_stuff <- mapM codeAlt alts
      alt_final0 <- mkMultiBranch maybe_ncons alt_stuff
 
-     let
-
-         -- drop the stg_ctoi_*_info header...
-         alt_final1 = SLIDE bndr_size ctoi_frame_header_w `consOL` alt_final0
-
-         -- after dropping the stg_ret_*_info header
-         alt_final2 = SLIDE 0 ret_info_header_w `consOL` alt_final1
-
-     -- When entering a case continuation BCO, the stack is always headed
-     -- by the stg_ret frame and the stg_ctoi frame that returned to it.
-     -- See Note [Stack layout when entering run_BCO]
-     --
-     -- Right after the breakpoint instruction, a case continuation BCO
-     -- drops the stg_ret and stg_ctoi frame headers (see alt_final1,
-     -- alt_final2), leaving the stack with the scrutinee followed by the
-     -- free variables (with depth==d_bndr)
-     alt_final <- getLastBreakTick >>= \case
-       Just (Breakpoint tick_ty tick_id fvs)
-         | gopt Opt_InsertBreakpoints (hsc_dflags hsc_env)
-         -- Construct an internal breakpoint to put at the start of this case
-         -- continuation BCO, for step-out.
-         -- See Note [Debugger: Stepout internal break locs]
+     case schemeIntoStack platform d p scrut of
+       -- See Note [Inlined case continuations]
+       Just compute_scrut
+         | gopt Opt_BcInlineCaseConts (hsc_dflags hsc_env)
+         , not ubx_tuple_frame
          -> do
+          (scrut_code, szb) <- compute_scrut
+          -- A mismatch means the alternatives would read the wrong stack
+          -- slots. Panic rather than falling back to the frame: a fallback
+          -- would hide a layout bug in 'schemeIntoStack'.
+          when (szb /= wordsToBytes platform bndr_size) $
+            pprPanic "doCase: inlined scrutinee size mismatch"
+              (vcat [ text "binder:" <+> ppr bndr <+> dcolon <+> ppr (idType bndr)
+                    , text "scrutinee pushed (bytes):" <+> ppr szb
+                    , text "binder size (words):" <+> ppr bndr_size ])
+          return (scrut_code `appOL` alt_final0)
+       _ -> do
+          let
 
-          -- same fvs available in the surrounding tick are available in the case continuation
+              -- drop the stg_ctoi_*_info header...
+              alt_final1 = SLIDE bndr_size ctoi_frame_header_w `consOL` alt_final0
 
-          -- The variable offsets into the yielded AP_STACK are adjusted
-          -- differently because a case continuation AP_STACK has the
-          -- additional stg_ret and stg_ctoi frame headers
-          -- (as per Note [Stack layout when entering run_BCO]):
-          let firstVarOff = ret_info_header_w+bndr_size+ctoi_frame_header_w
-              idOffSets = map (fmap (second (+firstVarOff))) $
-                          getVarOffSets platform d p fvs
-              ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
-              toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
-              toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
-              breakInfo = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty
-                            (Left (InternalBreakLoc tick_id))
+              -- after dropping the stg_ret_*_info header
+              alt_final2 = SLIDE 0 ret_info_header_w `consOL` alt_final1
 
-          mibi <- newBreakInfo breakInfo
-          return $ case mibi of
-            Nothing  -> alt_final2
-            Just ibi -> BRK_FUN ibi `consOL` alt_final2
-       _ -> pure alt_final2
+          -- When entering a case continuation BCO, the stack is always headed
+          -- by the stg_ret frame and the stg_ctoi frame that returned to it.
+          -- See Note [Stack layout when entering run_BCO]
+          --
+          -- Right after the breakpoint instruction, a case continuation BCO
+          -- drops the stg_ret and stg_ctoi frame headers (see alt_final1,
+          -- alt_final2), leaving the stack with the scrutinee followed by the
+          -- free variables (with depth==d_bndr)
+          alt_final <- getLastBreakTick >>= \case
+            Just (Breakpoint tick_ty tick_id fvs)
+              | gopt Opt_InsertBreakpoints (hsc_dflags hsc_env)
+              -- Construct an internal breakpoint to put at the start of this case
+              -- continuation BCO, for step-out.
+              -- See Note [Debugger: Stepout internal break locs]
+              -> do
 
-     add_bco_name <- shouldAddBcoName
-     let
-         alt_bco_name = getName bndr
-         alt_bco = mkProtoBCO platform add_bco_name alt_bco_name alt_final (Left alts)
-                       0{-no arity-} bitmap_size bitmap True{-is alts-}
-     scrut_code <- schemeE (d + wordsToBytes platform ctoi_frame_header_w + save_ccs_size_b)
-                           (d + wordsToBytes platform ctoi_frame_header_w + save_ccs_size_b)
-                           p scrut
-     if ubx_tuple_frame
-       then do let tuple_bco = tupleBCO platform call_info args_offsets
-               return (PUSH_ALTS_TUPLE alt_bco call_info tuple_bco
-                       `consOL` scrut_code)
-       else let scrut_rep = case non_void_arg_reps of
-                  []    -> V
-                  [rep] -> rep
-                  _     -> panic "schemeE(StgCase).push_alts"
-            in return (PUSH_ALTS alt_bco scrut_rep `consOL` scrut_code)
+               -- same fvs available in the surrounding tick are available in the case continuation
+
+               -- The variable offsets into the yielded AP_STACK are adjusted
+               -- differently because a case continuation AP_STACK has the
+               -- additional stg_ret and stg_ctoi frame headers
+               -- (as per Note [Stack layout when entering run_BCO]):
+               let firstVarOff = ret_info_header_w+bndr_size+ctoi_frame_header_w
+                   idOffSets = map (fmap (second (+firstVarOff))) $
+                               getVarOffSets platform d p fvs
+                   ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
+                   toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
+                   toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
+                   breakInfo = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty
+                                 (Left (InternalBreakLoc tick_id))
+
+               mibi <- newBreakInfo breakInfo
+               return $ case mibi of
+                 Nothing  -> alt_final2
+                 Just ibi -> BRK_FUN ibi `consOL` alt_final2
+            _ -> pure alt_final2
+
+          add_bco_name <- shouldAddBcoName
+          let
+              alt_bco_name = getName bndr
+              alt_bco = mkProtoBCO platform add_bco_name alt_bco_name alt_final (Left alts)
+                            0{-no arity-} bitmap_size bitmap True{-is alts-}
+          scrut_code <- schemeE (d + wordsToBytes platform ctoi_frame_header_w + save_ccs_size_b)
+                                (d + wordsToBytes platform ctoi_frame_header_w + save_ccs_size_b)
+                                p scrut
+          if ubx_tuple_frame
+            then do let tuple_bco = tupleBCO platform call_info args_offsets
+                    return (PUSH_ALTS_TUPLE alt_bco call_info tuple_bco
+                            `consOL` scrut_code)
+            else let scrut_rep = case non_void_arg_reps of
+                       []    -> V
+                       [rep] -> rep
+                       _     -> panic "schemeE(StgCase).push_alts"
+                 in return (PUSH_ALTS alt_bco scrut_rep `consOL` scrut_code)
+
+{-
+Note [Inlined case continuations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Usually a case expression pushes a case continuation frame (PUSH_ALTS) whose
+BCO holds the alternatives, and compiles the scrutinee in tail position; the
+scrutinee returns into that frame. See Note [Case continuation BCOs].
+
+If the scrutinee cannot leave the current BCO we avoid the frame and the extra
+BCO: 'schemeIntoStack' compiles the scrutinee so that it leaves its value on
+top of the stack at depth d, and the alternatives follow directly in the
+parent BCO. The alternatives are compiled exactly as before, at depth
+d_bndr = d + bndr_size with the outer sequel, because after the continuation
+BCO's two header SLIDEs its stack is also just [value][parent stack at d].
+
+"Cannot leave the BCO" means the scrutinee's code does not enter or call
+anything, return, yield, or perform a heap or stack check. This holds for:
+
+  * literals and unlifted variables (PUSH_*),
+  * primops the interpreter implements inline ('doPrimOpCode'),
+  * ordinary saturated constructor applications (PACK),
+  * non-breakpoint ticks around such expressions (HPC_TICK or nothing),
+  * a non-recursive let (or let-no-escape) of a constructor around such an
+    expression; the constructor is slid away from under the value afterwards.
+
+Whether a primop is inline must be decided by calling 'doPrimOpCode', not by
+matching on the primop: e.g. 64-bit primops are only inline on 64-bit
+platforms.
+
+Everything else keeps the frame:
+
+  * applications and lifted variables: they ENTER a closure, which may
+    evaluate arbitrary code, GC or context switch.
+  * tagToEnum#: compiled as a SLIDE and ENTER ('implement_tagToId').
+  * primops without an inline implementation: compiled as a tail call to the
+    primop wrapper.
+  * foreign calls and prim calls: they call out of the interpreter and can
+    return to the scheduler.
+  * nested cases: the alternatives of the inner case are compiled in tail
+    position against the outer sequel, so the inner case has no single point
+    where its value is left on the stack. (The inner case's own scrutinee may
+    of course be inlined into its alternatives' BCO.)
+  * scrutinees needing an unboxed tuple frame: the value spans several
+    components and tuple returns go through the tuple_bco; Unarise eliminates
+    most of these cases anyway.
+  * general lets: every binder allocates a closure whose code is a separate
+    BCO anyway, and between ALLOC_* and MK* the closures are uninitialised.
+
+Why this is safe without a frame:
+
+  * GC: the continuation frame's bitmap describes the parent's stack while the
+    scrutinee runs. Since the scrutinee cannot GC, nothing needs describing.
+    The alternatives' own safepoints are unaffected, as they use the outer
+    sequel just like before.
+  * Heap checks: allocation by the inlined code is still bounded per BCO
+    entry, because each instruction runs at most once per entry.
+  * Stack checks: 'mkProtoBCO' sums 'bciStackUse' over all instructions.
+    Each instruction's stack growth is bounded by its 'bciStackUse' and jumps
+    only go forward, so the sum bounds the peak; PUSH_ALTS counted its BCO's
+    stack use as well, so the parent's STKCHECK stays sufficient.
+  * Profiling: the dropped stg_restore_cccs frame only matters if the
+    scrutinee could change the CCCS, which it cannot.
+  * Breakpoints: the step-out BRK_FUN of a continuation BCO is only reachable
+    by returning into its frame, which can't happen while a non-leaving
+    scrutinee runs. It can't be kept either: BRK_FUN may only be the first
+    instruction of a BCO, as the interpreter only resumes a BCO at pc 0.
+    See Note [Debugger: Stepout internal break locs].
+
+-fno-bc-inline-case-conts disables this.
+-}
 
 {-
 Note [Debugger: Stepout internal break locs]

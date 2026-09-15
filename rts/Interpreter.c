@@ -1471,7 +1471,9 @@ function (in run_BCO_fun or run_BCO)
    +---------------+
 
 Second, if this BCO is a case cont., as per Note [Case continuation BCOs] (only
-in run_BCO):
+in run_BCO). Not every case has a continuation BCO: alternatives of a case
+whose scrutinee cannot leave the current BCO are compiled inline, without a
+frame (Note [Inlined case continuations] in GHC.StgToByteCode).
 
    |     ....      |
    +---------------+
