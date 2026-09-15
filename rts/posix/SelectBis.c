@@ -361,6 +361,10 @@ void pollCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr)
         /* Poll for I/O readiness, without waiting. */
         struct timeval tv = (struct timeval) { .tv_sec = 0, .tv_usec = 0 };
         int res = select(maxfd+1, iomgr->rfds, iomgr->wfds, NULL, &tv);
+        debugTrace(DEBUG_iomanager,
+                   "select(nfds = %lu, timeout = 0) = %d",
+                   (unsigned long) maxfd+1, res);
+
         if (res == 0) {
             /* There is no I/O ready. We'll return to the scheduler. */
 
@@ -422,11 +426,15 @@ bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr)
         /* Decide if we are going to wait if no I/O is ready, either:
          * poll only, wait indefinitely, or wait until a timeout.
          */
-        struct timeval tv, *timeout_us;
-        timeout_us = timeoutInMicroseconds(iomgr, wait, now, &tv);
+        Time timeout = timeoutWaitTime(iomgr, wait, now);
 
         /* Check for I/O readiness, possibly waiting. */
+        struct timeval tv, *timeout_us = timeoutAsTimeval(timeout, &tv);
         int res = select(maxfd+1, iomgr->rfds, iomgr->wfds, NULL, timeout_us);
+
+        debugTrace(DEBUG_iomanager,
+                   "select(nfds = %d, timeout = %" FMT_Int64 " us) = %d",
+                   maxfd+1, TimeToUS(timeout), res);
 
         if (res == 0) {
             /* Success but there is no I/O ready. This can happen either if we
@@ -434,7 +442,7 @@ bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr)
              * occurred before any I/O became ready. Either way, the do-while
              * loop condition will handle it.
              */
-            ASSERT(timeout_us != NULL);
+            ASSERT(timeout != -1);
 
         } else if (res > 0) {
             int ncompletions = res;
