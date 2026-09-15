@@ -350,7 +350,13 @@ hashToSegment# hash# = hash# `andI#` segmentMask#
 
 hashToIndex# :: MutableArray# RealWorld [FastString] -> Int# -> Int#
 hashToIndex# buckets# hash# =
-  (hash# `uncheckedIShiftRL#` segmentBits#) `remInt#` size#
+  -- CQ[bucket-mask]
+  -- Q: Why is masking with size-1 correct here?
+  -- A~ The bucket count is always a power of two: initialNumBuckets is 64
+  --    and maybeResizeSegment only doubles it. The shift is logical, so
+  --    the hash is non-negative and the mask yields the same index as
+  --    remInt# did.
+  (hash# `uncheckedIShiftRL#` segmentBits#) `andI#` (size# -# 1#)
   where
     !(I# segmentBits#) = segmentBits
     size# = sizeofMutableArray# buckets#
