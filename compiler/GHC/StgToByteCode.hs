@@ -662,44 +662,71 @@ schemeE d s p (StgCase scrut bndr _ alts)
 -- | Compile an expression that cannot leave the current BCO, leaving its value
 -- on top of the stack instead of returning it. Also returns the size of that
 -- value in bytes.
--- 'Nothing' if the expression might leave the BCO. The decision is made
--- without running any 'BcM' action.
+-- 'Nothing' if the expression might leave the BCO. The decision depends only
+-- on the expression and the platform, not on the stack depth or environment
+-- (which is why they are arguments of the result), and runs no 'BcM' action.
 -- See Note [Inlined case continuations].
-schemeIntoStack :: Platform -> StackDepth -> BCEnv -> CgStgExpr
-                -> Maybe (BcM (BCInstrList, ByteOff))
-schemeIntoStack platform d p e = case e of
-  StgLit lit -> Just $ pushAtom d p (StgLitArg lit)
+schemeIntoStack :: Platform -> CgStgExpr
+                -> Maybe (StackDepth -> BCEnv -> BcM (BCInstrList, ByteOff))
+schemeIntoStack platform e = case e of
+  StgLit lit -> Just $ \d p -> pushAtom d p (StgLitArg lit)
   StgApp x []
-    | isUnliftedType (idType x) -> Just $ pushAtom d p (StgVarArg x)
+    | isUnliftedType (idType x) -> Just $ \d p -> pushAtom d p (StgVarArg x)
   _ | Just _ <- maybe_is_tagToEnum_call e -> Nothing
   StgOpApp (StgPrimOp op) args _ty -> do
-    compute <- doPrimOpCode platform op d p args
-    Just $ do
-      (prim_code, width) <- compute
+    compute <- doPrimOpCode platform op args
+    Just $ \d p -> do
+      (prim_code, width) <- compute d p
       return (prim_code, wordsToBytes platform (primOpResultWords platform width))
   StgConApp con _cn args _tys
     | not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con)
-    -> Just $ do
+    -> Just $ \d p -> do
       alloc_con <- mkConAppCode d d p con args
       return (alloc_con, wordSize platform)
   StgTick (HpcTick tick_mod ix) rhs -> do
-    compute <- schemeIntoStack platform d p rhs
-    Just $ first (HPC_TICK (mkHpcTickBoxesLabell platform tick_mod) (fromIntegral ix) `consOL`)
-      <$> compute
+    compute <- schemeIntoStack platform rhs
+    Just $ \d p ->
+      first (HPC_TICK (mkHpcTickBoxesLabell platform tick_mod) (fromIntegral ix) `consOL`)
+        <$> compute d p
   StgTick Breakpoint{} _ -> Nothing
-  StgTick _ rhs -> schemeIntoStack platform d p rhs
-  StgLetNoEscape xlet bnd body -> schemeIntoStack platform d p (StgLet xlet bnd body)
+  StgTick _ rhs -> schemeIntoStack platform rhs
+  StgLetNoEscape xlet bnd body -> schemeIntoStack platform (StgLet xlet bnd body)
   StgLet _xlet (StgNonRec x (StgRhsCon _cc data_con _cnum _ticks args _typ)) body -> do
-    let !d2 = d + wordSize platform
-    compute_body <- schemeIntoStack platform d2 (UniqMap.addToUniqMap p x d2) body
-    Just $ do
+    compute_body <- schemeIntoStack platform body
+    Just $ \d p -> do
+      let !d2 = d + wordSize platform
       alloc_code <- mkConAppCode d d p data_con args
-      (body_code, szb) <- compute_body
+      (body_code, szb) <- compute_body d2 (UniqMap.addToUniqMap p x d2)
       -- drop the let-bound constructor from under the value
       return ( alloc_code `appOL` body_code `appOL`
                unitOL (SLIDE (bytesToWords platform szb) 1)
              , szb )
   _ -> Nothing
+
+-- | Does a case on this binder use a tuple return frame? Unboxed tuples and
+-- sums with at most one non-void component, like @(# Word# #)@ or
+-- @(# Int#, State# RealWorld #)@, do not: they have the same runtime rep as
+-- that component, and use the more efficient single-value return frames.
+ubxTupleFrame :: Platform -> Id -> Bool
+ubxTupleFrame platform bndr =
+  (isUnboxedTupleType bndr_ty || isUnboxedSumType bndr_ty) &&
+  length (typeArgReps platform bndr_ty) > 1
+  where
+    bndr_ty = idType bndr
+
+-- | For @case scrut of bndr { alts }@: if the alternatives are compiled inline
+-- into the current BCO, the code pushing the scrutinee's value; 'Nothing' if
+-- the case uses a continuation BCO. Pure, and independent of the stack depth
+-- and environment, so the decision can be made before any code is generated.
+-- See Note [Inlined case continuations].
+inlinedCaseScrutinee :: Platform -> DynFlags -> CgStgExpr -> Id
+                     -> Maybe (StackDepth -> BCEnv -> BcM (BCInstrList, ByteOff))
+inlinedCaseScrutinee platform dflags scrut bndr
+  | gopt Opt_BcInlineCaseConts dflags
+  , not (ubxTupleFrame platform bndr)
+  = schemeIntoStack platform scrut
+  | otherwise
+  = Nothing
 
 -- | Compile code to do a tail call.  Specifically, push the fn,
 -- slide the on-stack app back down to the sequel depth,
@@ -863,9 +890,9 @@ doPrimOp  :: Platform
           -> [StgArg]
           -> Maybe (BcM BCInstrList)
 doPrimOp platform op init_d s p args = do
-  compute <- doPrimOpCode platform op init_d p args
+  compute <- doPrimOpCode platform op args
   Just $ do
-    (prim_code, width) <- compute
+    (prim_code, width) <- compute init_d p
     let slide = mkSlideW (primOpResultWords platform width)
                          (bytesToWords platform $ init_d - s)
                 `snocOL` primOpReturn width
@@ -895,14 +922,13 @@ primOpReturn (PrimOpRetWidth width)
 
 -- | Compile a primop so that its result is left on top of the stack, without
 -- returning. Also returns the 'PrimOpRetWidth' of the operation.
--- 'Nothing' if the interpreter has no inline implementation of the primop.
+-- 'Nothing' if the interpreter has no inline implementation of the primop;
+-- this does not depend on the stack depth or environment.
 doPrimOpCode :: Platform
              -> PrimOp
-             -> StackDepth
-             -> BCEnv
              -> [StgArg]
-             -> Maybe (BcM (BCInstrList, PrimOpRetWidth))
-doPrimOpCode platform op init_d p args =
+             -> Maybe (StackDepth -> BCEnv -> BcM (BCInstrList, PrimOpRetWidth))
+doPrimOpCode platform op args =
   case op of
     IntAddOp -> sizedPrimOp OP_ADD
     Int64AddOp -> only64bit $ sizedPrimOp OP_ADD
@@ -1133,20 +1159,21 @@ doPrimOpCode platform op init_d p args =
 
     -- Push args, execute primop
     -- Decides width of operation based on first argument.
-    sizedPrimOp op_inst = Just $ do
+    sizedPrimOp op_inst = Just $ \init_d p -> do
       let width = primArg1Width (head args)
       prim_code <- mkPrimOpCode init_d p (op_inst width) $ args
       return (prim_code, PrimOpRetWidth width)
 
     -- primOpWithRep op w => operation @op@ resulting in result @w@ wide.
-    primOpWithRep :: BCInstr -> Width -> Maybe (BcM (BCInstrList, PrimOpRetWidth))
-    primOpWithRep op_inst result_width = Just $ do
+    primOpWithRep :: BCInstr -> Width
+                  -> Maybe (StackDepth -> BCEnv -> BcM (BCInstrList, PrimOpRetWidth))
+    primOpWithRep op_inst result_width = Just $ \init_d p -> do
       prim_code <- mkPrimOpCode init_d p op_inst $ args
       return (prim_code, PrimOpRetWidth result_width)
 
     -- Coerce the argument, requires them to be the same size
-    mk_conv :: Width -> Maybe (BcM (BCInstrList, PrimOpRetWidth))
-    mk_conv target_width = Just $ do
+    mk_conv :: Width -> Maybe (StackDepth -> BCEnv -> BcM (BCInstrList, PrimOpRetWidth))
+    mk_conv target_width = Just $ \init_d p -> do
       let width = primArg1Width (head args)
       massert (width == target_width)
       (push_code, _bytes) <- pushAtom init_d p (head args)
@@ -1232,17 +1259,12 @@ doCase d s p scrut bndr alts
         platform = profilePlatform profile
 
         -- Are we dealing with an unboxed tuple with a tuple return frame?
-        --
-        -- 'Simple' tuples with at most one non-void component,
-        -- like (# Word# #) or (# Int#, State# RealWorld #) do not have a
-        -- tuple return frame. This is because (# foo #) and (# foo, Void# #)
-        -- have the same runtime rep. We have more efficient small
-        -- return frames for the situations with one non-void element.
-
         non_void_arg_reps = typeArgReps platform bndr_ty
-        ubx_tuple_frame =
-          (isUnboxedTupleType bndr_ty || isUnboxedSumType bndr_ty) &&
-          length non_void_arg_reps > 1
+        ubx_tuple_frame = ubxTupleFrame platform bndr
+
+        -- Are the alternatives compiled inline? Decided before generating any
+        -- code. See Note [Inlined case continuations]
+        m_inline_scrut = inlinedCaseScrutinee platform (hsc_dflags hsc_env) scrut bndr
 
         profiling
           | Just interp <- hsc_interp hsc_env
@@ -1450,13 +1472,10 @@ doCase d s p scrut bndr alts
      alt_stuff <- mapM codeAlt alts
      alt_final0 <- mkMultiBranch maybe_ncons alt_stuff
 
-     case schemeIntoStack platform d p scrut of
+     case m_inline_scrut of
        -- See Note [Inlined case continuations]
-       Just compute_scrut
-         | gopt Opt_BcInlineCaseConts (hsc_dflags hsc_env)
-         , not ubx_tuple_frame
-         -> do
-          (scrut_code, szb) <- compute_scrut
+       Just compute_scrut -> do
+          (scrut_code, szb) <- compute_scrut d p
           -- A mismatch means the alternatives would read the wrong stack
           -- slots. Panic rather than falling back to the frame: a fallback
           -- would hide a layout bug in 'schemeIntoStack'.
@@ -1466,7 +1485,7 @@ doCase d s p scrut bndr alts
                     , text "scrutinee pushed (bytes):" <+> ppr szb
                     , text "binder size (words):" <+> ppr bndr_size ])
           return (scrut_code `appOL` alt_final0)
-       _ -> do
+       Nothing -> do
           let
 
               -- drop the stg_ctoi_*_info header...
