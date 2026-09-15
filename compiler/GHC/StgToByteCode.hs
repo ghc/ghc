@@ -70,7 +70,7 @@ import GHC.Types.SptEntry
 import GHC.ByteCode.Breakpoints
 import qualified GHC.HsToCore.Coverage as Coverage
 
-import Data.List ( genericReplicate, intersperse
+import Data.List ( genericReplicate, intersperse, isSuffixOf
                  , partition, scanl', sortBy, zip4, zip6 )
 import Foreign hiding (shiftL, shiftR)
 import Control.Monad
@@ -839,6 +839,13 @@ schemeJump d s p j target args = do
    return (push_code `appOL`
            mkSlideB platform (d_args - d) (d - base) `snocOL`
            JMP (jt_label target))
+
+-- | Which kind of closure the RHS of a join point rejected with this verdict is.
+joinClosureKind :: Maybe JoinPointVerdict -> ClosureKind
+joinClosureKind (Just JoinRejectRecursive{}) = ClosureRecJoin
+joinClosureKind (Just JoinRejectCrossBco{}) = ClosureCrossJoin
+joinClosureKind (Just _) = ClosureOtherJoin
+joinClosureKind Nothing = ClosureLet
 
 -- | The stack space a join point parameter takes when compiled as a label.
 joinParamSize :: Platform -> Id -> ByteOff
@@ -1789,9 +1796,25 @@ newtype ContPath = ContPath [Id]
 
 -- | Why the occurrences of a join point are not all jumps in one BCO.
 data CrossBco
-  = CrossSpread          -- ^ jumps in more than one BCO, none in a closure
-  | CrossClosure         -- ^ some occurrence is in a closure RHS
-  | CrossOther           -- ^ some occurrence is not a jump in tail position
+  = CrossSpread !SpreadShape   -- ^ jumps in more than one BCO, none in a closure
+  | CrossClosure !ClosureKind  -- ^ some occurrence is in a closure RHS
+  | CrossOther                 -- ^ some occurrence is not a jump in tail position
+  deriving Eq
+
+-- | How the BCOs of the jumps of a 'CrossSpread' join point are nested.
+data SpreadShape
+  = SpreadChain      -- ^ each BCO of a jump contains the next
+  | SpreadSiblings   -- ^ two of them are in different branches
+  deriving Eq
+
+-- | The closure an occurrence of a 'CrossClosure' join point is in. STG
+-- forbids occurrences under a lambda or in a thunk, so it should always be
+-- the RHS of a join point that is compiled as a closure itself.
+data ClosureKind
+  = ClosureRecJoin    -- ^ the RHS of a recursive join point
+  | ClosureCrossJoin  -- ^ the RHS of a join point rejected for cross-BCO jumps
+  | ClosureOtherJoin  -- ^ the RHS of a join point rejected for another reason
+  | ClosureLet        -- ^ an ordinary let, which STG should not allow
   deriving Eq
 
 -- | Would a rejected join point be eligible without the reason it was rejected
@@ -1832,16 +1855,16 @@ joinPointVerdicts platform dflags = foldl' top UniqMap.emptyUniqMap
         -- The verdict depends on the placement of the join points nested in
         -- the binding and the body, so decide them first.
         let !vs' = expr (binds vs bind) body
-            placement j = verdictPlacement =<< UniqMap.lookupUniqMap vs' j
-            verdict = joinPointVerdict platform dflags placement bind body
+            verdict_of j = UniqMap.lookupUniqMap vs' j
+            verdict = joinPointVerdict platform dflags verdict_of bind body
         in UniqMap.addListToUniqMap vs' [ (j, verdict) | j <- bindBinders bind ]
       StgTick _ body -> expr vs body
 
 -- | The verdict for the join point binding of @let-no-escape bind in body@,
--- given the placement of the labels of the join points nested in it.
-joinPointVerdict :: Platform -> DynFlags -> (Id -> Maybe ContPath) -> CgStgBinding
-                 -> CgStgExpr -> JoinPointVerdict
-joinPointVerdict platform dflags placement bind body
+-- given the verdicts of the join points nested in it.
+joinPointVerdict :: Platform -> DynFlags -> (Id -> Maybe JoinPointVerdict)
+                 -> CgStgBinding -> CgStgExpr -> JoinPointVerdict
+joinPointVerdict platform dflags verdict_of bind body
   | gopt Opt_InsertBreakpoints dflags = JoinRejectBreakpoints
   | not (gopt Opt_BcJoinPointsAsLabels dflags) = JoinRejectDisabled
   | otherwise = case bind of
@@ -1859,7 +1882,7 @@ joinPointVerdict platform dflags placement bind body
         -> JoinRejectRecursive (recursive j params rhs_body)
       StgRec{} -> JoinRejectRecGroup
   where
-    sites j params = joinJumpSites platform dflags placement j (length params)
+    sites j params = joinJumpSites platform dflags verdict_of j (length params)
     -- as for v1: all jumps in the body and the RHS in the defining BCO
     recursive j params rhs_body
       | all (== SiteIn (ContPath [])) (sites j params body ++ sites j params rhs_body)
@@ -1870,28 +1893,36 @@ joinPointVerdict platform dflags placement bind body
 -- | The BCO that all the occurrences are jumps in, if there is one.
 singleBco :: [JumpSite] -> Either CrossBco ContPath
 singleBco sites
-  | SiteInClosure `elem` sites = Left CrossClosure
+  | kind : _ <- [ k | SiteInClosure k <- sites ] = Left (CrossClosure kind)
   | SiteOther `elem` sites = Left CrossOther
   | otherwise = case sites of
       [] -> Right (ContPath [])  -- no jumps at all
       SiteIn path : rest
         | all (== SiteIn path) rest -> Right path
-      _ -> Left CrossSpread
+      _ -> Left (CrossSpread shape)
+  where
+    -- A path is the list of the case binders of the continuations enclosing
+    -- the jump, innermost first, so one BCO contains another exactly if its
+    -- path is a suffix of the other's.
+    paths = [ ks | SiteIn (ContPath ks) <- sites ]
+    shape | and [ p `isSuffixOf` q || q `isSuffixOf` p | p <- paths, q <- paths ]
+          = SpreadChain
+          | otherwise = SpreadSiblings
 
 -- | An occurrence of a join point.
 data JumpSite
-  = SiteIn !ContPath  -- ^ a saturated jump, emitted into the BCO at this path
-  | SiteInClosure     -- ^ any occurrence in the RHS of a closure
-  | SiteOther         -- ^ any other occurrence
+  = SiteIn !ContPath          -- ^ a saturated jump, emitted into the BCO at this path
+  | SiteInClosure !ClosureKind -- ^ any occurrence in the RHS of a closure
+  | SiteOther                 -- ^ any other occurrence
   deriving Eq
 
 -- | The occurrences of the join point @j@ in an expression, and which BCOs
--- their code is emitted into. The placement tells where the labels of the join
+-- their code is emitted into. The verdicts tell where the labels of the join
 -- points nested in the expression are, and 'inlinedCaseScrutinee' which cases
 -- have continuation BCOs, exactly as in code generation.
-joinJumpSites :: Platform -> DynFlags -> (Id -> Maybe ContPath) -> Id -> Int -> CgStgExpr
-              -> [JumpSite]
-joinJumpSites platform dflags placement j arity = go []
+joinJumpSites :: Platform -> DynFlags -> (Id -> Maybe JoinPointVerdict) -> Id -> Int
+              -> CgStgExpr -> [JumpSite]
+joinJumpSites platform dflags verdict_of j arity = go []
   where
     mentions_in args = any (argMentions j) args
 
@@ -1913,14 +1944,16 @@ joinJumpSites platform dflags placement j arity = go []
           -- the alternatives go into a continuation BCO
           else concatMap (go (bndr : path) . alt_rhs) alts
       -- every let-bound RHS is a BCO of its own
-      StgLet _ bind body -> [SiteInClosure | bindMentions j bind] ++ go path body
+      StgLet _ bind body -> [SiteInClosure ClosureLet | bindMentions j bind] ++ go path body
       StgLetNoEscape _ bind body
         | StgNonRec j' (StgRhsClosure _ _ _ _ rhs_body _) <- bind
-        , Just (ContPath rhs_path) <- placement j'
+        , Just (ContPath rhs_path) <- verdictPlacement =<< verdict_of j'
         -- the RHS of a label is emitted where the label is
         -> go (rhs_path ++ path) rhs_body ++ go path body
         | otherwise
-        -> [SiteInClosure | bindMentions j bind] ++ go path body
+        -> [ SiteInClosure (joinClosureKind (verdict_of j''))
+           | bindMentions j bind, j'' <- take 1 (bindBinders bind) ]
+           ++ go path body
       StgTick tick body -> [SiteOther | tickMentions j tick] ++ go path body
 
 -- | Does the variable occur anywhere in the expression, including in closures
@@ -1977,8 +2010,18 @@ joinPointStats verdict_map =
     <+> number (== JoinRejectDisabled) <+> text "rejected-disabled,"
     <+> number isCrossBco <+> text "rejected-cross-BCO"
     <+> parens (hsep (punctuate comma
-          [ number (== JoinRejectCrossBco CrossSpread) <+> text "spread"
-          , number (== JoinRejectCrossBco CrossClosure) <+> text "in-closure"
+          [ number (== JoinRejectCrossBco (CrossSpread SpreadChain))
+              <+> text "spread-chain"
+          , number (== JoinRejectCrossBco (CrossSpread SpreadSiblings))
+              <+> text "spread-siblings"
+          , number (== JoinRejectCrossBco (CrossClosure ClosureRecJoin))
+              <+> text "in-rec-join"
+          , number (== JoinRejectCrossBco (CrossClosure ClosureCrossJoin))
+              <+> text "in-cross-join"
+          , number (== JoinRejectCrossBco (CrossClosure ClosureOtherJoin))
+              <+> text "in-other-join"
+          , number (== JoinRejectCrossBco (CrossClosure ClosureLet))
+              <+> text "in-let"
           , number (== JoinRejectCrossBco CrossOther) <+> text "other" ]))
   where
     -- counting does not depend on the order
