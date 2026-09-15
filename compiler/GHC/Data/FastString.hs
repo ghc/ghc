@@ -589,7 +589,12 @@ mkNewFastStringShortByteString :: ShortByteString -> Int
 mkNewFastStringShortByteString sbs uid n_zencs = do
   let zstr = mkZFastString n_zencs sbs
       chars = utf8CountCharsShortByteString sbs
-  return (FastString uid chars sbs zstr)
+  -- CQ[force-new-fs]
+  -- Q: Why the strict return?
+  -- A~ n_chars is a strict field, so a lazy return makes the whole
+  --    constructor (including the char-count loop) a thunk. That thunk
+  --    is what gets stored in the bucket and handed to the caller.
+  return $! FastString uid chars sbs zstr
 
 hashStr  :: ShortByteString -> Int
  -- produce a hash value between 0 & m (inclusive)
