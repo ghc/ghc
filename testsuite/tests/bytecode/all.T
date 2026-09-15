@@ -30,3 +30,22 @@ test('InlineCaseConts',
 test('InlineCaseContsOff',
      [extra_files(['InlineCaseConts.hs']), req_interp, only_ways(['normal'])],
      run_command, [inline_case_conts_cmd.format(compiler='{compiler}', flags='-fno-bc-inline-case-conts')])
+
+# Join points are compiled as labels when all their jumps stay in the BCO of
+# the definition (Note [Join points as labels]); run the program in the
+# interpreter, and count the ProtoBCOs with and without
+# -fbc-join-points-as-labels.
+join_points_opts = "-O -fno-unoptimized-core-for-interpreter -fno-break-points"
+test('JoinPointsAsLabels',
+     [extra_files(['JoinPointsAsLabels.hs']), req_interp, only_ways(['normal'])],
+     run_command,
+     ['{compiler} -e main ' + join_points_opts + ' JoinPointsAsLabels.hs'])
+join_points_count_cmd = ("{compiler} -fbyte-code -no-link -ddump-bcos -fforce-recomp "
+                         "-dno-typeable-binds -v0 " + join_points_opts +
+                         " {flags} JoinPointsAsLabels.hs | grep -c '^ *ProtoBCO'")
+test('JoinPointsAsLabelsCount',
+     [extra_files(['JoinPointsAsLabels.hs']), req_interp, only_ways(['normal'])],
+     run_command, [join_points_count_cmd.format(compiler='{compiler}', flags='')])
+test('JoinPointsAsLabelsCountOff',
+     [extra_files(['JoinPointsAsLabels.hs']), req_interp, only_ways(['normal'])],
+     run_command, [join_points_count_cmd.format(compiler='{compiler}', flags='-fno-bc-join-points-as-labels')])

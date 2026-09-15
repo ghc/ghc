@@ -1316,3 +1316,22 @@ Other
     ``-fno-bc-inline-case-conts`` restores the old code shape, which is useful
     for bisecting interpreter bugs.
 
+.. ghc-flag:: -fbc-join-points-as-labels
+    :shortdesc: Compile join points in bytecode as labels in the current BCO
+        when all their jumps stay in it.
+    :reverse: -fno-bc-join-points-as-labels
+    :type: dynamic
+
+    :since: 10.2.1
+    :default: enabled
+
+    A join point is normally compiled to bytecode like any other local
+    function: a heap-allocated closure with a bytecode object of its own,
+    called at every jump. When every jump to a non-recursive join point is
+    emitted into the bytecode object containing its definition, the bytecode
+    generator instead emits the join point's code at a label in that object,
+    and each jump as a stack adjustment followed by a jump to the label. This
+    has no effect when breakpoints are enabled (:ghc-flag:`-fbreak-points`).
+    ``-fno-bc-join-points-as-labels`` restores the old code shape, which is
+    useful for bisecting interpreter bugs.
+

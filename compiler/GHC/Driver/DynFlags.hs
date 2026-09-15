@@ -1222,6 +1222,7 @@ defaultFlags settings
 -- See Note [Updating flag description in the User's Guide]
   = [ Opt_AutoLinkPackages,
       Opt_BcInlineCaseConts,
+      Opt_BcJoinPointsAsLabels,
       Opt_DiagnosticsShowCaret,
       Opt_EmbedManifest,
       Opt_FamAppCache,

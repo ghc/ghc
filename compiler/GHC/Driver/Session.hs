@@ -2646,6 +2646,7 @@ fFlagsDeps = [
   flagSpec "check-prim-bounds"                Opt_DoBoundsChecking,
   flagSpec "add-bco-name"                     Opt_AddBcoName,
   flagSpec "bc-inline-case-conts"             Opt_BcInlineCaseConts,
+  flagSpec "bc-join-points-as-labels"         Opt_BcJoinPointsAsLabels,
   flagSpec "num-constant-folding"             Opt_NumConstantFolding,
   flagSpec "core-constant-folding"            Opt_CoreConstantFolding,
   flagSpec "fast-pap-calls"                   Opt_FastPAPCalls,

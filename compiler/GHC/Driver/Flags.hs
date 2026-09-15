@@ -607,6 +607,7 @@ data GeneralFlag
    | Opt_DoBoundsChecking
    | Opt_AddBcoName
    | Opt_BcInlineCaseConts
+   | Opt_BcJoinPointsAsLabels
    | Opt_NoLlvmMangler                  -- hidden flag
    | Opt_FastLlvm                       -- hidden flag
    | Opt_NoTypeableBinds
