@@ -1,9 +1,0 @@
-section: compiler
-issues: #27047
-mrs: !15619
-synopsis:
-  Fix incorrect overflow bit for ``MUL2`` on AArch64 for sub-``W64`` operands.
-description:
-  This fixes the computation of the overflow bit for ``MO_S_Mul2`` on
-  sub-``W64`` operands; the old condition was exactly inverted.
-

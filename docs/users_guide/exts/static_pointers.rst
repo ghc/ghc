@@ -40,11 +40,9 @@ The compiler includes entries in this table for all static forms found
 in the linked modules. The value can be obtained from the reference via
 :base-ref:`GHC.StaticPtr.deRefStaticPtr`.
 
-The body ``e`` of a ``static e`` expression must be a closed expression. Where
-we say an expression is *closed* when all of its free (type) variables are
-closed. And a variable is *closed* if it is let-bound to a *closed* expression
-and its type is *closed* as well. And a type is *closed* if it has no free
-variables.
+In an expression ``static e``, the free term variables of ``e`` must all be
+bound at top level, and all typing constraints arising from ``e`` must be
+soluble using global instance declarations only.
 
 All of the following are permissible: ::
 
@@ -56,14 +54,12 @@ All of the following are permissible: ::
     ref3 = static (inc 1)
     ref4 = static ((\x -> x + 1) (1 :: Int))
     ref5 = static (let x = 'a' in x)
-    ref6 = let x = 'a' in static x
 
 While the following definitions are rejected: ::
 
-    ref7 y = let x = y in static x    -- x is not closed
-    ref8 y = static (let x = 1 in y)  -- y is not let-bound
-    ref9 (y :: a) = let x = undefined :: a
-                     in static x      -- x has a non-closed type
+    ref6 = let x = 'a' in static x    -- x is not bound at top level
+    ref7 y = let x = y in static x    -- x is not bound at top level
+    ref8 y = static (let x = 1 in y)  -- y is not bound at top level
 
 .. note::
 

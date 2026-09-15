@@ -11,6 +11,11 @@ for specific guidance on migrating programs to this release.
 Language
 ~~~~~~~~
 
+- The default language edition has been bumped to :extension:`GHC2024`, as per
+  the accepted `GHC proposal 632
+  <https://github.com/ghc-proposals/ghc-proposals/pull/632>`_
+  (:ghc-ticket:`26039`).
+
 - Fix a bug introduced in GHC 9.10 where GHC would erroneously accept infix uses
   of promoted data constructors without enabling :extension:`DataKinds`. As a
   result, you may need to enable :extension:`DataKinds` in code that did not
@@ -32,7 +37,7 @@ Language
 
 - Implicit parameters and ``ImpredicativeTypes``.  GHC now knows
   that if ``?foo::S`` is coecible to ``?foo::T`` only if ``S`` is coercible to ``T``.
-  Example (from :ghc-ticket:`#26737`)::
+  Example (from :ghc-ticket:`26737`)::
 
     {-# LANGUAGE ImplicitParams, ImpredicativeTypes #-}
     newtype N = MkN Int
@@ -68,8 +73,34 @@ Language
   modifiers now bind tighter than constructors. The first now parses as
   ``let (%1 x):xs = ... in ...``, and the second no longer parses at all.
 
+- The treatment of static forms has been simplified, implementing `GHC proposal
+  732 <https://github.com/ghc-proposals/ghc-proposals/pull/732>`_
+  (:ghc-ticket:`26556`). There is a new, simple rule for ``(static e)``, namely
+  that the free term variables of ``e`` must be bound at top level. This also
+  fixes :ghc-ticket:`26545`, :ghc-ticket:`24464`, :ghc-ticket:`24773`,
+  :ghc-ticket:`16981`, :ghc-ticket:`26466` and :ghc-ticket:`27664`.
+
+- Allow kinds of the form ``k -> *`` and ``* -> k`` to occur in expression
+  syntax, i.e. to be used as required type arguments (:ghc-ticket:`26587`,
+  :ghc-ticket:`26967`). For example::
+
+      {-# LANGUAGE RequiredTypeArguments, StarIsType #-}
+      x1 = f (* -> * -> *)
+      x2 = f (forall k. k -> *)
+      x3 = f ((* -> *) -> Constraint)
+
+- Infix holes (``t1 `_` t2``) are now permitted in types, following the
+  precedent set by term-level expressions (:ghc-ticket:`11107`). Error messages
+  for illegal promotion ticks are now reported at more precise source locations.
+
+- List comprehensions are now considered to be completely non-linear under
+  :extension:`LinearTypes` (:ghc-ticket:`25081`).
+
 Compiler
 ~~~~~~~~
+
+- :ghc-flag:`-fpolymorphic-specialisation` is now switched on by default
+  (:ghc-ticket:`23559`).
 
 - Code coverage's (:ghc-flag:`-fhpc`) treatment of record fields now extends
   beyond record fields accessed via :extension:`RecordWildCards` and
@@ -81,14 +112,15 @@ Compiler
   will will not yet mark ``bar`` or ``baz`` as covered.
 
 - Pattern synonyms can now be suggested as valid hole fits (except, of course,
-  if they are unidirectional).
+  if they are unidirectional). Valid hole fits also now use deep subsumption
+  for data constructors, matching up multiplicities (:ghc-ticket:`26338`).
 
 - GHC uses the information from the definition of a *closed* type family to
   generate some extra functional dependencies for type equalities involving
   that type family. As a consequence:
 
   * typechecking will succeed a bit more often (see :ghc-ticket:`23162`)
-  * pattern-match incompleteness checking is a bit smarter, giving fewer false warnings (see :ghc-ticket:`#22652`)
+  * pattern-match incompleteness checking is a bit smarter, giving fewer false warnings (see :ghc-ticket:`22652`)
 
 - When multiple ``-msse*`` flags are given, the maximum version takes effect.
   For example, ``-msse4.2 -msse2`` is now equivalent to ``-msse4.2``.
@@ -103,29 +135,29 @@ Compiler
 - The flag ``-fhide-source-paths`` is enabled by default at verbosity level 1 and below by default.
   This improves the readability of the compiler output, as we transition from:
 
-.. code-block:: text
+  .. code-block:: text
 
-    [  1 of 139] Compiling Distribution.Compat.Binary ( src/Distribution/Compat/Binary.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Binary.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Binary.dyn_o )
-    [  2 of 139] Compiling Distribution.Compat.Exception ( src/Distribution/Compat/Exception.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Exception.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Exception.dyn_o )
-    [  3 of 139] Compiling Distribution.Compat.Newtype ( src/Distribution/Compat/Newtype.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Newtype.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Newtype.dyn_o )
-    [  4 of 139] Compiling Distribution.Compat.Semigroup ( src/Distribution/Compat/Semigroup.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Semigroup.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Semigroup.dyn_o )
-    [  5 of 139] Compiling Distribution.PackageDescription.Utils ( src/Distribution/PackageDescription/Utils.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/PackageDescription/Utils.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/PackageDescription/Utils.dyn_o )
-    [  6 of 139] Compiling Distribution.Utils.Base62 ( src/Distribution/Utils/Base62.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Utils/Base62.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Utils/Base62.dyn_o )
-    [  7 of 139] Compiling Distribution.Utils.MD5 ( src/Distribution/Utils/MD5.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Utils/MD5.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Utils/MD5.dyn_o )
+      [  1 of 139] Compiling Distribution.Compat.Binary ( src/Distribution/Compat/Binary.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Binary.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Binary.dyn_o )
+      [  2 of 139] Compiling Distribution.Compat.Exception ( src/Distribution/Compat/Exception.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Exception.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Exception.dyn_o )
+      [  3 of 139] Compiling Distribution.Compat.Newtype ( src/Distribution/Compat/Newtype.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Newtype.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Newtype.dyn_o )
+      [  4 of 139] Compiling Distribution.Compat.Semigroup ( src/Distribution/Compat/Semigroup.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Semigroup.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Semigroup.dyn_o )
+      [  5 of 139] Compiling Distribution.PackageDescription.Utils ( src/Distribution/PackageDescription/Utils.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/PackageDescription/Utils.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/PackageDescription/Utils.dyn_o )
+      [  6 of 139] Compiling Distribution.Utils.Base62 ( src/Distribution/Utils/Base62.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Utils/Base62.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Utils/Base62.dyn_o )
+      [  7 of 139] Compiling Distribution.Utils.MD5 ( src/Distribution/Utils/MD5.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Utils/MD5.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Utils/MD5.dyn_o )
 
-to
+  to
 
-.. code-block:: text
+  .. code-block:: text
 
-    [  1 of 139] Compiling Distribution.Compat.Binary
-    [  2 of 139] Compiling Distribution.Compat.Exception
-    [  3 of 139] Compiling Distribution.Compat.Newtype
-    [  4 of 139] Compiling Distribution.Compat.Semigroup
-    [  5 of 139] Compiling Distribution.PackageDescription.Utils
-    [  6 of 139] Compiling Distribution.Utils.Base62
-    [  7 of 139] Compiling Distribution.Utils.MD5
+      [  1 of 139] Compiling Distribution.Compat.Binary
+      [  2 of 139] Compiling Distribution.Compat.Exception
+      [  3 of 139] Compiling Distribution.Compat.Newtype
+      [  4 of 139] Compiling Distribution.Compat.Semigroup
+      [  5 of 139] Compiling Distribution.PackageDescription.Utils
+      [  6 of 139] Compiling Distribution.Utils.Base62
+      [  7 of 139] Compiling Distribution.Utils.MD5
 
-See :ghc-ticket:`25345`.
+  See :ghc-ticket:`25345`.
 
 - Add several options for x86 extensions: :ghc-flag:`-mavx512bw`,
   :ghc-flag:`-mavx512dq`, :ghc-flag:`-mavx512vl`, and :ghc-flag:`-mgfni`.
@@ -141,42 +173,842 @@ See :ghc-ticket:`25345`.
 - SIMD support has been added to the AArch64 Native Code Generator.
   Currently, 128-bit wide vectors are supported via ASIMD (also known as NEON).
 
+- Added the :ghc-flag:`-fwrite-byte-code` option which makes GHC emit a
+  ``.gbc`` file which contains a serialised representation of bytecode.
+
+  The bytecode can be loaded by the compiler to avoid having to reinterpret a
+  module when using the bytecode interpreter (for example, in GHCi).
+
+  There are also the new options:
+
+  * :ghc-flag:`-gbcdir ⟨dir⟩`: Specify the directory to place the gbc files
+  * :ghc-flag:`-gbcsuf ⟨suffix⟩`: Specify the suffix for gbc files
+
+  The option :ghc-flag:`-fbyte-code-and-object-code` now implies
+  :ghc-flag:`-fwrite-byte-code`.
+
+- Added support for building bytecode libraries. A bytecode library is a
+  collection of bytecode files (``.gbc``) and a library which combines together
+  additional object files. A bytecode library is created by invoking GHC with
+  the :ghc-flag:`-bytecodelib` flag.
+
+  A bytecode library can be used to satisfy a package dependency when using the
+  interpreter. If a user enables :ghc-flag:`-fprefer-byte-code`, then if a
+  package provides a bytecode library, that will be loaded and used to satisfy
+  the dependency (:ghc-ticket:`26298`).
+
+- Support statically linking executables properly (:ghc-ticket:`26434`).
+  This does a number of things:
+
+  * Makes GHC aware of ``extra-libraries-static`` (this changes the package
+    database format).
+  * Adds a switch :ghc-flag:`-static-external` that will honour
+    ``extra-libraries-static`` to link external system dependencies statically.
+    See also :ghc-flag:`-exclude-static-external ⟨lib1,lib2,...⟩`.
+  * Adds a new field to settings/targets: "ld supports verbatim namespace".
+  * Adds a switch :ghc-flag:`-fully-static` that is meant as a high-level
+    interface for e.g. cabal. This also honours ``extra-libraries-static``.
+
+- Warn when :ghc-flag:`-dynamic` is mixed with :ghc-flag:`-staticlib`.
+
+- GHC now builds the external interpreter program on demand when it is missing
+  (:ghc-ticket:`24731`). ``iserv`` has been removed from the tree completely:
+  Hadrian no longer builds or distributes ``iserv``, and the GHC driver uses
+  the on-demand external interpreter by default when invoked with
+  :ghc-flag:`-fexternal-interpreter`, without needing to specify ``-pgmi ""``.
+  The on-demand external interpreter program is linked with the threaded RTS if
+  it is available in the target RTS ways.
+
+- Support larger unboxed sums: the known constructor encoding for sums in
+  interfaces now uses 11 bits for both the arity and the alternative (up from
+  8 and 6, respectively).
+
+- Changed the way data constructors are typechecked, in particular how
+  multiplicities are made to line up (:ghc-ticket:`26072`, :ghc-ticket:`26311`).
+
+- The LoongArch64 native code generator now supports finer-grained ``DBAR``
+  hints on LA664 and newer microarchitectures, including for atomic writes,
+  implements ``MO_BSwap`` and ``MO_BRev`` with bit-manipulation instructions,
+  and adds ``cmpxchg`` and ``xchg`` primops. The new :ghc-flag:`-mla664` flag
+  enables the LA664 instructions. LA464 remains the default.
+
+- Fixed implicit lifting to use a precise level check (:ghc-ticket:`26088`).
+
+- :ghc-flag:`-fdiagnostics-as-json` output now includes the rendered diagnostic
+  message, in the same format GHC would produce without the flag
+  (:ghc-ticket:`26173`).
+
+- :ghc-flag:`-fdiagnostics-as-json` is now respected for error messages from
+  pre-processors (:ghc-ticket:`25480`), for Core diagnostics and for driver
+  diagnostics (see :ghc-ticket:`24113`).
+
+- Changed the error message of ``ghcExit`` from ``<no location info>: error:
+  Compilation had errors`` to ``Compilation had errors``.
+
+- Handle non-fractional ``CmmFloat`` literals (infinity and NaN) in Cmm's
+  common block eliminator (:ghc-ticket:`26229`).
+
+- Allow defining ``HasField`` instances for naughty fields
+  (:ghc-ticket:`26295`).
+
+- Don't warn about unused imports when a generated import is used
+  (:ghc-ticket:`21730`).
+
+- Serialize wired-in names as external names when creating HIE files
+  (:ghc-ticket:`26238`).
+
+- Fixed the simplifier firing rules or inlinings that are not active throughout
+  the whole activation range of a RULE or stable unfolding when simplifying its
+  right-hand side (:ghc-ticket:`26323`).
+
+- Non-pointer fields of data constructors are now sorted by size, always
+  storing the largest field first, which reduces wasted padding/alignment space
+  in closures with differently sized fields. Unboxed sums with a small enough
+  number of constructors now use ``Word8``, ``Word16`` or ``Word32`` for the
+  tag field.
+
+- Typechecker plugins (and defaulting plugins) are now run during pattern-match
+  checking, which significantly improves pattern-match warnings for programs
+  that rely on typechecking plugins in order to typecheck (e.g. dealing with
+  GADTs indexed by natural numbers and using natural number arithmetic)
+  (:ghc-ticket:`26395`).
+
+- Core plugins can now access unoptimized Core: the first simple optimization
+  pass after desugaring is now a real ``CoreToDo`` pass, which allows
+  ``CorePlugin``\ s to decide whether they want to be executed before or after
+  this pass (:ghc-ticket:`23337`).
+
+- Added the :ghc-flag:`-dno-builtin-rules` and :ghc-flag:`-dno-bignum-rules`
+  debug flags to disable built-in rules and bignum rules respectively
+  (:ghc-ticket:`20298`).
+
+- Fixed LLVM linking of Intel BMI intrinsics ``pdep{8,16}`` and ``pext{8,16}``
+  (:ghc-ticket:`26065`).
+
+- Fixed a regression that caused overloaded functions to no longer be
+  specialised as effectively as in previous releases, hurting runtime
+  performance (:ghc-ticket:`26831`).
+
+- Warn when :ghc-flag:`-finfo-table-map` is used with :ghc-flag:`-fllvm`, as
+  these are currently not supported together (:ghc-ticket:`26435`).
+
+- The driver now recognises ``.dyn_o`` files as object files when passed on
+  the command line, fixing plugins compiled with this suffix
+  (:ghc-ticket:`24486`).
+
+- Fixed ``-dsuppress-uniques`` to also suppress the unique of free variables
+  shown in demand signatures (:ghc-ticket:`27106`).
+
+- Improved the detection of custom type errors in equality constraints, which
+  improves detection of redundant pattern match warnings (:ghc-ticket:`26400`).
+
+- Introduced :ghc-flag:`-fno-distinct-constructor-tables` and
+  :ghc-flag:`-fdistinct-constructor-tables-only=⟨cs⟩`, to only generate
+  distinct constructor tables for specific constructors (:ghc-ticket:`23703`).
+
+- Fixed typechecking of pattern synonym declarations without a type signature
+  that contain unfilled metavariables (:ghc-ticket:`26465`).
+
+- Added hints and explanations for unsolved ``HasField`` constraints, such as
+  similar name suggestions and import suggestions (:ghc-ticket:`18776`,
+  :ghc-ticket:`22382`, :ghc-ticket:`26480`).
+
+- Improved compiler performance by making ``OccAnal`` stricter, reducing
+  residency and improving compile times.
+
+- Fixed an oversight that caused explicit namespace specifiers of subordinate
+  export items to be ignored; ``module M (T (type A))`` is now rejected
+  (:ghc-ticket:`12488`).
+
+- Added an ``HsWrapper`` optimiser, fixing a regression where ``SPECIALIZE``
+  pragmas with higher-rank quantifiers were rejected with "RULE left-hand side
+  too complicated to desugar" (:ghc-ticket:`26349`).
+
+- Fixed a shadowing bug with implicit parameters (:ghc-ticket:`26451`).
+
+- Fixed a bug in the Cmm register-conflict analysis where an assignment's
+  left-hand side register was not accounted for, which could generate incorrect
+  code (:ghc-ticket:`26550`).
+
+- Fixed a register allocator bug where the format of a spilled register was
+  not updated after reassignment, which could corrupt vector register contents
+  (:ghc-ticket:`26542`).
+
+- Fixed the order of spill/reload instructions emitted by the AArch64 native
+  code generator (:ghc-ticket:`26537`).
+
+- Pass the ``+evex512`` attribute to LLVM 18+ when ``-mavx512f`` is set
+  (:ghc-ticket:`26410`).
+
+- Properly handle errors during the link step in the driver
+  (:ghc-ticket:`26496`).
+
+- User-written kinds of data declarations are now preserved instead of being
+  expanded during kind checking. This affects the kinds stored in interface
+  files and thus the documentation generated by Haddock.
+
+- Units with no exposed modules are now excluded from the
+  :ghc-flag:`-Wunused-packages` check (:ghc-ticket:`24120`).
+
+- Fixed a bug in defaulting, which was doing some unification but then failing
+  to iterate (:ghc-ticket:`26582`).
+
+- ``ghc -M`` now reports all missing modules at once, as opposed to only
+  reporting a single missing module (:ghc-ticket:`26551`).
+
+- Improved the performance of pattern-match overlap checking when there is a
+  very large set of patterns (:ghc-ticket:`26514`).
+
+- Fixed PIC jump tables on Windows by avoiding overflows in jump tables
+  (:ghc-ticket:`24016`).
+
+- Fixed an incorrect optimisation that folded multiplication, division, or
+  remainder by an out-of-range power-of-2 literal into a shift
+  (:ghc-ticket:`25664`).
+
+- Reinstated the Template Haskell level check when reporting out-of-scope
+  identifiers, fixing misleading errors caused by staging errors
+  (:ghc-ticket:`26099`).
+
+- Fixed a compiler panic when computing reachability to a module graph node
+  that does not exist (:ghc-ticket:`26568`).
+
+- Reduced memory usage of the package database by using ``OsPath`` instead of
+  ``FilePath`` in ``PkgDbRef`` and ``UnitDatabase``.
+
+- Reduced allocations during recompilation checking by using ``OsPath`` when
+  checking file modification times.
+
+- Fixed a number of register allocation bugs relating to register formats,
+  some of which could corrupt vector register contents when spilling and
+  reloading (:ghc-ticket:`26411`, :ghc-ticket:`26526`, :ghc-ticket:`26668`).
+
+- Enabled a Cmm comparison-folding optimisation on all architectures,
+  previously restricted to x86/x86-64 (:ghc-ticket:`26664`).
+
+- Bumped the maximum supported LLVM version to 23 (:ghc-ticket:`26813`,
+  :ghc-ticket:`27764`).
+
+- Fixed the inferred quantification order of function arrows with an explicit
+  multiplicity, ``a %m -> b``, to be ``[a, m, b]`` (:ghc-ticket:`23764`).
+
+- Fixed data family instance type class instance changes not triggering
+  recompilation (:ghc-ticket:`26705`).
+
+- Fixed associated type family changes not triggering recompilation in
+  dependent modules (:ghc-ticket:`26183`).
+
+- Fixed a missing InVar->OutVar lookup in ``SetLevels`` (:ghc-ticket:`26681`).
+
+- Fixed LLVM backend ``pdep``/``pext`` handling for i386 targets
+  (:ghc-ticket:`26450`).
+
+- Account for "stupid theta" in the demand signature of data constructor
+  wrappers (:ghc-ticket:`26748`).
+
+- Fixed split sections on Windows (:ghc-ticket:`26696`, :ghc-ticket:`26494`).
+
+- Fixed scoping errors in the type-class specialiser (:ghc-ticket:`26682`,
+  :ghc-ticket:`27629`).
+
+- Improved case merging by floating join points out of ``DEFAULT``
+  alternatives (:ghc-ticket:`26709`).
+
+- The driver now uses ``-O3`` as the LLVM optimization level when compiling
+  with :ghc-flag:`-O2`, trading compilation time for faster generated code.
+
+- Improved newtype unwrapping in the constraint solver (:ghc-ticket:`26746`).
+
+- Add evals for strict data constructor arguments in worker functions
+  (:ghc-ticket:`26722`).
+
+- Fixed PPC NCG shift right operations at smaller than word sizes
+  (:ghc-ticket:`26519`).
+
+- Fixed split sections for the LLVM backend (:ghc-ticket:`26770`).
+
+- PPC NCG: generate the clear-right instruction at architecture width for all
+  ``MachOp`` widths (:ghc-ticket:`24145`).
+
+- Fixed two bugs in short-cut constraint solving, one of which stopped the
+  ``constraints`` package from compiling (:ghc-ticket:`26805`).
+
+- Fixed a compiler loop caused by not taking the current simplifier phase into
+  account when computing the phase range used to simplify the right-hand side
+  of a RULE or stable unfolding (:ghc-ticket:`26826`).
+
+- Fixed a subtle bug in ``GHC.Core.Utils.mkTick`` that could generate
+  type-incorrect code (:ghc-ticket:`26772`).
+
+- Improved error messages for unsolved representational equalities
+  (:ghc-ticket:`15850`, :ghc-ticket:`20289`, :ghc-ticket:`20468`,
+  :ghc-ticket:`23731`, :ghc-ticket:`25949`, :ghc-ticket:`26137`).
+
+- Improved defaulting of representational equalities, which can now handle
+  situations involving functional dependencies and type-family injectivity
+  annotations.
+
+- Fixed non-determinism in ``TyLitMap`` by using deterministic maps for
+  strings (:ghc-ticket:`26846`).
+
+- Under :extension:`ExplicitLevelImports`, imported types are now subject to
+  the same level (staging) checks as values (:ghc-ticket:`26098`).
+
+- Fix the interaction of :extension:`ExplicitLevelImports` with qualified
+  imports (:ghc-ticket:`26616`, :ghc-ticket:`27385`).
+
+- PPC NCG: Use libcall for 64-bit ``cmpxchg`` on 32-bit PowerPC
+  (:ghc-ticket:`23969`).
+
+- NCG for PPC: add pattern for ``CmmRegOff`` to ``iselExpr64``
+  (:ghc-ticket:`26828`).
+
+- Fixed cast worker/wrapper incorrectly firing on INLINE functions
+  (:ghc-ticket:`26903`).
+
+- Fixed a long-standing interaction between ticks and casts in ``Eliminate
+  Identity Case``.
+
+- Fixed non-determinism in ``WithHsDocIdentifiers`` binary instance by using a
+  stable sort (:ghc-ticket:`26858`).
+
+- Make the order of usages in interface files deterministic
+  (:ghc-ticket:`26877`).
+
+- Fixed a bug where ``mergeCaseAlts`` could move a tick in between a join
+  point and its jump, producing invalid Core (:ghc-ticket:`26642`,
+  :ghc-ticket:`26693`, :ghc-ticket:`26929`).
+
+- Fixed negative type literals bypassing the renamer check via
+  :extension:`RequiredTypeArguments`, causing the compiler to hang
+  (:ghc-ticket:`26861`).
+
+- Fixed :ghc-flag:`-fcheck-prim-bounds` for non-constant arguments; previously
+  bounds were only checked for constant (literal) arguments
+  (:ghc-ticket:`26958`).
+
+- Fixed linking against ``libm`` on toolchains that enable ``--as-needed`` by
+  default, by adding ``-lm`` after the object files on the link line.
+
+- Improved error messages for unsupported type literals, such as unboxed or
+  fractional literals (:ghc-ticket:`26862`, :ghc-ticket:`25121`).
+
+- Vector literals on AArch64 without the LLVM backend now report "SIMD
+  operations on AArch64 currently require the LLVM backend" instead of
+  panicking.
+
+- ``NOINLINE`` pragmas are now applied to generated ``Typeable`` bindings,
+  reducing the number of exported top level names and unfoldings, which
+  reduces interface file sizes and the number of global/dynamic linker
+  symbols.
+
+- Fixed the Haddock documentation for ``GHC.Prim`` (:ghc-ticket:`26954`).
+
+- Fixed non-determinism in the order of packages passed to the linker, which
+  resulted in non-reproducible builds (:ghc-ticket:`26838`).
+
+- Fixed demand analysis giving an absent demand to an argument that was still
+  used by the function's stable unfolding, which could cause a run-time crash
+  (:ghc-ticket:`26416`, :ghc-ticket:`27626`).
+
+- Constant-fold numeric literal casts when building unboxed sums during
+  unarisation, so that top-level closures built from unboxed-sum literals are
+  statically allocated instead of being allocated as thunks
+  (:ghc-ticket:`25650`).
+
+- Fixed spurious incomplete record selector warnings for bare record field
+  projections such as ``.fld`` (:ghc-ticket:`26686`).
+
+- Fixed ``capi`` wrappers failing to compile with newer GCC/Clang by collapsing
+  chains of void pointers to a single ``void*`` (:ghc-ticket:`26852`).
+
+- Unpacking of enumeration types now goes to ``Word8#``/``Word16#``/``Word#``
+  directly instead of through an intermediate unboxed sum, allowing a
+  branchless conversion (:ghc-ticket:`26970`).
+
+- Fixed an infinite loop in the type checker triggered by deep subsumption
+  (:ghc-ticket:`26823`).
+
+- AArch64: fixed a register allocation bug where ``MOVK``'s destination
+  register was not marked as both read and written, which could clobber live
+  values (:ghc-ticket:`26980`).
+
+- Implemented basic value range analysis to determine at compile time the
+  result of some comparison primops, and to filter unreachable alternatives in
+  case expressions (:ghc-ticket:`25718`).
+
+- Word-to-float conversions on x86 now emit direct assembly instead of a C
+  function call (:ghc-ticket:`22252`).
+
+- Fixed a segfault caused by refining the ``DEFAULT`` alternative for
+  dictionaries of unary typeclasses (:ghc-ticket:`27071`).
+
+- Fix a bug where an absent constraint argument could be replaced by an error
+  thunk, which GHC then evaluated, crashing the program (:ghc-ticket:`27627`).
+
+- Fix a bug where the specialiser could drop an argument that the function's
+  stable unfolding still used, resulting in a runtime crash
+  (:ghc-ticket:`27703`).
+
+- Fix a bug where a class declared abstractly in an hs-boot file was assumed
+  not to be unary, so GHC speculatively evaluated a dictionary that could be
+  bottom, crashing the program (:ghc-ticket:`27704`).
+
+- Fix a bug where ``-fspec-eval-dictfun`` could speculatively evaluate a
+  looping dictionary whose recursion went through an hs-boot import, hanging
+  the program (:ghc-ticket:`27717`).
+
+- Cache unit databases and use a global ``UnitIndex`` to deduplicate
+  ``UnitInfo``\ s across multiple home units, reducing memory usage
+  (:ghc-ticket:`26423`, :ghc-ticket:`27500`, :ghc-ticket:`27748`).
+
+- AArch64 code generation: use ``SXTW`` instead of ``SXTH`` for ``W32`` sign
+  extension (:ghc-ticket:`26978`).
+
+- On AArch64, use a logical instead of an arithmetic right shift for the
+  unsigned right shift (``MO_U_Shr``) at 8/16 bit word size
+  (:ghc-ticket:`26979`).
+
+- Avoid AArch64 register clobbering bug in MUL2 (:ghc-ticket:`27046`).
+
+- Fix incorrect overflow bit for ``MUL2`` on AArch64 for sub-``W64`` operands
+  (:ghc-ticket:`27047`).
+
+- :ghc-flag:`-finter-module-far-jumps` is now enabled by default for profiled
+  ways on AArch64 Linux, working around jump offset overflow errors
+  ("relocation truncated to fit: R_AARCH64_JUMP26") from some binutils and gcc
+  versions when linking large profiled libraries (:ghc-ticket:`26994`).
+
+- A number of fixes to the ARM64 ncg, fixing a number of bugs, including
+  incorrect runtime results when using subword operations
+  (:ghc-ticket:`27430`, :ghc-ticket:`27539`, :ghc-ticket:`27538`,
+  :ghc-ticket:`27537`, :ghc-ticket:`27550`, :ghc-ticket:`27533`).
+
+- Fixed ``mkTick`` to avoid attaching profiling ticks to coercions, preventing
+  a compiler panic (:ghc-ticket:`27121`).
+
+- Fix two crashes that could happen in a multithreaded setting when profiling
+  (:ghc-ticket:`27123`).
+
+- Fix "failed to detect OverLit" panic in the pattern-match checker
+  (:ghc-ticket:`25926`, :ghc-ticket:`27124`).
+
+- Fix ``getStgArgFromTrivialArg`` panic in CoreToStg (:ghc-ticket:`27182`).
+
+- Another fix for another ``getStgArgFromTrivialArg`` panic in CoreToStg
+  (:ghc-ticket:`27386`).
+
+- Don't drop cost centres around variables of type ``IO ()``
+  (:ghc-ticket:`27225`).
+
+- Fix spurious ``-Wincomplete-uni-patterns`` warning under
+  ``-finfo-table-map`` (:ghc-ticket:`27314`).
+
+- Recognise ``considerAccessible`` under ticks (``-g``, ``-finfo-table-map``,
+  ``-fhpc`` etc) (:ghc-ticket:`27360`).
+
+- Fix a panic on ``@ty`` in a pattern synonym RHS (:ghc-ticket:`27440`).
+
+- Fix spurious out-of-scope errors from ``type ty`` in a pattern synonym RHS
+  (:ghc-ticket:`27583`).
+
+- Fix a panic on a required type argument in a pattern synonym RHS
+  (:ghc-ticket:`27586`).
+
+- Stop representation-polymorphism checks from producing a coercion that fails
+  Core Lint (:ghc-ticket:`27639`).
+
+- Fixed an issue that caused the specializer to sometimes loop on recursive
+  dictionary superclasses (:ghc-ticket:`27705`).
+
+- Fix a CorePrep miscompilation that could project a field out of an absent
+  dictionary, resulting in a segfault (:ghc-ticket:`25924`).
+
+- Fix exponential-time desugaring of nested ``case`` expressions. The
+  scrutinee is no longer desugared a second time when recording long-distance
+  information for the pattern-match checker (:ghc-ticket:`27383`,
+  :ghc-ticket:`20251`).
+
+- Fix invalid cmm basic block output when proc-point splitting is enabled
+  (wasm/llvm/unregisterised) (:ghc-ticket:`27447`).
+
+- Fix a token leak in the ``-jsem`` jobserver shutdown path
+  (:ghc-ticket:`27253`).
+
+- Update to semaphore-compat 2.0.1 (``-jsem`` protocol v2)
+  (:ghc-ticket:`25087`).
+
+- Introduce a cache of home module name providers (:ghc-ticket:`27055`).
+
+- Reference the correct package in error messages when trying to import a
+  reexported module from a hidden package (:ghc-ticket:`27417`).
+
+- Eliminate redundant thunks introduced by tag inference
+  (:ghc-ticket:`27005`).
+
+- Rename ``ZonkAny`` to ``UnusedType`` and add pretty printing logic for it
+  (:ghc-ticket:`27390`).
+
+- Fix module finalizers on multiple platforms (:ghc-ticket:`27072`).
+
+- Fix redundant AP thunk codegen when not using ``-ticky-ap-thunk``
+  (:ghc-ticket:`27502`).
+
+- When generating IPE stack frames, GHC now insists on using a source location
+  that is local to the current module (:ghc-ticket:`27749`).
+
+- :ghc-flag:`-fobject-determinism` sorts the list of object files to be linked
+  for reproducible builds (:ghc-ticket:`27612`).
+
 GHCi
 ~~~~
 
 - Added the :ghci-cmd:`:version` command. This displays the current GHC version.
 
+- Improved bytecode loading performance by caching ``MallocStrings`` requests
+  for repeated breakpoint strings, avoiding redundant remote heap allocation
+  (:ghc-ticket:`26995`).
+
+- Added the ``:shell`` command, which works similarly to ``:!``, except it
+  guarantees to run the command via ``sh -c``. On POSIX hosts the behavior is
+  identical to ``:!``, but on Windows it uses the msys2 shell instead of the
+  system ``cmd.exe`` shell.
+
+- The GHCi startup banner now includes the active language edition, plus an
+  indication of whether this was the default (:ghc-ticket:`26037`).
+
+- Added the :ghc-flag:`-fimport-loaded-targets` flag, which automatically
+  imports all loaded targets into the GHCi session (:ghc-ticket:`26866`).
+
+- Added support for custom external interpreter commands, allowing GHC API
+  clients to extend the external interpreter with their own message handlers
+  (:ghc-ticket:`26652`).
+
+- Removed the size limit on unboxed tuples supported by the bytecode
+  interpreter on 64-bit platforms (:ghc-ticket:`26946`).
+
+- External interpreter trace messages are now printed to stderr instead of
+  stdout (:ghc-ticket:`26807`).
+
+- Initialize plugins for ``:set +c`` in GHCi (:ghc-ticket:`23110`).
+
+- Fixed the order in which ``:info`` lists instances, which previously
+  depended on the order in which interface files happened to be loaded
+  (:ghc-ticket:`27532`).
+
+- Fix regression to allow loading modules into the GHCi after startup
+  (:ghc-ticket:`27202`, :ghc-ticket:`27640`).
+
+- Allocate static constructors for bytecode, fixing segfaults when certain
+  programs are loaded by the bytecode interpreter (:ghc-ticket:`25636`).
+
+JavaScript backend
+~~~~~~~~~~~~~~~~~~
+
+- The JavaScript backend now exports the ``HEAP8`` and ``HEAPU8`` symbols,
+  which newer Emscripten versions require (:ghc-ticket:`26290`).
+
+- The JavaScript backend now supports more than 128 registers, fixing runtime
+  ``ReferenceError`` failures for functions taking very many arguments
+  (:ghc-ticket:`26558`).
+
+- Fixed JavaScript backend linking of units exposed in the unit database but
+  not explicitly passed on the command line (:ghc-ticket:`24886`).
+
+- Fixed ``Enum`` serialisation in the JavaScript backend, which went through
+  ``Word16`` (:ghc-ticket:`24593`).
+
+- Fixed recompilation avoidance for the JavaScript backend
+  (:ghc-ticket:`23013`).
+
+- Replaced the ``BigInt``-based implementations of 32-bit and 64-bit
+  ``quot``/``rem`` in the JavaScript backend with pure ``Number`` arithmetic,
+  avoiding the overhead of ``BigInt`` promotion (:ghc-ticket:`23597`).
+
+WebAssembly backend
+~~~~~~~~~~~~~~~~~~~
+
+- The internal-interpreter flag is now enabled for the ``ghc`` library in wasm
+  stage1, making it possible to launch a GHC API session that makes use of the
+  internal interpreter (:ghc-ticket:`26431`, :ghc-ticket:`25400`).
+
+- The wasm ``dyld`` script can now be used to load and run wasm shared
+  libraries fully client-side in the browser without needing a
+  ``wasm32-wasi-ghci`` backend.
+
+- Fixed handling of ``ByteArray#``/``MutableByteArray#`` arguments in JSFFI
+  imports on the wasm backend.
+
+- Use ``import.meta.main`` for proper distinction of Node.js main modules
+  (:ghc-ticket:`26916`).
+
+- Added an ``/assets`` endpoint to the wasm ``dyld`` HTTP server and the
+  :ghc-flag:`-fghci-browser-assets-dir` flag to specify the assets root
+  directory, so assets can be fetched from the same host without a separate
+  HTTP server (:ghc-ticket:`26951`).
+
+- Fixed an ``Illegal foreign declaration`` error when wasm GHCi loads modules
+  with JSFFI exports (:ghc-ticket:`26998`).
+
+- Ensure post-linker output is synchronous ESM and fix loading in
+  ServiceWorker (:ghc-ticket:`27257`).
+
 Runtime system
 ~~~~~~~~~~~~~~
 
-- Add a new `poll` I/O manager, based on the classic unix `poll()` API. It is
-  available in the single-threaded RTS on posix platforms. The `select` I/O
-  manager remains the default for this combination for now, but this default
-  may change in future releases. The new I/O manager can be selected via the
-  runtime flag :rts-flag:`--io-manager=(name)`.
+- Add a new ``poll`` I/O manager, based on the classic unix ``poll()`` API. It
+  is the default I/O manager in the single-threaded RTS on all posix platforms
+  except macOS (where the ``select`` I/O manager remains the default due to
+  macOS platform limitations). The I/O manager can be selected via the runtime
+  flag :rts-flag:`--io-manager=(name)`.
 
-  Compared to the `select` I/O manager, this one has slightly less severe
+  Compared to the ``select`` I/O manager, this one has slightly less severe
   restrictions on the number of sockets/pipes that can be waited on, though
   it still scales poorly for waiting on socket/pipe readiness. It does however
-  scale much better for thread timers (such as `threadDelay`), and improves
+  scale much better for thread timers (such as ``threadDelay``), and improves
   timer precision on 32bit Linux and 32bit FreeBSD from milliseconds to
   microseconds.
 
   This I/O manager introduces new infrastructure for I/O managers that is
   intended to be used in future for a new generation of in-RTS I/O managers,
   using more scalable platform-specific APIs (such as epoll, io_uring and
-  kqueue). This first one, based on `poll()`, is merely intended to be
+  kqueue). This first one, based on ``poll()``, is merely intended to be
   portable.
+
+- :rts-flag:`--eventlog-flush-interval=⟨seconds⟩` is now disabled when
+  compiled against the non-threaded RTS, where using it led to eventlog
+  corruption (:ghc-ticket:`26222`).
+
+- IPE entries now have a stable identifier instead of being indexed by their
+  address, so profiles from different runs can be compared, and the IPE
+  metadata is placed in a specific ``.ipe`` section so it can be stripped from
+  the final binary if desired (:ghc-ticket:`21766`).
+
+- Added the ``-hT ⟨type⟩`` and ``-hi ⟨addr⟩`` heap profile filtering options,
+  which are available in non-profiled builds (:ghc-ticket:`26361`). Also fixed
+  the brace syntax of ``-h`` filter options,
+  which had stopped working, and a bug where combining ``-he⟨era⟩`` and
+  ``-hr⟨retainer⟩`` would ignore whether the retainer matches.
+
+- Removed the signal-based ticker implementations. All platforms now use the
+  pthreads and ``nanosleep`` based ticker (:ghc-ticket:`27073`).
+
+- Removed the unnecessary ``libm``, ``libdl`` and ``need-pthread`` Cabal flags
+  from the RTS package, performing those checks via autoconf macros instead.
+
+- Used computed goto for instruction dispatch in the bytecode interpreter,
+  improving interpreter performance (:ghc-ticket:`12953`).
+
+- Fixed a deadlock with eventlog flush interval and RTS shutdown
+  (:ghc-ticket:`26573`).
+
+- Handle 16-bit overflow of ELF section header string table
+  (:ghc-ticket:`26603`).
+
+- Fixed object file format detection in ``loadArchive`` (:ghc-ticket:`26630`).
+
+- Fixed a number of instances of undefined behaviour in the bytecode
+  interpreter, including a zero-length variable length array, an unaligned
+  read, and signed integer overflow in subword arithmetic.
+
+- Fixed an ABI mismatch in calls to the variadic ``barf`` function, both in
+  compiler-generated code and hand-written Cmm (:ghc-ticket:`22882`).
+
+- ``shrinkMutableByteArray#`` now opportunistically reclaims slop space,
+  reducing heap fragmentation, and ``resizeMutableByteArray#`` now grows the
+  ``MutableByteArray#`` in-place if possible.
+
+- Use ``INFO_TABLE_CONSTR`` for ``stg_dummy_ret_closure`` (:ghc-ticket:`26745`).
+
+- Switch prim to use modern atomic compiler builtins (:ghc-ticket:`26729`).
+
+- The runtime linker now supports COMMON symbols (:ghc-ticket:`6107`).
+
+- Fixed a potential crash when decoding stack snapshots, caused by an invalid
+  pointer left in a GC-visible slot (:ghc-ticket:`27009`).
+
+- Fixed a missing profiling header in the ``origin_thunk`` stack frame info
+  table, which could cause corruption when the frame was copied by the garbage
+  collector (:ghc-ticket:`27007`).
+
+- Fixed the ``SLIDE`` bytecode instruction crashing when sliding off the end
+  of a stack chunk (:ghc-ticket:`27001`).
+
+- Fixed a stack alignment bug on x86 that could cause segfaults or corrupted
+  registers when using AVX/AVX-512 vector code (:ghc-ticket:`26595`,
+  :ghc-ticket:`26822`).
+
+- Fixed a race condition where a cloned-stack request could be mishandled
+  after its target thread migrated to another capability (:ghc-ticket:`27008`).
+
+- STM no longer creates a transaction for the right-hand side of
+  ``catchRetry#``, avoiding quadratic behaviour for nested ``orElse``
+  (:ghc-ticket:`26028`).
+
+- Windows: fixed crashes and memory leaks in the legacy I/O manager's handling
+  of asynchronous I/O results (:ghc-ticket:`26341`).
+
+- Fixed a race condition between ``flushEventLog`` and
+  ``startEventLogging``/``endEventLogging`` that could corrupt the eventlog
+  (:ghc-ticket:`27082`).
+
+- Fix a possible use-after-free bug with TSOs (:ghc-ticket:`26716`,
+  :ghc-ticket:`26717`).
+
+- Add rts Message to set/unset TSO flags (:ghc-ticket:`27131`).
+
+- Fix several black hole handling bugs that could lead to deadlocks or crashes
+  in multithreaded programs. These could show up as the program hanging or
+  "END_TSO_QUEUE object entered" errors (:ghc-ticket:`26922`,
+  :ghc-ticket:`26936`).
+
+- Fix "unknown/strange object 24 crash" in compacting GC
+  (:ghc-ticket:`27434`).
+
+- Fix a parallel GC race on weakly-ordered architectures (AArch64) that could
+  crash or silently corrupt the heap (:ghc-ticket:`27477`).
+
+- Fix "unknown/strange object 1" crash in the compacting GC when collecting
+  large data constructor closures (:ghc-ticket:`27649`).
+
+- Fix a crash when capturing or resuming a delimited continuation that adjusts
+  the async exception masking state (:ghc-ticket:`27651`).
+
+- Fix a segfault that could occur when querying the label of an unlabeled
+  thread (:ghc-ticket:`27618`).
+
+- Rethrow exceptions in overlapped IO when using the WinIO IO manager
+  (:ghc-ticket:`27283`).
+
+- The RTS API now exposes the ``RUNTIME_TRACE_FLAG`` type and the
+  ``getTraceFlag`` and ``setTraceFlag`` functions that can be used to change
+  the trace flags at runtime (:ghc-ticket:`27186`).
+
+- The RTS ``-l`` flag now accepts the new event class ``I``, which controls
+  whether or not IPE events are emitted (:ghc-ticket:`27239`).
 
 
 Cmm
 ~~~
 
+- Info tables now use half-word literals, so they are mapped to the same
+  assembler code on big-endian and little-endian platforms
+  (:ghc-ticket:`26579`).
+
+- Fix miscompiled ``%load_relaxed`` primop, add missing ``%store_relaxed``
+  (:ghc-ticket:`27483`).
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
-- Updated to `Unicode 17.0.0
-  <https://www.unicode.org/versions/Unicode17.0.0>`_.
+- ``GHC.Num.{BigNat, Integer, Natural}`` are no longer exposed. Users should
+  import them from ``ghc-bignum`` instead (`CLC proposal #359
+  <https://github.com/haskell/core-libraries-committee/issues/359>`_).
+
+- GHC internals in ``GHC.Num`` have been deprecated and will be removed after
+  one major release (`CLC proposal #360
+  <https://github.com/haskell/core-libraries-committee/issues/360>`_).
+
+- Removed ``GHC.Desugar``, which was deprecated and should have been removed
+  in GHC 9.14.
+
+- Removed ``GHC.JS.Prim.Internal.Build`` (`CLC proposal #329
+  <https://github.com/haskell/core-libraries-committee/issues/329>`_).
+
+- Modified the implementation of ``Data.List.sortOn`` to use ``(>)`` instead
+  of ``compare`` (`CLC proposal #332
+  <https://github.com/haskell/core-libraries-committee/issues/332>`_).
+
+- Removed extra laziness from ``Data.Bifunctor.Bifunctor`` instances for all
+  tuples to have the same laziness as their ``Data.Functor.Functor``
+  counterparts, i.e. they became more strict than before (`CLC proposal #339
+  <https://github.com/haskell/core-libraries-committee/issues/339>`_).
+
+- Adjusted the strictness of ``Data.List.iterate'`` to be more reasonable:
+  every element of the output list is forced to WHNF when the ``(:)``
+  containing it is forced (`CLC proposal #335
+  <https://github.com/haskell/core-libraries-committee/issues/335>`_).
+
+- Changed ``hIsReadable`` and ``hIsWritable`` such that they always throw a
+  respective exception when encountering a closed or semi-closed handle, not
+  just in the case of a file handle (`CLC proposal #371
+  <https://github.com/haskell/core-libraries-committee/issues/371>`_).
+
+- Added ``{-# WARNING in "x-partial" #-}`` to ``Data.List.{init,last}``. Use
+  ``{-# OPTIONS_GHC -Wno-x-partial #-}`` to disable it (`CLC proposal #292
+  <https://github.com/haskell/core-libraries-committee/issues/292>`_).
+
+- Added ``Data.List.NonEmpty.mapMaybe`` (`CLC proposal #337
+  <https://github.com/haskell/core-libraries-committee/issues/337>`_).
+
+- Added ``thenA`` and ``thenM`` (`CLC proposal #351
+  <https://github.com/haskell/core-libraries-committee/issues/351>`_).
+
+- Added ``nubOrd`` and ``nubOrdBy`` to ``Data.List`` and
+  ``Data.List.NonEmpty`` (`CLC proposal #336
+  <https://github.com/haskell/core-libraries-committee/issues/336>`_).
+
+- Added ``Semigroup`` and ``Monoid`` instances for ``Control.Monad.ST.Lazy``
+  (`CLC proposal #374
+  <https://github.com/haskell/core-libraries-committee/issues/374>`_).
+
+- Generalized ``deleteBy`` and ``deleteFirstsBy`` (`CLC proposal #372
+  <https://github.com/haskell/core-libraries-committee/issues/372>`_).
+
+- Added ``System.IO.hGetNewlineMode`` (`CLC proposal #370
+  <https://github.com/haskell/core-libraries-committee/issues/370>`_).
+
+- Added a new module ``System.IO.OS`` with operations for obtaining
+  operating-system handles (file descriptors, Windows handles) (`CLC proposal
+  #369 <https://github.com/haskell/core-libraries-committee/issues/369>`_).
+
+- Exported ``labelThread`` from ``Control.Concurrent`` (`CLC proposal #376
+  <https://github.com/haskell/core-libraries-committee/issues/376>`_).
+
+- Fixed issues with ``toRational`` for types capable to represent infinite and
+  not-a-number values (`CLC proposal #338
+  <https://github.com/haskell/core-libraries-committee/issues/338>`_).
+
+- Ensured that ``rationalToFloat`` and ``rationalToDouble`` always inline in
+  the end (`CLC proposal #356
+  <https://github.com/haskell/core-libraries-committee/issues/356>`_).
+
+- Improved the error message for ``Data.Char.chr`` (`CLC proposal #384
+  <https://github.com/haskell/core-libraries-committee/issues/384>`_).
+
+- ``GHC.Conc.throwSTM`` and ``GHC.Conc.Sync.throwSTM`` now carry a
+  ``HasCallStack`` constraint and attach a ``Backtrace`` annotation to the
+  thrown exception (:ghc-ticket:`25365`).
+
+- ``GHC.Conc.catchSTM`` and ``GHC.Conc.Sync.catchSTM`` now attach a
+  ``WhileHandling`` annotation to exceptions thrown from the handler
+  (:ghc-ticket:`25365`).
+
+- Backtraces for ``error`` exceptions are now evaluated at the moment they are
+  thrown (`CLC proposal #383
+  <https://github.com/haskell/core-libraries-committee/issues/383>`_,
+  :ghc-ticket:`26751`).
+
+- Implementation details are now hidden when throwing exceptions in ``throw``
+  and ``throwSTM`` (`CLC proposal #387
+  <https://github.com/haskell/core-libraries-committee/issues/387>`_).
+
+- The ``onException`` continuation is now annotated with ``WhileHandling``
+  (`CLC proposal #397
+  <https://github.com/haskell/core-libraries-committee/issues/397>`_,
+  :ghc-ticket:`26759`).
+
+- Added ``@since`` annotation to ``System.Info.fullCompilerVersion``
+  (:ghc-ticket:`26973`).
+
+- Don't drop ``ExceptionContext`` in ``SomeException(toException)``
+  (:ghc-ticket:`27455`).
+
+- Fix ``retry`` and async exception delivery inside a ``catchSTM`` handler
+  (:ghc-ticket:`27657`).
+
+- Show ``ExceptionContext`` in the ``displayExceptionAnnotation``
+  implementation of ``WhileHandling`` (:ghc-ticket:`27456`).
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
@@ -184,21 +1016,228 @@ Cmm
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
+- Fixed the ``Data`` instance for ``ModuleName`` to give a non-bottom
+  ``toConstr`` implementation (:ghc-ticket:`27129`).
+
+- ``SourceError`` now stores the context needed to print its diagnostics, via
+  the new ``SourceErrorContext`` datatype (:ghc-ticket:`26387`).
+
+- ``HsTyLit`` has been dropped in favor of ``HsLit``, with new ``HsNatural``
+  and ``HsDouble`` constructors (:ghc-ticket:`26862`, :ghc-ticket:`25121`).
+
+- ``thNameToGhcName`` has been generalised via the new ``HasHscEnv`` class,
+  modelled on ``HasDynFlags``. It is the recommended way of looking up names
+  in GHC plugins.
+
+- Added an ``Outputable`` instance for ``Natural``, as well as a ``natural ::
+  Natural -> SDoc`` function that mirrors the existing ``integer`` function.
+
+- Renamed ``interpreterBackend`` to ``bytecodeBackend``. The
+  ``interpreterBackend`` binding is left as a deprecated alias.
+
+- Removed the ``Data`` instance for ``ClsInst``.
+
+- Merged ``HsMultilineString`` into ``HsString``, so ``HsLit`` no longer has a
+  separate constructor for multi-line string literals (:ghc-ticket:`26860`).
+
+- ``TopLevelFlag`` and ``RuleName`` moved to ``Language.Haskell.Syntax.Basic``,
+  ``OverlapMode`` to the new module ``Language.Haskell.Syntax.Overlap`` and
+  ``OverlapFlag`` to the new module ``GHC.Hs.Decls.Overlap``. ``OverlapMode``
+  gained a TTG extension point.
+
+- Added missing ``(==)`` logic for the ``HsInt{8,16,32}`` and
+  ``HsWord{8,16,32}`` constructors of ``HsLit``.
+
+- ``ForeignCall`` types that do not need extension points moved to the new
+  ``Language.Haskell.Syntax.Decls.Foreign`` module. ``CCallTarget``, ``CType``
+  and ``Header`` gained TTG extension points, and their ``Bool`` parameters
+  were replaced with descriptive data types.
+
+- Removed the backwards compatibility pattern synonym ``ModLocation``
+  (:ghc-ticket:`24932`).
+
+- Fixed several oversights in ``GHC.Hs.Syn.Type.hsExprType``
+  (:ghc-ticket:`26910`).
+
+- Drop ``preloadClosure`` from ``UnitState`` (:ghc-ticket:`27308`).
+
+- Fix the ``Data.Data`` instance of ``HsCtxt`` to avoid a crash
+  (:ghc-ticket:`27359`).
+
+- The records for typechecker plugins and defaulting plugins have been updated
+  to reflect the fact that these plugins may be invoked after the end of
+  typechecking. The fields ``tcPluginStop`` and ``dePluginStop`` are replaced
+  by ``tcPluginPostTc``/``tcPluginShutdown`` and
+  ``dePluginPostTc``/``dePluginShutdown`` respectively. To migrate a plugin
+  whose stop action was a simple resource release, move that action to
+  ``tcPluginShutdown`` and set ``tcPluginPostTc = const (return ())``
+  (:ghc-ticket:`26839`).
+
+- ``typecheckModule``, ``hscTypecheckRename``,
+  ``hscTypecheckRenameWithDiagnostics`` and ``hscTypecheckAndGetWarnings`` all
+  take an additional argument that specifies how to start/stop ``TcM``
+  plugins, and ``tcRnModule`` now takes a ``TcRnModuleOptions`` record
+  (:ghc-ticket:`26839`).
+
+- Removed ``withTcPlugins``, ``withHoleFitPlugins`` and
+  ``withDefaultingPlugins`` in favour of a single ``withTcMPlugins``
+  (:ghc-ticket:`26839`).
+
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~
+
+- Fix invalid srtlen field returned by peekItbl when no tables-next-to-code
+  (:ghc-ticket:`27465`).
+
+``ghc-internal`` library
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Fixed a crash when decoding a captured stack containing a bytecode object
+  with an empty payload bitmap (:ghc-ticket:`26640`).
 
 ``ghc-experimental`` library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- New SIMD primops for bitwise logical operations on 128-wide vectors.
+- New SIMD primops for bitwise logical operations on 128-wide vectors, and
+  new ``abs``/``sqrt`` SIMD primops for absolute value and square root, such
+  as ``absInt32X4#`` and ``sqrtDoubleX4#``. These are supported by the LLVM
+  backend and the X86_64 NCG backend (for the latter, only for 128-wide
+  vectors).
+
+- Fixed the ``GHC.Exception.Backtrace.Experimental`` module, which was not
+  compiled or included in the library.
+
+- Added an optional ``SrcLoc`` to the ``StackAnnotation`` class in
+  ``GHC.Stack.Annotation.Experimental`` (:ghc-ticket:`26806`).
+
+- Added a cumulative ``gc_sync_elapsed_ns`` counter to ``RTSStats``
+  (:ghc-ticket:`26944`).
+
+- Exposed ``decodeStackWithIpe`` and related stack-decoding helpers from
+  ``ghc-experimental`` (:ghc-ticket:`27065`).
 
 ``template-haskell`` library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Introduced ``namedDefaultQuasiQuoter`` and ``defaultQuasiQuoter``, which
+  fail with a helpful error when used in an inappropriate context
+  (:ghc-ticket:`24434`).
 
 - We have added the ``addDependentDirectory`` function to match
   ``addDependentFile``, which adds a directory to the list of dependencies that
   the recompilation checker will look at to determine if a module needs to be
   recompiled.
+
+Packaging and Build System
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- The minimal bootstrap GHC version has been bumped to 9.10.
+
+- ``configure`` no longer probes for the ``gold`` linker, which has been
+  dropped from binutils 2.44 (:ghc-ticket:`25716`).
+
+- ``configure`` now checks that ``python3`` is at least version 3.7, as the
+  testsuite driver requires (:ghc-ticket:`23234`), and a missing python is
+  now a warning instead of an error, so it is not mandatory when installing a
+  bindist (:ghc-ticket:`26347`).
+
+- Hadrian now enables ``terminfo`` if ``--with-curses-*`` flags are given to
+  ``configure``, and cross-builds build ``terminfo`` only in upper stages,
+  which re-enables building cross-compilers with ``terminfo``
+  (:ghc-ticket:`26288`).
+
+- GHC now reads ``lib/targets/default.target``, a serialized ``ghc-toolchain``
+  ``Target``, and the now-redundant entries have been removed from
+  ``lib/settings`` (:ghc-ticket:`24212`).
+
+- ``CFLAGS``, ``CXXFLAGS`` and similar flags given to ``configure`` apply to
+  building GHC itself and are no longer carried over to the target settings
+  used by GHC at runtime (:ghc-ticket:`25637`).
+
+- The bindist ``configure`` script now checks ``cc`` consistently with the
+  source ``configure`` script (:ghc-ticket:`26394`), and the build, host and
+  target platforms chosen at the initial ``configure`` are correctly
+  propagated to it (:ghc-ticket:`21970`).
+
+- Hadrian builds the in-tree gmp with ``-fvisibility=hidden``, so gmp symbols
+  are no longer exported by the ``ghc-internal`` shared library.
+
+- ``ghc-toolchain`` now detects the PowerPC 64-bit ABI (:ghc-ticket:`26521`).
+
+- Fixed an ``-Wincompatible-pointer-types`` error in the ``utimbuf`` FFI
+  wrapper on Windows with recent toolchains (:ghc-ticket:`26337`).
+
+- Hadrian now places user-supplied arguments after package arguments, making
+  it easier to override default package arguments in ``UserSettings.hs``
+  (:ghc-ticket:`25821`).
+
+- Added the ``with_profiled_libs`` Hadrian flavour transformer, the exact
+  opposite of ``no_profiled_libs``, and fixed the ``profiled_ghc`` flavour
+  transformer to include profiled dynamic libraries.
+
+- Hadrian now only installs the JavaScript files required by the wasm and JS
+  targets into ``libdir`` for those targets, instead of unconditionally on
+  other targets as well.
+
+- Removed the ``--via-asm`` hsc2hs flag when cross compiling to Windows,
+  which fails with recent llvm-mingw toolchains.
+
+- ``libffi`` is now built and bundled via the new ``libffi-clib`` submodule
+  and Haskell package instead of bespoke Hadrian logic. The ability to link
+  against a system ``libffi`` is retained.
+
+- Removed a build-system hack that forced ``-fno-PIC`` on RTS objects on
+  i386, restoring compatibility with modern toolchains (:ghc-ticket:`26792`).
+
+- ``ghc-toolchain`` now also configures ``windres`` on non-Windows platforms,
+  as it may be needed for cross compilation (:ghc-ticket:`24588`).
+
+- ``ghc-toolchain`` and ``configure`` now check for a C11-capable C compiler
+  instead of C99 (:ghc-ticket:`26908`).
+
+- The build system now accepts version 2.2 of the ``happy`` parser generator.
+
+- Deprecated Hadrian's ``--bignum`` flag in favour of the ``+native_bignum``
+  flavour transformer, which is now enabled automatically for the JS target.
+
+- Hadrian now builds profiled dynamic objects with ``-dynamic-too``,
+  improving build parallelism (:ghc-ticket:`27010`).
+
+- Installed the ``rts/Types.h`` header when using the JavaScript backend,
+  fixing use of ``HsFFI.h`` (:ghc-ticket:`27033`).
+
+- Fixed the ``--target`` support check in ``configure`` to use the stage0 C
+  compiler instead of ``$CC`` (:ghc-ticket:`26999`).
+
+- ``configure`` now defaults ``$LLVMAS`` to ``$CC`` when ``$CcLlvmBackend`` is
+  ``YES``, instead of an auto-detected ``clang`` from the environment
+  (:ghc-ticket:`26769`).
+
+- Fixed building the RTS with ``-Werror`` on glibc 2.43, which changed the
+  values of ``_XOPEN_SOURCE`` and ``_POSIX_C_SOURCE`` (:ghc-ticket:`27076`).
+
+- Debian 9 and 10 and Ubuntu 18.04 and 20.04 are end of life and have been
+  dropped from CI and the release bindists. Debian 13 has been added
+  (:ghc-ticket:`25876`).
+
+- Fixed the build of ``getExecutablePath`` on GNU/Hurd, and GNU/Hurd is now
+  advertised as ``gnu``, like the autotools do.
+
+- Bumped the ``process`` submodule to 1.6.30.0, which includes a fix for a
+  segfault on macOS 15 with certain command line SDK versions
+  (:ghc-ticket:`27144`).
+
+- Hadrian no longer leaves stale ``.conf`` files in its package databases when
+  rebuilding in the same build root with different settings (e.g. another
+  flavour, or when hashes change with ``+hash-unit-ids``)
+  (:ghc-ticket:`26661`).
+
+``ghc-pkg``
+~~~~~~~~~~~
+
+- Removed ``traceId`` from the ``ghc-pkg`` executable.
+
+- Improve performance of ``ghc-pkg list`` command (:ghc-ticket:`27275`).
 
 Included libraries
 ~~~~~~~~~~~~~~~~~~

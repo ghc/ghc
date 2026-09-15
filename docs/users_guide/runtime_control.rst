@@ -1464,6 +1464,12 @@ Currently the available I/O managers are:
     and select one by name. The available names are the ones from the table
     above.
 
+    The default is chosen when GHC is configured. On Posix platforms the
+    ``poll`` I/O manager is the default for the non-threaded RTS, except on
+    macOS where it is not built because ``poll()`` does not work properly
+    there, so ``select`` remains the default. ``mio`` is used for the threaded
+    RTS. The default is reported by ``+RTS --info``.
+
 Some I/O managers have additional configuration, detailed below.
 
 The ``select`` I/O manager
@@ -1728,7 +1734,7 @@ Getting information about the RTS
         ,("Compiler unregisterised", "NO")
         ,("Tables next to code", "YES")
         ,("Flag -with-rtsopts", "")
-        ,("I/O manager default", "select")
+        ,("I/O manager default", "poll")
         ]
 
     The information is formatted such that it can be read as a of type

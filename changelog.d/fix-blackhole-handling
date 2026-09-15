@@ -1,6 +1,0 @@
-section: rts
-synopsis: Fix several black hole handling bugs that could lead to deadlocks
-  or crashes in multithreaded programs. These could show up as the program
-  hanging or "END_TSO_QUEUE object entered" errors.
-issues: #26922 #26936
-mrs: !15640
