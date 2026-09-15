@@ -135,11 +135,11 @@ static void notifyTimeoutCompletion(CapIOManager *iomgr, StgTimeout *timeout)
 }
 
 
-/* poll() expect a timeout in milliseconds, with special
- * values of -1 for indefinite wait, and 0 for no waiting.
+/* Returns the duration until the next timeout, with special values 0 for
+ * no timeout and -1 for infinite timeout. Use one of the timeoutAs* functions
+ * to convert into the form expected by platform APIs.
  */
-#if !(defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1)
-int timeoutInMilliseconds(CapIOManager *iomgr, bool wait, Time now)
+Time timeoutWaitTime(CapIOManager *iomgr, bool wait, Time now)
 {
     if (!wait) {
         /* Don't wait, just poll. */
@@ -152,7 +152,22 @@ int timeoutInMilliseconds(CapIOManager *iomgr, bool wait, Time now)
         /* Any expired timeouts should have been cleared, so we must be waiting
          * for a timeout in the future. */
         ASSERT(waittime > 0);
+        return waittime;
 
+    } else {
+        /* No timeouts, wait forever */
+        return -1;
+    }
+}
+
+
+/* Convert the result of timeoutWaitTime into the timeout representation
+ * used by poll(). This representation uses millisecond precision with special
+ * values 0 and -1 for no wait and indefinite wait.
+ */
+int timeoutAsPollTimeout(Time waittime)
+{
+    if (waittime > 0) {
         /* SUSv2 allows implementations to have an implementation defined
          * maximum timeout for poll(2). It does not specify any limits on
          * this maximum however. It is safe to pick a low limit, because if
@@ -170,38 +185,25 @@ int timeoutInMilliseconds(CapIOManager *iomgr, bool wait, Time now)
         return (waittime_ms < max_timeout_ms) ? waittime_ms : max_timeout_ms;
 
     } else {
-        /* No timeouts, wait forever */
-        return -1;
+        /* We must be in the 0 or -1 special cases */
+        ASSERT(waittime == 0 || waittime == -1);
+        return (int) waittime;
     }
 }
-#endif
 
 
-/* ppoll() expect a timeout in nanoseconds, using
- * struct timespec * with special values of NULL for indefinite wait,
- * and 0 for no waiting.
+/* Convert the result of timeoutWaitTime into a 'struct timespec *' which is
+ * the timeout representation used by many modern APIs: ppoll(), pselect(),
+ * epoll_wait2(), kevent() and io_uring_enter2(). This representation uses
+ * nanosecond precision with NULL for indefinite wait, and 0 for no waiting.
  */
-#if (defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1)
-struct timespec *timeoutInNanoseconds(CapIOManager *iomgr, bool wait,
-                                      Time now, struct timespec *tv)
+struct timespec *timeoutAsTimespec(Time waittime, struct timespec *tv)
 {
-    if (!wait) {
-        /* Don't wait, just poll. */
-        *tv = (struct timespec) { .tv_sec = 0, .tv_nsec = 0 };
-        return tv;
-
-    } else if (!isEmptyTimeoutQueue(iomgr->timeout_queue)) {
-        Time waketime = findMinWaketimeTimeoutQueue(iomgr->timeout_queue);
-        Time waittime = waketime - now;
-
-        /* Any expired timeouts should have been cleared, so we must be waiting
-         * for a timeout in the future. */
-        ASSERT(waittime > 0);
-
-        /* See comments above in timeoutInMilliseconds about the max timeout */
+    if (waittime > 0) {
+        /* See comments above about the max timeout */
         const int64_t max_timeout_ms = INT_MAX / 1000;
+        const Time    max_timeout_ns = MSToTime(max_timeout_ms);
 
-        const Time max_timeout_ns = MSToTime(max_timeout_ms);
         if (waittime < max_timeout_ns) {
             /* Time in nanoseconds to separate seconds and nanoseconds */
             *tv = (struct timespec) {
@@ -217,25 +219,26 @@ struct timespec *timeoutInNanoseconds(CapIOManager *iomgr, bool wait,
         return tv;
 
     } else {
-        /* No timeouts, wait forever */
-        return NULL;
+        /* We must be in the 0 or -1 special cases */
+        ASSERT(waittime == 0 || waittime == -1);
+        if (waittime == 0) {
+            /* Don't wait, just poll. */
+            *tv = (struct timespec) { .tv_sec  = 0, .tv_nsec = 0 };
+            return tv;
+        } else {
+            /* No timeouts, wait forever */
+            return NULL;
+        }
     }
 }
-#endif
 
-/* select() expect a timeout in microseconds, using struct timeval * with
- * special values of NULL for indefinite wait, and 0 for no waiting.
+/* Convert the result of timeoutWaitTime into a 'struct timeval *' which is
+ * the timeout representation used by select(). This representation uses
+ * microsecond precision with NULL for indefinite wait, and 0 for no waiting.
  */
-#if defined(IOMGR_ENABLED_SELECTBIS)
-struct timeval *timeoutInMicroseconds(CapIOManager *iomgr, bool wait,
-                                      Time now, struct timeval *tv)
+struct timeval *timeoutAsTimeval(Time waittime, struct timeval *tv)
 {
-    if (!wait) {
-        /* Don't wait, just poll. */
-        *tv = (struct timeval) { .tv_sec = 0, .tv_usec = 0 };
-        return tv;
-
-    } else if (!isEmptyTimeoutQueue(iomgr->timeout_queue)) {
+    if (waittime > 0) {
         /* SUSv2 allows implementations to have an implementation defined
          * maximum timeout for select(2). The standard requires
          * implementations to silently truncate values exceeding this maximum
@@ -254,13 +257,6 @@ struct timeval *timeoutInMicroseconds(CapIOManager *iomgr, bool wait,
          */
         const time_t max_seconds = 2678400; // 31 * 24 * 60 * 60
 
-        Time waketime = findMinWaketimeTimeoutQueue(iomgr->timeout_queue);
-        Time waittime = waketime - now;
-
-        /* Any expired timeouts should have been cleared, so we must be waiting
-         * for a timeout in the future. */
-        ASSERT(waittime > 0);
-
         tv->tv_sec  = TimeToSeconds(waittime);
         if (tv->tv_sec < max_seconds) {
             tv->tv_usec = TimeToUS(waittime) % 1000000;
@@ -271,10 +267,19 @@ struct timeval *timeoutInMicroseconds(CapIOManager *iomgr, bool wait,
         return tv;
 
     } else {
-        return NULL;
+        /* We must be in the 0 or -1 special cases */
+        ASSERT(waittime == 0 || waittime == -1);
+
+        if (waittime == 0) {
+            /* Don't wait, just poll. */
+            *tv = (struct timeval) { .tv_sec = 0, .tv_usec = 0 };
+            return tv;
+        } else {
+            /* No timeouts, wait forever */
+            return NULL;
+        }
     }
 }
-#endif
 
 #endif // defined(IOMGR_ENABLED_POLL) || ... etc
 

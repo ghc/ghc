@@ -26,35 +26,38 @@ void syncDelayCancelTimeout(CapIOManager *iomgr, StgTSO *tso);
  */
 void processTimeoutCompletions(CapIOManager *iomgr, Time now);
 
-/* Utility to compute the timeout wait time (in milliseconds) between now and
- * the next timer expiry (if any), or no waiting (if !wait).
+#if defined(IOMGR_ENABLED_POLL) \
+ || defined(IOMGR_ENABLED_SELECTBIS)
+/* Compute the timeout wait time between now and the next timer expiry (if any)
+ * using the given IOManager's timeout_queue.
  *
- * This is intended to be used with poll() which expect a
- * timeout in milliseconds, with special values of -1 for indefinite wait,
- * and 0 for no waiting.
+ * Use one of the timeoutAs* functions to convert into the form expected by
+ * particular platform APIs.
+ *
+ * It returns the wait time duration as a Time (i.e. nanoseconds), but with
+ * special values 0 for no timeout and -1 for indefinite timeout.
  */
-#if !(defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1)
-int timeoutInMilliseconds(CapIOManager *iomgr, bool wait, Time now);
+Time timeoutWaitTime(CapIOManager *iomgr, bool wait, Time now);
 #endif
 
-/* As above, but a timeout in nanoseconds. This is intended to be used with
- * ppoll() which expect struct timespec *, with special
- * values of NULL for indefinite wait, and 0 for no waiting.
+/* Convert the result of timeoutWaitTime into the timeout representation
+ * used by poll(). This representation uses millisecond precision with special
+ * values 0 and -1 for no wait and indefinite wait.
  */
-#if (defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1)
-struct timespec *timeoutInNanoseconds(CapIOManager *iomgr, bool wait,
-                                      Time now, struct timespec *tv);
-#endif
+int timeoutAsPollTimeout(Time waittime);
 
-/* As above, but a timeout in microseconds. This is intended to be used with
- * select() which expect struct timespec *, with special values of NULL for
- * indefinite wait, and 0 for no waiting.
+/* Convert the result of timeoutWaitTime into a 'struct timeval *' which is
+ * the timeout representation used by select(). This representation uses
+ * microsecond precision with NULL for indefinite wait, and 0 for no waiting.
  */
-#if defined(IOMGR_ENABLED_SELECTBIS)
-struct timeval *timeoutInMicroseconds(CapIOManager *iomgr, bool wait,
-                                      Time now, struct timeval *tv);
+struct timeval *timeoutAsTimeval(Time waittime, struct timeval *tv);
 
-#endif
+/* Convert the result of timeoutWaitTime into a 'struct timespec *' which is
+ * the timeout representation used by many modern APIs: ppoll(), pselect(),
+ * epoll_wait2(), kevent() and io_uring_enter2(). This representation uses
+ * nanosecond precision with NULL for indefinite wait, and 0 for no waiting.
+ */
+struct timespec *timeoutAsTimespec(Time waittime, struct timespec *tv);
 
 #include "EndPrivate.h"
 
