@@ -422,9 +422,19 @@ buildManPage = do
             checkSphinxWarnings dir
             copyFileUntracked (dir -/- "ghc.1") file
 
--- | Find the Haddock files for the dependencies of the current library.
+-- | Find the Haddock files for the transitive dependencies of the current
+-- library. Transitive because the package defining a reexported name may not be
+-- a direct dependency (#27786).
 haddockDependencies :: Context -> Action [(Package, FilePath)]
 haddockDependencies context = do
-    depNames <- interpretInContext context (getContextData depNames)
-    sequence [ (,) <$> pure depPkg <*> (pkgHaddockFile $ vanillaContext (stage context) depPkg)
-             | Just depPkg <- map findPackageByName depNames, (pkgName depPkg) `notElem` haddockExclude ]
+    depPkgs <- go [] [Context.package context]
+    sequence [ (,) depPkg <$> pkgHaddockFile (vanillaContext (stage context) depPkg)
+             | depPkg <- depPkgs ]
+  where
+    go seen [] = return seen
+    go seen (pkg:pkgs) = do
+        names <- interpretInContext (context { Context.package = pkg }) (getContextData depNames)
+        let new = [ depPkg | Just depPkg <- map findPackageByName names
+                           , pkgName depPkg `notElem` haddockExclude
+                           , depPkg `notElem` seen ]
+        go (seen ++ new) (pkgs ++ new)

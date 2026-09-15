@@ -1,0 +1,6 @@
+section: packaging
+synopsis: Hadrian now passes the interfaces of all transitive dependencies to
+  Haddock, so documentation of entities reexported from ``ghc-internal`` via
+  ``base`` (e.g. in ``stm``) is no longer missing.
+issues: #27786 #25850
+mrs: !16691
