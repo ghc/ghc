@@ -1701,7 +1701,12 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
 
   -- codegen into object file whose path is in out_obj
   out_obj <- newTempName logger tmpfs tmp_dir TFL_CurrentModule "o"
-  stgToJS logger js_config stg_binds this_mod spt_entries foreign_stubs cost_centre_info out_obj
+  let
+    -- We are compiling a single expression, which thus cannot contain any
+    -- TyCon definitions. See also the call to byteCodeGen
+    -- in GHC.Driver.Main.Passes.hscCompileCoreExpr'.
+    tycons = []
+  stgToJS logger js_config stg_binds tycons this_mod spt_entries foreign_stubs cost_centre_info out_obj
 
   let TxtI id_sym = makeIdentForId binding_id Nothing IdPlain this_mod
   -- link code containing binding "id_sym = expr", using id_sym as root

@@ -22,6 +22,7 @@ import GHC.Hs.Syn.Type
 import GHC.Core
 import GHC.Core.Type
 import GHC.Core.Make
+import GHC.Core.Make.BigTuple
 import GHC.Core.Utils
 
 import GHC.HsToCore.Monad          -- the monadery used in the desugarer
@@ -88,7 +89,6 @@ dsListComp lquals res_ty = do
     isParallelStmt (ParStmt {}) = True
     isParallelStmt _            = False
 
-
 -- This function lets you desugar a inner list comprehension and a list of the binders
 -- of that comprehension that we need in the outer comprehension into such an expression
 -- and the type of the elements that it outputs (tuples of binders)
@@ -151,7 +151,7 @@ dsTransStmt (TransStmt { trS_form = form, trS_stmts = stmts, trS_bndrs = binderM
                 , inner_list_expr' ]
 
     -- Build a pattern that ensures the consumer binds into the NEW binders,
-    -- which hold lists rather than single values
+    -- which hold lists rather than single values.
     let pat = mkBigLHsVarPatTupId to_bndrs  -- NB: no '!
     return (bound_unzipped_inner_list_expr', pat)
 
@@ -258,15 +258,17 @@ deListComp (ParStmt _ stmtss_w_bndrs _ _ : quals) list
 
        ; (zip_fn, zip_rhs) <- mkZipBind (toList qual_tys)
 
+        -- pat is the pattern ((x1,..,xn), (y1,..,ym)) in the example above.
+        -- 'mkZipBind' boxes both the per-branch tuples and their elements, so we
+        -- unbox at both levels; see Note [Boxing big tuple elements] in GHC.HsToCore.Utils.
+       ; let bndrs_s = [bs | ParStmtBlock _ _ bs _ <- toList stmtss_w_bndrs]
+             pat = mkBigLHsPatTupId
+                     (zipWith mkUnboxViewPat (toList qual_tys)
+                              (map mkBigLHsVarPatTupId bndrs_s))
+
         -- Deal with [e | pat <- zip l1 .. ln] in example above
        ; deBindComp pat (Let (Rec [(zip_fn, zip_rhs)]) (mkApps (Var zip_fn) (toList exps)))
                     quals list }
-  where
-        bndrs_s = [bs | ParStmtBlock _ _ bs _ <- toList stmtss_w_bndrs]
-
-        -- pat is the pattern ((x1,..,xn), (y1,..,ym)) in the example above
-        pat  = mkBigLHsPatTupId pats
-        pats = map mkBigLHsVarPatTupId bndrs_s
 
 deListComp (RecStmt {} : _) _ = panic "deListComp RecStmt"
 
@@ -415,8 +417,9 @@ mkZipBind elt_tys = do
 
     zip_fn <- newSysLocalMDs zip_fn_ty
 
+    as'_tup  <- mkBigCoreVarTup BoxedElements as'
     let inner_rhs = mkConsExpr elt_tuple_ty
-                        (mkBigCoreVarTup as')
+                        as'_tup
                         (mkVarApps (Var zip_fn) as's)
         zip_body  = foldr mk_case inner_rhs (zip3 ass as' as's)
 
@@ -456,9 +459,9 @@ mkUnzipBind _ elt_tys
 
        ; unzip_fn <- newSysLocalMDs unzip_fn_ty
 
-       ; let nil_tuple = mkBigCoreTup (map mkNilExpr elt_tys)
-             concat_expressions = map mkConcatExpression (zip3 elt_tys (map Var xs) (map Var xss))
-             tupled_concat_expression = mkBigCoreTup concat_expressions
+       ; nil_tuple <- mkBigCoreTup (map mkNilExpr elt_tys)
+       ; let concat_expressions = map mkConcatExpression (zip3 elt_tys (map Var xs) (map Var xss))
+       ; tupled_concat_expression <- mkBigCoreTup concat_expressions
 
        ; folder_body_inner_case <- mkBigTupleCase xss tupled_concat_expression (Var axs)
        ; folder_body_outer_case <- mkBigTupleCase xs folder_body_inner_case (Var ax)
@@ -637,8 +640,10 @@ dsInnerMonadComp :: [ExprLStmt GhcTc]
                  -> SyntaxExpr GhcTc   -- The monomorphic "return" operator
                  -> DsM CoreExpr
 dsInnerMonadComp stmts bndrs ret_op
-  = dsMcStmts (stmts ++
-                 [noLocA (LastStmt noExtField (mkBigLHsVarTupId bndrs) Nothing ret_op)])
+  = dsMcStmts $
+      stmts
+        ++
+      [noLocA (LastStmt noExtField (mkBigLHsVarTupId bndrs) Nothing ret_op)]
 
 
 -- The `unzip` function for `GroupStmt` in a monad comprehensions
@@ -655,7 +660,7 @@ dsInnerMonadComp stmts bndrs ret_op
 mkMcUnzipM :: TransForm
            -> HsExpr GhcTc      -- fmap
            -> Id                -- Of type n (a,b,c)
-           -> [Type]            -- [a,b,c]   (not representation-polymorphic)
+           -> [Type]            -- [a,b,c]
            -> DsM CoreExpr      -- Of type (n a, n b, n c)
 mkMcUnzipM ThenForm _ ys _
   = return (Var ys) -- No unzipping to do
@@ -666,14 +671,14 @@ mkMcUnzipM _ fmap_op ys elt_tys
        ; let tup_ty = mkBigCoreTupTy elt_tys
        ; tup_xs   <- newSysLocalMDs tup_ty
 
-       ; let mk_elt i = mkApps fmap_op'  -- fmap :: forall a b. (a -> b) -> n a -> n b
-                           [ Type tup_ty, Type (getNth elt_tys i)
-                           , mk_sel i, Var ys]
+       ; let mk_elt i =  -- fmap :: forall a b. (a -> b) -> n a -> n b
+               do { sel <- mkBigTupleSelector BoxedElements xs (getNth xs i)
+                                              tup_xs (Var tup_xs)
+                  ; return (mkApps fmap_op' [ Type tup_ty, Type (getNth elt_tys i)
+                                            , Lam tup_xs sel, Var ys ]) }
 
-             mk_sel n = Lam tup_xs $
-                        mkBigTupleSelector xs (getNth xs n) tup_xs (Var tup_xs)
-
-       ; return (mkBigCoreTup (map mk_elt [0..length elt_tys - 1])) }
+       ; elts <- mapM mk_elt [0 .. length elt_tys - 1]
+       ; mkBigCoreTup elts }
 
 -- | Make a fully applied 'foldr' expression
 mkFoldrExpr :: Type             -- ^ Element type of the list
@@ -710,4 +715,3 @@ mkBuildExpr elt_ty mk_build_inside = do
     newTyVar tyvar_tmpl = do
       uniq <- getUniqueM
       return (setTyVarUnique tyvar_tmpl uniq)
-

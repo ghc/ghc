@@ -769,7 +769,7 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
              wrap_lf_info
                | wrap_arity == 0  = LFCon data_con
                -- See W1 in Note [LFInfo of DataCon workers and wrappers]
-               | isNewTyCon tycon = panic "mkDataConRep: we shouldn't look at LFInfo for newtype wrapper ids"
+               | no_binding       = panic "mkDataConRep: we shouldn't look at LFInfo for no-binding DataCon Ids"
                | otherwise        = LFReEntrant TopLevel (countFunRepArgs wrap_arity wrap_ty) True ArgUnknown
                                                       -- LFInfo stores post-unarisation arity
 
@@ -799,9 +799,10 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
              -- See Note [Inline partially-applied constructor wrappers]
              -- Passing Nothing here allows the wrapper to inline when
              -- unsaturated.
-             wrap_unf | isNewTyCon tycon = mkCompulsoryUnfolding wrap_rhs
-                        -- See Note [Compulsory newtype unfolding]
-                      | otherwise        = mkDataConUnfolding wrap_rhs
+             wrap_unf | no_binding = mkCompulsoryUnfolding wrap_rhs
+                        -- See Note [Compulsory newtype unfolding], which applies to
+                        -- every constructor without a binding ('dataConHasNoBinding')
+                      | otherwise  = mkDataConUnfolding wrap_rhs
              wrap_rhs = mkCoreTyLams wrap_tvbs $
                         mkCoreLams wrap_args $
                         wrapFamInstBody tycon res_ty_args non_wrap_arg_ty $
@@ -846,6 +847,9 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
              -- wrapper
 
     new_tycon = isNewTyCon tycon
+
+    no_binding = dataConHasNoBinding data_con
+
     arg_ibangs
       | new_tycon
       = map (const HsLazy) orig_arg_tys -- See Note [HsImplBangs for newtypes]

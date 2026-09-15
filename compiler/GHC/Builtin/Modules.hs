@@ -42,6 +42,7 @@ gHC_INTERNAL_BASE, gHC_INTERNAL_GHCI_HELPERS, gHC_INTERNAL_MAYBE,
   gHC_INTERNAL_WORD, gHC_INTERNAL_MONAD_FAIL,
   gHC_INTERNAL_CONTROL_EXCEPTION_BASE, gHC_INTERNAL_TYPEERROR,
   gHC_INTERNAL_TYPELITS, gHC_INTERNAL_TYPELITS_INTERNAL, gHC_INTERNAL_TYPENATS,
+  gHC_INTERNAL_BOX,
   gHC_INTERNAL_TYPENATS_INTERNAL, gHC_INTERNAL_UNSAFE_COERCE :: Module
 gHC_INTERNAL_BASE                   = mkGhcInternalModule (fsLit "GHC.Internal.Base")
 gHC_INTERNAL_GHCI_HELPERS           = mkGhcInternalModule (fsLit "GHC.Internal.GHCi.Helpers")
@@ -55,8 +56,15 @@ gHC_INTERNAL_TYPEERROR              = mkGhcInternalModule (fsLit "GHC.Internal.T
 gHC_INTERNAL_TYPELITS               = mkGhcInternalModule (fsLit "GHC.Internal.TypeLits")
 gHC_INTERNAL_TYPELITS_INTERNAL      = mkGhcInternalModule (fsLit "GHC.Internal.TypeLits.Internal")
 gHC_INTERNAL_TYPENATS               = mkGhcInternalModule (fsLit "GHC.Internal.TypeNats")
+gHC_INTERNAL_BOX                    = mkGhcInternalModule (fsLit "GHC.Internal.Box")
 gHC_INTERNAL_TYPENATS_INTERNAL      = mkGhcInternalModule (fsLit "GHC.Internal.TypeNats.Internal")
 gHC_INTERNAL_UNSAFE_COERCE          = mkGhcInternalModule (fsLit "GHC.Internal.Unsafe.Coerce")
+
+-- | Modules consisting solely of wired-in declarations, with no instances or
+-- rules. GHC never loads their interfaces on account of a wired-in thing.
+-- See Note [Loading instances for wired-in things] in GHC.Iface.Load.
+isWiredInOnlyModule :: Module -> Bool
+isWiredInOnlyModule mod = mod == gHC_INTERNAL_BOX
 
 rOOT_MAIN :: Module
 rOOT_MAIN       = mkMainModule (fsLit ":Main") -- Root module for initialisation

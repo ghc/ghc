@@ -1516,6 +1516,7 @@ setNominalRole_maybe r co
                      ProofIrrelProv {} -> True   -- it's always safe
                      PluginProv {}     -> False  -- who knows? This choice is conservative.
                      SubMultProv {}    -> True
+                     CanonicalProv {}  -> False  -- representational only; can't make nominal
       = Just $ co { uco_role = Nominal }
     setNominalRole_maybe_helper _ = Nothing
 

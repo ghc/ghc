@@ -19,17 +19,12 @@ module GHC.Core.Make (
         MkStringIds (..), getMkStringIds,
 
         -- * Constructing small tuples
-        mkCoreVarTupTy, mkCoreTup, mkCoreUnboxedTuple, mkCoreUnboxedSum,
+        mkCoreVarTupTy, mkCoreTup, mkCoreBoxedTuple,
+        mkCoreUnboxedTuple, mkCoreUnboxedSum,
         mkCoreTupBoxity, unitExpr,
 
-        -- * Constructing big tuples
-        mkChunkified, chunkify,
-        mkBigCoreVarTup, mkBigCoreVarTupSolo,
-        mkBigCoreVarTupTy, mkBigCoreTupTy,
-        mkBigCoreTup,
-
-          -- * Deconstructing big tuples
-        mkBigTupleSelector, mkBigTupleSelectorSolo, mkBigTupleCase,
+        -- * Pattern matching on chunked tuples
+        mkChunkedTupleCase,
 
         -- * Constructing list expressions
         mkNilExpr, mkConsExpr, mkListExpr,
@@ -59,7 +54,7 @@ import GHC.Types.Basic( TypeOrConstraint(..) )
 import GHC.Types.Demand
 import GHC.Types.Name      hiding ( varName )
 import GHC.Types.Literal
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.Supply ( MonadUnique )
 
 import GHC.Core
 import GHC.Core.Utils ( exprType, mkSingleAltCase, bindNonRec, mkCast, mkTick )
@@ -79,7 +74,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
-import GHC.Settings.Constants( mAX_TUPLE_SIZE )
 import GHC.Data.FastString
 import GHC.Data.OrdList
 import GHC.Data.Maybe ( expectJust )
@@ -87,6 +81,7 @@ import GHC.Data.Maybe ( expectJust )
 import Data.List        ( partition )
 import Data.List.NonEmpty ( NonEmpty (..) )
 import Data.Char        ( ord )
+import Data.Foldable    ( foldrM )
 
 infixl 4 `mkCoreApp`, `mkCoreApps`
 
@@ -335,6 +330,10 @@ mkStringExprFSWith ids str
 ************************************************************************
 -}
 
+-- | The unit expression
+unitExpr :: CoreExpr
+unitExpr = Var unitDataConId
+
 {- Note [Flattening one-tuples]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This family of functions creates a tuple of variables/expressions/types.
@@ -365,13 +364,16 @@ This arose from discussions in #16881.
 One-tuples that arise internally depend on the circumstance; often flattening
 is a good idea. Decisions are made on a case-by-case basis.
 
-'mkCoreBoxedTuple` and `mkBigCoreVarTupSolo` build tuples without flattening.
+`mkCoreBoxedTuple` and `mkBigCoreVarTup BareElements` (in GHC.Core.Make.BigTuple)
+build tuples without flattening.
 -}
 
--- | Build a small tuple holding the specified expressions
--- One-tuples are *not* flattened; see Note [Flattening one-tuples]
--- See also Note [Don't flatten tuples from HsSyn]
--- Arguments must have kind Type
+-- | Build a small tuple holding the specified expressions.
+--
+-- One-tuples are *not* flattened; see Note [Flattening one-tuples] as well
+-- as Note [Don't flatten tuples from HsSyn].
+--
+-- Arguments must have kind @Type@.
 mkCoreBoxedTuple :: HasDebugCallStack => [CoreExpr] -> CoreExpr
 mkCoreBoxedTuple cs
   = assertPpr (all (tcIsLiftedTypeKind . typeKind . exprType) cs) (ppr cs)
@@ -418,308 +420,47 @@ mkCoreUnboxedSum arity alt tys exp
                    ++ map Type tys
                    ++ [exp])
 
-{- Note [Big tuples]
-~~~~~~~~~~~~~~~~~~~~
-"Big" tuples (`mkBigCoreTup` and friends) are more general than "small"
-ones (`mkCoreTup` and friends) in two ways.
-
-1. GHCs built-in tuples can only go up to 'mAX_TUPLE_SIZE' in arity, but
-   we might conceivably want to build such a massive tuple as part of the
-   output of a desugaring stage (notably that for list comprehensions).
-
-   `mkBigCoreTup` encodes such big tuples by creating and pattern
-   matching on /nested/ small tuples that are directly expressible by
-   GHC.
-
-   Nesting policy: it's better to have a 2-tuple of 10-tuples (3 objects)
-   than a 10-tuple of 2-tuples (11 objects), so we want the leaves of any
-   construction to be big.
-
-2. When desugaring arrows we gather up a tuple of free variables, which
-   may include dictionaries (of kind Constraint) and unboxed values.
-
-   These can't live in a tuple. `mkBigCoreTup` encodes such tuples by
-   boxing up the offending arguments: see Note [Boxing constructors]
-   in GHC.Builtin.WiredIn.Types.
-
-If you just use the 'mkBigCoreTup', 'mkBigCoreVarTupTy', 'mkBigTupleSelector'
-and 'mkBigTupleCase' functions to do all your work with tuples you should be
-fine, and not have to worry about the arity limitation, or kind limitation at
-all.
-
-The "big" tuple operations flatten 1-tuples just like "small" tuples.
-But see Note [Don't flatten tuples from HsSyn]
--}
-
-mkBigCoreVarTupSolo :: [Id] -> CoreExpr
--- Same as mkBigCoreVarTup, but:
---   - one-tuples are not flattened
---     see Note [Flattening one-tuples]
---   - arguments should have kind Type
-mkBigCoreVarTupSolo [id] = mkCoreBoxedTuple [Var id]
-mkBigCoreVarTupSolo ids  = mkChunkified mkCoreTup (map Var ids)
-
--- | Build a big tuple holding the specified variables
--- One-tuples are flattened; see Note [Flattening one-tuples]
--- Arguments don't have to have kind Type
-mkBigCoreVarTup :: [Id] -> CoreExpr
-mkBigCoreVarTup ids = mkBigCoreTup (map Var ids)
-
--- | Build a "big" tuple holding the specified expressions
--- One-tuples are flattened; see Note [Flattening one-tuples]
--- Arguments don't have to have kind Type; ones that do not are boxed
--- This function crashes (in wrapBox) if given a non-Type
--- argument that it doesn't know how to box.
-mkBigCoreTup :: [CoreExpr] -> CoreExpr
-mkBigCoreTup exprs = mkChunkified mkCoreTup (map wrapBox exprs)
-
--- | Build the type of a big tuple that holds the specified variables
--- One-tuples are flattened; see Note [Flattening one-tuples]
-mkBigCoreVarTupTy :: HasDebugCallStack => [Id] -> Type
-mkBigCoreVarTupTy ids = mkBigCoreTupTy (map idType ids)
-
--- | Build the type of a big tuple that holds the specified type of thing
--- One-tuples are flattened; see Note [Flattening one-tuples]
-mkBigCoreTupTy :: HasDebugCallStack => [Type] -> Type
-mkBigCoreTupTy tys = mkChunkified mkBoxedTupleTy $
-                     map boxTy tys
-
--- | The unit expression
-unitExpr :: CoreExpr
-unitExpr = Var unitDataConId
-
---------------------------------------------------------------
-wrapBox :: CoreExpr -> CoreExpr
--- ^ If (e :: ty) and (ty :: Type), wrapBox is a no-op
--- But if (ty :: ki), and ki is not Type, wrapBox returns (K @ty e)
---     which has kind Type
--- where K is the boxing data constructor for ki
--- See Note [Boxing constructors] in GHC.Builtin.WiredIn.Types
--- Panics if there /is/ no boxing data con
-wrapBox e
-  = case boxingDataCon e_ty of
-      BI_NoBoxNeeded                       -> e
-      BI_Box { bi_inst_con = boxing_expr } -> App boxing_expr e
-      BI_NoBoxAvailable -> pprPanic "wrapBox" (ppr e $$ ppr (exprType e))
-                           -- We should do better than panicing: #22336
+-- | Pattern match on a tuple built by @'mkChunkified' 'mkCoreTup'@, binding the
+-- given variables in the body. Strict in the entire chunked tuple:
+--
+-- > mkChunkedTupleCase [a,b,c,d] body e
+-- >   = case e of v { (p,q) ->
+-- >     case p of p { (a,b) ->
+-- >     case q of q { (c,d) ->
+-- >     body }}}
+--
+-- (pretending 'mAX_TUPLE_SIZE' is 2).
+mkChunkedTupleCase
+  :: MonadUnique m
+  => [Id]       -- ^ The tuple identifiers to pattern match on;
+                --   bring these into scope in the body
+  -> CoreExpr   -- ^ Body of the case
+  -> CoreExpr   -- ^ Scrutinee
+  -> m CoreExpr
+mkChunkedTupleCase all_vars all_body scrut
+  = go (chunkify all_vars) all_body
   where
-    e_ty = exprType e
-
-boxTy :: HasDebugCallStack => Type -> Type
--- ^ `boxTy ty` is the boxed version of `ty`. That is,
--- if `e :: ty`, then `wrapBox e :: boxTy ty`.
--- Note that if `ty :: Type`, `boxTy ty` just returns `ty`.
--- Panics if it is not possible to box `ty`, like `wrapBox` (#22336)
--- See Note [Boxing constructors] in GHC.Builtin.WiredIn.Types
-boxTy ty
-  = case boxingDataCon ty of
-      BI_NoBoxNeeded -> ty
-      BI_Box { bi_boxed_type = box_ty } -> box_ty
-      BI_NoBoxAvailable -> pprPanic "boxTy" (ppr ty)
-                           -- We should do better than panicing: #22336
-
-unwrapBox :: UniqSupply -> Id -> CoreExpr
-                 -> (UniqSupply, Id, CoreExpr)
--- If v's type required boxing (i.e it is unlifted or a constraint)
--- then (unwrapBox us v body) returns
---          (case box_v of MkDict v -> body)
---          together with box_v
---      where box_v is a fresh variable
--- Otherwise unwrapBox is a no-op
--- Panics if no box is available (#22336)
-unwrapBox us var body
-  = case boxingDataCon var_ty of
-      BI_NoBoxNeeded    -> (us, var, body)
-      BI_NoBoxAvailable -> pprPanic "unwrapBox" (ppr var $$ ppr var_ty)
-                           -- We should do better than panicing: #22336
-      BI_Box { bi_data_con = box_con, bi_boxed_type = box_ty }
-         -> (us', var', body')
-         where
-           var'  = mkSysLocal (fsLit "uc") uniq ManyTy box_ty
-           body' = Case (Var var') var' (exprType body)
-                        [Alt (DataAlt box_con) [var] body]
-  where
-    var_ty      = idType var
-    (uniq, us') = takeUniqFromSupply us
-
--- | Lifts a \"small\" constructor into a \"big\" constructor by recursive decomposition
-mkChunkified :: ([a] -> a)      -- ^ \"Small\" constructor function, of maximum input arity 'mAX_TUPLE_SIZE'
-             -> [a]             -- ^ Possible \"big\" list of things to construct from
-             -> a               -- ^ Constructed thing made possible by recursive decomposition
-mkChunkified small_tuple as = mk_big_tuple (chunkify as)
-  where
-        -- Each sub-list is short enough to fit in a tuple
-    mk_big_tuple [as] = small_tuple as
-    mk_big_tuple as_s = mk_big_tuple (chunkify (map small_tuple as_s))
-
-chunkify :: [a] -> [[a]]
--- ^ Split a list into lists that are small enough to have a corresponding
--- tuple arity. The sub-lists of the result all have length <= 'mAX_TUPLE_SIZE'
--- But there may be more than 'mAX_TUPLE_SIZE' sub-lists
-chunkify xs
-  | n_xs <= mAX_TUPLE_SIZE = [xs]
-  | otherwise              = split xs
-  where
-    n_xs     = length xs
-    split [] = []
-    split xs = let (as, bs) = splitAt mAX_TUPLE_SIZE xs
-               in as : split bs
-
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Tuple destructors}
-*                                                                      *
-************************************************************************
--}
-
--- | Builds a selector which scrutinises the given
--- expression and extracts the one name from the list given.
--- If you want the no-shadowing rule to apply, the caller
--- is responsible for making sure that none of these names
--- are in scope.
---
--- If there is just one 'Id' in the tuple, then the selector is
--- just the identity.
---
--- If necessary, we pattern match on a \"big\" tuple.
---
--- A tuple selector is not linear in its argument. Consequently, the case
--- expression built by `mkBigTupleSelector` must consume its scrutinee 'Many'
--- times. And all the argument variables must have multiplicity 'Many'.
-mkBigTupleSelector, mkBigTupleSelectorSolo
-    :: [Id]         -- ^ The 'Id's to pattern match the tuple against
-    -> Id           -- ^ The 'Id' to select
-    -> Id           -- ^ A variable of the same type as the scrutinee
-    -> CoreExpr     -- ^ Scrutinee
-    -> CoreExpr     -- ^ Selector expression
-
--- mkBigTupleSelector [a,b,c,d] b v e
---          = case e of v {
---                (p,q) -> case p of p {
---                           (a,b) -> b }}
--- We use 'tpl' vars for the p,q, since shadowing does not matter.
---
--- In fact, it's more convenient to generate it innermost first, getting
---
---        case (case e of v
---                (p,q) -> p) of p
---          (a,b) -> b
-mkBigTupleSelector vars the_var scrut_var scrut
-  = mk_tup_sel (chunkify vars) the_var
-  where
-    mk_tup_sel [vars] the_var = mkSmallTupleSelector vars the_var scrut_var scrut
-    mk_tup_sel vars_s the_var = mkSmallTupleSelector group the_var tpl_v $
-                                mk_tup_sel (chunkify tpl_vs) tpl_v
-        where
-          tpl_tys = [mkBoxedTupleTy (map idType gp) | gp <- vars_s]
-          tpl_vs  = mkTemplateLocals tpl_tys
-          (tpl_v, group) = case
-            [ (tpl,gp)
-            | (tpl,gp) <- zipEqual tpl_vs vars_s
-            , the_var `elem` gp
-            ] of
-              [x] -> x
-              _ -> panic "mkBigTupleSelector"
--- ^ 'mkBigTupleSelectorSolo' is like 'mkBigTupleSelector'
--- but one-tuples are NOT flattened (see Note [Flattening one-tuples])
-mkBigTupleSelectorSolo vars the_var scrut_var scrut
-  | [_] <- vars
-  = mkSmallTupleSelector1 vars the_var scrut_var scrut
-  | otherwise
-  = mkBigTupleSelector vars the_var scrut_var scrut
-
--- | `mkSmallTupleSelector` is like 'mkBigTupleSelector', but for tuples that
--- are guaranteed never to be "big".  Also does not unwrap boxed types.
---
--- > mkSmallTupleSelector [x] x v e = [| e |]
--- > mkSmallTupleSelector [x,y,z] x v e = [| case e of v { (x,y,z) -> x } |]
-mkSmallTupleSelector, mkSmallTupleSelector1
-          :: [Id]        -- The tuple args
-          -> Id          -- The selected one
-          -> Id          -- A variable of the same type as the scrutinee
-          -> CoreExpr    -- Scrutinee
-          -> CoreExpr
-mkSmallTupleSelector [var] should_be_the_same_var _ scrut
-  = assert (var == should_be_the_same_var) $
-    scrut  -- Special case for 1-tuples
-mkSmallTupleSelector vars the_var scrut_var scrut
-  = mkSmallTupleSelector1 vars the_var scrut_var scrut
-
--- ^ 'mkSmallTupleSelector1' is like 'mkSmallTupleSelector'
--- but one-tuples are NOT flattened (see Note [Flattening one-tuples])
-mkSmallTupleSelector1 vars the_var scrut_var scrut
-  = assert (notNull vars) $
-    Case scrut scrut_var (idType the_var)
-         [Alt (DataAlt (tupleDataCon Boxed (length vars))) vars (Var the_var)]
-
--- | A generalization of 'mkBigTupleSelector', allowing the body
--- of the case to be an arbitrary expression.
---
--- To avoid shadowing, we use uniques to invent new variables.
---
--- If necessary we pattern match on a "big" tuple.
-mkBigTupleCase :: MonadUnique m    --   For inventing names of intermediate variables
-               => [Id]             -- ^ The tuple identifiers to pattern match on;
-                                   --   Bring these into scope in the body
-               -> CoreExpr         -- ^ Body of the case
-               -> CoreExpr         -- ^ Scrutinee
-               -> m CoreExpr
--- ToDo: eliminate cases where none of the variables are needed.
---
---         mkBigTupleCase uniqs [a,b,c,d] body v e
---           = case e of v { (p,q) ->
---             case p of p { (a,b) ->
---             case q of q { (c,d) ->
---             body }}}
-mkBigTupleCase vars body scrut
-  = do us <- getUniqueSupplyM
-       let (wrapped_us, wrapped_vars, wrapped_body) = foldr unwrap (us,[],body) vars
-       return $ mk_tuple_case wrapped_us (chunkify wrapped_vars) wrapped_body
-  where
-    scrut_ty = exprType scrut
-
-    unwrap var (us,vars,body)
-      = (us', var':vars, body')
-      where
-        (us', var', body') = unwrapBox us var body
-
-    mk_tuple_case :: UniqSupply -> [[Id]] -> CoreExpr -> CoreExpr
-    -- mk_tuple_case [[a1..an], [b1..bm], ...] body
+    -- go [[a1..an], [b1..bm], ...] body
     --    case scrut of (p,q, ...) ->
     --    case p of (a1,..an) ->
     --    case q of (b1,..bm) ->
     --    ... -> body
-    -- This is the case where don't need any nesting
-    mk_tuple_case us [vars] body
-      = mkSmallTupleCase vars body scrut_var scrut
-      where
-        scrut_var = case scrut of
-                       Var v -> v
-                       _ -> snd (new_var us scrut_ty)
+    go [vars] body
+      = do { scrut_var <- case scrut of
+                            Var v -> return v
+                            _     -> mkSysLocalM (fsLit "ds") ManyTy (exprType scrut)
+           ; return (mkSmallTupleCase vars body scrut_var scrut) }
+    go vars_s body
+      = do { (vars', body') <- foldrM one_tuple_case ([], body) vars_s
+           ; go (chunkify vars') body' }
 
-    -- This is the case where we must nest tuples at least once
-    mk_tuple_case us vars_s body
-      = mk_tuple_case us' (chunkify vars') body'
-      where
-        (us', vars', body') = foldr one_tuple_case (us, [], body) vars_s
+    one_tuple_case chunk_vars (vs, body)
+      = do { scrut_var <- mkSysLocalM (fsLit "ds") ManyTy (mkCoreVarTupTy chunk_vars)
+           ; return ( scrut_var:vs
+                    , mkSmallTupleCase chunk_vars body scrut_var (Var scrut_var) ) }
 
-    one_tuple_case chunk_vars (us, vs, body)
-      = (us', scrut_var:vs, body')
-      where
-        tup_ty           = mkBoxedTupleTy (map idType chunk_vars)
-        (us', scrut_var) = new_var us tup_ty
-        body' = mkSmallTupleCase chunk_vars body scrut_var (Var scrut_var)
-
-    new_var :: UniqSupply -> Type -> (UniqSupply, Id)
-    new_var us ty = (us', id)
-       where
-         (uniq, us') = takeUniqFromSupply us
-         id = mkSysLocal (fsLit "ds") uniq ManyTy ty
-
--- | As 'mkBigTupleCase', but for a tuple that is small enough to be guaranteed
--- not to need nesting.
+-- | Pattern match on a tuple of arity at most 'mAX_TUPLE_SIZE', flattening
+-- one-tuples.
 mkSmallTupleCase
         :: [Id]         -- ^ The tuple args
         -> CoreExpr     -- ^ Body of the case
@@ -1237,4 +978,3 @@ mkRuntimeErrorTy torc = mkSpecForAllTys [runtimeRep1TyVar, tyvar] $
     kind = case torc of
               TypeLike       -> mkTYPEapp       runtimeRep1Ty
               ConstraintLike -> mkCONSTRAINTapp runtimeRep1Ty
-

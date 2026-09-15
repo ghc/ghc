@@ -47,23 +47,26 @@ import GHC.Prelude
 import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids
 import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Types.Box ( boxWiredInTyCons )
 import GHC.Builtin.WiredIn.TypeLits ( typeNatTyCons )
 import GHC.Builtin.WiredIn.Ids ( wiredInIds, ghcPrimIds )
 import GHC.Builtin.WiredIn.Prim
 import GHC.Builtin.KnownKeys
 
+import GHC.Core.Class
 import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.DataCon
-import GHC.Core.Class
+import GHC.Core.Multiplicity ( Scaled(..) )
 import GHC.Core.TyCon
 
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Types.RepType ( typePrimRep )
+import GHC.Types.SrcLoc
+import GHC.Types.TyThing
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
-import GHC.Types.TyThing
-import GHC.Types.SrcLoc
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc as Utils
@@ -627,6 +630,7 @@ wiredInNames
     all_names =
       concat [ concatMap wired_tycon_kk_names primTyCons
              , concatMap wired_tycon_kk_names wiredInTyCons
+             , concatMap wired_tycon_kk_names boxWiredInTyCons
              , concatMap wired_tycon_kk_names typeNatTyCons
              , map idName wiredInIds
              , map idName allThePrimOpIds
@@ -766,11 +770,29 @@ isUnboundName name = name `hasKey` unboundKey
 *                                                                      *
             Built-in keys
 *                                                                      *
-************************************************************************
+**********************************************************************-}
 
-ToDo: make it do the ``like'' part properly (as in 0.26 and before).
--}
+-- | Is this the 'I#' constructor of @data Int = I# Int#@, or the 'BoxInt'
+-- boxing constructor of the 'IntRep' reduct of 'Box'?
+-- See Note [Boxing constructors] in GHC.Builtin.WiredIn.Types.Box.
+maybeIntLikeCon :: DataCon -> Bool
+maybeIntLikeCon dc
 
-maybeCharLikeCon, maybeIntLikeCon :: DataCon -> Bool
-maybeCharLikeCon con = con `hasKey` charDataConKey
-maybeIntLikeCon  con = con `hasKey` intDataConKey
+  -- I#
+  | dc `hasKey` intDataConKey
+  = True
+
+  -- BoxInt (the only boxing data constructor whose field has 'IntRep')
+  | isBoxingDataCon dc
+  , [Scaled _ arg_ty] <- dataConRepArgTys dc
+  , [IntRep] <- typePrimRep arg_ty
+  = True
+
+  | otherwise
+  = False
+
+-- | Is this the 'C#' constructor of @data Char = C# Char#@?
+maybeCharLikeCon :: DataCon -> Bool
+maybeCharLikeCon dc = dc `hasKey` charDataConKey
+  -- NB: we don't allow the 'BoxWord' boxing data constructor,
+  -- as that doesn't give us a way to distinguish 'Char#' from 'Word#'.

@@ -365,6 +365,11 @@ import GHC.Prim hiding
   , sqrtFloatX16#
   , sqrtDoubleX8#
 #endif
+
+#if __GLASGOW_HASKELL__ >= 1001
+  -- Don't re-export box/unbox
+  , box, unbox
+#endif
   )
 
 import GHC.Prim.Ext

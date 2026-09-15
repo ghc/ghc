@@ -203,7 +203,17 @@ lintStgArg (StgVarArg v) = do { lintStgVarOcc v
                               ; lintAppCbvMarks v [] }
 
 lintStgVarOcc :: Id -> LintM ()
-lintStgVarOcc id = checkInScope id
+lintStgVarOcc id = do
+    checkInScope id
+    -- Enforce that 'Box' constructors appear exactly saturated.
+    -- See Note [No implicit binds for Box constructors] in GHC.CoreToStg.AddImplicitBinds.
+    case isDataConId_maybe id of
+      Just con
+        | isBoxingDataCon con && not (isNullaryRepDataCon con)
+        -> addErrL $
+             hang (text "Unexpected value occurrence of a boxing data constructor") 2 $
+               ppr id <+> dcolon <+> ppr (idType id)
+      _ -> return ()
 
 lintStgBinds
     :: (OutputablePass a, BinderP a ~ Id)

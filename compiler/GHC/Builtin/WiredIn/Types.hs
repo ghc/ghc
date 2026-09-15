@@ -19,6 +19,8 @@ module GHC.Builtin.WiredIn.Types (
 
         mkWiredInIdName,    -- used in GHC.Types.Id.Make
 
+        mkWiredInDataConName, pcTyCon, pcDataCon, pcDataConConstraint,
+
         -- * All wired in things
         wiredInTyCons, isBuiltInOcc, isBuiltInOcc_maybe,
         isTupleTyOrigName_maybe, isSumTyOrigName_maybe,
@@ -36,9 +38,6 @@ module GHC.Builtin.WiredIn.Types (
         ordEQDataCon, ordEQDataConId, ordEQDataConName,
         ordGTDataCon, ordGTDataConId, ordGTDataConName,
         promotedLTDataCon, promotedEQDataCon, promotedGTDataCon,
-
-        -- * Boxing primitive types
-        boxingDataCon, BoxingInfo(..),
 
         -- * Char
         charTyCon, charDataCon,
@@ -65,7 +64,8 @@ module GHC.Builtin.WiredIn.Types (
         nilDataCon, nilDataConName, nilDataConKey,
         consDataCon, consDataConName,
         promotedNilDataCon, promotedConsDataCon,
-        mkListTy, mkPromotedListTy, extractPromotedList,
+        mkListTy, mkPromotedListTy,
+        extractPromotedList, extractPromotedList_maybe,
 
         -- * Maybe
         maybeTyCon, maybeTyConName,
@@ -75,6 +75,7 @@ module GHC.Builtin.WiredIn.Types (
 
         -- * Tuples
         mkTupleTy, mkTupleTy1, mkBoxedTupleTy, mkTupleStr,
+        mkChunkified, chunkify,
         tupleTyCon, tupleDataCon, tupleTyConName, tupleDataConName,
         promotedTupleDataCon,
         unitTyCon, unitDataCon, unitDataConId, unitTy, unitTyConKey,
@@ -182,7 +183,6 @@ import GHC.Builtin.WiredIn.Prim
 import GHC.Builtin.Uniques
 
 -- others:
-import GHC.Core( Expr(Type), mkConApp )
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Type
 import GHC.Types.Id
@@ -190,7 +190,6 @@ import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.Core.Class     ( Class, mkClass )
-import GHC.Core.Map.Type  ( TypeMap, emptyTypeMap, extendTypeMap, lookupTypeMap )
 import qualified GHC.Core.TyCo.Rep as TyCoRep ( Type(TyConApp) )
 
 import GHC.Hs.Extension (GhcTc)
@@ -216,8 +215,8 @@ import GHC.Unit.Module        ( Module )
 
 import Data.Maybe
 import Data.Array
-import GHC.Data.FastString
 import GHC.Data.BooleanFormula ( mkAnd )
+import GHC.Data.FastString
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -286,7 +285,6 @@ names in GHC.Builtin.KnownKeys, so they use wTcQual, wDataQual, etc
 
 -}
 
-
 -- This list is used only to define GHC.Builtin.wiredInNames. That in turn
 -- is used to initialise the name environment carried around by the renamer.
 -- This means that if we look up the name of a TyCon (or its implicit binders)
@@ -301,8 +299,7 @@ names in GHC.Builtin.KnownKeys, so they use wTcQual, wDataQual, etc
 -- See also Note [Overview of known entities]
 wiredInTyCons :: [TyCon]
 
-wiredInTyCons = map (dataConTyCon . snd) boxingDataCons
-             ++ [ anyTyCon
+wiredInTyCons = [ anyTyCon
                 , unusedTypeTyCon
                 , boolTyCon
                 , charTyCon
@@ -549,7 +546,6 @@ implement it merely with an empty kind polymorphic type family. See #10886 for a
 bit of history.
 -}
 
-
 anyTyConName :: Name
 anyTyConName =
     mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Any") anyTyConKey anyTyCon
@@ -616,7 +612,6 @@ makeRecoveryTyCon tc
 -- Kinds
 typeSymbolKindConName :: Name
 typeSymbolKindConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Symbol") typeSymbolKindConNameKey typeSymbolKindCon
-
 
 {-
 ************************************************************************
@@ -756,7 +751,6 @@ mkDataConWorkerName data_con wrk_key =
     dc_occ  = nameOccName dc_name
     wrk_occ = mkDataConWorkerOcc dc_occ
 
-
 {-
 ************************************************************************
 *                                                                      *
@@ -771,7 +765,6 @@ typeSymbolKindCon = pcTyCon typeSymbolKindConName Nothing [] []
 
 typeSymbolKind :: Kind
 typeSymbolKind = mkTyConTy typeSymbolKindCon
-
 
 {-
 ************************************************************************
@@ -1911,7 +1904,6 @@ unrestrictedFunTyConName :: Name
 unrestrictedFunTyConName = mkWiredInTyConName BuiltInSyntax gHC_TYPES (fsLit "->")
                                               unrestrictedFunTyConKey unrestrictedFunTyCon
 
-
 {- *********************************************************************
 *                                                                      *
       Type synonyms (all declared in ghc-prim:GHC.Types)
@@ -1944,7 +1936,6 @@ i.e. TYPE :: RuntimeRep -> TYPE LiftedRep
 so the check will loop infinitely.  Hence the use of a naked FunTy
 constructor in tTYPETyCon and cONSTRAINTTyCon.
 -}
-
 
 ----------------------
 -- type Constraint = CONSTRAINT LiftedRep
@@ -1992,7 +1983,6 @@ unliftedTypeKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Unli
 unliftedTypeKind :: Type
 unliftedTypeKind = mkTyConTy unliftedTypeKindTyCon
 
-
 {- *********************************************************************
 *                                                                      *
       data Levity = Lifted | Unlifted
@@ -2027,7 +2017,6 @@ liftedDataConTy = mkTyConTy liftedDataConTyCon
 
 unliftedDataConTy :: Type
 unliftedDataConTy = mkTyConTy unliftedDataConTyCon
-
 
 {- *********************************************************************
 *                                                                      *
@@ -2087,7 +2076,6 @@ boxedRepDataCon = pcSpecialDataCon boxedRepDataConName
           Nothing    -> [BoxedRep Nothing]
     prim_rep_fun args
       = pprPanic "boxedRepDataCon" (ppr args)
-
 
 boxedRepDataConTyCon :: TyCon
 boxedRepDataConTyCon = promoteDataCon boxedRepDataCon
@@ -2226,7 +2214,6 @@ unliftedRepTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "UnliftedR
 
 unliftedRepTy :: RuntimeRepType
 unliftedRepTy = mkTyConTy unliftedRepTyCon
-
 
 {- *********************************************************************
 *                                                                      *
@@ -2382,140 +2369,6 @@ doubleTyCon = mkCTypeCon doubleTyConName "HsDouble" [doubleDataCon]
 doubleDataCon :: DataCon
 doubleDataCon = pcDataCon doubleDataConName [] [doublePrimTy] doubleTyCon
 
-{- *********************************************************************
-*                                                                      *
-              Boxing data constructors
-*                                                                      *
-********************************************************************* -}
-
-{- Note [Boxing constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In ghc-prim:GHC.Types we have a family of data types, one for each RuntimeRep
-that "box" unlifted values into a (boxed, lifted) value of kind Type. For example
-
-  type Int8Box :: TYPE Int8Rep -> Type
-  data Int8Box (a :: TYPE Int8Rep) = MkInt8Box a
-    -- MkInt8Box :: forall (a :: TYPE Int8Rep). a -> Int8Box a
-
-Then we can package an `Int8#` into an `Int8Box` with `MkInt8Box`.  We can also
-package up a (lifted) Constraint as a value of kind Type.
-
-There are a fixed number of RuntimeReps, so we only need a fixed number
-of boxing types.  (For TupleRep we need to box recursively; not yet done,
-see #22336.)
-
-This is used:
-
-* In desugaring, when we need to package up a bunch of values into a tuple,
-  for example when desugaring arrows.  See Note [Big tuples] in GHC.Core.Make.
-
-* In let-floating when we want to float an unlifted sub-expression.
-  See Note [Floating MFEs of unlifted type] in GHC.Core.Opt.SetLevels
-
-In this module we make wired-in data type declarations for all of
-these boxing functions.  The goal is to define boxingDataCon_maybe.
-
-Wrinkles
-(W1) The runtime system has special treatment (e.g. commoning up during GC)
-     for Int and Char values. See  Note [CHARLIKE and INTLIKE closures] and
-     Note [Precomputed static closures] in the RTS.
-
-     So we treat Int# and Char# specially, in specialBoxingDataCon_maybe
--}
-
-data BoxingInfo b
-  = BI_NoBoxNeeded   -- The type has kind Type, so there is nothing to do
-
-  | BI_NoBoxAvailable  -- The type does not have kind Type, but sadly we
-                       -- don't have a boxing data constructor either
-
-  | BI_Box             -- The type does not have kind Type, and we do have a
-                       -- boxing data constructor; here it is
-      { bi_data_con   :: DataCon
-      , bi_inst_con   :: Expr b
-      , bi_boxed_type :: Type }
-    -- e.g. BI_Box { bi_data_con = I#, bi_inst_con = I#, bi_boxed_type = Int }
-    --        recall: data Int = I# Int#
-    --
-    --      BI_Box { bi_data_con = MkInt8Box, bi_inst_con = MkInt8Box @ty
-    --             , bi_boxed_type = Int8Box ty }
-    --        recall: data Int8Box (a :: TYPE Int8Rep) = MkIntBox a
-
-boxingDataCon :: Type -> BoxingInfo b
--- ^ Given a type 'ty', if 'ty' is not of kind Type, return a data constructor that
---   will box it, and the type of the boxed thing, which /does/ now have kind Type.
--- See Note [Boxing constructors]
-boxingDataCon ty
-  | tcIsLiftedTypeKind kind
-  = BI_NoBoxNeeded    -- Fast path for Type
-
-  | Just box_con <- specialBoxingDataCon_maybe ty
-  = BI_Box { bi_data_con = box_con, bi_inst_con = mkConApp box_con []
-           , bi_boxed_type = tyConNullaryTy (dataConTyCon box_con) }
-
-  | Just box_con <- lookupTypeMap boxingDataConMap kind
-  = BI_Box { bi_data_con = box_con, bi_inst_con = mkConApp box_con [Type ty]
-           , bi_boxed_type = mkTyConApp (dataConTyCon box_con) [ty] }
-
-  | otherwise
-  = BI_NoBoxAvailable
-
-  where
-    kind = typeKind ty
-
-specialBoxingDataCon_maybe :: Type -> Maybe DataCon
--- ^ See Note [Boxing constructors] wrinkle (W1)
-specialBoxingDataCon_maybe ty
-  = case splitTyConApp_maybe ty of
-      Just (tc, _) | tc `hasKey` intPrimTyConKey  -> Just intDataCon
-                   | tc `hasKey` charPrimTyConKey -> Just charDataCon
-      _ -> Nothing
-
-boxingDataConMap :: TypeMap DataCon
--- See Note [Boxing constructors]
-boxingDataConMap = foldl add emptyTypeMap boxingDataCons
-  where
-    add bdcm (kind, boxing_con) = extendTypeMap bdcm kind boxing_con
-
-boxingDataCons :: [(Kind, DataCon)]
--- The Kind is the kind of types for which the DataCon is the right boxing
-boxingDataCons = zipWith mkBoxingDataCon
-  (map mkBoxingTyConUnique [1..])
-  [ (mkTYPEapp wordRepDataConTy, fsLit "WordBox", fsLit "MkWordBox")
-  , (mkTYPEapp intRepDataConTy,  fsLit "IntBox",  fsLit "MkIntBox")
-
-  , (mkTYPEapp floatRepDataConTy,  fsLit "FloatBox",  fsLit "MkFloatBox")
-  , (mkTYPEapp doubleRepDataConTy,  fsLit "DoubleBox",  fsLit "MkDoubleBox")
-
-  , (mkTYPEapp int8RepDataConTy,  fsLit "Int8Box",  fsLit "MkInt8Box")
-  , (mkTYPEapp int16RepDataConTy, fsLit "Int16Box", fsLit "MkInt16Box")
-  , (mkTYPEapp int32RepDataConTy, fsLit "Int32Box", fsLit "MkInt32Box")
-  , (mkTYPEapp int64RepDataConTy, fsLit "Int64Box", fsLit "MkInt64Box")
-
-  , (mkTYPEapp word8RepDataConTy,  fsLit "Word8Box",   fsLit "MkWord8Box")
-  , (mkTYPEapp word16RepDataConTy, fsLit "Word16Box",  fsLit "MkWord16Box")
-  , (mkTYPEapp word32RepDataConTy, fsLit "Word32Box",  fsLit "MkWord32Box")
-  , (mkTYPEapp word64RepDataConTy, fsLit "Word64Box",  fsLit "MkWord64Box")
-
-  , (unliftedTypeKind, fsLit "LiftBox", fsLit "MkLiftBox")
-  , (constraintKind,   fsLit "DictBox", fsLit "MkDictBox") ]
-
-mkBoxingDataCon :: Unique -> (Kind, FastString, FastString) -> (Kind, DataCon)
-mkBoxingDataCon uniq_tc (kind, fs_tc, fs_dc)
-  = (kind, dc)
-  where
-    uniq_dc = boxingDataConUnique uniq_tc
-
-    (tv:_) = mkTemplateTyVars (repeat kind)
-    tc = pcTyCon tc_name Nothing [tv] [dc]
-    tc_name = mkWiredInTyConName UserSyntax gHC_TYPES fs_tc uniq_tc tc
-
-    dc | isConstraintKind kind
-       = pcDataConConstraint dc_name [tv] [mkTyVarTy tv] tc
-       | otherwise
-       = pcDataCon           dc_name [tv] [mkTyVarTy tv] tc
-    dc_name = mkWiredInDataConName UserSyntax gHC_TYPES fs_dc uniq_dc dc
-
 {-
 ************************************************************************
 *                                                                      *
@@ -2652,7 +2505,6 @@ isPromotedMaybeTy t
   | Just (tc,[_])   <- splitTyConApp_maybe t, tc == promotedNothingDataCon = return $ Nothing
   | otherwise = Nothing
 
-
 {-
 ** *********************************************************************
 *                                                                      *
@@ -2723,6 +2575,32 @@ mkTupleTy1 Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))
 mkBoxedTupleTy :: [Type] -> Type
 mkBoxedTupleTy tys = mkTupleTy Boxed tys
 
+-- | Lifts a \"small\" constructor into a \"big\" constructor by recursive decomposition
+mkChunkified :: ([a] -> a)      -- ^ \"Small\" constructor function, of maximum input arity 'mAX_TUPLE_SIZE'
+             -> [a]             -- ^ Possible \"big\" list of things to construct from
+             -> a               -- ^ Constructed thing made possible by recursive decomposition
+mkChunkified small_tuple as = mk_big_tuple (chunkify as)
+  -- Nesting policy: it's better to have a 2-tuple of 10-tuples (3 objects)
+  -- than a 10-tuple of 2-tuples (11 objects), so we want the leaves of any
+  -- construction to be big.
+  where
+        -- Each sub-list is short enough to fit in a tuple
+    mk_big_tuple [as] = small_tuple as
+    mk_big_tuple as_s = mk_big_tuple (chunkify (map small_tuple as_s))
+
+chunkify :: [a] -> [[a]]
+-- ^ Split a list into lists that are small enough to have a corresponding
+-- tuple arity. The sub-lists of the result all have length <= 'mAX_TUPLE_SIZE'
+-- But there may be more than 'mAX_TUPLE_SIZE' sub-lists
+chunkify xs
+  | n_xs <= mAX_TUPLE_SIZE = [xs]
+  | otherwise              = split xs
+  where
+    n_xs     = length xs
+    split [] = []
+    split xs = let (as, bs) = splitAt mAX_TUPLE_SIZE xs
+               in as : split bs
+
 unitTy :: Type
 unitTy = mkTupleTy Boxed []
 
@@ -2736,7 +2614,6 @@ unitTy = mkTupleTy Boxed []
 mkConstraintTupleTy :: [Type] -> Type
 mkConstraintTupleTy [ty] = ty
 mkConstraintTupleTy tys = mkTyConApp (cTupleTyCon (length tys)) tys
-
 
 {- *********************************************************************
 *                                                                      *
@@ -2790,23 +2667,40 @@ mkPromotedListTy k tys
     nil :: Type
     nil = mkTyConApp promotedNilDataCon [k]
 
--- | Extract the elements of a promoted list. Panics if the type is not a
--- promoted list
-extractPromotedList :: Type    -- ^ The promoted list
+-- | Extract the elements of a promoted list (a type of kind @[k]@ for some @k@).
+--
+-- Panics if that is not possible (e.g. the type is a skolem type variable).
+extractPromotedList :: HasDebugCallStack
+                    => Type    -- ^ The promoted list
                     -> [Type]
-extractPromotedList tys = go tys
+extractPromotedList ty =
+  case extractPromotedList_maybe ty of
+    Just elts -> elts
+    Nothing -> pprPanic "extractPromotedList" (ppr ty)
+
+-- | Extract the elements of a promoted list (a type of kind @[k]@ for some @k@).
+--
+-- Returns 'Nothing' if that is not possible (e.g. the type is a skolem
+-- type variable).
+extractPromotedList_maybe :: HasDebugCallStack => Type -> Maybe [Type]
+extractPromotedList_maybe ty0 = assert _is_list $ go ty0
   where
-    go list_ty
-      | Just (tc, [_k, t, ts]) <- splitTyConApp_maybe list_ty
-      = assert (tc `hasKey` consDataConKey) $
-        t : go ts
-
-      | Just (tc, [_k]) <- splitTyConApp_maybe list_ty
-      = assert (tc `hasKey` nilDataConKey)
-        []
-
+    _is_list
+      | Just (tc, [_]) <- splitTyConApp_maybe (typeKind ty0)
+      , tc `hasKey` listTyConKey
+      = True
       | otherwise
-      = pprPanic "extractPromotedList" (ppr tys)
+      = False
+
+    go list_ty =
+      case splitTyConApp_maybe list_ty of
+        Just (tc, args)
+          | tc `hasKey` consDataConKey
+          , [_k, t, ts] <- args
+          -> (t :) <$> go ts
+          | tc `hasKey` nilDataConKey
+          -> Just []
+        _ -> Nothing
 
 ---------------------------------------
 -- ghc-bignum

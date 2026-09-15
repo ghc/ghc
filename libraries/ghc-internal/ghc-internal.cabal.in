@@ -191,6 +191,7 @@ Library
         GHC.Internal.ArrayArray
         GHC.Internal.Base
         GHC.Internal.Bits
+        GHC.Internal.Box
         GHC.Internal.ByteOrder
         GHC.Internal.Char
         GHC.Internal.Clock

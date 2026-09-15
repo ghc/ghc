@@ -25,6 +25,7 @@ module GHC.Builtin.WiredIn.TypeLits
   , typeUnconsSymbolTyCon
   , typeCharToNatTyCon
   , typeNatToCharTyCon
+  , listIndexTyCon
   ) where
 
 import GHC.Prelude
@@ -40,6 +41,7 @@ import GHC.Core.TyCo.Compare   ( tcEqType )
 import GHC.Types.Name          ( Name, BuiltInSyntax(..) )
 import GHC.Types.Unique.FM
 import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Types.Box ( boxTFTyCon, listIndexTyCon )
 import GHC.Builtin.WiredIn.Prim  ( mkTemplateAnonTyConBinders, mkTemplateTyVars )
 import GHC.Builtin.Modules     ( gHC_INTERNAL_TYPELITS
                                , gHC_INTERNAL_TYPELITS_INTERNAL
@@ -382,6 +384,8 @@ typeNatTyCons =
   , typeUnconsSymbolTyCon
   , typeCharToNatTyCon
   , typeNatToCharTyCon
+  , listIndexTyCon -- See [Boxing TupleRep and SumRep] in GHC.Builtin.WiredIn.Types.Box
+  , boxTFTyCon     -- See Note [Boxing constructors] in GHC.Builtin.WiredIn.Types.Box
   ]
 
 

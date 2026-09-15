@@ -51,6 +51,8 @@ import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.Utils
 import GHC.Core.Make
+import GHC.Core.Make.Box ( mkBox, mkUnbox )
+import GHC.Core.Make.BigTuple ( mkBigCoreTupTy )
 import GHC.Core.PatSyn
 
 import GHC.Driver.Session
@@ -69,6 +71,7 @@ import GHC.Unit.Module
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Types.Box ( boxTyCon )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.WiredIn.Ids
 
@@ -815,9 +818,41 @@ ds_app_var (L loc fun_id) hs_args core_args
             `mkCoreApps` rest_args)
 
   -----------------------
+  -- Desugar away the magic 'box'/'unbox' Ids.
+  -- See Note [Desugaring box & unbox] in GHC.Core.Make.Box.
+  | fun_id `hasKey` boxIdKey || fun_id `hasKey` unboxIdKey
+  = ds_box_unbox fun_id core_args
+
+  -----------------------
   -- Phew!  No more special cases.  Just build an applications
   | otherwise
   = ds_app_finish fun_id core_args
+
+---------------
+-- | Desugar an application of the magic 'box'/'unbox' 'Id's.
+-- See Note [Desugaring box & unbox] in GHC.Core.Make.Box.
+ds_box_unbox :: Id -> [CoreExpr] -> DsM CoreExpr
+ds_box_unbox fun_id core_args
+  = case core_args of
+      -- Applied to a value argument: desugar it in place.
+      Type rep : Type ty : arg : rest
+        -> do { e <- mk rep ty arg
+              ; return (mkCoreApps e rest) }
+      -- Applied only to its type arguments: eta-expand, then desugar.
+      [Type rep, Type ty]
+        -> do { x <- newSysLocalDs (Scaled ManyTy (arg_ty rep ty))
+              ; e <- mk rep ty (Var x)
+              ; return (Lam x e) }
+      _ -> pprPanic "ds_box_unbox: box/unbox lacks its two type arguments"
+                    (ppr fun_id <+> ppr core_args)
+  where
+    is_box = fun_id `hasKey` boxIdKey
+    mk | is_box    = mkBox
+       | otherwise = mkUnbox
+    -- The type of the value argument that box/unbox expects.
+    arg_ty rep ty
+      | is_box    = ty                             -- box   :: a -> Box @rep a
+      | otherwise = mkTyConApp boxTyCon [rep, ty]  -- unbox :: Box @rep a -> a
 
 ---------------
 ds_app_finish :: Id -> [CoreExpr] -> DsM CoreExpr
@@ -1159,14 +1194,15 @@ dsDo ctx stmts res_ty
             , xbstc_boundResultMult = ManyTy
             , xbstc_failOp          = Nothing -- Tuple cannot fail
             }
-          (mkBigLHsPatTupId later_pats)
+          -- The recursive tuple is boxed, so we unbox when binding it and box
+          -- when building it; see Note [Boxing big tuple elements] in
+          -- GHC.HsToCore.Utils.
+          (mkBigLHsVarPatTupId tup_ids)
           mfix_app
 
         tup_ids      = rec_ids ++ filterOut (`elem` rec_ids) later_ids
         tup_ty       = mkBigCoreTupTy (map idType tup_ids) -- Deals with singleton case
-        rec_tup_pats = map nlVarPat tup_ids
-        later_pats   = rec_tup_pats
-        rets         = map noLocA rec_rets
+        rets         = zipWith mkHsBoxApp (map idType tup_ids) (map noLocA rec_rets)
         mfix_app     = nlHsSyntaxApps mfix_op [mfix_arg]
         match_group  = MatchGroupTc [unrestricted tup_ty] body_ty (Generated OtherExpansion SkipPmc)
         mfix_arg     = noLocA $ HsLam noAnn LamSingle
@@ -1175,7 +1211,7 @@ dsDo ctx stmts res_ty
                                                     (noLocA [mfix_pat]) body]
                                , mg_ext = match_group
                                })
-        mfix_pat     = noLocA $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats
+        mfix_pat     = noLocA $ LazyPat noExtField $ mkBigLHsVarPatTupId tup_ids
         body         = noLocA $ HsDo body_ty
                                 ctx (noLocA (rec_stmts ++ [ret_stmt]))
         ret_app      = nlHsSyntaxApps return_op [mkBigLHsTupId rets]

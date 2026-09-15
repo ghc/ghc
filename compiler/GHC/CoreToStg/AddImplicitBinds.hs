@@ -13,7 +13,7 @@ import GHC.CoreToStg.Prep( CorePrepPgmConfig(..) )
 import GHC.Unit( ModLocation(..), ml_hs_file )
 
 import GHC.Core
-import GHC.Core.DataCon( DataCon, dataConWorkId, dataConWrapId )
+import GHC.Core.DataCon( DataCon, dataConWorkId, dataConWrapId, dataConHasNoBinding )
 import GHC.Core.TyCon( TyCon, tyConDataCons, isBoxedDataTyCon, tyConClass_maybe )
 import GHC.Core.Class( classAllSelIds )
 
@@ -84,6 +84,59 @@ give a loop).  As Lennart says: the ice is thin here, but it works.
 Hmm.  Should we create bindings for dictionary constructors?  They are
 always fully applied, and the bindings are just there to support
 partial applications. But it's easier to let them through.
+
+Note [No implicit binds for Box constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are wired-in boxing data constructors (see Note [Boxing constructors] in
+GHC.Builtin.WiredIn.Types.Box) for every 'RuntimeRep', including SIMD vector representations
+such as:
+
+  data BoxVec64Int8 = BoxVec64Int8 Int8X64# -- 512 bits
+
+These data constructors are defined in GHC.Internal.Box. Like any data
+constructor, BoxVec64Int8 would ordinarily get a standalone worker binding
+(see Note [Data constructor workers]), which CorePrep eta-expands to:
+
+  BoxVec64Int8 = \x -> BoxVec64Int8 x
+
+(There is no wrapper: boxing constructors are wired-in, with 'NoDataConRep'.)
+
+This binding allocates the constructor, which stores the unboxed field 'x' into
+the heap. For a wide SIMD field, that store forces the code generator to *move*
+a SIMD vector value, which is not supported by every backend:
+
+  * the X86 NCG needs AVX2/AVX512F for 256/512-bit moves;
+  * the AArch64 NCG has no register wider than 128 bits (NEON);
+  * the PowerPC/RISCV64/LoongArch NCGs and the JavaScript/Wasm backends have
+    limited or no SIMD support.
+
+As a result, GHC is not able to generate code for certain VecRep DataCon workers.
+To solve this problem, we omit this implicit binding for all boxing data
+constructors (not just VecRep ones). This is sound because these constructors
+are only ever used *saturated*:
+
+  - The data constructors are not exported.
+  - They are only (indirectly) accessible via 'box'/'unbox', and these desugar
+    directly to saturated constructor applications.
+
+This is checked by STG Lint: see GHC.Stg.Lint.lintStgVarOcc.
+
+A saturated application allocates inline at the use site, using the constructor's
+info table (still emitted by 'cgDataCon'), as explained in
+Note [Saturation of data constructors in STG] in GHC.CoreToStg. Thus the
+standalone worker code is never needed (one exception would be for nullary data
+constructors, but there are no nullary boxing data constructors).
+
+The upshot is that:
+
+  1. GHC can compile GHC.Internal.Box, regardless of the level of SIMD support.
+  2. The actual SIMD vector move instructions only ever appear at use sites of
+     'box'/'unbox', in a module compiled with the user's own backend and SIMD
+     flags. The user will get appropriate error messages if their machine
+     or configuration don't support the necessary SIMD vector instructions.
+     This is consistent with SIMD support in GHC: we can compile the module that
+     defines FloatX8#, but users importing and using that type in their own code
+     will get appropriate errors if their configuration doesn't support it.
 -}
 
 
@@ -119,6 +172,9 @@ mkImplicitBinds gen_debug_info mod_loc tycon
 
 dataConBinds :: Bool -> ModLocation -> DataCon -> [CoreBind]
 dataConBinds gen_debug_info mod_loc data_con
+  | dataConHasNoBinding data_con
+  = []
+  | otherwise
   = wrapper_bind ++ worker_bind
   where
     work_id = dataConWorkId data_con

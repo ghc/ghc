@@ -228,7 +228,7 @@ constructor worker.
 
 * If the data constructor is /under/-saturated we just fall through to build
   a `StgApp`.  Remember, data constructor workers have a regular top-level definition
-  (injected by GHC.CoreToStg.Prep.mkDataConWorkers) so we can partially apply
+  (injected by GHC.CoreToStg.AddImplicitBinds) so we can partially apply
   that function.
 
 * If the data constructor is /over/-saturated, which can happen (see #23865) we again

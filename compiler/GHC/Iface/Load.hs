@@ -94,7 +94,7 @@ import GHC.Settings.Constants
 
 import GHC.Builtin
 import GHC.Builtin.KnownKeys
-import GHC.Builtin.Modules( rEBINDABLE_MOD_NAME, eSSENTIALS_NAME, gHC_PRIM )
+import GHC.Builtin.Modules( rEBINDABLE_MOD_NAME, eSSENTIALS_NAME, gHC_PRIM, isWiredInOnlyModule )
 import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids
 import GHC.Builtin.WiredIn.Prim
@@ -555,6 +555,13 @@ for any module with an instance decl or RULE that we might want.
   is compiled late in the base library, and we don't want to force it to
   load before it's been compiled!
 
+* As this only affects instances/RULES, we can skip modules that do not contain
+  any. This is very convenient for GHC.Internal.Box which happens to depend on
+  the 'Natural' type; an implicit dependency on 'GHC.Internal.Box' can be added
+  by the big tuple machinery or by SetLevels, and we want to avoid this implicit
+  dependency forcing an interface load (which might fail as we might not yet
+  have compiled it, because 'Natural' is compiled quite late within ghc-internal).
+
 All of this is done by the type checker. The renamer plays no role.
 (It used to, but no longer.)
 -}
@@ -710,6 +717,7 @@ loadInterfaceForModule doc m
 loadWiredInHomeIface :: Name -> IfM lcl ()
 loadWiredInHomeIface name
   = assert (isWiredInName name) $
+    unless (isWiredInOnlyModule (nameModule name)) $
     do _ <- loadSysInterface doc (nameModule name); return ()
   where
     doc = text "Need home interface for wired-in thing" <+> ppr name

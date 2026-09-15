@@ -1579,6 +1579,12 @@ data UnivCoProvenance
 
   | SubMultProv -- ^ A submultiplicity coercion
 
+  | CanonicalProv
+      -- ^ Used to coerce a type to the canonical type of its runtime
+      -- representation.
+      --
+      -- See Note [The canonical type of a RuntimeRep] in GHC.Core.Make.Box.
+
   deriving (Eq, Ord, Data.Data)
   -- Why Ord?  See Note [Ord instance of IfaceType] in GHC.Iface.Type
 
@@ -1587,6 +1593,7 @@ instance Outputable UnivCoProvenance where
   ppr (ProofIrrelProv {})  = text "(proof irrel)"
   ppr (PluginProv str)     = parens (text "plugin" <+> brackets (text str))
   ppr SubMultProv          = text "(sub-mult)"
+  ppr CanonicalProv        = text "(canonical)"
 
 instance NFData UnivCoProvenance where
   rnf p = p `seq` ()
@@ -1596,6 +1603,7 @@ instance Binary UnivCoProvenance where
   put_ bh ProofIrrelProv = putByte bh 2
   put_ bh (PluginProv a) = putByte bh 3 >> put_ bh a
   put_ bh SubMultProv    = putByte bh 4
+  put_ bh CanonicalProv  = putByte bh 5
   get bh = do
       tag <- getByte bh
       case tag of
@@ -1604,8 +1612,8 @@ instance Binary UnivCoProvenance where
            3 -> do a <- get bh
                    return $ PluginProv a
            4 -> return SubMultProv
+           5 -> return CanonicalProv
            _ -> panic ("get UnivCoProvenance " ++ show tag)
-
 
 {- Note [Phantom coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

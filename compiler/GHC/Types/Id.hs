@@ -602,20 +602,18 @@ hasNoBinding :: Id -> Bool
 -- more.  Instead, we inject a binding for them at the CorePrep stage. The
 -- exception to this is unboxed tuples and sums datacons, which definitely have
 -- no binding
-hasNoBinding id = case Var.idDetails id of
+hasNoBinding id =
+  case Var.idDetails id of
 
--- TEMPORARILY make all primops hasNoBinding, to avoid #20155
--- The goal is to understand #20155 and revert to the commented out version
-                        PrimOpId _ _ -> True    -- See Note [Eta expanding primops] in GHC.Builtin.PrimOps
---                        PrimOpId _ lev_poly -> lev_poly    -- TEMPORARILY commented out
+    -- TEMPORARILY make all primops hasNoBinding, to avoid #20155
+    -- The goal is to understand #20155 and revert to the commented out version
+    PrimOpId _ _ -> True    -- See Note [Eta expanding primops] in GHC.Builtin.PrimOps
+--  PrimOpId _ lev_poly -> lev_poly    -- TEMPORARILY commented out
 
-                        FCallId _        -> True
-                        DataConWorkId dc -> isUnboxedTupleDataCon dc
-                                            || isUnboxedSumDataCon dc
-                                            || isUnaryClassDataCon dc
-                                               -- Unary class dictionary constructors are eliminated
-                                               -- See Note [Unary class magic] in GHC.Core.TyCon
-                        _                -> isCompulsoryUnfolding (realIdUnfolding id)
+    FCallId _        -> True
+    RepPolyId {}     -> True -- e.g. seq, coerce, unsafeCoerce, box/unbox...
+    DataConWorkId dc -> dataConHasNoBinding dc
+    _                -> isCompulsoryUnfolding (realIdUnfolding id)
   -- Note: this function must be very careful not to force
   -- any of the fields that aren't the 'uf_src' field of
   -- the 'Unfolding' of the 'Id'. This is because these fields are computed

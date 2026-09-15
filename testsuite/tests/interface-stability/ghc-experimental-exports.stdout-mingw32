@@ -5889,6 +5889,8 @@ module GHC.PrimOps where
   data BCO
   type Bool :: *
   data Bool = False | True
+  type Box :: forall (q :: RuntimeRep). TYPE q -> *
+  newtype Box @q a = ...
   type ByteArray# :: UnliftedType
   data ByteArray#
   type role CONSTRAINT nominal
@@ -5910,14 +5912,10 @@ module GHC.PrimOps where
   class DataToTag a where
     dataToTag# :: a -> Int#
     {-# MINIMAL dataToTag# #-}
-  type DictBox :: Constraint -> *
-  data DictBox a = a => MkDictBox
   type Double :: *
   data Double = D# Double#
   type Double# :: TYPE DoubleRep
   data Double#
-  type DoubleBox :: TYPE DoubleRep -> *
-  data DoubleBox a = MkDoubleBox a
   type DoubleX2# :: TYPE (VecRep Vec2 DoubleElemRep)
   data DoubleX2#
   type DoubleX4# :: TYPE (VecRep Vec4 DoubleElemRep)
@@ -5933,8 +5931,6 @@ module GHC.PrimOps where
   data Float = F# Float#
   type Float# :: TYPE FloatRep
   data Float#
-  type FloatBox :: TYPE FloatRep -> *
-  data FloatBox a = MkFloatBox a
   type FloatX16# :: TYPE (VecRep Vec16 FloatElemRep)
   data FloatX16#
   type FloatX4# :: TYPE (VecRep Vec4 FloatElemRep)
@@ -5980,8 +5976,6 @@ module GHC.PrimOps where
   data Int8X32#
   type Int8X64# :: TYPE (VecRep Vec64 Int8ElemRep)
   data Int8X64#
-  type IntBox :: TYPE IntRep -> *
-  data IntBox a = MkIntBox a
   type IsList :: * -> Constraint
   class IsList l where
     type Item :: * -> *
@@ -6132,8 +6126,6 @@ module GHC.PrimOps where
   data Word8X32#
   type Word8X64# :: TYPE (VecRep Vec64 Word8ElemRep)
   data Word8X64#
-  type WordBox :: TYPE WordRep -> *
-  data WordBox a = MkWordBox a
   type ZeroBitRep :: RuntimeRep
   type ZeroBitRep = TupleRep '[]
   type ZeroBitType :: *
@@ -6237,6 +6229,7 @@ module GHC.PrimOps where
   bitReverse32# :: Word# -> Word#
   bitReverse64# :: Word64# -> Word64#
   bitReverse8# :: Word# -> Word#
+  box :: forall {q :: RuntimeRep} (a :: TYPE q). a -> Box a
   breakpoint :: forall a. a -> a
   breakpointCond :: forall a. Bool -> a -> a
   broadcastDoubleX2# :: Double# -> DoubleX2#
@@ -7486,6 +7479,7 @@ module GHC.PrimOps where
   tryPutMVar# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). MVar# d a -> a -> State# d -> (# State# d, Int# #)
   tryReadMVar# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). MVar# d a -> State# d -> (# State# d, Int#, a #)
   tryTakeMVar# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). MVar# d a -> State# d -> (# State# d, Int#, a #)
+  unbox :: forall {q :: RuntimeRep} (a :: TYPE q). Box a -> a
   uncheckedIShiftL# :: Int# -> Int# -> Int#
   uncheckedIShiftL64# :: Int64# -> Int# -> Int64#
   uncheckedIShiftRA# :: Int# -> Int# -> Int#

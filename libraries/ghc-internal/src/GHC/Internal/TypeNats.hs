@@ -18,6 +18,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# OPTIONS_GHC -fdefines-known-key-names #-}
 
 {-| This module is an internal GHC module.  It declares the constants used
@@ -46,6 +47,8 @@ module GHC.Internal.TypeNats
   , withSomeSNat
   , withKnownNat
   , unsafeWithSNatCo
+    -- * Type-level list indexing
+  , type (!!)
 
     -- * Functions on type literals
   , type (<=), type (<=?), type (+), type (*), type (^), type (-)
@@ -400,6 +403,12 @@ bypass our role annotation on ``SNat``, but /only within its argument/:
 The above reasoning applies identically for the other singleton types
 'SChar' and 'SSymbol' as well.
 -}
+
+-- | Type-level list indexing (starting from 0).
+type (!!) :: forall k. [k] -> Nat -> k
+type family xs !! n where
+  -- Wired-in (GHC.Builtin.WiredIn.Types.Box.axListIndex).
+infixl 9 !!
 
 
 -- | A explicitly bidirectional pattern synonym relating an 'SNat' to a

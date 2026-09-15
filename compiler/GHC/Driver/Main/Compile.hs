@@ -693,7 +693,7 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
                   (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds)
 
               -- do the unfortunately effectual business
-              stgToJS logger js_config stg_binds this_mod spt_entries foreign_stubs0 cost_centre_info output_filename
+              stgToJS logger js_config stg_binds tycons this_mod spt_entries foreign_stubs0 cost_centre_info output_filename
               return (output_filename, stub_c_exists, foreign_fps, Just stg_cg_infos, Just cmm_cg_infos)
 
             Just _          ->

@@ -70,6 +70,7 @@ extern StgClosure ZCMain_main_closure;
 #define Fzh_con_info              ghc_hs_iface->Fzh_con_info
 #define Dzh_con_info              ghc_hs_iface->Dzh_con_info
 #define Wzh_con_info              ghc_hs_iface->Wzh_con_info
+#define BoxInt_con_info           ghc_hs_iface->BoxInt_con_info
 #define W8zh_con_info             ghc_hs_iface->W8zh_con_info
 #define W16zh_con_info            ghc_hs_iface->W16zh_con_info
 #define W32zh_con_info            ghc_hs_iface->W32zh_con_info

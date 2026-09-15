@@ -41,6 +41,7 @@ typedef struct {
     const StgInfoTable *Fzh_con_info;  // GHC.Internal.Types.Fzh_con_info
     const StgInfoTable *Dzh_con_info;  // GHC.Internal.Types.Dzh_con_info
     const StgInfoTable *Wzh_con_info;  // GHC.Internal.Types.Wzh_con_info
+    const StgInfoTable *BoxInt_con_info;  // GHC.Internal.Box.BoxInt_con_info  (Box @IntRep)
     StgClosure *absentSumFieldError_closure;  // GHC.Internal.Prim.Panic.absentSumFieldError_closure
     StgClosure *runAllocationLimitHandler_closure;  // GHC.Internal.AllocationLimitHandler.runAllocationLimitHandler_closure
     const StgInfoTable *Ptr_con_info;  // GHC.Internal.Ptr.Ptr_con_info

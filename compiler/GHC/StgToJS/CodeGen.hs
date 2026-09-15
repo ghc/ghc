@@ -37,6 +37,8 @@ import GHC.StgToJS.Ids
 
 import GHC.Stg.Syntax
 import GHC.Core.DataCon
+import GHC.Core.TyCon
+  ( TyCon, isBoxedDataTyCon, tyConDataCons )
 import GHC.Core.TyCo.Rep (scaledThing)
 
 import GHC.Unit.Module
@@ -45,6 +47,7 @@ import GHC.Linker.Types (SptEntry (..))
 import GHC.Types.CostCentre
 import GHC.Types.ForeignStubs (ForeignStubs (..), getCHeader, getCStub)
 import GHC.Types.RepType
+import GHC.Types.Var.Set (emptyDVarSet)
 import GHC.Types.Id
 import GHC.Types.Unique
 import GHC.Types.Unique.FM (nonDetEltsUFM)
@@ -70,13 +73,14 @@ stgToJS
   :: Logger
   -> StgToJSConfig
   -> [CgStgTopBinding]
+  -> [TyCon]
   -> Module
   -> [SptEntry]
   -> ForeignStubs
   -> CollectedCCs
   -> FilePath -- ^ Output file name
   -> IO ()
-stgToJS logger config stg_binds0 this_mod spt_entries foreign_stubs cccs output_fn = do
+stgToJS logger config stg_binds0 tycons this_mod spt_entries foreign_stubs cccs output_fn = do
 
   let (unfloated_binds, stg_binds) = sinkPgm this_mod stg_binds0
     -- TODO: avoid top level lifting in core-2-core when the JS backend is
@@ -87,7 +91,7 @@ stgToJS logger config stg_binds0 this_mod spt_entries foreign_stubs cccs output_
 
   (deps,lus) <- runG config this_mod unfloated_binds $ do
     ifProfilingM $ initCostCentres cccs
-    lus  <- genUnits this_mod stg_binds spt_entries foreign_stubs
+    lus  <- genUnits this_mod stg_binds tycons spt_entries foreign_stubs
     deps <- genDependencyData this_mod lus
     pure (deps,lus)
 
@@ -109,14 +113,16 @@ stgToJS logger config stg_binds0 this_mod spt_entries foreign_stubs cccs output_
 genUnits :: HasDebugCallStack
          => Module
          -> [CgStgTopBinding]
+         -> [TyCon]
          -> [SptEntry]
          -> ForeignStubs
          -> G [LinkableUnit] -- ^ the linkable units
-genUnits m ss spt_entries foreign_stubs = do
-    gbl     <- generateGlobalBlock
-    exports <- generateExportsBlock
-    others  <- go 2 ss
-    pure (gbl:exports:others)
+genUnits m ss tycons spt_entries foreign_stubs = do
+    gbl       <- generateGlobalBlock
+    exports   <- generateExportsBlock
+    con_infos <- genNoBindingConBlocks tycons
+    others    <- go 2 ss
+    pure (gbl:exports:others ++ con_infos)
     where
       go :: HasDebugCallStack
          => Int                 -- the block we're generating (block 0 is the global unit for the module)
@@ -233,41 +239,50 @@ genUnits m ss spt_entries foreign_stubs = do
             _ -> panic "generateBlock: invalid size"
 
         StgTopLifted decl -> do
-          tl        <- genToplevel decl
-          extraTl   <- State.gets (ggsToplevelStats . gsGroup)
-          ci        <- State.gets (ggsClosureInfo . gsGroup)
-          si        <- State.gets (ggsStatic . gsGroup)
-          unf       <- State.gets gsUnfloated
-          extraDeps <- State.gets (ggsExtraDeps . gsGroup)
-          fRefs     <- State.gets (ggsForeignRefs . gsGroup)
-          resetGroup
-          let allDeps  = collectIds unf decl
-              topDeps  = collectTopIds decl
-              required = hasExport decl
-              stat     = jStgStatToJS
-                         $ mconcat (reverse extraTl) <> tl
-          let opt_stat = jsOptimize stat
-          syms <- mapM (fmap (\(identFS -> i) -> i) . identForId) topDeps
-          let oi = ObjBlock
-                    { oiSymbols  = syms
-                    , oiClInfo   = ci
-                    , oiStatic   = si
-                    , oiStat     = opt_stat
-                    , oiRaw      = ""
-                    , oiFExports = []
-                    , oiFImports = fRefs
-                    }
-          let lu = LinkableUnit
-                    { luObjBlock     = oi
-                    , luIdExports    = topDeps
-                    , luOtherExports = []
-                    , luIdDeps       = allDeps
-                    , luPseudoIdDeps = []
-                    , luOtherDeps    = S.toList extraDeps
-                    , luRequired     = required
-                    , luForeignRefs  = fRefs
-                    }
+          tl  <- genToplevel decl
+          unf <- State.gets gsUnfloated
+          let allDeps = collectIds unf decl
+              topDeps = collectTopIds decl
+          lu <- mkLinkableUnitFromGroup tl topDeps allDeps (hasExport decl)
           pure $! seqList topDeps `seq` seqList allDeps `seq` Just lu
+
+-- | Assemble a 'LinkableUnit' from the toplevel statements, closure infos,
+-- statics, dependencies and foreign references accumulated in the current group
+-- state.
+mkLinkableUnitFromGroup
+  :: JStgStat  -- ^ final toplevel statement
+  -> [Id]      -- ^ exported 'Id's (become the unit's exported symbols)
+  -> [Id]      -- ^ 'Id' dependencies of the unit
+  -> Bool      -- ^ whether the unit is required
+  -> G LinkableUnit
+mkLinkableUnitFromGroup tl exported_ids id_deps required = do
+  extraTl   <- State.gets (ggsToplevelStats . gsGroup)
+  ci        <- State.gets (ggsClosureInfo . gsGroup)
+  si        <- State.gets (ggsStatic . gsGroup)
+  extraDeps <- State.gets (ggsExtraDeps . gsGroup)
+  fRefs     <- State.gets (ggsForeignRefs . gsGroup)
+  resetGroup
+  syms <- mapM (fmap identFS . identForId) exported_ids
+  let opt_stat = jsOptimize $ jStgStatToJS $ mconcat (reverse extraTl) <> tl
+      oi = ObjBlock
+            { oiSymbols  = syms
+            , oiClInfo   = ci
+            , oiStatic   = si
+            , oiStat     = opt_stat
+            , oiRaw      = ""
+            , oiFExports = []
+            , oiFImports = fRefs
+            }
+  pure $ LinkableUnit
+            { luObjBlock     = oi
+            , luIdExports    = exported_ids
+            , luOtherExports = []
+            , luIdDeps       = id_deps
+            , luPseudoIdDeps = []
+            , luOtherDeps    = S.toList extraDeps
+            , luRequired     = required
+            , luForeignRefs  = fRefs
+            }
 
 -- | variable prefix for the nth block in module
 
@@ -309,6 +324,35 @@ genSetConInfo i d l {- srt -} = do
 
 mkDataEntry :: Ident -> JStgStat
 mkDataEntry i = FuncStat i [] returnStack
+
+-- | Generate standalone info-table linkable units for the data constructors of
+-- this module that have no worker binding ('hasNoBinding'), and hence whose
+-- info table is not emitted by 'genToplevelConEntry'.
+genNoBindingConBlocks :: HasDebugCallStack => [TyCon] -> G [LinkableUnit]
+genNoBindingConBlocks tycons =
+  traverse genConInfoBlock
+    [ con
+    | tycon <- tycons
+    , isBoxedDataTyCon tycon
+    , con <- tyConDataCons tycon
+    , hasNoBinding $ dataConWorkId con
+    , not $ has_SIMD_field con
+       -- Skip constructors with SIMD vector fields (unsupported by the JS backend)
+    ]
+  where
+    has_SIMD_field :: DataCon -> Bool
+    has_SIMD_field dc =
+      any (any is_vecrep . typePrimRep . scaledThing) (dataConRepArgTys dc)
+    is_vecrep :: PrimRep -> Bool
+    is_vecrep (VecRep {}) = True
+    is_vecrep _ = False
+
+genConInfoBlock :: HasDebugCallStack => DataCon -> G LinkableUnit
+genConInfoBlock con = do
+  let work_id = dataConWorkId con
+  -- a bare constructor entry has no live variables / static references
+  resetSlots $ genSetConInfo work_id con emptyDVarSet
+  mkLinkableUnitFromGroup mempty [work_id] [] False
 
 genToplevelRhs :: Id -> CgStgRhs -> G JStgStat
 -- general cases:

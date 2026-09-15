@@ -1,0 +1,11 @@
+section: base
+issues: #22473
+mrs: !16144
+synopsis:
+  Remove boxing datatypes from ``base``
+description:
+  The boxing datatypes ``IntBox``, ``WordBox``, ``FloatBox``, ``DoubleBox``
+  and ``DictBox`` have been removed from ``base``.
+  These were exported by mistake, as they were meant only for internal use.
+  They have been superseded by the new ``Box`` type (exported by ``ghc-experimental``).
+  See `CLC proposal 421 <https://github.com/haskell/core-libraries-committee/issues/421>`_.

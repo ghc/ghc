@@ -33,6 +33,7 @@ module GHC.HsToCore.Utils (
         -- LHs tuples
         mkLHsPatTup, mkVanillaTuplePat,
         mkBigLHsVarTupId, mkBigLHsTupId, mkBigLHsVarPatTupId, mkBigLHsPatTupId,
+        mkHsBoxApp, mkUnboxViewPat,
 
         mkSelectorBinds,
 
@@ -53,6 +54,8 @@ import GHC.HsToCore.Monad
 
 import GHC.Core.Utils
 import GHC.Core.Make
+import GHC.Core.Make.Box ( boxTy )
+import GHC.Core.Make.BigTuple
 import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Core.TyCon
@@ -542,8 +545,8 @@ There are three cases.
        in t `seq` body
     The 'Solo' is a one-tuple; see Note [One-tuples] in GHC.Builtin.WiredIn.Types
     Note that forcing 't' makes the pattern match happen,
-    but does not force 'v'.  That's why we call `mkBigCoreVarTupSolo`
-    in `mkSelectorBinds`
+    but does not force 'v'.  That's why we use the 'BareElements' layout
+    (which preserves one-tuples) in `mkSelectorBinds`
 
   * The pattern binds no variables
         let !(True,False) = e in body
@@ -660,15 +663,17 @@ mkSelectorBinds ticks pat ctx val_expr
        ; return ( val_var, (val_var, val_expr) : binds) }
 
   | otherwise                          -- General case (C)
-  = do { tuple_var  <- newSysLocalMDs tuple_ty
+  = do { local_tuple <- mkBigCoreVarTup BareElements binders
+       ; let tuple_ty = exprType local_tuple
+       ; tuple_var  <- newSysLocalMDs tuple_ty
        ; error_expr <- mkErrorAppDs pAT_ERROR_ID tuple_ty (ppr pat')
        ; tuple_expr <- matchSimply val_expr ctx ManyTy pat
                                    local_tuple error_expr
        ; let mk_tup_bind tick binder
-               = (binder, mkOptTickBox tick $
-                          mkBigTupleSelectorSolo local_binders binder
-                                           tuple_var (Var tuple_var))
-             tup_binds = zipWith mk_tup_bind ticks' binders
+               = do { sel <- mkBigTupleSelector BareElements local_binders binder
+                                                tuple_var (Var tuple_var)
+                    ; return (binder, mkOptTickBox tick sel) }
+       ; tup_binds <- zipWithM mk_tup_bind ticks' binders
        ; return (tuple_var, (tuple_var, tuple_expr) : tup_binds) }
   where
     pat' = strip_bangs pat
@@ -679,8 +684,6 @@ mkSelectorBinds ticks pat ctx val_expr
     ticks'  = ticks ++ repeat []
 
     local_binders = map localiseId binders      -- See Note [Localise pattern binders]
-    local_tuple   = mkBigCoreVarTupSolo binders
-    tuple_ty      = exprType local_tuple
 
 strip_bangs :: LPat (GhcPass p) -> LPat (GhcPass p)
 -- Remove outermost bangs and parens
@@ -732,19 +735,90 @@ mkVanillaTuplePat :: [LPat GhcTc] -> Boxity -> Pat GhcTc
 -- A vanilla tuple pattern simply gets its type from its sub-patterns
 mkVanillaTuplePat pats box = TuplePat (map hsLPatType pats) pats box
 
--- The Big equivalents for the source tuple expressions
+-- | Build a "big tuple" of the given variables, always using the 'BoxedElements'
+-- big tuple layout.
+--
+-- Source syntax analogue of 'mkBigCoreVarTup'.
 mkBigLHsVarTupId :: [Id] -> LHsExpr GhcTc
-mkBigLHsVarTupId ids = mkBigLHsTupId (map nlHsVar ids)
+mkBigLHsVarTupId ids =
+  mkBigLHsTupId [ mkHsBoxApp (idType v) (nlHsVar v) | v <- ids ]
 
 mkBigLHsTupId :: [LHsExpr GhcTc] -> LHsExpr GhcTc
 mkBigLHsTupId = mkChunkified (\e -> mkLHsTupleExpr e noExtField)
 
--- The Big equivalents for the source tuple patterns
+-- | Converse of 'mkBigLHsVarTupId': matches a big tuple, binding the
+-- given variables.
+--
+-- Always uses the 'BoxedElements' big tuple layout.
 mkBigLHsVarPatTupId :: [Id] -> LPat GhcTc
-mkBigLHsVarPatTupId bs = mkBigLHsPatTupId (map nlVarPat bs)
+mkBigLHsVarPatTupId bs =
+  mkBigLHsPatTupId [ mkUnboxViewPat (idType v) (nlVarPat v) | v <- bs ]
 
 mkBigLHsPatTupId :: [LPat GhcTc] -> LPat GhcTc
 mkBigLHsPatTupId = mkChunkified mkLHsPatTup
+
+{- Note [Boxing big tuple elements]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At certain points while desugaring we need to collect up binders into a "big
+tuple" (see Note [Big tuples] in GHC.Core.Make.BigTuple). Specifically, this happens for
+
+  - parallel comprehensions (GHC.HsToCore.ListComp.{deListComp,dsMcStmt}),
+    which 'zip'/'mzip' the per-branch tuples of binders together;
+
+  - @then@/@group@/@using@ statements (GHC.HsToCore.ListComp.{dsTransStmt,dsMcStmt})
+    which pass the bound variables through the @using@ function and 'unzip' the
+    grouped result;
+
+  - recursive @do@ blocks (@mdo@/@rec@), in 'GHC.HsToCore.Expr.dsDo', which tie
+    the knot through 'mfix' over a tuple of the recursive binders;
+
+  - arrows, in "GHC.HsToCore.Arrows", which thread the command environment
+    through arrow combinators by using a big tuple.
+
+Some of these binders may have an unboxed type (e.g. Int#); we must thus box
+them before putting them into the big tuple. We do this using the magic Id @box@:
+
+  box :: forall {r} (a :: TYPE r). a -> Box a
+
+where 'Box' is the type described in Note [Boxing constructors]
+in GHC.Builtin.WiredIn.Types.Box. Similarly, when we need to unbox again, we use:
+
+  unbox :: forall {r} (a :: TYPE r). Box a -> a
+
+Building a big tuple thus boxes each element; conversely, we must unbox each
+element when unboxing. Concretely:
+
+  - At the HsSyn level, 'mkBigLHsVarTupId' boxes (using 'mkHsBoxApp') and
+    'mkBigLHsVarPatTupId' unboxes (using the 'mkUnboxViewPat' view pattern).
+
+  - At the Core level, 'mkBigCoreVarTup' and 'mkBigCoreTup' box each element,
+    and 'mkBigTupleCase' / 'mkBigTupleSelector' unboxes them again.
+
+Note that even types of kind Type are boxed in this way: we may only learn that
+a binder is lifted after constraint solving, so the typechecker
+(which builds these tuple types, e.g. in GHC.Tc.Gen.Match) always boxes, and
+the desugarer must follow suit to stay type-correct.
+-}
+
+-- | @mkHsBoxApp ty e@ constructs the syntax @box \@ty e@, which allows us to
+-- box the expression @e :: ty@ regardless of its runtime representation.
+--
+-- See Note [Boxing big tuple elements].
+mkHsBoxApp :: Type -> LHsExpr GhcTc -> LHsExpr GhcTc
+mkHsBoxApp ty e
+  = mkLHsWrap (mkWpTyApps [getRuntimeRep ty, ty]) (nlHsVar boxId) `nlHsApp` e
+
+-- | @mkUnboxViewPat ty p@ constructs syntax for the view pattern
+-- @unbox \@ty -> p@, which matches a scrutinee of type @boxTy ty@ by unboxing
+-- it (to type @ty@) and running the inner pattern @p@ against the result.
+--
+-- See Note [Boxing big tuple elements].
+mkUnboxViewPat :: Type -> LPat GhcTc -> LPat GhcTc
+mkUnboxViewPat ty inner
+  = noLocA (ViewPat (boxTy ty)
+                    (mkLHsWrap (mkWpTyApps [getRuntimeRep ty, ty]) (nlHsVar unboxId))
+                    inner)
+
 
 {-
 ************************************************************************

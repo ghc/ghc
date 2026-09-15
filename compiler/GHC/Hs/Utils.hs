@@ -124,10 +124,9 @@ import GHC.Core.Coercion( isReflCo )
 import GHC.Core.Multiplicity ( pattern ManyTy )
 import GHC.Core.DataCon
 import GHC.Core.ConLike
-import GHC.Core.Make   ( mkChunkified )
 import GHC.Core.Type   ( Type, isUnliftedType )
 
-import GHC.Builtin.WiredIn.Types ( unitTy )
+import GHC.Builtin.WiredIn.Types ( unitTy, mkChunkified )
 
 import GHC.Types.Id
 import GHC.Types.Name

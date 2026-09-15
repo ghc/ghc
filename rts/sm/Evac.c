@@ -850,15 +850,15 @@ loop:
       goto loop;
 
   // For ints and chars of low value, save space by replacing references to
-  //    these with closures with references to common, shared ones in the RTS.
+  // these with closures with references to common, shared ones in the RTS.
   //
-  // * Except when compiling into Windows DLLs which don't support cross-package
-  //    data references very well.
-  //
+  // Besides 'data Int = I# Int#' and 'data Char = C# Char#', this also applies
+  // to the boxing constructor 'BoxInt', but not to 'BoxWord'.
+  // See [Boxing IntRep/WordRep] in Note [Boxing constructors] in GHC.Builtin.WiredIn.Types.Box.
   case CONSTR_0_1:
   {
       StgWord w = (StgWord)q->payload[0];
-      if (info == Czh_con_info &&
+      if ((info == Czh_con_info) &&
           // unsigned, so always true:  (StgChar)w >= MIN_CHARLIKE &&
           (StgChar)w <= MAX_CHARLIKE) {
           RELAXED_STORE(p, \
@@ -866,7 +866,7 @@ loop:
                                     (StgClosure *)CHARLIKE_CLOSURE((StgChar)w)
                                    ));
       }
-      else if (info == Izh_con_info &&
+      else if ((info == Izh_con_info || info == BoxInt_con_info) &&
           (StgInt)w >= MIN_INTLIKE && (StgInt)w <= MAX_INTLIKE) {
           RELAXED_STORE(p, \
                         TAG_CLOSURE(tag, \

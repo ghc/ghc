@@ -38,6 +38,7 @@ import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Make
+import GHC.Core.Make.BigTuple
 import GHC.Core.ConLike
 
 import GHC.Builtin.WiredIn.Types
@@ -211,9 +212,10 @@ splitTypeAt n ty
 --
 --      ((x1,...,xn),stk)
 
-buildEnvStack :: [Id] -> Id -> CoreExpr
+buildEnvStack :: [Id] -> Id -> DsM CoreExpr
 buildEnvStack env_ids stack_id
-  = mkCorePairExpr (mkBigCoreVarTup env_ids) (Var stack_id)
+  = do { env_tup <- mkBigCoreVarTup BoxedElements env_ids
+       ; return (mkCorePairExpr env_tup (Var stack_id)) }
 
 ----------------------------------------------
 --              matchEnvStack
@@ -267,9 +269,10 @@ matchVarStack (param_id:param_ids) stack_id body = do
     pair_id <- newSysLocalMDs (mkCorePairTy (idType param_id) (idType tail_id))
     return (pair_id, coreCasePair pair_id param_id tail_id tail_code)
 
+-- | Build the source-level environment/stack pair @((x1,..,xn), stack)@.
 mkHsEnvStackExpr :: [Id] -> Id -> LHsExpr GhcTc
 mkHsEnvStackExpr env_ids stack_id
-  = mkLHsTupleExpr [mkLHsVarTuple env_ids noExtField, nlHsVar stack_id]
+  = mkLHsTupleExpr [mkBigLHsVarTupId env_ids, nlHsVar stack_id]
                    noExtField
 
 -- Translation of arrow abstraction
@@ -291,7 +294,8 @@ dsProcExpr pat (L _ (HsCmdTop (CmdTopTc { ctt_res_ty = cmd_ty, ctt_table = ids }
        <- dsfixCmd meth_ids locals unitTy cmd_ty cmd
     let env_ty = mkBigCoreVarTupTy env_ids
     let env_stk_ty = mkCorePairTy env_ty unitTy
-    let env_stk_expr = mkCorePairExpr (mkBigCoreVarTup env_ids) mkCoreUnitExpr
+    env_tup <- mkBigCoreVarTup BoxedElements env_ids
+    let env_stk_expr = mkCorePairExpr env_tup mkCoreUnitExpr
     fail_expr <- mkFailExpr (ArrowMatchCtxt ProcExpr) env_stk_ty
     var <- selectSimpleMatchVarL ManyTy pat
     match_code <- matchSimply (Var var) (ArrowMatchCtxt ProcExpr) ManyTy pat env_stk_expr fail_expr
@@ -398,10 +402,11 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdApp _ cmd arg) env_ids = do
     stack_id <- newSysLocalMDs stack_ty
     arg_id <- newSysLocalMDs arg_ty
     -- push the argument expression onto the stack
+    env_tup' <- mkBigCoreVarTup BoxedElements env_ids'
     let
         stack' = mkCorePairExpr (Var arg_id) (Var stack_id)
         core_body = bindNonRec arg_id core_arg
-                        (mkCorePairExpr (mkBigCoreVarTup env_ids') stack')
+                        (mkCorePairExpr env_tup' stack')
 
     -- match the environment and stack against the input
     core_map <- matchEnvStack env_ids stack_id core_body
@@ -449,10 +454,10 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdIf _ mb_fun cond then_cmd else_cmd)
         fvs_cond = exprFreeIdsDSet core_cond
                    `uniqDSetIntersectUniqSet` local_vars
 
-        core_left  = mk_left_expr  then_ty else_ty
-                       (buildEnvStack then_ids stack_id)
-        core_right = mk_right_expr then_ty else_ty
-                       (buildEnvStack else_ids stack_id)
+    then_stk <- buildEnvStack then_ids stack_id
+    else_stk <- buildEnvStack else_ids stack_id
+    let core_left  = mk_left_expr  then_ty else_ty then_stk
+        core_right = mk_right_expr then_ty else_ty else_stk
 
     core_if <- case mb_fun of
        NoSyntaxExprTc  -> matchEnvStack env_ids stack_id $
@@ -567,9 +572,9 @@ dsCmd ids local_vars stack_ty res_ty
     -- the expression is built from the inside out, so the actions
     -- are presented in reverse order
 
-    let -- build a new environment, plus what's left of the stack
-        core_expr = buildEnvStack env_ids' stack_id'
-        in_ty = envStackType env_ids stack_ty
+    -- build a new environment, plus what's left of the stack
+    core_expr <- buildEnvStack env_ids' stack_id'
+    let in_ty = envStackType env_ids stack_ty
         in_ty' = envStackType env_ids' stack_ty'
 
     -- bind the scrutinees to the parameters
@@ -599,7 +604,8 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdLet _ lbinds@binds body) env_ids = do
        <- dsfixCmd ids local_vars' stack_ty res_ty body
     stack_id <- newSysLocalMDs stack_ty
     -- build a new environment, plus the stack, using the let bindings
-    core_binds <- dsLocalBinds lbinds (buildEnvStack env_ids' stack_id)
+    env_stk   <- buildEnvStack env_ids' stack_id
+    core_binds <- dsLocalBinds lbinds env_stk
     -- match the old environment and stack against the input
     core_map <- matchEnvStack env_ids stack_id core_binds
     return (do_premap ids
@@ -669,8 +675,8 @@ dsTrimCmdArg local_vars env_ids
     (core_cmd, free_vars, env_ids')
        <- dsfixCmd meth_ids local_vars stack_ty cmd_ty cmd
     stack_id <- newSysLocalMDs stack_ty
-    trim_code
-      <- matchEnvStack env_ids stack_id (buildEnvStack env_ids' stack_id)
+    env_stk   <- buildEnvStack env_ids' stack_id
+    trim_code <- matchEnvStack env_ids stack_id env_stk
     let
         in_ty = envStackType env_ids stack_ty
         in_ty' = envStackType env_ids' stack_ty
@@ -738,9 +744,9 @@ dsCmdLam ids local_vars stack_ty res_ty pats body env_ids = do
     -- the expression is built from the inside out, so the actions
     -- are presented in reverse order
 
-    let -- build a new environment, plus what's left of the stack
-        core_expr = buildEnvStack env_ids' stack_id'
-        in_ty = envStackType env_ids stack_ty
+    -- build a new environment, plus what's left of the stack
+    core_expr <- buildEnvStack env_ids' stack_id'
+    let in_ty = envStackType env_ids stack_ty
         in_ty' = envStackType env_ids' stack_ty'
         lam_cxt = ArrowMatchCtxt (ArrowLamAlt LamSingle)
 
@@ -913,10 +919,12 @@ dsCmdStmt
 
 dsCmdStmt ids local_vars out_ids (BodyStmt c_ty cmd _ _) env_ids = do
     (core_cmd, fv_cmd, env_ids1) <- dsfixCmd ids local_vars unitTy c_ty cmd
+    env1_tup <- mkBigCoreVarTup BoxedElements env_ids1
+    out_tup  <- mkBigCoreVarTup BoxedElements out_ids
     core_mux <- matchEnv env_ids
         (mkCorePairExpr
-            (mkCorePairExpr (mkBigCoreVarTup env_ids1) mkCoreUnitExpr)
-            (mkBigCoreVarTup out_ids))
+            (mkCorePairExpr env1_tup mkCoreUnitExpr)
+            out_tup)
     let
         in_ty = mkBigCoreVarTupTy env_ids
         in_ty1 = mkCorePairTy (mkBigCoreVarTupTy env_ids1) unitTy
@@ -952,10 +960,12 @@ dsCmdStmt ids local_vars out_ids (BindStmt _ pat cmd) env_ids = do
     -- multiplexing function
     --          \ (xs) -> (((xs1),()),(xs2))
 
+    env1_tup <- mkBigCoreVarTup BoxedElements env_ids1
+    env2_tup <- mkBigCoreVarTup BoxedElements env_ids2
     core_mux <- matchEnv env_ids
         (mkCorePairExpr
-            (mkCorePairExpr (mkBigCoreVarTup env_ids1) mkCoreUnitExpr)
-            (mkBigCoreVarTup env_ids2))
+            (mkCorePairExpr env1_tup mkCoreUnitExpr)
+            env2_tup)
 
     -- projection function
     --          \ (p, (xs2)) -> (zs)
@@ -964,7 +974,8 @@ dsCmdStmt ids local_vars out_ids (BindStmt _ pat cmd) env_ids = do
     let
        after_c_ty = mkCorePairTy pat_ty env_ty2
        out_ty = mkBigCoreVarTupTy out_ids
-    body_expr <- coreCaseTuple env_id env_ids2 (mkBigCoreVarTup out_ids)
+    out_tup   <- mkBigCoreVarTup BoxedElements out_ids
+    body_expr <- coreCaseTuple env_id env_ids2 out_tup
 
     fail_expr <- mkFailExpr (StmtCtxt (HsDoStmt (DoExpr Nothing))) out_ty
     pat_id    <- selectSimpleMatchVarL ManyTy pat
@@ -995,7 +1006,8 @@ dsCmdStmt ids local_vars out_ids (BindStmt _ pat cmd) env_ids = do
 
 dsCmdStmt ids local_vars out_ids (LetStmt _ binds) env_ids = do
     -- build a new environment using the let bindings
-    core_binds <- dsLocalBinds binds (mkBigCoreVarTup out_ids)
+    out_tup    <- mkBigCoreVarTup BoxedElements out_ids
+    core_binds <- dsLocalBinds binds out_tup
     -- match the old environment against the input
     core_map <- matchEnv env_ids core_binds
     return (do_arr ids
@@ -1036,7 +1048,8 @@ dsCmdStmt ids local_vars out_ids
     let
         later_ty = mkBigCoreVarTupTy later_ids
         post_pair_ty = mkCorePairTy later_ty env2_ty
-    post_loop_body <- coreCaseTuple env2_id env2_ids (mkBigCoreVarTup out_ids)
+    out_tup        <- mkBigCoreVarTup BoxedElements out_ids
+    post_loop_body <- coreCaseTuple env2_id env2_ids out_tup
 
     post_loop_fn <- matchEnvStack later_ids env2_id post_loop_body
 
@@ -1050,8 +1063,9 @@ dsCmdStmt ids local_vars out_ids
     let
         env1_ty = mkBigCoreVarTupTy env1_ids
         pre_pair_ty = mkCorePairTy env1_ty env2_ty
-        pre_loop_body = mkCorePairExpr (mkBigCoreVarTup env1_ids)
-                                        (mkBigCoreVarTup env2_ids)
+    env1_tup <- mkBigCoreVarTup BoxedElements env1_ids
+    env2_tup <- mkBigCoreVarTup BoxedElements env2_ids
+    let pre_loop_body = mkCorePairExpr env1_tup env2_tup
 
     pre_loop_fn <- matchEnv env_ids pre_loop_body
 
@@ -1102,14 +1116,13 @@ dsRecCmd ids local_vars stmts later_ids later_rets rec_ids rec_rets = do
         out_ids = exprsFreeIdsList (core_later_rets ++ core_rec_rets)
         out_ty = mkBigCoreVarTupTy out_ids
 
-        later_tuple = mkBigCoreTup core_later_rets
         later_ty = mkBigCoreVarTupTy later_ids
-
-        rec_tuple = mkBigCoreTup core_rec_rets
         rec_ty = mkBigCoreVarTupTy rec_ids
-
-        out_pair = mkCorePairExpr later_tuple rec_tuple
         out_pair_ty = mkCorePairTy later_ty rec_ty
+
+    later_tuple <- mkBigCoreTup core_later_rets
+    rec_tuple   <- mkBigCoreTup core_rec_rets
+    let out_pair = mkCorePairExpr later_tuple rec_tuple
 
     mk_pair_fn <- matchEnv out_ids out_pair
 
@@ -1119,19 +1132,23 @@ dsRecCmd ids local_vars stmts later_ids later_rets rec_ids rec_rets = do
 
     -- squash_pair_fn = \ ((env1_ids), ~(rec_ids)) -> (env_ids)
 
-    rec_id <- newSysLocalMDs rec_ty
+    rec_id   <- newSysLocalMDs rec_ty
     let
         env1_id_set = fv_stmts `uniqDSetMinusUniqSet` rec_id_set
         env1_ids = dVarSetElems env1_id_set
         env1_ty = mkBigCoreVarTupTy env1_ids
         in_pair_ty = mkCorePairTy env1_ty rec_ty
-        core_body = mkBigCoreTup (map selectVar env_ids)
-          where
-            selectVar v
-                | v `elemVarSet` rec_id_set
-                  = mkBigTupleSelector rec_ids v rec_id (Var rec_id)
-                | otherwise = Var v
 
+        -- It's important to be lazy in rec_ids (see the ~(rec_ids) above),
+        -- so we must use mkBigTupleSelector and not mkBigTupleCase.
+        -- Tested in arrowrun005.
+        selectVar v
+          | v `elemVarSet` rec_id_set
+          = mkBigTupleSelector BoxedElements rec_ids v rec_id (Var rec_id)
+          | otherwise
+          = return (Var v)
+
+    core_body <- mkBigCoreTup =<< mapM selectVar env_ids
     squash_pair_fn <- matchEnvStack env1_ids rec_id core_body
 
     -- loop (premap squash_pair_fn (ss >>> arr mk_pair_fn))

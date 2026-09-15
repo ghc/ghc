@@ -592,6 +592,21 @@ frontendPluginTyConKey                  = mkPreludeTyConUnique 103
 trTyConTyConKey :: KnownKey
 trTyConTyConKey                         = mkPreludeTyConUnique 104
 
+listIndexTyConKey :: Unique
+listIndexTyConKey = mkPreludeTyConUnique 122
+
+boxTyConKey :: Unique
+boxTyConKey = mkPreludeTyConUnique 123
+
+boxTFTyConKey :: Unique
+boxTFTyConKey = mkPreludeTyConUnique 124
+
+dictBoxTyConKey :: Unique
+dictBoxTyConKey = mkPreludeTyConUnique 125
+
+boxSumTyConKey :: Unique
+boxSumTyConKey = mkPreludeTyConUnique 126
+
 -- "Unsatisfiable" constraint
 unsatisfiableClassKey :: KnownKey
 unsatisfiableClassKey = mkPreludeTyConUnique 170
@@ -795,11 +810,31 @@ integerIPDataConKey       = mkPreludeDataConUnique 122
 naturalNSDataConKey       = mkPreludeDataConUnique 123
 naturalNBDataConKey       = mkPreludeDataConUnique 124
 
+mkDictBoxDataConKey :: Unique
+mkDictBoxDataConKey = mkPreludeDataConUnique 126
+
+mkBoxDataConKey :: Unique
+mkBoxDataConKey = mkPreludeDataConUnique 128
 
 ---------------- Template Haskell -------------------
 --      GHC.Builtin.TH: USES DataUniques 200-250
 -----------------------------------------------------
 
+-- 300 -- 491 (300 + 3 * mAX_SUM_SIZE - 1)
+boxSumDataConKey :: Int -> Unique
+boxSumDataConKey k = mkPreludeDataConUnique (300 + 3 * k)
+
+{-
+************************************************************************
+*                                                                      *
+\subsubsection[Uniques-prelude-CoAxioms]{@Uniques@ for wired-in @CoAxioms@}
+*                                                                      *
+************************************************************************
+-}
+
+-- Coercion axiom for the 'Box' newtype (Box a ~R# BoxTF a)
+boxCoKey :: Unique
+boxCoKey = mkPreludeCoAxiomUnique 103
 
 {-
 ************************************************************************
@@ -944,6 +979,11 @@ unsafeCoercePrimIdKey    = mkPreludeMiscIdUnique 571
 -- HasField class ops
 getFieldClassOpKey :: KnownKey
 getFieldClassOpKey = mkPreludeMiscIdUnique 572
+
+-- box/unbox
+boxIdKey, unboxIdKey :: Unique
+boxIdKey   = mkPreludeMiscIdUnique 575
+unboxIdKey = mkPreludeMiscIdUnique 576
 
 -- "Unsatisfiable" constraints
 unsatisfiableIdKey :: KnownKey

@@ -46,6 +46,7 @@ import GHC.Core.SimpleOpt
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.InstEnv ( CanonicalEvidence(..) )
 import GHC.Core.Make
+import GHC.Core.Make.BigTuple
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity     ( etaExpand )
 import GHC.Core.Unfold.Make
@@ -345,8 +346,7 @@ dsAbsBinds dflags tyvars dicts exports
              new_force_vars = get_new_force_vars force_vars
              locals       = map abe_mono exports
              all_locals   = locals ++ new_force_vars
-             tup_expr     = mkBigCoreVarTup all_locals
-             tup_ty       = exprType tup_expr
+       ; tup_expr <- mkBigCoreVarTup BoxedElements all_locals
        ; let poly_tup_rhs = mkLams tyvars $ mkLams dicts $
                             mkCoreLets ds_ev_binds $
                             mkLet aux_binds $
@@ -363,11 +363,13 @@ dsAbsBinds dflags tyvars dicts exports
                           , abe_poly = global
                           , abe_mono = local, abe_prags = spec_prags })
                           -- See Note [ABExport wrapper] in "GHC.Hs.Binds"
-                = do { tup_id  <- newSysLocalMDs tup_ty
-                     ; dsHsWrapper wrap $ \core_wrap -> do
-                     { let rhs = core_wrap $ mkLams tyvars $ mkLams dicts $
-                                 mkBigTupleSelector all_locals local tup_id $
-                                 mkVarApps (Var poly_tup_id) (tyvars ++ dicts)
+                = do { dsHsWrapper wrap $ \core_wrap -> do
+                       -- The tuple components are boxed; we select the desired
+                       -- one and unbox it; mkBigTupleCase does the unboxing.
+                       -- See Note [Boxing big tuple elements] in GHC.HsToCore.Utils.
+                     { sel_body <- mkBigTupleCase all_locals (Var local) $
+                                     mkVarApps (Var poly_tup_id) (tyvars ++ dicts)
+                     ; let rhs = core_wrap $ mkLams tyvars $ mkLams dicts sel_body
                            rhs_for_spec = Let (NonRec poly_tup_id poly_tup_rhs) rhs
                      ; (spec_binds, rules) <- dsSpecs rhs_for_spec spec_prags
                      ; let global' = (global `setInlinePragma` defaultInlinePragma)

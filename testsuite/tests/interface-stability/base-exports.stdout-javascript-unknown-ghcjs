@@ -3305,14 +3305,10 @@ module GHC.Base where
   class DataToTag a where
     dataToTag# :: a -> Int#
     {-# MINIMAL dataToTag# #-}
-  type DictBox :: Constraint -> *
-  data DictBox a = a => MkDictBox
   type Double :: *
   data Double = D# Double#
   type Double# :: TYPE DoubleRep
   data Double#
-  type DoubleBox :: TYPE DoubleRep -> *
-  data DoubleBox a = MkDoubleBox a
   type DoubleX2# :: TYPE (VecRep Vec2 DoubleElemRep)
   data DoubleX2#
   type DoubleX4# :: TYPE (VecRep Vec4 DoubleElemRep)
@@ -3331,8 +3327,6 @@ module GHC.Base where
   data Float = F# Float#
   type Float# :: TYPE FloatRep
   data Float#
-  type FloatBox :: TYPE FloatRep -> *
-  data FloatBox a = MkFloatBox a
   type FloatX16# :: TYPE (VecRep Vec16 FloatElemRep)
   data FloatX16#
   type FloatX4# :: TYPE (VecRep Vec4 FloatElemRep)
@@ -3387,8 +3381,6 @@ module GHC.Base where
   data Int8X32#
   type Int8X64# :: TYPE (VecRep Vec64 Int8ElemRep)
   data Int8X64#
-  type IntBox :: TYPE IntRep -> *
-  data IntBox a = MkIntBox a
   type KindBndr :: *
   type KindBndr = Int
   type KindRep :: *
@@ -3562,8 +3554,6 @@ module GHC.Base where
   data Word8X32#
   type Word8X64# :: TYPE (VecRep Vec64 Word8ElemRep)
   data Word8X64#
-  type WordBox :: TYPE WordRep -> *
-  data WordBox a = MkWordBox a
   type ZeroBitRep :: RuntimeRep
   type ZeroBitRep = TupleRep '[]
   type ZeroBitType :: *
@@ -5447,14 +5437,10 @@ module GHC.Exts where
   class DataToTag a where
     dataToTag# :: a -> Int#
     {-# MINIMAL dataToTag# #-}
-  type DictBox :: Constraint -> *
-  data DictBox a = a => MkDictBox
   type Double :: *
   data Double = D# Double#
   type Double# :: TYPE DoubleRep
   data Double#
-  type DoubleBox :: TYPE DoubleRep -> *
-  data DoubleBox a = MkDoubleBox a
   type DoubleX2# :: TYPE (VecRep Vec2 DoubleElemRep)
   data DoubleX2#
   type DoubleX4# :: TYPE (VecRep Vec4 DoubleElemRep)
@@ -5470,8 +5456,6 @@ module GHC.Exts where
   data Float = F# Float#
   type Float# :: TYPE FloatRep
   data Float#
-  type FloatBox :: TYPE FloatRep -> *
-  data FloatBox a = MkFloatBox a
   type FloatX16# :: TYPE (VecRep Vec16 FloatElemRep)
   data FloatX16#
   type FloatX4# :: TYPE (VecRep Vec4 FloatElemRep)
@@ -5517,8 +5501,6 @@ module GHC.Exts where
   data Int8X32#
   type Int8X64# :: TYPE (VecRep Vec64 Int8ElemRep)
   data Int8X64#
-  type IntBox :: TYPE IntRep -> *
-  data IntBox a = MkIntBox a
   type IsList :: * -> Constraint
   class IsList l where
     type Item :: * -> *
@@ -5668,8 +5650,6 @@ module GHC.Exts where
   data Word8X32#
   type Word8X64# :: TYPE (VecRep Vec64 Word8ElemRep)
   data Word8X64#
-  type WordBox :: TYPE WordRep -> *
-  data WordBox a = MkWordBox a
   type ZeroBitRep :: RuntimeRep
   type ZeroBitRep = TupleRep '[]
   type ZeroBitType :: *

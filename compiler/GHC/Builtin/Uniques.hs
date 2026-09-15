@@ -33,6 +33,8 @@ module GHC.Builtin.Uniques
     , mkPrimOpIdUnique, mkPrimOpWrapperUnique
     , mkPreludeMiscIdUnique, mkPreludeDataConUnique
     , mkPreludeTyConUnique, mkPreludeClassUnique
+    , mkPreludeCoAxiomUnique
+    , mkBoxingTyConUnique, boxingDataConUnique
 
     , mkRegSingleUnique, mkRegPairUnique, mkRegClassUnique, mkRegSubUnique
     , mkCostCentreUnique
@@ -50,9 +52,6 @@ module GHC.Builtin.Uniques
     , dataConWorkerUnique, dataConTyRepNameUnique
 
     , initExitJoinUnique
-
-      -- Boxing data types
-    , mkBoxingTyConUnique, boxingDataConUnique
 
     ) where
 
@@ -353,7 +352,7 @@ Allocation of unique supply characters:
         other a-z: lower case chars for unique supplies.  Used so far:
 
         a       TypeChecking?
-        b       Boxing tycons & datacons
+        b       Boxing tycons & datacons (see Note [Boxing constructors] in GHC.Builtin.WiredIn.Types.Box)
         c       StgToCmm/Renamer
         d       desugarer
         f       AbsC flattener
@@ -365,6 +364,7 @@ Allocation of unique supply characters:
         r       Hsc name cache
         s       simplifier
         u       Cmm pipeline
+        x       wired-in coercion axioms (mkPreludeCoAxiomUnique)
         y       GHCi bytecode generator
         z       anonymous sums
 
@@ -374,7 +374,6 @@ Note [Related uniques for wired-in things]
   * u: the TyCon itself
   * u+1: the TyConRepName of the TyCon (for use with TypeRep)
   The "+1" is implemented in tyConRepNameUnique.
-  If this ever changes, make sure to also change the treatment for boxing tycons.
 
 * All wired in datacons use *three* uniques:
   * u: the DataCon itself
@@ -382,9 +381,8 @@ Note [Related uniques for wired-in things]
   * u+2: the TyConRepName of the promoted TyCon
   No wired-in datacons have wrappers.
   The "+1" is implemented in dataConWorkerUnique and the "+2" is in dataConTyRepNameUnique.
-  If this ever changes, make sure to also change the treatment for boxing tycons.
 
-* Because boxing tycons (see Note [Boxing constructors] in GHC.Builtin.WiredIn.Types)
+* Because boxing tycons (see Note [Boxing constructors] in GHC.Builtin.WiredIn.Types.Box)
   come with both a tycon and a datacon, each one takes up five slots, combining
   the two cases above. Getting from the tycon to the datacon (by adding 2)
   is implemented in boxingDataConUnique.
@@ -457,17 +455,21 @@ dataConTyRepNameUnique, dataConWorkerUnique :: Unique -> Unique
 dataConWorkerUnique  u = incrUnique u
 dataConTyRepNameUnique u = stepUnique u 2
 
+-- Wired-in newtype constructors have an additional slot for the coercion axiom
+mkPreludeCoAxiomUnique :: Int -> Unique
+mkPreludeCoAxiomUnique i = mkUniqueInt PreludeCoAxiomTag i
+
 --------------------------------------------------
--- The data constructors of RuntimeRep occupy *five* slots:
--- See Note [Related uniques for wired-in things]
+-- The data constructors of RuntimeRep occupy *five* slots: two for the TyCon,
+-- and three for the DataCon; see Note [Related uniques for wired-in things].
 --
---    Example: WordRep
+-- Example: WordRep
 --
--- * u: the TyCon of the boxing data type WordBox
--- * u+1: the TyConRepName of the boxing data type
--- * u+2: the DataCon for MkWordBox
--- * u+3: the worker id for MkWordBox
--- * u+4: the TyConRepName of the promoted TyCon 'MkWordBox
+--   * u: the BoxWord TyCon
+--   * u+1: its TyConRepName
+--   * u+2: the BoxWord DataCon
+--   * u+3: its worker Id
+--   * u+4: the TyConRepName of its promoted TyCon
 --
 -- Note carefully that
 -- * u,u+1 are in sync with the conventions for

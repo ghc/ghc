@@ -27,8 +27,8 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.Class
 import GHC.Core.Reduction( Reduction, reductionCoercion )
 import GHC.Core
-import GHC.Core.DataCon
 import GHC.Core.Make
+import GHC.Core.Make.Box ( boxDictTy, liftConstraint, unliftConstraintExpr )
 import GHC.Core.Coercion( isReflCo, mkSubCo, hasCoercionHole )
 import GHC.Core.Unify    ( tcMatchTyKis )
 import GHC.Core.Predicate
@@ -46,7 +46,7 @@ import GHC.Builtin.KnownKeys( unsatisfiableIdKey
                             )
 import GHC.Builtin.Modules ( gHC_INTERNAL_TYPEERROR )
 import GHC.Builtin.WiredIn.Types
-import GHC.Builtin.WiredIn.Ids ( unboxedUnitExpr )
+import GHC.Builtin.WiredIn.Types.Box ( mkDictBoxDataCon )
 
 import GHC.Types.Unique
 import GHC.Types.Var
@@ -318,27 +318,22 @@ unsatisfiableEvExpr (unsat_ev, given_msg) wtd_ty
          -- See Note [Evidence terms from Unsatisfiable Givens]
          -- for a description of what evidence term we are constructing here.
 
-       ; let -- (##) -=> wtd_ty
-             fun_ty = mkFunTy visArgConstraintLike ManyTy unboxedUnitTy wtd_ty
-             mkDictBox = case boxingDataCon fun_ty of
-               BI_Box { bi_data_con = mkDictBox } -> mkDictBox
-               _ -> pprPanic "unsatisfiableEvExpr: no DictBox!" (ppr wtd_ty)
-             dictBox = dataConTyCon mkDictBox
-       ; ev_bndr <- mkSysLocalM (fsLit "ct") ManyTy fun_ty
-             -- Dict ((##) -=> wtd_ty)
-       ; let scrut_ty = mkTyConApp dictBox [fun_ty]
-             -- unsatisfiable @{LiftedRep} @given_msg @(Dict ((##) -=> wtd_ty)) unsat_ev
+         -- Box the constraint @wtd_ty@ with 'DictBox'.
+         -- NB: this handles both lifted and unlifted constraints.
+       ; ev_bndr <- mkSysLocalM (fsLit "ct") ManyTy (liftConstraint wtd_ty)
+       ; let scrut_ty = boxDictTy wtd_ty
+             -- unsatisfiable @{LiftedRep} @given_msg @(DictBox (liftConstraint wtd_ty)) unsat_ev
              scrut =
                mkCoreApps (Var unsatisfiable_id)
                  [ Type liftedRepTy
                  , Type given_msg
                  , Type scrut_ty
                  , Var unsat_ev ]
-             -- case scrut of { MkDictBox @((##) -=> wtd_ty)) ct -> ct (# #) }
+             -- case scrut of { MkDictBox ct -> ct (# #) }
              ev_expr =
                mkWildCase scrut (unrestricted $ scrut_ty) wtd_ty
-               [ Alt (DataAlt mkDictBox) [ev_bndr] $
-                   mkCoreApps (Var ev_bndr) [unboxedUnitExpr]
+               [ Alt (DataAlt mkDictBoxDataCon) [ev_bndr] $
+                   unliftConstraintExpr (Var ev_bndr)
                ]
         ; return ev_expr } }
 

@@ -158,6 +158,7 @@ data UniqueTag
   | PreludeDataConTag
   | PreludeMiscIdTag
   | PreludeTyConTag
+  | PreludeCoAxiomTag
   | PrimOpTag
   | PseudoTag
   | RegClassTag
@@ -209,6 +210,7 @@ uniqueTag PreludeClassTag      = '2'
 uniqueTag PreludeDataConTag    = '6'
 uniqueTag PreludeMiscIdTag     = '0'
 uniqueTag PreludeTyConTag      = '3'
+uniqueTag PreludeCoAxiomTag    = 'x'
 uniqueTag PrimOpTag            = '9'
 uniqueTag PseudoTag            = 'E'
 uniqueTag RegClassTag          = 'A'
@@ -280,6 +282,7 @@ charToUniqueTag 'T' = TsanTag
 charToUniqueTag 'u' = SrtTag
 charToUniqueTag 'v' = TvNSTag
 charToUniqueTag 'V' = VarNSTag
+charToUniqueTag 'x' = PreludeCoAxiomTag
 charToUniqueTag 'X' = LocalTag
 charToUniqueTag 'z' = SumTag
 charToUniqueTag c

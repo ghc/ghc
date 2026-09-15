@@ -208,6 +208,7 @@ Library
         GHC.Builtin.PrimOps.Ids
         GHC.Builtin.TH
         GHC.Builtin.WiredIn.Types
+        GHC.Builtin.WiredIn.Types.Box
         GHC.Builtin.WiredIn.TypeLits
         GHC.Builtin.WiredIn.Prim
         GHC.Builtin.WiredIn.Ids
@@ -372,6 +373,8 @@ Library
         GHC.Core.LateCC.Utils
         GHC.Core.LateCC.OverloadedCalls
         GHC.Core.Make
+        GHC.Core.Make.BigTuple
+        GHC.Core.Make.Box
         GHC.Core.Map.Expr
         GHC.Core.Map.Type
         GHC.Core.Multiplicity

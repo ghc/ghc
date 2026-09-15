@@ -1508,6 +1508,7 @@ module GHC.Prim where
   bitReverse32# :: Word# -> Word#
   bitReverse64# :: Word64# -> Word64#
   bitReverse8# :: Word# -> Word#
+  box :: forall {q :: GHC.Internal.Types.RuntimeRep} (a :: TYPE q). a -> GHC.Internal.Box.Box a
   broadcastDoubleX2# :: Double# -> DoubleX2#
   broadcastDoubleX4# :: Double# -> DoubleX4#
   broadcastDoubleX8# :: Double# -> DoubleX8#
@@ -2705,6 +2706,7 @@ module GHC.Prim where
   tryPutMVar# :: forall {l :: GHC.Internal.Types.Levity} d (a :: TYPE (GHC.Internal.Types.BoxedRep l)). MVar# d a -> a -> State# d -> (# State# d, Int# #)
   tryReadMVar# :: forall {l :: GHC.Internal.Types.Levity} d (a :: TYPE (GHC.Internal.Types.BoxedRep l)). MVar# d a -> State# d -> (# State# d, Int#, a #)
   tryTakeMVar# :: forall {l :: GHC.Internal.Types.Levity} d (a :: TYPE (GHC.Internal.Types.BoxedRep l)). MVar# d a -> State# d -> (# State# d, Int#, a #)
+  unbox :: forall {q :: GHC.Internal.Types.RuntimeRep} (a :: TYPE q). GHC.Internal.Box.Box a -> a
   uncheckedIShiftL# :: Int# -> Int# -> Int#
   uncheckedIShiftL64# :: Int64# -> Int# -> Int64#
   uncheckedIShiftRA# :: Int# -> Int# -> Int#
@@ -3937,22 +3939,14 @@ module GHC.Types where
     {-# MINIMAL #-}
   type Constraint :: *
   type Constraint = CONSTRAINT LiftedRep
-  type DictBox :: Constraint -> *
-  data DictBox a = a => MkDictBox
   type Double :: *
   data Double = D# GHC.Internal.Prim.Double#
-  type DoubleBox :: TYPE DoubleRep -> *
-  data DoubleBox a = MkDoubleBox a
   type Float :: *
   data Float = F# GHC.Internal.Prim.Float#
-  type FloatBox :: TYPE FloatRep -> *
-  data FloatBox a = MkFloatBox a
   type IO :: * -> *
   newtype IO a = IO (GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld, a #))
   type Int :: *
   data Int = I# GHC.Internal.Prim.Int#
-  type IntBox :: TYPE IntRep -> *
-  data IntBox a = MkIntBox a
   type KindBndr :: *
   type KindBndr = Int
   type KindRep :: *
@@ -6985,8 +6979,6 @@ module GHC.Types where
   type Void# = (# #)
   type Word :: *
   data Word = W# GHC.Internal.Prim.Word#
-  type WordBox :: TYPE WordRep -> *
-  data WordBox a = MkWordBox a
   type ZeroBitRep :: RuntimeRep
   type ZeroBitRep = TupleRep '[]
   type ZeroBitType :: *

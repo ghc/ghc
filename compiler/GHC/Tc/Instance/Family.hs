@@ -446,7 +446,7 @@ tcLookupDataFamInst_maybe fam_inst_envs tc tc_args
   , let rep_tc = dataFamInstRepTyCon rep_fam
         co     = mkUnbranchedAxInstCo Representational ax rep_args
                                       (mkCoVarCos cvs)
-  = assert (null rep_cos) $ -- See Note [Constrained family instances] in ??? (renamed?)
+  = assert (null rep_cos) $ -- See Note [Constrained family instances] in GHC.Core.FamInstEnv
     Just (rep_tc, rep_args, co)
 
   | otherwise

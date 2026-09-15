@@ -59,7 +59,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCon
 -- Create chunkified tuple types for monad comprehensions
-import GHC.Core.Make
+import GHC.Core.Make.BigTuple
 
 import GHC.Hs
 
@@ -650,7 +650,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
        ; let m_app ty = mkTyConApp m_tc [ty]
 
        --------------- Typecheck the 'using' function -------------
-       -- using :: ((a,b,c)->t) -> m (a,b,c) -> m (a,b,c)m      (ThenForm)
+       -- using :: ((a,b,c)->t) -> m (a,b,c) -> m (a,b,c)       (ThenForm)
        --       :: ((a,b,c)->t) -> m (a,b,c) -> m (m (a,b,c)))  (GroupForm)
 
          -- n_app :: Type -> Type   -- Wraps a 'ty' into '[ty]' for GroupForm
@@ -929,10 +929,10 @@ tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
                         (m_ty `mkAppTy` mkBoxedTupleTy [alphaTy, betaTy])
        ; mzip_op' <- unLoc `fmap` tcCheckPolyExpr (noLocA mzip_op) mzip_ty
 
-        -- type dummies since we don't know all binder types yet
+        -- type dummies since we don't know all binder types yet.
        ; tup_tys_and_bndr_stmts_s <- traverse (\ bndr_stmts@(ParStmtBlock _ _ names _) ->
            [ (tup_tys, bndr_stmts)
-           | tup_tys <- mkBigCoreTupTy <$> traverse (const (newFlexiTyVarTy liftedTypeKind)) names ]) bndr_stmts_s
+           | tup_tys <- mkBigCoreTupTy <$> traverse (newOpenFlexiFRRTyVarTy . FRRBinder) names ]) bndr_stmts_s
 
        -- Typecheck bind:
        ; let tuple_ty = mk_tuple_ty (NE.map fst tup_tys_and_bndr_stmts_s)
@@ -1034,7 +1034,7 @@ tcDoStmt ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_names
                        , recS_mfix_fn = mfix_op, recS_bind_fn = bind_op })
          res_ty thing_inside
   = do  { let tup_names = rec_names ++ filterOut (`elem` rec_names) later_names
-        ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
+        ; tup_elt_tys <- mapM (newOpenFlexiFRRTyVarTy . FRRBinder) tup_names
         ; let tup_ids = zipWith (\n t -> mkLocalId n ManyTy t) tup_names tup_elt_tys
                 -- Many because it's a recursive definition
               tup_ty  = mkBigCoreTupTy tup_elt_tys

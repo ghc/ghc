@@ -153,6 +153,9 @@ module GHC.Internal.Exts
 
         -- * The maximum tuple size
         maxTupleSize,
+
+        -- * Boxing values of any runtime representation
+        Box,
        ) where
 
 import GHC.Internal.Base
@@ -331,6 +334,7 @@ import GHC.Internal.Data.Ord
 import qualified GHC.Internal.Debug.Trace
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce# ) -- just for re-export
 import GHC.Internal.Tuple (maxTupleSize)
+import GHC.Internal.Box (Box)
 
 -- | 'the' ensures that all the elements of the list are identical
 -- and then returns that unique element

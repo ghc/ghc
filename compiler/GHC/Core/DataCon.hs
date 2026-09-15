@@ -54,7 +54,8 @@ module GHC.Core.DataCon (
         isLazyDataConRep,
         isTupleDataCon, isBoxedTupleDataCon, isUnboxedTupleDataCon,
         isUnboxedSumDataCon, isCovertGadtDataCon, isUnaryClassDataCon,
-        isVanillaDataCon, isNewDataCon, isTypeDataCon,
+        isVanillaDataCon, isNewDataCon, isTypeDataCon, isBoxingDataCon,
+        dataConHasNoBinding,
         classDataCon, dataConCannotMatch,
         dataConUserTyVarBindersNeedWrapper, checkDataConTyVars,
         isBanged, isUnpacked, isMarkedStrict, cbvFromStrictMark, eqHsBang, isSrcStrict, isSrcUnpacked,
@@ -90,6 +91,7 @@ import GHC.Types.Basic
 import GHC.Data.FastString
 import GHC.Unit.Types
 import GHC.Utils.Binary
+import GHC.Types.Unique ( UniqueTag (BoxingTyConTag), unpkUnique )
 import GHC.Types.Unique.FM ( UniqFM )
 import GHC.Types.Unique.Set
 import GHC.Builtin.Uniques( mkAlphaTyVarUnique )
@@ -1686,6 +1688,15 @@ isNewDataCon dc = isNewTyCon (dataConTyCon dc)
 isTypeDataCon :: DataCon -> Bool
 isTypeDataCon dc = isTypeDataTyCon (dataConTyCon dc)
 
+-- | Is this one of the boxing data constructors of Note [Boxing constructors]
+-- in GHC.Builtin.WiredIn.Types.Box?
+isBoxingDataCon :: DataCon -> Bool
+isBoxingDataCon dc
+  | (BoxingTyConTag, _) <- unpkUnique $ getUnique dc
+  = True
+  | otherwise
+  = False
+
 isCovertGadtDataCon :: DataCon -> Bool
 -- See Note [isCovertGadtDataCon]
 isCovertGadtDataCon (MkData { dcUnivTyVars  = univ_tvs
@@ -1707,6 +1718,21 @@ isCovertGadtDataCon (MkData { dcUnivTyVars  = univ_tvs
 
 isUnaryClassDataCon :: DataCon -> Bool
 isUnaryClassDataCon dc = isUnaryClassTyCon (dataConTyCon dc)
+
+-- | Does this data constructor lack an associated top-level binding?
+dataConHasNoBinding :: DataCon -> Bool
+dataConHasNoBinding dc
+  =  isNewDataCon dc
+     -- Newtype constructors turn into a cast.
+     -- See Note [Newtype workers] in GHC.Types.Id.Make.
+  || isUnboxedTupleDataCon dc
+  || isUnboxedSumDataCon dc
+  || isUnaryClassDataCon dc
+     -- Unary class dictionary constructors are eliminated in Core Prep.
+     -- See Note [Unary class magic] in GHC.Core.TyCon
+  || (isBoxingDataCon dc && not (isNullaryRepDataCon dc))
+     -- Non-nullary Box constructors have no binding.
+     -- See Note [No implicit binds for Box constructors] in GHC.CoreToStg.AddImplicitBinds.
 
 {- Note [isCovertGadtDataCon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

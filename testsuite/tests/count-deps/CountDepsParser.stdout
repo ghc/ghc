@@ -10,6 +10,7 @@ GHC.Builtin.WiredIn.Ids
 GHC.Builtin.WiredIn.Prim
 GHC.Builtin.WiredIn.TypeLits
 GHC.Builtin.WiredIn.Types
+GHC.Builtin.WiredIn.Types.Box
 GHC.Cmm.BlockId
 GHC.Cmm.CLabel
 GHC.Cmm.Dataflow.Label

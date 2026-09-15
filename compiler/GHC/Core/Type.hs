@@ -2711,9 +2711,11 @@ sORTKind_maybe (TyConApp tc tys)
 sORTKind_maybe _ = Nothing
 
 typeTypeOrConstraint :: HasDebugCallStack => Type -> TypeOrConstraint
--- Precondition: expects a type that classifies values.
--- Returns whether it is TypeLike or ConstraintLike.
--- Equivalent to calling sORTKind_maybe, but faster in the FunTy case
+-- ^ Returns whether the given type is 'TypeLike' or 'ConstraintLike'.
+--
+-- Equivalent to calling 'sORTKind_maybe', but faster in the 'FunTy' case.
+--
+-- __Precondition__: expects a type that classifies values.
 typeTypeOrConstraint ty
    = case coreFullView ty of
        FunTy { ft_af = af } -> funTyFlagResultTypeOrConstraint af

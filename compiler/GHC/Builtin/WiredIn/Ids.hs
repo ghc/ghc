@@ -26,6 +26,7 @@ module GHC.Builtin.WiredIn.Ids (
         noinlineConstraintId, noinlineConstraintIdName,
         coerceName, leftSectionName, rightSectionName,
         pcRepPolyId,
+        boxId, unboxId,
 
         unboxedUnitExpr,
         mkRepPolyIdConcreteTyVars,
@@ -35,6 +36,7 @@ import GHC.Prelude
 
 import GHC.Builtin.WiredIn.Prim
 import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Types.Box ( boxTyCon )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.Modules( gHC_PRIM, gHC_MAGIC )
 
@@ -154,6 +156,7 @@ ghcPrimIds
     , proxyHashId
     , leftSectionId
     , rightSectionId
+    , boxId, unboxId
     ]
 
 {-
@@ -387,6 +390,46 @@ rightSectionId = pcRepPolyId rightSectionName ty concs info
       mkRepPolyIdConcreteTyVars
         [ ((openAlphaTy, mkArgPos 3 Top), runtimeRep1TyVar)
         , ((openBetaTy , mkArgPos 2 Top), runtimeRep2TyVar)]
+
+------------------------------------------------
+-- box/unbox
+
+boxIdName, unboxIdName :: Name
+boxIdName = mkWiredInIdName gHC_PRIM (fsLit "box") boxIdKey boxId
+unboxIdName = mkWiredInIdName gHC_PRIM (fsLit "unbox") unboxIdKey unboxId
+
+-- | The magic 'Id' 'box'.
+--
+-- It has no unfolding and no binding: it is inlined during desugaring.
+--
+-- See Note [Desugaring box & unbox] in GHC.Core.Make.Box.
+boxId :: Id
+boxId = pcRepPolyId boxIdName ty concs info
+  where
+    info = noCafIdInfo
+    ty  = mkInfForAllTys  [ runtimeRep1TyVar ] $
+          mkSpecForAllTys [ openAlphaTyVar ]   $
+          mkVisFunTyMany openAlphaTy
+          (mkTyConApp boxTyCon [runtimeRep1Ty, openAlphaTy])
+    concs = mkRepPolyIdConcreteTyVars
+          [((openAlphaTy, mkArgPos 1 Top), runtimeRep1TyVar)]
+
+-- | The magic 'Id' 'unbox'.
+--
+-- It has no unfolding and no binding: it is inlined during desugaring.
+--
+-- See Note [Desugaring box & unbox] in GHC.Core.Make.Box.
+unboxId :: Id
+unboxId = pcRepPolyId unboxIdName ty concs info
+  where
+    info = noCafIdInfo
+    ty  = mkInfForAllTys  [ runtimeRep1TyVar ] $
+          mkSpecForAllTys [ openAlphaTyVar ]   $
+          mkVisFunTyMany
+            (mkTyConApp boxTyCon [runtimeRep1Ty, openAlphaTy])
+            openAlphaTy
+    concs = mkRepPolyIdConcreteTyVars
+          [((openAlphaTy, mkArgPos 1 Top), runtimeRep1TyVar)]
 
 --------------------------------------------------------------------------------
 

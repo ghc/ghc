@@ -1013,6 +1013,11 @@ lintIdOcc id nargs
           checkL (not (id `hasKnownKey` makeStaticKey)) $
           text "Found makeStatic nested in an expression"
 
+          -- box/unbox must have been desugared away; they have no binding.
+          -- See Note [Desugaring box & unbox] in GHC.Core.Make.Box.
+        ; checkL (not (id `hasKey` boxIdKey || id `hasKey` unboxIdKey)) $
+          text "Undesugared occurrence of" <+> ppr id
+
         -- Occurrences of an Id should never be dead....
         -- except in a couple of special cases
         -- See Note [Dead occurrences]
@@ -2456,10 +2461,11 @@ lintCoercion (FunCo { fco_role = r, fco_afl = afl, fco_afr = afr
 -- See Note [Bad unsafe coercion]
 lintCoercion co@(UnivCo { uco_role = r, uco_prov = prov
                         , uco_lty = ty1, uco_rty = ty2, uco_deps = deps })
-  = do { -- Check the role.  PhantomProv must have Phantom role, otherwise any role is fine
+  = do { -- Check the role required by the 'UnivCoProvenance'.
          case prov of
-            PhantomProv -> lintRole co Phantom r
-            _           -> return ()
+            PhantomProv   -> lintRole co Phantom r
+            CanonicalProv -> lintRole co Representational r
+            _             -> return ()
 
        -- Check the to and from types
        ; lintType ty1

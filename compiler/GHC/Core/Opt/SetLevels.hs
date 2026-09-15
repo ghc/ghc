@@ -94,7 +94,11 @@ import GHC.Core.Subst
 import GHC.Core.TyCo.Subst( lookupTyVar )
 import GHC.Core.TyCo.FVs
 import GHC.Core.Make    ( sortQuantVars )
-import GHC.Core.Type    ( Type, mightBeUnliftedType, typeHasFixedRuntimeRep )
+import GHC.Core.Make.Box ( mkCanonicalCo )
+import GHC.Core.Coercion ( MCoercion(..), MCoercionR, mkSymMCo )
+import GHC.Core.DataCon ( DataCon, dataConTyCon )
+import GHC.Core.Type    ( Type, mightBeUnliftedType, typeHasFixedRuntimeRep
+                        , mkTyConTy, getRuntimeRep )
 import GHC.Core.Multiplicity     ( pattern ManyTy )
 
 import GHC.Types.Id
@@ -116,8 +120,8 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Unique.DFM
 import GHC.Types.Basic  ( Arity, RecFlag(..), isRec )
 
-import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.KnownKeys      ( runRWKey )
+import GHC.Builtin.WiredIn.Types.Box ( RuntimeRepBoxingInfo(..), repBoxingInfo )
 
 import GHC.Data.FastString
 
@@ -639,29 +643,24 @@ lvlMFE env strict_ctxt ann_expr
 
   -- OK, so the float has an unlifted type (not top-level bindable)
   --     and no new value lambdas (float_is_new_lam is False)
-  -- Try for the boxing strategy
+  -- Try for the boxing strategy: box the value, float the box, and unbox at
+  -- each use site.
   -- See Note [Floating MFEs of unlifted type]
   | escapes_value_lam
   , not expr_ok_for_spec -- Boxing/unboxing isn't worth it for cheap expressions
                          -- See Note [Test cheapness with exprOkForSpeculation]
-  , BI_Box { bi_data_con = box_dc, bi_inst_con = boxing_expr
-           , bi_boxed_type = box_ty } <- boxingDataCon expr_ty
-  , let [bx_bndr, ubx_bndr] = mkTemplateLocals [box_ty, expr_ty]
-  = do { expr1 <- lvlExpr rhs_env ann_expr
-       ; let l1r       = incMinorLvlFrom rhs_env
-             float_rhs = mkLams abs_vars_w_lvls $
-                         Case expr1 (stayPut l1r ubx_bndr) box_ty
-                             [Alt DEFAULT [] (App boxing_expr (Var ubx_bndr))]
+  = case repBoxingInfo (getRuntimeRep expr_ty) of
+      -- Lifted expressions were floated without boxing by the
+      -- 'exprIsTopLevelBindable' case above.
+      BoxLifted -> pprPanic "lvlMFE: boxing a lifted expression" (ppr expr)
 
-       ; var <- newLvlVar float_rhs NotJoinPoint
-       ; let l1u      = incMinorLvlFrom env
-             use_expr = Case (mkVarApps (Var var) abs_vars)
-                             (stayPut l1u bx_bndr) expr_ty
-                             [Alt (DataAlt box_dc) [stayPut l1u ubx_bndr] (Var ubx_bndr)]
-       ; return (Let (NonRec (TB var (FloatMe dest_lvl)) float_rhs)
-                     use_expr) }
+      -- We don't box unboxed tuples or sums; it's better to float their
+      -- components individually. See Note [Floating MFEs of unlifted type]
+      BoxComponents {} -> lvlExpr env ann_expr
 
-  | otherwise          -- e.g. do not float unboxed tuples
+      BoxWithDataCon box_dc fld_ty -> box_and_float box_dc fld_ty
+
+  | otherwise
   = lvlExpr env ann_expr
 
   where
@@ -709,6 +708,36 @@ lvlMFE env strict_ctxt ann_expr
                 && (   not strict_ctxt                     -- (a)
                     || is_hnf                              -- (b)
                     || (is_bot_lam && escapes_value_lam))  -- (c)
+
+
+    -- Box the expression with the boxing data constructor 'box_dc', float
+    -- the box, and unbox it at the use site.
+    box_and_float :: DataCon -> Type -> LvlM LevelledExpr
+    box_and_float box_dc fld_ty
+      = do { expr1 <- lvlExpr rhs_env ann_expr
+           ; let box_ty   = mkTyConTy (dataConTyCon box_dc)
+                 -- The boxing data constructor stores acanonical type, so we
+                 -- cast using 'mkCanonicalCo'.
+                 -- See Note [The canonical type of a RuntimeRep] in GHC.Core.Make.Box.
+                 canon_co = mkCanonicalCo expr_ty  -- expr_ty ~R# fld_ty
+                 [bx_bndr, ubx_bndr, fld_bndr] = mkTemplateLocals [box_ty, expr_ty, fld_ty]
+                 l1r       = incMinorLvlFrom rhs_env
+                 float_rhs = mkLams abs_vars_w_lvls $
+                             Case expr1 (stayPut l1r ubx_bndr) box_ty
+                                 [Alt DEFAULT [] (mkConApp box_dc [Var ubx_bndr `mk_cast` canon_co])]
+
+           ; var <- newLvlVar float_rhs NotJoinPoint
+           ; let l1u      = incMinorLvlFrom env
+                 use_expr = Case (mkVarApps (Var var) abs_vars)
+                                 (stayPut l1u bx_bndr) expr_ty
+                                 [Alt (DataAlt box_dc) [stayPut l1u fld_bndr]
+                                      (Var fld_bndr `mk_cast` mkSymMCo canon_co)]
+           ; return (Let (NonRec (TB var (FloatMe dest_lvl)) float_rhs)
+                         use_expr) }
+      where
+        mk_cast :: LevelledExpr -> MCoercionR -> LevelledExpr
+        mk_cast e MRefl    = e
+        mk_cast e (MCo co) = Cast e co
 
 hasFreeJoin :: LevelEnv -> DVarSet -> Bool
 -- Has a free join point which is not being floated to top level.
@@ -966,7 +995,7 @@ Even if we floated 'j' to top level, (b) would still hold.
 Bottom line: never float a MFE that has a free JoinId.
 
 Note [Floating MFEs of unlifted type]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have
    case f x of (r::Int#) -> blah
 we'd like to float (f x). But it's not trivial because it has type
@@ -977,22 +1006,11 @@ and replace the original (f x) with
    case (case y of I# r -> r) of r -> blah
 
 Being able to float unboxed expressions is sometimes important; see #12603.
-I'm not sure how /often/ it is important, but it's not hard to achieve.
+I'm not sure how /often/ it is important, but it's not hard to achieve:
+See Note [Boxing constructors] in GHC.Builtin.WiredIn.Types.Box.
 
-We only do it for a fixed collection of types for which we have a
-convenient boxing constructor (see boxingDataCon_maybe).  In
-particular we /don't/ do it for unboxed tuples; it's better to float
-the components of the tuple individually.
-
-I did experiment with a form of boxing that works for any type, namely
-wrapping in a function.  In our example
-
-   let y = case f x of r -> \v. f x
-   in case y void of r -> blah
-
-It works fine, but it's 50% slower (based on some crude benchmarking).
-I suppose we could do it for types not covered by boxingDataCon_maybe,
-but it's more code and I'll wait to see if anyone wants it.
+Note that we /don't/ box unboxed tuples or sums; it's better to float their
+components individually.
 
 Note [Test cheapness with exprOkForSpeculation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

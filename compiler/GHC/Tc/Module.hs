@@ -100,7 +100,7 @@ import GHC.Iface.Env     ( externaliseName )
 import GHC.Iface.Load
 
 import GHC.Builtin.WiredIn.Types ( mkListTy, anyTypeOfKind )
-import GHC.Builtin.Modules( mAIN_NAME, gHC_PRIM, rOOT_MAIN )
+import GHC.Builtin.Modules( mAIN_NAME, gHC_PRIM, rOOT_MAIN, isWiredInOnlyModule )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
 import GHC.Builtin
@@ -359,6 +359,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                  $ do { -- Compare hi-boot iface (if any) with the real thing
                         -- Must be done after processing the exports
                         tcg_env <- checkHiBootIface tcg_env boot_info
+                      ; checkWiredInOnlyModule tcg_env
                       ; -- The new type env is already available to stuff
                         -- slurped from interface files, via syncTypeEnvKnotVars,
                         -- itself called by tcRnSrcDecls. It's important that this
@@ -1854,6 +1855,19 @@ tcTyClsInstDecls tycl_decls deriv_decls default_decls binds
 *                                                                      *
 ************************************************************************
 -}
+
+-- | A module consisting solely of wired-in declarations must not define
+-- instances or rules: GHC never loads its interface to look for them.
+-- See Note [Loading instances for wired-in things] in GHC.Iface.Load.
+checkWiredInOnlyModule :: TcGblEnv -> TcM ()
+checkWiredInOnlyModule tcg_env
+  | isWiredInOnlyModule (tcg_mod tcg_env)
+  , not (null (tcg_insts tcg_env) && null (tcg_fam_insts tcg_env) && null (tcg_rules tcg_env))
+  = pprPanic "checkWiredInOnlyModule" $
+      vcat [ ppr (tcg_mod tcg_env) <+> text "must not declare instances or rules."
+           , text "See Note [Loading instances for wired-in things] in GHC.Iface.Load." ]
+  | otherwise
+  = return ()
 
 checkMainType :: TcGblEnv -> TcRn WantedConstraints
 -- If this is the Main module, and it defines a function main,
