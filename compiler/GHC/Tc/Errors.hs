@@ -481,7 +481,8 @@ reportImplic ctxt implic@(Implic { ic_skols  = tvs
     ctxt' = ctxt1 { cec_tidy     = env1
                   , cec_encl     = implic' : cec_encl ctxt
 
-                  , cec_suppress = insoluble || cec_suppress ctxt
+-- NO LONGER NEEDED
+--                   , cec_suppress =  cec_suppress ctxt
                         -- Suppress inessential errors if there
                         -- are insolubles anywhere in the
                         -- tree rooted here, or we've come across
@@ -572,8 +573,9 @@ mkErrorItem ct
                             , ei_suppress  = suppressCtError ev }}
 
 -- | Actually report this 'ErrorItem'.
-unsuppressErrorItem :: ErrorItem -> ErrorItem
-unsuppressErrorItem ei = ei { ei_suppress = False }
+-- NOT NEEDED ANY MORE
+--unsuppressErrorItem :: ErrorItem -> ErrorItem
+-- unsuppressErrorItem ei = ei { ei_suppress = False }
 
 -- | Should we completely ignore this constraint in error reporting?
 -- It *must* be the case that any constraint for which this returns True
@@ -647,19 +649,23 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
   | isEmptyWC wc
   = traceTc "reportWanteds empty WC" empty
   | otherwise
-  = do { tidy_items1 <- mapMaybeM mkErrorItem tidy_cts
+  = do { let tidy_cts  = bagToList (mapBag (tidyCt env)           simples)
+             tidy_errs = bagToList (mapBag (tidyDelayedError env) errs)
+
+       ; tidy_items1 <- mapMaybeM mkErrorItem tidy_cts
 
          -- Catch an awkward (and probably rare) case in which /all/ errors are
          -- suppressed: see (SCE3) in Note [ei_suppress: suppressing confusing errors]
-       ; errs_already <- ifErrsM (return True) (return False)
+--       ; errs_already <- ifErrsM (return True) (return False)
        ; let tidy_items
-               | not errs_already                     -- Have not already reported an error (perhaps
-                                                      --   from an outer implication); see #21405
-               , not (any ignoreConstraint simples)   -- No error is ignorable (is reported elsewhere)
-               , all ei_suppress tidy_items1          -- All errors are suppressed
-               = map unsuppressErrorItem tidy_items1
-
-               | otherwise
+-- NO LONGER NEEDED
+--               | not errs_already                     -- Have not already reported an error (perhaps
+--                                                      --   from an outer implication); see #21405
+--               , not (any ignoreConstraint simples)   -- No error is ignorable (is reported elsewhere)
+--               , all ei_suppress tidy_items1          -- All errors are suppressed
+--               = map unsuppressErrorItem tidy_items1
+--
+--               | otherwise
                = tidy_items1
 
        ; traceTc "reportWanteds 1" (vcat [ text "Simples =" <+> ppr simples
@@ -668,23 +674,20 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
                                          , text "tidy_items1 =" <+> ppr tidy_items1
                                          , text "tidy_errs =" <+> ppr tidy_errs ])
 
-         -- First, deal with any out-of-scope errors:
-       ; let (out_of_scope, other_holes, not_conc_errs, mult_co_errs) = partition_errors tidy_errs
+       ; let (out_of_scope, other_holes, not_conc_errs, mult_co_errs)
+                = partition_errors tidy_errs
+
                -- Don't suppress out-of-scope errors
                -- See (SLIE0) in Note [cec_suppress: suppressing less-important error messages]
-             ctxt_for_scope_errs = ctxt { cec_suppress = False }
+--              ctxt_for_scope_errs = ctxt { cec_suppress = False }
+
+         -- First, deal with any out-of-scope errors:
        ; (_, no_out_of_scope) <- askNoErrs $
-                                 reportHoles tidy_items ctxt_for_scope_errs out_of_scope
+                                 reportHoles ctxt tidy_items out_of_scope
 
-         -- Next, deal with things that are utterly wrong
-         -- These should not be suppressed by the incoming context
-         -- (but should be suppressed by out-of-scope errors)
-         -- See (SLIE0) in Note [cec_suppress: suppressing less-important error messages]
-       ; let ctxt_for_insols = ctxt { cec_suppress = not no_out_of_scope }
-
-       -- Don't suppress holes or concreteness errors unless we have scope errors
-       ; reportHoles tidy_items ctxt_for_insols other_holes
-       ; reportNotConcreteErrs  ctxt_for_insols not_conc_errs
+       -- Don't suppress holes or concreteness errors, ever
+       ; reportHoles ctxt tidy_items other_holes
+       ; reportNotConcreteErrs ctxt not_conc_errs
 
        -- We only want to report multiplicity coercion errors for multiplicity
        -- constraints which are /solved/ with a non-reflexivity coercion. We
@@ -692,29 +695,45 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
        -- when /all/ other constraints are solved.
        -- See wrinkle (DME1) in Note [Coercion errors in tcSubMult] in GHC.Tc.Utils.Unify.
        ; when (null simples) $
-         reportMultiplicityCoercionErrs ctxt_for_insols mult_co_errs
+         reportMultiplicityCoercionErrs ctxt mult_co_errs
 
        -- Now the constraints that give serious errors
        -- Like Int ~ Bool (incl nullary TyCons)
        -- or   Int ~ t a  (AppTy on one side)
-       ; (items1, no_serious_errs)
+       --
+       -- First visible ones, then invisible ones; but all serious
+       ; let suppress_insols = not no_out_of_scope
+                -- Serious errors are not suppressed by cec_suppress,
+                -- hence not including cec_suppress in suppress_insols
+                -- See (SLIE0) in Note [cec_suppress: suppressing less-important
+                --             error messages]
+             (vis_items, invis_items)
+                = partition (isVisibleOrigin . errorItemOrigin) tidy_items
+
+       ; (vis_items1, no_vis_serious_errs)
             <- askNoErrs $
-               tryReporters ctxt_for_insols serious_reporters tidy_items
+               tryReporters ctxt suppress_insols serious_reporters vis_items
+
+       ; let suppress_invis = suppress_insols || not no_vis_serious_errs
+       ; (invis_items1, no_invis_serious_errs)
+            <- askNoErrs $
+               tryReporters ctxt suppress_invis serious_reporters invis_items
 
        -- Now take account of the inherited cec_suppress, and augment it
        -- to suppress further errors if we have found any serious errors locally
-       ; let suppress_for_rest = cec_suppress ctxt
-                                 || not no_out_of_scope
-                                 || not no_serious_errs
-             ctxt_for_rest = ctxt { cec_suppress = suppress_for_rest }
+       ; let suppress_rest = cec_suppress ctxt
+                             || suppress_invis
+                             || not no_invis_serious_errs
 
        -- Next, deal with the less-serious constraints
-       ; leftovers <- tryReporters ctxt_for_rest less_serious_reporters items1
+       ; leftovers <- tryReporters ctxt suppress_rest less_serious_reporters $
+                      (vis_items1 ++ invis_items1)
        ; massertPpr (null leftovers)
            (text "The following unsolved Wanted constraints \
                  \have not been reported to the user:"
            $$ ppr leftovers)
 
+       ; let ctxt_for_rest = ctxt { cec_suppress = suppress_rest }
        ; mapBagM_ (reportImplic ctxt_for_rest) implics
             -- NB ctxt2: don't suppress inner insolubles if there's only a
             -- wanted insoluble here; but do suppress inner insolubles
@@ -722,8 +741,6 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
        }
  where
     env       = cec_tidy ctxt
-    tidy_cts  = bagToList (mapBag (tidyCt env)           simples)
-    tidy_errs = bagToList (mapBag (tidyDelayedError env) errs)
 
     partition_errors :: [DelayedError] -> ([Hole], [Hole], [NotConcreteError], [(TcCoercion, CtLoc)])
     partition_errors []
@@ -747,14 +764,14 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
       = [ -- We put implicit lifting errors first, because are solid errors
           -- See "Implicit lifting" in GHC.Tc.Gen.Splice
           -- Note [Lifecycle of an untyped splice, and PendingRnSplice]
-          ("implicit lifting", is_implicit_lifting, True, mkImplicitLiftingReporter)
+          ("implicit lifting", is_implicit_lifting, mkImplicitLiftingReporter)
 
         -- Next, solid equality errors
-        , given_eq_spec
-        , ("insoluble2",      utterly_wrong,  True, mkGroupReporter mkEqErr)
-        , ("skolem eq1",      very_wrong,     True, mkSkolReporter)
-        , ("FixedRuntimeRep", is_FRR,         True, mkGroupReporter mkFRRErr)
-        , ("skolem eq2",      skolem_eq,      True, mkSkolReporter)
+        , ("given_eq",        is_given_eq,   mkGivenErrorReporter)
+        , ("insoluble2",      utterly_wrong, mkGroupReporter mkEqErr)
+        , ("skolem eq1",      very_wrong,    mkSkolReporter)
+        , ("FixedRuntimeRep", is_FRR,        mkGroupReporter mkFRRErr)
+        , ("skolem eq2",      skolem_eq,     mkSkolReporter)
 
         -- Next, custom type errors
         -- See Note [Custom type errors in constraints] in GHC.Tc.Types.Constraint
@@ -770,29 +787,29 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
         -- we want to report it as a custom error, /not/ as a mis-match
         -- between TypeError and ()!  Also see the Assert example
         -- in Note [Custom type errors in constraints]
-        , ("custom_error", is_user_type_error, True,  mkUserTypeErrorReporter)
+        , ("custom_error", is_user_type_error,  mkUserTypeErrorReporter)
            -- (Handles TypeError and Unsatisfiable)
 
         -- "non-tv-eq": equalities (ty1 ~ ty2) where ty1 is not a tyvar
-        , ("non-tv eq",       non_tv_eq,      True, mkSkolReporter)
+        , ("non-tv eq",       non_tv_eq, mkSkolReporter)
 
             -- The only remaining equalities are alpha ~ ty,
             -- where alpha is untouchable; and representational equalities
             -- Prefer homogeneous equalities over hetero, because the
             -- former might be holding up the latter.
             -- See Note [Equalities with heterogeneous kinds] in GHC.Tc.Solver.Equality
-        , ("Homo eqs",      is_homo_equality,  True,  mkGroupReporter mkEqErr)
-        , ("Other eqs",     is_equality,       True,  mkGroupReporter mkEqErr)
+        , ("Homo eqs",      is_homo_equality, mkGroupReporter mkEqErr)
+        , ("Other eqs",     is_equality,      mkGroupReporter mkEqErr)
 
-        , ("Insoluble fundeps", is_insoluble, True, mkGroupReporter mkDictErr)
+        , ("Insoluble fundeps", is_insoluble, mkGroupReporter mkDictErr)
         ]
 
     -- less_serious_reporters: we suppress these if have already
     -- reported a serious error, higher in the tree
     less_serious_reporters
-      = [ ("Irreds",          is_irred,        False, mkGroupReporter mkIrredErr)
-        , ("Dicts",           is_dict,         False, mkGroupReporter mkDictErr)
-        , ("Quantified",      is_qc,           False, mkGroupReporter mkQCErr) ]
+      = [ ("Irreds",          is_irred, mkGroupReporter mkIrredErr)
+        , ("Dicts",           is_dict,  mkGroupReporter mkDictErr)
+        , ("Quantified",      is_qc,    mkGroupReporter mkQCErr) ]
 
     -- rigid_nom_eq, rigid_nom_tv_eq,
     is_dict, is_equality, is_FRR, is_irred :: ErrorItem -> Pred -> Bool
@@ -856,30 +873,6 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
 
     is_qc _ (ForAllPred {}) = True
     is_qc _ _               = False
-
-    given_eq_spec  -- See Note [Given errors]
-      | has_gadt_match_here
-      = ("insoluble1a", is_given_eq, True,  mkGivenErrorReporter)
-      | otherwise
-      = ("insoluble1b", is_given_eq, False, ignoreErrorReporter)
-          -- False means don't suppress subsequent errors
-          -- Reason: we don't report all given errors
-          --         (see mkGivenErrorReporter), and we should only suppress
-          --         subsequent errors if we actually report this one!
-          --         #13446 is an example
-
-    -- See Note [Given errors]
-    has_gadt_match_here = has_gadt_match (cec_encl ctxt)
-    has_gadt_match [] = False
-    has_gadt_match (implic : implics)
-      | PatSkol {} <- ic_info implic
-      , ic_given_eqs implic /= NoGivenEqs
-      , ic_warn_inaccessible implic
-          -- Don't bother doing this if -Winaccessible-code isn't enabled.
-          -- See Note [Avoid -Winaccessible-code when deriving] in GHC.Tc.TyCl.Instance.
-      = True
-      | otherwise
-      = has_gadt_match implics
 
 ---------------
 isSkolemTy :: TcLevel -> Type -> Bool
@@ -1039,7 +1032,6 @@ type Reporter
 type ReporterSpec
   = ( String                      -- Name
     , ErrorItem -> Pred -> Bool  -- Pick these ones
-    , Bool                        -- True <=> suppress subsequent reporters
     , Reporter)                   -- The reporter itself
 
 mkSkolReporter :: Reporter
@@ -1058,9 +1050,12 @@ mkSkolReporter ctxt items
        | eq_lhs_type   item1 item2 = True
        | otherwise                 = False
 
-reportHoles :: [ErrorItem]  -- other (tidied) constraints
-            -> SolverReportErrCtxt -> [Hole] -> TcM ()
-reportHoles tidy_items ctxt holes
+reportHoles :: SolverReportErrCtxt
+            -> [ErrorItem]  -- Other (tidied) constraints
+            -> [Hole]       -- Holes to report
+            -> TcM ()
+-- Ignores cec_suppress
+reportHoles ctxt tidy_items holes
   = do
       diag_opts <- initDiagOpts <$> getDynFlags
       let severity = diagReasonSeverity diag_opts (cec_type_holes ctxt)
@@ -1115,6 +1110,7 @@ zonkTidyTcLclEnvs tidy_env lcls = foldM go (tidy_env, emptyNameEnv) (concatMap c
                 return (tidy_env',  extendNameEnv name_env name tidy_ty)
 
 reportNotConcreteErrs :: SolverReportErrCtxt -> [NotConcreteError] -> TcM ()
+-- Ignores cec_suppress
 reportNotConcreteErrs _ [] = return ()
 reportNotConcreteErrs ctxt errs@(err0:_)
   = do { msg <- mkErrorReport (ctLocEnv (nce_loc err0)) diag (Just ctxt) [] []
@@ -1218,15 +1214,10 @@ mkImplicitLiftingReporter ctxt
 
 mkGivenErrorReporter :: Reporter
 -- See Note [Given errors]
-mkGivenErrorReporter ctxt (item:|_)
+mkGivenErrorReporter ctxt items@(item:|_)
+  | Just implic <- has_gadt_match (cec_encl ctxt)
   = do { (ctxt, relevant_binds, item) <- relevantBindings True ctxt item
-       ; let implic =
-               case cec_encl ctxt of
-                -- cec_encl is always non-empty when mkGivenErrorReporter is called
-                 outer_implic:_ -> outer_implic
-                 _ -> pprPanic "mkGivenErrorReporter" (ppr item)
-
-             loc'  = setCtLocEnv (ei_loc item) (ic_env implic)
+       ; let loc'  = setCtLocEnv (ei_loc item) (ic_env implic)
              item' = item { ei_loc = loc' }
                    -- For given constraints we overwrite the env (and hence src-loc)
                    -- with one from the immediately-enclosing implication.
@@ -1234,18 +1225,29 @@ mkGivenErrorReporter ctxt (item:|_)
 
        ; eq_err_msg <- mkEqErr_help ctxt item' ty1 ty2
        ; let msg = TcRnInaccessibleCode implic (SolverReportWithCtxt ctxt eq_err_msg)
-       ; msg <- mkErrorReport (ctLocEnv loc') msg (Just ctxt) [SupplementaryBindings relevant_binds] []
+       ; msg <- mkErrorReport (ctLocEnv loc') msg (Just ctxt)
+                      [SupplementaryBindings relevant_binds] []
        ; reportDiagnostic msg }
-  where
-    (ty1, ty2)   = getEqPredTys (errorItemPred item)
 
-ignoreErrorReporter :: Reporter
--- Discard Given errors that don't come from
--- a pattern match; maybe we should warn instead?
-ignoreErrorReporter ctxt items
+  | otherwise  -- Discard Given errors that don't come from
+               -- a pattern match; maybe we should warn instead?
   = do { traceTc "mkGivenErrorReporter no" (ppr items $$ ppr (cec_encl ctxt))
        ; return () }
 
+  where
+    (ty1, ty2)   = getEqPredTys (errorItemPred item)
+
+    has_gadt_match :: [Implication] -> Maybe Implication
+    has_gadt_match [] = Nothing
+    has_gadt_match (implic : implics)
+      | PatSkol {} <- ic_info implic
+      , ic_given_eqs implic /= NoGivenEqs
+      , ic_warn_inaccessible implic
+          -- Don't bother doing this if -Winaccessible-code isn't enabled.
+          -- See Note [Avoid -Winaccessible-code when deriving] in GHC.Tc.TyCl.Instance.
+      = Just implic
+      | otherwise
+      = has_gadt_match implics
 
 {- Note [Given errors]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -1427,31 +1429,29 @@ mkErrorTerm ct_loc ty ctxt msg supp hints
 
        ; return $ evDelayedError ty err_str }
 
-tryReporters :: SolverReportErrCtxt -> [ReporterSpec] -> [ErrorItem]
+tryReporters :: SolverReportErrCtxt
+             -> Bool              -- Suppress errors if this is True
+                                  -- (over-riding cec_suppress)
+             -> [ReporterSpec]
+             -> [ErrorItem]
              -> TcM [ErrorItem]
 -- Use the first reporter in the list whose predicate says True
-tryReporters ctxt reporters items
-  = do { let (vis_items, invis_items) = partition (isVisibleOrigin . errorItemOrigin) items
-       ; traceTc "tryReporters {" (ppr vis_items $$ ppr invis_items)
-       ; items' <- go reporters vis_items invis_items
+tryReporters ctxt suppress reporters items
+  = do { traceTc "tryReporters {" (ppr items)
+       ; items' <- go reporters items
        ; traceTc "tryReporters }" (ppr items')
        ; return items' }
   where
-    go [] vis_items invis_items
-      = return (vis_items ++ invis_items)
-
-    go (r : rs) vis_items invis_items
-       -- Always look at *visible* Origins before invisible ones
-       -- this is the whole point of isVisibleOrigin
-      = do { vis_items'   <- tryReporter ctxt  r vis_items
-           ; invis_items' <- tryReporter ctxt r invis_items
-           ; go rs vis_items' invis_items' }
-                -- Carry on with the rest, because we must make
-                -- deferred bindings for them if we have -fdefer-type-errors
-                -- But suppress their error messages
+    -- Use `suppress` to set the `cec_supress` flag for these items
+    ctxt_w_suppress = ctxt { cec_suppress = suppress }
+    go []     items = return items
+    go (r:rs) items = do { items' <- tryReporter ctxt_w_suppress r items
+                         ; go rs items' }
+                      -- Carry on with the rest, because we must make
+                      -- deferred bindings for them if we have -fdefer-type-errors
 
 tryReporter :: SolverReportErrCtxt -> ReporterSpec -> [ErrorItem] -> TcM [ErrorItem]
-tryReporter ctxt (str, keep_me,  _, reporter) items = case nonEmpty yeses of
+tryReporter ctxt (str, keep_me, reporter) items = case nonEmpty yeses of
     Nothing -> return items
     Just yeses -> do
        { traceTc "tryReporter{ " (text str <+> ppr yeses)
