@@ -134,6 +134,11 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries hpc_info
            "Proto-BCOs" FormatByteCode
            (vcat (intersperse (char ' ') (map ppr $ elemsFlatBag proto_bcos)))
 
+        -- See Note [Join points as labels]
+        putDumpFileMaybe logger Opt_D_dump_BCOs
+           "Join points" FormatText
+           (joinPointStats (profilePlatform profile) dflags binds)
+
         let mod_breaks = case mb_modBreaks of
              Nothing -> Nothing
              Just mb -> Just $ mkInternalModBreaks this_mod breakInfo mb
@@ -1548,6 +1553,176 @@ doCase d s p scrut bndr alts
                        [rep] -> rep
                        _     -> panic "schemeE(StgCase).push_alts"
                  in return (PUSH_ALTS alt_bco scrut_rep `consOL` scrut_code)
+
+-- -----------------------------------------------------------------------------
+-- Join points as labels: eligibility analysis
+-- See Note [Join points as labels]
+
+-- | Whether a join point binding can be compiled as a label, and if not, why.
+data JoinPointVerdict
+  = JoinAsLabel
+  | JoinRejectBreakpoints   -- ^ breakpoints are enabled
+  | JoinRejectConRhs        -- ^ the RHS is a constructor application
+  | JoinRejectRecGroup      -- ^ a group of several (mutually) recursive join points
+  | JoinRejectRecursive !Bool
+    -- ^ self-recursive; 'True' if it would be eligible otherwise
+  | JoinRejectCrossBco      -- ^ some jump would be emitted into another BCO
+  deriving Eq
+
+-- | The verdict for the join point binding of @let-no-escape bind in body@.
+joinPointVerdict :: Platform -> DynFlags -> CgStgBinding -> CgStgExpr
+                 -> JoinPointVerdict
+joinPointVerdict platform dflags bind body
+  | gopt Opt_InsertBreakpoints dflags = JoinRejectBreakpoints
+  | otherwise = case bind of
+      StgNonRec _ StgRhsCon{} -> JoinRejectConRhs
+      StgNonRec j (StgRhsClosure _ _ _ params rhs_body _)
+        | exprMentions j rhs_body
+        -> JoinRejectRecursive (stays j params body && stays j params rhs_body)
+        | stays j params body
+        -> JoinAsLabel
+        | otherwise
+        -> JoinRejectCrossBco
+      -- a self-recursive join point is a singleton group
+      StgRec [(j, StgRhsClosure _ _ _ params rhs_body _)]
+        -> JoinRejectRecursive (stays j params body && stays j params rhs_body)
+      StgRec{} -> JoinRejectRecGroup
+  where
+    stays j params = joinJumpsStayInBco platform dflags j (length params)
+
+-- | Is every occurrence of the join point @j@ in the expression a saturated
+-- jump whose code is emitted into the same BCO as the expression's own code?
+joinJumpsStayInBco :: Platform -> DynFlags -> Id -> Int -> CgStgExpr -> Bool
+joinJumpsStayInBco platform dflags j arity = go
+  where
+    no_mention = not . argMentions j
+    no_rhs_mention = not . bindMentions j
+
+    go e = case e of
+      StgApp f args
+        | f == j    -> length args == arity && all no_mention args
+        | otherwise -> all no_mention args
+      StgLit{} -> True
+      StgConApp _ _ args _ -> all no_mention args
+      StgOpApp _ args _ -> all no_mention args
+      -- no alternatives: the scrutinee is compiled in tail position
+      StgCase scrut _ _ [] -> go scrut
+      StgCase scrut bndr _ alts
+        | exprMentions j scrut -> False
+        | isJust (inlinedCaseScrutinee platform dflags scrut bndr)
+        -> all (go . alt_rhs) alts
+        | otherwise  -- the alternatives go into a continuation BCO
+        -> not (any (exprMentions j . alt_rhs) alts)
+      -- every let-bound RHS is a BCO of its own
+      StgLet _ bind body -> no_rhs_mention bind && go body
+      StgLetNoEscape _ bind body
+        | StgNonRec _ (StgRhsClosure _ _ _ _ rhs_body _) <- bind
+        , JoinAsLabel <- joinPointVerdict platform dflags bind body
+        -- an inner label's body stays in this BCO
+        -> go rhs_body && go body
+        | otherwise
+        -> no_rhs_mention bind && go body
+      StgTick tick body -> not (tickMentions j tick) && go body
+
+-- | Does the variable occur anywhere in the expression, including in closures
+-- and breakpoint free variables?
+exprMentions :: Id -> CgStgExpr -> Bool
+exprMentions j = go
+  where
+    go e = case e of
+      StgApp f args -> f == j || any (argMentions j) args
+      StgLit{} -> False
+      StgConApp _ _ args _ -> any (argMentions j) args
+      StgOpApp _ args _ -> any (argMentions j) args
+      StgCase scrut _ _ alts -> go scrut || any (go . alt_rhs) alts
+      StgLet _ bind body -> bindMentions j bind || go body
+      StgLetNoEscape _ bind body -> bindMentions j bind || go body
+      StgTick tick body -> tickMentions j tick || go body
+
+bindMentions :: Id -> CgStgBinding -> Bool
+bindMentions j bind = any rhs_mentions (bindRhss bind)
+  where
+    rhs_mentions (StgRhsClosure _ _ _ _ body _) = exprMentions j body
+    rhs_mentions (StgRhsCon _ _ _ _ args _) = any (argMentions j) args
+
+argMentions :: Id -> StgArg -> Bool
+argMentions j (StgVarArg v) = v == j
+argMentions _ StgLitArg{} = False
+
+tickMentions :: Id -> StgTickish -> Bool
+tickMentions j (Breakpoint _ _ fvs) = j `elem` fvs
+tickMentions _ _ = False
+
+bindRhss :: GenStgBinding pass -> [GenStgRhs pass]
+bindRhss (StgNonRec _ rhs) = [rhs]
+bindRhss (StgRec pairs) = map snd pairs
+
+-- | Per-module counts of join point verdicts, for -ddump-bcos.
+joinPointStats :: Platform -> DynFlags -> [CgStgTopBinding] -> SDoc
+joinPointStats platform dflags binds =
+  text "join points:" <+> int (length verdicts) <+> text "total,"
+    <+> number (== JoinAsLabel) <+> text "eligible (v1),"
+    <+> number isRecursive <+> text "rejected-recursive"
+    <+> parens (number (== JoinRejectRecursive True) <+> text "otherwise eligible") <> comma
+    <+> number (== JoinRejectRecGroup) <+> text "rejected-rec-group,"
+    <+> number (== JoinRejectConRhs) <+> text "rejected-con-rhs,"
+    <+> number (== JoinRejectBreakpoints) <+> text "rejected-breakpoint,"
+    <+> number (== JoinRejectCrossBco) <+> text "rejected-cross-BCO"
+  where
+    number p = int (count p verdicts)
+    isRecursive JoinRejectRecursive{} = True
+    isRecursive _ = False
+
+    -- one verdict per binder
+    verdicts = concatMap top binds
+    top StgTopStringLit{} = []
+    top (StgTopLifted bind) = concatMap rhs (bindRhss bind)
+
+    rhs (StgRhsClosure _ _ _ _ body _) = expr body
+    rhs StgRhsCon{} = []
+
+    expr e = case e of
+      StgApp{} -> []
+      StgLit{} -> []
+      StgConApp{} -> []
+      StgOpApp{} -> []
+      StgCase scrut _ _ alts -> expr scrut ++ concatMap (expr . alt_rhs) alts
+      StgLet _ bind body -> concatMap rhs (bindRhss bind) ++ expr body
+      StgLetNoEscape _ bind body ->
+        replicate (length (bindRhss bind)) (joinPointVerdict platform dflags bind body)
+          ++ concatMap rhs (bindRhss bind) ++ expr body
+      StgTick _ body -> expr body
+
+{-
+Note [Join points as labels]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A join point ('StgLetNoEscape') is currently compiled like any other let: a
+heap closure with a BCO of its own, entered at every jump. When all its jumps
+are emitted into the BCO containing its definition, it could instead be a
+label in that BCO, and each jump a SLIDE and JMP. This is work in progress:
+so far only the eligibility analysis exists ('joinPointVerdict'), and its
+results are counted in the "join points" line of -ddump-bcos.
+
+A binding @let-no-escape j = \params -> rhs in body@ is eligible if
+
+  * breakpoints are disabled. The optimisation is simply switched off with
+    -fbreak-points: breakpoint wrappers can bury jumps in closures (see
+    Note [Join points and bytecode preparation] in GHC.Stg.BcPrep), a
+    breakpoint at the start of the join point's RHS would need a BRK_FUN in
+    the middle of a BCO, and in practice the simplifier creates hardly any
+    join points when breakpoints are enabled;
+  * the RHS is a closure, not a constructor application;
+  * it is not recursive, neither a 'StgRec' group nor mentioning j in rhs: a
+    backward jump would be a loop without a safepoint;
+  * every occurrence of j in body is a saturated tail call that is emitted
+    into the current BCO ('joinJumpsStayInBco'). Code goes into another BCO in
+    the RHS of a let, and in the alternatives of a case whose continuation is
+    not inlined. Whether a case is inlined must be decided by the same function
+    as in 'doCase', 'inlinedCaseScrutinee', or the analysis and the code
+    generator could disagree. Occurrences of j anywhere else, e.g. in a closure
+    or in a breakpoint's free variables, make the binding ineligible, even
+    though STG's invariants should rule them out.
+-}
 
 {-
 Note [Inlined case continuations]
