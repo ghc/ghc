@@ -1881,6 +1881,8 @@ dynamic_flags_deps = [
       (intSuffix   (\n d -> d { unfoldingOpts = updateCaseThreshold n (unfoldingOpts d)}))
   , make_ord_flag defFlag "funfolding-case-scaling"
       (intSuffix   (\n d -> d { unfoldingOpts = updateCaseScaling n (unfoldingOpts d)}))
+  , make_ord_flag defFlag "funfolding-unknown-call-arg-discount"
+      (intSuffix   (\n d -> d { unfoldingOpts = updateUnknownCallArg n (unfoldingOpts d)}))
 
   , make_dep_flag defFlag "funfolding-keeness-factor"
       (floatSuffix (\_ d -> d))

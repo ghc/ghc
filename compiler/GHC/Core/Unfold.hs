@@ -30,6 +30,7 @@ module GHC.Core.Unfold (
         updateFunAppDiscount, updateDictDiscount,
         updateVeryAggressive, updateCaseScaling,
         updateCaseThreshold, updateReportPrefix,
+        updateUnknownCallArg,
 
         inlineBoringOk, calcUnfoldingGuidance,
         uncondInlineJoin
@@ -42,7 +43,7 @@ import GHC.Core.Utils
 import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Core.Class( Class )
-import GHC.Core.Predicate( isUnaryClass, isDictId )
+import GHC.Core.Predicate( isUnaryClass )
 
 import GHC.Types.Id
 import GHC.Types.Literal
@@ -87,6 +88,9 @@ data UnfoldingOpts = UnfoldingOpts
    , unfoldingCaseScaling :: !Int
       -- ^ Penalize depth with 1/x
 
+   , unfoldingUnknownCallArg :: !Int
+      -- ^ Penalize depth with 1/x
+
    , unfoldingReportPrefix :: !(Maybe String)
       -- ^ Only report inlining decisions for names with this prefix
    }
@@ -121,6 +125,11 @@ defaultUnfoldingOpts = UnfoldingOpts
       -- Penalize depth with (size*depth)/scaling
    , unfoldingCaseScaling = 30
 
+      -- Makes functions more likely to inline if they apply
+      -- a function argument to interesting arguments.
+      -- See Note [Discounting for known-at-callsite function calls]
+   , unfoldingUnknownCallArg = 10
+
       -- Don't filter inlining decision reports
    , unfoldingReportPrefix = Nothing
    }
@@ -148,6 +157,11 @@ updateCaseThreshold n opts = opts { unfoldingCaseThreshold = n }
 
 updateCaseScaling :: Int -> UnfoldingOpts -> UnfoldingOpts
 updateCaseScaling n opts = opts { unfoldingCaseScaling = n }
+
+updateUnknownCallArg :: Int -> UnfoldingOpts -> UnfoldingOpts
+updateUnknownCallArg n opts = opts { unfoldingUnknownCallArg = n }
+
+
 
 updateReportPrefix :: Maybe String -> UnfoldingOpts -> UnfoldingOpts
 updateReportPrefix n opts = opts { unfoldingReportPrefix = n }
@@ -335,6 +349,8 @@ isValFun :: CoreExpr -> Bool
 -- one top-level value lambda
 isValFun (Lam b e) | isRuntimeVar b = True
                    | otherwise      = isValFun e
+isValFun (Cast e _c) = isValFun e
+isValFun (Tick _t e) = isValFun e
 isValFun _                          = False
 
 calcUnfoldingGuidance
@@ -709,10 +725,10 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
            FCallId _                     -> sizeN (callSize (length val_args) voids)
            DataConWorkId dc              -> conSize    dc (length val_args)
            PrimOpId op _                 -> primOpSize op (length val_args)
-           ClassOpId cls _               -> classOpSize opts cls top_args val_args
+           ClassOpId cls _               -> classOpSize opts cls top_args val_args voids
            _ | fun `hasKey` buildIdKey   -> buildSize
              | fun `hasKey` augmentIdKey -> augmentSize
-             | otherwise                 -> funSize opts top_args fun (length val_args) voids
+             | otherwise                 -> funSize opts top_args fun val_args voids
 
     ------------
     size_up_alt (Alt _con _bndrs rhs) = size_up rhs `addSizeN` 10
@@ -777,11 +793,11 @@ litSize _other = 0    -- Must match size of nullary constructors
                       -- Key point: if  x |-> 4, then x must inline unconditionally
                       --            (eg via case binding)
 
-classOpSize :: UnfoldingOpts -> Class -> [Id] -> [CoreExpr] -> ExprSize
+classOpSize :: UnfoldingOpts -> Class -> [Id] -> [CoreExpr] -> Int -> ExprSize
 -- See (IA1) in Note [Interesting arguments] in GHC.Core.Opt.Simplify.Utils
-classOpSize _opts _cls _top_args []
+classOpSize _opts _cls _top_args [] _voids
   = sizeZero   -- A non-applied classop
-classOpSize opts cls top_args (dict_arg:other_val_args)
+classOpSize opts cls top_args (dict_arg:other_val_args) voids
   = SizeIs size dict_arg_discount 0
   where
     -- See (UCM4) in Note [Unary class magic] in GHC.Core.TyCon
@@ -789,7 +805,7 @@ classOpSize opts cls top_args (dict_arg:other_val_args)
 
     -- Size penalty for applying the extracted class method to it's
     -- arguments.
-    method_app_size = (10 * length other_val_args)
+    method_app_size = callSize (length other_val_args) voids
 
     size = op_app_size + method_app_size
 
@@ -809,14 +825,8 @@ classOpSize opts cls top_args (dict_arg:other_val_args)
     dict_discount
       | null other_val_args = unfoldingDictDiscount opts
       | otherwise           = unfoldingDictDiscount opts + unfoldingFunAppDiscount opts +
-                                -- Just trying things.
-                                5 * numTopDictArgs
-    numTopDictArgs = (count (isTopArgDict) other_val_args)
-    isTopArgDict expr
-      | Just v <- getIdFromTrivialExpr_maybe expr
-      , v `elem` top_args
-      = isDictId v
-      | otherwise = False
+                                -- See Note [Discounting for known-at-callsite function calls]
+                              unknownFunArgDiscount opts top_args other_val_args
 
 -- | The size of a function call
 callSize
@@ -842,12 +852,13 @@ jumpSize _n_val_args _voids = 0   -- Jumps are small, and we don't want penalise
   -- spectral/puzzle. TODO Perhaps adjusting the default threshold would be a
   -- better solution?
 
-funSize :: UnfoldingOpts -> [Id] -> Id -> Int -> Int -> ExprSize
+funSize :: UnfoldingOpts -> [Id] -> Id -> [CoreExpr] -> Int -> ExprSize
 -- Size for function calls where the function is not a constructor or primops
 -- Note [Function applications]
-funSize opts top_args fun n_val_args voids
+funSize opts top_args fun val_args voids
   | otherwise = SizeIs size arg_discount res_discount
   where
+    n_val_args = length val_args
     some_val_args = n_val_args > 0
     is_join = isJoinId fun
 
@@ -855,10 +866,14 @@ funSize opts top_args fun n_val_args voids
          | not some_val_args    = 0
          | otherwise            = callSize n_val_args voids
 
+    fun_discount
+      | fun `elem` top_args = unfoldingFunAppDiscount opts + unknownFunArgDiscount opts top_args val_args
+      | otherwise = unfoldingFunAppDiscount opts
+
         --                  DISCOUNTS
         --  See Note [Function and non-function discounts]
     arg_discount | some_val_args && fun `elem` top_args
-                 = unitBag (fun, unfoldingFunAppDiscount opts)
+                 = unitBag (fun, fun_discount)
                  | otherwise = emptyBag
         -- If the function is an argument and is applied
         -- to some values, give it an arg-discount
@@ -880,7 +895,64 @@ conSize dc n_val_args
 -- See Note [Constructor size and result discount]
   | otherwise = SizeIs 10 emptyBag 10
 
-{- Note [Constructor size and result discount]
+-- See Note [Discounting for known-at-callsite function calls]
+unknownFunArgDiscount :: UnfoldingOpts -> [Id] -> [CoreExpr] -> Int
+unknownFunArgDiscount opts top_args args = sum (map arg_discount args)
+  where
+    arg_discount arg
+      | interestingArg arg = unfoldingUnknownCallArg opts
+      | otherwise          = 0
+
+    -- Little brother to the simplifier's interestingArg.
+    -- Use trivial_expr_fold to look through casts, ticks and type applications,
+    -- in a principled manner.
+    interestingVar v = v `elem` top_args || exprIsConLike (Var v)
+    interestingArg = trivial_expr_fold interestingVar (const True) False True
+
+{-
+Note [Discounting for known-at-callsite function calls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A regular unknown function call `f x y` inside some function `foo` provides no
+optimization opportunities to improve `foo` no matter what shape x and y have.
+
+However we might have a pattern where a function argument is applied to
+interesting arguments like:
+
+    foo f g x = ... f x ... g g ...
+    bar = foo snd snd (1,2)
+
+Here we really want to inline `foo`, as it will expose `snd` to the tuple, causing
+it to inline and eliminating the tuple allocation completely.
+
+Note that this doesn't always require the function argument itself to be inlined.
+Inlining `foo` will also expose the strictness and W/W properties of foos function
+arguments and allows specConstr to fire on them. There is simple a large number of
+optimizations that can happen for known functions that are impossible for unknown
+calls.
+
+So here is the plan: Whenever the argument to `f` could be useful for optimizing
+`foo` if `f` is a known call we give `f` a discount.
+
+This includes:
+
+* The argument is a top_arg itself. (Think `f id 1` with `f g = g`)
+* The argument is con like: This can help rules, W/W, SpecConstr, further inlining.
+* The argument is a literal: Rules/Inlining
+* The argument is non-trivial:
+    + If it's a thunk strictness might allow eager evaluationg
+    + If it's a pap/lambda we might be able to eta-expand it, removing an intermediate pap
+      or even removing the PAP fully.
+
+However we have to be careful. It's *not* a given that we actually
+get a benefit from inlining such a call into it's context. It fully
+depends on the specific arguments. So we simply make those interesting
+arguments "free" rather charging the usual cost of 10 per applied arg.
+
+Similarly we *only* should give this discount to a unknown call. If the function
+`f` being called inside `foo` is a known function all those optimizations can
+happen inside foo without inlining it into it's call sites.
+
+Note [Constructor size and result discount]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Treat a constructors application as size 10, regardless of how many
 arguments it has; we are keen to expose them (and we charge separately

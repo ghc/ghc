@@ -1654,7 +1654,9 @@ it off at source.
 
 {-# INLINE trivial_expr_fold #-}
 trivial_expr_fold :: (Id -> r) -> (Literal -> r) -> r -> r -> CoreExpr -> r
--- ^ The worker function for Note [exprIsTrivial] and Note [getIdFromTrivialExpr]
+-- ^  k_id k_lit k_triv k_not_triv
+--
+-- The worker function for Note [exprIsTrivial] and Note [getIdFromTrivialExpr]
 -- This is meant to have the code of both functions in one place and make it
 -- easy to derive custom predicates.
 --

@@ -13,3 +13,4 @@ updateDictDiscount      :: Int -> UnfoldingOpts -> UnfoldingOpts
 updateVeryAggressive    :: Bool -> UnfoldingOpts -> UnfoldingOpts
 updateCaseThreshold     :: Int -> UnfoldingOpts -> UnfoldingOpts
 updateCaseScaling       :: Int -> UnfoldingOpts -> UnfoldingOpts
+updateUnknownCallArg    :: Int -> UnfoldingOpts -> UnfoldingOpts

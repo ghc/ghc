@@ -1902,6 +1902,26 @@ as such you shouldn't need to set any of them explicitly. A flag
     recommended. Values in the range 10 <= n <= 20 allow some inlining to take place
     while still allowing GHC to compile modules containing such inlining loops.
 
+.. ghc-flag:: -funfolding-unknown-call-arg-discount=⟨n⟩
+    :shortdesc: *default: 10.* Discount for each interesting arg applied to a unknown function.
+    :type: dynamic
+    :category:
+
+    :default: 10
+
+    .. index::
+       single: inlining, controlling
+       single: unfolding, controlling
+
+    Typically a function like ``foo f x`` is not much more likely to inline if
+    ``f`` is a known argument.
+
+    With this discount being given we make GHC more eager to inline ``foo``
+    if ``f`` is applied to interesting arguments inside the RHS of ``foo``.
+
+    This optimizes cases where other optimizations can fire on the call to ``f``
+    after it has been made a known call by inlining ``foo`` into it's call site.
+
 
 .. ghc-flag:: -fworker-wrapper
     :shortdesc: Enable the worker/wrapper transformation. Implied by :ghc-flag:`-O`
