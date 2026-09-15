@@ -1,40 +1,41 @@
 {
   "arch": "x86_64",
-  "cabal-lib-version": "3.16.0.0",
-  "cabal-version": "3.16.0.0",
-  "compiler-abi": "147c",
+  "cabal-lib-version": "3.18.1.0",
+  "cabal-version": "3.18.1.0",
+  "compiler-abi": "415c",
   "compiler-id": "ghc-9.10.3",
   "install-plan": [
     {
       "component-name": "lib",
       "depends": [
-        "Cabal-syntax-3.16.1.0-a236216a5dc39e095c27636e489ab8d04e476769259d20c4353e6a73cdc72b90",
-        "array-0.5.8.0-52e5",
-        "base-4.20.2.0-17a7",
-        "bytestring-0.12.2.0-efe2",
-        "containers-0.7-7106",
-        "deepseq-1.5.0.0-fb1c",
-        "directory-1.3.10.1-eb020d809605602a187ebfcda553b5d4459432e607631013de7fb458111b134c",
-        "filepath-1.5.4.0-d558",
-        "mtl-2.3.1-d091",
-        "parsec-3.1.18.0-100a",
-        "pretty-1.1.3.6-8ad3",
-        "process-1.6.27.0-b88932f7b166079d4ac8676a9030c1d296fb2f8739cb237c0e3228b98ecc42b6",
-        "time-1.12.2-f935",
-        "transformers-0.6.1.1-d0a2",
-        "unix-2.8.7.0-b856"
+        "Cabal-syntax-3.16.1.0-2f02b23116ab35e95b2326e2a1bd202d120b762ee1e1ec4b5287b2c54b4cddc9",
+        "array-0.5.8.0-4471",
+        "base-4.20.2.0-127e",
+        "bytestring-0.12.2.0-825f",
+        "containers-0.7-bf99",
+        "deepseq-1.5.0.0-268d",
+        "directory-1.3.10.1-315a0a7fedb0f1aed616daa8ad9b864d904915e05937383cc13f582ed605ab36",
+        "filepath-1.5.4.0-3bd9",
+        "mtl-2.3.1-bcd6",
+        "parsec-3.1.18.0-00c1",
+        "pretty-1.1.3.6-7ead",
+        "process-1.6.27.0-0b1e1060989e93ab5d9d3d490f7c922d4a748a1d2e2a56de08ec5c18f4907526",
+        "time-1.12.2-c96f",
+        "transformers-0.6.1.1-4229",
+        "unix-2.8.7.0-de61"
       ],
       "exe-depends": [],
       "flags": {
         "git-rev": false
       },
-      "id": "Cabal-3.16.1.0-c0407845849191db5b96e64afa4bfb521691629c58c89783091a9ede11fd8d30",
+      "id": "Cabal-3.16.1.0-6a9fbb7502fdc19d2a2d0397a75415c98d1bcbbad07d2396921b184ec0488ee3",
       "pkg-cabal-sha256": "6d7ee02dc18c7485d597d131356cee25b3b95778746f39b73bca1d2d44b12e11",
       "pkg-name": "Cabal",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -46,32 +47,33 @@
     {
       "component-name": "lib",
       "depends": [
-        "array-0.5.8.0-52e5",
-        "base-4.20.2.0-17a7",
-        "binary-0.8.9.3-bc9a",
-        "bytestring-0.12.2.0-efe2",
-        "containers-0.7-7106",
-        "deepseq-1.5.0.0-fb1c",
-        "directory-1.3.10.1-eb020d809605602a187ebfcda553b5d4459432e607631013de7fb458111b134c",
-        "filepath-1.5.4.0-d558",
-        "mtl-2.3.1-d091",
-        "parsec-3.1.18.0-100a",
-        "pretty-1.1.3.6-8ad3",
-        "text-2.1.3-408f",
-        "time-1.12.2-f935",
-        "transformers-0.6.1.1-d0a2"
+        "array-0.5.8.0-4471",
+        "base-4.20.2.0-127e",
+        "binary-0.8.9.3-28ff",
+        "bytestring-0.12.2.0-825f",
+        "containers-0.7-bf99",
+        "deepseq-1.5.0.0-268d",
+        "directory-1.3.10.1-315a0a7fedb0f1aed616daa8ad9b864d904915e05937383cc13f582ed605ab36",
+        "filepath-1.5.4.0-3bd9",
+        "mtl-2.3.1-bcd6",
+        "parsec-3.1.18.0-00c1",
+        "pretty-1.1.3.6-7ead",
+        "text-2.1.3-9f75",
+        "time-1.12.2-c96f",
+        "transformers-0.6.1.1-4229"
       ],
       "exe-depends": [
-        "alex-3.5.4.0-e-alex-0cade3aef1e7c45aed52b2adac265733ce3279e5538352ca7abb4c797fbb00ca"
+        "alex-3.5.4.0-e-alex-ce91ac9b07edecfd3bd72d4fcd4ce829f2bfd560a67a88c8d97459cce3e49677"
       ],
       "flags": {},
-      "id": "Cabal-syntax-3.16.1.0-a236216a5dc39e095c27636e489ab8d04e476769259d20c4353e6a73cdc72b90",
+      "id": "Cabal-syntax-3.16.1.0-2f02b23116ab35e95b2326e2a1bd202d120b762ee1e1ec4b5287b2c54b4cddc9",
       "pkg-cabal-sha256": "4c3f63157628d3dc359c2af16ffe683b84a54857694c9d59d5fb7232f4679957",
       "pkg-name": "Cabal-syntax",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -81,23 +83,24 @@
       "type": "configured"
     },
     {
-      "bin-file": "/home/terrorjack/.cabal/store/ghc-9.10.3-147c/alex-3.5.4.0-e-alex-0cade3aef1e7c45aed52b2adac265733ce3279e5538352ca7abb4c797fbb00ca/bin/alex",
+      "bin-file": "/home/zubin/.cabal/store/ghc-9.10.3-415c/alex-3.5.4.0-e-alex-ce91ac9b07edecfd3bd72d4fcd4ce829f2bfd560a67a88c8d97459cce3e49677/bin/alex",
       "component-name": "exe:alex",
       "depends": [
-        "array-0.5.8.0-52e5",
-        "base-4.20.2.0-17a7",
-        "containers-0.7-7106",
-        "directory-1.3.10.1-eb020d809605602a187ebfcda553b5d4459432e607631013de7fb458111b134c"
+        "array-0.5.8.0-4471",
+        "base-4.20.2.0-127e",
+        "containers-0.7-bf99",
+        "directory-1.3.10.1-315a0a7fedb0f1aed616daa8ad9b864d904915e05937383cc13f582ed605ab36"
       ],
       "exe-depends": [],
       "flags": {},
-      "id": "alex-3.5.4.0-e-alex-0cade3aef1e7c45aed52b2adac265733ce3279e5538352ca7abb4c797fbb00ca",
+      "id": "alex-3.5.4.0-e-alex-ce91ac9b07edecfd3bd72d4fcd4ce829f2bfd560a67a88c8d97459cce3e49677",
       "pkg-cabal-sha256": "38b3481bb0d5eb58c9dd6579e7904859372c3c0c82a8db86e58177649c289621",
       "pkg-name": "alex",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -108,19 +111,19 @@
     },
     {
       "depends": [
-        "base-4.20.2.0-17a7"
+        "base-4.20.2.0-127e"
       ],
-      "id": "array-0.5.8.0-52e5",
+      "id": "array-0.5.8.0-4471",
       "pkg-name": "array",
       "pkg-version": "0.5.8.0",
       "type": "pre-existing"
     },
     {
       "depends": [
-        "ghc-internal-9.1003.0-6552",
-        "ghc-prim-0.12.0-1026"
+        "ghc-internal-9.1003.0-a65c",
+        "ghc-prim-0.12.0-d0f9"
       ],
-      "id": "base-4.20.2.0-17a7",
+      "id": "base-4.20.2.0-127e",
       "pkg-name": "base",
       "pkg-version": "4.20.2.0",
       "type": "pre-existing"
@@ -128,18 +131,19 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7",
-        "bytestring-0.12.2.0-efe2"
+        "base-4.20.2.0-127e",
+        "bytestring-0.12.2.0-825f"
       ],
       "exe-depends": [],
       "flags": {},
-      "id": "base16-bytestring-1.0.2.0-29bd0f434dcdbe2901a6d2585dcfa06ab67b022e6476b19392956b4d59214cb5",
+      "id": "base16-bytestring-1.0.2.0-9e75c0d11c122f861bae5561a3e0118af885d0974e8adc0d67318557498123bc",
       "pkg-cabal-sha256": "a694e88f9ec9fc79f0b03f233d3fea592b68f70a34aac2ddb5bcaecb6562e2fd",
       "pkg-name": "base16-bytestring",
+      "pkg-revision": 1,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -150,24 +154,24 @@
     },
     {
       "depends": [
-        "array-0.5.8.0-52e5",
-        "base-4.20.2.0-17a7",
-        "bytestring-0.12.2.0-efe2",
-        "containers-0.7-7106"
+        "array-0.5.8.0-4471",
+        "base-4.20.2.0-127e",
+        "bytestring-0.12.2.0-825f",
+        "containers-0.7-bf99"
       ],
-      "id": "binary-0.8.9.3-bc9a",
+      "id": "binary-0.8.9.3-28ff",
       "pkg-name": "binary",
       "pkg-version": "0.8.9.3",
       "type": "pre-existing"
     },
     {
       "depends": [
-        "base-4.20.2.0-17a7",
-        "deepseq-1.5.0.0-fb1c",
-        "ghc-prim-0.12.0-1026",
-        "template-haskell-2.22.0.0-b851"
+        "base-4.20.2.0-127e",
+        "deepseq-1.5.0.0-268d",
+        "ghc-prim-0.12.0-d0f9",
+        "template-haskell-2.22.0.0-5e01"
       ],
-      "id": "bytestring-0.12.2.0-efe2",
+      "id": "bytestring-0.12.2.0-825f",
       "pkg-name": "bytestring",
       "pkg-version": "0.12.2.0",
       "type": "pre-existing"
@@ -175,19 +179,20 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7"
+        "base-4.20.2.0-127e"
       ],
       "exe-depends": [],
       "flags": {
         "llvm": false
       },
-      "id": "clock-0.8.4-060313280706c73602ee99afcb3bc47ef20d95522e54d794386cb36b0a05883d",
+      "id": "clock-0.8.4-61ec4dfc43d4502bd3b1c02148cbe8731abf891bee52f4914f3c93b835b70f72",
       "pkg-cabal-sha256": "b938655b00cf204ce69abfff946021bed111d2609a9f7a9c22e28a1a202e9115",
       "pkg-name": "clock",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -198,12 +203,12 @@
     },
     {
       "depends": [
-        "array-0.5.8.0-52e5",
-        "base-4.20.2.0-17a7",
-        "deepseq-1.5.0.0-fb1c",
-        "template-haskell-2.22.0.0-b851"
+        "array-0.5.8.0-4471",
+        "base-4.20.2.0-127e",
+        "deepseq-1.5.0.0-268d",
+        "template-haskell-2.22.0.0-5e01"
       ],
-      "id": "containers-0.7-7106",
+      "id": "containers-0.7-bf99",
       "pkg-name": "containers",
       "pkg-version": "0.7",
       "type": "pre-existing"
@@ -211,21 +216,22 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7",
-        "bytestring-0.12.2.0-efe2"
+        "base-4.20.2.0-127e",
+        "bytestring-0.12.2.0-825f"
       ],
       "exe-depends": [],
       "flags": {
         "exe": false,
         "use-cbits": true
       },
-      "id": "cryptohash-sha256-0.11.102.1-e3db2c08cb1862103e90660deb943771942019a3f79d1b5d2e2f89a83496be5b",
+      "id": "cryptohash-sha256-0.11.102.1-eacbd2a65295bb03ee7d7e1666df4ed95ea8f869bbdf6cc9970b9aa6c70c47f4",
       "pkg-cabal-sha256": "0e9de2ccce261e7a5b027e842f6f47f50eb0e6059a0de98a5479f75aa8164107",
       "pkg-name": "cryptohash-sha256",
+      "pkg-revision": 6,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -236,11 +242,11 @@
     },
     {
       "depends": [
-        "array-0.5.8.0-52e5",
-        "base-4.20.2.0-17a7",
-        "ghc-prim-0.12.0-1026"
+        "array-0.5.8.0-4471",
+        "base-4.20.2.0-127e",
+        "ghc-prim-0.12.0-d0f9"
       ],
-      "id": "deepseq-1.5.0.0-fb1c",
+      "id": "deepseq-1.5.0.0-268d",
       "pkg-name": "deepseq",
       "pkg-version": "1.5.0.0",
       "type": "pre-existing"
@@ -248,24 +254,25 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7",
-        "file-io-0.1.6-09cd1f129dc1d254b01779cfd4f89401859373e2c56eb25f3913054ccfdb34af",
-        "filepath-1.5.4.0-d558",
-        "os-string-2.0.7-78d7",
-        "time-1.12.2-f935",
-        "unix-2.8.7.0-b856"
+        "base-4.20.2.0-127e",
+        "file-io-0.1.6-0b61db6ad9aaa1f92f50a030d23b4ca139427ad1c9af6485b17e073880b137c9",
+        "filepath-1.5.4.0-3bd9",
+        "os-string-2.0.7-ea02",
+        "time-1.12.2-c96f",
+        "unix-2.8.7.0-de61"
       ],
       "exe-depends": [],
       "flags": {
         "os-string": true
       },
-      "id": "directory-1.3.10.1-eb020d809605602a187ebfcda553b5d4459432e607631013de7fb458111b134c",
+      "id": "directory-1.3.10.1-315a0a7fedb0f1aed616daa8ad9b864d904915e05937383cc13f582ed605ab36",
       "pkg-cabal-sha256": "bf029d8163ccae567cc6a5aa8f654016f58dfc066d15f8a8f7c74b8ca855562c",
       "pkg-name": "directory",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -276,13 +283,13 @@
     },
     {
       "depends": [
-        "base-4.20.2.0-17a7",
-        "mtl-2.3.1-d091",
-        "stm-2.5.3.1-b6b4",
-        "template-haskell-2.22.0.0-b851",
-        "transformers-0.6.1.1-d0a2"
+        "base-4.20.2.0-127e",
+        "mtl-2.3.1-bcd6",
+        "stm-2.5.3.1-0f67",
+        "template-haskell-2.22.0.0-5e01",
+        "transformers-0.6.1.1-4229"
       ],
-      "id": "exceptions-0.10.9-b2f8",
+      "id": "exceptions-0.10.9-e10f",
       "pkg-name": "exceptions",
       "pkg-version": "0.10.9",
       "type": "pre-existing"
@@ -290,23 +297,24 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7",
-        "clock-0.8.4-060313280706c73602ee99afcb3bc47ef20d95522e54d794386cb36b0a05883d",
-        "directory-1.3.10.1-eb020d809605602a187ebfcda553b5d4459432e607631013de7fb458111b134c",
-        "filepath-1.5.4.0-d558",
-        "process-1.6.27.0-b88932f7b166079d4ac8676a9030c1d296fb2f8739cb237c0e3228b98ecc42b6",
-        "time-1.12.2-f935",
-        "unix-2.8.7.0-b856"
+        "base-4.20.2.0-127e",
+        "clock-0.8.4-61ec4dfc43d4502bd3b1c02148cbe8731abf891bee52f4914f3c93b835b70f72",
+        "directory-1.3.10.1-315a0a7fedb0f1aed616daa8ad9b864d904915e05937383cc13f582ed605ab36",
+        "filepath-1.5.4.0-3bd9",
+        "process-1.6.27.0-0b1e1060989e93ab5d9d3d490f7c922d4a748a1d2e2a56de08ec5c18f4907526",
+        "time-1.12.2-c96f",
+        "unix-2.8.7.0-de61"
       ],
       "exe-depends": [],
       "flags": {},
-      "id": "extra-1.8.1-fdca8a752fbce7321b47176aa976e3cace072edbd9b3a6eb8b78c5642e852ecc",
+      "id": "extra-1.8.1-172ae8ed600ab175de621566a8043bbbbf04252058d9415ba6cebebbb221dbac",
       "pkg-cabal-sha256": "b9c360f2f3fbff5ca04656b7aa0a91b254ac7de7e4b959bae4688a178ffd79d1",
       "pkg-name": "extra",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -318,25 +326,26 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7",
-        "bytestring-0.12.2.0-efe2",
-        "deepseq-1.5.0.0-fb1c",
-        "filepath-1.5.4.0-d558",
-        "os-string-2.0.7-78d7",
-        "unix-2.8.7.0-b856"
+        "base-4.20.2.0-127e",
+        "bytestring-0.12.2.0-825f",
+        "deepseq-1.5.0.0-268d",
+        "filepath-1.5.4.0-3bd9",
+        "os-string-2.0.7-ea02",
+        "unix-2.8.7.0-de61"
       ],
       "exe-depends": [],
       "flags": {
         "long-paths": true,
         "os-string": true
       },
-      "id": "file-io-0.1.6-09cd1f129dc1d254b01779cfd4f89401859373e2c56eb25f3913054ccfdb34af",
+      "id": "file-io-0.1.6-0b61db6ad9aaa1f92f50a030d23b4ca139427ad1c9af6485b17e073880b137c9",
       "pkg-cabal-sha256": "5e3466f15993e499db47d79d09c519d6d37c143cfe94fb46dd218bf2f6f3fd39",
       "pkg-name": "file-io",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -347,14 +356,14 @@
     },
     {
       "depends": [
-        "base-4.20.2.0-17a7",
-        "bytestring-0.12.2.0-efe2",
-        "deepseq-1.5.0.0-fb1c",
-        "exceptions-0.10.9-b2f8",
-        "os-string-2.0.7-78d7",
-        "template-haskell-2.22.0.0-b851"
+        "base-4.20.2.0-127e",
+        "bytestring-0.12.2.0-825f",
+        "deepseq-1.5.0.0-268d",
+        "exceptions-0.10.9-e10f",
+        "os-string-2.0.7-ea02",
+        "template-haskell-2.22.0.0-5e01"
       ],
-      "id": "filepath-1.5.4.0-d558",
+      "id": "filepath-1.5.4.0-3bd9",
       "pkg-name": "filepath",
       "pkg-version": "1.5.4.0",
       "type": "pre-existing"
@@ -362,20 +371,21 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7",
-        "directory-1.3.10.1-eb020d809605602a187ebfcda553b5d4459432e607631013de7fb458111b134c",
-        "extra-1.8.1-fdca8a752fbce7321b47176aa976e3cace072edbd9b3a6eb8b78c5642e852ecc",
-        "filepath-1.5.4.0-d558"
+        "base-4.20.2.0-127e",
+        "directory-1.3.10.1-315a0a7fedb0f1aed616daa8ad9b864d904915e05937383cc13f582ed605ab36",
+        "extra-1.8.1-172ae8ed600ab175de621566a8043bbbbf04252058d9415ba6cebebbb221dbac",
+        "filepath-1.5.4.0-3bd9"
       ],
       "exe-depends": [],
       "flags": {},
-      "id": "filepattern-0.1.3-26883dcea976f7041d9d4efca66a1ecda414c720e35a73ad266fbe9dd3777249",
+      "id": "filepattern-0.1.3-2944a0becf5a5a378ef7465afe19d26726ecce52c52d0ea9f21a14439e4848bd",
       "pkg-cabal-sha256": "372c1733d83b90045eb29da9f010fed79bfef8771ce65eb126a1d83ecc54a9a2",
       "pkg-name": "filepattern",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -386,46 +396,47 @@
     },
     {
       "depends": [
-        "ghc-prim-0.12.0-1026"
+        "ghc-prim-0.12.0-d0f9"
       ],
-      "id": "ghc-bignum-1.3-a320",
+      "id": "ghc-bignum-1.3-9ca9",
       "pkg-name": "ghc-bignum",
       "pkg-version": "1.3",
       "type": "pre-existing"
     },
     {
       "depends": [
-        "base-4.20.2.0-17a7"
+        "base-4.20.2.0-127e"
       ],
-      "id": "ghc-boot-th-9.10.3-503b",
+      "id": "ghc-boot-th-9.10.3-9679",
       "pkg-name": "ghc-boot-th",
       "pkg-version": "9.10.3",
       "type": "pre-existing"
     },
     {
       "depends": [
-        "ghc-bignum-1.3-a320",
-        "ghc-prim-0.12.0-1026",
+        "ghc-bignum-1.3-9ca9",
+        "ghc-prim-0.12.0-d0f9",
         "rts-1.0.2"
       ],
-      "id": "ghc-internal-9.1003.0-6552",
+      "id": "ghc-internal-9.1003.0-a65c",
       "pkg-name": "ghc-internal",
       "pkg-version": "9.1003.0",
       "type": "pre-existing"
     },
     {
-      "build-info": "/home/terrorjack/workspace/ghc-bump-bootstrap/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.3/ghc-platform-0.1.0.0/build-info.json",
+      "build-info": "/tmp/claude-1000/bootstrap-plans/9_10_3/build/x86_64-linux/ghc-9.10.3/ghc-platform-0.1.0.0/build-info.json",
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7"
+        "base-4.20.2.0-127e"
       ],
-      "dist-dir": "/home/terrorjack/workspace/ghc-bump-bootstrap/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.3/ghc-platform-0.1.0.0",
+      "dist-dir": "/tmp/claude-1000/bootstrap-plans/9_10_3/build/x86_64-linux/ghc-9.10.3/ghc-platform-0.1.0.0",
       "exe-depends": [],
       "flags": {},
       "id": "ghc-platform-0.1.0.0-inplace",
       "pkg-name": "ghc-platform",
+      "pkg-revision": 0,
       "pkg-src": {
-        "path": "/home/terrorjack/workspace/ghc-bump-bootstrap/hadrian/../libraries/ghc-platform",
+        "path": "/home/zubin/ghcs/10.0/hadrian/../libraries/ghc-platform",
         "type": "local"
       },
       "pkg-version": "0.1.0.0",
@@ -436,30 +447,31 @@
       "depends": [
         "rts-1.0.2"
       ],
-      "id": "ghc-prim-0.12.0-1026",
+      "id": "ghc-prim-0.12.0-d0f9",
       "pkg-name": "ghc-prim",
       "pkg-version": "0.12.0",
       "type": "pre-existing"
     },
     {
-      "build-info": "/home/terrorjack/workspace/ghc-bump-bootstrap/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.3/ghc-toolchain-0.1.0.0/build-info.json",
+      "build-info": "/tmp/claude-1000/bootstrap-plans/9_10_3/build/x86_64-linux/ghc-9.10.3/ghc-toolchain-0.1.0.0/build-info.json",
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7",
-        "directory-1.3.10.1-eb020d809605602a187ebfcda553b5d4459432e607631013de7fb458111b134c",
-        "filepath-1.5.4.0-d558",
+        "base-4.20.2.0-127e",
+        "directory-1.3.10.1-315a0a7fedb0f1aed616daa8ad9b864d904915e05937383cc13f582ed605ab36",
+        "filepath-1.5.4.0-3bd9",
         "ghc-platform-0.1.0.0-inplace",
-        "process-1.6.27.0-b88932f7b166079d4ac8676a9030c1d296fb2f8739cb237c0e3228b98ecc42b6",
-        "text-2.1.3-408f",
-        "transformers-0.6.1.1-d0a2"
+        "process-1.6.27.0-0b1e1060989e93ab5d9d3d490f7c922d4a748a1d2e2a56de08ec5c18f4907526",
+        "text-2.1.3-9f75",
+        "transformers-0.6.1.1-4229"
       ],
-      "dist-dir": "/home/terrorjack/workspace/ghc-bump-bootstrap/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.3/ghc-toolchain-0.1.0.0",
+      "dist-dir": "/tmp/claude-1000/bootstrap-plans/9_10_3/build/x86_64-linux/ghc-9.10.3/ghc-toolchain-0.1.0.0",
       "exe-depends": [],
       "flags": {},
       "id": "ghc-toolchain-0.1.0.0-inplace",
       "pkg-name": "ghc-toolchain",
+      "pkg-revision": 0,
       "pkg-src": {
-        "path": "/home/terrorjack/workspace/ghc-bump-bootstrap/hadrian/../utils/ghc-toolchain",
+        "path": "/home/zubin/ghcs/10.0/hadrian/../utils/ghc-toolchain",
         "type": "local"
       },
       "pkg-version": "0.1.0.0",
@@ -467,30 +479,30 @@
       "type": "configured"
     },
     {
-      "bin-file": "/home/terrorjack/workspace/ghc-bump-bootstrap/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.3/hadrian-0.1.0.0/x/hadrian/build/hadrian/hadrian",
-      "build-info": "/home/terrorjack/workspace/ghc-bump-bootstrap/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.3/hadrian-0.1.0.0/x/hadrian/build-info.json",
+      "bin-file": "/tmp/claude-1000/bootstrap-plans/9_10_3/build/x86_64-linux/ghc-9.10.3/hadrian-0.1.0.0/x/hadrian/build/hadrian/hadrian",
+      "build-info": "/tmp/claude-1000/bootstrap-plans/9_10_3/build/x86_64-linux/ghc-9.10.3/hadrian-0.1.0.0/x/hadrian/build-info.json",
       "component-name": "exe:hadrian",
       "depends": [
-        "Cabal-3.16.1.0-c0407845849191db5b96e64afa4bfb521691629c58c89783091a9ede11fd8d30",
-        "base-4.20.2.0-17a7",
-        "base16-bytestring-1.0.2.0-29bd0f434dcdbe2901a6d2585dcfa06ab67b022e6476b19392956b4d59214cb5",
-        "bytestring-0.12.2.0-efe2",
-        "containers-0.7-7106",
-        "cryptohash-sha256-0.11.102.1-e3db2c08cb1862103e90660deb943771942019a3f79d1b5d2e2f89a83496be5b",
-        "directory-1.3.10.1-eb020d809605602a187ebfcda553b5d4459432e607631013de7fb458111b134c",
-        "extra-1.8.1-fdca8a752fbce7321b47176aa976e3cace072edbd9b3a6eb8b78c5642e852ecc",
-        "filepath-1.5.4.0-d558",
+        "Cabal-3.16.1.0-6a9fbb7502fdc19d2a2d0397a75415c98d1bcbbad07d2396921b184ec0488ee3",
+        "base-4.20.2.0-127e",
+        "base16-bytestring-1.0.2.0-9e75c0d11c122f861bae5561a3e0118af885d0974e8adc0d67318557498123bc",
+        "bytestring-0.12.2.0-825f",
+        "containers-0.7-bf99",
+        "cryptohash-sha256-0.11.102.1-eacbd2a65295bb03ee7d7e1666df4ed95ea8f869bbdf6cc9970b9aa6c70c47f4",
+        "directory-1.3.10.1-315a0a7fedb0f1aed616daa8ad9b864d904915e05937383cc13f582ed605ab36",
+        "extra-1.8.1-172ae8ed600ab175de621566a8043bbbbf04252058d9415ba6cebebbb221dbac",
+        "filepath-1.5.4.0-3bd9",
         "ghc-platform-0.1.0.0-inplace",
         "ghc-toolchain-0.1.0.0-inplace",
-        "mtl-2.3.1-d091",
-        "parsec-3.1.18.0-100a",
-        "shake-0.19.9-26be79a6006eb77bc8ea6c4acdbf2fdf4bd5963e60c8a411987e39d04d22bc6a",
-        "text-2.1.3-408f",
-        "time-1.12.2-f935",
-        "transformers-0.6.1.1-d0a2",
-        "unordered-containers-0.2.21-de14d6502d6610b3da465ec3c7b65467a132d9410b6d014fa79e4f2ed5eed79b"
+        "mtl-2.3.1-bcd6",
+        "parsec-3.1.18.0-00c1",
+        "shake-0.19.9-238284672362317c6d0657f0ab363817c57db5b90ce2666cf2964f6f3df5cf5d",
+        "text-2.1.3-9f75",
+        "time-1.12.2-c96f",
+        "transformers-0.6.1.1-4229",
+        "unordered-containers-0.2.21-b92636c00e1122a9344c94e71ec3cae077c83e7083b3f4a151dacbdcab9d5708"
       ],
-      "dist-dir": "/home/terrorjack/workspace/ghc-bump-bootstrap/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.3/hadrian-0.1.0.0/x/hadrian",
+      "dist-dir": "/tmp/claude-1000/bootstrap-plans/9_10_3/build/x86_64-linux/ghc-9.10.3/hadrian-0.1.0.0/x/hadrian",
       "exe-depends": [],
       "flags": {
         "selftest": false,
@@ -498,8 +510,9 @@
       },
       "id": "hadrian-0.1.0.0-inplace-hadrian",
       "pkg-name": "hadrian",
+      "pkg-revision": 0,
       "pkg-src": {
-        "path": "/home/terrorjack/workspace/ghc-bump-bootstrap/hadrian/.",
+        "path": "/home/zubin/ghcs/10.0/hadrian/.",
         "type": "local"
       },
       "pkg-version": "0.1.0.0",
@@ -509,26 +522,27 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7",
-        "bytestring-0.12.2.0-efe2",
-        "containers-0.7-7106",
-        "deepseq-1.5.0.0-fb1c",
-        "filepath-1.5.4.0-d558",
-        "os-string-2.0.7-78d7",
-        "text-2.1.3-408f"
+        "base-4.20.2.0-127e",
+        "bytestring-0.12.2.0-825f",
+        "containers-0.7-bf99",
+        "deepseq-1.5.0.0-268d",
+        "filepath-1.5.4.0-3bd9",
+        "os-string-2.0.7-ea02",
+        "text-2.1.3-9f75"
       ],
       "exe-depends": [],
       "flags": {
         "arch-native": false,
         "random-initial-seed": false
       },
-      "id": "hashable-1.5.1.0-2d5fa92ede5f3cbf172e7c1bc385ec56324436c24c54b1f5427cced823e62798",
+      "id": "hashable-1.5.1.0-804dfeb1bd55ea4f8d18544d6420269b42b38e02f6c3a5df7432f1a86af20647",
       "pkg-cabal-sha256": "140fc5adad166f7b527567cbd26ff481e8da4a66bdfc84be3ddf28dbeb66f275",
       "pkg-name": "hashable",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -540,17 +554,18 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7"
+        "base-4.20.2.0-127e"
       ],
       "exe-depends": [],
       "flags": {},
-      "id": "heaps-0.4.1-1631132b9f053f489025ff0a32e89ef5e5c6065e3922a212956f0c8772ba3ea5",
+      "id": "heaps-0.4.1-54ca8b9761e05605aa7b190fbb7727112096381865398b95a1a0068f586295b9",
       "pkg-cabal-sha256": "74ce60a23b8ef247b8bca71eeb38289e82b3b5e83b2383600b2c838a68218068",
       "pkg-name": "heaps",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -562,17 +577,18 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7"
+        "base-4.20.2.0-127e"
       ],
       "exe-depends": [],
       "flags": {},
-      "id": "js-dgtable-0.5.2-e8654d5f11fa53f1860bede6ee2578bcab00dd4074e6fed49d4c07bcb8c54ad7",
+      "id": "js-dgtable-0.5.2-e6ee22aac1ebd46d750ff128d5e99478829e44236c26f8599ede02f73e1f7dd2",
       "pkg-cabal-sha256": "f75cb4fa53c88c65794becdd48eb0d3b2b8abd89a3d5c19e87af91f5225c15e4",
       "pkg-name": "js-dgtable",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -584,17 +600,18 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7"
+        "base-4.20.2.0-127e"
       ],
       "exe-depends": [],
       "flags": {},
-      "id": "js-flot-0.8.3-77004cc9c053a7c71b0fd8a0b4d0b87cec1659cb0fb481224c22d7bc416defce",
+      "id": "js-flot-0.8.3-ffc5f29dcd952eeffed5ccc34d29bc849ebc101b3a52394ea3fdb60272248a2d",
       "pkg-cabal-sha256": "4c1c447a9a2fba0adba6d30678302a30c32b9dfde9e7aa9e9156483e1545096d",
       "pkg-name": "js-flot",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -606,17 +623,18 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7"
+        "base-4.20.2.0-127e"
       ],
       "exe-depends": [],
       "flags": {},
-      "id": "js-jquery-3.7.1-db5e10cac67bd5e02afee78a3399584298241b31b8dee43c241f36bd0a30ebeb",
+      "id": "js-jquery-3.7.1-f9f635ec3910a22805b37c0fadbaec991704965c8b64a200171df221307b1404",
       "pkg-cabal-sha256": "fdbdfd4d413848c678a3737f2b985a5db66b796c6847b1ae08246ea3795c0ba2",
       "pkg-name": "js-jquery",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -627,46 +645,46 @@
     },
     {
       "depends": [
-        "base-4.20.2.0-17a7",
-        "transformers-0.6.1.1-d0a2"
+        "base-4.20.2.0-127e",
+        "transformers-0.6.1.1-4229"
       ],
-      "id": "mtl-2.3.1-d091",
+      "id": "mtl-2.3.1-bcd6",
       "pkg-name": "mtl",
       "pkg-version": "2.3.1",
       "type": "pre-existing"
     },
     {
       "depends": [
-        "base-4.20.2.0-17a7",
-        "bytestring-0.12.2.0-efe2",
-        "deepseq-1.5.0.0-fb1c",
-        "exceptions-0.10.9-b2f8",
-        "template-haskell-2.22.0.0-b851"
+        "base-4.20.2.0-127e",
+        "bytestring-0.12.2.0-825f",
+        "deepseq-1.5.0.0-268d",
+        "exceptions-0.10.9-e10f",
+        "template-haskell-2.22.0.0-5e01"
       ],
-      "id": "os-string-2.0.7-78d7",
+      "id": "os-string-2.0.7-ea02",
       "pkg-name": "os-string",
       "pkg-version": "2.0.7",
       "type": "pre-existing"
     },
     {
       "depends": [
-        "base-4.20.2.0-17a7",
-        "bytestring-0.12.2.0-efe2",
-        "mtl-2.3.1-d091",
-        "text-2.1.3-408f"
+        "base-4.20.2.0-127e",
+        "bytestring-0.12.2.0-825f",
+        "mtl-2.3.1-bcd6",
+        "text-2.1.3-9f75"
       ],
-      "id": "parsec-3.1.18.0-100a",
+      "id": "parsec-3.1.18.0-00c1",
       "pkg-name": "parsec",
       "pkg-version": "3.1.18.0",
       "type": "pre-existing"
     },
     {
       "depends": [
-        "base-4.20.2.0-17a7",
-        "deepseq-1.5.0.0-fb1c",
-        "ghc-prim-0.12.0-1026"
+        "base-4.20.2.0-127e",
+        "deepseq-1.5.0.0-268d",
+        "ghc-prim-0.12.0-d0f9"
       ],
-      "id": "pretty-1.1.3.6-8ad3",
+      "id": "pretty-1.1.3.6-7ead",
       "pkg-name": "pretty",
       "pkg-version": "1.1.3.6",
       "type": "pre-existing"
@@ -674,20 +692,21 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7",
-        "deepseq-1.5.0.0-fb1c",
-        "template-haskell-2.22.0.0-b851",
-        "transformers-0.6.1.1-d0a2"
+        "base-4.20.2.0-127e",
+        "deepseq-1.5.0.0-268d",
+        "template-haskell-2.22.0.0-5e01",
+        "transformers-0.6.1.1-4229"
       ],
       "exe-depends": [],
       "flags": {},
-      "id": "primitive-0.9.1.0-e2522b12496b6a54d32fc50d63739542886af0b7de9fbbaf49c9dd11cd266d3b",
+      "id": "primitive-0.9.1.0-9cc3246865dc9d99ceb05f8a2f33536dfa1e3860820745dc9e05b65016dda9ed",
       "pkg-cabal-sha256": "756b222c715bc6ef5ba81fa69cdbaa20c5c53beb6f16f174b8bacc93a6d239f0",
       "pkg-name": "primitive",
+      "pkg-revision": 1,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -699,24 +718,25 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7",
-        "deepseq-1.5.0.0-fb1c",
-        "directory-1.3.10.1-eb020d809605602a187ebfcda553b5d4459432e607631013de7fb458111b134c",
-        "filepath-1.5.4.0-d558",
-        "os-string-2.0.7-78d7",
-        "unix-2.8.7.0-b856"
+        "base-4.20.2.0-127e",
+        "deepseq-1.5.0.0-268d",
+        "directory-1.3.10.1-315a0a7fedb0f1aed616daa8ad9b864d904915e05937383cc13f582ed605ab36",
+        "filepath-1.5.4.0-3bd9",
+        "os-string-2.0.7-ea02",
+        "unix-2.8.7.0-de61"
       ],
       "exe-depends": [],
       "flags": {
         "os-string": true
       },
-      "id": "process-1.6.27.0-b88932f7b166079d4ac8676a9030c1d296fb2f8739cb237c0e3228b98ecc42b6",
+      "id": "process-1.6.27.0-0b1e1060989e93ab5d9d3d490f7c922d4a748a1d2e2a56de08ec5c18f4907526",
       "pkg-cabal-sha256": "0512ed17e7e312a6412859abcb37a7bcc81b94cbb797a1ba2a8c78a5d3055d32",
       "pkg-name": "process",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -728,22 +748,23 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7",
-        "bytestring-0.12.2.0-efe2",
-        "deepseq-1.5.0.0-fb1c",
-        "mtl-2.3.1-d091",
-        "splitmix-0.1.3.2-c83f4d58ab16b6f5b056f510da5d5d15305079b344ea8af2e2c32cba8feb45a1",
-        "transformers-0.6.1.1-d0a2"
+        "base-4.20.2.0-127e",
+        "bytestring-0.12.2.0-825f",
+        "deepseq-1.5.0.0-268d",
+        "mtl-2.3.1-bcd6",
+        "splitmix-0.1.3.2-de60a72081a48909618ce63c3dc4de98fa55a46b7ea7750d349f8474c688dfb5",
+        "transformers-0.6.1.1-4229"
       ],
       "exe-depends": [],
       "flags": {},
-      "id": "random-1.3.1-ccb1f9d87f65efda1133fc92efd4b7ce4a1b1373f8ce5f89a381e314c148ad77",
+      "id": "random-1.3.1-b95cffe4672bd3fe28522a4704f08d89a095e10233a2b5404a82f16ad8754e58",
       "pkg-cabal-sha256": "0b4f649c3e78713b2ccad1535251ee34b148237fb2229d7058c2b1d9ccc324b8",
       "pkg-name": "random",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -762,27 +783,27 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7",
-        "binary-0.8.9.3-bc9a",
-        "bytestring-0.12.2.0-efe2",
-        "deepseq-1.5.0.0-fb1c",
-        "directory-1.3.10.1-eb020d809605602a187ebfcda553b5d4459432e607631013de7fb458111b134c",
-        "extra-1.8.1-fdca8a752fbce7321b47176aa976e3cace072edbd9b3a6eb8b78c5642e852ecc",
-        "filepath-1.5.4.0-d558",
-        "filepattern-0.1.3-26883dcea976f7041d9d4efca66a1ecda414c720e35a73ad266fbe9dd3777249",
-        "hashable-1.5.1.0-2d5fa92ede5f3cbf172e7c1bc385ec56324436c24c54b1f5427cced823e62798",
-        "heaps-0.4.1-1631132b9f053f489025ff0a32e89ef5e5c6065e3922a212956f0c8772ba3ea5",
-        "js-dgtable-0.5.2-e8654d5f11fa53f1860bede6ee2578bcab00dd4074e6fed49d4c07bcb8c54ad7",
-        "js-flot-0.8.3-77004cc9c053a7c71b0fd8a0b4d0b87cec1659cb0fb481224c22d7bc416defce",
-        "js-jquery-3.7.1-db5e10cac67bd5e02afee78a3399584298241b31b8dee43c241f36bd0a30ebeb",
-        "primitive-0.9.1.0-e2522b12496b6a54d32fc50d63739542886af0b7de9fbbaf49c9dd11cd266d3b",
-        "process-1.6.27.0-b88932f7b166079d4ac8676a9030c1d296fb2f8739cb237c0e3228b98ecc42b6",
-        "random-1.3.1-ccb1f9d87f65efda1133fc92efd4b7ce4a1b1373f8ce5f89a381e314c148ad77",
-        "time-1.12.2-f935",
-        "transformers-0.6.1.1-d0a2",
-        "unix-2.8.7.0-b856",
-        "unordered-containers-0.2.21-de14d6502d6610b3da465ec3c7b65467a132d9410b6d014fa79e4f2ed5eed79b",
-        "utf8-string-1.0.2-9495a6e5177dde48f97fd29258c60c235f167f07cae65feb857609dd8598ca03"
+        "base-4.20.2.0-127e",
+        "binary-0.8.9.3-28ff",
+        "bytestring-0.12.2.0-825f",
+        "deepseq-1.5.0.0-268d",
+        "directory-1.3.10.1-315a0a7fedb0f1aed616daa8ad9b864d904915e05937383cc13f582ed605ab36",
+        "extra-1.8.1-172ae8ed600ab175de621566a8043bbbbf04252058d9415ba6cebebbb221dbac",
+        "filepath-1.5.4.0-3bd9",
+        "filepattern-0.1.3-2944a0becf5a5a378ef7465afe19d26726ecce52c52d0ea9f21a14439e4848bd",
+        "hashable-1.5.1.0-804dfeb1bd55ea4f8d18544d6420269b42b38e02f6c3a5df7432f1a86af20647",
+        "heaps-0.4.1-54ca8b9761e05605aa7b190fbb7727112096381865398b95a1a0068f586295b9",
+        "js-dgtable-0.5.2-e6ee22aac1ebd46d750ff128d5e99478829e44236c26f8599ede02f73e1f7dd2",
+        "js-flot-0.8.3-ffc5f29dcd952eeffed5ccc34d29bc849ebc101b3a52394ea3fdb60272248a2d",
+        "js-jquery-3.7.1-f9f635ec3910a22805b37c0fadbaec991704965c8b64a200171df221307b1404",
+        "primitive-0.9.1.0-9cc3246865dc9d99ceb05f8a2f33536dfa1e3860820745dc9e05b65016dda9ed",
+        "process-1.6.27.0-0b1e1060989e93ab5d9d3d490f7c922d4a748a1d2e2a56de08ec5c18f4907526",
+        "random-1.3.1-b95cffe4672bd3fe28522a4704f08d89a095e10233a2b5404a82f16ad8754e58",
+        "time-1.12.2-c96f",
+        "transformers-0.6.1.1-4229",
+        "unix-2.8.7.0-de61",
+        "unordered-containers-0.2.21-b92636c00e1122a9344c94e71ec3cae077c83e7083b3f4a151dacbdcab9d5708",
+        "utf8-string-1.0.2-2f06d1ff92d8991bab769df1a8ebd81f40e443571c4829a0ecfa30297d6402ef"
       ],
       "exe-depends": [],
       "flags": {
@@ -791,13 +812,14 @@
         "portable": false,
         "threaded": true
       },
-      "id": "shake-0.19.9-26be79a6006eb77bc8ea6c4acdbf2fdf4bd5963e60c8a411987e39d04d22bc6a",
+      "id": "shake-0.19.9-238284672362317c6d0657f0ab363817c57db5b90ce2666cf2964f6f3df5cf5d",
       "pkg-cabal-sha256": "8704f35f7857f71adef2b74aafb5580f73dfab004a804718d418c16798f4a186",
       "pkg-name": "shake",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -807,30 +829,30 @@
       "type": "configured"
     },
     {
-      "bin-file": "/home/terrorjack/.cabal/store/ghc-9.10.3-147c/shake-0.19.9-e-shake-d11a1d72dcbb7ae8bbbcc3c5beca2a27804002847263f88d31741ee864e9d031/bin/shake",
+      "bin-file": "/home/zubin/.cabal/store/ghc-9.10.3-415c/shake-0.19.9-e-shake-393c33fdcf7743986d2e5e6d5242bac9fd4436d929284cc7e77b946e5912eb8f/bin/shake",
       "component-name": "exe:shake",
       "depends": [
-        "base-4.20.2.0-17a7",
-        "binary-0.8.9.3-bc9a",
-        "bytestring-0.12.2.0-efe2",
-        "deepseq-1.5.0.0-fb1c",
-        "directory-1.3.10.1-eb020d809605602a187ebfcda553b5d4459432e607631013de7fb458111b134c",
-        "extra-1.8.1-fdca8a752fbce7321b47176aa976e3cace072edbd9b3a6eb8b78c5642e852ecc",
-        "filepath-1.5.4.0-d558",
-        "filepattern-0.1.3-26883dcea976f7041d9d4efca66a1ecda414c720e35a73ad266fbe9dd3777249",
-        "hashable-1.5.1.0-2d5fa92ede5f3cbf172e7c1bc385ec56324436c24c54b1f5427cced823e62798",
-        "heaps-0.4.1-1631132b9f053f489025ff0a32e89ef5e5c6065e3922a212956f0c8772ba3ea5",
-        "js-dgtable-0.5.2-e8654d5f11fa53f1860bede6ee2578bcab00dd4074e6fed49d4c07bcb8c54ad7",
-        "js-flot-0.8.3-77004cc9c053a7c71b0fd8a0b4d0b87cec1659cb0fb481224c22d7bc416defce",
-        "js-jquery-3.7.1-db5e10cac67bd5e02afee78a3399584298241b31b8dee43c241f36bd0a30ebeb",
-        "primitive-0.9.1.0-e2522b12496b6a54d32fc50d63739542886af0b7de9fbbaf49c9dd11cd266d3b",
-        "process-1.6.27.0-b88932f7b166079d4ac8676a9030c1d296fb2f8739cb237c0e3228b98ecc42b6",
-        "random-1.3.1-ccb1f9d87f65efda1133fc92efd4b7ce4a1b1373f8ce5f89a381e314c148ad77",
-        "time-1.12.2-f935",
-        "transformers-0.6.1.1-d0a2",
-        "unix-2.8.7.0-b856",
-        "unordered-containers-0.2.21-de14d6502d6610b3da465ec3c7b65467a132d9410b6d014fa79e4f2ed5eed79b",
-        "utf8-string-1.0.2-9495a6e5177dde48f97fd29258c60c235f167f07cae65feb857609dd8598ca03"
+        "base-4.20.2.0-127e",
+        "binary-0.8.9.3-28ff",
+        "bytestring-0.12.2.0-825f",
+        "deepseq-1.5.0.0-268d",
+        "directory-1.3.10.1-315a0a7fedb0f1aed616daa8ad9b864d904915e05937383cc13f582ed605ab36",
+        "extra-1.8.1-172ae8ed600ab175de621566a8043bbbbf04252058d9415ba6cebebbb221dbac",
+        "filepath-1.5.4.0-3bd9",
+        "filepattern-0.1.3-2944a0becf5a5a378ef7465afe19d26726ecce52c52d0ea9f21a14439e4848bd",
+        "hashable-1.5.1.0-804dfeb1bd55ea4f8d18544d6420269b42b38e02f6c3a5df7432f1a86af20647",
+        "heaps-0.4.1-54ca8b9761e05605aa7b190fbb7727112096381865398b95a1a0068f586295b9",
+        "js-dgtable-0.5.2-e6ee22aac1ebd46d750ff128d5e99478829e44236c26f8599ede02f73e1f7dd2",
+        "js-flot-0.8.3-ffc5f29dcd952eeffed5ccc34d29bc849ebc101b3a52394ea3fdb60272248a2d",
+        "js-jquery-3.7.1-f9f635ec3910a22805b37c0fadbaec991704965c8b64a200171df221307b1404",
+        "primitive-0.9.1.0-9cc3246865dc9d99ceb05f8a2f33536dfa1e3860820745dc9e05b65016dda9ed",
+        "process-1.6.27.0-0b1e1060989e93ab5d9d3d490f7c922d4a748a1d2e2a56de08ec5c18f4907526",
+        "random-1.3.1-b95cffe4672bd3fe28522a4704f08d89a095e10233a2b5404a82f16ad8754e58",
+        "time-1.12.2-c96f",
+        "transformers-0.6.1.1-4229",
+        "unix-2.8.7.0-de61",
+        "unordered-containers-0.2.21-b92636c00e1122a9344c94e71ec3cae077c83e7083b3f4a151dacbdcab9d5708",
+        "utf8-string-1.0.2-2f06d1ff92d8991bab769df1a8ebd81f40e443571c4829a0ecfa30297d6402ef"
       ],
       "exe-depends": [],
       "flags": {
@@ -839,13 +861,14 @@
         "portable": false,
         "threaded": true
       },
-      "id": "shake-0.19.9-e-shake-d11a1d72dcbb7ae8bbbcc3c5beca2a27804002847263f88d31741ee864e9d031",
+      "id": "shake-0.19.9-e-shake-393c33fdcf7743986d2e5e6d5242bac9fd4436d929284cc7e77b946e5912eb8f",
       "pkg-cabal-sha256": "8704f35f7857f71adef2b74aafb5580f73dfab004a804718d418c16798f4a186",
       "pkg-name": "shake",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -857,20 +880,21 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7",
-        "deepseq-1.5.0.0-fb1c"
+        "base-4.20.2.0-127e",
+        "deepseq-1.5.0.0-268d"
       ],
       "exe-depends": [],
       "flags": {
         "optimised-mixer": false
       },
-      "id": "splitmix-0.1.3.2-c83f4d58ab16b6f5b056f510da5d5d15305079b344ea8af2e2c32cba8feb45a1",
+      "id": "splitmix-0.1.3.2-de60a72081a48909618ce63c3dc4de98fa55a46b7ea7750d349f8474c688dfb5",
       "pkg-cabal-sha256": "a557cff65eed1f70f3a3b468423cd58e7a9a9564c5cc00c76a13de64dec9bcbd",
       "pkg-name": "splitmix",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -881,69 +905,69 @@
     },
     {
       "depends": [
-        "array-0.5.8.0-52e5",
-        "base-4.20.2.0-17a7"
+        "array-0.5.8.0-4471",
+        "base-4.20.2.0-127e"
       ],
-      "id": "stm-2.5.3.1-b6b4",
+      "id": "stm-2.5.3.1-0f67",
       "pkg-name": "stm",
       "pkg-version": "2.5.3.1",
       "type": "pre-existing"
     },
     {
       "depends": [
-        "base-4.20.2.0-17a7",
-        "ghc-boot-th-9.10.3-503b",
-        "ghc-prim-0.12.0-1026",
-        "pretty-1.1.3.6-8ad3"
+        "base-4.20.2.0-127e",
+        "ghc-boot-th-9.10.3-9679",
+        "ghc-prim-0.12.0-d0f9",
+        "pretty-1.1.3.6-7ead"
       ],
-      "id": "template-haskell-2.22.0.0-b851",
+      "id": "template-haskell-2.22.0.0-5e01",
       "pkg-name": "template-haskell",
       "pkg-version": "2.22.0.0",
       "type": "pre-existing"
     },
     {
       "depends": [
-        "array-0.5.8.0-52e5",
-        "base-4.20.2.0-17a7",
-        "binary-0.8.9.3-bc9a",
-        "bytestring-0.12.2.0-efe2",
-        "deepseq-1.5.0.0-fb1c",
-        "ghc-prim-0.12.0-1026",
-        "template-haskell-2.22.0.0-b851"
+        "array-0.5.8.0-4471",
+        "base-4.20.2.0-127e",
+        "binary-0.8.9.3-28ff",
+        "bytestring-0.12.2.0-825f",
+        "deepseq-1.5.0.0-268d",
+        "ghc-prim-0.12.0-d0f9",
+        "template-haskell-2.22.0.0-5e01"
       ],
-      "id": "text-2.1.3-408f",
+      "id": "text-2.1.3-9f75",
       "pkg-name": "text",
       "pkg-version": "2.1.3",
       "type": "pre-existing"
     },
     {
       "depends": [
-        "base-4.20.2.0-17a7",
-        "deepseq-1.5.0.0-fb1c"
+        "base-4.20.2.0-127e",
+        "deepseq-1.5.0.0-268d"
       ],
-      "id": "time-1.12.2-f935",
+      "id": "time-1.12.2-c96f",
       "pkg-name": "time",
       "pkg-version": "1.12.2",
       "type": "pre-existing"
     },
     {
       "depends": [
-        "base-4.20.2.0-17a7"
+        "base-4.20.2.0-127e"
       ],
-      "id": "transformers-0.6.1.1-d0a2",
+      "id": "transformers-0.6.1.1-4229",
       "pkg-name": "transformers",
       "pkg-version": "0.6.1.1",
       "type": "pre-existing"
     },
     {
       "depends": [
-        "base-4.20.2.0-17a7",
-        "bytestring-0.12.2.0-efe2",
-        "filepath-1.5.4.0-d558",
-        "os-string-2.0.7-78d7",
-        "time-1.12.2-f935"
+        "base-4.20.2.0-127e",
+        "bytestring-0.12.2.0-825f",
+        "filepath-1.5.4.0-3bd9",
+        "os-string-2.0.7-ea02",
+        "time-1.12.2-c96f"
       ],
-      "id": "unix-2.8.7.0-b856",
+      "id": "unix-2.8.7.0-de61",
       "pkg-name": "unix",
       "pkg-version": "2.8.7.0",
       "type": "pre-existing"
@@ -951,22 +975,23 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7",
-        "deepseq-1.5.0.0-fb1c",
-        "hashable-1.5.1.0-2d5fa92ede5f3cbf172e7c1bc385ec56324436c24c54b1f5427cced823e62798",
-        "template-haskell-2.22.0.0-b851"
+        "base-4.20.2.0-127e",
+        "deepseq-1.5.0.0-268d",
+        "hashable-1.5.1.0-804dfeb1bd55ea4f8d18544d6420269b42b38e02f6c3a5df7432f1a86af20647",
+        "template-haskell-2.22.0.0-5e01"
       ],
       "exe-depends": [],
       "flags": {
         "debug": false
       },
-      "id": "unordered-containers-0.2.21-de14d6502d6610b3da465ec3c7b65467a132d9410b6d014fa79e4f2ed5eed79b",
+      "id": "unordered-containers-0.2.21-b92636c00e1122a9344c94e71ec3cae077c83e7083b3f4a151dacbdcab9d5708",
       "pkg-cabal-sha256": "c5de1fb3377ed3c5f4cd851a771d1acc5c37d2f6bef0a499295c0e8857da5605",
       "pkg-name": "unordered-containers",
+      "pkg-revision": 2,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
@@ -978,18 +1003,19 @@
     {
       "component-name": "lib",
       "depends": [
-        "base-4.20.2.0-17a7",
-        "bytestring-0.12.2.0-efe2"
+        "base-4.20.2.0-127e",
+        "bytestring-0.12.2.0-825f"
       ],
       "exe-depends": [],
       "flags": {},
-      "id": "utf8-string-1.0.2-9495a6e5177dde48f97fd29258c60c235f167f07cae65feb857609dd8598ca03",
+      "id": "utf8-string-1.0.2-2f06d1ff92d8991bab769df1a8ebd81f40e443571c4829a0ecfa30297d6402ef",
       "pkg-cabal-sha256": "79416292186feeaf1f60e49ac5a1ffae9bf1b120e040a74bf0e81ca7f1d31d3f",
       "pkg-name": "utf8-string",
+      "pkg-revision": 0,
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
-          "uri": "https://hackage.haskell.org/"
+          "uri": "http://hackage.haskell.org/"
         },
         "type": "repo-tar"
       },
