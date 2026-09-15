@@ -1,6 +1,0 @@
-section: compiler
-synopsis: Fix a bug where -fspec-eval-dictfun could speculatively evaluate a
-  looping dictionary whose recursion went through an hs-boot import, hanging
-  the program.
-mrs: !16519
-issues: #27717

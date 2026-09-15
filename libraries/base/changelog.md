@@ -5,13 +5,11 @@
   * Add `{-# WARNING in "x-partial" #-}` to `Data.List.{init,last}`.
     Use `{-# OPTIONS_GHC -Wno-x-partial #-}` to disable it.
     ([CLC proposal #87](https://github.com/haskell/core-libraries-committee/issues/292))
-  * Remove deprecated, unstable heap representation details from `GHC.Exts` ([CLC proposal #212](https://github.com/haskell/core-libraries-committee/issues/212))
   * Add `Data.List.NonEmpty.mapMaybe`. ([CLC proposal #337](https://github.com/haskell/core-libraries-committee/issues/337))
   * Fix issues with toRational for types capable to represent infinite and not-a-number values ([CLC proposal #338](https://github.com/haskell/core-libraries-committee/issues/338))
   * Ensure that `rationalToFloat` and `rationalToDouble` always inline in the end. ([CLC proposal #356](https://github.com/haskell/core-libraries-committee/issues/356))
   * Modify the implementation of `Data.List.sortOn` to use `(>)` instead of `compare`. ([CLC proposal #332](https://github.com/haskell/core-libraries-committee/issues/332))
   * Add `thenA` and `thenM`. ([CLC proposal #351](https://github.com/haskell/core-libraries-committee/issues/351))
-  * Fix bug where `naturalAndNot` was incorrectly truncating results ([CLC proposal #350](github.com/haskell/core-libraries-committee/issues/350))
   * generalize `deleteBy` and `deleteFirstsBy` ([CLC proposal 372](https://github.com/haskell/core-libraries-committee/issues/372))
   * GHC.Num.{BigNat, Integer, Natural} are no longer exposed. Users should import them from `ghc-bignum` instead. ([CLC proposal #359](github.com/haskell/core-libraries-committee/issues/359))
   * Remove extra laziness from `Data.Bifunctor.Bifunctor` instances for all tuples to have the same laziness as their `Data.Functor.Functor` counterparts (i.e. they became more strict than before) ([CLC proposal #339](https://github.com/haskell/core-libraries-committee/issues/339))
@@ -31,9 +29,13 @@
   * The implementation of `toException` in `SomeException`'s `Exception` instance no longer drops exception context, in keeping with the behavior originally proposed in [CLC Proposal #200](https://github.com/haskell/core-libraries-committee/issues/200).
   * Annotate `onException` continuation with `WhileHandling`. ([CLC Proposal #397](https://github.com/haskell/core-libraries-committee/issues/397))
   * Improve error message for `Data.Char.chr`. ([CLC Proposal #384](https://github.com/haskell/core-libraries-committee/issues/384))
+  * Remove `GHC.Desugar`, which was deprecated and should have been removed in GHC 9.14. ([CLC proposal #216](https://github.com/haskell/core-libraries-committee/issues/216))
+  * Add `@since` annotation to `System.Info.fullCompilerVersion`. ([GHC #26973](https://gitlab.haskell.org/ghc/ghc/-/issues/26973))
 
-## 4.22.0.0 *TBA*
+## 4.22.0.0 *December 2025*
   * Shipped with GHC 9.14.1
+  * Remove deprecated, unstable heap representation details from `GHC.Exts` ([CLC proposal #212](https://github.com/haskell/core-libraries-committee/issues/212))
+  * Fix bug where `naturalAndNot` was incorrectly truncating results ([CLC proposal #350](github.com/haskell/core-libraries-committee/issues/350))
   * The internal `GHC.Weak.Finalize.runFinalizerBatch` function has been deprecated ([CLC proposal #342](https://github.com/haskell/core-libraries-committee/issues/342))
   * Define `displayException` of `SomeAsyncException` to unwrap the exception.
       ([CLC proposal #309](https://github.com/haskell/core-libraries-committee/issues/309))

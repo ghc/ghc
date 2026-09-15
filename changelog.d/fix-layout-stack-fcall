@@ -1,4 +1,0 @@
-section: compiler
-synopsis: Fix invalid cmm basic block output when proc-point splitting is enabled (wasm/llvm/unregisterised)
-issues: #27447
-mrs: !16271

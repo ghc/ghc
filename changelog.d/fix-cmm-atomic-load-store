@@ -1,4 +1,0 @@
-section: cmm
-synopsis: Fix miscompiled %load_relaxed primop, add missing %store_relaxed
-issues: #27483
-mrs: !16320

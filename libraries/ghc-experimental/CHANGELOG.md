@@ -6,6 +6,8 @@
   These are supported by the LLVM backend and by the X86_64 NCG backend (for the latter, only for 128-wide vectors).
 - New abs/sqrt SIM primops for absolute value and square root, such as absInt32X4#, sqrtDoubleX4#, etc. These are
   supported by the LLVM backend and the X86_64 NCG backend (for the latter, only for 128-wide vectors).
+- Fix the `GHC.Exception.Backtrace.Experimental` module, which was never compiled or included in the library.
+- Expose `decodeStackWithIpe` from `GHC.Stack.Decode.Experimental`.
 
 ## ghc-experimental-9.1402.0
 

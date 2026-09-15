@@ -1,8 +1,0 @@
-section: rts
-synopsis: Rethrow exceptions in overlapped IO when using the WinIO IO manager.
-issues: #27283
-mrs: !15887
-
-description: {
-  This change was made to support WinIO in the network library; see https://github.com/haskell/network/issues/602.
-}
