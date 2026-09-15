@@ -807,6 +807,9 @@ doTailCall init_d s p fn args = do
     (final_d, more_push_code) <- push_seq (d + sz) args
     return (final_d, push_code `appOL` more_push_code)
 
+-- | Compile a primop in tail position: compute it inline, then slide the
+-- result down to the sequel and return it.
+-- 'Nothing' if the interpreter has no inline implementation of the primop.
 doPrimOp  :: Platform
           -> PrimOp
           -> StackDepth
@@ -814,7 +817,47 @@ doPrimOp  :: Platform
           -> BCEnv
           -> [StgArg]
           -> Maybe (BcM BCInstrList)
-doPrimOp platform op init_d s p args =
+doPrimOp platform op init_d s p args = do
+  compute <- doPrimOpCode platform op init_d p args
+  Just $ do
+    (prim_code, width) <- compute
+    let slide = mkSlideW (primOpResultWords platform width)
+                         (bytesToWords platform $ init_d - s)
+                `snocOL` primOpReturn width
+    return $ prim_code `appOL` slide
+
+-- | The 'Width' that fixes the size of the result slot ('primOpResultWords')
+-- and the return convention ('primOpReturn') of an inline primop.
+--
+-- For sized arithmetic and comparison operations this is the width of the
+-- first argument; for the @IndexOffAddrOp_*@ operations it is the width of
+-- the result. It is not the width of the result value in general (e.g.
+-- comparisons produce an @Int#@ whatever their argument width), so do not use
+-- it as such.
+newtype PrimOpRetWidth = PrimOpRetWidth Width
+
+-- | Size in words of the result an inline primop leaves on the stack.
+primOpResultWords :: Platform -> PrimOpRetWidth -> WordOff
+primOpResultWords platform (PrimOpRetWidth width)
+  | platformWordWidth platform < width = 2
+  | otherwise = 1
+
+-- | The RETURN instruction for the result of an inline primop.
+primOpReturn :: PrimOpRetWidth -> BCInstr
+primOpReturn (PrimOpRetWidth width)
+  | W64 <- width = RETURN L -- L works for 64 bit on any platform
+  | otherwise = RETURN N -- <64bit width, fits in word on all platforms
+
+-- | Compile a primop so that its result is left on top of the stack, without
+-- returning. Also returns the 'PrimOpRetWidth' of the operation.
+-- 'Nothing' if the interpreter has no inline implementation of the primop.
+doPrimOpCode :: Platform
+             -> PrimOp
+             -> StackDepth
+             -> BCEnv
+             -> [StgArg]
+             -> Maybe (BcM (BCInstrList, PrimOpRetWidth))
+doPrimOpCode platform op init_d p args =
   case op of
     IntAddOp -> sizedPrimOp OP_ADD
     Int64AddOp -> only64bit $ sizedPrimOp OP_ADD
@@ -1041,50 +1084,38 @@ doPrimOp platform op init_d s p args =
         BoxedRep{} -> unexpectedRep
         VecRep{} -> unexpectedRep
       where
-        unexpectedRep = panic "doPrimOp: Unexpected argument rep"
+        unexpectedRep = panic "doPrimOpCode: Unexpected argument rep"
 
-
-    -- TODO: The slides for the result need to be two words on 32bit for 64bit ops.
-    mkNReturn width
-      | W64 <- width = RETURN L -- L works for 64 bit on any platform
-      | otherwise = RETURN N -- <64bit width, fits in word on all platforms
-
-    mkSlideWords width = if platformWordWidth platform < width then 2 else 1
-
-    -- Push args, execute primop, slide, return_N
+    -- Push args, execute primop
     -- Decides width of operation based on first argument.
     sizedPrimOp op_inst = Just $ do
       let width = primArg1Width (head args)
-      prim_code <- mkPrimOpCode init_d s p (op_inst width) $ args
-      let slide = mkSlideW (mkSlideWords width) (bytesToWords platform $ init_d - s) `snocOL` mkNReturn width
-      return $ prim_code `appOL` slide
+      prim_code <- mkPrimOpCode init_d p (op_inst width) $ args
+      return (prim_code, PrimOpRetWidth width)
 
     -- primOpWithRep op w => operation @op@ resulting in result @w@ wide.
-    primOpWithRep :: BCInstr -> Width -> Maybe (BcM (OrdList BCInstr))
+    primOpWithRep :: BCInstr -> Width -> Maybe (BcM (BCInstrList, PrimOpRetWidth))
     primOpWithRep op_inst result_width = Just $ do
-      prim_code <- mkPrimOpCode init_d s p op_inst $ args
-      let slide = mkSlideW (mkSlideWords result_width) (bytesToWords platform $ init_d - s) `snocOL` mkNReturn result_width
-      return $ prim_code `appOL` slide
+      prim_code <- mkPrimOpCode init_d p op_inst $ args
+      return (prim_code, PrimOpRetWidth result_width)
 
     -- Coerce the argument, requires them to be the same size
-    mk_conv :: Width -> Maybe (BcM (OrdList BCInstr))
+    mk_conv :: Width -> Maybe (BcM (BCInstrList, PrimOpRetWidth))
     mk_conv target_width = Just $ do
       let width = primArg1Width (head args)
       massert (width == target_width)
       (push_code, _bytes) <- pushAtom init_d p (head args)
-      let slide = mkSlideW (mkSlideWords target_width) (bytesToWords platform $ init_d - s) `snocOL` mkNReturn target_width
-      return $ push_code `appOL` slide
+      return (push_code, PrimOpRetWidth target_width)
 
 -- Push the arguments on the stack and emit the given instruction
 -- Pushes at least one word per non void arg.
 mkPrimOpCode
     :: StackDepth
-    -> Sequel
     -> BCEnv
     -> BCInstr                  -- The operator
     -> [StgArg]                 -- Args, in *reverse* order (must be fully applied)
     -> BcM BCInstrList
-mkPrimOpCode orig_d _ p op_inst args = app_code
+mkPrimOpCode orig_d p op_inst args = app_code
   where
     app_code = do
         profile <- getProfile
