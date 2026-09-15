@@ -387,13 +387,13 @@ void pollCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
         int res = ppoll(poll_table, nfds, &tv, NULL);
 
         debugTrace(DEBUG_iomanager,
-                   "ppoll(nfds = %lu, timeout.sec = 0, timeout.nsec = 0) = %d",
+                   "ppoll(nfds = %lu, timeout = 0) = %d",
                    (unsigned long) nfds, res);
 #else
         int res = poll(poll_table, nfds, 0);
 
         debugTrace(DEBUG_iomanager,
-                   "poll(nfds = %lu, timeout_ms = 0) = %d",
+                   "poll(nfds = %lu, timeout = 0) = %d",
                    (unsigned long) nfds, res);
 #endif
         if (res == 0) {
@@ -461,29 +461,22 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
         /* Decide if we are going to wait if no I/O is ready, either:
          * poll only, wait indefinitely, or wait until a timeout.
          */
-#if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
-        struct timespec ts, *timeout_ns;
-        timeout_ns = timeoutInNanoseconds(iomgr, wait, now, &ts);
-#else
-        int timeout_ms = timeoutInMilliseconds(iomgr, wait, now);
-#endif
+        Time timeout = timeoutWaitTime(iomgr, wait, now);
 
         /* Check for I/O readiness, possibly waiting. */
 #if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
+        struct timespec ts, *timeout_ns = timeoutAsTimespec(timeout, &ts);
         int res = ppoll(poll_table, nfds, timeout_ns, NULL);
 
         debugTrace(DEBUG_iomanager,
-                   "ppoll(nfds = %lu, timeout.sec = %lld, timeout.nsec = %lld)"
-                   " = %d",
-                   (unsigned long) nfds,
-                   (long long) (timeout_ns == NULL ? -1 : timeout_ns->tv_sec),
-                   (long long) (timeout_ns == NULL ?  0 : timeout_ns->tv_nsec),
-                   res);
+                   "ppoll(nfds = %lu, timeout = %" FMT_Int64 " ns) = %d",
+                   nfds, timeout, res);
 #else
+        int timeout_ms = timeoutAsPollTimeout(timeout);
         int res = poll(poll_table, nfds, timeout_ms);
 
         debugTrace(DEBUG_iomanager,
-                   "poll(nfds = %lu, timeout_ms = %d) = %d",
+                   "poll(nfds = %lu, timeout = %d ms) = %d",
                    nfds, timeout_ms, res);
 #endif
 
@@ -493,11 +486,7 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
              * occurred before any I/O became ready. Either way, the do-while
              * loop condition will handle it.
              */
-#if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
-            ASSERT(timeout_ns != NULL);
-#else
-            ASSERT(timeout_ms != -1);
-#endif
+            ASSERT(timeout != -1);
 
         } else if (res > 0) {
             int ncompletions = res;
