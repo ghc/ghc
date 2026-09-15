@@ -91,14 +91,14 @@
   ],
   "dependencies": [
     {
-      "cabal_sha256": "0b239653389dbc5f33129d92ef31e44172c53e6ada373d636d89f09d23cc6009",
+      "cabal_sha256": "9456ccdbeeb1818983f0d25f25999adb5fca07d149474d2f82de956b2eb03a7e",
       "component": "lib:unix",
       "flags": [
         "-non-portable-tests",
         "+os-string"
       ],
       "package": "unix",
-      "revision": 0,
+      "revision": 1,
       "source": "hackage",
       "src_sha256": "a128dea3bfeb731a562f22d376fa606e902154d95321363f7ec1ea6b787a5a3e",
       "version": "2.8.8.0"
@@ -139,11 +139,11 @@
       "version": "3.5.4.0"
     },
     {
-      "cabal_sha256": "4c3f63157628d3dc359c2af16ffe683b84a54857694c9d59d5fb7232f4679957",
+      "cabal_sha256": "17cf54d07d7aa65ea24ba4045912b8a8af065f10e429fd1811d43810b313c504",
       "component": "lib:Cabal-syntax",
       "flags": [],
       "package": "Cabal-syntax",
-      "revision": 0,
+      "revision": 2,
       "source": "hackage",
       "src_sha256": "6bd561449b4d96aca4896e17a34cb504d1b0fd83b338380d131b16b50b36bda7",
       "version": "3.16.1.0"
@@ -161,13 +161,13 @@
       "version": "1.6.27.0"
     },
     {
-      "cabal_sha256": "6d7ee02dc18c7485d597d131356cee25b3b95778746f39b73bca1d2d44b12e11",
+      "cabal_sha256": "39873317ab895194547c3fd72c91cdb97c800a49b2656920854747ee466627ca",
       "component": "lib:Cabal",
       "flags": [
         "-git-rev"
       ],
       "package": "Cabal",
-      "revision": 0,
+      "revision": 1,
       "source": "hackage",
       "src_sha256": "c6b8a37d21dc67c1c68d36a6258ea529391d4bb8bcc1caebaa9b483d93ef2556",
       "version": "3.16.1.0"

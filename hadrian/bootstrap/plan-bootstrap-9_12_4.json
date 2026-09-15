@@ -2,11 +2,11 @@
   "builtin": [
     {
       "package": "rts",
-      "version": "1.0.2"
+      "version": "1.0.3"
     },
     {
       "package": "ghc-prim",
-      "version": "0.12.0"
+      "version": "0.13.0"
     },
     {
       "package": "ghc-bignum",
@@ -14,11 +14,11 @@
     },
     {
       "package": "ghc-internal",
-      "version": "9.1002.0"
+      "version": "9.1204.0"
     },
     {
       "package": "base",
-      "version": "4.20.1.0"
+      "version": "4.21.2.0"
     },
     {
       "package": "array",
@@ -26,35 +26,39 @@
     },
     {
       "package": "deepseq",
-      "version": "1.5.0.0"
-    },
-    {
-      "package": "ghc-boot-th",
-      "version": "9.10.2"
+      "version": "1.5.1.0"
     },
     {
       "package": "pretty",
       "version": "1.1.3.6"
     },
     {
-      "package": "template-haskell",
-      "version": "2.22.0.0"
+      "package": "ghc-boot-th",
+      "version": "9.12.4"
     },
     {
-      "package": "containers",
-      "version": "0.7"
+      "package": "template-haskell",
+      "version": "2.23.0.0"
     },
     {
       "package": "bytestring",
       "version": "0.12.2.0"
     },
     {
+      "package": "containers",
+      "version": "0.7"
+    },
+    {
+      "package": "binary",
+      "version": "0.8.9.3"
+    },
+    {
       "package": "transformers",
-      "version": "0.6.1.1"
+      "version": "0.6.3.0"
     },
     {
       "package": "mtl",
-      "version": "2.3.1"
+      "version": "2.3.2"
     },
     {
       "package": "stm",
@@ -62,107 +66,54 @@
     },
     {
       "package": "exceptions",
-      "version": "0.10.9"
+      "version": "0.10.12"
     },
     {
       "package": "os-string",
-      "version": "2.0.4"
+      "version": "2.0.10"
     },
     {
       "package": "filepath",
-      "version": "1.5.4.0"
+      "version": "1.5.5.0"
     },
     {
       "package": "time",
-      "version": "1.12.2"
+      "version": "1.14"
     },
     {
       "package": "unix",
-      "version": "2.8.6.0"
+      "version": "2.8.8.0"
     },
     {
-      "package": "binary",
-      "version": "0.8.9.3"
+      "package": "file-io",
+      "version": "0.1.6"
+    },
+    {
+      "package": "directory",
+      "version": "1.3.10.1"
     },
     {
       "package": "text",
-      "version": "2.1.2"
+      "version": "2.1.4"
     },
     {
       "package": "parsec",
       "version": "3.1.18.0"
+    },
+    {
+      "package": "Cabal-syntax",
+      "version": "3.14.2.0"
+    },
+    {
+      "package": "process",
+      "version": "1.6.26.1"
+    },
+    {
+      "package": "Cabal",
+      "version": "3.14.2.0"
     }
   ],
   "dependencies": [
-    {
-      "cabal_sha256": "5e3466f15993e499db47d79d09c519d6d37c143cfe94fb46dd218bf2f6f3fd39",
-      "component": "lib:file-io",
-      "flags": [
-        "+long-paths",
-        "+os-string"
-      ],
-      "package": "file-io",
-      "revision": 0,
-      "source": "hackage",
-      "src_sha256": "0ae9986dc1df9a87d17a16c6c0afb2bfc72dcd2a2ec7a40faf1257bf1fa4d710",
-      "version": "0.1.6"
-    },
-    {
-      "cabal_sha256": "bf029d8163ccae567cc6a5aa8f654016f58dfc066d15f8a8f7c74b8ca855562c",
-      "component": "lib:directory",
-      "flags": [
-        "+os-string"
-      ],
-      "package": "directory",
-      "revision": 0,
-      "source": "hackage",
-      "src_sha256": "d8f718851aa25a357ca4a6d0204eb357a69383b9b69528d18e2bca463e94c259",
-      "version": "1.3.10.1"
-    },
-    {
-      "cabal_sha256": "38b3481bb0d5eb58c9dd6579e7904859372c3c0c82a8db86e58177649c289621",
-      "component": "exe:alex",
-      "flags": [],
-      "package": "alex",
-      "revision": 0,
-      "source": "hackage",
-      "src_sha256": "a9ea70f2c4900e685312cf330d1fe955a3e8f00acd1328d463ae150481d28ade",
-      "version": "3.5.4.0"
-    },
-    {
-      "cabal_sha256": "17cf54d07d7aa65ea24ba4045912b8a8af065f10e429fd1811d43810b313c504",
-      "component": "lib:Cabal-syntax",
-      "flags": [],
-      "package": "Cabal-syntax",
-      "revision": 2,
-      "source": "hackage",
-      "src_sha256": "6bd561449b4d96aca4896e17a34cb504d1b0fd83b338380d131b16b50b36bda7",
-      "version": "3.16.1.0"
-    },
-    {
-      "cabal_sha256": "0512ed17e7e312a6412859abcb37a7bcc81b94cbb797a1ba2a8c78a5d3055d32",
-      "component": "lib:process",
-      "flags": [
-        "+os-string"
-      ],
-      "package": "process",
-      "revision": 0,
-      "source": "hackage",
-      "src_sha256": "ee9ef426d33560f3d06b237fbb8156c530c6b265cca8ef0c63abadb12769b693",
-      "version": "1.6.27.0"
-    },
-    {
-      "cabal_sha256": "39873317ab895194547c3fd72c91cdb97c800a49b2656920854747ee466627ca",
-      "component": "lib:Cabal",
-      "flags": [
-        "-git-rev"
-      ],
-      "package": "Cabal",
-      "revision": 1,
-      "source": "hackage",
-      "src_sha256": "c6b8a37d21dc67c1c68d36a6258ea529391d4bb8bcc1caebaa9b483d93ef2556",
-      "version": "3.16.1.0"
-    },
     {
       "cabal_sha256": "a694e88f9ec9fc79f0b03f233d3fea592b68f70a34aac2ddb5bcaecb6562e2fd",
       "component": "lib:base16-bytestring",
